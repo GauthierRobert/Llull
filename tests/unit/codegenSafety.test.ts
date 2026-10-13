@@ -54,8 +54,7 @@ describe.each(['cadquery', 'build123d', 'openscad', 'freecad'])(
     const text = exported(hostileDocument(), language);
 
     it('keeps the payload off every executable line start', () => {
-      for (const line of text.split('\n'))
-        expect(line.trimStart().startsWith('__import__')).toBe(false);
+      for (const line of text.split('\n')) expect(line.trimStart().startsWith('__import__')).toBe(false);
     });
 
     it('emits a numeric segment count only', () => {

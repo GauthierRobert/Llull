@@ -37,20 +37,14 @@ describe('triangulatePolygon', () => {
   it('never bridges through a hole when bridge candidates tie', () => {
     const result = triangulatePolygon(rect(0, 0, 6000, 4000), [rect(1000, 1000, 2000, 2000)]);
     expect(result.complete).toBe(true);
-    expect(triangulatedArea(rect(0, 0, 6000, 4000), [rect(1000, 1000, 2000, 2000)])).toBeCloseTo(
-      23e6,
-    );
+    expect(triangulatedArea(rect(0, 0, 6000, 4000), [rect(1000, 1000, 2000, 2000)])).toBeCloseTo(23e6);
   });
 
   it('subtracts one or several holes', () => {
     expect(triangulatedArea(rect(0, 0, 10, 8), [rect(2, 2, 4, 5)])).toBeCloseTo(80 - 6);
-    expect(
-      triangulatedArea(rect(0, 0, 10, 8), [
-        rect(1, 1, 3, 3),
-        rect(6, 4, 9, 7).reverse(),
-        rect(4, 1, 5, 6),
-      ]),
-    ).toBeCloseTo(80 - 4 - 9 - 5);
+    expect(triangulatedArea(rect(0, 0, 10, 8), [rect(1, 1, 3, 3), rect(6, 4, 9, 7).reverse(), rect(4, 1, 5, 6)])).toBeCloseTo(
+      80 - 4 - 9 - 5,
+    );
     const lShape: Point2[] = [
       [0, 0],
       [10, 0],
@@ -59,9 +53,7 @@ describe('triangulatePolygon', () => {
       [4, 10],
       [0, 10],
     ];
-    expect(triangulatedArea(lShape, [rect(1, 6, 3, 8), rect(6, 1, 8, 3)])).toBeCloseTo(
-      polygonArea(lShape) - 8,
-    );
+    expect(triangulatedArea(lShape, [rect(1, 6, 3, 8), rect(6, 1, 8, 3)])).toBeCloseTo(polygonArea(lShape) - 8);
   });
 
   it('returns all input vertices and no triangles for degenerate input', () => {
@@ -89,12 +81,7 @@ describe('triangulatePolygon — randomized', () => {
       for (let attempt = 0; attempt < 10 && holes.length < 1 + (trial % 3); attempt++) {
         const x0 = 250 + Math.round(random() * ((width - 2000) / 250)) * 250;
         const y0 = 250 + Math.round(random() * ((depth - 2000) / 250)) * 250;
-        const candidate = rect(
-          x0,
-          y0,
-          x0 + 500 + Math.round(random() * 4) * 250,
-          y0 + 500 + Math.round(random() * 4) * 250,
-        );
+        const candidate = rect(x0, y0, x0 + 500 + Math.round(random() * 4) * 250, y0 + 500 + Math.round(random() * 4) * 250);
         const [cx1, cy1] = candidate[2]!;
         const clear = holes.every((hole) => {
           const [hx0, hy0] = hole[0]!;

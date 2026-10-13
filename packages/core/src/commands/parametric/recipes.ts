@@ -6,11 +6,7 @@ import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { changed, noop, report } from '../noop';
 import { MAX_PROJECT_DEPTH, MAX_PROJECT_STEPS } from '../limits';
-import {
-  resolveStepForReplay,
-  runReplayStep,
-  unresolvedExpressionsNote,
-} from '../history/replayStep';
+import { resolveStepForReplay, runReplayStep, unresolvedExpressionsNote } from '../history/replayStep';
 
 /**
  * Replay `steps` ADDITIVELY on top of `base`, remapping ids within the recipe to the fresh ones the
@@ -75,17 +71,11 @@ export const saveRecipe = defineCommand({
           'Must be a non-empty, non-whitespace-only string. ' +
           'Used as both the display name and the key for instantiate_recipe.',
       ),
-    label: z
-      .string()
-      .optional()
-      .describe(
-        'Optional human/AI note describing the recipe\'s purpose, e.g. "L-bracket with 3 holes".',
-      ),
+    label: z.string().optional().describe('Optional human/AI note describing the recipe\'s purpose, e.g. "L-bracket with 3 holes".'),
   }),
   annotations: { metaHistory: true, idempotent: true },
   run: (doc, { name, label }): CommandResult => {
-    if (name.trim() === '')
-      return noop(doc, 'save_recipe failed: name must be a non-empty, non-whitespace-only string.');
+    if (name.trim() === '') return noop(doc, 'save_recipe failed: name must be a non-empty, non-whitespace-only string.');
 
     const steps: FeatureStep[] = doc.featureHistory.map((s) => ({ ...s }));
 
@@ -99,10 +89,7 @@ export const saveRecipe = defineCommand({
 
     const stepCount = steps.length;
     const emptySuffix = stepCount === 0 ? ' (empty recipe — no steps in featureHistory)' : '';
-    return report(
-      newDoc,
-      `save_recipe '${name}': saved ${stepCount} step${stepCount === 1 ? '' : 's'}${emptySuffix}.`,
-    );
+    return report(newDoc, `save_recipe '${name}': saved ${stepCount} step${stepCount === 1 ? '' : 's'}${emptySuffix}.`);
   },
 });
 
@@ -134,31 +121,21 @@ export const instantiateRecipe = defineCommand({
   run: (doc, params, ctx): CommandResult => {
     const context = ctx ?? currentContext();
     if (context.recipeDepth >= MAX_PROJECT_DEPTH) {
-      return noop(
-        doc,
-        `instantiate_recipe failed: nesting depth exceeds MAX_PROJECT_DEPTH (${MAX_PROJECT_DEPTH}).`,
-      );
+      return noop(doc, `instantiate_recipe failed: nesting depth exceeds MAX_PROJECT_DEPTH (${MAX_PROJECT_DEPTH}).`);
     }
     const nested = { ...context, recipeDepth: context.recipeDepth + 1 };
     return runInContext(nested, () => instantiateRecipeOnce(doc, params.name, nested));
   },
 });
 
-function instantiateRecipeOnce(
-  doc: CadDocument,
-  name: string,
-  ctx: ExecutionContext,
-): CommandResult {
-  if (name.trim() === '')
-    return noop(doc, 'instantiate_recipe failed: name must be a non-empty string.');
+function instantiateRecipeOnce(doc: CadDocument, name: string, ctx: ExecutionContext): CommandResult {
+  if (name.trim() === '') return noop(doc, 'instantiate_recipe failed: name must be a non-empty string.');
 
   const recipe = doc.recipes[name];
   if (!recipe) {
     const available = Object.keys(doc.recipes);
     const hint =
-      available.length > 0
-        ? ` Available recipes: ${available.join(', ')}.`
-        : ' No recipes have been saved yet (call save_recipe first).';
+      available.length > 0 ? ` Available recipes: ${available.join(', ')}.` : ' No recipes have been saved yet (call save_recipe first).';
     return noop(doc, `instantiate_recipe failed: recipe '${name}' not found.${hint}`);
   }
 

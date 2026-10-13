@@ -16,11 +16,7 @@ function rewritten(name: string, params: Record<string, unknown>): Call {
 }
 
 /** Run the rewritten call against `doc`. */
-function runRewritten(
-  doc: CadDocument,
-  name: string,
-  params: Record<string, unknown>,
-): ReturnType<typeof execute> {
+function runRewritten(doc: CadDocument, name: string, params: Record<string, unknown>): ReturnType<typeof execute> {
   const call = rewritten(name, params);
   return execute(doc, call.name, call.params);
 }
@@ -137,13 +133,8 @@ describe('retired path and arc distribution', () => {
       count: 4,
     });
     expect(entityAt(full, 2).position[0]).toBeCloseTo(-10, 3);
-    expect(
-      runRewritten(doc, 'distribute_on_arc', { sourceId: id, ...arc, radius: 0, count: 3 })
-        .affected,
-    ).toEqual([]);
-    expect(rewritten('distribute_on_arc', { sourceId: id, count: 1 }).params).not.toHaveProperty(
-      'startOffset',
-    );
+    expect(runRewritten(doc, 'distribute_on_arc', { sourceId: id, ...arc, radius: 0, count: 3 }).affected).toEqual([]);
+    expect(rewritten('distribute_on_arc', { sourceId: id, count: 1 }).params).not.toHaveProperty('startOffset');
   });
 
   it('distribute_along_path becomes component instances along the path entity', () => {
@@ -180,19 +171,13 @@ describe('retired path and arc distribution', () => {
     const result = runRewritten(path.document, 'distribute_along_path', params);
     const instances = result.affected.map((k) => result.document.entities[k] as Entity);
     expect(instances.every((e) => e.kind === 'instance')).toBe(true);
-    expect(instances.map((e) => e.position[0])).toEqual([
-      expect.closeTo(2, 5),
-      expect.closeTo(10, 5),
-      expect.closeTo(18, 5),
-    ]);
+    expect(instances.map((e) => e.position[0])).toEqual([expect.closeTo(2, 5), expect.closeTo(10, 5), expect.closeTo(18, 5)]);
   });
 });
 
 describe('retired make_tube_between', () => {
   it('becomes an add_cylinder centred on the midpoint with its axis along p2 - p1', () => {
-    expect(
-      rewritten('make_tube_between', { p1: [0, 0, 0], p2: [0, 0, 10], radius: 2, color: '#fff' }),
-    ).toEqual({
+    expect(rewritten('make_tube_between', { p1: [0, 0, 0], p2: [0, 0, 10], radius: 2, color: '#fff' })).toEqual({
       name: 'add_cylinder',
       params: { radius: 2, height: 10, position: [0, 0, 5], axis: [0, 0, 10], color: '#fff' },
     });

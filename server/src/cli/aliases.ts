@@ -31,9 +31,7 @@ export function planAliases(actions: unknown, data: unknown): PlanAliases | null
   const scene = data['scene'];
   const steps = data['steps'];
   if (!isRecord(scene) || !Array.isArray(scene['entities']) || !Array.isArray(steps)) return null;
-  const present = new Set(
-    scene['entities'].map((entity) => (isRecord(entity) ? String(entity['id']) : '')),
-  );
+  const present = new Set(scene['entities'].map((entity) => (isRecord(entity) ? String(entity['id']) : '')));
   const aliases: Record<string, string[]> = {};
   const consumed: string[] = [];
   actions.forEach((action, index) => {

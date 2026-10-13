@@ -23,14 +23,7 @@ interface ToolKeys {
   onOtherKey?: (event: KeyboardEvent) => void;
 }
 
-export function useToolKeys({
-  armed,
-  inProgress,
-  onCancel,
-  onDisarm,
-  onEnter,
-  onOtherKey,
-}: ToolKeys): void {
+export function useToolKeys({ armed, inProgress, onCancel, onDisarm, onEnter, onOtherKey }: ToolKeys): void {
   const onKey = useCallback(
     (e: KeyboardEvent): void => {
       if (isEditingKeyEvent(e)) return;

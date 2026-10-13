@@ -20,8 +20,7 @@ import {
 } from './elementToolForm';
 import { ALL_PROFILES, BASE_OPTIONS, JOINT_OPTIONS } from './steelProfileOptions';
 
-const profile = (defaultValue: string): ToolField =>
-  select('profile', 'Profile', defaultValue, ALL_PROFILES);
+const profile = (defaultValue: string): ToolField => select('profile', 'Profile', defaultValue, ALL_PROFILES);
 
 const gradeField = (): ToolField => txt('material', 'Steel grade (blank = default)', '', true);
 

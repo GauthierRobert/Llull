@@ -520,18 +520,9 @@ export interface Component {
  * A point on an entity: its `position` when `kind` is absent, else a named sub-point of a
  * line, arc, or circle ('center' of a line is its midpoint).
  */
-export type EntityRef =
-  | { readonly entityId: string }
-  | { readonly entityId: string; readonly kind: 'start' | 'end' | 'center' | 'mid' };
+export type EntityRef = { readonly entityId: string } | { readonly entityId: string; readonly kind: 'start' | 'end' | 'center' | 'mid' };
 
-export const CONSTRAINT_KINDS = [
-  'coincident',
-  'parallel',
-  'perpendicular',
-  'tangent',
-  'distance',
-  'angle',
-] as const;
+export const CONSTRAINT_KINDS = ['coincident', 'parallel', 'perpendicular', 'tangent', 'distance', 'angle'] as const;
 
 type ConstraintKind = (typeof CONSTRAINT_KINDS)[number];
 
@@ -577,9 +568,7 @@ interface JointBase<K extends string> {
  * prismatic slides by `displacement` (document units) along it.
  * @see add_joint, set_joint_value, evaluate_motion, bake_motion
  */
-export type Joint =
-  | (JointBase<'revolute'> & { angle: number })
-  | (JointBase<'prismatic'> & { displacement: number });
+export type Joint = (JointBase<'revolute'> & { angle: number }) | (JointBase<'prismatic'> & { displacement: number });
 
 export type JointKind = Joint['kind'];
 
@@ -660,13 +649,7 @@ export interface Material {
   finish?: MaterialFinish;
 }
 
-export const FINISH_PATTERNS = [
-  'carbon_twill',
-  'carbon_plain',
-  'brushed',
-  'knurl',
-  'checker',
-] as const;
+export const FINISH_PATTERNS = ['carbon_twill', 'carbon_plain', 'brushed', 'knurl', 'checker'] as const;
 
 export type FinishPattern = (typeof FINISH_PATTERNS)[number];
 

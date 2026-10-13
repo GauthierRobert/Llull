@@ -39,8 +39,7 @@ export const clearDocument = defineCommand({
     const layerCount = Object.keys(doc.layers).length;
 
     const fresh = createEmptyDocument();
-    const isLayersDefault =
-      layerCount === 1 && doc.layerOrder.length === 1 && doc.layerOrder[0] === fresh.layerOrder[0];
+    const isLayersDefault = layerCount === 1 && doc.layerOrder.length === 1 && doc.layerOrder[0] === fresh.layerOrder[0];
     const isAlreadyEmpty =
       [
         doc.entities,
@@ -73,9 +72,7 @@ export const clearDocument = defineCommand({
     delete nextDoc.building;
     delete nextDoc.civil;
 
-    const layerPart = keepLayers
-      ? `kept ${layerCount} layer${layerCount === 1 ? '' : 's'}`
-      : `reset to default layer`;
+    const layerPart = keepLayers ? `kept ${layerCount} layer${layerCount === 1 ? '' : 's'}` : `reset to default layer`;
 
     return report(
       nextDoc,

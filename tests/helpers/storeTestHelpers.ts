@@ -40,11 +40,7 @@ export function localDispatch(name: string, params: unknown): CommandResult {
 export const TEST_EPOCH = 'test-epoch';
 
 /** Wrap a document as a live snapshot event (live-sync protocol). USE IN TESTS ONLY. */
-export function liveSnapshot(
-  document: CadDocument,
-  seq = 0,
-  epoch = TEST_EPOCH,
-): LiveSnapshotEvent {
+export function liveSnapshot(document: CadDocument, seq = 0, epoch = TEST_EPOCH): LiveSnapshotEvent {
   return { epoch, seq, stateHash: documentHash(document), document };
 }
 
@@ -54,10 +50,7 @@ export async function flushPromises(): Promise<void> {
 }
 
 /** Dispatches `add_box` and checks the undo/redo flags the (mocked) server response set. */
-export async function expectUndoRedoFlagsAfterDispatch(
-  canUndo: boolean,
-  canRedo: boolean,
-): Promise<void> {
+export async function expectUndoRedoFlagsAfterDispatch(canUndo: boolean, canRedo: boolean): Promise<void> {
   useStore.getState().dispatch('add_box', { size: [1, 1, 1] });
   await flushPromises();
   expect(useStore.getState().canUndo).toBe(canUndo);
@@ -83,9 +76,6 @@ export function resetOfflineStore(): void {
 
 /** Replaces `dispatch` with a spy that answers every call's `onResult` with `result`. */
 export function answerDispatch(result: { summary: string; changed: boolean }): void {
-  const answer = (_n: string, _p: unknown, options?: { onResult?: (r: unknown) => void }): void =>
-    options?.onResult?.(result);
-  useStore.setState({ dispatch: vi.fn(answer) } as unknown as Parameters<
-    typeof useStore.setState
-  >[0]);
+  const answer = (_n: string, _p: unknown, options?: { onResult?: (r: unknown) => void }): void => options?.onResult?.(result);
+  useStore.setState({ dispatch: vi.fn(answer) } as unknown as Parameters<typeof useStore.setState>[0]);
 }

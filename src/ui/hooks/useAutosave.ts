@@ -15,13 +15,7 @@ import { useEffect } from 'react';
 import { serializeDocument } from '@core/commands/persistence/serialization';
 import { useStore } from '@ui/store';
 import { useSessionStore } from '@ui/store/sessionStore';
-import {
-  type KeyValueStorage,
-  browserStorage,
-  clearAutosave,
-  readAutosave,
-  writeAutosave,
-} from '@ui/store/autosave';
+import { type KeyValueStorage, browserStorage, clearAutosave, readAutosave, writeAutosave } from '@ui/store/autosave';
 
 export const AUTOSAVE_DELAY_MS = 1500;
 
@@ -35,8 +29,7 @@ export function useAutosave(storage: KeyValueStorage | null = browserStorage()):
       if (timer !== null) clearTimeout(timer);
       timer = null;
       const state = useStore.getState();
-      if (storage === null || !restoreDecided || !pending || state.liveStatus === 'connected')
-        return;
+      if (storage === null || !restoreDecided || !pending || state.liveStatus === 'connected') return;
       pending = false;
       if (state.document.order.length === 0) clearAutosave(storage);
       else {

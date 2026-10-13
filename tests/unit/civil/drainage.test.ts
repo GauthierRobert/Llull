@@ -2,18 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
-import {
-  manningFullFlow,
-  partialFlowDischarge,
-  rationalFlowLps,
-  solvePartialFlow,
-} from '@aec/civil/drainage/hydraulics';
+import { manningFullFlow, partialFlowDischarge, rationalFlowLps, solvePartialFlow } from '@aec/civil/drainage/hydraulics';
 
-function run(
-  doc: CadDocument,
-  name: string,
-  params: Record<string, unknown> = {},
-): ReturnType<typeof execute> {
+function run(doc: CadDocument, name: string, params: Record<string, unknown> = {}): ReturnType<typeof execute> {
   return execute(doc, name, params);
 }
 
@@ -58,10 +49,7 @@ describe('hydraulics', () => {
     for (const fraction of [0.05, 0.2, 0.5, 0.8, 1]) {
       const flow = solvePartialFlow(0.3, 0.01, 0.013, full * fraction);
       expect(flow.depthRatio).toBeGreaterThan(previous);
-      expect(partialFlowDischarge(0.3, 0.01, 0.013, flow.depthRatio)).toBeCloseTo(
-        full * fraction,
-        6,
-      );
+      expect(partialFlowDischarge(0.3, 0.01, 0.013, flow.depthRatio)).toBeCloseTo(full * fraction, 6);
       previous = flow.depthRatio;
     }
     expect(solvePartialFlow(0.3, 0.01, 0.013, full * 0.5).depthRatio).toBeCloseTo(0.5, 1);
@@ -90,10 +78,7 @@ describe('drainage commands', () => {
   it('takes the rim from a surface and refuses bad manholes', () => {
     let doc = run(createEmptyDocument(), 'set_units', { units: 'm' }).document;
     expect(run(doc, 'add_manhole', { location: [0, 0], invertElevation: 1 }).affected).toEqual([]);
-    expect(
-      run(doc, 'add_manhole', { location: [0, 0], invertElevation: 1, surfaceId: 'surface-9' })
-        .affected,
-    ).toEqual([]);
+    expect(run(doc, 'add_manhole', { location: [0, 0], invertElevation: 1, surfaceId: 'surface-9' }).affected).toEqual([]);
     const bad = run(doc, 'add_manhole', { location: [0, 0], invertElevation: 5, rimElevation: 4 });
     expect(bad.document).toBe(doc);
     expect(bad.summary).toContain('must be above');
@@ -147,9 +132,7 @@ describe('drainage commands', () => {
       invertElevation: 90,
       rimElevation: 95,
     }).document;
-    expect(run(twin, 'add_pipe', { fromId: 'manhole-1', toId: 'manhole-4' }).summary).toContain(
-      'same plan',
-    );
+    expect(run(twin, 'add_pipe', { fromId: 'manhole-1', toId: 'manhole-4' }).summary).toContain('same plan');
   });
 
   it('warns on adverse slope', () => {
@@ -180,9 +163,7 @@ describe('drainage commands', () => {
     expect(run(doc, 'update_pipe', { pipeId: 'pipe-1' }).affected).toEqual([]);
     expect(run(doc, 'update_pipe', { pipeId: 'pipe-9', diameter: 1 }).summary).toContain('no pipe');
     expect(run(doc, 'update_pipe', { pipeId: 'pipe-1', manningN: 0 }).affected).toEqual([]);
-    expect(run(doc, 'update_pipe', { pipeId: 'pipe-1', invertTo: 99 }).summary).toContain(
-      'adverse',
-    );
+    expect(run(doc, 'update_pipe', { pipeId: 'pipe-1', invertTo: 99 }).summary).toContain('adverse');
 
     const raised = run(doc, 'update_manhole', {
       manholeId: 'manhole-2',
@@ -197,27 +178,17 @@ describe('drainage commands', () => {
     expect(manhole).toMatchObject({ name: 'Junction', invertElevation: 97.8 });
     expect(manhole && 'catchment' in manhole).toBe(false);
     expect(run(doc, 'update_manhole', { manholeId: 'manhole-2' }).affected).toEqual([]);
-    expect(run(doc, 'update_manhole', { manholeId: 'x', name: 'a' }).summary).toContain(
-      'no manhole',
-    );
-    expect(
-      run(doc, 'update_manhole', { manholeId: 'manhole-2', rimElevation: 90 }).summary,
-    ).toContain('must be above');
-    expect(run(doc, 'update_manhole', { manholeId: 'manhole-2', diameter: 0 }).affected).toEqual(
-      [],
-    );
-    expect(
-      run(doc, 'update_manhole', { manholeId: 'manhole-2', surfaceId: 's' }).summary,
-    ).toContain('no surface');
+    expect(run(doc, 'update_manhole', { manholeId: 'x', name: 'a' }).summary).toContain('no manhole');
+    expect(run(doc, 'update_manhole', { manholeId: 'manhole-2', rimElevation: 90 }).summary).toContain('must be above');
+    expect(run(doc, 'update_manhole', { manholeId: 'manhole-2', diameter: 0 }).affected).toEqual([]);
+    expect(run(doc, 'update_manhole', { manholeId: 'manhole-2', surfaceId: 's' }).summary).toContain('no surface');
     const moved = run(doc, 'update_manhole', {
       manholeId: 'manhole-2',
       location: [60, 10],
       runoffCoefficient: 0.5,
     });
     expect(moved.document.civil?.objects['manhole-2']).toMatchObject({ position: [60, 10] });
-    expect(
-      run(doc, 'update_manhole', { manholeId: 'manhole-2', location: [0, 0] }).summary,
-    ).toContain('zero-length');
+    expect(run(doc, 'update_manhole', { manholeId: 'manhole-2', location: [0, 0] }).summary).toContain('zero-length');
   });
 
   it('cascades deletion from a manhole to its pipes', () => {
@@ -341,13 +312,9 @@ describe('drainage analysis', () => {
 
   it('rejects bad criteria and empty networks', () => {
     const doc = network();
-    expect(run(doc, 'check_drainage_network', { rainfallIntensityMmH: 0 }).summary).toContain(
-      'failed',
-    );
+    expect(run(doc, 'check_drainage_network', { rainfallIntensityMmH: 0 }).summary).toContain('failed');
     expect(run(doc, 'check_drainage_network', { maxDepthRatio: 2 }).affected).toEqual([]);
-    expect(run(doc, 'check_drainage_network', { minVelocity: 5, maxVelocity: 1 }).affected).toEqual(
-      [],
-    );
+    expect(run(doc, 'check_drainage_network', { minVelocity: 5, maxVelocity: 1 }).affected).toEqual([]);
     const empty = run(createEmptyDocument(), 'check_drainage_network', {});
     expect(empty.summary).toContain('no drainage pipes');
     expect(run(createEmptyDocument(), 'drainage_schedule', {}).summary).toContain('no manholes');
@@ -375,11 +342,7 @@ describe('drainage analysis', () => {
       pipes: Array<{ diameterMm: number; status: string; reasons: string[] }>;
     };
     expect(after.pipes[0]?.diameterMm).toBe(375);
-    expect(
-      after.pipes.every(
-        (p) => !p.reasons.some((r) => r.includes('depth') || r.includes('capacity')),
-      ),
-    ).toBe(true);
+    expect(after.pipes.every((p) => !p.reasons.some((r) => r.includes('depth') || r.includes('capacity')))).toBe(true);
     expect(sized.summary).toContain('Resized');
     const again = run(sized.document, 'size_drainage_pipes', {});
     expect(again.summary).toContain('no diameter change');

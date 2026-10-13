@@ -34,9 +34,7 @@ export function yieldStrength(grade: string): number {
 function stressArea(diameterMm: number): number {
   const nominal = Object.keys(STRESS_AREA)
     .map(Number)
-    .reduce((best, size) =>
-      Math.abs(size - diameterMm) < Math.abs(best - diameterMm) ? size : best,
-    );
+    .reduce((best, size) => (Math.abs(size - diameterMm) < Math.abs(best - diameterMm) ? size : best));
   return STRESS_AREA[nominal] as number;
 }
 
@@ -61,10 +59,7 @@ const ANCHOR_GRADES: Readonly<Record<number, readonly [number, number]>> = {
  * Design resistances of one anchor bolt, N: tension 0.9 fub As / γM2; shear (threads in the shear
  * plane, EN 1993-1-8 §6.2.2(7)) αbc fub As / γM2 with αbc = 0.44 − 0.0003 fyb.
  */
-export function anchorBoltResistance(
-  diameterMm: number,
-  grade = 8.8,
-): { tension: number; shear: number } {
+export function anchorBoltResistance(diameterMm: number, grade = 8.8): { tension: number; shear: number } {
   const [fub, fyb] = ANCHOR_GRADES[grade] ?? (ANCHOR_GRADES[8.8] as readonly [number, number]);
   const area = stressArea(diameterMm);
   return {
@@ -102,8 +97,7 @@ export function sectionResistance(
 }
 
 /** Euler buckling force π² E I / L² (N) of second moment of area `inertia` (mm⁴) over `length` (mm). */
-export const eulerForce = (inertia: number, length: number): number =>
-  (Math.PI ** 2 * E_STEEL * inertia) / length ** 2;
+export const eulerForce = (inertia: number, length: number): number => (Math.PI ** 2 * E_STEEL * inertia) / length ** 2;
 
 /** One storey of a sway frame for the Horne αcr estimate. */
 export interface StoreyDrift {
@@ -144,12 +138,9 @@ export function bucklingReduction(slenderness: number, imperfection: number): nu
 /** Imperfection factors of the buckling curves (Tab. 6.1/6.2): rolled I, hot-finished hollow. */
 function curves(profile: SteelProfile): { major: number; minor: number } {
   if (profile.shape === 'I') {
-    return profile.h / profile.b > 1.2
-      ? { major: 0.21, minor: 0.34 }
-      : { major: 0.34, minor: 0.49 };
+    return profile.h / profile.b > 1.2 ? { major: 0.21, minor: 0.34 } : { major: 0.34, minor: 0.49 };
   }
-  if (profile.shape === 'SHS' || profile.shape === 'RHS' || profile.shape === 'CHS')
-    return { major: 0.21, minor: 0.21 };
+  if (profile.shape === 'SHS' || profile.shape === 'RHS' || profile.shape === 'CHS') return { major: 0.21, minor: 0.21 };
   return { major: 0.49, minor: 0.49 };
 }
 
@@ -163,8 +154,7 @@ const G_STEEL = 81000; // N/mm²
 export function criticalMoment(profile: SteelProfile, length: number, c1 = 1): number {
   if (profile.shape !== 'I') return Infinity;
   const minor = sectionProperties(profile).minorInertia;
-  const torsion =
-    (2 * profile.b * profile.tf ** 3 + (profile.h - 2 * profile.tf) * profile.tw ** 3) / 3;
+  const torsion = (2 * profile.b * profile.tf ** 3 + (profile.h - 2 * profile.tf) * profile.tw ** 3) / 3;
   const warping = (minor * (profile.h - profile.tf) ** 2) / 4;
   const euler = eulerForce(minor, length);
   return c1 * euler * Math.sqrt(warping / minor + (G_STEEL * torsion) / euler);
@@ -174,23 +164,14 @@ export function criticalMoment(profile: SteelProfile, length: number, c1 = 1): n
  * χLT for rolled I-sections (§6.3.2.3: λ̄LT,0 = 0.4, β = 0.75; curve b for h/b ≤ 2, c above).
  * `momentFactor` scales Mcr (C1 and load-position effects).
  */
-export function lateralTorsionalReduction(
-  profile: SteelProfile,
-  fy: number,
-  length: number,
-  momentFactor = 1,
-): number {
+export function lateralTorsionalReduction(profile: SteelProfile, fy: number, length: number, momentFactor = 1): number {
   const mcr = criticalMoment(profile, length, momentFactor);
   if (!Number.isFinite(mcr)) return 1;
   const slenderness = Math.sqrt(sectionResistance(profile, fy).moment / mcr);
   if (slenderness <= 0.4) return 1;
   const imperfection = profile.h / profile.b <= 2 ? 0.34 : 0.49;
   const phi = 0.5 * (1 + imperfection * (slenderness - 0.4) + 0.75 * slenderness ** 2);
-  return Math.min(
-    1,
-    1 / slenderness ** 2,
-    1 / (phi + Math.sqrt(phi * phi - 0.75 * slenderness ** 2)),
-  );
+  return Math.min(1, 1 / slenderness ** 2, 1 / (phi + Math.sqrt(phi * phi - 0.75 * slenderness ** 2)));
 }
 
 /** Moment amplification 1 / (1 − 1/αcr) of EN 1993-1-1 §5.2.2(5): none from αcr = 10, capped at 20 near instability. */
@@ -224,27 +205,20 @@ export function memberBuckling(
 ): BucklingCheck {
   const section = sectionProperties(profile);
   const resistance = sectionResistance(profile, fy);
-  const slenderness = (inertia: number, length: number): number =>
-    Math.sqrt(resistance.axial / eulerForce(inertia, length));
+  const slenderness = (inertia: number, length: number): number => Math.sqrt(resistance.axial / eulerForce(inertia, length));
   const { major, minor } = curves(profile);
   const lambdaMajor = slenderness(section.inertia, lengths.major);
   const lambdaMinor = slenderness(section.minorInertia, lengths.minor);
   const chiMajor = bucklingReduction(lambdaMajor, major);
   const chiMinor = bucklingReduction(lambdaMinor, minor);
-  const chiLateralTorsional = lateralTorsionalReduction(
-    profile,
-    fy,
-    lengths.lateralTorsional ?? lengths.minor,
-  );
+  const chiLateralTorsional = lateralTorsionalReduction(profile, fy, lengths.lateralTorsional ?? lengths.minor);
   const axial = Math.max(0, compression);
   const n = axial / ((chiMajor * resistance.axial) / GAMMA_M1);
   const nMinor = axial / ((chiMinor * resistance.axial) / GAMMA_M1);
   const plastic = resistance.sectionClass <= 2;
   // Annex B Tab. B.1 — class 1–2: Cm (1 + (λ̄ − 0.2) n) ≤ Cm (1 + 0.8 n);
   // class 3: Cm (1 + 0.6 λ̄ n) ≤ Cm (1 + 0.6 n).
-  const kyy = plastic
-    ? 0.9 * (1 + clamp(lambdaMajor - 0.2, 0, 0.8) * n)
-    : 0.9 * (1 + 0.6 * Math.min(lambdaMajor, 1) * n);
+  const kyy = plastic ? 0.9 * (1 + clamp(lambdaMajor - 0.2, 0, 0.8) * n) : 0.9 * (1 + 0.6 * Math.min(lambdaMajor, 1) * n);
   // Tab. B.2 (CmLT = 0.9): kzy = 1 − c λ̄z nz / (CmLT − 0.25), λ̄z clamped to 1; c = 0.1 / 0.05.
   const factor = plastic ? 0.1 : 0.05;
   const kzy =
@@ -252,10 +226,7 @@ export function memberBuckling(
       ? 0.6 * kyy
       : plastic && lambdaMinor < 0.4
         ? Math.min(0.6 + lambdaMinor, 1 - (factor * lambdaMinor * nMinor) / 0.65)
-        : Math.max(
-            1 - (factor * Math.min(lambdaMinor, 1) * nMinor) / 0.65,
-            1 - (factor * nMinor) / 0.65,
-          );
+        : Math.max(1 - (factor * Math.min(lambdaMinor, 1) * nMinor) / 0.65, 1 - (factor * nMinor) / 0.65);
   const bending = Math.abs(moment) / ((chiLateralTorsional * resistance.moment) / GAMMA_M1);
   return {
     utilisation: Math.max(n + kyy * bending, nMinor + kzy * bending),

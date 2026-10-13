@@ -33,9 +33,7 @@ export function resultJson(result: PrintableResult): string {
     changed: result.changed,
     ...(result.data !== undefined ? { data: result.data } : {}),
     ...(result.saved !== undefined ? { saved: result.saved } : {}),
-    ...(result.planAliases !== undefined
-      ? { aliases: result.planAliases.aliases, consumedAliases: result.planAliases.consumed }
-      : {}),
+    ...(result.planAliases !== undefined ? { aliases: result.planAliases.aliases, consumedAliases: result.planAliases.consumed } : {}),
   });
 }
 

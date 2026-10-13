@@ -25,11 +25,7 @@ import { supportPrimitives } from './planSupports';
  * Builds the plan of `levelId` (or the active / lowest level).
  * @failure no such level -> null
  */
-export function buildPlanDrawing(
-  doc: PlanSource,
-  levelId: string | undefined,
-  options: { dimensions?: boolean } = {},
-): PlanDrawing | null {
+export function buildPlanDrawing(doc: PlanSource, levelId: string | undefined, options: { dimensions?: boolean } = {}): PlanDrawing | null {
   const building = getBuilding(doc);
   const resolvedId = existingLevelId(building, levelId);
   const level = resolvedId !== undefined ? building.levels[resolvedId] : undefined;

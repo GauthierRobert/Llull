@@ -1,12 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import {
-  applyTool,
-  downloadText,
-  elementRows,
-  openBuilding,
-  scheduleCsv,
-  status,
-} from './buildingHelpers';
+import { applyTool, downloadText, elementRows, openBuilding, scheduleCsv, status } from './buildingHelpers';
 
 /**
  * End-to-end: an industrial (factory builder) workflow in the real app, covering
@@ -97,14 +90,10 @@ test.describe('industrial workflow', () => {
 
     const schedule = await scheduleCsv(page, 'member');
     expect(schedule.name).toBe('member-schedule.csv');
-    expect(schedule.text.split('\n')[0]).toBe(
-      'Mark,Role,Profile,Length (mm),Mass (kg),Grade,Level,Note',
-    );
+    expect(schedule.text.split('\n')[0]).toBe('Mark,Role,Profile,Length (mm),Mass (kg),Grade,Level,Note');
     expect(schedule.text).toContain('HEA400');
 
-    const ifc = await downloadText(page, () =>
-      page.getByRole('button', { name: 'IFC (BIM)' }).click(),
-    );
+    const ifc = await downloadText(page, () => page.getByRole('button', { name: 'IFC (BIM)' }).click());
     for (const entity of ['IFCCOLUMN(', 'IFCMEMBER(', 'IFCFOOTING(', 'IFCISHAPEPROFILEDEF(']) {
       expect(ifc.text).toContain(entity);
     }
@@ -116,26 +105,20 @@ test.describe('industrial workflow', () => {
     await expect(status(page)).toContainText('Added portal-frame hall');
 
     await page.getByLabel('Elevation direction').selectOption('east');
-    const elevation = await downloadText(page, () =>
-      page.getByRole('button', { name: 'Elevation sheet' }).click(),
-    );
+    const elevation = await downloadText(page, () => page.getByRole('button', { name: 'Elevation sheet' }).click());
     expect(elevation.name).toMatch(/East_elevation_A3_1-\d+\.svg$/);
     expect(elevation.text).toContain('<title>East elevation</title>');
     expect(elevation.text).toContain('id="title-block"');
 
     await page.getByLabel('Section cut position').fill('12000');
     await page.getByRole('checkbox', { name: 'Hide cladding' }).check();
-    const section = await downloadText(page, () =>
-      page.getByRole('button', { name: 'Section sheet' }).click(),
-    );
+    const section = await downloadText(page, () => page.getByRole('button', { name: 'Section sheet' }).click());
     expect(section.text).toContain('Section at x = 12000, viewed from east');
     expect(section.text).toContain('class="section"');
     await expect(page.getByTestId('building-export-status')).toContainText('visible face');
   });
 
-  test('I11–I16 — multi-span hall, base plates, cable tray, curved wall, hatched DXF', async ({
-    page,
-  }) => {
+  test('I11–I16 — multi-span hall, base plates, cable tray, curved wall, hatched DXF', async ({ page }) => {
     await openBuilding(page);
     await applyTool(page, 'hall', { spans: '18000, 18000', length: '24000' });
     await expect(status(page)).toContainText('(2 spans)');
@@ -149,30 +132,22 @@ test.describe('industrial workflow', () => {
     await applyTool(page, 'curvedWall', { x1: '40000', xm: '43000', ym: '3000', x2: '46000' });
     await expect(status(page)).toContainText('Added curved wall');
 
-    const dxf = await downloadText(page, () =>
-      page.getByRole('button', { name: 'DXF (AutoCAD)' }).click(),
-    );
+    const dxf = await downloadText(page, () => page.getByRole('button', { name: 'DXF (AutoCAD)' }).click());
     expect(dxf.text).toContain('A-WALL-PATT');
     expect(dxf.text).toContain('S-COLS-PATT');
 
     await page.getByLabel('Elevation direction').selectOption('south');
     await page.getByLabel('Section cut position').fill('12000');
-    const section = await downloadText(page, () =>
-      page.getByRole('button', { name: 'Section sheet' }).click(),
-    );
+    const section = await downloadText(page, () => page.getByRole('button', { name: 'Section sheet' }).click());
     expect(section.text).toContain('class="poche-steel"');
 
-    const ifc = await downloadText(page, () =>
-      page.getByRole('button', { name: 'IFC (BIM)' }).click(),
-    );
+    const ifc = await downloadText(page, () => page.getByRole('button', { name: 'IFC (BIM)' }).click());
     for (const entity of ['IFCCABLECARRIERSEGMENT(', 'IFCPLATE(', 'IFCMECHANICALFASTENER(']) {
       expect(ifc.text).toContain(entity);
     }
   });
 
-  test('S13, S14, I17 — wall build-up, door in a curved wall, moment connections', async ({
-    page,
-  }) => {
+  test('S13, S14, I17 — wall build-up, door in a curved wall, moment connections', async ({ page }) => {
     await openBuilding(page);
     await applyTool(page, 'hall', { span: '18000', length: '12000', cladding: 'false' });
     await expect(elementRows(page, 'connection')).toHaveCount(9);
@@ -193,9 +168,7 @@ test.describe('industrial workflow', () => {
     const curvedId = ((await curved.getAttribute('data-testid')) ?? '').replace('element-row-', '');
     await applyTool(page, 'door', { wallId: curvedId });
     await expect(status(page)).toContainText(`in wall W2`);
-    const ifc = await downloadText(page, () =>
-      page.getByRole('button', { name: 'IFC (BIM)' }).click(),
-    );
+    const ifc = await downloadText(page, () => page.getByRole('button', { name: 'IFC (BIM)' }).click());
     for (const entity of ['IFCMATERIALLAYERSETUSAGE(', "'END_PLATE'", 'IFCDOOR(']) {
       expect(ifc.text).toContain(entity);
     }
@@ -215,18 +188,14 @@ test.describe('industrial workflow', () => {
     expect(schedule.text.split('\n')[1]).toMatch(/,a9 flanges \/ a6 web · \d+\.\d m$/);
   });
 
-  test('I20–I23 — wind and crane combinations, buckling, sway stability, deflections', async ({
-    page,
-  }) => {
+  test('I20–I23 — wind and crane combinations, buckling, sway stability, deflections', async ({ page }) => {
     await windyCraneHall(page);
     await page.getByTestId('frame-check').click();
     const summary = page.getByTestId('frame-check-summary');
     await expect(summary).toContainText('66 ULS combination(s)');
     await expect(summary).toContainText('qp = 0.7 kN/m²');
     await expect(summary).toContainText('min αcr');
-    await expect(
-      page.getByTestId('frame-check-row').filter({ hasText: 'deflection' }).first(),
-    ).toBeVisible();
+    await expect(page.getByTestId('frame-check-row').filter({ hasText: 'deflection' }).first()).toBeVisible();
     await page.getByTestId('frame-design').click();
     await expect(status(page)).toContainText('Designed 6 frame(s) for 66 ULS combination(s)');
     await page.getByTestId('frame-check').click();
@@ -259,14 +228,10 @@ test.describe('industrial workflow', () => {
     await expect(status(page)).toContainText('Designed 12 of 12 footing(s)');
     const schedule = await scheduleCsv(page, 'footing');
     expect(schedule.text).toMatch(/H\d+ @ \d+ B1\/B2/);
-    const plan = await downloadText(page, () =>
-      page.getByRole('button', { name: 'Anchor plan' }).click(),
-    );
+    const plan = await downloadText(page, () => page.getByRole('button', { name: 'Anchor plan' }).click());
     expect(plan.name).toMatch(/anchor-plan/);
     expect(plan.text).toContain('A+6000/1');
-    const nc = await downloadText(page, () =>
-      page.getByRole('button', { name: 'NC files (DSTV)' }).click(),
-    );
+    const nc = await downloadText(page, () => page.getByRole('button', { name: 'NC files (DSTV)' }).click());
     expect(nc.name).toMatch(/\.nc1$/);
     expect(nc.text).toMatch(/^ST/m);
     await expect(page.getByTestId('building-export-status')).toContainText('DSTV NC1:');
@@ -341,13 +306,7 @@ test.describe('industrial workflow', () => {
     await page.getByTestId('footing-design').click();
     await expect(status(page)).toContainText('Designed 12 of 12 footing(s)');
     const summary = page.getByTestId('frame-check-summary');
-    for (const check of [
-      'frame-check',
-      'bracing-check',
-      'purlin-check',
-      'foundation-check',
-      'runway-check',
-    ]) {
+    for (const check of ['frame-check', 'bracing-check', 'purlin-check', 'foundation-check', 'runway-check']) {
       await page.getByTestId(check).click();
       await expect(summary).toContainText('all OK');
     }

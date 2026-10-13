@@ -97,24 +97,8 @@ function appActions(): PaletteAction[] {
         { keywords: 'sketch 2d tool', shortcut: DRAW_TOOL_KEYS[spec.tool] },
       ),
     ),
-    action(
-      'view-3d',
-      'View',
-      'Switch to 3D view',
-      'Perspective modeling view',
-      'cube',
-      () => tools().setViewMode('3d'),
-      { shortcut: '3' },
-    ),
-    action(
-      'view-2d',
-      'View',
-      'Switch to 2D view',
-      'Top-down drafting view',
-      'square',
-      () => tools().setViewMode('2d'),
-      { shortcut: '2' },
-    ),
+    action('view-3d', 'View', 'Switch to 3D view', 'Perspective modeling view', 'cube', () => tools().setViewMode('3d'), { shortcut: '3' }),
+    action('view-2d', 'View', 'Switch to 2D view', 'Top-down drafting view', 'square', () => tools().setViewMode('2d'), { shortcut: '2' }),
     action(
       'gizmo-translate',
       'View',
@@ -124,74 +108,32 @@ function appActions(): PaletteAction[] {
       () => tools().setGizmoMode('translate'),
       { keywords: 'translate transform', shortcut: GIZMO_KEYS.translate },
     ),
-    action(
-      'gizmo-rotate',
-      'View',
-      'Rotate gizmo',
-      'Rotate selected solids (3D)',
-      'transformRotate',
-      () => tools().setGizmoMode('rotate'),
-      { keywords: 'transform', shortcut: GIZMO_KEYS.rotate },
-    ),
-    action(
-      'gizmo-scale',
-      'View',
-      'Scale gizmo',
-      'Scale selected solids (3D)',
-      'transformScale',
-      () => tools().setGizmoMode('scale'),
-      { keywords: 'transform resize', shortcut: GIZMO_KEYS.scale },
-    ),
-    action(
-      'theme',
-      'View',
-      'Toggle light / dark theme',
-      'Switch the color theme',
-      'sun',
-      () => useThemeStore.getState().toggleTheme(),
-      { keywords: 'appearance mode color' },
-    ),
+    action('gizmo-rotate', 'View', 'Rotate gizmo', 'Rotate selected solids (3D)', 'transformRotate', () => tools().setGizmoMode('rotate'), {
+      keywords: 'transform',
+      shortcut: GIZMO_KEYS.rotate,
+    }),
+    action('gizmo-scale', 'View', 'Scale gizmo', 'Scale selected solids (3D)', 'transformScale', () => tools().setGizmoMode('scale'), {
+      keywords: 'transform resize',
+      shortcut: GIZMO_KEYS.scale,
+    }),
+    action('theme', 'View', 'Toggle light / dark theme', 'Switch the color theme', 'sun', () => useThemeStore.getState().toggleTheme(), {
+      keywords: 'appearance mode color',
+    }),
     action('undo', 'Edit', 'Undo', 'Revert the last change', 'undo', () => store().undo(), {
       shortcut: 'Ctrl Z',
     }),
-    action(
-      'redo',
-      'Edit',
-      'Redo',
-      'Re-apply the last undone change',
-      'redo',
-      () => store().redo(),
-      {
-        shortcut: 'Ctrl Y',
-      },
-    ),
-    action(
-      'duplicate',
-      'Edit',
-      'Duplicate selection',
-      'Copy the selected entities',
-      'copy',
-      duplicateSelection,
-      { shortcut: 'Ctrl D' },
-    ),
-    action(
-      'delete',
-      'Edit',
-      'Delete selection',
-      'Remove the selected entities',
-      'trash',
-      deleteSelection,
-      { keywords: 'remove erase', shortcut: 'Del' },
-    ),
-    action(
-      'clear-selection',
-      'Edit',
-      'Clear selection',
-      'Deselect everything',
-      'cursor',
-      () => store().clearSelection(),
-      { keywords: 'deselect', shortcut: 'Esc' },
-    ),
+    action('redo', 'Edit', 'Redo', 'Re-apply the last undone change', 'redo', () => store().redo(), {
+      shortcut: 'Ctrl Y',
+    }),
+    action('duplicate', 'Edit', 'Duplicate selection', 'Copy the selected entities', 'copy', duplicateSelection, { shortcut: 'Ctrl D' }),
+    action('delete', 'Edit', 'Delete selection', 'Remove the selected entities', 'trash', deleteSelection, {
+      keywords: 'remove erase',
+      shortcut: 'Del',
+    }),
+    action('clear-selection', 'Edit', 'Clear selection', 'Deselect everything', 'cursor', () => store().clearSelection(), {
+      keywords: 'deselect',
+      shortcut: 'Esc',
+    }),
     action(
       'toggle-sidebar',
       'Panels',
@@ -211,28 +153,16 @@ function appActions(): PaletteAction[] {
       { keywords: 'properties' },
     ),
     ...SIDEBAR_TAB_SPECS.map((spec) =>
-      action(
-        `panel-${spec.tab}`,
-        'Panels',
-        `Open ${spec.label}`,
-        `Show the ${spec.label} panel`,
-        spec.icon,
-        () => {
-          if (!(layout().sidebarOpen && layout().sidebarTab === spec.tab)) {
-            layout().selectSidebarTab(spec.tab);
-          }
-        },
-      ),
+      action(`panel-${spec.tab}`, 'Panels', `Open ${spec.label}`, `Show the ${spec.label} panel`, spec.icon, () => {
+        if (!(layout().sidebarOpen && layout().sidebarTab === spec.tab)) {
+          layout().selectSidebarTab(spec.tab);
+        }
+      }),
     ),
-    action(
-      'shortcuts',
-      'Panels',
-      'Keyboard shortcuts',
-      'Show every shortcut',
-      'keyboard',
-      () => tools().setShortcutsOpen(true),
-      { keywords: 'help keys', shortcut: '?' },
-    ),
+    action('shortcuts', 'Panels', 'Keyboard shortcuts', 'Show every shortcut', 'keyboard', () => tools().setShortcutsOpen(true), {
+      keywords: 'help keys',
+      shortcut: '?',
+    }),
   ];
 }
 
@@ -260,11 +190,7 @@ export function allPaletteItems(): PaletteItem[] {
  * Filter + rank for a query. Empty query: recents (as group 'Recent') then everything else in
  * catalog order. Non-empty: best score first; ties keep catalog order (actions before commands).
  */
-export function searchPaletteItems(
-  items: readonly PaletteItem[],
-  query: string,
-  recentIds: readonly string[],
-): PaletteItem[] {
+export function searchPaletteItems(items: readonly PaletteItem[], query: string, recentIds: readonly string[]): PaletteItem[] {
   if (query.trim() === '') {
     const byId = new Map(items.map((item) => [item.id, item]));
     const recent = recentIds

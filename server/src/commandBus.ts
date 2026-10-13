@@ -35,12 +35,9 @@ const _resultsByCommandId = new Map<string, CachedResult>();
 type HistoryDirection = 'undo' | 'redo';
 const history: Record<HistoryDirection, CadDocument[]> = { undo: [], redo: [] };
 
-const pushCapped = (stack: CadDocument[], doc: CadDocument): CadDocument[] =>
-  [...stack, doc].slice(-MAX_UNDO_DEPTH);
+const pushCapped = (stack: CadDocument[], doc: CadDocument): CadDocument[] => [...stack, doc].slice(-MAX_UNDO_DEPTH);
 
-function withHistoryFlags(
-  result: Omit<CommandResponseBody, 'canUndo' | 'canRedo'>,
-): CommandResponseBody {
+function withHistoryFlags(result: Omit<CommandResponseBody, 'canUndo' | 'canRedo'>): CommandResponseBody {
   return { ...result, canUndo: canUndo(), canRedo: canRedo() };
 }
 
@@ -59,12 +56,7 @@ function withHistoryFlags(
  *   (network retries are safe). Only document-changing, non-readOnly results are cached; reuse with
  *   a different name/params is an error result. Bounded LRU of MAX_IDEMPOTENCY_ENTRIES.
  */
-export function applyCommand(
-  name: string,
-  params: unknown,
-  commandId?: string,
-  actor?: Actor,
-): CommandResponseBody {
+export function applyCommand(name: string, params: unknown, commandId?: string, actor?: Actor): CommandResponseBody {
   if (commandId === undefined) return runCommand(name, params, actor);
   const requestHash = hashJson([name, params]);
   const cached = _resultsByCommandId.get(commandId);
@@ -127,13 +119,7 @@ function runCommand(name: string, params: unknown, actor?: Actor): CommandRespon
   return withHistoryFlags(outcome);
 }
 
-function recordAudit(
-  actor: Actor | undefined,
-  command: string,
-  params: unknown,
-  summary: string,
-  affectedCount: number,
-): void {
+function recordAudit(actor: Actor | undefined, command: string, params: unknown, summary: string, affectedCount: number): void {
   const who = actor ?? ANONYMOUS_ACTOR('rest');
   appendAudit({
     ts: new Date().toISOString(),

@@ -62,8 +62,7 @@ function LevelRow({ level, active, units, levels }: LevelRowProps): React.ReactE
         }
       >
         {/* The accessible name is the visible text plus this prefix (WCAG label-in-name). */}
-        <span className="visually-hidden">Activate level</span>{' '}
-        <span className="panel__row-main">{level.name}</span>{' '}
+        <span className="visually-hidden">Activate level</span> <span className="panel__row-main">{level.name}</span>{' '}
         <span className="panel__row-meta">
           +{level.elevation} {units} · h {level.height}
         </span>
@@ -75,11 +74,7 @@ function LevelRow({ level, active, units, levels }: LevelRowProps): React.ReactE
       )}
       {mode === 'copy' && (
         <li>
-          <CopyLevelForm
-            source={level}
-            targets={levels.filter((candidate) => candidate.id !== level.id)}
-            onDone={() => setMode(null)}
-          />
+          <CopyLevelForm source={level} targets={levels.filter((candidate) => candidate.id !== level.id)} onDone={() => setMode(null)} />
         </li>
       )}
     </>
@@ -102,11 +97,7 @@ function AddLevelForm(): React.ReactElement {
   };
 
   return (
-    <form
-      className="building-inline-form building-level-form"
-      onSubmit={handleSubmit}
-      aria-label="Add level"
-    >
+    <form className="building-inline-form building-level-form" onSubmit={handleSubmit} aria-label="Add level">
       <input
         type="text"
         placeholder="Level name, e.g. First floor"
@@ -144,13 +135,7 @@ export function LevelsSection(): React.ReactElement {
     >
       <ul className="panel__list" aria-label="Building levels">
         {[...levels].reverse().map((level) => (
-          <LevelRow
-            key={level.id}
-            level={level}
-            active={level.id === activeLevelId}
-            units={units}
-            levels={levels}
-          />
+          <LevelRow key={level.id} level={level} active={level.id === activeLevelId} units={units} levels={levels} />
         ))}
       </ul>
       <AddLevelForm />

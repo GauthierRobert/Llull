@@ -26,10 +26,7 @@ export function shouldRebase(
  * The camera target rounded to a `gridSize` grid (default = the rebase threshold), so the origin
  * jumps in discrete steps instead of accumulating drift or micro-rebasing on every pan.
  */
-export function snapOriginToTarget(
-  cameraTarget: readonly [number, number, number],
-  gridSize = 1e4,
-): [number, number, number] {
+export function snapOriginToTarget(cameraTarget: readonly [number, number, number], gridSize = 1e4): [number, number, number] {
   return [
     Math.round(cameraTarget[0] / gridSize) * gridSize,
     Math.round(cameraTarget[1] / gridSize) * gridSize,
@@ -45,9 +42,5 @@ export function toRenderPosition(
   worldPos: readonly [number, number, number],
   renderOrigin: readonly [number, number, number],
 ): [number, number, number] {
-  return [
-    worldPos[0] - renderOrigin[0],
-    worldPos[1] - renderOrigin[1],
-    worldPos[2] - renderOrigin[2],
-  ];
+  return [worldPos[0] - renderOrigin[0], worldPos[1] - renderOrigin[1], worldPos[2] - renderOrigin[2]];
 }

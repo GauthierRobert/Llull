@@ -7,17 +7,7 @@ import { createBeamLoads } from '@aec/industrial/steelDesign/steelBeamLoads';
 import { collectSteelBars } from '@aec/industrial/steelDesign/steelMemberBars';
 import { analyseSimpleBeam } from '@aec/industrial/steelDesign/steelBeamAnalysis';
 import { analysedRow, skippedRow } from '@aec/industrial/steelDesign/steelMemberRows';
-import {
-  beam,
-  brace,
-  check,
-  column,
-  rowOf,
-  squareBay,
-  step,
-  twoLevels,
-  withMember,
-} from './steelFixtures';
+import { beam, brace, check, column, rowOf, squareBay, step, twoLevels, withMember } from './steelFixtures';
 
 const pointLoaded = (
   loads: ReturnType<typeof createBeamLoads>,
@@ -216,8 +206,7 @@ describe('bracing edge cases', () => {
 });
 
 describe('beam check internals', () => {
-  const lone = (): ReturnType<typeof twoLevels> =>
-    beam(twoLevels(), [0, 0], [2000, 0], 'IPE200', 200);
+  const lone = (): ReturnType<typeof twoLevels> => beam(twoLevels(), [0, 0], [2000, 0], 'IPE200', 200);
 
   it('reduces the moment resistance when the shear exceeds half of Vpl,Rd', () => {
     const bar = collectSteelBars(lone()).find((entry) => entry.role === 'beam');
@@ -227,12 +216,9 @@ describe('beam check internals', () => {
     const { result, heavy } = pointLoaded(loads, loads.lengthM / 2, 400);
     const row = checkBeam(bar, result, 250, undefined);
     const bending = row.checks.find((entry) => entry.name.startsWith('bending'));
-    const unreduced = checkBeam(
-      bar,
-      { ...result, uls: { ...heavy, shearAtMoment: 0 } },
-      250,
-      undefined,
-    ).checks.find((entry) => entry.name.startsWith('bending'));
+    const unreduced = checkBeam(bar, { ...result, uls: { ...heavy, shearAtMoment: 0 } }, 250, undefined).checks.find((entry) =>
+      entry.name.startsWith('bending'),
+    );
     expect(bending?.utilisation ?? 0).toBeGreaterThan((unreduced?.utilisation ?? 0) * 1.05);
   });
 

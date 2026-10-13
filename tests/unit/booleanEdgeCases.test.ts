@@ -24,18 +24,14 @@ describe('boolean edge cases', () => {
   });
 
   it('a non-empty result still replaces the operands', () => {
-    setGeometryKernel(
-      kernelReturning({ positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] }),
-    );
+    setGeometryKernel(kernelReturning({ positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] }));
     const result = execute(doc, 'boolean', { op: 'union', a: idA, b: idB });
     expect(result.affected).toHaveLength(1);
     expect(result.document.entities[idA]).toBeUndefined();
   });
 
   it('rejects component instances with a pointer to explode_instance', () => {
-    setGeometryKernel(
-      kernelReturning({ positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] }),
-    );
+    setGeometryKernel(kernelReturning({ positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] }));
     const component = execute(doc, 'create_component', {
       name: 'Part',
       entityIds: [idA],

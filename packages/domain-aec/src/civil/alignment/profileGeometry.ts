@@ -31,19 +31,14 @@ export interface VerticalCurve {
 export function validateProfile(profile: ReadonlyArray<ProfilePvi>): string | null {
   if (profile.length < 2) return 'a profile needs at least 2 PVIs.';
   for (const pvi of profile) {
-    if (!Number.isFinite(pvi.station) || !Number.isFinite(pvi.elevation))
-      return 'PVI stations and elevations must be finite numbers.';
-    if (!(pvi.curveLength >= 0) || !Number.isFinite(pvi.curveLength))
-      return `PVI at station ${pvi.station}: curveLength must be >= 0.`;
+    if (!Number.isFinite(pvi.station) || !Number.isFinite(pvi.elevation)) return 'PVI stations and elevations must be finite numbers.';
+    if (!(pvi.curveLength >= 0) || !Number.isFinite(pvi.curveLength)) return `PVI at station ${pvi.station}: curveLength must be >= 0.`;
   }
   for (let i = 1; i < profile.length; i++) {
     if (!((profile[i] as ProfilePvi).station > (profile[i - 1] as ProfilePvi).station))
       return `PVI stations must increase strictly (PVI ${i} at ${(profile[i] as ProfilePvi).station}).`;
   }
-  if (
-    (profile[0] as ProfilePvi).curveLength > 0 ||
-    (profile[profile.length - 1] as ProfilePvi).curveLength > 0
-  ) {
+  if ((profile[0] as ProfilePvi).curveLength > 0 || (profile[profile.length - 1] as ProfilePvi).curveLength > 0) {
     return 'the first and last PVI cannot carry a vertical curve.';
   }
   for (let i = 1; i + 1 < profile.length; i++) {
@@ -103,20 +98,14 @@ export function verticalCurves(profile: ReadonlyArray<ProfilePvi>): VerticalCurv
 }
 
 /** Design elevation at `station`; null outside the first / last PVI. */
-export function designElevation(
-  profile: ReadonlyArray<ProfilePvi>,
-  station: number,
-): number | null {
+export function designElevation(profile: ReadonlyArray<ProfilePvi>, station: number): number | null {
   const first = profile[0];
   const last = profile[profile.length - 1];
-  if (!first || !last || station < first.station - 1e-9 || station > last.station + 1e-9)
-    return null;
+  if (!first || !last || station < first.station - 1e-9 || station > last.station + 1e-9) return null;
   for (const curve of verticalCurves(profile)) {
     if (station >= curve.startStation && station <= curve.endStation) {
       const x = station - curve.startStation;
-      return (
-        curve.startElevation + curve.gradeIn * x + (curve.gradeChange * x * x) / (2 * curve.length)
-      );
+      return curve.startElevation + curve.gradeIn * x + (curve.gradeChange * x * x) / (2 * curve.length);
     }
   }
   const segmentGrades = grades(profile);
@@ -128,7 +117,5 @@ export function designElevation(
 
 /** Extra sampling stations on vertical curves (start, end and 8 divisions) so they draw smoothly. */
 export function verticalCurveStations(profile: ReadonlyArray<ProfilePvi>): number[] {
-  return verticalCurves(profile).flatMap((curve) =>
-    Array.from({ length: 9 }, (_, k) => curve.startStation + (curve.length * k) / 8),
-  );
+  return verticalCurves(profile).flatMap((curve) => Array.from({ length: 9 }, (_, k) => curve.startStation + (curve.length * k) / 8));
 }

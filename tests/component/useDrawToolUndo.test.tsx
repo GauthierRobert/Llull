@@ -41,9 +41,7 @@ describe('draw tool move', () => {
     act(() => result.current.handleClick([1, 1]));
     expect(dispatch).not.toHaveBeenCalled();
     act(() => result.current.handleClick([4, -1]));
-    expect(dispatch.mock.calls).toEqual([
-      ['move_entities', { ids: ['a', 'b'], delta: [3, -2, 0] }],
-    ]);
+    expect(dispatch.mock.calls).toEqual([['move_entities', { ids: ['a', 'b'], delta: [3, -2, 0] }]]);
     expect(result.current.collectedPoints).toHaveLength(0);
   });
 

@@ -49,29 +49,16 @@ export function riserRows(
 ): RiserRow[] {
   return riserRuns(run.points).map((riser): RiserRow => {
     const onRun = (station: SupportStation): boolean =>
-      station.onRiser &&
-      station.attached &&
-      station.arc >= riser.startArc - 1 &&
-      station.arc <= riser.endArc + 1;
+      station.onRiser && station.attached && station.arc >= riser.startArc - 1 && station.arc <= riser.endArc + 1;
     const lateral = stations
-      .filter(
-        (station) => onRun(station) && (station.type === 'guide' || station.type === 'anchor'),
-      )
+      .filter((station) => onRun(station) && (station.type === 'guide' || station.type === 'anchor'))
       .map((station) => station.arc - riser.startArc)
       .sort((a, b) => a - b);
-    const clamps = stations.filter(
-      (station) => onRun(station) && (station.type === 'shoe' || station.type === 'anchor'),
-    );
-    const carried = [
-      riser.startArc <= 1 && carriers[0] !== null,
-      riser.endArc >= run.lengthMm - 1 && carriers[1] !== null,
-    ] as const;
+    const clamps = stations.filter((station) => onRun(station) && (station.type === 'shoe' || station.type === 'anchor'));
+    const carried = [riser.startArc <= 1 && carriers[0] !== null, riser.endArc >= run.lengthMm - 1 && carriers[1] !== null] as const;
     const { length } = riser;
     const stretch = [...(carried[0] ? [0] : []), ...lateral, ...(carried[1] ? [length] : [])];
-    const largest = stretch.reduce(
-      (best, position, index) => Math.max(best, position - (stretch[index - 1] ?? position)),
-      0,
-    );
+    const largest = stretch.reduce((best, position, index) => Math.max(best, position - (stretch[index - 1] ?? position)), 0);
     const overhangLimit = allowedMm * overhangRatio;
     const free: [number | null, number | null] = [
       carried[0] ? null : (lateral[0] ?? length),
@@ -80,9 +67,7 @@ export function riserRows(
     const issues: string[] = [];
     const label = `riser z ${shown(riser.from[2])} → ${shown(riser.to[2])} m (${shown(length)} m)`;
     if (largest > allowedMm + EPSILON) {
-      issues.push(
-        `${label}: lateral guide spacing ${shown(largest)} m exceeds ${shown(allowedMm)} m allowed`,
-      );
+      issues.push(`${label}: lateral guide spacing ${shown(largest)} m exceeds ${shown(allowedMm)} m allowed`);
     }
     if (lateral.length === 0 && free.every((value) => value !== null)) {
       if (length > overhangLimit + EPSILON) {
@@ -110,13 +95,7 @@ export function riserRows(
           Math.abs(station.arc - riser.endArc) <= overhangLimit + EPSILON),
     );
     const weightBy: RiserRow['weightBy'] =
-      carried[0] || carried[1]
-        ? 'carried end'
-        : clamps.length > 0
-          ? 'clamp'
-          : elbowSupported
-            ? 'elbow support'
-            : null;
+      carried[0] || carried[1] ? 'carried end' : clamps.length > 0 ? 'clamp' : elbowSupported ? 'elbow support' : null;
     const weightKn = (pipeWeightPerMetre(run.diameterMm, WATER_DENSITY) * length) / 1000;
     if (weightBy === null) {
       issues.push(
@@ -128,9 +107,7 @@ export function riserRows(
       toZM: roundedMetres(riser.to[2]),
       lengthM: roundedMetres(length),
       guides: lateral.length,
-      maxGuideSpacingM: roundedMetres(
-        Math.max(largest, ...free.map((value) => (value === null ? 0 : value))),
-      ),
+      maxGuideSpacingM: roundedMetres(Math.max(largest, ...free.map((value) => (value === null ? 0 : value)))),
       allowedSpacingM: roundedMetres(allowedMm),
       weightKn: round(weightKn, 2),
       weightBy,

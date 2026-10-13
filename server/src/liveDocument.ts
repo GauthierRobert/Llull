@@ -21,8 +21,7 @@ import { isTestRun, positiveInteger } from './env';
  * Autosave path (override via `LLULL_AUTOSAVE_PATH`; default next to the server bundle). Disabled
  * under tests (vitest sets `VITEST`, our harness sets `TEST`) so a user's saved project survives.
  */
-const AUTOSAVE_PATH =
-  process.env['LLULL_AUTOSAVE_PATH'] ?? path.resolve(__dirname, '..', '.autosave.json');
+const AUTOSAVE_PATH = process.env['LLULL_AUTOSAVE_PATH'] ?? path.resolve(__dirname, '..', '.autosave.json');
 
 setAuditDefaultDirectory(path.dirname(AUTOSAVE_PATH));
 

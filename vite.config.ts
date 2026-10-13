@@ -53,9 +53,7 @@ export default defineConfig(({ command }) => ({
     alias: {
       // manifold-3d's Node-only branch imports node:module; stub it for browser bundles only
       // (the vitest/node run keeps the real module).
-      ...(command === 'build'
-        ? { 'node:module': resolve(import.meta.dirname, 'src/ui/geometry/nodeModuleStub.ts') }
-        : {}),
+      ...(command === 'build' ? { 'node:module': resolve(import.meta.dirname, 'src/ui/geometry/nodeModuleStub.ts') } : {}),
       ...workspaceAliases(),
     },
   },
@@ -70,14 +68,7 @@ export default defineConfig(({ command }) => ({
     // and contain full repo copies; never scan them for tests.
     // `server/**` has its own node-env vitest config — keep it out of the app
     // (jsdom) suite so the two never cross-contaminate.
-    exclude: [
-      ...configDefaults.exclude,
-      '.claude/worktrees/**',
-      'server/**',
-      'desktop/**',
-      'tests/e2e/**',
-      'tests/pwa/**',
-    ],
+    exclude: [...configDefaults.exclude, '.claude/worktrees/**', 'server/**', 'desktop/**', 'tests/e2e/**', 'tests/pwa/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],

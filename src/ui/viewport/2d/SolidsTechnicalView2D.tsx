@@ -33,10 +33,7 @@ export function SolidsTechnicalView2D({
   const palette = useViewportPalette();
   const cutDepth = useSectionCutDepth();
 
-  const drawings = useMemo(
-    () => technicalView({ components }, solids, { frame: TOP_VIEW, cutDepth }),
-    [components, solids, cutDepth],
-  );
+  const drawings = useMemo(() => technicalView({ components }, solids, { frame: TOP_VIEW, cutDepth }), [components, solids, cutDepth]);
   const scale = useMemo((): DrawingScale => {
     const [minX, minY, maxX, maxY] = drawingBounds(drawings.flatMap((d) => d.primitives));
     const extent = Math.max(Math.hypot(maxX - minX, maxY - minY), 1e-6);
@@ -45,19 +42,10 @@ export function SolidsTechnicalView2D({
   const items = useMemo((): StyledPrimitive[] => {
     const colorOf = new Map(solids.map((solid) => [solid.id, solid.color]));
     return drawings.flatMap(({ entityId, primitives }) => {
-      const color = selectedIds.has(entityId)
-        ? SELECTION_COLOR
-        : (colorOf.get(entityId) ?? palette.background);
+      const color = selectedIds.has(entityId) ? SELECTION_COLOR : (colorOf.get(entityId) ?? palette.background);
       return primitives.map((primitive) => ({ primitive, color }));
     });
   }, [drawings, solids, selectedIds, palette.background]);
 
-  return (
-    <DrawingPrimitives2D
-      name="solids-technical-view-2d"
-      items={items}
-      scale={scale}
-      fillColor={palette.background}
-    />
-  );
+  return <DrawingPrimitives2D name="solids-technical-view-2d" items={items} scale={scale} fillColor={palette.background} />;
 }

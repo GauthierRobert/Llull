@@ -46,11 +46,10 @@ describe('expressionSyntaxError', () => {
 });
 
 describe('set_parameter with an invalid expression', () => {
-  const base = execute(
-    execute(createEmptyDocument(), 'set_parameter', { name: 'w', expression: '5' }).document,
-    'set_parameter',
-    { name: 'h', expression: 'w * 2' },
-  ).document;
+  const base = execute(execute(createEmptyDocument(), 'set_parameter', { name: 'w', expression: '5' }).document, 'set_parameter', {
+    name: 'h',
+    expression: 'w * 2',
+  }).document;
 
   it('keeps the previous expression, value and dependents', () => {
     const result = execute(base, 'set_parameter', { name: 'w', expression: '2*' });

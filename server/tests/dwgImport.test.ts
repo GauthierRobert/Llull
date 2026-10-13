@@ -143,20 +143,14 @@ describe('POST /import/dwg', () => {
 
   it('answers 503 with install instructions when no converter is available', async () => {
     const { app } = await load({ LLULL_DWG2DXF: 'off' });
-    const res = await request(app)
-      .post('/import/dwg')
-      .set('Content-Type', 'application/octet-stream')
-      .send(DWG);
+    const res = await request(app).post('/import/dwg').set('Content-Type', 'application/octet-stream').send(DWG);
     expect(res.status).toBe(503);
     expect(res.body.error).toMatch(/LibreDWG 0\.14\+/);
   }, 60_000);
 
   it('answers 503 when the configured executable does not exist', async () => {
     const { app } = await load({ LLULL_DWG2DXF: path.join(dir, 'does-not-exist') });
-    const res = await request(app)
-      .post('/import/dwg')
-      .set('Content-Type', 'application/octet-stream')
-      .send(DWG);
+    const res = await request(app).post('/import/dwg').set('Content-Type', 'application/octet-stream').send(DWG);
     expect(res.status).toBe(503);
   }, 60_000);
 
@@ -172,10 +166,7 @@ describe('POST /import/dwg', () => {
 
   it('answers 400 for an unknown target and for a missing body', async () => {
     const { app } = await load({ LLULL_DWG2DXF: okScript });
-    const bad = await request(app)
-      .post('/import/dwg?target=nope')
-      .set('Content-Type', 'application/octet-stream')
-      .send(DWG);
+    const bad = await request(app).post('/import/dwg?target=nope').set('Content-Type', 'application/octet-stream').send(DWG);
     expect(bad.status).toBe(400);
     const empty = await request(app).post('/import/dwg').send({});
     expect(empty.status).toBe(400);
@@ -184,10 +175,7 @@ describe('POST /import/dwg', () => {
   it('answers 504 when the converter exceeds the timeout, and cleans its temp dir', async () => {
     const { app } = await load({ LLULL_DWG2DXF: slowScript, LLULL_DWG_TIMEOUT_MS: '300' });
     const before = (await readdir(tmpdir())).filter((n) => n.startsWith('llull-dwg-'));
-    const res = await request(app)
-      .post('/import/dwg')
-      .set('Content-Type', 'application/octet-stream')
-      .send(DWG);
+    const res = await request(app).post('/import/dwg').set('Content-Type', 'application/octet-stream').send(DWG);
     expect(res.status).toBe(504);
     const after = (await readdir(tmpdir())).filter((n) => n.startsWith('llull-dwg-'));
     expect(after.length).toBeLessThanOrEqual(before.length);

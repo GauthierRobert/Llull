@@ -31,9 +31,7 @@ export function unshapeExchangeResult(shaped: McpShapedResult): ExchangeCommandR
   const affected = fromStructure ?? fromText ?? [];
   let data: unknown;
   if (structured !== undefined) {
-    const rest = Object.fromEntries(
-      Object.entries(structured).filter(([key]) => key !== 'affected'),
-    );
+    const rest = Object.fromEntries(Object.entries(structured).filter(([key]) => key !== 'affected'));
     data = 'data' in rest && Object.keys(rest).length === 1 ? rest['data'] : rest;
   }
   return {

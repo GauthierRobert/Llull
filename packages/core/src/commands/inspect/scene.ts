@@ -11,13 +11,7 @@ import type { CommandResult } from '../types';
 import { report } from '../noop';
 import { defineCommand, z } from '../schema';
 import type { Bounds } from '../../geometry/bounds';
-import {
-  type EntitySummary,
-  type LayerSummary,
-  type GroupSummary,
-  type AnimationSummary,
-  type SceneSnapshot,
-} from './sceneTypes';
+import { type EntitySummary, type LayerSummary, type GroupSummary, type AnimationSummary, type SceneSnapshot } from './sceneTypes';
 import { entityBoundsInDoc, mergeBounds } from '../../geometry/bounds';
 import { rotatedEntityBounds } from '../../geometry/rotatedBounds';
 /** Structured snapshot of the document. @pure */
@@ -30,10 +24,7 @@ export function computeSceneSnapshot(doc: CadDocument): SceneSnapshot {
     const e = doc.entities[id];
     if (!e) continue;
     // Instances have no own geometry: their AABB comes from the referenced component.
-    const bounds =
-      e.kind === 'instance' || e.kind === 'dimension'
-        ? entityBoundsInDoc(doc, e)
-        : rotatedEntityBounds(e);
+    const bounds = e.kind === 'instance' || e.kind === 'dimension' ? entityBoundsInDoc(doc, e) : rotatedEntityBounds(e);
     entities.push({ id: e.id, kind: e.kind, layerId: e.layerId, position: e.position, bounds });
     sceneBounds = sceneBounds ? mergeBounds(sceneBounds, bounds) : bounds;
     layerCounts[e.layerId] = (layerCounts[e.layerId] ?? 0) + 1;

@@ -31,15 +31,10 @@ export const explodePolyline = defineCommand({
     const polyline = resolvePolyline(doc, 'explode_polyline', id);
     if ('summary' in polyline) return polyline;
     if (polyline.points.length < 2) {
-      return noop(
-        doc,
-        `explode_polyline: polyline ${id} has fewer than 2 points — nothing to explode.`,
-      );
+      return noop(doc, `explode_polyline: polyline ${id} has fewer than 2 points — nothing to explode.`);
     }
 
-    const ring = polyline.closed
-      ? [...polyline.points, elementAt(polyline.points, 0)]
-      : polyline.points;
+    const ring = polyline.closed ? [...polyline.points, elementAt(polyline.points, 0)] : polyline.points;
     const segments = ring.slice(1).map((end, i): [Vec2, Vec2] => [elementAt(ring, i), end]);
 
     // Remove the polyline, add one line per segment
@@ -121,8 +116,7 @@ export const offset2D = defineCommand({
       }
       case 'polyline': {
         const pts = entity.points;
-        if (pts.length < 2)
-          return noop(doc, `offset_2d: polyline ${id} has fewer than 2 points — no-op.`);
+        if (pts.length < 2) return noop(doc, `offset_2d: polyline ${id} has fewer than 2 points — no-op.`);
         const edgeCount = entity.closed ? pts.length : pts.length - 1;
         const segs = Array.from({ length: edgeCount }, (_, i) =>
           offsetSegment(elementAt(pts, i), elementAt(pts, (i + 1) % pts.length), distance),
@@ -131,17 +125,14 @@ export const offset2D = defineCommand({
           const prev = elementAt(segs, entity.closed ? (i - 1 + segs.length) % segs.length : i);
           return miterJoin(prev[0], prev[1], seg[0], seg[1]);
         });
-        const points: Vec2[] = entity.closed
-          ? joins
-          : [elementAt(segs, 0)[0], ...joins, elementAt(segs, segs.length - 1)[1]];
+        const points: Vec2[] = entity.closed ? joins : [elementAt(segs, 0)[0], ...joins, elementAt(segs, segs.length - 1)[1]];
         offsetEntity = { ...base, id: newId, kind: 'polyline', points, closed: entity.closed };
         summary = `Offset polyline ${id} by ${distance} → new polyline ${newId} (${points.length} points).`;
         break;
       }
       case 'circle': {
         const radius = entity.radius + distance;
-        if (radius <= 0)
-          return noop(doc, `offset_2d: resulting circle radius ${radius} <= 0 — no-op.`);
+        if (radius <= 0) return noop(doc, `offset_2d: resulting circle radius ${radius} <= 0 — no-op.`);
         offsetEntity = { ...base, id: newId, kind: 'circle', center: entity.center, radius };
         summary = `Offset circle ${id} by ${distance} → new circle ${newId} radius ${radius}.`;
         break;
@@ -150,10 +141,7 @@ export const offset2D = defineCommand({
         const width = entity.width + 2 * distance;
         const height = entity.height + 2 * distance;
         if (width <= 0 || height <= 0) {
-          return noop(
-            doc,
-            `offset_2d: resulting rectangle ${width}×${height} is degenerate — no-op.`,
-          );
+          return noop(doc, `offset_2d: resulting rectangle ${width}×${height} is degenerate — no-op.`);
         }
         // The origin shifts by -distance on X and Y so the rectangle grows/shrinks on every side.
         const [x, y, z] = entity.position;
@@ -169,10 +157,7 @@ export const offset2D = defineCommand({
         break;
       }
       default:
-        return noop(
-          doc,
-          `offset_2d: entity ${id} has unsupported kind '${entity.kind}'. Supported: line, polyline, circle, rectangle.`,
-        );
+        return noop(doc, `offset_2d: entity ${id} has unsupported kind '${entity.kind}'. Supported: line, polyline, circle, rectangle.`);
     }
 
     return commitEntity(doc, offsetEntity, summary);

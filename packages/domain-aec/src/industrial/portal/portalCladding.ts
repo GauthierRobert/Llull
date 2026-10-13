@@ -76,11 +76,7 @@ export function claddingPanels(geometry: HallGeometry, p: PortalProfiles): Cladd
     panels.push({
       role: 'wall',
       outward: [0, outward, 0],
-      corners: [
-        [wallX0, y, 0],
-        [wallX1, y, 0],
-        ...[...profileLine].reverse().map(([x, z]): Vec3 => [x, y, z]),
-      ],
+      corners: [[wallX0, y, 0], [wallX1, y, 0], ...[...profileLine].reverse().map(([x, z]): Vec3 => [x, y, z])],
     });
   }
   return panels;

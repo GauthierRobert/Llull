@@ -30,8 +30,7 @@ function inCircle(points: ReadonlyArray<Vec2>, a: number, b: number, c: number, 
   const ad = adx * adx + ady * ady;
   const bd = bdx * bdx + bdy * bdy;
   const cd = cdx * cdx + cdy * cdy;
-  const det =
-    adx * (bdy * cd - bd * cdy) - ady * (bdx * cd - bd * cdx) + ad * (bdx * cdy - bdy * cdx);
+  const det = adx * (bdy * cd - bd * cdy) - ady * (bdx * cd - bd * cdx) + ad * (bdx * cdy - bdy * cdx);
   return det > 0;
 }
 
@@ -66,12 +65,7 @@ export function delaunay(input: ReadonlyArray<Vec2>): Triangles {
   const span = Math.max(maxX - minX, maxY - minY) || 1;
   const midX = (minX + maxX) / 2;
   const midY = (minY + maxY) / 2;
-  const points: Vec2[] = [
-    ...input,
-    [midX - 40 * span, midY - 30 * span],
-    [midX + 40 * span, midY - 30 * span],
-    [midX, midY + 40 * span],
-  ];
+  const points: Vec2[] = [...input, [midX - 40 * span, midY - 30 * span], [midX + 40 * span, midY - 30 * span], [midX, midY + 40 * span]];
   const stride = count + 3;
   const vertices: number[] = [];
   const alive: boolean[] = [];
@@ -142,8 +136,7 @@ export function delaunay(input: ReadonlyArray<Vec2>): Triangles {
     for (const triangle of bad) {
       for (let k = 0; k < 3; k++) {
         const neighbour = across(triangle, k);
-        if (neighbour === undefined || !bad.has(neighbour))
-          boundary.push([corner(triangle, k), corner(triangle, (k + 1) % 3)]);
+        if (neighbour === undefined || !bad.has(neighbour)) boundary.push([corner(triangle, k), corner(triangle, (k + 1) % 3)]);
       }
     }
     for (const triangle of bad) {

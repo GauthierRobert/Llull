@@ -1,23 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import {
-  type CadDocument,
-  type Entity,
-  type SubdivisionEntity,
-  type Vec3,
-  createEmptyDocument,
-} from '@core/model/types';
+import { type CadDocument, type Entity, type SubdivisionEntity, type Vec3, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { serializeDocument } from '@core/commands/persistence/serialization';
 import { entityBounds } from '@core/geometry/bounds';
 import { solidTriangles } from '@core/geometry/solidTriangles';
 import { tessellateEntity } from '@core/commands/render/polygons';
-import {
-  boxCage,
-  cageProblem,
-  cylinderCage,
-  subdivide,
-  subdivisionTriangles,
-} from '@core/geometry/subdivision';
+import { boxCage, cageProblem, cylinderCage, subdivide, subdivisionTriangles } from '@core/geometry/subdivision';
 import { expectNoOp } from '../helpers/expectNoOp';
 import { isWatertight, createdIn, volumeOf } from '../helpers/fixtureDocument';
 
@@ -84,10 +72,7 @@ describe('subdivision geometry', () => {
 
   it.each([
     [{ vertices: [[0, 0, 0]], faces: [], creases: [] }, 'at least 4 vertices'],
-    [
-      { ...boxCage([1, 1, 1], [1, 1, 1]), faces: boxCage([1, 1, 1], [1, 1, 1]).faces.slice(1) },
-      'borders only one face',
-    ],
+    [{ ...boxCage([1, 1, 1], [1, 1, 1]), faces: boxCage([1, 1, 1], [1, 1, 1]).faces.slice(1) }, 'borders only one face'],
     [
       {
         ...boxCage([1, 1, 1], [1, 1, 1]),
@@ -269,11 +254,7 @@ describe('add_subdivision_solid', () => {
 
   it('rejects a duplicate explicit id and is pure', () => {
     const { doc } = created(empty, { box: { size: [1, 1, 1] }, id: 'S' });
-    expectNoOp(
-      run(doc, 'add_subdivision_solid', { box: { size: [1, 1, 1] }, id: 'S' }),
-      doc,
-      'already exists',
-    );
+    expectNoOp(run(doc, 'add_subdivision_solid', { box: { size: [1, 1, 1] }, id: 'S' }), doc, 'already exists');
     const snapshot = JSON.stringify(doc);
     run(doc, 'add_subdivision_solid', { box: { size: [1, 1, 1] } });
     expect(JSON.stringify(doc)).toBe(snapshot);
@@ -281,19 +262,11 @@ describe('add_subdivision_solid', () => {
 
   it('scales, round-trips and refuses corrupt saved cages', () => {
     const { doc, e } = created(empty, { box: { size: [2, 2, 2] }, levels: 1 });
-    const big = run(doc, 'scale_entity', { id: e.id, factor: 2 }).document.entities[
-      e.id
-    ] as SubdivisionEntity;
+    const big = run(doc, 'scale_entity', { id: e.id, factor: 2 }).document.entities[e.id] as SubdivisionEntity;
     expect(big.vertices[0]).toEqual([-2, -2, 2]);
     const loaded = run(empty, 'load_document', { json: serializeDocument(doc) });
     expect(loaded.document.entities[e.id]).toEqual(e);
-    for (const corrupt of [
-      { vertices: [[0, 0]] },
-      { faces: [[0, 'x']] },
-      { creases: [[0]] },
-      { levels: 9 },
-      { faces: e.faces.slice(1) },
-    ]) {
+    for (const corrupt of [{ vertices: [[0, 0]] }, { faces: [[0, 'x']] }, { creases: [[0]] }, { levels: 9 }, { faces: e.faces.slice(1) }]) {
       const bad = { ...doc, entities: { [e.id]: { ...e, ...corrupt } as unknown as Entity } };
       const result = run(empty, 'load_document', { json: serializeDocument(bad) });
       expect(result.summary, JSON.stringify(corrupt)).toContain('subdivision');
@@ -403,19 +376,12 @@ describe('edit_subdivision_cage', () => {
     [{ falloff: -1, translate: [0, 0, 1] }, 'falloff must be >= 0'],
     [{ scale: [1, 0, 1] }, 'scale factors must be > 0'],
     [{ levels: 7 }, 'levels must be an integer'],
-    [
-      { region: { min: [50, 50, 50], max: [60, 60, 60] }, translate: [0, 0, 1] },
-      'selection is empty',
-    ],
+    [{ region: { min: [50, 50, 50], max: [60, 60, 60] }, translate: [0, 0, 1] }, 'selection is empty'],
   ])('rejects bad edits (%#)', (params, text) => {
     const withBox = run(base.doc, 'add_box', { size: [1, 1, 1] });
     const boxId = withBox.affected[0] as string;
     const id = text === "expected 'subdivision'" ? boxId : base.e.id;
-    expectNoOp(
-      run(withBox.document, 'edit_subdivision_cage', { id, ...params }),
-      withBox.document,
-      text,
-    );
+    expectNoOp(run(withBox.document, 'edit_subdivision_cage', { id, ...params }), withBox.document, text);
   });
 
   it('is pure', () => {

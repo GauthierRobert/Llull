@@ -24,9 +24,7 @@ vi.mock('manifold-3d', async (importOriginal) => {
 
 /** Wrap every Manifold/CrossSection factory and derived-shape method; report what was never freed. */
 async function instrumentedKernel(): Promise<{
-  kernel: Awaited<
-    ReturnType<typeof import('@kernel-manifold/manifoldKernel').createManifoldKernel>
-  >;
+  kernel: Awaited<ReturnType<typeof import('@kernel-manifold/manifoldKernel').createManifoldKernel>>;
   leaked: () => number;
   created: () => number;
 }> {
@@ -71,10 +69,7 @@ async function instrumentedKernel(): Promise<{
 }
 
 const common = { layerId: 'layer-default', color: '#888888' };
-const placed = (
-  position: Vec3,
-  rotation: Vec3 = [0.2, 0.1, 0.3],
-): Pick<Entity, 'position' | 'rotation' | 'layerId' | 'color'> => ({
+const placed = (position: Vec3, rotation: Vec3 = [0.2, 0.1, 0.3]): Pick<Entity, 'position' | 'rotation' | 'layerId' | 'color'> => ({
   position,
   rotation,
   ...common,

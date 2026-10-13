@@ -23,13 +23,7 @@ export interface ParsedSurvey {
 }
 
 function splitFields(line: string): string[] {
-  const delimiter = line.includes(',')
-    ? ','
-    : line.includes(';')
-      ? ';'
-      : line.includes('\t')
-        ? '\t'
-        : /\s+/;
+  const delimiter = line.includes(',') ? ',' : line.includes(';') ? ';' : line.includes('\t') ? '\t' : /\s+/;
   return line
     .split(delimiter)
     .map((field) => field.trim())

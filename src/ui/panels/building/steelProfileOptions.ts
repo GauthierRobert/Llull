@@ -11,9 +11,7 @@ export const ALL_PROFILES: ReadonlyArray<SelectOption> = STEEL_PROFILES.map(
   (profile): SelectOption => [profile.name, `${profile.name} · ${profile.massPerMetre} kg/m`],
 );
 
-export const I_PROFILES: ReadonlyArray<SelectOption> = ALL_PROFILES.filter(([name]) =>
-  /^(IPE|HEA|HEB)/.test(name),
-);
+export const I_PROFILES: ReadonlyArray<SelectOption> = ALL_PROFILES.filter(([name]) => /^(IPE|HEA|HEB)/.test(name));
 
 export const MEMBER_ROLE_OPTIONS: ReadonlyArray<SelectOption> = [
   ['column', 'Column'],

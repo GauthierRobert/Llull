@@ -82,22 +82,13 @@ describe('shoe on a beam below the pipe', () => {
     expect(support?.pedestalHeight).toBeCloseTo(200, 6);
     const block = result.document.entities['pipeSupport-1:block'];
     expect(block?.kind === 'box' ? block.size[2] : 0).toBeCloseTo(200, 6);
-    expect(
-      Object.keys(result.document.entities).filter((id) => id.includes(':stop-')),
-    ).toHaveLength(2);
+    expect(Object.keys(result.document.entities).filter((id) => id.includes(':stop-'))).toHaveLength(2);
   });
 
   it('builds a cap and side stops for an anchor', () => {
     const result = execute(shoeDoc(), 'add_pipe_support', { ...SHOE_AT, type: 'anchor' });
-    const parts = Object.keys(result.document.entities).filter((id) =>
-      id.startsWith('pipeSupport-1:'),
-    );
-    expect(parts.sort()).toEqual([
-      'pipeSupport-1:block',
-      'pipeSupport-1:cap',
-      'pipeSupport-1:stop-left',
-      'pipeSupport-1:stop-right',
-    ]);
+    const parts = Object.keys(result.document.entities).filter((id) => id.startsWith('pipeSupport-1:'));
+    expect(parts.sort()).toEqual(['pipeSupport-1:block', 'pipeSupport-1:cap', 'pipeSupport-1:stop-left', 'pipeSupport-1:stop-right']);
   });
 
   it('accepts an explicit memberId and refuses one that cannot carry the pipe', () => {
@@ -289,36 +280,16 @@ describe('line selector and failures', () => {
 
   it.each([
     ['neither pipeId nor line', { at: [[0, 0, 0]] }, 'give exactly one of pipeId or line'],
-    [
-      'both pipeId and line',
-      { pipeId: 'pipe-1', line: 'L-1', at: [[0, 0, 0]] },
-      'exactly one of pipeId',
-    ],
-    [
-      'neither at nor spacing',
-      { pipeId: 'pipe-1' },
-      'exactly one of at (list of points) or spacing',
-    ],
-    [
-      'both at and spacing',
-      { pipeId: 'pipe-1', at: [[0, 0, 0]], spacing: 1000 },
-      'exactly one of at',
-    ],
+    ['both pipeId and line', { pipeId: 'pipe-1', line: 'L-1', at: [[0, 0, 0]] }, 'exactly one of pipeId'],
+    ['neither at nor spacing', { pipeId: 'pipe-1' }, 'exactly one of at (list of points) or spacing'],
+    ['both at and spacing', { pipeId: 'pipe-1', at: [[0, 0, 0]], spacing: 1000 }, 'exactly one of at'],
     ['spacing <= 0', { pipeId: 'pipe-1', spacing: 0 }, 'must be > 0'],
     ['negative maxReach', { ...SHOE_AT, maxReach: -1 }, 'must be > 0'],
     ['negative planTolerance', { ...SHOE_AT, planTolerance: -1 }, 'planTolerance >= 0'],
     ['unknown pipe', { pipeId: 'pipe-9', at: [[0, 0, 0]] }, "'pipe-9' is not a pipe element"],
-    [
-      'element that is not a pipe',
-      { pipeId: 'member-1', at: [[0, 0, 0]] },
-      'is not a pipe element',
-    ],
+    ['element that is not a pipe', { pipeId: 'member-1', at: [[0, 0, 0]] }, 'is not a pipe element'],
     ['unknown line', { line: 'L-9', at: [[0, 0, 0]] }, "no pipe carries line 'L-9'"],
-    [
-      'point far from the pipe',
-      { pipeId: 'pipe-1', at: [[3000, 3500, 3027.15]] },
-      'from the pipe(s)',
-    ],
+    ['point far from the pipe', { pipeId: 'pipe-1', at: [[3000, 3500, 3027.15]] }, 'from the pipe(s)'],
     ['point that is not 3D', { pipeId: 'pipe-1', at: [[3000, 2000]] }, 'is not [x, y, z]'],
     ['empty point list', { pipeId: 'pipe-1', at: [] }, 'no support could be placed'],
   ])('is a no-op for %s', (_label, params, text) => {
@@ -357,16 +328,13 @@ describe('line selector and failures', () => {
 });
 
 describe('support as a building element', () => {
-  const supported = (): CadDocument =>
-    execute(shoeDoc(), 'add_pipe_support', { ...SHOE_AT }).document;
+  const supported = (): CadDocument => execute(shoeDoc(), 'add_pipe_support', { ...SHOE_AT }).document;
 
   it('is deleted with its pipe', () => {
     const result = execute(supported(), 'delete_building_element', { elementIds: ['pipe-1'] });
     expect(supportsOf(result.document)).toEqual([]);
     expect(result.summary).toContain('pipe-1, pipeSupport-1');
-    expect(Object.keys(result.document.entities).some((id) => id.startsWith('pipeSupport'))).toBe(
-      false,
-    );
+    expect(Object.keys(result.document.entities).some((id) => id.startsWith('pipeSupport'))).toBe(false);
   });
 
   it('can be deleted alone', () => {
@@ -458,22 +426,11 @@ describe('deliverables', () => {
       csv: string;
     };
     expect(data.columns.slice(0, 5)).toEqual(['Mark', 'Line', 'Pipe', 'Type', 'Bears on']);
-    expect(data.rows).toEqual([
-      ['PS1', 'L-1', 'PL1', 'shoe', 'SB1', 3000, 2000, 3027.2, '', 'Ground', 'attached'],
-    ]);
+    expect(data.rows).toEqual([['PS1', 'L-1', 'PL1', 'shoe', 'SB1', 3000, 2000, 3027.2, '', 'Ground', 'attached']]);
     const hanger = execute(supported(), 'building_schedule', { kind: 'support' }).data as {
       rows: Array<Array<string | number>>;
     };
-    expect(hanger.rows[0]?.slice(3)).toEqual([
-      'hanger',
-      'SB1',
-      3000,
-      2000,
-      2000,
-      612.9,
-      'Floor',
-      'attached',
-    ]);
+    expect(hanger.rows[0]?.slice(3)).toEqual(['hanger', 'SB1', 3000, 2000, 2000, 612.9, 'Floor', 'attached']);
     const unattached = execute(shoeDoc(), 'add_pipe_support', {
       pipeId: 'pipe-1',
       at: [[500, 2000, 3027.15]],
@@ -494,32 +451,23 @@ describe('deliverables', () => {
       }
     ).lines;
     expect(lines.find((line) => line.key === 'pipe-support.hanger.ea')?.quantity).toBe(1);
-    expect(lines.find((line) => line.key === 'pipe-support.hanger-rod.m')?.quantity).toBeCloseTo(
-      0.613,
-      3,
-    );
+    expect(lines.find((line) => line.key === 'pipe-support.hanger-rod.m')?.quantity).toBeCloseTo(0.613, 3);
   });
 
   it('exports an IfcBuildingElementProxy PIPESUPPORT with a property set and stable GlobalIds', () => {
-    const ifc = (doc: CadDocument): string =>
-      (execute(doc, 'export_ifc', {}).data as { ifc: string }).ifc;
+    const ifc = (doc: CadDocument): string => (execute(doc, 'export_ifc', {}).data as { ifc: string }).ifc;
     const doc = supported();
     const text = ifc(doc);
     const proxy = text.split('\n').find((line) => line.includes("'pipeSupport-1'"));
-    expect(proxy).toMatch(
-      /^#\d+=IFCBUILDINGELEMENTPROXY\('[^']{22}',\$,'PS1','L-2 hanger','PIPESUPPORT',/,
-    );
+    expect(proxy).toMatch(/^#\d+=IFCBUILDINGELEMENTPROXY\('[^']{22}',\$,'PS1','L-2 hanger','PIPESUPPORT',/);
     expect(proxy).toContain('.ELEMENT.)');
     expect(text).toContain("'Pset_llullPipeSupport'");
-    expect(text).toContain(
-      "IFCPROPERTYSINGLEVALUE('SupportType','Shoe, hanger, guide or anchor',IFCLABEL('hanger'),$)",
-    );
+    expect(text).toContain("IFCPROPERTYSINGLEVALUE('SupportType','Shoe, hanger, guide or anchor',IFCLABEL('hanger'),$)");
     expect(text).toContain(
       "IFCPROPERTYSINGLEVALUE('BearsOn','Mark of the steel member it bears on (empty = unattached)',IFCLABEL('SB1'),$)",
     );
     expect(text).toContain('IFCLENGTHMEASURE(612.85)');
-    const guid = (text: string): string | undefined =>
-      /IFCBUILDINGELEMENTPROXY\('([^']{22})'/.exec(text)?.[1];
+    const guid = (text: string): string | undefined => /IFCBUILDINGELEMENTPROXY\('([^']{22})'/.exec(text)?.[1];
     const more = execute(doc, 'add_pipe_support', {
       pipeId: 'pipe-1',
       at: [[500, 2000, 2000]],
@@ -535,9 +483,7 @@ describe('deliverables', () => {
     expect(text).toContain("'L-1 guide','PIPESUPPORT'");
     const building = doc.building;
     if (!building) throw new Error('no building');
-    const elements = Object.fromEntries(
-      Object.entries(building.elements).filter(([id]) => id !== 'pipe-1'),
-    );
+    const elements = Object.fromEntries(Object.entries(building.elements).filter(([id]) => id !== 'pipe-1'));
     const orphan = {
       ...doc,
       building: {
@@ -553,8 +499,7 @@ describe('deliverables', () => {
 
 describe('clash rules', () => {
   const clashes = (doc: CadDocument): Array<{ a: string; b: string }> =>
-    (execute(doc, 'check_clashes', {}).data as { clashes: Array<{ a: string; b: string }> })
-      .clashes;
+    (execute(doc, 'check_clashes', {}).data as { clashes: Array<{ a: string; b: string }> }).clashes;
 
   it('does not report a support touching its own pipe and the steel it bears on', () => {
     const shoe = execute(shoeDoc(), 'add_pipe_support', { ...SHOE_AT, type: 'anchor' }).document;
@@ -580,9 +525,7 @@ describe('clash rules', () => {
       end: [4000, 2000, -700],
       levelId: 'level-2',
     });
-    const found = clashes(doc).filter(
-      (clash) => clash.a === 'pipeSupport-1' || clash.b === 'pipeSupport-1',
-    );
+    const found = clashes(doc).filter((clash) => clash.a === 'pipeSupport-1' || clash.b === 'pipeSupport-1');
     expect(found.length).toBeGreaterThan(0);
     let shoe = execute(shoeDoc(), 'add_pipe_support', { ...SHOE_AT }).document;
     shoe = step(shoe, 'add_pipe_run', {
@@ -593,9 +536,7 @@ describe('clash rules', () => {
         [3000, 4000, 2985],
       ],
     });
-    expect(
-      clashes(shoe).some((clash) => clash.a === 'pipeSupport-1' || clash.b === 'pipeSupport-1'),
-    ).toBe(true);
+    expect(clashes(shoe).some((clash) => clash.a === 'pipeSupport-1' || clash.b === 'pipeSupport-1')).toBe(true);
   });
 
   it('does not clash two supports with each other', () => {
@@ -605,10 +546,6 @@ describe('clash rules', () => {
       at: [[3150, 2000, 3027.15]],
       type: 'guide',
     }).document;
-    expect(
-      clashes(doc).filter(
-        (clash) => clash.a.startsWith('pipeSupport') && clash.b.startsWith('pipeSupport'),
-      ),
-    ).toEqual([]);
+    expect(clashes(doc).filter((clash) => clash.a.startsWith('pipeSupport') && clash.b.startsWith('pipeSupport'))).toEqual([]);
   });
 });

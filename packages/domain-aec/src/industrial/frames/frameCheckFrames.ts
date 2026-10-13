@@ -9,15 +9,7 @@ import { windCasesOf, type FrameLoads, type LoadCase } from './frameModelTypes';
 import { solveCombination } from './frameModelSolve';
 import { framesOf } from './frameModelFrames';
 import { memberBuckling, sectionResistance, yieldStrength } from '../steelDesign/steelDesign';
-import {
-  type CheckRow,
-  SLS_CRANE,
-  SLS_SWAY,
-  SLS_VERTICAL,
-  connectionCheck,
-  solveUltimate,
-  ultimateCombinations,
-} from './frameCheckSolve';
+import { type CheckRow, SLS_CRANE, SLS_SWAY, SLS_VERTICAL, connectionCheck, solveUltimate, ultimateCombinations } from './frameCheckSolve';
 
 /** Forces of a row that reports a stability or deflection limit rather than member forces. */
 const NO_FORCES = { axial: 0, moment: 0, shear: 0 } as const;
@@ -60,15 +52,11 @@ export function checkFrames(
       unstable += 1;
       continue;
     }
-    let stability: { alpha: number; column: string; combination: string; method: string } | null =
-      null;
+    let stability: { alpha: number; column: string; combination: string; method: string } | null = null;
     for (const { combination, outcome } of ultimate) {
       if (!outcome) continue;
       const { result, amplification } = outcome;
-      if (
-        outcome.criticalMember !== null &&
-        (stability === null || outcome.alphaCritical < stability.alpha)
-      ) {
+      if (outcome.criticalMember !== null && (stability === null || outcome.alphaCritical < stability.alpha)) {
         stability = {
           alpha: outcome.alphaCritical,
           column: outcome.criticalMember,
@@ -111,9 +99,7 @@ export function checkFrames(
       });
       for (const connection of Object.values(building.elements)) {
         if (connection.category !== 'connection') continue;
-        const index = frame.members.findIndex(
-          (analysis) => analysis.elementId === connection.rafterId,
-        );
+        const index = frame.members.findIndex((analysis) => analysis.elementId === connection.rafterId);
         const analysis = frame.members[index];
         const forces = result.members[index];
         if (!analysis || !forces) continue;

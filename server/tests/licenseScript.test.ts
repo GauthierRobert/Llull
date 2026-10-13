@@ -21,10 +21,7 @@ describe('scripts/license.mjs', () => {
     const key = path.join(dir, 'private.pem');
     const publicPem = run('keygen', '--out', key);
     const payload = path.join(dir, 'payload.json');
-    fs.writeFileSync(
-      payload,
-      JSON.stringify({ customer: 'Script Co', seats: 7, expires: '2999-01-01' }),
-    );
+    fs.writeFileSync(payload, JSON.stringify({ customer: 'Script Co', seats: 7, expires: '2999-01-01' }));
     const license = run('sign', payload, '--key', key).trim();
     expect(verifyLicense(license, publicPem)).toMatchObject({ mode: 'licensed', seats: 7 });
     expect(() => run('keygen', '--out', key)).toThrow();

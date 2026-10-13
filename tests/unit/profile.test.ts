@@ -28,12 +28,10 @@ const TRI_POINTS = [
 ];
 const docWithCircle = (): { doc: Doc; id: string } =>
   docWith('circle-1', { kind: 'circle', center: [0, 0], radius: 5, position: [1, 2, 0] });
-const docWithRectangle = (): { doc: Doc; id: string } =>
-  docWith('rect-1', { kind: 'rectangle', width: 4, height: 3 });
+const docWithRectangle = (): { doc: Doc; id: string } => docWith('rect-1', { kind: 'rectangle', width: 4, height: 3 });
 const docWithPolyline = (closed: boolean, id: string): { doc: Doc; id: string } =>
   docWith(id, { kind: 'polyline', points: TRI_POINTS, closed });
-const docWithLine = (): { doc: Doc; id: string } =>
-  docWith('line-1', { kind: 'line', start: [0, 0], end: [5, 5] });
+const docWithLine = (): { doc: Doc; id: string } => docWith('line-1', { kind: 'line', start: [0, 0], end: [5, 5] });
 
 const extrusionOf = (result: ReturnType<typeof execute>): ExtrusionEntity =>
   result.document.entities[result.affected[0]!] as ExtrusionEntity;
@@ -114,11 +112,7 @@ describe('extrude_profile', () => {
 
   it('missing id → graceful no-op', () => {
     const doc = createEmptyDocument();
-    expectNoOp(
-      execute(doc, 'extrude_profile', { id: 'nonexistent', depth: 5 }),
-      doc,
-      'nonexistent',
-    );
+    expectNoOp(execute(doc, 'extrude_profile', { id: 'nonexistent', depth: 5 }), doc, 'nonexistent');
   });
 
   it.each([

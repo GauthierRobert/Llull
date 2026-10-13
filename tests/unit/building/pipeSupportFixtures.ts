@@ -30,7 +30,5 @@ export function hangerDoc(): CadDocument {
 }
 
 export function supportsOf(doc: CadDocument): PipeSupportElement[] {
-  return Object.values(doc.building?.elements ?? {}).filter(
-    (element): element is PipeSupportElement => element.category === 'pipeSupport',
-  );
+  return Object.values(doc.building?.elements ?? {}).filter((element): element is PipeSupportElement => element.category === 'pipeSupport');
 }

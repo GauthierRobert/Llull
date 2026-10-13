@@ -39,10 +39,8 @@ export function resampleRing(polygon: ReadonlyArray<Vec2>, count = SECTION_RING_
     }
   });
   const start: Vec2 = [
-    (ccw[startEdge] as Vec2)[0] +
-      startT * ((ccw[(startEdge + 1) % ccw.length] as Vec2)[0] - (ccw[startEdge] as Vec2)[0]),
-    (ccw[startEdge] as Vec2)[1] +
-      startT * ((ccw[(startEdge + 1) % ccw.length] as Vec2)[1] - (ccw[startEdge] as Vec2)[1]),
+    (ccw[startEdge] as Vec2)[0] + startT * ((ccw[(startEdge + 1) % ccw.length] as Vec2)[0] - (ccw[startEdge] as Vec2)[0]),
+    (ccw[startEdge] as Vec2)[1] + startT * ((ccw[(startEdge + 1) % ccw.length] as Vec2)[1] - (ccw[startEdge] as Vec2)[1]),
   ];
   const loop: Vec2[] = [start];
   for (let k = 1; k <= ccw.length; k++) loop.push(ccw[(startEdge + k) % ccw.length] as Vec2);
@@ -67,10 +65,7 @@ export function resampleRing(polygon: ReadonlyArray<Vec2>, count = SECTION_RING_
 }
 
 /** `ring` cyclically shifted to best match `reference` point-for-point (least squared distance). */
-export function alignRing<P extends Vec2 | Vec3>(
-  ring: ReadonlyArray<P>,
-  reference: ReadonlyArray<P>,
-): P[] {
+export function alignRing<P extends Vec2 | Vec3>(ring: ReadonlyArray<P>, reference: ReadonlyArray<P>): P[] {
   let bestShift = 0;
   let bestCost = Infinity;
   for (let shift = 0; shift < ring.length; shift++) {
@@ -98,7 +93,5 @@ const RING_STEPS = 4;
 
 /** Dense sample of the ring's closed curve (RING_STEPS per ring point, same count for every ring). */
 export function sampleRing(ring: ReadonlyArray<Vec2 | Vec3>): Vec3[] {
-  return ringCurves(ring).flatMap((segment) =>
-    Array.from({ length: RING_STEPS }, (_, s) => segmentPoint(segment, s / RING_STEPS)),
-  );
+  return ringCurves(ring).flatMap((segment) => Array.from({ length: RING_STEPS }, (_, s) => segmentPoint(segment, s / RING_STEPS)));
 }

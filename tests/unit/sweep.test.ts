@@ -1,11 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  type CadDocument,
-  type Entity,
-  type SweepEntity,
-  DEFAULT_LAYER_ID,
-  createEmptyDocument,
-} from '@core/model/types';
+import { type CadDocument, type Entity, type SweepEntity, DEFAULT_LAYER_ID, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { serializeDocument } from '@core/commands/persistence/serialization';
 import { entityBounds } from '@core/geometry/bounds';
@@ -336,11 +330,7 @@ describe('sweep_profile — failures are no-ops', () => {
 
   it('rejects a duplicate explicit id', () => {
     const first = execute(empty, 'sweep_profile', { path: L_PATH, radius: 1, id: 'p' }).document;
-    expectNoOp(
-      execute(first, 'sweep_profile', { path: L_PATH, radius: 1, id: 'p' }),
-      first,
-      'already exists',
-    );
+    expectNoOp(execute(first, 'sweep_profile', { path: L_PATH, radius: 1, id: 'p' }), first, 'already exists');
   });
 });
 
@@ -375,8 +365,7 @@ describe('sweep entity across the kind dispatch', () => {
 
   it('rotation-minimizing frames stay orthonormal along the path', () => {
     for (const frame of sweepFrames(bar.path)) {
-      const dot = (a: readonly number[], b: readonly number[]): number =>
-        a.reduce((sum, v, k) => sum + v * (b[k] ?? 0), 0);
+      const dot = (a: readonly number[], b: readonly number[]): number => a.reduce((sum, v, k) => sum + v * (b[k] ?? 0), 0);
       expect(dot(frame.normal, frame.tangent)).toBeCloseTo(0, 9);
       expect(dot(frame.binormal, frame.normal)).toBeCloseTo(0, 9);
       expect(dot(frame.normal, frame.normal)).toBeCloseTo(1, 9);
@@ -399,25 +388,19 @@ describe('sweep entity across the kind dispatch', () => {
 
   it('scale_entity scales path, radii and section curves', () => {
     const doc = { ...empty, entities: { [pipe.id]: pipe }, order: [pipe.id] };
-    const scaled = execute(doc, 'scale_entity', { id: pipe.id, factor: 2 }).document.entities[
-      pipe.id
-    ] as SweepEntity;
+    const scaled = execute(doc, 'scale_entity', { id: pipe.id, factor: 2 }).document.entities[pipe.id] as SweepEntity;
     expect(scaled.section).toEqual({ shape: 'circle', radius: 2, innerRadius: 1 });
     expect(scaled.path[2]?.points[1]).toEqual([20, 20, 0]);
     expect(volumeOf(scaled)).toBeCloseTo(volumeOf(pipe) * 8, 6);
 
-    const sketched = sweepOf(
-      docWith({ id: 'e', kind: 'ellipse', center: [0, 0], radiusX: 1, radiusY: 0.5 }),
-      {
-        path: L_PATH,
-        sectionId: 'e',
-      },
-    );
-    const big = execute(
-      { ...empty, entities: { [sketched.id]: sketched }, order: [sketched.id] },
-      'scale_entity',
-      { id: sketched.id, factor: 3 },
-    ).document.entities[sketched.id] as SweepEntity;
+    const sketched = sweepOf(docWith({ id: 'e', kind: 'ellipse', center: [0, 0], radiusX: 1, radiusY: 0.5 }), {
+      path: L_PATH,
+      sectionId: 'e',
+    });
+    const big = execute({ ...empty, entities: { [sketched.id]: sketched }, order: [sketched.id] }, 'scale_entity', {
+      id: sketched.id,
+      factor: 3,
+    }).document.entities[sketched.id] as SweepEntity;
     expect(big.section.shape === 'profile' && big.section.curves?.[0]?.points[0]).toEqual([3, 0]);
   });
 
@@ -585,16 +568,8 @@ describe('closed-path sweeps', () => {
         ],
       },
     );
-    expect(
-      sweepOf(doc, { pathId: 'r', radius: 1 }).path.filter((s) => s.type === 'arc'),
-    ).toHaveLength(4);
-    expect(
-      sweepOf(doc, { pathId: 'p', radius: 1 }).path.filter((s) => s.type === 'arc'),
-    ).toHaveLength(3);
-    expectNoOp(
-      execute(doc, 'sweep_profile', { pathId: 'p', radius: 1, bendRadius: 40 }),
-      doc,
-      'too large',
-    );
+    expect(sweepOf(doc, { pathId: 'r', radius: 1 }).path.filter((s) => s.type === 'arc')).toHaveLength(4);
+    expect(sweepOf(doc, { pathId: 'p', radius: 1 }).path.filter((s) => s.type === 'arc')).toHaveLength(3);
+    expectNoOp(execute(doc, 'sweep_profile', { pathId: 'p', radius: 1, bendRadius: 40 }), doc, 'too large');
   });
 });

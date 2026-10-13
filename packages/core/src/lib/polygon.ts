@@ -7,10 +7,7 @@ import { centroid2, lerp2, orient2 } from './vec2';
 export type Point2 = Vec2;
 
 /** Calls `visit(x1, y1, x2, y2, cross)` for each closed-polygon edge; cross = x1*y2 - x2*y1. */
-function forEachEdge(
-  points: ReadonlyArray<Point2>,
-  visit: (x1: number, y1: number, x2: number, y2: number, cross: number) => void,
-): void {
+function forEachEdge(points: ReadonlyArray<Point2>, visit: (x1: number, y1: number, x2: number, y2: number, cross: number) => void): void {
   for (let i = 0; i < points.length; i++) {
     const [x1, y1] = points[i] as Point2;
     const [x2, y2] = points[(i + 1) % points.length] as Point2;
@@ -72,11 +69,7 @@ export function distance(a: Point2, b: Point2): number {
 }
 
 /** Distance from `p` to segment `a`→`b` and the clamped parameter t ∈ [0,1] of the foot point. */
-export function projectOntoSegment(
-  p: Point2,
-  a: Point2,
-  b: Point2,
-): { distance: number; t: number } {
+export function projectOntoSegment(p: Point2, a: Point2, b: Point2): { distance: number; t: number } {
   const dx = b[0] - a[0];
   const dy = b[1] - a[1];
   const lengthSquared = dx * dx + dy * dy;
@@ -87,11 +80,7 @@ export function projectOntoSegment(
 
 /** True when the polygon has ≥ 3 finite vertices and a non-zero area. */
 export function isValidPolygon(points: ReadonlyArray<Point2>): boolean {
-  return (
-    points.length >= 3 &&
-    points.every(([x, y]) => Number.isFinite(x) && Number.isFinite(y)) &&
-    polygonArea(points) > 1e-12
-  );
+  return points.length >= 3 && points.every(([x, y]) => Number.isFinite(x) && Number.isFinite(y)) && polygonArea(points) > 1e-12;
 }
 
 /**
@@ -121,12 +110,7 @@ export function offsetPolygon(points: ReadonlyArray<Point2>, delta: number): Poi
  * Parameters `{ t, u }` of the crossing of the infinite lines P(t) = p + t(q − p) and
  * Q(u) = r + u(s − r), or null when parallel/collinear. t and u are not clamped to [0, 1].
  */
-export function lineIntersectionParams(
-  p: Point2,
-  q: Point2,
-  r: Point2,
-  s: Point2,
-): { t: number; u: number } | null {
+export function lineIntersectionParams(p: Point2, q: Point2, r: Point2, s: Point2): { t: number; u: number } | null {
   const dx1 = q[0] - p[0];
   const dy1 = q[1] - p[1];
   const dx2 = s[0] - r[0];
@@ -163,10 +147,7 @@ export function pointInPolygon(point: Point2, polygon: ReadonlyArray<Point2>): b
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
     const [xi, yi] = polygon[i] as Point2;
     const [xj, yj] = polygon[j] as Point2;
-    if (
-      yi > point[1] !== yj > point[1] &&
-      point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi) + xi
-    ) {
+    if (yi > point[1] !== yj > point[1] && point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi) + xi) {
       inside = !inside;
     }
   }

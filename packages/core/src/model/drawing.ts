@@ -99,9 +99,7 @@ export type DrawingPrimitive =
     };
 
 /** [minX, minY, maxX, maxY] of `primitives` (arcs and circles by their full circle); [0, 0, 0, 0] when empty. @pure */
-export function drawingBounds(
-  primitives: ReadonlyArray<DrawingPrimitive>,
-): [number, number, number, number] {
+export function drawingBounds(primitives: ReadonlyArray<DrawingPrimitive>): [number, number, number, number] {
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;

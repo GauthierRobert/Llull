@@ -7,10 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import { isTestRun } from './env';
 
-const ENV_FILE_CANDIDATES = [
-  path.resolve(__dirname, '..', '..', '.env'),
-  path.resolve(__dirname, '..', '.env'),
-];
+const ENV_FILE_CANDIDATES = [path.resolve(__dirname, '..', '..', '.env'), path.resolve(__dirname, '..', '.env')];
 
 if (!isTestRun()) {
   for (const envFilePath of ENV_FILE_CANDIDATES) {

@@ -3,13 +3,7 @@ import { type MeshSolidEntity, type CadDocument, createEmptyDocument } from '@co
 import { execute } from '@core/commands/registry';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import type { MeshData } from '@core/model/types';
-import {
-  TETRA,
-  fakeKernel,
-  type FakeCall,
-  type FakeKernel,
-  type FakeKernelSpec,
-} from '../helpers/fakeKernel';
+import { TETRA, fakeKernel, type FakeCall, type FakeKernel, type FakeKernelSpec } from '../helpers/fakeKernel';
 
 // Canned meshes
 
@@ -100,11 +94,8 @@ describe('modify3d commands', () => {
   });
 
   describe.each(CASES)('$cmd', ({ cmd, op, key, size, other, mesh, edges }) => {
-    const run = (
-      doc: CadDocument,
-      id: string,
-      extra: Record<string, unknown> = {},
-    ): ReturnType<typeof execute> => execute(doc, cmd, { id, [key]: size, ...extra });
+    const run = (doc: CadDocument, id: string, extra: Record<string, unknown> = {}): ReturnType<typeof execute> =>
+      execute(doc, cmd, { id, [key]: size, ...extra });
 
     it('creates a new mesh entity and marks it as affected', () => {
       const { doc, boxId } = docWithBox();

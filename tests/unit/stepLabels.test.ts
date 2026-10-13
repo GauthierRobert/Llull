@@ -51,9 +51,7 @@ describe('labelStep', () => {
   it('styles every solid with one shared color chain per distinct color', () => {
     expect(labeled.match(/COLOUR_RGB\('',1\.000,0\.000,0\.000\)/g)).toHaveLength(1);
     expect(labeled.match(/STYLED_ITEM\('color',\(#\d+\),#(15|359)\)/g)).toHaveLength(2);
-    expect(labeled).toMatch(
-      /MECHANICAL_DESIGN_GEOMETRIC_PRESENTATION_REPRESENTATION\('',\(#\d+,#\d+\),#345\)/,
-    );
+    expect(labeled).toMatch(/MECHANICAL_DESIGN_GEOMETRIC_PRESENTATION_REPRESENTATION\('',\(#\d+,#\d+\),#345\)/);
     const ids = [...labeled.matchAll(/^#(\d+) = /gm)].map((m) => m[1]);
     expect(new Set(ids).size).toBe(ids.length);
     expect(labeled.indexOf('STYLED_ITEM')).toBeLessThan(labeled.lastIndexOf('ENDSEC;'));

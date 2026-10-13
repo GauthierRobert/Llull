@@ -46,9 +46,7 @@ export const surfaceElevation = defineCommand({
     const listed = samples
       .slice(0, 5)
       .map((sample) =>
-        sample.elevation === null
-          ? 'outside'
-          : `${toMetres(doc, sample.elevation).toFixed(3)} m (${sample.slopePercent} %)`,
+        sample.elevation === null ? 'outside' : `${toMetres(doc, sample.elevation).toFixed(3)} m (${sample.slopePercent} %)`,
       )
       .join('; ');
     return report(

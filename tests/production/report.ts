@@ -34,12 +34,7 @@ export function writeReport(report: ScenarioReport, extra: Record<string, unknow
 }
 
 /** Store a deliverable the driver produced (downloaded file, agent transcript…) next to the report. */
-export function writeArtifact(
-  driver: string,
-  scenario: string,
-  name: string,
-  text: string,
-): string {
+export function writeArtifact(driver: string, scenario: string, name: string, text: string): string {
   const dir = path.join(REPORT_ROOT, driver, scenario);
   mkdirSync(dir, { recursive: true });
   const file = path.join(dir, name);
@@ -54,12 +49,7 @@ function readReports(): ScenarioReport[] {
     .flatMap((dir) =>
       readdirSync(path.join(REPORT_ROOT, dir.name))
         .filter((name) => name.endsWith('.json'))
-        .map(
-          (name) =>
-            JSON.parse(
-              readFileSync(path.join(REPORT_ROOT, dir.name, name), 'utf8'),
-            ) as ScenarioReport,
-        ),
+        .map((name) => JSON.parse(readFileSync(path.join(REPORT_ROOT, dir.name, name), 'utf8')) as ScenarioReport),
     );
 }
 
@@ -74,18 +64,14 @@ export function formatReport(report: ScenarioReport): string {
         `| ${check.pass ? '✅' : check.known ? '⚠️' : '❌'} | ${check.id} | ${check.area} | ${check.detail.replace(/\|/g, '\\|')} |`,
     ),
   ];
-  if (report.regressions.length > 0)
-    lines.push('', `**Regressions:** ${report.regressions.join(', ')}`);
-  if (report.fixed.length > 0)
-    lines.push('', `**Fixed (remove from knownIssues):** ${report.fixed.join(', ')}`);
+  if (report.regressions.length > 0) lines.push('', `**Regressions:** ${report.regressions.join(', ')}`);
+  if (report.fixed.length > 0) lines.push('', `**Fixed (remove from knownIssues):** ${report.fixed.join(', ')}`);
   return lines.join('\n');
 }
 
 function writeSummary(): void {
   mkdirSync(REPORT_ROOT, { recursive: true });
-  const reports = readReports().sort((a, b) =>
-    `${a.scenario}${a.driver}`.localeCompare(`${b.scenario}${b.driver}`),
-  );
+  const reports = readReports().sort((a, b) => `${a.scenario}${a.driver}`.localeCompare(`${b.scenario}${b.driver}`));
   const text = [
     '# Production scenarios — summary',
     '',

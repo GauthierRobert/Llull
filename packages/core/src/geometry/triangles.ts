@@ -24,8 +24,5 @@ export function fanTriangulate(verts: Vec3[]): Triangle[] {
  */
 export function earClipTriangulateVerts(verts: Vec3[]): Triangle[] {
   const indexTris = earClipTriangulate(verts.map((v) => [v[0], v[1]] as const));
-  return indexTris.map(
-    ([ia, ib, ic]) =>
-      [elementAt(verts, ia), elementAt(verts, ib), elementAt(verts, ic)] as Triangle,
-  );
+  return indexTris.map(([ia, ib, ic]) => [elementAt(verts, ia), elementAt(verts, ib), elementAt(verts, ic)] as Triangle);
 }

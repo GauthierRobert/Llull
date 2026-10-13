@@ -35,11 +35,7 @@ const MATERIALS: ReadonlyArray<readonly [string, string]> = [
 
 /** Thickness / optional height / material fields shared by every wall tool. */
 function wallSectionFields(thickness: string, material: string): ToolField[] {
-  return [
-    num('thickness', 'Thickness', thickness),
-    num('height', 'Height', '', true),
-    select('material', 'Material', material, MATERIALS),
-  ];
+  return [num('thickness', 'Thickness', thickness), num('height', 'Height', '', true), select('material', 'Material', material, MATERIALS)];
 }
 
 /** A wall tool: `geometry` fields + the shared section fields -> ONE `command` on the level. */
@@ -123,12 +119,7 @@ function rectangle(reader: FieldReader): Array<[number, number]> {
   return corners([...reader.point('x1', 'y1'), ...reader.point('x2', 'y2')]);
 }
 
-const RECTANGLE_FIELDS = [
-  num('x1', 'X1', '0'),
-  num('y1', 'Y1', '0'),
-  num('x2', 'X2', '5000'),
-  num('y2', 'Y2', '4000'),
-];
+const RECTANGLE_FIELDS = [num('x1', 'X1', '0'), num('y1', 'Y1', '0'), num('x2', 'X2', '5000'), num('y2', 'Y2', '4000')];
 
 /** Slab / room outline: the level's walls, or the form's rectangle. */
 function outline(
@@ -167,12 +158,7 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
   wallTool(
     'wall',
     'Wall',
-    [
-      num('x1', 'Start X', '0'),
-      num('y1', 'Start Y', '0'),
-      num('x2', 'End X', '5000'),
-      num('y2', 'End Y', '0'),
-    ],
+    [num('x1', 'Start X', '0'), num('y1', 'Start Y', '0'), num('x2', 'End X', '5000'), num('y2', 'End Y', '0')],
     ['200', 'concrete'],
     'draw_walls',
     (reader) => ({ points: [reader.point('x1', 'y1'), reader.point('x2', 'y2')] }),
@@ -202,19 +188,11 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     fields: [
       checkbox('allWalls', 'Every wall of the level', true),
       select('wallId', 'Wall', '', 'walls'),
-      txt(
-        'layers',
-        'Layers (outside → inside)',
-        '20 render finish; 120 mineral-wool insulation; 200 concrete structure; 13 gypsum finish',
-      ),
+      txt('layers', 'Layers (outside → inside)', '20 render finish; 120 mineral-wool insulation; 200 concrete structure; 13 gypsum finish'),
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
-      const wallIds = reader.flag('allWalls')
-        ? [...context.wallIds]
-        : reader.text('wallId') === ''
-          ? []
-          : [reader.text('wallId')];
+      const wallIds = reader.flag('allWalls') ? [...context.wallIds] : reader.text('wallId') === '' ? [] : [reader.text('wallId')];
       if (wallIds.length === 0) return { ok: false, reason: 'Pick a wall first.' };
       const layers = reader
         .text('layers')
@@ -244,14 +222,9 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     'add_door',
     (reader) => ({ swing: reader.text('swing') }),
   ),
-  hostedOpeningTool(
-    'window',
-    'Window',
-    ['1200', '1200'],
-    [num('sillHeight', 'Sill height', '900')],
-    'add_window',
-    (reader) => ({ sillHeight: reader.number('sillHeight') }),
-  ),
+  hostedOpeningTool('window', 'Window', ['1200', '1200'], [num('sillHeight', 'Sill height', '900')], 'add_window', (reader) => ({
+    sillHeight: reader.number('sillHeight'),
+  })),
   {
     id: 'slab',
     label: 'Slab / roof',
@@ -275,8 +248,7 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     build: (values, context) => {
       const reader = new FieldReader(values);
       const shape = outline(reader, context.wallIds, context.gridExtent ?? null);
-      if (shape === null)
-        return { ok: false, reason: 'No structural grid to take the extent from.' };
+      if (shape === null) return { ok: false, reason: 'No structural grid to take the extent from.' };
       return result(reader, 'add_slab', {
         ...shape,
         thickness: reader.number('thickness'),
@@ -335,9 +307,7 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
-      const position = reader.flag('atGrid')
-        ? { atGridIntersections: true }
-        : { location: reader.point('x', 'y') };
+      const position = reader.flag('atGrid') ? { atGridIntersections: true } : { location: reader.point('x', 'y') };
       return result(reader, 'add_column', {
         ...position,
         shape: reader.text('shape'),

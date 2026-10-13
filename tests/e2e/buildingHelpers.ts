@@ -23,18 +23,13 @@ export async function openBuilding(page: Page): Promise<void> {
   await expect(page.getByTestId('building-panel')).toBeVisible();
 }
 
-export async function applyTool(
-  page: Page,
-  tool: string,
-  fields: Record<string, string> = {},
-): Promise<void> {
+export async function applyTool(page: Page, tool: string, fields: Record<string, string> = {}): Promise<void> {
   await page.getByTestId('building-tool-select').selectOption(tool);
   for (const [key, value] of Object.entries(fields)) {
     const field = page.getByTestId(`tool-field-${key}`);
     const tag = await field.evaluate((element) => element.tagName);
     if (tag === 'SELECT') await field.selectOption(value);
-    else if ((await field.getAttribute('type')) === 'checkbox')
-      await field.setChecked(value === 'true');
+    else if ((await field.getAttribute('type')) === 'checkbox') await field.setChecked(value === 'true');
     else await field.fill(value);
   }
   await page.getByTestId('tool-submit').click();
@@ -51,21 +46,14 @@ export async function captureDownloads(page: Page): Promise<void> {
     Object.assign(window, { __downloads: captured });
     const originalClick = HTMLAnchorElement.prototype.click;
     HTMLAnchorElement.prototype.click = function click(this: HTMLAnchorElement): void {
-      if (this.href.startsWith('blob:'))
-        captured.push(fetch(this.href).then((response) => response.text()));
+      if (this.href.startsWith('blob:')) captured.push(fetch(this.href).then((response) => response.text()));
       originalClick.call(this);
     };
   });
 }
 
-export async function downloadText(
-  page: Page,
-  trigger: () => Promise<void>,
-): Promise<{ name: string; text: string }> {
-  const [download]: [Download, void] = await Promise.all([
-    page.waitForEvent('download'),
-    trigger(),
-  ]);
+export async function downloadText(page: Page, trigger: () => Promise<void>): Promise<{ name: string; text: string }> {
+  const [download]: [Download, void] = await Promise.all([page.waitForEvent('download'), trigger()]);
   const text = await page.evaluate(async () => {
     const downloads = (window as unknown as { __downloads: Array<Promise<string>> }).__downloads;
     return (await downloads[downloads.length - 1]) ?? '';
@@ -75,10 +63,7 @@ export async function downloadText(
 
 /** Loads `text` into the project file input as if the user picked a file. */
 /** Selects the `kind` schedule and downloads it as CSV. */
-export async function scheduleCsv(
-  page: Page,
-  kind: string,
-): Promise<{ name: string; text: string }> {
+export async function scheduleCsv(page: Page, kind: string): Promise<{ name: string; text: string }> {
   await page.getByLabel('Schedule').selectOption(kind);
   return downloadText(page, () => page.getByRole('button', { name: 'Schedule CSV' }).click());
 }
@@ -95,5 +80,4 @@ export async function openProjectFile(page: Page, text: string): Promise<void> {
     }, text);
 }
 
-export const status = (page: Page): ReturnType<Page['getByTestId']> =>
-  page.getByTestId('building-last-summary');
+export const status = (page: Page): ReturnType<Page['getByTestId']> => page.getByTestId('building-last-summary');

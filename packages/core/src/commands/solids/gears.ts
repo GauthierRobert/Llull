@@ -8,13 +8,7 @@ import type { CommandResult } from '../types';
 import { defineCommand, z, colorField, nameField, looseVec3 } from '../schema';
 import { nextId } from '../../lib/id';
 import { compactNumber as fmt, vecText } from '../../lib/compactNumber';
-import {
-  DEFAULT_FLANK_SAMPLES,
-  externalGearPattern,
-  pitchRadiusOf,
-  toothOutline,
-  toothProfile,
-} from '../../lib/gearOutline';
+import { DEFAULT_FLANK_SAMPLES, externalGearPattern, pitchRadiusOf, toothOutline, toothProfile } from '../../lib/gearOutline';
 import { circleThrough, ringMesh } from '../../geometry/prismMesh';
 import { moduleProblem, placedMeshEntity, toothShapeProblem } from './gearSolid';
 import { finiteVec3OrZero } from '../../lib/vec3';
@@ -80,17 +74,11 @@ export const addSpurGear = defineCommand({
       ),
     pressureAngle: z
       .number()
-      .describe(
-        'Pressure angle in RADIANS. Must be in (0, π/2). ' +
-          'Standard value: 0.3491 rad (20°). Omit to use the 20° default.',
-      )
+      .describe('Pressure angle in RADIANS. Must be in (0, π/2). ' + 'Standard value: 0.3491 rad (20°). Omit to use the 20° default.')
       .optional(),
     faceWidth: z
       .number()
-      .describe(
-        'Gear face width (thickness along Z) in document units. Must be > 0. ' +
-          'Typical: 8–12× module for spur gears.',
-      ),
+      .describe('Gear face width (thickness along Z) in document units. Must be > 0. ' + 'Typical: 8–12× module for spur gears.'),
     bore: z
       .number()
       .describe(
@@ -99,14 +87,12 @@ export const addSpurGear = defineCommand({
       )
       .optional(),
     position: looseVec3(
-      'World-space center of the gear [x, y, z] in document units. ' +
-        'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
+      'World-space center of the gear [x, y, z] in document units. ' + 'Right-handed frame, +Z up. Defaults to [0, 0, 0].',
     ).optional(),
     rotation: z
       .array(z.number())
       .describe(
-        `${ROTATION_CONVENTION}. Defaults to [0, 0, 0]. ` +
-          'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
+        `${ROTATION_CONVENTION}. Defaults to [0, 0, 0]. ` + 'If non-finite or not length-3 the rotation is ignored and [0,0,0] is used.',
       )
       .optional(),
     color: colorField(DEFAULT_GEAR_COLOR),
@@ -132,9 +118,7 @@ export const addSpurGear = defineCommand({
 
     const teethInt = teeth;
     if (teethInt < 3 || teethInt > MAX_GEAR_TEETH) {
-      return fail(
-        `teeth must be a finite integer in [3, ${MAX_GEAR_TEETH}], got ${String(teeth)}.`,
-      );
+      return fail(`teeth must be a finite integer in [3, ${MAX_GEAR_TEETH}], got ${String(teeth)}.`);
     }
 
     const shapeProblem = toothShapeProblem(pressureAngle, faceWidth);
@@ -149,9 +133,7 @@ export const addSpurGear = defineCommand({
     const resolvedPosition = finiteVec3OrZero(position);
     const resolvedRotation = finiteVec3OrZero(rotation);
 
-    const { points: profile, curves } = toothProfile(
-      externalGearPattern(mod, teethInt, pressureAngle, DEFAULT_FLANK_SAMPLES),
-    );
+    const { points: profile, curves } = toothProfile(externalGearPattern(mod, teethInt, pressureAngle, DEFAULT_FLANK_SAMPLES));
 
     const pitchDiameter = mod * teethInt;
     const outerDiameter = pitchDiameter + 2 * mod;
@@ -159,25 +141,11 @@ export const addSpurGear = defineCommand({
     const id = nextId('gear');
     const entity =
       bore > 0
-        ? placedMeshEntity(
-            id,
-            ringMesh(profile, circleThrough(profile, bore), faceWidth),
-            resolvedPosition,
-            resolvedRotation,
-            color,
+        ? placedMeshEntity(id, ringMesh(profile, circleThrough(profile, bore), faceWidth), resolvedPosition, resolvedRotation, color, name)
+        : newEntity('extrusion', id, { profile, depth: faceWidth, curves }, resolvedPosition, color, {
+            rotation: resolvedRotation,
             name,
-          )
-        : newEntity(
-            'extrusion',
-            id,
-            { profile, depth: faceWidth, curves },
-            resolvedPosition,
-            color,
-            {
-              rotation: resolvedRotation,
-              name,
-            },
-          );
+          });
 
     return commitSolid(
       doc,

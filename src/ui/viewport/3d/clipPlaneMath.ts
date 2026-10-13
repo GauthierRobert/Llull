@@ -19,12 +19,7 @@ export interface RenderClipPlane {
 }
 
 /** @pure */
-export function renderClipPlane(
-  axis: ClipAxis,
-  flipped: boolean,
-  offset: number,
-  renderOrigin: Vec3,
-): RenderClipPlane {
+export function renderClipPlane(axis: ClipAxis, flipped: boolean, offset: number, renderOrigin: Vec3): RenderClipPlane {
   const index = AXIS_INDEX[axis];
   const sign = flipped ? -1 : 1;
   const normal: [number, number, number] = [0, 0, 0];

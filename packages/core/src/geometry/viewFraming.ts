@@ -29,18 +29,11 @@ export interface FramingOptions {
  * horizontal half-angles of the viewport camera, times `padding`.
  * @param aspect viewport width / height (default square)
  */
-export function fitFraming(
-  bounds: Bounds,
-  aspect = 1,
-  padding = 1.2,
-  options: FramingOptions = {},
-): Framing {
+export function fitFraming(bounds: Bounds, aspect = 1, padding = 1.2, options: FramingOptions = {}): Framing {
   const { degenerateBelow = 0.001, degenerateRadius = 1 } = options;
   const extentRadius = boundsDiagonalRadius(bounds);
-  const radius =
-    extentRadius > 0 && extentRadius >= degenerateBelow ? extentRadius : degenerateRadius;
+  const radius = extentRadius > 0 && extentRadius >= degenerateBelow ? extentRadius : degenerateRadius;
   const halfVertical = toRadians(VIEWPORT_FOV_DEGREES / 2);
-  const halfAngle =
-    aspect >= 1 ? halfVertical : Math.atan(Math.tan(halfVertical) * Math.max(aspect, 1e-3));
+  const halfAngle = aspect >= 1 ? halfVertical : Math.atan(Math.tan(halfVertical) * Math.max(aspect, 1e-3));
   return { center: boundsCenter(bounds), distance: (radius / Math.sin(halfAngle)) * padding };
 }

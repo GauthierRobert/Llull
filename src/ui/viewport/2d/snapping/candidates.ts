@@ -8,11 +8,7 @@ import type { CadDocument, Vec2 } from '@core/model/types';
 import { wrapAngle } from '@lib/angle';
 import { solidSnaps } from '../solidDrawing';
 import type { CollectOpts, SnapPoint, SnapType } from './types';
-import {
-  curveCurveIntersections,
-  segmentCurveIntersections,
-  type CircularCurve,
-} from './curveIntersections';
+import { curveCurveIntersections, segmentCurveIntersections, type CircularCurve } from './curveIntersections';
 import { allSegmentIntersections } from './segmentSweep';
 import {
   entityToSegments,
@@ -84,14 +80,7 @@ export function collectSnapCandidates(
   };
 
   /** Tangent + nearest snaps shared by arcs (full = false) and circles (full = true). */
-  const addCurveSnaps = (
-    cx: number,
-    cy: number,
-    r: number,
-    startAngle: number,
-    endAngle: number,
-    full: boolean,
-  ): void => {
+  const addCurveSnaps = (cx: number, cy: number, r: number, startAngle: number, endAngle: number, full: boolean): void => {
     allCurves.push({ cx, cy, r, startAngle, endAngle, full });
     if (doTangents) {
       for (const snap of snapTangentToCircle(from, cx, cy, r)) {
@@ -150,10 +139,7 @@ export function collectSnapCandidates(
         const { radius: r } = entity;
         const startAngle = entity.startAngle + rotationZ;
         const endAngle = entity.endAngle + rotationZ;
-        const onArc = (angle: number): [number, number] => [
-          cx + r * Math.cos(angle),
-          cy + r * Math.sin(angle),
-        ];
+        const onArc = (angle: number): [number, number] => [cx + r * Math.cos(angle), cy + r * Math.sin(angle)];
 
         if (doCenters) add('center', cx, cy);
         if (doEndpoints) {
@@ -162,8 +148,7 @@ export function collectSnapCandidates(
         }
         // Midpoint along the SWEPT arc (direction-respecting), so an arc that crosses the 0/2π
         // wrap still lands on the arc itself rather than the opposite side.
-        if (doMidpoints)
-          add('midpoint', ...onArc(startAngle + wrapAngle(endAngle - startAngle) / 2));
+        if (doMidpoints) add('midpoint', ...onArc(startAngle + wrapAngle(endAngle - startAngle) / 2));
         addCurveSnaps(cx, cy, r, startAngle, endAngle, false);
         break;
       }
@@ -232,12 +217,7 @@ export function collectSnapCandidates(
       default:
         if (!doSolidSnaps) break;
         for (const snap of solidSnaps(document, entity, opts.cutDepth)) {
-          const wanted =
-            snap.type === 'endpoint'
-              ? doEndpoints
-              : snap.type === 'midpoint'
-                ? doMidpoints
-                : doCenters;
+          const wanted = snap.type === 'endpoint' ? doEndpoints : snap.type === 'midpoint' ? doMidpoints : doCenters;
           if (wanted) candidates.push(snap);
         }
         break;

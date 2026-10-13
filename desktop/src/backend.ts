@@ -49,9 +49,7 @@ function settingsPath(userDataDir: string): string {
 function rememberedPort(userDataDir: string): number | null {
   const parsed = readJsonFile(settingsPath(userDataDir));
   const port = isRecord(parsed) ? parsed['port'] : undefined;
-  return typeof port === 'number' && Number.isInteger(port) && port > 0 && port < 65536
-    ? port
-    : null;
+  return typeof port === 'number' && Number.isInteger(port) && port > 0 && port < 65536 ? port : null;
 }
 
 /** The remembered port when free, else the default when free, else any free port (remembered). */
@@ -85,10 +83,7 @@ async function waitForHealth(url: string, exited: () => string | null): Promise<
     const exitReason = exited();
     if (exitReason !== null) throw new Error(exitReason);
     if (await isHealthy(url)) return;
-    if (Date.now() > deadline)
-      throw new Error(
-        `the local backend did not answer ${url}/health within ${HEALTH_TIMEOUT_MS} ms`,
-      );
+    if (Date.now() > deadline) throw new Error(`the local backend did not answer ${url}/health within ${HEALTH_TIMEOUT_MS} ms`);
     await new Promise((resolve) => setTimeout(resolve, HEALTH_POLL_MS));
   }
 }
@@ -97,14 +92,8 @@ async function waitForHealth(url: string, exited: () => string | null): Promise<
  * Start the backend and resolve once `/health` answers.
  * @failure the process exits or never answers -> rejects (the process is killed)
  */
-export async function startBackend(
-  fork: ForkBackend,
-  entry: string,
-  env: Record<string, string>,
-  url: string,
-): Promise<RunningBackend> {
-  if (!fs.existsSync(entry))
-    throw new Error(`backend bundle missing: ${entry} (run npm run build in desktop/)`);
+export async function startBackend(fork: ForkBackend, entry: string, env: Record<string, string>, url: string): Promise<RunningBackend> {
+  if (!fs.existsSync(entry)) throw new Error(`backend bundle missing: ${entry} (run npm run build in desktop/)`);
   const child = fork(entry, env);
   let exitReason: string | null = null;
   const exited = new Promise<void>((resolve) => {

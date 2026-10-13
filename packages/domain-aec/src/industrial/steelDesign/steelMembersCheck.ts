@@ -67,9 +67,7 @@ export const checkSteelMembers = defineCommand({
     floorDeadLoad: z
       .number()
       .optional()
-      .describe(
-        'Permanent load of floor gratings / finishes, kN/m², on every floor slab (add_slab role floor). Default 0.5.',
-      ),
+      .describe('Permanent load of floor gratings / finishes, kN/m², on every floor slab (add_slab role floor). Default 0.5.'),
     imposedLoad: z
       .number()
       .optional()
@@ -79,29 +77,19 @@ export const checkSteelMembers = defineCommand({
     pipeContentDensity: z
       .number()
       .optional()
-      .describe(
-        'Density of the pipe contents, kg/m³: 1000 = water-filled (default, operating / hydrotest), 0 = empty pipes.',
-      ),
-    cableTrayWeight: z
-      .number()
-      .optional()
-      .describe('Weight of a cable tray including its cables, kg per metre of run. Default 75.'),
+      .describe('Density of the pipe contents, kg/m³: 1000 = water-filled (default, operating / hydrotest), 0 = empty pipes.'),
+    cableTrayWeight: z.number().optional().describe('Weight of a cable tray including its cables, kg per metre of run. Default 75.'),
     notionalFactor: z
       .number()
       .optional()
       .describe(
         'Equivalent horizontal force as a fraction of the factored vertical load at each floor level (EN 1993-1-1 §5.3.2 φ0 = 1/200 = 0.005, no αh / αm reduction). Default 0.005.',
       ),
-    deflectionRatio: z
-      .number()
-      .optional()
-      .describe('Beam deflection limit as span / n under G + Q. Default 250 (L/250).'),
+    deflectionRatio: z.number().optional().describe('Beam deflection limit as span / n under G + Q. Default 250 (L/250).'),
     swayRatio: z
       .number()
       .optional()
-      .describe(
-        'Storey drift limit of moment frames as storey height / n under G + Q + notional horizontal forces. Default 300 (h/300).',
-      ),
+      .describe('Storey drift limit of moment frames as storey height / n under G + Q + notional horizontal forces. Default 300 (h/300).'),
     levelId: z
       .string()
       .optional()
@@ -119,9 +107,7 @@ export const checkSteelMembers = defineCommand({
       deflectionRatio = 250,
       swayRatio = 300,
     } = params;
-    const nonNegative = [floorDeadLoad, imposedLoad, pipeContentDensity, cableTrayWeight].every(
-      isNonNegativeNumber,
-    );
+    const nonNegative = [floorDeadLoad, imposedLoad, pipeContentDensity, cableTrayWeight].every(isNonNegativeNumber);
     if (!nonNegative) {
       return noop(
         doc,
@@ -130,12 +116,10 @@ export const checkSteelMembers = defineCommand({
     }
     if (!(isFiniteNumber(notionalFactor) && notionalFactor >= 0 && notionalFactor <= 0.1))
       return noop(doc, 'check_steel_members failed: notionalFactor must be a number in [0, 0.1].');
-    if (!isPositiveNumber(deflectionRatio))
-      return noop(doc, 'check_steel_members failed: deflectionRatio must be a number > 0.');
+    if (!isPositiveNumber(deflectionRatio)) return noop(doc, 'check_steel_members failed: deflectionRatio must be a number > 0.');
     const unknownLevel = unknownLevelFailure(doc, 'check_steel_members', params.levelId);
     if (unknownLevel) return unknownLevel;
-    if (!isPositiveNumber(swayRatio))
-      return noop(doc, 'check_steel_members failed: swayRatio must be a number > 0.');
+    if (!isPositiveNumber(swayRatio)) return noop(doc, 'check_steel_members failed: swayRatio must be a number > 0.');
     const analysis = analyseSteelStructure(doc, {
       floorDeadLoad,
       imposedLoad,
@@ -146,19 +130,11 @@ export const checkSteelMembers = defineCommand({
       swayRatio,
     });
     if (analysis.rows.length === 0) {
-      return noop(
-        doc,
-        'check_steel_members failed: the model has no steel members (add_steel_member).',
-      );
+      return noop(doc, 'check_steel_members failed: the model has no steel members (add_steel_member).');
     }
-    const members = analysis.rows.filter(
-      (row) => params.levelId === undefined || row.levelId === params.levelId,
-    );
+    const members = analysis.rows.filter((row) => params.levelId === undefined || row.levelId === params.levelId);
     if (members.length === 0) {
-      return noop(
-        doc,
-        `check_steel_members failed: level '${params.levelId ?? ''}' has no steel members.`,
-      );
+      return noop(doc, `check_steel_members failed: level '${params.levelId ?? ''}' has no steel members.`);
     }
     const analysed = members.filter((row) => row.analysed);
     const failing = analysed.filter((row) => !row.ok);
@@ -180,23 +156,15 @@ export const checkSteelMembers = defineCommand({
       ]),
     );
     const list = (rows: typeof members): string =>
-      briefList(
-        rows,
-        (row) => `${row.mark} ${row.profile}${row.analysed ? ` ${row.utilisation}` : ''}`,
-      );
-    const frameText =
-      analysis.frames.length === 0 ? '' : `, ${analysis.frames.length} moment frame(s)`;
+      briefList(rows, (row) => `${row.mark} ${row.profile}${row.analysed ? ` ${row.utilisation}` : ''}`);
+    const frameText = analysis.frames.length === 0 ? '' : `, ${analysis.frames.length} moment frame(s)`;
     const summary =
       `Steel member check (G ${floorDeadLoad} + Q ${imposedLoad} kN/m² floors, φ ${notionalFactor}): ` +
       `${members.length} member(s), ${analysed.length} analysed, ${notAnalysed.length} not analysed${frameText}; ` +
       `max utilisation ${worst?.utilisation ?? 0} (${worst?.mark ?? '—'} ${worst?.profile ?? ''}, ${worst?.check ?? '—'}); ` +
-      (failing.length === 0
-        ? 'all analysed members OK'
-        : `${failing.length} failure(s): ${list(failing)}`) +
+      (failing.length === 0 ? 'all analysed members OK' : `${failing.length} failure(s): ${list(failing)}`) +
       (notAnalysed.length === 0 ? '' : `; not analysed: ${list(notAnalysed)}`) +
-      (analysis.warnings.length === 0
-        ? '.'
-        : `; ${analysis.warnings.length} warning(s) in data.warnings.`);
+      (analysis.warnings.length === 0 ? '.' : `; ${analysis.warnings.length} warning(s) in data.warnings.`);
     return report(doc, summary, {
       ok: failing.length === 0 && notAnalysed.length === 0,
       members,

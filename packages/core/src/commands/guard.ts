@@ -20,10 +20,7 @@ function containsNonFinite(value: unknown, depth = 0): boolean {
 /** A top-level 2-number `position` is a planar shorthand: pad z=0 (never mutates `params`). */
 function padPlanarPosition(params: object): object {
   const position = (params as { position?: unknown }).position;
-  const isPlanar =
-    Array.isArray(position) &&
-    position.length === 2 &&
-    position.every((n) => typeof n === 'number');
+  const isPlanar = Array.isArray(position) && position.length === 2 && position.every((n) => typeof n === 'number');
   return isPlanar ? { ...params, position: [...position, 0] } : params;
 }
 
@@ -65,10 +62,7 @@ function describePositionContract(schema: ParamsSchema): ParamsSchema {
 
 /** Log `message` with the error's stack and return its message for the agent-facing summary. */
 function warnAndDescribe(message: string, error: unknown): string {
-  console.warn(
-    `[llull] ${message}`,
-    error instanceof Error ? (error.stack ?? error.message) : error,
-  );
+  console.warn(`[llull] ${message}`, error instanceof Error ? (error.stack ?? error.message) : error);
   return errorMessage(error);
 }
 
@@ -92,9 +86,7 @@ export function guardCommand(def: CommandDefinition<unknown>): CommandDefinition
     ...def,
     paramsSchema: describePositionContract(def.paramsSchema),
     run: (doc, params, ctx): CommandResult => {
-      const safeParams = padPlanarPosition(
-        typeof params === 'object' && params !== null ? params : {},
-      );
+      const safeParams = padPlanarPosition(typeof params === 'object' && params !== null ? params : {});
       if (hasPrototypeIdKey(safeParams)) {
         return rejection(
           doc,
@@ -110,10 +102,7 @@ export function guardCommand(def: CommandDefinition<unknown>): CommandDefinition
           return rejection(doc, `${def.name} rejected: invalid params — ${reason}`);
         }
         if (!checked.success) {
-          return rejection(
-            doc,
-            `${def.name} rejected: invalid params — ${formatIssues(checked.error)}. Document unchanged.`,
-          );
+          return rejection(doc, `${def.name} rejected: invalid params — ${formatIssues(checked.error)}. Document unchanged.`);
         }
       }
       let result: CommandResult;
@@ -129,10 +118,7 @@ export function guardCommand(def: CommandDefinition<unknown>): CommandDefinition
         for (const id of result.affected) {
           const reason = corruptionReason(result.document.entities[id]);
           if (reason !== null) {
-            return rejection(
-              doc,
-              `${def.name} rejected: result for ${id} contains ${reason}. Document unchanged.`,
-            );
+            return rejection(doc, `${def.name} rejected: result for ${id} contains ${reason}. Document unchanged.`);
           }
         }
       }

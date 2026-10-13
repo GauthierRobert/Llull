@@ -13,10 +13,7 @@ function hall(): CadDocument {
   return portalHall(HALL);
 }
 
-function run(
-  doc: CadDocument,
-  params: Record<string, unknown> = {},
-): ReturnType<typeof exportNcFiles.run> {
+function run(doc: CadDocument, params: Record<string, unknown> = {}): ReturnType<typeof exportNcFiles.run> {
   return execute(doc, 'export_nc_files', params);
 }
 
@@ -68,9 +65,7 @@ describe('export_nc_files', () => {
   });
 
   it('writes an ST block for an IPE450 rafter with a pitched cut', () => {
-    const rafter = files(hall()).find(
-      (file) => file.kind === 'member' && file.profile === 'IPE450',
-    );
+    const rafter = files(hall()).find((file) => file.kind === 'member' && file.profile === 'IPE450');
     expect(rafter).toBeDefined();
     const file = rafter as NcFile;
     expect(file.quantity).toBeGreaterThan(1);
@@ -92,20 +87,14 @@ describe('export_nc_files', () => {
   });
 
   it('gives straight members square cuts and flange holes at eaves columns', () => {
-    const columns = files(hall()).filter(
-      (file) => file.kind === 'member' && file.profile === 'HEA400',
-    );
+    const columns = files(hall()).filter((file) => file.kind === 'member' && file.profile === 'HEA400');
     expect(columns.length).toBeGreaterThan(0);
     const withHoles = columns.find((file) => block(file, 'BO').length > 0) as NcFile;
     expect(withHoles).toBeDefined();
     expect([16, 17, 18, 19].map((i) => Number(stField(withHoles, i)))).toEqual([0, 0, 0, 0]);
     const holes = block(withHoles, 'BO');
     expect(holes).toHaveLength(8);
-    expect(
-      holes.every(([face, , , diameter]) =>
-        face === 'o' || face === 'u' ? diameter === '22.00' : true,
-      ),
-    ).toBe(true);
+    expect(holes.every(([face, , , diameter]) => (face === 'o' || face === 'u' ? diameter === '22.00' : true))).toBe(true);
     const flange = Number(stField(withHoles, 10));
     for (const [, x, y] of holes) {
       expect(Number(y)).toBeGreaterThan(0);
@@ -117,9 +106,7 @@ describe('export_nc_files', () => {
   it('writes base plate files with an AK contour and the anchor holes', () => {
     const plate = files(hall()).find((file) => file.kind === 'plate' && file.mark.startsWith('BP'));
     const base = (plate ?? files(hall()).find((file) => file.kind === 'plate')) as NcFile;
-    const baseFiles = files(hall()).filter(
-      (file) => file.kind === 'plate' && block(file, 'BO').length === 4,
-    );
+    const baseFiles = files(hall()).filter((file) => file.kind === 'plate' && block(file, 'BO').length === 4);
     expect(baseFiles.length).toBeGreaterThan(0);
     const file = baseFiles[0] as NcFile;
     expect(base).toBeDefined();
@@ -142,18 +129,14 @@ describe('export_nc_files', () => {
   });
 
   it('writes connection end plates with their bolt holes', () => {
-    const endPlates = files(hall()).filter(
-      (file) => file.kind === 'plate' && block(file, 'BO').length === 8,
-    );
+    const endPlates = files(hall()).filter((file) => file.kind === 'plate' && block(file, 'BO').length === 8);
     expect(endPlates.length).toBeGreaterThan(0);
     expect(block(endPlates[0] as NcFile, 'AK')).toHaveLength(5);
   });
 
   it('groups identical members with a quantity and lists source ids', () => {
     const all = files(hall());
-    const totalMembers = Object.values(hall().building?.elements ?? {}).filter(
-      (element) => element.category === 'member',
-    ).length;
+    const totalMembers = Object.values(hall().building?.elements ?? {}).filter((element) => element.category === 'member').length;
     const memberFiles = all.filter((file) => file.kind === 'member');
     expect(memberFiles.reduce((sum, file) => sum + file.quantity, 0)).toBe(totalMembers);
     expect(memberFiles.length).toBeLessThan(totalMembers);
@@ -192,8 +175,7 @@ describe('export_nc_files', () => {
   it('filters by memberIds and by includePlates', () => {
     const doc = hall();
     const members = Object.values(doc.building?.elements ?? {}).filter(
-      (element) =>
-        element.category === 'member' && element.role === 'column' && element.profile === 'HEA400',
+      (element) => element.category === 'member' && element.role === 'column' && element.profile === 'HEA400',
     );
     const target = members[0];
     expect(target).toBeDefined();
@@ -260,14 +242,8 @@ describe('export_nc_files', () => {
   it('cuts rafters back to the end plates at eaves and apex', () => {
     const doc = hall();
     const elements = Object.values(doc.building?.elements ?? {});
-    const rafter = elements.find(
-      (e) => e.category === 'member' && e.role === 'rafter',
-    ) as SteelMemberElement;
-    const node = Math.hypot(
-      rafter.end[0] - rafter.start[0],
-      rafter.end[1] - rafter.start[1],
-      rafter.end[2] - rafter.start[2],
-    );
+    const rafter = elements.find((e) => e.category === 'member' && e.role === 'rafter') as SteelMemberElement;
+    const node = Math.hypot(rafter.end[0] - rafter.start[0], rafter.end[1] - rafter.start[1], rafter.end[2] - rafter.start[2]);
     const eaves = elements.find(
       (e) => e.category === 'connection' && e.kind === 'eaves' && e.rafterId === rafter.id,
     ) as MomentConnectionElement;
@@ -275,9 +251,9 @@ describe('export_nc_files', () => {
     const hcol = findProfile(column.profile)?.h ?? 0;
     const cos = Math.hypot(rafter.end[0] - rafter.start[0], rafter.end[1] - rafter.start[1]) / node;
     const eavesCut = (hcol / 2 + eaves.plateThickness) / cos;
-    const apex = elements.find(
-      (e) => e.category === 'connection' && e.kind === 'apex' && e.rafterId === rafter.id,
-    ) as MomentConnectionElement | undefined;
+    const apex = elements.find((e) => e.category === 'connection' && e.kind === 'apex' && e.rafterId === rafter.id) as
+      | MomentConnectionElement
+      | undefined;
     const apexCut = apex ? apex.plateThickness / cos : 0;
     const file = files(doc).find((f) => f.sourceIds.includes(rafter.id)) as NcFile;
     expect(file.length).toBeCloseTo(node - eavesCut - apexCut, 0);

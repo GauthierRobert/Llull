@@ -30,11 +30,7 @@ describe('build_project ExecutionContext.onStep', () => {
     const ends = events.filter((e) => e.phase === 'end');
     expect(ends.map((e) => e.ok)).toEqual([true, true, true]);
     const steps = (result.data as { steps: { command: string }[] }).steps;
-    expect(ends.map((e) => steps[e.stepPosition ?? -1]?.command)).toEqual([
-      'add_box',
-      'add_sphere',
-      'add_sphere',
-    ]);
+    expect(ends.map((e) => steps[e.stepPosition ?? -1]?.command)).toEqual(['add_box', 'add_sphere', 'add_sphere']);
   });
 
   it('marks a graceful no-op step as not ok', () => {

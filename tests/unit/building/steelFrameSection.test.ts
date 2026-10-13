@@ -37,10 +37,7 @@ describe('which axis a frame plane bends', () => {
     const section = sectionProperties(heb);
     expect(inPlaneInertia(heb, 0, 'X')).toBeCloseTo(section.inertia, 3);
     expect(inPlaneInertia(heb, 0, 'Y')).toBeCloseTo(section.minorInertia, 3);
-    expect(inPlaneInertia(heb, Math.PI / 4, 'X')).toBeCloseTo(
-      (section.inertia + section.minorInertia) / 2,
-      3,
-    );
+    expect(inPlaneInertia(heb, Math.PI / 4, 'X')).toBeCloseTo((section.inertia + section.minorInertia) / 2, 3);
   });
 });
 
@@ -70,9 +67,7 @@ describe('weak-axis resistance and interaction', () => {
     expect(pure.chi).toBeCloseTo(Math.min(reference.chiMajor, reference.chiMinor), 6);
     const bent = weakAxisBuckling(heb, 355, 500e3, 20e6, 3000);
     expect(bent.utilisation).toBeGreaterThan(pure.utilisation);
-    expect(weakAxisBuckling(heb, 355, 800e3, 20e6, 3000).utilisation).toBeGreaterThan(
-      bent.utilisation,
-    );
+    expect(weakAxisBuckling(heb, 355, 800e3, 20e6, 3000).utilisation).toBeGreaterThan(bent.utilisation);
     expect(weakAxisBuckling(heb, 355, -10, 20e6, 3000).utilisation).toBeGreaterThan(0);
   });
 
@@ -105,8 +100,7 @@ describe('moment resistance reduced by shear (§6.2.8)', () => {
     const full = shearReducedMoment(ipe, 355, vpl);
     expect(full.moment).toBeLessThan(three4.moment);
     const flangesOnly = (profile: SteelProfile): number =>
-      sectionProperties(profile).plasticModulus -
-      ((profile.h - 2 * profile.tf) * profile.tw) ** 2 / (4 * profile.tw);
+      sectionProperties(profile).plasticModulus - ((profile.h - 2 * profile.tf) * profile.tw) ** 2 / (4 * profile.tw);
     expect(full.moment).toBeCloseTo(flangesOnly(ipe) * 355, 0);
   });
 

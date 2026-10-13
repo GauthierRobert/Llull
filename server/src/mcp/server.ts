@@ -47,15 +47,10 @@ function makeErrorResult(message: string): CallToolResult {
 }
 
 /** Unknown tool: same "Unknown command" text as `execute`, plus the closest tool names. */
-function unknownToolResult(
-  name: string,
-  enabledToolsets: ReadonlySet<ToolsetName>,
-): CallToolResult {
+function unknownToolResult(name: string, enabledToolsets: ReadonlySet<ToolsetName>): CallToolResult {
   const suggestions = suggestToolNames(name, 5, enabledToolsets);
   const hint = suggestions.length > 0 ? ` Closest tools: ${suggestions.join(', ')}.` : '';
-  return makeErrorResult(
-    `Unknown command: ${name}.${hint} Use search_tools to find tools by keyword.`,
-  );
+  return makeErrorResult(`Unknown command: ${name}.${hint} Use search_tools to find tools by keyword.`);
 }
 
 /** Tool list for a session: registry tools + exchange/discovery meta-tools, filtered by toolset. */
@@ -104,9 +99,7 @@ export function buildMcpServer(
     const listed = listTools(enabledToolsets);
     if (caller.role !== 'viewer') return listed;
     return {
-      tools: listed.tools.filter(
-        (tool) => tool.name === 'enable_toolset' || isReadOnlyTool(tool.name),
-      ),
+      tools: listed.tools.filter((tool) => tool.name === 'enable_toolset' || isReadOnlyTool(tool.name)),
     };
   });
 
@@ -146,9 +139,7 @@ export function buildMcpServer(
 
     // Vision loop: the PNG replaces the multi-KB SVG in the text/structured content.
     const imageBlock = buildImageBlock(busResult.data);
-    const shaped = shapeToolCallContent(
-      imageBlock !== null ? { ...busResult, data: stripSvgFromData(busResult.data) } : busResult,
-    );
+    const shaped = shapeToolCallContent(imageBlock !== null ? { ...busResult, data: stripSvgFromData(busResult.data) } : busResult);
     return imageBlock !== null ? { ...shaped, content: [...shaped.content, imageBlock] } : shaped;
   };
 

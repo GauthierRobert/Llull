@@ -13,16 +13,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { useLayoutStore } from '@ui/store';
 import { Sidebar } from '@ui/components/Sidebar';
 
-const TAB_LABELS = [
-  'Building',
-  'Layers',
-  'Assembly',
-  'Mechanisms',
-  'Parameters',
-  'History',
-  'Configurations',
-  'Materials',
-];
+const TAB_LABELS = ['Building', 'Layers', 'Assembly', 'Mechanisms', 'Parameters', 'History', 'Configurations', 'Materials'];
 
 describe('Sidebar', () => {
   beforeEach(() => {
@@ -57,10 +48,7 @@ describe('Sidebar', () => {
     render(<Sidebar />);
     fireEvent.click(screen.getByRole('tab', { name: /^Parameters/ }));
     expect(useLayoutStore.getState().sidebarTab).toBe('parameters');
-    expect(screen.getByRole('tab', { name: /^Parameters/ })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
+    expect(screen.getByRole('tab', { name: /^Parameters/ })).toHaveAttribute('aria-selected', 'true');
     expect(screen.queryByLabelText('Layer list')).toBeNull();
   });
 

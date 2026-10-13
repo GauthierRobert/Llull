@@ -64,8 +64,7 @@ function makePolygon(verts: Vec3[], color: string): PreDepthPolygon {
   return { verts, color, normal, stroke: false };
 }
 
-const makePolygons = (faces: Vec3[][], color: string): PreDepthPolygon[] =>
-  faces.map((verts) => makePolygon(verts, color));
+const makePolygons = (faces: Vec3[][], color: string): PreDepthPolygon[] => faces.map((verts) => makePolygon(verts, color));
 
 /** Closed prism between two vertex rings: bottom cap (reversed, faces down), top cap, side quads. */
 function prism(bottom: Vec3[], top: Vec3[], color: string): PreDepthPolygon[] {
@@ -110,10 +109,7 @@ function tessellatePyramid(e: PyramidEntity): PreDepthPolygon[] {
 
 /** Revolution: closed profile swept about an axis (frames and caps: geometry/revolution.ts). */
 function tessellateRevolution(e: RevolutionEntity): PreDepthPolygon[] {
-  return makePolygons(
-    revolutionPolygons(e.profile, e.axis, e.angle, e.segments, e.position),
-    e.color,
-  );
+  return makePolygons(revolutionPolygons(e.profile, e.axis, e.angle, e.segments, e.position), e.color);
 }
 
 /** Extrusion: closed XY profile at position, extruded +Z by depth. */
@@ -129,11 +125,7 @@ function tessellateMesh(e: MeshSolidEntity): PreDepthPolygon[] {
 }
 
 /** Rotate polygons about `position` by `rotation`; normals rotate without translation. */
-function applyRotation(
-  polys: PreDepthPolygon[],
-  position: Vec3,
-  rotation: Vec3,
-): PreDepthPolygon[] {
+function applyRotation(polys: PreDepthPolygon[], position: Vec3, rotation: Vec3): PreDepthPolygon[] {
   if (isZeroRotation(rotation)) return polys;
   return polys.map((poly) => ({
     ...poly,
@@ -163,9 +155,7 @@ function strokeEllipseArc(
   startAngle: number,
   span: number,
 ): PreDepthPolygon[] {
-  const verts = arcPolyline(e.center, radiusX, startAngle, span, SEG_CIRCLE, radiusY).map((point) =>
-    place2D(point, e),
-  );
+  const verts = arcPolyline(e.center, radiusX, startAngle, span, SEG_CIRCLE, radiusY).map((point) => place2D(point, e));
   return [stroke(verts, e.color)];
 }
 
@@ -227,15 +217,13 @@ function tessellate2DSpline(e: SplineEntity): PreDepthPolygon[] {
 /** A tiny cross: two short segments. */
 function tessellate2DPoint(e: PointEntity): PreDepthPolygon[] {
   const s = 0.1;
-  const arm = (from: Vec2, to: Vec2): PreDepthPolygon =>
-    stroke([place2D(from, e), place2D(to, e)], e.color);
+  const arm = (from: Vec2, to: Vec2): PreDepthPolygon => stroke([place2D(from, e), place2D(to, e)], e.color);
   return [arm([-s, 0], [s, 0]), arm([0, -s], [0, s])];
 }
 
 /** Polygons of one entity; 3D solids carry their rotation, 2D shapes ignore it (plane orientation is out of scope). */
 export function tessellateEntity(e: Entity): PreDepthPolygon[] {
-  const rotated = (polys: PreDepthPolygon[]): PreDepthPolygon[] =>
-    applyRotation(polys, e.position, e.rotation);
+  const rotated = (polys: PreDepthPolygon[]): PreDepthPolygon[] => applyRotation(polys, e.position, e.rotation);
   switch (e.kind) {
     case 'box':
       return rotated(tessellateBox(e));

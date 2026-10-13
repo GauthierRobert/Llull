@@ -14,21 +14,8 @@ import { TriangleSoupMesh } from './TriangleSoupMesh';
 
 const SUBDIVISION_SURFACE: SolidSurface = { roughness: 0.45, metalness: 0.1, envMapIntensity: 0.9 };
 
-export function SubdivisionMesh({
-  entity,
-  ...shell
-}: SolidMeshKindProps<SubdivisionEntity>): React.ReactElement {
+export function SubdivisionMesh({ entity, ...shell }: SolidMeshKindProps<SubdivisionEntity>): React.ReactElement {
   const { vertices, faces, creases, levels } = entity;
-  const triangles = useMemo(
-    () => subdivisionTriangles({ vertices, faces, creases, levels }),
-    [vertices, faces, creases, levels],
-  );
-  return (
-    <TriangleSoupMesh
-      entity={entity}
-      triangles={triangles}
-      surface={SUBDIVISION_SURFACE}
-      {...shell}
-    />
-  );
+  const triangles = useMemo(() => subdivisionTriangles({ vertices, faces, creases, levels }), [vertices, faces, creases, levels]);
+  return <TriangleSoupMesh entity={entity} triangles={triangles} surface={SUBDIVISION_SURFACE} {...shell} />;
 }

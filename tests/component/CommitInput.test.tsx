@@ -57,9 +57,7 @@ describe('CommitInput', () => {
   });
 
   it('keeps the typed draft while focused when the value changes externally', () => {
-    const { rerender } = render(
-      <CommitInput className="x" label="size" value="2" onCommit={() => undefined} />,
-    );
+    const { rerender } = render(<CommitInput className="x" label="size" value="2" onCommit={() => undefined} />);
     act(() => input().focus());
     fireEvent.change(input(), { target: { value: '7' } });
     rerender(<CommitInput className="x" label="size" value="3" onCommit={() => undefined} />);

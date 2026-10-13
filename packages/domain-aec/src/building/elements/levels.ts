@@ -36,26 +36,16 @@ export const addLevel = defineCommand({
     'Building elements (walls, slabs, columns…) are placed relative to their level.',
   params: z.object({
     name: z.string().optional().describe('Level name, e.g. "Ground floor", "Level 1".'),
-    elevation: z
-      .number()
-      .optional()
-      .describe('Finished-floor elevation in document units. Default: stacks on the top level.'),
-    height: z
-      .number()
-      .optional()
-      .describe('Floor-to-floor height in document units (> 0). Default 3000 mm.'),
-    makeActive: z
-      .boolean()
-      .optional()
-      .describe('Make it the active level for new elements. Default true.'),
+    elevation: z.number().optional().describe('Finished-floor elevation in document units. Default: stacks on the top level.'),
+    height: z.number().optional().describe('Floor-to-floor height in document units (> 0). Default 3000 mm.'),
+    makeActive: z.boolean().optional().describe('Make it the active level for new elements. Default true.'),
   }),
   run: (doc, { name, elevation, height, makeActive = true }): CommandResult => {
     const building = getBuilding(doc);
     const tops = Object.values(building.levels).map((level) => level.elevation + level.height);
     const resolvedElevation = elevation ?? (tops.length > 0 ? Math.max(...tops) : 0);
     const resolvedHeight = height ?? fromMm(doc, 3000);
-    if (resolvedHeight <= 0)
-      return noop(doc, `add_level failed: height must be > 0 (got ${String(height)}).`);
+    if (resolvedHeight <= 0) return noop(doc, `add_level failed: height must be > 0 (got ${String(height)}).`);
     const id = nextLevelId(building);
     const level: BuildingLevel = {
       id,
@@ -98,28 +88,21 @@ export const updateLevel = defineCommand({
     const building = getBuilding(doc);
     const level = building.levels[levelId];
     if (!level) return noop(doc, `update_level failed: no level '${levelId}'.`);
-    if (height !== undefined && height <= 0)
-      return noop(doc, 'update_level failed: height must be > 0.');
+    if (height !== undefined && height <= 0) return noop(doc, 'update_level failed: height must be > 0.');
     const updated: BuildingLevel = {
       ...level,
       name: name?.trim() || level.name,
       elevation: elevation ?? level.elevation,
       height: height ?? level.height,
     };
-    if (
-      updated.name === level.name &&
-      updated.elevation === level.elevation &&
-      updated.height === level.height
-    ) {
+    if (updated.name === level.name && updated.elevation === level.elevation && updated.height === level.height) {
       return noop(doc, `update_level: level ${levelId} "${level.name}" already has these values.`);
     }
     const levels = { ...building.levels, [levelId]: updated };
     const elements = Object.fromEntries(
       Object.entries(building.elements).map(([id, element]) => [
         id,
-        'levelId' in element && element.levelId === levelId
-          ? followLevelHeight(element, level.height, updated.height)
-          : element,
+        'levelId' in element && element.levelId === levelId ? followLevelHeight(element, level.height, updated.height) : element,
       ]),
     );
     const next: BuildingModel = {
@@ -134,10 +117,7 @@ export const updateLevel = defineCommand({
     return {
       document,
       summary: `Level ${levelId} "${updated.name}": elevation ${updated.elevation}, height ${updated.height} ${doc.units}.`,
-      affected: [
-        levelId,
-        ...elementsOnLevel(getBuilding(document), levelId).flatMap((element) => element.entityIds),
-      ],
+      affected: [levelId, ...elementsOnLevel(getBuilding(document), levelId).flatMap((element) => element.entityIds)],
     };
   },
 });
@@ -155,10 +135,7 @@ export const deleteLevel = defineCommand({
     'case its walls (with their doors/windows), slabs, columns, beams, stairs and rooms are deleted too.',
   params: z.object({
     levelId: z.string().describe('Level id to delete.'),
-    deleteElements: z
-      .boolean()
-      .optional()
-      .describe('Also delete every element on the level. Default false.'),
+    deleteElements: z.boolean().optional().describe('Also delete every element on the level. Default false.'),
   }),
   run: (doc, { levelId, deleteElements = false }): CommandResult => {
     const building = getBuilding(doc);
@@ -181,8 +158,7 @@ export const deleteLevel = defineCommand({
       ...withoutElements(building, onLevel),
       levels,
       levelOrder,
-      activeLevelId:
-        building.activeLevelId === levelId ? (levelOrder[0] ?? null) : building.activeLevelId,
+      activeLevelId: building.activeLevelId === levelId ? (levelOrder[0] ?? null) : building.activeLevelId,
     };
     return {
       document: regenerateBuilding(doc, next),
@@ -202,8 +178,7 @@ export const setActiveLevel = defineCommand({
     const building = getBuilding(doc);
     const level = building.levels[levelId];
     if (!level) return noop(doc, `set_active_level failed: no level '${levelId}'.`);
-    if (building.activeLevelId === levelId)
-      return noop(doc, `Level ${levelId} "${level.name}" is already active.`);
+    if (building.activeLevelId === levelId) return noop(doc, `Level ${levelId} "${level.name}" is already active.`);
     return {
       document: { ...doc, building: { ...building, activeLevelId: levelId } },
       summary: `Active level is now ${levelId} "${level.name}".`,
@@ -212,15 +187,7 @@ export const setActiveLevel = defineCommand({
   },
 });
 
-const PROJECT_FIELDS: ReadonlyArray<keyof ProjectInfo> = [
-  'name',
-  'client',
-  'address',
-  'author',
-  'drawingNumber',
-  'revision',
-  'date',
-];
+const PROJECT_FIELDS: ReadonlyArray<keyof ProjectInfo> = ['name', 'client', 'address', 'author', 'drawingNumber', 'revision', 'date'];
 
 /** @command set_project_info @pure @failure no field given -> no-op */
 export const setProjectInfo = defineCommand({
@@ -236,12 +203,7 @@ export const setProjectInfo = defineCommand({
     author: z.string().optional().describe('Drawn by (company or person).'),
     drawingNumber: z.string().optional().describe('Drawing number, e.g. "A-101".'),
     revision: z.string().optional().describe('Revision, e.g. "B".'),
-    date: z
-      .string()
-      .optional()
-      .describe(
-        'Issue date as YYYY-MM-DD, e.g. "2026-10-01" (other formats are not used for the IFC header).',
-      ),
+    date: z.string().optional().describe('Issue date as YYYY-MM-DD, e.g. "2026-10-01" (other formats are not used for the IFC header).'),
   }),
   run: (doc, params): CommandResult => {
     const building = getBuilding(doc);
@@ -252,16 +214,9 @@ export const setProjectInfo = defineCommand({
     }
     const changed = Object.keys(changes);
     if (changed.length === 0) {
-      return noop(
-        doc,
-        `set_project_info: no fields given (allowed: ${PROJECT_FIELDS.join(', ')}).`,
-      );
+      return noop(doc, `set_project_info: no fields given (allowed: ${PROJECT_FIELDS.join(', ')}).`);
     }
-    if (
-      Object.entries(changes).every(
-        ([field, value]) => building.project[field as keyof ProjectInfo] === value,
-      )
-    ) {
+    if (Object.entries(changes).every(([field, value]) => building.project[field as keyof ProjectInfo] === value)) {
       return noop(doc, 'set_project_info: the given fields already hold these values.');
     }
     return {
@@ -293,20 +248,16 @@ export const describeBuilding = defineCommand({
       .map((level) => ({
         ...level,
         active: level.id === building.activeLevelId,
-        elementCount: elements.filter(
-          (element) => 'levelId' in element && element.levelId === level.id,
-        ).length,
+        elementCount: elements.filter((element) => 'levelId' in element && element.levelId === level.id).length,
       }));
     const counts = new Map<string, number>();
-    for (const element of elements)
-      counts.set(element.category, (counts.get(element.category) ?? 0) + 1);
-    const countText =
-      [...counts.entries()].map(([category, count]) => `${count} ${category}`).join(', ') ||
-      'no elements';
-    return report(
-      doc,
-      `Building "${building.project.name}": ${levels.length} level(s), ${countText}.`,
-      { project: building.project, units: doc.units, levels, elements },
-    );
+    for (const element of elements) counts.set(element.category, (counts.get(element.category) ?? 0) + 1);
+    const countText = [...counts.entries()].map(([category, count]) => `${count} ${category}`).join(', ') || 'no elements';
+    return report(doc, `Building "${building.project.name}": ${levels.length} level(s), ${countText}.`, {
+      project: building.project,
+      units: doc.units,
+      levels,
+      elements,
+    });
   },
 });

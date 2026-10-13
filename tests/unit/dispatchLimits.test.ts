@@ -1,14 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import {
-  MAX_AFFECTED_IDS_SHOWN,
-  MAX_CODE_TEXT_CHARS,
-  MAX_JSON_TEXT_CHARS,
-  shapeToolCallContent,
-} from '@mcp/dispatch';
+import { MAX_AFFECTED_IDS_SHOWN, MAX_CODE_TEXT_CHARS, MAX_JSON_TEXT_CHARS, shapeToolCallContent } from '@mcp/dispatch';
 
 const ids = (count: number): string[] => Array.from({ length: count }, (_, i) => `box-${i}.1`);
-const totalChars = (blocks: Array<{ text: string }>): number =>
-  blocks.reduce((sum, block) => sum + block.text.length, 0);
+const totalChars = (blocks: Array<{ text: string }>): number => blocks.reduce((sum, block) => sum + block.text.length, 0);
 
 describe('shapeToolCallContent size limits', () => {
   it('lists every affected id up to the cap, unchanged format', () => {
@@ -42,9 +36,7 @@ describe('shapeToolCallContent size limits', () => {
   });
 
   it('adds no structuredContent for a small mutation, and keeps a data record own affected key', () => {
-    expect(
-      shapeToolCallContent({ summary: 's', affected: ids(3), isError: false }).structuredContent,
-    ).toBeUndefined();
+    expect(shapeToolCallContent({ summary: 's', affected: ids(3), isError: false }).structuredContent).toBeUndefined();
     const own = shapeToolCallContent({
       summary: 's',
       affected: ids(3),

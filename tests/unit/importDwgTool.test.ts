@@ -46,9 +46,7 @@ describe('import_dwg tool', () => {
       deps(converter),
     );
     expect(result?.isError).toBeFalsy();
-    expect(applied).toEqual([
-      { name: 'import_dxf', params: { text: 'DXF(QUJD)', sourceUnit: 'mm', layers: ['A'] } },
-    ]);
+    expect(applied).toEqual([{ name: 'import_dxf', params: { text: 'DXF(QUJD)', sourceUnit: 'mm', layers: ['A'] } }]);
   });
 
   it('runs import_survey_dxf for target survey and reads path files', async () => {
@@ -78,11 +76,7 @@ describe('import_dwg tool', () => {
     expect(bad?.isError).toBe(true);
     const missing = await applyExchangeToolCall('import_dwg', {}, deps(converter));
     expect(textOf(missing)).toMatch(/dwgBase64 or path/);
-    const noDir = await applyExchangeToolCall(
-      'import_dwg',
-      { path: 'a.dwg' },
-      deps({ convertDwg: converter.convertDwg }),
-    );
+    const noDir = await applyExchangeToolCall('import_dwg', { path: 'a.dwg' }, deps({ convertDwg: converter.convertDwg }));
     expect(textOf(noDir)).toMatch(/LLULL_EXCHANGE_DIR/);
     const failing = await applyExchangeToolCall(
       'import_dwg',

@@ -15,14 +15,9 @@ import type { PlantIntent } from '../plant/intent';
 function issuedCheck(intent: PlantIntent, { document, deliverable }: GradeContext): CheckOutcome {
   const project = buildingOf(document).project;
   const problems: string[] = [];
-  if (project.revision !== intent.project.revision)
-    problems.push(`revision "${project.revision}", expected "${intent.project.revision}"`);
-  if (project.date !== intent.project.date)
-    problems.push(`date "${project.date}", expected "${intent.project.date}"`);
-  const sheets = [
-    ...levelsByElevation(document).map((level) => `plan:${level.id}`),
-    'elevation:south',
-  ];
+  if (project.revision !== intent.project.revision) problems.push(`revision "${project.revision}", expected "${intent.project.revision}"`);
+  if (project.date !== intent.project.date) problems.push(`date "${project.date}", expected "${intent.project.date}"`);
+  const sheets = [...levelsByElevation(document).map((level) => `plan:${level.id}`), 'elevation:south'];
   for (const id of sheets) {
     const printed = drawingIdentity(parseSheet(deliverable(id)));
     if (printed.revision !== intent.project.revision || printed.date !== intent.project.date) {
@@ -34,9 +29,7 @@ function issuedCheck(intent: PlantIntent, { document, deliverable }: GradeContex
   return {
     pass: problems.length === 0,
     detail:
-      problems.length === 0
-        ? `issued at revision ${project.revision} (${project.date}) on ${sheets.length} sheets`
-        : problems.join('; '),
+      problems.length === 0 ? `issued at revision ${project.revision} (${project.date}) on ${sheets.length} sheets` : problems.join('; '),
   };
 }
 
@@ -47,8 +40,7 @@ function identityCheck({ document, baseline }: GradeContext): CheckOutcome {
   for (const [id, element] of Object.entries(before)) {
     const now = after[id];
     if (!now) problems.push(`${element.mark} (${id}) removed or replaced`);
-    else if (now.mark !== element.mark)
-      problems.push(`${id} renumbered ${element.mark} → ${now.mark}`);
+    else if (now.mark !== element.mark) problems.push(`${id} renumbered ${element.mark} → ${now.mark}`);
   }
   return {
     pass: problems.length === 0,

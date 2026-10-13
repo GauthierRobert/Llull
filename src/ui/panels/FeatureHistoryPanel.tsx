@@ -23,11 +23,7 @@ interface FeatureStepRowProps {
   totalCount: number;
 }
 
-const FeatureStepRow = memo(function FeatureStepRow({
-  step,
-  index,
-  totalCount,
-}: FeatureStepRowProps): React.ReactElement {
+const FeatureStepRow = memo(function FeatureStepRow({ step, index, totalCount }: FeatureStepRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const [editing, setEditing] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
@@ -39,21 +35,13 @@ const FeatureStepRow = memo(function FeatureStepRow({
 
   const submitEdit = (params: Record<string, unknown>): void => {
     setRefusal(null);
-    dispatchThen(
-      'edit_step_params',
-      { stepId: step.id, params },
-      () => setEditing(false),
-      setRefusal,
-    );
+    dispatchThen('edit_step_params', { stepId: step.id, params }, () => setEditing(false), setRefusal);
   };
 
   return (
     <>
       <li
-        className={classNames(
-          'panel__row panel__row--overlay-actions history-step',
-          isSuppressed && 'history-step--suppressed',
-        )}
+        className={classNames('panel__row panel__row--overlay-actions history-step', isSuppressed && 'history-step--suppressed')}
         data-testid={`history-step-${step.id}`}
         aria-label={`Step ${index + 1}: ${displayLabel}${isSuppressed ? ' (suppressed)' : ''}`}
       >
@@ -105,13 +93,9 @@ const FeatureStepRow = memo(function FeatureStepRow({
         <button
           type="button"
           className={`icon-btn history-suppress-btn${isSuppressed ? ' history-suppress-btn--suppressed' : ''}`}
-          onClick={() =>
-            dispatch('set_step_suppressed', { stepId: step.id, suppressed: !step.suppressed })
-          }
+          onClick={() => dispatch('set_step_suppressed', { stepId: step.id, suppressed: !step.suppressed })}
           aria-pressed={isSuppressed}
-          aria-label={
-            isSuppressed ? `Restore step ${displayLabel}` : `Suppress step ${displayLabel}`
-          }
+          aria-label={isSuppressed ? `Restore step ${displayLabel}` : `Suppress step ${displayLabel}`}
           title={isSuppressed ? 'Restore (un-suppress)' : 'Suppress (skip during replay)'}
         >
           <Icon name={isSuppressed ? 'eyeOff' : 'eye'} size={14} />
@@ -167,11 +151,7 @@ export function FeatureHistoryPanel({ className }: FeatureHistoryPanelProps): Re
       </PanelHeader>
 
       {stepCount === 0 ? (
-        <PanelEmpty
-          icon="history"
-          message="No history steps yet."
-          hint="Every command you run is recorded here as an editable step."
-        />
+        <PanelEmpty icon="history" message="No history steps yet." hint="Every command you run is recorded here as an editable step." />
       ) : (
         <ol className="panel__list" aria-label="Feature history steps">
           {featureHistory.map((step, index) => (

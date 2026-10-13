@@ -26,24 +26,17 @@ type BatchIds =
  * @failure empty, > MAX_BATCH_IDS, or no listed entity exists -> `{ ok: false, result }` no-op
  * @invariant `existing` and `missing` are de-duplicated, in first-seen order
  */
-function resolveBatchIds(
-  doc: CadDocument,
-  command: string,
-  ids: readonly string[],
-  emptyDetail: string,
-): BatchIds {
+function resolveBatchIds(doc: CadDocument, command: string, ids: readonly string[], emptyDetail: string): BatchIds {
   const fail = (summary: string): BatchIds => ({
     ok: false,
     result: noop(doc, `${command}: ${summary}`),
   });
   if (ids.length === 0) return fail(emptyDetail);
-  if (ids.length > MAX_BATCH_IDS)
-    return fail(`${ids.length} ids exceeds MAX_BATCH_IDS (${MAX_BATCH_IDS}).`);
+  if (ids.length > MAX_BATCH_IDS) return fail(`${ids.length} ids exceeds MAX_BATCH_IDS (${MAX_BATCH_IDS}).`);
   const unique = [...new Set(ids)];
   const existing = unique.filter((id) => Object.hasOwn(doc.entities, id));
   const missing = unique.filter((id) => !Object.hasOwn(doc.entities, id));
-  if (existing.length === 0)
-    return fail(`no listed entity exists (missing: [${missing.join(', ')}]).`);
+  if (existing.length === 0) return fail(`no listed entity exists (missing: [${missing.join(', ')}]).`);
   return { ok: true, existing, missing };
 }
 
@@ -64,28 +57,16 @@ export const deleteEntities = defineCommand({
     '2 members are dissolved. Ids that do not exist are skipped and listed in the summary; ' +
     'if none exist nothing changes.',
   params: z.object({
-    ids: z
-      .array(z.string())
-      .describe(
-        `Entity ids to delete (non-empty, at most ${MAX_BATCH_IDS}). Missing ids are skipped.`,
-      ),
+    ids: z.array(z.string()).describe(`Entity ids to delete (non-empty, at most ${MAX_BATCH_IDS}). Missing ids are skipped.`),
   }),
   run: (doc, { ids }): CommandResult => {
-    const batch = resolveBatchIds(
-      doc,
-      'delete_entities',
-      ids,
-      'ids must be a non-empty array of strings.',
-    );
+    const batch = resolveBatchIds(doc, 'delete_entities', ids, 'ids must be a non-empty array of strings.');
     if (!batch.ok) return batch.result;
     const { existing, missing } = batch;
 
     const { document, dissolvedGroups, prunedReferences } = withoutEntities(doc, new Set(existing));
 
-    const dissolveSuffix =
-      dissolvedGroups.length > 0
-        ? ` Dissolved group(s): [${dissolvedGroups.join(', ')}] (fell below 2 members).`
-        : '';
+    const dissolveSuffix = dissolvedGroups.length > 0 ? ` Dissolved group(s): [${dissolvedGroups.join(', ')}] (fell below 2 members).` : '';
     const missingSuffix = missing.length > 0 ? ` Skipped missing: [${missing.join(', ')}].` : '';
 
     return changed(
@@ -110,11 +91,7 @@ export const moveEntities = defineCommand({
     'Translate several entities by the same delta in one step (one undo). Ids that do not exist are skipped and listed in the summary; ' +
     'if none exist nothing changes.',
   params: z.object({
-    ids: z
-      .array(z.string())
-      .describe(
-        `Entity ids to move (non-empty, at most ${MAX_BATCH_IDS}). Missing ids are skipped.`,
-      ),
+    ids: z.array(z.string()).describe(`Entity ids to move (non-empty, at most ${MAX_BATCH_IDS}). Missing ids are skipped.`),
     delta: vec3('Translation [dx, dy, dz] in document units applied to every entity.'),
   }),
   run: (doc, { ids, delta }): CommandResult => {
@@ -151,14 +128,8 @@ export const duplicateEntities = defineCommand({
     'Ids that do not exist are skipped and listed in the summary; if none exist nothing changes. ' +
     'Returns the new entity ids in affected, in the order of the (de-duplicated) input ids.',
   params: z.object({
-    ids: z
-      .array(z.string())
-      .describe(
-        `Entity ids to duplicate (non-empty, at most ${MAX_BATCH_IDS}). Missing ids are skipped.`,
-      ),
-    offset: looseVec3(
-      'Optional [dx, dy, dz] offset applied to every copy. Defaults to [0, 0, 0] (exact overlap).',
-    ).optional(),
+    ids: z.array(z.string()).describe(`Entity ids to duplicate (non-empty, at most ${MAX_BATCH_IDS}). Missing ids are skipped.`),
+    offset: looseVec3('Optional [dx, dy, dz] offset applied to every copy. Defaults to [0, 0, 0] (exact overlap).').optional(),
   }),
   run: (doc, { ids, offset = ORIGIN }): CommandResult => {
     const batch = resolveBatchIds(doc, 'duplicate_entities', ids, 'ids must be a non-empty array.');

@@ -34,13 +34,7 @@ function positionOf(entityId: string, entities: Entities): Vec3 {
   return entities[entityId]?.position ?? ORIGIN;
 }
 
-function ConstraintLine({
-  constraint,
-  entities,
-}: {
-  constraint: Constraint;
-  entities: Entities;
-}): React.ReactElement | null {
+function ConstraintLine({ constraint, entities }: { constraint: Constraint; entities: Entities }): React.ReactElement | null {
   const posA = positionOf(constraint.a.entityId, entities);
   const posB = positionOf(constraint.b.entityId, entities);
 
@@ -65,11 +59,7 @@ function ConstraintLine({
       <lineSegments geometry={geometry} material={material} renderOrder={998} />
       <Text
         font={TEXT_FONT_URL}
-        position={[
-          (posA[0] + posB[0]) / 2,
-          (posA[1] + posB[1]) / 2,
-          (posA[2] + posB[2]) / 2 + 0.25,
-        ]}
+        position={[(posA[0] + posB[0]) / 2, (posA[1] + posB[1]) / 2, (posA[2] + posB[2]) / 2 + 0.25]}
         fontSize={0.35}
         color={CONSTRAINT_COLOR}
         anchorX="center"

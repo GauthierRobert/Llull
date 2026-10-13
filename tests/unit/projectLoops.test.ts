@@ -11,11 +11,8 @@ interface PlanData {
   steps: { ok: boolean; summary: string; path?: string }[];
 }
 
-const run = (
-  doc: CadDocument,
-  actions: unknown[],
-  extra: object = {},
-): ReturnType<typeof execute> => execute(doc, 'build_project', { actions, ...extra });
+const run = (doc: CadDocument, actions: unknown[], extra: object = {}): ReturnType<typeof execute> =>
+  execute(doc, 'build_project', { actions, ...extra });
 
 const cylinders = (doc: CadDocument): CylinderEntity[] =>
   Object.values(doc.entities).filter((e): e is CylinderEntity => e.kind === 'cylinder');
@@ -188,9 +185,7 @@ describe('build_project nestable loops', () => {
       { command: 'set_parameter', params: { name: 'n', expression: '4' } },
       {
         for: { var: 'k', from: 0, to: '=n-1', step: 2 },
-        actions: [
-          { command: 'add_cylinder', params: { radius: 1, height: 1, position: ['=$k', 0, 0] } },
-        ],
+        actions: [{ command: 'add_cylinder', params: { radius: 1, height: 1, position: ['=$k', 0, 0] } }],
       },
     ]);
     expect(cylinders(result.document).map((c) => c.position[0])).toEqual([0, 2]);
@@ -231,9 +226,7 @@ describe('build_project nestable loops', () => {
   });
 
   it('reports header errors at run time', () => {
-    const bad = run(createEmptyDocument(), [
-      { repeat: { count: 2.5 }, actions: [{ command: 'add_box', params: { size: [1, 1, 1] } }] },
-    ]);
+    const bad = run(createEmptyDocument(), [{ repeat: { count: 2.5 }, actions: [{ command: 'add_box', params: { size: [1, 1, 1] } }] }]);
     expect(bad.affected).toEqual([]);
     expect(bad.summary).toContain('non-negative integer');
   });
@@ -286,8 +279,7 @@ describe('build_project nestable loops', () => {
 });
 
 describe('build_project validate with loops', () => {
-  const validate = (actions: unknown[]): PlanData =>
-    run(createEmptyDocument(), actions, { validate: true }).data as PlanData;
+  const validate = (actions: unknown[]): PlanData => run(createEmptyDocument(), actions, { validate: true }).data as PlanData;
 
   it('accepts a valid parametric loop whose parameters the plan itself defines', () => {
     const data = validate([...params(7, 50), polar]);
@@ -315,9 +307,7 @@ describe('build_project validate with loops', () => {
   it('reports bad counts, caps, unknown commands, missing params and aliases', () => {
     expect(validate([{ repeat: { count: 'n' }, actions: [] }]).issues?.[0]).toContain('step 0');
     expect(validate([{ repeat: { count: 1.5 }, actions: [] }]).issues?.[0]).toContain('integer');
-    expect(validate([{ repeat: { count: 2000 }, actions: [] }]).issues?.[0]).toContain(
-      'MAX_LOOP_ITERATIONS',
-    );
+    expect(validate([{ repeat: { count: 2000 }, actions: [] }]).issues?.[0]).toContain('MAX_LOOP_ITERATIONS');
     expect(
       validate([
         { repeat: { count: 600 }, actions: [] },
@@ -393,9 +383,7 @@ describe('replay of a loop step that needs the kernel', () => {
           name: 'build_project',
           suppressed: false,
           params: {
-            actions: [
-              { repeat: { count: 1 }, actions: [{ command: 'boolean', params: { op: 'union' } }] },
-            ],
+            actions: [{ repeat: { count: 1 }, actions: [{ command: 'boolean', params: { op: 'union' } }] }],
           },
         },
       ],

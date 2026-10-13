@@ -16,13 +16,7 @@ function formatEditableNumber(n: number): string {
   return fixedNumber(n, 3);
 }
 
-export function PropRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}): React.ReactElement {
+export function PropRow({ label, children }: { label: string; children: React.ReactNode }): React.ReactElement {
   return (
     <div className="props-row">
       <span className="props-key">{label}</span>
@@ -31,15 +25,7 @@ export function PropRow({
   );
 }
 
-export function ScalarRow({
-  label,
-  value,
-  unit,
-}: {
-  label: string;
-  value: number;
-  unit?: string;
-}): React.ReactElement {
+export function ScalarRow({ label, value, unit }: { label: string; value: number; unit?: string }): React.ReactElement {
   return (
     <PropRow label={label}>
       <span className="props-number">

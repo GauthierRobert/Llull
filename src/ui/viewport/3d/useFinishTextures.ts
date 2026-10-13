@@ -66,13 +66,8 @@ export function useFinishTextures(material: FinishSource | undefined): FinishTex
  */
 export function applyBoxUvs(geometry: THREE.BufferGeometry, scale: number): void {
   const position = geometry.getAttribute('position');
-  const corner = (i: number): [number, number, number] => [
-    position.getX(i),
-    position.getY(i),
-    position.getZ(i),
-  ];
-  if (geometry.index === null && geometry.getAttribute('normal') === undefined)
-    geometry.computeVertexNormals();
+  const corner = (i: number): [number, number, number] => [position.getX(i), position.getY(i), position.getZ(i)];
+  if (geometry.index === null && geometry.getAttribute('normal') === undefined) geometry.computeVertexNormals();
   const normal = geometry.getAttribute('normal');
   const uvs = new Float32Array(position.count * 2);
   for (let i = 0; i < position.count; i++) {

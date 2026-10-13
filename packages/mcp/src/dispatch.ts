@@ -26,9 +26,7 @@ export type McpShapedResult = {
 
 /** The `text` of a `{ format: 'code', text }` data record, else null. */
 function codeText(data: unknown): string | null {
-  return isRecord(data) && data.format === 'code' && typeof data.text === 'string'
-    ? data.text
-    : null;
+  return isRecord(data) && data.format === 'code' && typeof data.text === 'string' ? data.text : null;
 }
 
 /**
@@ -73,12 +71,7 @@ function jsonText(value: unknown): string {
  * clipped past `MAX_CODE_TEXT_CHARS`).
  * @pure
  */
-export function shapeToolCallContent(result: {
-  summary: string;
-  affected: string[];
-  isError: boolean;
-  data?: unknown;
-}): McpShapedResult {
+export function shapeToolCallContent(result: { summary: string; affected: string[]; isError: boolean; data?: unknown }): McpShapedResult {
   const { summary, affected, isError, data } = result;
   const content: McpTextContent[] = [{ type: 'text', text: summary }];
   if (affected.length > 0) {
@@ -94,15 +87,12 @@ export function shapeToolCallContent(result: {
   }
   if (data === undefined) {
     // Ids past the text cap would otherwise be in no channel at all.
-    return affected.length > MAX_AFFECTED_IDS_SHOWN
-      ? { content, isError, structuredContent: { affected } }
-      : { content, isError };
+    return affected.length > MAX_AFFECTED_IDS_SHOWN ? { content, isError, structuredContent: { affected } } : { content, isError };
   }
 
   // Source code (export_code) is shown verbatim so agents read it as code, not as a JSON string.
   const code = codeText(data);
-  const jsonData =
-    isRecord(data) && code !== null ? { ...data, text: '(source code in the next block)' } : data;
+  const jsonData = isRecord(data) && code !== null ? { ...data, text: '(source code in the next block)' } : data;
   content.push({ type: 'text', text: `\`\`\`json\n${jsonText(jsonData)}\n\`\`\`` });
   if (code !== null) {
     content.push({

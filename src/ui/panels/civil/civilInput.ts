@@ -39,9 +39,7 @@ export function parsePvis(text: string): PviInput[] | null {
     const values = parseNumberRow(row);
     if (values === null || values.length < 2 || values.length > 3) return null;
     const [station = 0, elevation = 0, curveLength] = values;
-    pvis.push(
-      curveLength === undefined ? { station, elevation } : { station, elevation, curveLength },
-    );
+    pvis.push(curveLength === undefined ? { station, elevation } : { station, elevation, curveLength });
   }
   return pvis;
 }

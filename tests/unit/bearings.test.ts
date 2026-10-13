@@ -32,11 +32,7 @@ describe('add_bearing', () => {
     for (const id of data.rollingElementIds) expect(r.document.entities[id]!.kind).toBe('sphere');
     const group = r.document.groups[data.groupId]!;
     expect(group.name).toBe('Bearing 6205');
-    expect(group.memberIds).toEqual([
-      data.innerRingId,
-      data.outerRingId,
-      ...data.rollingElementIds,
-    ]);
+    expect(group.memberIds).toEqual([data.innerRingId, data.outerRingId, ...data.rollingElementIds]);
     expect(r.affected).toEqual([...group.memberIds, data.groupId]);
     expect(r.document.order).toEqual(group.memberIds);
     const outer = rotatedEntityBounds(r.document.entities[data.outerRingId]!);

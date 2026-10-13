@@ -20,13 +20,10 @@ function boundsOf(points: ReadonlyArray<readonly [number, number]>): PlanExtent 
 
 export function gridExtent(building: BuildingModel | undefined): PlanExtent | null {
   if (building === undefined) return null;
-  const lines = Object.values(building.elements).filter(
-    (element): element is GridElement => element.category === 'grid',
-  );
+  const lines = Object.values(building.elements).filter((element): element is GridElement => element.category === 'grid');
   if (lines.length === 0) return null;
   const coordinates = lines.flatMap((line) => [...line.start, ...line.end]);
-  const tolerance =
-    (Math.max(...coordinates) - Math.min(...coordinates)) * RELATIVE_CROSSING_TOLERANCE;
+  const tolerance = (Math.max(...coordinates) - Math.min(...coordinates)) * RELATIVE_CROSSING_TOLERANCE;
   const crossings: Array<readonly [number, number]> = [];
   lines.forEach((line, index) => {
     for (const other of lines.slice(index + 1)) {

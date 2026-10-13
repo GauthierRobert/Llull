@@ -21,32 +21,17 @@ export const listSteelProfiles = defineCommand({
     'perimeter (mm). Optionally filter by family.',
   params: z.object({
     // tolerant: lower-case / padded family names are normalised in run.
-    family: tolerant(
-      z
-        .enum(['IPE', 'HEA', 'HEB', 'UPN', 'C', 'SHS', 'RHS', 'CHS', 'L'])
-        .optional()
-        .describe('Only this family.'),
-    ),
+    family: tolerant(z.enum(['IPE', 'HEA', 'HEB', 'UPN', 'C', 'SHS', 'RHS', 'CHS', 'L']).optional().describe('Only this family.')),
   }),
   run: (doc, { family }): CommandResult => {
     const raw: unknown = family;
-    if (raw !== undefined && typeof raw !== 'string')
-      return noop(doc, 'list_steel_profiles: family must be a string such as "HEA".');
+    if (raw !== undefined && typeof raw !== 'string') return noop(doc, 'list_steel_profiles: family must be a string such as "HEA".');
     const wanted = raw?.trim().toUpperCase();
     const families: string[] = [...new Set(STEEL_PROFILES.map((profile) => profile.family))];
     if (wanted !== undefined && !families.includes(wanted)) {
-      return noop(
-        doc,
-        `list_steel_profiles: unknown family '${raw?.trim()}' (valid families: ${families.join(', ')}).`,
-      );
+      return noop(doc, `list_steel_profiles: unknown family '${raw?.trim()}' (valid families: ${families.join(', ')}).`);
     }
-    const profiles = STEEL_PROFILES.filter(
-      (profile) => wanted === undefined || profile.family === wanted,
-    );
-    return report(
-      doc,
-      `${profiles.length} steel profile(s): ${profiles.map((profile) => profile.name).join(', ')}.`,
-      { profiles },
-    );
+    const profiles = STEEL_PROFILES.filter((profile) => wanted === undefined || profile.family === wanted);
+    return report(doc, `${profiles.length} steel profile(s): ${profiles.map((profile) => profile.name).join(', ')}.`, { profiles });
   },
 });

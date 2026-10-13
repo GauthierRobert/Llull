@@ -78,13 +78,7 @@ function arcPoints(center: Vec2, radius: number, start: number, end: number): Ve
 }
 
 /** Chain line along `points` (ISO 128 type 04: long dash, gap, dot, gap), one pattern for the whole run. */
-function chainRing(
-  buffer: SegmentBuffer,
-  points: ReadonlyArray<Vec2>,
-  closed: boolean,
-  unit: number,
-  color: THREE.Color,
-): void {
+function chainRing(buffer: SegmentBuffer, points: ReadonlyArray<Vec2>, closed: boolean, unit: number, color: THREE.Color): void {
   const count = closed ? points.length : points.length - 1;
   const pattern = LINE_PATTERNS.center.map((length) => length * unit);
   let phase = 0;
@@ -98,10 +92,7 @@ function chainRing(
       const left = (pattern[phase] as number) - drawn;
       const end = Math.min(length, s + left);
       if (phase % 2 === 0) {
-        const lerp = (t: number): Vec2 => [
-          a[0] + ((b[0] - a[0]) * t) / length,
-          a[1] + ((b[1] - a[1]) * t) / length,
-        ];
+        const lerp = (t: number): Vec2 => [a[0] + ((b[0] - a[0]) * t) / length, a[1] + ((b[1] - a[1]) * t) / length];
         buffer.add(lerp(s), lerp(end), color);
       }
       drawn += end - s;
@@ -146,8 +137,7 @@ function fillArea(
   stroke: THREE.Color,
 ): void {
   if (fill === 'hatch') {
-    for (const [a, b] of ansi31Hatch([outer, ...holes], hatchSpacing))
-      buffers.thin.add(a, b, stroke);
+    for (const [a, b] of ansi31Hatch([outer, ...holes], hatchSpacing)) buffers.thin.add(a, b, stroke);
   } else if (fill === 'solid') {
     buffers.fills.push({
       outer: relative(outer, anchor),
@@ -156,8 +146,7 @@ function fillArea(
   }
 }
 
-const relative = (points: ReadonlyArray<Vec2>, [ax, ay]: Vec2): Vec2[] =>
-  points.map(([x, y]): Vec2 => [x - ax, y - ay]);
+const relative = (points: ReadonlyArray<Vec2>, [ax, ay]: Vec2): Vec2[] => points.map(([x, y]): Vec2 => [x - ax, y - ay]);
 
 /**
  * Line-weight buffers, fills and labels of `items`, relative to `anchor`.
@@ -179,12 +168,7 @@ export function buildDrawingBuffers(
   items.forEach(({ primitive, color }, index) => {
     const stroke = new THREE.Color(color);
     const style = primitive.style;
-    const target =
-      style === 'cut' || style === 'visible'
-        ? buffers.thick
-        : style === 'hidden'
-          ? buffers.dashed
-          : buffers.thin;
+    const target = style === 'cut' || style === 'visible' ? buffers.thick : style === 'hidden' ? buffers.dashed : buffers.thin;
     const ring = (points: ReadonlyArray<Vec2>, closed: boolean): void => {
       if (style === 'center') chainRing(buffers.thin, points, closed, patternUnit, stroke);
       else target.ring(points, closed, stroke);
@@ -201,10 +185,7 @@ export function buildDrawingBuffers(
         ring([primitive.a, primitive.b], false);
         break;
       case 'arc':
-        ring(
-          arcPoints(primitive.center, primitive.radius, primitive.startAngle, primitive.endAngle),
-          false,
-        );
+        ring(arcPoints(primitive.center, primitive.radius, primitive.startAngle, primitive.endAngle), false);
         break;
       case 'circle': {
         const points = arcPoints(primitive.center, primitive.radius, 0, Math.PI * 2).slice(0, -1);

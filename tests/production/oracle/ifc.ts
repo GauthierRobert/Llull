@@ -85,8 +85,7 @@ export function parseIfc(text: string): IfcFile {
   }
   for (const entity of entities.values()) {
     for (const ref of references(entity.args)) {
-      if (!entities.has(ref))
-        errors.push(`#${entity.id} ${entity.type} references missing #${ref}`);
+      if (!entities.has(ref)) errors.push(`#${entity.id} ${entity.type} references missing #${ref}`);
     }
   }
   return { schema, entities, errors };
@@ -155,8 +154,7 @@ export function globalIdProblems(file: IfcFile): { malformed: string[]; duplicat
  * reference to IFCOWNERHISTORY), then a Name — decided by structure, so a GlobalId of the wrong
  * length is reported, not skipped.
  */
-const NOT_ROOTED =
-  /^IFC(PROPERTY(?!SET)|QUANTITY|COMPLEXPROPERTY|PHYSICALCOMPLEXQUANTITY|MATERIAL)/;
+const NOT_ROOTED = /^IFC(PROPERTY(?!SET)|QUANTITY|COMPLEXPROPERTY|PHYSICALCOMPLEXQUANTITY|MATERIAL)/;
 
 function isRooted(entity: StepEntity, file: IfcFile): boolean {
   const [first, owner] = entity.args;

@@ -33,9 +33,7 @@ export const addLayer = defineCommand({
     'Create a new layer with the given name and append it to the layer order. ' +
     'Returns the new layer id in affected. The layer starts visible and unlocked.',
   params: z.object({
-    name: z
-      .string()
-      .describe('Human-readable name for the new layer, e.g. "Walls". Must be non-empty.'),
+    name: z.string().describe('Human-readable name for the new layer, e.g. "Walls". Must be non-empty.'),
     color: z
       .string()
       .optional()
@@ -48,8 +46,7 @@ export const addLayer = defineCommand({
     const trimmed = name.trim();
     if (!trimmed) return noop(doc, 'add_layer requires a non-empty name.');
 
-    if (color !== undefined && !isHexColor(color))
-      return noop(doc, `add_layer: color must be a #rrggbb hex string (got "${color}").`);
+    if (color !== undefined && !isHexColor(color)) return noop(doc, `add_layer: color must be a #rrggbb hex string (got "${color}").`);
 
     const id = nextId('layer');
     const layer: Layer = {
@@ -60,11 +57,7 @@ export const addLayer = defineCommand({
       ...(color !== undefined ? { color } : {}),
     };
 
-    return changed(
-      { ...withLayer(doc, layer), layerOrder: [...doc.layerOrder, id] },
-      `Created layer ${id} ("${trimmed}").`,
-      [id],
-    );
+    return changed({ ...withLayer(doc, layer), layerOrder: [...doc.layerOrder, id] }, `Created layer ${id} ("${trimmed}").`, [id]);
   },
 });
 
@@ -91,12 +84,7 @@ export const updateLayer = defineCommand({
     name: z.string().describe('New display name for the layer. Must be non-empty.').optional(),
     visible: z.boolean().describe('true to make the layer visible; false to hide it.').optional(),
     locked: z.boolean().describe('true to lock the layer; false to unlock it.').optional(),
-    color: z
-      .string()
-      .describe(
-        'New layer tint as a hex string #rrggbb, e.g. "#ff0000"; any other format is rejected.',
-      )
-      .optional(),
+    color: z.string().describe('New layer tint as a hex string #rrggbb, e.g. "#ff0000"; any other format is rejected.').optional(),
   }),
   run: (doc, { id, name, visible, locked, color }): CommandResult => {
     const layer = doc.layers[id];
@@ -104,8 +92,7 @@ export const updateLayer = defineCommand({
 
     const trimmed = name?.trim();
     if (trimmed === '') return noop(doc, 'update_layer requires a non-empty name.');
-    if (color !== undefined && !isHexColor(color))
-      return noop(doc, `update_layer: color must be a #rrggbb hex string (got "${color}").`);
+    if (color !== undefined && !isHexColor(color)) return noop(doc, `update_layer: color must be a #rrggbb hex string (got "${color}").`);
 
     const patch: Partial<Layer> = {
       ...(trimmed === undefined ? {} : { name: trimmed }),
@@ -114,20 +101,10 @@ export const updateLayer = defineCommand({
       ...(color === undefined ? {} : { color }),
     };
     const fields = Object.keys(patch);
-    if (fields.length === 0)
-      return noop(
-        doc,
-        `update_layer: give at least one of name, visible, locked, color for ${id}.`,
-      );
+    if (fields.length === 0) return noop(doc, `update_layer: give at least one of name, visible, locked, color for ${id}.`);
 
-    const changes = Object.entries(patch).map(
-      ([field, value]) => `${field} = ${JSON.stringify(value)}`,
-    );
-    return changed(
-      withLayer(doc, { ...layer, ...patch }),
-      `Layer ${id} ("${layer.name}"): ${changes.join(', ')}.`,
-      [id],
-    );
+    const changes = Object.entries(patch).map(([field, value]) => `${field} = ${JSON.stringify(value)}`);
+    return changed(withLayer(doc, { ...layer, ...patch }), `Layer ${id} ("${layer.name}"): ${changes.join(', ')}.`, [id]);
   },
 });
 
@@ -194,16 +171,10 @@ export const deleteLayer = defineCommand({
     'The default layer cannot be deleted. ' +
     'Graceful no-op if the layer id does not exist.',
   params: z.object({
-    id: z
-      .string()
-      .describe(
-        'Id of the layer to delete. Must not be "layer-default" (the default layer). ' +
-          'Must exist in the document.',
-      ),
+    id: z.string().describe('Id of the layer to delete. Must not be "layer-default" (the default layer). ' + 'Must exist in the document.'),
   }),
   run: (doc, { id }): CommandResult => {
-    if (id === DEFAULT_LAYER_ID)
-      return noop(doc, `Cannot delete the default layer (${DEFAULT_LAYER_ID}).`);
+    if (id === DEFAULT_LAYER_ID) return noop(doc, `Cannot delete the default layer (${DEFAULT_LAYER_ID}).`);
 
     const layer = doc.layers[id];
     if (!layer) return noop(doc, `No layer ${id} — delete_layer is a no-op.`);
@@ -220,9 +191,7 @@ export const deleteLayer = defineCommand({
         layers: nextLayers,
         layerOrder: doc.layerOrder.filter((lid) => lid !== id),
       },
-      summary:
-        `Deleted layer ${id} ("${layer.name}"). ` +
-        `${orphans.length} entity(s) reassigned to default layer ${DEFAULT_LAYER_ID}.`,
+      summary: `Deleted layer ${id} ("${layer.name}"). ` + `${orphans.length} entity(s) reassigned to default layer ${DEFAULT_LAYER_ID}.`,
       affected: [id],
     };
   },

@@ -14,12 +14,7 @@ import { elementsOf, getBuilding, withElement } from '../../building/model';
 import { noop } from '@core/commands/noop';
 import { add3, scale3 } from '@lib/vec3';
 import { regenerateBuilding } from '../../building/evaluate/evaluateElements';
-import {
-  designResult,
-  finalUtilisationText,
-  noChangeResult,
-  utilisationStats,
-} from '../reports/designReport';
+import { designResult, finalUtilisationText, noChangeResult, utilisationStats } from '../reports/designReport';
 import { sweepFrame } from '../../shared/mesh';
 import { findProfile, lightestProfile, sectionProperties } from '../../steel/profiles';
 
@@ -45,15 +40,10 @@ export function nextSecondaryProfile(name: string): string | null {
   const profile = findProfile(name);
   if (!profile) return null;
   if (profile.shape !== 'C') return nextProfile(name);
-  const heavierC = lightestProfile(
-    (candidate) => candidate.family === 'C' && candidate.massPerMetre > profile.massPerMetre,
-  );
+  const heavierC = lightestProfile((candidate) => candidate.family === 'C' && candidate.massPerMetre > profile.massPerMetre);
   if (heavierC) return heavierC.name;
   const modulus = sectionProperties(profile).elasticModulus;
-  const ipe = lightestProfile(
-    (candidate) =>
-      candidate.family === 'IPE' && sectionProperties(candidate).plasticModulus > modulus * 1.02,
-  );
+  const ipe = lightestProfile((candidate) => candidate.family === 'IPE' && sectionProperties(candidate).plasticModulus > modulus * 1.02);
   return ipe?.name ?? null;
 }
 
@@ -82,8 +72,7 @@ export const designPurlins = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const { targetUtilisation = 0.95, ...loadParams } = params;
-    if (!isValidTargetUtilisation(targetUtilisation))
-      return noop(doc, 'design_purlins failed: targetUtilisation must be in [0.5, 1].');
+    if (!isValidTargetUtilisation(targetUtilisation)) return noop(doc, 'design_purlins failed: targetUtilisation must be in [0.5, 1].');
     const analyse = (document: CadDocument): { rows: PurlinRow[]; summary: string } => {
       const result = checkPurlins.run(document, loadParams);
       const data = result.data as { rows: PurlinRow[] } | undefined;
@@ -104,20 +93,14 @@ export const designPurlins = defineCommand({
       }
       if (groups.size === 0) return null;
       return upsizeProfileGroups(building, groups, nextSecondaryProfile, (next, group, larger) => {
-        const { building: resizedBuilding, resizedIds } = resizeProfileGroup(
-          next,
-          group,
-          larger,
-          (element) => element.levelId === levelId,
-        );
+        const { building: resizedBuilding, resizedIds } = resizeProfileGroup(next, group, larger, (element) => element.levelId === levelId);
         return {
           building: reseatResized(current, resizedBuilding, resizedIds, group.profile, larger),
           changedIds: resizedIds,
         };
       });
     });
-    if (changed.size === 0)
-      return noChangeResult(doc, `${first.rows.length} purlin / rail row(s)`, first.rows, limited);
+    if (changed.size === 0) return noChangeResult(doc, `${first.rows.length} purlin / rail row(s)`, first.rows, limited);
     const document = regenerateBuilding(doc, getBuilding(current));
     const final = analyse(document).rows;
     const stats = utilisationStats(final);
@@ -168,8 +151,7 @@ function reseatResized(
       const rafter = rafters.find(
         (candidate) =>
           candidate.levelId === member.levelId &&
-          (Math.abs(candidate.start[1] - member.start[1]) < tolerance ||
-            Math.abs(candidate.start[1] - member.end[1]) < tolerance) &&
+          (Math.abs(candidate.start[1] - member.start[1]) < tolerance || Math.abs(candidate.start[1] - member.end[1]) < tolerance) &&
           member.start[0] > Math.min(candidate.start[0], candidate.end[0]) - margin &&
           member.start[0] < Math.max(candidate.start[0], candidate.end[0]) + margin,
       );

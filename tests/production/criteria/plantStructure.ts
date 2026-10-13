@@ -3,12 +3,7 @@ import type { SteelMemberElement } from '@core/model/building';
 import type { CheckOutcome, Criterion, GradeContext } from '../contract';
 import { absolute, distance, elementsOf, levelsByElevation, round } from '../oracle/geometry';
 import { section } from '../oracle/steel';
-import {
-  gridCoordinates,
-  letterLabels,
-  type IntentMember,
-  type PlantIntent,
-} from '../plant/intent';
+import { gridCoordinates, letterLabels, type IntentMember, type PlantIntent } from '../plant/intent';
 
 /**
  * @layer tests/production/criteria
@@ -36,10 +31,8 @@ export function absoluteMembers(doc: CadDocument): AbsoluteMember[] {
 }
 
 const sameAxis = (a: { start: Vec3; end: Vec3 }, b: { start: Vec3; end: Vec3 }): boolean =>
-  (distance(a.start, b.start) <= POSITION_TOLERANCE &&
-    distance(a.end, b.end) <= POSITION_TOLERANCE) ||
-  (distance(a.start, b.end) <= POSITION_TOLERANCE &&
-    distance(a.end, b.start) <= POSITION_TOLERANCE);
+  (distance(a.start, b.start) <= POSITION_TOLERANCE && distance(a.end, b.end) <= POSITION_TOLERANCE) ||
+  (distance(a.start, b.end) <= POSITION_TOLERANCE && distance(a.end, b.start) <= POSITION_TOLERANCE);
 
 const normalized = (profile: string): string => profile.replace(/\s+/g, '').toUpperCase();
 
@@ -60,19 +53,15 @@ function memberCheck(doc: CadDocument, intended: IntentMember[], role: string): 
     }
     unmatched.delete(found);
     if (normalized(found.element.profile) !== normalized(member.profile)) {
-      wrongProfile.push(
-        `${found.element.mark} is ${found.element.profile}, expected ${member.profile}`,
-      );
+      wrongProfile.push(`${found.element.mark} is ${found.element.profile}, expected ${member.profile}`);
     }
   }
   const extra = [...unmatched].map((m) => `${m.element.mark} ${describeAxis(m)}`);
   const pass = missing.length === 0 && wrongProfile.length === 0 && extra.length === 0;
   const parts = [`${intended.length - missing.length}/${intended.length} ${role}s placed`];
-  if (missing.length > 0)
-    parts.push(`missing ${missing.length}: ${missing.slice(0, 4).join('; ')}`);
+  if (missing.length > 0) parts.push(`missing ${missing.length}: ${missing.slice(0, 4).join('; ')}`);
   if (wrongProfile.length > 0) parts.push(`wrong section: ${wrongProfile.slice(0, 4).join('; ')}`);
-  if (extra.length > 0)
-    parts.push(`not in the design ${extra.length}: ${extra.slice(0, 4).join('; ')}`);
+  if (extra.length > 0) parts.push(`not in the design ${extra.length}: ${extra.slice(0, 4).join('; ')}`);
   return { pass, detail: parts.join(' — ') };
 }
 
@@ -91,8 +80,7 @@ function levelsCheck(intent: PlantIntent, { document }: GradeContext): CheckOutc
   }
   return {
     pass: problems.length === 0,
-    detail:
-      problems.length === 0 ? `${model.length} levels at the design FFLs` : problems.join('; '),
+    detail: problems.length === 0 ? `${model.length} levels at the design FFLs` : problems.join('; '),
   };
 }
 
@@ -105,22 +93,17 @@ function gridCheck(intent: PlantIntent, { document }: GradeContext): CheckOutcom
     const label = String(i + 1);
     const axis = axes.find((a) => Math.abs(a.start[0] - x) <= 1 && Math.abs(a.end[0] - x) <= 1);
     if (!axis) problems.push(`no axis at x=${x}`);
-    else if (axis.mark !== label)
-      problems.push(`axis at x=${x} labelled ${axis.mark}, expected ${label}`);
+    else if (axis.mark !== label) problems.push(`axis at x=${x} labelled ${axis.mark}, expected ${label}`);
   });
   letterLabels(ys.length).forEach((label, i) => {
     const y = ys[i] ?? 0;
     const axis = axes.find((a) => Math.abs(a.start[1] - y) <= 1 && Math.abs(a.end[1] - y) <= 1);
     if (!axis) problems.push(`no axis at y=${y}`);
-    else if (axis.mark !== label)
-      problems.push(`axis at y=${y} labelled ${axis.mark}, expected ${label}`);
+    else if (axis.mark !== label) problems.push(`axis at y=${y} labelled ${axis.mark}, expected ${label}`);
   });
   return {
     pass: problems.length === 0,
-    detail:
-      problems.length === 0
-        ? `${xs.length} × ${ys.length} grid axes, correctly labelled`
-        : problems.join('; '),
+    detail: problems.length === 0 ? `${xs.length} × ${ys.length} grid axes, correctly labelled` : problems.join('; '),
   };
 }
 
@@ -139,16 +122,13 @@ function floorsCheck(intent: PlantIntent, { document }: GradeContext): CheckOutc
       continue;
     }
     if (Math.abs(slab.thickness - floor.thickness) > 0.5) {
-      problems.push(
-        `${slab.mark} at ${ffl} is ${slab.thickness} thick, expected ${floor.thickness}`,
-      );
+      problems.push(`${slab.mark} at ${ffl} is ${slab.thickness} thick, expected ${floor.thickness}`);
     }
     if (!slab.material.toLowerCase().includes(floor.material.toLowerCase())) {
       problems.push(`${slab.mark} at ${ffl} is ${slab.material}, expected ${floor.material}`);
     }
     if (
-      Math.abs(polygonArea(slab.boundary) - polygonArea(floor.boundary)) >
-        1e-3 * polygonArea(floor.boundary) ||
+      Math.abs(polygonArea(slab.boundary) - polygonArea(floor.boundary)) > 1e-3 * polygonArea(floor.boundary) ||
       !sameExtents(slab.boundary, floor.boundary)
     ) {
       problems.push(`${slab.mark} at ${ffl} does not cover the grid footprint`);
@@ -156,16 +136,12 @@ function floorsCheck(intent: PlantIntent, { document }: GradeContext): CheckOutc
   }
   return {
     pass: problems.length === 0,
-    detail:
-      problems.length === 0 ? `${intent.floors.length} floors as designed` : problems.join('; '),
+    detail: problems.length === 0 ? `${intent.floors.length} floors as designed` : problems.join('; '),
   };
 }
 
 /** Plan bounding boxes equal within 1 mm (catches a slab of the right area in the wrong place). */
-function sameExtents(
-  a: readonly (readonly number[])[],
-  b: readonly (readonly number[])[],
-): boolean {
+function sameExtents(a: readonly (readonly number[])[], b: readonly (readonly number[])[]): boolean {
   const box = (points: readonly (readonly number[])[]): number[] => [
     Math.min(...points.map((p) => p[0] ?? 0)),
     Math.min(...points.map((p) => p[1] ?? 0)),
@@ -207,16 +183,13 @@ function tonnageCheck(intent: PlantIntent, ctx: GradeContext): CheckOutcome {
   const takeoffKg = (takeoff.lines ?? [])
     .filter((line) => line.key.startsWith('member.') && line.unit === 'kg')
     .reduce((sum, line) => sum + line.quantity, 0);
-  if (oracleModel === null)
-    return { pass: false, detail: 'a member section is not in the oracle table' };
+  if (oracleModel === null) return { pass: false, detail: 'a member section is not in the oracle table' };
   const off = (a: number, b: number): number => Math.abs(a - b) / Math.max(b, 1);
   const detail =
     `takeoff ${round(takeoffKg / 1000, 2)} t, oracle on the model ${round(oracleModel / 1000, 2)} t, ` +
     `design ${round(oracleDesign / 1000, 2)} t`;
   return {
-    pass:
-      off(takeoffKg, oracleModel) <= TONNAGE_TOLERANCE &&
-      off(oracleModel, oracleDesign) <= TONNAGE_TOLERANCE,
+    pass: off(takeoffKg, oracleModel) <= TONNAGE_TOLERANCE && off(oracleModel, oracleDesign) <= TONNAGE_TOLERANCE,
     detail,
   };
 }
@@ -263,8 +236,7 @@ export function structureCriteria(intent: PlantIntent): Criterion[] {
     {
       id: 'steel-tonnage',
       area: 'structure',
-      requirement:
-        'Takeoff steel tonnage within 0.5 % of an independent section table, and of the design.',
+      requirement: 'Takeoff steel tonnage within 0.5 % of an independent section table, and of the design.',
       check: (ctx) => tonnageCheck(intent, ctx),
     },
   ];

@@ -4,13 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import {
-  type Animation,
-  type CadDocument,
-  type EntityGroup,
-  type LineEntity,
-  createEmptyDocument,
-} from '@core/model/types';
+import { type Animation, type CadDocument, type EntityGroup, type LineEntity, createEmptyDocument } from '@core/model/types';
 import { isEntityVisible } from '../../src/ui/viewport/entityVisibility';
 import { animatedEntityIds } from '../../src/ui/viewport/3d/animationClickHelpers';
 import { collectSnapCandidates } from '../../src/ui/viewport/2d/snapping/candidates';
@@ -56,9 +50,7 @@ describe('isEntityVisible', () => {
 
   it('hides on document layer, viewport layer filter, or entity filter', () => {
     const hiddenLayerDoc = lineDoc(false);
-    expect(
-      isEntityVisible(hiddenLayerDoc.line, hiddenLayerDoc.doc.layers, new Set(), new Set()),
-    ).toBe(false);
+    expect(isEntityVisible(hiddenLayerDoc.line, hiddenLayerDoc.doc.layers, new Set(), new Set())).toBe(false);
     const { doc, line } = lineDoc();
     expect(isEntityVisible(line, doc.layers, new Set(['layer-default']), new Set())).toBe(false);
     expect(isEntityVisible(line, doc.layers, new Set(), new Set(['l1']))).toBe(false);
@@ -86,10 +78,7 @@ describe('animatedEntityIds', () => {
   const group: EntityGroup = { id: 'g1', name: 'G', memberIds: ['b2', 'b3'] } as EntityGroup;
 
   it('collects direct and group-member targets', () => {
-    const ids = animatedEntityIds(
-      { a1: animation('a1', 'entity', 'b1'), a2: animation('a2', 'group', 'g1') },
-      { g1: group },
-    );
+    const ids = animatedEntityIds({ a1: animation('a1', 'entity', 'b1'), a2: animation('a2', 'group', 'g1') }, { g1: group });
     expect([...ids].sort()).toEqual(['b1', 'b2', 'b3']);
   });
 

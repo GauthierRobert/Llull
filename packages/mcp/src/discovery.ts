@@ -80,11 +80,7 @@ export function buildDiscoveryToolDefinitions(): McpToolDefinition[] {
 
 /** Every tool a session can be served: registry commands + exchange + discovery meta-tools. */
 export function buildAllMcpTools(): McpToolDefinition[] {
-  return [
-    ...buildMcpTools(),
-    ...buildExchangeToolDefinitions(),
-    ...buildDiscoveryToolDefinitions(),
-  ];
+  return [...buildMcpTools(), ...buildExchangeToolDefinitions(), ...buildDiscoveryToolDefinitions()];
 }
 
 /** Plural-insensitive stem: "edges" -> "edge", "holes" -> "hole", "entities" -> "entity". */
@@ -193,11 +189,7 @@ function wordMatches(word: string, token: string): boolean {
  * Keyword score: name word equals the token 10, name word starts with it 6, token inside the name
  * 3, toolset name 2, description word starts with it 1.
  */
-function scoreTool(
-  tool: McpToolDefinition,
-  toolset: ToolsetName,
-  tokens: readonly string[],
-): number {
+function scoreTool(tool: McpToolDefinition, toolset: ToolsetName, tokens: readonly string[]): number {
   const nameWords = tokenize(tool.name);
   const descriptionWords = tokenize(tool.description);
   let score = 0;
@@ -215,11 +207,7 @@ function scoreTool(
  * Rank every tool (registry commands + exchange + discovery tools, enabled or not) against `query`.
  * @invariant results sorted by score desc then name; zero-score tools are dropped
  */
-export function searchTools(
-  query: string,
-  limit: number,
-  enabledToolsets: ReadonlySet<ToolsetName>,
-): ToolSearchResult[] {
+export function searchTools(query: string, limit: number, enabledToolsets: ReadonlySet<ToolsetName>): ToolSearchResult[] {
   const tokens = queryTokens(query);
   if (tokens.length === 0) return [];
   return buildAllMcpTools()
@@ -270,57 +258,32 @@ export function closestToolNames(name: string, limit: number): string[] {
  * "Did you mean" names for an unknown tool: typo matches first, else keyword search of the name
  * (`foo_bar` -> "foo bar") within the enabled toolsets.
  */
-export function suggestToolNames(
-  name: string,
-  limit: number,
-  enabledToolsets: ReadonlySet<ToolsetName>,
-): string[] {
+export function suggestToolNames(name: string, limit: number, enabledToolsets: ReadonlySet<ToolsetName>): string[] {
   const typoMatches = closestToolNames(name, limit);
-  return typoMatches.length > 0
-    ? typoMatches
-    : searchTools(name.replace(/_/g, ' '), limit, enabledToolsets).map((r) => r.name);
+  return typoMatches.length > 0 ? typoMatches : searchTools(name.replace(/_/g, ' '), limit, enabledToolsets).map((r) => r.name);
 }
 
-function outcome(
-  summary: string,
-  isError: boolean,
-  data?: unknown,
-  toolsListChanged = false,
-): DiscoveryOutcome {
+function outcome(summary: string, isError: boolean, data?: unknown, toolsListChanged = false): DiscoveryOutcome {
   return {
     result: shapeToolCallContent({ summary, affected: [], isError, data }),
     toolsListChanged,
   };
 }
 
-function runSearchTools(
-  args: Record<string, unknown>,
-  enabledToolsets: ReadonlySet<ToolsetName>,
-): DiscoveryOutcome {
+function runSearchTools(args: Record<string, unknown>, enabledToolsets: ReadonlySet<ToolsetName>): DiscoveryOutcome {
   const query = typeof args.query === 'string' ? args.query.trim() : '';
   if (query === '') return outcome('search_tools: query must be a non-empty string.', true);
   const requestedLimit = isFiniteNumber(args.limit) ? args.limit : SEARCH_TOOLS_DEFAULT_LIMIT;
   const limit = clamp(Math.floor(requestedLimit), 1, SEARCH_TOOLS_MAX_LIMIT);
   const results = searchTools(query, limit, enabledToolsets);
-  if (results.length === 0)
-    return outcome(`search_tools: no tools match "${query}".`, false, { results });
+  if (results.length === 0) return outcome(`search_tools: no tools match "${query}".`, false, { results });
   const names = results.map((r) => `${r.name} [${r.toolset}${r.enabled ? '' : ', disabled'}]`);
   const disabled = [...new Set(results.filter((r) => !r.enabled).map((r) => r.toolset))];
-  const hint =
-    disabled.length > 0
-      ? ` Call enable_toolset for: ${disabled.join(', ')} to use disabled tools.`
-      : '';
-  return outcome(
-    `search_tools: ${results.length} match(es) for "${query}": ${names.join(', ')}.${hint}`,
-    false,
-    { results },
-  );
+  const hint = disabled.length > 0 ? ` Call enable_toolset for: ${disabled.join(', ')} to use disabled tools.` : '';
+  return outcome(`search_tools: ${results.length} match(es) for "${query}": ${names.join(', ')}.${hint}`, false, { results });
 }
 
-function runEnableToolset(
-  args: Record<string, unknown>,
-  enabledToolsets: Set<ToolsetName>,
-): DiscoveryOutcome {
+function runEnableToolset(args: Record<string, unknown>, enabledToolsets: Set<ToolsetName>): DiscoveryOutcome {
   const requested = typeof args.toolset === 'string' ? args.toolset.trim().toLowerCase() : '';
   if (requested === 'all') {
     const added = TOOLSET_NAMES.filter((name) => !enabledToolsets.has(name));
@@ -329,20 +292,12 @@ function runEnableToolset(
       added.length > 0
         ? `enable_toolset: enabled all toolsets (${added.join(', ')} added); re-list tools to load their schemas.`
         : 'enable_toolset: all toolsets were already enabled.';
-    return outcome(
-      summary,
-      false,
-      { toolset: 'all', changed: added.length > 0, enabled: [...enabledToolsets] },
-      added.length > 0,
-    );
+    return outcome(summary, false, { toolset: 'all', changed: added.length > 0, enabled: [...enabledToolsets] }, added.length > 0);
   }
   const toolset = TOOLSET_NAMES.find((name) => name === requested);
   if (toolset === undefined) {
     const shown = requested === '' ? 'a "toolset" string argument' : `"${requested}"`;
-    return outcome(
-      `enable_toolset: unknown toolset ${shown}. Valid toolsets: ${TOOLSET_NAMES.join(', ')}, or "all".`,
-      true,
-    );
+    return outcome(`enable_toolset: unknown toolset ${shown}. Valid toolsets: ${TOOLSET_NAMES.join(', ')}, or "all".`, true);
   }
   const changed = !enabledToolsets.has(toolset);
   enabledToolsets.add(toolset);
@@ -356,11 +311,7 @@ function runEnableToolset(
  * Dispatch a discovery tool call; returns null for any other tool name.
  * @failure empty query / unknown toolset → isError result (valid toolsets listed)
  */
-export function applyDiscoveryToolCall(
-  toolName: string,
-  rawArgs: unknown,
-  enabledToolsets: Set<ToolsetName>,
-): DiscoveryOutcome | null {
+export function applyDiscoveryToolCall(toolName: string, rawArgs: unknown, enabledToolsets: Set<ToolsetName>): DiscoveryOutcome | null {
   const args = isRecord(rawArgs) ? rawArgs : {};
   switch (toolName) {
     case 'search_tools':

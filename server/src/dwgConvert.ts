@@ -80,10 +80,7 @@ function hasDwgMagic(bytes: Uint8Array): boolean {
   return /^AC10\d\d$/.test(head);
 }
 
-type RunOutcome =
-  | { kind: 'missing' }
-  | { kind: 'timeout' }
-  | { kind: 'done'; code: number | null; stderr: string };
+type RunOutcome = { kind: 'missing' } | { kind: 'timeout' } | { kind: 'done'; code: number | null; stderr: string };
 
 /** Spawn `command args` (no shell); resolves, never rejects. */
 function runConverter(command: string, args: string[], timeoutMs: number): Promise<RunOutcome> {
@@ -115,9 +112,7 @@ function runConverter(command: string, args: string[], timeoutMs: number): Promi
 
 async function readDxfIn(dir: string, preferred: string): Promise<string | null> {
   const names = await readdir(dir).catch(() => [] as string[]);
-  const name = names.includes(preferred)
-    ? preferred
-    : names.find((entry) => entry.toLowerCase().endsWith('.dxf'));
+  const name = names.includes(preferred) ? preferred : names.find((entry) => entry.toLowerCase().endsWith('.dxf'));
   if (name === undefined) return null;
   const file = path.join(dir, name);
   const info = await stat(file);
@@ -133,21 +128,12 @@ async function readDxfIn(dir: string, preferred: string): Promise<string | null>
  * @failure bad magic -> 400; too big -> 413; no converter installed -> 503; timeout -> 504;
  *          converter failure -> 422
  */
-export async function convertDwgToDxf(
-  bytes: Uint8Array,
-  config: DwgConvertConfig = dwgConfigFromEnv(),
-): Promise<string> {
+export async function convertDwgToDxf(bytes: Uint8Array, config: DwgConvertConfig = dwgConfigFromEnv()): Promise<string> {
   if (bytes.length > config.maxBytes) {
-    throw new DwgConvertError(
-      `DWG file is ${bytes.length} bytes; the limit is ${config.maxBytes} bytes (LLULL_DWG_MAX_BYTES).`,
-      413,
-    );
+    throw new DwgConvertError(`DWG file is ${bytes.length} bytes; the limit is ${config.maxBytes} bytes (LLULL_DWG_MAX_BYTES).`, 413);
   }
   if (!hasDwgMagic(bytes)) {
-    throw new DwgConvertError(
-      'Not a DWG file: expected the "AC10xx" version header (is it a DXF? use import_dxf).',
-      400,
-    );
+    throw new DwgConvertError('Not a DWG file: expected the "AC10xx" version header (is it a DXF? use import_dxf).', 400);
   }
   if (config.dwg2dxf === null && config.odaConverter === null) {
     throw new DwgConvertError(NO_DWG_CONVERTER_MESSAGE, 503);
@@ -176,18 +162,12 @@ export async function convertDwgToDxf(
       const outcome = await runConverter(attempt.command, attempt.args, config.timeoutMs);
       if (outcome.kind === 'missing') continue;
       if (outcome.kind === 'timeout') {
-        throw new DwgConvertError(
-          `DWG conversion timed out after ${config.timeoutMs} ms (LLULL_DWG_TIMEOUT_MS).`,
-          504,
-        );
+        throw new DwgConvertError(`DWG conversion timed out after ${config.timeoutMs} ms (LLULL_DWG_TIMEOUT_MS).`, 504);
       }
       const text = await readDxfIn(outDir, 'input.dxf');
       if (text !== null) return text;
       const detail = outcome.stderr.trim().slice(-1000);
-      throw new DwgConvertError(
-        `DWG conversion failed (exit ${String(outcome.code)}): ${detail || 'no DXF produced'}`,
-        422,
-      );
+      throw new DwgConvertError(`DWG conversion failed (exit ${String(outcome.code)}): ${detail || 'no DXF produced'}`, 422);
     }
     throw new DwgConvertError(NO_DWG_CONVERTER_MESSAGE, 503);
   } finally {
@@ -202,8 +182,7 @@ function createDwgConverterPort(env: NodeJS.ProcessEnv = process.env): DwgConver
   const limit = concurrencyLimiter(MAX_CONCURRENT_CONVERSIONS);
   const root = config.exchangeDir;
   return {
-    convertDwg: (dwgBase64) =>
-      limit(() => convertDwgToDxf(Buffer.from(dwgBase64, 'base64'), config)),
+    convertDwg: (dwgBase64) => limit(() => convertDwgToDxf(Buffer.from(dwgBase64, 'base64'), config)),
     ...(root !== null
       ? {
           readExchangeFile: async (relative: string): Promise<string> =>

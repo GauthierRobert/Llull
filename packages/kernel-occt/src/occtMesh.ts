@@ -7,15 +7,7 @@
 import type { MeshData } from '@core/model/types';
 import { isClosedMesh } from './meshClosure';
 import { release } from '@core/geometry/nativeObject';
-import {
-  explorer,
-  type OccApi,
-  type OccHandle,
-  type OccExplorer,
-  type OccShape,
-  type OccTopoDS,
-  type OccTriangulation,
-} from './occtTypes';
+import { explorer, type OccApi, type OccHandle, type OccExplorer, type OccShape, type OccTopoDS, type OccTriangulation } from './occtTypes';
 
 /** Display deflections: linear (document units), angular (radians). */
 const DISPLAY_DEFLECTION = [0.1, 0.5] as const;
@@ -40,11 +32,7 @@ interface Triangulated {
 /** Whether `shape` holds a solid and no face outside a solid (explorer: faces, avoiding solids). */
 function isClosedSolid(api: OccApi, shape: OccShape): boolean {
   const solids = explorer(api, shape, 'TopAbs_SOLID');
-  const freeFaces = new api.TopExp_Explorer_2(
-    shape,
-    api.TopAbs_ShapeEnum.TopAbs_FACE,
-    api.TopAbs_ShapeEnum.TopAbs_SOLID,
-  ) as OccExplorer;
+  const freeFaces = new api.TopExp_Explorer_2(shape, api.TopAbs_ShapeEnum.TopAbs_FACE, api.TopAbs_ShapeEnum.TopAbs_SOLID) as OccExplorer;
   try {
     return solids.More() === true && freeFaces.More() !== true;
   } finally {
@@ -53,18 +41,8 @@ function isClosedSolid(api: OccApi, shape: OccShape): boolean {
   }
 }
 
-function triangulate(
-  api: OccApi,
-  shape: OccShape,
-  [linear, angular]: readonly [number, number],
-): Triangulated {
-  const mesher = new api.BRepMesh_IncrementalMesh_2(
-    shape,
-    linear,
-    false,
-    angular,
-    false,
-  ) as OccHandle & {
+function triangulate(api: OccApi, shape: OccShape, [linear, angular]: readonly [number, number]): Triangulated {
+  const mesher = new api.BRepMesh_IncrementalMesh_2(shape, linear, false, angular, false) as OccHandle & {
     Perform(): void;
   };
   mesher.Perform();
@@ -99,8 +77,7 @@ function triangulate(
         release(placement);
 
         // A REVERSED face's stored triangles wind against the solid's outward normal: flip them.
-        const reversed =
-          face.Orientation_1().value === api.TopAbs_Orientation.TopAbs_REVERSED.value;
+        const reversed = face.Orientation_1().value === api.TopAbs_Orientation.TopAbs_REVERSED.value;
         for (let i = 1; i <= nTris; i++) {
           const t = tri.Triangle(i);
           const [first, second, third] = [t.Value(1), t.Value(2), t.Value(3)];

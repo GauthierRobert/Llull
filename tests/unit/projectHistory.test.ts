@@ -78,9 +78,7 @@ describe('build_project feature history', () => {
           step: { command: 'add_box', params: { size: [1, 1, 1], position: ['=$i * 5', 0, 0] } },
         },
       ]);
-      const recorded = built.document.featureHistory.map(
-        (s) => (s.params as { position: unknown[] }).position,
-      );
+      const recorded = built.document.featureHistory.map((s) => (s.params as { position: unknown[] }).position);
       expect(recorded).toEqual([
         [0, 0, 0],
         [5, 0, 0],
@@ -95,9 +93,7 @@ describe('build_project feature history', () => {
           step: { command: 'add_sphere', params: { radius: '=$r * 2' } },
         },
       ]);
-      expect(
-        built.document.featureHistory.map((s) => (s.params as { radius: unknown }).radius),
-      ).toEqual([4, 8]);
+      expect(built.document.featureHistory.map((s) => (s.params as { radius: unknown }).radius)).toEqual([4, 8]);
     });
 
     it('records an expression over a non-parameter identifier as its value', () => {
@@ -107,9 +103,7 @@ describe('build_project feature history', () => {
           step: { command: 'add_box', params: { size: ['=i + 1', 1, 1] } },
         },
       ]);
-      expect(
-        built.document.featureHistory.map((s) => (s.params as { size: unknown[] }).size[0]),
-      ).toEqual([1, 2]);
+      expect(built.document.featureHistory.map((s) => (s.params as { size: unknown[] }).size[0])).toEqual([1, 2]);
     });
 
     it('keeps =expr in repeat bodies when it only references document parameters', () => {
@@ -117,9 +111,7 @@ describe('build_project feature history', () => {
         { command: 'set_parameter', params: { name: 'W', expression: '3' } },
         { repeat: { count: 2 }, step: { command: 'add_box', params: { size: ['=W * 2', 1, 1] } } },
       ]);
-      expect(
-        built.document.featureHistory.map((s) => (s.params as { size: unknown[] }).size[0]),
-      ).toEqual(['=W * 2', '=W * 2']);
+      expect(built.document.featureHistory.map((s) => (s.params as { size: unknown[] }).size[0])).toEqual(['=W * 2', '=W * 2']);
     });
 
     it('handles mixed nested structures (arrays of objects) without losing values', () => {
@@ -181,10 +173,7 @@ describe('executeRecorded', () => {
   it('keeps previous history steps and only rewrites the last one', () => {
     let doc = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
     doc = executeRecorded(doc, 'add_sphere', { radius: 3 }, { radius: '=R' }).document;
-    expect(doc.featureHistory.map((s) => s.params)).toEqual([
-      { size: [1, 1, 1] },
-      { radius: '=R' },
-    ]);
+    expect(doc.featureHistory.map((s) => s.params)).toEqual([{ size: [1, 1, 1] }, { radius: '=R' }]);
   });
 });
 
@@ -199,8 +188,6 @@ describe('build_project + insert_step', () => {
         },
       ],
     });
-    expect(result.document.featureHistory.map((step) => step.params)).toEqual([
-      { size: ['=w', '=w', '=w'] },
-    ]);
+    expect(result.document.featureHistory.map((step) => step.params)).toEqual([{ size: ['=w', '=w', '=w'] }]);
   });
 });

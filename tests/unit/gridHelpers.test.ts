@@ -6,13 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import {
-  adaptiveGridStep,
-  majorGridStep,
-  localGridPatch,
-  pixelsToWorld,
-  scaleBarLength,
-} from '@ui/viewport/2d/gridHelpers';
+import { adaptiveGridStep, majorGridStep, localGridPatch, pixelsToWorld, scaleBarLength } from '@ui/viewport/2d/gridHelpers';
 
 // adaptiveGridStep
 
@@ -60,10 +54,7 @@ describe('adaptiveGridStep', () => {
       const exp = Math.floor(log10);
       const mantissa = step / Math.pow(10, exp);
       // mantissa should be 1, 2, or 5 (with floating-point tolerance)
-      const isNice =
-        Math.abs(mantissa - 1) < 1e-9 ||
-        Math.abs(mantissa - 2) < 1e-9 ||
-        Math.abs(mantissa - 5) < 1e-9;
+      const isNice = Math.abs(mantissa - 1) < 1e-9 || Math.abs(mantissa - 2) < 1e-9 || Math.abs(mantissa - 5) < 1e-9;
       expect(isNice, `step=${step} zoom=${zoom} mantissa=${mantissa}`).toBe(true);
     }
   });
@@ -198,10 +189,7 @@ describe('scaleBarLength', () => {
       const exp = Math.floor(log10);
       const mantissa = worldLength / Math.pow(10, exp);
       const isNice =
-        Math.abs(mantissa - 1) < 1e-9 ||
-        Math.abs(mantissa - 2) < 1e-9 ||
-        Math.abs(mantissa - 5) < 1e-9 ||
-        Math.abs(mantissa - 10) < 1e-9;
+        Math.abs(mantissa - 1) < 1e-9 || Math.abs(mantissa - 2) < 1e-9 || Math.abs(mantissa - 5) < 1e-9 || Math.abs(mantissa - 10) < 1e-9;
       expect(isNice, `worldLength=${worldLength} zoom=${zoom} mantissa=${mantissa}`).toBe(true);
     }
   });

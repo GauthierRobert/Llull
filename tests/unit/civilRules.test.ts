@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  alignmentParamsOf,
-  failuresOf,
-  manholeParamsOf,
-  stormParams,
-} from '@ui/panels/civil/civilRules';
+import { alignmentParamsOf, failuresOf, manholeParamsOf, stormParams } from '@ui/panels/civil/civilRules';
 
 const alignment = {
   points: '0,0; 10,0; 10,10',
@@ -17,22 +12,20 @@ const alignment = {
 
 describe('alignmentParamsOf', () => {
   it('gathers points and optional lists', () => {
-    expect(alignmentParamsOf({ ...alignment, surfaceId: 's1', interval: '20', name: 'A' })).toEqual(
-      {
-        ok: true,
-        params: {
-          points: [
-            [0, 0],
-            [10, 0],
-            [10, 10],
-          ],
-          radii: [5],
-          surfaceId: 's1',
-          stationInterval: 20,
-          name: 'A',
-        },
+    expect(alignmentParamsOf({ ...alignment, surfaceId: 's1', interval: '20', name: 'A' })).toEqual({
+      ok: true,
+      params: {
+        points: [
+          [0, 0],
+          [10, 0],
+          [10, 10],
+        ],
+        radii: [5],
+        surfaceId: 's1',
+        stationInterval: 20,
+        name: 'A',
       },
-    );
+    });
   });
   it('reports the first malformed field', () => {
     expect(alignmentParamsOf({ ...alignment, points: '0,0' })).toMatchObject({ ok: false });
@@ -50,12 +43,10 @@ describe('alignmentParamsOf', () => {
 describe('manholeParamsOf', () => {
   const manhole = { position: '1,2', invert: '5', surfaceId: '', numbers: {}, name: '' };
   it('gathers location, invert and filled numeric fields', () => {
-    expect(manholeParamsOf({ ...manhole, numbers: { diameter: '1.2', rimElevation: '' } })).toEqual(
-      {
-        ok: true,
-        params: { location: [1, 2], invertElevation: 5, diameter: 1.2 },
-      },
-    );
+    expect(manholeParamsOf({ ...manhole, numbers: { diameter: '1.2', rimElevation: '' } })).toEqual({
+      ok: true,
+      params: { location: [1, 2], invertElevation: 5, diameter: 1.2 },
+    });
   });
   it('requires exactly one point and an invert', () => {
     expect(manholeParamsOf({ ...manhole, position: '1,2; 3,4' }).ok).toBe(false);

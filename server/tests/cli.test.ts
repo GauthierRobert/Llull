@@ -22,9 +22,7 @@ interface Captured {
   readonly fetched: { url: string; body: unknown; auth: string | null }[];
 }
 
-function capture(
-  options: { stdin?: string; env?: Record<string, string>; reply?: unknown; status?: number } = {},
-): Captured {
+function capture(options: { stdin?: string; env?: Record<string, string>; reply?: unknown; status?: number } = {}): Captured {
   const out: string[] = [];
   const err: string[] = [];
   const fetched: Captured['fetched'] = [];
@@ -42,8 +40,7 @@ function capture(
         auth: headers.get('Authorization'),
       });
       if (options.reply === 'throw') return Promise.reject(new Error('ECONNREFUSED'));
-      const text =
-        typeof options.reply === 'string' ? options.reply : JSON.stringify(options.reply);
+      const text = typeof options.reply === 'string' ? options.reply : JSON.stringify(options.reply);
       return Promise.resolve(new Response(text, { status: options.status ?? 200 }));
     },
   };
@@ -53,8 +50,7 @@ function capture(
 let workDir = '';
 let docPath = '';
 const docFlag = (): string[] => ['--doc', docPath];
-const entityIds = (): string[] =>
-  Object.keys(deserializeDocument(readFileSync(docPath, 'utf8')).entities);
+const entityIds = (): string[] => Object.keys(deserializeDocument(readFileSync(docPath, 'utf8')).entities);
 
 beforeAll(async () => {
   setGeometryKernel(await createManifoldKernel());
@@ -82,9 +78,7 @@ describe('llull CLI — discovery', () => {
     const json = capture();
     await runCli(['list', '--toolset', 'measure', '--json'], json.io);
     expect(JSON.parse(json.out[0] ?? '')).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ name: 'mass_properties', readOnly: true }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ name: 'mass_properties', readOnly: true })]),
     );
 
     const search = capture();
@@ -131,9 +125,7 @@ describe('llull CLI — discovery', () => {
 describe('llull CLI — local document', () => {
   it('creates the document on the first change and appends to it', async () => {
     const first = capture();
-    expect(await runCli(['exec', 'add_box', 'size=[10,10,10]', ...docFlag()], first.io)).toBe(
-      EXIT_OK,
-    );
+    expect(await runCli(['exec', 'add_box', 'size=[10,10,10]', ...docFlag()], first.io)).toBe(EXIT_OK);
     expect(first.out[0]).toMatch(/Added box box-1\.1/);
     const shorthand = capture();
     expect(await runCli(['add_sphere', '{"radius":3}', ...docFlag()], shorthand.io)).toBe(EXIT_OK);
@@ -172,18 +164,14 @@ describe('llull CLI — local document', () => {
 
   it('exits 1 on a rejected command and 2 on unreadable params', async () => {
     const rejected = capture();
-    expect(await runCli(['exec', 'add_box', 'size=[-1,1,1]', ...docFlag()], rejected.io)).toBe(
-      EXIT_COMMAND_ERROR,
-    );
+    expect(await runCli(['exec', 'add_box', 'size=[-1,1,1]', ...docFlag()], rejected.io)).toBe(EXIT_COMMAND_ERROR);
     expect(rejected.out[0]).toMatch(/add_box failed: size must be/);
     expect(existsSync(docPath)).toBe(false);
 
     const badJson = capture();
     expect(await runCli(['exec', 'add_box', '{oops', ...docFlag()], badJson.io)).toBe(EXIT_USAGE);
     const missing = capture();
-    expect(await runCli(['exec', 'add_box', '@nowhere.json', ...docFlag()], missing.io)).toBe(
-      EXIT_USAGE,
-    );
+    expect(await runCli(['exec', 'add_box', '@nowhere.json', ...docFlag()], missing.io)).toBe(EXIT_USAGE);
     expect(missing.err[0]).toMatch(/cannot read nowhere\.json/);
     const pairs = capture();
     expect(await runCli(['exec', 'add_box', 'width', ...docFlag()], pairs.io)).toBe(EXIT_USAGE);
@@ -216,9 +204,7 @@ describe('llull CLI — local document', () => {
         ],
       }),
     });
-    expect(await runCli(['run', '-', '--continue', '--json', ...docFlag()], failing.io)).toBe(
-      EXIT_COMMAND_ERROR,
-    );
+    expect(await runCli(['run', '-', '--continue', '--json', ...docFlag()], failing.io)).toBe(EXIT_COMMAND_ERROR);
     const report = JSON.parse(failing.out[0] ?? '') as { data: { steps: { ok: boolean }[] } };
     expect(report.data.steps.map((step) => step.ok)).toEqual([false, true]);
 
@@ -254,9 +240,7 @@ describe('llull CLI — local document', () => {
 
   it('--dry-run reports the change without writing the file', async () => {
     const c = capture();
-    expect(await runCli(['exec', 'add_box', 'size=[1,1,1]', '--dry-run', ...docFlag()], c.io)).toBe(
-      EXIT_OK,
-    );
+    expect(await runCli(['exec', 'add_box', 'size=[1,1,1]', '--dry-run', ...docFlag()], c.io)).toBe(EXIT_OK);
     expect(c.out[0]).toMatch(/Added box/);
     expect(existsSync(docPath)).toBe(false);
   });
@@ -265,12 +249,7 @@ describe('llull CLI — local document', () => {
     await runCli(['exec', 'add_box', 'size=[5,5,5]', ...docFlag()], capture().io);
     const stlPath = path.join(workDir, 'out', 'part.stl');
     const stl = capture();
-    expect(
-      await runCli(
-        ['exec', 'export_stl', 'format=binary', '--save', stlPath, '--json', ...docFlag()],
-        stl.io,
-      ),
-    ).toBe(EXIT_OK);
+    expect(await runCli(['exec', 'export_stl', 'format=binary', '--save', stlPath, '--json', ...docFlag()], stl.io)).toBe(EXIT_OK);
     const printed = JSON.parse(stl.out[0] ?? '') as {
       data: { stlBase64: string };
       saved: { path: string; bytes: number }[];
@@ -280,18 +259,11 @@ describe('llull CLI — local document', () => {
     expect(readFileSync(stlPath)).toHaveLength(84 + 12 * 50);
 
     const png = capture();
-    expect(
-      await runCli(['render_view', '--save', path.join(workDir, 'v.png'), ...docFlag()], png.io),
-    ).toBe(EXIT_OK);
+    expect(await runCli(['render_view', '--save', path.join(workDir, 'v.png'), ...docFlag()], png.io)).toBe(EXIT_OK);
     expect(png.out[0]).toMatch(/Saved .*v\.png/);
 
     const nothing = capture();
-    expect(
-      await runCli(
-        ['describe_scene', '--save', path.join(workDir, 'x.txt'), ...docFlag()],
-        nothing.io,
-      ),
-    ).toBe(EXIT_COMMAND_ERROR);
+    expect(await runCli(['describe_scene', '--save', path.join(workDir, 'x.txt'), ...docFlag()], nothing.io)).toBe(EXIT_COMMAND_ERROR);
     expect(nothing.err.join('\n')).toMatch(/no file payload/);
   });
 
@@ -344,9 +316,7 @@ describe('llull CLI — reviewer regressions', () => {
   it('keeps string params as strings in key=value form', async () => {
     await runCli(['add_box', 'size=[1,1,1]', ...docFlag()], capture().io);
     const named = capture();
-    expect(
-      await runCli(['set_entity_name', 'id=box-1.1', 'name=123', ...docFlag()], named.io),
-    ).toBe(EXIT_OK);
+    expect(await runCli(['set_entity_name', 'id=box-1.1', 'name=123', ...docFlag()], named.io)).toBe(EXIT_OK);
     const doc = deserializeDocument(readFileSync(docPath, 'utf8'));
     expect(doc.entities['box-1.1']?.name).toBe('123');
   });
@@ -360,25 +330,16 @@ describe('llull CLI — reviewer regressions', () => {
   it('still reports the result when --save fails', async () => {
     await runCli(['add_box', 'size=[1,1,1]', ...docFlag()], capture().io);
     const c = capture();
-    expect(
-      await runCli(
-        ['measure_bounding_box', 'id=box-1.1', '--save', path.join(workDir, 'b.txt'), ...docFlag()],
-        c.io,
-      ),
-    ).toBe(EXIT_COMMAND_ERROR);
+    expect(await runCli(['measure_bounding_box', 'id=box-1.1', '--save', path.join(workDir, 'b.txt'), ...docFlag()], c.io)).toBe(
+      EXIT_COMMAND_ERROR,
+    );
     expect(c.err.join('\n')).toMatch(/--save: .*no file payload/);
     expect(c.err[0]).not.toMatch(/^llull:/);
   });
 
   it('runs through the real launcher (esbuild bundle + path aliases)', async () => {
     const launcher = path.resolve(__dirname, '..', 'bin', 'llull.cjs');
-    const { stdout } = await promisify(execFile)(process.execPath, [
-      launcher,
-      'add_box',
-      'size=[2,2,2]',
-      '--doc',
-      docPath,
-    ]);
+    const { stdout } = await promisify(execFile)(process.execPath, [launcher, 'add_box', 'size=[2,2,2]', '--doc', docPath]);
     expect(stdout).toMatch(/Added box box-1\.1/);
     expect(entityIds()).toEqual(['box-1.1']);
   }, 60_000);
@@ -413,9 +374,7 @@ describe('llull CLI — --server backend', () => {
     expect(undo.fetched.map((f) => f.url)).toEqual(['http://h/undo', 'http://h/redo']);
 
     const denied = capture({ reply: { error: 'Unauthorized' }, status: 401 });
-    expect(await runCli(['add_box', 'size=[1,1,1]', ...server], denied.io)).toBe(
-      EXIT_COMMAND_ERROR,
-    );
+    expect(await runCli(['add_box', 'size=[1,1,1]', ...server], denied.io)).toBe(EXIT_COMMAND_ERROR);
     expect(denied.out[0]).toMatch(/HTTP 401: Unauthorized/);
 
     const html = capture({ reply: '<html>gateway</html>', status: 502 });
@@ -428,9 +387,7 @@ describe('llull CLI — --server backend', () => {
 
   it('refuses local-only operations against a server', async () => {
     const dry = capture();
-    expect(await runCli(['add_box', 'size=[1,1,1]', '--dry-run', ...server], dry.io)).toBe(
-      EXIT_USAGE,
-    );
+    expect(await runCli(['add_box', 'size=[1,1,1]', '--dry-run', ...server], dry.io)).toBe(EXIT_USAGE);
     const fresh = capture();
     expect(await runCli(['new', ...server], fresh.io)).toBe(EXIT_USAGE);
     expect(dry.fetched).toEqual([]);

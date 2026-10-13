@@ -3,6 +3,7 @@ import { execute } from '@core/commands/registry';
 import type { GoldenAction } from './plans';
 import { normalize, normalizeGeometry } from './normalize';
 import { runPlan } from './runPlan';
+import { compactJson } from '../helpers/compactJson';
 
 /** Plans whose replay_history result differs from the original today. Reason mandatory. */
 const REPLAY_DIVERGES: Record<string, string> = {};
@@ -15,9 +16,7 @@ export function describePlans(plans: Record<string, GoldenAction[]>): void {
         const outcome = runPlan(actions);
         expect(outcome.failedSteps).toEqual([]);
         expect(outcome.affected.length).toBeGreaterThan(0);
-        await expect(JSON.stringify(normalize(outcome.document), null, 2)).toMatchFileSnapshot(
-          `./__snapshots__/${name}.json`,
-        );
+        await expect(compactJson(normalize(outcome.document), 4)).toMatchFileSnapshot(`./__snapshots__/${name}.json`);
       });
 
       const replayTest = name in REPLAY_DIVERGES ? it.fails : it;

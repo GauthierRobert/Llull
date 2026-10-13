@@ -46,10 +46,7 @@ const EPSILON = 1e-9;
 const MESH = 400;
 
 /** Total permanent and imposed load (kN) of a load set. */
-export function loadTotals(
-  pieces: ReadonlyArray<LinePiece>,
-  points: ReadonlyArray<PointLoad>,
-): { permanent: number; imposed: number } {
+export function loadTotals(pieces: ReadonlyArray<LinePiece>, points: ReadonlyArray<PointLoad>): { permanent: number; imposed: number } {
   let permanent = 0;
   let imposed = 0;
   for (const piece of pieces) {
@@ -101,10 +98,7 @@ function deflectionOf(
   const sag: number[] = [0];
   for (let i = 1; i < xs.length; i++) {
     const dx = (xs[i] as number) - (xs[i - 1] as number);
-    slope.push(
-      (slope[i - 1] as number) +
-        (((curvature[i] as number) + (curvature[i - 1] as number)) / 2) * dx,
-    );
+    slope.push((slope[i - 1] as number) + (((curvature[i] as number) + (curvature[i - 1] as number)) / 2) * dx);
     sag.push((sag[i - 1] as number) + (((slope[i] as number) + (slope[i - 1] as number)) / 2) * dx);
   }
   const initialSlope = -(sag[sag.length - 1] as number) / length;
@@ -152,19 +146,11 @@ export function analyseSimpleBeam(
   }
   const reactionEnd = firstMoment / length;
   const reactionStart = totalLoad - reactionEnd;
-  const breakpoints = [
-    0,
-    length,
-    ...lines.flatMap((line) => [line.from, line.to]),
-    ...concentrated.map((point) => point.at),
-  ]
+  const breakpoints = [0, length, ...lines.flatMap((line) => [line.from, line.to]), ...concentrated.map((point) => point.at)]
     .sort((a, b) => a - b)
     .filter((x, index, all) => index === 0 || x - (all[index - 1] as number) > EPSILON);
   const pointsAt = (x: number): number =>
-    concentrated.reduce(
-      (sum, point) => (Math.abs(point.at - x) <= EPSILON ? sum + point.force : sum),
-      0,
-    );
+    concentrated.reduce((sum, point) => (Math.abs(point.at - x) <= EPSILON ? sum + point.force : sum), 0);
   let shear = reactionStart - pointsAt(0);
   let moment = 0;
   let maxMoment = 0;
@@ -176,10 +162,7 @@ export function analyseSimpleBeam(
     const x = breakpoints[k] as number;
     const span = (breakpoints[k + 1] as number) - x;
     const middle = x + span / 2;
-    const q = lines.reduce(
-      (sum, line) => (line.from <= middle && middle <= line.to ? sum + line.q : sum),
-      0,
-    );
+    const q = lines.reduce((sum, line) => (line.from <= middle && middle <= line.to ? sum + line.q : sum), 0);
     stations.push({ x, moment, shear, q });
     if (moment > maxMoment) {
       maxMoment = moment;

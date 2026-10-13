@@ -52,11 +52,7 @@ interface TributaryRules {
 export function tributaryLengths(
   arcs: ReadonlyArray<number>,
   length: number,
-  {
-    groupDistance = SAME_SUPPORT_DISTANCE,
-    carriedStart = false,
-    carriedEnd = false,
-  }: TributaryRules = {},
+  { groupDistance = SAME_SUPPORT_DISTANCE, carriedStart = false, carriedEnd = false }: TributaryRules = {},
 ): number[] {
   const groups: number[][] = [];
   arcs.forEach((arc, index) => {
@@ -65,17 +61,14 @@ export function tributaryLengths(
       last.push(index);
     } else groups.push([index]);
   });
-  const centres = groups.map(
-    (group) => group.reduce((sum, index) => sum + (arcs[index] as number), 0) / group.length,
-  );
+  const centres = groups.map((group) => group.reduce((sum, index) => sum + (arcs[index] as number), 0) / group.length);
   const result = new Array<number>(arcs.length).fill(0);
   groups.forEach((group, position) => {
     const here = centres[position] as number;
     const previous = centres[position - 1];
     const next = centres[position + 1];
     const before = previous !== undefined ? (here - previous) / 2 : carriedStart ? here / 2 : here;
-    const after =
-      next !== undefined ? (next - here) / 2 : carriedEnd ? (length - here) / 2 : length - here;
+    const after = next !== undefined ? (next - here) / 2 : carriedEnd ? (length - here) / 2 : length - here;
     for (const index of group) result[index] = (before + after) / group.length;
   });
   return result;
@@ -96,9 +89,7 @@ export function applySupportedPipe(
   const stations = supportStations(units, run, supportsOfPipe(units, run.element.id));
   const attached = stations.filter((station) => station.attached && !isLateralOnly(station));
   for (const station of stations.filter((candidate) => !candidate.attached)) {
-    warnings.push(
-      `support ${station.mark} (${station.type} on ${label}) is attached to no steel member: it carries nothing`,
-    );
+    warnings.push(`support ${station.mark} (${station.type} on ${label}) is attached to no steel member: it carries nothing`);
   }
   if (attached.length === 0) {
     warnings.push(
@@ -140,8 +131,7 @@ export function applySupportedPipe(
       }
       carried += weight;
     } else {
-      const role =
-        member?.category === 'member' ? `${member.role} ${member.mark}` : station.memberId;
+      const role = member?.category === 'member' ? `${member.role} ${member.mark}` : station.memberId;
       warnings.push(
         `support ${station.mark} (${station.type} on ${label}) bears on ${role ?? 'nothing'}, which check_steel_members does not analyse as a floor beam or column: its ${weight.toFixed(1)} kN are not carried by any checked member`,
       );

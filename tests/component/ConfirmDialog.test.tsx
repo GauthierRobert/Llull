@@ -24,10 +24,7 @@ function setup(): { onConfirm: () => void; onCancel: () => void } {
 describe('ConfirmDialog', () => {
   it('is a named modal dialog with focus on Cancel', () => {
     setup();
-    expect(screen.getByRole('dialog', { name: 'Delete project' })).toHaveAttribute(
-      'aria-modal',
-      'true',
-    );
+    expect(screen.getByRole('dialog', { name: 'Delete project' })).toHaveAttribute('aria-modal', 'true');
     expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
   });
 
@@ -68,13 +65,7 @@ describe('ConfirmDialog', () => {
     document.body.appendChild(opener);
     opener.focus();
     const { unmount } = render(
-      <ConfirmDialog
-        title="t"
-        message="m"
-        confirmLabel="Ok"
-        onConfirm={() => undefined}
-        onCancel={() => undefined}
-      />,
+      <ConfirmDialog title="t" message="m" confirmLabel="Ok" onConfirm={() => undefined} onCancel={() => undefined} />,
     );
     unmount();
     expect(opener).toHaveFocus();

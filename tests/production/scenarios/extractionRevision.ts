@@ -65,9 +65,7 @@ const revisedIntent: PlantIntent = {
 
 function revisionScript(): ToolCall[] {
   const base = extractionBuilding.script;
-  const index = base.findIndex(
-    (call) => call.tool === 'add_equipment' && call.args['mark'] === EXTRACTOR,
-  );
+  const index = base.findIndex((call) => call.tool === 'add_equipment' && call.args['mark'] === EXTRACTOR);
   const original = base[index]?.args ?? {};
   const size = original['size'] as number[];
   return [

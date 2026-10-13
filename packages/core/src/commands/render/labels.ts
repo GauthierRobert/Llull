@@ -75,19 +75,12 @@ function entityKeyPoints(e: Entity): Vec3[] {
     case 'arc': {
       // Centre + a radius handle at the mid-sweep angle, so the marker sits ON the curve.
       const mid = (e.startAngle + e.endAngle) / 2;
-      return [
-        lift(e.center[0], e.center[1]),
-        lift(e.center[0] + e.radius * Math.cos(mid), e.center[1] + e.radius * Math.sin(mid)),
-      ];
+      return [lift(e.center[0], e.center[1]), lift(e.center[0] + e.radius * Math.cos(mid), e.center[1] + e.radius * Math.sin(mid))];
     }
     case 'circle':
       return [lift(e.center[0], e.center[1]), lift(e.center[0] + e.radius, e.center[1])];
     case 'ellipse':
-      return [
-        lift(e.center[0], e.center[1]),
-        lift(e.center[0] + e.radiusX, e.center[1]),
-        lift(e.center[0], e.center[1] + e.radiusY),
-      ];
+      return [lift(e.center[0], e.center[1]), lift(e.center[0] + e.radiusX, e.center[1]), lift(e.center[0], e.center[1] + e.radiusY)];
     case 'rectangle':
     case 'image':
       return [lift(0, 0), lift(e.width, 0), lift(e.width, e.height), lift(0, e.height)];
@@ -102,8 +95,7 @@ function entityKeyPoints(e: Entity): Vec3[] {
 function labelAnchor(keyPoints: Vec3[], project: Projector): [number, number] {
   if (keyPoints.length === 0) return [0, 0];
   const screen = keyPoints.map((point) => project(point));
-  const mean = (axis: 0 | 1): number =>
-    screen.reduce((sum, point) => sum + point[axis], 0) / screen.length;
+  const mean = (axis: 0 | 1): number => screen.reduce((sum, point) => sum + point[axis], 0) / screen.length;
   return [mean(0), mean(1) - 8];
 }
 
@@ -113,11 +105,7 @@ function labelAnchor(keyPoints: Vec3[], project: Projector): [number, number] {
  *
  * @pure — returns a new SVG string; does not modify the input.
  */
-export function appendEntityLabels(
-  svgString: string,
-  data: RenderViewData,
-  entities: ReadonlyArray<Entity>,
-): string {
+export function appendEntityLabels(svgString: string, data: RenderViewData, entities: ReadonlyArray<Entity>): string {
   const { camera, width, height } = data;
   const project = makeProjector(camera, data.orthoHalf, width, height);
 
@@ -132,11 +120,8 @@ export function appendEntityLabels(
     for (const point of keyPoints) {
       const screen = project(point);
       // Only draw markers reasonably within the viewport (with generous margin).
-      if (screen[0] < -20 || screen[0] > width + 20 || screen[1] < -20 || screen[1] > height + 20)
-        continue;
-      lines.push(
-        `    ${svgDot(screen, `fill="${color}" opacity="0.85" stroke="#0d0d1a" stroke-width="0.8"`)}`,
-      );
+      if (screen[0] < -20 || screen[0] > width + 20 || screen[1] < -20 || screen[1] > height + 20) continue;
+      lines.push(`    ${svgDot(screen, `fill="${color}" opacity="0.85" stroke="#0d0d1a" stroke-width="0.8"`)}`);
     }
 
     // The label is always drawn (clamped inside the viewport), even if its markers clip.

@@ -10,18 +10,14 @@ describe('collectGridAnnotations', () => {
       xSpacings: [6000, 6000],
       ySpacings: [8000],
     }).document;
-    const gridEntities = Object.values(doc.entities).filter(
-      (entity) => doc.layers[entity.layerId]?.name === GRID_LAYER_NAME,
-    );
+    const gridEntities = Object.values(doc.entities).filter((entity) => doc.layers[entity.layerId]?.name === GRID_LAYER_NAME);
     expect(gridEntities.length).toBeGreaterThan(0);
     const { axes, bubbles } = collectGridAnnotations(gridEntities);
     expect(axes.length).toBeGreaterThan(0);
     expect(bubbles.length).toBe(axes.length * 2);
     expect(bubbles.every((bubble) => bubble.label !== '')).toBe(true);
     const extent = 12000;
-    expect(Math.min(...bubbles.map((bubble) => bubble.radius))).toBeGreaterThanOrEqual(
-      extent * 0.012 * 0.99,
-    );
+    expect(Math.min(...bubbles.map((bubble) => bubble.radius))).toBeGreaterThanOrEqual(extent * 0.012 * 0.99);
   });
 });
 

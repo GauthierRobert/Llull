@@ -7,9 +7,7 @@ import { execute } from '@core/commands/registry';
 
 const captured = vi.hoisted(() => ({ handlers: {} as Record<string, (event: unknown) => void> }));
 
-vi.mock('@ui/viewport/2d/GroundPlane', async () =>
-  (await import('../helpers/groundPlaneMock')).groundPlaneMock(captured),
-);
+vi.mock('@ui/viewport/2d/GroundPlane', async () => (await import('../helpers/groundPlaneMock')).groundPlaneMock(captured));
 
 import { BoxSelectInteraction } from '@ui/viewport/2d/BoxSelectInteraction';
 

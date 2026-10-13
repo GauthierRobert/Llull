@@ -33,19 +33,7 @@ export function supportSchedule(doc: CadDocument): {
     ];
   });
   return {
-    columns: [
-      'Mark',
-      'Line',
-      'Pipe',
-      'Type',
-      'Bears on',
-      'x',
-      'y',
-      'z',
-      `Rod length (${doc.units})`,
-      'Level',
-      'Status',
-    ],
+    columns: ['Mark', 'Line', 'Pipe', 'Type', 'Bears on', 'x', 'y', 'z', `Rod length (${doc.units})`, 'Level', 'Status'],
     rows,
   };
 }

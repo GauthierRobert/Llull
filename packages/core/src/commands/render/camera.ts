@@ -11,12 +11,7 @@ export interface Camera {
 }
 
 /** Build an orthographic camera for a named view at a given scene radius. */
-export function cameraForView(
-  view: ViewName,
-  center: Vec3,
-  radius: number,
-  direction?: Vec3,
-): Camera {
+export function cameraForView(view: ViewName, center: Vec3, radius: number, direction?: Vec3): Camera {
   const d = radius * 2.5;
   const [cx, cy, cz] = center;
   const target: [number, number, number] = [cx, cy, cz];
@@ -59,11 +54,7 @@ export function cameraBasis(cam: Camera): { fwd: Vec3; right: Vec3; up: Vec3 } {
 }
 
 /** Project a world-space point to camera space [u, v, depth]. */
-export function projectPoint(
-  p: Vec3,
-  cam: Camera,
-  basis: { fwd: Vec3; right: Vec3; up: Vec3 },
-): [number, number, number] {
+export function projectPoint(p: Vec3, cam: Camera, basis: { fwd: Vec3; right: Vec3; up: Vec3 }): [number, number, number] {
   const d = sub3(p, cam.position);
   const u = dot3(d, basis.right);
   const v = dot3(d, basis.up);
@@ -74,12 +65,7 @@ export function projectPoint(
 export type Projector = (p: Vec3) => [number, number];
 
 /** World→screen projector (SVG pixels, Y down) fitting `orthoHalf` world units into 90 % of the canvas. @pure */
-export function makeProjector(
-  cam: Camera,
-  orthoHalf: number,
-  width: number,
-  height: number,
-): Projector {
+export function makeProjector(cam: Camera, orthoHalf: number, width: number, height: number): Projector {
   const basis = cameraBasis(cam);
   const margin = 0.9;
   const scale = Math.min(((width / 2) * margin) / orthoHalf, ((height / 2) * margin) / orthoHalf);
@@ -98,8 +84,6 @@ export function shade(normal: Vec3, baseColor: string): string {
   const diff = Math.max(0, dot3(normal, LIGHT_DIR));
   const factor = AMBIENT + (1 - AMBIENT) * diff;
   const hex = baseColor.replace('#', '');
-  const [r, g, b] = [0, 2, 4].map((i) =>
-    Math.min(255, Math.round(parseInt(hex.substring(i, i + 2), 16) * factor)),
-  );
+  const [r, g, b] = [0, 2, 4].map((i) => Math.min(255, Math.round(parseInt(hex.substring(i, i + 2), 16) * factor)));
   return `rgb(${r},${g},${b})`;
 }

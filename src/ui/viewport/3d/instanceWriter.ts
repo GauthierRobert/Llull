@@ -21,11 +21,7 @@ const WHITE = new THREE.Color(1, 1, 1);
 const DUMMY = new THREE.Object3D();
 const SCRATCH_COLOR = new THREE.Color();
 
-export function writeBatchInstances(
-  mesh: THREE.InstancedMesh,
-  batch: InstanceBatch,
-  selectionSet: ReadonlySet<EntityId>,
-): void {
+export function writeBatchInstances(mesh: THREE.InstancedMesh, batch: InstanceBatch, selectionSet: ReadonlySet<EntityId>): void {
   if (!mesh.instanceColor) mesh.setColorAt(0, WHITE);
 
   batch.entities.forEach((entity, i) => {

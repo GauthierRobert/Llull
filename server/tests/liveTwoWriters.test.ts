@@ -72,12 +72,8 @@ describe('two concurrent writers', () => {
     subscribeLive(two as never);
     const startSeq = getLiveSnapshot().seq;
 
-    const responses = await Promise.all(
-      Array.from({ length: 20 }, (_, i) => writer(i % 2 === 0 ? 'a' : 'b', i, `w-${i}`)),
-    );
-    expect(responses.every((response) => response.status === 200 && !response.body.isError)).toBe(
-      true,
-    );
+    const responses = await Promise.all(Array.from({ length: 20 }, (_, i) => writer(i % 2 === 0 ? 'a' : 'b', i, `w-${i}`)));
+    expect(responses.every((response) => response.status === 200 && !response.body.isError)).toBe(true);
     const ids = responses.flatMap((response) => response.body.affected as string[]);
     expect(new Set(ids).size).toBe(20);
 
@@ -97,11 +93,7 @@ describe('two concurrent writers', () => {
     subscribeLive(follower as never);
     const startSeq = getLiveSnapshot().seq;
 
-    const racing = await Promise.all([
-      writer('a', 0, 'same-id'),
-      writer('a', 0, 'same-id'),
-      writer('a', 0, 'same-id'),
-    ]);
+    const racing = await Promise.all([writer('a', 0, 'same-id'), writer('a', 0, 'same-id'), writer('a', 0, 'same-id')]);
     expect(racing.map((response) => response.body.affected)).toEqual([
       racing[0]?.body.affected,
       racing[0]?.body.affected,
@@ -131,12 +123,7 @@ describe('two concurrent writers', () => {
     await writer('b', 1, 'u-2');
     await request(app).post('/undo').send({});
     const frames = follower.frames.map(parseSseFrame);
-    expect(frames.map((frame) => frame.event)).toEqual([
-      'snapshot',
-      'command',
-      'command',
-      'snapshot',
-    ]);
+    expect(frames.map((frame) => frame.event)).toEqual(['snapshot', 'command', 'command', 'snapshot']);
     const last = frames.at(-1)!;
     expect(last.data['seq']).toBe(getLiveSnapshot().seq);
     expect(last.data['stateHash']).toBe(getLiveSnapshot().stateHash);

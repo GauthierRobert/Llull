@@ -97,20 +97,14 @@ export function featureEdges(faces: ReadonlyArray<Face>, tolerance: number): Fea
     const feature =
       adjacent.length !== 2 ||
       fronts.length === 1 ||
-      (first !== undefined &&
-        second !== undefined &&
-        dot3(first.normal, second.normal) < FEATURE_COS);
+      (first !== undefined && second !== undefined && dot3(first.normal, second.normal) < FEATURE_COS);
     if (feature) edges.push({ a, b });
   }
   return edges;
 }
 
 /** Segments where the faces cross the section plane depth = `cutDepth`, projected. */
-export function cutSegments(
-  faces: ReadonlyArray<Face>,
-  frame: ViewFrame,
-  cutDepth: number,
-): Segment2[] {
+export function cutSegments(faces: ReadonlyArray<Face>, frame: ViewFrame, cutDepth: number): Segment2[] {
   return planeChords(
     faces.map((face) => face.triangle),
     sectionPlane(frame, cutDepth),

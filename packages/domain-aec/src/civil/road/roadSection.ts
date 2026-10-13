@@ -67,20 +67,12 @@ interface Rule {
   readonly reach: number;
 }
 
-function findDaylight(
-  tin: Tin,
-  edge: Vec2,
-  outward: Vec2,
-  edgeZ: number,
-  rule: Rule,
-): number | null {
-  const ground = (d: number): number | null =>
-    elevationAt(tin, [edge[0] + outward[0] * d, edge[1] + outward[1] * d]);
+function findDaylight(tin: Tin, edge: Vec2, outward: Vec2, edgeZ: number, rule: Rule): number | null {
+  const ground = (d: number): number | null => elevationAt(tin, [edge[0] + outward[0] * d, edge[1] + outward[1] * d]);
   const ground0 = ground(0);
   if (ground0 === null) return null;
   const fill = ground0 < edgeZ;
-  const batter = (d: number): number =>
-    batterLevel(edgeZ, d, fill ? 'fill' : 'cut', rule.section.cutSlope, rule.section.fillSlope);
+  const batter = (d: number): number => batterLevel(edgeZ, d, fill ? 'fill' : 'cut', rule.section.cutSlope, rule.section.fillSlope);
   const gap = (d: number): number | null => {
     const g = ground(d);
     return g === null ? null : fill ? g - batter(d) : batter(d) - g;
@@ -123,10 +115,7 @@ export function crossSectionAt(
   };
   const side = (node: SectionNode, sign: 1 | -1): SectionNode | null => {
     if (!tin) return null;
-    const edge: Vec2 = [
-      placed.point[0] + normal[0] * node.offset,
-      placed.point[1] + normal[1] * node.offset,
-    ];
+    const edge: Vec2 = [placed.point[0] + normal[0] * node.offset, placed.point[1] + normal[1] * node.offset];
     const distance = findDaylight(tin, edge, [normal[0] * sign, normal[1] * sign], node.z, rule);
     if (distance === null) return null;
     const fill = (elevationAt(tin, edge) ?? node.z) < node.z;
@@ -152,9 +141,7 @@ function designAtOffset(design: ReadonlyArray<SectionNode>, offset: number): num
     const a = design[i - 1] as SectionNode;
     const b = design[i] as SectionNode;
     if (offset <= b.offset) {
-      return b.offset === a.offset
-        ? b.z
-        : a.z + ((b.z - a.z) * (offset - a.offset)) / (b.offset - a.offset);
+      return b.offset === a.offset ? b.z : a.z + ((b.z - a.z) * (offset - a.offset)) / (b.offset - a.offset);
     }
   }
   return (design[design.length - 1] as SectionNode).z;
@@ -162,10 +149,7 @@ function designAtOffset(design: ReadonlyArray<SectionNode>, offset: number): num
 
 /** Ground elevation at one offset of a cross-section (null off the TIN). */
 export function groundAtOffset(cross: RoadCrossSection, tin: Tin, offset: number): number | null {
-  return elevationAt(tin, [
-    cross.origin[0] - Math.sin(cross.direction) * offset,
-    cross.origin[1] + Math.cos(cross.direction) * offset,
-  ]);
+  return elevationAt(tin, [cross.origin[0] - Math.sin(cross.direction) * offset, cross.origin[1] + Math.cos(cross.direction) * offset]);
 }
 
 /** Offsets where the section is sampled: every design node plus `step`-spaced fillers. */

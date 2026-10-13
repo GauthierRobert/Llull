@@ -31,10 +31,7 @@ function runCommand(command: CommandDefinition<unknown>, params: Record<string, 
 
 /** A command opens its form first when it takes input or would destroy content. */
 function needsForm(command: CommandDefinition<unknown>): boolean {
-  return (
-    Object.keys(command.paramsSchema.properties).length > 0 ||
-    command.annotations?.destructive === true
-  );
+  return Object.keys(command.paramsSchema.properties).length > 0 || command.annotations?.destructive === true;
 }
 
 interface PaletteListProps {
@@ -46,20 +43,11 @@ interface PaletteListProps {
   onChoose: (item: PaletteItem) => void;
 }
 
-function PaletteList({
-  items,
-  activeIndex,
-  listId,
-  grouped,
-  onHover,
-  onChoose,
-}: PaletteListProps): React.ReactElement {
+function PaletteList({ items, activeIndex, listId, grouped, onHover, onChoose }: PaletteListProps): React.ReactElement {
   const listRef = useRef<HTMLUListElement | null>(null);
 
   useEffect(() => {
-    listRef.current
-      ?.querySelector<HTMLElement>(`#${CSS.escape(`${listId}-${activeIndex}`)}`)
-      ?.scrollIntoView?.({ block: 'nearest' });
+    listRef.current?.querySelector<HTMLElement>(`#${CSS.escape(`${listId}-${activeIndex}`)}`)?.scrollIntoView?.({ block: 'nearest' });
   }, [activeIndex, listId]);
 
   if (items.length === 0) {
@@ -125,10 +113,7 @@ function OpenPalette(): React.ReactElement {
   const listId = useId();
 
   const catalog = useMemo(() => allPaletteItems(), []);
-  const results = useMemo(
-    () => searchPaletteItems(catalog, query, recentIds),
-    [catalog, query, recentIds],
-  );
+  const results = useMemo(() => searchPaletteItems(catalog, query, recentIds), [catalog, query, recentIds]);
 
   useEffect(() => {
     if (formCommand === null) inputRef.current?.focus();

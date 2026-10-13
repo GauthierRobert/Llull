@@ -35,10 +35,7 @@ function readStoredViews(): NamedView[] {
   return Array.isArray(stored)
     ? stored.filter(
         (view): view is NamedView =>
-          isRecord(view) &&
-          typeof view.id === 'string' &&
-          typeof view.name === 'string' &&
-          typeof view.camera === 'object',
+          isRecord(view) && typeof view.id === 'string' && typeof view.name === 'string' && typeof view.camera === 'object',
       )
     : [];
 }
@@ -47,10 +44,7 @@ function generateId(): string {
   return `nv-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-type ApplyCamera = (
-  position: readonly [number, number, number],
-  target: readonly [number, number, number],
-) => void;
+type ApplyCamera = (position: readonly [number, number, number], target: readonly [number, number, number]) => void;
 
 interface NamedViewStoreState {
   /** Saved named views, in creation order. */

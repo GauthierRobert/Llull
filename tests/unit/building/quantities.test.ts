@@ -48,9 +48,7 @@ describe('quantity_takeoff', () => {
     expect(line(lines, 'stair.concrete.ea').quantity).toBe(1);
     expect(line(lines, 'room.floor.m2').quantity).toBeCloseTo(9.7 * 7.7);
     expect(result.summary).toMatch(/Walls, concrete: 30\.969 m³/);
-    expect((result.data as { csv: string }).csv.split('\n')[0]).toBe(
-      'Key,Description,Quantity,Unit',
-    );
+    expect((result.data as { csv: string }).csv.split('\n')[0]).toBe('Key,Description,Quantity,Unit');
   });
 
   it('reports an empty model and converts from metre documents', () => {
@@ -81,9 +79,7 @@ describe('building_schedule', () => {
     const result = execute(house(), 'building_schedule', { kind });
     const data = result.data as { rows: unknown[][]; columns: string[]; csv: string };
     expect(data.rows).toHaveLength(rows);
-    expect(data.csv.split('\n')[0]).toBe(
-      data.columns.map((c) => (c.includes(',') ? `"${c}"` : c)).join(','),
-    );
+    expect(data.csv.split('\n')[0]).toBe(data.columns.map((c) => (c.includes(',') ? `"${c}"` : c)).join(','));
   });
 
   it('door schedule lists host wall and swing; window lists area', () => {
@@ -94,11 +90,8 @@ describe('building_schedule', () => {
       rows: unknown[][];
     };
     expect(windows.rows[0]?.[6]).toBeCloseTo(1.44);
-    const columns = execute(
-      run(doc, 'add_column', { location: [1, 1], shape: 'circular' }),
-      'building_schedule',
-      { kind: 'column' },
-    ).data as { rows: unknown[][] };
+    const columns = execute(run(doc, 'add_column', { location: [1, 1], shape: 'circular' }), 'building_schedule', { kind: 'column' })
+      .data as { rows: unknown[][] };
     expect(columns.rows[1]?.[3]).toBe('Ø300');
   });
 

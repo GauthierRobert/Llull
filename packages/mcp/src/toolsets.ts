@@ -13,17 +13,7 @@
 
 import { pluginToolNames } from '@core/plugins/host';
 
-export const TOOLSET_NAMES = [
-  'core',
-  '2d',
-  '3d',
-  'measure',
-  'parametric',
-  'assembly',
-  'exchange',
-  'building',
-  'civil',
-] as const;
+export const TOOLSET_NAMES = ['core', '2d', '3d', 'measure', 'parametric', 'assembly', 'exchange', 'building', 'civil'] as const;
 
 export type ToolsetName = (typeof TOOLSET_NAMES)[number];
 
@@ -121,14 +111,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'edit_subdivision_cage',
     'surface_from_curves',
   ],
-  measure: [
-    'measure_distance',
-    'measure_angle',
-    'measure_area',
-    'measure_perimeter',
-    'measure_bounding_box',
-    'mass_properties',
-  ],
+  measure: ['measure_distance', 'measure_angle', 'measure_area', 'measure_perimeter', 'measure_bounding_box', 'mass_properties'],
   parametric: [
     'replay_history',
     'set_step_suppressed',

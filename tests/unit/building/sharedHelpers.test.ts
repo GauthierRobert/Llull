@@ -19,9 +19,7 @@ import { levelOrFailure, unknownLevelFailure } from '@aec/building/levelLookup';
 
 describe('utilisation reductions', () => {
   it('maxUtilisation is the largest value, 0 when empty', () => {
-    expect(maxUtilisation([{ utilisation: 0.4 }, { utilisation: 1.2 }, { utilisation: 0.9 }])).toBe(
-      1.2,
-    );
+    expect(maxUtilisation([{ utilisation: 0.4 }, { utilisation: 1.2 }, { utilisation: 0.9 }])).toBe(1.2);
     expect(maxUtilisation([])).toBe(0);
   });
 
@@ -61,12 +59,7 @@ describe('commitBuilding', () => {
     doc = run(doc, 'add_column', { location: [1000, 1000] });
     const building = getBuilding(doc);
     const ids = Object.keys(building.elements);
-    const result = commitBuilding(
-      doc,
-      building,
-      ids,
-      (document) => `has ${Object.keys(document.building?.elements ?? {}).length}`,
-    );
+    const result = commitBuilding(doc, building, ids, (document) => `has ${Object.keys(document.building?.elements ?? {}).length}`);
     expect(result.summary).toBe(`has ${ids.length}`);
     expect(result.affected).toEqual(expect.arrayContaining(ids));
     expect(result.data).toBeUndefined();
@@ -115,9 +108,7 @@ describe('second-pass shared helpers', () => {
   });
 
   it('svgText escapes content and rotates only when asked', () => {
-    expect(svgText(1, 2, 3, 'middle', 'a<b')).toBe(
-      '<text x="1" y="2" font-size="3" text-anchor="middle">a&lt;b</text>',
-    );
+    expect(svgText(1, 2, 3, 'middle', 'a<b')).toBe('<text x="1" y="2" font-size="3" text-anchor="middle">a&lt;b</text>');
     expect(svgText(1, 2, 3, 'start', 'x', 90)).toContain('transform="rotate(90 1 2)"');
   });
 
@@ -141,12 +132,8 @@ describe('final-pass shared helpers', () => {
 
   it('craneValueProblem reports the first non-positive, then the first negative value', () => {
     expect(craneValueProblem({ craneCapacity: 10, hoistingSpeed: 0 })).toBeUndefined();
-    expect(craneValueProblem({ craneCapacity: 0, hoistingSpeed: -1 })).toBe(
-      'craneCapacity must be a number > 0',
-    );
-    expect(craneValueProblem({ craneCapacity: 10, minHookApproach: -1 })).toBe(
-      'minHookApproach must be a number >= 0',
-    );
+    expect(craneValueProblem({ craneCapacity: 0, hoistingSpeed: -1 })).toBe('craneCapacity must be a number > 0');
+    expect(craneValueProblem({ craneCapacity: 10, minHookApproach: -1 })).toBe('minHookApproach must be a number >= 0');
   });
 
   it('levelOrFailure resolves an existing level and fails on an unknown one', () => {
@@ -154,9 +141,7 @@ describe('final-pass shared helpers', () => {
     const levelId = getBuilding(doc).levelOrder[0] as string;
     expect(levelOrFailure(doc, 'check_x', levelId)).toBe(levelId);
     const failure = levelOrFailure(doc, 'check_x', 'ghost');
-    expect(typeof failure === 'object' && failure.summary).toBe(
-      "check_x failed: no level 'ghost'.",
-    );
+    expect(typeof failure === 'object' && failure.summary).toBe("check_x failed: no level 'ghost'.");
     expect(unknownLevelFailure(doc, 'check_x', undefined)).toBeUndefined();
     expect(unknownLevelFailure(doc, 'check_x', 'ghost')?.document).toBe(doc);
   });

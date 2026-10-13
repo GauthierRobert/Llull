@@ -1,11 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import {
-  type CadDocument,
-  type MeshSolidEntity,
-  type MeshData,
-  type ShapeRecipe,
-  createEmptyDocument,
-} from '@core/model/types';
+import { type CadDocument, type MeshSolidEntity, type MeshData, type ShapeRecipe, createEmptyDocument } from '@core/model/types';
 import { execute, getCommand } from '@core/commands/registry';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { recipeKey, validateShapeRecipe } from '@core/geometry/shapeRecipe';
@@ -98,11 +92,7 @@ describe('blend_union', () => {
     }).document;
     const instance = Object.values(withInstance.entities).find((e) => e.kind === 'instance');
     setGeometryKernel(fakeKernel({ blend: BLEND_MESH }));
-    expectNoOp(
-      execute(withInstance, 'blend_union', { ids: [ids[0], instance?.id], radius: 0.2 }),
-      withInstance,
-      'explode_instance',
-    );
+    expectNoOp(execute(withInstance, 'blend_union', { ids: [ids[0], instance?.id], radius: 0.2 }), withInstance, 'explode_instance');
   });
 });
 
@@ -159,9 +149,7 @@ describe('blend recipes', () => {
     expect(validateShapeRecipe(blend)).toBeNull();
     expect(validateShapeRecipe({ ...blend, sources: [leaf('a')] })).toContain('>= 2 sources');
     expect(validateShapeRecipe({ ...blend, radius: 0 })).toContain('radius must be > 0');
-    expect(
-      validateShapeRecipe({ ...blend, sources: [leaf('a'), { op: 'nope' } as never] }),
-    ).toContain('unknown recipe op');
+    expect(validateShapeRecipe({ ...blend, sources: [leaf('a'), { op: 'nope' } as never] })).toContain('unknown recipe op');
     expect(validateShapeRecipe({ ...fillet, sizeEnd: 0 })).toContain('sizeEnd must be > 0');
   });
 });

@@ -5,13 +5,7 @@ import { isRecord } from '../../lib/isRecord';
 import { isFiniteNumber } from '../../lib/isFiniteNumber';
 import { isVec3 } from '../../lib/vec3';
 import { documentExtensions } from '../../plugins/host';
-import {
-  validateCamera,
-  validateLayer,
-  validateEntityValue,
-  validateMaterialValue,
-  validateParameterValue,
-} from './guards';
+import { validateCamera, validateLayer, validateEntityValue, validateMaterialValue, validateParameterValue } from './guards';
 
 const VALID_CONSTRAINT_KINDS: ReadonlySet<string> = new Set(CONSTRAINT_KINDS);
 
@@ -49,11 +43,9 @@ function validateJointValue(id: string, v: unknown): string | null {
   const axisErr = validateJointAxis(id, v['axis']);
   if (axisErr !== null) return axisErr;
   if (kind === 'revolute') {
-    if (!isFiniteNumber(v['angle']))
-      return `joint '${id}' (revolute): angle must be a finite number`;
+    if (!isFiniteNumber(v['angle'])) return `joint '${id}' (revolute): angle must be a finite number`;
   } else {
-    if (!isFiniteNumber(v['displacement']))
-      return `joint '${id}' (prismatic): displacement must be a finite number`;
+    if (!isFiniteNumber(v['displacement'])) return `joint '${id}' (prismatic): displacement must be a finite number`;
   }
   return null;
 }
@@ -67,8 +59,7 @@ function validateDriveRelationValue(id: string, v: unknown): string | null {
     return `driveRelation '${id}': driven must be a non-empty string`;
   if (!isFiniteNumber(v['ratio'])) return `driveRelation '${id}': ratio must be a finite number`;
   if ('offset' in v && v['offset'] !== undefined) {
-    if (!isFiniteNumber(v['offset']))
-      return `driveRelation '${id}': offset must be a finite number when present`;
+    if (!isFiniteNumber(v['offset'])) return `driveRelation '${id}': offset must be a finite number when present`;
   }
   return null;
 }
@@ -77,8 +68,7 @@ function validateConstraintValue(id: string, v: unknown): string | null {
   if (!isRecord(v)) return `constraint '${id}' is not an object`;
   if (typeof v['id'] !== 'string') return `constraint '${id}': id field must be a string`;
   const kind = v['kind'];
-  if (typeof kind !== 'string' || !VALID_CONSTRAINT_KINDS.has(kind))
-    return `constraint '${id}': unknown kind '${String(kind)}'`;
+  if (typeof kind !== 'string' || !VALID_CONSTRAINT_KINDS.has(kind)) return `constraint '${id}': unknown kind '${String(kind)}'`;
   for (const field of ['a', 'b'] as const) {
     const ref = v[field];
     if (!isRecord(ref)) return `constraint '${id}': ${field} must be an object`;
@@ -92,8 +82,7 @@ function validateConstraintValue(id: string, v: unknown): string | null {
   }
   if (kind === 'distance' || kind === 'angle') {
     const val = v['value'];
-    if (typeof val !== 'number' && typeof val !== 'string')
-      return `constraint '${id}' (${kind}): value must be a number or string`;
+    if (typeof val !== 'number' && typeof val !== 'string') return `constraint '${id}' (${kind}): value must be a number or string`;
   }
   return null;
 }
@@ -106,8 +95,7 @@ function validateRecipeValue(name: string, v: unknown): string | null {
     const step = v['steps'][i] as unknown;
     if (!isRecord(step)) return `recipe '${name}': steps[${i}] is not an object`;
     if (typeof step['id'] !== 'string') return `recipe '${name}': steps[${i}].id must be a string`;
-    if (typeof step['name'] !== 'string')
-      return `recipe '${name}': steps[${i}].name must be a string`;
+    if (typeof step['name'] !== 'string') return `recipe '${name}': steps[${i}].name must be a string`;
   }
   return null;
 }
@@ -193,10 +181,7 @@ export function validateDocumentValues(v: Record<string, unknown>): string[] {
     if (!validateLayer(layer)) errors.push(`layer entry is malformed: ${JSON.stringify(layer)}`);
   }
 
-  const validateSection = (
-    section: unknown,
-    validate: (key: string, value: unknown) => string | null,
-  ): void => {
+  const validateSection = (section: unknown, validate: (key: string, value: unknown) => string | null): void => {
     if (!isRecord(section)) return;
     for (const [key, value] of Object.entries(section)) {
       const err = validate(key, value);

@@ -43,11 +43,7 @@ export const SAME_SUPPORT_DISTANCE = 100;
 
 /** Absolute mm position of a point given in document units relative to level `levelId`. */
 export function absolutePointMm(units: ModelUnits, levelId: string, point: Vec3): Vec3 {
-  return [
-    units.toMm(point[0]),
-    units.toMm(point[1]),
-    units.elevationMm(levelId) + units.toMm(point[2]),
-  ];
+  return [units.toMm(point[0]), units.toMm(point[1]), units.elevationMm(levelId) + units.toMm(point[2])];
 }
 
 /** Absolute mm route of a pipe element. */
@@ -72,20 +68,12 @@ export function supportsOfPipe(units: ModelUnits, pipeId: string): PipeSupportEl
 }
 
 /** Support stations of a pipe sorted by arc length; unattached supports are listed with `attached` false. */
-export function supportStations(
-  units: ModelUnits,
-  run: PipeRun,
-  supports: ReadonlyArray<PipeSupportElement>,
-): SupportStation[] {
+export function supportStations(units: ModelUnits, run: PipeRun, supports: ReadonlyArray<PipeSupportElement>): SupportStation[] {
   return supports
     .flatMap((support): SupportStation[] => {
-      const snap = nearestOnRoute(
-        run.points,
-        absolutePointMm(units, run.element.levelId, support.position),
-      );
+      const snap = nearestOnRoute(run.points, absolutePointMm(units, run.element.levelId, support.position));
       if (snap === null) return [];
-      const member =
-        support.memberId === null ? undefined : units.building.elements[support.memberId];
+      const member = support.memberId === null ? undefined : units.building.elements[support.memberId];
       return [
         {
           id: support.id,
@@ -103,8 +91,7 @@ export function supportStations(
 }
 
 /** A guide on a riser restrains it laterally only: it carries none of the pipe weight. */
-export const isLateralOnly = (station: Pick<SupportStation, 'onRiser' | 'type'>): boolean =>
-  station.onRiser && station.type === 'guide';
+export const isLateralOnly = (station: Pick<SupportStation, 'onRiser' | 'type'>): boolean => station.onRiser && station.type === 'guide';
 
 /** Supports of `run` that carry pipe weight: all but the guides on risers. */
 export function weightSupportsOf(units: ModelUnits, run: PipeRun): PipeSupportElement[] {
@@ -127,12 +114,7 @@ function insideEquipment(units: ModelUnits, point: Vec3): boolean {
     const [cos, sin] = [Math.cos(element.angle), Math.sin(element.angle)];
     const [along, across] = [dx * cos + dy * sin, -dx * sin + dy * cos];
     const base = elevationMm(element.levelId);
-    return (
-      Math.abs(along) <= length / 2 + 1 &&
-      Math.abs(across) <= width / 2 + 1 &&
-      point[2] >= base - 1 &&
-      point[2] <= base + height + 1
-    );
+    return Math.abs(along) <= length / 2 + 1 && Math.abs(across) <= width / 2 + 1 && point[2] >= base - 1 && point[2] <= base + height + 1;
   });
 }
 
@@ -140,11 +122,7 @@ function insideEquipment(units: ModelUnits, point: Vec3): boolean {
  * What carries each end of `run`: equipment whose footprint contains the end point (a nozzle), else
  * a different pipe whose centreline passes within the larger outside diameter (a branch on a header).
  */
-export function endCarriers(
-  units: ModelUnits,
-  run: PipeRun,
-  runs: ReadonlyArray<PipeRun>,
-): [EndCarrier | null, EndCarrier | null] {
+export function endCarriers(units: ModelUnits, run: PipeRun, runs: ReadonlyArray<PipeRun>): [EndCarrier | null, EndCarrier | null] {
   const carrier = (point: Vec3 | undefined): EndCarrier | null => {
     if (point === undefined) return null;
     if (insideEquipment(units, point)) return 'equipment';
@@ -165,9 +143,5 @@ export function endCarriers(
 export function carriedByEnds(units: ModelUnits, run: PipeRun): boolean {
   const [start, end] = endCarriers(units, run, pipeRunsOf(units));
   const limit = pipeSpanLimit(run.element.dn, run.diameterMm);
-  return (
-    start !== null &&
-    end !== null &&
-    spanCoordinate(run.points, run.lengthMm) / 1000 <= limit.spanM + 1e-9
-  );
+  return start !== null && end !== null && spanCoordinate(run.points, run.lengthMm) / 1000 <= limit.spanM + 1e-9;
 }

@@ -40,15 +40,7 @@ function runLoop(
     }
     const { extras, bindings } = iteration(iter);
     const env = buildEnv(run.current, { i: iter, ...extras });
-    const r = execStep(
-      run,
-      index,
-      step.command,
-      step.params ?? {},
-      bindings,
-      env,
-      `${label}[${iter}]`,
-    );
+    const r = execStep(run, index, step.command, step.params ?? {}, bindings, env, `${label}[${iter}]`);
     loopAffected = r.affected;
     if (!r.ok && run.onError === 'abort') return true;
   }
@@ -63,8 +55,7 @@ function runAction(run: PlanRun, raw: ActionItem, index: number): boolean {
     const countResult = resolveCount(raw.repeat.count, run.current);
     if (countResult.error !== null) return failStep(run, index, 'repeat', countResult.error);
     const count = Math.round(countResult.count);
-    if (count < 0)
-      return failStep(run, index, 'repeat', `repeat: count must be >= 0 (got ${count}).`);
+    if (count < 0) return failStep(run, index, 'repeat', `repeat: count must be >= 0 (got ${count}).`);
     return runLoop(run, index, raw.step, count, 'repeat', raw.repeat.as, () => ({
       extras: {},
       bindings: run.bindings,
@@ -110,27 +101,16 @@ function estimateSteps(actions: ActionItem[], doc: CadDocument): number {
   return total;
 }
 
-export function runProject(
-  doc: CadDocument,
-  { actions, onError = 'abort', validate = false }: BuildProjectParams,
-): CommandResult {
+export function runProject(doc: CadDocument, { actions, onError = 'abort', validate = false }: BuildProjectParams): CommandResult {
   const rejected = (summary: string): CommandResult =>
-    rejectPlan(
-      doc,
-      { ok: false, validated: validate, stepCount: 0, steps: [], failedAt: null },
-      summary,
-    );
+    rejectPlan(doc, { ok: false, validated: validate, stepCount: 0, steps: [], failedAt: null }, summary);
   if (actions.length === 0) return rejected('build_project: no actions provided.');
   if (actions.length > MAX_PROJECT_ACTIONS) {
-    return rejected(
-      `build_project: ${actions.length} actions exceeds MAX_PROJECT_ACTIONS (${MAX_PROJECT_ACTIONS}).`,
-    );
+    return rejected(`build_project: ${actions.length} actions exceeds MAX_PROJECT_ACTIONS (${MAX_PROJECT_ACTIONS}).`);
   }
   const estimatedSteps = estimateSteps(actions, doc);
   if (estimatedSteps > MAX_PROJECT_STEPS) {
-    return rejected(
-      `build_project: plan expands to ${estimatedSteps} steps, exceeding MAX_PROJECT_STEPS (${MAX_PROJECT_STEPS}).`,
-    );
+    return rejected(`build_project: plan expands to ${estimatedSteps} steps, exceeding MAX_PROJECT_STEPS (${MAX_PROJECT_STEPS}).`);
   }
   if (validate) return validatePlan(doc, actions);
 

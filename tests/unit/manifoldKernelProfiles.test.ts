@@ -15,8 +15,7 @@ const extrusion = (profile: number[][], depth: number): Entity =>
     depth,
     ...base,
   }) as unknown as Entity;
-const box = (position: number[]): Entity =>
-  ({ id: 'b', kind: 'box', position, size: [2, 2, 2], ...base }) as unknown as Entity;
+const box = (position: number[]): Entity => ({ id: 'b', kind: 'box', position, size: [2, 2, 2], ...base }) as unknown as Entity;
 
 function volume(mesh: MeshData): number {
   let sum = 0;
@@ -27,10 +26,7 @@ function volume(mesh: MeshData): number {
     };
     const [a, b, c] = [at(0), at(1), at(2)] as [number[], number[], number[]];
     sum +=
-      (a[0]! * (b[1]! * c[2]! - b[2]! * c[1]!) -
-        a[1]! * (b[0]! * c[2]! - b[2]! * c[0]!) +
-        a[2]! * (b[0]! * c[1]! - b[1]! * c[0]!)) /
-      6;
+      (a[0]! * (b[1]! * c[2]! - b[2]! * c[1]!) - a[1]! * (b[0]! * c[2]! - b[2]! * c[0]!) + a[2]! * (b[0]! * c[1]! - b[1]! * c[0]!)) / 6;
   }
   return sum;
 }

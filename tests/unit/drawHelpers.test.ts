@@ -5,31 +5,14 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import {
-  rectParamsFromCorners,
-  circleRadiusFromPoints,
-} from '../../src/ui/viewport/2d/drawHelpers';
+import { rectParamsFromCorners, circleRadiusFromPoints } from '../../src/ui/viewport/2d/drawHelpers';
 
 // rectParamsFromCorners
 
 describe('rectParamsFromCorners', () => {
   it.each([
-    [
-      'computes width, height and lower-left origin for bottom-left → top-right',
-      [1, 2],
-      [5, 6],
-      4,
-      4,
-      [1, 2, 0],
-    ],
-    [
-      'computes correct lower-left origin when corners are reversed (top-right → bottom-left)',
-      [5, 6],
-      [1, 2],
-      4,
-      4,
-      [1, 2, 0],
-    ],
+    ['computes width, height and lower-left origin for bottom-left → top-right', [1, 2], [5, 6], 4, 4, [1, 2, 0]],
+    ['computes correct lower-left origin when corners are reversed (top-right → bottom-left)', [5, 6], [1, 2], 4, 4, [1, 2, 0]],
     ['handles negative coordinate corners', [-3, -3], [3, 3], 6, 6, [-3, -3, 0]],
     ['handles mixed quadrant corners (top-left to bottom-right)', [1, 5], [4, 2], 3, 3, [1, 2, 0]],
   ] as const)('%s', (_label, first, second, width, height, position) => {

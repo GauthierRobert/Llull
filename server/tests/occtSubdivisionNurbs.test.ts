@@ -36,11 +36,7 @@ const subdivision = (
 function limitVolume(entity: SubdivisionEntity): number {
   return subdivisionTriangles({ ...entity, levels: 5 }).reduce(
     (sum, [a, b, c]) =>
-      sum +
-      (a[0] * (b[1] * c[2] - b[2] * c[1]) -
-        a[1] * (b[0] * c[2] - b[2] * c[0]) +
-        a[2] * (b[0] * c[1] - b[1] * c[0])) /
-        6,
+      sum + (a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0])) / 6,
     0,
   );
 }
@@ -71,9 +67,7 @@ describe('occt exact subdivision solids', () => {
 
   it('builds creased and extraordinary-vertex cages (cylinder with sharp caps)', () => {
     const cage = cylinderCage(1, 2, 6, 2);
-    const rims = cage.faces
-      .slice(-2)
-      .flatMap((face) => face.map((a, i) => [a, face[(i + 1) % face.length]] as [number, number]));
+    const rims = cage.faces.slice(-2).flatMap((face) => face.map((a, i) => [a, face[(i + 1) % face.length]] as [number, number]));
     const topology = topologyOf(subdivision({ ...cage, creases: rims }, 3));
     expect(topology.solids).toBe(1);
     expect(topology.volume).toBeGreaterThan(0.8 * Math.PI * 2 * 0.75);

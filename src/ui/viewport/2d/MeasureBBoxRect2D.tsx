@@ -36,14 +36,7 @@ function RectLines2D({ min, max }: { min: Vec3; max: Vec3 }): React.ReactElement
   const material = useOverlayMaterial(OVERLAY_ACCENT, 0.9);
 
   // lineLoop closes the last→first segment automatically.
-  return (
-    <lineLoop
-      geometry={anchored.geometry}
-      position={anchored.anchor}
-      material={material}
-      renderOrder={999}
-    />
-  );
+  return <lineLoop geometry={anchored.geometry} position={anchored.anchor} material={material} renderOrder={999} />;
 }
 
 export function MeasureBBoxRect2D(): React.ReactElement | null {

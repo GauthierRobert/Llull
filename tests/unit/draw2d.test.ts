@@ -1,14 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { expectPure } from '../helpers/expectNoOp';
 import { createEmptyDocument, is2D, is3D } from '@core/model/types';
-import type {
-  LineEntity,
-  PolylineEntity,
-  ArcEntity,
-  CircleEntity,
-  RectangleEntity,
-  PointEntity,
-} from '@core/model/types';
+import type { LineEntity, PolylineEntity, ArcEntity, CircleEntity, RectangleEntity, PointEntity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 
 function expectPureCommand(name: string, params: unknown): void {
@@ -202,16 +195,12 @@ describe('2D draw commands', () => {
     it('wraps a sweep larger than 2π into (0, 2π] and keeps CCW wrap and full sweeps', () => {
       const doc = createEmptyDocument();
       const base = { center: [0, 0], radius: 2 };
-      const arcOf = (result: ReturnType<typeof execute>): ArcEntity =>
-        result.document.entities[result.affected[0]!] as ArcEntity;
+      const arcOf = (result: ReturnType<typeof execute>): ArcEntity => result.document.entities[result.affected[0]!] as ArcEntity;
       const over = execute(doc, 'draw_arc', { ...base, startAngle: -2.04, endAngle: 4.71 });
       expect(arcOf(over).endAngle - arcOf(over).startAngle).toBeCloseTo(6.75 - 2 * Math.PI, 9);
       expect(over.summary).toContain('wrapped');
       const overNeg = execute(doc, 'draw_arc', { ...base, startAngle: 4.71, endAngle: -2.04 });
-      expect(arcOf(overNeg).endAngle - arcOf(overNeg).startAngle).toBeCloseTo(
-        4 * Math.PI - 6.75,
-        9,
-      );
+      expect(arcOf(overNeg).endAngle - arcOf(overNeg).startAngle).toBeCloseTo(4 * Math.PI - 6.75, 9);
       const wrap = execute(doc, 'draw_arc', { ...base, startAngle: 5, endAngle: 1 });
       expect(arcOf(wrap)).toMatchObject({ startAngle: 5, endAngle: 1 });
       expect(wrap.summary).not.toContain('wrapped');

@@ -26,8 +26,6 @@ export function pickContext(zoom: number, extraFilter?: (entity: Entity) => bool
   return {
     document,
     tolerance: PICK_RADIUS_PX / (zoom > 0 ? zoom : 1),
-    accepts: (entity) =>
-      (extraFilter?.(entity) ?? true) &&
-      isEntityVisible(entity, layers, hiddenLayerIds, hiddenEntityIds),
+    accepts: (entity) => (extraFilter?.(entity) ?? true) && isEntityVisible(entity, layers, hiddenLayerIds, hiddenEntityIds),
   };
 }

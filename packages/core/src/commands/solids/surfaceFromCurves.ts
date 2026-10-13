@@ -21,18 +21,11 @@ import { cageData, cageText, levelsField, sizeProblem } from './subdivision';
 const MAX_PATCH_CELLS = 24;
 
 /** Dense polylines of the boundary curves (inline points or 2D sketch curves), or an error. */
-function boundaryPolylines(
-  doc: CadDocument,
-  curves: Vec3[][] | undefined,
-  curveIds: string[] | undefined,
-): Vec3[][] | string {
-  if ((curves === undefined) === (curveIds === undefined))
-    return 'give exactly one of curves or curveIds';
+function boundaryPolylines(doc: CadDocument, curves: Vec3[][] | undefined, curveIds: string[] | undefined): Vec3[][] | string {
+  if ((curves === undefined) === (curveIds === undefined)) return 'give exactly one of curves or curveIds';
   if (curves !== undefined) {
     if (curves.some((points) => points.length < 2)) return 'every curve needs at least 2 points';
-    return curves.map((points) =>
-      points.length === 2 ? points : sampleChain(catmullRomBeziers(points, false), false),
-    );
+    return curves.map((points) => (points.length === 2 ? points : sampleChain(catmullRomBeziers(points, false), false)));
   }
   const polylines: Vec3[][] = [];
   for (const id of curveIds ?? []) {
@@ -68,20 +61,12 @@ export const surfaceFromCurves = defineCommand({
       .array(z.array(vec3('Curve point [x, y, z] in world coordinates.')))
       .describe('2 or 4 boundary curves as world point lists (alternative to curveIds).')
       .optional(),
-    curveIds: z
-      .array(z.string())
-      .describe('2 or 4 ids of 2D sketch curves bounding the patch (alternative to curves).')
-      .optional(),
+    curveIds: z.array(z.string()).describe('2 or 4 ids of 2D sketch curves bounding the patch (alternative to curves).').optional(),
     thickness: z.number().describe('Wall thickness in document units (> 0).'),
-    flip: z
-      .boolean()
-      .describe('Thicken toward the other side of the surface (default false).')
-      .optional(),
+    flip: z.boolean().describe('Thicken toward the other side of the surface (default false).').optional(),
     cells: z
       .tuple([z.number().int(), z.number().int()])
-      .describe(
-        `Cage cells [along the first curve, across] (1..${MAX_PATCH_CELLS} each; default [8, 8]).`,
-      )
+      .describe(`Cage cells [along the first curve, across] (1..${MAX_PATCH_CELLS} each; default [8, 8]).`)
       .optional(),
     levels: levelsField.optional(),
     ...namedSolidStyleFields(),

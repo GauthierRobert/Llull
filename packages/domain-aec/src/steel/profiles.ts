@@ -39,11 +39,7 @@ const STEEL_DENSITY_KG_PER_MM2_M = 0.00785;
 
 type Row = readonly [string, number, number, number, number, number];
 
-function rolled(
-  family: 'IPE' | 'HEA' | 'HEB' | 'UPN',
-  rows: ReadonlyArray<Row>,
-  shape: 'I' | 'U' = 'I',
-): SteelProfile[] {
+function rolled(family: 'IPE' | 'HEA' | 'HEB' | 'UPN', rows: ReadonlyArray<Row>, shape: 'I' | 'U' = 'I'): SteelProfile[] {
   return rows.map(([size, h, b, tw, tf, mass]) => ({
     name: `${family}${size}`,
     family,
@@ -175,9 +171,7 @@ const RHS: SteelProfile[] = (
     [250, 150, 8],
     [300, 200, 10],
   ] as const
-).map(([h, b, t]) =>
-  thin('RHS', `RHS${h}x${b}x${t}`, { h, b, t }, 2 * (h + b), 2 * t * (h + b - 2 * t)),
-);
+).map(([h, b, t]) => thin('RHS', `RHS${h}x${b}x${t}`, { h, b, t }, 2 * (h + b), 2 * t * (h + b - 2 * t)));
 
 const CHS: SteelProfile[] = (
   [
@@ -191,15 +185,7 @@ const CHS: SteelProfile[] = (
     [219.1, 8],
     [273, 10],
   ] as const
-).map(([d, t]) =>
-  thin(
-    'CHS',
-    `CHS${d}x${t}`,
-    { h: d, b: d, t },
-    Math.PI * d,
-    (Math.PI * (d * d - (d - 2 * t) ** 2)) / 4,
-  ),
-);
+).map(([d, t]) => thin('CHS', `CHS${d}x${t}`, { h: d, b: d, t }, Math.PI * d, (Math.PI * (d * d - (d - 2 * t) ** 2)) / 4));
 
 const ANGLES: SteelProfile[] = (
   [
@@ -224,13 +210,7 @@ const COLD_FORMED: SteelProfile[] = (
     [300, 90, 25, 3.0],
   ] as const
 ).map(([h, b, lip, t]) =>
-  thin(
-    'C',
-    `C${h}x${b}x${t.toFixed(1)}`,
-    { h, b, t, lip },
-    2 * (h + 2 * b + 2 * lip),
-    t * (h + 2 * b + 2 * lip - 4 * t),
-  ),
+  thin('C', `C${h}x${b}x${t.toFixed(1)}`, { h, b, t, lip }, 2 * (h + 2 * b + 2 * lip), t * (h + 2 * b + 2 * lip - 4 * t)),
 );
 
 /** Structural steel density, kg/m³. */
@@ -249,14 +229,9 @@ export const STEEL_PROFILES: ReadonlyArray<SteelProfile> = [
 ];
 
 /** Lightest catalogue profile accepted by `accept`; the first listed on equal mass. */
-export function lightestProfile(
-  accept: (candidate: SteelProfile) => boolean,
-): SteelProfile | undefined {
+export function lightestProfile(accept: (candidate: SteelProfile) => boolean): SteelProfile | undefined {
   return STEEL_PROFILES.filter(accept).reduce<SteelProfile | undefined>(
-    (lightest, candidate) =>
-      lightest === undefined || candidate.massPerMetre < lightest.massPerMetre
-        ? candidate
-        : lightest,
+    (lightest, candidate) => (lightest === undefined || candidate.massPerMetre < lightest.massPerMetre ? candidate : lightest),
     undefined,
   );
 }
@@ -433,9 +408,7 @@ export function sectionProperties(profile: SteelProfile): SectionProperties {
       second: sign * orientation * m.second,
     };
   };
-  const total = loops
-    .map((loop, index) => signed(loop, index === 0 ? 1 : -1))
-    .reduce(addMoments, { area: 0, first: 0, second: 0 });
+  const total = loops.map((loop, index) => signed(loop, index === 0 ? 1 : -1)).reduce(addMoments, { area: 0, first: 0, second: 0 });
   const centroid = total.first / total.area;
   const inertia = total.second - total.area * centroid ** 2;
   const minor = loops
@@ -455,11 +428,7 @@ export function sectionProperties(profile: SteelProfile): SectionProperties {
       const part = clipAt(loop, level, 1);
       return part.length < 3 ? sum : sum + signed(part, index === 0 ? 1 : -1).area;
     }, 0);
-  const { low, high } = bisect(
-    (level) => areaAbove(level) > total.area / 2,
-    Math.min(...ys),
-    Math.max(...ys),
-  );
+  const { low, high } = bisect((level) => areaAbove(level) > total.area / 2, Math.min(...ys), Math.max(...ys));
   const axis = (low + high) / 2;
   const plasticModulus = loops.reduce((sum, loop, index) => {
     const sign = index === 0 ? 1 : -1;

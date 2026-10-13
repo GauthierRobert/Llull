@@ -25,17 +25,12 @@ interface WorkerScope {
   readonly stores: Map<string, Map<string, Response>>;
   readonly fetchMock: ReturnType<typeof vi.fn>;
   waitFor(type: string, data?: Record<string, unknown>): Promise<void>;
-  request(
-    path: string,
-    mode?: string,
-    method?: string,
-  ): { handled: boolean; response: Promise<Response> | undefined };
+  request(path: string, mode?: string, method?: string): { handled: boolean; response: Promise<Response> | undefined };
 }
 
 function workerScope(network: (url: string) => Promise<Response>): WorkerScope {
   const stores = new Map<string, Map<string, Response>>();
-  const keyOf = (request: FakeRequest | string): string =>
-    new URL(typeof request === 'string' ? request : request.url, ORIGIN).href;
+  const keyOf = (request: FakeRequest | string): string => new URL(typeof request === 'string' ? request : request.url, ORIGIN).href;
   const caches = {
     open: async (name: string) => {
       const store = stores.get(name) ?? new Map<string, Response>();
@@ -74,11 +69,7 @@ function workerScope(network: (url: string) => Promise<Response>): WorkerScope {
     handlers.get(type)?.({ ...data, waitUntil: (p: Promise<unknown>) => (pending = p) });
     await pending;
   };
-  const request = (
-    path: string,
-    mode = 'cors',
-    method = 'GET',
-  ): { handled: boolean; response: Promise<Response> | undefined } => {
+  const request = (path: string, mode = 'cors', method = 'GET'): { handled: boolean; response: Promise<Response> | undefined } => {
     let response: Promise<Response> | undefined;
     handlers.get('fetch')?.({
       request: { url: new URL(path, ORIGIN).href, method, mode },
@@ -95,10 +86,7 @@ describe('service worker runtime', () => {
     scope.stores.set('llull-v1', new Map());
     scope.stores.set('other-app', new Map());
     await scope.waitFor('install');
-    expect([...(scope.stores.get('llull-v2')?.keys() ?? [])]).toEqual([
-      `${ORIGIN}/index.html`,
-      `${ORIGIN}/assets/index-a1.js`,
-    ]);
+    expect([...(scope.stores.get('llull-v2')?.keys() ?? [])]).toEqual([`${ORIGIN}/index.html`, `${ORIGIN}/assets/index-a1.js`]);
     await scope.waitFor('activate');
     expect([...scope.stores.keys()].sort()).toEqual(['llull-v2', 'other-app']);
     expect(scope.self.clients.claim).toHaveBeenCalled();
@@ -107,9 +95,7 @@ describe('service worker runtime', () => {
   it('serves hashed assets cache-first and caches what it fetches', async () => {
     const scope = workerScope(async (url) => new Response(`net:${url}`));
     await scope.waitFor('install');
-    expect(await (await scope.request('/assets/index-a1.js').response)?.text()).toBe(
-      'assets/index-a1.js',
-    );
+    expect(await (await scope.request('/assets/index-a1.js').response)?.text()).toBe('assets/index-a1.js');
     expect(scope.fetchMock).not.toHaveBeenCalled();
     await scope.request('/assets/lazy-b2.js').response;
     await scope.request('/assets/lazy-b2.js').response;

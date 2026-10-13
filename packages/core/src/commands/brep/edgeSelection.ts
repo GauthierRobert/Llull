@@ -31,8 +31,7 @@ function edgeDistanceSquared(edge: ShapeEdge, point: Vec3): number {
   let best = distanceSq3(path[0] ?? edge.mid, point);
   for (let k = 1; k < path.length; k++) {
     const [a, b] = [path[k - 1], path[k]];
-    if (a !== undefined && b !== undefined)
-      best = Math.min(best, segmentDistanceSquared(point, a, b));
+    if (a !== undefined && b !== undefined) best = Math.min(best, segmentDistanceSquared(point, a, b));
   }
   return best;
 }
@@ -78,9 +77,7 @@ function selectionProblem(topology: ShapeTopology | null, edges: readonly number
     const edge = topology.edges[index];
     return edge !== undefined && !roundable(edge);
   });
-  return unroundable.length > 0
-    ? `edge ${unroundable.join(', ')} is a seam or degenerate edge (no corner to round)`
-    : null;
+  return unroundable.length > 0 ? `edge ${unroundable.join(', ')} is a seam or degenerate edge (no corner to round)` : null;
 }
 
 export type EdgeSelection = { readonly edges: number[] } | { readonly problem: string };
@@ -90,16 +87,10 @@ export type EdgeSelection = { readonly edges: number[] } | { readonly problem: s
  * selected adds nothing); [] with no indices and no points = all edges.
  * @failure points without exact topology, an index out of range / repeated / on a seam -> problem
  */
-export function selectEdges(
-  topology: ShapeTopology | null,
-  indices: readonly number[],
-  near: readonly Vec3[],
-): EdgeSelection {
-  if (near.length > 0 && topology === null)
-    return { problem: 'edgesNear needs the exact B-rep topology of the OCC kernel' };
+export function selectEdges(topology: ShapeTopology | null, indices: readonly number[], near: readonly Vec3[]): EdgeSelection {
+  if (near.length > 0 && topology === null) return { problem: 'edgesNear needs the exact B-rep topology of the OCC kernel' };
   const picked = topology === null ? [] : near.map((point) => nearestEdge(topology, point));
-  if (picked.some((index) => index === undefined))
-    return { problem: 'edgesNear found no roundable edge (the solid has only seams)' };
+  if (picked.some((index) => index === undefined)) return { problem: 'edgesNear found no roundable edge (the solid has only seams)' };
   const fromPoints = (picked as number[]).filter((index) => !indices.includes(index));
   const edges = [...indices, ...new Set(fromPoints)];
   const problem = selectionProblem(topology, edges);

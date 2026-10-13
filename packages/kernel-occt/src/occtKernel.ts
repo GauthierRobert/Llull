@@ -61,8 +61,7 @@ async function getOccModule(options: OcctKernelOptions): Promise<OccApi> {
   if (_modulePromise) return _modulePromise;
 
   _modulePromise = (async () => {
-    const factory: OcctFactory =
-      options.factory ?? (await import('opencascade.js/dist/opencascade.wasm.js')).default;
+    const factory: OcctFactory = options.factory ?? (await import('opencascade.js/dist/opencascade.wasm.js')).default;
 
     const opts: Record<string, unknown> = {};
     if (options.wasmBinary) opts['wasmBinary'] = options.wasmBinary;
@@ -93,29 +92,22 @@ const BOOLEAN_BUILDERS: Readonly<Record<BooleanOp, string>> = {
  * binding/programming faults that do not touch module state.
  */
 /** `WebAssembly.RuntimeError` (a trap), read from the global: not every TS lib declares the value. */
-const TrapError = (globalThis as { WebAssembly?: { RuntimeError?: new () => Error } }).WebAssembly
-  ?.RuntimeError;
+const TrapError = (globalThis as { WebAssembly?: { RuntimeError?: new () => Error } }).WebAssembly?.RuntimeError;
 
 function degradesModule(error: unknown, operation: OperationClass): boolean {
   if (!(error instanceof Error)) return true;
   if (TrapError !== undefined && error instanceof TrapError) return true; // a WASM trap
-  return (
-    operation === 'fragile' && error instanceof ReferenceError && /___cxa_/.test(error.message)
-  );
+  return operation === 'fragile' && error instanceof ReferenceError && /___cxa_/.test(error.message);
 }
 
 /** 'refusal': a C++ exception is a graceful no; 'fragile': it may have degraded the module. */
 type OperationClass = 'fragile' | 'refusal';
 
 /** Run `body`, mapping any OCC exception to null and releasing every handle it registered. */
-function guarded<T>(
-  operation: OperationClass,
-  body: (own: <H extends OccHandle | null>(handle: H) => H) => T | null,
-): T | null {
+function guarded<T>(operation: OperationClass, body: (own: <H extends OccHandle | null>(handle: H) => H) => T | null): T | null {
   return withOwned(body, (error) => {
     if (degradesModule(error, operation)) nativeFailures++;
-    if (error instanceof Error)
-      console.warn(`[occtKernel] OCC operation failed: ${errorMessage(error)}`);
+    if (error instanceof Error) console.warn(`[occtKernel] OCC operation failed: ${errorMessage(error)}`);
   });
 }
 
@@ -172,11 +164,7 @@ function roundEdges(
  * tangent cylinder): its tessellation has holes and every later boolean on it can hang, so it is
  * refused like any other failed fillet.
  */
-function validOrNull(
-  api: OccApi,
-  shape: OccShape,
-  own: <H extends OccHandle | null>(handle: H) => H,
-): OccShape | null {
+function validOrNull(api: OccApi, shape: OccShape, own: <H extends OccHandle | null>(handle: H) => H): OccShape | null {
   const check = own(new api.BRepCheck_Analyzer(shape, true) as OccValidity);
   return check.IsValid_2() ? shape : null;
 }
@@ -240,15 +228,9 @@ function blendedUnion(api: OccApi, shapes: readonly OccShape[], radius: number):
  * union leaves the seam between two fused boxes as a split face, so one visible edge is two B-rep
  * edges and a fillet on it rounds only half. Falls back to `shape` when unification fails.
  */
-function unified(
-  api: OccApi,
-  shape: OccShape,
-  own: <H extends OccHandle | null>(handle: H) => H,
-): OccShape {
+function unified(api: OccApi, shape: OccShape, own: <H extends OccHandle | null>(handle: H) => H): OccShape {
   try {
-    const unifier = own(
-      new api.ShapeUpgrade_UnifySameDomain_2(shape, true, true, false) as OccUnifier,
-    );
+    const unifier = own(new api.ShapeUpgrade_UnifySameDomain_2(shape, true, true, false) as OccUnifier);
     unifier.AllowInternalEdges(false);
     unifier.Build();
     return unifier.Shape();
@@ -285,11 +267,7 @@ function hollow(api: OccApi, solid: OccShape, thickness: number): OccShape | nul
 }
 
 /** Copy of `shape` under a transform built by `makeTransform` (released afterwards). */
-function transformed(
-  api: OccApi,
-  shape: OccShape,
-  makeTransform: () => OccHandle,
-): OccShape | null {
+function transformed(api: OccApi, shape: OccShape, makeTransform: () => OccHandle): OccShape | null {
   return guarded('refusal', (own) => transformedCopy(api, shape, own(makeTransform())));
 }
 
@@ -297,10 +275,7 @@ function transformed(
 function untangle(a: ShapeRecipe, b: ShapeRecipe): [ShapeRecipe, ShapeRecipe] {
   if (a.op !== 'solid' || b.op !== 'solid') return [a, b];
   const [entityA, entityB] = clearTangentContact(a.entity, b.entity);
-  return [
-    entityA === a.entity ? a : { op: 'solid', entity: entityA },
-    entityB === b.entity ? b : { op: 'solid', entity: entityB },
-  ];
+  return [entityA === a.entity ? a : { op: 'solid', entity: entityA }, entityB === b.entity ? b : { op: 'solid', entity: entityB }];
 }
 
 /** Native OCC operations behind the recipe evaluator. */
@@ -324,11 +299,9 @@ export function occtOps(api: OccApi): KernelOps<OccShape> {
         radiusEnd,
       ),
     blend: (shapes, radius) => blendedUnion(api, shapes, radius),
-    chamfer: (shape, edges, distance) =>
-      roundEdges(api, shape, edges, distance, (solid) => new api.BRepFilletAPI_MakeChamfer(solid)),
+    chamfer: (shape, edges, distance) => roundEdges(api, shape, edges, distance, (solid) => new api.BRepFilletAPI_MakeChamfer(solid)),
     shell: (shape, thickness) => hollow(api, shape, thickness),
-    place: (shape, position: Vec3, rotation: Vec3) =>
-      transformed(api, shape, () => placementTransform(api, rotation, position)),
+    place: (shape, position: Vec3, rotation: Vec3) => transformed(api, shape, () => placementTransform(api, rotation, position)),
     scale: (shape, factor) =>
       factor > 0
         ? transformed(api, shape, () => {

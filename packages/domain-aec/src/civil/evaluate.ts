@@ -59,7 +59,5 @@ export function commitCivil(
 ): CommandResult {
   const document = regenerateCivil(doc, model);
   const affected = civilAffected(document, objectIds);
-  return data === undefined
-    ? { document, summary, affected }
-    : { document, summary, affected, data };
+  return data === undefined ? { document, summary, affected } : { document, summary, affected, data };
 }

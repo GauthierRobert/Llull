@@ -36,11 +36,7 @@ describe('live sync protocol', () => {
 });
 
 describe('documentHash covers every part of the document', () => {
-  const doc = execute(
-    execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document,
-    'add_sphere',
-    { radius: 2 },
-  ).document;
+  const doc = execute(execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document, 'add_sphere', { radius: 2 }).document;
   const [firstId = '', secondId = ''] = doc.order;
   const firstEntity = doc.entities[firstId]!;
 
@@ -69,9 +65,7 @@ describe('documentHash covers every part of the document', () => {
     expect(documentHash({ ...doc, order: [...doc.order].reverse() })).not.toBe(documentHash(doc));
     const [step, ...later] = doc.featureHistory;
     expect(documentHash({ ...doc, featureHistory: later })).not.toBe(documentHash(doc));
-    expect(
-      documentHash({ ...doc, featureHistory: [{ ...step!, suppressed: true }, ...later] }),
-    ).not.toBe(documentHash(doc));
+    expect(documentHash({ ...doc, featureHistory: [{ ...step!, suppressed: true }, ...later] })).not.toBe(documentHash(doc));
     expect(documentHash({ ...doc, units: 'in' })).not.toBe(documentHash(doc));
   });
 

@@ -62,13 +62,7 @@ describe('add_platform', () => {
     expect(result.summary).toContain('fill');
     const platform = civilObject(getCivil(result.document), 'platform-1', 'platform');
     expect(platform?.entityIds).toEqual(
-      expect.arrayContaining([
-        'platform-1:pad',
-        'platform-1:outline',
-        'platform-1:daylight',
-        'platform-1:batter-fill',
-        'platform-1:label',
-      ]),
+      expect.arrayContaining(['platform-1:pad', 'platform-1:outline', 'platform-1:daylight', 'platform-1:batter-fill', 'platform-1:label']),
     );
     expect(platform?.entityIds).not.toContain('platform-1:batter-cut');
     expect(result.affected).toContain('platform-1');
@@ -160,10 +154,7 @@ describe('add_platform', () => {
       expect(result.document).toBe(doc);
       expect(result.summary).toContain(text);
     }
-    expect(
-      execute(doc, 'add_platform', { surfaceId: 'surface-1', boundary: [[0, 0]], elevation: 1 })
-        .affected,
-    ).toEqual([]);
+    expect(execute(doc, 'add_platform', { surfaceId: 'surface-1', boundary: [[0, 0]], elevation: 1 }).affected).toEqual([]);
   });
 
   it('is pure', () => {
@@ -177,9 +168,7 @@ describe('add_platform', () => {
 describe('update_platform', () => {
   it('changes the level and regenerates volumes', () => {
     const doc = withPad(flat());
-    const before = (
-      execute(doc, 'platform_earthworks', { platformId: 'platform-1' }).data as Volumes
-    ).fillM3;
+    const before = (execute(doc, 'platform_earthworks', { platformId: 'platform-1' }).data as Volumes).fillM3;
     const result = execute(doc, 'update_platform', {
       platformId: 'platform-1',
       elevation: 102,
@@ -316,10 +305,7 @@ describe('platform_earthworks', () => {
       elevation: 130,
       fillSlope: 2,
     });
-    const data = execute(doc, 'platform_earthworks', { platformId: 'platform-1' }).data as Record<
-      string,
-      number | Vec2[]
-    >;
+    const data = execute(doc, 'platform_earthworks', { platformId: 'platform-1' }).data as Record<string, number | Vec2[]>;
     expect(data['daylightClipped'] as number).toBeGreaterThan(0);
     expect(data['fillM3'] as number).toBeGreaterThan(0);
   });
@@ -359,12 +345,8 @@ describe('balance_platform', () => {
   it('is a no-op for bad input or when no balance exists', () => {
     const doc = withPad(flat());
     expect(execute(doc, 'balance_platform', { platformId: 'platform-9' }).affected).toEqual([]);
-    expect(
-      execute(doc, 'balance_platform', { platformId: 'platform-1', swellFactor: 0 }).summary,
-    ).toContain('swellFactor');
-    const plateau = withPad(
-      ground((x, y) => (x >= 40 && x <= 60 && y >= 40 && y <= 60 ? 100 : 50)),
-    );
+    expect(execute(doc, 'balance_platform', { platformId: 'platform-1', swellFactor: 0 }).summary).toContain('swellFactor');
+    const plateau = withPad(ground((x, y) => (x >= 40 && x <= 60 && y >= 40 && y <= 60 ? 100 : 50)));
     const result = execute(plateau, 'balance_platform', { platformId: 'platform-1' });
     expect(result.affected).toEqual([]);
     expect(result.document).toBe(plateau);

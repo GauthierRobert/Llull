@@ -35,15 +35,10 @@ export const exportCivilPlanSheet = defineCommand({
     scale: z
       .number()
       .optional()
-      .describe(
-        'Scale denominator N for 1:N, e.g. 500 for 1:500 (> 0). Default: smallest standard scale that fits.',
-      ),
+      .describe('Scale denominator N for 1:N, e.g. 500 for 1:500 (> 0). Default: smallest standard scale that fits.'),
     center: vec2('Plan point [x, y] (document units) at the centre of the viewport.').optional(),
     title: z.string().optional().describe('Drawing title. Default "Civil plan".'),
-    layers: z
-      .array(z.string())
-      .optional()
-      .describe('Civil layer names to draw, e.g. ["C-TOPO-MAJR", "C-ROAD-CNTR"]. Default: all.'),
+    layers: z.array(z.string()).optional().describe('Civil layer names to draw, e.g. ["C-TOPO-MAJR", "C-ROAD-CNTR"]. Default: all.'),
   }),
   run: (doc, { paper, scale, center, title, layers }): CommandResult => {
     const sheet = buildCivilPlanSheet(doc, { paper, scale, center, title, layers });
@@ -89,16 +84,8 @@ export const exportPlanProfileSheet = defineCommand({
   params: z.object({
     alignmentId: alignmentIdParam,
     paper: z.enum(PAPER_SIZES).optional().describe('Paper size, landscape. Default A3.'),
-    scale: z
-      .number()
-      .optional()
-      .describe(
-        'Horizontal scale denominator N for 1:N (> 0). Default: smallest standard scale that fits.',
-      ),
-    verticalExaggeration: z
-      .number()
-      .optional()
-      .describe('Vertical / horizontal scale ratio (> 0). Default 10.'),
+    scale: z.number().optional().describe('Horizontal scale denominator N for 1:N (> 0). Default: smallest standard scale that fits.'),
+    verticalExaggeration: z.number().optional().describe('Vertical / horizontal scale ratio (> 0). Default 10.'),
   }),
   run: (doc, { alignmentId, paper = 'A3', scale, verticalExaggeration = 10 }): CommandResult => {
     const alignment = civilObjectOrNoop(doc, alignmentId, 'alignment', 'export_plan_profile_sheet');
@@ -117,6 +104,4 @@ export const exportPlanProfileSheet = defineCommand({
   },
 });
 
-export const civilSheetCommands = [exportCivilPlanSheet, exportPlanProfileSheet] as ReadonlyArray<
-  CommandDefinition<unknown>
->;
+export const civilSheetCommands = [exportCivilPlanSheet, exportPlanProfileSheet] as ReadonlyArray<CommandDefinition<unknown>>;

@@ -86,8 +86,7 @@ export class UiSession {
     const reacted = await this.page
       .waitForFunction(
         (previous) =>
-          (document.querySelector('.status-summary')?.textContent ?? '') !== previous ||
-          document.querySelector('.panel__error') !== null,
+          (document.querySelector('.status-summary')?.textContent ?? '') !== previous || document.querySelector('.panel__error') !== null,
         before,
         { timeout: 4000 },
       )
@@ -112,10 +111,7 @@ export class UiSession {
     const wait = this.lastDownload + DOWNLOAD_GAP_MS - Date.now();
     if (wait > 0) await this.page.waitForTimeout(wait);
     this.lastDownload = Date.now();
-    const [download] = await Promise.all([
-      this.page.waitForEvent('download', { timeout: 30_000 }),
-      trigger(),
-    ]);
+    const [download] = await Promise.all([this.page.waitForEvent('download', { timeout: 30_000 }), trigger()]);
     const file = await download.path();
     return { name: download.suggestedFilename(), text: readFileSync(file, 'utf8') };
   }

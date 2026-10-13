@@ -13,13 +13,7 @@ import { elementsOf } from '../../building/model';
 import { collectSteelBars, modelUnits, type SteelBar } from '../steelDesign/steelMemberBars';
 import { nearestOnRoute, RISER_SLOPE } from './routeSupport';
 import { absolutePointMm, pipeRunOf } from './pipeSupportLayout';
-import {
-  bearingOf,
-  findBearingMember,
-  findRiserBearingMember,
-  riserBearingOf,
-  type BearingLimits,
-} from './pipeSupportMember';
+import { bearingOf, findBearingMember, findRiserBearingMember, riserBearingOf, type BearingLimits } from './pipeSupportMember';
 
 /** Default vertical reach, mm: pedestal below the pipe / hanger rod above it / riser bracket length. */
 export const REACH: Readonly<Record<'below' | 'above', number>> = { below: 500, above: 3000 };
@@ -57,18 +51,12 @@ export function resolveBearing(
   explicit?: SteelBar,
 ): Bearing | string | null {
   if (riser) {
-    const hit = explicit
-      ? riserBearingOf(explicit, point, diameter, limits)
-      : findRiserBearingMember(bars, point, diameter, limits);
+    const hit = explicit ? riserBearingOf(explicit, point, diameter, limits) : findRiserBearingMember(bars, point, diameter, limits);
     if (hit === null || typeof hit === 'string') return hit;
     return { memberId: hit.memberId, gap: 0, riser: { standoff: hit.standoff, angle: hit.angle } };
   }
-  const hit = explicit
-    ? bearingOf(explicit, type, point, diameter, limits)
-    : findBearingMember(bars, type, point, diameter, limits);
-  return hit === null || typeof hit === 'string'
-    ? hit
-    : { memberId: hit.memberId, gap: hit.gap, riser: null };
+  const hit = explicit ? bearingOf(explicit, type, point, diameter, limits) : findBearingMember(bars, type, point, diameter, limits);
+  return hit === null || typeof hit === 'string' ? hit : { memberId: hit.memberId, gap: hit.gap, riser: null };
 }
 
 /** The attachment fields of a support element (document units) for `bearing` (null = unattached). */
@@ -76,8 +64,7 @@ export function attachmentFields(
   doc: Pick<CadDocument, 'units'>,
   type: PipeSupportElement['type'],
   bearing: Bearing | null,
-): Pick<PipeSupportElement, 'memberId' | 'rodLength' | 'pedestalHeight'> &
-  Partial<Pick<PipeSupportElement, 'standoff' | 'standoffAngle'>> {
+): Pick<PipeSupportElement, 'memberId' | 'rodLength' | 'pedestalHeight'> & Partial<Pick<PipeSupportElement, 'standoff' | 'standoffAngle'>> {
   const gap = bearing ? clean(fromMm(doc, bearing.gap)) : 0;
   return {
     memberId: bearing?.memberId ?? null,
@@ -124,9 +111,7 @@ function attachmentSignature(building: BuildingModel, support: PipeSupportElemen
     support.position,
     elevation(support.levelId),
     pipe?.category === 'pipe' ? [pipe.diameter, pipe.points] : null,
-    member?.category === 'member'
-      ? [member.start, member.end, member.profile, member.role, elevation(member.levelId)]
-      : null,
+    member?.category === 'member' ? [member.start, member.end, member.profile, member.role, elevation(member.levelId)] : null,
   ]);
 }
 
@@ -137,11 +122,7 @@ function attachmentSignature(building: BuildingModel, support: PipeSupportElemen
  * unattached. Reach limits are the defaults, widened to the support's current pedestal / rod / bracket.
  * @pure
  */
-export function reconcilePipeSupports(
-  doc: CadDocument,
-  next: BuildingModel,
-  alsoIds: ReadonlyArray<string> = [],
-): SupportReconciliation {
+export function reconcilePipeSupports(doc: CadDocument, next: BuildingModel, alsoIds: ReadonlyArray<string> = []): SupportReconciliation {
   const previous = doc.building;
   const unchanged: SupportReconciliation = {
     building: next,
@@ -153,9 +134,7 @@ export function reconcilePipeSupports(
   const candidates = elementsOf(next, 'pipeSupport').filter((support) => {
     const before = previous.elements[support.id];
     const dangling = support.memberId !== null && memberMark(next, support.memberId) === null;
-    const changed =
-      before?.category === 'pipeSupport' &&
-      attachmentSignature(previous, before) !== attachmentSignature(next, support);
+    const changed = before?.category === 'pipeSupport' && attachmentSignature(previous, before) !== attachmentSignature(next, support);
     return dangling || changed || alsoIds.includes(support.id);
   });
   if (candidates.length === 0) return unchanged;
@@ -171,8 +150,7 @@ export function reconcilePipeSupports(
     const run = pipeRunOf(units, pipe);
     const point = absolutePointMm(units, support.levelId, support.position);
     const riser = isRiserPoint(run.points, point);
-    const current =
-      (riser ? (support.standoff ?? 0) : support.rodLength + support.pedestalHeight) / unit;
+    const current = (riser ? (support.standoff ?? 0) : support.rodLength + support.pedestalHeight) / unit;
     const below = support.type !== 'hanger';
     const limits: BearingLimits = {
       maxReach: Math.max(REACH[below ? 'below' : 'above'], current),
@@ -180,13 +158,9 @@ export function reconcilePipeSupports(
     };
     const member = bars.find((bar) => bar.id === support.memberId);
     const kind = support.type;
-    const tryMember = member
-      ? resolveBearing(bars, kind, point, run.diameterMm, limits, riser, member)
-      : null;
+    const tryMember = member ? resolveBearing(bars, kind, point, run.diameterMm, limits, riser, member) : null;
     const found =
-      tryMember !== null && typeof tryMember !== 'string'
-        ? tryMember
-        : resolveBearing(bars, kind, point, run.diameterMm, limits, riser);
+      tryMember !== null && typeof tryMember !== 'string' ? tryMember : resolveBearing(bars, kind, point, run.diameterMm, limits, riser);
     const bearing = found !== null && typeof found !== 'string' ? found : null;
     const fields = attachmentFields(doc, support.type, bearing);
     const updated: PipeSupportElement = { ...support, ...fields };
@@ -201,9 +175,7 @@ export function reconcilePipeSupports(
       from:
         support.memberId === null
           ? null
-          : (memberMark(next, support.memberId) ??
-            memberMark(previous, support.memberId) ??
-            support.memberId),
+          : (memberMark(next, support.memberId) ?? memberMark(previous, support.memberId) ?? support.memberId),
       to: memberMark(building, bearing?.memberId ?? null),
     };
     if (bearing === null) {
@@ -220,14 +192,8 @@ export function reconciliationNote(result: SupportReconciliation): string {
   if (reattached.length + detached.length + kept.length === 0) return '';
   const parts = [
     ...(kept.length > 0 ? [`${kept.length} kept (${kept.join(', ')})`] : []),
-    ...reattached.map(
-      (change) =>
-        `${change.mark} re-attached ${change.from ?? 'unattached'} -> ${change.to ?? '?'}`,
-    ),
-    ...detached.map(
-      (change) =>
-        `${change.mark} DETACHED from ${change.from ?? '?'} (no steel in reach: now unattached, carries nothing)`,
-    ),
+    ...reattached.map((change) => `${change.mark} re-attached ${change.from ?? 'unattached'} -> ${change.to ?? '?'}`),
+    ...detached.map((change) => `${change.mark} DETACHED from ${change.from ?? '?'} (no steel in reach: now unattached, carries nothing)`),
   ];
   return ` Pipe supports re-checked: ${parts.join('; ')}.`;
 }

@@ -1,11 +1,5 @@
 import { entityOfKind } from '../entity/entityOfKind';
-import type {
-  CadDocument,
-  InstanceEntity,
-  JointMateRef,
-  DriveRelation,
-  Vec3,
-} from '../../model/types';
+import type { CadDocument, InstanceEntity, JointMateRef, DriveRelation, Vec3 } from '../../model/types';
 import { resolveNumeric } from '../parametric/expression';
 import { axisVector } from '../../lib/axis';
 import { topologicalSort } from '../../lib/topologicalSort';
@@ -110,10 +104,7 @@ interface EvaluatedMotion {
  *
  * @pure
  */
-export function evaluateMotionInternal(
-  doc: CadDocument,
-  overrides: Readonly<Record<string, number>> = {},
-): EvaluatedMotion {
+export function evaluateMotionInternal(doc: CadDocument, overrides: Readonly<Record<string, number>> = {}): EvaluatedMotion {
   // Step 1: collect base joint values
   const resolvedJoints: Record<string, number> = {};
   for (const [jid, joint] of Object.entries(doc.joints)) {

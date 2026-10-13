@@ -25,12 +25,7 @@ function runScript(scenario: Scenario, from: CadDocument): CadDocument {
 
 export async function extractionRevisionFlow(session: UiSession): Promise<UiRun> {
   const baseline = runScript(extractionBuilding, createEmptyDocument());
-  const revA = writeArtifact(
-    'ui',
-    extractionRevision.id,
-    'rev-a-issued-project.json',
-    serializeDocument(baseline),
-  );
+  const revA = writeArtifact('ui', extractionRevision.id, 'rev-a-issued-project.json', serializeDocument(baseline));
 
   await session.start();
   await session.openProject(revA);

@@ -27,13 +27,8 @@ createServer(async (request, response) => {
     return;
   }
   const file = normalize(join(ROOT, path === '/' ? 'index.html' : path));
-  const body = await readFile(file.startsWith(ROOT) ? file : ROOT).catch(() =>
-    readFile(join(ROOT, 'index.html')),
-  );
+  const body = await readFile(file.startsWith(ROOT) ? file : ROOT).catch(() => readFile(join(ROOT, 'index.html')));
   const type = TYPES[extname(file)] ?? 'text/html';
-  const payload =
-    path === '/sw.js'
-      ? body.toString().replace(/"version":"([^"]+)"/, `"version":"$1${buildSuffix}"`)
-      : body;
+  const payload = path === '/sw.js' ? body.toString().replace(/"version":"([^"]+)"/, `"version":"$1${buildSuffix}"`) : body;
   response.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-cache' }).end(payload);
 }).listen(PORT);

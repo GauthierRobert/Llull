@@ -16,13 +16,7 @@ import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeome
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { LINE_PATTERNS } from '@core/model/drawing';
 import { TEXT_FONT_URL } from '@ui/viewport/textFont';
-import {
-  type DrawingLabel,
-  type DrawingScale,
-  type SegmentBuffer,
-  type StyledPrimitive,
-  buildDrawingBuffers,
-} from './drawingGeometry';
+import { type DrawingLabel, type DrawingScale, type SegmentBuffer, type StyledPrimitive, buildDrawingBuffers } from './drawingGeometry';
 import { planAnchor } from './planAnchor';
 import { useMinScreenSize } from './useMinScreenSize';
 
@@ -37,10 +31,7 @@ interface DrawingObjects {
   readonly labels: DrawingLabel[];
 }
 
-function thinSegments(
-  buffer: SegmentBuffer,
-  material: THREE.LineBasicMaterial | THREE.LineDashedMaterial,
-): THREE.LineSegments {
+function thinSegments(buffer: SegmentBuffer, material: THREE.LineBasicMaterial | THREE.LineDashedMaterial): THREE.LineSegments {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(buffer.positions, 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(buffer.colors, 3));
@@ -49,10 +40,7 @@ function thinSegments(
     const distances: number[] = [];
     for (let index = 0; index < buffer.positions.length; index += 6) {
       const [ax, ay, , bx, by] = buffer.positions.slice(index, index + 6) as number[];
-      distances.push(
-        0,
-        Math.hypot((bx as number) - (ax as number), (by as number) - (ay as number)),
-      );
+      distances.push(0, Math.hypot((bx as number) - (ax as number), (by as number) - (ay as number)));
     }
     geometry.setAttribute('lineDistance', new THREE.Float32BufferAttribute(distances, 1));
   }
@@ -83,10 +71,7 @@ function buildObjects(
     }
     return shape;
   });
-  const fill = new THREE.Mesh(
-    new THREE.ShapeGeometry(shapes),
-    new THREE.MeshBasicMaterial({ color: fillColor, side: THREE.DoubleSide }),
-  );
+  const fill = new THREE.Mesh(new THREE.ShapeGeometry(shapes), new THREE.MeshBasicMaterial({ color: fillColor, side: THREE.DoubleSide }));
   fill.position.z = -0.01;
   return {
     thick: thickSegments(buffers.thick),
@@ -116,13 +101,7 @@ function DrawingLabelText({ label }: { label: DrawingLabel }): React.ReactElemen
   useMinScreenSize(ref, label.dimension ? label.height : 0);
   return (
     <group ref={ref} position={[label.at[0], label.at[1], 0.01]} rotation={[0, 0, label.rotation]}>
-      <Text
-        font={TEXT_FONT_URL}
-        fontSize={label.height}
-        color={label.color}
-        anchorX="center"
-        anchorY="middle"
-      >
+      <Text font={TEXT_FONT_URL} fontSize={label.height} color={label.color} anchorX="center" anchorY="middle">
         {label.content}
       </Text>
     </group>
@@ -137,12 +116,7 @@ interface DrawingPrimitives2DProps {
   readonly fillColor: string;
 }
 
-export function DrawingPrimitives2D({
-  name,
-  items,
-  scale,
-  fillColor,
-}: DrawingPrimitives2DProps): React.ReactElement | null {
+export function DrawingPrimitives2D({ name, items, scale, fillColor }: DrawingPrimitives2DProps): React.ReactElement | null {
   const size = useThree((state) => state.size);
   // Vertices are stored relative to this point (float32 precision); the group re-adds it.
   const anchor = useMemo(() => planAnchor(items.map((item) => item.primitive)), [items]);

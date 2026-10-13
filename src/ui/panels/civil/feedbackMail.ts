@@ -23,10 +23,7 @@ export interface FeedbackStats {
 }
 
 export function feedbackStats(doc: CadDocument): FeedbackStats {
-  const civil = Object.fromEntries(CIVIL_CATEGORIES.map((category) => [category, 0])) as Record<
-    CivilCategory,
-    number
-  >;
+  const civil = Object.fromEntries(CIVIL_CATEGORIES.map((category) => [category, 0])) as Record<CivilCategory, number>;
   for (const id of doc.civil?.order ?? []) {
     const category = doc.civil?.objects[id]?.category;
     if (category !== undefined) civil[category] += 1;
@@ -46,11 +43,7 @@ function feedbackBody(text: string, stats: FeedbackStats): string {
   ].join('\n');
 }
 
-export function feedbackMailto(
-  text: string,
-  stats: FeedbackStats,
-  recipient: string = FEEDBACK_RECIPIENT,
-): string {
+export function feedbackMailto(text: string, stats: FeedbackStats, recipient: string = FEEDBACK_RECIPIENT): string {
   const subject = `llull pilot feedback (v${APP_VERSION})`;
   return (
     `mailto:${encodeURIComponent(recipient).replace(/%40/g, '@')}` +

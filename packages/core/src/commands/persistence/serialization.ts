@@ -108,18 +108,13 @@ const COLLECTION_DEFAULTS: ReadonlyArray<readonly [string, 'record' | 'array']> 
 function migrate(raw: Record<string, unknown>): Record<string, unknown> {
   const units = DOCUMENT_UNITS.find((unit) => unit === raw['units']) ?? 'mm';
   const displayPrecision: number =
-    typeof raw['displayPrecision'] === 'number' &&
-    raw['displayPrecision'] >= 0 &&
-    Number.isInteger(raw['displayPrecision'])
+    typeof raw['displayPrecision'] === 'number' && raw['displayPrecision'] >= 0 && Number.isInteger(raw['displayPrecision'])
       ? raw['displayPrecision']
       : 3;
   const collections = Object.fromEntries(
     COLLECTION_DEFAULTS.map(([key, shape]) => {
       const value = raw[key];
-      return [
-        key,
-        shape === 'record' ? (isRecord(value) ? value : {}) : Array.isArray(value) ? value : [],
-      ];
+      return [key, shape === 'record' ? (isRecord(value) ? value : {}) : Array.isArray(value) ? value : []];
     }),
   );
   return { ...raw, units, displayPrecision, ...collections };
@@ -143,15 +138,11 @@ export function deserializeDocument(json: string): CadDocument {
   }
 
   if (parsed['format'] !== 'llull-document') {
-    throw new Error(
-      `load_document: unrecognized format '${String(parsed['format'])}' — expected 'llull-document'.`,
-    );
+    throw new Error(`load_document: unrecognized format '${String(parsed['format'])}' — expected 'llull-document'.`);
   }
 
   if (!READABLE_VERSIONS.has(parsed['version'])) {
-    throw new Error(
-      `load_document: unsupported version ${String(parsed['version'])} — expected 1 or ${CURRENT_SCHEMA_VERSION}.`,
-    );
+    throw new Error(`load_document: unsupported version ${String(parsed['version'])} — expected 1 or ${CURRENT_SCHEMA_VERSION}.`);
   }
 
   const rawDoc = parsed['document'];
@@ -162,15 +153,11 @@ export function deserializeDocument(json: string): CadDocument {
     );
   }
 
-  const migratedDoc = withSafeStepCounter(
-    restoreDerivedEntities(migrateRetiredCommands(migrate(rawDoc))),
-  );
+  const migratedDoc = withSafeStepCounter(restoreDerivedEntities(migrateRetiredCommands(migrate(rawDoc))));
 
   const valueErrors = validateDocumentValues(migratedDoc);
   if (valueErrors.length > 0) {
-    throw new Error(
-      `load_document: document contains invalid values:\n  ${valueErrors.join('\n  ')}`,
-    );
+    throw new Error(`load_document: document contains invalid values:\n  ${valueErrors.join('\n  ')}`);
   }
 
   return migratedDoc as unknown as CadDocument;

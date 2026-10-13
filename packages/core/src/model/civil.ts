@@ -8,14 +8,7 @@
 
 import type { Vec2, Vec3 } from './vectors';
 
-export const CIVIL_CATEGORIES = [
-  'pointGroup',
-  'surface',
-  'platform',
-  'alignment',
-  'manhole',
-  'pipe',
-] as const;
+export const CIVIL_CATEGORIES = ['pointGroup', 'surface', 'platform', 'alignment', 'manhole', 'pipe'] as const;
 
 export type CivilCategory = (typeof CIVIL_CATEGORIES)[number];
 
@@ -155,13 +148,7 @@ export interface PipeObject extends CivilObjectBase {
   readonly invertTo: number;
 }
 
-export type CivilObject =
-  | PointGroupObject
-  | SurfaceObject
-  | PlatformObject
-  | AlignmentObject
-  | ManholeObject
-  | PipeObject;
+export type CivilObject = PointGroupObject | SurfaceObject | PlatformObject | AlignmentObject | ManholeObject | PipeObject;
 
 /** 2D similarity (Helmert) between local site coordinates and the projected grid. */
 export interface SiteCalibration {

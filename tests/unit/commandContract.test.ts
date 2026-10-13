@@ -19,8 +19,7 @@ import { createEmptyDocument } from '@core/model/types';
 import type { CommandResult, ParamsSchema } from '@core/commands/types';
 
 vi.mock('@core/commands/registry', () => ({
-  getCommand: (name: string) =>
-    name === 'fake_measure' || name === 'fake_noop' ? { name } : undefined,
+  getCommand: (name: string) => (name === 'fake_measure' || name === 'fake_noop' ? { name } : undefined),
   execute: (doc: unknown, name: string): CommandResult => {
     const document = doc as ReturnType<typeof createEmptyDocument>;
     if (name === 'fake_measure') {

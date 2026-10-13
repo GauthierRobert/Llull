@@ -40,10 +40,7 @@ export function localToWorld2D(entity: Entity, lx: number, ly: number): [number,
  * (entity rotation about Z and position applied).
  */
 export function entityToSegments(entity: Entity): Segment[] {
-  const segmentBetween = (a: Vec2, b: Vec2): Segment => [
-    ...localToWorld2D(entity, a[0], a[1]),
-    ...localToWorld2D(entity, b[0], b[1]),
-  ];
+  const segmentBetween = (a: Vec2, b: Vec2): Segment => [...localToWorld2D(entity, a[0], a[1]), ...localToWorld2D(entity, b[0], b[1])];
   const chain = (points: ReadonlyArray<Vec2>, closed: boolean): Segment[] => {
     const path = closed && points.length >= 2 ? closeLoop(points) : points;
     return path.flatMap((a, index) => {
@@ -69,14 +66,7 @@ export function entityToSegments(entity: Entity): Segment[] {
  * Unclamped parameter t of the foot of (px,py) on the line a→b (0 at a, 1 at b).
  * @failure returns null when a and b coincide
  */
-function footParameter(
-  px: number,
-  py: number,
-  ax: number,
-  ay: number,
-  bx: number,
-  by: number,
-): number | null {
+function footParameter(px: number, py: number, ax: number, ay: number, bx: number, by: number): number | null {
   const dx = bx - ax;
   const dy = by - ay;
   const lenSq = dx * dx + dy * dy;
@@ -90,13 +80,7 @@ function footParameter(
  *
  * @pure
  */
-export function snapPerpendicular(
-  from: Vec2 | null,
-  ax: number,
-  ay: number,
-  bx: number,
-  by: number,
-): SnapPoint | null {
+export function snapPerpendicular(from: Vec2 | null, ax: number, ay: number, bx: number, by: number): SnapPoint | null {
   if (from === null) return null;
   const t = footParameter(from[0], from[1], ax, ay, bx, by);
   if (t === null || t < 0 || t > 1) return null; // degenerate segment, or foot outside it
@@ -119,13 +103,7 @@ export function snapPerpendicular(
  * @pure
  * @invariant Returns [] when px,py is strictly inside the circle.
  */
-export function tangentPointsToCircle(
-  px: number,
-  py: number,
-  cx: number,
-  cy: number,
-  r: number,
-): Array<[number, number]> {
+export function tangentPointsToCircle(px: number, py: number, cx: number, cy: number, r: number): Array<[number, number]> {
   const dx = px - cx;
   const dy = py - cy;
   const d = Math.hypot(dx, dy);
@@ -146,12 +124,7 @@ export function tangentPointsToCircle(
  * @pure
  * @invariant Returns [] when from is null or strictly inside the circle.
  */
-export function snapTangentToCircle(
-  from: Vec2 | null,
-  cx: number,
-  cy: number,
-  r: number,
-): SnapPoint[] {
+export function snapTangentToCircle(from: Vec2 | null, cx: number, cy: number, r: number): SnapPoint[] {
   if (from === null) return [];
   return tangentPointsToCircle(from[0], from[1], cx, cy, r).map(([x, y]) => ({
     x,
@@ -167,14 +140,7 @@ export function snapTangentToCircle(
  *
  * @pure
  */
-export function snapExtension(
-  cursorX: number,
-  cursorY: number,
-  ax: number,
-  ay: number,
-  bx: number,
-  by: number,
-): SnapPoint | null {
+export function snapExtension(cursorX: number, cursorY: number, ax: number, ay: number, bx: number, by: number): SnapPoint | null {
   const t = footParameter(cursorX, cursorY, ax, ay, bx, by);
   if (t === null || (t >= 0 && t <= 1)) return null; // degenerate segment, or within it
   return { x: ax + t * (bx - ax), y: ay + t * (by - ay), type: 'extension' };
@@ -186,14 +152,7 @@ export function snapExtension(
  *
  * @pure
  */
-export function nearestOnSegment(
-  px: number,
-  py: number,
-  ax: number,
-  ay: number,
-  bx: number,
-  by: number,
-): [number, number] {
+export function nearestOnSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number): [number, number] {
   const { t } = projectOntoSegment([px, py], [ax, ay], [bx, by]);
   return [ax + t * (bx - ax), ay + t * (by - ay)];
 }

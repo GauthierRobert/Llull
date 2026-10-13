@@ -23,9 +23,7 @@ export function nearestSnap<Type extends string, Candidate extends { readonly ty
     if (!(distance <= tolerance)) continue;
     const closer = distance < bestDistance - TIE_EPSILON;
     const tiedWithHigherPriority =
-      best !== null &&
-      Math.abs(distance - bestDistance) <= TIE_EPSILON &&
-      priority[candidate.type] < priority[best.type];
+      best !== null && Math.abs(distance - bestDistance) <= TIE_EPSILON && priority[candidate.type] < priority[best.type];
     if (closer || tiedWithHigherPriority) {
       bestDistance = distance;
       best = candidate;

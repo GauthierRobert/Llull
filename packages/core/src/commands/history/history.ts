@@ -61,11 +61,7 @@ function regenerateWith(
     brokenDependents.length > 0
       ? ` Warning: ${brokenDependents.length} step(s) no longer change the document (a referenced entity or input is gone): ${brokenDependents.map((step) => `${step.id} (${step.name})`).join(', ')}.`
       : '';
-  return changed(
-    regenerated,
-    `${command}: ${done(`${count} ${count === 1 ? 'entity' : 'entities'}`)}${brokenNote}`,
-    regenerated.order,
-  );
+  return changed(regenerated, `${command}: ${done(`${count} ${count === 1 ? 'entity' : 'entities'}`)}${brokenNote}`, regenerated.order);
 }
 
 /** Locate `stepId`, let `edit` build the new history (or a no-op message), then regenerate. */
@@ -90,15 +86,7 @@ function editStep(
   if (!step) return noop(doc, `${command}: step '${stepId}' not found in featureHistory.`);
   const edited = edit(idx, step);
   if (typeof edited === 'string') return noop(doc, `${command}: ${edited}`);
-  return regenerateWith(
-    doc,
-    command,
-    edited.history,
-    edited.done,
-    ctx,
-    undefined,
-    edited.mustApplyStepId,
-  );
+  return regenerateWith(doc, command, edited.history, edited.done, ctx, undefined, edited.mustApplyStepId);
 }
 
 /**
@@ -119,8 +107,7 @@ export const replayHistoryCommand = defineCommand({
   annotations: { metaHistory: true, idempotent: true },
   run: (doc, _params, ctx): CommandResult => {
     const context = ctx ?? currentContext();
-    if (doc.featureHistory.length === 0)
-      return noop(doc, 'replay_history: featureHistory is empty — nothing to replay.');
+    if (doc.featureHistory.length === 0) return noop(doc, 'replay_history: featureHistory is empty — nothing to replay.');
     const warnings: string[] = [];
     const refused = kernelRefusal(doc, doc.featureHistory, context);
     if (refused !== null) return noop(doc, `replay_history: ${refused}`);
@@ -149,11 +136,7 @@ export const setStepSuppressed = defineCommand({
     'A suppressed step is skipped during replay, effectively hiding its contribution ' +
     'without deleting it. The document is regenerated after the flag is changed.',
   params: z.object({
-    stepId: z
-      .string()
-      .describe(
-        'Id of the FeatureStep to suppress or un-suppress (from doc.featureHistory[*].id).',
-      ),
+    stepId: z.string().describe('Id of the FeatureStep to suppress or un-suppress (from doc.featureHistory[*].id).'),
     suppressed: z.boolean().describe('true to suppress (skip during replay), false to restore.'),
   }),
   annotations: { metaHistory: true, idempotent: true },
@@ -185,11 +168,7 @@ export const editStepParams = defineCommand({
     'the document by replaying featureHistory. Use to parametrically edit a past ' +
     'operation (e.g. change the size of a box created earlier).',
   params: z.object({
-    stepId: z
-      .string()
-      .describe(
-        'Id of the FeatureStep whose params are to be replaced (from doc.featureHistory[*].id).',
-      ),
+    stepId: z.string().describe('Id of the FeatureStep whose params are to be replaced (from doc.featureHistory[*].id).'),
     params: z
       .object({})
       .describe(
@@ -314,22 +293,12 @@ export const insertStep = defineCommand({
         'Registry command name (snake_case) for the new step, e.g. "add_box". ' +
           'Must be a known command name; unknown names are stored but skipped during replay.',
       ),
-    params: z
-      .object({})
-      .describe(
-        'Params object for the command named in `name`. Must be compatible with that command.',
-      ),
-    label: z
-      .string()
-      .optional()
-      .describe('Optional human/AI-readable label for this step, e.g. "Base plate".'),
+    params: z.object({}).describe('Params object for the command named in `name`. Must be compatible with that command.'),
+    label: z.string().optional().describe('Optional human/AI-readable label for this step, e.g. "Base plate".'),
   }),
   annotations: { metaHistory: true },
   run: (doc, { afterStepId, name: cmdName, params: stepParams, label }, ctx): CommandResult => {
-    const insertIdx =
-      afterStepId === undefined
-        ? doc.featureHistory.length - 1
-        : doc.featureHistory.findIndex((s) => s.id === afterStepId);
+    const insertIdx = afterStepId === undefined ? doc.featureHistory.length - 1 : doc.featureHistory.findIndex((s) => s.id === afterStepId);
     if (afterStepId !== undefined && insertIdx === -1)
       return noop(doc, `insert_step: afterStepId '${afterStepId}' not found in featureHistory.`);
 
@@ -341,11 +310,7 @@ export const insertStep = defineCommand({
       suppressed: false,
       ...(label !== undefined ? { label } : {}),
     };
-    const newHistory = [
-      ...doc.featureHistory.slice(0, insertIdx + 1),
-      newStep,
-      ...doc.featureHistory.slice(insertIdx + 1),
-    ];
+    const newHistory = [...doc.featureHistory.slice(0, insertIdx + 1), newStep, ...doc.featureHistory.slice(insertIdx + 1)];
     return regenerateWith(
       doc,
       'insert_step',

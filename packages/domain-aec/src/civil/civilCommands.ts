@@ -29,10 +29,7 @@ export const describeCivil = defineCommand({
     const civil = getCivil(doc);
     const objects = civil.order
       .map((id) => civil.objects[id])
-      .filter(
-        (object) =>
-          object !== undefined && (category === undefined || object.category === category),
-      )
+      .filter((object) => object !== undefined && (category === undefined || object.category === category))
       .map((object) => ({
         id: object?.id ?? '',
         category: object?.category ?? 'pointGroup',
@@ -40,10 +37,9 @@ export const describeCivil = defineCommand({
         references: object ? referencesOf(object) : [],
         entities: object?.entityIds.length ?? 0,
       }));
-    const counts = CIVIL_CATEGORIES.map((name) => [
-      name,
-      objects.filter((object) => object.category === name).length,
-    ]).filter(([, count]) => (count as number) > 0);
+    const counts = CIVIL_CATEGORIES.map((name) => [name, objects.filter((object) => object.category === name).length]).filter(
+      ([, count]) => (count as number) > 0,
+    );
     return report(
       doc,
       objects.length === 0
@@ -87,10 +83,7 @@ export const deleteCivilObject = defineCommand({
     }
     if (doomed.size > 1 && !cascade) {
       const others = [...doomed].filter((other) => other !== id);
-      return noop(
-        doc,
-        `delete_civil_object refused: ${others.join(', ')} reference ${id}. Delete them first or pass cascade: true.`,
-      );
+      return noop(doc, `delete_civil_object refused: ${others.join(', ')} reference ${id}. Delete them first or pass cascade: true.`);
     }
     const document = regenerateCivil(doc, withoutObjects(civil, doomed));
     return {

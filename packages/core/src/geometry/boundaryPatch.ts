@@ -36,10 +36,7 @@ const last = (curve: readonly Vec3[]): Vec3 => curve[curve.length - 1] as Vec3;
  * P01→P11, left P00→P01. Four curves must chain end to start (any order / direction) within
  * `tolerance`; two curves are opposite sides joined by straight lines. Error text otherwise.
  */
-export function coonsSides(
-  curves: readonly (readonly Vec3[])[],
-  tolerance: number,
-): Array<(t: number) => Vec3> | string {
+export function coonsSides(curves: readonly (readonly Vec3[])[], tolerance: number): Array<(t: number) => Vec3> | string {
   if (curves.some((curve) => curve.length < 2)) return 'every curve needs at least 2 points';
   const at = (curve: readonly Vec3[]) => (t: number) => polylineAt(curve, t);
   if (curves.length === 2) {
@@ -73,35 +70,22 @@ export function coonsSides(
         if (d < gap) [gap, best, reversed] = [d, k, flip];
       }
     });
-    if (gap > tolerance)
-      return `the curves do not form a closed loop (a ${gap.toPrecision(3)} gap after curve ${chain.length - 1})`;
+    if (gap > tolerance) return `the curves do not form a closed loop (a ${gap.toPrecision(3)} gap after curve ${chain.length - 1})`;
     const next = remaining.splice(best, 1)[0] as readonly Vec3[];
     chain.push(reversed ? [...next].reverse() : next);
   }
   const closing = distance3(last(chain[3] as readonly Vec3[]), first(chain[0] as readonly Vec3[]));
-  if (closing > tolerance)
-    return `the curves do not form a closed loop (a ${closing.toPrecision(3)} gap closing it)`;
+  if (closing > tolerance) return `the curves do not form a closed loop (a ${closing.toPrecision(3)} gap closing it)`;
   const [bottom, right, top, left] = chain as [Vec3[], Vec3[], Vec3[], Vec3[]];
   return [at(bottom), at(right), at([...top].reverse()), at([...left].reverse())];
 }
 
 /** Coons surface point of the four sides at (u, v). */
 function coonsPoint(sides: ReadonlyArray<(t: number) => Vec3>, u: number, v: number): Vec3 {
-  const [bottom, right, top, left] = sides as [
-    (t: number) => Vec3,
-    (t: number) => Vec3,
-    (t: number) => Vec3,
-    (t: number) => Vec3,
-  ];
+  const [bottom, right, top, left] = sides as [(t: number) => Vec3, (t: number) => Vec3, (t: number) => Vec3, (t: number) => Vec3];
   const [p00, p10, p01, p11] = [bottom(0), bottom(1), top(0), top(1)];
-  const ruled = add3(
-    add3(scale3(bottom(u), 1 - v), scale3(top(u), v)),
-    add3(scale3(left(v), 1 - u), scale3(right(v), u)),
-  );
-  const bilinear = add3(
-    add3(scale3(p00, (1 - u) * (1 - v)), scale3(p10, u * (1 - v))),
-    add3(scale3(p01, (1 - u) * v), scale3(p11, u * v)),
-  );
+  const ruled = add3(add3(scale3(bottom(u), 1 - v), scale3(top(u), v)), add3(scale3(left(v), 1 - u), scale3(right(v), u)));
+  const bilinear = add3(add3(scale3(p00, (1 - u) * (1 - v)), scale3(p10, u * (1 - v))), add3(scale3(p01, (1 - u) * v), scale3(p11, u * v)));
   return sub3(ruled, bilinear);
 }
 

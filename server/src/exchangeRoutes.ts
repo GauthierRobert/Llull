@@ -13,10 +13,7 @@ import type { ExchangeOptions } from './pythonExchange';
 import { guardMutation } from './security';
 import { actorOf } from './audit';
 
-export function buildExchangeRouter(
-  restLimiter: RequestHandler,
-  exchange: ExchangeOptions,
-): Router {
+export function buildExchangeRouter(restLimiter: RequestHandler, exchange: ExchangeOptions): Router {
   const router = Router();
   router.post('/exchange', restLimiter, guardMutation(), (req, res) => {
     const body = req.body as unknown;

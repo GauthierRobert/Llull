@@ -10,10 +10,8 @@ import path from 'node:path';
 import type request from 'supertest';
 
 export const BRIDGE_SCRIPT = path.resolve(__dirname, '../python/llull_bridge.py');
-const configuredPython =
-  process.env['LLULL_TEST_CADQUERY_PYTHON'] ?? process.env['LLULL_PYTHON'] ?? 'python3';
-export const CADQUERY_PYTHON =
-  configuredPython === 'off' ? '/nonexistent/python' : configuredPython;
+const configuredPython = process.env['LLULL_TEST_CADQUERY_PYTHON'] ?? process.env['LLULL_PYTHON'] ?? 'python3';
+export const CADQUERY_PYTHON = configuredPython === 'off' ? '/nonexistent/python' : configuredPython;
 export const BUILD123D_PYTHON = process.env['LLULL_TEST_BUILD123D_PYTHON'];
 
 interface ProbeResult {

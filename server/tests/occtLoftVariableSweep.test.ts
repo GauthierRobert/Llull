@@ -9,14 +9,7 @@ import { describe, it, expect } from 'vitest';
 import type { CadDocument, Entity } from '@core/model/types';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import {
-  box,
-  booleanMesh,
-  expectBoundsClose,
-  liveKernels,
-  meshOf,
-  volume,
-} from './kernelTestSupport';
+import { box, booleanMesh, expectBoundsClose, liveKernels, meshOf, volume } from './kernelTestSupport';
 
 const kernels = liveKernels();
 const empty = createEmptyDocument();
@@ -135,8 +128,6 @@ describe('closed-path sweeps on the live kernels', () => {
       ],
     });
     agree(band, 0.05);
-    expect(
-      booleanMesh(kernels.occt, 'subtract', band, box([40, 0, 4], [10, 10, 20])),
-    ).not.toBeNull();
+    expect(booleanMesh(kernels.occt, 'subtract', band, box([40, 0, 4], [10, 10, 20]))).not.toBeNull();
   });
 });

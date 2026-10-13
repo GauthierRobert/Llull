@@ -86,17 +86,11 @@ function closeFrames(frames: SweepFrame[]): SweepFrame[] {
   const open = frames.slice(0, -1);
   const first = open[0] as SweepFrame;
   const last = frames[frames.length - 1] as SweepFrame;
-  const twist = Math.atan2(
-    dot3(cross3(first.normal, last.normal), first.tangent),
-    dot3(first.normal, last.normal),
-  );
+  const twist = Math.atan2(dot3(cross3(first.normal, last.normal), first.tangent), dot3(first.normal, last.normal));
   const fractions = frameFractions(frames);
   return open.map((frame, i) => {
     const angle = -twist * (fractions[i] as number);
-    const normal = add3(
-      scale3(frame.normal, Math.cos(angle)),
-      scale3(cross3(frame.tangent, frame.normal), Math.sin(angle)),
-    );
+    const normal = add3(scale3(frame.normal, Math.cos(angle)), scale3(cross3(frame.tangent, frame.normal), Math.sin(angle)));
     return { ...frame, normal, binormal: cross3(frame.tangent, normal) };
   });
 }
@@ -129,16 +123,12 @@ export function sweepSegmentRings(sweep: SweepShape): Vec3[][] {
   const fractions = frameFractions(frames);
   const { outer } = sectionLoops(section);
   const loopAt = (i: number): Vec2[] =>
-    stations !== undefined && stations.length >= 2
-      ? stationLoopAt(stations, fractions[i] as number)
-      : outer;
+    stations !== undefined && stations.length >= 2 ? stationLoopAt(stations, fractions[i] as number) : outer;
   return path.map((_, index) =>
     frames
       .filter((frame, i) => frame.segment === index || frames[i + 1]?.segment === index)
       .flatMap((frame) =>
-        loopAt(frames.indexOf(frame)).map(([x, y]) =>
-          add3(frame.point, add3(scale3(frame.normal, x), scale3(frame.binormal, y))),
-        ),
+        loopAt(frames.indexOf(frame)).map(([x, y]) => add3(frame.point, add3(scale3(frame.normal, x), scale3(frame.binormal, y)))),
       ),
   );
 }
@@ -158,10 +148,7 @@ function frameFractions(frames: readonly SweepFrame[]): number[] {
 }
 
 /** Point and section axes at path fraction `t` (0..1), interpolated between sampled frames. */
-export function frameAtFraction(
-  path: ReadonlyArray<CurveSegment<Vec3>>,
-  t: number,
-): Pick<SweepFrame, 'point' | 'normal' | 'binormal'> {
+export function frameAtFraction(path: ReadonlyArray<CurveSegment<Vec3>>, t: number): Pick<SweepFrame, 'point' | 'normal' | 'binormal'> {
   const open = sweepFrames(path);
   // A loop's last span runs back to the first frame (the twist correction makes them meet).
   const frames = isClosedChain(path) && open[0] !== undefined ? [...open, open[0]] : open;
@@ -206,8 +193,7 @@ function closedWalls(outerRings: Vec3[][], innerRings: Vec3[][] | null): Triangl
   for (let i = 0; i < outerRings.length; i++) {
     const next = (i + 1) % outerRings.length;
     triangles.push(...walls(outerRings[i] as Vec3[], outerRings[next] as Vec3[], false));
-    if (innerRings !== null)
-      triangles.push(...walls(innerRings[i] as Vec3[], innerRings[next] as Vec3[], true));
+    if (innerRings !== null) triangles.push(...walls(innerRings[i] as Vec3[], innerRings[next] as Vec3[], true));
   }
   return triangles;
 }
@@ -233,31 +219,23 @@ export function sweepTriangles(sweep: SweepShape, origin: Vec3 = [0, 0, 0]): Tri
   const { outer, inner } = sectionLoops(section);
   if (frames.length < 2 || outer.length < 3) return [];
   const ringAt = (frame: SweepFrame, loop: readonly Vec2[]): Vec3[] =>
-    loop.map(([x, y]) =>
-      add3(origin, add3(frame.point, add3(scale3(frame.normal, x), scale3(frame.binormal, y)))),
-    );
+    loop.map(([x, y]) => add3(origin, add3(frame.point, add3(scale3(frame.normal, x), scale3(frame.binormal, y)))));
   const outerRings = frames.map((frame) => ringAt(frame, outer));
   const innerRings = inner === null ? null : frames.map((frame) => ringAt(frame, inner));
   if (isClosedChain(path)) return closedWalls(outerRings, innerRings);
   const triangles: Triangle[] = [];
   for (let i = 0; i + 1 < frames.length; i++) {
     triangles.push(...walls(outerRings[i] as Vec3[], outerRings[i + 1] as Vec3[], false));
-    if (innerRings !== null)
-      triangles.push(...walls(innerRings[i] as Vec3[], innerRings[i + 1] as Vec3[], true));
+    if (innerRings !== null) triangles.push(...walls(innerRings[i] as Vec3[], innerRings[i + 1] as Vec3[], true));
   }
   const [startOuter, endOuter] = [outerRings[0] as Vec3[], outerRings[frames.length - 1] as Vec3[]];
   if (innerRings !== null) {
-    const [startInner, endInner] = [
-      innerRings[0] as Vec3[],
-      innerRings[frames.length - 1] as Vec3[],
-    ];
+    const [startInner, endInner] = [innerRings[0] as Vec3[], innerRings[frames.length - 1] as Vec3[]];
     outer.forEach((_, j) => {
       const k = (j + 1) % outer.length;
       const at = (ring: Vec3[], index: number): Vec3 => ring[index] as Vec3;
       triangles.push(...quad(at(endOuter, j), at(endOuter, k), at(endInner, k), at(endInner, j)));
-      triangles.push(
-        ...quad(at(startInner, j), at(startInner, k), at(startOuter, k), at(startOuter, j)),
-      );
+      triangles.push(...quad(at(startInner, j), at(startInner, k), at(startOuter, k), at(startOuter, j)));
     });
     return triangles;
   }

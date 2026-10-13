@@ -10,13 +10,7 @@ import {
   validateHorizontal,
   type ArcElement,
 } from '@aec/civil/alignment/alignmentGeometry';
-import {
-  designElevation,
-  grades,
-  validateProfile,
-  verticalCurves,
-  verticalCurveStations,
-} from '@aec/civil/alignment/profileGeometry';
+import { designElevation, grades, validateProfile, verticalCurves, verticalCurveStations } from '@aec/civil/alignment/profileGeometry';
 
 const corner: { points: Vec2[]; radii: number[]; startStation: number } = {
   points: [
@@ -94,10 +88,7 @@ describe('horizontal geometry', () => {
     expect(back?.offset).toBeCloseTo(0, 6);
     const inside = stationOffset(corner, [70, 30]);
     expect(inside?.offset).toBeCloseTo(30, 6);
-    const outside = stationOffset(corner, [
-      70 + 38 * Math.cos(-Math.PI / 4),
-      30 + 38 * Math.sin(-Math.PI / 4),
-    ]);
+    const outside = stationOffset(corner, [70 + 38 * Math.cos(-Math.PI / 4), 30 + 38 * Math.sin(-Math.PI / 4)]);
     expect(outside?.offset).toBeCloseTo(-8, 6);
   });
 
@@ -244,18 +235,13 @@ describe('vertical geometry', () => {
   });
 
   it('validates stations, lengths and overlapping curves', () => {
-    const pvi = (
-      station: number,
-      curveLength = 0,
-    ): { station: number; elevation: number; curveLength: number } => ({
+    const pvi = (station: number, curveLength = 0): { station: number; elevation: number; curveLength: number } => ({
       station,
       elevation: 0,
       curveLength,
     });
     expect(validateProfile([pvi(0)])).toMatch(/at least 2/);
-    expect(
-      validateProfile([pvi(0), { station: Number.NaN, elevation: 0, curveLength: 0 }]),
-    ).toMatch(/finite/);
+    expect(validateProfile([pvi(0), { station: Number.NaN, elevation: 0, curveLength: 0 }])).toMatch(/finite/);
     expect(validateProfile([pvi(0), pvi(5, -1), pvi(10)])).toMatch(/curveLength/);
     expect(validateProfile([pvi(0), pvi(0)])).toMatch(/increase/);
     expect(validateProfile([pvi(0, 10), pvi(10)])).toMatch(/first and last/);

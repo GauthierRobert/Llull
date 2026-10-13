@@ -42,9 +42,7 @@ describe('check_bracing', () => {
     expect(data.gableArea).toBeGreaterThan(180);
     expect(data.gableArea).toBeLessThan(186);
     const groups = new Set(data.rows.map((row) => row.group));
-    expect(groups).toEqual(
-      new Set(['roof bracing', 'wall bracing west', 'wall bracing east', 'gable posts']),
-    );
+    expect(groups).toEqual(new Set(['roof bracing', 'wall bracing west', 'wall bracing east', 'gable posts']));
     expect(data.csv.split('\n')[0]).toContain('Utilisation');
     expect(result.summary).toMatch(/gable 18\d\.\d m².*2 braced bay.*all OK/);
   });
@@ -79,9 +77,7 @@ describe('check_bracing', () => {
     expect(lightData.failures.length).toBeGreaterThan(0);
     expect(light.summary).toMatch(/failure\(s\).*diagonal/);
     const heavy = checkBracing.run(hall({ braceProfile: 'CHS219.1x8' }), { windPressure: 3 });
-    const heavyRows = (heavy.data as { rows: BracingRow[] }).rows.filter(
-      (row) => row.kind === 'diagonal',
-    );
+    const heavyRows = (heavy.data as { rows: BracingRow[] }).rows.filter((row) => row.kind === 'diagonal');
     expect(heavyRows.every((row) => row.utilisation <= 1)).toBe(true);
     expect(Math.max(...heavyRows.map((row) => row.utilisation))).toBeLessThan(
       Math.max(
@@ -112,20 +108,12 @@ describe('check_bracing', () => {
     );
     const inMetres = checkBracing.run(metres, {});
     const inMillimetres = checkBracing.run(hall(), {});
-    expect((inMetres.data as { windForce: number }).windForce).toBeCloseTo(
-      (inMillimetres.data as { windForce: number }).windForce,
-      0,
-    );
+    expect((inMetres.data as { windForce: number }).windForce).toBeCloseTo((inMillimetres.data as { windForce: number }).windForce, 0);
   });
 
   it('selects a level and rejects bad input without changing the document', () => {
     const doc = hall();
-    for (const params of [
-      { windPressure: -1 },
-      { deadLoad: Number.NaN },
-      { snowLoad: -0.1 },
-      { levelId: 'nope' },
-    ]) {
+    for (const params of [{ windPressure: -1 }, { deadLoad: Number.NaN }, { snowLoad: -0.1 }, { levelId: 'nope' }]) {
       const result = checkBracing.run(doc, params);
       expect(result.document).toBe(doc);
       expect(result.affected).toEqual([]);
@@ -183,9 +171,7 @@ describe('check_bracing', () => {
   it('uses column height and purlin gap as strut buckling lengths', () => {
     const rows = rowsOf(hall(), { windPressure: 0 });
     const wall = rows.find((row) => row.kind === 'strut' && row.group.startsWith('wall'));
-    const roof = rows.find(
-      (row) => row.kind === 'strut' && row.group === 'roof bracing' && /rafter/.test(row.check),
-    );
+    const roof = rows.find((row) => row.kind === 'strut' && row.group === 'roof bracing' && /rafter/.test(row.check));
     expect(wall?.check).toMatch(/Lcr 7000 mm, column height/);
     expect(roof?.check).toMatch(/purlin gap/);
     expect(Number(/Lcr (\d+) mm/.exec(roof?.check ?? '')?.[1])).toBeLessThan(2000);
@@ -202,9 +188,7 @@ describe('check_bracing', () => {
       expect(row.resistance).toBeGreaterThan(0);
       expect(row.check).toMatch(/Lcr 6000 mm bay/);
     }
-    const missing = rowsOf(without(doc, 'purlin')).filter((row) =>
-      /no eaves strut found/.test(row.check),
-    );
+    const missing = rowsOf(without(doc, 'purlin')).filter((row) => /no eaves strut found/.test(row.check));
     expect(missing).toHaveLength(4);
     expect(missing.every((row) => row.utilisation === 99)).toBe(true);
     const result = checkBracing.run(without(doc, 'purlin'), {});
@@ -240,10 +224,9 @@ describe('check_bracing', () => {
       }),
       { windPressure: 1 },
     ).filter((row) => /eaves strut/.test(row.check));
-    const light = rowsOf(
-      hall({ span: undefined, spans: [12000, 12000], length: 30000, roofType: 'monopitch' }),
-      { windPressure: 1 },
-    ).filter((row) => /eaves strut/.test(row.check));
+    const light = rowsOf(hall({ span: undefined, spans: [12000, 12000], length: 30000, roofType: 'monopitch' }), {
+      windPressure: 1,
+    }).filter((row) => /eaves strut/.test(row.check));
     expect(light.every((row) => row.utilisation > 1)).toBe(true);
     expect(heavy.every((row) => row.utilisation < 1)).toBe(true);
   });
@@ -276,9 +259,7 @@ describe('check_bracing crane longitudinal path', () => {
     const craned = wallDiagonals(rowsOf(hall(crane)));
     expect(plain.length).toBeGreaterThan(0);
     expect(craned.length).toBe(plain.length);
-    expect(Math.max(...craned.map((row) => row.utilisation))).toBeGreaterThan(
-      Math.max(...plain.map((row) => row.utilisation)),
-    );
+    expect(Math.max(...craned.map((row) => row.utilisation))).toBeGreaterThan(Math.max(...plain.map((row) => row.utilisation)));
     expect((checkBracing.run(hall(), {}).data as CraneData).crane).toBeNull();
   });
 
@@ -286,14 +267,9 @@ describe('check_bracing crane longitudinal path', () => {
     const result = checkBracing.run(hall(crane), {});
     const data = result.data as CraneData;
     const rows = (result.data as { rows: BracingRow[] }).rows;
-    const craneRows = rows.filter((row) =>
-      row.check.startsWith('crane longitudinal (group 1 / group 7)'),
-    );
+    const craneRows = rows.filter((row) => row.check.startsWith('crane longitudinal (group 1 / group 7)'));
     expect(craneRows.length).toBeGreaterThanOrEqual(2);
-    expect(data.crane?.design).toBeCloseTo(
-      Math.max(data.crane?.driveGroup1 ?? 0, data.crane?.bufferGroup7 ?? 0),
-      9,
-    );
+    expect(data.crane?.design).toBeCloseTo(Math.max(data.crane?.driveGroup1 ?? 0, data.crane?.bufferGroup7 ?? 0), 9);
     expect(data.crane?.bufferGroup7).toBeCloseTo(23.1, 0);
     expect(data.crane?.governing).toBe('group 7');
     expect(data.crane?.foundationHorizontalY.length).toBe(craneRows.length);
@@ -304,8 +280,7 @@ describe('check_bracing crane longitudinal path', () => {
 
   it('scales with travelSpeed and is a no-op on bad crane params', () => {
     const doc = hall(crane);
-    const design = (travelSpeed: number): number =>
-      (checkBracing.run(doc, { travelSpeed }).data as CraneData).crane?.bufferGroup7 ?? 0;
+    const design = (travelSpeed: number): number => (checkBracing.run(doc, { travelSpeed }).data as CraneData).crane?.bufferGroup7 ?? 0;
     expect(design(0.6) / design(0.3)).toBeCloseTo(2, 6);
     for (const params of [{ travelSpeed: 0 }, { bufferStiffness: -5 }, { craneCapacity: 0 }]) {
       const result = checkBracing.run(doc, params);

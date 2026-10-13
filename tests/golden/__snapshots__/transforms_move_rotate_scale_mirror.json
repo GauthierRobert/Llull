@@ -6,21 +6,9 @@
       "#1": {
         "id": "#1",
         "kind": "box",
-        "size": [
-          2,
-          2,
-          2
-        ],
-        "position": [
-          -3,
-          2,
-          1
-        ],
-        "rotation": [
-          0,
-          0,
-          0.785398163
-        ],
+        "size": [2,2,2],
+        "position": [-3,2,1],
+        "rotation": [0,0,0.785398163],
         "layerId": "#2",
         "color": "#6b8f9c"
       }
@@ -59,75 +47,37 @@
       {
         "id": "#3",
         "name": "add_box",
-        "params": {
-          "size": [
-            1,
-            1,
-            1
-          ]
-        },
+        "params": {"size":[1,1,1]},
         "suppressed": false,
-        "affected": [
-          "#1"
-        ]
+        "affected": ["#1"]
       },
       {
         "id": "#4",
         "name": "move_entities",
-        "params": {
-          "ids": [
-            "#1"
-          ],
-          "delta": [
-            3,
-            2,
-            1
-          ]
-        },
+        "params": {"ids":["#1"],"delta":[3,2,1]},
         "suppressed": false,
-        "affected": [
-          "#1"
-        ]
+        "affected": ["#1"]
       },
       {
         "id": "#5",
         "name": "rotate_entity",
-        "params": {
-          "id": "#1",
-          "delta": [
-            0,
-            0,
-            0.785398163
-          ]
-        },
+        "params": {"id":"#1","delta":[0,0,0.785398163]},
         "suppressed": false,
-        "affected": [
-          "#1"
-        ]
+        "affected": ["#1"]
       },
       {
         "id": "#6",
         "name": "scale_entity",
-        "params": {
-          "id": "#1",
-          "factor": 2
-        },
+        "params": {"id":"#1","factor":2},
         "suppressed": false,
-        "affected": [
-          "#1"
-        ]
+        "affected": ["#1"]
       },
       {
         "id": "#7",
         "name": "mirror_entity",
-        "params": {
-          "id": "#1",
-          "axis": "x"
-        },
+        "params": {"id":"#1","axis":"x"},
         "suppressed": false,
-        "affected": [
-          "#1"
-        ]
+        "affected": ["#1"]
       }
     ],
     "configurations": {},

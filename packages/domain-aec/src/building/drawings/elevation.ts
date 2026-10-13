@@ -12,11 +12,7 @@ import { elementsOf, fileSlug, getBuilding } from '../model';
 import { noop, report } from '@core/commands/noop';
 import { escapeXml } from '@lib/escapeXml';
 import { sub2 } from '@lib/vec2';
-import {
-  ELEVATION_DIRECTIONS,
-  buildElevationDrawing,
-  type ElevationDirection,
-} from './elevationProjection';
+import { ELEVATION_DIRECTIONS, buildElevationDrawing, type ElevationDirection } from './elevationProjection';
 import {
   PAPER_MM,
   PAPER_FIELD,
@@ -73,9 +69,7 @@ function buildElevationSheet(
   };
   const millimetresPerUnit = toMm(doc, 1);
   const [minU, minZ, maxU, maxZ] = drawing.bounds;
-  const scale =
-    options.scale ??
-    fitScale((maxU - minU) * millimetresPerUnit, (maxZ - minZ) * millimetresPerUnit, viewport);
+  const scale = options.scale ?? fitScale((maxU - minU) * millimetresPerUnit, (maxZ - minZ) * millimetresPerUnit, viewport);
   const k = millimetresPerUnit / scale;
   const offsetX = viewport.x + (viewport.width - (maxU - minU) * k) / 2;
   const offsetY = viewport.y + viewport.height - (viewport.height - (maxZ - minZ) * k) / 2;
@@ -87,9 +81,7 @@ function buildElevationSheet(
   const building = getBuilding(doc);
   const annotations: string[] = [];
   const [left, right] = [toPaper([minU, 0])[0] - 6, toPaper([maxU, 0])[0] + 6];
-  const ground = building.levelOrder
-    .map((id) => building.levels[id]?.elevation)
-    .filter((value): value is number => value !== undefined);
+  const ground = building.levelOrder.map((id) => building.levels[id]?.elevation).filter((value): value is number => value !== undefined);
   // A ground line only where there is a building to stand on (a machine part has none).
   if (ground.length > 0) {
     const groundY = toPaper([0, Math.min(...ground)])[1];
@@ -179,33 +171,17 @@ export const exportElevationSheet = defineCommand({
     direction: z
       .enum(ELEVATION_DIRECTIONS)
       .optional()
-      .describe(
-        'Side the viewer stands on (north elevation = north façade seen from the north). Default south.',
-      ),
-    cutAt: z
-      .number()
-      .optional()
-      .describe(
-        'Section plane position on the viewing axis (y for north / south, x for east / west).',
-      ),
-    exclude: z
-      .array(z.string())
-      .optional()
-      .describe('Building categories to leave out, e.g. ["panel", "slab"].'),
+      .describe('Side the viewer stands on (north elevation = north façade seen from the north). Default south.'),
+    cutAt: z.number().optional().describe('Section plane position on the viewing axis (y for north / south, x for east / west).'),
+    exclude: z.array(z.string()).optional().describe('Building categories to leave out, e.g. ["panel", "slab"].'),
     paper: PAPER_FIELD,
     scale: SCALE_FIELD,
     title: z.string().optional().describe('Drawing title. Default "<Direction> elevation".'),
   }),
-  run: (
-    doc,
-    { direction = 'south', cutAt, exclude, paper = 'A3', scale, title },
-  ): CommandResult => {
+  run: (doc, { direction = 'south', cutAt, exclude, paper = 'A3', scale, title }): CommandResult => {
     const sheet = buildElevationSheet(doc, { direction, cutAt, exclude, paper, scale, title });
     if (!sheet) {
-      return noop(
-        doc,
-        'export_elevation_sheet failed: no 3D geometry to draw (on that side of the cut) or invalid scale.',
-      );
+      return noop(doc, 'export_elevation_sheet failed: no 3D geometry to draw (on that side of the cut) or invalid scale.');
     }
     return report(
       doc,

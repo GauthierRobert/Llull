@@ -9,14 +9,7 @@ import type { CommandResult } from '@core/commands/types';
 import { commandCatalog, defineCommand, z, vec2 } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
 import { fromMm } from '@core/model/units';
-import {
-  civilObject,
-  civilObjectsOf,
-  getCivil,
-  nextCivilId,
-  toMetresText,
-  withObject,
-} from '../model';
+import { civilObject, civilObjectsOf, getCivil, nextCivilId, toMetresText, withObject } from '../model';
 import { commitCivil } from '../evaluate';
 import { surfaceTinById } from '../surface/surfaceTin';
 import { elevationAt } from '../surface/tin';
@@ -27,33 +20,16 @@ import { exportDrainageLongSection } from './drainageLongSectionCommand';
 
 const manholeFields = {
   invertElevation: z.number().describe('Invert (lowest internal) elevation of the chamber.'),
-  rimElevation: z
-    .number()
-    .optional()
-    .describe('Rim (cover level) elevation; must be above the invert. Overrides `surfaceId`.'),
-  surfaceId: z
-    .string()
-    .optional()
-    .describe('Surface id; when `rimElevation` is omitted the rim is the ground level there.'),
-  diameter: z
-    .number()
-    .optional()
-    .describe('Chamber internal diameter in document units (> 0). Default 1200 mm.'),
-  catchmentAreaHa: z
-    .number()
-    .optional()
-    .describe('Contributing catchment area in hectares (> 0) for the rational method.'),
-  runoffCoefficient: z
-    .number()
-    .optional()
-    .describe('Runoff coefficient C, 0 to 1. Default 0.9 when a catchment area is given.'),
+  rimElevation: z.number().optional().describe('Rim (cover level) elevation; must be above the invert. Overrides `surfaceId`.'),
+  surfaceId: z.string().optional().describe('Surface id; when `rimElevation` is omitted the rim is the ground level there.'),
+  diameter: z.number().optional().describe('Chamber internal diameter in document units (> 0). Default 1200 mm.'),
+  catchmentAreaHa: z.number().optional().describe('Contributing catchment area in hectares (> 0) for the rational method.'),
+  runoffCoefficient: z.number().optional().describe('Runoff coefficient C, 0 to 1. Default 0.9 when a catchment area is given.'),
   inflowLps: z.number().optional().describe('Additional point inflow in litres per second (>= 0).'),
   entryTimeMin: z
     .number()
     .optional()
-    .describe(
-      "Inlet (entry) time in minutes (> 0) of this manhole's catchment for the time of concentration. Default 5.",
-    ),
+    .describe("Inlet (entry) time in minutes (> 0) of this manhole's catchment for the time of concentration. Default 5."),
   name: z.string().optional().describe('Display name. Default "MH<n>".'),
 };
 
@@ -65,21 +41,15 @@ function checkOptions(options: {
   entryTimeMin?: number | undefined;
 }): string | null {
   if (options.diameter !== undefined && !(options.diameter > 0)) return 'diameter must be > 0.';
-  if (options.catchmentAreaHa !== undefined && options.catchmentAreaHa < 0)
-    return 'catchmentAreaHa must be >= 0.';
+  if (options.catchmentAreaHa !== undefined && options.catchmentAreaHa < 0) return 'catchmentAreaHa must be >= 0.';
   const c = options.runoffCoefficient;
   if (c !== undefined && !(c >= 0 && c <= 1)) return 'runoffCoefficient must be between 0 and 1.';
   if (options.inflowLps !== undefined && options.inflowLps < 0) return 'inflowLps must be >= 0.';
-  if (options.entryTimeMin !== undefined && !(options.entryTimeMin > 0))
-    return 'entryTimeMin must be > 0.';
+  if (options.entryTimeMin !== undefined && !(options.entryTimeMin > 0)) return 'entryTimeMin must be > 0.';
   return null;
 }
 
-function groundLevel(
-  civil: ReturnType<typeof getCivil>,
-  surfaceId: string,
-  at: Vec2,
-): number | string {
+function groundLevel(civil: ReturnType<typeof getCivil>, surfaceId: string, at: Vec2): number | string {
   const tin = surfaceTinById(civil, surfaceId);
   if (!tin) return `no surface ${surfaceId}.`;
   return elevationAt(tin, at) ?? `position [${at[0]}, ${at[1]}] is outside surface ${surfaceId}.`;
@@ -119,20 +89,14 @@ export const addManhole = defineCommand({
     let rim = params.rimElevation;
     if (rim === undefined) {
       if (params.surfaceId === undefined) {
-        return noop(
-          doc,
-          'add_manhole failed: give rimElevation or a surfaceId to take the rim from.',
-        );
+        return noop(doc, 'add_manhole failed: give rimElevation or a surfaceId to take the rim from.');
       }
       const ground = groundLevel(civil, params.surfaceId, params.location);
       if (typeof ground === 'string') return noop(doc, `add_manhole failed: ${ground}`);
       rim = ground;
     }
     if (!(rim > params.invertElevation)) {
-      return noop(
-        doc,
-        `add_manhole failed: rim ${rim} must be above invert ${params.invertElevation}.`,
-      );
+      return noop(doc, `add_manhole failed: rim ${rim} must be above invert ${params.invertElevation}.`);
     }
     const id = nextCivilId(civil, 'manhole');
     const catchment = catchmentOf(params.catchmentAreaHa, params.runoffCoefficient);
@@ -193,13 +157,8 @@ export const updateManhole = defineCommand({
       rim = ground;
     }
     const invert = params.invertElevation ?? manhole.invertElevation;
-    if (!(rim > invert))
-      return noop(doc, `update_manhole failed: rim ${rim} must be above invert ${invert}.`);
-    const catchment = catchmentOf(
-      params.catchmentAreaHa,
-      params.runoffCoefficient,
-      manhole.catchment,
-    );
+    if (!(rim > invert)) return noop(doc, `update_manhole failed: rim ${rim} must be above invert ${invert}.`);
+    const catchment = catchmentOf(params.catchmentAreaHa, params.runoffCoefficient, manhole.catchment);
     const inflow = params.inflowLps === undefined ? manhole.inflow : params.inflowLps;
     const entryTimeMin = params.entryTimeMin ?? manhole.entryTimeMin;
     const updated: ManholeObject = {
@@ -215,27 +174,16 @@ export const updateManhole = defineCommand({
       ...(inflow ? { inflow } : {}),
       ...(entryTimeMin ? { entryTimeMin } : {}),
     };
-    if (JSON.stringify(updated) === JSON.stringify(manhole))
-      return noop(doc, `update_manhole: nothing to change on ${manhole.id}.`);
+    if (JSON.stringify(updated) === JSON.stringify(manhole)) return noop(doc, `update_manhole: nothing to change on ${manhole.id}.`);
     const next = withObject(civil, updated);
-    const attached = civilObjectsOf(next, 'pipe').filter(
-      (pipe) => pipe.fromId === manhole.id || pipe.toId === manhole.id,
-    );
+    const attached = civilObjectsOf(next, 'pipe').filter((pipe) => pipe.fromId === manhole.id || pipe.toId === manhole.id);
     const degenerate = attached.filter((pipe) => !((pipePlanLength(next, pipe) ?? 0) > 0));
     if (degenerate.length > 0) {
-      return noop(
-        doc,
-        `update_manhole failed: the move would give zero-length pipe(s) ${degenerate.map((p) => p.id).join(', ')}.`,
-      );
+      return noop(doc, `update_manhole failed: the move would give zero-length pipe(s) ${degenerate.map((p) => p.id).join(', ')}.`);
     }
-    const below = attached.filter(
-      (pipe) =>
-        (pipe.fromId === manhole.id ? pipe.invertFrom : pipe.invertTo) < updated.invertElevation,
-    );
+    const below = attached.filter((pipe) => (pipe.fromId === manhole.id ? pipe.invertFrom : pipe.invertTo) < updated.invertElevation);
     const warning =
-      below.length > 0
-        ? ` Warning: pipe(s) ${below.map((p) => p.id).join(', ')} have an invert below the manhole invert.`
-        : '';
+      below.length > 0 ? ` Warning: pipe(s) ${below.map((p) => p.id).join(', ')} have an invert below the manhole invert.` : '';
     return commitCivil(
       doc,
       next,

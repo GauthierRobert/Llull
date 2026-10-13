@@ -10,10 +10,7 @@ interface FocusTrapOptions {
 }
 
 /** Focusable elements inside `container`, in DOM order; disabled and hidden ones are skipped. */
-export function focusableElements(
-  container: HTMLElement,
-  { links = false }: FocusTrapOptions = {},
-): HTMLElement[] {
+export function focusableElements(container: HTMLElement, { links = false }: FocusTrapOptions = {}): HTMLElement[] {
   const selector = links ? `a[href],${CONTROL_SELECTOR}` : CONTROL_SELECTOR;
   return Array.from(container.querySelectorAll<HTMLElement>(selector)).filter(
     (element) => !element.hasAttribute('disabled') && !element.hasAttribute('hidden'),
@@ -21,11 +18,7 @@ export function focusableElements(
 }
 
 /** Keep Tab / Shift+Tab cycling inside `container`. */
-export function trapTab(
-  event: React.KeyboardEvent<HTMLElement>,
-  container: HTMLElement,
-  options: FocusTrapOptions = {},
-): void {
+export function trapTab(event: React.KeyboardEvent<HTMLElement>, container: HTMLElement, options: FocusTrapOptions = {}): void {
   const focusable = focusableElements(container, options);
   const first = focusable[0];
   const last = focusable[focusable.length - 1];

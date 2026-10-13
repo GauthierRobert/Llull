@@ -33,10 +33,7 @@ export interface MotionStudyData {
 }
 
 /** World AABB per instance id with each instance moved to its position at the step. @pure */
-function boundsAtStep(
-  doc: CadDocument,
-  instancePositions: Record<string, Vec3>,
-): Record<string, Bounds> {
+function boundsAtStep(doc: CadDocument, instancePositions: Record<string, Vec3>): Record<string, Bounds> {
   const result: Record<string, Bounds> = {};
   for (const id of Object.keys(doc.entities)) {
     const entity = doc.entities[id];
@@ -141,36 +138,23 @@ export const motionStudy = defineCommand({
     } satisfies MotionStudyData;
 
     if (start === end) {
-      return report(
-        doc,
-        `motion_study: start === end (${start}). Sweep has zero length — no steps to evaluate.`,
-        emptyStudy,
-      );
+      return report(doc, `motion_study: start === end (${start}). Sweep has zero length — no steps to evaluate.`, emptyStudy);
     }
 
     const rawSteps = steps ?? 24;
     if (rawSteps < 2) {
-      return report(
-        doc,
-        `motion_study: steps must be at least 2 (got ${String(steps)}). No sweep performed.`,
-        emptyStudy,
-      );
+      return report(doc, `motion_study: steps must be at least 2 (got ${String(steps)}). No sweep performed.`, emptyStudy);
     }
     const clampedSteps = Math.min(360, rawSteps);
 
     if (mode === 'joint') {
-      if (!(target in doc.joints))
-        return noop(doc, `motion_study: joint '${target}' does not exist in doc.joints.`);
+      if (!(target in doc.joints)) return noop(doc, `motion_study: joint '${target}' does not exist in doc.joints.`);
     } else {
       // mode === 'parameter'
       const param = Object.hasOwn(doc.parameters, target) ? doc.parameters[target] : undefined;
-      if (!param)
-        return noop(doc, `motion_study: parameter '${target}' does not exist in doc.parameters.`);
+      if (!param) return noop(doc, `motion_study: parameter '${target}' does not exist in doc.parameters.`);
       if (typeof param.value !== 'number' || !Number.isFinite(param.value)) {
-        return noop(
-          doc,
-          `motion_study: parameter '${target}' is not numeric (value: ${String(param.value)}).`,
-        );
+        return noop(doc, `motion_study: parameter '${target}' is not numeric (value: ${String(param.value)}).`);
       }
     }
 
@@ -193,15 +177,11 @@ export const motionStudy = defineCommand({
         for (const [jid, joint] of Object.entries(doc.joints)) {
           const rawValue = joint.kind === 'revolute' ? joint.angle : joint.displacement;
           const stored = typeof rawValue === 'number' ? rawValue : 0;
-          baseValues[jid] =
-            currentParamValue !== 0 && stored === currentParamValue ? sweepValue : stored;
+          baseValues[jid] = currentParamValue !== 0 && stored === currentParamValue ? sweepValue : stored;
         }
       }
 
-      const { instancePositions, instanceRotations, resolvedJoints } = evaluateMotionInternal(
-        doc,
-        baseValues,
-      );
+      const { instancePositions, instanceRotations, resolvedJoints } = evaluateMotionInternal(doc, baseValues);
 
       motionSteps.push({
         stepIndex: k,

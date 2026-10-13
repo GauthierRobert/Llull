@@ -14,23 +14,8 @@ import { GAMMA_G, GAMMA_Q } from '../../shared/loadFactors';
 import { type BeamResult } from './steelFraming';
 import type { ColumnSegment } from './steelColumnChecks';
 import type { FrameCoverage } from './steelFrameDetect';
-import {
-  clusterMeans,
-  LEVEL_TOLERANCE,
-  compressionClass,
-  minorRadius,
-  nearestIndex,
-  type SteelBar,
-} from './steelMemberBars';
-import {
-  analysedRow,
-  metres,
-  noProfileRow,
-  skippedRow,
-  ULS_COMBINATION,
-  type CheckLine,
-  type MemberRow,
-} from './steelMemberRows';
+import { clusterMeans, LEVEL_TOLERANCE, compressionClass, minorRadius, nearestIndex, type SteelBar } from './steelMemberBars';
+import { analysedRow, metres, noProfileRow, skippedRow, ULS_COMBINATION, type CheckLine, type MemberRow } from './steelMemberRows';
 
 type Direction = 'X' | 'Y';
 
@@ -115,12 +100,7 @@ function geometryOf(bar: SteelBar, storey: number): BraceGeometry | undefined {
   return undefined;
 }
 
-function braceRow(
-  geometry: BraceGeometry,
-  panelShear: number,
-  crossing: boolean,
-  phiText: string,
-): MemberRow {
+function braceRow(geometry: BraceGeometry, panelShear: number, crossing: boolean, phiText: string): MemberRow {
   const { bar } = geometry;
   const profile = bar.profile;
   if (!profile) return noProfileRow(bar);
@@ -180,12 +160,7 @@ export function checkBracing(
   const phiText = notionalLabel(notionalFactor);
   if (levels.length === 0) {
     return {
-      rows: braces.map((brace) =>
-        skippedRow(
-          brace,
-          'no floor beams: the storey load that drives the bracing cannot be derived',
-        ),
-      ),
+      rows: braces.map((brace) => skippedRow(brace, 'no floor beams: the storey load that drives the bracing cannot be derived')),
       strutForces,
       storeys: [],
       warnings,
@@ -194,15 +169,13 @@ export function checkBracing(
   const levelLoad = levels.map(() => 0);
   for (const { loads } of beams) {
     const index = levelOf(loads.top);
-    levelLoad[index] =
-      (levelLoad[index] ?? 0) + GAMMA_G * loads.directPermanent + GAMMA_Q * loads.directImposed;
+    levelLoad[index] = (levelLoad[index] ?? 0) + GAMMA_G * loads.directPermanent + GAMMA_Q * loads.directImposed;
   }
   for (const segment of columnSegments) {
     const index = levelOf(segment.to);
     levelLoad[index] = (levelLoad[index] ?? 0) + GAMMA_G * segment.weight;
   }
-  const shearOf = (storey: number): number =>
-    notionalFactor * levelLoad.slice(storey).reduce((sum, load) => sum + load, 0);
+  const shearOf = (storey: number): number => notionalFactor * levelLoad.slice(storey).reduce((sum, load) => sum + load, 0);
   const geometries: BraceGeometry[] = [];
   const rows: MemberRow[] = [];
   for (const brace of braces) {
@@ -238,18 +211,11 @@ export function checkBracing(
       if (level !== g.storey && level !== g.storey - 1) continue;
       const along: 0 | 1 = g.direction === 'X' ? 0 : 1;
       const across: 0 | 1 = along === 0 ? 1 : 0;
-      const onPlane =
-        Math.abs(loads.a[across] - g.plane) <= COORDINATE_STEP &&
-        Math.abs(loads.b[across] - g.plane) <= COORDINATE_STEP;
-      const [low, high] = [
-        Math.min(loads.a[along], loads.b[along]),
-        Math.max(loads.a[along], loads.b[along]),
-      ];
-      if (!onPlane || low > g.low + CHORD_END_TOLERANCE || high < g.high - CHORD_END_TOLERANCE)
-        continue;
+      const onPlane = Math.abs(loads.a[across] - g.plane) <= COORDINATE_STEP && Math.abs(loads.b[across] - g.plane) <= COORDINATE_STEP;
+      const [low, high] = [Math.min(loads.a[along], loads.b[along]), Math.max(loads.a[along], loads.b[along])];
+      if (!onPlane || low > g.low + CHORD_END_TOLERANCE || high < g.high - CHORD_END_TOLERANCE) continue;
       const previous = strutForces.get(loads.bar.id);
-      if (!previous || previous.force < shear)
-        strutForces.set(loads.bar.id, { force: shear, note });
+      if (!previous || previous.force < shear) strutForces.set(loads.bar.id, { force: shear, note });
     }
   }
   const storeys: StoreyReport[] = levels.map((level, storey) => {
@@ -265,10 +231,7 @@ export function checkBracing(
       };
     };
     const framed = (direction: Direction): number =>
-      frames.filter(
-        (frame) =>
-          frame.direction === direction && frame.beamTops.some((top) => levelOf(top) >= storey),
-      ).length;
+      frames.filter((frame) => frame.direction === direction && frame.beamTops.some((top) => levelOf(top) >= storey)).length;
     return {
       storey: storey + 1,
       topOfSteel: level,

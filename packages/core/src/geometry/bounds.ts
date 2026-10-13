@@ -1,11 +1,4 @@
-import type {
-  CadDocument,
-  DimensionEntity,
-  Entity,
-  InstanceEntity,
-  TextEntity,
-  Vec3,
-} from '../model/types';
+import type { CadDocument, DimensionEntity, Entity, InstanceEntity, TextEntity, Vec3 } from '../model/types';
 import { instanceToWorld } from './instanceTransform';
 import { tupleExtent } from '../lib/extent';
 import { ORIGIN, add3, sub3, vec3At } from '../lib/vec3';
@@ -84,13 +77,7 @@ function meshLocalBounds(e: Extract<Entity, { kind: 'mesh' }>): Bounds {
 
 /** Local-space AABB of a sweep or loft: its tessellated surface around the local origin. */
 function sweepLocalBounds(e: Extract<Entity, { kind: 'sweep' | 'loft' | 'subdivision' }>): Bounds {
-  const corners = (
-    e.kind === 'sweep'
-      ? sweepTriangles(e)
-      : e.kind === 'loft'
-        ? loftTriangles(e)
-        : subdivisionTriangles(e)
-  ).flat();
+  const corners = (e.kind === 'sweep' ? sweepTriangles(e) : e.kind === 'loft' ? loftTriangles(e) : subdivisionTriangles(e)).flat();
   if (corners.length === 0) return bounds(ORIGIN, ORIGIN);
   const { min, max } = positionsExtent(corners.flat());
   return bounds(min, max);
@@ -129,10 +116,7 @@ export function localBounds(e: Entity): Bounds {
       // Lower-front-left corner at position; extends +X/+Y/+Z by size.
       return bounds(ORIGIN, e.size);
     case 'pyramid':
-      return bounds(
-        [-e.baseWidth / 2, -e.baseDepth / 2, 0],
-        [e.baseWidth / 2, e.baseDepth / 2, e.height],
-      );
+      return bounds([-e.baseWidth / 2, -e.baseDepth / 2, 0], [e.baseWidth / 2, e.baseDepth / 2, e.height]);
     case 'sweep':
     case 'loft':
     case 'subdivision':
@@ -159,19 +143,13 @@ export function localBounds(e: Entity): Bounds {
     case 'arc':
     case 'circle':
       // Conservative: full center±radius box (arcs are not angle-trimmed here).
-      return bounds(
-        [e.center[0] - e.radius, e.center[1] - e.radius, 0],
-        [e.center[0] + e.radius, e.center[1] + e.radius, 0],
-      );
+      return bounds([e.center[0] - e.radius, e.center[1] - e.radius, 0], [e.center[0] + e.radius, e.center[1] + e.radius, 0]);
     case 'rectangle':
     case 'image':
       // Origin at lower-left; extends +X (width), +Y (height).
       return bounds(ORIGIN, [e.width, e.height, 0]);
     case 'ellipse':
-      return bounds(
-        [e.center[0] - e.radiusX, e.center[1] - e.radiusY, 0],
-        [e.center[0] + e.radiusX, e.center[1] + e.radiusY, 0],
-      );
+      return bounds([e.center[0] - e.radiusX, e.center[1] - e.radiusY, 0], [e.center[0] + e.radiusX, e.center[1] + e.radiusY, 0]);
     case 'text':
       return textLocalBounds(e);
     case 'dimension': {
@@ -225,15 +203,10 @@ const MAX_NESTING = 8;
  *
  * @pure — reads only; does not mutate
  */
-export function instanceBoundsFromDoc(
-  instance: InstanceEntity,
-  doc: CadDocument,
-  depth = 0,
-): Bounds {
+export function instanceBoundsFromDoc(instance: InstanceEntity, doc: CadDocument, depth = 0): Bounds {
   const component = doc.components[instance.componentId];
   // Past MAX_NESTING a reference cycle is assumed: the instance counts as a point at its position.
-  if (!component || component.order.length === 0 || depth >= MAX_NESTING)
-    return { min: instance.position, max: instance.position };
+  if (!component || component.order.length === 0 || depth >= MAX_NESTING) return { min: instance.position, max: instance.position };
 
   const { scale = [1, 1, 1], rotation, position } = instance;
   const toWorld = instanceToWorld(scale, rotation, position);
@@ -275,10 +248,7 @@ function dimensionBoundsFromDoc(dimension: DimensionEntity, doc: CadDocument): B
   if (!first) return entityBounds(dimension);
   const { min, max } = rest.reduce(mergeBounds, first);
   const offset = Math.abs(dimension.offset ?? 5);
-  return bounds(
-    [min[0] - offset, min[1] - offset, min[2]],
-    [max[0] + offset, max[1] + offset, max[2]],
-  );
+  return bounds([min[0] - offset, min[1] - offset, min[2]], [max[0] + offset, max[1] + offset, max[2]]);
 }
 
 /** True when two AABBs overlap (touching counts) on every axis. */

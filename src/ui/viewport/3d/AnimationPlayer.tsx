@@ -48,12 +48,7 @@ function writeUnitAxis(target: THREE.Vector3, v: Vec3): void {
 }
 
 /** Write the rotation pivot into `target`: the animation's own, else the target's position (a group's: member centroid). */
-function writePivot(
-  target: THREE.Vector3,
-  anim: Animation,
-  memberIds: string[],
-  entities: CadDocument['entities'],
-): void {
+function writePivot(target: THREE.Vector3, anim: Animation, memberIds: string[], entities: CadDocument['entities']): void {
   if (anim.pivot) {
     target.set(anim.pivot[0], anim.pivot[1], anim.pivot[2]);
   } else if (anim.targetKind === 'entity') {
@@ -128,15 +123,13 @@ export function AnimationPlayer(): null {
     let pooled = 0;
 
     for (const anim of animList) {
-      const running =
-        anim.trigger === 'auto' ? animationPlaying : activeClickAnimationIds.has(anim.id);
+      const running = anim.trigger === 'auto' ? animationPlaying : activeClickAnimationIds.has(anim.id);
 
       // Advance phase (frozen when not running).
       const phase = (phaseMap.current.get(anim.id) ?? 0) + (running ? delta : 0);
       phaseMap.current.set(anim.id, phase);
 
-      const memberIds =
-        anim.targetKind === 'entity' ? [anim.targetId] : (groups[anim.targetId]?.memberIds ?? []);
+      const memberIds = anim.targetKind === 'entity' ? [anim.targetId] : (groups[anim.targetId]?.memberIds ?? []);
       if (memberIds.length === 0) continue;
 
       const contribution = (pool[pooled] ??= {

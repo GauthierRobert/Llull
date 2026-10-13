@@ -3,12 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import {
-  radialSegmentsForDiag,
-  sphereDiag,
-  cylinderDiag,
-  torusDiag,
-} from '../../src/ui/viewport/3d/lodSegments';
+import { radialSegmentsForDiag, sphereDiag, cylinderDiag, torusDiag } from '../../src/ui/viewport/3d/lodSegments';
 
 describe('radialSegmentsForDiag', () => {
   it('returns minimum 8 segments for a very small diagonal', () => {

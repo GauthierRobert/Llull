@@ -6,15 +6,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { act, render, screen, fireEvent } from '@testing-library/react';
 import { useStore } from '@ui/store';
-import {
-  CivilPanel,
-  downloadText,
-  localDispatch,
-  spyDispatch,
-  setupCivilStore,
-  SURVEY,
-  surveyed,
-} from '../helpers/civilPanel';
+import { CivilPanel, downloadText, localDispatch, spyDispatch, setupCivilStore, SURVEY, surveyed } from '../helpers/civilPanel';
 
 vi.mock('@ui/download', () => ({ downloadText: vi.fn(), downloadBlob: vi.fn() }));
 

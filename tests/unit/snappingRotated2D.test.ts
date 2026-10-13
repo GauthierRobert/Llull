@@ -49,9 +49,7 @@ describe('2D snapping honours rotation about Z', () => {
   });
 
   it('shifts arc end angles by the rotation', () => {
-    const pts = collectSnapCandidates(
-      docOf({ kind: 'arc', center: [0, 0], radius: 2, startAngle: 0, endAngle: QUARTER_TURN }),
-    );
+    const pts = collectSnapCandidates(docOf({ kind: 'arc', center: [0, 0], radius: 2, startAngle: 0, endAngle: QUARTER_TURN }));
     const endpoints = pts.filter((p) => p.type === 'endpoint');
     expect(endpoints[0]?.x).toBeCloseTo(10);
     expect(endpoints[0]?.y).toBeCloseTo(2);

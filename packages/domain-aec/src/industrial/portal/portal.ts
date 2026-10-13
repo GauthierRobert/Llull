@@ -8,24 +8,12 @@ import type { BuildingModel, SlabElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, vec2, z } from '@core/commands/schema';
 import { fromMm, toMetres } from '@core/model/units';
-import {
-  getBuilding,
-  nextElementId,
-  nextMark,
-  resolveLevel,
-  withElement,
-} from '../../building/model';
+import { getBuilding, nextElementId, nextMark, resolveLevel, withElement } from '../../building/model';
 import { noop } from '@core/commands/noop';
 import { commitBuilding } from '../../building/evaluate/evaluateElements';
 import { findProfile, type SteelProfile } from '../../steel/profiles';
 import { appendMembers, type MemberSpec } from '../common/memberSupport';
-import {
-  appendFootings,
-  appendPanel,
-  columnFeet,
-  MAX_GENERATED_MEMBERS,
-  withoutFootings,
-} from '../foundations/footingPanelSupport';
+import { appendFootings, appendPanel, columnFeet, MAX_GENERATED_MEMBERS, withoutFootings } from '../foundations/footingPanelSupport';
 import { portalInputs } from './portalInputs';
 import { buildHallGeometry } from './portalGeometry';
 import { portalFrameParams } from './portalParams';
@@ -60,15 +48,10 @@ export const addCraneRunway = defineCommand({
   params: z.object({
     start: vec2('Runway start [x, y].'),
     end: vec2('Runway end [x, y].'),
-    railHeight: z
-      .number()
-      .describe('Top of the runway beam above the level, in document units (> 0).'),
+    railHeight: z.number().describe('Top of the runway beam above the level, in document units (> 0).'),
     profile: z.string().optional().describe('Runway beam section. Default HEB300.'),
     capacity: z.number().optional().describe('Crane capacity in tonnes (for notes). Default 10.'),
-    supportSpacing: z
-      .number()
-      .optional()
-      .describe('Distance between supports, in document units (> 0). Default 6000 mm.'),
+    supportSpacing: z.number().optional().describe('Distance between supports, in document units (> 0). Default 6000 mm.'),
     bracketProfile: z.string().optional().describe('Bracket section. Default HEB200.'),
     levelId: levelIdParam,
   }),
@@ -76,10 +59,7 @@ export const addCraneRunway = defineCommand({
     const length = Math.hypot(params.end[0] - params.start[0], params.end[1] - params.start[1]);
     const spacing = params.supportSpacing ?? fromMm(doc, 6000);
     if (!(length > 0) || !(params.railHeight > 0) || !(spacing > 0)) {
-      return noop(
-        doc,
-        'add_crane_runway failed: distinct points, railHeight > 0 and supportSpacing > 0 required.',
-      );
+      return noop(doc, 'add_crane_runway failed: distinct points, railHeight > 0 and supportSpacing > 0 required.');
     }
     const profile = findProfile(params.profile ?? 'HEB300');
     const bracket = findProfile(params.bracketProfile ?? 'HEB200');
@@ -91,10 +71,7 @@ export const addCraneRunway = defineCommand({
       );
     }
     if (length / spacing > MAX_GENERATED_MEMBERS) {
-      return noop(
-        doc,
-        `add_crane_runway failed: supportSpacing too small (over ${MAX_GENERATED_MEMBERS} segments).`,
-      );
+      return noop(doc, `add_crane_runway failed: supportSpacing too small (over ${MAX_GENERATED_MEMBERS} segments).`);
     }
     const resolution = resolveLevel(doc, getBuilding(doc), params.levelId);
     if (!resolution.ok) return noop(doc, `add_crane_runway failed: ${resolution.reason}.`);
@@ -152,9 +129,7 @@ export const addPortalFrameBuilding = defineCommand({
     const pitch = toRadians(pitchDegrees);
     const estimatedMembers =
       bays *
-      (6 * spanCount +
-        2 * spanCount * (Math.ceil(span / 2 / Math.cos(pitch) / purlinSpacing) + 1) +
-        2 * Math.ceil(eave / railSpacing));
+      (6 * spanCount + 2 * spanCount * (Math.ceil(span / 2 / Math.cos(pitch) / purlinSpacing) + 1) + 2 * Math.ceil(eave / railSpacing));
     if (estimatedMembers > MAX_GENERATED_MEMBERS) {
       return noop(
         doc,
@@ -173,8 +148,7 @@ export const addPortalFrameBuilding = defineCommand({
       monopitch: roofType === 'monopitch',
       mm,
     });
-    const { columnLines, spanBounds, x0, x1, totalWidth, ys, y0, yEnd, ridge, monopitch, h } =
-      geometry;
+    const { columnLines, spanBounds, x0, x1, totalWidth, ys, y0, yEnd, ridge, monopitch, h } = geometry;
     const specs = hallMemberSpecs({ geometry, profiles: p, purlinSpacing, railSpacing });
     const ids: string[] = [];
     // Structural grid: column lines (letters) along the hall, frame lines (numbers) across it.
@@ -200,8 +174,7 @@ export const addPortalFrameBuilding = defineCommand({
       ids.push(building.elementOrder[building.elementOrder.length - 1] as string);
     }
     const membersAdded = appendMembers(building, levelId, specs);
-    if ('reason' in membersAdded)
-      return noop(doc, `add_portal_frame_building failed: ${membersAdded.reason}.`);
+    if ('reason' in membersAdded) return noop(doc, `add_portal_frame_building failed: ${membersAdded.reason}.`);
     building = membersAdded.building;
     ids.push(...membersAdded.ids);
     if (params.connections !== false) {
@@ -236,11 +209,7 @@ export const addPortalFrameBuilding = defineCommand({
     if (crane) {
       const craneProfile = findProfile(crane.profile ?? 'HEB300');
       const bracket = findProfile('HEB200') as SteelProfile;
-      if (!craneProfile)
-        return noop(
-          doc,
-          `add_portal_frame_building failed: unknown crane profile '${crane.profile ?? ''}'.`,
-        );
+      if (!craneProfile) return noop(doc, `add_portal_frame_building failed: unknown crane profile '${crane.profile ?? ''}'.`);
       const inset = h(p.column) / 2 + mm(500);
       const runway = spanBounds
         .flatMap(([a, b]) => [a + inset, b - inset])
@@ -256,8 +225,7 @@ export const addPortalFrameBuilding = defineCommand({
           }),
         );
       const craneAdded = appendMembers(building, levelId, runway);
-      if ('reason' in craneAdded)
-        return noop(doc, `add_portal_frame_building failed: ${craneAdded.reason}.`);
+      if ('reason' in craneAdded) return noop(doc, `add_portal_frame_building failed: ${craneAdded.reason}.`);
       building = craneAdded.building;
       ids.push(...craneAdded.ids);
     }
@@ -266,12 +234,7 @@ export const addPortalFrameBuilding = defineCommand({
         doc,
         building,
         levelId,
-        withoutFootings(
-          building,
-          levelId,
-          columnFeet(building, levelId, mm(10), new Set(membersAdded.ids)),
-          mm(10),
-        ),
+        withoutFootings(building, levelId, columnFeet(building, levelId, mm(10), new Set(membersAdded.ids)), mm(10)),
         {},
       );
       building = footings.building;
@@ -347,23 +310,13 @@ interface RunwaySpec {
 }
 
 /** Runway beam segments between supports + brackets to the nearest steel column at each support. */
-function runwayMembers(
-  doc: CadDocument,
-  building: BuildingModel,
-  levelId: string,
-  spec: RunwaySpec,
-): MemberSpec[] {
+function runwayMembers(doc: CadDocument, building: BuildingModel, levelId: string, spec: RunwaySpec): MemberSpec[] {
   const dx = spec.end[0] - spec.start[0];
   const dy = spec.end[1] - spec.start[1];
   const length = Math.hypot(dx, dy);
-  const at = (distance: number): Vec2 => [
-    spec.start[0] + (dx / length) * distance,
-    spec.start[1] + (dy / length) * distance,
-  ];
+  const at = (distance: number): Vec2 => [spec.start[0] + (dx / length) * distance, spec.start[1] + (dy / length) * distance];
   const axisZ = spec.railHeight - fromMm(doc, spec.profile.h) / 2;
-  const stations = [
-    ...new Set([0, ...spec.supports.filter((s) => s > 0 && s < length), length]),
-  ].sort((a, b) => a - b);
+  const stations = [...new Set([0, ...spec.supports.filter((s) => s > 0 && s < length), length])].sort((a, b) => a - b);
   const members: MemberSpec[] = [];
   for (let index = 0; index + 1 < stations.length; index++) {
     const [from, to] = [at(stations[index] as number), at(stations[index + 1] as number)];
@@ -376,8 +329,7 @@ function runwayMembers(
     });
   }
   const columns = Object.values(building.elements).filter(
-    (element) =>
-      element.category === 'member' && element.role === 'column' && element.levelId === levelId,
+    (element) => element.category === 'member' && element.role === 'column' && element.levelId === levelId,
   );
   const bracketZ = spec.railHeight - fromMm(doc, spec.profile.h) - fromMm(doc, spec.bracket.h) / 2;
   for (const station of stations) {

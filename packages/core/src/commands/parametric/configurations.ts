@@ -51,18 +51,14 @@ export const createConfiguration = defineCommand({
   }),
   annotations: { metaHistory: true, idempotent: true },
   run: (doc, { name, parameterValues }): CommandResult => {
-    if (name.trim() === '')
-      return noop(doc, 'create_configuration failed: name must be a non-empty string.');
+    if (name.trim() === '') return noop(doc, 'create_configuration failed: name must be a non-empty string.');
 
     const expressions: Record<string, string> = {};
     for (const [k, v] of Object.entries(parameterValues)) {
       if (typeof v === 'string') {
         expressions[k] = v;
       } else {
-        return noop(
-          doc,
-          `create_configuration '${name}' failed: parameterValues['${k}'] must be a string expression, got ${typeof v}.`,
-        );
+        return noop(doc, `create_configuration '${name}' failed: parameterValues['${k}'] must be a string expression, got ${typeof v}.`);
       }
     }
 
@@ -108,8 +104,7 @@ export const activateConfiguration = defineCommand({
   }),
   annotations: { idempotent: true, metaHistory: true },
   run: (doc, { name }, ctx): CommandResult => {
-    if (name.trim() === '')
-      return noop(doc, 'activate_configuration failed: name must be a non-empty string.');
+    if (name.trim() === '') return noop(doc, 'activate_configuration failed: name must be a non-empty string.');
 
     const config = doc.configurations[name];
     if (!config) {
@@ -122,12 +117,8 @@ export const activateConfiguration = defineCommand({
     }
 
     // Parameters named in the config but absent from the document are created (and reported).
-    const unknownParams = Object.keys(config.parameterValues).filter(
-      (paramName) => !(paramName in doc.parameters),
-    );
-    const changedParams = Object.entries(config.parameterValues).map(
-      ([paramName, expression]) => `${paramName}="${expression}"`,
-    );
+    const unknownParams = Object.keys(config.parameterValues).filter((paramName) => !(paramName in doc.parameters));
+    const changedParams = Object.entries(config.parameterValues).map(([paramName, expression]) => `${paramName}="${expression}"`);
     // The seed value is kept when evaluation fails (reEvaluateAll retains the last good value).
     const updatedParameters = Object.entries(config.parameterValues).reduce(
       (table, [paramName, expression]) => withParameterExpression(table, paramName, expression),

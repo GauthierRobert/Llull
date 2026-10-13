@@ -7,14 +7,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
-import type {
-  CadDocument,
-  LineEntity,
-  CircleEntity,
-  RectangleEntity,
-  PolylineEntity,
-  ArcEntity,
-} from '@core/model/types';
+import type { CadDocument, LineEntity, CircleEntity, RectangleEntity, PolylineEntity, ArcEntity } from '@core/model/types';
 import {
   snapPerpendicular,
   tangentPointsToCircle,
@@ -457,10 +450,7 @@ describe('applyOrthoPolar', () => {
   });
 
   it.each([
-    [
-      'snaps to the nearest polar angle increment (polar=true, increment=15°)',
-      (15 * Math.PI) / 180,
-    ],
+    ['snaps to the nearest polar angle increment (polar=true, increment=15°)', (15 * Math.PI) / 180],
     ['treats a 0 polarIncrement as the 15° default (never returns NaN)', 0],
   ])('%s', (_name, polarIncrement) => {
     const origin: [number, number] = [0, 0];

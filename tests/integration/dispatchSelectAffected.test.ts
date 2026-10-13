@@ -29,9 +29,7 @@ function stubServerAffecting(id: string): void {
 function boxThenArray(count: number): string {
   useStore.getState().dispatch('add_box', { size: [1, 1, 1] }, { selectAffected: true });
   const first = useStore.getState().document.order[0]!;
-  useStore
-    .getState()
-    .dispatch('array_linear', { id: first, count, offset: [2, 0, 0] }, { selectAffected: true });
+  useStore.getState().dispatch('array_linear', { id: first, count, offset: [2, 0, 0] }, { selectAffected: true });
   return first;
 }
 

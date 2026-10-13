@@ -40,11 +40,7 @@ export interface ProgramRun {
 
 /** Port to the Python exchange process. Implementations throw Error with an agent-readable message. */
 export interface CadExchangePort {
-  runProgram(request: {
-    language: PythonBackend;
-    source: string;
-    step: boolean;
-  }): Promise<ProgramRun>;
+  runProgram(request: { language: PythonBackend; source: string; step: boolean }): Promise<ProgramRun>;
   importStep(stepBase64: string): Promise<{ bodies: unknown[] }>;
   /** Read a file from the configured exchange directory as base64 (or text when `encoding` is utf8). */
   readExchangeFile?(path: string, encoding: 'base64' | 'utf8'): Promise<string>;
@@ -96,8 +92,7 @@ export function buildExchangeToolDefinitions(): McpToolDefinition[] {
           language: LANGUAGE_SCHEMA,
           save: {
             type: 'boolean',
-            description:
-              'Also write <name>.step into the server exchange directory (default true when configured).',
+            description: 'Also write <name>.step into the server exchange directory (default true when configured).',
           },
         },
         required: [],
@@ -213,12 +208,9 @@ async function readInput(
   encoding: 'base64' | 'utf8',
 ): Promise<string> {
   if (inline !== undefined) return inline;
-  if (path === undefined)
-    throw new Error(`provide ${encoding === 'base64' ? 'stepBase64' : 'code'} or path`);
+  if (path === undefined) throw new Error(`provide ${encoding === 'base64' ? 'stepBase64' : 'code'} or path`);
   if (port.readExchangeFile === undefined) {
-    throw new Error(
-      'path is unavailable: the server has no exchange directory (LLULL_EXCHANGE_DIR)',
-    );
+    throw new Error('path is unavailable: the server has no exchange directory (LLULL_EXCHANGE_DIR)');
   }
   return port.readExchangeFile(path, encoding);
 }
@@ -231,15 +223,13 @@ interface StepFile {
   readonly savedTo?: string;
 }
 
-const NO_STEP_BACKEND =
-  'STEP export needs the Python bridge (LLULL_PYTHON is off) or the exact OCC kernel (LLULL_KERNEL=occt).';
+const NO_STEP_BACKEND = 'STEP export needs the Python bridge (LLULL_PYTHON is off) or the exact OCC kernel (LLULL_KERNEL=occt).';
 
 /** Without the Python bridge: the exact B-rep kernel writes the STEP itself (`export_step_exact`). */
 function exportStepExact(getDoc: () => CadDocument, name?: string): StepFile | { error: string } {
   const exact = execute(getDoc(), 'export_step_exact', {});
   const data = exact.data as { step?: string; solidCount?: number } | undefined;
-  if (data?.step === undefined)
-    return { error: `${NO_STEP_BACKEND} Kernel export: ${exact.summary}` };
+  if (data?.step === undefined) return { error: `${NO_STEP_BACKEND} Kernel export: ${exact.summary}` };
   const fileName = `${safeFileName(name, 'model')}.step`;
   const bytes = data.step.length;
   return {
@@ -264,25 +254,18 @@ export async function exportStepFile(
 ): Promise<StepFile | { error: string }> {
   if (port === null) return exportStepExact(getDoc, options.name);
   const language = pythonLanguage(options.language);
-  if (language === null)
-    return { error: 'export_step: language must be "cadquery" or "build123d".' };
+  if (language === null) return { error: 'export_step: language must be "cadquery" or "build123d".' };
   const code = execute(getDoc(), 'export_code', { language, name: options.name ?? 'model' });
-  const codeData = code.data as
-    | { text: string; fileName: string; solidCount: number; source: string }
-    | undefined;
+  const codeData = code.data as { text: string; fileName: string; solidCount: number; source: string } | undefined;
   if (codeData === undefined) return { error: `export_step: ${code.summary}` };
-  if (codeData.solidCount === 0)
-    return { error: 'export_step: the model has no 3D solids to export.' };
+  if (codeData.solidCount === 0) return { error: 'export_step: the model has no 3D solids to export.' };
 
   const run = await port.runProgram({ language, source: codeData.text, step: true });
-  if (run.stepBase64 === undefined)
-    return { error: 'export_step: the Python bridge returned no STEP data.' };
+  if (run.stepBase64 === undefined) return { error: 'export_step: the Python bridge returned no STEP data.' };
   // export_code already sanitised the base name; only the extension changes.
   const fileName = codeData.fileName.replace(/\.[^.]+$/, '.step');
   const savedTo =
-    options.save !== false && port.writeExchangeFile !== undefined
-      ? await port.writeExchangeFile(fileName, run.stepBase64)
-      : undefined;
+    options.save !== false && port.writeExchangeFile !== undefined ? await port.writeExchangeFile(fileName, run.stepBase64) : undefined;
   const bytes = Math.floor((run.stepBase64.length * 3) / 4);
   const summary =
     `export_step: ${codeData.solidCount} solid(s) from ${codeData.source} → ${fileName} ` +
@@ -297,11 +280,7 @@ export async function exportStepFile(
   };
 }
 
-async function exportStep(
-  deps: ExchangeDeps,
-  port: CadExchangePort | null,
-  args: Record<string, unknown>,
-): Promise<McpShapedResult> {
+async function exportStep(deps: ExchangeDeps, port: CadExchangePort | null, args: Record<string, unknown>): Promise<McpShapedResult> {
   const name = nonEmptyString(args['name']);
   const file = await exportStepFile(deps.getDoc, port, {
     language: args.language,
@@ -325,17 +304,8 @@ function importOutcome(summary: string, result: ExchangeCommandResult): McpShape
   });
 }
 
-async function importStep(
-  deps: ExchangeDeps,
-  port: CadExchangePort,
-  args: Record<string, unknown>,
-): Promise<McpShapedResult> {
-  const stepBase64 = await readInput(
-    port,
-    nonEmptyString(args['stepBase64']),
-    nonEmptyString(args['path']),
-    'base64',
-  );
+async function importStep(deps: ExchangeDeps, port: CadExchangePort, args: Record<string, unknown>): Promise<McpShapedResult> {
+  const stepBase64 = await readInput(port, nonEmptyString(args['stepBase64']), nonEmptyString(args['path']), 'base64');
   const { bodies } = await port.importStep(stepBase64);
   const result = deps.applyCommand('import_mesh', { bodies });
   return importOutcome(`import_step: ${result.summary}`, result);
@@ -351,22 +321,15 @@ const NO_DWG =
   'ODA File Converter (LLULL_ODA_CONVERTER=<executable>) and leave LLULL_DWG2DXF unset/not "off" ' +
   '(see docs/CAD_EXCHANGE.md). Alternatively save the drawing as ASCII DXF and use import_dxf.';
 
-async function importDwg(
-  deps: ExchangeDeps,
-  dwg: DwgConverterPort,
-  args: Record<string, unknown>,
-): Promise<McpShapedResult> {
+async function importDwg(deps: ExchangeDeps, dwg: DwgConverterPort, args: Record<string, unknown>): Promise<McpShapedResult> {
   const target = args.target ?? 'drawing';
-  if (target !== 'drawing' && target !== 'survey')
-    return failure('import_dwg: target must be "drawing" or "survey"; nothing was changed.');
+  if (target !== 'drawing' && target !== 'survey') return failure('import_dwg: target must be "drawing" or "survey"; nothing was changed.');
   let dwgBase64 = nonEmptyString(args['dwgBase64']);
   if (dwgBase64 === undefined) {
     const file = nonEmptyString(args['path']);
     if (file === undefined) return failure('import_dwg: provide dwgBase64 or path.');
     if (dwg.readExchangeFile === undefined) {
-      return failure(
-        'import_dwg: path is unavailable: the server has no exchange directory (LLULL_EXCHANGE_DIR).',
-      );
+      return failure('import_dwg: path is unavailable: the server has no exchange directory (LLULL_EXCHANGE_DIR).');
     }
     dwgBase64 = await dwg.readExchangeFile(file);
   }
@@ -380,11 +343,7 @@ async function importDwg(
   return importOutcome(`import_dwg (${command}): ${result.summary}`, result);
 }
 
-async function importCode(
-  deps: ExchangeDeps,
-  port: CadExchangePort,
-  args: Record<string, unknown>,
-): Promise<McpShapedResult> {
+async function importCode(deps: ExchangeDeps, port: CadExchangePort, args: Record<string, unknown>): Promise<McpShapedResult> {
   if (!deps.allowCodeExecution) {
     return failure(
       'import_code: running Python is disabled on this server. Start it with LLULL_ALLOW_CODE_EXECUTION=1 ' +
@@ -394,17 +353,10 @@ async function importCode(
   const language = pythonLanguage(args.language);
   if (language === null) return failure('import_code: language must be "cadquery" or "build123d".');
   if (args.mode !== undefined && args.mode !== 'replace' && args.mode !== 'append') {
-    return failure(
-      `import_code: mode must be "replace" or "append" (got ${JSON.stringify(args.mode)}); nothing was changed.`,
-    );
+    return failure(`import_code: mode must be "replace" or "append" (got ${JSON.stringify(args.mode)}); nothing was changed.`);
   }
   const mode = args.mode === 'append' ? 'append' : 'replace';
-  const source = await readInput(
-    port,
-    nonEmptyString(args['code']),
-    nonEmptyString(args['path']),
-    'utf8',
-  );
+  const source = await readInput(port, nonEmptyString(args['code']), nonEmptyString(args['path']), 'utf8');
   const run = await port.runProgram({ language, source, step: false });
   const result = deps.applyCommand('apply_code_trace', { trace: run.trace, mode });
   const kind = run.traced
@@ -424,11 +376,7 @@ const EXCHANGE_HANDLERS = new Map([
  * @layer mcp
  * @failure missing Python, disabled execution, script/bridge errors → isError result, document unchanged
  */
-export async function applyExchangeToolCall(
-  toolName: string,
-  rawArgs: unknown,
-  deps: ExchangeDeps,
-): Promise<McpShapedResult | null> {
+export async function applyExchangeToolCall(toolName: string, rawArgs: unknown, deps: ExchangeDeps): Promise<McpShapedResult | null> {
   if (toolName === 'import_dwg') {
     if (deps.dwg === undefined || deps.dwg === null) return failure(`import_dwg ${NO_DWG}`);
     try {
@@ -442,9 +390,7 @@ export async function applyExchangeToolCall(
   if (handler === undefined && toolName !== 'export_step') return null;
   if (deps.port === null && handler !== undefined) return failure(`${toolName} ${NO_PYTHON}`);
   try {
-    return handler === undefined || deps.port === null
-      ? await exportStep(deps, deps.port, args)
-      : await handler(deps, deps.port, args);
+    return handler === undefined || deps.port === null ? await exportStep(deps, deps.port, args) : await handler(deps, deps.port, args);
   } catch (error) {
     return failure(`${toolName} failed: ${errorMessage(error)}`);
   }

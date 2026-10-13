@@ -118,8 +118,7 @@ function useSnap(cursor: Vec2 | null, opts: UseSnapOpts = {}): SnapResult | null
 
   // snap() is order-independent (it ranks by distance then snap-type priority),
   // so the union below is equivalent to the single pre-split collectSnapCandidates call.
-  const candidates =
-    cursorCandidates.length === 0 ? staticCandidates : [...staticCandidates, ...cursorCandidates];
+  const candidates = cursorCandidates.length === 0 ? staticCandidates : [...staticCandidates, ...cursorCandidates];
 
   return snap(adjustedCursor, candidates, gridSize, tolerance);
 }
@@ -136,12 +135,7 @@ const SNAP_TOLERANCE_PX = 12;
  * stay grabbable from very zoomed out to very zoomed in. `ortho` constrains the cursor to the
  * horizontal/vertical from `drawOrigin` (held Shift while drawing).
  */
-export function useZoomSnap(
-  cursor: Vec2 | null,
-  zoom: number,
-  drawOrigin: Vec2 | null = null,
-  ortho = false,
-): SnapResult | null {
+export function useZoomSnap(cursor: Vec2 | null, zoom: number, drawOrigin: Vec2 | null = null, ortho = false): SnapResult | null {
   return useSnap(cursor, {
     gridSize: adaptiveGridStep(zoom),
     tolerance: pixelsToWorld(SNAP_TOLERANCE_PX, zoom),

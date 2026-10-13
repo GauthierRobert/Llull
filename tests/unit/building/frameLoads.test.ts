@@ -10,12 +10,7 @@ import {
   sectionResistance,
 } from '@aec/industrial/steelDesign/steelDesign';
 import { framesOf } from '@aec/industrial/frames/frameModelFrames';
-import {
-  craneActions,
-  valleyLines,
-  craneCapacityOf,
-  DOWNWIND_ROOF_FACTOR,
-} from '@aec/industrial/frames/frameModelTypes';
+import { craneActions, valleyLines, craneCapacityOf, DOWNWIND_ROOF_FACTOR } from '@aec/industrial/frames/frameModelTypes';
 import { baseReactions } from '@aec/industrial/frames/frameModelSolve';
 import { frameRoofAverage } from '@aec/industrial/common/windCoefficients';
 import { findProfile, sectionProperties } from '@aec/steel/profiles';
@@ -65,15 +60,9 @@ describe('member buckling (EN 1993-1-1 §6.3)', () => {
     expect(bending.chiLateralTorsional).toBe(1);
     expect(bending.utilisation).toBeCloseTo(1e8 / sectionResistance(profile, 355).moment);
     // Hollow and other shapes use their own curves.
-    expect(
-      memberBuckling(findProfile('SHS100x5')!, 355, 1e5, 0, { major: 3000, minor: 3000 }).chiMajor,
-    ).toBeLessThan(1);
-    expect(
-      memberBuckling(findProfile('L100x10')!, 355, 1e5, 0, { major: 3000, minor: 3000 }).chiMinor,
-    ).toBeLessThan(1);
-    expect(
-      memberBuckling(findProfile('IPE300')!, 355, 1e5, 0, { major: 3000, minor: 3000 }).chiMajor,
-    ).toBeGreaterThan(0.9);
+    expect(memberBuckling(findProfile('SHS100x5')!, 355, 1e5, 0, { major: 3000, minor: 3000 }).chiMajor).toBeLessThan(1);
+    expect(memberBuckling(findProfile('L100x10')!, 355, 1e5, 0, { major: 3000, minor: 3000 }).chiMinor).toBeLessThan(1);
+    expect(memberBuckling(findProfile('IPE300')!, 355, 1e5, 0, { major: 3000, minor: 3000 }).chiMajor).toBeGreaterThan(0.9);
   });
 
   it('uses the class 3 interaction factor for class 3 sections', () => {
@@ -81,17 +70,9 @@ describe('member buckling (EN 1993-1-1 §6.3)', () => {
     const resistance = sectionResistance(profile, 355);
     expect(resistance.sectionClass).toBe(3);
     const lengths = { major: 6000, minor: 100 };
-    const result = memberBuckling(
-      profile,
-      355,
-      0.3 * resistance.axial,
-      0.3 * resistance.moment,
-      lengths,
-    );
+    const result = memberBuckling(profile, 355, 0.3 * resistance.axial, 0.3 * resistance.moment, lengths);
     const n = 0.3 / result.chiMajor;
-    const lambda = Math.sqrt(
-      resistance.axial / ((Math.PI ** 2 * 210000 * sectionProperties(profile).inertia) / 6000 ** 2),
-    );
+    const lambda = Math.sqrt(resistance.axial / ((Math.PI ** 2 * 210000 * sectionProperties(profile).inertia) / 6000 ** 2));
     expect(result.utilisation).toBeCloseTo(n + 0.9 * (1 + 0.6 * Math.min(lambda, 1) * n) * 0.3, 6);
   });
 });
@@ -146,22 +127,16 @@ describe('load combinations', () => {
     expect(windy.combinations).toHaveLength(10);
     expect(windy.combinations).toContain('1.0G+1.5W←(cpi−0.3)');
     expect(windy.combinations).toContain('1.0G+1.5W→');
-    expect(row(windy, 'SC5', 'column').utilisation).toBeGreaterThan(
-      row(calm, 'SC5', 'column').utilisation,
-    );
+    expect(row(windy, 'SC5', 'column').utilisation).toBeGreaterThan(row(calm, 'SC5', 'column').utilisation);
     const sway = windy.rows.find((candidate) => candidate.check.startsWith('eaves sway'))!;
     expect(sway.combination).toMatch(/^SLS W/);
     expect(sway.utilisation).toBeGreaterThan(0);
     // Uplift reverses the apex moment: the bolt group sees both signs.
-    const apex = windy.rows.find(
-      (candidate) => candidate.kind === 'connection' && candidate.check.startsWith('apex'),
-    )!;
+    const apex = windy.rows.find((candidate) => candidate.kind === 'connection' && candidate.check.startsWith('apex'))!;
     const moments = apex.forces!.map((force) => force.moment);
     expect(Math.max(...moments)).toBeGreaterThan(0);
     expect(Math.min(...moments)).toBeLessThan(0);
-    expect(execute(doc, 'check_portal_frames', { windPressure: 1 }).summary).toMatch(
-      /qp = 1 kN\/m²/,
-    );
+    expect(execute(doc, 'check_portal_frames', { windPressure: 1 }).summary).toMatch(/qp = 1 kN\/m²/);
   });
 
   it('applies crane actions from the runway at the brackets', () => {
@@ -178,13 +153,9 @@ describe('load combinations', () => {
     expect(rail.check).toMatch(/h\/400/);
     // A heavy crane governs the columns.
     const heavier = check(doc, { craneCapacity: 50 });
-    expect(row(heavier, 'SC5', 'column').utilisation).toBeGreaterThan(
-      row(without, 'SC5', 'column').utilisation,
-    );
+    expect(row(heavier, 'SC5', 'column').utilisation).toBeGreaterThan(row(without, 'SC5', 'column').utilisation);
     expect(row(heavier, 'SC5', 'column').combination).toMatch(/^1\.35G\+1\.35C/);
-    expect(rail.utilisation).toBeLessThan(
-      heavier.rows.find((candidate) => candidate.check.startsWith('rail-level'))!.utilisation,
-    );
+    expect(rail.utilisation).toBeLessThan(heavier.rows.find((candidate) => candidate.check.startsWith('rail-level'))!.utilisation);
     const both = check(doc, { windPressure: 0.8 });
     expect(both.combinations).toHaveLength(66);
     expect(both.combinations).toContain('1.35G+1.35C(right)+0.75S+0.9W→');
@@ -212,14 +183,8 @@ describe('load combinations', () => {
     expect(actions.selfWeight).toBeCloseTo(self, 6);
     expect(actions.staticMax).toBeCloseTo(0.4 * self + (0.2 * self + hoist) * near, 3);
     expect(actions.staticMax + actions.staticMin).toBeCloseTo(self + hoist, 3);
-    expect(actions.group1.max).toBeCloseTo(
-      1.1 * (0.4 * self + 0.2 * self * near) + 1.134 * hoist * near,
-      3,
-    );
-    expect(actions.group1.min).toBeCloseTo(
-      1.1 * (0.4 * self + 0.2 * self * far) + 1.134 * hoist * far,
-      3,
-    );
+    expect(actions.group1.max).toBeCloseTo(1.1 * (0.4 * self + 0.2 * self * near) + 1.134 * hoist * near, 3);
+    expect(actions.group1.min).toBeCloseTo(1.1 * (0.4 * self + 0.2 * self * far) + 1.134 * hoist * far, 3);
     expect(actions.group1.max).toBeGreaterThan(actions.group1.min);
     // Drive: K = μ Σ driven = 0.2 Rmin, HL = φ5 K / 2, HT = φ5 ξ M / a with M = K (ξ1 − 0.5) l.
     const drive = 0.2 * actions.staticMin;
@@ -248,9 +213,7 @@ describe('load combinations', () => {
     expect(heavy.selfWeight).toBe(100000);
     expect(heavy.staticMax + heavy.staticMin).toBeCloseTo(100000 + HOIST_10T, 3);
     expect(heavy.staticMin).toBeCloseTo(0.4 * 100000 + (20000 + HOIST_10T) * (2 / 24), 3);
-    expect(heavy.group1.transverseMax).toBeLessThan(
-      craneActions(10, 24000).group1.transverseMax * 2,
-    );
+    expect(heavy.group1.transverseMax).toBeLessThan(craneActions(10, 24000).group1.transverseMax * 2);
     // Hook approach beyond the span is clamped: all load on one rail side, no negative reaction.
     expect(craneActions(10, 24000, { minHookApproach: 99 }).staticMin).toBeGreaterThan(0);
   });
@@ -259,9 +222,7 @@ describe('load combinations', () => {
     const doc = hall({ crane: { capacity: 10, railHeight: 6000 } });
     const building = doc.building!;
     const loads = { deadLoad: 0.5, snowLoad: 0.8, windPressure: 0 };
-    const reactions = baseReactions(doc, building, building.levelOrder[0]!, loads).filter(
-      (reaction) => reaction.frame === 'frame 3',
-    );
+    const reactions = baseReactions(doc, building, building.levelOrder[0]!, loads).filter((reaction) => reaction.frame === 'frame 3');
     const vertical = (key: 'CL' | 'CR' | 'CL5' | 'CR5'): number =>
       reactions.reduce((sum, reaction) => sum + (reaction.cases[key]?.vertical ?? 0), 0);
     const horizontal = (key: 'CL' | 'CL5' | 'CR'): number =>
@@ -274,10 +235,7 @@ describe('load combinations', () => {
     expect(vertical('CR5')).toBeCloseTo(vertical('CL5'), -1);
     // Group 1 transverse HT = both rails in +x (CL) / −x (CR); skewing HS (group 5) is a couple.
     const actions = craneActions(10, 22610);
-    expect(horizontal('CL')).toBeCloseTo(
-      -(actions.group1.transverseMax + actions.group1.transverseMin),
-      -1,
-    );
+    expect(horizontal('CL')).toBeCloseTo(-(actions.group1.transverseMax + actions.group1.transverseMin), -1);
     expect(horizontal('CR')).toBeCloseTo(-horizontal('CL'), -1);
     expect(Math.abs(horizontal('CL5'))).toBeLessThan(Math.abs(horizontal('CL')));
   });
@@ -294,9 +252,7 @@ describe('load combinations', () => {
     const steep = check(hall({ roofPitch: 30 }));
     const stability = steep.rows.find((candidate) => candidate.kind === 'stability')!;
     expect(stability.check).toMatch(/modified Horne 0\.8 αH \(1 − N\/Ncr\), roof slope > 26°/);
-    expect(check(hall()).rows.find((candidate) => candidate.kind === 'stability')!.check).toMatch(
-      /\(Horne;/,
-    );
+    expect(check(hall()).rows.find((candidate) => candidate.kind === 'stability')!.check).toMatch(/\(Horne;/);
   });
 
   it('reports frames that are mechanisms as unstable', () => {
@@ -355,12 +311,8 @@ describe('load combinations', () => {
 
   it('rejects negative wind or crane input', () => {
     const doc = hall();
-    expect(execute(doc, 'check_portal_frames', { windPressure: -1 }).summary).toMatch(
-      /must be >= 0/,
-    );
-    expect(execute(doc, 'design_portal_frames', { craneCapacity: -2 }).summary).toMatch(
-      /must be >= 0/,
-    );
+    expect(execute(doc, 'check_portal_frames', { windPressure: -1 }).summary).toMatch(/must be >= 0/);
+    expect(execute(doc, 'design_portal_frames', { craneCapacity: -2 }).summary).toMatch(/must be >= 0/);
   });
 });
 
@@ -387,12 +339,10 @@ describe('internal pressure (EN 1991-1-4 §7.2.9)', () => {
       windPressure: 1,
     }).filter((reaction) => reaction.frame === 'frame 3');
     // Same net sway (cpi acts on both walls): equal total horizontal reaction.
-    const total = (key: 'WL' | 'WLs'): number =>
-      reactions.reduce((sum, reaction) => sum + reaction.cases[key]!.horizontal, 0);
+    const total = (key: 'WL' | 'WLs'): number => reactions.reduce((sum, reaction) => sum + reaction.cases[key]!.horizontal, 0);
     expect(total('WLs')).toBeCloseTo(total('WL'), 0);
     // Roof uplift (cpi − cpe over both slopes, 6°): windward H, leeward I/J average.
-    const uplift = (key: 'WL' | 'WLs'): number =>
-      reactions.reduce((sum, reaction) => sum + reaction.cases[key]!.vertical, 0);
+    const uplift = (key: 'WL' | 'WLs'): number => reactions.reduce((sum, reaction) => sum + reaction.cases[key]!.vertical, 0);
     const roof = windward + leeward;
     expect(uplift('WL') / uplift('WLs')).toBeCloseTo((0.4 - roof) / (-0.6 - roof), 3);
   });
@@ -402,16 +352,11 @@ describe('baseReactions', () => {
   it('balances the applied loads per case', () => {
     const doc = hall();
     const building = doc.building!;
-    const reactions = baseReactions(
-      doc,
-      building,
-      building.activeLevelId ?? building.levelOrder[0]!,
-      {
-        deadLoad: 0.5,
-        snowLoad: 0.8,
-        windPressure: 1,
-      },
-    );
+    const reactions = baseReactions(doc, building, building.activeLevelId ?? building.levelOrder[0]!, {
+      deadLoad: 0.5,
+      snowLoad: 0.8,
+      windPressure: 1,
+    });
     const frame = reactions.filter((reaction) => reaction.frame === 'frame 3');
     expect(frame).toHaveLength(2);
     // Snow 0.8 kN/m² × 6 m × 24 m on plan.
@@ -420,9 +365,7 @@ describe('baseReactions', () => {
     // Wind on both walls (0.8 + 0.5) × 1 kN/m² × 6 m × eaves height, resisted horizontally.
     const horizontal = frame.reduce((sum, reaction) => sum + reaction.cases.WL!.horizontal, 0);
     expect(horizontal / 1000).toBeCloseTo(-(0.8 + 0.5) * 6 * 7, 0);
-    expect(
-      frame.every((reaction) => reaction.cases.WL!.vertical < reaction.cases.G!.vertical),
-    ).toBe(true);
+    expect(frame.every((reaction) => reaction.cases.WL!.vertical < reaction.cases.G!.vertical)).toBe(true);
   });
 });
 
@@ -460,20 +403,9 @@ describe('multi-span roof wind (EN 1991-1-4 §7.2.7, Fig. 7.10 simplified)', () 
     const wind = uplifts(doc, 'WL');
     expect(wind).toHaveLength(6);
     // Windward span: slopes (cpi − H) and (cpi − I/J); downwind spans (spans 2, 3): the same × 0.6 on the suction.
-    const [windwardSlope, leewardSlope, downwindWindward, downwindLeeward] = wind as [
-      number,
-      number,
-      number,
-      number,
-    ];
-    expect(downwindWindward / windwardSlope).toBeCloseTo(
-      (0.2 - DOWNWIND_ROOF_FACTOR * windward) / (0.2 - windward),
-      6,
-    );
-    expect(downwindLeeward / leewardSlope).toBeCloseTo(
-      (0.2 - DOWNWIND_ROOF_FACTOR * leeward) / (0.2 - leeward),
-      6,
-    );
+    const [windwardSlope, leewardSlope, downwindWindward, downwindLeeward] = wind as [number, number, number, number];
+    expect(downwindWindward / windwardSlope).toBeCloseTo((0.2 - DOWNWIND_ROOF_FACTOR * windward) / (0.2 - windward), 6);
+    expect(downwindLeeward / leewardSlope).toBeCloseTo((0.2 - DOWNWIND_ROOF_FACTOR * leeward) / (0.2 - leeward), 6);
     expect(wind[4]).toBeCloseTo(downwindWindward, 9);
     expect(wind[5]).toBeCloseTo(downwindLeeward, 9);
     // Wind from the right mirrors it: the last span is windward.
@@ -484,18 +416,13 @@ describe('multi-span roof wind (EN 1991-1-4 §7.2.7, Fig. 7.10 simplified)', () 
     expect(mirrored[0]).toBeCloseTo(downwindLeeward, 9);
     // Internal suction cpi = −0.3.
     const suction = uplifts(doc, 'WLs');
-    expect(suction[2]! / suction[0]!).toBeCloseTo(
-      (-0.3 - DOWNWIND_ROOF_FACTOR * windward) / (-0.3 - windward),
-      6,
-    );
+    expect(suction[2]! / suction[0]!).toBeCloseTo((-0.3 - DOWNWIND_ROOF_FACTOR * windward) / (-0.3 - windward), 6);
   });
 
   it('puts wall pressure on the outer columns only', () => {
     const frame = frameOf(hall({ spans: [20000, 20000, 20000], span: undefined }));
     const columns = frame.members.filter((member) => member.role === 'column');
-    const xs = [...new Set(columns.map((member) => frame.nodes[member.geometry.a]?.x))].sort(
-      (a, b) => (a ?? 0) - (b ?? 0),
-    );
+    const xs = [...new Set(columns.map((member) => frame.nodes[member.geometry.a]?.x))].sort((a, b) => (a ?? 0) - (b ?? 0));
     expect(xs).toHaveLength(4);
     for (const column of columns) {
       const x = frame.nodes[column.geometry.a]?.x;

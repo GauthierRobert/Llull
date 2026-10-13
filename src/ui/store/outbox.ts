@@ -8,12 +8,7 @@
 import type { CadDocument, EntityId } from '@core/model/types';
 import { extendIdMap, mapStringLeaves, remapIds } from '@core/commands/history/regenerate';
 import { errorMessage } from '@lib/errorMessage';
-import {
-  fetchLiveSnapshot,
-  isCommandRefusal,
-  isConnectionRefusal,
-  postCommand,
-} from './serverCommands';
+import { fetchLiveSnapshot, isCommandRefusal, isConnectionRefusal, postCommand } from './serverCommands';
 import type { CadStoreState, OutboxCommand, StoreGet, StoreSet } from './storeTypes';
 import { resetGraceRuns } from './graceRuns';
 
@@ -105,8 +100,7 @@ export function moveLastOutboxEntry(
   direction: 'undo' | 'redo',
 ): Pick<CadStoreState, 'localOutbox' | 'localRedoOutbox'> {
   const from = direction === 'undo' ? state.localOutbox : state.localRedoOutbox;
-  if (from.length === 0)
-    return { localOutbox: state.localOutbox, localRedoOutbox: state.localRedoOutbox };
+  if (from.length === 0) return { localOutbox: state.localOutbox, localRedoOutbox: state.localRedoOutbox };
   // One undo step = its entry plus the coalesced entries that follow it.
   let start = from.length - 1;
   while (start > 0 && from[start]?.coalesced === true) start -= 1;
@@ -122,18 +116,13 @@ export function withLocalSelection(doc: CadDocument, selection: readonly EntityI
   return { ...doc, selection: selection.filter((id) => id in doc.entities) };
 }
 
-export function removeOutboxEntry(
-  outbox: readonly OutboxCommand[],
-  commandId: string,
-): OutboxCommand[] {
+export function removeOutboxEntry(outbox: readonly OutboxCommand[], commandId: string): OutboxCommand[] {
   return outbox.filter((entry) => entry.commandId !== commandId);
 }
 
 function syncedSummary(sentCount: number, rejected: readonly string[]): string {
   const synced = `Synced ${sentCount} offline command${sentCount === 1 ? '' : 's'} to the server.`;
-  return rejected.length === 0
-    ? synced
-    : `${synced} The server refused ${rejected.length} (dropped): ${rejected.join('; ')}.`;
+  return rejected.length === 0 ? synced : `${synced} The server refused ${rejected.length} (dropped): ${rejected.join('; ')}.`;
 }
 
 /**
@@ -168,11 +157,7 @@ export function flushOutbox(set: StoreSet, get: StoreGet): void {
         continue;
       }
       try {
-        const response = await postCommand(
-          next.name,
-          remapIds(next.params, flushIdMap),
-          next.commandId,
-        );
+        const response = await postCommand(next.name, remapIds(next.params, flushIdMap), next.commandId);
         sent.push(response.summary);
         extendIdMap(flushIdMap, next.affected, response.affected);
         for (const id of next.affected) ackedLocalIds.add(id);

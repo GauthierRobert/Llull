@@ -7,12 +7,7 @@ import { nextId } from '../../lib/id';
 import { ORIGIN, finiteVec3OrZero } from '../../lib/vec3';
 import { MAX_CURVE_SAMPLES, MAX_SPLINE_CONTROL_POINTS } from '../limits';
 import { sampleInvolute } from '../../lib/gearOutline';
-import {
-  DEFAULT_DRAW_COLOR,
-  drawPointSeries,
-  workPlaneNamedFields,
-  workPlaneStyleFields,
-} from './shared';
+import { DEFAULT_DRAW_COLOR, drawPointSeries, workPlaneNamedFields, workPlaneStyleFields } from './shared';
 import { commitEntity } from '../entity/commitEntity';
 import { pointsExtent } from '../../geometry/bounds';
 import { noop } from '../noop';
@@ -33,38 +28,18 @@ export const drawEllipse = defineCommand({
     'Both must be > 0. position places the work-plane origin in 3D space (default [0,0,0]).',
   params: z.object({
     center: vec2('Center point [x, y] of the ellipse in local 2D work-plane coordinates.'),
-    radiusX: z
-      .number()
-      .describe('Semi-axis length along the local X axis (half-width). Must be greater than 0.'),
-    radiusY: z
-      .number()
-      .describe('Semi-axis length along the local Y axis (half-height). Must be greater than 0.'),
+    radiusX: z.number().describe('Semi-axis length along the local X axis (half-width). Must be greater than 0.'),
+    radiusY: z.number().describe('Semi-axis length along the local Y axis (half-height). Must be greater than 0.'),
     ...workPlaneStyleFields(),
   }),
-  run: (
-    doc,
-    { center, radiusX, radiusY, position = ORIGIN, color = DEFAULT_DRAW_COLOR },
-  ): CommandResult => {
+  run: (doc, { center, radiusX, radiusY, position = ORIGIN, color = DEFAULT_DRAW_COLOR }): CommandResult => {
     if (radiusX <= 0 || radiusY <= 0) {
-      return noop(
-        doc,
-        `draw_ellipse: radiusX and radiusY must both be > 0 (got radiusX=${radiusX}, radiusY=${radiusY}).`,
-      );
+      return noop(doc, `draw_ellipse: radiusX and radiusY must both be > 0 (got radiusX=${radiusX}, radiusY=${radiusY}).`);
     }
     const id = nextId('ellipse');
     const safeCenter: Vec2 = [center[0], center[1]];
-    const entity = newEntity(
-      'ellipse',
-      id,
-      { center: safeCenter, radiusX, radiusY },
-      position,
-      color,
-    );
-    return commitEntity(
-      doc,
-      entity,
-      `Drew ellipse ${id} center [${safeCenter.join(', ')}] radiusX ${radiusX} radiusY ${radiusY}.`,
-    );
+    const entity = newEntity('ellipse', id, { center: safeCenter, radiusX, radiusY }, position, color);
+    return commitEntity(doc, entity, `Drew ellipse ${id} center [${safeCenter.join(', ')}] radiusX ${radiusX} radiusY ${radiusY}.`);
   },
 });
 
@@ -86,27 +61,16 @@ export const drawSpline = defineCommand({
   params: z.object({
     points: z
       .array(z.array(z.number()))
-      .describe(
-        'Ordered list of through-points in local 2D work-plane coordinates. ' +
-          'Each point is [x, y]. Minimum 2 points required.',
-      ),
+      .describe('Ordered list of through-points in local 2D work-plane coordinates. ' + 'Each point is [x, y]. Minimum 2 points required.'),
     closed: z
       .boolean()
-      .describe(
-        'When true, the spline loops back from the last point to the first, forming a closed curve. Defaults to false.',
-      )
+      .describe('When true, the spline loops back from the last point to the first, forming a closed curve. Defaults to false.')
       .optional(),
     ...workPlaneStyleFields(),
   }),
-  run: (
-    doc,
-    { points, closed = false, position = ORIGIN, color = DEFAULT_DRAW_COLOR },
-  ): CommandResult => {
+  run: (doc, { points, closed = false, position = ORIGIN, color = DEFAULT_DRAW_COLOR }): CommandResult => {
     if (points.length > MAX_SPLINE_CONTROL_POINTS) {
-      return noop(
-        doc,
-        `draw_spline: ${points.length} points exceeds MAX_SPLINE_CONTROL_POINTS (${MAX_SPLINE_CONTROL_POINTS}).`,
-      );
+      return noop(doc, `draw_spline: ${points.length} points exceeds MAX_SPLINE_CONTROL_POINTS (${MAX_SPLINE_CONTROL_POINTS}).`);
     }
     return drawPointSeries(doc, 'spline', points, closed, position, color);
   },
@@ -163,50 +127,25 @@ export const drawInvolute = defineCommand({
   }),
   run: (
     doc,
-    {
-      baseRadius,
-      startAngle = 0,
-      endAngle,
-      samples = 24,
-      position = ORIGIN,
-      rotation = ORIGIN,
-      color = DEFAULT_DRAW_COLOR,
-      name,
-    },
+    { baseRadius, startAngle = 0, endAngle, samples = 24, position = ORIGIN, rotation = ORIGIN, color = DEFAULT_DRAW_COLOR, name },
   ): CommandResult => {
-    if (baseRadius <= 0)
-      return noop(doc, `draw_involute: baseRadius must be > 0, got ${baseRadius}.`);
+    if (baseRadius <= 0) return noop(doc, `draw_involute: baseRadius must be > 0, got ${baseRadius}.`);
     const samplesInt = Math.round(samples);
     if (samplesInt < 2 || samplesInt > MAX_CURVE_SAMPLES) {
-      return noop(
-        doc,
-        `draw_involute: samples must be in [2, ${MAX_CURVE_SAMPLES}], got ${samples}.`,
-      );
+      return noop(doc, `draw_involute: samples must be in [2, ${MAX_CURVE_SAMPLES}], got ${samples}.`);
     }
     if (endAngle <= startAngle) {
-      return noop(
-        doc,
-        `draw_involute: endAngle (${endAngle}) must be > startAngle (${startAngle}).`,
-      );
+      return noop(doc, `draw_involute: endAngle (${endAngle}) must be > startAngle (${startAngle}).`);
     }
 
-    const points: ReadonlyArray<Vec2> = sampleInvolute(
-      baseRadius,
-      startAngle,
-      endAngle,
-      samplesInt,
-    ).map(([x, y]) => [x, y]);
+    const points: ReadonlyArray<Vec2> = sampleInvolute(baseRadius, startAngle, endAngle, samplesInt).map(([x, y]) => [x, y]);
     const { minX, minY, maxX, maxY } = pointsExtent(points);
 
     const id = nextId('inv');
-    const entity = newEntity(
-      'polyline',
-      id,
-      { points, closed: false },
-      finiteVec3OrZero(position),
-      color,
-      { rotation: finiteVec3OrZero(rotation), name },
-    );
+    const entity = newEntity('polyline', id, { points, closed: false }, finiteVec3OrZero(position), color, {
+      rotation: finiteVec3OrZero(rotation),
+      name,
+    });
 
     return commitEntity(
       doc,

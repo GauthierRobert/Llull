@@ -90,9 +90,7 @@ export function parseSheet(svg: string): Sheet {
 
 /** The ISO sheet name matching the paper size, or null. */
 export function paperName(sheet: Sheet): string | null {
-  const found = Object.entries(ISO_PAPER).find(
-    ([, [w, h]]) => Math.abs(w - sheet.widthMm) < 0.5 && Math.abs(h - sheet.heightMm) < 0.5,
-  );
+  const found = Object.entries(ISO_PAPER).find(([, [w, h]]) => Math.abs(w - sheet.widthMm) < 0.5 && Math.abs(h - sheet.heightMm) < 0.5);
   return found?.[0] ?? null;
 }
 
@@ -117,10 +115,7 @@ export function drawingIdentity(sheet: Sheet): {
   revision: string;
   date: string;
 } {
-  const [drawingNumber = '', revision = '', date = ''] = titleBlockField(
-    sheet,
-    'DWG NO · REV · DATE',
-  )
+  const [drawingNumber = '', revision = '', date = ''] = titleBlockField(sheet, 'DWG NO · REV · DATE')
     .split('·')
     .map((part) => part.trim());
   return { drawingNumber, revision, date };

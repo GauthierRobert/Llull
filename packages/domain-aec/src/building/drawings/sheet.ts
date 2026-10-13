@@ -53,14 +53,9 @@ function buildPlanSheet(
   const viewport = sheetDrawingArea(width, height);
   const millimetresPerUnit = toMm(doc, 1);
   const [minX, minY, maxX, maxY] = drawing.bounds;
-  const scale =
-    requestedScale ??
-    fitScale((maxX - minX) * millimetresPerUnit, (maxY - minY) * millimetresPerUnit, viewport);
+  const scale = requestedScale ?? fitScale((maxX - minX) * millimetresPerUnit, (maxY - minY) * millimetresPerUnit, viewport);
   const paperPerUnit = millimetresPerUnit / scale;
-  const painter = new DrawingPainter(
-    paperMap(viewport, [(minX + maxX) / 2, (minY + maxY) / 2], paperPerUnit),
-    paperPerUnit,
-  );
+  const painter = new DrawingPainter(paperMap(viewport, [(minX + maxX) / 2, (minY + maxY) / 2], paperPerUnit), paperPerUnit);
   for (const primitive of drawing.primitives) painter.paint(primitive);
   const title = requestedTitle?.trim() || `${drawing.level.name} — Floor plan`;
   const svg = composeSheetSvg(doc, {
@@ -81,9 +76,7 @@ function buildPlanSheet(
     paper,
     scale,
     levelId: drawing.level.id,
-    fits:
-      ((maxX - minX) * millimetresPerUnit) / scale <= viewport.width &&
-      ((maxY - minY) * millimetresPerUnit) / scale <= viewport.height,
+    fits: ((maxX - minX) * millimetresPerUnit) / scale <= viewport.width && ((maxY - minY) * millimetresPerUnit) / scale <= viewport.height,
   };
 }
 
@@ -110,10 +103,7 @@ export const exportPlanSheet = defineCommand({
   run: (doc, { levelId, paper = 'A3', scale, title }): CommandResult => {
     const sheet = buildPlanSheet(doc, levelId, paper, scale, title);
     if (!sheet) {
-      return noop(
-        doc,
-        'export_plan_sheet failed: no such level (add_level / draw_walls first) or invalid scale (must be > 0).',
-      );
+      return noop(doc, 'export_plan_sheet failed: no such level (add_level / draw_walls first) or invalid scale (must be > 0).');
     }
     return report(
       doc,

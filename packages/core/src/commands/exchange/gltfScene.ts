@@ -128,11 +128,7 @@ export function collectDecalParts(doc: CadDocument, ids: readonly string[]): Dec
       if (patch.positions.length === 0) continue;
       const positions: number[] = [];
       for (let i = 0; i < patch.positions.length; i += 3) {
-        const p: Vec3 = [
-          patch.positions[i] ?? 0,
-          patch.positions[i + 1] ?? 0,
-          patch.positions[i + 2] ?? 0,
-        ];
+        const p: Vec3 = [patch.positions[i] ?? 0, patch.positions[i + 1] ?? 0, patch.positions[i + 2] ?? 0];
         positions.push(...entityLocalToWorld(entity, p));
       }
       parts.push({
@@ -156,11 +152,7 @@ function srgbToLinear(c: number): number {
 export function linearColorFactor(hex: string): [number, number, number, number] {
   const rgb = parseHexRgb(hex);
   if (rgb === null) return [0.214, 0.214, 0.214, 1];
-  const [r, g, b] = rgb.map((c) => Number(srgbToLinear(c / 255).toFixed(4))) as [
-    number,
-    number,
-    number,
-  ];
+  const [r, g, b] = rgb.map((c) => Number(srgbToLinear(c / 255).toFixed(4))) as [number, number, number];
   return [r, g, b, 1];
 }
 
@@ -247,9 +239,7 @@ function materialOf(builder: GltfBuilder, appearance: PartAppearance): Record<st
 }
 
 /** The group an entity belongs to (its glTF parent node), when any. */
-export type GroupOf = (
-  entityId: string,
-) => { readonly id: string; readonly name: string } | undefined;
+export type GroupOf = (entityId: string) => { readonly id: string; readonly name: string } | undefined;
 
 /**
  * glTF JSON (without buffer uri) and its BIN payload for `parts`; an entity in a group (`groupOf`)
@@ -286,18 +276,8 @@ export function buildGltfScene(
       POSITION: builder.vertexData(positions, 3, true),
       NORMAL: builder.vertexData(creasedNormals(part.tris), 3),
     };
-    if (appearance.finish !== undefined)
-      attributes['TEXCOORD_0'] = builder.vertexData(
-        boxUvs(part.localTris, appearance.finish.scale),
-        2,
-      );
-    builder.mesh(
-      part.name,
-      attributes,
-      material,
-      { llullId: part.entityId, kind: part.kind },
-      parentOf(part.entityId),
-    );
+    if (appearance.finish !== undefined) attributes['TEXCOORD_0'] = builder.vertexData(boxUvs(part.localTris, appearance.finish.scale), 2);
+    builder.mesh(part.name, attributes, material, { llullId: part.entityId, kind: part.kind }, parentOf(part.entityId));
   }
   decals.forEach((decal, index) => {
     const material = builder.material(`decal:${index}`, () => ({
@@ -305,9 +285,7 @@ export function buildGltfScene(
       alphaMode: 'BLEND',
       pbrMetallicRoughness: {
         baseColorTexture: {
-          index: builder.texture(
-            encodePng(decal.image.width, decal.image.height, decal.image.rgba),
-          ),
+          index: builder.texture(encodePng(decal.image.width, decal.image.height, decal.image.rgba)),
         },
         metallicFactor: 0,
         roughnessFactor: 0.6,

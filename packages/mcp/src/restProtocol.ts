@@ -77,9 +77,7 @@ export function parseCommandResponse(body: unknown, status: number): CommandOutc
       changed: false,
     };
   }
-  const affected = Array.isArray(body['affected'])
-    ? body['affected'].filter((id): id is string => typeof id === 'string')
-    : [];
+  const affected = Array.isArray(body['affected']) ? body['affected'].filter((id): id is string => typeof id === 'string') : [];
   return {
     summary: body['summary'],
     affected,

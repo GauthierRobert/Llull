@@ -36,17 +36,13 @@ if (command === 'keygen') {
   if (!payloadFile || payloadFile.startsWith('--')) fail('usage: license.mjs sign <payload.json>');
   const payload = JSON.parse(fs.readFileSync(payloadFile, 'utf8'));
   if (typeof payload.customer !== 'string' || payload.customer === '') fail('customer is required');
-  if (!Number.isInteger(payload.seats) || payload.seats < 1)
-    fail('seats must be a positive integer');
+  if (!Number.isInteger(payload.seats) || payload.seats < 1) fail('seats must be a positive integer');
   if (typeof payload.expires !== 'string' || Number.isNaN(Date.parse(payload.expires))) {
     fail('expires must be an ISO date (e.g. 2027-12-31)');
   }
   payload.features ??= [];
   if (!Array.isArray(payload.features)) fail('features must be an array of strings');
-  const keyFile = flag(
-    '--key',
-    process.env.LLULL_LICENSE_PRIVATE_KEY_FILE ?? 'license-private.pem',
-  );
+  const keyFile = flag('--key', process.env.LLULL_LICENSE_PRIVATE_KEY_FILE ?? 'license-private.pem');
   const privateKey = crypto.createPrivateKey(fs.readFileSync(keyFile, 'utf8'));
   const bytes = Buffer.from(
     JSON.stringify({

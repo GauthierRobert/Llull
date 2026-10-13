@@ -49,9 +49,7 @@ export const ANONYMOUS_ACTOR = (source: AuditSource): Actor => ({
 /** The acting user of an authenticated request (anonymous outside named-user mode). */
 export function actorOf(res: Response, source: AuditSource): Actor {
   const user = requestUser(res);
-  return user === undefined
-    ? ANONYMOUS_ACTOR(source)
-    : { userId: user.id, userName: user.name, source, named: true };
+  return user === undefined ? ANONYMOUS_ACTOR(source) : { userId: user.id, userName: user.name, source, named: true };
 }
 
 /** Resolved audit file, or null when auditing is off (tests without LLULL_AUDIT_FILE). */
@@ -81,8 +79,7 @@ export function hashJson(value: unknown): string {
 function rotate(file: string, keep: number): void {
   fs.rmSync(`${file}.${keep}`, { force: true });
   for (let index = keep - 1; index >= 1; index -= 1) {
-    if (fs.existsSync(`${file}.${index}`))
-      fs.renameSync(`${file}.${index}`, `${file}.${index + 1}`);
+    if (fs.existsSync(`${file}.${index}`)) fs.renameSync(`${file}.${index}`, `${file}.${index + 1}`);
   }
   fs.renameSync(file, `${file}.1`);
 }
@@ -95,11 +92,7 @@ export function appendAudit(entry: AuditEntry): void {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     const line = `${JSON.stringify(entry)}\n`;
     const size = fs.existsSync(file) ? fs.statSync(file).size : 0;
-    if (
-      size > 0 &&
-      size + Buffer.byteLength(line) >
-        positiveInteger(process.env['LLULL_AUDIT_MAX_BYTES'], 10 * 1024 * 1024)
-    ) {
+    if (size > 0 && size + Buffer.byteLength(line) > positiveInteger(process.env['LLULL_AUDIT_MAX_BYTES'], 10 * 1024 * 1024)) {
       rotate(file, positiveInteger(process.env['LLULL_AUDIT_KEEP'], 5));
     }
     fs.appendFileSync(file, line, { encoding: 'utf8', mode: 0o600 });

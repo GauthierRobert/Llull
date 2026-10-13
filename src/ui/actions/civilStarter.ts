@@ -117,10 +117,6 @@ export async function startCivilSite(): Promise<string> {
     return message;
   }
   return new Promise((resolve) => {
-    dispatch(
-      'build_project',
-      { actions: civilStarterActions(surveyText) },
-      { onResult: (result) => resolve(result.summary) },
-    );
+    dispatch('build_project', { actions: civilStarterActions(surveyText) }, { onResult: (result) => resolve(result.summary) });
   });
 }

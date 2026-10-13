@@ -9,12 +9,7 @@ import type { CadDocument } from '@core/model/types';
 import type { AlignmentObject, CivilModel } from '@core/model/civil';
 import { endStation, pointAtStation } from '../alignment/alignmentGeometry';
 import { designElevation, validateProfile } from '../alignment/profileGeometry';
-import {
-  crossSectionAt,
-  sectionAreas,
-  type RoadCrossSection,
-  type SectionAreas,
-} from './roadSection';
+import { crossSectionAt, sectionAreas, type RoadCrossSection, type SectionAreas } from './roadSection';
 import { surfaceTinById } from '../surface/surfaceTin';
 import { elevationAt } from '../surface/tin';
 import { crossSlopesAt, hasSuperelevation, superelevationRate } from '../alignment/superelevation';
@@ -76,20 +71,14 @@ export function analyseStations(
     const groundZ = tin && placed ? elevationAt(tin, placed.point) : null;
     const designZ = profileOk ? designElevation(alignment.profile, station) : null;
     const cross =
-      alignment.section && designZ !== null
-        ? crossSectionAt(alignment, alignment.section, tin, station, designZ, unitsPerMetre)
-        : null;
+      alignment.section && designZ !== null ? crossSectionAt(alignment, alignment.section, tin, station, designZ, unitsPerMetre) : null;
     const areas = cross && tin ? sectionAreas(cross, tin, step) : null;
     return { station, designZ, groundZ, cross, areas };
   });
 }
 
 /** Report rows with average-end-area cumulative volumes (m3) and the mass-haul ordinate. */
-export function reportRows(
-  doc: CadDocument,
-  alignment: AlignmentObject,
-  analysis: ReadonlyArray<StationAnalysis>,
-): ReportRow[] {
+export function reportRows(doc: CadDocument, alignment: AlignmentObject, analysis: ReadonlyArray<StationAnalysis>): ReportRow[] {
   const metre = toMetres(doc, 1);
   const areaFactor = metre * metre;
   let cut = 0;
@@ -121,10 +110,7 @@ export function reportRows(
       cumulativeFillM3: round(fill, 2),
       massHaulM3: round(cut - fill, 2),
       superelevationPercent: hasSuperelevation(alignment)
-        ? round(
-            superelevationRate(crossSlopesAt(alignment, crossfall, laneWidth, entry.station)) * 100,
-            3,
-          )
+        ? round(superelevationRate(crossSlopesAt(alignment, crossfall, laneWidth, entry.station)) * 100, 3)
         : null,
     };
   });
@@ -146,8 +132,6 @@ const CSV_COLUMNS = [
 ] as const;
 
 export function reportCsv(rows: ReadonlyArray<ReportRow>): string {
-  const lines = rows.map((row) =>
-    [row.stationText, ...CSV_COLUMNS.slice(1).map((column) => row[column] ?? '')].join(','),
-  );
+  const lines = rows.map((row) => [row.stationText, ...CSV_COLUMNS.slice(1).map((column) => row[column] ?? '')].join(','));
   return [CSV_COLUMNS.join(','), ...lines].join('\n');
 }

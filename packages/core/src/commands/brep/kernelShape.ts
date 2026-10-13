@@ -69,10 +69,7 @@ export interface KernelResult {
  * Evaluate `recipe` and tessellate it for display.
  * @failure kernel refuses the recipe -> 'refused'; it evaluates but yields no triangles -> 'empty'
  */
-export function evaluateRecipe(
-  kernel: GeometryKernel,
-  recipe: ShapeRecipe,
-): KernelResult | 'refused' | 'empty' {
+export function evaluateRecipe(kernel: GeometryKernel, recipe: ShapeRecipe): KernelResult | 'refused' | 'empty' {
   const shape = kernel.evaluate(recipe);
   if (shape === null) return 'refused';
   const mesh = kernel.tessellate(shape);
@@ -82,16 +79,9 @@ export function evaluateRecipe(
 
 /** The `mesh` entity of a kernel result (world space), styled after `source`. */
 function kernelResultEntity(id: string, result: KernelResult, source: Entity): Entity {
-  return newEntity(
-    'mesh',
-    id,
-    { mesh: result.mesh, brep: result.recipe },
-    [0, 0, 0],
-    source.color,
-    {
-      layerId: source.layerId,
-    },
-  );
+  return newEntity('mesh', id, { mesh: result.mesh, brep: result.recipe }, [0, 0, 0], source.color, {
+    layerId: source.layerId,
+  });
 }
 
 /** Summary suffix describing the exact topology kept by the kernel ('' for mesh-only kernels). */

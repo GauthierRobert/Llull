@@ -14,8 +14,7 @@ const mm = (value: number): string => `${Math.round(value * 10) / 10}`;
 const point = (values: readonly number[]): string => `(${values.map(mm).join(', ')})`;
 
 /** Primary (grid) members: secondary steel with a `purpose` is listed separately. */
-const primary = (intent: PlantIntent): IntentMember[] =>
-  intent.members.filter((m) => m.purpose === undefined);
+const primary = (intent: PlantIntent): IntentMember[] => intent.members.filter((m) => m.purpose === undefined);
 
 function profilesOf(intent: PlantIntent, role: string): string[] {
   return [
@@ -59,14 +58,10 @@ function supportLines(intent: PlantIntent): string[] {
 }
 
 type Axis = 'x' | 'y';
-const runsAlong = (m: IntentMember): Axis =>
-  Math.abs(m.end[0] - m.start[0]) >= Math.abs(m.end[1] - m.start[1]) ? 'x' : 'y';
+const runsAlong = (m: IntentMember): Axis => (Math.abs(m.end[0] - m.start[0]) >= Math.abs(m.end[1] - m.start[1]) ? 'x' : 'y');
 
 /** The usual beam section along an axis (most frequent), and the members that differ from it. */
-function beamRule(
-  intent: PlantIntent,
-  axis: Axis,
-): { profile: string; exceptions: IntentMember[] } {
+function beamRule(intent: PlantIntent, axis: Axis): { profile: string; exceptions: IntentMember[] } {
   const beams = primary(intent).filter((m) => m.role === 'beam' && runsAlong(m) === axis);
   const counts = new Map<string, number>();
   for (const beam of beams) counts.set(beam.profile, (counts.get(beam.profile) ?? 0) + 1);
@@ -135,10 +130,7 @@ export function plantBrief(intent: PlantIntent, extra: string[] = []): string {
     '',
     '## Grid and levels',
     `- Numbered axes 1–${xs.length} along X at x = ${xs.map(mm).join(', ')}; lettered axes ${letters.join(', ')} along Y at y = ${ys.map(mm).join(', ')}.`,
-    ...intent.levels.map(
-      (level) =>
-        `- Level "${level.name}": FFL ${mm(level.elevation)}, storey height ${mm(level.height)}.`,
-    ),
+    ...intent.levels.map((level) => `- Level "${level.name}": FFL ${mm(level.elevation)}, storey height ${mm(level.height)}.`),
     '',
     ...(intent.structureBrief ?? buildingRules),
     ...secondarySteel(intent),
@@ -147,8 +139,7 @@ export function plantBrief(intent: PlantIntent, extra: string[] = []): string {
     '| Line | Service | DN (OD) | From | To | Route |',
     '| ---- | ------- | ------- | ---- | -- | ----- |',
     ...intent.pipes.map(
-      (p) =>
-        `| ${p.line} | ${p.service} | DN${p.dn} (${PIPE_OD[p.dn] ?? '?'}) | ${p.from} | ${p.to} | ${p.route.map(point).join(' → ')} |`,
+      (p) => `| ${p.line} | ${p.service} | DN${p.dn} (${PIPE_OD[p.dn] ?? '?'}) | ${p.from} | ${p.to} | ${p.route.map(point).join(' → ')} |`,
     ),
     `Battery-limit tie-ins (lines may end open there): ${Object.entries(intent.tieIns)
       .map(([id, p]) => `${id} ${point(p)}`)

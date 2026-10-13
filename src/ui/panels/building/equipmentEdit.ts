@@ -62,19 +62,12 @@ export function equipmentValues(element: EquipmentElement): EquipmentEditValues 
   };
 }
 
-type EquipmentEdit =
-  | { readonly ok: true; readonly params: Record<string, unknown> }
-  | { readonly ok: false; readonly reason: string };
+type EquipmentEdit = { readonly ok: true; readonly params: Record<string, unknown> } | { readonly ok: false; readonly reason: string };
 
 /** `update_equipment` params for the fields whose text differs from `initial`. */
-export function buildEquipmentUpdate(
-  elementId: string,
-  initial: EquipmentEditValues,
-  values: EquipmentEditValues,
-): EquipmentEdit {
+export function buildEquipmentUpdate(elementId: string, initial: EquipmentEditValues, values: EquipmentEditValues): EquipmentEdit {
   const reader = new FieldReader(values);
-  const changed = (...keys: EquipmentEditKey[]): boolean =>
-    keys.some((key) => values[key] !== initial[key]);
+  const changed = (...keys: EquipmentEditKey[]): boolean => keys.some((key) => values[key] !== initial[key]);
   const changes: Record<string, unknown> = {};
   if (changed('mark')) changes['mark'] = reader.text('mark');
   if (changed('name')) changes['name'] = reader.text('name');

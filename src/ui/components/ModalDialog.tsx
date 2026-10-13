@@ -68,10 +68,7 @@ export function ModalDialog({
   };
 
   return (
-    <div
-      className={backdropClassName}
-      {...(closeOn === 'click' ? { onClick: closeOnHit } : { onMouseDown: closeOnHit })}
-    >
+    <div className={backdropClassName} {...(closeOn === 'click' ? { onClick: closeOnHit } : { onMouseDown: closeOnHit })}>
       <div
         ref={dialogRef}
         className={className}

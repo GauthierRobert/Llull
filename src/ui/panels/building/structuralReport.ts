@@ -41,9 +41,7 @@ function toPipeRows(pipes: ReadonlyArray<unknown>): ReportRow[] {
 
 export function toWarnings(data: unknown): string[] {
   const warnings: unknown = isRecord(data) ? data.warnings : undefined;
-  return Array.isArray(warnings)
-    ? warnings.filter((warning): warning is string => typeof warning === 'string')
-    : [];
+  return Array.isArray(warnings) ? warnings.filter((warning): warning is string => typeof warning === 'string') : [];
 }
 
 function toReportRows(data: unknown): ReportRow[] {
@@ -56,9 +54,7 @@ function toReportRows(data: unknown): ReportRow[] {
       const value = row[key];
       return typeof value === 'string' ? value : '';
     };
-    const label = [text('mark') || text('column'), text('kind') || text('check'), text('frame')]
-      .filter((part) => part !== '')
-      .join(' · ');
+    const label = [text('mark') || text('column'), text('kind') || text('check'), text('frame')].filter((part) => part !== '').join(' · ');
     return [
       {
         key: `${index}:${text('elementId')}`,

@@ -16,9 +16,7 @@ function tetrahedron(shift = 0): MeshData {
     [0, 3, 2],
     [1, 2, 3],
   ];
-  const positions = faces.flatMap((face) =>
-    face.flatMap((corner) => corners[corner]!.map((value) => value + shift)),
-  );
+  const positions = faces.flatMap((face) => face.flatMap((corner) => corners[corner]!.map((value) => value + shift)));
   return { positions, indices: faces.flatMap((_, f) => [f * 3, f * 3 + 1, f * 3 + 2]) };
 }
 

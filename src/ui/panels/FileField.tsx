@@ -15,17 +15,9 @@ interface FileFieldBase {
 }
 
 type FileFieldProps = FileFieldBase &
-  (
-    | { onText: (text: string, fileName: string) => void; onFile?: never }
-    | { onFile: (file: File) => void; onText?: never }
-  );
+  ({ onText: (text: string, fileName: string) => void; onFile?: never } | { onFile: (file: File) => void; onText?: never });
 
-export function FileField({
-  label,
-  accept,
-  ariaLabel,
-  ...handlers
-}: FileFieldProps): React.ReactElement {
+export function FileField({ label, accept, ariaLabel, ...handlers }: FileFieldProps): React.ReactElement {
   const onChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
     if (handlers.onText !== undefined) {
       readChosenFile(event, handlers.onText);

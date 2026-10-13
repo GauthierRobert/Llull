@@ -6,11 +6,7 @@ import { noop } from '../noop';
 import { entityOfKind } from '../entity/entityOfKind';
 
 /** The polyline entity `id`, or the no-op result naming `command` when it is missing or another kind. */
-export function resolvePolyline(
-  doc: CadDocument,
-  command: string,
-  id: string,
-): PolylineEntity | CommandResult {
+export function resolvePolyline(doc: CadDocument, command: string, id: string): PolylineEntity | CommandResult {
   const found = entityOfKind(doc, id, ['polyline']);
   return typeof found === 'string' ? noop(doc, `${command}: ${found}.`) : found;
 }

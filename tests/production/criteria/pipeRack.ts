@@ -1,23 +1,9 @@
 import type { CableTrayElement, PipeElement } from '@core/model/building';
 import type { Vec3 } from '@core/model/types';
 import type { CheckOutcome, Criterion, GradeContext } from '../contract';
-import {
-  absolute,
-  distance,
-  elementsOf,
-  polylineLength,
-  round,
-  sameEnds,
-} from '../oracle/geometry';
+import { absolute, distance, elementsOf, polylineLength, round, sameEnds } from '../oracle/geometry';
 import { column, parseCsv } from '../oracle/csv';
-import {
-  ofType,
-  parseIfc,
-  references,
-  stepString,
-  type IfcFile,
-  type StepValue,
-} from '../oracle/ifc';
+import { ofType, parseIfc, references, stepString, type IfcFile, type StepValue } from '../oracle/ifc';
 import { PIPE_OD, section } from '../oracle/steel';
 import type { PlantIntent } from '../plant/intent';
 import { absoluteMembers } from './plantStructure';
@@ -96,8 +82,7 @@ const underside = (run: Run, point: Vec3): number => point[2] - run.height / 2;
 function bentsOf(ctx: GradeContext): number[] {
   const xs: number[] = [];
   for (const { element, start } of absoluteMembers(ctx.document)) {
-    if (element.role === 'column' && !xs.some((x) => Math.abs(x - start[0]) <= AT))
-      xs.push(start[0]);
+    if (element.role === 'column' && !xs.some((x) => Math.abs(x - start[0]) <= AT)) xs.push(start[0]);
   }
   return xs.sort((a, b) => a - b);
 }
@@ -115,10 +100,7 @@ function tierBeamsAt(ctx: GradeContext, x: number): { beams: TierBeam[]; unknown
   const unknown: string[] = [];
   for (const { element, start, end } of absoluteMembers(ctx.document)) {
     const across =
-      element.role === 'beam' &&
-      Math.abs(start[0] - x) <= AT &&
-      Math.abs(end[0] - x) <= AT &&
-      Math.abs(start[1] - end[1]) > AT;
+      element.role === 'beam' && Math.abs(start[0] - x) <= AT && Math.abs(end[0] - x) <= AT && Math.abs(start[1] - end[1]) > AT;
     if (!across) continue;
     const facts = section(element.profile);
     if (!facts) {
@@ -143,8 +125,7 @@ function supportCheck(kind: Run['kind'], rules: RackRules, ctx: GradeContext): C
   if (runs.length === 0) return { pass: false, detail: `no ${kind} in the model` };
   for (const x of bents) {
     const { beams, unknown } = tierBeamsAt(ctx, x);
-    if (unknown.length > 0)
-      problems.push(`bent x=${round(x, 0)}: section ${unknown[0]} not tabulated`);
+    if (unknown.length > 0) problems.push(`bent x=${round(x, 0)}: section ${unknown[0]} not tabulated`);
     for (const run of runs) {
       const at = crossingAt(run.route, x);
       if (!at) {
@@ -154,19 +135,14 @@ function supportCheck(kind: Run['kind'], rules: RackRules, ctx: GradeContext): C
       const bottom = underside(run, at);
       const half = run.width / 2;
       const carrier = beams.find(
-        (beam) =>
-          at[1] - half >= beam.yMin - AT &&
-          at[1] + half <= beam.yMax + AT &&
-          Math.abs(beam.top - bottom) <= rules.supportTolerance,
+        (beam) => at[1] - half >= beam.yMin - AT && at[1] + half <= beam.yMax + AT && Math.abs(beam.top - bottom) <= rules.supportTolerance,
       );
       if (carrier) {
         supports++;
         continue;
       }
       const under = beams.filter((beam) => at[1] >= beam.yMin && at[1] <= beam.yMax);
-      const nearest = under
-        .map((beam) => beam.top - bottom)
-        .sort((a, b) => Math.abs(a) - Math.abs(b))[0];
+      const nearest = under.map((beam) => beam.top - bottom).sort((a, b) => Math.abs(a) - Math.abs(b))[0];
       problems.push(
         `${run.label} at bent x=${round(x, 0)}: ` +
           (nearest === undefined
@@ -191,8 +167,7 @@ function roadClearanceCheck(rules: RackRules, ctx: GradeContext): CheckOutcome {
   for (const { element, start, end } of absoluteMembers(ctx.document)) {
     const reaches = Math.max(start[0], end[0]) > xMin && Math.min(start[0], end[0]) < xMax;
     if (!reaches) continue;
-    if (element.role === 'column')
-      obstructions.push(`${element.mark} (${element.profile}) stands in the road`);
+    if (element.role === 'column') obstructions.push(`${element.mark} (${element.profile}) stands in the road`);
     const facts = section(element.profile);
     candidates.push({
       label: `${element.mark} ${element.profile}`,
@@ -212,8 +187,7 @@ function roadClearanceCheck(rules: RackRules, ctx: GradeContext): CheckOutcome {
     });
   }
   const lowest = candidates.sort((a, b) => a.bottom - b.bottom)[0];
-  if (!lowest)
-    return { pass: false, detail: 'nothing crosses the road corridor: no rack over the road' };
+  if (!lowest) return { pass: false, detail: 'nothing crosses the road corridor: no rack over the road' };
   const pass = lowest.bottom >= rules.roadClearHeight && obstructions.length === 0;
   return {
     pass,
@@ -244,9 +218,7 @@ function spacingCheck(rules: RackRules, ctx: GradeContext): CheckOutcome {
     placed.sort((a, b) => a.bottom - b.bottom);
     const tiers: Placed[][] = [];
     for (const item of placed) {
-      const tier = tiers.find(
-        (group) => Math.abs((group[0]?.bottom ?? 0) - item.bottom) <= rules.supportTolerance + 50,
-      );
+      const tier = tiers.find((group) => Math.abs((group[0]?.bottom ?? 0) - item.bottom) <= rules.supportTolerance + 50);
       if (tier) tier.push(item);
       else tiers.push([item]);
     }
@@ -273,11 +245,7 @@ function spacingCheck(rules: RackRules, ctx: GradeContext): CheckOutcome {
   };
 }
 
-function batteryLimitsCheck(
-  intent: PlantIntent,
-  rules: RackRules,
-  ctx: GradeContext,
-): CheckOutcome {
+function batteryLimitsCheck(intent: PlantIntent, rules: RackRules, ctx: GradeContext): CheckOutcome {
   const pipes = elementsOf(ctx.document, 'pipe');
   const bents = bentsOf(ctx);
   const first = bents[0] ?? 0;
@@ -292,9 +260,7 @@ function batteryLimitsCheck(
     const route = pipe.points.map((point) => absolute(ctx.document, pipe.levelId, point));
     const ends = [route[0], route.at(-1)];
     const sides = ends.map((end) => {
-      const tieIn = end
-        ? tieIns.find(([, point]) => distance(point, end) <= END_TOLERANCE)
-        : undefined;
+      const tieIn = end ? tieIns.find(([, point]) => distance(point, end) <= END_TOLERANCE) : undefined;
       if (tieIn) used.set(tieIn[0], pipe.mark);
       return { end, tieIn: tieIn?.[0] };
     });
@@ -307,15 +273,12 @@ function batteryLimitsCheck(
       Math.abs((xs[0] ?? NaN) - rules.batteryLimits.west) > END_TOLERANCE ||
       Math.abs((xs[1] ?? NaN) - rules.batteryLimits.east) > END_TOLERANCE
     ) {
-      problems.push(
-        `${pipe.mark} ${pipe.service} runs x ${round(xs[0] ?? NaN, 0)} to ${round(xs[1] ?? NaN, 0)}, not BL1 to BL2`,
-      );
+      problems.push(`${pipe.mark} ${pipe.service} runs x ${round(xs[0] ?? NaN, 0)} to ${round(xs[1] ?? NaN, 0)}, not BL1 to BL2`);
     }
     if (Math.min(...route.map((p) => p[0])) > first || Math.max(...route.map((p) => p[0])) < last) {
       problems.push(`${pipe.mark} does not span bent 1 to bent ${bents.length}`);
     }
-    if (route.length !== 2)
-      problems.push(`${pipe.mark} has ${route.length - 2} bend(s) on a straight rack line`);
+    if (route.length !== 2) problems.push(`${pipe.mark} has ${route.length - 2} bend(s) on a straight rack line`);
   }
   const unused = tieIns.filter(([id]) => !used.has(id)).map(([id]) => id);
   if (unused.length > 0) problems.push(`tie-ins with no line: ${unused.slice(0, 6).join(', ')}`);
@@ -360,14 +323,11 @@ function lineMetresCheck(intent: PlantIntent, ctx: GradeContext): CheckOutcome {
     const listed = scheduleByOd.get(od) ?? 0;
     rows.push(`DN${dn} ${round(metres, 1)}/${round(taken, 1)}/${round(listed, 1)}`);
     const tolerance = 0.005 * metres + 0.05;
-    if (Math.abs(taken - metres) > tolerance)
-      problems.push(`DN${dn} takeoff ${round(taken, 1)} m, design ${round(metres, 1)} m`);
-    if (Math.abs(listed - metres) > tolerance)
-      problems.push(`DN${dn} pipe schedule ${round(listed, 1)} m, design ${round(metres, 1)} m`);
+    if (Math.abs(taken - metres) > tolerance) problems.push(`DN${dn} takeoff ${round(taken, 1)} m, design ${round(metres, 1)} m`);
+    if (Math.abs(listed - metres) > tolerance) problems.push(`DN${dn} pipe schedule ${round(listed, 1)} m, design ${round(metres, 1)} m`);
   }
   const extra = [...takeoffByOd.keys()].filter((od) => !designed.has(od));
-  if (extra.length > 0)
-    problems.push(`takeoff lists sizes not in the line list: Ø${extra.join(', Ø')}`);
+  if (extra.length > 0) problems.push(`takeoff lists sizes not in the line list: Ø${extra.join(', Ø')}`);
   return {
     pass: problems.length === 0,
     detail:
@@ -381,12 +341,10 @@ function trayCheck(intent: PlantIntent, rules: RackRules, ctx: GradeContext): Ch
   const wanted = intent.trays ?? [];
   const trays = elementsOf(ctx.document, 'tray');
   const problems: string[] = [];
-  if (trays.length !== wanted.length)
-    problems.push(`${trays.length} tray run(s), design has ${wanted.length}`);
+  if (trays.length !== wanted.length) problems.push(`${trays.length} tray run(s), design has ${wanted.length}`);
   const designedMetres = wanted.reduce((sum, tray) => sum + polylineLength(tray.route) / 1000, 0);
   const modelledMetres = trays.reduce(
-    (sum, tray) =>
-      sum + polylineLength(tray.points.map((p) => absolute(ctx.document, tray.levelId, p))) / 1000,
+    (sum, tray) => sum + polylineLength(tray.points.map((p) => absolute(ctx.document, tray.levelId, p))) / 1000,
     0,
   );
   if (Math.abs(modelledMetres - designedMetres) > 0.005 * designedMetres + 0.05) {
@@ -399,9 +357,7 @@ function trayCheck(intent: PlantIntent, rules: RackRules, ctx: GradeContext): Ch
     .filter((line) => line.key.startsWith('tray.') && line.unit === 'm')
     .reduce((sum, line) => sum + line.quantity, 0);
   if (Math.abs(takeoffMetres - designedMetres) > 0.005 * designedMetres + 0.05) {
-    problems.push(
-      `takeoff ${round(takeoffMetres, 2)} m of tray, design ${round(designedMetres, 2)} m`,
-    );
+    problems.push(`takeoff ${round(takeoffMetres, 2)} m of tray, design ${round(designedMetres, 2)} m`);
   }
   const support = supportCheck('tray', rules, ctx);
   if (!support.pass) problems.push(support.detail);
@@ -414,14 +370,10 @@ function trayCheck(intent: PlantIntent, rules: RackRules, ctx: GradeContext): Ch
   };
 }
 
-const numbers = (value: StepValue | undefined): number[] =>
-  Array.isArray(value) ? value.map((item) => Number(item)) : [];
+const numbers = (value: StepValue | undefined): number[] => (Array.isArray(value) ? value.map((item) => Number(item)) : []);
 
 /** Radius, extrusion depth, start point and axis of the straight solid an IFC element is built on. */
-function extrusionOf(
-  file: IfcFile,
-  shape: number,
-): { radius: number; depth: number; origin: number[]; axis: number[] } | null {
+function extrusionOf(file: IfcFile, shape: number): { radius: number; depth: number; origin: number[]; axis: number[] } | null {
   const entity = (id: number | undefined): { type: string; args: StepValue[] } | undefined =>
     id === undefined ? undefined : file.entities.get(id);
   const [representation] = references([entity(shape)?.args[2] ?? []]);
@@ -436,10 +388,7 @@ function extrusionOf(
 }
 
 /** The briefed line whose ends match this route (either direction), or undefined. */
-function intendedLine(
-  intent: PlantIntent,
-  route: Vec3[],
-): PlantIntent['pipes'][number] | undefined {
+function intendedLine(intent: PlantIntent, route: Vec3[]): PlantIntent['pipes'][number] | undefined {
   return intent.pipes.find((line) => sameEnds(route, line.route, END_TOLERANCE));
 }
 
@@ -458,27 +407,15 @@ function ifcLinesCheck(intent: PlantIntent, ctx: GradeContext): CheckOutcome {
     const lineNumber = intendedLine(intent, route)?.line;
     if (lineNumber === undefined) {
       problems.push(`${pipe.mark} matches no briefed line`);
-    } else if (
-      !new RegExp(`(^|\\W)${lineNumber}(\\W|$)`).test(
-        `${stepString(segment.args[2])} ${stepString(segment.args[3])}`,
-      )
-    ) {
+    } else if (!new RegExp(`(^|\\W)${lineNumber}(\\W|$)`).test(`${stepString(segment.args[2])} ${stepString(segment.args[3])}`)) {
       problems.push(`${pipe.mark}: IFC carries no line number ${lineNumber}`);
     }
     const solid = extrusionOf(file, references([segment.args[6] ?? '$'])[0] ?? -1);
     const start = route[0] ?? [0, 0, 0];
     const end = route.at(-1) ?? [0, 0, 0];
     const length = distance(start, end);
-    const exported: Vec3 = [
-      solid?.origin[0] ?? NaN,
-      solid?.origin[1] ?? NaN,
-      solid?.origin[2] ?? NaN,
-    ];
-    const direction = [
-      (end[0] - start[0]) / length,
-      (end[1] - start[1]) / length,
-      (end[2] - start[2]) / length,
-    ];
+    const exported: Vec3 = [solid?.origin[0] ?? NaN, solid?.origin[1] ?? NaN, solid?.origin[2] ?? NaN];
+    const direction = [(end[0] - start[0]) / length, (end[1] - start[1]) / length, (end[2] - start[2]) / length];
     if (!solid) problems.push(`${pipe.mark}: no extruded solid`);
     else if (
       Math.abs(solid.radius * 2 - pipe.diameter) > 0.5 ||
@@ -493,8 +430,7 @@ function ifcLinesCheck(intent: PlantIntent, ctx: GradeContext): CheckOutcome {
   }
   const trays = ofType(file, 'IFCCABLECARRIERSEGMENT').length;
   const modelTrays = elementsOf(ctx.document, 'tray').length;
-  if (trays !== modelTrays)
-    problems.push(`IFC has ${trays} cable carrier segment(s), model ${modelTrays} tray(s)`);
+  if (trays !== modelTrays) problems.push(`IFC has ${trays} cable carrier segment(s), model ${modelTrays} tray(s)`);
   return {
     pass: problems.length === 0 && pipes.length > 0,
     detail:
@@ -509,36 +445,31 @@ export function pipeRackCriteria(intent: PlantIntent, rules: RackRules): Criteri
     {
       id: 'rack-line-supports',
       area: 'engineering',
-      requirement:
-        'Every line rests on the tier beam of every bent it crosses: pipe underside = top of steel (±5 mm).',
+      requirement: 'Every line rests on the tier beam of every bent it crosses: pipe underside = top of steel (±5 mm).',
       check: (ctx) => supportCheck('pipe', rules, ctx),
     },
     {
       id: 'rack-cable-tray',
       area: 'engineering',
-      requirement:
-        'The cable tray runs the rack length on the upper tier, supported on every bent, and is in the takeoff.',
+      requirement: 'The cable tray runs the rack length on the upper tier, supported on every bent, and is in the takeoff.',
       check: (ctx) => trayCheck(intent, rules, ctx),
     },
     {
       id: 'rack-road-clearance',
       area: 'coordination',
-      requirement:
-        'Clear height under the rack over the road crossing is at least the briefed value, with no column in the road.',
+      requirement: 'Clear height under the rack over the road crossing is at least the briefed value, with no column in the road.',
       check: (ctx) => roadClearanceCheck(rules, ctx),
     },
     {
       id: 'rack-line-spacing',
       area: 'piping',
-      requirement:
-        'Adjacent lines (and the tray) on a tier keep the minimum clear gap between outside diameters.',
+      requirement: 'Adjacent lines (and the tray) on a tier keep the minimum clear gap between outside diameters.',
       check: (ctx) => spacingCheck(rules, ctx),
     },
     {
       id: 'rack-battery-limits',
       area: 'piping',
-      requirement:
-        'Every line runs straight from its BL1 tie-in to its BL2 tie-in over the full rack length; no tie-in left unused.',
+      requirement: 'Every line runs straight from its BL1 tie-in to its BL2 tie-in over the full rack length; no tie-in left unused.',
       check: (ctx) => batteryLimitsCheck(intent, rules, ctx),
     },
     {
@@ -551,8 +482,7 @@ export function pipeRackCriteria(intent: PlantIntent, rules: RackRules): Criteri
     {
       id: 'rack-line-metres',
       area: 'piping',
-      requirement:
-        'Total line metres per DN agree between the design, the quantity takeoff and the pipe schedule.',
+      requirement: 'Total line metres per DN agree between the design, the quantity takeoff and the pipe schedule.',
       check: (ctx) => lineMetresCheck(intent, ctx),
     },
   ];

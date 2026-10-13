@@ -104,9 +104,7 @@ const totalVolume = (imported: Imported): number =>
 const manifest = JSON.parse(readFileSync(path.join(ROOT, 'quality', 'corpus.json'), 'utf8')) as {
   files: CorpusEntry[];
 };
-const entries = manifest.files.filter(
-  (entry) => entry.format === 'step' && TIERS.indexOf(entry.tier) <= TIERS.indexOf(TIER),
-);
+const entries = manifest.files.filter((entry) => entry.format === 'step' && TIERS.indexOf(entry.tier) <= TIERS.indexOf(TIER));
 const port = createPythonExchangePort({
   python: CADQUERY_PYTHON,
   build123dPython: CADQUERY_PYTHON,
@@ -134,12 +132,7 @@ function soupOf(entity: Entity): readonly number[] {
  * A known issue must still fail its assertions; a crash while loading only counts as the known
  * failure when `imports` itself is known (otherwise it is reported, never absorbed).
  */
-function check(
-  entry: CorpusEntry,
-  id: CheckId,
-  load: () => Promise<unknown>,
-  body: () => void | Promise<void>,
-): void {
+function check(entry: CorpusEntry, id: CheckId, load: () => Promise<unknown>, body: () => void | Promise<void>): void {
   if (!entry.knownIssues.includes(id)) {
     it(id, body, 600_000);
     return;
@@ -152,9 +145,7 @@ function check(
     } catch {
       failed = true;
     }
-    expect(failed, `${id} passes now: remove it from knownIssues in quality/corpus.json`).toBe(
-      true,
-    );
+    expect(failed, `${id} passes now: remove it from knownIssues in quality/corpus.json`).toBe(true);
   }, 600_000);
 }
 
@@ -204,9 +195,7 @@ describe.each(entries)('STEP $id — $description', (entry) => {
     const { ref: r, imported: i } = await load();
     expect(i.meshes.length).toBeGreaterThan(0);
     if (r.solids > 0) {
-      expect(i.meshes.length, 'solids + closed shells').toBeGreaterThanOrEqual(
-        r.solids + r.closedShells,
-      );
+      expect(i.meshes.length, 'solids + closed shells').toBeGreaterThanOrEqual(r.solids + r.closedShells);
     }
   });
 
@@ -246,9 +235,7 @@ describe.each(entries)('STEP $id — $description', (entry) => {
     const box: Box6 = [...data.min, ...data.max];
     const error = boxDistance(box, faceBox) / diagonal(faceBox);
     metrics['boxError'] = error;
-    expect(boxDistance(box, faceBox)).toBeLessThanOrEqual(
-      MAX_BOX_ERROR * diagonal(faceBox) + 2 * CHORD,
-    );
+    expect(boxDistance(box, faceBox)).toBeLessThanOrEqual(MAX_BOX_ERROR * diagonal(faceBox) + 2 * CHORD);
   });
 
   check(entry, 'part-placement', load, async () => {
@@ -265,9 +252,7 @@ describe.each(entries)('STEP $id — $description', (entry) => {
     const area = i.meshes.reduce((total, mesh) => total + analyzeSoup(soupOf(mesh)).area, 0);
     const error = Math.abs(area - r.area) / r.area;
     metrics['areaError'] = error;
-    expect(error, 'imported surface area vs every face of the file').toBeLessThanOrEqual(
-      MAX_AREA_ERROR,
-    );
+    expect(error, 'imported surface area vs every face of the file').toBeLessThanOrEqual(MAX_AREA_ERROR);
   });
 
   check(entry, 'colors', load, async () => {
@@ -290,9 +275,7 @@ describe.each(entries)('STEP $id — $description', (entry) => {
   check(entry, 'check-model', load, async () => {
     const { imported: i } = await load();
     const data = execute(i.document, 'check_model', {}).data as { ok: boolean; issues: unknown[] };
-    expect(
-      data.issues.filter((issue) => (issue as { severity: string }).severity === 'error'),
-    ).toEqual([]);
+    expect(data.issues.filter((issue) => (issue as { severity: string }).severity === 'error')).toEqual([]);
   });
 
   check(entry, 'save-load', load, async () => {
@@ -311,10 +294,7 @@ describe.each(entries)('STEP $id — $description', (entry) => {
   });
 
   if (entry.source !== 'synthetic') return;
-  const expected = (): Expected =>
-    JSON.parse(
-      readFileSync(path.join(CORPUS_DIR, `${entry.id}.expected.json`), 'utf8'),
-    ) as Expected;
+  const expected = (): Expected => JSON.parse(readFileSync(path.join(CORPUS_DIR, `${entry.id}.expected.json`), 'utf8')) as Expected;
 
   check(entry, 'intent-geometry', load, async () => {
     const { imported: i } = await load();
@@ -342,8 +322,5 @@ describe.each(entries)('STEP $id — $description', (entry) => {
 
 afterAll(() => {
   mkdirSync(path.join(CORPUS_DIR, 'reports'), { recursive: true });
-  writeFileSync(
-    path.join(CORPUS_DIR, 'reports', 'step-import.json'),
-    JSON.stringify({ tier: TIER, files: report }, null, 2),
-  );
+  writeFileSync(path.join(CORPUS_DIR, 'reports', 'step-import.json'), JSON.stringify({ tier: TIER, files: report }, null, 2));
 });

@@ -8,10 +8,7 @@ import { useEffect, useMemo, type DependencyList } from 'react';
 import type { Vec2 } from '@core/model/types';
 import { anchoredGeometry } from './lineGeometry';
 
-export function useDisposable<T extends { dispose: () => void }>(
-  create: () => T,
-  deps: DependencyList,
-): T {
+export function useDisposable<T extends { dispose: () => void }>(create: () => T, deps: DependencyList): T {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const resource = useMemo(create, deps);
   useEffect(() => () => resource.dispose(), [resource]);

@@ -21,12 +21,7 @@ export function pitchRadiusOf(mod: number, teeth: number): number {
  * `samples` points of the involute of a circle of radius `rb` (x = rb(cos t + t sin t),
  * y = rb(sin t - t cos t)), t linear from `tStart` to `tEnd`. Shared by `draw_involute`.
  */
-export function sampleInvolute(
-  rb: number,
-  tStart: number,
-  tEnd: number,
-  samples: number,
-): ReadonlyArray<Point2> {
+export function sampleInvolute(rb: number, tStart: number, tEnd: number, samples: number): ReadonlyArray<Point2> {
   const n = Math.max(samples - 1, 1);
   return Array.from({ length: n + 1 }, (_, i): Point2 => {
     const t = tStart + ((tEnd - tStart) * i) / n;
@@ -53,8 +48,7 @@ export interface ToothPattern {
 }
 
 /** Involute parameter t (= tan of the pressure angle) at which the curve reaches radius `r`. */
-const involuteT = (baseRadius: number, r: number): number =>
-  r <= baseRadius ? 0 : Math.sqrt((r / baseRadius) ** 2 - 1);
+const involuteT = (baseRadius: number, r: number): number => (r <= baseRadius ? 0 : Math.sqrt((r / baseRadius) ** 2 - 1));
 
 /** Smallest half angular thickness at the tip, as a fraction of the nominal half pitch-thickness, before the tip radius is lowered. */
 const MIN_TIP_FRACTION = 0.15;
@@ -128,12 +122,7 @@ export function toothProfile(pattern: ToothPattern): {
   const rootSpan = pitchAngle - 2 * first.half;
   const rootSteps = Math.max(2, Math.ceil(rootSpan / ARC_STEP));
   /** Cubic Bézier of the involute between `a` and `b` on the side `sign` (−1 left, +1 right) of tooth `centre`. */
-  const flankBezier = (
-    centre: number,
-    sign: 1 | -1,
-    a: FlankSample,
-    b: FlankSample,
-  ): readonly [Point2, Point2, Point2, Point2] => {
+  const flankBezier = (centre: number, sign: 1 | -1, a: FlankSample, b: FlankSample): readonly [Point2, Point2, Point2, Point2] => {
     const point = (f: FlankSample): Point2 => polar(f.radius, centre + sign * f.half);
     const tangent = (f: FlankSample): Point2 => {
       const radial = (baseRadius * f.t) / Math.sqrt(1 + f.t * f.t);
@@ -171,15 +160,10 @@ export function toothProfile(pattern: ToothPattern): {
     curves.push({ type: 'bezier', points: flankBezier(centre, -1, first, last) });
     curves.push({
       type: 'arc',
-      points: [
-        polar(last.radius, centre - last.half),
-        polar(last.radius, centre),
-        polar(last.radius, centre + last.half),
-      ],
+      points: [polar(last.radius, centre - last.half), polar(last.radius, centre), polar(last.radius, centre + last.half)],
     });
     curves.push({ type: 'bezier', points: flankBezier(centre, 1, last, first) });
-    if (undercut)
-      curves.push({ type: 'line', points: [polar(first.radius, centre + first.half), rightLead] });
+    if (undercut) curves.push({ type: 'line', points: [polar(first.radius, centre + first.half), rightLead] });
     const rootStart = undercut ? rightLead : polar(first.radius, centre + first.half);
     const nextLeft = polar(undercut ? rootRadius : first.radius, centre + pitchAngle - first.half);
     curves.push({
@@ -218,20 +202,13 @@ function gearPattern(
     tipRadius: pitchRadius + tip * mod,
     rootRadius: pitchRadius - root * mod,
     refRadius: pitchRadius,
-    halfAngleAtRef:
-      Math.PI / (2 * teeth) + (backlashSign * (BACKLASH_PER_MODULE * mod)) / (4 * pitchRadius),
+    halfAngleAtRef: Math.PI / (2 * teeth) + (backlashSign * (BACKLASH_PER_MODULE * mod)) / (4 * pitchRadius),
     flankSamples,
     phase,
   };
 }
 
-type PatternArgs = [
-  mod: number,
-  teeth: number,
-  pressureAngle: number,
-  flankSamples: number,
-  phase?: number,
-];
+type PatternArgs = [mod: number, teeth: number, pressureAngle: number, flankSamples: number, phase?: number];
 
 const patternWith =
   (depths: PatternDepths) =>

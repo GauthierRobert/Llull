@@ -32,15 +32,8 @@ const MIN_ROD = 50;
 
 const isBelow = (type: PipeSupportType): boolean => type !== 'hanger';
 
-function planProjection(
-  bar: SteelBar,
-  point: Vec3,
-): { distance: number; t: number; axisZ: number } {
-  const { distance, t } = projectOntoSegment(
-    [point[0], point[1]],
-    [bar.start[0], bar.start[1]],
-    [bar.end[0], bar.end[1]],
-  );
+function planProjection(bar: SteelBar, point: Vec3): { distance: number; t: number; axisZ: number } {
+  const { distance, t } = projectOntoSegment([point[0], point[1]], [bar.start[0], bar.start[1]], [bar.end[0], bar.end[1]]);
   return { distance, t, axisZ: bar.start[2] + (bar.end[2] - bar.start[2]) * t };
 }
 
@@ -63,13 +56,7 @@ function barTraits(bar: SteelBar): {
  * Whether `bar` can carry a support of `type` at the pipe centreline point `point` (absolute mm,
  * pipe outside diameter `diameter`); the gap and plan distance when it can, else the reason.
  */
-export function bearingOf(
-  bar: SteelBar,
-  type: PipeSupportType,
-  point: Vec3,
-  diameter: number,
-  limits: BearingLimits,
-): BearingHit | string {
+export function bearingOf(bar: SteelBar, type: PipeSupportType, point: Vec3, diameter: number, limits: BearingLimits): BearingHit | string {
   const { width, depth, slope, failure } = barTraits(bar);
   const underside = point[2] - diameter / 2;
   const top = point[2] + diameter / 2;
@@ -79,31 +66,23 @@ export function bearingOf(
     if (planDistance > Math.max(width, depth) / 2 + limits.planTolerance)
       return failure(`is ${Math.round(planDistance)} mm from the pipe in plan`);
     const [low, high] = [Math.min(bar.start[2], bar.end[2]), Math.max(bar.start[2], bar.end[2])];
-    if (underside >= low - PENETRATION && underside <= high + PENETRATION)
-      return { memberId: bar.id, gap: 0, planDistance };
+    if (underside >= low - PENETRATION && underside <= high + PENETRATION) return { memberId: bar.id, gap: 0, planDistance };
     const gap = underside - high;
     return gap >= 0 && gap <= limits.maxReach
       ? { memberId: bar.id, gap, planDistance }
-      : failure(
-          `top is ${Math.round(gap)} mm from the pipe underside (reach ${limits.maxReach} mm)`,
-        );
+      : failure(`top is ${Math.round(gap)} mm from the pipe underside (reach ${limits.maxReach} mm)`);
   }
-  if (slope > HORIZONTAL_RATIO)
-    return failure('is inclined: only horizontal members carry supports');
+  if (slope > HORIZONTAL_RATIO) return failure('is inclined: only horizontal members carry supports');
   const projection = planProjection(bar, point);
   if (projection.distance > width / 2 + limits.planTolerance) {
     return failure(
       `is ${Math.round(projection.distance)} mm from the pipe in plan (half width ${Math.round(width / 2)} + tolerance ${limits.planTolerance} mm)`,
     );
   }
-  const gap = isBelow(type)
-    ? underside - (projection.axisZ + depth / 2)
-    : projection.axisZ - depth / 2 - top;
+  const gap = isBelow(type) ? underside - (projection.axisZ + depth / 2) : projection.axisZ - depth / 2 - top;
   const [minimum, side] = isBelow(type) ? [-PENETRATION, 'below'] : [MIN_ROD, 'above'];
   if (gap < minimum || gap > limits.maxReach) {
-    return failure(
-      `is ${Math.round(gap)} mm ${side} the pipe (needs ${minimum}…${limits.maxReach} mm)`,
-    );
+    return failure(`is ${Math.round(gap)} mm ${side} the pipe (needs ${minimum}…${limits.maxReach} mm)`);
   }
   return {
     memberId: bar.id,
@@ -126,39 +105,26 @@ interface RiserHit extends BearingHit {
  * clamp elevation (± `planTolerance`) and whose face is within `maxReach` of the pipe surface.
  * The bracket length and direction when it can, else the reason.
  */
-export function riserBearingOf(
-  bar: SteelBar,
-  point: Vec3,
-  diameter: number,
-  limits: BearingLimits,
-): RiserHit | string {
+export function riserBearingOf(bar: SteelBar, point: Vec3, diameter: number, limits: BearingLimits): RiserHit | string {
   const { width, depth, slope, failure } = barTraits(bar);
   const column = slope >= VERTICAL_RATIO;
-  if (!column && slope > HORIZONTAL_RATIO)
-    return failure('is inclined: only columns and horizontal members take riser brackets');
+  if (!column && slope > HORIZONTAL_RATIO) return failure('is inclined: only columns and horizontal members take riser brackets');
   const projection = column ? null : planProjection(bar, point);
   const nearest: [number, number] =
     projection === null
       ? [bar.start[0], bar.start[1]]
-      : [
-          bar.start[0] + (bar.end[0] - bar.start[0]) * projection.t,
-          bar.start[1] + (bar.end[1] - bar.start[1]) * projection.t,
-        ];
+      : [bar.start[0] + (bar.end[0] - bar.start[0]) * projection.t, bar.start[1] + (bar.end[1] - bar.start[1]) * projection.t];
   const planDistance = Math.hypot(point[0] - nearest[0], point[1] - nearest[1]);
   const [low, high] = column
     ? [Math.min(bar.start[2], bar.end[2]), Math.max(bar.start[2], bar.end[2])]
     : [(projection?.axisZ ?? 0) - depth / 2, (projection?.axisZ ?? 0) + depth / 2];
   if (point[2] < low - limits.planTolerance || point[2] > high + limits.planTolerance) {
-    return failure(
-      `spans z ${Math.round(low)}…${Math.round(high)} mm, not the riser elevation ${Math.round(point[2])} mm`,
-    );
+    return failure(`spans z ${Math.round(low)}…${Math.round(high)} mm, not the riser elevation ${Math.round(point[2])} mm`);
   }
   const clearance = planDistance - (column ? Math.max(width, depth) : width) / 2 - diameter / 2;
   if (clearance < -PENETRATION) return failure('would pass through the riser');
   if (clearance > limits.maxReach) {
-    return failure(
-      `is ${Math.round(clearance)} mm from the pipe surface (reach ${limits.maxReach} mm)`,
-    );
+    return failure(`is ${Math.round(clearance)} mm from the pipe surface (reach ${limits.maxReach} mm)`);
   }
   return {
     memberId: bar.id,
@@ -199,11 +165,7 @@ export function findBearingMember(
     if (bar.profile === null) continue;
     const hit = bearingOf(bar, type, point, diameter, limits);
     if (typeof hit === 'string') continue;
-    if (
-      best === null ||
-      hit.gap < best.gap - 1e-6 ||
-      (Math.abs(hit.gap - best.gap) <= 1e-6 && hit.planDistance < best.planDistance)
-    ) {
+    if (best === null || hit.gap < best.gap - 1e-6 || (Math.abs(hit.gap - best.gap) <= 1e-6 && hit.planDistance < best.planDistance)) {
       best = hit;
     }
   }

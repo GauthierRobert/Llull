@@ -8,10 +8,7 @@ const free: FrameNode['restraint'] = [false, false, false];
 
 const [L, q, I] = [6000, -10, 8.356e7];
 /** The 6 m beam under uniform load q on a roller at its far end; `releases` hinge the member ends. */
-const udlBeam = (
-  start: FrameNode['restraint'],
-  releases: object,
-): NonNullable<ReturnType<typeof solveFrame>> =>
+const udlBeam = (start: FrameNode['restraint'], releases: object): NonNullable<ReturnType<typeof solveFrame>> =>
   solveFrame(
     [
       { x: 0, y: 0, restraint: start },
@@ -80,10 +77,7 @@ describe('solveFrame', () => {
 
   it('reports the in-span deflection of a single member (5qL⁴/384EI)', () => {
     const result = udlBeam(pinned, {});
-    expect(result.members[0]!.maxDisplacement.y).toBeCloseTo(
-      Math.abs((5 * q * L ** 4) / (384 * E * I)),
-      3,
-    );
+    expect(result.members[0]!.maxDisplacement.y).toBeCloseTo(Math.abs((5 * q * L ** 4) / (384 * E * I)), 3);
   });
 
   it('applies node loads: cantilever tip force (PL³/3EI) and moment (ML²/2EI)', () => {

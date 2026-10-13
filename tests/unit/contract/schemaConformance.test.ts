@@ -60,9 +60,7 @@ describe('schema conformance: schema-shaped params never make a command throw', 
       }
       const result = execute(doc, def.name, params);
       const threw = warn.mock.calls.some((call) => String(call[0]).startsWith('[llull] command'));
-      expect(threw, `${def.name} threw on ${JSON.stringify(params)}: ${result.summary}`).toBe(
-        false,
-      );
+      expect(threw, `${def.name} threw on ${JSON.stringify(params)}: ${result.summary}`).toBe(false);
     });
   }
 });
@@ -81,14 +79,12 @@ describe('schemas never rewrite params (run receives the raw, validated params)'
     for (const key of ['shape']) {
       const shape = def[key];
       if (shape && typeof shape === 'object') {
-        for (const [k, v] of Object.entries(shape))
-          rewritingNodes(v, `${path}.${k}`, out, depth + 1);
+        for (const [k, v] of Object.entries(shape)) rewritingNodes(v, `${path}.${k}`, out, depth + 1);
       }
     }
     for (const key of ['items', 'options']) {
       const list = def[key];
-      if (Array.isArray(list))
-        list.forEach((v, i) => rewritingNodes(v, `${path}[${i}]`, out, depth + 1));
+      if (Array.isArray(list)) list.forEach((v, i) => rewritingNodes(v, `${path}[${i}]`, out, depth + 1));
     }
   }
 

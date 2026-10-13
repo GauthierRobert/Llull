@@ -47,23 +47,12 @@ function commitCorner<K extends 'arc' | 'line'>(
  * the no-op result when the index is out of range or a neighbouring segment has zero length.
  * Also rejects polylines with fewer than 3 points.
  */
-function resolveCorner(
-  doc: CadDocument,
-  command: string,
-  verb: string,
-  poly: PolylineEntity,
-  vertexIndex: number,
-): Corner | CommandResult {
+function resolveCorner(doc: CadDocument, command: string, verb: string, poly: PolylineEntity, vertexIndex: number): Corner | CommandResult {
   const n = poly.points.length;
   if (n < 3) {
-    return noop(
-      doc,
-      `${command}: polyline ${poly.id} needs at least 3 points to ${verb} a corner (got ${n}).`,
-    );
+    return noop(doc, `${command}: polyline ${poly.id} needs at least 3 points to ${verb} a corner (got ${n}).`);
   }
-  const isValidIndex = poly.closed
-    ? vertexIndex >= 0 && vertexIndex < n
-    : vertexIndex >= 1 && vertexIndex <= n - 2;
+  const isValidIndex = poly.closed ? vertexIndex >= 0 && vertexIndex < n : vertexIndex >= 1 && vertexIndex <= n - 2;
   if (!isValidIndex) {
     return noop(
       doc,
@@ -81,10 +70,7 @@ function resolveCorner(
   const lenPrev = len2(toPrev);
   const lenNext = len2(toNext);
   if (lenPrev < 1e-12 || lenNext < 1e-12) {
-    return noop(
-      doc,
-      `${command}: degenerate segment at vertex ${vertexIndex} — zero-length segment.`,
-    );
+    return noop(doc, `${command}: degenerate segment at vertex ${vertexIndex} — zero-length segment.`);
   }
   return { poly, vertex, toPrev, toNext, lenPrev, lenNext };
 }
@@ -132,15 +118,11 @@ export const fillet2D = defineCommand({
     const halfAngle = angleFromCosine(dot2(dirPrev, dirNext)) / 2;
 
     if (halfAngle < 1e-9 || Math.abs(halfAngle - Math.PI / 2) < 1e-9) {
-      return noop(
-        doc,
-        `fillet_2d: segments at vertex ${vertexIndex} are collinear — no fillet possible.`,
-      );
+      return noop(doc, `fillet_2d: segments at vertex ${vertexIndex} are collinear — no fillet possible.`);
     }
 
     const tanHalf = Math.tan(halfAngle);
-    if (!isFinite(tanHalf) || tanHalf < 1e-12)
-      return noop(doc, `fillet_2d: degenerate angle at vertex ${vertexIndex}.`);
+    if (!isFinite(tanHalf) || tanHalf < 1e-12) return noop(doc, `fillet_2d: degenerate angle at vertex ${vertexIndex}.`);
     const tangentDist = radius / tanHalf;
 
     if (tangentDist > lenPrev - 1e-9 || tangentDist > lenNext - 1e-9) {
@@ -164,22 +146,15 @@ export const fillet2D = defineCommand({
     const arcEnd = leftTurn ? startAngle : endAngle;
 
     const arcId = nextId('arc');
-    const { document, pointCount } = commitCorner(
-      doc,
-      poly,
-      vertexIndex,
-      [tangentPrev, tangentNext],
-      {
-        kind: 'arc',
-        id: arcId,
-        geometry: { center: arcCenter, radius, startAngle: arcStart, endAngle: arcEnd },
-      },
-    );
+    const { document, pointCount } = commitCorner(doc, poly, vertexIndex, [tangentPrev, tangentNext], {
+      kind: 'arc',
+      id: arcId,
+      geometry: { center: arcCenter, radius, startAngle: arcStart, endAngle: arcEnd },
+    });
 
     return changed(
       document,
-      `Filleted polyline ${id} at vertex ${vertexIndex} with radius ${radius} → ` +
-        `updated polyline (${pointCount} pts) + arc ${arcId}.`,
+      `Filleted polyline ${id} at vertex ${vertexIndex} with radius ${radius} → ` + `updated polyline (${pointCount} pts) + arc ${arcId}.`,
       [id, arcId],
     );
   },
@@ -205,11 +180,7 @@ export const chamfer2D = defineCommand({
     'No-op if distance is too large for the adjacent segment lengths.',
   params: z.object({
     id: z.string().describe('Id of the polyline entity to chamfer.'),
-    distance: z
-      .number()
-      .describe(
-        'Chamfer setback distance from the vertex along each adjacent segment. Must be > 0.',
-      ),
+    distance: z.number().describe('Chamfer setback distance from the vertex along each adjacent segment. Must be > 0.'),
     vertexIndex: z
       .number()
       .int()

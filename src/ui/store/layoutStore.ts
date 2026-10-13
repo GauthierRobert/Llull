@@ -50,8 +50,7 @@ function isSidebarTab(value: unknown): value is SidebarTab {
   return SIDEBAR_TABS.some((tab) => tab === value);
 }
 
-const booleanOr = (value: unknown, fallback: boolean): boolean =>
-  typeof value === 'boolean' ? value : fallback;
+const booleanOr = (value: unknown, fallback: boolean): boolean => (typeof value === 'boolean' ? value : fallback);
 
 function readStoredLayout(): PersistedLayout {
   const stored = readStored(STORAGE_KEY);

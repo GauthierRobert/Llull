@@ -14,25 +14,7 @@ afterAll(() => {
   vi.restoreAllMocks();
 });
 
-const GARBAGE: unknown[] = [
-  undefined,
-  null,
-  NaN,
-  Infinity,
-  -Infinity,
-  -1,
-  0,
-  1e12,
-  '',
-  'abc',
-  '5',
-  [],
-  {},
-  true,
-  [NaN, 1, 2],
-  ['x'],
-  [{}],
-];
+const GARBAGE: unknown[] = [undefined, null, NaN, Infinity, -Infinity, -1, 0, 1e12, '', 'abc', '5', [], {}, true, [NaN, 1, 2], ['x'], [{}]];
 
 function seeded(): CadDocument {
   let doc = createEmptyDocument();

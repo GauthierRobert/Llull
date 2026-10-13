@@ -27,13 +27,7 @@ export function cliShimFor(platform: NodeJS.Platform, runtime: string, cliEntry:
   if (platform === 'win32') {
     return {
       fileName: 'llull.cmd',
-      content: [
-        '@echo off',
-        'setlocal',
-        'set ELECTRON_RUN_AS_NODE=1',
-        `"${runtime}" "${cliEntry}" %*`,
-        '',
-      ].join('\r\n'),
+      content: ['@echo off', 'setlocal', 'set ELECTRON_RUN_AS_NODE=1', `"${runtime}" "${cliEntry}" %*`, ''].join('\r\n'),
     };
   }
   return {
@@ -55,20 +49,13 @@ export interface InstalledShim {
   readonly pathHint: string;
 }
 
-export function installCliShim(
-  binDir: string,
-  shim: CliShim,
-  platform: NodeJS.Platform,
-  pathVariable: string | undefined,
-): InstalledShim {
+export function installCliShim(binDir: string, shim: CliShim, platform: NodeJS.Platform, pathVariable: string | undefined): InstalledShim {
   fs.mkdirSync(binDir, { recursive: true });
   const target = path.join(binDir, shim.fileName);
   fs.writeFileSync(target, shim.content, { mode: 0o755 });
   if (platform !== 'win32') fs.chmodSync(target, 0o755);
   const separator = platform === 'win32' ? ';' : ':';
-  const onPath = (pathVariable ?? '')
-    .split(separator)
-    .some((entry) => path.resolve(entry) === path.resolve(binDir));
+  const onPath = (pathVariable ?? '').split(separator).some((entry) => path.resolve(entry) === path.resolve(binDir));
   return {
     path: target,
     onPath,

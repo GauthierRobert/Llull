@@ -17,15 +17,10 @@ import { SolidMeshShell, type SolidMeshKindProps, type SolidSurface } from './So
 
 const MESH_SOLID_SURFACE: SolidSurface = { roughness: 0.5, metalness: 0.15, envMapIntensity: 0.8 };
 
-export function MeshSolidMesh({
-  entity,
-  ...shell
-}: SolidMeshKindProps<MeshSolidEntity>): React.ReactElement {
+export function MeshSolidMesh({ entity, ...shell }: SolidMeshKindProps<MeshSolidEntity>): React.ReactElement {
   const { mesh } = entity;
 
   const geometry = useMemo(() => buildMeshSolidGeometry(mesh), [mesh]);
 
-  return (
-    <SolidMeshShell entity={entity} geometry={geometry} surface={MESH_SOLID_SURFACE} {...shell} />
-  );
+  return <SolidMeshShell entity={entity} geometry={geometry} surface={MESH_SOLID_SURFACE} {...shell} />;
 }

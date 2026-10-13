@@ -44,8 +44,7 @@ describe('steel profile catalogue', () => {
       const profile = findProfile(name);
       expect(profile, name).toBeDefined();
       const { outer, holes } = profileOutline(profile!);
-      const area =
-        Math.abs(polygonArea(outer)) - holes.reduce((s, h) => s + Math.abs(polygonArea(h)), 0);
+      const area = Math.abs(polygonArea(outer)) - holes.reduce((s, h) => s + Math.abs(polygonArea(h)), 0);
       expect(area / profile!.area, name).toBeGreaterThan(0.9);
       expect(area / profile!.area, name).toBeLessThan(1.1);
     }
@@ -58,9 +57,7 @@ describe('steel profile catalogue', () => {
     expect(profiles.length).toBeGreaterThan(5);
     expect(profiles.every((p) => p.family === 'HEA')).toBe(true);
     expect(result.document).toBe(doc);
-    expect(
-      (execute(doc, 'list_steel_profiles', {}).data as { profiles: unknown[] }).profiles,
-    ).toHaveLength(STEEL_PROFILES.length);
+    expect((execute(doc, 'list_steel_profiles', {}).data as { profiles: unknown[] }).profiles).toHaveLength(STEEL_PROFILES.length);
     const unknown = execute(doc, 'list_steel_profiles', { family: 'XYZ' });
     expect(unknown.document).toBe(doc);
     expect(unknown.data).toBeUndefined();
@@ -291,8 +288,7 @@ describe('add_portal_frame_building', () => {
     expect(JSON.stringify(before)).toBe(snapshot);
     const doc = result.document;
     const members = elementsOf(doc, 'member');
-    const byRole = (role: string): number =>
-      members.filter((m) => m.category === 'member' && m.role === role).length;
+    const byRole = (role: string): number => members.filter((m) => m.category === 'member' && m.role === role).length;
     // 6 frames (5 bays) × 2 columns + 2 gable posts per end.
     expect(byRole('column')).toBe(12 + 4);
     expect(byRole('rafter')).toBe(12);
@@ -317,13 +313,9 @@ describe('add_portal_frame_building', () => {
       floorSlab: false,
       crane: { capacity: 16, railHeight: 4500 },
     }).document;
-    const crane = elementsOf(doc, 'member').filter(
-      (m) => m.category === 'member' && m.role === 'crane',
-    );
+    const crane = elementsOf(doc, 'member').filter((m) => m.category === 'member' && m.role === 'crane');
     expect(crane).toHaveLength(10);
-    const brackets = elementsOf(doc, 'member').filter(
-      (m) => m.category === 'member' && m.note === 'crane bracket',
-    );
+    const brackets = elementsOf(doc, 'member').filter((m) => m.category === 'member' && m.note === 'crane bracket');
     expect(brackets).toHaveLength(12);
     expect(elementsOf(doc, 'footing')).toHaveLength(0);
     expect(elementsOf(doc, 'panel')).toHaveLength(0);
@@ -465,11 +457,7 @@ describe('check_clashes', () => {
     const pipe = elementsOf(doc, 'pipe')[0]!.id;
     expect(involving(press!).some((c) => c.kind === 'hard')).toBe(true);
     expect(involving(pipe).filter((c) => c.kind === 'hard').length).toBeGreaterThanOrEqual(6);
-    expect(
-      clashes.some(
-        (c) => c.kind === 'clearance' && [c.a, c.b].includes(saw!) && [c.a, c.b].includes(drill!),
-      ),
-    ).toBe(true);
+    expect(clashes.some((c) => c.kind === 'clearance' && [c.a, c.b].includes(saw!) && [c.a, c.b].includes(drill!))).toBe(true);
     expect(result.summary).toMatch(/hard clash\(es\), \d+ clearance violation/);
     // Clashes are sorted hard first.
     expect(clashes[0]?.kind).toBe('hard');
@@ -551,9 +539,7 @@ describe('industrial takeoff, schedules, plan and IFC', () => {
   it('draws columns as cut sections, equipment with clearance and hides roof framing', () => {
     const doc = hallWithProcess();
     const plan = buildPlanDrawing(doc, undefined)!;
-    const memberPolygons = plan.primitives.filter(
-      (p) => p.type === 'polygon' && p.layer.startsWith('S-'),
-    );
+    const memberPolygons = plan.primitives.filter((p) => p.type === 'polygon' && p.layer.startsWith('S-'));
     expect(memberPolygons.length).toBeGreaterThanOrEqual(16);
     const texts = plan.primitives.filter((p) => p.type === 'text').map((p) => p.content);
     expect(texts.some((t) => t.includes('Lathe'))).toBe(true);
@@ -583,9 +569,7 @@ describe('industrial takeoff, schedules, plan and IFC', () => {
       json: serializeDocument(doc),
     });
     expect(loaded.summary).not.toMatch(/failed/);
-    expect(Object.keys(loaded.document.building!.elements)).toEqual(
-      Object.keys(doc.building!.elements),
-    );
+    expect(Object.keys(loaded.document.building!.elements)).toEqual(Object.keys(doc.building!.elements));
   });
 });
 
@@ -595,18 +579,13 @@ describe('review regressions', () => {
     const first = elementsOf(doc, 'footing').length;
     doc = run(doc, 'add_portal_frame_building', { ...SMALL_HALL, origin: [40000, 0] });
     expect(elementsOf(doc, 'footing')).toHaveLength(2 * first);
-    expect(execute(doc, 'add_footing', { underColumns: true }).summary).toMatch(
-      /every column already has a footing/,
-    );
+    expect(execute(doc, 'add_footing', { underColumns: true }).summary).toMatch(/every column already has a footing/);
   });
 
   it('closes the front gable cladding flush with the side walls', () => {
     const doc = execute(createEmptyDocument(), 'add_portal_frame_building', SMALL_HALL).document;
     const gables = elementsOf(doc, 'panel').filter(
-      (panel) =>
-        panel.category === 'panel' &&
-        panel.role === 'wall' &&
-        new Set(panel.corners.map((corner) => corner[1])).size === 1,
+      (panel) => panel.category === 'panel' && panel.role === 'wall' && new Set(panel.corners.map((corner) => corner[1])).size === 1,
     );
     const ys = gables.map((panel) => (panel.category === 'panel' ? panel.corners[0]![1] : 0));
     expect(ys.sort((a, b) => a - b)).toEqual([-200, 30200]);
@@ -614,18 +593,14 @@ describe('review regressions', () => {
 
   it('orients gable wind posts on their strong axis', () => {
     const doc = execute(createEmptyDocument(), 'add_portal_frame_building', SMALL_HALL).document;
-    const posts = elementsOf(doc, 'member').filter(
-      (m) => m.category === 'member' && m.profile === 'HEA200',
-    );
+    const posts = elementsOf(doc, 'member').filter((m) => m.category === 'member' && m.profile === 'HEA200');
     expect(posts.length).toBeGreaterThan(0);
     expect(posts.every((m) => m.category === 'member' && m.roll === Math.PI / 2)).toBe(true);
   });
 
   it('refuses generators that would create an excessive number of members', () => {
     const doc = createEmptyDocument();
-    expect(execute(doc, 'add_portal_frame_building', { purlinSpacing: 1 }).summary).toMatch(
-      /over the 5000 limit/,
-    );
+    expect(execute(doc, 'add_portal_frame_building', { purlinSpacing: 1 }).summary).toMatch(/over the 5000 limit/);
     expect(
       execute(doc, 'add_crane_runway', {
         start: [0, 0],
@@ -634,9 +609,7 @@ describe('review regressions', () => {
         supportSpacing: 1,
       }).summary,
     ).toMatch(/supportSpacing too small/);
-    expect(
-      execute(doc, 'add_crane_runway', { start: [0, 0], end: [6000, 0], railHeight: 400 }).summary,
-    ).toMatch(/railHeight must exceed/);
+    expect(execute(doc, 'add_crane_runway', { start: [0, 0], end: [6000, 0], railHeight: 400 }).summary).toMatch(/railHeight must exceed/);
   });
 
   it('draws a diagonal wall panel along its true plan line', () => {
@@ -648,9 +621,7 @@ describe('review regressions', () => {
         [0, 10000, 3000],
       ],
     });
-    const line = buildPlanDrawing(doc, undefined)!.primitives.find(
-      (p) => p.type === 'line' && p.layer === 'A-CLAD',
-    );
+    const line = buildPlanDrawing(doc, undefined)!.primitives.find((p) => p.type === 'line' && p.layer === 'A-CLAD');
     expect(line?.type === 'line' && [line.a, line.b]).toEqual([
       [0, 10000],
       [10000, 0],
@@ -736,9 +707,9 @@ describe('review regressions', () => {
 
   it('fails gracefully on non-string profiles and families', () => {
     const doc = createEmptyDocument();
-    expect(
-      execute(doc, 'add_steel_member', { profile: 300, start: [0, 0, 0], end: [1, 0, 0] }).summary,
-    ).toMatch(/rejected: invalid params/);
+    expect(execute(doc, 'add_steel_member', { profile: 300, start: [0, 0, 0], end: [1, 0, 0] }).summary).toMatch(
+      /rejected: invalid params/,
+    );
     expect(execute(doc, 'list_steel_profiles', { family: 3 }).summary).toMatch(/must be a string/);
   });
 
@@ -770,21 +741,15 @@ describe('multi-span halls', () => {
     expect(result.summary).toMatch(/30\.0 × 12\.0 m \(2 spans\)/);
     expect(result.data).toMatchObject({ spans: 2, frames: 3 });
     const members = elementsOf(doc, 'member');
-    const frameColumns = members.filter(
-      (m) => m.category === 'member' && m.role === 'column' && m.profile === 'HEA400',
-    );
+    const frameColumns = members.filter((m) => m.category === 'member' && m.role === 'column' && m.profile === 'HEA400');
     expect(frameColumns).toHaveLength(3 * 3);
-    expect(members.filter((m) => m.category === 'member' && m.role === 'rafter')).toHaveLength(
-      3 * 4,
-    );
+    expect(members.filter((m) => m.category === 'member' && m.role === 'rafter')).toHaveLength(3 * 4);
     const grids = elementsOf(doc, 'grid').map((g) => g.mark);
     expect(grids.slice(0, 3)).toEqual(['A', 'B', 'C']);
     // 2 roof panels per span + 2 side walls + 2 gables (one polygon following both roofs).
     const panels = elementsOf(doc, 'panel');
     expect(panels).toHaveLength(8);
-    const gable = panels.find(
-      (panel) => panel.category === 'panel' && panel.role === 'wall' && panel.corners.length > 4,
-    );
+    const gable = panels.find((panel) => panel.category === 'panel' && panel.role === 'wall' && panel.corners.length > 4);
     expect(gable?.category === 'panel' && gable.corners).toHaveLength(2 + 5);
     expect(doc.entities[`${gable!.id}:body`]?.kind).toBe('mesh');
     expect(execute(doc, 'check_clashes', {}).summary).toBe('No clashes found.');
@@ -797,9 +762,7 @@ describe('multi-span halls', () => {
       length: 12000,
       crane: { railHeight: 5000 },
     }).document;
-    const runway = elementsOf(doc, 'member').filter(
-      (m) => m.category === 'member' && m.role === 'crane',
-    );
+    const runway = elementsOf(doc, 'member').filter((m) => m.category === 'member' && m.role === 'crane');
     expect(new Set(runway.map((m) => (m.category === 'member' ? m.start[0] : 0))).size).toBe(4);
   });
 
@@ -840,10 +803,7 @@ describe('add_cable_tray', () => {
     expect(JSON.stringify(before)).toBe(snapshot);
     expect(result.summary).toBe('Added data cable tray CT1 (tray-1) 400×100, 9.00 m.');
     expect(result.affected[0]).toBe('tray-1');
-    expect(element(result.document, 'tray-1').entityIds).toEqual([
-      'tray-1:segment-0',
-      'tray-1:segment-1',
-    ]);
+    expect(element(result.document, 'tray-1').entityIds).toEqual(['tray-1:segment-0', 'tray-1:segment-1']);
     expect(result.document.entities['tray-1:segment-0']?.layerId).toBeDefined();
     const defaults = execute(createEmptyDocument(), 'add_cable_tray', {
       points: [
@@ -955,9 +915,7 @@ describe('add_base_plates', () => {
     const before = JSON.stringify(doc);
     const result = execute(doc, 'add_base_plates', {});
     expect(JSON.stringify(doc)).toBe(before);
-    expect(result.summary).toMatch(
-      /Added 2 base plate\(s\) with 8 anchor bolt\(s\) M24: \d+\.\d kg/,
-    );
+    expect(result.summary).toMatch(/Added 2 base plate\(s\) with 8 anchor bolt\(s\) M24: \d+\.\d kg/);
     doc = result.document;
     expect(element(doc, 'plate-1')).toMatchObject({
       memberId: 'member-1',
@@ -995,13 +953,7 @@ describe('add_base_plates', () => {
       boltDiameter: 30,
       length: 590,
     });
-    for (const params of [
-      { boltCount: 3 },
-      { boltCount: 14 },
-      { thickness: 0 },
-      { levelId: 'nope' },
-      { memberIds: ['member-9'] },
-    ]) {
+    for (const params of [{ boltCount: 3 }, { boltCount: 14 }, { thickness: 0 }, { levelId: 'nope' }, { memberIds: ['member-9'] }]) {
       expect(execute(doc, 'add_base_plates', params).affected, JSON.stringify(params)).toEqual([]);
     }
   });
@@ -1010,9 +962,9 @@ describe('add_base_plates', () => {
     let doc = run(column(createEmptyDocument(), 0), 'add_base_plates', {});
     doc = run(doc, 'move_building_element', { elementIds: ['member-1'], delta: [1000, 0] });
     expect(doc.entities['plate-1:body']?.position).toEqual([1000, 0, -10]);
-    expect(
-      execute(doc, 'move_building_element', { elementIds: ['plate-1'], delta: [1, 0] }).summary,
-    ).toMatch(/refused: plate-1 follow their host/);
+    expect(execute(doc, 'move_building_element', { elementIds: ['plate-1'], delta: [1, 0] }).summary).toMatch(
+      /refused: plate-1 follow their host/,
+    );
     doc = run(doc, 'add_level', { name: 'Upper' });
     doc = run(doc, 'copy_level_elements', {
       sourceLevelId: 'level-1',
@@ -1036,9 +988,7 @@ describe('add_base_plates', () => {
     };
     expect(schedule.rows[0]?.slice(0, 5)).toEqual(['BP1', 'SC1', '590×500', 25, '4×M24']);
     const plan = buildPlanDrawing(hall, undefined)!;
-    expect(plan.primitives.filter((p) => p.type === 'circle' && p.layer === 'S-CONN')).toHaveLength(
-      64,
-    );
+    expect(plan.primitives.filter((p) => p.type === 'circle' && p.layer === 'S-CONN')).toHaveLength(64);
     const ifc = (execute(hall, 'export_ifc', {}).data as IfcExport).ifc;
     expect(ifc).toContain("'BASE_PLATE'");
     expect(ifc).toContain('.ANCHORBOLT.');
@@ -1074,9 +1024,7 @@ describe('phase 2 review regressions', () => {
 
   it('fails gracefully on non-array spans', () => {
     for (const spans of [18000, {}]) {
-      expect(
-        execute(createEmptyDocument(), 'add_portal_frame_building', { spans }).summary,
-      ).toMatch(/rejected: invalid params/);
+      expect(execute(createEmptyDocument(), 'add_portal_frame_building', { spans }).summary).toMatch(/rejected: invalid params/);
     }
   });
 
@@ -1118,9 +1066,7 @@ describe('phase 2 review regressions', () => {
     });
     const result = execute(doc, 'add_base_plates', {});
     expect(result.summary).toMatch(/anchor bolt\(s\) M24/);
-    const lines = (
-      execute(result.document, 'quantity_takeoff', {}).data as { lines: TakeoffLine[] }
-    ).lines;
+    const lines = (execute(result.document, 'quantity_takeoff', {}).data as { lines: TakeoffLine[] }).lines;
     expect(lines.some((line) => line.key === 'plate.anchor M24.ea')).toBe(true);
   });
 
@@ -1132,9 +1078,7 @@ describe('phase 2 review regressions', () => {
         [10000, 0, 5000],
       ],
     });
-    const edges = buildPlanDrawing(doc, undefined)!.primitives.filter(
-      (p) => p.type === 'polyline' && p.layer === 'E-TRAY',
-    );
+    const edges = buildPlanDrawing(doc, undefined)!.primitives.filter((p) => p.type === 'polyline' && p.layer === 'E-TRAY');
     expect(edges.map((edge) => edge.type === 'polyline' && edge.points[0])).toEqual([
       [0, 150],
       [0, -150],
@@ -1151,8 +1095,7 @@ describe('phase 2 review regressions', () => {
 
   it('fills cut plates as steel in sections and rejects plates on non-columns', () => {
     const doc = plated();
-    const drawing = execute(doc, 'export_elevation_sheet', { direction: 'south', cutAt: 0 })
-      .data as { svg: string };
+    const drawing = execute(doc, 'export_elevation_sheet', { direction: 'south', cutAt: 0 }).data as { svg: string };
     // Steel cut faces are filled solid (class "cut"), not hatched.
     expect(drawing.svg).toContain('class="cut"');
     const broken = rawBuilding(doc);

@@ -23,12 +23,7 @@ interface CivilReportRowProps {
   };
 }
 
-export function CivilReportRow({
-  object,
-  report,
-  field,
-  action,
-}: CivilReportRowProps): React.ReactElement {
+export function CivilReportRow({ object, report, field, action }: CivilReportRowProps): React.ReactElement {
   const [text, setText] = useState('');
   const detail = useCivilReport(report.command, report.idKey, object.id);
   return (

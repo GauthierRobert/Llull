@@ -1,15 +1,7 @@
 /** Regression tests for the core command-layer review (expressions, rotations, exports, refs). */
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
-import type {
-  CadDocument,
-  Constraint,
-  Entity,
-  ExtrusionEntity,
-  Joint,
-  RectangleEntity,
-  Vec3,
-} from '@core/model/types';
+import type { CadDocument, Constraint, Entity, ExtrusionEntity, Joint, RectangleEntity, Vec3 } from '@core/model/types';
 import { execute, listCommands } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import { evaluateExpression } from '@core/commands/parametric/expression';
@@ -20,10 +12,8 @@ import { elementAt } from '@lib/elementAt';
 import { sampleArc } from '@lib/arc';
 import { sub3, cross3, dot3 } from '@lib/vec3';
 
-const run = (doc: CadDocument, name: string, params: unknown): ReturnType<typeof execute> =>
-  execute(doc, name, params);
-const only = (doc: CadDocument, kind: string): Entity =>
-  Object.values(doc.entities).find((e) => e.kind === kind) as Entity;
+const run = (doc: CadDocument, name: string, params: unknown): ReturnType<typeof execute> => execute(doc, name, params);
+const only = (doc: CadDocument, kind: string): Entity => Object.values(doc.entities).find((e) => e.kind === kind) as Entity;
 
 describe('expressions: own numeric names and finite results', () => {
   it('rejects divide-by-zero and inherited names', () => {
@@ -46,11 +36,10 @@ describe('expressions: own numeric names and finite results', () => {
     const doc = run(createEmptyDocument(), 'set_parameter', { name: 'p', expression: '1/0' });
     expect(doc.document.parameters.p).toBeUndefined();
     expect(doc.summary).toContain('not a finite number');
-    const reference = run(
-      run(createEmptyDocument(), 'set_parameter', { name: 'z', expression: '0' }).document,
-      'set_parameter',
-      { name: 'q', expression: '1/z' },
-    );
+    const reference = run(run(createEmptyDocument(), 'set_parameter', { name: 'z', expression: '0' }).document, 'set_parameter', {
+      name: 'q',
+      expression: '1/z',
+    });
     expect(reference.document.parameters.q?.error).toBeDefined();
     expect(Number.isFinite(reference.document.parameters.q?.value)).toBe(true);
     const ok = run(createEmptyDocument(), 'set_parameter', { name: 'p', expression: '6/3' });
@@ -71,11 +60,7 @@ describe('world-Z rotation helper', () => {
     const tilted: Vec3 = [Math.PI / 2, 0, 0];
     const rotated = rotateEulerAboutWorldZ(tilted, Math.PI / 2);
     const viaEuler = applyEulerXYZ([1, 2, 3], [0, 0, 0], rotated);
-    const direct = applyEulerXYZ(
-      applyEulerXYZ([1, 2, 3], [0, 0, 0], tilted),
-      [0, 0, 0],
-      [0, 0, Math.PI / 2],
-    );
+    const direct = applyEulerXYZ(applyEulerXYZ([1, 2, 3], [0, 0, 0], tilted), [0, 0, 0], [0, 0, Math.PI / 2]);
     direct.forEach((v, i) => expect(viaEuler[i]).toBeCloseTo(v));
     expect(composeEulerXYZ([0.1, 0.2, 0.3], [0, 0, 0])).toEqual([0.1, 0.2, 0.3]);
   });
@@ -107,9 +92,7 @@ describe('world-Z rotation helper', () => {
 
   it('array_polar failure: missing id is a no-op', () => {
     const doc = createEmptyDocument();
-    expect(run(doc, 'array_polar', { id: 'nope', count: 3, center: [0, 0, 0] }).affected).toEqual(
-      [],
-    );
+    expect(run(doc, 'array_polar', { id: 'nope', count: 3, center: [0, 0, 0] }).affected).toEqual([]);
   });
 });
 
@@ -155,11 +138,7 @@ describe('extrude_profile does not inherit the sketch rotation', () => {
     const plain = run(doc, 'extrude_profile', { id, depth: 3 });
     expect((only(plain.document, 'extrusion') as ExtrusionEntity).rotation).toEqual([0, 0, 0]);
     const rotated = run(doc, 'extrude_profile', { id, depth: 3, rotation: [0, 0, Math.PI / 2] });
-    expect((only(rotated.document, 'extrusion') as ExtrusionEntity).rotation).toEqual([
-      0,
-      0,
-      Math.PI / 2,
-    ]);
+    expect((only(rotated.document, 'extrusion') as ExtrusionEntity).rotation).toEqual([0, 0, Math.PI / 2]);
   });
 
   it('failure: depth <= 0 is a no-op', () => {
@@ -196,11 +175,7 @@ describe('exported extrusion facets face outward', () => {
       const centre: Vec3 = [1, 1, 1];
       for (const [a, b, c] of triangles) {
         const normal = cross3(sub3(b, a), sub3(c, a));
-        const middle: Vec3 = [
-          (a[0] + b[0] + c[0]) / 3,
-          (a[1] + b[1] + c[1]) / 3,
-          (a[2] + b[2] + c[2]) / 3,
-        ];
+        const middle: Vec3 = [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3];
         expect(dot3(normal, sub3(middle, centre))).toBeGreaterThan(0);
       }
     });
@@ -376,8 +351,7 @@ describe('deleting entities prunes constraints, joints and drives', () => {
   it('check_model flags dangling references left by a hand edit', () => {
     const doc = build();
     const broken = { ...doc, entities: {}, order: [] };
-    const issues = (run(broken, 'check_model', {}).data as { issues: Array<{ code: string }> })
-      .issues;
+    const issues = (run(broken, 'check_model', {}).data as { issues: Array<{ code: string }> }).issues;
     expect(issues.filter((i) => i.code === 'dangling_reference').length).toBeGreaterThanOrEqual(3);
   });
 
@@ -446,12 +420,7 @@ describe('execute marks refusals as rejected', () => {
   it('requiresKernel without a kernel', () => {
     const kernelCommand = listCommands().find((c) => c.annotations?.requiresKernel === true);
     expect(kernelCommand).toBeDefined();
-    const result = execute(
-      createEmptyDocument(),
-      (kernelCommand as { name: string }).name,
-      {},
-      { ...defaultContext(), kernel: null },
-    );
+    const result = execute(createEmptyDocument(), (kernelCommand as { name: string }).name, {}, { ...defaultContext(), kernel: null });
     expect(result.rejected).toBe(true);
     expect(result.summary).toContain('kernel not available');
   });

@@ -60,10 +60,9 @@ function placeholderBoundaries(api: OccApi): OccHandle[] {
 
 /** B-spline face whose poles are `patch` (u along i, v along j); null when OCC refuses it. */
 function patchFace(api: OccApi, patch: BezierPatch, boundaries: OccHandle[]): OccShape | null {
-  const filling = new api.GeomFill_BSplineCurves_2(
-    ...boundaries,
-    api.GeomFill_FillingStyle.GeomFill_CoonsStyle,
-  ) as OccHandle & { Surface(): OccHandle & { get(): OccBSplineSurface } };
+  const filling = new api.GeomFill_BSplineCurves_2(...boundaries, api.GeomFill_FillingStyle.GeomFill_CoonsStyle) as OccHandle & {
+    Surface(): OccHandle & { get(): OccBSplineSurface };
+  };
   const surfaceHandle = filling.Surface();
   const surface = surfaceHandle.get();
   try {

@@ -14,8 +14,7 @@ import { projectOntoSegment } from '@lib/polygon';
 
 type EdgeStyle = 'visible' | 'hidden' | 'cut';
 
-const isEdgeStyle = (style: string): style is EdgeStyle =>
-  style === 'visible' || style === 'hidden' || style === 'cut';
+const isEdgeStyle = (style: string): style is EdgeStyle => style === 'visible' || style === 'hidden' || style === 'cut';
 
 function pushPath(into: Segment2[], points: ReadonlyArray<Vec2>, closed: boolean): void {
   for (let i = 0; i + 1 < points.length; i++) into.push([points[i] as Vec2, points[i + 1] as Vec2]);
@@ -25,10 +24,7 @@ function pushPath(into: Segment2[], points: ReadonlyArray<Vec2>, closed: boolean
 }
 
 /** Edge segments of `primitives` grouped by line style; arcs / circles are not emitted by the technical view. @pure */
-function segmentsByStyle(
-  primitives: ReadonlyArray<DrawingPrimitive>,
-  tolerance: number,
-): Map<EdgeStyle, Segment2[]> {
+function segmentsByStyle(primitives: ReadonlyArray<DrawingPrimitive>, tolerance: number): Map<EdgeStyle, Segment2[]> {
   const byStyle = new Map<EdgeStyle, Segment2[]>();
   for (const primitive of primitives) {
     if (!isEdgeStyle(primitive.style)) continue;
@@ -69,7 +65,5 @@ export function segmentsDistSq(segments: ReadonlyArray<Segment2>, point: Vec2): 
  */
 export function drawingChains(primitives: ReadonlyArray<DrawingPrimitive>): SegmentChain<Vec2>[] {
   const tolerance = drawingTolerance(primitives);
-  return [...segmentsByStyle(primitives, tolerance).values()].flatMap((segments) =>
-    chainSegments(segments, tolerance, true),
-  );
+  return [...segmentsByStyle(primitives, tolerance).values()].flatMap((segments) => chainSegments(segments, tolerance, true));
 }

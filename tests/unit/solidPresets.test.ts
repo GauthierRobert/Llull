@@ -2,11 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { rotatedEntityBounds } from '@core/geometry/rotatedBounds';
-import {
-  SOLID_PRESETS,
-  nextPlacement,
-  solidCommandParams,
-} from '@ui/components/toolbar/solidPresets';
+import { SOLID_PRESETS, nextPlacement, solidCommandParams } from '@ui/components/toolbar/solidPresets';
 
 function addPreset(doc: CadDocument, index: number): CadDocument {
   const preset = SOLID_PRESETS[index]!;
@@ -16,11 +12,7 @@ function addPreset(doc: CadDocument, index: number): CadDocument {
 describe('solid presets', () => {
   it('every preset creates exactly one solid resting on the ground plane', () => {
     for (const preset of SOLID_PRESETS) {
-      const result = execute(
-        createEmptyDocument(),
-        preset.command,
-        solidCommandParams(preset, [0, 0, 0]),
-      );
+      const result = execute(createEmptyDocument(), preset.command, solidCommandParams(preset, [0, 0, 0]));
       expect(result.affected, preset.command).toHaveLength(1);
       const entity = result.document.entities[result.affected[0]!]!;
       expect(rotatedEntityBounds(entity).min[2], preset.command).toBeCloseTo(0, 6);

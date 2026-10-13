@@ -84,12 +84,7 @@ function InstanceRow({ instance, componentName, selected }: InstanceRowProps): R
       <span className="panel__row-icon" aria-hidden="true">
         <Icon name="assembly" size={14} />
       </span>
-      <button
-        type="button"
-        className="assembly-instance-info"
-        aria-pressed={selected}
-        aria-label={`Select instance of ${componentName}`}
-      >
+      <button type="button" className="assembly-instance-info" aria-pressed={selected} aria-label={`Select instance of ${componentName}`}>
         <span className="assembly-instance-name" title={componentName}>
           {componentName}
         </span>
@@ -122,20 +117,14 @@ export function AssemblyPanel({ className }: AssemblyPanelProps): React.ReactEle
 
   const componentList = Object.values(components);
 
-  const instanceList = orderedValues(order, entities).filter(
-    (entity): entity is InstanceEntity => entity.kind === 'instance',
-  );
+  const instanceList = orderedValues(order, entities).filter((entity): entity is InstanceEntity => entity.kind === 'instance');
 
   const selectionSet = useSelectionSet();
 
   return (
     <aside className={classNames('panel assembly-panel', className)} aria-label="Assembly">
       <PanelHeader title="Assembly" />
-      <PanelSection
-        title="Components"
-        count={componentList.length}
-        countLabel={`${componentList.length} components`}
-      >
+      <PanelSection title="Components" count={componentList.length} countLabel={`${componentList.length} components`}>
         {componentList.length === 0 ? (
           <PanelEmpty compact icon="assembly" message="No components defined." />
         ) : (
@@ -147,11 +136,7 @@ export function AssemblyPanel({ className }: AssemblyPanelProps): React.ReactEle
         )}
       </PanelSection>
 
-      <PanelSection
-        title="Instances"
-        count={instanceList.length}
-        countLabel={`${instanceList.length} instances`}
-      >
+      <PanelSection title="Instances" count={instanceList.length} countLabel={`${instanceList.length} instances`}>
         {instanceList.length === 0 ? (
           <PanelEmpty compact icon="assembly" message="No instances in the scene." />
         ) : (
@@ -159,14 +144,7 @@ export function AssemblyPanel({ className }: AssemblyPanelProps): React.ReactEle
             {instanceList.map((inst) => {
               const comp = components[inst.componentId];
               const compName = comp ? comp.name : inst.componentId;
-              return (
-                <InstanceRow
-                  key={inst.id}
-                  instance={inst}
-                  componentName={compName}
-                  selected={selectionSet.has(inst.id)}
-                />
-              );
+              return <InstanceRow key={inst.id} instance={inst} componentName={compName} selected={selectionSet.has(inst.id)} />;
             })}
           </ul>
         )}

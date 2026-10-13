@@ -68,9 +68,7 @@ describe('level-explicit placement', () => {
     render(<BuildingPanel />);
     pickTool('slab');
     setField('source', 'rectangle');
-    expect(
-      within(screen.getByTestId('building-tools')).getByRole('option', { name: 'Active level' }),
-    ).toBeInTheDocument();
+    expect(within(screen.getByTestId('building-tools')).getByRole('option', { name: 'Active level' })).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('tool-submit'));
     const params = dispatch.mock.calls.at(-1)?.[1] as Record<string, unknown>;
     expect(params).not.toHaveProperty('material');
@@ -109,10 +107,7 @@ describe('level-explicit placement', () => {
     pickTool(tool);
     setField('levelId', 'level-2');
     fireEvent.click(screen.getByTestId('tool-submit'));
-    expect(dispatch).toHaveBeenLastCalledWith(
-      command,
-      expect.objectContaining({ levelId: 'level-2' }),
-    );
+    expect(dispatch).toHaveBeenLastCalledWith(command, expect.objectContaining({ levelId: 'level-2' }));
   });
 
   it('slab opening offers the stairs of every level', () => {
@@ -160,10 +155,7 @@ describe('pipe run line list data', () => {
     expect(dispatch).not.toHaveBeenCalled();
     setField('diameter', '250');
     fireEvent.click(screen.getByTestId('tool-submit'));
-    expect(dispatch).toHaveBeenLastCalledWith(
-      'add_pipe_run',
-      expect.objectContaining({ diameter: 250 }),
-    );
+    expect(dispatch).toHaveBeenLastCalledWith('add_pipe_run', expect.objectContaining({ diameter: 250 }));
   });
 });
 
@@ -248,9 +240,7 @@ describe('equipment editor', () => {
 
   it('keeps the element id and tag across the update through the real command', () => {
     useStore.setState({
-      dispatch: ((name: string, params: unknown) => localDispatch(name, params)) as ReturnType<
-        typeof useStore.getState
-      >['dispatch'],
+      dispatch: ((name: string, params: unknown) => localDispatch(name, params)) as ReturnType<typeof useStore.getState>['dispatch'],
     });
     render(<BuildingPanel />);
     fireEvent.click(screen.getByRole('button', { name: 'Edit equipment E-301' }));

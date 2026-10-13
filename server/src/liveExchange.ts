@@ -17,8 +17,7 @@ import type { Actor } from './audit';
 /** The live document + the command bus (undo, live sync, audit attributed to `actor`). */
 const liveHost = (actor: Actor): ExchangeHost => ({
   getDoc: getLiveDoc,
-  applyCommand: (commandName, commandParams) =>
-    applyCommand(commandName, commandParams, undefined, actor),
+  applyCommand: (commandName, commandParams) => applyCommand(commandName, commandParams, undefined, actor),
 });
 
 /** Run an exchange tool against the live document (MCP tools/call); commands go through the bus. */

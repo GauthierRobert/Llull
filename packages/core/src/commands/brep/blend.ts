@@ -39,15 +39,12 @@ export const blendUnion = defineCommand({
     '(use boolean op union there). If the kernel refuses, try another radius: a blend must fit inside ' +
     'the smallest wall it touches, and a crotch where three solids meet can reject specific radii.',
   params: z.object({
-    ids: z
-      .array(z.string())
-      .describe('Ids of the 3D solids to weld (>= 2, distinct). The first one styles the result.'),
+    ids: z.array(z.string()).describe('Ids of the 3D solids to weld (>= 2, distinct). The first one styles the result.'),
     radius: z.number().describe('Joint fillet radius in document units (> 0).'),
   }),
   run: (doc, { ids, radius }, ctx): CommandResult => {
     const fail = failer(doc, 'blend_union');
-    if (ids.length < 2 || ids.length > MAX_BLEND_OPERANDS)
-      return fail(`needs 2..${MAX_BLEND_OPERANDS} solids (got ${ids.length})`);
+    if (ids.length < 2 || ids.length > MAX_BLEND_OPERANDS) return fail(`needs 2..${MAX_BLEND_OPERANDS} solids (got ${ids.length})`);
     if (new Set(ids).size !== ids.length) return fail('ids must be distinct');
     if (!(radius > 0)) return fail(`radius must be > 0 (got ${radius})`);
     const operands: Entity[] = [];
@@ -55,14 +52,12 @@ export const blendUnion = defineCommand({
       const entity = doc.entities[id];
       if (entity === undefined) return fail(`entity '${id}' not found`);
       if (!is3D(entity)) return fail(`entity '${id}' is a 2D shape; blends need 3D solids`);
-      if (entity.kind === 'instance')
-        return fail(`entity '${id}' is a component instance; run explode_instance first`);
+      if (entity.kind === 'instance') return fail(`entity '${id}' is a component instance; run explode_instance first`);
       operands.push(entity);
     }
     const kernel = (ctx ?? currentContext()).kernel;
     if (!kernel) return noop(doc, kernelUnavailable('blend_union'));
-    if (!kernel.supports('blend'))
-      return fail(`this kernel cannot fillet joints; use ${OCC_KERNEL_HINT}, or boolean op union`);
+    if (!kernel.supports('blend')) return fail(`this kernel cannot fillet joints; use ${OCC_KERNEL_HINT}, or boolean op union`);
     const recipe: ShapeRecipe = {
       op: 'blend',
       sources: operands.map((entity) => operandRecipe(kernel, entity)),
@@ -73,8 +68,7 @@ export const blendUnion = defineCommand({
       return fail(
         `the kernel could not blend the joints of [${ids.join(', ')}] with radius ${radius}; try another radius (smaller usually fits; a crotch where 3 solids meet can reject specific radii)`,
       );
-    if (result === 'empty')
-      return fail('the union is empty or could not be meshed as a closed solid');
+    if (result === 'empty') return fail('the union is empty or could not be meshed as a closed solid');
     return commitKernelResult(
       doc,
       kernel,

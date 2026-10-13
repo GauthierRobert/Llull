@@ -10,12 +10,7 @@ import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from '../frames/fr
 import { baseReactions } from '../frames/frameModelSolve';
 import { SOIL_SHAPE, soilInputs } from './soilParams';
 import { findFooting } from './foundationCombinations';
-import {
-  defaultThrustTie,
-  reactionColumn,
-  slabSharePerColumn,
-  slidingHorizontalOf,
-} from './foundationThrust';
+import { defaultThrustTie, reactionColumn, slabSharePerColumn, slidingHorizontalOf } from './foundationThrust';
 import { COVER_MM, type FootingDesignRow } from './footingModel';
 import { designFootingRow, isResized } from './footingDesignRow';
 import { sizeText } from './footingSizing';
@@ -110,15 +105,11 @@ export const designFootings = defineCommand({
       if (outcome.change) changes.push(outcome.change);
     }
     if (rows.length === 0) {
-      return noop(
-        doc,
-        `design_footings failed: no portal frame column with a footing on level '${levelId}'.`,
-      );
+      return noop(doc, `design_footings failed: no portal frame column with a footing on level '${levelId}'.`);
     }
     const designed = rows.filter((row) => row.status === 'designed');
     const failed = rows.filter((row) => row.status === 'failed');
-    const maxOf = (pick: (row: FootingDesignRow) => number): number =>
-      Math.max(0, ...designed.map(pick));
+    const maxOf = (pick: (row: FootingDesignRow) => number): number => Math.max(0, ...designed.map(pick));
     const maxShear = maxOf((row) => row.shearUtilisation);
     const maxPunching = maxOf((row) => row.punchingUtilisation);
     const format = (row: FootingDesignRow): string =>
@@ -131,9 +122,7 @@ export const designFootings = defineCommand({
       summary:
         `Designed ${designed.length} of ${rows.length} footing(s) on level '${levelId}' (${describeLoads(loads)}, soil ${soilBearing} kPa, C25/30 B500, cover ${COVER_MM} mm, ${allowShrink ? 'sizes may shrink' : 'sizes only grow'}; sizes B×L×h mm): ` +
         `${designed.length > 0 ? briefList(designed, format, 8, '; ') : 'none'}. ` +
-        (failed.length > 0
-          ? `${failed.length} not sized — left unchanged: ${briefList(failed, failureText, 8, '; ')}. `
-          : '') +
+        (failed.length > 0 ? `${failed.length} not sized — left unchanged: ${briefList(failed, failureText, 8, '; ')}. ` : '') +
         `Max shear ${round(maxShear)}, max punching ${round(maxPunching)}; ` +
         `${changed.length > 0 ? `${changed.length} footing(s) changed` : 'no change'}. Bending in the frame plane.`,
       affected: elementAffected(document, changed),

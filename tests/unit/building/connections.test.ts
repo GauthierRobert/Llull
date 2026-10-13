@@ -40,9 +40,7 @@ describe('add_moment_connections', () => {
     const before = JSON.stringify(doc);
     const result = execute(doc, 'add_moment_connections', {});
     expect(JSON.stringify(doc)).toBe(before);
-    expect(result.summary).toMatch(
-      /Added 3 moment connection\(s\): 2 eaves \(haunched\), 1 apex; 22 bolt\(s\) M20, \d+\.\d kg/,
-    );
+    expect(result.summary).toMatch(/Added 3 moment connection\(s\): 2 eaves \(haunched\), 1 apex; 22 bolt\(s\) M20, \d+\.\d kg/);
     const added = connections(result.document);
     expect(added.map((c) => [c.kind, c.rafterId, c.end, c.otherId])).toEqual([
       ['eaves', 'member-3', 'start', 'member-1'],
@@ -60,9 +58,7 @@ describe('add_moment_connections', () => {
     const xs = meshXs(result.document, 'connection-1:plate');
     expect(Math.min(...xs)).toBeCloseTo(145, 6);
     expect(Math.max(...xs)).toBeCloseTo(170, 6);
-    expect(execute(result.document, 'add_moment_connections', {}).summary).toMatch(
-      /no unconnected/,
-    );
+    expect(execute(result.document, 'add_moment_connections', {}).summary).toMatch(/no unconnected/);
   });
 
   it('takes sizes and explicit rafters, and validates them', () => {
@@ -82,9 +78,7 @@ describe('add_moment_connections', () => {
     for (const params of [{ plateThickness: 0 }, { boltDiameter: -1 }, { levelId: 'nope' }]) {
       expect(execute(frame(), 'add_moment_connections', params).affected).toEqual([]);
     }
-    expect(execute(createEmptyDocument(), 'add_moment_connections', {}).summary).toMatch(
-      /no unconnected/,
-    );
+    expect(execute(createEmptyDocument(), 'add_moment_connections', {}).summary).toMatch(/no unconnected/);
   });
 
   it('follows its rafter and is deleted with the rafter or the column', () => {
@@ -95,10 +89,7 @@ describe('add_moment_connections', () => {
       profile: 'HEB400',
     }).document;
     expect(Math.min(...meshXs(doc, 'connection-1:plate'))).toBeGreaterThan(before);
-    expect(
-      execute(doc, 'move_building_element', { elementIds: ['connection-1'], delta: [1, 0] })
-        .summary,
-    ).toMatch(/refused/);
+    expect(execute(doc, 'move_building_element', { elementIds: ['connection-1'], delta: [1, 0] }).summary).toMatch(/refused/);
     const withoutColumn = execute(doc, 'delete_building_element', { elementIds: ['member-1'] });
     expect(withoutColumn.document.building?.elements['connection-1']).toBeUndefined();
     expect(withoutColumn.document.building?.elements['connection-2']).toBeDefined();
@@ -133,15 +124,7 @@ describe('add_moment_connections', () => {
     const schedule = execute(doc, 'building_schedule', { kind: 'connection' }).data as {
       rows: unknown[][];
     };
-    expect(schedule.rows[0]?.slice(0, 7)).toEqual([
-      'MC1',
-      'eaves',
-      'RF1',
-      'SC1',
-      25,
-      '8×M20',
-      1200,
-    ]);
+    expect(schedule.rows[0]?.slice(0, 7)).toEqual(['MC1', 'eaves', 'RF1', 'SC1', 25, '8×M20', 1200]);
     const ifc = (execute(doc, 'export_ifc', {}).data as IfcExport).ifc;
     expect(ifc).toContain("'END_PLATE'");
     expect(ifc).toContain("'HAUNCH'");
@@ -200,28 +183,25 @@ describe('phase 3 review regressions', () => {
       start: [0, 0, 5000],
     });
     expect(moved.summary).toMatch(/connection-1 removed/);
-    expect(
-      execute(doc, 'update_steel_member', { memberId: 'member-1', note: 'x' }).summary,
-    ).not.toMatch(/removed/);
+    expect(execute(doc, 'update_steel_member', { memberId: 'member-1', note: 'x' }).summary).not.toMatch(/removed/);
   });
 
   it('refuses to move a column away from its connected rafter', () => {
     const doc = execute(frame(), 'add_moment_connections', {}).document;
-    expect(
-      execute(doc, 'move_building_element', { elementIds: ['member-1'], delta: [3000, 0] }).summary,
-    ).toMatch(/connection-1 join a moved member to a member that is not moved/);
-    expect(
-      execute(doc, 'move_building_element', { elementIds: ['member-3'], delta: [3000, 0] }).summary,
-    ).toMatch(/connection-1, connection-2 join a moved member/);
+    expect(execute(doc, 'move_building_element', { elementIds: ['member-1'], delta: [3000, 0] }).summary).toMatch(
+      /connection-1 join a moved member to a member that is not moved/,
+    );
+    expect(execute(doc, 'move_building_element', { elementIds: ['member-3'], delta: [3000, 0] }).summary).toMatch(
+      /connection-1, connection-2 join a moved member/,
+    );
     const together = execute(doc, 'move_building_element', {
       elementIds: ['member-1', 'member-2', 'member-3', 'member-4'],
       delta: [3000, 0],
     });
     expect(together.affected.length).toBeGreaterThan(0);
-    expect(
-      execute(doc, 'move_building_element', { elementIds: ['connection-1'], delta: [1, 0] })
-        .summary,
-    ).toMatch(/follow their host \(a wall, a steel column or a rafter\)/);
+    expect(execute(doc, 'move_building_element', { elementIds: ['connection-1'], delta: [1, 0] }).summary).toMatch(
+      /follow their host \(a wall, a steel column or a rafter\)/,
+    );
   });
 
   it('copies connections with their members to another level', () => {
@@ -243,9 +223,7 @@ describe('phase 3 review regressions', () => {
   it('details the apex when only the higher-id rafter is requested', () => {
     const result = execute(frame(), 'add_moment_connections', { rafterIds: ['member-4'] });
     expect(connections(result.document).map((c) => c.kind)).toEqual(['eaves', 'apex']);
-    expect(execute(result.document, 'add_moment_connections', {}).summary).toMatch(
-      /Added 1 moment connection\(s\): 1 eaves/,
-    );
+    expect(execute(result.document, 'add_moment_connections', {}).summary).toMatch(/Added 1 moment connection\(s\): 1 eaves/);
   });
 
   it('weighs the modelled plates (taller on a steep rafter)', () => {

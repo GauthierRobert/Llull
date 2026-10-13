@@ -23,11 +23,7 @@ export function CivilPanel({ className }: { className?: string }): React.ReactEl
   const objectCount = useStore((s) => s.document.civil?.order.length ?? 0);
   return (
     <div className={classNames('panel civil-panel', className)} data-testid="civil-panel">
-      <PanelHeader
-        title="Civil / Site"
-        count={objectCount}
-        countLabel={`${objectCount} civil objects`}
-      >
+      <PanelHeader title="Civil / Site" count={objectCount} countLabel={`${objectCount} civil objects`}>
         <CivilFeedback />
       </PanelHeader>
       {objectCount === 0 && (

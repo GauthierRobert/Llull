@@ -21,8 +21,7 @@ export function deleteSelection(): void {
   const { elementIds, entityIds } = parts;
   if (elementIds.length > 0) dispatchStep('delete_building_element', { elementIds }, false);
   // A mixed selection is two commands but one local undo step.
-  if (entityIds.length > 0)
-    dispatchStep('delete_entities', { ids: entityIds }, elementIds.length > 0);
+  if (entityIds.length > 0) dispatchStep('delete_entities', { ids: entityIds }, elementIds.length > 0);
 }
 
 /** Dispatch one command of a multi-command action; `joinPrevious` folds it into the last local undo step. */
@@ -76,11 +75,7 @@ export function duplicateSelection(): void {
   const state = useStore.getState();
   const selection = state.document.selection;
   if (selection.length === 0) return;
-  state.dispatch(
-    'duplicate_entities',
-    { ids: [...selection], offset: duplicateOffset() },
-    { selectAffected: selection.length === 1 },
-  );
+  state.dispatch('duplicate_entities', { ids: [...selection], offset: duplicateOffset() }, { selectAffected: selection.length === 1 });
 }
 
 /**
@@ -95,11 +90,7 @@ export function moveSelection(delta: Vec3, options: { joinPrevious?: boolean } =
   const joinPrevious = options.joinPrevious === true;
   let dispatched = false;
   if (elementIds.length > 0 && delta[2] === 0) {
-    dispatchStep(
-      'move_building_element',
-      { elementIds, delta: [delta[0], delta[1]] },
-      joinPrevious,
-    );
+    dispatchStep('move_building_element', { elementIds, delta: [delta[0], delta[1]] }, joinPrevious);
     dispatched = true;
   }
   // Local undo: a mixed move is one step; a held arrow key (`joinPrevious`) is one step too.

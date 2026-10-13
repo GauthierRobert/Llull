@@ -18,9 +18,7 @@ const SCHEDULES = ['member', 'equipment', 'pipe'] as const;
 /** The "Takeoff CSV" download as the `{ lines }` shape the criteria read (key, unit, quantity). */
 function takeoffJson(csv: string): string {
   const [, ...rows] = parseCsv(csv);
-  const lines = rows
-    .filter((row) => row.length >= 4)
-    .map((row) => ({ key: row[0] ?? '', unit: row[3] ?? '', quantity: Number(row[2]) }));
+  const lines = rows.filter((row) => row.length >= 4).map((row) => ({ key: row[0] ?? '', unit: row[3] ?? '', quantity: Number(row[2]) }));
   return JSON.stringify({ lines });
 }
 
@@ -59,8 +57,6 @@ export async function exportPackage(
 /** Top bar "Save": the project file the office archives. */
 export async function saveProject(session: UiSession): Promise<string> {
   await session.deselect();
-  const file = await session.download(() =>
-    session.page.getByRole('button', { name: 'Save project to a JSON file' }).click(),
-  );
+  const file = await session.download(() => session.page.getByRole('button', { name: 'Save project to a JSON file' }).click());
   return file.text;
 }

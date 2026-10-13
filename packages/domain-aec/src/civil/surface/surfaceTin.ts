@@ -29,11 +29,7 @@ export function surfacePoints(civil: CivilModel, surface: SurfaceObject): Vec3[]
 export function surfaceTin(civil: CivilModel, surface: SurfaceObject): Tin {
   const groups = surface.pointGroupIds.map((id) => civilObject(civil, id, 'pointGroup'));
   const cached = memo.get(surface);
-  if (
-    cached &&
-    cached.groups.length === groups.length &&
-    cached.groups.every((group, index) => group === groups[index])
-  ) {
+  if (cached && cached.groups.length === groups.length && cached.groups.every((group, index) => group === groups[index])) {
     return cached.tin;
   }
   const tin = buildTin(surfacePoints(civil, surface), {

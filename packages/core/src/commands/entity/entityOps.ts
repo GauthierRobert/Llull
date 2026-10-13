@@ -76,18 +76,12 @@ function pruneGroupMembers(
 }
 
 /** Records of `record` whose key is not in `dropped`. */
-function withoutKeys<T>(
-  record: Readonly<Record<string, T>>,
-  dropped: ReadonlySet<string>,
-): Record<string, T> {
+function withoutKeys<T>(record: Readonly<Record<string, T>>, dropped: ReadonlySet<string>): Record<string, T> {
   return Object.fromEntries(Object.entries(record).filter(([key]) => !dropped.has(key)));
 }
 
 /** Constraint, joint and drive-relation records that do not reference a removed entity. */
-function pruneReferences(
-  doc: CadDocument,
-  removed: ReadonlySet<string>,
-): { references: Partial<CadDocument>; prunedReferences: number } {
+function pruneReferences(doc: CadDocument, removed: ReadonlySet<string>): { references: Partial<CadDocument>; prunedReferences: number } {
   const droppedConstraints = new Set(
     Object.values(doc.constraints)
       .filter((c) => removed.has(c.a.entityId) || removed.has(c.b.entityId))
@@ -148,21 +142,13 @@ export function withoutEntities(
  * stored and appended to `order`.
  * @pure
  */
-export function replaceEntities(
-  doc: CadDocument,
-  removedIds: readonly string[],
-  result: Entity,
-): CadDocument {
+export function replaceEntities(doc: CadDocument, removedIds: readonly string[], result: Entity): CadDocument {
   return withEntity(withoutEntities(doc, new Set(removedIds)).document, result);
 }
 
 /** Number of constraint, joint and drive-relation records in `doc`. */
 function referenceRecordCount(doc: CadDocument): number {
-  return (
-    Object.keys(doc.constraints).length +
-    Object.keys(doc.joints).length +
-    Object.keys(doc.driveRelations).length
-  );
+  return Object.keys(doc.constraints).length + Object.keys(doc.joints).length + Object.keys(doc.driveRelations).length;
 }
 
 /** `referenceSuffix` for the records an entity-consuming command dropped between `before` and `after`. */
@@ -172,7 +158,5 @@ export function referenceLossSuffix(before: CadDocument, after: CadDocument): st
 
 /** Summary fragment naming how many constraints/joints/drive relations a deletion removed. */
 export function referenceSuffix(prunedReferences: number): string {
-  return prunedReferences > 0
-    ? ` Also removed ${prunedReferences} constraint/joint/drive record(s) that referenced it.`
-    : '';
+  return prunedReferences > 0 ? ` Also removed ${prunedReferences} constraint/joint/drive record(s) that referenced it.` : '';
 }

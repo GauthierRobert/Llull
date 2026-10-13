@@ -145,9 +145,7 @@ export const civilSiteIntent: CivilIntent = {
 };
 
 /** Survey rows of the supplied file (header and blank lines excluded). */
-export function surveyRows(
-  intent: CivilIntent,
-): { e: number; n: number; z: number; code: string }[] {
+export function surveyRows(intent: CivilIntent): { e: number; n: number; z: number; code: string }[] {
   return intent.surveyText
     .split(/\r?\n/)
     .slice(1)

@@ -65,12 +65,7 @@ describe('ExecutionContext', () => {
 
   it('uses ctx.kernel even when no process kernel is installed', () => {
     const { doc, a, b } = twoBoxes();
-    const result = execute(
-      doc,
-      'boolean',
-      { op: 'union', a, b },
-      contextWith({ kernel: triangleKernel() }),
-    );
+    const result = execute(doc, 'boolean', { op: 'union', a, b }, contextWith({ kernel: triangleKernel() }));
     const created = result.document.entities[result.affected[0] ?? ''] as MeshSolidEntity;
     expect(created.kind).toBe('mesh');
   });
@@ -85,24 +80,14 @@ describe('ExecutionContext', () => {
 
   it('replay refuses to regenerate kernel-dependent history without a kernel', () => {
     const { doc, a, b } = twoBoxes();
-    const unioned = execute(
-      doc,
-      'boolean',
-      { op: 'union', a, b },
-      contextWith({ kernel: triangleKernel() }),
-    );
+    const unioned = execute(doc, 'boolean', { op: 'union', a, b }, contextWith({ kernel: triangleKernel() }));
     const replayed = execute(unioned.document, 'replay_history', {});
     expect(Object.keys(replayed.document.entities)).toEqual(Object.keys(unioned.document.entities));
   });
 
   it('restores the outer context after execute returns', () => {
     const outer = currentContext();
-    execute(
-      createEmptyDocument(),
-      'add_box',
-      { size: [1, 1, 1] },
-      contextWith({ ids: prefixedIds('x') }),
-    );
+    execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }, contextWith({ ids: prefixedIds('x') }));
     expect(currentContext().ids).toBe(outer.ids);
   });
 });

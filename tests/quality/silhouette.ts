@@ -21,9 +21,7 @@ const HIDE_OVERLAYS = 'body *:not(canvas):not(:has(canvas)) { visibility: hidden
 
 /** Screenshot of the canvas alone, after the demand frameloop has painted. */
 export async function shootCanvas(page: Page, canvas: Locator): Promise<Buffer> {
-  await page.evaluate(
-    () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
-  );
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
   await page.waitForTimeout(250);
   const style = await page.addStyleTag({ content: HIDE_OVERLAYS });
   const shot = await canvas.screenshot();
@@ -95,16 +93,9 @@ export function aspectOf(rect: NonNullable<Silhouette['rect']>): number {
 export function isFramed(shape: Silhouette, minSpan: number, margin = 1): boolean {
   if (shape.rect === null) return false;
   const { minX, minY, maxX, maxY } = shape.rect;
-  const span = Math.max(
-    (maxX - minX + 1) / shape.canvasWidth,
-    (maxY - minY + 1) / shape.canvasHeight,
-  );
+  const span = Math.max((maxX - minX + 1) / shape.canvasWidth, (maxY - minY + 1) / shape.canvasHeight);
   return (
-    span >= minSpan &&
-    minX >= margin &&
-    minY >= margin &&
-    maxX <= shape.canvasWidth - 1 - margin &&
-    maxY <= shape.canvasHeight - 1 - margin
+    span >= minSpan && minX >= margin && minY >= margin && maxX <= shape.canvasWidth - 1 - margin && maxY <= shape.canvasHeight - 1 - margin
   );
 }
 

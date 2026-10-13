@@ -60,20 +60,12 @@ function StarterTemplates(): React.ReactElement {
 /** View helpers once a building exists: frame it, and peel the cladding off to see the structure. */
 function BuildingViewActions(): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
-  const claddingLayerId = useStore(
-    (s) => Object.values(s.document.layers).find((layer) => layer.name === CLADDING_LAYER_NAME)?.id,
-  );
-  const claddingHidden = useViewportStore(
-    (s) => claddingLayerId !== undefined && s.hiddenLayerIds.has(claddingLayerId),
-  );
+  const claddingLayerId = useStore((s) => Object.values(s.document.layers).find((layer) => layer.name === CLADDING_LAYER_NAME)?.id);
+  const claddingHidden = useViewportStore((s) => claddingLayerId !== undefined && s.hiddenLayerIds.has(claddingLayerId));
   const toggleLayerVisibility = useViewportStore((s) => s.toggleLayerVisibility);
   return (
     <div className="building-actions" aria-label="Building view">
-      <button
-        type="button"
-        className="btn btn--ghost btn--sm"
-        onClick={() => dispatch('fit_view', { direction: 'iso' })}
-      >
+      <button type="button" className="btn btn--ghost btn--sm" onClick={() => dispatch('fit_view', { direction: 'iso' })}>
         Zoom to building
       </button>
       {claddingLayerId !== undefined && (
@@ -96,11 +88,7 @@ export function BuildingPanel({ className }: { className?: string }): React.Reac
   const elementCount = useStore((s) => s.document.building?.elementOrder.length ?? 0);
   return (
     <div className={classNames('panel building-panel', className)} data-testid="building-panel">
-      <PanelHeader
-        title="Building"
-        count={elementCount}
-        countLabel={`${elementCount} building elements`}
-      />
+      <PanelHeader title="Building" count={elementCount} countLabel={`${elementCount} building elements`} />
       {!hasBuilding && (
         <PanelEmpty
           icon="building"

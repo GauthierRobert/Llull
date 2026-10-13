@@ -11,15 +11,7 @@ import { z } from 'zod';
 import { isHexColor } from '../lib/isHexColor';
 import type { CadDocument, Vec2, Vec3 } from '../model/types';
 import type { ExecutionContext } from './types';
-import type {
-  CommandAnnotations,
-  CommandDefinition,
-  CommandResult,
-  ParamItemSpec,
-  ParamSpec,
-  ParamsSchema,
-  ParamType,
-} from './types';
+import type { CommandAnnotations, CommandDefinition, CommandResult, ParamItemSpec, ParamSpec, ParamsSchema, ParamType } from './types';
 
 export { z };
 
@@ -40,8 +32,7 @@ function unwrap(schema: z.ZodType): Unwrapped {
   let description = schema.description;
   for (;;) {
     const def = current.def as { type: string; innerType?: z.ZodType };
-    if (!WRAPPER_TYPES.has(def.type) || !def.innerType)
-      return { core: current, optional, description };
+    if (!WRAPPER_TYPES.has(def.type) || !def.innerType) return { core: current, optional, description };
     optional = optional || def.type === 'optional' || def.type === 'default';
     current = def.innerType;
     description ??= current.description;
@@ -57,9 +48,7 @@ function enumValues(core: z.ZodType): readonly (string | number)[] | undefined {
   };
   if (def.type === 'enum' && def.entries) return Object.values(def.entries);
   if (def.type === 'literal' && def.values) {
-    return def.values.filter(
-      (v): v is string | number => typeof v === 'string' || typeof v === 'number',
-    );
+    return def.values.filter((v): v is string | number => typeof v === 'string' || typeof v === 'number');
   }
   if (def.type === 'union' && def.options) {
     const nested = def.options.map((option) => enumValues(unwrap(option).core));
@@ -101,9 +90,7 @@ function itemSchema(core: z.ZodType): z.ZodType | undefined {
   if (def.type === 'tuple') return def.items?.[0];
   if (def.type !== 'array') return undefined;
   // `untypedArray()` (element `any`) declares no `items` to agents.
-  return (def.element?.def as { type?: string } | undefined)?.type === 'any'
-    ? undefined
-    : def.element;
+  return (def.element?.def as { type?: string } | undefined)?.type === 'any' ? undefined : def.element;
 }
 
 function objectShape(core: z.ZodType): Record<string, z.ZodType> | undefined {
@@ -189,9 +176,7 @@ interface CommandSpec<S extends ParamsObject> {
  * @invariant unknown keys are preserved (loose object) so recorded/legacy params still run
  * @failure params failing the schema -> `execute` no-ops with `<name> rejected: invalid params …`
  */
-export function defineCommand<S extends ParamsObject>(
-  spec: CommandSpec<S>,
-): CommandDefinition<z.output<S>> {
+export function defineCommand<S extends ParamsObject>(spec: CommandSpec<S>): CommandDefinition<z.output<S>> {
   const definition: CommandDefinition<z.output<S>> = {
     name: spec.name,
     description: spec.description,
@@ -206,9 +191,7 @@ export function defineCommand<S extends ParamsObject>(
  * A feature's (or plugin's) command list, params erased to `unknown`. This is the one sanctioned
  * erasure: `execute` validates params against each command's own schema before `run` sees them.
  */
-export function commandCatalog(
-  ...commands: ReadonlyArray<CommandDefinition<never>>
-): ReadonlyArray<CommandDefinition<unknown>> {
+export function commandCatalog(...commands: ReadonlyArray<CommandDefinition<never>>): ReadonlyArray<CommandDefinition<unknown>> {
   return commands as ReadonlyArray<CommandDefinition<unknown>>;
 }
 
@@ -218,9 +201,7 @@ export function vec2(description: string): z.ZodTuple<[z.ZodNumber, z.ZodNumber]
 }
 
 /** 3-number vector `[x, y, z]`. */
-export function vec3(
-  description: string,
-): z.ZodTuple<[z.ZodNumber, z.ZodNumber, z.ZodNumber], null> {
+export function vec3(description: string): z.ZodTuple<[z.ZodNumber, z.ZodNumber, z.ZodNumber], null> {
   return z.tuple([z.number(), z.number(), z.number()]).describe(description);
 }
 
@@ -262,16 +243,10 @@ export function colorField(defaultColor: string): z.ZodOptional<z.ZodString> {
 
 /** Optional display-name param of a created entity. */
 export function nameField(): z.ZodOptional<z.ZodString> {
-  return z
-    .string()
-    .describe('Optional display name for the entity (shown in the scene tree).')
-    .optional();
+  return z.string().describe('Optional display name for the entity (shown in the scene tree).').optional();
 }
 
 /** Optional layer id param of a created entity. */
 export function layerIdField(): z.ZodOptional<z.ZodString> {
-  return z
-    .string()
-    .describe('Layer id to assign the entity to. Defaults to the document default layer.')
-    .optional();
+  return z.string().describe('Layer id to assign the entity to. Defaults to the document default layer.').optional();
 }

@@ -56,8 +56,7 @@ const SIGNED: Readonly<Record<string, ReadonlyArray<string>>> = {
 };
 
 /** Fields that must be strictly positive. */
-const positiveFields = (category: string): string[] =>
-  (NUMBERS[category] ?? []).filter((field) => !SIGNED[category]?.includes(field));
+const positiveFields = (category: string): string[] => (NUMBERS[category] ?? []).filter((field) => !SIGNED[category]?.includes(field));
 
 /** Plan-point fields each category must carry (categories not listed carry none). */
 const POINTS: Readonly<Record<string, ReadonlyArray<string>>> = {
@@ -71,11 +70,9 @@ const POINTS: Readonly<Record<string, ReadonlyArray<string>>> = {
   curvedWall: ['start', 'through', 'end'],
 };
 
-const isPoint = (value: unknown): boolean =>
-  Array.isArray(value) && value.length >= 2 && value.every(isFiniteNumber);
+const isPoint = (value: unknown): boolean => Array.isArray(value) && value.length >= 2 && value.every(isFiniteNumber);
 
-const isPolygon = (value: unknown): boolean =>
-  Array.isArray(value) && value.length >= 3 && value.every(isPoint);
+const isPolygon = (value: unknown): boolean => Array.isArray(value) && value.length >= 3 && value.every(isPoint);
 
 type Elements = Record<string, unknown>;
 
@@ -85,14 +82,11 @@ function wallLayerErrors(key: string, element: Elements): string[] {
   const layers = parseWallLayers(raw);
   const thickness = element['thickness'];
   if (typeof layers === 'string') return [`building element ${key}: ${layers}`];
-  if (
-    !(raw as unknown[]).every((layer) => isRecord(layer) && typeof layer['function'] === 'string')
-  ) {
+  if (!(raw as unknown[]).every((layer) => isRecord(layer) && typeof layer['function'] === 'string')) {
     return [`building element ${key}: every stored layer needs a function`];
   }
   const total = layers.reduce((sum, layer) => sum + layer.thickness, 0);
-  return typeof thickness === 'number' &&
-    Math.abs(total - thickness) > 1e-6 * Math.max(1, thickness)
+  return typeof thickness === 'number' && Math.abs(total - thickness) > 1e-6 * Math.max(1, thickness)
     ? [`building element ${key}: layer thicknesses must add up to the wall thickness`]
     : [];
 }
@@ -172,22 +166,14 @@ function openingHostErrors(key: string, element: Elements, elements: Elements): 
     : [`building element ${key}: hostId '${hostId}' is not a wall`];
 }
 
-function elementErrors(
-  key: string,
-  element: unknown,
-  levels: Record<string, unknown>,
-  elements: Record<string, unknown>,
-): string[] {
+function elementErrors(key: string, element: unknown, levels: Record<string, unknown>, elements: Record<string, unknown>): string[] {
   if (!isRecord(element)) return [`building element ${key} is not an object`];
   const category = element['category'];
-  if (typeof category !== 'string' || !CATEGORIES.has(category))
-    return [`building element ${key}: unknown category '${String(category)}'`];
+  if (typeof category !== 'string' || !CATEGORIES.has(category)) return [`building element ${key}: unknown category '${String(category)}'`];
   const errors: string[] = [];
   if (element['id'] !== key) errors.push(`building element ${key}: id does not match its key`);
-  if (typeof element['mark'] !== 'string')
-    errors.push(`building element ${key}: mark must be a string`);
-  if (!isStringArray(element['entityIds']))
-    errors.push(`building element ${key}: entityIds must be a string array`);
+  if (typeof element['mark'] !== 'string') errors.push(`building element ${key}: mark must be a string`);
+  if (!isStringArray(element['entityIds'])) errors.push(`building element ${key}: entityIds must be a string array`);
   for (const field of NUMBERS[category] ?? []) {
     const value = element[field];
     if (!isFiniteNumber(value)) {
@@ -196,13 +182,11 @@ function elementErrors(
   }
   for (const field of positiveFields(category)) {
     const value = element[field];
-    if (typeof value === 'number' && !(value > 0))
-      errors.push(`building element ${key}: ${field} must be > 0`);
+    if (typeof value === 'number' && !(value > 0)) errors.push(`building element ${key}: ${field} must be > 0`);
   }
   for (const field of ['sillHeight', 'clearance', 'weight']) {
     const value = element[field];
-    if (typeof value === 'number' && value < 0)
-      errors.push(`building element ${key}: ${field} must be >= 0`);
+    if (typeof value === 'number' && value < 0) errors.push(`building element ${key}: ${field} must be >= 0`);
   }
   const reinforcement = element['reinforcement'];
   if (category === 'footing' && reinforcement !== undefined) {
@@ -213,9 +197,7 @@ function elementErrors(
         return isPositiveNumber(value);
       });
     if (!valid) {
-      errors.push(
-        `building element ${key}: reinforcement must have barDiameter, spacing and cover > 0`,
-      );
+      errors.push(`building element ${key}: reinforcement must have barDiameter, spacing and cover > 0`);
     }
   }
   if (category === 'stair') {
@@ -255,28 +237,16 @@ function elementErrors(
       }
     }
   }
-  if (
-    category === 'equipment' &&
-    !(isVec3(element['size']) && element['size'].every((n) => n > 0))
-  ) {
+  if (category === 'equipment' && !(isVec3(element['size']) && element['size'].every((n) => n > 0))) {
     errors.push(`building element ${key}: size must be [length, width, height], all > 0`);
   }
   const shapeValue = element['shape'];
-  if (
-    category === 'equipment' &&
-    shapeValue !== undefined &&
-    !(typeof shapeValue === 'string' && EQUIPMENT_SHAPES.includes(shapeValue))
-  ) {
+  if (category === 'equipment' && shapeValue !== undefined && !(typeof shapeValue === 'string' && EQUIPMENT_SHAPES.includes(shapeValue))) {
     errors.push(`building element ${key}: shape must be one of ${EQUIPMENT_SHAPES.join(', ')}`);
   }
   const role = element['role'];
-  if (
-    category === 'member' &&
-    !(typeof role === 'string' && Object.keys(MEMBER_LAYER).includes(role))
-  ) {
-    errors.push(
-      `building element ${key}: role must be one of ${Object.keys(MEMBER_LAYER).join(', ')}`,
-    );
+  if (category === 'member' && !(typeof role === 'string' && Object.keys(MEMBER_LAYER).includes(role))) {
+    errors.push(`building element ${key}: role must be one of ${Object.keys(MEMBER_LAYER).join(', ')}`);
   }
   if (category === 'panel' && role !== 'roof' && role !== 'wall') {
     errors.push(`building element ${key}: role must be roof or wall`);
@@ -319,9 +289,7 @@ function elementErrors(
     ['corners', 3],
     ['points', 2],
   ] as const) {
-    const expected =
-      (category === 'panel' && field === 'corners') ||
-      ((category === 'pipe' || category === 'tray') && field === 'points');
+    const expected = (category === 'panel' && field === 'corners') || ((category === 'pipe' || category === 'tray') && field === 'points');
     const value = element[field];
     if (expected && !(Array.isArray(value) && value.length >= minimum && value.every(isVec3))) {
       errors.push(`building element ${key}: ${field} must be ≥ ${minimum} [x, y, z] points`);
@@ -359,17 +327,11 @@ export function buildingErrors(raw: unknown): string[] {
   const levels = raw['levels'];
   const elements = raw['elements'];
   if (!isRecord(raw['project'])) errors.push('building.project must be an object');
-  if (raw['uid'] !== undefined && typeof raw['uid'] !== 'string')
-    errors.push('building.uid must be a string');
+  if (raw['uid'] !== undefined && typeof raw['uid'] !== 'string') errors.push('building.uid must be a string');
   const counters = raw['counters'];
   if (
     counters !== undefined &&
-    !(
-      isRecord(counters) &&
-      Object.values(counters).every(
-        (value) => typeof value === 'number' && Number.isInteger(value) && value >= 0,
-      )
-    )
+    !(isRecord(counters) && Object.values(counters).every((value) => typeof value === 'number' && Number.isInteger(value) && value >= 0))
   ) {
     errors.push('building.counters must map id prefixes to non-negative integers');
   }
@@ -394,7 +356,6 @@ export function buildingErrors(raw: unknown): string[] {
       errors.push(`building.${field} must list known ids`);
     }
   }
-  for (const [key, element] of Object.entries(elements))
-    errors.push(...elementErrors(key, element, levels, elements));
+  for (const [key, element] of Object.entries(elements)) errors.push(...elementErrors(key, element, levels, elements));
   return errors;
 }

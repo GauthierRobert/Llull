@@ -15,9 +15,7 @@ const STEEL_DENSITY = 7850; // kg/m³
  * max(2.5, OD / 40).
  */
 export function pipeWallThickness(outsideDiameter: number): number {
-  const match = PIPE_SIZES.find(
-    ([, diameter]) => Math.abs(diameter - outsideDiameter) <= OUTSIDE_DIAMETER_TOLERANCE_MM,
-  );
+  const match = PIPE_SIZES.find(([, diameter]) => Math.abs(diameter - outsideDiameter) <= OUTSIDE_DIAMETER_TOLERANCE_MM);
   return match?.[2] ?? Math.max(2.5, outsideDiameter / 40);
 }
 

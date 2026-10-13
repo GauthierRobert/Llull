@@ -18,13 +18,7 @@ import { useMemo } from 'react';
 import * as THREE from 'three';
 import type { Material } from '@core/model/types';
 import { type DisplayMode, useViewportStore } from '@ui/store';
-import {
-  SELECTION_EMISSIVE,
-  SELECTION_EMISSIVE_INTENSITY,
-  XRAY_EMISSIVE,
-  XRAY_EMISSIVE_INTENSITY,
-  XRAY_OPACITY,
-} from '../viewportPalette';
+import { SELECTION_EMISSIVE, SELECTION_EMISSIVE_INTENSITY, XRAY_EMISSIVE, XRAY_EMISSIVE_INTENSITY, XRAY_OPACITY } from '../viewportPalette';
 
 /** Document-material fields that drive a mesh's PBR surface. */
 export type PbrMaterial = Pick<Material, 'color' | 'metalness' | 'roughness' | 'finish'>;

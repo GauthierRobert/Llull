@@ -128,9 +128,7 @@ export interface CadStoreState {
   setLiveStatus(status: LiveStatus): void;
 }
 
-export type StoreSet = (
-  partial: Partial<CadStoreState> | ((state: CadStoreState) => Partial<CadStoreState>),
-) => void;
+export type StoreSet = (partial: Partial<CadStoreState> | ((state: CadStoreState) => Partial<CadStoreState>)) => void;
 export type StoreGet = () => CadStoreState;
 
 /** One locally executed mutating command awaiting replay on the server. */

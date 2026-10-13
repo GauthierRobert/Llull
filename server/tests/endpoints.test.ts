@@ -86,10 +86,7 @@ describe('POST /command — validation', () => {
   });
 
   it('returns 400 when body is empty', async () => {
-    const res = await request(app)
-      .post('/command')
-      .set('Content-Type', 'application/json')
-      .send('{}');
+    const res = await request(app).post('/command').set('Content-Type', 'application/json').send('{}');
 
     expect(res.status).toBe(400);
   });

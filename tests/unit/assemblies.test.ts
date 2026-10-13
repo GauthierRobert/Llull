@@ -21,10 +21,7 @@ interface Comp {
 }
 
 /** Doc with one box promoted to a component (replaced by a single instance). */
-function makeComponent(
-  name: string,
-  boxParams: Record<string, unknown> = { size: [1, 1, 1] },
-): Comp {
+function makeComponent(name: string, boxParams: Record<string, unknown> = { size: [1, 1, 1] }): Comp {
   const box = execute(createEmptyDocument(), 'add_box', boxParams);
   const boxId = box.affected[0]!;
   const comp = execute(box.document, 'create_component', { name, entityIds: [boxId] });
@@ -39,10 +36,7 @@ function makeComponent(
 }
 
 /** Component + a second instance inserted at `position`. */
-function withSecondInstance(
-  c: Comp,
-  position: [number, number, number],
-): Comp & { inst2Id: string } {
+function withSecondInstance(c: Comp, position: [number, number, number]): Comp & { inst2Id: string } {
   const inst2 = execute(c.doc, 'insert_instance', { componentId: c.componentId, position });
   return { ...c, doc: inst2.document, inst2Id: inst2.affected[0]! };
 }
@@ -146,18 +140,12 @@ describe('assemblies', () => {
 
   it('create_component is pure — input document is not mutated', () => {
     const doc = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
-    expectPure(doc, () =>
-      execute(doc, 'create_component', { name: 'Test', entityIds: [doc.order[0]!] }),
-    );
+    expectPure(doc, () => execute(doc, 'create_component', { name: 'Test', entityIds: [doc.order[0]!] }));
   });
 
   it('create_component with empty entityIds is a graceful no-op', () => {
     const doc = createEmptyDocument();
-    expectNoOp(
-      execute(doc, 'create_component', { name: 'Empty', entityIds: [] }),
-      doc,
-      'non-empty',
-    );
+    expectNoOp(execute(doc, 'create_component', { name: 'Empty', entityIds: [] }), doc, 'non-empty');
   });
 
   it('create_component with a missing entity id is a graceful no-op', () => {
@@ -231,10 +219,7 @@ describe('assemblies', () => {
   // explode_instance
 
   it('explode_instance replaces instance with baked world-space entities', () => {
-    const c = withSecondInstance(
-      makeComponent('BoxComp', { size: [1, 1, 1], position: [3, 0, 0] }),
-      [10, 0, 0],
-    );
+    const c = withSecondInstance(makeComponent('BoxComp', { size: [1, 1, 1], position: [3, 0, 0] }), [10, 0, 0]);
     const result = execute(c.doc, 'explode_instance', { id: c.inst2Id });
     const doc = result.document;
 
@@ -301,10 +286,7 @@ describe('assemblies', () => {
 
   it('describe_scene reports an instance world AABB from its component extent (not a point)', () => {
     // Box size [2,2,2] at origin → local AABB [-1,-1,-1]..[1,1,1]; second instance at [10,0,0].
-    const c = withSecondInstance(
-      makeComponent('Brick2', { size: [2, 2, 2], position: [0, 0, 0] }),
-      [10, 0, 0],
-    );
+    const c = withSecondInstance(makeComponent('Brick2', { size: [2, 2, 2], position: [0, 0, 0] }), [10, 0, 0]);
 
     const snap = execute(c.doc, 'describe_scene', {}).data as {
       entities: Array<{ id: string; kind: string; bounds: { min: number[]; max: number[] } }>;

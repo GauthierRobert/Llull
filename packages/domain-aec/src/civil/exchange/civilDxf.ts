@@ -26,49 +26,25 @@ function planWorld(entity: Entity, point: Vec2, frame: Frame): Vec2 {
   return frame(entityPlanPoint(entity, point));
 }
 
-function writeMesh(
-  writer: DxfWriter,
-  layer: string,
-  entity: Entity & { kind: 'mesh' },
-  frame: Frame,
-): void {
+function writeMesh(writer: DxfWriter, layer: string, entity: Entity & { kind: 'mesh' }, frame: Frame): void {
   const { positions, indices } = entity.mesh;
   const vertex = (index: number): Vec3 => {
-    const [x, y] = frame([
-      entity.position[0] + (positions[index * 3] ?? 0),
-      entity.position[1] + (positions[index * 3 + 1] ?? 0),
-    ]);
+    const [x, y] = frame([entity.position[0] + (positions[index * 3] ?? 0), entity.position[1] + (positions[index * 3 + 1] ?? 0)]);
     return [x, y, entity.position[2] + (positions[index * 3 + 2] ?? 0)];
   };
   for (let k = 0; k + 2 < indices.length; k += 3) {
-    writer.face3d(
-      layer,
-      vertex(indices[k] ?? 0),
-      vertex(indices[k + 1] ?? 0),
-      vertex(indices[k + 2] ?? 0),
-    );
+    writer.face3d(layer, vertex(indices[k] ?? 0), vertex(indices[k + 1] ?? 0), vertex(indices[k + 2] ?? 0));
   }
 }
 
-function writeEntity(
-  writer: DxfWriter,
-  layer: string,
-  entity: Entity,
-  frame: Frame,
-  rotationDeg: number,
-): void {
+function writeEntity(writer: DxfWriter, layer: string, entity: Entity, frame: Frame, rotationDeg: number): void {
   const z = entity.position[2];
   switch (entity.kind) {
     case 'point':
       writer.point2(layer, frame([entity.position[0], entity.position[1]]), z);
       return;
     case 'line':
-      writer.line(
-        layer,
-        planWorld(entity, entity.start, frame),
-        planWorld(entity, entity.end, frame),
-        z,
-      );
+      writer.line(layer, planWorld(entity, entity.start, frame), planWorld(entity, entity.end, frame), z);
       return;
     case 'polyline':
       writer.polyline(

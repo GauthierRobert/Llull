@@ -50,11 +50,7 @@ export function clipSegment(a: Vec2, b: Vec2, rect: ClipRect): [Vec2, Vec2] | nu
 }
 
 /** Connected runs of `points` (optionally closed) that lie inside `rect`. */
-export function clipPolyline(
-  points: ReadonlyArray<Vec2>,
-  closed: boolean,
-  rect: ClipRect,
-): Vec2[][] {
+export function clipPolyline(points: ReadonlyArray<Vec2>, closed: boolean, rect: ClipRect): Vec2[][] {
   const runs: Vec2[][] = [];
   const count = closed ? points.length : points.length - 1;
   let open: Vec2[] | null = null;
@@ -69,10 +65,7 @@ export function clipPolyline(
       continue;
     }
     const [start, end] = clipped;
-    const continues =
-      open !== null &&
-      previousEnd !== null &&
-      Math.hypot(previousEnd[0] - start[0], previousEnd[1] - start[1]) < 1e-6;
+    const continues = open !== null && previousEnd !== null && Math.hypot(previousEnd[0] - start[0], previousEnd[1] - start[1]) < 1e-6;
     if (open !== null && continues) {
       open.push(end);
     } else {

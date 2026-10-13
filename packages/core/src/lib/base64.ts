@@ -40,8 +40,7 @@ export function base64ToUint8Array(text: string): Uint8Array | null {
     if (value < 0) return null;
     triple = (triple << 6) | value;
     if (i % 4 === 3) {
-      for (const shift of [16, 8, 0])
-        if (out < bytes.length) bytes[out++] = (triple >> shift) & 0xff;
+      for (const shift of [16, 8, 0]) if (out < bytes.length) bytes[out++] = (triple >> shift) & 0xff;
       triple = 0;
     }
   }

@@ -42,12 +42,7 @@ export const shearCheckLine = (
 });
 
 /** SLS deflection check line against `limit` (mm); `label` names the limit, e.g. "L/250". */
-export const deflectionCheckLine = (
-  subject: string,
-  label: string,
-  deflection: number,
-  limit: number,
-): CheckLine => ({
+export const deflectionCheckLine = (subject: string, label: string, deflection: number, limit: number): CheckLine => ({
   name: `deflection (${label})`,
   utilisation: deflection / limit,
   combination: 'SLS G + Q',
@@ -119,15 +114,12 @@ export function analysedRow(
     governing: worst.combination,
     detail: worst.detail,
     checks: lines.map((line) => ({ name: line.name, utilisation: round(line.utilisation, 3) })),
-    forces: Object.fromEntries(
-      Object.entries(forces).map(([key, value]) => [key, round(value, 3)]),
-    ),
+    forces: Object.fromEntries(Object.entries(forces).map(([key, value]) => [key, round(value, 3)])),
   };
 }
 
 /** Row of a bar whose catalogue profile is unknown. */
-export const noProfileRow = (bar: SteelBar): MemberRow =>
-  skippedRow(bar, bar.skipReason ?? 'profile not in the catalogue');
+export const noProfileRow = (bar: SteelBar): MemberRow => skippedRow(bar, bar.skipReason ?? 'profile not in the catalogue');
 
 interface Skipped {
   readonly skipped: MemberRow;
@@ -136,23 +128,15 @@ interface Skipped {
 const skip = (bar: SteelBar, reason: string): Skipped => ({ skipped: skippedRow(bar, reason) });
 
 /** Profile and resistance of a bar bent about its depth axis, or the row of a bar not covered (shape, class 4). */
-function beamSection(
-  bar: SteelBar,
-): { profile: SteelProfile; resistance: ReturnType<typeof sectionResistance> } | Skipped {
+function beamSection(bar: SteelBar): { profile: SteelProfile; resistance: ReturnType<typeof sectionResistance> } | Skipped {
   const { profile } = bar;
   if (!profile) return { skipped: noProfileRow(bar) };
   if (!isBeamShape(profile)) {
-    return skip(
-      bar,
-      `${profile.name}: ${profile.shape} sections as beams (torsion from eccentric load, principal axes) are not covered`,
-    );
+    return skip(bar, `${profile.name}: ${profile.shape} sections as beams (torsion from eccentric load, principal axes) are not covered`);
   }
   const resistance = sectionResistance(profile, bar.fy);
   if (resistance.sectionClass === 4) {
-    return skip(
-      bar,
-      `${profile.name} is class 4 in bending at fy ${bar.fy}: effective-section resistance is not covered`,
-    );
+    return skip(bar, `${profile.name} is class 4 in bending at fy ${bar.fy}: effective-section resistance is not covered`);
   }
   return { profile, resistance };
 }
@@ -160,10 +144,7 @@ function beamSection(
 /** Row built by `build` from the section of a beam bar, or the skipped row when it is not covered. */
 export function withBeamSection(
   bar: SteelBar,
-  build: (section: {
-    profile: SteelProfile;
-    resistance: ReturnType<typeof sectionResistance>;
-  }) => MemberRow,
+  build: (section: { profile: SteelProfile; resistance: ReturnType<typeof sectionResistance> }) => MemberRow,
 ): MemberRow {
   const gate = beamSection(bar);
   return 'skipped' in gate ? gate.skipped : build(gate);
@@ -181,16 +162,10 @@ export function columnSection(bar: SteelBar):
   if (!profile) return { skipped: noProfileRow(bar) };
   const sectionClass = compressionClass(profile, bar.fy);
   if (sectionClass === null) {
-    return skip(
-      bar,
-      `${profile.name}: ${profile.shape} sections in compression (torsional-flexural buckling) are not covered`,
-    );
+    return skip(bar, `${profile.name}: ${profile.shape} sections in compression (torsional-flexural buckling) are not covered`);
   }
   if (sectionClass === 4) {
-    return skip(
-      bar,
-      `${profile.name} is class 4 in compression at fy ${bar.fy}: effective-section resistance is not covered`,
-    );
+    return skip(bar, `${profile.name} is class 4 in compression at fy ${bar.fy}: effective-section resistance is not covered`);
   }
   return { profile, sectionClass, resistance: sectionResistance(profile, bar.fy) };
 }

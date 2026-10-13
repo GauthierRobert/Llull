@@ -29,12 +29,7 @@ function unionOfTwoBoxes(topology: ShapeTopology | null): {
 describe('mass_properties of a kernel result', () => {
   it('reports the exact B-rep volume when the kernel has topology', () => {
     const { doc, id, kernel } = unionOfTwoBoxes(TOPOLOGY);
-    const result = execute(
-      doc,
-      'mass_properties',
-      { entityId: id },
-      { ...defaultContext(), kernel },
-    );
+    const result = execute(doc, 'mass_properties', { entityId: id }, { ...defaultContext(), kernel });
     expect(result.data).toEqual({ volume: 0.17, volumeUnit: 'mm³', method: 'exact' });
     expect(result.summary).toContain('(exact B-rep)');
     expect(result.affected).toEqual([]);
@@ -43,12 +38,7 @@ describe('mass_properties of a kernel result', () => {
 
   it('falls back to the display mesh without exact topology', () => {
     const { doc, id, kernel } = unionOfTwoBoxes(null);
-    const result = execute(
-      doc,
-      'mass_properties',
-      { entityId: id },
-      { ...defaultContext(), kernel },
-    );
+    const result = execute(doc, 'mass_properties', { entityId: id }, { ...defaultContext(), kernel });
     expect(result.data).toMatchObject({ method: 'mesh' });
     expect((result.data as { volume: number }).volume).toBeCloseTo(1 / 6, 9);
     expect(result.summary).toContain('display mesh');
@@ -56,12 +46,7 @@ describe('mass_properties of a kernel result', () => {
 
   it('mass_properties weighs the exact volume', () => {
     const { doc, id, kernel } = unionOfTwoBoxes(TOPOLOGY);
-    const result = execute(
-      doc,
-      'mass_properties',
-      { entityId: id, density: 2 },
-      { ...defaultContext(), kernel },
-    );
+    const result = execute(doc, 'mass_properties', { entityId: id, density: 2 }, { ...defaultContext(), kernel });
     expect(result.data).toMatchObject({ volume: 0.17, mass: 0.34 });
   });
 

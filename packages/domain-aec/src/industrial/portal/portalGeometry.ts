@@ -60,10 +60,7 @@ export interface HallGeometry {
 /** Column lines, frame lines and roof-line functions of a hall. */
 export function buildHallGeometry(input: HallGeometryInput): HallGeometry {
   const { originX, originY, spanWidths, bays, bay, pitch, eave, monopitch, mm } = input;
-  const columnLines = spanWidths.reduce<number[]>(
-    (lines, width) => [...lines, (lines[lines.length - 1] as number) + width],
-    [originX],
-  );
+  const columnLines = spanWidths.reduce<number[]>((lines, width) => [...lines, (lines[lines.length - 1] as number) + width], [originX]);
   const spanBounds = spanWidths.map((_, index): readonly [number, number] => [
     columnLines[index] as number,
     columnLines[index + 1] as number,
@@ -78,9 +75,7 @@ export function buildHallGeometry(input: HallGeometryInput): HallGeometry {
     if (monopitch) return eave + (x - x0) * rise;
     const [a, b] =
       spanBounds.find(([from, to]) => x >= from && x <= to) ??
-      (x < x0
-        ? (spanBounds[0] as readonly [number, number])
-        : (spanBounds[spanBounds.length - 1] as readonly [number, number]));
+      (x < x0 ? (spanBounds[0] as readonly [number, number]) : (spanBounds[spanBounds.length - 1] as readonly [number, number]));
     return eave + Math.min(x - a, b - x) * rise;
   };
   /** Column height at a column line (the eaves). */
@@ -96,9 +91,7 @@ export function buildHallGeometry(input: HallGeometryInput): HallGeometry {
       { side: 1, lowX: b, lowZ: eave, highX: middle, highZ: peak },
     ];
   };
-  const ridge = Math.max(
-    ...spanBounds.flatMap((bounds) => slopesOf(bounds).map((slope) => slope.highZ)),
-  );
+  const ridge = Math.max(...spanBounds.flatMap((bounds) => slopesOf(bounds).map((slope) => slope.highZ)));
   return {
     mm,
     h: (profile) => mm(profile.h),

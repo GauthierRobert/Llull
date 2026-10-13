@@ -32,8 +32,7 @@ function checkedAlignment(
   if ('summary' in alignment) return alignment;
   const interval = params.interval ?? alignment.stationInterval;
   if (!(interval > 0)) return noop(doc, `${command} failed: interval must be > 0.`);
-  if (alignmentLength(alignment) <= 0)
-    return noop(doc, `${command} failed: ${alignment.name} has no valid geometry.`);
+  if (alignmentLength(alignment) <= 0) return noop(doc, `${command} failed: ${alignment.name} has no valid geometry.`);
   return { alignment, interval };
 }
 
@@ -57,10 +56,7 @@ export const alignmentReport = defineCommand({
   params: z.object({
     alignmentId: alignmentIdParam,
     interval: intervalField('Row', 'the alignment station interval'),
-    designSpeedKmh: z
-      .number()
-      .optional()
-      .describe('Design speed (km/h, > 0) to enable the geometric checks.'),
+    designSpeedKmh: z.number().optional().describe('Design speed (km/h, > 0) to enable the geometric checks.'),
   }),
   run: (doc, params): CommandResult => {
     const checked = checkedAlignment(doc, params, 'alignment_report');
@@ -69,11 +65,7 @@ export const alignmentReport = defineCommand({
     if (params.designSpeedKmh !== undefined && !(params.designSpeedKmh > 0))
       return noop(doc, 'alignment_report failed: designSpeedKmh must be > 0.');
     const stations = reportStations(alignment, interval);
-    const rows = reportRows(
-      doc,
-      alignment,
-      analyseStations(doc, getCivil(doc), alignment, stations),
-    );
+    const rows = reportRows(doc, alignment, analyseStations(doc, getCivil(doc), alignment, stations));
     const last = rows[rows.length - 1];
     const totals = {
       lengthM: Number(toMetres(doc, alignmentLength(alignment)).toFixed(3)),
@@ -81,10 +73,7 @@ export const alignmentReport = defineCommand({
       fillM3: last?.cumulativeFillM3 ?? 0,
       netM3: last?.massHaulM3 ?? 0,
     };
-    const checks =
-      params.designSpeedKmh === undefined
-        ? undefined
-        : designChecks(doc, alignment, params.designSpeedKmh);
+    const checks = params.designSpeedKmh === undefined ? undefined : designChecks(doc, alignment, params.designSpeedKmh);
     const earthworks = rows.some((row) => row.cutAreaM2 !== null)
       ? `cut ${totals.cutM3} m3, fill ${totals.fillM3} m3, net ${totals.netM3} m3 (+ = surplus)`
       : 'earthworks need a profile, a road section and a ground surface';
@@ -117,10 +106,7 @@ export const exportLongSection = defineCommand({
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
     alignmentId: alignmentIdParam,
-    verticalExaggeration: z
-      .number()
-      .optional()
-      .describe('Vertical / horizontal scale ratio (> 0). Default 10.'),
+    verticalExaggeration: z.number().optional().describe('Vertical / horizontal scale ratio (> 0). Default 10.'),
     interval: intervalField('Table column', 'the station interval'),
   }),
   run: (doc, params): CommandResult => {
@@ -128,29 +114,20 @@ export const exportLongSection = defineCommand({
     if ('summary' in checked) return checked;
     const { alignment, interval } = checked;
     const exaggeration = params.verticalExaggeration ?? 10;
-    if (!(exaggeration > 0))
-      return noop(doc, 'export_long_section failed: verticalExaggeration must be > 0.');
+    if (!(exaggeration > 0)) return noop(doc, 'export_long_section failed: verticalExaggeration must be > 0.');
     if (validateProfile(alignment.profile) !== null) {
-      return noop(
-        doc,
-        `export_long_section failed: ${alignment.name} has no design profile (set_alignment_profile).`,
-      );
+      return noop(doc, `export_long_section failed: ${alignment.name} has no design profile (set_alignment_profile).`);
     }
     const civil = getCivil(doc);
     const stations = reportStations(alignment, interval);
     const rows = reportRows(doc, alignment, analyseStations(doc, civil, alignment, stations));
     const text = longSectionSvg(doc, civil, alignment, rows, exaggeration);
-    if (text === null)
-      return noop(doc, 'export_long_section failed: the profile has no stations on the alignment.');
+    if (text === null) return noop(doc, 'export_long_section failed: the profile has no stations on the alignment.');
     const fileName = `${safeFileName(alignment.name, alignment.id)}_long_section.svg`;
-    return report(
-      doc,
-      `Long section of ${alignment.name}: ${fileName} (${text.length} bytes, VE x${exaggeration}).`,
-      {
-        text,
-        fileName,
-      },
-    );
+    return report(doc, `Long section of ${alignment.name}: ${fileName} (${text.length} bytes, VE x${exaggeration}).`, {
+      text,
+      fileName,
+    });
   },
 });
 
@@ -177,10 +154,7 @@ export const exportCrossSections = defineCommand({
     if ('summary' in checked) return checked;
     const { alignment } = checked;
     if (!alignment.section || validateProfile(alignment.profile) !== null) {
-      return noop(
-        doc,
-        `export_cross_sections failed: ${alignment.name} needs a design profile and a road section.`,
-      );
+      return noop(doc, `export_cross_sections failed: ${alignment.name} needs a design profile and a road section.`);
     }
     let interval = checked.interval;
     let stations = reportStations(alignment, interval);
@@ -191,8 +165,7 @@ export const exportCrossSections = defineCommand({
     const civil = getCivil(doc);
     const analysis = analyseStations(doc, civil, alignment, stations);
     const text = crossSectionSvg(doc, civil, alignment, analysis);
-    if (text === null)
-      return noop(doc, 'export_cross_sections failed: no station lies on the design profile.');
+    if (text === null) return noop(doc, 'export_cross_sections failed: no station lies on the design profile.');
     const fileName = `${safeFileName(alignment.name, alignment.id)}_cross_sections.svg`;
     const drawn = analysis.filter((entry) => entry.cross !== null).length;
     return report(doc, `Cross sections of ${alignment.name}: ${drawn} stations, ${fileName}.`, {
@@ -203,8 +176,4 @@ export const exportCrossSections = defineCommand({
   },
 });
 
-export const roadReportCommands = commandCatalog(
-  alignmentReport,
-  exportLongSection,
-  exportCrossSections,
-);
+export const roadReportCommands = commandCatalog(alignmentReport, exportLongSection, exportCrossSections);

@@ -30,10 +30,7 @@ interface SnapIndicator3DProps {
   snapType: Snap3DType;
 }
 
-export function SnapIndicator3D({
-  position,
-  snapType,
-}: SnapIndicator3DProps): React.ReactElement | null {
+export function SnapIndicator3D({ position, snapType }: SnapIndicator3DProps): React.ReactElement | null {
   const invalidate = useThree((s) => s.invalidate);
 
   const geometry = useDisposable(() => new THREE.OctahedronGeometry(INDICATOR_SIZE, 0), []);
@@ -56,12 +53,5 @@ export function SnapIndicator3D({
 
   if (snapType === 'none') return null;
 
-  return (
-    <mesh
-      geometry={geometry}
-      material={material}
-      position={[position[0], position[1], position[2]]}
-      renderOrder={999}
-    />
-  );
+  return <mesh geometry={geometry} material={material} position={[position[0], position[1], position[2]]} renderOrder={999} />;
 }

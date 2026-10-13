@@ -68,12 +68,7 @@ export const setCamera = defineCommand({
         'Vertical orbit angle in radians. 0 = overhead (along +Z), π/2 = eye-level. ' +
           'Clamped to [0.01, π−0.01] to avoid gimbal lock. Omit to keep current value.',
       ),
-    distance: z
-      .number()
-      .optional()
-      .describe(
-        'Orbit radius — distance from target to camera eye. Must be > 0. Omit to keep current value.',
-      ),
+    distance: z.number().optional().describe('Orbit radius — distance from target to camera eye. Must be > 0. Omit to keep current value.'),
   }),
   run: (doc, p): CommandResult => {
     if (p.distance !== undefined && p.distance <= 0)
@@ -86,12 +81,9 @@ export const setCamera = defineCommand({
       polar: p.polar === undefined ? prev.polar : clampPolar(p.polar),
       distance: p.distance ?? prev.distance,
     };
-    const changed = (['target', 'azimuth', 'polar', 'distance'] as const).filter(
-      (field) => p[field] !== undefined,
-    );
+    const changed = (['target', 'azimuth', 'polar', 'distance'] as const).filter((field) => p[field] !== undefined);
 
-    if (changed.length === 0)
-      return noop(doc, 'set_camera: no fields specified; camera unchanged.');
+    if (changed.length === 0) return noop(doc, 'set_camera: no fields specified; camera unchanged.');
 
     return report(
       { ...doc, camera: next },
@@ -142,8 +134,7 @@ export const fitView = defineCommand({
     const direction: FitDirection = p.direction ?? 'iso';
     const padding: number = p.padding ?? 1.2;
 
-    if (padding <= 0)
-      return noop(doc, `fit_view: padding must be > 0 (got ${padding}). Camera unchanged.`);
+    if (padding <= 0) return noop(doc, `fit_view: padding must be > 0 (got ${padding}). Camera unchanged.`);
 
     const { bounds } = computeSceneSnapshot(doc);
 

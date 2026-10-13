@@ -8,12 +8,7 @@ import { defineCommand, z } from '@core/commands/schema';
 import { levelOrFailure } from '../../building/levelLookup';
 import { noop, report } from '@core/commands/noop';
 import { isNonNegativeNumber } from '@lib/isFiniteNumber';
-import {
-  bufferStiffnessField,
-  craneSelfWeightField,
-  craneValueProblem,
-  travelSpeedField,
-} from '../common/craneParams';
+import { bufferStiffnessField, craneSelfWeightField, craneValueProblem, travelSpeedField } from '../common/craneParams';
 import { DEFAULT_BUFFER_STIFFNESS, DEFAULT_TRAVEL_SPEED } from '../runway/runwayCheckModel';
 import { round } from '../../shared/numeric';
 import { checkTable, failureSummary } from '../reports/checkReport';
@@ -66,14 +61,8 @@ export const checkBracing = defineCommand({
       .describe(
         'Peak velocity pressure qp, kN/m² (EN 1991-1-4). Default 0.6. Frame gable coefficient 0.8 + 0.5; gable posts use net cpe + cpi = 0.8 + 0.2.',
       ),
-    deadLoad: z
-      .number()
-      .optional()
-      .describe('Roof dead load, kN/m², for the stabilising force only. Default 0.5.'),
-    snowLoad: z
-      .number()
-      .optional()
-      .describe('Roof snow load, kN/m², for the stabilising force only. Default 0.8.'),
+    deadLoad: z.number().optional().describe('Roof dead load, kN/m², for the stabilising force only. Default 0.5.'),
+    snowLoad: z.number().optional().describe('Roof snow load, kN/m², for the stabilising force only. Default 0.8.'),
     craneCapacity: z
       .number()
       .optional()
@@ -87,15 +76,10 @@ export const checkBracing = defineCommand({
   }),
   run: (doc: CadDocument, params): CommandResult => {
     const { windPressure = 0.6, deadLoad = 0.5, snowLoad = 0.8 } = params;
-    if (
-      !isNonNegativeNumber(windPressure) ||
-      !isNonNegativeNumber(deadLoad) ||
-      !isNonNegativeNumber(snowLoad)
-    ) {
+    if (!isNonNegativeNumber(windPressure) || !isNonNegativeNumber(deadLoad) || !isNonNegativeNumber(snowLoad)) {
       return noop(doc, 'check_bracing failed: windPressure, deadLoad, snowLoad must be >= 0.');
     }
-    const { travelSpeed = DEFAULT_TRAVEL_SPEED, bufferStiffness = DEFAULT_BUFFER_STIFFNESS } =
-      params;
+    const { travelSpeed = DEFAULT_TRAVEL_SPEED, bufferStiffness = DEFAULT_BUFFER_STIFFNESS } = params;
     const problem = craneValueProblem({
       craneCapacity: params.craneCapacity,
       craneSelfWeight: params.craneSelfWeight,
@@ -132,17 +116,7 @@ export const checkBracing = defineCommand({
     } = analysis;
     const { csv, failures, worst } = checkTable(
       rows,
-      [
-        'Group',
-        'Mark',
-        'Type',
-        'Force (kN)',
-        'Resistance (kN)',
-        'M (kNm)',
-        'Utilisation',
-        'Status',
-        'Check',
-      ],
+      ['Group', 'Mark', 'Type', 'Force (kN)', 'Resistance (kN)', 'M (kNm)', 'Utilisation', 'Status', 'Check'],
       (row, status) => [
         row.group,
         row.mark,
@@ -161,11 +135,7 @@ export const checkBracing = defineCommand({
         `ULS wind ${round(windUltimate, 1)} kN, roof level ${round(roofWind, 1)} kN + stability ${round(stability, 1)} kN ` +
         `over ${bayCount} braced bay(s) = ${round(bayForce, 1)} kN each; ${rows.length} check(s), ` +
         `max utilisation ${round(worst?.utilisation ?? 0)} (${worst?.mark ?? '—'} ${worst?.kind ?? ''}, ${worst?.group ?? '—'}); ` +
-        failureSummary(
-          failures,
-          (row) => `${row.mark} ${row.kind}`,
-          'all OK (preliminary, tension-only diagonals).',
-        ),
+        failureSummary(failures, (row) => `${row.mark} ${row.kind}`, 'all OK (preliminary, tension-only diagonals).'),
       {
         rows,
         csv,

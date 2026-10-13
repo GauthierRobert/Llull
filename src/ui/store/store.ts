@@ -25,8 +25,7 @@ export const useStore = create<CadStoreState>()((set, get) => {
     if (isLocalMode(get())) stepLocalHistory(set, get, direction);
     else postHistoryStep(set, get, direction);
   };
-  const setSelection = (selection: EntityId[]): void =>
-    set((state) => ({ document: { ...state.document, selection } }));
+  const setSelection = (selection: EntityId[]): void => set((state) => ({ document: { ...state.document, selection } }));
 
   return {
     document: createEmptyDocument(),
@@ -126,11 +125,7 @@ export const useStore = create<CadStoreState>()((set, get) => {
     },
 
     setLiveStatus(status: LiveStatus): void {
-      set(
-        status === 'connected'
-          ? { liveStatus: status, sseEverConnected: true }
-          : { liveStatus: status },
-      );
+      set(status === 'connected' ? { liveStatus: status, sseEverConnected: true } : { liveStatus: status });
       if (status === 'disconnected') {
         onSseDisconnected(set, get);
       } else if (status === 'connected' && get().hasUnsyncedLocalEdits) {

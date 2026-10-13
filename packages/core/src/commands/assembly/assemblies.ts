@@ -6,37 +6,20 @@
  * @layer core/commands
  */
 
-import {
-  type Component,
-  type Entity,
-  type InstanceEntity,
-  type Vec3,
-  DEFAULT_LAYER_ID,
-} from '../../model/types';
+import { type Component, type Entity, type InstanceEntity, type Vec3, DEFAULT_LAYER_ID } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
 import { UNIT_SCALE, expandInstance } from '../../geometry/instanceExpansion';
 import { nextId } from '../../lib/id';
 import { commitEntity } from '../entity/commitEntity';
-import {
-  referenceLossSuffix,
-  referenceSuffix,
-  replaceEntities,
-  withoutEntities,
-} from '../entity/entityOps';
+import { referenceLossSuffix, referenceSuffix, replaceEntities, withoutEntities } from '../entity/entityOps';
 import { entityOfKind } from '../entity/entityOfKind';
 import { changed, noop } from '../noop';
 import { EXTRUSION_COLOR } from '../solids/shared';
 import { ORIGIN } from '../../lib/vec3';
 
 /** A fresh instance of `componentId` (default color `#c8553d`). */
-export function instanceEntity(
-  id: string,
-  componentId: string,
-  position: Vec3,
-  rotation: Vec3,
-  scale?: Vec3,
-): InstanceEntity {
+export function instanceEntity(id: string, componentId: string, position: Vec3, rotation: Vec3, scale?: Vec3): InstanceEntity {
   return {
     id,
     kind: 'instance',
@@ -54,10 +37,7 @@ export function instanceEntity(
  * instance of B which contains an instance of A), or null when the component graph is acyclic.
  * Missing components are ignored. @pure
  */
-export function findComponentCycle(
-  components: Readonly<Record<string, Component>>,
-  startId: string,
-): string[] | null {
+export function findComponentCycle(components: Readonly<Record<string, Component>>, startId: string): string[] | null {
   const visit = (id: string, path: string[]): string[] | null => {
     const component = Object.hasOwn(components, id) ? components[id] : undefined;
     if (!component) return null;
@@ -92,11 +72,7 @@ export const createComponent = defineCommand({
     'All ids in entityIds must exist in the document; any missing id causes a graceful no-op. ' +
     'Returns the new instance id in affected.',
   params: z.object({
-    name: z
-      .string()
-      .describe(
-        'Human-readable name for the component, e.g. "Wheel". Used as the component label.',
-      ),
+    name: z.string().describe('Human-readable name for the component, e.g. "Wheel". Used as the component label.'),
     entityIds: z
       .array(z.string())
       .describe(
@@ -120,15 +96,11 @@ export const createComponent = defineCommand({
       ),
   }),
   run: (doc, { name, entityIds, componentId, replace = false }): CommandResult => {
-    if (entityIds.length === 0)
-      return noop(doc, 'create_component: entityIds must be a non-empty array.');
+    if (entityIds.length === 0) return noop(doc, 'create_component: entityIds must be a non-empty array.');
 
     const missing = entityIds.filter((id) => !(id in doc.entities));
     if (missing.length > 0) {
-      return noop(
-        doc,
-        `create_component: entity id(s) not found: [${missing.join(', ')}]. Document unchanged.`,
-      );
+      return noop(doc, `create_component: entity id(s) not found: [${missing.join(', ')}]. Document unchanged.`);
     }
 
     const compId = componentId ?? nextId('comp');
@@ -180,35 +152,19 @@ export const insertInstance = defineCommand({
     'Editing the component later automatically updates all its instances. ' +
     'componentId must exist in doc.components. Returns the new instance id in affected.',
   params: z.object({
-    componentId: z
-      .string()
-      .describe('Id of an existing Component in doc.components. Obtain via create_component.'),
+    componentId: z.string().describe('Id of an existing Component in doc.components. Obtain via create_component.'),
     position: vec3('World-space origin [x, y, z] for the instance. Default: [0, 0, 0].').optional(),
-    rotation: vec3(
-      'Euler rotation [rx, ry, rz] in radians (XYZ order). Default: [0, 0, 0].',
-    ).optional(),
-    scale: vec3(
-      'Per-axis scale factors [sx, sy, sz]. Default: [1, 1, 1]. All components must be finite.',
-    ).optional(),
+    rotation: vec3('Euler rotation [rx, ry, rz] in radians (XYZ order). Default: [0, 0, 0].').optional(),
+    scale: vec3('Per-axis scale factors [sx, sy, sz]. Default: [1, 1, 1]. All components must be finite.').optional(),
   }),
-  run: (
-    doc,
-    { componentId, position: rawPosition, rotation: rawRotation, scale },
-  ): CommandResult => {
+  run: (doc, { componentId, position: rawPosition, rotation: rawRotation, scale }): CommandResult => {
     const position = rawPosition ?? ORIGIN;
     const rotation = rawRotation ?? ORIGIN;
     const component = doc.components[componentId];
-    if (!component)
-      return noop(doc, `insert_instance: component "${componentId}" not found in doc.components.`);
+    if (!component) return noop(doc, `insert_instance: component "${componentId}" not found in doc.components.`);
 
     const instanceId = nextId('instance');
-    const instance = instanceEntity(
-      instanceId,
-      componentId,
-      position,
-      rotation,
-      scale ?? UNIT_SCALE,
-    );
+    const instance = instanceEntity(instanceId, componentId, position, rotation, scale ?? UNIT_SCALE);
 
     return commitEntity(
       doc,
@@ -236,9 +192,7 @@ export const explodeInstance = defineCommand({
     'The instance entity is removed and its order position is filled with the produced entities. ' +
     'Returns the new entity ids in affected.',
   params: z.object({
-    id: z
-      .string()
-      .describe('Id of an InstanceEntity to explode into its world-space component entities.'),
+    id: z.string().describe('Id of an InstanceEntity to explode into its world-space component entities.'),
   }),
   run: (doc, { id }): CommandResult => {
     const entity = entityOfKind(doc, id, ['instance']);
@@ -246,10 +200,7 @@ export const explodeInstance = defineCommand({
 
     const component = doc.components[entity.componentId];
     if (!component) {
-      return noop(
-        doc,
-        `explode_instance: component "${entity.componentId}" referenced by instance "${id}" not found.`,
-      );
+      return noop(doc, `explode_instance: component "${entity.componentId}" referenced by instance "${id}" not found.`);
     }
 
     const bakedEntities = expandInstance(entity, component);

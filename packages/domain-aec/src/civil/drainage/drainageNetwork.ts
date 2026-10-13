@@ -60,9 +60,7 @@ export interface ManholeRow {
 
 /** Runoff plus point inflow generated at a manhole itself (L/s). */
 export function localFlowLps(manhole: ManholeObject, intensityMmH: number): number {
-  const runoff = manhole.catchment
-    ? rationalFlowLps(manhole.catchment.runoffCoefficient, intensityMmH, manhole.catchment.areaHa)
-    : 0;
+  const runoff = manhole.catchment ? rationalFlowLps(manhole.catchment.runoffCoefficient, intensityMmH, manhole.catchment.areaHa) : 0;
   return runoff + (manhole.inflow ?? 0);
 }
 
@@ -144,21 +142,13 @@ function manholeRow(
   const entryTimeMin = manhole.entryTimeMin ?? DEFAULT_ENTRY_TIME_MIN;
   const pipes = civilObjectsOf(civil, 'pipe');
   const incoming = pipes.filter((pipe) => pipe.toId === manhole.id).map((pipe) => pipe.invertTo);
-  const outgoing = pipes
-    .filter((pipe) => pipe.fromId === manhole.id)
-    .map((pipe) => pipe.invertFrom);
-  const dropM =
-    incoming.length > 0 && outgoing.length > 0
-      ? round(toMetres(doc, Math.max(...incoming) - Math.min(...outgoing)), 3)
-      : null;
+  const outgoing = pipes.filter((pipe) => pipe.fromId === manhole.id).map((pipe) => pipe.invertFrom);
+  const dropM = incoming.length > 0 && outgoing.length > 0 ? round(toMetres(doc, Math.max(...incoming) - Math.min(...outgoing)), 3) : null;
   const reasons: string[] = [];
-  if (dropM !== null && dropM < 0)
-    reasons.push(`outgoing invert ${(-dropM).toFixed(3)} m above incoming`);
+  if (dropM !== null && dropM < 0) reasons.push(`outgoing invert ${(-dropM).toFixed(3)} m above incoming`);
   if (!(manhole.rimElevation > manhole.invertElevation)) reasons.push('rim not above invert');
   if (hgl?.flooding) {
-    reasons.push(
-      `HGL ${hgl.hglM.toFixed(3)} m above rim - freeboard ${criteria.freeboardM} m: flooding risk`,
-    );
+    reasons.push(`HGL ${hgl.hglM.toFixed(3)} m above rim - freeboard ${criteria.freeboardM} m: flooding risk`);
   }
   return {
     id: manhole.id,
@@ -181,20 +171,14 @@ export interface NetworkAnalysis {
   readonly diverging: readonly string[];
 }
 
-export function analyseNetwork(
-  doc: CadDocument,
-  civil: CivilModel,
-  criteria: DrainageCriteria,
-): NetworkAnalysis {
+export function analyseNetwork(doc: CadDocument, civil: CivilModel, criteria: DrainageCriteria): NetworkAnalysis {
   const flows = computeFlows(doc, civil, criteria);
   const hgl = computeHgl(doc, civil, criteria, flows);
   return {
     pipes: civilObjectsOf(civil, 'pipe').map((pipe) =>
       pipeRow(doc, civil, pipe, flows.pipes.get(pipe.id), hgl.pipes.get(pipe.id), criteria),
     ),
-    manholes: civilObjectsOf(civil, 'manhole').map((manhole) =>
-      manholeRow(doc, civil, manhole, hgl.manholes.get(manhole.id), criteria),
-    ),
+    manholes: civilObjectsOf(civil, 'manhole').map((manhole) => manholeRow(doc, civil, manhole, hgl.manholes.get(manhole.id), criteria)),
     diverging: flows.diverging,
   };
 }

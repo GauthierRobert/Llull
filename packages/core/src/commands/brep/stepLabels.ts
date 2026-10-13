@@ -22,8 +22,7 @@ export interface StepLabel {
   readonly color?: string;
 }
 
-const PRODUCT_PATTERN =
-  /PRODUCT\('Open CASCADE STEP translator [\d.]+ (\d+)',\s*'Open CASCADE STEP translator [\d.]+ \1',''/g;
+const PRODUCT_PATTERN = /PRODUCT\('Open CASCADE STEP translator [\d.]+ (\d+)',\s*'Open CASCADE STEP translator [\d.]+ \1',''/g;
 const REPRESENTATION_PATTERN =
   /#(\d+) = (?:ADVANCED_BREP_SHAPE_REPRESENTATION|MANIFOLD_SURFACE_SHAPE_REPRESENTATION|SHAPE_REPRESENTATION)\('',\(([^)]*)\),(#\d+)\);/g;
 
@@ -68,18 +67,11 @@ function geometryItems(step: string, itemList: string): string[] {
 function named(statement: string, label: StepLabel): string {
   const name = stepString(label.name);
   const description = stepString(label.description ?? '');
-  return statement.replace(
-    /PRODUCT\('[^']*',\s*'[^']*',''/,
-    `PRODUCT('${name}','${name}','${description}'`,
-  );
+  return statement.replace(/PRODUCT\('[^']*',\s*'[^']*',''/, `PRODUCT('${name}','${name}','${description}'`);
 }
 
 /** Append a color chain per distinct color and one STYLED_ITEM per labeled solid. */
-function addColors(
-  step: string,
-  styled: readonly { items: string[]; rgb: [number, number, number] }[],
-  context: string,
-): string {
+function addColors(step: string, styled: readonly { items: string[]; rgb: [number, number, number] }[], context: string): string {
   const end = step.lastIndexOf('ENDSEC;');
   if (end < 0 || styled.length === 0) return step;
   let next = Math.max(...[...step.matchAll(/^#(\d+) = /gm)].map((m) => Number(m[1]))) + 1;

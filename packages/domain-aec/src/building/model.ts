@@ -4,12 +4,7 @@
  */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
-import type {
-  BimCategory,
-  BuildingElement,
-  BuildingLevel,
-  BuildingModel,
-} from '@core/model/building';
+import type { BimCategory, BuildingElement, BuildingLevel, BuildingModel } from '@core/model/building';
 import { createEmptyBuilding } from '@core/model/building';
 import { fromMm } from '@core/model/units';
 import { uniqueId } from '@lib/id';
@@ -25,14 +20,8 @@ export function orderedElements(building: BuildingModel): BuildingElement[] {
 }
 
 /** Elements of one category, in `elementOrder`. */
-export function elementsOf<C extends BimCategory>(
-  building: BuildingModel,
-  category: C,
-): Array<Extract<BuildingElement, { category: C }>> {
-  return orderedElements(building).filter(
-    (element): element is Extract<BuildingElement, { category: C }> =>
-      element.category === category,
-  );
+export function elementsOf<C extends BimCategory>(building: BuildingModel, category: C): Array<Extract<BuildingElement, { category: C }>> {
+  return orderedElements(building).filter((element): element is Extract<BuildingElement, { category: C }> => element.category === category);
 }
 
 /** Elements of one category placed on `levelId`, in `elementOrder`. */
@@ -41,26 +30,17 @@ export function levelElementsOf<C extends BimCategory>(
   category: C,
   levelId: string,
 ): Array<Extract<BuildingElement, { category: C }>> {
-  return elementsOf(building, category).filter(
-    (element) => 'levelId' in element && element.levelId === levelId,
-  );
+  return elementsOf(building, category).filter((element) => 'levelId' in element && element.levelId === levelId);
 }
 
 /** Elements placed on `levelId` (grids, doors and windows carry no level of their own). */
 export function elementsOnLevel(building: BuildingModel, levelId: string): BuildingElement[] {
-  return Object.values(building.elements).filter(
-    (element) => 'levelId' in element && element.levelId === levelId,
-  );
+  return Object.values(building.elements).filter((element) => 'levelId' in element && element.levelId === levelId);
 }
 
 /** Lenient plan point: first two components finite; a third (z) is tolerated and dropped by `toVec2`. Stricter than none, looser than `@lib/vec2` isVec2 (exactly 2). */
 export function isVec2(value: unknown): value is Vec2 {
-  return (
-    Array.isArray(value) &&
-    value.length >= 2 &&
-    isFiniteNumber(value[0]) &&
-    isFiniteNumber(value[1])
-  );
+  return Array.isArray(value) && value.length >= 2 && isFiniteNumber(value[0]) && isFiniteNumber(value[1]);
 }
 
 export function toVec2(value: Vec2): Vec2 {
@@ -128,19 +108,11 @@ export function nextElementId(building: BuildingModel, category: BimCategory): s
 }
 
 /** Next schedule mark for a category, e.g. "W3", "D2". */
-export function nextMark(
-  building: BuildingModel,
-  category: Exclude<BimCategory, 'grid' | 'room'>,
-): string {
+export function nextMark(building: BuildingModel, category: Exclude<BimCategory, 'grid' | 'room'>): string {
   const prefix = MARK_PREFIX[category];
   // Categories sharing a prefix (straight and curved walls) share one numbering.
   const marks = Object.values(building.elements)
-    .filter(
-      (element) =>
-        element.category !== 'grid' &&
-        element.category !== 'room' &&
-        MARK_PREFIX[element.category] === prefix,
-    )
+    .filter((element) => element.category !== 'grid' && element.category !== 'room' && MARK_PREFIX[element.category] === prefix)
     .map((element) => element.mark);
   return markAfter(prefix, marks);
 }
@@ -170,11 +142,7 @@ type LevelResolution =
  * "Level 0" (elevation 0, height 3 m) created on the fly.
  * @failure unknown explicit levelId -> ok:false
  */
-export function resolveLevel(
-  doc: CadDocument,
-  building: BuildingModel,
-  levelId: string | undefined,
-): LevelResolution {
+export function resolveLevel(doc: CadDocument, building: BuildingModel, levelId: string | undefined): LevelResolution {
   if (levelId !== undefined) {
     const level = building.levels[levelId];
     if (!level) {
@@ -197,14 +165,10 @@ export function resolveLevel(
 }
 
 /** Level a read-only check or export runs on: `requested`, else the active / first level; undefined when it does not exist. */
-export const existingLevelId = (
-  building: BuildingModel,
-  requested: string | undefined,
-): string | undefined => {
+export const existingLevelId = (building: BuildingModel, requested: string | undefined): string | undefined => {
   if (requested !== undefined) return building.levels[requested] ? requested : undefined;
   const levelId = [building.activeLevelId, building.levelOrder[0]].find(
-    (candidate): candidate is string =>
-      candidate != null && building.levels[candidate] !== undefined,
+    (candidate): candidate is string => candidate != null && building.levels[candidate] !== undefined,
   );
   return levelId;
 };
@@ -265,33 +229,18 @@ export function fileSlug(text: string, fallback: string): string {
  * `CommandResult.affected` for building commands: the element ids first (so history replay,
  * recipes and build_project `$alias` re-link hosts and references), then their entity ids.
  */
-export function elementAffected(
-  document: CadDocument,
-  elementIds: ReadonlyArray<string>,
-): string[] {
-  return [
-    ...elementIds,
-    ...elementIds.flatMap((id) => document.building?.elements[id]?.entityIds ?? []),
-  ];
+export function elementAffected(document: CadDocument, elementIds: ReadonlyArray<string>): string[] {
+  return [...elementIds, ...elementIds.flatMap((id) => document.building?.elements[id]?.entityIds ?? [])];
 }
 
 /**
  * Re-targets heights that follow the level height (walls / columns at full storey height, stairs
  * climbing the whole storey) from `oldHeight` to `newHeight`; other elements are returned as is.
  */
-export function followLevelHeight(
-  element: BuildingElement,
-  oldHeight: number,
-  newHeight: number,
-): BuildingElement {
+export function followLevelHeight(element: BuildingElement, oldHeight: number, newHeight: number): BuildingElement {
   const same = (value: number): boolean => Math.abs(value - oldHeight) <= oldHeight * 1e-9;
   if (oldHeight === newHeight) return element;
-  if (
-    (element.category === 'wall' ||
-      element.category === 'curvedWall' ||
-      element.category === 'column') &&
-    same(element.height)
-  ) {
+  if ((element.category === 'wall' || element.category === 'curvedWall' || element.category === 'column') && same(element.height)) {
     return { ...element, height: newHeight };
   }
   if (element.category === 'stair' && same(element.riserCount * element.riserHeight))

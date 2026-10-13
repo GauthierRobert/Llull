@@ -4,11 +4,7 @@ import { type BoxEntity, type CadDocument, createEmptyDocument } from '@core/mod
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import { createReplayCache } from '@core/commands/history/replayCache';
-import {
-  changedParameters,
-  parametersReadBy,
-  stepsReading,
-} from '@core/commands/history/dependents';
+import { changedParameters, parametersReadBy, stepsReading } from '@core/commands/history/dependents';
 
 function parametricBox(): CadDocument {
   let doc = execute(createEmptyDocument(), 'set_parameter', {
@@ -26,9 +22,7 @@ function parametricBox(): CadDocument {
 
 describe('parameter dependents', () => {
   it('finds parameters read by nested =expr params', () => {
-    expect([
-      ...parametersReadBy({ size: ['=w * 2', 3], nested: { h: '=h + w' }, label: 'w' }),
-    ]).toEqual(['w', 'h']);
+    expect([...parametersReadBy({ size: ['=w * 2', 3], nested: { h: '=h + w' }, label: 'w' })]).toEqual(['w', 'h']);
   });
 
   it('detects changed, added and removed parameter values', () => {
@@ -45,9 +39,7 @@ describe('parameter dependents', () => {
 
   it('lists only live steps that read a changed parameter', () => {
     const doc = parametricBox();
-    expect(stepsReading(doc.featureHistory, new Set(['w'])).map((s) => s.name)).toEqual([
-      'add_box',
-    ]);
+    expect(stepsReading(doc.featureHistory, new Set(['w'])).map((s) => s.name)).toEqual(['add_box']);
     expect(stepsReading(doc.featureHistory, new Set())).toEqual([]);
     const suppressed = doc.featureHistory.map((s) => ({ ...s, suppressed: true }));
     expect(stepsReading(suppressed, new Set(['w']))).toEqual([]);

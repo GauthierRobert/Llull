@@ -18,9 +18,7 @@ describe('retired building commands', () => {
       name: 'add_wall',
       params: { start: [0, 0], end: [5000, 0], thickness: 150 },
     };
-    const loaded = deserializeDocument(
-      serializeDocument({ ...modern, featureHistory: [legacyStep] }),
-    );
+    const loaded = deserializeDocument(serializeDocument({ ...modern, featureHistory: [legacyStep] }));
     expect(loaded.featureHistory[0]).toMatchObject({
       name: 'draw_walls',
       params: {

@@ -31,10 +31,7 @@ export const setCoordinateSystem = defineCommand({
     '(<CoordinateSystem>). Keeps an existing site calibration (set_site_calibration).',
   params: z.object({
     name: z.string().describe('CRS name, e.g. "RGF93 / Lambert-93". Must not be empty.'),
-    epsg: z
-      .number()
-      .optional()
-      .describe('EPSG code of the projected CRS (positive integer), e.g. 2154.'),
+    epsg: z.number().optional().describe('EPSG code of the projected CRS (positive integer), e.g. 2154.'),
     verticalDatum: z.string().optional().describe('Vertical datum name, e.g. "NGF-IGN69".'),
   }),
   run: (doc, { name, epsg, verticalDatum }): CommandResult => {
@@ -45,9 +42,7 @@ export const setCoordinateSystem = defineCommand({
     const crs: CivilCrs = {
       name: name.trim(),
       ...(epsg !== undefined ? { epsg } : {}),
-      ...(verticalDatum !== undefined && verticalDatum.trim() !== ''
-        ? { verticalDatum: verticalDatum.trim() }
-        : {}),
+      ...(verticalDatum !== undefined && verticalDatum.trim() !== '' ? { verticalDatum: verticalDatum.trim() } : {}),
       ...(calibration !== undefined ? { calibration } : {}),
     };
     return {
@@ -76,21 +71,13 @@ export const setSiteCalibration = defineCommand({
   params: z.object({
     localOrigin: vec2('[x, y] of a control point in local (document) coordinates.'),
     gridOrigin: vec2('[easting, northing] of the same control point in grid coordinates.'),
-    rotationDeg: z
-      .number()
-      .optional()
-      .describe('Counter-clockwise rotation of local axes into grid axes, degrees. Default 0.'),
-    scaleFactor: z
-      .number()
-      .optional()
-      .describe('Combined scale factor k = grid distance / local distance, > 0. Default 1.'),
+    rotationDeg: z.number().optional().describe('Counter-clockwise rotation of local axes into grid axes, degrees. Default 0.'),
+    scaleFactor: z.number().optional().describe('Combined scale factor k = grid distance / local distance, > 0. Default 1.'),
   }),
   run: (doc, { localOrigin, gridOrigin, rotationDeg = 0, scaleFactor = 1 }): CommandResult => {
     const values = [...localOrigin, ...gridOrigin, rotationDeg, scaleFactor];
-    if (!values.every(Number.isFinite))
-      return noop(doc, 'set_site_calibration failed: all values must be finite numbers.');
-    if (!(scaleFactor > 0))
-      return noop(doc, 'set_site_calibration failed: scaleFactor must be > 0.');
+    if (!values.every(Number.isFinite)) return noop(doc, 'set_site_calibration failed: all values must be finite numbers.');
+    if (!(scaleFactor > 0)) return noop(doc, 'set_site_calibration failed: scaleFactor must be > 0.');
     const previous = getCivil(doc).crs ?? { name: 'Unnamed' };
     const crs: CivilCrs = {
       ...previous,
@@ -121,14 +108,11 @@ export const transformCoordinates = defineCommand({
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
     points: z.array(vec2('[x, y] point to convert.')).describe('Points to convert.'),
-    direction: z
-      .enum(['localToGrid', 'gridToLocal'])
-      .describe('"localToGrid": local -> grid; "gridToLocal": grid -> local.'),
+    direction: z.enum(['localToGrid', 'gridToLocal']).describe('"localToGrid": local -> grid; "gridToLocal": grid -> local.'),
   }),
   run: (doc, { points, direction }): CommandResult => {
     const calibration = getCivil(doc).crs?.calibration;
-    if (!calibration)
-      return noop(doc, 'transform_coordinates failed: no site calibration (set_site_calibration).');
+    if (!calibration) return noop(doc, 'transform_coordinates failed: no site calibration (set_site_calibration).');
     if (points.length === 0) return noop(doc, 'transform_coordinates failed: no points.');
     const convert = direction === 'localToGrid' ? localToGrid : gridToLocal;
     return report(doc, `Transformed ${points.length} point(s) ${direction}.`, {
@@ -138,8 +122,4 @@ export const transformCoordinates = defineCommand({
   },
 });
 
-export const crsCommands = commandCatalog(
-  setCoordinateSystem,
-  setSiteCalibration,
-  transformCoordinates,
-);
+export const crsCommands = commandCatalog(setCoordinateSystem, setSiteCalibration, transformCoordinates);

@@ -86,12 +86,8 @@ describe('render stroke placement honours the work-plane rotation', () => {
       ],
     });
     const dots = (doc: CadDocument): string[] => {
-      const svg = (
-        execute(doc, 'render_view', { view: 'top', ...labelled }).data as { svg: string }
-      ).svg;
-      return [...svg.matchAll(/<circle cx="([-\d.]+)" cy="([-\d.]+)"/g)].map(
-        (m) => `${m[1]},${m[2]}`,
-      );
+      const svg = (execute(doc, 'render_view', { view: 'top', ...labelled }).data as { svg: string }).svg;
+      return [...svg.matchAll(/<circle cx="([-\d.]+)" cy="([-\d.]+)"/g)].map((m) => `${m[1]},${m[2]}`);
     };
     const expected = dots(upright.doc);
     expect(expected.length).toBeGreaterThan(0);

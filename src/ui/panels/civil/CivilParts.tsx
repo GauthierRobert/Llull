@@ -12,9 +12,7 @@ import { PairSelect } from '@ui/panels/OptionSelect';
 import { formatPoints, selectedPolylinePoints } from './civilInput';
 
 /** Civil objects of `category` in creation order (re-derived when the civil model changes). */
-export function useCivilObjects<C extends CivilCategory>(
-  category: C,
-): Array<Extract<CivilObject, { category: C }>> {
+export function useCivilObjects<C extends CivilCategory>(category: C): Array<Extract<CivilObject, { category: C }>> {
   const civil = useStore((s) => s.document.civil);
   return useMemo(
     () =>
@@ -36,12 +34,7 @@ interface CivilObjectRowProps {
   body?: React.ReactNode;
 }
 
-export function CivilObjectRow({
-  object,
-  detail,
-  children,
-  body,
-}: CivilObjectRowProps): React.ReactElement {
+export function CivilObjectRow({ object, detail, children, body }: CivilObjectRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   return (
     <li className="civil-row" data-testid={`civil-row-${object.id}`}>
@@ -75,13 +68,7 @@ interface CivilObjectSelectProps {
 }
 
 /** Select over civil objects; an unknown `value` falls back to the first object (or empty). */
-export function CivilObjectSelect({
-  objects,
-  value,
-  label,
-  onChange,
-  emptyLabel,
-}: CivilObjectSelectProps): React.ReactElement {
+export function CivilObjectSelect({ objects, value, label, onChange, emptyLabel }: CivilObjectSelectProps): React.ReactElement {
   return (
     <PairSelect
       value={value}
@@ -110,8 +97,7 @@ export function useChosenId(
   preferredIndex?: number,
 ): [string, (id: string) => void] {
   const [picked, setPicked] = useState('');
-  const value =
-    picked === '' && preferredIndex !== undefined ? (objects[preferredIndex]?.id ?? '') : picked;
+  const value = picked === '' && preferredIndex !== undefined ? (objects[preferredIndex]?.id ?? '') : picked;
   return [chosenId(objects, value, allowEmpty), setPicked];
 }
 
@@ -122,22 +108,8 @@ interface CivilFieldProps {
   label: string;
 }
 
-function CivilInput({
-  value,
-  set,
-  hint,
-  label,
-  type,
-}: CivilFieldProps & { type?: 'number' }): React.ReactElement {
-  return (
-    <input
-      type={type}
-      value={value}
-      placeholder={hint}
-      aria-label={label}
-      onChange={(event) => set(event.target.value)}
-    />
-  );
+function CivilInput({ value, set, hint, label, type }: CivilFieldProps & { type?: 'number' }): React.ReactElement {
+  return <input type={type} value={value} placeholder={hint} aria-label={label} onChange={(event) => set(event.target.value)} />;
 }
 
 export function TextField(props: CivilFieldProps): React.ReactElement {

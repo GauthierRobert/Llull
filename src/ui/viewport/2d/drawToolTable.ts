@@ -43,10 +43,7 @@ interface DrawToolDescriptor {
  * Wall-chain params: consecutive near-duplicate clicks (a double-click to finish adds the last
  * point twice) are merged; clicking the first point again closes the loop.
  */
-export function wallChainParams(
-  points: ReadonlyArray<Vec2>,
-  closed: boolean,
-): { points: Vec2[]; closed: boolean } {
+export function wallChainParams(points: ReadonlyArray<Vec2>, closed: boolean): { points: Vec2[]; closed: boolean } {
   const distinct = dropRepeatedPoints(points);
   const first = distinct[0];
   const last = distinct[distinct.length - 1];
@@ -55,9 +52,7 @@ export function wallChainParams(
     first !== undefined &&
     last !== undefined &&
     Math.hypot(first[0] - last[0], first[1] - last[1]) <= chainTolerance(points);
-  return returnsToStart
-    ? { points: distinct.slice(0, -1), closed: true }
-    : { points: distinct, closed };
+  return returnsToStart ? { points: distinct.slice(0, -1), closed: true } : { points: distinct, closed };
 }
 
 const segment: AnchoredOutline = (anchor, cursor) => [anchor, cursor];
@@ -117,9 +112,7 @@ const DESCRIPTORS: Partial<Record<DrawToolKind, DrawToolDescriptor>> = {
     },
     preview: (center, rim) => {
       const radius = circleRadiusFromPoints(center, rim);
-      return radius === null
-        ? null
-        : ellipseOutline(center[0], center[1], radius, radius, OUTLINE_SEGMENTS);
+      return radius === null ? null : ellipseOutline(center[0], center[1], radius, radius, OUTLINE_SEGMENTS);
     },
   },
   rectangle: {
@@ -150,13 +143,7 @@ const DESCRIPTORS: Partial<Record<DrawToolKind, DrawToolDescriptor>> = {
       const ellipse = ellipseParamsFromCenterCorner(center, corner);
       return ellipse === null
         ? null
-        : ellipseOutline(
-            ellipse.center[0],
-            ellipse.center[1],
-            ellipse.radiusX,
-            ellipse.radiusY,
-            OUTLINE_SEGMENTS,
-          );
+        : ellipseOutline(ellipse.center[0], ellipse.center[1], ellipse.radiusX, ellipse.radiusY, OUTLINE_SEGMENTS);
     },
   },
 };

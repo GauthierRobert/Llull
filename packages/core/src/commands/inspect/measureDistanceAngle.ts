@@ -25,35 +25,23 @@ export const measureDistance = defineCommand({
     'Mix point and entity freely (e.g. point1 + entityId2). ' +
     'Returns data: { distance, unit } and a factual summary. Does not modify the document.',
   params: z.object({
-    point1: vec3(
-      'First world-space point [x, y, z]. Omit to use entityId1 centroid instead.',
-    ).optional(),
-    point2: vec3(
-      'Second world-space point [x, y, z]. Omit to use entityId2 centroid instead.',
-    ).optional(),
+    point1: vec3('First world-space point [x, y, z]. Omit to use entityId1 centroid instead.').optional(),
+    point2: vec3('Second world-space point [x, y, z]. Omit to use entityId2 centroid instead.').optional(),
     entityId1: z
       .string()
       .optional()
-      .describe(
-        'Id of the first entity. Its bounding-box centroid is used as the first location ' +
-          'when point1 is not provided.',
-      ),
+      .describe('Id of the first entity. Its bounding-box centroid is used as the first location ' + 'when point1 is not provided.'),
     entityId2: z
       .string()
       .optional()
-      .describe(
-        'Id of the second entity. Its bounding-box centroid is used as the second location ' +
-          'when point2 is not provided.',
-      ),
+      .describe('Id of the second entity. Its bounding-box centroid is used as the second location ' + 'when point2 is not provided.'),
   }),
   run: (doc, { point1, point2, entityId1, entityId2 }): CommandResult => {
     const sides = [
       { point: point1, entityId: entityId1 },
       { point: point2, entityId: entityId2 },
     ];
-    const unknown = sides.find(
-      ({ point, entityId }) => !point && entityId && !doc.entities[entityId],
-    );
+    const unknown = sides.find(({ point, entityId }) => !point && entityId && !doc.entities[entityId]);
     if (unknown) return noop(doc, `measure_distance: entity '${unknown.entityId}' not found.`);
     const [locA, locB] = sides.map(({ point, entityId }) => {
       const entity = entityId ? doc.entities[entityId] : undefined;
@@ -63,8 +51,7 @@ export const measureDistance = defineCommand({
     if (!locA || !locB) {
       return noop(
         doc,
-        'measure_distance: provide two locations — each as a point [x,y,z] (point1/point2) ' +
-          'or an entity id (entityId1/entityId2).',
+        'measure_distance: provide two locations — each as a point [x,y,z] (point1/point2) ' + 'or an entity id (entityId1/entityId2).',
       );
     }
 
@@ -102,9 +89,7 @@ export const measureAngle = defineCommand({
     lineId1: z
       .string()
       .optional()
-      .describe(
-        "Id of the first 'line' entity. Used together with lineId2 to measure the angle between two lines.",
-      ),
+      .describe("Id of the first 'line' entity. Used together with lineId2 to measure the angle between two lines."),
     lineId2: z.string().optional().describe("Id of the second 'line' entity."),
   }),
   run: (doc, { points, lineId1, lineId2 }): CommandResult => {
@@ -122,23 +107,18 @@ export const measureAngle = defineCommand({
       vA = [e1.end[0] - e1.start[0], e1.end[1] - e1.start[1], 0];
       vB = [e2.end[0] - e2.start[0], e2.end[1] - e2.start[1], 0];
     } else {
-      return noop(
-        doc,
-        'measure_angle: provide either points (3 world-space points) or lineId1 + lineId2.',
-      );
+      return noop(doc, 'measure_angle: provide either points (3 world-space points) or lineId1 + lineId2.');
     }
 
     const lenA = len3(vA);
     const lenB = len3(vB);
-    if (lenA < 1e-12 || lenB < 1e-12)
-      return noop(doc, 'measure_angle: degenerate vector (zero length) — cannot compute angle.');
+    if (lenA < 1e-12 || lenB < 1e-12) return noop(doc, 'measure_angle: degenerate vector (zero length) — cannot compute angle.');
 
     const radians = angleFromCosine(dot3(vA, vB) / (lenA * lenB));
     const degrees = toDegrees(radians);
-    return report(
-      doc,
-      `Angle = ${degrees.toFixed(doc.displayPrecision)}° (${radians.toFixed(doc.displayPrecision)} rad).`,
-      { degrees, radians },
-    );
+    return report(doc, `Angle = ${degrees.toFixed(doc.displayPrecision)}° (${radians.toFixed(doc.displayPrecision)} rad).`, {
+      degrees,
+      radians,
+    });
   },
 });

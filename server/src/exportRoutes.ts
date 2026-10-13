@@ -16,12 +16,7 @@ import { guardRead } from './security';
 import { fileOfRecord } from './cli/saveFiles';
 
 /** Attachment headers + a text (send) or binary (end) body. */
-function sendDownload(
-  res: Response,
-  fileName: string,
-  contentType: string,
-  body: string | Buffer,
-): void {
+function sendDownload(res: Response, fileName: string, contentType: string, body: string | Buffer): void {
   res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
   res.setHeader('Content-Type', contentType);
   if (typeof body === 'string') {

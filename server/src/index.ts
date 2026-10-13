@@ -30,12 +30,7 @@ import { buildExportRouter } from './exportRoutes';
 import { buildAdminRouter } from './adminRoutes';
 import { errorMessage } from '@lib/errorMessage';
 import { startServer } from './lifecycle';
-import {
-  getAllowedOrigins,
-  hostAllowlist,
-  buildRestRateLimiter,
-  jsonErrorHandler,
-} from './security';
+import { getAllowedOrigins, hostAllowlist, buildRestRateLimiter, jsonErrorHandler } from './security';
 
 const app = express();
 
@@ -72,9 +67,7 @@ app.use('/mcp', buildMcpRouter(exchange));
 const staticDir = process.env['LLULL_STATIC_DIR'];
 if (staticDir !== undefined && staticDir !== '') {
   app.use(express.static(staticDir));
-  app.get('/{*path}', (req, res, next) =>
-    req.accepts('html') === 'html' ? res.sendFile(path.resolve(staticDir, 'index.html')) : next(),
-  );
+  app.get('/{*path}', (req, res, next) => (req.accepts('html') === 'html' ? res.sendFile(path.resolve(staticDir, 'index.html')) : next()));
 }
 app.use((req, res) => {
   res.status(404).json({ error: `Not found: ${req.method} ${req.path}` });

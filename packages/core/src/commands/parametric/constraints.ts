@@ -24,25 +24,16 @@ import { expressionSyntaxError } from './expression';
 /** Optional named point of a line / arc / circle (`EntityRef.kind`). */
 const SUB_POINT = z.enum(['start', 'end', 'center', 'mid']).optional();
 
-const entityRef = (
-  entityIdDescription: string,
-  kindDescription: string,
-): z.ZodObject<{ entityId: z.ZodString; kind: typeof SUB_POINT }> =>
+const entityRef = (entityIdDescription: string, kindDescription: string): z.ZodObject<{ entityId: z.ZodString; kind: typeof SUB_POINT }> =>
   z.object({
     entityId: z.string().describe(entityIdDescription),
     kind: SUB_POINT.describe(kindDescription),
   });
 
 /** Semantic checks zod cannot express: non-empty entity ids; `value` on dimensional kinds. */
-function validateConstraintShape(c: {
-  kind: string;
-  a: { entityId: string };
-  b: { entityId: string };
-  value?: unknown;
-}): string | null {
+function validateConstraintShape(c: { kind: string; a: { entityId: string }; b: { entityId: string }; value?: unknown }): string | null {
   for (const key of ['a', 'b'] as const) {
-    if (c[key].entityId.length === 0)
-      return `constraint.${key} must be a valid EntityRef (has entityId)`;
+    if (c[key].entityId.length === 0) return `constraint.${key} must be a valid EntityRef (has entityId)`;
   }
   if ((c.kind === 'distance' || c.kind === 'angle') && c.value === undefined)
     return `constraint kind '${c.kind}' requires a numeric or string 'value' field`;
@@ -78,18 +69,12 @@ export const addConstraint = defineCommand({
               'Dimensional: "distance" (distance between two points equals value), ' +
               '"angle" (angle between two line directions equals value in radians).',
           ),
-        a: entityRef(
-          'Id of the first entity.',
-          'Sub-point selector: start, end, center, or mid.',
-        ).describe(
+        a: entityRef('Id of the first entity.', 'Sub-point selector: start, end, center, or mid.').describe(
           'First entity reference. Minimum: { entityId: "<id>" }. ' +
             'Optional sub-point: { entityId: "<id>", kind: "start"|"end"|"center"|"mid" } ' +
             'to target a specific geometric point on a line, arc, or circle.',
         ),
-        b: entityRef(
-          'Id of the second entity.',
-          'Sub-point selector: start, end, center, or mid.',
-        ).describe(
+        b: entityRef('Id of the second entity.', 'Sub-point selector: start, end, center, or mid.').describe(
           'Second entity reference. Same shape as "a". ' +
             '{ entityId: "<id>" } or { entityId: "<id>", kind: "start"|"end"|"center"|"mid" }.',
         ),
@@ -120,32 +105,21 @@ export const addConstraint = defineCommand({
     const err = validateConstraintShape(constraint);
     if (err !== null) return noop(doc, `add_constraint failed: ${err}.`);
 
-    const unknownEntity = [constraint.a.entityId, constraint.b.entityId].find(
-      (entityId) => !Object.hasOwn(doc.entities, entityId),
-    );
+    const unknownEntity = [constraint.a.entityId, constraint.b.entityId].find((entityId) => !Object.hasOwn(doc.entities, entityId));
     if (unknownEntity !== undefined) {
-      return noop(
-        doc,
-        `add_constraint failed: entity '${unknownEntity}' does not exist in the document; create it first.`,
-      );
+      return noop(doc, `add_constraint failed: entity '${unknownEntity}' does not exist in the document; create it first.`);
     }
     if (typeof constraint.value === 'string') {
       const syntaxError = expressionSyntaxError(constraint.value);
       if (syntaxError !== null) {
-        return noop(
-          doc,
-          `add_constraint failed: value '${constraint.value}' is not a valid expression — ${syntaxError}.`,
-        );
+        return noop(doc, `add_constraint failed: value '${constraint.value}' is not a valid expression — ${syntaxError}.`);
       }
     }
 
     const constraintId = idOrNext(id, 'con');
 
     if (idTaken(doc.constraints, constraintId)) {
-      return noop(
-        doc,
-        `add_constraint: constraint id '${constraintId}' already exists — no change made.`,
-      );
+      return noop(doc, `add_constraint: constraint id '${constraintId}' already exists — no change made.`);
     }
 
     const newConstraint = { ...constraint, id: constraintId } as Constraint;
@@ -189,8 +163,7 @@ export const deleteConstraint = defineCommand({
   }),
   run: (doc, { id }): CommandResult => {
     const constraint = Object.hasOwn(doc.constraints, id) ? doc.constraints[id] : undefined;
-    if (!constraint)
-      return noop(doc, `delete_constraint: constraint '${id}' does not exist — no change made.`);
+    if (!constraint) return noop(doc, `delete_constraint: constraint '${id}' does not exist — no change made.`);
 
     const newConstraints = { ...doc.constraints };
     delete newConstraints[id];
@@ -229,12 +202,8 @@ export const updateConstraint = defineCommand({
           .union([z.string(), z.number()])
           .optional()
           .describe('New value for distance/angle constraints. Number or expression string.'),
-        a: entityRef('Entity id.', 'Sub-point selector.')
-          .optional()
-          .describe('New first entity reference { entityId, kind? }.'),
-        b: entityRef('Entity id.', 'Sub-point selector.')
-          .optional()
-          .describe('New second entity reference { entityId, kind? }.'),
+        a: entityRef('Entity id.', 'Sub-point selector.').optional().describe('New first entity reference { entityId, kind? }.'),
+        b: entityRef('Entity id.', 'Sub-point selector.').optional().describe('New second entity reference { entityId, kind? }.'),
       })
       .describe(
         'Fields to update. All fields are optional; omitted fields are not changed. ' +
@@ -244,8 +213,7 @@ export const updateConstraint = defineCommand({
   }),
   run: (doc, { id, patch }): CommandResult => {
     const existing = Object.hasOwn(doc.constraints, id) ? doc.constraints[id] : undefined;
-    if (!existing)
-      return noop(doc, `update_constraint: constraint '${id}' does not exist — no change made.`);
+    if (!existing) return noop(doc, `update_constraint: constraint '${id}' does not exist — no change made.`);
 
     const updates: Record<string, unknown> = {};
 
@@ -253,34 +221,22 @@ export const updateConstraint = defineCommand({
       const ref = patch[key];
       if (ref === undefined) continue;
       if (ref.entityId.length === 0) {
-        return noop(
-          doc,
-          `update_constraint: patch.${key} is not a valid EntityRef — no change made.`,
-        );
+        return noop(doc, `update_constraint: patch.${key} is not a valid EntityRef — no change made.`);
       }
       if (!Object.hasOwn(doc.entities, ref.entityId)) {
-        return noop(
-          doc,
-          `update_constraint: patch.${key} entity '${ref.entityId}' does not exist in the document — no change made.`,
-        );
+        return noop(doc, `update_constraint: patch.${key} entity '${ref.entityId}' does not exist in the document — no change made.`);
       }
       updates[key] = ref;
     }
 
     if (patch.value !== undefined) {
       if (existing.kind !== 'distance' && existing.kind !== 'angle') {
-        return noop(
-          doc,
-          `update_constraint: constraint '${id}' is kind '${existing.kind}' which has no 'value' field — no change made.`,
-        );
+        return noop(doc, `update_constraint: constraint '${id}' is kind '${existing.kind}' which has no 'value' field — no change made.`);
       }
       if (typeof patch.value === 'string') {
         const syntaxError = expressionSyntaxError(patch.value);
         if (syntaxError !== null) {
-          return noop(
-            doc,
-            `update_constraint: value '${patch.value}' is not a valid expression — ${syntaxError}. No change made.`,
-          );
+          return noop(doc, `update_constraint: value '${patch.value}' is not a valid expression — ${syntaxError}. No change made.`);
         }
       }
       updates['value'] = patch.value;

@@ -13,12 +13,7 @@ import { keyOnlyHandle } from '@core/geometry/shapeKernel';
 import { errorMessage } from '@lib/errorMessage';
 import { nativeFailureCount } from '@kernel-occt/occtKernel';
 import { createNodeOcctKernel } from './occtNode';
-import {
-  STATUS_READY,
-  STATUS_REPLY,
-  type KernelReply,
-  type KernelRequest,
-} from './occtWorkerProtocol';
+import { STATUS_READY, STATUS_REPLY, type KernelReply, type KernelRequest } from './occtWorkerProtocol';
 
 interface WorkerInit {
   readonly statusBuffer: SharedArrayBuffer;
@@ -64,9 +59,7 @@ function run(kernel: GeometryKernel, request: KernelRequest, testHooks: boolean)
   const method = kernel[request.op] as (...args: unknown[]) => unknown;
   const result = method.apply(kernel, [...request.args]);
   // The server rebuilds the full handle from its own recipe: never clone the tree back.
-  return request.op === 'evaluate' && result !== null
-    ? keyOnlyHandle(result as ShapeHandle)
-    : result;
+  return request.op === 'evaluate' && result !== null ? keyOnlyHandle(result as ShapeHandle) : result;
 }
 
 main().catch((error: unknown) => {

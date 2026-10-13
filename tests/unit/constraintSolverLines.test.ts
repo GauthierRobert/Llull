@@ -11,13 +11,7 @@ function twoLines(
   return { doc: second.document, idA: first.affected[0]!, idB: second.affected[0]! };
 }
 
-function constrain(
-  doc: CadDocument,
-  kind: string,
-  idA: string,
-  idB: string,
-  value?: number,
-): CadDocument {
+function constrain(doc: CadDocument, kind: string, idA: string, idB: string, value?: number): CadDocument {
   return execute(doc, 'add_constraint', {
     constraint: {
       kind,
@@ -53,10 +47,7 @@ function solve(doc: CadDocument): {
 }
 
 describe('solve_constraints on line orientation constraints', () => {
-  const { doc, idA, idB } = twoLines(
-    { start: [0, 0], end: [10, 0] },
-    { start: [0, 5], end: [10, 8] },
-  );
+  const { doc, idA, idB } = twoLines({ start: [0, 0], end: [10, 0] }, { start: [0, 5], end: [10, 8] });
 
   it('parallel rotates line b until it is parallel to line a, keeping its length', () => {
     const solved = solve(constrain(doc, 'parallel', idA, idB));

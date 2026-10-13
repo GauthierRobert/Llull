@@ -84,9 +84,7 @@ describe('shell_solid', () => {
 
   it('rejects missing ids and 2D shapes', () => {
     setGeometryKernel(fakeKernel({ shell: SHELL_MESH }));
-    expect(execute(doc, 'shell_solid', { id: 'ghost', thickness: 1 }).summary).toContain(
-      'not found',
-    );
+    expect(execute(doc, 'shell_solid', { id: 'ghost', thickness: 1 }).summary).toContain('not found');
     const line = execute(doc, 'draw_polyline', {
       points: [
         [0, 0],

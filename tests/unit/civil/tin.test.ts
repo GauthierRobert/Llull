@@ -22,15 +22,9 @@ function circumcircleContains(points: Vec2[], tri: number[], p: Vec2): boolean {
   const [a, b, c] = tri.map((index) => points[index] as Vec2) as [Vec2, Vec2, Vec2];
   const d = 2 * (a[0] * (b[1] - c[1]) + b[0] * (c[1] - a[1]) + c[0] * (a[1] - b[1]));
   const ux =
-    ((a[0] ** 2 + a[1] ** 2) * (b[1] - c[1]) +
-      (b[0] ** 2 + b[1] ** 2) * (c[1] - a[1]) +
-      (c[0] ** 2 + c[1] ** 2) * (a[1] - b[1])) /
-    d;
+    ((a[0] ** 2 + a[1] ** 2) * (b[1] - c[1]) + (b[0] ** 2 + b[1] ** 2) * (c[1] - a[1]) + (c[0] ** 2 + c[1] ** 2) * (a[1] - b[1])) / d;
   const uy =
-    ((a[0] ** 2 + a[1] ** 2) * (c[0] - b[0]) +
-      (b[0] ** 2 + b[1] ** 2) * (a[0] - c[0]) +
-      (c[0] ** 2 + c[1] ** 2) * (b[0] - a[0])) /
-    d;
+    ((a[0] ** 2 + a[1] ** 2) * (c[0] - b[0]) + (b[0] ** 2 + b[1] ** 2) * (a[0] - c[0]) + (c[0] ** 2 + c[1] ** 2) * (b[0] - a[0])) / d;
   const r = Math.hypot(a[0] - ux, a[1] - uy);
   return Math.hypot(p[0] - ux, p[1] - uy) < r * (1 - 1e-9);
 }
@@ -54,10 +48,7 @@ describe('delaunay', () => {
 
   it('produces counter-clockwise triangles with empty circumcircles', () => {
     const next = random(7);
-    const points: Vec2[] = Array.from({ length: 300 }, () => [
-      650000 + next() * 500,
-      6800000 + next() * 500,
-    ]);
+    const points: Vec2[] = Array.from({ length: 300 }, () => [650000 + next() * 500, 6800000 + next() * 500]);
     const triangles = delaunay(points);
     // Euler: 2n - 2 - h triangles, h hull vertices (>= 3).
     expect(triangles.length / 3).toBeLessThanOrEqual(2 * 300 - 5);

@@ -32,11 +32,7 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
   const takeoff = new TakeoffAccumulator();
   const addWall = (material: string, rows: Parameters<TakeoffAccumulator['add']>[3]): void =>
     takeoff.add('wall', material, `Walls, ${material}`, rows);
-  const lengthRow = (length: number): ['m', string, number] => [
-    'm',
-    'length',
-    scale.length(length),
-  ];
+  const lengthRow = (length: number): ['m', string, number] => ['m', 'length', scale.length(length)];
   const faceRows = (netArea: number, volume: number): Parameters<TakeoffAccumulator['add']>[3] => [
     ['m2', 'net face area', scale.area(netArea)],
     ['m3', 'volume', scale.volume(volume)],
@@ -44,21 +40,13 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
   for (const wall of elementsOf(building, 'wall')) {
     const quantities = wallQuantities(building, wall);
     addWall(wall.material, [lengthRow(quantities.length)]);
-    for (const layer of wall.layers ?? [
-      { material: wall.material, thickness: wall.thickness, function: 'structure' },
-    ]) {
-      addWall(
-        layer.material,
-        faceRows(quantities.netArea, (quantities.volume * layer.thickness) / wall.thickness),
-      );
+    for (const layer of wall.layers ?? [{ material: wall.material, thickness: wall.thickness, function: 'structure' }]) {
+      addWall(layer.material, faceRows(quantities.netArea, (quantities.volume * layer.thickness) / wall.thickness));
     }
   }
   for (const wall of elementsOf(building, 'curvedWall')) {
     const quantities = wallQuantities(building, wall);
-    addWall(wall.material, [
-      lengthRow(quantities.length),
-      ...faceRows(quantities.netArea, quantities.volume),
-    ]);
+    addWall(wall.material, [lengthRow(quantities.length), ...faceRows(quantities.netArea, quantities.volume)]);
   }
   for (const category of ['door', 'window'] as const) {
     for (const opening of elementsOf(building, category)) {
@@ -103,9 +91,7 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
     ]);
   }
   for (const room of elementsOf(building, 'room')) {
-    takeoff.add('room', 'floor', 'Rooms', [
-      ['m2', 'net floor area', scale.area(polygonArea(room.boundary))],
-    ]);
+    takeoff.add('room', 'floor', 'Rooms', [['m2', 'net floor area', scale.area(polygonArea(room.boundary))]]);
   }
   for (const member of elementsOf(building, 'member')) {
     const profile = findProfile(member.profile);
@@ -115,9 +101,7 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
       ['kg', 'mass', metres * profile.massPerMetre],
       ['m', 'length', metres],
     ]);
-    takeoff.add('member', 'paint', 'Steel', [
-      ['m2', 'paint / coating surface', metres * profile.perimeter * 0.001],
-    ]);
+    takeoff.add('member', 'paint', 'Steel', [['m2', 'paint / coating surface', metres * profile.perimeter * 0.001]]);
   }
   for (const footing of elementsOf(building, 'footing')) {
     takeoff.add('footing', footing.material, `Pad footings, ${footing.material}`, [
@@ -126,9 +110,7 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
     ]);
     const rebar = footingRebarMass(footing, scale);
     if (rebar > 0) {
-      takeoff.add('footing', 'rebar', 'Pad footing reinforcement B500', [
-        ['kg', 'mass (both ways, 10% laps)', rebar],
-      ]);
+      takeoff.add('footing', 'rebar', 'Pad footing reinforcement B500', [['kg', 'mass (both ways, 10% laps)', rebar]]);
     }
   }
   for (const panel of elementsOf(building, 'panel')) {
@@ -145,15 +127,11 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
   }
   for (const pipe of elementsOf(building, 'pipe')) {
     const size = `${pipe.service} Ø${pipe.diameter}`;
-    takeoff.add('pipe', size, `Pipe ${size}`, [
-      ['m', 'length', scale.length(routeLength(pipe.points))],
-    ]);
+    takeoff.add('pipe', size, `Pipe ${size}`, [['m', 'length', scale.length(routeLength(pipe.points))]]);
   }
   for (const tray of elementsOf(building, 'tray')) {
     const size = `${tray.system} ${tray.width}×${tray.height}`;
-    takeoff.add('tray', size, `Cable tray ${size}`, [
-      ['m', 'length', scale.length(trayLength(tray))],
-    ]);
+    takeoff.add('tray', size, `Cable tray ${size}`, [['m', 'length', scale.length(trayLength(tray))]]);
   }
   for (const plate of elementsOf(building, 'plate')) {
     const bolt = boltSize(doc, plate.boltDiameter);
@@ -161,26 +139,12 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
       ['kg', 'mass', plateMass(doc, plate)],
       ['ea', 'count', 1],
     ]);
-    takeoff.add('plate', `anchor ${bolt}`, `Anchor bolts ${bolt}`, [
-      ['ea', 'count', plate.boltCount],
-    ]);
+    takeoff.add('plate', `anchor ${bolt}`, `Anchor bolts ${bolt}`, [['ea', 'count', plate.boltCount]]);
   }
   for (const support of elementsOf(building, 'pipeSupport')) {
-    takeoff.add(
-      'pipeSupport',
-      support.type,
-      `Pipe supports (${support.type})`,
-      [['ea', 'count', 1]],
-      'pipe-support',
-    );
+    takeoff.add('pipeSupport', support.type, `Pipe supports (${support.type})`, [['ea', 'count', 1]], 'pipe-support');
     if (support.type === 'hanger') {
-      takeoff.add(
-        'pipeSupport',
-        'hanger-rod',
-        'Pipe hanger rods',
-        [['m', 'length', scale.length(support.rodLength)]],
-        'pipe-support',
-      );
+      takeoff.add('pipeSupport', 'hanger-rod', 'Pipe hanger rods', [['m', 'length', scale.length(support.rodLength)]], 'pipe-support');
     }
   }
   for (const connection of elementsOf(building, 'connection')) {
@@ -188,12 +152,8 @@ export function computeTakeoff(doc: CadDocument): TakeoffLine[] {
     takeoff.add('connection', connection.material, `Moment connections ${connection.material}`, [
       ['kg', 'plates and haunches', connectionMass(doc, building, connection)],
     ]);
-    takeoff.add('connection', connection.kind, `Moment connections, ${connection.kind}`, [
-      ['ea', 'count', 1],
-    ]);
-    takeoff.add('connection', `bolt ${bolt}`, `Bolts ${bolt} 8.8`, [
-      ['ea', 'count', 2 * connection.boltRows],
-    ]);
+    takeoff.add('connection', connection.kind, `Moment connections, ${connection.kind}`, [['ea', 'count', 1]]);
+    takeoff.add('connection', `bolt ${bolt}`, `Bolts ${bolt} 8.8`, [['ea', 'count', 2 * connection.boltRows]]);
     const welds = connectionWelds(doc, building, connection);
     if (welds) {
       takeoff.add('connection', 'weld', 'Fillet welds', [['m', 'length', welds.length / 1000]]);
@@ -208,10 +168,7 @@ export function memberLength(member: Extract<BuildingElement, { category: 'membe
 }
 
 /** Steel mass of a member in kg. */
-export function memberMass(
-  doc: CadDocument,
-  member: Extract<BuildingElement, { category: 'member' }>,
-): number {
+export function memberMass(doc: CadDocument, member: Extract<BuildingElement, { category: 'member' }>): number {
   const profile = findProfile(member.profile);
   return profile ? toMetres(doc, memberLength(member)) * profile.massPerMetre : 0;
 }

@@ -18,12 +18,7 @@ const moved = (patch: Partial<GizmoTransform>): GizmoTransform => ({ ...rest, ..
 
 describe('gizmoDragCommit', () => {
   it('translate: a moved target becomes move_entities with the delta', () => {
-    const commit = gizmoDragCommit(
-      'translate',
-      'box-1.1',
-      rest,
-      moved({ position: { x: 0.5, y: 0, z: 1 } }),
-    );
+    const commit = gizmoDragCommit('translate', 'box-1.1', rest, moved({ position: { x: 0.5, y: 0, z: 1 } }));
     expect(commit).toEqual({
       name: 'move_entities',
       params: { ids: ['box-1.1'], delta: [0.5, 0, 0] },
@@ -35,12 +30,7 @@ describe('gizmoDragCommit', () => {
   });
 
   it('rotate: becomes rotate_entity with the Euler delta in radians', () => {
-    const commit = gizmoDragCommit(
-      'rotate',
-      'box-1.1',
-      rest,
-      moved({ rotation: { x: 0, y: 0, z: Math.PI / 2 } }),
-    );
+    const commit = gizmoDragCommit('rotate', 'box-1.1', rest, moved({ rotation: { x: 0, y: 0, z: Math.PI / 2 } }));
     expect(commit).toEqual({
       name: 'rotate_entity',
       params: { id: 'box-1.1', delta: [0, 0, Math.PI / 2] },
@@ -89,12 +79,7 @@ describe('gizmo commit through the command layer', () => {
 
   it('dispatching the commit moves the entity', () => {
     const id = localDispatch('add_box', { size: [2, 2, 2] }).affected[0]!;
-    const commit = gizmoDragCommit(
-      'translate',
-      id,
-      rest,
-      moved({ position: { x: 3, y: 0, z: 1 } }),
-    )!;
+    const commit = gizmoDragCommit('translate', id, rest, moved({ position: { x: 3, y: 0, z: 1 } }))!;
     useStore.getState().dispatch(commit.name, commit.params);
     expect(useStore.getState().document.entities[id]?.position[0]).toBeCloseTo(3);
   });

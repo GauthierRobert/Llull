@@ -1,12 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { portalHall } from '../../helpers/portalHall';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
-import type {
-  BuildingElement,
-  MomentConnectionElement,
-  PanelElement,
-  SteelMemberElement,
-} from '@core/model/building';
+import type { BuildingElement, MomentConnectionElement, PanelElement, SteelMemberElement } from '@core/model/building';
 import { execute } from '@core/commands/registry';
 import { framesOf } from '@aec/industrial/frames/frameModelFrames';
 import { baseReactions } from '@aec/industrial/frames/frameModelSolve';
@@ -36,9 +31,7 @@ describe('add_portal_frame_building roofType', () => {
       roofType: 'duopitch',
     });
     expect(explicit.document.building!.elements).toEqual(defaulted.document.building!.elements);
-    expect(explicit.document.building!.elementOrder).toEqual(
-      defaulted.document.building!.elementOrder,
-    );
+    expect(explicit.document.building!.elementOrder).toEqual(defaulted.document.building!.elementOrder);
     expect(explicit.summary).toBe(defaulted.summary);
     expect(defaulted.summary).toContain('ridge 8.26 m');
     expect(membersOf(defaulted.document, 'rafter')).toHaveLength(12);
@@ -92,9 +85,7 @@ describe('add_portal_frame_building roofType', () => {
 
   it('has two eaves connections per frame and no apex', () => {
     const doc = hall();
-    const connections = elementsOf(doc).filter(
-      (element): element is MomentConnectionElement => element.category === 'connection',
-    );
+    const connections = elementsOf(doc).filter((element): element is MomentConnectionElement => element.category === 'connection');
     expect(connections).toHaveLength(12);
     expect(connections.every((connection) => connection.kind === 'eaves')).toBe(true);
     expect(connections.filter((connection) => connection.end === 'start')).toHaveLength(6);
@@ -118,18 +109,12 @@ describe('add_portal_frame_building roofType', () => {
       expect(slope).toBeCloseTo(PITCH, 9);
     }
     const rails = membersOf(doc, 'rail');
-    const topLeft = Math.max(
-      ...rails.filter((rail) => rail.start[0] < 0).map((rail) => rail.start[2]),
-    );
-    const topRight = Math.max(
-      ...rails.filter((rail) => rail.start[0] > 24000).map((rail) => rail.start[2]),
-    );
+    const topLeft = Math.max(...rails.filter((rail) => rail.start[0] < 0).map((rail) => rail.start[2]));
+    const topRight = Math.max(...rails.filter((rail) => rail.start[0] > 24000).map((rail) => rail.start[2]));
     expect(topLeft).toBeLessThan(7000);
     expect(topRight).toBeGreaterThan(7000);
     expect(topRight).toBeLessThan(7000 + RISE);
-    expect(rails.filter((rail) => rail.start[0] > 24000).length).toBeGreaterThan(
-      rails.filter((rail) => rail.start[0] < 0).length,
-    );
+    expect(rails.filter((rail) => rail.start[0] > 24000).length).toBeGreaterThan(rails.filter((rail) => rail.start[0] < 0).length);
   });
 
   it('braces the single roof slope in an X and the walls to their own heights', () => {
@@ -138,14 +123,8 @@ describe('add_portal_frame_building roofType', () => {
     // 2 end bays × (2 roof + 2 + 2 wall) diagonals.
     expect(braces).toHaveLength(12);
     const walls = braces.filter((brace) => brace.start[0] === brace.end[0]);
-    expect(Math.max(...walls.filter((brace) => brace.start[0] === 0).map(topOf))).toBeCloseTo(
-      7000,
-      6,
-    );
-    expect(Math.max(...walls.filter((brace) => brace.start[0] === 24000).map(topOf))).toBeCloseTo(
-      7000 + RISE,
-      6,
-    );
+    expect(Math.max(...walls.filter((brace) => brace.start[0] === 0).map(topOf))).toBeCloseTo(7000, 6);
+    expect(Math.max(...walls.filter((brace) => brace.start[0] === 24000).map(topOf))).toBeCloseTo(7000 + RISE, 6);
     const roof = braces.filter((brace) => brace.start[0] !== brace.end[0]);
     expect(roof).toHaveLength(4);
     for (const brace of roof) {
@@ -160,9 +139,7 @@ describe('add_portal_frame_building roofType', () => {
     expect(elements.filter((element) => element.category === 'plate')).toHaveLength(18);
     expect(elements.filter((element) => element.category === 'footing')).toHaveLength(18);
     expect(membersOf(doc, 'crane').length).toBeGreaterThan(0);
-    const roofPanels = elements.filter(
-      (element): element is PanelElement => element.category === 'panel' && element.role === 'roof',
-    );
+    const roofPanels = elements.filter((element): element is PanelElement => element.category === 'panel' && element.role === 'roof');
     expect(roofPanels).toHaveLength(1);
     const corners = roofPanels[0]!.corners;
     const slope = Math.atan2(
@@ -263,9 +240,7 @@ describe('check_purlins on a monopitch roof (EN 1991-1-4 Tab. 7.3a)', () => {
     expect(highest.row.zone).toBe('G');
     expect(lowest.row.zone).toBe('G');
     expect(highest.row.upliftUtilisation!).toBeGreaterThan(lowest.row.upliftUtilisation!);
-    const cornerHigh = result.rows
-      .filter((row) => row.check.includes('cpe -2.32'))
-      .every((row) => row.zone === 'F');
+    const cornerHigh = result.rows.filter((row) => row.check.includes('cpe -2.32')).every((row) => row.zone === 'F');
     expect(cornerHigh).toBe(true);
   });
 
@@ -301,18 +276,14 @@ describe('monopitch hall in the drawing, IFC and quantity exports', () => {
     expect(quantity('panel-roof.sandwich-panel.m2')).toBeGreaterThan(0.95 * expectedRoof);
     expect(quantity('panel-roof.sandwich-panel.m2')).toBeLessThan(1.05 * expectedRoof);
     expect(quantity('member.IPE450.m')).toBeCloseTo((6 * 24000) / Math.cos(PITCH) / 1000, 1);
-    expect(lines.some((line) => line.key === 'connection.eaves.ea' && line.quantity === 12)).toBe(
-      true,
-    );
+    expect(lines.some((line) => line.key === 'connection.eaves.ea' && line.quantity === 12)).toBe(true);
     expect(lines.some((line) => line.key.startsWith('connection.apex'))).toBe(false);
   });
 
   it('checks bracing, foundations and the crane runway of a monopitch hall', () => {
     const doc = hall({ crane: { capacity: 10, railHeight: 5000 } });
     expect(execute(doc, 'check_bracing', { windPressure: 0.7 }).summary).toContain('all OK');
-    expect(execute(doc, 'check_foundations', { windPressure: 0.7 }).summary).toMatch(
-      /^Checked 12 footing/,
-    );
+    expect(execute(doc, 'check_foundations', { windPressure: 0.7 }).summary).toMatch(/^Checked 12 footing/);
     expect(execute(doc, 'check_crane_runways', {}).summary).toMatch(/crane runway beam/);
   });
 });

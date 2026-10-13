@@ -41,13 +41,7 @@ export function RestoredBanner(): React.ReactElement | null {
       <button type="button" className="btn btn--ghost btn--sm" onClick={startFresh}>
         Start fresh
       </button>
-      <IconButton
-        icon="close"
-        size={12}
-        label="Dismiss restore notice"
-        title="Dismiss"
-        onClick={() => setRestoredAt(null)}
-      />
+      <IconButton icon="close" size={12} label="Dismiss restore notice" title="Dismiss" onClick={() => setRestoredAt(null)} />
     </div>
   );
 }

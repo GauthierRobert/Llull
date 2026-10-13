@@ -19,12 +19,7 @@ import { rotatedEntityBounds } from '../../geometry/rotatedBounds';
 import { withEntity } from '../entity/entityOps';
 import { newEntity } from '../entity/newEntity';
 import { boundsText, commitSolid, positionField, rotationField } from './shared';
-import {
-  moduleProblem,
-  placedMeshEntity,
-  pressureAngleProblem,
-  teethCountProblem,
-} from './gearSolid';
+import { moduleProblem, placedMeshEntity, pressureAngleProblem, teethCountProblem } from './gearSolid';
 import { failedWith } from '../noop';
 
 const SHAFT_SEGMENTS = 64;
@@ -46,21 +41,11 @@ export const addSplineShaft = defineCommand({
     'circle is half the pitch; tip radius = referenceDiameter/2 - 0.1*module, tooth depth 0.9*module (approximation of the DIN tolerances). ' +
     'Tooth flanks are sampled coarsely (7 points) to keep STEP/boolean cost low.',
   params: z.object({
-    referenceDiameter: z
-      .number()
-      .describe('DIN 5480 reference diameter dB, > 0 (e.g. 200 for W200x5x38).'),
+    referenceDiameter: z.number().describe('DIN 5480 reference diameter dB, > 0 (e.g. 200 for W200x5x38).'),
     module: z.number().describe('Spline module, > 0 (e.g. 5 for W200x5x38).'),
-    teeth: z
-      .number()
-      .describe(
-        'Tooth count, integer >= 6. Default round(referenceDiameter/module) - 2 (DIN 5480).',
-      )
-      .optional(),
+    teeth: z.number().describe('Tooth count, integer >= 6. Default round(referenceDiameter/module) - 2 (DIN 5480).').optional(),
     length: z.number().describe('Shaft length along +Z, > 0.'),
-    pressureAngle: z
-      .number()
-      .describe('Flank pressure angle in RADIANS, in (0, π/2). Default 0.5236 (30°, DIN 5480).')
-      .optional(),
+    pressureAngle: z.number().describe('Flank pressure angle in RADIANS, in (0, π/2). Default 0.5236 (30°, DIN 5480).').optional(),
     position: positionField('Centre of the bottom face. '),
     rotation: rotationField(),
     color: z.string().describe('Hex color. Default "#9aa3ad".').optional(),
@@ -68,17 +53,7 @@ export const addSplineShaft = defineCommand({
   }),
   run: (
     doc,
-    {
-      referenceDiameter,
-      module: mod,
-      teeth,
-      length,
-      pressureAngle = Math.PI / 6,
-      position,
-      rotation,
-      color = '#9aa3ad',
-      name,
-    },
+    { referenceDiameter, module: mod, teeth, length, pressureAngle = Math.PI / 6, position, rotation, color = '#9aa3ad', name },
   ): CommandResult => {
     const fail = failedWith(doc, 'add_spline_shaft');
     if (!(referenceDiameter > 0 && Number.isFinite(referenceDiameter))) {
@@ -89,15 +64,13 @@ export const addSplineShaft = defineCommand({
     const count = Math.round(teeth ?? referenceDiameter / mod - 2);
     const teethIssue = teethCountProblem('teeth', count, 6, teeth ?? count);
     if (teethIssue !== null) return fail(teethIssue);
-    if (!(length > 0 && Number.isFinite(length)))
-      return fail(`length must be finite and > 0, got ${String(length)}.`);
+    if (!(length > 0 && Number.isFinite(length))) return fail(`length must be finite and > 0, got ${String(length)}.`);
     const angleProblem = pressureAngleProblem(pressureAngle);
     if (angleProblem !== null) return fail(angleProblem);
     const referenceRadius = referenceDiameter / 2;
     const tipRadius = referenceRadius - 0.1 * mod;
     const rootRadius = tipRadius - 0.9 * mod;
-    if (!(rootRadius > 0))
-      return fail('module is too large for this referenceDiameter (root radius <= 0).');
+    if (!(rootRadius > 0)) return fail('module is too large for this referenceDiameter (root radius <= 0).');
     const profile = toothOutline({
       teeth: count,
       baseRadius: pitchRadiusOf(mod, count) * Math.cos(pressureAngle),
@@ -171,10 +144,7 @@ interface KeywayGeometry {
 /** Shaft section outlines for a groove of `width` and `depth` on the +X side. */
 function keywayGeometry(radius: number, width: number, depth: number): KeywayGeometry {
   const half = Math.asin(width / (2 * radius));
-  const outsideSteps = Math.max(
-    8,
-    Math.ceil(((2 * Math.PI - 2 * half) * SHAFT_SEGMENTS) / (2 * Math.PI)),
-  );
+  const outsideSteps = Math.max(8, Math.ceil(((2 * Math.PI - 2 * half) * SHAFT_SEGMENTS) / (2 * Math.PI)));
   const outside = arcPolyline([0, 0], radius, half, 2 * Math.PI - 2 * half, outsideSteps);
   const slotSteps = Math.max(2, Math.ceil((2 * half * SHAFT_SEGMENTS) / (2 * Math.PI)));
   const slotInside = arcPolyline([0, 0], radius, -half, 2 * half, slotSteps).slice(1, -1);
@@ -191,14 +161,7 @@ function keywayGeometry(radius: number, width: number, depth: number): KeywayGeo
 }
 
 /** Local mesh of a shaft (z in [0, length]) with a rectangular keyway pocket from `z0` to `z1`. */
-export function keyedShaftMesh(
-  radius: number,
-  length: number,
-  width: number,
-  depth: number,
-  z0: number,
-  z1: number,
-): MeshData {
+export function keyedShaftMesh(radius: number, length: number, width: number, depth: number, z0: number, z1: number): MeshData {
   const { full, notched, step } = keywayGeometry(radius, width, depth);
   const builder = createMeshBuilder();
   const bottomOpen = z0 <= 0;
@@ -237,32 +200,12 @@ export const addKeyedShaft = defineCommand({
   params: z.object({
     diameter: z.number().describe('Shaft diameter, > 0.'),
     length: z.number().describe('Shaft length along +Z, > 0.'),
-    keyWidth: z
-      .number()
-      .describe('Keyway width b. Default from DIN 6885 for the diameter.')
-      .optional(),
-    keyDepth: z
-      .number()
-      .describe('Groove depth t1 measured from the shaft surface. Default from DIN 6885.')
-      .optional(),
-    keyHeight: z
-      .number()
-      .describe('Key height h (only used when includeKey is true). Default from DIN 6885.')
-      .optional(),
-    keyLength: z
-      .number()
-      .describe('Keyway length along the shaft, > 0 and <= length. Default 60% of length.')
-      .optional(),
-    keyOffset: z
-      .number()
-      .describe(
-        'Distance from the shaft bottom end (z = 0) to the keyway start, >= 0. Default centred.',
-      )
-      .optional(),
-    includeKey: z
-      .boolean()
-      .describe('Also create the parallel key part. Default false.')
-      .optional(),
+    keyWidth: z.number().describe('Keyway width b. Default from DIN 6885 for the diameter.').optional(),
+    keyDepth: z.number().describe('Groove depth t1 measured from the shaft surface. Default from DIN 6885.').optional(),
+    keyHeight: z.number().describe('Key height h (only used when includeKey is true). Default from DIN 6885.').optional(),
+    keyLength: z.number().describe('Keyway length along the shaft, > 0 and <= length. Default 60% of length.').optional(),
+    keyOffset: z.number().describe('Distance from the shaft bottom end (z = 0) to the keyway start, >= 0. Default centred.').optional(),
+    includeKey: z.boolean().describe('Also create the parallel key part. Default false.').optional(),
     position: positionField('Centre of the shaft bottom face. '),
     rotation: rotationField(),
     color: z.string().describe('Shaft hex color. Default "#9aa3ad".').optional(),
@@ -288,48 +231,28 @@ export const addKeyedShaft = defineCommand({
     },
   ): CommandResult => {
     const fail = failedWith(doc, 'add_keyed_shaft');
-    if (!(diameter > 0 && Number.isFinite(diameter)))
-      return fail(`diameter must be finite and > 0, got ${String(diameter)}.`);
-    if (!(length > 0 && Number.isFinite(length)))
-      return fail(`length must be finite and > 0, got ${String(length)}.`);
+    if (!(diameter > 0 && Number.isFinite(diameter))) return fail(`diameter must be finite and > 0, got ${String(diameter)}.`);
+    if (!(length > 0 && Number.isFinite(length))) return fail(`length must be finite and > 0, got ${String(length)}.`);
     const din = din6885Key(diameter);
-    const [width, depth, height] = [
-      keyWidth ?? din.width,
-      keyDepth ?? din.depth,
-      keyHeight ?? din.height,
-    ];
+    const [width, depth, height] = [keyWidth ?? din.width, keyDepth ?? din.depth, keyHeight ?? din.height];
     const radius = diameter / 2;
-    if (!(width > 0 && width < 1.8 * radius))
-      return fail(`keyWidth must be in (0, ${fmt(1.8 * radius)}), got ${String(width)}.`);
+    if (!(width > 0 && width < 1.8 * radius)) return fail(`keyWidth must be in (0, ${fmt(1.8 * radius)}), got ${String(width)}.`);
     const sagitta = radius - Math.sqrt(radius * radius - (width * width) / 4);
     if (!(depth > sagitta && depth <= 0.9 * radius)) {
-      return fail(
-        `keyDepth must be in (${fmt(sagitta)}, ${fmt(0.9 * radius)}], got ${String(depth)}.`,
-      );
+      return fail(`keyDepth must be in (${fmt(sagitta)}, ${fmt(0.9 * radius)}], got ${String(depth)}.`);
     }
-    if (!(height > depth))
-      return fail(`keyHeight must be > keyDepth (${fmt(depth)}), got ${String(height)}.`);
+    if (!(height > depth)) return fail(`keyHeight must be > keyDepth (${fmt(depth)}), got ${String(height)}.`);
     const span = keyLength ?? 0.6 * length;
-    if (!(span > 0 && span <= length))
-      return fail(`keyLength must be in (0, ${fmt(length)}], got ${String(span)}.`);
+    if (!(span > 0 && span <= length)) return fail(`keyLength must be in (0, ${fmt(length)}], got ${String(span)}.`);
     const start = keyOffset ?? (length - span) / 2;
     if (!(start >= 0 && start + span <= length + 1e-9)) {
-      return fail(
-        `keyOffset must be in [0, ${fmt(length - span)}] for keyLength ${fmt(span)}, got ${String(start)}.`,
-      );
+      return fail(`keyOffset must be in [0, ${fmt(length - span)}] for keyLength ${fmt(span)}, got ${String(start)}.`);
     }
 
     const at: Vec3 = finiteVec3OrZero(position);
     const turn: Vec3 = finiteVec3OrZero(rotation);
     const shaftId = nextId('shaft');
-    const shaft = placedMeshEntity(
-      shaftId,
-      keyedShaftMesh(radius, length, width, depth, start, start + span),
-      at,
-      turn,
-      color,
-      name,
-    );
+    const shaft = placedMeshEntity(shaftId, keyedShaftMesh(radius, length, width, depth, start, start + span), at, turn, color, name);
     const entities: Entity[] = [shaft];
     if (includeKey) {
       const x0 = radius - depth;
@@ -344,16 +267,7 @@ export const addKeyedShaft = defineCommand({
         positions: slab.positions.map((v, i) => (i % 3 === 2 ? v + start : v)),
         indices: slab.indices,
       };
-      entities.push(
-        placedMeshEntity(
-          nextId('key'),
-          lifted,
-          at,
-          turn,
-          keyColor,
-          name ? `${name}_key` : undefined,
-        ),
-      );
+      entities.push(placedMeshEntity(nextId('key'), lifted, at, turn, keyColor, name ? `${name}_key` : undefined));
     }
     return {
       document: entities.reduce(withEntity, doc),

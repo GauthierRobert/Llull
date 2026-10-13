@@ -27,11 +27,7 @@ interface MaterialRowProps {
   onSelect: (name: string) => void;
 }
 
-const MaterialRow = memo(function MaterialRow({
-  material,
-  isSelected,
-  onSelect,
-}: MaterialRowProps): React.ReactElement {
+const MaterialRow = memo(function MaterialRow({ material, isSelected, onSelect }: MaterialRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   // A count (not the id array) keeps rows from re-rendering on every selection change.
   const selectedCount = useStore((s) => s.document.selection.length);
@@ -56,12 +52,7 @@ const MaterialRow = memo(function MaterialRow({
         aria-label={`Select material ${material.name}`}
         title={material.name}
       >
-        <span
-          className="material-swatch"
-          style={{ background: material.color }}
-          aria-hidden="true"
-          title={material.color}
-        />
+        <span className="material-swatch" style={{ background: material.color }} aria-hidden="true" title={material.color} />
         <span className="material-name" title={material.name}>
           {material.name}
         </span>
@@ -77,9 +68,7 @@ const MaterialRow = memo(function MaterialRow({
         disabled={selectedCount === 0}
         aria-label={`Assign material ${material.name} to selected entities`}
         title={
-          selectedCount === 0
-            ? 'Select entities in the viewport first'
-            : `Assign "${material.name}" to ${selectedCount} selected entity`
+          selectedCount === 0 ? 'Select entities in the viewport first' : `Assign "${material.name}" to ${selectedCount} selected entity`
         }
       >
         Assign
@@ -204,10 +193,7 @@ export function MaterialsPanel({ className }: MaterialsPanelProps): React.ReactE
 
   const [activeMaterialName, setActiveMaterialName] = useState<string | null>(null);
 
-  const handleMaterialSelect = useCallback(
-    (name: string): void => setActiveMaterialName((prev) => (prev === name ? null : name)),
-    [],
-  );
+  const handleMaterialSelect = useCallback((name: string): void => setActiveMaterialName((prev) => (prev === name ? null : name)), []);
 
   return (
     <aside className={classNames('panel materials-panel', className)} aria-label="Materials">
@@ -218,11 +204,7 @@ export function MaterialsPanel({ className }: MaterialsPanelProps): React.ReactE
       />
 
       {materialList.length === 0 ? (
-        <PanelEmpty
-          icon="materials"
-          message="No materials defined."
-          hint="Create one below, then assign it to the selection."
-        />
+        <PanelEmpty icon="materials" message="No materials defined." hint="Create one below, then assign it to the selection." />
       ) : (
         <ul className="panel__list" aria-label="Material list" role="list">
           {materialList.map((material) => (

@@ -9,12 +9,7 @@
  * @failure unknown material or unknown entity id → no-op per-entity, summary lists failures
  */
 
-import {
-  type CadDocument,
-  type Material,
-  type MaterialFinish,
-  FINISH_PATTERNS,
-} from '../../model/types';
+import { type CadDocument, type Material, type MaterialFinish, FINISH_PATTERNS } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { isHexColor } from '../../lib/isHexColor';
@@ -28,12 +23,10 @@ function finishProblem(
   clearcoat: number | undefined,
 ): string | null {
   if (!(scale > 0)) return `finishScale must be > 0, got ${scale}`;
-  if (color2 !== undefined && !isHexColor(color2))
-    return `color2 must be a 6-digit hex string, got "${color2}"`;
+  if (color2 !== undefined && !isHexColor(color2)) return `color2 must be a 6-digit hex string, got "${color2}"`;
   if (normalStrength !== undefined && !(normalStrength >= 0 && normalStrength <= 2))
     return `normalStrength must be in [0, 2], got ${normalStrength}`;
-  if (clearcoat !== undefined && !(clearcoat >= 0 && clearcoat <= 1))
-    return `clearcoat must be in [0, 1], got ${clearcoat}`;
+  if (clearcoat !== undefined && !(clearcoat >= 0 && clearcoat <= 1)) return `clearcoat must be in [0, 1], got ${clearcoat}`;
   return null;
 }
 
@@ -102,49 +95,21 @@ export const createMaterial = defineCommand({
       .optional(),
     finishScale: z
       .number()
-      .describe(
-        'Size of one texture tile in document units (> 0; a carbon tile holds 8 tows). Default 24.',
-      )
+      .describe('Size of one texture tile in document units (> 0; a carbon tile holds 8 tows). Default 24.')
       .optional(),
-    color2: z
-      .string()
-      .describe('Secondary #rrggbb colour of the finish (crossing tows, checker squares).')
-      .optional(),
-    normalStrength: z
-      .number()
-      .describe('Relief depth of the finish normal map in [0, 2]. Default 1.')
-      .optional(),
-    clearcoat: z
-      .number()
-      .describe(
-        'Clear lacquer over the finish in [0, 1] (glossy carbon, painted parts). Default 0.',
-      )
-      .optional(),
+    color2: z.string().describe('Secondary #rrggbb colour of the finish (crossing tows, checker squares).').optional(),
+    normalStrength: z.number().describe('Relief depth of the finish normal map in [0, 2]. Default 1.').optional(),
+    clearcoat: z.number().describe('Clear lacquer over the finish in [0, 1] (glossy carbon, painted parts). Default 0.').optional(),
   }),
   annotations: { idempotent: true },
   run: (
     doc,
-    {
-      name,
-      density,
-      color,
-      metalness,
-      roughness,
-      finish: pattern,
-      finishScale: requestedScale,
-      color2,
-      normalStrength,
-      clearcoat,
-    },
+    { name, density, color, metalness, roughness, finish: pattern, finishScale: requestedScale, color2, normalStrength, clearcoat },
   ): CommandResult => {
-    if (name.trim() === '')
-      return noop(doc, 'create_material failed: name must be a non-empty string.');
+    if (name.trim() === '') return noop(doc, 'create_material failed: name must be a non-empty string.');
 
     if (density <= 0) {
-      return noop(
-        doc,
-        `create_material '${name}' failed: density must be a finite number > 0, got ${String(density)}.`,
-      );
+      return noop(doc, `create_material '${name}' failed: density must be a finite number > 0, got ${String(density)}.`);
     }
 
     for (const [field, value] of [
@@ -152,26 +117,17 @@ export const createMaterial = defineCommand({
       ['roughness', roughness],
     ] as const) {
       if (value < 0 || value > 1) {
-        return noop(
-          doc,
-          `create_material '${name}' failed: ${field} must be in [0, 1], got ${String(value)}.`,
-        );
+        return noop(doc, `create_material '${name}' failed: ${field} must be in [0, 1], got ${String(value)}.`);
       }
     }
 
     if (!isHexColor(color)) {
-      return noop(
-        doc,
-        `create_material '${name}' failed: color must be a 6-digit hex string like "#b0b0b0", got "${String(color)}".`,
-      );
+      return noop(doc, `create_material '${name}' failed: color must be a 6-digit hex string like "#b0b0b0", got "${String(color)}".`);
     }
 
     const finishOptions = [requestedScale, color2, normalStrength, clearcoat];
     if (pattern === undefined && finishOptions.some((option) => option !== undefined))
-      return noop(
-        doc,
-        `create_material '${name}' failed: finishScale / color2 / normalStrength / clearcoat need a finish pattern.`,
-      );
+      return noop(doc, `create_material '${name}' failed: finishScale / color2 / normalStrength / clearcoat need a finish pattern.`);
     const finishScale = requestedScale ?? 24;
     const finishIssue = finishProblem(finishScale, color2, normalStrength, clearcoat);
     if (finishIssue !== null) return noop(doc, `create_material '${name}' failed: ${finishIssue}.`);
@@ -240,23 +196,17 @@ export const assignMaterial = defineCommand({
   }),
   annotations: { idempotent: true },
   run: (doc, { materialName, entityIds }): CommandResult => {
-    if (materialName.trim() === '')
-      return noop(doc, 'assign_material failed: materialName must be a non-empty string.');
+    if (materialName.trim() === '') return noop(doc, 'assign_material failed: materialName must be a non-empty string.');
 
     if (!doc.materials[materialName]) {
       const available = Object.keys(doc.materials);
       const hint =
-        available.length > 0
-          ? ` Available materials: ${available.join(', ')}.`
-          : ' No materials defined yet — call create_material first.';
+        available.length > 0 ? ` Available materials: ${available.join(', ')}.` : ' No materials defined yet — call create_material first.';
       return noop(doc, `assign_material failed: material '${materialName}' not found.${hint}`);
     }
 
     if (entityIds.length === 0) {
-      return noop(
-        doc,
-        'assign_material failed: entityIds must be a non-empty array of entity ids.',
-      );
+      return noop(doc, 'assign_material failed: entityIds must be a non-empty array of entity ids.');
     }
 
     const assigned: string[] = [];
@@ -277,10 +227,7 @@ export const assignMaterial = defineCommand({
     }
 
     if (assigned.length === 0) {
-      return noop(
-        doc,
-        `assign_material '${materialName}': no valid entity ids found — missing: ${missing.join(', ')}.`,
-      );
+      return noop(doc, `assign_material '${materialName}': no valid entity ids found — missing: ${missing.join(', ')}.`);
     }
 
     const newDoc: CadDocument = { ...doc, entities: updatedEntities };

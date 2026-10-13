@@ -61,9 +61,7 @@ interface BridgeResponse {
 }
 
 /** Resolve the exchange config from the environment; null when the bridge is disabled. */
-export function pythonExchangeConfigFromEnv(
-  env: NodeJS.ProcessEnv = process.env,
-): PythonExchangeConfig | null {
+export function pythonExchangeConfigFromEnv(env: NodeJS.ProcessEnv = process.env): PythonExchangeConfig | null {
   const python = env['LLULL_PYTHON'] ?? 'python3';
   if (python === 'off') return null;
   return {
@@ -126,11 +124,7 @@ export function callBridge(
       stdout.push(chunk);
     });
     child.on('error', (error) => {
-      finish(
-        new Error(
-          `cannot start Python "${python}": ${error.message}. Set LLULL_PYTHON to a python with CadQuery.`,
-        ),
-      );
+      finish(new Error(`cannot start Python "${python}": ${error.message}. Set LLULL_PYTHON to a python with CadQuery.`));
     });
     child.on('close', (code) => {
       const text = Buffer.concat(stdout).toString('utf8');
@@ -138,9 +132,7 @@ export function callBridge(
         finish(null, JSON.parse(text) as BridgeResponse);
       } catch {
         const detail = stderr().trim().slice(-2000);
-        finish(
-          new Error(`Python bridge exited with code ${String(code)} without a response. ${detail}`),
-        );
+        finish(new Error(`Python bridge exited with code ${String(code)} without a response. ${detail}`));
       }
     });
     child.stdin.on('error', () => {
@@ -172,11 +164,7 @@ export function resolveInside(root: string, relative: string): string {
  * Resolve `relative` inside `root` and re-check after following symlinks, so a link placed in the
  * exchange directory cannot read or write outside it. Writes refuse an existing symlink target.
  */
-export async function confinedPath(
-  root: string,
-  relative: string,
-  mode: 'read' | 'write',
-): Promise<string> {
+export async function confinedPath(root: string, relative: string, mode: 'read' | 'write'): Promise<string> {
   const target = resolveInside(root, relative);
   const realRoot = await realpath(root);
   const checked = mode === 'read' ? await realpath(target) : await realpath(path.dirname(target));
@@ -211,14 +199,9 @@ export function concurrencyLimiter(limit: number): <T>(task: () => Promise<T>) =
 
 export function createPythonExchangePort(config: PythonExchangeConfig): CadExchangePort {
   const limit = concurrencyLimiter(MAX_CONCURRENT_RUNS);
-  const run = async (
-    language: PythonBackend | 'step',
-    request: Record<string, unknown>,
-  ): Promise<BridgeResponse> => {
+  const run = async (language: PythonBackend | 'step', request: Record<string, unknown>): Promise<BridgeResponse> => {
     const python = language === 'build123d' ? config.build123dPython : config.python;
-    const response = await limit(() =>
-      callBridge(python, config.bridgeScript, request, config.timeoutMs),
-    );
+    const response = await limit(() => callBridge(python, config.bridgeScript, request, config.timeoutMs));
     if (!response.ok) throw bridgeError(response);
     return response;
   };
@@ -230,9 +213,7 @@ export function createPythonExchangePort(config: PythonExchangeConfig): CadExcha
         trace: response['trace'],
         traced: response['traced'] === true,
         log: typeof response.log === 'string' ? response.log : '',
-        ...(typeof response['stepBase64'] === 'string'
-          ? { stepBase64: response['stepBase64'] }
-          : {}),
+        ...(typeof response['stepBase64'] === 'string' ? { stepBase64: response['stepBase64'] } : {}),
       };
     },
     async importStep(stepBase64): Promise<{ bodies: unknown[] }> {

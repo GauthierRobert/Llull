@@ -25,8 +25,7 @@ function resetStores(): void {
   useToolStore.setState({ viewMode: '3d', drawTool: 'none', modifyTool: 'none' });
 }
 
-const dispatch = (name: string, params: unknown): void =>
-  useStore.getState().dispatch(name, params);
+const dispatch = (name: string, params: unknown): void => useStore.getState().dispatch(name, params);
 
 describe('project name', () => {
   beforeEach(resetStores);
@@ -144,10 +143,7 @@ describe('useAutoFrame', () => {
     render(<Harness />);
     const before = useStore.getState().document.camera;
     act(() => dispatch('add_box', { size: [5000, 5000, 5000], position: [20000, 20000, 0] }));
-    expect(useStore.getState().localOutbox.map((entry) => entry.name)).toEqual([
-      'add_box',
-      'fit_view',
-    ]);
+    expect(useStore.getState().localOutbox.map((entry) => entry.name)).toEqual(['add_box', 'fit_view']);
     act(() => useStore.getState().undo());
     expect(useStore.getState().document.order).toHaveLength(0);
     expect(useStore.getState().document.camera).toEqual(before);

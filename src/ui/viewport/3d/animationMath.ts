@@ -23,21 +23,14 @@ import type { Animation, Vec3 } from '@core/model/types';
  *
  * @pure
  */
-export function evaluateAnimationScalar(
-  anim: Pick<Animation, 'mode' | 'speed' | 'amplitude' | 'frequency'>,
-  phase: number,
-): number {
+export function evaluateAnimationScalar(anim: Pick<Animation, 'mode' | 'speed' | 'amplitude' | 'frequency'>, phase: number): number {
   if (anim.mode === 'spin') return anim.speed * phase;
   // oscillate
   return anim.amplitude * Math.sin(2 * Math.PI * anim.frequency * phase);
 }
 
 /** Rotate `point` in place by `rotation` about `pivot` (translate to the pivot, rotate, translate back). */
-function rotateAboutPivotInPlace(
-  point: THREE.Vector3,
-  rotation: THREE.Quaternion,
-  pivot: THREE.Vector3,
-): THREE.Vector3 {
+function rotateAboutPivotInPlace(point: THREE.Vector3, rotation: THREE.Quaternion, pivot: THREE.Vector3): THREE.Vector3 {
   return point.sub(pivot).applyQuaternion(rotation).add(pivot);
 }
 
@@ -94,12 +87,7 @@ export function composeAnimatedPoseInto(
   scratch: PoseScratch,
 ): void {
   pose.position.set(basePosition[0], basePosition[1], basePosition[2]);
-  scratch.euler.set(
-    baseRotationEulerXYZ[0],
-    baseRotationEulerXYZ[1],
-    baseRotationEulerXYZ[2],
-    'XYZ',
-  );
+  scratch.euler.set(baseRotationEulerXYZ[0], baseRotationEulerXYZ[1], baseRotationEulerXYZ[2], 'XYZ');
   pose.quaternion.setFromEuler(scratch.euler);
 
   for (const contrib of contributions) {

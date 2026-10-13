@@ -20,12 +20,7 @@ import {
   wheelBaseField,
 } from '../common/craneParams';
 import { craneCapacityOf, type CraneModel } from '../frames/frameModelTypes';
-import {
-  DEFAULT_BUFFER_STIFFNESS,
-  DEFAULT_CRANE_SPAN,
-  DEFAULT_TRAVEL_SPEED,
-  type RunwayCheckRow,
-} from './runwayCheckModel';
+import { DEFAULT_BUFFER_STIFFNESS, DEFAULT_CRANE_SPAN, DEFAULT_TRAVEL_SPEED, type RunwayCheckRow } from './runwayCheckModel';
 import { checkBeam } from './runwayBeamCheck';
 import { round } from '../../shared/numeric';
 import { checkTable, failureSummary } from '../reports/checkReport';
@@ -76,9 +71,7 @@ export const runwayCheck = defineCommand({
     craneSpan: z
       .number()
       .optional()
-      .describe(
-        'Bridge span between the two runway rails, mm (> 0). Default: x distance to the paired runway beam, else 20000.',
-      ),
+      .describe('Bridge span between the two runway rails, mm (> 0). Default: x distance to the paired runway beam, else 20000.'),
     craneSelfWeight: craneSelfWeightField,
     minHookApproach: minHookApproachField,
     travelSpeed: travelSpeedField,
@@ -86,9 +79,7 @@ export const runwayCheck = defineCommand({
     craneClass: z
       .enum(['S2', 'S3', 'S4'])
       .optional()
-      .describe(
-        'EN 1991-3 / EN 1993-6 fatigue duty class (S2 light, S3 medium, S4 heavy). Default S3.',
-      ),
+      .describe('EN 1991-3 / EN 1993-6 fatigue duty class (S2 light, S3 medium, S4 heavy). Default S3.'),
     railSize: z
       .enum(['A45', 'A55', 'A65', 'A75', 'A100', 'flat50x30'])
       .optional()
@@ -135,15 +126,11 @@ export const runwayCheck = defineCommand({
     const mm = (value: number): number => toMm(doc, value);
     const rows: RunwayCheckRow[] = [];
     const runways = Object.values(building.elements).filter(
-      (element): element is SteelMemberElement =>
-        element.category === 'member' && element.role === 'crane' && element.levelId === levelId,
+      (element): element is SteelMemberElement => element.category === 'member' && element.role === 'crane' && element.levelId === levelId,
     );
     /** Bridge span: x distance to the nearest runway beam facing this one (overlapping y range). */
     const pairedSpan = (beam: SteelMemberElement): number => {
-      const [yLow, yHigh] = [
-        Math.min(beam.start[1], beam.end[1]),
-        Math.max(beam.start[1], beam.end[1]),
-      ];
+      const [yLow, yHigh] = [Math.min(beam.start[1], beam.end[1]), Math.max(beam.start[1], beam.end[1])];
       const distances = runways
         .filter(
           (other) =>
@@ -174,17 +161,10 @@ export const runwayCheck = defineCommand({
         wheelBase,
         ...(craneSelfWeight !== undefined ? { craneSelfWeight } : {}),
       };
-      const beamRows = checkBeam(
-        element,
-        span,
-        capacity,
-        craneSpan ?? pairedSpan(element),
-        model,
-        craneClass,
-        railSize,
-        girder,
-        { travelSpeed, stiffness: bufferStiffness },
-      );
+      const beamRows = checkBeam(element, span, capacity, craneSpan ?? pairedSpan(element), model, craneClass, railSize, girder, {
+        travelSpeed,
+        stiffness: bufferStiffness,
+      });
       if (beamRows.length === 0) continue;
       beams += 1;
       capacities.add(capacity);
@@ -192,19 +172,7 @@ export const runwayCheck = defineCommand({
     }
     const { csv, failures, worst } = checkTable(
       rows,
-      [
-        'Beam',
-        'Mark',
-        'Profile',
-        'Span (mm)',
-        'Kind',
-        'Check',
-        'Value',
-        'Limit',
-        'Unit',
-        'Utilisation',
-        'Status',
-      ],
+      ['Beam', 'Mark', 'Profile', 'Span (mm)', 'Kind', 'Check', 'Value', 'Limit', 'Unit', 'Utilisation', 'Status'],
       (row, status) => [
         row.elementId,
         row.mark,
@@ -229,11 +197,7 @@ export const runwayCheck = defineCommand({
       doc,
       `Checked ${beams} crane runway beam(s), ${rows.length} check(s) (${[...capacities].join('/')} t, class ${craneClass}, wheelBase ${wheelBase} mm): ` +
         `max utilisation ${round(worst.utilisation)} (${worst.mark} ${worst.kind}: ${worst.check}); ` +
-        failureSummary(
-          failures,
-          (row) => `${row.mark} ${row.kind}`,
-          'all OK (preliminary, simply supported spans).',
-        ),
+        failureSummary(failures, (row) => `${row.mark} ${row.kind}`, 'all OK (preliminary, simply supported spans).'),
       {
         rows,
         csv,

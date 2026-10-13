@@ -49,10 +49,8 @@ interface Candidate {
 function planeOf(bar: SteelBar): { direction: FrameDirection; coordinate: number } | null {
   const dx = Math.abs(bar.end[0] - bar.start[0]);
   const dy = Math.abs(bar.end[1] - bar.start[1]);
-  if (dy <= PLANE_TOLERANCE && dx > PLANE_TOLERANCE)
-    return { direction: 'X', coordinate: (bar.start[1] + bar.end[1]) / 2 };
-  if (dx <= PLANE_TOLERANCE && dy > PLANE_TOLERANCE)
-    return { direction: 'Y', coordinate: (bar.start[0] + bar.end[0]) / 2 };
+  if (dy <= PLANE_TOLERANCE && dx > PLANE_TOLERANCE) return { direction: 'X', coordinate: (bar.start[1] + bar.end[1]) / 2 };
+  if (dx <= PLANE_TOLERANCE && dy > PLANE_TOLERANCE) return { direction: 'Y', coordinate: (bar.start[0] + bar.end[0]) / 2 };
   return null;
 }
 
@@ -72,8 +70,7 @@ function candidateOf(beam: BeamResult, markOf: (id: string) => string): Candidat
       continue;
     }
     if (joint === 'rigid') {
-      const where =
-        support.type === 'beam' ? `frames into beam ${markOf(support.id)}` : 'bears on nothing';
+      const where = support.type === 'beam' ? `frames into beam ${markOf(support.id)}` : 'bears on nothing';
       return `${name} joint is rigid but the beam ${where}: a moment joint needs a column`;
     }
     if (support.type === 'beam')
@@ -87,13 +84,9 @@ function candidateOf(beam: BeamResult, markOf: (id: string) => string): Candidat
  * @invariant a column belongs to at most one frame plane (the first beam in model order wins)
  * @failure rigid joint to nothing / to a beam / beam outside an X or Y plane -> beam rejected with reason
  */
-export function detectFrames(
-  beams: ReadonlyArray<BeamResult>,
-  columns: ReadonlyArray<SteelBar>,
-): FrameDetection {
+export function detectFrames(beams: ReadonlyArray<BeamResult>, columns: ReadonlyArray<SteelBar>): FrameDetection {
   const columnById = new Map(columns.map((column) => [column.id, column]));
-  const markOf = (id: string): string =>
-    columnById.get(id)?.mark ?? beams.find((b) => b.loads.bar.id === id)?.loads.bar.mark ?? id;
+  const markOf = (id: string): string => columnById.get(id)?.mark ?? beams.find((b) => b.loads.bar.id === id)?.loads.bar.mark ?? id;
   const rejected = new Map<string, string>();
   const candidates: Candidate[] = [];
   for (const beam of beams) {
@@ -149,14 +142,9 @@ export function detectFrames(
 function connectedComponents(candidates: ReadonlyArray<Candidate>): Candidate[][] {
   const components: { columns: Set<string>; members: Candidate[] }[] = [];
   for (const candidate of candidates) {
-    const touching = components.filter((component) =>
-      candidate.columnIds.some((id) => component.columns.has(id)),
-    );
+    const touching = components.filter((component) => candidate.columnIds.some((id) => component.columns.has(id)));
     const merged = {
-      columns: new Set([
-        ...touching.flatMap((component) => [...component.columns]),
-        ...candidate.columnIds,
-      ]),
+      columns: new Set([...touching.flatMap((component) => [...component.columns]), ...candidate.columnIds]),
       members: [...touching.flatMap((component) => component.members), candidate],
     };
     merged.members.sort((a, b) => candidates.indexOf(a) - candidates.indexOf(b));
@@ -169,7 +157,6 @@ function connectedComponents(candidates: ReadonlyArray<Candidate>): Candidate[][
 function frameLabel(first: Candidate, columns: ReadonlyArray<SteelBar>): string {
   const plane = `${first.direction === 'Y' ? 'x' : 'y'} = ${metres(first.coordinate)} m`;
   const marks = columns.map((column) => column.mark);
-  const shown =
-    marks.length > 3 ? `${marks[0] ?? ''}…${marks[marks.length - 1] ?? ''}` : marks.join(', ');
+  const shown = marks.length > 3 ? `${marks[0] ?? ''}…${marks[marks.length - 1] ?? ''}` : marks.join(', ');
   return `frame ${plane} (${shown})`;
 }

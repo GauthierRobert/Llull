@@ -42,14 +42,8 @@ interface MassPropertiesData {
 }
 
 /** Shape probe: an object holding every `required` key and none of the `forbidden` ones. */
-function hasShape(
-  data: unknown,
-  required: readonly string[],
-  forbidden: readonly string[] = [],
-): boolean {
-  return (
-    isRecord(data) && required.every((key) => key in data) && !forbidden.some((key) => key in data)
-  );
+function hasShape(data: unknown, required: readonly string[], forbidden: readonly string[] = []): boolean {
+  return isRecord(data) && required.every((key) => key in data) && !forbidden.some((key) => key in data);
 }
 
 function isDistanceData(data: unknown): data is DistanceData {
@@ -181,13 +175,7 @@ export function MeasurementHUD(): React.ReactElement | null {
           <Icon name="ruler" size={14} />
           {title}
         </span>
-        <button
-          type="button"
-          className="mhud-dismiss"
-          onClick={clearLastMeasure}
-          aria-label="Dismiss measurement"
-          title="Dismiss"
-        >
+        <button type="button" className="mhud-dismiss" onClick={clearLastMeasure} aria-label="Dismiss measurement" title="Dismiss">
           <Icon name="close" size={12} />
         </button>
       </div>

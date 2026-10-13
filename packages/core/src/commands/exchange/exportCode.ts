@@ -48,20 +48,13 @@ export const exportCode = defineCommand({
     language: z
       .enum(['cadquery', 'build123d', 'openscad', 'freecad'])
       .describe('Target: "cadquery" | "build123d" | "openscad" | "freecad".'),
-    name: z
-      .string()
-      .optional()
-      .describe('Base file name without extension (sanitized). Default "model".'),
+    name: z.string().optional().describe('Base file name without extension (sanitized). Default "model".'),
   }),
   annotations: { readOnly: true, idempotent: true },
   run: (doc, { language, name }, ctx): CommandResult => {
     const program = buildFeatureProgram(doc, getCommand, (ctx ?? currentContext()).kernel);
     const text =
-      language === 'openscad'
-        ? emitOpenScad(program)
-        : language === 'freecad'
-          ? emitFreeCad(program)
-          : emitPython(program, language);
+      language === 'openscad' ? emitOpenScad(program) : language === 'freecad' ? emitFreeCad(program) : emitPython(program, language);
     const base = safeFileName(name, 'model');
     const fileName = `${base}.${FILE_EXTENSIONS[language]}`;
     const notes = program.notes.length > 0 ? ` Notes: ${program.notes.join(' ')}` : '';

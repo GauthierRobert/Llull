@@ -6,14 +6,7 @@
  */
 
 import type { CadDocument, EntityId } from '@core/model/types';
-import {
-  isCommandRefusal,
-  isConnectionRefusal,
-  postCommand,
-  postRedo,
-  postUndo,
-  ServerCommandError,
-} from './serverCommands';
+import { isCommandRefusal, isConnectionRefusal, postCommand, postRedo, postUndo, ServerCommandError } from './serverCommands';
 import type { ServerCommandResponse } from './serverCommands';
 import { measureAfter, statusSummaryFor } from './feedback';
 import { newCommandId, poisonDroppedEntry, removeOutboxEntry } from './outbox';
@@ -21,8 +14,7 @@ import { forgetGraceRun, nextDispatchSeq, runEarlierGraceRuns, trackGraceRun } f
 import { runLocally, selectionAfter, stepLocalHistory } from './localMode';
 import type { CadStoreState, DispatchOptions, StoreGet, StoreSet } from './storeTypes';
 
-const isHttpError = (err: unknown): boolean =>
-  err instanceof ServerCommandError && err.kind === 'http';
+const isHttpError = (err: unknown): boolean => err instanceof ServerCommandError && err.kind === 'http';
 
 /**
  * Before the /live stream has connected once, a POST gets this long to answer; past it the command
@@ -33,15 +25,11 @@ export const CONNECT_GRACE_MS = 400;
 
 /** True when a failed POST means "server never reachable": safe to run locally. */
 function sseIsDown(state: CadStoreState): boolean {
-  return (
-    state.liveStatus === 'disconnected' ||
-    (state.liveStatus === 'connecting' && !state.sseEverConnected)
-  );
+  return state.liveStatus === 'disconnected' || (state.liveStatus === 'connecting' && !state.sseEverConnected);
 }
 
 function postFailureMessage(err: unknown, what: string): string {
-  if (err instanceof ServerCommandError)
-    return err.kind === 'http' ? err.message : `${what} not applied — network error, retry.`;
+  if (err instanceof ServerCommandError) return err.kind === 'http' ? err.message : `${what} not applied — network error, retry.`;
   return `${what} failed: ${String(err)}`;
 }
 
@@ -76,8 +64,7 @@ function selectAffectedIn(
   options: DispatchOptions | undefined,
 ): CadDocument {
   const unchanged =
-    doc.selection.length === selectionAtDispatch.length &&
-    doc.selection.every((id, index) => id === selectionAtDispatch[index]);
+    doc.selection.length === selectionAtDispatch.length && doc.selection.every((id, index) => id === selectionAtDispatch[index]);
   if (!unchanged) return doc;
   const selection = selectionAfter(doc.selection, affected, options);
   return selection === doc.selection ? doc : { ...doc, selection };
@@ -93,12 +80,7 @@ function responseChanged(response: ServerCommandResponse): boolean {
  * flush: drop its outbox entry, poison the ids it created (later entries using them are dropped
  * by the flush), and tell the user (the post-flush snapshot reconciles the document).
  */
-function dropRefusedGraceRun(
-  set: StoreSet,
-  get: StoreGet,
-  commandId: string,
-  message: string,
-): void {
+function dropRefusedGraceRun(set: StoreSet, get: StoreGet, commandId: string, message: string): void {
   const { localOutbox, liveBase } = get();
   const entry = localOutbox.find((queued) => queued.commandId === commandId);
   if (entry !== undefined) poisonDroppedEntry(entry, liveBase, localOutbox);
@@ -109,13 +91,7 @@ function dropRefusedGraceRun(
 }
 
 /** Fire-and-forget: the document update comes from the /live SSE stream. */
-export function postDispatch(
-  set: StoreSet,
-  get: StoreGet,
-  name: string,
-  params: unknown,
-  options?: DispatchOptions,
-): void {
+export function postDispatch(set: StoreSet, get: StoreGet, name: string, params: unknown, options?: DispatchOptions): void {
   const selectionAtDispatch = get().document.selection;
   const commandId = newCommandId();
   const dispatchSeq = nextDispatchSeq();
@@ -176,9 +152,7 @@ export function postDispatch(
         }
         return;
       }
-      handlePostFailure(set, get, err, `Command '${name}'`, fallBackLocally, (summary) =>
-        options?.onResult?.({ summary, changed: false }),
-      );
+      handlePostFailure(set, get, err, `Command '${name}'`, fallBackLocally, (summary) => options?.onResult?.({ summary, changed: false }));
     });
 }
 
@@ -192,8 +166,6 @@ export function postHistoryStep(set: StoreSet, get: StoreGet, direction: 'undo' 
       });
     })
     .catch((err: unknown) => {
-      handlePostFailure(set, get, err, direction === 'undo' ? 'Undo' : 'Redo', () =>
-        stepLocalHistory(set, get, direction),
-      );
+      handlePostFailure(set, get, err, direction === 'undo' ? 'Undo' : 'Redo', () => stepLocalHistory(set, get, direction));
     });
 }

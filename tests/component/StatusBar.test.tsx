@@ -191,11 +191,7 @@ describe('StatusBar — license mode', () => {
   beforeEach(resetStore);
 
   it('shows the license label from GET /license when connected', async () => {
-    const fetchMock = vi.fn(() =>
-      Promise.resolve(
-        new Response(JSON.stringify({ mode: 'evaluation', label: 'Evaluation — 3 users' })),
-      ),
-    );
+    const fetchMock = vi.fn(() => Promise.resolve(new Response(JSON.stringify({ mode: 'evaluation', label: 'Evaluation — 3 users' }))));
     vi.stubGlobal('fetch', fetchMock);
     useStore.setState({ liveStatus: 'connected' });
     render(<StatusBar />);

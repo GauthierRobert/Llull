@@ -62,15 +62,13 @@ function pinchedVertex(faces: ReadonlyArray<ReadonlyArray<number>>, count: numbe
 export function cageProblem(cage: Cage): string | null {
   const count = cage.vertices.length;
   if (count < 4) return `a closed cage needs at least 4 vertices (got ${count})`;
-  if (cage.faces.length < 4)
-    return `a closed cage needs at least 4 faces (got ${cage.faces.length})`;
+  if (cage.faces.length < 4) return `a closed cage needs at least 4 faces (got ${cage.faces.length})`;
   const directed = new Set<string>();
   for (const [f, face] of cage.faces.entries()) {
     if (face.length < 3) return `face ${f} has ${face.length} vertices (needs 3+)`;
     if (new Set(face).size !== face.length) return `face ${f} repeats a vertex`;
     for (const [i, a] of face.entries()) {
-      if (!Number.isInteger(a) || a < 0 || a >= count)
-        return `face ${f} references vertex ${a}, outside 0..${count - 1}`;
+      if (!Number.isInteger(a) || a < 0 || a >= count) return `face ${f} references vertex ${a}, outside 0..${count - 1}`;
       const b = face[(i + 1) % face.length] as number;
       if (directed.has(`${a}>${b}`))
         return `edge ${a}-${b} is used twice in the same direction (faces must all wind counter-clockwise seen from outside)`;
@@ -79,14 +77,12 @@ export function cageProblem(cage: Cage): string | null {
   }
   for (const key of directed) {
     const [a, b] = key.split('>');
-    if (!directed.has(`${b}>${a}`))
-      return `edge ${a}-${b} borders only one face; the cage must be closed`;
+    if (!directed.has(`${b}>${a}`)) return `edge ${a}-${b} borders only one face; the cage must be closed`;
   }
   const used = new Set(cage.faces.flat());
   for (let v = 0; v < count; v++) if (!used.has(v)) return `vertex ${v} is not used by any face`;
   const pinched = pinchedVertex(cage.faces, count);
-  if (pinched !== null)
-    return `vertex ${pinched} joins separate fans of faces (a pinch); give each sheet its own vertex`;
+  if (pinched !== null) return `vertex ${pinched} joins separate fans of faces (a pinch); give each sheet its own vertex`;
   for (const [a, b] of cage.creases) {
     if (!directed.has(`${a}>${b}`)) return `crease ${a}-${b} is not an edge of the cage`;
   }
@@ -119,9 +115,7 @@ function subdivideOnce(cage: Cage): Cage {
   const edgeIndex = new Map(edgeList.map((edge, i) => [edgeKey(edge.a, edge.b), i]));
   const edgePoints = edgeList.map((edge) => {
     const ends = [vertices[edge.a] as Vec3, vertices[edge.b] as Vec3];
-    return edge.sharp
-      ? centroid3(ends)
-      : centroid3([...ends, ...edge.faces.map((f) => facePoints[f] as Vec3)]);
+    return edge.sharp ? centroid3(ends) : centroid3([...ends, ...edge.faces.map((f) => facePoints[f] as Vec3)]);
   });
   const incident = vertices.map((): EdgeInfo[] => []);
   const adjacentFaces = vertices.map((): number[] => []);
@@ -140,15 +134,12 @@ function subdivideOnce(cage: Cage): Cage {
     }
     const n = around.length;
     const q = centroid3((adjacentFaces[v] as number[]).map((f) => facePoints[f] as Vec3));
-    const r = centroid3(
-      around.map((edge) => centroid3([vertices[edge.a] as Vec3, vertices[edge.b] as Vec3])),
-    );
+    const r = centroid3(around.map((edge) => centroid3([vertices[edge.a] as Vec3, vertices[edge.b] as Vec3])));
     return scale3(add3(add3(q, scale3(r, 2)), scale3(p, n - 3)), 1 / n);
   });
   const edgeBase = vertices.length;
   const faceBase = edgeBase + edgeList.length;
-  const edgeVertex = (a: number, b: number): number =>
-    edgeBase + (edgeIndex.get(edgeKey(a, b)) as number);
+  const edgeVertex = (a: number, b: number): number => edgeBase + (edgeIndex.get(edgeKey(a, b)) as number);
   const quads = faces.flatMap((face, f) =>
     face.map((v, i) => [
       v,
@@ -210,20 +201,10 @@ export function boxCage(size: Vec3, segments: readonly [number, number, number])
   };
   const faces: number[][] = [];
   /** One side of the box: `grid(u, v)` maps a side cell corner to i, j, k; `flip` reverses winding. */
-  const side = (
-    nu: number,
-    nv: number,
-    grid: (u: number, v: number) => [number, number, number],
-    flip: boolean,
-  ): void => {
+  const side = (nu: number, nv: number, grid: (u: number, v: number) => [number, number, number], flip: boolean): void => {
     for (let u = 0; u < nu; u++) {
       for (let v = 0; v < nv; v++) {
-        const quad = [
-          vertexAt(...grid(u, v)),
-          vertexAt(...grid(u + 1, v)),
-          vertexAt(...grid(u + 1, v + 1)),
-          vertexAt(...grid(u, v + 1)),
-        ];
+        const quad = [vertexAt(...grid(u, v)), vertexAt(...grid(u + 1, v)), vertexAt(...grid(u + 1, v + 1)), vertexAt(...grid(u, v + 1))];
         faces.push(flip ? quad.reverse() : quad);
       }
     }
@@ -241,21 +222,12 @@ export function boxCage(size: Vec3, segments: readonly [number, number, number])
  * Cage of a `sides`-gon prism along Z centred on the origin (circumradius `radius`), `segments`
  * rings of side faces, one n-gon per end cap.
  */
-export function cylinderCage(
-  radius: number,
-  height: number,
-  sides: number,
-  segments: number,
-): Cage {
+export function cylinderCage(radius: number, height: number, sides: number, segments: number): Cage {
   const vertices: Vec3[] = [];
   for (let k = 0; k <= segments; k++) {
     for (let i = 0; i < sides; i++) {
       const angle = (2 * Math.PI * i) / sides;
-      vertices.push([
-        radius * Math.cos(angle),
-        radius * Math.sin(angle),
-        (k / segments - 0.5) * height,
-      ]);
+      vertices.push([radius * Math.cos(angle), radius * Math.sin(angle), (k / segments - 0.5) * height]);
     }
   }
   const at = (k: number, i: number): number => k * sides + (i % sides);

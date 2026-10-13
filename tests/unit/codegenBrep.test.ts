@@ -26,11 +26,7 @@ const TOPOLOGY: Topology = {
   volume: 8,
 };
 
-beforeEach(() =>
-  setGeometryKernel(
-    fakeKernel({ boolean: TETRA, fillet: TETRA, chamfer: TETRA, shell: TETRA, topology: TOPOLOGY }),
-  ),
-);
+beforeEach(() => setGeometryKernel(fakeKernel({ boolean: TETRA, fillet: TETRA, chamfer: TETRA, shell: TETRA, topology: TOPOLOGY })));
 afterEach(() => setGeometryKernel(null));
 
 function step(doc: CadDocument, name: string, params: unknown): ReturnType<typeof execute> {
@@ -58,8 +54,7 @@ function model(): CadDocument {
     a: filleted.affected[0],
     b: drill.affected[0],
   });
-  return step(drilled.document, 'shell_solid', { id: drilled.affected[0], thickness: 0.2 })
-    .document;
+  return step(drilled.document, 'shell_solid', { id: drilled.affected[0], thickness: 0.2 }).document;
 }
 
 describe('export_code of exact kernel results', () => {
@@ -75,9 +70,7 @@ describe('export_code of exact kernel results', () => {
   it('edge enumeration does not need OCP.TopTools.TopTools_IndexedMapOfShape (OCP >= 7.8)', () => {
     for (const language of ['cadquery', 'build123d'] as const) {
       const { text } = code(model(), language);
-      expect(text).toMatch(
-        /try:\n\s+from OCP\.TopTools import TopTools_IndexedMapOfShape as IndexedShapeMap/,
-      );
+      expect(text).toMatch(/try:\n\s+from OCP\.TopTools import TopTools_IndexedMapOfShape as IndexedShapeMap/);
       expect(text).toMatch(/except ImportError:.*\n\s+from OCP\.collections import IndexedMap_/);
     }
   });
@@ -103,9 +96,7 @@ describe('export_code of exact kernel results', () => {
       featureHistory: [],
       entities: { [entity.id]: entity },
     });
-    expect(code(asSnapshot(moved), 'cadquery').text).toMatch(
-      /^box_1 = translate\(box_1, \(5, 0, 0\)\)$/m,
-    );
+    expect(code(asSnapshot(moved), 'cadquery').text).toMatch(/^box_1 = translate\(box_1, \(5, 0, 0\)\)$/m);
     const fallback = code(asSnapshot(turned), 'cadquery');
     expect(fallback.text).toMatch(/= mesh\(\[/);
     expect(fallback.summary).toMatch(/no analytic form; exported as a triangle mesh/);
@@ -150,12 +141,7 @@ describe('export_code of exact kernel results', () => {
       ],
     };
     const applied = execute(createEmptyDocument(), 'apply_code_trace', { trace });
-    expect(applied.document.featureHistory.map((s) => s.name)).toEqual([
-      'add_box',
-      'fillet_edge',
-      'chamfer_edge',
-      'shell_solid',
-    ]);
+    expect(applied.document.featureHistory.map((s) => s.name)).toEqual(['add_box', 'fillet_edge', 'chamfer_edge', 'shell_solid']);
     const [id] = applied.document.order;
     expect((applied.document.entities[id!] as MeshSolidEntity).brep?.op).toBe('shell');
   });

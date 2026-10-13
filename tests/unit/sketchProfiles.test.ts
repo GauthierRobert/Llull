@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  type Entity,
-  type ExtrusionEntity,
-  type RevolutionEntity,
-  createEmptyDocument,
-} from '@core/model/types';
+import { type Entity, type ExtrusionEntity, type RevolutionEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { serializeDocument } from '@core/commands/persistence/serialization';
 import { entityCurves } from '@core/commands/solids/sketchCurves';
@@ -49,16 +44,7 @@ describe('revolve_profile with profileIds', () => {
     });
     expect(result.affected).toHaveLength(1);
     const bell = result.document.entities[result.affected[0] as string] as RevolutionEntity;
-    expect(bell.curves?.map((s) => s.type).sort()).toEqual([
-      'bezier',
-      'bezier',
-      'bezier',
-      'bezier',
-      'bezier',
-      'bezier',
-      'line',
-      'line',
-    ]);
+    expect(bell.curves?.map((s) => s.type).sort()).toEqual(['bezier', 'bezier', 'bezier', 'bezier', 'bezier', 'bezier', 'line', 'line']);
     expect(bell.profile.length).toBeGreaterThan(50);
     expect(result.summary).toContain('6 exact curve segment(s)');
     // Profile polygon samples lie on the exact curves (same chain, same parameterisation).
@@ -162,9 +148,7 @@ describe('extrude_profile with curved sketches', () => {
     const ext = result.document.entities[result.affected[0] as string] as ExtrusionEntity;
     expect(ext.curves?.map((s) => s.type)).toEqual(['line', 'arc']);
     expect(result.summary).toContain('[flat, arc]');
-    const volume = (
-      execute(result.document, 'mass_properties', { entityId: ext.id }).data as { volume: number }
-    ).volume;
+    const volume = (execute(result.document, 'mass_properties', { entityId: ext.id }).data as { volume: number }).volume;
     expect(volume).toBeCloseTo(2 * Math.PI, 1);
   });
 
@@ -245,9 +229,7 @@ describe('exact curves survive edits and persistence', () => {
   const withExt = { ...empty, entities: { [ext.id]: ext }, order: [ext.id] };
 
   it('scale_entity scales the polygon and its curves together', () => {
-    const scaled = execute(withExt, 'scale_entity', { id: ext.id, factor: 2 }).document.entities[
-      ext.id
-    ] as ExtrusionEntity;
+    const scaled = execute(withExt, 'scale_entity', { id: ext.id, factor: 2 }).document.entities[ext.id] as ExtrusionEntity;
     expect(scaled.curves?.[0]?.points[0]).toEqual([4, 0]);
     expect(scaled.profile[0]?.[0]).toBeCloseTo(4, 9);
 
@@ -256,11 +238,8 @@ describe('exact curves survive edits and persistence', () => {
       'revolve_profile',
       { profileIds: ['c'] },
     );
-    const bigger = execute(
-      { ...empty, entities: { [rev.id]: rev }, order: [rev.id] },
-      'scale_entity',
-      { id: rev.id, factor: 2 },
-    ).document.entities[rev.id] as RevolutionEntity;
+    const bigger = execute({ ...empty, entities: { [rev.id]: rev }, order: [rev.id] }, 'scale_entity', { id: rev.id, factor: 2 }).document
+      .entities[rev.id] as RevolutionEntity;
     expect(bigger.curves?.[0]?.points[0]).toEqual([8, 0]);
   });
 
@@ -285,9 +264,7 @@ describe('exact curves survive edits and persistence', () => {
 
   it('entityCurves has no curve for non-sketch kinds and an empty one-point spline', () => {
     expect(entityCurves(ext)).toBeNull();
-    const lonely = docWith({ id: 'sp', kind: 'spline', closed: false, points: [[0, 0]] }).entities[
-      'sp'
-    ];
+    const lonely = docWith({ id: 'sp', kind: 'spline', closed: false, points: [[0, 0]] }).entities['sp'];
     expect(entityCurves(lonely as Entity)?.curves).toEqual([]);
   });
 });

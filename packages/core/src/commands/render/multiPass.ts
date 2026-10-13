@@ -147,8 +147,7 @@ export function buildSectionSvg(
   options: RenderOptions = {},
 ): string {
   const axisIndex = 'xyz'.indexOf(axis);
-  const onKeptSide = (id: string): boolean =>
-    (doc.entities[id]?.position[axisIndex] ?? 0) >= offset;
+  const onKeptSide = (id: string): boolean => (doc.entities[id]?.position[axisIndex] ?? 0) >= offset;
   const kept = renderSubset(doc, onKeptSide, view, width, height, options);
   const cut = renderSubset(doc, (id) => !onKeptSide(id), view, width, height, options);
   return svgDocument(
@@ -168,12 +167,7 @@ function sectionPlaneLine(data: RenderViewData, axis: 'x' | 'y' | 'z', offset: n
   const { bounds } = data;
   const ext = bounds ? boundsExtent(bounds) * 1.5 : 10;
   const [cx, cy, cz] = bounds ? boundsCenter(bounds) : ORIGIN;
-  const along = (t: number): Vec3 =>
-    axis === 'z'
-      ? [cx + t, cy, offset]
-      : axis === 'y'
-        ? [cx + t, offset, cz]
-        : [offset, cy + t, cz];
+  const along = (t: number): Vec3 => (axis === 'z' ? [cx + t, cy, offset] : axis === 'y' ? [cx + t, offset, cz] : [offset, cy + t, cz]);
   const project = makeProjector(data.camera, data.orthoHalf, data.width, data.height);
   const s0 = project(along(-ext));
   const s1 = project(along(ext));

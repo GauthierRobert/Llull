@@ -35,10 +35,7 @@ export function useAppUpdateAvailable(): boolean {
 }
 
 /** A worker that finished installing while another one controls the page is an update. */
-function watchInstalling(
-  registration: ServiceWorkerRegistration,
-  container: ServiceWorkerContainer,
-): void {
+function watchInstalling(registration: ServiceWorkerRegistration, container: ServiceWorkerContainer): void {
   const worker = registration.installing;
   if (worker === null) return;
   worker.addEventListener('statechange', () => {

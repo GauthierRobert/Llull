@@ -1,12 +1,6 @@
 import type { Vec3 } from '@core/model/types';
 import { section } from '../oracle/steel';
-import {
-  gridCoordinates,
-  type IntentMember,
-  type IntentSupport,
-  type IntentPipe,
-  type PlantIntent,
-} from '../plant/intent';
+import { gridCoordinates, type IntentMember, type IntentSupport, type IntentPipe, type PlantIntent } from '../plant/intent';
 
 /**
  * @layer tests/production/scenarios

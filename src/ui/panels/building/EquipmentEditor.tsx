@@ -12,12 +12,7 @@ import { useFormValues } from '@ui/panels/useFormValues';
 import { LabeledInput } from '@ui/panels/LabeledInput';
 import { LabeledSelect } from '@ui/panels/LabeledSelect';
 import { LevelSelect } from './LevelSelect';
-import {
-  EQUIPMENT_EDIT_FIELDS,
-  buildEquipmentUpdate,
-  equipmentValues,
-  type EquipmentEditValues,
-} from './equipmentEdit';
+import { EQUIPMENT_EDIT_FIELDS, buildEquipmentUpdate, equipmentValues, type EquipmentEditValues } from './equipmentEdit';
 import { EQUIPMENT_SHAPE_OPTIONS } from './industrialTools';
 
 interface EquipmentEditorProps {

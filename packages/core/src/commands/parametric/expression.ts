@@ -49,9 +49,7 @@ const EOF_TOKEN: Token = { kind: 'eof', text: '' };
 const BUILTIN_CONSTANTS: Readonly<Record<string, number>> = { pi: Math.PI, tau: 2 * Math.PI };
 
 /** Built-in functions: accepted argument count range and implementation. */
-const BUILTIN_FUNCTIONS: Readonly<
-  Record<string, { min: number; max: number; fn: (...args: number[]) => number }>
-> = {
+const BUILTIN_FUNCTIONS: Readonly<Record<string, { min: number; max: number; fn: (...args: number[]) => number }>> = {
   sin: { min: 1, max: 1, fn: Math.sin },
   cos: { min: 1, max: 1, fn: Math.cos },
   tan: { min: 1, max: 1, fn: Math.tan },
@@ -95,8 +93,7 @@ function tokenize(src: string): Token[] | string {
       const at = start + src.slice(start).search(/[^ \t\n\r]/);
       return `unexpected character '${src.charAt(at)}' at position ${at}`;
     }
-    const [kind, text] =
-      Object.entries(match.groups ?? {}).find(([, value]) => value !== undefined) ?? [];
+    const [kind, text] = Object.entries(match.groups ?? {}).find(([, value]) => value !== undefined) ?? [];
     if (kind !== undefined && text !== undefined) tokens.push({ kind: kind as TokenKind, text });
   }
   return tokens;
@@ -126,11 +123,7 @@ function applyOperator(op: string, left: number, right: number): number {
 }
 
 /** Left-associative chain of `parseOperand` separated by operators drawn from `operators`. */
-function parseBinary(
-  s: ParseState,
-  operators: string,
-  parseOperand: (s: ParseState) => EvalResult,
-): EvalResult {
+function parseBinary(s: ParseState, operators: string, parseOperand: (s: ParseState) => EvalResult): EvalResult {
   let left = parseOperand(s);
   while (left.ok && peek(s).kind === 'op' && operators.includes(peek(s).text)) {
     const op = consume(s).text;
@@ -182,9 +175,7 @@ function parseCall(s: ParseState, name: string): EvalResult {
     };
   }
   const value = def.fn(...args);
-  return Number.isNaN(value)
-    ? { ok: false, error: `${name}() is undefined for these arguments` }
-    : { ok: true, value };
+  return Number.isNaN(value) ? { ok: false, error: `${name}() is undefined for these arguments` } : { ok: true, value };
 }
 
 function parsePrimary(s: ParseState): EvalResult {
@@ -201,9 +192,7 @@ function parsePrimary(s: ParseState): EvalResult {
     const value =
       (Object.hasOwn(s.env, t.text) ? s.env[t.text] : undefined) ??
       (Object.hasOwn(BUILTIN_CONSTANTS, t.text) ? BUILTIN_CONSTANTS[t.text] : undefined);
-    return value === undefined
-      ? { ok: false, error: `unknown parameter: ${t.text}` }
-      : { ok: true, value };
+    return value === undefined ? { ok: false, error: `unknown parameter: ${t.text}` } : { ok: true, value };
   }
 
   if (t.kind === 'lparen') {
@@ -238,10 +227,7 @@ function parsePrimary(s: ParseState): EvalResult {
  * @param env         Map of parameter name → current numeric value.
  *                    Names not in this map trigger an unknown-reference error.
  */
-export function evaluateExpression(
-  expression: string,
-  env: Readonly<Record<string, number>>,
-): EvalResult {
+export function evaluateExpression(expression: string, env: Readonly<Record<string, number>>): EvalResult {
   if (expression.trim() === '') return { ok: false, error: 'expression is empty' };
 
   const tokensOrError = tokenize(expression);
@@ -252,11 +238,9 @@ export function evaluateExpression(
   if (!result.ok) return result;
 
   // Ensure the entire input was consumed.
-  if (peek(state).kind !== 'eof')
-    return { ok: false, error: `unexpected token '${peek(state).text}' after expression` };
+  if (peek(state).kind !== 'eof') return { ok: false, error: `unexpected token '${peek(state).text}' after expression` };
 
-  if (!Number.isFinite(result.value))
-    return { ok: false, error: 'expression result is not a finite number (divide by zero?)' };
+  if (!Number.isFinite(result.value)) return { ok: false, error: 'expression result is not a finite number (divide by zero?)' };
   return result;
 }
 
@@ -272,8 +256,7 @@ export function expressionSyntaxError(expression: string): string | null {
   const probeEnv = Object.fromEntries([...refs].map((name) => [name, 1]));
   const result = evaluateExpression(expression, probeEnv);
   if (result.ok) return null;
-  if (result.error.startsWith('expression result is not a finite'))
-    return refs.size === 0 ? result.error : null;
+  if (result.error.startsWith('expression result is not a finite')) return refs.size === 0 ? result.error : null;
   return result.error;
 }
 
@@ -295,17 +278,12 @@ export function extractReferences(expression: string): ReadonlySet<string> {
 }
 
 /** Parameter name → last evaluated value (parameters in error keep their last good value). */
-export function parameterValues(
-  parameters: Readonly<Record<string, Parameter>>,
-): Record<string, number> {
+export function parameterValues(parameters: Readonly<Record<string, Parameter>>): Record<string, number> {
   return Object.fromEntries(Object.entries(parameters).map(([name, p]) => [name, p.value]));
 }
 
 /** A number, or an expression string evaluated over the parameter values; null when it fails. */
-export function resolveNumeric(
-  raw: number | string,
-  parameters: Readonly<Record<string, Parameter>>,
-): number | null {
+export function resolveNumeric(raw: number | string, parameters: Readonly<Record<string, Parameter>>): number | null {
   if (typeof raw === 'number') return raw;
   const result = evaluateExpression(raw, parameterValues(parameters));
   return result.ok ? result.value : null;

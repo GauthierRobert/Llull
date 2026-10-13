@@ -41,12 +41,8 @@ describe('profiles that enclose no area are refused', () => {
       [10, 10],
       [0, 10],
     ];
-    expect(execute(empty, 'extrude_profile', { profile: square, depth: 2 }).affected).toHaveLength(
-      1,
-    );
-    expect(
-      execute(empty, 'extrude_profile', { profile: withMidpoint, depth: 2 }).affected,
-    ).toHaveLength(1);
+    expect(execute(empty, 'extrude_profile', { profile: square, depth: 2 }).affected).toHaveLength(1);
+    expect(execute(empty, 'extrude_profile', { profile: withMidpoint, depth: 2 }).affected).toHaveLength(1);
   });
 
   it('revolve_profile still accepts a real polygon', () => {
@@ -60,9 +56,7 @@ describe('profiles that enclose no area are refused', () => {
 
   it('a very small but proper polygon is not mistaken for flat', () => {
     const tiny = square.map(([x, y]) => [x! * 1e-6, y! * 1e-6]);
-    expect(execute(empty, 'extrude_profile', { profile: tiny, depth: 1e-6 }).affected).toHaveLength(
-      1,
-    );
+    expect(execute(empty, 'extrude_profile', { profile: tiny, depth: 1e-6 }).affected).toHaveLength(1);
   });
 
   describe('extrude_profile', () => {

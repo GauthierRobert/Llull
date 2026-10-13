@@ -45,14 +45,7 @@ export function svgPolyline(points: ReadonlyArray<Point>, stroke: string, width 
   return `<polyline points="${list}" fill="none" stroke="${stroke}" stroke-width="${width}"/>`;
 }
 
-export function svgRect(
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  stroke = '#444',
-  fill = 'none',
-): string {
+export function svgRect(x: number, y: number, w: number, h: number, stroke = '#444', fill = 'none'): string {
   return `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" stroke="${stroke}" fill="${fill}"/>`;
 }
 

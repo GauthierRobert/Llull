@@ -34,10 +34,7 @@ interface DimensionRenderer2DProps {
   selected: boolean;
 }
 
-export function DimensionRenderer2D({
-  entity,
-  selected,
-}: DimensionRenderer2DProps): React.ReactElement | null {
+export function DimensionRenderer2D({ entity, selected }: DimensionRenderer2DProps): React.ReactElement | null {
   const { dimensionKind, entityIds, offset: rawOffset, precision, label, color, position } = entity;
   const offset = rawOffset ?? DEFAULT_OFFSET;
   const textRef = useRef<THREE.Group>(null);
@@ -55,22 +52,13 @@ export function DimensionRenderer2D({
   if (!drawing) return null;
 
   const displayText =
-    label ||
-    (dimensionKind === 'angular'
-      ? `${drawing.value.toFixed(1)}°`
-      : drawing.value.toFixed(precision ?? displayPrecision));
+    label || (dimensionKind === 'angular' ? `${drawing.value.toFixed(1)}°` : drawing.value.toFixed(precision ?? displayPrecision));
 
   return (
     <group position={[position[0], position[1], position[2]]}>
       {drawing.lines && <PlacedLineObject object={drawing.lines} position={ORIGIN} />}
       <group ref={textRef} position={[drawing.textX, drawing.textY, 0.01]}>
-        <Text
-          font={TEXT_FONT_URL}
-          fontSize={TEXT_HEIGHT}
-          color={dimColor}
-          anchorX="center"
-          anchorY="middle"
-        >
+        <Text font={TEXT_FONT_URL} fontSize={TEXT_HEIGHT} color={dimColor} anchorX="center" anchorY="middle">
           {displayText}
         </Text>
       </group>

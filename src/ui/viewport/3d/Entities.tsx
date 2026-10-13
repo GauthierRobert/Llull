@@ -42,9 +42,7 @@ import { expandInstance } from '@core/geometry/instanceExpansion';
 import type { PbrMaterial } from './useMaterialProps';
 import type { SolidMeshKindProps } from './entities/SolidMeshShell';
 
-type SolidMeshBranch<E extends Entity> = (
-  props: SolidMeshKindProps<E>,
-) => React.ReactElement | null;
+type SolidMeshBranch<E extends Entity> = (props: SolidMeshKindProps<E>) => React.ReactElement | null;
 
 const SOLID_MESHES: { [K in SolidKind]: SolidMeshBranch<Extract<Entity, { kind: K }>> } = {
   box: BoxMesh,
@@ -98,22 +96,14 @@ function InstanceEntityRenderer({
     [instance.id, onSelect],
   );
 
-  const expandedEntities = useMemo(
-    () => (component ? expandInstance(instance, component) : []),
-    [component, instance],
-  );
+  const expandedEntities = useMemo(() => (component ? expandInstance(instance, component) : []), [component, instance]);
 
   if (!component || expandedEntities.length === 0) return null;
 
   return (
     <group name={`instance-${instance.id}`}>
       {expandedEntities.map((entity) => (
-        <EntityRenderer
-          key={entity.id}
-          entity={entity}
-          selected={selected}
-          onSelect={handleSubSelect}
-        />
+        <EntityRenderer key={entity.id} entity={entity} selected={selected} onSelect={handleSubSelect} />
       ))}
     </group>
   );
@@ -143,9 +133,7 @@ const EntityRenderer = memo(function EntityRenderer({
   if (entity.kind in SOLID_MESHES) {
     // Keyed by kind, so the branch picked always matches the entity's narrowed type.
     const Mesh = SOLID_MESHES[entity.kind as SolidKind] as SolidMeshBranch<Entity>;
-    const mesh = (
-      <Mesh entity={entity} selected={selected} onSelect={onSelect} pbrMaterial={pbrMaterial} />
-    );
+    const mesh = <Mesh entity={entity} selected={selected} onSelect={onSelect} pbrMaterial={pbrMaterial} />;
     if (entity.decals === undefined) return mesh;
     return (
       <>
@@ -160,14 +148,7 @@ const EntityRenderer = memo(function EntityRenderer({
     case 'instance':
       // `document` is required for the instance branch — it is always passed from Entities.
       if (!document) return null;
-      return (
-        <InstanceEntityRenderer
-          instance={entity}
-          document={document}
-          selected={selected}
-          onSelect={onSelect}
-        />
-      );
+      return <InstanceEntityRenderer instance={entity} document={document} selected={selected} onSelect={onSelect} />;
     default:
       // Remaining 2D shape kinds (line/arc/circle/point/…) draw on their own work plane, at its
       // elevation, through the same renderers as the 2D view (architecture L7).
@@ -206,18 +187,14 @@ export function Entities(): React.ReactElement {
   const visibleEntities = useMemo(() => {
     return order
       .map((id) => entities[id])
-      .filter(
-        (entity): entity is Entity =>
-          entity !== undefined && isEntityVisible(entity, layers, hiddenLayerIds, hiddenEntityIds),
-      );
+      .filter((entity): entity is Entity => entity !== undefined && isEntityVisible(entity, layers, hiddenLayerIds, hiddenEntityIds));
   }, [order, entities, layers, hiddenLayerIds, hiddenEntityIds]);
 
   // Pass the materials map so batches can carry per-batch PBR overrides.
   // Textured (finish) materials and decals need per-entity geometry, so they skip instancing.
   const hasFinish = useCallback(
     (entity: Entity): boolean =>
-      entity.decals !== undefined ||
-      (entity.materialId !== undefined && materials[entity.materialId]?.finish !== undefined),
+      entity.decals !== undefined || (entity.materialId !== undefined && materials[entity.materialId]?.finish !== undefined),
     [materials],
   );
   // Animated entities are located by scene-object name, so they take the per-entity path.
@@ -234,8 +211,7 @@ export function Entities(): React.ReactElement {
     () =>
       visibleEntities.filter(
         (entity) =>
-          (!isBatchable(entity) || animatedIds.has(entity.id) || hasFinish(entity)) &&
-          layers[entity.layerId]?.name !== GRID_LAYER_NAME,
+          (!isBatchable(entity) || animatedIds.has(entity.id) || hasFinish(entity)) && layers[entity.layerId]?.name !== GRID_LAYER_NAME,
       ),
     [visibleEntities, animatedIds, layers, hasFinish],
   );

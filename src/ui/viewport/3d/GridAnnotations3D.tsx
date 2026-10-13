@@ -40,8 +40,7 @@ export function GridAnnotations3D({ document }: { document: CadDocument }): Reac
   }, [order, entities, layers, hiddenLayerIds, hiddenEntityIds]);
   // One outline per bubble radius (R9: no geometry rebuilt every render).
   const outlines = useMemo(
-    () =>
-      new Map(annotations.bubbles.map((bubble) => [bubble.radius, bubbleOutline(bubble.radius)])),
+    () => new Map(annotations.bubbles.map((bubble) => [bubble.radius, bubbleOutline(bubble.radius)])),
     [annotations],
   );
 
@@ -59,10 +58,7 @@ export function GridAnnotations3D({ document }: { document: CadDocument }): Reac
         />
       ))}
       {annotations.bubbles.map((bubble) => (
-        <Billboard
-          key={bubble.id}
-          position={[bubble.center[0], bubble.center[1], bubble.center[2] + bubble.radius]}
-        >
+        <Billboard key={bubble.id} position={[bubble.center[0], bubble.center[1], bubble.center[2] + bubble.radius]}>
           <Line
             points={outlines.get(bubble.radius) ?? bubbleOutline(bubble.radius)}
             color={bubble.color}

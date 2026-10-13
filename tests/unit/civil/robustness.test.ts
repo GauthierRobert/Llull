@@ -131,8 +131,7 @@ describe('surface point limit', () => {
 });
 
 describe('civil file validation', () => {
-  const base = (): Record<string, unknown> =>
-    JSON.parse(JSON.stringify(surveyedDocument().civil)) as Record<string, unknown>;
+  const base = (): Record<string, unknown> => JSON.parse(JSON.stringify(surveyedDocument().civil)) as Record<string, unknown>;
 
   function withObject(object: Record<string, unknown>): Record<string, unknown> {
     const civil = base();

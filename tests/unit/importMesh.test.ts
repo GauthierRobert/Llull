@@ -33,9 +33,7 @@ describe('import_mesh', () => {
 
   it('expands indexed geometry into a soup so every consumer agrees', () => {
     const quadPositions = [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0];
-    const result = importMesh(createEmptyDocument(), [
-      { positions: quadPositions, indices: [0, 1, 2, 0, 2, 3] },
-    ]);
+    const result = importMesh(createEmptyDocument(), [{ positions: quadPositions, indices: [0, 1, 2, 0, 2, 3] }]);
     const mesh = meshOf(result.document, result.affected[0]!);
     expect(mesh.mesh.positions).toEqual([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0]);
     expect(mesh.mesh.indices).toEqual([0, 1, 2, 3, 4, 5]);
@@ -48,11 +46,7 @@ describe('import_mesh', () => {
       { positions: TRIANGLE, name: '   ', color: 'red' },
       { positions: TRIANGLE, name: 7, color: 12 },
     ]);
-    const [a, b, c] = result.affected.map((id) => meshOf(result.document, id)) as [
-      MeshSolidEntity,
-      MeshSolidEntity,
-      MeshSolidEntity,
-    ];
+    const [a, b, c] = result.affected.map((id) => meshOf(result.document, id)) as [MeshSolidEntity, MeshSolidEntity, MeshSolidEntity];
     expect(a.name).toBe('Bracket');
     expect(a.color).toBe('#AaBb01');
     expect(b.name).toBeUndefined();
@@ -104,18 +98,9 @@ describe('import_mesh', () => {
     });
 
     it('rejects non-finite or non-numeric positions', () => {
-      expectNoOp(
-        [{ positions: [0, 0, Number.NaN, 0, 0, 0, 0, 0, 0] }],
-        'positions must be finite numbers',
-      );
-      expectNoOp(
-        [{ positions: [0, 0, '1', 0, 0, 0, 0, 0, 0] }],
-        'positions must be finite numbers',
-      );
-      expectNoOp(
-        [{ positions: [0, 0, Number.POSITIVE_INFINITY, 0, 0, 0, 0, 0, 0] }],
-        'positions must be finite numbers',
-      );
+      expectNoOp([{ positions: [0, 0, Number.NaN, 0, 0, 0, 0, 0, 0] }], 'positions must be finite numbers');
+      expectNoOp([{ positions: [0, 0, '1', 0, 0, 0, 0, 0, 0] }], 'positions must be finite numbers');
+      expectNoOp([{ positions: [0, 0, Number.POSITIVE_INFINITY, 0, 0, 0, 0, 0, 0] }], 'positions must be finite numbers');
     });
 
     it('rejects partial triangles and empty positions without indices', () => {
@@ -139,10 +124,7 @@ describe('import_mesh', () => {
 
     it('rejects more than MAX_IMPORT_TRIANGLES triangles in total', () => {
       const positions = new Array<number>(9 * (MAX_IMPORT_TRIANGLES / 2 + 1)).fill(0);
-      expectNoOp(
-        [{ positions }, { positions }],
-        `more than MAX_IMPORT_TRIANGLES (${MAX_IMPORT_TRIANGLES})`,
-      );
+      expectNoOp([{ positions }, { positions }], `more than MAX_IMPORT_TRIANGLES (${MAX_IMPORT_TRIANGLES})`);
     });
   });
 

@@ -54,30 +54,15 @@ export function LevelEditForm({ level, units, onDone }: LevelEditFormProps): Rea
       ...changedNumber('elevation', elevation, level.elevation),
       ...changedNumber('height', height, level.height),
     };
-    if (Object.keys(changes).length > 0)
-      dispatch('update_level', { levelId: level.id, ...changes });
+    if (Object.keys(changes).length > 0) dispatch('update_level', { levelId: level.id, ...changes });
     onDone();
   };
 
   return (
-    <CommandForm
-      ariaLabel={`Edit level ${level.name}`}
-      submitLabel="Save level"
-      onSubmit={handleSubmit}
-    >
+    <CommandForm ariaLabel={`Edit level ${level.name}`} submitLabel="Save level" onSubmit={handleSubmit}>
       <LabeledInput label="Level name" type="text" value={name} onChange={setName} />
-      <LabeledInput
-        label={`Elevation (${units})`}
-        type="number"
-        value={elevation}
-        onChange={setElevation}
-      />
-      <LabeledInput
-        label={`Floor-to-floor height (${units})`}
-        type="number"
-        value={height}
-        onChange={setHeight}
-      />
+      <LabeledInput label={`Elevation (${units})`} type="number" value={elevation} onChange={setElevation} />
+      <LabeledInput label={`Floor-to-floor height (${units})`} type="number" value={height} onChange={setHeight} />
     </CommandForm>
   );
 }

@@ -172,11 +172,7 @@ describe('set_underlay', () => {
 
   it('rejects missing id, nothing to set, and out-of-range opacity', () => {
     const { doc, id } = withUnderlay();
-    expectNoOp(
-      execute(doc, 'set_underlay', { id: 'x', opacity: 0.1 }),
-      doc,
-      "entity 'x' not found",
-    );
+    expectNoOp(execute(doc, 'set_underlay', { id: 'x', opacity: 0.1 }), doc, "entity 'x' not found");
     expectNoOp(execute(doc, 'set_underlay', { id }), doc, 'give opacity and/or locked');
     expectNoOp(execute(doc, 'set_underlay', { id, opacity: -1 }), doc, 'opacity must be');
   });

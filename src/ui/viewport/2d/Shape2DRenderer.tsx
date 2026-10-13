@@ -33,13 +33,7 @@ const RENDERERS: { [K in Shape2DKind]: RenderBranch<Extract<Entity, { kind: K }>
   image: ImageUnderlayRenderer,
 };
 
-export function Shape2DRenderer({
-  entity,
-  selected,
-}: {
-  entity: Entity;
-  selected: boolean;
-}): React.ReactElement | null {
+export function Shape2DRenderer({ entity, selected }: { entity: Entity; selected: boolean }): React.ReactElement | null {
   if (!(entity.kind in RENDERERS)) return null;
   // The map is keyed by kind, so the branch picked always matches the entity's narrowed type.
   const Renderer = RENDERERS[entity.kind as Shape2DKind] as RenderBranch<Entity>;

@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  anchoredGeometry,
-  positionsGeometry,
-  rebaseToAnchor,
-} from '../../src/ui/viewport/lineGeometry';
+import { anchoredGeometry, positionsGeometry, rebaseToAnchor } from '../../src/ui/viewport/lineGeometry';
 
 describe('rebaseToAnchor', () => {
   it('keeps full precision for geometry far from the origin', () => {

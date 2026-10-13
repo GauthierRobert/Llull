@@ -14,9 +14,7 @@ const RECENT_LIMIT = 5;
 
 function readRecent(): string[] {
   const stored = readStored(STORAGE_KEY);
-  return Array.isArray(stored)
-    ? stored.filter((id): id is string => typeof id === 'string').slice(0, RECENT_LIMIT)
-    : [];
+  return Array.isArray(stored) ? stored.filter((id): id is string => typeof id === 'string').slice(0, RECENT_LIMIT) : [];
 }
 
 /** Outcome of a command run from the palette, shown as a toast. */
@@ -59,10 +57,7 @@ export const usePaletteStore = create<PaletteStoreState>()((set, get) => ({
   },
 
   recordRecent(id: string): void {
-    const recentIds = [id, ...get().recentIds.filter((existing) => existing !== id)].slice(
-      0,
-      RECENT_LIMIT,
-    );
+    const recentIds = [id, ...get().recentIds.filter((existing) => existing !== id)].slice(0, RECENT_LIMIT);
     writeStored(STORAGE_KEY, recentIds);
     set({ recentIds });
   },

@@ -47,18 +47,14 @@ export class BuildingPanel {
     for (const [key, value] of Object.entries(fields)) {
       await section.getByTestId(`equipment-edit-${key}`).fill(value);
     }
-    return this.session.acting(`edit equipment ${mark}`, () =>
-      section.getByTestId('equipment-save').click(),
-    );
+    return this.session.acting(`edit equipment ${mark}`, () => section.getByTestId('equipment-save').click());
   }
 
   async addLevel(name: string, height: number): Promise<string> {
     const { page } = this.session;
     await page.getByLabel('New level name').fill(name);
     await page.getByLabel('New level height').fill(String(height));
-    return this.session.acting(`add level ${name}`, () =>
-      page.getByRole('button', { name: 'Add level', exact: true }).click(),
-    );
+    return this.session.acting(`add level ${name}`, () => page.getByRole('button', { name: 'Add level', exact: true }).click());
   }
 
   async setProjectInfo(info: Record<string, string>): Promise<string> {
@@ -66,9 +62,7 @@ export class BuildingPanel {
     for (const [key, value] of Object.entries(info)) {
       await page.getByTestId(`project-${key}`).fill(value);
     }
-    return this.session.acting('project information', () =>
-      page.getByRole('button', { name: 'Save project info' }).click(),
-    );
+    return this.session.acting('project information', () => page.getByRole('button', { name: 'Save project info' }).click());
   }
 
   /** Clash section: run the check and read its own result line. */

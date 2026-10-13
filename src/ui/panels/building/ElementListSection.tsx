@@ -18,10 +18,7 @@ interface ElementRowProps {
   selected: boolean;
 }
 
-const ElementRow = memo(function ElementRow({
-  element,
-  selected,
-}: ElementRowProps): React.ReactElement {
+const ElementRow = memo(function ElementRow({ element, selected }: ElementRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const select = useStore((s) => s.select);
   const units = useStore((s) => s.document.units);
@@ -52,9 +49,7 @@ export function ElementListSection(): React.ReactElement {
   const building = useStore((s) => s.document.building);
   const elements = useMemo(() => elementsOnActiveLevel(building), [building]);
   const selected = useSelectionSet();
-  const activeName = building?.activeLevelId
-    ? building.levels[building.activeLevelId]?.name
-    : undefined;
+  const activeName = building?.activeLevelId ? building.levels[building.activeLevelId]?.name : undefined;
   return (
     <PanelSection
       title={activeName ? `Elements · ${activeName}` : 'Elements'}
@@ -65,11 +60,7 @@ export function ElementListSection(): React.ReactElement {
     >
       <ul className="panel__list" aria-label="Building elements">
         {elements.map((element) => (
-          <ElementRow
-            key={element.id}
-            element={element}
-            selected={isElementSelected(element, selected)}
-          />
+          <ElementRow key={element.id} element={element} selected={isElementSelected(element, selected)} />
         ))}
       </ul>
     </PanelSection>

@@ -724,8 +724,7 @@ describe('set_parameter', () => {
   });
 
   it('parameters round-trip through serialize/deserialize', async () => {
-    const { serializeDocument, deserializeDocument } =
-      await import('@core/commands/persistence/serialization');
+    const { serializeDocument, deserializeDocument } = await import('@core/commands/persistence/serialization');
     let doc = createEmptyDocument();
     doc = execute(doc, 'set_parameter', { name: 'width', expression: '10' }).document;
     doc = execute(doc, 'set_parameter', { name: 'height', expression: 'width * 2' }).document;
@@ -1579,9 +1578,7 @@ describe('scale_entity — ellipse and spline', () => {
     const rock = execute(doc, 'animate', { mode: 'oscillate', targetId, frequency: 1 });
     expect(rock.document).toBe(doc);
     expect(rock.summary).toContain('amplitude');
-    expect(
-      execute(doc, 'animate', { mode: 'oscillate', targetId, amplitude: 1 }).summary,
-    ).toContain('frequency');
+    expect(execute(doc, 'animate', { mode: 'oscillate', targetId, amplitude: 1 }).summary).toContain('frequency');
   });
 
   it('animate oscillate is pure — input document is not mutated', () => {
@@ -2278,12 +2275,7 @@ describe('render_view', () => {
     expect(result.affected).toHaveLength(1);
     const jid = result.affected[0]!;
     expect(result.document.joints[jid]!.kind).toBe('prismatic');
-    expect(
-      (result.document.joints[jid] as Extract<
-        (typeof result.document.joints)[string],
-        { kind: 'prismatic' }
-      >)!.displacement,
-    ).toBe(0);
+    expect((result.document.joints[jid] as Extract<(typeof result.document.joints)[string], { kind: 'prismatic' }>)!.displacement).toBe(0);
   });
 
   it('add_joint — failure: unknown instanceId a is a no-op', () => {
@@ -2378,10 +2370,7 @@ describe('render_view', () => {
 
     const result = execute(doc, 'set_joint_value', { id: jid, value: 'angle' });
     expect(result.affected).toEqual([jid]);
-    const joint = result.document.joints[jid]! as Extract<
-      (typeof result.document.joints)[string],
-      { kind: 'revolute' }
-    >;
+    const joint = result.document.joints[jid]! as Extract<(typeof result.document.joints)[string], { kind: 'revolute' }>;
     expect(joint.angle).toBeCloseTo(1.5708, 3);
   });
 
@@ -3031,9 +3020,7 @@ describe('add_dimension', () => {
       entityIds: [lineId, ln2.affected[0]!],
     });
     expect(result.affected).toHaveLength(1);
-    const e = result.document.entities[
-      result.affected[0]!
-    ]! as import('@core/model/types').DimensionEntity;
+    const e = result.document.entities[result.affected[0]!]! as import('@core/model/types').DimensionEntity;
     expect(e.dimensionKind).toBe('linear');
   });
 
@@ -3044,9 +3031,7 @@ describe('add_dimension', () => {
       entityIds: [pointId1, pointId2],
     });
     expect(result.affected).toHaveLength(1);
-    const e = result.document.entities[
-      result.affected[0]!
-    ]! as import('@core/model/types').DimensionEntity;
+    const e = result.document.entities[result.affected[0]!]! as import('@core/model/types').DimensionEntity;
     expect(e.kind).toBe('dimension');
     expect(e.dimensionKind).toBe('aligned');
   });
@@ -3059,9 +3044,7 @@ describe('add_dimension', () => {
       label: 'R5',
     });
     expect(result.affected).toHaveLength(1);
-    const e = result.document.entities[
-      result.affected[0]!
-    ]! as import('@core/model/types').DimensionEntity;
+    const e = result.document.entities[result.affected[0]!]! as import('@core/model/types').DimensionEntity;
     expect(e.dimensionKind).toBe('radial');
     expect(e.entityIds).toEqual([circleId]);
     expect(e.label).toBe('R5');
@@ -3091,9 +3074,7 @@ describe('add_dimension', () => {
       precision: 1,
     });
     expect(result.affected).toHaveLength(1);
-    const e = result.document.entities[
-      result.affected[0]!
-    ]! as import('@core/model/types').DimensionEntity;
+    const e = result.document.entities[result.affected[0]!]! as import('@core/model/types').DimensionEntity;
     expect(e.dimensionKind).toBe('angular');
     expect(e.entityIds).toHaveLength(3);
     expect(e.precision).toBe(1);
@@ -3123,9 +3104,7 @@ describe('add_dimension', () => {
       precision: 2,
       label: '≈ 10 mm',
     });
-    const e = result.document.entities[
-      result.affected[0]!
-    ]! as import('@core/model/types').DimensionEntity;
+    const e = result.document.entities[result.affected[0]!]! as import('@core/model/types').DimensionEntity;
     expect(e.offset).toBe(12);
     expect(e.precision).toBe(2);
     expect(e.label).toBe('≈ 10 mm');
@@ -3672,8 +3651,7 @@ describe('add_dimension', () => {
   // ── persistence: featureHistory round-trips through serializeDocument ─────
 
   it('featureHistory — round-trips through serializeDocument / deserializeDocument', async () => {
-    const { serializeDocument, deserializeDocument } =
-      await import('@core/commands/persistence/serialization');
+    const { serializeDocument, deserializeDocument } = await import('@core/commands/persistence/serialization');
     let doc = createEmptyDocument();
     doc = execute(doc, 'add_box', { size: [3, 3, 3] }).document;
     const json = serializeDocument(doc);
@@ -4114,8 +4092,7 @@ describe('=expr param resolution in replay_history', () => {
   // ── persistence round-trip includes configurations ───────────────────────
 
   it('persistence round-trip: configurations survive serialize/deserialize', async () => {
-    const { serializeDocument, deserializeDocument } =
-      await import('@core/commands/persistence/serialization');
+    const { serializeDocument, deserializeDocument } = await import('@core/commands/persistence/serialization');
     let doc = createEmptyDocument();
     doc = execute(doc, 'create_configuration', {
       name: 'large',
@@ -4551,8 +4528,7 @@ describe('=expr param resolution in replay_history', () => {
   // ── persistence round-trip includes materials ────────────────────────────
 
   it('persistence round-trip: materials survive serialize/deserialize', async () => {
-    const { serializeDocument, deserializeDocument } =
-      await import('@core/commands/persistence/serialization');
+    const { serializeDocument, deserializeDocument } = await import('@core/commands/persistence/serialization');
     let doc = createEmptyDocument();
     doc = execute(doc, 'create_material', {
       name: 'steel',
@@ -4854,9 +4830,7 @@ describe('Q4 — replayHistory id-remapping', () => {
     // Replay: the moved copy must still be the one displaced by +7 in Y (positional
     // zip of array_linear's `affected` must map the SAME copy across regeneration).
     const replayed = execute(doc, 'replay_history', {});
-    const movedInReplay = Object.values(replayed.document.entities).filter(
-      (e) => e.position[1] === 7,
-    );
+    const movedInReplay = Object.values(replayed.document.entities).filter((e) => e.position[1] === 7);
     expect(movedInReplay).toHaveLength(1);
     // And exactly one entity is displaced — no other copy accidentally got the move.
     const total = Object.keys(replayed.document.entities).length;
@@ -5104,9 +5078,7 @@ describe('export_stl', () => {
   it('binary STL: a vertex round-trips little-endian (locks the 50-byte record layout)', () => {
     let doc = createEmptyDocument();
     doc = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] }).document;
-    const bytes = base64ToUint8Array(
-      (execute(doc, 'export_stl', { format: 'binary' }).data as StlData).stlBase64!,
-    );
+    const bytes = base64ToUint8Array((execute(doc, 'export_stl', { format: 'binary' }).data as StlData).stlBase64!);
     const view = new DataView(bytes.buffer);
     // First triangle's first vertex begins at offset 84 + 12 (after the 3-float normal).
     const vx = view.getFloat32(84 + 12, true);
@@ -5495,8 +5467,7 @@ describe('export_stl', () => {
     });
 
     it('recipe count and entity count survive serialise → deserialise round-trip', async () => {
-      const { serializeDocument, deserializeDocument } =
-        await import('@core/commands/persistence/serialization');
+      const { serializeDocument, deserializeDocument } = await import('@core/commands/persistence/serialization');
 
       let doc = createEmptyDocument();
       doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
@@ -5819,11 +5790,7 @@ describe('W4B — unified placement anchor', () => {
   }
 
   /** Resolve the single created entity from a command result. */
-  function createdEntity(
-    doc: ReturnType<typeof createEmptyDocument>,
-    name: string,
-    params: object,
-  ): Entity {
+  function createdEntity(doc: ReturnType<typeof createEmptyDocument>, name: string, params: object): Entity {
     const result = execute(doc, name, params);
     expect(result.affected).toHaveLength(1);
     return result.document.entities[result.affected[0]!]!;
@@ -6384,9 +6351,7 @@ describe('fit_view', () => {
     expect(schema).toBeDefined();
     const dirProp = schema!.input_schema.properties['direction'];
     expect(dirProp).toBeDefined();
-    expect(dirProp!.enum).toEqual(
-      expect.arrayContaining(['front', 'back', 'left', 'right', 'top', 'bottom', 'iso', 'current']),
-    );
+    expect(dirProp!.enum).toEqual(expect.arrayContaining(['front', 'back', 'left', 'right', 'top', 'bottom', 'iso', 'current']));
   });
 });
 
@@ -6581,9 +6546,7 @@ describe('export_gltf', () => {
 
     // BIN buffer inlined as data: URI
     const buffers = gltf['buffers'] as Array<Record<string, unknown>>;
-    expect((buffers[0]!['uri'] as string).startsWith('data:application/octet-stream;base64,')).toBe(
-      true,
-    );
+    expect((buffers[0]!['uri'] as string).startsWith('data:application/octet-stream;base64,')).toBe(true);
   });
 
   it('box: triangleCount=12 in glTF JSON mode', () => {
@@ -8063,9 +8026,7 @@ describe('guardCommand contract', () => {
 
   it('a build_project plan containing prototype-key free text still runs', () => {
     const r = execute(createEmptyDocument(), 'build_project', {
-      actions: [
-        { command: 'add_text', params: { content: 'toString', position: [0, 0, 0], height: 1 } },
-      ],
+      actions: [{ command: 'add_text', params: { content: 'toString', position: [0, 0, 0], height: 1 } }],
     });
     expect(r.affected).toHaveLength(1);
   });
@@ -8094,9 +8055,7 @@ describe('guardCommand contract', () => {
 
   it('position schema descriptions state the [x, y] shorthand contract', () => {
     const box = toToolSchemas().find((t) => t.name === 'add_box')!;
-    expect(box.input_schema.properties['position']!.description).toContain(
-      '[x, y] is accepted and placed at z=0',
-    );
+    expect(box.input_schema.properties['position']!.description).toContain('[x, y] is accepted and placed at z=0');
   });
 
   it('query command data survives the guard', () => {

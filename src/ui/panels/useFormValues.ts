@@ -15,9 +15,7 @@ interface FormValues<V extends Readonly<Record<string, string>>> {
   field: (key: keyof V & string) => { value: string; set: (value: string) => void };
 }
 
-export function useFormValues<V extends Readonly<Record<string, string>>>(
-  initial: () => V,
-): FormValues<V> {
+export function useFormValues<V extends Readonly<Record<string, string>>>(initial: () => V): FormValues<V> {
   const [values, setValues] = useState<V>(initial);
   const [error, setError] = useState('');
   const change = (key: keyof V & string, value: string): void => {

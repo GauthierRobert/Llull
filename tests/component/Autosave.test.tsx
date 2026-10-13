@@ -10,13 +10,7 @@ import { useSessionStore } from '@ui/store/sessionStore';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { serializeDocument } from '@core/commands/persistence/serialization';
-import {
-  AUTOSAVE_KEY,
-  clearAutosave,
-  readAutosave,
-  writeAutosave,
-  type KeyValueStorage,
-} from '@ui/store/autosave';
+import { AUTOSAVE_KEY, clearAutosave, readAutosave, writeAutosave, type KeyValueStorage } from '@ui/store/autosave';
 import { AUTOSAVE_DELAY_MS, useAutosave } from '@ui/hooks/useAutosave';
 import { RestoredBanner } from '@ui/components/RestoredBanner';
 

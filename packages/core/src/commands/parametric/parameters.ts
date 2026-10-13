@@ -33,9 +33,7 @@ function topoSort(parameters: Readonly<Record<string, Parameter>>): {
  * (the last good value is kept). Shared with `activate_configuration`.
  * @pure
  */
-export function reEvaluateAll(
-  parameters: Readonly<Record<string, Parameter>>,
-): Record<string, Parameter> {
+export function reEvaluateAll(parameters: Readonly<Record<string, Parameter>>): Record<string, Parameter> {
   const { sorted, cycleSet } = topoSort(parameters);
   const result: Record<string, Parameter> = {};
   const env: Record<string, number> = {};
@@ -113,8 +111,7 @@ export const setParameter = defineCommand({
         `set_parameter failed: name '${name}' is invalid. Use letters, digits, and underscores; must not start with a digit.`,
       );
     }
-    if (expression.trim() === '')
-      return noop(doc, `set_parameter failed: expression must be a non-empty string.`);
+    if (expression.trim() === '') return noop(doc, `set_parameter failed: expression must be a non-empty string.`);
 
     const syntaxError = expressionSyntaxError(expression);
     if (syntaxError !== null) {
@@ -141,9 +138,7 @@ export const setParameter = defineCommand({
       );
     }
 
-    const dependentCount = Object.values(evaluated).filter(
-      (p) => p.name !== name && extractReferences(p.expression).has(name),
-    ).length;
+    const dependentCount = Object.values(evaluated).filter((p) => p.name !== name && extractReferences(p.expression).has(name)).length;
     const { document, dependentSteps, refusal } = regenerateParameterDependents(doc, newDoc, ctx);
     if (refusal !== undefined) return noop(doc, `set_parameter '${name}': ${refusal}`);
 
@@ -184,12 +179,9 @@ export const deleteParameter = defineCommand({
       ),
   }),
   run: (doc, { name }): CommandResult => {
-    if (!Object.hasOwn(doc.parameters, name))
-      return noop(doc, `delete_parameter: parameter '${name}' does not exist — no change made.`);
+    if (!Object.hasOwn(doc.parameters, name)) return noop(doc, `delete_parameter: parameter '${name}' does not exist — no change made.`);
 
-    const evaluated = reEvaluateAll(
-      Object.fromEntries(Object.entries(doc.parameters).filter(([key]) => key !== name)),
-    );
+    const evaluated = reEvaluateAll(Object.fromEntries(Object.entries(doc.parameters).filter(([key]) => key !== name)));
 
     const erroredDependents = Object.values(evaluated)
       .filter((p) => p.error)
@@ -200,9 +192,7 @@ export const deleteParameter = defineCommand({
     return report(
       newDoc,
       `delete_parameter '${name}': removed.` +
-        (erroredDependents.length > 0
-          ? ` ${erroredDependents.length} dependent(s) now have errors: ${erroredDependents.join(', ')}.`
-          : ''),
+        (erroredDependents.length > 0 ? ` ${erroredDependents.length} dependent(s) now have errors: ${erroredDependents.join(', ')}.` : ''),
     );
   },
 });

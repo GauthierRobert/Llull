@@ -57,19 +57,10 @@ const LayerRow = memo(function LayerRow({ layer, entityCount }: LayerRowProps): 
       <IconButton
         icon={effectivelyVisible ? 'eye' : 'eyeOff'}
         size={14}
-        className={classNames(
-          'layer-visibility-btn',
-          !effectivelyVisible && 'layer-visibility-btn--hidden',
-        )}
+        className={classNames('layer-visibility-btn', !effectivelyVisible && 'layer-visibility-btn--hidden')}
         pressed={effectivelyVisible}
-        label={
-          effectivelyVisible
-            ? `Hide layer ${layer.name} in viewport`
-            : `Show layer ${layer.name} in viewport`
-        }
-        title={
-          effectivelyVisible ? 'Hide layer in viewport (local)' : 'Show layer in viewport (local)'
-        }
+        label={effectivelyVisible ? `Hide layer ${layer.name} in viewport` : `Show layer ${layer.name} in viewport`}
+        title={effectivelyVisible ? 'Hide layer in viewport (local)' : 'Show layer in viewport (local)'}
         onClick={() => toggleLayerVisibility(layer.id)}
       />
 
@@ -110,10 +101,7 @@ const LayerRow = memo(function LayerRow({ layer, entityCount }: LayerRowProps): 
         <span className="panel__row-main layer-name">{layer.name}</span>
       )}
 
-      <span
-        className="panel__row-meta"
-        title={`${entityCount} ${entityCount === 1 ? 'entity' : 'entities'} on this layer`}
-      >
+      <span className="panel__row-meta" title={`${entityCount} ${entityCount === 1 ? 'entity' : 'entities'} on this layer`}>
         {entityCount}
         <span className="visually-hidden">{entityCount === 1 ? ' entity' : ' entities'}</span>
       </span>
@@ -179,13 +167,7 @@ function AddLayerForm(): React.ReactElement {
           aria-label="New layer name"
           autoComplete="off"
         />
-        <button
-          type="submit"
-          className="btn btn--primary"
-          disabled={trimmed === ''}
-          aria-label="Add layer"
-          title="Add layer"
-        >
+        <button type="submit" className="btn btn--primary" disabled={trimmed === ''} aria-label="Add layer" title="Add layer">
           <Icon name="plus" size={14} />
         </button>
       </div>
@@ -204,11 +186,7 @@ export function LayersPanel({ className }: LayersPanelProps): React.ReactElement
 
   return (
     <aside className={classNames('panel layers-panel', className)} aria-label="Layers">
-      <PanelHeader
-        title="Layers"
-        count={layerOrder.length}
-        countLabel={`${layerOrder.length} layers`}
-      />
+      <PanelHeader title="Layers" count={layerOrder.length} countLabel={`${layerOrder.length} layers`} />
 
       <ul className="panel__list" aria-label="Layer list" role="list">
         {orderedValues(layerOrder, layers).map((layer) => (

@@ -42,8 +42,7 @@ type Corner = readonly [number, number, number];
 const axes = [0, 1, 2] as const;
 
 /** True when AABB `b` is fully inside `[qMin, qMax]`. */
-const insideAabb = (b: Bounds, qMin: Corner, qMax: Corner): boolean =>
-  axes.every((i) => b.min[i] >= qMin[i] && b.max[i] <= qMax[i]);
+const insideAabb = (b: Bounds, qMin: Corner, qMax: Corner): boolean => axes.every((i) => b.min[i] >= qMin[i] && b.max[i] <= qMax[i]);
 
 const isInverted = (min: Corner, max: Corner): boolean => axes.some((i) => min[i] > max[i]);
 
@@ -72,16 +71,11 @@ export const findEntities = defineCommand({
     kind: z
       .enum(FILTERABLE_KINDS)
       .optional()
-      .describe(
-        `Filter by entity kind. One of: ${FILTERABLE_KINDS.map((kind) => `"${kind}"`).join(', ')}. ` +
-          'Omit to match all kinds.',
-      ),
+      .describe(`Filter by entity kind. One of: ${FILTERABLE_KINDS.map((kind) => `"${kind}"`).join(', ')}. ` + 'Omit to match all kinds.'),
     layerId: z
       .string()
       .optional()
-      .describe(
-        'Filter by layer id. Only entities assigned to this layer are returned. Omit to match all layers.',
-      ),
+      .describe('Filter by layer id. Only entities assigned to this layer are returned. Omit to match all layers.'),
     name: z
       .string()
       .optional()
@@ -92,15 +86,11 @@ export const findEntities = defineCommand({
     nameExact: z
       .boolean()
       .optional()
-      .describe(
-        'When true, the name filter requires an exact case-sensitive match instead of a substring match. Default: false.',
-      ),
+      .describe('When true, the name filter requires an exact case-sensitive match instead of a substring match. Default: false.'),
     tag: z
       .string()
       .optional()
-      .describe(
-        'Filter to entities that have this exact tag string in their tags array. Omit to match all entities regardless of tags.',
-      ),
+      .describe('Filter to entities that have this exact tag string in their tags array. Omit to match all entities regardless of tags.'),
     bboxMin: vec3(
       'World-space minimum corner [x, y, z] of a bounding box filter. Must be provided together with bboxMax. ' +
         'Only entities whose world-space AABB overlaps this box are returned.',
@@ -173,12 +163,9 @@ export const findEntities = defineCommand({
     } = params;
 
     const fail = failer(doc, 'find_entities');
-    if ((bboxMin === undefined) !== (bboxMax === undefined))
-      return fail('bboxMin and bboxMax must both be provided or both omitted');
-    if (nearPoint !== undefined && nearPoint.radius <= 0)
-      return fail('nearPoint.radius must be a finite number > 0');
-    if (insideBBox !== undefined && isInverted(insideBBox[0], insideBBox[1]))
-      return fail('insideBBox min must be <= max on every axis');
+    if ((bboxMin === undefined) !== (bboxMax === undefined)) return fail('bboxMin and bboxMax must both be provided or both omitted');
+    if (nearPoint !== undefined && nearPoint.radius <= 0) return fail('nearPoint.radius must be a finite number > 0');
+    if (insideBBox !== undefined && isInverted(insideBBox[0], insideBBox[1])) return fail('insideBBox min must be <= max on every axis');
     if (overlapsBBox !== undefined && isInverted(overlapsBBox[0], overlapsBBox[1]))
       return fail('overlapsBBox min must be <= max on every axis');
     const touchingRef = touchingId !== undefined ? entityOfKind(doc, touchingId) : undefined;
@@ -199,8 +186,7 @@ export const findEntities = defineCommand({
       }
       if (tag !== undefined && !e.tags?.includes(tag)) continue;
       if (nameFuzzyLc !== undefined && !e.name?.toLowerCase().includes(nameFuzzyLc)) continue;
-      if (tagFuzzyLc !== undefined && !e.tags?.some((t) => t.toLowerCase().includes(tagFuzzyLc)))
-        continue;
+      if (tagFuzzyLc !== undefined && !e.tags?.some((t) => t.toLowerCase().includes(tagFuzzyLc))) continue;
       if (touchingId !== undefined && e.id === touchingId) continue;
 
       const needsBounds = bboxMin || nearPoint || insideBBox || overlapsBBox || touchingBounds;
@@ -209,8 +195,7 @@ export const findEntities = defineCommand({
         if (bboxMin && bboxMax && !boundsOverlap(b, { min: bboxMin, max: bboxMax })) continue;
         if (nearPoint && distanceSq3(boundsCenter(b), nearPoint.point) > nearRadiusSq) continue;
         if (insideBBox && !insideAabb(b, insideBBox[0], insideBBox[1])) continue;
-        if (overlapsBBox && !boundsOverlap(b, { min: overlapsBBox[0], max: overlapsBBox[1] }))
-          continue;
+        if (overlapsBBox && !boundsOverlap(b, { min: overlapsBBox[0], max: overlapsBBox[1] })) continue;
         if (touchingBounds && !boundsOverlap(b, touchingBounds)) continue;
       }
 

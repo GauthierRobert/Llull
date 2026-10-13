@@ -69,11 +69,7 @@ export function CivilCrsSection(): React.ReactElement {
           <TextField {...field('name')} hint="CRS name" label="CRS name" />
           <NumberTextField {...field('epsg')} hint="EPSG" label="EPSG code" />
           <TextField {...field('datum')} hint="Vertical datum" label="Vertical datum" />
-          <button
-            type="submit"
-            className="btn btn--primary btn--sm"
-            disabled={values.name.trim() === ''}
-          >
+          <button type="submit" className="btn btn--primary btn--sm" disabled={values.name.trim() === ''}>
             Set CRS
           </button>
         </div>
@@ -93,9 +89,7 @@ export function CivilCrsSection(): React.ReactElement {
         <p className="civil-status" data-testid="civil-crs-current">
           {crs.name}
           {crs.epsg !== undefined ? ` (EPSG:${crs.epsg})` : ''}
-          {calibration
-            ? ` — calibrated, rotation ${calibration.rotationDeg}°, scale ${calibration.scaleFactor}`
-            : ' — not calibrated'}
+          {calibration ? ` — calibrated, rotation ${calibration.rotationDeg}°, scale ${calibration.scaleFactor}` : ' — not calibrated'}
         </p>
       )}
       {status !== '' && <p className="civil-status">{status}</p>}

@@ -112,12 +112,7 @@ interface GridPatch {
  * @invariant divisions even, 2 ≤ divisions ≤ maxDivisions
  * @failure step <= 0 or visibleWorld <= 0 -> minimal 2-cell patch
  */
-export function localGridPatch(
-  visibleWorld: number,
-  step: number,
-  margin = 2.5,
-  maxDivisions = 1000,
-): GridPatch {
+export function localGridPatch(visibleWorld: number, step: number, margin = 2.5, maxDivisions = 1000): GridPatch {
   if (step <= 0 || visibleWorld <= 0) {
     const safeStep = step > 0 ? step : 1;
     return { extent: safeStep * 2, divisions: 2 };
@@ -177,10 +172,7 @@ export function formatScaleBarLength(worldLength: number): string {
  * @invariant zoom > 0
  * @invariant worldLength > 0, pixelLength > 0
  */
-export function scaleBarLength(
-  zoom: number,
-  targetPx = 80,
-): { worldLength: number; pixelLength: number } {
+export function scaleBarLength(zoom: number, targetPx = 80): { worldLength: number; pixelLength: number } {
   if (zoom <= 0) return { worldLength: 1, pixelLength: 1 };
 
   // World units visible across targetPx pixels.

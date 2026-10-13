@@ -1,12 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument, type Entity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import {
-  flipTriangleWinding,
-  orientOutward,
-  signedMeshVolume,
-  soupIndices,
-} from '@core/geometry/meshVolume';
+import { flipTriangleWinding, orientOutward, signedMeshVolume, soupIndices } from '@core/geometry/meshVolume';
 import { boundsDiagonalRadius, entityBounds } from '@core/geometry/bounds';
 import { fitFraming } from '@core/geometry/viewFraming';
 import { closedShapeArea } from '@core/geometry/shapeArea';
@@ -133,10 +128,7 @@ describe('UI-shared geometry helpers', () => {
     };
     const normal = fitFraming(point, 1, 1);
     expect(normal.distance).toBeGreaterThan(0);
-    expect(fitFraming(point, 1, 1, { degenerateRadius: 2 }).distance).toBeCloseTo(
-      normal.distance * 2,
-      9,
-    );
+    expect(fitFraming(point, 1, 1, { degenerateRadius: 2 }).distance).toBeCloseTo(normal.distance * 2, 9);
     const tiny = {
       min: [0, 0, 0] as [number, number, number],
       max: [0.002, 0, 0] as [number, number, number],
@@ -145,10 +137,7 @@ describe('UI-shared geometry helpers', () => {
   });
 
   it('entityLocalToWorld rotates about the entity origin then translates', () => {
-    const world = entityLocalToWorld(
-      { position: [10, 0, 0], rotation: [0, 0, Math.PI / 2] },
-      [1, 0, 0],
-    );
+    const world = entityLocalToWorld({ position: [10, 0, 0], rotation: [0, 0, Math.PI / 2] }, [1, 0, 0]);
     expect(world[0]).toBeCloseTo(10, 12);
     expect(world[1]).toBeCloseTo(1, 12);
     expect(world[2]).toBeCloseTo(0, 12);
@@ -167,9 +156,7 @@ describe('UI-shared geometry helpers', () => {
       doc = result.document;
       return doc.entities[result.affected[0] as string] as Entity;
     };
-    expect(
-      closedShapeArea(make('draw_ellipse', { center: [0, 0], radiusX: 2, radiusY: 1 })),
-    ).toBeCloseTo(2 * Math.PI, 12);
+    expect(closedShapeArea(make('draw_ellipse', { center: [0, 0], radiusX: 2, radiusY: 1 }))).toBeCloseTo(2 * Math.PI, 12);
     expect(closedShapeArea(make('draw_rectangle', { width: 3, height: 2 }))).toBe(6);
     const closed = make('draw_polyline', {
       points: [

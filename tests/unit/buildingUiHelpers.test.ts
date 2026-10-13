@@ -8,19 +8,15 @@ import { createEmptyDocument } from '@core/model/types';
 describe('building element tools', () => {
   const context = { levelId: 'level-1', wallIds: ['wall-1', 'wall-2'] };
 
-  it.each(ELEMENT_TOOLS.map((tool) => [tool.id, tool] as const))(
-    '%s defaults build a call to a registered command',
-    (_id, tool) => {
-      const values = { ...defaultValues(tool), wallId: 'wall-1', stairId: 'stair-1', name: 'Room' };
-      const outcome = tool.build(values, context);
-      expect(outcome.ok).toBe(true);
-      if (outcome.ok) expect(getCommand(outcome.command)).toBeDefined();
-    },
-  );
+  it.each(ELEMENT_TOOLS.map((tool) => [tool.id, tool] as const))('%s defaults build a call to a registered command', (_id, tool) => {
+    const values = { ...defaultValues(tool), wallId: 'wall-1', stairId: 'stair-1', name: 'Room' };
+    const outcome = tool.build(values, context);
+    expect(outcome.ok).toBe(true);
+    if (outcome.ok) expect(getCommand(outcome.command)).toBeDefined();
+  });
 
   it('the default perimeter then slab-from-walls tools produce a valid model', () => {
-    const tool = (id: string): ElementTool =>
-      ELEMENT_TOOLS.find((candidate) => candidate.id === id)!;
+    const tool = (id: string): ElementTool => ELEMENT_TOOLS.find((candidate) => candidate.id === id)!;
     const perimeter = tool('perimeter').build(defaultValues(tool('perimeter')), {
       levelId: null,
       wallIds: [],

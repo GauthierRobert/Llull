@@ -34,20 +34,13 @@ function NetworkChecks(): React.ReactElement {
   };
 
   const checkCsv = (): void => {
-    setStatus(
-      downloadCsvQuery('check_drainage_network', checkParams, 'drainage-check.csv').summary,
-    );
+    setStatus(downloadCsvQuery('check_drainage_network', checkParams, 'drainage-check.csv').summary);
   };
 
   return (
     <>
       <div className="building-actions">
-        <NumberTextField
-          value={rainfall}
-          set={setRainfall}
-          hint="Rainfall mm/h (50)"
-          label="Rainfall intensity"
-        />
+        <NumberTextField value={rainfall} set={setRainfall} hint="Rainfall mm/h (50)" label="Rainfall intensity" />
         {IDF_FIELDS.map((key) => (
           <input
             key={key}
@@ -124,11 +117,7 @@ export function DrainageSection(): React.ReactElement {
       {manholes.length > 0 && (
         <ul className="civil-list" aria-label="Manholes">
           {manholes.map((manhole) => (
-            <CivilObjectRow
-              key={manhole.id}
-              object={manhole}
-              detail={`invert ${manhole.invertElevation}, rim ${manhole.rimElevation}`}
-            />
+            <CivilObjectRow key={manhole.id} object={manhole} detail={`invert ${manhole.invertElevation}, rim ${manhole.rimElevation}`} />
           ))}
         </ul>
       )}

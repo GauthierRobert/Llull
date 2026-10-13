@@ -42,13 +42,7 @@ function ResultCard({ result }: { result: PaletteResult }): React.ReactElement {
         <strong className="palette-toast__title">{humanizeName(result.commandName)}</strong>
         <span className="palette-toast__summary">{result.summary}</span>
       </span>
-      <IconButton
-        icon="close"
-        size={12}
-        label="Dismiss result"
-        title="Dismiss"
-        onClick={dismissResult}
-      />
+      <IconButton icon="close" size={12} label="Dismiss result" title="Dismiss" onClick={dismissResult} />
     </div>
   );
 }

@@ -16,12 +16,7 @@ import { execute } from '../execute';
  *   `recordedParams`; otherwise (query, no-op, meta-history command such as insert_step, which
  *   appends a step for another command) the result is returned untouched.
  */
-export function executeRecorded(
-  doc: CadDocument,
-  command: string,
-  params: unknown,
-  recordedParams: unknown,
-): CommandResult {
+export function executeRecorded(doc: CadDocument, command: string, params: unknown, recordedParams: unknown): CommandResult {
   const result = execute(doc, command, params);
   const history = result.document.featureHistory;
   const appended = history.length === doc.featureHistory.length + 1 ? history.at(-1) : undefined;

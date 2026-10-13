@@ -80,29 +80,22 @@ function classify(
   dz: number,
 ): { kind: BarKind; reason: string | undefined } {
   const skip = (reason: string): { kind: BarKind; reason: string } => ({ kind: 'skipped', reason });
-  if (profile === null)
-    return skip(`profile '${profileName}' is not in the steel catalogue (list_steel_profiles)`);
+  if (profile === null) return skip(`profile '${profileName}' is not in the steel catalogue (list_steel_profiles)`);
   if (!(length > 1)) return skip('member length is zero');
   const pointer = POINTER[role];
   if (pointer !== undefined) {
-    return skip(
-      `role '${role}' carries roof, wind or crane loads that check_steel_members does not derive — use ${pointer}`,
-    );
+    return skip(`role '${role}' carries roof, wind or crane loads that check_steel_members does not derive — use ${pointer}`);
   }
   const ratio = Math.abs(dz) / length;
   if (role === 'column') {
-    return ratio >= VERTICAL_RATIO
-      ? { kind: 'column', reason: undefined }
-      : skip('column is inclined more than 18° from the vertical');
+    return ratio >= VERTICAL_RATIO ? { kind: 'column', reason: undefined } : skip('column is inclined more than 18° from the vertical');
   }
   if (role === 'beam') {
     return ratio <= HORIZONTAL_RATIO
       ? { kind: 'beam', reason: undefined }
       : skip('beam slopes more than 5.7° (floor beams are taken as horizontal)');
   }
-  return ratio >= HORIZONTAL_RATIO
-    ? { kind: 'brace', reason: undefined }
-    : skip('horizontal brace (plan bracing) is not covered');
+  return ratio >= HORIZONTAL_RATIO ? { kind: 'brace', reason: undefined } : skip('horizontal brace (plan bracing) is not covered');
 }
 
 /** Every steel member of the document, in document order, with absolute mm geometry. */
@@ -111,27 +104,16 @@ export function collectSteelBars(doc: CadDocument): SteelBar[] {
   const bars: SteelBar[] = [];
   const plateFixities = new Map<string, BaseFixity>();
   for (const element of Object.values(building.elements)) {
-    if (element.category === 'plate')
-      plateFixities.set(element.memberId, element.fixity ?? 'pinned');
+    if (element.category === 'plate') plateFixities.set(element.memberId, element.fixity ?? 'pinned');
   }
   for (const element of elementsOf(building, 'member')) {
     const base = elevationMm(element.levelId);
-    const point = (value: readonly number[]): Vec3 => [
-      toMm(value[0] ?? 0),
-      toMm(value[1] ?? 0),
-      base + toMm(value[2] ?? 0),
-    ];
+    const point = (value: readonly number[]): Vec3 => [toMm(value[0] ?? 0), toMm(value[1] ?? 0), base + toMm(value[2] ?? 0)];
     const start = point(element.start);
     const end = point(element.end);
     const length = distance3(end, start);
     const profile = findProfile(element.profile) ?? null;
-    const { kind, reason } = classify(
-      element.role,
-      profile,
-      element.profile,
-      length,
-      end[2] - start[2],
-    );
+    const { kind, reason } = classify(element.role, profile, element.profile, length, end[2] - start[2]);
     bars.push({
       id: element.id,
       mark: element.mark,
@@ -156,12 +138,10 @@ export function collectSteelBars(doc: CadDocument): SteelBar[] {
 }
 
 /** Self weight of a profile, kN/m. */
-export const selfWeightPerMetre = (profile: SteelProfile): number =>
-  weightKnPerMetre(profile.massPerMetre);
+export const selfWeightPerMetre = (profile: SteelProfile): number => weightKnPerMetre(profile.massPerMetre);
 
 /** Top of steel of a horizontal beam (axis mid-height + half the section depth), mm. */
-export const topOfSteel = (bar: SteelBar): number =>
-  (bar.start[2] + bar.end[2]) / 2 + (bar.profile?.h ?? 0) / 2;
+export const topOfSteel = (bar: SteelBar): number => (bar.start[2] + bar.end[2]) / 2 + (bar.profile?.h ?? 0) / 2;
 
 const sectionCache = new WeakMap<SteelProfile, ReturnType<typeof sectionProperties>>();
 
@@ -185,30 +165,14 @@ export function compressionClass(profile: SteelProfile, fy: number): 1 | 2 | 3 |
   switch (profile.shape) {
     case 'I':
       return Math.max(
-        byLimits((profile.h - 2 * profile.tf) / profile.tw, [
-          33 * epsilon,
-          38 * epsilon,
-          42 * epsilon,
-        ]),
-        byLimits((profile.b - profile.tw) / 2 / profile.tf, [
-          9 * epsilon,
-          10 * epsilon,
-          14 * epsilon,
-        ]),
+        byLimits((profile.h - 2 * profile.tf) / profile.tw, [33 * epsilon, 38 * epsilon, 42 * epsilon]),
+        byLimits((profile.b - profile.tw) / 2 / profile.tf, [9 * epsilon, 10 * epsilon, 14 * epsilon]),
       ) as 1 | 2 | 3 | 4;
     case 'CHS':
-      return byLimits(profile.h / profile.tw, [
-        50 * epsilon ** 2,
-        70 * epsilon ** 2,
-        90 * epsilon ** 2,
-      ]);
+      return byLimits(profile.h / profile.tw, [50 * epsilon ** 2, 70 * epsilon ** 2, 90 * epsilon ** 2]);
     case 'SHS':
     case 'RHS':
-      return byLimits((Math.max(profile.h, profile.b) - 3 * profile.tw) / profile.tw, [
-        33 * epsilon,
-        38 * epsilon,
-        42 * epsilon,
-      ]);
+      return byLimits((Math.max(profile.h, profile.b) - 3 * profile.tw) / profile.tw, [33 * epsilon, 38 * epsilon, 42 * epsilon]);
     default:
       return null;
   }
@@ -230,18 +194,11 @@ export const clusterMeans = (values: ReadonlyArray<number>, tolerance: number): 
 
 /** Index of the value closest to `target` (the first on a tie). */
 export const nearestIndex = (values: ReadonlyArray<number>, target: number): number =>
-  values.reduce(
-    (best, value, index) =>
-      Math.abs(value - target) < Math.abs((values[best] as number) - target) ? index : best,
-    0,
-  );
+  values.reduce((best, value, index) => (Math.abs(value - target) < Math.abs((values[best] as number) - target) ? index : best), 0);
 
 /** Shapes the beam check covers (principal-axis bending about the depth axis, no torsion). */
 export const isBeamShape = (profile: SteelProfile): boolean =>
-  profile.shape === 'I' ||
-  profile.shape === 'SHS' ||
-  profile.shape === 'RHS' ||
-  profile.shape === 'CHS';
+  profile.shape === 'I' || profile.shape === 'SHS' || profile.shape === 'RHS' || profile.shape === 'CHS';
 
 /** Radius of gyration about the weak axis, mm. */
 export function minorRadius(profile: SteelProfile): number {

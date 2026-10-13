@@ -28,17 +28,13 @@ const withoutRoles = (doc: CadDocument, roles: readonly string[]): CadDocument =
   withoutElements(doc, (element) => element.category === 'member' && roles.includes(element.role));
 
 const withProfile = (doc: CadDocument, role: string, profile: string): CadDocument =>
-  mapElements(doc, (element) =>
-    element.category === 'member' && element.role === role ? { ...element, profile } : element,
-  );
+  mapElements(doc, (element) => (element.category === 'member' && element.role === role ? { ...element, profile } : element));
 
-const purlinsOf = (data: PurlinData): PurlinRow[] =>
-  data.rows.filter((row) => row.kind === 'purlin');
+const purlinsOf = (data: PurlinData): PurlinRow[] => data.rows.filter((row) => row.kind === 'purlin');
 const railsOf = (data: PurlinData): PurlinRow[] => data.rows.filter((row) => row.kind === 'rail');
 const uplift = (row: PurlinRow): number => row.upliftUtilisation ?? 0;
 /** Interior purlins carry a full tributary width (edge purlins carry half). */
-const interior = (rows: PurlinRow[]): PurlinRow[] =>
-  rows.filter((row) => row.check.includes('tributary 1724'));
+const interior = (rows: PurlinRow[]): PurlinRow[] => rows.filter((row) => row.check.includes('tributary 1724'));
 
 describe('effectiveModulusRatio', () => {
   it('reduces a slender C, keeps C200x75x2.5 fully effective and a stocky section gross', () => {
@@ -97,16 +93,13 @@ describe('check_purlins', () => {
       expect.arrayContaining(['roof:F', 'roof:G', 'roof:H', 'roof:I']),
     );
     const cpes = (zone: string): number[] =>
-      data.zones
-        .filter((entry) => entry.surface === 'roof' && entry.zone === zone)
-        .map((entry) => entry.cpe);
+      data.zones.filter((entry) => entry.surface === 'roof' && entry.zone === zone).map((entry) => entry.cpe);
     // 6° pitch, Tab. 7.4a across the ridge: F -1.62 / G -1.16; Tab. 7.4b along it: F -1.57 / G -1.3 / H -0.69 / I -0.59
     expect(cpes('F')).toContain(-1.62);
     expect(cpes('G')).toEqual(expect.arrayContaining([-1.16]));
     expect(cpes('I')).toContain(-0.59);
     expect(Math.min(...cpes('G'))).toBeGreaterThanOrEqual(-1.3);
-    const zoneRows = (zone: string): PurlinRow[] =>
-      interior(purlinsOf(data)).filter((row) => row.zone === zone);
+    const zoneRows = (zone: string): PurlinRow[] => interior(purlinsOf(data)).filter((row) => row.zone === zone);
     const maxUplift = (zone: string): number => Math.max(...zoneRows(zone).map(uplift));
     expect(maxUplift('F')).toBeGreaterThan(maxUplift('G'));
     expect(maxUplift('G')).toBeGreaterThan(maxUplift('I'));
@@ -127,9 +120,7 @@ describe('check_purlins', () => {
     expect(Math.max(...storm.map(uplift))).toBeGreaterThan(1);
     const noWind = purlinsOf(check(doc, { windPressure: 0 }));
     expect(noWind.every((row) => uplift(row) === 0)).toBe(true);
-    const snowy = Math.max(
-      ...purlinsOf(check(doc, { windPressure: 0, snowLoad: 2 })).map((row) => row.utilisation),
-    );
+    const snowy = Math.max(...purlinsOf(check(doc, { windPressure: 0, snowLoad: 2 })).map((row) => row.utilisation));
     expect(snowy).toBeGreaterThan(Math.max(...noWind.map((row) => row.utilisation)));
   });
 
@@ -162,9 +153,7 @@ describe('check_purlins', () => {
     const slim = railsOf(check(hall({ railProfile: 'C150x65x2.0' })));
     expect(slim.some((row) => row.check.includes('span/150'))).toBe(true);
     const lighter = railsOf(check(hall({ railProfile: 'C300x90x3.0' })));
-    expect(Math.max(...lighter.map((row) => row.utilisation))).toBeLessThan(
-      Math.max(...rails.map((row) => row.utilisation)),
-    );
+    expect(Math.max(...lighter.map((row) => row.utilisation))).toBeLessThan(Math.max(...rails.map((row) => row.utilisation)));
   });
 
   it('reduces rail bending resistance under suction (free inner flange) but not under pressure', () => {
@@ -173,9 +162,7 @@ describe('check_purlins', () => {
     expect(suction.length).toBeGreaterThan(0);
     // cold-formed C: simplified χ = 0.75 (span <= 6 m) or 0.6 (> 6 m)
     expect(suction.some((row) => /free flange\) \(χ 0\.(6|75)/.test(row.check))).toBe(true);
-    const pressureOnly = railsOf(
-      check(hall({ length: 6000, baySpacing: 6000 }), { windPressure: 3 }),
-    );
+    const pressureOnly = railsOf(check(hall({ length: 6000, baySpacing: 6000 }), { windPressure: 3 }));
     expect(pressureOnly.length).toBeGreaterThan(0);
   });
 
@@ -207,8 +194,7 @@ describe('check_purlins', () => {
     );
     expect(metre.rows).toHaveLength(millimetres.rows.length);
     expect(metre.maxUtilisation).toBeCloseTo(millimetres.maxUtilisation, 6);
-    const counts = (data: PurlinData): string[] =>
-      data.zones.map((zone) => `${zone.surface}${zone.zone}${zone.members}`);
+    const counts = (data: PurlinData): string[] => data.zones.map((zone) => `${zone.surface}${zone.zone}${zone.members}`);
     expect(counts(metre)).toEqual(counts(millimetres));
   });
 
@@ -277,11 +263,7 @@ describe('multi-span roof wind (EN 1991-1-4 Fig. 7.10 simplified)', () => {
     const elements = doc.building!.elements;
     const found = data.rows.find((row) => {
       const element = elements[row.elementId];
-      return (
-        element?.category === 'member' &&
-        Math.abs(element.start[0] - x) < 20 &&
-        Math.abs(element.start[1] - y) < 20
-      );
+      return element?.category === 'member' && Math.abs(element.start[0] - x) < 20 && Math.abs(element.start[1] - y) < 20;
     });
     if (!found) throw new Error(`no purlin at x ${x}, y ${y}`);
     return found;

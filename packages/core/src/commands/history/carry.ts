@@ -43,24 +43,13 @@ export function orphanState(
   base: CadDocument,
 ): Pick<
   CadDocument,
-  | 'materials'
-  | 'components'
-  | 'constraints'
-  | 'constraintOrder'
-  | 'joints'
-  | 'jointOrder'
-  | 'driveRelations'
-  | 'driveRelationOrder'
+  'materials' | 'components' | 'constraints' | 'constraintOrder' | 'joints' | 'jointOrder' | 'driveRelations' | 'driveRelationOrder'
 > {
   const history = base.featureHistory;
   const affected = affectedIds(history);
 
-  const materialClaims = new Set(
-    history.filter((s) => s.name === 'create_material').map((s) => paramString(s, 'name')),
-  );
-  const materials = Object.fromEntries(
-    Object.entries(base.materials).filter(([key]) => !materialClaims.has(key)),
-  );
+  const materialClaims = new Set(history.filter((s) => s.name === 'create_material').map((s) => paramString(s, 'name')));
+  const materials = Object.fromEntries(Object.entries(base.materials).filter(([key]) => !materialClaims.has(key)));
 
   const componentSteps = history.filter((s) => s.name === 'create_component');
   const componentClaims = new Set<string | undefined>();
@@ -76,11 +65,7 @@ export function orphanState(
     else unattributable++;
   }
   const components =
-    unattributable > 0
-      ? {}
-      : Object.fromEntries(
-          Object.entries(base.components).filter(([key]) => !componentClaims.has(key)),
-        );
+    unattributable > 0 ? {} : Object.fromEntries(Object.entries(base.components).filter(([key]) => !componentClaims.has(key)));
 
   const constraints = orphanRecords(base.constraints, base.constraintOrder, affected);
   const joints = orphanRecords(base.joints, base.jointOrder, affected);

@@ -6,65 +6,32 @@
       "#1": {
         "id": "#1",
         "kind": "arc",
-        "center": [
-          0,
-          0
-        ],
+        "center": [0,0],
         "radius": 5,
         "startAngle": 0,
         "endAngle": 3.14159265,
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
+        "position": [0,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#4a90d9"
       },
       "#3": {
         "id": "#3",
         "kind": "circle",
-        "center": [
-          3,
-          3
-        ],
+        "center": [3,3],
         "radius": 2,
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
+        "position": [0,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#4a90d9"
       },
       "#4": {
         "id": "#4",
         "kind": "circle",
-        "center": [
-          -3,
-          3
-        ],
+        "center": [-3,3],
         "radius": 1.5,
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
+        "position": [0,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#ff0000"
       }
@@ -105,50 +72,23 @@
       {
         "id": "#5",
         "name": "draw_arc",
-        "params": {
-          "center": [
-            0,
-            0
-          ],
-          "radius": 5,
-          "startAngle": 0,
-          "endAngle": 3.14159265
-        },
+        "params": {"center":[0,0],"radius":5,"startAngle":0,"endAngle":3.14159265},
         "suppressed": false,
-        "affected": [
-          "#1"
-        ]
+        "affected": ["#1"]
       },
       {
         "id": "#6",
         "name": "draw_arc",
-        "params": {
-          "center": [
-            3,
-            3
-          ],
-          "radius": 2
-        },
+        "params": {"center":[3,3],"radius":2},
         "suppressed": false,
-        "affected": [
-          "#3"
-        ]
+        "affected": ["#3"]
       },
       {
         "id": "#7",
         "name": "draw_arc",
-        "params": {
-          "center": [
-            -3,
-            3
-          ],
-          "radius": 1.5,
-          "color": "#ff0000"
-        },
+        "params": {"center":[-3,3],"radius":1.5,"color":"#ff0000"},
         "suppressed": false,
-        "affected": [
-          "#4"
-        ]
+        "affected": ["#4"]
       }
     ],
     "configurations": {},

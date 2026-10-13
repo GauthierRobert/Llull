@@ -120,9 +120,7 @@ function EstimateTable(): React.ReactElement {
                   <td className="building-table__number">
                     {line.quantity} {UNIT_LABEL[line.unit] ?? line.unit}
                   </td>
-                  <td className="building-table__number">
-                    {line.amount === null ? '—' : line.amount.toFixed(2)}
-                  </td>
+                  <td className="building-table__number">{line.amount === null ? '—' : line.amount.toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
@@ -148,18 +146,13 @@ export function QuantitiesSection(): React.ReactElement {
   const [schedule, setSchedule] = useState<(typeof SCHEDULES)[number]>('wall');
   const [status, setStatus] = useState('');
 
-  const downloadCsv = (
-    command: string,
-    params: Record<string, unknown>,
-    fileName: string,
-  ): void => {
+  const downloadCsv = (command: string, params: Record<string, unknown>, fileName: string): void => {
     const { summary, downloaded } = downloadCsvQuery(command, params, fileName);
     if (!downloaded) setStatus(summary);
   };
   const downloadTakeoff = (): void => downloadCsv('quantity_takeoff', {}, 'quantity-takeoff.csv');
   const downloadEstimate = (): void => downloadCsv('estimate_cost', {}, 'cost-estimate.csv');
-  const downloadSchedule = (): void =>
-    downloadCsv('building_schedule', { kind: schedule }, `${schedule}-schedule.csv`);
+  const downloadSchedule = (): void => downloadCsv('building_schedule', { kind: schedule }, `${schedule}-schedule.csv`);
 
   return (
     <PanelSection

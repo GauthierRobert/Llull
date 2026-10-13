@@ -3,9 +3,7 @@
 import type { ThreeEvent } from '@react-three/fiber';
 
 /** Shift / Ctrl / Cmd held ⇒ the click toggles into the selection instead of replacing it. */
-export function isAdditiveSelect(
-  event: Pick<MouseEvent, 'shiftKey' | 'ctrlKey' | 'metaKey'>,
-): boolean {
+export function isAdditiveSelect(event: Pick<MouseEvent, 'shiftKey' | 'ctrlKey' | 'metaKey'>): boolean {
   return event.shiftKey || event.ctrlKey || event.metaKey;
 }
 

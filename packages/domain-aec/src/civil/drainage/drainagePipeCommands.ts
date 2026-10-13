@@ -8,39 +8,20 @@ import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { noop } from '@core/commands/noop';
 import { fromMm } from '@core/model/units';
-import {
-  civilObject,
-  civilObjectsOf,
-  getCivil,
-  nextCivilId,
-  toMetresText,
-  withObject,
-} from '../model';
+import { civilObject, civilObjectsOf, getCivil, nextCivilId, toMetresText, withObject } from '../model';
 import { commitCivil } from '../evaluate';
 import { flowsTo, pipePlanLength } from './drainageTopology';
 
 const pipeFields = {
-  diameter: z
-    .number()
-    .optional()
-    .describe('Pipe internal diameter in document units (> 0). Default 300 mm.'),
+  diameter: z.number().optional().describe('Pipe internal diameter in document units (> 0). Default 300 mm.'),
   material: z.string().optional().describe('Pipe material label, e.g. "PVC", "HDPE", "Concrete".'),
   manningN: z.number().optional().describe('Manning roughness n (> 0). Default 0.013 (PVC).'),
-  invertFrom: z
-    .number()
-    .optional()
-    .describe('Invert elevation at the upstream end. Default: upstream manhole invert.'),
-  invertTo: z
-    .number()
-    .optional()
-    .describe('Invert elevation at the downstream end. Default: downstream manhole invert.'),
+  invertFrom: z.number().optional().describe('Invert elevation at the upstream end. Default: upstream manhole invert.'),
+  invertTo: z.number().optional().describe('Invert elevation at the downstream end. Default: downstream manhole invert.'),
   name: z.string().optional().describe('Display name. Default "P<n>".'),
 };
 
-function checkPipeValues(values: {
-  diameter?: number | undefined;
-  manningN?: number | undefined;
-}): string | null {
+function checkPipeValues(values: { diameter?: number | undefined; manningN?: number | undefined }): string | null {
   if (values.diameter !== undefined && !(values.diameter > 0)) return 'diameter must be > 0.';
   if (values.manningN !== undefined && !(values.manningN > 0)) return 'manningN must be > 0.';
   return null;
@@ -75,31 +56,19 @@ export const addPipe = defineCommand({
     const from = civilObject(civil, params.fromId, 'manhole');
     const to = civilObject(civil, params.toId, 'manhole');
     if (!from || !to) {
-      return noop(
-        doc,
-        `add_pipe failed: ${!from ? params.fromId : params.toId} is not a manhole in this document.`,
-      );
+      return noop(doc, `add_pipe failed: ${!from ? params.fromId : params.toId} is not a manhole in this document.`);
     }
-    if (from.id === to.id)
-      return noop(doc, `add_pipe failed: ${from.id} cannot connect to itself.`);
+    if (from.id === to.id) return noop(doc, `add_pipe failed: ${from.id} cannot connect to itself.`);
     const problem = checkPipeValues(params);
     if (problem !== null) return noop(doc, `add_pipe failed: ${problem}`);
     const duplicate = civilObjectsOf(civil, 'pipe').find(
-      (pipe) =>
-        (pipe.fromId === from.id && pipe.toId === to.id) ||
-        (pipe.fromId === to.id && pipe.toId === from.id),
+      (pipe) => (pipe.fromId === from.id && pipe.toId === to.id) || (pipe.fromId === to.id && pipe.toId === from.id),
     );
     if (duplicate) {
-      return noop(
-        doc,
-        `add_pipe failed: ${duplicate.id} already connects ${from.id} and ${to.id}.`,
-      );
+      return noop(doc, `add_pipe failed: ${duplicate.id} already connects ${from.id} and ${to.id}.`);
     }
     if (flowsTo(civil, to.id, from.id)) {
-      return noop(
-        doc,
-        `add_pipe failed: ${from.id} -> ${to.id} would close a loop in the network.`,
-      );
+      return noop(doc, `add_pipe failed: ${from.id} -> ${to.id} would close a loop in the network.`);
     }
     const id = nextCivilId(civil, 'pipe');
     const pipe: PipeObject = {
@@ -116,8 +85,7 @@ export const addPipe = defineCommand({
       invertTo: params.invertTo ?? to.invertElevation,
     };
     const length = pipePlanLength(civil, pipe) ?? 0;
-    if (!(length > 0))
-      return noop(doc, `add_pipe failed: ${from.id} and ${to.id} share the same plan position.`);
+    if (!(length > 0)) return noop(doc, `add_pipe failed: ${from.id} and ${to.id} share the same plan position.`);
     const adverse = pipe.invertFrom <= pipe.invertTo ? ' Warning: adverse or zero slope.' : '';
     return commitCivil(
       doc,
@@ -160,11 +128,9 @@ export const updatePipe = defineCommand({
       invertFrom: params.invertFrom ?? pipe.invertFrom,
       invertTo: params.invertTo ?? pipe.invertTo,
     };
-    if (JSON.stringify(updated) === JSON.stringify(pipe))
-      return noop(doc, `update_pipe: nothing to change on ${pipe.id}.`);
+    if (JSON.stringify(updated) === JSON.stringify(pipe)) return noop(doc, `update_pipe: nothing to change on ${pipe.id}.`);
     const length = pipePlanLength(civil, updated) ?? 0;
-    const adverse =
-      updated.invertFrom <= updated.invertTo ? ' Warning: adverse or zero slope.' : '';
+    const adverse = updated.invertFrom <= updated.invertTo ? ' Warning: adverse or zero slope.' : '';
     return commitCivil(
       doc,
       withObject(civil, updated),

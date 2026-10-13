@@ -13,14 +13,8 @@ import { buildTorusGeometry } from './primitiveGeometry';
 
 const TORUS_SURFACE: SolidSurface = { roughness: 0.4, metalness: 0.1, envMapIntensity: 0.9 };
 
-export function TorusMesh({
-  entity,
-  ...shell
-}: SolidMeshKindProps<TorusEntity>): React.ReactElement {
+export function TorusMesh({ entity, ...shell }: SolidMeshKindProps<TorusEntity>): React.ReactElement {
   const { ringRadius, tubeRadius } = entity;
-  const geometry = useMemo(
-    () => buildTorusGeometry(ringRadius, tubeRadius),
-    [ringRadius, tubeRadius],
-  );
+  const geometry = useMemo(() => buildTorusGeometry(ringRadius, tubeRadius), [ringRadius, tubeRadius]);
   return <SolidMeshShell entity={entity} geometry={geometry} surface={TORUS_SURFACE} {...shell} />;
 }

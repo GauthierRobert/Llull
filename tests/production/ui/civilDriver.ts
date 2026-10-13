@@ -17,8 +17,7 @@ import type { UiSession } from './session';
 
 const asNumbers = (value: unknown): number[] => (Array.isArray(value) ? value.map(Number) : []);
 const text = (value: unknown): string => (value === undefined ? '' : String(value));
-const points = (value: unknown): string =>
-  (Array.isArray(value) ? value : []).map((point) => asNumbers(point).join(',')).join('; ');
+const points = (value: unknown): string => (Array.isArray(value) ? value : []).map((point) => asNumbers(point).join(',')).join('; ');
 const list = (value: unknown): string => asNumbers(value).join(', ');
 
 export class CivilUiDriver {
@@ -88,12 +87,9 @@ export class CivilUiDriver {
     const args = call.args;
     if (call.tool === 'set_project_info') {
       const building = this.page.getByTestId('building-panel');
-      if (!(await building.isVisible()))
-        await this.page.getByRole('tab', { name: 'Building' }).click();
+      if (!(await building.isVisible())) await this.page.getByRole('tab', { name: 'Building' }).click();
       await expect(building).toBeVisible();
-      return this.building.setProjectInfo(
-        Object.fromEntries(Object.entries(args).map(([key, value]) => [key, text(value)])),
-      );
+      return this.building.setProjectInfo(Object.fromEntries(Object.entries(args).map(([key, value]) => [key, text(value)])));
     }
     await this.openSite();
     const alignment = this.intent.road.name;
@@ -113,9 +109,7 @@ export class CivilUiDriver {
         await this.fill('Major contour every', text(args['majorEvery']));
         return this.act('create surface', 'Create surface');
       case 'surface_report':
-        return (
-          (await this.page.getByTestId(`civil-row-${text(args['surfaceId'])}`).textContent()) ?? ''
-        );
+        return (await this.page.getByTestId(`civil-row-${text(args['surfaceId'])}`).textContent()) ?? '';
       case 'add_platform':
         await this.fill('Platform outline', points(args['boundary']));
         await this.fill('Platform elevation', text(args['elevation']));
@@ -153,9 +147,7 @@ export class CivilUiDriver {
       case 'alignment_report':
         await this.fill(`Design speed of ${alignment}`, text(args['designSpeedKmh']));
         await this.session.download(() => this.button('Report CSV').click());
-        return (
-          (await this.page.getByTestId(`civil-alignment-status-alignment-1`).textContent()) ?? ''
-        );
+        return (await this.page.getByTestId(`civil-alignment-status-alignment-1`).textContent()) ?? '';
       case 'add_manhole': {
         await this.fill('Manhole position', asNumbers(args['location']).join(','));
         await this.fill('Manhole invert', text(args['invertElevation']));
@@ -182,16 +174,11 @@ export class CivilUiDriver {
         return (await this.page.getByTestId('civil-drainage-status').textContent()) ?? '';
       case 'export_plan_profile_sheet':
         await this.page.getByLabel(`Sheet paper of ${alignment}`).selectOption(text(args['paper']));
-        return this.take(
-          `plan-profile:${text(args['alignmentId'])}:${text(args['paper'])}`,
-          'Plan-profile sheet',
-        );
+        return this.take(`plan-profile:${text(args['alignmentId'])}:${text(args['paper'])}`, 'Plan-profile sheet');
       case 'export_landxml':
         return this.take('landxml', 'LandXML');
       default:
-        this.gaps.add(
-          `No Civil panel control for ${call.tool}: reachable only through the command palette.`,
-        );
+        this.gaps.add(`No Civil panel control for ${call.tool}: reachable only through the command palette.`);
         this.steps.palette += 1;
         return runViaPalette(this.session, call.tool, args);
     }

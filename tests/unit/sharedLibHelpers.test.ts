@@ -58,9 +58,7 @@ describe('arc sampling', () => {
   });
 
   it('sampleArc omits the start point', () => {
-    expect(sampleArc([0, 0], 1, 0, Math.PI, 2)).toEqual(
-      arcPolyline([0, 0], 1, 0, Math.PI, 2).slice(1),
-    );
+    expect(sampleArc([0, 0], 1, 0, Math.PI, 2)).toEqual(arcPolyline([0, 0], 1, 0, Math.PI, 2).slice(1));
   });
 
   it('circlePolygon is the open full circle', () => {

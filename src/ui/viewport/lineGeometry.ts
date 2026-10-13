@@ -11,10 +11,7 @@ export function flattenPoints(points: ReadonlyArray<Vec2>, z = 0): number[] {
 
 /** BufferGeometry whose `position` attribute is the given flat xyz list. */
 export function positionsGeometry(positions: ArrayLike<number>): THREE.BufferGeometry {
-  return new THREE.BufferGeometry().setAttribute(
-    'position',
-    new THREE.BufferAttribute(Float32Array.from(positions), 3),
-  );
+  return new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(Float32Array.from(positions), 3));
 }
 
 /** LineSegments geometry (z = 0): every consecutive vertex pair is one segment. */
@@ -56,13 +53,7 @@ export function rectangleOutline(width: number, height: number): number[] {
 }
 
 /** Segment vertex pairs approximating an axis-aligned ellipse outline. */
-export function ellipseOutline(
-  cx: number,
-  cy: number,
-  radiusX: number,
-  radiusY: number,
-  segments: number,
-): Vec2[] {
+export function ellipseOutline(cx: number, cy: number, radiusX: number, radiusY: number, segments: number): Vec2[] {
   const vertex = (index: number): Vec2 => {
     const angle = (index / segments) * Math.PI * 2;
     return ellipsePoint([cx, cy], radiusX, radiusY, angle);
@@ -96,8 +87,6 @@ export function rebaseToAnchor(positions: ReadonlyArray<number>): {
 } {
   const anchorX = positions[0] ?? 0;
   const anchorY = positions[1] ?? 0;
-  const local = positions.map((value, index) =>
-    index % 3 === 0 ? value - anchorX : index % 3 === 1 ? value - anchorY : value,
-  );
+  const local = positions.map((value, index) => (index % 3 === 0 ? value - anchorX : index % 3 === 1 ? value - anchorY : value));
   return { anchor: [anchorX, anchorY, 0], local };
 }

@@ -5,9 +5,7 @@ import { execute } from '@core/commands/registry';
 describe('transform commands', () => {
   // Helpers
 
-  function docWithBox(
-    position = [0, 0, 0] as [number, number, number],
-  ): ReturnType<typeof execute> {
+  function docWithBox(position = [0, 0, 0] as [number, number, number]): ReturnType<typeof execute> {
     const doc = createEmptyDocument();
     return execute(doc, 'add_box', { size: [2, 4, 6], position });
   }
@@ -408,11 +406,7 @@ describe('transform commands', () => {
       // Box at [1,0,0], center [0,0,0], count=3, angle=PI (180°)
       // step = PI/3 = 60°
       // copy1 at 60°, copy2 at 120°
-      const { result } = runOnBox(
-        'array_polar',
-        { count: 3, center: [0, 0, 0], angle: Math.PI },
-        [1, 0, 0],
-      );
+      const { result } = runOnBox('array_polar', { count: 3, center: [0, 0, 0], angle: Math.PI }, [1, 0, 0]);
 
       expect(result.affected).toHaveLength(2);
       const copy1 = result.document.entities[result.affected[0]!]!;
@@ -430,11 +424,7 @@ describe('transform commands', () => {
     });
 
     it('is a no-op when count < 2', () => {
-      const { created, result } = runOnBox(
-        'array_polar',
-        { count: 1, center: [0, 0, 0] },
-        [2, 0, 0],
-      );
+      const { created, result } = runOnBox('array_polar', { count: 1, center: [0, 0, 0] }, [2, 0, 0]);
       expect(result.affected).toHaveLength(0);
       expect(result.document).toBe(created.document);
     });

@@ -18,9 +18,7 @@ import type { DrawingScale, StyledPrimitive } from './drawingGeometry';
 
 const DIMENSION_COLOR = '#d6a243';
 
-const LAYER_COLORS: ReadonlyMap<string, string> = new Map(
-  Object.values(CATEGORY_LAYER).map(({ name, color }) => [name, color]),
-);
+const LAYER_COLORS: ReadonlyMap<string, string> = new Map(Object.values(CATEGORY_LAYER).map(({ name, color }) => [name, color]));
 
 function strokeColor(layer: string, wallStroke: string): string {
   if (layer === 'A-WALL' || layer === 'S-COLS') return wallStroke;
@@ -33,10 +31,7 @@ export function BuildingPlan2D(): React.ReactElement | null {
   const layers = useStore((s) => s.document.layers);
   const theme = useThemeStore((s) => s.theme);
 
-  const plan = useMemo(
-    () => (building ? buildPlanDrawing({ building, units }, undefined) : null),
-    [building, units],
-  );
+  const plan = useMemo(() => (building ? buildPlanDrawing({ building, units }, undefined) : null), [building, units]);
   const [wallFill, wallStroke] = theme === 'dark' ? ['#5f646e', '#d7dae0'] : ['#5a5d63', '#1f2125'];
   const items = useMemo((): StyledPrimitive[] => {
     if (!plan) return [];
@@ -53,7 +48,5 @@ export function BuildingPlan2D(): React.ReactElement | null {
     [units],
   );
 
-  return (
-    <DrawingPrimitives2D name="building-plan-2d" items={items} scale={scale} fillColor={wallFill} />
-  );
+  return <DrawingPrimitives2D name="building-plan-2d" items={items} scale={scale} fillColor={wallFill} />;
 }

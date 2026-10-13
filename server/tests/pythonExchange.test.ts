@@ -50,9 +50,7 @@ describe('pythonExchangeConfigFromEnv', () => {
   });
 
   it('build123d python falls back to LLULL_PYTHON, and can be overridden', () => {
-    expect(pythonExchangeConfigFromEnv({ LLULL_PYTHON: '/opt/py' })?.build123dPython).toBe(
-      '/opt/py',
-    );
+    expect(pythonExchangeConfigFromEnv({ LLULL_PYTHON: '/opt/py' })?.build123dPython).toBe('/opt/py');
     const config = pythonExchangeConfigFromEnv({
       LLULL_PYTHON: '/opt/py',
       LLULL_PYTHON_BUILD123D: '/opt/b123/bin/python',
@@ -64,16 +62,12 @@ describe('pythonExchangeConfigFromEnv', () => {
   it('parses LLULL_PYTHON_TIMEOUT_MS and ignores junk / non-positive values', () => {
     expect(pythonExchangeConfigFromEnv({ LLULL_PYTHON_TIMEOUT_MS: '2500' })?.timeoutMs).toBe(2500);
     for (const junk of ['abc', '0', '-5', '']) {
-      expect(pythonExchangeConfigFromEnv({ LLULL_PYTHON_TIMEOUT_MS: junk })?.timeoutMs).toBe(
-        120_000,
-      );
+      expect(pythonExchangeConfigFromEnv({ LLULL_PYTHON_TIMEOUT_MS: junk })?.timeoutMs).toBe(120_000);
     }
   });
 
   it('resolves LLULL_EXCHANGE_DIR to an absolute path; empty means none', () => {
-    expect(pythonExchangeConfigFromEnv({ LLULL_EXCHANGE_DIR: 'rel/dir' })?.exchangeDir).toBe(
-      path.resolve('rel/dir'),
-    );
+    expect(pythonExchangeConfigFromEnv({ LLULL_EXCHANGE_DIR: 'rel/dir' })?.exchangeDir).toBe(path.resolve('rel/dir'));
     expect(pythonExchangeConfigFromEnv({ LLULL_EXCHANGE_DIR: '' })?.exchangeDir).toBeNull();
   });
 });
@@ -124,10 +118,7 @@ describe('callBridge with a fake python', () => {
   });
 
   it('rejects when stdout is not JSON, including the stderr tail', async () => {
-    const garbage = await script(
-      'garbage.js',
-      `console.error('boom detail');process.stdout.write('not json at all');`,
-    );
+    const garbage = await script('garbage.js', `console.error('boom detail');process.stdout.write('not json at all');`);
     await expect(callBridge(process.execPath, garbage, { op: 'probe' }, 10_000)).rejects.toThrow(
       /exited with code 0 without a response\. boom detail/,
     );
@@ -143,16 +134,14 @@ describe('callBridge with a fake python', () => {
   it('kills the process and rejects past the timeout', async () => {
     const sleeper = await script('sleep.js', `process.stdin.resume();setTimeout(()=>{},60000);`);
     const started = Date.now();
-    await expect(callBridge(process.execPath, sleeper, { op: 'probe' }, 300)).rejects.toThrow(
-      /timed out after 300 ms/,
-    );
+    await expect(callBridge(process.execPath, sleeper, { op: 'probe' }, 300)).rejects.toThrow(/timed out after 300 ms/);
     expect(Date.now() - started).toBeLessThan(5000);
   });
 
   it('rejects with a helpful message when the executable is missing', async () => {
-    await expect(
-      callBridge('/nonexistent/python-xyz', 'bridge.py', { op: 'probe' }, 5000),
-    ).rejects.toThrow(/cannot start Python "\/nonexistent\/python-xyz".*LLULL_PYTHON/);
+    await expect(callBridge('/nonexistent/python-xyz', 'bridge.py', { op: 'probe' }, 5000)).rejects.toThrow(
+      /cannot start Python "\/nonexistent\/python-xyz".*LLULL_PYTHON/,
+    );
   });
 
   it('tolerates a process that exits without reading stdin', async () => {
@@ -164,10 +153,7 @@ describe('callBridge with a fake python', () => {
 });
 
 describe('createPythonExchangePort', () => {
-  async function portWith(
-    bridgeBody: string,
-    exchangeDir: string | null,
-  ): Promise<ReturnType<typeof createPythonExchangePort>> {
+  async function portWith(bridgeBody: string, exchangeDir: string | null): Promise<ReturnType<typeof createPythonExchangePort>> {
     const config: PythonExchangeConfig = {
       python: process.execPath,
       build123dPython: process.execPath,
@@ -202,9 +188,9 @@ let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{
 
   it('turns a bridge ok:false into an Error with an install hint for missing modules', async () => {
     const port = await portWith(fakeBridge, null);
-    await expect(
-      port.runProgram({ language: 'cadquery', source: 'raise', step: false }),
-    ).rejects.toThrow(/No module named 'cadquery'.*pip install cadquery/);
+    await expect(port.runProgram({ language: 'cadquery', source: 'raise', step: false })).rejects.toThrow(
+      /No module named 'cadquery'.*pip install cadquery/,
+    );
   });
 
   it('importStep returns bodies and rejects a response without bodies', async () => {
@@ -214,18 +200,9 @@ let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{
   });
 
   it('routes build123d to the build123d python', async () => {
-    const scriptA = await script(
-      'which-a.js',
-      `process.stdout.write('{"ok":true,"trace":"A","traced":true,"log":""}')`,
-    );
-    const scriptB = await script(
-      'which-b.js',
-      `process.stdout.write('{"ok":true,"trace":"B","traced":true,"log":""}')`,
-    );
-    const wrapper = await script(
-      'wrapper.sh',
-      `#!/bin/sh\nexec "${process.execPath}" "${scriptB}"\n`,
-    );
+    const scriptA = await script('which-a.js', `process.stdout.write('{"ok":true,"trace":"A","traced":true,"log":""}')`);
+    const scriptB = await script('which-b.js', `process.stdout.write('{"ok":true,"trace":"B","traced":true,"log":""}')`);
+    const wrapper = await script('wrapper.sh', `#!/bin/sh\nexec "${process.execPath}" "${scriptB}"\n`);
     await chmod(wrapper, 0o755);
     const port = createPythonExchangePort({
       python: process.execPath,
@@ -234,12 +211,8 @@ let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{
       bridgeScript: scriptA,
       exchangeDir: null,
     });
-    expect((await port.runProgram({ language: 'cadquery', source: '', step: false })).trace).toBe(
-      'A',
-    );
-    expect((await port.runProgram({ language: 'build123d', source: '', step: false })).trace).toBe(
-      'B',
-    );
+    expect((await port.runProgram({ language: 'cadquery', source: '', step: false })).trace).toBe('A');
+    expect((await port.runProgram({ language: 'build123d', source: '', step: false })).trace).toBe('B');
   });
 
   it('has no exchange-file methods without an exchange dir', async () => {
@@ -251,16 +224,11 @@ let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{
   it('writes and reads files inside the exchange dir, creating it, and confines paths', async () => {
     const dir = path.join(scratch, 'exchange', 'nested');
     const port = await portWith(fakeBridge, dir);
-    const written = await port.writeExchangeFile!(
-      'part.step',
-      Buffer.from('HELLO').toString('base64'),
-    );
+    const written = await port.writeExchangeFile!('part.step', Buffer.from('HELLO').toString('base64'));
     expect(written).toBe(path.join(dir, 'part.step'));
     expect((await stat(written)).isFile()).toBe(true);
     expect(await readFile(written, 'utf8')).toBe('HELLO');
-    expect(await port.readExchangeFile!('part.step', 'base64')).toBe(
-      Buffer.from('HELLO').toString('base64'),
-    );
+    expect(await port.readExchangeFile!('part.step', 'base64')).toBe(Buffer.from('HELLO').toString('base64'));
     expect(await port.readExchangeFile!('part.step', 'utf8')).toBe('HELLO');
     await expect(port.readExchangeFile!('../outside', 'utf8')).rejects.toThrow(/inside/);
     await expect(port.writeExchangeFile!('../outside.step', 'QUJD')).rejects.toThrow(/inside/);

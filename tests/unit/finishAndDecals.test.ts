@@ -1,12 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { inflateSync } from 'node:zlib';
-import {
-  type CadDocument,
-  type Entity,
-  type Material,
-  FINISH_PATTERNS,
-  createEmptyDocument,
-} from '@core/model/types';
+import { type CadDocument, type Entity, type Material, FINISH_PATTERNS, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { serializeDocument } from '@core/commands/persistence/serialization';
 import { encodePng } from '@lib/png';
@@ -70,10 +64,7 @@ describe('PNG encoder', () => {
 
 describe('finish maps', () => {
   it.each(FINISH_PATTERNS)('%s builds tileable size² RGBA maps with unit normals', (pattern) => {
-    const maps = finishMaps(
-      { color: '#336699', metalness: 0.5, roughness: 0.4, finish: { pattern, scale: 10 } },
-      32,
-    );
+    const maps = finishMaps({ color: '#336699', metalness: 0.5, roughness: 0.4, finish: { pattern, scale: 10 } }, 32);
     expect(maps).not.toBeNull();
     expect(maps?.albedo).toHaveLength(32 * 32 * 4);
     const n = maps?.normal ?? new Uint8Array();
@@ -206,11 +197,10 @@ describe('text decals', () => {
 
   it('converts world placement into the frame of a moved and rotated solid', () => {
     const { doc, id } = base();
-    const moved = execute(
-      execute(doc, 'move_entities', { ids: [id], delta: [5, 0, 0] }).document,
-      'rotate_entity',
-      { id, delta: [0, 0, Math.PI / 2] },
-    ).document;
+    const moved = execute(execute(doc, 'move_entities', { ids: [id], delta: [5, 0, 0] }).document, 'rotate_entity', {
+      id,
+      delta: [0, 0, Math.PI / 2],
+    }).document;
     const result = execute(moved, 'add_decal', {
       id,
       text: 'L',
@@ -261,11 +251,7 @@ describe('text decals', () => {
   it('refuses 2D targets, removes decals, scales them and validates saved ones', () => {
     const { doc, id } = base();
     const sketch = execute(doc, 'draw_arc', { center: [0, 0], radius: 1 });
-    expectNoOp(
-      execute(sketch.document, 'add_decal', { id: sketch.affected[0], ...onTop }),
-      sketch.document,
-      'not a solid',
-    );
+    expectNoOp(execute(sketch.document, 'add_decal', { id: sketch.affected[0], ...onTop }), sketch.document, 'not a solid');
     const painted = execute(doc, 'add_decal', { id, ...onTop }).document;
     const decalId = painted.entities[id]?.decals?.[0]?.id as string;
     const scaled = execute(painted, 'scale_entity', { id, factor: 2 }).document;

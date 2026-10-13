@@ -131,10 +131,7 @@ describe('Disposal audit — custom BufferGeometry', () => {
     const result = withDisposeSpy(
       () => {
         const geo = new THREE.BufferGeometry();
-        geo.setAttribute(
-          'position',
-          new THREE.BufferAttribute(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), 3),
-        );
+        geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), 3));
         geo.computeVertexNormals();
         return geo;
       },

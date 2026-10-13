@@ -16,8 +16,7 @@ import { type Cage, edgeKey, subdivide } from './subdivision';
 /** Sixteen control points of a bicubic Bézier patch, `poles[i * 4 + j]` = P(i, j). */
 export type BezierPatch = readonly Vec3[];
 
-const sum = (points: readonly Vec3[]): Vec3 =>
-  points.reduce<Vec3>((total, p) => add3(total, p), [0, 0, 0]);
+const sum = (points: readonly Vec3[]): Vec3 => points.reduce<Vec3>((total, p) => add3(total, p), [0, 0, 0]);
 
 /** Patches of a quad-only cage (every face 4 vertices, closed, consistently wound). */
 export function quadCagePatches(cage: Cage): BezierPatch[] {
@@ -47,10 +46,7 @@ export function quadCagePatches(cage: Cage): BezierPatch[] {
       const next = at(face[(k + 1) % 4] as number);
       const previous = at(face[(k + 3) % 4] as number);
       const diagonal = at(face[(k + 2) % 4] as number);
-      return scale3(
-        add3(add3(scale3(at(v), n), scale3(add3(next, previous), 2)), diagonal),
-        1 / (n + 5),
-      );
+      return scale3(add3(add3(scale3(at(v), n), scale3(add3(next, previous), 2)), diagonal), 1 / (n + 5));
     }),
   );
   /** Interior points around each vertex, and per directed edge v→w the two faces' points at v. */
@@ -100,10 +96,7 @@ export function quadCagePatches(cage: Cage): BezierPatch[] {
  * Bézier patches of a subdivision solid (local frame), from its cage refined `refine` times
  * (>= 1 so every face is a quad). One patch per refined face.
  */
-export function subdivisionPatches(
-  entity: Pick<SubdivisionEntity, 'vertices' | 'faces' | 'creases'>,
-  refine = 1,
-): BezierPatch[] {
+export function subdivisionPatches(entity: Pick<SubdivisionEntity, 'vertices' | 'faces' | 'creases'>, refine = 1): BezierPatch[] {
   return quadCagePatches(subdivide(entity, Math.max(1, refine)));
 }
 

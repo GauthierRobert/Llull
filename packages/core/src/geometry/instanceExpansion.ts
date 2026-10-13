@@ -5,14 +5,7 @@
  * @layer core/commands
  */
 
-import {
-  type CadDocument,
-  type Component,
-  type Entity,
-  type InstanceEntity,
-  type Vec3,
-  is3D,
-} from '../model/types';
+import { type CadDocument, type Component, type Entity, type InstanceEntity, type Vec3, is3D } from '../model/types';
 import { solidTriangles } from './solidTriangles';
 import { isZeroRotation } from '../lib/eulerRotation';
 import { add3 } from '../lib/vec3';
@@ -102,12 +95,7 @@ export function expandInstance(instance: InstanceEntity, component: Component): 
     .filter((e): e is Entity => e !== undefined)
     .map((childEntity): Entity => {
       if (needsMeshBake(childEntity, [sx, sy, sz])) {
-        return bakedMeshChild(
-          childEntity,
-          instance,
-          [sx, sy, sz],
-          expandedId(instance.id, childEntity.id),
-        );
+        return bakedMeshChild(childEntity, instance, [sx, sy, sz], expandedId(instance.id, childEntity.id));
       }
       return {
         ...scaledChild(childEntity, [sx, sy, sz]),
@@ -124,9 +112,6 @@ export function expandInstance(instance: InstanceEntity, component: Component): 
  * keyed by the (immutable) entity compare it to stay correct.
  * @pure
  */
-export function expansionDependency(
-  entity: Entity,
-  doc: Pick<CadDocument, 'components'>,
-): CadDocument['components'] | undefined {
+export function expansionDependency(entity: Entity, doc: Pick<CadDocument, 'components'>): CadDocument['components'] | undefined {
   return entity.kind === 'instance' ? doc.components : undefined;
 }

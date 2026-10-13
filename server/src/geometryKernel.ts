@@ -42,10 +42,7 @@ function startIsolatedOcct(): GeometryKernel | null {
   const isolated = createIsolatedKernel({ callTimeoutMs: occtCallTimeoutMs() });
   if (isolated.start()) return isolated;
   isolated.dispose();
-  warnUnavailable(
-    'OCC worker unavailable; running OCC in-process',
-    'a WASM abort would stop the server',
-  );
+  warnUnavailable('OCC worker unavailable; running OCC in-process', 'a WASM abort would stop the server');
   return null;
 }
 

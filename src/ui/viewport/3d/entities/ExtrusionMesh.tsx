@@ -12,10 +12,7 @@ import type { ExtrusionEntity } from '@core/model/types';
 import { SolidMeshShell, type SolidMeshKindProps } from './SolidMeshShell';
 import { pointsKey, useStableByKey } from '../../useStableByKey';
 
-export function ExtrusionMesh({
-  entity,
-  ...shell
-}: SolidMeshKindProps<ExtrusionEntity>): React.ReactElement {
+export function ExtrusionMesh({ entity, ...shell }: SolidMeshKindProps<ExtrusionEntity>): React.ReactElement {
   const { depth } = entity;
 
   // Rebuild geometry only when the profile points or depth change.

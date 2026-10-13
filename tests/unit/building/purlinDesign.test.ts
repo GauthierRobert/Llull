@@ -8,8 +8,7 @@ import { nextSecondaryProfile } from '@aec/industrial/purlins/purlinDesign';
 import type { PurlinRow } from '@aec/industrial/purlins/purlinModel';
 import { membersOf } from './elementEdits';
 
-const hall = (params: Record<string, unknown> = {}): CadDocument =>
-  portalHall({ span: 24000, length: 30000, ...params });
+const hall = (params: Record<string, unknown> = {}): CadDocument => portalHall({ span: 24000, length: 30000, ...params });
 
 const rowsOf = (doc: CadDocument, params: Record<string, unknown> = {}): PurlinRow[] =>
   (execute(doc, 'check_purlins', params).data as { rows: PurlinRow[] }).rows;
@@ -75,10 +74,7 @@ describe('design_purlins', () => {
     const doc = hall({ roofType: 'monopitch' });
     const result = execute(doc, 'design_purlins', { windPressure: 1.2 });
     const unit = doc.units === 'mm' ? 1 : 0.001;
-    const [oldPurlins, newPurlins] = [
-      membersOf(doc, 'purlin'),
-      membersOf(result.document, 'purlin'),
-    ];
+    const [oldPurlins, newPurlins] = [membersOf(doc, 'purlin'), membersOf(result.document, 'purlin')];
     for (const purlin of newPurlins) {
       const old = oldPurlins.find((member) => member.id === purlin.id);
       if (!old) throw new Error('purlin');

@@ -59,11 +59,7 @@ describe('GET /export/stl — ascii (default)', () => {
 });
 
 function getBinaryStl(): Promise<request.Response> {
-  return request(app)
-    .get('/export/stl')
-    .query({ format: 'binary' })
-    .buffer(true)
-    .parse(parseBuffer);
+  return request(app).get('/export/stl').query({ format: 'binary' }).buffer(true).parse(parseBuffer);
 }
 
 // (b) Binary download

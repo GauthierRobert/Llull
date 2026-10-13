@@ -15,10 +15,7 @@ import { buildWedgeGeometry } from './primitiveGeometry';
 
 const WEDGE_SURFACE: SolidSurface = { roughness: 0.5, metalness: 0.08, envMapIntensity: 0.8 };
 
-export function WedgeMesh({
-  entity,
-  ...shell
-}: SolidMeshKindProps<WedgeEntity>): React.ReactElement {
+export function WedgeMesh({ entity, ...shell }: SolidMeshKindProps<WedgeEntity>): React.ReactElement {
   const [w, h, d] = entity.size;
   const geometry = useMemo(() => buildWedgeGeometry(w, h, d), [w, h, d]);
   return <SolidMeshShell entity={entity} geometry={geometry} surface={WEDGE_SURFACE} {...shell} />;

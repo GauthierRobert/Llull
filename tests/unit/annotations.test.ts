@@ -80,14 +80,7 @@ describe('CommandDefinition.annotations — destructive commands', () => {
 });
 
 describe('CommandDefinition.annotations — idempotent commands', () => {
-  const IDEMPOTENT_NAMES = [
-    'set_units',
-    'set_parameter',
-    'update_layer',
-    'set_entity_layer',
-    'set_entity_name',
-    'stop_animation',
-  ] as const;
+  const IDEMPOTENT_NAMES = ['set_units', 'set_parameter', 'update_layer', 'set_entity_layer', 'set_entity_name', 'stop_animation'] as const;
 
   for (const name of IDEMPOTENT_NAMES) {
     it(`${name} has annotations.idempotent === true`, () => {
@@ -246,11 +239,7 @@ describe('annotations invariant', () => {
       if (!cmd.annotations) continue;
       const { readOnly, destructive, idempotent, metaHistory, requiresKernel } = cmd.annotations;
       const atLeastOne =
-        readOnly === true ||
-        destructive === true ||
-        idempotent === true ||
-        metaHistory === true ||
-        requiresKernel === true;
+        readOnly === true || destructive === true || idempotent === true || metaHistory === true || requiresKernel === true;
       expect(atLeastOne, `${cmd.name} has an annotations object but no flag is true`).toBe(true);
     }
   });

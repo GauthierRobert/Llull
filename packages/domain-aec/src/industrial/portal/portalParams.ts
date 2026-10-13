@@ -8,10 +8,7 @@ import { levelIdParam } from '../../building/levelParams';
 
 export const portalFrameParams = z.object({
   origin: vec2('Corner (gridline A1) [x, y]. Default [0, 0].').optional(),
-  span: z
-    .number()
-    .optional()
-    .describe('Clear span between column axes (X), in document units. Default 24000 mm.'),
+  span: z.number().optional().describe('Clear span between column axes (X), in document units. Default 24000 mm.'),
   spans: z
     .array(z.number())
     .optional()
@@ -20,16 +17,8 @@ export const portalFrameParams = z.object({
         'valley between roofs). Overrides span.',
     ),
   length: z.number().optional().describe('Hall length (Y), in document units. Default 48000 mm.'),
-  baySpacing: z
-    .number()
-    .optional()
-    .describe(
-      'Target frame spacing; adjusted to divide the length, in document units. Default 6000 mm.',
-    ),
-  eaveHeight: z
-    .number()
-    .optional()
-    .describe('Column height to the eaves, in document units. Default 7000 mm.'),
+  baySpacing: z.number().optional().describe('Target frame spacing; adjusted to divide the length, in document units. Default 6000 mm.'),
+  eaveHeight: z.number().optional().describe('Column height to the eaves, in document units. Default 7000 mm.'),
   roofPitch: z.number().optional().describe('Roof slope in degrees. Default 6.'),
   roofType: z
     .enum(['duopitch', 'monopitch'])
@@ -44,26 +33,14 @@ export const portalFrameParams = z.object({
   columnProfile: z.string().optional().describe('Default HEA400.'),
   rafterProfile: z.string().optional().describe('Default IPE450.'),
   purlinProfile: z.string().optional().describe('Default C200x75x2.5.'),
-  railProfile: z
-    .string()
-    .optional()
-    .describe('Side rails. Default C200x75x2.5 (passes check_purlins at qp 0.6 on 6 m bays).'),
+  railProfile: z.string().optional().describe('Side rails. Default C200x75x2.5 (passes check_purlins at qp 0.6 on 6 m bays).'),
   braceProfile: z.string().optional().describe('Bracing. Default CHS76.1x3.6.'),
   gablePostProfile: z.string().optional().describe('Gable wind posts. Default HEA200.'),
-  purlinSpacing: z
-    .number()
-    .optional()
-    .describe('Along the slope, in document units. Default 1800 mm.'),
+  purlinSpacing: z.number().optional().describe('Along the slope, in document units. Default 1800 mm.'),
   railSpacing: z.number().optional().describe('Vertical, in document units. Default 1800 mm.'),
   footings: z.boolean().optional().describe('Pad footings under columns. Default true.'),
-  connections: z
-    .boolean()
-    .optional()
-    .describe('Bolted end-plate moment connections (haunched eaves, apex). Default true.'),
-  basePlates: z
-    .boolean()
-    .optional()
-    .describe('Base plates with 4 M24 anchor bolts under every column. Default true.'),
+  connections: z.boolean().optional().describe('Bolted end-plate moment connections (haunched eaves, apex). Default true.'),
+  basePlates: z.boolean().optional().describe('Base plates with 4 M24 anchor bolts under every column. Default true.'),
   columnBase: z
     .enum(['pinned', 'fixed'])
     .optional()

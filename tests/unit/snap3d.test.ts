@@ -29,36 +29,15 @@ function docWith(id: string, shape: Record<string, unknown>): CadDocument {
   return { ...emptyDoc(), entities: { [id]: entity }, order: [id] };
 }
 
-function docWithBox(
-  id: string,
-  px: number,
-  py: number,
-  pz: number,
-  w: number,
-  h: number,
-  d: number,
-): CadDocument {
+function docWithBox(id: string, px: number, py: number, pz: number, w: number, h: number, d: number): CadDocument {
   return docWith(id, { kind: 'box', size: [w, h, d], position: [px, py, pz] });
 }
 
-function docWithCylinder(
-  id: string,
-  px: number,
-  py: number,
-  pz: number,
-  radius: number,
-  height: number,
-): CadDocument {
+function docWithCylinder(id: string, px: number, py: number, pz: number, radius: number, height: number): CadDocument {
   return docWith(id, { kind: 'cylinder', radius, height, position: [px, py, pz] });
 }
 
-function docWithSphere(
-  id: string,
-  px: number,
-  py: number,
-  pz: number,
-  radius: number,
-): CadDocument {
+function docWithSphere(id: string, px: number, py: number, pz: number, radius: number): CadDocument {
   return docWith(id, { kind: 'sphere', radius, position: [px, py, pz] });
 }
 
@@ -140,11 +119,7 @@ describe('collectSnapCandidates3D', () => {
     };
     const candidates = collectSnapCandidates3D(rotated as CadDocument, undefined);
     // Rx(90deg) maps +Z to -Y: top disc centre ends at y = -3.
-    expect(
-      candidates.find(
-        (c) => Math.abs(c.y + 3) < 1e-9 && Math.abs(c.z) < 1e-9 && Math.abs(c.x) < 1e-9,
-      ),
-    ).toBeDefined();
+    expect(candidates.find((c) => Math.abs(c.y + 3) < 1e-9 && Math.abs(c.z) < 1e-9 && Math.abs(c.x) < 1e-9)).toBeDefined();
   });
 
   it('extrusion AABB spans the XY profile and +Z depth', () => {

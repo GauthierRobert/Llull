@@ -68,8 +68,7 @@ describe('computed outputs on a small model, checked by hand', () => {
         lines: Array<{ key: string; quantity: number }>;
       }
     ).lines;
-  const quantity = (doc: CadDocument, key: string): number | undefined =>
-    lines(doc).find((line) => line.key === key)?.quantity;
+  const quantity = (doc: CadDocument, key: string): number | undefined => lines(doc).find((line) => line.key === key)?.quantity;
 
   it.each(['mm', 'm'] as const)('weights, lengths and paint in a %s document', (units) => {
     const doc = model(units);
@@ -115,8 +114,7 @@ describe('computed outputs on a small model, checked by hand', () => {
       size: [1000, 1000, 1000],
       clearance: 0,
     }).document;
-    const clash = (execute(doc, 'check_clashes', {}).data as { clashes: Array<{ depth: number }> })
-      .clashes[0];
+    const clash = (execute(doc, 'check_clashes', {}).data as { clashes: Array<{ depth: number }> }).clashes[0];
     // Boxes span x -500..500 and 400..1400: 100 mm overlap in x is the minimum axis.
     expect(clash?.depth).toBeCloseTo(100, 6);
   });

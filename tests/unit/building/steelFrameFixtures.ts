@@ -4,8 +4,7 @@ import { findProfile, sectionProperties } from '@aec/steel/profiles';
 import { G, step, twoLevels } from './steelFixtures';
 
 /** Self weight of a catalogue profile, kN/m. */
-export const weightOf = (profile: string): number =>
-  ((findProfile(profile)?.massPerMetre ?? 0) * G) / 1000;
+export const weightOf = (profile: string): number => ((findProfile(profile)?.massPerMetre ?? 0) * G) / 1000;
 
 /** Strong-axis second moment of area of a catalogue profile, mm⁴. */
 export const inertiaOf = (profile: string): number => {
@@ -81,15 +80,7 @@ export function portal(
     endJoint?: 'pinned' | 'rigid';
   } = {},
 ): CadDocument {
-  const {
-    span = 6000,
-    base = 'pinned',
-    columnProfile,
-    beamProfile,
-    columnRoll,
-    startJoint = 'rigid',
-    endJoint = 'rigid',
-  } = options;
+  const { span = 6000, base = 'pinned', columnProfile, beamProfile, columnRoll, startJoint = 'rigid', endJoint = 'rigid' } = options;
   let doc = twoLevels();
   for (const y of [0, span]) {
     doc = frameColumn(doc, 0, y, {
@@ -108,8 +99,7 @@ export function portal(
 /** The stored member with this mark. */
 export function memberOf(doc: CadDocument, mark: string): SteelMemberElement {
   const found = Object.values(doc.building?.elements ?? {}).find(
-    (element): element is SteelMemberElement =>
-      element.category === 'member' && element.mark === mark,
+    (element): element is SteelMemberElement => element.category === 'member' && element.mark === mark,
   );
   if (!found) throw new Error(`no member ${mark}`);
   return found;

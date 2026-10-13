@@ -24,9 +24,7 @@ interface PipeSpanLimit {
  */
 export function pipeSpanLimit(dn: number | undefined, outsideDiameterMm: number): PipeSpanLimit {
   const byDn = dn === undefined ? undefined : PIPE_SIZES.find(([size]) => size === dn);
-  const entry =
-    byDn ??
-    PIPE_SIZES.find(([, od]) => Math.abs(od - outsideDiameterMm) <= OUTSIDE_DIAMETER_TOLERANCE_MM);
+  const entry = byDn ?? PIPE_SIZES.find(([, od]) => Math.abs(od - outsideDiameterMm) <= OUTSIDE_DIAMETER_TOLERANCE_MM);
   if (entry) return { dn: entry[0], spanM: entry[3], approximated: false };
   const smaller = [...PIPE_SIZES].reverse().find(([, od]) => od < outsideDiameterMm);
   const [fallbackDn, , , fallbackSpan] = smaller ?? (PIPE_SIZES[0] as (typeof PIPE_SIZES)[0]);

@@ -18,10 +18,7 @@ function industrialModel(): CadDocument {
     crane: { capacity: 10, railHeight: 4500 },
   }).document;
   const steps: Array<[string, Json]> = [
-    [
-      'add_equipment',
-      { name: 'Pump', mark: 'P-1', location: [3000, 3000], size: [1500, 800, 900] },
-    ],
+    ['add_equipment', { name: 'Pump', mark: 'P-1', location: [3000, 3000], size: [1500, 800, 900] }],
     [
       'add_pipe_run',
       {
@@ -52,10 +49,7 @@ function industrialModel(): CadDocument {
 /** Every path (up to `depth` keys deep) inside `root`, as key lists. */
 function pathsIn(root: unknown, depth: number, prefix: string[] = []): string[][] {
   if (depth === 0 || root === null || typeof root !== 'object') return [];
-  return Object.entries(root as Json).flatMap(([key, value]) => [
-    [...prefix, key],
-    ...pathsIn(value, depth - 1, [...prefix, key]),
-  ]);
+  return Object.entries(root as Json).flatMap(([key, value]) => [[...prefix, key], ...pathsIn(value, depth - 1, [...prefix, key])]);
 }
 
 function corrupt(base: Json, path: string[], value: unknown): Json {
@@ -72,17 +66,11 @@ function rawCrash(text: string): string | null {
     deserializeDocument(text);
     return null;
   } catch (error) {
-    return !(error instanceof Error) || error instanceof TypeError || error instanceof RangeError
-      ? String(error)
-      : null;
+    return !(error instanceof Error) || error instanceof TypeError || error instanceof RangeError ? String(error) : null;
   }
 }
 
-function fuzzBuilding(
-  file: { version: number; document: Json },
-  label: string,
-  depth: number,
-): string[] {
+function fuzzBuilding(file: { version: number; document: Json }, label: string, depth: number): string[] {
   const building = file.document['building'] as Json;
   const elements = building['elements'] as Record<string, Json>;
   const firstOfCategory = new Map<string, string>();
@@ -92,10 +80,7 @@ function fuzzBuilding(
   }
   const roots: Array<[string[], unknown]> = [
     [['building'], { ...building, elements: undefined }],
-    ...[...firstOfCategory.values()].map((id): [string[], unknown] => [
-      ['building', 'elements', id],
-      elements[id],
-    ]),
+    ...[...firstOfCategory.values()].map((id): [string[], unknown] => [['building', 'elements', id], elements[id]]),
     [['building', 'levels'], building['levels']],
   ];
   const failures: string[] = [];

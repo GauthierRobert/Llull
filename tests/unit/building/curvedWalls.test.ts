@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import {
-  arcThrough,
-  curvedWallBand,
-  curvedWallLength,
-} from '@aec/building/geometry/curvedWallGeometry';
+import { arcThrough, curvedWallBand, curvedWallLength } from '@aec/building/geometry/curvedWallGeometry';
 import { buildPlanDrawing } from '@aec/building/drawings/planDrawing';
 import { buildingErrors } from '@aec/building/validate';
 import { serializeDocument } from '@core/commands/persistence/serialization';
@@ -89,10 +85,7 @@ describe('add_curved_wall', () => {
     }).document;
     const lines = (execute(doc, 'quantity_takeoff', {}).data as { lines: TakeoffLine[] }).lines;
     expect(lines.find((line) => line.key === 'wall.masonry.m')?.quantity).toBeCloseTo(15.708, 2);
-    expect(lines.find((line) => line.key === 'wall.masonry.m3')?.quantity).toBeCloseTo(
-      15.708 * 3 * 0.3,
-      2,
-    );
+    expect(lines.find((line) => line.key === 'wall.masonry.m3')?.quantity).toBeCloseTo(15.708 * 3 * 0.3, 2);
     const schedule = execute(doc, 'building_schedule', { kind: 'wall' }).data as {
       rows: unknown[][];
     };
@@ -101,9 +94,7 @@ describe('add_curved_wall', () => {
     const cut = plan.primitives.find((p) => p.type === 'polygon' && p.layer === 'A-WALL');
     expect(cut?.type === 'polygon' && cut.fill).toBe('hatch');
     expect((execute(doc, 'export_dxf', {}).data as DxfExport).layers).toContain('A-WALL-PATT');
-    expect((execute(doc, 'export_ifc', {}).data as IfcExport).ifc).toMatch(
-      /IFCWALL\('[^']+',\$,'W1'/,
-    );
+    expect((execute(doc, 'export_ifc', {}).data as IfcExport).ifc).toMatch(/IFCWALL\('[^']+',\$,'W1'/);
     doc = execute(doc, 'add_pipe_run', {
       points: [
         [0, 0, 1000],
@@ -181,10 +172,7 @@ describe('openings in curved walls', () => {
     expect(door.category === 'door' && door.offset).toBeCloseTo((Math.PI * 5000) / 2);
     const window = doc.building!.elements['window-1']!;
     // The window is projected onto the arc nearest to [-4000, 3000] (angle 143.13° → 36.87° from the start).
-    expect(window.category === 'window' && window.offset).toBeCloseTo(
-      5000 * Math.atan2(3000, 4000),
-      0,
-    );
+    expect(window.category === 'window' && window.offset).toBeCloseTo(5000 * Math.atan2(3000, 4000), 0);
     // Door leaf sits on the arc, oriented along the tangent (horizontal at the crown).
     expect(doc.entities['door-1:leaf']).toMatchObject({ kind: 'box' });
     const leaf = doc.entities['door-1:leaf'];
@@ -197,16 +185,10 @@ describe('openings in curved walls', () => {
 
   it('refuses openings that do not fit and moves / deletes them with the wall', () => {
     let doc = withDoor();
-    expect(
-      execute(doc, 'add_door', { wallId: 'curvedWall-1', offset: 100, width: 1000 }).summary,
-    ).toMatch(/spans/);
-    expect(
-      execute(doc, 'add_window', { wallId: 'curvedWall-1', offset: 7854, width: 1200 }).summary,
-    ).toMatch(/overlaps/);
+    expect(execute(doc, 'add_door', { wallId: 'curvedWall-1', offset: 100, width: 1000 }).summary).toMatch(/spans/);
+    expect(execute(doc, 'add_window', { wallId: 'curvedWall-1', offset: 7854, width: 1200 }).summary).toMatch(/overlaps/);
     expect(execute(doc, 'add_door', { wallId: 'curvedWall-1', at: 'x' }).affected).toEqual([]);
-    expect(execute(doc, 'update_opening', { openingId: 'door-1', width: 1200 }).affected).toContain(
-      'door-1',
-    );
+    expect(execute(doc, 'update_opening', { openingId: 'door-1', width: 1200 }).affected).toContain('door-1');
     doc = execute(doc, 'move_building_element', {
       elementIds: ['curvedWall-1'],
       delta: [0, 1000],
@@ -327,8 +309,7 @@ describe('curved / straight corner review regressions', () => {
   });
 
   it('trims the curved wall end so the corner does not overlap', async () => {
-    const { curvedWallExtent, curvedWallLength } =
-      await import('@aec/building/geometry/curvedWallGeometry');
+    const { curvedWallExtent, curvedWallLength } = await import('@aec/building/geometry/curvedWallGeometry');
     let doc = execute(createEmptyDocument(), 'add_curved_wall', HALF).document;
     doc = execute(doc, 'draw_walls', {
       points: [
@@ -343,9 +324,6 @@ describe('curved / straight corner review regressions', () => {
     const lines = (execute(doc, 'quantity_takeoff', {}).data as { lines: TakeoffLine[] }).lines;
     // Curved 300 × 3000 over (L − 100) + straight 200 × 3000 over (4000 + 150).
     const expected = (Math.PI * 5000 - 100) * 0.3 * 3 * 1e-3 + 4150 * 0.2 * 3 * 1e-3;
-    expect(lines.find((line) => line.key === 'wall.concrete.m3')?.quantity).toBeCloseTo(
-      expected,
-      2,
-    );
+    expect(lines.find((line) => line.key === 'wall.concrete.m3')?.quantity).toBeCloseTo(expected, 2);
   });
 });

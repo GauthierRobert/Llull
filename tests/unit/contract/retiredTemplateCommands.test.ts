@@ -49,9 +49,7 @@ describe('retired instantiate_template', () => {
       template: 'flange',
       params: { outerRadius: 20, boreRadius: 5, boltCount: 3, boltCircleRadius: 12, holeRadius: 1 },
     });
-    expect(shapes(doc).map((e) => (e as Extract<Entity, { kind: 'circle' }>).radius)).toEqual([
-      20, 5, 1, 1, 1,
-    ]);
+    expect(shapes(doc).map((e) => (e as Extract<Entity, { kind: 'circle' }>).radius)).toEqual([20, 5, 1, 1, 1]);
   });
 
   it('rectangular_plate_with_holes replays as the plate then the hole grid row by row', () => {

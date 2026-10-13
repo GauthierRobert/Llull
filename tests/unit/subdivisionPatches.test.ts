@@ -16,14 +16,12 @@ function torusCage(around: number, tube: number): Cage {
   const at = (i: number, j: number): number => (i % around) * tube + (j % tube);
   const faces: number[][] = [];
   for (let i = 0; i < around; i++) {
-    for (let j = 0; j < tube; j++)
-      faces.push([at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j + 1)]);
+    for (let j = 0; j < tube; j++) faces.push([at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j + 1)]);
   }
   return { vertices, faces, creases: [] };
 }
 
-const near = (a: Vec3, b: Vec3, digits = 9): void =>
-  a.forEach((value, axis) => expect(value).toBeCloseTo(b[axis] as number, digits));
+const near = (a: Vec3, b: Vec3, digits = 9): void => a.forEach((value, axis) => expect(value).toBeCloseTo(b[axis] as number, digits));
 
 describe('subdivision Bézier patches', () => {
   it('reproduces the uniform bicubic B-spline exactly on a regular cage', () => {
@@ -38,9 +36,7 @@ describe('subdivision Bézier patches', () => {
       t ** 3 / 6,
     ];
     const vertex = (i: number, j: number): Vec3 =>
-      cage.vertices[
-        (((i % around) + around) % around) * tube + (((j % tube) + tube) % tube)
-      ] as Vec3;
+      cage.vertices[(((i % around) + around) % around) * tube + (((j % tube) + tube) % tube)] as Vec3;
     patches.forEach((poles, f) => {
       const [i, j] = [Math.floor(f / tube), f % tube];
       for (const [u, v] of [
@@ -69,9 +65,7 @@ describe('subdivision Bézier patches', () => {
     const patches = subdivisionPatches(cage);
     expect(patches).toHaveLength(24);
     const deep = subdivide(refined, 5).vertices;
-    refined.faces.forEach((face, f) =>
-      near(patchPoint(patches[f] as Vec3[], 0, 0), deep[face[0] as number] as Vec3, 2),
-    );
+    refined.faces.forEach((face, f) => near(patchPoint(patches[f] as Vec3[], 0, 0), deep[face[0] as number] as Vec3, 2));
   });
 
   it('shares boundary curves exactly between neighbours (watertight)', () => {

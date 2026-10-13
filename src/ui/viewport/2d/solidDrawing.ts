@@ -30,18 +30,12 @@ const drawingCache = new WeakMap<Entity, CachedDrawing>();
 
 const EMPTY: CachedDrawing = { primitives: [], cutDepth: undefined, dependency: undefined };
 
-function cachedDrawing(
-  document: Pick<CadDocument, 'components'>,
-  entity: Entity,
-  cutDepth: number | undefined,
-): CachedDrawing {
+function cachedDrawing(document: Pick<CadDocument, 'components'>, entity: Entity, cutDepth: number | undefined): CachedDrawing {
   if (!is3D(entity) || entity.tags?.includes('bim') === true) return EMPTY;
   const dependency = expansionDependency(entity, document);
   const cached = drawingCache.get(entity);
   if (cached && cached.cutDepth === cutDepth && cached.dependency === dependency) return cached;
-  const primitives = technicalView(document, [entity], { frame: TOP_VIEW, cutDepth }).flatMap(
-    (drawing) => drawing.primitives,
-  );
+  const primitives = technicalView(document, [entity], { frame: TOP_VIEW, cutDepth }).flatMap((drawing) => drawing.primitives);
   const fresh: CachedDrawing = { primitives, cutDepth, dependency };
   drawingCache.set(entity, fresh);
   return fresh;
@@ -52,31 +46,19 @@ function cachedDrawing(
  * `cutDepth` when given; `[]` for 2D shapes, empty geometry and derived `bim` geometry (drawn per
  * level elsewhere). Memoized per entity.
  */
-export function solidDrawing(
-  document: Pick<CadDocument, 'components'>,
-  entity: Entity,
-  cutDepth?: number,
-): DrawingPrimitive[] {
+export function solidDrawing(document: Pick<CadDocument, 'components'>, entity: Entity, cutDepth?: number): DrawingPrimitive[] {
   return cachedDrawing(document, entity, cutDepth).primitives;
 }
 
 /** Edge segments of `solidDrawing` (visible / hidden / cut). Memoized with it. */
-export function solidSegments(
-  document: Pick<CadDocument, 'components'>,
-  entity: Entity,
-  cutDepth?: number,
-): Segment2[] {
+export function solidSegments(document: Pick<CadDocument, 'components'>, entity: Entity, cutDepth?: number): Segment2[] {
   const entry = cachedDrawing(document, entity, cutDepth);
   entry.segments ??= drawingSegments(entry.primitives);
   return entry.segments;
 }
 
 /** Snap points of `solidDrawing`. Memoized with it. */
-export function solidSnaps(
-  document: Pick<CadDocument, 'components'>,
-  entity: Entity,
-  cutDepth?: number,
-): SnapPoint[] {
+export function solidSnaps(document: Pick<CadDocument, 'components'>, entity: Entity, cutDepth?: number): SnapPoint[] {
   const entry = cachedDrawing(document, entity, cutDepth);
   entry.snaps ??= drawingSnapPoints(entry.primitives);
   return entry.snaps;

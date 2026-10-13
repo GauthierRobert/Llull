@@ -80,14 +80,9 @@ describe('drawing corpus: plans rebuild the real parts', () => {
   it.each(manifest.parts.map((part) => [part.id, part] as const))('%s', (_id, part) => {
     const doc = build(part.id);
     const volume = solidVolume(doc);
-    expect(Math.abs(volume / part.volume - 1), `${part.title}: volume ${volume}`).toBeLessThan(
-      part.volumeTolerance,
-    );
+    expect(Math.abs(volume / part.volume - 1), `${part.title}: volume ${volume}`).toBeLessThan(part.volumeTolerance);
     sortedExtents(doc).forEach((size, axis) =>
-      expect(
-        Math.abs(size - (part.extents[axis] ?? 0)),
-        `${part.title} extent ${axis}`,
-      ).toBeLessThan(0.5),
+      expect(Math.abs(size - (part.extents[axis] ?? 0)), `${part.title} extent ${axis}`).toBeLessThan(0.5),
     );
   });
 });

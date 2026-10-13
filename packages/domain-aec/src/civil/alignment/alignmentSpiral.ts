@@ -69,11 +69,7 @@ export function clothoidLocal(along: number, radius: number, length: number): Ve
 }
 
 /** Spiral-curve constants for `radius`, spiral `length` and total `deflection`; null when deflection < 2 theta. */
-export function spiralCurve(
-  radius: number,
-  length: number,
-  deflection: number,
-): SpiralCurve | null {
+export function spiralCurve(radius: number, length: number, deflection: number): SpiralCurve | null {
   const theta = length / (2 * radius);
   if (deflection < 2 * theta - ANGLE_SLACK) return null;
   const [xs, ys] = clothoidLocal(length, radius, length);
@@ -101,10 +97,7 @@ export function spiralSweep(element: SpiralElement): number {
 }
 
 /** Point and travel direction on a spiral at `along` (0..length) from its start. */
-export function spiralPointAt(
-  element: SpiralElement,
-  along: number,
-): { point: Vec2; direction: number } {
+export function spiralPointAt(element: SpiralElement, along: number): { point: Vec2; direction: number } {
   const radius = finiteRadius(element);
   const turn = element.rotation === 'ccw' ? 1 : -1;
   const entry = element.radiusStart === Infinity;
@@ -115,10 +108,7 @@ export function spiralPointAt(
   const sin = Math.sin(element.tangentHeading);
   const local: Vec2 = entry ? [x, turn * y] : [-x, turn * y];
   return {
-    point: [
-      element.tangentPoint[0] + local[0] * cos - local[1] * sin,
-      element.tangentPoint[1] + local[0] * sin + local[1] * cos,
-    ],
+    point: [element.tangentPoint[0] + local[0] * cos - local[1] * sin, element.tangentPoint[1] + local[0] * sin + local[1] * cos],
     direction: element.tangentHeading + (entry ? turn * theta : -turn * theta),
   };
 }

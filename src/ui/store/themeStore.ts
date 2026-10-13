@@ -30,9 +30,7 @@ function readStoredTheme(): Theme | null {
 }
 
 function lightMediaQuery(): MediaQueryList | null {
-  return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-    ? window.matchMedia(LIGHT_QUERY)
-    : null;
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia(LIGHT_QUERY) : null;
 }
 
 function systemTheme(): Theme {

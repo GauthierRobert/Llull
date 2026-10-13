@@ -4,11 +4,7 @@
  * @layer domain-aec
  */
 
-import type {
-  BasePlateElement,
-  MomentConnectionElement,
-  SteelMemberElement,
-} from '@core/model/building';
+import type { BasePlateElement, MomentConnectionElement, SteelMemberElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { unknownLevelFailure } from '../../building/levelLookup';
@@ -19,12 +15,7 @@ import { round } from '../../shared/numeric';
 import { noop, report } from '@core/commands/noop';
 import { sweepFrame } from '../../shared/mesh';
 import { findProfile, STEEL_DENSITY_KG_PER_M3 } from '../../steel/profiles';
-import {
-  connectionSolids,
-  plateLayout,
-  type ConnectionSolid,
-  type PlateLayout,
-} from '../connections/evaluateConnections';
+import { connectionSolids, plateLayout, type ConnectionSolid, type PlateLayout } from '../connections/evaluateConnections';
 import { buildFiles, type NcFile } from './ncFiles';
 import {
   ANCHOR_HOLE_CLEARANCE_MM,
@@ -52,11 +43,7 @@ function platePiece(
     sourceId: string;
   },
 ): NcPiece {
-  const [length, width, thickness] = [
-    round(toMm(doc, parts.length)),
-    round(toMm(doc, parts.width)),
-    round(toMm(doc, parts.thickness)),
-  ];
+  const [length, width, thickness] = [round(toMm(doc, parts.length)), round(toMm(doc, parts.width)), round(toMm(doc, parts.thickness))];
   return {
     kind: 'plate',
     mark: parts.mark,
@@ -107,11 +94,7 @@ function basePlatePiece(doc: CadDocument, plate: BasePlateElement, layout: Plate
 }
 
 /** One piece per end-plate solid of the connection (second plate marked `<mark>b`); none without a main plate. */
-function endPlatePieces(
-  doc: CadDocument,
-  connection: MomentConnectionElement,
-  solids: ReadonlyArray<ConnectionSolid>,
-): NcPiece[] {
+function endPlatePieces(doc: CadDocument, connection: MomentConnectionElement, solids: ReadonlyArray<ConnectionSolid>): NcPiece[] {
   const mm = (value: number): number => toMm(doc, value);
   const outline = solids.find((solid) => solid.part === 'plate')?.outline;
   if (!outline) return [];
@@ -166,19 +149,9 @@ export const exportNcFiles = defineCommand({
     memberIds: z
       .array(z.string())
       .optional()
-      .describe(
-        'Steel member ids to export (also selects the base plates and end plates they host). Default: every steel member.',
-      ),
-    includePlates: z
-      .boolean()
-      .optional()
-      .describe(
-        'Also export base plates and connection end plates as separate NC files. Default true.',
-      ),
-    levelId: z
-      .string()
-      .optional()
-      .describe('Only export pieces of this level id. Default: all levels.'),
+      .describe('Steel member ids to export (also selects the base plates and end plates they host). Default: every steel member.'),
+    includePlates: z.boolean().optional().describe('Also export base plates and connection end plates as separate NC files. Default true.'),
+    levelId: z.string().optional().describe('Only export pieces of this level id. Default: all levels.'),
   }),
   run: (doc, params): CommandResult => {
     const { memberIds, includePlates = true, levelId } = params;

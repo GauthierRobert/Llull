@@ -4,19 +4,7 @@ import { execute, getCommand } from '@core/commands/registry';
 import { checkSteelMembers } from '@aec/industrial/steelDesign/steelMembersCheck';
 import { pipeWeightPerMetre } from '@aec/industrial/piping/pipeWeight';
 import { findProfile, sectionProperties } from '@aec/steel/profiles';
-import {
-  G,
-  beam,
-  brace,
-  check,
-  column,
-  rowOf,
-  rowsByRole,
-  squareBay,
-  step,
-  twoLevels,
-  beamOnColumns,
-} from './steelFixtures';
+import { G, beam, brace, check, column, rowOf, rowsByRole, squareBay, step, twoLevels, beamOnColumns } from './steelFixtures';
 
 const IPE300 = (findProfile('IPE300')?.massPerMetre ?? 0) * G * 1e-3; // kN/m
 const HEB200 = (findProfile('HEB200')?.massPerMetre ?? 0) * G * 1e-3; // kN/m
@@ -65,9 +53,7 @@ describe('beam under its self weight', () => {
     expect(bending?.name).toContain('LTB checked');
     expect(row.detail).toBeTruthy();
     const restrained = rowOf(check(squareBay()), 'SB1');
-    expect(restrained.checks.find((entry) => entry.name.startsWith('bending'))?.name).toContain(
-      'LTB restrained',
-    );
+    expect(restrained.checks.find((entry) => entry.name.startsWith('bending'))?.name).toContain('LTB restrained');
   });
 });
 
@@ -97,10 +83,7 @@ describe('floor and equipment load path', () => {
     expect(data.loads.equipment[0]?.carriedKn).toBeCloseTo(weight, 6);
     expect(data.loads.equipment[0]?.support).toBe('floor');
     const beams = rowsByRole(data, 'beam');
-    const reactionSum = beams.reduce(
-      (sum, row) => sum + (row.forces['reactionStart'] ?? 0) + (row.forces['reactionEnd'] ?? 0),
-      0,
-    );
+    const reactionSum = beams.reduce((sum, row) => sum + (row.forces['reactionStart'] ?? 0) + (row.forces['reactionEnd'] ?? 0), 0);
     const imposed = IMPOSED * (36 - 4);
     const expectedBeams = 1.35 * (36 * FLOOR_DEAD + weight + 4 * IPE300 * 6) + 1.5 * imposed;
     expect(Math.abs(reactionSum - expectedBeams) / expectedBeams).toBeLessThan(2e-3);
@@ -156,8 +139,7 @@ describe('floor and equipment load path', () => {
     expect(data.loads.equipment[0]?.carriedKn).toBeCloseTo((30000 * G) / 1000, 6);
     const share = (middle.forces['reactionStart'] ?? 0) * 2;
     expect(share).toBeGreaterThan(1.35 * ((30000 * G) / 1000) * 0.95);
-    for (const row of others)
-      expect(row.forces['MEd'] ?? 0).toBeLessThan(middle.forces['MEd'] ?? 0);
+    for (const row of others) expect(row.forces['MEd'] ?? 0).toBeLessThan(middle.forces['MEd'] ?? 0);
   });
 
   it('reports equipment on grade and carries none of it', () => {
@@ -205,9 +187,7 @@ describe('floor and equipment load path', () => {
       thickness: 30,
     });
     const data = check(doc);
-    expect(data.warnings.some((text) => text.includes('has no steel beam at its level'))).toBe(
-      true,
-    );
+    expect(data.warnings.some((text) => text.includes('has no steel beam at its level'))).toBe(true);
     expect(data.loads.floors[0]?.supportingBeams).toBe(0);
   });
 });
@@ -309,8 +289,7 @@ describe('pipes and trays', () => {
     expect(data.loads.lines[0]?.supports).toBe(2);
     expect(data.loads.lines[0]?.carriedKn).toBeCloseTo(weight * 6, 6);
     // support 1: 1 m overhang + 1 m half span = 2 m; support 2: 1 m half span + 3 m overhang = 4 m
-    const momentOf = (mark: string): number =>
-      (rowOf(data, mark).forces['MEd'] ?? 0) / 1.35 - (IPE300 * 16) / 8;
+    const momentOf = (mark: string): number => (rowOf(data, mark).forces['MEd'] ?? 0) / 1.35 - (IPE300 * 16) / 8;
     expect(momentOf('SB2') / momentOf('SB1')).toBeCloseTo(2, 2);
   });
 
@@ -364,9 +343,7 @@ describe('beams framing into beams', () => {
     doc = column(doc, 0, 0);
     doc = beam(doc, [0, 0], [6000, 0]);
     const data = check(doc);
-    expect(data.warnings.some((text) => text.includes('SB1 end rests on no column or beam'))).toBe(
-      true,
-    );
+    expect(data.warnings.some((text) => text.includes('SB1 end rests on no column or beam'))).toBe(true);
   });
 
   it('flags circular beam framing and still analyses every beam', () => {
@@ -406,13 +383,9 @@ describe('bracing', () => {
   it('makes the chord beam of the braced bay a strut and flags the unbraced direction', () => {
     const data = check(braced());
     const chord = rowOf(data, 'SB1');
-    expect(chord.checks.map((entry) => entry.name)).toContain(
-      'strut compression + bending (§6.3.3)',
-    );
+    expect(chord.checks.map((entry) => entry.name)).toContain('strut compression + bending (§6.3.3)');
     expect(chord.forces['NEd']).toBeGreaterThan(1);
-    expect(rowOf(data, 'SB3').checks.map((entry) => entry.name)).not.toContain(
-      'strut compression + bending (§6.3.3)',
-    );
+    expect(rowOf(data, 'SB3').checks.map((entry) => entry.name)).not.toContain('strut compression + bending (§6.3.3)');
     expect(data.warnings.some((text) => text.includes('no bracing in direction Y'))).toBe(true);
   });
 

@@ -32,10 +32,7 @@ describe('sectionProperties', () => {
     expect(shs.inertia).toBeCloseTo(exact, -2);
     expect(shs.elasticModulus).toBeCloseTo(exact / 50, -1);
     expect(shs.minorInertia).toBeCloseTo(exact, -2);
-    expect(shs.plasticModulus).toBeCloseTo(
-      ((100 * 50 * 50) / 2) * 2 - ((90 * 45 * 45) / 2) * 2,
-      -1,
-    );
+    expect(shs.plasticModulus).toBeCloseTo(((100 * 50 * 50) / 2) * 2 - ((90 * 45 * 45) / 2) * 2, -1);
     const angle = sectionProperties(findProfile('L100x10')!);
     expect(angle.area).toBeCloseTo(1900, -1);
     expect(angle.plasticModulus).toBeGreaterThan(angle.elasticModulus);

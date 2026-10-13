@@ -42,9 +42,7 @@ describe('toParamsSchema', () => {
           })
           .describe('Nested'),
         empty: z.object({}).describe('Empty'),
-        items: z
-          .array(z.object({ id: z.string().describe('Id') }).describe('Item'))
-          .describe('Items'),
+        items: z.array(z.object({ id: z.string().describe('Id') }).describe('Item')).describe('Items'),
       }),
     );
     expect(schema.required).toEqual([
@@ -144,17 +142,13 @@ describe('schema helpers', () => {
       items: { type: 'number' },
     });
     expect(schema.required).toEqual(['path', 'loose', 'loose3']);
-    expect(
-      params.safeParse({ path: [1, 'x'], rotation: 'bad', loose: [1, 2, 3], loose3: [1] }).success,
-    ).toBe(true);
+    expect(params.safeParse({ path: [1, 'x'], rotation: 'bad', loose: [1, 2, 3], loose3: [1] }).success).toBe(true);
   });
 });
 
 describe('formatIssues', () => {
   it('names the path, message and offending input', () => {
-    const result = z
-      .object({ size: vec3('Size') })
-      .safeParse({ size: [1, 'x', 2] }, { reportInput: true });
+    const result = z.object({ size: vec3('Size') }).safeParse({ size: [1, 'x', 2] }, { reportInput: true });
     expect(result.success).toBe(false);
     if (!result.success) expect(formatIssues(result.error)).toMatch(/^size\.1: .*\(got "x"\)/);
   });

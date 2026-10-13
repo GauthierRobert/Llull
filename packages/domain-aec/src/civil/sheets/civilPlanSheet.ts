@@ -52,10 +52,7 @@ const LEGEND_WIDTH = 52;
 type Drawable = Entity & { kind: 'line' | 'polyline' | 'point' | 'text' };
 
 const isDrawable = (entity: Entity): entity is Drawable =>
-  entity.kind === 'line' ||
-  entity.kind === 'polyline' ||
-  entity.kind === 'point' ||
-  entity.kind === 'text';
+  entity.kind === 'line' || entity.kind === 'polyline' || entity.kind === 'point' || entity.kind === 'text';
 
 function worldPoints(entity: Drawable): Vec2[] {
   const place = (point: Vec2): Vec2 => entityPlanPoint(entity, point);
@@ -90,13 +87,7 @@ function strokeWidth(layer: string): number {
   return 0.2;
 }
 
-function gridTicks(
-  doc: CadDocument,
-  scale: number,
-  viewport: Viewport,
-  center: Vec2,
-  toPaper: (point: Vec2) => Vec2,
-): string[] {
+function gridTicks(doc: CadDocument, scale: number, viewport: Viewport, center: Vec2, toPaper: (point: Vec2) => Vec2): string[] {
   const calibration = doc.civil?.crs?.calibration;
   if (!calibration) return [];
   const unitsPerMm = scale / toMm(doc, 1);
@@ -106,11 +97,7 @@ function gridTicks(
   const parts: string[] = [];
   const first = (value: number): number => Math.floor((value - reach) / stepUnits) * stepUnits;
   for (let easting = first(gridCentre[0]); easting <= gridCentre[0] + reach; easting += stepUnits) {
-    for (
-      let northing = first(gridCentre[1]);
-      northing <= gridCentre[1] + reach;
-      northing += stepUnits
-    ) {
+    for (let northing = first(gridCentre[1]); northing <= gridCentre[1] + reach; northing += stepUnits) {
       const [x, y] = toPaper(gridToLocal(calibration, [easting, northing]));
       if (
         !insideRect([x, y], {
@@ -130,11 +117,7 @@ function gridTicks(
   return parts;
 }
 
-function legend(
-  x: number,
-  y: number,
-  layers: ReadonlyArray<{ name: string; color: string; count: number }>,
-): string {
+function legend(x: number, y: number, layers: ReadonlyArray<{ name: string; color: string; count: number }>): string {
   const rows = layers.map(
     (layer, index) =>
       `<rect x="${n(x + 2)}" y="${n(y + 8 + index * 4.5)}" width="6" height="2" fill="${escapeXml(layer.color)}"/>` +
@@ -151,10 +134,7 @@ function legend(
  * not positive or no entity lies on the requested layers.
  * @pure
  */
-export function buildCivilPlanSheet(
-  doc: CadDocument,
-  options: CivilSheetOptions,
-): CivilPlanSheet | null {
+export function buildCivilPlanSheet(doc: CadDocument, options: CivilSheetOptions): CivilPlanSheet | null {
   const items = civilPlanEntities(doc, options.layers);
   if (items.length === 0 || (options.scale !== undefined && !(options.scale > 0))) return null;
   const [width, height] = PAPER_MM[options.paper];
@@ -166,9 +146,7 @@ export function buildCivilPlanSheet(
   const bounds = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)] as const;
   const mmPerUnit = toMm(doc, 1);
   const center: Vec2 = options.center ?? [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2];
-  const scale =
-    options.scale ??
-    fitScale((bounds[2] - bounds[0]) * mmPerUnit, (bounds[3] - bounds[1]) * mmPerUnit, viewport);
+  const scale = options.scale ?? fitScale((bounds[2] - bounds[0]) * mmPerUnit, (bounds[3] - bounds[1]) * mmPerUnit, viewport);
   const perUnit = mmPerUnit / scale;
   const toPaper = paperMap(viewport, center, perUnit);
   const counts = { lines: 0, polylines: 0, points: 0, texts: 0 };
@@ -181,9 +159,7 @@ export function buildCivilPlanSheet(
     let markup = '';
     if (entity.kind === 'line' || entity.kind === 'polyline') {
       const runs = clipPolyline(paper, entity.kind === 'polyline' && entity.closed, viewport);
-      markup = runs
-        .map((run) => `<polyline class="civil-line" points="${svgPoints(run)}" ${stroke}/>`)
-        .join('');
+      markup = runs.map((run) => `<polyline class="civil-line" points="${svgPoints(run)}" ${stroke}/>`).join('');
       if (runs.length > 0) counts[entity.kind === 'line' ? 'lines' : 'polylines']++;
     } else if (paper[0] && insideRect(paper[0], viewport)) {
       const [x, y] = paper[0];
@@ -193,8 +169,7 @@ export function buildCivilPlanSheet(
       } else if (entity.kind === 'text') {
         const size = clamp(entity.height * perUnit, 1.8, 5);
         const turn = toDegrees(-entity.rotation[2]);
-        const anchor =
-          entity.anchor === 'left' ? 'start' : entity.anchor === 'right' ? 'end' : 'middle';
+        const anchor = entity.anchor === 'left' ? 'start' : entity.anchor === 'right' ? 'end' : 'middle';
         markup =
           `<text class="civil-text" x="${n(x)}" y="${n(y)}" font-size="${n(size)}" text-anchor="${anchor}" fill="${escapeXml(color)}"` +
           `${turn !== 0 ? ` transform="rotate(${n(turn)} ${n(x)} ${n(y)})"` : ''}>${escapeXml(entity.content)}</text>`;
@@ -224,10 +199,7 @@ export function buildCivilPlanSheet(
       `<clipPath id="${clipId}"><rect x="${n(viewport.x)}" y="${n(viewport.y)}" width="${n(viewport.width)}" height="${n(viewport.height)}"/></clipPath>` +
       `<g clip-path="url(#${clipId})">${body.join('')}${gridTicks(doc, scale, viewport, center, toPaper).join('')}</g>` +
       `<rect x="${n(viewport.x)}" y="${n(viewport.y)}" width="${n(viewport.width)}" height="${n(viewport.height)}" class="frame-thin"/>`,
-    overlays: [
-      northArrow(width - MARGIN - 12, MARGIN + 12),
-      legend(viewport.x + viewport.width + 2, MARGIN + 28, layers),
-    ],
+    overlays: [northArrow(width - MARGIN - 12, MARGIN + 12), legend(viewport.x + viewport.width + 2, MARGIN + 28, layers)],
   });
   return {
     text: `${text}\n`,

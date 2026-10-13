@@ -43,9 +43,7 @@ export class ViewportErrorBoundary extends Component<Props, State> {
             </span>
             <h2 className="vp-error__title">The viewport hit a problem</h2>
             <p className="vp-error__message">{this.state.message}</p>
-            <p className="vp-error__hint">
-              Your document is safe. Reload the page to restore the view.
-            </p>
+            <p className="vp-error__hint">Your document is safe. Reload the page to restore the view.</p>
           </div>
         </div>
       );

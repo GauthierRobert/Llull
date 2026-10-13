@@ -83,8 +83,7 @@ export function useDrawTool(): UseDrawToolResult {
 
   /** Points of the shape in progress, read from the synchronous mirror (never the render closure). */
   const livePoints = useCallback(
-    (): Vec2[] =>
-      progressRef.current.tool === activeTool ? progressRef.current.points : EMPTY_POINTS,
+    (): Vec2[] => (progressRef.current.tool === activeTool ? progressRef.current.points : EMPTY_POINTS),
     [activeTool],
   );
 

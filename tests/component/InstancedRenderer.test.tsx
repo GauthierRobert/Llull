@@ -21,12 +21,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '@ui/store';
 import { type Entity } from '@core/model/types';
 import { localDispatch } from '../helpers/storeTestHelpers';
-import {
-  groupEntitiesForInstancing,
-  entityIdFromInstanceId,
-  isBatchable,
-  type InstanceBatch,
-} from '../../src/ui/viewport/3d/grouping';
+import { groupEntitiesForInstancing, entityIdFromInstanceId, isBatchable, type InstanceBatch } from '../../src/ui/viewport/3d/grouping';
 import { makeMaterialArgs } from '@ui/viewport/3d/InstancedRenderer';
 
 function getVisibleEntities(): Entity[] {
@@ -83,18 +78,7 @@ describe('InstancedRenderer integration — unique-color boxes → separate batc
   });
 
   it('10 boxes with unique colors → 10 batches with 1 instance each', () => {
-    const colors = [
-      '#ff0000',
-      '#00ff00',
-      '#0000ff',
-      '#ffff00',
-      '#ff00ff',
-      '#00ffff',
-      '#ffffff',
-      '#aaaaaa',
-      '#555555',
-      '#123456',
-    ];
+    const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ffffff', '#aaaaaa', '#555555', '#123456'];
     for (const color of colors) {
       localDispatch('add_box', { size: [5, 5, 5], color });
     }

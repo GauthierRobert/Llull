@@ -20,11 +20,7 @@ import { polygonArea } from '@lib/polygon';
 import { existingLevelIdParam } from '../../building/levelParams';
 
 /** Steel mass of a connection in kg: its modelled end plate(s) + haunch (half the rafter section per metre). */
-export function connectionMass(
-  doc: Pick<CadDocument, 'units'>,
-  building: BuildingModel,
-  connection: MomentConnectionElement,
-): number {
+export function connectionMass(doc: Pick<CadDocument, 'units'>, building: BuildingModel, connection: MomentConnectionElement): number {
   const rafter = building.elements[connection.rafterId];
   const profile = rafter?.category === 'member' ? findProfile(rafter.profile) : undefined;
   const solids = buildingConnectionSolids(doc, building, connection);
@@ -52,63 +48,35 @@ export const addMomentConnections = defineCommand({
     '(plate 20/25 mm, M20 bolts, haunch = 1/5 of the rafter plan length). Follows the rafter; plate, ' +
     'haunch and bolt quantities feed the takeoff and the connection schedule.',
   params: z.object({
-    rafterIds: z
-      .array(z.string())
-      .optional()
-      .describe('Rafter member ids. Default: every rafter of the level.'),
+    rafterIds: z.array(z.string()).optional().describe('Rafter member ids. Default: every rafter of the level.'),
     levelId: existingLevelIdParam,
-    plateThickness: z
-      .number()
-      .optional()
-      .describe('End plate thickness, in document units. Default 20 / 25 mm.'),
-    boltDiameter: z
-      .number()
-      .optional()
-      .describe('Bolt diameter, in document units. Default 20 mm (M20).'),
-    haunchLength: z
-      .number()
-      .optional()
-      .describe('Eaves haunch length along the rafter. Default 1/5 of its plan length.'),
+    plateThickness: z.number().optional().describe('End plate thickness, in document units. Default 20 / 25 mm.'),
+    boltDiameter: z.number().optional().describe('Bolt diameter, in document units. Default 20 mm (M20).'),
+    haunchLength: z.number().optional().describe('Eaves haunch length along the rafter. Default 1/5 of its plan length.'),
   }),
   run: (doc, params): CommandResult => {
     const { plateThickness, boltDiameter, haunchLength } = params;
     const positive = (value: number | undefined): boolean => value === undefined || value > 0;
     if (!positive(plateThickness) || !positive(boltDiameter) || !positive(haunchLength)) {
-      return noop(
-        doc,
-        'add_moment_connections failed: plateThickness, boltDiameter and haunchLength must be > 0.',
-      );
+      return noop(doc, 'add_moment_connections failed: plateThickness, boltDiameter and haunchLength must be > 0.');
     }
     const building = getBuilding(doc);
     const unknownLevel = unknownLevelFailure(doc, 'add_moment_connections', params.levelId);
     if (unknownLevel) return unknownLevel;
     const levelId = existingLevelId(building, params.levelId) ?? '';
-    const joints = findMomentJoints(
-      building,
-      levelId,
-      params.rafterIds ? new Set(params.rafterIds) : null,
-      fromMm(doc, 10),
-    );
+    const joints = findMomentJoints(building, levelId, params.rafterIds ? new Set(params.rafterIds) : null, fromMm(doc, 10));
     if (joints.length === 0) {
-      return noop(
-        doc,
-        'add_moment_connections failed: no unconnected rafter-to-column or rafter-to-rafter joint found.',
-      );
+      return noop(doc, 'add_moment_connections failed: no unconnected rafter-to-column or rafter-to-rafter joint found.');
     }
     const added = appendConnections(doc, building, levelId, joints, {
       plateThickness,
       boltDiameter,
       haunchLength,
     });
-    const connections = added.ids.map(
-      (id) => added.building.elements[id] as MomentConnectionElement,
-    );
+    const connections = added.ids.map((id) => added.building.elements[id] as MomentConnectionElement);
     const eaves = connections.filter((connection) => connection.kind === 'eaves').length;
     const bolts = connections.reduce((sum, connection) => sum + 2 * connection.boltRows, 0);
-    const kilograms = connections.reduce(
-      (sum, connection) => sum + connectionMass(doc, added.building, connection),
-      0,
-    );
+    const kilograms = connections.reduce((sum, connection) => sum + connectionMass(doc, added.building, connection), 0);
     return commitBuilding(
       doc,
       added.building,
@@ -146,9 +114,7 @@ export function fullStrengthFactor(fy: number): number {
     [420, 520, 1.0],
     [460, 540, 1.0],
   ];
-  const [, fu, beta] =
-    grades.find(([grade]) => grade >= fy) ??
-    (grades[grades.length - 1] as readonly [number, number, number]);
+  const [, fu, beta] = grades.find(([grade]) => grade >= fy) ?? (grades[grades.length - 1] as readonly [number, number, number]);
   return (beta * fy * 1.25) / (Math.SQRT2 * fu);
 }
 
@@ -164,8 +130,7 @@ export function connectionWelds(
   const rafter = building.elements[connection.rafterId];
   const profile = rafter?.category === 'member' ? findProfile(rafter.profile) : undefined;
   if (!profile) return null;
-  const fy =
-    Number(/S\s*(\d{3})/i.exec(rafter?.category === 'member' ? rafter.material : '')?.[1]) || 355;
+  const fy = Number(/S\s*(\d{3})/i.exec(rafter?.category === 'member' ? rafter.material : '')?.[1]) || 355;
   const factor = fullStrengthFactor(fy);
   const throat = (thickness: number): number => Math.max(3, Math.ceil(factor * thickness));
   const [flangeThroat, webThroat] = [throat(profile.tf), throat(profile.tw)];
@@ -178,9 +143,6 @@ export function connectionWelds(
   const haunchFlange = haunch > 0 ? 2 * profile.b : 0;
   const flangeLength = plates * flanges + haunchFlange;
   const webLength = plates * web + haunchWeb;
-  const metal =
-    (flangeThroat ** 2 * flangeLength + webThroat ** 2 * webLength) *
-    STEEL_DENSITY_KG_PER_M3 *
-    1e-9;
+  const metal = (flangeThroat ** 2 * flangeLength + webThroat ** 2 * webLength) * STEEL_DENSITY_KG_PER_M3 * 1e-9;
   return { flangeThroat, webThroat, length: flangeLength + webLength, metal };
 }

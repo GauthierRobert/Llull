@@ -71,11 +71,7 @@ export function TerrainSection(): React.ReactElement {
         <TextField {...field('name')} hint="Surface name" label="Surface name" />
         <NumberTextField {...field('interval')} hint="Contour interval" label="Contour interval" />
         <NumberTextField {...field('majorEvery')} hint="Major every" label="Major contour every" />
-        <NumberTextField
-          {...field('maxEdge')}
-          hint="Max edge (optional)"
-          label="Maximum triangle edge"
-        />
+        <NumberTextField {...field('maxEdge')} hint="Max edge (optional)" label="Maximum triangle edge" />
         <button type="submit" className="btn btn--primary btn--sm" disabled={groups.length === 0}>
           Create surface
         </button>

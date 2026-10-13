@@ -10,12 +10,7 @@ import type { CurveSegment } from '@core/model/curve';
 import type { Entity, Vec2, Vec3 } from '@core/model/types';
 import { frameAtFraction, stationRingAt, sweepStartAxes } from '@core/geometry/sweep';
 import { ringCurves } from '@core/geometry/sectionRing';
-import {
-  mapSegment,
-  reverseChain,
-  sampleProfile,
-  segmentTangent,
-} from '@core/geometry/curveSegments';
+import { mapSegment, reverseChain, sampleProfile, segmentTangent } from '@core/geometry/curveSegments';
 import { add3, scale3 } from '@lib/vec3';
 import { signedArea } from '@lib/polygon';
 import { release } from '@core/geometry/nativeObject';
@@ -82,11 +77,7 @@ function chainWire(api: OccApi, chain: ReadonlyArray<CurveSegment<Vec3>>): OccSh
 }
 
 /** Planar face bounded by `outer`, minus optional `holes` (each reversed into an inner loop). */
-function wireFace(
-  api: OccApi,
-  outer: OccShape,
-  holes: ReadonlyArray<OccShape & { Reverse(): void }> = [],
-): OccShape | null {
+function wireFace(api: OccApi, outer: OccShape, holes: ReadonlyArray<OccShape & { Reverse(): void }> = []): OccShape | null {
   const makeFace = new api.BRepBuilderAPI_MakeFace_15(outer, true) as OccMakeFace & {
     Add(wire: OccShape): void;
   };
@@ -120,12 +111,7 @@ export function chainFace(
 }
 
 /** Exact circle wire of `radius` centred at `center` in the plane normal to `normal`. */
-function circleWire(
-  api: OccApi,
-  center: Vec3,
-  normal: Vec3,
-  radius: number,
-): OccShape & { Reverse(): void } {
+function circleWire(api: OccApi, center: Vec3, normal: Vec3, radius: number): OccShape & { Reverse(): void } {
   const origin = point(api, center);
   const direction: OccHandle = new api.gp_Dir_4(...normal);
   const frame: OccHandle = new api.gp_Ax2_3(origin, direction);
@@ -182,26 +168,17 @@ function stationSweep(api: OccApi, entity: Extract<Entity, { kind: 'sweep' }>): 
   const stations = entity.stations ?? [];
   const count = clamp(entity.path.length * SKIN_SECTIONS_PER_SEGMENT, 8, 64);
   const fractions = [
-    ...new Set([
-      ...Array.from({ length: count + 1 }, (_, k) => k / count),
-      ...stations.map((station) => station.at),
-    ]),
+    ...new Set([...Array.from({ length: count + 1 }, (_, k) => k / count), ...stations.map((station) => station.at)]),
   ].sort((a, b) => a - b);
   const rings = fractions.map((t) => {
     const frame = frameAtFraction(entity.path, t);
-    return stationRingAt(stations, t).map(([x, y]) =>
-      add3(frame.point, add3(scale3(frame.normal, x), scale3(frame.binormal, y))),
-    );
+    return stationRingAt(stations, t).map(([x, y]) => add3(frame.point, add3(scale3(frame.normal, x), scale3(frame.binormal, y))));
   });
   return skinnedSolid(api, rings, false);
 }
 
 /** Smooth or ruled BRepOffsetAPI_ThruSections solid through ring wires; null when OCC fails. */
-function skinnedSolid(
-  api: OccApi,
-  rings: ReadonlyArray<ReadonlyArray<Vec3>>,
-  ruled: boolean,
-): OccShape | null {
+function skinnedSolid(api: OccApi, rings: ReadonlyArray<ReadonlyArray<Vec3>>, ruled: boolean): OccShape | null {
   const maker = new api.BRepOffsetAPI_ThruSections(true, ruled, 1e-6) as OccHandle & {
     AddWire(wire: OccShape): void;
     CheckCompatibility(check: boolean): void;
@@ -245,12 +222,11 @@ export function sweptSolid(api: OccApi, entity: Entity): OccShape | null {
     release(spine);
     return null;
   }
-  const pipe = new api.BRepOffsetAPI_MakePipe_2(
-    spine,
-    face,
-    api.GeomFill_Trihedron.GeomFill_IsCorrectedFrenet,
-    false,
-  ) as OccHandle & { Build(): void; IsDone(): boolean; Shape(): OccShape };
+  const pipe = new api.BRepOffsetAPI_MakePipe_2(spine, face, api.GeomFill_Trihedron.GeomFill_IsCorrectedFrenet, false) as OccHandle & {
+    Build(): void;
+    IsDone(): boolean;
+    Shape(): OccShape;
+  };
   pipe.Build();
   const shape = pipe.IsDone() ? pipe.Shape() : null;
   [pipe, face, spine].forEach(release);

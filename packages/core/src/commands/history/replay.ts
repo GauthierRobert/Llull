@@ -73,9 +73,7 @@ export function replayHistory(
     // only entries no step produced are carried (see history_carry.ts).
     ...orphanState(base),
     // The building identity (IFC GlobalId salt) survives replay; its content is regenerated.
-    ...(base.building?.uid !== undefined
-      ? { building: { ...createEmptyBuilding(), uid: base.building.uid } }
-      : {}),
+    ...(base.building?.uid !== undefined ? { building: { ...createEmptyBuilding(), uid: base.building.uid } } : {}),
   };
 
   // idMap tracks old entity id (from when the step was first recorded) → new id

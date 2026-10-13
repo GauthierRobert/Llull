@@ -4,14 +4,7 @@
  * misleading agents.
  */
 import { describe, expect, it } from 'vitest';
-import {
-  buildAllMcpTools,
-  getMcpPrompt,
-  listMcpPrompts,
-  listMcpResources,
-  readMcpResource,
-  SERVER_INSTRUCTIONS,
-} from '@mcp/index';
+import { buildAllMcpTools, getMcpPrompt, listMcpPrompts, listMcpResources, readMcpResource, SERVER_INSTRUCTIONS } from '@mcp/index';
 import { CONVENTIONS_GUIDE } from '@mcp/conventions';
 import { createEmptyDocument } from '@core/model/types';
 
@@ -19,9 +12,7 @@ const tools = buildAllMcpTools();
 const toolByName = new Map(tools.map((tool) => [tool.name, tool]));
 
 function propertyNames(toolName: string): Set<string> {
-  const schema = toolByName.get(toolName)?.inputSchema as
-    | { properties?: Record<string, unknown> }
-    | undefined;
+  const schema = toolByName.get(toolName)?.inputSchema as { properties?: Record<string, unknown> } | undefined;
   return new Set(Object.keys(schema?.properties ?? {}));
 }
 
@@ -30,8 +21,7 @@ function promptTexts(): Array<{ prompt: string; text: string }> {
   return listMcpPrompts().map((descriptor) => {
     const args: Record<string, string> = {};
     for (const argument of descriptor.arguments ?? []) {
-      args[argument.name] =
-        argument.name === 'view' ? 'top' : argument.name === 'brief' ? 'a hall' : '10';
+      args[argument.name] = argument.name === 'view' ? 'top' : argument.name === 'brief' ? 'a hall' : '10';
     }
     const result = getMcpPrompt(descriptor.name, args);
     return {
@@ -49,9 +39,7 @@ interface PlanStep {
 
 function jsonBlocks(text: string): unknown[] {
   // Plans may carry `// comment` lines; a comment marker follows whitespace, a URL's does not.
-  return [...text.matchAll(/```json\n([\s\S]*?)```/g)].map((match) =>
-    JSON.parse((match[1] ?? 'null').replace(/(^|\s)\/\/.*$/gm, '')),
-  );
+  return [...text.matchAll(/```json\n([\s\S]*?)```/g)].map((match) => JSON.parse((match[1] ?? 'null').replace(/(^|\s)\/\/.*$/gm, '')));
 }
 
 function stepsOf(plan: unknown): PlanStep[] {
@@ -92,9 +80,7 @@ describe('prompt plans', () => {
     for (const { prompt, text } of promptTexts()) {
       for (const match of text.matchAll(/```json\n([\s\S]*?)```/g)) {
         const before = text.slice(0, match.index);
-        const mentioned = [...before.matchAll(/`([a-z_]+)`/g)]
-          .map((found) => found[1] ?? '')
-          .filter((name) => toolByName.has(name));
+        const mentioned = [...before.matchAll(/`([a-z_]+)`/g)].map((found) => found[1] ?? '').filter((name) => toolByName.has(name));
         const tool = mentioned.at(-1);
         const example = JSON.parse((match[1] ?? '{}').replace(/(^|\s)\/\/.*$/gm, '')) as unknown;
         if (tool === undefined || typeof example !== 'object' || example === null) continue;
@@ -155,17 +141,13 @@ describe('backticked names in prose', () => {
     const known = vocabulary();
     // Document-level fields and literals the guide explains, which are not command parameters.
     const documentWords = new Set(['units', 'mm', 'cm', 'm', 'in', 'ft', 'rotation', 'position']);
-    const stale = backtickedIdentifiers(CONVENTIONS_GUIDE).filter(
-      (word) => !known.has(word) && !documentWords.has(word),
-    );
+    const stale = backtickedIdentifiers(CONVENTIONS_GUIDE).filter((word) => !known.has(word) && !documentWords.has(word));
     expect([...new Set(stale)]).toEqual([]);
   });
 
   it('the server instructions mention only real tools, parameters and resources', () => {
     const known = vocabulary();
-    const stale = backtickedIdentifiers(SERVER_INSTRUCTIONS).filter(
-      (word) => !known.has(word) && !['structuredContent'].includes(word),
-    );
+    const stale = backtickedIdentifiers(SERVER_INSTRUCTIONS).filter((word) => !known.has(word) && !['structuredContent'].includes(word));
     expect(stale).toEqual([]);
     const uris = new Set(listMcpResources().map((resource) => resource.uri));
     const mentioned = [...SERVER_INSTRUCTIONS.matchAll(/`(cad:\/\/[a-z]+)`/g)].map((m) => m[1]);

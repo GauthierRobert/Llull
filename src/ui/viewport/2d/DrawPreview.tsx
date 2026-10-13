@@ -32,12 +32,7 @@ interface Preview {
 }
 
 /** Chain tools preview a straight-segment rubber band; the others an outline from the one placed point. */
-function previewOf(
-  tool: DrawToolKind,
-  points: ReadonlyArray<Vec2>,
-  cursor: Vec2,
-  crosshairRadius: number,
-): Preview | null {
+function previewOf(tool: DrawToolKind, points: ReadonlyArray<Vec2>, cursor: Vec2, crosshairRadius: number): Preview | null {
   const outline = drawToolDescriptor(tool)?.preview;
   if (outline === undefined) return null;
   if (outline === 'chain') {
@@ -65,20 +60,9 @@ interface OverlaySegmentsProps {
   renderOrder: number;
 }
 
-function OverlaySegments({
-  vertices,
-  material,
-  renderOrder,
-}: OverlaySegmentsProps): React.ReactElement {
+function OverlaySegments({ vertices, material, renderOrder }: OverlaySegmentsProps): React.ReactElement {
   const anchored = useAnchoredGeometry(() => vertices, 0, [vertices]);
-  return (
-    <lineSegments
-      geometry={anchored.geometry}
-      material={material}
-      renderOrder={renderOrder}
-      position={anchored.anchor}
-    />
-  );
+  return <lineSegments geometry={anchored.geometry} material={material} renderOrder={renderOrder} position={anchored.anchor} />;
 }
 
 interface DrawPreviewProps {
@@ -91,39 +75,21 @@ interface DrawPreviewProps {
 }
 
 /** Draws over entities (renderOrder 998) but under snap glyphs. */
-export function DrawPreview({
-  activeTool,
-  collectedPoints,
-  cursor,
-  zoom,
-}: DrawPreviewProps): React.ReactElement | null {
+export function DrawPreview({ activeTool, collectedPoints, cursor, zoom }: DrawPreviewProps): React.ReactElement | null {
   const solidMaterial = useOverlayMaterial(OVERLAY_ACCENT, 0.85);
   const hintMaterial = useOverlayMaterial(PREVIEW_HINT_COLOR, 0.5);
   const crosshairRadius = pixelsToWorld(CROSSHAIR_RADIUS_PX, zoom);
   const preview = useMemo(
-    () =>
-      cursor === null ? null : previewOf(activeTool, collectedPoints, cursor, crosshairRadius),
+    () => (cursor === null ? null : previewOf(activeTool, collectedPoints, cursor, crosshairRadius)),
     [activeTool, collectedPoints, cursor, crosshairRadius],
   );
 
   if (!preview) return null;
-  return (
-    <OverlaySegments
-      vertices={preview.vertices}
-      material={preview.hint ? hintMaterial : solidMaterial}
-      renderOrder={998}
-    />
-  );
+  return <OverlaySegments vertices={preview.vertices} material={preview.hint ? hintMaterial : solidMaterial} renderOrder={998} />;
 }
 
 /** Small square marker at each already-collected vertex. */
-export function CollectedPointMarkers({
-  points,
-  zoom,
-}: {
-  points: Vec2[];
-  zoom: number;
-}): React.ReactElement | null {
+export function CollectedPointMarkers({ points, zoom }: { points: Vec2[]; zoom: number }): React.ReactElement | null {
   const material = useOverlayMaterial(MARKER_COLOR);
   const markerRadius = pixelsToWorld(MARKER_RADIUS_PX, zoom);
   const vertices = useMemo(

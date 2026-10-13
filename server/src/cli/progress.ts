@@ -76,10 +76,8 @@ export function createStepObserver(options: StepObserverOptions): StepObserver {
     const elapsed = now() - (startedAt.get(event.ordinal) ?? now());
     if (event.stepPosition !== undefined) durations.set(event.stepPosition, elapsed);
     const label = `[${event.ordinal}/${event.total}] ${event.command}`;
-    if (progress)
-      print(`${label} … ${formatDuration(elapsed)}${event.ok === false ? ' FAILED' : ''}`);
-    if (elapsed >= slowMs)
-      print(`llull: warning: slow step ${label} took ${formatDuration(elapsed)}`);
+    if (progress) print(`${label} … ${formatDuration(elapsed)}${event.ok === false ? ' FAILED' : ''}`);
+    if (elapsed >= slowMs) print(`llull: warning: slow step ${label} took ${formatDuration(elapsed)}`);
   };
 
   return {

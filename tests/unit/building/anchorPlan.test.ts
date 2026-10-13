@@ -21,8 +21,7 @@ function hall(units?: 'm'): CadDocument {
   return result.document;
 }
 
-const texts = (svg: string): string[] =>
-  [...svg.matchAll(/<text [^>]*>([^<]*)<\/text>/g)].map((match) => match[1] as string);
+const texts = (svg: string): string[] => [...svg.matchAll(/<text [^>]*>([^<]*)<\/text>/g)].map((match) => match[1] as string);
 
 describe('export_anchor_plan', () => {
   it('draws every bolt and lists every plate in the schedule', () => {
@@ -32,10 +31,7 @@ describe('export_anchor_plan', () => {
     const data = result.data as AnchorData;
     const building = doc.building;
     const plates = Object.values(building?.elements ?? {}).filter((e) => e.category === 'plate');
-    const bolts = plates.reduce(
-      (sum, plate) => sum + (plate.category === 'plate' ? plate.boltCount : 0),
-      0,
-    );
+    const bolts = plates.reduce((sum, plate) => sum + (plate.category === 'plate' ? plate.boltCount : 0), 0);
     expect(plates.length).toBeGreaterThan(0);
     expect(data.plates).toBe(plates.length);
     expect(data.boltCount).toBe(bolts);
@@ -68,9 +64,7 @@ describe('export_anchor_plan', () => {
     expect(all).toContain('300');
     expect(all).toContain('Anchor bolt schedule (mm)');
     expect(all.some((text) => /^\+?-?\d\.\d{3}$|TOC [+-]\d/.test(text))).toBe(true);
-    const grids = Object.values(hall().building?.elements ?? {}).filter(
-      (e) => e.category === 'grid',
-    );
+    const grids = Object.values(hall().building?.elements ?? {}).filter((e) => e.category === 'grid');
     expect(grids.length).toBeGreaterThan(2);
     // Typical frame bay (e.g. 6000) appears as a running dimension.
     expect(all.filter((text) => /^\d{4,5}$/.test(text)).length).toBeGreaterThan(2);
@@ -79,8 +73,7 @@ describe('export_anchor_plan', () => {
   it('honours embedment, scale, paper and level params', () => {
     const doc = hall();
     const levelId = doc.building?.levelOrder[0] ?? '';
-    const data = anchorPlan.run(doc, { levelId, scale: 200, paper: 'A2', embedment: 450 })
-      .data as AnchorData;
+    const data = anchorPlan.run(doc, { levelId, scale: 200, paper: 'A2', embedment: 450 }).data as AnchorData;
     expect(data.scale).toBe(200);
     expect(data.levelId).toBe(levelId);
     expect(data.filename).toContain('A2_1-200');
@@ -103,16 +96,13 @@ describe('export_anchor_plan', () => {
     const elements = { ...building.elements };
     const order = building.elementOrder.filter((id) => elements[id]?.category !== 'footing');
     for (const id of Object.keys(elements)) {
-      if (elements[id]?.category === 'footing' || elements[id]?.category === 'grid')
-        delete elements[id];
+      if (elements[id]?.category === 'footing' || elements[id]?.category === 'grid') delete elements[id];
     }
     const bare = { ...doc, building: { ...building, elements, elementOrder: order } };
     const result = anchorPlan.run(bare, { paper: 'A4' });
     const data = result.data as AnchorData;
     expect(data.boltCount).toBeGreaterThan(0);
-    expect(texts(data.svg).some((text) => text.startsWith('A/') || text.startsWith('-/'))).toBe(
-      true,
-    );
+    expect(texts(data.svg).some((text) => text.startsWith('A/') || text.startsWith('-/'))).toBe(true);
     const many = { ...bare, building: { ...bare.building, elements: { ...elements } } };
     const plateIds = order.filter((id) => elements[id]?.category === 'plate');
     const first = elements[plateIds[0] as string];
@@ -123,9 +113,7 @@ describe('export_anchor_plan', () => {
       many.building.elementOrder = [...many.building.elementOrder, id];
     }
     const big = anchorPlan.run(many as CadDocument, { paper: 'A4' });
-    expect(texts((big.data as AnchorData).svg).some((text) => text.includes('not shown'))).toBe(
-      true,
-    );
+    expect(texts((big.data as AnchorData).svg).some((text) => text.includes('not shown'))).toBe(true);
   });
 
   it('signs the grid offset of off-grid plates in the schedule and labels', () => {
@@ -140,23 +128,17 @@ describe('export_anchor_plan', () => {
 
   it('places grid dimensions outside the plate labels', () => {
     const data = anchorPlan.run(hall(), {}).data as AnchorData;
-    const group = (id: string): string =>
-      new RegExp(`<g id="${id}">([\\s\\S]*?)</g>`).exec(data.svg)?.[1] ?? '';
-    const labelYs = [...group('plate-labels').matchAll(/<text [^>]*y="([\d.-]+)"/g)].map((m) =>
+    const group = (id: string): string => new RegExp(`<g id="${id}">([\\s\\S]*?)</g>`).exec(data.svg)?.[1] ?? '';
+    const labelYs = [...group('plate-labels').matchAll(/<text [^>]*y="([\d.-]+)"/g)].map((m) => Number(m[1]));
+    const dimYs = [...group('grid-dimensions').matchAll(/<line [^>]*y1="([\d.-]+)"[^>]*y2="([\d.-]+)" class="dim"/g)].flatMap((m) => [
       Number(m[1]),
-    );
-    const dimYs = [
-      ...group('grid-dimensions').matchAll(
-        /<line [^>]*y1="([\d.-]+)"[^>]*y2="([\d.-]+)" class="dim"/g,
-      ),
-    ].flatMap((m) => [Number(m[1]), Number(m[2])]);
+      Number(m[2]),
+    ]);
     expect(labelYs.length).toBeGreaterThan(0);
     expect(dimYs.length).toBeGreaterThan(0);
-    const horizontalRuns = [
-      ...group('grid-dimensions').matchAll(
-        /<line [^>]*y1="([\d.-]+)"[^>]*y2="([\d.-]+)" class="dim"/g,
-      ),
-    ].filter((m) => m[1] === m[2]);
+    const horizontalRuns = [...group('grid-dimensions').matchAll(/<line [^>]*y1="([\d.-]+)"[^>]*y2="([\d.-]+)" class="dim"/g)].filter(
+      (m) => m[1] === m[2],
+    );
     expect(horizontalRuns.length).toBeGreaterThan(0);
     const top = Math.min(...labelYs) - 2;
     expect(Math.min(...horizontalRuns.map((run) => Number(run[1])))).toBeLessThanOrEqual(top - 8);
@@ -189,13 +171,7 @@ describe('export_anchor_plan', () => {
 
   it('rejects bad params', () => {
     const doc = hall();
-    for (const params of [
-      { paper: 'B5' as never },
-      { scale: 0 },
-      { scale: Number.NaN },
-      { embedment: -1 },
-      { levelId: 'level-99' },
-    ]) {
+    for (const params of [{ paper: 'B5' as never }, { scale: 0 }, { scale: Number.NaN }, { embedment: -1 }, { levelId: 'level-99' }]) {
       const result = execute(doc, 'export_anchor_plan', params);
       expect(result.document, JSON.stringify(params)).toBe(doc);
       expect(result.affected).toEqual([]);

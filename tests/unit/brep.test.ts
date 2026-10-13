@@ -49,12 +49,8 @@ function twoBoxes(): { doc: CadDocument; a: string; b: string; line: string } {
   };
 }
 
-const run = (
-  doc: CadDocument,
-  name: string,
-  params: unknown,
-  kernel: GeometryKernel | null,
-): ReturnType<typeof execute> => execute(doc, name, params, { ...defaultContext(), kernel });
+const run = (doc: CadDocument, name: string, params: unknown, kernel: GeometryKernel | null): ReturnType<typeof execute> =>
+  execute(doc, name, params, { ...defaultContext(), kernel });
 
 describe('kernel results keep their exact construction', () => {
   it('boolean union stores the boolean recipe of both exact operands and reports the topology', () => {
@@ -76,12 +72,7 @@ describe('kernel results keep their exact construction', () => {
     const kernel = fakeKernel({ boolean: TETRA, fillet: TETRA });
     const unioned = run(doc, 'boolean', { op: 'union', a, b }, kernel);
     const id = unioned.affected[0]!;
-    const filleted = run(
-      unioned.document,
-      'fillet_edge',
-      { id, edgeIndices: [3], radius: 0.2 },
-      kernel,
-    );
+    const filleted = run(unioned.document, 'fillet_edge', { id, edgeIndices: [3], radius: 0.2 }, kernel);
     const mesh = filleted.document.entities[filleted.affected[0]!] as MeshSolidEntity;
     expect(mesh.brep).toMatchObject({
       op: 'fillet',
@@ -98,9 +89,7 @@ describe('kernel results keep their exact construction', () => {
     const id = filleted.affected[0]!;
     const meshOnly = fakeKernel({ boolean: TETRA, unsupported: ['fillet', 'chamfer', 'shell'] });
     const unioned = run(filleted.document, 'boolean', { op: 'union', a: id, b }, meshOnly);
-    expect(unioned.summary).toContain(
-      `This kernel cannot rebuild '${id}' (its exact tree needs fillet)`,
-    );
+    expect(unioned.summary).toContain(`This kernel cannot rebuild '${id}' (its exact tree needs fillet)`);
     const mesh = unioned.document.entities[unioned.affected[0]!] as MeshSolidEntity;
     expect(mesh.brep).toMatchObject({
       op: 'boolean',
@@ -133,9 +122,7 @@ describe('kernel results keep their exact construction', () => {
       expect(result.summary).toMatch(message);
       expect(result.document).toBe(doc);
     }
-    expect(
-      run(doc, 'fillet_edge', { id: a, edgeIndices: [0, 28], radius: 0.1 }, kernel).affected,
-    ).toHaveLength(1);
+    expect(run(doc, 'fillet_edge', { id: a, edgeIndices: [0, 28], radius: 0.1 }, kernel).affected).toHaveLength(1);
   });
 
   it('edgesNear picks the nearest roundable edge and merges with indices', () => {
@@ -205,16 +192,14 @@ describe('kernel results keep their exact construction', () => {
   it('edgesNear needs exact topology and a roundable edge', () => {
     const { doc, a } = twoBoxes();
     const params = { id: a, edgesNear: [[0, 0, 0]], distance: 0.1 };
-    expect(run(doc, 'chamfer_edge', params, fakeKernel({ chamfer: TETRA })).summary).toMatch(
-      /edgesNear needs the exact B-rep topology/,
-    );
+    expect(run(doc, 'chamfer_edge', params, fakeKernel({ chamfer: TETRA })).summary).toMatch(/edgesNear needs the exact B-rep topology/);
     const seamsOnly = {
       ...TOPOLOGY,
       edges: TOPOLOGY.edges.map((edge) => ({ ...edge, seam: true })),
     };
-    expect(
-      run(doc, 'chamfer_edge', params, fakeKernel({ chamfer: TETRA, topology: seamsOnly })).summary,
-    ).toMatch(/found no roundable edge/);
+    expect(run(doc, 'chamfer_edge', params, fakeKernel({ chamfer: TETRA, topology: seamsOnly })).summary).toMatch(
+      /found no roundable edge/,
+    );
   });
 
   it('fillet_edge on a component instance asks to explode it first', () => {
@@ -287,9 +272,7 @@ describe('inspect_topology', () => {
     const { doc, a } = twoBoxes();
     expect(run(doc, 'inspect_topology', { id: a }, null).summary).toMatch(/not available/);
     expect(run(doc, 'inspect_topology', { id: a }, fakeKernel()).summary).toMatch(/no exact B-rep/);
-    expect(run(doc, 'inspect_topology', { id: a }, fakeKernel({ solid: null })).summary).toMatch(
-      /could not build/,
-    );
+    expect(run(doc, 'inspect_topology', { id: a }, fakeKernel({ solid: null })).summary).toMatch(/could not build/);
   });
 });
 
@@ -310,12 +293,7 @@ describe('export_step_exact', () => {
 
   it('exports a subset and reports skipped ids', () => {
     const { doc, a, line } = twoBoxes();
-    const result = run(
-      doc,
-      'export_step_exact',
-      { entityIds: [a, line, 'ghost'] },
-      fakeKernel({ step: 'S' }),
-    );
+    const result = run(doc, 'export_step_exact', { entityIds: [a, line, 'ghost'] }, fakeKernel({ step: 'S' }));
     expect(result.data).toMatchObject({
       solidCount: 1,
       skipped: [`${line} (2D)`, 'ghost (not found)'],
@@ -326,14 +304,8 @@ describe('export_step_exact', () => {
   it('refuses: no kernel, no solids, a solid the kernel cannot build, a kernel without STEP', () => {
     const { doc, line } = twoBoxes();
     expect(run(doc, 'export_step_exact', {}, null).summary).toMatch(/not available/);
-    expect(
-      run(doc, 'export_step_exact', { entityIds: [line] }, fakeKernel({ step: 'S' })).summary,
-    ).toMatch(/no 3D solids/);
-    expect(
-      run(doc, 'export_step_exact', {}, fakeKernel({ solid: null, step: 'S' })).summary,
-    ).toMatch(/could not build/);
-    expect(run(doc, 'export_step_exact', {}, fakeKernel()).summary).toMatch(
-      /cannot write exact STEP/,
-    );
+    expect(run(doc, 'export_step_exact', { entityIds: [line] }, fakeKernel({ step: 'S' })).summary).toMatch(/no 3D solids/);
+    expect(run(doc, 'export_step_exact', {}, fakeKernel({ solid: null, step: 'S' })).summary).toMatch(/could not build/);
+    expect(run(doc, 'export_step_exact', {}, fakeKernel()).summary).toMatch(/cannot write exact STEP/);
   });
 });

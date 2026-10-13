@@ -20,15 +20,7 @@ export function ArcRenderer({
   selected,
 }: Branch<ArcEntity>): React.ReactElement {
   const shared = { center, position, rotation, color, selected };
-  return (
-    <EllipticalCurve
-      {...shared}
-      startAngle={startAngle}
-      endAngle={endAngle}
-      radiusX={radius}
-      radiusY={radius}
-    />
-  );
+  return <EllipticalCurve {...shared} startAngle={startAngle} endAngle={endAngle} radiusX={radius} radiusY={radius} />;
 }
 
 export function EllipseRenderer({

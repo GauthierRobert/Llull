@@ -55,16 +55,8 @@ describe('MechanismOverlay — constraint line geometry', () => {
     expect(entityB).toBeDefined();
 
     // Mirror the geometry build in ConstraintLine.
-    const posA = new THREE.Vector3(
-      entityA!.position[0],
-      entityA!.position[1],
-      entityA!.position[2],
-    );
-    const posB = new THREE.Vector3(
-      entityB!.position[0],
-      entityB!.position[1],
-      entityB!.position[2],
-    );
+    const posA = new THREE.Vector3(entityA!.position[0], entityA!.position[1], entityA!.position[2]);
+    const posB = new THREE.Vector3(entityB!.position[0], entityB!.position[1], entityB!.position[2]);
 
     const positions = new Float32Array([posA.x, posA.y, posA.z, posB.x, posB.y, posB.z]);
     const geo = new THREE.BufferGeometry();
@@ -124,11 +116,7 @@ describe('MechanismOverlay — joint arrow', () => {
     expect(joint!.kind).toBe(kind);
 
     const entity = doc.entities[joint!.a.instanceId];
-    const origin = new THREE.Vector3(
-      entity?.position[0] ?? 0,
-      entity?.position[1] ?? 0,
-      entity?.position[2] ?? 0,
-    );
+    const origin = new THREE.Vector3(entity?.position[0] ?? 0, entity?.position[1] ?? 0, entity?.position[2] ?? 0);
     const axis = new THREE.Vector3(0, 0, 1); // 'z'
 
     const arrow = new THREE.ArrowHelper(axis, origin, 1.5, color, 0.35, 0.18);

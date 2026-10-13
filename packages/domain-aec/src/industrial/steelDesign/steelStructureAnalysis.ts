@@ -50,10 +50,7 @@ interface SteelStructureAnalysis {
 }
 
 /** @failure document without a building / steel members -> rows [] */
-export function analyseSteelStructure(
-  doc: CadDocument,
-  params: SteelCheckParams,
-): SteelStructureAnalysis {
+export function analyseSteelStructure(doc: CadDocument, params: SteelCheckParams): SteelStructureAnalysis {
   const units = modelUnits(doc);
   const bars = collectSteelBars(doc);
   const columns = bars.filter((bar) => bar.kind === 'column');
@@ -66,20 +63,11 @@ export function analyseSteelStructure(
     framing.columnNodes.set(columnId, [...(framing.columnNodes.get(columnId) ?? []), node]);
   }
   const segments = new Map<string, ColumnSegment[]>(
-    columns.map((column) => [
-      column.id,
-      columnSegments(column, framing.columnNodes.get(column.id) ?? []),
-    ]),
+    columns.map((column) => [column.id, columnSegments(column, framing.columnNodes.get(column.id) ?? [])]),
   );
   const results: BeamResult[] = [...framing.results.values()];
   const frames = analyseFrames(results, columns, framing.columnNodes, params);
-  const bracing = checkBracing(
-    braces,
-    results,
-    [...segments.values()].flat(),
-    params.notionalFactor,
-    frames.coverage,
-  );
+  const bracing = checkBracing(braces, results, [...segments.values()].flat(), params.notionalFactor, frames.coverage);
   const rowById = new Map<string, MemberRow>(bracing.rows.map((row) => [row.id, row]));
   for (const column of columns) {
     rowById.set(column.id, checkColumn(column, segments.get(column.id) ?? []));
@@ -87,23 +75,12 @@ export function analyseSteelStructure(
   for (const result of results) {
     rowById.set(
       result.loads.bar.id,
-      checkBeam(
-        result.loads.bar,
-        result,
-        params.deflectionRatio,
-        bracing.strutForces.get(result.loads.bar.id),
-      ),
+      checkBeam(result.loads.bar, result, params.deflectionRatio, bracing.strutForces.get(result.loads.bar.id)),
     );
   }
   for (const [id, row] of frames.rows) rowById.set(id, row);
-  const rows = bars.map(
-    (bar) =>
-      rowById.get(bar.id) ??
-      skippedRow(bar, bar.skipReason ?? 'member is not part of the analysis'),
-  );
-  const massKg = new Map(
-    bars.map((bar) => [bar.id, ((bar.profile?.massPerMetre ?? 0) * bar.length) / 1000]),
-  );
+  const rows = bars.map((bar) => rowById.get(bar.id) ?? skippedRow(bar, bar.skipReason ?? 'member is not part of the analysis'));
+  const massKg = new Map(bars.map((bar) => [bar.id, ((bar.profile?.massPerMetre ?? 0) * bar.length) / 1000]));
   return {
     rows,
     floors: area.floors,
@@ -111,13 +88,7 @@ export function analyseSteelStructure(
     lines: lines.runs,
     storeys: bracing.storeys,
     frames: frames.reports,
-    warnings: [
-      ...area.warnings,
-      ...lines.warnings,
-      ...framing.warnings,
-      ...frames.warnings,
-      ...bracing.warnings,
-    ],
+    warnings: [...area.warnings, ...lines.warnings, ...framing.warnings, ...frames.warnings, ...bracing.warnings],
     massKg,
   };
 }

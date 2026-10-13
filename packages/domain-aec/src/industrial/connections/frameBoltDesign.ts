@@ -75,10 +75,7 @@ export function sizeBoltGroups(
     changes.push(`${kind} connections: ${chosen.rows * 2} × M${chosen.diameter}`);
     for (const row of targets) {
       const original = building.elements[row.elementId] as MomentConnectionElement;
-      if (
-        original.boltRows === chosen.rows &&
-        original.boltDiameter === fromMm(doc, chosen.diameter)
-      ) {
+      if (original.boltRows === chosen.rows && original.boltDiameter === fromMm(doc, chosen.diameter)) {
         continue;
       }
       building = withElement(building, {
@@ -93,11 +90,7 @@ export function sizeBoltGroups(
 }
 
 /** Bolt rows at least 2.2 d0 apart (EN 1993-1-8 Tab. 3.3; d0 = d + 2 mm up to M24, + 3 mm above). */
-function rowSpacingOk(
-  doc: Pick<CadDocument, 'units'>,
-  building: BuildingModel,
-  connection: MomentConnectionElement,
-): boolean {
+function rowSpacingOk(doc: Pick<CadDocument, 'units'>, building: BuildingModel, connection: MomentConnectionElement): boolean {
   if (connection.boltRows < 2) return true;
   const solids = buildingConnectionSolids(doc, building, connection);
   if (!solids) return false;

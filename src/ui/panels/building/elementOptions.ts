@@ -35,10 +35,7 @@ export function elementOptions(building: BuildingModel | undefined): ElementOpti
     if (!element) continue;
     const onActiveLevel = 'levelId' in element && element.levelId === building.activeLevelId;
     if (element.category === 'wall' && onActiveLevel) {
-      const length = Math.hypot(
-        element.end[0] - element.start[0],
-        element.end[1] - element.start[1],
-      );
+      const length = Math.hypot(element.end[0] - element.start[0], element.end[1] - element.start[1]);
       options.walls.push({ id, label: `${element.mark} · ${Math.round(length)} long` });
       options.hosts.push({ id, label: `${element.mark} · ${Math.round(length)} long` });
     } else if (element.category === 'curvedWall' && onActiveLevel) {

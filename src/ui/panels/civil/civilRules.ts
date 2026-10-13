@@ -8,9 +8,7 @@ import type { Vec2 } from '@core/model/types';
 import { optionalNumber, optionalText, parseNumber, parseNumberList } from '@ui/numberText';
 import { parsePoints } from './civilInput';
 
-export type Gathered =
-  | { readonly ok: true; readonly params: Record<string, unknown> }
-  | { readonly ok: false; readonly error: string };
+export type Gathered = { readonly ok: true; readonly params: Record<string, unknown> } | { readonly ok: false; readonly error: string };
 
 export interface AlignmentInput {
   readonly points: string;
@@ -73,10 +71,7 @@ export function manholeParamsOf(input: ManholeInput): Gathered {
       location: at[0],
       invertElevation,
       ...(input.surfaceId !== '' ? { surfaceId: input.surfaceId } : {}),
-      ...Object.entries(input.numbers).reduce(
-        (params, [key, text]) => ({ ...params, ...optionalNumber(key, text) }),
-        {},
-      ),
+      ...Object.entries(input.numbers).reduce((params, [key, text]) => ({ ...params, ...optionalNumber(key, text) }), {}),
       ...optionalText('name', input.name),
     },
   };
@@ -86,20 +81,13 @@ export function manholeParamsOf(input: ManholeInput): Gathered {
 export function failuresOf(data: unknown): string[] {
   if (typeof data !== 'object' || data === null || !('failures' in data)) return [];
   const failures: unknown = data.failures;
-  return Array.isArray(failures)
-    ? failures.filter((item): item is string => typeof item === 'string')
-    : [];
+  return Array.isArray(failures) ? failures.filter((item): item is string => typeof item === 'string') : [];
 }
 
 export const IDF_FIELDS = ['a', 'b', 'c'] as const;
 
 /** Design storm params: the IDF curve when a, b and c are all given, else the constant intensity. */
-export function stormParams(
-  rainfall: string,
-  idf: Record<(typeof IDF_FIELDS)[number], string>,
-): Record<string, unknown> {
+export function stormParams(rainfall: string, idf: Record<(typeof IDF_FIELDS)[number], string>): Record<string, unknown> {
   const [a, b, c] = IDF_FIELDS.map((key) => parseNumber(idf[key]));
-  return a !== undefined && b !== undefined && c !== undefined
-    ? { idf: { a, b, c } }
-    : optionalNumber('rainfallIntensityMmH', rainfall);
+  return a !== undefined && b !== undefined && c !== undefined ? { idf: { a, b, c } } : optionalNumber('rainfallIntensityMmH', rainfall);
 }

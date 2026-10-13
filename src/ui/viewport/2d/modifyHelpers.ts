@@ -12,15 +12,7 @@
 import { ellipsePoint } from '@lib/arc';
 import { distance, pointInPolygon, projectOntoSegment } from '@lib/polygon';
 import type * as THREE from 'three';
-import type {
-  CadDocument,
-  DimensionEntity,
-  Entity,
-  EntityId,
-  ImageEntity,
-  TextEntity,
-  Vec2,
-} from '@core/model/types';
+import type { CadDocument, DimensionEntity, Entity, EntityId, ImageEntity, TextEntity, Vec2 } from '@core/model/types';
 import { is3D } from '@core/model/types';
 import { GLYPH_WIDTH_RATIO, textLocalBounds } from '@core/geometry/bounds';
 import { closedShapeArea } from '@core/geometry/shapeArea';
@@ -91,11 +83,7 @@ export function offsetSideSign(start: Vec2, end: Vec2, pick: Vec2): 1 | -1 {
  *
  * @pure
  */
-export function signedOffsetDistance(
-  entity: Entity | undefined,
-  worldPick: Vec2 | null,
-  distance: number,
-): number {
+export function signedOffsetDistance(entity: Entity | undefined, worldPick: Vec2 | null, distance: number): number {
   if (entity === undefined || worldPick === null) return distance;
   // Shift the world-space pick into the entity's local frame.
   const localPick: Vec2 = [worldPick[0] - entity.position[0], worldPick[1] - entity.position[1]];
@@ -143,16 +131,7 @@ export function entityDistSq(entity: Entity, worldPick: Vec2): number {
     case 'arc': {
       // Distance to the nearest point on the swept arc (not its full circle).
       const [cx, cy] = entity.center;
-      const [nx, ny] = nearestOnArc(
-        pick[0],
-        pick[1],
-        cx,
-        cy,
-        entity.radius,
-        entity.startAngle,
-        entity.endAngle,
-        false,
-      );
+      const [nx, ny] = nearestOnArc(pick[0], pick[1], cx, cy, entity.radius, entity.startAngle, entity.endAngle, false);
       return distance(pick, [nx, ny]) ** 2;
     }
     case 'rectangle': {
@@ -238,10 +217,7 @@ interface LabelBox {
  * Dimensions are associative, so the label position comes from the referenced entities.
  * @failure dangling or wrong-kind references -> null
  */
-export function dimensionLabelBox(
-  document: CadDocument,
-  dimension: DimensionEntity,
-): LabelBox | null {
+export function dimensionLabelBox(document: CadDocument, dimension: DimensionEntity): LabelBox | null {
   const drawing = dimensionDrawing(
     dimension.dimensionKind,
     dimension.entityIds.map((id) => document.entities[id]),
@@ -267,11 +243,7 @@ export function dimensionLabelBox(
  * Squared distance from `worldPick` to a dimension's label box.
  * @failure dangling or wrong-kind references -> Infinity (not pickable)
  */
-export function dimensionLabelDistSq(
-  document: CadDocument,
-  dimension: DimensionEntity,
-  worldPick: Vec2,
-): number {
+export function dimensionLabelDistSq(document: CadDocument, dimension: DimensionEntity, worldPick: Vec2): number {
   const box = dimensionLabelBox(document, dimension);
   if (box === null) return Infinity;
   const dx = Math.max(Math.abs(worldPick[0] - box.center[0]) - box.halfWidth, 0);
@@ -380,10 +352,5 @@ export function pickEntityId(
 ): EntityId | null {
   const onOutline = nearestEntityId(document, worldPick, tolerance, isPickable);
   if (onOutline !== null) return onOutline;
-  return lowestScoringEntityId(
-    document,
-    isPickable,
-    (entity) => enclosingArea(entity, worldPick),
-    Infinity,
-  );
+  return lowestScoringEntityId(document, isPickable, (entity) => enclosingArea(entity, worldPick), Infinity);
 }

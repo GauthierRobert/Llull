@@ -5,8 +5,7 @@ import { execute } from '@core/commands/registry';
 
 describe('export_stl solid name', () => {
   const doc = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
-  const exportData = (params: Record<string, unknown>): ExportStlData =>
-    execute(doc, 'export_stl', params).data as ExportStlData;
+  const exportData = (params: Record<string, unknown>): ExportStlData => execute(doc, 'export_stl', params).data as ExportStlData;
 
   it('wraps ASCII output in the requested name', () => {
     const stl = exportData({ name: 'bracket' }).stl!;
@@ -43,8 +42,7 @@ describe('export_stl entity names', () => {
     const [first] = doc.order;
     return execute(doc, 'set_entity_name', { id: first, name: 'Bearing 1' }).document;
   };
-  const stlOf = (doc: Doc, p: Record<string, unknown>): string =>
-    (execute(doc, 'export_stl', p).data as ExportStlData).stl!;
+  const stlOf = (doc: Doc, p: Record<string, unknown>): string => (execute(doc, 'export_stl', p).data as ExportStlData).stl!;
 
   it('names the solid after a lone exported named entity', () => {
     const doc = named();
@@ -59,10 +57,7 @@ describe('export_stl entity names', () => {
   it('perEntity writes one named solid block per entity (name, else id)', () => {
     const doc = named();
     const lines = stlOf(doc, { perEntity: true }).split('\n');
-    expect(lines.filter((line) => line.startsWith('solid '))).toEqual([
-      'solid Bearing 1',
-      `solid ${doc.order[1]}`,
-    ]);
+    expect(lines.filter((line) => line.startsWith('solid '))).toEqual(['solid Bearing 1', `solid ${doc.order[1]}`]);
     expect(lines.filter((line) => line.startsWith('endsolid ')).length).toBe(2);
     expect(lines.filter((line) => line.includes('facet normal')).length).toBe(24);
   });

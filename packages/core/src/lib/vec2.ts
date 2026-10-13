@@ -21,11 +21,7 @@ export function dot2(a: Vec2, b: Vec2): number {
 }
 
 /** @pure `center + R(angle)·[u, v]`: (u, v) rotated counter-clockwise by `angle`, then offset by `center` (x, y). */
-export function planPoint(
-  center: readonly [number, number, ...number[]],
-  angle: number,
-  [u, v]: Vec2,
-): Vec2 {
+export function planPoint(center: readonly [number, number, ...number[]], angle: number, [u, v]: Vec2): Vec2 {
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
   return [center[0] + u * cos - v * sin, center[1] + u * sin + v * cos];
@@ -60,10 +56,7 @@ export function lerp2(a: Vec2, b: Vec2, t: number): Vec2 {
 /** @pure vertex average of `points` (`[0, 0]` when empty) */
 export function centroid2(points: ReadonlyArray<Vec2>): Vec2 {
   const count = Math.max(points.length, 1);
-  return [
-    points.reduce((sum, p) => sum + p[0], 0) / count,
-    points.reduce((sum, p) => sum + p[1], 0) / count,
-  ];
+  return [points.reduce((sum, p) => sum + p[0], 0) / count, points.reduce((sum, p) => sum + p[1], 0) / count];
 }
 
 /** @pure left perpendicular (90° counter-clockwise) */
@@ -73,11 +66,7 @@ export function perp2(a: Vec2): Vec2 {
 
 /** @pure true for an exact-length-2 array of finite numbers */
 export function isVec2(value: unknown): value is Vec2 {
-  return (
-    Array.isArray(value) &&
-    value.length === 2 &&
-    value.every((c) => typeof c === 'number' && Number.isFinite(c))
-  );
+  return Array.isArray(value) && value.length === 2 && value.every((c) => typeof c === 'number' && Number.isFinite(c));
 }
 
 /** @pure true for an array whose every element satisfies `isVec2` */

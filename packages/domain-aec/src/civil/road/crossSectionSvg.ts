@@ -45,12 +45,7 @@ export function crossSectionSvg(
   const scale = Math.min((PANEL_WIDTH - 40) / (2 * halfWidth), (PANEL_HEIGHT - 70) / spanZ);
   const rowsCount = Math.ceil(entries.length / COLUMNS);
   const body: string[] = [
-    svgText(
-      MARGIN,
-      18,
-      `Cross sections - ${alignment.name} (scale 1:${Math.round(1 / scale)} H = V, m)`,
-      { size: 13, weight: 'bold' },
-    ),
+    svgText(MARGIN, 18, `Cross sections - ${alignment.name} (scale 1:${Math.round(1 / scale)} H = V, m)`, { size: 13, weight: 'bold' }),
   ];
   entries.forEach((entry, index) => {
     const { cross, areas } = entry;
@@ -87,21 +82,8 @@ export function crossSectionSvg(
       ? `Cut ${(areas.cutArea * metre * metre).toFixed(2)} m2   Fill ${(areas.fillArea * metre * metre).toFixed(2)} m2`
       : 'no existing ground';
     body.push(svgText(left + 6, top + PANEL_HEIGHT - 8, notes, { size: 9 }));
-    const day = [cross.right, cross.left].map((node) =>
-      node ? `${(Math.abs(node.offset) * metre).toFixed(1)}` : '-',
-    );
-    body.push(
-      svgText(
-        left + PANEL_WIDTH - 6,
-        top + PANEL_HEIGHT - 8,
-        `daylight R ${day[0]} / L ${day[1]} m`,
-        { size: 9, anchor: 'end' },
-      ),
-    );
+    const day = [cross.right, cross.left].map((node) => (node ? `${(Math.abs(node.offset) * metre).toFixed(1)}` : '-'));
+    body.push(svgText(left + PANEL_WIDTH - 6, top + PANEL_HEIGHT - 8, `daylight R ${day[0]} / L ${day[1]} m`, { size: 9, anchor: 'end' }));
   });
-  return svgDocument(
-    MARGIN * 2 + COLUMNS * (PANEL_WIDTH + 10),
-    40 + rowsCount * (PANEL_HEIGHT + 10),
-    body,
-  );
+  return svgDocument(MARGIN * 2 + COLUMNS * (PANEL_WIDTH + 10), 40 + rowsCount * (PANEL_HEIGHT + 10), body);
 }

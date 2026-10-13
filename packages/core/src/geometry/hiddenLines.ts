@@ -11,14 +11,7 @@ import { pointInPolygon, projectOntoSegment } from '../lib/polygon';
 import { lerp3 } from '../lib/vec3';
 import { pointsExtent } from './bounds';
 import { clipSegmentToSide } from './planeEdges';
-import {
-  type Face,
-  type FeatureEdge,
-  type Segment2,
-  type ViewFrame,
-  depthOf,
-  sectionPlane,
-} from './viewProjection';
+import { type Face, type FeatureEdge, type Segment2, type ViewFrame, depthOf, sectionPlane } from './viewProjection';
 
 export interface EdgeRuns {
   readonly visible: Segment2[];
@@ -59,10 +52,7 @@ class Occluders {
   private readonly cell: number;
   private readonly min: Vec2;
 
-  constructor(
-    triangles: ReadonlyArray<ProjectedTriangle>,
-    bounds: readonly [number, number, number, number],
-  ) {
+  constructor(triangles: ReadonlyArray<ProjectedTriangle>, bounds: readonly [number, number, number, number]) {
     this.min = [bounds[0], bounds[1]];
     const extent = Math.max(bounds[2] - bounds[0], bounds[3] - bounds[1], 1e-9);
     this.size = Math.min(256, Math.max(1, Math.ceil(Math.sqrt(triangles.length / 4))));
@@ -84,8 +74,7 @@ class Occluders {
   }
 
   private index(point: Vec2): [number, number] {
-    const clampIndex = (value: number): number =>
-      Math.min(this.size - 1, Math.max(0, Math.floor(value / this.cell)));
+    const clampIndex = (value: number): number => Math.min(this.size - 1, Math.max(0, Math.floor(value / this.cell)));
     return [clampIndex(point[0] - this.min[0]), clampIndex(point[1] - this.min[1])];
   }
 
@@ -95,10 +84,7 @@ class Occluders {
     for (const triangle of this.cells.get(i * this.size + j) ?? []) {
       const weights = barycentric(triangle, point);
       if (weights === null) continue;
-      const faceDepth =
-        weights[0] * triangle.depths[0] +
-        weights[1] * triangle.depths[1] +
-        weights[2] * triangle.depths[2];
+      const faceDepth = weights[0] * triangle.depths[0] + weights[1] * triangle.depths[1] + weights[2] * triangle.depths[2];
       if (faceDepth > depth + tolerance && faceDepth <= cutDepth + tolerance) return true;
     }
     return false;
@@ -142,11 +128,7 @@ function underCap(point: Vec2, { loops, box }: Cap, tolerance: number): boolean 
  * viewer's side of `cutDepth` is removed (Infinity = no section).
  * @returns one entry per source, in order
  */
-export function classifyEdges(
-  sources: ReadonlyArray<ViewSource>,
-  frame: ViewFrame,
-  cutDepth: number,
-): EdgeRuns[] {
+export function classifyEdges(sources: ReadonlyArray<ViewSource>, frame: ViewFrame, cutDepth: number): EdgeRuns[] {
   const triangles: ProjectedTriangle[] = [];
   for (const source of sources) {
     for (const face of source.faces) {
@@ -162,23 +144,17 @@ export function classifyEdges(
   const step = extent / 120;
   const occluders = new Occluders(triangles, Number.isFinite(bounds[0]) ? bounds : [0, 0, 1, 1]);
   const caps: Cap[] = sources.flatMap((source) =>
-    source.cutLoops.length > 0
-      ? [{ loops: source.cutLoops, box: pointsExtent(source.cutLoops.flat()) }]
-      : [],
+    source.cutLoops.length > 0 ? [{ loops: source.cutLoops, box: pointsExtent(source.cutLoops.flat()) }] : [],
   );
   const nudge = step * 0.01;
   const coveredAt = (at: Vec2, depth: number): boolean =>
-    occluders.covers(at, depth, tolerance, cutDepth) ||
-    (depth < cutDepth - tolerance && caps.some((cap) => underCap(at, cap, nudge * 2)));
+    occluders.covers(at, depth, tolerance, cutDepth) || (depth < cutDepth - tolerance && caps.some((cap) => underCap(at, cap, nudge * 2)));
   // Hidden only when covered on both sides of the edge: an edge on a shared triangle border inside
   // a face is hidden, an edge along an occluder's outline stays visible (visible lines win).
   const hiddenAt = (point: Vec3, side: Vec2): boolean => {
     const [x, y] = frame.project(point);
     const depth = depthOf(frame, point);
-    return (
-      coveredAt([x + side[0] * nudge, y + side[1] * nudge], depth) &&
-      coveredAt([x - side[0] * nudge, y - side[1] * nudge], depth)
-    );
+    return coveredAt([x + side[0] * nudge, y + side[1] * nudge], depth) && coveredAt([x - side[0] * nudge, y - side[1] * nudge], depth);
   };
   const plane = sectionPlane(frame, cutDepth);
   return sources.map((source) => {
@@ -192,14 +168,7 @@ export function classifyEdges(
 }
 
 /** Splits a→b into visible / hidden runs (pieces of ~`step`, transitions refined by bisection). */
-function splitEdge(
-  a: Vec3,
-  b: Vec3,
-  frame: ViewFrame,
-  step: number,
-  hiddenAt: (point: Vec3, side: Vec2) => boolean,
-  runs: EdgeRuns,
-): void {
+function splitEdge(a: Vec3, b: Vec3, frame: ViewFrame, step: number, hiddenAt: (point: Vec3, side: Vec2) => boolean, runs: EdgeRuns): void {
   const [pa, pb] = [frame.project(a), frame.project(b)];
   const length = Math.hypot(pb[0] - pa[0], pb[1] - pa[1]);
   if (length <= step * 1e-6) return;

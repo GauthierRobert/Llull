@@ -42,14 +42,7 @@ export const CIVIL_LAYER_COLOR: ReadonlyMap<string, string> = new Map(
 
 type Common = Omit<BaseEntity, 'kind'>;
 
-function common(
-  object: CivilObject,
-  part: string,
-  label: string,
-  layer: CivilLayerKey,
-  position: Vec3,
-  color?: string,
-): Common {
+function common(object: CivilObject, part: string, label: string, layer: CivilLayerKey, position: Vec3, color?: string): Common {
   const spec = CIVIL_LAYERS[layer];
   return {
     id: `${object.id}:${part}`,
@@ -104,13 +97,7 @@ export function civilLine(
   return { ...common(object, part, label, layer, [0, 0, elevation]), kind: 'line', start, end };
 }
 
-export function civilPoint(
-  object: CivilObject,
-  part: string,
-  label: string,
-  layer: CivilLayerKey,
-  position: Vec3,
-): PointEntity {
+export function civilPoint(object: CivilObject, part: string, label: string, layer: CivilLayerKey, position: Vec3): PointEntity {
   return { ...common(object, part, label, layer, position), kind: 'point' };
 }
 

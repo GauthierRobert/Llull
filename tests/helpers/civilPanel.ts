@@ -16,9 +16,7 @@ export function setupCivilStore(): void {
 }
 
 /** A 20 m survey square, four TOPO-coded points. */
-export const SURVEY = ['1,0,0,10,TOPO', '2,20,0,11,TOPO', '3,0,20,12,TOPO', '4,20,20,13,TOPO'].join(
-  '\n',
-);
+export const SURVEY = ['1,0,0,10,TOPO', '2,20,0,11,TOPO', '3,0,20,12,TOPO', '4,20,20,13,TOPO'].join('\n');
 
 /** Metres, `survey` imported as 'Topo' and a surface built from it. */
 export function surveyed(survey: string = SURVEY): void {

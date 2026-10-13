@@ -32,23 +32,14 @@ function disposeGrid(grid: THREE.GridHelper): void {
 }
 
 /** Swap in a new patch geometry; the helper keeps its own material. */
-function resizeGrid(
-  grid: THREE.GridHelper,
-  extent: number,
-  divisions: number,
-  color: number,
-): void {
+function resizeGrid(grid: THREE.GridHelper, extent: number, divisions: number, color: number): void {
   const scratch = new THREE.GridHelper(extent, divisions, color, color);
   grid.geometry.dispose();
   grid.geometry = scratch.geometry;
   (scratch.material as THREE.Material).dispose();
 }
 
-export function AdaptiveGrid2D({
-  minorColor,
-  majorColor,
-  baseZ,
-}: AdaptiveGrid2DProps): React.ReactElement {
+export function AdaptiveGrid2D({ minorColor, majorColor, baseZ }: AdaptiveGrid2DProps): React.ReactElement {
   const minorGrid = useMemo(() => createFlatGrid(100, 10, minorColor), [minorColor]);
   const majorGrid = useMemo(() => createFlatGrid(100, 10, majorColor), [majorColor]);
   const lastBuilt = useRef({ step: 0, minorDivisions: 0, majorDivisions: 0 });
@@ -71,11 +62,7 @@ export function AdaptiveGrid2D({
     const majorPatch = localGridPatch(visibleWorld, majorGridStep(step));
 
     const built = lastBuilt.current;
-    if (
-      step !== built.step ||
-      minorPatch.divisions !== built.minorDivisions ||
-      majorPatch.divisions !== built.majorDivisions
-    ) {
+    if (step !== built.step || minorPatch.divisions !== built.minorDivisions || majorPatch.divisions !== built.majorDivisions) {
       lastBuilt.current = {
         step,
         minorDivisions: minorPatch.divisions,

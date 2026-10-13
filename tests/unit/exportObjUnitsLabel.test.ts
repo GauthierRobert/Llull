@@ -5,8 +5,7 @@ import { execute } from '@core/commands/registry';
 describe('export_obj units label', () => {
   const doc = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
   const objText = (units?: string): string =>
-    (execute(doc, 'export_obj', units === undefined ? {} : { units }).data as { text: string })
-      .text;
+    (execute(doc, 'export_obj', units === undefined ? {} : { units }).data as { text: string }).text;
 
   it('embeds the label in the header comment', () => {
     expect(objText('cm').split('\n')[0]).toBe('# llull OBJ export — units: cm');

@@ -13,10 +13,7 @@ import type { StoreApi } from 'zustand';
 import { useStore, useViewportStore } from '@ui/store';
 
 /** Invalidate the canvas whenever `changed(state, previous)` holds for `store`. */
-function useInvalidateOnChange<T>(
-  store: Pick<StoreApi<T>, 'subscribe'>,
-  changed: (state: T, previous: T) => boolean,
-): void {
+function useInvalidateOnChange<T>(store: Pick<StoreApi<T>, 'subscribe'>, changed: (state: T, previous: T) => boolean): void {
   const invalidate = useThree((s) => s.invalidate);
   useEffect(
     () =>
@@ -27,10 +24,8 @@ function useInvalidateOnChange<T>(
   );
 }
 
-const documentChanged = (
-  state: ReturnType<typeof useStore.getState>,
-  previous: ReturnType<typeof useStore.getState>,
-): boolean => state.document !== previous.document || state.renderOrigin !== previous.renderOrigin;
+const documentChanged = (state: ReturnType<typeof useStore.getState>, previous: ReturnType<typeof useStore.getState>): boolean =>
+  state.document !== previous.document || state.renderOrigin !== previous.renderOrigin;
 
 /** Repaints when the CAD document or renderOrigin change. */
 export function StoreInvalidator(): null {

@@ -21,10 +21,7 @@ describe('build_project completion summary counts plan steps, not expanded comma
   it('a failing step inside a repeat counts once against its plan step (onError continue)', () => {
     const result = execute(createEmptyDocument(), 'build_project', {
       onError: 'continue',
-      actions: [
-        box,
-        { repeat: { count: 3 }, step: { command: 'add_box', params: { size: [0, 0, 0] } } },
-      ],
+      actions: [box, { repeat: { count: 3 }, step: { command: 'add_box', params: { size: [0, 0, 0] } } }],
     });
     expect(result.summary).toContain('Plan complete: 1/2 plan step(s) ok (4 commands executed)');
   });

@@ -212,12 +212,8 @@ describe('add_door / add_window', () => {
   it('refuses openings that overflow, overlap, are too tall, or name a missing wall', () => {
     const doc = run(oneWall(), 'add_door', { wallId: 'wall-1', offset: 1000 });
     expect(execute(doc, 'add_window', { wallId: 'wall-1', offset: 4900 }).summary).toMatch(/spans/);
-    expect(execute(doc, 'add_window', { wallId: 'wall-1', offset: 1500 }).summary).toMatch(
-      /overlaps D1/,
-    );
-    expect(
-      execute(doc, 'add_window', { wallId: 'wall-1', offset: 3000, height: 2500 }).summary,
-    ).toMatch(/exceeds/);
+    expect(execute(doc, 'add_window', { wallId: 'wall-1', offset: 1500 }).summary).toMatch(/overlaps D1/);
+    expect(execute(doc, 'add_window', { wallId: 'wall-1', offset: 3000, height: 2500 }).summary).toMatch(/exceeds/);
     expect(execute(doc, 'add_door', { wallId: 'nope' }).summary).toMatch(/no wall/);
     expect(execute(doc, 'add_door', { wallId: 'wall-1', width: -1 }).summary).toMatch(/width/);
     expect(execute(doc, 'add_door', { wallId: 'wall-1', at: 'x' }).document).toBe(doc);
@@ -244,20 +240,14 @@ describe('add_door / add_window', () => {
       width: 800,
       mark: 'W-A',
     });
-    expect(execute(doc, 'update_opening', { openingId: 'window-1', offset: 100 }).summary).toMatch(
-      /refused/,
-    );
-    expect(execute(doc, 'update_opening', { openingId: 'wall-1' }).summary).toMatch(
-      /no door or window/,
-    );
-    expect(execute(doc, 'update_opening', { openingId: 'window-1', height: 0 }).summary).toMatch(
-      /> 0/,
-    );
-    const swung = execute(
-      run(doc, 'add_door', { wallId: 'wall-1', offset: 600 }),
-      'update_opening',
-      { openingId: 'door-1', swing: 'right', material: 'steel' },
-    );
+    expect(execute(doc, 'update_opening', { openingId: 'window-1', offset: 100 }).summary).toMatch(/refused/);
+    expect(execute(doc, 'update_opening', { openingId: 'wall-1' }).summary).toMatch(/no door or window/);
+    expect(execute(doc, 'update_opening', { openingId: 'window-1', height: 0 }).summary).toMatch(/> 0/);
+    const swung = execute(run(doc, 'add_door', { wallId: 'wall-1', offset: 600 }), 'update_opening', {
+      openingId: 'door-1',
+      swing: 'right',
+      material: 'steel',
+    });
     expect(swung.document.building!.elements['door-1']).toMatchObject({
       swing: 'right',
       material: 'steel',
@@ -296,23 +286,13 @@ describe('update_wall', () => {
       ],
     });
     doc = run(doc, 'add_window', { wallId: 'wall-1', offset: 3000 });
-    expect(execute(doc, 'update_wall', { wallId: 'wall-1', end: [2000, 0] }).summary).toMatch(
-      /refused/,
-    );
-    expect(execute(doc, 'update_wall', { wallId: 'wall-1', height: 1000 }).summary).toMatch(
-      /exceeds/,
-    );
+    expect(execute(doc, 'update_wall', { wallId: 'wall-1', end: [2000, 0] }).summary).toMatch(/refused/);
+    expect(execute(doc, 'update_wall', { wallId: 'wall-1', height: 1000 }).summary).toMatch(/exceeds/);
     expect(execute(doc, 'update_wall', { wallId: 'x' }).summary).toMatch(/no wall/);
-    expect(execute(doc, 'update_wall', { wallId: 'wall-1', start: [1] }).summary).toMatch(
-      /rejected: invalid params — start/,
-    );
+    expect(execute(doc, 'update_wall', { wallId: 'wall-1', start: [1] }).summary).toMatch(/rejected: invalid params — start/);
     expect(execute(doc, 'update_wall', { wallId: 'wall-1', thickness: 0 }).summary).toMatch(/> 0/);
-    expect(execute(doc, 'update_wall', { wallId: 'wall-1', levelId: 'zz' }).summary).toMatch(
-      /no level/,
-    );
-    expect(execute(doc, 'update_wall', { wallId: 'wall-1', end: [0, 0] }).summary).toMatch(
-      /coincide/,
-    );
+    expect(execute(doc, 'update_wall', { wallId: 'wall-1', levelId: 'zz' }).summary).toMatch(/no level/);
+    expect(execute(doc, 'update_wall', { wallId: 'wall-1', end: [0, 0] }).summary).toMatch(/coincide/);
   });
 });
 
@@ -415,9 +395,7 @@ describe('built wall extents', () => {
         [4000, 5000],
       ],
     });
-    expect(execute(doc, 'add_door', { wallId: 'wall-2', offset: 450 }).summary).toMatch(
-      /built from 100\.000 to 5000\.000/,
-    );
+    expect(execute(doc, 'add_door', { wallId: 'wall-2', offset: 450 }).summary).toMatch(/built from 100\.000 to 5000\.000/);
     expect(execute(doc, 'add_door', { wallId: 'wall-2', offset: 600 }).document).not.toBe(doc);
   });
 
@@ -437,12 +415,8 @@ describe('built wall extents', () => {
     });
     const phi = (degrees * Math.PI) / 180;
     // Equal 200 mm walls: the earlier wall reaches (t/2)·cot(φ/2) past the joint.
-    expect(endAdjustment(doc.building!, wall(doc, 'wall-1'), 'end')).toBeCloseTo(
-      100 / Math.tan(phi / 2),
-    );
-    expect(endAdjustment(doc.building!, wall(doc, 'wall-2'), 'start')).toBeCloseTo(
-      -(100 - 100 * Math.abs(Math.cos(phi))) / Math.sin(phi),
-    );
+    expect(endAdjustment(doc.building!, wall(doc, 'wall-1'), 'end')).toBeCloseTo(100 / Math.tan(phi / 2));
+    expect(endAdjustment(doc.building!, wall(doc, 'wall-2'), 'start')).toBeCloseTo(-(100 - 100 * Math.abs(Math.cos(phi))) / Math.sin(phi));
   });
 
   it('acute joints reach the far face', () => {
@@ -459,9 +433,7 @@ describe('built wall extents', () => {
       ],
     });
     const phi = Math.PI / 3;
-    expect(endAdjustment(doc.building!, wall(doc, 'wall-1'), 'end')).toBeCloseTo(
-      (100 + 100 * Math.cos(phi)) / Math.sin(phi),
-    );
+    expect(endAdjustment(doc.building!, wall(doc, 'wall-1'), 'end')).toBeCloseTo((100 + 100 * Math.cos(phi)) / Math.sin(phi));
   });
 
   it('clamps sill / head pieces to the built extent', () => {

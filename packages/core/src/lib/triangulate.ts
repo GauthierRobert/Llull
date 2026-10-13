@@ -13,8 +13,7 @@ function pointInTriangle(p: Point2, a: Point2, b: Point2, c: Point2): boolean {
 /** True when `p` lies on segment a–b strictly between its ends. */
 function onSegment(p: Point2, a: Point2, b: Point2): boolean {
   const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
-  if (length === 0 || Math.abs(orient2(a, b, p)) > length * 1e-9 * Math.max(1, length))
-    return false;
+  if (length === 0 || Math.abs(orient2(a, b, p)) > length * 1e-9 * Math.max(1, length)) return false;
   const t = ((p[0] - a[0]) * (b[0] - a[0]) + (p[1] - a[1]) * (b[1] - a[1])) / (length * length);
   return t > 1e-9 && t < 1 - 1e-9;
 }
@@ -33,8 +32,7 @@ function bridge(
   extremity: (point: Point2) => number,
 ): Vertex[] {
   const holeStart = hole.reduce(
-    (best, vertex, index) =>
-      extremity(vertex.point) > extremity((hole[best] as Vertex).point) ? index : best,
+    (best, vertex, index) => (extremity(vertex.point) > extremity((hole[best] as Vertex).point) ? index : best),
     0,
   );
   const from = (hole[holeStart] as Vertex).point;
@@ -42,30 +40,23 @@ function bridge(
   const holes = [hole, ...obstacles].map((loop) => loop.map((vertex) => vertex.point));
   const outline = ring.map((vertex) => vertex.point);
   const visible = (to: Point2): boolean => {
-    const at = (t: number): Point2 => [
-      from[0] + (to[0] - from[0]) * t,
-      from[1] + (to[1] - from[1]) * t,
-    ];
+    const at = (t: number): Point2 => [from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t];
     const crossesEdge = loops.some((loop) =>
       loop.some((vertex, index) => {
         const next = (loop[(index + 1) % loop.length] as Vertex).point;
         return segmentsIntersect(from, to, vertex.point, next);
       }),
     );
-    const grazesVertex = loops.some((loop) =>
-      loop.some(({ point }) => point !== from && point !== to && onSegment(point, from, to)),
-    );
+    const grazesVertex = loops.some((loop) => loop.some(({ point }) => point !== from && point !== to && onSegment(point, from, to)));
     const samples = [at(1e-3), at(0.5), at(1 - 1e-3)];
     const leavesRegion = samples.some(
-      (sample) =>
-        !pointInPolygon(sample, outline) || holes.some((points) => pointInPolygon(sample, points)),
+      (sample) => !pointInPolygon(sample, outline) || holes.some((points) => pointInPolygon(sample, points)),
     );
     return !crossesEdge && !grazesVertex && !leavesRegion;
   };
   // A point already shared by an earlier bridge must not anchor another one (ears would overlap).
   const occurrences = new Map<number, number>();
-  for (const vertex of ring)
-    occurrences.set(vertex.index, (occurrences.get(vertex.index) ?? 0) + 1);
+  for (const vertex of ring) occurrences.set(vertex.index, (occurrences.get(vertex.index) ?? 0) + 1);
   let target = -1;
   let bestDistance = Infinity;
   ring.forEach((vertex, index) => {
@@ -78,13 +69,7 @@ function bridge(
   });
   if (target < 0) return ring;
   const rotatedHole = [...hole.slice(holeStart), ...hole.slice(0, holeStart)];
-  return [
-    ...ring.slice(0, target + 1),
-    ...rotatedHole,
-    rotatedHole[0] as Vertex,
-    ring[target] as Vertex,
-    ...ring.slice(target + 1),
-  ];
+  return [...ring.slice(0, target + 1), ...rotatedHole, rotatedHole[0] as Vertex, ring[target] as Vertex, ...ring.slice(target + 1)];
 }
 
 /**
@@ -106,10 +91,7 @@ const EXTREMITIES: ReadonlyArray<(point: Point2) => number> = [
   (point) => -point[1],
 ];
 
-export function triangulatePolygon(
-  outer: ReadonlyArray<Point2>,
-  holes: ReadonlyArray<ReadonlyArray<Point2>> = [],
-): Triangulation {
+export function triangulatePolygon(outer: ReadonlyArray<Point2>, holes: ReadonlyArray<ReadonlyArray<Point2>> = []): Triangulation {
   let attempt = triangulateWith(outer, holes, EXTREMITIES[0] as (point: Point2) => number);
   for (const extremity of EXTREMITIES.slice(1)) {
     if (attempt.complete || holes.length === 0) break;
@@ -126,8 +108,7 @@ function triangulateWith(
   const vertices: Point2[] = [];
   const toVertices = (points: ReadonlyArray<Point2>, wantCounterClockwise: boolean): Vertex[] => {
     const isCounterClockwise = signedArea(points) > 0;
-    const ordered =
-      isCounterClockwise === wantCounterClockwise ? [...points] : [...points].reverse();
+    const ordered = isCounterClockwise === wantCounterClockwise ? [...points] : [...points].reverse();
     return ordered.map((point) => {
       vertices.push(point);
       return { point, index: vertices.length - 1 };
@@ -135,11 +116,9 @@ function triangulateWith(
   };
   let ring = toVertices(outer, true);
   const holeRings = holes.map((hole) => toVertices(hole, false));
-  const reach = (loop: ReadonlyArray<Vertex>): number =>
-    Math.max(...loop.map((vertex) => extremity(vertex.point)));
+  const reach = (loop: ReadonlyArray<Vertex>): number => Math.max(...loop.map((vertex) => extremity(vertex.point)));
   const pending = [...holeRings].sort((a, b) => reach(b) - reach(a));
-  for (const [index, hole] of pending.entries())
-    ring = bridge(ring, hole, pending.slice(index + 1), extremity);
+  for (const [index, hole] of pending.entries()) ring = bridge(ring, hole, pending.slice(index + 1), extremity);
 
   const triangles: Array<[number, number, number]> = [];
   const remaining = [...ring];
@@ -157,8 +136,7 @@ function triangulateWith(
       if (orient2(previous.point, current.point, next.point) <= 1e-12) continue;
       // Only reflex (or flat) vertices can invalidate an ear (earcut rule).
       const blocked = remaining.some((other, j) => {
-        if ([previous, current, next].some((corner) => same(corner.point, other.point)))
-          return false;
+        if ([previous, current, next].some((corner) => same(corner.point, other.point))) return false;
         const [before, , after] = neighbours(j);
         if (orient2(before.point, other.point, after.point) > 1e-12) return false;
         return pointInTriangle(other.point, previous.point, current.point, next.point);

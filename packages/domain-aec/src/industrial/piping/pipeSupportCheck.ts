@@ -76,9 +76,7 @@ function rowOf(
   const stations = supportStations(units, run, supportsOfPipe(units, element.id));
   const unattached = stations.filter((station) => !station.attached);
   const weightBearing = weightSupportsOf(units, run).length > 0;
-  const explicitArcs = stations
-    .filter((station) => station.attached && !isLateralOnly(station))
-    .map((station) => station.arc);
+  const explicitArcs = stations.filter((station) => station.attached && !isLateralOnly(station)).map((station) => station.arc);
   const resting = weightBearing ? [] : restingArcs(units, element, beams);
   const arcs = (weightBearing ? explicitArcs : resting).sort((a, b) => a - b);
   const carriers = endCarriers(units, run, runs);
@@ -94,10 +92,7 @@ function rowOf(
   const length = spanCoordinate(run.points, run.lengthMm);
   const spans = arcs.map((arc) => spanCoordinate(run.points, arc));
   const stretch = [...(carriers[0] ? [0] : []), ...spans, ...(carriers[1] ? [length] : [])];
-  const largest = stretch.reduce(
-    (best, arc, index) => Math.max(best, arc - (stretch[index - 1] ?? arc)),
-    0,
-  );
+  const largest = stretch.reduce((best, arc, index) => Math.max(best, arc - (stretch[index - 1] ?? arc)), 0);
   const overhang = {
     start: carriers[0] ? null : (spans[0] ?? length),
     end: carriers[1] ? null : length - (spans.at(-1) ?? 0),
@@ -108,9 +103,7 @@ function rowOf(
     issues.push(`no support: ${shown(length)} m of pipe rest on nothing`);
   }
   if (largest / 1000 > allowed + 1e-9) {
-    issues.push(
-      `span ${shown(largest)} m exceeds ${allowed.toFixed(2)} m allowed for DN${limit.dn} (table ${limit.spanM} m)`,
-    );
+    issues.push(`span ${shown(largest)} m exceeds ${allowed.toFixed(2)} m allowed for DN${limit.dn} (table ${limit.spanM} m)`);
   }
   for (const [end, value] of [
     ['start', overhang.start],
@@ -121,9 +114,7 @@ function rowOf(
       (arcs.length > 0 || carriers[0] !== null || carriers[1] !== null) &&
       value / 1000 > allowed * overhangRatio + 1e-9
     ) {
-      issues.push(
-        `${end} overhang ${shown(value)} m exceeds ${(allowed * overhangRatio).toFixed(2)} m (${overhangRatio} × allowed span)`,
-      );
+      issues.push(`${end} overhang ${shown(value)} m exceeds ${(allowed * overhangRatio).toFixed(2)} m (${overhangRatio} × allowed span)`);
     }
   }
   for (const station of unattached) {
@@ -190,27 +181,18 @@ export const checkPipeSupports = defineCommand({
     spanFactor: z
       .number()
       .optional()
-      .describe(
-        'Multiplier on the table span, > 0, e.g. 0.8 for insulated lines or many valves. Default 1.',
-      ),
+      .describe('Multiplier on the table span, > 0, e.g. 0.8 for insulated lines or many valves. Default 1.'),
     overhangRatio: z
       .number()
       .optional()
-      .describe(
-        'Largest overhang of a free pipe end beyond its last support, as a fraction of the allowed span, ≥ 0. Default 0.5.',
-      ),
+      .describe('Largest overhang of a free pipe end beyond its last support, as a fraction of the allowed span, ≥ 0. Default 0.5.'),
     line: z.string().optional().describe('Only the pipe(s) with this line number, e.g. "L-101".'),
-    levelId: z
-      .string()
-      .optional()
-      .describe('Only the pipes of this level id. Default: every level.'),
+    levelId: z.string().optional().describe('Only the pipes of this level id. Default: every level.'),
   }),
   run: (doc: CadDocument, params): CommandResult => {
     const { spanFactor = 1, overhangRatio = 0.5 } = params;
-    if (!isPositiveNumber(spanFactor))
-      return noop(doc, 'check_pipe_supports failed: spanFactor must be a number > 0.');
-    if (!isNonNegativeNumber(overhangRatio))
-      return noop(doc, 'check_pipe_supports failed: overhangRatio must be a number >= 0.');
+    if (!isPositiveNumber(spanFactor)) return noop(doc, 'check_pipe_supports failed: spanFactor must be a number > 0.');
+    if (!isNonNegativeNumber(overhangRatio)) return noop(doc, 'check_pipe_supports failed: overhangRatio must be a number >= 0.');
     const unknownLevel = unknownLevelFailure(doc, 'check_pipe_supports', params.levelId);
     if (unknownLevel) return unknownLevel;
     const units = modelUnits(doc);
@@ -235,17 +217,7 @@ export const checkPipeSupports = defineCommand({
     const failing = pipes.filter((row) => !row.ok);
     const unattached = pipes.reduce((sum, row) => sum + row.unattached, 0);
     const csv = toCsv(
-      [
-        'Mark',
-        'Line',
-        'DN',
-        'Length (m)',
-        'Allowed span (m)',
-        'Largest span (m)',
-        'Supports',
-        'Status',
-        'Issues',
-      ],
+      ['Mark', 'Line', 'DN', 'Length (m)', 'Allowed span (m)', 'Largest span (m)', 'Supports', 'Status', 'Issues'],
       pipes.map((row) => [
         row.mark,
         row.line,
@@ -258,10 +230,7 @@ export const checkPipeSupports = defineCommand({
         row.issues.join('; '),
       ]),
     );
-    const list = briefList(
-      failing,
-      (row) => `${row.mark}${row.line === '' ? '' : ` ${row.line}`} (${row.issues[0] ?? ''})`,
-    );
+    const list = briefList(failing, (row) => `${row.mark}${row.line === '' ? '' : ` ${row.line}`} (${row.issues[0] ?? ''})`);
     return report(
       doc,
       `Pipe support check (span table × ${spanFactor}): ${pipes.length} pipe(s), ${pipes.length - failing.length} ok` +

@@ -16,9 +16,7 @@ export function lintClaude(root = process.cwd()) {
   const claudeDir = join(root, '.claude');
   const read = (path) => readFileSync(path, 'utf8');
 
-  const skills = readdirSync(join(claudeDir, 'skills')).filter((d) =>
-    statSync(join(claudeDir, 'skills', d)).isDirectory(),
-  );
+  const skills = readdirSync(join(claudeDir, 'skills')).filter((d) => statSync(join(claudeDir, 'skills', d)).isDirectory());
   for (const skill of skills) {
     const file = join(claudeDir, 'skills', skill, 'SKILL.md');
     if (!existsSync(file)) {
@@ -26,8 +24,7 @@ export function lintClaude(root = process.cwd()) {
       continue;
     }
     const front = frontmatter(read(file));
-    if (front.name !== skill)
-      errors.push(`skills/${skill}/SKILL.md: frontmatter name "${front.name ?? ''}" != directory`);
+    if (front.name !== skill) errors.push(`skills/${skill}/SKILL.md: frontmatter name "${front.name ?? ''}" != directory`);
     if (!front.description) errors.push(`skills/${skill}/SKILL.md: missing description`);
   }
 
@@ -36,39 +33,30 @@ export function lintClaude(root = process.cwd()) {
     .map((f) => f.slice(0, -3));
   for (const agent of agents) {
     const front = frontmatter(read(join(claudeDir, 'agents', `${agent}.md`)));
-    if (front.name !== agent)
-      errors.push(`agents/${agent}.md: frontmatter name "${front.name ?? ''}" != file name`);
+    if (front.name !== agent) errors.push(`agents/${agent}.md: frontmatter name "${front.name ?? ''}" != file name`);
     if (!front.description) errors.push(`agents/${agent}.md: missing description`);
   }
 
   const claudeMd = read(join(root, 'CLAUDE.md'));
   const skillsSection = section(claudeMd, 'SKILLS');
   for (const [, name] of skillsSection.matchAll(/^- `([a-z0-9-]+)`/gm))
-    if (!skills.includes(name))
-      errors.push(`CLAUDE.md SKILLS lists \`${name}\` but .claude/skills/${name}/ does not exist`);
+    if (!skills.includes(name)) errors.push(`CLAUDE.md SKILLS lists \`${name}\` but .claude/skills/${name}/ does not exist`);
   for (const skill of skills)
-    if (!skillsSection.includes(`\`${skill}\``))
-      errors.push(`CLAUDE.md SKILLS does not list .claude/skills/${skill}`);
+    if (!skillsSection.includes(`\`${skill}\``)) errors.push(`CLAUDE.md SKILLS does not list .claude/skills/${skill}`);
   for (const [, name] of section(claudeMd, 'AGENTS').matchAll(/^\| `([a-z0-9-]+)`/gm))
-    if (!agents.includes(name))
-      errors.push(
-        `CLAUDE.md AGENTS lists \`${name}\` but .claude/agents/${name}.md does not exist`,
-      );
+    if (!agents.includes(name)) errors.push(`CLAUDE.md AGENTS lists \`${name}\` but .claude/agents/${name}.md does not exist`);
 
   const rulesDir = join(claudeDir, 'rules');
   for (const rule of readdirSync(rulesDir)) {
     const text = read(join(rulesDir, rule));
-    if (text.startsWith('---') && !/^paths:\s*\n(\s+- .+\n)+/m.test(text))
-      errors.push(`rules/${rule}: frontmatter without a paths: list`);
+    if (text.startsWith('---') && !/^paths:\s*\n(\s+- .+\n)+/m.test(text)) errors.push(`rules/${rule}: frontmatter without a paths: list`);
   }
 
   const docs = [join(root, 'CLAUDE.md'), ...markdownFiles(claudeDir)];
   for (const doc of docs) {
     const text = read(doc);
     const where = relative(root, doc);
-    for (const [, ref] of text.matchAll(
-      /(?:^|[\s`(@])((?:\.claude\/|docs\/|rules\/|context\/)[\w./-]+\.(?:md|mjs|json))/g,
-    )) {
+    for (const [, ref] of text.matchAll(/(?:^|[\s`(@])((?:\.claude\/|docs\/|rules\/|context\/)[\w./-]+\.(?:md|mjs|json))/g)) {
       const base = ref.startsWith('rules/') || ref.startsWith('context/') ? claudeDir : root;
       if (!existsSync(join(base, ref))) errors.push(`${where}: reference to missing ${ref}`);
     }
@@ -79,8 +67,7 @@ export function lintClaude(root = process.cwd()) {
     for (const group of groups)
       for (const hook of group.hooks ?? [])
         for (const [, script] of String(hook.command ?? '').matchAll(/(\.claude\/hooks\/[\w.-]+)/g))
-          if (!existsSync(join(root, script)))
-            errors.push(`settings.json: hook script ${script} missing`);
+          if (!existsSync(join(root, script))) errors.push(`settings.json: hook script ${script} missing`);
 
   return errors;
 }

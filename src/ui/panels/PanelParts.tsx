@@ -15,12 +15,7 @@ interface PanelHeaderProps {
   children?: React.ReactNode;
 }
 
-export function PanelHeader({
-  title,
-  count,
-  countLabel,
-  children,
-}: PanelHeaderProps): React.ReactElement {
+export function PanelHeader({ title, count, countLabel, children }: PanelHeaderProps): React.ReactElement {
   return (
     <div className="panel__header">
       <h2 className="panel__title">{title}</h2>
@@ -167,13 +162,7 @@ export function FormError({ text }: { text: string }): React.ReactElement | null
 }
 
 /** Polite status line (a command summary or a validation message); nothing while `text` is empty. */
-export function StatusLine({
-  text,
-  testId,
-}: {
-  text: string;
-  testId?: string;
-}): React.ReactElement | null {
+export function StatusLine({ text, testId }: { text: string; testId?: string }): React.ReactElement | null {
   if (text === '') return null;
   return (
     <p className="building-summary" role="status" data-testid={testId}>

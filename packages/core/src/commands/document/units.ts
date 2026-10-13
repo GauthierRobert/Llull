@@ -33,19 +33,12 @@ export const setUnits = defineCommand({
       .int()
       .optional()
       .describe(
-        'Number of decimal places to show when formatting length values (e.g. 2 → "12.50 mm"). ' +
-          'Must be an integer in [0, 20].',
+        'Number of decimal places to show when formatting length values (e.g. 2 → "12.50 mm"). ' + 'Must be an integer in [0, 20].',
       ),
   }),
   run: (doc, { units, displayPrecision }): CommandResult => {
-    if (
-      displayPrecision !== undefined &&
-      (displayPrecision < 0 || displayPrecision > MAX_DISPLAY_PRECISION)
-    ) {
-      return noop(
-        doc,
-        `Invalid displayPrecision ${String(displayPrecision)}. Must be an integer in [0, ${MAX_DISPLAY_PRECISION}].`,
-      );
+    if (displayPrecision !== undefined && (displayPrecision < 0 || displayPrecision > MAX_DISPLAY_PRECISION)) {
+      return noop(doc, `Invalid displayPrecision ${String(displayPrecision)}. Must be an integer in [0, ${MAX_DISPLAY_PRECISION}].`);
     }
 
     if (units === undefined && displayPrecision === undefined)
@@ -54,10 +47,7 @@ export const setUnits = defineCommand({
     const nextUnits = units ?? doc.units;
     const nextPrecision = displayPrecision ?? doc.displayPrecision;
 
-    return report(
-      { ...doc, units: nextUnits, displayPrecision: nextPrecision },
-      `Units set to ${nextUnits}, precision ${nextPrecision}.`,
-    );
+    return report({ ...doc, units: nextUnits, displayPrecision: nextPrecision }, `Units set to ${nextUnits}, precision ${nextPrecision}.`);
   },
 });
 

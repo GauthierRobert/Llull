@@ -10,14 +10,7 @@ import React, { useState } from 'react';
 import type { PlatformObject } from '@core/model/civil';
 import { useStore } from '@ui/store';
 import { PanelSection, FormError, StatusLine } from '@ui/panels/PanelParts';
-import {
-  CivilObjectSelect,
-  useCivilObjects,
-  NumberTextField,
-  PointsFromSelectionRow,
-  TextField,
-  useChosenId,
-} from './CivilParts';
+import { CivilObjectSelect, useCivilObjects, NumberTextField, PointsFromSelectionRow, TextField, useChosenId } from './CivilParts';
 import { optionalNumber, parseNumber, optionalText } from '@ui/numberText';
 import { parsePoints } from './civilInput';
 import { useFormValues } from '@ui/panels/useFormValues';
@@ -55,18 +48,8 @@ function CompareSurfaces(): React.ReactElement {
   const [status, setStatus] = useState('');
   return (
     <div className="building-inline-form" aria-label="Compare surfaces">
-      <CivilObjectSelect
-        objects={surfaces}
-        value={baseId}
-        label="Base surface"
-        onChange={setBase}
-      />
-      <CivilObjectSelect
-        objects={surfaces}
-        value={comparisonId}
-        label="Comparison surface"
-        onChange={setComparison}
-      />
+      <CivilObjectSelect objects={surfaces} value={baseId} label="Base surface" onChange={setBase} />
+      <CivilObjectSelect objects={surfaces} value={comparisonId} label="Comparison surface" onChange={setComparison} />
       <button
         type="button"
         className="btn btn--ghost btn--sm"
@@ -134,19 +117,10 @@ export function EarthworksSection(): React.ReactElement {
           noSelectionError="Select one closed polyline first."
           setError={setError}
         >
-          <CivilObjectSelect
-            objects={surfaces}
-            value={surfaceId}
-            label="Platform surface"
-            onChange={setSurface}
-          />
+          <CivilObjectSelect objects={surfaces} value={surfaceId} label="Platform surface" onChange={setSurface} />
         </PointsFromSelectionRow>
         <div className="building-inline-form">
-          <NumberTextField
-            {...field('elevation')}
-            hint="Pad elevation"
-            label="Platform elevation"
-          />
+          <NumberTextField {...field('elevation')} hint="Pad elevation" label="Platform elevation" />
           <NumberTextField {...field('cutSlope')} hint="Cut H:1V (1.5)" label="Cut slope" />
           <NumberTextField {...field('fillSlope')} hint="Fill H:1V (2)" label="Fill slope" />
           <TextField {...field('name')} hint="Name" label="Platform name" />

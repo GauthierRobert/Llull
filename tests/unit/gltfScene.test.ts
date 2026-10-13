@@ -20,16 +20,13 @@ interface GltfJson {
   accessors: Array<{ count: number }>;
 }
 
-function build(
-  steps: Array<{ command: string; params: Record<string, unknown>; as?: string }>,
-): CadDocument {
+function build(steps: Array<{ command: string; params: Record<string, unknown>; as?: string }>): CadDocument {
   const result = execute(createEmptyDocument(), 'build_project', { actions: steps });
   expect(result.summary).toContain('Plan complete');
   return result.document;
 }
 
-const gltfOf = (doc: CadDocument, params: Record<string, unknown> = {}): GltfJson =>
-  parsedGltf<GltfJson>(doc, params);
+const gltfOf = (doc: CadDocument, params: Record<string, unknown> = {}): GltfJson => parsedGltf<GltfJson>(doc, params);
 
 const scene = (): CadDocument =>
   build([
@@ -130,17 +127,13 @@ describe('glTF helpers', () => {
     const cube = solidTriangles(box.document.entities[box.affected[0] as string]!);
     const cubeNormals = creasedNormals(cube);
     for (let i = 0; i < cubeNormals.length; i += 3) {
-      const n = [cubeNormals[i], cubeNormals[i + 1], cubeNormals[i + 2]].map((v) =>
-        Math.abs(v ?? 0),
-      );
+      const n = [cubeNormals[i], cubeNormals[i + 1], cubeNormals[i + 2]].map((v) => Math.abs(v ?? 0));
       expect(n.filter((v) => v > 0.999)).toHaveLength(1);
     }
     const sphere = execute(createEmptyDocument(), 'add_sphere', { radius: 1 });
     const tris = solidTriangles(sphere.document.entities[sphere.affected[0] as string]!);
     const normals = creasedNormals(tris);
     const [x, y, z] = tris[40]![0];
-    expect(
-      normals[40 * 9]! * x + normals[40 * 9 + 1]! * y + normals[40 * 9 + 2]! * z,
-    ).toBeGreaterThan(0.995);
+    expect(normals[40 * 9]! * x + normals[40 * 9 + 1]! * y + normals[40 * 9 + 2]! * z).toBeGreaterThan(0.995);
   });
 });

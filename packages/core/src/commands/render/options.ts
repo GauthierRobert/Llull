@@ -47,10 +47,7 @@ function validateCut(doc: CadDocument, cut: NonNullable<RenderParams['cut']>): s
 }
 
 /** Validated render options, or the reason they are invalid. @pure */
-export function resolveRenderOptions(
-  doc: CadDocument,
-  params: RenderParams,
-): { options: RenderOptions } | { error: string } {
+export function resolveRenderOptions(doc: CadDocument, params: RenderParams): { options: RenderOptions } | { error: string } {
   const options: RenderOptions = {};
   if (params.zoom !== undefined) {
     if (!Number.isFinite(params.zoom) || params.zoom <= 0) return { error: 'zoom must be > 0' };
@@ -88,8 +85,7 @@ export function resolveRenderOptions(
   return { options };
 }
 
-const listIds = (ids: readonly string[]): string =>
-  ids.slice(0, 8).join(', ') + (ids.length > 8 ? `, … (+${ids.length - 8})` : '');
+const listIds = (ids: readonly string[]): string => ids.slice(0, 8).join(', ') + (ids.length > 8 ? `, … (+${ids.length - 8})` : '');
 
 /** Sentences describing simplification, skipped entities and cutaway outcome ('' when nothing). */
 export function renderNotes(data: RenderViewData, cut: CutSpec | undefined): string {
@@ -103,9 +99,7 @@ export function renderNotes(data: RenderViewData, cut: CutSpec | undefined): str
     );
   }
   if (data.skippedEntityIds.length > 0) {
-    notes.push(
-      `NOT drawn (budget smaller than the entity count): ${listIds(data.skippedEntityIds)}. Raise maxPolygons.`,
-    );
+    notes.push(`NOT drawn (budget smaller than the entity count): ${listIds(data.skippedEntityIds)}. Raise maxPolygons.`);
   }
   if (cut) {
     notes.push(

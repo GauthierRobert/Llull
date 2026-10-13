@@ -61,10 +61,7 @@ export const addAlignment = defineCommand({
     'the corridor, batters to daylight and earthworks; report with alignment_report.',
   params: z.object({
     points: pointsInput().describe('PIs from start to end, at least 2: [[x, y], ...].'),
-    radii: z
-      .array(z.number())
-      .optional()
-      .describe('Curve radius per interior PI (length = points - 2); 0 = no curve. Default all 0.'),
+    radii: z.array(z.number()).optional().describe('Curve radius per interior PI (length = points - 2); 0 = no curve. Default all 0.'),
     spirals: z
       .array(z.number())
       .optional()
@@ -72,14 +69,8 @@ export const addAlignment = defineCommand({
         'Clothoid length on each side of the circular curve per interior PI (length = points - 2); ' +
           '0 = no spiral; needs radius > 0. Default all 0.',
       ),
-    startStation: z
-      .number()
-      .optional()
-      .describe('Station of the first point, document units. Default 0.'),
-    stationInterval: z
-      .number()
-      .optional()
-      .describe('Station tick / section spacing (> 0). Default 20 m.'),
+    startStation: z.number().optional().describe('Station of the first point, document units. Default 0.'),
+    stationInterval: z.number().optional().describe('Station tick / section spacing (> 0). Default 20 m.'),
     surfaceId: z.string().optional().describe('Existing-ground surface id (from create_surface).'),
     name: z.string().optional().describe('Alignment name. Default "Alignment <n>".'),
   }),
@@ -92,8 +83,7 @@ export const addAlignment = defineCommand({
     const interval = params.stationInterval ?? fromMetres(doc, 20);
     if (!(interval > 0)) return noop(doc, 'add_alignment failed: stationInterval must be > 0.');
     const startStation = params.startStation ?? 0;
-    if (!Number.isFinite(startStation))
-      return noop(doc, 'add_alignment failed: startStation must be a number.');
+    if (!Number.isFinite(startStation)) return noop(doc, 'add_alignment failed: startStation must be a number.');
     const surface = surfaceProblem(doc, params.surfaceId);
     if (surface !== null) return noop(doc, `add_alignment failed: ${surface}`);
     const id = nextCivilId(civil, 'alignment');
@@ -142,10 +132,7 @@ export const updateAlignment = defineCommand({
     alignmentId: alignmentIdParam,
     points: pointsInput().optional().describe('New PIs, at least 2.'),
     radii: z.array(z.number()).optional().describe('New radii (length = points - 2).'),
-    spirals: z
-      .array(z.number())
-      .optional()
-      .describe('New clothoid lengths per interior PI (length = points - 2); 0 = no spiral.'),
+    spirals: z.array(z.number()).optional().describe('New clothoid lengths per interior PI (length = points - 2); 0 = no spiral.'),
     startStation: z.number().optional().describe('New start station, document units.'),
     stationInterval: z.number().optional().describe('New station spacing (> 0).'),
     surfaceId: z.string().optional().describe('Ground surface id; "" removes the link.'),
@@ -155,25 +142,18 @@ export const updateAlignment = defineCommand({
     const alignment = civilObjectOrNoop(doc, params.alignmentId, 'alignment', 'update_alignment');
     if ('summary' in alignment) return alignment;
     const points = params.points ?? alignment.points;
-    const fitted = Array.from(
-      { length: Math.max(points.length - 2, 0) },
-      (_, i) => alignment.radii[i] ?? 0,
-    );
+    const fitted = Array.from({ length: Math.max(points.length - 2, 0) }, (_, i) => alignment.radii[i] ?? 0);
     const radii = params.radii ?? fitted;
-    const spirals =
-      params.spirals ??
-      fitted.map((_, i) => ((radii[i] ?? 0) > 0 ? (alignment.spirals?.[i] ?? 0) : 0));
+    const spirals = params.spirals ?? fitted.map((_, i) => ((radii[i] ?? 0) > 0 ? (alignment.spirals?.[i] ?? 0) : 0));
     const problem = validateHorizontal(points, radii, spirals);
     if (problem !== null) return noop(doc, `update_alignment failed: ${problem}`);
     const interval = params.stationInterval ?? alignment.stationInterval;
     if (!(interval > 0)) return noop(doc, 'update_alignment failed: stationInterval must be > 0.');
     const startStation = params.startStation ?? alignment.startStation;
-    if (!Number.isFinite(startStation))
-      return noop(doc, 'update_alignment failed: startStation must be a number.');
+    if (!Number.isFinite(startStation)) return noop(doc, 'update_alignment failed: startStation must be a number.');
     const surface = surfaceProblem(doc, params.surfaceId);
     if (surface !== null) return noop(doc, `update_alignment failed: ${surface}`);
-    const surfaceId =
-      params.surfaceId === undefined ? alignment.surfaceId : params.surfaceId || undefined;
+    const surfaceId = params.surfaceId === undefined ? alignment.surfaceId : params.surfaceId || undefined;
     const updated: AlignmentObject = {
       id: alignment.id,
       category: 'alignment',
@@ -189,21 +169,17 @@ export const updateAlignment = defineCommand({
       ...(alignment.section ? { section: alignment.section } : {}),
       ...(alignment.superelevation ? { superelevation: alignment.superelevation } : {}),
     };
-    if (JSON.stringify(updated) === JSON.stringify(alignment))
-      return noop(doc, `update_alignment: nothing to change on ${alignment.id}.`);
+    if (JSON.stringify(updated) === JSON.stringify(alignment)) return noop(doc, `update_alignment: nothing to change on ${alignment.id}.`);
     const last = alignment.profile[alignment.profile.length - 1];
     const outside =
-      last &&
-      (last.station > endStation(updated) + 1e-6 ||
-        (alignment.profile[0]?.station ?? 0) < startStation - 1e-6)
+      last && (last.station > endStation(updated) + 1e-6 || (alignment.profile[0]?.station ?? 0) < startStation - 1e-6)
         ? ' Warning: the profile now extends beyond the alignment stations.'
         : '';
     return commitCivil(
       doc,
       withObject(getCivil(doc), updated),
       [updated.id],
-      `Updated alignment ${updated.name} (${updated.id}): length ` +
-        `${toMetres(doc, alignmentLength(updated)).toFixed(2)} m.${outside}`,
+      `Updated alignment ${updated.name} (${updated.id}): length ` + `${toMetres(doc, alignmentLength(updated)).toFixed(2)} m.${outside}`,
     );
   },
 });
@@ -213,10 +189,7 @@ function gradeSummary(doc: CadDocument, profile: ReadonlyArray<ProfilePvi>): str
     .map((g) => `${(g * 100).toFixed(2)}%`)
     .join(', ');
   const curves = verticalCurves(profile)
-    .map(
-      (c) =>
-        `${c.kind} PVI ${stationText(doc, c.pviStation)} L=${toMetres(doc, c.length).toFixed(1)} m K=${c.k.toFixed(1)}`,
-    )
+    .map((c) => `${c.kind} PVI ${stationText(doc, c.pviStation)} L=${toMetres(doc, c.length).toFixed(1)} m K=${c.k.toFixed(1)}`)
     .join('; ');
   return `Grades: ${gradeText}.${curves ? ` Vertical curves: ${curves}.` : ' No vertical curves.'}`;
 }
@@ -259,8 +232,7 @@ export const setAlignmentProfile = defineCommand({
     const profile = pvis
       .map((pvi): ProfilePvi => {
         const outside = pvi.station < start ? start - pvi.station : pvi.station - end;
-        const station =
-          outside > 0 && outside <= snap ? (pvi.station < start ? start : end) : pvi.station;
+        const station = outside > 0 && outside <= snap ? (pvi.station < start ? start : end) : pvi.station;
         return { station, elevation: pvi.elevation, curveLength: pvi.curveLength ?? 0 };
       })
       .sort((a, b) => a.station - b.station);
@@ -300,10 +272,7 @@ export const setRoadSection = defineCommand({
   params: z.object({
     alignmentId: alignmentIdParam,
     laneWidth: z.number().optional().describe('Carriageway width each side (> 0). Default 3.5 m.'),
-    shoulderWidth: z
-      .number()
-      .optional()
-      .describe('Shoulder width each side (>= 0). Default 1.0 m.'),
+    shoulderWidth: z.number().optional().describe('Shoulder width each side (>= 0). Default 1.0 m.'),
     crossfall: z.number().optional().describe('Crossfall ratio 0..0.3. Default 0.025.'),
     cutSlope: z.number().optional().describe('Cut batter H per 1 V (> 0). Default 1.5.'),
     fillSlope: z.number().optional().describe('Fill batter H per 1 V (> 0). Default 2.0.'),
@@ -328,10 +297,7 @@ export const setRoadSection = defineCommand({
       section.fillSlope > 0 &&
       Object.values(section).every(Number.isFinite);
     if (!valid) {
-      return noop(
-        doc,
-        'set_road_section failed: laneWidth and slopes must be > 0, shoulderWidth >= 0, crossfall between 0 and 0.3.',
-      );
+      return noop(doc, 'set_road_section failed: laneWidth and slopes must be > 0, shoulderWidth >= 0, crossfall between 0 and 0.3.');
     }
     return commitCivil(
       doc,

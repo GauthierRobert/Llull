@@ -126,16 +126,9 @@ interface McpToolResult {
  *
  * Reads `res.text` (SSE body) and extracts the JSON-RPC result for `id`.
  */
-async function mcpCallTool(
-  sessionId: string,
-  name: string,
-  args: Record<string, unknown>,
-): Promise<McpToolResult> {
+async function mcpCallTool(sessionId: string, name: string, args: Record<string, unknown>): Promise<McpToolResult> {
   const id = nextId();
-  const res = await mcpPost(
-    { id, method: 'tools/call', params: { name, arguments: args } },
-    sessionId,
-  );
+  const res = await mcpPost({ id, method: 'tools/call', params: { name, arguments: args } }, sessionId);
 
   expect(res.status).toBe(200);
   const result = parseSseResult(res.text, id) as McpToolResult | undefined;
@@ -188,10 +181,7 @@ describe('MCP tools/list', () => {
     const tools = await mcpListTools(sessionId);
     // The transport appends the exchange tools (export_step, import_step, import_code) on top
     // of the core registry tools.
-    const expectedCount =
-      listCommands().length +
-      buildExchangeToolDefinitions().length +
-      buildDiscoveryToolDefinitions().length;
+    const expectedCount = listCommands().length + buildExchangeToolDefinitions().length + buildDiscoveryToolDefinitions().length;
     expect(tools.length).toBe(expectedCount);
   });
 
@@ -200,10 +190,7 @@ describe('MCP tools/list', () => {
 
     const tools = await mcpListTools(sessionId);
     const registeredNames = listCommands().map((c) => c.name);
-    const exchangeNames = [
-      ...buildExchangeToolDefinitions(),
-      ...buildDiscoveryToolDefinitions(),
-    ].map((t) => t.name);
+    const exchangeNames = [...buildExchangeToolDefinitions(), ...buildDiscoveryToolDefinitions()].map((t) => t.name);
     const expectedNames = [...registeredNames, ...exchangeNames];
     const toolNames = tools.map((t) => t.name);
     expect(toolNames).toEqual(expectedNames);

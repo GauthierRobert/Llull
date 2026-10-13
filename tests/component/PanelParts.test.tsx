@@ -26,10 +26,7 @@ describe('ListRow', () => {
     const onDelete = vi.fn();
     render(
       <ul>
-        <ListRow
-          onSelect={onSelect}
-          actions={<DeleteButton label="Delete wall W1" onDelete={onDelete} />}
-        >
+        <ListRow onSelect={onSelect} actions={<DeleteButton label="Delete wall W1" onDelete={onDelete} />}>
           W1
         </ListRow>
       </ul>,

@@ -53,11 +53,7 @@ const MAX_PLOT_WIDTH = PLOT_MAX_WIDTH;
 const MAX_PLOT_HEIGHT = 420;
 const TABLE_LABELS = ['Chainage', 'Rim', 'Invert', 'Pipe', 'HGL'];
 
-export function drainageLongSectionSvg(
-  title: string,
-  stations: readonly RunStation[],
-  segments: readonly RunSegment[],
-): string {
+export function drainageLongSectionSvg(title: string, stations: readonly RunStation[], segments: readonly RunSegment[]): string {
   const lengthM = Math.max(stations[stations.length - 1]?.chainageM ?? 0, 1e-6);
   const levels = [
     ...stations.flatMap((s) => [s.rimM, s.invertM, s.hglM]),
@@ -75,8 +71,7 @@ export function drainageLongSectionSvg(
     svgText(
       LEFT,
       42,
-      `Scale H 1:${Math.round(1 / hScale)}  V 1:${Math.round(1 / vScale)}; levels in m; ` +
-        `ground = rim, red = obvert/invert, blue = HGL`,
+      `Scale H 1:${Math.round(1 / hScale)}  V 1:${Math.round(1 / vScale)}; levels in m; ` + `ground = rim, red = obvert/invert, blue = HGL`,
       { size: 10 },
     ),
     svgRect(LEFT, TOP, plotWidth, plotHeight),
@@ -114,10 +109,7 @@ export function drainageLongSectionSvg(
     body.push(svgLine(invert[0], invert[1], '#d02020', 2));
     body.push(svgLine(obvert[0], obvert[1], '#d02020', 2));
   }
-  const hglPoints: Pair[] = segments.flatMap((s) => [
-    [x(s.startM), y(s.hglUpM)] as Pair,
-    [x(s.endM), y(s.hglDownM)] as Pair,
-  ]);
+  const hglPoints: Pair[] = segments.flatMap((s) => [[x(s.startM), y(s.hglUpM)] as Pair, [x(s.endM), y(s.hglDownM)] as Pair]);
   if (hglPoints.length >= 2) body.push(svgPolyline(hglPoints, '#1060d0', 2));
   const bandTop = TOP + plotHeight + 12;
   pushTableLabels(body, TABLE_LABELS, LEFT, plotWidth, bandTop, ROW_HEIGHT);
@@ -135,11 +127,7 @@ export function drainageLongSectionSvg(
   }
   for (const segment of segments) {
     const mid = (x(segment.startM) + x(segment.endM)) / 2;
-    cell(
-      mid,
-      3,
-      `${segment.id} Ø${segment.diameterMm} ${segment.slopePct.toFixed(2)}% ${segment.lengthM.toFixed(1)}m`,
-    );
+    cell(mid, 3, `${segment.id} Ø${segment.diameterMm} ${segment.slopePct.toFixed(2)}% ${segment.lengthM.toFixed(1)}m`);
   }
   return svgDocument(LEFT + plotWidth + 40, bandTop + TABLE_LABELS.length * ROW_HEIGHT + 20, body);
 }

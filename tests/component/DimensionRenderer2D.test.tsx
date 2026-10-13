@@ -41,8 +41,7 @@ const addLine = (x1: number, y1: number, x2: number, y2: number): string =>
       [x2, y2, 0],
     ],
   });
-const addCircle = (cx: number, cy: number, r: number): string =>
-  created('draw_arc', { center: [cx, cy, 0], radius: r });
+const addCircle = (cx: number, cy: number, r: number): string => created('draw_arc', { center: [cx, cy, 0], radius: r });
 
 interface Dimensioned {
   affected: readonly string[];
@@ -51,11 +50,7 @@ interface Dimensioned {
 }
 
 /** Dispatch add_dimension; `dim` is the created entity (undefined when the command no-ops). */
-function dimension(
-  dimensionKind: string,
-  entityIds: readonly string[],
-  extra: Record<string, unknown> = {},
-): Dimensioned {
+function dimension(dimensionKind: string, entityIds: readonly string[], extra: Record<string, unknown> = {}): Dimensioned {
   const { affected } = localDispatch('add_dimension', { dimensionKind, entityIds, ...extra });
   const dimId = affected[0];
   const dim = (dimId ? useStore.getState().document.entities[dimId] : undefined) as DimensionEntity;
@@ -181,11 +176,7 @@ describe('DimensionRenderer2D', () => {
 
     it('angular dimension accepts vertex point + 2 line entities', () => {
       const vertex = addPoint(0, 0);
-      const { affected, dim } = dimension('angular', [
-        vertex,
-        addLine(0, 0, 5, 0),
-        addLine(0, 0, 0, 5),
-      ]);
+      const { affected, dim } = dimension('angular', [vertex, addLine(0, 0, 5, 0), addLine(0, 0, 0, 5)]);
       expect(affected).toHaveLength(1);
       expect(dim.dimensionKind).toBe('angular');
       expect(dim.entityIds[0]).toBe(vertex);

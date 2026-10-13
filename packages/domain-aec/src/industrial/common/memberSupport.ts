@@ -3,22 +3,10 @@
  */
 
 import type { CadDocument, Vec3 } from '@core/model/types';
-import type {
-  BaseFixity,
-  BuildingModel,
-  JointFixity,
-  MemberRole,
-  SteelMemberElement,
-} from '@core/model/building';
+import type { BaseFixity, BuildingModel, JointFixity, MemberRole, SteelMemberElement } from '@core/model/building';
 import { z } from '@core/commands/schema';
 import { toMm } from '@core/model/units';
-import {
-  getBuilding,
-  markAfter,
-  nextElementId,
-  withElement,
-  levelElementsOf,
-} from '../../building/model';
+import { getBuilding, markAfter, nextElementId, withElement, levelElementsOf } from '../../building/model';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { distance3 } from '@lib/vec3';
 import { findProfile, type SteelProfile } from '../../steel/profiles';
@@ -33,21 +21,11 @@ const ROLE_MARK: Readonly<Record<MemberRole, string>> = {
   crane: 'CB',
 };
 
-export const MEMBER_ROLES: ReadonlyArray<MemberRole> = [
-  'column',
-  'rafter',
-  'beam',
-  'brace',
-  'purlin',
-  'rail',
-  'crane',
-];
+export const MEMBER_ROLES: ReadonlyArray<MemberRole> = ['column', 'rafter', 'beam', 'brace', 'purlin', 'rail', 'crane'];
 
 /** Every steel member of the building, in `elements` key order. */
 export function membersOf(building: BuildingModel): SteelMemberElement[] {
-  return Object.values(building.elements).filter(
-    (element): element is SteelMemberElement => element.category === 'member',
-  );
+  return Object.values(building.elements).filter((element): element is SteelMemberElement => element.category === 'member');
 }
 
 /** Next mark for a member role, e.g. "SC4", "PU12". */
@@ -111,14 +89,10 @@ export const baseFixitySchema = z.enum(['pinned', 'fixed']);
  * Joint / base fixity only make sense on the member that owns them.
  * @returns the reason, or null when the combination is valid
  */
-export function fixityProblem(
-  role: MemberRole,
-  fixity: Pick<MemberSpec, 'startJoint' | 'endJoint' | 'baseFixity'>,
-): string | null {
+export function fixityProblem(role: MemberRole, fixity: Pick<MemberSpec, 'startJoint' | 'endJoint' | 'baseFixity'>): string | null {
   if ((fixity.startJoint !== undefined || fixity.endJoint !== undefined) && role !== 'beam')
     return `startJoint / endJoint apply to beams (role is '${role}')`;
-  if (fixity.baseFixity !== undefined && role !== 'column')
-    return `baseFixity applies to columns (role is '${role}')`;
+  if (fixity.baseFixity !== undefined && role !== 'column') return `baseFixity applies to columns (role is '${role}')`;
   return null;
 }
 
@@ -135,8 +109,7 @@ export function appendMembers(
   const ids: string[] = [];
   for (const spec of specs) {
     const profile = findProfile(spec.profile);
-    if (!profile)
-      return { reason: `unknown steel profile '${spec.profile}' (see list_steel_profiles)` };
+    if (!profile) return { reason: `unknown steel profile '${spec.profile}' (see list_steel_profiles)` };
     const length = distance3(spec.end, spec.start);
     if (!(length > 0)) return { reason: 'start and end must differ' };
     const member: SteelMemberElement = {

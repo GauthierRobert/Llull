@@ -3,23 +3,14 @@ import { execute } from '@core/commands/registry';
 import type { CadDocument } from '@core/model/types';
 import type { FrameReport } from '@aec/industrial/steelDesign/steelFrameAnalysis';
 import { check as baseCheck, rowOf, step, twoLevels, type CheckData } from './steelFixtures';
-import {
-  BEAM_Z,
-  frameColumn,
-  gratingFloor,
-  inertiaOf,
-  jointBeam,
-  portal,
-  weightOf,
-} from './steelFrameFixtures';
+import { BEAM_Z, frameColumn, gratingFloor, inertiaOf, jointBeam, portal, weightOf } from './steelFrameFixtures';
 
 interface FrameData extends CheckData {
   frames: FrameReport[];
   storeys: Array<{ shear: number; verticalLoad: number; frames: { X: number; Y: number } }>;
 }
 
-const check = (doc: CadDocument, params: Record<string, unknown> = {}): FrameData =>
-  baseCheck(doc, params) as FrameData;
+const check = (doc: CadDocument, params: Record<string, unknown> = {}): FrameData => baseCheck(doc, params) as FrameData;
 
 /** Set the fixity of every base plate (add_base_plates itself leaves it pinned). */
 function withPlateFixity(doc: CadDocument, fixity: 'pinned' | 'fixed'): CadDocument {
@@ -29,10 +20,7 @@ function withPlateFixity(doc: CadDocument, fixity: 'pinned' | 'fixed'): CadDocum
     building: {
       ...building,
       elements: Object.fromEntries(
-        Object.entries(building.elements).map(([id, element]) => [
-          id,
-          element.category === 'plate' ? { ...element, fixity } : element,
-        ]),
+        Object.entries(building.elements).map(([id, element]) => [id, element.category === 'plate' ? { ...element, fixity } : element]),
       ),
     },
   } as CadDocument;
@@ -107,18 +95,9 @@ describe('single-bay portal vs the classical closed forms', () => {
     const data = check(portal({ base: 'fixed' }));
     const column = rowOf(data, 'SC1');
     const names = column.checks.map((entry) => entry.name);
-    expect(names).toEqual(
-      expect.arrayContaining([
-        'frame N+M (§6.3.3)',
-        'cross-section N+M (§6.2.9)',
-        'shear (§6.2.6)',
-        'sway h/300',
-      ]),
-    );
+    expect(names).toEqual(expect.arrayContaining(['frame N+M (§6.3.3)', 'cross-section N+M (§6.2.9)', 'shear (§6.2.6)', 'sway h/300']));
     const beam = rowOf(data, 'SB1');
-    expect(beam.checks.map((entry) => entry.name)).toEqual(
-      expect.arrayContaining(['frame N+M (§6.3.3)', 'deflection (L/250)']),
-    );
+    expect(beam.checks.map((entry) => entry.name)).toEqual(expect.arrayContaining(['frame N+M (§6.3.3)', 'deflection (L/250)']));
   });
 });
 
@@ -190,9 +169,7 @@ describe('two-storey bent with pinned bases', () => {
     const data = check(doc);
     const alpha = data.frames[0]?.alphaCritical ?? Infinity;
     expect(alpha).toBeLessThan(3);
-    const stability = data.members.flatMap((row) =>
-      row.checks.filter((entry) => entry.name.startsWith('sway stability')),
-    );
+    const stability = data.members.flatMap((row) => row.checks.filter((entry) => entry.name.startsWith('sway stability')));
     expect(stability).toHaveLength(1);
     expect(stability[0]?.utilisation).toBeGreaterThan(1);
     expect(data.ok).toBe(false);
@@ -252,18 +229,14 @@ describe('braced in one direction, framed in the other', () => {
         elements: Object.fromEntries(
           Object.entries(doc.building!.elements).map(([id, element]) => [
             id,
-            element.category === 'member' && element.role === 'beam'
-              ? { ...element, startJoint: 'pinned', endJoint: 'pinned' }
-              : element,
+            element.category === 'member' && element.role === 'beam' ? { ...element, startJoint: 'pinned', endJoint: 'pinned' } : element,
           ]),
         ),
       },
     } as CadDocument;
     const data = check(pinned);
     expect(data.frames).toEqual([]);
-    expect(data.warnings.filter((text) => text.includes('no bracing in direction Y'))).toHaveLength(
-      1,
-    );
+    expect(data.warnings.filter((text) => text.includes('no bracing in direction Y'))).toHaveLength(1);
   });
 
   it('delivers the pinned X beams to the frame columns as vertical loads (column axial = sum of reactions)', () => {
@@ -289,9 +262,7 @@ describe('column base fixity', () => {
   it('warns when the column fixity contradicts its base plate', () => {
     const doc = withPlateFixity(step(portal({ base: 'fixed' }), 'add_base_plates', {}), 'pinned');
     const data = check(doc);
-    expect(
-      data.warnings.some((text) => text.includes("baseFixity 'fixed' but its base plate is")),
-    ).toBe(true);
+    expect(data.warnings.some((text) => text.includes("baseFixity 'fixed' but its base plate is"))).toBe(true);
     expect(rowOf(data, 'SC1').forces['baseMoment']).toBeGreaterThan(0);
   });
 });

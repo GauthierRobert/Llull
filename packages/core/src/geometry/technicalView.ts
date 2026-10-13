@@ -48,18 +48,14 @@ interface TechnicalViewOptions {
 
 /** Even-odd loops grouped into outer boundaries, each with the holes directly inside it. */
 function nestLoops(loops: ReadonlyArray<Vec2[]>): Array<{ outer: Vec2[]; holes: Vec2[][] }> {
-  const containers = loops.map((loop, index) =>
-    loops.filter((other, j) => j !== index && pointInPolygon(loop[0] as Vec2, other)),
-  );
+  const containers = loops.map((loop, index) => loops.filter((other, j) => j !== index && pointInPolygon(loop[0] as Vec2, other)));
   const regions = loops.flatMap((outer, index) =>
     (containers[index] as Vec2[][]).length % 2 === 0 ? [{ outer, holes: [] as Vec2[][] }] : [],
   );
   loops.forEach((loop, index) => {
     const inside = containers[index] as Vec2[][];
     if (inside.length % 2 === 0) return;
-    const parent = regions
-      .filter((region) => inside.includes(region.outer))
-      .sort((a, b) => polygonArea(a.outer) - polygonArea(b.outer))[0];
+    const parent = regions.filter((region) => inside.includes(region.outer)).sort((a, b) => polygonArea(a.outer) - polygonArea(b.outer))[0];
     parent?.holes.push(loop);
   });
   return regions;
@@ -82,11 +78,7 @@ interface SolidFaces {
 /** Per frame, per entity object: entities are immutable, so an edit yields a new key. */
 const facesCache = new WeakMap<ViewFrame, WeakMap<Entity, SolidFaces>>();
 
-function solidFaces(
-  doc: Pick<CadDocument, 'components'>,
-  entity: Entity,
-  frame: ViewFrame,
-): SolidFaces {
+function solidFaces(doc: Pick<CadDocument, 'components'>, entity: Entity, frame: ViewFrame): SolidFaces {
   const dependency = expansionDependency(entity, doc);
   const byEntity = facesCache.get(frame) ?? new WeakMap<Entity, SolidFaces>();
   facesCache.set(frame, byEntity);
@@ -100,12 +92,7 @@ function solidFaces(
 }
 
 /** Line primitives of `segments`, skipping any already drawn (coincident edges, e.g. a box's top and bottom). */
-function lines(
-  segments: ReadonlyArray<Segment2>,
-  style: 'visible' | 'hidden',
-  drawn: Set<string>,
-  tolerance: number,
-): DrawingPrimitive[] {
+function lines(segments: ReadonlyArray<Segment2>, style: 'visible' | 'hidden', drawn: Set<string>, tolerance: number): DrawingPrimitive[] {
   const layer = TECHNICAL_LAYERS[style];
   const primitives: DrawingPrimitive[] = [];
   for (const segment of segments) {
@@ -132,9 +119,7 @@ export function technicalView(
   const sources: ViewSource[] = cached.map(({ faces, edges, tolerance }) => ({
     faces,
     edges,
-    cutLoops: Number.isFinite(cutDepth)
-      ? chainLoops(cutSegments(faces, frame, cutDepth), tolerance)
-      : [],
+    cutLoops: Number.isFinite(cutDepth) ? chainLoops(cutSegments(faces, frame, cutDepth), tolerance) : [],
   }));
   const runs = classifyEdges(sources, frame, cutDepth);
   const sectioned = Number.isFinite(cutDepth);

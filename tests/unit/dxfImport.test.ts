@@ -195,9 +195,7 @@ describe('dxf reader', () => {
     expect(blockLine?.kind === 'line' && blockLine.b[1]).toBeCloseTo(2, 9);
     expect(primitives.some((p) => p.kind === 'circle' && p.layer === 'MARKS')).toBe(true);
     // Non-uniform insert turns the circle into a closed polyline.
-    expect(primitives.some((p) => p.kind === 'polyline' && p.layer === 'MARKS' && p.closed)).toBe(
-      true,
-    );
+    expect(primitives.some((p) => p.kind === 'polyline' && p.layer === 'MARKS' && p.closed)).toBe(true);
     expect(skipped.get('HATCH')).toBe(1);
     expect(skipped.get('INSERT')).toBe(1);
   });

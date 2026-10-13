@@ -54,12 +54,7 @@ export function NamedViewsOverlay(): React.ReactElement {
       </button>
 
       {isExpanded && (
-        <div
-          id="named-views-panel"
-          className="vp-popover named-views-panel"
-          role="region"
-          aria-label="Named views panel"
-        >
+        <div id="named-views-panel" className="vp-popover named-views-panel" role="region" aria-label="Named views panel">
           <div className="named-views-save-row">
             <label className="visually-hidden" htmlFor="named-view-name-input">
               Name

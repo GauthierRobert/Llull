@@ -31,12 +31,7 @@ export function DecalOverlay({ entity }: { entity: Entity }): React.ReactElement
       geometry.setAttribute('uv', new THREE.Float32BufferAttribute(patch.uvs, 2));
       geometry.computeVertexNormals();
       const image = rasterizeText(decal.text, decal.color, decal.background);
-      const texture = new THREE.DataTexture(
-        new Uint8Array(image.rgba),
-        image.width,
-        image.height,
-        THREE.RGBAFormat,
-      );
+      const texture = new THREE.DataTexture(new Uint8Array(image.rgba), image.width, image.height, THREE.RGBAFormat);
       texture.colorSpace = THREE.SRGBColorSpace;
       texture.magFilter = THREE.LinearFilter;
       texture.minFilter = THREE.LinearMipmapLinearFilter;

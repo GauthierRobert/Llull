@@ -8,12 +8,7 @@
 
 import { notionalLabel } from './steelBracingChecks';
 import { frameRows } from './steelFrameChecks';
-import {
-  detectFrames,
-  type FrameCoverage,
-  type FrameDirection,
-  type MomentFrame,
-} from './steelFrameDetect';
+import { detectFrames, type FrameCoverage, type FrameDirection, type MomentFrame } from './steelFrameDetect';
 import { buildFrameSystem } from './steelFrameModel';
 import { solveFrameSystem } from './steelFrameSolve';
 import type { BeamResult, ColumnNode } from './steelFraming';
@@ -78,9 +73,7 @@ function analyseFrame(
   });
   const solutions = solveFrameSystem(system, params.notionalFactor);
   if (!solutions) {
-    return failed(
-      'the moment frame is a mechanism (unstable under the loads): fix the column bases, add rigid joints or bracing',
-    );
+    return failed('the moment frame is a mechanism (unstable under the loads): fix the column bases, add rigid joints or bracing');
   }
   const rows = frameRows({
     frame,
@@ -121,12 +114,7 @@ function analyseFrame(
       amplification: solutions.amplification,
       jointMoments,
     },
-    warnings: [
-      ...baseNotes,
-      ...[...system.invalid].map(
-        ([id, reason]) => `${bars.find((bar) => bar.id === id)?.mark ?? id}: ${reason}`,
-      ),
-    ],
+    warnings: [...baseNotes, ...[...system.invalid].map(([id, reason]) => `${bars.find((bar) => bar.id === id)?.mark ?? id}: ${reason}`)],
   };
 }
 

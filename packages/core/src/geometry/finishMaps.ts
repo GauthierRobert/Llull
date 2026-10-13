@@ -108,10 +108,7 @@ export function finishMaps(
   const finish = material.finish;
   if (finish === undefined) return null;
   const base = hexRgb(material.color);
-  const second =
-    finish.color2 !== undefined
-      ? hexRgb(finish.color2)
-      : map3(base, (c) => Math.min(255, c * 1.18 + 10));
+  const second = finish.color2 !== undefined ? hexRgb(finish.color2) : map3(base, (c) => Math.min(255, c * 1.18 + 10));
   const strength = finish.normalStrength ?? 1;
   const pixels = size * size;
   const heights = new Float32Array(pixels);
@@ -135,8 +132,7 @@ export function finishMaps(
   }
   const normal = new Uint8Array(pixels * 4);
   const relief = 2.5 * strength;
-  const h = (x: number, y: number): number =>
-    heights[((y + size) % size) * size + ((x + size) % size)] as number;
+  const h = (x: number, y: number): number => heights[((y + size) % size) * size + ((x + size) % size)] as number;
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const dx = (h(x + 1, y) - h(x - 1, y)) * relief;
@@ -156,11 +152,7 @@ export function finishMaps(
  * Box-projected texture coordinates of one triangle corner: the facet's dominant normal axis
  * picks the projection plane, one texture tile per `scale` document units.
  */
-export function boxUv(
-  point: readonly number[],
-  facetNormal: readonly number[],
-  scale: number,
-): [number, number] {
+export function boxUv(point: readonly number[], facetNormal: readonly number[], scale: number): [number, number] {
   const [ax, ay, az] = facetNormal.map(Math.abs) as [number, number, number];
   const [x, y, z] = [point[0] ?? 0, point[1] ?? 0, point[2] ?? 0];
   if (az >= ax && az >= ay) return [x / scale, y / scale];

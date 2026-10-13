@@ -27,9 +27,7 @@ import { requestUser } from './users';
 import { actorOf } from './audit';
 
 /** Toolsets from `LLULL_TOOLSETS` (comma-separated; unset = core only, `all` = everything). Warns on unknown names. */
-export function toolsetsFromEnv(
-  raw: string | undefined = process.env['LLULL_TOOLSETS'],
-): ReadonlySet<ToolsetName> {
+export function toolsetsFromEnv(raw: string | undefined = process.env['LLULL_TOOLSETS']): ReadonlySet<ToolsetName> {
   const { enabled, unknown } = parseToolsets(raw);
   if (unknown.length > 0) {
     console.warn(`[llull-mcp] LLULL_TOOLSETS: ignoring unknown toolset(s): ${unknown.join(', ')}`);

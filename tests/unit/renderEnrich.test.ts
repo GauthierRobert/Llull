@@ -54,9 +54,7 @@ describe('render_view overlays', () => {
     expect(svg).toContain('W:2');
     expect(svg).toContain('D:2');
     expect(svg).toContain('H:2');
-    expect(render(createEmptyDocument(), { ...bare, showDimensions: true }).svg).not.toContain(
-      'W:',
-    );
+    expect(render(createEmptyDocument(), { ...bare, showDimensions: true }).svg).not.toContain('W:');
   });
 
   it('showLabels marks 3D solids, 2D shapes, names and a legend', () => {
@@ -141,9 +139,7 @@ describe('render_view isolate and section', () => {
   });
 
   it('section works on an empty document', () => {
-    expect(render(createEmptyDocument(), { section: { axis: 'z', offset: 0 } }).svg).toContain(
-      'section-plane',
-    );
+    expect(render(createEmptyDocument(), { section: { axis: 'z', offset: 0 } }).svg).toContain('section-plane');
   });
 
   it('rejects an invalid section axis without touching the document', () => {
@@ -177,18 +173,8 @@ describe('render_view label markers and axes (ported from server enrichment test
       2,
     ],
     ['circle (center + radius handle)', 'draw_arc', { center: [1, 2], radius: 1.5 }, 2],
-    [
-      'ellipse (center + 2 semi-axes)',
-      'draw_ellipse',
-      { center: [0, 0], radiusX: 3, radiusY: 1.5 },
-      3,
-    ],
-    [
-      'arc (center + on-curve handle)',
-      'draw_arc',
-      { center: [0, 0], radius: 2, startAngle: Math.PI / 2, endAngle: Math.PI },
-      2,
-    ],
+    ['ellipse (center + 2 semi-axes)', 'draw_ellipse', { center: [0, 0], radiusX: 3, radiusY: 1.5 }, 3],
+    ['arc (center + on-curve handle)', 'draw_arc', { center: [0, 0], radius: 2, startAngle: Math.PI / 2, endAngle: Math.PI }, 2],
     ['rectangle (4 corners)', 'draw_rectangle', { position: [0, 0], width: 4, height: 3 }, 4],
   ])('%s', (_label, command, params, expected) => {
     const created = execute(createEmptyDocument(), command, params);
@@ -249,12 +235,9 @@ describe('render_view hide2D and scale label', () => {
     expect(Object.keys(sketched.entities)).toHaveLength(2);
   });
 
-  it.each(['left', 'right', 'front', 'top'] as const)(
-    'scale label shows a non-zero pixel length in the %s view',
-    (view) => {
-      const { doc } = boxDoc();
-      const match = /mm = ([\d.]+) px/.exec(render(doc, { view }).svg);
-      expect(Number(match?.[1])).toBeGreaterThan(0);
-    },
-  );
+  it.each(['left', 'right', 'front', 'top'] as const)('scale label shows a non-zero pixel length in the %s view', (view) => {
+    const { doc } = boxDoc();
+    const match = /mm = ([\d.]+) px/.exec(render(doc, { view }).svg);
+    expect(Number(match?.[1])).toBeGreaterThan(0);
+  });
 });

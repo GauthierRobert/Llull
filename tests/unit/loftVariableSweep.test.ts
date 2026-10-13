@@ -1,33 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import {
-  type Entity,
-  type LoftEntity,
-  type SweepEntity,
-  type Vec2,
-  type Vec3,
-  createEmptyDocument,
-} from '@core/model/types';
+import { type Entity, type LoftEntity, type SweepEntity, type Vec2, type Vec3, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { serializeDocument } from '@core/commands/persistence/serialization';
 import { entityBounds } from '@core/geometry/bounds';
 import { solidTriangles } from '@core/geometry/solidTriangles';
 import { tessellateEntity } from '@core/commands/render/polygons';
-import {
-  SECTION_RING_POINTS,
-  alignRing,
-  resampleRing,
-  sampleRing,
-} from '@core/geometry/sectionRing';
+import { SECTION_RING_POINTS, alignRing, resampleRing, sampleRing } from '@core/geometry/sectionRing';
 import { skinTriangles } from '@core/geometry/skin';
 import { loftRings } from '@core/geometry/loft';
 import { frameAtFraction, stationRingAt } from '@core/geometry/sweep';
 import { expectNoOp } from '../helpers/expectNoOp';
-import {
-  docWith,
-  createdEntity as created,
-  volumeOf,
-  isWatertight,
-} from '../helpers/fixtureDocument';
+import { docWith, createdEntity as created, volumeOf, isWatertight } from '../helpers/fixtureDocument';
 
 const empty = createEmptyDocument();
 
@@ -131,11 +114,7 @@ describe('loft_sections', () => {
       },
       'same centre',
     ],
-    [
-      'bad spec',
-      { sections: [{ center: [0, 0, 0], radius: 1 }, { center: [0, 0, 1] }] },
-      'section 1: give exactly one',
-    ],
+    ['bad spec', { sections: [{ center: [0, 0, 0], radius: 1 }, { center: [0, 0, 1] }] }, 'section 1: give exactly one'],
     ['missing sketch', { sectionIds: ['nope', 'nope2'] }, 'section 0: no entity'],
     [
       'half an ellipse',
@@ -206,11 +185,7 @@ describe('loft_sections', () => {
 
   it('rejects a duplicate explicit id and is pure', () => {
     const first = execute(empty, 'loft_sections', { ...twoCircles, id: 'L' }).document;
-    expectNoOp(
-      execute(first, 'loft_sections', { ...twoCircles, id: 'L' }),
-      first,
-      'already exists',
-    );
+    expectNoOp(execute(first, 'loft_sections', { ...twoCircles, id: 'L' }), first, 'already exists');
     const snapshot = JSON.stringify(first);
     execute(first, 'loft_sections', twoCircles);
     expect(JSON.stringify(first)).toBe(snapshot);
@@ -219,9 +194,7 @@ describe('loft_sections', () => {
   it('scales, round-trips and refuses corrupt saved lofts', () => {
     const cone = created<LoftEntity>(empty, 'loft_sections', twoCircles);
     const doc = { ...empty, entities: { [cone.id]: cone }, order: [cone.id] };
-    const big = execute(doc, 'scale_entity', { id: cone.id, factor: 2 }).document.entities[
-      cone.id
-    ] as LoftEntity;
+    const big = execute(doc, 'scale_entity', { id: cone.id, factor: 2 }).document.entities[cone.id] as LoftEntity;
     expect(big.rings[1]?.[0]?.[2]).toBeCloseTo(8, 9);
     const loaded = execute(createEmptyDocument(), 'load_document', {
       json: serializeDocument(doc),
@@ -295,11 +268,8 @@ describe('sweep_profile stations (variable section)', () => {
     expect(isWatertight(solidTriangles(tube))).toBe(true);
     const frame = frameAtFraction(tube.path, 0);
     expect(frame.point).toEqual([0, 0, 0]);
-    const scaled = execute(
-      { ...empty, entities: { [tube.id]: tube }, order: [tube.id] },
-      'scale_entity',
-      { id: tube.id, factor: 2 },
-    ).document.entities[tube.id] as SweepEntity;
+    const scaled = execute({ ...empty, entities: { [tube.id]: tube }, order: [tube.id] }, 'scale_entity', { id: tube.id, factor: 2 })
+      .document.entities[tube.id] as SweepEntity;
     expect(Math.hypot(...((scaled.stations?.[0]?.ring[0] ?? [0, 0]) as Vec2))).toBeCloseTo(3, 6);
   });
 
@@ -370,10 +340,7 @@ describe('sweep_profile stations (variable section)', () => {
       ],
     });
     const doc = { ...empty, entities: { [tube.id]: tube }, order: [tube.id] };
-    expect(
-      execute(createEmptyDocument(), 'load_document', { json: serializeDocument(doc) }).document
-        .entities[tube.id],
-    ).toEqual(tube);
+    expect(execute(createEmptyDocument(), 'load_document', { json: serializeDocument(doc) }).document.entities[tube.id]).toEqual(tube);
     for (const stations of [
       'nope',
       [

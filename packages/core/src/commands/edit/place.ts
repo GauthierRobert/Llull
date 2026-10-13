@@ -29,11 +29,7 @@ const axisIndexOf = (axis: 'x' | 'y' | 'z'): AxisIndex => (axis === 'x' ? 0 : ax
 
 /** Copy of `e` translated by `delta` along one axis. */
 function shiftAlong(e: Entity, axisIndex: AxisIndex, delta: number): Entity {
-  return translated(e, [
-    axisIndex === 0 ? delta : 0,
-    axisIndex === 1 ? delta : 0,
-    axisIndex === 2 ? delta : 0,
-  ]);
+  return translated(e, [axisIndex === 0 ? delta : 0, axisIndex === 1 ? delta : 0, axisIndex === 2 ? delta : 0]);
 }
 
 const plural = (n: number): string => (n === 1 ? 'y' : 'ies');
@@ -57,18 +53,14 @@ export const align = defineCommand({
     '"center-x", "center-y", "center-z". ' +
     'The reference entity is not moved. Returns affected: targetIds.',
   params: z.object({
-    targetIds: z
-      .array(z.string())
-      .describe('Ids of entities to move. Must all exist in the document.'),
+    targetIds: z.array(z.string()).describe('Ids of entities to move. Must all exist in the document.'),
     edge: z
       .string()
       .describe(
         'Which bounding-box face or center to align along: ' +
           '"min-x"|"min-y"|"min-z"|"max-x"|"max-y"|"max-z"|"center-x"|"center-y"|"center-z".',
       ),
-    referenceId: z
-      .string()
-      .describe('Id of the entity whose bounding-box edge is the alignment target. Not moved.'),
+    referenceId: z.string().describe('Id of the entity whose bounding-box edge is the alignment target. Not moved.'),
   }),
   run: (doc, { targetIds: requestedIds, edge, referenceId }): CommandResult => {
     const targetIds = [...new Set(requestedIds)];
@@ -88,11 +80,7 @@ export const align = defineCommand({
     const axisIndex = axisIndexOf(edgeMatch[2] as 'x' | 'y' | 'z');
     const edgeValue = (e: Entity): number => {
       const { min, max } = entityBoundsInDoc(doc, e);
-      return edgeType === 'min'
-        ? min[axisIndex]
-        : edgeType === 'max'
-          ? max[axisIndex]
-          : (min[axisIndex] + max[axisIndex]) / 2;
+      return edgeType === 'min' ? min[axisIndex] : edgeType === 'max' ? max[axisIndex] : (min[axisIndex] + max[axisIndex]) / 2;
     };
 
     const refValue = edgeValue(refEntity);
@@ -104,10 +92,7 @@ export const align = defineCommand({
     }
 
     if (moved.length === 0) {
-      return noop(
-        doc,
-        `align: all ${targetIds.length} entit${plural(targetIds.length)} already aligned to ${edge} of "${referenceId}".`,
-      );
+      return noop(doc, `align: all ${targetIds.length} entit${plural(targetIds.length)} already aligned to ${edge} of "${referenceId}".`);
     }
     return changed(
       replaceEntitiesById(doc, moved),
@@ -135,31 +120,21 @@ export const distribute = defineCommand({
     'and are not moved; all entities in between are repositioned. ' +
     'Returns affected: the ids of the entities that actually moved.',
   params: z.object({
-    targetIds: z
-      .array(z.string())
-      .describe('Ids of entities to distribute. Must contain at least 2 existing entity ids.'),
+    targetIds: z.array(z.string()).describe('Ids of entities to distribute. Must contain at least 2 existing entity ids.'),
     axis: z.string().describe('Axis along which to distribute: "x", "y", or "z".'),
     mode: z
       .string()
-      .describe(
-        '"equal-spacing" (default): equal center-to-center distance. ' +
-          '"equal-gap": equal gap between entity bounding boxes.',
-      )
+      .describe('"equal-spacing" (default): equal center-to-center distance. ' + '"equal-gap": equal gap between entity bounding boxes.')
       .optional(),
   }),
   run: (doc, { targetIds: requestedIds, axis, mode = 'equal-spacing' }): CommandResult => {
     const targetIds = [...new Set(requestedIds)];
-    if (targetIds.length < 2)
-      return noop(doc, 'distribute: targetIds must contain at least 2 distinct entity ids.');
+    if (targetIds.length < 2) return noop(doc, 'distribute: targetIds must contain at least 2 distinct entity ids.');
     const missingId = targetIds.find((id) => !doc.entities[id]);
     if (missingId) return noop(doc, `distribute: entity "${missingId}" not found.`);
-    if (axis !== 'x' && axis !== 'y' && axis !== 'z')
-      return noop(doc, `distribute: invalid axis "${axis}". Must be "x", "y", or "z".`);
+    if (axis !== 'x' && axis !== 'y' && axis !== 'z') return noop(doc, `distribute: invalid axis "${axis}". Must be "x", "y", or "z".`);
     if (mode !== 'equal-spacing' && mode !== 'equal-gap') {
-      return noop(
-        doc,
-        `distribute: invalid mode "${mode}". Must be "equal-spacing" or "equal-gap".`,
-      );
+      return noop(doc, `distribute: invalid mode "${mode}". Must be "equal-spacing" or "equal-gap".`);
     }
     const axisIndex = axisIndexOf(axis);
 
@@ -203,10 +178,7 @@ export const distribute = defineCommand({
     }
 
     if (moved.length === 0) {
-      return noop(
-        doc,
-        `distribute: ${n} entit${plural(n)} already evenly distributed along ${axis}.`,
-      );
+      return noop(doc, `distribute: ${n} entit${plural(n)} already evenly distributed along ${axis}.`);
     }
     return changed(
       replaceEntitiesById(doc, moved),
@@ -233,31 +205,21 @@ export const stackOn = defineCommand({
   params: z.object({
     movingId: z.string().describe('Id of the entity to move.'),
     baseId: z.string().describe('Id of the entity acting as the base (not moved).'),
-    axis: z
-      .string()
-      .describe('Axis along which to stack: "x", "y", or "z" (default "z", +Z up).')
-      .optional(),
+    axis: z.string().describe('Axis along which to stack: "x", "y", or "z" (default "z", +Z up).').optional(),
   }),
   run: (doc, { movingId, baseId, axis = 'z' }): CommandResult => {
     if (movingId === baseId) {
-      return noop(
-        doc,
-        `stack_on: movingId and baseId are both "${movingId}"; cannot stack an entity on itself.`,
-      );
+      return noop(doc, `stack_on: movingId and baseId are both "${movingId}"; cannot stack an entity on itself.`);
     }
     const movingEntity = doc.entities[movingId];
     if (!movingEntity) return noop(doc, `stack_on: moving entity "${movingId}" not found.`);
     const baseEntity = doc.entities[baseId];
     if (!baseEntity) return noop(doc, `stack_on: base entity "${baseId}" not found.`);
-    if (axis !== 'x' && axis !== 'y' && axis !== 'z')
-      return noop(doc, `stack_on: invalid axis "${axis}". Must be "x", "y", or "z".`);
+    if (axis !== 'x' && axis !== 'y' && axis !== 'z') return noop(doc, `stack_on: invalid axis "${axis}". Must be "x", "y", or "z".`);
     const axisIndex = axisIndexOf(axis);
-    const delta =
-      entityBoundsInDoc(doc, baseEntity).max[axisIndex] -
-      entityBoundsInDoc(doc, movingEntity).min[axisIndex];
+    const delta = entityBoundsInDoc(doc, baseEntity).max[axisIndex] - entityBoundsInDoc(doc, movingEntity).min[axisIndex];
 
-    if (Math.abs(delta) < 1e-10)
-      return noop(doc, `stack_on: "${movingId}" is already stacked on "${baseId}" along ${axis}.`);
+    if (Math.abs(delta) < 1e-10) return noop(doc, `stack_on: "${movingId}" is already stacked on "${baseId}" along ${axis}.`);
     return changed(
       replaceEntity(doc, shiftAlong(movingEntity, axisIndex, delta)),
       `stack_on: moved "${movingId}" by ${delta.toFixed(4)} along ${axis} to sit on top of "${baseId}".`,

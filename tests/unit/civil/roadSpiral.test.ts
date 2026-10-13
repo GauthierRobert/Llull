@@ -13,11 +13,7 @@ import {
   type ArcElement,
 } from '@aec/civil/alignment/alignmentGeometry';
 import { clothoidLocal, spiralCurve } from '@aec/civil/alignment/alignmentSpiral';
-import {
-  crossSlopesAt,
-  superelevationRate,
-  superelevationStations,
-} from '@aec/civil/alignment/superelevation';
+import { crossSlopesAt, superelevationRate, superelevationStations } from '@aec/civil/alignment/superelevation';
 import { crossSectionAt } from '@aec/civil/road/roadSection';
 import { civilErrors } from '@aec/civil/validate';
 import { alignmentOf, expectSaveLoadRoundTrip, surveyedDocument } from './fixtures';
@@ -70,10 +66,7 @@ describe('clothoid geometry', () => {
     expect(x).toBeCloseTo(length - length ** 5 / (40 * a2 ** 2), 2);
     expect(y).toBeCloseTo(length ** 3 / (6 * a2) - length ** 7 / (336 * a2 ** 3), 2);
     expect(x).toBeCloseTo(length * (1 - theta ** 2 / 10 + theta ** 4 / 216 - theta ** 6 / 9360), 8);
-    expect(y).toBeCloseTo(
-      length * (theta / 3 - theta ** 3 / 42 + theta ** 5 / 1320 - theta ** 7 / 75600),
-      8,
-    );
+    expect(y).toBeCloseTo(length * (theta / 3 - theta ** 3 / 42 + theta ** 5 / 1320 - theta ** 7 / 75600), 8);
   });
 
   it('computes shift, tangent length and arc angle', () => {
@@ -126,12 +119,7 @@ describe('clothoid geometry', () => {
 
   it('has curvature linear in station and 1/R on the circle', () => {
     const input = { points: POINTS, radii: [R], spirals: [LS], startStation: 0 };
-    const [, entry, arc, exit] = horizontalElements(input) as [
-      unknown,
-      SpiralElement,
-      ArcElement,
-      SpiralElement,
-    ];
+    const [, entry, arc, exit] = horizontalElements(input) as [unknown, SpiralElement, ArcElement, SpiralElement];
     const curvature = (station: number): number => {
       const h = 1e-4;
       const a = pointAtStation(input, station - h)?.direction ?? NaN;
@@ -150,10 +138,7 @@ describe('clothoid geometry', () => {
     const [, entry] = horizontalElements(input) as [unknown, SpiralElement];
     const at = pointAtStation(input, entry.startStation + 25);
     const placed = at as NonNullable<typeof at>;
-    const left: [number, number] = [
-      placed.point[0] - Math.sin(placed.direction) * 3,
-      placed.point[1] + Math.cos(placed.direction) * 3,
-    ];
+    const left: [number, number] = [placed.point[0] - Math.sin(placed.direction) * 3, placed.point[1] + Math.cos(placed.direction) * 3];
     const found = stationOffset(input, left);
     expect(found?.station).toBeCloseTo(entry.startStation + 25, 5);
     expect(found?.offset).toBeCloseTo(3, 5);
@@ -243,12 +228,7 @@ describe('superelevation', () => {
 
   it('follows crown, runout, runoff, full rate and back', () => {
     const a = alignment();
-    const [, entry, arc, exit] = horizontalElements(a) as [
-      unknown,
-      SpiralElement,
-      ArcElement,
-      SpiralElement,
-    ];
+    const [, entry, arc, exit] = horizontalElements(a) as [unknown, SpiralElement, ArcElement, SpiralElement];
     const c = 0.025;
     const at = (s: number): ReturnType<typeof crossSlopesAt> => crossSlopesAt(a, c, 3.5, s);
     expect(at(10)).toEqual({ left: c, right: c });
@@ -317,18 +297,10 @@ describe('superelevation', () => {
     const a = alignmentOf(doc, id);
     const arc = horizontalElements(a).find((e) => e.kind === 'arc') as ArcElement;
     const station = arc.startStation + arc.length / 2;
-    const cross = crossSectionAt(
-      a,
-      a.section as NonNullable<typeof a.section>,
-      null,
-      station,
-      101,
-      1,
-    );
+    const cross = crossSectionAt(a, a.section as NonNullable<typeof a.section>, null, station, 101, 1);
     const nodes = cross?.template ?? [];
     const slope = (i: number, j: number): number =>
-      ((nodes[j]?.z ?? NaN) - (nodes[i]?.z ?? NaN)) /
-      ((nodes[j]?.offset ?? NaN) - (nodes[i]?.offset ?? NaN));
+      ((nodes[j]?.z ?? NaN) - (nodes[i]?.z ?? NaN)) / ((nodes[j]?.offset ?? NaN) - (nodes[i]?.offset ?? NaN));
     expect(slope(0, 2)).toBeCloseTo(-0.07, 12);
     expect(slope(2, 4)).toBeCloseTo(-0.07, 12);
     expect(nodes[0]?.z).toBeCloseTo(101 + 0.07 * 4.5, 12);
@@ -352,8 +324,7 @@ describe('superelevation', () => {
     expect(Math.abs(peak?.superelevationPercent ?? 0)).toBeGreaterThan(0);
     expect(Math.max(...rows.map((r) => r.superelevationPercent ?? 0))).toBe(7);
     const plain = execute(doc, 'set_superelevation', { alignmentId: id, maxRate: 0 });
-    const plainData = execute(plain.document, 'alignment_report', { alignmentId: id, interval: 10 })
-      .data as {
+    const plainData = execute(plain.document, 'alignment_report', { alignmentId: id, interval: 10 }).data as {
       rows: Array<{ superelevationPercent: number | null; fillAreaM2: number }>;
       csv: string;
     };
@@ -369,9 +340,7 @@ describe('superelevation', () => {
     const set = execute(doc, 'set_superelevation', { alignmentId: id, maxRate: 0.07 });
     expect(set.summary).toContain('7.00 %');
     expect(set.affected.length).toBeGreaterThan(0);
-    expect(
-      execute(set.document, 'set_superelevation', { alignmentId: id, maxRate: 0.07 }).affected,
-    ).toEqual([]);
+    expect(execute(set.document, 'set_superelevation', { alignmentId: id, maxRate: 0.07 }).affected).toEqual([]);
     const removed = execute(set.document, 'set_superelevation', { alignmentId: id, maxRate: 0 });
     expect(removed.summary).toContain('Removed superelevation (was 7.00 %)');
     expect(alignmentOf(removed.document, id).superelevation).toBeUndefined();
@@ -401,12 +370,8 @@ describe('superelevation', () => {
     };
     expect(civilErrors(withObject({ spirals: 'x' })).join()).toMatch(/spirals must be numbers/);
     expect(civilErrors(withObject({ spirals: [5, 5] })).join()).toMatch(/spirals needs 1 value/);
-    expect(civilErrors(withObject({ superelevation: { maxRate: 0.5 } })).join()).toMatch(
-      /superelevation needs/,
-    );
-    expect(
-      civilErrors(withObject({ superelevation: { maxRate: 0.06, runoffLength: -1 } })).join(),
-    ).toMatch(/superelevation needs/);
+    expect(civilErrors(withObject({ superelevation: { maxRate: 0.5 } })).join()).toMatch(/superelevation needs/);
+    expect(civilErrors(withObject({ superelevation: { maxRate: 0.06, runoffLength: -1 } })).join()).toMatch(/superelevation needs/);
     expect(civilErrors(withObject({ superelevation: 3 })).join()).toMatch(/superelevation needs/);
     expect(civilErrors(withObject({}))).toEqual([]);
   });
@@ -423,8 +388,7 @@ describe('design checks and LandXML', () => {
         failures: string[];
       };
     }
-    const run = (speed: number): Report =>
-      execute(doc, 'alignment_report', { alignmentId: id, designSpeedKmh: speed }).data as Report;
+    const run = (speed: number): Report => execute(doc, 'alignment_report', { alignmentId: id, designSpeedKmh: speed }).data as Report;
     const slow = run(40).checks;
     expect(slow.spirals).toHaveLength(2);
     expect(slow.spirals[0]?.minLengthM).toBeCloseTo(40 ** 3 / (46.656 * 0.6 * 100), 1);
@@ -440,8 +404,7 @@ describe('design checks and LandXML', () => {
 
   it('writes Spiral / Curve / Spiral elements to LandXML', () => {
     const { doc } = spiralDoc();
-    const text = (execute(doc, 'export_landxml', { date: '2026-10-09' }).data as { text: string })
-      .text;
+    const text = (execute(doc, 'export_landxml', { date: '2026-10-09' }).data as { text: string }).text;
     const spirals = text.match(/<Spiral [^>]*>/g) ?? [];
     expect(spirals).toHaveLength(2);
     expect(spirals[0]).toContain('radiusStart="INF" radiusEnd="100"');
@@ -452,9 +415,7 @@ describe('design checks and LandXML', () => {
     expect(text).toContain('</Spiral>');
     expect(text.indexOf('<Spiral')).toBeLessThan(text.indexOf('<Curve'));
     expect(text.lastIndexOf('<Spiral')).toBeGreaterThan(text.indexOf('<Curve'));
-    expect(text).toMatch(
-      /<Spiral [^>]*><Start>[^<]+<\/Start><PI>[^<]+<\/PI><End>[^<]+<\/End><\/Spiral>/,
-    );
+    expect(text).toMatch(/<Spiral [^>]*><Start>[^<]+<\/Start><PI>[^<]+<\/PI><End>[^<]+<\/End><\/Spiral>/);
   });
 });
 
@@ -476,10 +437,7 @@ describe('set_alignment_profile end snapping', () => {
       ],
     });
     const alignment = snapped.document.civil?.objects['alignment-1'];
-    expect(alignment?.category === 'alignment' && alignment.profile[1]?.station).toBeCloseTo(
-      100.0135,
-      9,
-    );
+    expect(alignment?.category === 'alignment' && alignment.profile[1]?.station).toBeCloseTo(100.0135, 9);
     const far = execute(doc, 'set_alignment_profile', {
       alignmentId: 'alignment-1',
       pvis: [

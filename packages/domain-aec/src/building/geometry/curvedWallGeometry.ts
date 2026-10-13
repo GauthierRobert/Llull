@@ -30,10 +30,7 @@ export function arcThrough(start: Vec2, through: Vec2, end: Vec2): Arc | null {
   const a2 = ax * ax + ay * ay;
   const b2 = bx * bx + by * by;
   const c2 = cx * cx + cy * cy;
-  const center: Vec2 = [
-    (a2 * (by - cy) + b2 * (cy - ay) + c2 * (ay - by)) / d,
-    (a2 * (cx - bx) + b2 * (ax - cx) + c2 * (bx - ax)) / d,
-  ];
+  const center: Vec2 = [(a2 * (by - cy) + b2 * (cy - ay) + c2 * (ay - by)) / d, (a2 * (cx - bx) + b2 * (ax - cx) + c2 * (bx - ax)) / d];
   const angle = ([x, y]: Vec2): number => Math.atan2(y - center[1], x - center[0]);
   const turn = (from: number, to: number): number => {
     const delta = (to - from) % (2 * Math.PI);
@@ -75,10 +72,7 @@ function arcFrame(arc: Arc, s: number): { point: Vec2; tangent: Vec2 } {
   const angle = arc.startAngle + Math.sign(arc.sweep) * (s / arc.radius);
   const sign = Math.sign(arc.sweep) || 1;
   return {
-    point: [
-      arc.center[0] + arc.radius * Math.cos(angle),
-      arc.center[1] + arc.radius * Math.sin(angle),
-    ],
+    point: [arc.center[0] + arc.radius * Math.cos(angle), arc.center[1] + arc.radius * Math.sin(angle)],
     tangent: [-Math.sin(angle) * sign, Math.cos(angle) * sign],
   };
 }
@@ -103,9 +97,7 @@ export function tangentWall(wall: CurvedWallElement, offset: number): WallElemen
   const arc = curvedWallArc(wall);
   // Ends exactly at the arc end when the offset is clamped there (unit-independent).
   const length = Math.max(curvedWallLength(wall), offset);
-  const { point, tangent } = arc
-    ? arcFrame(arc, offset)
-    : { point: wall.start, tangent: [1, 0] as Vec2 };
+  const { point, tangent } = arc ? arcFrame(arc, offset) : { point: wall.start, tangent: [1, 0] as Vec2 };
   const start: Vec2 = [point[0] - tangent[0] * offset, point[1] - tangent[1] * offset];
   return {
     id: wall.id,

@@ -50,10 +50,7 @@ function ConfigurationRow({ config, active }: ConfigurationRowProps): React.Reac
       </div>
 
       {paramEntries.length > 0 && (
-        <ul
-          className="config-param-list"
-          aria-label={`Parameters for configuration ${config.name}`}
-        >
+        <ul className="config-param-list" aria-label={`Parameters for configuration ${config.name}`}>
           {paramEntries.map(([paramName, expression]) => (
             <li key={paramName} className="config-param-entry">
               <span className="config-param-name" title={paramName}>
@@ -88,13 +85,7 @@ interface ParameterValueRowProps {
   canRemove: boolean;
 }
 
-function ParameterValueRow({
-  index,
-  entry,
-  onChange,
-  onRemove,
-  canRemove,
-}: ParameterValueRowProps): React.ReactElement {
+function ParameterValueRow({ index, entry, onChange, onRemove, canRemove }: ParameterValueRowProps): React.ReactElement {
   return (
     <div className="config-pv-row" data-testid={`config-pv-row-${index}`}>
       <input
@@ -143,8 +134,7 @@ function CreateConfigurationForm(): React.ReactElement {
   const updateRow = (index: number, patch: Partial<PvEntry>): void =>
     setPvRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   const handleAddRow = (): void => setPvRows((prev) => [...prev, newRow()]);
-  const handleRemoveRow = (index: number): void =>
-    setPvRows((prev) => prev.filter((_, i) => i !== index));
+  const handleRemoveRow = (index: number): void => setPvRows((prev) => prev.filter((_, i) => i !== index));
 
   const draft = configurationDraftOf(configName, pvRows);
 
@@ -222,26 +212,14 @@ export function ConfigurationsPanel({ className }: ConfigurationsPanelProps): Re
 
   return (
     <aside className={classNames('panel configs-panel', className)} aria-label="Configurations">
-      <PanelHeader
-        title="Configurations"
-        count={configList.length}
-        countLabel={`${configList.length} configurations`}
-      />
+      <PanelHeader title="Configurations" count={configList.length} countLabel={`${configList.length} configurations`} />
 
       {configList.length === 0 ? (
-        <PanelEmpty
-          icon="configurations"
-          message="No configurations defined."
-          hint="A configuration is a named set of parameter values."
-        />
+        <PanelEmpty icon="configurations" message="No configurations defined." hint="A configuration is a named set of parameter values." />
       ) : (
         <ul className="config-list" aria-label="Configuration list" role="list">
           {configList.map((config) => (
-            <ConfigurationRow
-              key={config.name}
-              config={config}
-              active={isConfigurationActive(config, parameters)}
-            />
+            <ConfigurationRow key={config.name} config={config} active={isConfigurationActive(config, parameters)} />
           ))}
         </ul>
       )}

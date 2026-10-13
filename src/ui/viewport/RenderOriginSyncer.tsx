@@ -20,11 +20,7 @@ export function RenderOriginSyncer(): null {
     if (!orbit?.target) return;
     // Read per frame: the store updates synchronously, so a rebase is visible to the next frame.
     const { renderOrigin: origin, setRenderOrigin } = useStore.getState();
-    const worldTarget: [number, number, number] = [
-      orbit.target.x + origin[0],
-      orbit.target.y + origin[1],
-      orbit.target.z + origin[2],
-    ];
+    const worldTarget: [number, number, number] = [orbit.target.x + origin[0], orbit.target.y + origin[1], orbit.target.z + origin[2]];
     if (!shouldRebase(worldTarget, origin)) return;
     const newOrigin = snapOriginToTarget(worldTarget);
     const dx = newOrigin[0] - origin[0];

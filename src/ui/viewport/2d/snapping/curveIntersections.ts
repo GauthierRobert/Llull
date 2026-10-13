@@ -19,8 +19,7 @@ export interface CircularCurve {
 type Point = [number, number];
 
 const onCurve = (curve: CircularCurve, x: number, y: number): boolean =>
-  curve.full ||
-  isAngleOnArc(Math.atan2(y - curve.cy, x - curve.cx), curve.startAngle, curve.endAngle);
+  curve.full || isAngleOnArc(Math.atan2(y - curve.cy, x - curve.cx), curve.startAngle, curve.endAngle);
 
 /**
  * Intersections of a finite segment with a circle/arc (0, 1 or 2 points).

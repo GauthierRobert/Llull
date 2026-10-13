@@ -22,16 +22,7 @@ export interface ShapeHandle {
 }
 
 export type EdgeCurve = 'line' | 'circle' | 'ellipse' | 'bspline' | 'other';
-export type FaceSurface =
-  | 'plane'
-  | 'cylinder'
-  | 'cone'
-  | 'sphere'
-  | 'torus'
-  | 'bspline'
-  | 'revolution'
-  | 'extrusion'
-  | 'other';
+export type FaceSurface = 'plane' | 'cylinder' | 'cone' | 'sphere' | 'torus' | 'bspline' | 'revolution' | 'extrusion' | 'other';
 
 /** One unique edge; `index` is what `fillet_edge` / `chamfer_edge` `edgeIndices` select. */
 export interface ShapeEdge {

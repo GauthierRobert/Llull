@@ -11,13 +11,7 @@ import { commitBuilding } from '../evaluate/evaluateElements';
 import { noop } from '@core/commands/noop';
 import { isPositiveNumber } from '@lib/isFiniteNumber';
 
-const WALL_LAYER_FUNCTIONS = [
-  'structure',
-  'insulation',
-  'membrane',
-  'air',
-  'finish',
-] as const satisfies ReadonlyArray<WallLayerFunction>;
+const WALL_LAYER_FUNCTIONS = ['structure', 'insulation', 'membrane', 'air', 'finish'] as const satisfies ReadonlyArray<WallLayerFunction>;
 
 /** @failure malformed layer list -> reason string */
 export function parseWallLayers(value: unknown): WallLayer[] | string {
@@ -78,18 +72,13 @@ export const setWallLayers = defineCommand({
     'finish }. Wall thickness becomes the sum; quantities are reported per layer material; plans show ' +
     'the layer lines; IFC gets a material layer set. layers: null removes the build-up.',
   params: z.object({
-    wallIds: z
-      .array(z.string())
-      .describe('Ids of existing straight walls (e.g. ["wall-1"]); curved walls are not accepted.'),
+    wallIds: z.array(z.string()).describe('Ids of existing straight walls (e.g. ["wall-1"]); curved walls are not accepted.'),
     layers: z
       .array(
         z.object({
           material: z.string().describe('Layer material name, e.g. "brick", "mineral wool".'),
           thickness: z.number().describe('Layer thickness in document units (> 0).'),
-          function: z
-            .enum(WALL_LAYER_FUNCTIONS)
-            .optional()
-            .describe('Role of the layer. Default "structure".'),
+          function: z.enum(WALL_LAYER_FUNCTIONS).optional().describe('Role of the layer. Default "structure".'),
         }),
       )
       .nullable()
@@ -118,8 +107,7 @@ export const setWallLayers = defineCommand({
     const thickness = parsed.reduce((sum, layer) => sum + layer.thickness, 0);
     const material = structuralMaterial(parsed);
     let next = building;
-    for (const wall of walls)
-      next = withElement(next, { ...wall, layers: parsed, thickness, material });
+    for (const wall of walls) next = withElement(next, { ...wall, layers: parsed, thickness, material });
     return commitBuilding(
       doc,
       next,

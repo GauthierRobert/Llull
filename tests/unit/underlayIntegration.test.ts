@@ -78,8 +78,7 @@ describe('image entity across the core switches', () => {
       ...doc,
       entities: { ...doc.entities, [imageId]: { ...imageOf(doc, imageId), width: 0 } },
     };
-    const issues = (execute(broken, 'check_model', {}).data as { issues: { entityId?: string }[] })
-      .issues;
+    const issues = (execute(broken, 'check_model', {}).data as { issues: { entityId?: string }[] }).issues;
     expect(issues.some((issue) => issue.entityId === imageId)).toBe(true);
   });
 
@@ -90,13 +89,9 @@ describe('image entity across the core switches', () => {
 
     const image = imageOf(doc, imageId);
     expect(validateEntityValue(image)).toBeNull();
-    expect(validateEntityValue({ ...image, dataUrl: 'data:image/gif;base64,AAAA' })).toContain(
-      'dataUrl',
-    );
+    expect(validateEntityValue({ ...image, dataUrl: 'data:image/gif;base64,AAAA' })).toContain('dataUrl');
     expect(validateEntityValue({ ...image, dataUrl: 'x'.repeat(8_000_001) })).toContain('dataUrl');
-    expect(
-      validateEntityValue({ ...image, dataUrl: `data:image/png;base64,${'A'.repeat(8_000_000)}` }),
-    ).toContain('exceeds');
+    expect(validateEntityValue({ ...image, dataUrl: `data:image/png;base64,${'A'.repeat(8_000_000)}` })).toContain('exceeds');
     expect(validateEntityValue({ ...image, opacity: 2 })).toContain('opacity');
     expect(validateEntityValue({ ...image, locked: 'yes' })).toContain('locked');
     expect(validateEntityValue({ ...image, pixelWidth: 0 })).toContain('pixelWidth');

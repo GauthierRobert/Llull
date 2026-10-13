@@ -12,9 +12,7 @@ const captured = vi.hoisted(() => ({
 }));
 
 vi.mock('@react-three/fiber', () => ({ flushSync: captured.flushSync }));
-vi.mock('@ui/viewport/2d/GroundPlane', async () =>
-  (await import('../helpers/groundPlaneMock')).groundPlaneMock(captured),
-);
+vi.mock('@ui/viewport/2d/GroundPlane', async () => (await import('../helpers/groundPlaneMock')).groundPlaneMock(captured));
 vi.mock('@ui/viewport/2d/useSnap', () => ({
   useZoomSnap: (cursor: Vec2 | null) => (cursor ? { x: cursor[0], y: cursor[1] } : null),
 }));
@@ -32,15 +30,7 @@ const pointer = (x: number, y: number): unknown => ({
 });
 
 function renderLine(onClickPoint = vi.fn()): ReturnType<typeof vi.fn> {
-  render(
-    <DrawInteraction
-      activeTool="line"
-      collectedPoints={[]}
-      onClickPoint={onClickPoint}
-      onDoubleClick={vi.fn()}
-      zoom={50}
-    />,
-  );
+  render(<DrawInteraction activeTool="line" collectedPoints={[]} onClickPoint={onClickPoint} onDoubleClick={vi.fn()} zoom={50} />);
   return onClickPoint;
 }
 

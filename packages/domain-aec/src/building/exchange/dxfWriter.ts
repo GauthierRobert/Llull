@@ -134,15 +134,7 @@ export class DxfWriter {
     this.pair(51, toDegrees(endAngle));
   }
 
-  text(
-    layer: string,
-    at: Vec2,
-    height: number,
-    content: string,
-    align: 'left' | 'center' | 'right',
-    rotation = 0,
-    z = 0,
-  ): void {
+  text(layer: string, at: Vec2, height: number, content: string, align: 'left' | 'center' | 'right', rotation = 0, z = 0): void {
     this.start('TEXT', layer);
     this.point(10, at, z);
     this.pair(40, height);
@@ -198,10 +190,7 @@ export class DxfWriter {
   }
 }
 
-function writeDimension(
-  writer: DxfWriter,
-  primitive: Extract<DrawingPrimitive, { type: 'dimension' }>,
-): void {
+function writeDimension(writer: DxfWriter, primitive: Extract<DrawingPrimitive, { type: 'dimension' }>): void {
   const { segments, label } = dimensionGeometry(primitive);
   for (const [a, b] of segments) writer.line(primitive.layer, a, b);
   writer.text(primitive.layer, label.at, label.height, primitive.label, 'center', label.angle);
@@ -227,32 +216,16 @@ function writeFill(
   }
   const { vertices, triangles } = triangulatePolygon(outer, holes);
   for (const [i, j, k] of triangles) {
-    writer.solid(
-      patternLayer(layer),
-      vertices[i] as Vec2,
-      vertices[j] as Vec2,
-      vertices[k] as Vec2,
-    );
+    writer.solid(patternLayer(layer), vertices[i] as Vec2, vertices[j] as Vec2, vertices[k] as Vec2);
   }
 }
 
-export function writePrimitive(
-  writer: DxfWriter,
-  primitive: DrawingPrimitive,
-  hatchSpacing: number,
-): void {
+export function writePrimitive(writer: DxfWriter, primitive: DrawingPrimitive, hatchSpacing: number): void {
   switch (primitive.type) {
     case 'polygon':
       writer.polyline(primitive.layer, primitive.points, true);
       if (primitive.fill !== undefined) {
-        writeFill(
-          writer,
-          primitive.layer,
-          primitive.points,
-          primitive.holes ?? [],
-          primitive.fill,
-          hatchSpacing,
-        );
+        writeFill(writer, primitive.layer, primitive.points, primitive.holes ?? [], primitive.fill, hatchSpacing);
       }
       return;
     case 'polyline':
@@ -262,13 +235,7 @@ export function writePrimitive(
       writer.line(primitive.layer, primitive.a, primitive.b);
       return;
     case 'arc':
-      writer.arc(
-        primitive.layer,
-        primitive.center,
-        primitive.radius,
-        primitive.startAngle,
-        primitive.endAngle,
-      );
+      writer.arc(primitive.layer, primitive.center, primitive.radius, primitive.startAngle, primitive.endAngle);
       return;
     case 'circle':
       writer.circle(primitive.layer, primitive.center, primitive.radius);

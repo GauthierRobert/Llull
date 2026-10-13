@@ -9,13 +9,7 @@
 
 import type { Feature, FeatureProgram } from './program';
 import { formatNumber, provenance, quote } from './format';
-import {
-  modifierLine,
-  parametersAndModel,
-  placementKwargs,
-  pythonTuple,
-  shapeCallOpen,
-} from './pythonCalls';
+import { modifierLine, parametersAndModel, placementKwargs, pythonTuple, shapeCallOpen } from './pythonCalls';
 import { pythonRuntime, type PythonBackend } from './pythonRuntime';
 
 const LIBRARY: Readonly<Record<PythonBackend, string>> = {

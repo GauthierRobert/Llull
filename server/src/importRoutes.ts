@@ -34,11 +34,7 @@ function coerce(key: string, value: unknown): unknown {
   return value;
 }
 
-function commandParams(
-  target: 'drawing' | 'survey',
-  source: Record<string, unknown>,
-  text: string,
-): Record<string, unknown> {
+function commandParams(target: 'drawing' | 'survey', source: Record<string, unknown>, text: string): Record<string, unknown> {
   const params: Record<string, unknown> = { text };
   for (const key of target === 'survey' ? SURVEY_KEYS : DRAWING_KEYS) {
     if (source[key] !== undefined && source[key] !== '') params[key] = coerce(key, source[key]);
@@ -50,10 +46,8 @@ export function buildImportRouter(restLimiter: RequestHandler): Router {
   const router = Router();
   const limit = (): number => dwgConfigFromEnv().maxBytes;
   // Body parsers are built per request so LLULL_DWG_MAX_BYTES is honoured; JSON gets +33% for base64.
-  const raw: RequestHandler = (req, res, next) =>
-    express.raw({ type: 'application/octet-stream', limit: limit() })(req, res, next);
-  const json: RequestHandler = (req, res, next) =>
-    express.json({ limit: Math.ceil(limit() * 1.4) + 4096 })(req, res, next);
+  const raw: RequestHandler = (req, res, next) => express.raw({ type: 'application/octet-stream', limit: limit() })(req, res, next);
+  const json: RequestHandler = (req, res, next) => express.json({ limit: Math.ceil(limit() * 1.4) + 4096 })(req, res, next);
 
   router.post('/dwg', restLimiter, guardMutation(), raw, json, (req, res) => {
     const body: unknown = req.body;
@@ -79,12 +73,7 @@ export function buildImportRouter(restLimiter: RequestHandler): Router {
     convertDwgToDxf(bytes)
       .then((text) => {
         const command = target === 'survey' ? 'import_survey_dxf' : 'import_dxf';
-        const result = applyCommand(
-          command,
-          commandParams(target, source, text),
-          undefined,
-          actorOf(res, 'rest'),
-        );
+        const result = applyCommand(command, commandParams(target, source, text), undefined, actorOf(res, 'rest'));
         const reply: DwgImportResponseBody = {
           ...result,
           command,

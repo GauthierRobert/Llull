@@ -17,13 +17,7 @@ import { toRenderPosition } from './floatingOrigin';
 type Vec3 = readonly [number, number, number];
 
 /** Place the camera at `position` looking at `target` (both WORLD space; the camera lives in render space). */
-export function driveCamera(
-  camera: THREE.Camera,
-  orbit: OrbitControlsImpl,
-  invalidate: () => void,
-  position: Vec3,
-  target: Vec3,
-): void {
+export function driveCamera(camera: THREE.Camera, orbit: OrbitControlsImpl, invalidate: () => void, position: Vec3, target: Vec3): void {
   const { renderOrigin } = useStore.getState();
   const renderTarget = new THREE.Vector3(...toRenderPosition(target, renderOrigin));
   camera.up.set(0, 0, 1);

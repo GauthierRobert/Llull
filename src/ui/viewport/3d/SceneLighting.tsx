@@ -32,18 +32,9 @@ function useSceneBounds(): SceneBounds {
 }
 
 /** Ground contact-shadow patch sized to the scene footprint (see contactShadowPlane.ts). */
-function SceneContactShadows({
-  opacity,
-  bounds,
-}: {
-  opacity: number;
-  bounds: SceneBounds;
-}): React.ReactElement {
+function SceneContactShadows({ opacity, bounds }: { opacity: number; bounds: SceneBounds }): React.ReactElement {
   const renderOrigin = useStore((s) => s.renderOrigin);
-  const plane = useMemo(
-    () => computeContactShadowPlane(bounds, renderOrigin),
-    [bounds, renderOrigin],
-  );
+  const plane = useMemo(() => computeContactShadowPlane(bounds, renderOrigin), [bounds, renderOrigin]);
   // frames={1} bakes once: remount (re-bake) when the footprint changes.
   const bakeKey = `${plane.position.join(',')}|${plane.scale}|${plane.far}`;
   return (
@@ -62,13 +53,7 @@ function SceneContactShadows({
 }
 
 /** Shadow-casting key light that follows the scene's extent (see keyLightRig.ts). */
-function SceneKeyLight({
-  shadowMapSize,
-  bounds,
-}: {
-  shadowMapSize: number;
-  bounds: SceneBounds;
-}): React.ReactElement {
+function SceneKeyLight({ shadowMapSize, bounds }: { shadowMapSize: number; bounds: SceneBounds }): React.ReactElement {
   const renderOrigin = useStore((s) => s.renderOrigin);
   const invalidate = useThree((s) => s.invalidate);
   const lightRef = useRef<THREE.DirectionalLight>(null);
@@ -138,10 +123,7 @@ interface SceneLightingProps {
   contactShadowOpacity: number;
 }
 
-export function SceneLighting({
-  quality,
-  contactShadowOpacity,
-}: SceneLightingProps): React.ReactElement {
+export function SceneLighting({ quality, contactShadowOpacity }: SceneLightingProps): React.ReactElement {
   return (
     <>
       {/* ---- IBL environment: studio preset for reflections/ambient; no background.
@@ -161,9 +143,7 @@ export function SceneLighting({
       {/* ---- Soft shadow patch: PCSS-style softening on the shadow map.
            Disabled in Low tier (softShadowSamples === 0) to save per-fragment cost.
            Medium tier: 8 samples (halved from High's 16). ---- */}
-      {quality.softShadowSamples > 0 && (
-        <SoftShadows size={25} samples={quality.softShadowSamples} focus={0.5} />
-      )}
+      {quality.softShadowSamples > 0 && <SoftShadows size={25} samples={quality.softShadowSamples} focus={0.5} />}
 
       {/* ---- Light rig ----
            hemisphere: warm ground / cool sky fill to avoid pure-black undersides.

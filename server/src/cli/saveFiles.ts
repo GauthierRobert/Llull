@@ -24,9 +24,7 @@ const TEXT_KEYS = ['text', 'step', 'stl', 'ifc', 'svg', 'content'] as const;
 /** The single file a data record carries (base64 or text payload), or null. */
 export function fileOfRecord(record: Record<string, unknown>): OutputFile | null {
   const bareName = nonEmptyString(record['name']);
-  const name =
-    nonEmptyString(record['fileName']) ??
-    (bareName !== undefined && path.extname(bareName) !== '' ? bareName : null);
+  const name = nonEmptyString(record['fileName']) ?? (bareName !== undefined && path.extname(bareName) !== '' ? bareName : null);
   for (const key of BASE64_KEYS) {
     const value = nonEmptyString(record[key]);
     if (value !== undefined) return { name, bytes: Buffer.from(value, 'base64') };
@@ -87,17 +85,12 @@ export function saveDataFiles(data: unknown, target: string): SavedFile[] {
         : 'the result carries no file payload to save (no data.files / text / base64 field).',
     );
   }
-  const targetIsDirectory =
-    files.length > 1 ||
-    target.endsWith('/') ||
-    (fs.existsSync(target) && fs.statSync(target).isDirectory());
+  const targetIsDirectory = files.length > 1 || target.endsWith('/') || (fs.existsSync(target) && fs.statSync(target).isDirectory());
   if (targetIsDirectory) fs.mkdirSync(target, { recursive: true });
   else fs.mkdirSync(path.dirname(path.resolve(target)), { recursive: true });
   return files.map((file, index) => {
     const fallback = `file-${index + 1}`;
-    const filePath = targetIsDirectory
-      ? path.join(target, path.basename(file.name ?? fallback))
-      : target;
+    const filePath = targetIsDirectory ? path.join(target, path.basename(file.name ?? fallback)) : target;
     fs.writeFileSync(filePath, file.bytes);
     return { path: filePath, bytes: file.bytes.length };
   });

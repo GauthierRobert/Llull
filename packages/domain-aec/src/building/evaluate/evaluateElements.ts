@@ -5,26 +5,10 @@
 
 import type { CadDocument, Entity } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
-import type {
-  BuildingElement,
-  BuildingModel,
-  GridElement,
-  OpeningElement,
-  SteelMemberElement,
-} from '@core/model/building';
+import type { BuildingElement, BuildingModel, GridElement, OpeningElement, SteelMemberElement } from '@core/model/building';
 import { curvedWallExtent, tangentWall } from '../geometry/curvedWallGeometry';
-import {
-  evaluateEquipment,
-  evaluateFooting,
-  evaluateMember,
-  evaluatePanel,
-  evaluatePipe,
-  evaluateTray,
-} from '../../industrial/evaluate';
-import {
-  evaluatePlate,
-  evaluateConnection,
-} from '../../industrial/connections/evaluateConnections';
+import { evaluateEquipment, evaluateFooting, evaluateMember, evaluatePanel, evaluatePipe, evaluateTray } from '../../industrial/evaluate';
+import { evaluatePlate, evaluateConnection } from '../../industrial/connections/evaluateConnections';
 import { evaluatePipeSupport } from '../../industrial/piping/evaluateSupports';
 import { reconcilePipeSupports } from '../../industrial/piping/pipeSupportAttach';
 import { BUILDING_LAYER_COLOR } from './entities';
@@ -84,12 +68,7 @@ function evaluateElement(context: EvaluationContext, element: BuildingElement): 
       return evaluateTray(context.doc, leveled, level);
     case 'pipeSupport': {
       const pipe = building.elements[leveled.pipeId];
-      return evaluatePipeSupport(
-        context.doc,
-        leveled,
-        pipe?.category === 'pipe' ? pipe : undefined,
-        level,
-      );
+      return evaluatePipeSupport(context.doc, leveled, pipe?.category === 'pipe' ? pipe : undefined, level);
     }
     case 'connection': {
       const members: Record<string, SteelMemberElement | undefined> = {};
@@ -100,17 +79,10 @@ function evaluateElement(context: EvaluationContext, element: BuildingElement): 
       return evaluateConnection(context.doc, leveled, members, level);
     }
     case 'curvedWall':
-      return evaluateCurvedWall(
-        leveled,
-        level,
-        openingsOf(building, leveled.id),
-        curvedWallExtent(building, leveled),
-      );
+      return evaluateCurvedWall(leveled, level, openingsOf(building, leveled.id), curvedWallExtent(building, leveled));
     case 'plate': {
       const member = building.elements[leveled.memberId];
-      return member?.category === 'member'
-        ? evaluatePlate(context.doc, leveled, member, level)
-        : [];
+      return member?.category === 'member' ? evaluatePlate(context.doc, leveled, member, level) : [];
     }
   }
 }
@@ -146,7 +118,5 @@ export function commitBuilding(
   const document = regenerateBuilding(doc, model);
   const text = typeof summary === 'function' ? summary(document) : summary;
   const affected = elementAffected(document, elementIds);
-  return data === undefined
-    ? { document, summary: text, affected }
-    : { document, summary: text, affected, data };
+  return data === undefined ? { document, summary: text, affected } : { document, summary: text, affected, data };
 }

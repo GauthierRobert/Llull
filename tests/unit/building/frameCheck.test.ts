@@ -54,8 +54,7 @@ describe('check_portal_frames', () => {
     const doc = hall();
     const light = execute(doc, 'check_portal_frames', { deadLoad: 0.2, snowLoad: 0 });
     const heavy = execute(doc, 'check_portal_frames', { deadLoad: 0.5, snowLoad: 2 });
-    const max = (result: ReturnType<typeof execute>): number =>
-      (result.data as { maxUtilisation: number }).maxUtilisation;
+    const max = (result: ReturnType<typeof execute>): number => (result.data as { maxUtilisation: number }).maxUtilisation;
     expect(max(heavy)).toBeGreaterThan(max(light));
     expect(execute(doc, 'check_portal_frames', { snowLoad: -1 }).data).toBeUndefined();
     expect(execute(doc, 'check_portal_frames', { levelId: 'nope' }).summary).toMatch(/no level/);
@@ -82,12 +81,8 @@ describe('design_portal_frames', () => {
     const rafters = Object.values(result.document.building!.elements).filter(
       (element) => element.category === 'member' && element.role === 'rafter',
     );
-    expect(
-      new Set(rafters.map((rafter) => rafter.category === 'member' && rafter.profile)).size,
-    ).toBe(1);
-    const check = (
-      execute(result.document, 'check_portal_frames', {}).data as { maxUtilisation: number }
-    ).maxUtilisation;
+    expect(new Set(rafters.map((rafter) => rafter.category === 'member' && rafter.profile)).size).toBe(1);
+    const check = (execute(result.document, 'check_portal_frames', {}).data as { maxUtilisation: number }).maxUtilisation;
     expect(check).toBeLessThanOrEqual(0.95);
   });
 
@@ -105,8 +100,7 @@ describe('weld detailing', () => {
   it('sizes full-strength fillet welds and reports them in the schedule and takeoff', () => {
     const doc = hall();
     const connection = Object.values(doc.building!.elements).find(
-      (element): element is MomentConnectionElement =>
-        element.category === 'connection' && element.kind === 'eaves',
+      (element): element is MomentConnectionElement => element.category === 'connection' && element.kind === 'eaves',
     )!;
     // IPE450: tf 14.6 → a9, tw 9.4 → a6.
     const welds = connectionWelds(doc, doc.building!, connection)!;
@@ -119,26 +113,19 @@ describe('weld detailing', () => {
     expect(schedule.rows[0]?.[9]).toMatch(/^a9 flanges \/ a6 web · \d+\.\d m$/);
     const lines = (execute(doc, 'quantity_takeoff', {}).data as { lines: TakeoffLine[] }).lines;
     expect(lines.find((line) => line.key === 'connection.weld.m')?.quantity).toBeGreaterThan(10);
-    expect(lines.find((line) => line.key === 'connection.weld metal.kg')?.quantity).toBeGreaterThan(
-      5,
-    );
+    expect(lines.find((line) => line.key === 'connection.weld metal.kg')?.quantity).toBeGreaterThan(5);
   });
 });
 
 describe('structural review regressions', () => {
   it('gives mirror-image eaves the same (hogging) moment sign', () => {
     const rows = (execute(hall(), 'check_portal_frames', {}).data as { rows: CheckRow[] }).rows;
-    const eaves = rows.filter(
-      (row) =>
-        row.kind === 'connection' && row.frame === 'frame 2' && row.check.startsWith('eaves'),
-    );
+    const eaves = rows.filter((row) => row.kind === 'connection' && row.frame === 'frame 2' && row.check.startsWith('eaves'));
     expect(eaves).toHaveLength(2);
     expect(eaves.every((row) => row.forces!.every((force) => force.moment < 0))).toBe(true);
     // Left eaves under the → imperfection mirrors the right eaves under ←.
     expect(eaves[0]!.forces![0]!.moment / eaves[1]!.forces![1]!.moment).toBeCloseTo(1, 2);
-    const apex = rows.filter(
-      (row) => row.kind === 'connection' && row.frame === 'frame 2' && row.check.startsWith('apex'),
-    );
+    const apex = rows.filter((row) => row.kind === 'connection' && row.frame === 'frame 2' && row.check.startsWith('apex'));
     expect(apex.every((row) => row.forces!.every((force) => force.moment > 0))).toBe(true);
   });
 
@@ -155,16 +142,12 @@ describe('structural review regressions', () => {
       Object.values(d.building!.elements).flatMap((e) => (e.category === 'member' ? [e] : []));
     const before = new Map(members(doc).map((m) => [m.id, m]));
     const after = members(result.document);
-    const gablePosts = after.filter(
-      (m) => m.role === 'column' && m.start[0] !== 0 && m.start[0] !== 24000,
-    );
+    const gablePosts = after.filter((m) => m.role === 'column' && m.start[0] !== 0 && m.start[0] !== 24000);
     expect(gablePosts.length).toBeGreaterThan(0);
     expect(gablePosts.every((m) => m.profile === 'HEA240')).toBe(true);
     // Gable post tops drop by half the rafter depth increase (on the slope).
     const post = gablePosts[0]!;
-    expect(Math.max(post.start[2], post.end[2])).toBeLessThan(
-      Math.max(before.get(post.id)!.start[2], before.get(post.id)!.end[2]),
-    );
+    expect(Math.max(post.start[2], post.end[2])).toBeLessThan(Math.max(before.get(post.id)!.start[2], before.get(post.id)!.end[2]));
     // Purlins move up with the deeper rafter; rails move out with the deeper column.
     const purlin = after.find((m) => m.role === 'purlin')!;
     expect(purlin.start[2]).toBeGreaterThan(before.get(purlin.id)!.start[2]);
@@ -179,9 +162,7 @@ describe('structural review regressions', () => {
       start: [0, 0, 6000],
       end: [6000, 0, 6600],
     }).document;
-    expect(execute(single, 'check_portal_frames', {}).summary).toMatch(
-      /single frame: no tributary width/,
-    );
+    expect(execute(single, 'check_portal_frames', {}).summary).toMatch(/single frame: no tributary width/);
     let two = hall();
     two = execute(two, 'add_portal_frame_building', {
       origin: [40000, 0],

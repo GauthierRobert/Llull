@@ -60,10 +60,7 @@ export const buildProject = defineCommand({
       .enum(['abort', 'continue'])
       .optional()
       .describe('Failure policy: "abort" (default, full rollback on first failure) or "continue".'),
-    validate: z
-      .boolean()
-      .optional()
-      .describe('When true, dry-run only: validate every step without modifying the document.'),
+    validate: z.boolean().optional().describe('When true, dry-run only: validate every step without modifying the document.'),
   }),
   // Each inner step is recorded in featureHistory by `execute`; recording the plan itself too
   // would replay every step twice.

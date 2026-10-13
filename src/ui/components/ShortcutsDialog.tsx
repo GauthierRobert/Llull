@@ -39,14 +39,7 @@ export function ShortcutsDialog(): React.ReactElement | null {
         <h2 id={titleId} className="shortcuts-dialog__title">
           Keyboard shortcuts
         </h2>
-        <button
-          ref={closeRef}
-          type="button"
-          className="icon-btn"
-          onClick={close}
-          aria-label="Close shortcuts"
-          title="Close"
-        >
+        <button ref={closeRef} type="button" className="icon-btn" onClick={close} aria-label="Close shortcuts" title="Close">
           <Icon name="close" size={14} />
         </button>
       </div>

@@ -13,9 +13,7 @@ import { shoeDoc } from '../unit/building/pipeSupportFixtures';
 import { pickTool, setField, submit } from '../helpers/buildingForm';
 
 const supportCount = (): number =>
-  Object.values(useStore.getState().document.building?.elements ?? {}).filter(
-    (element) => element.category === 'pipeSupport',
-  ).length;
+  Object.values(useStore.getState().document.building?.elements ?? {}).filter((element) => element.category === 'pipeSupport').length;
 
 beforeEach(() => {
   resetStore();

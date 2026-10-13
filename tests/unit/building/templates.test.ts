@@ -29,8 +29,7 @@ describe('add_building_template', () => {
     const result = execute(doc, 'add_building_template', { template: 'office', origin: [0, 0] });
     const building = result.document.building!;
     expect(building.project.name).toBe('Tower A');
-    const counts = (category: string): number =>
-      Object.values(building.elements).filter((element) => element.category === category).length;
+    const counts = (category: string): number => Object.values(building.elements).filter((element) => element.category === category).length;
     expect(counts('column')).toBe(36);
     expect(counts('door')).toBe(1);
     expect(counts('window')).toBe(17);
@@ -40,9 +39,7 @@ describe('add_building_template', () => {
   it('rejects unknown templates and bad origins; stacks a second template', () => {
     const doc = createEmptyDocument();
     expect(execute(doc, 'add_building_template', { template: 'castle' }).document).toBe(doc);
-    expect(execute(doc, 'add_building_template', { template: 'house', origin: [1] }).document).toBe(
-      doc,
-    );
+    expect(execute(doc, 'add_building_template', { template: 'house', origin: [1] }).document).toBe(doc);
     const metres = execute(doc, 'set_units', { units: 'm' }).document;
     const ok = execute(metres, 'add_building_template', { template: 'house' });
     expect(ok.document.building!.levels['level-2']!.elevation).toBeCloseTo(2.9);
@@ -115,9 +112,7 @@ describe('second review regressions', () => {
         [4000, 0],
       ],
     }).document;
-    expect(execute(doc, 'duplicate_entities', { ids: ['wall-1:body-0'] }).summary).toMatch(
-      /rejected/,
-    );
+    expect(execute(doc, 'duplicate_entities', { ids: ['wall-1:body-0'] }).summary).toMatch(/rejected/);
     expect(buildingElementOf(doc, 'wall-1:body-0')).toBe('wall-1');
     const forged = {
       ...doc,
@@ -143,8 +138,6 @@ describe('second review regressions', () => {
     expect(uid).toBeDefined();
     const replayed = execute(doc, 'replay_history', {}).document;
     expect(replayed.building!.uid).toBe(uid);
-    expect(
-      execute(createEmptyDocument(), 'describe_building', {}).document.building,
-    ).toBeUndefined();
+    expect(execute(createEmptyDocument(), 'describe_building', {}).document.building).toBeUndefined();
   });
 });

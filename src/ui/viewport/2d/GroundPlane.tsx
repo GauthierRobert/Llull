@@ -18,10 +18,7 @@ type GroundPlaneProps = Pick<
 
 export function GroundPlane({ z = 0, ...handlers }: GroundPlaneProps): React.ReactElement {
   const geometry = useDisposable(() => new THREE.PlaneGeometry(1e8, 1e8), []);
-  const material = useDisposable(
-    () => new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide }),
-    [],
-  );
+  const material = useDisposable(() => new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide }), []);
   return <mesh geometry={geometry} material={material} position={[0, 0, z]} {...handlers} />;
 }
 

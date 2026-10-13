@@ -13,22 +13,12 @@ import { nextId } from '../../lib/id';
 import { MAX_COPIES_PER_COMMAND } from '../limits';
 import { scaleGeometry } from '../../geometry/scaleGeometry';
 import { add3, isVec3, scale3, sub3 } from '../../lib/vec3';
-import {
-  applyMat3,
-  eulerFromMat,
-  matFromAxisAngle,
-  matFromEulerXYZ,
-  mulMat3,
-  unitAxisOrNull,
-} from '../../lib/axisRotation';
+import { applyMat3, eulerFromMat, matFromAxisAngle, matFromEulerXYZ, mulMat3, unitAxisOrNull } from '../../lib/axisRotation';
 import { replaceEntity } from '../entity/entityOps';
 import { rotateEulerAboutWorldZ } from '../../lib/eulerRotation';
 import { toDegrees } from '../../lib/angle';
 
-const arrayCountField = z
-  .number()
-  .int()
-  .describe('Total number of instances including the original. Must be an integer >= 2.');
+const arrayCountField = z.number().int().describe('Total number of instances including the original. Must be an integer >= 2.');
 
 /**
  * @command rotate_entity
@@ -43,9 +33,7 @@ export const rotateEntity = defineCommand({
     'Add Euler-angle deltas (radians) to an entity rotation. Modifies only the rotation field; position and geometry are unchanged.',
   params: z.object({
     id: z.string().describe('Id of the entity to rotate.'),
-    delta: looseVec3(
-      'Euler-angle increments [dRx, dRy, dRz] in radians to add to the current rotation.',
-    ),
+    delta: looseVec3('Euler-angle increments [dRx, dRy, dRz] in radians to add to the current rotation.'),
   }),
   run: (doc, { id, delta }): CommandResult => {
     const target = doc.entities[id];
@@ -78,17 +66,12 @@ export const scaleEntity = defineCommand({
     'Uniformly scale an entity by a positive factor. Scales geometry in-place for all kinds — 3D: box size, cylinder radius & height, sphere radius, extrusion profile & depth; 2D: line/polyline points, arc/circle/ellipse radii, rectangle width & height, spline points (about the local origin). Position is unchanged.',
   params: z.object({
     id: z.string().describe('Id of the entity to scale.'),
-    factor: z
-      .number()
-      .describe(
-        'Uniform scale factor. Must be greater than 0. A value of 2 doubles the size; 0.5 halves it.',
-      ),
+    factor: z.number().describe('Uniform scale factor. Must be greater than 0. A value of 2 doubles the size; 0.5 halves it.'),
   }),
   run: (doc, { id, factor }): CommandResult => {
     const target = doc.entities[id];
     if (!target) return noop(doc, `No entity ${id} to scale.`);
-    if (factor <= 0)
-      return noop(doc, `scale_entity: factor must be > 0 (got ${factor}); entity ${id} unchanged.`);
+    if (factor <= 0) return noop(doc, `scale_entity: factor must be > 0 (got ${factor}); entity ${id} unchanged.`);
 
     const { scaled, dims } = scaleGeometry(target, factor);
     return changed(replaceEntity(doc, scaled), `Scaled ${id} by factor ${factor}; ${dims}.`, [id]);
@@ -112,32 +95,20 @@ export const mirrorEntity = defineCommand({
     "Mirror an entity across the origin along a world axis by negating that axis component of its position. axis must be 'x', 'y', or 'z'.",
   params: z.object({
     id: z.string().describe('Id of the entity to mirror.'),
-    axis: z
-      .string()
-      .describe(
-        "World axis to mirror across: 'x' negates the X position component, 'y' negates Y, 'z' negates Z.",
-      ),
+    axis: z.string().describe("World axis to mirror across: 'x' negates the X position component, 'y' negates Y, 'z' negates Z."),
   }),
   run: (doc, { id, axis }): CommandResult => {
     const target = doc.entities[id];
     if (!target) return noop(doc, `No entity ${id} to mirror.`);
     if (!VALID_AXES.has(axis)) {
-      return noop(
-        doc,
-        `mirror_entity: axis must be 'x', 'y', or 'z' (got '${axis}'); entity ${id} unchanged.`,
-      );
+      return noop(doc, `mirror_entity: axis must be 'x', 'y', or 'z' (got '${axis}'); entity ${id} unchanged.`);
     }
 
     const [px, py, pz] = target.position;
-    const newPosition: Vec3 =
-      axis === 'x' ? [-px, py, pz] : axis === 'y' ? [px, -py, pz] : [px, py, -pz];
+    const newPosition: Vec3 = axis === 'x' ? [-px, py, pz] : axis === 'y' ? [px, -py, pz] : [px, py, -pz];
 
     const mirrored: Entity = { ...target, position: newPosition };
-    return changed(
-      replaceEntity(doc, mirrored),
-      `Mirrored ${id} across ${axis}-axis; new position [${newPosition.join(', ')}].`,
-      [id],
-    );
+    return changed(replaceEntity(doc, mirrored), `Mirrored ${id} across ${axis}-axis; new position [${newPosition.join(', ')}].`, [id]);
   },
 });
 
@@ -178,18 +149,14 @@ export const arrayLinear = defineCommand({
     id: z.string().describe('Id of the entity to array.'),
     count: arrayCountField,
     offset: looseVec3(
-      'World-space translation vector [dx, dy, dz] between consecutive instances. ' +
-        'All components must be finite numbers.',
+      'World-space translation vector [dx, dy, dz] between consecutive instances. ' + 'All components must be finite numbers.',
     ),
   }),
   run: (doc, { id, count, offset }): CommandResult => {
     const target = doc.entities[id];
     if (!target) return noop(doc, `array_linear: No entity ${id}.`);
     if (count < 2 || count > MAX_COPIES_PER_COMMAND) {
-      return noop(
-        doc,
-        `array_linear: count must be an integer in [2, ${MAX_COPIES_PER_COMMAND}] (got ${count}); entity ${id} unchanged.`,
-      );
+      return noop(doc, `array_linear: count must be an integer in [2, ${MAX_COPIES_PER_COMMAND}] (got ${count}); entity ${id} unchanged.`);
     }
     if (!isVec3(offset)) {
       return noop(
@@ -234,8 +201,7 @@ export const arrayPolar = defineCommand({
     id: z.string().describe('Id of the entity to array.'),
     count: arrayCountField,
     center: looseVec3(
-      'World-space point [cx, cy, cz] the rotation axis passes through. ' +
-        'With the default Z axis only cx and cy matter.',
+      'World-space point [cx, cy, cz] the rotation axis passes through. ' + 'With the default Z axis only cx and cy matter.',
     ),
     axis: looseVec3(
       'Optional rotation axis direction [dx, dy, dz] (any non-zero length, normalized). Defaults to [0, 0, 1]. ' +
@@ -253,10 +219,7 @@ export const arrayPolar = defineCommand({
     const target = doc.entities[id];
     if (!target) return noop(doc, `array_polar: No entity ${id}.`);
     if (count < 2 || count > MAX_COPIES_PER_COMMAND) {
-      return noop(
-        doc,
-        `array_polar: count must be an integer in [2, ${MAX_COPIES_PER_COMMAND}] (got ${count}); entity ${id} unchanged.`,
-      );
+      return noop(doc, `array_polar: count must be an integer in [2, ${MAX_COPIES_PER_COMMAND}] (got ${count}); entity ${id} unchanged.`);
     }
     if (!isVec3(center) || !Number.isFinite(angle)) {
       return noop(
@@ -266,10 +229,7 @@ export const arrayPolar = defineCommand({
     }
     const unitAxis = axis === undefined ? ([0, 0, 1] as Vec3) : unitAxisOrNull(axis);
     if (!unitAxis) {
-      return noop(
-        doc,
-        `array_polar: axis must be 3 finite numbers with non-zero length; entity ${id} unchanged.`,
-      );
+      return noop(doc, `array_polar: axis must be 3 finite numbers with non-zero length; entity ${id} unchanged.`);
     }
 
     const zAxis = unitAxis[0] === 0 && unitAxis[1] === 0 && unitAxis[2] === 1;
@@ -285,9 +245,7 @@ export const arrayPolar = defineCommand({
         const turn = matFromAxisAngle(unitAxis, theta);
         return {
           position: add3(base, applyMat3(turn, offset)),
-          rotation: zAxis
-            ? rotateEulerAboutWorldZ(target.rotation, theta)
-            : eulerFromMat(mulMat3(turn, oldMatrix)),
+          rotation: zAxis ? rotateEulerAboutWorldZ(target.rotation, theta) : eulerFromMat(mulMat3(turn, oldMatrix)),
         };
       }),
     );

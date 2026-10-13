@@ -17,13 +17,5 @@ export function RectangleRenderer({
   selected: boolean;
 }): React.ReactElement {
   const positions = useMemo(() => rectangleOutline(width, height), [width, height]);
-  return (
-    <ShapeLine
-      positions={positions}
-      position={position}
-      rotation={rotation}
-      color={color}
-      selected={selected}
-    />
-  );
+  return <ShapeLine positions={positions} position={position} rotation={rotation} color={color} selected={selected} />;
 }

@@ -80,26 +80,13 @@ function SceneContents2D({
   const entities = useStore((s) => s.document.entities);
   // Lifted work planes (contours, DXF elevations) are brought into the camera's depth range.
   const planDepth = useMemo(() => computePlanDepth(order, entities), [order, entities]);
-  const groupOffset = useMemo(
-    () => new THREE.Vector3(-renderOrigin[0], -renderOrigin[1], -planDepth.top),
-    [renderOrigin, planDepth.top],
-  );
+  const groupOffset = useMemo(() => new THREE.Vector3(-renderOrigin[0], -renderOrigin[1], -planDepth.top), [renderOrigin, planDepth.top]);
 
   return (
     <>
-      <OrthographicCamera
-        makeDefault
-        position={[0, 0, PLAN_CAMERA_HEIGHT]}
-        near={0.01}
-        far={planDepth.far}
-        zoom={50}
-      />
+      <OrthographicCamera makeDefault position={[0, 0, PLAN_CAMERA_HEIGHT]} near={0.01} far={planDepth.far} zoom={50} />
 
-      <MapControls
-        makeDefault
-        {...MAP_CONTROLS_CONFIG}
-        {...cameraGestures(isDrawing || isModifying)}
-      />
+      <MapControls makeDefault {...MAP_CONTROLS_CONFIG} {...cameraGestures(isDrawing || isModifying)} />
 
       <StoreInvalidator />
 
@@ -141,12 +128,7 @@ function SceneContents2D({
         />
 
         {/* Modify pick interaction: entity-click capture for modify tools */}
-        <ModifyPickInteraction
-          activeTool={activeModifyTool}
-          phase={modifyPhase}
-          zoom={zoom}
-          onEntityPick={onEntityPick}
-        />
+        <ModifyPickInteraction activeTool={activeModifyTool} phase={modifyPhase} zoom={zoom} onEntityPick={onEntityPick} />
 
         {/* Measurement bbox rectangle — shown when measure_bounding_box result is present */}
         <MeasureBBoxRect2D />
@@ -174,13 +156,7 @@ export function Viewport2D(): React.ReactElement {
 
   return (
     <div className="viewport-2d-wrapper">
-      <Canvas
-        frameloop="demand"
-        gl={{ antialias: true, alpha: false }}
-        dpr={[1, 2]}
-        orthographic
-        style={{ width: '100%', height: '100%' }}
-      >
+      <Canvas frameloop="demand" gl={{ antialias: true, alpha: false }} dpr={[1, 2]} orthographic style={{ width: '100%', height: '100%' }}>
         <Suspense fallback={null}>
           <SceneContents2D
             activeTool={activeTool}

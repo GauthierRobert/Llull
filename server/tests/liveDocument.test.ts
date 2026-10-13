@@ -12,14 +12,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { frameEntityIds, makeFakeRes, parseSseFrame } from './sseTestHelpers';
-import {
-  getLiveDoc,
-  getLiveSnapshot,
-  setLiveDoc,
-  subscribeLive,
-  _resetLiveDoc,
-  _subscriberCount,
-} from '../src/liveDocument';
+import { getLiveDoc, getLiveSnapshot, setLiveDoc, subscribeLive, _resetLiveDoc, _subscriberCount } from '../src/liveDocument';
 import { applyToolCall } from '../../tests/helpers/applyToolCall';
 import { createEmptyDocument } from '@core/model/types';
 

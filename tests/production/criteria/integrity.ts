@@ -51,9 +51,7 @@ function replayCheck({ document }: GradeContext): CheckOutcome {
   }
   const a = JSON.parse(before) as { document: Record<string, unknown> };
   const b = JSON.parse(after) as { document: Record<string, unknown> };
-  const differing = Object.keys(a.document).filter(
-    (key) => JSON.stringify(a.document[key]) !== JSON.stringify(b.document[key]),
-  );
+  const differing = Object.keys(a.document).filter((key) => JSON.stringify(a.document[key]) !== JSON.stringify(b.document[key]));
   return { pass: false, detail: `replay changes: ${differing.join(', ')} (${replayed.summary})` };
 }
 

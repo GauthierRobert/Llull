@@ -22,29 +22,16 @@ import { replaceEntity } from '../entity/entityOps';
 export const groupEntities = defineCommand({
   name: 'group_entities',
   description:
-    'Create a named group containing >= 2 existing entities. ' +
-    'The group id is returned in affected. Entities are not moved or changed.',
+    'Create a named group containing >= 2 existing entities. ' + 'The group id is returned in affected. Entities are not moved or changed.',
   params: z.object({
-    ids: z
-      .array(z.string())
-      .describe(
-        'Array of entity ids to include in the group. Must contain >= 2 ids that exist in the document.',
-      ),
-    name: z
-      .string()
-      .describe(
-        'Optional human-readable label for the group, e.g. "Wheel assembly". Defaults to "Group".',
-      )
-      .optional(),
+    ids: z.array(z.string()).describe('Array of entity ids to include in the group. Must contain >= 2 ids that exist in the document.'),
+    name: z.string().describe('Optional human-readable label for the group, e.g. "Wheel assembly". Defaults to "Group".').optional(),
   }),
   run: (doc, { ids, name = 'Group' }): CommandResult => {
     const validIds = [...new Set(ids)].filter((id) => Object.hasOwn(doc.entities, id));
 
     if (validIds.length < 2) {
-      return noop(
-        doc,
-        `group_entities requires >= 2 valid entity ids; got ${validIds.length} (from ${ids.length} provided).`,
-      );
+      return noop(doc, `group_entities requires >= 2 valid entity ids; got ${validIds.length} (from ${ids.length} provided).`);
     }
 
     const groupId = nextId('group');
@@ -141,8 +128,7 @@ export const setEntityName = defineCommand({
     };
 
     const namePart = patched.name !== undefined ? `name="${patched.name}"` : 'name=<none>';
-    const tagsPart =
-      patched.tags !== undefined ? `tags=[${patched.tags.join(', ')}]` : 'tags=<none>';
+    const tagsPart = patched.tags !== undefined ? `tags=[${patched.tags.join(', ')}]` : 'tags=<none>';
 
     return changed(replaceEntity(doc, patched), `Entity ${id}: ${namePart}, ${tagsPart}.`, [id]);
   },

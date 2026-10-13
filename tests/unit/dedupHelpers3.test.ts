@@ -27,10 +27,7 @@ describe('planPoint', () => {
   it('matches the inline expression bit for bit', () => {
     const angle = 0.7;
     const [cos, sin] = [Math.cos(angle), Math.sin(angle)];
-    expect(planPoint([1.1, 2.2], angle, [3.3, 4.4])).toEqual([
-      1.1 + 3.3 * cos - 4.4 * sin,
-      2.2 + 3.3 * sin + 4.4 * cos,
-    ]);
+    expect(planPoint([1.1, 2.2], angle, [3.3, 4.4])).toEqual([1.1 + 3.3 * cos - 4.4 * sin, 2.2 + 3.3 * sin + 4.4 * cos]);
   });
   it('is what entityPlanPoint applies about the entity Z rotation', () => {
     const entity = { position: [5, 6, 7], rotation: [0, 0, 0.3] } as const;
@@ -92,9 +89,7 @@ describe('check_model positive-field table', () => {
       const data = execute(doc, 'check_model', {}).data as {
         issues: Array<{ code: string; entityId?: string }>;
       };
-      expect(data.issues.some((i) => i.code === 'degenerate_size' && i.entityId === 'c')).toBe(
-        true,
-      );
+      expect(data.issues.some((i) => i.code === 'degenerate_size' && i.entityId === 'c')).toBe(true);
     }
     const healthy = docWith({ id: 'c', kind: 'cylinder', radius: 1, height: 2 });
     const data = execute(healthy, 'check_model', {}).data as { issues: Array<{ code: string }> };

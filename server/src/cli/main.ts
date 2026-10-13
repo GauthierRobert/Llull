@@ -13,30 +13,9 @@ import { createEmptyDocument } from '@core/model/types';
 import { CONVENTIONS_GUIDE, isToolsetName } from '@mcp/index';
 import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
-import {
-  booleanFlag,
-  missingValueFlag,
-  paramsSource,
-  APP_SERVER,
-  cliTarget,
-  parseArgv,
-  stringFlag,
-  type ParsedArgv,
-} from './argv';
-import {
-  createLocalBackend,
-  createRemoteBackend,
-  saveDocumentWithBackup,
-  type CliBackend,
-} from './backend';
-import {
-  describeCommand,
-  listCatalog,
-  searchCatalog,
-  suggestNames,
-  toolsetCounts,
-  type CatalogEntry,
-} from './catalog';
+import { booleanFlag, missingValueFlag, paramsSource, APP_SERVER, cliTarget, parseArgv, stringFlag, type ParsedArgv } from './argv';
+import { createLocalBackend, createRemoteBackend, saveDocumentWithBackup, type CliBackend } from './backend';
+import { describeCommand, listCatalog, searchCatalog, suggestNames, toolsetCounts, type CatalogEntry } from './catalog';
 import { planAliases } from './aliases';
 import { planText, resultJson, resultText, type PrintableResult } from './output';
 import { createStepObserver, type StepObserver } from './progress';
@@ -90,16 +69,14 @@ function timeoutOf(args: ParsedArgv): number | undefined {
   const raw = stringFlag(args, 'timeout');
   if (raw === undefined) return undefined;
   const seconds = Number(raw);
-  if (!Number.isFinite(seconds) || seconds <= 0)
-    throw new UsageError(`--timeout needs a positive number of seconds (got "${raw}").`);
+  if (!Number.isFinite(seconds) || seconds <= 0) throw new UsageError(`--timeout needs a positive number of seconds (got "${raw}").`);
   return seconds;
 }
 
 /** Progress/timing/deadline observer of a local run; a `--server` run is the server's to execute. */
 function observerOf(args: ParsedArgv, io: CliIo): StepObserver | undefined {
   if (serverOf(args, io) !== undefined) {
-    if (booleanFlag(args, 'progress'))
-      io.stderr('llull: --progress has no effect with --server (the server runs the plan).');
+    if (booleanFlag(args, 'progress')) io.stderr('llull: --progress has no effect with --server (the server runs the plan).');
     return undefined;
   }
   const timeoutSeconds = timeoutOf(args);
@@ -123,11 +100,7 @@ function withTimeout(observer: StepObserver | undefined, result: CommandOutcome)
   };
 }
 
-function remoteTargetOf(
-  server: string,
-  args: ParsedArgv,
-  io: CliIo,
-): { url: string; token?: string } {
+function remoteTargetOf(server: string, args: ParsedArgv, io: CliIo): { url: string; token?: string } {
   const flagToken = stringFlag(args, 'token');
   if (server !== APP_SERVER) {
     const token = flagToken ?? io.env['LLULL_TOKEN'];
@@ -135,22 +108,15 @@ function remoteTargetOf(
   }
   const app = readDesktopDiscovery(llullHome(io.env));
   if (app === null)
-    throw new UsageError(
-      'the llull desktop app is not running (llull status). Start it, or drop --app to work on a local --doc file.',
-    );
+    throw new UsageError('the llull desktop app is not running (llull status). Start it, or drop --app to work on a local --doc file.');
   // $LLULL_TOKEN belongs to --server (often a cloud token); the app has its own per-launch token.
   return { url: app.url, token: flagToken ?? app.token };
 }
 
-async function backendOf(
-  args: ParsedArgv,
-  io: CliIo,
-  observer?: StepObserver,
-): Promise<CliBackend> {
+async function backendOf(args: ParsedArgv, io: CliIo, observer?: StepObserver): Promise<CliBackend> {
   const server = serverOf(args, io);
   if (server !== undefined) {
-    if (booleanFlag(args, 'dry-run'))
-      throw new UsageError('--dry-run works on a local --doc only; the server applies every call.');
+    if (booleanFlag(args, 'dry-run')) throw new UsageError('--dry-run works on a local --doc only; the server applies every call.');
     const target = remoteTargetOf(server, args, io);
     const timeoutSeconds = timeoutOf(args);
     return createRemoteBackend(target.url, {
@@ -191,8 +157,7 @@ function parseJson(text: string, origin: string): unknown {
 
 /** Top-level params declared as plain strings: their `key=value` values are never JSON-parsed. */
 function stringParamKeys(name: string): ReadonlySet<string> {
-  const properties =
-    getCommand(name)?.paramsSchema.properties ?? exchangeTool(name)?.inputSchema.properties ?? {};
+  const properties = getCommand(name)?.paramsSchema.properties ?? exchangeTool(name)?.inputSchema.properties ?? {};
   return new Set(
     Object.entries(properties)
       .filter(([, spec]) => spec.type === 'string')
@@ -242,12 +207,7 @@ function unknownCommand(name: string): never {
 }
 
 /** Print a result, honouring `--save` (write the payload, keep only metadata) and `--json`. */
-function finish(
-  result: PrintableResult,
-  args: ParsedArgv,
-  io: CliIo,
-  text: (r: PrintableResult) => string = resultText,
-): number {
+function finish(result: PrintableResult, args: ParsedArgv, io: CliIo, text: (r: PrintableResult) => string = resultText): number {
   let printable = result;
   const save = stringFlag(args, 'save');
   if (save !== undefined && !result.isError) {
@@ -261,8 +221,7 @@ function finish(
       return EXIT_COMMAND_ERROR;
     }
   }
-  if (!booleanFlag(args, 'quiet') || printable.isError)
-    io.stdout(booleanFlag(args, 'json') ? resultJson(printable) : text(printable));
+  if (!booleanFlag(args, 'quiet') || printable.isError) io.stdout(booleanFlag(args, 'json') ? resultJson(printable) : text(printable));
   return printable.isError ? EXIT_COMMAND_ERROR : EXIT_OK;
 }
 
@@ -271,11 +230,7 @@ function printEntries(entries: readonly CatalogEntry[], args: ParsedArgv, io: Cl
     io.stdout(JSON.stringify(entries));
     return EXIT_OK;
   }
-  io.stdout(
-    entries
-      .map((e) => `${e.name} [${e.toolset}${e.readOnly ? ', read-only' : ''}] ${e.description}`)
-      .join('\n'),
-  );
+  io.stdout(entries.map((e) => `${e.name} [${e.toolset}${e.readOnly ? ', read-only' : ''}] ${e.description}`).join('\n'));
   return EXIT_OK;
 }
 
@@ -286,8 +241,7 @@ function withOutcome(name: string, result: CommandOutcome): CommandOutcome {
 
 async function runExec(args: ParsedArgv, io: CliIo): Promise<number> {
   const [, name, ...rest] = args.positionals;
-  if (name === undefined)
-    throw new UsageError('exec needs a command name: llull exec <command> [params]');
+  if (name === undefined) throw new UsageError('exec needs a command name: llull exec <command> [params]');
   const isExchange = exchangeTool(name) !== undefined;
   if (getCommand(name) === undefined && !isExchange) unknownCommand(name);
   const raw = await paramsOf(name, rest, io);
@@ -299,9 +253,7 @@ async function runExec(args: ParsedArgv, io: CliIo): Promise<number> {
   }
   const observer = observerOf(args, io);
   const backend = await backendOf(args, io, observer);
-  const result = isExchange
-    ? await backend.exchange(name, params)
-    : await backend.run(name, params);
+  const result = isExchange ? await backend.exchange(name, params) : await backend.run(name, params);
   return finish(withTimeout(observer, withOutcome(name, result)), args, io);
 }
 
@@ -319,17 +271,13 @@ async function runPlan(args: ParsedArgv, io: CliIo): Promise<number> {
   };
   const observer = observerOf(args, io);
   const backend = await backendOf(args, io, observer);
-  const result = withTimeout(
-    observer,
-    withOutcome('build_project', await backend.run('build_project', params)),
-  );
+  const result = withTimeout(observer, withOutcome('build_project', await backend.run('build_project', params)));
   const found = planAliases(base['actions'], result.data);
   return finish(found === null ? result : { ...result, planAliases: found }, args, io, planText);
 }
 
 function runNew(args: ParsedArgv, io: CliIo): number {
-  if (serverOf(args, io) !== undefined)
-    throw new UsageError('new creates a local document file; it does not apply to --server.');
+  if (serverOf(args, io) !== undefined) throw new UsageError('new creates a local document file; it does not apply to --server.');
   const docPath = docPathOf(args, io);
   if (fs.existsSync(docPath) && !booleanFlag(args, 'force'))
     throw new UsageError(`${docPath} exists; pass --force to replace it with an empty document.`);
@@ -340,8 +288,7 @@ function runNew(args: ParsedArgv, io: CliIo): number {
 
 function runList(args: ParsedArgv, io: CliIo): number {
   const toolset = stringFlag(args, 'toolset') ?? args.positionals[1];
-  if (toolset !== undefined && !isToolsetName(toolset))
-    throw new UsageError(`unknown toolset "${toolset}"; see: llull toolsets`);
+  if (toolset !== undefined && !isToolsetName(toolset)) throw new UsageError(`unknown toolset "${toolset}"; see: llull toolsets`);
   return printEntries(listCatalog(toolset), args, io);
 }
 
@@ -349,10 +296,7 @@ function runSearch(args: ParsedArgv, io: CliIo): number {
   const query = args.positionals.slice(1).join(' ').trim();
   if (query === '') throw new UsageError('search needs words: llull search fillet edge');
   const limit = Number(stringFlag(args, 'limit') ?? DEFAULT_SEARCH_LIMIT);
-  const entries = searchCatalog(
-    query,
-    Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : DEFAULT_SEARCH_LIMIT,
-  );
+  const entries = searchCatalog(query, Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : DEFAULT_SEARCH_LIMIT);
   if (entries.length === 0 && !booleanFlag(args, 'json')) {
     io.stdout(`No command matches "${query}". Browse with: llull list <toolset>`);
     return EXIT_OK;
@@ -362,8 +306,7 @@ function runSearch(args: ParsedArgv, io: CliIo): number {
 
 function runDescribe(args: ParsedArgv, io: CliIo): number {
   const names = args.positionals.slice(1);
-  if (names.length === 0)
-    throw new UsageError('describe needs a command name: llull describe add_box');
+  if (names.length === 0) throw new UsageError('describe needs a command name: llull describe add_box');
   const described = names.map((name) => describeCommand(name) ?? unknownCommand(name));
   io.stdout(
     booleanFlag(args, 'json')
@@ -375,11 +318,7 @@ function runDescribe(args: ParsedArgv, io: CliIo): number {
 
 function runToolsets(args: ParsedArgv, io: CliIo): number {
   const counts = toolsetCounts();
-  io.stdout(
-    booleanFlag(args, 'json')
-      ? JSON.stringify(counts)
-      : counts.map((c) => `${c.toolset}: ${c.commands} command(s)`).join('\n'),
-  );
+  io.stdout(booleanFlag(args, 'json') ? JSON.stringify(counts) : counts.map((c) => `${c.toolset}: ${c.commands} command(s)`).join('\n'));
   return EXIT_OK;
 }
 
@@ -393,10 +332,7 @@ async function runStatus(args: ParsedArgv, io: CliIo): Promise<number> {
   if (booleanFlag(args, 'json')) {
     io.stdout(
       JSON.stringify({
-        app:
-          app === null
-            ? null
-            : { url: app.url, pid: app.pid, documentPath: app.documentPath, version: app.version },
+        app: app === null ? null : { url: app.url, pid: app.pid, documentPath: app.documentPath, version: app.version },
         doc: docPath,
         docExists: fs.existsSync(docPath),
       }),
@@ -414,11 +350,7 @@ async function runStatus(args: ParsedArgv, io: CliIo): Promise<number> {
   return EXIT_OK;
 }
 
-async function runHistory(
-  direction: 'undo' | 'redo',
-  args: ParsedArgv,
-  io: CliIo,
-): Promise<number> {
+async function runHistory(direction: 'undo' | 'redo', args: ParsedArgv, io: CliIo): Promise<number> {
   const backend = await backendOf(args, io);
   return finish(await (direction === 'undo' ? backend.undo() : backend.redo()), args, io);
 }

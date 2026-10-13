@@ -32,17 +32,11 @@ function runBoolean(
   if (missing !== undefined) return noop(doc, `${opName}: entity '${missing}' not found.`);
   const flat = ids.find((_, i) => !is3D(operands[i] as Entity));
   if (flat !== undefined) {
-    return noop(
-      doc,
-      `${opName}: entity '${flat}' is a 2D shape; boolean operations require 3D solids.`,
-    );
+    return noop(doc, `${opName}: entity '${flat}' is a 2D shape; boolean operations require 3D solids.`);
   }
   const instanced = ids.find((_, i) => (operands[i] as Entity).kind === 'instance');
   if (instanced !== undefined) {
-    return noop(
-      doc,
-      `${opName}: entity '${instanced}' is a component instance; run explode_instance first to get solids.`,
-    );
+    return noop(doc, `${opName}: entity '${instanced}' is a component instance; run explode_instance first to get solids.`);
   }
   const [entA, entB] = operands as [Entity, Entity];
 
@@ -57,10 +51,7 @@ function runBoolean(
   };
   const result = evaluateRecipe(kernel, recipe);
   if (result === 'refused') {
-    return noop(
-      doc,
-      `${opName}: kernel returned null for operands '${a}' and '${b}'. The geometry may be degenerate or unsupported.`,
-    );
+    return noop(doc, `${opName}: kernel returned null for operands '${a}' and '${b}'. The geometry may be degenerate or unsupported.`);
   }
   if (result === 'empty') {
     return noop(
@@ -74,8 +65,7 @@ function runBoolean(
     kernel,
     result,
     [entA, entB],
-    (newId, triangles) =>
-      `${opName}: merged '${a}' and '${b}' into mesh '${newId}' (${triangles} triangles). Operands consumed.`,
+    (newId, triangles) => `${opName}: merged '${a}' and '${b}' into mesh '${newId}' (${triangles} triangles). Operands consumed.`,
   );
 }
 
@@ -100,9 +90,7 @@ export const booleanOperation = defineCommand({
     'Requires a geometry kernel to be injected (available after app initialization). ' +
     SOLID_OPERANDS_NOTE,
   params: z.object({
-    op: z
-      .enum(['union', 'subtract', 'intersect'])
-      .describe('"union" (a ∪ b), "subtract" (a minus b) or "intersect" (a ∩ b).'),
+    op: z.enum(['union', 'subtract', 'intersect']).describe('"union" (a ∪ b), "subtract" (a minus b) or "intersect" (a ∩ b).'),
     a: z.string().describe('Id of the first 3D solid operand (the base solid for subtract).'),
     b: z.string().describe('Id of the second 3D solid operand (the tool solid for subtract).'),
   }),

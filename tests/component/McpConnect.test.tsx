@@ -22,9 +22,7 @@ import { McpConnect, McpConnectButton } from '@ui/components/McpConnect';
 
 // Mock clipboard
 
-const writeTextMock: Mock<(text: string) => Promise<void>> = vi.fn((_text: string) =>
-  Promise.resolve(),
-);
+const writeTextMock: Mock<(text: string) => Promise<void>> = vi.fn((_text: string) => Promise.resolve());
 
 beforeEach(() => {
   writeTextMock.mockClear();
@@ -57,15 +55,9 @@ describe('McpConnect — structure', () => {
 
   it.each<[string, () => string | RegExp]>([
     ['the title "Connect an MCP agent"', () => /connect an mcp agent/i],
-    [
-      'the server install and start command in a code block',
-      () => 'npm --prefix server install && npm --prefix server run dev',
-    ],
+    ['the server install and start command in a code block', () => 'npm --prefix server install && npm --prefix server run dev'],
     ['the endpoint URL in a code block', () => 'http://localhost:3001/mcp'],
-    [
-      'the live registry command count as a capability badge',
-      () => `${listCommands().length} commands`,
-    ],
+    ['the live registry command count as a capability badge', () => `${listCommands().length} commands`],
     ['the "structuredContent" capability badge', () => 'structuredContent'],
     ['the "prompts (EN2)" capability badge', () => 'prompts (EN2)'],
     ['the "session isolation" capability badge', () => 'session isolation'],
@@ -252,11 +244,7 @@ describe('McpConnect — copy buttons', () => {
       'npm --prefix server install && npm --prefix server run dev',
     ],
     ['endpoint URL (the correct port-3001 URL)', /copy endpoint url/i, 'http://localhost:3001/mcp'],
-    [
-      'read cad://conventions (the tool name)',
-      /copy read cad:\/\/conventions tool name/i,
-      'read cad://conventions',
-    ],
+    ['read cad://conventions (the tool name)', /copy read cad:\/\/conventions tool name/i, 'read cad://conventions'],
   ])('Copy button for %s calls clipboard.writeText', async (_label, name, expected) => {
     render(<McpConnect onClose={() => undefined} />);
     const copyBtns = screen.getAllByRole('button', { name });
@@ -271,9 +259,7 @@ describe('McpConnect — copy buttons', () => {
     fireEvent.click(firstCopy!);
 
     await waitFor(() => {
-      expect(
-        screen.getByRole('button', { name: /install and start command copied/i }),
-      ).toBeDefined();
+      expect(screen.getByRole('button', { name: /install and start command copied/i })).toBeDefined();
     });
   });
 });
@@ -287,9 +273,7 @@ describe('copy button robustness', () => {
     fireEvent.click(copyButtons[0] as HTMLElement);
     await waitFor(() => expect(writeTextMock).toHaveBeenCalled());
     fireEvent.click(screen.getAllByRole('button', { name: /^copy /i })[1] as HTMLElement);
-    await waitFor(() =>
-      expect(screen.getAllByRole('button', { name: /copied$/i })).toHaveLength(1),
-    );
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /copied$/i })).toHaveLength(1));
     unmount();
   });
 });

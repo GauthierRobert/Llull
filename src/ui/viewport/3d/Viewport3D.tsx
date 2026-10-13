@@ -11,13 +11,7 @@ import { Suspense, useCallback, useMemo, useState } from 'react';
 import { ensureBvhSetup } from './bvhSetup';
 import { VIEWPORT_FOV_DEGREES } from '@core/model/viewport';
 import { Canvas } from '@react-three/fiber';
-import {
-  OrbitControls,
-  Grid,
-  GizmoHelper,
-  GizmoViewport,
-  PerspectiveCamera,
-} from '@react-three/drei';
+import { OrbitControls, Grid, GizmoHelper, GizmoViewport, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { type GizmoMode, useStore, useToolStore } from '@ui/store';
 import { Entities } from './Entities';
@@ -46,11 +40,7 @@ interface SceneContentsProps {
   onDraggingChanged: (dragging: boolean) => void;
 }
 
-function SceneContents({
-  orbitEnabled,
-  gizmoMode,
-  onDraggingChanged,
-}: SceneContentsProps): React.ReactElement {
+function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneContentsProps): React.ReactElement {
   const renderOrigin = useStore((s) => s.renderOrigin);
 
   // R3 narrow selector: quality settings derived from entity count + user override.
@@ -71,10 +61,7 @@ function SceneContents({
   // render origin — keeping float32 mesh positions small (avoids jitter).
   // Raycasting is automatically correct: three.js resolves click events in
   // world space using the mesh's matrixWorld, which accounts for the group offset.
-  const groupOffset = useMemo(
-    () => new THREE.Vector3(-renderOrigin[0], -renderOrigin[1], -renderOrigin[2]),
-    [renderOrigin],
-  );
+  const groupOffset = useMemo(() => new THREE.Vector3(-renderOrigin[0], -renderOrigin[1], -renderOrigin[2]), [renderOrigin]);
 
   return (
     <>
@@ -82,14 +69,7 @@ function SceneContents({
 
       {/* up={[0,0,1]}: world up is +Z (right-handed, Z-up document convention); OrbitControls
           orbits about the camera's up. */}
-      <PerspectiveCamera
-        makeDefault
-        fov={VIEWPORT_FOV_DEGREES}
-        near={0.01}
-        far={1e8}
-        position={initialCamera.position}
-        up={[0, 0, 1]}
-      />
+      <PerspectiveCamera makeDefault fov={VIEWPORT_FOV_DEGREES} near={0.01} far={1e8} position={initialCamera.position} up={[0, 0, 1]} />
       <OrbitControls
         makeDefault
         target={initialCamera.target}
@@ -185,11 +165,7 @@ export function Viewport3D(): React.ReactElement {
         onPointerMissed={handlePointerMissed}
       >
         <Suspense fallback={null}>
-          <SceneContents
-            orbitEnabled={orbitEnabled}
-            gizmoMode={gizmoMode}
-            onDraggingChanged={handleDraggingChanged}
-          />
+          <SceneContents orbitEnabled={orbitEnabled} gizmoMode={gizmoMode} onDraggingChanged={handleDraggingChanged} />
         </Suspense>
       </Canvas>
 

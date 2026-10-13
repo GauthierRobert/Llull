@@ -7,9 +7,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 async function controlledPage(page: Page): Promise<void> {
   await page.goto('/');
-  await page.waitForFunction(
-    async () => (await navigator.serviceWorker.getRegistration())?.active?.state === 'activated',
-  );
+  await page.waitForFunction(async () => (await navigator.serviceWorker.getRegistration())?.active?.state === 'activated');
   await page.reload();
   await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
 }
@@ -48,10 +46,7 @@ test.describe('service worker', () => {
     // Installed but waiting: its cache is filled, the old build's cache still serves the page.
     expect((await cacheNames(page)).sort()).toEqual([before, `${before ?? ''}-next`].sort());
 
-    await Promise.all([
-      page.waitForEvent('framenavigated'),
-      page.getByRole('button', { name: 'Reload' }).click(),
-    ]);
+    await Promise.all([page.waitForEvent('framenavigated'), page.getByRole('button', { name: 'Reload' }).click()]);
     await expect(page.getByRole('main', { name: 'Viewport' })).toBeVisible();
     await expect.poll(() => cacheNames(page)).toEqual([`${before ?? ''}-next`]);
     await expect(page.locator('.update-banner')).toHaveCount(0);

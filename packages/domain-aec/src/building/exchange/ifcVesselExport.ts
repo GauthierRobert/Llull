@@ -15,25 +15,15 @@ import { shapeOf } from '../../industrial/equipment/equipmentShape';
 export function vesselSolid(context: Context, element: EquipmentElement): string | null {
   const shape = shapeOf(element);
   if (shape === 'box') return null;
-  const [length, width, height] = element.size.map((value) => context.mm(value)) as [
-    number,
-    number,
-    number,
-  ];
+  const [length, width, height] = element.size.map((value) => context.mm(value)) as [number, number, number];
   if (shape === 'vertical_vessel') {
     const profile = circleProfile(context, length / 2);
-    const axes = context.writer.add(
-      `IFCAXIS2PLACEMENT3D(${point3(context, 0, 0, 0)},${context.zAxis},${context.xAxis})`,
-    );
-    return context.writer.add(
-      `IFCEXTRUDEDAREASOLID(${profile},${axes},${context.zAxis},${ifcReal(height)})`,
-    );
+    const axes = context.writer.add(`IFCAXIS2PLACEMENT3D(${point3(context, 0, 0, 0)},${context.zAxis},${context.xAxis})`);
+    return context.writer.add(`IFCEXTRUDEDAREASOLID(${profile},${axes},${context.zAxis},${ifcReal(height)})`);
   }
   const profile = circleProfile(context, width / 2);
   const axes = context.writer.add(
     `IFCAXIS2PLACEMENT3D(${point3(context, -length / 2, 0, 0)},${direction(context, [1, 0, 0])},${direction(context, [0, 0, 1])})`,
   );
-  return context.writer.add(
-    `IFCEXTRUDEDAREASOLID(${profile},${axes},${context.zAxis},${ifcReal(length)})`,
-  );
+  return context.writer.add(`IFCEXTRUDEDAREASOLID(${profile},${axes},${context.zAxis},${ifcReal(length)})`);
 }

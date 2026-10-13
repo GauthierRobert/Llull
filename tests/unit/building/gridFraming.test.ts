@@ -3,11 +3,7 @@ import type { GridElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import type { SteelMemberElement } from '@core/model/building';
 import { execute } from '@core/commands/registry';
-import {
-  crossGridLines,
-  crossingsOnLine,
-  parseCrossingName,
-} from '@aec/industrial/framing/gridFraming';
+import { crossGridLines, crossingsOnLine, parseCrossingName } from '@aec/industrial/framing/gridFraming';
 import { step, twoLevels } from './steelFixtures';
 
 /** Lines A, B along X (y = 0, 6000); 1, 2, 3 along Y (x = 0, 5000, 10000). 6 intersections ... 2 x 3. */
@@ -26,9 +22,7 @@ function gridded(): CadDocument {
 }
 
 const members = (doc: CadDocument): SteelMemberElement[] =>
-  Object.values(doc.building?.elements ?? {}).filter(
-    (element): element is SteelMemberElement => element.category === 'member',
-  );
+  Object.values(doc.building?.elements ?? {}).filter((element): element is SteelMemberElement => element.category === 'member');
 
 const data = (result: { data?: unknown }): { elementIds: string[]; skipped: number } =>
   result.data as { elementIds: string[]; skipped: number };
@@ -56,9 +50,7 @@ describe('add_grid_columns', () => {
     expect(columns.map((c) => c.start)).toContainEqual([5000, 6000, 0]);
     expect(columns.map((c) => c.end)).toContainEqual([5000, 6000, 3000]);
     expect(result.affected).toEqual(expect.arrayContaining(data(result).elementIds));
-    expect(result.document.building?.elementOrder).toEqual(
-      expect.arrayContaining(data(result).elementIds),
-    );
+    expect(result.document.building?.elementOrder).toEqual(expect.arrayContaining(data(result).elementIds));
   });
 
   it('runs continuously to topLevelId and applies roll, fixity, material', () => {
@@ -108,9 +100,7 @@ describe('add_grid_columns', () => {
     expect(data(second)).toMatchObject({ skipped: 2 });
     expect(data(second).elementIds).toHaveLength(4);
     expect(second.summary).toMatch(/skipped 2 existing/);
-    expect(
-      rejects(second.document, 'add_grid_columns', { profile: 'HEB300', levelId: 'level-1' }),
-    ).toMatch(/already hold a column/);
+    expect(rejects(second.document, 'add_grid_columns', { profile: 'HEB300', levelId: 'level-1' })).toMatch(/already hold a column/);
   });
 
   it('skips crossings covered by a continuous column from a lower level', () => {
@@ -121,9 +111,9 @@ describe('add_grid_columns', () => {
       topLevelId: 'level-3',
     });
     expect(data(tall).elementIds).toHaveLength(6);
-    expect(
-      rejects(tall.document, 'add_grid_columns', { profile: 'HEB300', levelId: 'level-2' }),
-    ).toMatch(/all 6 intersection\(s\) already hold a column/);
+    expect(rejects(tall.document, 'add_grid_columns', { profile: 'HEB300', levelId: 'level-2' })).toMatch(
+      /all 6 intersection\(s\) already hold a column/,
+    );
     const top = execute(tall.document, 'add_grid_columns', {
       profile: 'HEB300',
       levelId: 'level-3',
@@ -174,12 +164,8 @@ describe('add_grid_columns', () => {
     expect(call({ topLevelId: 'level-9' })).toMatch(/unknown top level/);
     expect(call({ topLevelId: 'level-1' })).toMatch(/not above the base level/);
     expect(call({ axes: ['A', 'B'] })).toMatch(/no grid intersections/);
-    expect(rejects(twoLevels(), 'add_grid_columns', { profile: 'HEB300' })).toMatch(
-      /at least 2 grid lines/,
-    );
-    expect(rejects(createEmptyDocForGrid(), 'add_grid_columns', { profile: 'HEB300' })).toMatch(
-      /at least 2 grid lines/,
-    );
+    expect(rejects(twoLevels(), 'add_grid_columns', { profile: 'HEB300' })).toMatch(/at least 2 grid lines/);
+    expect(rejects(createEmptyDocForGrid(), 'add_grid_columns', { profile: 'HEB300' })).toMatch(/at least 2 grid lines/);
   });
 });
 
@@ -241,23 +227,15 @@ describe('add_grid_beams', () => {
   it('rejects bad input without changing the document', () => {
     const doc = gridded();
     expect(rejects(doc, 'add_grid_beams', { profile: 'NOPE' })).toMatch(/unknown steel profile/);
-    expect(rejects(doc, 'add_grid_beams', { profile: 'IPE300', levelId: 'x' })).toMatch(
-      /unknown level/,
-    );
-    expect(rejects(doc, 'add_grid_beams', { profile: 'IPE300', axes: ['Z'] })).toMatch(
-      /unknown grid axis label/,
-    );
-    expect(rejects(twoLevels(), 'add_grid_beams', { profile: 'IPE300' })).toMatch(
-      /at least 2 grid lines/,
-    );
+    expect(rejects(doc, 'add_grid_beams', { profile: 'IPE300', levelId: 'x' })).toMatch(/unknown level/);
+    expect(rejects(doc, 'add_grid_beams', { profile: 'IPE300', axes: ['Z'] })).toMatch(/unknown grid axis label/);
+    expect(rejects(twoLevels(), 'add_grid_beams', { profile: 'IPE300' })).toMatch(/at least 2 grid lines/);
     let parallel = twoLevels();
     parallel = step(parallel, 'add_grid_line', { start: [0, 0], end: [10, 0], label: 'A' });
     parallel = step(parallel, 'add_grid_line', { start: [0, 5], end: [10, 5], label: 'B' });
     expect(rejects(parallel, 'add_grid_beams', { profile: 'IPE300' })).toMatch(/no bays/);
     const framed = execute(doc, 'add_grid_beams', { profile: 'IPE300', levelId: 'level-1' });
-    expect(
-      rejects(framed.document, 'add_grid_beams', { profile: 'IPE300', levelId: 'level-1' }),
-    ).toMatch(/already hold a beam/);
+    expect(rejects(framed.document, 'add_grid_beams', { profile: 'IPE300', levelId: 'level-1' })).toMatch(/already hold a beam/);
   });
 });
 
@@ -309,9 +287,7 @@ describe('add_grid_bracing', () => {
       pattern: 'diagonal',
     });
     expect(data(reversed).elementIds).toHaveLength(1);
-    expect(rejects(both.document, 'add_grid_bracing', params)).toMatch(
-      /2 brace\(s\) with the same end points already exist/,
-    );
+    expect(rejects(both.document, 'add_grid_bracing', params)).toMatch(/2 brace\(s\) with the same end points already exist/);
   });
 
   it('adds one diagonal from bottom at from to top at to with offsets', () => {
@@ -382,11 +358,7 @@ describe('grid framing geometry', () => {
 
   it('merges coincident crossings and parses names', () => {
     const a = line('A', [0, 0], [10, 0]);
-    const crossings = crossingsOnLine(
-      a,
-      [a, line('1', [5, -1], [5, 1]), line('2', [5, -2], [5, 2]), line('3', [8, -1], [8, 1])],
-      0.001,
-    );
+    const crossings = crossingsOnLine(a, [a, line('1', [5, -1], [5, 1]), line('2', [5, -2], [5, 2]), line('3', [8, -1], [8, 1])], 0.001);
     expect(crossings.map((c) => c.along)).toEqual([5, 8]);
     expect(parseCrossingName(' A / 1 ')).toEqual(['A', '1']);
     expect(parseCrossingName('A/')).toBeNull();

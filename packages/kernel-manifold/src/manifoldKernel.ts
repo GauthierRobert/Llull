@@ -50,24 +50,14 @@ interface CrossSectionShape {
 interface ManifoldStatic {
   ofMesh(mesh: unknown): ManifoldShape;
   cube(size: [number, number, number], center?: boolean): ManifoldShape;
-  cylinder(
-    height: number,
-    radiusLow: number,
-    radiusHigh?: number,
-    circularSegments?: number,
-    center?: boolean,
-  ): ManifoldShape;
+  cylinder(height: number, radiusLow: number, radiusHigh?: number, circularSegments?: number, center?: boolean): ManifoldShape;
   sphere(radius: number, circularSegments?: number): ManifoldShape;
 }
 
 interface ManifoldModule {
   Manifold: ManifoldStatic;
   CrossSection: new (polygons: Array<Array<[number, number]>>) => CrossSectionShape;
-  Mesh: new (options: {
-    numProp: number;
-    vertProperties: Float32Array;
-    triVerts: Uint32Array;
-  }) => unknown;
+  Mesh: new (options: { numProp: number; vertProperties: Float32Array; triVerts: Uint32Array }) => unknown;
   setup(): void;
 }
 
@@ -174,9 +164,7 @@ function primitiveOf(m: ManifoldModule, entity: PrimitiveEntity): ManifoldShape 
       return sx > 0 && sy > 0 && sz > 0 ? m.Manifold.cube([sx, sy, sz], true) : null;
     }
     case 'cylinder':
-      return entity.radius > 0 && entity.height > 0
-        ? m.Manifold.cylinder(entity.height, entity.radius, -1, 0, true)
-        : null;
+      return entity.radius > 0 && entity.height > 0 ? m.Manifold.cylinder(entity.height, entity.radius, -1, 0, true) : null;
     case 'sphere':
       return entity.radius > 0 ? m.Manifold.sphere(entity.radius, 32) : null;
     case 'extrusion': {
@@ -228,11 +216,7 @@ function manifoldToMeshData(solid: ManifoldShape): MeshData | null {
   if (!mesh || mesh.numProp < 3) return null;
   const positions: number[] = [];
   for (let i = 0; i < mesh.vertProperties.length; i += mesh.numProp) {
-    positions.push(
-      mesh.vertProperties[i] ?? 0,
-      mesh.vertProperties[i + 1] ?? 0,
-      mesh.vertProperties[i + 2] ?? 0,
-    );
+    positions.push(mesh.vertProperties[i] ?? 0, mesh.vertProperties[i + 1] ?? 0, mesh.vertProperties[i + 2] ?? 0);
   }
   return { positions, indices: Array.from(mesh.triVerts) };
 }
@@ -252,8 +236,7 @@ function manifoldOps(mod: ManifoldModule): KernelOps<ManifoldShape> {
     blend: () => null,
     chamfer: () => null,
     shell: () => null,
-    place: (shape, position, rotation) =>
-      withOwned(() => applyTransform(shape, position, rotation)),
+    place: (shape, position, rotation) => withOwned(() => applyTransform(shape, position, rotation)),
     scale: (shape, factor) => (factor > 0 ? withOwned(() => shape.scale(factor)) : null),
     tessellate: (shape) => withOwned(() => manifoldToMeshData(shape)),
     topology: () => null,

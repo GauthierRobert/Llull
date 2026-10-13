@@ -122,11 +122,7 @@ function scene(draw: (doc: Doc) => Drawn = (d) => drawHorizontalPolyline(d, 10))
   };
 }
 
-function expectInstances(
-  result: ReturnType<typeof execute>,
-  componentId: string,
-  count: number,
-): void {
+function expectInstances(result: ReturnType<typeof execute>, componentId: string, count: number): void {
   expect(result.affected).toHaveLength(count);
   for (const id of result.affected) {
     const inst = result.document.entities[id] as InstanceEntity;
@@ -328,11 +324,7 @@ describe('pattern_along_path', () => {
     ['count is NaN', { count: NaN }],
     ['startOffset is negative', { count: 3, startOffset: -1 }],
     ['endOffset is Infinity', { count: 3, endOffset: Infinity }],
-    [
-      'offsets exceed path length (usable <= 0)',
-      { count: 3, startOffset: 6, endOffset: 6 },
-      'offsets',
-    ],
+    ['offsets exceed path length (usable <= 0)', { count: 3, startOffset: 6, endOffset: 6 }, 'offsets'],
   ];
   it.each(failures)('failure: %s', (_label, extra, summaryPart) => {
     const { doc, run } = scene();

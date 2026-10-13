@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Vec3 } from '@core/model/types';
-import {
-  type UnderlayPlacement,
-  calibrateUnderlay,
-  pixelToLocal,
-  pixelToWorld,
-  underlayCorners,
-} from '@core/geometry/imageUnderlay';
+import { type UnderlayPlacement, calibrateUnderlay, pixelToLocal, pixelToWorld, underlayCorners } from '@core/geometry/imageUnderlay';
 
 /** 200×100 px image at 1 unit/px, lower-left at [10, 20, 0]. */
 const BASE: UnderlayPlacement = {
@@ -120,9 +114,7 @@ describe('calibrateUnderlay', () => {
     const result = calibrateUnderlay(tilted, { pixelA: [0, 0], pixelB: [3, 4], distance: 10 });
     if (!result.ok) throw new Error(result.error);
     expect(result.placement.rotation).toEqual([0.3, 0.2, 0.1]);
-    expect(
-      distance(pixelToWorld(result.placement, [0, 0]), pixelToWorld(result.placement, [3, 4])),
-    ).toBeCloseTo(10);
+    expect(distance(pixelToWorld(result.placement, [0, 0]), pixelToWorld(result.placement, [3, 4]))).toBeCloseTo(10);
   });
 
   it.each([

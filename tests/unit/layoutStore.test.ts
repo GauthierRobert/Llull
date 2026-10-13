@@ -47,10 +47,7 @@ describe('layoutStore — persisted layout parsing', () => {
   });
 
   it('restores a valid stored layout', async () => {
-    localStorage.setItem(
-      'llull-layout',
-      JSON.stringify({ sidebarTab: 'history', sidebarOpen: false, inspectorOpen: false }),
-    );
+    localStorage.setItem('llull-layout', JSON.stringify({ sidebarTab: 'history', sidebarOpen: false, inspectorOpen: false }));
     vi.resetModules();
     const fresh = await import('@ui/store/layoutStore');
     expect(fresh.useLayoutStore.getState()).toMatchObject({

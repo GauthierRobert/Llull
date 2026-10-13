@@ -234,9 +234,7 @@ describe('BuildingPanel', () => {
     expect(screen.getByTestId('clash-summary')).toHaveTextContent('No clashes found.');
     fireEvent.change(screen.getByLabelText('Elevation direction'), { target: { value: 'east' } });
     fireEvent.click(screen.getByRole('button', { name: 'Elevation sheet' }));
-    expect(screen.getByTestId('building-export-status')).toHaveTextContent(
-      /East_elevation.*drawn line/,
-    );
+    expect(screen.getByTestId('building-export-status')).toHaveTextContent(/East_elevation.*drawn line/);
     fireEvent.change(screen.getByLabelText('Section cut position'), { target: { value: '0' } });
     fireEvent.click(screen.getByRole('checkbox', { name: 'Hide cladding' }));
     fireEvent.click(screen.getByRole('button', { name: 'Section sheet' }));
@@ -322,9 +320,7 @@ describe('BuildingPanel', () => {
     const { click } = stubDownloads();
     render(<BuildingPanel />);
     fireEvent.click(screen.getByRole('button', { name: 'Anchor plan' }));
-    expect(screen.getByTestId('building-export-status')).toHaveTextContent(
-      /^Anchor plan .*anchor bolt\(s\)/,
-    );
+    expect(screen.getByTestId('building-export-status')).toHaveTextContent(/^Anchor plan .*anchor bolt\(s\)/);
     expect(click).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button', { name: 'NC files (DSTV)' }));
     expect(screen.getByTestId('building-export-status')).toHaveTextContent(/^DSTV NC1: (\d+) file/);

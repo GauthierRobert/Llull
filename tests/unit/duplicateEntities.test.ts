@@ -44,9 +44,7 @@ describe('duplicate_entities', () => {
   it('is replayable: replay_history reproduces the copies', () => {
     const result = execute(doc, 'duplicate_entities', { ids: [boxId, sphereId] });
     const replayed = execute(result.document, 'replay_history', {});
-    expect(Object.keys(replayed.document.entities).sort()).toEqual(
-      Object.keys(result.document.entities).sort(),
-    );
+    expect(Object.keys(replayed.document.entities).sort()).toEqual(Object.keys(result.document.entities).sort());
   });
 
   it.each([

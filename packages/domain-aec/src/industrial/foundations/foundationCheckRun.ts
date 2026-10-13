@@ -20,8 +20,7 @@ const foundationCheckParams = z.object({
     .number()
     .optional()
     .describe(
-      'Tie capacity in kN used for the tie-force row (thrustTie only). Default 175 = 2 × H16 B500 ' +
-        'bars (fyd 435 N/mm²). Must be > 0.',
+      'Tie capacity in kN used for the tie-force row (thrustTie only). Default 175 = 2 × H16 B500 ' + 'bars (fyd 435 N/mm²). Must be > 0.',
     ),
 });
 
@@ -69,8 +68,7 @@ export const foundationCheck = defineCommand({
     if ('reason' in resolved) return noop(doc, `check_foundations failed: ${resolved.reason}.`);
     const { loads, levelId } = resolved;
     const tieCapacity = params.tieCapacity ?? DEFAULT_TIE_CAPACITY;
-    if (tieCapacity <= 0)
-      return noop(doc, 'check_foundations failed: tieCapacity must be a number > 0 (kN).');
+    if (tieCapacity <= 0) return noop(doc, 'check_foundations failed: tieCapacity must be a number > 0 (kN).');
     const thrustTie = params.thrustTie ?? defaultThrustTie(doc, levelId);
     const { rows, footings, plates, unchecked } = checkFoundations(
       doc,
@@ -86,31 +84,18 @@ export const foundationCheck = defineCommand({
       csv,
       failures,
       worst: worstRow,
-    } = checkTable(rows, ['Column', 'Footing', ...LIMIT_COLUMNS], (row, status) => [
-      row.column,
-      row.footing,
-      ...limitCells(row, status),
-    ]);
+    } = checkTable(rows, ['Column', 'Footing', ...LIMIT_COLUMNS], (row, status) => [row.column, row.footing, ...limitCells(row, status)]);
     if (!worstRow) {
-      return noop(
-        doc,
-        `check_foundations failed: no portal frame column with a footing or base plate on level '${levelId}'.`,
-      );
+      return noop(doc, `check_foundations failed: no portal frame column with a footing or base plate on level '${levelId}'.`);
     }
     const failureIds = [...new Set(failures.map((row) => row.elementId))];
     return report(
       doc,
       `Checked ${footings} footing(s) and ${plates} base plate(s) on level '${levelId}' ` +
         `(${describeLoads(loads)}, soil ${soilBearing} kPa, Es ${soilModulus} MPa, ${thrustTie ? `thrust taken by a tie / slab (capacity ${tieCapacity} kN)` : 'thrust resisted by pad friction'}): ${rows.length} check(s), ` +
-        (unchecked > 0
-          ? `${unchecked} footing(s) not checked (no analysed frame column, e.g. gable posts); `
-          : '') +
+        (unchecked > 0 ? `${unchecked} footing(s) not checked (no analysed frame column, e.g. gable posts); ` : '') +
         `max utilisation ${round(worstRow.utilisation)} (${worstRow.column} ${worstRow.check}, ${worstRow.combination}); ` +
-        failureSummary(
-          failures,
-          (row) => `${row.column} ${row.check}`,
-          'all OK (no reinforcement check).',
-        ),
+        failureSummary(failures, (row) => `${row.column} ${row.check}`, 'all OK (no reinforcement check).'),
       {
         rows,
         csv,

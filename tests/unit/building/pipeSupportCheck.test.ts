@@ -3,12 +3,7 @@ import type { CadDocument, Vec3 } from '@core/model/types';
 import { execute, getCommand } from '@core/commands/registry';
 import { checkPipeSupports, type PipeSupportRow } from '@aec/industrial/piping/pipeSupportCheck';
 import { hangerRodDiameter, pipeSpanLimit } from '@aec/industrial/piping/pipeSpans';
-import {
-  arcLengths,
-  nearestOnRoute,
-  pointAtArc,
-  spanCoordinate,
-} from '@aec/industrial/piping/routeSupport';
+import { arcLengths, nearestOnRoute, pointAtArc, spanCoordinate } from '@aec/industrial/piping/routeSupport';
 import { beam, step, twoLevels } from './steelFixtures';
 
 interface CheckData {
@@ -92,9 +87,7 @@ describe('span table', () => {
   });
 
   it('picks typical hanger rods by DN', () => {
-    expect([25, 50, 80, 100, 150, 200, 250, 300, 400].map(hangerRodDiameter)).toEqual([
-      10, 10, 12, 12, 16, 20, 24, 24, 30,
-    ]);
+    expect([25, 50, 80, 100, 150, 200, 250, 300, 400].map(hangerRodDiameter)).toEqual([10, 10, 12, 12, 16, 20, 24, 24, 30]);
   });
 });
 
@@ -131,9 +124,9 @@ describe('span verdicts', () => {
     ]);
     expect(data.ok).toBe(false);
     expect(data.failures).toEqual(['pipe-1']);
-    expect(
-      execute(shoes(railDoc([2000, 7000]), [2000, 7000]), 'check_pipe_supports', {}).summary,
-    ).toContain('1 failing: PL1 L-1 (span 5.00 m');
+    expect(execute(shoes(railDoc([2000, 7000]), [2000, 7000]), 'check_pipe_supports', {}).summary).toContain(
+      '1 failing: PL1 L-1 (span 5.00 m',
+    );
   });
 
   it('scales the table with spanFactor and the overhang with overhangRatio', () => {
@@ -252,10 +245,7 @@ describe('span verdicts', () => {
   });
 
   it('takes an untabulated size from the next smaller table row and says so', () => {
-    const row = rowOf(
-      run(shoes(railDoc([2000, 6000, 10000], undefined), [2000, 6000, 10000])),
-      'PL1',
-    );
+    const row = rowOf(run(shoes(railDoc([2000, 6000, 10000], undefined), [2000, 6000, 10000])), 'PL1');
     expect(row.dn).toBe(100);
     expect(row.notes).toEqual([]);
     const odd = step(twoLevels(), 'add_pipe_run', {
@@ -267,9 +257,7 @@ describe('span verdicts', () => {
       ],
     });
     expect(rowOf(run(odd), 'PL1')).toMatchObject({ dn: 80, maxSpanM: 3.7 });
-    expect(rowOf(run(odd), 'PL1').notes[0]).toBe(
-      'DN not tabulated: span of DN80 used (next smaller size)',
-    );
+    expect(rowOf(run(odd), 'PL1').notes[0]).toBe('DN not tabulated: span of DN80 used (next smaller size)');
   });
 });
 
@@ -403,9 +391,7 @@ describe('rows for every pipe, filters and failures', () => {
       ['PL2', 'L-2', 50, false],
     ]);
     expect(data.totals).toMatchObject({ pipes: 2, ok: 1, failing: 1 });
-    expect(data.csv.split('\n')[0]).toBe(
-      'Mark,Line,DN,Length (m),Allowed span (m),Largest span (m),Supports,Status,Issues',
-    );
+    expect(data.csv.split('\n')[0]).toBe('Mark,Line,DN,Length (m),Allowed span (m),Largest span (m),Supports,Status,Issues');
     expect(data.csv).toContain('PL1,L-1,DN100,12,4.3,4,3,OK,');
     expect(data.csv).toContain('PL2,L-2,DN50,8,3,0,0,FAIL,');
     expect(data.assumptions.join(' ')).toContain('MSS SP-69');

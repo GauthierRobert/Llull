@@ -14,13 +14,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
-import {
-  expectUndoRedoFlagsAfterDispatch,
-  liveSnapshot,
-  localDispatch,
-  flushPromises,
-  getState,
-} from '../helpers/storeTestHelpers';
+import { expectUndoRedoFlagsAfterDispatch, liveSnapshot, localDispatch, flushPromises, getState } from '../helpers/storeTestHelpers';
 import { mockFetch } from '../helpers/integrationFetch';
 
 // Helpers
@@ -55,61 +49,58 @@ describe.each([
     canRedo: false,
     networkError: 'Timeout',
   },
-] as const)(
-  '$op — server-authoritative',
-  ({ op, path, summary, canUndo, canRedo, networkError }) => {
-    const response = { summary, affected: [], isError: false, canUndo, canRedo };
+] as const)('$op — server-authoritative', ({ op, path, summary, canUndo, canRedo, networkError }) => {
+  const response = { summary, affected: [], isError: false, canUndo, canRedo };
 
-    beforeEach(() => {
-      resetStore();
-    });
+  beforeEach(() => {
+    resetStore();
+  });
 
-    afterEach(() => {
-      vi.unstubAllGlobals();
-    });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
 
-    it(`${op}() POSTs to /${path}`, async () => {
-      const spy = mockFetch(response);
+  it(`${op}() POSTs to /${path}`, async () => {
+    const spy = mockFetch(response);
 
-      getState()[op]();
-      await flushPromises();
+    getState()[op]();
+    await flushPromises();
 
-      expect(spy).toHaveBeenCalledOnce();
-      const [url, init] = spy.mock.calls[0] as [string, RequestInit];
-      expect(url).toBe(`http://localhost:3001/${path}`);
-      expect(init.method).toBe('POST');
-    });
+    expect(spy).toHaveBeenCalledOnce();
+    const [url, init] = spy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`http://localhost:3001/${path}`);
+    expect(init.method).toBe('POST');
+  });
 
-    it(`${op}() updates lastSummary from the server response`, async () => {
-      mockFetch(response);
+  it(`${op}() updates lastSummary from the server response`, async () => {
+    mockFetch(response);
 
-      getState()[op]();
-      await flushPromises();
+    getState()[op]();
+    await flushPromises();
 
-      expect(getState().lastSummary).toBe(summary);
-    });
+    expect(getState().lastSummary).toBe(summary);
+  });
 
-    it(`${op}() updates canUndo and canRedo from the server response`, async () => {
-      mockFetch(response);
+  it(`${op}() updates canUndo and canRedo from the server response`, async () => {
+    mockFetch(response);
 
-      getState()[op]();
-      await flushPromises();
+    getState()[op]();
+    await flushPromises();
 
-      expect(getState().canUndo).toBe(canUndo);
-      expect(getState().canRedo).toBe(canRedo);
-    });
+    expect(getState().canUndo).toBe(canUndo);
+    expect(getState().canRedo).toBe(canRedo);
+  });
 
-    it(`${op}() sets liveStatus to disconnected on network failure`, async () => {
-      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error(networkError)));
+  it(`${op}() sets liveStatus to disconnected on network failure`, async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error(networkError)));
 
-      getState()[op]();
-      await flushPromises();
+    getState()[op]();
+    await flushPromises();
 
-      expect(getState().liveStatus).toBe('disconnected');
-      expect(getState().lastSummary).toContain('ran locally');
-    });
-  },
-);
+    expect(getState().liveStatus).toBe('disconnected');
+    expect(getState().lastSummary).toContain('ran locally');
+  });
+});
 
 describe('undo — document arrives via live sync', () => {
   beforeEach(() => {

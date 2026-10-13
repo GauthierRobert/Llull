@@ -39,9 +39,7 @@ export function flowsTo(civil: CivilModel, startId: string, targetId: string): b
 /** Manholes ordered so every pipe's upstream manhole precedes its downstream one. */
 export function manholesUpstreamFirst(civil: CivilModel): ManholeObject[] {
   const manholes = civilObjectsOf(civil, 'manhole');
-  const pipes = civilObjectsOf(civil, 'pipe').filter(
-    (pipe) => civil.objects[pipe.fromId] && civil.objects[pipe.toId],
-  );
+  const pipes = civilObjectsOf(civil, 'pipe').filter((pipe) => civil.objects[pipe.fromId] && civil.objects[pipe.toId]);
   const waiting = new Map(manholes.map((m) => [m.id, pipes.filter((p) => p.toId === m.id).length]));
   const ordered: ManholeObject[] = [];
   const queue = manholes.filter((m) => waiting.get(m.id) === 0);

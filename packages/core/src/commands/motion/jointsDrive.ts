@@ -27,22 +27,15 @@ export const addDriveRelation = defineCommand({
     'Cyclic couplings (A→B→A) are rejected with an explanatory summary. ' +
     'Returns the new drive relation id in affected[0].',
   params: z.object({
-    driver: z
-      .string()
-      .describe('Id of the driving joint (source of motion). Must exist in doc.joints.'),
-    driven: z
-      .string()
-      .describe('Id of the driven joint (receives motion). Must exist in doc.joints.'),
+    driver: z.string().describe('Id of the driving joint (source of motion). Must exist in doc.joints.'),
+    driven: z.string().describe('Id of the driven joint (receives motion). Must exist in doc.joints.'),
     ratio: z
       .number()
       .describe(
         'Coupling ratio: driven = driver * ratio + offset. ' +
           'Use 1.0 for a direct coupling, 2.0 for a 2:1 gear-up, -1.0 to reverse direction.',
       ),
-    offset: z
-      .number()
-      .optional()
-      .describe('Optional additive offset applied after ratio multiplication. Default: 0.'),
+    offset: z.number().optional().describe('Optional additive offset applied after ratio multiplication. Default: 0.'),
     id: z
       .string()
       .optional()
@@ -53,38 +46,23 @@ export const addDriveRelation = defineCommand({
   }),
   run: (doc, { driver, driven, ratio, offset, id }): CommandResult => {
     if (!(driver in doc.joints)) {
-      return noop(
-        doc,
-        `add_drive_relation: driver joint '${String(driver)}' does not exist in doc.joints.`,
-      );
+      return noop(doc, `add_drive_relation: driver joint '${String(driver)}' does not exist in doc.joints.`);
     }
     if (!(driven in doc.joints)) {
-      return noop(
-        doc,
-        `add_drive_relation: driven joint '${String(driven)}' does not exist in doc.joints.`,
-      );
+      return noop(doc, `add_drive_relation: driven joint '${String(driven)}' does not exist in doc.joints.`);
     }
     if (driver === driven) {
-      return noop(
-        doc,
-        `add_drive_relation: driver and driven cannot be the same joint ('${driver}').`,
-      );
+      return noop(doc, `add_drive_relation: driver and driven cannot be the same joint ('${driver}').`);
     }
     // Cycle detection
     const cyclePath = detectCycleOnAdd(doc.driveRelations, driver, driven);
     if (cyclePath !== null) {
-      return noop(
-        doc,
-        `add_drive_relation: adding this relation would create a cycle: ${cyclePath}. No change made.`,
-      );
+      return noop(doc, `add_drive_relation: adding this relation would create a cycle: ${cyclePath}. No change made.`);
     }
 
     const drId = idOrNext(id, 'dr');
     if (idTaken(doc.driveRelations, drId)) {
-      return noop(
-        doc,
-        `add_drive_relation: drive relation id '${drId}' already exists — no change made.`,
-      );
+      return noop(doc, `add_drive_relation: drive relation id '${drId}' already exists — no change made.`);
     }
 
     const newDr: DriveRelation = {
@@ -127,19 +105,12 @@ export const deleteDriveRelation = defineCommand({
     'The joints themselves are not affected; only the coupling is removed. ' +
     'If the drive relation id does not exist the document is left unchanged.',
   params: z.object({
-    id: z
-      .string()
-      .describe(
-        'Id of the drive relation to remove. Must match an existing entry in doc.driveRelations.',
-      ),
+    id: z.string().describe('Id of the drive relation to remove. Must match an existing entry in doc.driveRelations.'),
   }),
   run: (doc, { id }): CommandResult => {
     const dr = Object.hasOwn(doc.driveRelations, id) ? doc.driveRelations[id] : undefined;
     if (!dr) {
-      return noop(
-        doc,
-        `delete_drive_relation: drive relation '${String(id)}' does not exist — no change made.`,
-      );
+      return noop(doc, `delete_drive_relation: drive relation '${String(id)}' does not exist — no change made.`);
     }
 
     const newDriveRelations = { ...doc.driveRelations };
@@ -151,10 +122,7 @@ export const deleteDriveRelation = defineCommand({
       driveRelationOrder: doc.driveRelationOrder.filter((drid) => drid !== id),
     };
 
-    return report(
-      newDoc,
-      `delete_drive_relation: removed coupling '${dr.driver}' → '${dr.driven}' (id: '${id}').`,
-    );
+    return report(newDoc, `delete_drive_relation: removed coupling '${dr.driver}' → '${dr.driven}' (id: '${id}').`);
   },
 });
 
@@ -194,11 +162,11 @@ export const evaluateMotion = defineCommand({
     const jointCount = Object.keys(resolvedJoints).length;
     const movedCount = Object.keys(instancePositions).length;
 
-    return report(
-      doc,
-      `evaluate_motion: evaluated ${jointCount} joint(s), ${movedCount} instance(s) would move.`,
-      { resolvedJoints, instancePositions, instanceRotations },
-    );
+    return report(doc, `evaluate_motion: evaluated ${jointCount} joint(s), ${movedCount} instance(s) would move.`, {
+      resolvedJoints,
+      instancePositions,
+      instanceRotations,
+    });
   },
 });
 
@@ -222,17 +190,13 @@ export const bakeMotion = defineCommand({
     'Returns the updated document with affected[] listing all modified instance ids.',
   params: z.object({}),
   run: (doc, _params): CommandResult => {
-    if (Object.keys(doc.joints).length === 0)
-      return noop(doc, 'bake_motion: no joints defined. Nothing to bake.');
+    if (Object.keys(doc.joints).length === 0) return noop(doc, 'bake_motion: no joints defined. Nothing to bake.');
 
     const { resolvedJoints, instancePositions, instanceRotations } = evaluateMotionInternal(doc);
 
     const movedIds = Object.keys(instancePositions);
     if (movedIds.length === 0) {
-      return report(
-        doc,
-        'bake_motion: joints exist but no instance positions changed (all instanceIds may be missing).',
-      );
+      return report(doc, 'bake_motion: joints exist but no instance positions changed (all instanceIds may be missing).');
     }
 
     // Apply computed positions and rotations to entities

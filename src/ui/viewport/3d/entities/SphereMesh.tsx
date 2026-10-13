@@ -12,10 +12,7 @@ import { buildSphereGeometry } from './primitiveGeometry';
 
 const SPHERE_SURFACE: SolidSurface = { roughness: 0.35, metalness: 0.12, envMapIntensity: 1.0 };
 
-export function SphereMesh({
-  entity,
-  ...shell
-}: SolidMeshKindProps<SphereEntity>): React.ReactElement {
+export function SphereMesh({ entity, ...shell }: SolidMeshKindProps<SphereEntity>): React.ReactElement {
   const { radius } = entity;
   const geometry = useMemo(() => buildSphereGeometry(radius), [radius]);
   return <SolidMeshShell entity={entity} geometry={geometry} surface={SPHERE_SURFACE} {...shell} />;

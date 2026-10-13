@@ -34,11 +34,7 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
         <div className="app-error__card">
           <strong className="app-error__title">Something went wrong</strong>
           <code className="app-error__message">{this.state.message}</code>
-          <button
-            type="button"
-            className="app-error__reload"
-            onClick={() => window.location.reload()}
-          >
+          <button type="button" className="app-error__reload" onClick={() => window.location.reload()}>
             Reload
           </button>
         </div>

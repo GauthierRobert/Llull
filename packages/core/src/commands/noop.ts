@@ -33,11 +33,7 @@ export const report = (document: CadDocument, summary: string, data?: unknown): 
 });
 
 /** Mutating result: `document` is the next state, `affected` the created/changed entity ids. */
-export const changed = (
-  document: CadDocument,
-  summary: string,
-  affected: string[],
-): CommandResult => ({
+export const changed = (document: CadDocument, summary: string, affected: string[]): CommandResult => ({
   document,
   summary,
   affected,

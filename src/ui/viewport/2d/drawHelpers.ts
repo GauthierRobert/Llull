@@ -64,10 +64,7 @@ export function dropRepeatedPoints(points: ReadonlyArray<Vec2>): Vec2[] {
   const tolerance = chainTolerance(points);
   return points.filter((point, index) => {
     const previous = points[index - 1];
-    return (
-      previous === undefined ||
-      Math.hypot(point[0] - previous[0], point[1] - previous[1]) > tolerance
-    );
+    return previous === undefined || Math.hypot(point[0] - previous[0], point[1] - previous[1]) > tolerance;
   });
 }
 

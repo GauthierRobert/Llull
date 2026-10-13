@@ -17,14 +17,7 @@ interface LabeledSelectProps {
   onChange: (value: string) => void;
 }
 
-export function LabeledSelect({
-  label,
-  value,
-  options,
-  blankLabel,
-  testId,
-  onChange,
-}: LabeledSelectProps): React.ReactElement {
+export function LabeledSelect({ label, value, options, blankLabel, testId, onChange }: LabeledSelectProps): React.ReactElement {
   return (
     <label className="field">
       <span className="field__label">{label}</span>

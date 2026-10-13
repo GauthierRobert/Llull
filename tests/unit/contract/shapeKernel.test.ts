@@ -2,13 +2,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { BoxEntity, Entity } from '@core/model/types';
 import type { ShapeRecipe } from '@core/model/types';
-import {
-  handleOf,
-  keyOnlyHandle,
-  kernelFromOps,
-  SHAPE_NOT_CACHED,
-  type KernelOps,
-} from '@core/geometry/shapeKernel';
+import { handleOf, keyOnlyHandle, kernelFromOps, SHAPE_NOT_CACHED, type KernelOps } from '@core/geometry/shapeKernel';
 import type { ShapeTopology } from '@core/geometry/kernel';
 import type { MeshData } from '@core/model/types';
 import { TETRA } from '../../helpers/fakeKernel';

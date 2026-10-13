@@ -70,8 +70,7 @@ const DUOPITCH_ACROSS: readonly Row[] = [
   { pitch: 45, zones: { F: [0, 0.7], G: [0, 0.7], H: [0, 0.6], I: [-0.2, 0], J: [-0.3, 0] } },
 ];
 
-const single = (...values: number[]): Array<readonly [number, number]> =>
-  values.map((value) => [value, value] as const);
+const single = (...values: number[]): Array<readonly [number, number]> => values.map((value) => [value, value] as const);
 
 /** Tab. 7.4b (duopitch, θ = 90°), cpe,10, one set. Held at the 5° values below 5°. */
 const DUOPITCH_ALONG: readonly Row[] = [
@@ -107,10 +106,7 @@ const MONOPITCH_ALONG: readonly Row[] = [5, 15, 30, 45].map((pitch) => ({
   zones: zonesOf(['Fup', 'Flow', 'G', 'H', 'I'], single(-1.6, -1.6, -1.8, -0.6, -0.5)),
 }));
 
-function zonesOf(
-  names: readonly RoofZone[],
-  values: ReadonlyArray<readonly [number, number]>,
-): Row['zones'] {
+function zonesOf(names: readonly RoofZone[], values: ReadonlyArray<readonly [number, number]>): Row['zones'] {
   return Object.fromEntries(names.map((name, index) => [name, values[index]]));
 }
 
@@ -127,23 +123,19 @@ function interpolate(rows: readonly Row[], pitchDeg: number): RoofCoefficients {
   const t = (pitch - lower.pitch) / (upper.pitch - lower.pitch);
   const blend = (a: number, b: number): number => a * (1 - t) + b * t;
   return Object.fromEntries(
-    (Object.entries(lower.zones) as Array<[RoofZone, readonly [number, number]]>).map(
-      ([zone, [suction, pressure]]) => {
-        const [upperSuction, upperPressure] = upper.zones[zone] ?? [suction, pressure];
-        return [
-          zone,
-          { suction: blend(suction, upperSuction), pressure: blend(pressure, upperPressure) },
-        ];
-      },
-    ),
+    (Object.entries(lower.zones) as Array<[RoofZone, readonly [number, number]]>).map(([zone, [suction, pressure]]) => {
+      const [upperSuction, upperPressure] = upper.zones[zone] ?? [suction, pressure];
+      return [zone, { suction: blend(suction, upperSuction), pressure: blend(pressure, upperPressure) }];
+    }),
   );
 }
 
 const asZones = (zones: Row['zones']): RoofCoefficients =>
   Object.fromEntries(
-    (Object.entries(zones) as Array<[RoofZone, readonly [number, number]]>).map(
-      ([zone, [suction, pressure]]) => [zone, { suction, pressure }],
-    ),
+    (Object.entries(zones) as Array<[RoofZone, readonly [number, number]]>).map(([zone, [suction, pressure]]) => [
+      zone,
+      { suction, pressure },
+    ]),
   );
 
 /**
@@ -151,14 +143,9 @@ const asZones = (zones: Row['zones']): RoofCoefficients =>
  * Flat roofs (and 0° ≤ α < 5° of the other types) use Tab. 7.2; α is clamped to the table range.
  * @invariant duopitch θ = 0° zones F G H I J, θ = 90° F G H I; monopitch θ = 0° / 180° F G H, θ = 90° Fup Flow G H I; flat F G H I
  */
-export function roofCoefficients(
-  roofType: RoofType,
-  pitchDeg: number,
-  direction: WindDirection,
-): RoofCoefficients {
+export function roofCoefficients(roofType: RoofType, pitchDeg: number, direction: WindDirection): RoofCoefficients {
   if (roofType === 'flat' || (pitchDeg >= 0 && pitchDeg < FLAT_ROOF_LIMIT)) return asZones(FLAT);
-  if (roofType === 'duopitch')
-    return interpolate(direction === 90 ? DUOPITCH_ALONG : DUOPITCH_ACROSS, pitchDeg);
+  if (roofType === 'duopitch') return interpolate(direction === 90 ? DUOPITCH_ALONG : DUOPITCH_ACROSS, pitchDeg);
   if (direction === 90) return interpolate(MONOPITCH_ALONG, pitchDeg);
   return interpolate(direction === 180 ? MONOPITCH_HIGH_EAVES : MONOPITCH_LOW_EAVES, pitchDeg);
 }

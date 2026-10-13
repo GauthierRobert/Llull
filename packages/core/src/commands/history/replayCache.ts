@@ -25,12 +25,7 @@ interface ReplayState {
 export type ReplayCache = LruCache<ReplayState>;
 
 /** Key of the state after applying a step with `resolvedParams` to the state keyed `previous`. */
-export function nextStateKey(
-  previous: string,
-  stepId: string,
-  commandName: string,
-  resolvedParams: unknown,
-): string {
+export function nextStateKey(previous: string, stepId: string, commandName: string, resolvedParams: unknown): string {
   return hashText(`${previous}|${stepId}|${commandName}|${JSON.stringify(resolvedParams) ?? ''}`);
 }
 

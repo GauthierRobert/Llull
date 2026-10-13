@@ -9,14 +9,7 @@ import type { CadDocument } from '@core/model/types';
 import { plans, type GoldenAction } from '../golden/plans';
 import { runPlan } from '../golden/runPlan';
 import { COMPLEX_2D, COMPLEX_3D } from './complexPlans';
-import {
-  aspectOf,
-  isFramed,
-  pixelAspectSlack,
-  shootCanvas,
-  silhouette,
-  type Silhouette,
-} from './silhouette';
+import { aspectOf, isFramed, pixelAspectSlack, shootCanvas, silhouette, type Silhouette } from './silhouette';
 
 /**
  * @layer tests/quality
@@ -34,14 +27,7 @@ import {
  * @invariant a check listed in knownIssues must FAIL (ratchet: a fix forces removing it)
  */
 
-type CheckId =
-  | 'errors'
-  | 'stretch'
-  | 'visible'
-  | 'framed'
-  | 'aspect'
-  | 'fit-all-button'
-  | 'top-view-button';
+type CheckId = 'errors' | 'stretch' | 'visible' | 'framed' | 'aspect' | 'fit-all-button' | 'top-view-button';
 type View = '2D' | '3D';
 
 interface DisplayCase {
@@ -168,9 +154,7 @@ function complexCases(): DisplayCase[] {
 
 /** World-space X / Y extent ratio — what a top-down view must show. */
 function expectedAspect(doc: CadDocument): number | null {
-  const data = execute(doc, 'measure_bounding_box', {}).data as
-    | { size: [number, number, number] }
-    | undefined;
+  const data = execute(doc, 'measure_bounding_box', {}).data as { size: [number, number, number] } | undefined;
   if (!data || data.size[0] <= 0 || data.size[1] <= 0) return null;
   return data.size[0] / data.size[1];
 }
@@ -251,11 +235,7 @@ test.describe('display quality gate', () => {
       await expect(page.getByRole('list', { name: 'Layer list' })).toBeVisible();
       const started = Date.now();
       // Uploaded by path: Playwright caps in-memory uploads at 50 MB (big STEP documents exceed it).
-      const upload = path.join(
-        CORPUS_DIR,
-        'display-input',
-        `${displayCase.id.replace('/', '-')}.json`,
-      );
+      const upload = path.join(CORPUS_DIR, 'display-input', `${displayCase.id.replace('/', '-')}.json`);
       mkdirSync(path.dirname(upload), { recursive: true });
       writeFileSync(upload, serializeDocument(displayCase.document));
       await page.locator('[aria-label="Project file"] input[type="file"]').setInputFiles(upload);
@@ -265,9 +245,7 @@ test.describe('display quality gate', () => {
       if (displayCase.view === '2D') {
         await page.getByRole('button', { name: '2D', exact: true }).click();
       }
-      const canvas = page.locator(
-        displayCase.view === '3D' ? '.viewport-3d-wrapper canvas' : '.viewport-2d-wrapper canvas',
-      );
+      const canvas = page.locator(displayCase.view === '3D' ? '.viewport-3d-wrapper canvas' : '.viewport-2d-wrapper canvas');
       await expect(canvas).toBeVisible();
       // Opening a project re-frames it (iso); view it from the top, framed, like a user would.
       if (displayCase.view === '3D') await page.getByRole('button', { name: 'Top view' }).click();
@@ -282,10 +260,7 @@ test.describe('display quality gate', () => {
 
       const expected = expectedAspect(displayCase.document);
       const framed = isFramed(shape, MIN_SPAN);
-      const aspectError =
-        shape.rect === null || expected === null
-          ? null
-          : Math.abs(aspectOf(shape.rect) / expected - 1);
+      const aspectError = shape.rect === null || expected === null ? null : Math.abs(aspectOf(shape.rect) / expected - 1);
       const results: Partial<Record<CheckId, boolean>> = {
         errors: problems.length === 0,
         stretch: Math.abs(buffer.aspect / buffer.cssAspect - 1) <= 0.01,
@@ -294,8 +269,7 @@ test.describe('display quality gate', () => {
       };
       // Aspect is only meaningful for a whole, framed silhouette.
       if (framed && aspectError !== null && shape.rect !== null) {
-        results.aspect =
-          aspectError <= ASPECT_TOLERANCE[displayCase.view] + pixelAspectSlack(shape.rect);
+        results.aspect = aspectError <= ASPECT_TOLERANCE[displayCase.view] + pixelAspectSlack(shape.rect);
       }
       if (displayCase.view === '3D') {
         await page.getByRole('button', { name: 'Fit all into view' }).click();

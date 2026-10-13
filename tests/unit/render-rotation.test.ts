@@ -26,9 +26,7 @@ import { applyEulerXYZ } from '@lib/eulerRotation';
  * return the union bounding box [minX, minY, maxX, maxY] in SVG screen space.
  * Returns null when no polygon points are found.
  */
-function svgPolygonBbox(
-  svg: string,
-): { minX: number; minY: number; maxX: number; maxY: number } | null {
+function svgPolygonBbox(svg: string): { minX: number; minY: number; maxX: number; maxY: number } | null {
   // Match all points="..." attributes (polygon and polyline elements)
   const pointsRe = /points="([^"]*)"/g;
   let minX = Infinity,
@@ -93,11 +91,7 @@ function renderSolid(
 const QUARTER_X: [number, number, number] = [Math.PI / 2, 0, 0];
 
 /** Unrotated vs rotated front-view bboxes of one solid. */
-function frontPair(
-  addCommand: string,
-  params: Record<string, unknown>,
-  delta: [number, number, number] = QUARTER_X,
-): { a: Bbox; b: Bbox } {
+function frontPair(addCommand: string, params: Record<string, unknown>, delta: [number, number, number] = QUARTER_X): { a: Bbox; b: Bbox } {
   const a = renderSolid(addCommand, params).bbox;
   const b = renderSolid(addCommand, params, delta).bbox;
   expect(a).not.toBeNull();

@@ -17,20 +17,14 @@ const footingsOf = (doc: CadDocument): FootingElement[] =>
   );
 
 const withFootings = (doc: CadDocument, patch: Partial<FootingElement>): CadDocument =>
-  mapElements(doc, (element) =>
-    element.category === 'footing' ? { ...element, ...patch } : element,
-  );
+  mapElements(doc, (element) => (element.category === 'footing' ? { ...element, ...patch } : element));
 
 function design(doc: CadDocument, params: Record<string, unknown> = {}): FootingDesignRow[] {
   return (designFootings.run(doc, params).data as { footings: FootingDesignRow[] }).footings;
 }
 
 const analysedFootings = (before: CadDocument, after: CadDocument): FootingElement[] => {
-  const ids = new Set(
-    (designFootings.run(before, {}).data as { footings: FootingDesignRow[] }).footings.map(
-      (row) => row.id,
-    ),
-  );
+  const ids = new Set((designFootings.run(before, {}).data as { footings: FootingDesignRow[] }).footings.map((row) => row.id));
   return footingsOf(after).filter((footing) => ids.has(footing.id));
 };
 
@@ -61,9 +55,7 @@ describe('design_footings', () => {
     expect(result.affected.length).toBeGreaterThan(0);
     expect(result.summary).toMatch(/Designed \d+ of \d+ footing\(s\) on level/);
     expect(result.summary).toMatch(/F\d+ H12 @ 150 \(As \d+ ≤ \d+ mm²\/m, shear [\d.]+, punching/);
-    expect(result.summary).toMatch(
-      /Max shear [\d.]+, max punching [\d.]+; \d+ footing\(s\) changed/,
-    );
+    expect(result.summary).toMatch(/Max shear [\d.]+, max punching [\d.]+; \d+ footing\(s\) changed/);
     // Re-running is idempotent.
     const again = designFootings.run(result.document, { windPressure: 0.7 });
     expect(again.affected).toEqual([]);
@@ -78,11 +70,8 @@ describe('design_footings', () => {
     const heavyRows = (heavyResult.data as { footings: FootingDesignRow[] }).footings;
     expect(heavyRows.every((row) => row.status === 'designed')).toBe(true);
     expect(steelMass(heavyResult.document)).toBeGreaterThan(steelMass(lightResult.document));
-    const governing = (rows: FootingDesignRow[]): number =>
-      Math.max(...rows.map((row) => row.asRequired));
-    expect(governing(heavyRows)).toBeGreaterThan(
-      governing((lightResult.data as { footings: FootingDesignRow[] }).footings),
-    );
+    const governing = (rows: FootingDesignRow[]): number => Math.max(...rows.map((row) => row.asRequired));
+    expect(governing(heavyRows)).toBeGreaterThan(governing((lightResult.data as { footings: FootingDesignRow[] }).footings));
   });
 
   it('grows a thin pad (plan and thickness) until shear and punching pass', () => {
@@ -97,9 +86,7 @@ describe('design_footings', () => {
       expect(footing.topOffset).toBe(footingsOf(thin)[0]?.topOffset);
     }
     expect(result.summary).toMatch(/F\d+ 2500×2500×150 → \d+×\d+×\d+ H\d+ @ \d+/);
-    expect(analysedFootings(thin, result.document).every((footing) => footing.reinforcement)).toBe(
-      true,
-    );
+    expect(analysedFootings(thin, result.document).every((footing) => footing.reinforcement)).toBe(true);
   });
 
   it('keeps the aspect ratio of a rectangular pad and never shrinks it', () => {
@@ -147,9 +134,9 @@ describe('design_footings', () => {
     expect(shrunk.summary).toMatch(/F\d+ 5000×5000×1000 → \d+×\d+×\d+/);
     const again = designFootings.run(shrunk.document, { allowShrink: true });
     expect(again.affected).toEqual([]);
-    const rows = (
-      foundationCheck.run(shrunk.document, {}).data as { rows: FoundationRow[] }
-    ).rows.filter((row) => footingsOf(shrunk.document).some((f) => f.id === row.elementId));
+    const rows = (foundationCheck.run(shrunk.document, {}).data as { rows: FoundationRow[] }).rows.filter((row) =>
+      footingsOf(shrunk.document).some((f) => f.id === row.elementId),
+    );
     expect(Math.max(...rows.map((row) => row.utilisation))).toBeLessThanOrEqual(1);
   });
 
@@ -169,9 +156,9 @@ describe('design_footings', () => {
     const clayRows = (withClay.data as { footings: FootingDesignRow[] }).footings;
     const designedIds = clayRows.filter((row) => row.status === 'designed').map((row) => row.id);
     expect(designedIds.length).toBeGreaterThan(0);
-    const checked = (
-      foundationCheck.run(withClay.document, { clayLayer: clay }).data as { rows: FoundationRow[] }
-    ).rows.filter((row) => designedIds.includes(row.elementId));
+    const checked = (foundationCheck.run(withClay.document, { clayLayer: clay }).data as { rows: FoundationRow[] }).rows.filter((row) =>
+      designedIds.includes(row.elementId),
+    );
     expect(Math.max(...checked.map((row) => row.utilisation))).toBeLessThanOrEqual(1);
     expect(size({ clayLayer: clay })).toBeGreaterThan(baseline);
     for (const params of [
@@ -211,9 +198,7 @@ describe('design_footings', () => {
       expect(result.data).toBeUndefined();
       expect(result.summary).toContain('design_footings failed');
     }
-    expect(designFootings.run(createEmptyDocument(), {}).summary).toContain(
-      'design_footings failed',
-    );
+    expect(designFootings.run(createEmptyDocument(), {}).summary).toContain('design_footings failed');
     const bare = hall({ footings: false });
     expect(designFootings.run(bare, {}).summary).toContain('no portal frame column with a footing');
   });
@@ -250,10 +235,9 @@ describe('punching perimeters and bending limit', () => {
       expect(row.punchingDistance).toBeGreaterThan(0);
       expect(row.punchingDistance).toBeLessThan(2 * effective);
     }
-    const mat = designMat(
-      { widthMm: 1500, lengthMm: 1500, thicknessMm: 300, faceXmm: 300, faceYmm: 300, leverM: 0.5 },
-      [{ combination: 'x', normal: 500, moment: 0 }],
-    ).chosen;
+    const mat = designMat({ widthMm: 1500, lengthMm: 1500, thicknessMm: 300, faceXmm: 300, faceYmm: 300, leverM: 0.5 }, [
+      { combination: 'x', normal: 500, moment: 0 },
+    ]).chosen;
     // Closer perimeters (a < 2d) carry the enhanced vRd,c·2d/a but a shorter perimeter: they govern.
     expect(mat?.punchingDistance).toBeGreaterThan(0);
     expect(mat?.punchingDistance).toBeLessThan(2 * (300 - 50 - (mat?.diameter ?? 0)));
@@ -275,10 +259,9 @@ describe('punching perimeters and bending limit', () => {
     );
     expect(result.chosen).toBeNull();
     expect(result.bendingLimited).toBe(true);
-    const thin = designMat(
-      { widthMm: 1500, lengthMm: 1500, thicknessMm: 150, faceXmm: 300, faceYmm: 300, leverM: 0.5 },
-      [{ combination: 'x', normal: 2000, moment: 0 }],
-    );
+    const thin = designMat({ widthMm: 1500, lengthMm: 1500, thicknessMm: 150, faceXmm: 300, faceYmm: 300, leverM: 0.5 }, [
+      { combination: 'x', normal: 2000, moment: 0 },
+    ]);
     expect(thin.chosen).toBeNull();
     expect(thin.bendingLimited).toBe(false);
   });
@@ -331,9 +314,7 @@ describe('check_foundations settlement', () => {
   it('settles less in stiffer soil and rejects a bad soilModulus', () => {
     const doc = hall();
     const soft = rowsOf(doc, { soilModulus: 5 }).find((row) => row.check.startsWith('settlement'));
-    const stiff = rowsOf(doc, { soilModulus: 50 }).find((row) =>
-      row.check.startsWith('settlement'),
-    );
+    const stiff = rowsOf(doc, { soilModulus: 50 }).find((row) => row.check.startsWith('settlement'));
     expect(soft?.value).toBeGreaterThan(stiff?.value ?? Infinity);
     expect((soft?.value ?? 0) / (stiff?.value ?? 1)).toBeCloseTo(10, 6);
     expect(rowsOf(doc, { soilModulus: 1 }).some((row) => row.utilisation > 1)).toBe(true);

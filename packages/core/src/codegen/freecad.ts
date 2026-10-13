@@ -8,13 +8,7 @@
 
 import type { Feature, FeatureProgram } from './program';
 import { commentText, formatNumber, provenance, quote, sectionBanner } from './format';
-import {
-  modifierLine,
-  parametersAndModel,
-  placementKwargs,
-  pythonTuple,
-  shapeCallOpen,
-} from './pythonCalls';
+import { modifierLine, parametersAndModel, placementKwargs, pythonTuple, shapeCallOpen } from './pythonCalls';
 import { FREECAD_SUBDIVISION_PY, SUBDIVISION_PY } from './pythonSubdivision';
 
 const HELPERS = String.raw`
@@ -194,12 +188,6 @@ export function emitFreeCad(program: FeatureProgram): string {
     const name = output.name ?? `solid_${i + 1}`;
     lines.push(`show(${output.variable}, ${quote(name)}, ${quote(output.color)})`);
   });
-  lines.push(
-    'doc.recompute()',
-    'if App.GuiUp:',
-    '    import FreeCADGui',
-    '    FreeCADGui.SendMsgToActiveView("ViewFit")',
-    '',
-  );
+  lines.push('doc.recompute()', 'if App.GuiUp:', '    import FreeCADGui', '    FreeCADGui.SendMsgToActiveView("ViewFit")', '');
   return lines.join('\n');
 }

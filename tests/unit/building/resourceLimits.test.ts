@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 
-const many = <T>(count: number, make: (index: number) => T): T[] =>
-  Array.from({ length: count }, (_, index) => make(index));
+const many = <T>(count: number, make: (index: number) => T): T[] => Array.from({ length: count }, (_, index) => make(index));
 
 const expectRefused = (doc: CadDocument, name: string, params: Record<string, unknown>): string => {
   const result = execute(doc, name, params);
@@ -30,9 +29,7 @@ describe('resource limits: generators refuse bombs with a clear summary', () => 
 
   it('draw_walls caps the outline at 500 points', () => {
     const points = many(501, (index) => [index * 100, (index % 2) * 100]);
-    expect(expectRefused(createEmptyDocument(), 'draw_walls', { points })).toMatch(
-      /at most 500 points per call \(got 501\)/,
-    );
+    expect(expectRefused(createEmptyDocument(), 'draw_walls', { points })).toMatch(/at most 500 points per call \(got 501\)/);
   });
 
   it('add_pipe_run and add_cable_tray cap a run at 1000 points', () => {
@@ -49,9 +46,7 @@ describe('resource limits: generators refuse bombs with a clear summary', () => 
         return [Math.cos(angle) * 5000, Math.sin(angle) * 5000, 3000];
       });
     const doc = createEmptyDocument();
-    expect(expectRefused(doc, 'add_panel', { corners: circle(501) })).toMatch(
-      /at most 500 corners \(got 501\)/,
-    );
+    expect(expectRefused(doc, 'add_panel', { corners: circle(501) })).toMatch(/at most 500 corners \(got 501\)/);
     expect(execute(doc, 'add_panel', { corners: circle(500) }).affected.length).toBeGreaterThan(0);
   });
 
@@ -67,9 +62,7 @@ describe('resource limits: generators refuse bombs with a clear summary', () => 
       /would put over 500 supports on .* use a larger spacing/,
     );
     const at = many(501, (index) => [index * 100, 0, 1000]);
-    expect(expectRefused(doc, 'add_pipe_support', { pipeId: 'pipe-1', at })).toMatch(
-      /at most 500 points per call \(got 501\)/,
-    );
+    expect(expectRefused(doc, 'add_pipe_support', { pipeId: 'pipe-1', at })).toMatch(/at most 500 points per call \(got 501\)/);
     doc = execute(doc, 'add_steel_member', {
       profile: 'IPE300',
       role: 'beam',

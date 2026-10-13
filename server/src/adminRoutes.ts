@@ -55,10 +55,7 @@ export function buildAdminRouter(restLimiter: RequestHandler): Router {
     const entries = readAudit({
       ...(typeof since === 'string' ? { since } : {}),
       ...(typeof user === 'string' && user !== '' ? { user } : {}),
-      limit: Math.min(
-        Number.isFinite(requested) && requested > 0 ? requested : 100,
-        MAX_AUDIT_LIMIT,
-      ),
+      limit: Math.min(Number.isFinite(requested) && requested > 0 ? requested : 100, MAX_AUDIT_LIMIT),
     });
     res.status(200).json({ count: entries.length, entries });
   });

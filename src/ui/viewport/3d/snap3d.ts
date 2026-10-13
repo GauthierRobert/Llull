@@ -64,12 +64,8 @@ function aabbSnapPoints({ min, max }: AABB): SnapPoint3D[] {
     for (const [axis, side] of moves) p[axis] = side[axis] ?? 0;
     return p;
   };
-  const corners = sides.flatMap((zs) =>
-    sides.flatMap((ys) => sides.map((xs) => point([xs[0], ys[1], zs[2]], 'vertex'))),
-  );
-  const faces = [0, 1, 2].flatMap((axis) =>
-    sides.map((side) => point(onSides([[axis, side]]), 'face-center')),
-  );
+  const corners = sides.flatMap((zs) => sides.flatMap((ys) => sides.map((xs) => point([xs[0], ys[1], zs[2]], 'vertex'))));
+  const faces = [0, 1, 2].flatMap((axis) => sides.map((side) => point(onSides([[axis, side]]), 'face-center')));
   const edges = [0, 1, 2].flatMap((axis) => {
     const [a = 0, b = 0] = [0, 1, 2].filter((other) => other !== axis);
     return sides.flatMap((bSide) =>
@@ -134,10 +130,7 @@ function sphereSnapPoints(entity: Entity & { kind: 'sphere' }): SnapPoint3D[] {
  * @pure deterministic, no side effects
  * @invariant Returns [] when document has no 3D entities (or only the excluded one).
  */
-export function collectSnapCandidates3D(
-  document: CadDocument,
-  excludeId: string | undefined,
-): SnapPoint3D[] {
+export function collectSnapCandidates3D(document: CadDocument, excludeId: string | undefined): SnapPoint3D[] {
   const candidates: SnapPoint3D[] = [];
 
   for (const id of document.order) {

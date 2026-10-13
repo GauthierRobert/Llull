@@ -30,18 +30,14 @@ export function resolveStepForReplay(
   if (step.name === 'build_project') return remapIds(step.params, idMap);
   const { resolved, errors } = resolveStepParams(step.params, buildParamEnv(doc.parameters));
   for (const e of errors) {
-    warnings?.push(
-      `${warningLabel} '${step.name}' param '${e.path}': ${e.expression} — ${e.reason}`,
-    );
+    warnings?.push(`${warningLabel} '${step.name}' param '${e.path}': ${e.expression} — ${e.reason}`);
   }
   return remapIds(resolved, idMap);
 }
 
 /** Summary suffix listing the `warnings` collected by `resolveStepForReplay`; empty when none. */
 export function unresolvedExpressionsNote(warnings: readonly string[]): string {
-  return warnings.length > 0
-    ? ` Unresolved expressions (${warnings.length}): ${warnings.join('; ')}.`
-    : '';
+  return warnings.length > 0 ? ` Unresolved expressions (${warnings.length}): ${warnings.join('; ')}.` : '';
 }
 
 /**

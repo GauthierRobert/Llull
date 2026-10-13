@@ -27,9 +27,7 @@ export interface FormField {
 /** Raw text per field name, as typed by the user. Empty string = not provided. */
 export type FormValues = Readonly<Record<string, string>>;
 
-type ParseResult =
-  | { ok: true; params: Record<string, unknown> }
-  | { ok: false; errors: Readonly<Record<string, string>> };
+type ParseResult = { ok: true; params: Record<string, unknown> } | { ok: false; errors: Readonly<Record<string, string>> };
 
 /** `add_box` -> "Add box"; `entityId` -> "Entity id". */
 export function humanizeName(name: string): string {
@@ -51,8 +49,7 @@ function fieldKind(spec: ParamSpec): FieldKind {
   if (spec.type === 'string') return 'text';
   if (spec.type === 'boolean') return 'boolean';
   if (spec.type === 'array' && isNumeric(spec.items?.type)) return 'numberList';
-  if (spec.type === 'array' && spec.items?.type === 'string' && spec.items.enum === undefined)
-    return 'textList';
+  if (spec.type === 'array' && spec.items?.type === 'string' && spec.items.enum === undefined) return 'textList';
   return 'json';
 }
 
@@ -87,10 +84,7 @@ function selectedIdFor(name: string, selection: readonly EntityId[]): EntityId |
  * Pre-fill entity-id fields from the current selection so "select, then run" just works; required
  * enums / booleans start on the value their select shows (first option / `true`).
  */
-export function initialValues(
-  fields: readonly FormField[],
-  selection: readonly EntityId[],
-): FormValues {
+export function initialValues(fields: readonly FormField[], selection: readonly EntityId[]): FormValues {
   const values: Record<string, string> = {};
   for (const field of fields) {
     const selectedId = field.kind === 'text' ? selectedIdFor(field.name, selection) : undefined;
@@ -116,10 +110,7 @@ export function initialValues(
 export function matchTypeahead(options: readonly string[], query: string): string | undefined {
   const needle = query.toLowerCase();
   if (needle === '') return undefined;
-  return (
-    options.find((option) => option.toLowerCase() === needle) ??
-    options.find((option) => option.toLowerCase().startsWith(needle))
-  );
+  return options.find((option) => option.toLowerCase() === needle) ?? options.find((option) => option.toLowerCase().startsWith(needle));
 }
 
 /** Text for one existing param value, the inverse of `parseField`; unusable values become blank. */
@@ -141,13 +132,8 @@ function formatParam(field: FormField, value: unknown): string {
 }
 
 /** Pre-fill the form from an existing params object (editing a recorded step). @pure */
-export function valuesFromParams(
-  fields: readonly FormField[],
-  params: Readonly<Record<string, unknown>>,
-): FormValues {
-  return Object.fromEntries(
-    fields.map((field) => [field.name, formatParam(field, params[field.name])]),
-  );
+export function valuesFromParams(fields: readonly FormField[], params: Readonly<Record<string, unknown>>): FormValues {
+  return Object.fromEntries(fields.map((field) => [field.name, formatParam(field, params[field.name])]));
 }
 
 function splitList(raw: string): string[] {

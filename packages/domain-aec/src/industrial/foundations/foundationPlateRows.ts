@@ -12,14 +12,7 @@ import type { BaseReaction } from '../frames/frameModelSolve';
 import { anchorBoltResistance, yieldStrength } from '../steelDesign/steelDesign';
 import { BEARING_STRENGTH, checkPlateMN } from '../connections/basePlateMN';
 import { type FoundationRow, MAX_UTILISATION } from './foundationModel';
-import {
-  type Candidate,
-  combine,
-  hasCase,
-  plateDemands,
-  ultimateCombinations,
-  worst,
-} from './foundationCombinations';
+import { type Candidate, combine, hasCase, plateDemands, ultimateCombinations, worst } from './foundationCombinations';
 import { rowOf } from './foundationRows';
 
 export function plateRows(
@@ -79,13 +72,7 @@ export function plateRows(
   }
   const tensionWorst = worst(tension);
   if (wind && tensionWorst) {
-    rows.push(
-      row(
-        `anchor tension Ft,Rd M${Math.round(toMm(plate.boltDiameter))} 8.8`,
-        tensionWorst,
-        'kN/bolt',
-      ),
-    );
+    rows.push(row(`anchor tension Ft,Rd M${Math.round(toMm(plate.boltDiameter))} 8.8`, tensionWorst, 'kN/bolt'));
   }
   const interactionWorst = worst(interaction);
   if (interactionWorst) {
@@ -103,18 +90,16 @@ export function plateRows(
       columnDepth: profile.h,
     };
     const fy = yieldStrength(plate.material);
-    const moments: Array<Candidate & { detail: string }> = plateDemands(reaction, wind).map(
-      (demand) => {
-        const verdict = checkPlateMN(geometry, demand.normal, demand.moment, fy);
-        return {
-          value: verdict.boltTension,
-          limit: verdict.boltLimit,
-          combination: demand.combination,
-          utilisation: verdict.utilisation,
-          detail: `N ${demand.normal.toFixed(0)} kN, M ${demand.moment.toFixed(0)} kNm: ${verdict.check}`,
-        };
-      },
-    );
+    const moments: Array<Candidate & { detail: string }> = plateDemands(reaction, wind).map((demand) => {
+      const verdict = checkPlateMN(geometry, demand.normal, demand.moment, fy);
+      return {
+        value: verdict.boltTension,
+        limit: verdict.boltLimit,
+        combination: demand.combination,
+        utilisation: verdict.utilisation,
+        detail: `N ${demand.normal.toFixed(0)} kN, M ${demand.moment.toFixed(0)} kNm: ${verdict.check}`,
+      };
+    });
     const momentWorst = worst(moments);
     if (momentWorst) {
       rows.push(row(`base plate M+N (${momentWorst.detail})`, momentWorst, 'kN/bolt'));

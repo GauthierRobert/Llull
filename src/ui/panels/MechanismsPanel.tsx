@@ -12,13 +12,7 @@ import React from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore, useViewportStore } from '@ui/store';
 import type { Constraint, Joint, DriveRelation } from '@core/model/types';
-import {
-  PanelEmpty,
-  PanelHeader,
-  PanelSection,
-  IconButton,
-  DeleteButton,
-} from '@ui/panels/PanelParts';
+import { PanelEmpty, PanelHeader, PanelSection, IconButton, DeleteButton } from '@ui/panels/PanelParts';
 import { CommitInput } from '@ui/panels/propertyFields';
 import { orderedValues } from '@ui/panels/orderedValues';
 import { parseNumber } from '@ui/numberText';
@@ -40,10 +34,7 @@ const JOINT_CHIP_TONE: Record<string, ChipTone> = {
 };
 
 const mechanismRowClass = (highlighted: boolean): string =>
-  classNames(
-    'panel__row panel__row--overlay-actions mechanisms-row',
-    highlighted && 'panel__row--selected mechanisms-row--highlighted',
-  );
+  classNames('panel__row panel__row--overlay-actions mechanisms-row', highlighted && 'panel__row--selected mechanisms-row--highlighted');
 
 /** Format an EntityRef for display: "entityId[:kind]". */
 function fmtEntityRef(ref: Constraint['a'] | Constraint['b']): string {
@@ -107,11 +98,7 @@ interface ConstraintRowProps {
   onHighlight: (id: string) => void;
 }
 
-function ConstraintRow({
-  constraint,
-  highlighted,
-  onHighlight,
-}: ConstraintRowProps): React.ReactElement {
+function ConstraintRow({ constraint, highlighted, onHighlight }: ConstraintRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
 
   const chipTone = CONSTRAINT_CHIP_TONE[constraint.kind] ?? 'accent';
@@ -234,10 +221,7 @@ interface DriveRelationRowProps {
 function DriveRelationRow({ relation }: DriveRelationRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
 
-  const offsetLabel =
-    relation.offset !== undefined && relation.offset !== 0
-      ? ` + ${relation.offset.toFixed(3)}`
-      : '';
+  const offsetLabel = relation.offset !== undefined && relation.offset !== 0 ? ` + ${relation.offset.toFixed(3)}` : '';
 
   return (
     <MechanismRow
@@ -273,21 +257,10 @@ interface MechanismSectionProps {
   rows: ReadonlyArray<React.ReactElement>;
 }
 
-function MechanismSection({
-  title,
-  testId,
-  listLabel,
-  rows,
-}: MechanismSectionProps): React.ReactElement {
+function MechanismSection({ title, testId, listLabel, rows }: MechanismSectionProps): React.ReactElement {
   const noun = title.toLowerCase();
   return (
-    <PanelSection
-      collapsible
-      title={title}
-      count={rows.length}
-      countLabel={`${rows.length} ${noun}`}
-      testId={testId}
-    >
+    <PanelSection collapsible title={title} count={rows.length} countLabel={`${rows.length} ${noun}`} testId={testId}>
       {rows.length === 0 ? (
         <PanelEmpty compact icon="mechanism" message={`No ${noun} defined.`} />
       ) : (
@@ -342,12 +315,7 @@ export function MechanismsPanel({ className }: MechanismsPanelProps): React.Reac
         testId="mechanisms-section-joints"
         listLabel="Joint list"
         rows={orderedValues(jointOrder, joints).map((joint) => (
-          <JointRow
-            key={joint.id}
-            joint={joint}
-            highlighted={isHighlighted('joint', joint.id)}
-            onHighlight={highlight('joint')}
-          />
+          <JointRow key={joint.id} joint={joint} highlighted={isHighlighted('joint', joint.id)} onHighlight={highlight('joint')} />
         ))}
       />
       <MechanismSection

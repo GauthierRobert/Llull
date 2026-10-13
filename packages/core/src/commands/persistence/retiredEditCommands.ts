@@ -27,10 +27,7 @@ const singleId = (id: unknown): unknown[] => (id === undefined ? [] : [id]);
 function polylineLength(path: unknown): number | null {
   if (!Array.isArray(path) || !path.every(isVec3)) return null;
   const points: Vec3[] = path;
-  return points.reduce(
-    (total, point, i) => total + (i === 0 ? 0 : distance3(point, points[i - 1] ?? point)),
-    0,
-  );
+  return points.reduce((total, point, i) => total + (i === 0 ? 0 : distance3(point, points[i - 1] ?? point)), 0);
 }
 
 export const RETIRED_EDIT_COMMANDS: Readonly<Record<string, RetiredCommandRewrite>> = {
@@ -63,10 +60,7 @@ export const RETIRED_EDIT_COMMANDS: Readonly<Record<string, RetiredCommandRewrit
    * at rotation [0, 0, 0] relative to the old result.
    */
   distribute_on_arc: ({ sourceId, center, normal, radius, startAngle, endAngle, count }) => {
-    const sweep =
-      typeof startAngle === 'number' && typeof endAngle === 'number'
-        ? Math.abs(endAngle - startAngle)
-        : null;
+    const sweep = typeof startAngle === 'number' && typeof endAngle === 'number' ? Math.abs(endAngle - startAngle) : null;
     const half = typeof radius === 'number' && sweep !== null ? (radius * sweep) / 2 : undefined;
     return call('pattern_along_path', {
       sourceId,

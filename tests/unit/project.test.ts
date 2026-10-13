@@ -172,10 +172,9 @@ describe('build_project — continue mode', () => {
   });
 
   it('continues past an unknown command and a malformed action', () => {
-    const { result, data } = build(
-      [{ command: 'nope', params: {} }, 42, { command: 'add_box', params: { size: [1, 1, 1] } }],
-      { onError: 'continue' },
-    );
+    const { result, data } = build([{ command: 'nope', params: {} }, 42, { command: 'add_box', params: { size: [1, 1, 1] } }], {
+      onError: 'continue',
+    });
     expect(data.steps.map((s) => s.ok)).toEqual([false, false, true]);
     expect(result.document.order).toHaveLength(1);
   });

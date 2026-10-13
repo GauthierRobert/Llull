@@ -15,23 +15,9 @@ import { regenerateBuilding } from '../../building/evaluate/evaluateElements';
 import { toVec3 } from '../common/memberSupport';
 import { modelUnits, collectSteelBars } from '../steelDesign/steelMemberBars';
 import { nearestOnRoute, pointAtArc, routeLength } from './routeSupport';
-import {
-  SAME_SUPPORT_DISTANCE,
-  endCarriers,
-  pipeRunsOf,
-  supportStations,
-  supportsOfPipe,
-  type PipeRun,
-} from './pipeSupportLayout';
+import { SAME_SUPPORT_DISTANCE, endCarriers, pipeRunsOf, supportStations, supportsOfPipe, type PipeRun } from './pipeSupportLayout';
 import { autoSupportArcs, isPlaceable } from './pipeSupportPlacement';
-import {
-  PLAN_TOLERANCE,
-  REACH,
-  attachmentFields,
-  clean,
-  isRiserPoint,
-  resolveBearing,
-} from './pipeSupportAttach';
+import { PLAN_TOLERANCE, REACH, attachmentFields, clean, isRiserPoint, resolveBearing } from './pipeSupportAttach';
 
 const SUPPORT_TYPES = ['shoe', 'hanger', 'guide', 'anchor'] as const;
 const SNAP_DISTANCE = 500;
@@ -70,18 +56,8 @@ export const addPipeSupport = defineCommand({
     "(the edit command's summary lists which). Marks PS1, PS2… " +
     'data.supports lists { id, mark, pipeId, type, position (level-relative), memberId, rodLength, standoff (riser bracket length) }.',
   params: z.object({
-    pipeId: z
-      .string()
-      .optional()
-      .describe(
-        'Element id of the pipe, e.g. "pipe-3" (from add_pipe_run data.elementId). Or use `line`.',
-      ),
-    line: z
-      .string()
-      .optional()
-      .describe(
-        'Line number of the pipe(s), e.g. "L-101" (the `line` given to add_pipe_run). Or use `pipeId`.',
-      ),
+    pipeId: z.string().optional().describe('Element id of the pipe, e.g. "pipe-3" (from add_pipe_run data.elementId). Or use `line`.'),
+    line: z.string().optional().describe('Line number of the pipe(s), e.g. "L-101" (the `line` given to add_pipe_run). Or use `pipeId`.'),
     at: z
       .array(z.array(z.number()))
       .optional()
@@ -128,17 +104,13 @@ export const addPipeSupport = defineCommand({
     snapDistance: z
       .number()
       .optional()
-      .describe(
-        'Largest distance from an `at` point to the pipe centreline, document units, > 0. Default 500 mm.',
-      ),
+      .describe('Largest distance from an `at` point to the pipe centreline, document units, > 0. Default 500 mm.'),
   }),
   run: (doc, params): CommandResult => {
     const { pipeId, line, at, spacing, memberId, type = 'shoe' } = params;
     const fail = (reason: string): CommandResult => noop(doc, `add_pipe_support failed: ${reason}`);
-    if ((pipeId === undefined) === (line === undefined))
-      return fail('give exactly one of pipeId or line.');
-    if ((at === undefined) === (spacing === undefined))
-      return fail('give exactly one of at (list of points) or spacing.');
+    if ((pipeId === undefined) === (line === undefined)) return fail('give exactly one of pipeId or line.');
+    if ((at === undefined) === (spacing === undefined)) return fail('give exactly one of at (list of points) or spacing.');
     const below = type !== 'hanger';
     const unit = fromMm(doc, 1);
     const limits = {
@@ -153,21 +125,13 @@ export const addPipeSupport = defineCommand({
     const { building } = units;
     const runs = pipeRunsOf(units);
     const targets =
-      pipeId !== undefined
-        ? runs.filter((run) => run.element.id === pipeId)
-        : runs.filter((run) => run.element.line === line?.trim());
+      pipeId !== undefined ? runs.filter((run) => run.element.id === pipeId) : runs.filter((run) => run.element.line === line?.trim());
     if (targets.length === 0) {
-      return fail(
-        pipeId !== undefined
-          ? `'${pipeId}' is not a pipe element (add_pipe_run).`
-          : `no pipe carries line '${line ?? ''}'.`,
-      );
+      return fail(pipeId !== undefined ? `'${pipeId}' is not a pipe element (add_pipe_run).` : `no pipe carries line '${line ?? ''}'.`);
     }
     if (spacing !== undefined) {
       const spacingMm = spacing / unit;
-      const crowded = targets.find(
-        (run) => routeLength(run.points) / spacingMm > MAX_SUPPORTS_PER_RUN,
-      );
+      const crowded = targets.find((run) => routeLength(run.points) / spacingMm > MAX_SUPPORTS_PER_RUN);
       if (crowded) {
         return fail(
           `spacing ${spacing} ${doc.units} would put over ${MAX_SUPPORTS_PER_RUN} supports on ${crowded.element.mark} (${Math.round(routeLength(crowded.points) / spacingMm)}); use a larger spacing.`,
@@ -178,8 +142,7 @@ export const addPipeSupport = defineCommand({
       return fail(`give at most ${MAX_SUPPORTS_PER_RUN} points per call (got ${at.length}).`);
     const bars = collectSteelBars(doc);
     const explicit = memberId === undefined ? undefined : bars.find((bar) => bar.id === memberId);
-    if (memberId !== undefined && !explicit)
-      return fail(`memberId '${memberId}' is not a steel member.`);
+    if (memberId !== undefined && !explicit) return fail(`memberId '${memberId}' is not a steel member.`);
     const wanted: Array<{ run: PipeRun; arc: number }> = [];
     const skipped: string[] = [];
     if (at !== undefined) {
@@ -200,33 +163,20 @@ export const addPipeSupport = defineCommand({
             `point [${raw.join(', ')}] is ${best ? Math.round(best.snap.distance * unit * 1000) / 1000 : '?'} from the pipe(s) (snapDistance ${params.snapDistance ?? fromMm(doc, SNAP_DISTANCE)})`,
           );
         } else if (type === 'hanger' && !isPlaceable(best.run, best.snap.arc)) {
-          skipped.push(
-            `point [${raw.join(', ')}] is on a riser (steep segment): a hanger cannot hang there, use a guide, shoe or anchor`,
-          );
+          skipped.push(`point [${raw.join(', ')}] is on a riser (steep segment): a hanger cannot hang there, use a guide, shoe or anchor`);
         } else wanted.push({ run: best.run, arc: best.snap.arc });
       }
     } else {
       for (const run of targets) {
-        const existing = supportStations(units, run, supportsOfPipe(units, run.element.id)).map(
-          (station) => station.arc,
-        );
-        const arcs = autoSupportArcs(
-          run,
-          endCarriers(units, run, runs),
-          existing,
-          (spacing as number) / unit,
-        );
+        const existing = supportStations(units, run, supportsOfPipe(units, run.element.id)).map((station) => station.arc);
+        const arcs = autoSupportArcs(run, endCarriers(units, run, runs), existing, (spacing as number) / unit);
         for (const arc of arcs) wanted.push({ run, arc });
       }
     }
     let next = building;
     const created: PipeSupportElement[] = [];
     for (const { run, arc } of wanted) {
-      const placed = supportStations(
-        units,
-        run,
-        supportsOfPipe({ ...units, building: next }, run.element.id),
-      );
+      const placed = supportStations(units, run, supportsOfPipe({ ...units, building: next }, run.element.id));
       if (placed.some((station) => Math.abs(station.arc - arc) < SAME_SUPPORT_DISTANCE)) {
         skipped.push(`${run.element.mark} at ${Math.round(arc)} mm: a support is already there`);
         continue;
@@ -255,16 +205,12 @@ export const addPipeSupport = defineCommand({
       created.push(support);
     }
     if (created.length === 0) {
-      return fail(
-        `no support could be placed${skipped.length > 0 ? ` (${skipped.join('; ')})` : ''}.`,
-      );
+      return fail(`no support could be placed${skipped.length > 0 ? ` (${skipped.join('; ')})` : ''}.`);
     }
     const document = regenerateBuilding(doc, next);
     const unattached = created.filter((support) => support.memberId === null);
     const marks = created.map((support) => support.mark);
-    const pipeMarks = [
-      ...new Set(created.map((support) => building.elements[support.pipeId]?.mark)),
-    ];
+    const pipeMarks = [...new Set(created.map((support) => building.elements[support.pipeId]?.mark))];
     return {
       document,
       summary:

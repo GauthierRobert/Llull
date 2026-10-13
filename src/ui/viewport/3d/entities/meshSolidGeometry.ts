@@ -27,9 +27,7 @@ export function buildMeshSolidGeometry(mesh: MeshData): THREE.BufferGeometry {
 }
 
 /** @pure — creased geometry for a triangle soup; null when there are no triangles. */
-export function buildTriangleSoupGeometry(
-  triangles: readonly Triangle[],
-): THREE.BufferGeometry | null {
+export function buildTriangleSoupGeometry(triangles: readonly Triangle[]): THREE.BufferGeometry | null {
   const positions = triangles.flat(2);
   if (positions.length === 0) return null;
   return buildMeshSolidGeometry({ positions, indices: soupIndices(positions) });

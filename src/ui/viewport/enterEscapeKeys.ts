@@ -6,10 +6,7 @@
 
 import type { KeyboardEvent } from 'react';
 
-export function enterEscapeKeys(handlers: {
-  onEnter?: () => void;
-  onEscape?: () => void;
-}): (event: KeyboardEvent) => void {
+export function enterEscapeKeys(handlers: { onEnter?: () => void; onEscape?: () => void }): (event: KeyboardEvent) => void {
   return (event) => {
     if (event.key === 'Enter' && handlers.onEnter) {
       event.preventDefault();

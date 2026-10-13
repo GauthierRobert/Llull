@@ -28,8 +28,7 @@ export interface NamedUser {
 /** JSON body of every 401 (REST mutation guard, `/mcp` bearer auth, named-user guard). */
 export const UNAUTHORIZED_BODY = { error: 'Unauthorized — valid Bearer token required.' };
 
-export const sha256Hex = (value: string): string =>
-  crypto.createHash('sha256').update(value).digest('hex');
+export const sha256Hex = (value: string): string => crypto.createHash('sha256').update(value).digest('hex');
 
 /** The digest bytes of `value` (compared with `timingSafeEqual`: no length leak). */
 export const sha256Digest = (value: string): Buffer => Buffer.from(sha256Hex(value), 'hex');
@@ -95,9 +94,7 @@ export function loadUsers(): readonly NamedUser[] {
 
 /** Ids allowed to log in under the license seat count (admins first, then file order). */
 export function licensedUserIds(users: readonly NamedUser[], seats: number): Set<string> {
-  const ordered = [...users].sort(
-    (a, b) => Number(b.role === 'admin') - Number(a.role === 'admin'),
-  );
+  const ordered = [...users].sort((a, b) => Number(b.role === 'admin') - Number(a.role === 'admin'));
   return new Set(ordered.slice(0, seats).map((user) => user.id));
 }
 

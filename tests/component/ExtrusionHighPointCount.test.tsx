@@ -26,12 +26,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { useStore } from '@ui/store';
 import { type ExtrusionEntity } from '@core/model/types';
-import {
-  type DispatchedEntity,
-  dispatchEntity,
-  resetStore,
-  shapeFromProfile,
-} from '../helpers/componentEntities';
+import { type DispatchedEntity, dispatchEntity, resetStore, shapeFromProfile } from '../helpers/componentEntities';
 
 // Helpers
 
@@ -91,10 +86,7 @@ function buildSyntheticGearProfile(
 
 // Geometry-level tests — THREE.ExtrudeGeometry on high-point-count concave profiles
 
-function extrudedVertexCount(
-  profile: ReadonlyArray<readonly [number, number]>,
-  depth: number,
-): number {
+function extrudedVertexCount(profile: ReadonlyArray<readonly [number, number]>, depth: number): number {
   const geo = new THREE.ExtrudeGeometry(shapeFromProfile(profile), { depth, bevelEnabled: false });
   const count = geo.attributes['position']?.count ?? 0;
   geo.dispose();

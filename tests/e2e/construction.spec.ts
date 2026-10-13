@@ -1,12 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import {
-  applyTool,
-  downloadText,
-  elementRows,
-  openBuilding,
-  openProjectFile,
-  status,
-} from './buildingHelpers';
+import { applyTool, downloadText, elementRows, openBuilding, openProjectFile, status } from './buildingHelpers';
 
 /**
  * End-to-end: a construction workflow in the real app (offline/local mode), one test per step
@@ -14,9 +7,7 @@ import {
  */
 
 /** Switches to 2D, arms the Wall tool and returns the canvas with its bounding box. */
-async function armWallTool(
-  page: Page,
-): Promise<{ canvas: ReturnType<Page['locator']>; box: { width: number; height: number } }> {
+async function armWallTool(page: Page): Promise<{ canvas: ReturnType<Page['locator']>; box: { width: number; height: number } }> {
   await page.getByRole('button', { name: '2D', exact: true }).click();
   await page.getByRole('button', { name: 'Wall', exact: true }).click();
   const canvas = page.locator('.viewport-2d-wrapper canvas');
@@ -75,24 +66,18 @@ test.describe('construction workflow', () => {
     await expect(elementRows(page, 'wall')).toHaveCount(6);
   });
 
-  test('S3 — the 2D Wall tool draws in document coordinates on a large building', async ({
-    page,
-  }) => {
+  test('S3 — the 2D Wall tool draws in document coordinates on a large building', async ({ page }) => {
     await openBuilding(page);
     await page.getByRole('button', { name: 'Starter office' }).click();
     const { canvas, box } = await armWallTool(page);
     await canvas.click({ position: { x: box.width * 0.45, y: box.height * 0.5 } });
     await canvas.click({ position: { x: box.width * 0.55, y: box.height * 0.5 } });
     await page.keyboard.press('Enter');
-    const saved = await downloadText(page, () =>
-      page.getByRole('button', { name: 'Save project to a JSON file' }).click(),
-    );
+    const saved = await downloadText(page, () => page.getByRole('button', { name: 'Save project to a JSON file' }).click());
     const document = JSON.parse(saved.text) as {
       document: { building: { elements: Record<string, { category: string; start?: number[] }> } };
     };
-    const walls = Object.entries(document.document.building.elements).filter(
-      ([, element]) => element.category === 'wall',
-    );
+    const walls = Object.entries(document.document.building.elements).filter(([, element]) => element.category === 'wall');
     const [, drawn] = walls[walls.length - 1]!;
     // The office spans 0…22500 × 0…12500 mm; the view is centred on it.
     expect(drawn.start![0]).toBeGreaterThan(5000);
@@ -166,15 +151,11 @@ test.describe('construction workflow', () => {
     await page.getByRole('button', { name: 'Set rate' }).click();
     await expect(page.getByTestId('estimate-total')).not.toContainText('0.00 EUR');
 
-    const takeoff = await downloadText(page, () =>
-      page.getByRole('button', { name: 'Takeoff CSV' }).click(),
-    );
+    const takeoff = await downloadText(page, () => page.getByRole('button', { name: 'Takeoff CSV' }).click());
     expect(takeoff.name).toBe('quantity-takeoff.csv');
     expect(takeoff.text).toContain('wall.masonry.m3');
     await page.getByLabel('Schedule').selectOption('door');
-    const schedule = await downloadText(page, () =>
-      page.getByRole('button', { name: 'Schedule CSV' }).click(),
-    );
+    const schedule = await downloadText(page, () => page.getByRole('button', { name: 'Schedule CSV' }).click());
     expect(schedule.text.split('\n')[1]).toMatch(/^D1,Ground floor,W1,900,2100,0,left,timber$/);
   });
 
@@ -184,24 +165,18 @@ test.describe('construction workflow', () => {
     await applyTool(page, 'door', { wallId: 'wall-1' });
     await applyTool(page, 'window', { wallId: 'wall-3' });
 
-    const dxf = await downloadText(page, () =>
-      page.getByRole('button', { name: 'DXF (AutoCAD)' }).click(),
-    );
+    const dxf = await downloadText(page, () => page.getByRole('button', { name: 'DXF (AutoCAD)' }).click());
     expect(dxf.name).toMatch(/\.dxf$/);
     expect(dxf.text.startsWith('0\nSECTION\n2\nHEADER')).toBe(true);
     expect(dxf.text).toContain('A-WALL');
 
     await page.getByLabel('Paper size').selectOption('A2');
     await page.getByLabel('Drawing scale').selectOption('50');
-    const sheet = await downloadText(page, () =>
-      page.getByRole('button', { name: 'Plan sheet' }).click(),
-    );
+    const sheet = await downloadText(page, () => page.getByRole('button', { name: 'Plan sheet' }).click());
     expect(sheet.name).toMatch(/_A2_1-50\.svg$/);
     expect(sheet.text).toContain('id="title-block"');
 
-    const ifc = await downloadText(page, () =>
-      page.getByRole('button', { name: 'IFC (BIM)' }).click(),
-    );
+    const ifc = await downloadText(page, () => page.getByRole('button', { name: 'IFC (BIM)' }).click());
     expect(ifc.text).toContain("FILE_SCHEMA(('IFC4'));");
     expect(ifc.text).toContain('IFCDOOR(');
     await expect(page.getByTestId('building-export-status')).toContainText('IFC4');
@@ -225,9 +200,7 @@ test.describe('construction workflow', () => {
   test('a building survives Save and Open', async ({ page }) => {
     await openBuilding(page);
     await page.getByRole('button', { name: 'Starter house' }).click();
-    const saved = await downloadText(page, () =>
-      page.getByRole('button', { name: 'Save project to a JSON file' }).click(),
-    );
+    const saved = await downloadText(page, () => page.getByRole('button', { name: 'Save project to a JSON file' }).click());
     expect(saved.text).toContain('"building"');
 
     await openBuilding(page);

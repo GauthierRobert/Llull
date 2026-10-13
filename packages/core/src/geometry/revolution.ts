@@ -16,13 +16,7 @@ export function revolutionAxisIndex(axis: Vec3): 0 | 1 | 2 {
 }
 
 type RevolutionProfile = ReadonlyArray<readonly [number, number]>;
-type RevolutionArgs = [
-  profile: RevolutionProfile,
-  axis: Vec3,
-  angle: number,
-  segments: number,
-  origin?: Vec3,
-];
+type RevolutionArgs = [profile: RevolutionProfile, axis: Vec3, angle: number, segments: number, origin?: Vec3];
 
 /**
  * @pure
@@ -31,9 +25,7 @@ type RevolutionArgs = [
  *   (partial sweep only, angle < 2*PI - 1e-6) start cap (reversed ring 0) and end cap (last ring)
  * @param origin added to every vertex (entity position); [0,0,0] for the local frame
  */
-export function revolutionPolygons(
-  ...[profile, axis, angle, segments, origin = [0, 0, 0]]: RevolutionArgs
-): Vec3[][] {
+export function revolutionPolygons(...[profile, axis, angle, segments, origin = [0, 0, 0]]: RevolutionArgs): Vec3[][] {
   if (profile.length < 3) return [];
   const [px, py, pz] = origin;
   const axial = revolutionAxisIndex(axis);
@@ -61,12 +53,7 @@ export function revolutionPolygons(
     const ringB = elementAt(rings, (s + 1) % ringCount);
     for (let i = 0; i < n; i++) {
       const j = (i + 1) % n;
-      polygons.push([
-        elementAt(ringA, i),
-        elementAt(ringA, j),
-        elementAt(ringB, j),
-        elementAt(ringB, i),
-      ]);
+      polygons.push([elementAt(ringA, i), elementAt(ringA, j), elementAt(ringB, j), elementAt(ringB, i)]);
     }
   }
   if (!isFull) {

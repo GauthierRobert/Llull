@@ -13,13 +13,8 @@ import { scale3 } from '../lib/vec3';
 import { scale2 } from '../lib/vec2';
 
 /** `{ curves }` scaled by `f` when the entity carries exact curves. */
-function scaledCurves(
-  e: { curves?: ReadonlyArray<CurveSegment<Vec2>> },
-  f: number,
-): { curves?: ReadonlyArray<CurveSegment<Vec2>> } {
-  return e.curves === undefined
-    ? {}
-    : { curves: e.curves.map((segment) => mapSegment(segment, (p: Vec2) => scale2(p, f))) };
+function scaledCurves(e: { curves?: ReadonlyArray<CurveSegment<Vec2>> }, f: number): { curves?: ReadonlyArray<CurveSegment<Vec2>> } {
+  return e.curves === undefined ? {} : { curves: e.curves.map((segment) => mapSegment(segment, (p: Vec2) => scale2(p, f))) };
 }
 
 function scaledSection(section: SweepSection, f: number): SweepSection {

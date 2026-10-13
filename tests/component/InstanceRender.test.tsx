@@ -25,13 +25,10 @@ function insertInstanceOf(
   entities: ReadonlyArray<readonly [string, unknown]>,
   instanceParams: Record<string, unknown> = {},
 ): { instanceId: string; instance: InstanceEntity; comp: Component } {
-  const entityIds = entities.map(
-    ([command, params]) => localDispatch(command, params).affected[0]!,
-  );
+  const entityIds = entities.map(([command, params]) => localDispatch(command, params).affected[0]!);
   localDispatch('create_component', { name, entityIds });
   const compId = Object.keys(useStore.getState().document.components)[0]!;
-  const instanceId = localDispatch('insert_instance', { componentId: compId, ...instanceParams })
-    .affected[0]!;
+  const instanceId = localDispatch('insert_instance', { componentId: compId, ...instanceParams }).affected[0]!;
   const { entities: all, components } = useStore.getState().document;
   return { instanceId, instance: all[instanceId] as InstanceEntity, comp: components[compId]! };
 }

@@ -1,13 +1,7 @@
 import type { CommandResult } from '../types';
 import { defineCommand, z, looseVec3 } from '../schema';
 import { ORIGIN } from '../../lib/vec3';
-import {
-  DEFAULT_SOLID_COLOR,
-  placeSolid,
-  placedSolidFields,
-  placeSizedSolid,
-  rejectNonPositive,
-} from './shared';
+import { DEFAULT_SOLID_COLOR, placeSolid, placedSolidFields, placeSizedSolid, rejectNonPositive } from './shared';
 
 /**
  * @command add_wedge
@@ -45,10 +39,7 @@ export const addWedge = defineCommand({
       center: 'geometric center of the AABB',
     }),
   }),
-  run: (
-    doc,
-    { size, position = ORIGIN, rotation, color = DEFAULT_SOLID_COLOR, anchor },
-  ): CommandResult => {
+  run: (doc, { size, position = ORIGIN, rotation, color = DEFAULT_SOLID_COLOR, anchor }): CommandResult => {
     return placeSizedSolid(doc, 'wedge', 'wdg', 'min', size, { position, rotation, color, anchor });
   },
 });
@@ -79,34 +70,15 @@ export const addPyramid = defineCommand({
     '"min" = min-XYZ corner of the AABB. ' +
     'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.',
   params: z.object({
-    baseWidth: z
-      .number()
-      .describe('Full width of the rectangular base along X in document units. Must be > 0.'),
-    baseDepth: z
-      .number()
-      .describe('Full depth of the rectangular base along Y in document units. Must be > 0.'),
-    height: z
-      .number()
-      .describe(
-        'Height from the base center to the apex along the local +Z axis in document units. Must be > 0.',
-      ),
+    baseWidth: z.number().describe('Full width of the rectangular base along X in document units. Must be > 0.'),
+    baseDepth: z.number().describe('Full depth of the rectangular base along Y in document units. Must be > 0.'),
+    height: z.number().describe('Height from the base center to the apex along the local +Z axis in document units. Must be > 0.'),
     ...placedSolidFields('pyramid', 'base-center', {
       'base-center': 'center of the rectangular base; apex at position+[0,0,height]',
       center: 'geometric center of the AABB (mid X/Y/Z)',
     }),
   }),
-  run: (
-    doc,
-    {
-      baseWidth,
-      baseDepth,
-      height,
-      position = ORIGIN,
-      rotation,
-      color = DEFAULT_SOLID_COLOR,
-      anchor,
-    },
-  ): CommandResult => {
+  run: (doc, { baseWidth, baseDepth, height, position = ORIGIN, rotation, color = DEFAULT_SOLID_COLOR, anchor }): CommandResult => {
     const rejected = rejectNonPositive(doc, 'add_pyramid', [
       ['baseWidth', baseWidth],
       ['baseDepth', baseDepth],
@@ -123,8 +95,7 @@ export const addPyramid = defineCommand({
       position,
       rotation,
       color,
-      describe: (id) =>
-        `Added pyramid ${id} with base ${baseWidth}×${baseDepth} and height ${height}`,
+      describe: (id) => `Added pyramid ${id} with base ${baseWidth}×${baseDepth} and height ${height}`,
     });
   },
 });

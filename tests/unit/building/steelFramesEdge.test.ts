@@ -3,30 +3,14 @@ import { execute } from '@core/commands/registry';
 import type { CadDocument } from '@core/model/types';
 import { buildingErrors } from '@aec/building/validate';
 import type { FrameReport } from '@aec/industrial/steelDesign/steelFrameAnalysis';
-import {
-  check as baseCheck,
-  rowOf,
-  step,
-  twoLevels,
-  withMember,
-  type CheckData,
-} from './steelFixtures';
-import {
-  frameColumn,
-  gratingFloor,
-  inertiaOf,
-  jointBeam,
-  memberOf,
-  portal,
-  weightOf,
-} from './steelFrameFixtures';
+import { check as baseCheck, rowOf, step, twoLevels, withMember, type CheckData } from './steelFixtures';
+import { frameColumn, gratingFloor, inertiaOf, jointBeam, memberOf, portal, weightOf } from './steelFrameFixtures';
 
 interface FrameData extends CheckData {
   frames: FrameReport[];
 }
 
-const check = (doc: CadDocument, params: Record<string, unknown> = {}): FrameData =>
-  baseCheck(doc, params) as FrameData;
+const check = (doc: CadDocument, params: Record<string, unknown> = {}): FrameData => baseCheck(doc, params) as FrameData;
 
 describe('joint fixity on add_steel_member / update_steel_member', () => {
   const base = (): CadDocument => twoLevels();
@@ -155,15 +139,11 @@ describe('rigid joints that cannot be modelled', () => {
     let doc = portal({ base: 'fixed' });
     doc = frameColumn(doc, -4000, 3000, { baseFixity: 'fixed' });
     doc = jointBeam(doc, [-4000, 3000], [0, 3000], { startJoint: 'rigid', endJoint: 'rigid' });
-    expect(row(doc, 'SB2').detail).toContain(
-      'end joint is rigid but the beam frames into beam SB1',
-    );
+    expect(row(doc, 'SB2').detail).toContain('end joint is rigid but the beam frames into beam SB1');
     let pinnedEnd = portal({ base: 'fixed' });
     pinnedEnd = frameColumn(pinnedEnd, -4000, 3000, { baseFixity: 'fixed' });
     pinnedEnd = jointBeam(pinnedEnd, [-4000, 3000], [0, 3000], { startJoint: 'rigid' });
-    expect(row(pinnedEnd, 'SB2').detail).toContain(
-      'the pinned end of a moment-frame beam must bear on',
-    );
+    expect(row(pinnedEnd, 'SB2').detail).toContain('the pinned end of a moment-frame beam must bear on');
     // The portal itself is still analysed.
     expect(row(pinnedEnd, 'SB1').analysed).toBe(true);
   });
@@ -223,19 +203,12 @@ describe('member rows of a frame', () => {
     expect(beam.forces['deflection']).toBeGreaterThanOrEqual(tip * 0.99);
     expect(beam.forces['jointMomentStart']).toBeLessThan(0);
     expect(beam.forces['jointMomentEnd']).toBeUndefined();
-    expect(data.warnings.some((text) => text.includes('SB1 end rests on no column or beam'))).toBe(
-      true,
-    );
+    expect(data.warnings.some((text) => text.includes('SB1 end rests on no column or beam'))).toBe(true);
   });
 
   it('is independent of the direction the beam is drawn', () => {
     type Joint = 'rigid' | 'pinned';
-    const drawn = (
-      from: [number, number],
-      to: [number, number],
-      start: Joint,
-      end: Joint,
-    ): ReturnType<typeof rowOf> => {
+    const drawn = (from: [number, number], to: [number, number], start: Joint, end: Joint): ReturnType<typeof rowOf> => {
       let doc = frameColumn(twoLevels(), 0, 0, { baseFixity: 'fixed' });
       doc = frameColumn(doc, 0, 6000, { baseFixity: 'pinned' });
       doc = jointBeam(doc, from, to, { startJoint: start, endJoint: end });
@@ -245,10 +218,7 @@ describe('member rows of a frame', () => {
     const backward = drawn([0, 6000], [0, 0], 'pinned', 'rigid');
     expect(forward.utilisation).toBeCloseTo(backward.utilisation, 6);
     expect(forward.forces['MEd']).toBeCloseTo(backward.forces['MEd'] ?? 0, 6);
-    expect(forward.forces['jointMomentStart']).toBeCloseTo(
-      backward.forces['jointMomentEnd'] ?? 0,
-      6,
-    );
+    expect(forward.forces['jointMomentStart']).toBeCloseTo(backward.forces['jointMomentEnd'] ?? 0, 6);
     expect(forward.forces['jointMomentStart']).toBeLessThan(0);
     // A pinned end carries no moment: the propped beam has M ≈ wL²/8 at the rigid end at most.
     expect(forward.forces['jointMomentEnd']).toBeUndefined();
@@ -262,10 +232,7 @@ describe('member rows of a frame', () => {
     expect(data.frames[0]?.direction).toBe('X');
     const reference = check(portal({ base: 'fixed' }));
     expect(rowOf(data, 'SB1').utilisation).toBeCloseTo(rowOf(reference, 'SB1').utilisation, 6);
-    expect(rowOf(data, 'SC1').forces['baseMoment']).toBeCloseTo(
-      rowOf(reference, 'SC1').forces['baseMoment'] ?? 0,
-      6,
-    );
+    expect(rowOf(data, 'SC1').forces['baseMoment']).toBeCloseTo(rowOf(reference, 'SC1').forces['baseMoment'] ?? 0, 6);
   });
 
   it('bends the weak axis when the column depth lies along the frame plane normal', () => {

@@ -221,9 +221,7 @@ describe('export_code', () => {
     expect(data.text).toContain('Block = box((1, 2, 3), position=(4, 0, 0), rotation=(0, 0, 90)');
     expect(data.text).toContain('name="Block"');
     const scad = codeOf(doc, 'openscad').text;
-    expect(scad).toContain(
-      'translate([4, 0, 0]) rotate([0, 0, 90]) cube([1, 2, 3], center = true)',
-    );
+    expect(scad).toContain('translate([4, 0, 0]) rotate([0, 0, 90]) cube([1, 2, 3], center = true)');
     expect(codeOf(doc, 'freecad').text).toContain('rotation=(0, 0, 90)');
   });
 
@@ -320,11 +318,7 @@ function plateTrace(): unknown {
         command: 'add_box',
         ref: 'f1',
         params: {
-          size: [
-            { value: 80, expression: 'width' },
-            { value: 40 },
-            { value: 8, expression: '(width / 10)' },
-          ],
+          size: [{ value: 80, expression: 'width' }, { value: 40 }, { value: 8, expression: '(width / 10)' }],
           ...ORIGIN_POSE,
           color: '#112233',
         },
@@ -355,9 +349,7 @@ function solids(doc: CadDocument): number {
 describe('apply_code_trace', () => {
   it('rebuilds parameters, features, booleans and names from a trace', () => {
     const result = execute(createEmptyDocument(), 'apply_code_trace', { trace: plateTrace() });
-    expect(result.summary).toContain(
-      'apply_code_trace (replace): 2 parameter(s) [width, thickness]',
-    );
+    expect(result.summary).toContain('apply_code_trace (replace): 2 parameter(s) [width, thickness]');
     expect(result.summary).toContain('3 feature(s) → 1 solid(s)');
     expect(result.affected).toHaveLength(1);
     const doc = result.document;
@@ -424,9 +416,7 @@ describe('apply_code_trace', () => {
       },
     });
     expect(result.affected).toHaveLength(3);
-    expect(
-      result.document.featureHistory.map((s) => (s.params as { radius: unknown }).radius),
-    ).toEqual([3, 4, 5]);
+    expect(result.document.featureHistory.map((s) => (s.params as { radius: unknown }).radius)).toEqual([3, 4, 5]);
   });
 
   it('replaces by default and keeps view/organisation state; append adds on top', () => {
@@ -493,8 +483,7 @@ describe('apply_code_trace', () => {
   });
 
   describe('failures leave the document unchanged', () => {
-    const base = (): CadDocument =>
-      execute(createEmptyDocument(), 'add_sphere', { radius: 1 }).document;
+    const base = (): CadDocument => execute(createEmptyDocument(), 'add_sphere', { radius: 1 }).document;
 
     function expectAbort(trace: unknown, reason: string, mode?: 'append' | 'replace'): void {
       const doc = base();
@@ -532,38 +521,20 @@ describe('apply_code_trace', () => {
     });
 
     it('rejects a bad parameter name or expression', () => {
-      expectAbort(
-        { parameters: [{ name: '1bad', expression: '3' }], features: [] },
-        'name must be an identifier',
-      );
+      expectAbort({ parameters: [{ name: '1bad', expression: '3' }], features: [] }, 'name must be an identifier');
       expectAbort({ parameters: ['x'], features: [] }, 'parameter 0');
-      expectAbort(
-        { parameters: [{ name: 'a', expression: '  ' }], features: [] },
-        'expression must be a non-empty string',
-      );
-      expectAbort(
-        { parameters: [{ name: 'a', expression: 3 }], features: [] },
-        'expression must be a non-empty string',
-      );
+      expectAbort({ parameters: [{ name: 'a', expression: '  ' }], features: [] }, 'expression must be a non-empty string');
+      expectAbort({ parameters: [{ name: 'a', expression: 3 }], features: [] }, 'expression must be a non-empty string');
     });
 
     it('rejects a parameter whose expression does not evaluate', () => {
-      expectAbort(
-        { parameters: [{ name: 'a', expression: 'zzz + 1' }], features: [] },
-        'parameter a = zzz + 1',
-      );
+      expectAbort({ parameters: [{ name: 'a', expression: 'zzz + 1' }], features: [] }, 'parameter a = zzz + 1');
     });
 
     it('rejects malformed features', () => {
-      expectAbort(
-        { parameters: [], features: [{ command: 'add_box' }] },
-        'feature 0: needs { command, params }',
-      );
+      expectAbort({ parameters: [], features: [{ command: 'add_box' }] }, 'feature 0: needs { command, params }');
       expectAbort({ parameters: [], features: [null] }, 'feature 0: needs { command, params }');
-      expectAbort(
-        { parameters: [], features: [{ command: 3, params: {} }] },
-        'needs { command, params }',
-      );
+      expectAbort({ parameters: [], features: [{ command: 3, params: {} }] }, 'needs { command, params }');
     });
 
     it('rejects commands outside the trace whitelist', () => {
@@ -571,11 +542,7 @@ describe('apply_code_trace', () => {
         { parameters: [], features: [{ command: 'clear_document', params: {} }] },
         'command "clear_document" is not allowed in a code trace',
       );
-      expectAbort(
-        { parameters: [], features: [{ command: 'build_project', params: { actions: [] } }] },
-        'not allowed',
-        'append',
-      );
+      expectAbort({ parameters: [], features: [{ command: 'build_project', params: { actions: [] } }] }, 'not allowed', 'append');
     });
 
     it('rejects an unknown ref', () => {
@@ -592,16 +559,11 @@ describe('apply_code_trace', () => {
       expectAbort(
         {
           parameters: [],
-          features: [
-            { command: 'add_sphere', params: { radius: { value: Number.POSITIVE_INFINITY } } },
-          ],
+          features: [{ command: 'add_sphere', params: { radius: { value: Number.POSITIVE_INFINITY } } }],
         },
         'non-finite number',
       );
-      expectAbort(
-        { parameters: [], features: [{ command: 'add_sphere', params: { radius: Number.NaN } }] },
-        'non-finite number',
-      );
+      expectAbort({ parameters: [], features: [{ command: 'add_sphere', params: { radius: Number.NaN } }] }, 'non-finite number');
     });
 
     it('rolls back fully when a later feature fails', () => {
@@ -660,9 +622,7 @@ describe('apply_code_trace', () => {
         ],
       },
     }).document;
-    expect(traced.featureHistory.map((s) => s.name)).toEqual(
-      direct.featureHistory.map((s) => s.name),
-    );
+    expect(traced.featureHistory.map((s) => s.name)).toEqual(direct.featureHistory.map((s) => s.name));
     expect(solids(traced)).toBe(solids(direct));
   });
 });

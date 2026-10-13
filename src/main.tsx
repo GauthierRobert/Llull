@@ -21,9 +21,7 @@ import { registerAppServiceWorker } from '@ui/services/appUpdates';
 // (dev/power-user toggle, opt-in only). OCC carries a 63 MB WASM binary (~800–1000 ms cold init),
 // so it is lazy-imported and injected asynchronously: the first render is never blocked and
 // commands no-op gracefully until the kernel resolves (architecture L9 / SOLID S5).
-const useOcct =
-  typeof window !== 'undefined' &&
-  parseKernelChoice(new URLSearchParams(window.location.search).get('kernel')) === 'occt';
+const useOcct = typeof window !== 'undefined' && parseKernelChoice(new URLSearchParams(window.location.search).get('kernel')) === 'occt';
 
 function installManifoldKernel(): void {
   createManifoldKernel()
@@ -47,9 +45,7 @@ installDefaultPlugins();
 
 // Production builds only: the dev server has no sw.js and must never be served from a cache.
 if (import.meta.env.PROD) {
-  registerAppServiceWorker().catch((e: unknown) =>
-    console.warn('Service worker not registered', e),
-  );
+  registerAppServiceWorker().catch((e: unknown) => console.warn('Service worker not registered', e));
 }
 
 const rootEl = document.getElementById('root');

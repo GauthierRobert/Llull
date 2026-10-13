@@ -31,9 +31,7 @@ export function DxfImports({ unit }: { unit: DocumentUnit }): React.ReactElement
         label="Import survey DXF"
         accept=".dxf"
         ariaLabel="Survey DXF file"
-        onText={(text, fileName) =>
-          dispatch('import_survey_dxf', { text, name: fileStem(fileName), sourceUnit: unit })
-        }
+        onText={(text, fileName) => dispatch('import_survey_dxf', { text, name: fileStem(fileName), sourceUnit: unit })}
       />
       <FileField
         label="Import DXF drawing"

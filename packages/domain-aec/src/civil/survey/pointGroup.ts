@@ -20,8 +20,7 @@ export function newPointGroup(
   const group: PointGroupObject = {
     id,
     category: 'pointGroup',
-    name:
-      requestedName?.trim() || `${defaultLabel} ${civilObjectsOf(civil, 'pointGroup').length + 1}`,
+    name: requestedName?.trim() || `${defaultLabel} ${civilObjectsOf(civil, 'pointGroup').length + 1}`,
     entityIds: [],
     points: [...points],
   };

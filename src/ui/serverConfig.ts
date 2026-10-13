@@ -22,9 +22,7 @@ function serverBaseOf(configured: string | undefined): string {
   return typeof window === 'undefined' ? DEFAULT_SERVER_BASE : window.location.origin;
 }
 
-export const SERVER_BASE: string = serverBaseOf(
-  readEnvString(import.meta.env['VITE_LLULL_SERVER_URL']),
-).replace(/\/+$/, '');
+export const SERVER_BASE: string = serverBaseOf(readEnvString(import.meta.env['VITE_LLULL_SERVER_URL'])).replace(/\/+$/, '');
 
 const BUILD_API_TOKEN: string | undefined = readEnvString(import.meta.env['VITE_LLULL_API_TOKEN']);
 const TOKEN_STORAGE_KEY = 'llull.apiToken';

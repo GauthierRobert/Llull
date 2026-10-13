@@ -359,9 +359,7 @@ describe('filletPolyline', () => {
     expect(segments.map((s) => s.type)).toEqual(['line', 'arc', 'line']);
     expect(segments[1]?.points[0]).toEqual([8, 0, 0]);
     close(segments[1]?.points[2] ?? [], [10, 2, 0]);
-    expect(
-      arcGeometry(...(segments[1] as unknown as { points: [Vec3, Vec3, Vec3] }).points)?.radius,
-    ).toBeCloseTo(2, 9);
+    expect(arcGeometry(...(segments[1] as unknown as { points: [Vec3, Vec3, Vec3] }).points)?.radius).toBeCloseTo(2, 9);
     expect(firstCorner(segments)).toBe(-1);
     expect(chainIssue(segments, false)).toBeNull();
   });

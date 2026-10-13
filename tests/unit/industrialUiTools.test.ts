@@ -28,48 +28,19 @@ describe('industrial tools', () => {
       craneRailHeight: '5000',
     });
     doc = apply(doc, 'hall', { basePlates: 'false', x: '40000', span: '12000', length: '12000' });
-    for (const id of [
-      'member',
-      'footing',
-      'panel',
-      'craneRunway',
-      'equipment',
-      'pipe',
-      'tray',
-      'basePlates',
-    ]) {
-      doc = apply(
-        doc,
-        id,
-        id === 'footing' ? { underColumns: 'false', x: '9000', y: '-3000' } : {},
-      );
+    for (const id of ['member', 'footing', 'panel', 'craneRunway', 'equipment', 'pipe', 'tray', 'basePlates']) {
+      doc = apply(doc, id, id === 'footing' ? { underColumns: 'false', x: '9000', y: '-3000' } : {});
     }
-    const categories = new Set(
-      Object.values(doc.building!.elements).map((element) => element.category),
-    );
-    for (const category of [
-      'member',
-      'footing',
-      'panel',
-      'equipment',
-      'pipe',
-      'tray',
-      'slab',
-      'grid',
-    ]) {
+    const categories = new Set(Object.values(doc.building!.elements).map((element) => element.category));
+    for (const category of ['member', 'footing', 'panel', 'equipment', 'pipe', 'tray', 'slab', 'grid']) {
       expect(categories.has(category as never), category).toBe(true);
     }
-    const crane = Object.values(doc.building!.elements).filter(
-      (element) => element.category === 'member' && element.role === 'crane',
-    );
+    const crane = Object.values(doc.building!.elements).filter((element) => element.category === 'member' && element.role === 'crane');
     expect(crane.length).toBeGreaterThan(0);
   });
 
   it('builds a multi-span hall from a list of widths', () => {
-    const hall = tool('hall').build(
-      { ...defaultValues(tool('hall')), spans: '20000, 25000' },
-      context,
-    );
+    const hall = tool('hall').build({ ...defaultValues(tool('hall')), spans: '20000, 25000' }, context);
     expect(hall.ok && hall.params).toMatchObject({ spans: [20000, 25000] });
     expect(hall.ok && 'span' in hall.params).toBe(false);
   });
@@ -80,20 +51,13 @@ describe('industrial tools', () => {
       columnBase: 'pinned',
       roofType: 'duopitch',
     });
-    const hall = tool('hall').build(
-      { ...defaultValues(tool('hall')), columnBase: 'fixed', roofType: 'monopitch' },
-      context,
-    );
+    const hall = tool('hall').build({ ...defaultValues(tool('hall')), columnBase: 'fixed', roofType: 'monopitch' }, context);
     expect(hall.ok && hall.params).toMatchObject({ columnBase: 'fixed', roofType: 'monopitch' });
     const doc = apply(createEmptyDocument(), 'hall', {
       columnBase: 'fixed',
       roofType: 'monopitch',
     });
-    expect(
-      Object.values(doc.building!.elements).some(
-        (element) => element.category === 'plate' && element.fixity === 'fixed',
-      ),
-    ).toBe(true);
+    expect(Object.values(doc.building!.elements).some((element) => element.category === 'plate' && element.fixity === 'fixed')).toBe(true);
   });
 
   it('converts degrees and omits blank optional fields', () => {
@@ -118,9 +82,7 @@ describe('industrial tools', () => {
     const shown = (values: Record<string, string>): string[] =>
       footing.fields.filter((field) => isFieldShown(field, values)).map((field) => field.key);
     expect(shown(defaults)).not.toContain('x');
-    expect(shown({ ...defaults, underColumns: 'false' })).toEqual(
-      expect.arrayContaining(['x', 'y']),
-    );
+    expect(shown({ ...defaults, underColumns: 'false' })).toEqual(expect.arrayContaining(['x', 'y']));
     expect(footing.build(defaults, context)).toMatchObject({
       ok: true,
       params: { underColumns: true },
@@ -129,9 +91,10 @@ describe('industrial tools', () => {
       ok: false,
       reason: 'Check: x, y',
     });
-    expect(
-      footing.build({ ...defaults, underColumns: 'false', x: '1000', y: '2000' }, context),
-    ).toMatchObject({ ok: true, params: { location: [1000, 2000] } });
+    expect(footing.build({ ...defaults, underColumns: 'false', x: '1000', y: '2000' }, context)).toMatchObject({
+      ok: true,
+      params: { location: [1000, 2000] },
+    });
   });
 
   it('places a vertical vessel from the equipment form', () => {
@@ -141,21 +104,22 @@ describe('industrial tools', () => {
       length: '4000',
       height: '12000',
     });
-    const vessel = Object.values(doc.building?.elements ?? {}).find(
-      (element) => element.category === 'equipment',
-    );
+    const vessel = Object.values(doc.building?.elements ?? {}).find((element) => element.category === 'equipment');
     expect(vessel).toMatchObject({ shape: 'vertical_vessel', size: [4000, 4000, 12000] });
   });
 
   it('reports malformed point lists and a missing equipment name', () => {
-    expect(
-      tool('pipe').build({ ...defaultValues(tool('pipe')), points: '0,0,0' }, context),
-    ).toEqual({ ok: false, reason: 'Check: points' });
-    expect(
-      tool('panel').build({ ...defaultValues(tool('panel')), corners: '0,0; 1,0; 1,1' }, context),
-    ).toEqual({ ok: false, reason: 'Check: corners' });
-    expect(
-      tool('equipment').build({ ...defaultValues(tool('equipment')), name: ' ' }, context),
-    ).toEqual({ ok: false, reason: 'Equipment needs a name.' });
+    expect(tool('pipe').build({ ...defaultValues(tool('pipe')), points: '0,0,0' }, context)).toEqual({
+      ok: false,
+      reason: 'Check: points',
+    });
+    expect(tool('panel').build({ ...defaultValues(tool('panel')), corners: '0,0; 1,0; 1,1' }, context)).toEqual({
+      ok: false,
+      reason: 'Check: corners',
+    });
+    expect(tool('equipment').build({ ...defaultValues(tool('equipment')), name: ' ' }, context)).toEqual({
+      ok: false,
+      reason: 'Equipment needs a name.',
+    });
   });
 });

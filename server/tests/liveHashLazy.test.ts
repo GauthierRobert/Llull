@@ -8,8 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const serialized = vi.hoisted(() => ({ count: 0 }));
 
 vi.mock('@core/commands/persistence/serialization', async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import('@core/commands/persistence/serialization')>();
+  const original = await importOriginal<typeof import('@core/commands/persistence/serialization')>();
   return {
     ...original,
     serializeDocument: (...args: Parameters<typeof original.serializeDocument>): string => {

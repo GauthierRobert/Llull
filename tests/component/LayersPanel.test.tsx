@@ -143,8 +143,7 @@ describe('LayersPanel — layer commands', () => {
     useStore.setState({ liveStatus: 'disconnected' });
   });
 
-  const layerNames = (): string[] =>
-    Object.values(useStore.getState().document.layers).map((layer) => layer.name);
+  const layerNames = (): string[] => Object.values(useStore.getState().document.layers).map((layer) => layer.name);
 
   it('adds a layer through add_layer and clears the field', () => {
     render(<LayersPanel />);
@@ -207,9 +206,6 @@ describe('LayersPanel — layer commands', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(useStore.getState().document.layers[id]).toBeDefined();
     const defaultName = useStore.getState().document.layers[DEFAULT_LAYER_ID]!.name;
-    expect(screen.getByRole('button', { name: `Delete layer ${defaultName}` })).toHaveProperty(
-      'disabled',
-      true,
-    );
+    expect(screen.getByRole('button', { name: `Delete layer ${defaultName}` })).toHaveProperty('disabled', true);
   });
 });

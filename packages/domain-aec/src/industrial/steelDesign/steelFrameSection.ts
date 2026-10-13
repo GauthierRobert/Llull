@@ -17,18 +17,13 @@ type BendingAxis = 'strong' | 'weak';
 const ALIGNMENT = toRadians(5);
 
 /** |cos| of the angle between the section depth axis of a vertical column and the frame's in-plane direction. */
-const depthAlignment = (roll: number, direction: FrameDirection): number =>
-  Math.abs(direction === 'Y' ? Math.sin(roll) : Math.cos(roll));
+const depthAlignment = (roll: number, direction: FrameDirection): number => Math.abs(direction === 'Y' ? Math.sin(roll) : Math.cos(roll));
 
 /**
  * Axis a vertical column bends about in a frame plane (depth points along +X at roll 0, +Y at π/2).
  * @returns null when the roll lies more than 5° from both principal directions
  */
-export function columnBendingAxis(
-  profile: SteelProfile,
-  roll: number,
-  direction: FrameDirection,
-): BendingAxis | null {
+export function columnBendingAxis(profile: SteelProfile, roll: number, direction: FrameDirection): BendingAxis | null {
   if (profile.shape === 'SHS' || profile.shape === 'CHS') return 'strong';
   const alignment = depthAlignment(roll, direction);
   if (alignment >= Math.cos(ALIGNMENT)) return 'strong';
@@ -36,21 +31,14 @@ export function columnBendingAxis(
 }
 
 /** Second moment of area for bending in the frame plane, mm⁴ (interpolated between the axes). */
-export function inPlaneInertia(
-  profile: SteelProfile,
-  roll: number,
-  direction: FrameDirection,
-): number {
+export function inPlaneInertia(profile: SteelProfile, roll: number, direction: FrameDirection): number {
   const section = sectionOf(profile);
   const weight = depthAlignment(roll, direction) ** 2;
   return section.inertia * weight + section.minorInertia * (1 - weight);
 }
 
 /** Weak-axis moment (N·mm) and shear (N) resistances. */
-export function weakAxisResistance(
-  profile: SteelProfile,
-  fy: number,
-): { moment: number; shear: number } {
+export function weakAxisResistance(profile: SteelProfile, fy: number): { moment: number; shear: number } {
   const section = sectionOf(profile);
   const resistance = sectionResistance(profile, fy);
   const elastic = section.minorInertia / (profile.b / 2);
@@ -105,11 +93,7 @@ export function weakAxisBuckling(
  * Major-axis moment resistance (N·mm) at a section carrying shear `shear` (kN): Mc,Rd, reduced
  * with ρ = (2V/Vpl,Rd − 1)² when V > 0.5 Vpl,Rd (EN 1993-1-1 §6.2.8).
  */
-export function shearReducedMoment(
-  profile: SteelProfile,
-  fy: number,
-  shear: number,
-): { moment: number; reduced: boolean } {
+export function shearReducedMoment(profile: SteelProfile, fy: number, shear: number): { moment: number; reduced: boolean } {
   const resistance = sectionResistance(profile, fy);
   const shearResistance = resistance.shear / 1000;
   if (!(shear > 0.5 * shearResistance)) return { moment: resistance.moment, reduced: false };

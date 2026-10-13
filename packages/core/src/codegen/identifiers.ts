@@ -41,12 +41,8 @@ export class Namer {
  * (`+ - * /`, parentheses, decimal numbers are valid Python, OpenSCAD and FreeCAD Python).
  * @returns null when the expression contains anything outside the grammar or an unknown name.
  */
-export function translateExpression(
-  expression: string,
-  identifiers: ReadonlyMap<string, string>,
-): string | null {
-  const token =
-    /\s*(?:(\d+\.?\d*(?:[eE][-+]?\d+)?|\.\d+(?:[eE][-+]?\d+)?)|([A-Za-z_]\w*)|([-+*/()]))/y;
+export function translateExpression(expression: string, identifiers: ReadonlyMap<string, string>): string | null {
+  const token = /\s*(?:(\d+\.?\d*(?:[eE][-+]?\d+)?|\.\d+(?:[eE][-+]?\d+)?)|([A-Za-z_]\w*)|([-+*/()]))/y;
   const parts: string[] = [];
   let index = 0;
   const source = expression.trim();

@@ -6,16 +6,7 @@
 
 import type { Entity } from '@core/model/types';
 
-export type SnapType =
-  | 'endpoint'
-  | 'midpoint'
-  | 'center'
-  | 'intersection'
-  | 'grid'
-  | 'perpendicular'
-  | 'tangent'
-  | 'extension'
-  | 'nearest';
+export type SnapType = 'endpoint' | 'midpoint' | 'center' | 'intersection' | 'grid' | 'perpendicular' | 'tangent' | 'extension' | 'nearest';
 
 export interface SnapPoint {
   readonly x: number;

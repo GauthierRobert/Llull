@@ -15,8 +15,7 @@ export function useAutoFrame(): void {
   useEffect(
     () =>
       useStore.subscribe((state, previous) => {
-        const becameNonEmpty =
-          previous.document.order.length === 0 && state.document.order.length > 0;
+        const becameNonEmpty = previous.document.order.length === 0 && state.document.order.length > 0;
         // Online, the camera is shared: framing would move every connected client's view.
         if (!becameNonEmpty || !isLocalMode(state)) return;
         const direction = useToolStore.getState().viewMode === '2d' ? 'current' : 'iso';

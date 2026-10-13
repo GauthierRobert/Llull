@@ -64,12 +64,7 @@ export function buildServiceWorkerManifest(
   const include = new RegExp(policy.precache.include);
   const exclude = new RegExp(policy.precache.exclude);
   const precache = files
-    .filter(
-      (file) =>
-        include.test(file.fileName) &&
-        !exclude.test(file.fileName) &&
-        file.bytes <= policy.precache.maxEntryBytes,
-    )
+    .filter((file) => include.test(file.fileName) && !exclude.test(file.fileName) && file.bytes <= policy.precache.maxEntryBytes)
     .map((file) => file.fileName)
     .concat(policy.precache.shell)
     .sort();
@@ -90,9 +85,7 @@ export function serviceWorkerPlugin(root: string): Plugin {
     name: 'llull-service-worker',
     apply: 'build',
     generateBundle(_options, bundle) {
-      const policy = parseServiceWorkerPolicy(
-        JSON.parse(readFileSync(resolve(root, 'serviceWorker/config.json'), 'utf8')),
-      );
+      const policy = parseServiceWorkerPolicy(JSON.parse(readFileSync(resolve(root, 'serviceWorker/config.json'), 'utf8')));
       const sourceOf = (fileName: string): string | Uint8Array => {
         const output = bundle[fileName];
         if (output === undefined) return '';

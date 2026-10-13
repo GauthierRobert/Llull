@@ -3,11 +3,7 @@ import { getGeometryKernel, setGeometryKernel } from '@core/geometry/kernel';
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
-import {
-  getActiveKernelName,
-  installGeometryKernel,
-  occtCallTimeoutMs,
-} from '../src/geometryKernel';
+import { getActiveKernelName, installGeometryKernel, occtCallTimeoutMs } from '../src/geometryKernel';
 
 afterEach(() => {
   delete process.env['LLULL_KERNEL'];

@@ -78,20 +78,12 @@ describe('unshapeExchangeResult', () => {
   });
 
   it('reads affected ids from the text when there is no data, and unwraps non-record data', () => {
-    expect(
-      unshapeExchangeResult(
-        shapeToolCallContent({ summary: 's', affected: ['x'], isError: false }),
-      ),
-    ).toEqual({
+    expect(unshapeExchangeResult(shapeToolCallContent({ summary: 's', affected: ['x'], isError: false }))).toEqual({
       summary: 's',
       affected: ['x'],
       isError: false,
     });
-    expect(
-      unshapeExchangeResult(
-        shapeToolCallContent({ summary: 's', affected: [], isError: true, data: [1] }),
-      ),
-    ).toEqual({
+    expect(unshapeExchangeResult(shapeToolCallContent({ summary: 's', affected: [], isError: true, data: [1] }))).toEqual({
       summary: 's',
       affected: [],
       isError: true,
@@ -151,9 +143,7 @@ describe('llull CLI — exchange tools', () => {
     const doc = path.join(dir, 'a.llull');
     await runCli(['add_box', 'size=[1,1,1]', '--doc', doc], capture().io);
     const c = capture();
-    expect(
-      await runCli(['export_step', '--save', path.join(dir, 'p.step'), '--doc', doc], c.io),
-    ).toBe(EXIT_OK);
+    expect(await runCli(['export_step', '--save', path.join(dir, 'p.step'), '--doc', doc], c.io)).toBe(EXIT_OK);
     expect(readFileSync(path.join(dir, 'p.step'), 'utf8')).toBe('ISO-10303-21;');
 
     const list = capture();
@@ -166,18 +156,11 @@ describe('llull CLI — exchange tools', () => {
 
   it('reports a missing Python bridge, a bad file= and file= on a tool without content', async () => {
     const noPython = capture(() => ({ port: null, dwg: null, allowCodeExecution: false }));
-    expect(await runCli(['export_step', '--doc', path.join(work(), 'x.llull')], noPython.io)).toBe(
-      EXIT_COMMAND_ERROR,
-    );
+    expect(await runCli(['export_step', '--doc', path.join(work(), 'x.llull')], noPython.io)).toBe(EXIT_COMMAND_ERROR);
     expect(noPython.out[0]).toMatch(/Python/);
 
     const missing = capture();
-    expect(
-      await runCli(
-        ['import_step', 'file=/nope/x.step', '--doc', path.join(work(), 'x.llull')],
-        missing.io,
-      ),
-    ).toBe(EXIT_USAGE);
+    expect(await runCli(['import_step', 'file=/nope/x.step', '--doc', path.join(work(), 'x.llull')], missing.io)).toBe(EXIT_USAGE);
     expect(() => withFileContent('export_step', { file: 'x' })).toThrow(/takes no file=/);
     expect(withFileContent('import_code', { mode: 'append' })).toEqual({ mode: 'append' });
   });
@@ -196,17 +179,12 @@ describe.skipIf(realPython === undefined)('llull CLI — real CadQuery STEP roun
     const a = path.join(dir, 'a.llull');
     await runCli(['add_box', 'size=[40,30,10]', '--doc', a], capture(real).io);
     const exported = capture(real);
-    expect(
-      await runCli(['export_step', '--save', path.join(dir, 'part.step'), '--doc', a], exported.io),
-    ).toBe(EXIT_OK);
+    expect(await runCli(['export_step', '--save', path.join(dir, 'part.step'), '--doc', a], exported.io)).toBe(EXIT_OK);
     expect(readFileSync(path.join(dir, 'part.step'), 'utf8')).toMatch(/^ISO-10303-21;/);
     const imported = capture(real);
-    expect(
-      await runCli(
-        ['import_step', `file=${path.join(dir, 'part.step')}`, '--doc', path.join(dir, 'b.llull')],
-        imported.io,
-      ),
-    ).toBe(EXIT_OK);
+    expect(await runCli(['import_step', `file=${path.join(dir, 'part.step')}`, '--doc', path.join(dir, 'b.llull')], imported.io)).toBe(
+      EXIT_OK,
+    );
     expect(imported.out[0]).toMatch(/Imported 1 mesh bod/);
   }, 120_000);
 });

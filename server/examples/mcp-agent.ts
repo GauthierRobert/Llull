@@ -53,19 +53,13 @@ function parseToolResult(result: { content: ContentItem[]; isError?: boolean }):
 
   // The server appends "Affected entity ids: id1, id2" as a second text block.
   const affectedLine = texts.find((t) => t.startsWith('Affected entity ids:'));
-  const affected: string[] = affectedLine
-    ? affectedLine.replace('Affected entity ids:', '').trim().split(/,\s*/)
-    : [];
+  const affected: string[] = affectedLine ? affectedLine.replace('Affected entity ids:', '').trim().split(/,\s*/) : [];
 
   return { summary, affected, isError: result.isError === true };
 }
 
 /** tools/call, with the SDK's compatibility result narrowed to the content form. */
-async function callAndParse(
-  client: Client,
-  name: string,
-  args: Record<string, unknown>,
-): Promise<ParsedToolResult> {
+async function callAndParse(client: Client, name: string, args: Record<string, unknown>): Promise<ParsedToolResult> {
   const raw = await client.callTool({ name, arguments: args });
   return parseToolResult(raw as { content: ContentItem[]; isError?: boolean });
 }
@@ -95,10 +89,7 @@ async function main(): Promise<void> {
     requestInit: { headers },
   });
 
-  const client = new Client(
-    { name: 'llull-example-agent', version: '0.1.0' },
-    { capabilities: {} },
-  );
+  const client = new Client({ name: 'llull-example-agent', version: '0.1.0' }, { capabilities: {} });
 
   console.log(`Connecting to llull MCP server at ${mcpUrl} ...`);
   // Cast to Transport: StreamableHTTPClientTransport's `sessionId` getter returns

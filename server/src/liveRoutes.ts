@@ -12,12 +12,7 @@
 import { Router, type RequestHandler } from 'express';
 import { isRecord } from '@lib/isRecord';
 import { applyCommand, undo, redo } from './commandBus';
-import {
-  subscribeLive,
-  getLiveSnapshot,
-  liveSubscriberCount,
-  MAX_LIVE_SUBSCRIBERS,
-} from './liveDocument';
+import { subscribeLive, getLiveSnapshot, liveSubscriberCount, MAX_LIVE_SUBSCRIBERS } from './liveDocument';
 import { guardMutation, guardRead } from './security';
 import { actorOf } from './audit';
 

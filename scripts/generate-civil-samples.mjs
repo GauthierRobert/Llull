@@ -76,9 +76,7 @@ function surveyPoints() {
 function surveyCsv(points) {
   const lines = ['P,E,N,Z,D'];
   for (const p of points) {
-    lines.push(
-      `${p.number},${fixed(ORIGIN.e + p.x)},${fixed(ORIGIN.n + p.y)},${fixed(p.z)},${p.code}`,
-    );
+    lines.push(`${p.number},${fixed(ORIGIN.e + p.x)},${fixed(ORIGIN.n + p.y)},${fixed(p.z)},${p.code}`);
   }
   return `${lines.join('\n')}\n`;
 }
@@ -99,12 +97,9 @@ function contourPolylines(level, step) {
   const segments = [];
   for (let i = 0; i < nx; i++) {
     for (let j = 0; j < ny; j++) {
-      const hits = [
-        cross(i, j, i + 1, j),
-        cross(i + 1, j, i + 1, j + 1),
-        cross(i + 1, j + 1, i, j + 1),
-        cross(i, j + 1, i, j),
-      ].filter((p) => p !== null);
+      const hits = [cross(i, j, i + 1, j), cross(i + 1, j, i + 1, j + 1), cross(i + 1, j + 1, i, j + 1), cross(i, j + 1, i, j)].filter(
+        (p) => p !== null,
+      );
       if (hits.length === 2) segments.push([hits[0], hits[1]]);
       if (hits.length === 4) segments.push([hits[0], hits[1]], [hits[2], hits[3]]);
     }
@@ -183,14 +178,7 @@ function surveyDxf() {
     dxfPair(9, '$INSUNITS') +
     dxfPair(70, 6) +
     dxfPair(0, 'ENDSEC');
-  return (
-    header +
-    dxfPair(0, 'SECTION') +
-    dxfPair(2, 'ENTITIES') +
-    entities +
-    dxfPair(0, 'ENDSEC') +
-    dxfPair(0, 'EOF')
-  );
+  return header + dxfPair(0, 'SECTION') + dxfPair(2, 'ENTITIES') + entities + dxfPair(0, 'ENDSEC') + dxfPair(0, 'EOF');
 }
 
 mkdirSync(OUT_DIR, { recursive: true });

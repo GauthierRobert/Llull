@@ -1,10 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import {
-  type CadDocument,
-  type Entity,
-  type ShapeRecipe,
-  createEmptyDocument,
-} from '@core/model/types';
+import { type CadDocument, type Entity, type ShapeRecipe, createEmptyDocument } from '@core/model/types';
 import type { DrawingPrimitive } from '@core/model/drawing';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { TOP_VIEW } from '@core/geometry/viewProjection';
@@ -18,11 +13,9 @@ const solidsOf = (doc: CadDocument): Entity[] => doc.order.map((id) => doc.entit
 const ofStyle = (primitives: ReadonlyArray<DrawingPrimitive>, style: string): DrawingPrimitive[] =>
   primitives.filter((p) => p.style === style);
 
-const lineLength = (p: DrawingPrimitive): number =>
-  p.type === 'line' ? Math.hypot(p.b[0] - p.a[0], p.b[1] - p.a[1]) : 0;
+const lineLength = (p: DrawingPrimitive): number => (p.type === 'line' ? Math.hypot(p.b[0] - p.a[0], p.b[1] - p.a[1]) : 0);
 
-const totalLength = (primitives: ReadonlyArray<DrawingPrimitive>): number =>
-  primitives.reduce((sum, p) => sum + lineLength(p), 0);
+const totalLength = (primitives: ReadonlyArray<DrawingPrimitive>): number => primitives.reduce((sum, p) => sum + lineLength(p), 0);
 
 describe('technicalView — top view of solids', () => {
   it('draws a box as thick visible edges only, on the OBJ layers', () => {
@@ -44,9 +37,7 @@ describe('technicalView — top view of solids', () => {
     const drawings = technicalView(doc, solidsOf(doc), { frame: TOP_VIEW });
     const under = drawings.find((d) => d.entityId === small.id);
     expect(ofStyle(under?.primitives ?? [], 'visible')).toHaveLength(0);
-    expect(totalLength(ofStyle(under?.primitives ?? [], 'hidden'))).toBeGreaterThanOrEqual(
-      8 - 1e-6,
-    );
+    expect(totalLength(ofStyle(under?.primitives ?? [], 'hidden'))).toBeGreaterThanOrEqual(8 - 1e-6);
   });
 
   it('hides an edge lying on the tessellation seams of the face above it', () => {
@@ -58,9 +49,7 @@ describe('technicalView — top view of solids', () => {
     // The box's edge x = 0 runs exactly along the cylinder cap's triangle borders.
     const box = add(doc, 'add_box', { size: [10, 40, 1], position: [-5, 0, 0] });
     doc = box.doc;
-    const drawing = technicalView(doc, solidsOf(doc), { frame: TOP_VIEW }).find(
-      (d) => d.entityId === box.id,
-    );
+    const drawing = technicalView(doc, solidsOf(doc), { frame: TOP_VIEW }).find((d) => d.entityId === box.id);
     const hiddenOnSeam = ofStyle(drawing?.primitives ?? [], 'hidden').filter(
       (p) => p.type === 'line' && Math.abs(p.a[0]) < 1e-9 && Math.abs(p.b[0]) < 1e-9,
     );
@@ -72,9 +61,7 @@ describe('technicalView — top view of solids', () => {
     let doc = add(createEmptyDocument(), 'add_box', { size: [4, 4, 1], position: [2, 0, 5] }).doc;
     const long = add(doc, 'add_box', { size: [8, 1, 1], position: [0, 0, 0] });
     doc = long.doc;
-    const drawing = technicalView(doc, solidsOf(doc), { frame: TOP_VIEW }).find(
-      (d) => d.entityId === long.id,
-    );
+    const drawing = technicalView(doc, solidsOf(doc), { frame: TOP_VIEW }).find((d) => d.entityId === long.id);
     const visible = totalLength(ofStyle(drawing?.primitives ?? [], 'visible'));
     const hidden = totalLength(ofStyle(drawing?.primitives ?? [], 'hidden'));
     // Long edges: x in [-4, 4]; the cover spans x in [0, 4] -> half of each long edge is hidden.
@@ -197,14 +184,11 @@ describe('centerLinePrimitives — round features of B-rep recipes', () => {
   };
   /** A mesh result spanning [-10, 10]³ whose B-rep recipe is `brep`. */
   const meshWith = (brep: ShapeRecipe): Entity => {
-    const corners = [-10, 10].flatMap((x) =>
-      [-10, 10].flatMap((y) => [-10, 10].flatMap((z) => [x, y, z])),
-    );
+    const corners = [-10, 10].flatMap((x) => [-10, 10].flatMap((y) => [-10, 10].flatMap((z) => [x, y, z])));
     const box = entityOf('add_box', { size: [1, 1, 1], position: [0, 0, 0] });
     return { ...box, kind: 'mesh', mesh: { positions: corners, indices: [] }, brep } as Entity;
   };
-  const centreOf = (entity: Entity): DrawingPrimitive[] =>
-    centerLinePrimitives(entity, { components: {} }, TOP_VIEW, 'C');
+  const centreOf = (entity: Entity): DrawingPrimitive[] => centerLinePrimitives(entity, { components: {} }, TOP_VIEW, 'C');
 
   it('walks booleans, fillets, shells, blends, placements and scales to the holes', () => {
     const plate = entityOf('add_box', { size: [10, 10, 2], position: [0, 0, 0] });
@@ -255,21 +239,15 @@ describe('centerLinePrimitives — round features of B-rep recipes', () => {
       op: 'solid',
       entity: entityOf('add_cylinder', { radius: 1, height: 2, position: [x, y, 0] }),
     }));
-    const union = corners.reduce(
-      (a, b): ShapeRecipe => ({ op: 'boolean', boolean: 'union', a, b }),
-    );
+    const union = corners.reduce((a, b): ShapeRecipe => ({ op: 'boolean', boolean: 'union', a, b }));
     const primitives = centreOf(meshWith(union));
     expect(primitives.filter((p) => p.type === 'line')).toHaveLength(8);
     expect(primitives.some((p) => p.type === 'circle')).toBe(false);
   });
 
   it('marks cones, tori and spheres, and follows the axis a revolution really spins about', () => {
-    expect(
-      centreOf(entityOf('add_cone', { radius: 2, height: 3, position: [0, 0, 0] })),
-    ).toHaveLength(2);
-    expect(
-      centreOf(entityOf('add_torus', { ringRadius: 4, tubeRadius: 1, position: [0, 0, 0] })),
-    ).toHaveLength(2);
+    expect(centreOf(entityOf('add_cone', { radius: 2, height: 3, position: [0, 0, 0] }))).toHaveLength(2);
+    expect(centreOf(entityOf('add_torus', { ringRadius: 4, tubeRadius: 1, position: [0, 0, 0] }))).toHaveLength(2);
     // Axis −X: the mesh spins about +X (dominant axis, sign ignored); axial span 0..4.
     const lying = entityOf('revolve_profile', {
       profile: [
@@ -282,9 +260,10 @@ describe('centerLinePrimitives — round features of B-rep recipes', () => {
       position: [0, 0, 0],
     });
     const [axis] = centreOf(lying);
-    expect(
-      axis?.type === 'line' && [Math.min(axis.a[0], axis.b[0]), Math.max(axis.a[0], axis.b[0])],
-    ).toEqual([expect.closeTo(-0.5), expect.closeTo(4.5)]);
+    expect(axis?.type === 'line' && [Math.min(axis.a[0], axis.b[0]), Math.max(axis.a[0], axis.b[0])]).toEqual([
+      expect.closeTo(-0.5),
+      expect.closeTo(4.5),
+    ]);
   });
 });
 
@@ -301,8 +280,6 @@ describe('technicalView — centre lines under a section', () => {
     const drawings = technicalView(doc, solidsOf(doc), { frame: TOP_VIEW, cutDepth: -5 });
     const centre = drawings.flatMap((d) => d.primitives).filter((p) => p.style === 'center');
     expect(centre).toHaveLength(2);
-    expect(
-      centre.every((p) => p.type === 'line' && Math.abs((p.a[0] + p.b[0]) / 2 - 5) < 1e-9),
-    ).toBe(true);
+    expect(centre.every((p) => p.type === 'line' && Math.abs((p.a[0] + p.b[0]) / 2 - 5) < 1e-9)).toBe(true);
   });
 });

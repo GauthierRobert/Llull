@@ -35,26 +35,13 @@ export const addCylinder = defineCommand({
     'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin. ' +
     'Orientation: pass EITHER rotation (Euler radians) OR axis [dx,dy,dz] = direction the local +Z (symmetry) axis should point in world space; axis wins when both are given and Euler angles are derived and stored.',
   params: z.object({
-    radius: z
-      .number()
-      .describe('Radius of the cylinder cross-section in document units. Must be > 0.'),
+    radius: z.number().describe('Radius of the cylinder cross-section in document units. Must be > 0.'),
     height: z.number().describe('Total height of the cylinder in document units. Must be > 0.'),
     ...placedSolidFields('cylinder', 'center'),
     axis: axisField(),
   }),
-  run: (
-    doc,
-    { radius, height, position = ORIGIN, rotation, axis, color = DEFAULT_SOLID_COLOR, anchor },
-  ): CommandResult => {
-    return placeRoundSolid(
-      doc,
-      'cylinder',
-      'cyl',
-      'center',
-      'radius',
-      { radius, height },
-      { position, rotation, axis, color, anchor },
-    );
+  run: (doc, { radius, height, position = ORIGIN, rotation, axis, color = DEFAULT_SOLID_COLOR, anchor }): CommandResult => {
+    return placeRoundSolid(doc, 'cylinder', 'cyl', 'center', 'radius', { radius, height }, { position, rotation, axis, color, anchor });
   },
 });
 
@@ -80,17 +67,9 @@ export const addSphere = defineCommand({
     'The anchor offset is applied in the local UNROTATED frame; rotation is then applied by the viewport about the stored origin.',
   params: z.object({
     radius: z.number().describe('Radius of the sphere in document units. Must be > 0.'),
-    ...placedSolidFields(
-      'sphere',
-      'center',
-      {},
-      rotationField('Stored for uniformity; geometrically moot for a sphere.'),
-    ),
+    ...placedSolidFields('sphere', 'center', {}, rotationField('Stored for uniformity; geometrically moot for a sphere.')),
   }),
-  run: (
-    doc,
-    { radius, position = ORIGIN, rotation, color = DEFAULT_SOLID_COLOR, anchor },
-  ): CommandResult => {
+  run: (doc, { radius, position = ORIGIN, rotation, color = DEFAULT_SOLID_COLOR, anchor }): CommandResult => {
     const rejected = rejectNonPositive(doc, 'add_sphere', [['radius', radius]]);
     if (rejected) return rejected;
     return placeSolid(doc, {
@@ -135,21 +114,14 @@ export const addCone = defineCommand({
     'Orientation: pass EITHER rotation (Euler radians) OR axis [dx,dy,dz] = direction the local +Z (symmetry) axis should point in world space; axis wins when both are given and Euler angles are derived and stored.',
   params: z.object({
     radius: z.number().describe('Radius of the circular base in document units. Must be > 0.'),
-    height: z
-      .number()
-      .describe(
-        'Height from the base center to the apex along the local +Z axis in document units. Must be > 0.',
-      ),
+    height: z.number().describe('Height from the base center to the apex along the local +Z axis in document units. Must be > 0.'),
     ...placedSolidFields('cone', 'base-center', {
       'base-center': 'center of the circular base; apex at position+[0,0,height]',
       center: 'geometric center of the AABB (mid X/Y/Z)',
     }),
     axis: axisField(),
   }),
-  run: (
-    doc,
-    { radius, height, position = ORIGIN, rotation, axis, color = DEFAULT_SOLID_COLOR, anchor },
-  ): CommandResult => {
+  run: (doc, { radius, height, position = ORIGIN, rotation, axis, color = DEFAULT_SOLID_COLOR, anchor }): CommandResult => {
     return placeRoundSolid(
       doc,
       'cone',
@@ -191,9 +163,7 @@ export const addTorus = defineCommand({
   params: z.object({
     ringRadius: z
       .number()
-      .describe(
-        'Distance from the torus center to the center of the tube (major radius) in document units. Must be > 0.',
-      ),
+      .describe('Distance from the torus center to the center of the tube (major radius) in document units. Must be > 0.'),
     tubeRadius: z
       .number()
       .describe(
@@ -204,18 +174,7 @@ export const addTorus = defineCommand({
     axis: axisField(),
     position: positionField('The ring lies in the XY plane. '),
   }),
-  run: (
-    doc,
-    {
-      ringRadius,
-      tubeRadius,
-      position = ORIGIN,
-      rotation,
-      axis,
-      color = DEFAULT_SOLID_COLOR,
-      anchor,
-    },
-  ): CommandResult => {
+  run: (doc, { ringRadius, tubeRadius, position = ORIGIN, rotation, axis, color = DEFAULT_SOLID_COLOR, anchor }): CommandResult => {
     const rejected = rejectNonPositive(doc, 'add_torus', [
       ['ringRadius', ringRadius],
       ['tubeRadius', tubeRadius],
@@ -233,8 +192,7 @@ export const addTorus = defineCommand({
       rotation,
       axis,
       color,
-      describe: (id) =>
-        `Added torus ${id} with ringRadius ${ringRadius} and tubeRadius ${tubeRadius}`,
+      describe: (id) => `Added torus ${id} with ringRadius ${ringRadius} and tubeRadius ${tubeRadius}`,
     });
   },
 });

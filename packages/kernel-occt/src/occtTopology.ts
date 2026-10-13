@@ -5,13 +5,7 @@
  * edge curve types, lengths and points, seam / degenerate flags, solid volume.
  */
 
-import type {
-  EdgeCurve,
-  FaceSurface,
-  ShapeEdge,
-  ShapeFace,
-  ShapeTopology,
-} from '@core/geometry/kernel';
+import type { EdgeCurve, FaceSurface, ShapeEdge, ShapeFace, ShapeTopology } from '@core/geometry/kernel';
 import type { Vec3 } from '@core/model/types';
 import { release } from '@core/geometry/nativeObject';
 import { explorer, type OccApi, type OccHandle, type OccPoint, type OccShape } from './occtTypes';
@@ -85,11 +79,7 @@ function pointAt(adaptor: { Value(u: number): OccPoint }, parameter: number): Ve
 }
 
 /** Number of distinct faces each unique edge bounds (1 = a seam), indexed like `edges`. */
-function adjacentFaceCounts(
-  api: OccApi,
-  faces: readonly OccShape[],
-  edges: readonly OccShape[],
-): number[] {
+function adjacentFaceCounts(api: OccApi, faces: readonly OccShape[], edges: readonly OccShape[]): number[] {
   const buckets = new Map<number, number[]>();
   edges.forEach((edge, index) => {
     const hash = edge.HashCode(HASH_BOUND);
@@ -100,9 +90,7 @@ function adjacentFaceCounts(
     const exp = explorer(api, face, 'TopAbs_EDGE');
     for (; exp.More(); exp.Next()) {
       const current = exp.Current();
-      const match = buckets
-        .get(current.HashCode(HASH_BOUND))
-        ?.find((index) => edges[index]?.IsSame(current));
+      const match = buckets.get(current.HashCode(HASH_BOUND))?.find((index) => edges[index]?.IsSame(current));
       if (match !== undefined) facesOf[match]?.add(faceIndex);
       release(current);
     }
@@ -153,9 +141,7 @@ function edgeInfo(api: OccApi, shape: OccShape, index: number, faceCount: number
     ...(curve === 'line'
       ? {}
       : {
-          samples: Array.from({ length: EDGE_SAMPLES + 1 }, (_, k) =>
-            pointAt(adaptor, first + ((last - first) * k) / EDGE_SAMPLES),
-          ),
+          samples: Array.from({ length: EDGE_SAMPLES + 1 }, (_, k) => pointAt(adaptor, first + ((last - first) * k) / EDGE_SAMPLES)),
         }),
     seam: faceCount === 1,
     degenerate,

@@ -7,24 +7,11 @@ import type { EquipmentElement, PipeElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, looseVec2, vec3, z } from '@core/commands/schema';
 import { fromMm, toMetres } from '@core/model/units';
-import {
-  getBuilding,
-  isVec2,
-  nextElementId,
-  nextMark,
-  resolveLevel,
-  toVec2,
-  withElement,
-} from '../../building/model';
+import { getBuilding, isVec2, nextElementId, nextMark, resolveLevel, toVec2, withElement } from '../../building/model';
 import { noop } from '@core/commands/noop';
 import { duplicateSummary, findTwin, samePath } from '../../shared/duplicates';
 import { commitBuilding } from '../../building/evaluate/evaluateElements';
-import {
-  SHAPE_PARAM_TEXT,
-  describeEquipmentShape,
-  equipmentShapeSchema,
-  normaliseEquipmentSize,
-} from './equipmentShape';
+import { SHAPE_PARAM_TEXT, describeEquipmentShape, equipmentShapeSchema, normaliseEquipmentSize } from './equipmentShape';
 import { PIPE_OUTSIDE_DIAMETER_MM, outsideDiameterMm } from '../piping/pipeSizes';
 import { hasRepeatedPoint, routeLength, routeOrFailure } from '../piping/routeSupport';
 import { levelIdParam } from '../../building/levelParams';
@@ -53,24 +40,14 @@ export const addEquipment = defineCommand({
     ),
     shape: equipmentShapeSchema.optional().describe(SHAPE_PARAM_TEXT),
     angle: z.number().optional().describe('Plan rotation in radians. Default 0.'),
-    clearance: z
-      .number()
-      .optional()
-      .describe('Maintenance / operating clearance around it, in document units. Default 800 mm.'),
+    clearance: z.number().optional().describe('Maintenance / operating clearance around it, in document units. Default 800 mm.'),
     weight: z.number().optional().describe('Operating weight in kg. Default 0 (unknown).'),
     levelId: levelIdParam,
-    mark: z
-      .string()
-      .optional()
-      .describe('Equipment tag, unique among equipment (duplicates are refused). Default EQn.'),
+    mark: z.string().optional().describe('Equipment tag, unique among equipment (duplicates are refused). Default EQn.'),
   }),
-  run: (
-    doc,
-    { name, location, size, shape = 'box', angle = 0, clearance, weight = 0, levelId, mark },
-  ): CommandResult => {
+  run: (doc, { name, location, size, shape = 'box', angle = 0, clearance, weight = 0, levelId, mark }): CommandResult => {
     if (name.trim() === '') return noop(doc, 'add_equipment failed: name is required.');
-    if (!isVec2(location))
-      return noop(doc, 'add_equipment failed: location must be [x, y] with finite numbers.');
+    if (!isVec2(location)) return noop(doc, 'add_equipment failed: location must be [x, y] with finite numbers.');
     const dimensions = normaliseEquipmentSize(shape, size);
     if (!dimensions) {
       return noop(
@@ -79,8 +56,7 @@ export const addEquipment = defineCommand({
       );
     }
     const resolvedClearance = clearance ?? fromMm(doc, 800);
-    if (resolvedClearance < 0 || weight < 0)
-      return noop(doc, 'add_equipment failed: clearance >= 0 and weight >= 0.');
+    if (resolvedClearance < 0 || weight < 0) return noop(doc, 'add_equipment failed: clearance >= 0 and weight >= 0.');
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noop(doc, `add_equipment failed: ${resolution.reason}.`);
     const requestedMark = mark?.trim();
@@ -136,15 +112,8 @@ export const addPipeRun = defineCommand({
     'clashes are reported by check_clashes. Support it with add_pipe_support and verify the spacing with check_pipe_supports. ' +
     'Refused if a pipe of the same diameter already follows the same route (either direction) on the level.',
   params: z.object({
-    points: z
-      .array(z.array(z.number()))
-      .describe('Pipe centreline [[x, y, z], …], 2 to 1000 points.'),
-    diameter: z
-      .number()
-      .optional()
-      .describe(
-        'Outside diameter in document units. Default: from `dn` when given, else 114.3 mm (DN100).',
-      ),
+    points: z.array(z.array(z.number())).describe('Pipe centreline [[x, y, z], …], 2 to 1000 points.'),
+    diameter: z.number().optional().describe('Outside diameter in document units. Default: from `dn` when given, else 114.3 mm (DN100).'),
     dn: z
       .number()
       .optional()
@@ -154,24 +123,13 @@ export const addPipeRun = defineCommand({
           'untabulated DN then needs an explicit `diameter`). Printed "DN100" in the line list.',
       ),
     line: z.string().optional().describe('Line number for the line list, e.g. "L-101".'),
-    from: z
-      .string()
-      .optional()
-      .describe(
-        'Line origin: equipment tag (e.g. "EQ1") or battery-limit / tie-in id (e.g. "BL-1").',
-      ),
-    to: z
-      .string()
-      .optional()
-      .describe('Line destination: equipment tag or battery-limit / tie-in id.'),
+    from: z.string().optional().describe('Line origin: equipment tag (e.g. "EQ1") or battery-limit / tie-in id (e.g. "BL-1").'),
+    to: z.string().optional().describe('Line destination: equipment tag or battery-limit / tie-in id.'),
     service: z.string().optional().describe('Fluid / service. Default "process".'),
     material: z.string().optional().describe('Pipe material. Default "steel".'),
     levelId: levelIdParam,
   }),
-  run: (
-    doc,
-    { points, diameter, dn, line, from, to, service, material, levelId },
-  ): CommandResult => {
+  run: (doc, { points, diameter, dn, line, from, to, service, material, levelId }): CommandResult => {
     const path = routeOrFailure('add_pipe_run', points, 'line');
     if (typeof path === 'string') return noop(doc, path);
     if (dn !== undefined && !(Number.isInteger(dn) && dn > 0))
@@ -179,10 +137,7 @@ export const addPipeRun = defineCommand({
     const tabulated = dn !== undefined ? outsideDiameterMm(dn) : null;
     if (diameter === undefined && dn !== undefined && tabulated === null) {
       const known = Object.keys(PIPE_OUTSIDE_DIAMETER_MM).join(', ');
-      return noop(
-        doc,
-        `add_pipe_run failed: DN${dn} is not in the pipe size table (${known}); give an explicit diameter.`,
-      );
+      return noop(doc, `add_pipe_run failed: DN${dn} is not in the pipe size table (${known}); give an explicit diameter.`);
     }
     const resolvedDiameter = diameter ?? fromMm(doc, tabulated ?? 114.3);
     if (hasRepeatedPoint(path) || resolvedDiameter <= 0)
@@ -195,8 +150,7 @@ export const addPipeRun = defineCommand({
       resolution.level.id,
       (element) => element.diameter === resolvedDiameter && samePath(element.points, path),
     );
-    if (pipeTwin)
-      return noop(doc, duplicateSummary('add_pipe_run', pipeTwin, 'a pipe on this route'));
+    if (pipeTwin) return noop(doc, duplicateSummary('add_pipe_run', pipeTwin, 'a pipe on this route'));
     const text = (value: string | undefined): string | undefined => value?.trim() || undefined;
     const [lineNumber, origin, destination] = [text(line), text(from), text(to)];
     const pipe: PipeElement = {

@@ -37,26 +37,9 @@ export function EllipticalCurve({
 }: EllipticalCurveProps): React.ReactElement {
   const [centerX, centerY] = center;
   const positions = useMemo(() => {
-    const curve = new THREE.EllipseCurve(
-      centerX,
-      centerY,
-      radiusX,
-      radiusY,
-      startAngle,
-      endAngle,
-      false,
-      0,
-    );
+    const curve = new THREE.EllipseCurve(centerX, centerY, radiusX, radiusY, startAngle, endAngle, false, 0);
     return curve.getPoints(CURVE_SEGMENTS).flatMap(({ x, y }) => [x, y, 0]);
   }, [centerX, centerY, radiusX, radiusY, startAngle, endAngle]);
 
-  return (
-    <ShapeLine
-      positions={positions}
-      position={position}
-      rotation={rotation}
-      color={color}
-      selected={selected}
-    />
-  );
+  return <ShapeLine positions={positions} position={position} rotation={rotation} color={color} selected={selected} />;
 }

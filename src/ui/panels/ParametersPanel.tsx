@@ -27,11 +27,7 @@ function ParameterRow({ param }: ParameterRowProps): React.ReactElement {
   const hasError = param.error != null;
 
   return (
-    <li
-      className="panel__row param-row"
-      data-testid={`param-row-${param.name}`}
-      aria-label={`Parameter: ${param.name}`}
-    >
+    <li className="panel__row param-row" data-testid={`param-row-${param.name}`} aria-label={`Parameter: ${param.name}`}>
       <span className="param-name" title={param.name}>
         {param.name}
       </span>
@@ -63,12 +59,7 @@ function ParameterRow({ param }: ParameterRowProps): React.ReactElement {
       />
 
       {hasError && (
-        <p
-          id={`param-error-${param.name}`}
-          className="param-error panel__error"
-          role="alert"
-          aria-live="polite"
-        >
+        <p id={`param-error-${param.name}`} className="param-error panel__error" role="alert" aria-live="polite">
           {param.error}
         </p>
       )}
@@ -89,12 +80,7 @@ function AddParameterRow(): React.ReactElement {
   });
 
   return (
-    <form
-      className="panel__form param-add-form"
-      onSubmit={handleSubmit}
-      aria-label="Add new parameter"
-      data-testid="param-add-form"
-    >
+    <form className="panel__form param-add-form" onSubmit={handleSubmit} aria-label="Add new parameter" data-testid="param-add-form">
       <div className="param-add-fields">
         <input
           type="text"
@@ -138,18 +124,10 @@ export function ParametersPanel({ className }: ParametersPanelProps): React.Reac
 
   return (
     <aside className={classNames('panel params-panel', className)} aria-label="Parameters">
-      <PanelHeader
-        title="Parameters"
-        count={paramList.length}
-        countLabel={`${paramList.length} parameters`}
-      />
+      <PanelHeader title="Parameters" count={paramList.length} countLabel={`${paramList.length} parameters`} />
 
       {paramList.length === 0 ? (
-        <PanelEmpty
-          icon="parameters"
-          message="No parameters defined."
-          hint="Name a value, then reference it from expressions."
-        />
+        <PanelEmpty icon="parameters" message="No parameters defined." hint="Name a value, then reference it from expressions." />
       ) : (
         <>
           <div className="param-columns" aria-hidden="true">

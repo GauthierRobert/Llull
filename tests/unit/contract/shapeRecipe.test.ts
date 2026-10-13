@@ -2,13 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import type { BoxEntity, Entity, MeshSolidEntity } from '@core/model/types';
 import type { ShapeRecipe } from '@core/model/types';
-import {
-  geometryKey,
-  meshRecipeOf,
-  recipeKey,
-  recipeOf,
-  validateShapeRecipe,
-} from '@core/geometry/shapeRecipe';
+import { geometryKey, meshRecipeOf, recipeKey, recipeOf, validateShapeRecipe } from '@core/geometry/shapeRecipe';
 import { TETRA } from '../../helpers/fakeKernel';
 
 function box(id: string, color: string, x = 0): BoxEntity {
@@ -30,10 +24,7 @@ const union = (a: Entity, b: Entity): ShapeRecipe => ({
   b: recipeOf(b),
 });
 
-function result(
-  brep: ShapeRecipe,
-  position: [number, number, number] = [0, 0, 0],
-): MeshSolidEntity {
+function result(brep: ShapeRecipe, position: [number, number, number] = [0, 0, 0]): MeshSolidEntity {
   return {
     id: 'mesh-1',
     kind: 'mesh',
@@ -50,9 +41,7 @@ describe('recipeKey', () => {
   it('ignores presentation fields (id, name, color, layer, tags, material)', () => {
     const recolored = { ...box('b', '#000000'), name: 'n', tags: ['t'], materialId: 'm' };
     expect(geometryKey(box('a', '#ffffff'))).toBe(geometryKey(recolored));
-    expect(recipeKey(union(box('a', '#fff'), box('b', '#fff', 1)))).toBe(
-      recipeKey(union(box('x', '#000', 0), box('y', '#123', 1))),
-    );
+    expect(recipeKey(union(box('a', '#fff'), box('b', '#fff', 1)))).toBe(recipeKey(union(box('x', '#000', 0), box('y', '#123', 1))));
   });
 
   it('differs when any geometric input differs (operands, op, size, edges, placement)', () => {
@@ -131,18 +120,10 @@ describe('validateShapeRecipe', () => {
     ['leaf without entity', { op: 'solid' }, /needs an entity/],
     ['bad boolean', { op: 'boolean', boolean: 'xor', a: leaf, b: leaf }, /unknown boolean 'xor'/],
     ['bad nested operand', { op: 'boolean', boolean: 'union', a: leaf, b: 1 }, /not an object/],
-    [
-      'fractional edge',
-      { op: 'fillet', source: leaf, edges: [0.5], size: 1 },
-      /non-negative integers/,
-    ],
+    ['fractional edge', { op: 'fillet', source: leaf, edges: [0.5], size: 1 }, /non-negative integers/],
     ['zero size', { op: 'chamfer', source: leaf, edges: [], size: 0 }, /size must be > 0/],
     ['zero thickness', { op: 'shell', source: leaf, thickness: 0 }, /thickness must be > 0/],
-    [
-      'bad placement',
-      { op: 'place', source: leaf, position: [1, 2], rotation: [0, 0, 0] },
-      /finite Vec3/,
-    ],
+    ['bad placement', { op: 'place', source: leaf, position: [1, 2], rotation: [0, 0, 0] }, /finite Vec3/],
     ['negative scale', { op: 'scale', source: leaf, factor: -1 }, /factor must be > 0/],
   ])('rejects %s', (_label, value, message) => {
     expect(validateShapeRecipe(value)).toMatch(message);
@@ -167,9 +148,7 @@ describe('validateShapeRecipe', () => {
 
   it('runs the injected leaf validator on every leaf', () => {
     const tree = { op: 'boolean', boolean: 'union', a: leaf, b: leaf };
-    expect(
-      validateShapeRecipe(tree, (entity) => (entity['id'] === 'a' ? 'bad leaf a' : null)),
-    ).toBe('bad leaf a');
+    expect(validateShapeRecipe(tree, (entity) => (entity['id'] === 'a' ? 'bad leaf a' : null))).toBe('bad leaf a');
   });
 
   it('rejects a tree nested deeper than the limit', () => {

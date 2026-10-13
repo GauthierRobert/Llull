@@ -187,16 +187,8 @@ describe('render_view cutaway', () => {
       ['zero normal', { planes: [{ normal: [0, 0, 0], offset: 1 }] }, /non-zero/],
       ['no planes', { planes: [] }, /1\.\.6 planes/],
       ['too many planes', { planes: Array(7).fill({ normal: [1, 0, 0], offset: 0 }) }, /planes/],
-      [
-        'empty selection',
-        { planes: [{ normal: [1, 0, 0], offset: 0 }], entityIds: [] },
-        /entityIds is empty/,
-      ],
-      [
-        'unknown ids',
-        { planes: [{ normal: [1, 0, 0], offset: 0 }], entityIds: ['nope'] },
-        /matches no entity/,
-      ],
+      ['empty selection', { planes: [{ normal: [1, 0, 0], offset: 0 }], entityIds: [] }, /entityIds is empty/],
+      ['unknown ids', { planes: [{ normal: [1, 0, 0], offset: 0 }], entityIds: ['nope'] }, /matches no entity/],
     ];
     for (const [, cut, message] of bad) {
       const result = execute(doc, 'render_view', { ...bare, cut });
@@ -249,12 +241,7 @@ describe('render_view cutaway', () => {
     };
     const tube = [...shell(2), ...shell(1)];
     const cut = { planes: [{ normal: [1, 0, 0] as [number, number, number], offset: 0 }] };
-    const result = cutEntityPolygons(
-      tube,
-      { ...cut, mode: 'intersection' },
-      unitPlanes({ ...cut, mode: 'intersection' }),
-      1e-6,
-    );
+    const result = cutEntityPolygons(tube, { ...cut, mode: 'intersection' }, unitPlanes({ ...cut, mode: 'intersection' }), 1e-6);
     const cap = result.polygons.find((p) => p.loops !== undefined);
     expect(result.cut).toBe(true);
     expect(cap?.loops).toHaveLength(2);

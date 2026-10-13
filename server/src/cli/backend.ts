@@ -64,15 +64,11 @@ export function createLocalBackend(docPath: string, options: LocalOptions): CliB
         prior,
         name,
         params,
-        options.observer !== undefined
-          ? { ...defaultContext(), onStep: options.observer.onStep }
-          : undefined,
+        options.observer !== undefined ? { ...defaultContext(), onStep: options.observer.onStep } : undefined,
       );
       doc = document;
       if (outcome.changed && !options.dryRun) saveDocumentWithBackup(docPath, document);
-      return outcome.data !== undefined
-        ? { ...outcome, data: options.observer?.withDurations(outcome.data) ?? outcome.data }
-        : outcome;
+      return outcome.data !== undefined ? { ...outcome, data: options.observer?.withDurations(outcome.data) ?? outcome.data } : outcome;
     } catch (error) {
       return failedOutcome(name, error);
     }
@@ -130,8 +126,7 @@ interface RemoteOptions {
 /** Backend over a running llull server: every call goes through its command bus (shared history). */
 export function createRemoteBackend(serverUrl: string, options: RemoteOptions): CliBackend {
   const base = serverUrl.replace(/\/+$/, '');
-  const timeoutMs =
-    options.timeoutSeconds !== undefined ? options.timeoutSeconds * 1000 : REMOTE_TIMEOUT_MS;
+  const timeoutMs = options.timeoutSeconds !== undefined ? options.timeoutSeconds * 1000 : REMOTE_TIMEOUT_MS;
   const post = async (route: string, body: unknown): Promise<CommandOutcome> => {
     try {
       const reply = await requestJson(`${base}${route}`, {

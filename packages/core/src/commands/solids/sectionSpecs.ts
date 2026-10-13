@@ -17,19 +17,10 @@ import { sketchLoop } from './sketchCurves';
 /** Zod fields of one section spec (each described for agents). */
 export const sectionSpecFields = {
   radius: z.number().describe('Round section radius (> 0).').optional(),
-  radiusX: z
-    .number()
-    .describe('Elliptical section: half-width along section x (> 0); give with radiusY.')
-    .optional(),
-  radiusY: z
-    .number()
-    .describe('Elliptical section: half-height along section y (> 0); give with radiusX.')
-    .optional(),
+  radiusX: z.number().describe('Elliptical section: half-width along section x (> 0); give with radiusY.').optional(),
+  radiusY: z.number().describe('Elliptical section: half-height along section y (> 0); give with radiusX.').optional(),
   section: untypedArray('Polygon section: closed [x, y] points (>= 3).').optional(),
-  sectionId: z
-    .string()
-    .describe('Id of a closed 2D sketch (circle, ellipse, rectangle, closed polyline/spline).')
-    .optional(),
+  sectionId: z.string().describe('Id of a closed 2D sketch (circle, ellipse, rectangle, closed polyline/spline).').optional(),
 };
 
 export interface SectionSpec {
@@ -66,8 +57,7 @@ export function specPolygon(doc: CadDocument, spec: SectionSpec): Vec2[] | strin
   const { radius, radiusX, radiusY, section, sectionId } = spec;
   const ellipse = radiusX !== undefined || radiusY !== undefined;
   const given = [radius !== undefined, ellipse, section !== undefined, sectionId !== undefined];
-  if (given.filter(Boolean).length !== 1)
-    return 'give exactly one of radius, radiusX+radiusY, section or sectionId';
+  if (given.filter(Boolean).length !== 1) return 'give exactly one of radius, radiusX+radiusY, section or sectionId';
   let polygon: Vec2[];
   if (radius !== undefined || ellipse) {
     const rx = radius ?? radiusX ?? 0;
@@ -87,10 +77,7 @@ export function specPolygon(doc: CadDocument, spec: SectionSpec): Vec2[] | strin
 }
 
 /** Section ring of a spec (or an error message), and its half-size (max distance from 0,0). */
-export function specRing(
-  doc: CadDocument,
-  spec: SectionSpec,
-): { ring: Vec2[]; halfSize: number } | string {
+export function specRing(doc: CadDocument, spec: SectionSpec): { ring: Vec2[]; halfSize: number } | string {
   const polygon = specPolygon(doc, spec);
   if (typeof polygon === 'string') return polygon;
   return {

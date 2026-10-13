@@ -24,12 +24,7 @@ export function layerName(category: BimCategory): string {
   return CATEGORY_LAYER[category].name;
 }
 
-export function band(
-  axis: Pick<WallElement, 'start' | 'end'>,
-  s0: number,
-  s1: number,
-  halfWidth: number,
-): Vec2[] {
+export function band(axis: Pick<WallElement, 'start' | 'end'>, s0: number, s1: number, halfWidth: number): Vec2[] {
   const frame = wallFrame(axis);
   return [
     pointAlong(axis, frame, s0, -halfWidth),
@@ -47,12 +42,14 @@ export const thinLine = (layer: string, a: Vec2, b: Vec2): DrawingPrimitive => (
   b,
 });
 
-export const annotationText = (
-  layer: string,
-  at: Vec2,
-  height: number,
-  content: string,
-): DrawingPrimitive => ({ type: 'text', layer, style: 'annotation', at, height, content });
+export const annotationText = (layer: string, at: Vec2, height: number, content: string): DrawingPrimitive => ({
+  type: 'text',
+  layer,
+  style: 'annotation',
+  at,
+  height,
+  content,
+});
 
 export function isCut(opening: OpeningElement, cutHeight: number): boolean {
   return opening.sillHeight < cutHeight && opening.sillHeight + opening.height > cutHeight;

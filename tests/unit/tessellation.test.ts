@@ -108,10 +108,7 @@ describe('tessellation — earClipTriangulate', () => {
         const theta = ((t * samplesPerTooth + s) / (teeth * samplesPerTooth)) * 2 * Math.PI;
         // Alternate between rOuter (tip) and rRoot (root) across each tooth.
         const phase = s / samplesPerTooth;
-        const r =
-          phase < 0.5
-            ? rOuter - (rOuter - rRoot) * (phase * 2)
-            : rRoot + (rOuter - rRoot) * ((phase - 0.5) * 2);
+        const r = phase < 0.5 ? rOuter - (rOuter - rRoot) * (phase * 2) : rRoot + (rOuter - rRoot) * ((phase - 0.5) * 2);
         pts.push([r * Math.cos(theta), r * Math.sin(theta)]);
       }
     }
@@ -171,12 +168,7 @@ describe('tessellation - boxFaces / wedgeFaces', () => {
       const [a, b, c] = face as [Vec3, Vec3, Vec3];
       const n = facetNormal(a, b, c);
       const mid = centroid(face);
-      return (
-        n.reduce(
-          (sum, value, axis) => sum + value * (mid[axis] ?? 0) - value * (inside[axis] ?? 0),
-          0,
-        ) > 0
-      );
+      return n.reduce((sum, value, axis) => sum + value * (mid[axis] ?? 0) - value * (inside[axis] ?? 0), 0) > 0;
     });
 
   it('box: six quads with outward normals', () => {

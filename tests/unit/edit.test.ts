@@ -25,11 +25,7 @@ function singleBox(params: Record<string, unknown> = {}): { doc: CadDocument; so
   return { doc: created.document, sourceId: created.affected[0]! };
 }
 
-function expectMissingNoOp(
-  cmd: string,
-  params: Record<string, unknown>,
-  summaryPart: string,
-): void {
+function expectMissingNoOp(cmd: string, params: Record<string, unknown>, summaryPart: string): void {
   const doc = createEmptyDocument();
   const result = execute(doc, cmd, params);
   expect(result.affected).toHaveLength(0);

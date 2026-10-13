@@ -34,11 +34,7 @@ export interface GridAnnotations {
   readonly bubbles: readonly GridBubble[];
 }
 
-function nearestLabel(
-  center: readonly [number, number],
-  texts: readonly Extract<Entity, { kind: 'text' }>[],
-  within: number,
-): string {
+function nearestLabel(center: readonly [number, number], texts: readonly Extract<Entity, { kind: 'text' }>[], within: number): string {
   let best = '';
   let bestDistance = within;
   for (const text of texts) {
@@ -70,20 +66,12 @@ export function collectGridAnnotations(gridEntities: readonly Entity[]): GridAnn
 
   let extent = 0;
   for (const axis of axes) {
-    extent = Math.max(
-      extent,
-      Math.abs(axis.end[0] - axis.start[0]),
-      Math.abs(axis.end[1] - axis.start[1]),
-    );
+    extent = Math.max(extent, Math.abs(axis.end[0] - axis.start[0]), Math.abs(axis.end[1] - axis.start[1]));
   }
   const minimumRadius = extent * MIN_BUBBLE_FRACTION;
 
   const bubbles = circles.map((circle): GridBubble => {
-    const center: Point3 = [
-      circle.position[0] + circle.center[0],
-      circle.position[1] + circle.center[1],
-      circle.position[2],
-    ];
+    const center: Point3 = [circle.position[0] + circle.center[0], circle.position[1] + circle.center[1], circle.position[2]];
     return {
       id: circle.id,
       center,

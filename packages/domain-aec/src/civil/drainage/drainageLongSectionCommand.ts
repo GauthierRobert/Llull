@@ -10,12 +10,7 @@ import { noop, report } from '@core/commands/noop';
 import { safeFileName } from '@lib/safeFileName';
 import { toMetres, toMm } from '@core/model/units';
 import { civilObject, civilObjectsOf, getCivil } from '../model';
-import {
-  criteriaOrFailure,
-  HYDRAULIC_FIELDS,
-  idfField,
-  intensityField,
-} from './drainageAnalysisCommands';
+import { criteriaOrFailure, HYDRAULIC_FIELDS, idfField, intensityField } from './drainageAnalysisCommands';
 import { computeFlows } from './drainageFlow';
 import { computeHgl } from './drainageHgl';
 import { pipePlanLength, pipeSlope } from './drainageTopology';
@@ -37,9 +32,7 @@ function runPipes(civil: CivilModel, fromId: string, toId: string | undefined): 
   const run: PipeObject[] = [];
   let current = fromId;
   for (;;) {
-    const next = pipes
-      .filter((p) => p.fromId === current)
-      .sort((a, b) => b.diameter - a.diameter || a.id.localeCompare(b.id))[0];
+    const next = pipes.filter((p) => p.fromId === current).sort((a, b) => b.diameter - a.diameter || a.id.localeCompare(b.id))[0];
     if (!next) return run;
     run.push(next);
     current = next.toId;
@@ -62,15 +55,8 @@ export const exportDrainageLongSection = defineCommand({
     'largest pipe at each fork down to the outfall. Returns data { text, fileName, pipeIds, manholeIds }.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
-    fromManholeId: z
-      .string()
-      .describe('Upstream manhole id where the run starts, e.g. "manhole-1".'),
-    toManholeId: z
-      .string()
-      .optional()
-      .describe(
-        'Downstream manhole id where the run ends. Default: follow the main run to the outfall.',
-      ),
+    fromManholeId: z.string().describe('Upstream manhole id where the run starts, e.g. "manhole-1".'),
+    toManholeId: z.string().optional().describe('Downstream manhole id where the run ends. Default: follow the main run to the outfall.'),
     rainfallIntensityMmH: intensityField,
     idf: idfField,
     ...HYDRAULIC_FIELDS,
@@ -80,8 +66,7 @@ export const exportDrainageLongSection = defineCommand({
     if ('summary' in criteria) return criteria;
     const civil = getCivil(doc);
     const start = civilObject(civil, params.fromManholeId, 'manhole');
-    if (!start)
-      return noop(doc, `export_drainage_long_section failed: no manhole ${params.fromManholeId}.`);
+    if (!start) return noop(doc, `export_drainage_long_section failed: no manhole ${params.fromManholeId}.`);
     if (params.toManholeId !== undefined && !civilObject(civil, params.toManholeId, 'manhole'))
       return noop(doc, `export_drainage_long_section failed: no manhole ${params.toManholeId}.`);
     const run = runPipes(civil, start.id, params.toManholeId);

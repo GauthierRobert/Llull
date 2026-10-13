@@ -94,15 +94,9 @@ describe('flat roofs (§7.2.3 Tab. 7.2, sharp eaves)', () => {
 
 describe('monopitch Tab. 7.3a', () => {
   it('reproduces the former hard-coded 5° values', () => {
-    expect(['F', 'G', 'H'].map((zone) => cpe('monopitch', 5, 0, zone as RoofZone))).toEqual([
-      -1.7, -1.2, -0.6,
-    ]);
-    expect(['F', 'G', 'H'].map((zone) => cpe('monopitch', 5, 180, zone as RoofZone))).toEqual([
-      -2.3, -1.3, -0.8,
-    ]);
-    expect(
-      ['Fup', 'Flow', 'G', 'H', 'I'].map((zone) => cpe('monopitch', 5, 90, zone as RoofZone)),
-    ).toEqual([-1.6, -1.6, -1.8, -0.6, -0.5]);
+    expect(['F', 'G', 'H'].map((zone) => cpe('monopitch', 5, 0, zone as RoofZone))).toEqual([-1.7, -1.2, -0.6]);
+    expect(['F', 'G', 'H'].map((zone) => cpe('monopitch', 5, 180, zone as RoofZone))).toEqual([-2.3, -1.3, -0.8]);
+    expect(['Fup', 'Flow', 'G', 'H', 'I'].map((zone) => cpe('monopitch', 5, 90, zone as RoofZone))).toEqual([-1.6, -1.6, -1.8, -0.6, -0.5]);
   });
 
   it('stays within 0.05 of the former values at 10° where the standard keeps them, and follows the table elsewhere', () => {
@@ -138,10 +132,7 @@ describe('monopitch Tab. 7.3a', () => {
 describe('duopitch frame average', () => {
   it('uses H windward and the area-weighted I / J leeward', () => {
     expect(frameRoofAverage('duopitch', 15, 0, 'suction', 'windward')).toBeCloseTo(-0.3, 9);
-    expect(frameRoofAverage('duopitch', 15, 0, 'suction', 'leeward')).toBeCloseTo(
-      0.9 * -0.4 + 0.1 * -1.0,
-      9,
-    );
+    expect(frameRoofAverage('duopitch', 15, 0, 'suction', 'leeward')).toBeCloseTo(0.9 * -0.4 + 0.1 * -1.0, 9);
     expect(frameRoofAverage('duopitch', 30, 0, 'pressure')).toBeCloseTo(0.4, 9);
   });
 });
@@ -163,12 +154,7 @@ const rafterLoads = (frame: FrameModel, loadCase: 'WL' | 'WLp' | 'WR' | 'WRp'): 
 describe('frame roof wind loads', () => {
   it('keeps the four base wind cases on the default 6° hall', () => {
     const frame = framesOfHall(hall())[0]!;
-    expect(frame.windCases.map((windCase) => windCase.loadCase)).toEqual([
-      'WL',
-      'WR',
-      'WLs',
-      'WRs',
-    ]);
+    expect(frame.windCases.map((windCase) => windCase.loadCase)).toEqual(['WL', 'WR', 'WLs', 'WRs']);
     expect(windCasesOf(framesOfHall(hall()))).toEqual([...WIND_CASES]);
     const check = execute(hall(), 'check_portal_frames', { windPressure: 0.9 }).data as {
       combinations: string[];
@@ -191,14 +177,7 @@ describe('frame roof wind loads', () => {
     const doc = hall({ roofPitch: 30 });
     const frames = framesOfHall(doc);
     const frame = frames[0]!;
-    expect(frame.windCases.map((windCase) => windCase.loadCase)).toEqual([
-      'WL',
-      'WR',
-      'WLs',
-      'WRs',
-      'WLp',
-      'WRp',
-    ]);
+    expect(frame.windCases.map((windCase) => windCase.loadCase)).toEqual(['WL', 'WR', 'WLs', 'WRs', 'WLp', 'WRp']);
     const [windwardSuction] = rafterLoads(frame, 'WL') as [number, number];
     const [windwardPressure, leewardPressure] = rafterLoads(frame, 'WLp') as [number, number];
     expect(windwardSuction).toBeGreaterThan(0);
@@ -230,13 +209,7 @@ describe('frame roof wind loads', () => {
 
   it('gives a monopitch roof the pressure case for wind on the low eaves only', () => {
     const frames = framesOfHall(hall({ roofType: 'monopitch', roofPitch: 30 }));
-    expect(windCasesOf(frames).map((windCase) => windCase.loadCase)).toEqual([
-      'WL',
-      'WR',
-      'WLs',
-      'WRs',
-      'WLp',
-    ]);
+    expect(windCasesOf(frames).map((windCase) => windCase.loadCase)).toEqual(['WL', 'WR', 'WLs', 'WRs', 'WLp']);
     const [rafter] = rafterLoads(frames[0]!, 'WLp');
     expect(rafter).toBeLessThan(0);
   });
@@ -259,9 +232,7 @@ const purlinData = (doc: CadDocument, params: Record<string, unknown> = {}): Pur
 
 describe('purlin wind zones per pitch', () => {
   const roofCpes = (data: PurlinData, zone: string): number[] =>
-    data.zones
-      .filter((entry) => entry.surface === 'roof' && entry.zone === zone)
-      .map((entry) => entry.cpe);
+    data.zones.filter((entry) => entry.surface === 'roof' && entry.zone === zone).map((entry) => entry.cpe);
 
   it('reads the zone values from the tables at the roof pitch', () => {
     const shallow = purlinData(hall());
@@ -274,9 +245,7 @@ describe('purlin wind zones per pitch', () => {
 
   it('uses the flat-roof table below 5° (perimeter F / G / H, I inside)', () => {
     const flat = purlinData(hall({ roofPitch: 0 }));
-    const zones = new Set(
-      flat.zones.filter((entry) => entry.surface === 'roof').map((e) => e.zone),
-    );
+    const zones = new Set(flat.zones.filter((entry) => entry.surface === 'roof').map((e) => e.zone));
     expect(zones).toEqual(new Set(['F', 'G', 'H/I']));
     expect(roofCpes(flat, 'F')).toEqual([-1.8]);
     expect(roofCpes(flat, 'G')).toEqual([-1.2]);
@@ -305,9 +274,7 @@ describe('purlin wind zones per pitch', () => {
 
   it('keeps the default hall within 5% of the former purlin utilisation (1.100)', () => {
     const data = purlinData(hall(), { windPressure: 0.9 });
-    const worst = Math.max(
-      ...data.rows.filter((row) => row.kind === 'purlin').map((r) => r.utilisation),
-    );
+    const worst = Math.max(...data.rows.filter((row) => row.kind === 'purlin').map((r) => r.utilisation));
     expect(Math.abs(worst / 1.0996518767307895 - 1)).toBeLessThan(0.05);
   });
 });

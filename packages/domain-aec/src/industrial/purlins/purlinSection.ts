@@ -22,10 +22,7 @@ interface Segment {
 function sectionModulus(segments: readonly Segment[], top: number): number {
   const area = segments.reduce((sum, segment) => sum + segment.area, 0);
   const axis = segments.reduce((sum, segment) => sum + segment.area * segment.y, 0) / area;
-  const inertia = segments.reduce(
-    (sum, segment) => sum + segment.inertia + segment.area * (segment.y - axis) ** 2,
-    0,
-  );
+  const inertia = segments.reduce((sum, segment) => sum + segment.inertia + segment.area * (segment.y - axis) ** 2, 0);
   return inertia / (top - axis);
 }
 
@@ -37,10 +34,7 @@ function sectionModulus(segments: readonly Segment[], top: number): number {
  * Lips fully effective (no distortional buckling χd); neutral axis shift not iterated.
  * @returns ratio <= 1 and the flange / web reduction factors
  */
-export function effectiveModulusRatio(
-  profile: SteelProfile,
-  fy: number,
-): { ratio: number; flangeRho: number; webRho: number } {
+export function effectiveModulusRatio(profile: SteelProfile, fy: number): { ratio: number; flangeRho: number; webRho: number } {
   const t = profile.tw;
   const epsilon = Math.sqrt(235 / fy);
   const web = profile.h - t;
@@ -58,12 +52,7 @@ export function effectiveModulusRatio(
   });
   const horizontal = (length: number, y: number): Segment => ({ area: t * length, y, inertia: 0 });
   const bottom = (): Segment[] => [horizontal(flange, -half), vertical(lip, -half + lip / 2)];
-  const gross: Segment[] = [
-    ...bottom(),
-    horizontal(flange, half),
-    vertical(lip, half - lip / 2),
-    vertical(web, 0),
-  ];
+  const gross: Segment[] = [...bottom(), horizontal(flange, half), vertical(lip, half - lip / 2), vertical(web, 0)];
   const effectiveZone = (webRho * web) / 2;
   const upperPart = 0.4 * effectiveZone;
   const lowerPart = 0.6 * effectiveZone;
@@ -92,18 +81,12 @@ function bendingResistance(profile: SteelProfile, fy: number): number {
 
 /** χLT of the free flange: I sections by EN 1993-1-1 §6.3.2.3, cold-formed C by the simplified §10.1 value. */
 export function freeFlangeReduction(profile: SteelProfile, fy: number, span: number): number {
-  return profile.shape === 'I'
-    ? lateralTorsionalReduction(profile, fy, span / 2)
-    : span > 6000
-      ? 0.6
-      : 0.75;
+  return profile.shape === 'I' ? lateralTorsionalReduction(profile, fy, span / 2) : span > 6000 ? 0.6 : 0.75;
 }
 
 /** Governing (highest utilisation) of a list of verdicts. */
 export function governing(verdicts: readonly Verdict[]): Verdict {
-  return verdicts.reduce((best, verdict) =>
-    verdict.utilisation > best.utilisation ? verdict : best,
-  );
+  return verdicts.reduce((best, verdict) => (verdict.utilisation > best.utilisation ? verdict : best));
 }
 
 /** Simply supported member under uniform line loads (kN/m, perpendicular to the strong axis). */
@@ -127,8 +110,7 @@ export function beamVerdicts(
   const momentResistance = (loads.reduction * bendingResistance(profile, fy)) / 1e6;
   const shearResistance = sectionResistance(profile, fy).shear / 1000;
   const inertia = sectionProperties(profile).inertia;
-  const deflection =
-    (5 * Math.max(0, loads.serviceability) * span ** 4) / (384 * E_STEEL * inertia);
+  const deflection = (5 * Math.max(0, loads.serviceability) * span ** 4) / (384 * E_STEEL * inertia);
   const limit = span / loads.deflectionRatio;
   return [
     {

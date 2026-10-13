@@ -90,43 +90,26 @@ export const drawBeltAround = defineCommand({
   }),
   run: (
     doc,
-    {
-      pulleys: pulleyInput,
-      arcSamples = 12,
-      position = ORIGIN,
-      rotation = ORIGIN,
-      color = DEFAULT_DRAW_COLOR,
-      name,
-    },
+    { pulleys: pulleyInput, arcSamples = 12, position = ORIGIN, rotation = ORIGIN, color = DEFAULT_DRAW_COLOR, name },
   ): CommandResult => {
     const pulleys = pulleyInput as unknown as PulleySpec[];
     const n = pulleys.length;
     if (n < 2) return noop(doc, `draw_belt_around: requires at least 2 pulleys (got ${n}).`);
 
     if (arcSamples < 2 || arcSamples > MAX_CURVE_SAMPLES) {
-      return noop(
-        doc,
-        `draw_belt_around: arcSamples must be a finite number in [2, ${MAX_CURVE_SAMPLES}] (got ${String(arcSamples)}).`,
-      );
+      return noop(doc, `draw_belt_around: arcSamples must be a finite number in [2, ${MAX_CURVE_SAMPLES}] (got ${String(arcSamples)}).`);
     }
     const samplesInt = Math.round(arcSamples);
 
     for (let i = 0; i < n; i++) {
       const p = elementAt(pulleys, i);
-      if (p.center.length < 2)
-        return noop(doc, `draw_belt_around: pulley[${i}] center must be a [x, y] array.`);
+      if (p.center.length < 2) return noop(doc, `draw_belt_around: pulley[${i}] center must be a [x, y] array.`);
       const [cx, cy] = p.center;
       if (!Number.isFinite(cx) || !Number.isFinite(cy)) {
-        return noop(
-          doc,
-          `draw_belt_around: pulley[${i}] center contains non-finite coordinate (${cx}, ${cy}).`,
-        );
+        return noop(doc, `draw_belt_around: pulley[${i}] center contains non-finite coordinate (${cx}, ${cy}).`);
       }
       if (!Number.isFinite(p.radius) || p.radius <= 0) {
-        return noop(
-          doc,
-          `draw_belt_around: pulley[${i}] radius must be a finite positive number (got ${String(p.radius)}).`,
-        );
+        return noop(doc, `draw_belt_around: pulley[${i}] radius must be a finite positive number (got ${String(p.radius)}).`);
       }
     }
 
@@ -138,10 +121,7 @@ export const drawBeltAround = defineCommand({
       const dy = p2.center[1] - p1.center[1];
       const d = len2([dx, dy]);
       if (d === 0) {
-        return noop(
-          doc,
-          `draw_belt_around: pulleys[${i}] and pulleys[${ni}] have coincident centers.`,
-        );
+        return noop(doc, `draw_belt_around: pulleys[${i}] and pulleys[${ni}] have coincident centers.`);
       }
       if (d < Math.abs(p1.radius - p2.radius)) {
         return noop(
@@ -152,9 +132,7 @@ export const drawBeltAround = defineCommand({
     }
 
     // tangentPairs[i] = [outgoing TP on pulleys[i], incoming TP on pulleys[(i+1)%n]]
-    const tangentPairs = pulleys.map((pulley, i) =>
-      externalTangentPoints(pulley, elementAt(pulleys, (i + 1) % n)),
-    );
+    const tangentPairs = pulleys.map((pulley, i) => externalTangentPoints(pulley, elementAt(pulleys, (i + 1) % n)));
 
     const points: Point[] = [];
     let totalLength = 0;
@@ -172,23 +150,17 @@ export const drawBeltAround = defineCommand({
       const outTPni = elementAt(tangentPairs, ni)[0];
       const inAngle = Math.atan2(inTP[1] - pni.center[1], inTP[0] - pni.center[0]);
       const outAngle = Math.atan2(outTPni[1] - pni.center[1], outTPni[0] - pni.center[0]);
-      points.push(
-        ...sampleArc(pni.center, pni.radius, inAngle, ccwSweep(inAngle, outAngle), samplesInt),
-      );
+      points.push(...sampleArc(pni.center, pni.radius, inAngle, ccwSweep(inAngle, outAngle), samplesInt));
       totalLength += pni.radius * ccwSweep(inAngle, outAngle);
     }
 
     const { minX, minY, maxX, maxY } = pointsExtent(points);
 
     const id = nextId('belt');
-    const entity = newEntity(
-      'polyline',
-      id,
-      { points, closed: true },
-      finiteVec3OrZero(position, true),
-      color,
-      { rotation: finiteVec3OrZero(rotation, true), name },
-    );
+    const entity = newEntity('polyline', id, { points, closed: true }, finiteVec3OrZero(position, true), color, {
+      rotation: finiteVec3OrZero(rotation, true),
+      name,
+    });
 
     return commitEntity(
       doc,

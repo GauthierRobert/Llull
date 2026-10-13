@@ -44,20 +44,11 @@ function volume(mesh: MeshData): number {
 
 const cases: Array<[string, Entity]> = [
   ['cylinder along +Z', solid({ kind: 'cylinder', radius: 2, height: 10, position: [1, 2, 3] })],
-  [
-    'box rotated about all three axes',
-    solid({ kind: 'box', size: [10, 4, 2], position: [5, 0, 0], rotation: [0.3, 0.5, 0.7] }),
-  ],
-  [
-    'cone rotated',
-    solid({ kind: 'cone', radius: 3, height: 8, position: [0, 0, 0], rotation: [0, 0.4, 0.2] }),
-  ],
+  ['box rotated about all three axes', solid({ kind: 'box', size: [10, 4, 2], position: [5, 0, 0], rotation: [0.3, 0.5, 0.7] })],
+  ['cone rotated', solid({ kind: 'cone', radius: 3, height: 8, position: [0, 0, 0], rotation: [0, 0.4, 0.2] })],
   ['torus', solid({ kind: 'torus', ringRadius: 6, tubeRadius: 1.5, position: [0, 0, 2] })],
   ['wedge', solid({ kind: 'wedge', size: [4, 3, 6], position: [1, 1, 1], rotation: [0.2, 0, 0] })],
-  [
-    'pyramid',
-    solid({ kind: 'pyramid', baseWidth: 4, baseDepth: 2, height: 5, position: [0, 0, 0] }),
-  ],
+  ['pyramid', solid({ kind: 'pyramid', baseWidth: 4, baseDepth: 2, height: 5, position: [0, 0, 0] })],
   [
     'partial revolution about y',
     solid({

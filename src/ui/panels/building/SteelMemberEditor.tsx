@@ -13,12 +13,7 @@ import {
   type SteelMemberEditKey,
   type SteelMemberEditValues,
 } from './steelMemberEdit';
-import {
-  ALL_PROFILES,
-  BASE_OPTIONS,
-  JOINT_OPTIONS,
-  MEMBER_ROLE_OPTIONS,
-} from './steelProfileOptions';
+import { ALL_PROFILES, BASE_OPTIONS, JOINT_OPTIONS, MEMBER_ROLE_OPTIONS } from './steelProfileOptions';
 import { CommandForm } from '@ui/panels/CommandForm';
 import { LabeledInput } from '@ui/panels/LabeledInput';
 import { LabeledSelect } from '@ui/panels/LabeledSelect';
@@ -47,12 +42,7 @@ export function SteelMemberEditor({ member }: { member: SteelMemberElement }): R
       submitTestId="member-save"
       onSubmit={handleSubmit}
     >
-      <LabeledSelect
-        label="Profile"
-        value={values.profile}
-        options={ALL_PROFILES}
-        onChange={set('profile')}
-      />
+      <LabeledSelect label="Profile" value={values.profile} options={ALL_PROFILES} onChange={set('profile')} />
       {horizontal && values.profile !== initial.profile && (
         <label className="field">
           <input
@@ -65,12 +55,7 @@ export function SteelMemberEditor({ member }: { member: SteelMemberElement }): R
         </label>
       )}
       <LabeledInput label="Grade" type="text" value={values.material} onChange={set('material')} />
-      <LabeledSelect
-        label="Role"
-        value={values.role}
-        options={MEMBER_ROLE_OPTIONS}
-        onChange={set('role')}
-      />
+      <LabeledSelect label="Role" value={values.role} options={MEMBER_ROLE_OPTIONS} onChange={set('role')} />
       {values.role === 'beam' && (
         <>
           <LabeledSelect

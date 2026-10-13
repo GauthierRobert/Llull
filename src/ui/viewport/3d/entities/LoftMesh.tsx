@@ -17,7 +17,5 @@ const LOFT_SURFACE: SolidSurface = { roughness: 0.4, metalness: 0.2, envMapInten
 export function LoftMesh({ entity, ...shell }: SolidMeshKindProps<LoftEntity>): React.ReactElement {
   const { rings, ruled } = entity;
   const triangles = useMemo(() => loftTriangles({ rings, ruled }), [rings, ruled]);
-  return (
-    <TriangleSoupMesh entity={entity} triangles={triangles} surface={LOFT_SURFACE} {...shell} />
-  );
+  return <TriangleSoupMesh entity={entity} triangles={triangles} surface={LOFT_SURFACE} {...shell} />;
 }

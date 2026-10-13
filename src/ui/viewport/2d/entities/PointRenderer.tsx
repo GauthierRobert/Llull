@@ -22,13 +22,7 @@ const CROSS_POSITIONS = flattenPoints([
   [0, 1],
 ]);
 
-export function PointRenderer({
-  entity: { position, color },
-  selected,
-}: {
-  entity: PointEntity;
-  selected: boolean;
-}): React.ReactElement {
+export function PointRenderer({ entity: { position, color }, selected }: { entity: PointEntity; selected: boolean }): React.ReactElement {
   const markerRef = useRef<THREE.Group>(null);
   useFrame(({ camera, size }) => {
     const marker = markerRef.current;
@@ -50,14 +44,7 @@ export function PointRenderer({
 
   return (
     <group ref={markerRef} position={position}>
-      <ShapeLine
-        positions={CROSS_POSITIONS}
-        segments
-        linewidth={2}
-        position={ORIGIN}
-        color={color}
-        selected={selected}
-      />
+      <ShapeLine positions={CROSS_POSITIONS} segments linewidth={2} position={ORIGIN} color={color} selected={selected} />
     </group>
   );
 }

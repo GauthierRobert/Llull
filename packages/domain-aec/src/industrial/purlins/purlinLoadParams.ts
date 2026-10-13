@@ -10,9 +10,7 @@ export const PURLIN_LOAD_SHAPE = {
   windPressure: z
     .number()
     .optional()
-    .describe(
-      'Peak velocity pressure qp, kN/m² (EN 1991-1-4, e.g. 0.6-1.0), >= 0. Default 0.6. 0 = no wind.',
-    ),
+    .describe('Peak velocity pressure qp, kN/m² (EN 1991-1-4, e.g. 0.6-1.0), >= 0. Default 0.6. 0 = no wind.'),
   snowLoad: z.number().optional().describe('Roof snow load on plan, kN/m², >= 0. Default 0.8.'),
   roofDeadLoad: z
     .number()

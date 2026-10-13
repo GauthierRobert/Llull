@@ -115,9 +115,7 @@ describe.skipIf(!hasCadQuery)('exact recipes through CadQuery', () => {
 
   it('a snapshot export (no history) still rebuilds the exact recipe', () => {
     const snapshot = { ...doc, featureHistory: [] };
-    const text = (
-      execute(snapshot, 'export_code', { language: 'cadquery' }).data as { text: string }
-    ).text;
+    const text = (execute(snapshot, 'export_code', { language: 'cadquery' }).data as { text: string }).text;
     expect(text).toMatch(/= cut\(/);
     expect(text).toMatch(/= fillet\(/);
   });

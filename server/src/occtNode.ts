@@ -14,10 +14,7 @@ import { createOcctKernel, type OcctFactory } from '@kernel-occt/occtKernel';
 export async function createNodeOcctKernel(): Promise<CachingKernel> {
   const distDir = join(dirname(createRequire(__filename).resolve('opencascade.js')), 'dist');
   const gluePath = join(distDir, 'opencascade.wasm.js');
-  const glueSource = (await readFile(gluePath, 'utf8')).replace(
-    /export default opencascade;\s*$/,
-    'module.exports = opencascade;',
-  );
+  const glueSource = (await readFile(gluePath, 'utf8')).replace(/export default opencascade;\s*$/, 'module.exports = opencascade;');
   const glueModule: { exports: unknown } = { exports: {} };
   new Function('module', 'exports', 'require', '__filename', '__dirname', glueSource)(
     glueModule,

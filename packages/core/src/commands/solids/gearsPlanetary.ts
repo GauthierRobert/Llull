@@ -11,12 +11,7 @@ import { nextId } from '../../lib/id';
 import { compactNumber as fmt, vecText } from '../../lib/compactNumber';
 import { applyEulerXYZ } from '../../lib/eulerRotation';
 import { finiteVec3OrZero } from '../../lib/vec3';
-import {
-  DEFAULT_FLANK_SAMPLES,
-  externalGearPattern,
-  pitchRadiusOf,
-  toothOutline,
-} from '../../lib/gearOutline';
+import { DEFAULT_FLANK_SAMPLES, externalGearPattern, pitchRadiusOf, toothOutline } from '../../lib/gearOutline';
 import { MAX_GEAR_TEETH } from '../limits';
 import { withEntity } from '../entity/entityOps';
 import { newEntity } from '../entity/newEntity';
@@ -32,11 +27,7 @@ const MAX_PLANETS = 12;
  * (tooth 0 at angle 0) and ring. Planet i sits at carrier angle `2π·i/planetCount`.
  * @invariant requires (sunTeeth + ringTeeth) % planetCount === 0
  */
-export function planetaryPhases(
-  sunTeeth: number,
-  planetTeeth: number,
-  planetCount: number,
-): { planets: number[]; ring: number } {
+export function planetaryPhases(sunTeeth: number, planetTeeth: number, planetCount: number): { planets: number[]; ring: number } {
   const ringTeeth = sunTeeth + 2 * planetTeeth;
   const planets = Array.from({ length: planetCount }, (_, i) => {
     const carrier = (2 * Math.PI * i) / planetCount;
@@ -68,35 +59,21 @@ export const addPlanetaryGearset = defineCommand({
     module: z.number().describe('Gear module (metric), > 0, shared by sun, planets and ring.'),
     sunTeeth: z.number().describe('Sun gear tooth count, integer >= 6.'),
     planetTeeth: z.number().describe('Planet gear tooth count, integer >= 6.'),
-    planetCount: z
-      .number()
-      .describe(
-        `Number of planets, integer in [1, ${MAX_PLANETS}]. (sunTeeth + ringTeeth) must be divisible by it.`,
-      ),
+    planetCount: z.number().describe(`Number of planets, integer in [1, ${MAX_PLANETS}]. (sunTeeth + ringTeeth) must be divisible by it.`),
     faceWidth: z.number().describe('Thickness of every gear along the axis, > 0.'),
     ringOuterRadius: z
       .number()
-      .describe(
-        'Outer radius of the ring gear rim, >= ring pitch radius + 2.25*module (the command reports the minimum).',
-      ),
-    pressureAngle: z
-      .number()
-      .describe('Pressure angle in RADIANS, in (0, π/2). Default 0.3491 (20°).')
-      .optional(),
+      .describe('Outer radius of the ring gear rim, >= ring pitch radius + 2.25*module (the command reports the minimum).'),
+    pressureAngle: z.number().describe('Pressure angle in RADIANS, in (0, π/2). Default 0.3491 (20°).').optional(),
     position: positionField('Centre of the sun/ring on the axis (z = bottom face). '),
     axis: z
       .enum(['x', 'y', 'z'])
-      .describe(
-        'Direction of the gear axis in world space. Default "z" (gears lie in the XY plane).',
-      )
+      .describe('Direction of the gear axis in world space. Default "z" (gears lie in the XY plane).')
       .optional(),
     sunColor: z.string().describe('Sun hex color. Default "#d9a441".').optional(),
     planetColor: z.string().describe('Planet hex color. Default "#7a9cbb".').optional(),
     ringColor: z.string().describe('Ring hex color. Default "#8892a0".').optional(),
-    namePrefix: z
-      .string()
-      .describe('Prefix for entity names: "<prefix>_sun", "<prefix>_planet_1".., "<prefix>_ring".')
-      .optional(),
+    namePrefix: z.string().describe('Prefix for entity names: "<prefix>_sun", "<prefix>_planet_1".., "<prefix>_ring".').optional(),
   }),
   run: (
     doc,
@@ -119,11 +96,7 @@ export const addPlanetaryGearset = defineCommand({
     const fail = failedWith(doc, 'add_planetary_gearset');
     const moduleIssue = moduleProblem(mod);
     if (moduleIssue !== null) return fail(moduleIssue);
-    const [sun, planet, count] = [sunTeeth, planetTeeth, planetCount].map(Math.round) as [
-      number,
-      number,
-      number,
-    ];
+    const [sun, planet, count] = [sunTeeth, planetTeeth, planetCount].map(Math.round) as [number, number, number];
     const ring = sun + 2 * planet;
     if (!(sun >= 6 && planet >= 6 && ring <= MAX_GEAR_TEETH)) {
       return fail(
@@ -131,16 +104,12 @@ export const addPlanetaryGearset = defineCommand({
       );
     }
     if (!(count >= 1 && count <= MAX_PLANETS)) {
-      return fail(
-        `planetCount must be an integer in [1, ${MAX_PLANETS}], got ${String(planetCount)}.`,
-      );
+      return fail(`planetCount must be an integer in [1, ${MAX_PLANETS}], got ${String(planetCount)}.`);
     }
     const shapeProblem = toothShapeProblem(pressureAngle, faceWidth);
     if (shapeProblem !== null) return fail(shapeProblem);
     if ((sun + ring) % count !== 0) {
-      const valid = Array.from({ length: MAX_PLANETS }, (_, i) => i + 1).filter(
-        (n) => (sun + ring) % n === 0,
-      );
+      const valid = Array.from({ length: MAX_PLANETS }, (_, i) => i + 1).filter((n) => (sun + ring) % n === 0);
       return fail(
         `assembly condition violated: (sunTeeth + ringTeeth) = ${sun + ring} (ringTeeth = ${ring}) is not divisible by planetCount ${count}. ` +
           `Valid planetCounts for this tooth combination: ${valid.join(', ')}.`,
@@ -148,9 +117,7 @@ export const addPlanetaryGearset = defineCommand({
     }
     const minRim = minRingOuterRadius(mod, ring);
     if (!(ringOuterRadius >= minRim && Number.isFinite(ringOuterRadius))) {
-      return fail(
-        `ringOuterRadius must be >= ${fmt(minRim)} (ring pitch radius + 2.25*module), got ${String(ringOuterRadius)}.`,
-      );
+      return fail(`ringOuterRadius must be >= ${fmt(minRim)} (ring pitch radius + 2.25*module), got ${String(ringOuterRadius)}.`);
     }
     const centerDistance = pitchRadiusOf(mod, sun + planet);
     if (count > 1 && 2 * centerDistance * Math.sin(Math.PI / count) <= mod * (planet + 2.2)) {
@@ -164,14 +131,7 @@ export const addPlanetaryGearset = defineCommand({
     const phases = planetaryPhases(sun, planet, count);
     const outline = (teeth: number, phase: number): ReadonlyArray<readonly [number, number]> =>
       toothOutline(externalGearPattern(mod, teeth, pressureAngle, DEFAULT_FLANK_SAMPLES, phase));
-    const toothed = (
-      id: string,
-      teeth: number,
-      phase: number,
-      at: Vec3,
-      color: string,
-      name: string,
-    ): Entity =>
+    const toothed = (id: string, teeth: number, phase: number, at: Vec3, color: string, name: string): Entity =>
       newEntity('extrusion', id, { profile: outline(teeth, phase), depth: faceWidth }, at, color, {
         rotation: turn,
         name,
@@ -182,11 +142,7 @@ export const addPlanetaryGearset = defineCommand({
     const planetIds: string[] = [];
     phases.planets.forEach((phase, i) => {
       const carrier = (2 * Math.PI * i) / count;
-      const local: Vec3 = [
-        centerDistance * Math.cos(carrier),
-        centerDistance * Math.sin(carrier),
-        0,
-      ];
+      const local: Vec3 = [centerDistance * Math.cos(carrier), centerDistance * Math.sin(carrier), 0];
       const offset = applyEulerXYZ(local, [0, 0, 0], turn);
       const at: Vec3 = [centre[0] + offset[0], centre[1] + offset[1], centre[2] + offset[2]];
       const id = nextId('planet');

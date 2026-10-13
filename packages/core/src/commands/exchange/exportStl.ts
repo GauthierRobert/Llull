@@ -153,26 +153,19 @@ export const exportStl = defineCommand({
     const triangleCount = tris.length;
     const nonEmpty = collected.parts.filter((part) => part.tris.length > 0);
     // A lone named entity names its solid; several entities need `name` or `perEntity`.
-    const solidName = cleanSolidName(
-      params.name ?? (nonEmpty.length === 1 ? nonEmpty[0]?.name : undefined),
-    );
+    const solidName = cleanSolidName(params.name ?? (nonEmpty.length === 1 ? nonEmpty[0]?.name : undefined));
     const summary = exportSummary('export_stl', fmt, { ...collected, tris });
     const data: ExportStlData =
       fmt === 'ascii'
         ? {
             format: 'ascii',
             triangleCount,
-            stl:
-              params.perEntity === true
-                ? buildPerEntityAsciiStl(collected.parts)
-                : buildAsciiStl(tris, solidName),
+            stl: params.perEntity === true ? buildPerEntityAsciiStl(collected.parts) : buildAsciiStl(tris, solidName),
           }
         : {
             format: 'binary',
             triangleCount,
-            stlBase64: uint8ArrayToBase64(
-              buildBinaryStl(tris, /^solid/i.test(solidName) ? `llull ${solidName}` : solidName),
-            ),
+            stlBase64: uint8ArrayToBase64(buildBinaryStl(tris, /^solid/i.test(solidName) ? `llull ${solidName}` : solidName)),
           };
     return report(doc, summary, data);
   },

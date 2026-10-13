@@ -22,12 +22,7 @@ export interface CommandRun {
  * `changed` = the returned document is not the input document.
  * @pure
  */
-export function runCommandOutcome(
-  doc: CadDocument,
-  name: string,
-  params: unknown,
-  ctx?: ExecutionContext,
-): CommandRun {
+export function runCommandOutcome(doc: CadDocument, name: string, params: unknown, ctx?: ExecutionContext): CommandRun {
   try {
     const result = execute(doc, name, params, ctx);
     return {
@@ -62,18 +57,10 @@ export function failedOutcome(name: string, error: unknown): CommandOutcome {
  * nothing. `mayNoop` overrides that for a caller that knows better (clearing an empty document).
  * @pure
  */
-export function outcomeIsFailure(
-  name: string,
-  outcome: CommandOutcome,
-  mayNoop?: boolean,
-): boolean {
+export function outcomeIsFailure(name: string, outcome: CommandOutcome, mayNoop?: boolean): boolean {
   if (outcome.isError) return true;
   if (isRecord(outcome.data) && outcome.data['ok'] === false) return true;
   const annotations = getCommand(name)?.annotations;
-  const noopAllowed =
-    mayNoop ??
-    (annotations?.readOnly === true ||
-      annotations?.idempotent === true ||
-      annotations?.metaHistory === true);
+  const noopAllowed = mayNoop ?? (annotations?.readOnly === true || annotations?.idempotent === true || annotations?.metaHistory === true);
   return !noopAllowed && !outcome.changed && outcome.data === undefined;
 }

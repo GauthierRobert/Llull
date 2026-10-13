@@ -6,21 +6,12 @@ import { planetaryPhases } from '@core/commands/solids/gearsPlanetary';
 import { polygonArea } from '@lib/polygon';
 import type { Point2 } from '@lib/polygon';
 import { buildSpurGearProfile } from '@core/commands/solids/gears';
-import {
-  isWatertight,
-  meshTris,
-  meshVertices,
-  insideTriangle,
-  planetaryInterference,
-  pointInMesh,
-  signedVolume,
-} from './gearTestUtils';
+import { isWatertight, meshTris, meshVertices, insideTriangle, planetaryInterference, pointInMesh, signedVolume } from './gearTestUtils';
 import type { Tri } from './gearTestUtils';
 
 const doc = (): CadDocument => createEmptyDocument();
 const mesh = (d: CadDocument, id: string): MeshSolidEntity => d.entities[id] as MeshSolidEntity;
-const extrusion = (d: CadDocument, id: string): ExtrusionEntity =>
-  d.entities[id] as ExtrusionEntity;
+const extrusion = (d: CadDocument, id: string): ExtrusionEntity => d.entities[id] as ExtrusionEntity;
 
 describe('gear profile cost', () => {
   it('flank sampling reduced: points per tooth 33 -> <= 19 with unchanged tooth count', () => {
@@ -51,9 +42,7 @@ describe('add_internal_gear', () => {
 
   it('tooth spaces accept an external gear of the same module (no overlap, clearance)', () => {
     const ringDoc = execute(doc(), 'add_internal_gear', params).document;
-    const ringTris = meshTris(mesh(ringDoc, ringDoc.order[0]!).mesh).filter((t) =>
-      t.every((v) => v[2] === 0),
-    );
+    const ringTris = meshTris(mesh(ringDoc, ringDoc.order[0]!).mesh).filter((t) => t.every((v) => v[2] === 0));
     // Pinion of 10 teeth, centre distance = module * (40 - 10) / 2, tooth 0 pointing at +X.
     const pinion = buildSpurGearProfile(2, 10, Math.PI / 9).map(([x, y]): Point2 => [x + 30, y]);
     const overlaps = pinion.some((p) => ringTris.some((t) => insideTriangle(p, t)));
@@ -62,10 +51,7 @@ describe('add_internal_gear', () => {
     const phases = Array.from({ length: 36 }, (_, i) => {
       const a = (i / 36) * ((2 * Math.PI) / 10);
       const rotated = buildSpurGearProfile(2, 10, Math.PI / 9).map(
-        ([x, y]): Point2 => [
-          30 + x * Math.cos(a) - y * Math.sin(a),
-          x * Math.sin(a) + y * Math.cos(a),
-        ],
+        ([x, y]): Point2 => [30 + x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)],
       );
       return rotated.some((p) => ringTris.some((t) => insideTriangle(p, t)));
     });
@@ -76,8 +62,7 @@ describe('add_internal_gear', () => {
   it('caps face outward (+Z top, -Z bottom) and cover exactly rim minus cavity', () => {
     const result = execute(doc(), 'add_internal_gear', params);
     const tris = meshTris(mesh(result.document, result.affected[0]!).mesh);
-    const signed = (t: Tri): number =>
-      (t[1][0] - t[0][0]) * (t[2][1] - t[0][1]) - (t[1][1] - t[0][1]) * (t[2][0] - t[0][0]);
+    const signed = (t: Tri): number => (t[1][0] - t[0][0]) * (t[2][1] - t[0][1]) - (t[1][1] - t[0][1]) * (t[2][0] - t[0][0]);
     const top = tris.filter((t) => t.every((v) => v[2] === 8));
     const bottom = tris.filter((t) => t.every((v) => v[2] === 0));
     expect(top.every((t) => signed(t) > 0)).toBe(true);
@@ -137,27 +122,20 @@ describe('add_planetary_gearset', () => {
     [18, 12, 3],
     [24, 24, 3],
     [13, 17, 2],
-  ])(
-    'sun %i / planet %i / %i planets mesh without interference',
-    (sunTeeth, planetTeeth, planetCount) => {
-      const result = execute(doc(), 'add_planetary_gearset', {
-        ...params,
-        sunTeeth,
-        planetTeeth,
-        planetCount,
-        ringOuterRadius: (2 * (sunTeeth + 2 * planetTeeth)) / 2 + 6,
-      });
-      expect(result.affected).toHaveLength(planetCount + 2);
-      expect(planetaryInterference(result.document, result.affected)).toEqual({ sun: 0, ring: 0 });
-      // Sensitivity control: twisting the planets by half a pitch must collide.
-      const twisted = planetaryInterference(
-        result.document,
-        result.affected,
-        Math.PI / planetTeeth,
-      );
-      expect(twisted.sun + twisted.ring).toBeGreaterThan(0);
-    },
-  );
+  ])('sun %i / planet %i / %i planets mesh without interference', (sunTeeth, planetTeeth, planetCount) => {
+    const result = execute(doc(), 'add_planetary_gearset', {
+      ...params,
+      sunTeeth,
+      planetTeeth,
+      planetCount,
+      ringOuterRadius: (2 * (sunTeeth + 2 * planetTeeth)) / 2 + 6,
+    });
+    expect(result.affected).toHaveLength(planetCount + 2);
+    expect(planetaryInterference(result.document, result.affected)).toEqual({ sun: 0, ring: 0 });
+    // Sensitivity control: twisting the planets by half a pitch must collide.
+    const twisted = planetaryInterference(result.document, result.affected, Math.PI / planetTeeth);
+    expect(twisted.sun + twisted.ring).toBeGreaterThan(0);
+  });
 
   it('returns ids, ratio and geometry data; ring teeth = sun + 2*planet', () => {
     const result = execute(doc(), 'add_planetary_gearset', { ...params, namePrefix: 'pg' });
@@ -166,9 +144,7 @@ describe('add_planetary_gearset', () => {
     expect(result.data).toMatchObject({ ringTeeth: 48, ratio: 5, centerDistance: 30 });
     expect(result.summary).toContain('ring');
     expect(result.document.entities[result.affected[0]!]!.name).toBe('pg_sun');
-    const planetPositions = result.affected
-      .slice(1, 4)
-      .map((id) => result.document.entities[id]!.position);
+    const planetPositions = result.affected.slice(1, 4).map((id) => result.document.entities[id]!.position);
     for (const [x, y] of planetPositions) expect(Math.hypot(x, y)).toBeCloseTo(30, 9);
   });
 
@@ -296,12 +272,7 @@ describe('add_bevel_gear', () => {
 describe('add_bevel_gear_pair', () => {
   const params = { module: 3, pinionTeeth: 18, wheelTeeth: 30, faceWidth: 12 };
 
-  const penetration = (
-    a: ReadonlyArray<Tri>,
-    b: ReadonlyArray<Tri>,
-    va: ReadonlyArray<Vec3>,
-    vb: ReadonlyArray<Vec3>,
-  ): number =>
+  const penetration = (a: ReadonlyArray<Tri>, b: ReadonlyArray<Tri>, va: ReadonlyArray<Vec3>, vb: ReadonlyArray<Vec3>): number =>
     va.filter((p) => pointInMesh(b, p)).length + vb.filter((p) => pointInMesh(a, p)).length;
 
   it('creates two watertight solids whose teeth mesh without interpenetration', () => {
@@ -316,22 +287,10 @@ describe('add_bevel_gear_pair', () => {
 
     // Control: rotating the wheel by half a pitch about its axis (X through the apex) must collide.
     const half = Math.PI / 30;
-    const turned = wv.map(
-      ([x, y, z]): Vec3 => [
-        x,
-        y * Math.cos(half) - z * Math.sin(half),
-        y * Math.sin(half) + z * Math.cos(half),
-      ],
-    );
+    const turned = wv.map(([x, y, z]): Vec3 => [x, y * Math.cos(half) - z * Math.sin(half), y * Math.sin(half) + z * Math.cos(half)]);
     const turnedTris = wt.map(
       (t): Tri =>
-        t.map(
-          ([x, y, z]): Vec3 => [
-            x,
-            y * Math.cos(half) - z * Math.sin(half),
-            y * Math.sin(half) + z * Math.cos(half),
-          ],
-        ) as unknown as Tri,
+        t.map(([x, y, z]): Vec3 => [x, y * Math.cos(half) - z * Math.sin(half), y * Math.sin(half) + z * Math.cos(half)]) as unknown as Tri,
     );
     expect(penetration(pt, turnedTris, pv, turned)).toBeGreaterThan(0);
   });
@@ -397,9 +356,7 @@ describe('add_spline_shaft', () => {
       module: 5,
       length: 10,
     });
-    expect(extrusion(result.document, result.affected[0]!).profile.length / 38).toBeLessThanOrEqual(
-      19,
-    );
+    expect(extrusion(result.document, result.affected[0]!).profile.length / 38).toBeLessThanOrEqual(19);
   });
 
   it('accepts an explicit tooth count', () => {
@@ -455,11 +412,7 @@ describe('add_keyed_shaft', () => {
   });
 
   it('open-ended keyway (offset 0 / reaching the end) stays watertight', () => {
-    for (const extra of [
-      { keyOffset: 0, keyLength: 50 },
-      { keyOffset: 50, keyLength: 50 },
-      { keyLength: 100 },
-    ]) {
+    for (const extra of [{ keyOffset: 0, keyLength: 50 }, { keyOffset: 50, keyLength: 50 }, { keyLength: 100 }]) {
       const result = execute(doc(), 'add_keyed_shaft', { ...params, ...extra });
       expect(result.affected).toHaveLength(1);
       expect(isWatertight(meshTris(mesh(result.document, result.affected[0]!).mesh))).toBe(true);
@@ -472,14 +425,8 @@ describe('add_keyed_shaft', () => {
     const key = mesh(result.document, result.affected[1]!);
     expect(key.name).toBe('in_key');
     const verts = meshVertices(key.mesh);
-    expect(Math.max(...verts.map((v) => v[0])) - Math.min(...verts.map((v) => v[0]))).toBeCloseTo(
-      8,
-      9,
-    );
-    expect(Math.max(...verts.map((v) => v[1])) - Math.min(...verts.map((v) => v[1]))).toBeCloseTo(
-      12,
-      9,
-    );
+    expect(Math.max(...verts.map((v) => v[0])) - Math.min(...verts.map((v) => v[0]))).toBeCloseTo(8, 9);
+    expect(Math.max(...verts.map((v) => v[1])) - Math.min(...verts.map((v) => v[1]))).toBeCloseTo(12, 9);
     expect(signedVolume(meshTris(key.mesh))).toBeCloseTo(12 * 8 * 60, 6);
   });
 

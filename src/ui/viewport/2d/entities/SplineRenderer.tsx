@@ -25,19 +25,9 @@ export function SplineRenderer({
       closed,
       'centripetal',
     );
-    return curve
-      .getPoints(points.length * SPLINE_SEGMENTS_PER_POINT)
-      .flatMap(({ x, y, z }) => [x, y, z]);
+    return curve.getPoints(points.length * SPLINE_SEGMENTS_PER_POINT).flatMap(({ x, y, z }) => [x, y, z]);
   }, [points, closed]);
 
   if (!positions) return null;
-  return (
-    <ShapeLine
-      positions={positions}
-      position={position}
-      rotation={rotation}
-      color={color}
-      selected={selected}
-    />
-  );
+  return <ShapeLine positions={positions} position={position} rotation={rotation} color={color} selected={selected} />;
 }

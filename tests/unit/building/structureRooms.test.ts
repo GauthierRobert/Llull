@@ -56,12 +56,8 @@ describe('add_slab', () => {
     ).toBe(doc);
     expect(execute(doc, 'add_slab', { wallIds: ['wall-1', 'wall-2'] }).document).toBe(doc);
     expect(execute(doc, 'add_slab', { wallIds: ['wall-1', 'nope'] }).document).toBe(doc);
-    expect(execute(doc, 'add_slab', { boundary: SQUARE, thickness: 0 }).summary).toMatch(
-      /thickness/,
-    );
-    expect(execute(doc, 'add_slab', { boundary: SQUARE, levelId: 'q' }).summary).toMatch(
-      /unknown level/,
-    );
+    expect(execute(doc, 'add_slab', { boundary: SQUARE, thickness: 0 }).summary).toMatch(/thickness/);
+    expect(execute(doc, 'add_slab', { boundary: SQUARE, levelId: 'q' }).summary).toMatch(/unknown level/);
   });
 
   it('add_slab from all level walls ignores T-joined partitions', () => {
@@ -105,12 +101,8 @@ describe('add_slab', () => {
       baseOffset: 0,
       material: 'concrete',
     });
-    expect(
-      wallLoop([mk('a', [0, 0], [1, 0]), mk('b', [5, 5], [6, 6]), mk('c', [1, 0], [0, 0])]),
-    ).toBeNull();
-    expect(
-      wallLoop([mk('a', [0, 0], [4, 0]), mk('b', [4, 0], [4, 4]), mk('c', [4, 4], [0, 5])]),
-    ).toBeNull();
+    expect(wallLoop([mk('a', [0, 0], [1, 0]), mk('b', [5, 5], [6, 6]), mk('c', [1, 0], [0, 0])])).toBeNull();
+    expect(wallLoop([mk('a', [0, 0], [4, 0]), mk('b', [4, 0], [4, 4]), mk('c', [4, 4], [0, 5])])).toBeNull();
   });
 });
 
@@ -143,9 +135,7 @@ describe('add_column', () => {
   it('failure paths', () => {
     const doc = createEmptyDocument();
     expect(execute(doc, 'add_column', {}).summary).toMatch(/location/);
-    expect(execute(doc, 'add_column', { atGridIntersections: true }).summary).toMatch(
-      /no intersections/,
-    );
+    expect(execute(doc, 'add_column', { atGridIntersections: true }).summary).toMatch(/no intersections/);
     expect(execute(doc, 'add_column', { location: [0, 0], width: -1 }).summary).toMatch(/> 0/);
     expect(execute(doc, 'add_column', { location: [0, 0], levelId: 'nope' }).document).toBe(doc);
   });
@@ -158,16 +148,9 @@ describe('add_beam / add_stair', () => {
       size: [6000, 300, 500],
       position: [3000, 0, 2750],
     });
-    expect(
-      execute(createEmptyDocument(), 'add_beam', { start: [0, 0], end: [0, 0] }).affected,
-    ).toEqual([]);
-    expect(
-      execute(createEmptyDocument(), 'add_beam', { start: [0, 0], end: [1, 0], depth: 0 }).affected,
-    ).toEqual([]);
-    expect(
-      execute(createEmptyDocument(), 'add_beam', { start: [0, 0], end: [1, 0], levelId: 'x' })
-        .affected,
-    ).toEqual([]);
+    expect(execute(createEmptyDocument(), 'add_beam', { start: [0, 0], end: [0, 0] }).affected).toEqual([]);
+    expect(execute(createEmptyDocument(), 'add_beam', { start: [0, 0], end: [1, 0], depth: 0 }).affected).toEqual([]);
+    expect(execute(createEmptyDocument(), 'add_beam', { start: [0, 0], end: [1, 0], levelId: 'x' }).affected).toEqual([]);
   });
 
   it('derives equal risers from the level height and reports the Blondel rule', () => {
@@ -214,12 +197,8 @@ describe('rooms and element edits', () => {
     const doc = perimeter();
     expect(execute(doc, 'add_room', { name: ' ' }).summary).toMatch(/name/);
     expect(execute(doc, 'add_room', { name: 'A' }).summary).toMatch(/boundary/);
-    expect(execute(doc, 'add_room', { name: 'A', wallIds: ['wall-1', 'grid-1'] }).document).toBe(
-      doc,
-    );
-    expect(execute(doc, 'add_room', { name: 'A', boundary: SQUARE, levelId: 'x' }).document).toBe(
-      doc,
-    );
+    expect(execute(doc, 'add_room', { name: 'A', wallIds: ['wall-1', 'grid-1'] }).document).toBe(doc);
+    expect(execute(doc, 'add_room', { name: 'A', boundary: SQUARE, levelId: 'x' }).document).toBe(doc);
   });
 
   it('delete_building_element removes a wall with its openings and re-trims neighbours', () => {
@@ -257,12 +236,8 @@ describe('rooms and element edits', () => {
     expect(moved['grid-1']).toMatchObject({ start: [1000, 0] });
     expect(moved['room-1']?.category === 'room' && moved['room-1'].boundary[0]).toEqual([1000, 0]);
     expect(result.document.entities['door-1:leaf']?.position[0]).toBeCloseTo(3000);
-    expect(
-      execute(doc, 'move_building_element', { elementIds: ['x'], delta: [1, 1] }).document,
-    ).toBe(doc);
-    expect(execute(doc, 'move_building_element', { elementIds: ids, delta: [1] }).document).toBe(
-      doc,
-    );
+    expect(execute(doc, 'move_building_element', { elementIds: ['x'], delta: [1, 1] }).document).toBe(doc);
+    expect(execute(doc, 'move_building_element', { elementIds: ids, delta: [1] }).document).toBe(doc);
   });
 
   it('copy_level_elements repeats a typical floor with its openings', () => {
@@ -294,17 +269,11 @@ describe('rooms and element edits', () => {
   it('copy_level_elements failure paths', () => {
     let doc = run(createEmptyDocument(), 'add_level', {});
     doc = run(doc, 'add_level', {});
-    expect(
-      execute(doc, 'copy_level_elements', { sourceLevelId: 'level-1', targetLevelIds: [] }).summary,
-    ).toMatch(/no targets/);
-    expect(
-      execute(doc, 'copy_level_elements', { sourceLevelId: 'level-1', targetLevelIds: ['level-9'] })
-        .summary,
-    ).toMatch(/level-9/);
-    expect(
-      execute(doc, 'copy_level_elements', { sourceLevelId: 'level-1', targetLevelIds: ['level-2'] })
-        .summary,
-    ).toMatch(/nothing to copy/);
+    expect(execute(doc, 'copy_level_elements', { sourceLevelId: 'level-1', targetLevelIds: [] }).summary).toMatch(/no targets/);
+    expect(execute(doc, 'copy_level_elements', { sourceLevelId: 'level-1', targetLevelIds: ['level-9'] }).summary).toMatch(/level-9/);
+    expect(execute(doc, 'copy_level_elements', { sourceLevelId: 'level-1', targetLevelIds: ['level-2'] }).summary).toMatch(
+      /nothing to copy/,
+    );
     const onlySource = execute(doc, 'copy_level_elements', {
       sourceLevelId: 'level-1',
       targetLevelIds: ['level-1', 'level-1'],
@@ -321,9 +290,7 @@ describe('rooms and element edits', () => {
       sourceLevelId: 'level-1',
       targetLevelIds: ['level-2', 'level-2'],
     });
-    const walls = Object.values(result.document.building!.elements).filter(
-      (element) => element.category === 'wall',
-    );
+    const walls = Object.values(result.document.building!.elements).filter((element) => element.category === 'wall');
     expect(walls).toHaveLength(8);
     expect(result.summary).toMatch(/to level-2:/);
   });
@@ -347,12 +314,8 @@ describe('level-aware edits', () => {
       ],
       levelId: 'level-1',
     });
-    expect(
-      execute(doc, 'add_room', { name: 'X', wallIds: ['wall-5', 'wall-2', 'wall-3'] }).summary,
-    ).toMatch(/different levels/);
-    expect(execute(doc, 'add_slab', { wallIds: ['wall-5', 'wall-2', 'wall-3'] }).summary).toMatch(
-      /different levels/,
-    );
+    expect(execute(doc, 'add_room', { name: 'X', wallIds: ['wall-5', 'wall-2', 'wall-3'] }).summary).toMatch(/different levels/);
+    expect(execute(doc, 'add_slab', { wallIds: ['wall-5', 'wall-2', 'wall-3'] }).summary).toMatch(/different levels/);
   });
 
   it('full-height walls, columns and stairs follow a level height change and copies', () => {
@@ -398,9 +361,9 @@ describe('review follow-ups', () => {
       ],
     });
     doc = run(doc, 'add_door', { wallId: 'wall-1' });
-    expect(
-      execute(doc, 'move_building_element', { elementIds: ['door-1'], delta: [1, 0] }).summary,
-    ).toMatch(/follow their host .* slide openings with update_opening/);
+    expect(execute(doc, 'move_building_element', { elementIds: ['door-1'], delta: [1, 0] }).summary).toMatch(
+      /follow their host .* slide openings with update_opening/,
+    );
   });
 
   it('slab openings travel with their slab', () => {

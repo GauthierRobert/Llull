@@ -17,9 +17,7 @@ export function isValidCut(cut: CutSpec): boolean {
     cut.planes.length > 0 &&
     cut.planes.every(
       ({ normal, offset }) =>
-        Number.isFinite(offset) &&
-        normal.every(Number.isFinite) &&
-        Math.hypot(normal[0], normal[1], normal[2]) > 1e-9,
+        Number.isFinite(offset) && normal.every(Number.isFinite) && Math.hypot(normal[0], normal[1], normal[2]) > 1e-9,
     )
   );
 }
@@ -95,12 +93,7 @@ export interface CutResult {
  * Clip every filled polygon of an entity and append the section caps.
  * @param tolerance chain-matching distance (world units)
  */
-export function cutEntityPolygons(
-  polygons: readonly PreDepthPolygon[],
-  cut: CutSpec,
-  planes: UnitPlane[],
-  tolerance: number,
-): CutResult {
+export function cutEntityPolygons(polygons: readonly PreDepthPolygon[], cut: CutSpec, planes: UnitPlane[], tolerance: number): CutResult {
   const solids = polygons.filter((p) => !p.stroke);
   const result: PreDepthPolygon[] = polygons.filter((p) => p.stroke);
   let touched = false;

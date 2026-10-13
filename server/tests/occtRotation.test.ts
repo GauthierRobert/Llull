@@ -54,10 +54,7 @@ describe('occt kernel honours entity rotation', () => {
     const base = box([0, 0, 0], [0, 0, 0], [6, 6, 2]);
     const turned = box([1, 1, 0], [0, 0, Math.PI / 4]);
     for (const op of ['union', 'subtract', 'intersect'] as const) {
-      expectSameBounds(
-        booleanMesh(occt, op, base, turned),
-        booleanMesh(manifold, op, base, turned),
-      );
+      expectSameBounds(booleanMesh(occt, op, base, turned), booleanMesh(manifold, op, base, turned));
     }
   }, 120_000);
 });

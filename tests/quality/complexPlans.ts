@@ -15,10 +15,7 @@ function range(count: number): number[] {
 }
 
 function zigzag(points: number, width: number, height: number): [number, number][] {
-  return range(points).map((index) => [
-    (index / (points - 1)) * width,
-    index % 2 === 0 ? 0 : height,
-  ]);
+  return range(points).map((index) => [(index / (points - 1)) * width, index % 2 === 0 ? 0 : height]);
 }
 
 export const COMPLEX_2D: Record<string, GoldenAction[]> = {
@@ -127,7 +124,5 @@ export const COMPLEX_3D: Record<string, GoldenAction[]> = {
     { command: 'add_cylinder', params: { radius: 5000, height: 20000, position: [60000, 0, 0] } },
   ],
   /** A 40 x 4 x 4 beam rotated 45° about Z: its footprint is square-ish, not 10:1. */
-  rotated_beam: [
-    { command: 'add_box', params: { size: [40, 4, 4], rotation: [0, 0, Math.PI / 4] } },
-  ],
+  rotated_beam: [{ command: 'add_box', params: { size: [40, 4, 4], rotation: [0, 0, Math.PI / 4] } }],
 };

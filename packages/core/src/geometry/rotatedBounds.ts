@@ -18,9 +18,7 @@ function localEntityCorners(e: Entity): Vec3[] {
   }
   const local = localBounds(e);
   const corners = boundsCorners(local);
-  return e.kind === 'cone' || e.kind === 'pyramid'
-    ? [...corners.slice(0, 4), [0, 0, local.max[2]]]
-    : corners;
+  return e.kind === 'cone' || e.kind === 'pyramid' ? [...corners.slice(0, 4), [0, 0, local.max[2]]] : corners;
 }
 
 /**
@@ -46,11 +44,7 @@ export function rotatedEntityBounds(e: Entity): Bounds {
 
   // Rotate each local corner about the entity origin, then take the world-space AABB.
   const rotated = localEntityCorners(e).map((local) =>
-    applyEulerXYZ(
-      [e.position[0] + local[0], e.position[1] + local[1], e.position[2] + local[2]],
-      e.position,
-      e.rotation,
-    ),
+    applyEulerXYZ([e.position[0] + local[0], e.position[1] + local[1], e.position[2] + local[2]], e.position, e.rotation),
   );
   return { ...boundsOfPoints(rotated), oriented: true };
 }

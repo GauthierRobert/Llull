@@ -6,11 +6,7 @@ import { DEFAULT_CRITERIA, intensityAt } from '@aec/civil/drainage/drainageCrite
 import { civilErrors } from '@aec/civil/validate';
 import { manningFullFlow } from '@aec/civil/drainage/hydraulics';
 
-function run(
-  doc: CadDocument,
-  name: string,
-  params: Record<string, unknown> = {},
-): ReturnType<typeof execute> {
+function run(doc: CadDocument, name: string, params: Record<string, unknown> = {}): ReturnType<typeof execute> {
   return execute(doc, name, params);
 }
 
@@ -42,10 +38,7 @@ const check = (doc: CadDocument, params: Record<string, unknown> = {}): CheckDat
 const FULL = manningFullFlow(0.3, 0.01, 0.013);
 const FULL_AREA = (Math.PI * 0.3 * 0.3) / 4;
 
-function build(
-  manholes: Array<Record<string, unknown>>,
-  pipes: Array<Record<string, unknown>>,
-): CadDocument {
+function build(manholes: Array<Record<string, unknown>>, pipes: Array<Record<string, unknown>>): CadDocument {
   let doc = run(createEmptyDocument(), 'set_units', { units: 'm' }).document;
   for (const params of manholes) doc = run(doc, 'add_manhole', params).document;
   for (const params of pipes) doc = run(doc, 'add_pipe', params).document;
@@ -84,11 +77,7 @@ describe('IDF and time of concentration', () => {
     const rows = check(chain({ inflowLps: (FULL / 2) * 1000 })).pipes;
     const travelMin = 50 / (FULL / FULL_AREA) / 60;
     expect(travelMin).toBeCloseTo(0.6091, 3);
-    expect(rows.map((r) => r.tcMin)).toEqual([
-      5,
-      expect.closeTo(5 + travelMin, 1),
-      expect.closeTo(5 + 2 * travelMin, 1),
-    ]);
+    expect(rows.map((r) => r.tcMin)).toEqual([5, expect.closeTo(5 + travelMin, 1), expect.closeTo(5 + 2 * travelMin, 1)]);
     expect(rows[0]?.velocity).toBeCloseTo(FULL / FULL_AREA, 2);
   });
 
@@ -144,9 +133,7 @@ describe('IDF and time of concentration', () => {
     expect(check(doc).pipes[0]?.tcMin).toBe(12);
     const retimed = run(doc, 'update_manhole', { manholeId: 'manhole-1', entryTimeMin: 8 });
     expect(retimed.document.civil?.objects['manhole-1']).toMatchObject({ entryTimeMin: 8 });
-    expect(
-      run(doc, 'update_manhole', { manholeId: 'manhole-1', entryTimeMin: 0 }).affected,
-    ).toEqual([]);
+    expect(run(doc, 'update_manhole', { manholeId: 'manhole-1', entryTimeMin: 0 }).affected).toEqual([]);
     expect(
       run(createEmptyDocument(), 'add_manhole', {
         location: [0, 0],
@@ -201,10 +188,7 @@ describe('diverging networks', () => {
     const sized = run(diverging(), 'size_drainage_pipes', {});
     expect((sized.data as { converged: boolean }).converged).toBe(true);
     const rows = check(sized.document).pipes;
-    expect((rows[1]?.designLps ?? 0) + (rows[2]?.designLps ?? 0)).toBeCloseTo(
-      rows[0]?.designLps ?? 0,
-      1,
-    );
+    expect((rows[1]?.designLps ?? 0) + (rows[2]?.designLps ?? 0)).toBeCloseTo(rows[0]?.designLps ?? 0, 1);
   });
 });
 
@@ -292,8 +276,7 @@ describe('export_drainage_long_section', () => {
   });
 
   it('follows the largest pipe at a fork and flags flooding in red', () => {
-    const forkRun = run(diverging(), 'export_drainage_long_section', { fromManholeId: 'manhole-1' })
-      .data as { manholeIds: string[] };
+    const forkRun = run(diverging(), 'export_drainage_long_section', { fromManholeId: 'manhole-1' }).data as { manholeIds: string[] };
     expect(forkRun.manholeIds).toEqual(['manhole-1', 'manhole-2', 'manhole-3']);
     const flooded = run(twoManholes(100), 'export_drainage_long_section', {
       fromManholeId: 'manhole-1',
@@ -313,9 +296,7 @@ describe('export_drainage_long_section', () => {
     expect(refused({ fromManholeId: 'nope' })).toContain('no manhole');
     expect(refused({ fromManholeId: 'manhole-1', toManholeId: 'nope' })).toContain('no manhole');
     expect(refused({ fromManholeId: 'manhole-4' })).toContain('no pipe run');
-    expect(refused({ fromManholeId: 'manhole-3', toManholeId: 'manhole-1' })).toContain(
-      'no pipe run',
-    );
+    expect(refused({ fromManholeId: 'manhole-3', toManholeId: 'manhole-1' })).toContain('no pipe run');
     expect(refused({ fromManholeId: 'manhole-1', freeboardM: -1 })).toContain('freeboardM');
   });
 });

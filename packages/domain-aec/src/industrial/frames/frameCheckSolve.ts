@@ -41,11 +41,7 @@ interface Combination {
 }
 
 /** EN 1990 6.10 combinations (ψ0: snow 0.5, wind 0.6; crane γ = 1.35). */
-export function ultimateCombinations(
-  wind: boolean,
-  crane: boolean,
-  windCases: ReadonlyArray<WindCase>,
-): Combination[] {
+export function ultimateCombinations(wind: boolean, crane: boolean, windCases: ReadonlyArray<WindCase>): Combination[] {
   const combinations: Combination[] = [
     { name: '1.35G+1.5S (→)', factors: { G: 1.35, S: 1.5 }, sway: 1 },
     { name: '1.35G+1.5S (←)', factors: { G: 1.35, S: 1.5 }, sway: -1 },
@@ -175,10 +171,7 @@ export function solveUltimate(frame: FrameModel, combination: Combination): Ulti
     id: piece.member.elementId,
     height: piece.height,
     compression: piece.compression,
-    drift: Math.abs(
-      (horne?.displacements[piece.member.geometry.b]?.[0] ?? 0) -
-        (horne?.displacements[piece.member.geometry.a]?.[0] ?? 0),
-    ),
+    drift: Math.abs((horne?.displacements[piece.member.geometry.b]?.[0] ?? 0) - (horne?.displacements[piece.member.geometry.a]?.[0] ?? 0)),
   }));
   const critical = horneAlphaCritical(storeys);
   let alphaCritical = critical.alpha;

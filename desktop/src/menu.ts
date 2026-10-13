@@ -17,11 +17,7 @@ export interface MenuHandlers {
   readonly openDataFolder: () => void;
 }
 
-export function menuTemplate(
-  handlers: MenuHandlers,
-  platform: NodeJS.Platform,
-  appName: string,
-): MenuItemConstructorOptions[] {
+export function menuTemplate(handlers: MenuHandlers, platform: NodeJS.Platform, appName: string): MenuItemConstructorOptions[] {
   const mac = platform === 'darwin';
   const file: MenuItemConstructorOptions = {
     label: 'File',
@@ -68,8 +64,6 @@ export function agentHelpText(cliOnPath: boolean): string {
     '--app sends every command to this window (undo with Ctrl+Z or llull undo --app).',
     'Without --app the CLI works on a document file (--doc part.llull.json).',
     '',
-    cliOnPath
-      ? 'The llull command is installed.'
-      : 'Install the llull command first: Help > Install Command Line Tool.',
+    cliOnPath ? 'The llull command is installed.' : 'Install the llull command first: Help > Install Command Line Tool.',
   ].join('\n');
 }

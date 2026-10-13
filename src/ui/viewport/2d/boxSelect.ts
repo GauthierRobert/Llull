@@ -48,8 +48,7 @@ export function boxSelectMode(start: Vec2, end: Vec2): BoxSelectMode {
   return end[0] >= start[0] ? 'window' : 'crossing';
 }
 
-const insideBox = (box: Box, [x, y]: Vec2): boolean =>
-  x >= box.minX && x <= box.maxX && y >= box.minY && y <= box.maxY;
+const insideBox = (box: Box, [x, y]: Vec2): boolean => x >= box.minX && x <= box.maxX && y >= box.minY && y <= box.maxY;
 
 /** Liang-Barsky: does segment a->b touch the box? */
 function segmentTouchesBox(box: Box, a: Vec2, b: Vec2): boolean {
@@ -69,22 +68,13 @@ function segmentTouchesBox(box: Box, a: Vec2, b: Vec2): boolean {
     }
     return true;
   };
-  return (
-    clip(-dx, a[0] - box.minX) &&
-    clip(dx, box.maxX - a[0]) &&
-    clip(-dy, a[1] - box.minY) &&
-    clip(dy, box.maxY - a[1])
-  );
+  return clip(-dx, a[0] - box.minX) && clip(dx, box.maxX - a[0]) && clip(-dy, a[1] - box.minY) && clip(dy, box.maxY - a[1]);
 }
 
-const boxesOverlap = (a: Box, b: Box): boolean =>
-  a.minX <= b.maxX && a.maxX >= b.minX && a.minY <= b.maxY && a.maxY >= b.minY;
+const boxesOverlap = (a: Box, b: Box): boolean => a.minX <= b.maxX && a.maxX >= b.minX && a.minY <= b.maxY && a.maxY >= b.minY;
 
 const insideOther = (inner: Box, outer: Box): boolean =>
-  inner.minX >= outer.minX &&
-  inner.maxX <= outer.maxX &&
-  inner.minY >= outer.minY &&
-  inner.maxY <= outer.maxY;
+  inner.minX >= outer.minX && inner.maxX <= outer.maxX && inner.minY >= outer.minY && inner.maxY <= outer.maxY;
 
 /** Sampled world geometry of one 2D entity, or null for kinds with no selectable outline. */
 function sampleEntity(document: CadDocument, entity: Entity): SampledGeometry | null {
@@ -105,14 +95,10 @@ function sampleEntity(document: CadDocument, entity: Entity): SampledGeometry | 
     case 'circle':
       return lines(arcPolyline(entity.center, entity.radius, 0, 2 * Math.PI, CURVE_SAMPLES));
     case 'ellipse':
-      return lines(
-        arcPolyline(entity.center, entity.radiusX, 0, 2 * Math.PI, CURVE_SAMPLES, entity.radiusY),
-      );
+      return lines(arcPolyline(entity.center, entity.radiusX, 0, 2 * Math.PI, CURVE_SAMPLES, entity.radiusY));
     case 'arc': {
       const sweep = wrapAngle(entity.endAngle - entity.startAngle);
-      return lines(
-        arcPolyline(entity.center, entity.radius, entity.startAngle, sweep, CURVE_SAMPLES),
-      );
+      return lines(arcPolyline(entity.center, entity.radius, entity.startAngle, sweep, CURVE_SAMPLES));
     }
     case 'point':
       return lines([[0, 0]]);

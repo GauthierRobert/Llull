@@ -123,12 +123,7 @@ function EntityDetail({ entity }: { entity: Entity }): React.ReactElement {
       <PanelSection title="Appearance">
         <PropRow label="Color">
           <span className="props-color">
-            <span
-              role="img"
-              className="props-color-swatch"
-              style={{ background: entity.color }}
-              aria-label={entity.color}
-            />
+            <span role="img" className="props-color-swatch" style={{ background: entity.color }} aria-label={entity.color} />
             <span className="props-number">{entity.color}</span>
           </span>
         </PropRow>
@@ -163,8 +158,7 @@ function PropertiesBody(): React.ReactElement {
       />
     );
   }
-  if (elementIds.size === 1 && everyEntityBelongs && soleElementId !== undefined)
-    return <ElementInspector elementId={soleElementId} />;
+  if (elementIds.size === 1 && everyEntityBelongs && soleElementId !== undefined) return <ElementInspector elementId={soleElementId} />;
   if (selection.length > 1) {
     return (
       <>
@@ -181,11 +175,7 @@ function PropertiesBody(): React.ReactElement {
       </>
     );
   }
-  return entity === undefined ? (
-    <PanelEmpty icon="info" message="Entity not found." />
-  ) : (
-    <EntityDetail entity={entity} />
-  );
+  return entity === undefined ? <PanelEmpty icon="info" message="Entity not found." /> : <EntityDetail entity={entity} />;
 }
 
 export function PropertiesPanel({ className }: { className?: string }): React.ReactElement {

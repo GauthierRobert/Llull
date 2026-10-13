@@ -38,12 +38,7 @@ function makeContext(kernel: GeometryKernel): ExecutionContext {
 
 describe('kernel parity across callers', () => {
   it('the same fillet_edge call yields the same entity for UI-style and server-style contexts', () => {
-    const base = execute(
-      createEmptyDocument(),
-      'add_box',
-      { size: [2, 2, 2] },
-      makeContext(makeKernel()),
-    );
+    const base = execute(createEmptyDocument(), 'add_box', { size: [2, 2, 2] }, makeContext(makeKernel()));
     const boxId = base.affected[0]!;
     const params = { id: boxId, radius: 0.2 };
 

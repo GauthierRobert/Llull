@@ -1,23 +1,11 @@
 import type { CadDocument } from '../../model/types';
 import { report } from '../noop';
 import type { CommandResult } from '../types';
-import {
-  type EvalResult,
-  evaluateExpression,
-  extractReferences,
-  isBuiltinConstant,
-  parameterValues,
-} from '../parametric/expression';
+import { type EvalResult, evaluateExpression, extractReferences, isBuiltinConstant, parameterValues } from '../parametric/expression';
 import { MAX_PROJECT_STEPS } from '../limits';
 import { mapStringLeaves } from '../history/regenerate';
 import { isRecord } from '../../lib/isRecord';
-import {
-  type PlanAction,
-  type RepeatStep,
-  type ForEachStep,
-  type StepReport,
-  type BuildProjectData,
-} from './types';
+import { type PlanAction, type RepeatStep, type ForEachStep, type StepReport, type BuildProjectData } from './types';
 
 /** `$alias` or `$alias[N]` — references the affected ids bound by an earlier step. */
 export const REF = /^\$([A-Za-z_]\w*)(?:\[(\d+)\])?$/;
@@ -66,18 +54,12 @@ function isControlStep(value: unknown, key: 'repeat' | 'for_each'): boolean {
   if (!isRecord(value)) return false;
   const control = value[key];
   const step = value['step'];
-  return (
-    typeof control === 'object' &&
-    control !== null &&
-    isRecord(step) &&
-    typeof step['command'] === 'string'
-  );
+  return typeof control === 'object' && control !== null && isRecord(step) && typeof step['command'] === 'string';
 }
 
 export const isRepeatStep = (value: unknown): value is RepeatStep => isControlStep(value, 'repeat');
 
-export const isForEachStep = (value: unknown): value is ForEachStep =>
-  isControlStep(value, 'for_each');
+export const isForEachStep = (value: unknown): value is ForEachStep => isControlStep(value, 'for_each');
 
 export function budgetFailure(index: number): StepReport {
   return {
@@ -90,11 +72,7 @@ export function budgetFailure(index: number): StepReport {
 }
 
 /** A rejected `build_project` run: unchanged doc plus the plan report. */
-export function rejectPlan(
-  doc: CadDocument,
-  data: BuildProjectData,
-  summary: string,
-): CommandResult {
+export function rejectPlan(doc: CadDocument, data: BuildProjectData, summary: string): CommandResult {
   return report(doc, summary, data);
 }
 
@@ -107,10 +85,7 @@ export function buildEnv(doc: CadDocument, extras: Record<string, number>): Reco
  * Fill `{expr}` placeholders (loop variables / parameters, any expression) with their integer or
  * decimal value: `piston{i}` with i=3 -> `piston3`.
  */
-export function interpolate(
-  text: string,
-  env: Record<string, number>,
-): { text: string; error: string | null } {
+export function interpolate(text: string, env: Record<string, number>): { text: string; error: string | null } {
   let error: string | null = null;
   const filled = text.replace(/\{([^{}]*)\}/g, (_, body: string) => {
     const r = evaluateExpression(body, env);
@@ -124,20 +99,12 @@ export function interpolate(
 }
 
 /** A `$…{expr}…` string leaf with its placeholders filled; any other text passes through. */
-export function fillPlaceholders(
-  text: string,
-  env: Record<string, number>,
-): { text: string; error: string | null } {
-  return text.startsWith('$') && text.includes('{')
-    ? interpolate(text, env)
-    : { text, error: null };
+export function fillPlaceholders(text: string, env: Record<string, number>): { text: string; error: string | null } {
+  return text.startsWith('$') && text.includes('{') ? interpolate(text, env) : { text, error: null };
 }
 
 /** Evaluate an `=expr` leaf; `$name` (a loop variable, `=$r * 2`) is stripped to match the env key. */
-export function evaluateLeafExpression(
-  text: string,
-  env: Record<string, number>,
-): { expr: string; result: EvalResult } {
+export function evaluateLeafExpression(text: string, env: Record<string, number>): { expr: string; result: EvalResult } {
   const expr = text.slice(1).replace(/\$([A-Za-z_]\w*)/g, '$1');
   return { expr, result: evaluateExpression(expr, env) };
 }
@@ -148,10 +115,7 @@ function evaluateOverParameters(raw: string, doc: CadDocument): EvalResult {
 }
 
 /** A `repeat` count: number literal, or expression string (leading `=` optional) over the parameters. */
-export function resolveCount(
-  raw: number | string,
-  doc: CadDocument,
-): { count: number; error: string | null } {
+export function resolveCount(raw: number | string, doc: CadDocument): { count: number; error: string | null } {
   if (typeof raw === 'number') return { count: raw, error: null };
   const result = evaluateOverParameters(raw, doc);
   if (!result.ok) return { count: 0, error: `repeat count expression error: ${result.error}` };
@@ -162,10 +126,7 @@ export function resolveCount(
  * `for_each` values: an array literal is used as is; a string is evaluated as arithmetic against
  * the parameters and wrapped as a one-element array (parameters only hold numbers).
  */
-export function resolveForEachValues(
-  raw: unknown[] | string,
-  doc: CadDocument,
-): { values: unknown[]; error: string | null } {
+export function resolveForEachValues(raw: unknown[] | string, doc: CadDocument): { values: unknown[]; error: string | null } {
   if (Array.isArray(raw)) return { values: raw, error: null };
   const result = evaluateOverParameters(raw, doc);
   if (!result.ok) return { values: [], error: `for_each values expression error: ${result.error}` };
@@ -173,11 +134,7 @@ export function resolveForEachValues(
 }
 
 /** Resolve `$alias` refs and `=expr` strings (over `env`, incl. loop variables) in `value`'s string leaves. */
-export function resolveExprInParam(
-  value: unknown,
-  bindings: Record<string, string[]>,
-  env: Record<string, number>,
-): Resolved {
+export function resolveExprInParam(value: unknown, bindings: Record<string, string[]>, env: Record<string, number>): Resolved {
   let firstError: string | null = null;
   const resolved = mapStringLeaves(value, (text) => {
     if (firstError !== null) return text;
@@ -200,19 +157,14 @@ export function resolveExprInParam(
     }
     return r.value;
   });
-  return firstError === null
-    ? { value: resolved, error: null }
-    : { value: undefined, error: firstError };
+  return firstError === null ? { value: resolved, error: null } : { value: undefined, error: firstError };
 }
 
 /**
  * History meta-commands whose `params` become ANOTHER step's params: they receive the recordable
  * form (parameter `=expr` kept) so the stored step stays parametric instead of frozen numbers.
  */
-export const STEP_PARAM_COMMANDS: ReadonlySet<string> = new Set([
-  'insert_step',
-  'edit_step_params',
-]);
+export const STEP_PARAM_COMMANDS: ReadonlySet<string> = new Set(['insert_step', 'edit_step_params']);
 
 /**
  * Params to RECORD in featureHistory for an inner step: `$alias` refs stay resolved (ids), but an
@@ -220,19 +172,12 @@ export const STEP_PARAM_COMMANDS: ReadonlySet<string> = new Set([
  * (architecture L8). Expressions using loop variables (`$i`, `$as`) are recorded as their value.
  * @pure
  */
-export function recordableParams(
-  raw: unknown,
-  resolved: unknown,
-  parameters: CadDocument['parameters'],
-): unknown {
+export function recordableParams(raw: unknown, resolved: unknown, parameters: CadDocument['parameters']): unknown {
   if (typeof raw === 'string' && raw.startsWith('=') && !raw.includes('$')) {
     const refs = extractReferences(raw.slice(1));
-    return [...refs].every((name) => name in parameters || isBuiltinConstant(name))
-      ? raw
-      : resolved;
+    return [...refs].every((name) => name in parameters || isBuiltinConstant(name)) ? raw : resolved;
   }
-  if (Array.isArray(raw) && Array.isArray(resolved))
-    return raw.map((item, i) => recordableParams(item, resolved[i], parameters));
+  if (Array.isArray(raw) && Array.isArray(resolved)) return raw.map((item, i) => recordableParams(item, resolved[i], parameters));
   if (isRecord(raw) && isRecord(resolved)) {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(resolved)) out[k] = recordableParams(raw[k], v, parameters);

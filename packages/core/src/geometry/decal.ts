@@ -38,18 +38,14 @@ function clip(polygon: Vec3[], axis: 0 | 1 | 2, sign: 1 | -1, limit: number): Ve
  * The decal patch over `triangles` (same frame as the decal): triangles with positions and UVs.
  * Only faces turned toward the decal (normal · decal normal > 0.2) receive it.
  */
-export function decalPatch(
-  decal: Decal,
-  triangles: readonly Triangle[],
-): { positions: number[]; uvs: number[] } {
+export function decalPatch(decal: Decal, triangles: readonly Triangle[]): { positions: number[]; uvs: number[] } {
   const { x, y, z } = decalAxes(decal);
   const toLocal = (p: Vec3): Vec3 => {
     const d = sub3(p, decal.center);
     return [dot3(d, x), dot3(d, y), dot3(d, z)];
   };
   const lift = Math.max(decal.width, decal.height) * 1e-3;
-  const toWorld = (q: Vec3): Vec3 =>
-    add3(decal.center, add3(add3(scale3(x, q[0]), scale3(y, q[1])), scale3(z, q[2] + lift)));
+  const toWorld = (q: Vec3): Vec3 => add3(decal.center, add3(add3(scale3(x, q[0]), scale3(y, q[1])), scale3(z, q[2] + lift)));
   const positions: number[] = [];
   const uvs: number[] = [];
   const [hw, hh, hd] = [decal.width / 2, decal.height / 2, decal.depth / 2];

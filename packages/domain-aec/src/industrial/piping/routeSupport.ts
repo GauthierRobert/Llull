@@ -19,11 +19,7 @@ function parseRoute(points: ReadonlyArray<unknown>): Vec3[] | null {
 }
 
 /** `parseRoute` plus the point cap, as a ready failure text (`tool` failed: …) for the command. */
-export function routeOrFailure(
-  tool: string,
-  points: ReadonlyArray<unknown>,
-  split: 'line' | 'run',
-): Vec3[] | string {
+export function routeOrFailure(tool: string, points: ReadonlyArray<unknown>, split: 'line' | 'run'): Vec3[] | string {
   const route = parseRoute(points);
   if (!route) return `${tool} failed: points must be ≥ 2 [x, y, z] points.`;
   return route.length > MAX_ROUTE_POINTS
@@ -34,12 +30,7 @@ export function routeOrFailure(
 export const hasRepeatedPoint = (route: ReadonlyArray<Vec3>): boolean =>
   route.some((point, index) => {
     const previous = route[index - 1];
-    return (
-      previous !== undefined &&
-      point[0] === previous[0] &&
-      point[1] === previous[1] &&
-      point[2] === previous[2]
-    );
+    return previous !== undefined && point[0] === previous[0] && point[1] === previous[1] && point[2] === previous[2];
   });
 
 export const routeLength = (route: ReadonlyArray<Vec3>): number => arcLengths(route).at(-1) ?? 0;
@@ -102,10 +93,7 @@ export function nearestOnRoute(route: ReadonlyArray<Vec3>, point: Vec3): RouteSn
 }
 
 /** Point and segment direction at arc length `arc` of `route` (clamped to its ends). */
-export function pointAtArc(
-  route: ReadonlyArray<Vec3>,
-  arc: number,
-): { point: Vec3; direction: Vec3; segment: number } | null {
+export function pointAtArc(route: ReadonlyArray<Vec3>, arc: number): { point: Vec3; direction: Vec3; segment: number } | null {
   let travelled = 0;
   let last: { point: Vec3; direction: Vec3; segment: number } | null = null;
   for (const [index, { a, delta, length, direction }] of segmentsOf(route).entries()) {

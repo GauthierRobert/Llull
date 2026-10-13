@@ -38,10 +38,7 @@ const SPEED_TABLE: ReadonlyArray<readonly [number, number, number, number]> = [
 ];
 
 function rowFor(speed: number): readonly [number, number, number, number] {
-  return (
-    SPEED_TABLE.find((row) => row[0] >= speed) ??
-    (SPEED_TABLE[SPEED_TABLE.length - 1] as readonly [number, number, number, number])
-  );
+  return SPEED_TABLE.find((row) => row[0] >= speed) ?? (SPEED_TABLE[SPEED_TABLE.length - 1] as readonly [number, number, number, number]);
 }
 
 export interface DesignChecks {
@@ -71,11 +68,7 @@ export interface DesignChecks {
   readonly failures: string[];
 }
 
-export function designChecks(
-  doc: CadDocument,
-  alignment: AlignmentObject,
-  designSpeedKmh: number,
-): DesignChecks {
+export function designChecks(doc: CadDocument, alignment: AlignmentObject, designSpeedKmh: number): DesignChecks {
   const [, friction, crestK, sagK] = rowFor(designSpeedKmh);
   const maxRate = alignment.superelevation?.maxRate ?? MAX_SUPERELEVATION;
   const minRadius = (designSpeedKmh * designSpeedKmh) / (127 * (maxRate + friction));
@@ -104,10 +97,7 @@ export function designChecks(
   });
   const spirals = horizontalElements(alignment).flatMap((element) => {
     if (element.kind !== 'spiral') return [];
-    const radiusM = toMetres(
-      doc,
-      Number.isFinite(element.radiusEnd) ? element.radiusEnd : element.radiusStart,
-    );
+    const radiusM = toMetres(doc, Number.isFinite(element.radiusEnd) ? element.radiusEnd : element.radiusStart);
     const lengthM = toMetres(doc, element.length);
     const minLengthM = designSpeedKmh ** 3 / (46.656 * LATERAL_JERK * radiusM);
     const station = stationText(doc, element.startStation);

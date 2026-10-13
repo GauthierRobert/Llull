@@ -80,12 +80,7 @@ export function DrawInteraction({
         }}
       />
 
-      <DrawPreview
-        activeTool={activeTool}
-        collectedPoints={collectedPoints}
-        cursor={snappedCursor}
-        zoom={zoom}
-      />
+      <DrawPreview activeTool={activeTool} collectedPoints={collectedPoints} cursor={snappedCursor} zoom={zoom} />
 
       <CollectedPointMarkers points={collectedPoints} zoom={zoom} />
     </>

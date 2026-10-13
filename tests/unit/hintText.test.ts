@@ -36,9 +36,7 @@ describe('hintText', () => {
   it('describes the armed draw tool and the 2D move tool', () => {
     expect(hintText({ ...base, viewMode: '2d', drawTool: 'rectangle' })).toMatch(/two opposite/);
     expect(hintText({ ...base, viewMode: '2d', drawTool: 'move' })).toMatch(/select something/i);
-    expect(hintText({ ...base, viewMode: '2d', drawTool: 'move', selectionCount: 2 })).toMatch(
-      /base point/,
-    );
+    expect(hintText({ ...base, viewMode: '2d', drawTool: 'move', selectionCount: 2 })).toMatch(/base point/);
   });
 
   it('defers to the modify palette prompt while a modify tool is armed', () => {

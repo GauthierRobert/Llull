@@ -61,8 +61,7 @@ export function listMcpResources(): McpResourceDescriptor[] {
       uri: CAD_RESOURCE_URIS.selection,
       name: 'Current Selection',
       description:
-        'The currently selected entity ids and a brief summary (kind, position) for each. ' +
-        'Empty array when nothing is selected.',
+        'The currently selected entity ids and a brief summary (kind, position) for each. ' + 'Empty array when nothing is selected.',
       mimeType: 'application/json',
     },
     {
@@ -92,8 +91,7 @@ export const MAX_RESOURCE_ITEMS = 500;
 function boundedScene(doc: CadDocument): Record<string, unknown> {
   const snapshot = computeSceneSnapshot(doc);
   const cut = (items: readonly unknown[]): boolean => items.length > MAX_RESOURCE_ITEMS;
-  if (!cut(snapshot.entities) && !cut(snapshot.selection) && !cut(snapshot.animations))
-    return { ...snapshot };
+  if (!cut(snapshot.entities) && !cut(snapshot.selection) && !cut(snapshot.animations)) return { ...snapshot };
   return {
     ...snapshot,
     entities: snapshot.entities.slice(0, MAX_RESOURCE_ITEMS),

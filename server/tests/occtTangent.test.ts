@@ -11,8 +11,7 @@ import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { createNodeOcctKernel } from '../src/occtNode';
 import { common, booleanMesh, volume } from './kernelTestSupport';
 
-const sphere = (rotation: Vec3): Entity =>
-  ({ id: 's', kind: 'sphere', position: [1, 1, 0], rotation, radius: 3, ...common }) as Entity;
+const sphere = (rotation: Vec3): Entity => ({ id: 's', kind: 'sphere', position: [1, 1, 0], rotation, radius: 3, ...common }) as Entity;
 // Top face at z = 3 touches the sphere (centre z = 0, r = 3) at a single point.
 const tangentBox: Entity = {
   id: 'b',

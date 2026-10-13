@@ -67,14 +67,8 @@ export function SurveySection(): React.ReactElement {
     >
       {documentUnit !== 'm' && (
         <div className="building-actions">
-          <span className="panel__empty-hint">
-            The document is in {documentUnit}; site work reads best in metres.
-          </span>
-          <button
-            type="button"
-            className="btn btn--ghost btn--sm"
-            onClick={() => dispatch('set_units', { units: 'm' })}
-          >
+          <span className="panel__empty-hint">The document is in {documentUnit}; site work reads best in metres.</span>
+          <button type="button" className="btn btn--ghost btn--sm" onClick={() => dispatch('set_units', { units: 'm' })}>
             Work in metres
           </button>
         </div>
@@ -96,12 +90,7 @@ export function SurveySection(): React.ReactElement {
             optionLabel={(option) => `${option} — ${FORMAT_HINT[option]}`}
             onChange={setFormat}
           />
-          <OptionSelect
-            value={unit}
-            options={DOCUMENT_UNITS}
-            label="Survey unit"
-            onChange={setUnit}
-          />
+          <OptionSelect value={unit} options={DOCUMENT_UNITS} label="Survey unit" onChange={setUnit} />
           <TextField value={name} set={setName} hint="Group name" label="Point group name" />
           <button type="submit" className="btn btn--primary btn--sm" disabled={text.trim() === ''}>
             Import points
@@ -112,11 +101,7 @@ export function SurveySection(): React.ReactElement {
       {groups.length > 0 && (
         <ul className="civil-list" aria-label="Point groups">
           {groups.map((group) => (
-            <CivilObjectRow
-              key={group.id}
-              object={group}
-              detail={`${group.points.length} points`}
-            />
+            <CivilObjectRow key={group.id} object={group} detail={`${group.points.length} points`} />
           ))}
         </ul>
       )}

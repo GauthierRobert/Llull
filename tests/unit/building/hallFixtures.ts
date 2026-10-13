@@ -5,6 +5,5 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 export const HALL = { span: 24000, length: 30000 };
 
 export function hall(params: Record<string, unknown> = {}): CadDocument {
-  return execute(createEmptyDocument(), 'add_portal_frame_building', { ...HALL, ...params })
-    .document;
+  return execute(createEmptyDocument(), 'add_portal_frame_building', { ...HALL, ...params }).document;
 }

@@ -9,23 +9,8 @@ import { fromMm } from '@core/model/units';
 import { round, unitsToMm } from '../../shared/numeric';
 import { findProfile } from '../../steel/profiles';
 import { findPlate, hasCase, ultimateCombinations } from './foundationCombinations';
-import {
-  COVER_MM,
-  FALLBACK_COLUMN_MM,
-  type FootingDesignRow,
-  MAX_PLAN_MM,
-  MAX_THICKNESS_MM,
-  type PadSize,
-} from './footingModel';
-import {
-  type SizingContext,
-  evaluatePad,
-  geometryOf,
-  netLoads,
-  padVolume,
-  sizeText,
-  trialSizes,
-} from './footingSizing';
+import { COVER_MM, FALLBACK_COLUMN_MM, type FootingDesignRow, MAX_PLAN_MM, MAX_THICKNESS_MM, type PadSize } from './footingModel';
+import { type SizingContext, evaluatePad, geometryOf, netLoads, padVolume, sizeText, trialSizes } from './footingSizing';
 
 export const isResized = (before: PadSize, after: PadSize): boolean =>
   before.some((value, index) => Math.round(value) !== Math.round(after[index] ?? 0));
@@ -66,11 +51,7 @@ export function designFootingRow(inputs: FootingDesignInputs): FootingDesignOutc
   const crane = hasCase(reaction, 'CL') || hasCase(reaction, 'CR');
   const current: PadSize = [toMm(footing.width), toMm(footing.length), toMm(footing.thickness)];
   const base = { id: footing.id, mark: footing.mark, column: column.mark };
-  const unloadedNet = netLoads(
-    reaction,
-    ultimateCombinations(wind, crane, false),
-    geometryOf(doc, footing, face).leverM,
-  );
+  const unloadedNet = netLoads(reaction, ultimateCombinations(wind, crane, false), geometryOf(doc, footing, face).leverM);
   if (unloadedNet.length === 0) {
     return {
       row: {

@@ -2,11 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { validateDocumentValues } from '@core/commands/persistence/validation';
 
-const base = (): Record<string, unknown> =>
-  JSON.parse(JSON.stringify(createEmptyDocument())) as Record<string, unknown>;
+const base = (): Record<string, unknown> => JSON.parse(JSON.stringify(createEmptyDocument())) as Record<string, unknown>;
 
-const withSection = (section: string, value: unknown): string[] =>
-  validateDocumentValues({ ...base(), [section]: value });
+const withSection = (section: string, value: unknown): string[] => validateDocumentValues({ ...base(), [section]: value });
 
 const mateRef = { instanceId: 'inst-1', frame: 'origin' };
 const joint = {
@@ -46,47 +44,20 @@ describe('validateDocumentValues section guards', () => {
         d1: { id: 'd1', driver: 'j1', driven: 'j2', ratio: 2, offset: 0.5 },
       }),
     ).toEqual([]);
-    expect(
-      withSection('recipes', { r1: { name: 'r1', steps: [{ id: 'step-1', name: 'add_box' }] } }),
-    ).toEqual([]);
+    expect(withSection('recipes', { r1: { name: 'r1', steps: [{ id: 'step-1', name: 'add_box' }] } })).toEqual([]);
   });
 
   it.each([
     ['joint is not an object', 'joints', { j1: 5 }, 'is not an object'],
     ['joint kind unknown', 'joints', { j1: { ...joint, kind: 'ball' } }, "unknown kind 'ball'"],
     ['joint mate ref missing', 'joints', { j1: { ...joint, a: 3 } }, 'a must be an object'],
-    [
-      'joint mate instanceId empty',
-      'joints',
-      { j1: { ...joint, b: { instanceId: '' } } },
-      'b.instanceId must be a non-empty string',
-    ],
-    [
-      'joint mate frame invalid',
-      'joints',
-      { j1: { ...joint, a: { instanceId: 'i', frame: 'diagonal' } } },
-      'a.frame must be',
-    ],
+    ['joint mate instanceId empty', 'joints', { j1: { ...joint, b: { instanceId: '' } } }, 'b.instanceId must be a non-empty string'],
+    ['joint mate frame invalid', 'joints', { j1: { ...joint, a: { instanceId: 'i', frame: 'diagonal' } } }, 'a.frame must be'],
     ['joint axis invalid', 'joints', { j1: { ...joint, axis: [1, 0] } }, 'axis must be'],
-    [
-      'revolute angle not finite',
-      'joints',
-      { j1: { ...joint, angle: 'x' } },
-      'angle must be a finite number',
-    ],
-    [
-      'prismatic displacement missing',
-      'joints',
-      { j1: { ...joint, kind: 'prismatic' } },
-      'displacement must be a finite number',
-    ],
+    ['revolute angle not finite', 'joints', { j1: { ...joint, angle: 'x' } }, 'angle must be a finite number'],
+    ['prismatic displacement missing', 'joints', { j1: { ...joint, kind: 'prismatic' } }, 'displacement must be a finite number'],
     ['constraint not an object', 'constraints', { c1: null }, 'is not an object'],
-    [
-      'constraint kind unknown',
-      'constraints',
-      { c1: { id: 'c1', kind: 'warp', a: {}, b: {} } },
-      "unknown kind 'warp'",
-    ],
+    ['constraint kind unknown', 'constraints', { c1: { id: 'c1', kind: 'warp', a: {}, b: {} } }, "unknown kind 'warp'"],
     [
       'constraint ref entityId missing',
       'constraints',
@@ -132,18 +103,8 @@ describe('validateDocumentValues section guards', () => {
       'offset must be a finite number',
     ],
     ['recipe not an object', 'recipes', { r1: 'nope' }, 'is not an object'],
-    [
-      'recipe steps not an array',
-      'recipes',
-      { r1: { name: 'r1', steps: 3 } },
-      'steps must be an array',
-    ],
-    [
-      'recipe step malformed',
-      'recipes',
-      { r1: { name: 'r1', steps: [{ id: 'step-1' }] } },
-      'steps[0].name must be a string',
-    ],
+    ['recipe steps not an array', 'recipes', { r1: { name: 'r1', steps: 3 } }, 'steps must be an array'],
+    ['recipe step malformed', 'recipes', { r1: { name: 'r1', steps: [{ id: 'step-1' }] } }, 'steps[0].name must be a string'],
   ])('rejects %s', (_label, section, value, fragment) => {
     const errors = withSection(section, value);
     expect(errors.length).toBeGreaterThan(0);

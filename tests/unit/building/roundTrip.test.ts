@@ -36,18 +36,9 @@ const STEPS: Step[] = [
   ['add_beam', { start: [0, 2500], end: [6000, 2500] }],
   ['add_stair', { start: [4000, 500], angle: 0 }],
   ['add_room', { name: 'Hall', wallIds: ['wall-1', 'wall-2', 'wall-3', 'wall-4'] }],
-  [
-    'add_steel_member',
-    { profile: 'HEA300', role: 'column', start: [0, 8000, 0], end: [0, 8000, 5000] },
-  ],
-  [
-    'add_steel_member',
-    { profile: 'HEA300', role: 'column', start: [6000, 8000, 0], end: [6000, 8000, 5000] },
-  ],
-  [
-    'add_steel_member',
-    { profile: 'IPE400', role: 'beam', start: [0, 8000, 5000], end: [6000, 8000, 5000] },
-  ],
+  ['add_steel_member', { profile: 'HEA300', role: 'column', start: [0, 8000, 0], end: [0, 8000, 5000] }],
+  ['add_steel_member', { profile: 'HEA300', role: 'column', start: [6000, 8000, 0], end: [6000, 8000, 5000] }],
+  ['add_steel_member', { profile: 'IPE400', role: 'beam', start: [0, 8000, 5000], end: [6000, 8000, 5000] }],
   ['add_base_plates', {}],
   ['add_footing', { underColumns: true }],
   ['add_equipment', { name: 'Pump', mark: 'P-1', location: [3000, 9500], size: [1500, 800, 900] }],
@@ -80,9 +71,7 @@ const roundTrip = (doc: CadDocument): CadDocument => deserializeDocument(seriali
 describe('derivation guard on every generated entity kind', () => {
   it('rejects move, rotate, scale, mirror and delete of any generated entity', () => {
     const doc = build();
-    const generated = Object.values(doc.building?.elements ?? {}).flatMap(
-      (element) => element.entityIds,
-    );
+    const generated = Object.values(doc.building?.elements ?? {}).flatMap((element) => element.entityIds);
     const categories = new Set(Object.values(doc.building?.elements ?? {}).map((e) => e.category));
     expect(categories.size).toBeGreaterThanOrEqual(15);
     expect(generated.length).toBeGreaterThan(50);
@@ -102,9 +91,7 @@ describe('derivation guard on every generated entity kind', () => {
           expect(result.document, label).toBe(doc);
         } else {
           // A mirror across an axis the entity already sits on changes nothing: no violation.
-          expect(JSON.stringify(result.document.entities), label).toBe(
-            JSON.stringify(doc.entities),
-          );
+          expect(JSON.stringify(result.document.entities), label).toBe(JSON.stringify(doc.entities));
           expect(name, label).toBe('mirror_entity');
         }
       }
@@ -133,9 +120,7 @@ describe('feature history replay reproduces the building', () => {
     expect(edited.summary, edited.summary).not.toMatch(/rejected|failed|refused/i);
     const wall = edited.document.building?.elements['wall-1'];
     expect(wall?.category === 'wall' && wall.thickness).toBe(300);
-    expect(Object.keys(edited.document.building?.elements ?? {})).toEqual(
-      Object.keys(doc.building?.elements ?? {}),
-    );
+    expect(Object.keys(edited.document.building?.elements ?? {})).toEqual(Object.keys(doc.building?.elements ?? {}));
   });
 });
 
@@ -161,11 +146,7 @@ describe('corrupt building data in a file is rejected gracefully', () => {
         try {
           deserializeDocument(JSON.stringify(copy));
         } catch (error) {
-          if (
-            !(error instanceof Error) ||
-            error instanceof TypeError ||
-            error instanceof RangeError
-          ) {
+          if (!(error instanceof Error) || error instanceof TypeError || error instanceof RangeError) {
             failures.push(`${path.join('.')}=${JSON.stringify(value)}: ${String(error)}`);
           }
         }

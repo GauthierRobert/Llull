@@ -70,11 +70,7 @@ function parsePayload(bytes: Buffer): LicensePayload {
 }
 
 /** Pure verification of a license string. @failure any problem -> evaluation status + warning */
-export function verifyLicense(
-  license: string,
-  publicKeyPemText: string,
-  now: Date = new Date(),
-): LicenseStatus {
+export function verifyLicense(license: string, publicKeyPemText: string, now: Date = new Date()): LicenseStatus {
   try {
     const [payloadPart, signaturePart, ...extra] = license.trim().split('.');
     if (payloadPart === undefined || signaturePart === undefined || extra.length > 0) {

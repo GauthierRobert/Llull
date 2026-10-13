@@ -56,7 +56,5 @@ export function derivedEntityIds(doc: CadDocument): Set<string> {
 
 /** Command names a toolset gets from installed plugins. */
 export function pluginToolNames(toolset: string): string[] {
-  return installed
-    .filter((plugin) => plugin.toolset === toolset)
-    .flatMap((plugin) => plugin.commands.map((command) => command.name));
+  return installed.filter((plugin) => plugin.toolset === toolset).flatMap((plugin) => plugin.commands.map((command) => command.name));
 }

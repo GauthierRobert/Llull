@@ -51,8 +51,7 @@ export type FakeKernel = CachingKernel & { readonly calls: FakeCall[] };
 /** `spec` fields are read at call time, so a test may mutate them between commands. */
 export function fakeKernel(spec: FakeKernelSpec = {}): FakeKernel {
   const calls: FakeCall[] = [];
-  const shape = (mesh: MeshData | null | undefined): FakeShape | null =>
-    mesh === null || mesh === undefined ? null : { mesh };
+  const shape = (mesh: MeshData | null | undefined): FakeShape | null => (mesh === null || mesh === undefined ? null : { mesh });
   const kernel = kernelFromOps<FakeShape>({
     unsupported: new Set(spec.unsupported ?? []),
     solid: (entity) => {

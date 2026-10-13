@@ -1,14 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import {
-  buildServiceWorkerManifest,
-  parseServiceWorkerPolicy,
-  serviceWorkerScript,
-} from '../../viteServiceWorker';
+import { buildServiceWorkerManifest, parseServiceWorkerPolicy, serviceWorkerScript } from '../../viteServiceWorker';
 
-const policy = parseServiceWorkerPolicy(
-  JSON.parse(readFileSync('serviceWorker/config.json', 'utf8')),
-);
+const policy = parseServiceWorkerPolicy(JSON.parse(readFileSync('serviceWorker/config.json', 'utf8')));
 
 const files = [
   { fileName: 'assets/index-a1.js', bytes: 1000 },
@@ -23,19 +17,12 @@ const files = [
 describe('service worker build', () => {
   it('the checked-in policy parses; a bad regex is rejected', () => {
     expect(policy.navigation.fallback).toBe('/index.html');
-    expect(() =>
-      parseServiceWorkerPolicy({ ...policy, runtime: { cacheFirst: '(', exclude: 'x' } }),
-    ).toThrow(/regular expression/);
+    expect(() => parseServiceWorkerPolicy({ ...policy, runtime: { cacheFirst: '(', exclude: 'x' } })).toThrow(/regular expression/);
   });
 
   it('precaches only the shell and small hashed js/css, sorted', () => {
     const manifest = buildServiceWorkerManifest(files, policy, () => 'h', 'sw');
-    expect(manifest.precache).toEqual([
-      'assets/index-a1.js',
-      'assets/index-b2.css',
-      'favicon.svg',
-      'index.html',
-    ]);
+    expect(manifest.precache).toEqual(['assets/index-a1.js', 'assets/index-b2.css', 'favicon.svg', 'index.html']);
   });
 
   it('the version changes with file contents or worker source and is stable otherwise', () => {

@@ -15,10 +15,7 @@ import { execute } from '@core/commands/registry';
 describe('measure commands', () => {
   // Shared helpers
 
-  function addBox(
-    doc: CadDocument,
-    size: readonly [number, number, number] = [2, 4, 6],
-  ): ReturnType<typeof execute> {
+  function addBox(doc: CadDocument, size: readonly [number, number, number] = [2, 4, 6]): ReturnType<typeof execute> {
     return execute(doc, 'add_box', { size, position: [0, 0, 0] });
   }
 
@@ -883,12 +880,8 @@ describe('measure commands', () => {
       ];
       const docFull = makeRevolution(profile, 2 * Math.PI);
       const docHalf = makeRevolution(profile, Math.PI);
-      const full = (
-        execute(docFull, 'mass_properties', { entityId: 'rev-test' }).data as { volume: number }
-      ).volume;
-      const half = (
-        execute(docHalf, 'mass_properties', { entityId: 'rev-test' }).data as { volume: number }
-      ).volume;
+      const full = (execute(docFull, 'mass_properties', { entityId: 'rev-test' }).data as { volume: number }).volume;
+      const half = (execute(docHalf, 'mass_properties', { entityId: 'rev-test' }).data as { volume: number }).volume;
       expect(half).toBeCloseTo(full / 2, 6);
     });
 
@@ -1015,12 +1008,9 @@ describe('measure commands', () => {
 
     it('happy: indexed unit-cube mesh mass = volume × density', () => {
       // Same unit-cube mesh as in mass_properties. volume ≈ 1 mm³.
-      const positions: number[] = [
-        0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1,
-      ];
+      const positions: number[] = [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1];
       const indices: number[] = [
-        0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 3, 6, 2, 3, 7, 6, 0, 4, 7, 0, 7, 3, 1,
-        2, 6, 1, 6, 5,
+        0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 3, 6, 2, 3, 7, 6, 0, 4, 7, 0, 7, 3, 1, 2, 6, 1, 6, 5,
       ];
       const meshEntity = {
         id: 'mesh-mass-1',

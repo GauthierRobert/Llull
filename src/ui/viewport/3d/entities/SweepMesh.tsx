@@ -15,16 +15,11 @@ import { TriangleSoupMesh } from './TriangleSoupMesh';
 
 const SWEEP_SURFACE: SolidSurface = { roughness: 0.4, metalness: 0.3, envMapIntensity: 0.9 };
 
-export function SweepMesh({
-  entity,
-  ...shell
-}: SolidMeshKindProps<SweepEntity>): React.ReactElement {
+export function SweepMesh({ entity, ...shell }: SolidMeshKindProps<SweepEntity>): React.ReactElement {
   const { path, section, stations } = entity;
   const triangles = useMemo(
     () => sweepTriangles(stations === undefined ? { path, section } : { path, section, stations }),
     [path, section, stations],
   );
-  return (
-    <TriangleSoupMesh entity={entity} triangles={triangles} surface={SWEEP_SURFACE} {...shell} />
-  );
+  return <TriangleSoupMesh entity={entity} triangles={triangles} surface={SWEEP_SURFACE} {...shell} />;
 }

@@ -10,13 +10,7 @@ const EI = 2.1e4;
 describe('analyseSimpleBeam', () => {
   it('matches wL²/8, wL/2 and 5wL⁴/384EI for a uniform load', () => {
     const [w, length] = [10, 6];
-    const response = analyseSimpleBeam(
-      length,
-      [{ from: 0, to: length, permanent: w, imposed: 0 }],
-      [],
-      ONE,
-      EI,
-    );
+    const response = analyseSimpleBeam(length, [{ from: 0, to: length, permanent: w, imposed: 0 }], [], ONE, EI);
     expect(response.maxMoment).toBeCloseTo((w * length ** 2) / 8, 9);
     expect(response.momentAt).toBeCloseTo(length / 2, 9);
     expect(response.reactionStart).toBeCloseTo((w * length) / 2, 9);
@@ -29,13 +23,7 @@ describe('analyseSimpleBeam', () => {
 
   it('matches PL/4, PL³/48EI and the lever rule for point loads', () => {
     const [load, length] = [100, 8];
-    const centred = analyseSimpleBeam(
-      length,
-      [],
-      [{ at: 4, permanent: load, imposed: 0 }],
-      ONE,
-      EI,
-    );
+    const centred = analyseSimpleBeam(length, [], [{ at: 4, permanent: load, imposed: 0 }], ONE, EI);
     expect(centred.maxMoment).toBeCloseTo((load * length) / 4, 9);
     expect(centred.shearAtMoment).toBeCloseTo(load / 2, 9);
     const expected = ((load * length ** 3) / (48 * EI)) * 1000;
@@ -48,12 +36,7 @@ describe('analyseSimpleBeam', () => {
   });
 
   it('applies the permanent / imposed factors and superposes loads', () => {
-    const response = analyseSimpleBeam(
-      4,
-      [{ from: 0, to: 4, permanent: 2, imposed: 3 }],
-      [{ at: 2, permanent: 4, imposed: 6 }],
-      ULS,
-    );
+    const response = analyseSimpleBeam(4, [{ from: 0, to: 4, permanent: 2, imposed: 3 }], [{ at: 2, permanent: 4, imposed: 6 }], ULS);
     const q = 1.35 * 2 + 1.5 * 3;
     const p = 1.35 * 4 + 1.5 * 6;
     expect(response.maxMoment).toBeCloseTo((q * 16) / 8 + (p * 4) / 4, 9);
@@ -76,12 +59,10 @@ describe('analyseSimpleBeam', () => {
   });
 
   it('totals the permanent and imposed load of a load set', () => {
-    expect(
-      loadTotals(
-        [{ from: 1, to: 3, permanent: 2, imposed: 1 }],
-        [{ at: 1, permanent: 5, imposed: 0.5 }],
-      ),
-    ).toEqual({ permanent: 9, imposed: 2.5 });
+    expect(loadTotals([{ from: 1, to: 3, permanent: 2, imposed: 1 }], [{ at: 1, permanent: 5, imposed: 0.5 }])).toEqual({
+      permanent: 9,
+      imposed: 2.5,
+    });
   });
 });
 

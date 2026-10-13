@@ -6,21 +6,9 @@
       "#1": {
         "id": "#1",
         "kind": "box",
-        "size": [
-          10,
-          5,
-          20
-        ],
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
+        "size": [10,5,20],
+        "position": [0,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#6b8f9c"
       },
@@ -29,16 +17,8 @@
         "kind": "cylinder",
         "radius": 5,
         "height": 10,
-        "position": [
-          20,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
+        "position": [20,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#6b8f9c"
       }
@@ -89,34 +69,16 @@
       {
         "id": "#4",
         "name": "add_box",
-        "params": {
-          "size": [
-            "=w",
-            "=h",
-            "=w * 2"
-          ]
-        },
+        "params": {"size":["=w","=h","=w * 2"]},
         "suppressed": false,
-        "affected": [
-          "#1"
-        ]
+        "affected": ["#1"]
       },
       {
         "id": "#5",
         "name": "add_cylinder",
-        "params": {
-          "radius": "=h",
-          "height": "=w",
-          "position": [
-            20,
-            0,
-            0
-          ]
-        },
+        "params": {"radius":"=h","height":"=w","position":[20,0,0]},
         "suppressed": false,
-        "affected": [
-          "#3"
-        ]
+        "affected": ["#3"]
       }
     ],
     "configurations": {},

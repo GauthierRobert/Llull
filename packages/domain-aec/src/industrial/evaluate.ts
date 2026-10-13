@@ -17,13 +17,7 @@ import type {
   SteelMemberElement,
 } from '@core/model/building';
 import { fromMm, toMm } from '@core/model/units';
-import {
-  base,
-  colorForMaterial,
-  MEMBER_LAYER,
-  meshEntity,
-  orientedBox,
-} from '../building/evaluate/entities';
+import { base, colorForMaterial, MEMBER_LAYER, meshEntity, orientedBox } from '../building/evaluate/entities';
 import { prismMesh, sweepMesh } from '../shared/mesh';
 import { circlePolygon } from '@lib/arc';
 import { findProfile, profileOutline } from '../steel/profiles';
@@ -46,22 +40,11 @@ export function atLevel(level: BuildingLevel, point: Vec3): Vec3 {
   return [point[0], point[1], level.elevation + point[2]];
 }
 
-export function evaluateMember(
-  doc: CadDocument,
-  member: SteelMemberElement,
-  level: BuildingLevel,
-): Entity[] {
+export function evaluateMember(doc: CadDocument, member: SteelMemberElement, level: BuildingLevel): Entity[] {
   const profile = findProfile(member.profile);
   if (!profile) return [];
   const { outer, holes } = profileOutline(profile);
-  const mesh = sweepMesh(
-    outer,
-    holes,
-    atLevel(level, member.start),
-    atLevel(level, member.end),
-    member.roll,
-    fromMm(doc, 1),
-  );
+  const mesh = sweepMesh(outer, holes, atLevel(level, member.start), atLevel(level, member.end), member.roll, fromMm(doc, 1));
   if (!mesh) return [];
   return [
     meshEntity(
@@ -82,11 +65,7 @@ export function evaluateFooting(footing: FootingElement, level: BuildingLevel): 
     orientedBox(
       footing,
       { part: 'body', label: `Footing ${footing.mark}` },
-      [
-        footing.location[0],
-        footing.location[1],
-        level.elevation + footing.topOffset - footing.thickness / 2,
-      ],
+      [footing.location[0], footing.location[1], level.elevation + footing.topOffset - footing.thickness / 2],
       0,
       [footing.width, footing.length, footing.thickness],
       colorForMaterial(footing.material, '#b4b2aa'),
@@ -175,11 +154,7 @@ export function evaluateEquipment(equipment: EquipmentElement, level: BuildingLe
   const [cos, sin] = [Math.cos(equipment.angle), Math.sin(equipment.angle)];
   const mesh =
     shape === 'vertical_vessel'
-      ? prismMesh(
-          circle,
-          [],
-          ([x, y], side): Vec3 => [cx + x, cy + y, level.elevation + side * height],
-        )
+      ? prismMesh(circle, [], ([x, y], side): Vec3 => [cx + x, cy + y, level.elevation + side * height])
       : prismMesh(
           circle,
           [],
@@ -218,13 +193,7 @@ export function evaluatePipe(pipe: PipeElement, level: BuildingLevel): Entity[] 
   const entities = sweepRun(pipe, circle, points, `Pipe ${pipe.mark} ${pipe.service}`, color);
   for (let index = 1; index + 1 < points.length; index++) {
     const joint: SphereEntity = {
-      ...base(
-        pipe,
-        { part: `joint-${index}`, label: `Pipe ${pipe.mark} bend` },
-        points[index] as Vec3,
-        [0, 0, 0],
-        color,
-      ),
+      ...base(pipe, { part: `joint-${index}`, label: `Pipe ${pipe.mark} bend` }, points[index] as Vec3, [0, 0, 0], color),
       kind: 'sphere',
       radius,
     };
@@ -248,11 +217,7 @@ export function trayOutline(width: number, height: number, sheet: number): Vec2[
   ];
 }
 
-export function evaluateTray(
-  doc: Pick<CadDocument, 'units'>,
-  tray: CableTrayElement,
-  level: BuildingLevel,
-): Entity[] {
+export function evaluateTray(doc: Pick<CadDocument, 'units'>, tray: CableTrayElement, level: BuildingLevel): Entity[] {
   return sweepRun(
     tray,
     trayOutline(tray.width, tray.height, fromMm(doc, 2)),

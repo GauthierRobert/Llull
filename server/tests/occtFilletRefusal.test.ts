@@ -17,13 +17,10 @@ import { createNodeOcctKernel } from '../src/occtNode';
 beforeAll(async () => setGeometryKernel(await createNodeOcctKernel()), 120_000);
 afterAll(() => setGeometryKernel(null));
 
-const plan = (name: string): unknown[] =>
-  JSON.parse(readFileSync(path.join(__dirname, 'fixtures', 'fillets', name), 'utf8')) as unknown[];
+const plan = (name: string): unknown[] => JSON.parse(readFileSync(path.join(__dirname, 'fixtures', 'fillets', name), 'utf8')) as unknown[];
 
 function runUntilFillet(actions: unknown[]): ReturnType<typeof execute> {
-  const filletAt = actions.findIndex(
-    (action) => (action as { command?: string }).command === 'fillet_edge',
-  );
+  const filletAt = actions.findIndex((action) => (action as { command?: string }).command === 'fillet_edge');
   return execute(createEmptyDocument(), 'build_project', {
     actions: actions.slice(0, filletAt + 1),
   });

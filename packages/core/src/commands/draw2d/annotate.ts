@@ -43,9 +43,7 @@ export const addText = defineCommand({
     height: z.number().describe('Cap-height of the text in model units. Must be greater than 0.'),
     rotation: z
       .array(z.number())
-      .describe(
-        'Euler rotation angles [rx, ry, rz] in radians that orient the work plane. Defaults to [0,0,0].',
-      )
+      .describe('Euler rotation angles [rx, ry, rz] in radians that orient the work plane. Defaults to [0,0,0].')
       .optional(),
     anchor: z
       .string()
@@ -56,24 +54,15 @@ export const addText = defineCommand({
           "'right': position is the right edge of the last glyph.",
       )
       .optional(),
-    color: z
-      .string()
-      .describe('Hex color string, e.g. "#333333". Defaults to "#333333".')
-      .optional(),
+    color: z.string().describe('Hex color string, e.g. "#333333". Defaults to "#333333".').optional(),
     layer: layerIdField(),
   }),
-  run: (
-    doc,
-    { content, position, height, rotation = [0, 0, 0], anchor = 'left', color = '#333333', layer },
-  ): CommandResult => {
-    if (content.trim().length === 0)
-      return noop(doc, 'add_text: content must be a non-empty string; entity not created.');
+  run: (doc, { content, position, height, rotation = [0, 0, 0], anchor = 'left', color = '#333333', layer }): CommandResult => {
+    if (content.trim().length === 0) return noop(doc, 'add_text: content must be a non-empty string; entity not created.');
 
-    if (height <= 0)
-      return noop(doc, `add_text: height must be > 0 (got ${height}); entity not created.`);
+    if (height <= 0) return noop(doc, `add_text: height must be > 0 (got ${height}); entity not created.`);
 
-    if (position.length < 3)
-      return noop(doc, 'add_text: position must be a [x, y, z] numeric array; entity not created.');
+    if (position.length < 3) return noop(doc, 'add_text: position must be a [x, y, z] numeric array; entity not created.');
 
     const id = nextId('text');
     const entity = {
@@ -142,9 +131,7 @@ export const addDimension = defineCommand({
       ),
     offset: z
       .number()
-      .describe(
-        'Perpendicular distance (model units) from the measured geometry to the dimension line. Default: 5.',
-      )
+      .describe('Perpendicular distance (model units) from the measured geometry to the dimension line. Default: 5.')
       .optional(),
     precision: z
       .number()
@@ -155,9 +142,7 @@ export const addDimension = defineCommand({
       .optional(),
     label: z
       .string()
-      .describe(
-        "Custom text to display instead of the computed value, e.g. 'REF' or '≈ 42 mm'. Omit to show the computed measurement.",
-      )
+      .describe("Custom text to display instead of the computed value, e.g. 'REF' or '≈ 42 mm'. Omit to show the computed measurement.")
       .optional(),
     layer: layerIdField(),
   }),
@@ -170,13 +155,9 @@ export const addDimension = defineCommand({
       );
     }
     if (precision !== undefined && (precision < 0 || precision > MAX_DISPLAY_PRECISION)) {
-      return noop(
-        doc,
-        `add_dimension: precision must be an integer in [0, ${MAX_DISPLAY_PRECISION}] (got ${precision}).`,
-      );
+      return noop(doc, `add_dimension: precision must be an integer in [0, ${MAX_DISPLAY_PRECISION}] (got ${precision}).`);
     }
-    if (entityIds.length === 0)
-      return noop(doc, `add_dimension: entityIds must be a non-empty array of entity ids.`);
+    if (entityIds.length === 0) return noop(doc, `add_dimension: entityIds must be a non-empty array of entity ids.`);
     if (entityIds.length !== rule.ids) {
       return noop(
         doc,
@@ -185,10 +166,7 @@ export const addDimension = defineCommand({
     }
     for (const refId of entityIds) {
       if (!(refId in doc.entities)) {
-        return noop(
-          doc,
-          `add_dimension: referenced entity '${refId}' does not exist in the document.`,
-        );
+        return noop(doc, `add_dimension: referenced entity '${refId}' does not exist in the document.`);
       }
     }
     for (const refId of entityIds) {

@@ -19,9 +19,7 @@ vi.mock('@core/commands/registry', async (importOriginal) => {
     ...actual,
     execute: (...args: Parameters<typeof actual.execute>) => {
       const result = actual.execute(...args);
-      return args[1] === 'check_portal_frames'
-        ? { ...result, data: { rows: [], warnings: ['Frame F1: not analysed'] } }
-        : result;
+      return args[1] === 'check_portal_frames' ? { ...result, data: { rows: [], warnings: ['Frame F1: not analysed'] } } : result;
     },
   };
 });
@@ -104,26 +102,16 @@ describe('building element inspector', () => {
     render(<PropertiesPanel />);
     fireEvent.change(screen.getByTestId('equipment-edit-weight'), { target: { value: '1234' } });
     fireEvent.click(screen.getByTestId('equipment-save'));
-    expect(dispatch).toHaveBeenCalledWith(
-      'update_equipment',
-      expect.objectContaining({ weight: 1234 }),
-    );
+    expect(dispatch).toHaveBeenCalledWith('update_equipment', expect.objectContaining({ weight: 1234 }));
   });
 });
 
 describe('grid framing tools', () => {
   it('lists the tools right after the structural grid', () => {
     render(<BuildingPanel />);
-    const labels = Array.from(
-      screen.getByTestId('building-tool-select').querySelectorAll('option'),
-    ).map((option) => option.textContent);
+    const labels = Array.from(screen.getByTestId('building-tool-select').querySelectorAll('option')).map((option) => option.textContent);
     const gridIndex = labels.indexOf('Structural grid');
-    expect(labels.slice(gridIndex, gridIndex + 4)).toEqual([
-      'Structural grid',
-      'Columns on grid',
-      'Beams on grid',
-      'Bracing on grid',
-    ]);
+    expect(labels.slice(gridIndex, gridIndex + 4)).toEqual(['Structural grid', 'Columns on grid', 'Beams on grid', 'Bracing on grid']);
   });
 
   it('dispatches add_grid_columns', () => {
@@ -205,9 +193,7 @@ describe('structural check section', () => {
     expect(screen.getByText('Snow load (kN/m²)')).toBeVisible();
     expect(screen.getByText('Wind pressure qp (kN/m²)')).toBeVisible();
     fireEvent.click(screen.getByTestId('frame-check'));
-    expect(screen.getByRole('list', { name: 'Warnings' })).toHaveTextContent(
-      'Frame F1: not analysed',
-    );
+    expect(screen.getByRole('list', { name: 'Warnings' })).toHaveTextContent('Frame F1: not analysed');
   });
 });
 
@@ -227,9 +213,7 @@ describe('levels: edit and copy', () => {
     const levels = Object.keys(useStore.getState().document.building?.levels ?? {});
     const dispatch = spyDispatch();
     render(<BuildingPanel />);
-    fireEvent.click(
-      screen.getByRole('button', { name: `Copy level ${levelName(levels[0]!)} to levels` }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: `Copy level ${levelName(levels[0]!)} to levels` }));
     fireEvent.click(screen.getByRole('checkbox', { name: levelName(levels[1]!) }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'Columns' }));
     fireEvent.click(screen.getByRole('button', { name: 'Copy elements' }));

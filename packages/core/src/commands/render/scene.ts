@@ -68,9 +68,7 @@ export function renderDocument(
   });
   const background = options.background === undefined ? DEFAULT_BACKGROUND : options.background;
   // Underlays are never capped by MAX_POLYGONS: they are one <image> each, painted first.
-  const underlays = orderedEntities(doc).flatMap((e) =>
-    drawableEntities(doc, e).filter((d): d is ImageEntity => d.kind === 'image'),
-  );
+  const underlays = orderedEntities(doc).flatMap((e) => drawableEntities(doc, e).filter((d): d is ImageEntity => d.kind === 'image'));
 
   return {
     view,
@@ -85,16 +83,6 @@ export function renderDocument(
     simplifiedEntityIds: fitted.simplifiedEntityIds,
     skippedEntityIds: fitted.skippedEntityIds,
     cutEntityIds,
-    svg: buildSvg(
-      polygons,
-      underlays,
-      cam,
-      orthoHalf,
-      width,
-      height,
-      view,
-      snapshot.entityCount,
-      background,
-    ),
+    svg: buildSvg(polygons, underlays, cam, orthoHalf, width, height, view, snapshot.entityCount, background),
   };
 }

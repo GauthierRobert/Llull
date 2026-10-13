@@ -27,9 +27,7 @@ function toAxis(raw: number[] | undefined): Vec3 {
   return [raw[0] ?? 0, raw[1] ?? 1, raw[2] ?? 0];
 }
 
-const targetIdField = z
-  .string()
-  .describe('Id of the entity or group to animate. Must exist in the document.');
+const targetIdField = z.string().describe('Id of the entity or group to animate. Must exist in the document.');
 
 const pivotField = z
   .array(z.number())
@@ -61,9 +59,7 @@ interface AnimationInput {
 /** A fresh animation (new id) from raw inputs; unknown channel/trigger fall back to rotation/auto. */
 function buildAnimation(
   input: AnimationInput,
-  motion:
-    | { mode: 'spin'; speed: number }
-    | { mode: 'oscillate'; amplitude: number; frequency: number },
+  motion: { mode: 'spin'; speed: number } | { mode: 'oscillate'; amplitude: number; frequency: number },
 ): Animation {
   const { pivot } = input;
   return {
@@ -77,9 +73,7 @@ function buildAnimation(
     amplitude: motion.mode === 'oscillate' ? motion.amplitude : 0,
     frequency: motion.mode === 'oscillate' ? motion.frequency : 0,
     trigger: input.trigger === 'click' ? 'click' : 'auto',
-    ...(pivot && pivot.length >= 3
-      ? { pivot: [pivot[0] ?? 0, pivot[1] ?? 0, pivot[2] ?? 0] as Vec3 }
-      : {}),
+    ...(pivot && pivot.length >= 3 ? { pivot: [pivot[0] ?? 0, pivot[1] ?? 0, pivot[2] ?? 0] as Vec3 } : {}),
   };
 }
 
@@ -115,9 +109,7 @@ export const animate = defineCommand({
     targetId: targetIdField,
     mode: z
       .enum(['spin', 'oscillate'])
-      .describe(
-        "'spin' = constant velocity (give speed); 'oscillate' = back-and-forth sine motion (give amplitude and frequency).",
-      ),
+      .describe("'spin' = constant velocity (give speed); 'oscillate' = back-and-forth sine motion (give amplitude and frequency)."),
     speed: z
       .number()
       .optional()
@@ -127,15 +119,11 @@ export const animate = defineCommand({
     amplitude: z
       .number()
       .optional()
-      .describe(
-        'oscillate: peak displacement, radians for the rotation channel or document units for the position channel. Must be > 0.',
-      ),
+      .describe('oscillate: peak displacement, radians for the rotation channel or document units for the position channel. Must be > 0.'),
     frequency: z
       .number()
       .optional()
-      .describe(
-        'oscillate: complete cycles per second (Hz), > 0. Example: 0.5 = one full back-and-forth every 2 seconds.',
-      ),
+      .describe('oscillate: complete cycles per second (Hz), > 0. Example: 0.5 = one full back-and-forth every 2 seconds.'),
     axis: z
       .array(z.number())
       .optional()
@@ -147,23 +135,17 @@ export const animate = defineCommand({
     channel: z
       .string()
       .optional()
-      .describe(
-        "Transform channel to drive: 'rotation' (default) turns / rocks the part; 'position' translates / slides it.",
-      ),
+      .describe("Transform channel to drive: 'rotation' (default) turns / rocks the part; 'position' translates / slides it."),
     pivot: pivotField,
     trigger: triggerField,
   }),
-  run: (
-    doc,
-    { targetId, mode, speed, amplitude, frequency, axis, channel, pivot, trigger },
-  ): CommandResult => {
+  run: (doc, { targetId, mode, speed, amplitude, frequency, axis, channel, pivot, trigger }): CommandResult => {
     const targetKind = resolveTargetKind(doc, targetId);
     if (targetKind === null) return noop(doc, `animate: no entity or group ${targetId}.`);
     const input = { targetId, targetKind, axis, channel, trigger, pivot };
 
     if (mode === 'spin') {
-      if (speed === undefined || !Number.isFinite(speed))
-        return noop(doc, `animate: spin needs a finite speed; ${targetId} unchanged.`);
+      if (speed === undefined || !Number.isFinite(speed)) return noop(doc, `animate: spin needs a finite speed; ${targetId} unchanged.`);
       const anim = buildAnimation(input, { mode, speed });
       const rotates = anim.channel === 'rotation';
       return report(
@@ -173,15 +155,9 @@ export const animate = defineCommand({
     }
 
     if (amplitude === undefined || !(amplitude > 0))
-      return noop(
-        doc,
-        `animate: oscillate amplitude must be > 0 (got ${amplitude}); ${targetId} unchanged.`,
-      );
+      return noop(doc, `animate: oscillate amplitude must be > 0 (got ${amplitude}); ${targetId} unchanged.`);
     if (frequency === undefined || !(frequency > 0))
-      return noop(
-        doc,
-        `animate: oscillate frequency must be > 0 (got ${frequency}); ${targetId} unchanged.`,
-      );
+      return noop(doc, `animate: oscillate frequency must be > 0 (got ${frequency}); ${targetId} unchanged.`);
     const anim = buildAnimation(input, { mode, amplitude, frequency });
     const rotates = anim.channel === 'rotation';
     return report(
@@ -212,10 +188,7 @@ export const stopAnimation = defineCommand({
     animationId: z
       .string()
       .optional()
-      .describe(
-        'Id of a specific animation to remove (e.g. "anim-abc123-4"). ' +
-          'Takes precedence over targetId when both are given.',
-      ),
+      .describe('Id of a specific animation to remove (e.g. "anim-abc123-4"). ' + 'Takes precedence over targetId when both are given.'),
     targetId: z
       .string()
       .optional()
@@ -229,32 +202,22 @@ export const stopAnimation = defineCommand({
     const existing = doc.animations;
 
     if (animationId !== undefined) {
-      if (existing[animationId] === undefined)
-        return noop(doc, `stop_animation: animation ${animationId} not found; nothing removed.`);
+      if (existing[animationId] === undefined) return noop(doc, `stop_animation: animation ${animationId} not found; nothing removed.`);
       const next = { ...existing };
       delete next[animationId];
-      return report(
-        { ...doc, animations: next },
-        `stop_animation: removed animation ${animationId}.`,
-      );
+      return report({ ...doc, animations: next }, `stop_animation: removed animation ${animationId}.`);
     }
 
     if (targetId !== undefined) {
       const toRemove = Object.values(existing).filter((a) => a.targetId === targetId);
       if (toRemove.length === 0) {
-        return noop(
-          doc,
-          `stop_animation: no animations found for target ${targetId}; nothing removed.`,
-        );
+        return noop(doc, `stop_animation: no animations found for target ${targetId}; nothing removed.`);
       }
       const next = { ...existing };
       for (const a of toRemove) {
         delete next[a.id];
       }
-      return report(
-        { ...doc, animations: next },
-        `stop_animation: removed ${toRemove.length} animation(s) for target ${targetId}.`,
-      );
+      return report({ ...doc, animations: next }, `stop_animation: removed ${toRemove.length} animation(s) for target ${targetId}.`);
     }
 
     const count = Object.keys(existing).length;

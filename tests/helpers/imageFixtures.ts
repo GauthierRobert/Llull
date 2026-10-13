@@ -1,11 +1,6 @@
 /** Minimal PNG / JPEG byte streams (headers only — enough for size parsing) as data URLs. */
 
-const be32 = (n: number): number[] => [
-  (n >>> 24) & 255,
-  (n >>> 16) & 255,
-  (n >>> 8) & 255,
-  n & 255,
-];
+const be32 = (n: number): number[] => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
 const be16 = (n: number): number[] => [(n >> 8) & 255, n & 255];
 
 export function pngBytes(width: number, height: number): Uint8Array {
@@ -83,8 +78,6 @@ export function jpegBytes(width: number, height: number, sof = 0xc0): Uint8Array
 
 const base64 = (bytes: Uint8Array): string => Buffer.from(bytes).toString('base64');
 
-export const pngDataUrl = (width: number, height: number): string =>
-  `data:image/png;base64,${base64(pngBytes(width, height))}`;
+export const pngDataUrl = (width: number, height: number): string => `data:image/png;base64,${base64(pngBytes(width, height))}`;
 
-export const jpegDataUrl = (width: number, height: number): string =>
-  `data:image/jpeg;base64,${base64(jpegBytes(width, height))}`;
+export const jpegDataUrl = (width: number, height: number): string => `data:image/jpeg;base64,${base64(jpegBytes(width, height))}`;

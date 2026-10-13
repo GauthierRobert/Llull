@@ -24,10 +24,7 @@ export function dimensionGeometry(primitive: Dimension): DimensionGeometry {
   const dy = primitive.b[1] - primitive.a[1];
   const length = Math.hypot(dx, dy) || 1;
   const normal: Vec2 = [dy / length, -dx / length];
-  const shift = (point: Vec2, distance: number): Vec2 => [
-    point[0] + normal[0] * distance,
-    point[1] + normal[1] * distance,
-  ];
+  const shift = (point: Vec2, distance: number): Vec2 => [point[0] + normal[0] * distance, point[1] + normal[1] * distance];
   const { offset } = primitive;
   const a = shift(primitive.a, offset);
   const b = shift(primitive.b, offset);

@@ -38,22 +38,13 @@ export const svgLine = (a: Vec2, b: Vec2, cssClass: string): string =>
  * Aligned dimension between paper points `a`, `b`: extension lines, the dimension line `side`
  * paper mm off a→b (positive = left of a→b on paper), oblique ticks and a readable label.
  */
-export function paperDimension(
-  a: Vec2,
-  b: Vec2,
-  side: number,
-  label: string,
-  textSize: number,
-): string[] {
+export function paperDimension(a: Vec2, b: Vec2, side: number, label: string, textSize: number): string[] {
   const dx = b[0] - a[0];
   const dy = b[1] - a[1];
   const length = Math.hypot(dx, dy);
   if (length === 0) return [];
   const normal: Vec2 = [dy / length, -dx / length];
-  const shift = (point: Vec2, distance: number): Vec2 => [
-    point[0] + normal[0] * distance,
-    point[1] + normal[1] * distance,
-  ];
+  const shift = (point: Vec2, distance: number): Vec2 => [point[0] + normal[0] * distance, point[1] + normal[1] * distance];
   const sign = Math.sign(side);
   const [da, db] = [shift(a, side), shift(b, side)];
   const parts = [
@@ -91,9 +82,7 @@ export class DrawingPainter {
         return;
       }
       case 'polyline':
-        this.parts.push(
-          `<polyline points="${this.points(primitive.points)}" class="${cssClass()}"/>`,
-        );
+        this.parts.push(`<polyline points="${this.points(primitive.points)}" class="${cssClass()}"/>`);
         return;
       case 'line':
         this.parts.push(svgLine(this.map(primitive.a), this.map(primitive.b), cssClass()));
@@ -107,8 +96,7 @@ export class DrawingPainter {
       }
       case 'arc': {
         const { center, radius, startAngle, endAngle } = primitive;
-        const at = (angle: number): Vec2 =>
-          this.map([center[0] + radius * Math.cos(angle), center[1] + radius * Math.sin(angle)]);
+        const at = (angle: number): Vec2 => this.map([center[0] + radius * Math.cos(angle), center[1] + radius * Math.sin(angle)]);
         const [start, end] = [at(startAngle), at(endAngle)];
         const large = wrapAngle(endAngle - startAngle) > Math.PI ? 1 : 0;
         const r = n(radius * this.paperPerUnit);
@@ -126,15 +114,7 @@ export class DrawingPainter {
       case 'dimension': {
         // Model "right of a→b" becomes "left of a→b" once Y is flipped on paper.
         const gap = clamp(primitive.offset * this.paperPerUnit, 6, 14);
-        this.parts.push(
-          ...paperDimension(
-            this.map(primitive.a),
-            this.map(primitive.b),
-            -gap,
-            primitive.label,
-            2.5,
-          ),
-        );
+        this.parts.push(...paperDimension(this.map(primitive.a), this.map(primitive.b), -gap, primitive.label, 2.5));
         return;
       }
     }

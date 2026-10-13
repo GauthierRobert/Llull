@@ -25,26 +25,20 @@ export function gridSurvey(f: (x: number, y: number) => number, n = 11, step = 1
 }
 
 /** Metric document with point group `pointGroup-1` and surface `surface-1` of z = f(x, y). */
-export function surveyedDocument(
-  f: (x: number, y: number) => number = (x) => 100 + x * 0.05,
-  n = 11,
-  step = 10,
-): CadDocument {
+export function surveyedDocument(f: (x: number, y: number) => number = (x) => 100 + x * 0.05, n = 11, step = 10): CadDocument {
   const imported = execute(metricDocument(), 'import_survey_points', {
     text: gridSurvey(f, n, step),
   });
   return execute(imported.document, 'create_surface', {}).document;
 }
 
-export const alignmentOf = (doc: CadDocument, id: string): AlignmentObject =>
-  doc.civil?.objects[id] as AlignmentObject;
+export const alignmentOf = (doc: CadDocument, id: string): AlignmentObject => doc.civil?.objects[id] as AlignmentObject;
 
 /** Save / load keeps the alignment, every entity id and the alignment report. */
 export function expectSaveLoadRoundTrip(doc: CadDocument, id: string): void {
   const loaded = deserializeDocument(serializeDocument(doc));
   expect(alignmentOf(loaded, id)).toEqual(alignmentOf(doc, id));
   expect(Object.keys(loaded.entities).sort()).toEqual(Object.keys(doc.entities).sort());
-  const report = (d: CadDocument): unknown =>
-    execute(d, 'alignment_report', { alignmentId: id }).data;
+  const report = (d: CadDocument): unknown => execute(d, 'alignment_report', { alignmentId: id }).data;
   expect(report(loaded)).toEqual(report(doc));
 }

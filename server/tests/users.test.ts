@@ -8,15 +8,7 @@ import request from 'supertest';
 import fs from 'fs';
 import { app } from '../src/index';
 import { authenticateToken, loadUsers } from '../src/users';
-import {
-  ADMIN,
-  EDITOR,
-  VIEWER,
-  bearer,
-  installUsersFile,
-  sha256,
-  withUserFixture,
-} from './userTestSupport';
+import { ADMIN, EDITOR, VIEWER, bearer, installUsersFile, sha256, withUserFixture } from './userTestSupport';
 import { subscribeLive } from '../src/liveDocument';
 import type { Response } from 'express';
 import { mcpRequest } from './mcpTestSupport';
@@ -46,10 +38,7 @@ describe('named-user authentication', () => {
   });
 
   it('ignores malformed user entries', () => {
-    fs.writeFileSync(
-      process.env['LLULL_USERS_FILE'] as string,
-      JSON.stringify([{ id: 'x', name: 'x', role: 'boss', tokenSha256: 'abc' }]),
-    );
+    fs.writeFileSync(process.env['LLULL_USERS_FILE'] as string, JSON.stringify([{ id: 'x', name: 'x', role: 'boss', tokenSha256: 'abc' }]));
     expect(loadUsers()).toHaveLength(0);
   });
 
@@ -209,15 +198,7 @@ describe('roles over MCP', () => {
 
   it('viewer sees and may call read-only tools only', async () => {
     const session = await openSession(VIEWER.token);
-    const list = rpcResult(
-      (
-        await mcp(
-          VIEWER.token,
-          { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} },
-          session,
-        )
-      ).text,
-    );
+    const list = rpcResult((await mcp(VIEWER.token, { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }, session)).text);
     const names = (list.tools ?? []).map((t) => t.name);
     expect(names).not.toContain('add_box');
     expect(names).toContain('search_tools');
@@ -230,11 +211,7 @@ describe('roles over MCP', () => {
     const session = await openSession(EDITOR.token);
     const call = await callAddBox(EDITOR.token, session);
     expect(call.isError).toBe(false);
-    const stolen = await mcp(
-      VIEWER.token,
-      { jsonrpc: '2.0', id: 4, method: 'tools/list', params: {} },
-      session,
-    );
+    const stolen = await mcp(VIEWER.token, { jsonrpc: '2.0', id: 4, method: 'tools/list', params: {} }, session);
     expect(stolen.status).toBe(403);
   });
 });

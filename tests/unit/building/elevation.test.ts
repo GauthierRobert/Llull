@@ -30,9 +30,7 @@ describe('buildElevationDrawing', () => {
     expect(ofStyle(south, 'visible')).toHaveLength(4);
     expect(ofStyle(south, 'hidden')).toHaveLength(0);
     expect(buildElevationDrawing(doc, { direction: 'east' })!.bounds).toEqual([-500, 0, 500, 1000]);
-    expect(buildElevationDrawing(doc, { direction: 'north' })!.bounds).toEqual([
-      -1000, 0, 1000, 1000,
-    ]);
+    expect(buildElevationDrawing(doc, { direction: 'north' })!.bounds).toEqual([-1000, 0, 1000, 1000]);
     expect(ofStyle(buildElevationDrawing(doc, { direction: 'west' })!, 'visible')).toHaveLength(4);
   });
 
@@ -59,9 +57,7 @@ describe('buildElevationDrawing', () => {
     const layerId = doc.entities['panel-1:body']!.layerId;
     const hidden = execute(doc, 'update_layer', { id: layerId, visible: false });
     expect(hidden.affected.length, hidden.summary).toBeGreaterThan(0);
-    expect(buildElevationDrawing(hidden.document, { direction: 'south' })!.primitives).toHaveLength(
-      frame.primitives.length,
-    );
+    expect(buildElevationDrawing(hidden.document, { direction: 'south' })!.primitives).toHaveLength(frame.primitives.length);
   });
 
   it('returns null for a document without 3D geometry', () => {
@@ -120,22 +116,18 @@ describe('export_elevation_sheet', () => {
   });
 
   it('draws a machine part without a ground line, with a scale bar that fits small scales', () => {
-    const sheet = execute(box(), 'export_elevation_sheet', { direction: 'south', scale: 2 })
-      .data as ElevationSheet;
+    const sheet = execute(box(), 'export_elevation_sheet', { direction: 'south', scale: 2 }).data as ElevationSheet;
     expect(sheet.svg).not.toContain('class="ground"');
     // 1:2 → 5 × 20 mm steps (a 50 mm bar on paper), labelled in mm.
     expect(sheet.svg).toContain('>100 mm</text>');
-    const full = execute(box(), 'export_elevation_sheet', { direction: 'south', scale: 1 })
-      .data as ElevationSheet;
+    const full = execute(box(), 'export_elevation_sheet', { direction: 'south', scale: 1 }).data as ElevationSheet;
     expect(full.svg).toContain('>50 mm</text>');
     const hallSheet = execute(hall(), 'export_elevation_sheet', {}).data as ElevationSheet;
     expect(hallSheet.svg).toContain('class="ground"');
   });
 
   it('fails on an empty document', () => {
-    expect(execute(createEmptyDocument(), 'export_elevation_sheet', {}).summary).toMatch(
-      /no 3D geometry/,
-    );
+    expect(execute(createEmptyDocument(), 'export_elevation_sheet', {}).summary).toMatch(/no 3D geometry/);
   });
 });
 
@@ -189,8 +181,7 @@ describe('section poché', () => {
     // The plane y = 0 cuts the tube's two side walls: two solid steel strips.
     expect(cuts.filter((p) => p.type === 'polygon' && p.fill === 'solid')).toHaveLength(2);
     expect(cuts.some((p) => p.type === 'polygon' && p.fill === 'hatch')).toBe(true);
-    const sheet = execute(doc, 'export_elevation_sheet', { direction: 'south', cutAt: 0 })
-      .data as ElevationSheet;
+    const sheet = execute(doc, 'export_elevation_sheet', { direction: 'south', cutAt: 0 }).data as ElevationSheet;
     expect(sheet.svg).toContain('class="cut"');
     expect(sheet.svg).toContain('class="cut-hatch"');
     expect(sheet.svg).toContain('id="hatch-concrete"');

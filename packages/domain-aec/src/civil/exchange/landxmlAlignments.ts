@@ -12,11 +12,7 @@ import type { AlignmentObject } from '@core/model/civil';
 import { escapeXml } from '@lib/escapeXml';
 import { toMetres } from '@core/model/units';
 import { civilObjectsOf, getCivil } from '../model';
-import {
-  alignmentLength,
-  horizontalElements,
-  type SpiralElement,
-} from '../alignment/alignmentGeometry';
+import { alignmentLength, horizontalElements, type SpiralElement } from '../alignment/alignmentGeometry';
 import { clothoidLocal } from '../alignment/alignmentSpiral';
 
 type Doc = Pick<CadDocument, 'civil' | 'units'>;
@@ -54,10 +50,7 @@ function alignmentXml(doc: Doc, alignment: AlignmentObject): string[] {
   const elements = horizontalElements(alignment).map((element) => {
     const common = `staStart="${metres(doc, element.startStation)}" length="${metres(doc, element.length)}"`;
     if (element.kind === 'line') {
-      return (
-        `        <Line ${common}><Start>${northEast(doc, element.start)}</Start>` +
-        `<End>${northEast(doc, element.end)}</End></Line>`
-      );
+      return `        <Line ${common}><Start>${northEast(doc, element.start)}</Start>` + `<End>${northEast(doc, element.end)}</End></Line>`;
     }
     if (element.kind === 'spiral') return spiralXml(doc, element);
     const delta = Number(toDegrees(element.deflection).toFixed(6));
@@ -100,10 +93,6 @@ function alignmentXml(doc: Doc, alignment: AlignmentObject): string[] {
 export function alignmentsXml(doc: Doc): string {
   const alignments = civilObjectsOf(getCivil(doc), 'alignment');
   if (alignments.length === 0) return '';
-  const lines = [
-    '  <Alignments name="Alignments">',
-    ...alignments.flatMap((alignment) => alignmentXml(doc, alignment)),
-    '  </Alignments>',
-  ];
+  const lines = ['  <Alignments name="Alignments">', ...alignments.flatMap((alignment) => alignmentXml(doc, alignment)), '  </Alignments>'];
   return `${lines.join('\n')}\n`;
 }

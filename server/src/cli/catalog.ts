@@ -9,22 +9,14 @@ import { getCommand, listCommands } from '@core/commands/registry';
 import type { CommandDefinition, ParamItemSpec, ParamsSchema } from '@core/commands/types';
 import type { McpToolDefinition } from '@mcp/tools';
 import { exchangeTool, exchangeToolDefinitions } from './exchange';
-import {
-  TOOLSET_NAMES,
-  closestToolNames,
-  searchTools,
-  toolsetOf,
-  type ToolsetName,
-} from '@mcp/index';
+import { TOOLSET_NAMES, closestToolNames, searchTools, toolsetOf, type ToolsetName } from '@mcp/index';
 
 const SHORT_DESCRIPTION_CHARS = 110;
 
 /** The first sentence of a description, capped for one-line listings. */
 export function shortDescription(description: string): string {
   const sentence = /^(.+?[.!?])(\s|$)/.exec(description)?.[1] ?? description;
-  return sentence.length <= SHORT_DESCRIPTION_CHARS
-    ? sentence
-    : `${sentence.slice(0, SHORT_DESCRIPTION_CHARS - 1)}…`;
+  return sentence.length <= SHORT_DESCRIPTION_CHARS ? sentence : `${sentence.slice(0, SHORT_DESCRIPTION_CHARS - 1)}…`;
 }
 
 export interface CatalogEntry {
@@ -122,19 +114,13 @@ function typeLabel(spec: ParamItemSpec): string {
 }
 
 /** One line per parameter: `- name (type, required): description`, nested object keys indented. */
-function paramLines(
-  properties: Record<string, ParamItemSpec>,
-  required: readonly string[],
-  indent: string,
-): string[] {
+function paramLines(properties: Record<string, ParamItemSpec>, required: readonly string[], indent: string): string[] {
   return Object.entries(properties).flatMap(([key, spec]) => {
     const flag = required.includes(key) ? ', required' : '';
     const line = `${indent}- ${key} (${typeLabel(spec)}${flag})${spec.description !== undefined ? `: ${spec.description}` : ''}`;
     const nested = spec.properties ?? spec.items?.properties;
     const nestedRequired = spec.required ?? spec.items?.required ?? [];
-    return nested === undefined
-      ? [line]
-      : [line, ...paramLines(nested, nestedRequired, `${indent}  `)];
+    return nested === undefined ? [line] : [line, ...paramLines(nested, nestedRequired, `${indent}  `)];
   });
 }
 

@@ -7,17 +7,7 @@
 import type { CadDocument } from '@core/model/types';
 import type { BuildingModel, PipeElement, PipeSupportElement } from '@core/model/building';
 import { supportShape } from '../../industrial/piping/supportParts';
-import {
-  type Context,
-  addPropertySet,
-  circleProfile,
-  extrusion,
-  ifcReal,
-  ifcString,
-  placement,
-  rectangleProfile,
-  shape,
-} from './ifcStep';
+import { type Context, addPropertySet, circleProfile, extrusion, ifcReal, ifcString, placement, rectangleProfile, shape } from './ifcStep';
 import type { Exported } from './ifcElementExport';
 
 export function exportPipeSupport(

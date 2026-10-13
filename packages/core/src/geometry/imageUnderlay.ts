@@ -18,10 +18,7 @@ import { sub3 } from '../lib/vec3';
 import { wrapSignedAngle } from '../lib/angle';
 import { planeToWorld } from './workPlane';
 
-export type UnderlayPlacement = Pick<
-  ImageEntity,
-  'position' | 'rotation' | 'width' | 'height' | 'pixelWidth' | 'pixelHeight'
->;
+export type UnderlayPlacement = Pick<ImageEntity, 'position' | 'rotation' | 'width' | 'height' | 'pixelWidth' | 'pixelHeight'>;
 
 /** Work-plane local [x, y] of image pixel `pixel`. */
 export function pixelToLocal(placement: UnderlayPlacement, pixel: Vec2): Vec2 {
@@ -88,27 +85,19 @@ function smallestAxisTurn(angle: number): number {
  * optional in-plane alignment of A→B with a local axis, then a translation pinning the anchor pixel.
  * @failure distance not finite/> 0, or A and B the same pixel -> { ok: false }
  */
-export function calibrateUnderlay(
-  placement: UnderlayPlacement,
-  calibration: UnderlayCalibration,
-): CalibrationResult {
+export function calibrateUnderlay(placement: UnderlayPlacement, calibration: UnderlayCalibration): CalibrationResult {
   const { pixelA, pixelB, distance, origin, align } = calibration;
-  if (!Number.isFinite(distance) || distance <= 0)
-    return { ok: false, error: `distance must be a finite number > 0 (got ${distance})` };
+  if (!Number.isFinite(distance) || distance <= 0) return { ok: false, error: `distance must be a finite number > 0 (got ${distance})` };
   const dx = pixelB[0] - pixelA[0];
   const dy = pixelB[1] - pixelA[1];
   const pixelDistance = Math.hypot(dx, dy);
-  if (!(pixelDistance > 0))
-    return { ok: false, error: 'pixelA and pixelB must be two different pixels' };
+  if (!(pixelDistance > 0)) return { ok: false, error: 'pixelA and pixelB must be two different pixels' };
 
   const unitsPerPixel = distance / pixelDistance;
   // Pixel +y is down, so the segment's in-plane angle (before rotation) is atan2(-dy, dx).
   const segmentAngle = Math.atan2(-dy, dx);
   const [rx, ry, rz] = placement.rotation;
-  const inPlane =
-    align === undefined
-      ? rz
-      : smallestAxisTurn((align === 'x' ? 0 : Math.PI / 2) - segmentAngle) + 0;
+  const inPlane = align === undefined ? rz : smallestAxisTurn((align === 'x' ? 0 : Math.PI / 2) - segmentAngle) + 0;
   const scaled = {
     ...placement,
     rotation: [rx, ry, inPlane] as Vec3,

@@ -7,12 +7,7 @@ import { describe, it, expect } from 'vitest';
 import type { ParamsSchema } from '@core/commands/types';
 import { listCommands } from '@core/commands/registry';
 import { fuzzyScore } from '@ui/components/commandPalette/fuzzyMatch';
-import {
-  fieldsFromSchema,
-  humanizeName,
-  initialValues,
-  parseFormValues,
-} from '@ui/components/commandPalette/paramForm';
+import { fieldsFromSchema, humanizeName, initialValues, parseFormValues } from '@ui/components/commandPalette/paramForm';
 import { allPaletteItems, searchPaletteItems } from '@ui/components/commandPalette/paletteItems';
 
 describe('fuzzyScore', () => {
@@ -68,18 +63,7 @@ describe('paramForm', () => {
 
   it('derives one field per property, required first, with a kind per type', () => {
     const fields = fieldsFromSchema(SCHEMA);
-    expect(fields.map((f) => f.name)).toEqual([
-      'id',
-      'radius',
-      'mode',
-      'note',
-      'entityId2',
-      'anchor',
-      'flip',
-      'position',
-      'ids',
-      'points',
-    ]);
+    expect(fields.map((f) => f.name)).toEqual(['id', 'radius', 'mode', 'note', 'entityId2', 'anchor', 'flip', 'position', 'ids', 'points']);
     const kinds = Object.fromEntries(fields.map((f) => [f.name, f.kind]));
     expect(kinds).toEqual({
       id: 'text',
@@ -186,9 +170,7 @@ describe('palette catalog', () => {
   const items = allPaletteItems();
 
   it('exposes every registry command exactly once', () => {
-    const commandNames = items.flatMap((item) =>
-      item.kind === 'command' ? [item.command.name] : [],
-    );
+    const commandNames = items.flatMap((item) => (item.kind === 'command' ? [item.command.name] : []));
     expect(commandNames).toEqual(listCommands().map((c) => c.name));
     expect(new Set(items.map((item) => item.id)).size).toBe(items.length);
   });

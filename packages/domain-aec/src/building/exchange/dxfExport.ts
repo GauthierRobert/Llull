@@ -14,14 +14,7 @@ import { buildPlanDrawing } from '../drawings/planDrawing';
 import { entityPlanPoint } from '@core/geometry/entityFrame';
 import { technicalView } from '@core/geometry/technicalView';
 import { TOP_VIEW } from '@core/geometry/viewProjection';
-import {
-  CENTER_LAYERS,
-  DxfWriter,
-  HIDDEN_LAYERS,
-  INSUNITS,
-  fmt,
-  writePrimitive,
-} from './dxfWriter';
+import { CENTER_LAYERS, DxfWriter, HIDDEN_LAYERS, INSUNITS, fmt, writePrimitive } from './dxfWriter';
 
 function writeDrafting(writer: DxfWriter, doc: CadDocument): void {
   for (const id of doc.order) {
@@ -40,12 +33,7 @@ function writeDrafting(writer: DxfWriter, doc: CadDocument): void {
       case 'rectangle':
         writer.polyline(
           layer,
-          [
-            world([0, 0]),
-            world([entity.width, 0]),
-            world([entity.width, entity.height]),
-            world([0, entity.height]),
-          ],
+          [world([0, 0]), world([entity.width, 0]), world([entity.width, entity.height]), world([0, entity.height])],
           true,
         );
         break;
@@ -94,9 +82,7 @@ function writeDrafting(writer: DxfWriter, doc: CadDocument): void {
 function writeSolids(writer: DxfWriter, doc: CadDocument, hatchSpacing: number): void {
   const solids = doc.order
     .map((id) => doc.entities[id])
-    .filter(
-      (entity): entity is Entity => !!entity && is3D(entity) && !entity.tags?.includes('bim'),
-    );
+    .filter((entity): entity is Entity => !!entity && is3D(entity) && !entity.tags?.includes('bim'));
   for (const { primitives } of technicalView(doc, solids, { frame: TOP_VIEW })) {
     for (const primitive of primitives) writePrimitive(writer, primitive, hatchSpacing);
   }
@@ -104,13 +90,9 @@ function writeSolids(writer: DxfWriter, doc: CadDocument, hatchSpacing: number):
 
 type Group = readonly [code: number, value: string | number];
 
-const flatten = (groups: ReadonlyArray<Group>): string[] =>
-  groups.flatMap(([code, value]) => [String(code), String(value)]);
+const flatten = (groups: ReadonlyArray<Group>): string[] => groups.flatMap(([code, value]) => [String(code), String(value)]);
 
-function header(
-  doc: Pick<CadDocument, 'units'>,
-  bounds: readonly [number, number, number, number],
-): string[] {
+function header(doc: Pick<CadDocument, 'units'>, bounds: readonly [number, number, number, number]): string[] {
   return flatten([
     [0, 'SECTION'],
     [2, 'HEADER'],
@@ -216,11 +198,7 @@ export interface DxfExport {
  * Builds the DXF text. @pure
  * @failure unknown level -> null
  */
-function buildDxf(
-  doc: CadDocument,
-  levelId: string | undefined,
-  includeDrafting: boolean,
-): DxfExport | null {
+function buildDxf(doc: CadDocument, levelId: string | undefined, includeDrafting: boolean): DxfExport | null {
   const building = getBuilding(doc);
   const writer = new DxfWriter();
   let levelLabel = 'drafting';
@@ -271,15 +249,7 @@ export const exportDxf = defineCommand({
   run: (doc, { levelId, includeDrafting = true }): CommandResult => {
     const result = buildDxf(doc, levelId, includeDrafting);
     if (!result) return noop(doc, `export_dxf failed: no level '${levelId ?? ''}'.`);
-    if (result.entityCount === 0)
-      return noop(
-        doc,
-        'export_dxf: nothing to export (no building elements, 2D drafting or 3D solids).',
-      );
-    return report(
-      doc,
-      `DXF ${result.filename}: ${result.entityCount} entities on layers ${result.layers.join(', ')}.`,
-      result,
-    );
+    if (result.entityCount === 0) return noop(doc, 'export_dxf: nothing to export (no building elements, 2D drafting or 3D solids).');
+    return report(doc, `DXF ${result.filename}: ${result.entityCount} entities on layers ${result.layers.join(', ')}.`, result);
   },
 });

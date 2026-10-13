@@ -38,9 +38,7 @@ describe('set_wall_layers', () => {
     const before = JSON.stringify(doc);
     const result = execute(doc, 'set_wall_layers', { wallIds: ['wall-1'], layers: BUILD_UP });
     expect(JSON.stringify(doc)).toBe(before);
-    expect(result.summary).toBe(
-      'Set a 4-layer build-up (435 total: 100 brick + 120 mineral-wool + 200 concrete + 15 gypsum) on W1.',
-    );
+    expect(result.summary).toBe('Set a 4-layer build-up (435 total: 100 brick + 120 mineral-wool + 200 concrete + 15 gypsum) on W1.');
     expect(result.affected[0]).toBe('wall-1');
     const wall = wallOf(result.document);
     expect(wall).toMatchObject({ thickness: 435, material: 'concrete' });
@@ -74,10 +72,7 @@ describe('set_wall_layers', () => {
     [{ wallIds: ['wall-9'], layers: BUILD_UP }, /must list existing walls/],
     [{ wallIds: ['wall-1'], layers: [] }, /1–10/],
     [{ wallIds: ['wall-1'], layers: [{ material: 'x', thickness: 0 }] }, /thickness > 0/],
-    [
-      { wallIds: ['wall-1'], layers: [{ material: 'x', thickness: 10, function: 'glue' }] },
-      /function/,
-    ],
+    [{ wallIds: ['wall-1'], layers: [{ material: 'x', thickness: 10, function: 'glue' }] }, /function/],
     [{ wallIds: 'wall-1', layers: BUILD_UP }, /rejected: invalid params — wallIds/],
   ])('rejects %j', (params, message) => {
     const result = execute(wallDoc(), 'set_wall_layers', params);
@@ -105,15 +100,10 @@ describe('set_wall_layers', () => {
       layers: BUILD_UP,
     }).document;
     const lines = (execute(doc, 'quantity_takeoff', {}).data as { lines: TakeoffLine[] }).lines;
-    expect(lines.find((line) => line.key === 'wall.mineral-wool.m3')?.quantity).toBeCloseTo(
-      5 * 3 * 0.12,
-      3,
-    );
+    expect(lines.find((line) => line.key === 'wall.mineral-wool.m3')?.quantity).toBeCloseTo(5 * 3 * 0.12, 3);
     expect(lines.find((line) => line.key === 'wall.brick.m2')?.quantity).toBeCloseTo(15, 3);
     expect(lines.find((line) => line.key === 'wall.concrete.m')?.quantity).toBeCloseTo(5, 3);
-    const layerLines = buildPlanDrawing(doc, undefined)!.primitives.filter(
-      (p) => p.type === 'line' && p.layer === 'A-WALL',
-    );
+    const layerLines = buildPlanDrawing(doc, undefined)!.primitives.filter((p) => p.type === 'line' && p.layer === 'A-WALL');
     expect(layerLines).toHaveLength(3);
     const ifc = (execute(doc, 'export_ifc', {}).data as IfcExport).ifc;
     expect(ifc.match(/IFCMATERIALLAYER\(/g)).toHaveLength(4);
@@ -154,11 +144,8 @@ describe('build-up review regressions', () => {
 
   it('counts layered walls as IFC products', () => {
     const plain = execute(wallDoc(), 'export_ifc', {}).data as IfcExport;
-    const layered = execute(
-      execute(wallDoc(), 'set_wall_layers', { wallIds: ['wall-1'], layers: BUILD_UP }).document,
-      'export_ifc',
-      {},
-    ).data as IfcExport;
+    const layered = execute(execute(wallDoc(), 'set_wall_layers', { wallIds: ['wall-1'], layers: BUILD_UP }).document, 'export_ifc', {})
+      .data as IfcExport;
     expect(layered.productCount).toBe(plain.productCount);
   });
 

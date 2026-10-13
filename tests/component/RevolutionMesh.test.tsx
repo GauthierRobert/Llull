@@ -33,11 +33,7 @@ const SQUARE_PROFILE: ReadonlyArray<readonly [number, number]> = [
 describe('RevolutionMesh — revolve_profile command → kind "revolution"', () => {
   beforeEach(resetStore);
 
-  const revolve = (
-    axis: [number, number, number],
-    angle: number,
-    segments: number,
-  ): DispatchedEntity =>
+  const revolve = (axis: [number, number, number], angle: number, segments: number): DispatchedEntity =>
     dispatchEntity('revolve_profile', { profile: SQUARE_PROFILE, axis, angle, segments });
 
   it('revolve_profile produces an entity with kind "revolution"', () => {

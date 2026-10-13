@@ -8,10 +8,7 @@ import { derivedEntityIds } from '@core/plugins/host';
 
 function hall(): CadDocument {
   let doc = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
-  doc = portalHall(
-    { span: 18000, length: 30000, baySpacing: 6000, eaveHeight: 6000, roofPitch: 6 },
-    doc,
-  );
+  doc = portalHall({ span: 18000, length: 30000, baySpacing: 6000, eaveHeight: 6000, roofPitch: 6 }, doc);
   return execute(doc, 'add_sphere', { radius: 1 }).document;
 }
 
@@ -25,9 +22,7 @@ describe('llull-document v2', () => {
     expect(compact.length).toBeLessThan(full.length / 2);
     const stored = JSON.parse(compact) as { version: number; document: CadDocument };
     expect(stored.version).toBe(2);
-    expect(Object.keys(stored.document.entities)).toHaveLength(
-      Object.keys(doc.entities).length - derived.size,
-    );
+    expect(Object.keys(stored.document.entities)).toHaveLength(Object.keys(doc.entities).length - derived.size);
 
     const loaded = deserializeDocument(compact);
     expect(loaded.entities).toEqual(doc.entities);
@@ -65,9 +60,7 @@ describe('llull-document v2', () => {
     doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
     const stale: Partial<CadDocument> = { ...doc };
     delete stale.nextStepNumber;
-    const loaded = deserializeDocument(
-      JSON.stringify({ format: 'llull-document', version: 2, document: stale }),
-    );
+    const loaded = deserializeDocument(JSON.stringify({ format: 'llull-document', version: 2, document: stale }));
     expect(loaded.nextStepNumber).toBe(3);
     const created = execute(loaded, 'add_box', { size: [1, 1, 1] }).affected[0] ?? '';
     expect(doc.entities[created]).toBeUndefined();

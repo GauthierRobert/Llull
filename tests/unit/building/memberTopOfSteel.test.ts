@@ -12,8 +12,7 @@ function withMember(start: number[], end: number[], role = 'beam'): CadDocument 
   }).document;
 }
 
-const member = (doc: CadDocument): SteelMemberElement =>
-  doc.building?.elements['member-1'] as SteelMemberElement;
+const member = (doc: CadDocument): SteelMemberElement => doc.building?.elements['member-1'] as SteelMemberElement;
 
 describe('update_steel_member keepTopOfSteel', () => {
   it('lowers a beam axis by half the depth increase so the top of steel stays', () => {

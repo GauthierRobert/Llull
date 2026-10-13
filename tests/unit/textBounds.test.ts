@@ -2,18 +2,18 @@ import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 
-function textBox(
-  content: string,
-  anchor?: string,
-): { min: number[]; max: number[]; size: number[] } {
+function textBox(content: string, anchor?: string): { min: number[]; max: number[]; size: number[] } {
   const created = execute(createEmptyDocument(), 'add_text', {
     content,
     position: [10, 20, 0],
     height: 2,
     ...(anchor ? { anchor } : {}),
   });
-  return execute(created.document, 'measure_bounding_box', { entityId: created.affected[0]! })
-    .data as { min: number[]; max: number[]; size: number[] };
+  return execute(created.document, 'measure_bounding_box', { entityId: created.affected[0]! }).data as {
+    min: number[];
+    max: number[];
+    size: number[];
+  };
 }
 
 describe('text bounds follow the rendered layout', () => {

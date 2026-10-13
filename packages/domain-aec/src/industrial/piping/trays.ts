@@ -7,13 +7,7 @@ import type { CableTrayElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { fromMm, toMetres } from '@core/model/units';
-import {
-  getBuilding,
-  nextElementId,
-  nextMark,
-  resolveLevel,
-  withElement,
-} from '../../building/model';
+import { getBuilding, nextElementId, nextMark, resolveLevel, withElement } from '../../building/model';
 import { noop } from '@core/commands/noop';
 import { duplicateSummary, findTwin, samePath } from '../../shared/duplicates';
 import { commitBuilding } from '../../building/evaluate/evaluateElements';
@@ -36,9 +30,7 @@ export const addCableTray = defineCommand({
     'the takeoff; clashes with steel, pipes and equipment are reported by check_clashes. Refused if a tray of the same ' +
     'size already follows the same route (either direction) on the level.',
   params: z.object({
-    points: z
-      .array(z.array(z.number()))
-      .describe('Tray centreline [[x, y, z], …], 2 to 1000 points.'),
+    points: z.array(z.array(z.number())).describe('Tray centreline [[x, y, z], …], 2 to 1000 points.'),
     width: z.number().optional().describe('Tray width, in document units. Default 300 mm.'),
     height: z.number().optional().describe('Side height, in document units. Default 60 mm.'),
     system: z.string().optional().describe('Cable system. Default "power".'),
@@ -50,10 +42,7 @@ export const addCableTray = defineCommand({
     const resolvedWidth = width ?? fromMm(doc, 300);
     const resolvedHeight = height ?? fromMm(doc, 60);
     if (hasRepeatedPoint(path) || !(resolvedWidth > 0) || !(resolvedHeight > 0)) {
-      return noop(
-        doc,
-        'add_cable_tray failed: consecutive points must differ, width and height be > 0.',
-      );
+      return noop(doc, 'add_cable_tray failed: consecutive points must differ, width and height be > 0.');
     }
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noop(doc, `add_cable_tray failed: ${resolution.reason}.`);
@@ -61,13 +50,9 @@ export const addCableTray = defineCommand({
       resolution.building,
       'tray',
       resolution.level.id,
-      (element) =>
-        element.width === resolvedWidth &&
-        element.height === resolvedHeight &&
-        samePath(element.points, path),
+      (element) => element.width === resolvedWidth && element.height === resolvedHeight && samePath(element.points, path),
     );
-    if (trayTwin)
-      return noop(doc, duplicateSummary('add_cable_tray', trayTwin, 'a cable tray on this route'));
+    if (trayTwin) return noop(doc, duplicateSummary('add_cable_tray', trayTwin, 'a cable tray on this route'));
     const tray: CableTrayElement = {
       id: nextElementId(resolution.building, 'tray'),
       category: 'tray',

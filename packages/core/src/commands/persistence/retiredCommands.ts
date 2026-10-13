@@ -44,12 +44,7 @@ interface Call {
 }
 
 /** The call with its nested plan calls rewritten, then itself rewritten while its name is retired. */
-function rewriteCall(
-  name: string,
-  params: unknown,
-  table: RewriteTable,
-  step?: { readonly id: string },
-): Call {
+function rewriteCall(name: string, params: unknown, table: RewriteTable, step?: { readonly id: string }): Call {
   const nested = rewriteNested(params, table);
   const rewrite = Object.hasOwn(table, name) ? table[name] : undefined;
   if (!rewrite || !isRecord(nested)) return { name, params: nested };
@@ -107,9 +102,7 @@ export function migrateRetiredCommands(raw: Record<string, unknown>): Record<str
           recipes: Object.fromEntries(
             Object.entries(recipes).map(([key, recipe]) => [
               key,
-              isRecord(recipe)
-                ? { ...recipe, steps: migrateSteps(recipe['steps'], table, false) }
-                : recipe,
+              isRecord(recipe) ? { ...recipe, steps: migrateSteps(recipe['steps'], table, false) } : recipe,
             ]),
           ),
         }

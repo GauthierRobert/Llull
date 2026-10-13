@@ -43,11 +43,7 @@ describe('duplicateSelection', () => {
 
     expect(dispatch).toHaveBeenCalledTimes(1);
     // Selection spans x -1..5.5; copies land one gap (1.5) beyond that width.
-    expect(dispatch).toHaveBeenCalledWith(
-      'duplicate_entities',
-      { ids, offset: [8, 0, 0] },
-      { selectAffected: false },
-    );
+    expect(dispatch).toHaveBeenCalledWith('duplicate_entities', { ids, offset: [8, 0, 0] }, { selectAffected: false });
   });
 
   it('selects the copy of a single selected entity', () => {

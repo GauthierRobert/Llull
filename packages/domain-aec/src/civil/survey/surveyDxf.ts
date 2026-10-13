@@ -61,32 +61,20 @@ export const importSurveyDxf = defineCommand({
   params: z.object({
     text: z.string().describe('DXF file content (ASCII).'),
     name: z.string().optional().describe('Point group name. Default "DXF survey <n>".'),
-    layers: z
-      .array(z.string())
-      .optional()
-      .describe('Only these DXF layers (case-insensitive). Default: every layer.'),
+    layers: z.array(z.string()).optional().describe('Only these DXF layers (case-insensitive). Default: every layer.'),
     sources: z
       .array(z.enum(SOURCES))
       .optional()
-      .describe(
-        'What becomes a point: points, vertices, faces, text. Default points, vertices, faces.',
-      ),
-    sourceUnit: z
-      .enum(DOCUMENT_UNITS)
-      .optional()
-      .describe('Drawing unit when $INSUNITS is missing. Default: $INSUNITS, else m.'),
+      .describe('What becomes a point: points, vertices, faces, text. Default points, vertices, faces.'),
+    sourceUnit: z.enum(DOCUMENT_UNITS).optional().describe('Drawing unit when $INSUNITS is missing. Default: $INSUNITS, else m.'),
     keepZeroElevation: z.boolean().optional().describe('Keep points at z = 0. Default false.'),
   }),
   run: (doc, params): CommandResult => {
     const drawing = parseDxf(params.text);
-    if (drawing === null)
-      return noop(doc, 'import_survey_dxf failed: not an ASCII DXF with an ENTITIES section.');
+    if (drawing === null) return noop(doc, 'import_survey_dxf failed: not an ASCII DXF with an ENTITIES section.');
     const headerMm = insUnitsMillimetres(drawing.insUnits);
     const unit =
-      params.sourceUnit ??
-      (headerMm === null
-        ? 'm'
-        : (DOCUMENT_UNITS.find((u) => fromUnit({ units: 'mm' }, 1, u) === headerMm) ?? 'm'));
+      params.sourceUnit ?? (headerMm === null ? 'm' : (DOCUMENT_UNITS.find((u) => fromUnit({ units: 'mm' }, 1, u) === headerMm) ?? 'm'));
     const sources = new Set<Source>(params.sources ?? ['points', 'vertices', 'faces']);
     const wanted = params.layers?.map((layer) => layer.toLowerCase());
     const seen = new Set<string>();
@@ -117,10 +105,7 @@ export const importSurveyDxf = defineCommand({
       );
     }
     if (points.length > MAX_POINTS) {
-      return noop(
-        doc,
-        `import_survey_dxf failed: ${points.length} points exceed the ${MAX_POINTS}-point limit; filter by layers.`,
-      );
+      return noop(doc, `import_survey_dxf failed: ${points.length} points exceed the ${MAX_POINTS}-point limit; filter by layers.`);
     }
     const { civil, id, group } = newPointGroup(doc, params.name, 'DXF survey', points);
     return commitCivil(

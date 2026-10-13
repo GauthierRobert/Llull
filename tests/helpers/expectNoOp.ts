@@ -3,11 +3,7 @@ import type { CadDocument } from '@core/model/types';
 import type { execute } from '@core/commands/registry';
 
 /** A rejected / no-op command: nothing affected, the very same document, optional summary text. */
-export function expectNoOp(
-  result: ReturnType<typeof execute>,
-  doc: CadDocument,
-  summary?: string,
-): void {
+export function expectNoOp(result: ReturnType<typeof execute>, doc: CadDocument, summary?: string): void {
   expect(result.affected).toHaveLength(0);
   expect(result.document).toBe(doc);
   if (summary) expect(result.summary).toContain(summary);

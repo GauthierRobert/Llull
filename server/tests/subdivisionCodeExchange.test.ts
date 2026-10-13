@@ -25,9 +25,7 @@ const hasCadQuery = probePython(CADQUERY_PYTHON).cadquery !== null;
 /** A creased cylinder cage (valence-6 cap centres after refinement, crease rings). */
 function creasedCage(): Pick<SubdivisionEntity, 'vertices' | 'faces' | 'creases'> {
   const cage = cylinderCage(2, 5, 6, 2);
-  const rim = (cage.faces[cage.faces.length - 1] ?? []).map(
-    (a, i, face) => [a, face[(i + 1) % face.length]] as [number, number],
-  );
+  const rim = (cage.faces[cage.faces.length - 1] ?? []).map((a, i, face) => [a, face[(i + 1) % face.length]] as [number, number]);
   return { ...cage, vertices: cage.vertices.map(([x, y, z]) => [x + 0.3 * z, y, z]), creases: rim };
 }
 
@@ -49,9 +47,7 @@ describe.skipIf(!hasPython)('python subdivision port', () => {
     const fromTypeScript = subdivisionPatches(cage);
     expect(fromPython).toHaveLength(fromTypeScript.length);
     fromTypeScript.forEach((poles, p) =>
-      poles.forEach((pole, k) =>
-        pole.forEach((value, axis) => expect(fromPython[p]?.[k]?.[axis]).toBeCloseTo(value, 9)),
-      ),
+      poles.forEach((pole, k) => pole.forEach((value, axis) => expect(fromPython[p]?.[k]?.[axis]).toBeCloseTo(value, 9))),
     );
   });
 });
@@ -65,24 +61,20 @@ describe.skipIf(!hasPython)('exported subdivision code', () => {
     name: 'grip',
   }).document;
 
-  it.each(['cadquery', 'build123d', 'freecad'] as const)(
-    '%s calls subdivision(...) and parses as Python',
-    (language) => {
-      const text = (execute(doc, 'export_code', { language }).data as { text: string }).text;
-      expect(text).toMatch(/= subdivision\(\[/);
-      expect(text).toContain('levels=2');
-      expect(text).not.toMatch(/= mesh\(\[/);
-      const parse = spawnSync('python3', ['-c', 'import ast, sys; ast.parse(sys.stdin.read())'], {
-        input: text,
-        encoding: 'utf8',
-      });
-      expect(parse.status, parse.stderr).toBe(0);
-    },
-  );
+  it.each(['cadquery', 'build123d', 'freecad'] as const)('%s calls subdivision(...) and parses as Python', (language) => {
+    const text = (execute(doc, 'export_code', { language }).data as { text: string }).text;
+    expect(text).toMatch(/= subdivision\(\[/);
+    expect(text).toContain('levels=2');
+    expect(text).not.toMatch(/= mesh\(\[/);
+    const parse = spawnSync('python3', ['-c', 'import ast, sys; ast.parse(sys.stdin.read())'], {
+      input: text,
+      encoding: 'utf8',
+    });
+    expect(parse.status, parse.stderr).toBe(0);
+  });
 
   it('openscad gets the subdivided surface as a placed polyhedron', () => {
-    const text = (execute(doc, 'export_code', { language: 'openscad' }).data as { text: string })
-      .text;
+    const text = (execute(doc, 'export_code', { language: 'openscad' }).data as { text: string }).text;
     expect(text).toMatch(/translate\(\[5, 0, 0\]\) polyhedron\(/);
   });
 });

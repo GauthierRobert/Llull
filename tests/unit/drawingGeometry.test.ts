@@ -48,9 +48,7 @@ describe('buildDrawingBuffers — ISO 128 line weights', () => {
     expect(buffers.fills).toHaveLength(0);
     expect(buffers.thick.positions[0]).toBe(-10);
     const [x0, y0, , x1, y1] = buffers.thin.positions as number[];
-    expect(Math.abs((y1 as number) - (y0 as number))).toBeCloseTo(
-      Math.abs((x1 as number) - (x0 as number)),
-    );
+    expect(Math.abs((y1 as number) - (y0 as number))).toBeCloseTo(Math.abs((x1 as number) - (x0 as number)));
   });
 
   it('fills only an explicit fill: solid keeps its holes, hatch draws lines, none stays open', () => {
@@ -86,17 +84,11 @@ describe('buildDrawingBuffers — ISO 128 line weights', () => {
   });
 
   it('breaks a centre line into long dashes and dots (chain line)', () => {
-    const buffers = buildDrawingBuffers(
-      [styled({ type: 'line', layer: 'L', style: 'center', a: [0, 0], b: [20, 0] })],
-      SCALE,
-      [0, 0],
-    );
+    const buffers = buildDrawingBuffers([styled({ type: 'line', layer: 'L', style: 'center', a: [0, 0], b: [20, 0] })], SCALE, [0, 0]);
     const pieces = segmentCount(buffers.thin.positions);
     expect(pieces).toBeGreaterThan(4);
     const lengths = Array.from({ length: pieces }, (_, i) =>
-      Math.abs(
-        (buffers.thin.positions[i * 6 + 3] as number) - (buffers.thin.positions[i * 6] as number),
-      ),
+      Math.abs((buffers.thin.positions[i * 6 + 3] as number) - (buffers.thin.positions[i * 6] as number)),
     );
     // ISO 128 type 04: long dash 6 units, dot 1 unit.
     expect(Math.max(...lengths)).toBeCloseTo(SCALE.patternUnit * 6);

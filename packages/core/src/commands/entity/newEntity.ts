@@ -11,11 +11,7 @@ export function newEntity<K extends Entity['kind']>(
   geometry: Omit<Extract<Entity, { kind: K }>, keyof BaseEntity>,
   position: Vec3,
   color: string,
-  {
-    rotation = [0, 0, 0],
-    name,
-    layerId = DEFAULT_LAYER_ID,
-  }: { rotation?: Vec3; name?: string | undefined; layerId?: string } = {},
+  { rotation = [0, 0, 0], name, layerId = DEFAULT_LAYER_ID }: { rotation?: Vec3; name?: string | undefined; layerId?: string } = {},
 ): Entity {
   return {
     id,

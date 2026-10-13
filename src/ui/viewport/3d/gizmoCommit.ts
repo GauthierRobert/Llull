@@ -24,8 +24,7 @@ export function computeScaleFactor(scale: Xyz): number {
 /** Deltas below this length are drags that did not move anything. */
 const MIN_DELTA = 1e-6;
 
-const isNegligible = (delta: readonly [number, number, number]): boolean =>
-  Math.hypot(delta[0], delta[1], delta[2]) < MIN_DELTA;
+const isNegligible = (delta: readonly [number, number, number]): boolean => Math.hypot(delta[0], delta[1], delta[2]) < MIN_DELTA;
 
 export interface GizmoTransform {
   readonly position: Xyz;
@@ -62,12 +61,7 @@ export function snapBackHint(
 }
 
 /** @param start transform at drag start; @param end transform at drag end (after any snapping). */
-export function gizmoDragCommit(
-  mode: GizmoMode,
-  id: string,
-  start: GizmoTransform,
-  end: GizmoTransform,
-): GizmoCommit | null {
+export function gizmoDragCommit(mode: GizmoMode, id: string, start: GizmoTransform, end: GizmoTransform): GizmoCommit | null {
   if (mode === 'translate') {
     const delta = computeDelta(start.position, end.position);
     return isNegligible(delta) ? null : { name: 'move_entities', params: { ids: [id], delta } };

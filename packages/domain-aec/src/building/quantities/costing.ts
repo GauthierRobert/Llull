@@ -12,12 +12,7 @@ export interface CostLine extends TakeoffLine {
 
 /** Rate lookup: exact key, then "<group>.*.<unit>", "<category>.*.<unit>", "*.<material>.<unit>". */
 export function rateFor(rates: Readonly<Record<string, number>>, line: TakeoffLine): number | null {
-  const candidates = [
-    line.key,
-    `${line.group}.*.${line.unit}`,
-    `${line.category}.*.${line.unit}`,
-    `*.${line.material}.${line.unit}`,
-  ];
+  const candidates = [line.key, `${line.group}.*.${line.unit}`, `${line.category}.*.${line.unit}`, `*.${line.material}.${line.unit}`];
   for (const candidate of candidates) {
     const rate = rates[candidate];
     if (typeof rate === 'number' && Number.isFinite(rate)) return rate;

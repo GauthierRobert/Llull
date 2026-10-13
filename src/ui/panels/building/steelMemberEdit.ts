@@ -7,26 +7,11 @@
 import type { SteelMemberElement } from '@core/model/building';
 import { changedFields, changedText } from '@ui/panels/changedParams';
 
-export type SteelMemberEditKey =
-  | 'profile'
-  | 'material'
-  | 'role'
-  | 'note'
-  | 'startJoint'
-  | 'endJoint'
-  | 'baseFixity';
+export type SteelMemberEditKey = 'profile' | 'material' | 'role' | 'note' | 'startJoint' | 'endJoint' | 'baseFixity';
 
 export type SteelMemberEditValues = Readonly<Record<SteelMemberEditKey, string>>;
 
-const EDIT_KEYS: ReadonlyArray<SteelMemberEditKey> = [
-  'profile',
-  'role',
-  'startJoint',
-  'endJoint',
-  'baseFixity',
-  'material',
-  'note',
-];
+const EDIT_KEYS: ReadonlyArray<SteelMemberEditKey> = ['profile', 'role', 'startJoint', 'endJoint', 'baseFixity', 'material', 'note'];
 
 /** Horizontal axis: a section change can keep its top of steel. */
 export function isHorizontalMember(member: SteelMemberElement): boolean {

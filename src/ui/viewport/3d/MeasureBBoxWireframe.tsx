@@ -19,15 +19,9 @@ import { OVERLAY_ACCENT } from '../viewportPalette';
 
 /** Segment vertices of the 12 box edges: corner bit 0/1/2 selects max x/y/z; an edge joins two corners differing in one bit. */
 function boxEdgePositions([x0, y0, z0]: Vec3, [x1, y1, z1]: Vec3): number[] {
-  const corner = (index: number): Vec3 => [
-    index & 1 ? x1 : x0,
-    index & 2 ? y1 : y0,
-    index & 4 ? z1 : z0,
-  ];
+  const corner = (index: number): Vec3 => [index & 1 ? x1 : x0, index & 2 ? y1 : y0, index & 4 ? z1 : z0];
   return [0, 1, 2, 3, 4, 5, 6, 7].flatMap((from) =>
-    [1, 2, 4]
-      .filter((bit) => !(from & bit))
-      .flatMap((bit) => [...corner(from), ...corner(from | bit)]),
+    [1, 2, 4].filter((bit) => !(from & bit)).flatMap((bit) => [...corner(from), ...corner(from | bit)]),
   );
 }
 

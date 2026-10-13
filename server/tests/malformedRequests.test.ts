@@ -92,10 +92,7 @@ describe('POST /command with malformed input', () => {
 
 describe('/mcp with malformed input', () => {
   it('truncated JSON is a 400 JSON error', async () => {
-    const res = await post('/mcp')
-      .set(MCP)
-      .set('Content-Type', 'application/json')
-      .send('{"jsonrpc":');
+    const res = await post('/mcp').set(MCP).set('Content-Type', 'application/json').send('{"jsonrpc":');
     expectCleanError(res, 400);
   });
 
@@ -125,10 +122,7 @@ describe('/mcp with malformed input', () => {
   });
 
   it('an unknown session id is a 404 JSON error', async () => {
-    const res = await post('/mcp')
-      .set(MCP)
-      .set('mcp-session-id', 'nope')
-      .send({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
+    const res = await post('/mcp').set(MCP).set('mcp-session-id', 'nope').send({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
     expectCleanError(res, 404);
   });
 

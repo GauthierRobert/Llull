@@ -16,21 +16,7 @@ import { GRAVITY } from '../../shared/numeric';
  * loads, φ = 1, drive force HT / φ5; EN 1993-6 §7.3). WLp / WRp: wind from the left / right with the
  * roof pressure set (EN 1991-1-4 Tab. 7.3a / 7.4a / 7.2: positive on the windward slope) and cpi = −0.3.
  */
-export type LoadCase =
-  | 'G'
-  | 'S'
-  | 'WL'
-  | 'WR'
-  | 'WLs'
-  | 'WRs'
-  | 'WLp'
-  | 'WRp'
-  | 'CL'
-  | 'CR'
-  | 'CL5'
-  | 'CR5'
-  | 'CLk'
-  | 'CRk';
+export type LoadCase = 'G' | 'S' | 'WL' | 'WR' | 'WLs' | 'WRs' | 'WLp' | 'WRp' | 'CL' | 'CR' | 'CL5' | 'CR5' | 'CLk' | 'CRk';
 
 export interface WindCase {
   readonly loadCase: 'WL' | 'WR' | 'WLs' | 'WRs' | 'WLp' | 'WRp';
@@ -91,8 +77,7 @@ export const ROOF_PRESSURE_CASE_MIN_CPE = 0.15;
 export function windCasesOf(frames: ReadonlyArray<Pick<FrameModel, 'windCases'>>): WindCase[] {
   return [...WIND_CASES, ...WIND_PRESSURE_CASES].filter(
     (windCase) =>
-      windCase.roofSet === 'suction' ||
-      frames.some((frame) => frame.windCases.some((own) => own.loadCase === windCase.loadCase)),
+      windCase.roofSet === 'suction' || frames.some((frame) => frame.windCases.some((own) => own.loadCase === windCase.loadCase)),
   );
 }
 
@@ -166,9 +151,7 @@ export function craneCapacityOf(member: SteelMemberElement): number | null {
 type HoistingClass = 'HC1' | 'HC2' | 'HC3' | 'HC4';
 
 /** EN 1991-3 Tab. 2.5: φ2 = φ2,min + β2 vh. */
-const HOISTING_CLASSES: Readonly<
-  Record<HoistingClass, { readonly beta2: number; readonly phi2Min: number }>
-> = {
+const HOISTING_CLASSES: Readonly<Record<HoistingClass, { readonly beta2: number; readonly phi2Min: number }>> = {
   HC1: { beta2: 0.17, phi2Min: 1.05 },
   HC2: { beta2: 0.34, phi2Min: 1.1 },
   HC3: { beta2: 0.51, phi2Min: 1.15 },
@@ -242,17 +225,12 @@ interface CraneActions {
  * with α = 0.015 rad, λS = ξ2 / nr on the loaded rail guide and ξ1 / nr on the other (IFF, simplified).
  * @param span bridge span between the rails, mm
  */
-export function craneActions(
-  capacityTonnes: number,
-  span: number,
-  model: CraneModel = {},
-): CraneActions {
+export function craneActions(capacityTonnes: number, span: number, model: CraneModel = {}): CraneActions {
   const { phi1, phi4, phi5, friction, rails, skewAngle } = CRANE_FACTORS;
   const { beta2, phi2Min } = HOISTING_CLASSES[model.hoistingClass ?? 'HC2'];
   const phi2 = phi2Min + beta2 * (model.hoistingSpeed ?? 0.1);
   const hoist = capacityTonnes * GRAVITY * 1000;
-  const self =
-    model.craneSelfWeight !== undefined ? model.craneSelfWeight * 1000 : 0.5 * hoist + 20000;
+  const self = model.craneSelfWeight !== undefined ? model.craneSelfWeight * 1000 : 0.5 * hoist + 20000;
   const approach = clamp((model.minHookApproach ?? 1) * 1000, 0, span);
   const wheelBase = model.wheelBase ?? 3000;
   const nearShare = (span - approach) / span;
@@ -260,8 +238,7 @@ export function craneActions(
   const trolleyAndHoist = 0.2 * self + hoist;
   const staticMax = 0.4 * self + trolleyAndHoist * nearShare;
   const staticMin = 0.4 * self + trolleyAndHoist * farShare;
-  const dynamic = (share: number): number =>
-    phi1 * (0.4 * self + 0.2 * self * share) + phi2 * hoist * share;
+  const dynamic = (share: number): number => phi1 * (0.4 * self + 0.2 * self * share) + phi2 * hoist * share;
   const total = staticMax + staticMin;
   const xi1 = staticMax / total;
   const xi2 = 1 - xi1;
@@ -299,9 +276,7 @@ export function valleyLines(
   const lowEnds = rafters.map(({ start, end }) => ((start[2] ?? 0) <= (end[2] ?? 0) ? start : end));
   const shared = (end: readonly number[]): boolean =>
     lowEnds.filter(
-      (other) =>
-        Math.abs((other[0] ?? 0) - (end[0] ?? 0)) <= tolerance &&
-        Math.abs((other[1] ?? 0) - (end[1] ?? 0)) <= tolerance,
+      (other) => Math.abs((other[0] ?? 0) - (end[0] ?? 0)) <= tolerance && Math.abs((other[1] ?? 0) - (end[1] ?? 0)) <= tolerance,
     ).length >= 2;
   const xs = lowEnds.filter(shared).map((end) => Math.round((end[0] ?? 0) / tolerance) * tolerance);
   return [...new Set(xs)].sort((a, b) => a - b);

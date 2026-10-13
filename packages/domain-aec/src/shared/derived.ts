@@ -32,9 +32,7 @@ export function ensureLayerIds(
  * owner (in order), syncing layers and selection.
  * @returns the document parts to spread plus the owners re-keyed with their new `entityIds`
  */
-export function regenerateOwned<
-  T extends { readonly id: string; readonly entityIds: readonly string[] },
->(
+export function regenerateOwned<T extends { readonly id: string; readonly entityIds: readonly string[] }>(
   doc: CadDocument,
   previous: Iterable<T>,
   current: Iterable<T>,
@@ -76,9 +74,7 @@ export function mergeRestored(
   const present = savedOrder.filter((id) => id in regenerated.entities);
   const placed = new Set(present);
   const order = [...present, ...regenerated.order.filter((id) => !placed.has(id))];
-  const selection = Array.isArray(raw['selection'])
-    ? (raw['selection'] as string[]).filter((id) => id in regenerated.entities)
-    : [];
+  const selection = Array.isArray(raw['selection']) ? (raw['selection'] as string[]).filter((id) => id in regenerated.entities) : [];
   return { entities: regenerated.entities, order, selection };
 }
 
@@ -136,9 +132,7 @@ interface DerivedModelSpec<K extends 'building' | 'civil'> {
  * names the derived entity ids and re-derives the omitted geometry on load (saved order first).
  * @invariant raw documents without a valid model, or whose regeneration throws, are returned unchanged
  */
-export function derivedModelExtension<K extends 'building' | 'civil'>(
-  spec: DerivedModelSpec<K>,
-): DocumentExtension {
+export function derivedModelExtension<K extends 'building' | 'civil'>(spec: DerivedModelSpec<K>): DocumentExtension {
   const restore = (raw: Record<string, unknown>): Record<string, unknown> => {
     const saved = raw[spec.key];
     if (saved === undefined || spec.errors(saved).length > 0) return raw;

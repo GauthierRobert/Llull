@@ -8,12 +8,7 @@
  */
 
 import type { DocumentUnit } from '@core/model/types';
-import type {
-  DwgImportResponseBody,
-  DwgImportTarget,
-  ErrorResponseBody,
-  LicenseResponseBody,
-} from '@mcp/restProtocol';
+import type { DwgImportResponseBody, DwgImportTarget, ErrorResponseBody, LicenseResponseBody } from '@mcp/restProtocol';
 import { fileStem } from '@ui/chosenFile';
 import { SERVER_BASE, serverAuthHeaders } from '@ui/serverConfig';
 
@@ -48,11 +43,7 @@ export async function fetchStepExport(name: string): Promise<ServerFileResult> {
  * POST /import/dwg — the server converts the DWG and runs the import command on the live
  * document (the change arrives through `/live`). Resolves to the status line to show.
  */
-export async function uploadDwg(
-  file: File,
-  target: DwgImportTarget,
-  unit: DocumentUnit,
-): Promise<string> {
+export async function uploadDwg(file: File, target: DwgImportTarget, unit: DocumentUnit): Promise<string> {
   const query = new URLSearchParams({ target, sourceUnit: unit });
   if (target === 'survey') query.set('name', fileStem(file.name));
   try {

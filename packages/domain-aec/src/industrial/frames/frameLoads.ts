@@ -7,14 +7,7 @@
 import { toDegrees } from '@lib/angle';
 import type { SteelMemberElement } from '@core/model/building';
 import { FLAT_ROOF_LIMIT, frameRoofAverage } from '../common/windCoefficients';
-import {
-  DOWNWIND_ROOF_FACTOR,
-  type WindCase,
-  CRANE_FACTORS,
-  type FrameLoads,
-  type NodeCaseLoad,
-  craneActions,
-} from './frameModelTypes';
+import { DOWNWIND_ROOF_FACTOR, type WindCase, CRANE_FACTORS, type FrameLoads, type NodeCaseLoad, craneActions } from './frameModelTypes';
 
 interface FrameCandidate {
   readonly y: number;
@@ -34,9 +27,7 @@ export function frameCandidates(
   ];
   const candidates: FrameCandidate[] = [];
   for (const y of [...new Set(rafters.map(planeOf))].sort((a, b) => a - b)) {
-    const inPlane = rafters
-      .filter((rafter) => planeOf(rafter) === y)
-      .sort((a, b) => xRange(a)[0] - xRange(b)[0]);
+    const inPlane = rafters.filter((rafter) => planeOf(rafter) === y).sort((a, b) => xRange(a)[0] - xRange(b)[0]);
     for (const rafter of inPlane) {
       const [low, high] = xRange(rafter);
       const last = candidates[candidates.length - 1];
@@ -52,9 +43,7 @@ export function frameCandidates(
   const hallOf = new Map<FrameCandidate, FrameCandidate[]>();
   for (const candidate of candidates) {
     const hall = [...new Set(hallOf.values())].find((hallMembers) =>
-      hallMembers.some(
-        (other) => candidate.range[0] < other.range[1] && candidate.range[1] > other.range[0],
-      ),
+      hallMembers.some((other) => candidate.range[0] < other.range[1] && candidate.range[1] > other.range[0]),
     );
     if (hall) {
       hall.push(candidate);
@@ -64,9 +53,7 @@ export function frameCandidates(
     }
   }
   const tributaryOf = (candidate: FrameCandidate): number => {
-    const ys = [...new Set((hallOf.get(candidate) ?? [candidate]).map((other) => other.y))].sort(
-      (a, b) => a - b,
-    );
+    const ys = [...new Set((hallOf.get(candidate) ?? [candidate]).map((other) => other.y))].sort((a, b) => a - b);
     const index = ys.indexOf(candidate.y);
     return ((ys[index + 1] ?? candidate.y) - (ys[index - 1] ?? candidate.y)) / 2;
   };
@@ -111,8 +98,7 @@ export function frameRoofWind(
     };
   };
   // A monopitch rafter has no partner meeting it at its high end (no apex).
-  const highEnd = (point: readonly number[], other: readonly number[]): boolean =>
-    (point[2] ?? 0) >= (other[2] ?? 0);
+  const highEnd = (point: readonly number[], other: readonly number[]): boolean => (point[2] ?? 0) >= (other[2] ?? 0);
   const hasApex = (rafter: SteelMemberElement): boolean =>
     roof.rafters.some((other) => {
       if (other.id === rafter.id) return false;
@@ -138,21 +124,13 @@ export function frameRoofWind(
       const [half0, half1] = fromLeft ? [low, middle] : [middle, high];
       const overlap = Math.max(0, Math.min(x1, half1) - Math.max(x0, half0));
       const share = Math.min(1, overlap / Math.max(x1 - x0, 1));
-      const flat = (slope: 'windward' | 'leeward'): number =>
-        frameRoofAverage('flat', pitchDegrees, 0, windCase.roofSet, slope);
+      const flat = (slope: 'windward' | 'leeward'): number => frameRoofAverage('flat', pitchDegrees, 0, windCase.roofSet, slope);
       return share * flat('windward') + (1 - share) * flat('leeward');
     }
     const faces = fromLeft === z1 > z0;
-    if (!apex)
-      return frameRoofAverage('monopitch', pitchDegrees, faces ? 0 : 180, windCase.roofSet);
+    if (!apex) return frameRoofAverage('monopitch', pitchDegrees, faces ? 0 : 180, windCase.roofSet);
     const spanIndex = valleys.filter((valley) => valley < (x0 + x1) / 2).length;
-    const cpe = frameRoofAverage(
-      'duopitch',
-      pitchDegrees,
-      0,
-      windCase.roofSet,
-      faces ? 'windward' : 'leeward',
-    );
+    const cpe = frameRoofAverage('duopitch', pitchDegrees, 0, windCase.roofSet, faces ? 'windward' : 'leeward');
     const windwardSpan = spanIndex === (fromLeft ? 0 : valleys.length);
     return windwardSpan || cpe > 0 ? cpe : DOWNWIND_ROOF_FACTOR * cpe;
   };
@@ -170,21 +148,13 @@ export interface CraneRail {
 }
 
 /** Rails paired left → right per crane bay; CL = maximum reaction on the left rail. */
-export function craneRailLoads(
-  rails: ReadonlyArray<CraneRail>,
-  craneModel: FrameLoads['craneModel'],
-  bayWidth: number,
-): NodeCaseLoad[] {
+export function craneRailLoads(rails: ReadonlyArray<CraneRail>, craneModel: FrameLoads['craneModel'], bayWidth: number): NodeCaseLoad[] {
   const nodeLoads: NodeCaseLoad[] = [];
   const ordered = [...rails].sort((a, b) => a.x - b.x);
   ordered.forEach((rail, index) => {
     const isLeft = index % 2 === 0;
     const partner = ordered[isLeft ? index + 1 : index - 1];
-    const actions = craneActions(
-      rail.capacity,
-      partner ? Math.abs(partner.x - rail.x) : bayWidth,
-      craneModel,
-    );
+    const actions = craneActions(rail.capacity, partner ? Math.abs(partner.x - rail.x) : bayWidth, craneModel);
     nodeLoads.push({
       node: rail.node,
       loadCase: 'G',
@@ -212,10 +182,7 @@ export function craneRailLoads(
       {
         max: actions.staticMax,
         min: actions.staticMin,
-        h: [
-          actions.group1.transverseMax / CRANE_FACTORS.phi5,
-          actions.group1.transverseMin / CRANE_FACTORS.phi5,
-        ],
+        h: [actions.group1.transverseMax / CRANE_FACTORS.phi5, actions.group1.transverseMin / CRANE_FACTORS.phi5],
         cases: ['CLk', 'CRk'],
         opposite: false,
       },
@@ -228,9 +195,7 @@ export function craneRailLoads(
         nodeLoads.push({
           node: rail.node,
           loadCase,
-          fx:
-            (loadCase === group.cases[0] ? transverse : -transverse) *
-            (group.opposite && !maximum ? -1 : 1),
+          fx: (loadCase === group.cases[0] ? transverse : -transverse) * (group.opposite && !maximum ? -1 : 1),
           fy: -reaction,
           mz: -reaction * rail.eccentricity,
         });

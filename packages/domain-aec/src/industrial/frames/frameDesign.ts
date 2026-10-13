@@ -29,12 +29,7 @@ import { checkFrames } from './frameCheckFrames';
 import type { BuildingModel, SteelMemberElement } from '@core/model/building';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { add3, scale3 } from '@lib/vec3';
-import {
-  designResult,
-  finalUtilisationText,
-  noChangeResult,
-  utilisationStats,
-} from '../reports/designReport';
+import { designResult, finalUtilisationText, noChangeResult, utilisationStats } from '../reports/designReport';
 import { sweepFrame } from '../../shared/mesh';
 
 /**
@@ -94,23 +89,14 @@ export const designPortalFrames = defineCommand({
           group,
           larger,
           (element) => analysed.has(element.id),
-          (building, resized) =>
-            refitPlates(current, withElement(building, resized), resized, group.profile).building,
+          (building, resized) => refitPlates(current, withElement(building, resized), resized, group.profile).building,
         );
         const { resizedIds } = resizedGroup;
-        const reseated = reseatDependents(
-          current,
-          resizedGroup.building,
-          resizedIds,
-          group.profile,
-          larger,
-          analysed,
-        );
+        const reseated = reseatDependents(current, resizedGroup.building, resizedIds, group.profile, larger, analysed);
         return { building: reseated.building, changedIds: [...resizedIds, ...reseated.moved] };
       });
     });
-    if (noFrames)
-      return noop(doc, 'design_portal_frames failed: no analysable portal frame on the level.');
+    if (noFrames) return noop(doc, 'design_portal_frames failed: no analysable portal frame on the level.');
     const { current, changes, changed } = upsized;
     let { limited } = upsized;
     const { rows } = checkFrames(current, levelId, loads);
@@ -131,11 +117,7 @@ export const designPortalFrames = defineCommand({
     const document = regenerateBuilding(doc, building);
     const final = checkFrames(document, levelId, loads);
     const unanalysedPosts = Object.values(building.elements).some(
-      (element) =>
-        element.category === 'member' &&
-        element.levelId === levelId &&
-        element.role === 'column' &&
-        !analysed.has(element.id),
+      (element) => element.category === 'member' && element.levelId === levelId && element.role === 'column' && !analysed.has(element.id),
     );
     const stats = utilisationStats(final.rows);
     return designResult(
@@ -189,10 +171,7 @@ function reseatDependents(
           element.role === 'purlin'
             ? Math.abs(element.start[1] - y) < tolerance || Math.abs(element.end[1] - y) < tolerance
             : onPlane(element, y);
-        const [low, high] = [
-          Math.min(candidate.start[0], candidate.end[0]),
-          Math.max(candidate.start[0], candidate.end[0]),
-        ];
+        const [low, high] = [Math.min(candidate.start[0], candidate.end[0]), Math.max(candidate.start[0], candidate.end[0])];
         // Gable posts stand strictly inside the rafter span (frame columns sit at its ends).
         const margin = element.role === 'purlin' ? -fromMm(doc, larger.h) : tolerance;
         return inPlane && element.start[0] > low + margin && element.start[0] < high - margin;
@@ -208,8 +187,7 @@ function reseatDependents(
       const column = resized.find(
         (candidate) =>
           candidate.role === 'column' &&
-          (Math.abs(candidate.start[1] - element.start[1]) < tolerance ||
-            Math.abs(candidate.start[1] - element.end[1]) < tolerance) &&
+          (Math.abs(candidate.start[1] - element.start[1]) < tolerance || Math.abs(candidate.start[1] - element.end[1]) < tolerance) &&
           Math.abs(candidate.start[0] - element.start[0]) < fromMm(doc, larger.h + 500),
       );
       if (column) offset = [Math.sign(element.start[0] - column.start[0]) * half, 0, 0];

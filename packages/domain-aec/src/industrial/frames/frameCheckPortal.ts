@@ -40,11 +40,7 @@ export const checkPortalFrames = defineCommand({
     const resolved = resolveFrameLoads(doc, params);
     if ('reason' in resolved) return noop(doc, `check_portal_frames failed: ${resolved.reason}.`);
     const { loads, levelId } = resolved;
-    const { rows, frames, skipped, combinations, minAlphaCritical } = checkFrames(
-      doc,
-      levelId,
-      loads,
-    );
+    const { rows, frames, skipped, combinations, minAlphaCritical } = checkFrames(doc, levelId, loads);
     if (frames === 0) {
       return noop(
         doc,
@@ -53,18 +49,7 @@ export const checkPortalFrames = defineCommand({
     }
     const { csv, failures, worst } = checkTable(
       rows,
-      [
-        'Frame',
-        'Mark',
-        'Type',
-        'N (kN)',
-        'M (kNm)',
-        'V (kN)',
-        'Utilisation',
-        'Status',
-        'Combination',
-        'Check',
-      ],
+      ['Frame', 'Mark', 'Type', 'N (kN)', 'M (kNm)', 'V (kN)', 'Utilisation', 'Status', 'Combination', 'Check'],
       (row, status) => [
         row.frame,
         row.mark,

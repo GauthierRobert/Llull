@@ -18,11 +18,7 @@ export const quad = (a: Vec3, b: Vec3, c: Vec3, d: Vec3): Triangle[] => [
 ];
 
 /** Wall quads between two rings, outward for a CCW ring pair (`flip` for an inward bore). */
-export function ringWalls(
-  lower: readonly Vec3[],
-  upper: readonly Vec3[],
-  flip: boolean,
-): Triangle[] {
+export function ringWalls(lower: readonly Vec3[], upper: readonly Vec3[], flip: boolean): Triangle[] {
   return lower.flatMap((_, j) => {
     const k = (j + 1) % lower.length;
     const [a, b, c, d] = [lower[j], lower[k], upper[k], upper[j]] as [Vec3, Vec3, Vec3, Vec3];
@@ -60,9 +56,7 @@ export function skinTriangles(rings: ReadonlyArray<ReadonlyArray<Vec3>>): Triang
   if (rings.some((ring) => ring.length !== first.length)) return [];
   const triangles: Triangle[] = [];
   for (let i = 0; i + 1 < rings.length; i++) {
-    triangles.push(
-      ...ringWalls(rings[i] as readonly Vec3[], rings[i + 1] as readonly Vec3[], false),
-    );
+    triangles.push(...ringWalls(rings[i] as readonly Vec3[], rings[i + 1] as readonly Vec3[], false));
   }
   const travel = sub3(centroid3(last), centroid3(first));
   const direction: Vec3 = Math.hypot(...travel) > 1e-12 ? travel : normalize3(ringNormal(first));

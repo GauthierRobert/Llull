@@ -56,18 +56,12 @@ describe('apply_code_trace validation', () => {
     const result = execute(createEmptyDocument(), 'apply_code_trace', {
       trace: {
         parameters: [],
-        features: [
-          box('f1'),
-          { command: 'move_entity', params: { id: { ref: 'f1' }, delta: [5, 0, 0] } },
-        ],
+        features: [box('f1'), { command: 'move_entity', params: { id: { ref: 'f1' }, delta: [5, 0, 0] } }],
       },
     });
     const [id] = result.affected;
     expect(result.document.entities[id!]?.position).toEqual([5, 0, 0]);
-    expect(result.document.featureHistory.map((step) => step.name)).toEqual([
-      'add_box',
-      'move_entities',
-    ]);
+    expect(result.document.featureHistory.map((step) => step.name)).toEqual(['add_box', 'move_entities']);
   });
 });
 
@@ -83,9 +77,7 @@ describe('buildFeatureProgram history check', () => {
     expect(program.source).toBe('snapshot');
     expect(program.notes.join(' ')).toMatch(/different geometry/);
     const solid = program.features[0];
-    expect(solid?.op === 'solid' && solid.shape.kind === 'box' && solid.shape.size[0].value).toBe(
-      9,
-    );
+    expect(solid?.op === 'solid' && solid.shape.kind === 'box' && solid.shape.size[0].value).toBe(9);
   });
 
   it('keeps the history when it reproduces the document', () => {

@@ -3,8 +3,7 @@ import { base64ToUint8Array, uint8ArrayToBase64 } from '@lib/base64';
 import { parseImageDataUrl } from '@lib/imageDataUrl';
 import { jpegBytes, jpegDataUrl, pngBytes, pngDataUrl } from '../helpers/imageFixtures';
 
-const dataUrl = (mime: string, bytes: Uint8Array): string =>
-  `data:${mime};base64,${uint8ArrayToBase64(bytes)}`;
+const dataUrl = (mime: string, bytes: Uint8Array): string => `data:${mime};base64,${uint8ArrayToBase64(bytes)}`;
 
 describe('base64ToUint8Array', () => {
   it('inverts uint8ArrayToBase64 for every padding length', () => {
@@ -70,7 +69,6 @@ describe('parseImageDataUrl', () => {
     const garbage = Uint8Array.from([0xff, 0xd8, 0x00, 0x00, 0, 0]);
     const truncatedSof = jpegBytes(4, 4).slice(0, 25);
     const noFrame = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0, 2]);
-    for (const bytes of [scanFirst, garbage, truncatedSof, noFrame])
-      expect(parseImageDataUrl(dataUrl('image/jpeg', bytes)).ok).toBe(false);
+    for (const bytes of [scanFirst, garbage, truncatedSof, noFrame]) expect(parseImageDataUrl(dataUrl('image/jpeg', bytes)).ok).toBe(false);
   });
 });

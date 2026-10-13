@@ -18,17 +18,17 @@ import { hashJson } from '../src/audit';
 import { isHealthy, requestJson } from '../src/restClient';
 import { writeFileAtomic } from '../src/writeFileAtomic';
 
-const jsonResponse = (body: unknown, status = 200): Response =>
-  new Response(JSON.stringify(body), { status });
+const jsonResponse = (body: unknown, status = 200): Response => new Response(JSON.stringify(body), { status });
 
 describe('parseCommandResponse', () => {
   it('reads a command-bus body', () => {
-    expect(
-      parseCommandResponse(
-        { summary: 'ok', affected: ['a', 3], changed: true, data: { x: 1 } },
-        200,
-      ),
-    ).toEqual({ summary: 'ok', affected: ['a'], isError: false, changed: true, data: { x: 1 } });
+    expect(parseCommandResponse({ summary: 'ok', affected: ['a', 3], changed: true, data: { x: 1 } }, 200)).toEqual({
+      summary: 'ok',
+      affected: ['a'],
+      isError: false,
+      changed: true,
+      data: { x: 1 },
+    });
   });
 
   it('turns an error body or a non-2xx status into an error outcome', () => {
@@ -102,8 +102,7 @@ describe('document files', () => {
 });
 
 describe('cliTarget', () => {
-  const target = (argv: string[], env: Record<string, string> = {}): CliTarget =>
-    cliTarget(parseArgv(argv), env);
+  const target = (argv: string[], env: Record<string, string> = {}): CliTarget => cliTarget(parseArgv(argv), env);
 
   it('prefers --app, then --server, then $LLULL_SERVER, else the local document', () => {
     expect(target(['--app', '--server', 'http://x'], { LLULL_SERVER: 'y' }).server).toBe('app');

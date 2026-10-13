@@ -12,9 +12,7 @@ describe('downloadText', () => {
     const create = vi.fn(() => 'blob:llull');
     const revoke = vi.fn();
     Object.assign(URL, { createObjectURL: create, revokeObjectURL: revoke });
-    const click = vi
-      .spyOn(HTMLAnchorElement.prototype, 'click')
-      .mockImplementation(() => undefined);
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
 
     downloadText('a,b', 'member-schedule.csv', 'text/csv');
 

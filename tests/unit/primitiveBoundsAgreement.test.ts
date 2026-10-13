@@ -47,11 +47,7 @@ function tessellatedBounds(entity: Entity): { min: Vec3; max: Vec3 } {
   return { min: min as unknown as Vec3, max: max as unknown as Vec3 };
 }
 
-function expectBoundsClose(
-  actual: { min: Vec3; max: Vec3 },
-  expected: { min: Vec3; max: Vec3 },
-  tolerance: number,
-): void {
+function expectBoundsClose(actual: { min: Vec3; max: Vec3 }, expected: { min: Vec3; max: Vec3 }, tolerance: number): void {
   for (let axis = 0; axis < 3; axis++) {
     expect(Math.abs(actual.min[axis]! - expected.min[axis]!)).toBeLessThanOrEqual(tolerance);
     expect(Math.abs(actual.max[axis]! - expected.max[axis]!)).toBeLessThanOrEqual(tolerance);
@@ -144,9 +140,7 @@ describe('primitive bounds agreement (render / core bbox / export tessellation)'
       height: 6,
       position: POSITION,
     });
-    const cylinderBounds = entityBounds(
-      cylinder.document.entities[cylinder.affected[0]!] as Entity,
-    );
+    const cylinderBounds = entityBounds(cylinder.document.entities[cylinder.affected[0]!] as Entity);
     const coneBounds = entityBounds(cone.document.entities[cone.affected[0]!] as Entity);
     expect(cylinderBounds.max[2] - cylinderBounds.min[2]).toBe(6);
     expect(cylinderBounds.max[1] - cylinderBounds.min[1]).toBe(4);
@@ -187,10 +181,7 @@ describe('primitive bounds agreement (render / core bbox / export tessellation)'
         const entity = result.document.entities[result.affected[0]!] as Entity;
         expect(entity.kind).toBe('revolution');
 
-        const rendered = renderedBounds(
-          buildRevolutionGeometry(PROFILE, axis, angle, 24),
-          POSITION,
-        );
+        const rendered = renderedBounds(buildRevolutionGeometry(PROFILE, axis, angle, 24), POSITION);
         const tessellated = tessellatedBounds(entity);
         const core = entityBounds(entity);
 
@@ -206,28 +197,20 @@ describe('primitive bounds agreement (render / core bbox / export tessellation)'
 });
 
 describe('instanced batch geometry matches single-mesh geometry (+Z-up)', () => {
-  it.each(['cylinder', 'sphere'] as const)(
-    '%s batch geometry has the single-mesh bounds',
-    (kind) => {
-      const doc =
-        kind === 'cylinder'
-          ? execute(createEmptyDocument(), 'add_cylinder', { radius: 1, height: 4 }).document
-          : execute(createEmptyDocument(), 'add_sphere', { radius: 1.5 }).document;
-      const entities = Object.values(doc.entities);
-      const batch = [...groupEntitiesForInstancing(entities).values()][0];
-      expect(batch).toBeDefined();
-      const batchGeometry = makeGeometry(batch!);
-      const singleGeometry =
-        kind === 'cylinder' ? buildCylinderGeometry(1, 4) : buildSphereGeometry(1.5);
-      batchGeometry.computeBoundingBox();
-      singleGeometry.computeBoundingBox();
-      expect(batchGeometry.boundingBox!.min.toArray()).toEqual(
-        singleGeometry.boundingBox!.min.toArray(),
-      );
-      expect(batchGeometry.boundingBox!.max.toArray()).toEqual(
-        singleGeometry.boundingBox!.max.toArray(),
-      );
-      if (kind === 'cylinder') expect(batchGeometry.boundingBox!.max.z).toBeCloseTo(2, 6);
-    },
-  );
+  it.each(['cylinder', 'sphere'] as const)('%s batch geometry has the single-mesh bounds', (kind) => {
+    const doc =
+      kind === 'cylinder'
+        ? execute(createEmptyDocument(), 'add_cylinder', { radius: 1, height: 4 }).document
+        : execute(createEmptyDocument(), 'add_sphere', { radius: 1.5 }).document;
+    const entities = Object.values(doc.entities);
+    const batch = [...groupEntitiesForInstancing(entities).values()][0];
+    expect(batch).toBeDefined();
+    const batchGeometry = makeGeometry(batch!);
+    const singleGeometry = kind === 'cylinder' ? buildCylinderGeometry(1, 4) : buildSphereGeometry(1.5);
+    batchGeometry.computeBoundingBox();
+    singleGeometry.computeBoundingBox();
+    expect(batchGeometry.boundingBox!.min.toArray()).toEqual(singleGeometry.boundingBox!.min.toArray());
+    expect(batchGeometry.boundingBox!.max.toArray()).toEqual(singleGeometry.boundingBox!.max.toArray());
+    if (kind === 'cylinder') expect(batchGeometry.boundingBox!.max.z).toBeCloseTo(2, 6);
+  });
 });

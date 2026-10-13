@@ -100,12 +100,7 @@ const STEP_RUN: ProgramRun = { trace: {}, traced: true, stepBase64: 'U1RFUFNURVA
 describe('buildExchangeToolDefinitions', () => {
   it('defines export_step, import_step, import_dwg and import_code with annotations', () => {
     const tools = buildExchangeToolDefinitions();
-    expect(tools.map((t) => t.name)).toEqual([
-      'export_step',
-      'import_step',
-      'import_dwg',
-      'import_code',
-    ]);
+    expect(tools.map((t) => t.name)).toEqual(['export_step', 'import_step', 'import_dwg', 'import_code']);
     const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
     expect(byName.export_step?.annotations).toEqual({ idempotentHint: true });
     expect(byName.import_step?.annotations).toBeUndefined();
@@ -296,9 +291,7 @@ describe('import_code', () => {
     log: '',
     trace: {
       parameters: [{ name: 'w', expression: '5' }],
-      features: [
-        { command: 'add_sphere', ref: 'f1', params: { radius: { value: 2, expression: 'w' } } },
-      ],
+      features: [{ command: 'add_sphere', ref: 'f1', params: { radius: { value: 2, expression: 'w' } } }],
     },
   };
 
@@ -319,9 +312,7 @@ describe('import_code', () => {
     expect(h.applied[0]?.name).toBe('apply_code_trace');
     expect(h.applied[0]?.params).toEqual({ trace: traced.trace, mode: 'replace' });
     const text = textOf(result);
-    expect(text).toContain(
-      'import_code (cadquery, parametric (feature history + parameters rebuilt))',
-    );
+    expect(text).toContain('import_code (cadquery, parametric (feature history + parameters rebuilt))');
     expect(text).toContain('apply_code_trace (replace)');
     expect(h.state.doc.parameters.w?.value).toBe(5);
     expect(h.state.doc.order).toHaveLength(1);
@@ -339,11 +330,7 @@ describe('import_code', () => {
       },
       doc: docWithBox(),
     });
-    const result = await applyExchangeToolCall(
-      'import_code',
-      { code: 'x', language: 'build123d', mode: 'append' },
-      h.deps,
-    );
+    const result = await applyExchangeToolCall('import_code', { code: 'x', language: 'build123d', mode: 'append' }, h.deps);
     expect(result?.isError).toBe(false);
     expect(h.port.runCalls[0]?.language).toBe('build123d');
     expect(h.applied[0]?.params).toMatchObject({ mode: 'append' });
@@ -384,11 +371,7 @@ describe('import_code', () => {
 
   it('rejects an unsupported language before running anything', async () => {
     const h = makeHarness({ run: traced });
-    const result = await applyExchangeToolCall(
-      'import_code',
-      { code: 'x', language: 'openscad' },
-      h.deps,
-    );
+    const result = await applyExchangeToolCall('import_code', { code: 'x', language: 'openscad' }, h.deps);
     expect(result?.isError).toBe(true);
     expect(textOf(result)).toContain('language must be "cadquery" or "build123d"');
     expect(h.port.runCalls).toEqual([]);
@@ -484,9 +467,7 @@ describe('shapeToolCallContent code blocks', () => {
     expect(result.isError).toBe(false);
     const last = result.content.at(-1)!.text;
     expect(last).toContain('cube([1, 2, 3], center = true)');
-    expect(
-      result.content.some((c) => c.text.startsWith('```json') && !c.text.includes('cube(')),
-    ).toBe(true);
+    expect(result.content.some((c) => c.text.startsWith('```json') && !c.text.includes('cube('))).toBe(true);
     expect(result.document).toBe(doc);
   });
 });

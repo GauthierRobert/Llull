@@ -7,21 +7,8 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import {
-  booleanFlag,
-  missingValueFlag,
-  paramsSource,
-  parseArgv,
-  stringFlag,
-} from '../src/cli/argv';
-import {
-  describeCommand,
-  listCatalog,
-  searchCatalog,
-  shortDescription,
-  suggestNames,
-  toolsetCounts,
-} from '../src/cli/catalog';
+import { booleanFlag, missingValueFlag, paramsSource, parseArgv, stringFlag } from '../src/cli/argv';
+import { describeCommand, listCatalog, searchCatalog, shortDescription, suggestNames, toolsetCounts } from '../src/cli/catalog';
 import { filesOfData, saveDataFiles, withoutPayloads } from '../src/cli/saveFiles';
 import { imageDataUrl, resolveImageRefs } from '../src/cli/imageParams';
 import { listCommands } from '@core/commands/registry';
@@ -29,15 +16,7 @@ import { exchangeToolDefinitions } from '../src/cli/exchange';
 
 describe('parseArgv', () => {
   it('splits positionals, value flags, boolean flags and --k=v', () => {
-    const parsed = parseArgv([
-      'exec',
-      'add_box',
-      '--doc',
-      'a.json',
-      '--json',
-      'size=[1,1,1]',
-      '--save=x.stl',
-    ]);
+    const parsed = parseArgv(['exec', 'add_box', '--doc', 'a.json', '--json', 'size=[1,1,1]', '--save=x.stl']);
     expect(parsed.positionals).toEqual(['exec', 'add_box', 'size=[1,1,1]']);
     expect(stringFlag(parsed, 'doc')).toBe('a.json');
     expect(stringFlag(parsed, 'save')).toBe('x.stl');
@@ -99,10 +78,10 @@ describe('imageParams', () => {
 
   it('replaces only top-level "@img:" strings of an object', () => {
     const read = (file: string): Buffer => (file === 'scan.jpg' ? jpeg : png);
-    const resolved = resolveImageRefs(
-      { dataUrl: '@img:scan.jpg', name: 'scan', nested: { dataUrl: '@img:x.png' }, n: 2 },
-      read,
-    ) as Record<string, unknown>;
+    const resolved = resolveImageRefs({ dataUrl: '@img:scan.jpg', name: 'scan', nested: { dataUrl: '@img:x.png' }, n: 2 }, read) as Record<
+      string,
+      unknown
+    >;
     expect(resolved['dataUrl']).toMatch(/^data:image\/jpeg;base64,/);
     expect(resolved['name']).toBe('scan');
     expect(resolved['nested']).toEqual({ dataUrl: '@img:x.png' });
@@ -126,9 +105,7 @@ describe('catalog', () => {
   it('searches registry commands only (no MCP-only discovery tools)', () => {
     const hits = searchCatalog('fillet edge', 5);
     expect(hits[0]?.name).toBe('fillet_edge');
-    expect(searchCatalog('search tools toolset', 20).map((h) => h.name)).not.toContain(
-      'search_tools',
-    );
+    expect(searchCatalog('search tools toolset', 20).map((h) => h.name)).not.toContain('search_tools');
   });
 
   it('describes a command with its params, and null for an unknown one', () => {
@@ -149,15 +126,9 @@ describe('saveFiles', () => {
   const dir = (): string => mkdtempSync(path.join(tmpdir(), 'llull-cli-save-'));
 
   it('extracts base64, text and multi-file payloads', () => {
-    expect(
-      filesOfData({ stlBase64: Buffer.from('ab').toString('base64') })[0]?.bytes.toString(),
-    ).toBe('ab');
-    expect(filesOfData({ text: 'code', fileName: 'm.py' })).toEqual([
-      { name: 'm.py', bytes: Buffer.from('code') },
-    ]);
-    expect(
-      filesOfData({ files: [{ name: 'a.nc1', content: 'A' }, { name: 'b.nc1', content: 'B' }, 3] }),
-    ).toHaveLength(2);
+    expect(filesOfData({ stlBase64: Buffer.from('ab').toString('base64') })[0]?.bytes.toString()).toBe('ab');
+    expect(filesOfData({ text: 'code', fileName: 'm.py' })).toEqual([{ name: 'm.py', bytes: Buffer.from('code') }]);
+    expect(filesOfData({ files: [{ name: 'a.nc1', content: 'A' }, { name: 'b.nc1', content: 'B' }, 3] })).toHaveLength(2);
     expect(filesOfData({ count: 1 })).toEqual([]);
     expect(filesOfData('text')).toEqual([]);
   });
@@ -166,10 +137,7 @@ describe('saveFiles', () => {
     const root = dir();
     const single = saveDataFiles({ step: 'ISO-10303' }, path.join(root, 'nested', 'p.step'));
     expect(readFileSync(single[0]?.path ?? '', 'utf8')).toBe('ISO-10303');
-    const many = saveDataFiles(
-      { files: [{ name: 'a.nc1', content: 'A' }, { content: 'B' }] },
-      path.join(root, 'nc'),
-    );
+    const many = saveDataFiles({ files: [{ name: 'a.nc1', content: 'A' }, { content: 'B' }] }, path.join(root, 'nc'));
     expect(many.map((f) => path.basename(f.path))).toEqual(['a.nc1', 'file-2']);
     const intoDir = saveDataFiles({ text: 'x', fileName: 'm.scad' }, `${root}/`);
     expect(intoDir[0]?.path).toBe(path.join(root, 'm.scad'));
@@ -177,8 +145,7 @@ describe('saveFiles', () => {
 
   it('rasterizes svg for a .png target and fails clearly without a payload', () => {
     const root = dir();
-    const svg =
-      '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>';
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>';
     const [png] = saveDataFiles({ svg, width: 20 }, path.join(root, 'v.png'));
     expect(
       readFileSync(png?.path ?? '')
@@ -186,18 +153,14 @@ describe('saveFiles', () => {
         .toString(),
     ).toBe('PNG');
     expect(() => saveDataFiles({ count: 1 }, path.join(root, 'x.png'))).toThrow(/no data.svg/);
-    expect(() => saveDataFiles({ svg: 'not svg', text: 'x' }, path.join(root, 'bad.png'))).toThrow(
-      /no data.svg that rasterizes/,
-    );
+    expect(() => saveDataFiles({ svg: 'not svg', text: 'x' }, path.join(root, 'bad.png'))).toThrow(/no data.svg that rasterizes/);
     expect(existsSync(path.join(root, 'bad.png'))).toBe(false);
     expect(() => saveDataFiles({ count: 1 }, path.join(root, 'x.txt'))).toThrow(/no file payload/);
     expect(existsSync(path.join(root, 'x.txt'))).toBe(false);
   });
 
   it('replaces payloads with size markers, recursing into files[]', () => {
-    expect(
-      withoutPayloads({ text: 'abc', count: 2, files: [{ content: 'xy', name: 'a' }] }),
-    ).toEqual({
+    expect(withoutPayloads({ text: 'abc', count: 2, files: [{ content: 'xy', name: 'a' }] })).toEqual({
       text: '<3 chars, saved>',
       count: 2,
       files: [{ content: '<2 chars, saved>', name: 'a' }],

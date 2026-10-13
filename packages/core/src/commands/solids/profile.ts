@@ -70,9 +70,7 @@ export const extrudeProfile = defineCommand({
         'Ids of coplanar 2D pieces (line, arc, polyline, spline) that join end to end into one closed loop; order and direction do not matter. Alternative to id and profile.',
       )
       .optional(),
-    depth: z
-      .number()
-      .describe('Extrusion depth in document units along +Z from the position. Must be > 0.'),
+    depth: z.number().describe('Extrusion depth in document units along +Z from the position. Must be > 0.'),
     position: looseVec3(
       'World-space origin of the profile plane [x, y, z] in document units. Defaults to [0, 0, 0] for an ' +
         'inline profile and to the (first) source entity position for id/ids.',
@@ -84,12 +82,8 @@ export const extrudeProfile = defineCommand({
   run: (doc, { profile, id, ids, depth, position, rotation, axis, color = EXTRUSION_COLOR }) => {
     const sources = [profile, id, ids].filter((source) => source !== undefined).length;
     if (sources === 0)
-      return noop(
-        doc,
-        'extrude_profile: give profile (inline points), id (one closed shape) or ids (pieces of a loop); no-op.',
-      );
-    if (sources > 1)
-      return noop(doc, 'extrude_profile: pass only one of profile, id or ids, not both; no-op.');
+      return noop(doc, 'extrude_profile: give profile (inline points), id (one closed shape) or ids (pieces of a loop); no-op.');
+    if (sources > 1) return noop(doc, 'extrude_profile: pass only one of profile, id or ids, not both; no-op.');
     if (profile !== undefined) {
       const rejected = rejectInlineProfile(doc, profile, depth);
       if (rejected) return rejected;
@@ -104,11 +98,7 @@ export const extrudeProfile = defineCommand({
       });
     }
     const label = id ?? (ids ?? []).join(', ');
-    if (depth <= 0)
-      return noop(
-        doc,
-        `extrude_profile: depth must be > 0 (got ${depth}); entity ${label} unchanged.`,
-      );
+    if (depth <= 0) return noop(doc, `extrude_profile: depth must be > 0 (got ${depth}); entity ${label} unchanged.`);
     const sourceIds = ids ?? (id !== undefined ? [id] : []);
     if (sourceIds.length === 0) return noop(doc, 'extrude_profile: ids must not be empty.');
     if (sourceIds.length === 1) {
@@ -119,8 +109,7 @@ export const extrudeProfile = defineCommand({
     if (typeof loop === 'string') return noop(doc, `extrude_profile: ${loop}; no-op.`);
     const flatProfile = rejectZeroAreaProfile(doc, 'extrude_profile', loop.profile);
     if (flatProfile) return flatProfile;
-    const source =
-      sourceIds.length === 1 ? `${doc.entities[label]?.kind} "${label}"` : `[${label}]`;
+    const source = sourceIds.length === 1 ? `${doc.entities[label]?.kind} "${label}"` : `[${label}]`;
     return extrusionResult(doc, {
       profile: loop.profile,
       depth,
@@ -135,30 +124,15 @@ export const extrudeProfile = defineCommand({
   },
 });
 
-function rejectInlineProfile(
-  doc: CadDocument,
-  profile: ReadonlyArray<readonly [number, number]>,
-  depth: number,
-): CommandResult | null {
-  if (profile.length < 3)
-    return noop(
-      doc,
-      `extrude_profile: profile must be an array of at least 3 [x,y] points; no-op.`,
-    );
+function rejectInlineProfile(doc: CadDocument, profile: ReadonlyArray<readonly [number, number]>, depth: number): CommandResult | null {
+  if (profile.length < 3) return noop(doc, `extrude_profile: profile must be an array of at least 3 [x,y] points; no-op.`);
   if (profile.length > MAX_PROFILE_POINTS)
-    return noop(
-      doc,
-      `extrude_profile: profile has ${profile.length} points, exceeding MAX_PROFILE_POINTS (${MAX_PROFILE_POINTS}); no-op.`,
-    );
+    return noop(doc, `extrude_profile: profile has ${profile.length} points, exceeding MAX_PROFILE_POINTS (${MAX_PROFILE_POINTS}); no-op.`);
   const badProfile = rejectBadProfile(doc, 'extrude_profile', profile);
   if (badProfile) return badProfile;
   const flatProfile = rejectZeroAreaProfile(doc, 'extrude_profile', profile);
   if (flatProfile) return flatProfile;
-  if (depth <= 0)
-    return noop(
-      doc,
-      `extrude_profile: depth must be a finite number > 0 (got ${String(depth)}); no-op.`,
-    );
+  if (depth <= 0) return noop(doc, `extrude_profile: depth must be a finite number > 0 (got ${String(depth)}); no-op.`);
   return null;
 }
 
@@ -206,13 +180,7 @@ function singleSourceIssue(doc: CadDocument, id: string): string | null {
   return null;
 }
 
-const CLOSED_SHAPE_KINDS: ReadonlySet<string> = new Set([
-  'circle',
-  'rectangle',
-  'ellipse',
-  'polyline',
-  'spline',
-]);
+const CLOSED_SHAPE_KINDS: ReadonlySet<string> = new Set(['circle', 'rectangle', 'ellipse', 'polyline', 'spline']);
 
 /** `{ curves }` when the loop has an arc or Bézier (a pure polygon needs no exact copy). */
 function exactCurves(curves: ReadonlyArray<CurveSegment<Vec2>>): {
@@ -300,9 +268,7 @@ export const revolveProfile = defineCommand({
         'Number of radial subdivisions for tessellation. Integer; higher = smoother surface. Default: 32. Minimum: 3 (smaller values are raised to 3).',
       )
       .optional(),
-    position: looseVec3(
-      'World-space origin of the revolution axis [x, y, z] in document units. Default: [0, 0, 0].',
-    ).optional(),
+    position: looseVec3('World-space origin of the revolution axis [x, y, z] in document units. Default: [0, 0, 0].').optional(),
     rotation: tolerant(
       looseVec3(
         `${ROTATION_CONVENTION} applied after revolution. Default: [0, 0, 0]. ` +
@@ -339,10 +305,7 @@ export const revolveProfile = defineCommand({
       curves = loop.curves.map((segment) => mapSegment(segment, shift));
     }
     if (profile.length < 3) {
-      return noop(
-        doc,
-        `revolve_profile: profile must be an array of at least 3 [x,y] points (got ${profile.length}); no-op.`,
-      );
+      return noop(doc, `revolve_profile: profile must be an array of at least 3 [x,y] points (got ${profile.length}); no-op.`);
     }
     if (profile.length > MAX_PROFILE_POINTS) {
       return noop(
@@ -351,29 +314,20 @@ export const revolveProfile = defineCommand({
       );
     }
     if (rawSegments !== undefined && rawSegments > MAX_REVOLVE_SEGMENTS) {
-      return noop(
-        doc,
-        `revolve_profile: segments ${rawSegments} exceeds MAX_REVOLVE_SEGMENTS (${MAX_REVOLVE_SEGMENTS}); no-op.`,
-      );
+      return noop(doc, `revolve_profile: segments ${rawSegments} exceeds MAX_REVOLVE_SEGMENTS (${MAX_REVOLVE_SEGMENTS}); no-op.`);
     }
     const badProfile = rejectBadProfile(doc, 'revolve_profile', profile);
     if (badProfile) return badProfile;
     const flatProfile = rejectZeroAreaProfile(doc, 'revolve_profile', profile);
     if (flatProfile) return flatProfile;
     if (explicitIdTaken(doc, explicitId)) {
-      return noop(
-        doc,
-        `revolve_profile: entity id "${explicitId}" already exists; choose another id or omit it; no-op.`,
-      );
+      return noop(doc, `revolve_profile: entity id "${explicitId}" already exists; choose another id or omit it; no-op.`);
     }
 
     const TWO_PI = 2 * Math.PI;
     const angle = rawAngle ?? TWO_PI;
     if (angle <= 0) {
-      return noop(
-        doc,
-        `revolve_profile: angle must be a finite number > 0 (got ${String(angle)}); no-op.`,
-      );
+      return noop(doc, `revolve_profile: angle must be a finite number > 0 (got ${String(angle)}); no-op.`);
     }
 
     const axis = resolveAxis(rawAxis);
@@ -400,9 +354,7 @@ export const revolveProfile = defineCommand({
     );
 
     const axisLabel =
-      rawAxis === 'x' || rawAxis === 'y' || rawAxis === 'z'
-        ? rawAxis
-        : `[${axis.map((v) => fixedNumber(v, 3)).join(', ')}]`;
+      rawAxis === 'x' || rawAxis === 'y' || rawAxis === 'z' ? rawAxis : `[${axis.map((v) => fixedNumber(v, 3)).join(', ')}]`;
     return commitSolid(
       doc,
       entity,

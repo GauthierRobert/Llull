@@ -16,10 +16,7 @@ import { findProfile, lightestProfile, sectionProperties } from '../../steel/pro
 const MAX_ITERATIONS = 15;
 
 /** Shared `targetUtilisation` parameter of the design commands. */
-export const targetUtilisationParam = z
-  .number()
-  .optional()
-  .describe('Maximum accepted utilisation (0.5–1). Default 0.95.');
+export const targetUtilisationParam = z.number().optional().describe('Maximum accepted utilisation (0.5–1). Default 0.95.');
 
 /** @invariant accepted target utilisations lie in [0.5, 1] */
 export function isValidTargetUtilisation(value: number): boolean {
@@ -53,8 +50,7 @@ export function resizeProfileGroup(
   let next = building;
   const resizedIds: string[] = [];
   for (const element of membersOf(building)) {
-    if (element.role !== group.role || element.profile !== group.profile || !isTarget(element))
-      continue;
+    if (element.role !== group.role || element.profile !== group.profile || !isTarget(element)) continue;
     next = resize(next, { ...element, profile: larger });
     resizedIds.push(element.id);
   }
@@ -71,11 +67,7 @@ export function upsizeProfileGroups(
   building: BuildingModel,
   groups: ProfileGroups,
   nextSize: (profile: string) => string | null,
-  resizeGroup: (
-    building: BuildingModel,
-    group: ProfileGroup,
-    larger: string,
-  ) => { building: BuildingModel; changedIds: string[] },
+  resizeGroup: (building: BuildingModel, group: ProfileGroup, larger: string) => { building: BuildingModel; changedIds: string[] },
 ): {
   building: BuildingModel;
   progressed: boolean;
@@ -138,16 +130,10 @@ export function iterateUpsizing(
 export function nextProfile(name: string): string | null {
   const profile = findProfile(name);
   if (!profile) return null;
-  const sameFamily = lightestProfile(
-    (candidate) =>
-      candidate.family === profile.family && candidate.massPerMetre > profile.massPerMetre,
-  );
+  const sameFamily = lightestProfile((candidate) => candidate.family === profile.family && candidate.massPerMetre > profile.massPerMetre);
   if (sameFamily) return sameFamily.name;
   if (profile.shape !== 'I') return null;
   const modulus = sectionProperties(profile).plasticModulus;
-  const stronger = lightestProfile(
-    (candidate) =>
-      candidate.shape === 'I' && sectionProperties(candidate).plasticModulus > modulus * 1.02,
-  );
+  const stronger = lightestProfile((candidate) => candidate.shape === 'I' && sectionProperties(candidate).plasticModulus > modulus * 1.02);
   return stronger?.name ?? null;
 }

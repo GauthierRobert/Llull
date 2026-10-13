@@ -21,8 +21,7 @@ function resolveLinePair(
   id: string,
   boundaryId: string,
 ): { line: LineEntity; boundary: LineEntity } | CommandResult {
-  if (id === boundaryId)
-    return noop(doc, `${command}: id and boundaryId must be different entities.`);
+  if (id === boundaryId) return noop(doc, `${command}: id and boundaryId must be different entities.`);
   const line = entityOfKind(doc, id, ['line']);
   if (typeof line === 'string') return noop(doc, `${command}: ${line}.`);
   const boundary = entityOfKind(doc, boundaryId, ['line']);
@@ -34,37 +33,20 @@ function resolveLinePair(
  * `id` with its endpoint nearer to the intersection with `boundaryId` (infinite lines) moved onto it;
  * `trim` additionally requires the intersection to lie on both segments, `extend` does not.
  */
-function moveEndpointToBoundary(
-  doc: CadDocument,
-  command: 'trim' | 'extend',
-  id: string,
-  boundaryId: string,
-): CommandResult {
+function moveEndpointToBoundary(doc: CadDocument, command: 'trim' | 'extend', id: string, boundaryId: string): CommandResult {
   const pair = resolveLinePair(doc, command, id, boundaryId);
   if ('summary' in pair) return pair;
   const { line, boundary } = pair;
   const hit = lineIntersectionParams(line.start, line.end, boundary.start, boundary.end);
-  if (hit === null)
-    return noop(doc, `${command}: lines ${id} and ${boundaryId} are parallel — no intersection.`);
-  if (
-    command === 'trim' &&
-    (hit.t < -1e-9 || hit.t > 1 + 1e-9 || hit.u < -1e-9 || hit.u > 1 + 1e-9)
-  ) {
-    return noop(
-      doc,
-      `${command}: intersection of ${id} and ${boundaryId} is outside segment bounds.`,
-    );
+  if (hit === null) return noop(doc, `${command}: lines ${id} and ${boundaryId} are parallel — no intersection.`);
+  if (command === 'trim' && (hit.t < -1e-9 || hit.t > 1 + 1e-9 || hit.u < -1e-9 || hit.u > 1 + 1e-9)) {
+    return noop(doc, `${command}: intersection of ${id} and ${boundaryId} is outside segment bounds.`);
   }
   const point = lerp2(line.start, line.end, hit.t);
-  const done =
-    command === 'trim'
-      ? `Trimmed line ${id} to intersection with ${boundaryId}`
-      : `Extended line ${id} to meet ${boundaryId}`;
-  return changed(
-    replaceEntity(doc, withNearerEndpointAt(line, point)),
-    `${done} at [${point[0].toFixed(3)}, ${point[1].toFixed(3)}].`,
-    [id],
-  );
+  const done = command === 'trim' ? `Trimmed line ${id} to intersection with ${boundaryId}` : `Extended line ${id} to meet ${boundaryId}`;
+  return changed(replaceEntity(doc, withNearerEndpointAt(line, point)), `${done} at [${point[0].toFixed(3)}, ${point[1].toFixed(3)}].`, [
+    id,
+  ]);
 }
 
 /**
@@ -87,8 +69,7 @@ export const trim = defineCommand({
     id: z.string().describe('Id of the line entity to trim.'),
     boundaryId: z.string().describe('Id of the line entity that acts as the trim boundary.'),
   }),
-  run: (doc, { id, boundaryId }): CommandResult =>
-    moveEndpointToBoundary(doc, 'trim', id, boundaryId),
+  run: (doc, { id, boundaryId }): CommandResult => moveEndpointToBoundary(doc, 'trim', id, boundaryId),
 });
 
 /**
@@ -111,6 +92,5 @@ export const extend = defineCommand({
     id: z.string().describe('Id of the line entity to extend.'),
     boundaryId: z.string().describe('Id of the line entity that acts as the extend boundary.'),
   }),
-  run: (doc, { id, boundaryId }): CommandResult =>
-    moveEndpointToBoundary(doc, 'extend', id, boundaryId),
+  run: (doc, { id, boundaryId }): CommandResult => moveEndpointToBoundary(doc, 'extend', id, boundaryId),
 });

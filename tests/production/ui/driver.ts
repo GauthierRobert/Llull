@@ -14,12 +14,10 @@ import type { UiSession } from './session';
  */
 
 const GAP = {
-  levelElevation:
-    "Levels list 'Add level' form has only name + height (no elevation): levels can only stack on the top one.",
+  levelElevation: "Levels list 'Add level' form has only name + height (no elevation): levels can only stack on the top one.",
   historyEdit:
     'No panel edits a history step: the only identity-preserving change of anything but an equipment is the command palette edit_step_params with hand-typed JSON and a step id.',
-  unmapped: (tool: string): string =>
-    `No panel control for ${tool}: reachable only through the command palette.`,
+  unmapped: (tool: string): string => `No panel control for ${tool}: reachable only through the command palette.`,
 } as const;
 
 const asNumbers = (value: unknown): number[] => (Array.isArray(value) ? value.map(Number) : []);
@@ -36,10 +34,7 @@ const rectangleFields = (boundary: unknown): Record<string, string> => {
   };
 };
 /** The equipment form fields (all but `mark`) of a step's params. */
-const equipmentFields = (
-  params: Record<string, unknown>,
-  weight: string,
-): Record<string, string> => {
+const equipmentFields = (params: Record<string, unknown>, weight: string): Record<string, string> => {
   const [location, size] = [asNumbers(params['location']), asNumbers(params['size'])];
   return {
     name: text(params['name']),
@@ -54,8 +49,7 @@ const equipmentFields = (
 };
 const levelOf = (args: Record<string, unknown>): Record<string, string> =>
   typeof args['levelId'] === 'string' ? { levelId: args['levelId'] } : {};
-const route = (points: unknown): string =>
-  (Array.isArray(points) ? points : []).map((point) => asNumbers(point).join(',')).join('; ');
+const route = (points: unknown): string => (Array.isArray(points) ? points : []).map((point) => asNumbers(point).join(',')).join('; ');
 
 /** Joint selects exist for beams, the base fixity select for columns (the form hides the others). */
 function memberFixity(args: Record<string, unknown>): Record<string, string> {
@@ -108,9 +102,7 @@ export class UiDriver {
     const args = call.args;
     switch (call.tool) {
       case 'set_project_info':
-        return this.panel.setProjectInfo(
-          Object.fromEntries(Object.entries(args).map(([key, value]) => [key, text(value)])),
-        );
+        return this.panel.setProjectInfo(Object.fromEntries(Object.entries(args).map(([key, value]) => [key, text(value)])));
       case 'add_level':
         return this.addLevel(args);
       case 'add_grid_system':
@@ -211,16 +203,12 @@ export class UiDriver {
       this.gaps.add(GAP.historyEdit);
       return this.palette('edit_step_params', args);
     }
-    return this.panel.editEquipment(
-      record['mark'],
-      equipmentFields(record, text(record['weight'])),
-    );
+    return this.panel.editEquipment(record['mark'], equipmentFields(record, text(record['weight'])));
   }
 
   /** One submission of the Pipe support form: the line, the type and the points (or a spacing). */
   private async addPipeSupport(args: Record<string, unknown>): Promise<string> {
-    const pipe =
-      typeof args['line'] === 'string' ? `line:${args['line']}` : `pipe:${text(args['pipeId'])}`;
+    const pipe = typeof args['line'] === 'string' ? `line:${args['line']}` : `pipe:${text(args['pipeId'])}`;
     return this.panel.applyTool(
       'pipeSupport',
       {

@@ -11,14 +11,7 @@ import { memberBuckling } from './steelDesign';
 import { GAMMA_G, GAMMA_Q } from '../../shared/loadFactors';
 import { type ColumnNode } from './steelFraming';
 import { selfWeightPerMetre, type SteelBar } from './steelMemberBars';
-import {
-  analysedRow,
-  columnSection,
-  metres,
-  ULS_COMBINATION,
-  type CheckLine,
-  type MemberRow,
-} from './steelMemberRows';
+import { analysedRow, columnSection, metres, ULS_COMBINATION, type CheckLine, type MemberRow } from './steelMemberRows';
 
 /** Beam ends whose axes differ by less than this are one level, mm. */
 const LEVEL_TOLERANCE = 300;
@@ -37,10 +30,7 @@ export interface ColumnSegment {
  * Segments of a column between its beam levels (and the stub above the top level).
  * @invariant axial(from) = Σ ULS reactions of levels at / above the segment top + 1.35 × self weight above its foot
  */
-export function columnSegments(
-  column: SteelBar,
-  nodes: ReadonlyArray<ColumnNode>,
-): ColumnSegment[] {
+export function columnSegments(column: SteelBar, nodes: ReadonlyArray<ColumnNode>): ColumnSegment[] {
   const low = Math.min(column.start[2], column.end[2]);
   const high = Math.max(column.start[2], column.end[2]);
   const weightPerMetre = column.profile ? selfWeightPerMetre(column.profile) : 0;
@@ -63,9 +53,7 @@ export function columnSegments(
   for (let index = 0; index < boundaries.length - 1; index++) {
     const from = boundaries[index] as number;
     const to = boundaries[index + 1] as number;
-    const above = inside
-      .filter((level) => level.z >= to - 0.5)
-      .reduce((sum, level) => sum + level.load, 0);
+    const above = inside.filter((level) => level.z >= to - 0.5).reduce((sum, level) => sum + level.load, 0);
     segments.push({
       from,
       to,
@@ -76,8 +64,7 @@ export function columnSegments(
   return segments;
 }
 
-const curveText = (shape: string, slender: boolean): string =>
-  shape === 'I' ? (slender ? 'curves a/b' : 'curves b/c') : 'curve a';
+const curveText = (shape: string, slender: boolean): string => (shape === 'I' ? (slender ? 'curves a/b' : 'curves b/c') : 'curve a');
 
 /** Row of a column from its segments. */
 export function checkColumn(column: SteelBar, segments: ReadonlyArray<ColumnSegment>): MemberRow {

@@ -46,27 +46,19 @@ describe('evaluateAnimationScalar', () => {
     // frequency=0.5 Hz → period=2s → quarter period = 0.5s
     // sin(2π * 0.5 * 0.5) = sin(π/2) = 1  → amplitude * 1
     const quarterPeriod = 1 / (4 * base.frequency);
-    expect(evaluateAnimationScalar({ ...base, mode: 'oscillate' }, quarterPeriod)).toBeCloseTo(
-      base.amplitude,
-    );
+    expect(evaluateAnimationScalar({ ...base, mode: 'oscillate' }, quarterPeriod)).toBeCloseTo(base.amplitude);
   });
 
   it('oscillate: −amplitude at three-quarter period', () => {
     // phase = 3/(4*frequency): sin = −1 → value = −amplitude
     const threeQtrPeriod = 3 / (4 * base.frequency);
-    expect(evaluateAnimationScalar({ ...base, mode: 'oscillate' }, threeQtrPeriod)).toBeCloseTo(
-      -base.amplitude,
-    );
+    expect(evaluateAnimationScalar({ ...base, mode: 'oscillate' }, threeQtrPeriod)).toBeCloseTo(-base.amplitude);
   });
 });
 
 // composeAnimatedPose
 
-const contribution = (
-  channel: 'rotation' | 'position',
-  axis: [number, number, number],
-  scalar: number,
-): AnimationContribution => ({
+const contribution = (channel: 'rotation' | 'position', axis: [number, number, number], scalar: number): AnimationContribution => ({
   channel,
   axis: new THREE.Vector3(...axis),
   scalar,
@@ -90,11 +82,7 @@ describe('composeAnimatedPose', () => {
 
   it('rotation contribution: position is rotated around pivot', () => {
     // Entity at [1,0,0]; pivot at origin; rotate π about Y → position becomes [−1,0,0]
-    const { position, quaternion } = composeAnimatedPose(
-      [1, 0, 0],
-      [0, 0, 0],
-      [contribution('rotation', [0, 1, 0], Math.PI)],
-    );
+    const { position, quaternion } = composeAnimatedPose([1, 0, 0], [0, 0, 0], [contribution('rotation', [0, 1, 0], Math.PI)]);
     expectPosition(position, [-1, 0, 0]);
     // Quaternion encodes π rotation about Y: x=0, y=1, z=0 (normalised), w≈0
     expect(quaternion[1]).toBeCloseTo(1); // y component dominates
@@ -102,11 +90,7 @@ describe('composeAnimatedPose', () => {
   });
 
   it('position contribution: translates along axis', () => {
-    const { position } = composeAnimatedPose(
-      [0, 0, 0],
-      [0, 0, 0],
-      [contribution('position', [1, 0, 0], 5)],
-    );
+    const { position } = composeAnimatedPose([0, 0, 0], [0, 0, 0], [contribution('position', [1, 0, 0], 5)]);
     expectPosition(position, [5, 0, 0]);
   });
 
@@ -116,10 +100,7 @@ describe('composeAnimatedPose', () => {
     const { position } = composeAnimatedPose(
       [1, 0, 0],
       [0, 0, 0],
-      [
-        contribution('rotation', [0, 0, 1], Math.PI / 2),
-        contribution('rotation', [0, 0, 1], Math.PI / 2),
-      ],
+      [contribution('rotation', [0, 0, 1], Math.PI / 2), contribution('rotation', [0, 0, 1], Math.PI / 2)],
     );
     expectPosition(position, [-1, 0, 0]);
   });

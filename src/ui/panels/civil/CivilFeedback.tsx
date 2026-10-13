@@ -23,11 +23,7 @@ function FeedbackForm({ onSent }: { onSent: () => void }): React.ReactElement {
         aria-label="Feedback text"
         onChange={(event) => setText(event.target.value)}
       />
-      <a
-        className="btn btn--primary btn--sm"
-        href={feedbackMailto(text, feedbackStats(document))}
-        onClick={onSent}
-      >
+      <a className="btn btn--primary btn--sm" href={feedbackMailto(text, feedbackStats(document))} onClick={onSent}>
         Send by e-mail
       </a>
     </div>

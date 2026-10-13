@@ -11,8 +11,7 @@ import type { Role } from '../src/users';
 import { _resetLiveDoc } from '../src/liveDocument';
 import { _resetHistory } from '../src/commandBus';
 
-export const sha256 = (value: string): string =>
-  crypto.createHash('sha256').update(value).digest('hex');
+export const sha256 = (value: string): string => crypto.createHash('sha256').update(value).digest('hex');
 
 export function tempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'llull-test-'));
@@ -42,12 +41,7 @@ export const ADMIN: TestUser = { id: 'ada', name: 'Ada Admin', role: 'admin', to
 /** Write a users file (hashes only) and point LLULL_USERS_FILE at it. */
 export function installUsersFile(dir: string, users: readonly TestUser[]): string {
   const file = path.join(dir, 'users.json');
-  fs.writeFileSync(
-    file,
-    JSON.stringify(
-      users.map(({ id, name, role, token }) => ({ id, name, role, tokenSha256: sha256(token) })),
-    ),
-  );
+  fs.writeFileSync(file, JSON.stringify(users.map(({ id, name, role, token }) => ({ id, name, role, tokenSha256: sha256(token) }))));
   process.env['LLULL_USERS_FILE'] = file;
   return file;
 }

@@ -112,8 +112,7 @@ describe('add_pipe_run line-list data', () => {
     const header = table.columns;
     expect(header[0]).toBe('Mark');
     expect(header).toEqual(expect.arrayContaining(['Line', 'DN', 'From', 'To']));
-    const cell = (row: number, column: string): unknown =>
-      table.rows[row]?.[header.indexOf(column)];
+    const cell = (row: number, column: string): unknown => table.rows[row]?.[header.indexOf(column)];
     expect(cell(0, 'Line')).toBe('L-101');
     expect(cell(0, 'DN')).toBe('DN100');
     expect(cell(0, 'From')).toBe('EQ1');
@@ -133,9 +132,7 @@ describe('add_pipe_run line-list data', () => {
     const ifc = (execute(doc, 'export_ifc', {}).data as IfcExport).ifc;
     expect(ifc).toMatch(/IFCPIPESEGMENT\('[^']{22}',\$,'PL1','L-101 steam'/);
     const plain = run(createEmptyDocument(), 'add_pipe_run', { points: ROUTE, service: 'steam' });
-    expect((execute(plain, 'export_ifc', {}).data as IfcExport).ifc).toMatch(
-      /IFCPIPESEGMENT\('[^']{22}',\$,'PL1','steam'/,
-    );
+    expect((execute(plain, 'export_ifc', {}).data as IfcExport).ifc).toMatch(/IFCPIPESEGMENT\('[^']{22}',\$,'PL1','steam'/);
   });
 
   it('validates the optional fields of a loaded document', () => {
@@ -180,33 +177,22 @@ describe('IFC equipment property set', () => {
     const ifc = (execute(plant(), 'export_ifc', {}).data as IfcExport).ifc;
     expect(ifc.match(/IFCPROPERTYSET\(/g)).toHaveLength(2);
     expect(ifc.match(/IFCRELDEFINESBYPROPERTIES\(/g)).toHaveLength(2);
-    const record = (type: string): string[] =>
-      ifc.split('\n').filter((line) => new RegExp(`^#\\d+=${type}\\(`).test(line));
+    const record = (type: string): string[] => ifc.split('\n').filter((line) => new RegExp(`^#\\d+=${type}\\(`).test(line));
     const proxy = record('IFCBUILDINGELEMENTPROXY').find((line) => line.includes("'equipment-1'"));
     const proxyRef = /^(#\d+)=/.exec(proxy ?? '')?.[1];
     expect(proxyRef).toBeDefined();
-    expect(record('IFCRELDEFINESBYPROPERTIES').some((line) => line.includes(`(${proxyRef})`))).toBe(
-      true,
-    );
+    expect(record('IFCRELDEFINESBYPROPERTIES').some((line) => line.includes(`(${proxyRef})`))).toBe(true);
     expect(ifc).toContain("'Pset_llullEquipment'");
-    expect(ifc).toContain(
-      "IFCPROPERTYSINGLEVALUE('OperatingWeight','Operating weight in kg',IFCMASSMEASURE(55000.),$)",
-    );
-    expect(ifc).toContain(
-      "IFCPROPERTYSINGLEVALUE('OperatingWeight','Operating weight in kg',IFCMASSMEASURE(450.),$)",
-    );
-    expect(ifc).toContain(
-      "IFCPROPERTYSINGLEVALUE('MaintenanceClearance','Free space around the footprint, mm',IFCLENGTHMEASURE(900.),$)",
-    );
+    expect(ifc).toContain("IFCPROPERTYSINGLEVALUE('OperatingWeight','Operating weight in kg',IFCMASSMEASURE(55000.),$)");
+    expect(ifc).toContain("IFCPROPERTYSINGLEVALUE('OperatingWeight','Operating weight in kg',IFCMASSMEASURE(450.),$)");
+    expect(ifc).toContain("IFCPROPERTYSINGLEVALUE('MaintenanceClearance','Free space around the footprint, mm',IFCLENGTHMEASURE(900.),$)");
   });
 
   it('derives GlobalIds from the element id (+ suffix), stable across revisions', () => {
     const guids = (doc: CadDocument): string[] =>
       (execute(doc, 'export_ifc', {}).data as IfcExport).ifc
         .split('\n')
-        .filter((line) =>
-          /^#\d+=IFC(BUILDINGELEMENTPROXY|PROPERTYSET|RELDEFINESBYPROPERTIES)\(/.test(line),
-        )
+        .filter((line) => /^#\d+=IFC(BUILDINGELEMENTPROXY|PROPERTYSET|RELDEFINESBYPROPERTIES)\(/.test(line))
         .map((line) => /\('([^']{22})'/.exec(line)?.[1] ?? '');
     const base = plant();
     const before = guids(base);
@@ -388,8 +374,7 @@ function tower(): CadDocument {
   return doc;
 }
 
-const near = (point: readonly number[] | undefined, x: number): boolean =>
-  point !== undefined && Math.abs((point[0] as number) - x) < 400;
+const near = (point: readonly number[] | undefined, x: number): boolean => point !== undefined && Math.abs((point[0] as number) - x) < 400;
 
 describe('columns on upper-floor plans', () => {
   const doc = tower();
@@ -415,22 +400,14 @@ describe('columns on upper-floor plans', () => {
 
   it('draws a tall concrete column on upper levels only while it crosses the cut', () => {
     const concrete = (levelId: string): boolean =>
-      buildPlanDrawing(doc, levelId)!.primitives.some(
-        (p) => p.layer === 'S-COLS' && p.type === 'polygon' && p.fill === 'hatch',
-      );
+      buildPlanDrawing(doc, levelId)!.primitives.some((p) => p.layer === 'S-COLS' && p.type === 'polygon' && p.fill === 'hatch');
     expect(concrete(ground)).toBe(true);
     expect(concrete(first)).toBe(true);
     expect(concrete(second)).toBe(true);
     const short = run(createEmptyDocument(), 'add_level', { height: 3000 });
-    const twoLevel = run(
-      run(short, 'add_column', { location: [0, 0], width: 300 }),
-      'add_level',
-      {},
-    );
+    const twoLevel = run(run(short, 'add_column', { location: [0, 0], width: 300 }), 'add_level', {});
     const upper = twoLevel.building?.levelOrder[1] as string;
-    expect(buildPlanDrawing(twoLevel, upper)!.primitives.some((p) => p.layer === 'S-COLS')).toBe(
-      false,
-    );
+    expect(buildPlanDrawing(twoLevel, upper)!.primitives.some((p) => p.layer === 'S-COLS')).toBe(false);
   });
 
   it('shows them in export_dxf and export_plan_sheet of the upper level', () => {
@@ -444,9 +421,7 @@ describe('columns on upper-floor plans', () => {
 
   it('ignores a column whose home level is unknown', () => {
     const broken = structuredClone(doc);
-    const member = Object.values(broken.building!.elements).find(
-      (e) => e.category === 'member' && e.role === 'column',
-    )!;
+    const member = Object.values(broken.building!.elements).find((e) => e.category === 'member' && e.role === 'column')!;
     (member as { levelId: string }).levelId = 'ghost';
     expect(() => buildPlanDrawing(broken, first)).not.toThrow();
   });

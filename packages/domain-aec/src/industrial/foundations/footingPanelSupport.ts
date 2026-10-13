@@ -18,12 +18,7 @@ export const MAX_GENERATED_MEMBERS = 5000;
  * Plan positions of every column foot on a level (steel columns and concrete columns),
  * de-duplicated; restricted to `onlyIds` when given.
  */
-export function columnFeet(
-  building: BuildingModel,
-  levelId: string,
-  tolerance: number,
-  onlyIds?: ReadonlySet<string>,
-): Vec2[] {
+export function columnFeet(building: BuildingModel, levelId: string, tolerance: number, onlyIds?: ReadonlySet<string>): Vec2[] {
   const feet: Vec2[] = [];
   for (const element of Object.values(building.elements)) {
     if (!('levelId' in element) || element.levelId !== levelId) continue;
@@ -31,10 +26,7 @@ export function columnFeet(
     let foot: Vec2 | null = null;
     if (element.category === 'column') foot = element.location;
     if (element.category === 'member' && element.role === 'column') {
-      foot =
-        element.start[2] <= element.end[2]
-          ? [element.start[0], element.start[1]]
-          : [element.end[0], element.end[1]];
+      foot = element.start[2] <= element.end[2] ? [element.start[0], element.start[1]] : [element.end[0], element.end[1]];
     }
     if (foot && !feet.some((existing) => distance(foot, existing) <= tolerance)) feet.push(foot);
   }
@@ -42,18 +34,11 @@ export function columnFeet(
 }
 
 /** `locations` without the ones already carrying a footing on the level. */
-export function withoutFootings(
-  building: BuildingModel,
-  levelId: string,
-  locations: ReadonlyArray<Vec2>,
-  tolerance: number,
-): Vec2[] {
+export function withoutFootings(building: BuildingModel, levelId: string, locations: ReadonlyArray<Vec2>, tolerance: number): Vec2[] {
   const existing = Object.values(building.elements).flatMap((element) =>
     element.category === 'footing' && element.levelId === levelId ? [element.location] : [],
   );
-  return locations.filter(
-    (location) => !existing.some((footing) => distance(location, footing) <= tolerance),
-  );
+  return locations.filter((location) => !existing.some((footing) => distance(location, footing) <= tolerance));
 }
 
 /** Adds pad footings (no regeneration). */

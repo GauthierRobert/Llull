@@ -1,33 +1,9 @@
 import type { CheckOutcome, Criterion, GradeContext } from '../contract';
 import { parseCsv, column } from '../oracle/csv';
 import { entityExtents, parseDxf } from '../oracle/dxf';
-import {
-  absolute,
-  buildingOf,
-  elementsOf,
-  levelsByElevation,
-  polylineLength,
-  round,
-} from '../oracle/geometry';
-import {
-  containment,
-  countByType,
-  globalIdProblems,
-  numbersIn,
-  ofType,
-  parseIfc,
-  references,
-  stepString,
-} from '../oracle/ifc';
-import {
-  STANDARD_SCALES,
-  drawingIdentity,
-  paperName,
-  parseSheet,
-  printedScales,
-  titleBlockField,
-  type Sheet,
-} from '../oracle/svg';
+import { absolute, buildingOf, elementsOf, levelsByElevation, polylineLength, round } from '../oracle/geometry';
+import { containment, countByType, globalIdProblems, numbersIn, ofType, parseIfc, references, stepString } from '../oracle/ifc';
+import { STANDARD_SCALES, drawingIdentity, paperName, parseSheet, printedScales, titleBlockField, type Sheet } from '../oracle/svg';
 import type { PlantIntent } from '../plant/intent';
 
 interface ProjectFields {
@@ -68,31 +44,20 @@ function ifcModelCheck({ document, deliverable }: GradeContext): CheckOutcome {
     IFCBEAM: members.filter((m) => m.role === 'beam').length,
     IFCMEMBER: members.filter((m) => m.role === 'brace').length,
     IFCSLAB: elementsOf(document, 'slab').length,
-    IFCOPENINGELEMENT: elementsOf(document, 'slab').reduce(
-      (n, s) => n + (s.openings?.length ?? 0),
-      0,
-    ),
+    IFCOPENINGELEMENT: elementsOf(document, 'slab').reduce((n, s) => n + (s.openings?.length ?? 0), 0),
     IFCPIPESEGMENT: elementsOf(document, 'pipe').length,
     IFCSTAIR: elementsOf(document, 'stair').length,
   };
   for (const [type, count] of Object.entries(expected)) {
-    if ((counts[type] ?? 0) !== count)
-      problems.push(`${type} ×${counts[type] ?? 0}, model has ${count}`);
+    if ((counts[type] ?? 0) !== count) problems.push(`${type} ×${counts[type] ?? 0}, model has ${count}`);
   }
   const names = new Set([...file.entities.values()].map((e) => stepString(e.args[2])));
   const missingTags = elementsOf(document, 'equipment').filter((e) => !names.has(e.mark));
-  if (missingTags.length > 0)
-    problems.push(`equipment not in IFC: ${missingTags.map((e) => e.mark).join(', ')}`);
+  if (missingTags.length > 0) problems.push(`equipment not in IFC: ${missingTags.map((e) => e.mark).join(', ')}`);
   const profiles = new Set(ofType(file, 'IFCISHAPEPROFILEDEF').map((e) => stepString(e.args[1])));
-  const missingProfiles = [...new Set(members.map((m) => m.profile))].filter(
-    (p) => !p.startsWith('CHS') && !profiles.has(p),
-  );
-  if (missingProfiles.length > 0)
-    problems.push(`profile names lost: ${missingProfiles.join(', ')}`);
-  return result(
-    problems,
-    `IFC4 well-formed, ${file.entities.size} entities, GlobalIds unique, element counts match the model`,
-  );
+  const missingProfiles = [...new Set(members.map((m) => m.profile))].filter((p) => !p.startsWith('CHS') && !profiles.has(p));
+  if (missingProfiles.length > 0) problems.push(`profile names lost: ${missingProfiles.join(', ')}`);
+  return result(problems, `IFC4 well-formed, ${file.entities.size} entities, GlobalIds unique, element counts match the model`);
 }
 
 function ifcStoreysCheck({ document, deliverable }: GradeContext): CheckOutcome {
@@ -118,21 +83,13 @@ function ifcStoreysCheck({ document, deliverable }: GradeContext): CheckOutcome 
     checked++;
     const expected = building.levels[element.levelId]?.name;
     const actual = contained.get(entity.id) ?? resolveViaHost(file, entity.id, contained);
-    if (actual !== expected)
-      problems.push(`${element.mark} in storey "${actual ?? 'none'}", expected "${expected}"`);
+    if (actual !== expected) problems.push(`${element.mark} in storey "${actual ?? 'none'}", expected "${expected}"`);
   }
-  return result(
-    problems,
-    `${storeyNames.length} storeys; ${checked} elements contained in their level's storey`,
-  );
+  return result(problems, `${storeyNames.length} storeys; ${checked} elements contained in their level's storey`);
 }
 
 /** Openings/aggregated parts are contained through their host. */
-function resolveViaHost(
-  file: ReturnType<typeof parseIfc>,
-  id: number,
-  contained: Map<number, string>,
-): string | undefined {
+function resolveViaHost(file: ReturnType<typeof parseIfc>, id: number, contained: Map<number, string>): string | undefined {
   for (const rel of [...ofType(file, 'IFCRELVOIDSELEMENT'), ...ofType(file, 'IFCRELAGGREGATES')]) {
     const [host, ...parts] = references(rel.args.slice(4));
     if (host !== undefined && parts.includes(id)) return contained.get(host);
@@ -185,22 +142,14 @@ function dxfPlansCheck({ document, deliverable }: GradeContext): CheckOutcome {
     const file = parseDxf(deliverable(`dxf:${level.id}`));
     problems.push(...file.errors.slice(0, 2).map((e) => `${level.name}: ${e}`));
     const cut = level.elevation + PLAN_CUT;
-    const cutColumns = columns.filter(
-      (c) => Math.min(c.start[2], c.end[2]) < cut && Math.max(c.start[2], c.end[2]) > cut,
-    );
-    const columnPoints = file.entities
-      .filter((e) => e.layer.startsWith('S-COL'))
-      .flatMap((e) => e.points);
-    const missing = cutColumns.filter(
-      (c) => !columnPoints.some(([x, y]) => Math.hypot(x - c.start[0], y - c.start[1]) <= 300),
-    );
-    if (missing.length > 0)
-      problems.push(`${level.name}: ${missing.length}/${cutColumns.length} cut columns not drawn`);
+    const cutColumns = columns.filter((c) => Math.min(c.start[2], c.end[2]) < cut && Math.max(c.start[2], c.end[2]) > cut);
+    const columnPoints = file.entities.filter((e) => e.layer.startsWith('S-COL')).flatMap((e) => e.points);
+    const missing = cutColumns.filter((c) => !columnPoints.some(([x, y]) => Math.hypot(x - c.start[0], y - c.start[1]) <= 300));
+    if (missing.length > 0) problems.push(`${level.name}: ${missing.length}/${cutColumns.length} cut columns not drawn`);
     const texts = file.entities.map((e) => e.text).join(' ');
     const tags = elementsOf(document, 'equipment').filter((e) => e.levelId === level.id);
     const untagged = tags.filter((e) => !texts.includes(e.mark));
-    if (untagged.length > 0)
-      problems.push(`${level.name}: equipment ${untagged.map((e) => e.mark).join(', ')} not drawn`);
+    if (untagged.length > 0) problems.push(`${level.name}: equipment ${untagged.map((e) => e.mark).join(', ')} not drawn`);
     const { min, max } = entityExtents(file);
     const grid = elementsOf(document, 'grid').flatMap((g) => [g.start, g.end]);
     const gridMin = [Math.min(...grid.map((p) => p[0])), Math.min(...grid.map((p) => p[1]))];
@@ -230,8 +179,7 @@ function titleBlockProblems(sheet: Sheet, project: ProjectFields, where: string)
 }
 
 function expectedProject(intent: PlantIntent | undefined, ctx: GradeContext): ProjectFields {
-  const { name, client, drawingNumber, revision, date } =
-    intent?.project ?? buildingOf(ctx.document).project;
+  const { name, client, drawingNumber, revision, date } = intent?.project ?? buildingOf(ctx.document).project;
   return { name, client, drawingNumber, revision, date };
 }
 
@@ -242,8 +190,7 @@ function planSheetsCheck(intent: PlantIntent | undefined, ctx: GradeContext): Ch
   for (const level of levelsByElevation(document)) {
     const sheet = parseSheet(deliverable(`plan:${level.id}`));
     problems.push(...sheet.errors.map((e) => `${level.name}: ${e}`));
-    if (paperName(sheet) === null)
-      problems.push(`${level.name}: ${sheet.widthMm}×${sheet.heightMm} mm is not an ISO sheet`);
+    if (paperName(sheet) === null) problems.push(`${level.name}: ${sheet.widthMm}×${sheet.heightMm} mm is not an ISO sheet`);
     const scales = printedScales(sheet);
     if (scales.length === 0 || !scales.every((s) => STANDARD_SCALES.includes(s))) {
       problems.push(`${level.name}: printed scale(s) ${scales.join(', ') || 'none'}`);
@@ -252,15 +199,9 @@ function planSheetsCheck(intent: PlantIntent | undefined, ctx: GradeContext): Ch
     const texts = sheet.texts.join(' ');
     const tags = elementsOf(document, 'equipment').filter((e) => e.levelId === level.id);
     const missing = tags.filter((e) => !texts.includes(e.mark));
-    if (missing.length > 0)
-      problems.push(
-        `${level.name}: tags ${missing.map((e) => e.mark).join(', ')} not on the sheet`,
-      );
+    if (missing.length > 0) problems.push(`${level.name}: tags ${missing.map((e) => e.mark).join(', ')} not on the sheet`);
   }
-  return result(
-    problems,
-    'one plan sheet per level: ISO paper, standard scale, complete title block, tags',
-  );
+  return result(problems, 'one plan sheet per level: ISO paper, standard scale, complete title block, tags');
 }
 
 function elevationSheetCheck(intent: PlantIntent | undefined, ctx: GradeContext): CheckOutcome {
@@ -283,23 +224,19 @@ function schedulesCheck(ctx: GradeContext): CheckOutcome {
   const problems: string[] = [];
   const members = parseCsv(ctx.deliverable('schedule:member'));
   const memberCount = elementsOf(document, 'member').length;
-  if (members.length - 1 !== memberCount)
-    problems.push(`member schedule ${members.length - 1} rows, model ${memberCount}`);
+  if (members.length - 1 !== memberCount) problems.push(`member schedule ${members.length - 1} rows, model ${memberCount}`);
   const scheduleKg = column(members, 'Mass (kg)').reduce((a, b) => a + b, 0);
   const takeoff = JSON.parse(ctx.deliverable('takeoff')) as {
     lines?: { key: string; unit: string; quantity: number }[];
   };
-  const takeoffKg = (takeoff.lines ?? [])
-    .filter((l) => l.key.startsWith('member.') && l.unit === 'kg')
-    .reduce((s, l) => s + l.quantity, 0);
+  const takeoffKg = (takeoff.lines ?? []).filter((l) => l.key.startsWith('member.') && l.unit === 'kg').reduce((s, l) => s + l.quantity, 0);
   if (Math.abs(scheduleKg - takeoffKg) > 0.005 * Math.max(takeoffKg, 1)) {
     problems.push(`member schedule ${round(scheduleKg)} kg ≠ takeoff ${round(takeoffKg)} kg`);
   }
   const equipment = parseCsv(ctx.deliverable('schedule:equipment'));
   for (const e of elementsOf(document, 'equipment')) {
     const row = equipment.find((cells) => cells[0] === e.mark);
-    if (!row || !row.includes(String(e.weight)))
-      problems.push(`equipment schedule: ${e.mark} missing or wrong weight`);
+    if (!row || !row.includes(String(e.weight))) problems.push(`equipment schedule: ${e.mark} missing or wrong weight`);
   }
   const pipes = parseCsv(ctx.deliverable('schedule:pipe'));
   const lengths = column(pipes, 'Length (m)');
@@ -311,10 +248,7 @@ function schedulesCheck(ctx: GradeContext): CheckOutcome {
       problems.push(`pipe schedule ${pipe.mark}: ${listed} m, geometry ${round(metres, 2)} m`);
     }
   });
-  return result(
-    problems,
-    `schedules agree with the model (${memberCount} members, ${round(takeoffKg / 1000, 2)} t)`,
-  );
+  return result(problems, `schedules agree with the model (${memberCount} members, ${round(takeoffKg / 1000, 2)} t)`);
 }
 
 /** Title-block expectations come from the brief (`intent`) when given, else from the document. */
@@ -323,36 +257,31 @@ export function deliverableCriteria(intent?: PlantIntent): Criterion[] {
     {
       id: 'ifc-model',
       area: 'deliverables',
-      requirement:
-        'IFC4 coordination model: well-formed, unique GlobalIds, every element exported with its class and profile.',
+      requirement: 'IFC4 coordination model: well-formed, unique GlobalIds, every element exported with its class and profile.',
       check: ifcModelCheck,
     },
     {
       id: 'ifc-storeys',
       area: 'deliverables',
-      requirement:
-        "IFC storeys at the level elevations, each element contained in its level's storey.",
+      requirement: "IFC storeys at the level elevations, each element contained in its level's storey.",
       check: ifcStoreysCheck,
     },
     {
       id: 'ifc-equipment-data',
       area: 'deliverables',
-      requirement:
-        'IFC equipment carries its operating weight (property set) for the structural engineer.',
+      requirement: 'IFC equipment carries its operating weight (property set) for the structural engineer.',
       check: ifcEquipmentDataCheck,
     },
     {
       id: 'dxf-plans',
       area: 'deliverables',
-      requirement:
-        'A DXF plan per level showing the columns cut at that level, the equipment and the grid.',
+      requirement: 'A DXF plan per level showing the columns cut at that level, the equipment and the grid.',
       check: dxfPlansCheck,
     },
     {
       id: 'plan-sheets',
       area: 'deliverables',
-      requirement:
-        'A plan sheet per level: ISO paper, standard scale, full title block, equipment tags.',
+      requirement: 'A plan sheet per level: ISO paper, standard scale, full title block, equipment tags.',
       check: (ctx) => planSheetsCheck(intent, ctx),
     },
     {

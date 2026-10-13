@@ -18,11 +18,7 @@ import type {
 } from '@core/model/building';
 import { sweepFrame } from '../../shared/mesh';
 import { panelFrame, trayOutline } from '../../industrial/evaluate';
-import {
-  buildingConnectionSolids,
-  plateLayout,
-  type ConnectionSolid,
-} from '../../industrial/connections/evaluateConnections';
+import { buildingConnectionSolids, plateLayout, type ConnectionSolid } from '../../industrial/connections/evaluateConnections';
 import { type SteelProfile, findProfile } from '../../steel/profiles';
 import {
   type Context,
@@ -66,18 +62,14 @@ function steelProfileDef(context: Context, profile: SteelProfile): string {
         `IFCCSHAPEPROFILEDEF(.AREA.,${name},${position},${r(profile.h)},${r(profile.b)},${r(profile.tw)},${r(profile.lip)},$)`,
       );
     case 'L':
-      return context.writer.add(
-        `IFCLSHAPEPROFILEDEF(.AREA.,${name},${position},${r(profile.h)},${r(profile.b)},${r(profile.tw)},$,$,$)`,
-      );
+      return context.writer.add(`IFCLSHAPEPROFILEDEF(.AREA.,${name},${position},${r(profile.h)},${r(profile.b)},${r(profile.tw)},$,$,$)`);
     case 'SHS':
     case 'RHS':
       return context.writer.add(
         `IFCRECTANGLEHOLLOWPROFILEDEF(.AREA.,${name},${position},${r(profile.b)},${r(profile.h)},${r(profile.tw)},$,$)`,
       );
     case 'CHS':
-      return context.writer.add(
-        `IFCCIRCLEHOLLOWPROFILEDEF(.AREA.,${name},${position},${r(profile.h / 2)},${r(profile.tw)})`,
-      );
+      return context.writer.add(`IFCCIRCLEHOLLOWPROFILEDEF(.AREA.,${name},${position},${r(profile.h / 2)},${r(profile.tw)})`);
   }
 }
 
@@ -101,24 +93,14 @@ function sweptSolids(context: Context, profileRef: string, points: ReadonlyArray
     const axes = context.writer.add(
       `IFCAXIS2PLACEMENT3D(${point3(context, start[0], start[1], start[2])},${direction(context, frame.d)},${direction(context, frame.u)})`,
     );
-    solids.push(
-      context.writer.add(
-        `IFCEXTRUDEDAREASOLID(${profileRef},${axes},${context.zAxis},${ifcReal(frame.length)})`,
-      ),
-    );
+    solids.push(context.writer.add(`IFCEXTRUDEDAREASOLID(${profileRef},${axes},${context.zAxis},${ifcReal(frame.length)})`));
   }
   return solids;
 }
 
 export function exportIndustrial(
   context: Context,
-  element:
-    | SteelMemberElement
-    | FootingElement
-    | PanelElement
-    | EquipmentElement
-    | PipeElement
-    | CableTrayElement,
+  element: SteelMemberElement | FootingElement | PanelElement | EquipmentElement | PipeElement | CableTrayElement,
   storeyPlacement: string,
 ): Exported | null {
   const { mm, writer } = context;
@@ -138,12 +120,7 @@ export function exportIndustrial(
       return { ref, material: element.material };
     }
     case 'footing': {
-      const local = placementAt(
-        context,
-        storeyPlacement,
-        element.location,
-        mm(element.topOffset - element.thickness),
-      );
+      const local = placementAt(context, storeyPlacement, element.location, mm(element.topOffset - element.thickness));
       const profile = rectangleProfile(context, [0, 0], mm(element.width), mm(element.length));
       const ref = writer.add(
         `IFCFOOTING('${guid}',$,${ifcString(element.mark)},$,$,${local},${shape(context, [extrusion(context, profile, mm(element.thickness))])},${ifcString(element.id)},.PAD_FOOTING.)`,
@@ -154,11 +131,7 @@ export function exportIndustrial(
       const frame = panelFrame(element.corners.map(mm3));
       if (!frame) return null;
       const outline = element.corners.map(mm3).map((corner): Vec2 => {
-        const offset: Vec3 = [
-          corner[0] - frame.origin[0],
-          corner[1] - frame.origin[1],
-          corner[2] - frame.origin[2],
-        ];
+        const offset: Vec3 = [corner[0] - frame.origin[0], corner[1] - frame.origin[1], corner[2] - frame.origin[2]];
         return [dot3(offset, frame.e1), dot3(offset, frame.e2)];
       });
       const local = framePlacement(context, storeyPlacement, frame.origin, frame.normal, frame.e1);
@@ -179,8 +152,7 @@ export function exportIndustrial(
         element.angle,
       );
       const solid =
-        vesselSolid(context, element) ??
-        extrusion(context, rectangleProfile(context, [0, 0], mm(length), mm(width)), mm(height));
+        vesselSolid(context, element) ?? extrusion(context, rectangleProfile(context, [0, 0], mm(length), mm(width)), mm(height));
       const ref = writer.add(
         `IFCBUILDINGELEMENTPROXY('${guid}',$,${ifcString(element.mark)},$,${ifcString(element.name)},${local},${shape(context, [solid])},${ifcString(element.id)},.ELEMENT.)`,
       );
@@ -204,10 +176,7 @@ export function exportIndustrial(
     }
     case 'tray': {
       const local = placement(context, storeyPlacement, 0, 0, 0);
-      const profile = polygonProfile(
-        context,
-        trayOutline(mm(element.width), mm(element.height), 2),
-      );
+      const profile = polygonProfile(context, trayOutline(mm(element.width), mm(element.height), 2));
       const solids = sweptSolids(context, profile, element.points.map(mm3));
       if (solids.length === 0) return null;
       const ref = writer.add(
@@ -259,9 +228,7 @@ export function exportConnection(
         `IFCAXIS2PLACEMENT3D(${point3(context, mm(bolt.origin[0]), mm(bolt.origin[1]), mm(bolt.origin[2] - level.elevation))},${direction(context, bolt.along)},${direction(context, bolt.x)})`,
       );
       const profile = scaledPolygonProfile(context, bolt.outline);
-      return writer.add(
-        `IFCEXTRUDEDAREASOLID(${profile},${axes},${context.zAxis},${ifcReal(mm(bolt.depth))})`,
-      );
+      return writer.add(`IFCEXTRUDEDAREASOLID(${profile},${axes},${context.zAxis},${ifcReal(mm(bolt.depth))})`);
     });
     const ref = writer.add(
       `IFCMECHANICALFASTENER('${context.guid(`${connection.id}:bolts`)}',$,${ifcString(`${connection.mark} bolts`)},$,$,${placement(context, storeyPlacement, 0, 0, 0)},${shape(context, items)},$,${ifcReal(mm(connection.boltDiameter))},${ifcReal(mm(bolts[0]?.depth ?? 0))},.BOLT.)`,
@@ -286,20 +253,14 @@ export function exportPlate(
   const [cx, cy, cz] = layout.center;
   const bottom = cz - level.elevation - plate.thickness / 2;
   const local = placement(context, storeyPlacement, mm(cx), mm(cy), mm(bottom), layout.angle);
-  const body = extrusion(
-    context,
-    rectangleProfile(context, [0, 0], mm(plate.length), mm(plate.width)),
-    mm(plate.thickness),
-  );
+  const body = extrusion(context, rectangleProfile(context, [0, 0], mm(plate.length), mm(plate.width)), mm(plate.thickness));
   const plateRef = writer.add(
     `IFCPLATE('${context.guid(plate.id)}',$,${ifcString(plate.mark)},$,'BASE_PLATE',${local},${shape(context, [body])},${ifcString(plate.id)},.USERDEFINED.)`,
   );
   const circle = circleProfile(context, mm(plate.boltDiameter) / 2);
   const boltLength = layout.boltBelow + plate.thickness + layout.boltAbove;
   const boltBottom = bottom - layout.boltBelow;
-  const bolts = layout.bolts.map(([x, y]) =>
-    extrusion(context, circle, mm(boltLength), mm(x), mm(y), mm(boltBottom)),
-  );
+  const bolts = layout.bolts.map(([x, y]) => extrusion(context, circle, mm(boltLength), mm(x), mm(y), mm(boltBottom)));
   const fastenerRef = writer.add(
     `IFCMECHANICALFASTENER('${context.guid(`${plate.id}:bolts`)}',$,${ifcString(`${plate.mark} anchors`)},$,$,${placement(context, storeyPlacement, 0, 0, 0)},${shape(context, bolts)},$,${ifcReal(mm(plate.boltDiameter))},${ifcReal(mm(boltLength))},.ANCHORBOLT.)`,
   );

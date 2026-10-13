@@ -108,24 +108,21 @@ module.exports = {
     },
     {
       name: 'nothing-imports-desktop',
-      comment:
-        'KI6: desktop/ is the outermost host (Electron shell); no package, app or server code depends on it.',
+      comment: 'KI6: desktop/ is the outermost host (Electron shell); no package, app or server code depends on it.',
       severity: 'error',
       from: { path: '^(packages|src|server)/' },
       to: { path: '^desktop/' },
     },
     {
       name: 'desktop-is-a-host',
-      comment:
-        'L6/KI6: the desktop shell starts the server and loads the web app over HTTP; it never imports the UI.',
+      comment: 'L6/KI6: the desktop shell starts the server and loads the web app over HTTP; it never imports the UI.',
       severity: 'error',
       from: { path: '^desktop/' },
       to: { path: '^src/' },
     },
     {
       name: 'not-to-unresolvable',
-      comment:
-        'server/ installs its own npm dependencies (not a workspace); its aliases still resolve.',
+      comment: 'server/ installs its own npm dependencies (not a workspace); its aliases still resolve.',
       severity: 'error',
       from: { pathNot: '^server/' },
       to: { couldNotResolve: true },

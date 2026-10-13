@@ -40,20 +40,12 @@ const distance = (a: Vec2, b: Vec2): number => Math.hypot(b[0] - a[0], b[1] - a[
  * CORNER_ANGLE, equals its neighbours' turns and its two chords are about equally long (a regular
  * arc, however coarse); a lone bend or a bend between unequal segments is a real corner. @pure
  */
-function isSmoothVertex(
-  at: (i: number) => Vec2,
-  i: number,
-  hasPrev: boolean,
-  hasNext: boolean,
-): boolean {
+function isSmoothVertex(at: (i: number) => Vec2, i: number, hasPrev: boolean, hasNext: boolean): boolean {
   const turn = turnAt(at(i - 1), at(i), at(i + 1));
   if (turn >= CORNER_ANGLE) return false;
   const [before, after] = [distance(at(i - 1), at(i)), distance(at(i), at(i + 1))];
   if (Math.max(before, after) > CHORD_RATIO * Math.min(before, after)) return false;
-  const neighbours = [
-    ...(hasPrev ? [turnAt(at(i - 2), at(i - 1), at(i))] : []),
-    ...(hasNext ? [turnAt(at(i), at(i + 1), at(i + 2))] : []),
-  ];
+  const neighbours = [...(hasPrev ? [turnAt(at(i - 2), at(i - 1), at(i))] : []), ...(hasNext ? [turnAt(at(i), at(i + 1), at(i + 2))] : [])];
   const margin = Math.max(turn * TURN_MATCH, TURN_MATCH_MIN);
   return neighbours.length > 0 && neighbours.every((t) => Math.abs(t - turn) <= margin);
 }
@@ -77,9 +69,7 @@ function chainRuns(chain: SegmentChain<Vec2>): { corners: Vec2[]; runs: Run[] } 
   if (closed) {
     if (cornerIndices.length === 0) return { corners: [], runs: [{ points, closed: true }] };
     const runs = cornerIndices.map((from, k): Run => {
-      const to =
-        (cornerIndices[(k + 1) % cornerIndices.length] as number) +
-        (k + 1 === cornerIndices.length ? count : 0);
+      const to = (cornerIndices[(k + 1) % cornerIndices.length] as number) + (k + 1 === cornerIndices.length ? count : 0);
       return {
         points: Array.from({ length: to - from + 1 }, (_, j) => at(from + j)),
         closed: false,
@@ -88,9 +78,7 @@ function chainRuns(chain: SegmentChain<Vec2>): { corners: Vec2[]; runs: Run[] } 
     return { corners: cornerIndices.map(at), runs };
   }
   const breaks = [0, ...cornerIndices, count - 1];
-  const runs = breaks
-    .slice(1)
-    .map((to, k): Run => ({ points: points.slice(breaks[k] as number, to + 1), closed: false }));
+  const runs = breaks.slice(1).map((to, k): Run => ({ points: points.slice(breaks[k] as number, to + 1), closed: false }));
   return { corners: breaks.map(at), runs };
 }
 
@@ -99,11 +87,7 @@ function totalTurn({ points, closed }: Run): number {
   const count = points.length;
   let sum = 0;
   for (let i = closed ? 0 : 1; i < (closed ? count : count - 1); i++) {
-    sum += turnAt(
-      points[(i - 1 + count) % count] as Vec2,
-      points[i] as Vec2,
-      points[(i + 1) % count] as Vec2,
-    );
+    sum += turnAt(points[(i - 1 + count) % count] as Vec2, points[i] as Vec2, points[(i + 1) % count] as Vec2);
   }
   return sum;
 }
@@ -117,8 +101,7 @@ function quadrantPoints(run: Run, tolerance: number): Vec2[] {
       const best = Math.max(...points.map((p) => sign * p[axis]));
       const tied = points.flatMap((p, i) => (sign * p[axis] >= best - tolerance * 10 ? [i] : []));
       if (!closed && (tied.includes(0) || tied.includes(points.length - 1))) continue;
-      const mean = (dimension: 0 | 1): number =>
-        tied.reduce((sum, i) => sum + (points[i] as Vec2)[dimension], 0) / tied.length;
+      const mean = (dimension: 0 | 1): number => tied.reduce((sum, i) => sum + (points[i] as Vec2)[dimension], 0) / tied.length;
       quadrants.push([mean(0), mean(1)]);
     }
   }
@@ -147,10 +130,7 @@ interface CentreLine {
 }
 
 /** Crossing of each pair of perpendicular centre lines sharing a midpoint. */
-function centreMarkSnaps(
-  primitives: ReadonlyArray<DrawingPrimitive>,
-  tolerance: number,
-): SnapPoint[] {
+function centreMarkSnaps(primitives: ReadonlyArray<DrawingPrimitive>, tolerance: number): SnapPoint[] {
   const lines: CentreLine[] = [];
   for (const primitive of primitives) {
     if (primitive.type !== 'line' || primitive.style !== 'center') continue;
@@ -168,11 +148,8 @@ function centreMarkSnaps(
       .slice(i + 1)
       .some(
         (other) =>
-          Math.hypot(other.middle[0] - line.middle[0], other.middle[1] - line.middle[1]) <=
-            tolerance * 10 &&
-          Math.abs(
-            line.direction[0] * other.direction[0] + line.direction[1] * other.direction[1],
-          ) < 1e-3,
+          Math.hypot(other.middle[0] - line.middle[0], other.middle[1] - line.middle[1]) <= tolerance * 10 &&
+          Math.abs(line.direction[0] * other.direction[0] + line.direction[1] * other.direction[1]) < 1e-3,
       );
     if (crossed) snaps.push({ x: line.middle[0], y: line.middle[1], type: 'center' });
   });
@@ -182,10 +159,7 @@ function centreMarkSnaps(
 /** Snap points of a solid's drawing, one per location and type. @pure */
 export function drawingSnapPoints(primitives: ReadonlyArray<DrawingPrimitive>): SnapPoint[] {
   const tolerance = drawingTolerance(primitives);
-  const all = [
-    ...drawingChains(primitives).flatMap((chain) => chainSnaps(chain, tolerance)),
-    ...centreMarkSnaps(primitives, tolerance),
-  ];
+  const all = [...drawingChains(primitives).flatMap((chain) => chainSnaps(chain, tolerance)), ...centreMarkSnaps(primitives, tolerance)];
   const seen = new Set<string>();
   return all.filter(({ x, y, type }) => {
     const key = `${type}:${quantizedKey([x, y], tolerance * 10)}`;

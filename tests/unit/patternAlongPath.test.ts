@@ -1,11 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  type CadDocument,
-  type Entity,
-  type Vec3,
-  DEFAULT_LAYER_ID,
-  createEmptyDocument,
-} from '@core/model/types';
+import { type CadDocument, type Entity, type Vec3, DEFAULT_LAYER_ID, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { applyEulerXYZ, eulerFromAxes } from '@lib/eulerRotation';
 import { expectNoOp } from '../helpers/expectNoOp';
@@ -71,9 +65,7 @@ describe('pattern_along_path', () => {
       rollStep: Math.PI / 2,
     });
     const [a, b] = result.affected.map((id) => result.document.entities[id] as Entity);
-    expect(Math.abs(dot(axis(a!.rotation, [0, 0, 1]), axis(b!.rotation, [0, 0, 1])))).toBeLessThan(
-      1e-9,
-    );
+    expect(Math.abs(dot(axis(a!.rotation, [0, 0, 1]), axis(b!.rotation, [0, 0, 1])))).toBeLessThan(1e-9);
     expect(axis(a!.rotation, [1, 0, 0])[0]).toBeCloseTo(1, 9);
   });
 
@@ -295,11 +287,7 @@ describe('pattern_along_path', () => {
       [0, 0, 0],
       [1, 0, 0],
     ];
-    expectNoOp(
-      execute(doc, 'pattern_along_path', { sourceId: linkId(doc), count: 2, arc, path }),
-      doc,
-      'exactly one',
-    );
+    expectNoOp(execute(doc, 'pattern_along_path', { sourceId: linkId(doc), count: 2, arc, path }), doc, 'exactly one');
     expectNoOp(execute(doc, 'pattern_along_path', { count: 2, path }), doc, 'exactly one');
   });
 

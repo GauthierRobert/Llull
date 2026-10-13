@@ -14,8 +14,7 @@ const belt = (
   doc = createEmptyDocument(),
 ): ReturnType<typeof execute> => execute(doc, 'draw_belt_around', { pulleys, ...extra });
 
-const beltPoly = (result: ReturnType<typeof execute>): PolylineEntity =>
-  result.document.entities[result.affected[0]!] as PolylineEntity;
+const beltPoly = (result: ReturnType<typeof execute>): PolylineEntity => result.document.entities[result.affected[0]!] as PolylineEntity;
 
 const triangle = (r: number, side: number): Pulley[] => [
   { center: [0, 0], radius: r },

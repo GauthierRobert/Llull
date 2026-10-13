@@ -16,9 +16,7 @@ const LOCAL_SUFFIX = ' (ran locally — offline)';
 
 /** Commands must run locally (never POST) in this state. */
 export function isLocalMode(state: CadStoreState): boolean {
-  return (
-    state.liveStatus === 'disconnected' || state.syncState !== 'idle' || state.hasUnsyncedLocalEdits
-  );
+  return state.liveStatus === 'disconnected' || state.syncState !== 'idle' || state.hasUnsyncedLocalEdits;
 }
 
 /** Local undo/redo would move the in-flight outbox entry; refuse until the flush finishes. */
@@ -38,16 +36,8 @@ export const MAX_AUTO_SELECT = 100;
  * Selection after a command: its affected ids when requested, non-empty and within
  * MAX_AUTO_SELECT, else unchanged.
  */
-export function selectionAfter(
-  current: EntityId[],
-  affected: readonly EntityId[],
-  options: DispatchOptions | undefined,
-): EntityId[] {
-  return options?.selectAffected === true &&
-    affected.length > 0 &&
-    affected.length <= MAX_AUTO_SELECT
-    ? [...affected]
-    : current;
+export function selectionAfter(current: EntityId[], affected: readonly EntityId[], options: DispatchOptions | undefined): EntityId[] {
+  return options?.selectAffected === true && affected.length > 0 && affected.length <= MAX_AUTO_SELECT ? [...affected] : current;
 }
 
 /** Run a command locally via `execute`. Pushes history only if the doc changed. */
@@ -70,11 +60,8 @@ export function runLocally(
     options?.onResult?.({ summary, changed: false });
     return;
   }
-  const coalesce =
-    options?.coalesce === true && state.localUndoStack.length > 0 && state.localOutbox.length > 0;
-  const localOnly =
-    options?.localOnly === true ||
-    (coalesce && state.localOutbox[state.localOutbox.length - 1]?.localOnly === true);
+  const coalesce = options?.coalesce === true && state.localUndoStack.length > 0 && state.localOutbox.length > 0;
+  const localOnly = options?.localOnly === true || (coalesce && state.localOutbox[state.localOutbox.length - 1]?.localOnly === true);
   set({
     document: {
       ...result.document,
@@ -82,9 +69,7 @@ export function runLocally(
     },
     lastSummary: shown,
     lastMeasure,
-    localUndoStack: coalesce
-      ? state.localUndoStack
-      : [...state.localUndoStack, state.document].slice(-LOCAL_HISTORY_LIMIT),
+    localUndoStack: coalesce ? state.localUndoStack : [...state.localUndoStack, state.document].slice(-LOCAL_HISTORY_LIMIT),
     localRedoStack: [],
     localOutbox: [
       ...state.localOutbox,
@@ -116,10 +101,7 @@ export function stepLocalHistory(set: StoreSet, get: StoreGet, direction: 'undo'
     return;
   }
   const remaining = source.slice(0, -1);
-  const other = [
-    ...(direction === 'undo' ? state.localRedoStack : state.localUndoStack),
-    state.document,
-  ];
+  const other = [...(direction === 'undo' ? state.localRedoStack : state.localUndoStack), state.document];
   const undoStack = direction === 'undo' ? remaining : other.slice(-LOCAL_HISTORY_LIMIT);
   const redoStack = direction === 'undo' ? other : remaining;
   set({

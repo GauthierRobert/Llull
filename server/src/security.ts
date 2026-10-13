@@ -11,11 +11,7 @@ import rateLimit from 'express-rate-limit';
 import { UNAUTHORIZED_BODY, isUserMode, requireRole, sha256Digest, type Role } from './users';
 import { positiveInteger } from './env';
 
-const DEFAULT_ALLOWED_ORIGINS: readonly string[] = [
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://localhost:3000',
-];
+const DEFAULT_ALLOWED_ORIGINS: readonly string[] = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'];
 
 /** Origins allowed to call the server from a browser. `LLULL_ALLOWED_ORIGINS` = comma-separated. */
 export function getAllowedOrigins(): string[] {
@@ -53,12 +49,7 @@ function hasValidAccessToken(req: Request, token: string): boolean {
 export function isLoopbackAddress(address: string | undefined): boolean {
   if (address === undefined) return false;
   const value = address.toLowerCase();
-  return (
-    value === 'localhost' ||
-    value === '::1' ||
-    value.startsWith('127.') ||
-    value.startsWith('::ffff:127.')
-  );
+  return value === 'localhost' || value === '::1' || value.startsWith('127.') || value.startsWith('::ffff:127.');
 }
 
 /**
@@ -66,8 +57,7 @@ export function isLoopbackAddress(address: string | undefined): boolean {
  * reverse proxy every client looks like loopback, so `X-Forwarded-For` / `Forwarded` demote it.
  */
 function isLocalPeer(req: Request): boolean {
-  if (req.headers['x-forwarded-for'] !== undefined || req.headers['forwarded'] !== undefined)
-    return false;
+  if (req.headers['x-forwarded-for'] !== undefined || req.headers['forwarded'] !== undefined) return false;
   return isLoopbackAddress(req.socket?.remoteAddress);
 }
 
@@ -115,10 +105,7 @@ export function hostAllowlist(): RequestHandler {
     if (typeof header === 'string') {
       const full = header.trim().toLowerCase();
       const bare = hostWithoutPort(full);
-      const allowed =
-        ['localhost', '127.0.0.1', '[::1]'].includes(bare) ||
-        extra.includes(full) ||
-        extra.includes(bare);
+      const allowed = ['localhost', '127.0.0.1', '[::1]'].includes(bare) || extra.includes(full) || extra.includes(bare);
       if (allowed) {
         next();
         return;
@@ -166,13 +153,7 @@ export function guardAdmin(): RequestHandler {
       next();
       return;
     }
-    res
-      .status(token ? 401 : 403)
-      .json(
-        token
-          ? UNAUTHORIZED_BODY
-          : { error: 'Admin endpoints need MCP_AUTH_TOKEN or a loopback peer.' },
-      );
+    res.status(token ? 401 : 403).json(token ? UNAUTHORIZED_BODY : { error: 'Admin endpoints need MCP_AUTH_TOKEN or a loopback peer.' });
   });
 }
 
@@ -189,10 +170,7 @@ function buildGuard(acceptQueryToken: boolean, role: Role): RequestHandler {
       next();
       return;
     }
-    if (
-      token &&
-      (hasValidBearer(req, token) || (acceptQueryToken && hasValidAccessToken(req, token)))
-    ) {
+    if (token && (hasValidBearer(req, token) || (acceptQueryToken && hasValidAccessToken(req, token)))) {
       next();
       return;
     }
@@ -238,12 +216,7 @@ interface HttpParseError extends Error {
 }
 
 /** Final error middleware: JSON bodies, never an HTML stack trace. */
-export function jsonErrorHandler(
-  err: unknown,
-  _req: Request,
-  res: Response,
-  next: NextFunction,
-): void {
+export function jsonErrorHandler(err: unknown, _req: Request, res: Response, next: NextFunction): void {
   if (res.headersSent) {
     next(err);
     return;
@@ -257,8 +230,7 @@ export function jsonErrorHandler(
     res.status(413).json({ error: 'Request body too large.' });
     return;
   }
-  const status =
-    typeof httpError.status === 'number' && httpError.status >= 400 ? httpError.status : 500;
+  const status = typeof httpError.status === 'number' && httpError.status >= 400 ? httpError.status : 500;
   if (status >= 500) console.error('[server] unhandled error:', httpError.message);
   res.status(status).json({ error: status >= 500 ? 'Internal server error.' : httpError.message });
 }

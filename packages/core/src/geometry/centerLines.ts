@@ -42,12 +42,7 @@ const SIDE_ON = 0.02;
 
 function axisOf(entity: Entity, place: Placement, scale: number): RoundAxis | null {
   const world = (local: Vec3): Vec3 => place(entityLocalToWorld(entity, local));
-  const line = (
-    localDirection: Vec3,
-    from: number,
-    to: number,
-    radius: number,
-  ): RoundAxis | null => {
+  const line = (localDirection: Vec3, from: number, to: number, radius: number): RoundAxis | null => {
     const origin = world([0, 0, 0]);
     const direction = sub3(world(localDirection), origin);
     if (Math.hypot(...direction) < 1e-12 || !(radius > 0)) return null;
@@ -59,12 +54,7 @@ function axisOf(entity: Entity, place: Placement, scale: number): RoundAxis | nu
     case 'cone':
       return line([0, 0, 1], 0, entity.height, entity.radius * scale);
     case 'torus':
-      return line(
-        [0, 0, 1],
-        -entity.tubeRadius,
-        entity.tubeRadius,
-        (entity.ringRadius + entity.tubeRadius) * scale,
-      );
+      return line([0, 0, 1], -entity.tubeRadius, entity.tubeRadius, (entity.ringRadius + entity.tubeRadius) * scale);
     case 'revolution': {
       const axial = entity.profile.map(([, along]) => along);
       const radius = Math.max(...entity.profile.map(([radial]) => Math.abs(radial)));
@@ -88,12 +78,7 @@ function axisOf(entity: Entity, place: Placement, scale: number): RoundAxis | nu
   }
 }
 
-function recipeAxes(
-  recipe: ShapeRecipe,
-  place: Placement,
-  scale: number,
-  depth: number,
-): RoundAxis[] {
+function recipeAxes(recipe: ShapeRecipe, place: Placement, scale: number, depth: number): RoundAxis[] {
   if (depth > MAX_RECIPE_DEPTH) return [];
   switch (recipe.op) {
     case 'solid': {
@@ -101,10 +86,7 @@ function recipeAxes(
       return axis ? [axis] : [];
     }
     case 'boolean':
-      return [
-        ...recipeAxes(recipe.a, place, scale, depth + 1),
-        ...recipeAxes(recipe.b, place, scale, depth + 1),
-      ];
+      return [...recipeAxes(recipe.a, place, scale, depth + 1), ...recipeAxes(recipe.b, place, scale, depth + 1)];
     case 'blend':
       return recipe.sources.flatMap((source) => recipeAxes(source, place, scale, depth + 1));
     case 'fillet':
@@ -113,20 +95,10 @@ function recipeAxes(
       return recipeAxes(recipe.source, place, scale, depth + 1);
     case 'place': {
       const frame = { position: recipe.position, rotation: recipe.rotation };
-      return recipeAxes(
-        recipe.source,
-        (point) => place(entityLocalToWorld(frame, point)),
-        scale,
-        depth + 1,
-      );
+      return recipeAxes(recipe.source, (point) => place(entityLocalToWorld(frame, point)), scale, depth + 1);
     }
     case 'scale':
-      return recipeAxes(
-        recipe.source,
-        (point) => place(scale3(point, recipe.factor)),
-        scale * recipe.factor,
-        depth + 1,
-      );
+      return recipeAxes(recipe.source, (point) => place(scale3(point, recipe.factor)), scale * recipe.factor, depth + 1);
   }
 }
 
@@ -138,9 +110,7 @@ function recipeAxes(
 function axisWithin(axis: RoundAxis, box: Bounds): RoundAxis | null {
   const margin = axis.radius * 1e-3;
   const inside = (point: Vec3): boolean =>
-    point.every(
-      (v, i) => v >= (box.min[i] as number) - margin && v <= (box.max[i] as number) + margin,
-    );
+    point.every((v, i) => v >= (box.min[i] as number) - margin && v <= (box.max[i] as number) + margin);
   if (axis.direction === null) return inside(axis.origin) ? axis : null;
   let [from, to] = [axis.from, axis.to];
   for (let i = 0; i < 3; i++) {
@@ -166,8 +136,7 @@ function axisBehindCut(axis: RoundAxis, frame: ViewFrame, cutDepth: number): Rou
   const rate = dot3(axis.direction, frame.toViewer);
   if (Math.abs(rate) < 1e-12) return base - axis.radius <= cutDepth ? axis : null;
   const limit = (cutDepth - base) / rate;
-  const [from, to] =
-    rate > 0 ? [axis.from, Math.min(axis.to, limit)] : [Math.max(axis.from, limit), axis.to];
+  const [from, to] = rate > 0 ? [axis.from, Math.min(axis.to, limit)] : [Math.max(axis.from, limit), axis.to];
   return from <= to ? { ...axis, from, to } : null;
 }
 
@@ -206,10 +175,7 @@ interface CentreMark {
  * Pitch circles (PCD) of ≥ 3 equal marks at one depth, equally distant from their common centre
  * AND evenly spaced around it (a rectangle's four corners are not a bolt circle).
  */
-function pitchCircles(
-  marks: ReadonlyArray<CentreMark>,
-  unit: number,
-): Array<Omit<CentreMark, 'depth'>> {
+function pitchCircles(marks: ReadonlyArray<CentreMark>, unit: number): Array<Omit<CentreMark, 'depth'>> {
   const groups = new Map<string, CentreMark[]>();
   for (const mark of marks) {
     const key = quantizedKey([mark.radius, mark.depth], unit);
@@ -225,13 +191,11 @@ function pitchCircles(
     const offsets = group.map(({ center: [x, y] }) => [x - center[0], y - center[1]] as const);
     const pitch = Math.hypot(...(offsets[0] ?? [0, 0]));
     const radius = group[0]?.radius ?? 0;
-    if (!(pitch > radius) || offsets.some((o) => Math.abs(Math.hypot(...o) - pitch) > unit * 10))
-      continue;
+    if (!(pitch > radius) || offsets.some((o) => Math.abs(Math.hypot(...o) - pitch) > unit * 10)) continue;
     const angles = offsets.map(([x, y]) => Math.atan2(y, x)).sort((a, b) => a - b);
     const step = (2 * Math.PI) / angles.length;
     const even = angles.every((angle, i) => {
-      const next =
-        i + 1 < angles.length ? (angles[i + 1] as number) : (angles[0] as number) + 2 * Math.PI;
+      const next = i + 1 < angles.length ? (angles[i + 1] as number) : (angles[0] as number) + 2 * Math.PI;
       return Math.abs(next - angle - step) < 1e-3;
     });
     if (even) circles.push({ center, radius: pitch });
@@ -271,10 +235,7 @@ export function centerLinePrimitives(
   for (const axis of axes) {
     const along = axis.direction === null ? 1 : Math.abs(dot3(axis.direction, frame.toViewer));
     if (along > END_ON) {
-      const middle =
-        axis.direction === null
-          ? axis.origin
-          : add3(axis.origin, scale3(axis.direction, (axis.from + axis.to) / 2));
+      const middle = axis.direction === null ? axis.origin : add3(axis.origin, scale3(axis.direction, (axis.from + axis.to) / 2));
       const center = frame.project(middle);
       const mark = { center, radius: axis.radius, depth: dot3(middle, frame.toViewer) };
       marks.set(quantizedKey([...center, axis.radius, mark.depth], unit), mark);
@@ -282,8 +243,7 @@ export function centerLinePrimitives(
       if ((crosses.get(key)?.radius ?? 0) < axis.radius) crosses.set(key, mark);
     } else if (along < SIDE_ON && axis.direction !== null) {
       const overshoot = axis.radius * OVERSHOOT;
-      const point = (t: number): Vec2 =>
-        frame.project(add3(axis.origin, scale3(axis.direction as Vec3, t)));
+      const point = (t: number): Vec2 => frame.project(add3(axis.origin, scale3(axis.direction as Vec3, t)));
       line(point(axis.from - overshoot), point(axis.to + overshoot));
     }
   }

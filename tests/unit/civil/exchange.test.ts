@@ -90,9 +90,7 @@ describe('export_landxml', () => {
     expect(xml).toContain('<CircStruct diameter="1000"/>');
     expect(xml).toContain('<Invert elev="99" flowDir="out" refPipe="P1"/>');
     expect(xml).toContain('<Invert elev="98.5" flowDir="in" refPipe="P1"/>');
-    expect(xml).toContain(
-      '<Pipe name="P1" refStart="MH1 (manhole-1)" refEnd="MH1 (manhole-2)" length="50" slope="1">',
-    );
+    expect(xml).toContain('<Pipe name="P1" refStart="MH1 (manhole-1)" refEnd="MH1 (manhole-2)" length="50" slope="1">');
     expect(xml).toContain('<CircPipe diameter="300" material="PVC" mannings="0.013"/>');
     expect(xml).not.toContain('<Surfaces>');
   });
@@ -157,23 +155,17 @@ describe('export_civil_dxf', () => {
     const result = execute(doc, 'export_civil_dxf', {});
     const data = result.data as { text: string; fileName: string; layers: string[] };
     expect(data.fileName).toBe('Untitled_project_civil.dxf');
-    expect(data.layers).toEqual(
-      expect.arrayContaining(['C-TOPO-PNTS', 'C-TOPO-TINN', 'C-TOPO-MINR']),
-    );
+    expect(data.layers).toEqual(expect.arrayContaining(['C-TOPO-PNTS', 'C-TOPO-TINN', 'C-TOPO-MINR']));
     const civilEntities = Object.values(doc.entities).filter((e) => e.tags?.includes('civil'));
     const mesh = civilEntities.find((e) => e.kind === 'mesh');
     if (mesh?.kind !== 'mesh') throw new Error('no TIN mesh');
     const faces = count(data.text, /^3DFACE$/gm);
     expect(faces).toBeGreaterThanOrEqual(mesh.mesh.indices.length / 3);
     expect(count(data.text, /^POINT$/gm)).toBe(25);
-    const contour = civilEntities.find(
-      (e) => e.kind === 'polyline' && e.layerId === 'layer-C-TOPO-MINR',
-    );
+    const contour = civilEntities.find((e) => e.kind === 'polyline' && e.layerId === 'layer-C-TOPO-MINR');
     if (contour?.kind !== 'polyline') throw new Error('no contour');
     const lines = data.text.split('\n');
-    const start = lines.findIndex(
-      (line, index) => line === 'POLYLINE' && lines[index + 2] === 'C-TOPO-MINR',
-    );
+    const start = lines.findIndex((line, index) => line === 'POLYLINE' && lines[index + 2] === 'C-TOPO-MINR');
     // Header point: 10 x / 20 y / 30 elevation.
     expect(lines.slice(start, start + 14)).toContain(String(contour.position[2]));
     expect(result.summary).toMatch(/^DXF Untitled_project_civil\.dxf: \d+ entities/);

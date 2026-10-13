@@ -24,8 +24,7 @@ function timestamp(): string {
   const d = new Date();
   const pad = (n: number): string => String(n).padStart(2, '0');
   return (
-    `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}` +
-    `-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`
+    `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}` + `-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`
   );
 }
 
@@ -92,13 +91,7 @@ export function ProjectIO(): React.ReactElement {
 
   return (
     <span className="project-io" role="group" aria-label="Project file">
-      <button
-        type="button"
-        className="project-io__btn"
-        onClick={handleNewClick}
-        aria-label="New project"
-        title="New project"
-      >
+      <button type="button" className="project-io__btn" onClick={handleNewClick} aria-label="New project" title="New project">
         <Icon name="plus" size={14} />
         <span>New</span>
       </button>

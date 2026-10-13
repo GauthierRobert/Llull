@@ -9,13 +9,7 @@ import { CommandParamForm } from '@ui/components/commandPalette/CommandParamForm
 
 describe('CommandParamForm enum typeahead', () => {
   function unitsSelect(): HTMLSelectElement {
-    render(
-      <CommandParamForm
-        command={getCommand('set_units')!}
-        onBack={() => undefined}
-        onSubmit={() => undefined}
-      />,
-    );
+    render(<CommandParamForm command={getCommand('set_units')!} onBack={() => undefined} onSubmit={() => undefined} />);
     return screen.getByLabelText(/^Units/) as HTMLSelectElement;
   }
 

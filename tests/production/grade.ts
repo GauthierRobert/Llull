@@ -2,14 +2,7 @@ import { execute } from '@core/commands/registry';
 import { serializeDocument } from '@core/commands/persistence/serialization';
 import type { CommandResult } from '@core/commands/types';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
-import type {
-  CheckReport,
-  DeliverableId,
-  DriverId,
-  GradeContext,
-  Scenario,
-  ScenarioReport,
-} from './contract';
+import type { CheckReport, DeliverableId, DriverId, GradeContext, Scenario, ScenarioReport } from './contract';
 
 /**
  * @layer tests/production
@@ -76,11 +69,7 @@ export function gradeContext(
   };
 }
 
-export function gradeScenario(
-  scenario: Scenario,
-  driver: DriverId,
-  context: GradeContext,
-): ScenarioReport {
+export function gradeScenario(scenario: Scenario, driver: DriverId, context: GradeContext): ScenarioReport {
   const known = new Set(scenario.knownIssues[driver] ?? []);
   const checks: CheckReport[] = scenario.criteria.map((criterion) => {
     let outcome;

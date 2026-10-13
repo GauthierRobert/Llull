@@ -12,11 +12,7 @@ import path from 'node:path';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { exportStepFile, type CadExchangePort } from '@mcp/index';
-import {
-  bridgeEnvironment,
-  createPythonExchangePort,
-  type PythonExchangeConfig,
-} from '../src/pythonExchange';
+import { bridgeEnvironment, createPythonExchangePort, type PythonExchangeConfig } from '../src/pythonExchange';
 
 let scratch: string;
 
@@ -41,9 +37,7 @@ describe('bridgeEnvironment', () => {
       ANTHROPIC_API_KEY: 'sk-secret',
       AWS_SECRET_ACCESS_KEY: 'x',
     });
-    expect(Object.keys(env).sort()).toEqual(
-      ['HOME', 'LANG', 'LC_ALL', 'PATH', 'PYTHONPATH', 'VIRTUAL_ENV'].sort(),
-    );
+    expect(Object.keys(env).sort()).toEqual(['HOME', 'LANG', 'LC_ALL', 'PATH', 'PYTHONPATH', 'VIRTUAL_ENV'].sort());
   });
 });
 
@@ -71,15 +65,11 @@ describe('exchange directory symlink confinement', () => {
   });
 
   it('refuses to read through a symlink that points outside', async () => {
-    await expect(port.readExchangeFile?.('leak.step', 'utf8')).rejects.toThrow(
-      /outside the exchange/,
-    );
+    await expect(port.readExchangeFile?.('leak.step', 'utf8')).rejects.toThrow(/outside the exchange/);
   });
 
   it('refuses to write into a symlinked directory outside', async () => {
-    await expect(port.writeExchangeFile?.('linked-dir/x.step', 'AAAA')).rejects.toThrow(
-      /outside the exchange/,
-    );
+    await expect(port.writeExchangeFile?.('linked-dir/x.step', 'AAAA')).rejects.toThrow(/outside the exchange/);
   });
 
   it('refuses to overwrite a symlink', async () => {
@@ -88,10 +78,7 @@ describe('exchange directory symlink confinement', () => {
   });
 
   it('still reads and writes regular files inside', async () => {
-    const written = await port.writeExchangeFile?.(
-      'ok.step',
-      Buffer.from('hello').toString('base64'),
-    );
+    const written = await port.writeExchangeFile?.('ok.step', Buffer.from('hello').toString('base64'));
     expect(written).toBe(path.join(root, 'ok.step'));
     expect(await port.readExchangeFile?.('ok.step', 'utf8')).toBe('hello');
   });

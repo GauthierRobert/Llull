@@ -58,10 +58,7 @@ export const billOfMaterials = defineCommand({
     const byComponent = new Map<string, InstanceEntity[]>();
     for (const entity of Object.values(doc.entities)) {
       if (entity.kind === 'instance') {
-        byComponent.set(entity.componentId, [
-          ...(byComponent.get(entity.componentId) ?? []),
-          entity,
-        ]);
+        byComponent.set(entity.componentId, [...(byComponent.get(entity.componentId) ?? []), entity]);
       }
     }
 
@@ -93,15 +90,11 @@ export const billOfMaterials = defineCommand({
     const totalInstances = [...byComponent.values()].reduce((sum, list) => sum + list.length, 0);
     const distinctComponents = rows.filter((r) => !r.orphan).length;
     const data = { rows, totalInstances, distinctComponents } satisfies BillOfMaterialsData;
-    if (totalInstances === 0)
-      return report(doc, 'bill_of_materials: 0 instances found. BOM is empty.', data);
-    const rowSummary = rows
-      .map((r) => `"${r.componentName}" ×${r.count}${r.orphan ? ' [ORPHAN]' : ''}`)
-      .join(', ');
+    if (totalInstances === 0) return report(doc, 'bill_of_materials: 0 instances found. BOM is empty.', data);
+    const rowSummary = rows.map((r) => `"${r.componentName}" ×${r.count}${r.orphan ? ' [ORPHAN]' : ''}`).join(', ');
     return report(
       doc,
-      `bill_of_materials: ${totalInstances} instance(s), ${distinctComponents} distinct component(s). ` +
-        `Rows: ${rowSummary}.`,
+      `bill_of_materials: ${totalInstances} instance(s), ${distinctComponents} distinct component(s). ` + `Rows: ${rowSummary}.`,
       data,
     );
   },

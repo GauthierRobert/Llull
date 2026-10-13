@@ -69,9 +69,7 @@ describe('dispatch onResult', () => {
       }),
     );
     const onResult = vi.fn();
-    useStore
-      .getState()
-      .dispatch('set_parameter', { name: 'width', expression: '10' }, { onResult });
+    useStore.getState().dispatch('set_parameter', { name: 'width', expression: '10' }, { onResult });
     await flushPromises();
     expect(onResult).toHaveBeenCalledWith({ summary: 'Set parameter width = 10.', changed: true });
   });

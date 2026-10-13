@@ -114,12 +114,8 @@ describe('pipe support plan symbols', () => {
     // pipe along +Y: the ticks run along Y, 200 mm either side of the axis
     expect(ticks).toContainEqual(expect.objectContaining({ a: [-200, 850], b: [-200, 1150] }));
     // the riser guide sits at the riser's plan point (0, 4000)
-    expect(
-      plan.filter((p) => p.type === 'text').map((p) => (p.type === 'text' ? p.content : '')),
-    ).toEqual(['PS1', 'PS2']);
-    expect(
-      plan.some((p) => p.type === 'polygon' && p.points.every((q) => Math.abs(q[1] - 4000) <= 150)),
-    ).toBe(true);
+    expect(plan.filter((p) => p.type === 'text').map((p) => (p.type === 'text' ? p.content : ''))).toEqual(['PS1', 'PS2']);
+    expect(plan.some((p) => p.type === 'polygon' && p.points.every((q) => Math.abs(q[1] - 4000) <= 150))).toBe(true);
   });
 
   it('draws supports on the plan of their own level only, like their pipe', () => {
@@ -135,20 +131,16 @@ describe('pipe support symbols in the exports', () => {
     const data = result.data as DxfExport;
     expect(data.layers).toEqual(expect.arrayContaining(['P-PIPE', 'P-SUPP', 'P-SUPP-PATT']));
     const lines = data.dxf.split('\n');
-    const onLayer = (type: string): number =>
-      lines.filter((line, index) => line === type && lines[index + 2] === 'P-SUPP').length;
+    const onLayer = (type: string): number => lines.filter((line, index) => line === type && lines[index + 2] === 'P-SUPP').length;
     expect(onLayer('CIRCLE')).toBe(1);
     expect(onLayer('TEXT')).toBe(4);
     expect(onLayer('LINE')).toBe(2 + 2 + 2);
-    expect(lines.filter((line, index) => line === 'PS3' && lines[index - 1] === '1')).toHaveLength(
-      1,
-    );
+    expect(lines.filter((line, index) => line === 'PS3' && lines[index - 1] === '1')).toHaveLength(1);
     expect(lines.filter((line) => line === 'SOLID').length).toBeGreaterThan(0);
   });
 
   it('draws them on the plan sheet', () => {
-    const sheet = execute(plantWithSupports(), 'export_plan_sheet', { levelId: 'level-1' })
-      .data as PlanSheet;
+    const sheet = execute(plantWithSupports(), 'export_plan_sheet', { levelId: 'level-1' }).data as PlanSheet;
     expect(sheet.svg).toContain('>PS1</text>');
     expect(sheet.svg).toContain('>PS4</text>');
     expect(sheet.svg).toContain('class="cut-hatch"');
@@ -156,9 +148,7 @@ describe('pipe support symbols in the exports', () => {
   });
 
   it('does not draw them on a level without supports', () => {
-    const data = execute(plantWithSupports(), 'export_dxf', { levelId: 'level-2' }).data as
-      | DxfExport
-      | undefined;
+    const data = execute(plantWithSupports(), 'export_dxf', { levelId: 'level-2' }).data as DxfExport | undefined;
     expect(data?.layers ?? []).not.toContain('P-SUPP');
   });
 });

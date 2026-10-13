@@ -44,11 +44,8 @@ function decimate(source: PreDepthPolygon[], keep: number): PreDepthPolygon[] {
  * when there are more entities than budget, the last ones in document order are skipped.
  */
 export function applyBudget(items: readonly EntityPolygons[], budget: number): BudgetResult {
-  const filledCount = (item: EntityPolygons): number =>
-    item.polygons.filter((p) => !p.stroke && p.loops === undefined).length;
-  const order = items
-    .map((item, index) => ({ item, index, count: filledCount(item) }))
-    .filter(({ count }) => count > 0);
+  const filledCount = (item: EntityPolygons): number => item.polygons.filter((p) => !p.stroke && p.loops === undefined).length;
+  const order = items.map((item, index) => ({ item, index, count: filledCount(item) })).filter(({ count }) => count > 0);
   order.sort((a, b) => a.count - b.count || a.index - b.index);
 
   const allowance = new Map<string, number>();

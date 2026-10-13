@@ -56,18 +56,10 @@ function meshDataToTopoDSShape(api: OccApi, mesh: MeshData): OccShape | null {
   const { positions, indices } = mesh;
   if (positions.length === 0 || indices.length === 0 || indices.length % 3 !== 0) return null;
 
-  const vertex = (index: number): Vec3 => [
-    positions[index * 3] ?? 0,
-    positions[index * 3 + 1] ?? 0,
-    positions[index * 3 + 2] ?? 0,
-  ];
+  const vertex = (index: number): Vec3 => [positions[index * 3] ?? 0, positions[index * 3 + 1] ?? 0, positions[index * 3 + 2] ?? 0];
   const sewing: OccSewing = new api.BRepBuilderAPI_Sewing(1e-6, true, true, true, false);
   for (let t = 0; t < indices.length; t += 3) {
-    const corners: [Vec3, Vec3, Vec3] = [
-      vertex(indices[t] ?? 0),
-      vertex(indices[t + 1] ?? 0),
-      vertex(indices[t + 2] ?? 0),
-    ];
+    const corners: [Vec3, Vec3, Vec3] = [vertex(indices[t] ?? 0), vertex(indices[t + 1] ?? 0), vertex(indices[t + 2] ?? 0)];
     const normal = cross3(sub3(corners[1], corners[0]), sub3(corners[2], corners[0]));
     if (dot3(normal, normal) < 1e-24) continue;
     const face = polygonFace(api, corners);
@@ -109,12 +101,7 @@ function meshDataToTopoDSShape(api: OccApi, mesh: MeshData): OccShape | null {
 }
 
 /** llull placement M = Rx·Ry·Rz (Rz applied first, radians) followed by the translation. */
-export function placementTransform(
-  api: OccApi,
-  rotation: Vec3,
-  position: Vec3,
-  anchorShift: Vec3 = [0, 0, 0],
-): OccHandle {
+export function placementTransform(api: OccApi, rotation: Vec3, position: Vec3, anchorShift: Vec3 = [0, 0, 0]): OccHandle {
   const total = new api.gp_Trsf_1();
   const offset: OccHandle = new api.gp_Vec_4(position[0], position[1], position[2]);
   total.SetTranslation_1(offset);
@@ -155,12 +142,7 @@ export function transformedCopy(api: OccApi, shape: OccShape, transform: OccHand
 }
 
 /** Copy of `shape` placed at `at`'s rotation and position; the input shape is released. */
-function placed(
-  api: OccApi,
-  shape: OccShape,
-  at: { readonly rotation: Vec3; readonly position: Vec3 },
-  anchorShift?: Vec3,
-): OccShape {
+function placed(api: OccApi, shape: OccShape, at: { readonly rotation: Vec3; readonly position: Vec3 }, anchorShift?: Vec3): OccShape {
   const placement = placementTransform(api, at.rotation, at.position, anchorShift);
   const moved = transformedCopy(api, shape, placement);
   release(placement);
@@ -218,8 +200,7 @@ function prism(api: OccApi, face: OccShape, offset: Vec3, entity: Entity): OccSh
  * clockwise face would extrude inside-out); degenerate or non-finite profiles -> null.
  */
 function extrudedProfile(api: OccApi, entity: Entity): OccShape | null {
-  if (entity.kind !== 'extrusion' || !isValidPolygon(entity.profile) || !(entity.depth > 0))
-    return null;
+  if (entity.kind !== 'extrusion' || !isValidPolygon(entity.profile) || !(entity.depth > 0)) return null;
   const face =
     entity.curves !== undefined
       ? chainFace(api, entity.curves, ([x, y]) => [x, y, 0], true)
@@ -254,16 +235,10 @@ function revolvedProfile(api: OccApi, entity: Entity): OccShape | null {
   if (!(entity.angle > 0) || !(entity.segments >= 3)) return null;
   const frame = (['X', 'Y', 'Z'] as const)[revolutionAxisIndex(entity.axis)];
   // The profile's winding must agree with the sweep direction or the solid comes out inside-out.
-  const ordered =
-    frame === 'Y'
-      ? toCounterClockwise(entity.profile)
-      : [...toCounterClockwise(entity.profile)].reverse();
+  const ordered = frame === 'Y' ? toCounterClockwise(entity.profile) : [...toCounterClockwise(entity.profile)].reverse();
   const place = ([radial, axial]: readonly [number, number]): Vec3 =>
     frame === 'Z' ? [radial, 0, axial] : frame === 'Y' ? [radial, axial, 0] : [axial, radial, 0];
-  const face =
-    entity.curves !== undefined
-      ? chainFace(api, entity.curves, place, frame === 'Y')
-      : polygonFace(api, ordered.map(place));
+  const face = entity.curves !== undefined ? chainFace(api, entity.curves, place, frame === 'Y') : polygonFace(api, ordered.map(place));
   if (face === null) return null;
   const sweepAxis: Vec3 = frame === 'Z' ? [0, 0, 1] : frame === 'Y' ? [0, -1, 0] : [1, 0, 0];
   const origin: OccHandle = new api.gp_Pnt_3(0, 0, 0);
@@ -318,9 +293,7 @@ export function entityToOccShape(api: OccApi, entity: Entity): OccShape | null {
   if (sx <= 0 || sy <= 0 || sz <= 0) return null;
   const [px, py, pz] = entity.position;
   const rotated = entity.rotation.some((angle) => angle !== 0);
-  const [ox, oy, oz] = rotated
-    ? [-sx / 2, -sy / 2, -sz / 2]
-    : [px - sx / 2, py - sy / 2, pz - sz / 2];
+  const [ox, oy, oz] = rotated ? [-sx / 2, -sy / 2, -sz / 2] : [px - sx / 2, py - sy / 2, pz - sz / 2];
   const origin: OccHandle = new api.gp_Pnt_3(ox, oy, oz);
   const maker = new api.BRepPrimAPI_MakeBox_2(origin, sx, sy, sz) as {
     Shape(): OccShape;

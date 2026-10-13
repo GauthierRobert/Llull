@@ -64,9 +64,7 @@ async function main() {
   const manifest = JSON.parse(await readFile(join(ROOT, 'quality', 'corpus.json'), 'utf8'));
   const wanted = manifest.files.filter(
     (entry) =>
-      entry.source !== 'synthetic' &&
-      TIERS.indexOf(entry.tier) <= TIERS.indexOf(tier) &&
-      (format === null || entry.format === format),
+      entry.source !== 'synthetic' && TIERS.indexOf(entry.tier) <= TIERS.indexOf(tier) && (format === null || entry.format === format),
   );
   await mkdir(CORPUS_DIR, { recursive: true });
   let failures = 0;

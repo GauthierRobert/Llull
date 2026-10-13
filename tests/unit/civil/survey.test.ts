@@ -9,10 +9,7 @@ import { gridSurvey, metricDocument, surveyedDocument } from './fixtures';
 
 describe('parseSurvey', () => {
   it('reads PENZD with a header, comments and descriptions', () => {
-    const parsed = parseSurvey(
-      'PT,E,N,Z,DESC\n# comment\n1,100,200,10.5,EP left\n\n2,101,201,10.6\nbad,line\n',
-      'PENZD',
-    );
+    const parsed = parseSurvey('PT,E,N,Z,DESC\n# comment\n1,100,200,10.5,EP left\n\n2,101,201,10.6\nbad,line\n', 'PENZD');
     expect(parsed.points).toEqual([
       { number: '1', easting: 100, northing: 200, elevation: 10.5, code: 'EP left' },
       { number: '2', easting: 101, northing: 201, elevation: 10.6 },
@@ -131,9 +128,7 @@ describe('create_surface', () => {
       contourInterval: 0.5,
       majorEvery: 0,
     });
-    expect(result.summary).toMatch(
-      /Created surface Design \(surface-1\): 4 points, 2 triangles; contours every 0.5 m/,
-    );
+    expect(result.summary).toMatch(/Created surface Design \(surface-1\): 4 points, 2 triangles; contours every 0.5 m/);
     expect(result.data).toEqual({ surfaceId: 'surface-1' });
   });
 
@@ -240,9 +235,7 @@ describe('surface queries', () => {
     expect(data.points[1]).toMatchObject({ elevation: null, slopePercent: null });
     expect(result.summary).toMatch(/102.500 m \(5 %\); outside; .*; …\s*\(1 outside the surface\)/);
     expect(result.document).toBe(doc);
-    expect(execute(doc, 'surface_elevation', { surfaceId: 'x', points: [[0, 0]] }).summary).toMatch(
-      /no surface x/,
-    );
+    expect(execute(doc, 'surface_elevation', { surfaceId: 'x', points: [[0, 0]] }).summary).toMatch(/no surface x/);
   });
 
   it('reports surface statistics', () => {
@@ -276,9 +269,7 @@ describe('civil model management', () => {
         entities: expect.any(Number),
       },
     ]);
-    expect(execute(metricDocument(), 'describe_civil', {}).summary).toBe(
-      'The civil model is empty.',
-    );
+    expect(execute(metricDocument(), 'describe_civil', {}).summary).toBe('The civil model is empty.');
   });
 
   it('deletes objects, refusing referenced ones unless cascading', () => {
@@ -320,8 +311,6 @@ describe('civil model management', () => {
     };
     const surface = envelope.document.civil.objects['surface-1'];
     if (surface) surface['contourInterval'] = -1;
-    expect(() => deserializeDocument(JSON.stringify(envelope))).toThrow(
-      /contourInterval must be > 0/,
-    );
+    expect(() => deserializeDocument(JSON.stringify(envelope))).toThrow(/contourInterval must be > 0/);
   });
 });

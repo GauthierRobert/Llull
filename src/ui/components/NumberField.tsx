@@ -11,10 +11,7 @@
 import React, { useState } from 'react';
 import { parseNumber } from '@ui/numberText';
 
-type NativeInputProps = Omit<
-  React.InputHTMLAttributes<HTMLInputElement>,
-  'type' | 'value' | 'defaultValue' | 'onChange'
->;
+type NativeInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type' | 'value' | 'defaultValue' | 'onChange'>;
 
 interface NumberFieldProps extends NativeInputProps {
   value: number;
@@ -22,12 +19,7 @@ interface NumberFieldProps extends NativeInputProps {
   ref?: React.Ref<HTMLInputElement>;
 }
 
-export function NumberField({
-  value,
-  onValueChange,
-  ref,
-  ...inputProps
-}: NumberFieldProps): React.ReactElement {
+export function NumberField({ value, onValueChange, ref, ...inputProps }: NumberFieldProps): React.ReactElement {
   const [text, setText] = useState(String(value));
   const [seenValue, setSeenValue] = useState(value);
   if (value !== seenValue) {

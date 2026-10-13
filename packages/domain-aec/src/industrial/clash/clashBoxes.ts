@@ -13,11 +13,7 @@ import { cross3, dot3, scale3, sub3 } from '@lib/vec3';
 import { midpoint } from '../../shared/vec3';
 import { findProfile } from '../../steel/profiles';
 import { atLevel } from '../evaluate';
-import {
-  arcPoints,
-  curvedWallArc,
-  curvedWallBand,
-} from '../../building/geometry/curvedWallGeometry';
+import { arcPoints, curvedWallArc, curvedWallBand } from '../../building/geometry/curvedWallGeometry';
 import { supportShape } from '../piping/supportParts';
 
 /** Oriented box: centre, orthonormal axes and half sizes along them. */
@@ -63,12 +59,7 @@ function zRotated(angle: number): readonly [Vec3, Vec3, Vec3] {
 }
 
 /** One oriented box per segment of a swept polyline (constant half section). */
-function polylineBoxes(
-  level: BuildingLevel,
-  points: ReadonlyArray<Vec3>,
-  halfWidth: number,
-  halfDepth: number,
-): OrientedBox[] {
+function polylineBoxes(level: BuildingLevel, points: ReadonlyArray<Vec3>, halfWidth: number, halfDepth: number): OrientedBox[] {
   const boxes: OrientedBox[] = [];
   for (let index = 0; index + 1 < points.length; index++) {
     const start = atLevel(level, points[index] as Vec3);
@@ -85,11 +76,7 @@ function polylineBoxes(
 }
 
 /** Oriented boxes of an element's solid parts (empty for categories not checked). */
-export function elementBoxes(
-  doc: CadDocument,
-  building: BuildingModel,
-  element: BuildingElement,
-): OrientedBox[] {
+export function elementBoxes(doc: CadDocument, building: BuildingModel, element: BuildingElement): OrientedBox[] {
   const level = 'levelId' in element ? building.levels[element.levelId] : undefined;
   switch (element.category) {
     case 'member': {
@@ -107,13 +94,9 @@ export function elementBoxes(
       ];
     }
     case 'pipe':
-      return level
-        ? polylineBoxes(level, element.points, element.diameter / 2, element.diameter / 2)
-        : [];
+      return level ? polylineBoxes(level, element.points, element.diameter / 2, element.diameter / 2) : [];
     case 'tray':
-      return level
-        ? polylineBoxes(level, element.points, element.width / 2, element.height / 2)
-        : [];
+      return level ? polylineBoxes(level, element.points, element.width / 2, element.height / 2) : [];
     case 'pipeSupport': {
       const pipe = building.elements[element.pipeId];
       if (!level || pipe?.category !== 'pipe') return [];
@@ -121,15 +104,9 @@ export function elementBoxes(
       const [cos, sin] = [Math.cos(angle), Math.sin(angle)];
       return parts.map((part): OrientedBox => {
         const half: Vec3 =
-          part.kind === 'box'
-            ? [part.size[0] / 2, part.size[1] / 2, part.size[2] / 2]
-            : [part.radius, part.radius, part.height / 2];
+          part.kind === 'box' ? [part.size[0] / 2, part.size[1] / 2, part.size[2] / 2] : [part.radius, part.radius, part.height / 2];
         return {
-          center: [
-            element.position[0] - sin * part.across,
-            element.position[1] + cos * part.across,
-            level.elevation + part.z,
-          ],
+          center: [element.position[0] - sin * part.across, element.position[1] + cos * part.across, level.elevation + part.z],
           axes: zRotated(angle),
           half,
         };

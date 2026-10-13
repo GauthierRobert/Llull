@@ -43,10 +43,7 @@ export const MEMBER_LAYER: Readonly<Record<MemberRole, { name: string; color: st
 };
 
 export const BUILDING_LAYER_COLOR: ReadonlyMap<string, string> = new Map(
-  [...Object.values(CATEGORY_LAYER), ...Object.values(MEMBER_LAYER)].map(({ name, color }) => [
-    `layer-${name}`,
-    color,
-  ]),
+  [...Object.values(CATEGORY_LAYER), ...Object.values(MEMBER_LAYER)].map(({ name, color }) => [`layer-${name}`, color]),
 );
 
 function layerIdFor(category: BimCategory): string {
@@ -84,13 +81,7 @@ interface EntityStub {
   readonly layer?: string;
 }
 
-export function base(
-  element: BuildingElement,
-  stub: EntityStub,
-  position: Vec3,
-  rotation: Vec3,
-  color: string,
-): Omit<BaseEntity, 'kind'> {
+export function base(element: BuildingElement, stub: EntityStub, position: Vec3, rotation: Vec3, color: string): Omit<BaseEntity, 'kind'> {
   return {
     id: `${element.id}:${stub.part}`,
     position,
@@ -102,23 +93,11 @@ export function base(
   };
 }
 
-export function orientedBox(
-  element: BuildingElement,
-  stub: EntityStub,
-  center: Vec3,
-  angle: number,
-  size: Vec3,
-  color: string,
-): BoxEntity {
+export function orientedBox(element: BuildingElement, stub: EntityStub, center: Vec3, angle: number, size: Vec3, color: string): BoxEntity {
   return { ...base(element, stub, center, [0, 0, angle], color), kind: 'box', size };
 }
 
 /** A world-space mesh entity (position at the origin). */
-export function meshEntity(
-  element: BuildingElement,
-  stub: EntityStub,
-  mesh: MeshData,
-  color: string,
-): MeshSolidEntity {
+export function meshEntity(element: BuildingElement, stub: EntityStub, mesh: MeshData, color: string): MeshSolidEntity {
   return { ...base(element, stub, [0, 0, 0], [0, 0, 0], color), kind: 'mesh', mesh };
 }

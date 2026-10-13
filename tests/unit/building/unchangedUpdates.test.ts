@@ -4,11 +4,7 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 
 /** Executes each command, then re-runs it with its twin params and expects the refusal. */
 const twinChecker = (): {
-  twinOf: (
-    name: string,
-    params: Record<string, unknown>,
-    twinParams?: Record<string, unknown>,
-  ) => void;
+  twinOf: (name: string, params: Record<string, unknown>, twinParams?: Record<string, unknown>) => void;
   current: () => CadDocument;
 } => {
   let doc = createEmptyDocument();
@@ -28,11 +24,7 @@ const expectNoOp = (doc: CadDocument, name: string, params: Record<string, unkno
   expect(result.summary).toMatch(/already|nothing/);
 };
 
-const expectTwinRefused = (
-  doc: CadDocument,
-  name: string,
-  params: Record<string, unknown>,
-): void => {
+const expectTwinRefused = (doc: CadDocument, name: string, params: Record<string, unknown>): void => {
   const again = execute(doc, name, params);
   expect(again.document, name).toBe(doc);
   expect(again.affected).toEqual([]);
@@ -82,15 +74,11 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
       elementIds: ['wall-1', 'wall-1', 'nope'],
       delta: [0, 500],
     });
-    expect(moved.summary).toMatch(
-      /Moved 1 element\(s\) by \[0, 500\]: wall-1\. Ignored unknown id\(s\): nope\./,
-    );
+    expect(moved.summary).toMatch(/Moved 1 element\(s\) by \[0, 500\]: wall-1\. Ignored unknown id\(s\): nope\./);
     const deleted = execute(moved.document, 'delete_building_element', {
       elementIds: ['wall-1', 'nope'],
     });
-    expect(deleted.summary).toMatch(
-      /Deleted 1 building element\(s\): wall-1\. Ignored unknown id\(s\): nope\./,
-    );
+    expect(deleted.summary).toMatch(/Deleted 1 building element\(s\): wall-1\. Ignored unknown id\(s\): nope\./);
   });
 
   it('draw_walls refuses a lone segment duplicating an existing wall (either direction)', () => {
@@ -112,9 +100,7 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
     ]) {
       const again = execute(doc, 'draw_walls', { points: [start, end] });
       expect(again.document).toBe(doc);
-      expect(again.summary).toMatch(
-        /every segment duplicates an existing wall on level-1 \(wall-1\)/,
-      );
+      expect(again.summary).toMatch(/every segment duplicates an existing wall on level-1 \(wall-1\)/);
     }
     const elsewhere = execute(doc, 'draw_walls', {
       points: [
@@ -171,9 +157,7 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
       ],
       closed: true,
     });
-    const walls = Object.values(roomB.document.building?.elements ?? {}).filter(
-      (element) => element.category === 'wall',
-    );
+    const walls = Object.values(roomB.document.building?.elements ?? {}).filter((element) => element.category === 'wall');
     expect(walls).toHaveLength(7);
     expect(roomB.summary).toMatch(/Added 3 wall\(s\)/);
     expect(roomB.summary).toMatch(/Skipped 1 segment already built as wall-2\./);
@@ -196,9 +180,7 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
     });
     expect(again.document).toBe(doc);
     expect(again.affected).toEqual([]);
-    expect(again.summary).toMatch(
-      /draw_walls failed: every segment duplicates an existing wall on level-1 \(wall-2, wall-1\)/,
-    );
+    expect(again.summary).toMatch(/draw_walls failed: every segment duplicates an existing wall on level-1 \(wall-2, wall-1\)/);
   });
 
   it('add_column skips occupied locations and refuses when all are occupied', () => {
@@ -280,16 +262,12 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
 
   it('add_building_template counts only the levels it added; repeating at the same origin fails cleanly', () => {
     const first = execute(createEmptyDocument(), 'add_building_template', { template: 'house' });
-    expect(first.summary).toMatch(
-      /Added house template: 3 level\(s\), \d+ building element\(s\) added on 3 new level\(s\)\./,
-    );
+    expect(first.summary).toMatch(/Added house template: 3 level\(s\), \d+ building element\(s\) added on 3 new level\(s\)\./);
     const second = execute(first.document, 'add_building_template', {
       template: 'house',
       origin: [30000, 0],
     });
-    expect(second.summary).toMatch(
-      /6 level\(s\), \d+ building element\(s\) added on 3 new level\(s\)\./,
-    );
+    expect(second.summary).toMatch(/6 level\(s\), \d+ building element\(s\) added on 3 new level\(s\)\./);
     const again = execute(first.document, 'add_building_template', { template: 'house' });
     expect(again.document).toBe(first.document);
     expect(again.summary).toMatch(/failed at step/);
@@ -360,12 +338,8 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
     const rename = execute(doc, 'update_opening', { openingId: 'door-2', mark: 'D-A' });
     expect(rename.document).toBe(doc);
     expect(rename.summary).toMatch(/mark 'D-A' is already used by door-1/);
-    expect(execute(doc, 'update_opening', { openingId: 'door-2', mark: 'D-B' }).summary).toMatch(
-      /already has these values/,
-    );
-    expect(
-      execute(doc, 'add_window', { wallId: 'wall-1', offset: 8000, mark: 'D-A' }).affected.length,
-    ).toBeGreaterThan(0);
+    expect(execute(doc, 'update_opening', { openingId: 'door-2', mark: 'D-B' }).summary).toMatch(/already has these values/);
+    expect(execute(doc, 'add_window', { wallId: 'wall-1', offset: 8000, mark: 'D-A' }).affected.length).toBeGreaterThan(0);
   });
 
   it('set_project_info', () => {

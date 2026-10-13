@@ -66,10 +66,7 @@ interface TransformGizmoProps {
   onDraggingChanged: (dragging: boolean) => void;
 }
 
-export function TransformGizmo({
-  mode,
-  onDraggingChanged,
-}: TransformGizmoProps): React.ReactElement | null {
+export function TransformGizmo({ mode, onDraggingChanged }: TransformGizmoProps): React.ReactElement | null {
   // Narrow selectors (R3). Single-entity selection only; gizmo hidden for 0 or multi-select (v1).
   const entity = useSoleSelectedEntity();
   const selectedId = entity?.id;
@@ -151,16 +148,10 @@ export function TransformGizmo({
     );
 
     // Store for drag-end consumption.
-    activeSnapRef.current = result.snapped
-      ? { x: result.x, y: result.y, z: result.z, type: result.type }
-      : null;
+    activeSnapRef.current = result.snapped ? { x: result.x, y: result.y, z: result.z, type: result.type } : null;
 
     showIndicator({
-      position: [
-        result.x - renderOrigin[0],
-        result.y - renderOrigin[1],
-        result.z - renderOrigin[2],
-      ],
+      position: [result.x - renderOrigin[0], result.y - renderOrigin[1], result.z - renderOrigin[2]],
       type: result.snapped ? result.type : 'none',
     });
   });
@@ -178,10 +169,7 @@ export function TransformGizmo({
         preDragPos.current.copy(target.position);
         preDragRot.current.copy(target.rotation);
         preDragScale.current.copy(target.scale);
-        snapCandidatesRef.current = collectSnapCandidates3D(
-          useStore.getState().document,
-          selectedId,
-        );
+        snapCandidatesRef.current = collectSnapCandidates3D(useStore.getState().document, selectedId);
         activeSnapRef.current = null;
         return;
       }
@@ -208,14 +196,7 @@ export function TransformGizmo({
       );
       if (commit !== null) dispatch(commit.name, commit.params);
       else if (mode === 'translate') {
-        const hint = snapBackHint(
-          preDragPos.current,
-          rawEnd,
-          false,
-          snapApplied,
-          SNAP3D_GRID_STEP,
-          useStore.getState().document.units,
-        );
+        const hint = snapBackHint(preDragPos.current, rawEnd, false, snapApplied, SNAP3D_GRID_STEP, useStore.getState().document.units);
         if (hint !== null) useStore.getState().setStatusMessage(hint);
       }
       // Reset gizmo scale to neutral; geometry dimensions live in the entity.
@@ -240,12 +221,7 @@ export function TransformGizmo({
     <>
       {/* Sibling pattern: a real scene-graph <group> is the controls' target (see header). */}
       <group ref={targetRef} position={[x, y, z]} rotation={entity.rotation} />
-      <TransformControls
-        ref={controlsRef}
-        object={targetRef as unknown as MutableRefObject<THREE.Object3D>}
-        mode={mode}
-        size={0.8}
-      />
+      <TransformControls ref={controlsRef} object={targetRef as unknown as MutableRefObject<THREE.Object3D>} mode={mode} size={0.8} />
       {snap3dEnabled && mode === 'translate' && indicator.type !== 'none' && (
         <SnapIndicator3D position={indicator.position} snapType={indicator.type} />
       )}

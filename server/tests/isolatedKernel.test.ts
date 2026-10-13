@@ -107,9 +107,7 @@ describe('isolated OCC kernel', () => {
   it('does not recycle the worker for a graceful refusal such as an oversized fillet', () => {
     const kernel = make();
     expect(meshOf(kernel, box(10))).not.toBeNull();
-    expect(
-      kernel.evaluate({ op: 'fillet', source: leaf(box(10)), edges: [], size: 50 }),
-    ).toBeNull();
+    expect(kernel.evaluate({ op: 'fillet', source: leaf(box(10)), edges: [], size: 50 })).toBeNull();
     expect(kernel.recycleCount()).toBe(0);
     expect(kernel.crashCount()).toBe(0);
     expect(meshOf(kernel, box(2))).not.toBeNull();
@@ -137,8 +135,7 @@ describe('isolated OCC kernel', () => {
   }, 120_000);
 
   describe('a worker that dies while idle', () => {
-    const sleepSync = (ms: number): void =>
-      void Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+    const sleepSync = (ms: number): void => void Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
     it('is replaced on the next call (event loop blocked: status word flags the death)', () => {
       const kernel = make(20_000);

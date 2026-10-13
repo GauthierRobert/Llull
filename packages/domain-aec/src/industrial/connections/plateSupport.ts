@@ -27,30 +27,25 @@ export function appendBasePlates(
   size: PlateSize,
 ): { building: BuildingModel; ids: string[] } {
   const margin = size.margin ?? fromMm(doc, 100);
-  return appendElements(
-    building,
-    columns,
-    'plate',
-    (column, id, mark): BasePlateElement | undefined => {
-      const profile = findProfile(column.profile);
-      if (!profile) return undefined;
-      return {
-        id,
-        category: 'plate',
-        mark,
-        entityIds: [],
-        levelId: column.levelId,
-        memberId: column.id,
-        length: fromMm(doc, profile.h) + 2 * margin,
-        width: fromMm(doc, profile.b) + 2 * margin,
-        thickness: size.thickness ?? fromMm(doc, profile.h >= 300 ? 25 : 20),
-        boltCount: size.boltCount ?? 4,
-        boltDiameter: size.boltDiameter ?? fromMm(doc, 24),
-        material: 'S355',
-        ...(size.fixity === 'fixed' ? { fixity: 'fixed' as const } : {}),
-      };
-    },
-  );
+  return appendElements(building, columns, 'plate', (column, id, mark): BasePlateElement | undefined => {
+    const profile = findProfile(column.profile);
+    if (!profile) return undefined;
+    return {
+      id,
+      category: 'plate',
+      mark,
+      entityIds: [],
+      levelId: column.levelId,
+      memberId: column.id,
+      length: fromMm(doc, profile.h) + 2 * margin,
+      width: fromMm(doc, profile.b) + 2 * margin,
+      thickness: size.thickness ?? fromMm(doc, profile.h >= 300 ? 25 : 20),
+      boltCount: size.boltCount ?? 4,
+      boltDiameter: size.boltDiameter ?? fromMm(doc, 24),
+      material: 'S355',
+      ...(size.fixity === 'fixed' ? { fixity: 'fixed' as const } : {}),
+    };
+  });
 }
 
 /**
@@ -69,8 +64,7 @@ export function refitPlates(
     return { building: withoutElements(building, removed), resized: [], removed: [...removed] };
   }
   const [before, after] = [findProfile(previousProfile), findProfile(member.profile)];
-  if (!before || !after || before.name === after.name)
-    return { building, resized: [], removed: [] };
+  if (!before || !after || before.name === after.name) return { building, resized: [], removed: [] };
   let next = building;
   for (const plate of plates) {
     next = withElement(next, {
@@ -91,8 +85,6 @@ export function columnsWithoutPlates(
   const plated = new Set(elementsOf(building, 'plate').map((plate) => plate.memberId));
   return elementsOf(building, 'member').filter(
     (element) =>
-      element.role === 'column' &&
-      !plated.has(element.id) &&
-      (memberIds ? memberIds.has(element.id) : element.levelId === levelId),
+      element.role === 'column' && !plated.has(element.id) && (memberIds ? memberIds.has(element.id) : element.levelId === levelId),
   );
 }

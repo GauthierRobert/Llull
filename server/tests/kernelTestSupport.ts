@@ -14,8 +14,7 @@ import { meshBounds } from '../../tests/helpers/meshBounds';
 
 export const leaf = (entity: Entity): ShapeRecipe => ({ op: 'solid', entity });
 
-const asRecipe = (source: Entity | ShapeRecipe): ShapeRecipe =>
-  'op' in source ? source : leaf(source);
+const asRecipe = (source: Entity | ShapeRecipe): ShapeRecipe => ('op' in source ? source : leaf(source));
 
 /** Display mesh of a recipe (or of an entity's leaf); null when the kernel refuses it. */
 export function meshOf(kernel: GeometryKernel, source: Entity | ShapeRecipe): MeshData | null {
@@ -23,19 +22,15 @@ export function meshOf(kernel: GeometryKernel, source: Entity | ShapeRecipe): Me
   return shape === null ? null : kernel.tessellate(shape);
 }
 
-export const booleanRecipe = (
-  op: BooleanOp,
-  a: Entity | ShapeRecipe,
-  b: Entity | ShapeRecipe,
-): ShapeRecipe => ({ op: 'boolean', boolean: op, a: asRecipe(a), b: asRecipe(b) });
+export const booleanRecipe = (op: BooleanOp, a: Entity | ShapeRecipe, b: Entity | ShapeRecipe): ShapeRecipe => ({
+  op: 'boolean',
+  boolean: op,
+  a: asRecipe(a),
+  b: asRecipe(b),
+});
 
 /** Mesh of `a op b` (exact operands); null when the kernel refuses it. */
-export function booleanMesh(
-  kernel: GeometryKernel,
-  op: BooleanOp,
-  a: Entity | ShapeRecipe,
-  b: Entity | ShapeRecipe,
-): MeshData | null {
+export function booleanMesh(kernel: GeometryKernel, op: BooleanOp, a: Entity | ShapeRecipe, b: Entity | ShapeRecipe): MeshData | null {
   return meshOf(kernel, booleanRecipe(op, a, b));
 }
 
@@ -51,11 +46,7 @@ export function volume(mesh: MeshData): number {
   let sum = 0;
   const p = mesh.positions;
   for (let i = 0; i < mesh.indices.length; i += 3) {
-    const [a, b, c] = [0, 1, 2].map((k) => (mesh.indices[i + k] ?? 0) * 3) as [
-      number,
-      number,
-      number,
-    ];
+    const [a, b, c] = [0, 1, 2].map((k) => (mesh.indices[i + k] ?? 0) * 3) as [number, number, number];
     sum +=
       ((p[a] ?? 0) * ((p[b + 1] ?? 0) * (p[c + 2] ?? 0) - (p[b + 2] ?? 0) * (p[c + 1] ?? 0)) -
         (p[a + 1] ?? 0) * ((p[b] ?? 0) * (p[c + 2] ?? 0) - (p[b + 2] ?? 0) * (p[c] ?? 0)) +
@@ -104,11 +95,7 @@ export function expectBooleanAgrees(
 export type Placement = [string, Vec3, Vec3];
 export const ORIGIN_PLACEMENT: Placement = ['origin', [0, 0, 0], [0, 0, 0]];
 export const TRANSLATED_PLACEMENT: Placement = ['translated', [5, -3, 2], [0, 0, 0]];
-export const ALL_AXES_PLACEMENT: Placement = [
-  'rotated about all axes',
-  [-2, 4, 1],
-  [0.3, -0.5, 1.1],
-];
+export const ALL_AXES_PLACEMENT: Placement = ['rotated about all axes', [-2, 4, 1], [0.3, -0.5, 1.1]];
 
 /** Both kernels' meshes of `entity`; each must exist (`label` names the case on failure). */
 export function bothMeshes(

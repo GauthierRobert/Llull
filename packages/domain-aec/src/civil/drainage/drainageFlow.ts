@@ -43,37 +43,22 @@ function pipeVelocity(diameterM: number, slope: number, manningN: number, flowM3
   return solvePartialFlow(diameterM, slope, manningN, flowM3s).velocity;
 }
 
-function capacityShares(
-  doc: CadDocument,
-  civil: CivilModel,
-  outgoing: readonly PipeObject[],
-): number[] {
+function capacityShares(doc: CadDocument, civil: CivilModel, outgoing: readonly PipeObject[]): number[] {
   if (outgoing.length === 1) return [1];
-  const capacities = outgoing.map((pipe) =>
-    manningFullFlow(toMetres(doc, pipe.diameter), pipeSlope(civil, pipe), pipe.manningN),
-  );
+  const capacities = outgoing.map((pipe) => manningFullFlow(toMetres(doc, pipe.diameter), pipeSlope(civil, pipe), pipe.manningN));
   const total = capacities.reduce((sum, value) => sum + value, 0);
   return capacities.map((value) => (total > 0 ? value / total : 1 / outgoing.length));
 }
 
 /** Flow, time of concentration and intensity per pipe for the current diameters. */
-export function computeFlows(
-  doc: CadDocument,
-  civil: CivilModel,
-  criteria: DrainageCriteria,
-): FlowResult {
-  const pipes = civilObjectsOf(civil, 'pipe').filter(
-    (pipe) => pipePlanLength(civil, pipe) !== null,
-  );
+export function computeFlows(doc: CadDocument, civil: CivilModel, criteria: DrainageCriteria): FlowResult {
+  const pipes = civilObjectsOf(civil, 'pipe').filter((pipe) => pipePlanLength(civil, pipe) !== null);
   const flows = new Map<string, PipeFlow>();
   const diverging: string[] = [];
   for (const manhole of manholesUpstreamFirst(civil)) {
-    let sumCA = manhole.catchment
-      ? manhole.catchment.runoffCoefficient * manhole.catchment.areaHa
-      : 0;
+    let sumCA = manhole.catchment ? manhole.catchment.runoffCoefficient * manhole.catchment.areaHa : 0;
     let inflow = manhole.inflow ?? 0;
-    let tc =
-      manhole.catchment || manhole.inflow ? (manhole.entryTimeMin ?? DEFAULT_ENTRY_TIME_MIN) : 0;
+    let tc = manhole.catchment || manhole.inflow ? (manhole.entryTimeMin ?? DEFAULT_ENTRY_TIME_MIN) : 0;
     for (const pipe of pipes.filter((p) => p.toId === manhole.id)) {
       const upstream = flows.get(pipe.id);
       if (!upstream) continue;
@@ -92,12 +77,7 @@ export function computeFlows(
       const share = shares[index] ?? 1;
       const diameterM = toMetres(doc, pipe.diameter);
       const designLps = rationalFlowLps(sumCA * share, intensityMmH, 1) + inflow * share;
-      const velocity = pipeVelocity(
-        diameterM,
-        pipeSlope(civil, pipe),
-        pipe.manningN,
-        designLps / 1000,
-      );
+      const velocity = pipeVelocity(diameterM, pipeSlope(civil, pipe), pipe.manningN, designLps / 1000);
       const lengthM = toMetres(doc, pipePlanLength(civil, pipe) ?? 0);
       flows.set(pipe.id, {
         tcMin,

@@ -6,21 +6,12 @@
  */
 
 /** The point at `angle` (radians) on the circle of `radius` about `center`. */
-export function polar(
-  center: readonly [number, number],
-  radius: number,
-  angle: number,
-): [number, number] {
+export function polar(center: readonly [number, number], radius: number, angle: number): [number, number] {
   return [center[0] + radius * Math.cos(angle), center[1] + radius * Math.sin(angle)];
 }
 
 /** The point at parametric `angle` (radians) on the axis-aligned ellipse of `radiusX` × `radiusY` about `center`. */
-export function ellipsePoint(
-  center: readonly [number, number],
-  radiusX: number,
-  radiusY: number,
-  angle: number,
-): [number, number] {
+export function ellipsePoint(center: readonly [number, number], radiusX: number, radiusY: number, angle: number): [number, number] {
   return [center[0] + radiusX * Math.cos(angle), center[1] + radiusY * Math.sin(angle)];
 }
 
@@ -57,10 +48,6 @@ export function sampleArc(
 }
 
 /** `segments` points of the full circle (first at angle 0, CCW, not closed). */
-export function circlePolygon(
-  center: readonly [number, number],
-  radius: number,
-  segments: number,
-): Array<[number, number]> {
+export function circlePolygon(center: readonly [number, number], radius: number, segments: number): Array<[number, number]> {
   return arcPolyline(center, radius, 0, 2 * Math.PI, segments).slice(0, segments);
 }

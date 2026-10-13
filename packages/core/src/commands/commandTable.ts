@@ -17,14 +17,9 @@ const byName = new Map<string, CommandDefinition<unknown>>();
  * Register `commands` (each wrapped by `guardCommand`), all or nothing.
  * @failure a name already registered, or repeated within `commands` -> throws, nothing registered
  */
-export function registerCommands(
-  source: string,
-  commands: ReadonlyArray<CommandDefinition<unknown>>,
-): void {
+export function registerCommands(source: string, commands: ReadonlyArray<CommandDefinition<unknown>>): void {
   const names = commands.map((command) => command.name);
-  const clash = commands.find(
-    (command, index) => byName.has(command.name) || names.indexOf(command.name) !== index,
-  );
+  const clash = commands.find((command, index) => byName.has(command.name) || names.indexOf(command.name) !== index);
   if (clash) throw new Error(`${source}: command '${clash.name}' is already registered`);
   for (const command of commands) {
     const guarded = guardCommand(command);

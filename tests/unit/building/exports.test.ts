@@ -17,11 +17,7 @@ import { drawHouseWalls, run } from '../../helpers/runFixtures';
 /** True for code points XML 1.0 forbids (C0 controls other than tab, LF, CR; U+FFFE; U+FFFF). */
 function isIllegalXmlCharacter(character: string): boolean {
   const code = character.codePointAt(0) ?? 0;
-  return (
-    (code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d) ||
-    code === 0xfffe ||
-    code === 0xffff
-  );
+  return (code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d) || code === 0xfffe || code === 0xffff;
 }
 
 function house(): CadDocument {
@@ -58,33 +54,21 @@ describe('plan drawing', () => {
   it('cuts walls at door gaps and window gaps but not high windows', () => {
     const plan = buildPlanDrawing(house(), undefined)!;
     expect(plan.level.name).toBe('Rez-de-chaussée');
-    const wallPolygons = plan.primitives.filter(
-      (p) => p.type === 'polygon' && p.layer === 'A-WALL',
-    );
+    const wallPolygons = plan.primitives.filter((p) => p.type === 'polygon' && p.layer === 'A-WALL');
     // wall-1: door + window gaps → 3 pieces; wall-3: door → 2; wall-2 high window (sill 1.5 m) → 1; wall-4 → 1
     expect(wallPolygons).toHaveLength(7);
     expect(plan.primitives.filter((p) => p.type === 'arc')).toHaveLength(2);
     expect(plan.primitives.filter((p) => p.layer === 'A-GLAZ')).toHaveLength(6);
     expect(plan.primitives.some((p) => p.type === 'circle' && p.layer === 'S-COLS')).toBe(true);
-    expect(
-      plan.primitives.some(
-        (p) => p.type === 'polygon' && p.layer === 'S-BEAM' && p.style === 'hidden',
-      ),
-    ).toBe(true);
+    expect(plan.primitives.some((p) => p.type === 'polygon' && p.layer === 'S-BEAM' && p.style === 'hidden')).toBe(true);
     expect(plan.primitives.some((p) => p.type === 'text' && p.content === 'UP 12R')).toBe(true);
-    expect(plan.primitives.some((p) => p.type === 'text' && p.content === '001 · 74.69 m²')).toBe(
-      true,
-    );
-    const dims = plan.primitives
-      .filter((p) => p.type === 'dimension')
-      .map((p) => p.type === 'dimension' && p.label);
+    expect(plan.primitives.some((p) => p.type === 'text' && p.content === '001 · 74.69 m²')).toBe(true);
+    const dims = plan.primitives.filter((p) => p.type === 'dimension').map((p) => p.type === 'dimension' && p.label);
     expect(dims).toEqual(['10300', '8300', '5000', '5000', '8000']);
   });
 
   it('draws grid lines as chain (centre) lines', () => {
-    const grids = buildPlanDrawing(house(), undefined)!.primitives.filter(
-      (p) => p.layer === 'S-GRID' && p.type === 'line',
-    );
+    const grids = buildPlanDrawing(house(), undefined)!.primitives.filter((p) => p.layer === 'S-GRID' && p.type === 'line');
     expect(grids.length).toBeGreaterThan(0);
     expect(grids.every((p) => p.style === 'center')).toBe(true);
   });
@@ -107,11 +91,10 @@ describe('plan drawing', () => {
         [4, 0],
       ],
     });
-    expect(
-      buildPlanDrawing(metres, undefined)!.primitives.flatMap((p) =>
-        p.type === 'dimension' ? [p.label] : [],
-      ),
-    ).toEqual(['4200', '200']);
+    expect(buildPlanDrawing(metres, undefined)!.primitives.flatMap((p) => (p.type === 'dimension' ? [p.label] : []))).toEqual([
+      '4200',
+      '200',
+    ]);
     expect(fileSlug('Rez-de-chaussée / 1', 'x')).toBe('Rez-de-chaussee_1');
     expect(fileSlug('***', 'x')).toBe('x');
   });
@@ -154,9 +137,7 @@ describe('export_dxf', () => {
     expect(data.filename).toBe('Maison_Dupont_Rez-de-chaussee.dxf');
     expect(data.dxf.startsWith('0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1009')).toBe(true);
     expect(data.dxf.trimEnd().endsWith('0\nEOF')).toBe(true);
-    expect(data.layers).toEqual(
-      expect.arrayContaining(['A-WALL', 'A-DOOR', 'A-GLAZ', 'S-GRID', 'A-ANNO-DIMS', 'Layer_0']),
-    );
+    expect(data.layers).toEqual(expect.arrayContaining(['A-WALL', 'A-DOOR', 'A-GLAZ', 'S-GRID', 'A-ANNO-DIMS', 'Layer_0']));
     expect(data.dxf).toContain('\nARC\n');
     expect(data.dxf).toContain('\nPOINT\n');
     expect(data.dxf).toContain('Note \\U+00B2');
@@ -172,9 +153,7 @@ describe('export_dxf', () => {
     let doc = run(createEmptyDocument(), 'add_box', { size: [10, 10, 1], position: [0, 0, 5] });
     doc = run(doc, 'add_cylinder', { radius: 2, height: 2, position: [0, 0, 0] });
     const data = execute(doc, 'export_dxf', {}).data as DxfExport;
-    expect(data.layers).toEqual(
-      expect.arrayContaining(['OBJ-VISIBLE', 'OBJ-HIDDEN', 'OBJ-CENTER']),
-    );
+    expect(data.layers).toEqual(expect.arrayContaining(['OBJ-VISIBLE', 'OBJ-HIDDEN', 'OBJ-CENTER']));
     expect(data.dxf).toMatch(/\nLAYER\n2\nOBJ-HIDDEN\n70\n0\n62\n8\n6\nDASHED/);
     expect(data.dxf).toMatch(/\nLAYER\n2\nOBJ-CENTER\n70\n0\n62\n1\n6\nCENTER/);
     expect(data.dxf).toContain('\nLTYPE\n2\nCENTER\n');
@@ -223,13 +202,10 @@ describe('export_plan_sheet', () => {
 
   it('honours paper, scale and title; rejects bad input', () => {
     const doc = house();
-    const sheet = execute(doc, 'export_plan_sheet', { paper: 'A1', scale: 50, title: 'Plan <RDC>' })
-      .data as PlanSheet;
+    const sheet = execute(doc, 'export_plan_sheet', { paper: 'A1', scale: 50, title: 'Plan <RDC>' }).data as PlanSheet;
     expect(sheet.svg).toContain('width="841mm"');
     expect(sheet.svg).toContain('Plan &lt;RDC&gt;');
-    expect(execute(doc, 'export_plan_sheet', { paper: 'B5' }).summary).toMatch(
-      /rejected: invalid params — paper/,
-    );
+    expect(execute(doc, 'export_plan_sheet', { paper: 'B5' }).summary).toMatch(/rejected: invalid params — paper/);
     expect(execute(doc, 'export_plan_sheet', { scale: 0 }).summary).toMatch(/invalid scale/);
     expect(execute(createEmptyDocument(), 'export_plan_sheet', {}).data).toBeUndefined();
   });
@@ -300,9 +276,7 @@ describe('export_ifc', () => {
     const doc = run(createEmptyDocument(), 'add_level', {});
     const data = execute(doc, 'export_ifc', { timestamp: '2027-01-02T03:04:05' }).data as IfcExport;
     expect(data.ifc).toContain("'2027-01-02T03:04:05'");
-    expect((execute(doc, 'export_ifc', {}).data as IfcExport).ifc).toContain(
-      "'1970-01-01T00:00:00'",
-    );
+    expect((execute(doc, 'export_ifc', {}).data as IfcExport).ifc).toContain("'1970-01-01T00:00:00'");
   });
 
   it('encoding helpers', () => {
@@ -332,11 +306,7 @@ describe('identity', () => {
       ],
     });
     const guids = (doc: CadDocument): string[] =>
-      [
-        ...(execute(doc, 'export_ifc', {}).data as IfcExport).ifc.matchAll(
-          /\('([0-9A-Za-z_$]{22})'/g,
-        ),
-      ].map((match) => match[1]!);
+      [...(execute(doc, 'export_ifc', {}).data as IfcExport).ifc.matchAll(/\('([0-9A-Za-z_$]{22})'/g)].map((match) => match[1]!);
     const shared = guids(a).filter((guid) => guids(b).includes(guid));
     expect(shared).toEqual([]);
     expect(guids(a)).toEqual(guids(run(a, 'set_project_info', { client: 'X' })));
@@ -413,9 +383,7 @@ describe('DXF layer names', () => {
     writer.line('S-GRID', [0, 0], [1, 0]);
     expect([...writer.layers.keys()]).toEqual(['A_B', 'A_B_2', 'A_B_3', 'S-GRID']);
     const layerOfEntity = (type: string): string[] =>
-      writer.lines.flatMap((line, index) =>
-        line === type && writer.lines[index - 1] === '0' ? [writer.lines[index + 2] as string] : [],
-      );
+      writer.lines.flatMap((line, index) => (line === type && writer.lines[index - 1] === '0' ? [writer.lines[index + 2] as string] : []));
     expect(layerOfEntity('LINE')).toEqual(['A_B', 'A_B_2', 'A_B', 'S-GRID']);
     expect(layerOfEntity('POLYLINE')).toEqual(['A_B_3']);
     expect(writer.layers.get('S-GRID')).toBe(1);
@@ -509,9 +477,7 @@ describe('export_ifc counts', () => {
     expect(data.elementCount).toBeGreaterThan(0);
     expect(data.elementCount).toBeLessThanOrEqual(modelled);
     expect(data.productCount).toBeGreaterThanOrEqual(data.elementCount);
-    expect(result.summary).toContain(
-      `${data.elementCount} building element(s) as ${data.productCount} IFC product(s)`,
-    );
+    expect(result.summary).toContain(`${data.elementCount} building element(s) as ${data.productCount} IFC product(s)`);
     const plain = execute(house(), 'export_ifc', {}).data as IfcExport;
     expect(plain.elementCount).toBeLessThanOrEqual(plain.productCount);
   });

@@ -32,13 +32,11 @@ export function arcPath(arc: ArcSpec): CurveSegment<Vec3>[] | string {
   if (!isVec3(center)) return 'arc center must be a finite [x, y, z] triple';
   if (!isVec3(normal) || len3(normal) < 1e-10) return 'arc normal must be a non-zero vector';
   if (!(radius > 0)) return `arc radius must be > 0 (got ${radius})`;
-  if (!Number.isFinite(startAngle) || !Number.isFinite(endAngle))
-    return 'arc angles must be finite numbers';
+  if (!Number.isFinite(startAngle) || !Number.isFinite(endAngle)) return 'arc angles must be finite numbers';
   const n = normalize3(normal);
   const u = inPlaneX(n);
   const v = cross3(n, u);
-  const at = (angle: number): Vec3 =>
-    add3(center, scale3(add3(scale3(u, Math.cos(angle)), scale3(v, Math.sin(angle))), radius));
+  const at = (angle: number): Vec3 => add3(center, scale3(add3(scale3(u, Math.cos(angle)), scale3(v, Math.sin(angle))), radius));
   const sweep = endAngle - startAngle;
   const full = Math.abs(sweep) >= Math.PI * 2 - 1e-9;
   const total = full ? Math.sign(sweep) * Math.PI * 2 : sweep;

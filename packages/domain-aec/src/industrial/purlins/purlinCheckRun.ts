@@ -57,15 +57,8 @@ export const checkPurlins = defineCommand({
   }),
   run: (doc: CadDocument, params): CommandResult => {
     const { windPressure = 0.6, snowLoad = 0.8, roofDeadLoad = 0.3 } = params;
-    if (
-      !isNonNegativeNumber(windPressure) ||
-      !isNonNegativeNumber(snowLoad) ||
-      !isNonNegativeNumber(roofDeadLoad)
-    ) {
-      return noop(
-        doc,
-        'check_purlins failed: windPressure, snowLoad and roofDeadLoad must be >= 0.',
-      );
+    if (!isNonNegativeNumber(windPressure) || !isNonNegativeNumber(snowLoad) || !isNonNegativeNumber(roofDeadLoad)) {
+      return noop(doc, 'check_purlins failed: windPressure, snowLoad and roofDeadLoad must be >= 0.');
     }
     const levelId = levelOrFailure(doc, 'check_purlins', params.levelId);
     if (typeof levelId !== 'string') return levelId;
@@ -73,11 +66,13 @@ export const checkPurlins = defineCommand({
     const analysis = analysePurlins(members, levelId, { windPressure, snowLoad, roofDeadLoad });
     if ('reason' in analysis) return noop(doc, analysis.reason);
     const { rows, zones, monopitch, eAcross, eAlong } = analysis;
-    const { csv, failures, worst } = checkTable(
-      rows,
-      ['Mark', 'Type', 'Zone', 'Span (m)', ...LIMIT_COLUMNS],
-      (row, status) => [row.mark, row.kind, row.zone, round(row.span), ...limitCells(row, status)],
-    );
+    const { csv, failures, worst } = checkTable(rows, ['Mark', 'Type', 'Zone', 'Span (m)', ...LIMIT_COLUMNS], (row, status) => [
+      row.mark,
+      row.kind,
+      row.zone,
+      round(row.span),
+      ...limitCells(row, status),
+    ]);
     const purlinRows = rows.filter((row) => row.kind === 'purlin');
     const maxOf = (list: readonly PurlinRow[]): number => round(maxUtilisation(list));
     return report(

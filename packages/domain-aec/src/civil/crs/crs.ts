@@ -18,10 +18,7 @@ export function localToGrid(calibration: SiteCalibration, point: Vec2): Vec2 {
   const sin = Math.sin(theta) * calibration.scaleFactor;
   const dx = point[0] - calibration.localOrigin[0];
   const dy = point[1] - calibration.localOrigin[1];
-  return [
-    calibration.gridOrigin[0] + cos * dx - sin * dy,
-    calibration.gridOrigin[1] + sin * dx + cos * dy,
-  ];
+  return [calibration.gridOrigin[0] + cos * dx - sin * dy, calibration.gridOrigin[1] + sin * dx + cos * dy];
 }
 
 /** Inverse of `localToGrid`. */
@@ -31,10 +28,7 @@ export function gridToLocal(calibration: SiteCalibration, point: Vec2): Vec2 {
   const sin = Math.sin(theta) / calibration.scaleFactor;
   const dx = point[0] - calibration.gridOrigin[0];
   const dy = point[1] - calibration.gridOrigin[1];
-  return [
-    calibration.localOrigin[0] + cos * dx + sin * dy,
-    calibration.localOrigin[1] - sin * dx + cos * dy,
-  ];
+  return [calibration.localOrigin[0] + cos * dx + sin * dy, calibration.localOrigin[1] - sin * dx + cos * dy];
 }
 
 /** The calibration of `doc`, when one is set. */
@@ -43,10 +37,7 @@ export function calibrationOf(doc: Pick<CadDocument, 'civil'>): SiteCalibration 
 }
 
 /** Frame an export uses: the requested one, else grid when calibrated, else local. */
-export function resolveFrame(
-  doc: Pick<CadDocument, 'civil'>,
-  requested: CoordinateFrame | undefined,
-): CoordinateFrame {
+export function resolveFrame(doc: Pick<CadDocument, 'civil'>, requested: CoordinateFrame | undefined): CoordinateFrame {
   if (calibrationOf(doc) === undefined) return 'local';
   return requested ?? 'grid';
 }

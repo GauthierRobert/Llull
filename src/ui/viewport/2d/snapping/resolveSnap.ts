@@ -34,21 +34,11 @@ const SNAP_TYPE_PRIORITY: Record<SnapType, number> = {
  *
  * @pure deterministic, no side effects
  */
-export function snap(
-  cursor: Vec2,
-  candidates: SnapPoint[],
-  gridSize: number,
-  tolerance: number,
-): SnapResult {
+export function snap(cursor: Vec2, candidates: SnapPoint[], gridSize: number, tolerance: number): SnapResult {
   const cx = cursor[0];
   const cy = cursor[1];
 
-  const best = nearestSnap(
-    candidates,
-    (candidate) => Math.hypot(candidate.x - cx, candidate.y - cy),
-    tolerance,
-    SNAP_TYPE_PRIORITY,
-  );
+  const best = nearestSnap(candidates, (candidate) => Math.hypot(candidate.x - cx, candidate.y - cy), tolerance, SNAP_TYPE_PRIORITY);
 
   if (best !== null) return { x: best.x, y: best.y, type: best.type, snapped: true };
 
@@ -95,8 +85,7 @@ export function applyOrthoPolar(origin: Vec2, cursor: Vec2, opts: OrthoPolarOpts
 
   // Polar tracking. Treat a missing OR non-positive increment as the 15° default
   // (a 0 increment from an uninitialized UI field would otherwise yield NaN).
-  const increment =
-    opts.polarIncrement && opts.polarIncrement > 0 ? opts.polarIncrement : Math.PI / 12;
+  const increment = opts.polarIncrement && opts.polarIncrement > 0 ? opts.polarIncrement : Math.PI / 12;
   const rawAngle = Math.atan2(dy, dx);
   const snappedAngle = Math.round(rawAngle / increment) * increment;
   return [origin[0] + length * Math.cos(snappedAngle), origin[1] + length * Math.sin(snappedAngle)];

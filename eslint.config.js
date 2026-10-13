@@ -7,13 +7,7 @@ import tseslint from 'typescript-eslint';
 export default tseslint.config(
   {
     // Isolated agent worktrees hold full repo copies; never lint them twice.
-    ignores: [
-      '**/dist/**',
-      '**/coverage/**',
-      '**/node_modules/**',
-      '**/*.cjs',
-      '.claude/worktrees/**',
-    ],
+    ignores: ['**/dist/**', '**/coverage/**', '**/node_modules/**', '**/*.cjs', '.claude/worktrees/**'],
   },
   js.configs.recommended,
   tseslint.configs.recommended,
@@ -33,15 +27,10 @@ export default tseslint.config(
       'no-restricted-imports': [
         'error',
         {
-          patterns: [
-            { group: ['@core/lib/*'], message: 'Import core helpers via @lib/* instead.' },
-          ],
+          patterns: [{ group: ['@core/lib/*'], message: 'Import core helpers via @lib/* instead.' }],
         },
       ],
-      '@typescript-eslint/consistent-type-imports': [
-        'error',
-        { fixStyle: 'separate-type-imports', disallowTypeAnnotations: false },
-      ],
+      '@typescript-eslint/consistent-type-imports': ['error', { fixStyle: 'separate-type-imports', disallowTypeAnnotations: false }],
     },
   },
   {

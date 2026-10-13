@@ -101,11 +101,7 @@ export function ModifyTools({
 
   return (
     <>
-      <div
-        className="vp-tool-palette vp-tool-palette--modify"
-        role="toolbar"
-        aria-label="2D modify tools"
-      >
+      <div className="vp-tool-palette vp-tool-palette--modify" role="toolbar" aria-label="2D modify tools">
         {TOOL_BUTTONS.map(({ tool, label, hint: kbHint, icon }) => (
           <button
             key={tool}
@@ -136,12 +132,7 @@ export function ModifyTools({
               onKeyDown={enterEscapeKeys({ onEnter: onCommitValue })}
               aria-label={`${valueLabel(activeTool)} value`}
             />
-            <button
-              type="button"
-              className="vp-primary-btn"
-              onClick={onCommitValue}
-              aria-label="Apply"
-            >
+            <button type="button" className="vp-primary-btn" onClick={onCommitValue} aria-label="Apply">
               Apply
             </button>
           </div>

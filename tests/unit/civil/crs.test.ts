@@ -60,13 +60,9 @@ describe('set_coordinate_system / set_site_calibration', () => {
     expect(doc.civil?.crs?.epsg).toBe(2154);
     const loaded = deserializeDocument(serializeDocument(doc));
     expect(loaded.civil?.crs?.calibration).toEqual(CALIBRATION);
-    expect(
-      civilErrors({ ...doc.civil, crs: { name: 'x', calibration: { scaleFactor: 0 } } }),
-    ).not.toEqual([]);
+    expect(civilErrors({ ...doc.civil, crs: { name: 'x', calibration: { scaleFactor: 0 } } })).not.toEqual([]);
     expect(civilErrors({ ...doc.civil, crs: { name: 3 } })).not.toEqual([]);
-    expect(
-      civilErrors({ ...doc.civil, crs: { name: 'x', epsg: -1, verticalDatum: 4 } }).length,
-    ).toBe(2);
+    expect(civilErrors({ ...doc.civil, crs: { name: 'x', epsg: -1, verticalDatum: 4 } }).length).toBe(2);
   });
 });
 
@@ -113,9 +109,7 @@ describe('transform_coordinates', () => {
       direction: 'localToGrid',
     });
     expect(none.summary).toMatch(/no site calibration/);
-    expect(
-      execute(doc, 'transform_coordinates', { points: [], direction: 'localToGrid' }).data,
-    ).toBeUndefined();
+    expect(execute(doc, 'transform_coordinates', { points: [], direction: 'localToGrid' }).data).toBeUndefined();
   });
 });
 
@@ -151,22 +145,16 @@ describe('exports use grid coordinates when calibrated', () => {
 
   it('LandXML writes CoordinateSystem and grid N E, or local on request', () => {
     const grid = (execute(site(), 'export_landxml', {}).data as { text: string }).text;
-    expect(grid).toContain(
-      '<CoordinateSystem name="RGF93 / Lambert-93" epsgCode="2154" verticalDatum="NGF-IGN69"/>',
-    );
+    expect(grid).toContain('<CoordinateSystem name="RGF93 / Lambert-93" epsgCode="2154" verticalDatum="NGF-IGN69"/>');
     expect(grid).toContain('2020 1000 5</CgPoint>');
-    const local = (
-      execute(site(), 'export_landxml', { coordinates: 'local' }).data as { text: string }
-    ).text;
+    const local = (execute(site(), 'export_landxml', { coordinates: 'local' }).data as { text: string }).text;
     expect(local).toContain('>0 10 5</CgPoint>');
     expect(local).not.toContain('CoordinateSystem');
   });
 
   it('LandXML without CRS has no CoordinateSystem; CRS alone keeps local coordinates', () => {
     const plain = execute(metricDocument(), 'import_survey_points', { text: survey }).document;
-    expect((execute(plain, 'export_landxml', {}).data as { text: string }).text).not.toContain(
-      'CoordinateSystem',
-    );
+    expect((execute(plain, 'export_landxml', {}).data as { text: string }).text).not.toContain('CoordinateSystem');
     const named = execute(plain, 'set_coordinate_system', { name: 'Local' }).document;
     const text = (execute(named, 'export_landxml', {}).data as { text: string }).text;
     expect(text).toContain('<CoordinateSystem name="Local"/>');
@@ -176,9 +164,7 @@ describe('exports use grid coordinates when calibrated', () => {
   it('civil DXF writes grid POINTs by default and local on request', () => {
     const dxf = (execute(site(), 'export_civil_dxf', {}).data as { text: string }).text;
     expect(dxf).toContain('2020');
-    const local = (
-      execute(site(), 'export_civil_dxf', { coordinates: 'local' }).data as { text: string }
-    ).text;
+    const local = (execute(site(), 'export_civil_dxf', { coordinates: 'local' }).data as { text: string }).text;
     expect(local).not.toContain('2020');
   });
 

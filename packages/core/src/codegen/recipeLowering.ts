@@ -34,11 +34,7 @@ export function meshSoup(mesh: MeshData): number[] {
 }
 
 /** Mid points of the selected edges of `source`, when the kernel has exact topology. */
-function edgeMidPoints(
-  kernel: GeometryKernel | null,
-  source: ShapeRecipe,
-  edges: readonly number[],
-): Vec3[] | undefined {
+function edgeMidPoints(kernel: GeometryKernel | null, source: ShapeRecipe, edges: readonly number[]): Vec3[] | undefined {
   if (kernel === null || edges.length === 0) return undefined;
   const shape = kernel.evaluate(source);
   const topology = shape === null ? null : kernel.topology(shape);
@@ -108,23 +104,14 @@ export function lowerRecipe(recipe: ShapeRecipe, lowering: RecipeLowering): Lowe
       const source = lowerRecipe(recipe.source, lowering);
       if (source === null) return null;
       const base = lowering.base(source.variable);
-      const feature = modificationFeature(
-        recipe,
-        base,
-        lowering.kernel,
-        soupOf(lowering.kernel, recipe),
-      );
+      const feature = modificationFeature(recipe, base, lowering.kernel, soupOf(lowering.kernel, recipe));
       return { features: [...source.features, feature], variable: source.variable };
     }
     case 'place': {
       if (recipe.rotation.some((angle) => angle !== 0)) return null;
       const source = lowerRecipe(recipe.source, lowering);
       if (source === null) return null;
-      const delta = recipe.position.map((value) => ({ value })) as [
-        { value: number },
-        { value: number },
-        { value: number },
-      ];
+      const delta = recipe.position.map((value) => ({ value })) as [{ value: number }, { value: number }, { value: number }];
       const feature: Feature = { ...lowering.base(source.variable), op: 'translate', delta };
       return { features: [...source.features, feature], variable: source.variable };
     }

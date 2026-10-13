@@ -7,11 +7,7 @@
 import type { FormEvent } from 'react';
 import { useDispatchThen } from '@ui/hooks/useDispatchThen';
 
-export function useDraftSubmit(
-  command: string,
-  draft: unknown,
-  onChanged: () => void,
-): (event: FormEvent) => void {
+export function useDraftSubmit(command: string, draft: unknown, onChanged: () => void): (event: FormEvent) => void {
   const dispatchThen = useDispatchThen();
   return (event) => {
     event.preventDefault();

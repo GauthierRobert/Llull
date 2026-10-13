@@ -11,15 +11,7 @@ import type { CadDocument, Entity } from '@core/model/types';
 import { createEmptyDocument } from '@core/model/types';
 import type { ShapeTopology } from '@core/geometry/kernel';
 import { execute } from '@core/commands/registry';
-import {
-  booleanMesh,
-  box,
-  common,
-  expectBoundsClose,
-  liveKernels,
-  meshOf,
-  volume,
-} from './kernelTestSupport';
+import { booleanMesh, box, common, expectBoundsClose, liveKernels, meshOf, volume } from './kernelTestSupport';
 
 const kernels = liveKernels();
 
@@ -76,8 +68,7 @@ describe('sweep_profile on the live kernels', () => {
   it('round pipe along a bent path: exact pipe wall 2π r L, meshes match π r² L', () => {
     const pipe = created(empty, 'sweep_profile', { path: L_PATH, radius: 1.5, bendRadius: 5 });
     const exact = (
-      execute({ ...empty, entities: { [pipe.id]: pipe } }, 'mass_properties', { entityId: pipe.id })
-        .data as { volume: number }
+      execute({ ...empty, entities: { [pipe.id]: pipe } }, 'mass_properties', { entityId: pipe.id }).data as { volume: number }
     ).volume;
     const { occt, manifold } = volumes(pipe);
     const length = exact / (Math.PI * 1.5 ** 2);
@@ -163,10 +154,7 @@ describe('exact profile curves on the live OCC kernel', () => {
     const doc = sketch({ id: 'c', kind: 'circle', center: [0, 0], radius: 5 });
     const ext = created(doc, 'extrude_profile', { id: 'c', depth: 4 });
     const wall = topologyOf(ext).faces.filter((face) => face.surface === 'cylinder');
-    expect(wall.reduce((sum, face) => sum + face.area, 0) / (2 * Math.PI * 5 * 4)).toBeCloseTo(
-      1,
-      6,
-    );
+    expect(wall.reduce((sum, face) => sum + face.area, 0) / (2 * Math.PI * 5 * 4)).toBeCloseTo(1, 6);
     expect(volumes(ext).occt / (Math.PI * 25 * 4)).toBeGreaterThan(0.98);
     expect(stepOf(ext)).toMatch(/CIRCLE/);
   });

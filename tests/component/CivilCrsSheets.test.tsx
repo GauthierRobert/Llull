@@ -2,14 +2,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import {
-  CivilPanel,
-  downloadText,
-  localDispatch,
-  spyDispatch,
-  setupCivilStore,
-  surveyed,
-} from '../helpers/civilPanel';
+import { CivilPanel, downloadText, localDispatch, spyDispatch, setupCivilStore, surveyed } from '../helpers/civilPanel';
 
 vi.mock('@ui/download', () => ({ downloadText: vi.fn(), downloadBlob: vi.fn() }));
 
@@ -52,9 +45,7 @@ describe('CivilCrsSection', () => {
     localDispatch('set_coordinate_system', { name: 'Lambert-93', epsg: 2154 });
     localDispatch('set_site_calibration', { localOrigin: [0, 0], gridOrigin: [1, 2] });
     render(<CivilPanel />);
-    expect(screen.getByTestId('civil-crs-current')).toHaveTextContent(
-      'Lambert-93 (EPSG:2154) — calibrated',
-    );
+    expect(screen.getByTestId('civil-crs-current')).toHaveTextContent('Lambert-93 (EPSG:2154) — calibrated');
   });
 });
 

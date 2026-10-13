@@ -39,8 +39,7 @@ const TAB_COUNTS: Readonly<Record<SidebarTab, (doc: CadDocument) => number>> = {
   civil: (doc) => doc.civil?.order.length ?? 0,
   layers: (doc) => doc.layerOrder.length,
   assembly: (doc) => Object.keys(doc.components).length,
-  mechanisms: (doc) =>
-    doc.constraintOrder.length + doc.jointOrder.length + doc.driveRelationOrder.length,
+  mechanisms: (doc) => doc.constraintOrder.length + doc.jointOrder.length + doc.driveRelationOrder.length,
   parameters: (doc) => Object.keys(doc.parameters).length,
   history: (doc) => doc.featureHistory.length,
   configurations: (doc) => Object.keys(doc.configurations).length,
@@ -109,13 +108,7 @@ export function Sidebar(): React.ReactElement {
 
   return (
     <aside aria-label="Sidebar" className={`sidebar${sidebarOpen ? '' : ' sidebar--collapsed'}`}>
-      <nav
-        className="rail"
-        role="tablist"
-        aria-orientation="vertical"
-        aria-label="Document browser"
-        onKeyDown={handleRailKeyDown}
-      >
+      <nav className="rail" role="tablist" aria-orientation="vertical" aria-label="Document browser" onKeyDown={handleRailKeyDown}>
         {SIDEBAR_TAB_SPECS.map((spec) => (
           <RailButton
             key={spec.tab}
@@ -127,12 +120,7 @@ export function Sidebar(): React.ReactElement {
         ))}
       </nav>
       {sidebarOpen && (
-        <div
-          className="sidebar__body"
-          role="tabpanel"
-          id="sidebar-panel"
-          aria-labelledby={`sidebar-tab-${sidebarTab}`}
-        >
+        <div className="sidebar__body" role="tabpanel" id="sidebar-panel" aria-labelledby={`sidebar-tab-${sidebarTab}`}>
           <ActivePanel className="sidebar-panel" />
         </div>
       )}

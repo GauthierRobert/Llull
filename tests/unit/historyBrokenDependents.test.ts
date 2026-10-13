@@ -9,11 +9,7 @@ describe('history edits warn about steps that lose their inputs', () => {
     delta: [5, 0, 0],
   });
   const doc = execute(moved.document, 'add_sphere', { radius: 1 }).document;
-  const [boxStep, moveStep, sphereStep] = doc.featureHistory.map((step) => step.id) as [
-    string,
-    string,
-    string,
-  ];
+  const [boxStep, moveStep, sphereStep] = doc.featureHistory.map((step) => step.id) as [string, string, string];
 
   it('delete_step names the dependent step that became a no-op', () => {
     const result = execute(doc, 'delete_step', { stepId: boxStep });

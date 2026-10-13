@@ -35,8 +35,7 @@ function coloredDoc(): CadDocument {
   return doc;
 }
 
-const gltfOf = (doc: CadDocument, params: Record<string, unknown> = {}): GltfJson =>
-  parsedGltf<GltfJson>(doc, params);
+const gltfOf = (doc: CadDocument, params: Record<string, unknown> = {}): GltfJson => parsedGltf<GltfJson>(doc, params);
 
 describe('export_gltf per-entity structure', () => {
   it('writes one named node and mesh per entity with a material per distinct color', () => {
@@ -46,16 +45,11 @@ describe('export_gltf per-entity structure', () => {
     expect(gltf.meshes.map((m) => m.name)).toEqual(['Frame', 'Plate', doc.order[2]]);
     expect(gltf.scenes[0]?.nodes).toEqual([0, 1, 2]);
     expect(gltf.materials).toHaveLength(2);
-    const material = (node: number): number | undefined =>
-      gltf.meshes[gltf.nodes[node]?.mesh ?? -1]?.primitives[0]?.material;
+    const material = (node: number): number | undefined => gltf.meshes[gltf.nodes[node]?.mesh ?? -1]?.primitives[0]?.material;
     expect(material(0)).toBe(material(2));
     expect(material(0)).not.toBe(material(1));
-    expect(gltf.materials[material(0) ?? -1]?.pbrMetallicRoughness.baseColorFactor).toEqual([
-      1, 0, 0, 1,
-    ]);
-    expect(gltf.materials[material(1) ?? -1]?.pbrMetallicRoughness.baseColorFactor).toEqual([
-      0, 0, 1, 1,
-    ]);
+    expect(gltf.materials[material(0) ?? -1]?.pbrMetallicRoughness.baseColorFactor).toEqual([1, 0, 0, 1]);
+    expect(gltf.materials[material(1) ?? -1]?.pbrMetallicRoughness.baseColorFactor).toEqual([0, 0, 1, 1]);
   });
 
   it('reports nodeCount, materialCount and the backward-compatible fields', () => {

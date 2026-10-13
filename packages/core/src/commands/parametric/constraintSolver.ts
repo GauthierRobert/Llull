@@ -17,12 +17,10 @@ function resolvePoint(doc: CadDocument, ref: EntityRef): Point | null {
     const { start, end } = entity;
     if (subKind === 'start') return [start[0] + px, start[1] + py];
     if (subKind === 'end') return [end[0] + px, end[1] + py];
-    if (subKind === 'center' || subKind === 'mid')
-      return [(start[0] + end[0]) / 2 + px, (start[1] + end[1]) / 2 + py];
+    if (subKind === 'center' || subKind === 'mid') return [(start[0] + end[0]) / 2 + px, (start[1] + end[1]) / 2 + py];
   }
 
-  if ((entity.kind === 'arc' || entity.kind === 'circle') && subKind === 'center')
-    return [entity.center[0] + px, entity.center[1] + py];
+  if ((entity.kind === 'arc' || entity.kind === 'circle') && subKind === 'center') return [entity.center[0] + px, entity.center[1] + py];
 
   return [px, py];
 }
@@ -68,10 +66,7 @@ function turnedLine(start: Vec2, end: Vec2, turn: number): { start: Vec2; end: V
   const my = (start[1] + end[1]) / 2;
   const cos = Math.cos(turn);
   const sin = Math.sin(turn);
-  const rotate = (p: Vec2): Vec2 => [
-    mx + (p[0] - mx) * cos - (p[1] - my) * sin,
-    my + (p[0] - mx) * sin + (p[1] - my) * cos,
-  ];
+  const rotate = (p: Vec2): Vec2 => [mx + (p[0] - mx) * cos - (p[1] - my) * sin, my + (p[0] - mx) * sin + (p[1] - my) * cos];
   return { start: rotate(start), end: rotate(end) };
 }
 
@@ -85,13 +80,7 @@ function turnedLine(start: Vec2, end: Vec2, turn: number): { start: Vec2; end: V
  *
  * Returns the squared error term for this constraint (for convergence check).
  */
-function applyConstraintGradient(
-  doc: CadDocument,
-  c: Constraint,
-  deltas: Delta,
-  turns: Turns,
-  stepSize: number,
-): number {
+function applyConstraintGradient(doc: CadDocument, c: Constraint, deltas: Delta, turns: Turns, stepSize: number): number {
   function addTurn(entityId: string, angle: number): void {
     turns.set(entityId, (turns.get(entityId) ?? 0) + angle);
   }
@@ -113,13 +102,7 @@ function applyConstraintGradient(
   }
 
   /** Gradient of (|pa - pb| - target)²; returns the squared error. */
-  function pullToDistance(
-    idA: string,
-    idB: string,
-    pa: readonly [number, number],
-    pb: readonly [number, number],
-    target: number,
-  ): number {
+  function pullToDistance(idA: string, idB: string, pa: readonly [number, number], pb: readonly [number, number], target: number): number {
     const dx = pa[0] - pb[0];
     const dy = pa[1] - pb[1];
     const dist = len2([dx, dy]);
@@ -235,8 +218,7 @@ export function runSolver(doc: CadDocument): {
   const BASE_STEP = 0.1;
 
   const constraints = Object.values(doc.constraints);
-  if (constraints.length === 0)
-    return { document: doc, residual: 0, iterations: 0, converged: true };
+  if (constraints.length === 0) return { document: doc, residual: 0, iterations: 0, converged: true };
 
   // Working copy of positions keyed by entity id.
   const positions = new Map<string, Vec3>();
@@ -262,10 +244,7 @@ export function runSolver(doc: CadDocument): {
   function totalResidual(target: CadDocument): number {
     const scratch: Delta = new Map();
     const scratchTurns: Turns = new Map();
-    return constraints.reduce(
-      (sum, c) => sum + applyConstraintGradient(target, c, scratch, scratchTurns, BASE_STEP),
-      0,
-    );
+    return constraints.reduce((sum, c) => sum + applyConstraintGradient(target, c, scratch, scratchTurns, BASE_STEP), 0);
   }
 
   let iterations = 0;

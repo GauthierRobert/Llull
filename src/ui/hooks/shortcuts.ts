@@ -8,16 +8,12 @@
 
 import type { DrawToolKind, GizmoMode, ModifyToolKind, ViewMode } from '@ui/store';
 
-const IS_APPLE_PLATFORM =
-  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.userAgent);
+const IS_APPLE_PLATFORM = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.userAgent);
 
 /** Label for the command-palette shortcut on this platform (⌘K on Apple, Ctrl K elsewhere). */
 export const PALETTE_SHORTCUT_LABEL = IS_APPLE_PLATFORM ? '⌘K' : 'Ctrl K';
 
-type ShortcutAction =
-  | { kind: 'draw'; tool: DrawToolKind }
-  | { kind: 'gizmo'; mode: GizmoMode }
-  | { kind: 'view'; viewMode: ViewMode };
+type ShortcutAction = { kind: 'draw'; tool: DrawToolKind } | { kind: 'gizmo'; mode: GizmoMode } | { kind: 'view'; viewMode: ViewMode };
 
 /** Draw-tool keys valid in both views (arming one switches to 2D). */
 const DRAW_KEYS: Readonly<Record<string, DrawToolKind>> = {
@@ -55,10 +51,7 @@ const KEYS_3D: Readonly<Record<string, GizmoMode>> = {
 
 /** Display key for each draw tool, derived from the lookup tables so an advertised key always works. */
 export const DRAW_TOOL_KEYS: Readonly<Partial<Record<DrawToolKind, string>>> = Object.fromEntries(
-  [...Object.entries(DRAW_KEYS), ...Object.entries(KEYS_2D)].map(([key, tool]) => [
-    tool,
-    key.toUpperCase(),
-  ]),
+  [...Object.entries(DRAW_KEYS), ...Object.entries(KEYS_2D)].map(([key, tool]) => [tool, key.toUpperCase()]),
 );
 
 /** Display key for each gizmo mode in the 3D view. */

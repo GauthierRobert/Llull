@@ -19,14 +19,9 @@ import { noop } from '../noop';
 import type { GeometryKernel } from '../../geometry/kernel';
 
 /** Surface-neutral pointer to the B-rep kernel (browser URL flag or server env var). */
-export const OCC_KERNEL_HINT =
-  'the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server)';
+export const OCC_KERNEL_HINT = 'the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server)';
 
-function validateSolidTarget(
-  doc: CadDocument,
-  opName: string,
-  id: string,
-): { entity: Entity } | CommandResult {
+function validateSolidTarget(doc: CadDocument, opName: string, id: string): { entity: Entity } | CommandResult {
   const entity = doc.entities[id];
   if (!entity) return noop(doc, `${opName}: entity '${id}' not found.`);
   if (!is3D(entity)) {
@@ -36,10 +31,7 @@ function validateSolidTarget(
     );
   }
   if (entity.kind === 'instance') {
-    return noop(
-      doc,
-      `${opName}: entity '${id}' is a component instance; run explode_instance first to get solids.`,
-    );
+    return noop(doc, `${opName}: entity '${id}' is a component instance; run explode_instance first to get solids.`);
   }
   return { entity };
 }
@@ -59,12 +51,7 @@ interface EdgeModification {
 }
 
 /** Why the kernel gave no usable result: an unsupported op, a failed / invalid solid, or an open mesh. */
-function modifyFailure(
-  command: string,
-  kernel: GeometryKernel,
-  modified: ShapeRecipe,
-  result: 'refused' | 'empty',
-): string {
+function modifyFailure(command: string, kernel: GeometryKernel, modified: ShapeRecipe, result: 'refused' | 'empty'): string {
   if (!kernel.supports(modified.op))
     return `${command}: kernel does not support ${command} for this operand (returned null). Use ${OCC_KERNEL_HINT} or a different operand.`;
   if (result === 'empty')
@@ -110,12 +97,10 @@ function modifyEdges(
     );
   }
   const selection = selectEdges(kernel.topology(sourceShape), edges, near);
-  if ('problem' in selection)
-    return noop(doc, `${command}: ${selection.problem} on '${id}'; document unchanged.`);
+  if ('problem' in selection) return noop(doc, `${command}: ${selection.problem} on '${id}'; document unchanged.`);
   const modified = recipe(source, selection.edges);
   const result = evaluateRecipe(kernel, modified);
-  if (typeof result === 'string')
-    return noop(doc, modifyFailure(command, kernel, modified, result));
+  if (typeof result === 'string') return noop(doc, modifyFailure(command, kernel, modified, result));
 
   const picked = near.length > 0 ? ` edgesNear selected edges ${selection.edges.join(', ')}.` : '';
   return commitKernelResult(
@@ -149,9 +134,7 @@ export const filletEdge = defineCommand({
     'With the default Manifold kernel, this command gracefully no-ops (returns unchanged doc). ' +
     'Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, or mesh — including boolean results).',
   params: z.object({
-    id: z
-      .string()
-      .describe('Id of the 3D solid entity to fillet. Must exist and be a 3D solid kind.'),
+    id: z.string().describe('Id of the 3D solid entity to fillet. Must exist and be a 3D solid kind.'),
     edgeIndices: z
       .array(z.number().int().nonnegative())
       .describe(
@@ -160,11 +143,7 @@ export const filletEdge = defineCommand({
       )
       .optional(),
     edgesNear: z
-      .array(
-        vec3(
-          'A point [x, y, z] near the edge to fillet (e.g. its mid point from inspect_topology).',
-        ),
-      )
+      .array(vec3('A point [x, y, z] near the edge to fillet (e.g. its mid point from inspect_topology).'))
       .describe(
         'Select edges by location: each point picks the roundable edge nearest to it (distance to the edge curve, so any point on an edge, e.g. its visible corner on a drawing, selects it). ' +
           'Prefer this in parametric models: the feature history keeps the points, so the same edge is ' +
@@ -221,9 +200,7 @@ export const chamferEdge = defineCommand({
     'with the default Manifold kernel this command gracefully no-ops. ' +
     'Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution, or mesh — including boolean results).',
   params: z.object({
-    id: z
-      .string()
-      .describe('Id of the 3D solid entity to chamfer. Must exist and be a 3D solid kind.'),
+    id: z.string().describe('Id of the 3D solid entity to chamfer. Must exist and be a 3D solid kind.'),
     edgeIndices: z
       .array(z.number().int().nonnegative())
       .describe(
@@ -232,11 +209,7 @@ export const chamferEdge = defineCommand({
       )
       .optional(),
     edgesNear: z
-      .array(
-        vec3(
-          'A point [x, y, z] near the edge to chamfer (e.g. its mid point from inspect_topology).',
-        ),
-      )
+      .array(vec3('A point [x, y, z] near the edge to chamfer (e.g. its mid point from inspect_topology).'))
       .describe(
         'Select edges by location: each point picks the roundable edge nearest to it (distance to the edge curve, so any point on an edge, e.g. its visible corner on a drawing, selects it). ' +
           'Prefer this in parametric models: the feature history keeps the points, so the same edge is ' +
@@ -276,14 +249,8 @@ export const shellSolid = defineCommand({
     'thin for the thickness) makes this a graceful no-op that leaves the document unchanged. ' +
     'Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution or mesh).',
   params: z.object({
-    id: z
-      .string()
-      .describe('Id of the closed 3D solid entity to hollow. Must exist and be a 3D solid.'),
-    thickness: z
-      .number()
-      .describe(
-        "Wall thickness in document units. Must be > 0 and smaller than half the solid's thinnest dimension.",
-      ),
+    id: z.string().describe('Id of the closed 3D solid entity to hollow. Must exist and be a 3D solid.'),
+    thickness: z.number().describe("Wall thickness in document units. Must be > 0 and smaller than half the solid's thinnest dimension."),
   }),
   run: (doc, { id, thickness }, ctx): CommandResult =>
     modifyEdges(doc, ctx, {

@@ -58,12 +58,7 @@ export function CameraReactor(): null {
     const orbit = controls as OrbitControlsImpl | null;
     if (!orbit) return;
 
-    const eye = sphericalToCartesian(
-      docCamera.target,
-      docCamera.azimuth,
-      docCamera.polar,
-      docCamera.distance,
-    );
+    const eye = sphericalToCartesian(docCamera.target, docCamera.azimuth, docCamera.polar, docCamera.distance);
     driveCamera(camera, orbit, invalidate, eye, docCamera.target);
   }, [docCamera, camera, controls, invalidate]);
 

@@ -116,12 +116,7 @@ interface InstanceBatchMeshProps {
  * `instanceColor` (setColorAt); `vertexColors` stays off — primitive geometries carry no color
  * attribute, so enabling it renders black.
  */
-function InstanceBatchMesh({
-  batch,
-  selectionSet,
-  displayMode,
-  onSelect,
-}: InstanceBatchMeshProps): React.ReactElement | null {
+function InstanceBatchMesh({ batch, selectionSet, displayMode, onSelect }: InstanceBatchMeshProps): React.ReactElement | null {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const count = batch.entities.length;
 
@@ -165,15 +160,7 @@ function InstanceBatchMesh({
     onSelect(entityId, isAdditiveSelect(e.nativeEvent));
   }
 
-  return (
-    <instancedMesh
-      ref={meshRef}
-      args={[geometry, material, count]}
-      onClick={handleClick}
-      castShadow
-      receiveShadow
-    />
-  );
+  return <instancedMesh ref={meshRef} args={[geometry, material, count]} onClick={handleClick} castShadow receiveShadow />;
 }
 
 interface InstancedRendererProps {
@@ -192,23 +179,13 @@ interface InstancedRendererProps {
  * Renders all instanced batches. One `<InstanceBatchMesh>` per batch key.
  * Reads `displayMode` from the viewport store directly (narrow selector, R3).
  */
-export function InstancedRenderer({
-  batches,
-  selectionSet,
-  onSelect,
-}: InstancedRendererProps): React.ReactElement {
+export function InstancedRenderer({ batches, selectionSet, onSelect }: InstancedRendererProps): React.ReactElement {
   const displayMode = useViewportStore((s) => s.displayMode);
 
   return (
     <group name="instanced-entities">
       {Array.from(batches.entries()).map(([key, batch]) => (
-        <InstanceBatchMesh
-          key={key}
-          batch={batch}
-          selectionSet={selectionSet}
-          displayMode={displayMode}
-          onSelect={onSelect}
-        />
+        <InstanceBatchMesh key={key} batch={batch} selectionSet={selectionSet} displayMode={displayMode} onSelect={onSelect} />
       ))}
     </group>
   );

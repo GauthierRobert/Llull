@@ -18,27 +18,17 @@ import { SolidMeshShell, type SolidMeshKindProps } from './SolidMeshShell';
 import { pointsKey, useStableByKey } from '../../useStableByKey';
 import { buildRevolutionGeometry } from './primitiveGeometry';
 
-function RevolutionSolid({
-  entity,
-  ...shell
-}: SolidMeshKindProps<RevolutionEntity>): React.ReactElement {
+function RevolutionSolid({ entity, ...shell }: SolidMeshKindProps<RevolutionEntity>): React.ReactElement {
   const { angle, segments } = entity;
   const profile = useStableByKey(entity.profile, pointsKey(entity.profile));
   const axis = useStableByKey(entity.axis, pointsKey([entity.axis]));
 
-  const geometry = useMemo(
-    () => buildRevolutionGeometry(profile, axis, angle, segments),
-    [profile, axis, angle, segments],
-  );
+  const geometry = useMemo(() => buildRevolutionGeometry(profile, axis, angle, segments), [profile, axis, angle, segments]);
 
-  return (
-    <SolidMeshShell entity={entity} geometry={geometry} doubleSided boundsTree={false} {...shell} />
-  );
+  return <SolidMeshShell entity={entity} geometry={geometry} doubleSided boundsTree={false} {...shell} />;
 }
 
-export function RevolutionMesh(
-  props: SolidMeshKindProps<RevolutionEntity>,
-): React.ReactElement | null {
+export function RevolutionMesh(props: SolidMeshKindProps<RevolutionEntity>): React.ReactElement | null {
   if (props.entity.profile.length < 3) return null;
   return <RevolutionSolid {...props} />;
 }

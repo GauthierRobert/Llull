@@ -13,8 +13,7 @@ import { levelId, type IntentEquipment, type PlantIntent } from './intent';
 /** Grating cut-out around equipment passing through a floor (toe-plate margin). */
 export const OPENING_MARGIN = 300;
 
-const rel = (intent: PlantIntent, level: number, z: number): number =>
-  z - (intent.levels[level]?.elevation ?? 0);
+const rel = (intent: PlantIntent, level: number, z: number): number => z - (intent.levels[level]?.elevation ?? 0);
 
 function openingAround(equipment: IntentEquipment, margin = OPENING_MARGIN): Vec2[] {
   const [cx, cy] = equipment.location;
@@ -45,11 +44,7 @@ export function plantScript(intent: PlantIntent): ToolCall[] {
   }
   calls.push({ tool: 'add_grid_system', args: { ...intent.grid } });
   for (const member of intent.members) {
-    const z = (point: readonly number[]): number[] => [
-      point[0] ?? 0,
-      point[1] ?? 0,
-      rel(intent, member.level, point[2] ?? 0),
-    ];
+    const z = (point: readonly number[]): number[] => [point[0] ?? 0, point[1] ?? 0, rel(intent, member.level, point[2] ?? 0)];
     calls.push({
       tool: 'add_steel_member',
       args: {

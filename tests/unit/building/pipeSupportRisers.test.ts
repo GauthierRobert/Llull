@@ -9,13 +9,8 @@ import { step, twoLevels } from './steelFixtures';
 import { supportsOf } from './pipeSupportFixtures';
 
 /** Steel member on level-1 (elevation 0: absolute coordinates). */
-const steel = (
-  doc: CadDocument,
-  role: 'column' | 'beam',
-  profile: string,
-  start: Vec3,
-  end: Vec3,
-): CadDocument => step(doc, 'add_steel_member', { role, profile, start, end, levelId: 'level-1' });
+const steel = (doc: CadDocument, role: 'column' | 'beam', profile: string, start: Vec3, end: Vec3): CadDocument =>
+  step(doc, 'add_steel_member', { role, profile, start, end, levelId: 'level-1' });
 
 /** DN100 (Ø114.3) route; table span 4.3 m, free-end limit 2.15 m. */
 const pipe = (points: Vec3[], doc: CadDocument = twoLevels()): CadDocument =>
@@ -34,22 +29,15 @@ const rowOf = (doc: CadDocument, params: Record<string, unknown> = {}): PipeSupp
   return data.pipes[0] as PipeSupportRow;
 };
 
-const supportAt = (
-  doc: CadDocument,
-  type: string,
-  at: Vec3,
-  extra: Record<string, unknown> = {},
-): CadDocument => step(doc, 'add_pipe_support', { pipeId: 'pipe-1', type, at: [at], ...extra });
+const supportAt = (doc: CadDocument, type: string, at: Vec3, extra: Record<string, unknown> = {}): CadDocument =>
+  step(doc, 'add_pipe_support', { pipeId: 'pipe-1', type, at: [at], ...extra });
 
 /** HEA200 post 500 mm east of the riser. */
-const withPost = (doc: CadDocument, x = 500, y = 0): CadDocument =>
-  steel(doc, 'column', 'HEA200', [x, y, 0], [x, y, 6000]);
+const withPost = (doc: CadDocument, x = 500, y = 0): CadDocument => steel(doc, 'column', 'HEA200', [x, y, 0], [x, y, 6000]);
 
 describe('riser runs', () => {
   it('finds runs steeper than 0.7 and at least 0.5 m, skipping fittings and flat pipe', () => {
-    expect(riserRuns(INTERIOR)).toEqual([
-      { startArc: 3000, endArc: 6800, length: 3800, from: [0, 0, 1000], to: [0, 0, 4800] },
-    ]);
+    expect(riserRuns(INTERIOR)).toEqual([{ startArc: 3000, endArc: 6800, length: 3800, from: [0, 0, 1000], to: [0, 0, 4800] }]);
     expect(
       riserRuns([
         [0, 0, 0],
@@ -101,9 +89,7 @@ describe('riser verdict in check_pipe_supports', () => {
         weightBy: null,
         ok: false,
         issues: [
-          expect.stringContaining(
-            'no lateral guide (an unguided riser between two elbows may be 2.15 m at most)',
-          ),
+          expect.stringContaining('no lateral guide (an unguided riser between two elbows may be 2.15 m at most)'),
           expect.stringContaining('weight is carried by nothing'),
         ],
       },
@@ -185,19 +171,16 @@ describe('riser verdict in check_pipe_supports', () => {
     }
     const unguided = rowOf(doc);
     expect(unguided.endCarriers).toEqual(['equipment', 'equipment']);
-    expect(unguided.risers[0]?.issues[0]).toContain(
-      'lateral guide spacing 6.00 m exceeds 4.30 m allowed',
-    );
+    expect(unguided.risers[0]?.issues[0]).toContain('lateral guide spacing 6.00 m exceeds 4.30 m allowed');
     const guided = rowOf(supportAt(withPost(doc), 'guide', [0, 0, 3500]));
     expect(guided.risers[0]).toMatchObject({ guides: 1, maxGuideSpacingM: 3, ok: true });
     // the pipe verdict includes the riser: nothing else is wrong with this pipe
     expect(unguided.ok).toBe(false);
     expect(guided.ok).toBe(true);
     expect(guided.issues).toEqual([]);
-    expect(
-      rowOf(supportAt(withPost(doc), 'guide', [0, 0, 3500]), { spanFactor: 0.5 }).risers[0]
-        ?.issues[0],
-    ).toContain('lateral guide spacing 3.00 m exceeds 2.15 m allowed');
+    expect(rowOf(supportAt(withPost(doc), 'guide', [0, 0, 3500]), { spanFactor: 0.5 }).risers[0]?.issues[0]).toContain(
+      'lateral guide spacing 3.00 m exceeds 2.15 m allowed',
+    );
   });
 
   it('ignores an unattached guide, which also fails the pipe, and risers under 0.5 m', () => {
@@ -243,11 +226,7 @@ describe('add_pipe_support on a riser', () => {
     // 500 mm axis distance - 100 mm half of HEA200 (max(b, h) / 2) - 57.15 mm pipe radius
     expect(support?.standoff).toBeCloseTo(500 - 100 - 57.15, 6);
     expect(support?.standoffAngle).toBeCloseTo(0, 9);
-    expect(result.affected).toEqual([
-      'pipeSupport-1',
-      'pipeSupport-1:clamp',
-      'pipeSupport-1:bracket',
-    ]);
+    expect(result.affected).toEqual(['pipeSupport-1', 'pipeSupport-1:clamp', 'pipeSupport-1:bracket']);
     expect(result.summary).toContain('Added 1 guide(s) PS1 on pipe PL1, bearing on SC1');
     const bracket = result.document.entities['pipeSupport-1:bracket'];
     expect(bracket?.kind === 'box' ? bracket.size[1] : 0).toBeCloseTo(500 - 100 - 57.15 - 20, 6);
@@ -270,9 +249,7 @@ describe('add_pipe_support on a riser', () => {
       at: [[0, 0, 4000]],
     });
     expect(supportsOf(high.document)[1]?.memberId).toBeNull();
-    expect(high.summary).toContain(
-      'WARNING 1 unattached (no steel member below or beside the pipe',
-    );
+    expect(high.summary).toContain('WARNING 1 unattached (no steel member below or beside the pipe');
   });
 
   it('keeps the shortest bracket among several members and honours maxReach', () => {
@@ -283,9 +260,7 @@ describe('add_pipe_support on a riser', () => {
     expect(supportsOf(doc)[0]?.standoffAngle).toBeCloseTo(Math.PI, 9);
     const far = steel(pipe(INTERIOR), 'column', 'HEA200', [1200, 0, 0], [1200, 0, 6000]);
     expect(supportsOf(supportAt(far, 'guide', [0, 0, 2900]))[0]?.memberId).toBeNull();
-    expect(supportsOf(supportAt(far, 'guide', [0, 0, 2900], { maxReach: 1100 }))[0]?.memberId).toBe(
-      'member-1',
-    );
+    expect(supportsOf(supportAt(far, 'guide', [0, 0, 2900], { maxReach: 1100 }))[0]?.memberId).toBe('member-1');
   });
 
   it('refuses an explicit member that cannot take the bracket and a hanger on a riser', () => {

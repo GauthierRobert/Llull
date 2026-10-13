@@ -28,9 +28,7 @@ function equipment(doc: CadDocument, id: string): EquipmentElement {
 
 /** Vertices of the single mesh entity in the document. */
 function vertices(doc: CadDocument): number[][] {
-  const entity = Object.values(doc.entities).find((candidate) => candidate.kind === 'mesh') as
-    | MeshSolidEntity
-    | undefined;
+  const entity = Object.values(doc.entities).find((candidate) => candidate.kind === 'mesh') as MeshSolidEntity | undefined;
   expect(entity).toBeDefined();
   const positions = entity!.mesh.positions;
   const points: number[][] = [];
@@ -169,9 +167,7 @@ describe('equipment shape', () => {
     });
     expect(bad.affected).toEqual([]);
     expect(bad.summary).toMatch(/shape horizontal_vessel/);
-    expect(
-      execute(doc, 'update_equipment', { elementId: 'equipment-1', shape: 'cone' }).affected,
-    ).toEqual([]);
+    expect(execute(doc, 'update_equipment', { elementId: 'equipment-1', shape: 'cone' }).affected).toEqual([]);
   });
 
   it('plan: vertical vessel is a circle with a centre mark and tag, horizontal a rectangle', () => {
@@ -204,9 +200,7 @@ describe('equipment shape', () => {
     expect(ifc).not.toMatch(/IFCRECTANGLEPROFILEDEF/);
     expect(ifc).toMatch(/IFCLABEL\('vertical_vessel'\)/);
     expect(ifc).toMatch(/IFCLABEL\('horizontal_vessel'\)/);
-    const boxIfc = (
-      execute(add(createEmptyDocument(), { size: [1, 1, 1] }), 'export_ifc', {}).data as IfcExport
-    ).ifc;
+    const boxIfc = (execute(add(createEmptyDocument(), { size: [1, 1, 1] }), 'export_ifc', {}).data as IfcExport).ifc;
     expect(boxIfc).toMatch(/IFCRECTANGLEPROFILEDEF/);
     expect(boxIfc).toMatch(/IFCLABEL\('box'\)/);
   });

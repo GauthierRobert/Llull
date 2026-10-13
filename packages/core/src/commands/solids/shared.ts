@@ -1,10 +1,4 @@
-import {
-  DEFAULT_LAYER_ID,
-  type BaseEntity,
-  type CadDocument,
-  type Entity,
-  type Vec3,
-} from '../../model/types';
+import { DEFAULT_LAYER_ID, type BaseEntity, type CadDocument, type Entity, type Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { z, colorField, layerIdField, looseVec3, nameField, tolerant } from '../schema';
 import { rotatedEntityBounds } from '../../geometry/rotatedBounds';
@@ -37,11 +31,7 @@ export function translated(entity: Entity, delta: Vec3): Entity {
  */
 type PlacementAnchor = 'center' | 'min' | 'base-center';
 
-const VALID_ANCHORS: ReadonlySet<string> = new Set<PlacementAnchor>([
-  'center',
-  'min',
-  'base-center',
-]);
+const VALID_ANCHORS: ReadonlySet<string> = new Set<PlacementAnchor>(['center', 'min', 'base-center']);
 
 /** Offset of `anchor` from the AABB center, given the positive half-extents `[hx, hy, hz]`. */
 function anchorOffsetFromCenter(anchor: PlacementAnchor, [hx, hy, hz]: Vec3): Vec3 {
@@ -62,16 +52,9 @@ function anchorOffsetFromCenter(anchor: PlacementAnchor, [hx, hy, hz]: Vec3): Ve
  * @param defaultAnchor the anchor the stored position natively represents (box 'center', cone 'base-center')
  * @param requestedAnchor the caller's anchor; anything but a valid anchor falls back to `defaultAnchor`
  */
-function resolvePosition(
-  halfExtents: Vec3,
-  defaultAnchor: PlacementAnchor,
-  requestedAnchor: unknown,
-  inputPosition: Vec3,
-): Vec3 {
+function resolvePosition(halfExtents: Vec3, defaultAnchor: PlacementAnchor, requestedAnchor: unknown, inputPosition: Vec3): Vec3 {
   const anchor: PlacementAnchor =
-    typeof requestedAnchor === 'string' && VALID_ANCHORS.has(requestedAnchor)
-      ? (requestedAnchor as PlacementAnchor)
-      : defaultAnchor;
+    typeof requestedAnchor === 'string' && VALID_ANCHORS.has(requestedAnchor) ? (requestedAnchor as PlacementAnchor) : defaultAnchor;
   if (anchor === defaultAnchor) return inputPosition;
 
   const requestedOffset = anchorOffsetFromCenter(anchor, halfExtents);
@@ -101,8 +84,7 @@ export const ROTATION_CONVENTION =
 /** `position` param of a placed primitive; `note` is inserted before the default sentence. */
 export function positionField(note = ''): z.ZodOptional<z.ZodType<Vec3>> {
   return looseVec3(
-    'World-space location of the anchor point [x, y, z] in document units. ' +
-      `Right-handed frame, +Z up. ${note}Defaults to [0, 0, 0].`,
+    'World-space location of the anchor point [x, y, z] in document units. ' + `Right-handed frame, +Z up. ${note}Defaults to [0, 0, 0].`,
   ).optional();
 }
 
@@ -119,16 +101,10 @@ export function anchorField(
   shape: string,
   defaultAnchor: AnchorName,
   details: Partial<Record<AnchorName, string>> = {},
-): z.ZodOptional<
-  z.ZodCatch<z.ZodEnum<{ center: 'center'; min: 'min'; 'base-center': 'base-center' }>>
-> {
-  const order: AnchorName[] = [
-    defaultAnchor,
-    ...(['center', 'min', 'base-center'] as const).filter((name) => name !== defaultAnchor),
-  ];
+): z.ZodOptional<z.ZodCatch<z.ZodEnum<{ center: 'center'; min: 'min'; 'base-center': 'base-center' }>>> {
+  const order: AnchorName[] = [defaultAnchor, ...(['center', 'min', 'base-center'] as const).filter((name) => name !== defaultAnchor)];
   const lines = order.map(
-    (name) =>
-      `"${name}"${name === defaultAnchor ? ' (default)' : ''}: ${details[name] ?? STANDARD_ANCHOR_TEXT[name]}. `,
+    (name) => `"${name}"${name === defaultAnchor ? ' (default)' : ''}: ${details[name] ?? STANDARD_ANCHOR_TEXT[name]}. `,
   );
   const description =
     `Which point on the ${shape} the position refers to. ${lines.join('')}` +
@@ -138,9 +114,7 @@ export function anchorField(
 }
 
 /** `rotation` param of a placed primitive; `note` replaces the "Matches rotate_entity" lead-in. */
-export function rotationField(
-  note = 'Matches rotate_entity convention.',
-): z.ZodOptional<z.ZodCatch<z.ZodType<Vec3>>> {
+export function rotationField(note = 'Matches rotate_entity convention.'): z.ZodOptional<z.ZodCatch<z.ZodType<Vec3>>> {
   return tolerant(
     looseVec3(
       `${ROTATION_CONVENTION}. ` +
@@ -192,10 +166,7 @@ export function namedSolidStyleFields(): {
 
 /** Optional explicit `id` param of a created solid. */
 export function explicitIdField(): z.ZodOptional<z.ZodString> {
-  return z
-    .string()
-    .describe('Optional explicit entity id. If omitted a unique id is generated.')
-    .optional();
+  return z.string().describe('Optional explicit entity id. If omitted a unique id is generated.').optional();
 }
 
 /** `true` when the explicit `id` is non-empty and already names an entity. */
@@ -214,9 +185,7 @@ export function existingLayerOrDefault(doc: CadDocument, layerId: string | undef
 }
 
 /** `axis` param of a placed primitive: direction of the primitive's local +Z (its symmetry axis). */
-export function axisField(
-  what = 'the primitive local +Z axis (its symmetry axis)',
-): z.ZodOptional<z.ZodCatch<z.ZodType<Vec3>>> {
+export function axisField(what = 'the primitive local +Z axis (its symmetry axis)'): z.ZodOptional<z.ZodCatch<z.ZodType<Vec3>>> {
   return tolerant(
     looseVec3(
       `Optional direction [dx, dy, dz] (any non-zero length, normalized) that ${what} points along ` +
@@ -237,9 +206,7 @@ export function resolveRotation(
 ): { readonly rotation: Vec3; readonly error?: undefined } | { readonly error: string } {
   if (axis === undefined) return { rotation: finiteVec3OrZero(rotation) };
   const euler = eulerFromAxis(axis);
-  return euler
-    ? { rotation: euler }
-    : { error: `axis must be 3 finite numbers with non-zero length, got ${JSON.stringify(axis)}` };
+  return euler ? { rotation: euler } : { error: `axis must be 3 finite numbers with non-zero length, got ${JSON.stringify(axis)}` };
 }
 
 /**
@@ -252,19 +219,14 @@ export function rejectNonPositive(
   dimensions: ReadonlyArray<readonly [name: string, value: number]>,
 ): CommandResult | null {
   for (const [name, value] of dimensions) {
-    if (!Number.isFinite(value) || value <= 0)
-      return noop(doc, `${command} failed: ${name} must be finite and > 0, got ${value}.`);
+    if (!Number.isFinite(value) || value <= 0) return noop(doc, `${command} failed: ${name} must be finite and > 0, got ${value}.`);
   }
   return null;
 }
 
 /** Same as `rejectNonPositive` for a `[w, h, d]` size vector (one combined summary). */
 function rejectBadSize(doc: CadDocument, command: string, size: Vec3): CommandResult | null {
-  if (
-    Array.isArray(size) &&
-    size.length === 3 &&
-    size.every((component) => Number.isFinite(component) && component > 0)
-  ) {
+  if (Array.isArray(size) && size.length === 3 && size.every((component) => Number.isFinite(component) && component > 0)) {
     return null;
   }
   return noop(
@@ -277,17 +239,10 @@ function rejectBadSize(doc: CadDocument, command: string, size: Vec3): CommandRe
  * Reject a 2D profile whose points are not all finite `[x, y]` pairs: the failing no-op naming
  * the first bad point, or `null` when valid (length is checked by the caller).
  */
-export function rejectBadProfile(
-  doc: CadDocument,
-  command: string,
-  profile: ReadonlyArray<unknown>,
-): CommandResult | null {
+export function rejectBadProfile(doc: CadDocument, command: string, profile: ReadonlyArray<unknown>): CommandResult | null {
   const index = profile.findIndex((point) => !isVec2(point));
   if (index < 0) return null;
-  return noop(
-    doc,
-    `${command} failed: profile point ${index} must be a finite [x, y] pair, got ${JSON.stringify(profile[index])}; no-op.`,
-  );
+  return noop(doc, `${command} failed: profile point ${index} must be a finite [x, y] pair, got ${JSON.stringify(profile[index])}; no-op.`);
 }
 
 /**
@@ -302,10 +257,7 @@ export function rejectZeroAreaProfile(
 ): CommandResult | null {
   const perimeter = polygonPerimeter(profile);
   if (polygonArea(profile) > 1e-12 * perimeter * perimeter) return null;
-  return noop(
-    doc,
-    `${command} failed: profile encloses no area (points are collinear or coincident); no-op.`,
-  );
+  return noop(doc, `${command} failed: profile encloses no area (points are collinear or coincident); no-op.`);
 }
 
 /**
@@ -338,12 +290,7 @@ export function placeSolid<K extends Entity['kind']>(
 ): CommandResult {
   const resolved = resolveRotation(spec.axis, spec.rotation);
   if (resolved.error !== undefined) return noop(doc, `Add ${spec.kind} failed: ${resolved.error}.`);
-  const storedPosition = resolvePosition(
-    spec.halfExtents,
-    spec.defaultAnchor,
-    spec.anchor,
-    spec.position,
-  );
+  const storedPosition = resolvePosition(spec.halfExtents, spec.defaultAnchor, spec.anchor, spec.position);
   const id = nextId(spec.idPrefix);
   const entity = newEntity(spec.kind, id, spec.geometry, storedPosition, spec.color, {
     rotation: resolved.rotation,

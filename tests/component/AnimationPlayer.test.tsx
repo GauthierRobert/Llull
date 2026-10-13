@@ -250,12 +250,8 @@ describe('ViewportControls — animation transport controls (with animations)', 
 
 // Part C — findClickAnimationsForEntity pure helper
 
-const clickAnim = (
-  id: string,
-  targetId: string,
-  targetKind: 'entity' | 'group',
-  trigger: 'click' | 'auto' = 'click',
-): Animation => makeAnimation({ id, targetId, targetKind, trigger });
+const clickAnim = (id: string, targetId: string, targetKind: 'entity' | 'group', trigger: 'click' | 'auto' = 'click'): Animation =>
+  makeAnimation({ id, targetId, targetKind, trigger });
 
 const groupOf = (...memberIds: string[]): EntityGroup => ({
   id: 'grp-1',
@@ -271,43 +267,13 @@ function findFor(animationList: Animation[], group?: EntityGroup): string[] {
 
 describe('findClickAnimationsForEntity', () => {
   it.each<[string, Animation[], EntityGroup | undefined, string[]]>([
-    [
-      'the entity is the direct target with trigger:click',
-      [clickAnim('a1', 'ent-1', 'entity')],
-      undefined,
-      ['a1'],
-    ],
-    [
-      'the entity is a member of the targeted group',
-      [clickAnim('a1', 'grp-1', 'group')],
-      groupOf('ent-1', 'ent-2'),
-      ['a1'],
-    ],
-    [
-      'auto-trigger animations are ignored',
-      [clickAnim('a1', 'ent-1', 'entity', 'auto')],
-      undefined,
-      [],
-    ],
-    [
-      'animations targeting a different entity are ignored',
-      [clickAnim('a1', 'ent-2', 'entity')],
-      undefined,
-      [],
-    ],
-    [
-      'the entity is NOT in the targeted group',
-      [clickAnim('a1', 'grp-1', 'group')],
-      groupOf('ent-3'),
-      [],
-    ],
+    ['the entity is the direct target with trigger:click', [clickAnim('a1', 'ent-1', 'entity')], undefined, ['a1']],
+    ['the entity is a member of the targeted group', [clickAnim('a1', 'grp-1', 'group')], groupOf('ent-1', 'ent-2'), ['a1']],
+    ['auto-trigger animations are ignored', [clickAnim('a1', 'ent-1', 'entity', 'auto')], undefined, []],
+    ['animations targeting a different entity are ignored', [clickAnim('a1', 'ent-2', 'entity')], undefined, []],
+    ['the entity is NOT in the targeted group', [clickAnim('a1', 'grp-1', 'group')], groupOf('ent-3'), []],
     ['the targeted group does not exist', [clickAnim('a1', 'grp-missing', 'group')], undefined, []],
-    [
-      'group animation with trigger:auto is ignored',
-      [clickAnim('a1', 'grp-1', 'group', 'auto')],
-      groupOf('ent-1'),
-      [],
-    ],
+    ['group animation with trigger:auto is ignored', [clickAnim('a1', 'grp-1', 'group', 'auto')], groupOf('ent-1'), []],
     ['there are no animations', [], undefined, []],
   ])('%s', (_label, animations, group, expected) => {
     expect(findFor(animations, group)).toEqual(expected);

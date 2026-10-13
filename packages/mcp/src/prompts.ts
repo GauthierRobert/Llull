@@ -71,8 +71,7 @@ const modelBracket: PromptTemplate = {
       },
       {
         name: 'hole_count',
-        description:
-          'Number of mounting holes (1–4). Holes are evenly spaced along the bracket width.',
+        description: 'Number of mounting holes (1–4). Holes are evenly spaced along the bracket width.',
         required: false,
       },
     ],
@@ -172,8 +171,7 @@ const orthographicSetup: PromptTemplate = {
     ],
   },
   buildMessages({ view = 'top' }) {
-    const info =
-      ORTHOGRAPHIC_VIEWS[view as keyof typeof ORTHOGRAPHIC_VIEWS] ?? ORTHOGRAPHIC_VIEWS.top;
+    const info = ORTHOGRAPHIC_VIEWS[view as keyof typeof ORTHOGRAPHIC_VIEWS] ?? ORTHOGRAPHIC_VIEWS.top;
 
     return conversation(
       `Set up a ${view} orthographic view of the current scene.`,
@@ -222,8 +220,7 @@ const parametricPart: PromptTemplate = {
   },
   buildMessages({ part_name = 'my_part' }) {
     return conversation(
-      `Show me how to model a parametric part called "${part_name}" using build_project ` +
-        `with alias references between steps.`,
+      `Show me how to model a parametric part called "${part_name}" using build_project ` + `with alias references between steps.`,
       `**Parametric part recipe — \`build_project\` with \`$alias\` references**\n\n` +
         `The key insight: each step can declare \`"as": "<alias>"\`, and any later step can\n` +
         `reference that step's created entity id as \`"$<alias>"\` (first affected id) or\n` +
@@ -450,10 +447,7 @@ export function listMcpPrompts(): McpPromptDescriptor[] {
  * @pure
  * @failure unknown name -> null (the transport replies with an MCP error)
  */
-export function getMcpPrompt(
-  name: string,
-  args: Record<string, string> = {},
-): McpPromptResult | null {
+export function getMcpPrompt(name: string, args: Record<string, string> = {}): McpPromptResult | null {
   const template = TEMPLATES.find((candidate) => candidate.descriptor.name === name);
   if (!template) return null;
   return {

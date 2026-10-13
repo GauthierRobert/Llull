@@ -82,11 +82,7 @@ async function request<Body>(path: string, postBody?: unknown): Promise<Body> {
     throw new ServerCommandError(`Network error: ${errorMessage(cause)}`);
   }
   if (!response.ok) {
-    throw new ServerCommandError(
-      `Server responded with HTTP ${response.status} for ${path}`,
-      'http',
-      response.status,
-    );
+    throw new ServerCommandError(`Server responded with HTTP ${response.status} for ${path}`, 'http', response.status);
   }
   return response.json() as Promise<Body>;
 }
@@ -97,15 +93,8 @@ async function request<Body>(path: string, postBody?: unknown): Promise<Body> {
  *
  * @throws ServerCommandError on network failure or non-ok HTTP status (also for undo / redo / snapshot).
  */
-export function postCommand(
-  name: string,
-  params: unknown,
-  commandId?: string,
-): Promise<ServerCommandResponse> {
-  return request(
-    '/command',
-    commandId === undefined ? { name, params } : { name, params, commandId },
-  );
+export function postCommand(name: string, params: unknown, commandId?: string): Promise<ServerCommandResponse> {
+  return request('/command', commandId === undefined ? { name, params } : { name, params, commandId });
 }
 
 /** POST /undo — walk back one step in server-side history. */

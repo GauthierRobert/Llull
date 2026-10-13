@@ -1,11 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getCommand } from '@core/commands/registry';
-import {
-  fieldsFromSchema,
-  matchTypeahead,
-  parseFormValues,
-  valuesFromParams,
-} from '@ui/components/commandPalette/paramForm';
+import { fieldsFromSchema, matchTypeahead, parseFormValues, valuesFromParams } from '@ui/components/commandPalette/paramForm';
 
 describe('matchTypeahead', () => {
   const units = ['mm', 'cm', 'm', 'km'];

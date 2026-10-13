@@ -5,11 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import {
-  nearestVertex,
-  offsetSideSign,
-  entityDistSq,
-} from '../../src/ui/viewport/2d/modifyHelpers';
+import { nearestVertex, offsetSideSign, entityDistSq } from '../../src/ui/viewport/2d/modifyHelpers';
 import type { Vec2 } from '@core/model/types';
 import type { LineEntity, PolylineEntity, CircleEntity, RectangleEntity } from '@core/model/types';
 

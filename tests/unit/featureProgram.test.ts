@@ -8,13 +8,7 @@ import type { Feature, FeatureProgram, ShapeSpec, Term } from '@core/codegen/pro
 import { emitPython } from '@core/codegen/python';
 import { emitOpenScad } from '@core/codegen/openscad';
 import { emitFreeCad } from '@core/codegen/freecad';
-import {
-  formatDegrees,
-  formatNumber,
-  formatTerm,
-  numberRows,
-  stepHeading,
-} from '@core/codegen/format';
+import { formatDegrees, formatNumber, formatTerm, numberRows, stepHeading } from '@core/codegen/format';
 import { TETRA, fakeKernel, installKernelPerTest } from '../helpers/fakeKernel';
 
 installKernelPerTest(fakeKernel({ boolean: TETRA }));
@@ -27,8 +21,7 @@ function program(doc: CadDocument): FeatureProgram {
   return buildFeatureProgram(doc, getCommand);
 }
 
-const t = (value: number, expression?: string): Term =>
-  expression === undefined ? { value } : { value, expression };
+const t = (value: number, expression?: string): Term => (expression === undefined ? { value } : { value, expression });
 
 /** Solid constructors emitted identically by the build123d, CadQuery-style and FreeCAD macros. */
 const PYTHON_SOLID_LINES = [
@@ -165,13 +158,7 @@ describe('history lowering', () => {
       'label:box_1',
     ]);
     expect(p.features.map((f) => f.step)).toEqual([1, 2, 3, 4, 5]);
-    expect(p.features.map((f) => f.command)).toEqual([
-      'add_box',
-      'add_cylinder',
-      'boolean',
-      'move_entities',
-      'set_entity_name',
-    ]);
+    expect(p.features.map((f) => f.command)).toEqual(['add_box', 'add_cylinder', 'boolean', 'move_entities', 'set_entity_name']);
     const boolean = p.features[2] as Extract<Feature, { op: 'boolean' }>;
     expect(boolean).toMatchObject({ kind: 'cut', left: 'box_1', right: 'cylinder_1' });
     expect(p.outputs).toEqual([{ variable: 'box_1', color: '#111111', name: 'Block' }]);
@@ -434,15 +421,11 @@ describe('emitters', () => {
       expect(text).toContain('a note');
       expect(text).toContain('w = param("w", 2)');
       expect(text).toContain('h = param("h", w)');
-      expect(text).toContain(
-        's0 = box((1, 2, d), position=(1, 0, 0), color="#aabbcc", name="First \\"one\\"")',
-      );
+      expect(text).toContain('s0 = box((1, 2, d), position=(1, 0, 0), color="#aabbcc", name="First \\"one\\"")');
       expect(text).toContain('s1 = cylinder(1, 2, position=(1, 0, 0)');
       expect(text).toContain('s2 = sphere(1,');
       for (const line of PYTHON_SOLID_LINES) expect(text).toContain(line);
-      expect(text).toContain(
-        's8 = revolve([(1, 0), (3, 0), (3, h)], axis="x", angle=180, segments=16',
-      );
+      expect(text).toContain('s8 = revolve([(1, 0), (3, 0), (3, h)], axis="x", angle=180, segments=16');
       expect(text).toContain('axis="y"');
       expect(text).toContain('angle=(h) * 180 / math.pi, segments=16');
       expect(text).toContain('s11 = mesh([\n    0, 0, 0, 1, 0, 0, 0, 1, 0,\n], color="#aabbcc")');
@@ -465,18 +448,14 @@ describe('emitters', () => {
     expect(text).toContain('sphere(r = 1)');
     expect(text).toContain('cylinder(h = 2, r1 = 1, r2 = 0)');
     expect(text).toContain('rotate_extrude() translate([5, 0]) circle(r = 1)');
-    expect(text).toContain(
-      'rotate([90, 0, 90]) linear_extrude(height = 1) polygon([[0, 0], [2, 0], [0, 3]])',
-    );
+    expect(text).toContain('rotate([90, 0, 90]) linear_extrude(height = 1) polygon([[0, 0], [2, 0], [0, 3]])');
     expect(text).toContain('[-(w) / 2, -1.5, 0]');
     expect(text).toContain('[(w) / 2, 1.5, 0]');
     expect(text).toContain('linear_extrude(height = 5) polygon([[1, 0], [3, 0], [3, h]])');
     expect(text).toContain('rotate([90, 0, 90]) rotate_extrude(angle = 180)');
     expect(text).toContain('rotate([-90, 0, 0]) rotate_extrude(angle = -(180))');
     expect(text).toContain('rotate_extrude(angle = (h) * 180 / PI)');
-    expect(text).toContain(
-      'polyhedron(points = [\n    [0, 0, 0],\n    [1, 0, 0],\n    [0, 1, 0]\n  ], faces = [[0, 2, 1]])',
-    );
+    expect(text).toContain('polyhedron(points = [\n    [0, 0, 0],\n    [1, 0, 0],\n    [0, 1, 0]\n  ], faces = [[0, 2, 1]])');
     expect(text).toContain('module s0_v2() union() { s0_v1(); s1_v1(); }');
     expect(text).toContain('difference() { s0_v2(); s2_v1(); }');
     expect(text).toContain('intersection() { s0_v3(); s3_v1(); }');
@@ -486,9 +465,7 @@ describe('emitters', () => {
     expect(text).toContain('color("#aabbcc") s0_v4(); // First');
     expect(text).toContain('// Note: a note');
     const spun = emitOpenScad(rotated);
-    expect(spun).toContain(
-      'translate([1, 0, 0]) rotate([90, 0, 0]) rotate([0, (a) * 180 / PI, 0]) rotate([0, 0, (h) * 180 / PI]) cube(',
-    );
+    expect(spun).toContain('translate([1, 0, 0]) rotate([90, 0, 0]) rotate([0, (a) * 180 / PI, 0]) rotate([0, 0, (h) * 180 / PI]) cube(');
   });
 
   it('emits a FreeCAD macro for every shape kind', () => {
@@ -509,8 +486,6 @@ describe('emitters', () => {
     expect(text).toContain('# s6 labelled "L"');
     expect(text).toContain('show(s0, "First", "#aabbcc")');
     expect(text).toContain('show(s6, "solid_2", "#000000")');
-    expect(emitFreeCad(rotated)).toContain(
-      'rotation=(90, (a) * 180 / math.pi, (h) * 180 / math.pi)',
-    );
+    expect(emitFreeCad(rotated)).toContain('rotation=(90, (a) * 180 / math.pi, (h) * 180 / math.pi)');
   });
 });

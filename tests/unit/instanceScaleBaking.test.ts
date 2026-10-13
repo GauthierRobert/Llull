@@ -1,15 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { volumeOf } from '../helpers/fixtureDocument';
 import { createEmptyDocument } from '@core/model/types';
-import type {
-  BoxEntity,
-  CadDocument,
-  CylinderEntity,
-  Entity,
-  InstanceEntity,
-  MeshSolidEntity,
-  Vec3,
-} from '@core/model/types';
+import type { BoxEntity, CadDocument, CylinderEntity, Entity, InstanceEntity, MeshSolidEntity, Vec3 } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { expandInstance } from '@core/geometry/instanceExpansion';
 
@@ -66,8 +58,7 @@ function meshPoints(entity: Entity): Vec3[] {
 }
 
 function extents(points: readonly Vec3[]): { min: Vec3; max: Vec3 } {
-  const axis = (k: 0 | 1 | 2, pick: (...values: number[]) => number): number =>
-    pick(...points.map((point) => point[k]));
+  const axis = (k: 0 | 1 | 2, pick: (...values: number[]) => number): number => pick(...points.map((point) => point[k]));
   return {
     min: [axis(0, Math.min), axis(1, Math.min), axis(2, Math.min)],
     max: [axis(0, Math.max), axis(1, Math.max), axis(2, Math.max)],
@@ -122,10 +113,7 @@ describe('expandInstance bakes non-uniform / mirrored scale exactly', () => {
   it('a cylinder scaled [2, 1, 1] is an elliptic cylinder of section area π·2r·r', () => {
     const radius = 1.5;
     const height = 2;
-    const { doc, instanceId, children } = singleChildInstance(
-      ['add_cylinder', { radius, height }],
-      [2, 1, 1],
-    );
+    const { doc, instanceId, children } = singleChildInstance(['add_cylinder', { radius, height }], [2, 1, 1]);
     const { min, max } = extents(meshPoints(children[0]!));
     expectVecClose(min, [-2 * radius, -radius, -height / 2]);
     expectVecClose(max, [2 * radius, radius, height / 2]);
@@ -137,10 +125,7 @@ describe('expandInstance bakes non-uniform / mirrored scale exactly', () => {
 
   it('a rotated box under a non-uniform scale is scaled along the instance axes', () => {
     // size [2, 4, 2] rotated 90° about Z occupies x ±2, y ±1; scale x2 → x ±4, y ±1.
-    const { doc, instanceId, children } = singleChildInstance(
-      ['add_box', { size: [2, 4, 2], rotation: [0, 0, Math.PI / 2] }],
-      [2, 1, 1],
-    );
+    const { doc, instanceId, children } = singleChildInstance(['add_box', { size: [2, 4, 2], rotation: [0, 0, Math.PI / 2] }], [2, 1, 1]);
     const { min, max } = extents(meshPoints(children[0]!));
     expectVecClose(min, [-4, -1, -1]);
     expectVecClose(max, [4, 1, 1]);
@@ -161,10 +146,7 @@ describe('expandInstance bakes non-uniform / mirrored scale exactly', () => {
 
   it('a negative scale mirrors a wedge and keeps its volume positive', () => {
     const size: Vec3 = [2, 3, 4];
-    const { doc, instanceId, children } = singleChildInstance(
-      ['add_wedge', { size, position: [1, 0, 0] }],
-      [-1, 1, 1],
-    );
+    const { doc, instanceId, children } = singleChildInstance(['add_wedge', { size, position: [1, 0, 0] }], [-1, 1, 1]);
     const points = meshPoints(children[0]!);
     const { min, max } = extents(points);
     expectVecClose(min, [-3, 0, 0]);

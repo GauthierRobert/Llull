@@ -28,8 +28,7 @@ const PIXEL_CONVENTION =
   'Image pixel coordinates [px, py]: origin at the TOP-left corner of the picture, +px right, ' +
   '+py DOWN (as read off the image); fractional values are fine.';
 
-const formatPoint = (point: readonly number[]): string =>
-  `[${point.map((value) => roundTo(value, 6)).join(', ')}]`;
+const formatPoint = (point: readonly number[]): string => `[${point.map((value) => roundTo(value, 6)).join(', ')}]`;
 
 /** The image entity `id`, or a no-op result explaining why there is none. */
 function underlayOf(doc: CadDocument, id: string, command: string): ImageEntity | CommandResult {
@@ -61,44 +60,18 @@ export const addImageUnderlay = defineCommand({
     'coordinates read off the picture into model coordinates for draw_polyline / extrude_profile / ' +
     `revolve_profile. Accepts PNG or JPEG base64 data URLs up to ${MAX_IMAGE_DATA_URL_LENGTH} characters.`,
   params: z.object({
-    dataUrl: z
-      .string()
-      .describe(
-        'The image as a base64 data URL: "data:image/png;base64,…" or "data:image/jpeg;base64,…".',
-      ),
-    position: vec3(
-      'World position [x, y, z] of the image lower-left corner (work-plane origin). Defaults to [0, 0, 0].',
-    ).optional(),
+    dataUrl: z.string().describe('The image as a base64 data URL: "data:image/png;base64,…" or "data:image/jpeg;base64,…".'),
+    position: vec3('World position [x, y, z] of the image lower-left corner (work-plane origin). Defaults to [0, 0, 0].').optional(),
     rotation: vec3(`${ROTATION_CONVENTION} of the work plane. Defaults to [0, 0, 0].`).optional(),
-    width: z
-      .number()
-      .describe('Placed image width in document units (> 0); height follows the aspect ratio.')
-      .optional(),
-    pixelSize: z
-      .number()
-      .describe(
-        'Document units per image pixel (> 0), e.g. 1.5 for a 1.5 mm/px scan. Excludes width.',
-      )
-      .optional(),
+    width: z.number().describe('Placed image width in document units (> 0); height follows the aspect ratio.').optional(),
+    pixelSize: z.number().describe('Document units per image pixel (> 0), e.g. 1.5 for a 1.5 mm/px scan. Excludes width.').optional(),
     opacity: opacityField(`Defaults to ${DEFAULT_OPACITY}.`),
-    locked: z
-      .boolean()
-      .describe('true: the viewport never picks/selects it while tracing. Defaults to false.')
-      .optional(),
+    locked: z.boolean().describe('true: the viewport never picks/selects it while tracing. Defaults to false.').optional(),
     name: nameField(),
   }),
   run: (
     doc,
-    {
-      dataUrl,
-      position = ORIGIN,
-      rotation = ORIGIN,
-      width,
-      pixelSize,
-      opacity = DEFAULT_OPACITY,
-      locked = false,
-      name,
-    },
+    { dataUrl, position = ORIGIN, rotation = ORIGIN, width, pixelSize, opacity = DEFAULT_OPACITY, locked = false, name },
   ): CommandResult => {
     const fail = failer(doc, 'add_image_underlay');
     if (dataUrl.length > MAX_IMAGE_DATA_URL_LENGTH)
@@ -109,14 +82,10 @@ export const addImageUnderlay = defineCommand({
     if (!parsed.ok) return fail(parsed.error);
     const { pixelWidth, pixelHeight } = parsed;
     if (Math.max(pixelWidth, pixelHeight) > MAX_IMAGE_PIXEL_SIDE)
-      return fail(
-        `image is ${pixelWidth}×${pixelHeight} px; the largest side may be ${MAX_IMAGE_PIXEL_SIDE} px`,
-      );
-    if (width !== undefined && pixelSize !== undefined)
-      return fail('give width OR pixelSize, not both');
+      return fail(`image is ${pixelWidth}×${pixelHeight} px; the largest side may be ${MAX_IMAGE_PIXEL_SIDE} px`);
+    if (width !== undefined && pixelSize !== undefined) return fail('give width OR pixelSize, not both');
     const unitsPerPixel = width !== undefined ? width / pixelWidth : (pixelSize ?? 1);
-    if (!Number.isFinite(unitsPerPixel) || unitsPerPixel <= 0)
-      return fail(`width/pixelSize must be > 0 (got ${width ?? pixelSize})`);
+    if (!Number.isFinite(unitsPerPixel) || unitsPerPixel <= 0) return fail(`width/pixelSize must be > 0 (got ${width ?? pixelSize})`);
     if (!(opacity >= 0 && opacity <= 1)) return fail(`opacity must be in [0, 1] (got ${opacity})`);
 
     const id = nextId('image');
@@ -167,17 +136,13 @@ export const calibrateUnderlayCommand = defineCommand({
     id: z.string().describe('Id of the image underlay to calibrate.'),
     pixelA: vec2(`First reference point. ${PIXEL_CONVENTION}`),
     pixelB: vec2('Second reference point, same pixel convention as pixelA.'),
-    distance: z
-      .number()
-      .describe('Real distance between pixelA and pixelB, in document units (> 0).'),
+    distance: z.number().describe('Real distance between pixelA and pixelB, in document units (> 0).'),
     origin: z
       .object({
         pixel: vec2('Image pixel [px, py] to pin (same convention as pixelA).'),
         world: vec3('World point [x, y, z] that pixel maps to after calibration.'),
       })
-      .describe(
-        'Optional: pin an image pixel to a world point. Defaults to pixelA staying where it is.',
-      )
+      .describe('Optional: pin an image pixel to a world point. Defaults to pixelA staying where it is.')
       .optional(),
     align: z
       .enum(['none', 'x', 'y'])
@@ -198,9 +163,7 @@ export const calibrateUnderlayCommand = defineCommand({
     const { placement, unitsPerPixel, pixelDistance } = result;
     const calibrated: ImageEntity = { ...image, ...placement };
     const turned =
-      placement.rotation[2] === image.rotation[2]
-        ? ''
-        : `, rotated in-plane to ${roundTo(toDegrees(placement.rotation[2]), 6)}°`;
+      placement.rotation[2] === image.rotation[2] ? '' : `, rotated in-plane to ${roundTo(toDegrees(placement.rotation[2]), 6)}°`;
     return changed(
       replaceEntity(doc, calibrated),
       `Calibrated underlay ${id}: ${roundTo(pixelDistance, 6)} px = ${distance} units → ` +
@@ -231,23 +194,15 @@ export const setUnderlay = defineCommand({
   run: (doc, { id, opacity, locked }): CommandResult => {
     const image = underlayOf(doc, id, 'set_underlay');
     if (!isImage(image)) return image;
-    if (opacity === undefined && locked === undefined)
-      return noop(doc, `set_underlay: give opacity and/or locked; ${id} unchanged.`);
+    if (opacity === undefined && locked === undefined) return noop(doc, `set_underlay: give opacity and/or locked; ${id} unchanged.`);
     if (opacity !== undefined && !(opacity >= 0 && opacity <= 1))
-      return noop(
-        doc,
-        `set_underlay: opacity must be in [0, 1] (got ${opacity}); ${id} unchanged.`,
-      );
+      return noop(doc, `set_underlay: opacity must be in [0, 1] (got ${opacity}); ${id} unchanged.`);
     const next: ImageEntity = {
       ...image,
       ...(opacity !== undefined ? { opacity } : {}),
       ...(locked !== undefined ? { locked } : {}),
     };
-    return changed(
-      replaceEntity(doc, next),
-      `Underlay ${id}: opacity ${next.opacity}, ${next.locked ? 'locked' : 'unlocked'}.`,
-      [id],
-    );
+    return changed(replaceEntity(doc, next), `Underlay ${id}: opacity ${next.opacity}, ${next.locked ? 'locked' : 'unlocked'}.`, [id]);
   },
 });
 
@@ -268,18 +223,13 @@ export const imageToWorld = defineCommand({
   annotations: { readOnly: true },
   params: z.object({
     id: z.string().describe('Id of the image underlay the pixel coordinates refer to.'),
-    points: z
-      .array(vec2(PIXEL_CONVENTION))
-      .describe(`Pixel points [[px, py], …] to convert (1..${MAX_PROFILE_POINTS}).`),
+    points: z.array(vec2(PIXEL_CONVENTION)).describe(`Pixel points [[px, py], …] to convert (1..${MAX_PROFILE_POINTS}).`),
   }),
   run: (doc, { id, points }): CommandResult => {
     const image = underlayOf(doc, id, 'image_to_world');
     if (!isImage(image)) return image;
     if (points.length === 0 || points.length > MAX_PROFILE_POINTS)
-      return noop(
-        doc,
-        `image_to_world: give 1..${MAX_PROFILE_POINTS} points (got ${points.length}).`,
-      );
+      return noop(doc, `image_to_world: give 1..${MAX_PROFILE_POINTS} points (got ${points.length}).`);
     const world = points.map((pixel): Vec3 => {
       const [x, y, z] = pixelToWorld(image, pixel);
       return [roundTo(x, 6), roundTo(y, 6), roundTo(z, 6)];

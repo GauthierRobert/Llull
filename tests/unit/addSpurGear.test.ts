@@ -43,9 +43,7 @@ describe('add_spur_gear', () => {
     for (let i = 0; i < n; i++) {
       for (let j = i + 2; j < n; j++) {
         if (i === 0 && j === n - 1) continue;
-        expect(
-          segmentsIntersect(profile[i]!, profile[(i + 1) % n]!, profile[j]!, profile[(j + 1) % n]!),
-        ).toBe(false);
+        expect(segmentsIntersect(profile[i]!, profile[(i + 1) % n]!, profile[j]!, profile[(j + 1) % n]!)).toBe(false);
       }
     }
   });
@@ -99,10 +97,7 @@ describe('add_spur_gear', () => {
       readonly [number, number],
       readonly [number, number],
     ];
-    const mid: [number, number] = [
-      (p0[0] + 3 * c1[0] + 3 * c2[0] + p3[0]) / 8,
-      (p0[1] + 3 * c1[1] + 3 * c2[1] + p3[1]) / 8,
-    ];
+    const mid: [number, number] = [(p0[0] + 3 * c1[0] + 3 * c2[0] + p3[0]) / 8, (p0[1] + 3 * c1[1] + 3 * c2[1] + p3[1]) / 8];
     const baseRadius = 30 * Math.cos(Math.PI / 9);
     const t = Math.sqrt(Math.max(0, (Math.hypot(mid[0], mid[1]) / baseRadius) ** 2 - 1));
     const angleOf = (p: readonly [number, number]): number => Math.atan2(p[1], p[0]);
@@ -111,13 +106,9 @@ describe('add_spur_gear', () => {
       return u - Math.atan(u);
     };
     expect(t).toBeGreaterThan(0);
-    expect(
-      Math.abs(
-        angleOf(mid) -
-          angleOf(p0) -
-          (involuteAngle(Math.hypot(...mid)) - involuteAngle(Math.hypot(...p0))),
-      ),
-    ).toBeLessThan(1e-3);
+    expect(Math.abs(angleOf(mid) - angleOf(p0) - (involuteAngle(Math.hypot(...mid)) - involuteAngle(Math.hypot(...p0))))).toBeLessThan(
+      1e-3,
+    );
   });
 
   it('pitch diameter equals module * teeth (direct: at least one tip point hits outerRadius)', () => {

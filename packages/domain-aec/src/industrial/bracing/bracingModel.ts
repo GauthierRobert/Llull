@@ -36,10 +36,7 @@ export function craneWallForce(
     ...(craneSelfWeight !== undefined ? { craneSelfWeight } : {}),
   });
   const driveGroup1 = (GAMMA_CRANE * actions.group1.longitudinal) / 1000;
-  const bufferGroup7 =
-    (GAMMA_BUFFER * bufferForce(actions.selfWeight, travelSpeed, bufferStiffness)) /
-    CRANE_FACTORS.rails /
-    1000;
+  const bufferGroup7 = (GAMMA_BUFFER * bufferForce(actions.selfWeight, travelSpeed, bufferStiffness)) / CRANE_FACTORS.rails / 1000;
   return {
     driveGroup1,
     bufferGroup7,
@@ -103,9 +100,7 @@ export const near = (a: number, b: number): boolean => Math.abs(a - b) <= TOLERA
 function minorImperfection(profile: SteelProfile): number {
   if (profile.shape === 'I') return profile.h / profile.b > 1.2 ? 0.34 : 0.49;
   if (profile.shape === 'C') return 0.34;
-  return profile.shape === 'SHS' || profile.shape === 'RHS' || profile.shape === 'CHS'
-    ? 0.21
-    : 0.49;
+  return profile.shape === 'SHS' || profile.shape === 'RHS' || profile.shape === 'CHS' ? 0.21 : 0.49;
 }
 
 /** Design buckling resistance χ·A·fy (N) about the minor axis for a buckling length (mm). */

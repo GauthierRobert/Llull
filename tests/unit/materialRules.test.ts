@@ -19,14 +19,10 @@ describe('materialDraftOf', () => {
       roughness: 0.45,
     });
   });
-  it.each([
-    { name: '  ' },
-    { density: '' },
-    { density: '0' },
-    { color: 'red' },
-    { metalness: '1.5' },
-    { roughness: 'x' },
-  ])('rejects %j', (patch) => {
-    expect(materialDraftOf({ ...valid, ...patch })).toBeNull();
-  });
+  it.each([{ name: '  ' }, { density: '' }, { density: '0' }, { color: 'red' }, { metalness: '1.5' }, { roughness: 'x' }])(
+    'rejects %j',
+    (patch) => {
+      expect(materialDraftOf({ ...valid, ...patch })).toBeNull();
+    },
+  );
 });

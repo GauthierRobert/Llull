@@ -4,12 +4,7 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { GRAVITY } from '@aec/shared/numeric';
 import { runwayCheck } from '@aec/industrial/runway/runwayCheckRun';
-import {
-  bufferForce,
-  wheelMoment,
-  wheelShear,
-  type RunwayCheckRow,
-} from '@aec/industrial/runway/runwayCheckModel';
+import { bufferForce, wheelMoment, wheelShear, type RunwayCheckRow } from '@aec/industrial/runway/runwayCheckModel';
 import { craneActions } from '@aec/industrial/frames/frameModelTypes';
 
 function hall(capacity = 10): CadDocument {
@@ -59,9 +54,7 @@ describe('check_crane_runways', () => {
       expect(row.utilisation).toBeLessThan(1);
     }
     expect(find(data.rows, 'fatigue').utilisation).toBeGreaterThan(0.2);
-    expect(find(data.rows, 'ltb').utilisation).toBeGreaterThanOrEqual(
-      find(data.rows, 'strength', 'bending').utilisation,
-    );
+    expect(find(data.rows, 'ltb').utilisation).toBeGreaterThanOrEqual(find(data.rows, 'strength', 'bending').utilisation);
     expect(data.csv).toContain('Utilisation');
     expect(result.summary).toMatch(/Checked \d+ crane runway beam\(s\).*10 t, class S3.*all OK/);
     expect(runwayCheck.annotations).toEqual({ readOnly: true, idempotent: true });
@@ -129,25 +122,18 @@ describe('check_crane_runways', () => {
     expect(longitudinal.check).toMatch(/HL \d+(\.\d)? kN, φ2 1\.134/);
     expect(longitudinal.utilisation).toBeLessThan(0.05);
     const hc4 = rowsOf(doc, { hoistingClass: 'HC4', hoistingSpeed: 0.5 });
-    expect(find(hc4, 'strength', 'bending').value).toBeGreaterThan(
-      find(base, 'strength', 'bending').value,
-    );
+    expect(find(hc4, 'strength', 'bending').value).toBeGreaterThan(find(base, 'strength', 'bending').value);
     expect(find(hc4, 'strength', 'longitudinal').check).toContain('φ2 1.54');
     const far = rowsOf(doc, { minHookApproach: 5 });
-    expect(find(far, 'strength', 'shear').value).toBeLessThan(
-      find(base, 'strength', 'shear').value,
-    );
+    expect(find(far, 'strength', 'shear').value).toBeLessThan(find(base, 'strength', 'shear').value);
     const spanned = rowsOf(doc, { craneSpan: 12000, craneSelfWeight: 30 });
-    expect(find(spanned, 'strength', 'shear').value).not.toBe(
-      find(base, 'strength', 'shear').value,
-    );
+    expect(find(spanned, 'strength', 'shear').value).not.toBe(find(base, 'strength', 'shear').value);
   });
 
   it('falls back to a 20 m bridge span for a runway without a paired beam', () => {
     const doc = hall();
     const kept = Object.values(doc.building!.elements).filter(
-      (element) =>
-        !(element.category === 'member' && element.role === 'crane' && element.start[0] > 10000),
+      (element) => !(element.category === 'member' && element.role === 'crane' && element.start[0] > 10000),
     );
     const single = {
       ...doc,
@@ -155,10 +141,7 @@ describe('check_crane_runways', () => {
     };
     const actions = craneActions(10, 20000);
     const lonely = rowsOf(single);
-    expect(find(lonely, 'strength', 'longitudinal').value).toBeCloseTo(
-      1.35 * actions.group1.longitudinal,
-      -1,
-    );
+    expect(find(lonely, 'strength', 'longitudinal').value).toBeCloseTo(1.35 * actions.group1.longitudinal, -1);
   });
 
   it('is a graceful no-op for bad input', () => {
@@ -237,12 +220,7 @@ describe('local wheel stresses (EN 1993-6 §5.7.1)', () => {
 
   it('rejects enum values outside the schema', () => {
     const doc = hall();
-    for (const params of [
-      { girder: 'cast' },
-      { railSize: 'X9' },
-      { craneClass: 'S9' },
-      { hoistingClass: 'HC9' },
-    ]) {
+    for (const params of [{ girder: 'cast' }, { railSize: 'X9' }, { craneClass: 'S9' }, { hoistingClass: 'HC9' }]) {
       const result = execute(doc, 'check_crane_runways', params);
       expect(result.document).toBe(doc);
       expect(result.summary).toMatch(/^check_crane_runways rejected: invalid params/);
@@ -257,8 +235,7 @@ describe('metre documents', () => {
       length: 30,
       crane: { capacity: 10, railHeight: 6 },
     }).document;
-    const max = (doc: CadDocument): number =>
-      (runwayCheck.run(doc, {}).data as { maxUtilisation: number }).maxUtilisation;
+    const max = (doc: CadDocument): number => (runwayCheck.run(doc, {}).data as { maxUtilisation: number }).maxUtilisation;
     expect(max(metres)).toBeCloseTo(max(hall()), 6);
   });
 });
@@ -305,12 +282,7 @@ describe('check_crane_runways longitudinal actions (EN 1991-3 groups 7 and 8)', 
 
   it('is a no-op on bad travelSpeed / bufferStiffness', () => {
     const doc = hall();
-    for (const params of [
-      { travelSpeed: 0 },
-      { travelSpeed: -1 },
-      { bufferStiffness: 0 },
-      { bufferStiffness: Number.NaN },
-    ]) {
+    for (const params of [{ travelSpeed: 0 }, { travelSpeed: -1 }, { bufferStiffness: 0 }, { bufferStiffness: Number.NaN }]) {
       expectFailed(doc, params, /failed/);
     }
   });

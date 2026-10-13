@@ -43,11 +43,7 @@ export function mergedEntityBounds(document: CadDocument, ids: readonly string[]
  * @param aspect viewport width / height (default square)
  * @failure no ids, or none that exist -> null
  */
-export function computeFitFraming(
-  document: CadDocument,
-  ids: readonly string[],
-  aspect = 1,
-): FitFraming | null {
+export function computeFitFraming(document: CadDocument, ids: readonly string[], aspect = 1): FitFraming | null {
   const merged = mergedEntityBounds(document, ids);
   if (!merged) return null;
 

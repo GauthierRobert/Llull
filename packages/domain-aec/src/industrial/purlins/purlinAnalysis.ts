@@ -37,10 +37,7 @@ interface PurlinLoads {
 }
 
 /** Steel members of `levelId` with endpoints in mm; `skipped` = marks of purlins / rails without a usable profile or length. */
-export function locatePurlinMembers(
-  doc: CadDocument,
-  levelId: string,
-): { members: Located[]; skipped: string[] } {
+export function locatePurlinMembers(doc: CadDocument, levelId: string): { members: Located[]; skipped: string[] } {
   const members: Located[] = [];
   const skipped: string[] = [];
   for (const { member, profile, start, end } of levelMembersInMm(doc, levelId)) {
@@ -78,8 +75,7 @@ export function analysePurlins(
 ): PurlinAnalysis | { reason: string } {
   const purlins = members.filter(({ member }) => member.role === 'purlin');
   const rails = members.filter(({ member }) => member.role === 'rail');
-  if (purlins.length === 0)
-    return { reason: `check_purlins: no purlins (role purlin) on level '${levelId}'.` };
+  if (purlins.length === 0) return { reason: `check_purlins: no purlins (role purlin) on level '${levelId}'.` };
 
   // Hall envelope: plan extents of every member, ridge height, eaves level.
   const everyPoint = members.flatMap(({ start, end }) => [start, end]);
@@ -87,15 +83,9 @@ export function analysePurlins(
   const [x0, x1] = [envelopeMin[0], envelopeMax[0]];
   const [y0, yEnd] = [envelopeMin[1], envelopeMax[1]];
   const height = envelopeMax[2];
-  const rafterZs = members
-    .filter(({ member }) => member.role === 'rafter')
-    .flatMap(({ start, end }) => [start[2], end[2]]);
+  const rafterZs = members.filter(({ member }) => member.role === 'rafter').flatMap(({ start, end }) => [start[2], end[2]]);
   const eaves = rafterZs.length > 0 ? Math.min(...rafterZs) : null;
-  const valleys = valleyLines(
-    members
-      .filter(({ member }) => member.role === 'rafter')
-      .map(({ start, end }) => ({ start, end })),
-  );
+  const valleys = valleyLines(members.filter(({ member }) => member.role === 'rafter').map(({ start, end }) => ({ start, end })));
   // Monopitch hall: no two rafters meet at their high ends (no ridge).
   const rafterHighEnds = members
     .filter(({ member }) => member.role === 'rafter')
@@ -103,10 +93,7 @@ export function analysePurlins(
   const monopitch =
     rafterHighEnds.length > 0 &&
     rafterHighEnds.every(
-      (point, index) =>
-        !rafterHighEnds.some(
-          (other, otherIndex) => otherIndex !== index && distance3(point, other) <= 10,
-        ),
+      (point, index) => !rafterHighEnds.some((other, otherIndex) => otherIndex !== index && distance3(point, other) <= 10),
     );
   const width = x1 - x0;
   const depth = yEnd - y0;
@@ -116,12 +103,7 @@ export function analysePurlins(
   // Purlin rows: one slope of one bay, ordered along x, split where the slope reverses.
   const rows: PurlinRow[] = [];
   const zoneStats = new Map<string, ZoneSummary>();
-  const record = (
-    surface: 'roof' | 'wall',
-    zone: string,
-    cpe: number,
-    utilisation: number,
-  ): void => {
+  const record = (surface: 'roof' | 'wall', zone: string, cpe: number, utilisation: number): void => {
     const key = `${surface}|${zone}|${cpe}`;
     const current = zoneStats.get(key);
     zoneStats.set(key, {
@@ -147,30 +129,20 @@ export function analysePurlins(
       const previous = slope?.[slope.length - 1];
       const reversed =
         previous !== undefined &&
-        ((sign > 0 && purlin.start[2] < previous.start[2] - TOLERANCE) ||
-          (sign < 0 && purlin.start[2] > previous.start[2] + TOLERANCE));
+        ((sign > 0 && purlin.start[2] < previous.start[2] - TOLERANCE) || (sign < 0 && purlin.start[2] > previous.start[2] + TOLERANCE));
       if (!slope || reversed) slopes.push([purlin]);
       else slope.push(purlin);
     }
     for (const slope of slopes) {
-      const eavesEnd = slope.reduce((low, purlin) =>
-        purlin.start[2] < low.start[2] ? purlin : low,
-      );
-      const highEnd = slope.reduce((top, purlin) =>
-        purlin.start[2] > top.start[2] ? purlin : top,
-      );
+      const eavesEnd = slope.reduce((low, purlin) => (purlin.start[2] < low.start[2] ? purlin : low));
+      const highEnd = slope.reduce((top, purlin) => (purlin.start[2] > top.start[2] ? purlin : top));
       const gaps = slope.slice(1).map((purlin, index) => {
         const before = slope[index] as Located;
         return Math.hypot(purlin.start[0] - before.start[0], purlin.start[2] - before.start[2]);
       });
       slope.forEach((purlin, index) => {
-        const neighbours = [gaps[index - 1], gaps[index]].filter(
-          (gap): gap is number => gap !== undefined && gap > TOLERANCE,
-        );
-        const tributary =
-          neighbours.length === 0
-            ? DEFAULT_TRIBUTARY
-            : neighbours.reduce((sum, gap) => sum + gap, 0) / 2;
+        const neighbours = [gaps[index - 1], gaps[index]].filter((gap): gap is number => gap !== undefined && gap > TOLERANCE);
+        const tributary = neighbours.length === 0 ? DEFAULT_TRIBUTARY : neighbours.reduce((sum, gap) => sum + gap, 0) / 2;
         const pitch = Math.abs(purlin.member.roll);
         const cosine = Math.cos(pitch);
         const fy = yieldStrength(purlin.member.material);
@@ -211,10 +183,7 @@ export function analysePurlins(
           bendingLabel: `uplift bending zone ${zone} cpe ${cpe}${direction} (free flange, Lcr span/2)`,
         });
         // Downward wind pressure (steep roofs): cpe,10 pressure set - cpi -0.3, normal to the slope.
-        const downwardCpe =
-          pressureOption.pressure >= ROOF_PRESSURE_CASE_MIN_CPE
-            ? pressureOption.pressure + CPI_PRESSURE
-            : 0;
+        const downwardCpe = pressureOption.pressure >= ROOF_PRESSURE_CASE_MIN_CPE ? pressureOption.pressure + CPI_PRESSURE : 0;
         const downwardVerdicts =
           downwardCpe > 0
             ? [
@@ -222,10 +191,7 @@ export function analysePurlins(
                 { label: '1.35G+1.5S+0.9W', windFactor: 0.9, snowFactor: GAMMA_Q },
               ].flatMap(({ label, windFactor, snowFactor }) =>
                 beamVerdicts(purlin.profile, fy, purlin.length, {
-                  ultimate:
-                    GAMMA_G * dead +
-                    snowFactor * snow +
-                    windFactor * windPressure * downwardCpe * trib,
+                  ultimate: GAMMA_G * dead + snowFactor * snow + windFactor * windPressure * downwardCpe * trib,
                   ultimateLabel: label,
                   serviceability: 0,
                   serviceabilityLabel: 'SLS',
@@ -272,8 +238,7 @@ export function analysePurlins(
     const trib = (upper - lower) / 2 / 1000;
     const fy = yieldStrength(rail.member.material);
     const gableDistance = Math.max(0, Math.min(rail.yMin - y0, yEnd - rail.yMax));
-    const suctionZone: WallZone =
-      gableDistance < eAlong / 5 - TOLERANCE ? 'A' : gableDistance < eAlong - TOLERANCE ? 'B' : 'C';
+    const suctionZone: WallZone = gableDistance < eAlong / 5 - TOLERANCE ? 'A' : gableDistance < eAlong - TOLERANCE ? 'B' : 'C';
     const suction = Math.abs(CPE_WALL[suctionZone]) + CPI_SUCTION;
     const pressure = CPE_WALL.D + CPI_PRESSURE;
     // Suction: inner flange free and in compression (χLT as purlin uplift); pressure: sheeting-restrained.
@@ -298,9 +263,7 @@ export function analysePurlins(
       }),
     }));
     const governingCase = cases.reduce((best, windCase) =>
-      governing(windCase.verdicts).utilisation > governing(best.verdicts).utilisation
-        ? windCase
-        : best,
+      governing(windCase.verdicts).utilisation > governing(best.verdicts).utilisation ? windCase : best,
     );
     const zone = governingCase.zone;
     const worst = governing(governingCase.verdicts);
@@ -316,8 +279,6 @@ export function analysePurlins(
     record('wall', zone, CPE_WALL[zone], worst.utilisation);
   }
 
-  const zones = [...zoneStats.values()].sort((a, b) =>
-    `${a.surface}${a.zone}` < `${b.surface}${b.zone}` ? -1 : 1,
-  );
+  const zones = [...zoneStats.values()].sort((a, b) => (`${a.surface}${a.zone}` < `${b.surface}${b.zone}` ? -1 : 1));
   return { rows, zones, monopitch, eAcross, eAlong };
 }

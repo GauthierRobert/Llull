@@ -122,11 +122,7 @@ export const exportGltf = defineCommand({
     const { entityIds, binary = false } = params;
     const collected = collectExportParts(doc, entityIds);
     const ids = collected.parts.map((part) => part.id);
-    const scene = buildGltfScene(
-      collectSceneParts(doc, ids),
-      collectDecalParts(doc, ids),
-      groupIndex(doc),
-    );
+    const scene = buildGltfScene(collectSceneParts(doc, ids), collectDecalParts(doc, ids), groupIndex(doc));
     const tris = collected.parts.flatMap((part) => part.tris);
     const counts = {
       triangleCount: tris.length,

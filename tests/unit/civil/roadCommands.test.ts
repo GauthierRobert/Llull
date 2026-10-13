@@ -9,10 +9,7 @@ const line: [number, number][] = [
   [250, 200],
 ];
 
-function withAlignment(
-  doc: CadDocument,
-  extra: Record<string, unknown> = {},
-): { doc: CadDocument; id: string } {
+function withAlignment(doc: CadDocument, extra: Record<string, unknown> = {}): { doc: CadDocument; id: string } {
   const result = execute(doc, 'add_alignment', { points: line, surfaceId: 'surface-1', ...extra });
   expect(result.affected.length, result.summary).toBeGreaterThan(0);
   return { doc: result.document, id: (result.data as { alignmentId: string }).alignmentId };
@@ -51,14 +48,7 @@ describe('add_alignment / update_alignment', () => {
     const ids = result.document.civil?.objects['alignment-1']?.entityIds ?? [];
     expect(ids).toContain('alignment-1:centreline');
     expect(ids.filter((id) => /:t\d+$/.test(id))).toHaveLength(Math.floor(data.lengthM / 20) + 1);
-    expect(ids).toEqual(
-      expect.arrayContaining([
-        'alignment-1:pc0',
-        'alignment-1:pt0',
-        'alignment-1:r0',
-        'alignment-1:pi0',
-      ]),
-    );
+    expect(ids).toEqual(expect.arrayContaining(['alignment-1:pc0', 'alignment-1:pt0', 'alignment-1:r0', 'alignment-1:pi0']));
     const label = result.document.entities['alignment-1:t1'];
     expect(label?.name).toBe('Main St 0+020.00');
     expect(result.document.order).toContain('alignment-1:centreline');
@@ -173,10 +163,7 @@ describe('set_alignment_profile / set_road_section', () => {
 
   it('refuses a missing alignment, short, overlapping, unordered or out-of-range profiles', () => {
     const { doc, id } = withAlignment(surveyedDocument(flat(100), 21, 20));
-    const pvi = (
-      station: number,
-      curveLength?: number,
-    ): { station: number; elevation: number; curveLength: number | undefined } => ({
+    const pvi = (station: number, curveLength?: number): { station: number; elevation: number; curveLength: number | undefined } => ({
       station,
       elevation: 100,
       curveLength,
@@ -227,9 +214,7 @@ describe('corridor and daylight', () => {
   it('draws the carriageway mesh at design level with crossfall and batters to daylight', () => {
     const { doc, id } = designed(101);
     const ids = doc.civil?.objects[id]?.entityIds ?? [];
-    expect(ids).toEqual(
-      expect.arrayContaining([`${id}:corridor`, `${id}:batters`, `${id}:daylight0`]),
-    );
+    expect(ids).toEqual(expect.arrayContaining([`${id}:corridor`, `${id}:batters`, `${id}:daylight0`]));
     const mesh = doc.entities[`${id}:corridor`];
     if (mesh?.kind !== 'mesh') throw new Error('corridor is not a mesh');
     const zs = mesh.mesh.positions.filter((_, i) => i % 3 === 2);
@@ -390,27 +375,19 @@ describe('alignment_report', () => {
       alignmentId: id,
       designSpeedKmh: 20,
     });
-    expect(
-      (gentle.data as { checks: { horizontal: Array<{ ok: boolean }> } }).checks.horizontal[0]?.ok,
-    ).toBe(true);
+    expect((gentle.data as { checks: { horizontal: Array<{ ok: boolean }> } }).checks.horizontal[0]?.ok).toBe(true);
     const fast = execute(profile.document, 'alignment_report', {
       alignmentId: id,
       designSpeedKmh: 200,
     });
     expect(fast.summary).toContain('200 km/h');
     const ok = designed(101);
-    expect(
-      execute(ok.doc, 'alignment_report', { alignmentId: ok.id, designSpeedKmh: 50 }).summary,
-    ).toContain('all checks pass');
+    expect(execute(ok.doc, 'alignment_report', { alignmentId: ok.id, designSpeedKmh: 50 }).summary).toContain('all checks pass');
   });
 
   it('refuses unknown alignments, bad intervals, bad speeds', () => {
     const { doc, id } = designed(101);
-    for (const params of [
-      { alignmentId: 'nope' },
-      { alignmentId: id, interval: 0 },
-      { alignmentId: id, designSpeedKmh: 0 },
-    ]) {
+    for (const params of [{ alignmentId: 'nope' }, { alignmentId: id, interval: 0 }, { alignmentId: id, designSpeedKmh: 0 }]) {
       const result = execute(doc, 'alignment_report', params);
       expect(result.data).toBeUndefined();
       expect(result.document).toBe(doc);
@@ -460,11 +437,7 @@ describe('long section and cross sections', () => {
 
   it('refuses a long section without a profile or with bad inputs', () => {
     const { doc, id } = withAlignment(surveyedDocument(flat(100), 21, 20));
-    for (const params of [
-      { alignmentId: id },
-      { alignmentId: 'nope' },
-      { alignmentId: id, verticalExaggeration: 0 },
-    ]) {
+    for (const params of [{ alignmentId: id }, { alignmentId: 'nope' }, { alignmentId: id, verticalExaggeration: 0 }]) {
       const result = execute(doc, 'export_long_section', params);
       expect(result.data).toBeUndefined();
     }

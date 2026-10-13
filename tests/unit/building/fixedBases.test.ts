@@ -5,11 +5,7 @@ import { execute } from '@core/commands/registry';
 import { type FrameLoads } from '@aec/industrial/frames/frameModelTypes';
 import { framesOf } from '@aec/industrial/frames/frameModelFrames';
 import { baseReactions, solveCombination } from '@aec/industrial/frames/frameModelSolve';
-import {
-  BEARING_STRENGTH,
-  checkPlateMN,
-  sizeBasePlate,
-} from '@aec/industrial/connections/basePlateMN';
+import { BEARING_STRENGTH, checkPlateMN, sizeBasePlate } from '@aec/industrial/connections/basePlateMN';
 import { type FoundationRow } from '@aec/industrial/foundations/foundationModel';
 import { footingMoment } from '@aec/industrial/foundations/foundationCombinations';
 import type { FootingDesignRow } from '@aec/industrial/foundations/footingModel';
@@ -21,9 +17,7 @@ const LOADS: FrameLoads = { deadLoad: 0.5, snowLoad: 0.8, windPressure: 0.7 };
 const CRANE_HALL = { ...HALL, crane: { capacity: 10, railHeight: 6000 } };
 
 const plates = (doc: CadDocument): BasePlateElement[] =>
-  Object.values(doc.building!.elements).filter(
-    (element): element is BasePlateElement => element.category === 'plate',
-  );
+  Object.values(doc.building!.elements).filter((element): element is BasePlateElement => element.category === 'plate');
 
 /** Same document with every pad footing replaced by a square pad of `size` × `thickness`. */
 function withPads(doc: CadDocument, size: number, thickness: number): CadDocument {
@@ -38,19 +32,12 @@ function withPads(doc: CadDocument, size: number, thickness: number): CadDocumen
 
 function sections(doc: CadDocument): { column: string; rafter: string; tonnes: number } {
   const members = Object.values(doc.building!.elements).flatMap((element) =>
-    element.category === 'member' && (element.role === 'column' || element.role === 'rafter')
-      ? [element]
-      : [],
+    element.category === 'member' && (element.role === 'column' || element.role === 'rafter') ? [element] : [],
   );
   const profileOf = (role: string): string =>
     members.find((member) => member.role === role && !member.profile.startsWith('HEA200'))!.profile;
   const tonnes = members.reduce((sum, member) => {
-    const length =
-      Math.hypot(
-        member.end[0] - member.start[0],
-        member.end[1] - member.start[1],
-        member.end[2] - member.start[2],
-      ) / 1000;
+    const length = Math.hypot(member.end[0] - member.start[0], member.end[1] - member.start[1], member.end[2] - member.start[2]) / 1000;
     return sum + (length * findProfile(member.profile)!.massPerMetre) / 1000;
   }, 0);
   return { column: profileOf('column'), rafter: profileOf('rafter'), tonnes };
@@ -69,9 +56,7 @@ describe('add_portal_frame_building columnBase', () => {
     for (const reaction of reactions) {
       for (const forces of Object.values(reaction.cases)) expect(forces.moment).toBe(0);
     }
-    expect(
-      plates(hall({ columnBase: 'pinned' })).every((plate) => plate.fixity === undefined),
-    ).toBe(true);
+    expect(plates(hall({ columnBase: 'pinned' })).every((plate) => plate.fixity === undefined)).toBe(true);
   });
 
   it('stores fixity on every base plate and reports it in the summary', () => {
@@ -82,9 +67,7 @@ describe('add_portal_frame_building columnBase', () => {
     expect(result.summary).toContain('fixed column bases');
     const list = plates(result.document);
     const members = result.document.building!.elements;
-    const framePlates = list.filter(
-      (plate) => (members[plate.memberId] as { roll: number }).roll === 0,
-    );
+    const framePlates = list.filter((plate) => (members[plate.memberId] as { roll: number }).roll === 0);
     expect(framePlates).toHaveLength(12);
     expect(framePlates.every((plate) => plate.fixity === 'fixed')).toBe(true);
     // Gable wind posts are not frame columns: pinned.
@@ -130,17 +113,12 @@ describe('fixed column bases in the frame analysis', () => {
     const fixed = frameOf(hall({ columnBase: 'fixed' }));
     const apex = (frame: typeof pinned): number => {
       const result = solveCombination(frame, { G: 1, S: 1 })!;
-      const top = frame.nodes.reduce(
-        (best, node, index) => (node.y > (frame.nodes[best]?.y ?? 0) ? index : best),
-        0,
-      );
+      const top = frame.nodes.reduce((best, node, index) => (node.y > (frame.nodes[best]?.y ?? 0) ? index : best), 0);
       return Math.abs(result.displacements[top]![1]);
     };
     const sway = (frame: typeof pinned): number => {
       const result = solveCombination(frame, { WL: 1 })!;
-      return Math.max(
-        ...frame.columnTops.map((top) => Math.abs(result.displacements[top.node]![0])),
-      );
+      return Math.max(...frame.columnTops.map((top) => Math.abs(result.displacements[top.node]![0])));
     };
     expect(fixed.nodes.filter((node) => node.restraint[2])).toHaveLength(2);
     expect(pinned.nodes.filter((node) => node.restraint[2])).toHaveLength(0);
@@ -152,9 +130,7 @@ describe('fixed column bases in the frame analysis', () => {
     const rail = (doc: CadDocument): number => {
       const frame = frameOf(doc);
       const result = solveCombination(frame, { CLk: 1 })!;
-      return Math.max(
-        ...frame.craneNodes.map((node) => Math.abs(result.displacements[node.node]![0])),
-      );
+      return Math.max(...frame.craneNodes.map((node) => Math.abs(result.displacements[node.node]![0])));
     };
     const pinned = rail(hall(CRANE_HALL));
     expect(pinned).toBeGreaterThan(0);
@@ -164,12 +140,9 @@ describe('fixed column bases in the frame analysis', () => {
   it('reports the base moment per case, counter-clockwise +', () => {
     const doc = hall({ columnBase: 'fixed' });
     const building = doc.building!;
-    const reactions = baseReactions(doc, building, building.levelOrder[0]!, LOADS).filter(
-      (reaction) => reaction.frame === 'frame 3',
-    );
+    const reactions = baseReactions(doc, building, building.levelOrder[0]!, LOADS).filter((reaction) => reaction.frame === 'frame 3');
     expect(reactions).toHaveLength(2);
-    const x = (id: string): number =>
-      (building.elements[id] as unknown as { start: number[] }).start[0]!;
+    const x = (id: string): number => (building.elements[id] as unknown as { start: number[] }).start[0]!;
     const [left, right] = [...reactions].sort((a, b) => x(a.columnId) - x(b.columnId)) as [
       (typeof reactions)[number],
       (typeof reactions)[number],
@@ -229,8 +202,7 @@ describe('footing eccentricity and overturning with a base moment', () => {
 
   it('designs the footing mat for the eccentric pressure (more steel than pinned)', () => {
     const required = (doc: CadDocument): number => {
-      const data = execute(withPads(doc, 4000, 900), 'design_footings', { windPressure: 0.7 })
-        .data as { footings: FootingDesignRow[] };
+      const data = execute(withPads(doc, 4000, 900), 'design_footings', { windPressure: 0.7 }).data as { footings: FootingDesignRow[] };
       return Math.max(...data.footings.map((row) => row.asRequired));
     };
     expect(required(hall({ columnBase: 'fixed' }))).toBeGreaterThan(required(hall()));
@@ -239,9 +211,7 @@ describe('footing eccentricity and overturning with a base moment', () => {
 
 describe('design_footings pad sizing', () => {
   const footingIds = (doc: CadDocument): string[] =>
-    Object.values(doc.building!.elements).flatMap((element) =>
-      element.category === 'footing' ? [element.id] : [],
-    );
+    Object.values(doc.building!.elements).flatMap((element) => (element.category === 'footing' ? [element.id] : []));
   const padSizes = (doc: CadDocument): number[][] =>
     Object.values(doc.building!.elements).flatMap((element) =>
       element.category === 'footing' ? [[element.width, element.length, element.thickness]] : [],
@@ -256,9 +226,7 @@ describe('design_footings pad sizing', () => {
     expect(rows.every((row) => row.status === 'designed')).toBe(true);
     expect(result.summary).toMatch(/F\d+ 1500×1500×600 → \d+×\d+×\d+ H\d+ @ \d+/);
     const designedIds = rows.map((row) => row.id);
-    const after = foundationRows(result.document).filter((row) =>
-      designedIds.includes(row.elementId),
-    );
+    const after = foundationRows(result.document).filter((row) => designedIds.includes(row.elementId));
     expect(after.some((row) => row.check.startsWith('overturning'))).toBe(true);
     expect(Math.max(...after.map((row) => row.utilisation))).toBeLessThanOrEqual(1);
     for (const row of rows) {
@@ -314,10 +282,7 @@ describe('base plate under M + N', () => {
   });
 
   it('is symmetric in the moment sign and shares uplift with a moment between the bolt groups', () => {
-    expect(checkPlateMN(geometry, 200, -150, 355).utilisation).toBeCloseTo(
-      checkPlateMN(geometry, 200, 150, 355).utilisation,
-      9,
-    );
+    expect(checkPlateMN(geometry, 200, -150, 355).utilisation).toBeCloseTo(checkPlateMN(geometry, 200, 150, 355).utilisation, 9);
     const uplift = checkPlateMN(geometry, -100, 10, 355);
     expect(uplift.bearingLength).toBe(0);
     const lever = 500 / 2 - 48;
@@ -325,9 +290,7 @@ describe('base plate under M + N', () => {
   });
 
   it('fails plates without tension bolts that need them', () => {
-    expect(checkPlateMN({ ...geometry, boltCount: 2 }, 100, 300, 355).utilisation).toBeGreaterThan(
-      1,
-    );
+    expect(checkPlateMN({ ...geometry, boltCount: 2 }, 100, 300, 355).utilisation).toBeGreaterThan(1);
   });
 
   it('sizes the lightest catalogue plate that passes and grows with the demand', () => {
@@ -367,16 +330,10 @@ describe('base plate under M + N', () => {
     expect(fixed).toHaveLength(12);
     expect(fixed[0]!.thickness).toBeGreaterThan(before.thickness);
     expect(fixed[0]!.boltDiameter).toBeGreaterThan(before.boltDiameter);
-    const rows = foundationRows(designed.document).filter((row) =>
-      row.check.startsWith('base plate M+N'),
-    );
+    const rows = foundationRows(designed.document).filter((row) => row.check.startsWith('base plate M+N'));
     expect(rows).toHaveLength(fixed.length);
     expect(rows.every((row) => row.utilisation <= 1)).toBe(true);
-    expect(
-      foundationRows(doc).some(
-        (row) => row.check.startsWith('base plate M+N') && row.utilisation > 1,
-      ),
-    ).toBe(true);
+    expect(foundationRows(doc).some((row) => row.check.startsWith('base plate M+N') && row.utilisation > 1)).toBe(true);
   });
 
   it('adds no M+N row for pinned bases', () => {

@@ -27,9 +27,7 @@ export const measureArea = defineCommand({
     entityId: z
       .string()
       .optional()
-      .describe(
-        "Id of a closed 2D shape entity: 'polyline' (must have closed:true), 'rectangle', 'circle', or 'ellipse'.",
-      ),
+      .describe("Id of a closed 2D shape entity: 'polyline' (must have closed:true), 'rectangle', 'circle', or 'ellipse'."),
     points: z
       .array(z.tuple([z.number(), z.number()]))
       .optional()
@@ -47,8 +45,7 @@ export const measureArea = defineCommand({
       });
 
     if (points) {
-      if (points.length < 3)
-        return noop(doc, `measure_area: points must have >= 3 vertices, got ${points.length}.`);
+      if (points.length < 3) return noop(doc, `measure_area: points must have >= 3 vertices, got ${points.length}.`);
       return measured(polygonArea(points), '');
     }
 
@@ -59,13 +56,9 @@ export const measureArea = defineCommand({
 
     if (e.kind === 'polyline') {
       if (!e.closed) {
-        return noop(
-          doc,
-          `measure_area: polyline '${entityId}' is not closed — cannot compute area.`,
-        );
+        return noop(doc, `measure_area: polyline '${entityId}' is not closed — cannot compute area.`);
       }
-      if (e.points.length < 3)
-        return noop(doc, `measure_area: polyline '${entityId}' has fewer than 3 points.`);
+      if (e.points.length < 3) return noop(doc, `measure_area: polyline '${entityId}' has fewer than 3 points.`);
     }
     const area = closedShapeArea(e);
     if (area === null)
@@ -96,9 +89,7 @@ export const measurePerimeter = defineCommand({
   params: z.object({
     entityId: z
       .string()
-      .describe(
-        "Id of the 2D shape entity to measure. Supported kinds: 'line', 'polyline', 'rectangle', 'circle', 'arc'.",
-      ),
+      .describe("Id of the 2D shape entity to measure. Supported kinds: 'line', 'polyline', 'rectangle', 'circle', 'arc'."),
   }),
   run: (doc, { entityId }): CommandResult => {
     const e = doc.entities[entityId];
@@ -112,10 +103,7 @@ export const measurePerimeter = defineCommand({
       case 'polyline':
         perimeter = e.closed
           ? polygonPerimeter(e.points)
-          : e.points.reduce(
-              (sum, p, i, pts) => (i === 0 ? 0 : sum + distance(elementAt(pts, i - 1), p)),
-              0,
-            );
+          : e.points.reduce((sum, p, i, pts) => (i === 0 ? 0 : sum + distance(elementAt(pts, i - 1), p)), 0);
         break;
       case 'rectangle':
         perimeter = 2 * (e.width + e.height);

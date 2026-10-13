@@ -668,9 +668,7 @@ export const plans: Record<string, GoldenAction[]> = {
       command: 'import_survey_points',
       params: {
         name: 'Topo',
-        points: [0, 20, 40, 60].flatMap((x) =>
-          [0, 20, 40, 60].map((y) => ({ x, y, z: 100 + x * 0.05 + y * 0.02 })),
-        ),
+        points: [0, 20, 40, 60].flatMap((x) => [0, 20, 40, 60].map((y) => ({ x, y, z: 100 + x * 0.05 + y * 0.02 }))),
       },
     },
     { command: 'create_surface', params: { contourInterval: 1, majorEvery: 2 } },

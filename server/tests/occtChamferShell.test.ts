@@ -84,11 +84,8 @@ describe('occt chamfer / fillet on true B-rep edges', () => {
   });
 
   it('flags the seam of a cylinder and the poles of a sphere (nothing to round there)', () => {
-    const round = (kind: string, extra: object): Entity =>
-      ({ ...cubeEntity(1), kind, ...extra }) as unknown as Entity;
-    const cylinder = occt.topology(
-      occt.evaluate(leaf(round('cylinder', { radius: 1, height: 2 })))!,
-    )!;
+    const round = (kind: string, extra: object): Entity => ({ ...cubeEntity(1), kind, ...extra }) as unknown as Entity;
+    const cylinder = occt.topology(occt.evaluate(leaf(round('cylinder', { radius: 1, height: 2 })))!)!;
     expect(cylinder.edges.filter((edge) => edge.seam)).toHaveLength(1);
     expect(cylinder.edges.filter((edge) => edge.curve === 'circle' && !edge.seam)).toHaveLength(2);
     const sphere = occt.topology(occt.evaluate(leaf(round('sphere', { radius: 1 })))!)!;

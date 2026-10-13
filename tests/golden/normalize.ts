@@ -8,8 +8,7 @@ import type { CadDocument } from '@core/model/types';
 import { serializeDocument } from '@core/commands/persistence/serialization';
 
 /** Legacy `prefix-<time36>-<counter36>` ids, step-scoped `prefix-<n>.<k>` ids, and `step-<n>`. */
-const NEXT_ID_PATTERN =
-  /[A-Za-z][A-Za-z0-9_]*-[0-9a-z]{6,}-[0-9a-z]+|[A-Za-z][A-Za-z0-9_]*-\d+\.\d+|step-\d+/;
+const NEXT_ID_PATTERN = /[A-Za-z][A-Za-z0-9_]*-[0-9a-z]{6,}-[0-9a-z]+|[A-Za-z][A-Za-z0-9_]*-\d+\.\d+|step-\d+/;
 
 function collectStructuralIds(value: unknown, into: Set<string>): void {
   if (Array.isArray(value)) {
@@ -21,12 +20,7 @@ function collectStructuralIds(value: unknown, into: Set<string>): void {
   const ownId = record['id'];
   if (typeof ownId === 'string' && NEXT_ID_PATTERN.test(ownId)) into.add(ownId);
   for (const [key, child] of Object.entries(record)) {
-    if (
-      child !== null &&
-      typeof child === 'object' &&
-      !Array.isArray(child) &&
-      (child as Record<string, unknown>)['id'] === key
-    ) {
+    if (child !== null && typeof child === 'object' && !Array.isArray(child) && (child as Record<string, unknown>)['id'] === key) {
       into.add(key);
     }
     collectStructuralIds(child, into);

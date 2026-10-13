@@ -36,23 +36,8 @@ export function LevelSelect({
   const options = levels.map((level): readonly [string, string] => [level.id, level.name]);
   const optional = blankLabel !== undefined ? { blankLabel } : {};
   return showLabel ? (
-    <LabeledSelect
-      label={label}
-      value={value}
-      options={options}
-      {...optional}
-      testId={testId}
-      onChange={onChange}
-    />
+    <LabeledSelect label={label} value={value} options={options} {...optional} testId={testId} onChange={onChange} />
   ) : (
-    <PairSelect
-      value={value}
-      options={options}
-      label={label}
-      {...optional}
-      testId={testId}
-      title={title}
-      onChange={onChange}
-    />
+    <PairSelect value={value} options={options} label={label} {...optional} testId={testId} title={title} onChange={onChange} />
   );
 }

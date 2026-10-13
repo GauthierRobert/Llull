@@ -1,11 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createdIn, volumeOf } from '../helpers/fixtureDocument';
-import {
-  type CadDocument,
-  type SubdivisionEntity,
-  type Vec3,
-  createEmptyDocument,
-} from '@core/model/types';
+import { type CadDocument, type SubdivisionEntity, type Vec3, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { entityBounds } from '@core/geometry/bounds';
 import { polylineAt } from '@core/geometry/boundaryPatch';

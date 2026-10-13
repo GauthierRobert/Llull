@@ -74,9 +74,5 @@ export function eulerFromAxes(x: Vec3, y: Vec3, z: Vec3): [number, number, numbe
 /** `v` rotated by the inverse of `euler` ((Rx·Ry·Rz)⁻¹ = Rz⁻¹·Ry⁻¹·Rx⁻¹), about the origin. */
 export function inverseEulerXYZ(v: Vec3, [rx, ry, rz]: Vec3): [number, number, number] {
   const o: Vec3 = [0, 0, 0];
-  return applyEulerXYZ(applyEulerXYZ(applyEulerXYZ(v, o, [-rx, 0, 0]), o, [0, -ry, 0]), o, [
-    0,
-    0,
-    -rz,
-  ]);
+  return applyEulerXYZ(applyEulerXYZ(applyEulerXYZ(v, o, [-rx, 0, 0]), o, [0, -ry, 0]), o, [0, 0, -rz]);
 }

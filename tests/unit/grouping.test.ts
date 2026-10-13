@@ -11,21 +11,11 @@
 
 import { describe, it, expect } from 'vitest';
 import type { Entity, BoxEntity, CylinderEntity, SphereEntity } from '@core/model/types';
-import {
-  entityRenderKey,
-  isBatchable,
-  groupEntitiesForInstancing,
-  entityIdFromInstanceId,
-} from '../../src/ui/viewport/3d/grouping';
+import { entityRenderKey, isBatchable, groupEntitiesForInstancing, entityIdFromInstanceId } from '../../src/ui/viewport/3d/grouping';
 
 // Test entity factories (only the fields used by grouping logic)
 
-function makeBox(
-  id: string,
-  size: [number, number, number] = [10, 20, 30],
-  color = '#c8553d',
-  layerId = 'layer-default',
-): BoxEntity {
+function makeBox(id: string, size: [number, number, number] = [10, 20, 30], color = '#c8553d', layerId = 'layer-default'): BoxEntity {
   return {
     id,
     kind: 'box',
@@ -37,13 +27,7 @@ function makeBox(
   };
 }
 
-function makeCylinder(
-  id: string,
-  radius = 5,
-  height = 12,
-  color = '#4488aa',
-  layerId = 'layer-default',
-): CylinderEntity {
+function makeCylinder(id: string, radius = 5, height = 12, color = '#4488aa', layerId = 'layer-default'): CylinderEntity {
   return {
     id,
     kind: 'cylinder',
@@ -56,12 +40,7 @@ function makeCylinder(
   };
 }
 
-function makeSphere(
-  id: string,
-  radius = 7,
-  color = '#ff0000',
-  layerId = 'layer-default',
-): SphereEntity {
+function makeSphere(id: string, radius = 7, color = '#ff0000', layerId = 'layer-default'): SphereEntity {
   return {
     id,
     kind: 'sphere',
@@ -185,11 +164,7 @@ describe('groupEntitiesForInstancing — empty input', () => {
 
 describe('groupEntitiesForInstancing — all singletons (unique geometry)', () => {
   it('returns one batch per entity when all have unique geometry params', () => {
-    const entities: Entity[] = [
-      makeBox('b1', [1, 2, 3]),
-      makeBox('b2', [4, 5, 6]),
-      makeBox('b3', [7, 8, 9]),
-    ];
+    const entities: Entity[] = [makeBox('b1', [1, 2, 3]), makeBox('b2', [4, 5, 6]), makeBox('b3', [7, 8, 9])];
     const result = groupEntitiesForInstancing(entities);
     expect(result.size).toBe(3);
     for (const batch of result.values()) {
@@ -217,11 +192,7 @@ describe('groupEntitiesForInstancing — all identical (same geometry)', () => {
   });
 
   it('all cylinders with the same params → 1 batch', () => {
-    const entities: Entity[] = [
-      makeCylinder('c1', 5, 12),
-      makeCylinder('c2', 5, 12),
-      makeCylinder('c3', 5, 12),
-    ];
+    const entities: Entity[] = [makeCylinder('c1', 5, 12), makeCylinder('c2', 5, 12), makeCylinder('c3', 5, 12)];
     const result = groupEntitiesForInstancing(entities);
     expect(result.size).toBe(1);
     const [batch] = result.values();
@@ -231,11 +202,7 @@ describe('groupEntitiesForInstancing — all identical (same geometry)', () => {
 
 describe('groupEntitiesForInstancing — mixed batchable and non-batchable', () => {
   it('omits non-batchable entities (cone) from the result', () => {
-    const entities: Entity[] = [
-      makeBox('b1', [10, 20, 30]),
-      makeConeStub('cone-1'),
-      makeBox('b2', [10, 20, 30]),
-    ];
+    const entities: Entity[] = [makeBox('b1', [10, 20, 30]), makeConeStub('cone-1'), makeBox('b2', [10, 20, 30])];
     const result = groupEntitiesForInstancing(entities);
     // Only the two identical boxes form one batch; the cone is omitted.
     expect(result.size).toBe(1);
@@ -264,11 +231,7 @@ describe('groupEntitiesForInstancing — mixed batchable and non-batchable', () 
 describe('groupEntitiesForInstancing — sort determinism', () => {
   it('entities within a batch are sorted by id (lexicographic ascending)', () => {
     // Deliberately insert in non-alphabetical order.
-    const entities: Entity[] = [
-      makeBox('box-c', [10, 20, 30]),
-      makeBox('box-a', [10, 20, 30]),
-      makeBox('box-b', [10, 20, 30]),
-    ];
+    const entities: Entity[] = [makeBox('box-c', [10, 20, 30]), makeBox('box-a', [10, 20, 30]), makeBox('box-b', [10, 20, 30])];
     const result = groupEntitiesForInstancing(entities);
     expect(result.size).toBe(1);
     const [batch] = result.values();
@@ -277,11 +240,7 @@ describe('groupEntitiesForInstancing — sort determinism', () => {
   });
 
   it('different input orderings produce the same sorted batch', () => {
-    const make = (): Entity[] => [
-      makeBox('z-entity', [1, 2, 3]),
-      makeBox('a-entity', [1, 2, 3]),
-      makeBox('m-entity', [1, 2, 3]),
-    ];
+    const make = (): Entity[] => [makeBox('z-entity', [1, 2, 3]), makeBox('a-entity', [1, 2, 3]), makeBox('m-entity', [1, 2, 3])];
 
     const r1 = groupEntitiesForInstancing(make());
     const r2 = groupEntitiesForInstancing(make().reverse());
@@ -311,11 +270,7 @@ describe('entityIdFromInstanceId', () => {
   const batch = {
     key: 'box|10|20|30|#ff0000|layer-default',
     kind: 'box' as const,
-    entities: [
-      makeBox('alpha', [10, 20, 30]),
-      makeBox('beta', [10, 20, 30]),
-      makeBox('gamma', [10, 20, 30]),
-    ],
+    entities: [makeBox('alpha', [10, 20, 30]), makeBox('beta', [10, 20, 30]), makeBox('gamma', [10, 20, 30])],
   };
 
   it('maps instanceId 0 → first entity id', () => {
@@ -352,9 +307,7 @@ describe('entityIdFromInstanceId', () => {
 
 describe('groupEntitiesForInstancing — 100 unique-color boxes', () => {
   it('produces 100 batches each with exactly 1 entity', () => {
-    const entities: Entity[] = Array.from({ length: 100 }, (_, i) =>
-      makeBox(`box-${i}`, [5, 5, 5], `#${String(i).padStart(6, '0')}`),
-    );
+    const entities: Entity[] = Array.from({ length: 100 }, (_, i) => makeBox(`box-${i}`, [5, 5, 5], `#${String(i).padStart(6, '0')}`));
     const result = groupEntitiesForInstancing(entities);
     expect(result.size).toBe(100);
     for (const batch of result.values()) {

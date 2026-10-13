@@ -14,23 +14,11 @@
 
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import {
-  MessageChannel,
-  Worker,
-  receiveMessageOnPort,
-  type MessagePort,
-} from 'node:worker_threads';
+import { MessageChannel, Worker, receiveMessageOnPort, type MessagePort } from 'node:worker_threads';
 import type { GeometryKernel, ShapeHandle } from '@core/geometry/kernel';
 import { errorMessage } from '@lib/errorMessage';
 import { handleOf, keyOnlyHandle, SHAPE_NOT_CACHED } from '@core/geometry/shapeKernel';
-import {
-  STATUS_DIED,
-  STATUS_READY,
-  STATUS_REPLY,
-  type KernelOperation,
-  type KernelReply,
-  type TestHook,
-} from './occtWorkerProtocol';
+import { STATUS_DIED, STATUS_READY, STATUS_REPLY, type KernelOperation, type KernelReply, type TestHook } from './occtWorkerProtocol';
 
 export interface IsolatedKernelOptions {
   /** Worker entry file; default `occtWorker.ts`/`.js` next to this module. */
@@ -107,12 +95,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
   const entry = options.entry ?? defaultWorkerEntry();
   if (entry === null) throw new Error('OCC worker entry not found next to the server modules');
   // A TypeScript entry (dev, tests) is compiled on load by tsx's CommonJS hook.
-  const execArgv =
-    options.execArgv !== undefined
-      ? [...options.execArgv]
-      : entry.endsWith('.ts')
-        ? ['--require', 'tsx/cjs']
-        : undefined;
+  const execArgv = options.execArgv !== undefined ? [...options.execArgv] : entry.endsWith('.ts') ? ['--require', 'tsx/cjs'] : undefined;
   const callTimeoutMs = options.callTimeoutMs ?? 60_000;
   const startTimeoutMs = options.startTimeoutMs ?? 60_000;
   let live: LiveWorker | null = null;
@@ -154,9 +137,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
       if (live === candidate) live = null;
       candidate.port.close();
       void candidate.worker.terminate();
-      throw outcome === 'timed-out'
-        ? new Error('OCC worker start timed out')
-        : new WorkerDiedOnStartError();
+      throw outcome === 'timed-out' ? new Error('OCC worker start timed out') : new WorkerDiedOnStartError();
     }
     Atomics.compareExchange(status, 0, STATUS_READY, 0); // a death since the load stays flagged
     candidate.ready = true;
@@ -191,10 +172,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
   };
 
   /** One synchronous request; null when the worker died, timed out or could not start. */
-  const exchange = (
-    op: KernelOperation | TestHook,
-    args: readonly unknown[],
-  ): KernelReply | null => {
+  const exchange = (op: KernelOperation | TestHook, args: readonly unknown[]): KernelReply | null => {
     let target: LiveWorker;
     try {
       target = ensureLive();
@@ -213,8 +191,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
     if (outcome !== 'timed-out' && state === STATUS_REPLY) {
       const reply = receiveMessageOnPort(port)?.message as KernelReply | undefined;
       Atomics.compareExchange(status, 0, STATUS_REPLY, 0); // idle; a death since the reply stays flagged
-      if (reply?.error !== undefined && !reply.error.startsWith(SHAPE_NOT_CACHED))
-        console.warn(`[occt] ${op} failed: ${reply.error}`);
+      if (reply?.error !== undefined && !reply.error.startsWith(SHAPE_NOT_CACHED)) console.warn(`[occt] ${op} failed: ${reply.error}`);
       if (reply?.recycle === true) {
         recycles++;
         recycle(); // a degraded module is replaced; the next call gets a fresh, pre-loaded one
@@ -231,18 +208,13 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
     return null;
   };
 
-  const call = (op: KernelOperation | TestHook, args: readonly unknown[]): unknown =>
-    exchange(op, args)?.result ?? null;
+  const call = (op: KernelOperation | TestHook, args: readonly unknown[]): unknown => exchange(op, args)?.result ?? null;
 
   /**
    * An output call on shapes: first with key-only handles (no recipe cloned across the thread); if
    * the worker no longer caches one (evicted, recycled), once more with the full handles.
    */
-  const shapeCall = (
-    op: KernelOperation,
-    handles: readonly ShapeHandle[],
-    wrap: boolean,
-  ): unknown => {
+  const shapeCall = (op: KernelOperation, handles: readonly ShapeHandle[], wrap: boolean): unknown => {
     const pack = (list: readonly ShapeHandle[]): unknown[] => (wrap ? [list] : [...list]);
     const reply = exchange(op, pack(handles.map(keyOnlyHandle)));
     if (reply?.error?.startsWith(SHAPE_NOT_CACHED) !== true) return reply?.result ?? null;
@@ -252,12 +224,9 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
   return {
     supports: () => true,
     evaluate: (recipe) => (call('evaluate', [recipe]) === null ? null : handleOf(recipe)),
-    tessellate: (shape) =>
-      shapeCall('tessellate', [shape], false) as ReturnType<GeometryKernel['tessellate']>,
-    topology: (shape) =>
-      shapeCall('topology', [shape], false) as ReturnType<GeometryKernel['topology']>,
-    exportStep: (shapes) =>
-      shapeCall('exportStep', shapes, true) as ReturnType<GeometryKernel['exportStep']>,
+    tessellate: (shape) => shapeCall('tessellate', [shape], false) as ReturnType<GeometryKernel['tessellate']>,
+    topology: (shape) => shapeCall('topology', [shape], false) as ReturnType<GeometryKernel['topology']>,
+    exportStep: (shapes) => shapeCall('exportStep', shapes, true) as ReturnType<GeometryKernel['exportStep']>,
     crashCount: () => crashes,
     recycleCount: () => recycles,
     forceFailure: (hook) => void call(hook, []),

@@ -1,11 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import {
-  MAX_COPIES_PER_COMMAND,
-  MAX_PROFILE_POINTS,
-  MAX_REVOLVE_SEGMENTS,
-} from '@core/commands/limits';
+import { MAX_COPIES_PER_COMMAND, MAX_PROFILE_POINTS, MAX_REVOLVE_SEGMENTS } from '@core/commands/limits';
 
 const ring = (count: number): Array<[number, number]> =>
   Array.from({ length: count }, (_, i): [number, number] => [
@@ -25,9 +21,7 @@ describe('point-count limits', () => {
   });
 
   it('extrude_profile accepts MAX_PROFILE_POINTS and refuses one more', () => {
-    expect(
-      execute(empty, 'extrude_profile', { profile: ring(MAX_PROFILE_POINTS), depth: 1 }).affected,
-    ).toHaveLength(1);
+    expect(execute(empty, 'extrude_profile', { profile: ring(MAX_PROFILE_POINTS), depth: 1 }).affected).toHaveLength(1);
     const refused = execute(empty, 'extrude_profile', {
       profile: ring(MAX_PROFILE_POINTS + 1),
       depth: 1,

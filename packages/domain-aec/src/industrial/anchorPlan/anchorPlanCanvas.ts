@@ -31,13 +31,7 @@ export class PlanCanvas {
     this.parts.push(svgLine(a, b, cssClass));
   }
 
-  text(
-    at: Vec2,
-    size: number,
-    content: string,
-    anchor: 'start' | 'middle' | 'end' = 'middle',
-    rotation = 0,
-  ): void {
+  text(at: Vec2, size: number, content: string, anchor: 'start' | 'middle' | 'end' = 'middle', rotation = 0): void {
     this.parts.push(svgText(at[0], at[1], size, anchor, content, rotation));
   }
 
@@ -47,19 +41,13 @@ export class PlanCanvas {
   }
 
   polygon(points: ReadonlyArray<Vec2>, cssClass: string): void {
-    this.parts.push(
-      `<polygon points="${svgPoints(points.map((point) => this.map(point)))}" class="${cssClass}"/>`,
-    );
+    this.parts.push(`<polygon points="${svgPoints(points.map((point) => this.map(point)))}" class="${cssClass}"/>`);
   }
 }
 
 export const mmText = (value: number): string => String(Math.round(value));
 
-export function scheduleTable(
-  rows: ReadonlyArray<ReadonlyArray<string>>,
-  x: number,
-  y: number,
-): string {
+export function scheduleTable(rows: ReadonlyArray<ReadonlyArray<string>>, x: number, y: number): string {
   const widths = [14, 14, 20, 14, 14, 26, 18];
   const headers = ['Plate', 'Grid', 'Bolts', 'Embed.', 'Proj.', 'Plate mm', 'TOC / grout'];
   const parts = [`<g id="bolt-schedule">`];

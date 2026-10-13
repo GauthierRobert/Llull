@@ -6,14 +6,7 @@
  * @pure
  */
 
-import {
-  type CadDocument,
-  type Entity,
-  type FeatureStep,
-  type Vec3,
-  is2D,
-  is3D,
-} from '../model/types';
+import { type CadDocument, type Entity, type FeatureStep, type Vec3, is2D, is3D } from '../model/types';
 import type { CommandDefinition } from '../commands/types';
 import { replayHistory, type ReplayStepEvent } from '../commands/history/replay';
 import { buildParamEnv } from '../commands/history/regenerate';
@@ -23,18 +16,7 @@ import { Namer, translateExpression } from './identifiers';
 import type { GeometryKernel } from '../geometry/kernel';
 import { recipeOf } from '../geometry/shapeRecipe';
 import { lowerRecipe, meshSoup, modificationFeature } from './recipeLowering';
-import type {
-  Axis,
-  Feature,
-  FeatureBase,
-  FeatureProgram,
-  ProgramOutput,
-  ProgramParameter,
-  ShapeSpec,
-  Term,
-  Term2,
-  Term3,
-} from './program';
+import type { Axis, Feature, FeatureBase, FeatureProgram, ProgramOutput, ProgramParameter, ShapeSpec, Term, Term2, Term3 } from './program';
 
 const EPSILON = 1e-9;
 
@@ -61,18 +43,10 @@ function child(raw: unknown, key: string | number): unknown {
 }
 
 function term3(values: Vec3, raw: unknown, ctx: LowerContext): Term3 {
-  return [
-    term(values[0], child(raw, 0), ctx),
-    term(values[1], child(raw, 1), ctx),
-    term(values[2], child(raw, 2), ctx),
-  ];
+  return [term(values[0], child(raw, 0), ctx), term(values[1], child(raw, 1), ctx), term(values[2], child(raw, 2), ctx)];
 }
 
-function profileTerms(
-  profile: ReadonlyArray<readonly [number, number]>,
-  raw: unknown,
-  ctx: LowerContext,
-): Term2[] {
+function profileTerms(profile: ReadonlyArray<readonly [number, number]>, raw: unknown, ctx: LowerContext): Term2[] {
   return profile.map(([x, y], i) => {
     const rawPoint = child(raw, i);
     return [term(x, child(rawPoint, 0), ctx), term(y, child(rawPoint, 1), ctx)];
@@ -194,10 +168,7 @@ function entityFeatures(
     });
     if (lowered !== null) {
       variables.set(entity.id, lowered.variable);
-      const label: Feature[] =
-        entity.name !== undefined
-          ? [{ ...base(lowered.variable), op: 'label', name: entity.name }]
-          : [];
+      const label: Feature[] = entity.name !== undefined ? [{ ...base(lowered.variable), op: 'label', name: entity.name }] : [];
       return { features: [...lowered.features, ...label], triangles: false };
     }
   }
@@ -248,9 +219,7 @@ function isPureTranslation(before: Entity, after: Entity, delta: unknown): delta
   if (!delta.every((d) => typeof d === 'number' && Number.isFinite(d))) return false;
   const moved = { ...before, position: after.position } as Entity;
   if (!geometryEqual(moved, after)) return false;
-  return after.position.every(
-    (p, i) => Math.abs(p - (before.position[i] as number) - (delta[i] as number)) <= EPSILON,
-  );
+  return after.position.every((p, i) => Math.abs(p - (before.position[i] as number) - (delta[i] as number)) <= EPSILON);
 }
 
 /** `boolean` op -> the emitted program's combinator. */
@@ -292,14 +261,9 @@ function lowerParameters(
     const identifier = identifiers.get(name);
     if (parameter === undefined || identifier === undefined) return [];
     const literal = Number(parameter.expression);
-    if (parameter.error !== undefined || Number.isFinite(literal))
-      return [{ name, identifier, value: parameter.value }];
+    if (parameter.error !== undefined || Number.isFinite(literal)) return [{ name, identifier, value: parameter.value }];
     const expression = translateExpression(parameter.expression, identifiers);
-    return [
-      expression === null
-        ? { name, identifier, value: parameter.value }
-        : { name, identifier, value: parameter.value, expression },
-    ];
+    return [expression === null ? { name, identifier, value: parameter.value } : { name, identifier, value: parameter.value, expression }];
   });
   return { parameters, identifiers };
 }
@@ -320,21 +284,11 @@ function outputsFor(doc: CadDocument, variables: ReadonlyMap<string, string>): P
   return solids(doc).flatMap((entity): ProgramOutput[] => {
     const variable = variables.get(entity.id);
     if (variable === undefined) return [];
-    return [
-      entity.name !== undefined
-        ? { variable, color: entity.color, name: entity.name }
-        : { variable, color: entity.color },
-    ];
+    return [entity.name !== undefined ? { variable, color: entity.color, name: entity.name } : { variable, color: entity.color }];
   });
 }
 
-function lowerSnapshot(
-  doc: CadDocument,
-  parameters: ProgramParameter[],
-  ctx: LowerContext,
-  namer: Namer,
-  notes: string[],
-): FeatureProgram {
+function lowerSnapshot(doc: CadDocument, parameters: ProgramParameter[], ctx: LowerContext, namer: Namer, notes: string[]): FeatureProgram {
   const variables = new Map<string, string>();
   const features: Feature[] = [];
   for (const entity of solids(doc)) {
@@ -351,9 +305,7 @@ function lowerSnapshot(
         : [first, ...rest].filter((feature): feature is Feature => feature !== undefined);
     features.push(...named);
     if (lowered.triangles) {
-      notes.push(
-        `${entity.kind} '${entity.id}' has no analytic form; exported as a triangle mesh.`,
-      );
+      notes.push(`${entity.kind} '${entity.id}' has no analytic form; exported as a triangle mesh.`);
     }
   }
   return {
@@ -366,11 +318,7 @@ function lowerSnapshot(
   };
 }
 
-const MODIFICATION_COMMANDS: ReadonlySet<string> = new Set([
-  'fillet_edge',
-  'chamfer_edge',
-  'shell_solid',
-]);
+const MODIFICATION_COMMANDS: ReadonlySet<string> = new Set(['fillet_edge', 'chamfer_edge', 'shell_solid']);
 
 /** A fillet / chamfer / shell step that replaced one solid by its exact modification, in place. */
 function modificationStep(
@@ -384,12 +332,10 @@ function modificationStep(
   const [result] = created;
   const sourceId = String(child(event.params, 'id'));
   const variable = variables.get(sourceId);
-  if (!MODIFICATION_COMMANDS.has(event.step.name) || created.length !== 1 || removed.length !== 1)
-    return null;
+  if (!MODIFICATION_COMMANDS.has(event.step.name) || created.length !== 1 || removed.length !== 1) return null;
   if (removed[0] !== sourceId || variable === undefined || result?.kind !== 'mesh') return null;
   const brep = result.brep;
-  if (brep === undefined || (brep.op !== 'fillet' && brep.op !== 'chamfer' && brep.op !== 'shell'))
-    return null;
+  if (brep === undefined || (brep.op !== 'fillet' && brep.op !== 'chamfer' && brep.op !== 'shell')) return null;
   variables.delete(sourceId);
   variables.set(result.id, variable);
   const sizeParam = { fillet: 'radius', chamfer: 'distance', shell: 'thickness' }[brep.op];
@@ -423,8 +369,7 @@ function lowerStep(
     variable,
   });
 
-  const booleanKind =
-    step.name === 'boolean' ? BOOLEAN_KINDS[String(child(event.params, 'op'))] : undefined;
+  const booleanKind = step.name === 'boolean' ? BOOLEAN_KINDS[String(child(event.params, 'op'))] : undefined;
   const operandA = String(child(event.params, 'a'));
   const operandB = String(child(event.params, 'b'));
   const left = variables.get(operandA);
@@ -478,9 +423,7 @@ function lowerStep(
     const lowered = entityFeatures(entity, after, rawParams, ctx, namer, base, variables);
     features.push(...lowered.features);
     if (lowered.triangles) {
-      notes.push(
-        `step ${stepNumber} (${step.name}): ${entity.kind} '${entity.id}' has no analytic form; exported as a triangle mesh.`,
-      );
+      notes.push(`step ${stepNumber} (${step.name}): ${entity.kind} '${entity.id}' has no analytic form; exported as a triangle mesh.`);
     }
   }
   return features;
@@ -496,9 +439,7 @@ function historyMismatch(doc: CadDocument, replayed: CadDocument): string | null
     const regenerated = actual[i];
     return regenerated === undefined || !geometryEqual(original, regenerated);
   });
-  return differing === undefined
-    ? null
-    : `featureHistory regenerates solid '${differing.id}' with different geometry`;
+  return differing === undefined ? null : `featureHistory regenerates solid '${differing.id}' with different geometry`;
 }
 
 /**

@@ -13,22 +13,11 @@ interface OverlayFlags {
 }
 
 /** The single overlay pipeline (dimensions, axes/grid, entity labels) applied on top of any base SVG. @pure */
-export function composeOverlays(
-  svg: string,
-  baseData: RenderViewData,
-  doc: CadDocument,
-  flags: OverlayFlags,
-): string {
+export function composeOverlays(svg: string, baseData: RenderViewData, doc: CadDocument, flags: OverlayFlags): string {
   let composed = svg;
   if (flags.showDimensions) composed = appendDimensionLabels(composed, baseData);
   if (flags.showAxes || flags.showGrid) {
-    composed = appendAxesAndGrid(
-      composed,
-      baseData,
-      doc.units ?? 'mm',
-      flags.showAxes,
-      flags.showGrid,
-    );
+    composed = appendAxesAndGrid(composed, baseData, doc.units ?? 'mm', flags.showAxes, flags.showGrid);
   }
   if (flags.showLabels) {
     composed = appendEntityLabels(composed, baseData, Object.values(doc.entities));
@@ -77,13 +66,7 @@ function appendDimensionLabels(svgString: string, data: RenderViewData): string 
 function groundGridLines(project: Projector, data: RenderViewData, axisLength: number): string[] {
   const { bounds } = data;
   const ext = bounds
-    ? Math.max(
-        Math.abs(bounds.max[0]),
-        Math.abs(bounds.min[0]),
-        Math.abs(bounds.max[1]),
-        Math.abs(bounds.min[1]),
-        1,
-      ) * 1.5
+    ? Math.max(Math.abs(bounds.max[0]), Math.abs(bounds.min[0]), Math.abs(bounds.max[1]), Math.abs(bounds.min[1]), 1) * 1.5
     : Math.max(axisLength * 3, 2);
 
   // Grid step: ~5–8 lines across the scene, rounded to a nice number (1, 2, 5, 10, 20, 50, ...).
@@ -96,11 +79,8 @@ function groundGridLines(project: Projector, data: RenderViewData, axisLength: n
   const iMax = Math.ceil(ext / gridStep);
   const ticks = Array.from({ length: iMax - iMin + 1 }, (_, n) => (iMin + n) * gridStep);
   const [low, high] = [iMin * gridStep, iMax * gridStep];
-  const line = (
-    from: [number, number, number],
-    to: [number, number, number],
-    attributes = '',
-  ): string => `    ${svgLine(project(from), project(to), attributes)}`;
+  const line = (from: [number, number, number], to: [number, number, number], attributes = ''): string =>
+    `    ${svgLine(project(from), project(to), attributes)}`;
 
   return [
     `  <g id="ground-grid" opacity="0.18" stroke="#88aacc" stroke-width="0.8" stroke-linecap="round">`,
@@ -113,12 +93,7 @@ function groundGridLines(project: Projector, data: RenderViewData, axisLength: n
 }
 
 /** World-frame X/Y/Z axis triad at the origin (when on screen) plus a "<length> <unit> = <px> px" scale label. */
-function worldAxesLines(
-  project: Projector,
-  data: RenderViewData,
-  units: string,
-  axisLength: number,
-): string[] {
+function worldAxesLines(project: Projector, data: RenderViewData, units: string, axisLength: number): string[] {
   const { width, height } = data;
   const origin = project([0, 0, 0]);
   const axes = [
@@ -129,31 +104,22 @@ function worldAxesLines(
   const labelStyle = `font-family="monospace" font-size="12" font-weight="bold" stroke="#1a1a2e" stroke-width="3" paint-order="stroke"`;
 
   const margin = 20;
-  const visible =
-    origin[0] > -margin &&
-    origin[0] < width + margin &&
-    origin[1] > -margin &&
-    origin[1] < height + margin;
+  const visible = origin[0] > -margin && origin[0] < width + margin && origin[1] > -margin && origin[1] < height + margin;
   const lines = visible
     ? [
         `  <g id="world-axes" stroke-linecap="round" stroke-linejoin="round">`,
-        ...axes.map(
-          ({ color, tip }) => `    ${svgLine(origin, tip, `stroke="${color}" stroke-width="2"`)}`,
-        ),
+        ...axes.map(({ color, tip }) => `    ${svgLine(origin, tip, `stroke="${color}" stroke-width="2"`)}`),
         ...axes.map(({ color, tip }) => `    ${svgDot(tip, `fill="${color}"`)}`),
         `    ${svgDot(origin, 'fill="#ffffff" opacity="0.7"')}`,
         ...axes.map(
-          ({ label, color, tip }) =>
-            `    <text x="${r2(tip[0] + 5)}" y="${r2(tip[1] + 4)}" ${labelStyle} fill="${color}">${label}</text>`,
+          ({ label, color, tip }) => `    <text x="${r2(tip[0] + 5)}" y="${r2(tip[1] + 4)}" ${labelStyle} fill="${color}">${label}</text>`,
         ),
         `  </g>`,
       ]
     : [];
 
   // Orthographic: every axis has the same world length, so the longest projection is the visible scale.
-  const scalePx = Math.max(
-    ...axes.map(({ tip }) => Math.hypot(tip[0] - origin[0], tip[1] - origin[1])),
-  );
+  const scalePx = Math.max(...axes.map(({ tip }) => Math.hypot(tip[0] - origin[0], tip[1] - origin[1])));
   const scaleLabel = `${r2(axisLength)} ${units} = ${r2(scalePx)} px`;
   lines.push(
     `  <text x="8" y="${height - 8}" font-family="monospace" font-size="10" ` +
@@ -167,13 +133,7 @@ function worldAxesLines(
  * `appendDimensionLabels`. The scale label uses the document `units`.
  * @pure
  */
-function appendAxesAndGrid(
-  svgString: string,
-  data: RenderViewData,
-  units: string,
-  showAxes: boolean,
-  showGrid: boolean,
-): string {
+function appendAxesAndGrid(svgString: string, data: RenderViewData, units: string, showAxes: boolean, showGrid: boolean): string {
   const { camera, width, height } = data;
   const orthoHalf = data.orthoHalf;
   const project = makeProjector(camera, orthoHalf, width, height);

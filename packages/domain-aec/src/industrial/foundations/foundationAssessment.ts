@@ -8,22 +8,11 @@ import type { CadDocument } from '@core/model/types';
 import { getBuilding, levelElementsOf } from '../../building/model';
 import type { FrameLoads } from '../frames/frameModelTypes';
 import { baseReactions } from '../frames/frameModelSolve';
-import {
-  type ClayLayer,
-  type FoundationRow,
-  MAX_UTILISATION,
-  type PadSettlement,
-} from './foundationModel';
+import { type ClayLayer, type FoundationRow, MAX_UTILISATION, type PadSettlement } from './foundationModel';
 import { differentialRows, footingRows } from './foundationRows';
 import { plateRows } from './foundationPlateRows';
 import { reactionColumn, slabSharePerColumn, slidingHorizontalOf } from './foundationThrust';
-import {
-  combine,
-  findFooting,
-  findPlate,
-  hasCase,
-  ultimateCombinations,
-} from './foundationCombinations';
+import { combine, findFooting, findPlate, hasCase, ultimateCombinations } from './foundationCombinations';
 import { footingSettlementParts } from './foundationSettlement';
 import { round } from '../../shared/numeric';
 
@@ -115,14 +104,10 @@ export function checkFoundations(
     }
     if (plate) {
       plates += 1;
-      rows.push(
-        ...plateRows(doc, building, reaction, column.mark, footing?.mark ?? '—', plate, wind),
-      );
+      rows.push(...plateRows(doc, building, reaction, column.mark, footing?.mark ?? '—', plate, wind));
     }
   }
   rows.push(...differentialRows(doc, settlements));
-  const unchecked = levelElementsOf(building, 'footing', levelId).filter(
-    (element) => !checkedFootings.has(element.id),
-  ).length;
+  const unchecked = levelElementsOf(building, 'footing', levelId).filter((element) => !checkedFootings.has(element.id)).length;
   return { rows, footings, plates, unchecked };
 }

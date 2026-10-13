@@ -35,9 +35,7 @@ describe('isAngleOnArc', () => {
 describe('arc tangent snaps', () => {
   it('only offers tangent points that lie on the swept arc', () => {
     // Upper half arc; from (2,0) tangent points are at ±60°; only +60° is on the arc.
-    const tangents = collectSnapCandidates(arcDoc(0, Math.PI), {}, [2, 0]).filter(
-      (p) => p.type === 'tangent',
-    );
+    const tangents = collectSnapCandidates(arcDoc(0, Math.PI), {}, [2, 0]).filter((p) => p.type === 'tangent');
     expect(tangents).toHaveLength(1);
     expect(tangents[0]?.x).toBeCloseTo(0.5);
     expect(tangents[0]?.y).toBeCloseTo(Math.sqrt(3) / 2);

@@ -14,12 +14,5 @@ export function ThemeToggle(): React.ReactElement {
   const toggleTheme = useThemeStore((s) => s.toggleTheme);
   const label = `Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`;
 
-  return (
-    <IconButton
-      icon={theme === 'dark' ? 'sun' : 'moon'}
-      size={16}
-      label={label}
-      onClick={toggleTheme}
-    />
-  );
+  return <IconButton icon={theme === 'dark' ? 'sun' : 'moon'} size={16} label={label} onClick={toggleTheme} />;
 }

@@ -15,10 +15,7 @@ const DEFAULT_SOIL_BEARING = 150;
 const DEFAULT_SOIL_MODULUS = 20;
 
 export const SOIL_SHAPE = {
-  soilBearing: z
-    .number()
-    .optional()
-    .describe('Allowable (SLS) soil bearing pressure in kPa. Default 150. Must be > 0.'),
+  soilBearing: z.number().optional().describe('Allowable (SLS) soil bearing pressure in kPa. Default 150. Must be > 0.'),
   thrustTie: z
     .boolean()
     .optional()
@@ -28,21 +25,13 @@ export const SOIL_SHAPE = {
         'check and one tie-force row per frame is added. false = every pad resists its own ' +
         'horizontal reaction by friction. Default true when the level has a slab element, else false.',
     ),
-  soilModulus: z
-    .number()
-    .optional()
-    .describe(
-      'Soil elastic (Young) modulus Es in MPa for the settlement rows. Default 20. Must be > 0.',
-    ),
+  soilModulus: z.number().optional().describe('Soil elastic (Young) modulus Es in MPa for the settlement rows. Default 20. Must be > 0.'),
   clayLayer: z
     .object({
       topDepth: z.number().describe('Layer top below founding level, m (>= 0).'),
       thickness: z.number().describe('Layer thickness, m (> 0).'),
       compressionIndex: z.number().describe('Compression index Cc (> 0).'),
-      recompressionIndex: z
-        .number()
-        .optional()
-        .describe('Recompression index Cr (> 0, <= Cc). Default Cc/5.'),
+      recompressionIndex: z.number().optional().describe('Recompression index Cr (> 0, <= Cc). Default Cc/5.'),
       voidRatio: z.number().describe('Initial void ratio e0 (> 0).'),
       unitWeight: z.number().optional().describe('Bulk unit weight kN/m³ (> 9.81). Default 19.'),
       preconsolidationPressure: z
@@ -68,10 +57,8 @@ export function soilInputs(params: {
 }): { soilBearing: number; soilModulus: number } | { reason: string } {
   const soilBearing = params.soilBearing ?? DEFAULT_SOIL_BEARING;
   const soilModulus = params.soilModulus ?? DEFAULT_SOIL_MODULUS;
-  if (!isFiniteNumber(soilBearing) || soilBearing <= 0)
-    return { reason: 'soilBearing must be a number > 0 (kPa).' };
-  if (!isFiniteNumber(soilModulus) || soilModulus <= 0)
-    return { reason: 'soilModulus must be a number > 0 (MPa).' };
+  if (!isFiniteNumber(soilBearing) || soilBearing <= 0) return { reason: 'soilBearing must be a number > 0 (kPa).' };
+  if (!isFiniteNumber(soilModulus) || soilModulus <= 0) return { reason: 'soilModulus must be a number > 0 (MPa).' };
   const clayError = params.clayLayer === undefined ? null : clayLayerError(params.clayLayer);
   if (clayError) return { reason: `${clayError}.` };
   return { soilBearing, soilModulus };

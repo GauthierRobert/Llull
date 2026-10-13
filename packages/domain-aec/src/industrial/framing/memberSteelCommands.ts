@@ -28,11 +28,7 @@ import {
 } from '../common/memberSupport';
 import { levelIdParam } from '../../building/levelParams';
 
-const fixityText = (
-  startJoint: string | undefined,
-  endJoint: string | undefined,
-  baseFixity: string | undefined,
-): string =>
+const fixityText = (startJoint: string | undefined, endJoint: string | undefined, baseFixity: string | undefined): string =>
   [
     startJoint === 'rigid' ? 'rigid start joint' : '',
     endJoint === 'rigid' ? 'rigid end joint' : '',
@@ -73,12 +69,8 @@ export const addSteelMember = defineCommand({
     note: z.string().optional().describe('Note carried to the member schedule.'),
     startJoint: jointFixitySchema
       .optional()
-      .describe(
-        'Beams only: joint at the start end: "pinned" (default) or "rigid" (moment connection to the column it frames into).',
-      ),
-    endJoint: jointFixitySchema
-      .optional()
-      .describe('Beams only: joint at the end end: "pinned" (default) or "rigid".'),
+      .describe('Beams only: joint at the start end: "pinned" (default) or "rigid" (moment connection to the column it frames into).'),
+    endJoint: jointFixitySchema.optional().describe('Beams only: joint at the end end: "pinned" (default) or "rigid".'),
     baseFixity: baseFixitySchema
       .optional()
       .describe(
@@ -87,19 +79,7 @@ export const addSteelMember = defineCommand({
   }),
   run: (
     doc,
-    {
-      profile,
-      start,
-      end,
-      role = 'beam',
-      roll = 0,
-      levelId,
-      material,
-      note,
-      startJoint,
-      endJoint,
-      baseFixity,
-    },
+    { profile, start, end, role = 'beam', roll = 0, levelId, material, note, startJoint, endJoint, baseFixity },
   ): CommandResult => {
     const from = toVec3(start);
     const to = toVec3(end);
@@ -119,14 +99,7 @@ export const addSteelMember = defineCommand({
         sameSegment(element.start, element.end, from, to),
     );
     if (memberTwin) {
-      return noop(
-        doc,
-        duplicateSummary(
-          'add_steel_member',
-          memberTwin,
-          `a ${role} ${profile} between these points`,
-        ),
-      );
+      return noop(doc, duplicateSummary('add_steel_member', memberTwin, `a ${role} ${profile} between these points`));
     }
     const added = appendMembers(resolution.building, resolution.level.id, [
       {
@@ -160,11 +133,7 @@ export const addSteelMember = defineCommand({
 const shiftZ = (point: Vec3, dz: number): Vec3 => [point[0], point[1], point[2] + dz];
 
 /** Axis z change that keeps the top of a horizontal member when its section depth changes; 0 unless roll is 0 or π (mod 2π). */
-function topOfSteelShift(
-  doc: Pick<CadDocument, 'units'>,
-  member: SteelMemberElement,
-  section: SteelProfile,
-): number {
+function topOfSteelShift(doc: Pick<CadDocument, 'units'>, member: SteelMemberElement, section: SteelProfile): number {
   const old = findProfile(member.profile);
   const horizontal = Math.abs(member.end[2] - member.start[2]) < 1e-9;
   const turns = Math.abs(member.roll) / Math.PI;
@@ -197,15 +166,9 @@ export const updateSteelMember = defineCommand({
     roll: z.number().optional().describe('New roll, radians.'),
     material: z.string().optional().describe('New steel grade.'),
     note: z.string().optional().describe('New schedule note.'),
-    startJoint: jointFixitySchema
-      .optional()
-      .describe('Beams only: new joint at the start end, "pinned" or "rigid" (moment connection).'),
-    endJoint: jointFixitySchema
-      .optional()
-      .describe('Beams only: new joint at the end end, "pinned" or "rigid".'),
-    baseFixity: baseFixitySchema
-      .optional()
-      .describe('Columns only: new base fixity, "pinned" or "fixed".'),
+    startJoint: jointFixitySchema.optional().describe('Beams only: new joint at the start end, "pinned" or "rigid" (moment connection).'),
+    endJoint: jointFixitySchema.optional().describe('Beams only: new joint at the end end, "pinned" or "rigid".'),
+    baseFixity: baseFixitySchema.optional().describe('Columns only: new base fixity, "pinned" or "fixed".'),
     keepTopOfSteel: z
       .boolean()
       .optional()
@@ -217,42 +180,20 @@ export const updateSteelMember = defineCommand({
   }),
   run: (
     doc,
-    {
-      memberId,
-      profile,
-      start,
-      end,
-      role,
-      roll,
-      material,
-      note,
-      startJoint,
-      endJoint,
-      baseFixity,
-      keepTopOfSteel = false,
-    },
+    { memberId, profile, start, end, role, roll, material, note, startJoint, endJoint, baseFixity, keepTopOfSteel = false },
   ): CommandResult => {
     const building = getBuilding(doc);
     const member = building.elements[memberId];
-    if (member?.category !== 'member')
-      return noop(doc, `update_steel_member failed: no member '${memberId}'.`);
+    if (member?.category !== 'member') return noop(doc, `update_steel_member failed: no member '${memberId}'.`);
     const section = findProfile(profile ?? member.profile);
-    if (!section)
-      return noop(doc, `update_steel_member failed: unknown steel profile '${profile ?? ''}'.`);
-    const topShift =
-      keepTopOfSteel && start === undefined && end === undefined
-        ? topOfSteelShift(doc, member, section)
-        : 0;
+    if (!section) return noop(doc, `update_steel_member failed: unknown steel profile '${profile ?? ''}'.`);
+    const topShift = keepTopOfSteel && start === undefined && end === undefined ? topOfSteelShift(doc, member, section) : 0;
     const from = start !== undefined ? toVec3(start) : shiftZ(member.start, topShift);
     const to = end !== undefined ? toVec3(end) : shiftZ(member.end, topShift);
     if (!from || !to) {
-      return noop(
-        doc,
-        'update_steel_member failed: start/end must be [x, y, z] (or [x, y] with z = 0).',
-      );
+      return noop(doc, 'update_steel_member failed: start/end must be [x, y, z] (or [x, y] with z = 0).');
     }
-    if (distance3(to, from) === 0)
-      return noop(doc, 'update_steel_member failed: start and end would coincide.');
+    if (distance3(to, from) === 0) return noop(doc, 'update_steel_member failed: start and end would coincide.');
     const nextRole = role ?? member.role;
     const problem = fixityProblem(nextRole, { startJoint, endJoint, baseFixity });
     if (problem) return noop(doc, `update_steel_member failed: ${problem}.`);
@@ -261,9 +202,7 @@ export const updateSteelMember = defineCommand({
     const fixities = {
       ...(isBeam && (startJoint ?? oldStart) ? { startJoint: startJoint ?? oldStart } : {}),
       ...(isBeam && (endJoint ?? oldEnd) ? { endJoint: endJoint ?? oldEnd } : {}),
-      ...(nextRole === 'column' && (baseFixity ?? oldBase)
-        ? { baseFixity: baseFixity ?? oldBase }
-        : {}),
+      ...(nextRole === 'column' && (baseFixity ?? oldBase) ? { baseFixity: baseFixity ?? oldBase } : {}),
     };
     const updated: SteelMemberElement = {
       ...rest,
@@ -281,10 +220,7 @@ export const updateSteelMember = defineCommand({
       (key) => JSON.stringify(updated[key]) === JSON.stringify(member[key]),
     );
     if (sameFields && Object.keys(member).length === Object.keys(updated).length) {
-      return noop(
-        doc,
-        `update_steel_member: ${memberId} already has these values; nothing changed.`,
-      );
+      return noop(doc, `update_steel_member: ${memberId} already has these values; nothing changed.`);
     }
     const refit = refitPlates(doc, withElement(building, updated), updated, member.profile);
     const stale = dropStaleConnections(refit.building, memberId, fromMm(doc, 10));

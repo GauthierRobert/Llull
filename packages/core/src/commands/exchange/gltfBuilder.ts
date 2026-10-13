@@ -96,13 +96,7 @@ export class GltfBuilder {
   }
 
   /** One triangle mesh and its node (under `parent`, else a scene root). */
-  mesh(
-    name: string,
-    attributes: Record<string, number>,
-    material: number,
-    extras: Record<string, unknown>,
-    parent?: number,
-  ): void {
+  mesh(name: string, attributes: Record<string, number>, material: number, extras: Record<string, unknown>, parent?: number): void {
     this.meshes.push({ name, primitives: [{ attributes, mode: 4, material }] });
     this.attach({ name, mesh: this.meshes.length - 1, extras }, parent);
   }

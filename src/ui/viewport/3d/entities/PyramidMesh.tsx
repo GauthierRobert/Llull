@@ -12,14 +12,8 @@ import type { PyramidEntity } from '@core/model/types';
 import { SolidMeshShell, type SolidMeshKindProps } from './SolidMeshShell';
 import { buildPyramidGeometry } from './primitiveGeometry';
 
-export function PyramidMesh({
-  entity,
-  ...shell
-}: SolidMeshKindProps<PyramidEntity>): React.ReactElement {
+export function PyramidMesh({ entity, ...shell }: SolidMeshKindProps<PyramidEntity>): React.ReactElement {
   const { baseWidth, baseDepth, height } = entity;
-  const geometry = useMemo(
-    () => buildPyramidGeometry(baseWidth, baseDepth, height),
-    [baseWidth, baseDepth, height],
-  );
+  const geometry = useMemo(() => buildPyramidGeometry(baseWidth, baseDepth, height), [baseWidth, baseDepth, height]);
   return <SolidMeshShell entity={entity} geometry={geometry} {...shell} />;
 }

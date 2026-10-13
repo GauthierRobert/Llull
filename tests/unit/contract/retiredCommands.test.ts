@@ -66,9 +66,7 @@ describe('retired command migration', () => {
   it('replays the migrated history', () => {
     const loaded = deserializeDocument(savedWithRetiredSteps());
     const replayed = execute(loaded, 'replay_history', {}).document;
-    expect(Object.values(replayed.entities).filter((entity) => entity.kind === 'box')).toHaveLength(
-      4,
-    );
+    expect(Object.values(replayed.entities).filter((entity) => entity.kind === 'box')).toHaveLength(4);
   });
 
   it('leaves current documents and malformed steps untouched', () => {
@@ -96,10 +94,7 @@ describe('retired command migration', () => {
       ],
     });
     const replayed = execute(deserializeDocument(saved), 'replay_history', {}).document;
-    expect(Object.values(replayed.animations).map((anim) => anim.mode)).toEqual([
-      'spin',
-      'oscillate',
-    ]);
+    expect(Object.values(replayed.animations).map((anim) => anim.mode)).toEqual(['spin', 'oscillate']);
   });
 
   it('maps add_mate onto add_constraint, keeping the minted mate id', () => {

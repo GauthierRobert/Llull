@@ -78,11 +78,7 @@ interface UseModifyToolResult {
    * `worldPoint` is the world-space click position (for nearest-vertex picking and offset side determination).
    * `entityPoints` is the vertex list, if the entity is a polyline (for fillet/chamfer).
    */
-  handleEntityPick: (
-    entityId: string,
-    worldPoint: Vec2,
-    entityPoints?: ReadonlyArray<Vec2>,
-  ) => void;
+  handleEntityPick: (entityId: string, worldPoint: Vec2, entityPoints?: ReadonlyArray<Vec2>) => void;
   /** Update the pending numeric value (distance / radius input). */
   setPendingValue: (v: number) => void;
   /** Commit the pending numeric value and dispatch the command (for offset/fillet/chamfer). */
@@ -204,8 +200,7 @@ export function useModifyTool(): UseModifyToolResult {
   // O/F/K/T/X/E activate tools. Keys typed into fields or dialogs are never consumed.
   const disarm = useCallback(() => setActiveTool('none'), [setActiveTool]);
   const toggleTool = useCallback(
-    (tool: ModifyToolKind) =>
-      setActiveTool(useToolStore.getState().modifyTool === tool ? 'none' : tool),
+    (tool: ModifyToolKind) => setActiveTool(useToolStore.getState().modifyTool === tool ? 'none' : tool),
     [setActiveTool],
   );
   const onHotkey = useCallback(

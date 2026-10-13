@@ -7,13 +7,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
-import type {
-  LineEntity,
-  PolylineEntity,
-  ArcEntity,
-  CircleEntity,
-  RectangleEntity,
-} from '@core/model/types';
+import type { LineEntity, PolylineEntity, ArcEntity, CircleEntity, RectangleEntity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { cross2, dot2, len2, normalize2, perp2 } from '@lib/vec2';
 import { offsetSegment, miterJoin } from '@core/commands/modify2d/geometry';

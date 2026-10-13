@@ -25,13 +25,7 @@ export function twoLevels(): CadDocument {
   });
 }
 
-export const column = (
-  doc: CadDocument,
-  x: number,
-  y: number,
-  profile = 'HEB200',
-  top = 3000,
-): CadDocument =>
+export const column = (doc: CadDocument, x: number, y: number, profile = 'HEB200', top = 3000): CadDocument =>
   step(doc, 'add_steel_member', {
     role: 'column',
     profile,
@@ -41,13 +35,7 @@ export const column = (
   });
 
 /** Beam on level-2 whose top of steel sits 30 mm under the floor (grating). */
-export const beam = (
-  doc: CadDocument,
-  from: [number, number],
-  to: [number, number],
-  profile = 'IPE300',
-  depth = 300,
-): CadDocument =>
+export const beam = (doc: CadDocument, from: [number, number], to: [number, number], profile = 'IPE300', depth = 300): CadDocument =>
   step(doc, 'add_steel_member', {
     role: 'beam',
     profile,
@@ -143,16 +131,11 @@ export function rowsByRole(data: CheckData, role: string): MemberRow[] {
 }
 
 /** Replace a member's profile name without the catalogue check of the command. */
-export function withMember(
-  doc: CadDocument,
-  mark: string,
-  patch: Partial<SteelMemberElement>,
-): CadDocument {
+export function withMember(doc: CadDocument, mark: string, patch: Partial<SteelMemberElement>): CadDocument {
   const building = doc.building;
   if (!building) throw new Error('no building');
   const entry = Object.values(building.elements).find(
-    (element): element is SteelMemberElement =>
-      element.category === 'member' && element.mark === mark,
+    (element): element is SteelMemberElement => element.category === 'member' && element.mark === mark,
   );
   if (!entry) throw new Error(`no member ${mark}`);
   return {

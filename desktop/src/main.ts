@@ -9,11 +9,7 @@ import { app, BrowserWindow, dialog, Menu, shell, utilityProcess } from 'electro
 import { randomBytes } from 'crypto';
 import path from 'path';
 import { errorMessage } from '@lib/errorMessage';
-import {
-  llullHome,
-  removeDesktopDiscovery,
-  writeDesktopDiscovery,
-} from '@server/cli/desktopDiscovery';
+import { llullHome, removeDesktopDiscovery, writeDesktopDiscovery } from '@server/cli/desktopDiscovery';
 import { chooseBackendPort, startBackend, type RunningBackend } from './backend';
 import { backendEnv, backendOrigin } from './backendEnv';
 import { cliShimFor, installCliShim } from './cliShim';
@@ -172,12 +168,7 @@ async function newDocument(): Promise<void> {
 function installCli(): void {
   const shim = cliShimFor(process.platform, process.execPath, layout.cliEntry);
   try {
-    const installed = installCliShim(
-      path.join(home, 'bin'),
-      shim,
-      process.platform,
-      process.env['PATH'],
-    );
+    const installed = installCliShim(path.join(home, 'bin'), shim, process.platform, process.env['PATH']);
     cliInstalled = true;
     void dialog.showMessageBox({
       type: 'info',
@@ -224,8 +215,7 @@ async function boot(): Promise<void> {
   const port = await chooseBackendPort(userData);
   const url = backendOrigin(port);
   backend = await startBackend(
-    (entry, env) =>
-      utilityProcess.fork(entry, [], { env, serviceName: 'llull-backend', stdio: 'inherit' }),
+    (entry, env) => utilityProcess.fork(entry, [], { env, serviceName: 'llull-backend', stdio: 'inherit' }),
     layout.serverEntry,
     backendEnv({ port, token, layout, userDataDir: userData, baseEnv: process.env }),
     url,

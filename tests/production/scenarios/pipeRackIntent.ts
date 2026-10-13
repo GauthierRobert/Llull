@@ -1,13 +1,7 @@
 import type { Vec3 } from '@core/model/types';
 import type { RackRules } from '../criteria/pipeRack';
 import { PIPE_OD, section } from '../oracle/steel';
-import {
-  gridCoordinates,
-  type IntentMember,
-  type IntentPipe,
-  type IntentTray,
-  type PlantIntent,
-} from '../plant/intent';
+import { gridCoordinates, type IntentMember, type IntentPipe, type IntentTray, type PlantIntent } from '../plant/intent';
 
 /**
  * @layer tests/production/scenarios

@@ -12,8 +12,6 @@ export function useSelectionSet(): ReadonlySet<string> {
 
 /** The selected entity when exactly one entity is selected, else undefined. */
 export function useSoleSelectedEntity(): Entity | undefined {
-  const selectedId = useStore((s) =>
-    s.document.selection.length === 1 ? s.document.selection[0] : undefined,
-  );
+  const selectedId = useStore((s) => (s.document.selection.length === 1 ? s.document.selection[0] : undefined));
   return useStore((s) => (selectedId === undefined ? undefined : s.document.entities[selectedId]));
 }

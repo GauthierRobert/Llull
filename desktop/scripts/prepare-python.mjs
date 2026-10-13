@@ -36,15 +36,11 @@ const TRIPLES = {
 function archiveUrl() {
   if (process.env.LLULL_PYTHON_STANDALONE_URL) return process.env.LLULL_PYTHON_STANDALONE_URL;
   const triple = TRIPLES[`${process.platform}-${process.arch}`];
-  if (triple === undefined)
-    throw new Error(`no bundled Python for ${process.platform}-${process.arch}`);
+  if (triple === undefined) throw new Error(`no bundled Python for ${process.platform}-${process.arch}`);
   return `https://github.com/astral-sh/python-build-standalone/releases/download/${RELEASE}/cpython-${VERSION}+${RELEASE}-${triple}-install_only.tar.gz`;
 }
 
-const interpreter = () =>
-  process.platform === 'win32'
-    ? path.join(pythonRoot, 'python.exe')
-    : path.join(pythonRoot, 'bin', 'python3');
+const interpreter = () => (process.platform === 'win32' ? path.join(pythonRoot, 'python.exe') : path.join(pythonRoot, 'bin', 'python3'));
 
 async function fetchPython() {
   rmSync(pythonRoot, { recursive: true, force: true });
@@ -61,8 +57,7 @@ async function fetchPython() {
   const bytes = Buffer.from(await response.arrayBuffer());
   const expected = process.env.LLULL_PYTHON_STANDALONE_SHA256;
   const actual = createHash('sha256').update(bytes).digest('hex');
-  if (expected && expected.toLowerCase() !== actual)
-    throw new Error(`checksum mismatch: expected ${expected}, got ${actual}`);
+  if (expected && expected.toLowerCase() !== actual) throw new Error(`checksum mismatch: expected ${expected}, got ${actual}`);
   const archive = path.join(buildDir, 'python.tar.gz');
   writeFileSync(archive, bytes);
   // The archive's top-level directory is `python/`.
@@ -75,17 +70,7 @@ function pipInstall() {
   execFileSync(
     interpreter(),
     // Wheels only: sdists make pip backtrack for many minutes and need a compiler toolchain.
-    [
-      '-m',
-      'pip',
-      'install',
-      '--no-cache-dir',
-      '--disable-pip-version-check',
-      '--only-binary',
-      ':all:',
-      '-r',
-      requirements,
-    ],
+    ['-m', 'pip', 'install', '--no-cache-dir', '--disable-pip-version-check', '--only-binary', ':all:', '-r', requirements],
     { stdio: 'inherit' },
   );
 }
@@ -94,11 +79,8 @@ function probeBridge() {
   const bridge = path.join(repo, 'server', 'python', 'llull_bridge.py');
   const output = execFileSync(interpreter(), [bridge], { input: '{"op":"probe"}' }).toString();
   const probe = JSON.parse(output);
-  if (probe.ok !== true || probe.cadquery === null)
-    throw new Error(`bundled Python has no working CadQuery: ${output}`);
-  console.warn(
-    `[prepare-python] Python ${probe.python}, CadQuery ${probe.cadquery} ready in ${pythonRoot}`,
-  );
+  if (probe.ok !== true || probe.cadquery === null) throw new Error(`bundled Python has no working CadQuery: ${output}`);
+  console.warn(`[prepare-python] Python ${probe.python}, CadQuery ${probe.cadquery} ready in ${pythonRoot}`);
 }
 
 await fetchPython();

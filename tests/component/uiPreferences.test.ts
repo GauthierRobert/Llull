@@ -63,18 +63,11 @@ describe('themeStore — system preference', () => {
 
 describe('layoutStore — narrow windows', () => {
   it('starts with both docks closed on a drawer-layout window, leaving storage untouched', async () => {
-    localStorage.setItem(
-      'llull-layout',
-      JSON.stringify({ sidebarTab: 'history', sidebarOpen: true, inspectorOpen: true }),
-    );
+    localStorage.setItem('llull-layout', JSON.stringify({ sidebarTab: 'history', sidebarOpen: true, inspectorOpen: true }));
     stubMatchMedia((query) => query.includes('max-width'));
     const { useLayoutStore } = await import('@ui/store/layoutStore');
     const state = useLayoutStore.getState();
-    expect([state.sidebarTab, state.sidebarOpen, state.inspectorOpen]).toEqual([
-      'history',
-      false,
-      false,
-    ]);
+    expect([state.sidebarTab, state.sidebarOpen, state.inspectorOpen]).toEqual(['history', false, false]);
     expect(JSON.parse(localStorage.getItem('llull-layout') ?? '{}')).toMatchObject({
       sidebarOpen: true,
     });

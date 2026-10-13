@@ -14,9 +14,7 @@ describe('ModelExport', () => {
     useStore.setState({ document: doc });
     // jsdom has no object URLs.
     Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:model'), revokeObjectURL: vi.fn() });
-    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
-      this: HTMLAnchorElement,
-    ) {
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
       downloads.push(this.download);
     });
   });

@@ -35,12 +35,7 @@ beforeEach(() => {
 
 type RpcApp = Parameters<typeof request>[0];
 
-async function rpcOn(
-  target: RpcApp,
-  sessionId: string | null,
-  method: string,
-  params: object,
-): Promise<unknown> {
+async function rpcOn(target: RpcApp, sessionId: string | null, method: string, params: object): Promise<unknown> {
   const id = rpcId++;
   const res = await mcpRequest(target, sessionId).send({ jsonrpc: '2.0', id, method, params });
   expect(res.status).toBe(200);
@@ -48,8 +43,7 @@ async function rpcOn(
   return parseSseResult(res.text, id);
 }
 
-const rpc = (sessionId: string | null, method: string, params: object): Promise<unknown> =>
-  rpcOn(app, sessionId, method, params);
+const rpc = (sessionId: string | null, method: string, params: object): Promise<unknown> => rpcOn(app, sessionId, method, params);
 
 async function openSession(): Promise<string> {
   return (await rpc(null, 'initialize', {
@@ -63,8 +57,7 @@ const coreApp = express();
 coreApp.use(express.json());
 coreApp.use('/mcp', buildMcpRouter({ port: null, allowCodeExecution: false }, toolsetsFromEnv('')));
 
-const coreRpc = (sessionId: string | null, method: string, params: object): Promise<unknown> =>
-  rpcOn(coreApp, sessionId, method, params);
+const coreRpc = (sessionId: string | null, method: string, params: object): Promise<unknown> => rpcOn(coreApp, sessionId, method, params);
 
 async function openCoreSession(): Promise<string> {
   return (await coreRpc(null, 'initialize', {
@@ -184,12 +177,8 @@ describe('MCP toolsets', () => {
     const { tools } = (await rpc(sessionId, 'tools/list', {})) as {
       tools: { name: string; annotations?: { readOnlyHint?: boolean } }[];
     };
-    expect(tools.find((tool) => tool.name === 'describe_scene')?.annotations?.readOnlyHint).toBe(
-      true,
-    );
-    expect(
-      tools.find((tool) => tool.name === 'add_box')?.annotations?.readOnlyHint,
-    ).toBeUndefined();
+    expect(tools.find((tool) => tool.name === 'describe_scene')?.annotations?.readOnlyHint).toBe(true);
+    expect(tools.find((tool) => tool.name === 'add_box')?.annotations?.readOnlyHint).toBeUndefined();
   });
 
   it('tools/call refuses a tool of a disabled toolset and names it', async () => {
@@ -227,9 +216,7 @@ describe('MCP toolsets', () => {
       },
     })) as { isError?: boolean; content: { text?: string }[] };
     expect(result.isError).toBe(false);
-    expect(Object.values(getLiveDoc().entities).some((entity) => entity.kind === 'line')).toBe(
-      true,
-    );
+    expect(Object.values(getLiveDoc().entities).some((entity) => entity.kind === 'line')).toBe(true);
   });
 
   it('advertises the render_view enrichment params in the filtered list', async () => {

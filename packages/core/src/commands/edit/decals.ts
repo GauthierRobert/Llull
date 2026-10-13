@@ -25,8 +25,7 @@ const MAX_DECALS_PER_ENTITY = 64;
 function target(doc: CadDocument, id: string): Entity | string {
   const entity = doc.entities[id];
   if (entity === undefined) return `entity '${id}' not found`;
-  if (!is3D(entity) || entity.kind === 'instance')
-    return `entity '${id}' (kind '${entity.kind}') is not a solid; decals paint 3D solids`;
+  if (!is3D(entity) || entity.kind === 'instance') return `entity '${id}' (kind '${entity.kind}') is not a solid; decals paint 3D solids`;
   return entity;
 }
 
@@ -54,41 +53,23 @@ export const addDecal = defineCommand({
     at: vec3('World point on the surface at the decal centre.'),
     normal: vec3('Outward surface direction at `at` (world); the decal projects along -normal.'),
     height: z.number().describe('Letter block height in document units (> 0).'),
-    width: z
-      .number()
-      .describe('Decal width (> 0). Default: from the text length at this height.')
-      .optional(),
-    angle: z
-      .number()
-      .describe('Rotation of the text about the normal, radians (default 0).')
-      .optional(),
-    depth: z
-      .number()
-      .describe('Projection depth through curved surfaces (> 0). Default: 2 × height.')
-      .optional(),
+    width: z.number().describe('Decal width (> 0). Default: from the text length at this height.').optional(),
+    angle: z.number().describe('Rotation of the text about the normal, radians (default 0).').optional(),
+    depth: z.number().describe('Projection depth through curved surfaces (> 0). Default: 2 × height.').optional(),
     color: colorField('#ffffff'),
-    background: z
-      .string()
-      .describe('Optional #rrggbb background behind the letters (default transparent).')
-      .optional(),
+    background: z.string().describe('Optional #rrggbb background behind the letters (default transparent).').optional(),
   }),
-  run: (
-    doc,
-    { id, text, at, normal, height, width, angle = 0, depth, color = '#ffffff', background },
-  ): CommandResult => {
+  run: (doc, { id, text, at, normal, height, width, angle = 0, depth, color = '#ffffff', background }): CommandResult => {
     const fail = failer(doc, 'add_decal');
     const entity = target(doc, id);
     if (typeof entity === 'string') return fail(entity);
-    if (text.trim().length === 0 || text.length > MAX_DECAL_TEXT)
-      return fail(`text must be 1..${MAX_DECAL_TEXT} characters`);
+    if (text.trim().length === 0 || text.length > MAX_DECAL_TEXT) return fail(`text must be 1..${MAX_DECAL_TEXT} characters`);
     if (!(height > 0)) return fail(`height must be > 0 (got ${height})`);
     if (width !== undefined && !(width > 0)) return fail(`width must be > 0 (got ${width})`);
     if (depth !== undefined && !(depth > 0)) return fail(`depth must be > 0 (got ${depth})`);
-    if (background !== undefined && !isHexColor(background))
-      return fail(`background must be a #rrggbb colour (got "${background}")`);
+    if (background !== undefined && !isHexColor(background)) return fail(`background must be a #rrggbb colour (got "${background}")`);
     if (Math.hypot(...normal) < 1e-12) return fail('normal must be non-zero');
-    if ((entity.decals?.length ?? 0) >= MAX_DECALS_PER_ENTITY)
-      return fail(`entity '${id}' already has ${MAX_DECALS_PER_ENTITY} decals`);
+    if ((entity.decals?.length ?? 0) >= MAX_DECALS_PER_ENTITY) return fail(`entity '${id}' already has ${MAX_DECALS_PER_ENTITY} decals`);
     const decal: Decal = {
       id: nextId('decal'),
       text,
@@ -102,9 +83,7 @@ export const addDecal = defineCommand({
       ...(background !== undefined ? { background } : {}),
     };
     if (decalPatch(decal, localTriangles(entity)).positions.length === 0)
-      return fail(
-        `the decal at [${at.join(', ')}] does not reach any face of '${id}' turned toward ${JSON.stringify(normal)}`,
-      );
+      return fail(`the decal at [${at.join(', ')}] does not reach any face of '${id}' turned toward ${JSON.stringify(normal)}`);
     const unknown = [...new Set([...text].filter((ch) => !hasGlyph(ch)))];
     const updated = { ...entity, decals: [...(entity.decals ?? []), decal] } as Entity;
     return changed(
@@ -134,16 +113,11 @@ export const removeDecal = defineCommand({
     const entity = doc.entities[id];
     if (entity === undefined) return noop(doc, `remove_decal: entity '${id}' not found; no-op.`);
     const decals = entity.decals ?? [];
-    if (!decals.some((decal) => decal.id === decalId))
-      return noop(doc, `remove_decal: '${id}' has no decal '${decalId}'; no-op.`);
+    if (!decals.some((decal) => decal.id === decalId)) return noop(doc, `remove_decal: '${id}' has no decal '${decalId}'; no-op.`);
     const rest = decals.filter((decal) => decal.id !== decalId);
     const updated = (
-      rest.length > 0
-        ? { ...entity, decals: rest }
-        : Object.fromEntries(Object.entries(entity).filter(([key]) => key !== 'decals'))
+      rest.length > 0 ? { ...entity, decals: rest } : Object.fromEntries(Object.entries(entity).filter(([key]) => key !== 'decals'))
     ) as Entity;
-    return changed(replaceEntity(doc, updated), `remove_decal: removed ${decalId} from '${id}'.`, [
-      id,
-    ]);
+    return changed(replaceEntity(doc, updated), `remove_decal: removed ${decalId} from '${id}'.`, [id]);
   },
 });

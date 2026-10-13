@@ -184,10 +184,7 @@ describe('CadStore — networked dispatch', () => {
 
   it('dispatch keeps liveStatus on HTTP 429 and surfaces the error in lastSummary', async () => {
     useStore.setState({ liveStatus: 'connected' });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({ ok: false, status: 429, json: () => Promise.resolve({}) }),
-    );
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 429, json: () => Promise.resolve({}) }));
 
     getState().dispatch('add_box', { size: [1, 1, 1] });
     await flushPromises();
@@ -442,10 +439,7 @@ describe('CadStore — offline fallback', () => {
 
   it('HTTP 4xx does NOT fall back locally', async () => {
     useStore.setState({ liveStatus: 'connected' });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({ ok: false, status: 400, json: () => Promise.resolve({}) }),
-    );
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 400, json: () => Promise.resolve({}) }));
     getState().dispatch('add_box', { size: [1, 1, 1] });
     await flushPromises();
     expect(getState().document.order).toHaveLength(0);
@@ -470,9 +464,7 @@ describe('CadStore — offline fallback', () => {
 
   it('never replays a local-only restore (and its coalesced framing) to the server', async () => {
     useStore.setState({ liveStatus: 'disconnected' });
-    const restored = serializeDocument(
-      execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document,
-    );
+    const restored = serializeDocument(execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document);
     getState().dispatch('load_document', { json: restored }, { localOnly: true });
     getState().dispatch('fit_view', { direction: 'iso' }, { coalesce: true });
     getState().dispatch('add_sphere', { radius: 2 });

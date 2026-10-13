@@ -25,25 +25,17 @@ function intoBoxFrame([x, y, z]: Vec3, [rx, ry, rz]: Vec3): Vec3 {
  * Radius that keeps `sphere` clear of every box face plane it is tangent to (inside or out);
  * the radius unchanged when it touches none.
  */
-function clearRadius(
-  sphere: { position: Vec3; radius: number },
-  box: { position: Vec3; rotation: Vec3; size: Vec3 },
-): number {
+function clearRadius(sphere: { position: Vec3; radius: number }, box: { position: Vec3; rotation: Vec3; size: Vec3 }): number {
   const gap = sphere.radius * TANGENT_GAP;
   const local = intoBoxFrame(
-    [
-      sphere.position[0] - box.position[0],
-      sphere.position[1] - box.position[1],
-      sphere.position[2] - box.position[2],
-    ],
+    [sphere.position[0] - box.position[0], sphere.position[1] - box.position[1], sphere.position[2] - box.position[2]],
     box.rotation,
   );
   let radius = sphere.radius;
   local.forEach((component, axis) => {
     // The contact point is the centre's foot on the plane: it must lie inside the face rectangle.
     const footInsideFace = local.every(
-      (other, otherAxis) =>
-        otherAxis === axis || Math.abs(other) <= (box.size[otherAxis] ?? 0) / 2 + gap * 4,
+      (other, otherAxis) => otherAxis === axis || Math.abs(other) <= (box.size[otherAxis] ?? 0) / 2 + gap * 4,
     );
     if (!footInsideFace) return;
     const half = (box.size[axis] ?? 0) / 2;

@@ -8,14 +8,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
-import {
-  CivilPanel,
-  downloadText,
-  localDispatch,
-  spyDispatch,
-  setupCivilStore,
-  surveyed,
-} from '../helpers/civilPanel';
+import { CivilPanel, downloadText, localDispatch, spyDispatch, setupCivilStore, surveyed } from '../helpers/civilPanel';
 
 vi.mock('@ui/download', () => ({ downloadText: vi.fn(), downloadBlob: vi.fn() }));
 
@@ -66,10 +59,7 @@ describe('Civil design controls', () => {
     expect(dispatch).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText('Spiral lengths'), { target: { value: '20' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add alignment' }));
-    expect(dispatch).toHaveBeenCalledWith(
-      'add_alignment',
-      expect.objectContaining({ radii: [40], spirals: [20] }),
-    );
+    expect(dispatch).toHaveBeenCalledWith('add_alignment', expect.objectContaining({ radii: [40], spirals: [20] }));
   });
 
   it('sets the superelevation of an alignment and explains a blank rate', () => {
@@ -108,9 +98,7 @@ describe('Civil design controls', () => {
     fireEvent.change(screen.getByLabelText('IDF c'), { target: { value: '0.8' } });
     fireEvent.change(screen.getByLabelText('Outfall level'), { target: { value: '8.6' } });
     fireEvent.click(screen.getByRole('button', { name: 'Check network' }));
-    expect(screen.getByTestId('civil-drainage-status')).toHaveTextContent(
-      /IDF i=1000\/\(t\+10\)\^0.8 mm\/h/,
-    );
+    expect(screen.getByTestId('civil-drainage-status')).toHaveTextContent(/IDF i=1000\/\(t\+10\)\^0.8 mm\/h/);
     fireEvent.click(screen.getByRole('button', { name: 'Size pipes' }));
     expect(dispatch).toHaveBeenCalledWith('size_drainage_pipes', {
       idf: { a: 1000, b: 10, c: 0.8 },

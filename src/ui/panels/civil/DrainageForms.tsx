@@ -8,13 +8,7 @@
 
 import React from 'react';
 import { useStore } from '@ui/store';
-import {
-  CivilObjectSelect,
-  useCivilObjects,
-  NumberTextField,
-  TextField,
-  useChosenId,
-} from './CivilParts';
+import { CivilObjectSelect, useCivilObjects, NumberTextField, TextField, useChosenId } from './CivilParts';
 import { optionalNumber, optionalText } from '@ui/numberText';
 import { manholeParamsOf } from './civilRules';
 import { FormError } from '@ui/panels/PanelParts';
@@ -82,12 +76,7 @@ export function ManholeForm(): React.ReactElement {
       </div>
       <div className="building-inline-form">
         {MANHOLE_FIELDS.map(([key, placeholder]) => (
-          <NumberTextField
-            key={key}
-            {...field(key)}
-            hint={placeholder}
-            label={`Manhole ${placeholder.toLowerCase()}`}
-          />
+          <NumberTextField key={key} {...field(key)} hint={placeholder} label={`Manhole ${placeholder.toLowerCase()}`} />
         ))}
         <TextField {...field('name')} hint="Name" label="Manhole name" />
         <button type="submit" className="btn btn--primary btn--sm">
@@ -125,11 +114,7 @@ export function PipeForm(): React.ReactElement {
       <NumberTextField {...field('diameter')} hint="Diameter" label="Pipe diameter" />
       <TextField {...field('material')} hint="Material" label="Pipe material" />
       <NumberTextField {...field('manningN')} hint="Manning n" label="Pipe Manning n" />
-      <button
-        type="submit"
-        className="btn btn--primary btn--sm"
-        disabled={manholes.length < 2 || fromId === toId}
-      >
+      <button type="submit" className="btn btn--primary btn--sm" disabled={manholes.length < 2 || fromId === toId}>
         Add pipe
       </button>
     </form>

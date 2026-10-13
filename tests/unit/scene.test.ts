@@ -247,11 +247,7 @@ describe('rotatedEntityBounds — zero rotation is byte-for-byte identical to en
 
 describe('rotatedEntityBounds — non-zero rotation produces oriented:true and correct extents', () => {
   const EPS = 1e-9;
-  function rotated(
-    addCommand: string,
-    params: Record<string, unknown>,
-    delta: [number, number, number],
-  ): { doc: CadDocument; e: Entity } {
+  function rotated(addCommand: string, params: Record<string, unknown>, delta: [number, number, number]): { doc: CadDocument; e: Entity } {
     const added = execute(createEmptyDocument(), addCommand, { ...params, position: [0, 0, 0] });
     const id = added.document.order[0]!;
     const doc = execute(added.document, 'rotate_entity', { id, delta }).document;
@@ -389,10 +385,7 @@ describe('instanceBoundsFromDoc — instance world AABB', () => {
     expect(instance.kind).toBe('instance');
 
     // instanceBoundsFromDoc must return the expanded box AABB, NOT a point
-    const bounds = instanceBoundsFromDoc(
-      instance as Parameters<typeof instanceBoundsFromDoc>[0],
-      doc,
-    );
+    const bounds = instanceBoundsFromDoc(instance as Parameters<typeof instanceBoundsFromDoc>[0], doc);
     // A 2×2×2 box centered at [0,0,0] → min [-1,-1,-1] max [1,1,1]
     expect(bounds.min[0]).toBeCloseTo(-1, 5);
     expect(bounds.min[1]).toBeCloseTo(-1, 5);
@@ -429,10 +422,7 @@ describe('instanceBoundsFromDoc — instance world AABB', () => {
       layerId: 'layer-default',
       color: '#fff',
     };
-    const bounds = instanceBoundsFromDoc(
-      fakeInstance as Parameters<typeof instanceBoundsFromDoc>[0],
-      doc,
-    );
+    const bounds = instanceBoundsFromDoc(fakeInstance as Parameters<typeof instanceBoundsFromDoc>[0], doc);
     expect(bounds.min).toEqual([5, 5, 5]);
     expect(bounds.max).toEqual([5, 5, 5]);
   });

@@ -8,13 +8,7 @@
  */
 
 import React, { useId } from 'react';
-import {
-  type DisplayMode,
-  type ClipAxis,
-  type QualityOverride,
-  useViewportStore,
-  useStore,
-} from '@ui/store';
+import { type DisplayMode, type ClipAxis, type QualityOverride, useViewportStore, useStore } from '@ui/store';
 import { type IconName, Icon } from '@ui/components/Icon';
 import { NumberField } from '@ui/components/NumberField';
 

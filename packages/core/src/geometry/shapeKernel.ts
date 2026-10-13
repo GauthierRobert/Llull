@@ -79,11 +79,7 @@ export interface CachingKernel extends GeometryKernel {
   clear(): void;
 }
 
-function build<S>(
-  ops: KernelOps<S>,
-  recipe: ShapeRecipe,
-  child: (r: ShapeRecipe) => S | null,
-): S | null {
+function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe) => S | null): S | null {
   switch (recipe.op) {
     case 'solid':
       return ops.solid(recipe.entity);

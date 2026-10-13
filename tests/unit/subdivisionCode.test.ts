@@ -12,8 +12,7 @@ const doc = execute(createEmptyDocument(), 'add_subdivision_solid', {
   name: 'knob',
 }).document;
 
-const exported = (language: string, source = doc): string =>
-  (execute(source, 'export_code', { language }).data as { text: string }).text;
+const exported = (language: string, source = doc): string => (execute(source, 'export_code', { language }).data as { text: string }).text;
 
 describe('subdivision solids in export_code', () => {
   it('emits an exact subdivision(...) call with the cage, creases, levels and placement', () => {
@@ -56,14 +55,10 @@ describe('apply_code_trace with add_subdivision_solid', () => {
       ],
     };
     const applied = execute(createEmptyDocument(), 'apply_code_trace', { trace });
-    const entity = applied.document.entities[
-      applied.document.order[0] as string
-    ] as SubdivisionEntity;
+    const entity = applied.document.entities[applied.document.order[0] as string] as SubdivisionEntity;
     expect(entity.kind).toBe('subdivision');
     expect(entity.position).toEqual([4, 0, 0]);
     expect(entity.creases).toEqual([[0, 1]]);
-    expect(applied.document.featureHistory.map((step) => step.name)).toEqual([
-      'add_subdivision_solid',
-    ]);
+    expect(applied.document.featureHistory.map((step) => step.name)).toEqual(['add_subdivision_solid']);
   });
 });

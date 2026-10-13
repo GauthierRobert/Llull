@@ -41,16 +41,12 @@ export const addEquipmentOpenings = defineCommand({
   run: (doc, { equipmentId, margin }): CommandResult => {
     const building = getBuilding(doc);
     const equipment = building.elements[equipmentId];
-    if (equipment?.category !== 'equipment')
-      return noop(doc, `add_equipment_openings failed: no equipment '${equipmentId}'.`);
+    if (equipment?.category !== 'equipment') return noop(doc, `add_equipment_openings failed: no equipment '${equipmentId}'.`);
     const gap = margin ?? fromMm(doc, 300);
     if (!(gap >= 0)) return noop(doc, 'add_equipment_openings failed: margin must be >= 0.');
     const crossed = slabsCrossedBy(building, equipment, fromMm(doc, 5));
     if (crossed.length === 0) {
-      return noop(
-        doc,
-        `add_equipment_openings: ${equipment.mark} crosses no floor without an opening — nothing to cut.`,
-      );
+      return noop(doc, `add_equipment_openings: ${equipment.mark} crosses no floor without an opening — nothing to cut.`);
     }
     const [halfLength, halfWidth] = [equipment.size[0] / 2 + gap, equipment.size[1] / 2 + gap];
     const outline: Vec2[] = (
@@ -76,8 +72,7 @@ export const addEquipmentOpenings = defineCommand({
       next = withElement(next, { ...slab, openings: [...(slab.openings ?? []), outline] });
       cut.push(slab);
     }
-    if (cut.length === 0)
-      return noop(doc, `add_equipment_openings refused: ${refused.join('; ')}.`);
+    if (cut.length === 0) return noop(doc, `add_equipment_openings refused: ${refused.join('; ')}.`);
     const document = regenerateBuilding(doc, next);
     const area = planAreaM2(doc, outline);
     return {

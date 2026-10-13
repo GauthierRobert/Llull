@@ -181,20 +181,14 @@ interface Transform {
 const IDENTITY: Transform = { apply: (point) => point, rotation: 0, scale: 1 };
 
 function point(record: DxfRecord, offset = 0): Vec3 {
-  return [
-    codeNumber(record, 10 + offset, 0),
-    codeNumber(record, 20 + offset, 0),
-    codeNumber(record, 30 + offset, 0),
-  ];
+  return [codeNumber(record, 10 + offset, 0), codeNumber(record, 20 + offset, 0), codeNumber(record, 30 + offset, 0)];
 }
 
 /** Arc points from `start` to `end` (radians, CCW) around `center`. */
 function arcPoints(center: Vec3, radius: number, start: number, end: number): Vec3[] {
   const sweep = positiveSweep(end - start);
   const segments = Math.max(4, Math.ceil(sweep / (Math.PI / 24)));
-  return arcPolyline([center[0], center[1]], radius, start, sweep, segments).map(
-    ([x, y]): Vec3 => [x, y, center[2]],
-  );
+  return arcPolyline([center[0], center[1]], radius, start, sweep, segments).map(([x, y]): Vec3 => [x, y, center[2]]);
 }
 
 /** LWPOLYLINE vertices with bulge arcs densified, at `elevation`. */
@@ -208,9 +202,7 @@ function lwPolylinePoints(record: DxfRecord, closed: boolean): Vec3[] {
     if (last && code === 42) last.bulge = Number(value);
   }
   const result: Vec3[] = [];
-  const finite = vertices.filter(
-    (vertex) => Number.isFinite(vertex.x) && Number.isFinite(vertex.y),
-  );
+  const finite = vertices.filter((vertex) => Number.isFinite(vertex.x) && Number.isFinite(vertex.y));
   if (!Number.isFinite(elevation)) return [];
   finite.forEach((vertex, index) => {
     result.push([vertex.x, vertex.y, elevation]);
@@ -225,20 +217,12 @@ function lwPolylinePoints(record: DxfRecord, closed: boolean): Vec3[] {
     const sagitta = radius * Math.cos(theta / 2);
     const normal = [-(next.y - vertex.y) / chord, (next.x - vertex.x) / chord];
     const sign = vertex.bulge > 0 ? 1 : -1;
-    const center: Vec3 = [
-      midX + sign * (normal[0] as number) * sagitta,
-      midY + sign * (normal[1] as number) * sagitta,
-      elevation,
-    ];
+    const center: Vec3 = [midX + sign * (normal[0] as number) * sagitta, midY + sign * (normal[1] as number) * sagitta, elevation];
     const startAngle = Math.atan2(vertex.y - center[1], vertex.x - center[0]);
     const steps = Math.max(2, Math.ceil(Math.abs(theta) / (Math.PI / 24)));
     for (let k = 1; k < steps; k++) {
       const angle = startAngle + (theta * k) / steps;
-      result.push([
-        center[0] + Math.abs(radius) * Math.cos(angle),
-        center[1] + Math.abs(radius) * Math.sin(angle),
-        elevation,
-      ]);
+      result.push([center[0] + Math.abs(radius) * Math.cos(angle), center[1] + Math.abs(radius) * Math.sin(angle), elevation]);
     }
   });
   return result;
@@ -266,11 +250,7 @@ function insertTransform(record: DxfRecord, block: DxfBlock, parent: Transform):
     apply: ([x, y, z]) => {
       const lx = (x - block.base[0]) * sx;
       const ly = (y - block.base[1]) * sy;
-      return parent.apply([
-        at[0] + lx * cos - ly * sin,
-        at[1] + lx * sin + ly * cos,
-        at[2] + (z - block.base[2]) * sz,
-      ]);
+      return parent.apply([at[0] + lx * cos - ly * sin, at[1] + lx * sin + ly * cos, at[2] + (z - block.base[2]) * sz]);
     },
     rotation: parent.rotation + rotation,
     scale: uniform,
@@ -299,19 +279,10 @@ const MAX_DXF_PRIMITIVES = 200000;
  * World-space primitives of every entity (block inserts expanded up to `maxDepth`); entities past
  * `maxPrimitives` are counted in `skipped` as "over limit".
  */
-export function flattenDxf(
-  drawing: DxfDrawing,
-  maxDepth = 8,
-  maxPrimitives = MAX_DXF_PRIMITIVES,
-): FlattenResult {
+export function flattenDxf(drawing: DxfDrawing, maxDepth = 8, maxPrimitives = MAX_DXF_PRIMITIVES): FlattenResult {
   const primitives: DxfPrimitive[] = [];
   const skipped = new Map<string, number>();
-  const visit = (
-    list: readonly DxfRecord[],
-    transform: Transform,
-    depth: number,
-    inherited: Common | null,
-  ): void => {
+  const visit = (list: readonly DxfRecord[], transform: Transform, depth: number, inherited: Common | null): void => {
     for (const record of list) {
       if (primitives.length >= maxPrimitives) {
         skipped.set('over limit', (skipped.get('over limit') ?? 0) + 1);
@@ -367,12 +338,9 @@ export function flattenDxf(
           if (mirrored(record)) [start, end] = [Math.PI - end, Math.PI - start];
           const center = world(local);
           if (transform.scale === null) {
-            const points = arcPoints(
-              ocs(record, local),
-              radius,
-              start,
-              record.type === 'ARC' ? end : Math.PI * 2,
-            ).map((p) => transform.apply(p));
+            const points = arcPoints(ocs(record, local), radius, start, record.type === 'ARC' ? end : Math.PI * 2).map((p) =>
+              transform.apply(p),
+            );
             primitives.push({
               ...common,
               kind: 'polyline',
@@ -424,8 +392,7 @@ export function flattenDxf(
         case '3DFACE': {
           const corners = [0, 1, 2, 3].map((k) => world(point(record, k)));
           const [, , c, d] = corners as [Vec3, Vec3, Vec3, Vec3];
-          const unique =
-            c[0] === d[0] && c[1] === d[1] && c[2] === d[2] ? corners.slice(0, 3) : corners;
+          const unique = c[0] === d[0] && c[1] === d[1] && c[2] === d[2] ? corners.slice(0, 3) : corners;
           primitives.push({ ...common, kind: 'face', corners: unique });
           break;
         }

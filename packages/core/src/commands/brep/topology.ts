@@ -21,25 +21,17 @@ const OCC_HINT = 'the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt
 /** Edges listed in the summary itself; the full list is always in `data.edges`. */
 const SUMMARY_EDGE_LIMIT = 24;
 
-const fmtVec = (v: Vec3, precision: number): string =>
-  `[${v.map((c) => fixedNumber(c, precision)).join(', ')}]`;
+const fmtVec = (v: Vec3, precision: number): string => `[${v.map((c) => fixedNumber(c, precision)).join(', ')}]`;
 
 function topologySummary(id: string, topology: ShapeTopology, precision: number): string {
   const surfaces = new Map<string, number>();
-  for (const face of topology.faces)
-    surfaces.set(face.surface, (surfaces.get(face.surface) ?? 0) + 1);
+  for (const face of topology.faces) surfaces.set(face.surface, (surfaces.get(face.surface) ?? 0) + 1);
   const faceKinds = [...surfaces].map(([surface, count]) => `${count} ${surface}`).join(', ');
   const edges = topology.edges
     .slice(0, SUMMARY_EDGE_LIMIT)
-    .map(
-      (edge) =>
-        `#${edge.index} ${edge.curve} len ${fixedNumber(edge.length, precision)} mid ${fmtVec(edge.mid, precision)}`,
-    )
+    .map((edge) => `#${edge.index} ${edge.curve} len ${fixedNumber(edge.length, precision)} mid ${fmtVec(edge.mid, precision)}`)
     .join('; ');
-  const more =
-    topology.edges.length > SUMMARY_EDGE_LIMIT
-      ? `; … ${topology.edges.length - SUMMARY_EDGE_LIMIT} more in data.edges`
-      : '';
+  const more = topology.edges.length > SUMMARY_EDGE_LIMIT ? `; … ${topology.edges.length - SUMMARY_EDGE_LIMIT} more in data.edges` : '';
   return (
     `inspect_topology: '${id}' is ${topology.solids} exact solid(s), volume ${fixedNumber(topology.volume, precision)}, ` +
     `${topology.faces.length} faces (${faceKinds}), ${topology.edges.length} edges, ${topology.vertices} vertices. ` +
@@ -73,26 +65,17 @@ export const inspectTopology = defineCommand({
     const entity = doc.entities[id];
     if (!entity) return noop(doc, `inspect_topology: entity '${id}' not found.`);
     if (!is3D(entity) || entity.kind === 'instance') {
-      return noop(
-        doc,
-        `inspect_topology: entity '${id}' (kind '${entity.kind}') is not a 3D solid; explode instances first.`,
-      );
+      return noop(doc, `inspect_topology: entity '${id}' (kind '${entity.kind}') is not a 3D solid; explode instances first.`);
     }
     const kernel = (ctx ?? currentContext()).kernel;
     if (!kernel) return noop(doc, kernelUnavailable('inspect_topology'));
     const shape = kernel.evaluate(operandRecipe(kernel, entity));
     if (shape === null) {
-      return noop(
-        doc,
-        `inspect_topology: the kernel could not build entity '${id}' (kind '${entity.kind}').`,
-      );
+      return noop(doc, `inspect_topology: the kernel could not build entity '${id}' (kind '${entity.kind}').`);
     }
     const topology = kernel.topology(shape);
     if (topology === null) {
-      return noop(
-        doc,
-        `inspect_topology: this kernel has no exact B-rep topology; use ${OCC_HINT}.`,
-      );
+      return noop(doc, `inspect_topology: this kernel has no exact B-rep topology; use ${OCC_HINT}.`);
     }
     return report(doc, topologySummary(id, topology, doc.displayPrecision), {
       entityId: id,
@@ -123,10 +106,7 @@ function stepLabels(doc: CadDocument, solids: readonly Entity[]): StepLabel[] {
 }
 
 /** Ids of the exportable solids in `entityIds` (or the whole document), plus the ids skipped and why. */
-function stepTargets(
-  doc: CadDocument,
-  entityIds: readonly string[] | undefined,
-): { solids: Entity[]; skipped: string[] } {
+function stepTargets(doc: CadDocument, entityIds: readonly string[] | undefined): { solids: Entity[]; skipped: string[] } {
   const ids = entityIds !== undefined && entityIds.length > 0 ? entityIds : doc.order;
   const solids: Entity[] = [];
   const skipped: string[] = [];
@@ -166,9 +146,7 @@ export const exportStepExact = defineCommand({
     entityIds: z
       .array(z.string())
       .optional()
-      .describe(
-        'Ids of the 3D solids to export. Omit or pass [] to export every 3D solid of the document.',
-      ),
+      .describe('Ids of the 3D solids to export. Omit or pass [] to export every 3D solid of the document.'),
   }),
   run: (doc, { entityIds }, ctx): CommandResult => {
     const kernel = (ctx ?? currentContext()).kernel;
@@ -179,17 +157,13 @@ export const exportStepExact = defineCommand({
     for (const entity of solids) {
       const shape = kernel.evaluate(operandRecipe(kernel, entity));
       if (shape === null) {
-        return noop(
-          doc,
-          `export_step_exact: the kernel could not build '${entity.id}' (kind '${entity.kind}'); nothing exported.`,
-        );
+        return noop(doc, `export_step_exact: the kernel could not build '${entity.id}' (kind '${entity.kind}'); nothing exported.`);
       }
       shapes.push(shape);
     }
     const exactStep = kernel.exportStep(shapes);
     const step = exactStep === null ? null : labelStep(exactStep, stepLabels(doc, solids));
-    if (step === null)
-      return noop(doc, `export_step_exact: this kernel cannot write exact STEP; use ${OCC_HINT}.`);
+    if (step === null) return noop(doc, `export_step_exact: this kernel cannot write exact STEP; use ${OCC_HINT}.`);
     const exported = solids.map((entity) => entity.id);
     const data: ExportStepExactData = {
       format: 'step',

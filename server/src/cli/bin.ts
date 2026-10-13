@@ -17,9 +17,7 @@ const KILL_GRACE_SECONDS = 5;
 
 function graceSeconds(env: NodeJS.ProcessEnv): number {
   const override = Number(env['LLULL_CLI_KILL_GRACE_SECONDS']);
-  return env['LLULL_CLI_KILL_GRACE_SECONDS'] !== undefined && override >= 0
-    ? override
-    : KILL_GRACE_SECONDS;
+  return env['LLULL_CLI_KILL_GRACE_SECONDS'] !== undefined && override >= 0 ? override : KILL_GRACE_SECONDS;
 }
 
 /** Seconds of a `--timeout` that needs supervising (a local run, not yet supervised), else undefined. */
@@ -46,10 +44,7 @@ function supervise(seconds: number): void {
   );
   child.on('exit', (code) => {
     clearTimeout(timer);
-    if (killed)
-      process.stderr.write(
-        `llull: timed out after ${seconds}s (--timeout); the run was killed, nothing was saved.\n`,
-      );
+    if (killed) process.stderr.write(`llull: timed out after ${seconds}s (--timeout); the run was killed, nothing was saved.\n`);
     process.exit(killed ? 1 : (code ?? 1));
   });
 }

@@ -17,17 +17,11 @@ import { stepIdSource } from '../lib/id';
  * re-mints identical ids; an execute nested inside a running step joins it (no extra step)
  * @failure unknown command, or `requiresKernel` while ctx.kernel is null -> no-op, affected:[], rejected:true
  */
-export function execute(
-  doc: CadDocument,
-  commandName: string,
-  params: unknown,
-  ctx: ExecutionContext = currentContext(),
-): CommandResult {
+export function execute(doc: CadDocument, commandName: string, params: unknown, ctx: ExecutionContext = currentContext()): CommandResult {
   const def = getCommand(commandName);
   if (!def) return rejection(doc, `Unknown command: ${commandName}`);
   const annotations = def.annotations;
-  if (annotations?.requiresKernel === true && ctx.kernel === null)
-    return rejection(doc, kernelUnavailable(commandName));
+  if (annotations?.requiresKernel === true && ctx.kernel === null) return rejection(doc, kernelUnavailable(commandName));
   const recordsStep = annotations?.readOnly !== true && annotations?.metaHistory !== true;
   if (!recordsStep || ctx.stepKey !== undefined) {
     // Queries, history meta-commands, and executes nested inside a running step append nothing.

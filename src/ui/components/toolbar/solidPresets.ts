@@ -10,14 +10,7 @@ import type { CadDocument, Vec3 } from '@core/model/types';
 import { rotatedEntityBounds } from '@core/geometry/rotatedBounds';
 import type { IconName } from '@ui/components/Icon';
 
-type SolidCommand =
-  | 'add_box'
-  | 'add_cylinder'
-  | 'add_sphere'
-  | 'add_cone'
-  | 'add_torus'
-  | 'add_wedge'
-  | 'add_pyramid';
+type SolidCommand = 'add_box' | 'add_cylinder' | 'add_sphere' | 'add_cone' | 'add_torus' | 'add_wedge' | 'add_pyramid';
 
 export interface SolidPreset {
   /** Registry command name. */
@@ -86,9 +79,7 @@ function footprints(document: CadDocument): Footprint[] {
 
 function slotIsFree(x: number, y: number, occupied: readonly Footprint[]): boolean {
   const half = DEFAULT_HALF_WIDTH + PLACEMENT_GAP / 2;
-  return occupied.every(
-    (f) => x + half <= f.minX || x - half >= f.maxX || y + half <= f.minY || y - half >= f.maxY,
-  );
+  return occupied.every((f) => x + half <= f.minX || x - half >= f.maxX || y + half <= f.minY || y - half >= f.maxY);
 }
 
 /** Slots of ring `ring` (Chebyshev distance from the origin cell), nearest first. */

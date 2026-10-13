@@ -61,18 +61,13 @@ function solveCase(system: FrameSystem, factors: LoadFactors, sway: number): Fra
 
 /** Relative horizontal displacement over a storey piece, mm. */
 export const driftOf = (result: FrameResult, piece: StoreyPiece): number =>
-  Math.abs(
-    (result.displacements[piece.top]?.[0] ?? 0) - (result.displacements[piece.bottom]?.[0] ?? 0),
-  );
+  Math.abs((result.displacements[piece.top]?.[0] ?? 0) - (result.displacements[piece.bottom]?.[0] ?? 0));
 
 /**
  * @param notionalFactor φ of the equivalent horizontal forces
  * @returns null when the frame is a mechanism (some case cannot be solved)
  */
-export function solveFrameSystem(
-  system: FrameSystem,
-  notionalFactor: number,
-): FrameSolutions | null {
+export function solveFrameSystem(system: FrameSystem, notionalFactor: number): FrameSolutions | null {
   const cases = [
     solveCase(system, ULS, notionalFactor),
     solveCase(system, ULS, -notionalFactor),
@@ -90,13 +85,9 @@ export function solveFrameSystem(
     const to = layout.nodes.indexOf(piece.top);
     const compression = Math.max(
       0,
-      ...layout.members
-        .slice(from, to)
-        .flatMap((index) => (ulsPlus.members[index]?.axial ?? []).map((axial) => -axial)),
+      ...layout.members.slice(from, to).flatMap((index) => (ulsPlus.members[index]?.axial ?? []).map((axial) => -axial)),
     );
-    return [
-      { id: piece.columnId, height: piece.height, compression, drift: driftOf(horne, piece) },
-    ];
+    return [{ id: piece.columnId, height: piece.height, compression, drift: driftOf(horne, piece) }];
   });
   const { alpha: alphaCritical, id: criticalColumn } = horneAlphaCritical(storeys);
   return {

@@ -23,10 +23,7 @@ interface PlanDepth {
 }
 
 /** @pure */
-export function computePlanDepth(
-  order: ReadonlyArray<EntityId>,
-  entities: Readonly<Record<EntityId, Entity>>,
-): PlanDepth {
+export function computePlanDepth(order: ReadonlyArray<EntityId>, entities: Readonly<Record<EntityId, Entity>>): PlanDepth {
   let top = 0;
   let bottom = 0;
   for (const id of order) {

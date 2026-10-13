@@ -21,13 +21,7 @@ import { mapStringLeaves } from '../history/regenerate';
 type Vars = Record<string, number>;
 
 /** Runs the actions of one loop body; true when the run must abort. */
-function runBody(
-  run: PlanRun,
-  index: number,
-  items: ActionItem[],
-  path: string,
-  vars: Vars,
-): boolean {
+function runBody(run: PlanRun, index: number, items: ActionItem[], path: string, vars: Vars): boolean {
   for (let j = 0; j < items.length; j++) {
     const item = items[j] as ActionItem;
     const itemPath = `${path} › step ${j}`;
@@ -53,8 +47,7 @@ function runItem(run: PlanRun, index: number, item: ActionItem, path: string, va
   let alias: string | undefined;
   if (item.as !== undefined) {
     const filled = interpolate(item.as, env);
-    if (filled.error !== null)
-      return failStep(run, index, item.command, `${path}: ${filled.error}`, path);
+    if (filled.error !== null) return failStep(run, index, item.command, `${path}: ${filled.error}`, path);
     alias = filled.text;
   }
   const r = execStep(run, index, item.command, item.params ?? {}, run.bindings, env, path, path);
@@ -66,23 +59,11 @@ function runItem(run: PlanRun, index: number, item: ActionItem, path: string, va
 }
 
 /** Expands one loop (header evaluated now, over the current document); true when the run must abort. */
-function runLoopNode(
-  run: PlanRun,
-  index: number,
-  node: LoopNode,
-  path: string,
-  vars: Vars,
-): boolean {
+function runLoopNode(run: PlanRun, index: number, node: LoopNode, path: string, vars: Vars): boolean {
   const header = resolveLoopHeader(node, buildEnv(run.current, vars));
   if (header.error !== null) return failStep(run, index, 'loop', `${path}: ${header.error}`, path);
   if (run.loopIterations + header.values.length > MAX_LOOP_ITERATIONS) {
-    return failStep(
-      run,
-      index,
-      'loop',
-      `${path}: loops expand to more than MAX_LOOP_ITERATIONS (${MAX_LOOP_ITERATIONS}) iterations`,
-      path,
-    );
+    return failStep(run, index, 'loop', `${path}: loops expand to more than MAX_LOOP_ITERATIONS (${MAX_LOOP_ITERATIONS}) iterations`, path);
   }
   run.loopIterations += header.values.length;
   for (let k = 0; k < header.values.length; k++) {

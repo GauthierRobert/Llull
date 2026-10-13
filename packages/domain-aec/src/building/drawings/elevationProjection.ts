@@ -68,17 +68,13 @@ export function buildElevationDrawing(
     return category !== null && excluded.has(category) ? [] : [entity];
   });
   const cutDepth = options.cutAt !== undefined ? projection.sign * options.cutAt : undefined;
-  const primitives = technicalView(doc, solids, { frame, cutDepth }).flatMap(
-    ({ entityId, primitives: drawn }) => {
-      const steel = isSteel(categoryOf(doc.entities[entityId]?.tags));
-      return drawn.flatMap((primitive): DrawingPrimitive[] => {
-        if (primitive.style === 'hidden') return [];
-        return steel && primitive.type === 'polygon' && primitive.fill === 'hatch'
-          ? [{ ...primitive, fill: 'solid' }]
-          : [primitive];
-      });
-    },
-  );
+  const primitives = technicalView(doc, solids, { frame, cutDepth }).flatMap(({ entityId, primitives: drawn }) => {
+    const steel = isSteel(categoryOf(doc.entities[entityId]?.tags));
+    return drawn.flatMap((primitive): DrawingPrimitive[] => {
+      if (primitive.style === 'hidden') return [];
+      return steel && primitive.type === 'polygon' && primitive.fill === 'hatch' ? [{ ...primitive, fill: 'solid' }] : [primitive];
+    });
+  });
   if (primitives.length === 0) return null;
   return { primitives, bounds: drawingBounds(primitives), projection };
 }

@@ -96,10 +96,7 @@ const GLYPH_VERTICES: Record<SnapType, Vec2[]> = {
     [-HALF * 0.1, HALF * 0.4],
   ],
   // Small dot inside a larger ring.
-  nearest: [
-    ...ellipseOutline(0, 0, HALF, HALF, 10),
-    ...ellipseOutline(0, 0, HALF * 0.3, HALF * 0.3, 4),
-  ],
+  nearest: [...ellipseOutline(0, 0, HALF, HALF, 10), ...ellipseOutline(0, 0, HALF * 0.3, HALF * 0.3, 4)],
   grid: [
     [-HALF, 0],
     [HALF, 0],
@@ -162,13 +159,7 @@ export function SnapIndicator({ zoom }: SnapIndicatorProps): React.ReactElement 
         }}
       />
       {snapResult?.snapped && snapResult.type !== null && (
-        <SnapGlyph
-          key={snapResult.type}
-          snapType={snapResult.type}
-          x={snapResult.x}
-          y={snapResult.y}
-          zoom={zoom}
-        />
+        <SnapGlyph key={snapResult.type} snapType={snapResult.type} x={snapResult.x} y={snapResult.y} zoom={zoom} />
       )}
     </>
   );

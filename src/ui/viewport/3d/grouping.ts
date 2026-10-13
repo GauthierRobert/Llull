@@ -77,10 +77,7 @@ export function isBatchable(entity: Entity): boolean {
  *
  * @pure
  */
-export function groupEntitiesForInstancing(
-  entities: Entity[],
-  materials: Record<string, Material> = {},
-): Map<string, InstanceBatch> {
+export function groupEntitiesForInstancing(entities: Entity[], materials: Record<string, Material> = {}): Map<string, InstanceBatch> {
   const map = new Map<string, InstanceBatch>();
 
   for (const entity of entities) {
@@ -120,9 +117,6 @@ export function groupEntitiesForInstancing(
  *
  * @pure
  */
-export function entityIdFromInstanceId(
-  batch: InstanceBatch,
-  instanceId: number,
-): EntityId | undefined {
+export function entityIdFromInstanceId(batch: InstanceBatch, instanceId: number): EntityId | undefined {
   return batch.entities[instanceId]?.id;
 }

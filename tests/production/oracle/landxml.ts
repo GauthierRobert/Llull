@@ -15,8 +15,7 @@ export interface LandXmlSummary {
   pipes: { name: string; slope: number; diameterMm: number }[];
 }
 
-const attribute = (tag: string, name: string): string =>
-  new RegExp(`\\b${name}="([^"]*)"`).exec(tag)?.[1] ?? '';
+const attribute = (tag: string, name: string): string => new RegExp(`\\b${name}="([^"]*)"`).exec(tag)?.[1] ?? '';
 
 /** Tag-balance check: every start tag closed by its matching end tag, a single root element. */
 function wellFormedness(xml: string): string[] {
@@ -45,9 +44,7 @@ function wellFormedness(xml: string): string[] {
 }
 
 function blocks(xml: string, tag: string): string[] {
-  return [...xml.matchAll(new RegExp(`<${tag}\\b[^>]*>[\\s\\S]*?</${tag}>`, 'g'))].map(
-    (match) => match[0],
-  );
+  return [...xml.matchAll(new RegExp(`<${tag}\\b[^>]*>[\\s\\S]*?</${tag}>`, 'g'))].map((match) => match[0]);
 }
 
 export function parseLandXml(xml: string): LandXmlSummary {

@@ -34,24 +34,17 @@ export const setSuperelevation = defineCommand({
     'crossfall is raised to the crossfall. Corridor, cross sections, volumes and alignment_report follow.',
   params: z.object({
     alignmentId: alignmentIdParam,
-    maxRate: z
-      .number()
-      .describe('Full superelevation rate on curves, ratio 0..0.15 (0.07 = 7 %). 0 removes it.'),
+    maxRate: z.number().describe('Full superelevation rate on curves, ratio 0..0.15 (0.07 = 7 %). 0 removes it.'),
     runoffLength: z
       .number()
       .optional()
-      .describe(
-        'Runoff length per curve end, document units (> 0). Default: spiral length or 0.5 % gradient.',
-      ),
+      .describe('Runoff length per curve end, document units (> 0). Default: spiral length or 0.5 % gradient.'),
   }),
   run: (doc, { alignmentId, maxRate, runoffLength }): CommandResult => {
     const alignment = civilObjectOrNoop(doc, alignmentId, 'alignment', 'set_superelevation');
     if ('summary' in alignment) return alignment;
     if (!Number.isFinite(maxRate) || maxRate < 0 || maxRate > MAX_SUPERELEVATION_RATE) {
-      return noop(
-        doc,
-        `set_superelevation failed: maxRate must be between 0 and ${MAX_SUPERELEVATION_RATE}.`,
-      );
+      return noop(doc, `set_superelevation failed: maxRate must be between 0 and ${MAX_SUPERELEVATION_RATE}.`);
     }
     if (runoffLength !== undefined && !(runoffLength > 0 && Number.isFinite(runoffLength)))
       return noop(doc, 'set_superelevation failed: runoffLength must be > 0.');
@@ -70,11 +63,6 @@ export const setSuperelevation = defineCommand({
         ? `Removed superelevation (was ${((previous?.maxRate ?? 0) * 100).toFixed(2)} %)`
         : `Set superelevation ${(maxRate * 100).toFixed(2)} %` +
           (runoffLength !== undefined ? `, runoff ${toMetresText(doc, runoffLength)} m` : '');
-    return commitCivil(
-      doc,
-      withObject(getCivil(doc), updated),
-      [alignment.id],
-      `${text} on ${alignment.name} (${alignment.id}).`,
-    );
+    return commitCivil(doc, withObject(getCivil(doc), updated), [alignment.id], `${text} on ${alignment.name} (${alignment.id}).`);
   },
 });

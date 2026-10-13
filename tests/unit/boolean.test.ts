@@ -286,15 +286,12 @@ describe('boolean commands', () => {
   // Purity
 
   describe('purity', () => {
-    it.each(['union', 'subtract', 'intersect'])(
-      'is pure — input document is not mutated by boolean %s',
-      (op) => {
-        const { doc, idA, idB } = docWithTwoBoxes();
-        const snapshot = JSON.stringify(doc);
-        execute(doc, 'boolean', { op, a: idA, b: idB });
-        expect(JSON.stringify(doc)).toBe(snapshot);
-      },
-    );
+    it.each(['union', 'subtract', 'intersect'])('is pure — input document is not mutated by boolean %s', (op) => {
+      const { doc, idA, idB } = docWithTwoBoxes();
+      const snapshot = JSON.stringify(doc);
+      execute(doc, 'boolean', { op, a: idA, b: idB });
+      expect(JSON.stringify(doc)).toBe(snapshot);
+    });
   });
 
   // Kernel injection round-trip

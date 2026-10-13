@@ -9,8 +9,5 @@ const NO_LEVELS: ReadonlyArray<BuildingLevel> = [];
 
 export function useBuildingLevels(): ReadonlyArray<BuildingLevel> {
   const building = useStore((s) => s.document.building);
-  return useMemo(
-    () => (building ? orderedValues(building.levelOrder, building.levels) : NO_LEVELS),
-    [building],
-  );
+  return useMemo(() => (building ? orderedValues(building.levelOrder, building.levels) : NO_LEVELS), [building]);
 }

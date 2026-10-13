@@ -11,26 +11,18 @@ interface SchemaNode {
 /** Every object parameter with named properties, as `command.path`. */
 function objectParams(name: string, path: string, node: SchemaNode): Array<[string, SchemaNode]> {
   const own: Array<[string, SchemaNode]> =
-    node.type === 'object' && node.properties && Object.keys(node.properties).length > 0
-      ? [[`${name}${path}`, node]]
-      : [];
-  const children = Object.entries(node.properties ?? {}).flatMap(([key, child]) =>
-    objectParams(name, `${path}.${key}`, child),
-  );
+    node.type === 'object' && node.properties && Object.keys(node.properties).length > 0 ? [[`${name}${path}`, node]] : [];
+  const children = Object.entries(node.properties ?? {}).flatMap(([key, child]) => objectParams(name, `${path}.${key}`, child));
   const items = node.items ? objectParams(name, `${path}[]`, node.items) : [];
   return [...own, ...children, ...items];
 }
 
 describe('nested parameter schemas', () => {
-  const all = listCommands().flatMap((command) =>
-    objectParams(command.name, '', command.paramsSchema as unknown as SchemaNode),
-  );
+  const all = listCommands().flatMap((command) => objectParams(command.name, '', command.paramsSchema as unknown as SchemaNode));
 
   it('declare the required fields of every object parameter (patch objects are all-optional)', () => {
     const missing = all
-      .filter(([path, node]) =>
-        path.includes('.') || path.includes('[]') ? !node.required : false,
-      )
+      .filter(([path, node]) => (path.includes('.') || path.includes('[]') ? !node.required : false))
       .map(([path]) => path)
       .filter((path) => !/\.patch$/.test(path));
     expect(missing).toEqual([]);

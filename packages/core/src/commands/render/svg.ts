@@ -12,28 +12,17 @@ export function r2(n: number): number {
 export const DEFAULT_BACKGROUND = '#1a1a2e';
 
 /** Wrap `layers` in a `width`×`height` SVG with `background` (a CSS color; `null` for none). */
-export function svgDocument(
-  width: number,
-  height: number,
-  layers: string[],
-  background: string | null = DEFAULT_BACKGROUND,
-): string {
+export function svgDocument(width: number, height: number, layers: string[], background: string | null = DEFAULT_BACKGROUND): string {
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
-    ...(background === null
-      ? []
-      : [`  <rect width="${width}" height="${height}" fill="${background}"/>`]),
+    ...(background === null ? [] : [`  <rect width="${width}" height="${height}" fill="${background}"/>`]),
     ...layers,
     '</svg>',
   ].join('\n');
 }
 
 /** `<line>` between two screen points (coordinates rounded to 2 decimals); `attributes` is appended as is. */
-export function svgLine(
-  from: readonly [number, number],
-  to: readonly [number, number],
-  attributes = '',
-): string {
+export function svgLine(from: readonly [number, number], to: readonly [number, number], attributes = ''): string {
   const extra = attributes === '' ? '' : ` ${attributes}`;
   return `<line x1="${r2(from[0])}" y1="${r2(from[1])}" x2="${r2(to[0])}" y2="${r2(to[1])}"${extra}/>`;
 }
@@ -85,8 +74,7 @@ const HATCH_PATTERN =
 function lighten(color: string): string {
   const hex = color.replace('#', '');
   if (!/^[0-9a-fA-F]{6}$/.test(hex)) return color;
-  const channel = (i: number): number =>
-    Math.round(parseInt(hex.substring(i, i + 2), 16) * 0.55 + 255 * 0.45);
+  const channel = (i: number): number => Math.round(parseInt(hex.substring(i, i + 2), 16) * 0.55 + 255 * 0.45);
   return `rgb(${channel(0)},${channel(2)},${channel(4)})`;
 }
 
@@ -98,8 +86,7 @@ const screenPoints = (verts: readonly Vec3[], project: Projector, separator: str
     })
     .join(separator);
 
-const screenPath = (loop: readonly Vec3[], project: Projector): string =>
-  `M${screenPoints(loop, project, 'L')}Z`;
+const screenPath = (loop: readonly Vec3[], project: Projector): string => `M${screenPoints(loop, project, 'L')}Z`;
 
 /** Section cap: flat light fill with a dark outline and a diagonal hatch on top. */
 function capSvg(loops: readonly Vec3[][], color: string, project: Projector): string {
@@ -137,8 +124,7 @@ function buildGroundGrid(project: Projector, target: Vec3, orthoHalf: number): s
   const step = (orthoHalf * 2) / GRID_LINES;
   const [cx, cy] = target;
   const at = (x: number, y: number): [number, number] => project([cx + x, cy + y, 0]);
-  const gridLine = (a: [number, number], b: [number, number]): string =>
-    svgLine(a, b, 'stroke="#333355" stroke-width="0.5"');
+  const gridLine = (a: [number, number], b: [number, number]): string => svgLine(a, b, 'stroke="#333355" stroke-width="0.5"');
   const parts: string[] = [];
   for (let i = 0; i <= GRID_LINES; i++) {
     const offset = -orthoHalf + step * i;
@@ -149,13 +135,7 @@ function buildGroundGrid(project: Projector, target: Vec3, orthoHalf: number): s
 }
 
 /** Small RGB axis triad at the bottom-left corner. */
-function buildAxisTriad(
-  project: Projector,
-  origin: Vec3,
-  width: number,
-  height: number,
-  orthoHalf: number,
-): string {
+function buildAxisTriad(project: Projector, origin: Vec3, width: number, height: number, orthoHalf: number): string {
   const armLen = orthoHalf * 0.15;
   const axes: [Vec3, string, string][] = [
     [add3(origin, scale3([1, 0, 0], armLen)), '#ff4444', 'X'],
@@ -175,9 +155,7 @@ function buildAxisTriad(
     const tx = r2(triadX + ((tsx - osx) / (width / 2)) * triadScale);
     const ty = r2(triadY + ((tsy - osy) / (height / 2)) * triadScale);
     parts.push(svgLine([triadX, triadY], [tx, ty], `stroke="${color}" stroke-width="2"`));
-    parts.push(
-      `<text x="${tx}" y="${ty}" font-family="monospace" font-size="10" fill="${color}">${label}</text>`,
-    );
+    parts.push(`<text x="${tx}" y="${ty}" font-family="monospace" font-size="10" fill="${color}">${label}</text>`);
   }
   return `  <g id="axis-triad">${parts.join('')}</g>`;
 }

@@ -34,11 +34,7 @@ async function drive(scenario: Scenario): Promise<{ calls: number; ms: number }>
   const session = await openSession(`production-scripted-${scenario.id}`);
   const started = Date.now();
   try {
-    const toolsets = new Set(
-      scenario.script
-        .map((call) => toolsetOf(call.tool))
-        .filter((t) => t !== undefined && t !== 'core'),
-    );
+    const toolsets = new Set(scenario.script.map((call) => toolsetOf(call.tool)).filter((t) => t !== undefined && t !== 'core'));
     for (const toolset of toolsets) {
       const enabled = await session.call('enable_toolset', { toolset });
       expect(enabled.isError, enabled.text).toBe(false);
@@ -111,9 +107,7 @@ describe('AI-agent loop plumbing (stub model)', () => {
     let deferred = 0;
     const send: SendTurn = (params) => {
       seenTools = params.tools?.length ?? 0;
-      deferred = (params.tools ?? []).filter(
-        (t) => 'defer_loading' in t && t.defer_loading === true,
-      ).length;
+      deferred = (params.tools ?? []).filter((t) => 'defer_loading' in t && t.defer_loading === true).length;
       const batch = pending.splice(0, pending.length > scenario.script.length ? 1 : 25);
       const content = batch.map((call, index) => ({
         type: 'tool_use' as const,
@@ -121,15 +115,9 @@ describe('AI-agent loop plumbing (stub model)', () => {
         name: call.tool,
         input: call.args,
       }));
-      return Promise.resolve(
-        stubMessage(content.length > 0 ? content : [{ type: 'text', text: 'Done.' }]),
-      );
+      return Promise.resolve(stubMessage(content.length > 0 ? content : [{ type: 'text', text: 'Done.' }]));
     };
-    const run = await runAgent(
-      scenario.brief,
-      { model: 'stub', effort: 'high', maxTurns: 50, maxUsd: 1 },
-      send,
-    );
+    const run = await runAgent(scenario.brief, { model: 'stub', effort: 'high', maxTurns: 50, maxUsd: 1 }, send);
     expect(seenTools).toBeGreaterThan(100);
     expect(deferred).toBeGreaterThan(0);
     expect(run.transcript[0]?.isError).toBe(true);
@@ -173,21 +161,14 @@ describe('AI-agent cost estimate and budget cap (stub model)', () => {
       };
       return Promise.resolve(stubMessage([probe], { input: 500_000, output: 50_000 }));
     };
-    const run = await runAgent(
-      'Budget probe.',
-      { model: 'claude-opus-5-5', effort: 'high', maxTurns: 50, maxUsd: 5 },
-      send,
-    );
+    const run = await runAgent('Budget probe.', { model: 'claude-opus-5-5', effort: 'high', maxTurns: 50, maxUsd: 5 }, send);
     expect(run.stopReason).toMatch(/^budget/);
     expect(turns).toBe(2); // 3 USD per turn: the second turn crosses 5 USD
     expect(run.estimatedUsd).toBeCloseTo(6, 6);
   });
 });
 
-function stubMessage(
-  content: unknown[],
-  tokens: { input: number; output: number } = { input: 0, output: 0 },
-): Anthropic.Beta.BetaMessage {
+function stubMessage(content: unknown[], tokens: { input: number; output: number } = { input: 0, output: 0 }): Anthropic.Beta.BetaMessage {
   const toolUse = content.some((block) => (block as { type: string }).type === 'tool_use');
   return {
     id: 'msg_stub',

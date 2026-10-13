@@ -35,11 +35,7 @@ describe('retired core draw commands', () => {
       { name: 'draw_circle', params: { center: [0, 0], radius: 2 } },
       { name: 'extrude_sketch', params: { id: 'circ-2.1', depth: 3 } },
     ]);
-    expect(loaded.featureHistory.map((step) => step.name)).toEqual([
-      'draw_polyline',
-      'draw_arc',
-      'extrude_profile',
-    ]);
+    expect(loaded.featureHistory.map((step) => step.name)).toEqual(['draw_polyline', 'draw_arc', 'extrude_profile']);
     expect(loaded.featureHistory[0]?.params).toEqual({
       points: [
         [0, 0],

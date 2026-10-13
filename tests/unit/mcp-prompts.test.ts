@@ -76,9 +76,7 @@ describe('getMcpPrompt() — unknown name', () => {
 
 describe('getMcpPrompt("model_bracket")', () => {
   it('returns a non-null result', () => {
-    expect(
-      getMcpPrompt('model_bracket', { width: '80', height: '40', thickness: '6' }),
-    ).not.toBeNull();
+    expect(getMcpPrompt('model_bracket', { width: '80', height: '40', thickness: '6' })).not.toBeNull();
   });
 
   it('result has a non-empty description', () => {
@@ -290,8 +288,7 @@ describe('getMcpPrompt() — content type invariants', () => {
 /** Extract the first ```json ... ``` block from a string and parse it. */
 function extractJsonBlock(text: string): unknown {
   const match = /```json\s*([\s\S]*?)```/.exec(text);
-  if (!match || match[1] === undefined)
-    throw new Error('No ```json block found in assistant message');
+  if (!match || match[1] === undefined) throw new Error('No ```json block found in assistant message');
   // Strip JS-style line comments (// ...) before parsing — templates may include them.
   const stripped = match[1].replace(/\/\/[^\n]*/g, '');
   return JSON.parse(stripped) as unknown;

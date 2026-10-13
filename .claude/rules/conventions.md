@@ -31,7 +31,7 @@ imports. Aliases are defined once, in `tsconfig.base.json` (extended by `tsconfi
 
 ## C5 — Formatting
 
-Prettier: semicolons, single quotes, trailing commas `all`, printWidth 100, tabWidth 2. A
+Prettier: semicolons, single quotes, trailing commas `all`, printWidth 140, tabWidth 2. A
 PostToolUse hook formats each edited file; never hand-format or fight it.
 
 ## C6 — Files & design

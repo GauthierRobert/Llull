@@ -35,10 +35,7 @@ export function autoSupportArcs(
   const chosen: number[] = [...existing];
   const add = (arc: number): void => {
     const clamped = clamp(arc, 0, length);
-    if (
-      isPlaceable(run, clamped) &&
-      chosen.every((other) => Math.abs(other - clamped) >= SAME_SUPPORT_DISTANCE)
-    ) {
+    if (isPlaceable(run, clamped) && chosen.every((other) => Math.abs(other - clamped) >= SAME_SUPPORT_DISTANCE)) {
       chosen.push(clamped);
     }
   };

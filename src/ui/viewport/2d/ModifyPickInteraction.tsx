@@ -26,12 +26,7 @@ interface ModifyPickInteractionProps {
   onEntityPick: (entityId: string, worldPoint: Vec2, entityPoints?: ReadonlyArray<Vec2>) => void;
 }
 
-export function ModifyPickInteraction({
-  activeTool,
-  phase,
-  zoom,
-  onEntityPick,
-}: ModifyPickInteractionProps): React.ReactElement | null {
+export function ModifyPickInteraction({ activeTool, phase, zoom, onEntityPick }: ModifyPickInteractionProps): React.ReactElement | null {
   const invalidate = useThree((s) => s.invalidate);
 
   // Don't intercept events when no modify tool is active or we're in value-entry phase.
@@ -55,11 +50,7 @@ export function ModifyPickInteraction({
         if (bestId === null) return;
 
         const bestEntity = document.entities[bestId];
-        onEntityPick(
-          bestId,
-          worldPick,
-          bestEntity?.kind === 'polyline' ? bestEntity.points : undefined,
-        );
+        onEntityPick(bestId, worldPick, bestEntity?.kind === 'polyline' ? bestEntity.points : undefined);
       }}
     />
   );

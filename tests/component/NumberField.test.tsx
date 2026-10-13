@@ -31,9 +31,7 @@ describe('NumberField', () => {
   });
 
   it('adopts an external value change but leaves equivalent typed text alone', () => {
-    const { rerender } = render(
-      <NumberField aria-label="amount" value={1} onValueChange={() => undefined} />,
-    );
+    const { rerender } = render(<NumberField aria-label="amount" value={1} onValueChange={() => undefined} />);
     fireEvent.change(field(), { target: { value: '1e-3' } });
     rerender(<NumberField aria-label="amount" value={0.001} onValueChange={() => undefined} />);
     expect(field().value).toBe('1e-3');

@@ -18,10 +18,7 @@ export function fileStem(fileName: string): string {
 }
 
 /** Reads the first chosen file as text, then hands it to `onText` (clears the input like `takeChosenFile`). */
-export function readChosenFile(
-  event: React.ChangeEvent<HTMLInputElement>,
-  onText: (text: string, fileName: string) => void,
-): void {
+export function readChosenFile(event: React.ChangeEvent<HTMLInputElement>, onText: (text: string, fileName: string) => void): void {
   const file = takeChosenFile(event);
   if (!file) return;
   file

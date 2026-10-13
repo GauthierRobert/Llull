@@ -35,8 +35,7 @@ function uint32(bytes: Uint8Array, at: number): number {
 /** [width, height] from the IHDR chunk that must follow the 8-byte signature. */
 function pngSize(bytes: Uint8Array): readonly [number, number] | null {
   const signed = PNG_SIGNATURE.every((byte, i) => bytes[i] === byte);
-  if (!signed || bytes.length < 24 || String.fromCharCode(...bytes.slice(12, 16)) !== 'IHDR')
-    return null;
+  if (!signed || bytes.length < 24 || String.fromCharCode(...bytes.slice(12, 16)) !== 'IHDR') return null;
   return [uint32(bytes, 16), uint32(bytes, 20)];
 }
 
@@ -76,15 +75,13 @@ function jpegSize(bytes: Uint8Array): readonly [number, number] | null {
  */
 export function parseImageDataUrl(dataUrl: string): ParsedImageDataUrl {
   const header = DATA_URL_PATTERN.exec(dataUrl);
-  if (header === null)
-    return fail('dataUrl must start with "data:image/png;base64," or "data:image/jpeg;base64,"');
+  if (header === null) return fail('dataUrl must start with "data:image/png;base64," or "data:image/jpeg;base64,"');
   const bytes = base64ToUint8Array(dataUrl.slice(header[0].length));
   if (bytes === null) return fail('dataUrl payload is not valid base64');
   const mime: RasterMime = header[1] === 'image/png' ? 'image/png' : 'image/jpeg';
   const size = mime === 'image/png' ? pngSize(bytes) : jpegSize(bytes);
   if (size === null) return fail(`dataUrl payload is not a readable ${mime} file`);
   const [pixelWidth, pixelHeight] = size;
-  if (pixelWidth <= 0 || pixelHeight <= 0)
-    return fail(`image has a zero pixel size (${pixelWidth}×${pixelHeight})`);
+  if (pixelWidth <= 0 || pixelHeight <= 0) return fail(`image has a zero pixel size (${pixelWidth}×${pixelHeight})`);
   return { ok: true, mime, pixelWidth, pixelHeight };
 }

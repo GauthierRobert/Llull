@@ -9,13 +9,7 @@ import React, { useMemo, useState } from 'react';
 import { useStore } from '@ui/store';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { ELEMENT_TOOLS } from './elementTools';
-import {
-  defaultValues,
-  isFieldShown,
-  type ElementListKind,
-  type ElementTool,
-  type ToolField,
-} from './elementToolForm';
+import { defaultValues, isFieldShown, type ElementListKind, type ElementTool, type ToolField } from './elementToolForm';
 import { CommandForm } from '@ui/panels/CommandForm';
 import { LabeledInput } from '@ui/panels/LabeledInput';
 import { LabeledSelect } from '@ui/panels/LabeledSelect';
@@ -26,9 +20,7 @@ import { gridExtent } from './gridExtent';
 import { elementOptions, type ElementOptions } from './elementOptions';
 
 const ALL_TOOLS: ReadonlyArray<ElementTool> = [...ELEMENT_TOOLS, ...INDUSTRIAL_TOOLS];
-const TOOL_GROUPS: ReadonlyArray<string> = [
-  ...new Set(ALL_TOOLS.map((tool) => tool.group ?? 'Building')),
-];
+const TOOL_GROUPS: ReadonlyArray<string> = [...new Set(ALL_TOOLS.map((tool) => tool.group ?? 'Building'))];
 
 /** Label of the blank first option of a live list. */
 function blankOptionLabel(listKind: ElementListKind, listLength: number): string {
@@ -71,9 +63,7 @@ function FieldInput({ field, value, lists, units, onChange }: FieldInputProps): 
         label={fieldLabel}
         value={value}
         options={options}
-        {...(listKind !== null
-          ? { blankLabel: field.blankLabel ?? blankOptionLabel(listKind, lists[listKind].length) }
-          : {})}
+        {...(listKind !== null ? { blankLabel: field.blankLabel ?? blankOptionLabel(listKind, lists[listKind].length) } : {})}
         testId={testId}
         onChange={(chosen) => onChange(field.key, chosen)}
       />
@@ -126,14 +116,7 @@ function ToolForm({ tool }: ToolFormProps): React.ReactElement {
       {tool.fields
         .filter((field) => isFieldShown(field, values))
         .map((field) => (
-          <FieldInput
-            key={field.key}
-            field={field}
-            value={values[field.key] ?? ''}
-            lists={lists}
-            units={units}
-            onChange={change}
-          />
+          <FieldInput key={field.key} field={field} value={values[field.key] ?? ''} lists={lists} units={units} onChange={change} />
         ))}
     </CommandForm>
   );
@@ -160,13 +143,11 @@ export function ElementToolsSection(): React.ReactElement {
         >
           {TOOL_GROUPS.map((group) => (
             <optgroup key={group} label={group}>
-              {ALL_TOOLS.filter((candidate) => (candidate.group ?? 'Building') === group).map(
-                (candidate) => (
-                  <option key={candidate.id} value={candidate.id}>
-                    {candidate.label}
-                  </option>
-                ),
-              )}
+              {ALL_TOOLS.filter((candidate) => (candidate.group ?? 'Building') === group).map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.label}
+                </option>
+              ))}
             </optgroup>
           ))}
         </select>

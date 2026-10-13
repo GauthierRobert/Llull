@@ -31,10 +31,7 @@ export function BuildingExportsSection(): React.ReactElement {
   const [cutAt, setCutAt] = useState('');
   const [hideCladding, setHideCladding] = useState(false);
   const [levelChoice, setLevelChoice] = useState('');
-  const levelParams =
-    levelChoice !== '' && levels.some((level) => level.id === levelChoice)
-      ? { levelId: levelChoice }
-      : {};
+  const levelParams = levelChoice !== '' && levels.some((level) => level.id === levelChoice) ? { levelId: levelChoice } : {};
   const scaleParams = scale === 'auto' ? {} : { scale: Number(scale) };
 
   const exportNcFiles = (): void => {
@@ -90,13 +87,7 @@ export function BuildingExportsSection(): React.ReactElement {
         />
       </div>
       <div className="building-inline-form">
-        <OptionSelect
-          value={direction}
-          options={DIRECTIONS}
-          label="Elevation direction"
-          optionLabel={capitalize}
-          onChange={setDirection}
-        />
+        <OptionSelect value={direction} options={DIRECTIONS} label="Elevation direction" optionLabel={capitalize} onChange={setDirection} />
         <input
           type="number"
           value={cutAt}
@@ -105,11 +96,7 @@ export function BuildingExportsSection(): React.ReactElement {
           aria-label="Section cut position"
         />
         <label className="field">
-          <input
-            type="checkbox"
-            checked={hideCladding}
-            onChange={(event) => setHideCladding(event.target.checked)}
-          />
+          <input type="checkbox" checked={hideCladding} onChange={(event) => setHideCladding(event.target.checked)} />
           <span>Hide cladding</span>
         </label>
         <QueryDownloadButton

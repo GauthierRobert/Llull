@@ -104,13 +104,7 @@ export function rasterizeText(
       const glyph = GLYPHS[chars[Math.floor((ix - 1) / CELL_W)] ?? ' '];
       const col = (ix - 1) % CELL_W;
       const row = iy - 1;
-      const on =
-        glyph !== undefined &&
-        ix >= 1 &&
-        col < 5 &&
-        row >= 0 &&
-        row < 7 &&
-        (((glyph[row] as number) >> (4 - col)) & 1) === 1;
+      const on = glyph !== undefined && ix >= 1 && col < 5 && row >= 0 && row < 7 && (((glyph[row] as number) >> (4 - col)) & 1) === 1;
       rgba.set(on ? fill : back, (y * width + x) * 4);
     }
   }

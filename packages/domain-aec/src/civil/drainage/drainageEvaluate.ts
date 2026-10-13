@@ -29,11 +29,7 @@ function axisPrismMesh(bottom: Vec3, top: Vec3, radius: number, sides: number): 
       const angle = (2 * Math.PI * i) / sides;
       const c = Math.cos(angle) * radius;
       const s = Math.sin(angle) * radius;
-      positions.push(
-        centre[0] + u[0] * c + v[0] * s,
-        centre[1] + u[1] * c + v[1] * s,
-        centre[2] + u[2] * c + v[2] * s,
-      );
+      positions.push(centre[0] + u[0] * c + v[0] * s, centre[1] + u[1] * c + v[1] * s, centre[2] + u[2] * c + v[2] * s);
     }
   }
   positions.push(...bottom, ...top);
@@ -55,13 +51,7 @@ export function evaluateManhole(context: CivilContext, manhole: ManholeObject): 
   const bottom: Vec3 = [x, y, manhole.invertElevation];
   const top: Vec3 = [x, y, manhole.rimElevation];
   return [
-    civilMesh(
-      manhole,
-      'body',
-      manhole.name,
-      'structures',
-      axisPrismMesh(bottom, top, radius, MANHOLE_SIDES),
-    ),
+    civilMesh(manhole, 'body', manhole.name, 'structures', axisPrismMesh(bottom, top, radius, MANHOLE_SIDES)),
     civilPolyline(
       manhole,
       'plan',

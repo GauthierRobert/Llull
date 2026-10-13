@@ -28,10 +28,7 @@ export interface ContactShadowPlane {
 }
 
 /** @pure @invariant bounds null -> the original fixed patch at the origin */
-export function computeContactShadowPlane(
-  bounds: Bounds | null,
-  renderOrigin: Vec3,
-): ContactShadowPlane {
+export function computeContactShadowPlane(bounds: Bounds | null, renderOrigin: Vec3): ContactShadowPlane {
   if (!bounds) return { position: [0, 0, -0.001], scale: DEFAULT_SCALE, far: DEFAULT_FAR };
   const extentX = bounds.max[0] - bounds.min[0];
   const extentY = bounds.max[1] - bounds.min[1];

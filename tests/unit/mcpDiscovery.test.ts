@@ -39,8 +39,7 @@ describe('search_tools summary hint', () => {
 });
 
 describe('search_tools on natural phrasing', () => {
-  const top = (query: string, count = 3): string[] =>
-    searchTools(query, count, new Set(parseToolsets('all').enabled)).map((r) => r.name);
+  const top = (query: string, count = 3): string[] => searchTools(query, count, new Set(parseToolsets('all').enabled)).map((r) => r.name);
 
   it.each([
     ['cut a hole', 'boolean'],
@@ -77,14 +76,10 @@ describe('search_tools', () => {
   });
 
   it('covers exchange tools and marks enabled state from the session set', () => {
-    const exchange = searchTools('export step', 5, coreOnly()).find(
-      (r) => r.name === 'export_step',
-    );
+    const exchange = searchTools('export step', 5, coreOnly()).find((r) => r.name === 'export_step');
     expect(exchange).toMatchObject({ toolset: 'exchange', enabled: false });
     const all = new Set(TOOLSET_NAMES);
-    expect(searchTools('export step', 5, all).find((r) => r.name === 'export_step')?.enabled).toBe(
-      true,
-    );
+    expect(searchTools('export step', 5, all).find((r) => r.name === 'export_step')?.enabled).toBe(true);
   });
 
   it('finds the discovery tools themselves as enabled core tools', () => {

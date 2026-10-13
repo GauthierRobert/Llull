@@ -1,12 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { type CadDocument, type Entity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import {
-  entityDistSq,
-  enclosingArea,
-  nearestEntityId,
-  pickEntityId,
-} from '@ui/viewport/2d/modifyHelpers';
+import { entityDistSq, enclosingArea, nearestEntityId, pickEntityId } from '@ui/viewport/2d/modifyHelpers';
 
 function run(doc: CadDocument, name: string, params: unknown): [CadDocument, string] {
   const result = execute(doc, name, params);

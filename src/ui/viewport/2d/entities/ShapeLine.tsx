@@ -45,8 +45,7 @@ export function ShapeLine({
 
   // Wrapper only: geometry and material are owned (and disposed) above.
   const object = useMemo(
-    () =>
-      segments ? new THREE.LineSegments(geometry, material) : new THREE.Line(geometry, material),
+    () => (segments ? new THREE.LineSegments(geometry, material) : new THREE.Line(geometry, material)),
     [geometry, material, segments],
   );
 

@@ -1,16 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import {
-  reconcilePipeSupports,
-  reconciliationNote,
-} from '@aec/industrial/piping/pipeSupportAttach';
+import { reconcilePipeSupports, reconciliationNote } from '@aec/industrial/piping/pipeSupportAttach';
 import { step } from './steelFixtures';
 import { shoeDoc, supportsOf } from './pipeSupportFixtures';
 
 /** shoeDoc + a shoe at the crossing of the pipe and the beam member-3 (SB1). */
-const supported = (): CadDocument =>
-  step(shoeDoc(), 'add_pipe_support', { pipeId: 'pipe-1', at: [[3000, 2000, 3027.15]] });
+const supported = (): CadDocument => step(shoeDoc(), 'add_pipe_support', { pipeId: 'pipe-1', at: [[3000, 2000, 3027.15]] });
 
 /** A second IPE300 beam on level-2 along Y at `x` (top of steel 2970, like member-3). */
 const secondBeam = (doc: CadDocument, x: number): CadDocument =>
@@ -24,9 +20,7 @@ const secondBeam = (doc: CadDocument, x: number): CadDocument =>
 
 const danglingMembers = (doc: CadDocument): string[] =>
   supportsOf(doc).flatMap((support) =>
-    support.memberId !== null && doc.building?.elements[support.memberId]?.category !== 'member'
-      ? [support.id]
-      : [],
+    support.memberId !== null && doc.building?.elements[support.memberId]?.category !== 'member' ? [support.id] : [],
   );
 
 describe('deleting the steel a support bears on', () => {
@@ -260,9 +254,7 @@ describe('reconcilePipeSupports', () => {
   it('changes nothing without a previous building or with nothing to re-check', () => {
     const doc = supported();
     const building = doc.building as NonNullable<CadDocument['building']>;
-    expect(reconcilePipeSupports({ ...doc, building: undefined as never }, building).building).toBe(
-      building,
-    );
+    expect(reconcilePipeSupports({ ...doc, building: undefined as never }, building).building).toBe(building);
     const result = reconcilePipeSupports(doc, building);
     expect(result.building).toBe(building);
     expect(reconciliationNote(result)).toBe('');

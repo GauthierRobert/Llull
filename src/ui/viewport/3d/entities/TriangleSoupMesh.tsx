@@ -18,10 +18,7 @@ interface TriangleSoupMeshProps<E extends BaseEntity> extends SolidMeshKindProps
   surface: SolidSurface;
 }
 
-export function TriangleSoupMesh<E extends BaseEntity>({
-  triangles,
-  ...shell
-}: TriangleSoupMeshProps<E>): React.ReactElement | null {
+export function TriangleSoupMesh<E extends BaseEntity>({ triangles, ...shell }: TriangleSoupMeshProps<E>): React.ReactElement | null {
   const geometry = useMemo(() => buildTriangleSoupGeometry(triangles), [triangles]);
   if (geometry === null) return null;
   return <SolidMeshShell geometry={geometry} {...shell} />;

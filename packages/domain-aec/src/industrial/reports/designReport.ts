@@ -60,11 +60,7 @@ export function designResult(
 }
 
 /** Tail of the changed-design summary: "Max utilisation now x[, n <noun> still failing][ (limited)].". */
-export function finalUtilisationText(
-  stats: UtilisationStats,
-  failingNoun: string,
-  limited: boolean,
-): string {
+export function finalUtilisationText(stats: UtilisationStats, failingNoun: string, limited: boolean): string {
   return (
     `Max utilisation now ${stats.maxUtilisation.toFixed(2)}` +
     `${stats.failures > 0 ? `, ${stats.failures} ${failingNoun} still failing` : ''}` +
