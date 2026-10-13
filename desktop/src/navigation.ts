@@ -20,3 +20,14 @@ export function navigationDecision(target: string, appOrigin: string): Navigatio
   if (origin === appOrigin) return 'app';
   return /^https?:$/i.test(new URL(target).protocol) ? 'external' : 'deny';
 }
+
+/**
+ * Web permissions (camera, geolocation, notifications, ...) the app window may receive. llull
+ * needs none beyond writing to the clipboard; everything else is denied instead of Electron's
+ * grant-all default.
+ */
+const ALLOWED_PERMISSIONS: ReadonlySet<string> = new Set(['clipboard-sanitized-write']);
+
+export function permissionAllowed(permission: string, requestingUrl: string, appOrigin: string): boolean {
+  return ALLOWED_PERMISSIONS.has(permission) && originOf(requestingUrl) === appOrigin;
+}

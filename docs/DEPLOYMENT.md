@@ -19,6 +19,15 @@ Set in a `.env` next to `docker-compose.yml`:
 | `LLULL_BIND`               | Host interface to publish (`127.0.0.1` default; use the proxy to expose) |
 | `LLULL_TOOLSETS`           | MCP toolsets per session (`core` default, `all`)                         |
 | `LLULL_LICENSE_PUBLIC_KEY` | Vendor public key PEM (see section 3)                                    |
+| `LLULL_TRUST_PROXY`        | Proxy hops trusted for the client IP (`1` default; per-client limits)    |
+
+Every other server variable (rate limits, session caps, timeouts, Python bridge, kernel) is listed
+in [server/README.md](../server/README.md#environment-variables).
+
+The image ships no Python/CadQuery (`LLULL_PYTHON=off`): STEP export/import and CadQuery code
+exchange answer "disabled". Use the desktop app for STEP, or extend the image with a CadQuery
+Python and set `LLULL_PYTHON`. Never build a public image with `VITE_LLULL_API_TOKEN`: it is baked
+into the JavaScript every visitor downloads.
 
 Without Docker: `npm ci && npm --prefix server ci && npm run build && npm --prefix server run build`,
 then `LLULL_STATIC_DIR=$PWD/dist HOST=0.0.0.0 LLULL_USERS_FILE=... node server/dist/index.js`.
@@ -80,13 +89,17 @@ Caddy:
 
 ```
 cad.example.com {
+    encode zstd gzip           # the OCC kernel WASM is 66 MB raw, ~14 MB compressed
     reverse_proxy 127.0.0.1:3001 {
         flush_interval -1      # SSE (/live, /mcp) must not be buffered
     }
 }
 ```
 
-nginx: `proxy_buffering off; proxy_read_timeout 1h; proxy_http_version 1.1;` on `/live` and `/mcp`.
+nginx: `proxy_buffering off; proxy_read_timeout 1h; proxy_http_version 1.1;` on `/live` and `/mcp`,
+and `gzip on; gzip_types application/javascript application/wasm text/css application/json;`.
+Keep `LLULL_TRUST_PROXY` equal to the number of proxies in front, so rate limits apply per client
+rather than to the proxy's single address.
 Set `LLULL_PUBLIC_URL=https://cad.example.com` and `LLULL_ALLOWED_HOSTS=cad.example.com`.
 
 ## 5. DWG converter

@@ -55,7 +55,10 @@ ENV NODE_ENV=production \
     LLULL_AUTOSAVE_PATH=/data/autosave/autosave.json \
     LLULL_AUDIT_FILE=/data/audit/audit.jsonl \
     LLULL_USERS_FILE=/data/users/users.json \
-    LLULL_LICENSE_FILE=/data/license/license.key
+    LLULL_LICENSE_FILE=/data/license/license.key \
+    LLULL_PYTHON=off
+# The image ships no Python/CadQuery: the STEP / CadQuery exchange bridge is off (clear "disabled"
+# errors instead of spawn failures). Use the desktop app, or extend this image, for STEP.
 VOLUME ["/data/autosave", "/data/audit", "/data/users", "/data/license"]
 RUN mkdir -p /data/autosave /data/audit /data/users /data/license && chown -R node:node /data
 USER node

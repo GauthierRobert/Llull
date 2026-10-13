@@ -10,7 +10,7 @@ import { backendEnv, backendOrigin } from '../src/backendEnv';
 import { cliShimFor, installCliShim } from '../src/cliShim';
 import { bundledPythonOf, desktopLayout } from '../src/layout';
 import { agentHelpText, menuTemplate } from '../src/menu';
-import { navigationDecision } from '../src/navigation';
+import { navigationDecision, permissionAllowed } from '../src/navigation';
 import { createDocumentSession } from '../src/documents';
 
 const scratch = (): string => mkdtempSync(path.join(tmpdir(), 'llull-desktop-'));
@@ -87,6 +87,18 @@ describe('navigationDecision', () => {
     expect(navigationDecision('file:///etc/passwd', origin)).toBe('deny');
     expect(navigationDecision('javascript:alert(1)', origin)).toBe('deny');
     expect(navigationDecision('not a url', origin)).toBe('deny');
+  });
+});
+
+describe('permissionAllowed', () => {
+  const origin = 'http://127.0.0.1:47827';
+
+  it('grants only clipboard writes, and only to the app origin', () => {
+    expect(permissionAllowed('clipboard-sanitized-write', `${origin}/`, origin)).toBe(true);
+    expect(permissionAllowed('clipboard-sanitized-write', 'https://evil.example/', origin)).toBe(false);
+    expect(permissionAllowed('media', `${origin}/`, origin)).toBe(false);
+    expect(permissionAllowed('geolocation', `${origin}/`, origin)).toBe(false);
+    expect(permissionAllowed('notifications', 'not a url', origin)).toBe(false);
   });
 });
 

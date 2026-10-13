@@ -1,6 +1,6 @@
 # Runs the same gate as `npm run check` (typecheck + architecture rules + unused exports + lint +
 # format + tests)
-# plus the coverage gate and the server + desktop suites, so the architecture laws hold for every change.
+# plus the coverage gate, the server + desktop suites and the production builds (web, server, image), so the architecture laws hold for every change.
 name: check
 
 on:
@@ -40,3 +40,7 @@ jobs:
       - run: npm --prefix server test
       - run: npm --prefix desktop run typecheck
       - run: npm --prefix desktop test
+      # Production artifacts: the web bundle, the server bundle and the on-prem image must build.
+      - run: npm run build
+      - run: npm --prefix server run build
+      - run: docker build --build-arg WITH_DWG=0 -t llull:ci .
