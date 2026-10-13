@@ -28,7 +28,7 @@ ARG LIBREDWG_SHA256=62ebb73b984f865960f20ed26619ea5f8789d5e3fd088fa40a2598384da8
 ARG LIBREDWG_URL=https://ftp.gnu.org/gnu/libredwg/libredwg-${LIBREDWG_VERSION}.tar.xz
 RUN mkdir -p /out/bin /out/lib && if [ "$WITH_DWG" = "1" ]; then \
       apt-get update \
-      && apt-get install -y --no-install-recommends build-essential ca-certificates curl xz-utils \
+      && apt-get install -y --no-install-recommends build-essential ca-certificates curl xz-utils pkg-config \
       && curl -fsSL -o /tmp/libredwg.tar.xz "$LIBREDWG_URL" \
       && echo "$LIBREDWG_SHA256  /tmp/libredwg.tar.xz" | sha256sum -c - \
       && mkdir /tmp/src && tar -xJf /tmp/libredwg.tar.xz -C /tmp/src --strip-components=1 \
