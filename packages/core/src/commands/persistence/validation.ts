@@ -4,9 +4,10 @@ import { findComponentCycle } from '../assembly/assemblies';
 import { isRecord } from '../../lib/isRecord';
 import { isFiniteNumber } from '../../lib/isFiniteNumber';
 import { isVec3 } from '../../lib/vec3';
+import { isReservedKey } from '../../lib/reservedKey';
 import { documentExtensions } from '../../plugins/host';
 import { corruptionReason } from '../guard';
-import { getCommand } from '../commandTable';
+import { getCommand, listCommands } from '../commandTable';
 import { validateAnimationValue, validateComponentValue, validateConfigurationValue, validateGroupValue } from './collections';
 import { validateCamera, validateLayer, validateEntityValue, validateMaterialValue, validateParameterValue } from './guards';
 
@@ -118,6 +119,8 @@ const HISTORY_CONTROL_COMMANDS: ReadonlySet<string> = new Set([
 function historyProblems(history: ReadonlyArray<unknown>): string[] {
   const errors: string[] = [];
   const seen = new Set<string>();
+  // an empty command table means the registry was never imported: names cannot be checked, so do not reject every step
+  const tableLoaded = listCommands().length > 0;
   history.forEach((step, index) => {
     if (!isRecord(step) || typeof step['id'] !== 'string' || typeof step['name'] !== 'string') {
       errors.push(`featureHistory[${index}] is malformed (needs string id and name)`);
@@ -127,8 +130,8 @@ function historyProblems(history: ReadonlyArray<unknown>): string[] {
     if (seen.has(step['id'])) errors.push(`${where}: duplicate step id`);
     seen.add(step['id']);
     const command = getCommand(step['name']);
-    if (!command) errors.push(`${where}: unknown command '${step['name']}'`);
-    else if (HISTORY_CONTROL_COMMANDS.has(step['name']))
+    if (!command && tableLoaded) errors.push(`${where}: unknown command '${step['name']}'`);
+    else if (command && HISTORY_CONTROL_COMMANDS.has(step['name']))
       errors.push(`${where}: '${step['name']}' edits the history itself and cannot be a history step`);
     if (!isRecord(step['params'])) errors.push(`${where}: params must be an object`);
     if (step['affected'] !== undefined && !isStringArray(step['affected'])) errors.push(`${where}: affected must be an array of strings`);
@@ -189,8 +192,7 @@ export function validateDocumentValues(v: Record<string, unknown>): string[] {
   for (const key of PROTOTYPE_KEYED_RECORDS) {
     const record = v[key];
     if (!isRecord(record)) continue;
-    for (const id of Object.keys(record))
-      if (id in Object.prototype) errors.push(`${key}: id '${id}' is a reserved JavaScript property name`);
+    for (const id of Object.keys(record)) if (isReservedKey(id)) errors.push(`${key}: id '${id}' is a reserved JavaScript property name`);
   }
   for (const layerId of v['layerOrder'] as string[])
     if (!Object.hasOwn(layers, layerId)) errors.push(`layerOrder: '${layerId}' does not reference a known layer`);

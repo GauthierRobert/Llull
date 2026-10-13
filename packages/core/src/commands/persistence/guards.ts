@@ -21,7 +21,7 @@ import {
   MAX_DISPLAY_PRECISION,
   MAX_IMAGE_DATA_URL_LENGTH,
   MAX_IMPORT_TRIANGLES,
-  MAX_PROFILE_POINTS,
+  MAX_STORED_PROFILE_POINTS,
   MAX_REVOLVE_SEGMENTS,
   MAX_SPLINE_CONTROL_POINTS,
 } from '../limits';
@@ -44,7 +44,11 @@ function sweepProblem(v: Record<string, unknown>): string | null {
   const path = v['path'];
   if (!Array.isArray(path) || path.length === 0 || !path.every((s) => isCurveSegment(s, 3)))
     return 'path must be a non-empty array of line/arc/bezier segments with [x, y, z] points';
-  const pathIssue = chainIssue(path as CurveSegment<Vec3>[], false);
+  // sweep_profile accepts closed loops (no end caps) unless the section varies along the path
+  const chain = path as CurveSegment<Vec3>[];
+  const closed = chainIssue(chain, true) === null;
+  if (closed && v['stations'] !== undefined) return 'path invalid — stations need an open path';
+  const pathIssue = chainIssue(chain, closed);
   if (pathIssue !== null) return `path invalid — ${pathIssue}`;
   const stations = stationsProblem(v['stations']);
   if (stations !== null) return stations;
@@ -230,7 +234,7 @@ function revolutionProblem(v: Record<string, unknown>): string | null {
     return `segments must be an integer 3..${MAX_REVOLVE_SEGMENTS}, got ${String(segments)}`;
   if (!isVec3(axis) || Math.hypot(...axis) < 1e-12) return 'axis must be a non-zero [x, y, z] of finite numbers';
   if (!isFiniteNumber(angle) || angle <= 0 || angle > 2 * Math.PI + 1e-9) return `angle must be in (0, 2π], got ${String(angle)}`;
-  return firstProblem(pointListProblem(v, 'profile', 3, MAX_PROFILE_POINTS), curvesProblem(v['curves']));
+  return firstProblem(pointListProblem(v, 'profile', 3, MAX_STORED_PROFILE_POINTS), curvesProblem(v['curves']));
 }
 
 function meshProblem(v: Record<string, unknown>): string | null {
@@ -283,7 +287,7 @@ const KIND_PROBLEMS: Readonly<Record<EntityKind, (v: Record<string, unknown>) =>
   torus: noProblem,
   pyramid: noProblem,
   extrusion: (v) =>
-    firstProblem(finiteField('depth')(v), pointListProblem(v, 'profile', 3, MAX_PROFILE_POINTS), curvesProblem(v['curves'])),
+    firstProblem(finiteField('depth')(v), pointListProblem(v, 'profile', 3, MAX_STORED_PROFILE_POINTS), curvesProblem(v['curves'])),
   revolution: revolutionProblem,
   sweep: sweepProblem,
   loft: (v) => ringsProblem(v['rings'], 3, 2) ?? (typeof v['ruled'] === 'boolean' ? null : 'ruled must be a boolean'),
@@ -291,7 +295,8 @@ const KIND_PROBLEMS: Readonly<Record<EntityKind, (v: Record<string, unknown>) =>
   image: imageProblem,
   mesh: meshProblem,
   line: (v) => firstProblem(vec2Problem(v, 'start'), vec2Problem(v, 'end')),
-  polyline: (v) => firstProblem(pointListProblem(v, 'points', 2, MAX_PROFILE_POINTS), closedFlagProblem(v)),
+  // uncapped: DXF import and offset_2d write polylines of any length (the file size already bounds a document)
+  polyline: (v) => firstProblem(pointListProblem(v, 'points', 2, Number.POSITIVE_INFINITY), closedFlagProblem(v)),
   spline: (v) => firstProblem(pointListProblem(v, 'points', 2, MAX_SPLINE_CONTROL_POINTS), closedFlagProblem(v)),
   arc: (v) => firstProblem(vec2Problem(v, 'center'), finiteField('startAngle')(v), finiteField('endAngle')(v)),
   circle: (v) => vec2Problem(v, 'center'),

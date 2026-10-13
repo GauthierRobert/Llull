@@ -63,8 +63,9 @@ function withSafeStepCounter(raw: Record<string, unknown>): Record<string, unkno
   const noteStepNumber = (digits: string | undefined, what: string): void => {
     if (digits === undefined) return;
     const n = Number(digits);
-    if (!Number.isSafeInteger(n) || n < 1) throw new Error(`load_document: ${what} has a step number that is not a safe integer >= 1.`);
-    highest = Math.max(highest, n);
+    if (!Number.isSafeInteger(n)) throw new Error(`load_document: ${what} has a step number that is not a safe integer.`);
+    // `-0.<n>` is a legal user-chosen id suffix: it can never collide with a step-minted id (steps start at 1)
+    if (n >= 1) highest = Math.max(highest, n);
   };
   // Entries are not validated yet: skip anything that is not a record with a string id so the value validation below reports
   // "featureHistory[i] is malformed" instead of a TypeError.
@@ -141,6 +142,8 @@ function migrate(raw: Record<string, unknown>): Record<string, unknown> {
 
 /**
  * Parse and validate a `serializeDocument` string (old files gain defaults via `migrate()`).
+ * @invariant every document a registered command produced reloads and re-serializes equal (tests/unit/persistenceRoundTrip.test.ts); the
+ *   feature-history command-name check is skipped while the command table is empty (registry not imported)
  * @failure throws an Error naming the failing field (bad JSON, format, version, structure, values); `load_document` turns it into a no-op
  *   summary
  */

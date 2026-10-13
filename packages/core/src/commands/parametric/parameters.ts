@@ -6,6 +6,7 @@
 import type { CadDocument, Parameter } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
+import { isReservedKey } from '../../lib/reservedKey';
 import { topologicalSort } from '../../lib/topologicalSort';
 import { changed, noop, report } from '../noop';
 import { evaluateExpression, expressionSyntaxError, extractReferences } from './expression';
@@ -92,10 +93,10 @@ export const setParameter = defineCommand({
       ),
   }),
   run: (doc, { name, expression }, ctx): CommandResult => {
-    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name) || name === '__proto__')
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name) || isReservedKey(name))
       return noop(
         doc,
-        `set_parameter failed: name '${name}' is invalid. Use letters, digits, and underscores; must not start with a digit.`,
+        `set_parameter failed: name '${name}' is invalid. Use letters, digits, and underscores; must not start with a digit; JavaScript reserved names (constructor, toString, __proto__, ...) are refused.`,
       );
     if (expression.trim() === '') return noop(doc, `set_parameter failed: expression must be a non-empty string.`);
     const syntaxError = expressionSyntaxError(expression);
