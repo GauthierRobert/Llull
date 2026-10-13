@@ -1,8 +1,4 @@
-/**
- * Drainage network topology: plan length, slope, reachability and upstream-to-downstream order.
- * @layer domain-aec/civil
- * @pure
- */
+/** Drainage network topology: plan length, slope, reachability and upstream-to-downstream order. */
 
 import type { CivilModel, ManholeObject, PipeObject } from '@core/model/civil';
 import { civilObjectsOf, civilObject } from '../model';
@@ -39,9 +35,7 @@ export function flowsTo(civil: CivilModel, startId: string, targetId: string): b
 /** Manholes ordered so every pipe's upstream manhole precedes its downstream one. */
 export function manholesUpstreamFirst(civil: CivilModel): ManholeObject[] {
   const manholes = civilObjectsOf(civil, 'manhole');
-  const pipes = civilObjectsOf(civil, 'pipe').filter(
-    (pipe) => civil.objects[pipe.fromId] && civil.objects[pipe.toId],
-  );
+  const pipes = civilObjectsOf(civil, 'pipe').filter((pipe) => civil.objects[pipe.fromId] && civil.objects[pipe.toId]);
   const waiting = new Map(manholes.map((m) => [m.id, pipes.filter((p) => p.toId === m.id).length]));
   const ordered: ManholeObject[] = [];
   const queue = manholes.filter((m) => waiting.get(m.id) === 0);

@@ -1,9 +1,4 @@
-/**
- * @layer ui/panels/building
- *
- * ClashSection — runs the read-only check_clashes command and lists hard clashes / clearance
- * violations; clicking a row selects both elements' geometry. Presentation only.
- */
+// Read-only check_clashes: hard clashes / clearance violations; a row selects both elements' geometry.
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
@@ -37,10 +32,7 @@ export function ClashSection(): React.ReactElement {
   const millimetres = (depth: number): number => Math.round(toMetres({ units }, depth) * 1000);
   const elements = building?.elements ?? {};
   const markOf = (id: string): string => elements[id]?.mark ?? id;
-  const entitiesOf = (clash: Clash): string[] => [
-    ...(elements[clash.a]?.entityIds ?? []),
-    ...(elements[clash.b]?.entityIds ?? []),
-  ];
+  const entitiesOf = (clash: Clash): string[] => [...(elements[clash.a]?.entityIds ?? []), ...(elements[clash.b]?.entityIds ?? [])];
 
   return (
     <PanelSection
@@ -50,12 +42,7 @@ export function ClashSection(): React.ReactElement {
       testId="building-clashes"
     >
       <div className="building-actions">
-        <button
-          type="button"
-          className="btn btn--primary btn--sm"
-          onClick={runCheck}
-          data-testid="clash-check"
-        >
+        <button type="button" className="btn btn--primary btn--sm" onClick={runCheck} data-testid="clash-check">
           Check clashes
         </button>
       </div>
@@ -72,11 +59,7 @@ export function ClashSection(): React.ReactElement {
           {report.clashes.length > 0 && (
             <ul className="panel__list" aria-label="Clashes">
               {report.clashes.map((clash) => (
-                <ListRow
-                  key={`${clash.kind}:${clash.a}:${clash.b}`}
-                  buttonTestId="clash-row"
-                  onSelect={() => select(entitiesOf(clash))}
-                >
+                <ListRow key={`${clash.kind}:${clash.a}:${clash.b}`} buttonTestId="clash-row" onSelect={() => select(entitiesOf(clash))}>
                   <span className="chip">{clash.kind === 'hard' ? 'Hard' : 'Clearance'}</span>
                   <span className="panel__row-main">
                     {markOf(clash.a)} × {markOf(clash.b)}

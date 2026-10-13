@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import { clamp } from '@lib/clamp';
 import { toRadians } from '@lib/angle';
 import type { BuildingModel, MomentConnectionElement } from '@core/model/building';
@@ -41,11 +37,7 @@ interface Combination {
 }
 
 /** EN 1990 6.10 combinations (ψ0: snow 0.5, wind 0.6; crane γ = 1.35). */
-export function ultimateCombinations(
-  wind: boolean,
-  crane: boolean,
-  windCases: ReadonlyArray<WindCase>,
-): Combination[] {
+export function ultimateCombinations(wind: boolean, crane: boolean, windCases: ReadonlyArray<WindCase>): Combination[] {
   const combinations: Combination[] = [
     { name: '1.35G+1.5S (→)', factors: { G: 1.35, S: 1.5 }, sway: 1 },
     { name: '1.35G+1.5S (←)', factors: { G: 1.35, S: 1.5 }, sway: -1 },
@@ -58,16 +50,8 @@ export function ultimateCombinations(
   if (wind) {
     for (const direction of winds) {
       combinations.push(
-        {
-          name: `1.35G+1.5${direction.label}+0.75S`,
-          factors: { G: 1.35, [direction.load]: 1.5, S: 0.75 },
-          sway: direction.sway,
-        },
-        {
-          name: `1.0G+1.5${direction.label}`,
-          factors: { G: 1, [direction.load]: 1.5 },
-          sway: direction.sway,
-        },
+        { name: `1.35G+1.5${direction.label}+0.75S`, factors: { G: 1.35, [direction.load]: 1.5, S: 0.75 }, sway: direction.sway },
+        { name: `1.0G+1.5${direction.label}`, factors: { G: 1, [direction.load]: 1.5 }, sway: direction.sway },
       );
     }
   }
@@ -125,9 +109,8 @@ interface UltimateResult {
 const HORNE_MAX_SLOPE = Math.tan(toRadians(26));
 
 /**
- * One ULS combination with sway imperfections (5.3.2) and amplified moments (5.2.2(5)).
- * Each column piece between nodes (base, crane bracket, top) is a storey: imperfection and Horne
- * forces act where the compression enters (φ ΔN, ΔN/200) and αcr = min h_i / (200 Δδ_i).
+ * One ULS combination with sway imperfections (5.3.2) and amplified moments (5.2.2(5)). Each column piece between nodes (base, crane
+ * bracket, top) is a storey: imperfection and Horne forces act where the compression enters (φ ΔN, ΔN/200) and αcr = min h_i / (200 Δδ_i).
  */
 export function solveUltimate(frame: FrameModel, combination: Combination): UltimateResult | null {
   const first = solveCombination(frame, combination.factors);
@@ -137,13 +120,7 @@ export function solveUltimate(frame: FrameModel, combination: Combination): Ulti
     if (member.role !== 'column' || !forces) return [];
     const [a, b] = [frame.nodes[member.geometry.a], frame.nodes[member.geometry.b]];
     if (!a || !b) return [];
-    return [
-      {
-        member,
-        height: Math.hypot(b.x - a.x, b.y - a.y),
-        compression: Math.max(0, -forces.axial[1]),
-      },
-    ];
+    return [{ member, height: Math.hypot(b.x - a.x, b.y - a.y), compression: Math.max(0, -forces.axial[1]) }];
   });
   // Compression entering at each node: the piece below minus the piece above.
   const entering = new Map<number, number>();
@@ -165,20 +142,14 @@ export function solveUltimate(frame: FrameModel, combination: Combination): Ulti
   );
   if (!result) return null;
   const horne = solveFrame(
-    frame.nodes.map((node, index) => ({
-      ...node,
-      load: { fx: (entering.get(index) ?? 0) / 200, fy: 0, mz: 0 },
-    })),
+    frame.nodes.map((node, index) => ({ ...node, load: { fx: (entering.get(index) ?? 0) / 200, fy: 0, mz: 0 } })),
     frame.members.map((member) => member.geometry),
   );
   const storeys = pieces.map((piece) => ({
     id: piece.member.elementId,
     height: piece.height,
     compression: piece.compression,
-    drift: Math.abs(
-      (horne?.displacements[piece.member.geometry.b]?.[0] ?? 0) -
-        (horne?.displacements[piece.member.geometry.a]?.[0] ?? 0),
-    ),
+    drift: Math.abs((horne?.displacements[piece.member.geometry.b]?.[0] ?? 0) - (horne?.displacements[piece.member.geometry.a]?.[0] ?? 0)),
   }));
   const critical = horneAlphaCritical(storeys);
   let alphaCritical = critical.alpha;

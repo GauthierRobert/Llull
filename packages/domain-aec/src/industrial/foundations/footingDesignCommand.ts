@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { elementAffected, getBuilding, withElement } from '../../building/model';
@@ -10,12 +6,7 @@ import { describeLoads, FRAME_LOAD_SHAPE, resolveFrameLoads } from '../frames/fr
 import { baseReactions } from '../frames/frameModelSolve';
 import { SOIL_SHAPE, soilInputs } from './soilParams';
 import { findFooting } from './foundationCombinations';
-import {
-  defaultThrustTie,
-  reactionColumn,
-  slabSharePerColumn,
-  slidingHorizontalOf,
-} from './foundationThrust';
+import { defaultThrustTie, reactionColumn, slabSharePerColumn, slidingHorizontalOf } from './foundationThrust';
 import { COVER_MM, type FootingDesignRow } from './footingModel';
 import { designFootingRow, isResized } from './footingDesignRow';
 import { sizeText } from './footingSizing';
@@ -34,8 +25,6 @@ const footingDesignParams = z.object({
 });
 
 /**
- * @command design_footings
- * @pure
  * @affects sizes (grows, or shrinks with allowShrink) and reinforces every analysed footing; a footing
  *          with no passing size within 6 m × 6 m × 1.5 m is left unchanged
  * @failure bad loads / unknown level / no footing under an analysed frame column -> no-op
@@ -43,27 +32,24 @@ const footingDesignParams = z.object({
 export const designFootings = defineCommand({
   name: 'design_footings',
   description:
-    'Size and design the reinforced-concrete pad footings under the portal-frame columns of a level ' +
-    'to EN 1992-1-1 (C25/30, B500) and store the plan size, thickness and bottom reinforcement on each footing, using the same ' +
-    'base reactions, loads and soil parameters as check_foundations (deadLoad / snowLoad / windPressure / ' +
-    'craneCapacity, soilBearing, thrustTie, soilModulus, clayLayer). Essential for fixed column bases (columnBase "fixed"), whose ' +
-    'default pads are far too small. Sizing: plan B × L keeps the existing aspect ratio (square for the default pads) in 100 mm steps ' +
-    'from the plate / column footprint + 2 × 100 mm up to 6 m, thickness h 300–1500 mm in 50 mm steps; the smallest concrete volume ' +
-    '(ties: wider plan first) that passes ALL of: the check_foundations footing rows (soil bearing with eccentricity incl. base moments, ' +
-    'overturning, uplift EQU, sliding, settlement, evaluated with the founding level dropping as h grows, topOffset kept) AND the reinforced ' +
-    'mat below. Pads that already pass are not shrunk (only grown) unless allowShrink is true. The top level (topOffset) stays fixed. ' +
-    'Mat: ULS net soil pressure (no self-weight) from 1.35G + 1.5S / ' +
-    'wind / crane combinations with load eccentricity (trapezoidal or triangular pressure); ' +
-    'bending at the face of the base plate (else the column profile), d = h − 50 mm cover − φ, ' +
-    'z ≤ 0.95d with K ≤ 0.167, As,min = 0.26 fctm/fyk b d; the lightest bar φ12/16/20/25 at ' +
-    '100–250 mm spacing (same both ways) satisfying As, one-way shear VRd,c at d from the face ' +
-    '(§6.2.2, CRd,c 0.12) and punching at every control perimeter a ≤ 2d from the face (§6.4.4, vRd,c·2d/a) with the ' +
-    'soil pressure inside it deducted (§6.4). If no size within 6 × 6 × 1.5 m passes, the footing is reported as failed and left ' +
-    'unchanged (size and reinforcement). The summary lists the size changes (e.g. "F1 1500×1500×400 → 2600×2600×700"); the takeoff ' +
-    'reports concrete and `footing.rebar.kg` for the new sizes. ' +
-    'Simplifications: bending in the frame plane (x) from the horizontal reaction and, for fixed column bases, the base moment (eccentric pressure), ' +
-    'uniform pressure across the other side, no uplift (tension) design, bar anchorage not checked. ' +
-    'Preliminary design, not a substitute for a structural engineer.',
+    'Size and design the reinforced-concrete pad footings under the portal-frame columns of a level to EN 1992-1-1 (C25/30, B500) and ' +
+    'store the plan size, thickness and bottom reinforcement on each footing, using the same base reactions, loads and soil parameters ' +
+    'as check_foundations (deadLoad / snowLoad / windPressure / craneCapacity, soilBearing, thrustTie, soilModulus, clayLayer). ' +
+    'Essential for fixed column bases (columnBase "fixed"), whose default pads are far too small. Sizing: plan B × L keeps the existing ' +
+    'aspect ratio (square for the default pads) in 100 mm steps from the plate / column footprint + 2 × 100 mm up to 6 m, thickness h ' +
+    '300–1500 mm in 50 mm steps; the smallest concrete volume (ties: wider plan first) that passes ALL of: the check_foundations footing ' +
+    'rows (soil bearing with eccentricity incl. base moments, overturning, uplift EQU, sliding, settlement, evaluated with the founding ' +
+    'level dropping as h grows, topOffset kept) AND the reinforced mat below. Pads that already pass are not shrunk (only grown) unless ' +
+    'allowShrink is true. The top level (topOffset) stays fixed. Mat: ULS net soil pressure (no self-weight) from 1.35G + 1.5S / wind / ' +
+    'crane combinations with load eccentricity (trapezoidal or triangular pressure); bending at the face of the base plate (else the ' +
+    'column profile), d = h − 50 mm cover − φ, z ≤ 0.95d with K ≤ 0.167, As,min = 0.26 fctm/fyk b d; the lightest bar φ12/16/20/25 at ' +
+    '100–250 mm spacing (same both ways) satisfying As, one-way shear VRd,c at d from the face (§6.2.2, CRd,c 0.12) and punching at ' +
+    'every control perimeter a ≤ 2d from the face (§6.4.4, vRd,c·2d/a) with the soil pressure inside it deducted (§6.4). If no size ' +
+    'within 6 × 6 × 1.5 m passes, the footing is reported as failed and left unchanged (size and reinforcement). The summary lists the ' +
+    'size changes (e.g. "F1 1500×1500×400 → 2600×2600×700"); the takeoff reports concrete and `footing.rebar.kg` for the new sizes. ' +
+    'Simplifications: bending in the frame plane (x) from the horizontal reaction and, for fixed column bases, the base moment ' +
+    '(eccentric pressure), uniform pressure across the other side, no uplift (tension) design, bar anchorage not checked. Preliminary ' +
+    'design, not a substitute for a structural engineer.',
   params: footingDesignParams,
   run: (doc, params): CommandResult => {
     const soil = soilInputs(params);
@@ -109,16 +95,10 @@ export const designFootings = defineCommand({
       }
       if (outcome.change) changes.push(outcome.change);
     }
-    if (rows.length === 0) {
-      return noop(
-        doc,
-        `design_footings failed: no portal frame column with a footing on level '${levelId}'.`,
-      );
-    }
+    if (rows.length === 0) return noop(doc, `design_footings failed: no portal frame column with a footing on level '${levelId}'.`);
     const designed = rows.filter((row) => row.status === 'designed');
     const failed = rows.filter((row) => row.status === 'failed');
-    const maxOf = (pick: (row: FootingDesignRow) => number): number =>
-      Math.max(0, ...designed.map(pick));
+    const maxOf = (pick: (row: FootingDesignRow) => number): number => Math.max(0, ...designed.map(pick));
     const maxShear = maxOf((row) => row.shearUtilisation);
     const maxPunching = maxOf((row) => row.punchingUtilisation);
     const format = (row: FootingDesignRow): string =>
@@ -131,9 +111,7 @@ export const designFootings = defineCommand({
       summary:
         `Designed ${designed.length} of ${rows.length} footing(s) on level '${levelId}' (${describeLoads(loads)}, soil ${soilBearing} kPa, C25/30 B500, cover ${COVER_MM} mm, ${allowShrink ? 'sizes may shrink' : 'sizes only grow'}; sizes B×L×h mm): ` +
         `${designed.length > 0 ? briefList(designed, format, 8, '; ') : 'none'}. ` +
-        (failed.length > 0
-          ? `${failed.length} not sized — left unchanged: ${briefList(failed, failureText, 8, '; ')}. `
-          : '') +
+        (failed.length > 0 ? `${failed.length} not sized — left unchanged: ${briefList(failed, failureText, 8, '; ')}. ` : '') +
         `Max shear ${round(maxShear)}, max punching ${round(maxPunching)}; ` +
         `${changed.length > 0 ? `${changed.length} footing(s) changed` : 'no change'}. Bending in the frame plane.`,
       affected: elementAffected(document, changed),

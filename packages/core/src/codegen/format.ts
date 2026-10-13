@@ -1,9 +1,4 @@
-/**
- * Source-text formatting shared by every code emitter.
- *
- * @layer core/codegen
- * @pure
- */
+/** Source-text formatting shared by every code emitter. */
 
 import { toDegrees } from '../lib/angle';
 import type { Feature, FeatureProgram, Term } from './program';
@@ -90,14 +85,13 @@ export function featureLinesWithHeadings(
 /** Numbers packed `perLine` per line, for long mesh arrays. */
 export function numberRows(values: readonly number[], perLine: number): string[] {
   const rows: string[] = [];
-  for (let i = 0; i < values.length; i += perLine) {
+  for (let i = 0; i < values.length; i += perLine)
     rows.push(
       values
         .slice(i, i + perLine)
         .map(formatNumber)
         .join(', '),
     );
-  }
   return rows;
 }
 

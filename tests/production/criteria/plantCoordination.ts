@@ -5,8 +5,6 @@ import { elementsOf, elevationOf, insidePolygon } from '../oracle/geometry';
 import type { PlantIntent } from '../plant/intent';
 
 /**
- * @layer tests/production/criteria
- *
  * Coordination and engineering sign-off: clash-free model, safe access between floors, and every
  * steel member covered by a structural verification the office can sign.
  */
@@ -44,28 +42,18 @@ function accessCheck(intent: PlantIntent, { document }: GradeContext): CheckOutc
     }
     const blondel = 2 * stair.riserHeight + stair.treadDepth;
     if (blondel < BLONDEL.min || blondel > BLONDEL.max) {
-      problems.push(
-        `${stair.mark} 2R+G = ${Math.round(blondel)} mm, outside ${BLONDEL.min}–${BLONDEL.max}`,
-      );
+      problems.push(`${stair.mark} 2R+G = ${Math.round(blondel)} mm, outside ${BLONDEL.min}–${BLONDEL.max}`);
     }
     const run = stair.treadDepth * (stair.riserCount - 1);
-    const nearTop: Vec2 = [
-      stair.start[0] + Math.cos(stair.angle) * run * 0.75,
-      stair.start[1] + Math.sin(stair.angle) * run * 0.75,
-    ];
-    const above = slabs.find(
-      (s) => Math.abs(elevationOf(document, s.levelId) + s.offset - to.elevation) <= 1,
-    );
+    const nearTop: Vec2 = [stair.start[0] + Math.cos(stair.angle) * run * 0.75, stair.start[1] + Math.sin(stair.angle) * run * 0.75];
+    const above = slabs.find((s) => Math.abs(elevationOf(document, s.levelId) + s.offset - to.elevation) <= 1);
     if (above && !(above.openings ?? []).some((opening) => insidePolygon(nearTop, opening))) {
       problems.push(`${stair.mark}: no stair well in ${above.mark} above it`);
     }
   }
   return {
     pass: problems.length === 0,
-    detail:
-      problems.length === 0
-        ? `${intent.stairs.length} stair flight(s) with wells, Blondel OK`
-        : problems.join('; '),
+    detail: problems.length === 0 ? `${intent.stairs.length} stair flight(s) with wells, Blondel OK` : problems.join('; '),
   };
 }
 
@@ -84,16 +72,8 @@ function memberRows(value: unknown, ids: ReadonlySet<string>, rows: MemberRow[] 
     const id = record['id'] ?? record['memberId'] ?? record['elementId'];
     const utilisation = record['utilisation'] ?? record['utilization'];
     const ok = record['ok'];
-    if (
-      typeof id === 'string' &&
-      ids.has(id) &&
-      (typeof utilisation === 'number' || typeof ok === 'boolean')
-    ) {
-      rows.push({
-        id,
-        utilisation: typeof utilisation === 'number' ? utilisation : null,
-        ok: typeof ok === 'boolean' ? ok : null,
-      });
+    if (typeof id === 'string' && ids.has(id) && (typeof utilisation === 'number' || typeof ok === 'boolean')) {
+      rows.push({ id, utilisation: typeof utilisation === 'number' ? utilisation : null, ok: typeof ok === 'boolean' ? ok : null });
     }
     for (const inner of Object.values(record)) memberRows(inner, ids, rows);
   }
@@ -108,10 +88,7 @@ function coverageCheck({ document, run }: GradeContext): CheckOutcome {
   const members = elementsOf(document, 'member');
   const ids = new Set(members.map((m) => m.id));
   const checks = listCommands().filter(
-    (command) =>
-      command.name.startsWith('check_') &&
-      command.annotations?.readOnly === true &&
-      !NOT_STRUCTURAL.has(command.name),
+    (command) => command.name.startsWith('check_') && command.annotations?.readOnly === true && !NOT_STRUCTURAL.has(command.name),
   );
   const rows: MemberRow[] = [];
   const perCheck: string[] = [];
@@ -121,11 +98,7 @@ function coverageCheck({ document, run }: GradeContext): CheckOutcome {
     if (found.length > 0) perCheck.push(`${command.name} ${new Set(found.map((r) => r.id)).size}`);
   }
   const covered = new Set(rows.map((r) => r.id));
-  const failing = new Set(
-    rows
-      .filter((r) => r.ok === false || (r.utilisation !== null && r.utilisation > 1))
-      .map((r) => r.id),
-  );
+  const failing = new Set(rows.filter((r) => r.ok === false || (r.utilisation !== null && r.utilisation > 1)).map((r) => r.id));
   const uncovered = members.filter((m) => !covered.has(m.id));
   const failed = members.filter((m) => failing.has(m.id));
   const worst = rows.reduce((max, r) => Math.max(max, r.utilisation ?? 0), 0);
@@ -163,35 +136,24 @@ function stabilityCheck({ run }: GradeContext): CheckOutcome {
     for (const direction of ['X', 'Y'] as const) {
       const systems = storey[direction].planes + (storey.frames?.[direction] ?? 0);
       if (systems === 0) {
-        problems.push(
-          `storey ${storey.storey} (below +${storey.topOfSteel / 1000} m) has no lateral system in ${direction}`,
-        );
+        problems.push(`storey ${storey.storey} (below +${storey.topOfSteel / 1000} m) has no lateral system in ${direction}`);
       }
     }
   }
   if (storeys.length === 0) problems.push('check_steel_members reported no storeys');
   return {
     pass: problems.length === 0,
-    detail:
-      problems.length === 0
-        ? `${storeys.length} storey(s) braced or framed in X and Y`
-        : problems.join('; '),
+    detail: problems.length === 0 ? `${storeys.length} storey(s) braced or framed in X and Y` : problems.join('; '),
   };
 }
 
 export function coordinationCriteria(intent: PlantIntent): Criterion[] {
   return [
-    {
-      id: 'clash-free',
-      area: 'coordination',
-      requirement: 'No hard clash and no clearance violation (check_clashes).',
-      check: clashCheck,
-    },
+    { id: 'clash-free', area: 'coordination', requirement: 'No hard clash and no clearance violation (check_clashes).', check: clashCheck },
     {
       id: 'access',
       area: 'coordination',
-      requirement:
-        'Every designed stair flight rises one storey, meets 2R+G 600–650 mm and has its well cut.',
+      requirement: 'Every designed stair flight rises one storey, meets 2R+G 600–650 mm and has its well cut.',
       check: (ctx) => accessCheck(intent, ctx),
     },
     {
@@ -204,8 +166,7 @@ export function coordinationCriteria(intent: PlantIntent): Criterion[] {
     {
       id: 'lateral-stability',
       area: 'engineering',
-      requirement:
-        'Every storey has a verified lateral system (bracing or moment frames) in both directions.',
+      requirement: 'Every storey has a verified lateral system (bracing or moment frames) in both directions.',
       check: stabilityCheck,
     },
   ];

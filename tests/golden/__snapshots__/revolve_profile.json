@@ -6,78 +6,24 @@
       "#1": {
         "id": "#1",
         "kind": "revolution",
-        "profile": [
-          [
-            1,
-            0
-          ],
-          [
-            2,
-            0
-          ],
-          [
-            2,
-            1
-          ],
-          [
-            1,
-            1
-          ]
-        ],
-        "axis": [
-          0,
-          0,
-          1
-        ],
+        "profile": [[1,0],[2,0],[2,1],[1,1]],
+        "axis": [0,0,1],
         "angle": 6.28318531,
         "segments": 8,
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
+        "position": [0,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#6b8f9c"
       },
       "#3": {
         "id": "#3",
         "kind": "revolution",
-        "profile": [
-          [
-            1,
-            0
-          ],
-          [
-            3,
-            0
-          ],
-          [
-            3,
-            2
-          ]
-        ],
-        "axis": [
-          0,
-          1,
-          0
-        ],
+        "profile": [[1,0],[3,0],[3,2]],
+        "axis": [0,1,0],
         "angle": 3.14159265,
         "segments": 6,
-        "position": [
-          10,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
+        "position": [10,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#6b8f9c"
       }
@@ -117,65 +63,16 @@
       {
         "id": "#4",
         "name": "revolve_profile",
-        "params": {
-          "profile": [
-            [
-              1,
-              0
-            ],
-            [
-              2,
-              0
-            ],
-            [
-              2,
-              1
-            ],
-            [
-              1,
-              1
-            ]
-          ],
-          "axis": "z",
-          "angle": 6.28318531,
-          "segments": 8
-        },
+        "params": {"profile":[[1,0],[2,0],[2,1],[1,1]],"axis":"z","angle":6.28318531,"segments":8},
         "suppressed": false,
-        "affected": [
-          "#1"
-        ]
+        "affected": ["#1"]
       },
       {
         "id": "#5",
         "name": "revolve_profile",
-        "params": {
-          "profile": [
-            [
-              1,
-              0
-            ],
-            [
-              3,
-              0
-            ],
-            [
-              3,
-              2
-            ]
-          ],
-          "axis": "y",
-          "angle": 3.14159265,
-          "segments": 6,
-          "position": [
-            10,
-            0,
-            0
-          ]
-        },
+        "params": {"profile":[[1,0],[3,0],[3,2]],"axis":"y","angle":3.14159265,"segments":6,"position":[10,0,0]},
         "suppressed": false,
-        "affected": [
-          "#3"
-        ]
+        "affected": ["#3"]
       }
     ],
     "configurations": {},

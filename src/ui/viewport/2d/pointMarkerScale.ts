@@ -1,26 +1,19 @@
-/**
- * @layer ui/viewport/2d
- *
- * Screen-constant sizing for `point` markers. A document-unit cross is invisible in mm drawings
- * (0.1 mm in a 100 m survey), so the marker is scaled each frame to a fixed pixel half-extent.
- */
+// Screen-constant `point` markers: a document-unit cross vanishes in mm drawings, so it is scaled per frame to fixed px.
 
-/** Marker half-arm length on screen, in CSS pixels. */
+/** Half-arm, CSS px. */
 export const POINT_MARKER_HALF_PIXELS = 5;
 
 type CameraProjection =
   | { readonly kind: 'orthographic'; readonly zoom: number }
   | {
       readonly kind: 'perspective';
-      /** Vertical field of view in degrees. */
+      /** Vertical FOV, degrees. */
       readonly fovDegrees: number;
-      /** Camera-to-marker distance in world units. */
       readonly distance: number;
-      /** Canvas height in CSS pixels. */
+      /** CSS px. */
       readonly viewportHeight: number;
     };
 
-/** @pure World units spanned by `pixels` screen pixels at the marker; 1 when degenerate. */
 export function worldUnitsForPixels(pixels: number, projection: CameraProjection): number {
   if (projection.kind === 'orthographic') return projection.zoom > 0 ? pixels / projection.zoom : 1;
   const { fovDegrees, distance, viewportHeight } = projection;

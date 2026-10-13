@@ -1,10 +1,4 @@
-/**
- * @layer ui/viewport/2d
- *
- * ZoomExtents2D — frames the whole document in the orthographic 2D view on mount and whenever
- * the document camera changes (fit_view / set_camera). The extents come from the
- * read-only `measure_bounding_box` command; only the three.js camera is touched (view state).
- */
+// Frames the document in the ortho view on mount and on document camera changes (extents from measure_bounding_box).
 
 import { useEffect } from 'react';
 import type * as THREE from 'three';

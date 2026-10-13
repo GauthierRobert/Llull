@@ -13,10 +13,7 @@ const desktop = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const server = path.resolve(desktop, '..', 'server');
 const target = path.join(desktop, 'build', 'server');
 
-if (
-  !existsSync(path.join(server, 'dist', 'index.js')) ||
-  !existsSync(path.join(server, 'dist', 'cli.js'))
-)
+if (!existsSync(path.join(server, 'dist', 'index.js')) || !existsSync(path.join(server, 'dist', 'cli.js')))
   throw new Error('server/dist is missing: run `npm run build:server` first.');
 
 rmSync(target, { recursive: true, force: true });
@@ -25,18 +22,12 @@ cpSync(path.join(server, 'dist'), path.join(target, 'dist'), {
   recursive: true,
   filter: (source) => !path.basename(source).startsWith('llull-cli.cjs'),
 });
-for (const file of ['package.json', 'package-lock.json'])
-  cpSync(path.join(server, file), path.join(target, file));
-for (const file of ['llull_bridge.py', 'requirements.txt'])
-  cpSync(path.join(server, 'python', file), path.join(target, 'python', file));
+for (const file of ['package.json', 'package-lock.json']) cpSync(path.join(server, file), path.join(target, file));
+for (const file of ['llull_bridge.py', 'requirements.txt']) cpSync(path.join(server, 'python', file), path.join(target, 'python', file));
 
-execFileSync(
-  process.platform === 'win32' ? 'npm.cmd' : 'npm',
-  ['ci', '--omit=dev', '--no-audit', '--no-fund'],
-  {
-    cwd: target,
-    stdio: 'inherit',
-    shell: process.platform === 'win32',
-  },
-);
+execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['ci', '--omit=dev', '--no-audit', '--no-fund'], {
+  cwd: target,
+  stdio: 'inherit',
+  shell: process.platform === 'win32',
+});
 console.warn(`[stage-server] staged ${target}`);

@@ -8,6 +8,7 @@ import type { TakeoffLine } from '@aec/building/quantities/takeoffBasics';
 import type { IfcExport } from '@aec/building/exchange/ifcBuild';
 import type { WallElement } from '@core/model/building';
 import { rawBuilding } from './elementEdits';
+import { xy } from '../../helpers/xy';
 
 const BUILD_UP = [
   { material: 'brick', thickness: 100, function: 'finish' },
@@ -17,13 +18,7 @@ const BUILD_UP = [
 ];
 
 function wallDoc(): CadDocument {
-  return execute(createEmptyDocument(), 'draw_walls', {
-    points: [
-      [0, 0],
-      [5000, 0],
-    ],
-    height: 3000,
-  }).document;
+  return execute(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 5000, 0), height: 3000 }).document;
 }
 
 function wallOf(doc: CadDocument, id = 'wall-1'): WallElement {
@@ -38,29 +33,19 @@ describe('set_wall_layers', () => {
     const before = JSON.stringify(doc);
     const result = execute(doc, 'set_wall_layers', { wallIds: ['wall-1'], layers: BUILD_UP });
     expect(JSON.stringify(doc)).toBe(before);
-    expect(result.summary).toBe(
-      'Set a 4-layer build-up (435 total: 100 brick + 120 mineral-wool + 200 concrete + 15 gypsum) on W1.',
-    );
+    expect(result.summary).toBe('Set a 4-layer build-up (435 total: 100 brick + 120 mineral-wool + 200 concrete + 15 gypsum) on W1.');
     expect(result.affected[0]).toBe('wall-1');
     const wall = wallOf(result.document);
     expect(wall).toMatchObject({ thickness: 435, material: 'concrete' });
     expect(layerBoundaries(wall)).toEqual([-117.5, 2.5, 202.5]);
   });
-
   it('treats a repeated wall id once (single mark in the summary)', () => {
-    const result = execute(wallDoc(), 'set_wall_layers', {
-      wallIds: ['wall-1', 'wall-1'],
-      layers: BUILD_UP,
-    });
+    const result = execute(wallDoc(), 'set_wall_layers', { wallIds: ['wall-1', 'wall-1'], layers: BUILD_UP });
     expect(result.summary).toMatch(/ on W1\.$/);
     expect(result.affected.filter((id) => id === 'wall-1')).toHaveLength(1);
   });
-
   it('removes a build-up and is dropped when update_wall changes the thickness', () => {
-    let doc = execute(wallDoc(), 'set_wall_layers', {
-      wallIds: ['wall-1'],
-      layers: BUILD_UP,
-    }).document;
+    let doc = execute(wallDoc(), 'set_wall_layers', { wallIds: ['wall-1'], layers: BUILD_UP }).document;
     const removed = execute(doc, 'set_wall_layers', { wallIds: ['wall-1'], layers: null });
     expect(removed.summary).toBe('Removed the build-up of W1.');
     expect(wallOf(removed.document).layers).toBeUndefined();
@@ -69,22 +54,17 @@ describe('set_wall_layers', () => {
     doc = execute(doc, 'update_wall', { wallId: 'wall-1', thickness: 300 }).document;
     expect(wallOf(doc).layers).toBeUndefined();
   });
-
   it.each([
     [{ wallIds: ['wall-9'], layers: BUILD_UP }, /must list existing walls/],
     [{ wallIds: ['wall-1'], layers: [] }, /1–10/],
     [{ wallIds: ['wall-1'], layers: [{ material: 'x', thickness: 0 }] }, /thickness > 0/],
-    [
-      { wallIds: ['wall-1'], layers: [{ material: 'x', thickness: 10, function: 'glue' }] },
-      /function/,
-    ],
+    [{ wallIds: ['wall-1'], layers: [{ material: 'x', thickness: 10, function: 'glue' }] }, /function/],
     [{ wallIds: 'wall-1', layers: BUILD_UP }, /rejected: invalid params — wallIds/],
   ])('rejects %j', (params, message) => {
     const result = execute(wallDoc(), 'set_wall_layers', params);
     expect(result.affected).toEqual([]);
     expect(result.summary).toMatch(message);
   });
-
   it('defaults the layer function to structure and picks the thickest without one', () => {
     expect(parseWallLayers([{ material: 'timber', thickness: 100 }])).toEqual([
       { material: 'timber', thickness: 100, function: 'structure' },
@@ -98,33 +78,20 @@ describe('set_wall_layers', () => {
     }).document;
     expect(wallOf(doc).material).toBe('wool');
   });
-
   it('reports quantities per layer, draws layer lines, exports an IFC layer set', () => {
-    const doc = execute(wallDoc(), 'set_wall_layers', {
-      wallIds: ['wall-1'],
-      layers: BUILD_UP,
-    }).document;
+    const doc = execute(wallDoc(), 'set_wall_layers', { wallIds: ['wall-1'], layers: BUILD_UP }).document;
     const lines = (execute(doc, 'quantity_takeoff', {}).data as { lines: TakeoffLine[] }).lines;
-    expect(lines.find((line) => line.key === 'wall.mineral-wool.m3')?.quantity).toBeCloseTo(
-      5 * 3 * 0.12,
-      3,
-    );
+    expect(lines.find((line) => line.key === 'wall.mineral-wool.m3')?.quantity).toBeCloseTo(5 * 3 * 0.12, 3);
     expect(lines.find((line) => line.key === 'wall.brick.m2')?.quantity).toBeCloseTo(15, 3);
     expect(lines.find((line) => line.key === 'wall.concrete.m')?.quantity).toBeCloseTo(5, 3);
-    const layerLines = buildPlanDrawing(doc, undefined)!.primitives.filter(
-      (p) => p.type === 'line' && p.layer === 'A-WALL',
-    );
+    const layerLines = buildPlanDrawing(doc, undefined)!.primitives.filter((p) => p.type === 'line' && p.layer === 'A-WALL');
     expect(layerLines).toHaveLength(3);
     const ifc = (execute(doc, 'export_ifc', {}).data as IfcExport).ifc;
     expect(ifc.match(/IFCMATERIALLAYER\(/g)).toHaveLength(4);
     expect(ifc).toContain('IFCMATERIALLAYERSETUSAGE(');
   });
-
   it('validates build-ups on load', () => {
-    const doc = execute(wallDoc(), 'set_wall_layers', {
-      wallIds: ['wall-1'],
-      layers: BUILD_UP,
-    }).document;
+    const doc = execute(wallDoc(), 'set_wall_layers', { wallIds: ['wall-1'], layers: BUILD_UP }).document;
     expect(buildingErrors(doc.building)).toEqual([]);
     const broken = rawBuilding(doc);
     broken.elements['wall-1']!['thickness'] = 400;
@@ -136,37 +103,21 @@ describe('set_wall_layers', () => {
 
 describe('build-up review regressions', () => {
   it('rejects stored layers without a function and never crashes the IFC export', () => {
-    const doc = execute(wallDoc(), 'set_wall_layers', {
-      wallIds: ['wall-1'],
-      layers: BUILD_UP,
-    }).document;
-    const broken = JSON.parse(JSON.stringify(doc.building)) as {
-      elements: Record<string, { layers?: Array<Record<string, unknown>> }>;
-    };
+    const doc = execute(wallDoc(), 'set_wall_layers', { wallIds: ['wall-1'], layers: BUILD_UP }).document;
+    const broken = JSON.parse(JSON.stringify(doc.building)) as { elements: Record<string, { layers?: Array<Record<string, unknown>> }> };
     delete broken.elements['wall-1']!.layers![0]!['function'];
     expect(buildingErrors(broken)).toEqual([expect.stringMatching(/needs a function/)]);
-    const loose = {
-      ...doc,
-      building: broken as unknown as NonNullable<CadDocument['building']>,
-    };
+    const loose = { ...doc, building: broken as unknown as NonNullable<CadDocument['building']> };
     expect(() => execute(loose, 'export_ifc', {})).not.toThrow();
   });
-
   it('counts layered walls as IFC products', () => {
     const plain = execute(wallDoc(), 'export_ifc', {}).data as IfcExport;
-    const layered = execute(
-      execute(wallDoc(), 'set_wall_layers', { wallIds: ['wall-1'], layers: BUILD_UP }).document,
-      'export_ifc',
-      {},
-    ).data as IfcExport;
+    const layered = execute(execute(wallDoc(), 'set_wall_layers', { wallIds: ['wall-1'], layers: BUILD_UP }).document, 'export_ifc', {})
+      .data as IfcExport;
     expect(layered.productCount).toBe(plain.productCount);
   });
-
   it('drops the build-up when update_wall changes the material', () => {
-    const doc = execute(wallDoc(), 'set_wall_layers', {
-      wallIds: ['wall-1'],
-      layers: BUILD_UP,
-    }).document;
+    const doc = execute(wallDoc(), 'set_wall_layers', { wallIds: ['wall-1'], layers: BUILD_UP }).document;
     const same = execute(doc, 'update_wall', { wallId: 'wall-1', material: 'concrete' });
     expect(wallOf(same.document).layers).toHaveLength(4);
     const changed = execute(doc, 'update_wall', { wallId: 'wall-1', material: 'timber' });

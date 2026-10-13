@@ -1,10 +1,6 @@
-/**
- * Agent-facing schema snapshot. `toToolSchemas()` is exactly what MCP agents read;
- * any change to a name, description, param shape or annotation must show up as a reviewed
- * snapshot diff (`npx vitest -u` to accept an intended change).
- */
 import { describe, it, expect } from 'vitest';
 import { toToolSchemas } from '@core/commands/registry';
+import { compactJson } from '../../helpers/compactJson';
 
 /** Recursively sort object keys so the snapshot compares content, not literal key order. */
 function sortKeys(value: unknown): unknown {
@@ -20,8 +16,6 @@ function sortKeys(value: unknown): unknown {
 describe('toToolSchemas snapshot', () => {
   it('matches the reviewed agent-facing schema surface', async () => {
     const schemas = [...toToolSchemas()].sort((a, b) => a.name.localeCompare(b.name));
-    await expect(JSON.stringify(sortKeys(schemas), null, 2) + '\n').toMatchFileSnapshot(
-      './__snapshots__/toolSchemas.json',
-    );
+    await expect(compactJson(sortKeys(schemas), 1) + '\n').toMatchFileSnapshot('./__snapshots__/toolSchemas.json');
   });
 });

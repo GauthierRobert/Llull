@@ -1,9 +1,7 @@
 /**
- * Floor framing load path: each beam is simply supported between its end nodes; its end reactions
- * go to the column at the node, or as a point load to the beam it frames into (secondary on
- * primary). Beams are analysed supporters-last, so every transferred reaction is in place.
- * @layer domain-aec
- * @pure
+ * Floor framing load path: each beam is simply supported between its end nodes; its end reactions go to the column at the node, or as a
+ * point load to the beam it frames into (secondary on primary). Beams are analysed supporters-last, so every transferred reaction is in
+ * place.
  */
 
 import { projectOntoSegment } from '@lib/polygon';
@@ -46,29 +44,19 @@ const COLUMN_MARGIN = 75;
 const BEAM_END_CLEARANCE = 100;
 const BEAM_TOP_TOLERANCE = 20;
 
-function columnAt(
-  point: readonly [number, number],
-  z: number,
-  columns: ReadonlyArray<SteelBar>,
-): SteelBar | undefined {
+function columnAt(point: readonly [number, number], z: number, columns: ReadonlyArray<SteelBar>): SteelBar | undefined {
   let best: { column: SteelBar; distance: number } | undefined;
   for (const column of columns) {
     const half = Math.max(column.profile?.h ?? 0, column.profile?.b ?? 0) / 2 + COLUMN_MARGIN;
     const distance = Math.hypot(column.start[0] - point[0], column.start[1] - point[1]);
     const low = Math.min(column.start[2], column.end[2]) - 150;
     const high = Math.max(column.start[2], column.end[2]) + 150;
-    if (distance <= half && z >= low && z <= high && (!best || distance < best.distance)) {
-      best = { column, distance };
-    }
+    if (distance <= half && z >= low && z <= high && (!best || distance < best.distance)) best = { column, distance };
   }
   return best?.column;
 }
 
-function beamAt(
-  point: readonly [number, number],
-  carried: BeamLoads,
-  beams: ReadonlyArray<BeamLoads>,
-): SupportRef {
+function beamAt(point: readonly [number, number], carried: BeamLoads, beams: ReadonlyArray<BeamLoads>): SupportRef {
   let best: { ref: SupportRef; distance: number } | undefined;
   const direction = (beam: BeamLoads): [number, number] => {
     const length = Math.hypot(beam.b[0] - beam.a[0], beam.b[1] - beam.a[1]) || 1;
@@ -80,20 +68,13 @@ function beamAt(
     const [bx, by] = direction(beam);
     if (Math.abs(cx * by - cy * bx) < 0.1) continue;
     const depth = beam.bar.profile?.h ?? 0;
-    if (
-      carried.top > beam.top + BEAM_TOP_TOLERANCE ||
-      carried.top < beam.top - depth - BEAM_TOP_TOLERANCE
-    ) {
-      continue;
-    }
+    if (carried.top > beam.top + BEAM_TOP_TOLERANCE || carried.top < beam.top - depth - BEAM_TOP_TOLERANCE) continue;
     const { distance, t } = projectOntoSegment(point, beam.a, beam.b);
     const along = t * beam.lengthM * 1000;
     const flange = (beam.bar.profile?.b ?? 0) / 2 + 50;
     if (distance > flange) continue;
     if (along < BEAM_END_CLEARANCE || along > beam.lengthM * 1000 - BEAM_END_CLEARANCE) continue;
-    if (!best || distance < best.distance) {
-      best = { ref: { type: 'beam', id: beam.bar.id, at: along }, distance };
-    }
+    if (!best || distance < best.distance) best = { ref: { type: 'beam', id: beam.bar.id, at: along }, distance };
   }
   return best?.ref ?? { type: 'none' };
 }
@@ -134,10 +115,7 @@ function analysisOrder(
  * @invariant a reaction is delivered to exactly one support per beam end (column, beam, or lost)
  * @failure end supported by nothing -> reaction lost, warning
  */
-export function analyseFraming(
-  beams: ReadonlyArray<BeamLoads>,
-  columns: ReadonlyArray<SteelBar>,
-): FramingResult {
+export function analyseFraming(beams: ReadonlyArray<BeamLoads>, columns: ReadonlyArray<SteelBar>): FramingResult {
   const warnings: string[] = [];
   const ends = new Map<string, readonly [SupportRef, SupportRef]>();
   for (const beam of beams) {
@@ -150,9 +128,7 @@ export function analyseFraming(
   }
   const { order, cyclic } = analysisOrder(beams, ends);
   if (cyclic.length > 0) {
-    warnings.push(
-      `circular beam framing at ${cyclic.map((beam) => beam.bar.mark).join(', ')}: reactions transferred in model order`,
-    );
+    warnings.push(`circular beam framing at ${cyclic.map((beam) => beam.bar.mark).join(', ')}: reactions transferred in model order`);
   }
   const results = new Map<string, BeamResult>();
   const columnNodes = new Map<string, ColumnNode[]>();

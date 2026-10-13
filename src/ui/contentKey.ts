@@ -1,9 +1,5 @@
-/**
- * @layer ui
- * React key for a form seeded from an immutable document object: its content hash, so the
- * form remounts (re-seeds its draft) exactly when the object's content changes — undo, live sync,
- * an agent edit — and keeps its draft otherwise. The hash is computed once per object identity.
- */
+// React key of a form seeded from an immutable document object: its content hash (once per identity), so the form
+// re-seeds exactly when the content changes (undo, live sync, an agent edit).
 
 import { hashText } from '@lib/hash';
 

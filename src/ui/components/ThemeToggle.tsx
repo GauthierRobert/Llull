@@ -1,9 +1,4 @@
-/**
- * @layer ui/components
- *
- * ThemeToggle — icon button flipping the dark / light color theme.
- * Reads/writes useThemeStore only (presentation state).
- */
+// Dark / light theme toggle (useThemeStore).
 
 import React from 'react';
 import { useThemeStore } from '@ui/store';
@@ -14,12 +9,5 @@ export function ThemeToggle(): React.ReactElement {
   const toggleTheme = useThemeStore((s) => s.toggleTheme);
   const label = `Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`;
 
-  return (
-    <IconButton
-      icon={theme === 'dark' ? 'sun' : 'moon'}
-      size={16}
-      label={label}
-      onClick={toggleTheme}
-    />
-  );
+  return <IconButton icon={theme === 'dark' ? 'sun' : 'moon'} size={16} label={label} onClick={toggleTheme} />;
 }

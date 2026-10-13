@@ -1,26 +1,9 @@
-/**
- * @layer ui/viewport/2d
- *
- * Pure geometry helpers for the interactive 2D modify tools.
- *
- * All functions are deterministic and side-effect free — they compute
- * dispatch params from raw pick coordinates. Unit-tested in tests/unit/.
- *
- * @pure
- */
+// Pure pick geometry for the 2D select/modify tools. 2D entity geometry is local to its work plane; picks shift by `position`.
 
 import { ellipsePoint } from '@lib/arc';
 import { distance, pointInPolygon, projectOntoSegment } from '@lib/polygon';
 import type * as THREE from 'three';
-import type {
-  CadDocument,
-  DimensionEntity,
-  Entity,
-  EntityId,
-  ImageEntity,
-  TextEntity,
-  Vec2,
-} from '@core/model/types';
+import type { CadDocument, DimensionEntity, Entity, EntityId, ImageEntity, TextEntity, Vec2 } from '@core/model/types';
 import { is3D } from '@core/model/types';
 import { GLYPH_WIDTH_RATIO, textLocalBounds } from '@core/geometry/bounds';
 import { closedShapeArea } from '@core/geometry/shapeArea';
@@ -32,29 +15,17 @@ import { solidSegments } from './solidDrawing';
 import { segmentsDistSq } from './solidDrawingEdges';
 import { rectangleCorners } from '../lineGeometry';
 
-/** Pick radius in screen pixels (selection and modify-tool picks). */
 export const PICK_RADIUS_PX = 10;
 
 interface NearestVertexResult {
-  /** 0-based index of the nearest vertex. */
   vertexIndex: number;
-  /** World-space position of that vertex. */
   point: Vec2;
-  /** Squared distance from the pick point to the vertex. */
   distSq: number;
 }
 
-/**
- * Find the vertex on a polyline that is nearest to a pick point.
- *
- * Returns null when the points array is empty.
- *
- * @pure
- * @failure returns null when points is empty
- */
+/** @failure empty points -> null */
 export function nearestVertex(points: ReadonlyArray<Vec2>, pick: Vec2): NearestVertexResult | null {
   if (points.length === 0) return null;
-
   let best: NearestVertexResult | null = null;
   points.forEach((point, vertexIndex) => {
     const dx = point[0] - pick[0];
@@ -65,68 +36,27 @@ export function nearestVertex(points: ReadonlyArray<Vec2>, pick: Vec2): NearestV
   return best;
 }
 
-/**
- * Determine the sign of the offset distance from a pick point relative to a line.
- *
- * Positive → the pick point is to the LEFT of start→end (same as offset_2d convention).
- * Negative → to the RIGHT.
- * Zero → pick is on the line; returns +1 by default.
- *
- * @pure
- */
+/** offset_2d convention: +1 when `pick` is LEFT of start→end (or on it), else -1. */
 export function offsetSideSign(start: Vec2, end: Vec2, pick: Vec2): 1 | -1 {
-  // Cross product of (end-start) × (pick-start)
-  const dx = end[0] - start[0];
-  const dy = end[1] - start[1];
-  const px = pick[0] - start[0];
-  const py = pick[1] - start[1];
-  const cross = dx * py - dy * px;
-  return cross >= 0 ? 1 : -1;
+  return (end[0] - start[0]) * (pick[1] - start[1]) - (end[1] - start[1]) * (pick[0] - start[0]) >= 0 ? 1 : -1;
 }
 
-/**
- * `distance` signed by the side of the entity's first segment on which `worldPick` lies
- * (offset_2d convention: positive = left of start→end). Unsigned when there is no pick, no
- * entity, or the entity has no first segment.
- *
- * @pure
- */
-export function signedOffsetDistance(
-  entity: Entity | undefined,
-  worldPick: Vec2 | null,
-  distance: number,
-): number {
+/** `distance` signed by the side of the entity's first segment `worldPick` is on; unsigned without pick/entity/segment. */
+export function signedOffsetDistance(entity: Entity | undefined, worldPick: Vec2 | null, distance: number): number {
   if (entity === undefined || worldPick === null) return distance;
-  // Shift the world-space pick into the entity's local frame.
   const localPick: Vec2 = [worldPick[0] - entity.position[0], worldPick[1] - entity.position[1]];
   if (entity.kind === 'line') return distance * offsetSideSign(entity.start, entity.end, localPick);
   const [first, second] = entity.kind === 'polyline' ? entity.points : [];
   return first && second ? distance * offsetSideSign(first, second, localPick) : distance;
 }
 
-/** Squared distance from point P to the segment AB. @pure */
 function pointToSegDistSq(p: Vec2, a: Vec2, b: Vec2): number {
   return projectOntoSegment(p, a, b).distance ** 2;
 }
 
-/**
- * Minimum squared distance from a world-space pick point to a 2D entity.
- *
- * All 2D entity geometry is LOCAL to the entity's work plane; `entity.position`
- * is the work-plane origin in world space. The world-space pick is shifted into
- * the entity's local frame and all geometry is compared in that frame.
- *
- * Handles: line, polyline, circle, rectangle, point, arc (swept range only),
- * ellipse (sampled), spline (through its control points), image (its frame, unless locked).
- * Returns Infinity for unsupported kinds.
- *
- * @pure
- */
+/** Squared pick distance to a 2D entity's outline (arc: swept range only; spline: control polygon); Infinity if unsupported. */
 export function entityDistSq(entity: Entity, worldPick: Vec2): number {
-  // Shift pick into local frame — same for every kind.
-  const ox = entity.position[0];
-  const oy = entity.position[1];
-  const pick: Vec2 = [worldPick[0] - ox, worldPick[1] - oy];
+  const pick: Vec2 = [worldPick[0] - entity.position[0], worldPick[1] - entity.position[1]];
 
   switch (entity.kind) {
     case 'line':
@@ -141,24 +71,12 @@ export function entityDistSq(entity: Entity, worldPick: Vec2): number {
       return d * d;
     }
     case 'arc': {
-      // Distance to the nearest point on the swept arc (not its full circle).
       const [cx, cy] = entity.center;
-      const [nx, ny] = nearestOnArc(
-        pick[0],
-        pick[1],
-        cx,
-        cy,
-        entity.radius,
-        entity.startAngle,
-        entity.endAngle,
-        false,
-      );
+      const [nx, ny] = nearestOnArc(pick[0], pick[1], cx, cy, entity.radius, entity.startAngle, entity.endAngle, false);
       return distance(pick, [nx, ny]) ** 2;
     }
-    case 'rectangle': {
-      // Rectangle corners are in local space (lower-left at local origin).
+    case 'rectangle':
       return chainDistSq(pick, rectangleCorners(entity.width, entity.height), true);
-    }
     case 'point':
       return distance(pick, [0, 0]) ** 2;
     case 'text': {
@@ -169,10 +87,10 @@ export function entityDistSq(entity: Entity, worldPick: Vec2): number {
     }
     case 'ellipse': {
       const { center, radiusX, radiusY } = entity;
-      const samples = Array.from({ length: ELLIPSE_PICK_SAMPLES + 1 }, (_, i): Vec2 => {
-        const t = (i / ELLIPSE_PICK_SAMPLES) * 2 * Math.PI;
-        return ellipsePoint(center, radiusX, radiusY, t);
-      });
+      const samples = Array.from(
+        { length: ELLIPSE_PICK_SAMPLES + 1 },
+        (_, i): Vec2 => ellipsePoint(center, radiusX, radiusY, (i / ELLIPSE_PICK_SAMPLES) * 2 * Math.PI),
+      );
       return chainDistSq(pick, samples, false);
     }
     case 'image': {
@@ -184,30 +102,20 @@ export function entityDistSq(entity: Entity, worldPick: Vec2): number {
   }
 }
 
-/**
- * World-XY frame (4 corners, pixel order) of an image underlay; null when it is locked, so a locked
- * underlay is never picked or box-selected while tracing over it.
- * @pure
- */
+/** World-XY corners of an image underlay; null when locked, so it is never picked while tracing over it. */
 export function underlayFrame(entity: ImageEntity): Vec2[] | null {
   if (entity.locked) return null;
   return underlayCorners(entity).map(([x, y]): Vec2 => [x, y]);
 }
 
-/**
- * Entity-local pick box of a text entity, projected from core `textLocalBounds` (the one layout
- * estimate); the block is centred vertically on the entity origin.
- * @pure
- */
+/** Entity-local text box from core `textLocalBounds`, centred vertically on the origin. */
 export function textLocalBox(entity: TextEntity): { left: number; width: number; height: number } {
   const { min, max } = textLocalBounds(entity);
   return { left: min[0], width: max[0] - min[0], height: max[1] - min[1] };
 }
 
-/** Segments used to approximate an ellipse outline for picking. */
 const ELLIPSE_PICK_SAMPLES = 48;
 
-/** Minimum squared distance from `pick` to a chain of segments (optionally closed). @pure */
 function chainDistSq(pick: Vec2, points: ReadonlyArray<Vec2>, closed: boolean): number {
   let best = Infinity;
   for (let i = 0; i < points.length - 1; i++) {
@@ -223,25 +131,17 @@ function chainDistSq(pick: Vec2, points: ReadonlyArray<Vec2>, closed: boolean): 
   return best;
 }
 
-/** Dimension label height (world units) used for picking — matches DimensionRenderer2D. */
+/** Matches DimensionRenderer2D. */
 const DIMENSION_LABEL_HEIGHT = 0.5;
 
 interface LabelBox {
-  /** World-space centre of the label. */
   readonly center: Vec2;
   readonly halfWidth: number;
   readonly halfHeight: number;
 }
 
-/**
- * World-space box of a dimension's label (width estimated from the label text).
- * Dimensions are associative, so the label position comes from the referenced entities.
- * @failure dangling or wrong-kind references -> null
- */
-export function dimensionLabelBox(
-  document: CadDocument,
-  dimension: DimensionEntity,
-): LabelBox | null {
+/** World box of an (associative) dimension's label. @failure dangling or wrong-kind references -> null */
+export function dimensionLabelBox(document: CadDocument, dimension: DimensionEntity): LabelBox | null {
   const drawing = dimensionDrawing(
     dimension.dimensionKind,
     dimension.entityIds.map((id) => document.entities[id]),
@@ -263,15 +163,8 @@ export function dimensionLabelBox(
   };
 }
 
-/**
- * Squared distance from `worldPick` to a dimension's label box.
- * @failure dangling or wrong-kind references -> Infinity (not pickable)
- */
-export function dimensionLabelDistSq(
-  document: CadDocument,
-  dimension: DimensionEntity,
-  worldPick: Vec2,
-): number {
+/** @failure dangling or wrong-kind references -> Infinity (not pickable) */
+export function dimensionLabelDistSq(document: CadDocument, dimension: DimensionEntity, worldPick: Vec2): number {
   const box = dimensionLabelBox(document, dimension);
   if (box === null) return Infinity;
   const dx = Math.max(Math.abs(worldPick[0] - box.center[0]) - box.halfWidth, 0);
@@ -279,15 +172,11 @@ export function dimensionLabelDistSq(
   return dx * dx + dy * dy;
 }
 
-/** Squared distance to the nearest edge of a 3D solid's drawn top view. */
 function solidEdgeDistSq(document: CadDocument, solid: Entity, worldPick: Vec2): number {
   return segmentsDistSq(solidSegments(document, solid, currentSectionCutDepth()), worldPick);
 }
 
-/**
- * Id of the first pickable entity (document order) with the lowest `score` strictly below
- * `limit`; a null score never wins.
- */
+/** First pickable entity (document order) with the lowest non-null `score` below `limit`. */
 function lowestScoringEntityId(
   document: CadDocument,
   isPickable: (entity: Entity) => boolean,
@@ -308,11 +197,6 @@ function lowestScoringEntityId(
   return bestId;
 }
 
-/**
- * Id of the entity nearest to `worldPick` within `tolerance` world units, or null.
- * Entities rejected by `isPickable` (e.g. hidden ones) are ignored.
- * @pure
- */
 export function nearestEntityId(
   document: CadDocument,
   worldPick: Vec2,
@@ -332,11 +216,7 @@ export function nearestEntityId(
   );
 }
 
-/**
- * Enclosed area of a closed 2D entity when `worldPick` lies inside it, else null.
- * Closed kinds: rectangle, circle, ellipse, closed polyline.
- * @pure
- */
+/** Area of a closed 2D entity (rectangle/circle/ellipse/closed polyline) containing `worldPick`, else null. */
 export function enclosingArea(entity: Entity, worldPick: Vec2): number | null {
   const pick: Vec2 = [worldPick[0] - entity.position[0], worldPick[1] - entity.position[1]];
   switch (entity.kind) {
@@ -367,11 +247,7 @@ export function enclosingArea(entity: Entity, worldPick: Vec2): number | null {
   return closedShapeArea(entity);
 }
 
-/**
- * Selection pick: the nearest outline within `tolerance` wins; otherwise the smallest closed
- * shape containing the point; otherwise null.
- * @pure
- */
+/** Nearest outline within `tolerance`, else the smallest closed shape containing the point. */
 export function pickEntityId(
   document: CadDocument,
   worldPick: Vec2,
@@ -380,10 +256,5 @@ export function pickEntityId(
 ): EntityId | null {
   const onOutline = nearestEntityId(document, worldPick, tolerance, isPickable);
   if (onOutline !== null) return onOutline;
-  return lowestScoringEntityId(
-    document,
-    isPickable,
-    (entity) => enclosingArea(entity, worldPick),
-    Infinity,
-  );
+  return lowestScoringEntityId(document, isPickable, (entity) => enclosingArea(entity, worldPick), Infinity);
 }

@@ -1,12 +1,5 @@
-/**
- * @layer ui
- * Build-time server configuration (Vite env, see `.env.example`).
- *
- * @invariant SERVER_BASE has no trailing slash
- * @invariant the token is embedded in the static bundle — use it only for deployments whose
- *            web app is itself access-controlled; it is required when the server runs with
- *            LLULL_REQUIRE_TOKEN_FOR_REST=true.
- */
+// Build-time server config (Vite env, `.env.example`). @invariant SERVER_BASE has no trailing slash. The shared token is
+// embedded in the bundle: only for access-controlled deployments; required with LLULL_REQUIRE_TOKEN_FOR_REST=true.
 
 const DEFAULT_SERVER_BASE = 'http://localhost:3001';
 
@@ -22,17 +15,12 @@ function serverBaseOf(configured: string | undefined): string {
   return typeof window === 'undefined' ? DEFAULT_SERVER_BASE : window.location.origin;
 }
 
-export const SERVER_BASE: string = serverBaseOf(
-  readEnvString(import.meta.env['VITE_LLULL_SERVER_URL']),
-).replace(/\/+$/, '');
+export const SERVER_BASE: string = serverBaseOf(readEnvString(import.meta.env['VITE_LLULL_SERVER_URL'])).replace(/\/+$/, '');
 
 const BUILD_API_TOKEN: string | undefined = readEnvString(import.meta.env['VITE_LLULL_API_TOKEN']);
 const TOKEN_STORAGE_KEY = 'llull.apiToken';
 
-/**
- * Per-user token for named-user servers: `localStorage['llull.apiToken']`, set once by opening the
- * app at `/#token=<token>` (the fragment is stripped). Falls back to the build-time shared token.
- */
+/** Per-user token `localStorage['llull.apiToken']`, set by opening `/#token=<token>` (fragment stripped); else the build-time token. */
 function currentApiToken(): string | undefined {
   try {
     const fragment = /^#token=(.+)$/.exec(window.location.hash)?.[1];
@@ -46,7 +34,7 @@ function currentApiToken(): string | undefined {
   }
 }
 
-/** `Authorization` header for REST mutations; empty when no token is configured. */
+/** Empty without a token. */
 export function serverAuthHeaders(): Record<string, string> {
   const token = currentApiToken();
   return token === undefined ? {} : { Authorization: `Bearer ${token}` };

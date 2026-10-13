@@ -1,8 +1,4 @@
-/**
- * Grid geometry shared by the grid-framing commands.
- * @layer domain-aec
- * @pure
- */
+/** Grid geometry shared by the grid-framing commands. */
 
 import type { Vec2 } from '@core/model/types';
 import type { BuildingModel, GridElement } from '@core/model/building';
@@ -22,15 +18,8 @@ export function gridLinesOf(building: BuildingModel): GridElement[] {
   return elementsOf(building, 'grid');
 }
 
-/**
- * Crossing of two grid segments, or null when parallel or when the crossing lies outside either
- * segment by more than `tolerance`.
- */
-export function crossGridLines(
-  a: GridElement,
-  b: GridElement,
-  tolerance: number,
-): { point: Vec2; along: number } | null {
+/** Crossing of two grid segments, or null when parallel or when the crossing lies outside either segment by more than `tolerance`. */
+export function crossGridLines(a: GridElement, b: GridElement, tolerance: number): { point: Vec2; along: number } | null {
   const dx = a.end[0] - a.start[0];
   const dy = a.end[1] - a.start[1];
   const ex = b.end[0] - b.start[0];
@@ -50,11 +39,7 @@ export function crossGridLines(
 }
 
 /** Crossings on `line` with the other `lines`, ordered along it; coincident crossings merged. */
-export function crossingsOnLine(
-  line: GridElement,
-  lines: ReadonlyArray<GridElement>,
-  tolerance: number,
-): GridCrossing[] {
+export function crossingsOnLine(line: GridElement, lines: ReadonlyArray<GridElement>, tolerance: number): GridCrossing[] {
   const found: GridCrossing[] = [];
   for (const other of lines) {
     if (other.id === line.id) continue;
@@ -68,8 +53,7 @@ export function crossingsOnLine(
   });
 }
 
-export const samePlanPoint = (p: Vec2, q: Vec2, tolerance: number): boolean =>
-  Math.hypot(p[0] - q[0], p[1] - q[1]) <= tolerance;
+export const samePlanPoint = (p: Vec2, q: Vec2, tolerance: number): boolean => Math.hypot(p[0] - q[0], p[1] - q[1]) <= tolerance;
 
 /** "A/1" or "1/A" -> ["A", "1"]; null when not two non-empty labels. */
 export function parseCrossingName(name: string): [string, string] | null {
@@ -79,7 +63,5 @@ export function parseCrossingName(name: string): [string, string] | null {
 }
 
 /** Labels in `labels` that no grid line carries. */
-export const unknownLabels = (
-  lines: ReadonlyArray<GridElement>,
-  labels: ReadonlyArray<string>,
-): string[] => labels.filter((label) => !lines.some((line) => line.mark === label));
+export const unknownLabels = (lines: ReadonlyArray<GridElement>, labels: ReadonlyArray<string>): string[] =>
+  labels.filter((label) => !lines.some((line) => line.mark === label));

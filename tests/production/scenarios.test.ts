@@ -6,8 +6,6 @@ import { gradeContext, gradeScenario } from './grade';
 import { SCENARIOS, chainOf } from './scenarios';
 
 /**
- * @layer tests/production
- *
  * Fast in-process run of every production scenario's scripted calls (no transport): the
  * engineering-office acceptance criteria hold, with exactly the scripted known issues failing.
  * The same scripts run through the real /mcp endpoint in server/tests/production.

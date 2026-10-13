@@ -1,14 +1,9 @@
 /**
- * Design-speed checks for a road alignment: minimum horizontal radius and minimum vertical curve K
- * (crest / sag), from simple AASHTO-style tables.
- * Assumptions: R = V^2 / (127 (e + f)) with superelevation e = 0.07 and the side-friction f below;
- * With a superelevation design e is its maxRate and each curve's required e = V^2/(127 R) - f must
- * not exceed it. A spiral must be at least Ls = V^3/(46.656 C R) (Barnett, comfort criterion with
- * lateral jerk C = 0.6 m/s^3, V in km/h, R and Ls in m).
- * K = stopping-sight-distance based minimum for the next table speed >= the design speed; a grade
- * change above 0.5 % needs a vertical curve.
- * @layer domain-aec/civil
- * @pure
+ * Design-speed checks for a road alignment: minimum horizontal radius and minimum vertical curve K (crest / sag), from simple AASHTO-style
+ * tables. Assumptions: R = V^2 / (127 (e + f)) with superelevation e = 0.07 and the side-friction f below; With a superelevation design e
+ * is its maxRate and each curve's required e = V^2/(127 R) - f must not exceed it. A spiral must be at least Ls = V^3/(46.656 C R)
+ * (Barnett, comfort criterion with lateral jerk C = 0.6 m/s^3, V in km/h, R and Ls in m). K = stopping-sight-distance based minimum for the
+ * next table speed >= the design speed; a grade change above 0.5 % needs a vertical curve.
  */
 
 import type { CadDocument } from '@core/model/types';
@@ -23,25 +18,14 @@ export const MAX_SUPERELEVATION = 0.07;
 export const LATERAL_JERK = 0.6;
 
 /** Speed km/h -> [side friction f, minimum crest K, minimum sag K]. */
+// prettier-ignore
 const SPEED_TABLE: ReadonlyArray<readonly [number, number, number, number]> = [
-  [20, 0.35, 1, 3],
-  [30, 0.28, 2, 6],
-  [40, 0.23, 4, 9],
-  [50, 0.19, 7, 13],
-  [60, 0.17, 11, 18],
-  [70, 0.15, 17, 23],
-  [80, 0.14, 26, 30],
-  [90, 0.13, 39, 38],
-  [100, 0.12, 52, 45],
-  [110, 0.11, 74, 55],
-  [120, 0.09, 95, 63],
+  [20, 0.35, 1, 3], [30, 0.28, 2, 6], [40, 0.23, 4, 9], [50, 0.19, 7, 13], [60, 0.17, 11, 18], [70, 0.15, 17, 23], [80, 0.14, 26, 30],
+  [90, 0.13, 39, 38], [100, 0.12, 52, 45], [110, 0.11, 74, 55], [120, 0.09, 95, 63],
 ];
 
 function rowFor(speed: number): readonly [number, number, number, number] {
-  return (
-    SPEED_TABLE.find((row) => row[0] >= speed) ??
-    (SPEED_TABLE[SPEED_TABLE.length - 1] as readonly [number, number, number, number])
-  );
+  return SPEED_TABLE.find((row) => row[0] >= speed) ?? (SPEED_TABLE[SPEED_TABLE.length - 1] as readonly [number, number, number, number]);
 }
 
 export interface DesignChecks {
@@ -71,11 +55,7 @@ export interface DesignChecks {
   readonly failures: string[];
 }
 
-export function designChecks(
-  doc: CadDocument,
-  alignment: AlignmentObject,
-  designSpeedKmh: number,
-): DesignChecks {
+export function designChecks(doc: CadDocument, alignment: AlignmentObject, designSpeedKmh: number): DesignChecks {
   const [, friction, crestK, sagK] = rowFor(designSpeedKmh);
   const maxRate = alignment.superelevation?.maxRate ?? MAX_SUPERELEVATION;
   const minRadius = (designSpeedKmh * designSpeedKmh) / (127 * (maxRate + friction));
@@ -104,10 +84,7 @@ export function designChecks(
   });
   const spirals = horizontalElements(alignment).flatMap((element) => {
     if (element.kind !== 'spiral') return [];
-    const radiusM = toMetres(
-      doc,
-      Number.isFinite(element.radiusEnd) ? element.radiusEnd : element.radiusStart,
-    );
+    const radiusM = toMetres(doc, Number.isFinite(element.radiusEnd) ? element.radiusEnd : element.radiusStart);
     const lengthM = toMetres(doc, element.length);
     const minLengthM = designSpeedKmh ** 3 / (46.656 * LATERAL_JERK * radiusM);
     const station = stationText(doc, element.startStation);
@@ -117,14 +94,7 @@ export function designChecks(
         `Spiral at ${station}: Ls=${lengthM.toFixed(1)} m is below the minimum ${minLengthM.toFixed(1)} m for ${designSpeedKmh} km/h on R=${radiusM.toFixed(1)} m.`,
       );
     }
-    return [
-      {
-        station,
-        lengthM: Number(lengthM.toFixed(2)),
-        minLengthM: Number(minLengthM.toFixed(1)),
-        ok,
-      },
-    ];
+    return [{ station, lengthM: Number(lengthM.toFixed(2)), minLengthM: Number(minLengthM.toFixed(1)), ok }];
   });
   const profileOk = validateProfile(alignment.profile) === null;
   const vertical = (profileOk ? verticalCurves(alignment.profile) : []).map((curve) => {
@@ -157,9 +127,8 @@ export function designChecks(
   return {
     designSpeedKmh,
     assumptions:
-      `Minimum radius R = V^2/(127(e+f)) with e = ${maxRate} and f = ${friction} ` +
-      `(table value for ${rowFor(designSpeedKmh)[0]} km/h); minimum K crest ${crestK}, sag ${sagK} ` +
-      `(stopping sight distance); spiral Ls >= V^3/(46.656 C R) with C = ${LATERAL_JERK} m/s^3; ` +
+      `Minimum radius R = V^2/(127(e+f)) with e = ${maxRate} and f = ${friction} (table value for ${rowFor(designSpeedKmh)[0]} km/h); ` +
+      `minimum K crest ${crestK}, sag ${sagK} (stopping sight distance); spiral Ls >= V^3/(46.656 C R) with C = ${LATERAL_JERK} m/s^3; ` +
       'grade breaks over 0.5 % need a vertical curve.',
     horizontal,
     spirals,

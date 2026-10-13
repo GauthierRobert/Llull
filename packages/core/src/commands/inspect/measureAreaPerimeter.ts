@@ -8,9 +8,6 @@ import { elementAt } from '../../lib/elementAt';
 import { positiveSweep } from '../../lib/angle';
 
 /**
- * @command measure_area
- * @pure
- * @layer core/commands
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data is { area: number, unit: string } where unit is derived (e.g. "mm²")
  * @failure open profile, non-2D entity, < 3 points, or missing id -> no-op, affected:[], no data
@@ -27,9 +24,7 @@ export const measureArea = defineCommand({
     entityId: z
       .string()
       .optional()
-      .describe(
-        "Id of a closed 2D shape entity: 'polyline' (must have closed:true), 'rectangle', 'circle', or 'ellipse'.",
-      ),
+      .describe("Id of a closed 2D shape entity: 'polyline' (must have closed:true), 'rectangle', 'circle', or 'ellipse'."),
     points: z
       .array(z.tuple([z.number(), z.number()]))
       .optional()
@@ -41,31 +36,17 @@ export const measureArea = defineCommand({
   run: (doc, { entityId, points }): CommandResult => {
     const areaUnit = `${doc.units}²`;
     const measured = (area: number, subject: string): CommandResult =>
-      report(doc, `Area${subject} = ${area.toFixed(doc.displayPrecision)} ${areaUnit}.`, {
-        area,
-        unit: areaUnit,
-      });
-
+      report(doc, `Area${subject} = ${area.toFixed(doc.displayPrecision)} ${areaUnit}.`, { area, unit: areaUnit });
     if (points) {
-      if (points.length < 3)
-        return noop(doc, `measure_area: points must have >= 3 vertices, got ${points.length}.`);
+      if (points.length < 3) return noop(doc, `measure_area: points must have >= 3 vertices, got ${points.length}.`);
       return measured(polygonArea(points), '');
     }
-
     if (!entityId) return noop(doc, 'measure_area: provide either entityId or points.');
-
     const e = doc.entities[entityId];
     if (!e) return noop(doc, `measure_area: entity '${entityId}' not found.`);
-
     if (e.kind === 'polyline') {
-      if (!e.closed) {
-        return noop(
-          doc,
-          `measure_area: polyline '${entityId}' is not closed — cannot compute area.`,
-        );
-      }
-      if (e.points.length < 3)
-        return noop(doc, `measure_area: polyline '${entityId}' has fewer than 3 points.`);
+      if (!e.closed) return noop(doc, `measure_area: polyline '${entityId}' is not closed — cannot compute area.`);
+      if (e.points.length < 3) return noop(doc, `measure_area: polyline '${entityId}' has fewer than 3 points.`);
     }
     const area = closedShapeArea(e);
     if (area === null)
@@ -78,9 +59,6 @@ export const measureArea = defineCommand({
 });
 
 /**
- * @command measure_perimeter
- * @pure
- * @layer core/commands
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data is { perimeter: number, unit: string }
  * @failure non-2D entity or missing id -> no-op, affected:[], no data
@@ -96,14 +74,11 @@ export const measurePerimeter = defineCommand({
   params: z.object({
     entityId: z
       .string()
-      .describe(
-        "Id of the 2D shape entity to measure. Supported kinds: 'line', 'polyline', 'rectangle', 'circle', 'arc'.",
-      ),
+      .describe("Id of the 2D shape entity to measure. Supported kinds: 'line', 'polyline', 'rectangle', 'circle', 'arc'."),
   }),
   run: (doc, { entityId }): CommandResult => {
     const e = doc.entities[entityId];
     if (!e) return noop(doc, `measure_perimeter: entity '${entityId}' not found.`);
-
     let perimeter: number;
     switch (e.kind) {
       case 'line':
@@ -112,10 +87,7 @@ export const measurePerimeter = defineCommand({
       case 'polyline':
         perimeter = e.closed
           ? polygonPerimeter(e.points)
-          : e.points.reduce(
-              (sum, p, i, pts) => (i === 0 ? 0 : sum + distance(elementAt(pts, i - 1), p)),
-              0,
-            );
+          : e.points.reduce((sum, p, i, pts) => (i === 0 ? 0 : sum + distance(elementAt(pts, i - 1), p)), 0);
         break;
       case 'rectangle':
         perimeter = 2 * (e.width + e.height);
@@ -135,10 +107,6 @@ export const measurePerimeter = defineCommand({
             "supported kinds are 'line', 'polyline', 'rectangle', 'circle', 'arc'.",
         );
     }
-
-    return report(doc, `Perimeter of ${entityId} = ${formatLength(doc, perimeter)}.`, {
-      perimeter,
-      unit: doc.units,
-    });
+    return report(doc, `Perimeter of ${entityId} = ${formatLength(doc, perimeter)}.`, { perimeter, unit: doc.units });
   },
 });

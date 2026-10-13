@@ -1,10 +1,4 @@
-/**
- * @layer ui/components
- *
- * McpConnect — modal dialog showing how to connect an MCP agent (McpConnectButton in the TopBar
- * opens it). Focus is trapped while open and restored to the trigger on close.
- * Presentation ONLY (PRIME DIRECTIVE).
- */
+// Modal "connect an MCP agent" dialog (opened by McpConnectButton in the TopBar); focus trapped, restored on close.
 
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { listCommands } from '@core/commands/registry';
@@ -17,14 +11,9 @@ const SERVER_INSTALL_CMD = 'npm --prefix server install && npm --prefix server r
 const SERVER_START_CMD = 'npm --prefix server run dev';
 const ENDPOINT_URL = `${SERVER_BASE}/mcp`;
 
-/** Capability badges; the command count is read from the live registry, never hard-coded. */
+/** The command count comes from the live registry. */
 function capabilityBadges(): readonly string[] {
-  return [
-    `${listCommands().length} commands`,
-    'structuredContent',
-    'prompts (EN2)',
-    'session isolation',
-  ];
+  return [`${listCommands().length} commands`, 'structuredContent', 'prompts (EN2)', 'session isolation'];
 }
 
 interface AgentLoopStep {
@@ -35,35 +24,18 @@ interface AgentLoopStep {
 const AGENT_LOOP_STEPS: readonly AgentLoopStep[] = [
   {
     tool: 'read cad://conventions',
-    description:
-      'Load the llull conventions resource to understand coordinate axes, units, and entity kinds.',
+    description: 'Load the llull conventions resource to understand coordinate axes, units, and entity kinds.',
   },
-  {
-    tool: 'describe_scene',
-    description: 'Inspect the current document: all entities, layers, and their properties.',
-  },
+  { tool: 'describe_scene', description: 'Inspect the current document: all entities, layers, and their properties.' },
   {
     tool: 'add_box (or any create/edit command)',
-    description:
-      'Create or modify geometry via any registered command (add_box, draw_polyline, extrude_profile, …).',
+    description: 'Create or modify geometry via any registered command (add_box, draw_polyline, extrude_profile, …).',
   },
-  {
-    tool: 'render_view',
-    description:
-      'Render a screenshot with axes, grid, units, and showLabels:true to verify the result visually.',
-  },
-  {
-    tool: 'check_model',
-    description: 'Validate the model (watertight, no self-intersections) after modifications.',
-  },
+  { tool: 'render_view', description: 'Render a screenshot with axes, grid, units, and showLabels:true to verify the result visually.' },
+  { tool: 'check_model', description: 'Validate the model (watertight, no self-intersections) after modifications.' },
 ];
 
-interface CopyButtonProps {
-  readonly text: string;
-  readonly label: string;
-}
-
-function CopyButton({ text, label }: CopyButtonProps): React.ReactElement {
+function CopyButton({ text, label }: { readonly text: string; readonly label: string }): React.ReactElement {
   const [copied, setCopied] = useState(false);
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -147,7 +119,7 @@ function McpAgentLoop(): React.ReactElement {
 }
 
 interface McpConnectProps {
-  /** Called when the dialog requests close (Esc, backdrop click, close button). */
+  /** Esc, backdrop click, close button. */
   readonly onClose: () => void;
 }
 
@@ -174,14 +146,7 @@ export function McpConnect({ onClose }: McpConnectProps): React.ReactElement {
           </h2>
           <p className="mcp-connect__subtitle">Let Claude or any MCP client drive this canvas.</p>
         </div>
-        <IconButton
-          icon="close"
-          size={14}
-          className="mcp-connect__close"
-          label="Close dialog"
-          title="Close"
-          onClick={onClose}
-        />
+        <IconButton icon="close" size={14} className="mcp-connect__close" label="Close dialog" title="Close" onClick={onClose} />
       </div>
 
       <div className="mcp-connect__body">
@@ -193,15 +158,10 @@ export function McpConnect({ onClose }: McpConnectProps): React.ReactElement {
           ))}
         </div>
 
-        <ConnectStep
-          step={1}
-          ariaLabel="Install and start server"
-          label="Install & start the MCP server"
-        >
+        <ConnectStep step={1} ariaLabel="Install and start server" label="Install & start the MCP server">
           <CodeRow code={SERVER_INSTALL_CMD} copyLabel="install and start command" />
           <p className="mcp-connect__hint mcp-connect__hint--inline">
-            If the server is already installed, use:{' '}
-            <code className="mcp-connect__inline-code">{SERVER_START_CMD}</code>
+            If the server is already installed, use: <code className="mcp-connect__inline-code">{SERVER_START_CMD}</code>
           </p>
         </ConnectStep>
 
@@ -209,8 +169,7 @@ export function McpConnect({ onClose }: McpConnectProps): React.ReactElement {
           <CodeRow code={ENDPOINT_URL} copyLabel="endpoint URL" />
           <p className="mcp-connect__hint mcp-connect__hint--inline">
             Point your MCP client (Claude Desktop, Cursor, etc.) at this URL. Set{' '}
-            <code className="mcp-connect__inline-code">MCP_AUTH_TOKEN</code> to protect the endpoint
-            in production.
+            <code className="mcp-connect__inline-code">MCP_AUTH_TOKEN</code> to protect the endpoint in production.
           </p>
         </ConnectStep>
 
@@ -234,7 +193,7 @@ export function McpConnectButton(): React.ReactElement {
 
   const handleClose = (): void => {
     setOpen(false);
-    // Restore focus to the trigger after the next paint.
+    // After the next paint.
     if (focusTimer.current !== null) clearTimeout(focusTimer.current);
     focusTimer.current = setTimeout(() => triggerRef.current?.focus(), 0);
   };

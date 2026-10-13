@@ -18,25 +18,21 @@ describe('clearTangentContact', () => {
     expect(gap).toBeGreaterThan(0);
     expect(gap).toBeLessThanOrEqual(3 * TANGENT_GAP * 3);
   });
-
   it('detects tangency with the far face of a box the centre sits inside the slab of', () => {
     // Centre z=0 is 1 below the box centre; the top face z=3 is exactly r=3 away (the crash case).
     const [clear] = clearTangentContact(sphere([1, 1, 0], 3), box([2, 1, 1], [5, 3, 4]));
     expect(radiusOf(clear)).toBeLessThan(3);
   });
-
   it('works whichever operand comes first', () => {
     const [first, second] = clearTangentContact(box([0, 0, 0], [4, 4, 4]), sphere([0, 0, 5], 3));
     expect(first.kind).toBe('box');
     expect(radiusOf(second)).toBeLessThan(3);
   });
-
   it('shrinks a sphere inscribed in a box (inside tangency)', () => {
     const [clear] = clearTangentContact(sphere([0, 0, 0], 2), box([0, 0, 0], [4, 4, 4]));
     expect(radiusOf(clear)).toBeLessThan(2);
     expect(radiusOf(clear)).toBeGreaterThan(2 - 1e-3);
   });
-
   it('follows a rotated, translated box', () => {
     // Local +X face of an 8-long box turned 90 degrees about Z sits at world y = 1 + 4.
     const turned = box([0, 1, 0], [8, 2, 2], [0, 0, Math.PI / 2]);
@@ -48,7 +44,6 @@ describe('clearTangentContact', () => {
     const translated = clearTangentContact(sphere([6, 1, 1], 3), box([1, 1, 1], [4, 4, 4]))[0];
     expect(radiusOf(translated)).toBeLessThan(3);
   });
-
   it('leaves a sphere tangent to the face plane but outside the face bounds unchanged', () => {
     // Plane z = 2 is exactly r = 3 below the centre, but the centre's foot (x = 10) is off the face.
     const offFace = sphere([10, 0, 5], 3);
@@ -56,7 +51,6 @@ describe('clearTangentContact', () => {
     const offFaceY = sphere([0, -9, 5], 3);
     expect(clearTangentContact(offFaceY, box([0, 0, 0], [4, 4, 4]))[0]).toBe(offFaceY);
   });
-
   it('leaves non-tangent spheres, other kinds and sphere-sphere pairs untouched', () => {
     const away = sphere([0, 0, 6], 3);
     expect(clearTangentContact(away, box([0, 0, 0], [4, 4, 4]))[0]).toBe(away);

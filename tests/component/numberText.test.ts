@@ -9,13 +9,11 @@ describe('numberText', () => {
     expect(parseNumber('abc')).toBeUndefined();
     expect(parseNumber('Infinity')).toBeUndefined();
   });
-
   it('builds an optional param only for a number', () => {
     expect(optionalNumber('height', '3')).toEqual({ height: 3 });
     expect(optionalNumber('height', ' ')).toEqual({});
     expect(optionalNumber('height', 'x')).toEqual({});
   });
-
   it('splits rows and lists on commas, semicolons and spaces', () => {
     expect(parseNumberRow('1, 2 3')).toEqual([1, 2, 3]);
     expect(parseNumberRow('1, a')).toBeNull();

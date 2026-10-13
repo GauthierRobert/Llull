@@ -1,11 +1,9 @@
 /**
  * Execution context — the injected dependencies of one `execute` call.
- *
- * @layer core/commands
- * @invariant a command reads its kernel, id source and registry ONLY from its context
- *   (architecture L9, solid S5); no command touches a module-level singleton.
- * @invariant contexts nest: a command that calls `execute` (build_project, replay, recipes)
- *   runs the inner command in the caller's context unless it passes its own.
+ * @invariant a command reads its kernel, id source and registry ONLY from its context (architecture L9, solid S5); no command touches a
+ *   module-level singleton.
+ * @invariant contexts nest: a command that calls `execute` (build_project, replay, recipes) runs the inner command in the caller's context
+ *   unless it passes its own.
  */
 
 import { getGeometryKernel } from '../geometry/kernel';
@@ -30,8 +28,8 @@ const replayCaches = new WeakMap<object, ReplayCache>();
 const NO_KERNEL = {};
 
 /**
- * Context built from the process defaults: installed kernel, counter ids, registry. The kernel
- * caches its own shapes by recipe key (`kernelFromOps`), so no wrapper is needed here.
+ * Context built from the process defaults: installed kernel, counter ids, registry. The kernel caches its own shapes by recipe key
+ * (`kernelFromOps`), so no wrapper is needed here.
  */
 export function defaultContext(): ExecutionContext {
   const kernel = getGeometryKernel();

@@ -1,53 +1,29 @@
-/**
- * @layer ui/store
- *
- * Tool store — which view is shown, which 2D draw or modify tool is armed (at most one),
- * which 3D transform gizmo mode is active, and whether the shortcut sheet is open. Shared by the main
- * toolbar, the keyboard shortcuts, the hint bar and both viewports.
- * Presentation-only state; never part of CadDocument (architecture L7).
- */
+// Presentation-only tool state: shown view, armed 2D draw OR modify tool, gizmo mode, shortcut sheet.
 
 import { create } from 'zustand';
 
 export type ViewMode = '3d' | '2d';
 
-export type DrawToolKind =
-  | 'none'
-  | 'move'
-  | 'line'
-  | 'polyline'
-  | 'wall'
-  | 'circle'
-  | 'rectangle'
-  | 'point'
-  | 'ellipse'
-  | 'spline';
+export type DrawToolKind = 'none' | 'move' | 'line' | 'polyline' | 'wall' | 'circle' | 'rectangle' | 'point' | 'ellipse' | 'spline';
 
-export type ModifyToolKind =
-  | 'none'
-  | 'offset'
-  | 'fillet'
-  | 'chamfer'
-  | 'trim'
-  | 'extend'
-  | 'explode';
+export type ModifyToolKind = 'none' | 'offset' | 'fillet' | 'chamfer' | 'trim' | 'extend' | 'explode';
 
 export type GizmoMode = 'translate' | 'rotate' | 'scale';
 
 interface ToolStoreState {
   viewMode: ViewMode;
-  /** Armed 2D tool; only meaningful in the 2D view. */
+  /** Only meaningful in 2D. */
   drawTool: DrawToolKind;
-  /** Armed 2D modify tool; mutually exclusive with drawTool. */
+  /** Mutually exclusive with drawTool. */
   modifyTool: ModifyToolKind;
   gizmoMode: GizmoMode;
   shortcutsOpen: boolean;
   setViewMode(viewMode: ViewMode): void;
-  /** Arm a 2D draw tool; arming any tool other than 'none' disarms the modify tool and shows 2D. */
+  /** Arming anything but 'none' disarms the modify tool and shows 2D. */
   setDrawTool(drawTool: DrawToolKind): void;
-  /** Arm `drawTool`, or disarm it when it is already the armed draw tool. */
+  /** Disarms when already armed. */
   toggleDrawTool(drawTool: DrawToolKind): void;
-  /** Arm a 2D modify tool; arming any tool other than 'none' disarms the draw tool and shows 2D. */
+  /** Arming anything but 'none' disarms the draw tool and shows 2D. */
   setModifyTool(modifyTool: ModifyToolKind): void;
   setGizmoMode(gizmoMode: GizmoMode): void;
   setShortcutsOpen(shortcutsOpen: boolean): void;

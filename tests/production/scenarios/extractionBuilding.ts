@@ -10,8 +10,6 @@ import { plantScript } from '../plant/script';
 import { extractionIntent } from './extractionIntent';
 
 /**
- * @layer tests/production/scenarios
- *
  * Desmet-type job 1: model the solvent extraction building (structure + equipment + main lines)
  * from the brief and issue the coordination package.
  */
@@ -29,9 +27,6 @@ export const extractionBuilding: Scenario = {
     ...deliverableCriteria(extractionIntent),
     ...integrityCriteria(),
   ],
-  knownIssues: {
-    scripted: [],
-    ui: [],
-  },
+  knownIssues: { scripted: [], ui: [] },
   agentBaseline: 0.6,
 };

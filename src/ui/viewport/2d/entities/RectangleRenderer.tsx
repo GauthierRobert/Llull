@@ -1,8 +1,4 @@
-/**
- * @layer ui/viewport/2d
- * Render branch for `kind:'rectangle'`: closed 4-corner loop, lower-left at the entity origin,
- * width along +X and height along +Y.
- */
+// `kind:'rectangle'`: closed loop, lower-left at the origin, width +X, height +Y.
 
 import { useMemo } from 'react';
 import type { RectangleEntity } from '@core/model/types';
@@ -17,13 +13,5 @@ export function RectangleRenderer({
   selected: boolean;
 }): React.ReactElement {
   const positions = useMemo(() => rectangleOutline(width, height), [width, height]);
-  return (
-    <ShapeLine
-      positions={positions}
-      position={position}
-      rotation={rotation}
-      color={color}
-      selected={selected}
-    />
-  );
+  return <ShapeLine positions={positions} position={position} rotation={rotation} color={color} selected={selected} />;
 }

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute, getCommand } from '@core/commands/registry';
+import { expectNoOp } from '../helpers/expectNoOp';
 
 function twoBoxes(): CadDocument {
   let doc = createEmptyDocument();
@@ -13,7 +14,6 @@ describe('move_entities', () => {
   it('is registered', () => {
     expect(getCommand('move_entities')).toBeDefined();
   });
-
   it('moves every listed entity by the delta in one step', () => {
     const doc = twoBoxes();
     const [a, b] = doc.order as [string, string];
@@ -23,7 +23,6 @@ describe('move_entities', () => {
     expect(result.document.entities[b]?.position).toEqual([6, 2, 3]);
     expect(result.summary).toMatch(/Moved 2 entities/);
   });
-
   it('skips missing ids and reports them', () => {
     const doc = twoBoxes();
     const [a] = doc.order as [string];
@@ -31,14 +30,12 @@ describe('move_entities', () => {
     expect(result.affected).toEqual([a]);
     expect(result.summary).toMatch(/Moved 1 entity .*Skipped missing: \[nope\]/);
   });
-
   it('is pure', () => {
     const doc = twoBoxes();
     const snapshot = structuredClone(doc);
     execute(doc, 'move_entities', { ids: doc.order, delta: [1, 1, 1] });
     expect(doc).toEqual(snapshot);
   });
-
   it.each([
     [{ ids: [], delta: [1, 0, 0] }, /non-empty array/],
     [{ ids: [1], delta: [1, 0, 0] }, /rejected: invalid params — ids\.0/],
@@ -50,8 +47,7 @@ describe('move_entities', () => {
   ])('no-op on bad input %#', (params, message) => {
     const doc = twoBoxes();
     const result = execute(doc, 'move_entities', params);
-    expect(result.document).toBe(doc);
-    expect(result.affected).toEqual([]);
+    expectNoOp(result, doc);
     expect(result.summary).toMatch(message);
   });
 });

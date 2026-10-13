@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Live OpenCascade: a fillet chosen by location (`edgesNear`) follows its edge through a parametric
  * edit — the feature history keeps the point, and replay re-resolves it on the regenerated B-rep.
  */
@@ -36,10 +35,7 @@ describe('occt fillet by location across a parametric edit', () => {
     expect(topologyOf(doc).volume).toBeCloseTo(40 * 20 * 10 - filletLoss(2, 40), 6);
 
     const boxStep = doc.featureHistory[0]!;
-    const widened = apply(doc, 'edit_step_params', {
-      stepId: boxStep.id,
-      params: { ...(boxStep.params as object), size: [80, 20, 10] },
-    });
+    const widened = apply(doc, 'edit_step_params', { stepId: boxStep.id, params: { ...(boxStep.params as object), size: [80, 20, 10] } });
     const topology = topologyOf(widened);
     expect(topology.volume).toBeCloseTo(80 * 20 * 10 - filletLoss(2, 80), 6);
     expect(topology.faces.filter((face) => face.surface === 'cylinder')).toHaveLength(1);
@@ -49,11 +45,7 @@ describe('occt fillet by location across a parametric edit', () => {
 describe('occt booleans merge same-domain faces', () => {
   it('a union of a plate and an upright flush with its side is one face per side', () => {
     // Plate 60×20×10 and an upright 20×20×40 standing on its left end, flush with three sides.
-    let doc = apply(createEmptyDocument(), 'add_box', {
-      size: [60, 20, 10],
-      anchor: 'min',
-      position: [0, 0, 0],
-    });
+    let doc = apply(createEmptyDocument(), 'add_box', { size: [60, 20, 10], anchor: 'min', position: [0, 0, 0] });
     doc = apply(doc, 'add_box', { size: [20, 20, 40], anchor: 'min', position: [0, 0, 0] });
     const [plate, upright] = doc.order;
     doc = apply(doc, 'boolean', { op: 'union', a: plate, b: upright });

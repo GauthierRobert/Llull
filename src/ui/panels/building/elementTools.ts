@@ -1,9 +1,4 @@
-/**
- * @layer ui/panels/building
- *
- * Declarative form specs for the building element tools: each tool maps form values to ONE
- * command + params (param-gathering only — the command does all document work, react R1).
- */
+// Declarative building element tool specs: form values → ONE command + params.
 
 import { toRadians } from '@lib/angle';
 import {
@@ -33,16 +28,12 @@ const MATERIALS: ReadonlyArray<readonly [string, string]> = [
   ['gypsum', 'Gypsum board'],
 ];
 
-/** Thickness / optional height / material fields shared by every wall tool. */
+/** Shared by every wall tool. */
 function wallSectionFields(thickness: string, material: string): ToolField[] {
-  return [
-    num('thickness', 'Thickness', thickness),
-    num('height', 'Height', '', true),
-    select('material', 'Material', material, MATERIALS),
-  ];
+  return [num('thickness', 'Thickness', thickness), num('height', 'Height', '', true), select('material', 'Material', material, MATERIALS)];
 }
 
-/** A wall tool: `geometry` fields + the shared section fields -> ONE `command` on the level. */
+/** `geometry` fields + section fields → ONE `command` on the level. */
 function wallTool(
   id: string,
   label: string,
@@ -65,24 +56,14 @@ function wallTool(
   };
 }
 
-/** Host wall / offset / size shared by door and window; `null` when no host wall is picked. */
-function hostedOpening(reader: FieldReader): {
-  wallId: string;
-  offset: number | undefined;
-  width: number;
-  height: number;
-} | null {
+/** Shared by door and window; null without a host wall. */
+function hostedOpening(reader: FieldReader): { wallId: string; offset: number | undefined; width: number; height: number } | null {
   const wallId = reader.text('wallId');
   if (wallId === '') return null;
-  return {
-    wallId,
-    offset: reader.optionalNumber('offset'),
-    width: reader.number('width'),
-    height: reader.number('height'),
-  };
+  return { wallId, offset: reader.optionalNumber('offset'), width: reader.number('width'), height: reader.number('height') };
 }
 
-/** Door / window: host wall + offset / size fields, then `extra` params; needs a host wall. */
+/** Host wall + offset / size, then `extra` params. */
 function hostedOpeningTool(
   id: string,
   label: string,
@@ -123,14 +104,9 @@ function rectangle(reader: FieldReader): Array<[number, number]> {
   return corners([...reader.point('x1', 'y1'), ...reader.point('x2', 'y2')]);
 }
 
-const RECTANGLE_FIELDS = [
-  num('x1', 'X1', '0'),
-  num('y1', 'Y1', '0'),
-  num('x2', 'X2', '5000'),
-  num('y2', 'Y2', '4000'),
-];
+const RECTANGLE_FIELDS = [num('x1', 'X1', '0'), num('y1', 'Y1', '0'), num('x2', 'X2', '5000'), num('y2', 'Y2', '4000')];
 
-/** Slab / room outline: the level's walls, or the form's rectangle. */
+/** The level's walls, or the form's rectangle. */
 function outline(
   reader: FieldReader,
   wallIds: ReadonlyArray<string>,
@@ -167,12 +143,7 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
   wallTool(
     'wall',
     'Wall',
-    [
-      num('x1', 'Start X', '0'),
-      num('y1', 'Start Y', '0'),
-      num('x2', 'End X', '5000'),
-      num('y2', 'End Y', '0'),
-    ],
+    [num('x1', 'Start X', '0'), num('y1', 'Start Y', '0'), num('x2', 'End X', '5000'), num('y2', 'End Y', '0')],
     ['200', 'concrete'],
     'draw_walls',
     (reader) => ({ points: [reader.point('x1', 'y1'), reader.point('x2', 'y2')] }),
@@ -190,11 +161,7 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     ],
     ['200', 'concrete'],
     'add_curved_wall',
-    (reader) => ({
-      start: reader.point('x1', 'y1'),
-      through: reader.point('xm', 'ym'),
-      end: reader.point('x2', 'y2'),
-    }),
+    (reader) => ({ start: reader.point('x1', 'y1'), through: reader.point('xm', 'ym'), end: reader.point('x2', 'y2') }),
   ),
   {
     id: 'wallLayers',
@@ -202,30 +169,18 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     fields: [
       checkbox('allWalls', 'Every wall of the level', true),
       select('wallId', 'Wall', '', 'walls'),
-      txt(
-        'layers',
-        'Layers (outside → inside)',
-        '20 render finish; 120 mineral-wool insulation; 200 concrete structure; 13 gypsum finish',
-      ),
+      txt('layers', 'Layers (outside → inside)', '20 render finish; 120 mineral-wool insulation; 200 concrete structure; 13 gypsum finish'),
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
-      const wallIds = reader.flag('allWalls')
-        ? [...context.wallIds]
-        : reader.text('wallId') === ''
-          ? []
-          : [reader.text('wallId')];
+      const wallIds = reader.flag('allWalls') ? [...context.wallIds] : reader.text('wallId') === '' ? [] : [reader.text('wallId')];
       if (wallIds.length === 0) return { ok: false, reason: 'Pick a wall first.' };
       const layers = reader
         .text('layers')
         .split(';')
         .map((part) => part.trim().split(/\s+/))
         .filter((words) => words.length >= 2)
-        .map(([thickness, material, fn]) => ({
-          thickness: Number(thickness),
-          material: material ?? '',
-          function: fn ?? 'structure',
-        }));
+        .map(([thickness, material, fn]) => ({ thickness: Number(thickness), material: material ?? '', function: fn ?? 'structure' }));
       if (layers.length === 0 || layers.some((layer) => !(layer.thickness > 0)))
         return { ok: false, reason: 'Check: layers ("thickness material function; …")' };
       return result(reader, 'set_wall_layers', { wallIds, layers });
@@ -244,14 +199,9 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     'add_door',
     (reader) => ({ swing: reader.text('swing') }),
   ),
-  hostedOpeningTool(
-    'window',
-    'Window',
-    ['1200', '1200'],
-    [num('sillHeight', 'Sill height', '900')],
-    'add_window',
-    (reader) => ({ sillHeight: reader.number('sillHeight') }),
-  ),
+  hostedOpeningTool('window', 'Window', ['1200', '1200'], [num('sillHeight', 'Sill height', '900')], 'add_window', (reader) => ({
+    sillHeight: reader.number('sillHeight'),
+  })),
   {
     id: 'slab',
     label: 'Slab / roof',
@@ -275,8 +225,7 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     build: (values, context) => {
       const reader = new FieldReader(values);
       const shape = outline(reader, context.wallIds, context.gridExtent ?? null);
-      if (shape === null)
-        return { ok: false, reason: 'No structural grid to take the extent from.' };
+      if (shape === null) return { ok: false, reason: 'No structural grid to take the extent from.' };
       return result(reader, 'add_slab', {
         ...shape,
         thickness: reader.number('thickness'),
@@ -307,16 +256,10 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
       const reader = new FieldReader(values);
       if (reader.text('source') === 'stair') {
         if (reader.text('stairId') === '') return { ok: false, reason: 'Pick a stair first.' };
-        return result(reader, 'add_slab_opening', {
-          stairId: reader.text('stairId'),
-          margin: reader.number('margin'),
-        });
+        return result(reader, 'add_slab_opening', { stairId: reader.text('stairId'), margin: reader.number('margin') });
       }
       if (reader.text('slabId') === '') return { ok: false, reason: 'Pick a slab first.' };
-      return result(reader, 'add_slab_opening', {
-        slabId: reader.text('slabId'),
-        boundary: rectangle(reader),
-      });
+      return result(reader, 'add_slab_opening', { slabId: reader.text('slabId'), boundary: rectangle(reader) });
     },
   },
   {
@@ -335,9 +278,7 @@ export const ELEMENT_TOOLS: ReadonlyArray<ElementTool> = [
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
-      const position = reader.flag('atGrid')
-        ? { atGridIntersections: true }
-        : { location: reader.point('x', 'y') };
+      const position = reader.flag('atGrid') ? { atGridIntersections: true } : { location: reader.point('x', 'y') };
       return result(reader, 'add_column', {
         ...position,
         shape: reader.text('shape'),

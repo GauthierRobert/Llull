@@ -49,7 +49,7 @@ Rules are already in context (`rules/commands.md` loads when you touch `packages
 
 ## Add structured doc-comments
 
-Tag each command with `@command`, `@pure`, `@affects`, `@invariant`, `@failure`
+Tag each command with `@affects`, `@invariant`, `@failure`
 (see conventions C2). No narrative prose in source.
 
 ## Done means

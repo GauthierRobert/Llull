@@ -1,8 +1,4 @@
-/**
- * @layer ui/viewport/3d
- * Camera synchronisation inside the Canvas: document.camera -> live camera/controls, and
- * adaptive near/far. Presentation only.
- */
+// In-Canvas camera sync: document.camera → live camera/controls, plus adaptive near/far.
 
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
@@ -11,14 +7,7 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useStore } from '@ui/store';
 import { driveCamera } from './cameraBridge';
 
-/**
- * Convert spherical CameraState → a cartesian THREE.Vector3 eye position.
- *
- * +Z-up right-handed convention:
- *   polar=0   → camera directly above the target along +Z
- *   polar=π/2 → camera in the XY plane (at target elevation)
- *   azimuth   → angle in the XY plane from +Y axis toward +X
- */
+/** Spherical → eye, +Z up: polar 0 = above the target, π/2 = in its XY plane; azimuth from +Y toward +X. */
 export function sphericalToCartesian(
   target: readonly [number, number, number],
   azimuth: number,
@@ -34,47 +23,25 @@ export function sphericalToCartesian(
 }
 
 /**
- * Reacts to `document.camera` changes written by commands (`set_camera`, `fit_view`)
- * and imperatively updates the PerspectiveCamera + OrbitControls to match.
- *
- * Pattern (R6): useEffect syncs an external object (three.js camera/controls) to
- * React state. Does NOT push drag-orbit updates back to the store — orbit/zoom
- * are presentation-only (architecture L4; PRIME DIRECTIVE).
- *
- * Feedback-loop guard: the effect compares the incoming CameraState value against
- * what the live camera currently shows (target + azimuth/polar/distance computed
- * from the camera position). Only applies when the selector produces a new object
- * reference (Zustand shallow equality keeps this stable through re-renders caused
- * by unrelated store slices).
- *
- * Must be mounted inside the Canvas so useThree resolves.
+ * Applies `document.camera` (set_camera, fit_view) to the camera + OrbitControls. Orbit/zoom are never pushed back
+ * (presentation only); the effect runs only on a new camera object, so unrelated store updates cannot loop.
  */
 export function CameraReactor(): null {
   const { camera, controls, invalidate } = useThree();
-  // Narrow selector: only subscribe to the camera slice (R3).
   const docCamera = useStore((s) => s.document.camera);
 
   useEffect(() => {
     const orbit = controls as OrbitControlsImpl | null;
     if (!orbit) return;
 
-    const eye = sphericalToCartesian(
-      docCamera.target,
-      docCamera.azimuth,
-      docCamera.polar,
-      docCamera.distance,
-    );
+    const eye = sphericalToCartesian(docCamera.target, docCamera.azimuth, docCamera.polar, docCamera.distance);
     driveCamera(camera, orbit, invalidate, eye, docCamera.target);
   }, [docCamera, camera, controls, invalidate]);
 
   return null;
 }
 
-/**
- * Keeps depth precision usable from millimetre parts to building-scale models (1e4–1e5 units in
- * mm): near/far track the camera→target distance at a fixed 1:4e6 ratio. Updates the projection
- * only when the distance changed by more than 10 %.
- */
+/** Depth precision from mm parts to building scale: near/far track the target distance (1:4e6), re-projected on a > 10 % change. */
 export function AdaptiveClipping(): null {
   const { camera, controls } = useThree();
   const lastDistance = useRef(0);

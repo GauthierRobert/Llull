@@ -1,29 +1,4 @@
-/**
- * @layer server/tests
- *
- * MCP transport integration tests — real MCP Streamable HTTP handshake.
- *
- * These tests drive the actual MCP `CallToolRequestSchema` handler through the
- * HTTP transport (via supertest), not through the command bus or REST endpoints
- * directly.  They verify that shapeToolCallContent is exercised end-to-end and
- * that MCP tool calls share undo history with the REST endpoints.
- *
- * Transport note: the MCP Streamable HTTP transport responds with
- * `Content-Type: text/event-stream` (SSE), not application/json.
- * supertest reads the body as `res.text`; we parse the SSE envelope to extract
- * the JSON-RPC result.  Format: `event: message\ndata: <JSON>\n\n`.
- *
- * Covers:
- *   (a) MCP initialize handshake → session id header returned.
- *   (b) tools/list → every registered command has a tool entry.
- *   (c) tools/call add_box (mutation) → summary block, "Affected entity ids" block,
- *       isError:false.
- *   (d) tools/call mass_properties on the created entity (query) → json data block,
- *       structuredContent is the record, isError:false.
- *   (e) tools/call add_box (MCP) then POST /undo (REST) → entity is reverted
- *       (real MCP-to-shared-history interop, replacing the comment-only test).
- *   (f) tools/call with unknown tool name → isError:true, explanatory content block.
- */
+/** Real MCP Streamable HTTP handshake + tools/call through supertest. */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import request from 'supertest';
@@ -33,418 +8,122 @@ import { _resetHistory } from '../src/commandBus';
 import { listCommands } from '@core/commands/registry';
 import * as registry from '@core/commands/registry';
 import { buildDiscoveryToolDefinitions, buildExchangeToolDefinitions } from '@mcp/index';
-import { mcpRequest } from './mcpTestSupport';
+import { callMcpTool, INITIALIZE_PARAMS, mcpRequest, mcpRpc, openMcpSession, type McpToolResult } from './mcpTestSupport';
 
-// SSE parsing helpers
-
-/**
- * Parse the JSON-RPC result from an SSE response body.
- *
- * The MCP Streamable HTTP transport always responds with `text/event-stream`.
- * Each message is a line starting with `data: ` followed by JSON.
- * We parse every data line and return the one whose `id` matches `rpcId`.
- */
-function parseSseResult(text: string, rpcId: number): unknown {
-  for (const line of text.split('\n')) {
-    if (!line.startsWith('data: ')) continue;
-    try {
-      const parsed = JSON.parse(line.slice('data: '.length)) as {
-        id?: number;
-        result?: unknown;
-        error?: unknown;
-        jsonrpc?: string;
-      };
-      if (parsed.id === rpcId) return parsed.result;
-    } catch {
-      // skip malformed lines
-    }
-  }
-  return undefined;
-}
-
-// JSON-RPC id counter — each request needs a unique id.
-
-let rpcId = 1;
-function nextId(): number {
-  return rpcId++;
-}
-
-// Transport helpers
-
-/**
- * Perform the MCP `initialize` handshake and return the session id.
- *
- * The first POST to /mcp (no mcp-session-id header) carries the `initialize`
- * method.  The server responds with the session id in the `mcp-session-id` header.
- */
-describe('MCP initialize instructions', () => {
-  it('returns the server instructions so agents learn the workflow up front', async () => {
-    const res = await mcpPost({ id: 9001, method: 'initialize', params: INITIALIZE_PARAMS });
-    expect(res.status).toBe(200);
-    expect(res.text).toContain('instructions');
-    expect(res.text).toContain('cad://conventions');
-    expect(res.text).toContain('search_tools');
-  });
-});
-
-const INITIALIZE_PARAMS = {
-  protocolVersion: '2024-11-05',
-  capabilities: {},
-  clientInfo: { name: 'test-client', version: '0.0.1' },
-};
-
-/** POST one JSON-RPC message to /mcp (with the session header once a session exists). */
-function mcpPost(message: Record<string, unknown>, sessionId?: string): request.Test {
-  return mcpRequest(app, sessionId).send({ jsonrpc: '2.0', ...message });
-}
-
-async function mcpInitialize(): Promise<string> {
-  const id = nextId();
-  const res = await mcpPost({ id, method: 'initialize', params: INITIALIZE_PARAMS });
-
-  expect(res.status).toBe(200);
-  const sessionId = res.headers['mcp-session-id'] as string | undefined;
-  expect(typeof sessionId).toBe('string');
-  return sessionId as string;
-}
-
-/** Initialize + send the `initialized` notification (required by the MCP spec): a ready session id. */
-async function mcpSession(): Promise<string> {
-  const sessionId = await mcpInitialize();
-  await mcpPost({ method: 'notifications/initialized' }, sessionId);
-  return sessionId;
-}
-
-interface McpToolResult {
-  content: Array<{ type: string; text?: string }>;
-  isError?: boolean;
-  structuredContent?: Record<string, unknown>;
-}
-
-/**
- * Call a tool over the MCP transport and return the parsed CallToolResult.
- *
- * Reads `res.text` (SSE body) and extracts the JSON-RPC result for `id`.
- */
-async function mcpCallTool(
-  sessionId: string,
-  name: string,
-  args: Record<string, unknown>,
-): Promise<McpToolResult> {
-  const id = nextId();
-  const res = await mcpPost(
-    { id, method: 'tools/call', params: { name, arguments: args } },
-    sessionId,
-  );
-
-  expect(res.status).toBe(200);
-  const result = parseSseResult(res.text, id) as McpToolResult | undefined;
-  expect(result).toBeDefined();
-  return result as McpToolResult;
-}
-
-/**
- * Call tools/list over the MCP transport and return the parsed tools array.
- */
-async function mcpListTools(sessionId: string): Promise<Array<{ name: string }>> {
-  const id = nextId();
-  const res = await mcpPost({ id, method: 'tools/list', params: {} }, sessionId);
-
-  expect(res.status).toBe(200);
-  const result = parseSseResult(res.text, id) as { tools?: Array<{ name: string }> } | undefined;
-  expect(result).toBeDefined();
-  return result!.tools ?? [];
-}
-
-// Reset shared state before each test.
+const mcpSession = (): Promise<string> => openMcpSession(app);
+const mcpCallTool = (sessionId: string, name: string, args: Record<string, unknown>): Promise<McpToolResult> =>
+  callMcpTool(app, sessionId, name, args);
+const entityCount = (): number => Object.keys(getLiveDoc().entities).length;
 
 beforeEach(() => {
-  rpcId = 1;
   _resetLiveDoc();
   _resetHistory();
 });
 
-// (a) MCP initialize handshake
-
-describe('MCP initialize handshake', () => {
-  it('returns 200 and a non-empty mcp-session-id header', async () => {
-    const sessionId = await mcpInitialize();
-    expect(sessionId.length).toBeGreaterThan(0);
+describe('MCP initialize', () => {
+  it('returns the server instructions so agents learn the workflow up front', async () => {
+    const res = await mcpRequest(app).send({ jsonrpc: '2.0', id: 9001, method: 'initialize', params: INITIALIZE_PARAMS });
+    expect(res.status).toBe(200);
+    for (const text of ['instructions', 'cad://conventions', 'search_tools']) expect(res.text).toContain(text);
   });
 
-  it('each initialize call returns a distinct session id', async () => {
-    const id1 = await mcpInitialize();
-    const id2 = await mcpInitialize();
-    expect(id1).not.toBe(id2);
+  it('returns a distinct non-empty mcp-session-id per call', async () => {
+    const id1 = await openMcpSession(app, false);
+    expect(id1.length).toBeGreaterThan(0);
+    expect(id1).not.toBe(await openMcpSession(app, false));
   });
 });
-
-// (b) tools/list — tool count == listCommands()
 
 describe('MCP tools/list', () => {
-  it('returns one tool per registered command plus the exchange tools', async () => {
-    const sessionId = await mcpSession();
-
-    const tools = await mcpListTools(sessionId);
-    // The transport appends the exchange tools (export_step, import_step, import_code) on top
-    // of the core registry tools.
-    const expectedCount =
-      listCommands().length +
-      buildExchangeToolDefinitions().length +
-      buildDiscoveryToolDefinitions().length;
-    expect(tools.length).toBe(expectedCount);
-  });
-
-  it('tool names include all registered command names plus exchange tool names', async () => {
-    const sessionId = await mcpSession();
-
-    const tools = await mcpListTools(sessionId);
-    const registeredNames = listCommands().map((c) => c.name);
-    const exchangeNames = [
-      ...buildExchangeToolDefinitions(),
-      ...buildDiscoveryToolDefinitions(),
-    ].map((t) => t.name);
-    const expectedNames = [...registeredNames, ...exchangeNames];
-    const toolNames = tools.map((t) => t.name);
-    expect(toolNames).toEqual(expectedNames);
+  it('lists every registered command, then the exchange and discovery tools', async () => {
+    const { result } = await mcpRpc(app, await mcpSession(), 'tools/list', {});
+    const { tools = [] } = result as { tools?: Array<{ name: string }> };
+    const extra = [...buildExchangeToolDefinitions(), ...buildDiscoveryToolDefinitions()];
+    expect(tools.length).toBe(listCommands().length + extra.length);
+    expect(tools.map((t) => t.name)).toEqual([...listCommands().map((c) => c.name), ...extra.map((t) => t.name)]);
   });
 });
-
-// (c) tools/call add_box — mutation → summary block + affected block
 
 describe('MCP tools/call — mutation (add_box)', () => {
-  it('returns isError:false with summary and affected-ids content blocks', async () => {
-    const sessionId = await mcpSession();
-
-    const result = await mcpCallTool(sessionId, 'add_box', {
-      size: [2, 2, 2],
-      position: [0, 0, 0],
-    });
-
+  it('returns summary + affected-ids blocks, no structuredContent, no image; updates the live document', async () => {
+    const result = await mcpCallTool(await mcpSession(), 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
     expect(result.isError).toBeFalsy();
     expect(Array.isArray(result.content)).toBe(true);
-
-    // Block 0: summary mentioning "box"
-    const summaryBlock = result.content[0];
-    expect(summaryBlock).toBeDefined();
-    expect(summaryBlock!.type).toBe('text');
-    expect(summaryBlock!.text).toMatch(/box/i);
-
-    // Block 1: "Affected entity ids: ..." (shapeToolCallContent adds this when affected is non-empty)
+    expect(result.content[0]!.type).toBe('text');
+    expect(result.content[0]!.text).toMatch(/box/i);
     expect(result.content.length).toBeGreaterThanOrEqual(2);
-    const affectedBlock = result.content[1];
-    expect(affectedBlock).toBeDefined();
-    expect(affectedBlock!.type).toBe('text');
-    expect(affectedBlock!.text).toMatch(/^Affected entity ids:/);
-  });
-
-  it('live document is updated after the MCP mutation', async () => {
-    const sessionId = await mcpSession();
-
-    await mcpCallTool(sessionId, 'add_box', { size: [3, 3, 3], position: [0, 0, 0] });
-
-    expect(Object.keys(getLiveDoc().entities)).toHaveLength(1);
-  });
-
-  it('does NOT set structuredContent for a mutation result', async () => {
-    const sessionId = await mcpSession();
-
-    const result = await mcpCallTool(sessionId, 'add_box', {
-      size: [1, 1, 1],
-      position: [0, 0, 0],
-    });
-
-    // Mutations have no `data` → no structuredContent
+    expect(result.content[1]!.type).toBe('text');
+    expect(result.content[1]!.text).toMatch(/^Affected entity ids:/);
     expect(result.structuredContent).toBeUndefined();
+    expect(result.content.filter((b) => b.type === 'image')).toHaveLength(0);
+    expect(entityCount()).toBe(1);
   });
 });
-
-// (d) tools/call mass_properties (query) → json data block + structuredContent
 
 describe('MCP tools/call — query (mass_properties)', () => {
-  it('returns json data block and structuredContent with volume record', async () => {
+  it('returns a json data block and the record as structuredContent, without mutating', async () => {
     const sessionId = await mcpSession();
-
-    // First create a box to measure.
-    const addResult = await mcpCallTool(sessionId, 'add_box', {
-      size: [2, 2, 2],
-      position: [0, 0, 0],
-    });
-
-    // Extract entity id from the "Affected entity ids: ..." block.
-    const affectedBlock = addResult.content.find((c) => c.text?.startsWith('Affected entity ids:'));
-    expect(affectedBlock).toBeDefined();
-    const entityId = affectedBlock!.text!.replace('Affected entity ids:', '').trim();
+    const added = await mcpCallTool(sessionId, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
+    const entityId = added.content
+      .find((c) => c.text?.startsWith('Affected entity ids:'))!
+      .text!.replace('Affected entity ids:', '')
+      .trim();
     expect(entityId.length).toBeGreaterThan(0);
-
-    // Measure volume via MCP.
-    const measureResult = await mcpCallTool(sessionId, 'mass_properties', { entityId });
-
-    expect(measureResult.isError).toBeFalsy();
-
-    // The json block starts with ```json
-    const jsonBlock = measureResult.content.find((c) => c.text?.startsWith('```json'));
-    expect(jsonBlock).toBeDefined();
-    expect(jsonBlock!.text).toContain('"volume"');
-
-    // structuredContent must be present with volume + unit fields
-    expect(measureResult.structuredContent).toBeDefined();
-    expect(typeof measureResult.structuredContent!['volume']).toBe('number');
-    expect(measureResult.structuredContent!['volumeUnit']).toBe('mm³');
-    // 2×2×2 box = volume 8
-    expect(measureResult.structuredContent!['volume']).toBeCloseTo(8);
-  });
-
-  it('query does NOT mutate the live document', async () => {
-    const sessionId = await mcpSession();
-
-    await mcpCallTool(sessionId, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    const entityId = Object.keys(getLiveDoc().entities)[0]!;
-
     const docBefore = getLiveDoc();
-    await mcpCallTool(sessionId, 'mass_properties', { entityId });
-
-    // Same reference — query did not swap the live document.
+    const measured = await mcpCallTool(sessionId, 'mass_properties', { entityId });
     expect(getLiveDoc()).toBe(docBefore);
+    expect(measured.isError).toBeFalsy();
+    expect(measured.content.find((c) => c.text?.startsWith('```json'))!.text).toContain('"volume"');
+    expect(typeof measured.structuredContent!['volume']).toBe('number');
+    expect(measured.structuredContent!['volumeUnit']).toBe('mm³');
+    expect(measured.structuredContent!['volume']).toBeCloseTo(8);
   });
 });
 
-// (e) MCP tools/call mutation → REST /undo reverts it (shared history interop)
-
-describe('MCP tools/call + REST /undo interop', () => {
-  it('POST /undo after MCP add_box reverts the entity (shared history)', async () => {
+describe('MCP tools/call + REST /undo share one history', () => {
+  it('REST undos revert MCP mutations one by one', async () => {
     const sessionId = await mcpSession();
-
-    // MCP call mutates the live document via the command bus.
-    await mcpCallTool(sessionId, 'add_box', { size: [4, 4, 4], position: [0, 0, 0] });
-    expect(Object.keys(getLiveDoc().entities)).toHaveLength(1);
-
-    // REST /undo — same command bus, same undo stack.
+    await mcpCallTool(sessionId, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
+    await mcpCallTool(sessionId, 'add_box', { size: [2, 2, 2], position: [5, 0, 0] });
+    expect(entityCount()).toBe(2);
     const undoRes = await request(app).post('/undo').send();
     expect(undoRes.status).toBe(200);
     expect(undoRes.body.summary).toBe('Undid last change.');
     expect(undoRes.body.canRedo).toBe(true);
-
-    // Entity is gone — MCP mutation was reverted by REST undo.
-    expect(Object.keys(getLiveDoc().entities)).toHaveLength(0);
-  });
-
-  it('two MCP mutations then two REST undos restore empty document', async () => {
-    const sessionId = await mcpSession();
-
-    await mcpCallTool(sessionId, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    await mcpCallTool(sessionId, 'add_box', { size: [2, 2, 2], position: [5, 0, 0] });
-    expect(Object.keys(getLiveDoc().entities)).toHaveLength(2);
-
+    expect(entityCount()).toBe(1);
     await request(app).post('/undo').send();
-    expect(Object.keys(getLiveDoc().entities)).toHaveLength(1);
-
-    await request(app).post('/undo').send();
-    expect(Object.keys(getLiveDoc().entities)).toHaveLength(0);
+    expect(entityCount()).toBe(0);
   });
 });
 
-// (g) tools/call render_view → image block present, no raw SVG in any text block
-
-describe('MCP tools/call — render_view (SVG stripping)', () => {
-  /** A fresh session with one box, then render_view. */
-  async function renderBox(): Promise<McpToolResult> {
+describe('MCP tools/call — render_view', () => {
+  it('adds an image block and strips the SVG from every text block and structuredContent', { timeout: 15000 }, async () => {
     const sessionId = await mcpSession();
     await mcpCallTool(sessionId, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
-    return mcpCallTool(sessionId, 'render_view', {});
-  }
-
-  it('response contains an image block', { timeout: 15000 }, async () => {
-    const result = await renderBox();
-
-    const imageBlocks = result.content.filter((b) => b.type === 'image');
-    expect(imageBlocks.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('no text block contains raw SVG markup (<svg or <polygon)', { timeout: 15000 }, async () => {
-    const result = await renderBox();
-
-    const textBlocks = result.content.filter((b) => b.type === 'text');
-    for (const block of textBlocks) {
-      expect(block.text ?? '').not.toMatch(/<svg/i);
-      expect(block.text ?? '').not.toMatch(/<polygon/i);
-    }
-  });
-
-  it('json metadata block still contains useful fields (not svg)', { timeout: 15000 }, async () => {
-    const result = await renderBox();
-
-    const jsonBlock = result.content.find((b) => b.text?.startsWith('```json'));
-    expect(jsonBlock).toBeDefined();
-    // Metadata fields that agents actually use must be present.
-    expect(jsonBlock!.text).toMatch(/"width"/);
-    expect(jsonBlock!.text).toMatch(/"height"/);
-    // The raw svg key must not appear.
-    expect(jsonBlock!.text).not.toMatch(/"svg"/);
-  });
-
-  it('structuredContent does not contain svg key', { timeout: 15000 }, async () => {
-    const result = await renderBox();
-
-    if (result.structuredContent !== undefined) {
-      expect('svg' in result.structuredContent).toBe(false);
-    }
-  });
-
-  it('normal mutation (add_box) still works unchanged — regression', async () => {
-    const sessionId = await mcpSession();
-
-    const result = await mcpCallTool(sessionId, 'add_box', {
-      size: [1, 1, 1],
-      position: [0, 0, 0],
-    });
-
-    expect(result.isError).toBeFalsy();
-    // No image block for non-SVG results.
-    expect(result.content.filter((b) => b.type === 'image')).toHaveLength(0);
-    // Summary and affected blocks present.
-    expect(result.content[0]!.type).toBe('text');
-    expect(result.content.some((b) => b.text?.startsWith('Affected entity ids:'))).toBe(true);
+    const result = await mcpCallTool(sessionId, 'render_view', {});
+    expect(result.content.filter((b) => b.type === 'image').length).toBeGreaterThanOrEqual(1);
+    for (const block of result.content.filter((b) => b.type === 'text')) expect(block.text ?? '').not.toMatch(/<svg|<polygon/i);
+    const json = result.content.find((b) => b.text?.startsWith('```json'))!.text;
+    expect(json).toMatch(/"width"/);
+    expect(json).toMatch(/"height"/);
+    expect(json).not.toMatch(/"svg"/);
+    if (result.structuredContent !== undefined) expect('svg' in result.structuredContent).toBe(false);
   });
 });
 
-// (f) Unknown tool name → isError:true
-
-describe('MCP tools/call — unknown tool name', () => {
-  it('returns isError:true with an explanatory summary content block', async () => {
-    const sessionId = await mcpSession();
-
-    const result = await mcpCallTool(sessionId, 'totally_nonexistent_tool', {});
-
+describe('MCP tools/call — failures are isError results', () => {
+  it.each([
+    ['totally_nonexistent_tool', [/unknown command/i]],
+    ['add_boxx', [/Closest tools: add_box[,.]/]],
+    ['make_box', [/Unknown command: make_box\./, /Closest tools: .*add_box/, /search_tools/]],
+  ])('unknown tool %s explains and suggests', async (name, patterns) => {
+    const result = await mcpCallTool(await mcpSession(), name, {});
     expect(result.isError).toBe(true);
-    expect(result.content.length).toBeGreaterThanOrEqual(1);
     expect(result.content[0]!.type).toBe('text');
-    expect(result.content[0]!.text).toMatch(/unknown command/i);
+    for (const pattern of patterns) expect(result.content[0]!.text).toMatch(pattern);
   });
 
-  it('puts a one-letter typo of a real tool first', async () => {
-    const sessionId = await mcpSession();
-
-    const result = await mcpCallTool(sessionId, 'add_boxx', {});
-
-    expect(result.content[0]!.text).toMatch(/Closest tools: add_box[,.]/);
-  });
-
-  it('suggests the closest real tools and points at search_tools', async () => {
-    const sessionId = await mcpSession();
-
-    const result = await mcpCallTool(sessionId, 'make_box', {});
-
-    expect(result.isError).toBe(true);
-    const text = result.content[0]!.text ?? '';
-    expect(text).toContain('Unknown command: make_box.');
-    expect(text).toMatch(/Closest tools: .*add_box/);
-    expect(text).toContain('search_tools');
-  });
-});
-
-describe('MCP tools/call — throwing command', () => {
-  it('is returned as an isError result, not a JSON-RPC error', async () => {
+  it('a throwing command is an isError result, not a JSON-RPC error', async () => {
     const sessionId = await mcpSession();
     vi.spyOn(registry, 'execute').mockImplementation(() => {
       throw new Error('kernel exploded');

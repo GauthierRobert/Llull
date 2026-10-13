@@ -1,20 +1,11 @@
-/**
- * @layer ui/viewport/2d
- *
- * Pairwise segment intersections via sweep-and-prune on the x axis: only pairs whose x and y
- * extents overlap reach the exact test, so scenes with thousands of segments stay near-linear.
- */
+// Pairwise segment intersections by x sweep-and-prune: only x/y-overlapping pairs reach the exact test (near-linear).
 
 import { segmentIntersection } from '@lib/polygon';
 import type { Segment } from './geometry';
 
 const EPSILON = 1e-9;
 
-/**
- * Every intersection point between two distinct segments of `segments`.
- * @pure
- * @invariant same point set as testing all i<j pairs with `segmentIntersection`
- */
+/** @invariant same points as testing every i<j pair with `segmentIntersection` */
 export function allSegmentIntersections(segments: ReadonlyArray<Segment>): Array<[number, number]> {
   const minX = segments.map(([ax, , bx]) => Math.min(ax, bx) - EPSILON);
   const maxX = segments.map(([ax, , bx]) => Math.max(ax, bx) + EPSILON);
@@ -29,8 +20,7 @@ export function allSegmentIntersections(segments: ReadonlyArray<Segment>): Array
     for (let next = order + 1; next < byMinX.length; next++) {
       const j = byMinX[next] as number;
       if ((minX[j] as number) > (maxX[i] as number)) break;
-      if ((minY[j] as number) > (maxY[i] as number) || (maxY[j] as number) < (minY[i] as number))
-        continue;
+      if ((minY[j] as number) > (maxY[i] as number) || (maxY[j] as number) < (minY[i] as number)) continue;
       const [cx, cy, dx, dy] = segments[j] as Segment;
       const point = segmentIntersection([ax, ay], [bx, by], [cx, cy], [dx, dy]);
       if (point) points.push([point[0], point[1]]);

@@ -1,7 +1,4 @@
-/**
- * Survey and terrain commands: import survey points, build / edit existing-ground TIN surfaces.
- * @layer domain-aec/civil
- */
+/** Survey and terrain commands: import survey points, build / edit existing-ground TIN surfaces. */
 
 import { type Vec2, type Vec3, DOCUMENT_UNITS } from '@core/model/types';
 import type { SurfaceObject, SurveyPoint } from '@core/model/civil';
@@ -43,28 +40,22 @@ const pointInput = z.object({
 });
 
 /**
- * @command import_survey_points
- * @pure
  * @affects creates 1 point group (+ a marker per point when <= 2000 points)
  * @failure no valid point / too many points -> no-op
  */
 export const importSurveyPoints = defineCommand({
   name: 'import_survey_points',
   description:
-    'Import survey points (topographic survey, total station / GNSS export) as a named point group. ' +
-    'Give `text` (CSV / TXT file content, one point per line; header and # comment lines skipped) in ' +
-    '`format` PENZD (default: number, easting, northing, elevation, description), PNEZD, PENZ, PNEZ, ' +
-    'ENZ or NEZ, and/or `points` [{ x, y, z }]. Coordinates are in `sourceUnit` (default m) and are ' +
+    'Import survey points (topographic survey, total station / GNSS export) as a named point group. Give `text` (CSV / TXT file content, ' +
+    'one point per line; header and # comment lines skipped) in `format` PENZD (default: number, easting, northing, elevation, ' +
+    'description), PNEZD, PENZ, PNEZ, ENZ or NEZ, and/or `points` [{ x, y, z }]. Coordinates are in `sourceUnit` (default m) and are ' +
     'converted to the document unit. Then build a terrain with create_surface.',
   params: z.object({
     name: z.string().optional().describe('Point group name. Default "Survey <n>".'),
     text: z.string().optional().describe('Survey file content (comma, tab, ; or space separated).'),
     format: z.enum(SURVEY_FORMATS).optional().describe('Column order of `text`. Default PENZD.'),
     points: z.array(pointInput).optional().describe('Points given directly.'),
-    sourceUnit: z
-      .enum(DOCUMENT_UNITS)
-      .optional()
-      .describe('Unit of the coordinates in `text` / `points`. Default m.'),
+    sourceUnit: z.enum(DOCUMENT_UNITS).optional().describe('Unit of the coordinates in `text` / `points`. Default m.'),
     coordinates: z
       .enum(['local', 'grid'])
       .optional()
@@ -73,28 +64,17 @@ export const importSurveyPoints = defineCommand({
           'site calibration (set_site_calibration) and is refused without one. Default "local".',
       ),
   }),
-  run: (
-    doc,
-    { name, text, format = 'PENZD', points = [], sourceUnit = 'm', coordinates = 'local' },
-  ): CommandResult => {
+  run: (doc, { name, text, format = 'PENZD', points = [], sourceUnit = 'm', coordinates = 'local' }): CommandResult => {
     const calibration = getCivil(doc).crs?.calibration;
     if (coordinates === 'grid' && !calibration) {
-      return noop(
-        doc,
-        'import_survey_points failed: coordinates "grid" needs a site calibration (set_site_calibration).',
-      );
+      return noop(doc, 'import_survey_points failed: coordinates "grid" needs a site calibration (set_site_calibration).');
     }
-    const parsed =
-      text !== undefined ? parseSurvey(text, format) : { points: [], rejectedLines: [] };
+    const parsed = text !== undefined ? parseSurvey(text, format) : { points: [], rejectedLines: [] };
     const convert = (value: number): number => fromUnit(doc, value, sourceUnit);
     const gathered: SurveyPoint[] = [
       ...parsed.points.map((point) => ({
         number: point.number,
-        position: [
-          convert(point.easting),
-          convert(point.northing),
-          convert(point.elevation),
-        ] as Vec3,
+        position: [convert(point.easting), convert(point.northing), convert(point.elevation)] as Vec3,
         ...(point.code !== undefined ? { code: point.code } : {}),
       })),
       ...points.map((point, index) => ({
@@ -114,26 +94,18 @@ export const importSurveyPoints = defineCommand({
       return noop(
         doc,
         `import_survey_points failed: no valid point found (format ${format}` +
-          (parsed.rejectedLines.length > 0
-            ? `; unreadable lines ${briefList(parsed.rejectedLines, String, 10)})`
-            : ')'),
+          (parsed.rejectedLines.length > 0 ? `; unreadable lines ${briefList(parsed.rejectedLines, String, 10)})` : ')'),
       );
     }
     if (surveyPoints.length > MAX_POINTS) {
-      return noop(
-        doc,
-        `import_survey_points failed: ${surveyPoints.length} points exceed the ${MAX_POINTS}-point limit; split the file.`,
-      );
+      return noop(doc, `import_survey_points failed: ${surveyPoints.length} points exceed the ${MAX_POINTS}-point limit; split the file.`);
     }
     const { civil, id, group } = newPointGroup(doc, name, 'Survey', surveyPoints);
     const skipped =
       parsed.rejectedLines.length > 0
         ? ` Skipped ${parsed.rejectedLines.length} unreadable line(s): ${briefList(parsed.rejectedLines, String, 10)}.`
         : '';
-    const drawn =
-      surveyPoints.length > MAX_DRAWN_POINTS
-        ? ` Markers not drawn above ${MAX_DRAWN_POINTS} points (the data is kept).`
-        : '';
+    const drawn = surveyPoints.length > MAX_DRAWN_POINTS ? ` Markers not drawn above ${MAX_DRAWN_POINTS} points (the data is kept).` : '';
     return commitCivil(
       doc,
       withObject(civil, group),
@@ -150,24 +122,18 @@ function surfaceSummary(doc: Parameters<typeof getCivil>[0], surface: SurfaceObj
 }
 
 /**
- * @command create_surface
- * @pure
  * @affects creates 1 surface: TIN mesh, minor / major contours, major contour labels
  * @failure unknown point group / fewer than 3 points / invalid boundary -> no-op
  */
 export const createSurface = defineCommand({
   name: 'create_surface',
   description:
-    'Build an existing-ground terrain surface (Delaunay TIN) from survey point groups and/or extra ' +
-    '[x, y, z] points, with minor and major contours (labelled with elevations in m). Optional plan ' +
-    '`boundary` clips the TIN; `maxEdgeLength` drops long hull triangles on concave sites. Defaults: ' +
-    'every point group, 1 m contour interval, every 5th contour major.',
+    'Build an existing-ground terrain surface (Delaunay TIN) from survey point groups and/or extra [x, y, z] points, with minor and ' +
+    'major contours (labelled with elevations in m). Optional plan `boundary` clips the TIN; `maxEdgeLength` drops long hull triangles ' +
+    'on concave sites. Defaults: every point group, 1 m contour interval, every 5th contour major.',
   params: z.object({
     name: z.string().optional().describe('Surface name. Default "EG <n>" (existing ground).'),
-    pointGroupIds: z
-      .array(z.string())
-      .optional()
-      .describe('Point groups to triangulate. Default: every point group.'),
+    pointGroupIds: z.array(z.string()).optional().describe('Point groups to triangulate. Default: every point group.'),
     points: z.array(vec3('Extra [x, y, z] point.')).optional().describe('Extra points.'),
     boundary: z.array(vec2('Boundary vertex [x, y].')).optional().describe('Outer boundary.'),
     maxEdgeLength: z.number().optional().describe('Drop triangles with a longer plan edge (> 0).'),
@@ -176,11 +142,9 @@ export const createSurface = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const civil = getCivil(doc);
-    const groupIds =
-      params.pointGroupIds ?? civilObjectsOf(civil, 'pointGroup').map((group) => group.id);
+    const groupIds = params.pointGroupIds ?? civilObjectsOf(civil, 'pointGroup').map((group) => group.id);
     const missing = groupIds.filter((id) => civilObject(civil, id, 'pointGroup') === undefined);
-    if (missing.length > 0)
-      return noop(doc, `create_surface failed: unknown point group(s) ${missing.join(', ')}.`);
+    if (missing.length > 0) return noop(doc, `create_surface failed: unknown point group(s) ${missing.join(', ')}.`);
     const checked = checkSurfaceOptions(params);
     if (checked !== null) return noop(doc, `create_surface failed: ${checked}`);
     const id = nextCivilId(civil, 'surface');
@@ -205,10 +169,7 @@ export const createSurface = defineCommand({
       );
     }
     if (surfaceTin(next, surface).triangles.length === 0) {
-      return noop(
-        doc,
-        'create_surface failed: the points give no triangle (need >= 3 non-collinear points inside the boundary).',
-      );
+      return noop(doc, 'create_surface failed: the points give no triangle (need >= 3 non-collinear points inside the boundary).');
     }
     const document = regenerateCivil(doc, next);
     return {
@@ -230,17 +191,13 @@ function checkSurfaceOptions(options: {
 }): string | null {
   if (options.boundary !== undefined && !isValidPolygon(options.boundary))
     return 'boundary must be a simple polygon of >= 3 [x, y] points.';
-  if (options.maxEdgeLength !== undefined && !(options.maxEdgeLength > 0))
-    return 'maxEdgeLength must be > 0.';
-  if (options.contourInterval !== undefined && !(options.contourInterval > 0))
-    return 'contourInterval must be > 0.';
+  if (options.maxEdgeLength !== undefined && !(options.maxEdgeLength > 0)) return 'maxEdgeLength must be > 0.';
+  if (options.contourInterval !== undefined && !(options.contourInterval > 0)) return 'contourInterval must be > 0.';
   if (options.majorEvery !== undefined && options.majorEvery < 0) return 'majorEvery must be >= 0.';
   return null;
 }
 
 /**
- * @command update_surface
- * @pure
  * @affects regenerates 1 surface (and every object graded against it)
  * @failure unknown surface / invalid option / no change -> no-op
  */
@@ -254,10 +211,7 @@ export const updateSurface = defineCommand({
     name: newNameParam,
     contourInterval: z.number().optional().describe('Minor contour interval (> 0).'),
     majorEvery: z.number().int().optional().describe('Every n-th contour is major (0 = none).'),
-    boundary: z
-      .array(vec2('Boundary vertex [x, y].'))
-      .optional()
-      .describe('New outer boundary ([] removes it).'),
+    boundary: z.array(vec2('Boundary vertex [x, y].')).optional().describe('New outer boundary ([] removes it).'),
     maxEdgeLength: z.number().optional().describe('Max plan edge length (0 removes the limit).'),
     addPoints: z.array(vec3('Extra [x, y, z] point.')).optional().describe('Points to add.'),
   }),
@@ -294,13 +248,9 @@ export const updateSurface = defineCommand({
     const next = withObject(civil, updated);
     const total = surfacePoints(next, updated).length;
     if (total > MAX_SURFACE_POINTS) {
-      return noop(
-        doc,
-        `update_surface failed: ${total} points exceed the ${MAX_SURFACE_POINTS}-point surface limit.`,
-      );
+      return noop(doc, `update_surface failed: ${total} points exceed the ${MAX_SURFACE_POINTS}-point surface limit.`);
     }
-    if (surfaceTin(next, updated).triangles.length === 0)
-      return noop(doc, 'update_surface failed: the surface would have no triangle.');
+    if (surfaceTin(next, updated).triangles.length === 0) return noop(doc, 'update_surface failed: the surface would have no triangle.');
     const document = regenerateCivil(doc, next);
     return {
       document,

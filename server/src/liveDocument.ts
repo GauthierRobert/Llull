@@ -1,10 +1,4 @@
-/**
- * @layer server
- * Shared live document — the ONE `CadDocument` every MCP session and the browser read and write.
- * `setLiveDoc` stores the document produced by `execute` and broadcasts the change to all SSE
- * subscribers (`GET /live`); transport/state glue only, it never creates or validates entities (L6).
- */
-
+/** The ONE shared `CadDocument` (MCP sessions + browser): store, autosave, SSE broadcast (`GET /live`). */
 import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
@@ -17,23 +11,16 @@ import { type LiveCommandEvent, type LiveSnapshotEvent, documentHash } from '@mc
 import { setAuditDefaultDirectory } from './audit';
 import { isTestRun, positiveInteger } from './env';
 
-/**
- * Autosave path (override via `LLULL_AUTOSAVE_PATH`; default next to the server bundle). Disabled
- * under tests (vitest sets `VITEST`, our harness sets `TEST`) so a user's saved project survives.
- */
-const AUTOSAVE_PATH =
-  process.env['LLULL_AUTOSAVE_PATH'] ?? path.resolve(__dirname, '..', '.autosave.json');
+const AUTOSAVE_PATH = process.env['LLULL_AUTOSAVE_PATH'] ?? path.resolve(__dirname, '..', '.autosave.json');
 
 setAuditDefaultDirectory(path.dirname(AUTOSAVE_PATH));
 
-const AUTOSAVE_ENABLED = !isTestRun() && process.env['LLULL_AUTOSAVE_DISABLED'] !== 'true';
+const AUTOSAVE_ENABLED = !isTestRun() /* keep the user's saved project */ && process.env['LLULL_AUTOSAVE_DISABLED'] !== 'true';
 
 function loadAutosave(): CadDocument {
   if (!AUTOSAVE_ENABLED) return createEmptyDocument();
   try {
-    if (!fs.existsSync(AUTOSAVE_PATH)) return createEmptyDocument();
-    const json = fs.readFileSync(AUTOSAVE_PATH, 'utf8');
-    return deserializeDocument(json);
+    return fs.existsSync(AUTOSAVE_PATH) ? deserializeDocument(fs.readFileSync(AUTOSAVE_PATH, 'utf8')) : createEmptyDocument();
   } catch (err) {
     const quarantined = quarantineAutosave();
     console.warn(
@@ -61,23 +48,21 @@ const autosaver = createAutosaver({
   serialize: serializeDocument,
 });
 
-/** Write any debounced autosave immediately (shutdown path). */
 export function flushAutosave(): void {
   if (AUTOSAVE_ENABLED) autosaver.flush();
 }
 
-/** Flush, then write every later mutation synchronously (no debounce). Call at shutdown start. */
+/** Flush, then write every later mutation synchronously (shutdown start). */
 export function stopAutosave(): void {
   if (AUTOSAVE_ENABLED) autosaver.stop();
 }
 
-/** End every open SSE stream and forget the subscribers (shutdown path). */
 export function closeAllSubscribers(): void {
   for (const res of _subscribers) {
     try {
       res.end();
     } catch {
-      // already closed
+      /* already closed */
     }
   }
   _subscribers.clear();
@@ -85,13 +70,10 @@ export function closeAllSubscribers(): void {
 
 let _liveDoc: CadDocument = loadAutosave();
 
-/** Number of changes applied to the live document since process start (the log position). */
-let _seq = 0;
+let _seq = 0; // changes since process start
+const _epoch: string = randomUUID(); // `_seq` restarts on restart, so clients compare `(epoch, seq)`
 
-/** Random per process: `_seq` restarts at 0 on restart, so clients compare `(epoch, seq)`. */
-const _epoch: string = randomUUID();
-
-/** Current log position `(epoch, seq)` without hashing the document (audit lines). */
+/** Log position without hashing the document (audit lines). */
 export function getLiveLogPosition(): { epoch: string; seq: number } {
   return { epoch: _epoch, seq: _seq };
 }
@@ -100,21 +82,17 @@ export function getLiveDoc(): CadDocument {
   return _liveDoc;
 }
 
-/** The current document with its log position — `GET /live/snapshot` and the SSE `snapshot` event. */
+/** `GET /live/snapshot` and the SSE `snapshot` event. */
 export function getLiveSnapshot(): LiveSnapshotEvent {
   return { epoch: _epoch, seq: _seq, stateHash: documentHash(_liveDoc), document: _liveDoc };
 }
 
-/** Open SSE streams: added by `subscribeLive`, removed on client disconnect. */
 const _subscribers = new Set<Response>();
-
-/** Max SSE subscribers; further `GET /live` get 503. */
-export const MAX_LIVE_SUBSCRIBERS = 64;
-
+export const MAX_LIVE_SUBSCRIBERS = 64; // further `GET /live` get 503
 /** A subscriber whose unsent buffer exceeds this is dropped (it resyncs via `/live/snapshot`). */
 const MAX_SSE_BACKLOG_BYTES = 8 * 1024 * 1024;
 
-/** One named SSE event (`event: <type>\ndata: <json>\n\n`); false when the connection is dead or too slow. */
+/** One named SSE event; false when the connection is dead or too slow. */
 function writeSseEvent(res: Response, eventType: string, payload: unknown): boolean {
   try {
     if (res.writableLength > MAX_SSE_BACKLOG_BYTES) {
@@ -128,30 +106,17 @@ function writeSseEvent(res: Response, eventType: string, payload: unknown): bool
   }
 }
 
-/** Broadcast one named SSE event to every subscriber, dropping dead connections. */
 function broadcast(eventType: 'snapshot' | 'command', payload: unknown): void {
-  for (const res of _subscribers) {
-    if (!writeSseEvent(res, eventType, payload)) {
-      _subscribers.delete(res);
-    }
-  }
+  for (const res of _subscribers) if (!writeSseEvent(res, eventType, payload)) _subscribers.delete(res);
 }
 
-/** The mutating command that produced a new live document (broadcast as the log entry). */
 interface LiveCommand {
   readonly name: string;
   readonly params: unknown;
-  /** Named user who ran it (named-user mode only); collaborators see who did what. */
   readonly user?: { readonly id: string; readonly name: string };
 }
 
-/**
- * Replace the shared document and broadcast the change.
- * With `command`: a `command` event `{ seq, name, params, stateHash }` (clients re-run it through
- * `execute` and verify `stateHash`). Without it (undo/redo/bulk replacement): a full `snapshot`.
- *
- * @sideeffect replaces `_liveDoc`, advances `_seq`, autosaves, broadcasts to all subscribers.
- */
+/** Replace the shared document; broadcast a `command` event (clients re-run + verify `stateHash`), or a `snapshot` without one. */
 export function setLiveDoc(next: CadDocument, command?: LiveCommand): void {
   _liveDoc = next;
   _seq += 1;
@@ -172,30 +137,18 @@ export function setLiveDoc(next: CadDocument, command?: LiveCommand): void {
   broadcast('command', event);
 }
 
-/**
- * Register an SSE subscriber (a `Response` already set up for `text/event-stream`) and send it the
- * current snapshot as the opening message. Returns the unsubscribe function.
- */
+/** Register an SSE `Response` and send it the opening snapshot; returns the unsubscribe function. */
 export function subscribeLive(res: Response): () => void {
   _subscribers.add(res);
-  if (!writeSseEvent(res, 'snapshot', getLiveSnapshot())) _subscribers.delete(res); // client already gone
-
-  return (): void => {
-    _subscribers.delete(res);
-  };
+  if (!writeSseEvent(res, 'snapshot', getLiveSnapshot())) _subscribers.delete(res);
+  return (): void => void _subscribers.delete(res);
 }
 
-/** Replace the live document without broadcasting. @internal — exposed for tests only. */
+/** @internal tests only: replace without broadcasting */
 export function _resetLiveDoc(doc?: CadDocument): void {
   _liveDoc = doc ?? createEmptyDocument();
 }
 
-/** Open SSE streams right now. */
 export function liveSubscriberCount(): number {
-  return _subscribers.size;
-}
-
-/** @internal — exposed for tests only. */
-export function _subscriberCount(): number {
   return _subscribers.size;
 }

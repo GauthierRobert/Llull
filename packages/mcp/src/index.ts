@@ -1,5 +1,4 @@
 /**
- * @layer mcp
  * Barrel — the public surface of the MCP tool layer, imported by `server/` and tests. Types and
  * helpers used only inside one module stay private to it. The concrete transport (stdio / HTTP)
  * belongs in `server/` — never here.
@@ -13,11 +12,7 @@ export { listMcpPrompts, getMcpPrompt } from './prompts';
 export { SERVER_INSTRUCTIONS } from './instructions';
 
 export type { CadExchangePort, DwgConverterPort, ProgramRun } from './exchangeTools';
-export {
-  buildExchangeToolDefinitions,
-  applyExchangeToolCall,
-  exportStepFile,
-} from './exchangeTools';
+export { buildExchangeToolDefinitions, applyExchangeToolCall, exportStepFile } from './exchangeTools';
 
 export type { ToolSearchResult } from './discovery';
 export {
@@ -30,12 +25,4 @@ export {
 } from './discovery';
 
 export type { ToolsetName } from './toolsets';
-export {
-  TOOLSET_NAMES,
-  TOOLSETS,
-  parseToolsets,
-  isToolsetName,
-  toolsetOf,
-  isToolEnabled,
-  isPromptEnabled,
-} from './toolsets';
+export { TOOLSET_NAMES, TOOLSETS, parseToolsets, isToolsetName, toolsetOf, isToolEnabled, isPromptEnabled } from './toolsets';

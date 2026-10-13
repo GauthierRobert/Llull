@@ -1,10 +1,4 @@
-/**
- * @layer ui/panels/building
- *
- * Equipment editor form spec: element → field texts, field texts → the `update_equipment` params
- * that changed (param-gathering only, react R1). Untouched fields are omitted so the history
- * step records exactly the revision.
- */
+// Equipment form spec: element → texts → changed `update_equipment` params (untouched fields omitted: exact revision).
 
 import type { EquipmentElement } from '@core/model/building';
 import { toDegrees, toRadians } from '@lib/angle';
@@ -62,19 +56,12 @@ export function equipmentValues(element: EquipmentElement): EquipmentEditValues 
   };
 }
 
-type EquipmentEdit =
-  | { readonly ok: true; readonly params: Record<string, unknown> }
-  | { readonly ok: false; readonly reason: string };
+type EquipmentEdit = { readonly ok: true; readonly params: Record<string, unknown> } | { readonly ok: false; readonly reason: string };
 
 /** `update_equipment` params for the fields whose text differs from `initial`. */
-export function buildEquipmentUpdate(
-  elementId: string,
-  initial: EquipmentEditValues,
-  values: EquipmentEditValues,
-): EquipmentEdit {
+export function buildEquipmentUpdate(elementId: string, initial: EquipmentEditValues, values: EquipmentEditValues): EquipmentEdit {
   const reader = new FieldReader(values);
-  const changed = (...keys: EquipmentEditKey[]): boolean =>
-    keys.some((key) => values[key] !== initial[key]);
+  const changed = (...keys: EquipmentEditKey[]): boolean => keys.some((key) => values[key] !== initial[key]);
   const changes: Record<string, unknown> = {};
   if (changed('mark')) changes['mark'] = reader.text('mark');
   if (changed('name')) changes['name'] = reader.text('name');

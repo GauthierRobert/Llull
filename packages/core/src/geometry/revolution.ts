@@ -1,8 +1,6 @@
 /**
- * @layer core/geometry
- * Shared surface-of-revolution sampling (export, render, viewport all consume this).
- * Sweep starts at +X, counter-clockwise; dominant axis component picks the frame
- * (Z: radial XY / axial Z, Y: radial XZ / axial Y, X: radial YZ / axial X).
+ * Shared surface-of-revolution sampling (export, render, viewport all consume this). Sweep starts at +X, counter-clockwise; dominant axis
+ * component picks the frame (Z: radial XY / axial Z, Y: radial XZ / axial Y, X: radial YZ / axial X).
  */
 
 import type { Vec3 } from '../model/types';
@@ -16,28 +14,18 @@ export function revolutionAxisIndex(axis: Vec3): 0 | 1 | 2 {
 }
 
 type RevolutionProfile = ReadonlyArray<readonly [number, number]>;
-type RevolutionArgs = [
-  profile: RevolutionProfile,
-  axis: Vec3,
-  angle: number,
-  segments: number,
-  origin?: Vec3,
-];
+type RevolutionArgs = [profile: RevolutionProfile, axis: Vec3, angle: number, segments: number, origin?: Vec3];
 
 /**
- * @pure
  * @invariant profile.length < 3 -> []
- * @invariant side faces: one quad [A_i, A_j, B_j, B_i] per profile edge per segment, then
- *   (partial sweep only, angle < 2*PI - 1e-6) start cap (reversed ring 0) and end cap (last ring)
+ * @invariant side faces: one quad [A_i, A_j, B_j, B_i] per profile edge per segment, then (partial sweep only, angle < 2*PI - 1e-6) start
+ *   cap (reversed ring 0) and end cap (last ring)
  * @param origin added to every vertex (entity position); [0,0,0] for the local frame
  */
-export function revolutionPolygons(
-  ...[profile, axis, angle, segments, origin = [0, 0, 0]]: RevolutionArgs
-): Vec3[][] {
+export function revolutionPolygons(...[profile, axis, angle, segments, origin = [0, 0, 0]]: RevolutionArgs): Vec3[][] {
   if (profile.length < 3) return [];
   const [px, py, pz] = origin;
   const axial = revolutionAxisIndex(axis);
-
   const toWorld = (r: number, a: number, theta: number): Vec3 => {
     const cosT = Math.cos(theta);
     const sinT = Math.sin(theta);
@@ -45,7 +33,6 @@ export function revolutionPolygons(
     if (axial === 1) return [px + r * cosT, py + a, pz + r * sinT];
     return [px + a, py + r * cosT, pz + r * sinT];
   };
-
   const n = profile.length;
   const isFull = angle >= 2 * Math.PI - 1e-6;
   const ringCount = isFull ? segments : segments + 1;
@@ -54,19 +41,13 @@ export function revolutionPolygons(
     const theta = (angle * s) / segments;
     rings.push(profile.map(([r, a]) => toWorld(r, a, theta)));
   }
-
   const polygons: Vec3[][] = [];
   for (let s = 0; s < segments; s++) {
     const ringA = elementAt(rings, s);
     const ringB = elementAt(rings, (s + 1) % ringCount);
     for (let i = 0; i < n; i++) {
       const j = (i + 1) % n;
-      polygons.push([
-        elementAt(ringA, i),
-        elementAt(ringA, j),
-        elementAt(ringB, j),
-        elementAt(ringB, i),
-      ]);
+      polygons.push([elementAt(ringA, i), elementAt(ringA, j), elementAt(ringB, j), elementAt(ringB, i)]);
     }
   }
   if (!isFull) {
@@ -77,16 +58,12 @@ export function revolutionPolygons(
 }
 
 /**
- * @pure
- * Fan-triangulates each polygon of `revolutionPolygons` (v0,vi,vi+1).
- * Triangles are flat xyz triples: [x0,y0,z0, x1,y1,z1, x2,y2,z2, ...].
+ * Fan-triangulates each polygon of `revolutionPolygons` (v0,vi,vi+1). Triangles are flat xyz triples: [x0,y0,z0, x1,y1,z1, x2,y2,z2, ...].
  */
 export function revolutionTriangles(...args: RevolutionArgs): Array<readonly [Vec3, Vec3, Vec3]> {
   const triangles: Array<readonly [Vec3, Vec3, Vec3]> = [];
   for (const polygon of revolutionPolygons(...args)) {
-    for (let i = 1; i + 1 < polygon.length; i++) {
-      triangles.push([elementAt(polygon, 0), elementAt(polygon, i), elementAt(polygon, i + 1)]);
-    }
+    for (let i = 1; i + 1 < polygon.length; i++) triangles.push([elementAt(polygon, 0), elementAt(polygon, i), elementAt(polygon, i + 1)]);
   }
   return triangles;
 }

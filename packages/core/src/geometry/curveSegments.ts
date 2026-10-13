@@ -1,8 +1,6 @@
 /**
- * @layer core/geometry
- * Pure math over exact curve chains (`CurveSegment`): evaluation, tangents, sampling, centripetal
- * Catmull-Rom → cubic Bézier conversion and polyline corner filleting. 2D points are lifted to
- * z = 0 internally, so every helper works for both `Vec2` profiles and `Vec3` paths.
+ * Pure math over exact curve chains (`CurveSegment`): evaluation, tangents, sampling, centripetal Catmull-Rom → cubic Bézier conversion and
+ * polyline corner filleting. 2D points are lifted to z = 0 internally, so every helper works for both `Vec2` profiles and `Vec3` paths.
  */
 
 import type { CurveSegment } from '../model/curve';
@@ -41,10 +39,7 @@ export function arcGeometry(start: Point, through: Point, end: Point): ArcGeomet
   const n = cross3(e1, e2);
   const nn = dot3(n, n);
   if (nn < 1e-18 * Math.max(1, dot3(e1, e1) * dot3(e2, e2))) return null;
-  const offset = scale3(
-    add3(scale3(cross3(n, e1), dot3(e2, e2)), scale3(cross3(e2, n), dot3(e1, e1))),
-    1 / (2 * nn),
-  );
+  const offset = scale3(add3(scale3(cross3(n, e1), dot3(e2, e2)), scale3(cross3(e2, n), dot3(e1, e1))), 1 / (2 * nn));
   const center = add3(a, offset);
   const radius = len3(offset);
   const normal = normalize3(n);
@@ -57,17 +52,13 @@ export function arcGeometry(start: Point, through: Point, end: Point): ArcGeomet
 
 function arcPoint(g: ArcGeometry, t: number): Vec3 {
   const angle = g.sweep * t;
-  return add3(
-    g.center,
-    add3(scale3(g.u, g.radius * Math.cos(angle)), scale3(g.v, g.radius * Math.sin(angle))),
-  );
+  return add3(g.center, add3(scale3(g.u, g.radius * Math.cos(angle)), scale3(g.v, g.radius * Math.sin(angle))));
 }
 
 function bezierPoint(p: readonly Vec3[], t: number): Vec3 {
   const s = 1 - t;
   const weights = [s * s * s, 3 * s * s * t, 3 * s * t * t, t * t * t];
-  const sum = (k: 0 | 1 | 2): number =>
-    p.reduce((acc, point, i) => acc + (weights[i] ?? 0) * point[k], 0);
+  const sum = (k: 0 | 1 | 2): number => p.reduce((acc, point, i) => acc + (weights[i] ?? 0) * point[k], 0);
   return [sum(0), sum(1), sum(2)];
 }
 
@@ -96,10 +87,7 @@ export function segmentTangent(segment: CurveSegment<Point>, t: number): Vec3 {
   if (segment.type === 'bezier') {
     const [p0, p1, p2, p3] = pts as [Vec3, Vec3, Vec3, Vec3];
     const s = 1 - t;
-    const derivative = add3(
-      add3(scale3(sub3(p1, p0), s * s), scale3(sub3(p2, p1), 2 * s * t)),
-      scale3(sub3(p3, p2), t * t),
-    );
+    const derivative = add3(add3(scale3(sub3(p1, p0), s * s), scale3(sub3(p2, p1), 2 * s * t)), scale3(sub3(p3, p2), t * t));
     if (len3(derivative) > JOINT_TOLERANCE) return normalize3(derivative);
     const h = t < 0.5 ? 1e-3 : -1e-3;
     const step = sub3(segmentPoint(segment, t + h), segmentPoint(segment, t));
@@ -113,9 +101,7 @@ export function segmentSteps(segment: CurveSegment<Point>): number {
   if (segment.type === 'line') return 1;
   if (segment.type === 'bezier') return BEZIER_STEPS;
   const g = arcGeometry(segment.points[0], segment.points[1], segment.points[2]);
-  return g === null
-    ? 1
-    : Math.max(4, Math.ceil((g.sweep / (2 * Math.PI)) * ARC_STEPS_PER_TURN - 1e-9));
+  return g === null ? 1 : Math.max(4, Math.ceil((g.sweep / (2 * Math.PI)) * ARC_STEPS_PER_TURN - 1e-9));
 }
 
 /** Samples of a chain, joints not repeated (an open chain keeps both ends; closed drops the last). */
@@ -123,8 +109,7 @@ export function sampleChain(segments: ReadonlyArray<CurveSegment<Point>>, closed
   const points: Vec3[] = [];
   segments.forEach((segment, index) => {
     const steps = segmentSteps(segment);
-    for (let s = index === 0 ? 0 : 1; s <= steps; s++)
-      points.push(segmentPoint(segment, s / steps));
+    for (let s = index === 0 ? 0 : 1; s <= steps; s++) points.push(segmentPoint(segment, s / steps));
   });
   if (closed && points.length > 1) points.pop();
   return points;
@@ -142,17 +127,12 @@ function reverseSegment<P extends Point>(segment: CurveSegment<P>): CurveSegment
 }
 
 /** Chain traversed backwards. */
-export function reverseChain<P extends Point>(
-  segments: ReadonlyArray<CurveSegment<P>>,
-): CurveSegment<P>[] {
+export function reverseChain<P extends Point>(segments: ReadonlyArray<CurveSegment<P>>): CurveSegment<P>[] {
   return [...segments].reverse().map(reverseSegment);
 }
 
 /** Every point mapped by `f` (scale, translate, plane change, snapping one end, …). */
-export function mapSegment<P, Q>(
-  segment: CurveSegment<P>,
-  f: (point: P, index: number) => Q,
-): CurveSegment<Q> {
+export function mapSegment<P, Q>(segment: CurveSegment<P>, f: (point: P, index: number) => Q): CurveSegment<Q> {
   const [a, b] = segment.points;
   switch (segment.type) {
     case 'line':
@@ -167,28 +147,21 @@ export function mapSegment<P, Q>(
 }
 
 const start = (segment: CurveSegment<Point>): Vec3 => lift(segment.points[0]);
-const end = (segment: CurveSegment<Point>): Vec3 =>
-  lift(segment.points[segment.points.length - 1] as Point);
+const end = (segment: CurveSegment<Point>): Vec3 => lift(segment.points[segment.points.length - 1] as Point);
 
 /**
- * First problem of a chain, or null: empty, disconnected joints, degenerate arcs, and (closed) an
- * end that does not return to the start / (open) an end that does.
+ * First problem of a chain, or null: empty, disconnected joints, degenerate arcs, and (closed) an end that does not return to the start /
+ * (open) an end that does.
  */
-export function chainIssue(
-  segments: ReadonlyArray<CurveSegment<Point>>,
-  closed: boolean,
-): string | null {
+export function chainIssue(segments: ReadonlyArray<CurveSegment<Point>>, closed: boolean): string | null {
   const first = segments[0];
   const last = segments[segments.length - 1];
   if (first === undefined || last === undefined) return 'the chain has no segments';
   for (let i = 0; i < segments.length; i++) {
     const segment = segments[i] as CurveSegment<Point>;
-    if (!segment.points.every((p) => p.every(Number.isFinite)))
-      return `segment ${i} has a non-finite point`;
-    if (distance3(start(segment), end(segment)) < JOINT_TOLERANCE)
-      return `segment ${i} has zero length`;
-    if (segment.type === 'arc' && arcGeometry(...segment.points) === null)
-      return `arc ${i} has collinear points`;
+    if (!segment.points.every((p) => p.every(Number.isFinite))) return `segment ${i} has a non-finite point`;
+    if (distance3(start(segment), end(segment)) < JOINT_TOLERANCE) return `segment ${i} has zero length`;
+    if (segment.type === 'arc' && arcGeometry(...segment.points) === null) return `arc ${i} has collinear points`;
     const next = segments[i + 1];
     if (next !== undefined && distance3(end(segment), start(next)) > JOINT_TOLERANCE)
       return `segment ${i + 1} does not start where segment ${i} ends`;
@@ -214,10 +187,7 @@ export function firstCorner(segments: ReadonlyArray<CurveSegment<Point>>): numbe
  * `CatmullRomCurve3(points, closed, 'centripetal')` (open ends extrapolate by reflection).
  * @invariant points.length >= 2
  */
-export function catmullRomBeziers<P extends Point>(
-  points: ReadonlyArray<P>,
-  closed: boolean,
-): CurveSegment<P>[] {
+export function catmullRomBeziers<P extends Point>(points: ReadonlyArray<P>, closed: boolean): CurveSegment<P>[] {
   const lifted = points.map(lift);
   const n = lifted.length;
   const at = (i: number): Vec3 => {
@@ -239,24 +209,10 @@ export function catmullRomBeziers<P extends Point>(
     if (dt0 < 1e-4) dt0 = dt1;
     if (dt2 < 1e-4) dt2 = dt1;
     const tangent = (a: Vec3, b: Vec3, c: Vec3, d0: number, d1: number): Vec3 =>
-      scale3(
-        add3(
-          sub3(scale3(sub3(b, a), 1 / d0), scale3(sub3(c, a), 1 / (d0 + d1))),
-          scale3(sub3(c, b), 1 / d1),
-        ),
-        dt1,
-      );
+      scale3(add3(sub3(scale3(sub3(b, a), 1 / d0), scale3(sub3(c, a), 1 / (d0 + d1))), scale3(sub3(c, b), 1 / d1)), dt1);
     const m1 = tangent(p0, p1, p2, dt0, dt1);
     const m2 = tangent(p1, p2, p3, dt1, dt2);
-    segments.push({
-      type: 'bezier',
-      points: [
-        out(p1),
-        out(add3(p1, scale3(m1, 1 / 3))),
-        out(sub3(p2, scale3(m2, 1 / 3))),
-        out(p2),
-      ],
-    });
+    segments.push({ type: 'bezier', points: [out(p1), out(add3(p1, scale3(m1, 1 / 3))), out(sub3(p2, scale3(m2, 1 / 3))), out(p2)] });
   }
   return segments;
 }
@@ -266,16 +222,8 @@ export function catmullRomBeziers<P extends Point>(
  * (straight runs stay lines). Collinear corners need no arc.
  * @failure a U-turn, or bends that overlap on a run -> error string
  */
-export function filletPolyline(
-  points: ReadonlyArray<Vec3>,
-  bendRadius: number,
-): CurveSegment<Vec3>[] | string {
-  type Bend = {
-    readonly enter: Vec3;
-    readonly mid: Vec3;
-    readonly exit: Vec3;
-    readonly cut: number;
-  };
+export function filletPolyline(points: ReadonlyArray<Vec3>, bendRadius: number): CurveSegment<Vec3>[] | string {
+  type Bend = { readonly enter: Vec3; readonly mid: Vec3; readonly exit: Vec3; readonly cut: number };
   const bends: Array<Bend | null> = [];
   for (let i = 1; i < points.length - 1; i++) {
     const [prev, corner, next] = [points[i - 1], points[i], points[i + 1]] as [Vec3, Vec3, Vec3];
@@ -307,14 +255,11 @@ export function filletPolyline(
     if (cutBefore + (bend?.cut ?? 0) > run + JOINT_TOLERANCE)
       return `bendRadius ${bendRadius} is too large for the run between points ${i - 1} and ${i} (length ${run.toFixed(3)})`;
     const lineEnd = bend === null ? (points[i] as Vec3) : bend.enter;
-    if (distance3(cursor, lineEnd) > JOINT_TOLERANCE)
-      segments.push({ type: 'line', points: [cursor, lineEnd] });
+    if (distance3(cursor, lineEnd) > JOINT_TOLERANCE) segments.push({ type: 'line', points: [cursor, lineEnd] });
     if (bend !== null) {
       segments.push({ type: 'arc', points: [bend.enter, bend.mid, bend.exit] });
       cursor = bend.exit;
-    } else {
-      cursor = lineEnd;
-    }
+    } else cursor = lineEnd;
   }
   return segments;
 }
@@ -324,14 +269,10 @@ export function filletPolyline(
  * of the closing edge round all vertices and back, so the chain closes on a straight (G1) joint.
  * Each closing-edge half must fit its own bend.
  */
-export function filletClosedPolygon(
-  points: ReadonlyArray<Vec3>,
-  bendRadius: number,
-): CurveSegment<Vec3>[] | string {
+export function filletClosedPolygon(points: ReadonlyArray<Vec3>, bendRadius: number): CurveSegment<Vec3>[] | string {
   const first = points[0];
   const last = points[points.length - 1];
-  if (points.length < 3 || first === undefined || last === undefined)
-    return 'a closed path needs at least 3 points';
+  if (points.length < 3 || first === undefined || last === undefined) return 'a closed path needs at least 3 points';
   const mid = scale3(add3(first, last), 0.5);
   return filletPolyline([mid, ...points, mid], bendRadius);
 }
@@ -340,11 +281,7 @@ export function filletClosedPolygon(
 export function isClosedChain(segments: ReadonlyArray<CurveSegment<Point>>): boolean {
   const first = segments[0];
   const last = segments[segments.length - 1];
-  return (
-    first !== undefined &&
-    last !== undefined &&
-    distance3(start(first), end(last)) <= JOINT_TOLERANCE
-  );
+  return first !== undefined && last !== undefined && distance3(start(first), end(last)) <= JOINT_TOLERANCE;
 }
 
 /** Whether the closing joint of a closed chain is tangent-continuous. */
@@ -366,8 +303,7 @@ export function chainLength(segments: ReadonlyArray<CurveSegment<Point>>): numbe
     }
     const steps = segment.type === 'bezier' ? 64 : 1;
     let length = 0;
-    for (let s = 1; s <= steps; s++)
-      length += distance3(segmentPoint(segment, (s - 1) / steps), segmentPoint(segment, s / steps));
+    for (let s = 1; s <= steps; s++) length += distance3(segmentPoint(segment, (s - 1) / steps), segmentPoint(segment, s / steps));
     return total + length;
   }, 0);
 }
@@ -381,14 +317,8 @@ export function minCurvatureRadius(segment: CurveSegment<Point>): number {
   for (let s = 0; s <= 64; s++) {
     const t = s / 64;
     const u = 1 - t;
-    const d1 = add3(
-      add3(scale3(sub3(p1, p0), 3 * u * u), scale3(sub3(p2, p1), 6 * u * t)),
-      scale3(sub3(p3, p2), 3 * t * t),
-    );
-    const d2 = add3(
-      scale3(add3(sub3(p2, scale3(p1, 2)), p0), 6 * u),
-      scale3(add3(sub3(p3, scale3(p2, 2)), p1), 6 * t),
-    );
+    const d1 = add3(add3(scale3(sub3(p1, p0), 3 * u * u), scale3(sub3(p2, p1), 6 * u * t)), scale3(sub3(p3, p2), 3 * t * t));
+    const d2 = add3(scale3(add3(sub3(p2, scale3(p1, 2)), p0), 6 * u), scale3(add3(sub3(p3, scale3(p2, 2)), p1), 6 * t));
     const bend = len3(cross3(d1, d2));
     if (bend > 1e-12) least = Math.min(least, len3(d1) ** 3 / bend);
   }

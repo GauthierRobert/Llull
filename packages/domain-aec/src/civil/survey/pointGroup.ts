@@ -1,8 +1,4 @@
-/**
- * New survey point group shared by every survey import command.
- * @layer domain-aec/civil
- * @pure
- */
+/** New survey point group shared by every survey import command. */
 
 import type { CadDocument } from '@core/model/types';
 import type { CivilModel, PointGroupObject, SurveyPoint } from '@core/model/civil';
@@ -20,8 +16,7 @@ export function newPointGroup(
   const group: PointGroupObject = {
     id,
     category: 'pointGroup',
-    name:
-      requestedName?.trim() || `${defaultLabel} ${civilObjectsOf(civil, 'pointGroup').length + 1}`,
+    name: requestedName?.trim() || `${defaultLabel} ${civilObjectsOf(civil, 'pointGroup').length + 1}`,
     entityIds: [],
     points: [...points],
   };

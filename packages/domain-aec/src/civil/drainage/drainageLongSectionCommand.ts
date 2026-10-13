@@ -1,7 +1,4 @@
-/**
- * export_drainage_long_section: SVG long section of a pipe run with the hydraulic grade line.
- * @layer domain-aec/civil
- */
+/** export_drainage_long_section: SVG long section of a pipe run with the hydraulic grade line. */
 
 import type { CivilModel, PipeObject } from '@core/model/civil';
 import type { CommandResult } from '@core/commands/types';
@@ -10,12 +7,7 @@ import { noop, report } from '@core/commands/noop';
 import { safeFileName } from '@lib/safeFileName';
 import { toMetres, toMm } from '@core/model/units';
 import { civilObject, civilObjectsOf, getCivil } from '../model';
-import {
-  criteriaOrFailure,
-  HYDRAULIC_FIELDS,
-  idfField,
-  intensityField,
-} from './drainageAnalysisCommands';
+import { criteriaOrFailure, HYDRAULIC_FIELDS, idfField, intensityField } from './drainageAnalysisCommands';
 import { computeFlows } from './drainageFlow';
 import { computeHgl } from './drainageHgl';
 import { pipePlanLength, pipeSlope } from './drainageTopology';
@@ -37,9 +29,7 @@ function runPipes(civil: CivilModel, fromId: string, toId: string | undefined): 
   const run: PipeObject[] = [];
   let current = fromId;
   for (;;) {
-    const next = pipes
-      .filter((p) => p.fromId === current)
-      .sort((a, b) => b.diameter - a.diameter || a.id.localeCompare(b.id))[0];
+    const next = pipes.filter((p) => p.fromId === current).sort((a, b) => b.diameter - a.diameter || a.id.localeCompare(b.id))[0];
     if (!next) return run;
     run.push(next);
     current = next.toId;
@@ -47,30 +37,20 @@ function runPipes(civil: CivilModel, fromId: string, toId: string | undefined): 
 }
 
 /**
- * @command export_drainage_long_section
- * @pure
  * @affects none (read-only)
  * @failure unknown manholes / no connecting run / bad criteria -> no-op
  */
 export const exportDrainageLongSection = defineCommand({
   name: 'export_drainage_long_section',
   description:
-    'Long section of a drainage pipe run as SVG text in `data.text` (`data.fileName`): ground (rim) ' +
-    'line, manholes with labels, pipe invert and obvert, the hydraulic grade line (same method as ' +
-    'check_drainage_network) and a table band of chainage, rim, invert, pipe (diameter, slope, length) ' +
-    'and HGL. The run starts at `fromManholeId` and ends at `toManholeId`, or, when omitted, follows the ' +
+    'Long section of a drainage pipe run as SVG text in `data.text` (`data.fileName`): ground (rim) line, manholes with labels, pipe ' +
+    'invert and obvert, the hydraulic grade line (same method as check_drainage_network) and a table band of chainage, rim, invert, pipe ' +
+    '(diameter, slope, length) and HGL. The run starts at `fromManholeId` and ends at `toManholeId`, or, when omitted, follows the ' +
     'largest pipe at each fork down to the outfall. Returns data { text, fileName, pipeIds, manholeIds }.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
-    fromManholeId: z
-      .string()
-      .describe('Upstream manhole id where the run starts, e.g. "manhole-1".'),
-    toManholeId: z
-      .string()
-      .optional()
-      .describe(
-        'Downstream manhole id where the run ends. Default: follow the main run to the outfall.',
-      ),
+    fromManholeId: z.string().describe('Upstream manhole id where the run starts, e.g. "manhole-1".'),
+    toManholeId: z.string().optional().describe('Downstream manhole id where the run ends. Default: follow the main run to the outfall.'),
     rainfallIntensityMmH: intensityField,
     idf: idfField,
     ...HYDRAULIC_FIELDS,
@@ -80,8 +60,7 @@ export const exportDrainageLongSection = defineCommand({
     if ('summary' in criteria) return criteria;
     const civil = getCivil(doc);
     const start = civilObject(civil, params.fromManholeId, 'manhole');
-    if (!start)
-      return noop(doc, `export_drainage_long_section failed: no manhole ${params.fromManholeId}.`);
+    if (!start) return noop(doc, `export_drainage_long_section failed: no manhole ${params.fromManholeId}.`);
     if (params.toManholeId !== undefined && !civilObject(civil, params.toManholeId, 'manhole'))
       return noop(doc, `export_drainage_long_section failed: no manhole ${params.toManholeId}.`);
     const run = runPipes(civil, start.id, params.toManholeId);

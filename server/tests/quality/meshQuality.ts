@@ -1,6 +1,4 @@
 /**
- * @layer server/tests/quality
- *
  * Pure triangle-soup diagnostics for the import quality gates. Not a test file.
  * @invariant input is a flat world-space triangle soup [x0,y0,z0, ...] (9 numbers per triangle)
  */
@@ -88,13 +86,8 @@ export function analyzeSoup(positions: readonly number[]): MeshReport {
     const triangleArea = Math.hypot(nx, ny, nz) / 2;
     area += triangleArea;
     if (triangleArea < areaFloor) degenerateTriangles += 1;
-    signedVolume +=
-      (ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx)) / 6;
-    const keys = [
-      vertexKey(ax, ay, az, quantum),
-      vertexKey(bx, by, bz, quantum),
-      vertexKey(cx, cy, cz, quantum),
-    ];
+    signedVolume += (ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx)) / 6;
+    const keys = [vertexKey(ax, ay, az, quantum), vertexKey(bx, by, bz, quantum), vertexKey(cx, cy, cz, quantum)];
     for (let corner = 0; corner < 3; corner += 1) {
       const from = keys[corner] ?? '';
       const to = keys[(corner + 1) % 3] ?? '';

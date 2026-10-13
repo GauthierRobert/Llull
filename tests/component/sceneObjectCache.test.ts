@@ -19,7 +19,6 @@ describe('SceneObjectCache', () => {
     expect(cache.get(scene, 'box-1')).toBe(box);
     expect(lookup).toHaveBeenCalledTimes(1);
   });
-
   it('re-resolves after the object is removed and replaced', () => {
     const scene = new THREE.Scene();
     const first = named('box-1');
@@ -32,7 +31,6 @@ describe('SceneObjectCache', () => {
     scene.add(second);
     expect(cache.get(scene, 'box-1')).toBe(second);
   });
-
   it('re-resolves when an ancestor group was removed', () => {
     const scene = new THREE.Scene();
     const group = new THREE.Group();

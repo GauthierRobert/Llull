@@ -8,26 +8,19 @@ export interface PlanAction {
 
 /** Runs `step` `count` times (number or `=expr`); `$i` is the 0-based iteration; `as` binds the last iteration's ids. */
 export interface RepeatStep {
-  repeat: {
-    count: number | string;
-    as?: string;
-  };
+  repeat: { count: number | string; as?: string };
   step: { command: string; params?: Record<string, unknown> };
 }
 
 /** Runs `step` per element of `values` (array or `=expr`); exposes `$<as>` (element) and `$i`. */
 export interface ForEachStep {
-  for_each: {
-    values: unknown[] | string;
-    as: string;
-  };
+  for_each: { values: unknown[] | string; as: string };
   step: { command: string; params?: Record<string, unknown> };
 }
 
 /**
- * Nestable loop with a body of actions. `repeat`: `count` iterations of variable `as` (default
- * `i`, 0-based). `for`: `var` from `from` to `to` inclusive, stepping by `step` (default 1).
- * Numbers or `=expr` strings; loop variables are usable as `i` or `$i` in expressions.
+ * Nestable loop with a body of actions. `repeat`: `count` iterations of variable `as` (default `i`, 0-based). `for`: `var` from `from` to
+ * `to` inclusive, stepping by `step` (default 1). Numbers or `=expr` strings; loop variables are usable as `i` or `$i` in expressions.
  */
 export interface LoopNode {
   repeat?: { count: number | string; as?: string };

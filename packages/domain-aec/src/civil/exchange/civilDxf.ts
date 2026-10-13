@@ -1,9 +1,6 @@
 /**
- * DXF (R12) of every civil-generated entity on its C-* layer: survey points (POINT), contours and
- * plan linework (POLYLINE / LINE at their elevation), labels (TEXT) and meshes (one 3DFACE per
- * triangle, so the TIN opens as faces in Civil 3D / BricsCAD).
- * @layer domain-aec/civil
- * @pure
+ * DXF (R12) of every civil-generated entity on its C-* layer: survey points (POINT), contours and plan linework (POLYLINE / LINE at their
+ * elevation), labels (TEXT) and meshes (one 3DFACE per triangle, so the TIN opens as faces in Civil 3D / BricsCAD).
  */
 
 import { toRadians } from '@lib/angle';
@@ -14,11 +11,7 @@ import { assembleDxf } from '../../building/exchange/dxfExport';
 import { localToGrid, resolveFrame, type CoordinateFrame } from '../crs/crs';
 import { entityPlanPoint } from '@core/geometry/entityFrame';
 
-export interface CivilDxf {
-  readonly text: string;
-  readonly entityCount: number;
-  readonly layers: string[];
-}
+export type CivilDxf = { readonly text: string; readonly entityCount: number; readonly layers: string[] };
 
 type Frame = (point: Vec2) => Vec2;
 
@@ -26,49 +19,25 @@ function planWorld(entity: Entity, point: Vec2, frame: Frame): Vec2 {
   return frame(entityPlanPoint(entity, point));
 }
 
-function writeMesh(
-  writer: DxfWriter,
-  layer: string,
-  entity: Entity & { kind: 'mesh' },
-  frame: Frame,
-): void {
+function writeMesh(writer: DxfWriter, layer: string, entity: Entity & { kind: 'mesh' }, frame: Frame): void {
   const { positions, indices } = entity.mesh;
   const vertex = (index: number): Vec3 => {
-    const [x, y] = frame([
-      entity.position[0] + (positions[index * 3] ?? 0),
-      entity.position[1] + (positions[index * 3 + 1] ?? 0),
-    ]);
+    const [x, y] = frame([entity.position[0] + (positions[index * 3] ?? 0), entity.position[1] + (positions[index * 3 + 1] ?? 0)]);
     return [x, y, entity.position[2] + (positions[index * 3 + 2] ?? 0)];
   };
   for (let k = 0; k + 2 < indices.length; k += 3) {
-    writer.face3d(
-      layer,
-      vertex(indices[k] ?? 0),
-      vertex(indices[k + 1] ?? 0),
-      vertex(indices[k + 2] ?? 0),
-    );
+    writer.face3d(layer, vertex(indices[k] ?? 0), vertex(indices[k + 1] ?? 0), vertex(indices[k + 2] ?? 0));
   }
 }
 
-function writeEntity(
-  writer: DxfWriter,
-  layer: string,
-  entity: Entity,
-  frame: Frame,
-  rotationDeg: number,
-): void {
+function writeEntity(writer: DxfWriter, layer: string, entity: Entity, frame: Frame, rotationDeg: number): void {
   const z = entity.position[2];
   switch (entity.kind) {
     case 'point':
       writer.point2(layer, frame([entity.position[0], entity.position[1]]), z);
       return;
     case 'line':
-      writer.line(
-        layer,
-        planWorld(entity, entity.start, frame),
-        planWorld(entity, entity.end, frame),
-        z,
-      );
+      writer.line(layer, planWorld(entity, entity.start, frame), planWorld(entity, entity.end, frame), z);
       return;
     case 'polyline':
       writer.polyline(
@@ -112,9 +81,5 @@ export function buildCivilDxf(doc: CadDocument, coordinates?: CoordinateFrame): 
     if (!entity?.tags?.includes('civil')) continue;
     writeEntity(writer, doc.layers[entity.layerId]?.name ?? '0', entity, frame, rotationDeg);
   }
-  return {
-    text: `${assembleDxf(doc, writer)}\n`,
-    entityCount: writer.entityCount,
-    layers: [...writer.layers.keys()],
-  };
+  return { text: `${assembleDxf(doc, writer)}\n`, entityCount: writer.entityCount, layers: [...writer.layers.keys()] };
 }

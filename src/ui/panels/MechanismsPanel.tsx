@@ -1,24 +1,12 @@
-/**
- * @layer ui/panels
- *
- * MechanismsPanel — collapsible sections for constraints (solve_constraints, delete_constraint),
- * joints (set_joint_value, delete_joint) and drive relations (delete_drive_relation).
- * Selecting a constraint / joint row highlights it in `mechanismSelection` so `MechanismOverlay`
- * can draw a cue in the 3D viewport.
- */
+// Constraints (solve/delete), joints (set value/delete) and drive relations (delete); a highlighted constraint/joint
+// row sets `mechanismSelection` for MechanismOverlay.
 
 import { toDegrees, toRadians } from '@lib/angle';
 import React from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore, useViewportStore } from '@ui/store';
 import type { Constraint, Joint, DriveRelation } from '@core/model/types';
-import {
-  PanelEmpty,
-  PanelHeader,
-  PanelSection,
-  IconButton,
-  DeleteButton,
-} from '@ui/panels/PanelParts';
+import { PanelEmpty, PanelHeader, PanelSection, IconButton, DeleteButton } from '@ui/panels/PanelParts';
 import { CommitInput } from '@ui/panels/propertyFields';
 import { orderedValues } from '@ui/panels/orderedValues';
 import { parseNumber } from '@ui/numberText';
@@ -34,18 +22,12 @@ const CONSTRAINT_CHIP_TONE: Record<string, ChipTone> = {
   angle: 'accent',
 };
 
-const JOINT_CHIP_TONE: Record<string, ChipTone> = {
-  revolute: 'accent',
-  prismatic: 'agent',
-};
+const JOINT_CHIP_TONE: Record<string, ChipTone> = { revolute: 'accent', prismatic: 'agent' };
 
 const mechanismRowClass = (highlighted: boolean): string =>
-  classNames(
-    'panel__row panel__row--overlay-actions mechanisms-row',
-    highlighted && 'panel__row--selected mechanisms-row--highlighted',
-  );
+  classNames('panel__row panel__row--overlay-actions mechanisms-row', highlighted && 'panel__row--selected mechanisms-row--highlighted');
 
-/** Format an EntityRef for display: "entityId[:kind]". */
+/** "entityId[:kind]" (last 6 id chars). */
 function fmtEntityRef(ref: Constraint['a'] | Constraint['b']): string {
   const shortId = ref.entityId.slice(-6);
   if ('kind' in ref && ref.kind) return `${shortId}:${ref.kind}`;
@@ -64,7 +46,6 @@ interface MechanismRowProps {
   info: React.ReactNode;
   /** Controls between the info text and the action buttons. */
   inline?: React.ReactNode;
-  /** Buttons after the highlight toggle. */
   actions: React.ReactNode;
 }
 
@@ -101,17 +82,15 @@ function MechanismRow({
   );
 }
 
-interface ConstraintRowProps {
-  constraint: Constraint;
-  highlighted: boolean;
-  onHighlight: (id: string) => void;
-}
-
 function ConstraintRow({
   constraint,
   highlighted,
   onHighlight,
-}: ConstraintRowProps): React.ReactElement {
+}: {
+  constraint: Constraint;
+  highlighted: boolean;
+  onHighlight: (id: string) => void;
+}): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
 
   const chipTone = CONSTRAINT_CHIP_TONE[constraint.kind] ?? 'accent';
@@ -161,28 +140,26 @@ function ConstraintRow({
   );
 }
 
-interface JointRowProps {
+function JointRow({
+  joint,
+  highlighted,
+  onHighlight,
+}: {
   joint: Joint;
   highlighted: boolean;
   onHighlight: (id: string) => void;
-}
-
-function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.ReactElement {
+}): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
 
   const documentUnits = useStore((s) => s.document.units);
   const revolute = joint.kind === 'revolute';
-  // Presentation only: revolute angles are shown in degrees (like Properties); the command
-  // keeps radians.
+  // Revolute angles shown in degrees (like Properties); the command takes radians.
   const currentValue = revolute ? toDegrees(joint.angle, 6) : joint.displacement;
 
   const commitInput = (text: string): void => {
     const parsed = parseNumber(text);
     if (parsed !== undefined && parsed !== currentValue) {
-      dispatch('set_joint_value', {
-        id: joint.id,
-        value: revolute ? toRadians(parsed) : parsed,
-      });
+      dispatch('set_joint_value', { id: joint.id, value: revolute ? toRadians(parsed) : parsed });
     }
   };
 
@@ -207,10 +184,7 @@ function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.Rea
             label={`Joint value for ${joint.id} (${unit})`}
             onCommit={commitInput}
             testId={`joint-value-${joint.id}`}
-            inputProps={{
-              type: 'number',
-              title: `Current ${revolute ? 'angle' : 'displacement'} in ${unit}`,
-            }}
+            inputProps={{ type: 'number', title: `Current ${revolute ? 'angle' : 'displacement'} in ${unit}` }}
           />
           <span className="panel__row-meta">{unit}</span>
         </>
@@ -227,17 +201,10 @@ function JointRow({ joint, highlighted, onHighlight }: JointRowProps): React.Rea
   );
 }
 
-interface DriveRelationRowProps {
-  relation: DriveRelation;
-}
-
-function DriveRelationRow({ relation }: DriveRelationRowProps): React.ReactElement {
+function DriveRelationRow({ relation }: { relation: DriveRelation }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
 
-  const offsetLabel =
-    relation.offset !== undefined && relation.offset !== 0
-      ? ` + ${relation.offset.toFixed(3)}`
-      : '';
+  const offsetLabel = relation.offset !== undefined && relation.offset !== 0 ? ` + ${relation.offset.toFixed(3)}` : '';
 
   return (
     <MechanismRow
@@ -273,21 +240,10 @@ interface MechanismSectionProps {
   rows: ReadonlyArray<React.ReactElement>;
 }
 
-function MechanismSection({
-  title,
-  testId,
-  listLabel,
-  rows,
-}: MechanismSectionProps): React.ReactElement {
+function MechanismSection({ title, testId, listLabel, rows }: MechanismSectionProps): React.ReactElement {
   const noun = title.toLowerCase();
   return (
-    <PanelSection
-      collapsible
-      title={title}
-      count={rows.length}
-      countLabel={`${rows.length} ${noun}`}
-      testId={testId}
-    >
+    <PanelSection collapsible title={title} count={rows.length} countLabel={`${rows.length} ${noun}`} testId={testId}>
       {rows.length === 0 ? (
         <PanelEmpty compact icon="mechanism" message={`No ${noun} defined.`} />
       ) : (
@@ -299,11 +255,7 @@ function MechanismSection({
   );
 }
 
-interface MechanismsPanelProps {
-  className?: string;
-}
-
-export function MechanismsPanel({ className }: MechanismsPanelProps): React.ReactElement {
+export function MechanismsPanel({ className }: { className?: string }): React.ReactElement {
   const constraints = useStore((s) => s.document.constraints);
   const constraintOrder = useStore((s) => s.document.constraintOrder);
   const joints = useStore((s) => s.document.joints);
@@ -342,12 +294,7 @@ export function MechanismsPanel({ className }: MechanismsPanelProps): React.Reac
         testId="mechanisms-section-joints"
         listLabel="Joint list"
         rows={orderedValues(jointOrder, joints).map((joint) => (
-          <JointRow
-            key={joint.id}
-            joint={joint}
-            highlighted={isHighlighted('joint', joint.id)}
-            onHighlight={highlight('joint')}
-          />
+          <JointRow key={joint.id} joint={joint} highlighted={isHighlighted('joint', joint.id)} onHighlight={highlight('joint')} />
         ))}
       />
       <MechanismSection

@@ -1,7 +1,4 @@
-/**
- * @layer server/tests
- * Parse one named SSE frame (`event: <type>\ndata: <json>\n\n`) written by liveDocument.
- */
+/** Parse one named SSE frame (`event: <type>\ndata: <json>\n\n`) written by liveDocument. */
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import type { Response } from 'express';
@@ -17,10 +14,7 @@ export function parseSseFrame(frame: string): ParsedSseFrame {
   if (eventLine === undefined || dataLine === undefined) {
     throw new Error(`Malformed SSE frame: ${JSON.stringify(frame)}`);
   }
-  return {
-    event: eventLine.slice('event: '.length),
-    data: JSON.parse(dataLine.slice('data: '.length)) as Record<string, unknown>,
-  };
+  return { event: eventLine.slice('event: '.length), data: JSON.parse(dataLine.slice('data: '.length)) as Record<string, unknown> };
 }
 
 /**

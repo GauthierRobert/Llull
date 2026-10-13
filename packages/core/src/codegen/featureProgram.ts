@@ -1,19 +1,9 @@
 /**
- * Lower a CadDocument to a FeatureProgram (program.ts): replay the feature history, diff each step's
- * solids, and bind numeric fields to the `=expr` params that produced them.
- *
- * @layer core/codegen
- * @pure
+ * Lower a CadDocument to a FeatureProgram (program.ts): replay the feature history, diff each step's solids, and bind numeric fields to the
+ * `=expr` params that produced them.
  */
 
-import {
-  type CadDocument,
-  type Entity,
-  type FeatureStep,
-  type Vec3,
-  is2D,
-  is3D,
-} from '../model/types';
+import { type CadDocument, type Entity, type FeatureStep, type Vec3, is2D, is3D } from '../model/types';
 import type { CommandDefinition } from '../commands/types';
 import { replayHistory, type ReplayStepEvent } from '../commands/history/replay';
 import { buildParamEnv } from '../commands/history/regenerate';
@@ -23,18 +13,7 @@ import { Namer, translateExpression } from './identifiers';
 import type { GeometryKernel } from '../geometry/kernel';
 import { recipeOf } from '../geometry/shapeRecipe';
 import { lowerRecipe, meshSoup, modificationFeature } from './recipeLowering';
-import type {
-  Axis,
-  Feature,
-  FeatureBase,
-  FeatureProgram,
-  ProgramOutput,
-  ProgramParameter,
-  ShapeSpec,
-  Term,
-  Term2,
-  Term3,
-} from './program';
+import type { Axis, Feature, FeatureBase, FeatureProgram, ProgramOutput, ProgramParameter, ShapeSpec, Term, Term2, Term3 } from './program';
 
 const EPSILON = 1e-9;
 
@@ -61,18 +40,10 @@ function child(raw: unknown, key: string | number): unknown {
 }
 
 function term3(values: Vec3, raw: unknown, ctx: LowerContext): Term3 {
-  return [
-    term(values[0], child(raw, 0), ctx),
-    term(values[1], child(raw, 1), ctx),
-    term(values[2], child(raw, 2), ctx),
-  ];
+  return [term(values[0], child(raw, 0), ctx), term(values[1], child(raw, 1), ctx), term(values[2], child(raw, 2), ctx)];
 }
 
-function profileTerms(
-  profile: ReadonlyArray<readonly [number, number]>,
-  raw: unknown,
-  ctx: LowerContext,
-): Term2[] {
+function profileTerms(profile: ReadonlyArray<readonly [number, number]>, raw: unknown, ctx: LowerContext): Term2[] {
   return profile.map(([x, y], i) => {
     const rawPoint = child(raw, i);
     return [term(x, child(rawPoint, 0), ctx), term(y, child(rawPoint, 1), ctx)];
@@ -100,11 +71,7 @@ function lowerShape(entity: Entity, doc: CadDocument, raw: unknown, ctx: LowerCo
       return { kind: entity.kind, size: term3(entity.size, field('size'), ctx) };
     case 'cylinder':
     case 'cone':
-      return {
-        kind: entity.kind,
-        radius: term(entity.radius, field('radius'), ctx),
-        height: term(entity.height, field('height'), ctx),
-      };
+      return { kind: entity.kind, radius: term(entity.radius, field('radius'), ctx), height: term(entity.height, field('height'), ctx) };
     case 'sphere':
       return { kind: 'sphere', radius: term(entity.radius, field('radius'), ctx) };
     case 'torus':
@@ -136,13 +103,7 @@ function lowerShape(entity: Entity, doc: CadDocument, raw: unknown, ctx: LowerCo
         segments: safeSegments(entity.segments),
       };
     case 'subdivision':
-      return {
-        kind: 'subdivision',
-        vertices: entity.vertices,
-        faces: entity.faces,
-        creases: entity.creases,
-        levels: entity.levels,
-      };
+      return { kind: 'subdivision', vertices: entity.vertices, faces: entity.faces, creases: entity.creases, levels: entity.levels };
     case 'mesh':
     case 'sweep':
     case 'loft':
@@ -172,8 +133,8 @@ function solidFeature(
 }
 
 /**
- * Features creating `entity` in `variables`: a kernel result rebuilds its exact recipe; anything else
- * (or a recipe with a rotated placement / scale) is one solid feature.
+ * Features creating `entity` in `variables`: a kernel result rebuilds its exact recipe; anything else (or a recipe with a rotated placement
+ * / scale) is one solid feature.
  * @returns the features and whether the entity was exported as a triangle mesh
  */
 function entityFeatures(
@@ -194,10 +155,7 @@ function entityFeatures(
     });
     if (lowered !== null) {
       variables.set(entity.id, lowered.variable);
-      const label: Feature[] =
-        entity.name !== undefined
-          ? [{ ...base(lowered.variable), op: 'label', name: entity.name }]
-          : [];
+      const label: Feature[] = entity.name !== undefined ? [{ ...base(lowered.variable), op: 'label', name: entity.name }] : [];
       return { features: [...lowered.features, ...label], triangles: false };
     }
   }
@@ -248,28 +206,15 @@ function isPureTranslation(before: Entity, after: Entity, delta: unknown): delta
   if (!delta.every((d) => typeof d === 'number' && Number.isFinite(d))) return false;
   const moved = { ...before, position: after.position } as Entity;
   if (!geometryEqual(moved, after)) return false;
-  return after.position.every(
-    (p, i) => Math.abs(p - (before.position[i] as number) - (delta[i] as number)) <= EPSILON,
-  );
+  return after.position.every((p, i) => Math.abs(p - (before.position[i] as number) - (delta[i] as number)) <= EPSILON);
 }
 
 /** `boolean` op -> the emitted program's combinator. */
-const BOOLEAN_KINDS: Readonly<Record<string, 'union' | 'cut' | 'intersect'>> = {
-  union: 'union',
-  subtract: 'cut',
-  intersect: 'intersect',
-};
+const BOOLEAN_KINDS: Readonly<Record<string, 'union' | 'cut' | 'intersect'>> = { union: 'union', subtract: 'cut', intersect: 'intersect' };
 
-function lowerParameters(
-  doc: CadDocument,
-  namer: Namer,
-): {
-  parameters: ProgramParameter[];
-  identifiers: Map<string, string>;
-} {
+function lowerParameters(doc: CadDocument, namer: Namer): { parameters: ProgramParameter[]; identifiers: Map<string, string> } {
   const identifiers = new Map<string, string>();
   for (const name of Object.keys(doc.parameters)) identifiers.set(name, namer.take(name));
-
   // Depth-first topological order so each parameter is defined after the ones it references.
   const ordered: string[] = [];
   const state = new Map<string, 'visiting' | 'done'>();
@@ -286,20 +231,14 @@ function lowerParameters(
     ordered.push(name);
   };
   for (const name of Object.keys(doc.parameters).sort()) visit(name);
-
   const parameters = ordered.flatMap((name): ProgramParameter[] => {
     const parameter = doc.parameters[name];
     const identifier = identifiers.get(name);
     if (parameter === undefined || identifier === undefined) return [];
     const literal = Number(parameter.expression);
-    if (parameter.error !== undefined || Number.isFinite(literal))
-      return [{ name, identifier, value: parameter.value }];
+    if (parameter.error !== undefined || Number.isFinite(literal)) return [{ name, identifier, value: parameter.value }];
     const expression = translateExpression(parameter.expression, identifiers);
-    return [
-      expression === null
-        ? { name, identifier, value: parameter.value }
-        : { name, identifier, value: parameter.value, expression },
-    ];
+    return [expression === null ? { name, identifier, value: parameter.value } : { name, identifier, value: parameter.value, expression }];
   });
   return { parameters, identifiers };
 }
@@ -320,29 +259,15 @@ function outputsFor(doc: CadDocument, variables: ReadonlyMap<string, string>): P
   return solids(doc).flatMap((entity): ProgramOutput[] => {
     const variable = variables.get(entity.id);
     if (variable === undefined) return [];
-    return [
-      entity.name !== undefined
-        ? { variable, color: entity.color, name: entity.name }
-        : { variable, color: entity.color },
-    ];
+    return [entity.name !== undefined ? { variable, color: entity.color, name: entity.name } : { variable, color: entity.color }];
   });
 }
 
-function lowerSnapshot(
-  doc: CadDocument,
-  parameters: ProgramParameter[],
-  ctx: LowerContext,
-  namer: Namer,
-  notes: string[],
-): FeatureProgram {
+function lowerSnapshot(doc: CadDocument, parameters: ProgramParameter[], ctx: LowerContext, namer: Namer, notes: string[]): FeatureProgram {
   const variables = new Map<string, string>();
   const features: Feature[] = [];
   for (const entity of solids(doc)) {
-    const base = (variable: string): FeatureBase => ({
-      step: null,
-      command: entity.kind,
-      variable,
-    });
+    const base = (variable: string): FeatureBase => ({ step: null, command: entity.kind, variable });
     const lowered = entityFeatures(entity, doc, undefined, ctx, namer, base, variables);
     const [first, ...rest] = lowered.features;
     const named =
@@ -350,27 +275,12 @@ function lowerSnapshot(
         ? [{ ...first, name: entity.name }]
         : [first, ...rest].filter((feature): feature is Feature => feature !== undefined);
     features.push(...named);
-    if (lowered.triangles) {
-      notes.push(
-        `${entity.kind} '${entity.id}' has no analytic form; exported as a triangle mesh.`,
-      );
-    }
+    if (lowered.triangles) notes.push(`${entity.kind} '${entity.id}' has no analytic form; exported as a triangle mesh.`);
   }
-  return {
-    units: doc.units,
-    source: 'snapshot',
-    parameters,
-    features,
-    outputs: outputsFor(doc, variables),
-    notes,
-  };
+  return { units: doc.units, source: 'snapshot', parameters, features, outputs: outputsFor(doc, variables), notes };
 }
 
-const MODIFICATION_COMMANDS: ReadonlySet<string> = new Set([
-  'fillet_edge',
-  'chamfer_edge',
-  'shell_solid',
-]);
+const MODIFICATION_COMMANDS: ReadonlySet<string> = new Set(['fillet_edge', 'chamfer_edge', 'shell_solid']);
 
 /** A fillet / chamfer / shell step that replaced one solid by its exact modification, in place. */
 function modificationStep(
@@ -384,12 +294,10 @@ function modificationStep(
   const [result] = created;
   const sourceId = String(child(event.params, 'id'));
   const variable = variables.get(sourceId);
-  if (!MODIFICATION_COMMANDS.has(event.step.name) || created.length !== 1 || removed.length !== 1)
-    return null;
+  if (!MODIFICATION_COMMANDS.has(event.step.name) || created.length !== 1 || removed.length !== 1) return null;
   if (removed[0] !== sourceId || variable === undefined || result?.kind !== 'mesh') return null;
   const brep = result.brep;
-  if (brep === undefined || (brep.op !== 'fillet' && brep.op !== 'chamfer' && brep.op !== 'shell'))
-    return null;
+  if (brep === undefined || (brep.op !== 'fillet' && brep.op !== 'chamfer' && brep.op !== 'shell')) return null;
   variables.delete(sourceId);
   variables.set(result.id, variable);
   const sizeParam = { fillet: 'radius', chamfer: 'distance', shell: 'thickness' }[brep.op];
@@ -417,14 +325,8 @@ function lowerStep(
     return previous !== undefined && previous !== current ? [[previous, current]] : [];
   });
   const [createdSolid] = created;
-  const base = (variable: string): FeatureBase => ({
-    step: stepNumber,
-    command: step.name,
-    variable,
-  });
-
-  const booleanKind =
-    step.name === 'boolean' ? BOOLEAN_KINDS[String(child(event.params, 'op'))] : undefined;
+  const base = (variable: string): FeatureBase => ({ step: stepNumber, command: step.name, variable });
+  const booleanKind = step.name === 'boolean' ? BOOLEAN_KINDS[String(child(event.params, 'op'))] : undefined;
   const operandA = String(child(event.params, 'a'));
   const operandB = String(child(event.params, 'b'));
   const left = variables.get(operandA);
@@ -443,10 +345,8 @@ function lowerStep(
     variables.set(createdSolid.id, left);
     return [{ ...base(left), op: 'boolean', kind: booleanKind, left, right }];
   }
-
   const modification = modificationStep(event, created, removed, variables, ctx, base);
   if (modification !== null) return [modification];
-
   const features: Feature[] = [];
   for (const id of removed) {
     const variable = variables.get(id);
@@ -458,16 +358,11 @@ function lowerStep(
     const variable = variables.get(current.id);
     if (variable === undefined) continue;
     const delta = child(event.params, 'delta');
-    if (step.name === 'move_entities' && isPureTranslation(previous, current, delta)) {
-      features.push({
-        ...base(variable),
-        op: 'translate',
-        delta: term3(delta, child(rawParams, 'delta'), ctx),
-      });
-    } else if (geometryEqual(previous, current)) {
-      if (current.name !== undefined && current.name !== previous.name) {
+    if (step.name === 'move_entities' && isPureTranslation(previous, current, delta))
+      features.push({ ...base(variable), op: 'translate', delta: term3(delta, child(rawParams, 'delta'), ctx) });
+    else if (geometryEqual(previous, current)) {
+      if (current.name !== undefined && current.name !== previous.name)
         features.push({ ...base(variable), op: 'label', name: current.name });
-      }
     } else {
       // Re-create from the evaluated state; remove first so the old solid does not linger.
       features.push({ ...base(variable), op: 'remove' });
@@ -477,11 +372,8 @@ function lowerStep(
   for (const entity of created) {
     const lowered = entityFeatures(entity, after, rawParams, ctx, namer, base, variables);
     features.push(...lowered.features);
-    if (lowered.triangles) {
-      notes.push(
-        `step ${stepNumber} (${step.name}): ${entity.kind} '${entity.id}' has no analytic form; exported as a triangle mesh.`,
-      );
-    }
+    if (lowered.triangles)
+      notes.push(`step ${stepNumber} (${step.name}): ${entity.kind} '${entity.id}' has no analytic form; exported as a triangle mesh.`);
   }
   return features;
 }
@@ -496,15 +388,12 @@ function historyMismatch(doc: CadDocument, replayed: CadDocument): string | null
     const regenerated = actual[i];
     return regenerated === undefined || !geometryEqual(original, regenerated);
   });
-  return differing === undefined
-    ? null
-    : `featureHistory regenerates solid '${differing.id}' with different geometry`;
+  return differing === undefined ? null : `featureHistory regenerates solid '${differing.id}' with different geometry`;
 }
 
 /**
  * Lower a document to a FeatureProgram. Prefers the featureHistory (parametric, ordered); falls
  * back to the current geometry when there is no history or replay does not reproduce the document.
- * @pure — replay works on fresh documents; `doc` is never mutated.
  * @invariant replay draws entity ids from the global `nextId` counter (as replay_history does), so
  *   ids minted after an export differ from ids minted without one; no document content changes.
  * @invariant history is used only when it regenerates every solid of `doc` (count + geometry).
@@ -520,7 +409,6 @@ export function buildFeatureProgram(
   const notes: string[] = [];
   const activeSteps: FeatureStep[] = doc.featureHistory.filter((s) => s.suppressed !== true);
   if (activeSteps.length === 0) return lowerSnapshot(doc, parameters, ctx, namer, notes);
-
   const features: Feature[] = [];
   const variables = new Map<string, string>();
   const stepNumbers = new Map(doc.featureHistory.map((s, i) => [s.id, i + 1]));
@@ -528,7 +416,6 @@ export function buildFeatureProgram(
     const stepNumber = stepNumbers.get(event.step.id) ?? 0;
     features.push(...lowerStep(event, stepNumber, variables, ctx, namer, notes));
   });
-
   const mismatch = historyMismatch(doc, replayed);
   if (mismatch !== null) {
     notes.push(`${mismatch}; exported the current geometry without its feature history.`);
@@ -536,12 +423,5 @@ export function buildFeatureProgram(
     for (const parameter of parameters) freshNamer.take(parameter.identifier);
     return lowerSnapshot(doc, parameters, ctx, freshNamer, notes);
   }
-  return {
-    units: doc.units,
-    source: 'history',
-    parameters,
-    features,
-    outputs: outputsFor(replayed, variables),
-    notes,
-  };
+  return { units: doc.units, source: 'history', parameters, features, outputs: outputsFor(replayed, variables), notes };
 }

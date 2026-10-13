@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { CadDocument } from '@core/model/types';
 import { getBuilding } from '../../building/model';
 import { findProfile } from '../../steel/profiles';
@@ -9,34 +5,17 @@ import { windCasesOf, type FrameLoads, type LoadCase } from './frameModelTypes';
 import { solveCombination } from './frameModelSolve';
 import { framesOf } from './frameModelFrames';
 import { memberBuckling, sectionResistance, yieldStrength } from '../steelDesign/steelDesign';
-import {
-  type CheckRow,
-  SLS_CRANE,
-  SLS_SWAY,
-  SLS_VERTICAL,
-  connectionCheck,
-  solveUltimate,
-  ultimateCombinations,
-} from './frameCheckSolve';
+import { type CheckRow, SLS_CRANE, SLS_SWAY, SLS_VERTICAL, connectionCheck, solveUltimate, ultimateCombinations } from './frameCheckSolve';
 
 /** Forces of a row that reports a stability or deflection limit rather than member forces. */
 const NO_FORCES = { axial: 0, moment: 0, shear: 0 } as const;
 
-/**
- * Analyses and checks every portal frame of a level: worst row per element over all combinations.
- * @pure
- */
+/** Analyses and checks every portal frame of a level: worst row per element over all combinations. */
 export function checkFrames(
   doc: CadDocument,
   levelId: string,
   loads: FrameLoads,
-): {
-  rows: CheckRow[];
-  frames: number;
-  skipped: string[];
-  combinations: string[];
-  minAlphaCritical: number;
-} {
+): { rows: CheckRow[]; frames: number; skipped: string[]; combinations: string[]; minAlphaCritical: number } {
   const building = getBuilding(doc);
   const { frames, skipped } = framesOf(doc, building, levelId, loads);
   const wind = loads.windPressure > 0;
@@ -51,30 +30,18 @@ export function checkFrames(
   let unstable = 0;
   let minAlphaCritical = Infinity;
   for (const frame of frames) {
-    const ultimate = combinations.map((combination) => ({
-      combination,
-      outcome: solveUltimate(frame, combination),
-    }));
+    const ultimate = combinations.map((combination) => ({ combination, outcome: solveUltimate(frame, combination) }));
     if (ultimate.some(({ outcome }) => outcome === null)) {
       skipped.push(`${frame.label} (unstable)`);
       unstable += 1;
       continue;
     }
-    let stability: { alpha: number; column: string; combination: string; method: string } | null =
-      null;
+    let stability: { alpha: number; column: string; combination: string; method: string } | null = null;
     for (const { combination, outcome } of ultimate) {
       if (!outcome) continue;
       const { result, amplification } = outcome;
-      if (
-        outcome.criticalMember !== null &&
-        (stability === null || outcome.alphaCritical < stability.alpha)
-      ) {
-        stability = {
-          alpha: outcome.alphaCritical,
-          column: outcome.criticalMember,
-          combination: combination.name,
-          method: outcome.method,
-        };
+      if (outcome.criticalMember !== null && (stability === null || outcome.alphaCritical < stability.alpha)) {
+        stability = { alpha: outcome.alphaCritical, column: outcome.criticalMember, combination: combination.name, method: outcome.method };
       }
       frame.members.forEach((analysis, index) => {
         const member = building.elements[analysis.elementId];
@@ -111,9 +78,7 @@ export function checkFrames(
       });
       for (const connection of Object.values(building.elements)) {
         if (connection.category !== 'connection') continue;
-        const index = frame.members.findIndex(
-          (analysis) => analysis.elementId === connection.rafterId,
-        );
+        const index = frame.members.findIndex((analysis) => analysis.elementId === connection.rafterId);
         const analysis = frame.members[index];
         const forces = result.members[index];
         if (!analysis || !forces) continue;
@@ -182,18 +147,10 @@ export function checkFrames(
         `${frame.label}:vertical`,
       );
     });
-    const swayCases: {
-      name: string;
-      factors: Partial<Record<LoadCase, number>>;
-      crane: boolean;
-    }[] = [];
+    const swayCases: { name: string; factors: Partial<Record<LoadCase, number>>; crane: boolean }[] = [];
     if (wind) {
       swayCases.push(
-        ...windCasesOf([frame]).map((windCase) => ({
-          name: `SLS ${windCase.label}`,
-          factors: { [windCase.loadCase]: 1 },
-          crane: false,
-        })),
+        ...windCasesOf([frame]).map((windCase) => ({ name: `SLS ${windCase.label}`, factors: { [windCase.loadCase]: 1 }, crane: false })),
       );
     }
     if (frame.craneNodes.length > 0) {

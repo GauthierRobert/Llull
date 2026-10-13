@@ -1,6 +1,4 @@
 /**
- * @layer tests/production/oracle
- *
  * Minimal, independent DXF (ASCII, R12+) reader: header extents, layer table and entities with
  * their layer, points and text — what a draughtsman sees when the file opens in AutoCAD.
  * R12 POLYLINE/VERTEX/SEQEND chains are folded into one entity with all vertices.

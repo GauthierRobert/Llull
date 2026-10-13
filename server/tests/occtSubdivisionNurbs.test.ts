@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Live OpenCascade: smooth subdivision solids become exact B-spline solids (one bicubic face per
  * refined cage quad, sewn closed) whose volume matches the Catmull-Clark limit surface, that take
  * booleans, and that write B_SPLINE_SURFACE geometry to STEP. A faceted (level 0) cage stays
@@ -21,26 +20,13 @@ const subdivision = (
   levels: number,
   position: Vec3 = [0, 0, 0],
   rotation: Vec3 = [0, 0, 0],
-): SubdivisionEntity =>
-  ({
-    id: 's',
-    kind: 'subdivision',
-    ...cage,
-    levels,
-    position,
-    rotation,
-    ...common,
-  }) as Entity as SubdivisionEntity;
+): SubdivisionEntity => ({ id: 's', kind: 'subdivision', ...cage, levels, position, rotation, ...common }) as Entity as SubdivisionEntity;
 
 /** Volume of the subdivided mesh at a deep level (converges to the limit surface from outside). */
 function limitVolume(entity: SubdivisionEntity): number {
   return subdivisionTriangles({ ...entity, levels: 5 }).reduce(
     (sum, [a, b, c]) =>
-      sum +
-      (a[0] * (b[1] * c[2] - b[2] * c[1]) -
-        a[1] * (b[0] * c[2] - b[2] * c[0]) +
-        a[2] * (b[0] * c[1] - b[1] * c[0])) /
-        6,
+      sum + (a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0])) / 6,
     0,
   );
 }
@@ -71,9 +57,7 @@ describe('occt exact subdivision solids', () => {
 
   it('builds creased and extraordinary-vertex cages (cylinder with sharp caps)', () => {
     const cage = cylinderCage(1, 2, 6, 2);
-    const rims = cage.faces
-      .slice(-2)
-      .flatMap((face) => face.map((a, i) => [a, face[(i + 1) % face.length]] as [number, number]));
+    const rims = cage.faces.slice(-2).flatMap((face) => face.map((a, i) => [a, face[(i + 1) % face.length]] as [number, number]));
     const topology = topologyOf(subdivision({ ...cage, creases: rims }, 3));
     expect(topology.solids).toBe(1);
     expect(topology.volume).toBeGreaterThan(0.8 * Math.PI * 2 * 0.75);
@@ -101,11 +85,7 @@ describe('occt exact subdivision solids', () => {
       [5, y, 3],
       [10, y, 0],
     ];
-    const result = execute(createEmptyDocument(), 'surface_from_curves', {
-      curves: [bow(0), bow(8)],
-      thickness: 0.5,
-      cells: [6, 4],
-    });
+    const result = execute(createEmptyDocument(), 'surface_from_curves', { curves: [bow(0), bow(8)], thickness: 0.5, cells: [6, 4] });
     const hood = result.document.entities[result.affected[0] as string] as Entity;
     const topology = topologyOf(hood);
     expect(topology.solids).toBe(1);

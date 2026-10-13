@@ -1,20 +1,12 @@
 /**
- * @layer ui/components
- *
- * NumberField — `<input type="number">` for a numeric value owned elsewhere (a store field). It
- * keeps the typed text locally so intermediate input ("0.", "-", "1e-") is never rewritten, and
- * reports only finite parsed numbers through `onValueChange`. An external change of `value`
- * replaces the text unless it already parses to that value. Its `ref` (a React 19 prop) reaches the
- * `<input>`.
+ * Number input over an external value: keeps the typed text ("0.", "-", "1e-" never rewritten), reports finite numbers
+ * only; an external `value` change replaces the text unless it already parses to it. `ref` reaches the <input>.
  */
 
 import React, { useState } from 'react';
 import { parseNumber } from '@ui/numberText';
 
-type NativeInputProps = Omit<
-  React.InputHTMLAttributes<HTMLInputElement>,
-  'type' | 'value' | 'defaultValue' | 'onChange'
->;
+type NativeInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type' | 'value' | 'defaultValue' | 'onChange'>;
 
 interface NumberFieldProps extends NativeInputProps {
   value: number;
@@ -22,12 +14,7 @@ interface NumberFieldProps extends NativeInputProps {
   ref?: React.Ref<HTMLInputElement>;
 }
 
-export function NumberField({
-  value,
-  onValueChange,
-  ref,
-  ...inputProps
-}: NumberFieldProps): React.ReactElement {
+export function NumberField({ value, onValueChange, ref, ...inputProps }: NumberFieldProps): React.ReactElement {
   const [text, setText] = useState(String(value));
   const [seenValue, setSeenValue] = useState(value);
   if (value !== seenValue) {

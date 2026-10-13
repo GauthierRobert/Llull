@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import { clamp } from '@lib/clamp';
 import type { SteelMemberElement } from '@core/model/building';
 import type { FrameMember, FrameNode } from '@lib/frame2d';
@@ -9,28 +5,13 @@ import type { CoefficientSet } from '../common/windCoefficients';
 import { GRAVITY } from '../../shared/numeric';
 
 /**
- * G dead, S snow, WL / WR wind from the left (+x) / right with internal pressure cpi = +0.2,
- * WLs / WRs the same with internal suction cpi = −0.3, CL / CR crane load group 1 (EN 1991-3 Tab. 2.2:
- * φ1 Gc + φ2 Q + drive forces) with the maximum wheel load at the left / right rail, CL5 / CR5 load
- * group 5 (φ4 + skewing HS) likewise, CLk / CRk the serviceability version of group 1 (static wheel
- * loads, φ = 1, drive force HT / φ5; EN 1993-6 §7.3). WLp / WRp: wind from the left / right with the
- * roof pressure set (EN 1991-1-4 Tab. 7.3a / 7.4a / 7.2: positive on the windward slope) and cpi = −0.3.
+ * G dead, S snow, WL / WR wind from the left (+x) / right with internal pressure cpi = +0.2, WLs / WRs the same with internal suction cpi =
+ * −0.3, CL / CR crane load group 1 (EN 1991-3 Tab. 2.2: φ1 Gc + φ2 Q + drive forces) with the maximum wheel load at the left / right rail,
+ * CL5 / CR5 load group 5 (φ4 + skewing HS) likewise, CLk / CRk the serviceability version of group 1 (static wheel loads, φ = 1, drive
+ * force HT / φ5; EN 1993-6 §7.3). WLp / WRp: wind from the left / right with the roof pressure set (EN 1991-1-4 Tab. 7.3a / 7.4a / 7.2:
+ * positive on the windward slope) and cpi = −0.3.
  */
-export type LoadCase =
-  | 'G'
-  | 'S'
-  | 'WL'
-  | 'WR'
-  | 'WLs'
-  | 'WRs'
-  | 'WLp'
-  | 'WRp'
-  | 'CL'
-  | 'CR'
-  | 'CL5'
-  | 'CR5'
-  | 'CLk'
-  | 'CRk';
+export type LoadCase = 'G' | 'S' | 'WL' | 'WR' | 'WLs' | 'WRs' | 'WLp' | 'WRp' | 'CL' | 'CR' | 'CL5' | 'CR5' | 'CLk' | 'CRk';
 
 export interface WindCase {
   readonly loadCase: 'WL' | 'WR' | 'WLs' | 'WRs' | 'WLp' | 'WRp';
@@ -46,42 +27,17 @@ export interface WindCase {
 export const WIND_CASES: ReadonlyArray<WindCase> = [
   { loadCase: 'WL', from: 'left', internalPressure: 0.2, roofSet: 'suction', label: 'W→' },
   { loadCase: 'WR', from: 'right', internalPressure: 0.2, roofSet: 'suction', label: 'W←' },
-  {
-    loadCase: 'WLs',
-    from: 'left',
-    internalPressure: -0.3,
-    roofSet: 'suction',
-    label: 'W→(cpi−0.3)',
-  },
-  {
-    loadCase: 'WRs',
-    from: 'right',
-    internalPressure: -0.3,
-    roofSet: 'suction',
-    label: 'W←(cpi−0.3)',
-  },
+  { loadCase: 'WLs', from: 'left', internalPressure: -0.3, roofSet: 'suction', label: 'W→(cpi−0.3)' },
+  { loadCase: 'WRs', from: 'right', internalPressure: -0.3, roofSet: 'suction', label: 'W←(cpi−0.3)' },
 ];
 
 /**
- * Roof pressure-set cases (cpi −0.3): present on a frame only when `FrameModel.windCases` lists them
- * (a rafter sees cpe ≥ ROOF_PRESSURE_CASE_MIN_CPE). Use `windCasesOf(frames)` to iterate the cases
- * that carry load.
+ * Roof pressure-set cases (cpi −0.3): present on a frame only when `FrameModel.windCases` lists them (a rafter sees cpe ≥
+ * ROOF_PRESSURE_CASE_MIN_CPE). Use `windCasesOf(frames)` to iterate the cases that carry load.
  */
 export const WIND_PRESSURE_CASES: ReadonlyArray<WindCase> = [
-  {
-    loadCase: 'WLp',
-    from: 'left',
-    internalPressure: -0.3,
-    roofSet: 'pressure',
-    label: 'W→(roof pressure)',
-  },
-  {
-    loadCase: 'WRp',
-    from: 'right',
-    internalPressure: -0.3,
-    roofSet: 'pressure',
-    label: 'W←(roof pressure)',
-  },
+  { loadCase: 'WLp', from: 'left', internalPressure: -0.3, roofSet: 'pressure', label: 'W→(roof pressure)' },
+  { loadCase: 'WRp', from: 'right', internalPressure: -0.3, roofSet: 'pressure', label: 'W←(roof pressure)' },
 ];
 
 /** A pressure-set case is generated when a rafter sees at least this cpe,10 (positive = pressure). */
@@ -91,8 +47,7 @@ export const ROOF_PRESSURE_CASE_MIN_CPE = 0.15;
 export function windCasesOf(frames: ReadonlyArray<Pick<FrameModel, 'windCases'>>): WindCase[] {
   return [...WIND_CASES, ...WIND_PRESSURE_CASES].filter(
     (windCase) =>
-      windCase.roofSet === 'suction' ||
-      frames.some((frame) => frame.windCases.some((own) => own.loadCase === windCase.loadCase)),
+      windCase.roofSet === 'suction' || frames.some((frame) => frame.windCases.some((own) => own.loadCase === windCase.loadCase)),
   );
 }
 
@@ -109,14 +64,10 @@ export interface AnalysisMember {
   readonly ends: readonly [boolean, boolean];
   readonly loads: CaseLoads;
   /**
-   * Buckling lengths (mm): in-plane system length, out-of-plane flexural length and the spacing
-   * of lateral-torsional restraints (purlins / side rails with fly braces to the inner flange).
+   * Buckling lengths (mm): in-plane system length, out-of-plane flexural length and the spacing of lateral-torsional restraints (purlins /
+   * side rails with fly braces to the inner flange).
    */
-  readonly lengths: {
-    readonly major: number;
-    readonly minor: number;
-    readonly lateralTorsional: number;
-  };
+  readonly lengths: { readonly major: number; readonly minor: number; readonly lateralTorsional: number };
 }
 
 export interface NodeCaseLoad {
@@ -166,9 +117,7 @@ export function craneCapacityOf(member: SteelMemberElement): number | null {
 type HoistingClass = 'HC1' | 'HC2' | 'HC3' | 'HC4';
 
 /** EN 1991-3 Tab. 2.5: φ2 = φ2,min + β2 vh. */
-const HOISTING_CLASSES: Readonly<
-  Record<HoistingClass, { readonly beta2: number; readonly phi2Min: number }>
-> = {
+const HOISTING_CLASSES: Readonly<Record<HoistingClass, { readonly beta2: number; readonly phi2Min: number }>> = {
   HC1: { beta2: 0.17, phi2Min: 1.05 },
   HC2: { beta2: 0.34, phi2Min: 1.1 },
   HC3: { beta2: 0.51, phi2Min: 1.15 },
@@ -176,18 +125,10 @@ const HOISTING_CLASSES: Readonly<
 };
 
 /**
- * EN 1991-3 dynamic and drive factors: φ1 on the self-weight, φ4 = 1.0 (rails within tolerance),
- * φ5 = 1.5 (smooth change of the drive force), friction μ = 0.2, nr = 2 rails, skew angle
- * α = 0.015 rad (simplified, §2.7.4).
+ * EN 1991-3 dynamic and drive factors: φ1 on the self-weight, φ4 = 1.0 (rails within tolerance), φ5 = 1.5 (smooth change of the drive
+ * force), friction μ = 0.2, nr = 2 rails, skew angle α = 0.015 rad (simplified, §2.7.4).
  */
-export const CRANE_FACTORS = {
-  phi1: 1.1,
-  phi4: 1,
-  phi5: 1.5,
-  friction: 0.2,
-  rails: 2,
-  skewAngle: 0.015,
-} as const;
+export const CRANE_FACTORS = { phi1: 1.1, phi4: 1, phi5: 1.5, friction: 0.2, rails: 2, skewAngle: 0.015 } as const;
 
 export interface CraneModel {
   readonly hoistingClass?: HoistingClass;
@@ -224,35 +165,24 @@ interface CraneActions {
     readonly transverseMin: number;
   };
   /** Load group 5: φ4 (Gc + Q) with skewing forces HS. N per rail. */
-  readonly group5: {
-    readonly max: number;
-    readonly min: number;
-    readonly skewMax: number;
-    readonly skewMin: number;
-  };
+  readonly group5: { readonly max: number; readonly min: number; readonly skewMax: number; readonly skewMin: number };
 }
 
 /**
- * Characteristic crane actions per rail (N) of one bridge crane, EN 1991-3 §2.
- * Statics: bridge 0.8 Gc at midspan, trolley 0.2 Gc + hoist load Q at the minimum hook approach e;
- * Rmax = 0.4 Gc + (0.2 Gc + Q)(l − e)/l, Rmin = 0.4 Gc + (0.2 Gc + Q) e/l (wheel load = rail / 2).
- * Group 1: φ1 on Gc, φ2 on Q; K = μ Σ driven wheel loads (one driven wheel per rail at the minimum static wheel load, Σ = Rmin),
- * HL,i = φ5 K / nr, M = K ls with ls = (ξ1 − 0.5) l, HT,1 = φ5 ξ2 M / a, HT,2 = φ5 ξ1 M / a (same
- * direction on both rails, conservative). Group 5: φ4 = 1 and HS,i = f λS,i ΣQr, f = 0.3(1 − e^(−250 α))
- * with α = 0.015 rad, λS = ξ2 / nr on the loaded rail guide and ξ1 / nr on the other (IFF, simplified).
+ * Characteristic crane actions per rail (N) of one bridge crane, EN 1991-3 §2. Statics: bridge 0.8 Gc at midspan, trolley 0.2 Gc + hoist
+ * load Q at the minimum hook approach e; Rmax = 0.4 Gc + (0.2 Gc + Q)(l − e)/l, Rmin = 0.4 Gc + (0.2 Gc + Q) e/l (wheel load = rail / 2).
+ * Group 1: φ1 on Gc, φ2 on Q; K = μ Σ driven wheel loads (one driven wheel per rail at the minimum static wheel load, Σ = Rmin), HL,i = φ5
+ * K / nr, M = K ls with ls = (ξ1 − 0.5) l, HT,1 = φ5 ξ2 M / a, HT,2 = φ5 ξ1 M / a (same direction on both rails, conservative). Group 5: φ4
+ * = 1 and HS,i = f λS,i ΣQr, f = 0.3(1 − e^(−250 α)) with α = 0.015 rad, λS = ξ2 / nr on the loaded rail guide and ξ1 / nr on the other
+ * (IFF, simplified).
  * @param span bridge span between the rails, mm
  */
-export function craneActions(
-  capacityTonnes: number,
-  span: number,
-  model: CraneModel = {},
-): CraneActions {
+export function craneActions(capacityTonnes: number, span: number, model: CraneModel = {}): CraneActions {
   const { phi1, phi4, phi5, friction, rails, skewAngle } = CRANE_FACTORS;
   const { beta2, phi2Min } = HOISTING_CLASSES[model.hoistingClass ?? 'HC2'];
   const phi2 = phi2Min + beta2 * (model.hoistingSpeed ?? 0.1);
   const hoist = capacityTonnes * GRAVITY * 1000;
-  const self =
-    model.craneSelfWeight !== undefined ? model.craneSelfWeight * 1000 : 0.5 * hoist + 20000;
+  const self = model.craneSelfWeight !== undefined ? model.craneSelfWeight * 1000 : 0.5 * hoist + 20000;
   const approach = clamp((model.minHookApproach ?? 1) * 1000, 0, span);
   const wheelBase = model.wheelBase ?? 3000;
   const nearShare = (span - approach) / span;
@@ -260,8 +190,7 @@ export function craneActions(
   const trolleyAndHoist = 0.2 * self + hoist;
   const staticMax = 0.4 * self + trolleyAndHoist * nearShare;
   const staticMin = 0.4 * self + trolleyAndHoist * farShare;
-  const dynamic = (share: number): number =>
-    phi1 * (0.4 * self + 0.2 * self * share) + phi2 * hoist * share;
+  const dynamic = (share: number): number => phi1 * (0.4 * self + 0.2 * self * share) + phi2 * hoist * share;
   const total = staticMax + staticMin;
   const xi1 = staticMax / total;
   const xi2 = 1 - xi1;
@@ -299,9 +228,7 @@ export function valleyLines(
   const lowEnds = rafters.map(({ start, end }) => ((start[2] ?? 0) <= (end[2] ?? 0) ? start : end));
   const shared = (end: readonly number[]): boolean =>
     lowEnds.filter(
-      (other) =>
-        Math.abs((other[0] ?? 0) - (end[0] ?? 0)) <= tolerance &&
-        Math.abs((other[1] ?? 0) - (end[1] ?? 0)) <= tolerance,
+      (other) => Math.abs((other[0] ?? 0) - (end[0] ?? 0)) <= tolerance && Math.abs((other[1] ?? 0) - (end[1] ?? 0)) <= tolerance,
     ).length >= 2;
   const xs = lowEnds.filter(shared).map((end) => Math.round((end[0] ?? 0) / tolerance) * tolerance);
   return [...new Set(xs)].sort((a, b) => a - b);

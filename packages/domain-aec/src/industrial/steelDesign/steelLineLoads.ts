@@ -1,9 +1,7 @@
 /**
- * Pipes and cable trays resting on beams: a run bears on a beam where it crosses the beam in plan
- * with its underside at the beam's top of steel; each support takes the run weight over half the
- * span to the neighbouring supports (the end supports also the overhang to the run end).
- * @layer domain-aec
- * @pure
+ * Pipes and cable trays resting on beams: a run bears on a beam where it crosses the beam in plan with its underside at the beam's top of
+ * steel; each support takes the run weight over half the span to the neighbouring supports (the end supports also the overhang to the run
+ * end).
  */
 
 import { clamp } from '@lib/clamp';
@@ -76,11 +74,7 @@ const END_TOLERANCE = 50;
 const GROUP_DISTANCE = 100;
 const NEARLY_HORIZONTAL = 0.1;
 
-function runOf(
-  units: ModelUnits,
-  element: PipeElement | CableTrayElement,
-  params: LineLoadParams,
-): Run {
+function runOf(units: ModelUnits, element: PipeElement | CableTrayElement, params: LineLoadParams): Run {
   const { toMm, elevationMm } = units;
   const base = elevationMm(element.levelId);
   const points = element.points.map((point): [number, number, number] => [
@@ -114,27 +108,18 @@ function runOf(
 
 function runsOf(units: ModelUnits, params: LineLoadParams): Run[] {
   return orderedElements(units.building).flatMap((element) =>
-    element.category === 'pipe' || element.category === 'tray'
-      ? [runOf(units, element, params)]
-      : [],
+    element.category === 'pipe' || element.category === 'tray' ? [runOf(units, element, params)] : [],
   );
 }
 
 /** Arc lengths (mm) at which `pipe` rests on top of `beams` (the rule for pipes without supports). */
-export function restingArcs(
-  units: ModelUnits,
-  pipe: PipeElement,
-  beams: ReadonlyArray<BeamLoads>,
-): number[] {
+export function restingArcs(units: ModelUnits, pipe: PipeElement, beams: ReadonlyArray<BeamLoads>): number[] {
   const run = runOf(units, pipe, { pipeContentDensity: 0, cableTrayWeight: 0 });
   return supportsOf(run, beams).supports.map((support) => support.s);
 }
 
 /** Supports of a run on `beams`, sorted by arc length, and the run length (mm). */
-function supportsOf(
-  run: Run,
-  beams: ReadonlyArray<BeamLoads>,
-): { supports: Support[]; length: number } {
+function supportsOf(run: Run, beams: ReadonlyArray<BeamLoads>): { supports: Support[]; length: number } {
   const supports: Support[] = [];
   let travelled = 0;
   run.points.forEach((from, index) => {
@@ -156,21 +141,12 @@ function supportsOf(
         const t = (qx * dy - qy * dx) / cross;
         const beamLength = beam.lengthM * 1000;
         if (u < -1e-9 || u > 1 + 1e-9) continue;
-        if (t * beamLength < -END_TOLERANCE || t * beamLength > beamLength + END_TOLERANCE)
-          continue;
+        if (t * beamLength < -END_TOLERANCE || t * beamLength > beamLength + END_TOLERANCE) continue;
         const underside = from[2] + u * dz - run.halfDepth;
         if (Math.abs(underside - beam.top) > SUPPORT_TOLERANCE) continue;
         const s = travelled + u * segment;
-        const duplicate = supports.some(
-          (support) => support.beam === beam && Math.abs(support.s - s) < 1,
-        );
-        if (!duplicate) {
-          supports.push({
-            s,
-            beam,
-            at: clamp(t * beamLength, 0, beamLength),
-          });
-        }
+        const duplicate = supports.some((support) => support.beam === beam && Math.abs(support.s - s) < 1);
+        if (!duplicate) supports.push({ s, beam, at: clamp(t * beamLength, 0, beamLength) });
       }
     }
     travelled += segment;
@@ -192,13 +168,7 @@ export function applyLineLoads(
   const warnings: string[] = [];
   const columnNodes: Array<readonly [string, ColumnNode]> = [];
   for (const run of runsOf(units, params)) {
-    const header = {
-      id: run.id,
-      mark: run.mark,
-      kind: run.kind,
-      label: run.label,
-      weightPerMetre: run.weightPerMetre,
-    };
+    const header = { id: run.id, mark: run.mark, kind: run.kind, label: run.label, weightPerMetre: run.weightPerMetre };
     const pipeRun = run.pipe ? pipeRunOf(units, run.pipe) : null;
     if (pipeRun && weightSupportsOf(units, pipeRun).length > 0) {
       const supported = applySupportedPipe(units, pipeRun, run.weightPerMetre, beams, bars);
@@ -224,13 +194,7 @@ export function applyLineLoads(
       support.beam.lineSupport = true;
       carried += weight;
     });
-    runs.push({
-      ...header,
-      lengthM: length / 1000,
-      supports: supports.length,
-      basis: nozzles ? 'nozzles' : 'resting',
-      carriedKn: carried,
-    });
+    runs.push({ ...header, lengthM: length / 1000, supports: supports.length, basis: nozzles ? 'nozzles' : 'resting', carriedKn: carried });
     if (supports.length === 0 && length > 0 && !nozzles) {
       warnings.push(
         `${run.kind} ${run.mark} (${run.label}) rests on no steel beam: its ${((run.weightPerMetre * length) / 1000).toFixed(1)} kN are not carried by any checked member${run.kind === 'pipe' ? ' (add_pipe_support: shoes on steel below or hangers from steel above)' : ''}`,

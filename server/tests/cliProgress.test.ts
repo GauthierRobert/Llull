@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * `llull run` progress (`--progress` / TTY), per-step timing (`durationMs`), the slow-step warning
  * and the `--timeout` deadline, driven by a fake clock through `runCli`.
  */
@@ -22,12 +21,7 @@ interface Captured {
 }
 
 /** A clock that advances `tick` ms on every read: every step then takes exactly `tick` ms. */
-function capture(options: {
-  stdin: string;
-  tick?: number;
-  tty?: boolean;
-  fetchImpl?: CliIo['fetchImpl'];
-}): Captured {
+function capture(options: { stdin: string; tick?: number; tty?: boolean; fetchImpl?: CliIo['fetchImpl'] }): Captured {
   const out: string[] = [];
   const err: string[] = [];
   let clock = 0;
@@ -65,12 +59,7 @@ describe('llull run — progress and timing', () => {
   it('streams one stderr line per step with --progress, announcing kernel commands first', async () => {
     const c = capture({ stdin: PLAN, tick: 1500 });
     expect(await runCli(['run', '-', '--progress', ...docFlag()], c.io)).toBe(EXIT_OK);
-    expect(c.err).toEqual([
-      '[1/3] add_box … 1.5s',
-      '[2/3] add_cylinder … 1.5s',
-      '[3/3] boolean …',
-      '[3/3] boolean … 1.5s',
-    ]);
+    expect(c.err).toEqual(['[1/3] add_box … 1.5s', '[2/3] add_cylinder … 1.5s', '[3/3] boolean …', '[3/3] boolean … 1.5s']);
   });
 
   it('streams progress when stderr is a terminal, and stays silent when it is not', async () => {
@@ -91,9 +80,7 @@ describe('llull run — progress and timing', () => {
       ]),
       tick: 10,
     });
-    expect(await runCli(['run', '-', '--progress', '--continue', ...docFlag()], c.io)).toBe(
-      EXIT_COMMAND_ERROR,
-    );
+    expect(await runCli(['run', '-', '--progress', '--continue', ...docFlag()], c.io)).toBe(EXIT_COMMAND_ERROR);
     expect(c.err).toEqual(['[1/2] add_box … 0.0s FAILED', '[2/2] add_sphere … 0.0s']);
   });
 
@@ -118,10 +105,7 @@ describe('llull run — progress and timing', () => {
   it('says --progress does nothing with --server', async () => {
     const c = capture({
       stdin: PLAN,
-      fetchImpl: () =>
-        Promise.resolve(
-          new Response(JSON.stringify({ summary: 'ok', affected: [], changed: true })),
-        ),
+      fetchImpl: () => Promise.resolve(new Response(JSON.stringify({ summary: 'ok', affected: [], changed: true }))),
     });
     await runCli(['run', '-', '--progress', '--server', 'http://cad.local:3001'], c.io);
     expect(c.err[0]).toMatch(/--progress has no effect with --server/);
@@ -131,12 +115,8 @@ describe('llull run — progress and timing', () => {
 describe('llull run — --timeout', () => {
   it('stops before the next step once the deadline passed: exit 1, clear message, nothing saved', async () => {
     const c = capture({ stdin: PLAN, tick: 1500 });
-    expect(await runCli(['run', '-', '--timeout', '2', ...docFlag()], c.io)).toBe(
-      EXIT_COMMAND_ERROR,
-    );
-    expect(c.out.join('\n')).toBe(
-      'llull: timed out after 2s (--timeout) before step 2/3 (add_cylinder); stopped, nothing was saved.',
-    );
+    expect(await runCli(['run', '-', '--timeout', '2', ...docFlag()], c.io)).toBe(EXIT_COMMAND_ERROR);
+    expect(c.out.join('\n')).toBe('llull: timed out after 2s (--timeout) before step 2/3 (add_cylinder); stopped, nothing was saved.');
     expect(existsSync(docPath)).toBe(false);
   });
 
@@ -157,13 +137,8 @@ describe('llull run — --timeout', () => {
   });
 
   it('applies to --server calls as a request timeout', async () => {
-    const c = capture({
-      stdin: PLAN,
-      fetchImpl: () => Promise.reject(new DOMException('timed out', 'TimeoutError')),
-    });
-    expect(
-      await runCli(['run', '-', '--timeout', '5', '--server', 'http://cad.local:3001'], c.io),
-    ).toBe(EXIT_COMMAND_ERROR);
+    const c = capture({ stdin: PLAN, fetchImpl: () => Promise.reject(new DOMException('timed out', 'TimeoutError')) });
+    expect(await runCli(['run', '-', '--timeout', '5', '--server', 'http://cad.local:3001'], c.io)).toBe(EXIT_COMMAND_ERROR);
     expect(c.out[0]).toMatch(/Timed out after 5s waiting for the llull server .*\(--timeout\)/);
   });
 });
@@ -178,10 +153,7 @@ describe('formatDuration', () => {
 
 describe('llull --timeout supervisor (real launcher)', () => {
   const launcher = path.resolve(__dirname, '..', 'bin', 'llull.cjs');
-  const run = (
-    args: string[],
-    env: NodeJS.ProcessEnv = process.env,
-  ): Promise<{ stdout: string; stderr: string; code: number }> =>
+  const run = (args: string[], env: NodeJS.ProcessEnv = process.env): Promise<{ stdout: string; stderr: string; code: number }> =>
     promisify(execFile)(process.execPath, [launcher, ...args], { env }).then(
       ({ stdout, stderr }) => ({ stdout, stderr, code: 0 }),
       (error: { stdout: string; stderr: string; code: number }) => error,
@@ -198,10 +170,7 @@ describe('llull --timeout supervisor (real launcher)', () => {
   }, 120_000);
 
   it('kills a child that never finishes (blocked on stdin) and exits 1 with the timeout message', async () => {
-    const stuck = await run(['run', '-', '--timeout', '1', '--doc', docPath], {
-      ...process.env,
-      LLULL_CLI_KILL_GRACE_SECONDS: '0',
-    });
+    const stuck = await run(['run', '-', '--timeout', '1', '--doc', docPath], { ...process.env, LLULL_CLI_KILL_GRACE_SECONDS: '0' });
     expect(stuck.code).toBe(1);
     expect(stuck.stderr).toMatch(/llull: timed out after 1s \(--timeout\); the run was killed/);
   }, 120_000);

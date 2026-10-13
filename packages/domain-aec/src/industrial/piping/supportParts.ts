@@ -1,10 +1,7 @@
 /**
- * Solid parts of a pipe support in the pipe's frame: a steel block (shoe, guide, anchor) between the
- * pipe underside and the steel below, with side stops (guide, anchor) and a cap (anchor); a hanger is
- * a clamp on the pipe top and a rod up to the steel above. On a riser every type is a clamp collar
- * with a horizontal bracket to the steel beside the pipe.
- * @layer domain-aec
- * @pure
+ * Solid parts of a pipe support in the pipe's frame: a steel block (shoe, guide, anchor) between the pipe underside and the steel below,
+ * with side stops (guide, anchor) and a cap (anchor); a hanger is a clamp on the pipe top and a rod up to the steel above. On a riser every
+ * type is a clamp collar with a horizontal bracket to the steel beside the pipe.
  */
 
 import type { CadDocument } from '@core/model/types';
@@ -48,55 +45,31 @@ export function pipeAngle(pipe: PipeElement, position: PipeSupportElement['posit
 }
 
 /** Clamp collar and bracket of a support on a riser; the frame is turned so `across` points to the steel. */
-function riserShape(
-  support: PipeSupportElement,
-  diameter: number,
-  mm: (value: number) => number,
-): SupportShape {
+function riserShape(support: PipeSupportElement, diameter: number, mm: (value: number) => number): SupportShape {
   const label = `Pipe support ${support.mark} ${support.type}`;
   const [z, collar] = [support.position[2], diameter + mm(40)];
-  const arm =
-    support.memberId !== null && support.standoff !== undefined ? support.standoff - mm(20) : 0;
-  const parts: SupportPart[] = [
-    {
-      kind: 'box',
-      name: 'clamp',
-      label: `${label} clamp`,
-      across: 0,
-      z,
-      size: [collar, collar, mm(80)],
-    },
-  ];
+  const arm = support.memberId !== null && support.standoff !== undefined ? support.standoff - mm(20) : 0;
+  const parts: SupportPart[] = [{ kind: 'box', name: 'clamp', label: `${label} clamp`, across: 0, z, size: [collar, collar, mm(80)] }];
   if (arm > mm(5)) {
-    parts.push({
-      kind: 'box',
-      name: 'bracket',
-      label: `${label} bracket`,
-      across: collar / 2 + arm / 2,
-      z,
-      size: [mm(60), arm, mm(40)],
-    });
+    parts.push({ kind: 'box', name: 'bracket', label: `${label} bracket`, across: collar / 2 + arm / 2, z, size: [mm(60), arm, mm(40)] });
   }
   return { angle: (support.standoffAngle ?? Math.PI / 2) - Math.PI / 2, parts };
 }
 
 /** Parts of `support` on `pipe`; z values are relative to the support's level. */
-export function supportShape(
-  doc: Pick<CadDocument, 'units'>,
-  support: PipeSupportElement,
-  pipe: PipeElement,
-): SupportShape {
+export function supportShape(doc: Pick<CadDocument, 'units'>, support: PipeSupportElement, pipe: PipeElement): SupportShape {
   const mm = (value: number): number => fromMm(doc, value);
   const diameter = pipe.diameter;
   const [top, underside] = [support.position[2] + diameter / 2, support.position[2] - diameter / 2];
   const label = `Pipe support ${support.mark} ${support.type}`;
-  const box = (
-    name: string,
-    text: string,
-    across: number,
-    z: number,
-    size: readonly [number, number, number],
-  ): SupportPart => ({ kind: 'box', name, label: `${label} ${text}`, across, z, size });
+  const box = (name: string, text: string, across: number, z: number, size: readonly [number, number, number]): SupportPart => ({
+    kind: 'box',
+    name,
+    label: `${label} ${text}`,
+    across,
+    z,
+    size,
+  });
   const snap = nearestOnRoute(pipe.points, support.position);
   if (snap && Math.abs(snap.direction[2]) > RISER_SLOPE) return riserShape(support, diameter, mm);
   const angle = pipeAngle(pipe, support.position);
@@ -119,28 +92,21 @@ export function supportShape(
   const stops = support.type === 'guide' || support.type === 'anchor';
   const length = Math.max(mm(150), diameter);
   const width = Math.max(mm(100), stops ? diameter + mm(30) : diameter / 2);
-  const pedestal =
-    support.pedestalHeight > 0 ? support.pedestalHeight : support.memberId === null ? mm(100) : 0;
+  const pedestal = support.pedestalHeight > 0 ? support.pedestalHeight : support.memberId === null ? mm(100) : 0;
   const height = Math.max(pedestal, mm(20));
-  const parts: SupportPart[] = [
-    box('block', 'block', 0, underside - height / 2, [length, width, height]),
-  ];
+  const parts: SupportPart[] = [box('block', 'block', 0, underside - height / 2, [length, width, height])];
   if (stops) {
     const stopHeight = diameter / 2 + mm(15);
     for (const side of [1, -1]) {
       parts.push(
-        box(
-          side > 0 ? 'stop-left' : 'stop-right',
-          'side stop',
-          side * (diameter / 2 + mm(10)),
-          underside + stopHeight / 2,
-          [length, mm(10), stopHeight],
-        ),
+        box(side > 0 ? 'stop-left' : 'stop-right', 'side stop', side * (diameter / 2 + mm(10)), underside + stopHeight / 2, [
+          length,
+          mm(10),
+          stopHeight,
+        ]),
       );
     }
   }
-  if (support.type === 'anchor') {
-    parts.push(box('cap', 'cap', 0, top + mm(5), [mm(30), diameter + mm(40), mm(10)]));
-  }
+  if (support.type === 'anchor') parts.push(box('cap', 'cap', 0, top + mm(5), [mm(30), diameter + mm(40), mm(10)]));
   return { angle, parts };
 }

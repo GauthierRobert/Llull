@@ -1,10 +1,7 @@
 /**
- * Member verification of a moment frame from its solved load cases: beams (rigid ends → end moments,
- * hogging lateral-torsional buckling over the hogging length), columns (N + M interaction §6.3.3 on
- * the axis the frame plane bends), storey drift and sway stability. Moments are amplified by
- * 1/(1 − 1/αcr) when αcr < 10 (EN 1993-1-1 §5.2.2(5)); the buckling length is the storey piece.
- * @layer domain-aec
- * @pure
+ * Member verification of a moment frame from its solved load cases: beams (rigid ends → end moments, hogging lateral-torsional buckling
+ * over the hogging length), columns (N + M interaction §6.3.3 on the axis the frame plane bends), storey drift and sway stability. Moments
+ * are amplified by 1/(1 − 1/αcr) when αcr < 10 (EN 1993-1-1 §5.2.2(5)); the buckling length is the storey piece.
  */
 
 import { toDegrees } from '@lib/angle';
@@ -12,12 +9,7 @@ import type { FrameResult } from '@lib/frame2d';
 import { memberBuckling } from './steelDesign';
 import type { MomentFrame } from './steelFrameDetect';
 import type { BarLayout, FrameSystem } from './steelFrameModel';
-import {
-  columnBendingAxis,
-  shearReducedMoment,
-  weakAxisBuckling,
-  weakAxisResistance,
-} from './steelFrameSection';
+import { columnBendingAxis, shearReducedMoment, weakAxisBuckling, weakAxisResistance } from './steelFrameSection';
 import { driftOf, type FrameSolutions } from './steelFrameSolve';
 import type { BeamResult } from './steelFraming';
 import type { SteelBar } from './steelMemberBars';
@@ -47,10 +39,8 @@ interface FrameCheckInput {
 const kilo = (value: number): number => value / 1000;
 const mega = (value: number): number => value / 1e6;
 
-const combinationOf = (input: FrameCheckInput): string =>
-  `${ULS_COMBINATION} + notional horizontal force ${input.phiText} (frame)`;
+const combinationOf = (input: FrameCheckInput): string => `${ULS_COMBINATION} + notional horizontal force ${input.phiText} (frame)`;
 
-/** Keeps the line of highest utilisation. */
 const worstOf = (current: CheckLine | undefined, next: CheckLine): CheckLine =>
   current === undefined || next.utilisation > current.utilisation ? next : current;
 
@@ -72,15 +62,11 @@ function beamDiagram(result: FrameResult, layout: BarLayout, amplification: numb
   let compression = 0;
   forces.forEach((member, index) => {
     if (!member) return;
-    const [low, high] = layout.reversed
-      ? [member.moment[1], member.moment[0]]
-      : [member.moment[0], member.moment[1]];
+    const [low, high] = layout.reversed ? [member.moment[1], member.moment[0]] : [member.moment[0], member.moment[1]];
     if (index === 0) stations.push(low * amplification);
     stations.push(high * amplification);
     const peak = member.maxMoment * amplification;
-    if (peak > Math.max(Math.abs(low), Math.abs(high)) * amplification + 1) {
-      interior = Math.max(interior, peak);
-    }
+    if (peak > Math.max(Math.abs(low), Math.abs(high)) * amplification + 1) interior = Math.max(interior, peak);
     shear = Math.max(shear, ...member.shear.map(Math.abs));
     compression = Math.max(compression, ...member.axial.map((value) => -value));
   });
@@ -97,8 +83,7 @@ function beamDiagram(result: FrameResult, layout: BarLayout, amplification: numb
 function hoggingLength(diagram: Diagram, layout: BarLayout, length: number): number {
   const along = (from: 'start' | 'end'): number => {
     const order = from === 'start' ? diagram.stations : [...diagram.stations].reverse();
-    const fractions =
-      from === 'start' ? layout.fractions : layout.fractions.map((t) => 1 - t).reverse();
+    const fractions = from === 'start' ? layout.fractions : layout.fractions.map((t) => 1 - t).reverse();
     if ((order[0] ?? 0) >= 0) return 0;
     for (let index = 1; index < order.length; index++) {
       const [before, after] = [order[index - 1] as number, order[index] as number];
@@ -113,12 +98,7 @@ function hoggingLength(diagram: Diagram, layout: BarLayout, length: number): num
   return Math.max(along('start'), along('end'));
 }
 
-function beamRow(
-  bar: SteelBar,
-  result: BeamResult,
-  layout: BarLayout,
-  input: FrameCheckInput,
-): MemberRow {
+function beamRow(bar: SteelBar, result: BeamResult, layout: BarLayout, input: FrameCheckInput): MemberRow {
   return withBeamSection(bar, ({ profile, resistance }) => {
     const { solutions } = input;
     const length = bar.length;
@@ -146,8 +126,7 @@ function beamRow(
         lateralTorsional: Math.max(hogLength, 1),
       });
       const worstBuckling = sagging.utilisation >= hogging.utilisation ? sagging : hogging;
-      const governingMoment =
-        sagging.utilisation >= hogging.utilisation ? diagram.sagging : diagram.hogging;
+      const governingMoment = sagging.utilisation >= hogging.utilisation ? diagram.sagging : diagram.hogging;
       interaction = worstOf(interaction, {
         name: 'frame N+M (§6.3.3)',
         utilisation: worstBuckling.utilisation,
@@ -167,21 +146,12 @@ function beamRow(
       });
       shearLine = worstOf(
         shearLine,
-        shearCheckLine(
-          profile.name,
-          combination,
-          diagram.shear / resistance.shear,
-          kilo(diagram.shear),
-          kilo(resistance.shear),
-        ),
+        shearCheckLine(profile.name, combination, diagram.shear / resistance.shear, kilo(diagram.shear), kilo(resistance.shear)),
       );
       maxMoment = Math.max(maxMoment, diagram.sagging, diagram.hogging);
       maxShear = Math.max(maxShear, diagram.shear);
       maxCompression = Math.max(maxCompression, compression);
-      const ends: [number, number] = [
-        diagram.stations[0] ?? 0,
-        diagram.stations[diagram.stations.length - 1] ?? 0,
-      ];
+      const ends: [number, number] = [diagram.stations[0] ?? 0, diagram.stations[diagram.stations.length - 1] ?? 0];
       ends.forEach((moment, index) => {
         if (Math.abs(moment) > Math.abs(joints[index] ?? 0)) joints[index] = moment;
       });
@@ -201,12 +171,7 @@ function beamRow(
   });
 }
 
-function deflectionLine(
-  bar: SteelBar,
-  layout: BarLayout,
-  result: FrameResult,
-  ratio: number,
-): { line: CheckLine; value: number } {
+function deflectionLine(bar: SteelBar, layout: BarLayout, result: FrameResult, ratio: number): { line: CheckLine; value: number } {
   const lift = layout.nodes.map((node) => result.displacements[node]?.[1] ?? 0);
   const first = lift[0] ?? 0;
   const last = lift[lift.length - 1] ?? 0;
@@ -220,10 +185,7 @@ function deflectionLine(
   const value = Math.max(0, ...sag);
   const limit = (cantilever ? 2 * bar.length : bar.length) / ratio;
   const label = cantilever ? `cantilever 2L/${ratio}` : `L/${ratio}`;
-  return {
-    value,
-    line: deflectionCheckLine(`${bar.profileName} L ${metres(bar.length)} m`, label, value, limit),
-  };
+  return { value, line: deflectionCheckLine(`${bar.profileName} L ${metres(bar.length)} m`, label, value, limit) };
 }
 
 function columnRow(bar: SteelBar, layout: BarLayout, input: FrameCheckInput): MemberRow {
@@ -238,8 +200,7 @@ function columnRow(bar: SteelBar, layout: BarLayout, input: FrameCheckInput): Me
     );
   }
   const { solutions, system } = input;
-  const bending =
-    axis === 'strong' ? resistance : { ...resistance, ...weakAxisResistance(profile, bar.fy) };
+  const bending = axis === 'strong' ? resistance : { ...resistance, ...weakAxisResistance(profile, bar.fy) };
   const combination = combinationOf(input);
   const axisText = axis === 'strong' ? 'strong axis' : 'weak axis';
   let interaction: CheckLine | undefined;
@@ -262,16 +223,9 @@ function columnRow(bar: SteelBar, layout: BarLayout, input: FrameCheckInput): Me
       const zText = `z ${metres(bottom?.y ?? 0)}–${metres(top?.y ?? 0)} m`;
       const buckling =
         axis === 'strong'
-          ? memberBuckling(profile, bar.fy, compression, moment, {
-              major: length,
-              minor: length,
-              lateralTorsional: length,
-            })
+          ? memberBuckling(profile, bar.fy, compression, moment, { major: length, minor: length, lateralTorsional: length })
           : undefined;
-      const weak =
-        axis === 'weak'
-          ? weakAxisBuckling(profile, bar.fy, compression, moment, length)
-          : undefined;
+      const weak = axis === 'weak' ? weakAxisBuckling(profile, bar.fy, compression, moment, length) : undefined;
       const utilisation = buckling?.utilisation ?? weak?.utilisation ?? 0;
       const chi = buckling ? Math.min(buckling.chiMajor, buckling.chiMinor) : (weak?.chi ?? 1);
       interaction = worstOf(interaction, {
@@ -289,19 +243,12 @@ function columnRow(bar: SteelBar, layout: BarLayout, input: FrameCheckInput): Me
       });
       shearLine = worstOf(
         shearLine,
-        shearCheckLine(
-          `${profile.name} (${axisText}) ${zText}`,
-          combination,
-          shear / bending.shear,
-          kilo(shear),
-          kilo(bending.shear),
-        ),
+        shearCheckLine(`${profile.name} (${axisText}) ${zText}`, combination, shear / bending.shear, kilo(shear), kilo(bending.shear)),
       );
       maxMoment = Math.max(maxMoment, moment);
       maxCompression = Math.max(maxCompression, compression);
       maxShear = Math.max(maxShear, shear);
-      if (index === 0)
-        baseMoment = Math.max(baseMoment, Math.abs(forces.moment[0]) * solutions.amplification);
+      if (index === 0) baseMoment = Math.max(baseMoment, Math.abs(forces.moment[0]) * solutions.amplification);
     });
   }
   let drift: CheckLine | undefined;

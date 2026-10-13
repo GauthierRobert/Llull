@@ -1,5 +1,4 @@
 /**
- * @layer server
  * POST /exchange `{ name, params }` — the exchange tools (export_step, import_step, import_dwg,
  * import_code) for REST callers: the `llull` CLI with `--app` / `--server` (`liveExchange.ts`).
  * Answers the command bus shape plus `changed`.
@@ -13,10 +12,7 @@ import type { ExchangeOptions } from './pythonExchange';
 import { guardMutation } from './security';
 import { actorOf } from './audit';
 
-export function buildExchangeRouter(
-  restLimiter: RequestHandler,
-  exchange: ExchangeOptions,
-): Router {
+export function buildExchangeRouter(restLimiter: RequestHandler, exchange: ExchangeOptions): Router {
   const router = Router();
   router.post('/exchange', restLimiter, guardMutation(), (req, res) => {
     const body = req.body as unknown;

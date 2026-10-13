@@ -1,10 +1,4 @@
-/**
- * @layer ui/viewport/3d
- *
- * Shared render shell for every 3D solid kind: selection click, display-mode material,
- * BVH raycasting acceleration and geometry disposal (R9). Each kind supplies only its
- * memoized geometry and base surface constants.
- */
+// Shared shell of every 3D solid branch: selection click, display-mode material, BVH raycasting, disposal (R9).
 
 import { useEffect, useLayoutEffect } from 'react';
 import * as THREE from 'three';
@@ -20,18 +14,13 @@ export interface SolidSurface {
   envMapIntensity: number;
 }
 
-/** Default surface used by most solid kinds. */
-const DEFAULT_SOLID_SURFACE: SolidSurface = {
-  roughness: 0.45,
-  metalness: 0.08,
-  envMapIntensity: 0.8,
-};
+const DEFAULT_SOLID_SURFACE: SolidSurface = { roughness: 0.45, metalness: 0.08, envMapIntensity: 0.8 };
 
 export interface SolidMeshKindProps<E extends BaseEntity> {
   entity: E;
   selected: boolean;
   onSelect: (id: string, additive: boolean) => void;
-  /** Optional PBR material override from an assigned document material. */
+  /** From an assigned document material. */
   pbrMaterial?: PbrMaterial | undefined;
 }
 
@@ -42,9 +31,9 @@ interface SolidMeshShellProps {
   onSelect: (id: string, additive: boolean) => void;
   pbrMaterial?: PbrMaterial | undefined;
   surface?: SolidSurface;
-  /** Render both faces regardless of display mode. */
+  /** Both faces whatever the display mode. */
   doubleSided?: boolean;
-  /** Build a BVH for raycasting (default true). */
+  /** BVH for raycasting (default true). */
   boundsTree?: boolean;
 }
 
@@ -60,7 +49,7 @@ export function SolidMeshShell({
 }: SolidMeshShellProps): React.ReactElement {
   const { position, rotation, color } = entity;
 
-  // Build BVH once per geometry for O(log n) raycasting; dispose with the geometry (R9).
+  // O(log n) raycasts; freed with the geometry.
   useEffect(() => {
     if (boundsTree) geometry.computeBoundsTree();
     else geometry.computeBoundingBox();
@@ -74,7 +63,7 @@ export function SolidMeshShell({
   const displayMode = useViewportStore((s) => s.displayMode);
   const finishScale = pbrMaterial?.finish?.scale;
   const textures = useFinishTextures(pbrMaterial);
-  // The finish maps need UVs: box-projected once per geometry / tile size, before the frame draws.
+  // Finish maps need UVs: box-projected per geometry / tile size, before the frame draws.
   useLayoutEffect(() => {
     if (finishScale !== undefined) applyBoxUvs(geometry, finishScale);
   }, [geometry, finishScale]);
@@ -90,7 +79,7 @@ export function SolidMeshShell({
       castShadow
       receiveShadow
     >
-      {/* Pushed back slightly so lines drawn on the surface (contours, outlines) stay visible. */}
+      {/* Pushed back so lines drawn on the surface (contours, outlines) stay visible. */}
       {textured ? (
         <meshPhysicalMaterial
           {...matProps}

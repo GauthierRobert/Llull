@@ -1,14 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
+import { expectNoOp } from '../../helpers/expectNoOp';
+import { xy, xyz } from '../../helpers/xy';
 
 /** Executes each command, then re-runs it with its twin params and expects the refusal. */
 const twinChecker = (): {
-  twinOf: (
-    name: string,
-    params: Record<string, unknown>,
-    twinParams?: Record<string, unknown>,
-  ) => void;
+  twinOf: (name: string, params: Record<string, unknown>, twinParams?: Record<string, unknown>) => void;
   current: () => CadDocument;
 } => {
   let doc = createEmptyDocument();
@@ -21,18 +19,13 @@ const twinChecker = (): {
   };
 };
 
-const expectNoOp = (doc: CadDocument, name: string, params: Record<string, unknown>): void => {
+const expectUnchanged = (doc: CadDocument, name: string, params: Record<string, unknown>): void => {
   const result = execute(doc, name, params);
-  expect(result.document).toBe(doc);
-  expect(result.affected).toEqual([]);
+  expectNoOp(result, doc);
   expect(result.summary).toMatch(/already|nothing/);
 };
 
-const expectTwinRefused = (
-  doc: CadDocument,
-  name: string,
-  params: Record<string, unknown>,
-): void => {
+const expectTwinRefused = (doc: CadDocument, name: string, params: Record<string, unknown>): void => {
   const again = execute(doc, name, params);
   expect(again.document, name).toBe(doc);
   expect(again.affected).toEqual([]);
@@ -41,19 +34,12 @@ const expectTwinRefused = (
 
 describe('update_* / set_* commands with unchanged values are no-ops', () => {
   it('update_wall', () => {
-    const doc = execute(createEmptyDocument(), 'draw_walls', {
-      points: [
-        [0, 0],
-        [4000, 0],
-      ],
-      thickness: 200,
-    }).document;
-    expectNoOp(doc, 'update_wall', { wallId: 'wall-1' });
-    expectNoOp(doc, 'update_wall', { wallId: 'wall-1', thickness: 200, end: [4000, 0] });
+    const doc = execute(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 4000, 0), thickness: 200 }).document;
+    expectUnchanged(doc, 'update_wall', { wallId: 'wall-1' });
+    expectUnchanged(doc, 'update_wall', { wallId: 'wall-1', thickness: 200, end: [4000, 0] });
     const changed = execute(doc, 'update_wall', { wallId: 'wall-1', thickness: 250 });
     expect(changed.affected.length).toBeGreaterThan(0);
   });
-
   it('update_steel_member', () => {
     const doc = execute(createEmptyDocument(), 'add_steel_member', {
       profile: 'IPE300',
@@ -61,146 +47,54 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
       start: [0, 0, 3000],
       end: [4000, 0, 3000],
     }).document;
-    expectNoOp(doc, 'update_steel_member', { memberId: 'member-1' });
-    expectNoOp(doc, 'update_steel_member', { memberId: 'member-1', profile: 'IPE300' });
-    const changed = execute(doc, 'update_steel_member', {
-      memberId: 'member-1',
-      profile: 'IPE400',
-    });
+    expectUnchanged(doc, 'update_steel_member', { memberId: 'member-1' });
+    expectUnchanged(doc, 'update_steel_member', { memberId: 'member-1', profile: 'IPE300' });
+    const changed = execute(doc, 'update_steel_member', { memberId: 'member-1', profile: 'IPE400' });
     expect(changed.affected.length).toBeGreaterThan(0);
   });
-
   it('move_building_element: zero delta no-op, duplicates counted once, unknown ids reported', () => {
-    const doc = execute(createEmptyDocument(), 'draw_walls', {
-      points: [
-        [0, 0],
-        [4000, 0],
-      ],
-    }).document;
-    expectNoOp(doc, 'move_building_element', { elementIds: ['wall-1'], delta: [0, 0] });
-    const moved = execute(doc, 'move_building_element', {
-      elementIds: ['wall-1', 'wall-1', 'nope'],
-      delta: [0, 500],
-    });
-    expect(moved.summary).toMatch(
-      /Moved 1 element\(s\) by \[0, 500\]: wall-1\. Ignored unknown id\(s\): nope\./,
-    );
-    const deleted = execute(moved.document, 'delete_building_element', {
-      elementIds: ['wall-1', 'nope'],
-    });
-    expect(deleted.summary).toMatch(
-      /Deleted 1 building element\(s\): wall-1\. Ignored unknown id\(s\): nope\./,
-    );
+    const doc = execute(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 4000, 0) }).document;
+    expectUnchanged(doc, 'move_building_element', { elementIds: ['wall-1'], delta: [0, 0] });
+    const moved = execute(doc, 'move_building_element', { elementIds: ['wall-1', 'wall-1', 'nope'], delta: [0, 500] });
+    expect(moved.summary).toMatch(/Moved 1 element\(s\) by \[0, 500\]: wall-1\. Ignored unknown id\(s\): nope\./);
+    const deleted = execute(moved.document, 'delete_building_element', { elementIds: ['wall-1', 'nope'] });
+    expect(deleted.summary).toMatch(/Deleted 1 building element\(s\): wall-1\. Ignored unknown id\(s\): nope\./);
   });
-
   it('draw_walls refuses a lone segment duplicating an existing wall (either direction)', () => {
-    const doc = execute(createEmptyDocument(), 'draw_walls', {
-      points: [
-        [0, 0],
-        [4000, 0],
-      ],
-    }).document;
-    for (const [start, end] of [
-      [
-        [0, 0],
-        [4000, 0],
-      ],
-      [
-        [4000, 0],
-        [0, 0],
-      ],
-    ]) {
+    const doc = execute(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 4000, 0) }).document;
+    for (const [start, end] of [xy(0, 0, 4000, 0), xy(4000, 0, 0, 0)]) {
       const again = execute(doc, 'draw_walls', { points: [start, end] });
       expect(again.document).toBe(doc);
-      expect(again.summary).toMatch(
-        /every segment duplicates an existing wall on level-1 \(wall-1\)/,
-      );
+      expect(again.summary).toMatch(/every segment duplicates an existing wall on level-1 \(wall-1\)/);
     }
-    const elsewhere = execute(doc, 'draw_walls', {
-      points: [
-        [0, 0],
-        [4000, 0],
-      ],
-      baseOffset: 100,
-    });
+    const elsewhere = execute(doc, 'draw_walls', { points: xy(0, 0, 4000, 0), baseOffset: 100 });
     expect(elsewhere.affected.length).toBeGreaterThan(0);
   });
-
   it('draw_walls skips a segment duplicating an existing wall and builds the rest', () => {
-    const doc = execute(createEmptyDocument(), 'draw_walls', {
-      points: [
-        [0, 0],
-        [4000, 0],
-      ],
-    }).document;
+    const doc = execute(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 4000, 0) }).document;
     const before = structuredClone(doc);
-    const chain = execute(doc, 'draw_walls', {
-      points: [
-        [4000, 3000],
-        [4000, 0],
-        [0, 0],
-      ],
-    });
+    const chain = execute(doc, 'draw_walls', { points: xy(4000, 3000, 4000, 0, 0, 0) });
     expect(doc).toEqual(before);
     expect(chain.data).toEqual({ wallIds: ['wall-2'], skippedDuplicatesOf: ['wall-1'] });
     expect(chain.summary).toMatch(/Added 1 wall\(s\) \S+ \(wall-2\)/);
     expect(chain.summary).toMatch(/Skipped 1 segment already built as wall-1\./);
     const wall = chain.document.building?.elements['wall-2'];
-    expect(wall?.category === 'wall' && [wall.start, wall.end]).toEqual([
-      [4000, 3000],
-      [4000, 0],
-    ]);
+    expect(wall?.category === 'wall' && [wall.start, wall.end]).toEqual(xy(4000, 3000, 4000, 0));
   });
-
   it('draw_walls: two rooms drawn as closed loops share one wall on their common edge', () => {
-    const roomA = execute(createEmptyDocument(), 'draw_walls', {
-      points: [
-        [0, 0],
-        [4000, 0],
-        [4000, 3000],
-        [0, 3000],
-      ],
-      closed: true,
-    });
-    const roomB = execute(roomA.document, 'draw_walls', {
-      points: [
-        [4000, 0],
-        [8000, 0],
-        [8000, 3000],
-        [4000, 3000],
-      ],
-      closed: true,
-    });
-    const walls = Object.values(roomB.document.building?.elements ?? {}).filter(
-      (element) => element.category === 'wall',
-    );
+    const roomA = execute(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 4000, 0, 4000, 3000, 0, 3000), closed: true });
+    const roomB = execute(roomA.document, 'draw_walls', { points: xy(4000, 0, 8000, 0, 8000, 3000, 4000, 3000), closed: true });
+    const walls = Object.values(roomB.document.building?.elements ?? {}).filter((element) => element.category === 'wall');
     expect(walls).toHaveLength(7);
     expect(roomB.summary).toMatch(/Added 3 wall\(s\)/);
     expect(roomB.summary).toMatch(/Skipped 1 segment already built as wall-2\./);
   });
-
   it('draw_walls refuses when every segment duplicates an existing wall', () => {
-    const doc = execute(createEmptyDocument(), 'draw_walls', {
-      points: [
-        [0, 0],
-        [4000, 0],
-        [4000, 3000],
-      ],
-    }).document;
-    const again = execute(doc, 'draw_walls', {
-      points: [
-        [4000, 3000],
-        [4000, 0],
-        [0, 0],
-      ],
-    });
-    expect(again.document).toBe(doc);
-    expect(again.affected).toEqual([]);
-    expect(again.summary).toMatch(
-      /draw_walls failed: every segment duplicates an existing wall on level-1 \(wall-2, wall-1\)/,
-    );
+    const doc = execute(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 4000, 0, 4000, 3000) }).document;
+    const again = execute(doc, 'draw_walls', { points: xy(4000, 3000, 4000, 0, 0, 0) });
+    expectNoOp(again, doc);
+    expect(again.summary).toMatch(/draw_walls failed: every segment duplicates an existing wall on level-1 \(wall-2, wall-1\)/);
   });
-
   it('add_column skips occupied locations and refuses when all are occupied', () => {
     let doc = execute(createEmptyDocument(), 'add_column', { location: [1000, 1000] }).document;
     const same = execute(doc, 'add_column', { location: [1000, 1000] });
@@ -213,22 +107,9 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
     expect(again.document).toBe(grid.document);
     expect(again.summary).toMatch(/columns already stand at/);
   });
-
   it('add_beam refuses a duplicate span (either direction) but allows another topOffset', () => {
-    const doc = execute(createEmptyDocument(), 'add_beam', {
-      start: [0, 0],
-      end: [5000, 0],
-    }).document;
-    for (const [start, end] of [
-      [
-        [0, 0],
-        [5000, 0],
-      ],
-      [
-        [5000, 0],
-        [0, 0],
-      ],
-    ]) {
+    const doc = execute(createEmptyDocument(), 'add_beam', { start: [0, 0], end: [5000, 0] }).document;
+    for (const [start, end] of [xy(0, 0, 5000, 0), xy(5000, 0, 0, 0)]) {
       const again = execute(doc, 'add_beam', { start, end });
       expect(again.document).toBe(doc);
       expect(again.summary).toMatch(/a beam over this span already exists as beam-1/);
@@ -236,14 +117,8 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
     const lower = execute(doc, 'add_beam', { start: [0, 0], end: [5000, 0], topOffset: -500 });
     expect(lower.affected.length).toBeGreaterThan(0);
   });
-
   it('add_slab / add_room / add_stair / add_curved_wall refuse an exact twin', () => {
-    const square = [
-      [0, 0],
-      [4000, 0],
-      [4000, 3000],
-      [0, 3000],
-    ];
+    const square = xy(0, 0, 4000, 0, 4000, 3000, 0, 3000);
     const rotated = [square[2], square[3], square[0], square[1]];
     const reversed = [...square].reverse();
     const { twinOf, current } = twinChecker();
@@ -255,13 +130,9 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
     const other = execute(current(), 'add_slab', { boundary: square, role: 'roof' });
     expect(other.affected.length).toBeGreaterThan(0);
   });
-
   it('add_steel_member / add_pipe_run / add_cable_tray refuse an exact twin', () => {
     const { twinOf, current } = twinChecker();
-    const route = [
-      [0, 0, 3000],
-      [6000, 0, 3000],
-    ];
+    const route = xyz(0, 0, 3000, 6000, 0, 3000);
     twinOf(
       'add_steel_member',
       { profile: 'IPE300', role: 'beam', start: [0, 0, 3000], end: [4000, 0, 3000] },
@@ -269,32 +140,18 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
     );
     twinOf('add_pipe_run', { points: route }, { points: [...route].reverse() });
     twinOf('add_cable_tray', { points: route });
-    const other = execute(current(), 'add_steel_member', {
-      profile: 'IPE400',
-      role: 'beam',
-      start: [0, 0, 3000],
-      end: [4000, 0, 3000],
-    });
+    const other = execute(current(), 'add_steel_member', { profile: 'IPE400', role: 'beam', start: [0, 0, 3000], end: [4000, 0, 3000] });
     expect(other.affected.length).toBeGreaterThan(0);
   });
-
   it('add_building_template counts only the levels it added; repeating at the same origin fails cleanly', () => {
     const first = execute(createEmptyDocument(), 'add_building_template', { template: 'house' });
-    expect(first.summary).toMatch(
-      /Added house template: 3 level\(s\), \d+ building element\(s\) added on 3 new level\(s\)\./,
-    );
-    const second = execute(first.document, 'add_building_template', {
-      template: 'house',
-      origin: [30000, 0],
-    });
-    expect(second.summary).toMatch(
-      /6 level\(s\), \d+ building element\(s\) added on 3 new level\(s\)\./,
-    );
+    expect(first.summary).toMatch(/Added house template: 3 level\(s\), \d+ building element\(s\) added on 3 new level\(s\)\./);
+    const second = execute(first.document, 'add_building_template', { template: 'house', origin: [30000, 0] });
+    expect(second.summary).toMatch(/6 level\(s\), \d+ building element\(s\) added on 3 new level\(s\)\./);
     const again = execute(first.document, 'add_building_template', { template: 'house' });
     expect(again.document).toBe(first.document);
     expect(again.summary).toMatch(/failed at step/);
   });
-
   it('add_stair refuses an absurd riser count, explicit or derived from a huge level', () => {
     const doc = execute(createEmptyDocument(), 'add_level', { height: 1e9 }).document;
     for (const params of [{ start: [0, 0] }, { start: [0, 0], riserCount: 201 }]) {
@@ -305,7 +162,6 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
     const ok = execute(doc, 'add_stair', { start: [0, 0], riserCount: 200 });
     expect(ok.affected.length).toBeGreaterThan(0);
   });
-
   it('add_footing underColumns skips feet that already have a footing', () => {
     let doc = execute(createEmptyDocument(), 'add_column', { location: [0, 0] }).document;
     doc = execute(doc, 'add_column', { location: [5000, 0] }).document;
@@ -316,22 +172,9 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
     expect(again.document).toBe(first.document);
     expect(again.summary).toMatch(/every column already has a footing/);
   });
-
   it('grid commands refuse an axis or a whole grid that already exists', () => {
-    let doc = execute(createEmptyDocument(), 'add_grid_line', {
-      start: [0, 0],
-      end: [0, 5000],
-    }).document;
-    for (const [start, end] of [
-      [
-        [0, 0],
-        [0, 5000],
-      ],
-      [
-        [0, 5000],
-        [0, 0],
-      ],
-    ]) {
+    let doc = execute(createEmptyDocument(), 'add_grid_line', { start: [0, 0], end: [0, 5000] }).document;
+    for (const [start, end] of [xy(0, 0, 0, 5000), xy(0, 5000, 0, 0)]) {
       const again = execute(doc, 'add_grid_line', { start, end, label: 'X' });
       expect(again.document).toBe(doc);
       expect(again.summary).toMatch(/axis 1 \(grid-1\) already runs between these points/);
@@ -344,14 +187,8 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
     const shifted = execute(doc, 'add_grid_system', { ...params, origin: [100000, 0] });
     expect(shifted.affected.length).toBeGreaterThan(0);
   });
-
   it('door / window marks stay unique per kind on add and update', () => {
-    let doc = execute(createEmptyDocument(), 'draw_walls', {
-      points: [
-        [0, 0],
-        [10000, 0],
-      ],
-    }).document;
+    let doc = execute(createEmptyDocument(), 'draw_walls', { points: xy(0, 0, 10000, 0) }).document;
     doc = execute(doc, 'add_door', { wallId: 'wall-1', offset: 1500, mark: 'D-A' }).document;
     const dup = execute(doc, 'add_door', { wallId: 'wall-1', offset: 5000, mark: 'D-A' });
     expect(dup.document).toBe(doc);
@@ -360,27 +197,18 @@ describe('update_* / set_* commands with unchanged values are no-ops', () => {
     const rename = execute(doc, 'update_opening', { openingId: 'door-2', mark: 'D-A' });
     expect(rename.document).toBe(doc);
     expect(rename.summary).toMatch(/mark 'D-A' is already used by door-1/);
-    expect(execute(doc, 'update_opening', { openingId: 'door-2', mark: 'D-B' }).summary).toMatch(
-      /already has these values/,
-    );
-    expect(
-      execute(doc, 'add_window', { wallId: 'wall-1', offset: 8000, mark: 'D-A' }).affected.length,
-    ).toBeGreaterThan(0);
+    expect(execute(doc, 'update_opening', { openingId: 'door-2', mark: 'D-B' }).summary).toMatch(/already has these values/);
+    expect(execute(doc, 'add_window', { wallId: 'wall-1', offset: 8000, mark: 'D-A' }).affected.length).toBeGreaterThan(0);
   });
-
   it('set_project_info', () => {
     const doc = execute(createEmptyDocument(), 'set_project_info', { name: 'Hall' }).document;
-    expectNoOp(doc, 'set_project_info', { name: 'Hall' });
+    expectUnchanged(doc, 'set_project_info', { name: 'Hall' });
     expect(execute(doc, 'set_project_info', { name: 'Hall B' }).summary).toMatch(/updated/);
   });
-
   it('set_cost_rates', () => {
-    const doc = execute(createEmptyDocument(), 'set_cost_rates', {
-      rates: { 'wall.concrete.m3': 180 },
-      currency: 'EUR',
-    }).document;
-    expectNoOp(doc, 'set_cost_rates', { rates: { 'wall.concrete.m3': 180 } });
-    expectNoOp(doc, 'set_cost_rates', { rates: { 'wall.concrete.m3': 180 }, replace: true });
+    const doc = execute(createEmptyDocument(), 'set_cost_rates', { rates: { 'wall.concrete.m3': 180 }, currency: 'EUR' }).document;
+    expectUnchanged(doc, 'set_cost_rates', { rates: { 'wall.concrete.m3': 180 } });
+    expectUnchanged(doc, 'set_cost_rates', { rates: { 'wall.concrete.m3': 180 }, replace: true });
     const changed = execute(doc, 'set_cost_rates', { rates: { 'wall.concrete.m3': 190 } });
     expect(changed.summary).toMatch(/Stored 1 cost rate/);
   });

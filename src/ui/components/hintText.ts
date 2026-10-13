@@ -1,9 +1,4 @@
-/**
- * @layer ui/components
- *
- * Contextual "what can I do now" text for the viewport hint bar. Pure: derived from the view,
- * the armed tool and the selection, so each state has one tested message.
- */
+// Pure viewport hint text from view, armed tool and selection: one tested message per state.
 
 import type { DrawToolKind, GizmoMode, ModifyToolKind, ViewMode } from '@ui/store';
 
@@ -49,16 +44,13 @@ export function hintText(context: HintContext): string {
   }
   if (viewMode === '2d' && drawTool !== 'none' && drawTool !== 'move')
     return `${DRAW_TOOL_HINTS[drawTool]} Esc cancels · Esc again returns to Select.`;
-  if (entityCount === 0)
-    return 'Empty model: pick a solid (Box, Cylinder…) or a 2D tool (Line, Rectangle…) in the toolbar above.';
+  if (entityCount === 0) return 'Empty model: pick a solid (Box, Cylinder…) or a 2D tool (Line, Rectangle…) in the toolbar above.';
   if (selectionCount === 0) {
     return viewMode === '3d'
       ? 'Click an object to select it · drag to orbit, right-drag to pan, scroll to zoom · ? shortcuts.'
       : 'Click a shape to select it · Shift+drag to box-select · drag to pan, scroll to zoom · ? shortcuts.';
   }
-  if (viewMode === '2d')
-    return `${selectionCount} selected · M to move · arrows nudge · Ctrl D duplicate · Del delete · Esc deselect.`;
-  if (selectionCount === 1)
-    return `${GIZMO_HINTS[gizmoMode]} · M / R / S: move, rotate, scale · arrows nudge · Del delete.`;
+  if (viewMode === '2d') return `${selectionCount} selected · M to move · arrows nudge · Ctrl D duplicate · Del delete · Esc deselect.`;
+  if (selectionCount === 1) return `${GIZMO_HINTS[gizmoMode]} · M / R / S: move, rotate, scale · arrows nudge · Del delete.`;
   return `${selectionCount} selected · arrows nudge · Ctrl D duplicate · Del delete · select one to get the gizmo.`;
 }

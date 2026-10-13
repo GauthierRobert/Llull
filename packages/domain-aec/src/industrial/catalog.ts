@@ -1,8 +1,4 @@
-/**
- * Industrial-steel commands — portal frames, members, checks, fabrication — the `industrial`
- * plugin's catalog (see plugin.ts).
- * @layer domain-aec/industrial
- */
+/** Industrial-steel commands — portal frames, members, checks, fabrication — the `industrial` plugin's catalog (see plugin.ts). */
 
 import { commandCatalog } from '@core/commands/schema';
 import { listSteelProfiles } from '../steel/steelProfileList';
@@ -31,37 +27,10 @@ import { checkSteelMembers } from './steelDesign/steelMembersCheck';
 import { addPipeSupport } from './piping/pipeSupports';
 import { checkPipeSupports } from './piping/pipeSupportCheck';
 
-/** Industrial-steel commands (portal frames, members, checks, fabrication). */
+// prettier-ignore
 export const industrialCommands = commandCatalog(
-  listSteelProfiles,
-  addSteelMember,
-  updateSteelMember,
-  addGridColumns,
-  addGridBeams,
-  addGridBracing,
-  addFooting,
-  addPanel,
-  addEquipment,
-  updateEquipment,
-  addEquipmentOpenings,
-  addPipeRun,
-  addPipeSupport,
-  addCableTray,
-  addBasePlates,
-  addMomentConnections,
-  checkPortalFrames,
-  designPortalFrames,
-  checkBracing,
-  foundationCheck,
-  designFootings,
-  exportNcFiles,
-  checkPurlins,
-  designPurlins,
-  exportAnchorPlan,
-  runwayCheck,
-  checkSteelMembers,
-  checkPipeSupports,
-  addCraneRunway,
-  addPortalFrameBuilding,
-  checkClashes,
+  listSteelProfiles, addSteelMember, updateSteelMember, addGridColumns, addGridBeams, addGridBracing, addFooting, addPanel, addEquipment,
+  updateEquipment, addEquipmentOpenings, addPipeRun, addPipeSupport, addCableTray, addBasePlates, addMomentConnections, checkPortalFrames,
+  designPortalFrames, checkBracing, foundationCheck, designFootings, exportNcFiles, checkPurlins, designPurlins, exportAnchorPlan,
+  runwayCheck, checkSteelMembers, checkPipeSupports, addCraneRunway, addPortalFrameBuilding, checkClashes,
 );

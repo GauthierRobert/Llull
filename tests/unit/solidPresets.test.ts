@@ -2,11 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { rotatedEntityBounds } from '@core/geometry/rotatedBounds';
-import {
-  SOLID_PRESETS,
-  nextPlacement,
-  solidCommandParams,
-} from '@ui/components/toolbar/solidPresets';
+import { SOLID_PRESETS, nextPlacement, solidCommandParams } from '@ui/components/toolbar/solidPresets';
 
 function addPreset(doc: CadDocument, index: number): CadDocument {
   const preset = SOLID_PRESETS[index]!;
@@ -16,21 +12,15 @@ function addPreset(doc: CadDocument, index: number): CadDocument {
 describe('solid presets', () => {
   it('every preset creates exactly one solid resting on the ground plane', () => {
     for (const preset of SOLID_PRESETS) {
-      const result = execute(
-        createEmptyDocument(),
-        preset.command,
-        solidCommandParams(preset, [0, 0, 0]),
-      );
+      const result = execute(createEmptyDocument(), preset.command, solidCommandParams(preset, [0, 0, 0]));
       expect(result.affected, preset.command).toHaveLength(1);
       const entity = result.document.entities[result.affected[0]!]!;
       expect(rotatedEntityBounds(entity).min[2], preset.command).toBeCloseTo(0, 6);
     }
   });
-
   it('drops the first solid at the origin', () => {
     expect(nextPlacement(createEmptyDocument())).toEqual([0, 0, 0]);
   });
-
   it('never overlaps existing solids and stays near the origin', () => {
     let doc = createEmptyDocument();
     for (let i = 0; i < 12; i++) doc = addPreset(doc, i % SOLID_PRESETS.length);
@@ -46,14 +36,12 @@ describe('solid presets', () => {
     }
     for (const box of boxes) expect(Math.abs(box.min[0])).toBeLessThan(10);
   });
-
   it('falls back past the +X edge when the area around the origin is full', () => {
     const doc = execute(createEmptyDocument(), 'add_box', { size: [200, 200, 1] }).document;
     const [x, y, z] = nextPlacement(doc);
     expect(x).toBeGreaterThan(100);
     expect([y, z]).toEqual([0, 0]);
   });
-
   it('treats reserved drop points as occupied', () => {
     const doc = createEmptyDocument();
     const first = nextPlacement(doc);

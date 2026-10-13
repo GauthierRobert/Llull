@@ -1,18 +1,11 @@
-/**
- * Portal hall cladding panels (roof, side walls, gables) as outward-facing corner loops.
- * @layer domain-aec
- */
+/** Portal hall cladding panels (roof, side walls, gables) as outward-facing corner loops. */
 
 import type { Vec2, Vec3 } from '@core/model/types';
 import { dot3 } from '@lib/vec3';
 import { panelFrame } from '../evaluate';
 import type { HallGeometry, PortalProfiles } from './portalGeometry';
 
-interface CladdingPanel {
-  readonly corners: Vec3[];
-  readonly role: 'roof' | 'wall';
-  readonly outward: Vec3;
-}
+type CladdingPanel = { readonly corners: Vec3[]; readonly role: 'roof' | 'wall'; readonly outward: Vec3 };
 
 /** Outward-facing panel corners: reversed when the Newell normal points against `outward`. */
 export function facing(corners: Vec3[], outward: Vec3): Vec3[] {
@@ -76,11 +69,7 @@ export function claddingPanels(geometry: HallGeometry, p: PortalProfiles): Cladd
     panels.push({
       role: 'wall',
       outward: [0, outward, 0],
-      corners: [
-        [wallX0, y, 0],
-        [wallX1, y, 0],
-        ...[...profileLine].reverse().map(([x, z]): Vec3 => [x, y, z]),
-      ],
+      corners: [[wallX0, y, 0], [wallX1, y, 0], ...[...profileLine].reverse().map(([x, z]): Vec3 => [x, y, z])],
     });
   }
   return panels;

@@ -1,7 +1,6 @@
 /**
- * Earthworks commands: graded platforms (pads) with cut / fill batters, cut / fill volumes,
- * balancing a pad level and comparing two surfaces.
- * @layer domain-aec/civil
+ * Earthworks commands: graded platforms (pads) with cut / fill batters, cut / fill volumes, balancing a pad level and comparing two
+ * surfaces.
  */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
@@ -11,26 +10,11 @@ import { commandCatalog, defineCommand, z, vec2 } from '@core/commands/schema';
 import { newNameParam } from '../commonParams';
 import { noop, report } from '@core/commands/noop';
 import { isValidPolygon, segmentsIntersect, toCounterClockwise } from '@lib/polygon';
-import {
-  civilObjectOrNoop,
-  civilObject,
-  civilObjectsOf,
-  getCivil,
-  nextCivilId,
-  toMetresText,
-  withObject,
-} from '../model';
+import { civilObjectOrNoop, civilObject, civilObjectsOf, getCivil, nextCivilId, toMetresText, withObject } from '../model';
 import { commitCivil } from '../evaluate';
 import { surfaceTin, surfaceTinById } from '../surface/surfaceTin';
 import { elevationAt, type Tin } from '../surface/tin';
-import {
-  buildSamples,
-  compareSurfaceVolumes,
-  daylightReach,
-  padEarthworks,
-  volumesFromSamples,
-  type Earthworks,
-} from './earthworksMath';
+import { buildSamples, compareSurfaceVolumes, daylightReach, padEarthworks, volumesFromSamples, type Earthworks } from './earthworksMath';
 import { daylightPoints } from './platformDaylight';
 import { toMetres } from '@core/model/units';
 import { round } from '../../shared/numeric';
@@ -48,14 +32,7 @@ function isSimple(polygon: ReadonlyArray<Vec2>): boolean {
   for (let i = 0; i < count; i++) {
     for (let j = i + 2; j < count; j++) {
       if (i === 0 && j === count - 1) continue;
-      if (
-        segmentsIntersect(
-          polygon[i] as Vec2,
-          polygon[(i + 1) % count] as Vec2,
-          polygon[j] as Vec2,
-          polygon[(j + 1) % count] as Vec2,
-        )
-      ) {
+      if (segmentsIntersect(polygon[i] as Vec2, polygon[(i + 1) % count] as Vec2, polygon[j] as Vec2, polygon[(j + 1) % count] as Vec2)) {
         return false;
       }
     }
@@ -65,12 +42,10 @@ function isSimple(polygon: ReadonlyArray<Vec2>): boolean {
 
 /** Why `platform` cannot be graded into `tin`, or null when it can. */
 function platformProblem(platform: PlatformObject, tin: Tin): string | null {
-  if (platform.boundary.length > MAX_BOUNDARY_VERTICES)
-    return `boundary has more than ${MAX_BOUNDARY_VERTICES} vertices.`;
+  if (platform.boundary.length > MAX_BOUNDARY_VERTICES) return `boundary has more than ${MAX_BOUNDARY_VERTICES} vertices.`;
   if (!isValidPolygon(platform.boundary) || !isSimple(platform.boundary))
     return 'boundary must be a simple (non self-intersecting) polygon of >= 3 [x, y] points.';
-  const problem =
-    slopeOf('cutSlope', platform.cutSlope) ?? slopeOf('fillSlope', platform.fillSlope);
+  const problem = slopeOf('cutSlope', platform.cutSlope) ?? slopeOf('fillSlope', platform.fillSlope);
   if (problem) return problem;
   if (platform.boundary.some((vertex) => elevationAt(tin, vertex) === null))
     return 'the boundary lies outside the surface (every vertex must be inside the TIN).';
@@ -97,24 +72,13 @@ function worksData(doc: CadDocument, works: Earthworks): Record<string, number> 
 
 const volumeText = (data: Record<string, number>): string =>
   `cut ${data['cutM3']} m³, fill ${data['fillM3']} m³, net ${data['netM3']} m³ (cut - fill)` +
-  ((data['samplesOutsideTin'] ?? 0) > 0
-    ? `; ${data['samplesOutsideTin']} grid sample(s) outside the TIN skipped`
-    : '');
+  ((data['samplesOutsideTin'] ?? 0) > 0 ? `; ${data['samplesOutsideTin']} grid sample(s) outside the TIN skipped` : '');
 
 function worksOf(platform: PlatformObject, tin: Tin, spacing?: number): Earthworks {
-  return padEarthworks(
-    tin,
-    platform.boundary,
-    platform.elevation,
-    platform.cutSlope,
-    platform.fillSlope,
-    spacing,
-  );
+  return padEarthworks(tin, platform.boundary, platform.elevation, platform.cutSlope, platform.fillSlope, spacing);
 }
 
 /**
- * @command add_platform
- * @pure
  * @affects creates 1 platform (pad + outline + daylight line + batters + label)
  * @invariant boundary is stored counter-clockwise; every vertex lies inside the surface TIN
  * @failure unknown surface / invalid polygon / bad slope / boundary outside surface -> no-op
@@ -122,12 +86,11 @@ function worksOf(platform: PlatformObject, tin: Tin, spacing?: number): Earthwor
 export const addPlatform = defineCommand({
   name: 'add_platform',
   description:
-    'Grade a flat building pad (platform) into an existing-ground surface. Give the pad outline ' +
-    '`boundary` (plan polygon, >= 3 simple [x, y] vertices inside the surface) and the finished ' +
-    'level `elevation`, both in document units. Cut and fill batters (side slopes, horizontal per ' +
-    '1 vertical; defaults 1.5 cut, 2 fill) are projected to the ground, producing the pad, its ' +
-    'daylight line and cut / fill volumes. Returns data { platformId, cutM3, fillM3, netM3 }. ' +
-    'Edit later with update_platform; find the balancing level with balance_platform.',
+    'Grade a flat building pad (platform) into an existing-ground surface. Give the pad outline `boundary` (plan polygon, >= 3 simple ' +
+    '[x, y] vertices inside the surface) and the finished level `elevation`, both in document units. Cut and fill batters (side slopes, ' +
+    'horizontal per 1 vertical; defaults 1.5 cut, 2 fill) are projected to the ground, producing the pad, its daylight line and cut / ' +
+    'fill volumes. Returns data { platformId, cutM3, fillM3, netM3 }. Edit later with update_platform; find the balancing level with ' +
+    'balance_platform.',
   params: z.object({
     surfaceId: z.string().describe('Existing-ground surface id, e.g. "surface-1".'),
     boundary: z
@@ -163,25 +126,21 @@ export const addPlatform = defineCommand({
       doc,
       withObject(civil, platform),
       [id],
-      `Created platform ${platform.name} (${id}) at ${toMetresText(doc, platform.elevation)} m on ` +
-        `${surface.name}: ${volumeText(data)}.`,
+      `Created platform ${platform.name} (${id}) at ${toMetresText(doc, platform.elevation)} m on ${surface.name}: ${volumeText(data)}.`,
       { platformId: id, ...data },
     );
   },
 });
 
 /**
- * @command update_platform
- * @pure
  * @affects regenerates 1 platform
  * @failure unknown platform / invalid value / boundary outside surface / no change -> no-op
  */
 export const updatePlatform = defineCommand({
   name: 'update_platform',
   description:
-    'Edit a graded platform: change its finished level, outline, batter slopes or name. Geometry ' +
-    'and volumes are regenerated; returns data { platformId, cutM3, fillM3, netM3 }. Only the given ' +
-    'fields change; the call is a no-op when nothing differs.',
+    'Edit a graded platform: change its finished level, outline, batter slopes or name. Geometry and volumes are regenerated; returns ' +
+    'data { platformId, cutM3, fillM3, netM3 }. Only the given fields change; the call is a no-op when nothing differs.',
   params: z.object({
     platformId: z.string().describe('Platform id, e.g. "platform-1".'),
     elevation: z.number().optional().describe('New finished level (document units).'),
@@ -199,8 +158,7 @@ export const updatePlatform = defineCommand({
     const platform = civilObject(civil, params.platformId, 'platform');
     if (!platform) return noop(doc, `update_platform failed: no platform ${params.platformId}.`);
     const tin = surfaceTinById(civil, platform.surfaceId);
-    if (!tin)
-      return noop(doc, `update_platform failed: surface ${platform.surfaceId} no longer exists.`);
+    if (!tin) return noop(doc, `update_platform failed: surface ${platform.surfaceId} no longer exists.`);
     const updated: PlatformObject = {
       ...platform,
       name: params.name?.trim() || platform.name,
@@ -209,8 +167,7 @@ export const updatePlatform = defineCommand({
       cutSlope: params.cutSlope ?? platform.cutSlope,
       fillSlope: params.fillSlope ?? platform.fillSlope,
     };
-    if (JSON.stringify(updated) === JSON.stringify(platform))
-      return noop(doc, `update_platform: nothing to change on ${platform.id}.`);
+    if (JSON.stringify(updated) === JSON.stringify(platform)) return noop(doc, `update_platform: nothing to change on ${platform.id}.`);
     const problem = platformProblem(updated, tin);
     if (problem) return noop(doc, `update_platform failed: ${problem}`);
     const data = worksData(doc, worksOf(updated, tin));
@@ -225,54 +182,35 @@ export const updatePlatform = defineCommand({
 });
 
 /**
- * @command platform_earthworks
- * @pure
  * @affects none (read-only)
  * @failure unknown platform / missing surface / bad spacing -> no-op
  */
 export const platformEarthworks = defineCommand({
   name: 'platform_earthworks',
   description:
-    'Earthworks report of a graded platform by the grid method: cut and fill volumes (m³), net ' +
-    '(cut - fill, positive = surplus to export), cut / fill plan areas (m²), pad area, maximum ' +
-    'cut / fill depth, grid spacing and the number of samples outside the TIN, plus the daylight ' +
-    'line vertices. Read-only; data { platformId, cutM3, fillM3, netM3, cutAreaM2, fillAreaM2, ' +
-    'padAreaM2, maxCutDepthM, maxFillDepthM, gridSpacingM, samples, samplesOutsideTin, daylight }.',
+    'Earthworks report of a graded platform by the grid method: cut and fill volumes (m³), net (cut - fill, positive = surplus to ' +
+    'export), cut / fill plan areas (m²), pad area, maximum cut / fill depth, grid spacing and the number of samples outside the TIN, ' +
+    'plus the daylight line vertices. Read-only; data { platformId, cutM3, fillM3, netM3, cutAreaM2, fillAreaM2, padAreaM2, ' +
+    'maxCutDepthM, maxFillDepthM, gridSpacingM, samples, samplesOutsideTin, daylight }.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
     platformId: z.string().describe('Platform id, e.g. "platform-1".'),
-    gridSpacing: z
-      .number()
-      .optional()
-      .describe('Grid cell size (document units). Default: about 2500 cells over the pad.'),
+    gridSpacing: z.number().optional().describe('Grid cell size (document units). Default: about 2500 cells over the pad.'),
   }),
   run: (doc, { platformId, gridSpacing }): CommandResult => {
     const civil = getCivil(doc);
     const platform = civilObject(civil, platformId, 'platform');
     if (!platform) return noop(doc, `platform_earthworks failed: no platform ${platformId}.`);
     const tin = surfaceTinById(civil, platform.surfaceId);
-    if (!tin) {
-      return noop(
-        doc,
-        `platform_earthworks failed: surface ${platform.surfaceId} no longer exists.`,
-      );
-    }
-    if (gridSpacing !== undefined && !(gridSpacing > 0))
-      return noop(doc, 'platform_earthworks failed: gridSpacing must be > 0.');
+    if (!tin) return noop(doc, `platform_earthworks failed: surface ${platform.surfaceId} no longer exists.`);
+    if (gridSpacing !== undefined && !(gridSpacing > 0)) return noop(doc, 'platform_earthworks failed: gridSpacing must be > 0.');
     const data = worksData(doc, worksOf(platform, tin, gridSpacing));
-    const daylight = daylightPoints(
-      tin,
-      platform.boundary,
-      platform.elevation,
-      platform.cutSlope,
-      platform.fillSlope,
-    );
+    const daylight = daylightPoints(tin, platform.boundary, platform.elevation, platform.cutSlope, platform.fillSlope);
     return report(
       doc,
-      `${platform.name} (${platform.id}) at ${toMetresText(doc, platform.elevation)} m: ` +
-        `${volumeText(data)}; cut area ${data['cutAreaM2']} m², fill area ${data['fillAreaM2']} m², ` +
-        `max cut ${data['maxCutDepthM']} m, max fill ${data['maxFillDepthM']} m; ` +
-        `grid ${data['gridSpacingM']} m.`,
+      `${platform.name} (${platform.id}) at ${toMetresText(doc, platform.elevation)} m: ${volumeText(data)}; cut area ` +
+        `${data['cutAreaM2']} m², fill area ${data['fillAreaM2']} m², max cut ${data['maxCutDepthM']} m, max fill ` +
+        `${data['maxFillDepthM']} m; grid ${data['gridSpacingM']} m.`,
       {
         platformId,
         ...data,
@@ -297,10 +235,7 @@ function surfaceRange(tin: Tin, boundary: ReadonlyArray<Vec2>): [number, number]
   const steps = 60;
   for (let i = 0; i <= steps; i++) {
     for (let j = 0; j <= steps; j++) {
-      const z = elevationAt(tin, [
-        minX + ((maxX - minX) * i) / steps,
-        minY + ((maxY - minY) * j) / steps,
-      ]);
+      const z = elevationAt(tin, [minX + ((maxX - minX) * i) / steps, minY + ((maxY - minY) * j) / steps]);
       if (z !== null) include(z);
     }
   }
@@ -308,34 +243,26 @@ function surfaceRange(tin: Tin, boundary: ReadonlyArray<Vec2>): [number, number]
 }
 
 /**
- * @command balance_platform
- * @pure
  * @affects regenerates 1 platform (new elevation)
  * @failure unknown platform / bad swell / no balancing level inside the ground range -> no-op
  */
 export const balancePlatform = defineCommand({
   name: 'balance_platform',
   description:
-    'Set a platform to the finished level where earthworks balance: cut volume x swellFactor = fill ' +
-    'volume (bisection between the lowest and highest existing ground in the pad). Mutates the ' +
-    'platform elevation (undoable). Summary and data { platformId, elevationM, cutM3, fillM3, ' +
-    'residualM3 } report the new level and the remaining imbalance.',
+    'Set a platform to the finished level where earthworks balance: cut volume x swellFactor = fill volume (bisection between the lowest ' +
+    'and highest existing ground in the pad). Mutates the platform elevation (undoable). Summary and data { platformId, elevationM, ' +
+    'cutM3, fillM3, residualM3 } report the new level and the remaining imbalance.',
   params: z.object({
     platformId: z.string().describe('Platform id, e.g. "platform-1".'),
-    swellFactor: z
-      .number()
-      .optional()
-      .describe('Bulking factor: fill needed = cut x swellFactor (> 0). Default 1.0.'),
+    swellFactor: z.number().optional().describe('Bulking factor: fill needed = cut x swellFactor (> 0). Default 1.0.'),
   }),
   run: (doc, { platformId, swellFactor = 1 }): CommandResult => {
     const civil = getCivil(doc);
     const platform = civilObject(civil, platformId, 'platform');
     if (!platform) return noop(doc, `balance_platform failed: no platform ${platformId}.`);
     const tin = surfaceTinById(civil, platform.surfaceId);
-    if (!tin)
-      return noop(doc, `balance_platform failed: surface ${platform.surfaceId} no longer exists.`);
-    if (!(swellFactor > 0) || !Number.isFinite(swellFactor))
-      return noop(doc, 'balance_platform failed: swellFactor must be > 0.');
+    if (!tin) return noop(doc, `balance_platform failed: surface ${platform.surfaceId} no longer exists.`);
+    if (!(swellFactor > 0) || !Number.isFinite(swellFactor)) return noop(doc, 'balance_platform failed: swellFactor must be > 0.');
     const [low, high] = surfaceRange(tin, platform.boundary);
     const reach = Math.max(
       daylightReach(tin, low, platform.cutSlope, platform.fillSlope),
@@ -343,13 +270,7 @@ export const balancePlatform = defineCommand({
     );
     const samples = buildSamples(tin, platform.boundary, reach);
     const imbalance = (elevation: number): number => {
-      const works = volumesFromSamples(
-        samples,
-        platform.boundary,
-        elevation,
-        platform.cutSlope,
-        platform.fillSlope,
-      );
+      const works = volumesFromSamples(samples, platform.boundary, elevation, platform.cutSlope, platform.fillSlope);
       return works.cutVolume * swellFactor - works.fillVolume;
     };
     if (imbalance(low) < 0 || imbalance(high) > 0) {
@@ -367,30 +288,18 @@ export const balancePlatform = defineCommand({
     }
     const elevation = (lower + upper) / 2;
     if (Math.abs(elevation - platform.elevation) < 1e-9) {
-      return noop(
-        doc,
-        `balance_platform: ${platform.name} is already balanced at ${toMetresText(doc, elevation)} m.`,
-      );
+      return noop(doc, `balance_platform: ${platform.name} is already balanced at ${toMetresText(doc, elevation)} m.`);
     }
     const updated: PlatformObject = { ...platform, elevation };
-    const works = volumesFromSamples(
-      samples,
-      platform.boundary,
-      elevation,
-      platform.cutSlope,
-      platform.fillSlope,
-    );
+    const works = volumesFromSamples(samples, platform.boundary, elevation, platform.cutSlope, platform.fillSlope);
     const data = worksData(doc, works);
-    const residual = round(
-      (works.cutVolume * swellFactor - works.fillVolume) * toMetres(doc, 1) ** 3,
-    );
+    const residual = round((works.cutVolume * swellFactor - works.fillVolume) * toMetres(doc, 1) ** 3);
     return commitCivil(
       doc,
       withObject(civil, updated),
       [platform.id],
       `Balanced ${platform.name} (${platform.id}): elevation ${toMetresText(doc, platform.elevation)} m -> ` +
-        `${round(toMetres(doc, elevation), 3)} m; ${volumeText(data)}; residual ${residual} m³ ` +
-        `(cut x ${swellFactor} - fill).`,
+        `${round(toMetres(doc, elevation), 3)} m; ${volumeText(data)}; residual ${residual} m³ (cut x ${swellFactor} - fill).`,
       {
         platformId: platform.id,
         elevationM: round(toMetres(doc, elevation), 4),
@@ -403,39 +312,30 @@ export const balancePlatform = defineCommand({
 });
 
 /**
- * @command compare_surfaces
- * @pure
  * @affects none (read-only)
  * @failure unknown surface / bad spacing / no shared extent -> no-op
  */
 export const compareSurfaces = defineCommand({
   name: 'compare_surfaces',
   description:
-    'Volume difference between two TIN surfaces by the grid method over their shared extent: cut ' +
-    'where the comparison surface lies below the base (e.g. base = existing ground, comparison = ' +
-    'design ground), fill where above. Read-only; data { cutM3, fillM3, netM3 (cut - fill), ' +
-    'cutAreaM2, fillAreaM2, areaM2, gridSpacingM, samples, samplesOutsideTin }.',
+    'Volume difference between two TIN surfaces by the grid method over their shared extent: cut where the comparison surface lies below ' +
+    'the base (e.g. base = existing ground, comparison = design ground), fill where above. Read-only; data { cutM3, fillM3, netM3 (cut - ' +
+    'fill), cutAreaM2, fillAreaM2, areaM2, gridSpacingM, samples, samplesOutsideTin }.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
     baseSurfaceId: z.string().describe('Base surface id (usually existing ground).'),
     comparisonSurfaceId: z.string().describe('Comparison surface id (usually design ground).'),
-    gridSpacing: z
-      .number()
-      .optional()
-      .describe('Grid cell size (document units). Default ~40000 cells.'),
+    gridSpacing: z.number().optional().describe('Grid cell size (document units). Default ~40000 cells.'),
   }),
   run: (doc, { baseSurfaceId, comparisonSurfaceId, gridSpacing }): CommandResult => {
     const civil = getCivil(doc);
     const base = surfaceTinById(civil, baseSurfaceId);
     const comparison = surfaceTinById(civil, comparisonSurfaceId);
     if (!base) return noop(doc, `compare_surfaces failed: no surface ${baseSurfaceId}.`);
-    if (!comparison)
-      return noop(doc, `compare_surfaces failed: no surface ${comparisonSurfaceId}.`);
-    if (gridSpacing !== undefined && !(gridSpacing > 0))
-      return noop(doc, 'compare_surfaces failed: gridSpacing must be > 0.');
+    if (!comparison) return noop(doc, `compare_surfaces failed: no surface ${comparisonSurfaceId}.`);
+    if (gridSpacing !== undefined && !(gridSpacing > 0)) return noop(doc, 'compare_surfaces failed: gridSpacing must be > 0.');
     const result = compareSurfaceVolumes(base, comparison, gridSpacing);
-    if (result.samples === 0)
-      return noop(doc, 'compare_surfaces failed: the surfaces share no plan extent.');
+    if (result.samples === 0) return noop(doc, 'compare_surfaces failed: the surfaces share no plan extent.');
     const k = toMetres(doc, 1);
     const data = {
       baseSurfaceId,
@@ -454,18 +354,10 @@ export const compareSurfaces = defineCommand({
       doc,
       `${comparisonSurfaceId} vs ${baseSurfaceId}: cut ${data.cutM3} m³, fill ${data.fillM3} m³, ` +
         `net ${data.netM3} m³ (cut - fill) over ${data.areaM2} m²; grid ${data.gridSpacingM} m` +
-        (data.samplesOutsideTin > 0
-          ? `; ${data.samplesOutsideTin} sample(s) outside a TIN skipped.`
-          : '.'),
+        (data.samplesOutsideTin > 0 ? `; ${data.samplesOutsideTin} sample(s) outside a TIN skipped.` : '.'),
       data,
     );
   },
 });
 
-export const earthworksCommands = commandCatalog(
-  addPlatform,
-  updatePlatform,
-  platformEarthworks,
-  balancePlatform,
-  compareSurfaces,
-);
+export const earthworksCommands = commandCatalog(addPlatform, updatePlatform, platformEarthworks, balancePlatform, compareSurfaces);

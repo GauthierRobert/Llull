@@ -1,6 +1,6 @@
 /**
- * Pure closed-mesh construction from planar outlines (prisms, lofts, holes) with welded vertices,
- * so the result is watertight by construction. @layer geometry
+ * Pure closed-mesh construction from planar outlines (prisms, lofts, holes) with welded vertices, so the result is watertight by
+ * construction. @layer geometry
  */
 
 import type { MeshData } from '../model/types';
@@ -71,9 +71,7 @@ export function addStarAnnulusCap(
     const raw = loop.map(([x, y]) => (Math.atan2(y, x) + turn) % turn);
     const start = raw.indexOf(Math.min(...raw));
     const points = [...loop.slice(start), ...loop.slice(0, start)];
-    const angles = [...raw.slice(start), ...raw.slice(0, start)].map((a, i, all) =>
-      i > 0 && a < all[i - 1]! ? a + turn : a,
-    );
+    const angles = [...raw.slice(start), ...raw.slice(0, start)].map((a, i, all) => (i > 0 && a < all[i - 1]! ? a + turn : a));
     return { points, angles };
   };
   const o = prepare(outer);
@@ -82,10 +80,8 @@ export function addStarAnnulusCap(
     const [x, y] = loop[i % loop.length]!;
     return builder.vertex(x, y, z);
   };
-  const emit = (a: number, b: number, c: number): void =>
-    up ? builder.triangle(a, b, c) : builder.triangle(a, c, b);
-  const angleAt = (loop: { angles: number[] }, i: number): number =>
-    i < loop.angles.length ? loop.angles[i]! : loop.angles[0]! + turn;
+  const emit = (a: number, b: number, c: number): void => (up ? builder.triangle(a, b, c) : builder.triangle(a, c, b));
+  const angleAt = (loop: { angles: number[] }, i: number): number => (i < loop.angles.length ? loop.angles[i]! : loop.angles[0]! + turn);
   let i = 0;
   let j = 0;
   while (i < o.points.length || j < n.points.length) {
@@ -117,11 +113,7 @@ export function circleThrough(loop: ReadonlyArray<Point2>, radius: number): Poin
 }
 
 /** Annulus prism (`outer` minus `inner`, both CCW and star-shaped about the origin) from z = 0 to `depth`. */
-export function ringMesh(
-  outer: ReadonlyArray<Point2>,
-  inner: ReadonlyArray<Point2>,
-  depth: number,
-): MeshData {
+export function ringMesh(outer: ReadonlyArray<Point2>, inner: ReadonlyArray<Point2>, depth: number): MeshData {
   const builder = createMeshBuilder();
   addStarAnnulusCap(builder, outer, inner, 0, false);
   addStarAnnulusCap(builder, outer, inner, depth, true);
@@ -161,22 +153,12 @@ export function addLoftWalls(
 }
 
 /** Straight walls of one ring between two heights. */
-export function addWalls(
-  builder: MeshBuilder,
-  ring: ReadonlyArray<Point2>,
-  z0: number,
-  z1: number,
-  outward: boolean,
-): void {
+export function addWalls(builder: MeshBuilder, ring: ReadonlyArray<Point2>, z0: number, z1: number, outward: boolean): void {
   addLoftWalls(builder, ring, z0, ring, z1, outward);
 }
 
 /** `outer` (CCW) minus `holes` (CCW each) extruded from z = 0 to `depth`; closed and watertight. */
-export function prismMesh(
-  outer: ReadonlyArray<Point2>,
-  holes: ReadonlyArray<ReadonlyArray<Point2>>,
-  depth: number,
-): MeshData {
+export function prismMesh(outer: ReadonlyArray<Point2>, holes: ReadonlyArray<ReadonlyArray<Point2>>, depth: number): MeshData {
   const builder = createMeshBuilder();
   addCap(builder, outer, holes, 0, false);
   addCap(builder, outer, holes, depth, true);
@@ -188,8 +170,7 @@ export function prismMesh(
 /** World-space copy of a local mesh: rotated (extrinsic XYZ) about the origin, then moved to `position`. */
 export function placeMesh(mesh: MeshData, position: Vec3, rotation: Vec3): MeshData {
   const positions: number[] = [];
-  for (let i = 0; i + 2 < mesh.positions.length; i += 3) {
+  for (let i = 0; i + 2 < mesh.positions.length; i += 3)
     positions.push(...entityLocalToWorld({ position, rotation }, vec3At(mesh.positions, i)));
-  }
   return { positions, indices: [...mesh.indices] };
 }

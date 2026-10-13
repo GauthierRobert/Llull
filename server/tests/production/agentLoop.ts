@@ -1,6 +1,4 @@
 /**
- * @layer server/tests/production
- *
  * The AI-agent driver's loop: Claude receives the job brief and works it through llull's MCP
  * tools only (manual tool-use loop over an MCP session). The tool array is fixed for the whole
  * conversation (every llull tool; those outside the session's enabled toolsets are deferred and
@@ -13,9 +11,7 @@ import { TOOLSET_NAMES } from '@mcp/toolsets';
 import { openSession, type McpSession } from './mcpHarness';
 
 /** One model turn. Default: the Anthropic Messages API; tests inject a stub. */
-export type SendTurn = (
-  params: Anthropic.Beta.MessageCreateParamsStreaming,
-) => Promise<Anthropic.Beta.BetaMessage>;
+export type SendTurn = (params: Anthropic.Beta.MessageCreateParamsStreaming) => Promise<Anthropic.Beta.BetaMessage>;
 
 const sendToApi: SendTurn = (params) => new Anthropic().beta.messages.stream(params).finalMessage();
 
@@ -28,10 +24,7 @@ export interface AgentOptions {
 }
 
 /** USD per million tokens (input, output, cache read, cache write) — Claude API list prices. */
-const PRICES: Record<
-  string,
-  { input: number; output: number; cacheRead: number; cacheWrite: number }
-> = {
+const PRICES: Record<string, { input: number; output: number; cacheRead: number; cacheWrite: number }> = {
   'claude-opus-5-5': { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5 },
   'claude-sonnet-5-5': { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
   'claude-fable-5-1': { input: 10, output: 50, cacheRead: 0.25, cacheWrite: 12.5 },
@@ -110,33 +103,20 @@ function toApiTools(tools: ToolDefinition[], loaded: Set<string>): Anthropic.Bet
 }
 
 /** MCP result content → tool_result content (text + images, e.g. render_view PNGs). */
-function toResultContent(
-  content: unknown,
-): Array<Anthropic.Beta.BetaTextBlockParam | Anthropic.Beta.BetaImageBlockParam> {
+function toResultContent(content: unknown): Array<Anthropic.Beta.BetaTextBlockParam | Anthropic.Beta.BetaImageBlockParam> {
   const blocks: Array<Anthropic.Beta.BetaTextBlockParam | Anthropic.Beta.BetaImageBlockParam> = [];
   for (const item of Array.isArray(content) ? content : []) {
     const block = item as { type?: string; text?: string; data?: string; mimeType?: string };
     if (block.type === 'text' && typeof block.text === 'string') {
       blocks.push({ type: 'text', text: block.text });
-    } else if (
-      block.type === 'image' &&
-      typeof block.data === 'string' &&
-      block.mimeType === 'image/png'
-    ) {
-      blocks.push({
-        type: 'image',
-        source: { type: 'base64', media_type: 'image/png', data: block.data },
-      });
+    } else if (block.type === 'image' && typeof block.data === 'string' && block.mimeType === 'image/png') {
+      blocks.push({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: block.data } });
     }
   }
   return blocks.length > 0 ? blocks : [{ type: 'text', text: '(no content)' }];
 }
 
-export async function runAgent(
-  brief: string,
-  options: AgentOptions,
-  send: SendTurn = sendToApi,
-): Promise<AgentRun> {
+export async function runAgent(brief: string, options: AgentOptions, send: SendTurn = sendToApi): Promise<AgentRun> {
   const tools = await allTools();
   const session = await openSession('production-agent');
   const started = Date.now();
@@ -158,8 +138,7 @@ export async function runAgent(
     const loaded = new Set((await session.client.listTools()).tools.map((tool) => tool.name));
     const apiTools = toApiTools(tools, loaded);
     const instructions = session.client.getInstructions() ?? '';
-    const system =
-      instructions === '' ? SYSTEM : `${SYSTEM}\n\nllull server instructions:\n${instructions}`;
+    const system = instructions === '' ? SYSTEM : `${SYSTEM}\n\nllull server instructions:\n${instructions}`;
     const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: 'user', content: brief }];
     while (run.turns < options.maxTurns) {
       run.turns++;
@@ -192,17 +171,12 @@ export async function runAgent(
         messages.push({ role: 'assistant', content: message.content });
         continue;
       }
-      const toolUses = message.content.filter(
-        (block): block is Anthropic.Beta.BetaToolUseBlock => block.type === 'tool_use',
-      );
+      const toolUses = message.content.filter((block): block is Anthropic.Beta.BetaToolUseBlock => block.type === 'tool_use');
       if (message.stop_reason !== 'tool_use' || toolUses.length === 0) break;
       messages.push({ role: 'assistant', content: message.content });
       const results: Anthropic.Beta.BetaToolResultBlockParam[] = [];
       for (const toolUse of toolUses) {
-        const raw = await session.client.callTool({
-          name: toolUse.name,
-          arguments: (toolUse.input ?? {}) as Record<string, unknown>,
-        });
+        const raw = await session.client.callTool({ name: toolUse.name, arguments: (toolUse.input ?? {}) as Record<string, unknown> });
         const content = toResultContent(raw.content);
         const isError = raw.isError === true;
         run.toolCalls++;

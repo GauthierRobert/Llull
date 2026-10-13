@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { type CadDocument, type Entity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
+import { xy } from '../helpers/xy';
 
 const PAYLOAD = "__import__('os').system('echo pwned')";
 
@@ -9,11 +10,7 @@ function hostileDocument(): CadDocument {
   const revolution = {
     id: 'rev-1',
     kind: 'revolution',
-    profile: [
-      [1, 0],
-      [2, 0],
-      [2, 1],
-    ],
+    profile: xy(1, 0, 2, 0, 2, 1),
     axis: [0, 0, 1],
     angle: Math.PI,
     segments: `0); ${PAYLOAD}; x=(0`,
@@ -52,12 +49,9 @@ describe.each(['cadquery', 'build123d', 'openscad', 'freecad'])(
   'export_code (%s) never lets document strings escape into code',
   (language) => {
     const text = exported(hostileDocument(), language);
-
     it('keeps the payload off every executable line start', () => {
-      for (const line of text.split('\n'))
-        expect(line.trimStart().startsWith('__import__')).toBe(false);
+      for (const line of text.split('\n')) expect(line.trimStart().startsWith('__import__')).toBe(false);
     });
-
     it('emits a numeric segment count only', () => {
       if (language === 'openscad') return;
       expect(text).toMatch(/segments=32\b/);

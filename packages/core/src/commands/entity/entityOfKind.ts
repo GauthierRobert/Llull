@@ -1,16 +1,10 @@
-/**
- * Entity lookup with a uniform refusal text: the entity of the wanted kind(s), else the reason.
- *
- * @layer core/commands
- * @pure
- */
+/** Entity lookup with a uniform refusal text: the entity of the wanted kind(s), else the reason. */
 
 import type { CadDocument, Entity } from '../../model/types';
 
 /**
- * Entity `id` when it exists and is one of `kinds`, else the reason (no trailing punctuation):
- * `entity '<id>' not found` or `entity '<id>' is kind 'x'; expected 'a' or 'b'`.
- * Omit `kinds` to accept any kind.
+ * Entity `id` when it exists and is one of `kinds`, else the reason (no trailing punctuation): `entity '<id>' not found` or `entity '<id>'
+ * is kind 'x'; expected 'a' or 'b'`. Omit `kinds` to accept any kind.
  */
 export function entityOfKind<K extends Entity['kind'] = Entity['kind']>(
   doc: CadDocument,

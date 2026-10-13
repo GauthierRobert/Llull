@@ -1,7 +1,6 @@
 /**
- * Technical-drawing primitives (ISO 128 line types) — the one 2D drawing vocabulary shared by the
- * building plan, the solids' orthographic views, the 2D viewport, DXF and sheet exporters.
- * @layer model
+ * Technical-drawing primitives (ISO 128 line types) — the one 2D drawing vocabulary shared by the building plan, the solids' orthographic
+ * views, the 2D viewport, DXF and sheet exporters.
  */
 
 import type { Vec2 } from './vectors';
@@ -18,8 +17,8 @@ import type { Vec2 } from './vectors';
 type DrawingStyle = 'cut' | 'visible' | 'thin' | 'hidden' | 'center' | 'annotation';
 
 /**
- * ISO 128 line patterns, [dash, gap, dash, gap, …] in pattern units — the one definition every
- * renderer scales: the 2D view (model units), SVG sheets (paper mm) and DXF line types.
+ * ISO 128 line patterns, [dash, gap, dash, gap, …] in pattern units — the one definition every renderer scales: the 2D view (model units),
+ * SVG sheets (paper mm) and DXF line types.
  */
 export const LINE_PATTERNS = {
   /** Type 02, dashed: hidden edges. */
@@ -34,8 +33,8 @@ export function dashArray(pattern: ReadonlyArray<number>, unit: number): string 
 }
 
 /**
- * Area fill of a closed polygon or circle: hatch (ANSI31, 45°) or solid (steel). Fill is explicit
- * data — no renderer infers it from the line style.
+ * Area fill of a closed polygon or circle: hatch (ANSI31, 45°) or solid (steel). Fill is explicit data — no renderer infers it from the
+ * line style.
  */
 export type DrawingFill = 'hatch' | 'solid';
 
@@ -49,19 +48,8 @@ export type DrawingPrimitive =
       /** Holes excluded from the fill (their outlines are separate primitives). */
       readonly holes?: Vec2[][];
     }
-  | {
-      readonly type: 'polyline';
-      readonly layer: string;
-      readonly style: DrawingStyle;
-      readonly points: Vec2[];
-    }
-  | {
-      readonly type: 'line';
-      readonly layer: string;
-      readonly style: DrawingStyle;
-      readonly a: Vec2;
-      readonly b: Vec2;
-    }
+  | { readonly type: 'polyline'; readonly layer: string; readonly style: DrawingStyle; readonly points: Vec2[] }
+  | { readonly type: 'line'; readonly layer: string; readonly style: DrawingStyle; readonly a: Vec2; readonly b: Vec2 }
   | {
       readonly type: 'arc';
       readonly layer: string;
@@ -99,9 +87,7 @@ export type DrawingPrimitive =
     };
 
 /** [minX, minY, maxX, maxY] of `primitives` (arcs and circles by their full circle); [0, 0, 0, 0] when empty. @pure */
-export function drawingBounds(
-  primitives: ReadonlyArray<DrawingPrimitive>,
-): [number, number, number, number] {
+export function drawingBounds(primitives: ReadonlyArray<DrawingPrimitive>): [number, number, number, number] {
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;

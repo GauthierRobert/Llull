@@ -1,20 +1,15 @@
-/**
- * @layer ui/store
- * Dispatches still inside their connect grace period (see `CONNECT_GRACE_MS` in ./onlineMode),
- * in dispatch order. Shared by ./onlineMode (tracks them) and ./outbox (resets them).
- */
+// Dispatches inside their connect grace period (CONNECT_GRACE_MS), in dispatch order: tracked by onlineMode, reset by outbox.
 
-/** A dispatch whose grace timer is armed and whose POST has not settled yet. */
+/** Grace timer armed, POST not settled. */
 export interface PendingGraceRun {
   readonly dispatchSeq: number;
-  /** Cancel the grace timer and run the command locally now (no-op if it already ran). */
+  /** Run locally now (no-op if it already ran). */
   readonly runNow: () => void;
-  /** Cancel the grace timer and ignore the POST outcome: the command never runs locally. */
+  /** Ignore the POST outcome: never runs locally. */
   readonly cancel: () => void;
 }
 
 let lastDispatchSeq = 0;
-/** In dispatch order. */
 const pendingGraceRuns: PendingGraceRun[] = [];
 
 export function nextDispatchSeq(): number {
@@ -41,7 +36,7 @@ export function runEarlierGraceRuns(dispatchSeq: number): void {
   }
 }
 
-/** Document replaced: cancel every pending grace run and restart the dispatch sequence. */
+/** Document replaced: cancel all and restart the dispatch sequence. */
 export function resetGraceRuns(): void {
   for (const pending of pendingGraceRuns.splice(0)) pending.cancel();
   lastDispatchSeq = 0;

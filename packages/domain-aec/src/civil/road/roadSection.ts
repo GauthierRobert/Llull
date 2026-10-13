@@ -1,9 +1,7 @@
 /**
- * Road cross-section: the template (carriageway + shoulders with crossfall), the cut / fill batters
- * to daylight on an existing-ground TIN, and the cut / fill areas against that ground.
- * Lengths are document units; offsets are signed from the centreline (left of travel positive).
- * @layer domain-aec/civil
- * @pure
+ * Road cross-section: the template (carriageway + shoulders with crossfall), the cut / fill batters to daylight on an existing-ground TIN,
+ * and the cut / fill areas against that ground. Lengths are document units; offsets are signed from the centreline (left of travel
+ * positive).
  */
 
 import type { Vec2 } from '@core/model/types';
@@ -14,10 +12,7 @@ import { crossSlopesAt, type CrossSlopes } from '../alignment/superelevation';
 import { bisect } from '@lib/bisect';
 import { batterLevel } from '../earthworks/batter';
 
-export interface SectionNode {
-  readonly offset: number;
-  readonly z: number;
-}
+export type SectionNode = { readonly offset: number; readonly z: number };
 
 export interface RoadCrossSection {
   readonly station: number;
@@ -34,15 +29,11 @@ export interface RoadCrossSection {
   readonly design: readonly SectionNode[];
 }
 
-export interface SectionAreas {
-  readonly cutArea: number;
-  readonly fillArea: number;
-  readonly groundCentre: number | null;
-}
+export type SectionAreas = { readonly cutArea: number; readonly fillArea: number; readonly groundCentre: number | null };
 
 /**
- * Template nodes for a centreline elevation, ascending offset. `slopes` overrides the normal crown
- * (superelevation): left of travel is positive offset.
+ * Template nodes for a centreline elevation, ascending offset. `slopes` overrides the normal crown (superelevation): left of travel is
+ * positive offset.
  */
 export function templateNodes(
   section: RoadSection,
@@ -51,36 +42,21 @@ export function templateNodes(
 ): SectionNode[] {
   const lane = section.laneWidth;
   const edge = lane + section.shoulderWidth;
-  const at = (offset: number): SectionNode => ({
-    offset,
-    z: designZ - (offset >= 0 ? slopes.left : slopes.right) * Math.abs(offset),
-  });
+  const at = (offset: number): SectionNode => ({ offset, z: designZ - (offset >= 0 ? slopes.left : slopes.right) * Math.abs(offset) });
   return [at(-edge), at(-lane), at(0), at(lane), at(edge)];
 }
 
 const BATTER_STEP_METRES = 0.5;
 const BATTER_REACH_METRES = 60;
 
-interface Rule {
-  readonly section: RoadSection;
-  readonly step: number;
-  readonly reach: number;
-}
+type Rule = { readonly section: RoadSection; readonly step: number; readonly reach: number };
 
-function findDaylight(
-  tin: Tin,
-  edge: Vec2,
-  outward: Vec2,
-  edgeZ: number,
-  rule: Rule,
-): number | null {
-  const ground = (d: number): number | null =>
-    elevationAt(tin, [edge[0] + outward[0] * d, edge[1] + outward[1] * d]);
+function findDaylight(tin: Tin, edge: Vec2, outward: Vec2, edgeZ: number, rule: Rule): number | null {
+  const ground = (d: number): number | null => elevationAt(tin, [edge[0] + outward[0] * d, edge[1] + outward[1] * d]);
   const ground0 = ground(0);
   if (ground0 === null) return null;
   const fill = ground0 < edgeZ;
-  const batter = (d: number): number =>
-    batterLevel(edgeZ, d, fill ? 'fill' : 'cut', rule.section.cutSlope, rule.section.fillSlope);
+  const batter = (d: number): number => batterLevel(edgeZ, d, fill ? 'fill' : 'cut', rule.section.cutSlope, rule.section.fillSlope);
   const gap = (d: number): number | null => {
     const g = ground(d);
     return g === null ? null : fill ? g - batter(d) : batter(d) - g;
@@ -90,18 +66,15 @@ function findDaylight(
   for (let d = rule.step; d <= rule.reach; d += rule.step) {
     const value = gap(d);
     if (value === null) return null;
-    if (value >= 0) {
-      return bisect((mid) => (gap(mid) ?? 1) < 0, previous, d, 30).high;
-    }
+    if (value >= 0) return bisect((mid) => (gap(mid) ?? 1) < 0, previous, d, 30).high;
     previous = d;
   }
   return null;
 }
 
 /**
- * Cross-section at `station` for centreline elevation `designZ`. With a `tin`, adds the batters to
- * daylight on both sides (cut where the ground is above the shoulder edge, else fill).
- * `unitsPerMetre` converts the metre-based batter search step / reach into document units.
+ * Cross-section at `station` for centreline elevation `designZ`. With a `tin`, adds the batters to daylight on both sides (cut where the
+ * ground is above the shoulder edge, else fill). `unitsPerMetre` converts the metre-based batter search step / reach into document units.
  */
 export function crossSectionAt(
   alignment: AlignmentObject,
@@ -116,17 +89,10 @@ export function crossSectionAt(
   const slopes = crossSlopesAt(alignment, section.crossfall, section.laneWidth, station);
   const template = templateNodes(section, designZ, slopes);
   const normal: Vec2 = [-Math.sin(placed.direction), Math.cos(placed.direction)];
-  const rule: Rule = {
-    section,
-    step: BATTER_STEP_METRES * unitsPerMetre,
-    reach: BATTER_REACH_METRES * unitsPerMetre,
-  };
+  const rule: Rule = { section, step: BATTER_STEP_METRES * unitsPerMetre, reach: BATTER_REACH_METRES * unitsPerMetre };
   const side = (node: SectionNode, sign: 1 | -1): SectionNode | null => {
     if (!tin) return null;
-    const edge: Vec2 = [
-      placed.point[0] + normal[0] * node.offset,
-      placed.point[1] + normal[1] * node.offset,
-    ];
+    const edge: Vec2 = [placed.point[0] + normal[0] * node.offset, placed.point[1] + normal[1] * node.offset];
     const distance = findDaylight(tin, edge, [normal[0] * sign, normal[1] * sign], node.z, rule);
     if (distance === null) return null;
     const fill = (elevationAt(tin, edge) ?? node.z) < node.z;
@@ -151,21 +117,14 @@ function designAtOffset(design: ReadonlyArray<SectionNode>, offset: number): num
   for (let i = 1; i < design.length; i++) {
     const a = design[i - 1] as SectionNode;
     const b = design[i] as SectionNode;
-    if (offset <= b.offset) {
-      return b.offset === a.offset
-        ? b.z
-        : a.z + ((b.z - a.z) * (offset - a.offset)) / (b.offset - a.offset);
-    }
+    if (offset <= b.offset) return b.offset === a.offset ? b.z : a.z + ((b.z - a.z) * (offset - a.offset)) / (b.offset - a.offset);
   }
   return (design[design.length - 1] as SectionNode).z;
 }
 
 /** Ground elevation at one offset of a cross-section (null off the TIN). */
 export function groundAtOffset(cross: RoadCrossSection, tin: Tin, offset: number): number | null {
-  return elevationAt(tin, [
-    cross.origin[0] - Math.sin(cross.direction) * offset,
-    cross.origin[1] + Math.cos(cross.direction) * offset,
-  ]);
+  return elevationAt(tin, [cross.origin[0] - Math.sin(cross.direction) * offset, cross.origin[1] + Math.cos(cross.direction) * offset]);
 }
 
 /** Offsets where the section is sampled: every design node plus `step`-spaced fillers. */

@@ -8,82 +8,28 @@
         "kind": "rectangle",
         "width": 4,
         "height": 2,
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
+        "position": [0,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#4a90d9"
       },
       "#3": {
         "id": "#3",
         "kind": "extrusion",
-        "profile": [
-          [
-            0,
-            0
-          ],
-          [
-            4,
-            0
-          ],
-          [
-            4,
-            2
-          ],
-          [
-            0,
-            2
-          ]
-        ],
+        "profile": [[0,0],[4,0],[4,2],[0,2]],
         "depth": 3,
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
+        "position": [0,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#c8553d"
       },
       "#4": {
         "id": "#4",
         "kind": "extrusion",
-        "profile": [
-          [
-            0,
-            0
-          ],
-          [
-            4,
-            0
-          ],
-          [
-            2,
-            3
-          ]
-        ],
+        "profile": [[0,0],[4,0],[2,3]],
         "depth": 2,
-        "position": [
-          10,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
+        "position": [10,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#c8553d"
       }
@@ -124,56 +70,23 @@
       {
         "id": "#5",
         "name": "draw_rectangle",
-        "params": {
-          "width": 4,
-          "height": 2
-        },
+        "params": {"width":4,"height":2},
         "suppressed": false,
-        "affected": [
-          "#1"
-        ]
+        "affected": ["#1"]
       },
       {
         "id": "#6",
         "name": "extrude_profile",
-        "params": {
-          "id": "#1",
-          "depth": 3
-        },
+        "params": {"id":"#1","depth":3},
         "suppressed": false,
-        "affected": [
-          "#3"
-        ]
+        "affected": ["#3"]
       },
       {
         "id": "#7",
         "name": "extrude_profile",
-        "params": {
-          "profile": [
-            [
-              0,
-              0
-            ],
-            [
-              4,
-              0
-            ],
-            [
-              2,
-              3
-            ]
-          ],
-          "depth": 2,
-          "position": [
-            10,
-            0,
-            0
-          ]
-        },
+        "params": {"profile":[[0,0],[4,0],[2,3]],"depth":2,"position":[10,0,0]},
         "suppressed": false,
-        "affected": [
-          "#4"
-        ]
+        "affected": ["#4"]
       }
     ],
     "configurations": {},

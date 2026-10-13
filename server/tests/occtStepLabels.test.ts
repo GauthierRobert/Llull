@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Live OpenCascade: export_step_exact stamps entity names, group names and colors on the STEP the
  * kernel writes (the product names and solid ids the kernel would otherwise number itself).
  */
@@ -32,8 +31,6 @@ describe('occt export_step_exact labels', () => {
     expect(step).toContain("COLOUR_RGB('',1.000,0.000,0.000)");
     expect(step).toContain("COLOUR_RGB('',0.000,0.000,1.000)");
     expect(step.match(/STYLED_ITEM\('color'/g)).toHaveLength(2);
-    expect(step.indexOf('MECHANICAL_DESIGN_GEOMETRIC_PRESENTATION_REPRESENTATION')).toBeLessThan(
-      step.lastIndexOf('ENDSEC;'),
-    );
+    expect(step.indexOf('MECHANICAL_DESIGN_GEOMETRIC_PRESENTATION_REPRESENTATION')).toBeLessThan(step.lastIndexOf('ENDSEC;'));
   }, 120_000);
 });

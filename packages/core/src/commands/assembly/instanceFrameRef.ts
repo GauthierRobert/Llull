@@ -4,9 +4,7 @@ import { entityOfKind } from '../entity/entityOfKind';
 
 type InstanceFrameRefSchema = z.ZodObject<{
   instanceId: z.ZodString;
-  frame: z.ZodOptional<
-    z.ZodEnum<{ origin: 'origin'; 'axis-x': 'axis-x'; 'axis-y': 'axis-y'; 'axis-z': 'axis-z' }>
-  >;
+  frame: z.ZodOptional<z.ZodEnum<{ origin: 'origin'; 'axis-x': 'axis-x'; 'axis-y': 'axis-y'; 'axis-z': 'axis-z' }>>;
 }>;
 
 /**
@@ -14,10 +12,7 @@ type InstanceFrameRefSchema = z.ZodObject<{
  * @param ordinal which side the object is, for the `instanceId` description
  * @param description agent-facing description of the whole object
  */
-export function instanceFrameRef(
-  ordinal: 'first' | 'second',
-  description: string,
-): InstanceFrameRefSchema {
+export function instanceFrameRef(ordinal: 'first' | 'second', description: string): InstanceFrameRefSchema {
   return z
     .object({
       instanceId: z.string().describe(`Id of the ${ordinal} InstanceEntity.`),
@@ -40,8 +35,7 @@ export function instanceRefsProblem(
 ): string | null {
   for (const side of ['a', 'b'] as const) {
     const { instanceId } = refs[side];
-    if (instanceId.length === 0)
-      return `${command}: ${side} must be an object with a non-empty instanceId string.`;
+    if (instanceId.length === 0) return `${command}: ${side} must be an object with a non-empty instanceId string.`;
     const found = entityOfKind(doc, instanceId, ['instance']);
     if (typeof found === 'string') return `${command}: ${side}.instanceId: ${found}.`;
   }

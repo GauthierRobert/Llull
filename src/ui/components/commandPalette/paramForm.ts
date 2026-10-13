@@ -1,11 +1,5 @@
-/**
- * @layer ui/components/commandPalette
- * @pure
- *
- * Generic param-gathering for ANY registry command: its `paramsSchema` becomes a list of form
- * fields; the string values typed into them become the params object passed to `dispatch`.
- * Validation of meaning stays in the command (`execute` + `run`); this only parses input shapes.
- */
+// Generic param form for ANY registry command: `paramsSchema` → fields; typed strings → the params passed to `dispatch`.
+// Only input shapes are parsed here; meaning is validated by the command.
 
 import type { ParamSpec, ParamsSchema, ParamType } from '@core/commands/types';
 import type { EntityId } from '@core/model/types';
@@ -16,20 +10,17 @@ type FieldKind = 'number' | 'text' | 'enum' | 'boolean' | 'numberList' | 'textLi
 export interface FormField {
   name: string;
   kind: FieldKind;
-  /** Human label derived from the param name (`entityId` -> "Entity id"). */
+  /** `entityId` -> "Entity id". */
   label: string;
   description: string;
   required: boolean;
-  /** Allowed values for `kind: 'enum'`. */
   options: readonly string[];
 }
 
-/** Raw text per field name, as typed by the user. Empty string = not provided. */
+/** Raw text per field; '' = not provided. */
 export type FormValues = Readonly<Record<string, string>>;
 
-type ParseResult =
-  | { ok: true; params: Record<string, unknown> }
-  | { ok: false; errors: Readonly<Record<string, string>> };
+type ParseResult = { ok: true; params: Record<string, unknown> } | { ok: false; errors: Readonly<Record<string, string>> };
 
 /** `add_box` -> "Add box"; `entityId` -> "Entity id". */
 export function humanizeName(name: string): string {
@@ -51,8 +42,7 @@ function fieldKind(spec: ParamSpec): FieldKind {
   if (spec.type === 'string') return 'text';
   if (spec.type === 'boolean') return 'boolean';
   if (spec.type === 'array' && isNumeric(spec.items?.type)) return 'numberList';
-  if (spec.type === 'array' && spec.items?.type === 'string' && spec.items.enum === undefined)
-    return 'textList';
+  if (spec.type === 'array' && spec.items?.type === 'string' && spec.items.enum === undefined) return 'textList';
   return 'json';
 }
 
@@ -87,24 +77,19 @@ function selectedIdFor(name: string, selection: readonly EntityId[]): EntityId |
  * Pre-fill entity-id fields from the current selection so "select, then run" just works; required
  * enums / booleans start on the value their select shows (first option / `true`).
  */
-export function initialValues(
-  fields: readonly FormField[],
-  selection: readonly EntityId[],
-): FormValues {
+export function initialValues(fields: readonly FormField[], selection: readonly EntityId[]): FormValues {
   const values: Record<string, string> = {};
   for (const field of fields) {
     const selectedId = field.kind === 'text' ? selectedIdFor(field.name, selection) : undefined;
-    if (selectedId !== undefined) {
-      values[field.name] = selectedId;
-    } else if (field.kind === 'textList' && MULTI_ID_FIELD.test(field.name)) {
-      values[field.name] = selection.join(', ');
-    } else if (field.kind === 'enum' && field.required) {
-      values[field.name] = field.options[0] ?? '';
-    } else if (field.kind === 'boolean' && field.required) {
-      values[field.name] = 'true';
-    } else {
-      values[field.name] = '';
-    }
+    values[field.name] =
+      selectedId ??
+      (field.kind === 'textList' && MULTI_ID_FIELD.test(field.name)
+        ? selection.join(', ')
+        : field.kind === 'enum' && field.required
+          ? (field.options[0] ?? '')
+          : field.kind === 'boolean' && field.required
+            ? 'true'
+            : '');
   }
   return values;
 }
@@ -116,10 +101,7 @@ export function initialValues(
 export function matchTypeahead(options: readonly string[], query: string): string | undefined {
   const needle = query.toLowerCase();
   if (needle === '') return undefined;
-  return (
-    options.find((option) => option.toLowerCase() === needle) ??
-    options.find((option) => option.toLowerCase().startsWith(needle))
-  );
+  return options.find((option) => option.toLowerCase() === needle) ?? options.find((option) => option.toLowerCase().startsWith(needle));
 }
 
 /** Text for one existing param value, the inverse of `parseField`; unusable values become blank. */
@@ -141,13 +123,8 @@ function formatParam(field: FormField, value: unknown): string {
 }
 
 /** Pre-fill the form from an existing params object (editing a recorded step). @pure */
-export function valuesFromParams(
-  fields: readonly FormField[],
-  params: Readonly<Record<string, unknown>>,
-): FormValues {
-  return Object.fromEntries(
-    fields.map((field) => [field.name, formatParam(field, params[field.name])]),
-  );
+export function valuesFromParams(fields: readonly FormField[], params: Readonly<Record<string, unknown>>): FormValues {
+  return Object.fromEntries(fields.map((field) => [field.name, formatParam(field, params[field.name])]));
 }
 
 function splitList(raw: string): string[] {

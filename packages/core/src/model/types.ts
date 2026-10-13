@@ -72,8 +72,8 @@ export interface BaseEntity {
 }
 
 /**
- * Text decal projected onto its solid along `-normal` (paint: shown and exported to glTF, not a
- * solid). All vectors are in the owning entity's local frame (before its rotation / position).
+ * Text decal projected onto its solid along `-normal` (paint: shown and exported to glTF, not a solid). All vectors are in the owning
+ * entity's local frame (before its rotation / position).
  * @invariant width, height, depth > 0; normal non-zero; text non-empty
  */
 export interface Decal {
@@ -124,8 +124,8 @@ export interface ExtrusionEntity extends BaseEntity {
 
 /**
  * Triangle mesh in world space (`position` is [0,0,0]): boolean/fillet/chamfer results, imports, plugin geometry.
- * @invariant `brep`, when present, is the exact construction tree the kernel tessellated into `mesh`
- *   (before `position`/`rotation`); a command that rewrites `mesh` must rewrite or drop `brep`
+ * @invariant `brep`, when present, is the exact construction tree the kernel tessellated into `mesh` (before `position`/`rotation`); a
+ *   command that rewrites `mesh` must rewrite or drop `brep`
  */
 export interface MeshSolidEntity extends BaseEntity {
   readonly kind: 'mesh';
@@ -135,14 +135,14 @@ export interface MeshSolidEntity extends BaseEntity {
 }
 
 /** Base circle in XY centered at `position`, apex at +Z. */
-export interface ConeEntity extends BaseEntity {
+interface ConeEntity extends BaseEntity {
   readonly kind: 'cone';
   radius: number;
   height: number;
 }
 
 /** Centered at `position`; valid when 0 < tubeRadius < ringRadius. */
-export interface TorusEntity extends BaseEntity {
+interface TorusEntity extends BaseEntity {
   readonly kind: 'torus';
   /** Major radius: center to tube center. */
   ringRadius: number;
@@ -151,14 +151,14 @@ export interface TorusEntity extends BaseEntity {
 }
 
 /** Right-triangular ramp: full height at z=0, tapering to zero at z=depth. `position` is the lower-front-left corner. */
-export interface WedgeEntity extends BaseEntity {
+interface WedgeEntity extends BaseEntity {
   readonly kind: 'wedge';
   /** [width (X), height (Y), depth (Z)], all > 0. */
   size: Vec3;
 }
 
 /** Rectangular base centered at `position` (±baseWidth/2 in X, ±baseDepth/2 in Y), apex at +Z. */
-export interface PyramidEntity extends BaseEntity {
+interface PyramidEntity extends BaseEntity {
   readonly kind: 'pyramid';
   baseWidth: number;
   baseDepth: number;
@@ -201,8 +201,8 @@ export type SweepSection =
     };
 
 /**
- * A cross-section swept along a tangent-continuous 3D path (pipes, rails, ducts, coils) with a
- * rotation-minimizing frame. Path points are local (relative to `position`, then `rotation`).
+ * A cross-section swept along a tangent-continuous 3D path (pipes, rails, ducts, coils) with a rotation-minimizing frame. Path points are
+ * local (relative to `position`, then `rotation`).
  * @invariant path is a connected chain of >= 1 segment, G1 at every joint, open (end != start)
  * @see sweep_profile
  */
@@ -211,8 +211,8 @@ export interface SweepEntity extends BaseEntity {
   path: ReadonlyArray<CurveSegment<Vec3>>;
   section: SweepSection;
   /**
-   * Variable section: rings (SECTION_RING_POINTS points, section coordinates, read as closed
-   * Catmull-Rom curves) at path fractions `at`, blended in between; replaces `section` geometry.
+   * Variable section: rings (SECTION_RING_POINTS points, section coordinates, read as closed Catmull-Rom curves) at path fractions `at`,
+   * blended in between; replaces `section` geometry.
    * @invariant >= 2 stations, `at` strictly increasing from 0 to 1, equal ring point counts
    */
   stations?: ReadonlyArray<SweepStation>;
@@ -225,8 +225,8 @@ export interface SweepStation {
 }
 
 /**
- * Solid skinned through ordered 3D section rings (local to `position`), each a closed Catmull-Rom
- * curve through SECTION_RING_POINTS aligned points; `ruled` joins neighbours with straight lines.
+ * Solid skinned through ordered 3D section rings (local to `position`), each a closed Catmull-Rom curve through SECTION_RING_POINTS aligned
+ * points; `ruled` joins neighbours with straight lines.
  * @invariant >= 2 rings, equal point counts, consistent winding
  * @see loft_sections
  */
@@ -237,8 +237,8 @@ export interface LoftEntity extends BaseEntity {
 }
 
 /**
- * Freeform solid: a closed polygon control cage (local to `position`) refined `levels` times by
- * Catmull-Clark subdivision; cage edges listed in `creases` stay sharp.
+ * Freeform solid: a closed polygon control cage (local to `position`) refined `levels` times by Catmull-Clark subdivision; cage edges
+ * listed in `creases` stay sharp.
  * @invariant closed 2-manifold cage, faces wound counter-clockwise seen from outside, 0..4 levels
  * @see add_subdivision_solid, edit_subdivision_cage
  */
@@ -318,9 +318,8 @@ export interface TextEntity extends BaseEntity {
 }
 
 /**
- * Associative dimension; `entityIds` required count by `dimensionKind`:
- * linear/aligned 2 (line or point), radial 1 (circle/arc/ellipse), angular 3 (vertex point + 2 lines, or 3 points).
- * Dangling refs are flagged by check_model.
+ * Associative dimension; `entityIds` required count by `dimensionKind`: linear/aligned 2 (line or point), radial 1 (circle/arc/ellipse),
+ * angular 3 (vertex point + 2 lines, or 3 points). Dangling refs are flagged by check_model.
  */
 export interface DimensionEntity extends BaseEntity {
   readonly kind: 'dimension';
@@ -335,8 +334,8 @@ export interface DimensionEntity extends BaseEntity {
 }
 
 /**
- * Raster underlay (a scanned drawing to trace over). Occupies [0, width] × [0, height] of its work
- * plane, lower-left corner at `position`; pixel (0, 0) is the image's TOP-left corner, +y down.
+ * Raster underlay (a scanned drawing to trace over). Occupies [0, width] × [0, height] of its work plane, lower-left corner at `position`;
+ * pixel (0, 0) is the image's TOP-left corner, +y down.
  * @invariant dataUrl is a base64 `data:image/png` or `data:image/jpeg` URL of pixelWidth × pixelHeight
  * @invariant width, height > 0; 0 <= opacity <= 1
  * @see add_image_underlay, calibrate_underlay, image_to_world
@@ -430,8 +429,7 @@ export interface EntityGroup {
 }
 
 /**
- * Named parameter-expression overrides; activating one rewrites `CadDocument.parameters`
- * and replays history.
+ * Named parameter-expression overrides; activating one rewrites `CadDocument.parameters` and replays history.
  * @see create_configuration, activate_configuration
  */
 export interface Configuration {
@@ -477,10 +475,7 @@ export interface Animation {
   trigger: 'auto' | 'click';
 }
 
-/**
- * One recorded command invocation; the history is the constructive recipe (architecture L8).
- * Suppressed steps are skipped on replay.
- */
+/** One recorded command invocation; the history is the constructive recipe (architecture L8). Suppressed steps are skipped on replay. */
 export interface FeatureStep {
   /** `step-<n>` (`CadDocument.nextStepNumber`); legacy v1 files keep their old ids. */
   readonly id: string;
@@ -517,21 +512,12 @@ export interface Component {
 }
 
 /**
- * A point on an entity: its `position` when `kind` is absent, else a named sub-point of a
- * line, arc, or circle ('center' of a line is its midpoint).
+ * A point on an entity: its `position` when `kind` is absent, else a named sub-point of a line, arc, or circle ('center' of a line is its
+ * midpoint).
  */
-export type EntityRef =
-  | { readonly entityId: string }
-  | { readonly entityId: string; readonly kind: 'start' | 'end' | 'center' | 'mid' };
+export type EntityRef = { readonly entityId: string } | { readonly entityId: string; readonly kind: 'start' | 'end' | 'center' | 'mid' };
 
-export const CONSTRAINT_KINDS = [
-  'coincident',
-  'parallel',
-  'perpendicular',
-  'tangent',
-  'distance',
-  'angle',
-] as const;
+export const CONSTRAINT_KINDS = ['coincident', 'parallel', 'perpendicular', 'tangent', 'distance', 'angle'] as const;
 
 type ConstraintKind = (typeof CONSTRAINT_KINDS)[number];
 
@@ -573,13 +559,11 @@ interface JointBase<K extends string> {
 }
 
 /**
- * Instance `b` moves relative to `a`: revolute rotates by `angle` (radians) about `axis`,
- * prismatic slides by `displacement` (document units) along it.
+ * Instance `b` moves relative to `a`: revolute rotates by `angle` (radians) about `axis`, prismatic slides by `displacement` (document
+ * units) along it.
  * @see add_joint, set_joint_value, evaluate_motion, bake_motion
  */
-export type Joint =
-  | (JointBase<'revolute'> & { angle: number })
-  | (JointBase<'prismatic'> & { displacement: number });
+export type Joint = (JointBase<'revolute'> & { angle: number }) | (JointBase<'prismatic'> & { displacement: number });
 
 export type JointKind = Joint['kind'];
 
@@ -616,9 +600,8 @@ export interface CadDocument {
   parameters: Record<string, Parameter>;
   animations: Record<string, Animation>;
   /**
-   * Replayable command list: replaying non-suppressed steps from `createEmptyDocument()`
-   * regenerates `entities` (architecture L8). `execute()` appends mutating commands;
-   * history meta-commands only edit the list.
+   * Replayable command list: replaying non-suppressed steps from `createEmptyDocument()` regenerates `entities` (architecture L8).
+   * `execute()` appends mutating commands; history meta-commands only edit the list.
    */
   featureHistory: FeatureStep[];
   /** Next `step-<n>`; never reused so step-scoped entity ids stay unique. Absent = 1. */
@@ -646,8 +629,8 @@ export interface CadDocument {
 }
 
 /**
- * Physical + PBR material. `density` is mass per (document unit)³ so mass = volume × density
- * (mm document: g/mm³, steel ≈ 0.00785). Replaced via `create_material`.
+ * Physical + PBR material. `density` is mass per (document unit)³ so mass = volume × density (mm document: g/mm³, steel ≈ 0.00785).
+ * Replaced via `create_material`.
  * @invariant density > 0 and finite; color matches /^#[0-9a-fA-F]{6}$/; metalness, roughness in [0, 1]
  */
 export interface Material {
@@ -660,19 +643,13 @@ export interface Material {
   finish?: MaterialFinish;
 }
 
-export const FINISH_PATTERNS = [
-  'carbon_twill',
-  'carbon_plain',
-  'brushed',
-  'knurl',
-  'checker',
-] as const;
+export const FINISH_PATTERNS = ['carbon_twill', 'carbon_plain', 'brushed', 'knurl', 'checker'] as const;
 
 export type FinishPattern = (typeof FINISH_PATTERNS)[number];
 
 /**
- * Tileable procedural finish: one texture tile spans `scale` document units, box-projected onto
- * the part (glTF export + viewport use the same maps).
+ * Tileable procedural finish: one texture tile spans `scale` document units, box-projected onto the part (glTF export + viewport use the
+ * same maps).
  * @invariant scale > 0; normalStrength in [0, 2]; clearcoat in [0, 1]
  */
 export interface MaterialFinish {
@@ -692,22 +669,10 @@ export function createEmptyDocument(): CadDocument {
   return {
     entities: {},
     order: [],
-    layers: {
-      [DEFAULT_LAYER_ID]: {
-        id: DEFAULT_LAYER_ID,
-        name: 'Layer 0',
-        visible: true,
-        locked: false,
-      },
-    },
+    layers: { [DEFAULT_LAYER_ID]: { id: DEFAULT_LAYER_ID, name: 'Layer 0', visible: true, locked: false } },
     layerOrder: [DEFAULT_LAYER_ID],
     selection: [],
-    camera: {
-      target: [0, 0, 0],
-      azimuth: (3 * Math.PI) / 4,
-      polar: Math.PI / 3,
-      distance: 12,
-    },
+    camera: { target: [0, 0, 0], azimuth: (3 * Math.PI) / 4, polar: Math.PI / 3, distance: 12 },
     groups: {},
     units: 'mm',
     displayPrecision: 3,
@@ -727,10 +692,7 @@ export function createEmptyDocument(): CadDocument {
   };
 }
 
-/**
- * World-space triangle mesh.
- * `positions`: flat xyz triples (length 3 × vertexCount); `indices`: flat triangle vertex indices.
- */
+/** World-space triangle mesh. `positions`: flat xyz triples (length 3 × vertexCount); `indices`: flat triangle vertex indices. */
 export interface MeshData {
   readonly positions: ReadonlyArray<number>;
   readonly indices: ReadonlyArray<number>;
@@ -739,21 +701,16 @@ export interface MeshData {
 export type BooleanOp = 'union' | 'subtract' | 'intersect';
 
 /**
- * Shape recipe: the serializable construction tree of a solid, stored on kernel results
- * (`MeshSolidEntity.brep`) and evaluated by the kernel (`@core/geometry/shapeRecipe`).
+ * Shape recipe: the serializable construction tree of a solid, stored on kernel results (`MeshSolidEntity.brep`) and evaluated by the
+ * kernel (`@core/geometry/shapeRecipe`).
  */
 export type ShapeRecipe =
   /** A solid entity as authored (primitive, profile solid, or a plain triangle mesh). */
   | { readonly op: 'solid'; readonly entity: Entity }
-  | {
-      readonly op: 'boolean';
-      readonly boolean: BooleanOp;
-      readonly a: ShapeRecipe;
-      readonly b: ShapeRecipe;
-    }
+  | { readonly op: 'boolean'; readonly boolean: BooleanOp; readonly a: ShapeRecipe; readonly b: ShapeRecipe }
   /**
-   * `edges`: 0-based indices into the source's unique edges (`ShapeTopology.edges`); [] = all.
-   * `sizeEnd` (fillet only): radius at each edge's end, varying linearly from `size` at its start.
+   * `edges`: 0-based indices into the source's unique edges (`ShapeTopology.edges`); [] = all. `sizeEnd` (fillet only): radius at each
+   * edge's end, varying linearly from `size` at its start.
    */
   | {
       readonly op: 'fillet' | 'chamfer';
@@ -766,11 +723,6 @@ export type ShapeRecipe =
   | { readonly op: 'blend'; readonly sources: readonly ShapeRecipe[]; readonly radius: number }
   | { readonly op: 'shell'; readonly source: ShapeRecipe; readonly thickness: number }
   /** Rotate (M = Rx·Ry·Rz, radians) then translate. */
-  | {
-      readonly op: 'place';
-      readonly source: ShapeRecipe;
-      readonly position: Vec3;
-      readonly rotation: Vec3;
-    }
+  | { readonly op: 'place'; readonly source: ShapeRecipe; readonly position: Vec3; readonly rotation: Vec3 }
   /** Uniform scale about the world origin. */
   | { readonly op: 'scale'; readonly source: ShapeRecipe; readonly factor: number };

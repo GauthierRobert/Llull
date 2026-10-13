@@ -6,84 +6,36 @@
       "#1": {
         "id": "#1",
         "kind": "box",
-        "size": [
-          1,
-          1,
-          1
-        ],
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
+        "size": [1,1,1],
+        "position": [0,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#6b8f9c"
       },
       "#3": {
         "id": "#3",
         "kind": "box",
-        "size": [
-          1,
-          1,
-          1
-        ],
-        "position": [
-          3,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
+        "size": [1,1,1],
+        "position": [3,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#6b8f9c"
       },
       "#4": {
         "id": "#4",
         "kind": "box",
-        "size": [
-          1,
-          1,
-          1
-        ],
-        "position": [
-          6,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
+        "size": [1,1,1],
+        "position": [6,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#6b8f9c"
       },
       "#5": {
         "id": "#5",
         "kind": "box",
-        "size": [
-          1,
-          1,
-          1
-        ],
-        "position": [
-          9,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
+        "size": [1,1,1],
+        "position": [9,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#6b8f9c"
       },
@@ -91,16 +43,8 @@
         "id": "#6",
         "kind": "sphere",
         "radius": 1,
-        "position": [
-          10,
-          5,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
+        "position": [10,5,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#6b8f9c"
       },
@@ -108,16 +52,8 @@
         "id": "#7",
         "kind": "sphere",
         "radius": 2,
-        "position": [
-          20,
-          5,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
+        "position": [20,5,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#6b8f9c"
       },
@@ -125,16 +61,8 @@
         "id": "#8",
         "kind": "sphere",
         "radius": 3,
-        "position": [
-          30,
-          5,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
+        "position": [30,5,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#6b8f9c"
       }
@@ -185,130 +113,51 @@
       {
         "id": "#9",
         "name": "add_box",
-        "params": {
-          "size": [
-            1,
-            1,
-            1
-          ],
-          "position": [
-            0,
-            0,
-            0
-          ]
-        },
+        "params": {"size":[1,1,1],"position":[0,0,0]},
         "suppressed": false,
-        "affected": [
-          "#1"
-        ]
+        "affected": ["#1"]
       },
       {
         "id": "#10",
         "name": "add_box",
-        "params": {
-          "size": [
-            1,
-            1,
-            1
-          ],
-          "position": [
-            3,
-            0,
-            0
-          ]
-        },
+        "params": {"size":[1,1,1],"position":[3,0,0]},
         "suppressed": false,
-        "affected": [
-          "#3"
-        ]
+        "affected": ["#3"]
       },
       {
         "id": "#11",
         "name": "add_box",
-        "params": {
-          "size": [
-            1,
-            1,
-            1
-          ],
-          "position": [
-            6,
-            0,
-            0
-          ]
-        },
+        "params": {"size":[1,1,1],"position":[6,0,0]},
         "suppressed": false,
-        "affected": [
-          "#4"
-        ]
+        "affected": ["#4"]
       },
       {
         "id": "#12",
         "name": "add_box",
-        "params": {
-          "size": [
-            1,
-            1,
-            1
-          ],
-          "position": [
-            9,
-            0,
-            0
-          ]
-        },
+        "params": {"size":[1,1,1],"position":[9,0,0]},
         "suppressed": false,
-        "affected": [
-          "#5"
-        ]
+        "affected": ["#5"]
       },
       {
         "id": "#13",
         "name": "add_sphere",
-        "params": {
-          "radius": 1,
-          "position": [
-            10,
-            5,
-            0
-          ]
-        },
+        "params": {"radius":1,"position":[10,5,0]},
         "suppressed": false,
-        "affected": [
-          "#6"
-        ]
+        "affected": ["#6"]
       },
       {
         "id": "#14",
         "name": "add_sphere",
-        "params": {
-          "radius": 2,
-          "position": [
-            20,
-            5,
-            0
-          ]
-        },
+        "params": {"radius":2,"position":[20,5,0]},
         "suppressed": false,
-        "affected": [
-          "#7"
-        ]
+        "affected": ["#7"]
       },
       {
         "id": "#15",
         "name": "add_sphere",
-        "params": {
-          "radius": 3,
-          "position": [
-            30,
-            5,
-            0
-          ]
-        },
+        "params": {"radius":3,"position":[30,5,0]},
         "suppressed": false,
-        "affected": [
-          "#8"
-        ]
+        "affected": ["#8"]
       }
     ],
     "configurations": {},

@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Live OpenCascade vs Manifold for lofts (BRepOffsetAPI_ThruSections) and variable-section sweeps
  * (BRepOffsetAPI_MakePipeShell): both kernels build a single closed solid and agree on volume and
  * bounds within the tessellation / blending tolerance.
@@ -9,14 +8,7 @@ import { describe, it, expect } from 'vitest';
 import type { CadDocument, Entity } from '@core/model/types';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import {
-  box,
-  booleanMesh,
-  expectBoundsClose,
-  liveKernels,
-  meshOf,
-  volume,
-} from './kernelTestSupport';
+import { box, booleanMesh, expectBoundsClose, liveKernels, meshOf, volume } from './kernelTestSupport';
 
 const kernels = liveKernels();
 const empty = createEmptyDocument();
@@ -107,11 +99,7 @@ describe('variable-section sweep on the live kernels', () => {
 describe('closed-path sweeps on the live kernels', () => {
   it('a hollow ring along a circle sketch is one exact solid with the Pappus volume', () => {
     const doc = execute(empty, 'draw_arc', { center: [0, 0], radius: 30 }).document;
-    const ring = created(doc, 'sweep_profile', {
-      pathId: doc.order[0],
-      radius: 4,
-      innerRadius: 3,
-    });
+    const ring = created(doc, 'sweep_profile', { pathId: doc.order[0], radius: 4, innerRadius: 3 });
     const { occt } = agree(ring, 0.04);
     expect(occt / (2 * Math.PI * 30 * Math.PI * (16 - 9))).toBeGreaterThan(0.97);
     expect(solidCount(ring)).toBe(1);
@@ -135,8 +123,6 @@ describe('closed-path sweeps on the live kernels', () => {
       ],
     });
     agree(band, 0.05);
-    expect(
-      booleanMesh(kernels.occt, 'subtract', band, box([40, 0, 4], [10, 10, 20])),
-    ).not.toBeNull();
+    expect(booleanMesh(kernels.occt, 'subtract', band, box([40, 0, 4], [10, 10, 20]))).not.toBeNull();
   });
 });

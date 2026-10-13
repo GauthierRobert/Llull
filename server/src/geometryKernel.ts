@@ -1,6 +1,4 @@
 /**
- * @layer server
- *
  * Inject the configured geometry kernel into the core at startup (architecture L9) so boolean and
  * fillet commands work for MCP agents exactly as in the browser app. `LLULL_KERNEL=occt` selects
  * OpenCascade (falls back to Manifold on failure); anything else is Manifold.
@@ -42,10 +40,7 @@ function startIsolatedOcct(): GeometryKernel | null {
   const isolated = createIsolatedKernel({ callTimeoutMs: occtCallTimeoutMs() });
   if (isolated.start()) return isolated;
   isolated.dispose();
-  warnUnavailable(
-    'OCC worker unavailable; running OCC in-process',
-    'a WASM abort would stop the server',
-  );
+  warnUnavailable('OCC worker unavailable; running OCC in-process', 'a WASM abort would stop the server');
   return null;
 }
 

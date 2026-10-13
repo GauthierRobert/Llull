@@ -1,7 +1,6 @@
 /**
- * Survey points from a DXF: 3D points, polyline / line vertices (contours, breaklines), 3D face
- * corners and numeric spot-height texts become a point group for create_surface.
- * @layer domain-aec/civil
+ * Survey points from a DXF: 3D points, polyline / line vertices (contours, breaklines), 3D face corners and numeric spot-height texts
+ * become a point group for create_surface.
  */
 
 import { type Vec3, DOCUMENT_UNITS } from '@core/model/types';
@@ -45,48 +44,33 @@ function samples(primitive: DxfPrimitive, sources: ReadonlySet<Source>): Vec3[] 
 }
 
 /**
- * @command import_survey_dxf
- * @pure
  * @affects creates 1 point group
  * @failure not a DXF / no elevated point -> no-op
  */
 export const importSurveyDxf = defineCommand({
   name: 'import_survey_dxf',
   description:
-    'Extract survey points from a topographic DXF into a point group, ready for create_surface: ' +
-    'POINT entities, vertices of 3D polylines / elevated contours / lines (breaklines), 3DFACE ' +
-    'corners and, optionally, numeric spot-height TEXT ("123.45" placed at the level). Filter by ' +
-    'DXF `layers` (e.g. ["TOPO_PTS", "CONTOURS"]). Points at elevation 0 are ignored unless ' +
-    '`keepZeroElevation`. Units from $INSUNITS unless `sourceUnit`.',
+    'Extract survey points from a topographic DXF into a point group, ready for create_surface: POINT entities, vertices of 3D polylines ' +
+    '/ elevated contours / lines (breaklines), 3DFACE corners and, optionally, numeric spot-height TEXT ("123.45" placed at the level). ' +
+    'Filter by DXF `layers` (e.g. ["TOPO_PTS", "CONTOURS"]). Points at elevation 0 are ignored unless `keepZeroElevation`. Units from ' +
+    '$INSUNITS unless `sourceUnit`.',
   params: z.object({
     text: z.string().describe('DXF file content (ASCII).'),
     name: z.string().optional().describe('Point group name. Default "DXF survey <n>".'),
-    layers: z
-      .array(z.string())
-      .optional()
-      .describe('Only these DXF layers (case-insensitive). Default: every layer.'),
+    layers: z.array(z.string()).optional().describe('Only these DXF layers (case-insensitive). Default: every layer.'),
     sources: z
       .array(z.enum(SOURCES))
       .optional()
-      .describe(
-        'What becomes a point: points, vertices, faces, text. Default points, vertices, faces.',
-      ),
-    sourceUnit: z
-      .enum(DOCUMENT_UNITS)
-      .optional()
-      .describe('Drawing unit when $INSUNITS is missing. Default: $INSUNITS, else m.'),
+      .describe('What becomes a point: points, vertices, faces, text. Default points, vertices, faces.'),
+    sourceUnit: z.enum(DOCUMENT_UNITS).optional().describe('Drawing unit when $INSUNITS is missing. Default: $INSUNITS, else m.'),
     keepZeroElevation: z.boolean().optional().describe('Keep points at z = 0. Default false.'),
   }),
   run: (doc, params): CommandResult => {
     const drawing = parseDxf(params.text);
-    if (drawing === null)
-      return noop(doc, 'import_survey_dxf failed: not an ASCII DXF with an ENTITIES section.');
+    if (drawing === null) return noop(doc, 'import_survey_dxf failed: not an ASCII DXF with an ENTITIES section.');
     const headerMm = insUnitsMillimetres(drawing.insUnits);
     const unit =
-      params.sourceUnit ??
-      (headerMm === null
-        ? 'm'
-        : (DOCUMENT_UNITS.find((u) => fromUnit({ units: 'mm' }, 1, u) === headerMm) ?? 'm'));
+      params.sourceUnit ?? (headerMm === null ? 'm' : (DOCUMENT_UNITS.find((u) => fromUnit({ units: 'mm' }, 1, u) === headerMm) ?? 'm'));
     const sources = new Set<Source>(params.sources ?? ['points', 'vertices', 'faces']);
     const wanted = params.layers?.map((layer) => layer.toLowerCase());
     const seen = new Set<string>();
@@ -117,10 +101,7 @@ export const importSurveyDxf = defineCommand({
       );
     }
     if (points.length > MAX_POINTS) {
-      return noop(
-        doc,
-        `import_survey_dxf failed: ${points.length} points exceed the ${MAX_POINTS}-point limit; filter by layers.`,
-      );
+      return noop(doc, `import_survey_dxf failed: ${points.length} points exceed the ${MAX_POINTS}-point limit; filter by layers.`);
     }
     const { civil, id, group } = newPointGroup(doc, params.name, 'DXF survey', points);
     return commitCivil(

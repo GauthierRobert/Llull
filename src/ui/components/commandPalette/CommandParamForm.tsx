@@ -1,37 +1,24 @@
-/**
- * @layer ui/components/commandPalette
- *
- * Generated param form for one registry command: one control per `paramsSchema` property,
- * entity-id fields pre-filled from the selection; a destructive command shows a warning and a
- * danger-styled Run. Submitting parses the text and dispatches the
- * command (react R1: gather params -> dispatch). Escape / Back returns to the command list.
- */
+// Generated param form for one registry command (ids pre-filled from the selection); destructive commands warn and
+// use a danger Run. Submit parses + dispatches; Escape / Back returns to the list.
 
 import React, { useId, useMemo, useRef, useState } from 'react';
 import type { CommandDefinition } from '@core/commands/types';
 import { useStore } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
-import {
-  fieldsFromSchema,
-  humanizeName,
-  initialValues,
-  matchTypeahead,
-  parseFormValues,
-  valuesFromParams,
-} from './paramForm';
+import { fieldsFromSchema, humanizeName, initialValues, matchTypeahead, parseFormValues, valuesFromParams } from './paramForm';
 import type { FormField, FormValues } from './paramForm';
 
 interface CommandParamFormProps {
   command: CommandDefinition<unknown>;
   onBack: () => void;
   onSubmit: (params: Record<string, unknown>) => void;
-  /** Edit mode: pre-fill from these params instead of the selection. */
+  /** Edit mode: pre-fill from these instead of the selection. */
   initialParams?: Readonly<Record<string, unknown>>;
-  /** Label of the submit button (default "Run"). */
+  /** Default "Run". */
   submitLabel?: string;
-  /** Label of the back/cancel button (default "Back to commands"). */
+  /** Default "Back to commands". */
   backLabel?: string;
-  /** A refusal / result message from the last submit, shown above the footer. */
+  /** Last submit's refusal / result. */
   statusMessage?: string | null;
 }
 
@@ -55,7 +42,6 @@ interface FieldControlProps {
   onChange: (value: string) => void;
 }
 
-/** Typed characters accumulate for this long before a new search starts. */
 const TYPEAHEAD_RESET_MS = 700;
 
 interface TypeaheadSelectProps {
@@ -66,14 +52,8 @@ interface TypeaheadSelectProps {
   onChange: (value: string) => void;
 }
 
-/** `<select>` whose type-to-select prefers an exact option over the first prefix match. */
-function TypeaheadSelect({
-  common,
-  value,
-  options,
-  optional,
-  onChange,
-}: TypeaheadSelectProps): React.ReactElement {
+/** Type-to-select prefers an exact option over the first prefix match. */
+function TypeaheadSelect({ common, value, options, optional, onChange }: TypeaheadSelectProps): React.ReactElement {
   const typed = useRef({ text: '', at: 0 });
   return (
     <select
@@ -83,8 +63,7 @@ function TypeaheadSelect({
       onKeyDown={(e) => {
         if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey || e.key === ' ') return;
         const now = Date.now();
-        const text =
-          now - typed.current.at > TYPEAHEAD_RESET_MS ? e.key : typed.current.text + e.key;
+        const text = now - typed.current.at > TYPEAHEAD_RESET_MS ? e.key : typed.current.text + e.key;
         typed.current = { text, at: now };
         const match = matchTypeahead(options, text);
         if (match === undefined) return;
@@ -102,33 +81,11 @@ function TypeaheadSelect({
   );
 }
 
-function FieldControl({
-  field,
-  id,
-  value,
-  describedBy,
-  invalid,
-  autoFocus,
-  onChange,
-}: FieldControlProps): React.ReactElement {
-  const common = {
-    id,
-    'aria-describedby': describedBy,
-    'aria-invalid': invalid,
-    'aria-required': field.required,
-    autoFocus,
-  };
+function FieldControl({ field, id, value, describedBy, invalid, autoFocus, onChange }: FieldControlProps): React.ReactElement {
+  const common = { id, 'aria-describedby': describedBy, 'aria-invalid': invalid, 'aria-required': field.required, autoFocus };
   if (field.kind === 'enum' || field.kind === 'boolean') {
     const options = field.kind === 'boolean' ? ['true', 'false'] : field.options;
-    return (
-      <TypeaheadSelect
-        common={common}
-        value={value}
-        options={options}
-        optional={!field.required}
-        onChange={onChange}
-      />
-    );
+    return <TypeaheadSelect common={common} value={value} options={options} optional={!field.required} onChange={onChange} />;
   }
   if (field.kind === 'json') {
     return (
@@ -167,9 +124,7 @@ export function CommandParamForm({
 }: CommandParamFormProps): React.ReactElement {
   const fields = useMemo(() => fieldsFromSchema(command.paramsSchema), [command]);
   const [values, setValues] = useState<FormValues>(() =>
-    initialParams === undefined
-      ? initialValues(fields, useStore.getState().document.selection)
-      : valuesFromParams(fields, initialParams),
+    initialParams === undefined ? initialValues(fields, useStore.getState().document.selection) : valuesFromParams(fields, initialParams),
   );
   const [errors, setErrors] = useState<Readonly<Record<string, string>>>({});
   const baseId = useId();
@@ -231,10 +186,7 @@ export function CommandParamForm({
             const helpId = `${fieldId}-help`;
             const error = errors[field.name];
             return (
-              <div
-                key={field.name}
-                className={`palette-field${error !== undefined ? ' palette-field--invalid' : ''}`}
-              >
+              <div key={field.name} className={`palette-field${error !== undefined ? ' palette-field--invalid' : ''}`}>
                 <label htmlFor={fieldId} className="palette-field__label">
                   {field.label}
                   {field.required ? (
@@ -283,11 +235,7 @@ export function CommandParamForm({
               ? 'All parameters are optional.'
               : `${requiredCount} required · blank optional fields use defaults`}
         </span>
-        <button
-          type="submit"
-          className={`btn ${destructive ? 'btn--destructive' : 'btn--primary'}`}
-          autoFocus={fields.length === 0}
-        >
+        <button type="submit" className={`btn ${destructive ? 'btn--destructive' : 'btn--primary'}`} autoFocus={fields.length === 0}>
           {submitLabel}
           <kbd className="kbd kbd--on-accent">Ctrl ↵</kbd>
         </button>

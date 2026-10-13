@@ -7,9 +7,5 @@ export function isHexColor(value: unknown): value is string {
 export function parseHexRgb(hex: string): [number, number, number] | null {
   const match = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex.trim());
   if (match === null) return null;
-  return [
-    parseInt(match[1] as string, 16),
-    parseInt(match[2] as string, 16),
-    parseInt(match[3] as string, 16),
-  ];
+  return [parseInt(match[1] as string, 16), parseInt(match[2] as string, 16), parseInt(match[3] as string, 16)];
 }

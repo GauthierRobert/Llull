@@ -1,8 +1,4 @@
-/**
- * DSTV NC1 text rendering and grouping of identical pieces into files.
- * @layer domain-aec
- * @pure
- */
+/** DSTV NC1 text rendering and grouping of identical pieces into files. */
 
 import { fileSlug } from '../../building/model';
 import type { NcPiece } from './ncMemberPieces';
@@ -27,12 +23,7 @@ function textField(value: string): string {
 }
 
 /** DSTV NC1 text for one piece (`quantity` pieces of the same mark). */
-function renderPiece(
-  piece: NcPiece,
-  quantity: number,
-  orderNumber: string,
-  drawingNumber: string,
-): string {
+function renderPiece(piece: NcPiece, quantity: number, orderNumber: string, drawingNumber: string): string {
   const lines: string[] = [
     'ST',
     textField(orderNumber),
@@ -56,16 +47,11 @@ function renderPiece(
     ].map(numberField),
     textField(''),
   ];
-  if (piece.contour.length > 0) {
-    lines.push('AK', ...piece.contour.map(([x, y]) => `  o${numberField(x)}${numberField(y)}`));
-  }
+  if (piece.contour.length > 0) lines.push('AK', ...piece.contour.map(([x, y]) => `  o${numberField(x)}${numberField(y)}`));
   if (piece.holes.length > 0) {
     lines.push(
       'BO',
-      ...piece.holes.map(
-        (hole) =>
-          `  ${hole.face}${numberField(hole.x)}${numberField(hole.y)}${numberField(hole.diameter)}`,
-      ),
+      ...piece.holes.map((hole) => `  ${hole.face}${numberField(hole.x)}${numberField(hole.y)}${numberField(hole.diameter)}`),
     );
   }
   lines.push('EN');
@@ -74,22 +60,10 @@ function renderPiece(
 
 function pieceKey(piece: NcPiece): string {
   const holes = piece.holes.map((hole) => `${hole.face},${hole.x},${hole.y},${hole.diameter}`);
-  return [
-    piece.kind,
-    piece.profileName,
-    piece.grade,
-    piece.length,
-    piece.height,
-    piece.cuts.join(','),
-    holes.sort().join(';'),
-  ].join('|');
+  return [piece.kind, piece.profileName, piece.grade, piece.length, piece.height, piece.cuts.join(','), holes.sort().join(';')].join('|');
 }
 
-export function buildFiles(
-  pieces: ReadonlyArray<NcPiece>,
-  orderNumber: string,
-  drawingNumber: string,
-): NcFile[] {
+export function buildFiles(pieces: ReadonlyArray<NcPiece>, orderNumber: string, drawingNumber: string): NcFile[] {
   const groups = new Map<string, NcPiece[]>();
   for (const piece of pieces) {
     const key = pieceKey(piece);

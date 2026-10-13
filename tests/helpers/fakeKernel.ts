@@ -10,10 +10,7 @@ import { kernelFromOps, type CachingKernel } from '@core/geometry/shapeKernel';
 import type { Entity } from '@core/model/types';
 
 /** A closed tetrahedron (4 triangles). */
-export const TETRA: MeshData = {
-  positions: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
-  indices: [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3],
-};
+export const TETRA: MeshData = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1], indices: [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3] };
 
 /** One triangle: the smallest mesh a kernel can return. */
 const TRIANGLE: MeshData = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] };
@@ -51,8 +48,7 @@ export type FakeKernel = CachingKernel & { readonly calls: FakeCall[] };
 /** `spec` fields are read at call time, so a test may mutate them between commands. */
 export function fakeKernel(spec: FakeKernelSpec = {}): FakeKernel {
   const calls: FakeCall[] = [];
-  const shape = (mesh: MeshData | null | undefined): FakeShape | null =>
-    mesh === null || mesh === undefined ? null : { mesh };
+  const shape = (mesh: MeshData | null | undefined): FakeShape | null => (mesh === null || mesh === undefined ? null : { mesh });
   const kernel = kernelFromOps<FakeShape>({
     unsupported: new Set(spec.unsupported ?? []),
     solid: (entity) => {

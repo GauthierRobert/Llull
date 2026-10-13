@@ -1,6 +1,4 @@
 /**
- * @layer quality
- *
  * Download the pinned quality-gate corpus (quality/corpus.json) into .cache/quality-corpus/.
  * Every file is verified against its sha256; a cached file with the right hash is not re-fetched.
  * Synthetic entries are skipped: `npm run quality:generate` (quality/synthetic_step.py) makes them.
@@ -64,9 +62,7 @@ async function main() {
   const manifest = JSON.parse(await readFile(join(ROOT, 'quality', 'corpus.json'), 'utf8'));
   const wanted = manifest.files.filter(
     (entry) =>
-      entry.source !== 'synthetic' &&
-      TIERS.indexOf(entry.tier) <= TIERS.indexOf(tier) &&
-      (format === null || entry.format === format),
+      entry.source !== 'synthetic' && TIERS.indexOf(entry.tier) <= TIERS.indexOf(tier) && (format === null || entry.format === format),
   );
   await mkdir(CORPUS_DIR, { recursive: true });
   let failures = 0;

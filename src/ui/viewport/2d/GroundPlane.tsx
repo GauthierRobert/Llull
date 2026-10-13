@@ -1,9 +1,4 @@
-/**
- * @layer ui/viewport/2d
- *
- * Invisible 1e8-square plane at height `z` that the 2D interaction layers use to capture pointer
- * events on the drafting plane. Geometry + material are disposed on unmount (R9).
- */
+// Invisible 1e8-square plane at `z` capturing pointer events for the 2D interaction layers.
 
 import * as THREE from 'three';
 import type { ThreeElements } from '@react-three/fiber';
@@ -18,10 +13,7 @@ type GroundPlaneProps = Pick<
 
 export function GroundPlane({ z = 0, ...handlers }: GroundPlaneProps): React.ReactElement {
   const geometry = useDisposable(() => new THREE.PlaneGeometry(1e8, 1e8), []);
-  const material = useDisposable(
-    () => new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide }),
-    [],
-  );
+  const material = useDisposable(() => new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide }), []);
   return <mesh geometry={geometry} material={material} position={[0, 0, z]} {...handlers} />;
 }
 

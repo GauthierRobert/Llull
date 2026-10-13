@@ -1,6 +1,4 @@
 /**
- * @layer server/tests/production
- *
  * Production gate, AI-agent driver: Claude gets ONLY the scenario brief (what a lead engineer
  * hands a designer) and must do the job through llull's MCP tools; the result is graded with the
  * same acceptance criteria as the scripted and UI drivers. Revision scenarios start from the
@@ -24,12 +22,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { gradeContext, gradeScenario } from '../../../tests/production/grade';
-import {
-  formatReport,
-  resetReports,
-  writeArtifact,
-  writeReport,
-} from '../../../tests/production/report';
+import { formatReport, resetReports, writeArtifact, writeReport } from '../../../tests/production/report';
 import { SCENARIOS, chainOf } from '../../../tests/production/scenarios';
 import type { Scenario } from '../../../tests/production/contract';
 import { runAgent, type AgentOptions } from './agentLoop';
@@ -87,26 +80,13 @@ describe('production scenarios — AI agent over /mcp', () => {
         const run = await runAgent(scenario.brief, OPTIONS);
         const report = gradeScenario(scenario, 'agent', gradeContext(liveDocument(), baseline));
         const done = report.checks.filter((c) => c.pass && job.includes(c.id)).map((c) => c.id);
-        const broken = report.checks
-          .filter((c) => !c.pass && before.checks.some((b) => b.id === c.id && b.pass))
-          .map((c) => c.id);
+        const broken = report.checks.filter((c) => !c.pass && before.checks.some((b) => b.id === c.id && b.pass)).map((c) => c.id);
         const { transcript, ...stats } = run;
         const id = TRIALS > 1 ? `${scenario.id}-trial${trial}` : scenario.id;
-        writeReport(
-          { ...report, scenario: id },
-          { ...OPTIONS, ...stats, agentBaseline: scenario.agentBaseline, job, done, broken },
-        );
+        writeReport({ ...report, scenario: id }, { ...OPTIONS, ...stats, agentBaseline: scenario.agentBaseline, job, done, broken });
         writeArtifact('agent', id, 'transcript.json', JSON.stringify(transcript, null, 2));
-        writeArtifact(
-          'agent',
-          id,
-          'final.llull.json',
-          gradeContext(liveDocument()).deliverable('save'),
-        );
-        expect(
-          job.length,
-          'the starting document already passes every job criterion',
-        ).toBeGreaterThan(0);
+        writeArtifact('agent', id, 'final.llull.json', gradeContext(liveDocument()).deliverable('save'));
+        expect(job.length, 'the starting document already passes every job criterion').toBeGreaterThan(0);
         const share = done.length / (job.length + broken.length);
         expect(
           share,

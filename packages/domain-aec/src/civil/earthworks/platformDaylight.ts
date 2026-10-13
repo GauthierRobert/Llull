@@ -1,8 +1,4 @@
-/**
- * Daylight line of a graded pad: where the cut / fill batter from the pad edge meets the ground.
- * @layer domain-aec/civil
- * @pure
- */
+/** Daylight line of a graded pad: where the cut / fill batter from the pad edge meets the ground. */
 
 import type { Vec2 } from '@core/model/types';
 import { polygonPerimeter } from '@lib/polygon';
@@ -33,10 +29,7 @@ export interface DaylightPoint {
   readonly clipped: boolean;
 }
 
-interface RingPoint {
-  readonly at: Vec2;
-  readonly normal: Vec2;
-}
+type RingPoint = { readonly at: Vec2; readonly normal: Vec2 };
 
 /** Pad outline (CCW) as points with outward normals; vertices get the corner bisector. */
 export function outlineRing(boundary: ReadonlyArray<Vec2>): RingPoint[] {
@@ -62,22 +55,14 @@ export function outlineRing(boundary: ReadonlyArray<Vec2>): RingPoint[] {
   return ring;
 }
 
-function march(
-  tin: Tin,
-  ring: RingPoint,
-  elevation: number,
-  cutSlope: number,
-  fillSlope: number,
-  reach: number,
-): DaylightPoint {
+function march(tin: Tin, ring: RingPoint, elevation: number, cutSlope: number, fillSlope: number, reach: number): DaylightPoint {
   const { at, normal } = ring;
   const base = { edge: at, daylight: at, distance: 0, elevation, mode: 'none' as BatterMode };
   const ground = elevationAt(tin, at);
   if (ground === null) return { ...base, clipped: true };
   if (ground === elevation) return { ...base, clipped: false };
   const mode: BatterMode = ground > elevation ? 'cut' : 'fill';
-  const designAt = (t: number): number =>
-    batterLevel(elevation, t, mode === 'cut' ? 'cut' : 'fill', cutSlope, fillSlope);
+  const designAt = (t: number): number => batterLevel(elevation, t, mode === 'cut' ? 'cut' : 'fill', cutSlope, fillSlope);
   const pointAt = (t: number): Vec2 => [at[0] + normal[0] * t, at[1] + normal[1] * t];
   const gapAt = (t: number): number | null => {
     const z = elevationAt(tin, pointAt(t));
@@ -116,7 +101,5 @@ export function daylightPoints(
   fillSlope: number,
 ): DaylightPoint[] {
   const reach = daylightReach(tin, elevation, cutSlope, fillSlope);
-  return outlineRing(boundary).map((ring) =>
-    march(tin, ring, elevation, cutSlope, fillSlope, reach),
-  );
+  return outlineRing(boundary).map((ring) => march(tin, ring, elevation, cutSlope, fillSlope, reach));
 }

@@ -1,6 +1,4 @@
 /**
- * @layer server/tests
- *
  * Real CAD-exchange round trips through the Python bridge (CadQuery / build123d on OpenCascade).
  * Skipped when the configured python has no CadQuery (CI). build123d tests additionally need
  * LLULL_TEST_BUILD123D_PYTHON=<python with build123d>.
@@ -16,12 +14,7 @@ import { entityToTriangles } from '@core/geometry/entityTriangles';
 import type { PythonBackend } from '@core/codegen/pythonRuntime';
 import { installGeometryKernel } from '../src/geometryKernel';
 import { createPythonExchangePort } from '../src/pythonExchange';
-import {
-  BRIDGE_SCRIPT,
-  BUILD123D_PYTHON,
-  CADQUERY_PYTHON,
-  probePython,
-} from './exchangeTestSupport';
+import { BRIDGE_SCRIPT, BUILD123D_PYTHON, CADQUERY_PYTHON, probePython } from './exchangeTestSupport';
 
 const cadqueryProbe = probePython(CADQUERY_PYTHON);
 const build123dProbe = BUILD123D_PYTHON === undefined ? null : probePython(BUILD123D_PYTHON);
@@ -55,11 +48,7 @@ const PROFILE_RING = [
 const PRIMITIVES: ReadonlyArray<readonly [string, string, Record<string, unknown>]> = [
   ['Cylinder', 'add_cylinder', { radius: 8, height: 30, position: [100, 0, 15] }],
   ['Cone', 'add_cone', { radius: 10, height: 20, position: [60, 0, 0], rotation: [0.2, 0.4, 0.1] }],
-  [
-    'Torus',
-    'add_torus',
-    { ringRadius: 15, tubeRadius: 4, position: [-60, 0, 10], rotation: [0.5, 0, 0] },
-  ],
+  ['Torus', 'add_torus', { ringRadius: 15, tubeRadius: 4, position: [-60, 0, 10], rotation: [0.5, 0, 0] }],
   ['Wedge', 'add_wedge', { size: [20, 10, 15], position: [0, 50, 0] }],
   ['Pyramid', 'add_pyramid', { baseWidth: 12, baseDepth: 8, height: 20, position: [0, -50, 0] }],
   ['Sphere', 'add_sphere', { radius: 7, position: [-100, 20, 7] }],
@@ -78,41 +67,13 @@ const PRIMITIVES: ReadonlyArray<readonly [string, string, Record<string, unknown
       position: [5, 5, 5],
     },
   ],
-  [
-    'Revolve Y quarter',
-    'revolve_profile',
-    { profile: PROFILE_RING, axis: 'y', angle: Math.PI / 2, position: [30, 30, 30] },
-  ],
-  [
-    'Revolve X quarter',
-    'revolve_profile',
-    { profile: PROFILE_RING, axis: 'x', angle: Math.PI / 2, position: [-30, 30, 30] },
-  ],
-  [
-    'Revolve Z half',
-    'revolve_profile',
-    { profile: PROFILE_RING, axis: 'z', angle: Math.PI, position: [30, -30, 0] },
-  ],
-  [
-    'Revolve Y full',
-    'revolve_profile',
-    { profile: PROFILE_RING, axis: 'y', position: [70, 40, 0] },
-  ],
-  [
-    'Rotated box',
-    'add_box',
-    { size: [10, 20, 30], position: [10, 70, 5], rotation: [0.3, 0.5, 0.7] },
-  ],
-  [
-    'Rotated wedge',
-    'add_wedge',
-    { size: [20, 10, 15], position: [-20, 70, 5], rotation: [0.3, 0.5, 0.7] },
-  ],
-  [
-    'Rotated pyramid',
-    'add_pyramid',
-    { baseWidth: 12, baseDepth: 8, height: 20, position: [40, 70, 5], rotation: [0.3, 0.5, 0.7] },
-  ],
+  ['Revolve Y quarter', 'revolve_profile', { profile: PROFILE_RING, axis: 'y', angle: Math.PI / 2, position: [30, 30, 30] }],
+  ['Revolve X quarter', 'revolve_profile', { profile: PROFILE_RING, axis: 'x', angle: Math.PI / 2, position: [-30, 30, 30] }],
+  ['Revolve Z half', 'revolve_profile', { profile: PROFILE_RING, axis: 'z', angle: Math.PI, position: [30, -30, 0] }],
+  ['Revolve Y full', 'revolve_profile', { profile: PROFILE_RING, axis: 'y', position: [70, 40, 0] }],
+  ['Rotated box', 'add_box', { size: [10, 20, 30], position: [10, 70, 5], rotation: [0.3, 0.5, 0.7] }],
+  ['Rotated wedge', 'add_wedge', { size: [20, 10, 15], position: [-20, 70, 5], rotation: [0.3, 0.5, 0.7] }],
+  ['Rotated pyramid', 'add_pyramid', { baseWidth: 12, baseDepth: 8, height: 20, position: [40, 70, 5], rotation: [0.3, 0.5, 0.7] }],
 ];
 
 const alias = (name: string): string => name.replace(/[^A-Za-z0-9]/g, '');
@@ -121,16 +82,8 @@ function fixtureActions(): unknown[] {
   const actions: unknown[] = [
     { command: 'set_parameter', params: { name: 'width', expression: '80' } },
     { command: 'set_parameter', params: { name: 'thickness', expression: 'width / 10' } },
-    {
-      command: 'add_box',
-      as: 'plate',
-      params: { size: ['=width', 40, '=thickness'], position: [0, 0, '=thickness / 2'] },
-    },
-    {
-      command: 'add_cylinder',
-      as: 'hole',
-      params: { radius: 6, height: 30, position: [40, 20, 4] },
-    },
+    { command: 'add_box', as: 'plate', params: { size: ['=width', 40, '=thickness'], position: [0, 0, '=thickness / 2'] } },
+    { command: 'add_cylinder', as: 'hole', params: { radius: 6, height: 30, position: [40, 20, 4] } },
     { command: 'boolean', as: 'cut', params: { op: 'subtract', a: '$plate', b: '$hole' } },
     { command: 'set_entity_name', params: { id: '$cut', name: 'Base plate' } },
   ];
@@ -182,11 +135,7 @@ function stepBox(positions: readonly number[]): Box3 {
 function maxDeviation(a: Box3, b: Box3): number {
   let worst = 0;
   for (let axis = 0; axis < 3; axis++) {
-    worst = Math.max(
-      worst,
-      Math.abs(a.min[axis]! - b.min[axis]!),
-      Math.abs(a.max[axis]! - b.max[axis]!),
-    );
+    worst = Math.max(worst, Math.abs(a.min[axis]! - b.min[axis]!), Math.abs(a.max[axis]! - b.max[axis]!));
   }
   return worst;
 }
@@ -208,12 +157,7 @@ function exportedCode(doc: CadDocument, language: PythonBackend): string {
   return text;
 }
 
-const deviationTable: Array<{
-  language: string;
-  name: string;
-  deviation: number;
-  tolerance: number;
-}> = [];
+const deviationTable: Array<{ language: string; name: string; deviation: number; tolerance: number }> = [];
 
 // Suites
 
@@ -239,19 +183,12 @@ function describeLanguage(language: PythonBackend, enabled: boolean): void {
     });
 
     it('rebuilds an editable parametric history from the generated code trace', async () => {
-      const run = await port.runProgram({
-        language,
-        source: exportedCode(doc, language),
-        step: false,
-      });
+      const run = await port.runProgram({ language, source: exportedCode(doc, language), step: false });
       expect(run.traced).toBe(true);
       const applied = execute(createEmptyDocument(), 'apply_code_trace', { trace: run.trace });
       expect(applied.affected.length).toBe(PRIMITIVES.length + 1);
       expect(JSON.stringify(applied.document.featureHistory)).toContain('=width');
-      const changed = execute(applied.document, 'set_parameter', {
-        name: 'width',
-        expression: '120',
-      });
+      const changed = execute(applied.document, 'set_parameter', { name: 'width', expression: '120' });
       const replayed = execute(changed.document, 'replay_history', {});
       const plate = Object.values(replayed.document.entities).find((e) => e.name === 'Base plate');
       const box = llullBox(plate!, replayed.document);
@@ -275,10 +212,7 @@ function describeLanguage(language: PythonBackend, enabled: boolean): void {
         const deviation = maxDeviation(expected, actual);
         const tolerance = 0.03 * sizeOf(expected) + 1e-3;
         deviationTable.push({ language, name, deviation, tolerance });
-        expect(
-          deviation,
-          `${name}: llull ${JSON.stringify(expected)} vs STEP ${JSON.stringify(actual)}`,
-        ).toBeLessThanOrEqual(tolerance);
+        expect(deviation, `${name}: llull ${JSON.stringify(expected)} vs STEP ${JSON.stringify(actual)}`).toBeLessThanOrEqual(tolerance);
       }
     });
   });
@@ -320,10 +254,7 @@ describe.skipIf(!hasCadQuery)('parametric round trip (cadquery)', () => {
 
   const widenedPlate = (): { document: CadDocument } => {
     const applied = execute(createEmptyDocument(), 'apply_code_trace', { trace: traced });
-    const changed = execute(applied.document, 'set_parameter', {
-      name: 'width',
-      expression: '120',
-    });
+    const changed = execute(applied.document, 'set_parameter', { name: 'width', expression: '120' });
     return execute(changed.document, 'replay_history', {});
   };
 
@@ -366,8 +297,7 @@ describe.skipIf(!hasCadQuery)('non-llull scripts (cadquery)', () => {
   it('script stdout cannot corrupt the JSON response and is returned as log', async () => {
     const run = await port.runProgram({
       language: 'cadquery',
-      source:
-        'import cadquery as cq\nprint("hello {not json}")\nresult = cq.Workplane().box(1,1,1)\n',
+      source: 'import cadquery as cq\nprint("hello {not json}")\nresult = cq.Workplane().box(1,1,1)\n',
       step: false,
     });
     expect(run.traced).toBe(false);
@@ -376,30 +306,20 @@ describe.skipIf(!hasCadQuery)('non-llull scripts (cadquery)', () => {
 
   it('a raising script surfaces its error message', async () => {
     await expect(
-      port.runProgram({
-        language: 'cadquery',
-        source: 'import cadquery as cq\nraise ValueError("kaboom 42")\n',
-        step: false,
-      }),
+      port.runProgram({ language: 'cadquery', source: 'import cadquery as cq\nraise ValueError("kaboom 42")\n', step: false }),
     ).rejects.toThrow(/kaboom 42/);
   });
 
   it('a script without a result is rejected with a clear error', async () => {
-    await expect(
-      port.runProgram({ language: 'cadquery', source: 'x = 1\n', step: false }),
-    ).rejects.toThrow(/.+/);
+    await expect(port.runProgram({ language: 'cadquery', source: 'x = 1\n', step: false })).rejects.toThrow(/.+/);
   });
 
   it('rejects a syntax error', async () => {
-    await expect(
-      port.runProgram({ language: 'cadquery', source: 'def (:\n', step: false }),
-    ).rejects.toThrow(/SyntaxError|syntax/i);
+    await expect(port.runProgram({ language: 'cadquery', source: 'def (:\n', step: false })).rejects.toThrow(/SyntaxError|syntax/i);
   });
 
   it('importStep rejects garbage STEP data', async () => {
-    await expect(
-      port.importStep(Buffer.from('not a step file').toString('base64')),
-    ).rejects.toThrow(/.+/);
+    await expect(port.importStep(Buffer.from('not a step file').toString('base64'))).rejects.toThrow(/.+/);
   });
 });
 
@@ -408,15 +328,8 @@ describe.skipIf(!hasCadQuery)('STEP names and colours (cadquery)', () => {
     expect(await installGeometryKernel()).toBe(true);
     let current = createEmptyDocument();
     const added = execute(current, 'add_box', { size: [10, 10, 10], color: '#aa3300' });
-    current = execute(added.document, 'set_entity_name', {
-      id: added.affected[0]!,
-      name: 'Base plate',
-    }).document;
-    const run = await port.runProgram({
-      language: 'cadquery',
-      source: exportedCode(current, 'cadquery'),
-      step: true,
-    });
+    current = execute(added.document, 'set_entity_name', { id: added.affected[0]!, name: 'Base plate' }).document;
+    const run = await port.runProgram({ language: 'cadquery', source: exportedCode(current, 'cadquery'), step: true });
     const imported = await port.importStep(run.stepBase64 as string);
     const result = execute(createEmptyDocument(), 'import_mesh', { bodies: imported.bodies });
     expect(result.affected).toHaveLength(1);
@@ -435,8 +348,7 @@ describe.skipIf(!hasCadQuery)('probe op', () => {
 describe.skipIf(!hasCadQuery)('fidelity summary', () => {
   it('prints the per-primitive deviation table', () => {
     const lines = deviationTable.map(
-      (row) =>
-        `${row.language.padEnd(9)} ${row.name.padEnd(20)} dev=${row.deviation.toFixed(4)} tol=${row.tolerance.toFixed(4)}`,
+      (row) => `${row.language.padEnd(9)} ${row.name.padEnd(20)} dev=${row.deviation.toFixed(4)} tol=${row.tolerance.toFixed(4)}`,
     );
     if (process.env['LLULL_TEST_PRINT_FIDELITY'] === '1') console.warn(lines.join('\n'));
     expect(deviationTable.every((row) => row.deviation <= row.tolerance)).toBe(true);

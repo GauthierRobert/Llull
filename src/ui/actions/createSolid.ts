@@ -1,17 +1,8 @@
-/**
- * @layer ui/actions
- *
- * Create a primitive from a preset: drop it at the nearest free spot, select it, and show it in
- * the 3D view with the move gizmo ready. Dispatch only (PRIME DIRECTIVE).
- */
+// Preset primitive dropped at the nearest free spot, selected, shown in 3D with the move gizmo ready.
 
 import type { Vec3 } from '@core/model/types';
 import { useStore, useToolStore } from '@ui/store';
-import {
-  type SolidPreset,
-  nextPlacement,
-  solidCommandParams,
-} from '@ui/components/toolbar/solidPresets';
+import { type SolidPreset, nextPlacement, solidCommandParams } from '@ui/components/toolbar/solidPresets';
 
 /** How long a drop point stays reserved while its entity travels through the server round trip. */
 const RESERVATION_MS = 3000;

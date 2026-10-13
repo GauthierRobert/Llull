@@ -1,17 +1,9 @@
 import type { Vec3 } from '@core/model/types';
 import type { RackRules } from '../criteria/pipeRack';
 import { PIPE_OD, section } from '../oracle/steel';
-import {
-  gridCoordinates,
-  type IntentMember,
-  type IntentPipe,
-  type IntentTray,
-  type PlantIntent,
-} from '../plant/intent';
+import { gridCoordinates, type IntentMember, type IntentPipe, type IntentTray, type PlantIntent } from '../plant/intent';
 
 /**
- * @layer tests/production/scenarios
- *
  * Inter-unit pipe rack of an oilseed extraction plant: 9 bays of 6 m (54 m, 10 portal bents),
  * two pipe tiers on IPE300 tier beams between HEB240 columns, longitudinal struts and vertical
  * X-bracing in bay 1, nine process / utility lines running battery limit to battery limit, a cable
@@ -88,13 +80,7 @@ function members(): IntentMember[] {
       }
       const z = axisZ(tos, TIER_BEAM);
       const mid = (x1 + x2) / 2;
-      result.push({
-        role: 'beam',
-        profile: TIER_BEAM,
-        start: [mid, 0, z],
-        end: [mid, WIDTH, z],
-        level: 0,
-      });
+      result.push({ role: 'beam', profile: TIER_BEAM, start: [mid, 0, z], end: [mid, WIDTH, z], level: 0 });
     }
   }
   // Bay 1 (bents 1–2): X-bracing below the lower tier and between the tiers in both column planes
@@ -107,20 +93,8 @@ function members(): IntentMember[] {
     result.push({ role: 'brace', profile: BRACE, start: b, end: [a[0], y, top], level: 0 });
     // Between the tiers (struts as chords), in the column-line planes outside the pipes.
     const upper = axisZ(TIERS[1], STRUT);
-    result.push({
-      role: 'brace',
-      profile: BRACE,
-      start: [a[0], y, top],
-      end: [b[0], y, upper],
-      level: 0,
-    });
-    result.push({
-      role: 'brace',
-      profile: BRACE,
-      start: [b[0], y, top],
-      end: [a[0], y, upper],
-      level: 0,
-    });
+    result.push({ role: 'brace', profile: BRACE, start: [a[0], y, top], end: [b[0], y, upper], level: 0 });
+    result.push({ role: 'brace', profile: BRACE, start: [b[0], y, top], end: [a[0], y, upper], level: 0 });
   }
   return result;
 }

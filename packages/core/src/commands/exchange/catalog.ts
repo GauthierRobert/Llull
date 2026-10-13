@@ -9,12 +9,4 @@ import { applyCodeTrace } from './codeTrace';
 import { importMesh } from './importMesh';
 import { importDxf } from './importDxf';
 
-export const exchangeCommands = commandCatalog(
-  exportStl,
-  exportObj,
-  exportGltf,
-  exportCode,
-  applyCodeTrace,
-  importMesh,
-  importDxf,
-);
+export const exchangeCommands = commandCatalog(exportStl, exportObj, exportGltf, exportCode, applyCodeTrace, importMesh, importDxf);

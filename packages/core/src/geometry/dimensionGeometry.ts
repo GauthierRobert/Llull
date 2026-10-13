@@ -1,9 +1,6 @@
 /**
- * Model-space geometry of an aligned dimension primitive — extension lines, dimension line, oblique
- * ticks and the value's placement. The one construction the 2D view and DXF draw (sheets draw the
- * same construction in paper space, `paperDimension`).
- * @layer geometry
- * @pure
+ * Model-space geometry of an aligned dimension primitive — extension lines, dimension line, oblique ticks and the value's placement. The
+ * one construction the 2D view and DXF draw (sheets draw the same construction in paper space, `paperDimension`).
  */
 
 import type { Vec2 } from '../model/vectors';
@@ -24,10 +21,7 @@ export function dimensionGeometry(primitive: Dimension): DimensionGeometry {
   const dy = primitive.b[1] - primitive.a[1];
   const length = Math.hypot(dx, dy) || 1;
   const normal: Vec2 = [dy / length, -dx / length];
-  const shift = (point: Vec2, distance: number): Vec2 => [
-    point[0] + normal[0] * distance,
-    point[1] + normal[1] * distance,
-  ];
+  const shift = (point: Vec2, distance: number): Vec2 => [point[0] + normal[0] * distance, point[1] + normal[1] * distance];
   const { offset } = primitive;
   const a = shift(primitive.a, offset);
   const b = shift(primitive.b, offset);
@@ -45,10 +39,6 @@ export function dimensionGeometry(primitive: Dimension): DimensionGeometry {
   const lift = offset * 0.22;
   return {
     segments,
-    label: {
-      at: [(a[0] + b[0]) / 2 - Math.sin(angle) * lift, (a[1] + b[1]) / 2 + Math.cos(angle) * lift],
-      angle,
-      height: offset * 0.25,
-    },
+    label: { at: [(a[0] + b[0]) / 2 - Math.sin(angle) * lift, (a[1] + b[1]) / 2 + Math.cos(angle) * lift], angle, height: offset * 0.25 },
   };
 }

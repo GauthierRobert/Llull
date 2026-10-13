@@ -1,7 +1,4 @@
-/**
- * Portal hall steel member layout: frames, gable posts, purlins, side rails, X-bracing.
- * @layer domain-aec
- */
+/** Portal hall steel member layout: frames, gable posts, purlins, side rails, X-bracing. */
 
 import type { MemberSpec } from '../common/memberSupport';
 import type { HallGeometry, PortalProfiles } from './portalGeometry';
@@ -23,21 +20,11 @@ export function hallMemberSpecs(input: HallMemberInput): MemberSpec[] {
   // Portal frames: columns on every column line, the rafters of every roof slope per span.
   for (const y of ys) {
     for (const x of columnLines) {
-      specs.push({
-        role: 'column',
-        profile: p.column.name,
-        start: [x, y, 0],
-        end: [x, y, columnTop(x)],
-      });
+      specs.push({ role: 'column', profile: p.column.name, start: [x, y, 0], end: [x, y, columnTop(x)] });
     }
     for (const bounds of spanBounds) {
       for (const slope of slopesOf(bounds)) {
-        specs.push({
-          role: 'rafter',
-          profile: p.rafter.name,
-          start: [slope.lowX, y, slope.lowZ],
-          end: [slope.highX, y, slope.highZ],
-        });
+        specs.push({ role: 'rafter', profile: p.rafter.name, start: [slope.lowX, y, slope.lowZ], end: [slope.highX, y, slope.highZ] });
       }
     }
   }
@@ -49,13 +36,7 @@ export function hallMemberSpecs(input: HallMemberInput): MemberSpec[] {
         const x = a + ((b - a) * index) / (posts + 1);
         const roofZ = roofLine(x) - h(p.rafter) / 2 / Math.cos(pitch);
         // Wind posts span out of the gable plane: strong axis along Y.
-        specs.push({
-          role: 'column',
-          profile: p.gable.name,
-          start: [x, y, 0],
-          end: [x, y, roofZ],
-          roll: Math.PI / 2,
-        });
+        specs.push({ role: 'column', profile: p.gable.name, start: [x, y, 0], end: [x, y, roofZ], roll: Math.PI / 2 });
       }
     }
   }
@@ -92,13 +73,7 @@ export function hallMemberSpecs(input: HallMemberInput): MemberSpec[] {
     for (const [x, roll, top] of railSides) {
       if (z >= top - railSpacing / 3) continue;
       for (let j = 0; j < bays; j++) {
-        specs.push({
-          role: 'rail',
-          profile: p.rail.name,
-          start: [x, ys[j] as number, z],
-          end: [x, ys[j + 1] as number, z],
-          roll,
-        });
+        specs.push({ role: 'rail', profile: p.rail.name, start: [x, ys[j] as number, z], end: [x, ys[j + 1] as number, z], roll });
       }
     }
   }
@@ -109,18 +84,8 @@ export function hallMemberSpecs(input: HallMemberInput): MemberSpec[] {
     for (const bounds of spanBounds) {
       for (const { lowX, lowZ, highX, highZ } of slopesOf(bounds)) {
         specs.push(
-          {
-            role: 'brace',
-            profile: p.brace.name,
-            start: [lowX, ya, lowZ],
-            end: [highX, yb, highZ],
-          },
-          {
-            role: 'brace',
-            profile: p.brace.name,
-            start: [lowX, yb, lowZ],
-            end: [highX, ya, highZ],
-          },
+          { role: 'brace', profile: p.brace.name, start: [lowX, ya, lowZ], end: [highX, yb, highZ] },
+          { role: 'brace', profile: p.brace.name, start: [lowX, yb, lowZ], end: [highX, ya, highZ] },
         );
       }
     }

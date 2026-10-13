@@ -1,6 +1,4 @@
 /**
- * @layer tests/production/oracle
- *
  * Independent steel section table: nominal depth h (mm) and mass (kg/m) from the producers'
  * published tables (EN 10365 rolled I/H sections, EN 10210 hot-finished CHS). Deliberately NOT
  * read from llull's catalogue, so a catalogue error shows up as a tonnage mismatch.
@@ -51,13 +49,4 @@ export function section(name: string): SectionFacts | null {
 }
 
 /** Process-pipe outside diameters (EN 10220 / ASME B36.10) by nominal size DN. */
-export const PIPE_OD: Record<number, number> = {
-  25: 33.7,
-  50: 60.3,
-  80: 88.9,
-  100: 114.3,
-  150: 168.3,
-  200: 219.1,
-  250: 273.0,
-  300: 323.9,
-};
+export const PIPE_OD: Record<number, number> = { 25: 33.7, 50: 60.3, 80: 88.9, 100: 114.3, 150: 168.3, 200: 219.1, 250: 273.0, 300: 323.9 };

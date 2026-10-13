@@ -1,7 +1,4 @@
-/**
- * Wall build-ups (layered wall types): structure, insulation, membranes, finishes.
- * @layer domain-aec
- */
+/** Wall build-ups (layered wall types): structure, insulation, membranes, finishes. */
 
 import type { WallElement, WallLayer, WallLayerFunction } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
@@ -11,13 +8,7 @@ import { commitBuilding } from '../evaluate/evaluateElements';
 import { noop } from '@core/commands/noop';
 import { isPositiveNumber } from '@lib/isFiniteNumber';
 
-const WALL_LAYER_FUNCTIONS = [
-  'structure',
-  'insulation',
-  'membrane',
-  'air',
-  'finish',
-] as const satisfies ReadonlyArray<WallLayerFunction>;
+const WALL_LAYER_FUNCTIONS = ['structure', 'insulation', 'membrane', 'air', 'finish'] as const satisfies ReadonlyArray<WallLayerFunction>;
 
 /** @failure malformed layer list -> reason string */
 export function parseWallLayers(value: unknown): WallLayer[] | string {
@@ -35,11 +26,7 @@ export function parseWallLayers(value: unknown): WallLayer[] | string {
     ) {
       return `each layer needs a material, a thickness > 0 and a function (${WALL_LAYER_FUNCTIONS.join(', ')})`;
     }
-    layers.push({
-      material: layer.material.trim(),
-      thickness: layer.thickness,
-      function: fn as WallLayerFunction,
-    });
+    layers.push({ material: layer.material.trim(), thickness: layer.thickness, function: fn as WallLayerFunction });
   }
   return layers;
 }
@@ -64,32 +51,24 @@ export function layerBoundaries(wall: WallElement): number[] {
 }
 
 /**
- * @command set_wall_layers
- * @pure
  * @affects the walls' build-up, thickness and structural material
  * @failure unknown wall / malformed layers -> no-op
  */
 export const setWallLayers = defineCommand({
   name: 'set_wall_layers',
   description:
-    'Give walls a build-up (wall type), like Revit / ArchiCAD composite walls: layers listed from the ' +
-    'right-hand face (looking from start to end — the exterior of a counter-clockwise perimeter) to the ' +
-    'left-hand face, each { material, thickness, function: structure | insulation | membrane | air | ' +
-    'finish }. Wall thickness becomes the sum; quantities are reported per layer material; plans show ' +
-    'the layer lines; IFC gets a material layer set. layers: null removes the build-up.',
+    'Give walls a build-up (wall type), like Revit / ArchiCAD composite walls: layers listed from the right-hand face (looking from ' +
+    'start to end — the exterior of a counter-clockwise perimeter) to the left-hand face, each { material, thickness, function: ' +
+    'structure | insulation | membrane | air | finish }. Wall thickness becomes the sum; quantities are reported per layer material; ' +
+    'plans show the layer lines; IFC gets a material layer set. layers: null removes the build-up.',
   params: z.object({
-    wallIds: z
-      .array(z.string())
-      .describe('Ids of existing straight walls (e.g. ["wall-1"]); curved walls are not accepted.'),
+    wallIds: z.array(z.string()).describe('Ids of existing straight walls (e.g. ["wall-1"]); curved walls are not accepted.'),
     layers: z
       .array(
         z.object({
           material: z.string().describe('Layer material name, e.g. "brick", "mineral wool".'),
           thickness: z.number().describe('Layer thickness in document units (> 0).'),
-          function: z
-            .enum(WALL_LAYER_FUNCTIONS)
-            .optional()
-            .describe('Role of the layer. Default "structure".'),
+          function: z.enum(WALL_LAYER_FUNCTIONS).optional().describe('Role of the layer. Default "structure".'),
         }),
       )
       .nullable()
@@ -118,8 +97,7 @@ export const setWallLayers = defineCommand({
     const thickness = parsed.reduce((sum, layer) => sum + layer.thickness, 0);
     const material = structuralMaterial(parsed);
     let next = building;
-    for (const wall of walls)
-      next = withElement(next, { ...wall, layers: parsed, thickness, material });
+    for (const wall of walls) next = withElement(next, { ...wall, layers: parsed, thickness, material });
     return commitBuilding(
       doc,
       next,

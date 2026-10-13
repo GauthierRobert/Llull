@@ -1,10 +1,6 @@
 /**
- * Refusal summaries for kernel-dependent work while no geometry kernel is installed: single
- * commands (`kernelUnavailable`) and replays whose live steps, recipes included, need the kernel
- * (refusing beats silently dropping that geometry).
- *
- * @layer core/commands
- * @pure
+ * Refusal summaries for kernel-dependent work while no geometry kernel is installed: single commands (`kernelUnavailable`) and replays
+ * whose live steps, recipes included, need the kernel (refusing beats silently dropping that geometry).
  */
 
 import type { CadDocument, FeatureStep } from '../model/types';
@@ -27,19 +23,12 @@ function plannedCommands(value: unknown): string[] {
 }
 
 /** Name of the first live step (recursing into recipes) that needs the kernel, else null. */
-function kernelStepIn(
-  doc: Pick<CadDocument, 'recipes'>,
-  steps: readonly FeatureStep[],
-  registry: CommandLookup,
-  depth = 0,
-): string | null {
+function kernelStepIn(doc: Pick<CadDocument, 'recipes'>, steps: readonly FeatureStep[], registry: CommandLookup, depth = 0): string | null {
   for (const step of steps) {
     if (step.suppressed) continue;
     if (registry(step.name)?.annotations?.requiresKernel === true) return step.name;
     if (step.name === 'build_project') {
-      const planned = plannedCommands(step.params).find(
-        (name) => registry(name)?.annotations?.requiresKernel === true,
-      );
+      const planned = plannedCommands(step.params).find((name) => registry(name)?.annotations?.requiresKernel === true);
       if (planned !== undefined) return planned;
     }
     if (depth < 8) {

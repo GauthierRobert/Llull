@@ -1,9 +1,5 @@
 /**
- * Parameter → feature dependencies: which history steps read which parameters, and
- * regeneration of only what a parameter change affects.
- *
- * @layer core/commands
- * @pure
+ * Parameter → feature dependencies: which history steps read which parameters, and regeneration of only what a parameter change affects.
  */
 
 import type { CadDocument, FeatureStep, Parameter } from '../../model/types';
@@ -24,10 +20,7 @@ export function parametersReadBy(params: unknown): Set<string> {
 }
 
 /** Names whose evaluated value (or existence) differs between two parameter tables. */
-export function changedParameters(
-  before: Record<string, Parameter>,
-  after: Record<string, Parameter>,
-): Set<string> {
+export function changedParameters(before: Record<string, Parameter>, after: Record<string, Parameter>): Set<string> {
   const changed = new Set<string>();
   for (const name of new Set([...Object.keys(before), ...Object.keys(after)])) {
     if (before[name]?.value !== after[name]?.value) changed.add(name);
@@ -40,20 +33,14 @@ const CONSTRAINT_COMMANDS: ReadonlySet<string> = new Set(['add_constraint', 'upd
 
 /** Identifiers in every string of `params`, `=` or not (conservative: an id may read as a name). */
 function bareExpressionRefs(params: unknown): string[] {
-  return stringLeaves(params).flatMap((text) => [
-    ...extractReferences(text.startsWith('=') ? text.slice(1) : text),
-  ]);
+  return stringLeaves(params).flatMap((text) => [...extractReferences(text.startsWith('=') ? text.slice(1) : text)]);
 }
 
 /**
- * Parameters a step reads: its own `=expr` params, the steps of an instantiated recipe, and the
- * bare dimensional expressions of constraint steps.
+ * Parameters a step reads: its own `=expr` params, the steps of an instantiated recipe, and the bare dimensional expressions of constraint
+ * steps.
  */
-function parametersReadByStep(
-  step: FeatureStep,
-  doc: Pick<CadDocument, 'recipes'>,
-  depth = 0,
-): Set<string> {
+function parametersReadByStep(step: FeatureStep, doc: Pick<CadDocument, 'recipes'>, depth = 0): Set<string> {
   const names = parametersReadBy(step.params);
   if (CONSTRAINT_COMMANDS.has(step.name)) {
     for (const name of bareExpressionRefs(step.params)) names.add(name);
@@ -75,30 +62,21 @@ export function stepsReading(
   doc: Pick<CadDocument, 'recipes'> = { recipes: {} },
 ): FeatureStep[] {
   if (names.size === 0) return [];
-  return history.filter(
-    (step) =>
-      !step.suppressed && [...parametersReadByStep(step, doc)].some((name) => names.has(name)),
-  );
+  return history.filter((step) => !step.suppressed && [...parametersReadByStep(step, doc)].some((name) => names.has(name)));
 }
 
 /**
- * After a parameter-table edit (`before` → `after`), regenerate the model when any step reads a
- * changed parameter. Unchanged history prefixes come from the replay cache, so only the steps
- * from the first dependent onward re-run.
+ * After a parameter-table edit (`before` → `after`), regenerate the model when any step reads a changed parameter. Unchanged history
+ * prefixes come from the replay cache, so only the steps from the first dependent onward re-run.
  * @returns the regenerated document and the number of dependent steps (0 → `after` untouched)
- * @failure dependents need the geometry kernel and none is available -> `refusal` set, `after`
- *   returned unregenerated (the caller no-ops)
+ * @failure dependents need the geometry kernel and none is available -> `refusal` set, `after` returned unregenerated (the caller no-ops)
  */
 export function regenerateParameterDependents(
   before: CadDocument,
   after: CadDocument,
   ctx: ExecutionContext = currentContext(),
 ): { document: CadDocument; dependentSteps: number; refusal?: string } {
-  const dependents = stepsReading(
-    after.featureHistory,
-    changedParameters(before.parameters, after.parameters),
-    after,
-  );
+  const dependents = stepsReading(after.featureHistory, changedParameters(before.parameters, after.parameters), after);
   if (dependents.length === 0) return { document: after, dependentSteps: 0 };
   const refusal = kernelRefusal(after, after.featureHistory, ctx);
   if (refusal !== null) return { document: after, dependentSteps: dependents.length, refusal };

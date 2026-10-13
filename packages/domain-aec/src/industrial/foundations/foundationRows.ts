@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { FootingElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import { toMetres } from '@core/model/units';
@@ -38,11 +34,7 @@ import { round } from '../../shared/numeric';
 
 /** demand / resistance capped at MAX_UTILISATION; zero resistance fails any demand. */
 const demandRatio = (demand: number, resistance: number): number =>
-  resistance > 0
-    ? Math.min(demand / resistance, MAX_UTILISATION)
-    : demand > 0
-      ? MAX_UTILISATION
-      : 0;
+  resistance > 0 ? Math.min(demand / resistance, MAX_UTILISATION) : demand > 0 ? MAX_UTILISATION : 0;
 
 export const rowOf =
   (column: string, footing: string, elementId: string) =>
@@ -59,13 +51,8 @@ export const rowOf =
   });
 
 /** Footing check rows (bearing, uplift, overturning, sliding, settlement) of one column's pad. */
-export function footingRows(
-  context: FootingCheckContext,
-  footing: FootingElement,
-  columnMark: string,
-): FoundationRow[] {
-  const { doc, reaction, soilBearing, wind, slidingHorizontal, slabShare, soilModulus, clayLayer } =
-    context;
+export function footingRows(context: FootingCheckContext, footing: FootingElement, columnMark: string): FoundationRow[] {
+  const { doc, reaction, soilBearing, wind, slidingHorizontal, slabShare, soilModulus, clayLayer } = context;
   const crane = hasCase(reaction, 'CL') || hasCase(reaction, 'CR');
   // Bending dimension = the smaller plan side (frame plane direction unknown: conservative).
   const { breadth, length: depthLength, thickness, backfill } = footingMetres(doc, footing);
@@ -133,15 +120,7 @@ export function footingRows(
       });
     }
     const overturningWorst = worst(overturning);
-    if (overturningWorst) {
-      rows.push(
-        row(
-          'overturning EQU (stabilising 0.9G·B/2 vs destabilising moment)',
-          overturningWorst,
-          'kNm',
-        ),
-      );
-    }
+    if (overturningWorst) rows.push(row('overturning EQU (stabilising 0.9G·B/2 vs destabilising moment)', overturningWorst, 'kNm'));
   }
 
   const sliding: Candidate[] = [];
@@ -150,21 +129,13 @@ export function footingRows(
     const h = slidingHorizontal(combination.factors);
     const resistance = (FRICTION * Math.max(0, v + weights + slabShare)) / GAMMA_R_H;
     const demand = Math.abs(h);
-    sliding.push({
-      value: demand,
-      limit: resistance,
-      combination: combination.name,
-      utilisation: demandRatio(demand, resistance),
-    });
+    sliding.push({ value: demand, limit: resistance, combination: combination.name, utilisation: demandRatio(demand, resistance) });
   }
   const slidingWorst = worst(sliding);
-  if (slidingWorst)
-    rows.push(row(`sliding (mu ${FRICTION}, gammaR,h ${GAMMA_R_H})`, slidingWorst, 'kN'));
+  if (slidingWorst) rows.push(row(`sliding (mu ${FRICTION}, gammaR,h ${GAMMA_R_H})`, slidingWorst, 'kN'));
 
   const parts = footingSettlementParts(doc, reaction, footing, soilModulus, clayLayer);
-  const breakdown = clayLayer
-    ? `elastic ${round(parts.elastic, 1)} mm + consolidation ${round(parts.consolidation, 1)} mm, `
-    : '';
+  const breakdown = clayLayer ? `elastic ${round(parts.elastic, 1)} mm + consolidation ${round(parts.consolidation, 1)} mm, ` : '';
   rows.push(
     row(
       `settlement (${breakdown}elastic Es ${soilModulus} MPa, rigid square Is ${SETTLEMENT_INFLUENCE}, nu ${POISSON_RATIO}, net q = q − 18 kN/m³ × founding depth)`,
@@ -180,10 +151,7 @@ export function footingRows(
   return rows;
 }
 
-export function differentialRows(
-  doc: CadDocument,
-  settlements: ReadonlyArray<PadSettlement>,
-): FoundationRow[] {
+export function differentialRows(doc: CadDocument, settlements: ReadonlyArray<PadSettlement>): FoundationRow[] {
   let best: FoundationRow | null = null;
   for (const frame of new Set(settlements.map((item) => item.frame))) {
     const ordered = settlements.filter((item) => item.frame === frame).sort((a, b) => a.x - b.x);

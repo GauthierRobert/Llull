@@ -1,9 +1,6 @@
 import type { CadDocument, Entity, EntityGroup } from '../../model/types';
 
-/**
- * Entities in drawing order (`doc.order`), skipping ids with no stored entity.
- * @pure
- */
+/** Entities in drawing order (`doc.order`), skipping ids with no stored entity. */
 export function orderedEntities(doc: CadDocument): Entity[] {
   return doc.order.flatMap((id) => {
     const e = doc.entities[id];
@@ -11,22 +8,14 @@ export function orderedEntities(doc: CadDocument): Entity[] {
   });
 }
 
-/**
- * `doc` with `entity` stored and appended to `order`.
- * @pure
- */
+/** `doc` with `entity` stored and appended to `order`. */
 export function withEntity(doc: CadDocument, entity: Entity): CadDocument {
-  return {
-    ...doc,
-    entities: { ...doc.entities, [entity.id]: entity },
-    order: [...doc.order, entity.id],
-  };
+  return { ...doc, entities: { ...doc.entities, [entity.id]: entity }, order: [...doc.order, entity.id] };
 }
 
 /**
- * `doc` with every entity of `created` stored and appended to `order` (same result as folding
- * `withEntity`, but one pass instead of re-spreading the entity bag per entity).
- * @pure
+ * `doc` with every entity of `created` stored and appended to `order` (same result as folding `withEntity`, but one pass instead of
+ * re-spreading the entity bag per entity).
  */
 export function withEntities(doc: CadDocument, created: ReadonlyArray<Entity>): CadDocument {
   if (created.length === 0) return doc;
@@ -35,11 +24,7 @@ export function withEntities(doc: CadDocument, created: ReadonlyArray<Entity>): 
   return { ...doc, entities, order: [...doc.order, ...created.map((entity) => entity.id)] };
 }
 
-/**
- * `doc` with every entity of `changed` stored under its id (order unchanged); one pass, equal to
- * folding `replaceEntity`.
- * @pure
- */
+/** `doc` with every entity of `changed` stored under its id (order unchanged); one pass, equal to folding `replaceEntity`. */
 export function replaceEntitiesById(doc: CadDocument, changed: ReadonlyArray<Entity>): CadDocument {
   if (changed.length === 0) return doc;
   const entities: CadDocument['entities'] = { ...doc.entities };
@@ -47,19 +32,14 @@ export function replaceEntitiesById(doc: CadDocument, changed: ReadonlyArray<Ent
   return { ...doc, entities };
 }
 
-/**
- * `doc` with `entity` stored under its id (order unchanged).
- * @pure
- */
+/** `doc` with `entity` stored under its id (order unchanged). */
 export function replaceEntity(doc: CadDocument, entity: Entity): CadDocument {
   return { ...doc, entities: { ...doc.entities, [entity.id]: entity } };
 }
 
 /**
- * Remove `removedIds` from every group's `memberIds`; a group left with fewer than 2 members is
- * dissolved (omitted from `nextGroups`, listed in `dissolvedGroups`).
- *
- * @pure
+ * Remove `removedIds` from every group's `memberIds`; a group left with fewer than 2 members is dissolved (omitted from `nextGroups`,
+ * listed in `dissolvedGroups`).
  */
 function pruneGroupMembers(
   groups: Readonly<Record<string, EntityGroup>> | undefined,
@@ -76,18 +56,12 @@ function pruneGroupMembers(
 }
 
 /** Records of `record` whose key is not in `dropped`. */
-function withoutKeys<T>(
-  record: Readonly<Record<string, T>>,
-  dropped: ReadonlySet<string>,
-): Record<string, T> {
+function withoutKeys<T>(record: Readonly<Record<string, T>>, dropped: ReadonlySet<string>): Record<string, T> {
   return Object.fromEntries(Object.entries(record).filter(([key]) => !dropped.has(key)));
 }
 
 /** Constraint, joint and drive-relation records that do not reference a removed entity. */
-function pruneReferences(
-  doc: CadDocument,
-  removed: ReadonlySet<string>,
-): { references: Partial<CadDocument>; prunedReferences: number } {
+function pruneReferences(doc: CadDocument, removed: ReadonlySet<string>): { references: Partial<CadDocument>; prunedReferences: number } {
   const droppedConstraints = new Set(
     Object.values(doc.constraints)
       .filter((c) => removed.has(c.a.entityId) || removed.has(c.b.entityId))
@@ -119,10 +93,8 @@ function pruneReferences(
 }
 
 /**
- * `doc` without `removed` entities: entities/order/selection, group memberships (groups left with
- * fewer than 2 members are dissolved and listed), and every constraint / joint / drive relation
- * that referenced a removed entity (counted in `prunedReferences`).
- * @pure
+ * `doc` without `removed` entities: entities/order/selection, group memberships (groups left with fewer than 2 members are dissolved and
+ * listed), and every constraint / joint / drive relation that referenced a removed entity (counted in `prunedReferences`).
  */
 export function withoutEntities(
   doc: CadDocument,
@@ -143,26 +115,14 @@ export function withoutEntities(
   return { document, dissolvedGroups, prunedReferences };
 }
 
-/**
- * `doc` with every `removedIds` entity consumed (entities/order/selection/groups) and `result`
- * stored and appended to `order`.
- * @pure
- */
-export function replaceEntities(
-  doc: CadDocument,
-  removedIds: readonly string[],
-  result: Entity,
-): CadDocument {
+/** `doc` with every `removedIds` entity consumed (entities/order/selection/groups) and `result` stored and appended to `order`. */
+export function replaceEntities(doc: CadDocument, removedIds: readonly string[], result: Entity): CadDocument {
   return withEntity(withoutEntities(doc, new Set(removedIds)).document, result);
 }
 
 /** Number of constraint, joint and drive-relation records in `doc`. */
 function referenceRecordCount(doc: CadDocument): number {
-  return (
-    Object.keys(doc.constraints).length +
-    Object.keys(doc.joints).length +
-    Object.keys(doc.driveRelations).length
-  );
+  return Object.keys(doc.constraints).length + Object.keys(doc.joints).length + Object.keys(doc.driveRelations).length;
 }
 
 /** `referenceSuffix` for the records an entity-consuming command dropped between `before` and `after`. */
@@ -172,7 +132,5 @@ export function referenceLossSuffix(before: CadDocument, after: CadDocument): st
 
 /** Summary fragment naming how many constraints/joints/drive relations a deletion removed. */
 export function referenceSuffix(prunedReferences: number): string {
-  return prunedReferences > 0
-    ? ` Also removed ${prunedReferences} constraint/joint/drive record(s) that referenced it.`
-    : '';
+  return prunedReferences > 0 ? ` Also removed ${prunedReferences} constraint/joint/drive record(s) that referenced it.` : '';
 }

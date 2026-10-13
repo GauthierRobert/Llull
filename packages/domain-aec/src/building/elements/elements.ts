@@ -1,7 +1,4 @@
-/**
- * Rooms, and generic edits on any building element (delete, move, copy to levels).
- * @layer domain-aec
- */
+/** Rooms, and generic edits on any building element (delete, move, copy to levels). */
 
 import type { Vec2, Vec3 } from '@core/model/types';
 import type { BuildingElement, BuildingModel, RoomElement } from '@core/model/building';
@@ -29,15 +26,10 @@ import { outlineOrNoop } from './structure';
 import { openingFitIssues } from './walls';
 import { nextMemberMark } from '../../industrial/common/memberSupport';
 import { copyPipeSupports } from '../../industrial/piping/pipeSupportCopy';
-import {
-  reconcilePipeSupports,
-  reconciliationNote,
-} from '../../industrial/piping/pipeSupportAttach';
+import { reconcilePipeSupports, reconciliationNote } from '../../industrial/piping/pipeSupportAttach';
 import { levelIdParam } from '../levelParams';
 
 /**
- * @command add_room
- * @pure
  * @affects creates the room outline + name/area tags on layer A-AREA
  * @failure missing name / invalid boundary / walls not a closed loop -> no-op
  */
@@ -49,38 +41,23 @@ export const addRoom = defineCommand({
     'rooms feed the room schedule and IFC spaces. Refused if a room with the same outline already exists on the level.',
   params: z.object({
     name: z.string().describe('Room name, e.g. "Kitchen".'),
-    number: z
-      .string()
-      .optional()
-      .describe('Room number. Default: level index × 100 + n (e.g. "101").'),
+    number: z.string().optional().describe('Room number. Default: level index × 100 + n (e.g. "101").'),
     boundary: z.array(z.array(z.number())).optional().describe('Closed plan polygon [[x, y], …].'),
-    wallIds: z
-      .array(z.string())
-      .optional()
-      .describe('Alternative to boundary: ids of walls enclosing the room (closed loop).'),
+    wallIds: z.array(z.string()).optional().describe('Alternative to boundary: ids of walls enclosing the room (closed loop).'),
     levelId: levelIdParam,
   }),
   run: (doc, { name, number, boundary, wallIds, levelId }): CommandResult => {
     if (name.trim() === '') return noop(doc, 'add_room failed: name is required.');
     const building = getBuilding(doc);
-    const resolved = outlineOrNoop(
-      doc,
-      building,
-      { boundary, wallIds },
-      (half) => -half,
-      'add_room',
-    );
+    const resolved = outlineOrNoop(doc, building, { boundary, wallIds }, (half) => -half, 'add_room');
     if ('summary' in resolved) return resolved;
     const { outline, wallLevelId } = resolved;
     const resolution = resolveLevel(doc, building, levelId ?? wallLevelId);
     if (!resolution.ok) return noop(doc, `add_room failed: ${resolution.reason}.`);
     const levelIndex = resolution.building.levelOrder.indexOf(resolution.level.id);
     const roomsOnLevel = levelElementsOf(resolution.building, 'room', resolution.level.id).length;
-    const roomTwin = findTwin(resolution.building, 'room', resolution.level.id, (element) =>
-      sameRing(element.boundary, outline),
-    );
-    if (roomTwin)
-      return noop(doc, duplicateSummary('add_room', roomTwin, 'a room with this outline'));
+    const roomTwin = findTwin(resolution.building, 'room', resolution.level.id, (element) => sameRing(element.boundary, outline));
+    if (roomTwin) return noop(doc, duplicateSummary('add_room', roomTwin, 'a room with this outline'));
     const room: RoomElement = {
       id: nextElementId(resolution.building, 'room'),
       category: 'room',
@@ -105,8 +82,6 @@ const ignoredNote = (ids: ReadonlyArray<string>): string =>
   ids.length > 0 ? ` Ignored unknown id(s): ${[...new Set(ids)].join(', ')}.` : '';
 
 /**
- * @command delete_building_element
- * @pure
  * @affects removes the elements' evaluated entities (walls take their doors/windows along)
  * @failure no known ids -> no-op
  */
@@ -114,18 +89,14 @@ export const deleteBuildingElement = defineCommand({
   name: 'delete_building_element',
   annotations: { destructive: true },
   description:
-    'Delete building elements by element id (walls, doors, windows, slabs, columns, beams, stairs, rooms, ' +
-    'grid axes). Deleting a wall also deletes its doors and windows; joined walls are re-trimmed. Deleting a ' +
-    'steel member re-attaches the pipe supports bearing on it to the nearest steel in reach, or leaves them ' +
-    'unattached (the summary says which).',
-  params: z.object({
-    elementIds: z.array(z.string()).describe('Element ids, e.g. ["wall-2", "door-1"].'),
-  }),
+    'Delete building elements by element id (walls, doors, windows, slabs, columns, beams, stairs, rooms, grid axes). Deleting a wall ' +
+    'also deletes its doors and windows; joined walls are re-trimmed. Deleting a steel member re-attaches the pipe supports bearing on ' +
+    'it to the nearest steel in reach, or leaves them unattached (the summary says which).',
+  params: z.object({ elementIds: z.array(z.string()).describe('Element ids, e.g. ["wall-2", "door-1"].') }),
   run: (doc, { elementIds }): CommandResult => {
     const building = getBuilding(doc);
     const known = elementIds.filter((id) => building.elements[id] !== undefined);
-    if (known.length === 0)
-      return noop(doc, 'delete_building_element: none of the given ids is a building element.');
+    if (known.length === 0) return noop(doc, 'delete_building_element: none of the given ids is a building element.');
     const ignored = elementIds.filter((id) => building.elements[id] === undefined);
     const doomed = withDependents(building, known);
     const removedEntityIds = [...doomed].flatMap((id) => building.elements[id]?.entityIds ?? []);
@@ -133,11 +104,7 @@ export const deleteBuildingElement = defineCommand({
     return {
       document: regenerateBuilding(doc, supports.building),
       summary: `Deleted ${doomed.size} building element(s): ${[...doomed].join(', ')}.${ignoredNote(ignored)}${reconciliationNote(supports)}`,
-      affected: [
-        ...doomed,
-        ...removedEntityIds,
-        ...[...supports.reattached, ...supports.detached].map((change) => change.id),
-      ],
+      affected: [...doomed, ...removedEntityIds, ...[...supports.reattached, ...supports.detached].map((change) => change.id)],
     };
   },
 });
@@ -151,19 +118,12 @@ function translated(element: BuildingElement, dx: number, dy: number): BuildingE
     case 'beam':
       return { ...element, start: shift(element.start), end: shift(element.end) };
     case 'curvedWall':
-      return {
-        ...element,
-        start: shift(element.start),
-        through: shift(element.through),
-        end: shift(element.end),
-      };
+      return { ...element, start: shift(element.start), through: shift(element.through), end: shift(element.end) };
     case 'slab':
       return {
         ...element,
         boundary: element.boundary.map(shift),
-        ...(element.openings
-          ? { openings: element.openings.map((opening) => opening.map(shift)) }
-          : {}),
+        ...(element.openings ? { openings: element.openings.map((opening) => opening.map(shift)) } : {}),
       };
     case 'room':
       return { ...element, boundary: element.boundary.map(shift) };
@@ -192,29 +152,21 @@ function translated(element: BuildingElement, dx: number, dy: number): BuildingE
 }
 
 /**
- * @command move_building_element
- * @pure
  * @affects regenerates the moved elements (hosted openings move with their wall)
  * @failure no known ids / invalid delta -> no-op
  */
 export const moveBuildingElement = defineCommand({
   name: 'move_building_element',
   description:
-    'Move building elements in plan by delta [dx, dy]. Doors/windows travel with their wall (to slide ' +
-    'an opening along its wall use update_opening). Corner joins are recomputed. A moved pipe takes its pipe ' +
-    'supports along and a moved steel member makes its supports re-check their reach: they re-attach to the ' +
-    'steel at the new position or become unattached (the summary says which).',
-  params: z.object({
-    elementIds: z.array(z.string()).describe('Element ids to move.'),
-    delta: vec2('Plan translation [dx, dy].'),
-  }),
+    'Move building elements in plan by delta [dx, dy]. Doors/windows travel with their wall (to slide an opening along its wall use ' +
+    'update_opening). Corner joins are recomputed. A moved pipe takes its pipe supports along and a moved steel member makes its ' +
+    'supports re-check their reach: they re-attach to the steel at the new position or become unattached (the summary says which).',
+  params: z.object({ elementIds: z.array(z.string()).describe('Element ids to move.'), delta: vec2('Plan translation [dx, dy].') }),
   run: (doc, { elementIds, delta }): CommandResult => {
     const building = getBuilding(doc);
     const known = [...new Set(elementIds)].filter((id) => building.elements[id] !== undefined);
-    if (known.length === 0)
-      return noop(doc, 'move_building_element: none of the given ids is a building element.');
-    if (delta[0] === 0 && delta[1] === 0)
-      return noop(doc, 'move_building_element: delta is [0, 0]; nothing to move.');
+    if (known.length === 0) return noop(doc, 'move_building_element: none of the given ids is a building element.');
+    if (delta[0] === 0 && delta[1] === 0) return noop(doc, 'move_building_element: delta is [0, 0]; nothing to move.');
     const ignored = elementIds.filter((id) => building.elements[id] === undefined);
     const strayOpenings = known.filter((id) => {
       const element = building.elements[id];
@@ -229,9 +181,7 @@ export const moveBuildingElement = defineCommand({
     }
     // Moving only one side of a moment connection would leave it floating.
     const detached = Object.values(building.elements).filter(
-      (element) =>
-        element.category === 'connection' &&
-        known.includes(element.otherId) !== known.includes(element.rafterId),
+      (element) => element.category === 'connection' && known.includes(element.otherId) !== known.includes(element.rafterId),
     );
     if (detached.length > 0) {
       return noop(
@@ -244,11 +194,7 @@ export const moveBuildingElement = defineCommand({
     const travelling = [
       ...known,
       ...Object.values(building.elements).flatMap((element) =>
-        element.category === 'pipeSupport' &&
-        known.includes(element.pipeId) &&
-        !known.includes(element.id)
-          ? [element.id]
-          : [],
+        element.category === 'pipeSupport' && known.includes(element.pipeId) && !known.includes(element.id) ? [element.id] : [],
       ),
     ];
     for (const id of travelling) {
@@ -275,23 +221,16 @@ export const moveBuildingElement = defineCommand({
 });
 
 /**
- * Room number for a copy on the level at `levelIndex`: numeric numbers keep their last two digits
- * under the level's hundred ("003" → "103"); other marks get a level suffix ("Lobby" → "Lobby-L1").
- * A numeric suffix is appended until the number is unused.
+ * Room number for a copy on the level at `levelIndex`: numeric numbers keep their last two digits under the level's hundred ("003" →
+ * "103"); other marks get a level suffix ("Lobby" → "Lobby-L1"). A numeric suffix is appended until the number is unused.
  */
-export function copiedRoomNumber(
-  building: BuildingModel,
-  mark: string,
-  levelIndex: number,
-): string {
+export function copiedRoomNumber(building: BuildingModel, mark: string, levelIndex: number): string {
   const used = new Set(
     Object.values(building.elements)
       .filter((element) => element.category === 'room')
       .map((element) => element.mark),
   );
-  const base = /^\d+$/.test(mark)
-    ? String(levelIndex * 100 + (Number(mark) % 100)).padStart(3, '0')
-    : `${mark}-L${levelIndex}`;
+  const base = /^\d+$/.test(mark) ? String(levelIndex * 100 + (Number(mark) % 100)).padStart(3, '0') : `${mark}-L${levelIndex}`;
   let candidate = base;
   for (let suffix = 2; used.has(candidate); suffix++) candidate = `${base}-${suffix}`;
   return candidate;
@@ -314,18 +253,15 @@ export const COPYABLE = [
 ] as const;
 
 /**
- * @command copy_level_elements
- * @pure
  * @affects duplicates the source level's elements (and hosted openings) onto each target level
  * @failure unknown levels / nothing to copy -> no-op
  */
 export const copyLevelElements = defineCommand({
   name: 'copy_level_elements',
   description:
-    'Repeat a floor: copy every wall (with its doors/windows), slab, column, beam, stair and room of the ' +
-    'source level onto each target level (typical floors of a multi-storey building). Optionally restrict ' +
-    'to some categories. Copied pipes bring their pipe supports, re-attached to the steel found at their new ' +
-    'position (unattached when none is in reach).',
+    'Repeat a floor: copy every wall (with its doors/windows), slab, column, beam, stair and room of the source level onto each target ' +
+    'level (typical floors of a multi-storey building). Optionally restrict to some categories. Copied pipes bring their pipe supports, ' +
+    're-attached to the steel found at their new position (unattached when none is in reach).',
   params: z.object({
     sourceLevelId: z.string().describe('Level to copy from.'),
     targetLevelIds: z.array(z.string()).describe('Levels to copy to.'),
@@ -338,29 +274,20 @@ export const copyLevelElements = defineCommand({
     const building = getBuilding(doc);
     const missing = [sourceLevelId, ...requestedTargetIds].filter((id) => !building.levels[id]);
     if (missing.length > 0 || requestedTargetIds.length === 0) {
-      return noop(
-        doc,
-        `copy_level_elements failed: unknown or missing level(s) ${missing.join(', ') || '(no targets)'}.`,
-      );
+      return noop(doc, `copy_level_elements failed: unknown or missing level(s) ${missing.join(', ') || '(no targets)'}.`);
     }
     const targetLevelIds = [...new Set(requestedTargetIds)].filter((id) => id !== sourceLevelId);
     if (targetLevelIds.length === 0) {
-      return noop(
-        doc,
-        `copy_level_elements: every target level is the source level ${sourceLevelId}; nothing to copy.`,
-      );
+      return noop(doc, `copy_level_elements: every target level is the source level ${sourceLevelId}; nothing to copy.`);
     }
     // Hosted elements (doors, windows, base plates) are copied with their host only.
-    const allowed = new Set<string>(
-      categories !== undefined && categories.length > 0 ? categories : COPYABLE,
-    );
+    const allowed = new Set<string>(categories !== undefined && categories.length > 0 ? categories : COPYABLE);
     const allElements = orderedElements(building);
     const sourceElements = allElements.filter(
       (element): element is Exclude<BuildingElement, { category: 'grid' | 'door' | 'window' }> =>
         'levelId' in element && element.levelId === sourceLevelId && allowed.has(element.category),
     );
-    if (sourceElements.length === 0)
-      return noop(doc, `copy_level_elements: level ${sourceLevelId} has nothing to copy.`);
+    if (sourceElements.length === 0) return noop(doc, `copy_level_elements: level ${sourceLevelId} has nothing to copy.`);
     const sourceHeight = building.levels[sourceLevelId]?.height ?? 0;
     let next = building;
     const created: string[] = [];
@@ -378,21 +305,12 @@ export const copyLevelElements = defineCommand({
               : nextMark(next, element.category);
         next = withElement(
           next,
-          followLevelHeight(
-            { ...element, id, mark, levelId: targetLevelId, entityIds: [] },
-            sourceHeight,
-            targetHeight,
-          ),
+          followLevelHeight({ ...element, id, mark, levelId: targetLevelId, entityIds: [] }, sourceHeight, targetHeight),
         );
         created.push(id);
         copiedIds.set(element.id, id);
         for (const hosted of allElements) {
-          if (
-            hostOf(hosted) !== element.id ||
-            (hosted.category !== 'plate' &&
-              hosted.category !== 'door' &&
-              hosted.category !== 'window')
-          )
+          if (hostOf(hosted) !== element.id || (hosted.category !== 'plate' && hosted.category !== 'door' && hosted.category !== 'window'))
             continue;
           const copyId = nextElementId(next, hosted.category);
           const mark = nextMark(next, hosted.category);
@@ -407,10 +325,7 @@ export const copyLevelElements = defineCommand({
       }
       // Moment connections follow when both connected members were copied.
       for (const connection of elementsOf(building, 'connection')) {
-        const [rafterId, otherId] = [
-          copiedIds.get(connection.rafterId),
-          copiedIds.get(connection.otherId),
-        ];
+        const [rafterId, otherId] = [copiedIds.get(connection.rafterId), copiedIds.get(connection.otherId)];
         if (rafterId === undefined || otherId === undefined) continue;
         const copyId = nextElementId(next, 'connection');
         next = withElement(next, {

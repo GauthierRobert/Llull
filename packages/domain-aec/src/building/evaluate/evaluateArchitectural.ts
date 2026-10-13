@@ -1,8 +1,4 @@
-/**
- * Evaluators of the architectural building elements: wall, opening, slab, column, beam, stair,
- * room and grid → document entities.
- * @layer domain-aec
- */
+/** Evaluators of the architectural building elements: wall, opening, slab, column, beam, stair, room and grid → document entities. */
 
 import type {
   ArcEntity,
@@ -37,33 +33,17 @@ import { prismMesh } from '../../shared/mesh';
 import { base, CATEGORY_LAYER, colorForMaterial, meshEntity, orientedBox } from './entities';
 import { curvedBandBetween } from '../geometry/curvedWallGeometry';
 import { gridBubbleCenters } from '../geometry/gridGeometry';
-import {
-  doorSwing,
-  openingsOf,
-  pointAlong,
-  wallExtent,
-  wallFrame,
-  wallPieces,
-} from '../geometry/wallGeometry';
+import { doorSwing, openingsOf, pointAlong, wallExtent, wallFrame, wallPieces } from '../geometry/wallGeometry';
 import type { WallExtent } from '../geometry/wallExtent';
 import { stairPoint } from '../geometry/stairGeometry';
 
-export interface EvaluationContext {
-  readonly doc: CadDocument;
-  readonly building: BuildingModel;
-}
+export type EvaluationContext = { readonly doc: CadDocument; readonly building: BuildingModel };
 
 /** A wall and the level it stands on. */
-export interface WallHost {
-  readonly wall: WallElement;
-  readonly level: BuildingLevel;
-}
+export type WallHost = { readonly wall: WallElement; readonly level: BuildingLevel };
 
 /** Plan frame of the wall and the elevation of its base. */
-function wallPlacement({ wall, level }: WallHost): {
-  frame: ReturnType<typeof wallFrame>;
-  baseZ: number;
-} {
+function wallPlacement({ wall, level }: WallHost): { frame: ReturnType<typeof wallFrame>; baseZ: number } {
   return { frame: wallFrame(wall), baseZ: level.elevation + wall.baseOffset };
 }
 
@@ -71,11 +51,7 @@ export function evaluateWall(context: EvaluationContext, host: WallHost): Entity
   const { wall } = host;
   const { frame, baseZ } = wallPlacement(host);
   const color = colorForMaterial(wall.material, '#c9c4b8');
-  const pieces = wallPieces(
-    wall,
-    openingsOf(context.building, wall.id),
-    wallExtent(context.building, wall),
-  );
+  const pieces = wallPieces(wall, openingsOf(context.building, wall.id), wallExtent(context.building, wall));
   return pieces.map((piece, index) => {
     const [x, y] = pointAlong(wall, frame, (piece.s0 + piece.s1) / 2);
     return orientedBox(
@@ -89,11 +65,7 @@ export function evaluateWall(context: EvaluationContext, host: WallHost): Entity
   });
 }
 
-export function evaluateOpening(
-  context: EvaluationContext,
-  opening: OpeningElement,
-  host: WallHost,
-): Entity[] {
+export function evaluateOpening(context: EvaluationContext, opening: OpeningElement, host: WallHost): Entity[] {
   const { wall, level } = host;
   const { frame, baseZ } = wallPlacement(host);
   const [cx, cy] = pointAlong(wall, frame, opening.offset);
@@ -123,13 +95,7 @@ export function evaluateOpening(
     colorForMaterial(opening.material, '#8b5a2b'),
   );
   const swingArc: ArcEntity = {
-    ...base(
-      opening,
-      { part: 'swing', label: `Door ${opening.mark} swing` },
-      [0, 0, planZ],
-      [0, 0, 0],
-      '#8b5a2b',
-    ),
+    ...base(opening, { part: 'swing', label: `Door ${opening.mark} swing` }, [0, 0, planZ], [0, 0, 0], '#8b5a2b'),
     kind: 'arc',
     center: hinge,
     radius: opening.width,
@@ -137,13 +103,7 @@ export function evaluateOpening(
     endAngle,
   };
   const swingLeaf: LineEntity = {
-    ...base(
-      opening,
-      { part: 'swing-leaf', label: `Door ${opening.mark} leaf (plan)` },
-      [0, 0, planZ],
-      [0, 0, 0],
-      '#8b5a2b',
-    ),
+    ...base(opening, { part: 'swing-leaf', label: `Door ${opening.mark} leaf (plan)` }, [0, 0, planZ], [0, 0, 0], '#8b5a2b'),
     kind: 'line',
     start: hinge,
     end: leafEnd,
@@ -158,11 +118,7 @@ export function evaluateSlab(slab: SlabElement, level: BuildingLevel): Entity[] 
   const openings = slab.openings ?? [];
   const mesh =
     openings.length > 0
-      ? prismMesh(slab.boundary, openings, ([x, y], side) => [
-          x,
-          y,
-          side === 1 ? bottom + slab.thickness : bottom,
-        ])
+      ? prismMesh(slab.boundary, openings, ([x, y], side) => [x, y, side === 1 ? bottom + slab.thickness : bottom])
       : null;
   if (mesh) return [meshEntity(slab, stub, mesh, color)];
   const extrusion: ExtrusionEntity = {
@@ -175,11 +131,7 @@ export function evaluateSlab(slab: SlabElement, level: BuildingLevel): Entity[] 
 }
 
 export function evaluateColumn(column: ColumnElement, level: BuildingLevel): Entity[] {
-  const center: Vec3 = [
-    column.location[0],
-    column.location[1],
-    level.elevation + column.height / 2,
-  ];
+  const center: Vec3 = [column.location[0], column.location[1], level.elevation + column.height / 2];
   const stub = { part: 'body', label: `Column ${column.mark}` };
   const color = colorForMaterial(column.material, '#9a9a90');
   if (column.shape === 'circular') {
@@ -229,49 +181,27 @@ export function evaluateStair(stair: StairElement, level: BuildingLevel): Entity
   return steps;
 }
 
-export function evaluateRoom(
-  context: EvaluationContext,
-  room: RoomElement,
-  level: BuildingLevel,
-): Entity[] {
+export function evaluateRoom(context: EvaluationContext, room: RoomElement, level: BuildingLevel): Entity[] {
   const planZ = level.elevation + fromMm(context.doc, 5);
   const color = CATEGORY_LAYER.room.color;
   const [cx, cy] = polygonCentroid(room.boundary);
   const textHeight = fromMm(context.doc, 250);
   const areaSquareMetres = planAreaM2(context.doc, room.boundary);
   const outline: PolylineEntity = {
-    ...base(
-      room,
-      { part: 'outline', label: `Room ${room.mark} ${room.name}` },
-      [0, 0, planZ],
-      [0, 0, 0],
-      color,
-    ),
+    ...base(room, { part: 'outline', label: `Room ${room.mark} ${room.name}` }, [0, 0, planZ], [0, 0, 0], color),
     kind: 'polyline',
     points: room.boundary,
     closed: true,
   };
   const nameTag: TextEntity = {
-    ...base(
-      room,
-      { part: 'tag-name', label: `Room ${room.mark} name` },
-      [cx, cy + textHeight * 0.8, planZ],
-      [0, 0, 0],
-      color,
-    ),
+    ...base(room, { part: 'tag-name', label: `Room ${room.mark} name` }, [cx, cy + textHeight * 0.8, planZ], [0, 0, 0], color),
     kind: 'text',
     content: `${room.name} ${room.mark}`,
     height: textHeight,
     anchor: 'center',
   };
   const areaTag: TextEntity = {
-    ...base(
-      room,
-      { part: 'tag-area', label: `Room ${room.mark} area` },
-      [cx, cy - textHeight * 0.8, planZ],
-      [0, 0, 0],
-      color,
-    ),
+    ...base(room, { part: 'tag-area', label: `Room ${room.mark} area` }, [cx, cy - textHeight * 0.8, planZ], [0, 0, 0], color),
     kind: 'text',
     content: `${areaSquareMetres.toFixed(2)} m²`,
     height: textHeight * 0.8,
@@ -296,13 +226,7 @@ export function evaluateGrid(context: EvaluationContext, grid: GridElement): Ent
     ['end', endCenter],
   ] as const) {
     const bubble: CircleEntity = {
-      ...base(
-        grid,
-        { part: `bubble-${part}`, label: `Grid ${grid.mark} bubble` },
-        [0, 0, 0],
-        [0, 0, 0],
-        color,
-      ),
+      ...base(grid, { part: `bubble-${part}`, label: `Grid ${grid.mark} bubble` }, [0, 0, 0], [0, 0, 0], color),
       kind: 'circle',
       center,
       radius: bubbleRadius,
@@ -336,9 +260,7 @@ export function evaluateCurvedWall(
   const pieces = wallPieces(wall, openings, extent);
   return pieces.flatMap((piece, index): Entity[] => {
     const band = curvedBandBetween(wall, piece.s0, piece.s1);
-    const mesh = band
-      ? prismMesh(band, [], ([x, y], side) => [x, y, bottom + (side ? piece.z1 : piece.z0)])
-      : null;
+    const mesh = band ? prismMesh(band, [], ([x, y], side) => [x, y, bottom + (side ? piece.z1 : piece.z0)]) : null;
     if (!mesh) return [];
     const part = pieces.length === 1 ? 'body' : `body-${index}`;
     return [meshEntity(wall, { part, label: `Wall ${wall.mark}` }, mesh, color)];

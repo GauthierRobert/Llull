@@ -15,9 +15,6 @@ interface MeasureBoundingBoxData {
 }
 
 /**
- * @command measure_bounding_box
- * @pure
- * @layer core/commands
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data is { min: Vec3, max: Vec3, size: Vec3 }
  * @failure missing entity id, empty document -> no-op, affected:[], no data
@@ -26,19 +23,13 @@ export const measureBoundingBox = defineCommand({
   name: 'measure_bounding_box',
   annotations: { readOnly: true },
   description:
-    'Compute the world-space axis-aligned bounding box (AABB). Three modes: ' +
-    '(a) entityId — AABB of one entity; ' +
+    'Compute the world-space axis-aligned bounding box (AABB). Three modes: (a) entityId — AABB of one entity; ' +
     '(b) useSelection:true — combined AABB of the current document selection; ' +
     '(c) no params (or useSelection:false) — combined AABB of the entire document. ' +
     'Returns data: { min:[x,y,z], max:[x,y,z], size:[w,h,d] }. Does not modify the document. ' +
     'Note: entity rotation is NOT applied to bounds (axis-aligned approximation).',
   params: z.object({
-    entityId: z
-      .string()
-      .optional()
-      .describe(
-        'Id of the entity whose bounding box to compute. Takes precedence over useSelection.',
-      ),
+    entityId: z.string().optional().describe('Id of the entity whose bounding box to compute. Takes precedence over useSelection.'),
     useSelection: z
       .boolean()
       .optional()
@@ -49,30 +40,21 @@ export const measureBoundingBox = defineCommand({
   }),
   run: (doc, { entityId, useSelection }): CommandResult => {
     let bounds: Bounds | null = null;
-
     if (entityId) {
       const e = doc.entities[entityId];
       if (!e) return noop(doc, `measure_bounding_box: entity '${entityId}' not found.`);
       bounds = entityBoundsInDoc(doc, e);
     } else {
       const ids = useSelection && doc.selection.length > 0 ? doc.selection : doc.order;
-
       for (const id of ids) {
         const e = doc.entities[id];
         if (!e) continue;
         const b = entityBoundsInDoc(doc, e);
         bounds = bounds ? mergeBounds(bounds, b) : b;
       }
-
-      if (!bounds)
-        return noop(doc, 'measure_bounding_box: document is empty — no bounds to compute.');
+      if (!bounds) return noop(doc, 'measure_bounding_box: document is empty — no bounds to compute.');
     }
-
-    const size: Vec3 = [
-      bounds.max[0] - bounds.min[0],
-      bounds.max[1] - bounds.min[1],
-      bounds.max[2] - bounds.min[2],
-    ];
+    const size: Vec3 = [bounds.max[0] - bounds.min[0], bounds.max[1] - bounds.min[1], bounds.max[2] - bounds.min[2]];
     const data: MeasureBoundingBoxData = { min: bounds.min, max: bounds.max, size };
     return report(
       doc,
@@ -105,8 +87,7 @@ function instanceMass(
   ctx: ExecutionContext | undefined,
 ): { volume: number; mass: number | null } | string {
   const component = doc.components[instance.componentId];
-  if (!component)
-    return `instance '${instance.id}' references missing component '${instance.componentId}'.`;
+  if (!component) return `instance '${instance.id}' references missing component '${instance.componentId}'.`;
   let volume = 0;
   let mass: number | null = 0;
   for (const baked of expandInstance(instance, component)) {
@@ -129,9 +110,6 @@ function instanceMass(
 }
 
 /**
- * @command mass_properties
- * @pure
- * @layer core/commands
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data is { volume, volumeUnit, method? } plus { density, mass, unit: 'g' } when a density is known
  * @failure non-solid entity, missing id, or a given density <= 0 -> no-op, affected:[], no data
@@ -178,17 +156,13 @@ export const massProperties = defineCommand({
       .optional(),
   }),
   run: (doc, { entityId, density }, ctx): CommandResult => {
-    if (density !== undefined && density <= 0)
-      return noop(doc, `mass_properties: density must be > 0, got ${String(density)}.`);
-
+    if (density !== undefined && density <= 0) return noop(doc, `mass_properties: density must be > 0, got ${String(density)}.`);
     const e = doc.entities[entityId];
     if (!e) return noop(doc, `mass_properties: entity '${entityId}' not found.`);
-
     const volumeUnit = `${doc.units}³`;
     const materialDensity = e.materialId ? doc.materials[e.materialId]?.density : undefined;
     const effectiveDensity = materialDensity ?? density;
     const densitySource = materialDensity === undefined ? 'param' : `material '${e.materialId}'`;
-
     if (e.kind === 'instance') {
       const assembly = instanceMass(doc, e, density, ctx);
       if (typeof assembly === 'string') return noop(doc, `mass_properties: ${assembly}`);
@@ -201,13 +175,7 @@ export const massProperties = defineCommand({
           { volume, volumeUnit } satisfies MassPropertiesData,
         );
       const averageDensity = volume > 0 ? mass / volume : (density ?? 0);
-      const data: MassPropertiesData = {
-        volume,
-        volumeUnit,
-        density: averageDensity,
-        mass,
-        unit: 'g',
-      };
+      const data: MassPropertiesData = { volume, volumeUnit, density: averageDensity, mass, unit: 'g' };
       return report(
         doc,
         `Mass of assembly ${entityId}: volume=${volume.toFixed(doc.displayPrecision)} ${doc.units}³, ` +
@@ -215,7 +183,6 @@ export const massProperties = defineCommand({
         data,
       );
     }
-
     const measured = solidVolume(doc, e, ctx);
     if ('error' in measured) return noop(doc, `mass_properties: ${measured.error}`);
     const { volume, method, approximation } = measured;
@@ -223,18 +190,10 @@ export const massProperties = defineCommand({
     const shown = volume.toFixed(doc.displayPrecision);
     if (effectiveDensity === undefined) {
       const how =
-        method === 'exact'
-          ? ' (exact B-rep)'
-          : method === 'mesh'
-            ? ' (display mesh; the OCC kernel gives the exact B-rep volume)'
-            : '';
+        method === 'exact' ? ' (exact B-rep)' : method === 'mesh' ? ' (display mesh; the OCC kernel gives the exact B-rep volume)' : '';
       const sign = approximation === undefined ? '=' : '≈';
       const note = approximation === undefined ? how : ` (${approximation})`;
-      return report(
-        doc,
-        `Volume of ${entityId} ${sign} ${shown} ${volumeUnit}${note}.`,
-        volumeData satisfies MassPropertiesData,
-      );
+      return report(doc, `Volume of ${entityId} ${sign} ${shown} ${volumeUnit}${note}.`, volumeData satisfies MassPropertiesData);
     }
     const mass = volume * effectiveDensity;
     const data: MassPropertiesData = { ...volumeData, density: effectiveDensity, mass, unit: 'g' };

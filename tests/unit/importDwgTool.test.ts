@@ -38,7 +38,6 @@ describe('import_dwg tool', () => {
     expect(buildAllMcpTools().map((t) => t.name)).toContain('import_dwg');
     expect(toolsetOf('import_dwg')).toBe('exchange');
   });
-
   it('converts then runs import_dxf by default, forwarding only drawing params', async () => {
     const result = await applyExchangeToolCall(
       'import_dwg',
@@ -46,11 +45,8 @@ describe('import_dwg tool', () => {
       deps(converter),
     );
     expect(result?.isError).toBeFalsy();
-    expect(applied).toEqual([
-      { name: 'import_dxf', params: { text: 'DXF(QUJD)', sourceUnit: 'mm', layers: ['A'] } },
-    ]);
+    expect(applied).toEqual([{ name: 'import_dxf', params: { text: 'DXF(QUJD)', sourceUnit: 'mm', layers: ['A'] } }]);
   });
-
   it('runs import_survey_dxf for target survey and reads path files', async () => {
     const result = await applyExchangeToolCall(
       'import_dwg',
@@ -58,12 +54,8 @@ describe('import_dwg tool', () => {
       deps(converter),
     );
     expect(result?.isError).toBeFalsy();
-    expect(applied[0]).toEqual({
-      name: 'import_survey_dxf',
-      params: { text: 'DXF(RklMRQ==)', name: 'Topo', keepZeroElevation: true },
-    });
+    expect(applied[0]).toEqual({ name: 'import_survey_dxf', params: { text: 'DXF(RklMRQ==)', name: 'Topo', keepZeroElevation: true } });
   });
-
   it('explains how to enable the converter when none is configured', async () => {
     for (const none of [null, undefined]) {
       const result = await applyExchangeToolCall('import_dwg', { dwgBase64: 'QUJD' }, deps(none));
@@ -72,17 +64,12 @@ describe('import_dwg tool', () => {
     }
     expect(applied).toEqual([]);
   });
-
   it('rejects bad input and surfaces converter failures without changing the document', async () => {
     const bad = await applyExchangeToolCall('import_dwg', { target: 'x' }, deps(converter));
     expect(bad?.isError).toBe(true);
     const missing = await applyExchangeToolCall('import_dwg', {}, deps(converter));
     expect(textOf(missing)).toMatch(/dwgBase64 or path/);
-    const noDir = await applyExchangeToolCall(
-      'import_dwg',
-      { path: 'a.dwg' },
-      deps({ convertDwg: converter.convertDwg }),
-    );
+    const noDir = await applyExchangeToolCall('import_dwg', { path: 'a.dwg' }, deps({ convertDwg: converter.convertDwg }));
     expect(textOf(noDir)).toMatch(/LLULL_EXCHANGE_DIR/);
     const failing = await applyExchangeToolCall(
       'import_dwg',

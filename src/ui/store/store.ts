@@ -1,13 +1,7 @@
 /**
- * @layer ui/store
- * Single Zustand store (the app's one source of truth). Every change goes through
- * `execute(doc, name, params)`.
- * - ONLINE (`./onlineMode`): `dispatch` POSTs /command; /live events are re-run on `liveBase`
- *   (`applyLiveCommand`) or adopted as snapshots (`hydrateLiveDocument`).
- * - LOCAL MODE (`./localMode`): when liveStatus is 'disconnected', syncState is not 'idle', or
- *   hasUnsyncedLocalEdits, commands run locally and are queued in `localOutbox` for replay
- *   (`./outbox`).
- * Connectivity is decided ONLY by the SSE hook (`setLiveStatus`).
+ * The single Zustand store; every change goes through `execute`. ONLINE (onlineMode): dispatch POSTs /command, /live
+ * events re-run on `liveBase` or hydrate snapshots. LOCAL (localMode) while disconnected, syncing or holding unsynced
+ * edits: run locally, queued in `localOutbox` (outbox). Connectivity is set ONLY by the SSE hook (`setLiveStatus`).
  */
 
 import { create } from 'zustand';
@@ -25,8 +19,7 @@ export const useStore = create<CadStoreState>()((set, get) => {
     if (isLocalMode(get())) stepLocalHistory(set, get, direction);
     else postHistoryStep(set, get, direction);
   };
-  const setSelection = (selection: EntityId[]): void =>
-    set((state) => ({ document: { ...state.document, selection } }));
+  const setSelection = (selection: EntityId[]): void => set((state) => ({ document: { ...state.document, selection } }));
 
   return {
     document: createEmptyDocument(),
@@ -117,20 +110,12 @@ export const useStore = create<CadStoreState>()((set, get) => {
       if (event.epoch !== state.liveEpoch) return false; // server restarted (or no snapshot yet)
       const applied = applyLiveCommand(state.liveBase, state.liveSeq, event);
       if (!applied.ok) return false;
-      set({
-        liveBase: applied.document,
-        liveSeq: event.seq,
-        document: withLocalSelection(applied.document, state.document.selection),
-      });
+      set({ liveBase: applied.document, liveSeq: event.seq, document: withLocalSelection(applied.document, state.document.selection) });
       return true;
     },
 
     setLiveStatus(status: LiveStatus): void {
-      set(
-        status === 'connected'
-          ? { liveStatus: status, sseEverConnected: true }
-          : { liveStatus: status },
-      );
+      set(status === 'connected' ? { liveStatus: status, sseEverConnected: true } : { liveStatus: status });
       if (status === 'disconnected') {
         onSseDisconnected(set, get);
       } else if (status === 'connected' && get().hasUnsyncedLocalEdits) {

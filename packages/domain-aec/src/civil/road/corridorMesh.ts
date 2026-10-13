@@ -1,43 +1,27 @@
 /**
- * Road corridor geometry: carriageway + shoulder mesh along the design profile, side-slope batters
- * to daylight on the existing ground, and the daylight lines.
- * @layer domain-aec/civil
- * @pure
+ * Road corridor geometry: carriageway + shoulder mesh along the design profile, side-slope batters to daylight on the existing ground, and
+ * the daylight lines.
  */
 
 import type { Entity, Vec2 } from '@core/model/types';
 import type { AlignmentObject } from '@core/model/civil';
 import { civilMesh, civilPolyline } from '../entities';
 import { sampleStations } from '../alignment/alignmentGeometry';
-import {
-  designElevation,
-  validateProfile,
-  verticalCurveStations,
-} from '../alignment/profileGeometry';
+import { designElevation, validateProfile, verticalCurveStations } from '../alignment/profileGeometry';
 import { crossSectionAt, type RoadCrossSection, type SectionNode } from './roadSection';
 import { superelevationStations } from '../alignment/superelevation';
 import { surfaceTinById } from '../surface/surfaceTin';
 import type { CivilContext } from '../context';
 import { toMetres } from '@core/model/units';
 
-interface MeshBuffers {
-  readonly positions: number[];
-  readonly indices: number[];
-}
+type MeshBuffers = { readonly positions: number[]; readonly indices: number[] };
 
 function vertex(cross: RoadCrossSection, node: SectionNode): [number, number, number] {
-  return [
-    cross.origin[0] - Math.sin(cross.direction) * node.offset,
-    cross.origin[1] + Math.cos(cross.direction) * node.offset,
-    node.z,
-  ];
+  return [cross.origin[0] - Math.sin(cross.direction) * node.offset, cross.origin[1] + Math.cos(cross.direction) * node.offset, node.z];
 }
 
 /** Adds a strip between consecutive rows of nodes (ascending offset), facing up. */
-function addStrip(
-  buffers: MeshBuffers,
-  rows: ReadonlyArray<{ cross: RoadCrossSection; nodes: ReadonlyArray<SectionNode> }>,
-): void {
+function addStrip(buffers: MeshBuffers, rows: ReadonlyArray<{ cross: RoadCrossSection; nodes: ReadonlyArray<SectionNode> }>): void {
   const base = buffers.positions.length / 3;
   const width = rows[0]?.nodes.length ?? 0;
   for (const row of rows) {
@@ -92,9 +76,7 @@ export function evaluateCorridor(context: CivilContext, alignment: AlignmentObje
     road,
     sections.map((cross) => ({ cross, nodes: cross.template })),
   );
-  const entities: Entity[] = [
-    civilMesh(alignment, 'corridor', `${alignment.name} carriageway`, 'corridor', road),
-  ];
+  const entities: Entity[] = [civilMesh(alignment, 'corridor', `${alignment.name} carriageway`, 'corridor', road)];
   const batters: MeshBuffers = { positions: [], indices: [] };
   const sides: Array<{
     part: string;
@@ -102,35 +84,18 @@ export function evaluateCorridor(context: CivilContext, alignment: AlignmentObje
     edge: (c: RoadCrossSection) => SectionNode;
     edgeFirst: boolean;
   }> = [
-    {
-      part: 'left',
-      pick: (c) => c.left,
-      edge: (c) => c.template[c.template.length - 1] as SectionNode,
-      edgeFirst: true,
-    },
-    {
-      part: 'right',
-      pick: (c) => c.right,
-      edge: (c) => c.template[0] as SectionNode,
-      edgeFirst: false,
-    },
+    { part: 'left', pick: (c) => c.left, edge: (c) => c.template[c.template.length - 1] as SectionNode, edgeFirst: true },
+    { part: 'right', pick: (c) => c.right, edge: (c) => c.template[0] as SectionNode, edgeFirst: false },
   ];
   for (const side of sides) {
     for (const run of daylightRuns(sections, side.pick)) {
       addStrip(
         batters,
-        run.map(({ cross, node }) => ({
-          cross,
-          nodes: side.edgeFirst ? [side.edge(cross), node] : [node, side.edge(cross)],
-        })),
+        run.map(({ cross, node }) => ({ cross, nodes: side.edgeFirst ? [side.edge(cross), node] : [node, side.edge(cross)] })),
       );
     }
   }
-  if (batters.indices.length > 0) {
-    entities.push(
-      civilMesh(alignment, 'batters', `${alignment.name} side slopes`, 'daylight', batters),
-    );
-  }
+  if (batters.indices.length > 0) entities.push(civilMesh(alignment, 'batters', `${alignment.name} side slopes`, 'daylight', batters));
   let lineIndex = 0;
   for (const side of sides) {
     for (const run of daylightRuns(sections, side.pick)) {
@@ -141,15 +106,7 @@ export function evaluateCorridor(context: CivilContext, alignment: AlignmentObje
       });
       const meanZ = run.reduce((sum, { node }) => sum + node.z, 0) / run.length;
       entities.push(
-        civilPolyline(
-          alignment,
-          `daylight${lineIndex++}`,
-          `${alignment.name} daylight ${side.part}`,
-          'daylight',
-          points,
-          false,
-          meanZ,
-        ),
+        civilPolyline(alignment, `daylight${lineIndex++}`, `${alignment.name} daylight ${side.part}`, 'daylight', points, false, meanZ),
       );
     }
   }

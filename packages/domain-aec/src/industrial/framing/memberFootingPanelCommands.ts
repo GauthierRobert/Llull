@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { Vec3 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, vec2, z } from '@core/commands/schema';
@@ -9,48 +5,28 @@ import { fromMm } from '@core/model/units';
 import { getBuilding, resolveLevel } from '../../building/model';
 import { noop } from '@core/commands/noop';
 import { commitBuilding } from '../../building/evaluate/evaluateElements';
-import {
-  appendFootings,
-  appendPanel,
-  columnFeet,
-  withoutFootings,
-} from '../foundations/footingPanelSupport';
+import { appendFootings, appendPanel, columnFeet, withoutFootings } from '../foundations/footingPanelSupport';
 import { toVec3 } from '../common/memberSupport';
 import { levelIdParam } from '../../building/levelParams';
 
 /**
- * @command add_footing
- * @pure
  * @affects creates 1 pad footing, or one under every column of the level
  * @failure no location / location already has a footing / no columns / sizes <= 0 -> no-op
  */
 export const addFooting = defineCommand({
   name: 'add_footing',
   description:
-    'Add concrete pad footings: one at a plan location, or (underColumns: true) one under every steel and ' +
-    'concrete column foot of the level (underColumns wins over location). With underColumns, feet that ' +
-    'already carry a footing on the level (within 10 mm) are skipped and the command is refused when none ' +
-    'is left; an explicit location that already carries a footing on the level (within 10 mm) is refused. ' +
-    'Top of footing at level + topOffset ' +
-    '(default −300 mm); default 1500 × 1500 × 600 mm.',
+    'Add concrete pad footings: one at a plan location, or (underColumns: true) one under every steel and concrete column foot of the ' +
+    'level (underColumns wins over location). With underColumns, feet that already carry a footing on the level (within 10 mm) are ' +
+    'skipped and the command is refused when none is left; an explicit location that already carries a footing on the level (within 10 ' +
+    'mm) is refused. Top of footing at level + topOffset (default −300 mm); default 1500 × 1500 × 600 mm.',
   params: z.object({
     location: vec2('Footing centre [x, y].').optional(),
-    underColumns: z
-      .boolean()
-      .optional()
-      .describe(
-        'Place one under each steel or concrete column foot of the level (ignores location).',
-      ),
+    underColumns: z.boolean().optional().describe('Place one under each steel or concrete column foot of the level (ignores location).'),
     width: z.number().optional().describe('Size along X, in document units. Default 1500 mm.'),
     length: z.number().optional().describe('Size along Y, in document units. Default = width.'),
-    thickness: z
-      .number()
-      .optional()
-      .describe('Depth of the pad, in document units. Default 600 mm.'),
-    topOffset: z
-      .number()
-      .optional()
-      .describe('Top of footing relative to the level, in document units. Default −300 mm.'),
+    thickness: z.number().optional().describe('Depth of the pad, in document units. Default 600 mm.'),
+    topOffset: z.number().optional().describe('Top of footing relative to the level, in document units. Default −300 mm.'),
     levelId: levelIdParam,
     material: z.string().optional().describe('Default concrete.'),
   }),
@@ -85,30 +61,23 @@ export const addFooting = defineCommand({
       topOffset,
       material,
     });
-    return commitBuilding(
-      doc,
-      added.building,
-      added.ids,
-      `Added ${added.ids.length} pad footing(s) ${added.ids.join(', ')}.`,
-      { elementIds: added.ids },
-    );
+    return commitBuilding(doc, added.building, added.ids, `Added ${added.ids.length} pad footing(s) ${added.ids.join(', ')}.`, {
+      elementIds: added.ids,
+    });
   },
 });
 
 const MAX_PANEL_CORNERS = 500;
 
 /**
- * @command add_panel
- * @pure
  * @affects creates 1 cladding panel (mesh on layer A-CLAD)
  * @failure < 3 corners / degenerate plane / thickness <= 0 -> no-op
  */
 export const addPanel = defineCommand({
   name: 'add_panel',
   description:
-    'Add a planar cladding, roofing or sandwich panel through 3D corners [[x, y, z], …] (z above the level). ' +
-    'The panel thickness grows along the plane normal (right-hand rule on the corner order). Use for ' +
-    'pitched roofs, façades and gables.',
+    'Add a planar cladding, roofing or sandwich panel through 3D corners [[x, y, z], …] (z above the level). The panel thickness grows ' +
+    'along the plane normal (right-hand rule on the corner order). Use for pitched roofs, façades and gables.',
   params: z.object({
     corners: z.array(z.array(z.number())).describe('Coplanar corners [[x, y, z], …], 3 to 500.'),
     role: z.enum(['roof', 'wall']).optional().describe('Roofing or wall cladding. Default wall.'),
@@ -126,23 +95,16 @@ export const addPanel = defineCommand({
     const points = corners.map(toVec3);
     if (points.length < 3 || points.some((point) => point === null))
       return noop(doc, 'add_panel failed: corners must be ≥ 3 [x, y, z] points.');
-    if (thickness !== undefined && !(thickness > 0))
-      return noop(doc, 'add_panel failed: thickness must be > 0.');
+    if (thickness !== undefined && !(thickness > 0)) return noop(doc, 'add_panel failed: thickness must be > 0.');
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noop(doc, `add_panel failed: ${resolution.reason}.`);
-    const added = appendPanel(doc, resolution.building, resolution.level.id, {
-      corners: points as Vec3[],
-      role,
-      thickness,
-      material,
-    });
+    const added = appendPanel(doc, resolution.building, resolution.level.id, { corners: points as Vec3[], role, thickness, material });
     if (!added) return noop(doc, 'add_panel failed: the corners do not span a plane.');
     return commitBuilding(
       doc,
       added.building,
       [added.id],
-      (document) =>
-        `Added ${role} panel ${document.building?.elements[added.id]?.mark ?? ''} (${added.id}).`,
+      (document) => `Added ${role} panel ${document.building?.elements[added.id]?.mark ?? ''} (${added.id}).`,
       { elementId: added.id },
     );
   },

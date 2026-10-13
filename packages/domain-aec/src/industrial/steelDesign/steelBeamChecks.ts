@@ -1,10 +1,7 @@
 /**
- * Beam verification (EN 1993-1-1) of a simply supported floor beam: bending Mc,Rd (§6.2.5) with
- * lateral-torsional buckling Mb,Rd (§6.3.2) unless restrained, shear Vpl,Rd (§6.2.6) with the
- * moment reduction above 0.5 Vpl,Rd (§6.2.8), serviceability deflection under G + Q, and — for the
- * chord of a braced bay — strut compression with bending (§6.3.3).
- * @layer domain-aec
- * @pure
+ * Beam verification (EN 1993-1-1) of a simply supported floor beam: bending Mc,Rd (§6.2.5) with lateral-torsional buckling Mb,Rd (§6.3.2)
+ * unless restrained, shear Vpl,Rd (§6.2.6) with the moment reduction above 0.5 Vpl,Rd (§6.2.8), serviceability deflection under G + Q, and
+ * — for the chord of a braced bay — strut compression with bending (§6.3.3).
  */
 
 import { lateralTorsionalReduction, memberBuckling } from './steelDesign';
@@ -33,12 +30,7 @@ export interface StrutForce {
  * @param deflectionRatio span / limit, e.g. 250 for L/250
  * @failure shape not covered / class 4 -> not analysed
  */
-export function checkBeam(
-  bar: SteelBar,
-  result: BeamResult,
-  deflectionRatio: number,
-  strut: StrutForce | undefined,
-): MemberRow {
+export function checkBeam(bar: SteelBar, result: BeamResult, deflectionRatio: number, strut: StrutForce | undefined): MemberRow {
   return withBeamSection(bar, ({ profile, resistance }) => {
     const lengthMm = bar.length;
     const lengthText = `L ${metres(lengthMm)} m`;
@@ -55,9 +47,7 @@ export function checkBeam(
     const shearResistance = resistance.shear / 1000;
     const shearCase = shearReducedMoment(profile, bar.fy, result.uls.shearAtMoment);
     const momentResistance = shearCase.moment / 1e6;
-    const reduction = shearCase.reduced
-      ? `, reduced for V ${result.uls.shearAtMoment.toFixed(0)} kN (§6.2.8)`
-      : '';
+    const reduction = shearCase.reduced ? `, reduced for V ${result.uls.shearAtMoment.toFixed(0)} kN (§6.2.8)` : '';
     const chiLateral = restrained ? 1 : lateralTorsionalReduction(profile, bar.fy, lengthMm, 1);
     const lines: CheckLine[] = [
       {
@@ -66,23 +56,10 @@ export function checkBeam(
         combination: ULS_COMBINATION,
         detail: `${profile.name} ${lengthText}, ${restraint}${elastic}: M ${momentEd.toFixed(1)} kNm ≤ ${restrained ? 'Mc,Rd' : `Mb,Rd (χLT ${chiLateral.toFixed(2)})`} ${(chiLateral * momentResistance).toFixed(1)} kNm${reduction}`,
       },
-      shearCheckLine(
-        profile.name,
-        ULS_COMBINATION,
-        shearEd / shearResistance,
-        shearEd,
-        shearResistance,
-      ),
+      shearCheckLine(profile.name, ULS_COMBINATION, shearEd / shearResistance, shearEd, shearResistance),
     ];
     const limit = lengthMm / deflectionRatio;
-    lines.push(
-      deflectionCheckLine(
-        `${profile.name} ${lengthText}`,
-        `L/${deflectionRatio}`,
-        result.sls.deflection,
-        limit,
-      ),
-    );
+    lines.push(deflectionCheckLine(`${profile.name} ${lengthText}`, `L/${deflectionRatio}`, result.sls.deflection, limit));
     if (strut && strut.force > 0) {
       const buckling = memberBuckling(profile, bar.fy, strut.force * 1000, momentEd * 1e6, {
         major: lengthMm,

@@ -1,8 +1,5 @@
 /**
- * Earthworks math (document units): grid-method cut / fill between a TIN and a graded pad with
- * cut / fill batters, and between two TINs.
- * @layer domain-aec/civil
- * @pure
+ * Earthworks math (document units): grid-method cut / fill between a TIN and a graded pad with cut / fill batters, and between two TINs.
  */
 
 import type { Vec2 } from '@core/model/types';
@@ -44,47 +41,27 @@ export interface Earthworks {
 export function distanceToOutline(p: Vec2, polygon: ReadonlyArray<Vec2>): number {
   let best = Infinity;
   for (let i = 0; i < polygon.length; i++) {
-    best = Math.min(
-      best,
-      projectOntoSegment(p, polygon[i] as Vec2, polygon[(i + 1) % polygon.length] as Vec2).distance,
-    );
+    best = Math.min(best, projectOntoSegment(p, polygon[i] as Vec2, polygon[(i + 1) % polygon.length] as Vec2).distance);
   }
   return best;
 }
 
 /** Farthest plan distance a batter can reach before meeting any ground of `tin`. */
-export function daylightReach(
-  tin: Tin,
-  elevation: number,
-  cutSlope: number,
-  fillSlope: number,
-): number {
+export function daylightReach(tin: Tin, elevation: number, cutSlope: number, fillSlope: number): number {
   const bounds = tinBounds(tin);
   if (!bounds) return 0;
-  return Math.max(
-    0,
-    (bounds.max[2] - elevation) * cutSlope,
-    (elevation - bounds.min[2]) * fillSlope,
-  );
+  return Math.max(0, (bounds.max[2] - elevation) * cutSlope, (elevation - bounds.min[2]) * fillSlope);
 }
 
 /** Cell count along an axis so cells are about `spacing` wide. */
-const cellsAlong = (length: number, spacing: number): number =>
-  Math.max(1, Math.ceil(length / spacing - 1e-9));
+const cellsAlong = (length: number, spacing: number): number => Math.max(1, Math.ceil(length / spacing - 1e-9));
 
 /**
- * Columns × rows of a grid of `step` cells over width × height, capped to MAX_SAMPLES after
- * rounding each axis (a thin strip cannot blow up one axis).
+ * Columns × rows of a grid of `step` cells over width × height, capped to MAX_SAMPLES after rounding each axis (a thin strip cannot blow up
+ * one axis).
  */
-export function gridSize(
-  width: number,
-  height: number,
-  step: number,
-): { columns: number; rows: number } {
-  const spacing =
-    (width / step) * (height / step) > MAX_SAMPLES
-      ? Math.sqrt((width * height) / MAX_SAMPLES)
-      : step;
+export function gridSize(width: number, height: number, step: number): { columns: number; rows: number } {
+  const spacing = (width / step) * (height / step) > MAX_SAMPLES ? Math.sqrt((width * height) / MAX_SAMPLES) : step;
   let columns = Math.min(cellsAlong(width, spacing), MAX_SAMPLES);
   let rows = Math.min(cellsAlong(height, spacing), MAX_SAMPLES);
   if (columns * rows > MAX_SAMPLES) {
@@ -95,13 +72,7 @@ export function gridSize(
 }
 
 /** Row-major cell centres of the sampling grid over a [minX, minY] + width × height window. */
-function cellCentres(
-  minX: number,
-  minY: number,
-  width: number,
-  height: number,
-  step: number,
-): { centres: Vec2[]; cellArea: number } {
+function cellCentres(minX: number, minY: number, width: number, height: number, step: number): { centres: Vec2[]; cellArea: number } {
   const { columns, rows } = gridSize(width, height, step);
   const dx = width / columns;
   const dy = height / rows;
@@ -115,25 +86,14 @@ function cellCentres(
 }
 
 function emptySamples(): GridSamples {
-  return {
-    ground: new Float64Array(0),
-    distance: new Float64Array(0),
-    cellArea: 0,
-    spacing: 0,
-    outsideTin: 0,
-  };
+  return { ground: new Float64Array(0), distance: new Float64Array(0), cellArea: 0, spacing: 0, outsideTin: 0 };
 }
 
 /**
- * Samples the ground of `tin` on a grid covering `boundary` expanded by `margin` (clipped to the
- * TIN extent). `spacing` defaults so the pad gets ~2500 cells; always capped at 250k samples.
+ * Samples the ground of `tin` on a grid covering `boundary` expanded by `margin` (clipped to the TIN extent). `spacing` defaults so the pad
+ * gets ~2500 cells; always capped at 250k samples.
  */
-export function buildSamples(
-  tin: Tin,
-  boundary: ReadonlyArray<Vec2>,
-  margin: number,
-  spacing?: number,
-): GridSamples {
+export function buildSamples(tin: Tin, boundary: ReadonlyArray<Vec2>, margin: number, spacing?: number): GridSamples {
   const bounds = tinBounds(tin);
   if (!bounds || boundary.length < 3) return emptySamples();
   const xs = boundary.map((point) => point[0]);
@@ -161,18 +121,10 @@ export function buildSamples(
 }
 
 /** Cut (+) / fill (-) depth of a cell: pad level inside the pad, batters outside. */
-function depthAt(
-  ground: number,
-  distance: number,
-  elevation: number,
-  cutSlope: number,
-  fillSlope: number,
-): number {
+function depthAt(ground: number, distance: number, elevation: number, cutSlope: number, fillSlope: number): number {
   if (distance === 0) return ground - elevation;
-  if (ground > elevation)
-    return Math.max(0, ground - batterLevel(elevation, distance, 'cut', cutSlope, fillSlope));
-  if (ground < elevation)
-    return Math.min(0, ground - batterLevel(elevation, distance, 'fill', cutSlope, fillSlope));
+  if (ground > elevation) return Math.max(0, ground - batterLevel(elevation, distance, 'cut', cutSlope, fillSlope));
+  if (ground < elevation) return Math.min(0, ground - batterLevel(elevation, distance, 'fill', cutSlope, fillSlope));
   return 0;
 }
 
@@ -252,23 +204,10 @@ export interface SurfaceComparison {
 }
 
 /** Cut where `comparison` lies below `base`, fill where above (grid method over the shared extent). */
-export function compareSurfaceVolumes(
-  base: Tin,
-  comparison: Tin,
-  spacing?: number,
-): SurfaceComparison {
+export function compareSurfaceVolumes(base: Tin, comparison: Tin, spacing?: number): SurfaceComparison {
   const a = tinBounds(base);
   const b = tinBounds(comparison);
-  const none: SurfaceComparison = {
-    cutVolume: 0,
-    fillVolume: 0,
-    cutArea: 0,
-    fillArea: 0,
-    area: 0,
-    spacing: 0,
-    samples: 0,
-    outsideTin: 0,
-  };
+  const none: SurfaceComparison = { cutVolume: 0, fillVolume: 0, cutArea: 0, fillArea: 0, area: 0, spacing: 0, samples: 0, outsideTin: 0 };
   if (!a || !b) return none;
   const minX = Math.max(a.min[0], b.min[0]);
   const maxX = Math.min(a.max[0], b.max[0]);

@@ -1,11 +1,8 @@
 /**
- * Superelevation: the cross slope of each carriageway side along an alignment. Normal crown on
- * tangents; per curve, the adverse (outer) side runs out to flat and on to the full rate at a constant
- * rotation rate, then the whole section tilts as one plane about the centreline, outer side raised.
- * Entry / exit ramps end at the SC / CS (spiral) or 30 % of the runoff into the circle (no spiral).
- * Slopes are ratios "falling away from the centreline" (negative = rising).
- * @layer domain-aec/civil
- * @pure
+ * Superelevation: the cross slope of each carriageway side along an alignment. Normal crown on tangents; per curve, the adverse (outer)
+ * side runs out to flat and on to the full rate at a constant rotation rate, then the whole section tilts as one plane about the
+ * centreline, outer side raised. Entry / exit ramps end at the SC / CS (spiral) or 30 % of the runoff into the circle (no spiral). Slopes
+ * are ratios "falling away from the centreline" (negative = rising).
  */
 
 import type { AlignmentObject } from '@core/model/civil';
@@ -42,19 +39,14 @@ function groupByCurve(elements: ReadonlyArray<HorizontalElement>): HorizontalEle
     if (element.kind === 'line') continue;
     const last = groups[groups.length - 1];
     const previous = last?.[last.length - 1];
-    const sameCurve =
-      previous !== undefined && previous.kind !== 'line' && previous.pi === element.pi;
+    const sameCurve = previous !== undefined && previous.kind !== 'line' && previous.pi === element.pi;
     if (last && sameCurve) last.push(element);
     else groups.push([element]);
   }
   return groups;
 }
 
-function rampsOf(
-  group: ReadonlyArray<HorizontalElement>,
-  fallbackRunoff: number,
-  runoffLength: number | undefined,
-): CurveRamps | null {
+function rampsOf(group: ReadonlyArray<HorizontalElement>, fallbackRunoff: number, runoffLength: number | undefined): CurveRamps | null {
   let entry: HorizontalElement | undefined;
   let exit: HorizontalElement | undefined;
   let arc: HorizontalElement | undefined;
@@ -66,9 +58,7 @@ function rampsOf(
   const first = group[0];
   if (!first || first.kind === 'line') return null;
   const turn = first.rotation === 'ccw' ? 1 : -1;
-  const arcShare = arc
-    ? Math.min(RUNOFF_IN_CURVE * (runoffLength ?? fallbackRunoff), arc.length / 2)
-    : 0;
+  const arcShare = arc ? Math.min(RUNOFF_IN_CURVE * (runoffLength ?? fallbackRunoff), arc.length / 2) : 0;
   const runoffIn = runoffLength ?? entry?.length ?? fallbackRunoff;
   const runoffOut = runoffLength ?? exit?.length ?? fallbackRunoff;
   return {
@@ -88,32 +78,20 @@ function outerFall(ramps: CurveRamps, station: number, crossfall: number, full: 
 }
 
 /** Full rate and the ramps of every curve, or null without a usable superelevation design. */
-function curvePlan(
-  alignment: AlignmentObject,
-  crossfall: number,
-  laneWidth: number,
-): { full: number; ramps: CurveRamps[] } | null {
+function curvePlan(alignment: AlignmentObject, crossfall: number, laneWidth: number): { full: number; ramps: CurveRamps[] } | null {
   const design = alignment.superelevation;
   if (!design || !(design.maxRate > 0)) return null;
   const full = Math.max(design.maxRate, crossfall);
   const fallback = (full * laneWidth) / MAX_RELATIVE_GRADIENT;
-  const ramps = groupByCurve(horizontalElements(alignment)).flatMap(
-    (group) => rampsOf(group, fallback, design.runoffLength) ?? [],
-  );
+  const ramps = groupByCurve(horizontalElements(alignment)).flatMap((group) => rampsOf(group, fallback, design.runoffLength) ?? []);
   return { full, ramps };
 }
 
 /**
- * Cross slopes of both carriageway sides at each requested station. `crossfall` is the normal crown
- * and `laneWidth` sizes the relative-gradient runoff of curves without a spiral. Without a
- * superelevation design the result is the normal crown everywhere.
+ * Cross slopes of both carriageway sides at each requested station. `crossfall` is the normal crown and `laneWidth` sizes the
+ * relative-gradient runoff of curves without a spiral. Without a superelevation design the result is the normal crown everywhere.
  */
-export function crossSlopesAt(
-  alignment: AlignmentObject,
-  crossfall: number,
-  laneWidth: number,
-  station: number,
-): CrossSlopes {
+export function crossSlopesAt(alignment: AlignmentObject, crossfall: number, laneWidth: number, station: number): CrossSlopes {
   const crown: CrossSlopes = { left: crossfall, right: crossfall };
   const plan = curvePlan(alignment, crossfall, laneWidth);
   if (!plan) return crown;
@@ -133,19 +111,15 @@ export function crossSlopesAt(
 }
 
 /**
- * Signed superelevation rate: (left fall - right fall) / 2. Positive = banked for a left-hand curve
- * (section falls to the left), negative = right-hand, 0 on the normal crown.
+ * Signed superelevation rate: (left fall - right fall) / 2. Positive = banked for a left-hand curve (section falls to the left), negative =
+ * right-hand, 0 on the normal crown.
  */
 export function superelevationRate(slopes: CrossSlopes): number {
   return (slopes.left - slopes.right) / 2;
 }
 
 /** Stations where the cross slope changes slope: the runout start, flat points and full-rate points. */
-export function superelevationStations(
-  alignment: AlignmentObject,
-  crossfall: number,
-  laneWidth: number,
-): number[] {
+export function superelevationStations(alignment: AlignmentObject, crossfall: number, laneWidth: number): number[] {
   const plan = curvePlan(alignment, crossfall, laneWidth);
   if (!plan) return [];
   const { full } = plan;
@@ -155,16 +129,7 @@ export function superelevationStations(
     const flatOut = ramps.fullOut + ramps.runoffOut;
     const runout = (crossfall * ramps.runoffIn) / full;
     const runoutOut = (crossfall * ramps.runoffOut) / full;
-    stations.push(
-      ramps.fullIn,
-      ramps.fullOut,
-      flatIn,
-      flatIn - runout,
-      flatIn + runout,
-      flatOut,
-      flatOut + runoutOut,
-      flatOut - runoutOut,
-    );
+    stations.push(ramps.fullIn, ramps.fullOut, flatIn, flatIn - runout, flatIn + runout, flatOut, flatOut + runoutOut, flatOut - runoutOut);
   }
   return stations;
 }

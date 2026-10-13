@@ -1,19 +1,6 @@
-/**
- * @layer ui/panels/building
- *
- * "Pipe support" tool spec → `add_pipe_support` (param-gathering only, react R1). The pipe is picked
- * from the live list (`line:<number>` = every pipe of that line, `pipe:<id>` = one unnumbered pipe).
- */
+// "Pipe support" → `add_pipe_support`; pipe picked from the live list (`line:<number>` = whole line, `pipe:<id>` = one).
 
-import {
-  FieldReader,
-  INDUSTRIAL_TOOL_GROUP,
-  num,
-  result,
-  select,
-  txt,
-  type ElementTool,
-} from './elementToolForm';
+import { FieldReader, INDUSTRIAL_TOOL_GROUP, num, result, select, txt, type ElementTool } from './elementToolForm';
 
 export const PIPE_SUPPORT_TOOL: ElementTool = {
   id: 'pipeSupport',
@@ -36,12 +23,10 @@ export const PIPE_SUPPORT_TOOL: ElementTool = {
     const reader = new FieldReader(values);
     const [kind, ...rest] = reader.text('pipe').split(':');
     const target = rest.join(':');
-    if (target === '' || (kind !== 'line' && kind !== 'pipe'))
-      return { ok: false, reason: 'Choose the pipe or line to support.' };
+    if (target === '' || (kind !== 'line' && kind !== 'pipe')) return { ok: false, reason: 'Choose the pipe or line to support.' };
     const hasPoints = reader.text('points') !== '';
     const spacing = reader.optionalNumber('spacing');
-    if (hasPoints === (spacing !== undefined))
-      return { ok: false, reason: 'Give either the support points or a maximum spacing.' };
+    if (hasPoints === (spacing !== undefined)) return { ok: false, reason: 'Give either the support points or a maximum spacing.' };
     return result(reader, 'add_pipe_support', {
       ...(kind === 'line' ? { line: target } : { pipeId: target }),
       type: reader.text('type'),

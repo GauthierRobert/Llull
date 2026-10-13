@@ -1,10 +1,4 @@
-/**
- * @layer ui/panels/civil
- *
- * AlignmentEditor — one road alignment: design profile PVIs (`set_alignment_profile`), road
- * template (`set_road_section`), superelevation (`set_superelevation`) and its deliverables
- * (report CSV, long / cross section SVG, plan-profile sheet on the chosen paper).
- */
+// One road alignment: profile PVIs, road template, superelevation, deliverables (report CSV, long / cross SVG, sheet).
 
 import React, { useState } from 'react';
 import type { AlignmentObject } from '@core/model/civil';
@@ -29,11 +23,7 @@ type SectionKey = (typeof SECTION_FIELDS)[number][0];
 
 const profileText = (alignment: AlignmentObject): string =>
   alignment.profile
-    .map((pvi) =>
-      pvi.curveLength > 0
-        ? `${pvi.station}, ${pvi.elevation}, ${pvi.curveLength}`
-        : `${pvi.station}, ${pvi.elevation}`,
-    )
+    .map((pvi) => (pvi.curveLength > 0 ? `${pvi.station}, ${pvi.elevation}, ${pvi.curveLength}` : `${pvi.station}, ${pvi.elevation}`))
     .join('\n');
 
 export function AlignmentEditor({ alignment }: { alignment: AlignmentObject }): React.ReactElement {
@@ -47,9 +37,7 @@ export function AlignmentEditor({ alignment }: { alignment: AlignmentObject }): 
     fillSlope: '',
   });
   const [designSpeed, setDesignSpeed] = useState('');
-  const [superelevation, setSuperelevation] = useState(() =>
-    alignment.superelevation ? String(alignment.superelevation.maxRate) : '',
-  );
+  const [superelevation, setSuperelevation] = useState(() => (alignment.superelevation ? String(alignment.superelevation.maxRate) : ''));
   const [paper, setPaper] = useState<PaperSize>('A3');
   const [status, setStatus] = useState('');
   const label = alignment.name;
@@ -67,10 +55,7 @@ export function AlignmentEditor({ alignment }: { alignment: AlignmentObject }): 
   const applySection = (): void => {
     dispatch('set_road_section', {
       alignmentId: alignment.id,
-      ...SECTION_FIELDS.reduce(
-        (params, [key]) => ({ ...params, ...optionalNumber(key, section[key]) }),
-        {},
-      ),
+      ...SECTION_FIELDS.reduce((params, [key]) => ({ ...params, ...optionalNumber(key, section[key]) }), {}),
     });
   };
 
@@ -128,12 +113,7 @@ export function AlignmentEditor({ alignment }: { alignment: AlignmentObject }): 
             </button>
           </div>
           <div className="building-actions">
-            <NumberTextField
-              value={designSpeed}
-              set={setDesignSpeed}
-              hint="Design speed km/h"
-              label={`Design speed of ${label}`}
-            />
+            <NumberTextField value={designSpeed} set={setDesignSpeed} hint="Design speed km/h" label={`Design speed of ${label}`} />
             <QueryDownloadButton
               label="Report CSV"
               command="alignment_report"
@@ -170,12 +150,7 @@ export function AlignmentEditor({ alignment }: { alignment: AlignmentObject }): 
               mimeType="image/svg+xml"
               onStatus={setStatus}
             />
-            <OptionSelect
-              value={paper}
-              options={PAPER_SIZES}
-              label={`Sheet paper of ${label}`}
-              onChange={setPaper}
-            />
+            <OptionSelect value={paper} options={PAPER_SIZES} label={`Sheet paper of ${label}`} onChange={setPaper} />
           </div>
           <StatusLine text={status} testId={`civil-alignment-status-${alignment.id}`} />
         </div>

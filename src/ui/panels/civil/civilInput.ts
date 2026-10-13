@@ -1,8 +1,3 @@
-/**
- * @layer ui/panels/civil
- * @pure Text-field parsing for the civil forms (param gathering only; the commands validate).
- */
-
 import type { CadDocument, Vec2 } from '@core/model/types';
 import { fixedNumber } from '@lib/compactNumber';
 import { parseNumberRow } from '@ui/numberText';
@@ -39,9 +34,7 @@ export function parsePvis(text: string): PviInput[] | null {
     const values = parseNumberRow(row);
     if (values === null || values.length < 2 || values.length > 3) return null;
     const [station = 0, elevation = 0, curveLength] = values;
-    pvis.push(
-      curveLength === undefined ? { station, elevation } : { station, elevation, curveLength },
-    );
+    pvis.push(curveLength === undefined ? { station, elevation } : { station, elevation, curveLength });
   }
   return pvis;
 }

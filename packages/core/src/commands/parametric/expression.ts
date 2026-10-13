@@ -1,9 +1,6 @@
 /**
  * Pure expression evaluator for the llull parametric parameter system.
  *
- * @layer core/commands
- * @pure — every exported function is stateless and side-effect-free.
- *
  * Supported grammar (EBNF):
  *   expr   = term { ('+' | '-') term }
  *   term   = factor { ('*' | '/') factor }
@@ -49,9 +46,7 @@ const EOF_TOKEN: Token = { kind: 'eof', text: '' };
 const BUILTIN_CONSTANTS: Readonly<Record<string, number>> = { pi: Math.PI, tau: 2 * Math.PI };
 
 /** Built-in functions: accepted argument count range and implementation. */
-const BUILTIN_FUNCTIONS: Readonly<
-  Record<string, { min: number; max: number; fn: (...args: number[]) => number }>
-> = {
+const BUILTIN_FUNCTIONS: Readonly<Record<string, { min: number; max: number; fn: (...args: number[]) => number }>> = {
   sin: { min: 1, max: 1, fn: Math.sin },
   cos: { min: 1, max: 1, fn: Math.cos },
   tan: { min: 1, max: 1, fn: Math.tan },
@@ -95,8 +90,7 @@ function tokenize(src: string): Token[] | string {
       const at = start + src.slice(start).search(/[^ \t\n\r]/);
       return `unexpected character '${src.charAt(at)}' at position ${at}`;
     }
-    const [kind, text] =
-      Object.entries(match.groups ?? {}).find(([, value]) => value !== undefined) ?? [];
+    const [kind, text] = Object.entries(match.groups ?? {}).find(([, value]) => value !== undefined) ?? [];
     if (kind !== undefined && text !== undefined) tokens.push({ kind: kind as TokenKind, text });
   }
   return tokens;
@@ -126,11 +120,7 @@ function applyOperator(op: string, left: number, right: number): number {
 }
 
 /** Left-associative chain of `parseOperand` separated by operators drawn from `operators`. */
-function parseBinary(
-  s: ParseState,
-  operators: string,
-  parseOperand: (s: ParseState) => EvalResult,
-): EvalResult {
+function parseBinary(s: ParseState, operators: string, parseOperand: (s: ParseState) => EvalResult): EvalResult {
   let left = parseOperand(s);
   while (left.ok && peek(s).kind === 'op' && operators.includes(peek(s).text)) {
     const op = consume(s).text;
@@ -171,65 +161,44 @@ function parseCall(s: ParseState, name: string): EvalResult {
       consume(s);
     }
   }
-  if (peek(s).kind !== 'rparen') {
-    return { ok: false, error: `expected ')' in call to ${name}` };
-  }
+  if (peek(s).kind !== 'rparen') return { ok: false, error: `expected ')' in call to ${name}` };
   consume(s);
-  if (args.length < def.min || args.length > def.max) {
-    return {
-      ok: false,
-      error: `${name}() takes ${def.min}-${def.max} argument(s), got ${args.length}`,
-    };
-  }
+  if (args.length < def.min || args.length > def.max)
+    return { ok: false, error: `${name}() takes ${def.min}-${def.max} argument(s), got ${args.length}` };
   const value = def.fn(...args);
-  return Number.isNaN(value)
-    ? { ok: false, error: `${name}() is undefined for these arguments` }
-    : { ok: true, value };
+  return Number.isNaN(value) ? { ok: false, error: `${name}() is undefined for these arguments` } : { ok: true, value };
 }
 
 function parsePrimary(s: ParseState): EvalResult {
   const t = peek(s);
-
   if (t.kind === 'number') {
     consume(s);
     return { ok: true, value: parseFloat(t.text) };
   }
-
   if (t.kind === 'ident') {
     consume(s);
     if (peek(s).kind === 'lparen') return parseCall(s, t.text);
     const value =
       (Object.hasOwn(s.env, t.text) ? s.env[t.text] : undefined) ??
       (Object.hasOwn(BUILTIN_CONSTANTS, t.text) ? BUILTIN_CONSTANTS[t.text] : undefined);
-    return value === undefined
-      ? { ok: false, error: `unknown parameter: ${t.text}` }
-      : { ok: true, value };
+    return value === undefined ? { ok: false, error: `unknown parameter: ${t.text}` } : { ok: true, value };
   }
-
   if (t.kind === 'lparen') {
     consume(s); // consume '('
     const inner = parseExpr(s);
     if (!inner.ok) return inner;
     const closing = peek(s);
-    if (closing.kind !== 'rparen') {
-      return {
-        ok: false,
-        error: `expected ')' but found '${closing.text || 'end of expression'}'`,
-      };
-    }
+    if (closing.kind !== 'rparen') return { ok: false, error: `expected ')' but found '${closing.text || 'end of expression'}'` };
     consume(s); // consume ')'
     return inner;
   }
-
   if (t.kind === 'eof') return { ok: false, error: 'unexpected end of expression' };
-
   return { ok: false, error: `unexpected token '${t.text}'` };
 }
 
 /**
  * Evaluate a single expression string against a flat `env` map of name→value.
  *
- * @pure — no side effects; returns a typed result rather than throwing.
  * @invariant Does not mutate `env`.
  * @failure Returns EvalErr with a descriptive message on any parse/eval error, or when the
  *   result is not finite (divide-by-zero, overflow).
@@ -238,25 +207,16 @@ function parsePrimary(s: ParseState): EvalResult {
  * @param env         Map of parameter name → current numeric value.
  *                    Names not in this map trigger an unknown-reference error.
  */
-export function evaluateExpression(
-  expression: string,
-  env: Readonly<Record<string, number>>,
-): EvalResult {
+export function evaluateExpression(expression: string, env: Readonly<Record<string, number>>): EvalResult {
   if (expression.trim() === '') return { ok: false, error: 'expression is empty' };
-
   const tokensOrError = tokenize(expression);
   if (typeof tokensOrError === 'string') return { ok: false, error: tokensOrError };
-
   const state: ParseState = { tokens: tokensOrError, pos: 0, env };
   const result = parseExpr(state);
   if (!result.ok) return result;
-
   // Ensure the entire input was consumed.
-  if (peek(state).kind !== 'eof')
-    return { ok: false, error: `unexpected token '${peek(state).text}' after expression` };
-
-  if (!Number.isFinite(result.value))
-    return { ok: false, error: 'expression result is not a finite number (divide by zero?)' };
+  if (peek(state).kind !== 'eof') return { ok: false, error: `unexpected token '${peek(state).text}' after expression` };
+  if (!Number.isFinite(result.value)) return { ok: false, error: 'expression result is not a finite number (divide by zero?)' };
   return result;
 }
 
@@ -264,24 +224,19 @@ export function evaluateExpression(
  * Syntax problem of `expression` independent of which parameters exist, else null. Unknown
  * references are NOT a syntax problem (a parameter may be defined later); a non-finite result
  * (divide by zero) only counts when the expression has no references to blame it on.
- *
- * @pure
  */
 export function expressionSyntaxError(expression: string): string | null {
   const refs = extractReferences(expression);
   const probeEnv = Object.fromEntries([...refs].map((name) => [name, 1]));
   const result = evaluateExpression(expression, probeEnv);
   if (result.ok) return null;
-  if (result.error.startsWith('expression result is not a finite'))
-    return refs.size === 0 ? result.error : null;
+  if (result.error.startsWith('expression result is not a finite')) return refs.size === 0 ? result.error : null;
   return result.error;
 }
 
 /**
  * Extract the set of parameter names referenced in an expression.
  * Returns an empty set if the expression is unparseable or has no references.
- *
- * @pure — used by the topological-sort cycle detector in parameters.ts.
  */
 export function extractReferences(expression: string): ReadonlySet<string> {
   const tokensOrError = tokenize(expression);
@@ -295,17 +250,12 @@ export function extractReferences(expression: string): ReadonlySet<string> {
 }
 
 /** Parameter name → last evaluated value (parameters in error keep their last good value). */
-export function parameterValues(
-  parameters: Readonly<Record<string, Parameter>>,
-): Record<string, number> {
+export function parameterValues(parameters: Readonly<Record<string, Parameter>>): Record<string, number> {
   return Object.fromEntries(Object.entries(parameters).map(([name, p]) => [name, p.value]));
 }
 
 /** A number, or an expression string evaluated over the parameter values; null when it fails. */
-export function resolveNumeric(
-  raw: number | string,
-  parameters: Readonly<Record<string, Parameter>>,
-): number | null {
+export function resolveNumeric(raw: number | string, parameters: Readonly<Record<string, Parameter>>): number | null {
   if (typeof raw === 'number') return raw;
   const result = evaluateExpression(raw, parameterValues(parameters));
   return result.ok ? result.value : null;

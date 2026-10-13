@@ -1,15 +1,6 @@
-/**
- * @layer domain-aec
- */
-
 import { shapeOf } from '../../industrial/equipment/equipmentShape';
 import type { CadDocument } from '@core/model/types';
-import type {
-  CurvedWallElement,
-  BuildingModel,
-  OpeningElement,
-  WallElement,
-} from '@core/model/building';
+import type { CurvedWallElement, BuildingModel, OpeningElement, WallElement } from '@core/model/building';
 import { distance, polygonArea, polygonPerimeter } from '@lib/polygon';
 import { elementsOf, getBuilding } from '../model';
 import { round } from '../../shared/numeric';
@@ -18,18 +9,8 @@ import { boltSize } from '../../industrial/evaluate';
 import { trayLength } from '../../industrial/piping/trays';
 import { plateMass } from '../../industrial/connections/plates';
 import { supportSchedule } from '../../industrial/piping/supportSchedule';
-import {
-  type ConnectionWelds,
-  connectionMass,
-  connectionWelds,
-} from '../../industrial/connections/connections';
-import {
-  columnSectionArea,
-  scaleFor,
-  slabNetArea,
-  stairVolume,
-  wallQuantities,
-} from './takeoffBasics';
+import { type ConnectionWelds, connectionMass, connectionWelds } from '../../industrial/connections/connections';
+import { columnSectionArea, scaleFor, slabNetArea, stairVolume, wallQuantities } from './takeoffBasics';
 import { memberLength, memberMass, panelArea } from './takeoffCompute';
 import { routeLength } from '../../industrial/piping/routeSupport';
 
@@ -57,11 +38,7 @@ type ScheduleKind = (typeof SCHEDULE_KINDS)[number];
 
 type Row = Array<string | number>;
 
-interface Schedule {
-  readonly kind: ScheduleKind;
-  readonly columns: string[];
-  readonly rows: Row[];
-}
+type Schedule = { readonly kind: ScheduleKind; readonly columns: string[]; readonly rows: Row[] };
 
 function levelName(building: BuildingModel, levelId: string): string {
   return building.levels[levelId]?.name ?? levelId;
@@ -69,15 +46,10 @@ function levelName(building: BuildingModel, levelId: string): string {
 
 /** "a8 flanges / a5 web · 3.2 m" (empty without welds). */
 function weldLabel(welds: ConnectionWelds | null): string {
-  return welds
-    ? `a${welds.flangeThroat} flanges / a${welds.webThroat} web · ${(welds.length / 1000).toFixed(1)} m`
-    : '';
+  return welds ? `a${welds.flangeThroat} flanges / a${welds.webThroat} web · ${(welds.length / 1000).toFixed(1)} m` : '';
 }
 
-function hostWallOf(
-  building: BuildingModel,
-  opening: OpeningElement,
-): WallElement | CurvedWallElement | undefined {
+function hostWallOf(building: BuildingModel, opening: OpeningElement): WallElement | CurvedWallElement | undefined {
   const wall = building.elements[opening.hostId];
   return wall?.category === 'wall' || wall?.category === 'curvedWall' ? wall : undefined;
 }
@@ -165,15 +137,7 @@ function scheduleTable(doc: CadDocument, kind: ScheduleKind): Omit<Schedule, 'ki
       };
     case 'slab':
       return {
-        columns: [
-          'Mark',
-          'Level',
-          'Role',
-          `Thickness (${unit})`,
-          'Material',
-          'Area (m²)',
-          'Volume (m³)',
-        ],
+        columns: ['Mark', 'Level', 'Role', `Thickness (${unit})`, 'Material', 'Area (m²)', 'Volume (m³)'],
         rows: elementsOf(building, 'slab').map((slab) => {
           const area = slabNetArea(slab);
           return [
@@ -189,15 +153,7 @@ function scheduleTable(doc: CadDocument, kind: ScheduleKind): Omit<Schedule, 'ki
       };
     case 'column':
       return {
-        columns: [
-          'Mark',
-          'Level',
-          'Shape',
-          `Section (${unit})`,
-          `Height (${unit})`,
-          'Material',
-          'Volume (m³)',
-        ],
+        columns: ['Mark', 'Level', 'Shape', `Section (${unit})`, `Height (${unit})`, 'Material', 'Volume (m³)'],
         rows: elementsOf(building, 'column').map((column) => [
           column.mark,
           levelName(building, column.levelId),
@@ -210,14 +166,7 @@ function scheduleTable(doc: CadDocument, kind: ScheduleKind): Omit<Schedule, 'ki
       };
     case 'beam':
       return {
-        columns: [
-          'Mark',
-          'Level',
-          `Span (${unit})`,
-          `Section (${unit})`,
-          'Material',
-          'Volume (m³)',
-        ],
+        columns: ['Mark', 'Level', `Span (${unit})`, `Section (${unit})`, 'Material', 'Volume (m³)'],
         rows: elementsOf(building, 'beam').map((beam) => {
           const span = distance(beam.start, beam.end);
           return [
@@ -232,16 +181,7 @@ function scheduleTable(doc: CadDocument, kind: ScheduleKind): Omit<Schedule, 'ki
       };
     case 'stair':
       return {
-        columns: [
-          'Mark',
-          'Level',
-          'Risers',
-          `Riser (${unit})`,
-          `Tread (${unit})`,
-          `Width (${unit})`,
-          'Material',
-          'Volume (m³)',
-        ],
+        columns: ['Mark', 'Level', 'Risers', `Riser (${unit})`, `Tread (${unit})`, `Width (${unit})`, 'Material', 'Volume (m³)'],
         rows: elementsOf(building, 'stair').map((stair) => [
           stair.mark,
           levelName(building, stair.levelId),
@@ -255,16 +195,7 @@ function scheduleTable(doc: CadDocument, kind: ScheduleKind): Omit<Schedule, 'ki
       };
     case 'member':
       return {
-        columns: [
-          'Mark',
-          'Role',
-          'Profile',
-          `Length (${unit})`,
-          'Mass (kg)',
-          'Grade',
-          'Level',
-          'Note',
-        ],
+        columns: ['Mark', 'Role', 'Profile', `Length (${unit})`, 'Mass (kg)', 'Grade', 'Level', 'Note'],
         rows: elementsOf(building, 'member').map((member) => [
           member.mark,
           member.role,
@@ -278,16 +209,7 @@ function scheduleTable(doc: CadDocument, kind: ScheduleKind): Omit<Schedule, 'ki
       };
     case 'footing':
       return {
-        columns: [
-          'Mark',
-          'Level',
-          'X',
-          'Y',
-          `Size (${unit})`,
-          `Top (${unit})`,
-          'Volume (m³)',
-          'Reinforcement',
-        ],
+        columns: ['Mark', 'Level', 'X', 'Y', `Size (${unit})`, `Top (${unit})`, 'Volume (m³)', 'Reinforcement'],
         rows: elementsOf(building, 'footing').map((footing) => [
           footing.mark,
           levelName(building, footing.levelId),
@@ -315,17 +237,7 @@ function scheduleTable(doc: CadDocument, kind: ScheduleKind): Omit<Schedule, 'ki
       };
     case 'equipment':
       return {
-        columns: [
-          'Mark',
-          'Name',
-          'Level',
-          'X',
-          'Y',
-          `Size (${unit})`,
-          `Clearance (${unit})`,
-          'Weight (kg)',
-          'Shape',
-        ],
+        columns: ['Mark', 'Name', 'Level', 'X', 'Y', `Size (${unit})`, `Clearance (${unit})`, 'Weight (kg)', 'Shape'],
         rows: elementsOf(building, 'equipment').map((equipment) => [
           equipment.mark,
           equipment.name,
@@ -340,19 +252,7 @@ function scheduleTable(doc: CadDocument, kind: ScheduleKind): Omit<Schedule, 'ki
       };
     case 'pipe':
       return {
-        columns: [
-          'Mark',
-          'Line',
-          'DN',
-          'Service',
-          `Diameter (${unit})`,
-          'Material',
-          'Length (m)',
-          'Bends',
-          'From',
-          'To',
-          'Level',
-        ],
+        columns: ['Mark', 'Line', 'DN', 'Service', `Diameter (${unit})`, 'Material', 'Length (m)', 'Bends', 'From', 'To', 'Level'],
         rows: elementsOf(building, 'pipe').map((pipe) => [
           pipe.mark,
           pipe.line ?? '',
@@ -369,15 +269,7 @@ function scheduleTable(doc: CadDocument, kind: ScheduleKind): Omit<Schedule, 'ki
       };
     case 'tray':
       return {
-        columns: [
-          'Mark',
-          'System',
-          `Width (${unit})`,
-          `Height (${unit})`,
-          'Length (m)',
-          'Bends',
-          'Level',
-        ],
+        columns: ['Mark', 'System', `Width (${unit})`, `Height (${unit})`, 'Length (m)', 'Bends', 'Level'],
         rows: elementsOf(building, 'tray').map((tray) => [
           tray.mark,
           tray.system,
@@ -390,16 +282,7 @@ function scheduleTable(doc: CadDocument, kind: ScheduleKind): Omit<Schedule, 'ki
       };
     case 'plate':
       return {
-        columns: [
-          'Mark',
-          'Column',
-          `Size (${unit})`,
-          `Thickness (${unit})`,
-          'Anchor bolts',
-          'Mass (kg)',
-          'Grade',
-          'Level',
-        ],
+        columns: ['Mark', 'Column', `Size (${unit})`, `Thickness (${unit})`, 'Anchor bolts', 'Mass (kg)', 'Grade', 'Level'],
         rows: elementsOf(building, 'plate').map((plate) => [
           plate.mark,
           building.elements[plate.memberId]?.mark ?? plate.memberId,
@@ -415,18 +298,7 @@ function scheduleTable(doc: CadDocument, kind: ScheduleKind): Omit<Schedule, 'ki
       return supportSchedule(doc);
     case 'connection':
       return {
-        columns: [
-          'Mark',
-          'Type',
-          'Rafter',
-          'Connected to',
-          'Plate t',
-          'Bolts',
-          'Haunch',
-          'Mass (kg)',
-          'Level',
-          'Welds',
-        ],
+        columns: ['Mark', 'Type', 'Rafter', 'Connected to', 'Plate t', 'Bolts', 'Haunch', 'Mass (kg)', 'Level', 'Welds'],
         rows: elementsOf(building, 'connection').map((connection) => [
           connection.mark,
           connection.kind,

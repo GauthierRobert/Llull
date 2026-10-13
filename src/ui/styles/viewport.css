@@ -1,7 +1,4 @@
-/* ==========================================================================
-   Viewport chrome — floating glass toolbars, popovers, tool palettes, HUDs
-   Everything here floats above the 2D / 3D canvas; model stays the hero.
-   ========================================================================== */
+/* ==== Viewport chrome: glass toolbars, popovers, tool palettes, HUDs floating above the 2D / 3D canvas ==== */
 
 .viewport-3d-wrapper,
 .viewport-2d-wrapper {
@@ -329,8 +326,7 @@
 
 /* ---- 2D tool palettes (left edge, vertical) --------------------------------- */
 
-/* Left-edge dock holding the 2D modify palette; covers the viewport but
-   passes pointer events through to the canvas except on its children. */
+/* Left-edge dock of the 2D modify palette: pointer events pass through to the canvas except on its children. */
 .vp-tool-dock {
   position: absolute;
   inset: 0;

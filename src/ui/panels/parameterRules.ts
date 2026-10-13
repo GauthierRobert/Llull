@@ -1,5 +1,3 @@
-/** @layer ui/panels Pure input rules for the "add parameter" form (no document access). */
-
 const PARAMETER_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
 export interface ParameterDraft {

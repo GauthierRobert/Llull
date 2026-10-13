@@ -1,8 +1,6 @@
 /**
- * Drawing-sheet envelope shared by building, industrial and civil sheets: ISO paper, scale fitting,
- * frame, title block, north arrow, scale bar.
- * @layer domain-aec/shared
- * @pure
+ * Drawing-sheet envelope shared by building, industrial and civil sheets: ISO paper, scale fitting, frame, title block, north arrow, scale
+ * bar.
  */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
@@ -18,24 +16,17 @@ export const PAPER_SIZES = ['A4', 'A3', 'A2', 'A1', 'A0'] as const;
 export type PaperSize = (typeof PAPER_SIZES)[number];
 
 /** `paper` parameter shared by the drawing-sheet commands. */
-export const PAPER_FIELD = z
-  .enum(PAPER_SIZES)
-  .optional()
-  .describe('Paper size (landscape). Default A3.');
+export const PAPER_FIELD = z.enum(PAPER_SIZES).optional().describe('Paper size (landscape). Default A3.');
 
 /** `scale` parameter of the building drawing sheets (plan, elevation). */
 export const SCALE_FIELD = z
   .number()
   .optional()
-  .describe(
-    'Scale denominator N for 1:N (e.g. 100). Default: the smallest standard scale that fits (1-2-5 steps beyond 1:2000).',
-  );
+  .describe('Scale denominator N for 1:N (e.g. 100). Default: the smallest standard scale that fits (1-2-5 steps beyond 1:2000).');
 
 /** Warning appended to a sheet summary when `what` is larger than the paper at the chosen scale. */
 export const sheetFitWarning = (fits: boolean, what: string): string =>
-  fits
-    ? ''
-    : ` WARNING: the ${what} is larger than the paper at this scale; omit scale to auto-fit or choose a larger paper.`;
+  fits ? '' : ` WARNING: the ${what} is larger than the paper at this scale; omit scale to auto-fit or choose a larger paper.`;
 
 /** Landscape ISO 216 sizes, millimetres. */
 export const PAPER_MM: Readonly<Record<PaperSize, readonly [number, number]>> = {
@@ -46,9 +37,7 @@ export const PAPER_MM: Readonly<Record<PaperSize, readonly [number, number]>> = 
   A0: [1189, 841],
 };
 
-const STANDARD_SCALES: ReadonlyArray<number> = [
-  1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000,
-];
+const STANDARD_SCALES: ReadonlyArray<number> = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000];
 
 export const MARGIN = 10;
 const BINDING_MARGIN = 20;
@@ -80,22 +69,14 @@ export const paperMap =
   ];
 
 /**
- * Dimension label placement: text angle (degrees, flipped to read left-to-right / bottom-up) for a
- * baseline direction (`dx`, `dy`), and the label anchor 1.2 mm off the midpoint of the dimension line `da`-`db`.
+ * Dimension label placement: text angle (degrees, flipped to read left-to-right / bottom-up) for a baseline direction (`dx`, `dy`), and the
+ * label anchor 1.2 mm off the midpoint of the dimension line `da`-`db`.
  */
-export function readableDimensionLabel(
-  da: Vec2,
-  db: Vec2,
-  dx: number,
-  dy: number,
-): { readonly angle: number; readonly middle: Vec2 } {
+export function readableDimensionLabel(da: Vec2, db: Vec2, dx: number, dy: number): { readonly angle: number; readonly middle: Vec2 } {
   const radians = readableAngle(Math.atan2(dy, dx));
   return {
     angle: toDegrees(radians),
-    middle: [
-      (da[0] + db[0]) / 2 + Math.sin(radians) * 1.2,
-      (da[1] + db[1]) / 2 - Math.cos(radians) * 1.2,
-    ],
+    middle: [(da[0] + db[0]) / 2 + Math.sin(radians) * 1.2, (da[1] + db[1]) / 2 - Math.cos(radians) * 1.2],
   };
 }
 
@@ -108,23 +89,16 @@ export const svgText = (
   content: string,
   rotationDeg = 0,
 ): string => {
-  const transform =
-    rotationDeg !== 0 ? ` transform="rotate(${n(rotationDeg)} ${n(x)} ${n(y)})"` : '';
+  const transform = rotationDeg !== 0 ? ` transform="rotate(${n(rotationDeg)} ${n(x)} ${n(y)})"` : '';
   return `<text x="${n(x)}" y="${n(y)}" font-size="${n(size)}" text-anchor="${anchor}"${transform}>${escapeXml(content)}</text>`;
 };
 
-export interface Viewport {
-  readonly x: number;
-  readonly y: number;
-  readonly width: number;
-  readonly height: number;
-}
+export type Viewport = { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
 
 /** Smallest standard scale 1:N at which the model extents fit the viewport. */
 export function fitScale(widthMm: number, heightMm: number, viewport: Viewport): number {
   for (const scale of STANDARD_SCALES) {
-    if (widthMm / scale <= viewport.width * 0.92 && heightMm / scale <= viewport.height * 0.92)
-      return scale;
+    if (widthMm / scale <= viewport.width * 0.92 && heightMm / scale <= viewport.height * 0.92) return scale;
   }
   // Beyond the standard scales: the next 1-2-5 step that fits, so the sheet never overflows.
   const largest = STANDARD_SCALES[STANDARD_SCALES.length - 1] as number;
@@ -149,10 +123,7 @@ const SHEET_DEFS =
   `<defs><pattern id="hatch-concrete" width="1.5" height="1.5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">` +
   `<rect width="1.5" height="1.5" fill="#d9d9d9"/><line x1="0" y1="0" x2="0" y2="1.5" stroke="#000" stroke-width="0.12"/></pattern></defs>`;
 
-function titleBlock(
-  doc: CadDocument,
-  sheet: { width: number; height: number; title: string; scale: number; paper: PaperSize },
-): string {
+function titleBlock(doc: CadDocument, sheet: { width: number; height: number; title: string; scale: number; paper: PaperSize }): string {
   const { project } = getBuilding(doc);
   const width = Math.min(180, sheet.width - BINDING_MARGIN - MARGIN);
   const x = sheet.width - MARGIN - width;
@@ -174,13 +145,7 @@ function titleBlock(
     cell(x + 2 * column, y + 14, 'ADDRESS', project.address || '—', 2.6),
     cell(x, y + 28, 'DRAWN BY', project.author || '—'),
     cell(x + column, y + 28, 'SCALE · SHEET', `1:${sheet.scale} @ ${sheet.paper}`),
-    cell(
-      x + 2 * column,
-      y + 28,
-      'DWG NO · REV · DATE',
-      `${project.drawingNumber} · ${project.revision} · ${project.date || '—'}`,
-      2.8,
-    ),
+    cell(x + 2 * column, y + 28, 'DWG NO · REV · DATE', `${project.drawingNumber} · ${project.revision} · ${project.date || '—'}`, 2.8),
     `</g>`,
   ].join('');
 }
@@ -195,9 +160,7 @@ export function northArrow(x: number, y: number): string {
 
 /** A length in metres as scale-bar text: millimetres below 1 m ("5 mm", "250 mm"), metres above. */
 function lengthLabel(metres: number): string {
-  return metres < 1
-    ? `${Number((metres * 1000).toPrecision(6))} mm`
-    : `${Number(metres.toPrecision(6))} m`;
+  return metres < 1 ? `${Number((metres * 1000).toPrecision(6))} mm` : `${Number(metres.toPrecision(6))} m`;
 }
 
 function scaleBar(x: number, y: number, scale: number): string {

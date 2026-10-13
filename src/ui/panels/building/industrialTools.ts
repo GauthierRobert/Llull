@@ -1,20 +1,9 @@
-/**
- * @layer ui/panels/building
- *
- * Declarative form specs for the industrial (steel hall / plant) tools: each maps form values to
- * ONE command + params (param-gathering only, react R1).
- */
+// Declarative industrial (steel hall / plant) tool specs: form values → ONE command + params.
 
 import { toRadians } from '@lib/angle';
 import { PIPE_OUTSIDE_DIAMETER_MM } from '@aec/industrial/piping/pipeSizes';
 import { PIPE_SUPPORT_TOOL } from './pipeSupportTool';
-import {
-  ALL_PROFILES,
-  BASE_OPTIONS as BASES,
-  I_PROFILES,
-  JOINT_OPTIONS as JOINTS,
-  MEMBER_ROLE_OPTIONS,
-} from './steelProfileOptions';
+import { ALL_PROFILES, BASE_OPTIONS as BASES, I_PROFILES, JOINT_OPTIONS as JOINTS, MEMBER_ROLE_OPTIONS } from './steelProfileOptions';
 import {
   FieldReader,
   INDUSTRIAL_TOOL_GROUP as GROUP,
@@ -38,10 +27,7 @@ function profileField(key: string, label: string, defaultValue: string, iOnly = 
 
 const DN_OPTIONS: ReadonlyArray<readonly [string, string]> = [
   ['', 'Custom Ø (enter below)'],
-  ...Object.entries(PIPE_OUTSIDE_DIAMETER_MM).map(([dn, diameter]): readonly [string, string] => [
-    dn,
-    `DN${dn} · Ø${diameter}`,
-  ]),
+  ...Object.entries(PIPE_OUTSIDE_DIAMETER_MM).map(([dn, diameter]): readonly [string, string] => [dn, `DN${dn} · Ø${diameter}`]),
 ];
 
 export const EQUIPMENT_SHAPE_OPTIONS: ReadonlyArray<readonly [string, string]> = [
@@ -91,9 +77,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
       const railHeight = reader.optionalNumber('craneRailHeight');
       return result(reader, 'add_portal_frame_building', {
         origin: reader.point('x', 'y'),
-        ...(reader.text('spans') === ''
-          ? { span: reader.number('span') }
-          : { spans: reader.numberList('spans') }),
+        ...(reader.text('spans') === '' ? { span: reader.number('span') } : { spans: reader.numberList('spans') }),
         length: reader.number('length'),
         baySpacing: reader.number('baySpacing'),
         eaveHeight: reader.number('eaveHeight'),
@@ -101,10 +85,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
         roofType: reader.text('roofType'),
         columnProfile: reader.text('columnProfile'),
         rafterProfile: reader.text('rafterProfile'),
-        crane:
-          railHeight === undefined
-            ? undefined
-            : { railHeight, capacity: reader.number('craneCapacity') },
+        crane: railHeight === undefined ? undefined : { railHeight, capacity: reader.number('craneCapacity') },
         cladding: reader.flag('cladding'),
         footings: reader.flag('footings'),
         basePlates: reader.flag('basePlates'),
@@ -131,20 +112,13 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
       num('roll', 'Roll (°)', '0'),
       defaultedSelect('startJoint', 'Start joint', 'Default (pinned)', JOINTS, BEAM_ONLY),
       defaultedSelect('endJoint', 'End joint', 'Default (pinned)', JOINTS, BEAM_ONLY),
-      defaultedSelect(
-        'baseFixity',
-        'Base fixity',
-        'Default (pinned / base plate)',
-        BASES,
-        COLUMN_ONLY,
-      ),
+      defaultedSelect('baseFixity', 'Base fixity', 'Default (pinned / base plate)', BASES, COLUMN_ONLY),
       levelField(),
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
       const role = reader.text('role');
-      const joint = (key: string): string | undefined =>
-        role === 'beam' ? reader.text(key) || undefined : undefined;
+      const joint = (key: string): string | undefined => (role === 'beam' ? reader.text(key) || undefined : undefined);
       return result(reader, 'add_steel_member', {
         role: reader.text('role'),
         profile: reader.text('profile'),
@@ -171,9 +145,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
     ],
     build: (values, context) => {
       const reader = new FieldReader(values);
-      const position = reader.flag('underColumns')
-        ? { underColumns: true }
-        : { location: reader.point('x', 'y') };
+      const position = reader.flag('underColumns') ? { underColumns: true } : { location: reader.point('x', 'y') };
       return result(reader, 'add_footing', {
         ...position,
         width: reader.number('width'),
@@ -275,8 +247,7 @@ export const INDUSTRIAL_TOOLS: ReadonlyArray<ElementTool> = [
       const reader = new FieldReader(values);
       const dn = reader.text('dn');
       const diameter = reader.optionalNumber('diameter');
-      if (dn === '' && diameter === undefined)
-        return { ok: false, reason: 'Pick a nominal size or give the outside Ø.' };
+      if (dn === '' && diameter === undefined) return { ok: false, reason: 'Pick a nominal size or give the outside Ø.' };
       return result(reader, 'add_pipe_run', {
         points: reader.pointList('points', 2),
         line: reader.text('line') || undefined,

@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { SteelMemberElement } from '@core/model/building';
 import { sectionProperties, type SteelProfile } from '../../steel/profiles';
 import { bucklingReduction, eulerForce } from '../steelDesign/steelDesign';
@@ -32,14 +28,9 @@ export function craneWallForce(
   travelSpeed: number,
   bufferStiffness: number,
 ): CraneWallForce {
-  const actions = craneActions(capacityTonnes, spanMm, {
-    ...(craneSelfWeight !== undefined ? { craneSelfWeight } : {}),
-  });
+  const actions = craneActions(capacityTonnes, spanMm, { ...(craneSelfWeight !== undefined ? { craneSelfWeight } : {}) });
   const driveGroup1 = (GAMMA_CRANE * actions.group1.longitudinal) / 1000;
-  const bufferGroup7 =
-    (GAMMA_BUFFER * bufferForce(actions.selfWeight, travelSpeed, bufferStiffness)) /
-    CRANE_FACTORS.rails /
-    1000;
+  const bufferGroup7 = (GAMMA_BUFFER * bufferForce(actions.selfWeight, travelSpeed, bufferStiffness)) / CRANE_FACTORS.rails / 1000;
   return {
     driveGroup1,
     bufferGroup7,
@@ -90,12 +81,7 @@ export interface BracingRow {
 
 export type Point = readonly [number, number, number];
 
-export interface Located {
-  readonly member: SteelMemberElement;
-  readonly profile: SteelProfile;
-  readonly start: Point;
-  readonly end: Point;
-}
+export type Located = { readonly member: SteelMemberElement; readonly profile: SteelProfile; readonly start: Point; readonly end: Point };
 
 export const near = (a: number, b: number): boolean => Math.abs(a - b) <= TOLERANCE;
 
@@ -103,9 +89,7 @@ export const near = (a: number, b: number): boolean => Math.abs(a - b) <= TOLERA
 function minorImperfection(profile: SteelProfile): number {
   if (profile.shape === 'I') return profile.h / profile.b > 1.2 ? 0.34 : 0.49;
   if (profile.shape === 'C') return 0.34;
-  return profile.shape === 'SHS' || profile.shape === 'RHS' || profile.shape === 'CHS'
-    ? 0.21
-    : 0.49;
+  return profile.shape === 'SHS' || profile.shape === 'RHS' || profile.shape === 'CHS' ? 0.21 : 0.49;
 }
 
 /** Design buckling resistance χ·A·fy (N) about the minor axis for a buckling length (mm). */
@@ -116,9 +100,4 @@ export function bucklingResistance(profile: SteelProfile, fy: number, length: nu
   return bucklingReduction(Math.sqrt(npl / critical), minorImperfection(profile)) * npl;
 }
 
-export interface Panel {
-  readonly group: string;
-  readonly roof: boolean;
-  readonly bay: string;
-  readonly braces: Located[];
-}
+export type Panel = { readonly group: string; readonly roof: boolean; readonly bay: string; readonly braces: Located[] };

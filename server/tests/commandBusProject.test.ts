@@ -1,6 +1,4 @@
 /**
- * @layer server/tests
- *
  * commandBus: a command that returns `data` AND changes the document (build_project) is applied
  * and recorded in history; a pure query (data, same document) is still skipped.
  */

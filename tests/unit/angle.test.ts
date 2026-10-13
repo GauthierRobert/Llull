@@ -28,7 +28,6 @@ describe('positiveSweep', () => {
     expect(positiveSweep(-Math.PI / 2)).toBeCloseTo((3 * Math.PI) / 2);
     expect(positiveSweep(-3 * Math.PI)).toBeCloseTo(Math.PI);
   });
-
   it('keeps a positive sweep, even beyond a full turn', () => {
     expect(positiveSweep(1)).toBe(1);
     expect(positiveSweep(3 * Math.PI)).toBe(3 * Math.PI);

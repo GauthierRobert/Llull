@@ -1,8 +1,6 @@
 /**
- * apply_code_trace — rebuild the document from the LLULL_TRACE recorded by running a generated (and
- * possibly agent-edited) CadQuery / build123d script, so code edits regenerate an editable model.
- *
- * @layer core/commands
+ * apply_code_trace — rebuild the document from the LLULL_TRACE recorded by running a generated (and possibly agent-edited) CadQuery /
+ * build123d script, so code edits regenerate an editable model.
  * @see export_code (code_exchange.ts), packages/core/src/codegen/pythonRuntime.ts (the recorder)
  */
 
@@ -108,8 +106,7 @@ function lowerTerm(
   if (typeof term.expression !== 'string') return { run: value, record: value };
   const expression = stripOuterParens(term.expression);
   const refs = [...extractReferences(expression)];
-  if (refs.length === 0 || !refs.every((r) => r in parameters))
-    return { run: value, record: value };
+  if (refs.length === 0 || !refs.every((r) => r in parameters)) return { run: value, record: value };
   const evaluated = evaluateExpression(expression, env);
   if (!evaluated.ok) return { run: value, record: value };
   return { run: evaluated.value, record: `=${expression}` };
@@ -137,9 +134,7 @@ function lowerParams(
     if (isTerm(value)) return lowerTerm(value, env, parameters);
     if (typeof value.ref === 'string' && Object.keys(value).length === 1) {
       const id = refs.get(value.ref);
-      return id === undefined
-        ? { error: `unknown solid reference "${value.ref}"` }
-        : { run: id, record: id };
+      return id === undefined ? { error: `unknown solid reference "${value.ref}"` } : { run: id, record: id };
     }
     const run: Record<string, unknown> = {};
     const record: Record<string, unknown> = {};
@@ -151,34 +146,25 @@ function lowerParams(
     }
     return { run, record };
   }
-  if (typeof value === 'number' && !Number.isFinite(value))
-    return { error: `non-finite number ${String(value)}` };
+  if (typeof value === 'number' && !Number.isFinite(value)) return { error: `non-finite number ${String(value)}` };
   return { run: value, record: value };
 }
 
 function validateTrace(trace: unknown): string | null {
   if (!isRecord(trace)) return 'trace must be an object';
   const { parameters, features } = trace;
-  if (!Array.isArray(parameters) || !Array.isArray(features))
-    return 'trace needs "parameters" and "features" arrays';
-  if (features.length > MAX_TRACE_FEATURES)
-    return `${features.length} features exceeds MAX_TRACE_FEATURES (${MAX_TRACE_FEATURES})`;
+  if (!Array.isArray(parameters) || !Array.isArray(features)) return 'trace needs "parameters" and "features" arrays';
+  if (features.length > MAX_TRACE_FEATURES) return `${features.length} features exceeds MAX_TRACE_FEATURES (${MAX_TRACE_FEATURES})`;
   for (const [i, p] of parameters.entries()) {
-    if (!isRecord(p) || typeof p.name !== 'string' || !PARAMETER_NAME.test(p.name))
-      return `parameter ${i}: name must be an identifier`;
-    if (typeof p.expression !== 'string' || p.expression.trim() === '')
-      return `parameter ${p.name}: expression must be a non-empty string`;
+    if (!isRecord(p) || typeof p.name !== 'string' || !PARAMETER_NAME.test(p.name)) return `parameter ${i}: name must be an identifier`;
+    if (typeof p.expression !== 'string' || p.expression.trim() === '') return `parameter ${p.name}: expression must be a non-empty string`;
   }
   const refs = new Set<string>();
   for (const [i, f] of features.entries()) {
-    if (!isRecord(f) || typeof f.command !== 'string' || !isRecord(f.params))
-      return `feature ${i}: needs { command, params }`;
-    if (!TRACE_COMMANDS.has(f.command))
-      return `feature ${i}: command "${f.command}" is not allowed in a code trace`;
-    if (f.ref !== undefined && (typeof f.ref !== 'string' || refs.has(f.ref)))
-      return `feature ${i}: ref must be a unique string`;
-    if (f.name !== undefined && typeof f.name !== 'string')
-      return `feature ${i}: name must be a string`;
+    if (!isRecord(f) || typeof f.command !== 'string' || !isRecord(f.params)) return `feature ${i}: needs { command, params }`;
+    if (!TRACE_COMMANDS.has(f.command)) return `feature ${i}: command "${f.command}" is not allowed in a code trace`;
+    if (f.ref !== undefined && (typeof f.ref !== 'string' || refs.has(f.ref))) return `feature ${i}: ref must be a unique string`;
+    if (f.name !== undefined && typeof f.name !== 'string') return `feature ${i}: name must be a string`;
     if (typeof f.ref === 'string') refs.add(f.ref);
   }
   return null;
@@ -202,9 +188,6 @@ function abort(doc: CadDocument, reason: string): CommandResult {
 }
 
 /**
- * @command apply_code_trace
- * @pure
- * @layer core/commands
  * @affects replace (default): parameters, featureHistory and solids rebuilt from the trace;
  *   append: trace added on top. affected = live solids created by the trace, in creation order
  * @invariant every trace feature is recorded as one FeatureStep; parameter-driven terms are stored as
@@ -234,42 +217,31 @@ export const applyCodeTrace = defineCommand({
     const invalid = validateTrace(rawTrace);
     if (invalid !== null) return abort(doc, invalid);
     const trace = rawTrace as unknown as CodeTrace;
-
     const start = mode === 'append' ? doc : replaceBase(doc);
     let current = start;
     for (const { name, expression } of trace.parameters) {
       const parameter = { name, expression: stripOuterParens(expression) };
       const result = execute(current, 'set_parameter', parameter);
       const stored = result.document.parameters[parameter.name];
-      if (stored === undefined || stored.error !== undefined) {
-        return abort(
-          doc,
-          `parameter ${parameter.name} = ${parameter.expression}: ${result.summary}`,
-        );
-      }
+      if (stored === undefined || stored.error !== undefined)
+        return abort(doc, `parameter ${parameter.name} = ${parameter.expression}: ${result.summary}`);
       current = result.document;
     }
-
     // `ref` names the FIRST solid a feature created (every runtime helper creates exactly one).
     const refs = new Map<string, string>();
     for (const [i, feature] of trace.features.entries()) {
       const env = buildParamEnv(current.parameters);
       const lowered = lowerParams(feature.params, refs, env, current.parameters);
-      if ('error' in lowered)
-        return abort(doc, `feature ${i} (${feature.command}): ${lowered.error}`);
+      if ('error' in lowered) return abort(doc, `feature ${i} (${feature.command}): ${lowered.error}`);
       const result = executeRecorded(current, feature.command, lowered.run, lowered.record);
       if (result.document === current && result.affected.length === 0)
         return abort(doc, `feature ${i} (${feature.command}) failed: ${result.summary}`);
       current = result.document;
-      if (feature.ref !== undefined && result.affected[0] !== undefined) {
-        refs.set(feature.ref, result.affected[0]);
-      }
+      if (feature.ref !== undefined && result.affected[0] !== undefined) refs.set(feature.ref, result.affected[0]);
       const id = feature.ref !== undefined ? refs.get(feature.ref) : undefined;
-      if (typeof feature.name === 'string' && feature.name !== '' && id !== undefined) {
+      if (typeof feature.name === 'string' && feature.name !== '' && id !== undefined)
         current = execute(current, 'set_entity_name', { id, name: feature.name }).document;
-      }
     }
-
     const live = current.order.filter((id) => start.entities[id] === undefined);
     const parameterNames = trace.parameters.map((p) => p.name);
     return changed(

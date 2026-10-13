@@ -1,8 +1,4 @@
-/**
- * DXF colour and unit tables: AutoCAD Color Index to hex, $INSUNITS to millimetres.
- * @layer core/lib
- * @pure
- */
+/** DXF colour and unit tables: AutoCAD Color Index to hex, $INSUNITS to millimetres. */
 
 const ACI_BASIC: Readonly<Record<number, string>> = {
   1: '#ff0000',

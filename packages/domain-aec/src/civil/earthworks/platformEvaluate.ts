@@ -1,8 +1,4 @@
-/**
- * Evaluates a graded platform (pad): pad mesh and outline, daylight line, batter meshes, label.
- * @layer domain-aec/civil
- * @pure
- */
+/** Evaluates a graded platform (pad): pad mesh and outline, daylight line, batter meshes, label. */
 
 import type { Entity, Vec2 } from '@core/model/types';
 import type { PlatformObject } from '@core/model/civil';
@@ -17,10 +13,7 @@ import { toMetres } from '@core/model/units';
 const CUT_COLOR = '#c0794a';
 const FILL_COLOR = '#8fae6b';
 
-interface MeshBuffer {
-  positions: number[];
-  indices: number[];
-}
+type MeshBuffer = { positions: number[]; indices: number[] };
 
 /** Pushes a triangle wound so its normal faces up (+Z). */
 function pushTriangle(
@@ -35,14 +28,8 @@ function pushTriangle(
   mesh.indices.push(base, normalZ >= 0 ? base + 1 : base + 2, normalZ >= 0 ? base + 2 : base + 1);
 }
 
-function batterMeshes(
-  points: ReadonlyArray<DaylightPoint>,
-  elevation: number,
-): Record<'cut' | 'fill', MeshBuffer> {
-  const meshes = {
-    cut: { positions: [], indices: [] } as MeshBuffer,
-    fill: { positions: [], indices: [] } as MeshBuffer,
-  };
+function batterMeshes(points: ReadonlyArray<DaylightPoint>, elevation: number): Record<'cut' | 'fill', MeshBuffer> {
+  const meshes = { cut: { positions: [], indices: [] } as MeshBuffer, fill: { positions: [], indices: [] } as MeshBuffer };
   points.forEach((current, i) => {
     const next = points[(i + 1) % points.length] as DaylightPoint;
     const mode = current.mode === 'none' ? next.mode : current.mode;
@@ -64,31 +51,13 @@ export function evaluatePlatform(context: CivilContext, platform: PlatformObject
   const entities: Entity[] = [];
   const pad = triangulatePolygon(outline as Vec2[]);
   const padMesh: MeshBuffer = { positions: [], indices: [] };
-  pad.vertices.forEach((vertex) =>
-    padMesh.positions.push(vertex[0], vertex[1], platform.elevation),
-  );
+  pad.vertices.forEach((vertex) => padMesh.positions.push(vertex[0], vertex[1], platform.elevation));
   pad.triangles.forEach((triangle) => padMesh.indices.push(...triangle));
   entities.push(civilMesh(platform, 'pad', `${platform.name} pad`, 'grading', padMesh));
-  entities.push(
-    civilPolyline(
-      platform,
-      'outline',
-      `${platform.name} outline`,
-      'grading',
-      outline,
-      true,
-      platform.elevation,
-    ),
-  );
+  entities.push(civilPolyline(platform, 'outline', `${platform.name} outline`, 'grading', outline, true, platform.elevation));
   const tin = surfaceTinById(context.civil, platform.surfaceId);
   if (tin) {
-    const points = daylightPoints(
-      tin,
-      outline,
-      platform.elevation,
-      platform.cutSlope,
-      platform.fillSlope,
-    );
+    const points = daylightPoints(tin, outline, platform.elevation, platform.cutSlope, platform.fillSlope);
     if (points.some((point) => point.distance > 0)) {
       entities.push(
         civilPolyline(
@@ -103,28 +72,10 @@ export function evaluatePlatform(context: CivilContext, platform: PlatformObject
       );
       const meshes = batterMeshes(points, platform.elevation);
       if (meshes.cut.indices.length > 0) {
-        entities.push(
-          civilMesh(
-            platform,
-            'batter-cut',
-            `${platform.name} cut batter`,
-            'grading',
-            meshes.cut,
-            CUT_COLOR,
-          ),
-        );
+        entities.push(civilMesh(platform, 'batter-cut', `${platform.name} cut batter`, 'grading', meshes.cut, CUT_COLOR));
       }
       if (meshes.fill.indices.length > 0) {
-        entities.push(
-          civilMesh(
-            platform,
-            'batter-fill',
-            `${platform.name} fill batter`,
-            'grading',
-            meshes.fill,
-            FILL_COLOR,
-          ),
-        );
+        entities.push(civilMesh(platform, 'batter-fill', `${platform.name} fill batter`, 'grading', meshes.fill, FILL_COLOR));
       }
     }
   }

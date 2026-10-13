@@ -1,7 +1,4 @@
-/**
- * Loads collected on one floor beam before its analysis: self weight, binned area loads, point loads.
- * @layer domain-aec
- */
+/** Loads collected on one floor beam before its analysis: self weight, binned area loads, point loads. */
 
 import { clamp } from '@lib/clamp';
 import type { LinePiece, PointLoad } from './steelBeamAnalysis';
@@ -65,13 +62,7 @@ export function depositArea(beam: BeamLoads, at: number, permanent: number, impo
 }
 
 /** Add a point load (kN) `at` mm from the beam start; `direct` loads count toward the storey load. */
-export function addPointLoad(
-  beam: BeamLoads,
-  at: number,
-  permanent: number,
-  imposed: number,
-  direct: boolean,
-): void {
+export function addPointLoad(beam: BeamLoads, at: number, permanent: number, imposed: number, direct: boolean): void {
   beam.points.push({ at: clamp(at / 1000, 0, beam.lengthM), permanent, imposed });
   if (direct) {
     beam.directPermanent += permanent;
@@ -87,11 +78,6 @@ export function flushBins(beam: BeamLoads): void {
     const permanent = beam.binsPermanent[index] ?? 0;
     const imposed = beam.binsImposed[index] ?? 0;
     if (permanent === 0 && imposed === 0) continue;
-    beam.pieces.push({
-      from: index * width,
-      to: (index + 1) * width,
-      permanent: permanent / width,
-      imposed: imposed / width,
-    });
+    beam.pieces.push({ from: index * width, to: (index + 1) * width, permanent: permanent / width, imposed: imposed / width });
   }
 }

@@ -1,7 +1,4 @@
-/**
- * Civil object management: list the civil model, delete objects (with their dependents on request).
- * @layer domain-aec/civil
- */
+/** Civil object management: list the civil model, delete objects (with their dependents on request). */
 
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
@@ -11,28 +8,19 @@ import { getCivil, withoutObjects } from './model';
 import { dependentsOf, referencesOf } from './integrity';
 import { regenerateCivil } from './evaluate';
 
-/**
- * @command describe_civil
- * @pure
- * @affects none (read-only)
- */
+/** @affects none (read-only) */
 export const describeCivil = defineCommand({
   name: 'describe_civil',
   description:
     'List the civil / site model: point groups, surfaces, platforms, alignments, manholes and pipes ' +
     'with their ids, names and the objects they reference. Optional `category` filter.',
   annotations: { readOnly: true, idempotent: true },
-  params: z.object({
-    category: z.enum(CIVIL_CATEGORIES).optional().describe('Only list objects of this category.'),
-  }),
+  params: z.object({ category: z.enum(CIVIL_CATEGORIES).optional().describe('Only list objects of this category.') }),
   run: (doc, { category }): CommandResult => {
     const civil = getCivil(doc);
     const objects = civil.order
       .map((id) => civil.objects[id])
-      .filter(
-        (object) =>
-          object !== undefined && (category === undefined || object.category === category),
-      )
+      .filter((object) => object !== undefined && (category === undefined || object.category === category))
       .map((object) => ({
         id: object?.id ?? '',
         category: object?.category ?? 'pointGroup',
@@ -40,10 +28,9 @@ export const describeCivil = defineCommand({
         references: object ? referencesOf(object) : [],
         entities: object?.entityIds.length ?? 0,
       }));
-    const counts = CIVIL_CATEGORIES.map((name) => [
-      name,
-      objects.filter((object) => object.category === name).length,
-    ]).filter(([, count]) => (count as number) > 0);
+    const counts = CIVIL_CATEGORIES.map((name) => [name, objects.filter((object) => object.category === name).length]).filter(
+      ([, count]) => (count as number) > 0,
+    );
     return report(
       doc,
       objects.length === 0
@@ -56,17 +43,14 @@ export const describeCivil = defineCommand({
 });
 
 /**
- * @command delete_civil_object
- * @pure
  * @affects removes the object(s) and their generated entities
  * @failure unknown id / referenced without `cascade` -> no-op
  */
 export const deleteCivilObject = defineCommand({
   name: 'delete_civil_object',
   description:
-    'Delete a civil object (point group, surface, platform, alignment, manhole or pipe) and its ' +
-    'generated geometry. Refused when other objects reference it unless `cascade` is true, which ' +
-    'deletes those dependents too (e.g. the pipes of a manhole).',
+    'Delete a civil object (point group, surface, platform, alignment, manhole or pipe) and its generated geometry. Refused when other ' +
+    'objects reference it unless `cascade` is true, which deletes those dependents too (e.g. the pipes of a manhole).',
   annotations: { destructive: true },
   params: z.object({
     id: z.string().describe('Civil object id, e.g. "manhole-2".'),
@@ -87,16 +71,9 @@ export const deleteCivilObject = defineCommand({
     }
     if (doomed.size > 1 && !cascade) {
       const others = [...doomed].filter((other) => other !== id);
-      return noop(
-        doc,
-        `delete_civil_object refused: ${others.join(', ')} reference ${id}. Delete them first or pass cascade: true.`,
-      );
+      return noop(doc, `delete_civil_object refused: ${others.join(', ')} reference ${id}. Delete them first or pass cascade: true.`);
     }
     const document = regenerateCivil(doc, withoutObjects(civil, doomed));
-    return {
-      document,
-      summary: `Deleted ${[...doomed].join(', ')}.`,
-      affected: [...doomed],
-    };
+    return { document, summary: `Deleted ${[...doomed].join(', ')}.`, affected: [...doomed] };
   },
 });

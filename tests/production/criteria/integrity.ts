@@ -4,8 +4,6 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { CheckOutcome, Criterion, GradeContext } from '../contract';
 
 /**
- * @layer tests/production/criteria
- *
  * Data integrity: the saved project reopens identical, and the feature history replays to the same
  * model — an office archives the file and must be able to regenerate it years later.
  */
@@ -44,16 +42,11 @@ function replayCheck({ document }: GradeContext): CheckOutcome {
   const before = canonical(definition(document));
   const after = canonical(definition(replayed.document));
   if (before === after) {
-    return {
-      pass: true,
-      detail: `${document.featureHistory.length} history steps replay to the same model`,
-    };
+    return { pass: true, detail: `${document.featureHistory.length} history steps replay to the same model` };
   }
   const a = JSON.parse(before) as { document: Record<string, unknown> };
   const b = JSON.parse(after) as { document: Record<string, unknown> };
-  const differing = Object.keys(a.document).filter(
-    (key) => JSON.stringify(a.document[key]) !== JSON.stringify(b.document[key]),
-  );
+  const differing = Object.keys(a.document).filter((key) => JSON.stringify(a.document[key]) !== JSON.stringify(b.document[key]));
   return { pass: false, detail: `replay changes: ${differing.join(', ')} (${replayed.summary})` };
 }
 

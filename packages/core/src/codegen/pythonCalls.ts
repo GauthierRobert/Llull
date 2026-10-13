@@ -1,9 +1,6 @@
 /**
- * Python call-expression fragments shared by the CadQuery/build123d and FreeCAD emitters, whose
- * runtimes expose the same helper signatures (`box(size, position=…, rotation=…)`, …).
- *
- * @layer core/codegen
- * @pure
+ * Python call-expression fragments shared by the CadQuery/build123d and FreeCAD emitters, whose runtimes expose the same helper signatures
+ * (`box(size, position=…, rotation=…)`, …).
  */
 
 import type { Feature, FeatureProgram, ShapeSpec, Term, Term2, Term3 } from './program';
@@ -70,15 +67,11 @@ export function shapeCallOpen(shape: ShapeSpec): string {
 }
 
 /** `v = fillet|chamfer(v, [edges], size[, near=[…]])` or `v = shell(v, thickness)`. */
-export function modifierLine(
-  feature: Extract<Feature, { op: 'fillet' | 'chamfer' | 'shell' }>,
-): string {
+export function modifierLine(feature: Extract<Feature, { op: 'fillet' | 'chamfer' | 'shell' }>): string {
   const v = feature.variable;
   if (feature.op === 'shell') return `${v} = shell(${v}, ${formatTerm(feature.thickness)})`;
   const near =
-    feature.near === undefined
-      ? ''
-      : `, near=[${feature.near.map((point) => `(${point.map(formatNumber).join(', ')})`).join(', ')}]`;
+    feature.near === undefined ? '' : `, near=[${feature.near.map((point) => `(${point.map(formatNumber).join(', ')})`).join(', ')}]`;
   const size = formatTerm(feature.size);
   return `${v} = ${feature.op}(${v}, [${feature.edges.map(formatNumber).join(', ')}], ${size}${near})`;
 }

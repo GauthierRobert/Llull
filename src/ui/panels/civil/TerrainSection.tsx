@@ -1,9 +1,4 @@
-/**
- * @layer ui/panels/civil
- *
- * TerrainSection — `create_surface` (TIN + contours) from the point groups, each surface with its
- * `surface_report` statistics and a contour-interval edit (`update_surface`).
- */
+// `create_surface` (TIN + contours) from point groups; per surface its `surface_report` and contour interval (`update_surface`).
 
 import React from 'react';
 import type { SurfaceObject } from '@core/model/civil';
@@ -22,10 +17,7 @@ function SurfaceRow({ surface }: { surface: SurfaceObject }): React.ReactElement
     <CivilReportRow
       object={surface}
       report={{ command: 'surface_report', idKey: 'surfaceId' }}
-      field={{
-        hint: String(surface.contourInterval),
-        label: `Contour interval of ${surface.name}`,
-      }}
+      field={{ hint: String(surface.contourInterval), label: `Contour interval of ${surface.name}` }}
       action={{
         label: 'Set interval',
         run: (text) => {
@@ -71,11 +63,7 @@ export function TerrainSection(): React.ReactElement {
         <TextField {...field('name')} hint="Surface name" label="Surface name" />
         <NumberTextField {...field('interval')} hint="Contour interval" label="Contour interval" />
         <NumberTextField {...field('majorEvery')} hint="Major every" label="Major contour every" />
-        <NumberTextField
-          {...field('maxEdge')}
-          hint="Max edge (optional)"
-          label="Maximum triangle edge"
-        />
+        <NumberTextField {...field('maxEdge')} hint="Max edge (optional)" label="Maximum triangle edge" />
         <button type="submit" className="btn btn--primary btn--sm" disabled={groups.length === 0}>
           Create surface
         </button>

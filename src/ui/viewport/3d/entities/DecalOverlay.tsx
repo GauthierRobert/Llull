@@ -1,11 +1,5 @@
-/**
- * @layer ui/viewport/3d
- *
- * Text decals of a solid: each decal's core projection patch (`@core/geometry/decal`, the same
- * triangles and UVs the glTF export writes) textured with the core block-font raster, drawn on top
- * of the solid in its local frame. Geometry and textures are rebuilt only when the entity changes
- * (pure commands give a new reference) and disposed with it (R9).
- */
+// Text decals on a solid's local frame: core projection patches (same triangles / UVs as glTF export) textured with the
+// core block-font raster; rebuilt per entity reference, disposed with it.
 
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
@@ -31,12 +25,7 @@ export function DecalOverlay({ entity }: { entity: Entity }): React.ReactElement
       geometry.setAttribute('uv', new THREE.Float32BufferAttribute(patch.uvs, 2));
       geometry.computeVertexNormals();
       const image = rasterizeText(decal.text, decal.color, decal.background);
-      const texture = new THREE.DataTexture(
-        new Uint8Array(image.rgba),
-        image.width,
-        image.height,
-        THREE.RGBAFormat,
-      );
+      const texture = new THREE.DataTexture(new Uint8Array(image.rgba), image.width, image.height, THREE.RGBAFormat);
       texture.colorSpace = THREE.SRGBColorSpace;
       texture.magFilter = THREE.LinearFilter;
       texture.minFilter = THREE.LinearMipmapLinearFilter;

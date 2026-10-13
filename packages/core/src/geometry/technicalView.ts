@@ -1,10 +1,7 @@
 /**
- * Technical (ISO 128) orthographic view of 3D solids as drawing primitives: thick visible edges,
- * thin dashed hidden edges, chain centre lines and — under a section plane — the cut faces
- * outlined thick and hatched at 45° (hidden edges are omitted from a section view, per ISO 128-50).
- * The 2D viewport and the DXF export draw solids through this one function.
- * @layer geometry
- * @pure
+ * Technical (ISO 128) orthographic view of 3D solids as drawing primitives: thick visible edges, thin dashed hidden edges, chain centre
+ * lines and — under a section plane — the cut faces outlined thick and hatched at 45° (hidden edges are omitted from a section view, per
+ * ISO 128-50). The 2D viewport and the DXF export draw solids through this one function.
  */
 
 import { type CadDocument, type Entity, type EntityId, type Vec2, is3D } from '../model/types';
@@ -28,12 +25,7 @@ import {
 } from './viewProjection';
 
 /** DXF / CAD layers of a technical view, one per line type. */
-export const TECHNICAL_LAYERS = {
-  visible: 'OBJ-VISIBLE',
-  hidden: 'OBJ-HIDDEN',
-  center: 'OBJ-CENTER',
-  cut: 'OBJ-CUT',
-} as const;
+export const TECHNICAL_LAYERS = { visible: 'OBJ-VISIBLE', hidden: 'OBJ-HIDDEN', center: 'OBJ-CENTER', cut: 'OBJ-CUT' } as const;
 
 export interface EntityDrawing {
   readonly entityId: EntityId;
@@ -48,18 +40,14 @@ interface TechnicalViewOptions {
 
 /** Even-odd loops grouped into outer boundaries, each with the holes directly inside it. */
 function nestLoops(loops: ReadonlyArray<Vec2[]>): Array<{ outer: Vec2[]; holes: Vec2[][] }> {
-  const containers = loops.map((loop, index) =>
-    loops.filter((other, j) => j !== index && pointInPolygon(loop[0] as Vec2, other)),
-  );
+  const containers = loops.map((loop, index) => loops.filter((other, j) => j !== index && pointInPolygon(loop[0] as Vec2, other)));
   const regions = loops.flatMap((outer, index) =>
     (containers[index] as Vec2[][]).length % 2 === 0 ? [{ outer, holes: [] as Vec2[][] }] : [],
   );
   loops.forEach((loop, index) => {
     const inside = containers[index] as Vec2[][];
     if (inside.length % 2 === 0) return;
-    const parent = regions
-      .filter((region) => inside.includes(region.outer))
-      .sort((a, b) => polygonArea(a.outer) - polygonArea(b.outer))[0];
+    const parent = regions.filter((region) => inside.includes(region.outer)).sort((a, b) => polygonArea(a.outer) - polygonArea(b.outer))[0];
     parent?.holes.push(loop);
   });
   return regions;
@@ -82,11 +70,7 @@ interface SolidFaces {
 /** Per frame, per entity object: entities are immutable, so an edit yields a new key. */
 const facesCache = new WeakMap<ViewFrame, WeakMap<Entity, SolidFaces>>();
 
-function solidFaces(
-  doc: Pick<CadDocument, 'components'>,
-  entity: Entity,
-  frame: ViewFrame,
-): SolidFaces {
+function solidFaces(doc: Pick<CadDocument, 'components'>, entity: Entity, frame: ViewFrame): SolidFaces {
   const dependency = expansionDependency(entity, doc);
   const byEntity = facesCache.get(frame) ?? new WeakMap<Entity, SolidFaces>();
   facesCache.set(frame, byEntity);
@@ -100,12 +84,7 @@ function solidFaces(
 }
 
 /** Line primitives of `segments`, skipping any already drawn (coincident edges, e.g. a box's top and bottom). */
-function lines(
-  segments: ReadonlyArray<Segment2>,
-  style: 'visible' | 'hidden',
-  drawn: Set<string>,
-  tolerance: number,
-): DrawingPrimitive[] {
+function lines(segments: ReadonlyArray<Segment2>, style: 'visible' | 'hidden', drawn: Set<string>, tolerance: number): DrawingPrimitive[] {
   const layer = TECHNICAL_LAYERS[style];
   const primitives: DrawingPrimitive[] = [];
   for (const segment of segments) {
@@ -118,8 +97,8 @@ function lines(
 }
 
 /**
- * The technical view of `entities` (3D solids; anything else is skipped) through `frame`. Edges
- * are hidden by every solid of the set, not only their own.
+ * The technical view of `entities` (3D solids; anything else is skipped) through `frame`. Edges are hidden by every solid of the set, not
+ * only their own.
  * @returns one drawing per solid that produced any primitive, in input order
  */
 export function technicalView(
@@ -132,9 +111,7 @@ export function technicalView(
   const sources: ViewSource[] = cached.map(({ faces, edges, tolerance }) => ({
     faces,
     edges,
-    cutLoops: Number.isFinite(cutDepth)
-      ? chainLoops(cutSegments(faces, frame, cutDepth), tolerance)
-      : [],
+    cutLoops: Number.isFinite(cutDepth) ? chainLoops(cutSegments(faces, frame, cutDepth), tolerance) : [],
   }));
   const runs = classifyEdges(sources, frame, cutDepth);
   const sectioned = Number.isFinite(cutDepth);
@@ -145,22 +122,10 @@ export function technicalView(
     if (source.faces.length === 0 || !edgeRuns) return;
     const primitives: DrawingPrimitive[] = [];
     for (const { outer, holes } of nestLoops(source.cutLoops as Vec2[][])) {
-      primitives.push({
-        type: 'polygon',
-        layer: TECHNICAL_LAYERS.cut,
-        style: 'cut',
-        points: outer,
-        fill: 'hatch',
-        holes,
-      });
+      primitives.push({ type: 'polygon', layer: TECHNICAL_LAYERS.cut, style: 'cut', points: outer, fill: 'hatch', holes });
       for (const hole of holes) {
         // A closed outline, not a polygon: an unfilled cut polygon reads as solid poché.
-        primitives.push({
-          type: 'polyline',
-          layer: TECHNICAL_LAYERS.cut,
-          style: 'cut',
-          points: [...hole, hole[0] as Vec2],
-        });
+        primitives.push({ type: 'polyline', layer: TECHNICAL_LAYERS.cut, style: 'cut', points: [...hole, hole[0] as Vec2] });
       }
     }
     // Visible first: a hidden run coinciding with a visible one is not drawn (visible lines win).

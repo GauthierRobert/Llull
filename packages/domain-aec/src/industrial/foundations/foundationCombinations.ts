@@ -1,13 +1,4 @@
-/**
- * @layer domain-aec
- */
-
-import type {
-  BasePlateElement,
-  BuildingModel,
-  FootingElement,
-  SteelMemberElement,
-} from '@core/model/building';
+import type { BasePlateElement, BuildingModel, FootingElement, SteelMemberElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import { toMetres } from '@core/model/units';
 import { elementsOf } from '../../building/model';
@@ -18,10 +9,7 @@ import { GAMMA_CRANE } from '../../shared/loadFactors';
 import { highestUtilisation } from '../common/utilisation';
 
 /** Factored base reaction: vertical v and horizontal h in kN, base moment m in kN·m (CCW +). */
-export function combine(
-  reaction: BaseReaction,
-  factors: Factors,
-): { v: number; h: number; m: number } {
+export function combine(reaction: BaseReaction, factors: Factors): { v: number; h: number; m: number } {
   let v = 0;
   let h = 0;
   let m = 0;
@@ -36,9 +24,9 @@ export function combine(
 }
 
 /**
- * Moment (kN·m, magnitude) the column delivers to the footing about its base: the reaction moment
- * m on the column acts on the footing reversed, the reaction h at the footing top (height `lever`)
- * contributes h·lever, so M = |m − h·lever| (both add under wind from either side).
+ * Moment (kN·m, magnitude) the column delivers to the footing about its base: the reaction moment m on the column acts on the footing
+ * reversed, the reaction h at the footing top (height `lever`) contributes h·lever, so M = |m − h·lever| (both add under wind from either
+ * side).
  */
 export function footingMoment(m: number, h: number, lever: number): number {
   return Math.abs(m - h * lever);
@@ -50,10 +38,7 @@ export function hasMoment(reaction: BaseReaction): boolean {
 }
 
 /** ULS (N kN compression +, M kN·m) pairs of a column base over every combination, for the base plate. */
-export function plateDemands(
-  reaction: BaseReaction,
-  wind: boolean,
-): Array<{ combination: string; normal: number; moment: number }> {
+export function plateDemands(reaction: BaseReaction, wind: boolean): Array<{ combination: string; normal: number; moment: number }> {
   const crane = hasCase(reaction, 'CL') || hasCase(reaction, 'CR');
   return [false, true].flatMap((favourable) =>
     ultimateCombinations(wind, crane, favourable).map((combination) => {
@@ -69,8 +54,8 @@ export function hasCase(reaction: BaseReaction, loadCase: LoadCase): boolean {
 }
 
 /**
- * Wind cases of the foundation combinations: the four suction cases plus the windward roof-pressure
- * cases of steep / flat roofs (absent cases contribute nothing in `combine`).
+ * Wind cases of the foundation combinations: the four suction cases plus the windward roof-pressure cases of steep / flat roofs (absent
+ * cases contribute nothing in `combine`).
  */
 export const FOUNDATION_WIND_CASES = [...WIND_CASES, ...WIND_PRESSURE_CASES];
 
@@ -93,18 +78,13 @@ export function serviceCombinations(wind: boolean, crane: boolean): Combination[
     }
   }
   if (crane) {
-    for (const [label, loadCase] of CRANE_CASES)
-      list.push({ name: `G+${label}`, factors: { G: 1, [loadCase]: 1 } });
+    for (const [label, loadCase] of CRANE_CASES) list.push({ name: `G+${label}`, factors: { G: 1, [loadCase]: 1 } });
   }
   return list;
 }
 
 /** ULS combinations; `favourable` uses 1.0G (uplift / sliding), otherwise 1.35G (compression). */
-export function ultimateCombinations(
-  wind: boolean,
-  crane: boolean,
-  favourable: boolean,
-): Combination[] {
+export function ultimateCombinations(wind: boolean, crane: boolean, favourable: boolean): Combination[] {
   const g = favourable ? 1 : 1.35;
   // Compression combinations carry the snow companion 0.75 S; the favourable ones do not.
   const companion = favourable ? {} : { S: 0.75 };
@@ -118,10 +98,7 @@ export function ultimateCombinations(
   }
   if (crane) {
     for (const [label, loadCase] of CRANE_CASES) {
-      list.push({
-        name: name(`1.35${label}`),
-        factors: { G: g, [loadCase]: GAMMA_CRANE, ...companion },
-      });
+      list.push({ name: name(`1.35${label}`), factors: { G: g, [loadCase]: GAMMA_CRANE, ...companion } });
     }
   }
   return list;
@@ -132,12 +109,7 @@ function columnBaseLocation(column: SteelMemberElement): { x: number; y: number 
   return { x: base[0], y: base[1] };
 }
 
-export function findFooting(
-  doc: CadDocument,
-  building: BuildingModel,
-  levelId: string,
-  column: SteelMemberElement,
-): FootingElement | null {
+export function findFooting(doc: CadDocument, building: BuildingModel, levelId: string, column: SteelMemberElement): FootingElement | null {
   const base = columnBaseLocation(column);
   const tolerance = TOLERANCE_METRES / toMetres(doc, 1);
   for (const element of Object.values(building.elements)) {
@@ -157,12 +129,7 @@ export function findPlate(building: BuildingModel, columnId: string): BasePlateE
   return elementsOf(building, 'plate').find((plate) => plate.memberId === columnId) ?? null;
 }
 
-export interface Candidate {
-  value: number;
-  limit: number;
-  combination: string;
-  utilisation: number;
-}
+export type Candidate = { value: number; limit: number; combination: string; utilisation: number };
 
 export function worst<T extends Candidate>(candidates: ReadonlyArray<T>): T | null {
   return highestUtilisation(candidates) ?? null;

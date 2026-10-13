@@ -1,9 +1,6 @@
 /**
- * OpenSCAD emitter: FeatureProgram → a .scad file. Parameters become top-level variables
- * (Customizer-friendly); every feature version becomes a module so booleans and edits keep order.
- *
- * @layer core/codegen
- * @pure
+ * OpenSCAD emitter: FeatureProgram → a .scad file. Parameters become top-level variables (Customizer-friendly); every feature version
+ * becomes a module so booleans and edits keep order.
  */
 
 import type { Feature, FeatureProgram, ShapeSpec, Term, Term2, Term3 } from './program';
@@ -34,9 +31,7 @@ function half(term: Term): string {
 }
 
 function negHalf(term: Term): string {
-  return term.expression !== undefined
-    ? `-(${term.expression}) / 2`
-    : formatNumber(-term.value / 2);
+  return term.expression !== undefined ? `-(${term.expression}) / 2` : formatNumber(-term.value / 2);
 }
 
 function meshPolyhedron(positions: readonly number[]): string {
@@ -77,8 +72,7 @@ function shapeSource(shape: ShapeSpec): string {
       return `linear_extrude(height = ${formatTerm(shape.depth)}) ${polygon(shape.profile)}`;
     case 'revolution': {
       const angle = formatDegrees(shape.angle, 'PI');
-      const body = (sweep: string): string =>
-        `rotate_extrude(angle = ${sweep}) ${polygon(shape.profile)}`;
+      const body = (sweep: string): string => `rotate_extrude(angle = ${sweep}) ${polygon(shape.profile)}`;
       if (shape.axis === 'x') return `rotate([90, 0, 90]) ${body(angle)}`;
       if (shape.axis === 'y') return `rotate([-90, 0, 0]) ${body(`-(${angle})`)}`;
       return body(angle);
@@ -121,22 +115,15 @@ export function emitOpenScad(program: FeatureProgram): string {
     '/* [Parameters] */',
   ];
   lines.push(
-    ...parameterLines(
-      program,
-      '//',
-      (p) =>
-        `${p.identifier} = ${p.expression ?? formatNumber(p.value)}; // ${commentText(p.name)}`,
-    ),
+    ...parameterLines(program, '//', (p) => `${p.identifier} = ${p.expression ?? formatNumber(p.value)}; // ${commentText(p.name)}`),
   );
   lines.push('', '/* [Hidden] */', '');
-
   const version = new Map<string, number>();
   const current = (variable: string): string => `${variable}_v${version.get(variable) ?? 0}`;
   const next = (variable: string): string => {
     version.set(variable, (version.get(variable) ?? 0) + 1);
     return current(variable);
   };
-
   const featureLine = (feature: Feature): string => {
     const v = feature.variable;
     switch (feature.op) {
@@ -167,7 +154,6 @@ export function emitOpenScad(program: FeatureProgram): string {
     }
   };
   lines.push(...featureLinesWithHeadings(program, '//', featureLine));
-
   lines.push('', '// ── result ──');
   for (const output of program.outputs) {
     const label = output.name !== undefined ? ` // ${commentText(output.name)}` : '';

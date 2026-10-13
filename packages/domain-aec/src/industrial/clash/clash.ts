@@ -1,7 +1,4 @@
-/**
- * Clash detection between structure, equipment and pipes (oriented-box separating-axis test).
- * @layer domain-aec
- */
+/** Clash detection between structure, equipment and pipes (oriented-box separating-axis test). */
 
 import { clamp01 } from '@lib/clamp';
 import type { CadDocument, Vec3 } from '@core/model/types';
@@ -18,28 +15,14 @@ import { briefList } from '../../shared/briefList';
 import { type OrientedBox, boxOverlap, elementBoxes } from './clashBoxes';
 import { slabPenetrations } from './clashSlabs';
 
-const CLEARANCE_OBSTACLES: ReadonlySet<BimCategory> = new Set([
-  'equipment',
-  'member',
-  'column',
-  'wall',
-  'curvedWall',
-  'stair',
-]);
+const CLEARANCE_OBSTACLES: ReadonlySet<BimCategory> = new Set(['equipment', 'member', 'column', 'wall', 'curvedWall', 'stair']);
 
-interface Solid {
-  readonly elementId: string;
-  readonly category: BimCategory;
-  readonly box: OrientedBox;
-}
+type Solid = { readonly elementId: string; readonly category: BimCategory; readonly box: OrientedBox };
 
 /** Category pairs that are checked (structure–structure joints are intentional and skipped). */
 function relevant(a: BimCategory, b: BimCategory): boolean {
   const active = (category: BimCategory): boolean =>
-    category === 'pipe' ||
-    category === 'tray' ||
-    category === 'equipment' ||
-    category === 'pipeSupport';
+    category === 'pipe' || category === 'tray' || category === 'equipment' || category === 'pipeSupport';
   if (a === 'pipeSupport' && b === 'pipeSupport') return false;
   if (active(a) || active(b)) return true;
   return (a === 'member') !== (b === 'member');
@@ -67,9 +50,7 @@ function pipeEnds(points: ReadonlyArray<Vec3>): Vec3[] {
 
 function pointInBox(point: Vec3, box: OrientedBox, margin: number): boolean {
   const offset = sub3(point, box.center);
-  return box.axes.every(
-    (axis, index) => Math.abs(dot3(offset, axis)) <= (box.half[index] as number) + margin,
-  );
+  return box.axes.every((axis, index) => Math.abs(dot3(offset, axis)) <= (box.half[index] as number) + margin);
 }
 
 function distanceToPolyline(point: Vec3, polyline: ReadonlyArray<Vec3>): number {
@@ -86,10 +67,7 @@ function distanceToPolyline(point: Vec3, polyline: ReadonlyArray<Vec3>): number 
 
 /** A pipe support touches its own pipe and the steel it bears on by design. */
 function bearsOn(support: BuildingElement, other: BuildingElement): boolean {
-  return (
-    support.category === 'pipeSupport' &&
-    (support.pipeId === other.id || support.memberId === other.id)
-  );
+  return support.category === 'pipeSupport' && (support.pipeId === other.id || support.memberId === other.id);
 }
 
 /** Intentional connections: a pipe ending on another pipe (tee / joint) or inside equipment, a support on its pipe / steel. */
@@ -102,8 +80,7 @@ function connected(
   boxB: OrientedBox,
 ): boolean {
   if (bearsOn(a, b) || bearsOn(b, a)) return true;
-  const runSize = (run: BuildingElement): number =>
-    run.category === 'pipe' ? run.diameter : run.category === 'tray' ? run.width : 0;
+  const runSize = (run: BuildingElement): number => (run.category === 'pipe' ? run.diameter : run.category === 'tray' ? run.width : 0);
   if (a.category === b.category && (a.category === 'pipe' || a.category === 'tray')) {
     const [pointsA, pointsB] = [pipeWorldPoints(building, a), pipeWorldPoints(building, b)];
     const tolerance = Math.max(runSize(a), runSize(b));
@@ -126,17 +103,12 @@ function formatDepthMm(depthMm: number): string {
 }
 
 /** All clashes on the given levels (or every level). @pure */
-function findClashes(
-  doc: CadDocument,
-  levelIds: ReadonlySet<string> | null,
-  tolerance: number,
-): Clash[] {
+function findClashes(doc: CadDocument, levelIds: ReadonlySet<string> | null, tolerance: number): Clash[] {
   const building = getBuilding(doc);
   const solids: Solid[] = [];
   for (const element of Object.values(building.elements)) {
     if (levelIds && !('levelId' in element && levelIds.has(element.levelId))) continue;
-    for (const box of elementBoxes(doc, building, element))
-      solids.push({ elementId: element.id, category: element.category, box });
+    for (const box of elementBoxes(doc, building, element)) solids.push({ elementId: element.id, category: element.category, box });
   }
   const found = new Map<string, Clash>();
   const record = (clash: Clash): void => {
@@ -147,12 +119,8 @@ function findClashes(
   for (let i = 0; i < solids.length; i++) {
     for (let j = i + 1; j < solids.length; j++) {
       const [first, second] = [solids[i] as Solid, solids[j] as Solid];
-      if (first.elementId === second.elementId || !relevant(first.category, second.category))
-        continue;
-      const [a, b] = [
-        building.elements[first.elementId] as BuildingElement,
-        building.elements[second.elementId] as BuildingElement,
-      ];
+      if (first.elementId === second.elementId || !relevant(first.category, second.category)) continue;
+      const [a, b] = [building.elements[first.elementId] as BuildingElement, building.elements[second.elementId] as BuildingElement];
       if (connected(doc, building, a, b, first.box, second.box)) continue;
       const depth = boxOverlap(first.box, second.box);
       const [low, high] = first.elementId < second.elementId ? [first, second] : [second, first];
@@ -169,31 +137,20 @@ function findClashes(
     if (equipment?.category !== 'equipment' || equipment.clearance <= 0) continue;
     const zone: OrientedBox = {
       ...solid.box,
-      half: [
-        solid.box.half[0] + equipment.clearance,
-        solid.box.half[1] + equipment.clearance,
-        solid.box.half[2],
-      ],
+      half: [solid.box.half[0] + equipment.clearance, solid.box.half[1] + equipment.clearance, solid.box.half[2]],
     };
     for (const other of solids) {
       if (other.elementId === solid.elementId || !CLEARANCE_OBSTACLES.has(other.category)) continue;
       const depth = boxOverlap(zone, other.box);
-      if (
-        depth > tolerance &&
-        !found.has(`hard:${[solid.elementId, other.elementId].sort().join(':')}`)
-      ) {
+      if (depth > tolerance && !found.has(`hard:${[solid.elementId, other.elementId].sort().join(':')}`)) {
         record({ a: solid.elementId, b: other.elementId, kind: 'clearance', depth });
       }
     }
   }
-  return [...found.values()].sort((x, y) =>
-    x.kind === y.kind ? y.depth - x.depth : x.kind === 'hard' ? -1 : 1,
-  );
+  return [...found.values()].sort((x, y) => (x.kind === y.kind ? y.depth - x.depth : x.kind === 'hard' ? -1 : 1));
 }
 
 /**
- * @command check_clashes
- * @pure read-only
  * @affects none; data = { clashes: Clash[] }
  * @failure unknown level / negative tolerance -> no data
  */
@@ -201,31 +158,22 @@ export const checkClashes = defineCommand({
   name: 'check_clashes',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Read-only clash detection (like Navisworks / Plant 3D): hard clashes between pipes, cable trays, equipment, steel ' +
-    'members, walls, concrete columns, beams and stairs, equipment passing through a floor / grating that has no ' +
-    'opening around it (add_slab_opening), plus equipment maintenance-clearance violations. ' +
-    'Steel-to-steel joints, run connections (a pipe end inside equipment, a pipe / tray ending on another) and a pipe ' +
-    'support touching its own pipe and the steel it bears on are not ' +
-    'reported. Returns element ids, kind and penetration depth (document units; summary in mm).',
+    'Read-only clash detection (like Navisworks / Plant 3D): hard clashes between pipes, cable trays, equipment, steel members, walls, ' +
+    'concrete columns, beams and stairs, equipment passing through a floor / grating that has no opening around it (add_slab_opening), ' +
+    'plus equipment maintenance-clearance violations. Steel-to-steel joints, run connections (a pipe end inside equipment, a pipe / tray ' +
+    'ending on another) and a pipe support touching its own pipe and the steel it bears on are not reported. Returns element ids, kind ' +
+    'and penetration depth (document units; summary in mm).',
   params: z.object({
     levelId: z.string().optional().describe('Only this level. Default: the whole building.'),
-    tolerance: z
-      .number()
-      .optional()
-      .describe('Ignore penetrations up to this depth, in document units (>= 0). Default 5 mm.'),
+    tolerance: z.number().optional().describe('Ignore penetrations up to this depth, in document units (>= 0). Default 5 mm.'),
   }),
   run: (doc, { levelId, tolerance }): CommandResult => {
     const building = getBuilding(doc);
     const unknownLevel = unknownLevelFailure(doc, 'check_clashes', levelId);
     if (unknownLevel) return unknownLevel;
     const resolvedTolerance = tolerance ?? fromMm(doc, 5);
-    if (!(resolvedTolerance >= 0))
-      return noop(doc, 'check_clashes failed: tolerance must be >= 0.');
-    const clashes = findClashes(
-      doc,
-      levelId !== undefined ? new Set([levelId]) : null,
-      resolvedTolerance,
-    );
+    if (!(resolvedTolerance >= 0)) return noop(doc, 'check_clashes failed: tolerance must be >= 0.');
+    const clashes = findClashes(doc, levelId !== undefined ? new Set([levelId]) : null, resolvedTolerance);
     const describe = (clash: Clash): string => {
       const [a, b] = [building.elements[clash.a], building.elements[clash.b]];
       return `${clash.kind} ${a?.mark ?? clash.a} × ${b?.mark ?? clash.b} (${formatDepthMm(toMm(doc, clash.depth))} mm)`;

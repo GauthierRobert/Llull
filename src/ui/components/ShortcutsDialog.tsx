@@ -1,10 +1,4 @@
-/**
- * @layer ui/components
- *
- * Keyboard shortcut sheet — opened with `?` or the toolbar's Shortcuts button. Content comes from
- * SHORTCUT_GROUPS so it never drifts from the real key handling. Modal: focus is trapped while
- * open and restored to the opener on close. Presentation only.
- */
+// Shortcut sheet (`?` or toolbar), content from SHORTCUT_GROUPS so it never drifts from the key handling; modal.
 
 import React, { useId, useRef } from 'react';
 import { useToolStore } from '@ui/store';
@@ -39,14 +33,7 @@ export function ShortcutsDialog(): React.ReactElement | null {
         <h2 id={titleId} className="shortcuts-dialog__title">
           Keyboard shortcuts
         </h2>
-        <button
-          ref={closeRef}
-          type="button"
-          className="icon-btn"
-          onClick={close}
-          aria-label="Close shortcuts"
-          title="Close"
-        >
+        <button ref={closeRef} type="button" className="icon-btn" onClick={close} aria-label="Close shortcuts" title="Close">
           <Icon name="close" size={14} />
         </button>
       </div>

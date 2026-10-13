@@ -1,8 +1,4 @@
-/**
- * Parameter validation and defaulting of add_portal_frame_building.
- * @layer domain-aec
- * @pure
- */
+/** Parameter validation and defaulting of add_portal_frame_building. */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
 import { fromMm } from '@core/model/units';
@@ -30,13 +26,8 @@ interface PortalInputs {
 }
 
 /** @failure any invalid dimension / profile / combination -> `{ reason }` (full failure summary) */
-export function portalInputs(
-  doc: CadDocument,
-  params: PortalParams,
-): PortalInputs | { reason: string } {
-  const fail = (reason: string): { reason: string } => ({
-    reason: `add_portal_frame_building failed: ${reason}`,
-  });
+export function portalInputs(doc: CadDocument, params: PortalParams): PortalInputs | { reason: string } {
+  const fail = (reason: string): { reason: string } => ({ reason: `add_portal_frame_building failed: ${reason}` });
   const mm = (value: number): number => fromMm(doc, value);
   const origin = params.origin ?? [0, 0];
   const span = params.spans ? Math.max(...params.spans) : (params.span ?? mm(24000));
@@ -46,12 +37,7 @@ export function portalInputs(
   const pitchDegrees = params.roofPitch ?? 6;
   const purlinSpacing = params.purlinSpacing ?? mm(1800);
   const railSpacing = params.railSpacing ?? mm(1800);
-  if (
-    params.spans &&
-    (params.spans.length < 1 ||
-      params.spans.length > 10 ||
-      params.spans.some((width) => width <= 0))
-  ) {
+  if (params.spans && (params.spans.length < 1 || params.spans.length > 10 || params.spans.some((width) => width <= 0))) {
     return fail('spans must be 1–10 widths, each > 0.');
   }
   const spanCount = params.spans?.length ?? 1;
@@ -70,14 +56,13 @@ export function portalInputs(
     brace: params.braceProfile ?? 'CHS76.1x3.6',
     gable: params.gablePostProfile ?? 'HEA200',
   };
-  const profiles = Object.fromEntries(
-    Object.entries(names).map(([key, name]) => [key, findProfile(name)]),
-  ) as Record<keyof typeof names, SteelProfile | undefined>;
+  const profiles = Object.fromEntries(Object.entries(names).map(([key, name]) => [key, findProfile(name)])) as Record<
+    keyof typeof names,
+    SteelProfile | undefined
+  >;
   const missing = Object.entries(profiles).filter(([, profile]) => !profile);
   if (missing.length > 0) {
-    return fail(
-      `unknown profile(s) ${missing.map(([key]) => names[key as keyof typeof names]).join(', ')} (see list_steel_profiles).`,
-    );
+    return fail(`unknown profile(s) ${missing.map(([key]) => names[key as keyof typeof names]).join(', ')} (see list_steel_profiles).`);
   }
   const p = profiles as PortalProfiles;
   if (params.crane && !(params.crane.railHeight > 0 && params.crane.railHeight < eave))

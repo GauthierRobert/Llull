@@ -1,8 +1,4 @@
-/**
- * Wind-bracing load path and member checks for a steel hall level (EN 1991-1-4, EN 1993-1-1).
- * @layer domain-aec
- * @pure
- */
+/** Wind-bracing load path and member checks for a steel hall level (EN 1991-1-4, EN 1993-1-1). */
 
 import type { CadDocument } from '@core/model/types';
 import { levelMembersInMm } from '../common/memberSupport';
@@ -41,9 +37,7 @@ interface BracingInputs {
 
 /** Steel members of `levelId` with endpoints in mm. */
 export function locateMembers(doc: CadDocument, levelId: string): Located[] {
-  return levelMembersInMm(doc, levelId).flatMap(({ profile, ...located }) =>
-    profile ? [{ ...located, profile }] : [],
-  );
+  return levelMembersInMm(doc, levelId).flatMap(({ profile, ...located }) => (profile ? [{ ...located, profile }] : []));
 }
 
 const axisLength = ({ start, end }: Located): number => distance3(end, start);
@@ -57,15 +51,11 @@ function gablePostRows(
   windPressure: number,
 ): BracingRow[] {
   const rows: BracingRow[] = [];
-  const sameSpot = (a: Point, b: Point): boolean =>
-    a.every((value, axis) => near(value, b[axis] ?? 0));
-  const meetsRafter = ({ start, end }: Located): boolean =>
-    rafterEnds.some((point) => sameSpot(point, start) || sameSpot(point, end));
+  const sameSpot = (a: Point, b: Point): boolean => a.every((value, axis) => near(value, b[axis] ?? 0));
+  const meetsRafter = ({ start, end }: Located): boolean => rafterEnds.some((point) => sameSpot(point, start) || sameSpot(point, end));
   const columns = members.filter(({ member }) => member.role === 'column');
   for (const planeY of [y0, yEnd]) {
-    const inPlane = columns
-      .filter(({ start }) => near(start[1], planeY))
-      .sort((a, b) => a.start[0] - b.start[0]);
+    const inPlane = columns.filter(({ start }) => near(start[1], planeY)).sort((a, b) => a.start[0] - b.start[0]);
     inPlane.forEach((post, index) => {
       if (meetsRafter(post)) return;
       const left = inPlane[index - 1]?.start[0] ?? post.start[0];
@@ -122,10 +112,8 @@ export function analyseBracing(
   const { windPressure, deadLoad, snowLoad, travelSpeed, bufferStiffness } = inputs;
   const braces = members.filter(({ member }) => member.role === 'brace');
   const rafters = members.filter(({ member }) => member.role === 'rafter');
-  if (braces.length === 0)
-    return { reason: `check_bracing: no bracing (role brace) on level '${levelId}'.` };
-  if (rafters.length === 0)
-    return { reason: `check_bracing failed: no rafters on level '${levelId}' (no gable).` };
+  if (braces.length === 0) return { reason: `check_bracing: no bracing (role brace) on level '${levelId}'.` };
+  if (rafters.length === 0) return { reason: `check_bracing failed: no rafters on level '${levelId}' (no gable).` };
   const rafterEnds = rafters.flatMap(({ start, end }) => [start, end]);
   const ys = rafterEnds.map((point) => point[1]);
   const y0 = Math.min(...ys);
@@ -136,10 +124,7 @@ export function analyseBracing(
   const centre = (x0 + x1) / 2;
   const gableAreaMm2 = rafters
     .filter(({ start, end }) => near(start[1], y0) && near(end[1], y0))
-    .reduce(
-      (sum, { start, end }) => sum + Math.abs(end[0] - start[0]) * ((start[2] + end[2]) / 2),
-      0,
-    );
+    .reduce((sum, { start, end }) => sum + Math.abs(end[0] - start[0]) * ((start[2] + end[2]) / 2), 0);
   const gableArea = gableAreaMm2 / 1e6;
   const planArea = ((x1 - x0) * (yEnd - y0)) / 1e6;
   const windUltimate = GAMMA_Q * windPressure * CP_GABLE * gableArea;
@@ -157,26 +142,18 @@ export function analyseBracing(
     const xHigh = round(Math.max(start[0], end[0]), 0);
     const side = start[0] <= centre ? 'west' : 'east';
     const key = roof ? `roof|${bay}|${xLow}|${xHigh}` : `wall|${bay}|${xLow}`;
-    const panel = panels.get(key) ?? {
-      group: roof ? 'roof bracing' : `wall bracing ${side}`,
-      roof,
-      bay,
-      braces: [],
-    };
+    const panel = panels.get(key) ?? { group: roof ? 'roof bracing' : `wall bracing ${side}`, roof, bay, braces: [] };
     panel.braces.push(located);
     panels.set(key, panel);
   }
   const bays = new Set([...panels.values()].map((panel) => panel.bay));
-  const bayWallPanels = (bay: string): number =>
-    [...panels.values()].filter((panel) => panel.bay === bay && !panel.roof).length;
+  const bayWallPanels = (bay: string): number => [...panels.values()].filter((panel) => panel.bay === bay && !panel.roof).length;
   const bayForce = roofForce / bays.size;
 
   // Crane longitudinal path: one runway line per carrying wall, force at rail level.
   const runways = members.filter(({ member }) => member.role === 'crane');
   const craneCapacity =
-    inputs.craneCapacity ??
-    runways.map(({ member }) => craneCapacityOf(member)).find((value) => value !== null) ??
-    null;
+    inputs.craneCapacity ?? runways.map(({ member }) => craneCapacityOf(member)).find((value) => value !== null) ?? null;
   const runwayXs = runways.map(({ start }) => start[0]);
   const craneSpan =
     runwayXs.length > 0 && Math.max(...runwayXs) - Math.min(...runwayXs) > 1000
@@ -184,32 +161,20 @@ export function analyseBracing(
       : DEFAULT_CRANE_SPAN;
   const craneForce =
     craneCapacity !== null && runways.length > 0
-      ? craneWallForce(
-          craneCapacity,
-          craneSpan,
-          inputs.craneSelfWeight,
-          travelSpeed,
-          bufferStiffness,
-        )
+      ? craneWallForce(craneCapacity, craneSpan, inputs.craneSelfWeight, travelSpeed, bufferStiffness)
       : null;
   const craneSides = new Set(runways.map(({ start }) => (start[0] <= centre ? 'west' : 'east')));
-  const wallPanelsOnSide = (side: string): number =>
-    [...panels.values()].filter((panel) => panel.group === `wall bracing ${side}`).length;
+  const wallPanelsOnSide = (side: string): number => [...panels.values()].filter((panel) => panel.group === `wall bracing ${side}`).length;
   const craneShareOf = (panel: Panel): number => {
     const side = panel.group.endsWith('west') ? 'west' : 'east';
-    return craneForce !== null && !panel.roof && craneSides.has(side)
-      ? craneForce.design / wallPanelsOnSide(side)
-      : 0;
+    return craneForce !== null && !panel.roof && craneSides.has(side) ? craneForce.design / wallPanelsOnSide(side) : 0;
   };
   const craneFoundation: { side: string; braced: number; total: number; perColumn: number }[] = [];
 
   // Roof strut = rafter braced laterally by purlins: largest purlin gap along the slope.
   const purlins = members.filter(({ member }) => member.role === 'purlin');
   const purlinGapAlong = (rafter: Located, bayStart: number, bayEnd: number): number => {
-    const [from, to] = [
-      Math.min(rafter.start[0], rafter.end[0]),
-      Math.max(rafter.start[0], rafter.end[0]),
-    ];
+    const [from, to] = [Math.min(rafter.start[0], rafter.end[0]), Math.max(rafter.start[0], rafter.end[0])];
     const slope = Math.hypot(rafter.end[0] - rafter.start[0], rafter.end[2] - rafter.start[2]);
     const cosine = Math.abs(rafter.end[0] - rafter.start[0]) / slope;
     const positions = purlins
@@ -229,15 +194,9 @@ export function analyseBracing(
   const rows: BracingRow[] = [];
   const sorted = [...panels.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   for (const [, panel] of sorted) {
-    const diagonal = panel.braces.reduce((best, candidate) =>
-      axisLength(candidate) > axisLength(best) ? candidate : best,
-    );
+    const diagonal = panel.braces.reduce((best, candidate) => (axisLength(candidate) > axisLength(best) ? candidate : best));
     const { start, end, profile, member } = diagonal;
-    const [dx, dy, dz] = [
-      Math.abs(end[0] - start[0]),
-      Math.abs(end[1] - start[1]),
-      Math.abs(end[2] - start[2]),
-    ];
+    const [dx, dy, dz] = [Math.abs(end[0] - start[0]), Math.abs(end[1] - start[1]), Math.abs(end[2] - start[2])];
     if (dy < TOLERANCE) continue;
     const length = axisLength(diagonal);
     const xLow = Math.min(start[0], end[0]);
@@ -279,12 +238,7 @@ export function analyseBracing(
           `crane longitudinal (group 1 / group 7): ${craneForce.governing} governs, 1.35 HL ${craneForce.driveGroup1.toFixed(1)} kN vs HB (γ 1.0) ${craneForce.bufferGroup7.toFixed(1)} kN per runway, share ${craneShare.toFixed(1)} kN on bay ${panel.bay} mm, tension ${craneTension.toFixed(1)} kN ≤ Npl,Rd ${npl.toFixed(1)} kN (included in the wall bracing row above)`,
         ),
       );
-      craneFoundation.push({
-        side,
-        braced: wallPanelsOnSide(side),
-        total: craneShare,
-        perColumn: craneShare / 2,
-      });
+      craneFoundation.push({ side, braced: wallPanelsOnSide(side), total: craneShare, perColumn: craneShare / 2 });
     }
     // Compression strut: rafter (roof) / column (wall) at either end of the bay.
     const [bayStart, bayEnd] = [Math.min(start[1], end[1]), Math.max(start[1], end[1])];
@@ -298,9 +252,7 @@ export function analyseBracing(
         )
       : members.find(
           ({ member: candidate, start: s }) =>
-            candidate.role === 'column' &&
-            near(s[0], start[0]) &&
-            (near(s[1], bayStart) || near(s[1], bayEnd)),
+            candidate.role === 'column' && near(s[0], start[0]) && (near(s[1], bayStart) || near(s[1], bayEnd)),
         );
     if (strut) {
       const compression = panel.roof ? (shear * dx) / dy : (shear * dz) / dy;
@@ -328,9 +280,7 @@ export function analyseBracing(
     if (atWall) {
       const wallX = near(xLow, x0) ? x0 : x1;
       // Eaves level of this wall (monopitch: the low and the high eaves differ).
-      const eavesZ = Math.min(
-        ...rafterEnds.filter((point) => near(point[0], wallX)).map((point) => point[2]),
-      );
+      const eavesZ = Math.min(...rafterEnds.filter((point) => near(point[0], wallX)).map((point) => point[2]));
       const eavesStrut = members.find(
         ({ member: candidate, start: s, end: e }) =>
           candidate.role === 'purlin' &&
@@ -341,9 +291,7 @@ export function analyseBracing(
       );
       const reaction = bayForce / 2;
       const fyEaves = eavesStrut ? yieldStrength(eavesStrut.member.material) : 0;
-      const eavesResistance = eavesStrut
-        ? bucklingResistance(eavesStrut.profile, fyEaves, dy) / 1000
-        : 0;
+      const eavesResistance = eavesStrut ? bucklingResistance(eavesStrut.profile, fyEaves, dy) / 1000 : 0;
       rows.push({
         group: panel.group,
         elementId: eavesStrut?.member.id ?? member.id,

@@ -14,8 +14,6 @@ import { extractionBuilding } from './extractionBuilding';
 import { extractionIntent } from './extractionIntent';
 
 /**
- * @layer tests/production/scenarios
- *
  * Desmet-type job 2: change order on the issued extraction building (revision B). The office edits
  * the existing model — it does not redraw it — and reissues: identities (marks, ids, IFC GlobalIds)
  * of untouched elements must survive so drawings, schedules and the BIM coordination stay valid.
@@ -50,13 +48,7 @@ const revisedIntent: PlantIntent = {
   project: { ...extractionIntent.project, ...PROJECT },
   equipment: [
     ...extractionIntent.equipment.map((e) =>
-      e.tag === EXTRACTOR
-        ? {
-            ...e,
-            size: [UPRATED.length, e.size[1], e.size[2]] as IntentEquipment['size'],
-            weight: UPRATED.weight,
-          }
-        : e,
+      e.tag === EXTRACTOR ? { ...e, size: [UPRATED.length, e.size[1], e.size[2]] as IntentEquipment['size'], weight: UPRATED.weight } : e,
     ),
     PUMP,
   ],
@@ -65,18 +57,13 @@ const revisedIntent: PlantIntent = {
 
 function revisionScript(): ToolCall[] {
   const base = extractionBuilding.script;
-  const index = base.findIndex(
-    (call) => call.tool === 'add_equipment' && call.args['mark'] === EXTRACTOR,
-  );
+  const index = base.findIndex((call) => call.tool === 'add_equipment' && call.args['mark'] === EXTRACTOR);
   const original = base[index]?.args ?? {};
   const size = original['size'] as number[];
   return [
     {
       tool: 'edit_step_params',
-      args: {
-        stepId: stepIdOf(base, index),
-        params: { ...original, size: [UPRATED.length, size[1], size[2]], weight: UPRATED.weight },
-      },
+      args: { stepId: stepIdOf(base, index), params: { ...original, size: [UPRATED.length, size[1], size[2]], weight: UPRATED.weight } },
     },
     {
       tool: 'add_equipment',
@@ -135,9 +122,6 @@ export const extractionRevision: Scenario = {
     ...deliverableCriteria(revisedIntent),
     ...integrityCriteria(),
   ],
-  knownIssues: {
-    scripted: [],
-    ui: [],
-  },
+  knownIssues: { scripted: [], ui: [] },
   agentBaseline: 0.6,
 };

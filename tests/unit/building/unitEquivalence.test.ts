@@ -32,28 +32,9 @@ const STEPS: Record<string, Step[]> = {
     ],
   ],
   'standalone crane runway on columns': [
-    [
-      'add_steel_member',
-      (k) => ({ profile: 'HEA400', role: 'column', start: [0, 0, 0], end: [0, 0, 6000 * k] }),
-    ],
-    [
-      'add_steel_member',
-      (k) => ({
-        profile: 'HEA400',
-        role: 'column',
-        start: [0, 6000 * k, 0],
-        end: [0, 6000 * k, 6000 * k],
-      }),
-    ],
-    [
-      'add_crane_runway',
-      (k) => ({
-        start: [700 * k, 0],
-        end: [700 * k, 12000 * k],
-        railHeight: 5000 * k,
-        capacity: 5,
-      }),
-    ],
+    ['add_steel_member', (k) => ({ profile: 'HEA400', role: 'column', start: [0, 0, 0], end: [0, 0, 6000 * k] })],
+    ['add_steel_member', (k) => ({ profile: 'HEA400', role: 'column', start: [0, 6000 * k, 0], end: [0, 6000 * k, 6000 * k] })],
+    ['add_crane_runway', (k) => ({ start: [700 * k, 0], end: [700 * k, 12000 * k], railHeight: 5000 * k, capacity: 5 })],
   ],
 };
 
@@ -73,17 +54,14 @@ function build(steps: Step[], units: 'mm' | 'm'): CadDocument {
   return doc;
 }
 
-const lines = (doc: CadDocument): Line[] =>
-  (execute(doc, 'quantity_takeoff', {}).data as { lines: Line[] }).lines;
+const lines = (doc: CadDocument): Line[] => (execute(doc, 'quantity_takeoff', {}).data as { lines: Line[] }).lines;
 
 describe('industrial generators: m and mm documents are the same building', () => {
   for (const [label, steps] of Object.entries(STEPS)) {
     it(`${label}: same elements and the same metric takeoff`, () => {
       const mm = build(steps, 'mm');
       const metres = build(steps, 'm');
-      expect(Object.keys(metres.building?.elements ?? {})).toEqual(
-        Object.keys(mm.building?.elements ?? {}),
-      );
+      expect(Object.keys(metres.building?.elements ?? {})).toEqual(Object.keys(mm.building?.elements ?? {}));
       const [a, b] = [lines(mm), lines(metres)];
       expect(b.map((line) => line.key)).toEqual(a.map((line) => line.key));
       for (const [index, line] of a.entries()) {

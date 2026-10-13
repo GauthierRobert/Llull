@@ -1,11 +1,5 @@
-/**
- * @layer ui/viewport/2d
- *
- * Vertex buffers of technical-drawing primitives (`@core/model/drawing`) by ISO 128 line weight:
- * thick continuous (cut, visible), thin continuous (thin, annotation, hatching, dimensions, chain
- * centre lines pre-split into long dash + dot) and thin dashed (hidden); solid poché fills and
- * text labels. Shared by every 2D technical drawing — the building plan and the solids' views.
- */
+// Vertex buffers of technical-drawing primitives by ISO 128 weight: thick (cut, visible), thin (annotation, hatching,
+// dimensions, chain lines pre-split into dash + dot), thin dashed (hidden); poché fills + labels. Shared by every 2D drawing.
 
 import * as THREE from 'three';
 import type { Vec2 } from '@core/model/types';
@@ -17,7 +11,6 @@ import { dimensionGeometry } from '@core/geometry/dimensionGeometry';
 
 const ARC_SEGMENTS = 32;
 
-/** A primitive with the colour it is stroked in. */
 export interface StyledPrimitive {
   readonly primitive: DrawingPrimitive;
   readonly color: string;
@@ -30,11 +23,11 @@ export interface DrawingLabel {
   readonly content: string;
   readonly color: string;
   readonly rotation: number;
-  /** Dimension values keep a minimum on-screen size when zoomed out. */
+  /** Keeps a minimum on-screen size when zoomed out. */
   readonly dimension: boolean;
 }
 
-/** Flat xyz positions + rgb colours of independent segments, relative to an anchor. */
+/** Flat xyz + rgb of independent segments, relative to an anchor. */
 export class SegmentBuffer {
   readonly positions: number[] = [];
   readonly colors: number[] = [];
@@ -59,15 +52,15 @@ export interface DrawingBuffers {
   readonly thick: SegmentBuffer;
   readonly thin: SegmentBuffer;
   readonly dashed: SegmentBuffer;
-  /** Solid poché regions (outer ring + holes), relative to the anchor. */
+  /** Outer ring + holes, relative to the anchor. */
   readonly fills: Array<{ readonly outer: Vec2[]; readonly holes: Vec2[][] }>;
   readonly labels: DrawingLabel[];
 }
 
 export interface DrawingScale {
-  /** Unit of the ISO line patterns (`LINE_PATTERNS`), model units. */
+  /** `LINE_PATTERNS` unit, model units. */
   readonly patternUnit: number;
-  /** Distance between hatch lines, model units. */
+  /** Model units. */
   readonly hatchSpacing: number;
 }
 
@@ -77,14 +70,8 @@ function arcPoints(center: Vec2, radius: number, start: number, end: number): Ve
   return [first, ...sampleArc(center, radius, start, positiveSweep(end - start), ARC_SEGMENTS)];
 }
 
-/** Chain line along `points` (ISO 128 type 04: long dash, gap, dot, gap), one pattern for the whole run. */
-function chainRing(
-  buffer: SegmentBuffer,
-  points: ReadonlyArray<Vec2>,
-  closed: boolean,
-  unit: number,
-  color: THREE.Color,
-): void {
+/** ISO 128 type 04 (long dash, gap, dot, gap), one pattern over the whole run. */
+function chainRing(buffer: SegmentBuffer, points: ReadonlyArray<Vec2>, closed: boolean, unit: number, color: THREE.Color): void {
   const count = closed ? points.length : points.length - 1;
   const pattern = LINE_PATTERNS.center.map((length) => length * unit);
   let phase = 0;
@@ -98,10 +85,7 @@ function chainRing(
       const left = (pattern[phase] as number) - drawn;
       const end = Math.min(length, s + left);
       if (phase % 2 === 0) {
-        const lerp = (t: number): Vec2 => [
-          a[0] + ((b[0] - a[0]) * t) / length,
-          a[1] + ((b[1] - a[1]) * t) / length,
-        ];
+        const lerp = (t: number): Vec2 => [a[0] + ((b[0] - a[0]) * t) / length, a[1] + ((b[1] - a[1]) * t) / length];
         buffer.add(lerp(s), lerp(end), color);
       }
       drawn += end - s;
@@ -136,7 +120,7 @@ function addDimension(
   });
 }
 
-/** An explicitly filled area: ANSI31 hatch lines (thin) or a solid poché region. */
+/** ANSI31 hatch (thin) or solid poché. */
 function fillArea(
   buffers: DrawingBuffers,
   { anchor, hatchSpacing }: { readonly anchor: Vec2; readonly hatchSpacing: number },
@@ -146,23 +130,15 @@ function fillArea(
   stroke: THREE.Color,
 ): void {
   if (fill === 'hatch') {
-    for (const [a, b] of ansi31Hatch([outer, ...holes], hatchSpacing))
-      buffers.thin.add(a, b, stroke);
+    for (const [a, b] of ansi31Hatch([outer, ...holes], hatchSpacing)) buffers.thin.add(a, b, stroke);
   } else if (fill === 'solid') {
-    buffers.fills.push({
-      outer: relative(outer, anchor),
-      holes: holes.map((hole) => relative(hole, anchor)),
-    });
+    buffers.fills.push({ outer: relative(outer, anchor), holes: holes.map((hole) => relative(hole, anchor)) });
   }
 }
 
-const relative = (points: ReadonlyArray<Vec2>, [ax, ay]: Vec2): Vec2[] =>
-  points.map(([x, y]): Vec2 => [x - ax, y - ay]);
+const relative = (points: ReadonlyArray<Vec2>, [ax, ay]: Vec2): Vec2[] => points.map(([x, y]): Vec2 => [x - ax, y - ay]);
 
-/**
- * Line-weight buffers, fills and labels of `items`, relative to `anchor`.
- * @pure
- */
+/** Relative to `anchor`. */
 export function buildDrawingBuffers(
   items: ReadonlyArray<StyledPrimitive>,
   { patternUnit, hatchSpacing }: DrawingScale,
@@ -179,12 +155,7 @@ export function buildDrawingBuffers(
   items.forEach(({ primitive, color }, index) => {
     const stroke = new THREE.Color(color);
     const style = primitive.style;
-    const target =
-      style === 'cut' || style === 'visible'
-        ? buffers.thick
-        : style === 'hidden'
-          ? buffers.dashed
-          : buffers.thin;
+    const target = style === 'cut' || style === 'visible' ? buffers.thick : style === 'hidden' ? buffers.dashed : buffers.thin;
     const ring = (points: ReadonlyArray<Vec2>, closed: boolean): void => {
       if (style === 'center') chainRing(buffers.thin, points, closed, patternUnit, stroke);
       else target.ring(points, closed, stroke);
@@ -201,10 +172,7 @@ export function buildDrawingBuffers(
         ring([primitive.a, primitive.b], false);
         break;
       case 'arc':
-        ring(
-          arcPoints(primitive.center, primitive.radius, primitive.startAngle, primitive.endAngle),
-          false,
-        );
+        ring(arcPoints(primitive.center, primitive.radius, primitive.startAngle, primitive.endAngle), false);
         break;
       case 'circle': {
         const points = arcPoints(primitive.center, primitive.radius, 0, Math.PI * 2).slice(0, -1);

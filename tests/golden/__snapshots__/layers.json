@@ -6,21 +6,9 @@
       "#1": {
         "id": "#1",
         "kind": "box",
-        "size": [
-          1,
-          1,
-          1
-        ],
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
+        "size": [1,1,1],
+        "position": [0,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#6b8f9c"
       }
@@ -74,88 +62,51 @@
       {
         "id": "#5",
         "name": "add_layer",
-        "params": {
-          "name": "Walls",
-          "color": "#ff0000"
-        },
+        "params": {"name":"Walls","color":"#ff0000"},
         "suppressed": false,
-        "affected": [
-          "#2"
-        ]
+        "affected": ["#2"]
       },
       {
         "id": "#6",
         "name": "add_layer",
-        "params": {
-          "name": "Doors"
-        },
+        "params": {"name":"Doors"},
         "suppressed": false,
-        "affected": [
-          "#4"
-        ]
+        "affected": ["#4"]
       },
       {
         "id": "#7",
         "name": "add_box",
-        "params": {
-          "size": [
-            1,
-            1,
-            1
-          ]
-        },
+        "params": {"size":[1,1,1]},
         "suppressed": false,
-        "affected": [
-          "#1"
-        ]
+        "affected": ["#1"]
       },
       {
         "id": "#8",
         "name": "set_entity_layer",
-        "params": {
-          "entityId": "#1",
-          "layerId": "#2"
-        },
+        "params": {"entityId":"#1","layerId":"#2"},
         "suppressed": false,
-        "affected": [
-          "#1"
-        ]
+        "affected": ["#1"]
       },
       {
         "id": "#9",
         "name": "update_layer",
-        "params": {
-          "id": "#4",
-          "name": "Windows"
-        },
+        "params": {"id":"#4","name":"Windows"},
         "suppressed": false,
-        "affected": [
-          "#4"
-        ]
+        "affected": ["#4"]
       },
       {
         "id": "#10",
         "name": "update_layer",
-        "params": {
-          "id": "#4",
-          "visible": false
-        },
+        "params": {"id":"#4","visible":false},
         "suppressed": false,
-        "affected": [
-          "#4"
-        ]
+        "affected": ["#4"]
       },
       {
         "id": "#11",
         "name": "update_layer",
-        "params": {
-          "id": "#2",
-          "locked": true
-        },
+        "params": {"id":"#2","locked":true},
         "suppressed": false,
-        "affected": [
-          "#2"
-        ]
+        "affected": ["#2"]
       }
     ],
     "configurations": {},

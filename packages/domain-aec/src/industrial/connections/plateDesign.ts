@@ -1,7 +1,4 @@
-/**
- * Base plate design of fixed column bases: lightest catalogue plate + anchor bolts for M + N.
- * @layer domain-aec
- */
+/** Base plate design of fixed column bases: lightest catalogue plate + anchor bolts for M + N. */
 
 import type { BasePlateElement, BuildingModel } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
@@ -15,9 +12,8 @@ import { baseReactions } from '../frames/frameModelSolve';
 import { yieldStrength } from '../steelDesign/steelDesign';
 
 /**
- * Sizes every fixed base plate of a level (one catalogue entry per column profile, from the worst
- * demands of all its columns) and stores plate size, thickness, bolt count and diameter on it.
- * @pure
+ * Sizes every fixed base plate of a level (one catalogue entry per column profile, from the worst demands of all its columns) and stores
+ * plate size, thickness, bolt count and diameter on it.
  */
 export function designFixedPlates(
   doc: CadDocument,

@@ -1,5 +1,4 @@
 /**
- * @layer tests/helpers
  * Shared setup for component tests that dispatch a command through the store and inspect
  * the resulting entity. USE IN TESTS ONLY.
  */
@@ -14,9 +13,7 @@ export function resetStore(): void {
 }
 
 /** Empty document plus a viewport store back at shaded / no section plane / nothing hidden. */
-export function resetViewportStores(
-  extra: Partial<ReturnType<typeof useViewportStore.getState>> = {},
-): void {
+export function resetViewportStores(extra: Partial<ReturnType<typeof useViewportStore.getState>> = {}): void {
   resetStore();
   useViewportStore.setState({
     displayMode: 'shaded',

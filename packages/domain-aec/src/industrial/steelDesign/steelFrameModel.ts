@@ -1,9 +1,6 @@
 /**
- * 2D model of a moment frame for the direct-stiffness solver: column pieces between the levels
- * where beams join, beams meshed at their point loads, the loads split into permanent / imposed.
- * Units: N, mm; vertical loads positive downward.
- * @layer domain-aec
- * @pure
+ * 2D model of a moment frame for the direct-stiffness solver: column pieces between the levels where beams join, beams meshed at their
+ * point loads, the loads split into permanent / imposed. Units: N, mm; vertical loads positive downward.
  */
 
 import { clamp } from '@lib/clamp';
@@ -13,14 +10,7 @@ import { E_STEEL } from './steelDesign';
 import type { MomentFrame } from './steelFrameDetect';
 import { inPlaneInertia } from './steelFrameSection';
 import type { BeamResult, ColumnNode } from './steelFraming';
-import {
-  clusterMeans,
-  LEVEL_TOLERANCE,
-  nearestIndex,
-  sectionOf,
-  selfWeightPerMetre,
-  type SteelBar,
-} from './steelMemberBars';
+import { clusterMeans, LEVEL_TOLERANCE, nearestIndex, sectionOf, selfWeightPerMetre, type SteelBar } from './steelMemberBars';
 
 interface SystemMember {
   readonly geometry: Omit<FrameMember, 'load'>;
@@ -81,28 +71,17 @@ const STATION_MERGE = 0.002;
 
 const FREE: FrameNode['restraint'] = [false, false, false];
 
-interface ColumnState {
-  readonly bar: SteelBar;
-  readonly u: number;
-  readonly zs: number[];
-  readonly nodes: number[];
-}
+type ColumnState = { readonly bar: SteelBar; readonly u: number; readonly zs: number[]; readonly nodes: number[] };
 
-/** Beam end z (axis) at the given end. */
-const endZ = (beam: BeamResult, end: 0 | 1): number =>
-  beam.loads.bar[end === 0 ? 'start' : 'end'][2];
+const endZ = (beam: BeamResult, end: 0 | 1): number => beam.loads.bar[end === 0 ? 'start' : 'end'][2];
 
 /**
  * Meshes a frame.
  * @param nonFrameReactions reactions delivered to the frame columns by beams that are not frame members
  * @invariant total vertical load of the model = Σ frame beam loads + non-frame reactions + column weights
  */
-export function buildFrameSystem(
-  frame: MomentFrame,
-  nonFrameReactions: ReadonlyMap<string, ReadonlyArray<ColumnNode>>,
-): FrameSystem {
-  const uOf = (point: readonly number[]): number =>
-    (frame.direction === 'Y' ? point[1] : point[0]) as number;
+export function buildFrameSystem(frame: MomentFrame, nonFrameReactions: ReadonlyMap<string, ReadonlyArray<ColumnNode>>): FrameSystem {
+  const uOf = (point: readonly number[]): number => (frame.direction === 'Y' ? point[1] : point[0]) as number;
   const nodes: FrameNode[] = [];
   const members: SystemMember[] = [];
   const nodeLoads: FrameSystem['nodeLoads'] = [];
@@ -114,11 +93,7 @@ export function buildFrameSystem(
   };
 
   const levelZs = clusterMeans(
-    frame.beams.flatMap((beam) =>
-      ([0, 1] as const).flatMap((end) =>
-        beam.ends[end].type === 'column' ? [endZ(beam, end)] : [],
-      ),
-    ),
+    frame.beams.flatMap((beam) => ([0, 1] as const).flatMap((end) => (beam.ends[end].type === 'column' ? [endZ(beam, end)] : []))),
     LEVEL_TOLERANCE,
   );
   const snapZ = (z: number): number => {
@@ -134,8 +109,7 @@ export function buildFrameSystem(
     for (const beam of frame.beams) {
       for (const end of [0, 1] as const) {
         const support = beam.ends[end];
-        if (support.type === 'column' && support.id === column.id)
-          requested.push(snapZ(endZ(beam, end)));
+        if (support.type === 'column' && support.id === column.id) requested.push(snapZ(endZ(beam, end)));
       }
     }
     const extras = (nonFrameReactions.get(column.id) ?? [])
@@ -167,9 +141,7 @@ export function buildFrameSystem(
   const levels: SystemLevel[] = levelZs.map((z) => ({
     z,
     nodes: [...states.values()].flatMap((state) =>
-      state.zs.flatMap((nodeZ, index) =>
-        Math.abs(nodeZ - z) < SAME_POINT ? [state.nodes[index] as number] : [],
-      ),
+      state.zs.flatMap((nodeZ, index) => (Math.abs(nodeZ - z) < SAME_POINT ? [state.nodes[index] as number] : [])),
     ),
     permanent: 0,
     imposed: 0,
@@ -215,9 +187,7 @@ export function buildFrameSystem(
     );
     boundaries.slice(1).forEach((top, boundary) => {
       const bottom = boundaries[boundary] as number;
-      const level = levels.findIndex((candidate) =>
-        candidate.nodes.includes(state.nodes[top] as number),
-      );
+      const level = levels.findIndex((candidate) => candidate.nodes.includes(state.nodes[top] as number));
       storeyPieces.push({
         columnId: state.bar.id,
         bottom: state.nodes[bottom] as number,
@@ -232,11 +202,7 @@ export function buildFrameSystem(
     for (const reaction of reactions) {
       if (frameBeamIds.has(reaction.beamId) || !states.has(columnId)) continue;
       const node = columnNode(columnId, snapZ(reaction.zAxis));
-      nodeLoads.push({
-        node,
-        permanent: reaction.permanent * 1000,
-        imposed: reaction.imposed * 1000,
-      });
+      nodeLoads.push({ node, permanent: reaction.permanent * 1000, imposed: reaction.imposed * 1000 });
       const level = levelAt(reaction.zAxis);
       if (level) {
         level.permanent += reaction.permanent * 1000;
@@ -291,15 +257,11 @@ export function buildFrameSystem(
     const releaseEnd = beam.ends[1].type === 'column' && bar.endJoint !== 'rigid';
     for (let index = 0; index < stations.length - 1; index++) {
       const [s0, s1] = [stations[index] as number, stations[index + 1] as number];
-      const overlap = (piece: { from: number; to: number }): number =>
-        Math.max(0, Math.min(s1, piece.to) - Math.max(s0, piece.from));
+      const overlap = (piece: { from: number; to: number }): number => Math.max(0, Math.min(s1, piece.to) - Math.max(s0, piece.from));
       const average = (key: 'permanent' | 'imposed'): number =>
         pieces.reduce((sum, piece) => sum + piece[key] * overlap(piece), 0) / (s1 - s0);
       const [lowNode, highNode] = [indices[index] as number, indices[index + 1] as number];
-      const [releaseLow, releaseHigh] = [
-        index === 0 && releaseStart,
-        index === stations.length - 2 && releaseEnd,
-      ];
+      const [releaseLow, releaseHigh] = [index === 0 && releaseStart, index === stations.length - 2 && releaseEnd];
       memberIds.push(members.length);
       members.push({
         geometry: {
@@ -319,11 +281,7 @@ export function buildFrameSystem(
     }
     for (const point of points) {
       const station = nearestIndex(stations, clamp(point.at, 0, lengthM));
-      nodeLoads.push({
-        node: indices[station] as number,
-        permanent: point.permanent * 1000,
-        imposed: point.imposed * 1000,
-      });
+      nodeLoads.push({ node: indices[station] as number, permanent: point.permanent * 1000, imposed: point.imposed * 1000 });
     }
     const totals = loadTotals(pieces, points);
     const level = levelAt((from.z + to.z) / 2);

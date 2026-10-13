@@ -1,7 +1,4 @@
-/**
- * Elevations and sections as printable SVG drawing sheets over the hidden-line projection.
- * @layer domain-aec
- */
+/** Elevations and sections as printable SVG drawing sheets over the hidden-line projection. */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
 import { DrawingPainter, svgLine } from '../../shared/drawingSvg';
@@ -12,11 +9,7 @@ import { elementsOf, fileSlug, getBuilding } from '../model';
 import { noop, report } from '@core/commands/noop';
 import { escapeXml } from '@lib/escapeXml';
 import { sub2 } from '@lib/vec2';
-import {
-  ELEVATION_DIRECTIONS,
-  buildElevationDrawing,
-  type ElevationDirection,
-} from './elevationProjection';
+import { ELEVATION_DIRECTIONS, buildElevationDrawing, type ElevationDirection } from './elevationProjection';
 import {
   PAPER_MM,
   PAPER_FIELD,
@@ -45,10 +38,7 @@ export interface ElevationSheet {
 const ANNOTATION_TOP = 14;
 const ANNOTATION_RIGHT = 34;
 
-/**
- * @pure
- * @failure no 3D geometry / invalid scale -> null
- */
+/** @failure no 3D geometry / invalid scale -> null */
 function buildElevationSheet(
   doc: CadDocument,
   options: {
@@ -73,9 +63,7 @@ function buildElevationSheet(
   };
   const millimetresPerUnit = toMm(doc, 1);
   const [minU, minZ, maxU, maxZ] = drawing.bounds;
-  const scale =
-    options.scale ??
-    fitScale((maxU - minU) * millimetresPerUnit, (maxZ - minZ) * millimetresPerUnit, viewport);
+  const scale = options.scale ?? fitScale((maxU - minU) * millimetresPerUnit, (maxZ - minZ) * millimetresPerUnit, viewport);
   const k = millimetresPerUnit / scale;
   const offsetX = viewport.x + (viewport.width - (maxU - minU) * k) / 2;
   const offsetY = viewport.y + viewport.height - (viewport.height - (maxZ - minZ) * k) / 2;
@@ -87,9 +75,7 @@ function buildElevationSheet(
   const building = getBuilding(doc);
   const annotations: string[] = [];
   const [left, right] = [toPaper([minU, 0])[0] - 6, toPaper([maxU, 0])[0] + 6];
-  const ground = building.levelOrder
-    .map((id) => building.levels[id]?.elevation)
-    .filter((value): value is number => value !== undefined);
+  const ground = building.levelOrder.map((id) => building.levels[id]?.elevation).filter((value): value is number => value !== undefined);
   // A ground line only where there is a building to stand on (a machine part has none).
   if (ground.length > 0) {
     const groundY = toPaper([0, Math.min(...ground)])[1];
@@ -160,8 +146,6 @@ function buildElevationSheet(
 }
 
 /**
- * @command export_elevation_sheet
- * @pure read-only
  * @affects none; data = { filename, svg, paper, scale, lines }
  * @failure bad direction / paper / scale / cutAt, nothing to draw -> no data
  */
@@ -169,44 +153,25 @@ export const exportElevationSheet = defineCommand({
   name: 'export_elevation_sheet',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Produce a printable elevation or section drawing (SVG in real millimetres, print to PDF at 100%) ' +
-    'drawn as an ISO 128 line drawing from the 3D model with hidden lines removed (visible edges heavy, ' +
-    'centre lines chain-dotted): north / south / east / west elevation (+Y is north), or a section when ' +
-    'cutAt is given (the model nearer to the viewer than the cut plane is removed; cut faces outlined heavy, ' +
-    'hatched at 45°, steel filled solid). Shows level datums, grid bubbles, scale bar and the title block. ' +
-    'Use exclude: ["panel"] to show the steel frame behind the cladding. data.svg holds the file text.',
+    'Produce a printable elevation or section drawing (SVG in real millimetres, print to PDF at 100%) drawn as an ISO 128 line drawing ' +
+    'from the 3D model with hidden lines removed (visible edges heavy, centre lines chain-dotted): north / south / east / west elevation ' +
+    '(+Y is north), or a section when cutAt is given (the model nearer to the viewer than the cut plane is removed; cut faces outlined ' +
+    'heavy, hatched at 45°, steel filled solid). Shows level datums, grid bubbles, scale bar and the title block. Use exclude: ["panel"] ' +
+    'to show the steel frame behind the cladding. data.svg holds the file text.',
   params: z.object({
     direction: z
       .enum(ELEVATION_DIRECTIONS)
       .optional()
-      .describe(
-        'Side the viewer stands on (north elevation = north façade seen from the north). Default south.',
-      ),
-    cutAt: z
-      .number()
-      .optional()
-      .describe(
-        'Section plane position on the viewing axis (y for north / south, x for east / west).',
-      ),
-    exclude: z
-      .array(z.string())
-      .optional()
-      .describe('Building categories to leave out, e.g. ["panel", "slab"].'),
+      .describe('Side the viewer stands on (north elevation = north façade seen from the north). Default south.'),
+    cutAt: z.number().optional().describe('Section plane position on the viewing axis (y for north / south, x for east / west).'),
+    exclude: z.array(z.string()).optional().describe('Building categories to leave out, e.g. ["panel", "slab"].'),
     paper: PAPER_FIELD,
     scale: SCALE_FIELD,
     title: z.string().optional().describe('Drawing title. Default "<Direction> elevation".'),
   }),
-  run: (
-    doc,
-    { direction = 'south', cutAt, exclude, paper = 'A3', scale, title },
-  ): CommandResult => {
+  run: (doc, { direction = 'south', cutAt, exclude, paper = 'A3', scale, title }): CommandResult => {
     const sheet = buildElevationSheet(doc, { direction, cutAt, exclude, paper, scale, title });
-    if (!sheet) {
-      return noop(
-        doc,
-        'export_elevation_sheet failed: no 3D geometry to draw (on that side of the cut) or invalid scale.',
-      );
-    }
+    if (!sheet) return noop(doc, 'export_elevation_sheet failed: no 3D geometry to draw (on that side of the cut) or invalid scale.');
     return report(
       doc,
       `Elevation sheet ${sheet.filename}: ${sheet.lines} drawn line(s) / cut face(s) at 1:${sheet.scale} on ${sheet.paper}.${sheetFitWarning(sheet.fits, 'view')}`,

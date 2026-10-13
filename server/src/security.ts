@@ -1,31 +1,23 @@
-/**
- * @layer server
- *
- * HTTP hardening helpers for the non-MCP routes: origin allowlist, mutation guard,
- * JSON error handler. No business logic (architecture L6).
- */
-
+/** HTTP hardening for the non-MCP routes: origin/host allowlists, auth guards, rate limits, JSON errors. */
 import crypto from 'crypto';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import rateLimit from 'express-rate-limit';
-import { UNAUTHORIZED_BODY, isUserMode, requireRole, sha256Digest, type Role } from './users';
+import { UNAUTHORIZED_BODY, bearerToken, isUserMode, requireRole, sha256Digest, type Role } from './users';
 import { positiveInteger } from './env';
 
-const DEFAULT_ALLOWED_ORIGINS: readonly string[] = [
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://localhost:3000',
-];
+const DEFAULT_ALLOWED_ORIGINS: readonly string[] = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'];
 
 /** Origins allowed to call the server from a browser. `LLULL_ALLOWED_ORIGINS` = comma-separated. */
 export function getAllowedOrigins(): string[] {
   const raw = process.env['LLULL_ALLOWED_ORIGINS'];
-  if (raw === undefined || raw.trim() === '') return [...DEFAULT_ALLOWED_ORIGINS];
-  return raw
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter((origin) => origin.length > 0);
+  return raw === undefined || raw.trim() === '' ? [...DEFAULT_ALLOWED_ORIGINS] : csv(raw);
 }
+
+const csv = (raw: string): string[] =>
+  raw
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
 
 /** Constant-time equality of two tokens (compares SHA-256 digests: no length leak). */
 function tokensMatch(presented: string, token: string): boolean {
@@ -34,51 +26,34 @@ function tokensMatch(presented: string, token: string): boolean {
 
 /** Constant-time `Authorization: Bearer <token>` check (digest compare: no length leak; scheme case-insensitive). */
 export function hasValidBearer(req: Request, token: string): boolean {
-  const header = req.headers['authorization'];
-  if (typeof header !== 'string') return false;
-  const match = /^bearer +(.+)$/i.exec(header);
-  const presented = match?.[1];
-  if (presented === undefined) return false;
-  return tokensMatch(presented, token);
+  const presented = bearerToken(req);
+  return presented !== undefined && tokensMatch(presented, token);
 }
 
 /** Constant-time check of the `?access_token=` query parameter (EventSource cannot set headers). */
 function hasValidAccessToken(req: Request, token: string): boolean {
   const presented = req.query['access_token'];
-  if (typeof presented !== 'string' || presented.length === 0) return false;
-  return tokensMatch(presented, token);
+  return typeof presented === 'string' && presented.length > 0 && tokensMatch(presented, token);
 }
 
 /** True for 127.0.0.0/8, ::1, ::ffff:127.*, and `localhost`. */
 export function isLoopbackAddress(address: string | undefined): boolean {
   if (address === undefined) return false;
   const value = address.toLowerCase();
+  return value === 'localhost' || value === '::1' || value.startsWith('127.') || value.startsWith('::ffff:127.');
+}
+
+/** Loopback TCP peer not relayed by a proxy (behind a local reverse proxy every client looks like loopback). */
+function isLocalPeer(req: Request): boolean {
   return (
-    value === 'localhost' ||
-    value === '::1' ||
-    value.startsWith('127.') ||
-    value.startsWith('::ffff:127.')
+    req.headers['x-forwarded-for'] === undefined && req.headers['forwarded'] === undefined && isLoopbackAddress(req.socket?.remoteAddress)
   );
 }
 
-/**
- * True when the TCP peer is loopback AND the request was not relayed by a proxy: behind a local
- * reverse proxy every client looks like loopback, so `X-Forwarded-For` / `Forwarded` demote it.
- */
-function isLocalPeer(req: Request): boolean {
-  if (req.headers['x-forwarded-for'] !== undefined || req.headers['forwarded'] !== undefined)
-    return false;
-  return isLoopbackAddress(req.socket?.remoteAddress);
-}
-
-/**
- * Startup safety: a non-loopback `HOST` without `MCP_AUTH_TOKEN` exposes an unauthenticated
- * document-mutating API to the network. Returns an error message to refuse startup, or null.
- * Opt out with `LLULL_ALLOW_UNAUTHENTICATED=true`.
- */
+/** Refusal message when a non-loopback `HOST` would expose an unauthenticated API (opt out: `LLULL_ALLOW_UNAUTHENTICATED=true`), else null. */
 export function checkBindSafety(host: string, env: NodeJS.ProcessEnv = process.env): string | null {
-  if (isLoopbackAddress(host) || env['MCP_AUTH_TOKEN'] || env['LLULL_USERS_FILE']) return null;
-  if (env['LLULL_ALLOW_UNAUTHENTICATED'] === 'true') return null;
+  if (isLoopbackAddress(host) || env['MCP_AUTH_TOKEN'] || env['LLULL_USERS_FILE'] || env['LLULL_ALLOW_UNAUTHENTICATED'] === 'true')
+    return null;
   return (
     `Refusing to start: HOST=${host} is not loopback and MCP_AUTH_TOKEN is not set. ` +
     'Set MCP_AUTH_TOKEN (or LLULL_USERS_FILE), bind to 127.0.0.1, or set LLULL_ALLOW_UNAUTHENTICATED=true.'
@@ -96,45 +71,27 @@ function hostWithoutPort(hostHeader: string): string {
 }
 
 /**
- * Host-header allowlist (DNS-rebinding defence). Allowed: localhost, 127.0.0.1, [::1] (any port)
- * plus `LLULL_ALLOWED_HOSTS` (comma-separated; `name` = any port, `name:port` = exact).
- * When `HOST` is non-loopback and `LLULL_ALLOWED_HOSTS` is unset, any Host is accepted
- * (public hostnames are unknown; bearer auth is mandatory there, see `checkBindSafety`).
+ * Host-header allowlist (DNS rebinding): localhost, 127.0.0.1, [::1] (any port) + `LLULL_ALLOWED_HOSTS` (`name` any port,
+ * `name:port` exact). Non-loopback `HOST` with no allowlist accepts any Host (bearer auth is mandatory there).
  */
 export function hostAllowlist(): RequestHandler {
   return (req: Request, res: Response, next: NextFunction): void => {
-    const extra = (process.env['LLULL_ALLOWED_HOSTS'] ?? '')
-      .split(',')
-      .map((entry) => entry.trim().toLowerCase())
-      .filter((entry) => entry.length > 0);
-    if (extra.length === 0 && !isLoopbackAddress(process.env['HOST'] ?? '127.0.0.1')) {
-      next();
-      return;
-    }
+    const extra = csv((process.env['LLULL_ALLOWED_HOSTS'] ?? '').toLowerCase());
     const header = req.headers['host'];
-    if (typeof header === 'string') {
-      const full = header.trim().toLowerCase();
-      const bare = hostWithoutPort(full);
-      const allowed =
-        ['localhost', '127.0.0.1', '[::1]'].includes(bare) ||
-        extra.includes(full) ||
-        extra.includes(bare);
-      if (allowed) {
-        next();
-        return;
-      }
-    }
-    res.status(403).json({ error: 'Host header is not allowed.' });
+    const full = typeof header === 'string' ? header.trim().toLowerCase() : undefined;
+    const bare = full === undefined ? undefined : hostWithoutPort(full);
+    const allowed =
+      (extra.length === 0 && !isLoopbackAddress(process.env['HOST'] ?? '127.0.0.1')) ||
+      (full !== undefined &&
+        bare !== undefined &&
+        (['localhost', '127.0.0.1', '[::1]'].includes(bare) || extra.includes(full) || extra.includes(bare)));
+    if (allowed) next();
+    else res.status(403).json({ error: 'Host header is not allowed.' });
   };
 }
 
 /**
- * Guard for the browser mutation routes (/command, /undo, /redo).
- *
- * The Origin allowlist is CSRF protection ONLY (it stops other websites driving a browser);
- * `Origin` is trivially forged by curl, so it is never treated as authentication for remote peers.
- *
- * Policy (evaluated per request):
+ * Guard for /command, /undo, /redo. The Origin allowlist is CSRF protection ONLY, never authentication. Policy:
  *   1. valid `Authorization: Bearer <MCP_AUTH_TOKEN>`              -> allow
  *   2. `LLULL_REQUIRE_TOKEN_FOR_REST=true` and a token is set       -> 401
  *   3. token set and peer is NOT loopback (or came via a proxy)     -> 401 (Origin is not trusted)
@@ -146,19 +103,12 @@ export function guardMutation(): RequestHandler {
   return buildGuard(false, 'editor');
 }
 
-/**
- * Guard for the read routes (/live, /live/snapshot, /export/*). Same policy as `guardMutation`
- * once a token is configured (so whatever lets the local UI mutate lets it read), plus
- * `?access_token=<token>` for EventSource / plain browser downloads. No token configured -> open.
- */
+/** Guard for /live, /live/snapshot, /export/*: `guardMutation` policy + `?access_token=` (EventSource); no token -> open. */
 export function guardRead(): RequestHandler {
   return buildGuard(true, 'viewer');
 }
 
-/**
- * Guard for `/admin/*`. Named-user mode: role `admin`. Single-token mode: the shared token (it is
- * all-powerful). No token configured: loopback peers only.
- */
+/** Guard for `/admin/*`: role `admin` (named users), the shared token, or (no token) loopback peers only. */
 export function guardAdmin(): RequestHandler {
   return userRoleOr('admin', false, (req, res, next) => {
     const token = process.env['MCP_AUTH_TOKEN'];
@@ -166,13 +116,7 @@ export function guardAdmin(): RequestHandler {
       next();
       return;
     }
-    res
-      .status(token ? 401 : 403)
-      .json(
-        token
-          ? UNAUTHORIZED_BODY
-          : { error: 'Admin endpoints need MCP_AUTH_TOKEN or a loopback peer.' },
-      );
+    res.status(token ? 401 : 403).json(token ? UNAUTHORIZED_BODY : { error: 'Admin endpoints need MCP_AUTH_TOKEN or a loopback peer.' });
   });
 }
 
@@ -189,10 +133,7 @@ function buildGuard(acceptQueryToken: boolean, role: Role): RequestHandler {
       next();
       return;
     }
-    if (
-      token &&
-      (hasValidBearer(req, token) || (acceptQueryToken && hasValidAccessToken(req, token)))
-    ) {
+    if (token && (hasValidBearer(req, token) || (acceptQueryToken && hasValidAccessToken(req, token)))) {
       next();
       return;
     }
@@ -213,10 +154,7 @@ function buildGuard(acceptQueryToken: boolean, role: Role): RequestHandler {
   });
 }
 
-/**
- * Per-IP express-rate-limit with the standard JSON 429 body. The limit is the positive integer in
- * env `maxVariable` (default 600) per `windowVariable` milliseconds (default 60000).
- */
+/** Per-IP limiter: env `maxVariable` requests (default 600) per env `windowVariable` ms (default 60000). */
 export function buildRateLimiter(maxVariable: string, windowVariable: string): RequestHandler {
   return rateLimit({
     windowMs: positiveInteger(process.env[windowVariable], 60_000),
@@ -227,7 +165,6 @@ export function buildRateLimiter(maxVariable: string, windowVariable: string): R
   });
 }
 
-/** Per-IP limiter for REST routes (`LLULL_REST_RATE_LIMIT_MAX` / `_WINDOW_MS`). */
 export function buildRestRateLimiter(): RequestHandler {
   return buildRateLimiter('LLULL_REST_RATE_LIMIT_MAX', 'LLULL_REST_RATE_LIMIT_WINDOW_MS');
 }
@@ -238,27 +175,15 @@ interface HttpParseError extends Error {
 }
 
 /** Final error middleware: JSON bodies, never an HTML stack trace. */
-export function jsonErrorHandler(
-  err: unknown,
-  _req: Request,
-  res: Response,
-  next: NextFunction,
-): void {
+export function jsonErrorHandler(err: unknown, _req: Request, res: Response, next: NextFunction): void {
   if (res.headersSent) {
     next(err);
     return;
   }
   const httpError = err as HttpParseError;
-  if (httpError.type === 'entity.parse.failed') {
-    res.status(400).json({ error: 'Malformed JSON body.' });
-    return;
-  }
-  if (httpError.type === 'entity.too.large') {
-    res.status(413).json({ error: 'Request body too large.' });
-    return;
-  }
-  const status =
-    typeof httpError.status === 'number' && httpError.status >= 400 ? httpError.status : 500;
+  if (httpError.type === 'entity.parse.failed') return void res.status(400).json({ error: 'Malformed JSON body.' });
+  if (httpError.type === 'entity.too.large') return void res.status(413).json({ error: 'Request body too large.' });
+  const status = typeof httpError.status === 'number' && httpError.status >= 400 ? httpError.status : 500;
   if (status >= 500) console.error('[server] unhandled error:', httpError.message);
   res.status(status).json({ error: status >= 500 ? 'Internal server error.' : httpError.message });
 }

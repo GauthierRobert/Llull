@@ -1,9 +1,4 @@
-/**
- * Terrain TIN: triangulated surface from 3D points, spot-elevation queries through a bucket grid,
- * and contour tracing.
- * @layer domain-aec/civil
- * @pure
- */
+/** Terrain TIN: triangulated surface from 3D points, spot-elevation queries through a bucket grid, and contour tracing. */
 
 import type { Vec2, Vec3 } from '@core/model/types';
 import { distance, pointInPolygon } from '@lib/polygon';
@@ -16,10 +11,7 @@ export interface Tin {
   readonly triangles: readonly number[];
 }
 
-export interface TinOptions {
-  readonly boundary?: readonly Vec2[];
-  readonly maxEdgeLength?: number;
-}
+export type TinOptions = { readonly boundary?: readonly Vec2[]; readonly maxEdgeLength?: number };
 
 /** Points closer than this in plan are merged (the first one wins). */
 const MERGE_TOLERANCE = 1e-6;
@@ -85,10 +77,7 @@ export function tinPlanArea(tin: Tin): number {
   return area;
 }
 
-export interface TinBounds {
-  readonly min: Vec3;
-  readonly max: Vec3;
-}
+export type TinBounds = { readonly min: Vec3; readonly max: Vec3 };
 
 /** Bounds of the vertices used by at least one triangle; null for an empty TIN. */
 export function tinBounds(tin: Tin): TinBounds | null {
@@ -150,8 +139,7 @@ export function elevationAt(tin: Tin, at: Vec2): number | null {
     const l1 = ((b[1] - c[1]) * (at[0] - c[0]) + (c[0] - b[0]) * (at[1] - c[1])) / det;
     const l2 = ((c[1] - a[1]) * (at[0] - c[0]) + (a[0] - c[0]) * (at[1] - c[1])) / det;
     const l3 = 1 - l1 - l2;
-    if (l1 < -BARYCENTRIC_TOLERANCE || l2 < -BARYCENTRIC_TOLERANCE || l3 < -BARYCENTRIC_TOLERANCE)
-      continue;
+    if (l1 < -BARYCENTRIC_TOLERANCE || l2 < -BARYCENTRIC_TOLERANCE || l3 < -BARYCENTRIC_TOLERANCE) continue;
     return l1 * a[2] + l2 * b[2] + l3 * c[2];
   }
   return null;

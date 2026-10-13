@@ -4,8 +4,6 @@ import type { Locator } from '@playwright/test';
 import type { UiSession } from './session';
 
 /**
- * @layer tests/production/ui
- *
  * Issue the coordination package through the Building panel's Deliverables and Quantities
  * sections: every file is the one the browser downloaded. Per-level files are issued by picking
  * the level in the "Export level" selector (the active level is not touched).
@@ -18,9 +16,7 @@ const SCHEDULES = ['member', 'equipment', 'pipe'] as const;
 /** The "Takeoff CSV" download as the `{ lines }` shape the criteria read (key, unit, quantity). */
 function takeoffJson(csv: string): string {
   const [, ...rows] = parseCsv(csv);
-  const lines = rows
-    .filter((row) => row.length >= 4)
-    .map((row) => ({ key: row[0] ?? '', unit: row[3] ?? '', quantity: Number(row[2]) }));
+  const lines = rows.filter((row) => row.length >= 4).map((row) => ({ key: row[0] ?? '', unit: row[3] ?? '', quantity: Number(row[2]) }));
   return JSON.stringify({ lines });
 }
 
@@ -37,7 +33,6 @@ export async function exportPackage(
     fileNames[id] = file.name;
   };
   const button = (name: string): Locator => page.getByRole('button', { name, exact: true });
-
   await take('ifc', () => button('IFC (BIM)').click());
   for (const levelId of levelIds) {
     await page.getByLabel('Export level').selectOption(levelId);
@@ -59,8 +54,6 @@ export async function exportPackage(
 /** Top bar "Save": the project file the office archives. */
 export async function saveProject(session: UiSession): Promise<string> {
   await session.deselect();
-  const file = await session.download(() =>
-    session.page.getByRole('button', { name: 'Save project to a JSON file' }).click(),
-  );
+  const file = await session.download(() => session.page.getByRole('button', { name: 'Save project to a JSON file' }).click());
   return file.text;
 }

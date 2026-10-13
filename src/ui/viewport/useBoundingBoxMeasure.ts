@@ -1,10 +1,4 @@
-/**
- * @layer ui/viewport
- *
- * Narrow store read of the last `measure_bounding_box` result for the 2D and 3D overlays.
- * Calls r3f `invalidate()` when the measure changes so a `frameloop="demand"` canvas repaints.
- * Must be used inside a Canvas. Presentational only — no document mutation.
- */
+// Last `measure_bounding_box` result for the 2D / 3D overlays; invalidates the demand canvas on change (in-Canvas only).
 
 import { useEffect } from 'react';
 import { useThree } from '@react-three/fiber';

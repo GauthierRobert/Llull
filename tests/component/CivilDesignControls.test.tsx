@@ -1,21 +1,9 @@
-/**
- * Component tests for the Civil / Site panel design controls a pilot tutorial uses (react R11):
- * clothoid spiral lengths on a new alignment, superelevation and the plan-profile paper on an
- * alignment, and the IDF design storm + outfall tailwater of the drainage check and sizing.
- */
-
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
-import {
-  CivilPanel,
-  downloadText,
-  localDispatch,
-  spyDispatch,
-  setupCivilStore,
-  surveyed,
-} from '../helpers/civilPanel';
+import { CivilPanel, downloadText, localDispatch, spyDispatch, setupCivilStore, surveyed } from '../helpers/civilPanel';
+import { xy } from '../helpers/xy';
 
 vi.mock('@ui/download', () => ({ downloadText: vi.fn(), downloadBlob: vi.fn() }));
 
@@ -23,16 +11,7 @@ const SURVEY = ['1,0,0,10', '2,100,0,11', '3,0,100,12', '4,100,100,13'].join('\n
 
 function site(): void {
   surveyed(SURVEY);
-  localDispatch('add_alignment', {
-    name: 'Road',
-    points: [
-      [10, 10],
-      [90, 10],
-      [90, 90],
-    ],
-    radii: [30],
-    surfaceId: 'surface-1',
-  });
+  localDispatch('add_alignment', { name: 'Road', points: xy(10, 10, 90, 10, 90, 90), radii: [30], surfaceId: 'surface-1' });
   localDispatch('set_alignment_profile', {
     alignmentId: 'alignment-1',
     pvis: [
@@ -41,11 +20,7 @@ function site(): void {
     ],
   });
   localDispatch('add_manhole', { location: [20, 50], invertElevation: 9, surfaceId: 'surface-1' });
-  localDispatch('add_manhole', {
-    location: [60, 50],
-    invertElevation: 8.5,
-    surfaceId: 'surface-1',
-  });
+  localDispatch('add_manhole', { location: [60, 50], invertElevation: 8.5, surfaceId: 'surface-1' });
   localDispatch('add_pipe', { fromId: 'manhole-1', toId: 'manhole-2' });
 }
 
@@ -56,9 +31,7 @@ describe('Civil design controls', () => {
     site();
     const dispatch = spyDispatch();
     render(<CivilPanel />);
-    fireEvent.change(screen.getByLabelText('Alignment points'), {
-      target: { value: '0,0; 50,10; 60,60' },
-    });
+    fireEvent.change(screen.getByLabelText('Alignment points'), { target: { value: '0,0; 50,10; 60,60' } });
     fireEvent.change(screen.getByLabelText('Curve radii'), { target: { value: '40' } });
     fireEvent.change(screen.getByLabelText('Spiral lengths'), { target: { value: 'x' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add alignment' }));
@@ -66,12 +39,8 @@ describe('Civil design controls', () => {
     expect(dispatch).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText('Spiral lengths'), { target: { value: '20' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add alignment' }));
-    expect(dispatch).toHaveBeenCalledWith(
-      'add_alignment',
-      expect.objectContaining({ radii: [40], spirals: [20] }),
-    );
+    expect(dispatch).toHaveBeenCalledWith('add_alignment', expect.objectContaining({ radii: [40], spirals: [20] }));
   });
-
   it('sets the superelevation of an alignment and explains a blank rate', () => {
     site();
     const dispatch = spyDispatch();
@@ -79,16 +48,10 @@ describe('Civil design controls', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Set superelevation' }));
     expect(screen.getByTestId('civil-alignment-status-alignment-1')).toHaveTextContent(/ratio/);
     expect(dispatch).not.toHaveBeenCalled();
-    fireEvent.change(screen.getByLabelText('Superelevation of Road'), {
-      target: { value: '0.06' },
-    });
+    fireEvent.change(screen.getByLabelText('Superelevation of Road'), { target: { value: '0.06' } });
     fireEvent.click(screen.getByRole('button', { name: 'Set superelevation' }));
-    expect(dispatch).toHaveBeenCalledWith('set_superelevation', {
-      alignmentId: 'alignment-1',
-      maxRate: 0.06,
-    });
+    expect(dispatch).toHaveBeenCalledWith('set_superelevation', { alignmentId: 'alignment-1', maxRate: 0.06 });
   });
-
   it('issues the plan-profile sheet on the chosen paper', () => {
     site();
     render(<CivilPanel />);
@@ -98,7 +61,6 @@ describe('Civil design controls', () => {
     expect(name).toMatch(/_A2_/);
     expect(content).toContain('<svg');
   });
-
   it('checks and sizes the network with an IDF curve and the outfall tailwater', () => {
     site();
     const dispatch = spyDispatch();
@@ -108,15 +70,10 @@ describe('Civil design controls', () => {
     fireEvent.change(screen.getByLabelText('IDF c'), { target: { value: '0.8' } });
     fireEvent.change(screen.getByLabelText('Outfall level'), { target: { value: '8.6' } });
     fireEvent.click(screen.getByRole('button', { name: 'Check network' }));
-    expect(screen.getByTestId('civil-drainage-status')).toHaveTextContent(
-      /IDF i=1000\/\(t\+10\)\^0.8 mm\/h/,
-    );
+    expect(screen.getByTestId('civil-drainage-status')).toHaveTextContent(/IDF i=1000\/\(t\+10\)\^0.8 mm\/h/);
     fireEvent.click(screen.getByRole('button', { name: 'Size pipes' }));
-    expect(dispatch).toHaveBeenCalledWith('size_drainage_pipes', {
-      idf: { a: 1000, b: 10, c: 0.8 },
-    });
+    expect(dispatch).toHaveBeenCalledWith('size_drainage_pipes', { idf: { a: 1000, b: 10, c: 0.8 } });
   });
-
   it('falls back to the constant intensity while the IDF curve is incomplete', () => {
     site();
     const dispatch = spyDispatch();

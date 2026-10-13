@@ -1,20 +1,11 @@
 /**
- * @command create_material
- * @command assign_material
- * @pure
- * @layer core/commands
  * @affects CadDocument.materials (create_material); BaseEntity.materialId (assign_material)
  * @invariant density > 0; metalness ∈ [0,1]; roughness ∈ [0,1]; color matches /^#[0-9a-fA-F]{6}$/
  * @failure blank name / density ≤ 0 / out-of-range PBR / invalid hex → no-op, affected:[]
  * @failure unknown material or unknown entity id → no-op per-entity, summary lists failures
  */
 
-import {
-  type CadDocument,
-  type Material,
-  type MaterialFinish,
-  FINISH_PATTERNS,
-} from '../../model/types';
+import { type CadDocument, type Material, type MaterialFinish, FINISH_PATTERNS } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { isHexColor } from '../../lib/isHexColor';
@@ -28,19 +19,14 @@ function finishProblem(
   clearcoat: number | undefined,
 ): string | null {
   if (!(scale > 0)) return `finishScale must be > 0, got ${scale}`;
-  if (color2 !== undefined && !isHexColor(color2))
-    return `color2 must be a 6-digit hex string, got "${color2}"`;
+  if (color2 !== undefined && !isHexColor(color2)) return `color2 must be a 6-digit hex string, got "${color2}"`;
   if (normalStrength !== undefined && !(normalStrength >= 0 && normalStrength <= 2))
     return `normalStrength must be in [0, 2], got ${normalStrength}`;
-  if (clearcoat !== undefined && !(clearcoat >= 0 && clearcoat <= 1))
-    return `clearcoat must be in [0, 1], got ${clearcoat}`;
+  if (clearcoat !== undefined && !(clearcoat >= 0 && clearcoat <= 1)) return `clearcoat must be in [0, 1], got ${clearcoat}`;
   return null;
 }
 
 /**
- * @command create_material
- * @pure
- * @layer core/commands
  * @affects adds or replaces CadDocument.materials[name]
  * @invariant existing materials with different names are untouched
  * @failure blank name → no-op; density ≤ 0 or non-finite → no-op;
@@ -54,8 +40,7 @@ export const createMaterial = defineCommand({
     'and PBR visual properties (color, metalness, roughness) used by the 3D viewport renderer. ' +
     'If a material with the same name already exists it is fully replaced. ' +
     'Density units match the document unit system: for a mm document, density is in g/mm³ ' +
-    '(steel ≈ 0.00785, aluminium ≈ 0.0027, PLA ≈ 0.00124). ' +
-    'Assign the material to entities with assign_material.',
+    '(steel ≈ 0.00785, aluminium ≈ 0.0027, PLA ≈ 0.00124). Assign the material to entities with assign_material.',
   params: z.object({
     name: z
       .string()
@@ -67,16 +52,14 @@ export const createMaterial = defineCommand({
       .number()
       .describe(
         'Density in (mass-unit) per (document-length-unit)³. Must be > 0 and finite. ' +
-          'For a document in mm: g/mm³ — steel ≈ 0.00785, aluminium ≈ 0.0027, PLA ≈ 0.00124, ' +
-          'titanium ≈ 0.00445, copper ≈ 0.00893. ' +
+          'For a document in mm: g/mm³ — steel ≈ 0.00785, aluminium ≈ 0.0027, PLA ≈ 0.00124, titanium ≈ 0.00445, copper ≈ 0.00893. ' +
           'This value is used by mass_properties when the material is assigned to an entity.',
       ),
     color: z
       .string()
       .describe(
         'Diffuse/albedo color as a 6-digit CSS hex string, e.g. "#b0b0b0" for grey steel. ' +
-          'Must match the pattern #rrggbb (exactly 6 hex digits after the #). ' +
-          'Used by the 3D viewport PBR renderer.',
+          'Must match the pattern #rrggbb (exactly 6 hex digits after the #). Used by the 3D viewport PBR renderer.',
       ),
     metalness: z
       .number()
@@ -88,8 +71,7 @@ export const createMaterial = defineCommand({
       .number()
       .describe(
         'PBR roughness factor in [0, 1]. 0 = mirror-smooth (polished metal), ' +
-          '1 = fully diffuse/matte (rough concrete, unfinished wood). ' +
-          'Brushed aluminium ≈ 0.3, matte plastic ≈ 0.7.',
+          '1 = fully diffuse/matte (rough concrete, unfinished wood). Brushed aluminium ≈ 0.3, matte plastic ≈ 0.7.',
       ),
     finish: z
       .enum(FINISH_PATTERNS)
@@ -102,76 +84,30 @@ export const createMaterial = defineCommand({
       .optional(),
     finishScale: z
       .number()
-      .describe(
-        'Size of one texture tile in document units (> 0; a carbon tile holds 8 tows). Default 24.',
-      )
+      .describe('Size of one texture tile in document units (> 0; a carbon tile holds 8 tows). Default 24.')
       .optional(),
-    color2: z
-      .string()
-      .describe('Secondary #rrggbb colour of the finish (crossing tows, checker squares).')
-      .optional(),
-    normalStrength: z
-      .number()
-      .describe('Relief depth of the finish normal map in [0, 2]. Default 1.')
-      .optional(),
-    clearcoat: z
-      .number()
-      .describe(
-        'Clear lacquer over the finish in [0, 1] (glossy carbon, painted parts). Default 0.',
-      )
-      .optional(),
+    color2: z.string().describe('Secondary #rrggbb colour of the finish (crossing tows, checker squares).').optional(),
+    normalStrength: z.number().describe('Relief depth of the finish normal map in [0, 2]. Default 1.').optional(),
+    clearcoat: z.number().describe('Clear lacquer over the finish in [0, 1] (glossy carbon, painted parts). Default 0.').optional(),
   }),
   annotations: { idempotent: true },
   run: (
     doc,
-    {
-      name,
-      density,
-      color,
-      metalness,
-      roughness,
-      finish: pattern,
-      finishScale: requestedScale,
-      color2,
-      normalStrength,
-      clearcoat,
-    },
+    { name, density, color, metalness, roughness, finish: pattern, finishScale: requestedScale, color2, normalStrength, clearcoat },
   ): CommandResult => {
-    if (name.trim() === '')
-      return noop(doc, 'create_material failed: name must be a non-empty string.');
-
-    if (density <= 0) {
-      return noop(
-        doc,
-        `create_material '${name}' failed: density must be a finite number > 0, got ${String(density)}.`,
-      );
-    }
-
+    if (name.trim() === '') return noop(doc, 'create_material failed: name must be a non-empty string.');
+    if (density <= 0) return noop(doc, `create_material '${name}' failed: density must be a finite number > 0, got ${String(density)}.`);
     for (const [field, value] of [
       ['metalness', metalness],
       ['roughness', roughness],
     ] as const) {
-      if (value < 0 || value > 1) {
-        return noop(
-          doc,
-          `create_material '${name}' failed: ${field} must be in [0, 1], got ${String(value)}.`,
-        );
-      }
+      if (value < 0 || value > 1) return noop(doc, `create_material '${name}' failed: ${field} must be in [0, 1], got ${String(value)}.`);
     }
-
-    if (!isHexColor(color)) {
-      return noop(
-        doc,
-        `create_material '${name}' failed: color must be a 6-digit hex string like "#b0b0b0", got "${String(color)}".`,
-      );
-    }
-
+    if (!isHexColor(color))
+      return noop(doc, `create_material '${name}' failed: color must be a 6-digit hex string like "#b0b0b0", got "${String(color)}".`);
     const finishOptions = [requestedScale, color2, normalStrength, clearcoat];
     if (pattern === undefined && finishOptions.some((option) => option !== undefined))
-      return noop(
-        doc,
-        `create_material '${name}' failed: finishScale / color2 / normalStrength / clearcoat need a finish pattern.`,
-      );
+      return noop(doc, `create_material '${name}' failed: finishScale / color2 / normalStrength / clearcoat need a finish pattern.`);
     const finishScale = requestedScale ?? 24;
     const finishIssue = finishProblem(finishScale, color2, normalStrength, clearcoat);
     if (finishIssue !== null) return noop(doc, `create_material '${name}' failed: ${finishIssue}.`);
@@ -185,19 +121,8 @@ export const createMaterial = defineCommand({
             ...(normalStrength !== undefined ? { normalStrength } : {}),
             ...(clearcoat !== undefined ? { clearcoat } : {}),
           };
-    const material: Material = {
-      name,
-      density,
-      color,
-      metalness,
-      roughness,
-      ...(finish !== undefined ? { finish } : {}),
-    };
-    const newDoc: CadDocument = {
-      ...doc,
-      materials: { ...doc.materials, [name]: material },
-    };
-
+    const material: Material = { name, density, color, metalness, roughness, ...(finish !== undefined ? { finish } : {}) };
+    const newDoc: CadDocument = { ...doc, materials: { ...doc.materials, [name]: material } };
     const action = doc.materials[name] ? 'replaced' : 'created';
     return report(
       newDoc,
@@ -207,9 +132,6 @@ export const createMaterial = defineCommand({
 });
 
 /**
- * @command assign_material
- * @pure
- * @layer core/commands
  * @affects sets BaseEntity.materialId on each target entity
  * @invariant material must exist in doc.materials; unknown entity ids → skip + note in summary
  * @failure unknown material name → no-op, affected:[]; empty entityIds → no-op
@@ -240,58 +162,33 @@ export const assignMaterial = defineCommand({
   }),
   annotations: { idempotent: true },
   run: (doc, { materialName, entityIds }): CommandResult => {
-    if (materialName.trim() === '')
-      return noop(doc, 'assign_material failed: materialName must be a non-empty string.');
-
+    if (materialName.trim() === '') return noop(doc, 'assign_material failed: materialName must be a non-empty string.');
     if (!doc.materials[materialName]) {
       const available = Object.keys(doc.materials);
       const hint =
-        available.length > 0
-          ? ` Available materials: ${available.join(', ')}.`
-          : ' No materials defined yet — call create_material first.';
+        available.length > 0 ? ` Available materials: ${available.join(', ')}.` : ' No materials defined yet — call create_material first.';
       return noop(doc, `assign_material failed: material '${materialName}' not found.${hint}`);
     }
-
-    if (entityIds.length === 0) {
-      return noop(
-        doc,
-        'assign_material failed: entityIds must be a non-empty array of entity ids.',
-      );
-    }
-
+    if (entityIds.length === 0) return noop(doc, 'assign_material failed: entityIds must be a non-empty array of entity ids.');
     const assigned: string[] = [];
     const missing: string[] = [];
     let updatedEntities = { ...doc.entities };
-
     for (const id of entityIds) {
       const entity = doc.entities[id];
       if (!entity) {
         missing.push(id);
         continue;
       }
-      updatedEntities = {
-        ...updatedEntities,
-        [id]: { ...entity, materialId: materialName },
-      };
+      updatedEntities = { ...updatedEntities, [id]: { ...entity, materialId: materialName } };
       assigned.push(id);
     }
-
-    if (assigned.length === 0) {
-      return noop(
-        doc,
-        `assign_material '${materialName}': no valid entity ids found — missing: ${missing.join(', ')}.`,
-      );
-    }
-
+    if (assigned.length === 0)
+      return noop(doc, `assign_material '${materialName}': no valid entity ids found — missing: ${missing.join(', ')}.`);
     const newDoc: CadDocument = { ...doc, entities: updatedEntities };
-
     const parts: string[] = [
       `assign_material '${materialName}': assigned to ${assigned.length} ${assigned.length === 1 ? 'entity' : 'entities'} (${assigned.join(', ')}).`,
     ];
-    if (missing.length > 0) {
-      parts.push(`Missing ids skipped: ${missing.join(', ')}.`);
-    }
-
+    if (missing.length > 0) parts.push(`Missing ids skipped: ${missing.join(', ')}.`);
     return changed(newDoc, parts.join(' '), assigned);
   },
 });

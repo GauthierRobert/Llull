@@ -1,9 +1,4 @@
-/**
- * @layer ui/panels/civil
- *
- * Shared civil panel parts: typed object lists from the store, an object row with a delete
- * button (`delete_civil_object`), an object select and a status line. Presentation only.
- */
+// Shared civil panel parts: typed object lists, object row (delete_civil_object), object select, status line.
 
 import React, { useMemo, useState } from 'react';
 import type { CivilCategory, CivilObject } from '@core/model/civil';
@@ -11,10 +6,8 @@ import { useStore } from '@ui/store';
 import { PairSelect } from '@ui/panels/OptionSelect';
 import { formatPoints, selectedPolylinePoints } from './civilInput';
 
-/** Civil objects of `category` in creation order (re-derived when the civil model changes). */
-export function useCivilObjects<C extends CivilCategory>(
-  category: C,
-): Array<Extract<CivilObject, { category: C }>> {
+/** Creation order, re-derived when the civil model changes. */
+export function useCivilObjects<C extends CivilCategory>(category: C): Array<Extract<CivilObject, { category: C }>> {
   const civil = useStore((s) => s.document.civil);
   return useMemo(
     () =>
@@ -36,12 +29,7 @@ interface CivilObjectRowProps {
   body?: React.ReactNode;
 }
 
-export function CivilObjectRow({
-  object,
-  detail,
-  children,
-  body,
-}: CivilObjectRowProps): React.ReactElement {
+export function CivilObjectRow({ object, detail, children, body }: CivilObjectRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   return (
     <li className="civil-row" data-testid={`civil-row-${object.id}`}>
@@ -70,18 +58,12 @@ interface CivilObjectSelectProps {
   value: string;
   label: string;
   onChange: (id: string) => void;
-  /** Label of the empty choice; omitted = no empty choice. */
+  /** Omitted = no empty choice. */
   emptyLabel?: string;
 }
 
-/** Select over civil objects; an unknown `value` falls back to the first object (or empty). */
-export function CivilObjectSelect({
-  objects,
-  value,
-  label,
-  onChange,
-  emptyLabel,
-}: CivilObjectSelectProps): React.ReactElement {
+/** An unknown `value` falls back to the first object (or empty). */
+export function CivilObjectSelect({ objects, value, label, onChange, emptyLabel }: CivilObjectSelectProps): React.ReactElement {
   return (
     <PairSelect
       value={value}
@@ -99,19 +81,14 @@ function chosenId(objects: ReadonlyArray<CivilObject>, value: string, allowEmpty
   return allowEmpty ? '' : (objects[0]?.id ?? '');
 }
 
-/**
- * A select's chosen object id with its setter: the picked id while it still names one of `objects`,
- * else the object at `preferredIndex` (when given and nothing was picked), else `chosenId`'s
- * fallback.
- */
+/** The picked id while it names one of `objects`, else `preferredIndex`'s object (nothing picked yet), else `chosenId`'s fallback. */
 export function useChosenId(
   objects: ReadonlyArray<CivilObject>,
   allowEmpty = false,
   preferredIndex?: number,
 ): [string, (id: string) => void] {
   const [picked, setPicked] = useState('');
-  const value =
-    picked === '' && preferredIndex !== undefined ? (objects[preferredIndex]?.id ?? '') : picked;
+  const value = picked === '' && preferredIndex !== undefined ? (objects[preferredIndex]?.id ?? '') : picked;
   return [chosenId(objects, value, allowEmpty), setPicked];
 }
 
@@ -122,22 +99,8 @@ interface CivilFieldProps {
   label: string;
 }
 
-function CivilInput({
-  value,
-  set,
-  hint,
-  label,
-  type,
-}: CivilFieldProps & { type?: 'number' }): React.ReactElement {
-  return (
-    <input
-      type={type}
-      value={value}
-      placeholder={hint}
-      aria-label={label}
-      onChange={(event) => set(event.target.value)}
-    />
-  );
+function CivilInput({ value, set, hint, label, type }: CivilFieldProps & { type?: 'number' }): React.ReactElement {
+  return <input type={type} value={value} placeholder={hint} aria-label={label} onChange={(event) => set(event.target.value)} />;
 }
 
 export function TextField(props: CivilFieldProps): React.ReactElement {
@@ -155,7 +118,6 @@ interface PointsFromSelectionRowProps {
   /** Shown through `setError` when the selection is not one polyline. */
   noSelectionError: string;
   setError: (message: string) => void;
-  /** Controls placed before the points field. */
   children?: React.ReactNode;
 }
 

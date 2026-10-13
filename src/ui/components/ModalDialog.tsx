@@ -1,11 +1,5 @@
-/**
- * @layer ui/components
- *
- * ModalDialog — the shell shared by every modal (confirm, shortcuts, command palette, MCP
- * connect): a backdrop that closes on a direct hit, a `role="dialog"` box where Escape closes and
- * Tab stays trapped, initial focus on open and focus handed back to the opener on close.
- * Presentation only.
- */
+// Shared modal shell: backdrop closes on a direct hit, role="dialog" with Escape-to-close and a Tab trap, initial
+// focus on open, focus returned to the opener on close.
 
 import React, { useEffect, useRef } from 'react';
 import { focusableElements, trapTab } from '@ui/focusTrap';
@@ -14,19 +8,19 @@ interface ModalDialogProps {
   backdropClassName: string;
   className: string;
   onClose: () => void;
-  /** Backdrop event that closes the dialog. Default 'click'. */
+  /** Default 'click'. */
   closeOn?: 'click' | 'mousedown';
-  /** Id of the visible title, or `label` when there is none. */
+  /** Visible title id, else `label`. */
   labelledBy?: string;
   label?: string;
   tabIndex?: number;
-  /** Focused on open: an element, or the first focusable control. Default none. */
+  /** An element, or the first focusable control. */
   initialFocus?: React.RefObject<HTMLElement | null> | 'first';
-  /** Give focus back to the element focused before opening. Default true. */
+  /** Default true. */
   restoreFocus?: boolean;
   /** Also trap focus on `a[href]` links. */
   links?: boolean;
-  /** Replaces the default Tab trap (cycle through the focusable controls). */
+  /** Replaces the default Tab cycle. */
   onTab?: (event: React.KeyboardEvent<HTMLDivElement>) => void;
   children: React.ReactNode;
 }
@@ -68,10 +62,7 @@ export function ModalDialog({
   };
 
   return (
-    <div
-      className={backdropClassName}
-      {...(closeOn === 'click' ? { onClick: closeOnHit } : { onMouseDown: closeOnHit })}
-    >
+    <div className={backdropClassName} {...(closeOn === 'click' ? { onClick: closeOnHit } : { onMouseDown: closeOnHit })}>
       <div
         ref={dialogRef}
         className={className}

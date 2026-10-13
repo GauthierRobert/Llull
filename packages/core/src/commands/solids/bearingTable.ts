@@ -1,15 +1,6 @@
-/**
- * Common rolling-bearing designations (ISO 15 boundary dimensions, mm): bore d, outer diameter D, width B.
- *
- * @layer core/commands
- */
+/** Common rolling-bearing designations (ISO 15 boundary dimensions, mm): bore d, outer diameter D, width B. */
 
-export const BEARING_TYPES = [
-  'deep_groove_ball',
-  'spherical_roller',
-  'tapered_roller',
-  'cylindrical_roller',
-] as const;
+export const BEARING_TYPES = ['deep_groove_ball', 'spherical_roller', 'tapered_roller', 'cylindrical_roller'] as const;
 
 export type BearingType = (typeof BEARING_TYPES)[number];
 
@@ -23,10 +14,7 @@ export interface BearingSize {
 type Row = readonly [designation: string, bore: number, outerDiameter: number, width: number];
 
 function rows(type: BearingType, list: readonly Row[]): Array<[string, BearingSize]> {
-  return list.map(([name, bore, outerDiameter, width]) => [
-    name,
-    { bore, outerDiameter, width, type },
-  ]);
+  return list.map(([name, bore, outerDiameter, width]) => [name, { bore, outerDiameter, width, type }]);
 }
 
 const DEEP_GROOVE: readonly Row[] = [

@@ -1,9 +1,6 @@
 /**
- * Steel section catalogue (European standard sections, dimensions in mm) and exact outlines.
- * Masses: catalogue values for hot-rolled I / U sections, computed (ρ = 7850 kg/m³, sharp corners)
- * for hollow sections, angles and cold-formed channels.
- * @layer domain-aec
- * @pure
+ * Steel section catalogue (European standard sections, dimensions in mm) and exact outlines. Masses: catalogue values for hot-rolled I / U
+ * sections, computed (ρ = 7850 kg/m³, sharp corners) for hollow sections, angles and cold-formed channels.
  */
 
 import type { Vec2 } from '@core/model/types';
@@ -39,11 +36,8 @@ const STEEL_DENSITY_KG_PER_MM2_M = 0.00785;
 
 type Row = readonly [string, number, number, number, number, number];
 
-function rolled(
-  family: 'IPE' | 'HEA' | 'HEB' | 'UPN',
-  rows: ReadonlyArray<Row>,
-  shape: 'I' | 'U' = 'I',
-): SteelProfile[] {
+function rolled(family: 'IPE' | 'HEA' | 'HEB' | 'UPN', rows: ReadonlyArray<Row>): SteelProfile[] {
+  const shape = family === 'UPN' ? 'U' : 'I';
   return rows.map(([size, h, b, tw, tf, mass]) => ({
     name: `${family}${size}`,
     family,
@@ -59,84 +53,40 @@ function rolled(
   }));
 }
 
+// prettier-ignore
 const IPE = rolled('IPE', [
-  ['80', 80, 46, 3.8, 5.2, 6.0],
-  ['100', 100, 55, 4.1, 5.7, 8.1],
-  ['120', 120, 64, 4.4, 6.3, 10.4],
-  ['140', 140, 73, 4.7, 6.9, 12.9],
-  ['160', 160, 82, 5.0, 7.4, 15.8],
-  ['180', 180, 91, 5.3, 8.0, 18.8],
-  ['200', 200, 100, 5.6, 8.5, 22.4],
-  ['220', 220, 110, 5.9, 9.2, 26.2],
-  ['240', 240, 120, 6.2, 9.8, 30.7],
-  ['270', 270, 135, 6.6, 10.2, 36.1],
-  ['300', 300, 150, 7.1, 10.7, 42.2],
-  ['330', 330, 160, 7.5, 11.5, 49.1],
-  ['360', 360, 170, 8.0, 12.7, 57.1],
-  ['400', 400, 180, 8.6, 13.5, 66.3],
-  ['450', 450, 190, 9.4, 14.6, 77.6],
-  ['500', 500, 200, 10.2, 16.0, 90.7],
-  ['550', 550, 210, 11.1, 17.2, 106],
-  ['600', 600, 220, 12.0, 19.0, 122],
+  ['80', 80, 46, 3.8, 5.2, 6.0], ['100', 100, 55, 4.1, 5.7, 8.1], ['120', 120, 64, 4.4, 6.3, 10.4], ['140', 140, 73, 4.7, 6.9, 12.9],
+  ['160', 160, 82, 5.0, 7.4, 15.8], ['180', 180, 91, 5.3, 8.0, 18.8], ['200', 200, 100, 5.6, 8.5, 22.4],
+  ['220', 220, 110, 5.9, 9.2, 26.2], ['240', 240, 120, 6.2, 9.8, 30.7], ['270', 270, 135, 6.6, 10.2, 36.1],
+  ['300', 300, 150, 7.1, 10.7, 42.2], ['330', 330, 160, 7.5, 11.5, 49.1], ['360', 360, 170, 8.0, 12.7, 57.1],
+  ['400', 400, 180, 8.6, 13.5, 66.3], ['450', 450, 190, 9.4, 14.6, 77.6], ['500', 500, 200, 10.2, 16.0, 90.7],
+  ['550', 550, 210, 11.1, 17.2, 106], ['600', 600, 220, 12.0, 19.0, 122],
 ]);
 
+// prettier-ignore
 const HEA = rolled('HEA', [
-  ['100', 96, 100, 5, 8, 16.7],
-  ['120', 114, 120, 5, 8, 19.9],
-  ['140', 133, 140, 5.5, 8.5, 24.7],
-  ['160', 152, 160, 6, 9, 30.4],
-  ['180', 171, 180, 6, 9.5, 35.5],
-  ['200', 190, 200, 6.5, 10, 42.3],
-  ['220', 210, 220, 7, 11, 50.5],
-  ['240', 230, 240, 7.5, 12, 60.3],
-  ['260', 250, 260, 7.5, 12.5, 68.2],
-  ['280', 270, 280, 8, 13, 76.4],
-  ['300', 290, 300, 8.5, 14, 88.3],
-  ['320', 310, 300, 9, 15.5, 97.6],
-  ['340', 330, 300, 9.5, 16.5, 105],
-  ['360', 350, 300, 10, 17.5, 112],
-  ['400', 390, 300, 11, 19, 125],
-  ['450', 440, 300, 11.5, 21, 140],
+  ['100', 96, 100, 5, 8, 16.7], ['120', 114, 120, 5, 8, 19.9], ['140', 133, 140, 5.5, 8.5, 24.7], ['160', 152, 160, 6, 9, 30.4],
+  ['180', 171, 180, 6, 9.5, 35.5], ['200', 190, 200, 6.5, 10, 42.3], ['220', 210, 220, 7, 11, 50.5], ['240', 230, 240, 7.5, 12, 60.3],
+  ['260', 250, 260, 7.5, 12.5, 68.2], ['280', 270, 280, 8, 13, 76.4], ['300', 290, 300, 8.5, 14, 88.3], ['320', 310, 300, 9, 15.5, 97.6],
+  ['340', 330, 300, 9.5, 16.5, 105], ['360', 350, 300, 10, 17.5, 112], ['400', 390, 300, 11, 19, 125], ['450', 440, 300, 11.5, 21, 140],
   ['500', 490, 300, 12, 23, 155],
 ]);
 
+// prettier-ignore
 const HEB = rolled('HEB', [
-  ['100', 100, 100, 6, 10, 20.4],
-  ['120', 120, 120, 6.5, 11, 26.7],
-  ['140', 140, 140, 7, 12, 33.7],
-  ['160', 160, 160, 8, 13, 42.6],
-  ['180', 180, 180, 8.5, 14, 51.2],
-  ['200', 200, 200, 9, 15, 61.3],
-  ['220', 220, 220, 9.5, 16, 71.5],
-  ['240', 240, 240, 10, 17, 83.2],
-  ['260', 260, 260, 10, 17.5, 93.0],
-  ['280', 280, 280, 10.5, 18, 103],
-  ['300', 300, 300, 11, 19, 117],
-  ['320', 320, 300, 11.5, 20.5, 127],
-  ['340', 340, 300, 12, 21.5, 134],
-  ['360', 360, 300, 12.5, 22.5, 142],
-  ['400', 400, 300, 13.5, 24, 155],
-  ['450', 450, 300, 14, 26, 171],
+  ['100', 100, 100, 6, 10, 20.4], ['120', 120, 120, 6.5, 11, 26.7], ['140', 140, 140, 7, 12, 33.7], ['160', 160, 160, 8, 13, 42.6],
+  ['180', 180, 180, 8.5, 14, 51.2], ['200', 200, 200, 9, 15, 61.3], ['220', 220, 220, 9.5, 16, 71.5], ['240', 240, 240, 10, 17, 83.2],
+  ['260', 260, 260, 10, 17.5, 93.0], ['280', 280, 280, 10.5, 18, 103], ['300', 300, 300, 11, 19, 117], ['320', 320, 300, 11.5, 20.5, 127],
+  ['340', 340, 300, 12, 21.5, 134], ['360', 360, 300, 12.5, 22.5, 142], ['400', 400, 300, 13.5, 24, 155], ['450', 450, 300, 14, 26, 171],
   ['500', 500, 300, 14.5, 28, 187],
 ]);
 
-const UPN = rolled(
-  'UPN',
-  [
-    ['80', 80, 45, 6, 8, 8.64],
-    ['100', 100, 50, 6, 8.5, 10.6],
-    ['120', 120, 55, 7, 9, 13.4],
-    ['140', 140, 60, 7, 10, 16.0],
-    ['160', 160, 65, 7.5, 10.5, 18.8],
-    ['180', 180, 70, 8, 11, 22.0],
-    ['200', 200, 75, 8.5, 11.5, 25.3],
-    ['220', 220, 80, 9, 12.5, 29.4],
-    ['240', 240, 85, 9.5, 13, 33.2],
-    ['260', 260, 90, 10, 14, 37.9],
-    ['300', 300, 100, 10, 16, 46.2],
-  ],
-  'U',
-);
+// prettier-ignore
+const UPN = rolled('UPN', [
+  ['80', 80, 45, 6, 8, 8.64], ['100', 100, 50, 6, 8.5, 10.6], ['120', 120, 55, 7, 9, 13.4], ['140', 140, 60, 7, 10, 16.0],
+  ['160', 160, 65, 7.5, 10.5, 18.8], ['180', 180, 70, 8, 11, 22.0], ['200', 200, 75, 8.5, 11.5, 25.3], ['220', 220, 80, 9, 12.5, 29.4],
+  ['240', 240, 85, 9.5, 13, 33.2], ['260', 260, 90, 10, 14, 37.9], ['300', 300, 100, 10, 16, 46.2],
+]);
 
 /** Constant-wall-thickness section: `t` is web and flange alike; the mass follows from the area. */
 function thin(
@@ -150,87 +100,29 @@ function thin(
   return { name, family, shape: family, h, b, tw: t, tf: t, lip, perimeter, area, massPerMetre };
 }
 
-const SHS: SteelProfile[] = (
-  [
-    [50, 3],
-    [60, 4],
-    [80, 4],
-    [100, 5],
-    [120, 6],
-    [140, 6],
-    [150, 8],
-    [200, 8],
-    [200, 10],
-    [250, 10],
-    [300, 10],
-  ] as const
-).map(([b, t]) => thin('SHS', `SHS${b}x${t}`, { h: b, b, t }, 4 * b, 4 * t * (b - t)));
+// prettier-ignore
+const SHS: SteelProfile[] = ([[50, 3], [60, 4], [80, 4], [100, 5], [120, 6], [140, 6], [150, 8], [200, 8], [200, 10], [250, 10], [300, 10]] as const).map(([b, t]) =>
+  thin('SHS', `SHS${b}x${t}`, { h: b, b, t }, 4 * b, 4 * t * (b - t)),
+);
 
-const RHS: SteelProfile[] = (
-  [
-    [100, 50, 4],
-    [120, 60, 5],
-    [150, 100, 6],
-    [200, 100, 6],
-    [250, 150, 8],
-    [300, 200, 10],
-  ] as const
-).map(([h, b, t]) =>
+// prettier-ignore
+const RHS: SteelProfile[] = ([[100, 50, 4], [120, 60, 5], [150, 100, 6], [200, 100, 6], [250, 150, 8], [300, 200, 10]] as const).map(([h, b, t]) =>
   thin('RHS', `RHS${h}x${b}x${t}`, { h, b, t }, 2 * (h + b), 2 * t * (h + b - 2 * t)),
 );
 
-const CHS: SteelProfile[] = (
-  [
-    [48.3, 3.2],
-    [60.3, 3.2],
-    [76.1, 3.6],
-    [88.9, 4],
-    [114.3, 5],
-    [139.7, 5],
-    [168.3, 6.3],
-    [219.1, 8],
-    [273, 10],
-  ] as const
-).map(([d, t]) =>
-  thin(
-    'CHS',
-    `CHS${d}x${t}`,
-    { h: d, b: d, t },
-    Math.PI * d,
-    (Math.PI * (d * d - (d - 2 * t) ** 2)) / 4,
-  ),
+// prettier-ignore
+const CHS: SteelProfile[] = ([[48.3, 3.2], [60.3, 3.2], [76.1, 3.6], [88.9, 4], [114.3, 5], [139.7, 5], [168.3, 6.3], [219.1, 8], [273, 10]] as const).map(([d, t]) =>
+  thin('CHS', `CHS${d}x${t}`, { h: d, b: d, t }, Math.PI * d, (Math.PI * (d * d - (d - 2 * t) ** 2)) / 4),
 );
 
-const ANGLES: SteelProfile[] = (
-  [
-    [40, 4],
-    [50, 5],
-    [60, 6],
-    [70, 7],
-    [80, 8],
-    [90, 9],
-    [100, 10],
-    [120, 12],
-    [150, 15],
-  ] as const
-).map(([b, t]) => thin('L', `L${b}x${t}`, { h: b, b, t }, 4 * b, t * (2 * b - t)));
+// prettier-ignore
+const ANGLES: SteelProfile[] = ([[40, 4], [50, 5], [60, 6], [70, 7], [80, 8], [90, 9], [100, 10], [120, 12], [150, 15]] as const).map(([b, t]) =>
+  thin('L', `L${b}x${t}`, { h: b, b, t }, 4 * b, t * (2 * b - t)),
+);
 
-const COLD_FORMED: SteelProfile[] = (
-  [
-    [150, 65, 15, 2.0],
-    [200, 75, 20, 2.0],
-    [200, 75, 20, 2.5],
-    [250, 75, 20, 2.5],
-    [300, 90, 25, 3.0],
-  ] as const
-).map(([h, b, lip, t]) =>
-  thin(
-    'C',
-    `C${h}x${b}x${t.toFixed(1)}`,
-    { h, b, t, lip },
-    2 * (h + 2 * b + 2 * lip),
-    t * (h + 2 * b + 2 * lip - 4 * t),
-  ),
+// prettier-ignore
+const COLD_FORMED: SteelProfile[] = ([[150, 65, 15, 2.0], [200, 75, 20, 2.0], [200, 75, 20, 2.5], [250, 75, 20, 2.5], [300, 90, 25, 3.0]] as const).map(([h, b, lip, t]) =>
+  thin('C', `C${h}x${b}x${t.toFixed(1)}`, { h, b, t, lip }, 2 * (h + 2 * b + 2 * lip), t * (h + 2 * b + 2 * lip - 4 * t)),
 );
 
 /** Structural steel density, kg/m³. */
@@ -249,14 +141,9 @@ export const STEEL_PROFILES: ReadonlyArray<SteelProfile> = [
 ];
 
 /** Lightest catalogue profile accepted by `accept`; the first listed on equal mass. */
-export function lightestProfile(
-  accept: (candidate: SteelProfile) => boolean,
-): SteelProfile | undefined {
+export function lightestProfile(accept: (candidate: SteelProfile) => boolean): SteelProfile | undefined {
   return STEEL_PROFILES.filter(accept).reduce<SteelProfile | undefined>(
-    (lightest, candidate) =>
-      lightest === undefined || candidate.massPerMetre < lightest.massPerMetre
-        ? candidate
-        : lightest,
+    (lightest, candidate) => (lightest === undefined || candidate.massPerMetre < lightest.massPerMetre ? candidate : lightest),
     undefined,
   );
 }
@@ -326,10 +213,7 @@ export function profileOutline(profile: SteelProfile): ProfileOutline {
         holes: [],
       };
     case 'U':
-      return {
-        outer: [...footed, [-x + tw, y - tf], [x, y - tf], [x, y], [-x, y]],
-        holes: [],
-      };
+      return { outer: [...footed, [-x + tw, y - tf], [x, y - tf], [x, y], [-x, y]], holes: [] };
     case 'C':
       return {
         outer: [
@@ -349,10 +233,7 @@ export function profileOutline(profile: SteelProfile): ProfileOutline {
         holes: [],
       };
     case 'L':
-      return {
-        outer: [...footed, [-x + tw, y], [-x, y]],
-        holes: [],
-      };
+      return { outer: [...footed, [-x + tw, y], [-x, y]], holes: [] };
     case 'SHS':
     case 'RHS':
       return { outer: rectangle(b, h), holes: [rectangle(b - 2 * tw, h - 2 * tw, true)] };
@@ -404,11 +285,7 @@ function clipAt(points: ReadonlyArray<Point>, level: number, side: 1 | -1): Poin
   return result;
 }
 
-interface Moments {
-  area: number;
-  first: number;
-  second: number;
-}
+type Moments = { area: number; first: number; second: number };
 
 const addMoments = (sum: Moments, m: Moments): Moments => ({
   area: sum.area + m.area,
@@ -416,26 +293,16 @@ const addMoments = (sum: Moments, m: Moments): Moments => ({
   second: sum.second + m.second,
 });
 
-/**
- * Exact section properties from the profile outline (bending about the axis perpendicular to
- * the depth h). Units: mm.
- * @pure
- */
+/** Exact section properties from the profile outline (bending about the axis perpendicular to the depth h). Units: mm. */
 export function sectionProperties(profile: SteelProfile): SectionProperties {
   const { outer, holes } = profileOutline(profile);
   const loops = [outer, ...holes];
   const signed = (loop: ReadonlyArray<Point>, sign: number): Moments => {
     const m = moments(loop);
     const orientation = Math.sign(m.area) || 1;
-    return {
-      area: sign * orientation * m.area,
-      first: sign * orientation * m.first,
-      second: sign * orientation * m.second,
-    };
+    return { area: sign * orientation * m.area, first: sign * orientation * m.first, second: sign * orientation * m.second };
   };
-  const total = loops
-    .map((loop, index) => signed(loop, index === 0 ? 1 : -1))
-    .reduce(addMoments, { area: 0, first: 0, second: 0 });
+  const total = loops.map((loop, index) => signed(loop, index === 0 ? 1 : -1)).reduce(addMoments, { area: 0, first: 0, second: 0 });
   const centroid = total.first / total.area;
   const inertia = total.second - total.area * centroid ** 2;
   const minor = loops
@@ -455,11 +322,7 @@ export function sectionProperties(profile: SteelProfile): SectionProperties {
       const part = clipAt(loop, level, 1);
       return part.length < 3 ? sum : sum + signed(part, index === 0 ? 1 : -1).area;
     }, 0);
-  const { low, high } = bisect(
-    (level) => areaAbove(level) > total.area / 2,
-    Math.min(...ys),
-    Math.max(...ys),
-  );
+  const { low, high } = bisect((level) => areaAbove(level) > total.area / 2, Math.min(...ys), Math.max(...ys));
   const axis = (low + high) / 2;
   const plasticModulus = loops.reduce((sum, loop, index) => {
     const sign = index === 0 ? 1 : -1;
@@ -472,11 +335,5 @@ export function sectionProperties(profile: SteelProfile): SectionProperties {
     }
     return part;
   }, 0);
-  return {
-    area: total.area,
-    inertia,
-    elasticModulus: inertia / extreme,
-    plasticModulus,
-    minorInertia,
-  };
+  return { area: total.area, inertia, elasticModulus: inertia / extreme, plasticModulus, minorInertia };
 }

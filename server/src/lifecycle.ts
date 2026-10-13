@@ -1,7 +1,4 @@
-/**
- * @layer server
- * Process lifecycle: bind safely, install the geometry kernel, drain on SIGTERM/SIGINT.
- */
+/** Process lifecycle: bind safely, install the geometry kernel, drain on SIGTERM/SIGINT. */
 
 import type { Server } from 'http';
 import type { Express } from 'express';
@@ -13,8 +10,7 @@ import { checkBindSafety, isLoopbackAddress } from './security';
 const SESSION_CLOSE_TIMEOUT_MS = 3_000;
 const DRAIN_TIMEOUT_MS = 5_000;
 
-const delay = (ms: number): Promise<void> =>
-  new Promise<void>((resolve) => setTimeout(resolve, ms).unref());
+const delay = (ms: number): Promise<void> => new Promise<void>((resolve) => setTimeout(resolve, ms).unref());
 
 /**
  * Stop accepting connections, end SSE/MCP streams, drain, flush autosave. Resolves when closed.
@@ -39,14 +35,8 @@ async function shutdown(server: Server): Promise<void> {
 export async function startServer(app: Express, port: number, host: string): Promise<Server> {
   const refusal = checkBindSafety(host);
   if (refusal !== null) throw new Error(refusal);
-  if (
-    !isLoopbackAddress(host) &&
-    !process.env['MCP_AUTH_TOKEN'] &&
-    !process.env['LLULL_USERS_FILE']
-  ) {
-    console.warn(
-      '[llull-server] WARNING: network-exposed without MCP_AUTH_TOKEN (LLULL_ALLOW_UNAUTHENTICATED=true).',
-    );
+  if (!isLoopbackAddress(host) && !process.env['MCP_AUTH_TOKEN'] && !process.env['LLULL_USERS_FILE']) {
+    console.warn('[llull-server] WARNING: network-exposed without MCP_AUTH_TOKEN (LLULL_ALLOW_UNAUTHENTICATED=true).');
   }
   await installGeometryKernel();
   const server = app.listen(port, host);
@@ -58,10 +48,7 @@ export async function startServer(app: Express, port: number, host: string): Pro
     server.once('error', (error: NodeJS.ErrnoException) => {
       reject(
         error.code === 'EADDRINUSE'
-          ? new Error(
-              `port ${port} on ${host} is already in use (another llull server?). ` +
-                'Stop it or set PORT to a free port.',
-            )
+          ? new Error(`port ${port} on ${host} is already in use (another llull server?). ` + 'Stop it or set PORT to a free port.')
           : error,
       );
     });

@@ -1,8 +1,5 @@
 /**
- * @layer server
- * MCP endpoint — Streamable HTTP transport (auth + rate limit + session routing only; tool logic
- * is `./mcp/server.ts` over `@mcp`, architecture L6).
- *
+ * MCP Streamable HTTP endpoint: auth + rate limit + session routing (tools: `./mcp/server.ts`).
  *   POST   /mcp  no `mcp-session-id` -> `initialize`, allocates a session; with it -> that session
  *   GET    /mcp  SSE stream for server notifications (session id required)
  *   DELETE /mcp  close the session (the shared document is untouched)
@@ -27,20 +24,12 @@ import { requestUser } from './users';
 import { actorOf } from './audit';
 
 /** Toolsets from `LLULL_TOOLSETS` (comma-separated; unset = core only, `all` = everything). Warns on unknown names. */
-export function toolsetsFromEnv(
-  raw: string | undefined = process.env['LLULL_TOOLSETS'],
-): ReadonlySet<ToolsetName> {
+export function toolsetsFromEnv(raw: string | undefined = process.env['LLULL_TOOLSETS']): ReadonlySet<ToolsetName> {
   const { enabled, unknown } = parseToolsets(raw);
-  if (unknown.length > 0) {
-    console.warn(`[llull-mcp] LLULL_TOOLSETS: ignoring unknown toolset(s): ${unknown.join(', ')}`);
-  }
+  if (unknown.length > 0) console.warn(`[llull-mcp] LLULL_TOOLSETS: ignoring unknown toolset(s): ${unknown.join(', ')}`);
   return enabled;
 }
 
-/**
- * @param exchange - STEP/code exchange port (defaults to the environment-configured Python bridge).
- * @param enabledToolsets - starting toolsets for each session (defaults to `LLULL_TOOLSETS`).
- */
 export function buildMcpRouter(
   exchange: ExchangeOptions = exchangeOptionsWithDwg(),
   enabledToolsets: ReadonlySet<ToolsetName> = toolsetsFromEnv(),
@@ -50,22 +39,14 @@ export function buildMcpRouter(
   router.use(buildAuthMiddleware());
   router.use(buildMcpRateLimiter());
 
-  /** Transport + bound `Server`; the session registers itself once the SDK assigns its id. */
   const allocateSession = (userId: string | undefined): StreamableHTTPServerTransport => {
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
-      onsessioninitialized: (sessionId) => {
-        sessions.set(sessionId, {
-          transport,
-          lastSeenMs: Date.now(),
-          ...(userId !== undefined ? { userId } : {}),
-        });
-      },
-      onsessionclosed: (sessionId) => {
-        sessions.delete(sessionId);
-      },
+      onsessioninitialized: (sessionId) =>
+        void sessions.set(sessionId, { transport, lastSeenMs: Date.now(), ...(userId !== undefined ? { userId } : {}) }),
+      onsessionclosed: (sessionId) => void sessions.delete(sessionId),
     });
-    // Also forget the session on any other close path (dropped socket, client close, crash).
+    // Any other close path (dropped socket, crash) forgets the session too.
     const priorOnClose = transport.onclose;
     transport.onclose = (): void => {
       priorOnClose?.();
@@ -104,10 +85,9 @@ export function buildMcpRouter(
       evictForCapacity();
       const transport = allocateSession(requestUser(res)?.id);
       try {
-        await buildMcpServer(exchange, enabledToolsets, {
-          actor: actorOf(res, 'mcp'),
-          role: requestUser(res)?.role ?? null,
-        }).connect(transport as Transport);
+        await buildMcpServer(exchange, enabledToolsets, { actor: actorOf(res, 'mcp'), role: requestUser(res)?.role ?? null }).connect(
+          transport as Transport,
+        );
         await transport.handleRequest(req, res, req.body as unknown);
       } catch (err: unknown) {
         console.error('[/mcp] new session error:', errorMessage(err));

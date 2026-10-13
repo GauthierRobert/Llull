@@ -1,9 +1,4 @@
-/**
- * Caller-chosen ids: an explicit non-empty id, else a freshly minted one.
- *
- * @layer core/commands
- * @pure
- */
+/** Caller-chosen ids: an explicit non-empty id, else a freshly minted one. */
 
 import { nextId } from '../../lib/id';
 

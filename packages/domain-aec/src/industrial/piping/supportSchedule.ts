@@ -1,18 +1,10 @@
-/**
- * Pipe support schedule: one row per support with its pipe, line, type, steel it bears on, position
- * and hanger rod length.
- * @layer domain-aec
- * @pure
- */
+/** Pipe support schedule: one row per support with its pipe, line, type, steel it bears on, position and hanger rod length. */
 
 import type { CadDocument } from '@core/model/types';
 import { elementsOf, getBuilding } from '../../building/model';
 import { round } from '../../shared/numeric';
 
-export function supportSchedule(doc: CadDocument): {
-  columns: string[];
-  rows: Array<Array<string | number>>;
-} {
+export function supportSchedule(doc: CadDocument): { columns: string[]; rows: Array<Array<string | number>> } {
   const building = getBuilding(doc);
   const rows = elementsOf(building, 'pipeSupport').map((support) => {
     const pipe = building.elements[support.pipeId];
@@ -32,20 +24,5 @@ export function supportSchedule(doc: CadDocument): {
       member?.category === 'member' ? 'attached' : 'UNATTACHED',
     ];
   });
-  return {
-    columns: [
-      'Mark',
-      'Line',
-      'Pipe',
-      'Type',
-      'Bears on',
-      'x',
-      'y',
-      'z',
-      `Rod length (${doc.units})`,
-      'Level',
-      'Status',
-    ],
-    rows,
-  };
+  return { columns: ['Mark', 'Line', 'Pipe', 'Type', 'Bears on', 'x', 'y', 'z', `Rod length (${doc.units})`, 'Level', 'Status'], rows };
 }

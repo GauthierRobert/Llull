@@ -1,7 +1,4 @@
-/**
- * Civil exchange (LandXML, DXF) commands.
- * @layer domain-aec/civil
- */
+/** Civil exchange (LandXML, DXF) commands. */
 
 import type { CommandDefinition, CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
@@ -15,33 +12,25 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const COORDINATES = z.enum(['local', 'grid']).optional();
 
 /**
- * @command export_landxml
- * @pure read-only
  * @affects none; data = { text, fileName, counts }
  * @failure empty civil model -> no data
  */
 export const exportLandxml = defineCommand({
   name: 'export_landxml',
   description:
-    'Export the civil model as LandXML 1.2 (Civil 3D, BricsCAD, 12d, Trimble Business Center…): ' +
-    'survey point groups (CgPoints), TIN surfaces (points + faces), alignments and the storm pipe ' +
-    'network (structures + pipes). Coordinates are "northing easting elevation" in metres. ' +
-    'data.text holds the file, data.fileName its name.',
+    'Export the civil model as LandXML 1.2 (Civil 3D, BricsCAD, 12d, Trimble Business Center…): survey point groups (CgPoints), TIN ' +
+    'surfaces (points + faces), alignments and the storm pipe network (structures + pipes). Coordinates are "northing easting elevation" ' +
+    'in metres. data.text holds the file, data.fileName its name.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
-    date: z
-      .string()
-      .regex(ISO_DATE)
-      .optional()
-      .describe('Header date yyyy-mm-dd. Default: the project date, else 1970-01-01.'),
+    date: z.string().regex(ISO_DATE).optional().describe('Header date yyyy-mm-dd. Default: the project date, else 1970-01-01.'),
     coordinates: COORDINATES.describe(
       'Plan coordinates: "grid" (projected CRS via the site calibration) or "local". Default grid ' +
         'when set_site_calibration was called, else local.',
     ),
   }),
   run: (doc, { date, coordinates }): CommandResult => {
-    if (getCivil(doc).order.length === 0)
-      return noop(doc, 'export_landxml: nothing to export (no civil objects).');
+    if (getCivil(doc).order.length === 0) return noop(doc, 'export_landxml: nothing to export (no civil objects).');
     const project = getBuilding(doc).project;
     const projectDate = ISO_DATE.test(project.date) ? project.date : '1970-01-01';
     const projectName = project.name.trim() === '' ? 'Site' : project.name;
@@ -61,8 +50,6 @@ export const exportLandxml = defineCommand({
 });
 
 /**
- * @command export_civil_dxf
- * @pure read-only
  * @affects none; data = { text, fileName, entityCount, layers }
  * @failure no civil entity -> no data
  */
@@ -81,17 +68,15 @@ export const exportCivilDxf = defineCommand({
   }),
   run: (doc, { coordinates }): CommandResult => {
     const result = buildCivilDxf(doc, coordinates);
-    if (result.entityCount === 0)
-      return noop(doc, 'export_civil_dxf: nothing to export (no civil entities).');
+    if (result.entityCount === 0) return noop(doc, 'export_civil_dxf: nothing to export (no civil entities).');
     const fileName = `${fileSlug(getBuilding(doc).project.name, 'site')}_civil.dxf`;
-    return report(
-      doc,
-      `DXF ${fileName}: ${result.entityCount} entities on layers ${result.layers.join(', ')}.`,
-      { text: result.text, fileName, entityCount: result.entityCount, layers: result.layers },
-    );
+    return report(doc, `DXF ${fileName}: ${result.entityCount} entities on layers ${result.layers.join(', ')}.`, {
+      text: result.text,
+      fileName,
+      entityCount: result.entityCount,
+      layers: result.layers,
+    });
   },
 });
 
-export const civilExchangeCommands = [exportLandxml, exportCivilDxf] as ReadonlyArray<
-  CommandDefinition<unknown>
->;
+export const civilExchangeCommands = [exportLandxml, exportCivilDxf] as ReadonlyArray<CommandDefinition<unknown>>;

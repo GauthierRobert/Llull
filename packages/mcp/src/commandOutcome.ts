@@ -1,5 +1,4 @@
 /**
- * @layer mcp
  * The one way a host runs a command and reports it: `execute` + the `CommandOutcome` shape, and the
  * one definition of "this outcome is a failure". Used by the server command bus and the CLI backend.
  */
@@ -20,14 +19,8 @@ export interface CommandRun {
 /**
  * Run `name` on `doc` through `execute`; a throwing command is an error outcome, never an exception.
  * `changed` = the returned document is not the input document.
- * @pure
  */
-export function runCommandOutcome(
-  doc: CadDocument,
-  name: string,
-  params: unknown,
-  ctx?: ExecutionContext,
-): CommandRun {
+export function runCommandOutcome(doc: CadDocument, name: string, params: unknown, ctx?: ExecutionContext): CommandRun {
   try {
     const result = execute(doc, name, params, ctx);
     return {
@@ -47,12 +40,7 @@ export function runCommandOutcome(
 
 /** The outcome of a command that threw (`execute` or the caller's own follow-up work). */
 export function failedOutcome(name: string, error: unknown): CommandOutcome {
-  return {
-    summary: `Command ${name} failed: ${errorMessage(error)}`,
-    affected: [],
-    isError: true,
-    changed: false,
-  };
+  return { summary: `Command ${name} failed: ${errorMessage(error)}`, affected: [], isError: true, changed: false };
 }
 
 /**
@@ -60,20 +48,11 @@ export function failedOutcome(name: string, error: unknown): CommandOutcome {
  * and a mutating command that changed nothing (a graceful no-op such as "add_box failed: …") are
  * failures — except setters (`idempotent`), read-only and history meta-commands, which may change
  * nothing. `mayNoop` overrides that for a caller that knows better (clearing an empty document).
- * @pure
  */
-export function outcomeIsFailure(
-  name: string,
-  outcome: CommandOutcome,
-  mayNoop?: boolean,
-): boolean {
+export function outcomeIsFailure(name: string, outcome: CommandOutcome, mayNoop?: boolean): boolean {
   if (outcome.isError) return true;
   if (isRecord(outcome.data) && outcome.data['ok'] === false) return true;
   const annotations = getCommand(name)?.annotations;
-  const noopAllowed =
-    mayNoop ??
-    (annotations?.readOnly === true ||
-      annotations?.idempotent === true ||
-      annotations?.metaHistory === true);
+  const noopAllowed = mayNoop ?? (annotations?.readOnly === true || annotations?.idempotent === true || annotations?.metaHistory === true);
   return !noopAllowed && !outcome.changed && outcome.data === undefined;
 }

@@ -1,9 +1,4 @@
-/**
- * @layer ui/panels/building
- *
- * ElementListSection — the active level's elements (plus grids): click selects the element's
- * entities in the viewport; the delete button dispatches delete_building_element.
- */
+// Active level's elements (+ grids): click selects the element's entities; delete → delete_building_element.
 
 import React, { memo, useMemo } from 'react';
 import { useStore } from '@ui/store';
@@ -13,15 +8,7 @@ import { DeleteButton, ListRow, PanelSection } from '@ui/panels/PanelParts';
 import { CATEGORY_LABEL, describe } from './describeElement';
 import { elementsOnActiveLevel, isElementSelected } from './elementListRules';
 
-interface ElementRowProps {
-  element: BuildingElement;
-  selected: boolean;
-}
-
-const ElementRow = memo(function ElementRow({
-  element,
-  selected,
-}: ElementRowProps): React.ReactElement {
+const ElementRow = memo(function ElementRow({ element, selected }: { element: BuildingElement; selected: boolean }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const select = useStore((s) => s.select);
   const units = useStore((s) => s.document.units);
@@ -52,9 +39,7 @@ export function ElementListSection(): React.ReactElement {
   const building = useStore((s) => s.document.building);
   const elements = useMemo(() => elementsOnActiveLevel(building), [building]);
   const selected = useSelectionSet();
-  const activeName = building?.activeLevelId
-    ? building.levels[building.activeLevelId]?.name
-    : undefined;
+  const activeName = building?.activeLevelId ? building.levels[building.activeLevelId]?.name : undefined;
   return (
     <PanelSection
       title={activeName ? `Elements · ${activeName}` : 'Elements'}
@@ -65,11 +50,7 @@ export function ElementListSection(): React.ReactElement {
     >
       <ul className="panel__list" aria-label="Building elements">
         {elements.map((element) => (
-          <ElementRow
-            key={element.id}
-            element={element}
-            selected={isElementSelected(element, selected)}
-          />
+          <ElementRow key={element.id} element={element} selected={isElementSelected(element, selected)} />
         ))}
       </ul>
     </PanelSection>

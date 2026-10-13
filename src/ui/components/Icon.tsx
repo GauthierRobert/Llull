@@ -1,17 +1,11 @@
-/**
- * @layer ui/components
- *
- * Icon — the single inline-SVG icon set for llull chrome (24×24 grid, stroke icons).
- * Decorative by default (aria-hidden); pair with a labelled control.
- */
+// The single inline-SVG icon set (24×24 stroke icons); aria-hidden, pair with a labelled control.
 
 import React from 'react';
 import { classNames } from '@ui/classNames';
 
 const ICON_PATHS = {
   layers: 'M12 3 2.5 8 12 13l9.5-5L12 3ZM2.5 12.5 12 17.5l9.5-5M2.5 16.5 12 21.5l9.5-5',
-  assembly:
-    'M3.5 7.5 9 4.5l5.5 3v6L9 16.5l-5.5-3v-6ZM9 10.5v6M3.5 7.5 9 10.5l5.5-3M14.5 13.5l6-3.3v6.3l-5.5 3-3.5-1.9',
+  assembly: 'M3.5 7.5 9 4.5l5.5 3v6L9 16.5l-5.5-3v-6ZM9 10.5v6M3.5 7.5 9 10.5l5.5-3M14.5 13.5l6-3.3v6.3l-5.5 3-3.5-1.9',
   mechanism:
     'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z',
   parameters: 'M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6',
@@ -49,18 +43,15 @@ const ICON_PATHS = {
   check: 'M20 6 9 17l-5-5',
   ruler:
     'M21.3 15.3 8.7 2.7a1 1 0 0 0-1.4 0L2.7 7.3a1 1 0 0 0 0 1.4l12.6 12.6a1 1 0 0 0 1.4 0l4.6-4.6a1 1 0 0 0 0-1.4ZM7.5 10.5l2-2M10.5 13.5l2-2M13.5 16.5l2-2',
-  wireframe:
-    'M12 2.5 3.5 7v10L12 21.5 20.5 17V7L12 2.5ZM3.5 7 12 11.5 20.5 7M12 11.5v10M3.5 17 12 11.5 20.5 17M12 2.5v9',
+  wireframe: 'M12 2.5 3.5 7v10L12 21.5 20.5 17V7L12 2.5ZM3.5 7 12 11.5 20.5 7M12 11.5v10M3.5 17 12 11.5 20.5 17M12 2.5v9',
   xray: 'M12 2.5 3.5 7v10L12 21.5 20.5 17V7L12 2.5Z M12 11.5v10M3.5 7 12 11.5 20.5 7',
   shaded: 'M12 2.5 3.5 7v10L12 21.5 20.5 17V7L12 2.5ZM3.5 7 12 11.5 20.5 7M12 11.5v10',
   plus: 'M12 5v14M5 12h14',
-  trash:
-    'M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6M10 11v6M14 11v6',
+  trash: 'M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6M10 11v6M14 11v6',
   arrowUp: 'M12 19V5M5 12l7-7 7 7',
   arrowDown: 'M12 5v14M19 12l-7 7-7-7',
   zap: 'M13 2 4 14h7l-1 8 9-12h-7l1-8Z',
-  explode:
-    'M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8',
+  explode: 'M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8',
   drawLine: 'M5 19 19 5M3 19h3v3H3zM18 2h3v3h-3z',
   drawPolyline: 'M3 18 8 8l6 6 7-9',
   drawCircle: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z',
@@ -71,23 +62,16 @@ const ICON_PATHS = {
   modifyOffset: 'M3 21V10a7 7 0 0 1 7-7h11M9 21v-8a4 4 0 0 1 4-4h8',
   modifyFillet: 'M4 20V12a8 8 0 0 1 8-8h8',
   modifyChamfer: 'M4 20V10l6-6h10',
-  modifyTrim:
-    'M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12',
+  modifyTrim: 'M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12',
   modifyExtend: 'M3 12h13M12 8l4 4-4 4M21 4v16',
-  terrain:
-    'M2 19c3-4 5-6 8-6s4 3 7 3 3-1 5-2M2 14c3-3 5-6 8-6s4 2 7 2 3-1 5-2M2 9c3-2 5-5 8-5s4 2 7 2 3 0 5-1',
+  terrain: 'M2 19c3-4 5-6 8-6s4 3 7 3 3-1 5-2M2 14c3-3 5-6 8-6s4 2 7 2 3-1 5-2M2 9c3-2 5-5 8-5s4 2 7 2 3 0 5-1',
   building: 'M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6M9 10h.01M15 10h.01',
   wall: 'M3 5h18v14H3zM3 9.5h18M3 14.5h18M9 5v4.5M15 5v4.5M6 9.5v5M12 9.5v5M18 9.5v5M9 14.5V19M15 14.5V19',
-  modifyExplode:
-    'M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8',
-  solidCylinder:
-    'M5 6c0-1.7 3.1-3 7-3s7 1.3 7 3-3.1 3-7 3-7-1.3-7-3ZM5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6',
-  solidSphere:
-    'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM3 12c0 1.9 4 3.5 9 3.5s9-1.6 9-3.5M12 3c-2.2 2.4-3.3 5.4-3.3 9s1.1 6.6 3.3 9',
-  solidCone:
-    'M12 3 4.5 18M12 3l7.5 15M4.5 18c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3-3.4-3-7.5-3-7.5 1.3-7.5 3Z',
-  solidTorus:
-    'M12 18c5 0 9-2.7 9-6s-4-6-9-6-9 2.7-9 6 4 6 9 6ZM8 11.5c1-.9 2.4-1.5 4-1.5s3 .6 4 1.5M9 12.5c.8.6 1.8 1 3 1s2.2-.4 3-1',
+  modifyExplode: 'M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8',
+  solidCylinder: 'M5 6c0-1.7 3.1-3 7-3s7 1.3 7 3-3.1 3-7 3-7-1.3-7-3ZM5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6',
+  solidSphere: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM3 12c0 1.9 4 3.5 9 3.5s9-1.6 9-3.5M12 3c-2.2 2.4-3.3 5.4-3.3 9s1.1 6.6 3.3 9',
+  solidCone: 'M12 3 4.5 18M12 3l7.5 15M4.5 18c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3-3.4-3-7.5-3-7.5 1.3-7.5 3Z',
+  solidTorus: 'M12 18c5 0 9-2.7 9-6s-4-6-9-6-9 2.7-9 6 4 6 9 6ZM8 11.5c1-.9 2.4-1.5 4-1.5s3 .6 4 1.5M9 12.5c.8.6 1.8 1 3 1s2.2-.4 3-1',
   solidWedge: 'M3 18h14l4-3V9L17 12H3l14-6M3 18v-6M17 18v-6M17 12l4-3',
   solidPyramid: 'M12 3 3 17l9 4 9-4-9-14ZM12 3v18',
   transformMove:
@@ -113,12 +97,7 @@ interface IconProps {
   className?: string;
 }
 
-export function Icon({
-  name,
-  size = 16,
-  strokeWidth = 1.75,
-  className,
-}: IconProps): React.ReactElement {
+export function Icon({ name, size = 16, strokeWidth = 1.75, className }: IconProps): React.ReactElement {
   return (
     <svg
       className={classNames('icon', className)}

@@ -1,9 +1,4 @@
-/**
- * @layer ui/panels/civil
- *
- * CivilExportsSection — LandXML (`export_landxml`) and civil DXF (`export_civil_dxf`) downloads.
- * Read-only: runs the exporters locally on the current document.
- */
+// Local read-only LandXML (`export_landxml`) and civil DXF (`export_civil_dxf`) downloads.
 
 import React, { useState } from 'react';
 import { PAPER_SIZES, type PaperSize } from '@aec/shared/sheetFrame';

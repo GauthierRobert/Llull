@@ -1,15 +1,12 @@
 /**
- * Recipe evaluator shared by every concrete kernel: a kernel implements `KernelOps<S>` on its own
- * native shape type `S` (an OCC TopoDS_Shape, a Manifold solid) and `kernelFromOps` turns it into a
- * `GeometryKernel` that walks recipes, caches native shapes by `recipeKey` (so an unchanged prefix of
- * the feature tree is never rebuilt) and hands out opaque `ShapeHandle`s.
- *
- * @layer core/geometry
+ * Recipe evaluator shared by every concrete kernel: a kernel implements `KernelOps<S>` on its own native shape type `S` (an OCC
+ * TopoDS_Shape, a Manifold solid) and `kernelFromOps` turns it into a `GeometryKernel` that walks recipes, caches native shapes by
+ * `recipeKey` (so an unchanged prefix of the feature tree is never rebuilt) and hands out opaque `ShapeHandle`s.
  * @invariant a handle carries its recipe: an evicted (or restarted-kernel) shape is rebuilt on use
- * @invariant a native shape is released exactly once, never while a call still reads it: eviction is
- *   deferred to the end of the outermost call (the cache may exceed `capacity` by that call's nodes)
- * @invariant a cached failure (null) is dropped as soon as the native module reports degradation
- *   (`failureEpoch` grows), so a spurious null is retried instead of sticking
+ * @invariant a native shape is released exactly once, never while a call still reads it: eviction is deferred to the end of the outermost
+ *   call (the cache may exceed `capacity` by that call's nodes)
+ * @invariant a cached failure (null) is dropped as soon as the native module reports degradation (`failureEpoch` grows), so a spurious null
+ *   is retried instead of sticking
  * @failure an op returning null or throwing -> that recipe (and every recipe built on it) is null
  */
 
@@ -19,8 +16,8 @@ import { recipeKey } from './shapeRecipe';
 import { errorMessage } from '../lib/errorMessage';
 
 /**
- * Native operations of a concrete kernel. Each returns a NEW native shape (never one of its inputs:
- * the cache owns and releases every returned native exactly once).
+ * Native operations of a concrete kernel. Each returns a NEW native shape (never one of its inputs: the cache owns and releases every
+ * returned native exactly once).
  */
 export interface KernelOps<S> {
   /** Recipe ops this kernel cannot perform at all (a capability gap, not a refusal of one input). */
@@ -46,8 +43,8 @@ export interface KernelOps<S> {
 }
 
 /**
- * What a handle really is; only this module and kernel proxies (via the helpers below) see through it.
- * `recipe` is absent on a key-only handle (sent to a worker that probably still caches the shape).
+ * What a handle really is; only this module and kernel proxies (via the helpers below) see through it. `recipe` is absent on a key-only
+ * handle (sent to a worker that probably still caches the shape).
  */
 interface HandleBody {
   readonly key: string;
@@ -79,11 +76,7 @@ export interface CachingKernel extends GeometryKernel {
   clear(): void;
 }
 
-function build<S>(
-  ops: KernelOps<S>,
-  recipe: ShapeRecipe,
-  child: (r: ShapeRecipe) => S | null,
-): S | null {
+function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe) => S | null): S | null {
   switch (recipe.op) {
     case 'solid':
       return ops.solid(recipe.entity);
@@ -126,8 +119,8 @@ function build<S>(
 }
 
 /**
- * Wrap native ops as a recipe-evaluating `GeometryKernel` with an LRU of `capacity` native shapes.
- * Failed recipes (null) are cached too, so a refused fillet is not retried on every replay.
+ * Wrap native ops as a recipe-evaluating `GeometryKernel` with an LRU of `capacity` native shapes. Failed recipes (null) are cached too, so
+ * a refused fillet is not retried on every replay.
  */
 export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKernel {
   const shapes = new Map<string, S | null>();
@@ -135,7 +128,6 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
   let depth = 0;
   let builds = 0;
   let epoch = ops.failureEpoch?.() ?? 0;
-
   const safeRelease = (shape: S): void => {
     try {
       ops.release(shape);
@@ -143,7 +135,6 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
       /* already released */
     }
   };
-
   const evict = (): void => {
     for (const key of shapes.keys()) {
       if (shapes.size <= capacity) return;
@@ -153,7 +144,6 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
       if (shape !== null && shape !== undefined) safeRelease(shape);
     }
   };
-
   /** After a degrading failure every cached null may be spurious: forget them. */
   const forgetFailuresIfDegraded = (): void => {
     const now = ops.failureEpoch?.() ?? 0;
@@ -162,7 +152,6 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
     for (const [key, shape] of shapes) if (shape === null) shapes.delete(key);
     for (const [key, mesh] of meshes) if (mesh === null) meshes.delete(key);
   };
-
   const evaluateNative = (recipe: ShapeRecipe): S | null => {
     const key = recipeKey(recipe);
     if (shapes.has(key)) {
@@ -182,7 +171,6 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
     shapes.set(key, shape);
     return shape;
   };
-
   /** Run one public call; evict (and retry-proof cached failures) only once the outermost ends. */
   const call = <T>(body: () => T): T => {
     if (depth === 0) forgetFailuresIfDegraded();
@@ -197,14 +185,12 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
       }
     }
   };
-
   const nativeOf = (handle: ShapeHandle): S | null => {
     const { key, recipe } = bodyOf(handle);
     if (recipe !== undefined) return evaluateNative(recipe);
     if (!shapes.has(key)) throw new Error(`${SHAPE_NOT_CACHED}: ${key}`);
     return shapes.get(key) ?? null;
   };
-
   return {
     supports: (op) => !(ops.unsupported?.has(op) ?? false),
     evaluate: (recipe) => call(() => (evaluateNative(recipe) === null ? null : handleOf(recipe))),

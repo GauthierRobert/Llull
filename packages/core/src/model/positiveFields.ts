@@ -1,8 +1,6 @@
 /**
- * Numeric entity fields that must be finite and > 0, per entity kind: the single table behind the
- * load-time guard (persistence/guards) and the model check (inspect/check_model).
- *
- * @layer core/model
+ * Numeric entity fields that must be finite and > 0, per entity kind: the single table behind the load-time guard (persistence/guards) and
+ * the model check (inspect/check_model).
  */
 
 export const POSITIVE_FIELDS: Readonly<Record<string, readonly string[]>> = {

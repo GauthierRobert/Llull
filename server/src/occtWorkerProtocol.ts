@@ -1,5 +1,4 @@
 /**
- * @layer server
  * Shared vocabulary between `isolatedKernel.ts` (server thread) and `occtWorker.ts` (worker).
  * Status word (shared `Int32Array`): 0 = busy, 3 = kernel ready, 1 = a reply waits on the message
  * port, 2 = the worker died while handling a request.

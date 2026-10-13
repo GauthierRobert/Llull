@@ -1,8 +1,6 @@
 /**
- * Replay engine: regenerate a document from a feature-history recipe (architecture L8).
- * Commands resolve through the active `ExecutionContext.registry`.
- *
- * @layer core/commands
+ * Replay engine: regenerate a document from a feature-history recipe (architecture L8). Commands resolve through the active
+ * `ExecutionContext.registry`.
  */
 
 import { type CadDocument, type FeatureStep, createEmptyDocument } from '../../model/types';
@@ -30,14 +28,11 @@ export interface ReplayStepEvent {
 }
 
 /**
- * Replay all non-suppressed steps of `history` from a fresh document, preserving the document-level
- * state of `base` (classification in history_carry.ts). `=expr` params resolve against
- * `base.parameters`; unresolved ones are reported in `resolveWarnings`.
- *
- * @pure
+ * Replay all non-suppressed steps of `history` from a fresh document, preserving the document-level state of `base` (classification in
+ * history_carry.ts). `=expr` params resolve against `base.parameters`; unresolved ones are reported in `resolveWarnings`.
  * @invariant steps with an unknown command name, or whose `run` throws, are skipped
- * @failure a live step needs the geometry kernel (`requiresKernel`) and none is available ->
- *   returns `base` unchanged (+ a warning) instead of regenerating without that step's geometry
+ * @failure a live step needs the geometry kernel (`requiresKernel`) and none is available -> returns `base` unchanged (+ a warning) instead
+ *   of regenerating without that step's geometry
  */
 export function replayHistory(
   base: CadDocument,
@@ -73,11 +68,8 @@ export function replayHistory(
     // only entries no step produced are carried (see history_carry.ts).
     ...orphanState(base),
     // The building identity (IFC GlobalId salt) survives replay; its content is regenerated.
-    ...(base.building?.uid !== undefined
-      ? { building: { ...createEmptyBuilding(), uid: base.building.uid } }
-      : {}),
+    ...(base.building?.uid !== undefined ? { building: { ...createEmptyBuilding(), uid: base.building.uid } } : {}),
   };
-
   // idMap tracks old entity id (from when the step was first recorded) → new id
   // (assigned during this replay). Subsequent steps' params are rewritten via
   // remapIds. Step-scoped ids replay identically, so this only maps legacy (pre-v2) ids.
@@ -86,7 +78,6 @@ export function replayHistory(
   // States are keyed by everything that determines them, so an unchanged prefix of an
   // edited history (or of a parameter change) is served from the cache instead of re-run.
   let stateKey = cache ? hashText(JSON.stringify({ ...doc, featureHistory: [] })) : '';
-
   for (const step of history) {
     if (step.suppressed) continue;
     const cmd = getCommandFn(step.name);
@@ -107,24 +98,15 @@ export function replayHistory(
       inert = result === null || result.document === doc;
       if (result) doc = { ...result.document, featureHistory: history };
       const mintedUid = uidBefore === undefined ? doc.building?.uid : undefined;
-      if (mintedUid === undefined) {
-        cache?.set(key, { doc, idMap: new Map(idMap), inert });
-      } else if (cache) {
+      if (mintedUid === undefined) cache?.set(key, { doc, idMap: new Map(idMap), inert });
+      else if (cache) {
         // The step minted a globally unique id (uniqueId): never memoize it, and key every later
         // state by that id so no other document is served this document's identity.
         key = nextStateKey(key, 'minted-uid', mintedUid, null);
       }
     }
     stateKey = key;
-    onStep?.({
-      step,
-      rawParams: remapIds(step.params, idMap),
-      params: remapped,
-      before,
-      after: doc,
-      inert,
-    });
+    onStep?.({ step, rawParams: remapIds(step.params, idMap), params: remapped, before, after: doc, inert });
   }
-
   return doc;
 }

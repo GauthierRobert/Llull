@@ -1,23 +1,12 @@
 /**
- * Plan-and-profile sheet: a stationed plan strip of the alignment above its long section, both at
- * the same horizontal scale so stations line up vertically.
- * @layer domain-aec/civil
- * @pure
+ * Plan-and-profile sheet: a stationed plan strip of the alignment above its long section, both at the same horizontal scale so stations
+ * line up vertically.
  */
 
 import type { CadDocument } from '@core/model/types';
 import type { AlignmentObject } from '@core/model/civil';
 import { escapeXml } from '@lib/escapeXml';
-import {
-  composeSheetSvg,
-  fitScale,
-  MARGIN,
-  n,
-  northArrow,
-  PAPER_MM,
-  sheetDrawingArea,
-  type PaperSize,
-} from '../../shared/sheetFrame';
+import { composeSheetSvg, fitScale, MARGIN, n, northArrow, PAPER_MM, sheetDrawingArea, type PaperSize } from '../../shared/sheetFrame';
 import { toMetres, toMm } from '@core/model/units';
 import { endStation, horizontalElements } from '../alignment/alignmentGeometry';
 import { stationText, getCivil } from '../model';
@@ -30,34 +19,22 @@ const PAPER_PER_UNIT = 0.25;
 const STRIP_HEIGHT = 42;
 const LONG_SECTION_RIGHT = 40;
 
-export interface PlanProfileOptions {
-  readonly paper: PaperSize;
-  readonly scale: number | undefined;
-  readonly verticalExaggeration: number;
-}
+export type PlanProfileOptions = { readonly paper: PaperSize; readonly scale: number | undefined; readonly verticalExaggeration: number };
 
-export interface PlanProfileSheet {
-  readonly text: string;
-  readonly scale: number;
-  readonly fits: boolean;
-}
+export type PlanProfileSheet = { readonly text: string; readonly scale: number; readonly fits: boolean };
 
 function sizeOf(svg: string): { width: number; height: number } {
   const match = /width="([\d.]+)" height="([\d.]+)"/.exec(svg);
   return { width: Number(match?.[1] ?? 0), height: Number(match?.[2] ?? 0) };
 }
 
-/**
- * @pure
- * @returns the sheet, or an explanation string when the alignment cannot be drawn
- */
+/** @returns the sheet, or an explanation string when the alignment cannot be drawn */
 export function buildPlanProfileSheet(
   doc: CadDocument,
   alignment: AlignmentObject,
   options: PlanProfileOptions,
 ): PlanProfileSheet | string {
-  if (validateProfile(alignment.profile) !== null)
-    return `${alignment.name} has no design profile (set_alignment_profile).`;
+  if (validateProfile(alignment.profile) !== null) return `${alignment.name} has no design profile (set_alignment_profile).`;
   if (options.scale !== undefined && !(options.scale > 0)) return 'scale must be > 0.';
   if (!(options.verticalExaggeration > 0)) return 'verticalExaggeration must be > 0.';
   const civil = getCivil(doc);
@@ -67,35 +44,17 @@ export function buildPlanProfileSheet(
   const lengthM = toMetres(doc, endStation(alignment)) - startM;
   const scale =
     options.scale ??
-    fitScale(lengthM * 1000, 1, {
-      ...area,
-      width: area.width - (LONG_SECTION_LEFT + LONG_SECTION_RIGHT) * PAPER_PER_UNIT,
-    });
+    fitScale(lengthM * 1000, 1, { ...area, width: area.width - (LONG_SECTION_LEFT + LONG_SECTION_RIGHT) * PAPER_PER_UNIT });
   const mmPerMetre = 1000 / scale;
-  const rows = reportRows(
-    doc,
-    alignment,
-    analyseStations(doc, civil, alignment, reportStations(alignment, alignment.stationInterval)),
-  );
-  const section = longSectionSvg(
-    doc,
-    civil,
-    alignment,
-    rows,
-    options.verticalExaggeration,
-    mmPerMetre / PAPER_PER_UNIT,
-  );
+  const rows = reportRows(doc, alignment, analyseStations(doc, civil, alignment, reportStations(alignment, alignment.stationInterval)));
+  const section = longSectionSvg(doc, civil, alignment, rows, options.verticalExaggeration, mmPerMetre / PAPER_PER_UNIT);
   if (section === null) return `${alignment.name}: the profile has no stations on the alignment.`;
   const size = sizeOf(section);
   const sectionTop = area.y + STRIP_HEIGHT + 4;
-  const stationX = (stationM: number): number =>
-    area.x + LONG_SECTION_LEFT * PAPER_PER_UNIT + (stationM - startM) * mmPerMetre;
+  const stationX = (stationM: number): number => area.x + LONG_SECTION_LEFT * PAPER_PER_UNIT + (stationM - startM) * mmPerMetre;
   const axisY = area.y + 22;
   const halfWidth = alignment.section
-    ? Math.max(
-        ((alignment.section.laneWidth + alignment.section.shoulderWidth) * toMm(doc, 1)) / scale,
-        1.5,
-      )
+    ? Math.max(((alignment.section.laneWidth + alignment.section.shoulderWidth) * toMm(doc, 1)) / scale, 1.5)
     : 3;
   const strip: string[] = [
     `<text x="${n(area.x)}" y="${n(area.y + 4)}" font-size="3.2" text-anchor="start">${escapeXml(`PLAN - ${alignment.name}`)}</text>`,
@@ -140,7 +99,6 @@ export function buildPlanProfileSheet(
     overlays: [northArrow(width - MARGIN - 12, MARGIN + 12)],
   });
   const fits =
-    area.x + size.width * PAPER_PER_UNIT <= area.x + area.width &&
-    sectionTop + size.height * PAPER_PER_UNIT <= area.y + area.height;
+    area.x + size.width * PAPER_PER_UNIT <= area.x + area.width && sectionTop + size.height * PAPER_PER_UNIT <= area.y + area.height;
   return { text: `${text}\n`, scale, fits };
 }

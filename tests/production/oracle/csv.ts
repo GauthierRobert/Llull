@@ -1,8 +1,4 @@
-/**
- * @layer tests/production/oracle
- *
- * RFC 4180 CSV reader (quoted fields, doubled quotes, CRLF) for issued schedules.
- */
+/** RFC 4180 CSV reader (quoted fields, doubled quotes, CRLF) for issued schedules. */
 
 export function parseCsv(text: string): string[][] {
   const rows: string[][] = [];

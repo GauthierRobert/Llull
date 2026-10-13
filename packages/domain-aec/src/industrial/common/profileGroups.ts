@@ -1,7 +1,6 @@
 /**
- * Shared profile-group mechanics of the iterative design commands (design_portal_frames,
- * design_purlins): members of one role and section are up-sized together so rows stay uniform.
- * @layer domain-aec
+ * Shared profile-group mechanics of the iterative design commands (design_portal_frames, design_purlins): members of one role and section
+ * are up-sized together so rows stay uniform.
  */
 
 import { z } from '@core/commands/schema';
@@ -16,20 +15,14 @@ import { findProfile, lightestProfile, sectionProperties } from '../../steel/pro
 const MAX_ITERATIONS = 15;
 
 /** Shared `targetUtilisation` parameter of the design commands. */
-export const targetUtilisationParam = z
-  .number()
-  .optional()
-  .describe('Maximum accepted utilisation (0.5–1). Default 0.95.');
+export const targetUtilisationParam = z.number().optional().describe('Maximum accepted utilisation (0.5–1). Default 0.95.');
 
 /** @invariant accepted target utilisations lie in [0.5, 1] */
 export function isValidTargetUtilisation(value: number): boolean {
   return isFiniteNumber(value) && value >= 0.5 && value <= 1;
 }
 
-interface ProfileGroup {
-  role: string;
-  profile: string;
-}
+type ProfileGroup = { role: string; profile: string };
 
 export type ProfileGroups = Map<string, ProfileGroup>;
 
@@ -39,9 +32,8 @@ export function addProfileGroup(groups: ProfileGroups, member: SteelMemberElemen
 }
 
 /**
- * Re-profile every member of the group accepted by `isTarget`; `resize` returns the building with
- * the resized member applied (it may also refit dependents).
- * @pure
+ * Re-profile every member of the group accepted by `isTarget`; `resize` returns the building with the resized member applied (it may also
+ * refit dependents).
  */
 export function resizeProfileGroup(
   building: BuildingModel,
@@ -53,8 +45,7 @@ export function resizeProfileGroup(
   let next = building;
   const resizedIds: string[] = [];
   for (const element of membersOf(building)) {
-    if (element.role !== group.role || element.profile !== group.profile || !isTarget(element))
-      continue;
+    if (element.role !== group.role || element.profile !== group.profile || !isTarget(element)) continue;
     next = resize(next, { ...element, profile: larger });
     resizedIds.push(element.id);
   }
@@ -62,27 +53,15 @@ export function resizeProfileGroup(
 }
 
 /**
- * One design iteration: up-size every group to `nextSize(profile)` via `resizeGroup` (which also
- * re-seats dependents). Groups without a larger size set `limited`; `progressed` is false when no
- * group could grow.
- * @pure
+ * One design iteration: up-size every group to `nextSize(profile)` via `resizeGroup` (which also re-seats dependents). Groups without a
+ * larger size set `limited`; `progressed` is false when no group could grow.
  */
 export function upsizeProfileGroups(
   building: BuildingModel,
   groups: ProfileGroups,
   nextSize: (profile: string) => string | null,
-  resizeGroup: (
-    building: BuildingModel,
-    group: ProfileGroup,
-    larger: string,
-  ) => { building: BuildingModel; changedIds: string[] },
-): {
-  building: BuildingModel;
-  progressed: boolean;
-  limited: boolean;
-  changes: string[];
-  changedIds: string[];
-} {
+  resizeGroup: (building: BuildingModel, group: ProfileGroup, larger: string) => { building: BuildingModel; changedIds: string[] },
+): { building: BuildingModel; progressed: boolean; limited: boolean; changes: string[]; changedIds: string[] } {
   let next = building;
   let progressed = false;
   let limited = false;
@@ -106,9 +85,8 @@ export function upsizeProfileGroups(
 type UpsizeStep = ReturnType<typeof upsizeProfileGroups>;
 
 /**
- * Iterate `step` (one upsize pass on the current document; `null` = nothing left to upsize) up
- * to MAX_ITERATIONS, accumulating the change texts and ids. `limited` when a group had no larger
- * size or the iteration cap was hit.
+ * Iterate `step` (one upsize pass on the current document; `null` = nothing left to upsize) up to MAX_ITERATIONS, accumulating the change
+ * texts and ids. `limited` when a group had no larger size or the iteration cap was hit.
  */
 export function iterateUpsizing(
   doc: CadDocument,
@@ -132,22 +110,16 @@ export function iterateUpsizing(
 }
 
 /**
- * Next heavier profile of the same family; at the top of the family, the lightest I-section
- * (IPE / HEA / HEB) with a larger plastic modulus. Null when nothing larger exists.
+ * Next heavier profile of the same family; at the top of the family, the lightest I-section (IPE / HEA / HEB) with a larger plastic
+ * modulus. Null when nothing larger exists.
  */
 export function nextProfile(name: string): string | null {
   const profile = findProfile(name);
   if (!profile) return null;
-  const sameFamily = lightestProfile(
-    (candidate) =>
-      candidate.family === profile.family && candidate.massPerMetre > profile.massPerMetre,
-  );
+  const sameFamily = lightestProfile((candidate) => candidate.family === profile.family && candidate.massPerMetre > profile.massPerMetre);
   if (sameFamily) return sameFamily.name;
   if (profile.shape !== 'I') return null;
   const modulus = sectionProperties(profile).plasticModulus;
-  const stronger = lightestProfile(
-    (candidate) =>
-      candidate.shape === 'I' && sectionProperties(candidate).plasticModulus > modulus * 1.02,
-  );
+  const stronger = lightestProfile((candidate) => candidate.shape === 'I' && sectionProperties(candidate).plasticModulus > modulus * 1.02);
   return stronger?.name ?? null;
 }

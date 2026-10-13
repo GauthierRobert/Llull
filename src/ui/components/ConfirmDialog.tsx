@@ -1,10 +1,4 @@
-/**
- * @layer ui/components
- *
- * ConfirmDialog — small modal asking to confirm a destructive action. Focus moves to the cancel
- * button on open, Tab is trapped, Escape / backdrop cancel, focus returns to the opener on close.
- * Presentation only.
- */
+// Confirm-a-destructive-action modal: focus on Cancel, Tab trapped, Escape / backdrop cancel, focus returned on close.
 
 import React, { useId, useRef } from 'react';
 import { ModalDialog } from './ModalDialog';
@@ -17,13 +11,7 @@ interface ConfirmDialogProps {
   onCancel: () => void;
 }
 
-export function ConfirmDialog({
-  title,
-  message,
-  confirmLabel,
-  onConfirm,
-  onCancel,
-}: ConfirmDialogProps): React.ReactElement {
+export function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCancel }: ConfirmDialogProps): React.ReactElement {
   const titleId = useId();
   const cancelRef = useRef<HTMLButtonElement | null>(null);
 

@@ -1,5 +1,3 @@
-/** @layer ui/panels Native select over a fixed list of string options (no casts on change). */
-
 import React from 'react';
 
 interface OptionSelectProps<Option extends string> {
@@ -55,15 +53,7 @@ interface PairSelectProps {
 }
 
 /** Native select over `[value, text]` pairs, optionally with a blank first choice. */
-export function PairSelect({
-  value,
-  options,
-  label,
-  blankLabel,
-  testId,
-  title,
-  onChange,
-}: PairSelectProps): React.ReactElement {
+export function PairSelect({ value, options, label, blankLabel, testId, title, onChange }: PairSelectProps): React.ReactElement {
   const texts = new Map(options);
   return (
     <OptionSelect

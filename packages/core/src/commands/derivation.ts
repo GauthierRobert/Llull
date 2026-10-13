@@ -1,8 +1,6 @@
 /**
- * Derivation guards: evaluated geometry that a definition element generated is read-only;
- * edit the source instead. Each guard inspects a command's before/after documents.
- *
- * @layer core/commands
+ * Derivation guards: evaluated geometry that a definition element generated is read-only; edit the source instead. Each guard inspects a
+ * command's before/after documents.
  * @invariant a guard is pure and returns null when the edit is legal
  */
 

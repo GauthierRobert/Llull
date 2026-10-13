@@ -1,16 +1,5 @@
-/**
- * Pure UI helpers: shared visibility rule, animated-entity set, snap/pick visibility filters,
- * and command-result type guards.
- */
-
 import { describe, it, expect } from 'vitest';
-import {
-  type Animation,
-  type CadDocument,
-  type EntityGroup,
-  type LineEntity,
-  createEmptyDocument,
-} from '@core/model/types';
+import { type Animation, type CadDocument, type EntityGroup, type LineEntity, createEmptyDocument } from '@core/model/types';
 import { isEntityVisible } from '../../src/ui/viewport/entityVisibility';
 import { animatedEntityIds } from '../../src/ui/viewport/3d/animationClickHelpers';
 import { collectSnapCandidates } from '../../src/ui/viewport/2d/snapping/candidates';
@@ -53,12 +42,9 @@ describe('isEntityVisible', () => {
     const { doc, line } = lineDoc();
     expect(isEntityVisible(line, doc.layers, new Set(), new Set())).toBe(true);
   });
-
   it('hides on document layer, viewport layer filter, or entity filter', () => {
     const hiddenLayerDoc = lineDoc(false);
-    expect(
-      isEntityVisible(hiddenLayerDoc.line, hiddenLayerDoc.doc.layers, new Set(), new Set()),
-    ).toBe(false);
+    expect(isEntityVisible(hiddenLayerDoc.line, hiddenLayerDoc.doc.layers, new Set(), new Set())).toBe(false);
     const { doc, line } = lineDoc();
     expect(isEntityVisible(line, doc.layers, new Set(['layer-default']), new Set())).toBe(false);
     expect(isEntityVisible(line, doc.layers, new Set(), new Set(['l1']))).toBe(false);
@@ -68,12 +54,10 @@ describe('isEntityVisible', () => {
 describe('hidden geometry is neither snapped nor picked', () => {
   const { doc } = lineDoc();
   const hidden = (): boolean => false;
-
   it('collectSnapCandidates skips entities rejected by isVisible', () => {
     expect(collectSnapCandidates(doc).length).toBeGreaterThan(0);
     expect(collectSnapCandidates(doc, { isVisible: hidden })).toEqual([]);
   });
-
   it('nearestEntityId honours a pixel-derived tolerance', () => {
     expect(nearestEntityId(doc, [5, 0.4], 0.5)).toBe('l1');
     expect(nearestEntityId(doc, [5, 0.4], 0.2)).toBeNull();
@@ -84,15 +68,10 @@ describe('animatedEntityIds', () => {
   const animation = (id: string, targetKind: 'entity' | 'group', targetId: string): Animation =>
     ({ id, targetKind, targetId }) as Animation;
   const group: EntityGroup = { id: 'g1', name: 'G', memberIds: ['b2', 'b3'] } as EntityGroup;
-
   it('collects direct and group-member targets', () => {
-    const ids = animatedEntityIds(
-      { a1: animation('a1', 'entity', 'b1'), a2: animation('a2', 'group', 'g1') },
-      { g1: group },
-    );
+    const ids = animatedEntityIds({ a1: animation('a1', 'entity', 'b1'), a2: animation('a2', 'group', 'g1') }, { g1: group });
     expect([...ids].sort()).toEqual(['b1', 'b2', 'b3']);
   });
-
   it('is empty without animations and tolerates a missing group', () => {
     expect(animatedEntityIds({}, {}).size).toBe(0);
     expect(animatedEntityIds({ a: animation('a', 'group', 'nope') }, {}).size).toBe(0);

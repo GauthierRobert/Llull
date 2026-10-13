@@ -1,9 +1,4 @@
-/**
- * @layer ui/panels/building
- *
- * Form specs for the grid framing tools (columns / beams / bracing laid out from the structural
- * grid): each maps form values to ONE command (param-gathering only, react R1).
- */
+// Grid framing tool specs (columns / beams / bracing from the structural grid): form values → ONE command.
 
 import { toRadians } from '@lib/angle';
 import {
@@ -20,8 +15,7 @@ import {
 } from './elementToolForm';
 import { ALL_PROFILES, BASE_OPTIONS, JOINT_OPTIONS } from './steelProfileOptions';
 
-const profile = (defaultValue: string): ToolField =>
-  select('profile', 'Profile', defaultValue, ALL_PROFILES);
+const profile = (defaultValue: string): ToolField => select('profile', 'Profile', defaultValue, ALL_PROFILES);
 
 const gradeField = (): ToolField => txt('material', 'Steel grade (blank = default)', '', true);
 

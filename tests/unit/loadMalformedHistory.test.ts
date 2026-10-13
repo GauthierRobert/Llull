@@ -4,16 +4,13 @@ import { execute } from '@core/commands/registry';
 import { serializeDocument } from '@core/commands/persistence/serialization';
 
 function envelopeWith(history: unknown): string {
-  const envelope = JSON.parse(serializeDocument(createEmptyDocument())) as {
-    document: Record<string, unknown>;
-  };
+  const envelope = JSON.parse(serializeDocument(createEmptyDocument())) as { document: Record<string, unknown> };
   envelope.document['featureHistory'] = history;
   return JSON.stringify(envelope);
 }
 
 describe('load_document with a malformed featureHistory', () => {
   const doc = createEmptyDocument();
-
   it.each([
     ['a null entry', [null]],
     ['a number entry', [5]],
@@ -25,7 +22,6 @@ describe('load_document with a malformed featureHistory', () => {
     expect(result.summary).toContain('featureHistory[0] is malformed');
     expect(result.summary).not.toContain('Cannot read properties');
   });
-
   it('still loads a well-formed history and raises the step counter past it', () => {
     const built = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
     const json = JSON.parse(serializeDocument(built)) as { document: Record<string, unknown> };

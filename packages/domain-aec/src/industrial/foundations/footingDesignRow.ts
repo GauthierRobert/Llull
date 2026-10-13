@@ -1,31 +1,12 @@
-/**
- * Design of one footing under one analysed column: smallest passing pad + reinforcement (EN 1992-1-1).
- * @layer domain-aec
- * @pure
- */
+/** Design of one footing under one analysed column: smallest passing pad + reinforcement (EN 1992-1-1). */
 
 import type { BuildingModel, FootingElement, SteelMemberElement } from '@core/model/building';
 import { fromMm } from '@core/model/units';
 import { round, unitsToMm } from '../../shared/numeric';
 import { findProfile } from '../../steel/profiles';
 import { findPlate, hasCase, ultimateCombinations } from './foundationCombinations';
-import {
-  COVER_MM,
-  FALLBACK_COLUMN_MM,
-  type FootingDesignRow,
-  MAX_PLAN_MM,
-  MAX_THICKNESS_MM,
-  type PadSize,
-} from './footingModel';
-import {
-  type SizingContext,
-  evaluatePad,
-  geometryOf,
-  netLoads,
-  padVolume,
-  sizeText,
-  trialSizes,
-} from './footingSizing';
+import { COVER_MM, FALLBACK_COLUMN_MM, type FootingDesignRow, MAX_PLAN_MM, MAX_THICKNESS_MM, type PadSize } from './footingModel';
+import { type SizingContext, evaluatePad, geometryOf, netLoads, padVolume, sizeText, trialSizes } from './footingSizing';
 
 export const isResized = (before: PadSize, after: PadSize): boolean =>
   before.some((value, index) => Math.round(value) !== Math.round(after[index] ?? 0));
@@ -37,14 +18,9 @@ interface FootingDesignOutcome {
   readonly change?: string;
 }
 
+// prettier-ignore
 const emptyRow = {
-  barDiameter: null,
-  spacing: null,
-  asProvided: null,
-  asRequired: 0,
-  shearUtilisation: 0,
-  punchingUtilisation: 0,
-  punchingDistance: 0,
+  barDiameter: null, spacing: null, asProvided: null, asRequired: 0, shearUtilisation: 0, punchingUtilisation: 0, punchingDistance: 0,
   combination: '-',
 } as const;
 
@@ -66,11 +42,7 @@ export function designFootingRow(inputs: FootingDesignInputs): FootingDesignOutc
   const crane = hasCase(reaction, 'CL') || hasCase(reaction, 'CR');
   const current: PadSize = [toMm(footing.width), toMm(footing.length), toMm(footing.thickness)];
   const base = { id: footing.id, mark: footing.mark, column: column.mark };
-  const unloadedNet = netLoads(
-    reaction,
-    ultimateCombinations(wind, crane, false),
-    geometryOf(doc, footing, face).leverM,
-  );
+  const unloadedNet = netLoads(reaction, ultimateCombinations(wind, crane, false), geometryOf(doc, footing, face).leverM);
   if (unloadedNet.length === 0) {
     return {
       row: {
@@ -104,11 +76,7 @@ export function designFootingRow(inputs: FootingDesignInputs): FootingDesignOutc
   const chosen = verdict.passes ? verdict.mat?.chosen : null;
   if (chosen) {
     const resized = isResized(size, current);
-    const reinforcement = {
-      barDiameter: fromMm(doc, chosen.diameter),
-      spacing: fromMm(doc, chosen.spacing),
-      cover: fromMm(doc, COVER_MM),
-    };
+    const reinforcement = { barDiameter: fromMm(doc, chosen.diameter), spacing: fromMm(doc, chosen.spacing), cover: fromMm(doc, COVER_MM) };
     const { reinforcement: previous, ...bare } = footing;
     const row: FootingDesignRow = {
       ...base,
@@ -137,13 +105,7 @@ export function designFootingRow(inputs: FootingDesignInputs): FootingDesignOutc
       row,
       updated: {
         ...bare,
-        ...(resized
-          ? {
-              width: fromMm(doc, size[0]),
-              length: fromMm(doc, size[1]),
-              thickness: fromMm(doc, size[2]),
-            }
-          : {}),
+        ...(resized ? { width: fromMm(doc, size[0]), length: fromMm(doc, size[1]), thickness: fromMm(doc, size[2]) } : {}),
         reinforcement,
       },
       change: `${footing.mark}${resized ? ` ${sizeText(current)} → ${sizeText(size)}` : ''} H${chosen.diameter} @ ${chosen.spacing}`,

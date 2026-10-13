@@ -1,14 +1,9 @@
 /**
- * DSTV NC1 export: one numerical-control file per steel piece (members, base plates, connection
- * end plates) for CNC saw / drill / profile-cutting lines. All lengths are millimetres.
- * @layer domain-aec
+ * DSTV NC1 export: one numerical-control file per steel piece (members, base plates, connection end plates) for CNC saw / drill /
+ * profile-cutting lines. All lengths are millimetres.
  */
 
-import type {
-  BasePlateElement,
-  MomentConnectionElement,
-  SteelMemberElement,
-} from '@core/model/building';
+import type { BasePlateElement, MomentConnectionElement, SteelMemberElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { unknownLevelFailure } from '../../building/levelLookup';
@@ -19,12 +14,7 @@ import { round } from '../../shared/numeric';
 import { noop, report } from '@core/commands/noop';
 import { sweepFrame } from '../../shared/mesh';
 import { findProfile, STEEL_DENSITY_KG_PER_M3 } from '../../steel/profiles';
-import {
-  connectionSolids,
-  plateLayout,
-  type ConnectionSolid,
-  type PlateLayout,
-} from '../connections/evaluateConnections';
+import { connectionSolids, plateLayout, type ConnectionSolid, type PlateLayout } from '../connections/evaluateConnections';
 import { buildFiles, type NcFile } from './ncFiles';
 import {
   ANCHOR_HOLE_CLEARANCE_MM,
@@ -35,28 +25,13 @@ import {
   outlineMean,
 } from './ncMemberPieces';
 
-export interface NcExport {
-  readonly files: NcFile[];
-  readonly count: number;
-}
+export type NcExport = { readonly files: NcFile[]; readonly count: number };
 
 function platePiece(
   doc: CadDocument,
-  parts: {
-    mark: string;
-    grade: string;
-    length: number;
-    width: number;
-    thickness: number;
-    holes: ReadonlyArray<NcHole>;
-    sourceId: string;
-  },
+  parts: { mark: string; grade: string; length: number; width: number; thickness: number; holes: ReadonlyArray<NcHole>; sourceId: string },
 ): NcPiece {
-  const [length, width, thickness] = [
-    round(toMm(doc, parts.length)),
-    round(toMm(doc, parts.width)),
-    round(toMm(doc, parts.thickness)),
-  ];
+  const [length, width, thickness] = [round(toMm(doc, parts.length)), round(toMm(doc, parts.width)), round(toMm(doc, parts.thickness))];
   return {
     kind: 'plate',
     mark: parts.mark,
@@ -107,11 +82,7 @@ function basePlatePiece(doc: CadDocument, plate: BasePlateElement, layout: Plate
 }
 
 /** One piece per end-plate solid of the connection (second plate marked `<mark>b`); none without a main plate. */
-function endPlatePieces(
-  doc: CadDocument,
-  connection: MomentConnectionElement,
-  solids: ReadonlyArray<ConnectionSolid>,
-): NcPiece[] {
+function endPlatePieces(doc: CadDocument, connection: MomentConnectionElement, solids: ReadonlyArray<ConnectionSolid>): NcPiece[] {
   const mm = (value: number): number => toMm(doc, value);
   const outline = solids.find((solid) => solid.part === 'plate')?.outline;
   if (!outline) return [];
@@ -145,8 +116,6 @@ function endPlatePieces(
 }
 
 /**
- * @command export_nc_files
- * @pure read-only
  * @affects none; data = { files: [{ name, content, mark, kind, profile, quantity, length, sourceIds }], count }
  * @invariant identical pieces (profile, length, cuts, holes, grade) share one file with quantity > 1
  * @failure no steel members / unknown level / bad params -> no-op, affected:[]
@@ -155,30 +124,18 @@ export const exportNcFiles = defineCommand({
   name: 'export_nc_files',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Export DSTV NC1 numerical-control files (one per distinct piece) for CNC saw-drill-cutting lines. ' +
-    'Steel members get an ST header (profile, code letter I/U/M/RO/L, length, section sizes, mass, ' +
-    'painted surface, cut angles; rafters are cut to the roof pitch) and a BO block for bolt holes ' +
-    'where the model has them (column flange holes at eaves moment connections). Base plates and ' +
-    'connection end plates become separate code-B files with an AK contour and BO holes. Identical ' +
-    'pieces are grouped into one file with a quantity. All numbers are millimetres whatever the ' +
-    'document unit. data.files[].content holds each NC1 file text.',
+    'Export DSTV NC1 numerical-control files (one per distinct piece) for CNC saw-drill-cutting lines. Steel members get an ST header ' +
+    '(profile, code letter I/U/M/RO/L, length, section sizes, mass, painted surface, cut angles; rafters are cut to the roof pitch) and ' +
+    'a BO block for bolt holes where the model has them (column flange holes at eaves moment connections). Base plates and connection ' +
+    'end plates become separate code-B files with an AK contour and BO holes. Identical pieces are grouped into one file with a ' +
+    'quantity. All numbers are millimetres whatever the document unit. data.files[].content holds each NC1 file text.',
   params: z.object({
     memberIds: z
       .array(z.string())
       .optional()
-      .describe(
-        'Steel member ids to export (also selects the base plates and end plates they host). Default: every steel member.',
-      ),
-    includePlates: z
-      .boolean()
-      .optional()
-      .describe(
-        'Also export base plates and connection end plates as separate NC files. Default true.',
-      ),
-    levelId: z
-      .string()
-      .optional()
-      .describe('Only export pieces of this level id. Default: all levels.'),
+      .describe('Steel member ids to export (also selects the base plates and end plates they host). Default: every steel member.'),
+    includePlates: z.boolean().optional().describe('Also export base plates and connection end plates as separate NC files. Default true.'),
+    levelId: z.string().optional().describe('Only export pieces of this level id. Default: all levels.'),
   }),
   run: (doc, params): CommandResult => {
     const { memberIds, includePlates = true, levelId } = params;
@@ -202,13 +159,7 @@ export const exportNcFiles = defineCommand({
       const profile = findProfile(element.profile);
       const frame = sweepFrame(element.start, element.end, element.roll);
       if (!profile || !frame) continue;
-      pieces.push(
-        memberPiece(doc, element, profile, frame, {
-          connections: allConnections,
-          members: allMembers,
-          levels: building.levels,
-        }),
-      );
+      pieces.push(memberPiece(doc, element, profile, frame, { connections: allConnections, members: allMembers, levels: building.levels }));
     }
     if (pieces.length === 0) {
       return noop(

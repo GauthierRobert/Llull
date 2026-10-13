@@ -1,6 +1,4 @@
 /**
- * @layer tests/production/oracle
- *
  * Independent LandXML 1.2 reader for issued civil exchange files: well-formedness (every element
  * closed in order, one root) and what Civil 3D / 12d import — CgPoints, TIN surfaces, alignments
  * (spirals, profile) and the pipe network (structures, pipes with their slope attribute).
@@ -15,8 +13,7 @@ export interface LandXmlSummary {
   pipes: { name: string; slope: number; diameterMm: number }[];
 }
 
-const attribute = (tag: string, name: string): string =>
-  new RegExp(`\\b${name}="([^"]*)"`).exec(tag)?.[1] ?? '';
+const attribute = (tag: string, name: string): string => new RegExp(`\\b${name}="([^"]*)"`).exec(tag)?.[1] ?? '';
 
 /** Tag-balance check: every start tag closed by its matching end tag, a single root element. */
 function wellFormedness(xml: string): string[] {
@@ -45,21 +42,12 @@ function wellFormedness(xml: string): string[] {
 }
 
 function blocks(xml: string, tag: string): string[] {
-  return [...xml.matchAll(new RegExp(`<${tag}\\b[^>]*>[\\s\\S]*?</${tag}>`, 'g'))].map(
-    (match) => match[0],
-  );
+  return [...xml.matchAll(new RegExp(`<${tag}\\b[^>]*>[\\s\\S]*?</${tag}>`, 'g'))].map((match) => match[0]);
 }
 
 export function parseLandXml(xml: string): LandXmlSummary {
   if (xml.trim() === '') {
-    return {
-      errors: ['empty file'],
-      cgPoints: 0,
-      surfaces: [],
-      alignments: [],
-      structs: 0,
-      pipes: [],
-    };
+    return { errors: ['empty file'], cgPoints: 0, surfaces: [], alignments: [], structs: 0, pipes: [] };
   }
   const count = (text: string, pattern: RegExp): number => (text.match(pattern) ?? []).length;
   return {

@@ -1,8 +1,6 @@
 /**
- * Watertight prism meshes: a planar outline (with holes) swept straight between two placements.
- * Used for slabs with openings, steel members, pipes and cladding panels.
- * @layer domain-aec
- * @pure
+ * Watertight prism meshes: a planar outline (with holes) swept straight between two placements. Used for slabs with openings, steel
+ * members, pipes and cladding panels.
  */
 
 import type { MeshData, Vec2, Vec3 } from '@core/model/types';
@@ -12,9 +10,8 @@ import { add3, cross3, dot3, scale3, sub3 } from '@lib/vec3';
 import { normalize } from './vec3';
 
 /**
- * Builds the prism of `outer` minus `holes`. `place(point, side)` maps a local outline point to
- * world space at the start (side 0) or end (side 1) of the sweep; the local frame must be
- * right-handed with the sweep direction as +z so caps and sides face outward.
+ * Builds the prism of `outer` minus `holes`. `place(point, side)` maps a local outline point to world space at the start (side 0) or end
+ * (side 1) of the sweep; the local frame must be right-handed with the sweep direction as +z so caps and sides face outward.
  * @returns null when the outline cannot be triangulated
  */
 export function prismMesh(
@@ -54,8 +51,8 @@ export interface SweepFrame {
 }
 
 /**
- * Member frame: the section depth (v) points "up" (+Z projected off the axis) for horizontal and
- * sloped members, and along +X for vertical members; `roll` then rotates the section about the axis.
+ * Member frame: the section depth (v) points "up" (+Z projected off the axis) for horizontal and sloped members, and along +X for vertical
+ * members; `roll` then rotates the section about the axis.
  * @returns null for a zero-length axis
  */
 export function sweepFrame(start: Vec3, end: Vec3, roll = 0): SweepFrame | null {

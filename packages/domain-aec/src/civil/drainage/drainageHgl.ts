@@ -1,9 +1,7 @@
 /**
- * Hydraulic grade line (metres) from the outfall(s) upstream. Per pipe: friction slope
- * Sf = (Q n / (A R^(2/3)))^2 (full bore), water level = max(normal-depth level, downstream HGL +
- * Sf L); a manhole loss K v^2 / 2g is added where the pipe runs under pressure at its upstream end.
- * @layer domain-aec/civil
- * @pure
+ * Hydraulic grade line (metres) from the outfall(s) upstream. Per pipe: friction slope Sf = (Q n / (A R^(2/3)))^2 (full bore), water level
+ * = max(normal-depth level, downstream HGL + Sf L); a manhole loss K v^2 / 2g is added where the pipe runs under pressure at its upstream
+ * end.
  */
 
 import type { CadDocument } from '@core/model/types';
@@ -28,15 +26,9 @@ export interface PipeHgl {
   readonly flooding: boolean;
 }
 
-export interface ManholeHgl {
-  readonly hglM: number;
-  readonly flooding: boolean;
-}
+export type ManholeHgl = { readonly hglM: number; readonly flooding: boolean };
 
-export interface HglResult {
-  readonly pipes: ReadonlyMap<string, PipeHgl>;
-  readonly manholes: ReadonlyMap<string, ManholeHgl>;
-}
+export type HglResult = { readonly pipes: ReadonlyMap<string, PipeHgl>; readonly manholes: ReadonlyMap<string, ManholeHgl> };
 
 interface PipeState {
   readonly diameterM: number;
@@ -48,12 +40,7 @@ interface PipeState {
   readonly velocityFull: number;
 }
 
-function pipeState(
-  doc: CadDocument,
-  civil: CivilModel,
-  pipe: PipeObject,
-  designLps: number,
-): PipeState {
+function pipeState(doc: CadDocument, civil: CivilModel, pipe: PipeObject, designLps: number): PipeState {
   const diameterM = toMetres(doc, pipe.diameter);
   const flowM3s = designLps / 1000;
   const slope = pipeSlope(civil, pipe);
@@ -71,21 +58,9 @@ function pipeState(
   };
 }
 
-export function computeHgl(
-  doc: CadDocument,
-  civil: CivilModel,
-  criteria: DrainageCriteria,
-  flows: FlowResult,
-): HglResult {
-  const pipes = civilObjectsOf(civil, 'pipe').filter(
-    (pipe) => pipePlanLength(civil, pipe) !== null,
-  );
-  const states = new Map(
-    pipes.map((pipe) => [
-      pipe.id,
-      pipeState(doc, civil, pipe, flows.pipes.get(pipe.id)?.designLps ?? 0),
-    ]),
-  );
+export function computeHgl(doc: CadDocument, civil: CivilModel, criteria: DrainageCriteria, flows: FlowResult): HglResult {
+  const pipes = civilObjectsOf(civil, 'pipe').filter((pipe) => pipePlanLength(civil, pipe) !== null);
+  const states = new Map(pipes.map((pipe) => [pipe.id, pipeState(doc, civil, pipe, flows.pipes.get(pipe.id)?.designLps ?? 0)]));
   const nodeLevel = new Map<string, number>();
   const pipeResults = new Map<string, Omit<PipeHgl, 'flooding'>>();
   for (const manhole of [...manholesUpstreamFirst(civil)].reverse()) {
@@ -98,9 +73,7 @@ export function computeHgl(
       });
       nodeLevel.set(
         manhole.id,
-        criteria.outfallLevel !== null
-          ? toMetres(doc, criteria.outfallLevel)
-          : Math.max(toMetres(doc, manhole.invertElevation), ...normal),
+        criteria.outfallLevel !== null ? toMetres(doc, criteria.outfallLevel) : Math.max(toMetres(doc, manhole.invertElevation), ...normal),
       );
       continue;
     }
@@ -109,21 +82,15 @@ export function computeHgl(
       if (!state) return -Infinity;
       const downstream = nodeLevel.get(pipe.toId) ?? state.invertDownM;
       const hglDownM = Math.max(downstream, state.invertDownM + state.normalDepthM);
-      const pipeUp = Math.max(
-        state.invertUpM + state.normalDepthM,
-        hglDownM + state.frictionSlope * state.lengthM,
-      );
+      const pipeUp = Math.max(state.invertUpM + state.normalDepthM, hglDownM + state.frictionSlope * state.lengthM);
       const pressurised = pipeUp > state.invertUpM + state.diameterM + LEVEL_TOLERANCE_M;
-      const loss = pressurised
-        ? (criteria.manholeLossK * state.velocityFull ** 2) / (2 * GRAVITY)
-        : 0;
+      const loss = pressurised ? (criteria.manholeLossK * state.velocityFull ** 2) / (2 * GRAVITY) : 0;
       const hglUpM = pipeUp + loss;
       pipeResults.set(pipe.id, {
         hglUpM,
         hglDownM,
         frictionSlope: state.frictionSlope,
-        surcharged:
-          pressurised || hglDownM > state.invertDownM + state.diameterM + LEVEL_TOLERANCE_M,
+        surcharged: pressurised || hglDownM > state.invertDownM + state.diameterM + LEVEL_TOLERANCE_M,
       });
       return hglUpM;
     });
@@ -132,10 +99,7 @@ export function computeHgl(
   const manholes = new Map<string, ManholeHgl>();
   for (const manhole of civilObjectsOf(civil, 'manhole')) {
     const hglM = nodeLevel.get(manhole.id) ?? toMetres(doc, manhole.invertElevation);
-    manholes.set(manhole.id, {
-      hglM,
-      flooding: hglM > toMetres(doc, manhole.rimElevation) - criteria.freeboardM,
-    });
+    manholes.set(manhole.id, { hglM, flooding: hglM > toMetres(doc, manhole.rimElevation) - criteria.freeboardM });
   }
   const floods = (id: string): boolean => manholes.get(id)?.flooding ?? false;
   const pipeHgl = new Map<string, PipeHgl>();

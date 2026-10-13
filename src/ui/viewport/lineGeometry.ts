@@ -1,5 +1,3 @@
-/** @layer ui/viewport — vertex-data builders shared by the 2D and 3D line overlays. */
-
 import { ellipsePoint } from '@lib/arc';
 import * as THREE from 'three';
 import type { Vec2 } from '@core/model/types';
@@ -9,12 +7,8 @@ export function flattenPoints(points: ReadonlyArray<Vec2>, z = 0): number[] {
   return points.flatMap(([x, y]) => [x, y, z]);
 }
 
-/** BufferGeometry whose `position` attribute is the given flat xyz list. */
 export function positionsGeometry(positions: ArrayLike<number>): THREE.BufferGeometry {
-  return new THREE.BufferGeometry().setAttribute(
-    'position',
-    new THREE.BufferAttribute(Float32Array.from(positions), 3),
-  );
+  return new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(Float32Array.from(positions), 3));
 }
 
 /** LineSegments geometry (z = 0): every consecutive vertex pair is one segment. */
@@ -56,13 +50,7 @@ export function rectangleOutline(width: number, height: number): number[] {
 }
 
 /** Segment vertex pairs approximating an axis-aligned ellipse outline. */
-export function ellipseOutline(
-  cx: number,
-  cy: number,
-  radiusX: number,
-  radiusY: number,
-  segments: number,
-): Vec2[] {
+export function ellipseOutline(cx: number, cy: number, radiusX: number, radiusY: number, segments: number): Vec2[] {
   const vertex = (index: number): Vec2 => {
     const angle = (index / segments) * Math.PI * 2;
     return ellipsePoint([cx, cy], radiusX, radiusY, angle);
@@ -70,10 +58,7 @@ export function ellipseOutline(
   return Array.from({ length: segments }, (_, index) => [vertex(index), vertex(index + 1)]).flat();
 }
 
-/**
- * Geometry for `vertices` (on plane `z`) stored relative to the first vertex, plus the anchor to
- * apply as the object's position — float32-safe far from the origin (see `rebaseToAnchor`).
- */
+/** Geometry relative to the first vertex + the anchor to use as the object position (see `rebaseToAnchor`). */
 export function anchoredGeometry(
   vertices: ReadonlyArray<Vec2>,
   z = 0,
@@ -83,21 +68,12 @@ export function anchoredGeometry(
 }
 
 /**
- * Vertices re-expressed relative to the first vertex's XY. GPU vertex attributes are float32
- * (about 0.06 units of resolution at 1e6); the anchor is added back on the CPU in float64 through
- * the object transform, so geometry far from the origin keeps its full precision.
- *
- * @pure
- * @invariant local[i] + anchor reproduces positions[i] (x, y); z is unchanged
+ * Vertices relative to the first vertex's XY: GPU attributes are float32 (~0.06 units at 1e6), the anchor is re-added
+ * in float64 by the object transform. @invariant local[i] + anchor reproduces positions[i] (x, y); z unchanged
  */
-export function rebaseToAnchor(positions: ReadonlyArray<number>): {
-  anchor: [number, number, number];
-  local: number[];
-} {
+export function rebaseToAnchor(positions: ReadonlyArray<number>): { anchor: [number, number, number]; local: number[] } {
   const anchorX = positions[0] ?? 0;
   const anchorY = positions[1] ?? 0;
-  const local = positions.map((value, index) =>
-    index % 3 === 0 ? value - anchorX : index % 3 === 1 ? value - anchorY : value,
-  );
+  const local = positions.map((value, index) => (index % 3 === 0 ? value - anchorX : index % 3 === 1 ? value - anchorY : value));
   return { anchor: [anchorX, anchorY, 0], local };
 }

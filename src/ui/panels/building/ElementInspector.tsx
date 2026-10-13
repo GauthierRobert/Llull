@@ -1,8 +1,4 @@
-/**
- * @layer ui/panels/building
- * Properties inspector for a selected building element (derived geometry is read-only, so the
- * element — not its mesh — is what an engineer edits). Editors dispatch update_* commands.
- */
+// Inspector of a selected building element (its derived geometry is read-only); editors dispatch update_*.
 
 import React from 'react';
 import { useStore } from '@ui/store';
@@ -37,22 +33,15 @@ function ElementEditor({ element }: { element: BuildingElement }): React.ReactEl
   }
 }
 
-interface ElementInspectorProps {
-  elementId: string;
-}
-
-export function ElementInspector({ elementId }: ElementInspectorProps): React.ReactElement {
+export function ElementInspector({ elementId }: { elementId: string }): React.ReactElement {
   const building = useStore((s) => s.document.building);
   const units = useStore((s) => s.document.units);
   const element = building?.elements[elementId];
-  if (building === undefined || element === undefined)
-    return <p className="panel__empty-hint">Building element {elementId} not found.</p>;
+  if (building === undefined || element === undefined) return <p className="panel__empty-hint">Building element {elementId} not found.</p>;
   const label = CATEGORY_LABEL[element.category];
   const level = levelNameOf(building, element);
   const facts: ReadonlyArray<readonly [string, string]> =
-    element.category === 'member'
-      ? memberFacts(element, { units })
-      : [['Summary', describe(element, units)]];
+    element.category === 'member' ? memberFacts(element, { units }) : [['Summary', describe(element, units)]];
   return (
     <section className="props-detail" aria-label="Building element">
       <div className="props-summary">
@@ -83,11 +72,7 @@ export function ElementInspector({ elementId }: ElementInspectorProps): React.Re
       </PanelSection>
       <ElementEditor element={element} />
       <div className="props-actions">
-        <button
-          type="button"
-          className="props-action props-action--danger"
-          onClick={deleteSelection}
-        >
+        <button type="button" className="props-action props-action--danger" onClick={deleteSelection}>
           <Icon name="trash" size={14} />
           Delete
         </button>

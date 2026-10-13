@@ -1,7 +1,4 @@
-/**
- * Equipment passing through a floor without an opening (a grating / slab not cut around it).
- * @layer domain-aec
- */
+/** Equipment passing through a floor without an opening (a grating / slab not cut around it). */
 
 import type { Vec2 } from '@core/model/types';
 import type { BuildingModel, EquipmentElement, SlabElement } from '@core/model/building';
@@ -22,10 +19,7 @@ function footprintSamples(equipment: EquipmentElement): Vec2[] {
   const samples: Vec2[] = [];
   for (let i = 0; i < SAMPLES_PER_SIDE; i++) {
     for (let j = 0; j < SAMPLES_PER_SIDE; j++) {
-      const local: Vec2 = [
-        (i / (SAMPLES_PER_SIDE - 1) - 0.5) * length * 0.999,
-        (j / (SAMPLES_PER_SIDE - 1) - 0.5) * width * 0.999,
-      ];
+      const local: Vec2 = [(i / (SAMPLES_PER_SIDE - 1) - 0.5) * length * 0.999, (j / (SAMPLES_PER_SIDE - 1) - 0.5) * width * 0.999];
       const [x, y] = rotatePoint2(local, equipment.angle);
       samples.push([x + equipment.location[0], y + equipment.location[1]]);
     }
@@ -34,18 +28,11 @@ function footprintSamples(equipment: EquipmentElement): Vec2[] {
 }
 
 function solidAt(slab: SlabElement, point: Vec2): boolean {
-  return (
-    pointInPolygon(point, slab.boundary) &&
-    !(slab.openings ?? []).some((opening) => pointInPolygon(point, opening))
-  );
+  return pointInPolygon(point, slab.boundary) && !(slab.openings ?? []).some((opening) => pointInPolygon(point, opening));
 }
 
 /** Slabs whose top lies strictly inside the equipment's height with solid slab under its footprint. */
-export function slabsCrossedBy(
-  building: BuildingModel,
-  equipment: EquipmentElement,
-  tolerance: number,
-): SlabElement[] {
+export function slabsCrossedBy(building: BuildingModel, equipment: EquipmentElement, tolerance: number): SlabElement[] {
   const level = building.levels[equipment.levelId];
   if (!level) return [];
   const base = level.elevation;
@@ -62,16 +49,11 @@ export function slabsCrossedBy(
 }
 
 /**
- * Every (equipment, slab) pair where the slab's top lies strictly inside the equipment's height
- * (more than `tolerance` from its base and top) and solid slab is under part of its footprint.
- * @pure
+ * Every (equipment, slab) pair where the slab's top lies strictly inside the equipment's height (more than `tolerance` from its base and
+ * top) and solid slab is under part of its footprint.
  * @invariant the footprint is the equipment's plan bounding rectangle (vessels included: conservative)
  */
-export function slabPenetrations(
-  building: BuildingModel,
-  inScope: (levelId: string) => boolean,
-  tolerance: number,
-): SlabPenetration[] {
+export function slabPenetrations(building: BuildingModel, inScope: (levelId: string) => boolean, tolerance: number): SlabPenetration[] {
   const found: SlabPenetration[] = [];
   for (const equipment of Object.values(building.elements)) {
     if (equipment.category !== 'equipment') continue;

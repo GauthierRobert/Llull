@@ -1,18 +1,9 @@
 import type { Vec2 } from '@core/model/types';
 import type { CheckOutcome, Criterion, GradeContext } from '../contract';
-import {
-  elementsOf,
-  elevationOf,
-  equipmentBox,
-  insidePolygon,
-  planCorners,
-  planOverlaps,
-} from '../oracle/geometry';
+import { elementsOf, elevationOf, equipmentBox, insidePolygon, planCorners, planOverlaps } from '../oracle/geometry';
 import type { PlantIntent } from '../plant/intent';
 
 /**
- * @layer tests/production/criteria
- *
  * Process equipment acceptance: every tag placed as specified, gratings cut where equipment passes
  * through a floor (computed geometrically, independent of the clash detector), and every elevated
  * equipment standing on a floor of its level.
@@ -29,16 +20,10 @@ function placedCheck(intent: PlantIntent, { document }: GradeContext): CheckOutc
     }
     const ffl = intent.levels[wanted.level]?.elevation ?? 0;
     if (Math.abs(elevationOf(document, found.levelId) - ffl) > 1) {
-      problems.push(
-        `${wanted.tag} on FFL ${elevationOf(document, found.levelId)}, expected ${ffl}`,
-      );
+      problems.push(`${wanted.tag} on FFL ${elevationOf(document, found.levelId)}, expected ${ffl}`);
     }
-    if (
-      Math.hypot(found.location[0] - wanted.location[0], found.location[1] - wanted.location[1]) > 5
-    ) {
-      problems.push(
-        `${wanted.tag} at (${found.location.join(', ')}), expected (${wanted.location.join(', ')})`,
-      );
+    if (Math.hypot(found.location[0] - wanted.location[0], found.location[1] - wanted.location[1]) > 5) {
+      problems.push(`${wanted.tag} at (${found.location.join(', ')}), expected (${wanted.location.join(', ')})`);
     }
     const box = equipmentBox(document, found);
     const size = [box.max[0] - box.min[0], box.max[1] - box.min[1], found.size[2]];
@@ -73,17 +58,11 @@ function openingsCheck({ document }: GradeContext): CheckOutcome {
       if (!planOverlaps(box, slab.boundary)) continue;
       crossings++;
       const corners = planCorners(box);
-      const cut = (slab.openings ?? []).some((opening) =>
-        corners.every((corner: Vec2) => insidePolygon(corner, opening)),
-      );
-      if (!cut)
-        problems.push(`${equipment.mark} passes through ${slab.mark} (top ${top}) with no opening`);
+      const cut = (slab.openings ?? []).some((opening) => corners.every((corner: Vec2) => insidePolygon(corner, opening)));
+      if (!cut) problems.push(`${equipment.mark} passes through ${slab.mark} (top ${top}) with no opening`);
     }
   }
-  return {
-    pass: problems.length === 0,
-    detail: problems.length === 0 ? `${crossings} floor crossing(s), all cut` : problems.join('; '),
-  };
+  return { pass: problems.length === 0, detail: problems.length === 0 ? `${crossings} floor crossing(s), all cut` : problems.join('; ') };
 }
 
 function supportedCheck({ document }: GradeContext): CheckOutcome {
@@ -105,10 +84,7 @@ function supportedCheck({ document }: GradeContext): CheckOutcome {
   }
   return {
     pass: problems.length === 0,
-    detail:
-      problems.length === 0
-        ? `${elevated} elevated equipment, all on a floor`
-        : problems.join('; '),
+    detail: problems.length === 0 ? `${elevated} elevated equipment, all on a floor` : problems.join('; '),
   };
 }
 
@@ -117,8 +93,7 @@ export function equipmentCriteria(intent: PlantIntent): Criterion[] {
     {
       id: 'equipment-placed',
       area: 'equipment',
-      requirement:
-        'Every equipment tag on its level, position, envelope, operating weight and clearance.',
+      requirement: 'Every equipment tag on its level, position, envelope, operating weight and clearance.',
       check: (ctx) => placedCheck(intent, ctx),
     },
     {

@@ -29,14 +29,9 @@ if (branch) {
   const dirty = git(['status', '--porcelain']).split('\n').filter(Boolean).length;
   lines.push(`- branch: ${branch}${dirty ? ` (${dirty} uncommitted file(s))` : ' (clean)'}`);
 }
-if (!existsSync('node_modules'))
-  lines.push('- node_modules missing: run `npm install` before `npm run check`.');
+if (!existsSync('node_modules')) lines.push('- node_modules missing: run `npm install` before `npm run check`.');
 const now = boardNow();
 if (now) lines.push(`- board NOW: ${now.slice(2)}`);
 
-process.stdout.write(
-  JSON.stringify({
-    hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: lines.join('\n') },
-  }),
-);
+process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: lines.join('\n') } }));
 process.exit(0);

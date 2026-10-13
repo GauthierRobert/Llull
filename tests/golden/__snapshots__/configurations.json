@@ -6,21 +6,9 @@
       "#1": {
         "id": "#1",
         "kind": "box",
-        "size": [
-          40,
-          40,
-          40
-        ],
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
+        "size": [40,40,40],
+        "position": [0,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#6b8f9c"
       }
@@ -65,28 +53,18 @@
       {
         "id": "#3",
         "name": "add_box",
-        "params": {
-          "size": [
-            "=w",
-            "=w",
-            "=w"
-          ]
-        },
+        "params": {"size":["=w","=w","=w"]},
         "suppressed": false
       }
     ],
     "configurations": {
       "small": {
         "name": "small",
-        "parameterValues": {
-          "w": "10"
-        }
+        "parameterValues": {"w":"10"}
       },
       "large": {
         "name": "large",
-        "parameterValues": {
-          "w": "40"
-        }
+        "parameterValues": {"w":"40"}
       }
     },
     "materials": {},

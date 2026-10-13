@@ -1,10 +1,5 @@
-/**
- * @layer ui/components
- *
- * Sidebar — vertical icon rail + the one document browser panel it selects
- * (building, civil, layers, assembly, mechanisms, parameters, history, configurations, materials).
- * Tab state lives in useLayoutStore (presentation only — never document state).
- */
+// Icon rail + the one browser panel it selects (building, civil, layers, assembly, mechanisms, parameters, history,
+// configurations, materials); tab state in useLayoutStore.
 
 import React from 'react';
 import type { CadDocument } from '@core/model/types';
@@ -33,14 +28,13 @@ const TAB_PANELS: Readonly<Record<SidebarTab, React.ComponentType<{ className?: 
   materials: MaterialsPanel,
 };
 
-/** Item count shown as a badge on each rail button. */
+/** Rail badge counts. */
 const TAB_COUNTS: Readonly<Record<SidebarTab, (doc: CadDocument) => number>> = {
   building: (doc) => doc.building?.elementOrder.length ?? 0,
   civil: (doc) => doc.civil?.order.length ?? 0,
   layers: (doc) => doc.layerOrder.length,
   assembly: (doc) => Object.keys(doc.components).length,
-  mechanisms: (doc) =>
-    doc.constraintOrder.length + doc.jointOrder.length + doc.driveRelationOrder.length,
+  mechanisms: (doc) => doc.constraintOrder.length + doc.jointOrder.length + doc.driveRelationOrder.length,
   parameters: (doc) => Object.keys(doc.parameters).length,
   history: (doc) => doc.featureHistory.length,
   configurations: (doc) => Object.keys(doc.configurations).length,
@@ -50,7 +44,7 @@ const TAB_COUNTS: Readonly<Record<SidebarTab, (doc: CadDocument) => number>> = {
 interface RailButtonProps {
   spec: SidebarTabSpec;
   active: boolean;
-  /** Roving tabindex: exactly one rail button is in the Tab order. */
+  /** Roving tabindex: one rail button in the Tab order. */
   focusable: boolean;
   onSelect: (tab: SidebarTab) => void;
 }
@@ -83,7 +77,7 @@ function RailButton({ spec, active, focusable, onSelect }: RailButtonProps): Rea
   );
 }
 
-/** ARIA tabs pattern: Arrow Up/Down move focus between rail tabs, Home/End jump to the ends. */
+/** ARIA tabs: Up/Down move focus, Home/End jump. */
 function handleRailKeyDown(e: React.KeyboardEvent<HTMLElement>): void {
   const tabs = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
   const current = tabs.indexOf(document.activeElement as HTMLButtonElement);
@@ -109,13 +103,7 @@ export function Sidebar(): React.ReactElement {
 
   return (
     <aside aria-label="Sidebar" className={`sidebar${sidebarOpen ? '' : ' sidebar--collapsed'}`}>
-      <nav
-        className="rail"
-        role="tablist"
-        aria-orientation="vertical"
-        aria-label="Document browser"
-        onKeyDown={handleRailKeyDown}
-      >
+      <nav className="rail" role="tablist" aria-orientation="vertical" aria-label="Document browser" onKeyDown={handleRailKeyDown}>
         {SIDEBAR_TAB_SPECS.map((spec) => (
           <RailButton
             key={spec.tab}
@@ -127,12 +115,7 @@ export function Sidebar(): React.ReactElement {
         ))}
       </nav>
       {sidebarOpen && (
-        <div
-          className="sidebar__body"
-          role="tabpanel"
-          id="sidebar-panel"
-          aria-labelledby={`sidebar-tab-${sidebarTab}`}
-        >
+        <div className="sidebar__body" role="tabpanel" id="sidebar-panel" aria-labelledby={`sidebar-tab-${sidebarTab}`}>
           <ActivePanel className="sidebar-panel" />
         </div>
       )}

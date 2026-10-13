@@ -1,8 +1,6 @@
 /**
- * Base plate under moment + axial force (EN 1993-1-8 §6.2.8, simplified): concrete bearing block with
- * fjd on the compression side, anchor bolts on the other, plate bending, and a catalogue sizing.
- * @layer domain-aec
- * @pure
+ * Base plate under moment + axial force (EN 1993-1-8 §6.2.8, simplified): concrete bearing block with fjd on the compression side, anchor
+ * bolts on the other, plate bending, and a catalogue sizing.
  */
 
 import { anchorBoltResistance } from '../steelDesign/steelDesign';
@@ -43,33 +41,23 @@ function boltOffsets(geometry: PlateMnGeometry): number[] {
   const columns = Math.max(1, geometry.boltCount / 2);
   const edge = Math.max(2 * geometry.boltDiameter, 40);
   return Array.from({ length: columns }, (_, index) =>
-    columns === 1
-      ? 0
-      : -geometry.length / 2 + edge + ((geometry.length - 2 * edge) * index) / (columns - 1),
+    columns === 1 ? 0 : -geometry.length / 2 + edge + ((geometry.length - 2 * edge) * index) / (columns - 1),
   );
 }
 
 /**
- * Checks the plate for a compression N (kN, negative = uplift) and a moment M (kN·m, sign ignored):
- * Ft = max(0, (M − N zc) / z) with zc the lever from the column axis to the centroid of the bearing
- * block (length c = (N + Ft) / (B fjd)) and z that centroid to the tension bolts; uplift without a
- * bearing block shares N and M between the two bolt groups. Utilisation = max of bolt tension,
- * bearing length against the distance between the bolt lines, and plate bending (cantilever beyond
- * the flange, t ≥ c √(3 fjd / fy), and bolt prying lever of the tension row).
- * @pure
+ * Checks the plate for a compression N (kN, negative = uplift) and a moment M (kN·m, sign ignored): Ft = max(0, (M − N zc) / z) with zc the
+ * lever from the column axis to the centroid of the bearing block (length c = (N + Ft) / (B fjd)) and z that centroid to the tension bolts;
+ * uplift without a bearing block shares N and M between the two bolt groups. Utilisation = max of bolt tension, bearing length against the
+ * distance between the bolt lines, and plate bending (cantilever beyond the flange, t ≥ c √(3 fjd / fy), and bolt prying lever of the
+ * tension row).
  */
-export function checkPlateMN(
-  geometry: PlateMnGeometry,
-  normal: number,
-  moment: number,
-  yieldStrength: number,
-): PlateMnCheck {
+export function checkPlateMN(geometry: PlateMnGeometry, normal: number, moment: number, yieldStrength: number): PlateMnCheck {
   const { length, width, thickness, boltDiameter, columnDepth } = geometry;
   const [axial, bending] = [normal * 1000, Math.abs(moment) * 1e6];
   const offsets = boltOffsets(geometry).filter((offset) => offset > 1e-6);
   const boltsPerSide = 2 * offsets.length;
-  const lever =
-    offsets.length > 0 ? offsets.reduce((sum, value) => sum + value, 0) / offsets.length : 0;
+  const lever = offsets.length > 0 ? offsets.reduce((sum, value) => sum + value, 0) / offsets.length : 0;
   const edge = Math.max(2 * boltDiameter, 40);
   const maxBlock = Math.max(length - 2 * edge, 1);
   const bearingForce = width * BEARING_STRENGTH;
@@ -91,8 +79,7 @@ export function checkPlateMN(
     tension = tensionOf(block);
     bearing = (axial + tension) / (bearingForce * maxBlock);
   }
-  const perBolt =
-    boltsPerSide > 0 ? tension / boltsPerSide : tension > 0 ? Number.POSITIVE_INFINITY : 0;
+  const perBolt = boltsPerSide > 0 ? tension / boltsPerSide : tension > 0 ? Number.POSITIVE_INFINITY : 0;
   const boltLimit = anchorBoltResistance(boltDiameter).tension;
   const boltRatio = perBolt / boltLimit;
   const overhang = Math.max(0, (length - columnDepth) / 2);
@@ -101,10 +88,7 @@ export function checkPlateMN(
   const requiredCompression = compressionLength * Math.sqrt((3 * BEARING_STRENGTH) / yieldStrength);
   const requiredTension = Math.sqrt((4 * tension * prying) / (width * yieldStrength));
   const requiredThickness = Math.max(requiredCompression, requiredTension);
-  const utilisation = Math.min(
-    Math.max(boltRatio, bearing, requiredThickness / thickness),
-    MAX_UTILISATION,
-  );
+  const utilisation = Math.min(Math.max(boltRatio, bearing, requiredThickness / thickness), MAX_UTILISATION);
   return {
     utilisation,
     boltTension: Number.isFinite(perBolt) ? perBolt / 1000 : MAX_UTILISATION,
@@ -142,14 +126,8 @@ const MIN_PITCH_FACTOR = 3;
 
 /** Catalogue of plate sizes, lightest (plate mass, then bolt area) first. */
 const CATALOGUE: ReadonlyArray<PlateSizing> = MARGINS.flatMap((margin) =>
-  THICKNESSES.flatMap((thickness) =>
-    BOLTS.map(([boltCount, boltDiameter]) => ({ margin, thickness, boltCount, boltDiameter })),
-  ),
-).sort(
-  (a, b) =>
-    a.margin * a.thickness - b.margin * b.thickness ||
-    a.boltCount * a.boltDiameter ** 2 - b.boltCount * b.boltDiameter ** 2,
-);
+  THICKNESSES.flatMap((thickness) => BOLTS.map(([boltCount, boltDiameter]) => ({ margin, thickness, boltCount, boltDiameter }))),
+).sort((a, b) => a.margin * a.thickness - b.margin * b.thickness || a.boltCount * a.boltDiameter ** 2 - b.boltCount * b.boltDiameter ** 2);
 
 export interface PlateDemand {
   /** Compression kN (negative = uplift) and moment kN·m. */
@@ -158,9 +136,8 @@ export interface PlateDemand {
 }
 
 /**
- * Lightest catalogue plate (margin 100–300 mm, t 25–50 mm, 4–12 bolts M24–M36) that passes every
- * demand with utilisation ≤ `target`; the most capable one when none does.
- * @pure
+ * Lightest catalogue plate (margin 100–300 mm, t 25–50 mm, 4–12 bolts M24–M36) that passes every demand with utilisation ≤ `target`; the
+ * most capable one when none does.
  */
 export function sizeBasePlate(
   column: { readonly depth: number; readonly width: number },
@@ -180,18 +157,8 @@ export function sizeBasePlate(
     };
     const columns = sizing.boltCount / 2;
     const edge = Math.max(2 * sizing.boltDiameter, 40);
-    if (
-      columns > 1 &&
-      (geometry.length - 2 * edge) / (columns - 1) < MIN_PITCH_FACTOR * sizing.boltDiameter
-    ) {
-      continue;
-    }
-    const worst = Math.max(
-      0,
-      ...demands.map(
-        (demand) => checkPlateMN(geometry, demand.normal, demand.moment, yieldStrength).utilisation,
-      ),
-    );
+    if (columns > 1 && (geometry.length - 2 * edge) / (columns - 1) < MIN_PITCH_FACTOR * sizing.boltDiameter) continue;
+    const worst = Math.max(0, ...demands.map((demand) => checkPlateMN(geometry, demand.normal, demand.moment, yieldStrength).utilisation));
     if (worst <= target) return { sizing, passes: true };
     if (best === null || worst < best.worst) best = { sizing, worst };
   }

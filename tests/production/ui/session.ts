@@ -2,8 +2,6 @@ import { readFileSync } from 'node:fs';
 import { expect, type Locator, type Page } from '@playwright/test';
 
 /**
- * @layer tests/production/ui
- *
  * One browser session on the real app (offline mode, no llull server): console-error watch,
  * "did the command work" feedback read from the status bar, and file downloads read back from disk.
  */
@@ -25,7 +23,6 @@ export class UiSession {
   /** Off while the app boots: the reload that clears storage aborts the first wasm download. */
   private watching = false;
   private lastDownload = 0;
-
   constructor(readonly page: Page) {
     page.on('console', (message) => {
       if (!this.watching || message.type() !== 'error') return;
@@ -52,9 +49,7 @@ export class UiSession {
   /** "Open project" with a project file picked from disk. */
   async openProject(file: string): Promise<void> {
     await this.page.locator('[aria-label="Project file"] input[type="file"]').setInputFiles(file);
-    await expect(this.page.getByLabel(/^Last command: Loaded document/)).toBeVisible({
-      timeout: 120_000,
-    });
+    await expect(this.page.getByLabel(/^Last command: Loaded document/)).toBeVisible({ timeout: 120_000 });
   }
 
   /** Click out of any field and press Esc: the palette leaves its result selected. */
@@ -63,11 +58,9 @@ export class UiSession {
     await this.page.keyboard.press('Escape');
     await expect(this.page.getByLabel('Selection: None')).toBeVisible();
   }
-
   private status(): Locator {
     return this.page.locator('.status-summary');
   }
-
   async summary(): Promise<string> {
     return (
       (await this.status()
@@ -86,8 +79,7 @@ export class UiSession {
     const reacted = await this.page
       .waitForFunction(
         (previous) =>
-          (document.querySelector('.status-summary')?.textContent ?? '') !== previous ||
-          document.querySelector('.panel__error') !== null,
+          (document.querySelector('.status-summary')?.textContent ?? '') !== previous || document.querySelector('.panel__error') !== null,
         before,
         { timeout: 4000 },
       )
@@ -112,10 +104,7 @@ export class UiSession {
     const wait = this.lastDownload + DOWNLOAD_GAP_MS - Date.now();
     if (wait > 0) await this.page.waitForTimeout(wait);
     this.lastDownload = Date.now();
-    const [download] = await Promise.all([
-      this.page.waitForEvent('download', { timeout: 30_000 }),
-      trigger(),
-    ]);
+    const [download] = await Promise.all([this.page.waitForEvent('download', { timeout: 30_000 }), trigger()]);
     const file = await download.path();
     return { name: download.suggestedFilename(), text: readFileSync(file, 'utf8') };
   }

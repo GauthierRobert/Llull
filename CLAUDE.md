@@ -1,146 +1,80 @@
 # llull — agent operating manual
 
-llull is a modern, MCP-first **2D + 3D** CAD web app — AutoCAD-like: 2D drafting and
-3D solid modeling in one shared document. This file is the entrypoint for any
-agent working on the codebase. It is optimized for machine consumption: terse,
-structured, link-dense. Follow it literally.
+MCP-first **2D + 3D** CAD web app (AutoCAD-like): 2D drafting + 3D solids in one document.
 
 ## PRIME DIRECTIVE
 
-> **Never mutate the document outside a command.** Both the UI and MCP call
-> `execute(doc, name, params)`. Editing entities directly in a component or the
-> MCP server is a bug. Write a command instead.
+**Never mutate the document outside a command.** UI and MCP both call `execute(doc, name, params)`.
+One registered command = one UI action + one MCP tool. Editing entities in a component/server = bug.
 
-One command added to the registry = one new capability for **both surfaces**
-(UI button + MCP tool — the latter drivable by Claude or any MCP agent) at once.
-This is the whole design. Protect it.
+## STACK (fixed; no alternatives without user approval)
 
-## STACK (fixed — do not introduce alternatives without explicit approval)
+React 19 + TS strict + Vite · three.js + r3f + drei (3D perspective; 2D = same scene, ortho top-down) ·
+Zustand (one store, `dispatch`) · zod v4 (one schema per command → TS type + MCP JSON Schema + validation) ·
+kernels Manifold (default) / OpenCascade.js behind `GeometryKernel` · Vitest + Testing Library ·
+ESLint flat + Prettier + knip · Express (optional MCP host + live doc) · Electron `desktop/` + bundled CPython/CadQuery ·
+agents: local = `llull` CLI (`--app` drives desktop), cloud = MCP `/mcp`.
 
-| Concern    | Choice                                  |
-| ---------- | --------------------------------------- |
-| UI         | React 19 + TypeScript (strict) + Vite   |
-| 3D viewport| three.js + @react-three/fiber + drei (perspective) |
-| 2D viewport| same three.js scene, orthographic top-down; Line/Shape geometry |
-| State      | Zustand (single store, `dispatch`)      |
-| Schemas    | zod v4 (one schema per command → TS type + MCP JSON Schema + runtime validation) |
-| Kernels    | Manifold (default) / OpenCascade.js, behind `GeometryKernel` |
-| Tests      | Vitest + Testing Library                |
-| Lint/fmt   | ESLint (flat config) + Prettier + knip (`npm run check`) |
-| Backend    | Node + Express (optional: MCP host + shared live document) |
-| Desktop    | Electron shell (`desktop/`) over the unchanged server + web app; bundled CPython + CadQuery |
-| Agents     | Local: Claude Code + `llull` CLI (`--app` drives the desktop window). Cloud: MCP (`/mcp`) |
-
-## LAYER MAP & DEPENDENCY LAW
-
-npm workspaces (`packages/*`); the web app and `server/` stay at the repo root.
+## LAYER MAP (npm workspaces `packages/*`; web app + `server/` at root)
 
 ```
-packages/core/src/          @core  Framework-agnostic brain. NO react / DOM / window / fetch.
-  lib/                      @lib   Tiny pure helpers (id, hash, polygon, triangulate, lruCache) — a leaf
-  model/                           types.ts (CadDocument, Entity, MeshData, ShapeRecipe) · vectors.ts · units.ts · building.ts · civil.ts
-  geometry/                        kernel.ts (GeometryKernel) · shapeRecipe.ts · shapeKernel.ts ·
-                                   pure geometry: tessellation, triangles, bounds, instanceExpansion
-  commands/                        THE command layer. Engine at the root: types.ts · schema.ts
-                                   (defineCommand, commandCatalog) · context.ts · commandTable.ts ·
-                                   execute.ts · guard.ts · registry.ts (composes catalogs + plugins)
-    <feature>/                     solids · draw2d · modify2d · edit · brep · inspect · render ·
-                                   exchange · persistence · history · parametric · project ·
-                                   assembly · motion · document · entity — each with catalog.ts
-  plugins/                         plugin.ts (CadPlugin) · host.ts (installPlugin, derivedEntityIds)
-  codegen/                         CadQuery / build123d / OpenSCAD / FreeCAD emitters
-packages/mcp/src/           @mcp   MCP tools/resources/prompts/toolsets/discovery/liveSync over the registry
-packages/domain-aec/src/    @aec   plugins, each `<domain>/{catalog,plugin}.ts`: building/ (elements, geometry,
-                                   evaluate, drawings, exchange, quantities) · industrial/<discipline>/ ·
-                                   civil/<topic>/ · steel/ · shared/ · index.ts (public API)
-packages/kernel-manifold/src/ @kernel-manifold   Manifold GeometryKernel
-packages/kernel-occt/src/   @kernel-occt       OpenCascade GeometryKernel
-src/app/                    @app   Composition root: installDefaultPlugins()
-src/ui/                     @ui    React. Presentation + param-gathering ONLY. No business logic.
-src/main.tsx                       installs the kernel (`?kernel=occt`) + default plugins, mounts <App>
-server/                            Express MCP host + `llull` CLI (src/cli/) (optional; own package.json, not a workspace)
-desktop/                           Electron app: starts server/ locally, File menu, CLI hand-off (own package.json)
+packages/core/src/        @core  framework-agnostic: NO react/DOM/window/fetch
+  lib/                    @lib   pure leaf helpers (id, hash, polygon, triangulate, lruCache)
+  model/                         types.ts (CadDocument, Entity, MeshData, ShapeRecipe) · vectors · units · building · civil
+  geometry/                      kernel.ts (GeometryKernel) · shapeRecipe · shapeKernel · tessellation, bounds, instanceExpansion
+  commands/                      engine: types · schema (defineCommand, commandCatalog) · context · commandTable · execute · guard · registry
+    <feature>/catalog.ts         solids draw2d modify2d edit brep inspect render exchange persistence history parametric project assembly motion document entity
+  plugins/                       plugin.ts (CadPlugin) · host.ts (installPlugin, derivedEntityIds)
+  codegen/                       CadQuery / build123d / OpenSCAD / FreeCAD emitters
+packages/mcp/src/         @mcp   tools/resources/prompts/toolsets/discovery/liveSync over the registry
+packages/domain-aec/src/  @aec   plugins `<domain>/{catalog,plugin}.ts`: building/ industrial/<discipline>/ civil/<topic>/ steel/ shared/
+packages/kernel-{manifold,occt}/src/   GeometryKernel impls
+src/app/                  @app   composition root: installDefaultPlugins()
+src/ui/                   @ui    React: presentation + param-gathering ONLY
+src/main.tsx                     installs kernel (`?kernel=occt`) + plugins, mounts <App>
+server/                          Express MCP host + `llull` CLI (src/cli/); own package.json
+desktop/                         Electron: starts server/, File menu, CLI hand-off; own package.json
 ```
 
-**Dependency direction is one-way: `desktop` → `server` (CLI discovery); `src/ui`, `server` → `src/app`, plugins, kernels, `@mcp` → `packages/core`.**
-Inside core: `commands`, `codegen`, `plugins` → `geometry` → `model` → `lib`. Enforced for every
-change by `npm run arch` (dependency-cruiser, `.dependency-cruiser.cjs`, part of `npm run check`):
-no import cycles (type-only included); core imports no package; packages are headless; plugins and kernels
-import only core's public API (`model`, `lib`, `geometry`, `plugins/plugin`, `commands/{schema,
-types,noop,derivation,registry}`). A PreToolUse hook (`.claude/hooks/enforce-architecture.mjs`)
-gives agents the same feedback at edit time.
+Dependency law: `.claude/rules/architecture.md` L2, enforced by `npm run arch` + edit-time hook.
 
-## RULES (authoritative — read before editing)
+## RULES (authoritative)
 
 @.claude/rules/architecture.md
 @.claude/rules/conventions.md
 @.claude/rules/workflow.md
 
-Path-scoped rules load automatically when you touch matching files: `rules/commands.md`
-(`packages/**`, `tests/**`), `rules/sync.md` (MCP / server / store), `rules/react.md` (`src/ui/**`).
+Path-scoped (auto-load): `rules/commands.md` (packages/**, tests/**), `rules/sync.md` (MCP/server/store), `rules/react.md` (src/ui/**).
+On demand: `.claude/context/command-layer.md` (signatures) · `.claude/context/model.md` (entity schema) ·
+`docs/ARCHITECTURE.md` · `docs/ADD_A_TOOL.md` · `docs/ROADMAP.md` · `.claude/work/BOARD.md` (task board).
 
-## DEEP REFERENCES (load on demand, do not inline unless needed)
+## AGENTS / SKILLS (descriptions come from the harness; delegation rules: workflow W5)
 
-- Command layer internals & exact signatures: `.claude/context/command-layer.md`
-- Document/entity schema reference: `.claude/context/model.md`
-- Human-prose architecture rationale: `docs/ARCHITECTURE.md`
-- Add-a-tool recipe (prose): `docs/ADD_A_TOOL.md`
-- Roadmap / current milestone: `docs/ROADMAP.md`
+Agents: `command-author` · `viewport-engineer` · `mcp-engineer` · `test-verifier` · `cad-reviewer` (diffs touching core/registry/plugins/MCP).
 
-## AGENTS (delegate when it pays — see workflow W5)
+## SKILLS
 
-| Agent              | Use for                                                    |
-| ------------------ | ---------------------------------------------------------- |
-| `command-author`   | Adding/editing commands in `packages/core/src/commands` or a plugin (+ tests) |
-| `viewport-engineer`| 2D + 3D viewport (r3f), gizmos, snapping, interaction       |
-| `mcp-engineer`     | MCP host (`packages/mcp`, `server`) — the registry exposed to MCP agents |
-| `test-verifier`    | Writing tests, hitting the coverage gate, running checks   |
-| `cad-reviewer`     | Reviewing a diff against the architecture laws             |
-
-Main thread by default; delegate for ≥ 2 independent lanes or > ~4 files in one lane.
-`cad-reviewer` for diffs touching core / registry / plugins / MCP.
-
-## SKILLS (invoke when the trigger matches)
-
-- `design-model` — design a complete CAD model/assembly end-to-end by composing existing commands into a validated `build_project` plan, then measure/check/render/export
-- `llull-cli` — THE local agent path: drive the registry from the shell (`llull`): `--app` (the open desktop window), local doc files or `--server`; plan files, `--save` exports/renders. MCP is for cloud agents
-- `add-command` — add a CAD operation (the most common task; UI + MCP in one)
-- `add-entity-kind` — add a new 2D shape or 3D solid kind (types → commands → kernels → codegen → UI → tests)
-- `fix-bug` — reproduce first (failing test / golden plan), then fix
-- `draw-2d` — add/extend 2D drafting (lines, arcs, polylines, dimensions, snapping, sketch→solid)
-- `parametric` — parameters, constraints, feature history (edit-and-regenerate)
-- `drawing-to-model` — rebuild a part from a 2D technical drawing and prove it (mass, extents, llull views vs drawing views, 3D IoU vs a real STEP/STL)
-- `measure` — read-only measurement/inspection tools (distance, area, volume, mass)
-- `mcp-server` — build/extend the MCP host over the registry
-- `viewport-feature` — implement or change 2D/3D viewport behavior
-- `verify-llull` — run the full verification loop and (optionally) drive the app
-- `continue-working` — resume the build from `.claude/work/BOARD.md`
+`design-model` `llull-cli` `add-command` `add-entity-kind` `fix-bug` `draw-2d` `parametric` `drawing-to-model` `measure`
+`mcp-server` `viewport-feature` `verify-llull` `continue-working`
 
 ## COMMANDS
 
 ```bash
-npm install          # root + every packages/* workspace
-npm run dev          # app at http://localhost:5173
+npm install          # root + workspaces (server/, desktop/ separately: npm --prefix <dir> install)
+npm run dev          # http://localhost:5173
 npm run check        # typecheck + arch + deadcode + lint + format:check + test — MUST pass before commit
-npm run arch         # dependency rules (layering, public API, no cycles) — .dependency-cruiser.cjs
-npm run deadcode     # no unused exports / exported types (knip, knip.json)
-npm run claude:lint  # .claude/ references (skills, agents, paths) resolve — run after editing .claude/
-npm run test:coverage
-npm run quality       # import + display quality gates on real CAD files (docs/QUALITY_GATES.md)
-npm run production    # engineering-office job scenarios via /mcp + the browser (docs/PRODUCTION_GATE.md)
-node server/bin/llull.cjs help   # llull CLI: any command on a local doc file, --app (desktop) or --server (llull-cli skill)
-npm --prefix desktop install && npm --prefix desktop test   # desktop app (Electron-free tests); start: npm --prefix desktop start
-npm --prefix server install && npm --prefix server run dev   # optional backend (not a workspace)
+npm run test:coverage  # gate 90/85/90/90 on core/{commands,geometry} + domain-aec
+npm run claude:lint  # after editing .claude/
+npm run quality | production   # real-file gates (docs/QUALITY_GATES.md, docs/PRODUCTION_GATE.md)
+node server/bin/llull.cjs help # CLI (llull-cli skill)
+npm --prefix server test ; npm --prefix desktop test
 ```
 
-## NON-NEGOTIABLES (`npm run check` + the coverage gate reject otherwise)
+## NON-NEGOTIABLES
 
-1. Commands are **pure**: return a new document, never mutate the argument. A test
-   enforces this (`is pure`).
-2. New command ⇒ `defineCommand({ name, description, params: z.object(…), run })` ⇒ registered
-   (core: its feature folder's `catalog.ts`; domain: its plugin's `commands`) ⇒ unit test (happy +
-   failure path).
-3. `packages/core/src/{commands,geometry}/**` and `packages/domain-aec/src/**` hold **90% statements /
-   85% branches / 90% functions / 90% lines**.
-4. Tool/command `name` is `snake_case` (it is the MCP tool name that agents call).
-5. TypeScript strict, no `any`. Max 500 code lines per file (ESLint, no allowlist). `npm run check` green.
+1. Commands are pure (new doc, never mutate input; `is pure` test).
+2. New command = `defineCommand({ name, description, params: z.object(…), run })` + registration (core: feature
+   `catalog.ts`; domain: plugin `commands`) + unit test (happy + failure).
+3. Coverage 90/85/90/90 on `packages/core/src/{commands,geometry}/**` + `packages/domain-aec/src/**`.
+4. Command/tool `name` is `snake_case`.
+5. TS strict, no `any`, ≤500 code lines/file, `npm run check` green.

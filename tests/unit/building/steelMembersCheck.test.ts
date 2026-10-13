@@ -4,19 +4,14 @@ import { execute, getCommand } from '@core/commands/registry';
 import { checkSteelMembers } from '@aec/industrial/steelDesign/steelMembersCheck';
 import { pipeWeightPerMetre } from '@aec/industrial/piping/pipeWeight';
 import { findProfile, sectionProperties } from '@aec/steel/profiles';
-import {
-  G,
-  beam,
-  brace,
-  check,
-  column,
-  rowOf,
-  rowsByRole,
-  squareBay,
-  step,
-  twoLevels,
-  beamOnColumns,
-} from './steelFixtures';
+import { G, beam, brace, check, column, rowOf, rowsByRole, squareBay, step, twoLevels, beamOnColumns, withMember } from './steelFixtures';
+import { expectNoOp } from '../../helpers/expectNoOp';
+import { xy, xyz } from '../../helpers/xy';
+import { checkBeam } from '@aec/industrial/steelDesign/steelBeamChecks';
+import { createBeamLoads } from '@aec/industrial/steelDesign/steelBeamLoads';
+import { collectSteelBars } from '@aec/industrial/steelDesign/steelMemberBars';
+import { analyseSimpleBeam } from '@aec/industrial/steelDesign/steelBeamAnalysis';
+import { analysedRow, skippedRow } from '@aec/industrial/steelDesign/steelMemberRows';
 
 const IPE300 = (findProfile('IPE300')?.massPerMetre ?? 0) * G * 1e-3; // kN/m
 const HEB200 = (findProfile('HEB200')?.massPerMetre ?? 0) * G * 1e-3; // kN/m
@@ -26,13 +21,11 @@ describe('check_steel_members registration', () => {
     expect(getCommand('check_steel_members')?.name).toBe(checkSteelMembers.name);
     expect(checkSteelMembers.annotations).toEqual({ readOnly: true, idempotent: true });
   });
-
   it('is pure: same document back, nothing affected, input untouched', () => {
     const doc = squareBay({ equipmentKg: 5000 });
     const snapshot = JSON.stringify(doc);
     const result = execute(doc, 'check_steel_members', {});
-    expect(result.document).toBe(doc);
-    expect(result.affected).toEqual([]);
+    expectNoOp(result, doc);
     expect(JSON.stringify(doc)).toBe(snapshot);
     expect(result.summary).toContain('8 member(s), 8 analysed');
   });
@@ -45,7 +38,6 @@ describe('beam under its self weight', () => {
     doc = column(doc, 6000, 0);
     return beam(doc, [0, 0], [6000, 0]);
   };
-
   it('has M = 1.35 wL²/8 and δ = 5wL⁴/384EI', () => {
     const data = check(lone());
     const row = rowOf(data, 'SB1');
@@ -58,23 +50,19 @@ describe('beam under its self weight', () => {
     expect(row.analysed).toBe(true);
     expect(row.ok).toBe(true);
   });
-
   it('checks lateral-torsional buckling when nothing restrains the top flange', () => {
     const row = rowOf(check(lone()), 'SB1');
     const bending = row.checks.find((entry) => entry.name.startsWith('bending'));
     expect(bending?.name).toContain('LTB checked');
     expect(row.detail).toBeTruthy();
     const restrained = rowOf(check(squareBay()), 'SB1');
-    expect(restrained.checks.find((entry) => entry.name.startsWith('bending'))?.name).toContain(
-      'LTB restrained',
-    );
+    expect(restrained.checks.find((entry) => entry.name.startsWith('bending'))?.name).toContain('LTB restrained');
   });
 });
 
 describe('floor and equipment load path', () => {
   const FLOOR_DEAD = 0.5;
   const IMPOSED = 5;
-
   it('gives every beam of a square bay a quarter of the floor load', () => {
     const data = check(squareBay());
     const floor = data.loads.floors[0];
@@ -89,7 +77,6 @@ describe('floor and equipment load path', () => {
       expect(forces['MEd']).toBeCloseTo(reactions[0]?.['MEd'] ?? 0, 6);
     }
   });
-
   it('delivers the full equipment weight, through the beams, to the columns', () => {
     const kg = 20000;
     const data = check(squareBay({ equipmentKg: kg }));
@@ -97,10 +84,7 @@ describe('floor and equipment load path', () => {
     expect(data.loads.equipment[0]?.carriedKn).toBeCloseTo(weight, 6);
     expect(data.loads.equipment[0]?.support).toBe('floor');
     const beams = rowsByRole(data, 'beam');
-    const reactionSum = beams.reduce(
-      (sum, row) => sum + (row.forces['reactionStart'] ?? 0) + (row.forces['reactionEnd'] ?? 0),
-      0,
-    );
+    const reactionSum = beams.reduce((sum, row) => sum + (row.forces['reactionStart'] ?? 0) + (row.forces['reactionEnd'] ?? 0), 0);
     const imposed = IMPOSED * (36 - 4);
     const expectedBeams = 1.35 * (36 * FLOOR_DEAD + weight + 4 * IPE300 * 6) + 1.5 * imposed;
     expect(Math.abs(reactionSum - expectedBeams) / expectedBeams).toBeLessThan(2e-3);
@@ -109,12 +93,10 @@ describe('floor and equipment load path', () => {
     const expectedColumns = expectedBeams + 1.35 * 4 * HEB200 * 3;
     expect(Math.abs(columnSum - expectedColumns) / expectedColumns).toBeLessThan(2e-3);
   });
-
   it('does not apply the imposed load under the equipment footprint', () => {
     const data = check(squareBay({ equipmentKg: 1000 }));
     expect(data.loads.floors[0]?.imposedKn).toBeCloseTo(IMPOSED * (36 - 4), 0);
   });
-
   it('sends an equipment straddling a beam line mostly to that beam', () => {
     let doc = twoLevels();
     const columns: Array<[number, number]> = [
@@ -133,81 +115,39 @@ describe('floor and equipment load path', () => {
     doc = beam(doc, [0, 6000], [0, 0]);
     doc = beam(doc, [12000, 0], [12000, 6000]);
     doc = beam(doc, [6000, 0], [6000, 6000]);
-    doc = step(doc, 'add_slab', {
-      levelId: 'level-2',
-      boundary: [
-        [0, 0],
-        [12000, 0],
-        [12000, 6000],
-        [0, 6000],
-      ],
-      thickness: 30,
-    });
-    doc = step(doc, 'add_equipment', {
-      name: 'Skid',
-      levelId: 'level-2',
-      location: [6000, 3000],
-      size: [2000, 2000, 1000],
-      weight: 30000,
-    });
+    doc = step(doc, 'add_slab', { levelId: 'level-2', boundary: xy(0, 0, 12000, 0, 12000, 6000, 0, 6000), thickness: 30 });
+    doc = step(doc, 'add_equipment', { name: 'Skid', levelId: 'level-2', location: [6000, 3000], size: [2000, 2000, 1000], weight: 30000 });
     const data = check(doc);
     const middle = rowOf(data, 'SB7');
     const others = ['SB1', 'SB2', 'SB3', 'SB4', 'SB5', 'SB6'].map((mark) => rowOf(data, mark));
     expect(data.loads.equipment[0]?.carriedKn).toBeCloseTo((30000 * G) / 1000, 6);
     const share = (middle.forces['reactionStart'] ?? 0) * 2;
     expect(share).toBeGreaterThan(1.35 * ((30000 * G) / 1000) * 0.95);
-    for (const row of others)
-      expect(row.forces['MEd'] ?? 0).toBeLessThan(middle.forces['MEd'] ?? 0);
+    for (const row of others) expect(row.forces['MEd'] ?? 0).toBeLessThan(middle.forces['MEd'] ?? 0);
   });
-
   it('reports equipment on grade and carries none of it', () => {
     let doc = squareBay();
-    doc = step(doc, 'add_equipment', {
-      name: 'Tank',
-      levelId: 'level-1',
-      location: [20000, 0],
-      size: [2000, 2000, 3000],
-      weight: 10000,
-    });
+    doc = step(doc, 'add_equipment', { name: 'Tank', levelId: 'level-1', location: [20000, 0], size: [2000, 2000, 3000], weight: 10000 });
     const data = check(doc);
     const tank = data.loads.equipment.find((entry) => entry.mark !== 'E-1');
     expect(tank?.support).toBe('grade');
     expect(tank?.carriedKn).toBe(0);
     expect(data.warnings.some((text) => text.includes('stands on grade'))).toBe(true);
   });
-
   it('puts equipment standing on beams (no floor slab) on those beams', () => {
     let doc = squareBay({ slab: false });
-    doc = step(doc, 'add_equipment', {
-      name: 'Skid',
-      levelId: 'level-2',
-      location: [3000, 3000],
-      size: [2000, 2000, 1000],
-      weight: 8000,
-    });
+    doc = step(doc, 'add_equipment', { name: 'Skid', levelId: 'level-2', location: [3000, 3000], size: [2000, 2000, 1000], weight: 8000 });
     // the equipment base is the level elevation (3000) = 30 mm above the beam tops: carried by beams
     const data = check(doc);
     expect(data.loads.equipment[0]?.support).toBe('beams');
     expect(data.loads.equipment[0]?.carriedKn).toBeCloseTo((8000 * G) / 1000, 6);
   });
-
   it('warns about a floor slab with no beam at its level', () => {
     let doc = twoLevels();
     doc = column(doc, 0, 0);
-    doc = step(doc, 'add_slab', {
-      levelId: 'level-2',
-      boundary: [
-        [0, 0],
-        [3000, 0],
-        [3000, 3000],
-        [0, 3000],
-      ],
-      thickness: 30,
-    });
+    doc = step(doc, 'add_slab', { levelId: 'level-2', boundary: xy(0, 0, 3000, 0, 3000, 3000, 0, 3000), thickness: 30 });
     const data = check(doc);
-    expect(data.warnings.some((text) => text.includes('has no steel beam at its level'))).toBe(
-      true,
-    );
+    expect(data.warnings.some((text) => text.includes('has no steel beam at its level'))).toBe(true);
     expect(data.loads.floors[0]?.supportingBeams).toBe(0);
   });
 });
@@ -234,20 +174,13 @@ describe('column buckling', () => {
     expect(row.forces['NEd']).toBeCloseTo(axial, 0);
     expect(row.check).toContain('flexural buckling');
   });
-
   it('splits a continuous column at every beam level and carries the load down', () => {
     let doc = twoLevels();
     doc = step(doc, 'add_level', { name: 'Top', elevation: 6000, height: 3000, makeActive: false });
     doc = column(doc, 0, 0, 'HEB200', 6000);
     doc = column(doc, 6000, 0, 'HEB200', 6000);
     for (const level of ['level-2', 'level-3']) {
-      doc = step(doc, 'add_steel_member', {
-        role: 'beam',
-        profile: 'IPE300',
-        start: [0, 0, -180],
-        end: [6000, 0, -180],
-        levelId: level,
-      });
+      doc = step(doc, 'add_steel_member', { role: 'beam', profile: 'IPE300', start: [0, 0, -180], end: [6000, 0, -180], levelId: level });
     }
     const data = check(doc);
     const lower = rowOf(data, 'SC1');
@@ -265,13 +198,9 @@ describe('pipes and trays', () => {
       levelId: 'level-1',
       diameter: 114.3,
       service: 'water',
-      points: [
-        [0, 2000, underside + 57.15],
-        [6000, 2000, underside + 57.15],
-      ],
+      points: xyz(0, 2000, underside + 57.15, 6000, 2000, underside + 57.15),
     });
   };
-
   it('detects the beam a pipe rests on and loads it with the pipe weight', () => {
     const data = check(pipeBeamDoc(2970));
     const line = data.loads.lines[0];
@@ -284,52 +213,40 @@ describe('pipes and trays', () => {
     expect(row.checks.some((entry) => entry.name.includes('LTB restrained'))).toBe(true);
     expect(row.detail).toBeTruthy();
   });
-
   it('still counts a pipe within 10 mm of the top of steel as resting', () => {
     expect(check(pipeBeamDoc(2978)).loads.lines[0]?.supports).toBe(1);
   });
-
   it('does not count a pipe floating above the beam', () => {
     const data = check(pipeBeamDoc(3030));
     expect(data.loads.lines[0]?.supports).toBe(0);
     expect(data.warnings.some((text) => text.includes('rests on no steel beam'))).toBe(true);
   });
-
   it('shares a run between supports by half the span to the neighbours', () => {
     const doc = step(beamOnColumns([1000, 3000]), 'add_pipe_run', {
       levelId: 'level-1',
       diameter: 114.3,
-      points: [
-        [0, 2000, 3027.15],
-        [6000, 2000, 3027.15],
-      ],
+      points: xyz(0, 2000, 3027.15, 6000, 2000, 3027.15),
     });
     const data = check(doc);
     const weight = pipeWeightPerMetre(114.3, 1000);
     expect(data.loads.lines[0]?.supports).toBe(2);
     expect(data.loads.lines[0]?.carriedKn).toBeCloseTo(weight * 6, 6);
     // support 1: 1 m overhang + 1 m half span = 2 m; support 2: 1 m half span + 3 m overhang = 4 m
-    const momentOf = (mark: string): number =>
-      (rowOf(data, mark).forces['MEd'] ?? 0) / 1.35 - (IPE300 * 16) / 8;
+    const momentOf = (mark: string): number => (rowOf(data, mark).forces['MEd'] ?? 0) / 1.35 - (IPE300 * 16) / 8;
     expect(momentOf('SB2') / momentOf('SB1')).toBeCloseTo(2, 2);
   });
-
   it('supports a cable tray by its underside and weighs it per metre', () => {
     const doc = step(beamOnColumns(), 'add_cable_tray', {
       levelId: 'level-1',
       width: 600,
       height: 100,
-      points: [
-        [0, 2000, 3020],
-        [6000, 2000, 3020],
-      ],
+      points: xyz(0, 2000, 3020, 6000, 2000, 3020),
     });
     const data = check(doc, { cableTrayWeight: 60 });
     expect(data.loads.lines[0]?.supports).toBe(1);
     expect(data.loads.lines[0]?.weightPerMetre).toBeCloseTo((60 * G) / 1000, 9);
     expect(data.loads.lines[0]?.carriedKn).toBeCloseTo((60 * G * 6) / 1000, 6);
   });
-
   it('weighs empty pipes lighter than water-filled ones', () => {
     const doc = pipeBeamDoc(2970);
     const full = check(doc).loads.lines[0]?.carriedKn ?? 0;
@@ -358,17 +275,13 @@ describe('beams framing into beams', () => {
     expect(primary.forces['reactionStart']).toBeCloseTo(1.35 * ((IPE300 * 6) / 2 + point / 2), 2);
     expect(data.warnings.filter((text) => text.includes('rests on no column or beam'))).toEqual([]);
   });
-
   it('warns about a beam end bearing on nothing', () => {
     let doc = twoLevels();
     doc = column(doc, 0, 0);
     doc = beam(doc, [0, 0], [6000, 0]);
     const data = check(doc);
-    expect(data.warnings.some((text) => text.includes('SB1 end rests on no column or beam'))).toBe(
-      true,
-    );
+    expect(data.warnings.some((text) => text.includes('SB1 end rests on no column or beam'))).toBe(true);
   });
-
   it('flags circular beam framing and still analyses every beam', () => {
     // pinwheel: A ends on the interior of B, B on C, C on A
     let doc = twoLevels();
@@ -387,7 +300,6 @@ describe('bracing', () => {
     doc = brace(doc, [0, 0, 0], [6000, 0, 2820]);
     return brace(doc, [6000, 0, 0], [0, 0, 2820]);
   };
-
   it('carries φ × the factored storey load as a tension-only diagonal force', () => {
     const data = check(braced());
     const vertical = 1.35 * (4 * IPE300 * 6 + 36 * 0.5 + 4 * HEB200 * 3) + 1.5 * 36 * 5;
@@ -402,20 +314,14 @@ describe('bracing', () => {
       expect(row.check).toContain('slenderness');
     }
   });
-
   it('makes the chord beam of the braced bay a strut and flags the unbraced direction', () => {
     const data = check(braced());
     const chord = rowOf(data, 'SB1');
-    expect(chord.checks.map((entry) => entry.name)).toContain(
-      'strut compression + bending (§6.3.3)',
-    );
+    expect(chord.checks.map((entry) => entry.name)).toContain('strut compression + bending (§6.3.3)');
     expect(chord.forces['NEd']).toBeGreaterThan(1);
-    expect(rowOf(data, 'SB3').checks.map((entry) => entry.name)).not.toContain(
-      'strut compression + bending (§6.3.3)',
-    );
+    expect(rowOf(data, 'SB3').checks.map((entry) => entry.name)).not.toContain('strut compression + bending (§6.3.3)');
     expect(data.warnings.some((text) => text.includes('no bracing in direction Y'))).toBe(true);
   });
-
   it('shares the storey shear by the braced planes of a direction', () => {
     let doc = braced();
     doc = brace(doc, [0, 6000, 0], [6000, 6000, 2820]);
@@ -424,7 +330,6 @@ describe('bracing', () => {
     const shared = rowOf(check(doc), 'BR1').forces['NEd'] ?? 0;
     expect(shared).toBeCloseTo(single / 2, 2);
   });
-
   it('also checks a single diagonal for buckling in compression', () => {
     let doc = squareBay();
     doc = brace(doc, [0, 0, 0], [6000, 0, 2820]);
@@ -446,7 +351,6 @@ describe('selection and results', () => {
     const result = checkSteelMembers.run(squareBay({ equipmentKg: 900000 }), {});
     expect(result.summary).toContain('failure(s)');
   });
-
   it('restricts the report to a level but analyses the whole model', () => {
     const doc = squareBay({ equipmentKg: 20000 });
     const all = check(doc);
@@ -457,35 +361,205 @@ describe('selection and results', () => {
     expect(ground.members).toHaveLength(4);
     expect(rowOf(ground, 'SC1').forces['NEd']).toBe(rowOf(all, 'SC1').forces['NEd']);
   });
-
   it('writes a CSV with one line per member', () => {
     const result = checkSteelMembers.run(squareBay(), {});
     const csv = (result.data as { csv: string }).csv;
     expect(csv.trim().split('\n')).toHaveLength(9);
     expect(csv.startsWith('Mark,Role,Profile')).toBe(true);
   });
-
   it('gives the same utilisation in a metre document', () => {
     let doc: CadDocument = { ...createEmptyDocument(), units: 'm' };
     doc = step(doc, 'add_level', { name: 'Floor', elevation: 3, height: 3, makeActive: false });
     for (const x of [0, 6]) {
-      doc = step(doc, 'add_steel_member', {
-        role: 'column',
-        profile: 'HEB200',
-        start: [x, 0, -3],
-        end: [x, 0, 0],
-        levelId: 'level-1',
-      });
+      doc = step(doc, 'add_steel_member', { role: 'column', profile: 'HEB200', start: [x, 0, -3], end: [x, 0, 0], levelId: 'level-1' });
     }
-    doc = step(doc, 'add_steel_member', {
-      role: 'beam',
-      profile: 'IPE300',
-      start: [0, 0, -0.18],
-      end: [6, 0, -0.18],
-      levelId: 'level-1',
-    });
+    doc = step(doc, 'add_steel_member', { role: 'beam', profile: 'IPE300', start: [0, 0, -0.18], end: [6, 0, -0.18], levelId: 'level-1' });
     const row = rowOf(check(doc), 'SB1');
     expect(row.forces['MEd']).toBeCloseTo((1.35 * IPE300 * 36) / 8, 2);
     expect(rowOf(check(doc), 'SC1').analysed).toBe(true);
+  });
+});
+
+const pointLoaded = (
+  loads: ReturnType<typeof createBeamLoads>,
+  at: number,
+  permanent: number,
+): { result: Parameters<typeof checkBeam>[1]; heavy: ReturnType<typeof analyseSimpleBeam> } => {
+  const heavy = analyseSimpleBeam(loads.lengthM, [], [{ at, permanent, imposed: 0 }], { permanent: 1, imposed: 0 });
+  const result = { loads, uls: heavy, sls: heavy, ends: [{ type: 'none' }, { type: 'none' }] as const };
+  return { result, heavy };
+};
+
+describe('check_steel_members failure paths', () => {
+  const rejected = (params: Record<string, unknown>, doc = squareBay()): string => {
+    const result = execute(doc, 'check_steel_members', params);
+    expectNoOp(result, doc);
+    expect(result.data).toBeUndefined();
+    return result.summary;
+  };
+  it('rejects an empty model', () => {
+    expect(rejected({}, createEmptyDocument())).toContain('no steel members');
+  });
+  it('rejects negative loads, a bad notional factor and a bad deflection ratio', () => {
+    expect(rejected({ imposedLoad: -1 })).toContain('must be numbers >= 0');
+    expect(rejected({ cableTrayWeight: -5 })).toContain('must be numbers >= 0');
+    expect(rejected({ notionalFactor: 0.5 })).toContain('notionalFactor');
+    expect(rejected({ deflectionRatio: 0 })).toContain('deflectionRatio');
+  });
+  it('rejects an unknown level and a level without steel', () => {
+    expect(rejected({ levelId: 'level-99' })).toContain("no level 'level-99'");
+    const doc = step(squareBay(), 'add_level', { name: 'Roof', elevation: 9000, height: 3000, makeActive: false });
+    expect(rejected({ levelId: 'level-3' }, doc)).toContain('has no steel members');
+  });
+});
+
+describe('members that cannot be analysed', () => {
+  it('keeps every member in the report with the reason', () => {
+    let doc = squareBay();
+    doc = withMember(doc, 'SB2', { profile: 'FOO100' });
+    doc = step(doc, 'add_steel_member', { role: 'rafter', profile: 'IPE300', start: [0, 0, 0], end: [6000, 0, 500], levelId: 'level-2' });
+    doc = step(doc, 'add_steel_member', { role: 'purlin', profile: 'IPE200', start: [0, 0, 0], end: [6000, 0, 0], levelId: 'level-2' });
+    const data = check(doc);
+    expect(data.members).toHaveLength(10);
+    expect(data.ok).toBe(false);
+    expect(data.totals.notAnalysed).toBe(3);
+    const unknown = rowOf(data, 'SB2');
+    expect(unknown).toMatchObject({ analysed: false, ok: false, check: 'not analysed' });
+    expect(unknown.detail).toContain('not in the steel catalogue');
+    expect(rowOf(data, 'RF1').detail).toContain('check_portal_frames');
+    expect(rowOf(data, 'PU1').detail).toContain('check_purlins');
+    const result = checkSteelMembers.run(doc, {});
+    expect(result.summary).toContain('not analysed: ');
+  });
+  it('refuses sloping beams, inclined columns, horizontal braces and zero-length members', () => {
+    let doc = squareBay();
+    doc = step(doc, 'add_steel_member', { role: 'beam', profile: 'IPE300', start: [0, 0, 0], end: [2000, 0, 1000], levelId: 'level-2' });
+    doc = step(doc, 'add_steel_member', { role: 'column', profile: 'HEB200', start: [0, 0, 0], end: [3000, 0, 1000], levelId: 'level-1' });
+    doc = step(doc, 'add_steel_member', {
+      role: 'brace',
+      profile: 'CHS139.7x5',
+      start: [0, 0, 100],
+      end: [6000, 0, 100],
+      levelId: 'level-1',
+    });
+    const data = check(doc);
+    expect(rowOf(data, 'SB5').detail).toContain('slopes more than');
+    expect(rowOf(data, 'SC5').detail).toContain('inclined');
+    expect(rowOf(data, 'BR1').detail).toContain('horizontal brace');
+    const zero = withMember(doc, 'SB1', { end: [0, 0, -180], start: [0, 0, -180] });
+    expect(rowOf(check(zero), 'SB1').detail).toContain('length is zero');
+  });
+  it('skips shapes and classes the checks do not cover', () => {
+    let doc = twoLevels();
+    doc = step(doc, 'add_steel_member', { role: 'column', profile: 'IPE600', start: [0, 0, 0], end: [3000, 0, 0], levelId: 'level-1' });
+    doc = step(doc, 'add_steel_member', {
+      role: 'column',
+      profile: 'IPE600',
+      start: [1000, 0, 0],
+      end: [1000, 0, 3000],
+      levelId: 'level-1',
+    });
+    doc = step(doc, 'add_steel_member', {
+      role: 'column',
+      profile: 'L100x10',
+      start: [2000, 0, 0],
+      end: [2000, 0, 3000],
+      levelId: 'level-1',
+    });
+    doc = beam(doc, [0, 4000], [6000, 4000], 'L100x10', 100);
+    doc = beam(doc, [0, 5000], [6000, 5000], 'UPN200', 200);
+    const data = check(doc);
+    expect(rowOf(data, 'SC2').detail).toContain('class 4 in compression');
+    expect(rowOf(data, 'SC3').detail).toContain('not covered');
+    expect(rowOf(data, 'SB1').detail).toContain('as beams');
+    expect(rowOf(data, 'SB2').detail).toContain('as beams');
+  });
+  it('uses the elastic modulus for a class 3 section', () => {
+    let doc = twoLevels();
+    doc = column(doc, 0, 0);
+    doc = column(doc, 6000, 0);
+    doc = step(doc, 'add_steel_member', {
+      role: 'beam',
+      profile: 'HEB300',
+      material: 'S460',
+      start: [0, 0, -180],
+      end: [6000, 0, -180],
+      levelId: 'level-2',
+    });
+    const row = rowOf(check(doc), 'SB1');
+    expect(row.checks[0]?.name).toContain('class 3');
+  });
+});
+
+describe('bracing edge cases', () => {
+  it('reports braces as not analysable when no floor beam gives a storey load', () => {
+    let doc = twoLevels();
+    doc = brace(doc, [0, 0, 0], [6000, 0, 3000]);
+    const row = rowOf(check(doc), 'BR1');
+    expect(row.analysed).toBe(false);
+    expect(row.detail).toContain('no floor beams');
+  });
+  it('refuses a brace that is not in an X or Y plane', () => {
+    let doc = squareBay();
+    doc = brace(doc, [0, 0, 0], [3000, 3000, 2820]);
+    const row = rowOf(check(doc), 'BR1');
+    expect(row.detail).toContain('not in a vertical plane parallel to X or Y');
+  });
+  it('flags a single diagonal whose section cannot be verified in compression', () => {
+    let doc = squareBay();
+    doc = brace(doc, [0, 0, 0], [6000, 0, 2820], 'L100x10');
+    expect(rowOf(check(doc), 'BR1').detail).toContain('single diagonal also acts in compression');
+  });
+  it('assigns a long Y-direction diagonal to its plane and reports storey shears', () => {
+    let doc = squareBay();
+    doc = brace(doc, [0, 0, 0], [0, 6000, 2820]);
+    doc = brace(doc, [0, 6000, 0], [0, 0, 2820]);
+    const data = check(doc, { notionalFactor: 0.01 });
+    expect(rowOf(data, 'BR1').forces['panelShear']).toBeCloseTo(data.storeys[0]?.shear ?? 0, 2);
+    expect(data.warnings.some((text) => text.includes('direction X'))).toBe(true);
+  });
+});
+
+describe('beam check internals', () => {
+  const lone = (): ReturnType<typeof twoLevels> => beam(twoLevels(), [0, 0], [2000, 0], 'IPE200', 200);
+  it('reduces the moment resistance when the shear exceeds half of Vpl,Rd', () => {
+    const bar = collectSteelBars(lone()).find((entry) => entry.role === 'beam');
+    if (!bar) throw new Error('beam');
+    const loads = createBeamLoads(bar);
+    loads.floorSupport = true;
+    const { result, heavy } = pointLoaded(loads, loads.lengthM / 2, 400);
+    const row = checkBeam(bar, result, 250, undefined);
+    const bending = row.checks.find((entry) => entry.name.startsWith('bending'));
+    const unreduced = checkBeam(bar, { ...result, uls: { ...heavy, shearAtMoment: 0 } }, 250, undefined).checks.find((entry) =>
+      entry.name.startsWith('bending'),
+    );
+    expect(bending?.utilisation ?? 0).toBeGreaterThan((unreduced?.utilisation ?? 0) * 1.05);
+  });
+  it('reduces the moment of a hollow section by (1 − ρ) under high shear', () => {
+    let doc = twoLevels();
+    doc = beam(doc, [0, 0], [2000, 0], 'RHS200x100x6', 200);
+    const bar = collectSteelBars(doc).find((entry) => entry.role === 'beam');
+    if (!bar) throw new Error('beam');
+    const loads = createBeamLoads(bar);
+    const { result } = pointLoaded(loads, 1, 500);
+    const row = checkBeam(bar, result, 250, { force: 5, note: 'test strut' });
+    expect(row.detail).toContain('reduced for V');
+    expect(row.checks.map((entry) => entry.name)).toContain('strut compression + bending (§6.3.3)');
+  });
+  it('builds rows: the worst check governs and a row with no check is not analysed', () => {
+    const bar = collectSteelBars(lone())[0];
+    if (!bar) throw new Error('bar');
+    const row = analysedRow(
+      bar,
+      [
+        { name: 'a', utilisation: 0.4, combination: 'c1', detail: 'd1' },
+        { name: 'b', utilisation: 1.2, combination: 'c2', detail: 'd2' },
+      ],
+      { MEd: 1.23456 },
+    );
+    expect(row).toMatchObject({ check: 'b', governing: 'c2', ok: false, utilisation: 1.2 });
+    expect(row.forces['MEd']).toBe(1.235);
+    expect(analysedRow(bar, []).analysed).toBe(false);
+    expect(skippedRow(bar, 'why').detail).toBe('why');
   });
 });

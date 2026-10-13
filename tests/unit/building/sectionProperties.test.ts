@@ -15,7 +15,6 @@ describe('sectionProperties', () => {
     expect(props.plasticModulus / 1e3 / wpl).toBeGreaterThan(0.93);
     expect(props.plasticModulus / 1e3 / wpl).toBeLessThan(1.01);
   });
-
   it.each([
     // name, Iz (cm⁴) — catalogue
     ['IPE300', 603.8],
@@ -25,17 +24,13 @@ describe('sectionProperties', () => {
     expect(props.minorInertia / 1e4 / iz).toBeGreaterThan(0.95);
     expect(props.minorInertia / 1e4 / iz).toBeLessThan(1.01);
   });
-
   it('gives exact values for a hollow section and an asymmetric angle', () => {
     const shs = sectionProperties(findProfile('SHS100x5')!);
     const exact = (100 ** 4 - 90 ** 4) / 12;
     expect(shs.inertia).toBeCloseTo(exact, -2);
     expect(shs.elasticModulus).toBeCloseTo(exact / 50, -1);
     expect(shs.minorInertia).toBeCloseTo(exact, -2);
-    expect(shs.plasticModulus).toBeCloseTo(
-      ((100 * 50 * 50) / 2) * 2 - ((90 * 45 * 45) / 2) * 2,
-      -1,
-    );
+    expect(shs.plasticModulus).toBeCloseTo(((100 * 50 * 50) / 2) * 2 - ((90 * 45 * 45) / 2) * 2, -1);
     const angle = sectionProperties(findProfile('L100x10')!);
     expect(angle.area).toBeCloseTo(1900, -1);
     expect(angle.plasticModulus).toBeGreaterThan(angle.elasticModulus);

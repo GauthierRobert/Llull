@@ -1,5 +1,3 @@
-/** @layer ui/panels/building Pure option lists for the element tools' live selects. */
-
 import type { BuildingModel } from '@core/model/building';
 import type { ElementListKind } from './elementToolForm';
 
@@ -35,10 +33,7 @@ export function elementOptions(building: BuildingModel | undefined): ElementOpti
     if (!element) continue;
     const onActiveLevel = 'levelId' in element && element.levelId === building.activeLevelId;
     if (element.category === 'wall' && onActiveLevel) {
-      const length = Math.hypot(
-        element.end[0] - element.start[0],
-        element.end[1] - element.start[1],
-      );
+      const length = Math.hypot(element.end[0] - element.start[0], element.end[1] - element.start[1]);
       options.walls.push({ id, label: `${element.mark} · ${Math.round(length)} long` });
       options.hosts.push({ id, label: `${element.mark} · ${Math.round(length)} long` });
     } else if (element.category === 'curvedWall' && onActiveLevel) {
@@ -49,17 +44,11 @@ export function elementOptions(building: BuildingModel | undefined): ElementOpti
         options.pipes.push({ id: `pipe:${id}`, label: `${element.mark} · DN${element.dn ?? '?'}` });
       } else if (!lineNumbers.has(line)) {
         lineNumbers.add(line);
-        options.pipes.push({
-          id: `line:${line}`,
-          label: `${line} · ${element.mark} · DN${element.dn ?? '?'}`,
-        });
+        options.pipes.push({ id: `line:${line}`, label: `${line} · ${element.mark} · DN${element.dn ?? '?'}` });
       }
     } else if (element.category === 'stair') {
       const level = building.levels[element.levelId]?.name ?? element.levelId;
-      options.stairs.push({
-        id,
-        label: `${element.mark} · ${element.riserCount} risers · ${level}`,
-      });
+      options.stairs.push({ id, label: `${element.mark} · ${element.riserCount} risers · ${level}` });
     } else if (element.category === 'slab') {
       const level = building.levels[element.levelId]?.name ?? element.levelId;
       options.slabs.push({ id, label: `${element.mark} · ${element.role} · ${level}` });

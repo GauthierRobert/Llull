@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import { planPoint } from '@lib/vec2';
 import { shapeOf } from '../../industrial/equipment/equipmentShape';
 import type { Vec2 } from '@core/model/types';
@@ -30,10 +26,7 @@ function offsetPolyline(points: ReadonlyArray<Vec2>, half: number): Vec2[][] {
       const next = points[index + 1];
       const before = previous ? normalOf(previous, point) : null;
       const after = next ? normalOf(point, next) : null;
-      const [nx, ny] =
-        before && after
-          ? [before[0] + after[0], before[1] + after[1]]
-          : ((before ?? after ?? [0, 0]) as Vec2);
+      const [nx, ny] = before && after ? [before[0] + after[0], before[1] + after[1]] : ((before ?? after ?? [0, 0]) as Vec2);
       const along = before && after ? 1 + before[0] * after[0] + before[1] * after[1] : 1;
       const factor = (side * half) / (before && after ? Math.max(along, 0.2) : 1);
       return [point[0] + nx * factor, point[1] + ny * factor];
@@ -42,12 +35,7 @@ function offsetPolyline(points: ReadonlyArray<Vec2>, half: number): Vec2[][] {
 }
 
 /** Corners of a `2·hx × 2·hy` rectangle centred on `center`, rotated by `angle` (counter-clockwise). */
-function rectangleAt(
-  center: readonly [number, number, ...number[]],
-  hx: number,
-  hy: number,
-  angle = 0,
-): Vec2[] {
+function rectangleAt(center: readonly [number, number, ...number[]], hx: number, hy: number, angle = 0): Vec2[] {
   return (
     [
       [-hx, -hy],
@@ -61,10 +49,7 @@ function rectangleAt(
 /** Plan symbols of industrial elements (cut at `cutHeight` above the level). */
 export function industrialPrimitives(
   doc: PlanSource,
-  element: Extract<
-    BuildingElement,
-    { category: 'member' | 'footing' | 'panel' | 'equipment' | 'pipe' | 'tray' | 'plate' }
-  >,
+  element: Extract<BuildingElement, { category: 'member' | 'footing' | 'panel' | 'equipment' | 'pipe' | 'tray' | 'plate' }>,
   cutHeight: number,
 ): DrawingPrimitive[] {
   const flat = (point: readonly [number, number, ...number[]]): Vec2 => [point[0], point[1]];
@@ -74,10 +59,7 @@ export function industrialPrimitives(
       const frame = sweepFrame(element.start, element.end, element.roll);
       const profile = findProfile(element.profile);
       if (!frame || !profile) return [];
-      const [low, high] = [
-        Math.min(element.start[2], element.end[2]),
-        Math.max(element.start[2], element.end[2]),
-      ];
+      const [low, high] = [Math.min(element.start[2], element.end[2]), Math.max(element.start[2], element.end[2])];
       if (Math.abs(frame.d[2]) > 0.9 && low <= cutHeight && high >= cutHeight) {
         const factor = fromMm(doc, 1);
         const section = (points: ReadonlyArray<Vec2>): Vec2[] =>
@@ -89,27 +71,12 @@ export function industrialPrimitives(
           );
         const { outer, holes } = profileOutline(profile);
         return [
-          {
-            type: 'polygon',
-            layer,
-            style: 'cut',
-            points: section(outer),
-            fill: 'solid',
-            holes: holes.map(section),
-          },
-          ...holes.map(
-            (hole): DrawingPrimitive => ({
-              type: 'polygon',
-              layer,
-              style: 'thin',
-              points: section(hole),
-            }),
-          ),
+          { type: 'polygon', layer, style: 'cut', points: section(outer), fill: 'solid', holes: holes.map(section) },
+          ...holes.map((hole): DrawingPrimitive => ({ type: 'polygon', layer, style: 'thin', points: section(hole) })),
         ];
       }
       // Roof framing (purlins, rafters, roof bracing) and side rails belong to the roof / elevation drawings.
-      if (element.role === 'purlin' || element.role === 'rafter' || element.role === 'rail')
-        return [];
+      if (element.role === 'purlin' || element.role === 'rafter' || element.role === 'rail') return [];
       if (element.role === 'brace' && low > 2 * cutHeight) return [];
       const [a, b] = [flat(element.start), flat(element.end)];
       if (distance(a, b) < 1e-9) return [];
@@ -136,31 +103,19 @@ export function industrialPrimitives(
     }
     case 'equipment': {
       const [length, width] = element.size;
-      const rectangle = (hx: number, hy: number): Vec2[] =>
-        rectangleAt(element.location, hx, hy, element.angle);
+      const rectangle = (hx: number, hy: number): Vec2[] => rectangleAt(element.location, hx, hy, element.angle);
       const layer = layerName('equipment');
       const round = shapeOf(element) === 'vertical_vessel';
       const [cx, cy] = element.location;
       const arm = length / 2;
       const outline: DrawingPrimitive[] = round
-        ? [
-            { type: 'circle', layer, style: 'thin', center: [cx, cy], radius: arm },
-            ...centreMarkLines([cx, cy], arm, layer),
-          ]
+        ? [{ type: 'circle', layer, style: 'thin', center: [cx, cy], radius: arm }, ...centreMarkLines([cx, cy], arm, layer)]
         : [{ type: 'polygon', layer, style: 'thin', points: rectangle(length / 2, width / 2) }];
       const zone: DrawingPrimitive[] =
         element.clearance <= 0
           ? []
           : round
-            ? [
-                {
-                  type: 'circle',
-                  layer,
-                  style: 'hidden',
-                  center: [cx, cy],
-                  radius: arm + element.clearance,
-                },
-              ]
+            ? [{ type: 'circle', layer, style: 'hidden', center: [cx, cy], radius: arm + element.clearance }]
             : [
                 {
                   type: 'polygon',
@@ -169,16 +124,7 @@ export function industrialPrimitives(
                   points: rectangle(length / 2 + element.clearance, width / 2 + element.clearance),
                 },
               ];
-      return [
-        ...outline,
-        ...zone,
-        annotationText(
-          layer,
-          element.location,
-          fromMm(doc, 250),
-          `${element.mark} ${element.name}`,
-        ),
-      ];
+      return [...outline, ...zone, annotationText(layer, element.location, fromMm(doc, 250), `${element.mark} ${element.name}`)];
     }
     case 'pipe': {
       const points = element.points.map(flat);
@@ -199,48 +145,25 @@ export function industrialPrimitives(
       const building = getBuilding(doc);
       const member = building.elements[element.memberId];
       const level = building.levels[element.levelId];
-      const layout =
-        member?.category === 'member' && level ? plateLayout(doc, element, member, level) : null;
+      const layout = member?.category === 'member' && level ? plateLayout(doc, element, member, level) : null;
       if (!layout) return [];
       const layer = layerName('plate');
       return [
-        {
-          type: 'polygon',
-          layer,
-          style: 'thin',
-          points: rectangleAt(layout.center, element.length / 2, element.width / 2, layout.angle),
-        },
+        { type: 'polygon', layer, style: 'thin', points: rectangleAt(layout.center, element.length / 2, element.width / 2, layout.angle) },
         ...layout.bolts.map(
-          (center): DrawingPrimitive => ({
-            type: 'circle',
-            layer,
-            style: 'thin',
-            center,
-            radius: element.boltDiameter / 2,
-          }),
+          (center): DrawingPrimitive => ({ type: 'circle', layer, style: 'thin', center, radius: element.boltDiameter / 2 }),
         ),
       ];
     }
     case 'tray': {
       // Vertical risers collapse to one plan point: keep distinct consecutive points only.
-      const points = element.points
-        .map(flat)
-        .filter(
-          (point, index, all) => index === 0 || distance(point, all[index - 1] ?? point) > 1e-9,
-        );
+      const points = element.points.map(flat).filter((point, index, all) => index === 0 || distance(point, all[index - 1] ?? point) > 1e-9);
       const layer = layerName('tray');
       const [a, b] = points;
       if (!a || !b) {
         const half = element.width / 2;
         if (!a) return [];
-        return [
-          {
-            type: 'polygon',
-            layer,
-            style: 'thin',
-            points: rectangleAt(a, half, half),
-          },
-        ];
+        return [{ type: 'polygon', layer, style: 'thin', points: rectangleAt(a, half, half) }];
       }
       return [
         ...offsetPolyline(points, element.width / 2).map(
@@ -258,9 +181,8 @@ export function industrialPrimitives(
 }
 
 /**
- * Cut symbol, on the plan of `level`, of a concrete or vertical steel column that belongs to ANOTHER
- * level but whose vertical extent crosses the plan cut (`level.elevation + cutHeight`).
- * @pure
+ * Cut symbol, on the plan of `level`, of a concrete or vertical steel column that belongs to ANOTHER level but whose vertical extent
+ * crosses the plan cut (`level.elevation + cutHeight`).
  */
 export function crossingColumnPrimitives(
   doc: PlanSource,
@@ -272,17 +194,10 @@ export function crossingColumnPrimitives(
   const home = getBuilding(doc).levels[element.levelId];
   if (!home) return [];
   const relativeCut = level.elevation + cutHeight - home.elevation;
-  if (element.category === 'column')
-    return relativeCut >= 0 && relativeCut < element.height ? [columnPrimitive(element)] : [];
+  if (element.category === 'column') return relativeCut >= 0 && relativeCut < element.height ? [columnPrimitive(element)] : [];
   if (element.role !== 'column') return [];
-  const [dx, dy, dz] = [
-    element.end[0] - element.start[0],
-    element.end[1] - element.start[1],
-    element.end[2] - element.start[2],
-  ];
+  const [dx, dy, dz] = [element.end[0] - element.start[0], element.end[1] - element.start[1], element.end[2] - element.start[2]];
   const vertical = Math.abs(dz) > 0.9 * Math.hypot(dx, dy, dz);
-  const crosses =
-    Math.min(element.start[2], element.end[2]) <= relativeCut &&
-    Math.max(element.start[2], element.end[2]) >= relativeCut;
+  const crosses = Math.min(element.start[2], element.end[2]) <= relativeCut && Math.max(element.start[2], element.end[2]) >= relativeCut;
   return vertical && crosses ? industrialPrimitives(doc, element, relativeCut) : [];
 }

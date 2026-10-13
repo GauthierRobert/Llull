@@ -6,21 +6,9 @@
       "#1": {
         "id": "#1",
         "kind": "box",
-        "size": [
-          1,
-          1,
-          1
-        ],
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
+        "size": [1,1,1],
+        "position": [0,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#6b8f9c",
         "materialId": "steel"
@@ -60,44 +48,23 @@
       {
         "id": "#3",
         "name": "add_box",
-        "params": {
-          "size": [
-            1,
-            1,
-            1
-          ]
-        },
+        "params": {"size":[1,1,1]},
         "suppressed": false,
-        "affected": [
-          "#1"
-        ]
+        "affected": ["#1"]
       },
       {
         "id": "#4",
         "name": "create_material",
-        "params": {
-          "name": "steel",
-          "density": 0.00785,
-          "color": "#808080",
-          "metalness": 0.9,
-          "roughness": 0.3
-        },
+        "params": {"name":"steel","density":0.00785,"color":"#808080","metalness":0.9,"roughness":0.3},
         "suppressed": false,
         "affected": []
       },
       {
         "id": "#5",
         "name": "assign_material",
-        "params": {
-          "materialName": "steel",
-          "entityIds": [
-            "#1"
-          ]
-        },
+        "params": {"materialName":"steel","entityIds":["#1"]},
         "suppressed": false,
-        "affected": [
-          "#1"
-        ]
+        "affected": ["#1"]
       }
     ],
     "configurations": {},

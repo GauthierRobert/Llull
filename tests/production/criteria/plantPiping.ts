@@ -1,22 +1,11 @@
 import type { Vec3 } from '@core/model/types';
 import type { CheckOutcome, Criterion, GradeContext } from '../contract';
-import {
-  absolute,
-  distance,
-  elementsOf,
-  equipmentBox,
-  insideBox,
-  polylineLength,
-  round,
-  sameEnds,
-} from '../oracle/geometry';
+import { absolute, distance, elementsOf, equipmentBox, insideBox, polylineLength, round, sameEnds } from '../oracle/geometry';
 import { PIPE_OD } from '../oracle/steel';
 import { parseCsv } from '../oracle/csv';
 import type { PlantIntent } from '../plant/intent';
 
 /**
- * @layer tests/production/criteria
- *
  * Piping acceptance: every process line between its two ends with the right size, no dangling
  * pipe end (each end inside an equipment or at a battery-limit tie-in), and a line list that a
  * piping lead can issue (line number, size, service, from, to).
@@ -29,10 +18,7 @@ function absoluteRoute(ctx: GradeContext, levelId: string, points: Vec3[]): Vec3
 }
 
 function linesCheck(intent: PlantIntent, ctx: GradeContext): CheckOutcome {
-  const pipes = elementsOf(ctx.document, 'pipe').map((pipe) => ({
-    pipe,
-    route: absoluteRoute(ctx, pipe.levelId, pipe.points),
-  }));
+  const pipes = elementsOf(ctx.document, 'pipe').map((pipe) => ({ pipe, route: absoluteRoute(ctx, pipe.levelId, pipe.points) }));
   const problems: string[] = [];
   for (const line of intent.pipes) {
     const found = pipes.find(({ route }) => sameEnds(route, line.route, END_TOLERANCE));
@@ -47,25 +33,17 @@ function linesCheck(intent: PlantIntent, ctx: GradeContext): CheckOutcome {
     const designed = polylineLength(line.route);
     const modelled = polylineLength(found.route);
     if (Math.abs(modelled - designed) > 0.01 * designed) {
-      problems.push(
-        `${line.line} is ${round(modelled / 1000, 2)} m long, routed ${round(designed / 1000, 2)} m`,
-      );
+      problems.push(`${line.line} is ${round(modelled / 1000, 2)} m long, routed ${round(designed / 1000, 2)} m`);
     }
   }
   return {
     pass: problems.length === 0,
-    detail:
-      problems.length === 0
-        ? `${intent.pipes.length} process lines routed and sized`
-        : problems.join('; '),
+    detail: problems.length === 0 ? `${intent.pipes.length} process lines routed and sized` : problems.join('; '),
   };
 }
 
 function connectivityCheck(intent: PlantIntent, ctx: GradeContext): CheckOutcome {
-  const boxes = elementsOf(ctx.document, 'equipment').map((e) => ({
-    mark: e.mark,
-    box: equipmentBox(ctx.document, e),
-  }));
+  const boxes = elementsOf(ctx.document, 'equipment').map((e) => ({ mark: e.mark, box: equipmentBox(ctx.document, e) }));
   const tieIns = Object.entries(intent.tieIns);
   const dangling: string[] = [];
   let ends = 0;
@@ -83,10 +61,7 @@ function connectivityCheck(intent: PlantIntent, ctx: GradeContext): CheckOutcome
   }
   return {
     pass: dangling.length === 0,
-    detail:
-      dangling.length === 0
-        ? `${ends} pipe ends, all connected`
-        : `dangling: ${dangling.join('; ')}`,
+    detail: dangling.length === 0 ? `${ends} pipe ends, all connected` : `dangling: ${dangling.join('; ')}`,
   };
 }
 
@@ -131,16 +106,12 @@ function supportsCheck({ document, run }: GradeContext): CheckOutcome {
   const pipes = elementsOf(document, 'pipe').length;
   const failing = rows.filter((r) => !r.ok);
   const problems = failing.map(
-    (r) =>
-      `${r.line ?? r.mark}: ${(r.issues ?? []).join(', ') || `span ${r.largestSpanM} m > ${r.allowedSpanM} m`}`,
+    (r) => `${r.line ?? r.mark}: ${(r.issues ?? []).join(', ') || `span ${r.largestSpanM} m > ${r.allowedSpanM} m`}`,
   );
   if (rows.length !== pipes) problems.push(`${rows.length} pipe rows for ${pipes} pipes`);
   return {
     pass: pipes > 0 && problems.length === 0,
-    detail:
-      problems.length === 0
-        ? `${pipes} lines supported within their standard spans`
-        : problems.join('; '),
+    detail: problems.length === 0 ? `${pipes} lines supported within their standard spans` : problems.join('; '),
   };
 }
 
@@ -149,29 +120,25 @@ export function pipingCriteria(intent: PlantIntent): Criterion[] {
     {
       id: 'process-lines',
       area: 'piping',
-      requirement:
-        'Every process line between its design ends, at its DN outside diameter and routed length.',
+      requirement: 'Every process line between its design ends, at its DN outside diameter and routed length.',
       check: (ctx) => linesCheck(intent, ctx),
     },
     {
       id: 'pipe-connectivity',
       area: 'piping',
-      requirement:
-        'No dangling pipe end: each end inside an equipment or at a battery-limit tie-in.',
+      requirement: 'No dangling pipe end: each end inside an equipment or at a battery-limit tie-in.',
       check: (ctx) => connectivityCheck(intent, ctx),
     },
     {
       id: 'line-list',
       area: 'piping',
-      requirement:
-        'The pipe schedule is a line list: line number, DN, from and to equipment per line.',
+      requirement: 'The pipe schedule is a line list: line number, DN, from and to equipment per line.',
       check: (ctx) => lineListCheck(intent, ctx),
     },
     {
       id: 'pipe-supports',
       area: 'piping',
-      requirement:
-        'Every line is carried by supports on steel (or nozzles) within the MSS SP-69 / ASME B31.1 span for its DN.',
+      requirement: 'Every line is carried by supports on steel (or nozzles) within the MSS SP-69 / ASME B31.1 span for its DN.',
       check: supportsCheck,
     },
   ];

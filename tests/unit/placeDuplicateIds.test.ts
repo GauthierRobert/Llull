@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
+import { expectNoOp } from '../helpers/expectNoOp';
 
 function boxesAtX(xs: number[]): { doc: ReturnType<typeof createEmptyDocument>; ids: string[] } {
   let doc = createEmptyDocument();
@@ -16,30 +17,18 @@ function boxesAtX(xs: number[]): { doc: ReturnType<typeof createEmptyDocument>; 
 describe('align / distribute with repeated target ids', () => {
   it('align reports each moved entity once', () => {
     const { doc, ids } = boxesAtX([0, 7]);
-    const result = execute(doc, 'align', {
-      targetIds: [ids[1]!, ids[1]!],
-      edge: 'center-x',
-      referenceId: ids[0]!,
-    });
+    const result = execute(doc, 'align', { targetIds: [ids[1]!, ids[1]!], edge: 'center-x', referenceId: ids[0]! });
     expect(result.affected).toEqual([ids[1]]);
     expect(result.document.entities[ids[1]!]!.position[0]).toBeCloseTo(0);
   });
-
   it('distribute treats repeated ids as one entity', () => {
     const { doc, ids } = boxesAtX([0, 5, 20]);
-    const result = execute(doc, 'distribute', {
-      targetIds: [ids[0]!, ids[1]!, ids[1]!, ids[2]!],
-      axis: 'x',
-    });
+    const result = execute(doc, 'distribute', { targetIds: [ids[0]!, ids[1]!, ids[1]!, ids[2]!], axis: 'x' });
     expect(result.affected).toEqual([ids[1]]);
     expect(result.document.entities[ids[1]!]!.position[0]).toBeCloseTo(10);
   });
-
   it('distribute with one distinct id is a no-op', () => {
     const { doc, ids } = boxesAtX([0, 5]);
-    const result = execute(doc, 'distribute', { targetIds: [ids[0]!, ids[0]!], axis: 'x' });
-    expect(result.affected).toEqual([]);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('at least 2 distinct');
+    expectNoOp(execute(doc, 'distribute', { targetIds: [ids[0]!, ids[0]!], axis: 'x' }), doc, 'at least 2 distinct');
   });
 });

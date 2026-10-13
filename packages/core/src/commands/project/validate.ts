@@ -1,11 +1,7 @@
 /**
- * `build_project` dry run (`validate: true`): structure, command names, required params, alias
- * refs, `=expr` evaluation and loop expansion, with issues located by path
- * (`step 4 › iter 2 › step 1`). Nothing executes; `set_parameter` actions are tracked so later
- * expressions and loop counts that read them evaluate.
- *
- * @layer core/commands
- * @pure
+ * `build_project` dry run (`validate: true`): structure, command names, required params, alias refs, `=expr` evaluation and loop expansion,
+ * with issues located by path (`step 4 › iter 2 › step 1`). Nothing executes; `set_parameter` actions are tracked so later expressions and
+ * loop counts that read them evaluate.
  */
 
 import type { CadDocument } from '../../model/types';
@@ -14,15 +10,7 @@ import { evaluateExpression, parameterValues } from '../parametric/expression';
 import { getCommand } from '../commandTable';
 import { MAX_LOOP_ITERATIONS } from '../limits';
 import { isLoopNode, resolveLoopHeader } from './loopHeader';
-import {
-  REF,
-  evaluateLeafExpression,
-  fillPlaceholders,
-  interpolate,
-  isForEachStep,
-  isPlanAction,
-  isRepeatStep,
-} from './resolve';
+import { REF, evaluateLeafExpression, fillPlaceholders, interpolate, isForEachStep, isPlanAction, isRepeatStep } from './resolve';
 import { type ActionItem, type LoopNode } from './types';
 import { mapStringLeaves } from '../history/regenerate';
 
@@ -37,11 +25,7 @@ interface Validation {
 }
 
 /** First problem in a step's params: undefined alias, bad placeholder, or failing `=expr`. */
-function findParamIssue(
-  value: unknown,
-  defined: ReadonlySet<string>,
-  env: Record<string, number>,
-): string | null {
+function findParamIssue(value: unknown, defined: ReadonlySet<string>, env: Record<string, number>): string | null {
   let first: string | null = null;
   mapStringLeaves(value, (raw) => {
     if (first !== null) return raw;
@@ -70,12 +54,7 @@ function trackParameter(state: Validation, params: Record<string, unknown>): voi
   if (r.ok) state.parameters[name] = r.value;
 }
 
-function validateAction(
-  state: Validation,
-  label: string,
-  raw: ActionItem,
-  vars: Record<string, number>,
-): void {
+function validateAction(state: Validation, label: string, raw: ActionItem, vars: Record<string, number>): void {
   if (!isPlanAction(raw)) {
     state.issues.push(`${label}: not a valid action (needs a string "command")`);
     return;
@@ -87,8 +66,7 @@ function validateAction(
     return;
   }
   for (const req of def.paramsSchema.required) {
-    if (!(req in params))
-      state.issues.push(`${label} (${raw.command}): missing required param "${req}"`);
+    if (!(req in params)) state.issues.push(`${label} (${raw.command}): missing required param "${req}"`);
   }
   const env = { ...state.parameters, ...vars };
   const issue = findParamIssue(params, state.defined, env);
@@ -96,18 +74,12 @@ function validateAction(
   if (raw.command === 'set_parameter') trackParameter(state, params);
   if (raw.as) {
     const filled = interpolate(raw.as, env);
-    if (filled.error !== null)
-      state.issues.push(`${label} (${raw.command}): alias ${filled.error}`);
+    if (filled.error !== null) state.issues.push(`${label} (${raw.command}): alias ${filled.error}`);
     else state.defined.add(filled.text);
   }
 }
 
-function validateLoop(
-  state: Validation,
-  label: string,
-  node: LoopNode,
-  vars: Record<string, number>,
-): void {
+function validateLoop(state: Validation, label: string, node: LoopNode, vars: Record<string, number>): void {
   const header = resolveLoopHeader(node, { ...state.parameters, ...vars });
   if (header.error !== null) {
     state.issues.push(`${label}: ${header.error}`);
@@ -115,9 +87,7 @@ function validateLoop(
   }
   state.loopIterations += header.values.length;
   if (state.loopIterations > MAX_LOOP_ITERATIONS) {
-    state.issues.push(
-      `${label}: loops expand to more than MAX_LOOP_ITERATIONS (${MAX_LOOP_ITERATIONS}) iterations`,
-    );
+    state.issues.push(`${label}: loops expand to more than MAX_LOOP_ITERATIONS (${MAX_LOOP_ITERATIONS}) iterations`);
     return;
   }
   for (let k = 0; k < header.values.length; k++) {
@@ -137,42 +107,27 @@ function validateItems(
   items.forEach((raw, j) => {
     if (state.issues.length >= MAX_ISSUES) return;
     const label = nested ? `${parent} › step ${j}` : `step ${j}`;
-    if (isLoopNode(raw)) {
-      validateLoop(state, label, raw, vars);
-    } else if (isRepeatStep(raw) || isForEachStep(raw)) {
-      if (nested) {
-        state.issues.push(
-          `${label}: a repeat/for_each with "step" cannot be nested; write { repeat, actions: [...] }`,
-        );
-      } else {
+    if (isLoopNode(raw)) validateLoop(state, label, raw, vars);
+    else if (isRepeatStep(raw) || isForEachStep(raw)) {
+      if (nested) state.issues.push(`${label}: a repeat/for_each with "step" cannot be nested; write { repeat, actions: [...] }`);
+      else {
         // Legacy single-step loops: inner expressions are validated at run time.
         state.defined.add(isRepeatStep(raw) ? (raw.repeat.as ?? '') : raw.for_each.as);
       }
-    } else {
-      validateAction(state, label, raw, vars);
-    }
+    } else validateAction(state, label, raw, vars);
   });
 }
 
 /** Static plan check with no side effects. @pure */
 export function validatePlan(doc: CadDocument, actions: ActionItem[]): CommandResult {
-  const state: Validation = {
-    issues: [],
-    defined: new Set<string>(),
-    parameters: parameterValues(doc.parameters),
-    loopIterations: 0,
-  };
+  const state: Validation = { issues: [], defined: new Set<string>(), parameters: parameterValues(doc.parameters), loopIterations: 0 };
   validateItems(state, actions, '', {}, false);
   const issues =
-    state.issues.length >= MAX_ISSUES
-      ? [...state.issues, `… further issues omitted (stopped at ${MAX_ISSUES})`]
-      : state.issues;
+    state.issues.length >= MAX_ISSUES ? [...state.issues, `… further issues omitted (stopped at ${MAX_ISSUES})`] : state.issues;
   const ok = issues.length === 0;
   return {
     document: doc,
-    summary: ok
-      ? `Plan valid: ${actions.length} step(s) ready.`
-      : `Plan invalid: ${issues.length} issue(s) — ${issues.join('; ')}.`,
+    summary: ok ? `Plan valid: ${actions.length} step(s) ready.` : `Plan invalid: ${issues.length} issue(s) — ${issues.join('; ')}.`,
     affected: [],
     data: { ok, validated: true, stepCount: actions.length, steps: [], failedAt: null, issues },
   };

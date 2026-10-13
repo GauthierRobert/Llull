@@ -1,5 +1,4 @@
 /**
- * @layer server
  * Per-step progress, timing and the whole-run deadline of a local `build_project` run, fed by the
  * registry's `ExecutionContext.onStep` (core stays clock- and I/O-free; this is the observer).
  */
@@ -56,12 +55,7 @@ export function createStepObserver(options: StepObserverOptions): StepObserver {
 
   const onStart = (event: PlanStepEvent): void => {
     if (deadline !== undefined && timeoutSeconds !== undefined && now() > deadline) {
-      stopped = {
-        seconds: timeoutSeconds,
-        ordinal: event.ordinal,
-        total: event.total,
-        command: event.command,
-      };
+      stopped = { seconds: timeoutSeconds, ordinal: event.ordinal, total: event.total, command: event.command };
       const abort = new Error(`--timeout ${timeoutSeconds}s exceeded before step ${event.ordinal}`);
       abort.stack = abort.message; // the registry logs a thrown error's stack: keep that to one line
       throw abort;
@@ -76,10 +70,8 @@ export function createStepObserver(options: StepObserverOptions): StepObserver {
     const elapsed = now() - (startedAt.get(event.ordinal) ?? now());
     if (event.stepPosition !== undefined) durations.set(event.stepPosition, elapsed);
     const label = `[${event.ordinal}/${event.total}] ${event.command}`;
-    if (progress)
-      print(`${label} … ${formatDuration(elapsed)}${event.ok === false ? ' FAILED' : ''}`);
-    if (elapsed >= slowMs)
-      print(`llull: warning: slow step ${label} took ${formatDuration(elapsed)}`);
+    if (progress) print(`${label} … ${formatDuration(elapsed)}${event.ok === false ? ' FAILED' : ''}`);
+    if (elapsed >= slowMs) print(`llull: warning: slow step ${label} took ${formatDuration(elapsed)}`);
   };
 
   return {

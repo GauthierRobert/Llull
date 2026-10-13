@@ -1,10 +1,5 @@
-/**
- * @layer ui/viewport/2d
- *
- * Edge geometry of a solid's drawing primitives — what the user sees as outline: visible, hidden
- * and cut edges (centre lines overshoot the part and are not edges). Pure helpers shared by
- * picking, box selection and snapping.
- */
+// Pure outline edges (visible / hidden / cut; centre lines are not edges) of a solid's drawing, for picking, box
+// selection and snapping.
 
 import { chainSegments, type SegmentChain } from '@core/geometry/planeEdges';
 import type { Segment2 } from '@core/geometry/viewProjection';
@@ -14,8 +9,7 @@ import { projectOntoSegment } from '@lib/polygon';
 
 type EdgeStyle = 'visible' | 'hidden' | 'cut';
 
-const isEdgeStyle = (style: string): style is EdgeStyle =>
-  style === 'visible' || style === 'hidden' || style === 'cut';
+const isEdgeStyle = (style: string): style is EdgeStyle => style === 'visible' || style === 'hidden' || style === 'cut';
 
 function pushPath(into: Segment2[], points: ReadonlyArray<Vec2>, closed: boolean): void {
   for (let i = 0; i + 1 < points.length; i++) into.push([points[i] as Vec2, points[i + 1] as Vec2]);
@@ -24,11 +18,8 @@ function pushPath(into: Segment2[], points: ReadonlyArray<Vec2>, closed: boolean
   if (closed && first && last) into.push([last, first]);
 }
 
-/** Edge segments of `primitives` grouped by line style; arcs / circles are not emitted by the technical view. @pure */
-function segmentsByStyle(
-  primitives: ReadonlyArray<DrawingPrimitive>,
-  tolerance: number,
-): Map<EdgeStyle, Segment2[]> {
+/** Grouped by line style (the technical view emits no arcs / circles). @pure */
+function segmentsByStyle(primitives: ReadonlyArray<DrawingPrimitive>, tolerance: number): Map<EdgeStyle, Segment2[]> {
   const byStyle = new Map<EdgeStyle, Segment2[]>();
   for (const primitive of primitives) {
     if (!isEdgeStyle(primitive.style)) continue;
@@ -48,13 +39,12 @@ function segmentsByStyle(
   return byStyle;
 }
 
-/** Every visible / hidden / cut edge segment of the drawing. @pure */
 export function drawingSegments(primitives: ReadonlyArray<DrawingPrimitive>): Segment2[] {
   const byStyle = segmentsByStyle(primitives, drawingTolerance(primitives));
   return [...byStyle.values()].flat();
 }
 
-/** Squared distance from `point` to the nearest of `segments` (Infinity when none). @pure */
+/** Infinity when none. @pure */
 export function segmentsDistSq(segments: ReadonlyArray<Segment2>, point: Vec2): number {
   let best = Infinity;
   for (const [a, b] of segments) {
@@ -63,13 +53,8 @@ export function segmentsDistSq(segments: ReadonlyArray<Segment2>, point: Vec2): 
   return best;
 }
 
-/**
- * Chains of same-style edge segments, joined where exactly two segments meet; a vertex shared by
- * three or more (a T-junction) ends the chains. A closed chain does not repeat its first point. @pure
- */
+/** Same-style chains joined where exactly two segments meet (a T-junction ends them); closed chains do not repeat the first point. @pure */
 export function drawingChains(primitives: ReadonlyArray<DrawingPrimitive>): SegmentChain<Vec2>[] {
   const tolerance = drawingTolerance(primitives);
-  return [...segmentsByStyle(primitives, tolerance).values()].flatMap((segments) =>
-    chainSegments(segments, tolerance, true),
-  );
+  return [...segmentsByStyle(primitives, tolerance).values()].flatMap((segments) => chainSegments(segments, tolerance, true));
 }

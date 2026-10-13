@@ -1,38 +1,29 @@
-/**
- * @layer ui/viewport/3d
- *
- * Shadow-casting key light placement that follows the scene. The original rig was fixed at
- * +-30 units around the origin, so models far larger or farther away (mm-scale buildings) cast no
- * shadows. The rig scales with the scene radius and aims at the scene centre in RENDER space
- * (world - renderOrigin), the space the light lives in.
- */
+// Shadow key light following the scene: scales with its radius (a fixed ±30 rig left mm-scale buildings unshadowed) and
+// aims at its centre in RENDER space.
 
 import { type Bounds, boundsCenter, boundsDiagonalRadius } from '@core/geometry/bounds';
 import type { Vec3 } from '@core/model/types';
 import { toRenderPosition } from './floatingOrigin';
 
-/** Half-size of the shadow frustum used for scenes smaller than this (the original fixed rig). */
+/** Frustum half-size floor (the original fixed rig). */
 export const MIN_SHADOW_HALF_EXTENT = 30;
-/** Key light offset from its target at the minimum extent (front-right, high angle). */
+/** Front-right, high angle, at the minimum extent. */
 const BASE_LIGHT_OFFSET: Vec3 = [8, -6, 14];
 const BASE_NEAR = 0.5;
 const BASE_FAR = 200;
-/** Frustum padding over the scene's bounding sphere. */
+/** Over the bounding sphere. */
 const PADDING = 1.2;
 
 export interface KeyLightRig {
   readonly target: Vec3;
   readonly position: Vec3;
-  /** Orthographic shadow camera half-size (left/right/top/bottom = +-halfExtent). */
+  /** Ortho shadow camera ±halfExtent. */
   readonly halfExtent: number;
   readonly near: number;
   readonly far: number;
 }
 
-/**
- * @pure
- * @invariant bounds null (empty scene) -> the original fixed rig at the origin
- */
+/** @invariant bounds null (empty scene) -> the original fixed rig at the origin */
 export function computeKeyLightRig(bounds: Bounds | null, renderOrigin: Vec3): KeyLightRig {
   const centre: Vec3 = bounds ? toRenderPosition(boundsCenter(bounds), renderOrigin) : [0, 0, 0];
   const radius = bounds ? boundsDiagonalRadius(bounds) : 0;

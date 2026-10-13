@@ -1,18 +1,9 @@
-/**
- * Civil model access: id minting, object insert / remove, typed lookups and `affected` lists.
- * @layer domain-aec/civil
- * @pure
- */
+/** Civil model access: id minting, object insert / remove, typed lookups and `affected` lists. */
 
 import type { CadDocument, DocumentUnit } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { noop } from '@core/commands/noop';
-import {
-  type CivilCategory,
-  type CivilModel,
-  type CivilObject,
-  createEmptyCivil,
-} from '@core/model/civil';
+import { type CivilCategory, type CivilModel, type CivilObject, createEmptyCivil } from '@core/model/civil';
 import { fromMm, toMetres } from '@core/model/units';
 import { dependentsOf } from './integrity';
 import { MM_PER_UNIT } from '@core/model/units';
@@ -60,9 +51,7 @@ export function civilObject<C extends CivilCategory>(
   category: C,
 ): Extract<CivilObject, { category: C }> | undefined {
   const object = civil.objects[id];
-  return object?.category === category
-    ? (object as Extract<CivilObject, { category: C }>)
-    : undefined;
+  return object?.category === category ? (object as Extract<CivilObject, { category: C }>) : undefined;
 }
 
 /** The object `id` of `category`, or the no-op result `<tool> failed: no <category> <id>.` */
@@ -72,26 +61,19 @@ export function civilObjectOrNoop<C extends CivilCategory>(
   category: C,
   tool: string,
 ): Extract<CivilObject, { category: C }> | CommandResult {
-  return (
-    civilObject(getCivil(doc), id, category) ?? noop(doc, `${tool} failed: no ${category} ${id}.`)
-  );
+  return civilObject(getCivil(doc), id, category) ?? noop(doc, `${tool} failed: no ${category} ${id}.`);
 }
 
 /** Objects of one category in creation order. */
-export function civilObjectsOf<C extends CivilCategory>(
-  civil: CivilModel,
-  category: C,
-): Array<Extract<CivilObject, { category: C }>> {
+export function civilObjectsOf<C extends CivilCategory>(civil: CivilModel, category: C): Array<Extract<CivilObject, { category: C }>> {
   return civil.order
     .map((id) => civil.objects[id])
-    .filter((object): object is Extract<CivilObject, { category: C }> => {
-      return object?.category === category;
-    });
+    .filter((object): object is Extract<CivilObject, { category: C }> => object?.category === category);
 }
 
 /**
- * Object ids first (replay / build_project aliases re-link references), then the entities of those
- * objects and of every object regenerated because it depends on them.
+ * Object ids first (replay / build_project aliases re-link references), then the entities of those objects and of every object regenerated
+ * because it depends on them.
  */
 export function civilAffected(document: CadDocument, objectIds: ReadonlyArray<string>): string[] {
   const civil = document.civil;
@@ -122,11 +104,7 @@ export function stationText(doc: Pick<CadDocument, 'units'>, station: number): s
 }
 
 /** Converts a length given in `unit` into the document's units. */
-export function fromUnit(
-  doc: Pick<CadDocument, 'units'>,
-  value: number,
-  unit: DocumentUnit,
-): number {
+export function fromUnit(doc: Pick<CadDocument, 'units'>, value: number, unit: DocumentUnit): number {
   return fromMm(doc, value * MM_PER_UNIT[unit]);
 }
 

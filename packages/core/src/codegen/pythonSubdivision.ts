@@ -1,12 +1,9 @@
 /**
- * Subdivision solids in generated Python: a library-free port of the core Catmull-Clark refinement
- * (geometry/subdivision.ts) and Bézier patch conversion (geometry/subdivisionPatches.ts), plus the
- * OCP builder that turns the patches into exact B-spline faces sewn into a solid (CadQuery and
- * build123d both run on OCP). The FreeCAD macro reuses the pure part with Part.BSplineSurface.
- *
- * @layer core/codegen
- * @invariant SUBDIVISION_PY mirrors the TypeScript rules (edge order, crease / corner rules, patch
- *   pole layout) so code and document describe the same surface
+ * Subdivision solids in generated Python: a library-free port of the core Catmull-Clark refinement (geometry/subdivision.ts) and Bézier
+ * patch conversion (geometry/subdivisionPatches.ts), plus the OCP builder that turns the patches into exact B-spline faces sewn into a
+ * solid (CadQuery and build123d both run on OCP). The FreeCAD macro reuses the pure part with Part.BSplineSurface.
+ * @invariant SUBDIVISION_PY mirrors the TypeScript rules (edge order, crease / corner rules, patch pole layout) so code and document
+ *   describe the same surface
  */
 
 /** Pure Python: `_subdivision_patches(vertices, faces, creases)` → 16-pole patches (local frame). */

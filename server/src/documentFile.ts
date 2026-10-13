@@ -1,5 +1,4 @@
 /**
- * @layer server
  * The `.llull` document file: the one reader and writer (CLI local backend, autosave, desktop).
  * Format = `serializeDocument` / `deserializeDocument`.
  */

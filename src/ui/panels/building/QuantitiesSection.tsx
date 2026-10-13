@@ -1,10 +1,5 @@
-/**
- * @layer ui/panels/building
- *
- * QuantitiesSection — live bill of quantities + cost estimate (read-only `quantity_takeoff` /
- * `estimate_cost`, run locally), CSV downloads of the takeoff and schedules, and a unit-rate form
- * that dispatches `set_cost_rates`.
- */
+// Live bill of quantities + cost estimate (local read-only quantity_takeoff / estimate_cost), CSV downloads, and the
+// unit-rate form (set_cost_rates).
 
 import React, { useMemo, useState } from 'react';
 import { useStore } from '@ui/store';
@@ -16,13 +11,7 @@ import { capitalize } from '@ui/panels/capitalize';
 import { isEstimateData } from '@ui/resultData';
 import { parseNumber } from '@ui/numberText';
 
-const UNIT_LABEL: Readonly<Record<string, string>> = {
-  m: 'm',
-  m2: 'm²',
-  m3: 'm³',
-  ea: 'ea',
-  kg: 'kg',
-};
+const UNIT_LABEL: Readonly<Record<string, string>> = { m: 'm', m2: 'm²', m3: 'm³', ea: 'ea', kg: 'kg' };
 const SCHEDULES = [
   'wall',
   'door',
@@ -81,14 +70,13 @@ function RateForm({ lines }: { lines: ReadonlyArray<CostLine> }): React.ReactEle
   );
 }
 
-/** Mounted only while the section is open: the cost estimate is not computed when collapsed. */
+/** Mounted only while open: no estimate computed when collapsed. */
 function EstimateTable(): React.ReactElement {
-  // The takeoff reads only the building model and the document units: re-run on those alone.
   const building = useStore((s) => s.document.building);
   const units = useStore((s) => s.document.units);
   const estimateResult = useMemo(
     () => runQuery('estimate_cost'),
-    // building + units are the only document slices the takeoff reads.
+    // The takeoff reads only building + units.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [building, units],
   );
@@ -120,9 +108,7 @@ function EstimateTable(): React.ReactElement {
                   <td className="building-table__number">
                     {line.quantity} {UNIT_LABEL[line.unit] ?? line.unit}
                   </td>
-                  <td className="building-table__number">
-                    {line.amount === null ? '—' : line.amount.toFixed(2)}
-                  </td>
+                  <td className="building-table__number">{line.amount === null ? '—' : line.amount.toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
@@ -148,18 +134,13 @@ export function QuantitiesSection(): React.ReactElement {
   const [schedule, setSchedule] = useState<(typeof SCHEDULES)[number]>('wall');
   const [status, setStatus] = useState('');
 
-  const downloadCsv = (
-    command: string,
-    params: Record<string, unknown>,
-    fileName: string,
-  ): void => {
+  const downloadCsv = (command: string, params: Record<string, unknown>, fileName: string): void => {
     const { summary, downloaded } = downloadCsvQuery(command, params, fileName);
     if (!downloaded) setStatus(summary);
   };
   const downloadTakeoff = (): void => downloadCsv('quantity_takeoff', {}, 'quantity-takeoff.csv');
   const downloadEstimate = (): void => downloadCsv('estimate_cost', {}, 'cost-estimate.csv');
-  const downloadSchedule = (): void =>
-    downloadCsv('building_schedule', { kind: schedule }, `${schedule}-schedule.csv`);
+  const downloadSchedule = (): void => downloadCsv('building_schedule', { kind: schedule }, `${schedule}-schedule.csv`);
 
   return (
     <PanelSection

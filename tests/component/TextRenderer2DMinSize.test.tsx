@@ -1,4 +1,3 @@
-/** TextRenderer2D keeps annotation text readable when zoomed out (min on-screen size hook). */
 import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import type { TextEntity } from '@core/model/types';

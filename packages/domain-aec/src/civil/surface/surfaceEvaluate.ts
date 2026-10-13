@@ -1,9 +1,4 @@
-/**
- * Evaluates survey point groups (point markers) and surfaces (TIN mesh, minor / major contours and
- * major-contour elevation labels).
- * @layer domain-aec/civil
- * @pure
- */
+/** Evaluates survey point groups (point markers) and surfaces (TIN mesh, minor / major contours and major-contour elevation labels). */
 
 import type { Entity, Vec2 } from '@core/model/types';
 import type { PointGroupObject, SurfaceObject } from '@core/model/civil';
@@ -21,9 +16,7 @@ export const MAX_CONTOUR_LINES = 3000;
 
 export function evaluatePointGroup(_context: CivilContext, group: PointGroupObject): Entity[] {
   if (group.points.length > MAX_DRAWN_POINTS) return [];
-  return group.points.map((point, index) =>
-    civilPoint(group, `p${index}`, `${group.name} ${point.number}`, 'points', point.position),
-  );
+  return group.points.map((point, index) => civilPoint(group, `p${index}`, `${group.name} ${point.number}`, 'points', point.position));
 }
 
 function elevationLabel(doc: CivilContext['doc'], elevation: number): string {
@@ -46,17 +39,13 @@ export function drawnInterval(tin: Tin, interval: number): number {
   const bounds = tinBounds(tin);
   if (bounds === null) return interval;
   const levels = (bounds.max[2] - bounds.min[2]) / interval;
-  return levels <= MAX_CONTOUR_LEVELS
-    ? interval
-    : interval * Math.ceil(levels / MAX_CONTOUR_LEVELS);
+  return levels <= MAX_CONTOUR_LEVELS ? interval : interval * Math.ceil(levels / MAX_CONTOUR_LEVELS);
 }
 
 export function evaluateSurface(context: CivilContext, surface: SurfaceObject): Entity[] {
   const tin = surfaceTin(context.civil, surface);
   if (tin.triangles.length === 0) return [];
-  const entities: Entity[] = [
-    civilMesh(surface, 'tin', `${surface.name} TIN`, 'tin', tinMesh(tin)),
-  ];
+  const entities: Entity[] = [civilMesh(surface, 'tin', `${surface.name} TIN`, 'tin', tinMesh(tin))];
   const height = labelHeight(context.doc);
   let lines = 0;
   const interval = drawnInterval(tin, surface.contourInterval);
@@ -72,21 +61,11 @@ export function evaluateSurface(context: CivilContext, surface: SurfaceObject): 
       const points = closed ? line.slice(0, -1) : line;
       const part = `c${index}_${k}`;
       const label = `${surface.name} contour ${elevationLabel(context.doc, level)}`;
-      entities.push(
-        civilPolyline(surface, part, label, major ? 'major' : 'minor', points, closed, level),
-      );
+      entities.push(civilPolyline(surface, part, label, major ? 'major' : 'minor', points, closed, level));
       if (major && line.length >= 4) {
         const { at, angle } = midpoint(line);
         entities.push(
-          civilText(
-            surface,
-            `${part}_label`,
-            elevationLabel(context.doc, level),
-            'major',
-            [at[0], at[1], level],
-            height,
-            angle,
-          ),
+          civilText(surface, `${part}_label`, elevationLabel(context.doc, level), 'major', [at[0], at[1], level], height, angle),
         );
       }
     });

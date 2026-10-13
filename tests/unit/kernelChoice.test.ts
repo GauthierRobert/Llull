@@ -8,6 +8,7 @@ import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
 import { type IdSource } from '@lib/id';
 import { fakeKernel } from '../helpers/fakeKernel';
+import { expectNoOp } from '../helpers/expectNoOp';
 
 describe('parseKernelChoice', () => {
   it.each([
@@ -38,32 +39,20 @@ function makeContext(kernel: GeometryKernel): ExecutionContext {
 
 describe('kernel parity across callers', () => {
   it('the same fillet_edge call yields the same entity for UI-style and server-style contexts', () => {
-    const base = execute(
-      createEmptyDocument(),
-      'add_box',
-      { size: [2, 2, 2] },
-      makeContext(makeKernel()),
-    );
+    const base = execute(createEmptyDocument(), 'add_box', { size: [2, 2, 2] }, makeContext(makeKernel()));
     const boxId = base.affected[0]!;
     const params = { id: boxId, radius: 0.2 };
-
     const fromUi = execute(base.document, 'fillet_edge', params, makeContext(makeKernel()));
     const fromServer = execute(base.document, 'fillet_edge', params, makeContext(makeKernel()));
-
     expect(fromUi.affected).toHaveLength(1);
     expect(fromServer.document).toEqual(fromUi.document);
     expect(fromServer.summary).toBe(fromUi.summary);
   });
-
   it('a context without a kernel is a graceful no-op', () => {
     const base = execute(createEmptyDocument(), 'add_box', { size: [2, 2, 2] });
-    const result = execute(
+    expectNoOp(
+      execute(base.document, 'fillet_edge', { id: base.affected[0]!, radius: 0.2 }, { ...makeContext(makeKernel()), kernel: null }),
       base.document,
-      'fillet_edge',
-      { id: base.affected[0]!, radius: 0.2 },
-      { ...makeContext(makeKernel()), kernel: null },
     );
-    expect(result.affected).toEqual([]);
-    expect(result.document).toBe(base.document);
   });
 });

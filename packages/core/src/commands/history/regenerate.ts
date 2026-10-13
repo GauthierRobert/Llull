@@ -1,10 +1,6 @@
 /**
- * Parameter-expression resolution and id remapping for the regeneration pass: string params
- * starting with `=` are expressions resolved against `doc.parameters`; a failing one keeps its
- * `=expr` text and is reported in `ResolveResult.errors` (never throws).
- *
- * @layer core/commands
- * @pure
+ * Parameter-expression resolution and id remapping for the regeneration pass: string params starting with `=` are expressions resolved
+ * against `doc.parameters`; a failing one keeps its `=expr` text and is reported in `ResolveResult.errors` (never throws).
  */
 
 import type { Parameter } from '../../model/types';
@@ -25,9 +21,7 @@ interface ResolveResult {
 }
 
 /** Parameter name → value, skipping parameters in error (stale values). @pure */
-export function buildParamEnv(
-  parameters: Readonly<Record<string, Parameter>>,
-): Readonly<Record<string, number>> {
+export function buildParamEnv(parameters: Readonly<Record<string, Parameter>>): Readonly<Record<string, number>> {
   return Object.fromEntries(
     Object.entries(parameters)
       .filter(([, param]) => !param.error)
@@ -36,28 +30,16 @@ export function buildParamEnv(
 }
 
 /**
- * Rebuild `value` with every STRING leaf replaced by `mapLeaf(text, path)`; arrays and plain
- * objects are walked recursively, other primitives pass through. `path` is `size[0]` / `a.b` style.
- *
- * @pure
+ * Rebuild `value` with every STRING leaf replaced by `mapLeaf(text, path)`; arrays and plain objects are walked recursively, other
+ * primitives pass through. `path` is `size[0]` / `a.b` style.
  * @invariant `value` is never mutated; new objects/arrays are always returned.
  */
-export function mapStringLeaves(
-  value: unknown,
-  mapLeaf: (text: string, path: string) => unknown,
-  path = '',
-): unknown {
+export function mapStringLeaves(value: unknown, mapLeaf: (text: string, path: string) => unknown, path = ''): unknown {
   if (typeof value === 'string') return mapLeaf(value, path);
-  if (Array.isArray(value)) {
-    return value.map((item, i) =>
-      mapStringLeaves(item, mapLeaf, path ? `${path}[${i}]` : `[${i}]`),
-    );
-  }
+  if (Array.isArray(value)) return value.map((item, i) => mapStringLeaves(item, mapLeaf, path ? `${path}[${i}]` : `[${i}]`));
   if (value !== null && typeof value === 'object') {
     const result: Record<string, unknown> = {};
-    for (const [key, val] of Object.entries(value)) {
-      result[key] = mapStringLeaves(val, mapLeaf, path ? `${path}.${key}` : key);
-    }
+    for (const [key, val] of Object.entries(value)) result[key] = mapStringLeaves(val, mapLeaf, path ? `${path}.${key}` : key);
     return result;
   }
   return value;
@@ -74,10 +56,7 @@ export function stringLeaves(value: unknown): string[] {
 }
 
 /** Resolve `=expr` strings in a step's params against `env`; `params` is not mutated. @pure */
-export function resolveStepParams(
-  params: unknown,
-  env: Readonly<Record<string, number>>,
-): ResolveResult {
+export function resolveStepParams(params: unknown, env: Readonly<Record<string, number>>): ResolveResult {
   const errors: ResolveError[] = [];
   const resolved = mapStringLeaves(params, (text, path) => {
     if (!text.startsWith('=')) return text;
@@ -92,7 +71,6 @@ export function resolveStepParams(
 /**
  * Replace every string in `params` that is a key of `idMap` with its mapped id (stale entity-id
  * references after earlier steps minted new ids). Blind walk: no per-command id-param allowlist.
- * @pure
  */
 export function remapIds(params: unknown, idMap: ReadonlyMap<string, string>): unknown {
   if (idMap.size === 0) return params;
@@ -100,11 +78,7 @@ export function remapIds(params: unknown, idMap: ReadonlyMap<string, string>): u
 }
 
 /** Record `recorded[i] -> replayed[i]` in `idMap` wherever they differ (common prefix only). */
-export function extendIdMap(
-  idMap: Map<string, string>,
-  recorded: readonly string[] | undefined,
-  replayed: readonly string[],
-): void {
+export function extendIdMap(idMap: Map<string, string>, recorded: readonly string[] | undefined, replayed: readonly string[]): void {
   if (!recorded) return;
   const len = Math.min(recorded.length, replayed.length);
   for (let i = 0; i < len; i++) {

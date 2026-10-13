@@ -1,10 +1,8 @@
 /**
- * @layer server
  * The exchange tools (export_step, import_step, import_dwg, import_code) are written against the
  * MCP layer and return MCP-shaped results. REST (`POST /exchange`) and the CLI want the command
  * bus shape `{ summary, affected, isError, data }`; this recovers it from `structuredContent`,
  * which carries the full data and every affected id.
- * @pure
  */
 
 import type { McpShapedResult } from '@mcp/dispatch';
@@ -31,9 +29,7 @@ export function unshapeExchangeResult(shaped: McpShapedResult): ExchangeCommandR
   const affected = fromStructure ?? fromText ?? [];
   let data: unknown;
   if (structured !== undefined) {
-    const rest = Object.fromEntries(
-      Object.entries(structured).filter(([key]) => key !== 'affected'),
-    );
+    const rest = Object.fromEntries(Object.entries(structured).filter(([key]) => key !== 'affected'));
     data = 'data' in rest && Object.keys(rest).length === 1 ? rest['data'] : rest;
   }
   return {

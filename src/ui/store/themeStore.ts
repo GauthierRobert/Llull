@@ -1,15 +1,4 @@
-/**
- * @layer ui/store
- *
- * Theme store — tracks the active color theme ('dark' | 'light').
- *
- * Persists the user's choice to localStorage so the preference survives
- * page reloads. Until the user picks one, the theme follows the OS
- * (`prefers-color-scheme`), live. The theme is applied as a `data-theme` attribute on
- * `<html>` — all other components rely only on CSS variables.
- *
- * This is UI-only state (presentation), intentionally NOT part of CadDocument.
- */
+// Color theme ('dark' | 'light') as `data-theme` on <html>; persisted once chosen, else follows the OS live. UI-only.
 
 import { create } from 'zustand';
 
@@ -30,9 +19,7 @@ function readStoredTheme(): Theme | null {
 }
 
 function lightMediaQuery(): MediaQueryList | null {
-  return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-    ? window.matchMedia(LIGHT_QUERY)
-    : null;
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia(LIGHT_QUERY) : null;
 }
 
 function systemTheme(): Theme {
@@ -48,11 +35,8 @@ function persistTheme(theme: Theme): void {
 }
 
 interface ThemeStoreState {
-  /** Active color theme. */
   theme: Theme;
-  /** Toggle between 'dark' and 'light'. */
   toggleTheme(): void;
-  /** Explicitly set the theme. */
   setTheme(theme: Theme): void;
 }
 

@@ -7,16 +7,8 @@
         "id": "#1",
         "kind": "instance",
         "componentId": "#2",
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
+        "position": [0,0,0],
+        "rotation": [0,0,0],
         "layerId": "#3",
         "color": "#c8553d"
       },
@@ -24,21 +16,9 @@
         "id": "#4",
         "kind": "instance",
         "componentId": "#2",
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
-        "scale": [
-          1,
-          1,
-          1
-        ],
+        "position": [0,0,0],
+        "rotation": [0,0,0],
+        "scale": [1,1,1],
         "layerId": "#3",
         "color": "#c8553d"
       },
@@ -46,21 +26,9 @@
         "id": "#5",
         "kind": "instance",
         "componentId": "#2",
-        "position": [
-          3,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
-        "scale": [
-          1,
-          1,
-          1
-        ],
+        "position": [3,0,0],
+        "rotation": [0,0,0],
+        "scale": [1,1,1],
         "layerId": "#3",
         "color": "#c8553d"
       }
@@ -101,94 +69,44 @@
       {
         "id": "#6",
         "name": "add_box",
-        "params": {
-          "size": [
-            1,
-            1,
-            1
-          ]
-        },
+        "params": {"size":[1,1,1]},
         "suppressed": false,
-        "affected": [
-          "#7"
-        ]
+        "affected": ["#7"]
       },
       {
         "id": "#8",
         "name": "create_component",
-        "params": {
-          "name": "Cube",
-          "entityIds": [
-            "#7"
-          ],
-          "componentId": "#2"
-        },
+        "params": {"name":"Cube","entityIds":["#7"],"componentId":"#2"},
         "suppressed": false,
-        "affected": [
-          "#1"
-        ]
+        "affected": ["#1"]
       },
       {
         "id": "#9",
         "name": "insert_instance",
-        "params": {
-          "componentId": "#2",
-          "position": [
-            0,
-            0,
-            0
-          ]
-        },
+        "params": {"componentId":"#2","position":[0,0,0]},
         "suppressed": false,
-        "affected": [
-          "#4"
-        ]
+        "affected": ["#4"]
       },
       {
         "id": "#10",
         "name": "insert_instance",
-        "params": {
-          "componentId": "#2",
-          "position": [
-            3,
-            0,
-            0
-          ]
-        },
+        "params": {"componentId":"#2","position":[3,0,0]},
         "suppressed": false,
-        "affected": [
-          "#5"
-        ]
+        "affected": ["#5"]
       },
       {
         "id": "#11",
         "name": "add_joint",
-        "params": {
-          "kind": "revolute",
-          "a": {
-            "instanceId": "#4"
-          },
-          "b": {
-            "instanceId": "#5"
-          },
-          "axis": "z"
-        },
+        "params": {"kind":"revolute","a":{"instanceId":"#4"},"b":{"instanceId":"#5"},"axis":"z"},
         "suppressed": false,
-        "affected": [
-          "#12"
-        ]
+        "affected": ["#12"]
       },
       {
         "id": "#13",
         "name": "set_joint_value",
-        "params": {
-          "id": "#12",
-          "value": 0.5
-        },
+        "params": {"id":"#12","value":0.5},
         "suppressed": false,
-        "affected": [
-          "#12"
-        ]
+        "affected": ["#12"]
       }
     ],
     "configurations": {},
@@ -198,32 +116,8 @@
       "#2": {
         "id": "#2",
         "name": "Cube",
-        "entities": {
-          "#7": {
-            "id": "#7",
-            "kind": "box",
-            "size": [
-              1,
-              1,
-              1
-            ],
-            "position": [
-              0,
-              0,
-              0
-            ],
-            "rotation": [
-              0,
-              0,
-              0
-            ],
-            "layerId": "#3",
-            "color": "#6b8f9c"
-          }
-        },
-        "order": [
-          "#7"
-        ]
+        "entities": {"#7":{"id":"#7","kind":"box","size":[1,1,1],"position":[0,0,0],"rotation":[0,0,0],"layerId":"#3","color":"#6b8f9c"}},
+        "order": ["#7"]
       }
     },
     "constraints": {},
@@ -232,12 +126,8 @@
       "#12": {
         "id": "#12",
         "kind": "revolute",
-        "a": {
-          "instanceId": "#4"
-        },
-        "b": {
-          "instanceId": "#5"
-        },
+        "a": {"instanceId":"#4"},
+        "b": {"instanceId":"#5"},
         "axis": "z",
         "angle": 0.5
       }

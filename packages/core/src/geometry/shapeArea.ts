@@ -1,16 +1,11 @@
-/**
- * Area enclosed by a closed 2D shape.
- *
- * @layer geometry
- * @pure
- */
+/** Area enclosed by a closed 2D shape. */
 
 import type { Entity } from '../model/types';
 import { polygonArea } from '../lib/polygon';
 
 /**
- * Enclosed area of a rectangle, circle, ellipse or closed polyline (>= 3 points), in the shape's
- * local plane; null for every other entity (open or degenerate polylines included).
+ * Enclosed area of a rectangle, circle, ellipse or closed polyline (>= 3 points), in the shape's local plane; null for every other entity
+ * (open or degenerate polylines included).
  */
 export function closedShapeArea(entity: Entity): number | null {
   switch (entity.kind) {

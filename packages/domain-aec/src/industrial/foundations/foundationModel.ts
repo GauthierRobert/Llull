@@ -47,10 +47,7 @@ export interface PadSettlement {
 
 export type Factors = Partial<Record<LoadCase, number>>;
 
-export interface Combination {
-  readonly name: string;
-  readonly factors: Factors;
-}
+export type Combination = { readonly name: string; readonly factors: Factors };
 
 /** Loads and soil parameters shared by every footing check row of one column. */
 export interface FootingCheckContext {

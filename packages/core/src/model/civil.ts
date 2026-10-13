@@ -1,21 +1,11 @@
 /**
- * Civil / site-engineering model (survey, terrain, earthworks, roads, drainage): the constructive
- * definition the civil plugin evaluates into ordinary entities. Lengths and elevations are in
- * document units; slopes are ratios (horizontal per 1 vertical for side slopes).
- *
- * @layer core/model
+ * Civil / site-engineering model (survey, terrain, earthworks, roads, drainage): the constructive definition the civil plugin evaluates
+ * into ordinary entities. Lengths and elevations are in document units; slopes are ratios (horizontal per 1 vertical for side slopes).
  */
 
 import type { Vec2, Vec3 } from './vectors';
 
-export const CIVIL_CATEGORIES = [
-  'pointGroup',
-  'surface',
-  'platform',
-  'alignment',
-  'manhole',
-  'pipe',
-] as const;
+export const CIVIL_CATEGORIES = ['pointGroup', 'surface', 'platform', 'alignment', 'manhole', 'pipe'] as const;
 
 export type CivilCategory = (typeof CIVIL_CATEGORIES)[number];
 
@@ -99,8 +89,7 @@ export interface AlignmentObject extends CivilObjectBase {
   /** Circular curve radius per interior PI (0 = no curve). Length = points.length - 2. */
   readonly radii: readonly number[];
   /**
-   * Clothoid transition length on each side of the circular curve per interior PI (0 = none).
-   * Same length as `radii`; absent = no spirals.
+   * Clothoid transition length on each side of the circular curve per interior PI (0 = none). Same length as `radii`; absent = no spirals.
    */
   readonly spirals?: readonly number[];
   readonly startStation: number;
@@ -155,13 +144,7 @@ export interface PipeObject extends CivilObjectBase {
   readonly invertTo: number;
 }
 
-export type CivilObject =
-  | PointGroupObject
-  | SurfaceObject
-  | PlatformObject
-  | AlignmentObject
-  | ManholeObject
-  | PipeObject;
+export type CivilObject = PointGroupObject | SurfaceObject | PlatformObject | AlignmentObject | ManholeObject | PipeObject;
 
 /** 2D similarity (Helmert) between local site coordinates and the projected grid. */
 export interface SiteCalibration {

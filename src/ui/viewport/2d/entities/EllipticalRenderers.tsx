@@ -1,5 +1,3 @@
-/** @layer ui/viewport/2d — render branches for `kind:'circle' | 'arc' | 'ellipse'`. */
-
 import type { ArcEntity, CircleEntity, EllipseEntity } from '@core/model/types';
 import { EllipticalCurve } from './EllipticalCurve';
 
@@ -20,15 +18,7 @@ export function ArcRenderer({
   selected,
 }: Branch<ArcEntity>): React.ReactElement {
   const shared = { center, position, rotation, color, selected };
-  return (
-    <EllipticalCurve
-      {...shared}
-      startAngle={startAngle}
-      endAngle={endAngle}
-      radiusX={radius}
-      radiusY={radius}
-    />
-  );
+  return <EllipticalCurve {...shared} startAngle={startAngle} endAngle={endAngle} radiusX={radius} radiusY={radius} />;
 }
 
 export function EllipseRenderer({

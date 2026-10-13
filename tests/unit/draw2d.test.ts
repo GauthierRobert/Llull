@@ -1,522 +1,106 @@
 import { describe, it, expect } from 'vitest';
-import { expectPure } from '../helpers/expectNoOp';
-import { createEmptyDocument, is2D, is3D } from '@core/model/types';
-import type {
-  LineEntity,
-  PolylineEntity,
-  ArcEntity,
-  CircleEntity,
-  RectangleEntity,
-  PointEntity,
-} from '@core/model/types';
+import { expectPure, expectNoOp } from '../helpers/expectNoOp';
+import { createEmptyDocument, is2D, is3D, type ArcEntity, type Entity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
+import { xy } from '../helpers/xy';
+import { add } from '../helpers/addEntity';
 
-function expectPureCommand(name: string, params: unknown): void {
-  const doc = createEmptyDocument();
-  expectPure(doc, () => execute(doc, name, params));
-}
+type Loose = Entity & Record<string, unknown>;
+const empty = createEmptyDocument();
+const created = (r: ReturnType<typeof execute>): Loose => r.document.entities[r.affected[0]!] as Loose;
 
 describe('2D draw commands', () => {
-  // draw_polyline, open 2-point form
-
-  describe('draw_polyline with 2 open points', () => {
-    it('creates a line entity with correct geometry', () => {
-      const doc = createEmptyDocument();
-      const result = execute(doc, 'draw_polyline', {
-        points: [
-          [0, 0],
-          [5, 3],
-        ],
-      });
-
-      expect(result.affected).toHaveLength(1);
-      const id = result.affected[0]!;
-      const entity = result.document.entities[id]! as LineEntity;
-      expect(entity.kind).toBe('line');
-      expect(entity.start).toEqual([0, 0]);
-      expect(entity.end).toEqual([5, 3]);
-      expect(result.document.order).toContain(id);
-      expect(result.summary).toContain(id);
-    });
-
-    it('uses default position [0,0,0] and default color', () => {
-      const doc = createEmptyDocument();
-      const result = execute(doc, 'draw_polyline', {
-        points: [
-          [1, 2],
-          [3, 4],
-        ],
-      });
-      const id = result.affected[0]!;
-      const entity = result.document.entities[id]!;
-      expect(entity.position).toEqual([0, 0, 0]);
-      expect(entity.color).toBe('#4a90d9');
-    });
-
-    it('accepts a custom position and color', () => {
-      const doc = createEmptyDocument();
-      const result = execute(doc, 'draw_polyline', {
-        points: [
-          [0, 0],
-          [1, 1],
-        ],
-        position: [2, 3, 4],
-        color: '#ff0000',
-      });
-      const entity = result.document.entities[result.affected[0]!]!;
-      expect(entity.position).toEqual([2, 3, 4]);
-      expect(entity.color).toBe('#ff0000');
-    });
-
-    it('keeps the line id prefix, and a closed 2-point series stays a polyline', () => {
-      const doc = createEmptyDocument();
-      const line = execute(doc, 'draw_polyline', {
-        points: [
-          [0, 0],
-          [5, 3],
-        ],
-      });
-      expect(line.affected[0]).toMatch(/^line-/);
-      const closed = execute(doc, 'draw_polyline', {
-        points: [
-          [0, 0],
-          [5, 3],
-        ],
-        closed: true,
-      });
-      expect(closed.document.entities[closed.affected[0]!]!.kind).toBe('polyline');
-      const three = execute(doc, 'draw_polyline', {
-        points: [
-          [0, 0],
-          [5, 3],
-          [6, 6],
-        ],
-      });
-      expect(three.document.entities[three.affected[0]!]!.kind).toBe('polyline');
-    });
-
-    it('is a no-op when a point is missing', () => {
-      const doc = createEmptyDocument();
-      const result = execute(doc, 'draw_polyline', { points: [null, [1, 1]] });
-      expect(result.affected).toHaveLength(0);
-      expect(result.document).toBe(doc);
-      expect(result.summary).toContain('draw_polyline');
-    });
-
-    it('is pure — input document is not mutated', () => {
-      expectPureCommand('draw_polyline', {
-        points: [
-          [0, 0],
-          [1, 1],
-        ],
-      });
-    });
+  it.each<[string, object, Record<string, unknown>, string[], RegExp?]>([
+    [
+      'draw_polyline',
+      { points: xy(0, 0, 5, 3) },
+      { kind: 'line', start: [0, 0], end: [5, 3], position: [0, 0, 0], color: '#4a90d9' },
+      [],
+      /^line-/,
+    ],
+    [
+      'draw_polyline',
+      { points: xy(0, 0, 1, 1), position: [2, 3, 4], color: '#ff0000' },
+      { kind: 'line', position: [2, 3, 4], color: '#ff0000' },
+      [],
+    ],
+    ['draw_polyline', { points: xy(0, 0, 5, 3), closed: true }, { kind: 'polyline' }, []],
+    ['draw_polyline', { points: xy(0, 0, 2, 0, 2, 2, 0, 2) }, { kind: 'polyline', points: xy(0, 0, 2, 0, 2, 2, 0, 2), closed: false }, []],
+    ['draw_polyline', { points: xy(0, 0, 1, 0, 0, 1), closed: true }, { kind: 'polyline', closed: true }, ['closed']],
+    [
+      'draw_arc',
+      { center: [1, 2], radius: 5, startAngle: 0, endAngle: Math.PI },
+      { kind: 'arc', center: [1, 2], radius: 5, startAngle: 0 },
+      ['5'],
+    ],
+    ['draw_arc', { center: [3, 4], radius: 7 }, { kind: 'circle', center: [3, 4], radius: 7 }, ['7'], /^circ-/],
+    ['draw_rectangle', { width: 10, height: 5 }, { kind: 'rectangle', width: 10, height: 5 }, ['10', '5']],
+    ['draw_point', { position: [1, 2, 3] }, { kind: 'point', position: [1, 2, 3] }, []],
+    ['draw_point', {}, { kind: 'point', position: [0, 0, 0] }, []],
+  ])('%s %j creates one 2D entity, purely', (name, p, shape, summary, idPattern) => {
+    const r = execute(empty, name, p);
+    expect(r.affected).toHaveLength(1);
+    const id = r.affected[0]!;
+    const e = created(r);
+    expect(e).toMatchObject(shape);
+    expect([is2D(e), is3D(e)]).toEqual([true, false]);
+    expect(r.document.order).toContain(id);
+    for (const s of [id, ...summary]) expect(r.summary).toContain(s);
+    if (idPattern) expect(id).toMatch(idPattern);
+    if (shape['kind'] === 'arc') expect(e['endAngle']).toBeCloseTo(Math.PI);
+    expectPure(empty, () => execute(empty, name, p));
   });
 
-  // draw_polyline
+  it.each<[string, object, string?]>([
+    ['draw_polyline', { points: [null, [1, 1]] }, 'draw_polyline'],
+    ['draw_polyline', { points: [[0, 0]] }, 'draw_polyline'],
+    ['draw_polyline', { points: [] }],
+    ['draw_arc', { center: [0, 0], radius: 0, startAngle: 0, endAngle: 1 }, 'draw_arc'],
+    ['draw_arc', { center: [0, 0], radius: -3, startAngle: 0, endAngle: 1 }],
+    ['draw_arc', { center: [0, 0], radius: 2, startAngle: 0 }, 'both startAngle and endAngle'],
+    ['draw_arc', { center: [0, 0], radius: 0 }, 'draw_arc'],
+    ['draw_arc', { center: [0, 0], radius: -1 }],
+    ['draw_arc', { center: [0, 0], radius: 2, startAngle: 0, endAngle: Number.NaN }],
+    ['draw_rectangle', { width: 0, height: 5 }, 'draw_rectangle'],
+    ['draw_rectangle', { width: 3, height: -2 }],
+  ])('%s %j is a no-op', (name, p, summary) => expectNoOp(execute(empty, name, p), empty, summary));
 
-  describe('draw_polyline', () => {
-    it('creates a polyline entity with correct geometry', () => {
-      const doc = createEmptyDocument();
-      const pts = [
-        [0, 0],
-        [2, 0],
-        [2, 2],
-        [0, 2],
-      ];
-      const result = execute(doc, 'draw_polyline', { points: pts });
-
-      expect(result.affected).toHaveLength(1);
-      const id = result.affected[0]!;
-      const entity = result.document.entities[id]! as PolylineEntity;
-      expect(entity.kind).toBe('polyline');
-      expect(entity.points).toHaveLength(4);
-      expect(entity.points[0]).toEqual([0, 0]);
-      expect(entity.points[2]).toEqual([2, 2]);
-      expect(entity.closed).toBe(false);
-      expect(result.document.order).toContain(id);
-    });
-
-    it('creates a closed polyline when closed=true', () => {
-      const doc = createEmptyDocument();
-      const result = execute(doc, 'draw_polyline', {
-        points: [
-          [0, 0],
-          [1, 0],
-          [0, 1],
-        ],
-        closed: true,
-      });
-      const entity = result.document.entities[result.affected[0]!]! as PolylineEntity;
-      expect(entity.closed).toBe(true);
-      expect(result.summary).toContain('closed');
-    });
-
-    it('is a no-op with fewer than 2 points', () => {
-      const doc = createEmptyDocument();
-      const one = execute(doc, 'draw_polyline', { points: [[0, 0]] });
-      expect(one.affected).toHaveLength(0);
-      expect(one.document).toBe(doc);
-      expect(one.summary).toContain('draw_polyline');
-
-      const zero = execute(doc, 'draw_polyline', { points: [] });
-      expect(zero.affected).toHaveLength(0);
-      expect(zero.document).toBe(doc);
-    });
-
-    it('is pure — input document is not mutated', () => {
-      expectPureCommand('draw_polyline', {
-        points: [
-          [0, 0],
-          [1, 1],
-        ],
-      });
-    });
+  it('draw_arc wraps a sweep over 2π into (0, 2π] and keeps CCW wrap and full sweeps', () => {
+    const sweep = (startAngle: number, endAngle: number): { s: number; summary: string; arc: ArcEntity } => {
+      const r = execute(empty, 'draw_arc', { center: [0, 0], radius: 2, startAngle, endAngle });
+      const arc = created(r) as unknown as ArcEntity;
+      return { s: arc.endAngle - arc.startAngle, summary: r.summary, arc };
+    };
+    const over = sweep(-2.04, 4.71);
+    expect(over.s).toBeCloseTo(6.75 - 2 * Math.PI, 9);
+    expect(over.summary).toContain('wrapped');
+    expect(sweep(4.71, -2.04).s).toBeCloseTo(4 * Math.PI - 6.75, 9);
+    const wrap = sweep(5, 1);
+    expect(wrap.arc).toMatchObject({ startAngle: 5, endAngle: 1 });
+    expect(wrap.summary).not.toContain('wrapped');
+    expect(sweep(0, 2 * Math.PI).arc.endAngle).toBeCloseTo(2 * Math.PI, 12);
+    const s0 = 5.886628178167261;
+    for (const turns of [2, 5]) expect(sweep(s0, s0 + turns * 2 * Math.PI).s).toBeCloseTo(2 * Math.PI, 9);
+    expect(sweep(1, 1 + 2 * Math.PI + 2e-9).s).toBeCloseTo(2 * Math.PI, 9);
   });
 
-  // draw_arc
-
-  describe('draw_arc', () => {
-    it('creates an arc entity with correct geometry', () => {
-      const doc = createEmptyDocument();
-      const result = execute(doc, 'draw_arc', {
-        center: [1, 2],
-        radius: 5,
-        startAngle: 0,
-        endAngle: Math.PI,
-      });
-
-      expect(result.affected).toHaveLength(1);
-      const id = result.affected[0]!;
-      const entity = result.document.entities[id]! as ArcEntity;
-      expect(entity.kind).toBe('arc');
-      expect(entity.center).toEqual([1, 2]);
-      expect(entity.radius).toBe(5);
-      expect(entity.startAngle).toBe(0);
-      expect(entity.endAngle).toBeCloseTo(Math.PI);
-      expect(result.document.order).toContain(id);
-      expect(result.summary).toContain(id);
-      expect(result.summary).toContain('5');
-    });
-
-    it('wraps a sweep larger than 2π into (0, 2π] and keeps CCW wrap and full sweeps', () => {
-      const doc = createEmptyDocument();
-      const base = { center: [0, 0], radius: 2 };
-      const arcOf = (result: ReturnType<typeof execute>): ArcEntity =>
-        result.document.entities[result.affected[0]!] as ArcEntity;
-      const over = execute(doc, 'draw_arc', { ...base, startAngle: -2.04, endAngle: 4.71 });
-      expect(arcOf(over).endAngle - arcOf(over).startAngle).toBeCloseTo(6.75 - 2 * Math.PI, 9);
-      expect(over.summary).toContain('wrapped');
-      const overNeg = execute(doc, 'draw_arc', { ...base, startAngle: 4.71, endAngle: -2.04 });
-      expect(arcOf(overNeg).endAngle - arcOf(overNeg).startAngle).toBeCloseTo(
-        4 * Math.PI - 6.75,
-        9,
-      );
-      const wrap = execute(doc, 'draw_arc', { ...base, startAngle: 5, endAngle: 1 });
-      expect(arcOf(wrap)).toMatchObject({ startAngle: 5, endAngle: 1 });
-      expect(wrap.summary).not.toContain('wrapped');
-      const full = execute(doc, 'draw_arc', { ...base, startAngle: 0, endAngle: 2 * Math.PI });
-      expect(arcOf(full).endAngle).toBeCloseTo(2 * Math.PI, 12);
-      for (const turns of [2, 5]) {
-        const s0 = 5.886628178167261;
-        const whole = execute(doc, 'draw_arc', {
-          ...base,
-          startAngle: s0,
-          endAngle: s0 + turns * 2 * Math.PI,
-        });
-        expect(arcOf(whole).endAngle - arcOf(whole).startAngle).toBeCloseTo(2 * Math.PI, 9);
-      }
-      const justOver = execute(doc, 'draw_arc', {
-        ...base,
-        startAngle: 1,
-        endAngle: 1 + 2 * Math.PI + 2e-9,
-      });
-      expect(arcOf(justOver).endAngle - arcOf(justOver).startAngle).toBeCloseTo(2 * Math.PI, 9);
-      const nan = execute(doc, 'draw_arc', { ...base, startAngle: 0, endAngle: Number.NaN });
-      expect(nan.affected).toEqual([]);
-    });
-
-    it('is a no-op when radius <= 0', () => {
-      const doc = createEmptyDocument();
-      const zero = execute(doc, 'draw_arc', {
-        center: [0, 0],
-        radius: 0,
-        startAngle: 0,
-        endAngle: 1,
-      });
-      expect(zero.affected).toHaveLength(0);
-      expect(zero.document).toBe(doc);
-      expect(zero.summary).toContain('draw_arc');
-
-      const neg = execute(doc, 'draw_arc', {
-        center: [0, 0],
-        radius: -3,
-        startAngle: 0,
-        endAngle: 1,
-      });
-      expect(neg.affected).toHaveLength(0);
-      expect(neg.document).toBe(doc);
-    });
-
-    it('is pure — input document is not mutated', () => {
-      expectPureCommand('draw_arc', { center: [0, 0], radius: 3, startAngle: 0, endAngle: 1 });
-    });
+  it('is3D is true and is2D false for solids', () => {
+    const box = created(execute(empty, 'add_box', { size: [1, 1, 1] }));
+    expect([is3D(box), is2D(box)]).toEqual([true, false]);
   });
 
-  // draw_arc without angles (full circle)
-
-  describe('draw_arc without angles', () => {
-    it('creates a circle entity with correct geometry', () => {
-      const doc = createEmptyDocument();
-      const result = execute(doc, 'draw_arc', { center: [3, 4], radius: 7 });
-
-      expect(result.affected).toHaveLength(1);
-      const id = result.affected[0]!;
-      const entity = result.document.entities[id]! as CircleEntity;
-      expect(entity.kind).toBe('circle');
-      expect(entity.center).toEqual([3, 4]);
-      expect(entity.radius).toBe(7);
-      expect(result.document.order).toContain(id);
-      expect(result.summary).toContain(id);
-      expect(result.summary).toContain('7');
-      expect(id).toMatch(/^circ-/);
-    });
-
-    it('is a no-op when only one of startAngle / endAngle is given', () => {
-      const doc = createEmptyDocument();
-      const half = execute(doc, 'draw_arc', { center: [0, 0], radius: 2, startAngle: 0 });
-      expect(half.affected).toHaveLength(0);
-      expect(half.document).toBe(doc);
-      expect(half.summary).toContain('both startAngle and endAngle');
-    });
-
-    it('is a no-op when radius <= 0', () => {
-      const doc = createEmptyDocument();
-      const zero = execute(doc, 'draw_arc', { center: [0, 0], radius: 0 });
-      expect(zero.affected).toHaveLength(0);
-      expect(zero.document).toBe(doc);
-      expect(zero.summary).toContain('draw_arc');
-
-      const neg = execute(doc, 'draw_arc', { center: [0, 0], radius: -1 });
-      expect(neg.affected).toHaveLength(0);
-      expect(neg.document).toBe(doc);
-    });
-
-    it('is pure — input document is not mutated', () => {
-      expectPureCommand('draw_arc', { center: [0, 0], radius: 5 });
-    });
-  });
-
-  // draw_rectangle
-
-  describe('draw_rectangle', () => {
-    it('creates a rectangle entity with correct geometry', () => {
-      const doc = createEmptyDocument();
-      const result = execute(doc, 'draw_rectangle', { width: 10, height: 5 });
-
-      expect(result.affected).toHaveLength(1);
-      const id = result.affected[0]!;
-      const entity = result.document.entities[id]! as RectangleEntity;
-      expect(entity.kind).toBe('rectangle');
-      expect(entity.width).toBe(10);
-      expect(entity.height).toBe(5);
-      expect(result.document.order).toContain(id);
-      expect(result.summary).toContain(id);
-      expect(result.summary).toContain('10');
-      expect(result.summary).toContain('5');
-    });
-
-    it('is a no-op when width or height <= 0', () => {
-      const doc = createEmptyDocument();
-      const zeroW = execute(doc, 'draw_rectangle', { width: 0, height: 5 });
-      expect(zeroW.affected).toHaveLength(0);
-      expect(zeroW.document).toBe(doc);
-      expect(zeroW.summary).toContain('draw_rectangle');
-
-      const negH = execute(doc, 'draw_rectangle', { width: 3, height: -2 });
-      expect(negH.affected).toHaveLength(0);
-      expect(negH.document).toBe(doc);
-    });
-
-    it('is pure — input document is not mutated', () => {
-      expectPureCommand('draw_rectangle', { width: 4, height: 3 });
-    });
-  });
-
-  // draw_point
-
-  describe('draw_point', () => {
-    it('creates a point entity at the given position', () => {
-      const doc = createEmptyDocument();
-      const result = execute(doc, 'draw_point', { position: [1, 2, 3] });
-
-      expect(result.affected).toHaveLength(1);
-      const id = result.affected[0]!;
-      const entity = result.document.entities[id]! as PointEntity;
-      expect(entity.kind).toBe('point');
-      expect(entity.position).toEqual([1, 2, 3]);
-      expect(result.document.order).toContain(id);
-      expect(result.summary).toContain(id);
-    });
-
-    it('defaults to position [0,0,0] when not provided', () => {
-      const doc = createEmptyDocument();
-      const result = execute(doc, 'draw_point', {});
-      const entity = result.document.entities[result.affected[0]!]!;
-      expect(entity.position).toEqual([0, 0, 0]);
-    });
-
-    it('is pure — input document is not mutated', () => {
-      expectPureCommand('draw_point', { position: [0, 0, 0] });
-    });
-  });
-
-  // is2D / is3D helpers
-
-  describe('is2D / is3D', () => {
-    it('is2D returns true for all 2D shape kinds', () => {
-      const doc = createEmptyDocument();
-
-      const line = execute(doc, 'draw_polyline', {
-        points: [
-          [0, 0],
-          [1, 1],
-        ],
-      });
-      expect(is2D(line.document.entities[line.affected[0]!]!)).toBe(true);
-      expect(is3D(line.document.entities[line.affected[0]!]!)).toBe(false);
-
-      const poly = execute(doc, 'draw_polyline', {
-        points: [
-          [0, 0],
-          [1, 1],
-        ],
-      });
-      expect(is2D(poly.document.entities[poly.affected[0]!]!)).toBe(true);
-
-      const arc = execute(doc, 'draw_arc', {
-        center: [0, 0],
-        radius: 1,
-        startAngle: 0,
-        endAngle: 1,
-      });
-      expect(is2D(arc.document.entities[arc.affected[0]!]!)).toBe(true);
-
-      const circ = execute(doc, 'draw_arc', { center: [0, 0], radius: 2 });
-      expect(is2D(circ.document.entities[circ.affected[0]!]!)).toBe(true);
-
-      const rect = execute(doc, 'draw_rectangle', { width: 2, height: 2 });
-      expect(is2D(rect.document.entities[rect.affected[0]!]!)).toBe(true);
-
-      const pt = execute(doc, 'draw_point', { position: [0, 0, 0] });
-      expect(is2D(pt.document.entities[pt.affected[0]!]!)).toBe(true);
-    });
-
-    it('is3D returns true for all 3D solid kinds, is2D returns false', () => {
-      const doc = createEmptyDocument();
-      const box = execute(doc, 'add_box', { size: [1, 1, 1] });
-      expect(is3D(box.document.entities[box.affected[0]!]!)).toBe(true);
-      expect(is2D(box.document.entities[box.affected[0]!]!)).toBe(false);
-    });
-  });
-
-  // scale_entity — 2D branches
-
-  describe('scale_entity on 2D shapes', () => {
-    it('scales a line start and end points', () => {
-      const doc = createEmptyDocument();
-      const created = execute(doc, 'draw_polyline', {
-        points: [
-          [1, 2],
-          [3, 4],
-        ],
-      });
-      const id = created.affected[0]!;
-
-      const result = execute(created.document, 'scale_entity', { id, factor: 2 });
-      const entity = result.document.entities[id]! as LineEntity;
-      expect(entity.kind).toBe('line');
-      expect(entity.start).toEqual([2, 4]);
-      expect(entity.end).toEqual([6, 8]);
-      expect(result.affected).toEqual([id]);
-    });
-
-    it('scales a polyline points', () => {
-      const doc = createEmptyDocument();
-      const created = execute(doc, 'draw_polyline', {
-        points: [
-          [1, 0],
-          [2, 0],
-          [2, 1],
-        ],
-      });
-      const id = created.affected[0]!;
-
-      const result = execute(created.document, 'scale_entity', { id, factor: 3 });
-      const entity = result.document.entities[id]! as PolylineEntity;
-      expect(entity.points[0]).toEqual([3, 0]);
-      expect(entity.points[1]).toEqual([6, 0]);
-      expect(entity.points[2]).toEqual([6, 3]);
-    });
-
-    it('scales an arc center and radius', () => {
-      const doc = createEmptyDocument();
-      const created = execute(doc, 'draw_arc', {
-        center: [2, 4],
-        radius: 5,
-        startAngle: 0,
-        endAngle: Math.PI,
-      });
-      const id = created.affected[0]!;
-
-      const result = execute(created.document, 'scale_entity', { id, factor: 2 });
-      const entity = result.document.entities[id]! as ArcEntity;
-      expect(entity.center).toEqual([4, 8]);
-      expect(entity.radius).toBeCloseTo(10);
-    });
-
-    it('scales a circle center and radius', () => {
-      const doc = createEmptyDocument();
-      const created = execute(doc, 'draw_arc', { center: [1, 2], radius: 4 });
-      const id = created.affected[0]!;
-
-      const result = execute(created.document, 'scale_entity', { id, factor: 0.5 });
-      const entity = result.document.entities[id]! as CircleEntity;
-      expect(entity.center).toEqual([0.5, 1]);
-      expect(entity.radius).toBeCloseTo(2);
-    });
-
-    it('scales a rectangle width and height', () => {
-      const doc = createEmptyDocument();
-      const created = execute(doc, 'draw_rectangle', { width: 4, height: 6 });
-      const id = created.affected[0]!;
-
-      const result = execute(created.document, 'scale_entity', { id, factor: 3 });
-      const entity = result.document.entities[id]! as RectangleEntity;
-      expect(entity.width).toBeCloseTo(12);
-      expect(entity.height).toBeCloseTo(18);
-    });
-
-    it('scaling a point is a no-geometry-change (returns point unchanged in geometry)', () => {
-      const doc = createEmptyDocument();
-      const created = execute(doc, 'draw_point', { position: [1, 2, 3] });
-      const id = created.affected[0]!;
-
-      const result = execute(created.document, 'scale_entity', { id, factor: 5 });
-      const entity = result.document.entities[id]! as PointEntity;
-      expect(entity.kind).toBe('point');
-      // position is not scaled (scale_entity scales local geometry, not world position)
-      expect(entity.position).toEqual([1, 2, 3]);
-      expect(result.affected).toEqual([id]);
-    });
-
-    it('scale_entity is pure on 2D shapes', () => {
-      const doc = createEmptyDocument();
-      const created = execute(doc, 'draw_arc', { center: [0, 0], radius: 3 });
-      const scaledDoc = created.document;
-      const snapshot = JSON.stringify(scaledDoc);
-      execute(scaledDoc, 'scale_entity', { id: created.affected[0]!, factor: 2 });
-      expect(JSON.stringify(scaledDoc)).toBe(snapshot);
-    });
+  it.each<[string, object, number, Record<string, unknown>]>([
+    ['draw_polyline', { points: xy(1, 2, 3, 4) }, 2, { kind: 'line', start: [2, 4], end: [6, 8] }],
+    ['draw_polyline', { points: xy(1, 0, 2, 0, 2, 1) }, 3, { points: xy(3, 0, 6, 0, 6, 3) }],
+    ['draw_arc', { center: [2, 4], radius: 5, startAngle: 0, endAngle: Math.PI }, 2, { center: [4, 8], radius: 10 }],
+    ['draw_arc', { center: [1, 2], radius: 4 }, 0.5, { center: [0.5, 1], radius: 2 }],
+    ['draw_rectangle', { width: 4, height: 6 }, 3, { width: 12, height: 18 }],
+    ['draw_point', { position: [1, 2, 3] }, 5, { kind: 'point', position: [1, 2, 3] }],
+  ])('scale_entity scales %s %j by %d (local geometry only), purely', (name, p, factor, shape) => {
+    const { doc, id } = add(empty, name, p);
+    const r = execute(doc, 'scale_entity', { id, factor });
+    expect(r.affected).toEqual([id]);
+    expect(r.document.entities[id]).toMatchObject(shape);
+    expectPure(doc, () => execute(doc, 'scale_entity', { id, factor }));
   });
 });

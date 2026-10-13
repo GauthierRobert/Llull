@@ -1,7 +1,3 @@
-/**
- * ConfirmDialog accessibility contract: focus lands on Cancel, Tab is trapped inside the dialog,
- * Escape / backdrop cancel, focus returns to the opener on close.
- */
 import { describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { ConfirmDialog } from '@ui/components/ConfirmDialog';
@@ -24,13 +20,9 @@ function setup(): { onConfirm: () => void; onCancel: () => void } {
 describe('ConfirmDialog', () => {
   it('is a named modal dialog with focus on Cancel', () => {
     setup();
-    expect(screen.getByRole('dialog', { name: 'Delete project' })).toHaveAttribute(
-      'aria-modal',
-      'true',
-    );
+    expect(screen.getByRole('dialog', { name: 'Delete project' })).toHaveAttribute('aria-modal', 'true');
     expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
   });
-
   it('confirms and cancels through its buttons', () => {
     const { onConfirm, onCancel } = setup();
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
@@ -38,7 +30,6 @@ describe('ConfirmDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
-
   it('cancels on Escape and on backdrop click, not on dialog click', () => {
     const { onCancel } = setup();
     const dialog = screen.getByRole('dialog');
@@ -49,7 +40,6 @@ describe('ConfirmDialog', () => {
     fireEvent.click(dialog.parentElement!);
     expect(onCancel).toHaveBeenCalledTimes(2);
   });
-
   it('keeps Tab and Shift+Tab inside the dialog', () => {
     setup();
     const dialog = screen.getByRole('dialog');
@@ -62,19 +52,12 @@ describe('ConfirmDialog', () => {
     expect(confirm).toHaveFocus();
     expect(dialog).toContainElement(document.activeElement as HTMLElement);
   });
-
   it('returns focus to the opener on unmount', () => {
     const opener = document.createElement('button');
     document.body.appendChild(opener);
     opener.focus();
     const { unmount } = render(
-      <ConfirmDialog
-        title="t"
-        message="m"
-        confirmLabel="Ok"
-        onConfirm={() => undefined}
-        onCancel={() => undefined}
-      />,
+      <ConfirmDialog title="t" message="m" confirmLabel="Ok" onConfirm={() => undefined} onCancel={() => undefined} />,
     );
     unmount();
     expect(opener).toHaveFocus();

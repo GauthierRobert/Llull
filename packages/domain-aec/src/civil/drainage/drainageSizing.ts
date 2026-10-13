@@ -1,8 +1,6 @@
 /**
- * Iterative pipe sizing: diameters set the velocities (travel times, Tc, intensity, split shares)
- * and those set the flows that size the diameters; repeated until no diameter changes.
- * @layer domain-aec/civil
- * @pure
+ * Iterative pipe sizing: diameters set the velocities (travel times, Tc, intensity, split shares) and those set the flows that size the
+ * diameters; repeated until no diameter changes.
  */
 
 import type { CadDocument } from '@core/model/types';

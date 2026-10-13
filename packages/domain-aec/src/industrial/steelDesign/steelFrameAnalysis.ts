@@ -1,19 +1,11 @@
 /**
- * Moment-frame analysis behind check_steel_members: detects the frames from the rigid joints,
- * solves each as a 2D frame, and returns the member rows, the frame reports and the storeys they
- * stabilise.
- * @layer domain-aec
- * @pure
+ * Moment-frame analysis behind check_steel_members: detects the frames from the rigid joints, solves each as a 2D frame, and returns the
+ * member rows, the frame reports and the storeys they stabilise.
  */
 
 import { notionalLabel } from './steelBracingChecks';
 import { frameRows } from './steelFrameChecks';
-import {
-  detectFrames,
-  type FrameCoverage,
-  type FrameDirection,
-  type MomentFrame,
-} from './steelFrameDetect';
+import { detectFrames, type FrameCoverage, type FrameDirection, type MomentFrame } from './steelFrameDetect';
 import { buildFrameSystem } from './steelFrameModel';
 import { solveFrameSystem } from './steelFrameSolve';
 import type { BeamResult, ColumnNode } from './steelFraming';
@@ -67,20 +59,12 @@ function analyseFrame(
   const bars = [...frame.columns, ...frame.beams.map((beam) => beam.loads.bar)];
   const failed = (reason: string): ReturnType<typeof analyseFrame> => ({
     rows: new Map(bars.map((bar) => [bar.id, skippedRow(bar, reason)])),
-    report: {
-      ...marks,
-      status: 'mechanism',
-      alphaCritical: null,
-      amplification: 1,
-      jointMoments: {},
-    },
+    report: { ...marks, status: 'mechanism', alphaCritical: null, amplification: 1, jointMoments: {} },
     warnings: [`${frame.label}: ${reason}`],
   });
   const solutions = solveFrameSystem(system, params.notionalFactor);
   if (!solutions) {
-    return failed(
-      'the moment frame is a mechanism (unstable under the loads): fix the column bases, add rigid joints or bracing',
-    );
+    return failed('the moment frame is a mechanism (unstable under the loads): fix the column bases, add rigid joints or bracing');
   }
   const rows = frameRows({
     frame,
@@ -121,12 +105,7 @@ function analyseFrame(
       amplification: solutions.amplification,
       jointMoments,
     },
-    warnings: [
-      ...baseNotes,
-      ...[...system.invalid].map(
-        ([id, reason]) => `${bars.find((bar) => bar.id === id)?.mark ?? id}: ${reason}`,
-      ),
-    ],
+    warnings: [...baseNotes, ...[...system.invalid].map(([id, reason]) => `${bars.find((bar) => bar.id === id)?.mark ?? id}: ${reason}`)],
   };
 }
 
@@ -157,10 +136,7 @@ export function analyseFrames(
     reports.push(outcome.report);
     warnings.push(...outcome.warnings);
     if (outcome.report.status === 'solved') {
-      coverage.push({
-        direction: frame.direction,
-        beamTops: frame.beams.map((beam) => beam.loads.top),
-      });
+      coverage.push({ direction: frame.direction, beamTops: frame.beams.map((beam) => beam.loads.top) });
     }
   }
   return { rows, reports, coverage, warnings };

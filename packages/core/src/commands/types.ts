@@ -1,7 +1,6 @@
 /**
- * Command contracts: a command is the ONE unit of change. Each is a pure function
- * `(document, params, ctx?) -> CommandResult` that returns a new document; the UI, the AI bridge
- * and the MCP server all invoke the same set through `execute`.
+ * Command contracts: a command is the ONE unit of change. Each is a pure function `(document, params, ctx?) -> CommandResult` that returns
+ * a new document; the UI, the AI bridge and the MCP server all invoke the same set through `execute`.
  */
 
 import type { CadDocument } from '../model/types';
@@ -17,19 +16,19 @@ export interface CommandResult {
   summary: string;
   /**
    * Ids of entities created or affected (the caller selects/highlights them).
-   * @invariant deterministic order for the same (doc-shape, params): feature-history replay zips a
-   *   step's recorded `affected` with the replay's positionally to remap downstream id references.
+   * @invariant deterministic order for the same (doc-shape, params): feature-history replay zips a step's recorded `affected` with the
+   *   replay's positionally to remap downstream id references.
    */
   affected: string[];
   /**
-   * Structured result of read-only/query commands (e.g. `{ distance: 42, unit: 'mm' }`); absent on
-   * mutating commands. Passes through `execute` and the MCP layer.
+   * Structured result of read-only/query commands (e.g. `{ distance: 42, unit: 'mm' }`); absent on mutating commands. Passes through
+   * `execute` and the MCP layer.
    */
   data?: unknown;
   /**
-   * Set by `execute`/`guardCommand` only when the call was refused before or around `run`
-   * (unknown command, invalid params, kernel unavailable, derivation guard, `run` threw, corrupt
-   * result). Absent on success and on a command's own graceful no-op. Surfaces map it to an error.
+   * Set by `execute`/`guardCommand` only when the call was refused before or around `run` (unknown command, invalid params, kernel
+   * unavailable, derivation guard, `run` threw, corrupt result). Absent on success and on a command's own graceful no-op. Surfaces map it
+   * to an error.
    */
   rejected?: true;
 }
@@ -43,15 +42,13 @@ export interface CommandAnnotations {
   /** Calling twice with the same params gives the same end state as once (setter semantics). */
   readonly idempotent?: boolean;
   /**
-   * `execute()` appends no FeatureStep: history meta-commands (appending would recurse),
-   * `load_document` (wholesale replacement) and parameter-table commands (document INPUT state,
-   * architecture L8). Not emitted to MCP.
+   * `execute()` appends no FeatureStep: history meta-commands (appending would recurse), `load_document` (wholesale replacement) and
+   * parameter-table commands (document INPUT state, architecture L8). Not emitted to MCP.
    */
   readonly metaHistory?: boolean;
   /**
-   * Needs `ExecutionContext.kernel`: `execute` no-ops it with a "kernel not ready" summary when
-   * none is available and `replayHistory` refuses to regenerate a history containing it.
-   * Not emitted to MCP.
+   * Needs `ExecutionContext.kernel`: `execute` no-ops it with a "kernel not ready" summary when none is available and `replayHistory`
+   * refuses to regenerate a history containing it. Not emitted to MCP.
    */
   readonly requiresKernel?: boolean;
 }
@@ -72,17 +69,14 @@ export interface CommandDefinition<P> {
 }
 
 /**
- * Maps the params of a retired command onto the call that replaced it. Persistence applies it to
- * saved feature-history / recipe steps so documents recorded before the merge still replay.
+ * Maps the params of a retired command onto the call that replaced it. Persistence applies it to saved feature-history / recipe steps so
+ * documents recorded before the merge still replay.
  */
 export type RetiredCommandRewrite = (
   params: Record<string, unknown>,
   /** The saved top-level history step; absent for nested plan actions and recipe steps. */
   step?: { readonly id: string },
-) => {
-  readonly name: string;
-  readonly params: Record<string, unknown>;
-};
+) => { readonly name: string; readonly params: Record<string, unknown> };
 
 export interface ParamsSchema {
   type: 'object';
@@ -114,8 +108,8 @@ export interface ParamSpec extends ParamItemSpec {
 
 /**
  * Execution context — the injected dependencies of one `execute` call (runtime: `context.ts`).
- * @invariant a command reads its kernel, id source and registry ONLY from its context
- *   (architecture L9); no command touches a module-level singleton.
+ * @invariant a command reads its kernel, id source and registry ONLY from its context (architecture L9); no command touches a module-level
+ *   singleton.
  */
 export type CommandLookup = (name: string) => CommandDefinition<unknown> | undefined;
 
@@ -147,18 +141,15 @@ export interface ExecutionContext {
   /** Nesting depth of `instantiate_recipe` expansions (re-entrancy guard). */
   readonly recipeDepth: number;
   /**
-   * Key of the feature-history step currently running, if any. A nested `execute` inside a
-   * step belongs to that step: it mints from the same id source and appends no step of its own.
+   * Key of the feature-history step currently running, if any. A nested `execute` inside a step belongs to that step: it mints from the
+   * same id source and appends no step of its own.
    */
   readonly stepKey?: string;
-  /**
-   * Replay prefix cache; null disables it. Results depend on the kernel, so the default
-   * context keeps one cache per installed kernel.
-   */
+  /** Replay prefix cache; null disables it. Results depend on the kernel, so the default context keeps one cache per installed kernel. */
   readonly replayCache: ReplayCache | null;
   /**
-   * Observer of `build_project` execution (CLI progress, timeouts); a throw aborts the plan.
-   * Optional and side-effect only: it never changes a result.
+   * Observer of `build_project` execution (CLI progress, timeouts); a throw aborts the plan. Optional and side-effect only: it never
+   * changes a result.
    */
   readonly onStep?: (event: PlanStepEvent) => void;
 }

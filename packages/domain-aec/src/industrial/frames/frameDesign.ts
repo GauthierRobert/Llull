@@ -1,8 +1,4 @@
-/**
- * Portal frame design: iterative up-sizing of frame sections and sizing of moment-connection bolt
- * groups against check_portal_frames.
- * @layer domain-aec
- */
+/** Portal frame design: iterative up-sizing of frame sections and sizing of moment-connection bolt groups against check_portal_frames. */
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { fromMm } from '@core/model/units';
@@ -29,17 +25,10 @@ import { checkFrames } from './frameCheckFrames';
 import type { BuildingModel, SteelMemberElement } from '@core/model/building';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { add3, scale3 } from '@lib/vec3';
-import {
-  designResult,
-  finalUtilisationText,
-  noChangeResult,
-  utilisationStats,
-} from '../reports/designReport';
+import { designResult, finalUtilisationText, noChangeResult, utilisationStats } from '../reports/designReport';
 import { sweepFrame } from '../../shared/mesh';
 
 /**
- * @command design_portal_frames
- * @pure
  * @affects up-sizes failing rafter / column profiles (all members of that role and section on the
  *          level, keeping frames uniform) and sizes the bolt groups of every moment connection
  * @failure bad loads / unknown level / no frame / no section large enough -> no-op or partial report
@@ -47,16 +36,12 @@ import { sweepFrame } from '../../shared/mesh';
 export const designPortalFrames = defineCommand({
   name: 'design_portal_frames',
   description:
-    'Preliminary design of the portal frames of a level with the same loads, combinations and ' +
-    'checks as check_portal_frames (strength, buckling, sway stability, SLS deflections): ' +
-    'repeatedly analyses the frames and up-sizes the rafter / column sections that exceed ' +
-    'targetUtilisation to the next heavier profile of the same family (uniformly for all frames), ' +
-    'then sizes the bolt groups of the moment connections (bolt diameter M20–M30 and rows) per ' +
-    'connection type for every combination. Reports every change and the final utilisations.',
-  params: z.object({
-    ...FRAME_LOAD_SHAPE,
-    targetUtilisation: targetUtilisationParam,
-  }),
+    'Preliminary design of the portal frames of a level with the same loads, combinations and checks as check_portal_frames (strength, ' +
+    'buckling, sway stability, SLS deflections): repeatedly analyses the frames and up-sizes the rafter / column sections that exceed ' +
+    'targetUtilisation to the next heavier profile of the same family (uniformly for all frames), then sizes the bolt groups of the ' +
+    'moment connections (bolt diameter M20–M30 and rows) per connection type for every combination. Reports every change and the final ' +
+    'utilisations.',
+  params: z.object({ ...FRAME_LOAD_SHAPE, targetUtilisation: targetUtilisationParam }),
   run: (doc, params): CommandResult => {
     const { targetUtilisation = 0.95 } = params;
     if (!isValidTargetUtilisation(targetUtilisation))
@@ -94,23 +79,14 @@ export const designPortalFrames = defineCommand({
           group,
           larger,
           (element) => analysed.has(element.id),
-          (building, resized) =>
-            refitPlates(current, withElement(building, resized), resized, group.profile).building,
+          (building, resized) => refitPlates(current, withElement(building, resized), resized, group.profile).building,
         );
         const { resizedIds } = resizedGroup;
-        const reseated = reseatDependents(
-          current,
-          resizedGroup.building,
-          resizedIds,
-          group.profile,
-          larger,
-          analysed,
-        );
+        const reseated = reseatDependents(current, resizedGroup.building, resizedIds, group.profile, larger, analysed);
         return { building: reseated.building, changedIds: [...resizedIds, ...reseated.moved] };
       });
     });
-    if (noFrames)
-      return noop(doc, 'design_portal_frames failed: no analysable portal frame on the level.');
+    if (noFrames) return noop(doc, 'design_portal_frames failed: no analysable portal frame on the level.');
     const { current, changes, changed } = upsized;
     let { limited } = upsized;
     const { rows } = checkFrames(current, levelId, loads);
@@ -131,20 +107,14 @@ export const designPortalFrames = defineCommand({
     const document = regenerateBuilding(doc, building);
     const final = checkFrames(document, levelId, loads);
     const unanalysedPosts = Object.values(building.elements).some(
-      (element) =>
-        element.category === 'member' &&
-        element.levelId === levelId &&
-        element.role === 'column' &&
-        !analysed.has(element.id),
+      (element) => element.category === 'member' && element.levelId === levelId && element.role === 'column' && !analysed.has(element.id),
     );
     const stats = utilisationStats(final.rows);
     return designResult(
       document,
       `Designed ${final.frames} frame(s) for ${final.combinations.length} ULS combination(s) + SLS (${describeLoads(loads)}): ` +
-        `${changes.length > 0 ? changes.join('; ') : 'no change needed'}. ` +
-        `${finalUtilisationText(stats, 'element(s)', limited)} ` +
-        `Frames only (verify bracing, foundations and runways with their checks)` +
-        `${unanalysedPosts ? '; gable posts are not analysed' : ''}.`,
+        `${changes.length > 0 ? changes.join('; ') : 'no change needed'}. ${finalUtilisationText(stats, 'element(s)', limited)} Frames ` +
+        `only (verify bracing, foundations and runways with their checks)${unanalysedPosts ? '; gable posts are not analysed' : ''}.`,
       changed,
       changes,
       stats,
@@ -153,9 +123,8 @@ export const designPortalFrames = defineCommand({
 });
 
 /**
- * Members placed from a resized member's depth follow it: purlins on a rafter move along the
- * rafter normal, gable-post tops drop under a deeper rafter, side rails move out with a deeper
- * column (by half the depth change).
+ * Members placed from a resized member's depth follow it: purlins on a rafter move along the rafter normal, gable-post tops drop under a
+ * deeper rafter, side rails move out with a deeper column (by half the depth change).
  */
 function reseatDependents(
   doc: Pick<CadDocument, 'units'>,
@@ -189,10 +158,7 @@ function reseatDependents(
           element.role === 'purlin'
             ? Math.abs(element.start[1] - y) < tolerance || Math.abs(element.end[1] - y) < tolerance
             : onPlane(element, y);
-        const [low, high] = [
-          Math.min(candidate.start[0], candidate.end[0]),
-          Math.max(candidate.start[0], candidate.end[0]),
-        ];
+        const [low, high] = [Math.min(candidate.start[0], candidate.end[0]), Math.max(candidate.start[0], candidate.end[0])];
         // Gable posts stand strictly inside the rafter span (frame columns sit at its ends).
         const margin = element.role === 'purlin' ? -fromMm(doc, larger.h) : tolerance;
         return inPlane && element.start[0] > low + margin && element.start[0] < high - margin;
@@ -208,8 +174,7 @@ function reseatDependents(
       const column = resized.find(
         (candidate) =>
           candidate.role === 'column' &&
-          (Math.abs(candidate.start[1] - element.start[1]) < tolerance ||
-            Math.abs(candidate.start[1] - element.end[1]) < tolerance) &&
+          (Math.abs(candidate.start[1] - element.start[1]) < tolerance || Math.abs(candidate.start[1] - element.end[1]) < tolerance) &&
           Math.abs(candidate.start[0] - element.start[0]) < fromMm(doc, larger.h + 500),
       );
       if (column) offset = [Math.sign(element.start[0] - column.start[0]) * half, 0, 0];

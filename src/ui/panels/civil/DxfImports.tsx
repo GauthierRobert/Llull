@@ -1,9 +1,4 @@
-/**
- * @layer ui/panels/civil
- *
- * DXF file inputs: survey points from a DXF (`import_survey_dxf`: POINTs, blocks, 3D polylines)
- * and a general drawing import (`import_dxf`). Reads the file as text, then dispatches.
- */
+// DXF inputs: survey points (`import_survey_dxf`: POINTs, blocks, 3D polylines) and a general `import_dxf`.
 
 import React, { useState } from 'react';
 import type { DocumentUnit } from '@core/model/types';
@@ -31,9 +26,7 @@ export function DxfImports({ unit }: { unit: DocumentUnit }): React.ReactElement
         label="Import survey DXF"
         accept=".dxf"
         ariaLabel="Survey DXF file"
-        onText={(text, fileName) =>
-          dispatch('import_survey_dxf', { text, name: fileStem(fileName), sourceUnit: unit })
-        }
+        onText={(text, fileName) => dispatch('import_survey_dxf', { text, name: fileStem(fileName), sourceUnit: unit })}
       />
       <FileField
         label="Import DXF drawing"

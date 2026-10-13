@@ -1,8 +1,4 @@
-/**
- * Small SVG builders for the road drawings (long section, cross sections). Text is XML-escaped.
- * @layer domain-aec/civil
- * @pure
- */
+/** Small SVG builders for the road drawings (long section, cross sections). Text is XML-escaped. */
 
 import { escapeXml } from '@lib/escapeXml';
 import { n, svgPoints } from '../../shared/sheetFrame';
@@ -27,9 +23,8 @@ export interface TextStyle {
 export function svgText(x: number, y: number, content: string, style: TextStyle = {}): string {
   const rotate = style.rotate ? ` transform="rotate(${n(style.rotate)} ${n(x)} ${n(y)})"` : '';
   return (
-    `<text x="${n(x)}" y="${n(y)}" font-family="monospace" font-size="${style.size ?? 10}" ` +
-    `text-anchor="${style.anchor ?? 'start'}" fill="${style.fill ?? '#222'}"` +
-    `${style.weight === 'bold' ? ' font-weight="bold"' : ''}${rotate}>${escapeXml(content)}</text>`
+    `<text x="${n(x)}" y="${n(y)}" font-family="monospace" font-size="${style.size ?? 10}" text-anchor="${style.anchor ?? 'start'}" ` +
+    `fill="${style.fill ?? '#222'}"${style.weight === 'bold' ? ' font-weight="bold"' : ''}${rotate}>${escapeXml(content)}</text>`
   );
 }
 
@@ -45,14 +40,7 @@ export function svgPolyline(points: ReadonlyArray<Point>, stroke: string, width 
   return `<polyline points="${list}" fill="none" stroke="${stroke}" stroke-width="${width}"/>`;
 }
 
-export function svgRect(
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  stroke = '#444',
-  fill = 'none',
-): string {
+export function svgRect(x: number, y: number, w: number, h: number, stroke = '#444', fill = 'none'): string {
   return `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" stroke="${stroke}" fill="${fill}"/>`;
 }
 
@@ -62,11 +50,8 @@ export function svgPolygon(points: ReadonlyArray<Point>, fill: string): string {
 }
 
 export function svgDocument(width: number, height: number, body: ReadonlyArray<string>): string {
-  return (
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${n(width)}" height="${n(height)}" ` +
-    `viewBox="0 0 ${n(width)} ${n(height)}"><rect width="100%" height="100%" fill="#fff"/>` +
-    `${body.join('')}</svg>`
-  );
+  const size = `width="${n(width)}" height="${n(height)}" viewBox="0 0 ${n(width)} ${n(height)}"`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" ${size}><rect width="100%" height="100%" fill="#fff"/>${body.join('')}</svg>`;
 }
 
 /** Vertical extent of a long-section plot: `rangeM` of `levels` padded 10% (min 0.5 m) each side, and the top level `zTop`. */
@@ -104,13 +89,7 @@ export function pushTableLabels(
   rowHeight: number,
 ): void {
   labels.forEach((label, row) => {
-    body.push(
-      svgText(left - 6, bandTop + row * rowHeight + 12, label, {
-        anchor: 'end',
-        size: 9,
-        weight: 'bold',
-      }),
-    );
+    body.push(svgText(left - 6, bandTop + row * rowHeight + 12, label, { anchor: 'end', size: 9, weight: 'bold' }));
     const rule = bandTop + (row + 1) * rowHeight;
     body.push(svgLine([left, rule], [left + plotWidth, rule], '#ccc'));
   });

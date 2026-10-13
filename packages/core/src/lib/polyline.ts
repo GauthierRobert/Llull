@@ -1,9 +1,4 @@
-/**
- * Arc-length helpers for open polylines of any dimension.
- *
- * @layer lib
- * @pure
- */
+/** Arc-length helpers for open polylines of any dimension. */
 
 type Coordinates = readonly number[];
 

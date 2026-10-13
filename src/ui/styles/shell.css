@@ -1,6 +1,4 @@
-/* ==========================================================================
-   Shell — app grid, top bar, sidebar rail, inspector dock, status bar
-   ========================================================================== */
+/* ==== Shell — app grid, top bar, sidebar rail, inspector dock, status bar ==== */
 
 .app-layout {
   display: grid;
@@ -32,9 +30,7 @@
   height: 100%;
 }
 
-/* ==========================================================================
-   Top bar
-   ========================================================================== */
+/* ==== Top bar ==== */
 
 .topbar {
   position: relative;
@@ -249,9 +245,7 @@
   background: var(--accent-hover);
 }
 
-/* ==========================================================================
-   Sidebar — icon rail + browser panel
-   ========================================================================== */
+/* ==== Sidebar — icon rail + browser panel ==== */
 
 .sidebar {
   display: flex;
@@ -360,9 +354,7 @@
   overflow-y: auto;
 }
 
-/* ==========================================================================
-   Inspector dock (Properties)
-   ========================================================================== */
+/* ==== Inspector dock (Properties) ==== */
 
 .inspector {
   width: var(--inspector-w);
@@ -373,9 +365,7 @@
   border-left: 1px solid var(--border);
 }
 
-/* ==========================================================================
-   2D / 3D view-mode toggle (floating, top-center of the viewport)
-   ========================================================================== */
+/* ==== 2D / 3D view-mode toggle (floating, top-center of the viewport) ==== */
 
 .view-mode-toggle {
   position: absolute;
@@ -413,9 +403,7 @@
   color: var(--accent-fg);
 }
 
-/* ==========================================================================
-   Status bar (bottom)
-   ========================================================================== */
+/* ==== Status bar (bottom) ==== */
 
 .status-bar-bottom {
   display: flex;
@@ -510,9 +498,7 @@
   animation: pulse-dot 1.4s var(--ease) infinite;
 }
 
-/* ==========================================================================
-   Responsive — narrow windows drop secondary chrome
-   ========================================================================== */
+/* ==== Responsive — narrow windows drop secondary chrome ==== */
 
 @media (max-width: 1180px) {
   .project-io__btn span,

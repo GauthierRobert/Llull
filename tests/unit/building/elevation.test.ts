@@ -6,16 +6,15 @@ import { buildElevationDrawing } from '@aec/building/drawings/elevationProjectio
 import { chainLoops } from '@core/geometry/planeEdges';
 import type { DrawingPrimitive } from '@core/model/drawing';
 import type { ElevationSheet } from '@aec/building/drawings/elevation';
+import { expectNoOp } from '../../helpers/expectNoOp';
+import { xy } from '../../helpers/xy';
 
 function hall(): CadDocument {
   return portalHall({ span: 12000, length: 18000, eaveHeight: 5000 });
 }
 
 function box(): CadDocument {
-  return execute(createEmptyDocument(), 'add_box', {
-    position: [0, 0, 500],
-    size: [2000, 1000, 1000],
-  }).document;
+  return execute(createEmptyDocument(), 'add_box', { position: [0, 0, 500], size: [2000, 1000, 1000] }).document;
 }
 
 const ofStyle = (drawing: { primitives: DrawingPrimitive[] }, style: string): DrawingPrimitive[] =>
@@ -30,12 +29,9 @@ describe('buildElevationDrawing', () => {
     expect(ofStyle(south, 'visible')).toHaveLength(4);
     expect(ofStyle(south, 'hidden')).toHaveLength(0);
     expect(buildElevationDrawing(doc, { direction: 'east' })!.bounds).toEqual([-500, 0, 500, 1000]);
-    expect(buildElevationDrawing(doc, { direction: 'north' })!.bounds).toEqual([
-      -1000, 0, 1000, 1000,
-    ]);
+    expect(buildElevationDrawing(doc, { direction: 'north' })!.bounds).toEqual([-1000, 0, 1000, 1000]);
     expect(ofStyle(buildElevationDrawing(doc, { direction: 'west' })!, 'visible')).toHaveLength(4);
   });
-
   it('removes edges hidden by nearer solids and cuts a section', () => {
     let doc = box();
     // A small box behind the first one, seen from the south: entirely hidden, so not drawn.
@@ -50,7 +46,6 @@ describe('buildElevationDrawing', () => {
     // A cut beyond all geometry leaves nothing.
     expect(buildElevationDrawing(doc, { direction: 'south', cutAt: 10000 })).toBeNull();
   });
-
   it('excludes categories and hidden layers', () => {
     const doc = hall();
     const all = buildElevationDrawing(doc, { direction: 'south' })!;
@@ -59,11 +54,8 @@ describe('buildElevationDrawing', () => {
     const layerId = doc.entities['panel-1:body']!.layerId;
     const hidden = execute(doc, 'update_layer', { id: layerId, visible: false });
     expect(hidden.affected.length, hidden.summary).toBeGreaterThan(0);
-    expect(buildElevationDrawing(hidden.document, { direction: 'south' })!.primitives).toHaveLength(
-      frame.primitives.length,
-    );
+    expect(buildElevationDrawing(hidden.document, { direction: 'south' })!.primitives).toHaveLength(frame.primitives.length);
   });
-
   it('returns null for a document without 3D geometry', () => {
     expect(buildElevationDrawing(createEmptyDocument(), { direction: 'north' })).toBeNull();
   });
@@ -75,8 +67,7 @@ describe('export_elevation_sheet', () => {
     const snapshot = JSON.stringify(doc);
     const result = execute(doc, 'export_elevation_sheet', { direction: 'east' });
     expect(JSON.stringify(doc)).toBe(snapshot);
-    expect(result.document).toBe(doc);
-    expect(result.affected).toEqual([]);
+    expectNoOp(result, doc);
     const sheet = result.data as ElevationSheet;
     expect(sheet.filename).toBe('Untitled_project_East_elevation_A3_1-100.svg');
     expect(sheet.svg).toMatch(/^<svg xmlns/);
@@ -89,7 +80,6 @@ describe('export_elevation_sheet', () => {
     expect(result.summary).toMatch(/drawn line\(s\) \/ cut face\(s\) at 1:100 on A3/);
     expect(sheet.svg).toContain('class="cut-line"');
   });
-
   it('draws a section with heavy cut lines and a custom title / scale', () => {
     const result = execute(hall(), 'export_elevation_sheet', {
       direction: 'south',
@@ -106,7 +96,6 @@ describe('export_elevation_sheet', () => {
     const titled = execute(hall(), 'export_elevation_sheet', { title: 'Frame on line 2' });
     expect((titled.data as ElevationSheet).filename).toMatch(/^Untitled_project_Frame_on_line_2_/);
   });
-
   it.each([
     [{ direction: 'up' }, /export_elevation_sheet rejected: invalid params — direction/],
     [{ paper: 'B5' }, /rejected: invalid params — paper/],
@@ -118,24 +107,18 @@ describe('export_elevation_sheet', () => {
     expect(result.summary).toMatch(message);
     expect(result.data).toBeUndefined();
   });
-
   it('draws a machine part without a ground line, with a scale bar that fits small scales', () => {
-    const sheet = execute(box(), 'export_elevation_sheet', { direction: 'south', scale: 2 })
-      .data as ElevationSheet;
+    const sheet = execute(box(), 'export_elevation_sheet', { direction: 'south', scale: 2 }).data as ElevationSheet;
     expect(sheet.svg).not.toContain('class="ground"');
     // 1:2 → 5 × 20 mm steps (a 50 mm bar on paper), labelled in mm.
     expect(sheet.svg).toContain('>100 mm</text>');
-    const full = execute(box(), 'export_elevation_sheet', { direction: 'south', scale: 1 })
-      .data as ElevationSheet;
+    const full = execute(box(), 'export_elevation_sheet', { direction: 'south', scale: 1 }).data as ElevationSheet;
     expect(full.svg).toContain('>50 mm</text>');
     const hallSheet = execute(hall(), 'export_elevation_sheet', {}).data as ElevationSheet;
     expect(hallSheet.svg).toContain('class="ground"');
   });
-
   it('fails on an empty document', () => {
-    expect(execute(createEmptyDocument(), 'export_elevation_sheet', {}).summary).toMatch(
-      /no 3D geometry/,
-    );
+    expect(execute(createEmptyDocument(), 'export_elevation_sheet', {}).summary).toMatch(/no 3D geometry/);
   });
 });
 
@@ -166,16 +149,8 @@ describe('section poché', () => {
       ],
       0.01,
     );
-    expect(loops).toEqual([
-      [
-        [0, 0],
-        [1, 0],
-        [1, 1],
-        [0, 1],
-      ],
-    ]);
+    expect(loops).toEqual([xy(0, 0, 1, 0, 1, 1, 0, 1)]);
   });
-
   it('fills cut steel solid and concrete hatched', () => {
     let doc = execute(createEmptyDocument(), 'add_steel_member', {
       profile: 'SHS100x5',
@@ -189,10 +164,27 @@ describe('section poché', () => {
     // The plane y = 0 cuts the tube's two side walls: two solid steel strips.
     expect(cuts.filter((p) => p.type === 'polygon' && p.fill === 'solid')).toHaveLength(2);
     expect(cuts.some((p) => p.type === 'polygon' && p.fill === 'hatch')).toBe(true);
-    const sheet = execute(doc, 'export_elevation_sheet', { direction: 'south', cutAt: 0 })
-      .data as ElevationSheet;
-    expect(sheet.svg).toContain('class="cut"');
-    expect(sheet.svg).toContain('class="cut-hatch"');
-    expect(sheet.svg).toContain('id="hatch-concrete"');
+    const sheet = execute(doc, 'export_elevation_sheet', { direction: 'south', cutAt: 0 }).data as ElevationSheet;
+    for (const s of ['class="cut"', 'class="cut-hatch"', 'id="hatch-concrete"']) expect(sheet.svg).toContain(s);
+  });
+});
+
+describe('export_elevation_sheet level datums', () => {
+  it('labels a level named after its elevation once, and others by name + datum', () => {
+    let doc = createEmptyDocument();
+    for (const name of ['Ground floor', '+6.00']) {
+      doc = execute(doc, 'add_level', { name, height: 6000 }).document;
+    }
+    doc = execute(doc, 'add_steel_member', {
+      role: 'column',
+      profile: 'HEB300',
+      levelId: 'level-1',
+      start: [0, 0, 0],
+      end: [0, 0, 12000],
+    }).document;
+    const { svg } = execute(doc, 'export_elevation_sheet', { direction: 'south' }).data as { svg: string };
+    expect(svg).toContain('>Ground floor +0.000<');
+    expect(svg).toContain('>+6.000<');
+    expect(svg).not.toContain('+6.00 +6.000');
   });
 });

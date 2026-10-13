@@ -1,15 +1,5 @@
-/**
- * @layer domain-aec
- */
-
 import type { CadDocument } from '@core/model/types';
-import type {
-  BimCategory,
-  BuildingElement,
-  BuildingModel,
-  CurvedWallElement,
-  WallElement,
-} from '@core/model/building';
+import type { BimCategory, BuildingElement, BuildingModel, CurvedWallElement, WallElement } from '@core/model/building';
 import { polygonArea } from '@lib/polygon';
 import { toMetres } from '@core/model/units';
 import { round } from '../../shared/numeric';
@@ -44,41 +34,24 @@ export function scaleFor(doc: CadDocument): Scale {
   };
 }
 
-interface WallQuantities {
-  readonly length: number;
-  readonly netArea: number;
-  readonly volume: number;
-}
+type WallQuantities = { readonly length: number; readonly netArea: number; readonly volume: number };
 
 /** Built body (joints applied) in document units: length, net one-face area, volume. */
-export function wallQuantities(
-  building: BuildingModel,
-  wall: WallElement | CurvedWallElement,
-): WallQuantities {
+export function wallQuantities(building: BuildingModel, wall: WallElement | CurvedWallElement): WallQuantities {
   const extent = builtExtent(building, wall);
   const length = extent.end - extent.start;
-  const openingArea = openingsOf(building, wall.id).reduce(
-    (sum, opening) => sum + opening.width * opening.height,
-    0,
-  );
+  const openingArea = openingsOf(building, wall.id).reduce((sum, opening) => sum + opening.width * opening.height, 0);
   const netArea = length * wall.height - openingArea;
   return { length, netArea, volume: netArea * wall.thickness };
 }
 
 /** Slab plan area minus its openings (document units²). */
 export function slabNetArea(slab: Extract<BuildingElement, { category: 'slab' }>): number {
-  return (slab.openings ?? []).reduce(
-    (area, opening) => area - polygonArea(opening),
-    polygonArea(slab.boundary),
-  );
+  return (slab.openings ?? []).reduce((area, opening) => area - polygonArea(opening), polygonArea(slab.boundary));
 }
 
-export function columnSectionArea(
-  column: Extract<BuildingElement, { category: 'column' }>,
-): number {
-  return column.shape === 'circular'
-    ? Math.PI * (column.width / 2) ** 2
-    : column.width * column.depth;
+export function columnSectionArea(column: Extract<BuildingElement, { category: 'column' }>): number {
+  return column.shape === 'circular' ? Math.PI * (column.width / 2) ** 2 : column.width * column.depth;
 }
 
 export function stairVolume(stair: Extract<BuildingElement, { category: 'stair' }>): number {
@@ -91,10 +64,7 @@ const REBAR_KG_PER_M3 = 7850;
 const REBAR_LAP_FACTOR = 1.1;
 
 /** Mass (kg) of a footing's two-way bottom mat incl. 10% laps; 0 when unreinforced. */
-export function footingRebarMass(
-  footing: Extract<BuildingElement, { category: 'footing' }>,
-  scale: Scale,
-): number {
+export function footingRebarMass(footing: Extract<BuildingElement, { category: 'footing' }>, scale: Scale): number {
   const { reinforcement } = footing;
   if (!reinforcement) return 0;
   const [diameter, spacing, cover, width, length] = [
@@ -105,8 +75,7 @@ export function footingRebarMass(
     footing.length,
   ].map(scale.length) as [number, number, number, number, number];
   const barLength = (extent: number): number => Math.max(0, extent - 2 * cover);
-  const barCount = (extent: number): number =>
-    Math.max(0, Math.floor((extent - 2 * cover) / spacing) + 1);
+  const barCount = (extent: number): number => Math.max(0, Math.floor((extent - 2 * cover) / spacing) + 1);
   const total = barCount(length) * barLength(width) + barCount(width) * barLength(length);
   return total * ((Math.PI * diameter ** 2) / 4) * REBAR_KG_PER_M3 * REBAR_LAP_FACTOR;
 }
@@ -138,9 +107,6 @@ export class TakeoffAccumulator {
   }
 
   result(): TakeoffLine[] {
-    return [...this.lines.values()].map((line) => ({
-      ...line,
-      quantity: round(line.quantity, 3),
-    }));
+    return [...this.lines.values()].map((line) => ({ ...line, quantity: round(line.quantity, 3) }));
   }
 }

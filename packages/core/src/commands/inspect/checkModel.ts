@@ -1,8 +1,4 @@
-/**
- * check_model: read-only lint pass (geometry defects, structural inconsistencies, parameter errors).
- *
- * @layer core/commands
- */
+/** check_model: read-only lint pass (geometry defects, structural inconsistencies, parameter errors). */
 
 import type { CadDocument, Entity } from '../../model/types';
 import type { CommandResult } from '../types';
@@ -33,37 +29,29 @@ export interface CheckResult {
   issues: Issue[];
 }
 
-const issue = (
-  severity: IssueSeverity,
-  code: string,
-  message: string,
-  entityId?: string,
-): Issue => ({ severity, code, message, ...(entityId !== undefined ? { entityId } : {}) });
+const issue = (severity: IssueSeverity, code: string, message: string, entityId?: string): Issue => ({
+  severity,
+  code,
+  message,
+  ...(entityId !== undefined ? { entityId } : {}),
+});
 
 /** Degenerate geometry: sizes, radii, and depths that are not finite and > 0 (`POSITIVE_FIELDS`). */
 function checkDegenerateGeometry(e: Entity): Issue[] {
   const label = e.kind.charAt(0).toUpperCase() + e.kind.slice(1);
-  const degenerate = (detail: string): Issue =>
-    issue('error', 'degenerate_size', `${label} entity '${e.id}' ${detail}.`, e.id);
+  const degenerate = (detail: string): Issue => issue('error', 'degenerate_size', `${label} entity '${e.id}' ${detail}.`, e.id);
   const fields: Record<string, unknown> = { ...e };
   const issues = (POSITIVE_FIELDS[e.kind] ?? [])
     .filter((field) => !isPositiveNumber(fields[field]))
-    .map((field) =>
-      degenerate(`has ${field} ${String(fields[field])}; ${field} must be finite and > 0`),
-    );
+    .map((field) => degenerate(`has ${field} ${String(fields[field])}; ${field} must be finite and > 0`));
   if (e.kind === 'box' || e.kind === 'wedge') {
     if (!e.size.every((c) => isPositiveNumber(c)))
-      issues.push(
-        degenerate(
-          `has a non-positive size component [${e.size.join(', ')}]; all dimensions must be finite and > 0`,
-        ),
-      );
+      issues.push(degenerate(`has a non-positive size component [${e.size.join(', ')}]; all dimensions must be finite and > 0`));
   } else if (e.kind === 'sweep') {
     if (e.section.shape === 'circle' && !isPositiveNumber(e.section.radius))
       issues.push(degenerate(`has section radius ${e.section.radius}; it must be finite and > 0`));
-  } else if (e.kind === 'text' && e.content.trim().length === 0) {
+  } else if (e.kind === 'text' && e.content.trim().length === 0)
     issues.push(degenerate('has empty content; content must be a non-empty string'));
-  }
   return issues;
 }
 
@@ -84,14 +72,7 @@ function checkOpenProfile(e: Entity): Issue[] {
 function checkInsufficientPoints(e: Entity): Issue[] {
   if ((e.kind !== 'polyline' && e.kind !== 'spline') || e.points.length >= 2) return [];
   const label = e.kind === 'polyline' ? 'Polyline' : 'Spline';
-  return [
-    issue(
-      'error',
-      'insufficient_points',
-      `${label} entity '${e.id}' has ${e.points.length} point(s); minimum is 2.`,
-      e.id,
-    ),
-  ];
+  return [issue('error', 'insufficient_points', `${label} entity '${e.id}' has ${e.points.length} point(s); minimum is 2.`, e.id)];
 }
 
 /** Far from origin: bounding-box centre beyond `farThreshold` (viewport precision issues). */
@@ -115,13 +96,7 @@ function checkEmptyLayers(doc: CadDocument): Issue[] {
   return doc.layerOrder.flatMap((layerId) => {
     const layer = doc.layers[layerId];
     return layer && !usedLayerIds.has(layerId)
-      ? [
-          issue(
-            'info',
-            'empty_layer',
-            `Layer '${layer.name}' (id: ${layerId}) has no entities assigned to it.`,
-          ),
-        ]
+      ? [issue('info', 'empty_layer', `Layer '${layer.name}' (id: ${layerId}) has no entities assigned to it.`)]
       : [];
   });
 }
@@ -171,12 +146,7 @@ function checkDanglingComponentRef(entity: Entity, doc: CadDocument): Issue[] {
 /** Constraints, joints and drive relations pointing at entities/joints that no longer exist. */
 function checkDanglingRelations(doc: CadDocument): Issue[] {
   const missing = (kind: string, id: string, refKind: string, refId: string): Issue =>
-    issue(
-      'error',
-      'dangling_reference',
-      `${kind} '${id}' references ${refKind} '${refId}' which does not exist in the document.`,
-      refId,
-    );
+    issue('error', 'dangling_reference', `${kind} '${id}' references ${refKind} '${refId}' which does not exist in the document.`, refId);
   return [
     ...Object.values(doc.constraints ?? {}).flatMap((c) =>
       [c.a.entityId, c.b.entityId]
@@ -230,9 +200,6 @@ export function runModelChecks(doc: CadDocument, farThreshold: number): CheckRes
 }
 
 /**
- * @command check_model
- * @pure
- * @layer core/commands
  * @affects nothing — read-only; document returned as the SAME reference, affected:[]
  * @invariant data satisfies CheckResult; document === input doc (same reference)
  * @failure never throws; always returns a valid CheckResult in data
@@ -264,20 +231,11 @@ export const checkModel = defineCommand({
   run: (doc, params): CommandResult => {
     const farThreshold = params.farThreshold ?? 1e6;
     const result = runModelChecks(doc, farThreshold);
-
-    const count = (severity: IssueSeverity): number =>
-      result.issues.filter((i) => i.severity === severity).length;
-
+    const count = (severity: IssueSeverity): number => result.issues.filter((i) => i.severity === severity).length;
     const summary =
       result.issues.length === 0
         ? 'check_model: no issues found — model is clean.'
         : `check_model: ${result.issues.length} issue(s) — ${count('error')} error(s), ${count('warning')} warning(s), ${count('info')} info(s). ok=${result.ok}.`;
-
-    return {
-      document: doc,
-      summary,
-      affected: [],
-      data: result,
-    };
+    return { document: doc, summary, affected: [], data: result };
   },
 });

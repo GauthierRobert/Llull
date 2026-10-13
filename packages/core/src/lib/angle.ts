@@ -1,9 +1,4 @@
-/**
- * Angle wrapping with explicit ranges (radians).
- *
- * @layer lib
- * @pure
- */
+/** Angle wrapping with explicit ranges (radians). */
 
 import { roundTo } from './compactNumber';
 
@@ -20,8 +15,8 @@ export function wrapSignedAngle(angle: number): number {
 }
 
 /**
- * A CCW arc sweep: a non-positive `sweep` gains whole turns until it lies in (0, 2π] (zero is a
- * full circle); a positive sweep, even beyond 2π, is returned unchanged.
+ * A CCW arc sweep: a non-positive `sweep` gains whole turns until it lies in (0, 2π] (zero is a full circle); a positive sweep, even beyond
+ * 2π, is returned unchanged.
  */
 export function positiveSweep(sweep: number): number {
   let result = sweep;
@@ -46,8 +41,8 @@ export function angleFromCosine(cosine: number): number {
 }
 
 /**
- * A text direction that reads left-to-right / bottom-up: `angle` (radians) turned by π into
- * (−π/2, π/2] when it points backwards. Dimension values, contour and alignment labels.
+ * A text direction that reads left-to-right / bottom-up: `angle` (radians) turned by π into (−π/2, π/2] when it points backwards. Dimension
+ * values, contour and alignment labels.
  */
 export function readableAngle(angle: number): number {
   const wrapped = wrapSignedAngle(angle);

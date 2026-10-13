@@ -3,10 +3,7 @@ import { expandInstance } from './instanceExpansion';
 import { solidTriangles } from './solidTriangles';
 import type { Triangle } from './triangles';
 
-/**
- * World-space triangles of one entity; instances are expanded through their component (`doc`).
- * 2D shapes return [].
- */
+/** World-space triangles of one entity; instances are expanded through their component (`doc`). 2D shapes return []. */
 export function entityToTriangles(e: Entity, doc: Pick<CadDocument, 'components'>): Triangle[] {
   if (e.kind === 'instance') {
     const component = doc.components[e.componentId];
@@ -32,8 +29,8 @@ export interface ExportPart {
 }
 
 /**
- * The exportable 3D entities named by `requestedIds` (all of `doc.order` when undefined/empty),
- * each with its world-space triangles. Unknown ids are reported, 2D entities are counted and skipped.
+ * The exportable 3D entities named by `requestedIds` (all of `doc.order` when undefined/empty), each with its world-space triangles.
+ * Unknown ids are reported, 2D entities are counted and skipped.
  */
 export function collectExportParts(
   doc: CadDocument,
@@ -41,13 +38,12 @@ export function collectExportParts(
 ): { parts: ExportPart[]; skipped2D: number; unknownIds: string[] } {
   const unknownIds: string[] = [];
   let idsToProcess: readonly string[] = doc.order;
-  if (requestedIds && requestedIds.length > 0) {
+  if (requestedIds && requestedIds.length > 0)
     idsToProcess = requestedIds.filter((id) => {
       const known = doc.entities[id] !== undefined;
       if (!known) unknownIds.push(id);
       return known;
     });
-  }
   const parts: ExportPart[] = [];
   let skipped2D = 0;
   for (const id of idsToProcess) {
@@ -57,12 +53,7 @@ export function collectExportParts(
       skipped2D++;
       continue;
     }
-    parts.push({
-      id,
-      name: entity.name,
-      color: entity.color,
-      tris: entityToTriangles(entity, doc),
-    });
+    parts.push({ id, name: entity.name, color: entity.color, tris: entityToTriangles(entity, doc) });
   }
   return { parts, skipped2D, unknownIds };
 }
@@ -82,9 +73,7 @@ export function exportSummary(
   format: string,
   { tris, skipped2D, unknownIds }: ReturnType<typeof collectExportTriangles>,
 ): string {
-  const parts = [
-    `${command}: ${tris.length} triangle${tris.length !== 1 ? 's' : ''} exported (format=${format}).`,
-  ];
+  const parts = [`${command}: ${tris.length} triangle${tris.length !== 1 ? 's' : ''} exported (format=${format}).`];
   if (skipped2D > 0) parts.push(`${skipped2D} 2D entit${skipped2D !== 1 ? 'ies' : 'y'} skipped.`);
   if (unknownIds.length > 0) parts.push(`Unknown ids skipped: ${unknownIds.join(', ')}.`);
   return parts.join(' ');

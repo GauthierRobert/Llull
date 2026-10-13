@@ -1,9 +1,4 @@
-/**
- * Mesh volume and winding helpers over flat xyz position arrays.
- *
- * @layer geometry
- * @pure
- */
+/** Mesh volume and winding helpers over flat xyz position arrays. */
 
 import type { Vec3 } from '../model/vectors';
 import { cross3, dot3, vec3At } from '../lib/vec3';
@@ -14,19 +9,14 @@ export function soupIndices(positions: ReadonlyArray<number>): number[] {
 }
 
 /**
- * Signed volume of a consistently wound mesh (Σ A·(B×C) / 6): positive when wound outward.
- * An empty `indices` means `positions` is a triangle soup.
+ * Signed volume of a consistently wound mesh (Σ A·(B×C) / 6): positive when wound outward. An empty `indices` means `positions` is a
+ * triangle soup.
  */
-export function signedMeshVolume(
-  positions: ReadonlyArray<number>,
-  indices: ReadonlyArray<number>,
-): number {
+export function signedMeshVolume(positions: ReadonlyArray<number>, indices: ReadonlyArray<number>): number {
   const corners = indices.length > 0 ? indices : soupIndices(positions);
   const corner = (n: number): Vec3 => vec3At(positions, (corners[n] ?? 0) * 3);
   let sum = 0;
-  for (let t = 0; t + 2 < corners.length; t += 3) {
-    sum += dot3(corner(t), cross3(corner(t + 1), corner(t + 2)));
-  }
+  for (let t = 0; t + 2 < corners.length; t += 3) sum += dot3(corner(t), cross3(corner(t + 1), corner(t + 2)));
   return sum / 6;
 }
 
@@ -40,13 +30,10 @@ export function flipTriangleWinding<T>(corners: T[]): void {
 }
 
 /**
- * Corner list of a closed mesh wound outward: `indices` as given (or the soup's own order),
- * with every triangle flipped when the mesh is inside-out. Never mutates its inputs.
+ * Corner list of a closed mesh wound outward: `indices` as given (or the soup's own order), with every triangle flipped when the mesh is
+ * inside-out. Never mutates its inputs.
  */
-export function orientOutward(
-  positions: ReadonlyArray<number>,
-  indices: ReadonlyArray<number>,
-): number[] {
+export function orientOutward(positions: ReadonlyArray<number>, indices: ReadonlyArray<number>): number[] {
   const corners = indices.length > 0 ? [...indices] : soupIndices(positions);
   if (signedMeshVolume(positions, corners) < 0) flipTriangleWinding(corners);
   return corners;

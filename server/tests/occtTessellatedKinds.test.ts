@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Live OpenCascade vs Manifold: wedge, pyramid and revolution are valid boolean operands whose
  * exact OCC volume agrees with Manifold's (a revolution finely segmented so its facets do not
  * count).
@@ -13,10 +12,7 @@ import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { createNodeOcctKernel } from '../src/occtNode';
 import { common, booleanMesh, booleanRecipe, box, leaf, meshOf, volume } from './kernelTestSupport';
 
-const at = (
-  position: Vec3,
-  rotation: Vec3,
-): Pick<Entity, 'position' | 'rotation' | 'layerId' | 'color'> => ({
+const at = (position: Vec3, rotation: Vec3): Pick<Entity, 'position' | 'rotation' | 'layerId' | 'color'> => ({
   position,
   rotation,
   ...common,
@@ -24,11 +20,7 @@ const at = (
 
 const shapes: Array<[string, (position: Vec3, rotation: Vec3) => Entity]> = [
   ['wedge', (p, r) => ({ id: 'w', kind: 'wedge', size: [4, 3, 5], ...at(p, r) }) as Entity],
-  [
-    'pyramid',
-    (p, r) =>
-      ({ id: 'y', kind: 'pyramid', baseWidth: 4, baseDepth: 3, height: 5, ...at(p, r) }) as Entity,
-  ],
+  ['pyramid', (p, r) => ({ id: 'y', kind: 'pyramid', baseWidth: 4, baseDepth: 3, height: 5, ...at(p, r) }) as Entity],
   [
     'revolution',
     (p, r) =>
@@ -71,22 +63,16 @@ describe.each(shapes)('occt %s', (name, make) => {
     expect(exact / volume(fromManifold!)).toBeCloseTo(1, 2);
   });
 
-  it.each(['union', 'subtract', 'intersect'] as const)(
-    '%s with a box agrees with Manifold',
-    (op) => {
-      const entity = make([0.3, 0.2, 0.1], [0.2, -0.1, 0.4]);
-      const other = box([1.3, 0.7, 1.9], [3.1, 2.3, 2.7]);
-      const [fromOcct, fromManifold] = [
-        booleanMesh(occt, op, entity, other),
-        booleanMesh(manifold, op, entity, other),
-      ];
-      expect(fromOcct, `${name} ${op}`).not.toBeNull();
-      expect(fromManifold, `${name} ${op}`).not.toBeNull();
-      // The exact B-rep volume: the OCC display mesh is a coarse (0.5 rad) tessellation.
-      const exact = occt.topology(occt.evaluate(booleanRecipe(op, entity, other))!)!.volume;
-      expect(exact / volume(fromManifold!)).toBeCloseTo(1, 2);
-    },
-  );
+  it.each(['union', 'subtract', 'intersect'] as const)('%s with a box agrees with Manifold', (op) => {
+    const entity = make([0.3, 0.2, 0.1], [0.2, -0.1, 0.4]);
+    const other = box([1.3, 0.7, 1.9], [3.1, 2.3, 2.7]);
+    const [fromOcct, fromManifold] = [booleanMesh(occt, op, entity, other), booleanMesh(manifold, op, entity, other)];
+    expect(fromOcct, `${name} ${op}`).not.toBeNull();
+    expect(fromManifold, `${name} ${op}`).not.toBeNull();
+    // The exact B-rep volume: the OCC display mesh is a coarse (0.5 rad) tessellation.
+    const exact = occt.topology(occt.evaluate(booleanRecipe(op, entity, other))!)!.volume;
+    expect(exact / volume(fromManifold!)).toBeCloseTo(1, 2);
+  });
 });
 
 // Revolution is built exactly (MakeRevol) in llull's frame for the dominant axis component:
@@ -98,23 +84,8 @@ describe('occt revolution frames', () => {
     [2.5, 3],
     [1, 2],
   ];
-  const revolution = (
-    profile: Array<[number, number]>,
-    axis: Vec3,
-    angle: number,
-    position: Vec3 = [1, -2, 3],
-  ): Entity =>
-    ({
-      id: 'v',
-      kind: 'revolution',
-      profile,
-      axis,
-      angle,
-      segments: 48,
-      position,
-      rotation: [0, 0, 0],
-      ...common,
-    }) as Entity;
+  const revolution = (profile: Array<[number, number]>, axis: Vec3, angle: number, position: Vec3 = [1, -2, 3]): Entity =>
+    ({ id: 'v', kind: 'revolution', profile, axis, angle, segments: 48, position, rotation: [0, 0, 0], ...common }) as Entity;
 
   const spans = (mesh: MeshData): number[] => {
     const lo = [Infinity, Infinity, Infinity];
@@ -144,9 +115,7 @@ describe('occt revolution frames', () => {
       const ratio = volume(fromOcct!) / volume(fromManifold!);
       expect(ratio).toBeGreaterThan(0.98);
       expect(ratio).toBeLessThan(1.04);
-      spans(fromOcct!).forEach((value, index) =>
-        expect(Math.abs(value - (spans(fromManifold!)[index] ?? NaN))).toBeLessThan(0.15),
-      );
+      spans(fromOcct!).forEach((value, index) => expect(Math.abs(value - (spans(fromManifold!)[index] ?? NaN))).toBeLessThan(0.15));
     }
   });
 
@@ -158,8 +127,6 @@ describe('occt revolution frames', () => {
     ];
     expect(meshOf(occt, revolution(flat, [0, 0, 1], Math.PI))).toBeNull();
     expect(meshOf(occt, revolution(ring, [0, 0, 1], 0))).toBeNull();
-    expect(
-      meshOf(occt, { ...revolution(ring, [0, 0, 1], Math.PI), segments: 2 } as Entity),
-    ).toBeNull();
+    expect(meshOf(occt, { ...revolution(ring, [0, 0, 1], Math.PI), segments: 2 } as Entity)).toBeNull();
   });
 });

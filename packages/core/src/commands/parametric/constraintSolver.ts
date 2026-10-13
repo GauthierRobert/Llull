@@ -8,28 +8,22 @@ import type { Vec2 as Point } from '../../model/vectors';
 function resolvePoint(doc: CadDocument, ref: EntityRef): Point | null {
   const entity = doc.entities[ref.entityId];
   if (!entity) return null;
-
   const [px, py] = entity.position;
   const subKind = 'kind' in ref ? ref.kind : undefined;
-
   // Named sub-points of line/arc/circle entities; anything else falls back to the entity position.
   if (entity.kind === 'line') {
     const { start, end } = entity;
     if (subKind === 'start') return [start[0] + px, start[1] + py];
     if (subKind === 'end') return [end[0] + px, end[1] + py];
-    if (subKind === 'center' || subKind === 'mid')
-      return [(start[0] + end[0]) / 2 + px, (start[1] + end[1]) / 2 + py];
+    if (subKind === 'center' || subKind === 'mid') return [(start[0] + end[0]) / 2 + px, (start[1] + end[1]) / 2 + py];
   }
-
-  if ((entity.kind === 'arc' || entity.kind === 'circle') && subKind === 'center')
-    return [entity.center[0] + px, entity.center[1] + py];
-
+  if ((entity.kind === 'arc' || entity.kind === 'circle') && subKind === 'center') return [entity.center[0] + px, entity.center[1] + py];
   return [px, py];
 }
 
 /**
- * Resolve the 2D direction vector of a line entity. Returns null when not applicable.
- * Normalises to unit length; returns [1, 0] on degenerate (zero-length) line.
+ * Resolve the 2D direction vector of a line entity. Returns null when not applicable. Normalises to unit length; returns [1, 0] on
+ * degenerate (zero-length) line.
  */
 function resolveDirection(doc: CadDocument, ref: EntityRef): [number, number] | null {
   const entity = doc.entities[ref.entityId];
@@ -68,39 +62,26 @@ function turnedLine(start: Vec2, end: Vec2, turn: number): { start: Vec2; end: V
   const my = (start[1] + end[1]) / 2;
   const cos = Math.cos(turn);
   const sin = Math.sin(turn);
-  const rotate = (p: Vec2): Vec2 => [
-    mx + (p[0] - mx) * cos - (p[1] - my) * sin,
-    my + (p[0] - mx) * sin + (p[1] - my) * cos,
-  ];
+  const rotate = (p: Vec2): Vec2 => [mx + (p[0] - mx) * cos - (p[1] - my) * sin, my + (p[0] - mx) * sin + (p[1] - my) * cos];
   return { start: rotate(start), end: rotate(end) };
 }
 
 /**
- * Compute the gradient contribution of one constraint and accumulate the position
- * delta into `deltas`. Each entity in the constraint receives a push that reduces
- * the constraint error.
+ * Compute the gradient contribution of one constraint and accumulate the position delta into `deltas`. Each entity in the constraint
+ * receives a push that reduces the constraint error.
  *
- * All movements are 2D (XY plane) — the solver only adjusts entity position[0] and
- * position[1]. Z is preserved.
+ * All movements are 2D (XY plane) — the solver only adjusts entity position[0] and position[1]. Z is preserved.
  *
  * Returns the squared error term for this constraint (for convergence check).
  */
-function applyConstraintGradient(
-  doc: CadDocument,
-  c: Constraint,
-  deltas: Delta,
-  turns: Turns,
-  stepSize: number,
-): number {
+function applyConstraintGradient(doc: CadDocument, c: Constraint, deltas: Delta, turns: Turns, stepSize: number): number {
   function addTurn(entityId: string, angle: number): void {
     turns.set(entityId, (turns.get(entityId) ?? 0) + angle);
   }
-
   function addDelta(entityId: string, dx: number, dy: number): void {
     const existing = deltas.get(entityId) ?? [0, 0];
     deltas.set(entityId, [existing[0] + dx, existing[1] + dy]);
   }
-
   /** Turns line b toward the nearest multiple of PI from `offset` relative to a; returns err². */
   function turnToLattice(pair: Constraint, offset: number): number {
     if (!('a' in pair) || !('b' in pair)) return 0;
@@ -111,15 +92,8 @@ function applyConstraintGradient(
     addTurn(pair.b.entityId, -TURN_RELAXATION * err);
     return err * err;
   }
-
   /** Gradient of (|pa - pb| - target)²; returns the squared error. */
-  function pullToDistance(
-    idA: string,
-    idB: string,
-    pa: readonly [number, number],
-    pb: readonly [number, number],
-    target: number,
-  ): number {
+  function pullToDistance(idA: string, idB: string, pa: readonly [number, number], pb: readonly [number, number], target: number): number {
     const dx = pa[0] - pb[0];
     const dy = pa[1] - pb[1];
     const dist = len2([dx, dy]);
@@ -131,7 +105,6 @@ function applyConstraintGradient(
     addDelta(idB, stepSize * err * ux, stepSize * err * uy);
     return err * err;
   }
-
   switch (c.kind) {
     case 'coincident': {
       const pa = resolvePoint(doc, c.a);
@@ -145,7 +118,6 @@ function applyConstraintGradient(
       addDelta(c.b.entityId, stepSize * dx, stepSize * dy);
       return err2;
     }
-
     case 'distance': {
       const pa = resolvePoint(doc, c.a);
       const pb = resolvePoint(doc, c.b);
@@ -154,7 +126,6 @@ function applyConstraintGradient(
       if (target === null) return 0;
       return pullToDistance(c.a.entityId, c.b.entityId, pa, pb, target);
     }
-
     case 'angle': {
       const da = resolveDirection(doc, c.a);
       const db = resolveDirection(doc, c.b);
@@ -166,17 +137,13 @@ function applyConstraintGradient(
       addTurn(c.b.entityId, -TURN_RELAXATION * err);
       return err * err;
     }
-
     case 'parallel':
       return turnToLattice(c, 0);
-
     case 'perpendicular':
       return turnToLattice(c, Math.PI / 2);
-
     case 'tangent': {
       const rA = resolveRadius(doc, c.a);
       const rB = resolveRadius(doc, c.b);
-
       if (rA !== null && rB !== null) {
         // Circle/arc ↔ circle/arc: external tangency.
         const pa = resolvePoint(doc, c.a);
@@ -184,7 +151,6 @@ function applyConstraintGradient(
         if (!pa || !pb) return 0;
         return pullToDistance(c.a.entityId, c.b.entityId, pa, pb, rA + rB);
       }
-
       // Line ↔ circle: |distance from circle center to line| == radius.
       const circleRef = rA !== null ? c.a : rB !== null ? c.b : null;
       if (circleRef === null) return 0;
@@ -214,39 +180,23 @@ function applyConstraintGradient(
  * Run the constraint solver and return a new document with updated entity positions.
  *
  * The solver is a 2D projected gradient descent / Newton-style iteration:
- * - Points are pulled by adjusting entity.position[0] and position[1] (2D XY plane); position[2] (Z)
- *   is preserved.
+ * - Points are pulled by adjusting entity.position[0] and position[1] (2D XY plane); position[2] (Z) is preserved.
  * - angle/parallel/perpendicular turn line b about its midpoint (its start/end change, not position).
  * - `residual` and `converged` describe the returned document, not the previous iterate.
- * - Iterates up to MAX_ITERATIONS steps, stopping early when residual < RESIDUAL_THRESHOLD
- *   or step delta < DELTA_THRESHOLD.
- *
- * @pure — never mutates `doc`.
+ * - Iterates up to MAX_ITERATIONS steps, stopping early when residual < RESIDUAL_THRESHOLD or step delta < DELTA_THRESHOLD.
  */
-export function runSolver(doc: CadDocument): {
-  document: CadDocument;
-  residual: number;
-  iterations: number;
-  converged: boolean;
-} {
+export function runSolver(doc: CadDocument): { document: CadDocument; residual: number; iterations: number; converged: boolean } {
   const MAX_ITERATIONS = 64;
   const RESIDUAL_THRESHOLD = 1e-8;
   const DELTA_THRESHOLD = 1e-10;
   const BASE_STEP = 0.1;
-
   const constraints = Object.values(doc.constraints);
-  if (constraints.length === 0)
-    return { document: doc, residual: 0, iterations: 0, converged: true };
-
+  if (constraints.length === 0) return { document: doc, residual: 0, iterations: 0, converged: true };
   // Working copy of positions keyed by entity id.
   const positions = new Map<string, Vec3>();
-  for (const [id, entity] of Object.entries(doc.entities)) {
-    positions.set(id, entity.position);
-  }
-
+  for (const [id, entity] of Object.entries(doc.entities)) positions.set(id, entity.position);
   // Working line endpoints for lines turned by angle/parallel/perpendicular constraints.
   const lineEnds = new Map<string, { start: Vec2; end: Vec2 }>();
-
   /** Build a document with the current working positions and line endpoints applied. */
   function buildDoc(): CadDocument {
     const newEntities: CadDocument['entities'] = {};
@@ -257,33 +207,21 @@ export function runSolver(doc: CadDocument): {
     }
     return { ...doc, entities: newEntities };
   }
-
   /** Total squared constraint error of `target` (gradient output discarded). */
   function totalResidual(target: CadDocument): number {
     const scratch: Delta = new Map();
     const scratchTurns: Turns = new Map();
-    return constraints.reduce(
-      (sum, c) => sum + applyConstraintGradient(target, c, scratch, scratchTurns, BASE_STEP),
-      0,
-    );
+    return constraints.reduce((sum, c) => sum + applyConstraintGradient(target, c, scratch, scratchTurns, BASE_STEP), 0);
   }
-
   let iterations = 0;
-
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
     const workingDoc = buildDoc();
     const deltas: Delta = new Map();
     const turns: Turns = new Map();
     let totalError = 0;
-
-    for (const c of constraints) {
-      totalError += applyConstraintGradient(workingDoc, c, deltas, turns, BASE_STEP);
-    }
-
+    for (const c of constraints) totalError += applyConstraintGradient(workingDoc, c, deltas, turns, BASE_STEP);
     iterations = iter + 1;
-
     if (totalError < RESIDUAL_THRESHOLD) break;
-
     // Apply deltas.
     let maxDelta = 0;
     for (const [id, [dx, dy]] of deltas) {
@@ -293,7 +231,6 @@ export function runSolver(doc: CadDocument): {
       positions.set(id, newPos);
       maxDelta = Math.max(maxDelta, Math.abs(dx), Math.abs(dy));
     }
-
     for (const [id, turn] of turns) {
       const line = workingDoc.entities[id];
       if (line?.kind !== 'line') continue;
@@ -301,10 +238,8 @@ export function runSolver(doc: CadDocument): {
       lineEnds.set(id, turnedLine(current.start, current.end, turn));
       maxDelta = Math.max(maxDelta, Math.abs(turn));
     }
-
     if (maxDelta < DELTA_THRESHOLD) break;
   }
-
   const document = buildDoc();
   // The loop measures the error BEFORE each update; report the error of the document returned.
   const residual = totalResidual(document);

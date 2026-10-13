@@ -64,12 +64,7 @@ export function buildServiceWorkerManifest(
   const include = new RegExp(policy.precache.include);
   const exclude = new RegExp(policy.precache.exclude);
   const precache = files
-    .filter(
-      (file) =>
-        include.test(file.fileName) &&
-        !exclude.test(file.fileName) &&
-        file.bytes <= policy.precache.maxEntryBytes,
-    )
+    .filter((file) => include.test(file.fileName) && !exclude.test(file.fileName) && file.bytes <= policy.precache.maxEntryBytes)
     .map((file) => file.fileName)
     .concat(policy.precache.shell)
     .sort();
@@ -90,18 +85,13 @@ export function serviceWorkerPlugin(root: string): Plugin {
     name: 'llull-service-worker',
     apply: 'build',
     generateBundle(_options, bundle) {
-      const policy = parseServiceWorkerPolicy(
-        JSON.parse(readFileSync(resolve(root, 'serviceWorker/config.json'), 'utf8')),
-      );
+      const policy = parseServiceWorkerPolicy(JSON.parse(readFileSync(resolve(root, 'serviceWorker/config.json'), 'utf8')));
       const sourceOf = (fileName: string): string | Uint8Array => {
         const output = bundle[fileName];
         if (output === undefined) return '';
         return output.type === 'chunk' ? output.code : output.source;
       };
-      const files = Object.keys(bundle).map((fileName) => ({
-        fileName,
-        bytes: Buffer.byteLength(sourceOf(fileName)),
-      }));
+      const files = Object.keys(bundle).map((fileName) => ({ fileName, bytes: Buffer.byteLength(sourceOf(fileName)) }));
       const workerSource = readFileSync(resolve(root, 'serviceWorker/sw.js'), 'utf8');
       const manifest = buildServiceWorkerManifest(
         files,
@@ -109,11 +99,7 @@ export function serviceWorkerPlugin(root: string): Plugin {
         (fileName) => createHash('sha256').update(sourceOf(fileName)).digest('hex'),
         workerSource,
       );
-      this.emitFile({
-        type: 'asset',
-        fileName: 'sw.js',
-        source: serviceWorkerScript(manifest, workerSource),
-      });
+      this.emitFile({ type: 'asset', fileName: 'sw.js', source: serviceWorkerScript(manifest, workerSource) });
     },
   };
 }

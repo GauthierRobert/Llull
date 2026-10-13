@@ -1,9 +1,5 @@
 /**
- * Cutaway for render_view: clips solid polygons against half-spaces (split, not dropped) and
- * rebuilds the section outline as capped loops.
- *
- * @layer core/commands
- * @pure
+ * Cutaway for render_view: clips solid polygons against half-spaces (split, not dropped) and rebuilds the section outline as capped loops.
  */
 
 import type { Vec3 } from '../../model/types';
@@ -17,9 +13,7 @@ export function isValidCut(cut: CutSpec): boolean {
     cut.planes.length > 0 &&
     cut.planes.every(
       ({ normal, offset }) =>
-        Number.isFinite(offset) &&
-        normal.every(Number.isFinite) &&
-        Math.hypot(normal[0], normal[1], normal[2]) > 1e-9,
+        Number.isFinite(offset) && normal.every(Number.isFinite) && Math.hypot(normal[0], normal[1], normal[2]) > 1e-9,
     )
   );
 }
@@ -71,8 +65,7 @@ function capFor(
     ),
     tolerance,
   )) {
-    // The removed region's face on this plane lies inside every other cut side (intersection)
-    // or outside all of them (union).
+    // The removed region's face on this plane lies inside every other cut side (intersection) or outside all of them (union).
     let clipped: Vec3[] = loop;
     for (const other of others) {
       clipped = clipToSide(clipped, other, mode === 'intersection');
@@ -95,12 +88,7 @@ export interface CutResult {
  * Clip every filled polygon of an entity and append the section caps.
  * @param tolerance chain-matching distance (world units)
  */
-export function cutEntityPolygons(
-  polygons: readonly PreDepthPolygon[],
-  cut: CutSpec,
-  planes: UnitPlane[],
-  tolerance: number,
-): CutResult {
+export function cutEntityPolygons(polygons: readonly PreDepthPolygon[], cut: CutSpec, planes: UnitPlane[], tolerance: number): CutResult {
   const solids = polygons.filter((p) => !p.stroke);
   const result: PreDepthPolygon[] = polygons.filter((p) => p.stroke);
   let touched = false;

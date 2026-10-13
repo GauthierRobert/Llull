@@ -1,5 +1,4 @@
 /**
- * @layer desktop/tests
  * The desktop app minus Electron: the real server bundle started the way the app starts it
  * (backendEnv + startBackend, `child_process.fork` instead of `utilityProcess.fork`), then the
  * File menu operations (DocumentSession) and the Claude Code path (`llull --app` via the
@@ -48,23 +47,11 @@ beforeAll(async () => {
     (entry, env) => fork(entry, [], { env, stdio: 'ignore' }),
     layout.serverEntry,
     // Vitest sets TEST/VITEST, which keep the server from listening; the app never has them.
-    backendEnv({
-      port,
-      token,
-      layout,
-      userDataDir: userData,
-      baseEnv: { ...process.env, TEST: undefined, VITEST: undefined },
-    }),
+    backendEnv({ port, token, layout, userDataDir: userData, baseEnv: { ...process.env, TEST: undefined, VITEST: undefined } }),
     url,
   );
   session = createDocumentSession({ url, token });
-  writeDesktopDiscovery(home, {
-    url,
-    token,
-    pid: process.pid,
-    documentPath: null,
-    version: 'test',
-  });
+  writeDesktopDiscovery(home, { url, token, pid: process.pid, documentPath: null, version: 'test' });
 }, 60_000);
 
 afterAll(async () => {

@@ -1,10 +1,5 @@
-/**
- * @layer ui/panels/building
- *
- * StructuralSection — roof / wind loads → the read-only structural checks (frames, bracing,
- * foundations, crane runways; utilisation list, click selects the element) and
- * design_portal_frames / design_purlins (dispatched; up-size sections, bolt groups, purlins and rails).
- */
+// Roof / wind loads → read-only structural checks (frames, bracing, foundations, crane runways; click selects) and
+// design_portal_frames / design_purlins.
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
@@ -34,10 +29,7 @@ const CHECKS = [
 type CheckCommand = (typeof CHECKS)[number]['command'];
 
 /** Multi-storey / rack check: its loads come from the model (slabs, equipment, pipes), not the form. */
-const loadsFromModel: ReadonlySet<CheckCommand> = new Set([
-  'check_steel_members',
-  'check_pipe_supports',
-]);
+const loadsFromModel: ReadonlySet<CheckCommand> = new Set(['check_steel_members', 'check_pipe_supports']);
 
 export function StructuralSection(): React.ReactElement {
   const building = useStore((s) => s.document.building);
@@ -48,20 +40,11 @@ export function StructuralSection(): React.ReactElement {
   const [windPressure, setWindPressure] = useState('0');
   const [computed, setReport] = useState<Report | null>(null);
   const report = computed !== null && computed.building === building ? computed : null;
-  const loads = {
-    deadLoad: Number(deadLoad),
-    snowLoad: Number(snowLoad),
-    windPressure: Number(windPressure),
-  };
+  const loads = { deadLoad: Number(deadLoad), snowLoad: Number(snowLoad), windPressure: Number(windPressure) };
 
   const runCheck = (command: CheckCommand): void => {
     const result = runQuery(command, loadsFromModel.has(command) ? {} : loads);
-    setReport({
-      summary: result.summary,
-      rows: worstRows(result.data),
-      warnings: toWarnings(result.data),
-      building,
-    });
+    setReport({ summary: result.summary, rows: worstRows(result.data), warnings: toWarnings(result.data), building });
   };
 
   return (
@@ -73,20 +56,8 @@ export function StructuralSection(): React.ReactElement {
       testId="building-structure"
     >
       <div className="building-inline-form">
-        <LabeledInput
-          label="Roof dead load (kN/m²)"
-          title="Roof dead load, kN/m²"
-          type="number"
-          value={deadLoad}
-          onChange={setDeadLoad}
-        />
-        <LabeledInput
-          label="Snow load (kN/m²)"
-          title="Snow load, kN/m²"
-          type="number"
-          value={snowLoad}
-          onChange={setSnowLoad}
-        />
+        <LabeledInput label="Roof dead load (kN/m²)" title="Roof dead load, kN/m²" type="number" value={deadLoad} onChange={setDeadLoad} />
+        <LabeledInput label="Snow load (kN/m²)" title="Snow load, kN/m²" type="number" value={snowLoad} onChange={setSnowLoad} />
         <LabeledInput
           label="Wind pressure qp (kN/m²)"
           title="Peak velocity pressure qp, kN/m² (0 = no wind)"
@@ -123,11 +94,7 @@ export function StructuralSection(): React.ReactElement {
           type="button"
           className="btn btn--ghost btn--sm"
           onClick={() =>
-            dispatch('design_purlins', {
-              roofDeadLoad: loads.deadLoad,
-              snowLoad: loads.snowLoad,
-              windPressure: loads.windPressure,
-            })
+            dispatch('design_purlins', { roofDeadLoad: loads.deadLoad, snowLoad: loads.snowLoad, windPressure: loads.windPressure })
           }
           data-testid="purlin-design"
         >
@@ -157,15 +124,9 @@ export function StructuralSection(): React.ReactElement {
                 buttonTestId="frame-check-row"
                 onSelect={() => select(building?.elements[row.elementId]?.entityIds ?? [])}
               >
-                {isFailing(row) ? (
-                  <span className="chip chip--danger">FAIL</span>
-                ) : (
-                  <span className="chip chip--success">OK</span>
-                )}
+                {isFailing(row) ? <span className="chip chip--danger">FAIL</span> : <span className="chip chip--success">OK</span>}
                 <span className="panel__row-main">{row.label}</span>
-                <span className="panel__row-meta">
-                  {row.detail !== '' ? row.detail : row.utilisation.toFixed(2)}
-                </span>
+                <span className="panel__row-meta">{row.detail !== '' ? row.detail : row.utilisation.toFixed(2)}</span>
               </ListRow>
             ))}
           </ul>

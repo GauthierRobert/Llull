@@ -1,10 +1,4 @@
-/**
- * @layer ui/viewport/3d
- *
- * React error boundary wrapping the r3f Canvas.
- * Catches render errors in the 3D scene and shows a minimal fallback
- * so the rest of the app keeps running.
- */
+// Error boundary around the r3f Canvas: a scene crash shows a fallback, the app keeps running.
 
 import { type ErrorInfo, type ReactNode, Component } from 'react';
 import { Icon } from '@ui/components/Icon';
@@ -43,9 +37,7 @@ export class ViewportErrorBoundary extends Component<Props, State> {
             </span>
             <h2 className="vp-error__title">The viewport hit a problem</h2>
             <p className="vp-error__message">{this.state.message}</p>
-            <p className="vp-error__hint">
-              Your document is safe. Reload the page to restore the view.
-            </p>
+            <p className="vp-error__hint">Your document is safe. Reload the page to restore the view.</p>
           </div>
         </div>
       );

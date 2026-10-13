@@ -1,8 +1,6 @@
 /**
- * Horizontal alignment geometry: tangents through PIs joined by simple circular curves.
- * All lengths and stations are in document units; angles in radians (0 = +X, counter-clockwise).
- * @layer domain-aec/civil
- * @pure
+ * Horizontal alignment geometry: tangents through PIs joined by simple circular curves. All lengths and stations are in document units;
+ * angles in radians (0 = +X, counter-clockwise).
  */
 
 import { clamp } from '@lib/clamp';
@@ -10,19 +8,11 @@ import { toDegrees } from '@lib/angle';
 import type { Vec2 } from '@core/model/types';
 import type { AlignmentObject } from '@core/model/civil';
 import { normalize2, sub2 } from '@lib/vec2';
-import {
-  nearestAlongSpiral,
-  spiralCurve,
-  spiralPointAt,
-  spiralSweep,
-  type SpiralCurve,
-  type SpiralElement,
-} from './alignmentSpiral';
+import { nearestAlongSpiral, spiralCurve, spiralPointAt, spiralSweep, type SpiralCurve, type SpiralElement } from './alignmentSpiral';
 
 export type { SpiralElement } from './alignmentSpiral';
 
-export type HorizontalInput = Pick<AlignmentObject, 'points' | 'radii' | 'startStation'> &
-  Partial<Pick<AlignmentObject, 'spirals'>>;
+export type HorizontalInput = Pick<AlignmentObject, 'points' | 'radii' | 'startStation'> & Partial<Pick<AlignmentObject, 'spirals'>>;
 
 export interface LineElement {
   readonly kind: 'line';
@@ -83,12 +73,7 @@ function unit(from: Vec2, to: Vec2): Vec2 {
   return normalize2(sub2(to, from));
 }
 
-function curveAt(
-  points: ReadonlyArray<Vec2>,
-  radii: ReadonlyArray<number>,
-  i: number,
-  spirals: ReadonlyArray<number>,
-): Curve | null {
+function curveAt(points: ReadonlyArray<Vec2>, radii: ReadonlyArray<number>, i: number, spirals: ReadonlyArray<number>): Curve | null {
   const radius = radii[i - 1] ?? 0;
   const before = points[i - 1] as Vec2;
   const pi = points[i] as Vec2;
@@ -112,10 +97,7 @@ function curveAt(
   let pt = st;
   let arcHeading = heading;
   if (spiral) {
-    const local = (h: number, x: number, y: number): Vec2 => [
-      x * Math.cos(h) - y * Math.sin(h),
-      x * Math.sin(h) + y * Math.cos(h),
-    ];
+    const local = (h: number, x: number, y: number): Vec2 => [x * Math.cos(h) - y * Math.sin(h), x * Math.sin(h) + y * Math.cos(h)];
     const entry = local(heading, spiral.xs, turn * spiral.ys);
     const exit = local(heading + turn * deflection, spiral.xs, -turn * spiral.ys);
     pc = [ts[0] + entry[0], ts[1] + entry[1]];
@@ -140,21 +122,11 @@ function curveAt(
   };
 }
 
-function tangentLengths(
-  points: ReadonlyArray<Vec2>,
-  radii: ReadonlyArray<number>,
-  spirals: ReadonlyArray<number>,
-): number[] {
-  return points.map((_, i) =>
-    i === 0 || i === points.length - 1 ? 0 : (curveAt(points, radii, i, spirals)?.tangent ?? 0),
-  );
+function tangentLengths(points: ReadonlyArray<Vec2>, radii: ReadonlyArray<number>, spirals: ReadonlyArray<number>): number[] {
+  return points.map((_, i) => (i === 0 || i === points.length - 1 ? 0 : (curveAt(points, radii, i, spirals)?.tangent ?? 0)));
 }
 
-function spiralProblem(
-  points: ReadonlyArray<Vec2>,
-  radii: ReadonlyArray<number>,
-  spirals: ReadonlyArray<number>,
-): string | null {
+function spiralProblem(points: ReadonlyArray<Vec2>, radii: ReadonlyArray<number>, spirals: ReadonlyArray<number>): string | null {
   for (let i = 1; i < points.length - 1; i++) {
     const length = spirals[i - 1] ?? 0;
     const radius = radii[i - 1] ?? 0;
@@ -162,17 +134,13 @@ function spiralProblem(
     if (!(radius > 0)) return `PI ${i}: a spiral needs a curve radius > 0.`;
     const d1 = unit(points[i - 1] as Vec2, points[i] as Vec2);
     const d2 = unit(points[i] as Vec2, points[i + 1] as Vec2);
-    const deflection = Math.atan2(
-      Math.abs(d1[0] * d2[1] - d1[1] * d2[0]),
-      d1[0] * d2[0] + d1[1] * d2[1],
-    );
+    const deflection = Math.atan2(Math.abs(d1[0] * d2[1] - d1[1] * d2[0]), d1[0] * d2[0] + d1[1] * d2[1]);
     if (deflection < EPS) continue;
     if (!spiralCurve(radius, length, deflection)) {
       const spiralAngle = length / (2 * radius);
       return (
-        `PI ${i}: deflection ${toDegrees(deflection).toFixed(3)} deg is smaller than twice ` +
-        `the spiral angle (2 x ${toDegrees(spiralAngle).toFixed(3)} deg for Ls ${length} ` +
-        `and R ${radius}); shorten the spirals or reduce the radius.`
+        `PI ${i}: deflection ${toDegrees(deflection).toFixed(3)} deg is smaller than twice the spiral angle (2 x ` +
+        `${toDegrees(spiralAngle).toFixed(3)} deg for Ls ${length} and R ${radius}); shorten the spirals or reduce the radius.`
       );
     }
   }
@@ -186,21 +154,17 @@ export function validateHorizontal(
   spirals: ReadonlyArray<number> = [],
 ): string | null {
   if (points.length < 2) return 'an alignment needs at least 2 points.';
-  if (!points.every((point) => Number.isFinite(point[0]) && Number.isFinite(point[1])))
-    return 'points must be finite [x, y] pairs.';
+  if (!points.every((point) => Number.isFinite(point[0]) && Number.isFinite(point[1]))) return 'points must be finite [x, y] pairs.';
   for (let i = 0; i + 1 < points.length; i++) {
     const a = points[i] as Vec2;
     const b = points[i + 1] as Vec2;
     if (Math.hypot(b[0] - a[0], b[1] - a[1]) < EPS) return `points ${i} and ${i + 1} coincide.`;
   }
-  if (radii.length !== points.length - 2)
-    return `radii needs ${points.length - 2} value(s) (one per interior PI), got ${radii.length}.`;
-  if (!radii.every((radius) => Number.isFinite(radius) && radius >= 0))
-    return 'radii must be finite numbers >= 0 (0 = no curve).';
+  if (radii.length !== points.length - 2) return `radii needs ${points.length - 2} value(s) (one per interior PI), got ${radii.length}.`;
+  if (!radii.every((radius) => Number.isFinite(radius) && radius >= 0)) return 'radii must be finite numbers >= 0 (0 = no curve).';
   if (spirals.length > 0 && spirals.length !== radii.length)
     return `spirals needs ${radii.length} value(s) (one per interior PI), got ${spirals.length}.`;
-  if (!spirals.every((length) => Number.isFinite(length) && length >= 0))
-    return 'spirals must be finite numbers >= 0 (0 = no spiral).';
+  if (!spirals.every((length) => Number.isFinite(length) && length >= 0)) return 'spirals must be finite numbers >= 0 (0 = no spiral).';
   for (let i = 1; i < points.length - 1; i++) {
     const a = points[i - 1] as Vec2;
     const b = points[i] as Vec2;
@@ -208,8 +172,7 @@ export function validateHorizontal(
     const d1 = unit(a, b);
     const d2 = unit(b, c);
     const reversal = d1[0] * d2[0] + d1[1] * d2[1] < -1 + 1e-9;
-    if ((radii[i - 1] ?? 0) > 0 && reversal)
-      return `PI ${i}: the alignment doubles back on itself.`;
+    if ((radii[i - 1] ?? 0) > 0 && reversal) return `PI ${i}: the alignment doubles back on itself.`;
   }
   const spiral = spiralProblem(points, radii, spirals);
   if (spiral !== null) return spiral;
@@ -242,14 +205,7 @@ export function horizontalElements(alignment: HorizontalInput): HorizontalElemen
     const length = Math.hypot(to[0] - cursor[0], to[1] - cursor[1]);
     if (length > EPS) {
       const direction = Math.atan2(to[1] - cursor[1], to[0] - cursor[0]);
-      elements.push({
-        kind: 'line',
-        start: cursor,
-        end: to,
-        startStation: station,
-        length,
-        direction,
-      });
+      elements.push({ kind: 'line', start: cursor, end: to, startStation: station, length, direction });
       station += length;
     }
     cursor = to;
@@ -316,32 +272,23 @@ function sweepOf(element: ArcElement | SpiralElement): number {
 }
 
 function maxCurvature(element: ArcElement | SpiralElement): number {
-  return element.kind === 'arc'
-    ? 1 / element.radius
-    : 1 / Math.min(element.radiusStart, element.radiusEnd);
+  return element.kind === 'arc' ? 1 / element.radius : 1 / Math.min(element.radiusStart, element.radiusEnd);
 }
 
 function arcSign(arc: ArcElement): number {
   return arc.rotation === 'ccw' ? 1 : -1;
 }
 
-/** Polar angle of the arc start about its centre. */
 function arcStartAngle(arc: ArcElement): number {
   return Math.atan2(arc.start[1] - arc.center[1], arc.start[0] - arc.center[0]);
 }
 
 /** Point and travel direction on one element at `station` (clamped to the element). */
-export function elementPointAt(
-  element: HorizontalElement,
-  station: number,
-): { point: Vec2; direction: number } {
+export function elementPointAt(element: HorizontalElement, station: number): { point: Vec2; direction: number } {
   const along = clamp(station - element.startStation, 0, element.length);
   if (element.kind === 'line') {
     return {
-      point: [
-        element.start[0] + Math.cos(element.direction) * along,
-        element.start[1] + Math.sin(element.direction) * along,
-      ],
+      point: [element.start[0] + Math.cos(element.direction) * along, element.start[1] + Math.sin(element.direction) * along],
       direction: element.direction,
     };
   }
@@ -349,29 +296,17 @@ export function elementPointAt(
   const start = arcStartAngle(element);
   const angle = start + (arcSign(element) * along) / element.radius;
   return {
-    point: [
-      element.center[0] + element.radius * Math.cos(angle),
-      element.center[1] + element.radius * Math.sin(angle),
-    ],
+    point: [element.center[0] + element.radius * Math.cos(angle), element.center[1] + element.radius * Math.sin(angle)],
     direction: angle + (arcSign(element) * Math.PI) / 2,
   };
 }
 
-function elementAtStation(
-  elements: ReadonlyArray<HorizontalElement>,
-  station: number,
-): HorizontalElement | undefined {
-  return (
-    elements.find((element) => station <= element.startStation + element.length) ??
-    elements[elements.length - 1]
-  );
+function elementAtStation(elements: ReadonlyArray<HorizontalElement>, station: number): HorizontalElement | undefined {
+  return elements.find((element) => station <= element.startStation + element.length) ?? elements[elements.length - 1];
 }
 
 /** Centreline point and travel direction at `station` (clamped to the alignment); null if invalid. */
-export function pointAtStation(
-  alignment: HorizontalInput,
-  station: number,
-): { point: Vec2; direction: number } | null {
+export function pointAtStation(alignment: HorizontalInput, station: number): { point: Vec2; direction: number } | null {
   const element = elementAtStation(horizontalElements(alignment), station);
   return element ? elementPointAt(element, station) : null;
 }
@@ -422,14 +357,9 @@ export function centrelinePoints(alignment: HorizontalInput): Vec2[] {
   for (const element of horizontalElements(alignment)) {
     if (result.length === 0) result.push(element.start);
     if (element.kind !== 'line') {
-      const steps = Math.max(
-        element.kind === 'spiral' ? 2 : 1,
-        Math.ceil(sweepOf(element) / MAX_ARC_STEP),
-      );
+      const steps = Math.max(element.kind === 'spiral' ? 2 : 1, Math.ceil(sweepOf(element) / MAX_ARC_STEP));
       for (let k = 1; k < steps; k++) {
-        result.push(
-          elementPointAt(element, element.startStation + (element.length * k) / steps).point,
-        );
+        result.push(elementPointAt(element, element.startStation + (element.length * k) / steps).point);
       }
     }
     result.push(element.end);
@@ -440,14 +370,10 @@ export function centrelinePoints(alignment: HorizontalInput): Vec2[] {
 const MAX_SAMPLES = 2000;
 
 /**
- * Ascending stations for sampling: start, end, every `interval` from the start, curve PC / PT,
- * any `extra` stations, with arcs subdivided to chords of at most 5 degrees. Capped at ~2000.
+ * Ascending stations for sampling: start, end, every `interval` from the start, curve PC / PT, any `extra` stations, with arcs subdivided
+ * to chords of at most 5 degrees. Capped at ~2000.
  */
-export function sampleStations(
-  alignment: HorizontalInput,
-  interval: number,
-  extra: ReadonlyArray<number> = [],
-): number[] {
+export function sampleStations(alignment: HorizontalInput, interval: number, extra: ReadonlyArray<number> = []): number[] {
   const elements = horizontalElements(alignment);
   if (elements.length === 0) return [];
   const start = alignment.startStation;
@@ -459,8 +385,7 @@ export function sampleStations(
   raw.sort((a, b) => a - b);
   const stations: number[] = [];
   for (const s of raw) {
-    if (stations.length === 0 || s - (stations[stations.length - 1] as number) > 1e-6)
-      stations.push(s);
+    if (stations.length === 0 || s - (stations[stations.length - 1] as number) > 1e-6) stations.push(s);
   }
   const dense: number[] = [];
   stations.forEach((s0, index) => {

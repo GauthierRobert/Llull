@@ -3,8 +3,6 @@
  * Every client applies each command with the same `execute` and checks the resulting state hash;
  * a gap or mismatch falls back to a full snapshot.
  *
- * @layer mcp
- * @pure
  * @invariant deterministic replay needs step-scoped ids and the same kernel on both ends
  * @invariant `selection` is per-client view state and is excluded from the state hash
  */
@@ -36,9 +34,7 @@ export interface LiveSnapshotEvent {
   readonly document: CadDocument;
 }
 
-type LiveApplyResult =
-  | { readonly ok: true; readonly document: CadDocument }
-  | { readonly ok: false; readonly reason: 'gap' | 'mismatch' };
+type LiveApplyResult = { readonly ok: true; readonly document: CadDocument } | { readonly ok: false; readonly reason: 'gap' | 'mismatch' };
 
 const hashByDocument = new WeakMap<CadDocument, string>();
 
@@ -55,10 +51,7 @@ function partHash(part: object, key: string): PartHash {
   const known = hashByPart.get(part);
   if (known !== undefined) return known;
   const hex = hashText(JSON.stringify([key, part]));
-  const hash = {
-    high: Number.parseInt(hex.slice(0, 8), 16),
-    low: Number.parseInt(hex.slice(8), 16),
-  };
+  const hash = { high: Number.parseInt(hex.slice(0, 8), 16), low: Number.parseInt(hex.slice(8), 16) };
   hashByPart.set(part, hash);
   return hash;
 }
@@ -79,10 +72,7 @@ class PartFold {
   }
 
   hex(): string {
-    return (
-      (this.high >>> 0).toString(16).padStart(8, '0') +
-      (this.low >>> 0).toString(16).padStart(8, '0')
-    );
+    return (this.high >>> 0).toString(16).padStart(8, '0') + (this.low >>> 0).toString(16).padStart(8, '0');
   }
 }
 
@@ -94,12 +84,7 @@ class PartFold {
 export function documentHash(doc: CadDocument): string {
   const known = hashByDocument.get(doc);
   if (known !== undefined) return known;
-  const rest = hashText(
-    serializeDocument(
-      { ...doc, selection: [], entities: {}, featureHistory: [] },
-      { includeDerived: true },
-    ),
-  );
+  const rest = hashText(serializeDocument({ ...doc, selection: [], entities: {}, featureHistory: [] }, { includeDerived: true }));
   const fold = new PartFold(rest);
   for (const id in doc.entities) {
     const entity = doc.entities[id];
@@ -112,11 +97,7 @@ export function documentHash(doc: CadDocument): string {
 }
 
 /** Apply one broadcast command to the client's copy of the server document at `baseSeq`. */
-export function applyLiveCommand(
-  base: CadDocument,
-  baseSeq: number,
-  event: LiveCommandEvent,
-): LiveApplyResult {
+export function applyLiveCommand(base: CadDocument, baseSeq: number, event: LiveCommandEvent): LiveApplyResult {
   if (event.seq !== baseSeq + 1) return { ok: false, reason: 'gap' };
   const result = execute(base, event.name, event.params);
   if (documentHash(result.document) !== event.stateHash) return { ok: false, reason: 'mismatch' };

@@ -4,9 +4,6 @@ import { DEFAULT_SOLID_COLOR, placeSizedSolid, placedSolidFields } from './share
 import { ORIGIN } from '../../lib/vec3';
 
 /**
- * @command add_box
- * @pure
- * @layer core/commands
  * @affects creates 1 box entity
  * @invariant all size components > 0
  * @failure any size component <= 0 or non-finite -> no-op, affected:[]
@@ -25,15 +22,6 @@ export const addBox = defineCommand({
     size: looseVec3('[width, height, depth] in document units. All three components must be > 0.'),
     ...placedSolidFields('box', 'center'),
   }),
-  run: (
-    doc,
-    { size, position = ORIGIN, rotation, color = DEFAULT_SOLID_COLOR, anchor },
-  ): CommandResult => {
-    return placeSizedSolid(doc, 'box', 'box', 'center', size, {
-      position,
-      rotation,
-      color,
-      anchor,
-    });
-  },
+  run: (doc, { size, position = ORIGIN, rotation, color = DEFAULT_SOLID_COLOR, anchor }): CommandResult =>
+    placeSizedSolid(doc, 'box', 'box', 'center', size, { position, rotation, color, anchor }),
 });

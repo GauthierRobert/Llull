@@ -1,9 +1,4 @@
-/**
- * @layer kernel
- * Minimal typings for the subset of the OCC WASM API the kernel uses, plus the two handle helpers.
- */
-
-/** Minimal typings for the subset of the OCC WASM API this kernel uses. */
+/** Minimal typings for the subset of the OCC WASM API the kernel uses, plus the two handle helpers. */
 export interface OccHandle {
   delete(): void;
 }
@@ -27,12 +22,7 @@ export interface OccTriangulation extends OccHandle {
   get(): {
     NbTriangles(): number;
     NbNodes(): number;
-    Node(i: number): OccHandle & {
-      X(): number;
-      Y(): number;
-      Z(): number;
-      Transform(placement: OccHandle): void;
-    };
+    Node(i: number): OccHandle & { X(): number; Y(): number; Z(): number; Transform(placement: OccHandle): void };
     Triangle(i: number): OccHandle & { Value(j: number): number };
   };
 }
@@ -121,9 +111,5 @@ export interface OccMakeSolid extends OccBuilder {
 export type OccApi = any; // The WASM binding is extremely wide; all narrowing is done above.
 
 export function explorer(api: OccApi, shape: OccShape, kind: string): OccExplorer {
-  return new api.TopExp_Explorer_2(
-    shape,
-    api.TopAbs_ShapeEnum[kind],
-    api.TopAbs_ShapeEnum.TopAbs_SHAPE,
-  ) as OccExplorer;
+  return new api.TopExp_Explorer_2(shape, api.TopAbs_ShapeEnum[kind], api.TopAbs_ShapeEnum.TopAbs_SHAPE) as OccExplorer;
 }

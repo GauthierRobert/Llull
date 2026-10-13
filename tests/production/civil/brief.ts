@@ -1,8 +1,6 @@
 import type { CivilIntent } from './intent';
 
 /**
- * @layer tests/production/civil
- *
  * Renders the civil intent as the brief a lead engineer hands to a designer: the survey file, the
  * layout decisions (pad outline, road PIs and design speed, manhole positions and catchments), the
  * design storm and the deliverables. Levels, profile and inverts are left to the designer — the

@@ -2,18 +2,9 @@ import { execute } from '@core/commands/registry';
 import { serializeDocument } from '@core/commands/persistence/serialization';
 import type { CommandResult } from '@core/commands/types';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
-import type {
-  CheckReport,
-  DeliverableId,
-  DriverId,
-  GradeContext,
-  Scenario,
-  ScenarioReport,
-} from './contract';
+import type { CheckReport, DeliverableId, DriverId, GradeContext, Scenario, ScenarioReport } from './contract';
 
 /**
- * @layer tests/production
- *
  * Grades a driver's final document against a scenario's acceptance criteria, then applies the
  * known-issue ratchet. Deliverables the driver downloaded (UI) are graded as downloaded; the rest
  * are produced from the final document with the same export commands an engineer would run.
@@ -76,11 +67,7 @@ export function gradeContext(
   };
 }
 
-export function gradeScenario(
-  scenario: Scenario,
-  driver: DriverId,
-  context: GradeContext,
-): ScenarioReport {
+export function gradeScenario(scenario: Scenario, driver: DriverId, context: GradeContext): ScenarioReport {
   const known = new Set(scenario.knownIssues[driver] ?? []);
   const checks: CheckReport[] = scenario.criteria.map((criterion) => {
     let outcome;
@@ -89,13 +76,7 @@ export function gradeScenario(
     } catch (error) {
       outcome = { pass: false, detail: `criterion threw: ${(error as Error).message}` };
     }
-    return {
-      id: criterion.id,
-      area: criterion.area,
-      requirement: criterion.requirement,
-      known: known.has(criterion.id),
-      ...outcome,
-    };
+    return { id: criterion.id, area: criterion.area, requirement: criterion.requirement, known: known.has(criterion.id), ...outcome };
   });
   const unknownKnown = [...known].filter((id) => !checks.some((check) => check.id === id));
   if (unknownKnown.length > 0) {

@@ -1,8 +1,4 @@
-/**
- * @layer ui/panels
- * FileField — a file `<input>` (optionally in a `field` label) that hands the chosen file to the
- * caller as text or as a `File`, and clears itself so the same file can be picked again.
- */
+// File input (optionally labelled) handing the file over as text or `File`; clears itself so re-picks fire.
 
 import React from 'react';
 import { readChosenFile, takeChosenFile } from '@ui/chosenFile';
@@ -15,17 +11,9 @@ interface FileFieldBase {
 }
 
 type FileFieldProps = FileFieldBase &
-  (
-    | { onText: (text: string, fileName: string) => void; onFile?: never }
-    | { onFile: (file: File) => void; onText?: never }
-  );
+  ({ onText: (text: string, fileName: string) => void; onFile?: never } | { onFile: (file: File) => void; onText?: never });
 
-export function FileField({
-  label,
-  accept,
-  ariaLabel,
-  ...handlers
-}: FileFieldProps): React.ReactElement {
+export function FileField({ label, accept, ariaLabel, ...handlers }: FileFieldProps): React.ReactElement {
   const onChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
     if (handlers.onText !== undefined) {
       readChosenFile(event, handlers.onText);

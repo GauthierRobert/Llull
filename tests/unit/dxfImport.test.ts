@@ -3,6 +3,7 @@ import { type Entity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { flattenDxf, parseDxf, codeNumber } from '@lib/dxfRead';
 import { aciToHex, insUnitsMillimetres } from '@lib/dxfUnits';
+import { expectPure } from '../helpers/expectNoOp';
 
 /** DXF text from [code, value] pairs. */
 function dxf(...pairs: Array<[number, string | number]>): string {
@@ -171,7 +172,6 @@ describe('dxf reader', () => {
     expect(parseDxf('not a dxf')).toBeNull();
     expect(parsed && codeNumber(parsed.entities[0] as never, 99, 7)).toBe(7);
   });
-
   it('flattens entities into world primitives', () => {
     const parsed = parseDxf(drawing());
     if (!parsed) throw new Error('unparsed');
@@ -195,13 +195,10 @@ describe('dxf reader', () => {
     expect(blockLine?.kind === 'line' && blockLine.b[1]).toBeCloseTo(2, 9);
     expect(primitives.some((p) => p.kind === 'circle' && p.layer === 'MARKS')).toBe(true);
     // Non-uniform insert turns the circle into a closed polyline.
-    expect(primitives.some((p) => p.kind === 'polyline' && p.layer === 'MARKS' && p.closed)).toBe(
-      true,
-    );
+    expect(primitives.some((p) => p.kind === 'polyline' && p.layer === 'MARKS' && p.closed)).toBe(true);
     expect(skipped.get('HATCH')).toBe(1);
     expect(skipped.get('INSERT')).toBe(1);
   });
-
   it('maps colours and units', () => {
     expect(aciToHex(1)).toBe('#ff0000');
     expect(aciToHex(250)).toBe('#333333');
@@ -218,10 +215,13 @@ describe('import_dxf', () => {
   it('imports entities on DXF layers, scaled to the document unit', () => {
     const doc = createEmptyDocument(); // mm
     const result = execute(doc, 'import_dxf', { text: drawing(6) });
-    expect(result.summary).toMatch(/Imported DXF \(\$INSUNITS 6\)/);
-    expect(result.summary).toMatch(/new layers: WALLS, TOPO/);
-    expect(result.summary).toMatch(/skipped 1 INSERT, 1 HATCH/);
-    expect(result.summary).toMatch(/1 3D line\(s\)\/polyline\(s\) flattened/);
+    for (const s of [
+      /Imported DXF \(\$INSUNITS 6\)/,
+      /new layers: WALLS, TOPO/,
+      /skipped 1 INSERT, 1 HATCH/,
+      /1 3D line\(s\)\/polyline\(s\) flattened/,
+    ])
+      expect(result.summary).toMatch(s);
     const entities = result.affected.map((id) => result.document.entities[id] as Entity);
     const line = entities.find((e) => e.kind === 'line' && e.color === '#ff0000');
     expect(line?.kind === 'line' && line.end).toEqual([10000, 0]);
@@ -233,14 +233,9 @@ describe('import_dxf', () => {
     expect(entities.some((e) => e.kind === 'text')).toBe(true);
     expect(entities.some((e) => e.kind === 'point' && e.position[2] === 99500)).toBe(true);
   });
-
   it('honours sourceUnit, layer filters, and refuses junk', () => {
     const doc = createEmptyDocument();
-    const filtered = execute(doc, 'import_dxf', {
-      text: drawing(0),
-      sourceUnit: 'mm',
-      layers: ['topo'],
-    });
+    const filtered = execute(doc, 'import_dxf', { text: drawing(0), sourceUnit: 'mm', layers: ['topo'] });
     expect(filtered.summary).toMatch(/Imported DXF \(mm\): 1 polyline, 1 point, 1 text/);
     const assumed = execute(doc, 'import_dxf', { text: drawing(0), layers: ['TIN'] });
     expect(assumed.summary).toMatch(/mm \(assumed\)/);
@@ -251,47 +246,32 @@ describe('import_dxf', () => {
     expect(junk.document).toBe(doc);
     expect(junk.summary).toMatch(/not an ASCII DXF/);
   });
-
   it('is pure', () => {
     const doc = createEmptyDocument();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'import_dxf', { text: drawing() });
-    expect(JSON.stringify(doc)).toBe(snapshot);
+    expectPure(doc, () => execute(doc, 'import_dxf', { text: drawing() }));
   });
 });
 
 describe('import_survey_dxf', () => {
   it('collects elevated points, vertices, faces and spot heights', () => {
     const doc = execute(createEmptyDocument(), 'set_units', { units: 'm' }).document;
-    const result = execute(doc, 'import_survey_dxf', {
-      text: drawing(6),
-      sources: ['points', 'vertices', 'faces', 'text'],
-    });
+    const result = execute(doc, 'import_survey_dxf', { text: drawing(6), sources: ['points', 'vertices', 'faces', 'text'] });
     expect(result.summary).toMatch(/Imported \d+ survey points from DXF \(m\)/);
     const group = result.document.civil?.objects['pointGroup-1'];
     const positions = group?.category === 'pointGroup' ? group.points.map((p) => p.position) : [];
     expect(positions).toContainEqual([7, 8, 99.5]);
     expect(positions).toContainEqual([5, 0, 101]);
     expect(positions).toContainEqual([3, 4, 101.25]);
-    const topo = execute(doc, 'import_survey_dxf', {
-      text: drawing(0),
-      layers: ['TOPO'],
-      name: 'T',
-    });
+    const topo = execute(doc, 'import_survey_dxf', { text: drawing(0), layers: ['TOPO'], name: 'T' });
     expect(topo.summary).toMatch(/as T \(pointGroup-1\)/);
   });
-
   it('refuses drawings without elevated points', () => {
     const doc = createEmptyDocument();
     const flat = execute(doc, 'import_survey_dxf', { text: drawing(), layers: ['MARKS'] });
     expect(flat.document).toBe(doc);
     expect(flat.summary).toMatch(/at elevation 0 ignored/);
     expect(execute(doc, 'import_survey_dxf', { text: 'x' }).summary).toMatch(/not an ASCII DXF/);
-    const kept = execute(doc, 'import_survey_dxf', {
-      text: drawing(),
-      layers: ['MARKS'],
-      keepZeroElevation: true,
-    });
+    const kept = execute(doc, 'import_survey_dxf', { text: drawing(), layers: ['MARKS'], keepZeroElevation: true });
     expect(kept.affected[0]).toBe('pointGroup-1');
   });
 });

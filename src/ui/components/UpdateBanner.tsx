@@ -1,9 +1,4 @@
-/**
- * @layer ui/components
- *
- * UpdateBanner — "a new version of llull is ready" with a Reload button. Binds the state of
- * `@ui/services/appUpdates` (the only service-worker owner); presentation only.
- */
+// "New version ready" banner with Reload, bound to @ui/services/appUpdates (the only service-worker owner).
 
 import React from 'react';
 import { applyAppUpdate, useAppUpdateAvailable } from '@ui/services/appUpdates';

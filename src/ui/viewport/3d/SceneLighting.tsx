@@ -1,7 +1,4 @@
-/**
- * @layer ui/viewport/3d
- * Environment, shadows and light rig scaled by the render-quality tier. Presentation only.
- */
+/** Environment, shadows and light rig scaled by the render-quality tier. Presentation only. */
 
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import { useThree } from '@react-three/fiber';
@@ -32,18 +29,9 @@ function useSceneBounds(): SceneBounds {
 }
 
 /** Ground contact-shadow patch sized to the scene footprint (see contactShadowPlane.ts). */
-function SceneContactShadows({
-  opacity,
-  bounds,
-}: {
-  opacity: number;
-  bounds: SceneBounds;
-}): React.ReactElement {
+function SceneContactShadows({ opacity, bounds }: { opacity: number; bounds: SceneBounds }): React.ReactElement {
   const renderOrigin = useStore((s) => s.renderOrigin);
-  const plane = useMemo(
-    () => computeContactShadowPlane(bounds, renderOrigin),
-    [bounds, renderOrigin],
-  );
+  const plane = useMemo(() => computeContactShadowPlane(bounds, renderOrigin), [bounds, renderOrigin]);
   // frames={1} bakes once: remount (re-bake) when the footprint changes.
   const bakeKey = `${plane.position.join(',')}|${plane.scale}|${plane.far}`;
   return (
@@ -62,13 +50,7 @@ function SceneContactShadows({
 }
 
 /** Shadow-casting key light that follows the scene's extent (see keyLightRig.ts). */
-function SceneKeyLight({
-  shadowMapSize,
-  bounds,
-}: {
-  shadowMapSize: number;
-  bounds: SceneBounds;
-}): React.ReactElement {
+function SceneKeyLight({ shadowMapSize, bounds }: { shadowMapSize: number; bounds: SceneBounds }): React.ReactElement {
   const renderOrigin = useStore((s) => s.renderOrigin);
   const invalidate = useThree((s) => s.invalidate);
   const lightRef = useRef<THREE.DirectionalLight>(null);
@@ -110,11 +92,7 @@ function SceneKeyLight({
   );
 }
 
-/**
- * The scene-extent-dependent lights. Only this component subscribes to the document, so an edit
- * never re-renders the environment / soft-shadow / fixed lights (an Environment re-render would
- * re-bake its cube map). One O(entities) bounds pass serves both children.
- */
+/** Only this subscribes to the document, so edits never re-render the Environment (its cube map would re-bake). */
 function SceneShadowRig({
   shadowMapSize,
   contactShadows,
@@ -133,23 +111,17 @@ function SceneShadowRig({
   );
 }
 
-interface SceneLightingProps {
-  quality: RenderQualitySettings;
-  contactShadowOpacity: number;
-}
-
 export function SceneLighting({
   quality,
   contactShadowOpacity,
-}: SceneLightingProps): React.ReactElement {
+}: {
+  quality: RenderQualitySettings;
+  contactShadowOpacity: number;
+}): React.ReactElement {
   return (
     <>
-      {/* ---- IBL environment: studio preset for reflections/ambient; no background.
-           Kept on across all quality tiers — it is a single texture sample (cheap)
-           and significantly improves material quality. ---- */}
       {quality.environmentEnabled && (
-        // Procedural studio IBL — no network fetch (preset="studio" pulls an HDR from a CDN
-        // and crashes the viewport offline).
+        // Procedural IBL: preset="studio" fetches an HDR from a CDN and crashes offline.
         <Environment background={false} resolution={256}>
           <Lightformer form="rect" intensity={2} position={[0, 5, 5]} scale={[10, 6, 1]} />
           <Lightformer form="rect" intensity={1} position={[-6, -2, 2]} scale={[6, 4, 1]} />
@@ -158,23 +130,12 @@ export function SceneLighting({
         </Environment>
       )}
 
-      {/* ---- Soft shadow patch: PCSS-style softening on the shadow map.
-           Disabled in Low tier (softShadowSamples === 0) to save per-fragment cost.
-           Medium tier: 8 samples (halved from High's 16). ---- */}
-      {quality.softShadowSamples > 0 && (
-        <SoftShadows size={25} samples={quality.softShadowSamples} focus={0.5} />
-      )}
+      {quality.softShadowSamples > 0 && <SoftShadows size={25} samples={quality.softShadowSamples} focus={0.5} />}
 
-      {/* ---- Light rig ----
-           hemisphere: warm ground / cool sky fill to avoid pure-black undersides.
-           directional key: high-angle from front-right, casts shadows.
-             shadow-mapSize scales with quality tier (2048 High / 1024 Medium+Low).
-           directional rim: cool back-left counter fill.  */}
+      {/* Hemisphere fill avoids pure-black undersides; cool back-left rim. */}
       <hemisphereLight args={['#c8d8f0', '#3a3228', 0.45]} position={[0, 0, 1]} />
       <directionalLight position={[-6, 8, 4]} intensity={0.4} color="#a8c8ff" />
 
-      {/* ---- Key light + contact shadows follow the scene extent. Contact shadows are rendered
-           once (frames=1) — safe under demand frameloop — and are off in the Low tier. ---- */}
       <SceneShadowRig
         shadowMapSize={quality.shadowMapSize}
         contactShadows={quality.contactShadowsEnabled}

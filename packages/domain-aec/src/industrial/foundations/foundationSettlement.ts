@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { FootingElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
 import { isFiniteNumber } from '@lib/isFiniteNumber';
@@ -27,8 +23,7 @@ function footingNetPressure(
   const { breadth, length, thickness, backfill } = footingMetres(doc, footing);
   const area = breadth * length;
   const { v } = combine(reaction, { G: 1, S: 1 });
-  const gross =
-    (v + (CONCRETE_UNIT_WEIGHT * thickness + BACKFILL_UNIT_WEIGHT * backfill) * area) / area;
+  const gross = (v + (CONCRETE_UNIT_WEIGHT * thickness + BACKFILL_UNIT_WEIGHT * backfill) * area) / area;
   return {
     pressure: Math.max(0, gross - BACKFILL_UNIT_WEIGHT * (thickness + backfill)),
     breadth,
@@ -48,8 +43,7 @@ export function clayLayerError(layer: unknown): string | null {
       ? null
       : `clayLayer.${name} must be a number ${allowZero ? '>= 0' : '> 0'}`;
   };
-  const optional = (name: string): string | null =>
-    fields[name] === undefined ? null : positive(name);
+  const optional = (name: string): string | null => (fields[name] === undefined ? null : positive(name));
   const error =
     positive('topDepth', true) ??
     positive('thickness') ??
@@ -60,19 +54,16 @@ export function clayLayerError(layer: unknown): string | null {
     optional('preconsolidationPressure');
   if (error) return error;
   const unitWeight = (fields.unitWeight as number | undefined) ?? DEFAULT_CLAY_UNIT_WEIGHT;
-  if (unitWeight <= WATER_UNIT_WEIGHT)
-    return `clayLayer.unitWeight must be > ${WATER_UNIT_WEIGHT} kN/m³ (water)`;
+  if (unitWeight <= WATER_UNIT_WEIGHT) return `clayLayer.unitWeight must be > ${WATER_UNIT_WEIGHT} kN/m³ (water)`;
   const cr = fields.recompressionIndex as number | undefined;
-  if (cr !== undefined && cr > (fields.compressionIndex as number))
-    return 'clayLayer.recompressionIndex must be <= compressionIndex';
+  if (cr !== undefined && cr > (fields.compressionIndex as number)) return 'clayLayer.recompressionIndex must be <= compressionIndex';
   return null;
 }
 
 /**
- * Primary consolidation settlement (mm) of a clay layer in 5 sublayers: groundwater at the founding level,
- * γ' = unitWeight − 9.81, σ'0 = 18 D + γ' z (D = founding depth, z below the founding level), Δσ = q B L / ((B + z)(L + z)) at the sublayer centre (2:1 spreading),
- * s = Σ Cc h/(1+e0) log10((σ'0+Δσ)/σ'0); with σ'p, Cr up to σ'p and Cc beyond.
- * @pure
+ * Primary consolidation settlement (mm) of a clay layer in 5 sublayers: groundwater at the founding level, γ' = unitWeight − 9.81, σ'0 = 18
+ * D + γ' z (D = founding depth, z below the founding level), Δσ = q B L / ((B + z)(L + z)) at the sublayer centre (2:1 spreading), s = Σ Cc
+ * h/(1+e0) log10((σ'0+Δσ)/σ'0); with σ'p, Cr up to σ'p and Cc beyond.
  */
 export function consolidationSettlement(
   netPressure: number,
@@ -97,9 +88,7 @@ export function consolidationSettlement(
     } else if (final <= preconsolidation) {
       strainIndex = recompression * Math.log10(final / initial);
     } else {
-      strainIndex =
-        recompression * Math.log10(preconsolidation / initial) +
-        layer.compressionIndex * Math.log10(final / preconsolidation);
+      strainIndex = recompression * Math.log10(preconsolidation / initial) + layer.compressionIndex * Math.log10(final / preconsolidation);
     }
     total += (sublayer * strainIndex) / (1 + layer.voidRatio);
   }
@@ -107,21 +96,12 @@ export function consolidationSettlement(
 }
 
 /**
- * Elastic settlement (mm) of a pad under SLS G+S: s = q B (1 − ν²) Is / Es, Is 0.88 (rigid square), q = (V + footing + backfill) / area − 18 kN/m³ × founding depth.
- * @pure
+ * Elastic settlement (mm) of a pad under SLS G+S: s = q B (1 − ν²) Is / Es, Is 0.88 (rigid square), q = (V + footing + backfill) / area −
+ * 18 kN/m³ × founding depth.
  */
-function footingSettlement(
-  doc: CadDocument,
-  reaction: BaseReaction,
-  footing: FootingElement,
-  soilModulus: number,
-): number {
+function footingSettlement(doc: CadDocument, reaction: BaseReaction, footing: FootingElement, soilModulus: number): number {
   const { pressure, breadth } = footingNetPressure(doc, reaction, footing);
-  return (
-    ((pressure * breadth * (1 - POISSON_RATIO ** 2) * SETTLEMENT_INFLUENCE) /
-      (soilModulus * 1000)) *
-    1000
-  );
+  return ((pressure * breadth * (1 - POISSON_RATIO ** 2) * SETTLEMENT_INFLUENCE) / (soilModulus * 1000)) * 1000;
 }
 
 /** Elastic + primary consolidation settlement (mm) of a pad. */
@@ -134,8 +114,6 @@ export function footingSettlementParts(
 ): { elastic: number; consolidation: number; total: number } {
   const elastic = footingSettlement(doc, reaction, footing, soilModulus);
   const { pressure, breadth, length, foundingDepth } = footingNetPressure(doc, reaction, footing);
-  const consolidation = clayLayer
-    ? consolidationSettlement(pressure, breadth, length, clayLayer, foundingDepth)
-    : 0;
+  const consolidation = clayLayer ? consolidationSettlement(pressure, breadth, length, clayLayer, foundingDepth) : 0;
   return { elastic, consolidation, total: elastic + consolidation };
 }

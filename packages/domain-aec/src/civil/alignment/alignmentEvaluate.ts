@@ -1,21 +1,13 @@
 /**
- * Evaluates a road alignment: centreline, station ticks + labels, curve annotations, and (with a
- * profile and road section) the corridor mesh, side slopes and daylight lines.
- * @layer domain-aec/civil
- * @pure
+ * Evaluates a road alignment: centreline, station ticks + labels, curve annotations, and (with a profile and road section) the corridor
+ * mesh, side slopes and daylight lines.
  */
 
 import type { Entity, Vec2 } from '@core/model/types';
 import type { AlignmentObject } from '@core/model/civil';
 import { civilLine, civilPoint, civilPolyline, civilText } from '../entities';
 import { readableAngle } from '@lib/angle';
-import {
-  centrelinePoints,
-  elementPointAt,
-  endStation,
-  horizontalElements,
-  pointAtStation,
-} from './alignmentGeometry';
+import { centrelinePoints, elementPointAt, endStation, horizontalElements, pointAtStation } from './alignmentGeometry';
 import { evaluateCorridor } from '../road/corridorMesh';
 import { stationText } from '../model';
 import { labelHeight, type CivilContext } from '../context';
@@ -62,11 +54,7 @@ function stationTicks(context: CivilContext, alignment: AlignmentObject): Entity
   return entities;
 }
 
-function spiralAnnotations(
-  context: CivilContext,
-  alignment: AlignmentObject,
-  elements: ReturnType<typeof horizontalElements>,
-): Entity[] {
+function spiralAnnotations(context: CivilContext, alignment: AlignmentObject, elements: ReturnType<typeof horizontalElements>): Entity[] {
   const height = labelHeight(context.doc);
   const station = (s: number): string => stationText(context.doc, s);
   const entities: Entity[] = [];
@@ -106,35 +94,20 @@ function curveAnnotations(context: CivilContext, alignment: AlignmentObject): En
   elements.forEach((element, position) => {
     if (element.kind !== 'arc') return;
     const i = index++;
-    const transition =
-      elements[position - 1]?.kind === 'spiral' || elements[position + 1]?.kind === 'spiral';
+    const transition = elements[position - 1]?.kind === 'spiral' || elements[position + 1]?.kind === 'spiral';
     const mid = elementPointAt(element, element.startStation + element.length / 2).point;
     const outward = (p: Vec2): Vec2 => {
       const length = Math.hypot(p[0] - element.center[0], p[1] - element.center[1]);
-      return [
-        p[0] + ((p[0] - element.center[0]) / length) * height * 2,
-        p[1] + ((p[1] - element.center[1]) / length) * height * 2,
-      ];
+      return [p[0] + ((p[0] - element.center[0]) / length) * height * 2, p[1] + ((p[1] - element.center[1]) / length) * height * 2];
     };
     const station = (s: number): string => stationText(context.doc, s);
     const place = (p: Vec2): [number, number, number] => [...outward(p), 0];
     entities.push(
-      civilPoint(alignment, `pi${i}`, `${alignment.name} PI`, 'centreline', [
-        element.pi[0],
-        element.pi[1],
-        0,
-      ]),
+      civilPoint(alignment, `pi${i}`, `${alignment.name} PI`, 'centreline', [element.pi[0], element.pi[1], 0]),
       ...(transition
         ? []
         : [
-            civilText(
-              alignment,
-              `pc${i}`,
-              `PC ${station(element.startStation)}`,
-              'annotation',
-              place(element.start),
-              height,
-            ),
+            civilText(alignment, `pc${i}`, `PC ${station(element.startStation)}`, 'annotation', place(element.start), height),
             civilText(
               alignment,
               `pt${i}`,
@@ -144,14 +117,7 @@ function curveAnnotations(context: CivilContext, alignment: AlignmentObject): En
               height,
             ),
           ]),
-      civilText(
-        alignment,
-        `r${i}`,
-        `R=${Number(toMetres(context.doc, element.radius).toFixed(2))}`,
-        'annotation',
-        place(mid),
-        height,
-      ),
+      civilText(alignment, `r${i}`, `R=${Number(toMetres(context.doc, element.radius).toFixed(2))}`, 'annotation', place(mid), height),
     );
   });
   return [...entities, ...spiralAnnotations(context, alignment, elements)];
@@ -161,15 +127,7 @@ export function evaluateAlignment(context: CivilContext, alignment: AlignmentObj
   const points = centrelinePoints(alignment);
   if (points.length < 2) return [];
   return [
-    civilPolyline(
-      alignment,
-      'centreline',
-      `${alignment.name} centreline`,
-      'centreline',
-      points,
-      false,
-      0,
-    ),
+    civilPolyline(alignment, 'centreline', `${alignment.name} centreline`, 'centreline', points, false, 0),
     ...stationTicks(context, alignment),
     ...curveAnnotations(context, alignment),
     ...evaluateCorridor(context, alignment),

@@ -1,3 +1,4 @@
+import { idOrNext } from '../entity/explicitId';
 import type { CurveSegment } from '../../model/curve';
 import type { CadDocument, SweepSection, SweepStation, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
@@ -5,15 +6,9 @@ import { defineCommand, untypedArray, z } from '../schema';
 import { failer } from '../noop';
 import { isVec3, sub3 } from '../../lib/vec3';
 import { polygonArea } from '../../lib/polygon';
+import { polylineLength } from '../../lib/polyline';
 import { newEntity } from '../entity/newEntity';
-import {
-  DEFAULT_SOLID_COLOR,
-  commitSolid,
-  existingLayerOrDefault,
-  solidStyleFields,
-  explicitIdOrNext,
-  explicitIdTaken,
-} from './shared';
+import { DEFAULT_SOLID_COLOR, commitSolid, existingLayerOrDefault, solidStyleFields, explicitIdTaken } from './shared';
 import { MAX_PROFILE_POINTS } from '../limits';
 import { sketchPath } from './sketchCurves';
 import { type SectionSpec, sectionLoop, sectionSpecFields, specRing } from './sectionSpecs';
@@ -48,10 +43,7 @@ function resolveSection(
     if (!(radius > 0)) return `radius must be > 0 (got ${radius})`;
     if (innerRadius !== undefined && !(innerRadius > 0 && innerRadius < radius))
       return `innerRadius must be > 0 and < radius ${radius} (got ${innerRadius})`;
-    return {
-      section: { shape: 'circle', radius, ...(innerRadius !== undefined ? { innerRadius } : {}) },
-      halfSize: radius,
-    };
+    return { section: { shape: 'circle', radius, ...(innerRadius !== undefined ? { innerRadius } : {}) }, halfSize: radius };
   }
   if (innerRadius !== undefined) return 'innerRadius only applies to a circular section (radius)';
   const loop = sectionLoop(doc, section, sectionId);
@@ -76,8 +68,7 @@ function resolveStations(
   for (let i = 0; i < raw.length; i++) {
     const spec = raw[i] as SectionSpec & { at: number };
     const previous = stations[i - 1];
-    if (!(spec.at >= 0 && spec.at <= 1))
-      return `station ${i}: at must be in [0, 1] (got ${spec.at})`;
+    if (!(spec.at >= 0 && spec.at <= 1)) return `station ${i}: at must be in [0, 1] (got ${spec.at})`;
     if (previous !== undefined && !(spec.at > previous.at))
       return `station ${i}: at must be greater than the previous station (${previous.at})`;
     const resolved = specRing(doc, spec);
@@ -106,14 +97,12 @@ function resolvePath(
     const bad = path.findIndex((point) => !isVec3(point));
     if (bad >= 0) return `path point ${bad} must be a finite [x, y, z] triple`;
     const points = path as Vec3[];
-    if (points.length < 2 || points.length > MAX_PROFILE_POINTS)
-      return `path needs 2..${MAX_PROFILE_POINTS} points (got ${points.length})`;
+    if (points.length < 2 || points.length > MAX_PROFILE_POINTS) return `path needs 2..${MAX_PROFILE_POINTS} points (got ${points.length})`;
     return bentOrSmooth(points, closed, smooth, bendRadius);
   }
   const entity = doc.entities[pathId as string];
   const world = sketchPath(doc, pathId as string);
-  if (typeof world === 'string' || (entity?.kind !== 'polyline' && entity?.kind !== 'rectangle'))
-    return world;
+  if (typeof world === 'string' || (entity?.kind !== 'polyline' && entity?.kind !== 'rectangle')) return world;
   const loop = entity.kind === 'rectangle' || entity.closed;
   const corners = world.map((segment) => segment.points[0] as Vec3);
   if (!loop) corners.push(world[world.length - 1]?.points[1] as Vec3);
@@ -121,25 +110,12 @@ function resolvePath(
 }
 
 /** Corner points joined by bends (or a smooth spline through them), open or closed. */
-function bentOrSmooth(
-  points: readonly Vec3[],
-  closed: boolean,
-  smooth: boolean,
-  bendRadius: number,
-): CurveSegment<Vec3>[] | string {
+function bentOrSmooth(points: readonly Vec3[], closed: boolean, smooth: boolean, bendRadius: number): CurveSegment<Vec3>[] | string {
   if (smooth) return catmullRomBeziers(points, closed);
   return closed ? filletClosedPolygon(points, bendRadius) : filletPolyline(points, bendRadius);
 }
 
-/** Tightest radius of curvature on the path (Infinity when it is straight). */
-function tightestBend(path: ReadonlyArray<CurveSegment<Vec3>>): number {
-  return path.reduce((least, segment) => Math.min(least, minCurvatureRadius(segment)), Infinity);
-}
-
 /**
- * @command sweep_profile
- * @pure
- * @layer core/commands
  * @affects creates 1 sweep entity positioned at the path start
  * @invariant path is open, connected and tangent-continuous (G1); bends are wider than the section
  * @failure bad / ambiguous section or path, sharp corner, bend tighter than the section,
@@ -193,14 +169,8 @@ export const sweepProfile = defineCommand({
           'Default: 3 × the section radius (a long-radius elbow). Must exceed the section radius.',
       )
       .optional(),
-    radius: z
-      .number()
-      .describe('Round section: outer radius (> 0). Use this for pipes, rods, tubes and wires.')
-      .optional(),
-    innerRadius: z
-      .number()
-      .describe('Round section only: bore radius for a hollow pipe (0 < innerRadius < radius).')
-      .optional(),
+    radius: z.number().describe('Round section: outer radius (> 0). Use this for pipes, rods, tubes and wires.').optional(),
+    innerRadius: z.number().describe('Round section only: bore radius for a hollow pipe (0 < innerRadius < radius).').optional(),
     section: untypedArray(
       'Polygon section: closed [x, y] points in section coordinates (centred on the path; +y toward world +Z). ' +
         'Alternative to radius / sectionId.',
@@ -213,12 +183,7 @@ export const sweepProfile = defineCommand({
       )
       .optional(),
     stations: z
-      .array(
-        z.object({
-          at: z.number().describe('Path fraction of this section: 0 = path start, 1 = path end.'),
-          ...sectionSpecFields,
-        }),
-      )
+      .array(z.object({ at: z.number().describe('Path fraction of this section: 0 = path start, 1 = path end.'), ...sectionSpecFields }))
       .describe(
         'Variable section: >= 2 cross-sections along the path, with `at` strictly increasing from 0 ' +
           'to 1, each a radius, radiusX+radiusY ellipse, section polygon or sectionId. The section ' +
@@ -256,8 +221,7 @@ export const sweepProfile = defineCommand({
           : resolveStations(doc, rawStations);
     if (typeof resolved === 'string') return fail(resolved);
     const { section, halfSize } = resolved;
-    const stations: SweepStation[] | undefined =
-      'stations' in resolved ? (resolved.stations as SweepStation[]) : undefined;
+    const stations: SweepStation[] | undefined = 'stations' in resolved ? (resolved.stations as SweepStation[]) : undefined;
     const bendRadius = rawBend ?? DEFAULT_BEND_FACTOR * halfSize;
     if (!(bendRadius > 0)) return fail(`bendRadius must be > 0 (got ${bendRadius})`);
     const path = resolvePath(doc, rawPath, pathId, smooth, bendRadius, closed);
@@ -267,31 +231,19 @@ export const sweepProfile = defineCommand({
     const issue = chainIssue(path, loop);
     if (issue !== null) return fail(`path invalid — ${issue}`);
     const corner = firstCorner(path);
-    if (corner >= 0)
-      return fail(
-        `the path has a sharp corner at joint ${corner}; use a bendRadius or smooth: true`,
-      );
-    if (loop && !closesSmoothly(path))
-      return fail(
-        'the closed path has a sharp corner where it closes; use a bendRadius or smooth: true',
-      );
-    const bend = tightestBend(path);
+    if (corner >= 0) return fail(`the path has a sharp corner at joint ${corner}; use a bendRadius or smooth: true`);
+    if (loop && !closesSmoothly(path)) return fail('the closed path has a sharp corner where it closes; use a bendRadius or smooth: true');
+    const bend = Math.min(...path.map(minCurvatureRadius));
     if (bend <= halfSize)
       return fail(
         `a bend of radius ${bend.toFixed(3)} (arc or spline curvature) is not wider than the section (${halfSize.toFixed(3)}); the solid would self-intersect`,
       );
     const start = path[0]?.points[0] as Vec3;
     const local = path.map((segment) => mapSegment(segment, (p: Vec3): Vec3 => sub3(p, start)));
-    const id = explicitIdOrNext(explicitId, 'swp');
-    const geometry =
-      stations === undefined ? { path: local, section } : { path: local, section, stations };
-    const entity = newEntity('sweep', id, geometry, start, color, {
-      layerId: existingLayerOrDefault(doc, layerId),
-    });
-    const samples = sampleChain(path, false);
-    let length = 0;
-    for (let i = 1; i < samples.length; i++)
-      length += Math.hypot(...sub3(samples[i] as Vec3, samples[i - 1] as Vec3));
+    const id = idOrNext(explicitId, 'swp');
+    const geometry = stations === undefined ? { path: local, section } : { path: local, section, stations };
+    const entity = newEntity('sweep', id, geometry, start, color, { layerId: existingLayerOrDefault(doc, layerId) });
+    const length = polylineLength(sampleChain(path, false));
     const shape =
       stations !== undefined
         ? `${stations.length}-station variable section`

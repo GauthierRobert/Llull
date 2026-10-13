@@ -5,23 +5,16 @@ describe('useToolStore', () => {
   beforeEach(() => {
     useToolStore.setState({ viewMode: '3d', drawTool: 'none', modifyTool: 'none' });
   });
-
   it('arming a draw tool shows 2D and disarms the modify tool', () => {
     useToolStore.getState().setModifyTool('trim');
     useToolStore.getState().setDrawTool('circle');
-    expect(useToolStore.getState()).toMatchObject({
-      viewMode: '2d',
-      drawTool: 'circle',
-      modifyTool: 'none',
-    });
+    expect(useToolStore.getState()).toMatchObject({ viewMode: '2d', drawTool: 'circle', modifyTool: 'none' });
   });
-
   it('arming a modify tool shows 2D and disarms the draw tool', () => {
     useToolStore.getState().setDrawTool('line');
     useToolStore.getState().setModifyTool('offset');
     expect(useToolStore.getState()).toMatchObject({ drawTool: 'none', modifyTool: 'offset' });
   });
-
   it('toggleDrawTool arms a tool, then disarms it when toggled again', () => {
     useToolStore.getState().toggleDrawTool('circle');
     expect(useToolStore.getState()).toMatchObject({ drawTool: 'circle', viewMode: '2d' });
@@ -30,7 +23,6 @@ describe('useToolStore', () => {
     useToolStore.getState().toggleDrawTool('line');
     expect(useToolStore.getState().drawTool).toBe('none');
   });
-
   it('disarming keeps the view; switching to 3D disarms both', () => {
     useToolStore.getState().setDrawTool('line');
     useToolStore.getState().setDrawTool('none');

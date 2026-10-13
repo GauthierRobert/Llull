@@ -8,14 +8,9 @@ import type { Feature, FeatureProgram, ShapeSpec, Term } from '@core/codegen/pro
 import { emitPython } from '@core/codegen/python';
 import { emitOpenScad } from '@core/codegen/openscad';
 import { emitFreeCad } from '@core/codegen/freecad';
-import {
-  formatDegrees,
-  formatNumber,
-  formatTerm,
-  numberRows,
-  stepHeading,
-} from '@core/codegen/format';
+import { formatDegrees, formatNumber, formatTerm, numberRows, stepHeading } from '@core/codegen/format';
 import { TETRA, fakeKernel, installKernelPerTest } from '../helpers/fakeKernel';
+import { expectPure } from '../helpers/expectNoOp';
 
 installKernelPerTest(fakeKernel({ boolean: TETRA }));
 
@@ -27,8 +22,7 @@ function program(doc: CadDocument): FeatureProgram {
   return buildFeatureProgram(doc, getCommand);
 }
 
-const t = (value: number, expression?: string): Term =>
-  expression === undefined ? { value } : { value, expression };
+const t = (value: number, expression?: string): Term => (expression === undefined ? { value } : { value, expression });
 
 /** Solid constructors emitted identically by the build123d, CadQuery-style and FreeCAD macros. */
 const PYTHON_SOLID_LINES = [
@@ -44,27 +38,22 @@ describe('translateExpression', () => {
     ['width', 'width'],
     ['len', 'len_1'],
   ]);
-
   it('maps identifiers and normalises spacing', () => {
     expect(translateExpression('width*2 + len', ids)).toBe('width * 2 + len_1');
     expect(translateExpression('(width+1)/2', ids)).toBe('(width + 1) / 2');
     expect(translateExpression('  -width ', ids)).toBe('- width');
   });
-
   it('keeps decimal and exponent numbers', () => {
     expect(translateExpression('1.5e3 * width + .5', ids)).toBe('1.5e3 * width + .5');
   });
-
   it('returns null for an unknown identifier', () => {
     expect(translateExpression('width + missing', ids)).toBeNull();
   });
-
   it('returns null for characters outside the grammar', () => {
     expect(translateExpression('width ^ 2', ids)).toBeNull();
     expect(translateExpression('width, 2', ids)).toBeNull();
     expect(translateExpression('width % 2', ids)).toBeNull();
   });
-
   it('returns null for an empty expression', () => {
     expect(translateExpression('   ', ids)).toBeNull();
     expect(translateExpression('', ids)).toBeNull();
@@ -79,15 +68,10 @@ describe('parameters', () => {
     doc = run(doc, 'set_parameter', { name: 'c', expression: 'a + b' });
     const p = program(doc);
     expect(p.parameters.map((x) => x.name)).toEqual(['b', 'a', 'c']);
-    expect(p.parameters.find((x) => x.name === 'b')).toEqual({
-      name: 'b',
-      identifier: 'b',
-      value: 3,
-    });
+    expect(p.parameters.find((x) => x.name === 'b')).toEqual({ name: 'b', identifier: 'b', value: 3 });
     expect(p.parameters.find((x) => x.name === 'a')?.expression).toBe('b * 2');
     expect(p.parameters.find((x) => x.name === 'c')?.expression).toBe('a + b');
   });
-
   it('allocates unique, safe identifiers (reserved words, spaces, digits, collisions)', () => {
     const parameters: CadDocument['parameters'] = {
       len: { name: 'len', expression: '1', value: 1 },
@@ -109,7 +93,6 @@ describe('parameters', () => {
     expect(idOf('cut')).toBe('cut_1');
     expect(new Set(p.parameters.map((x) => x.identifier)).size).toBe(p.parameters.length);
   });
-
   it('exports errored parameters as plain values and survives dependency cycles', () => {
     const parameters: CadDocument['parameters'] = {
       broken: { name: 'broken', expression: 'zzz', value: 0, error: 'unknown identifier' },
@@ -119,19 +102,10 @@ describe('parameters', () => {
     };
     const p = program({ ...createEmptyDocument(), parameters });
     expect(p.parameters).toHaveLength(4);
-    expect(p.parameters.find((x) => x.name === 'broken')).toEqual({
-      name: 'broken',
-      identifier: 'broken',
-      value: 0,
-    });
+    expect(p.parameters.find((x) => x.name === 'broken')).toEqual({ name: 'broken', identifier: 'broken', value: 0 });
     // Unsupported grammar (function call) degrades to the value.
-    expect(p.parameters.find((x) => x.name === 'weird')).toEqual({
-      name: 'weird',
-      identifier: 'weird',
-      value: 8,
-    });
+    expect(p.parameters.find((x) => x.name === 'weird')).toEqual({ name: 'weird', identifier: 'weird', value: 8 });
   });
-
   it('avoids collisions between entity variables and parameter identifiers (snapshot)', () => {
     let doc = run(createEmptyDocument(), 'set_parameter', { name: 'Plate', expression: '1' });
     doc = run(doc, 'add_box', { size: [1, 1, 1] });
@@ -165,27 +139,17 @@ describe('history lowering', () => {
       'label:box_1',
     ]);
     expect(p.features.map((f) => f.step)).toEqual([1, 2, 3, 4, 5]);
-    expect(p.features.map((f) => f.command)).toEqual([
-      'add_box',
-      'add_cylinder',
-      'boolean',
-      'move_entities',
-      'set_entity_name',
-    ]);
+    expect(p.features.map((f) => f.command)).toEqual(['add_box', 'add_cylinder', 'boolean', 'move_entities', 'set_entity_name']);
     const boolean = p.features[2] as Extract<Feature, { op: 'boolean' }>;
     expect(boolean).toMatchObject({ kind: 'cut', left: 'box_1', right: 'cylinder_1' });
     expect(p.outputs).toEqual([{ variable: 'box_1', color: '#111111', name: 'Block' }]);
     expect(p.notes).toEqual([]);
   });
-
   it('binds an =expr only when it evaluates to the entity value (binding guard)', () => {
     const doc = project(createEmptyDocument(), [
       { command: 'set_parameter', params: { name: 'width', expression: '80' } },
       // anchor "min" shifts the stored position by size/2, so '=width' no longer equals the value.
-      {
-        command: 'add_box',
-        params: { size: ['=width', 2, 2], position: ['=width', 0, 0], anchor: 'min' },
-      },
+      { command: 'add_box', params: { size: ['=width', 2, 2], position: ['=width', 0, 0], anchor: 'min' } },
     ]);
     const feature = program(doc).features[0] as Extract<Feature, { op: 'solid' }>;
     const shape = feature.shape as Extract<ShapeSpec, { kind: 'box' }>;
@@ -193,7 +157,6 @@ describe('history lowering', () => {
     expect(feature.position[0]).toEqual({ value: 120 });
     expect(feature.position[0].expression).toBeUndefined();
   });
-
   it('translates compound parameter expressions and keeps plain numbers literal', () => {
     const doc = project(createEmptyDocument(), [
       { command: 'set_parameter', params: { name: 'width', expression: '80' } },
@@ -204,7 +167,6 @@ describe('history lowering', () => {
     expect(shape.size[0]).toEqual({ value: 50, expression: '(width + 20) / 2' });
     expect(shape.size[1]).toEqual({ value: 1 });
   });
-
   it('turns a metadata-only change into a label feature (no remove/solid)', () => {
     let doc = run(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });
     doc = run(doc, 'set_entity_name', { id: doc.order[0], name: 'Lid' });
@@ -212,7 +174,6 @@ describe('history lowering', () => {
     expect(p.features.map((f) => f.op)).toEqual(['solid', 'label']);
     expect(p.features[1]).toMatchObject({ op: 'label', name: 'Lid', variable: 'box_1' });
   });
-
   it('lowers a geometry modification (scale / rotate) as remove + re-created solid', () => {
     for (const [command, params] of [
       ['scale_entity', { factor: 2 }],
@@ -226,7 +187,6 @@ describe('history lowering', () => {
       expect(p.outputs).toHaveLength(1);
     }
   });
-
   it('keeps the scaled size and rotation in the re-created solid', () => {
     let doc = run(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });
     doc = run(doc, 'scale_entity', { id: doc.order[0], factor: 3 });
@@ -234,7 +194,6 @@ describe('history lowering', () => {
     const last = program(doc).features.at(-1) as Extract<Feature, { op: 'solid' }>;
     expect(last.rotation[2].value).toBeCloseTo(Math.PI / 2, 9);
   });
-
   it('lowers delete_entities as a remove and drops the solid from the outputs', () => {
     let doc = run(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });
     doc = run(doc, 'add_sphere', { radius: 1 });
@@ -244,7 +203,6 @@ describe('history lowering', () => {
     expect(p.features[2]?.variable).toBe('box_1');
     expect(p.outputs.map((o) => o.variable)).toEqual(['sphere_1']);
   });
-
   it('lowers move_entities as a translate with its numeric delta', () => {
     let doc = run(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });
     doc = run(doc, 'move_entities', { ids: [doc.order[0]], delta: [1, 0, 0] });
@@ -252,7 +210,6 @@ describe('history lowering', () => {
     expect(move.op).toBe('translate');
     expect(move.delta.map((d) => d.value)).toEqual([1, 0, 0]);
   });
-
   it('binds a move delta to a parameter expression', () => {
     const doc = project(createEmptyDocument(), [
       { command: 'set_parameter', params: { name: 'dx', expression: '7' } },
@@ -262,7 +219,6 @@ describe('history lowering', () => {
     const move = program(doc).features[1] as Extract<Feature, { op: 'translate' }>;
     expect(move.delta[0]).toEqual({ value: 7, expression: 'dx' });
   });
-
   it('skips suppressed history steps', () => {
     let doc = run(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });
     doc = run(doc, 'add_sphere', { radius: 1 });
@@ -271,7 +227,6 @@ describe('history lowering', () => {
     expect(p.source).toBe('history');
     expect(p.features.map((f) => f.command)).toEqual(['add_box']);
   });
-
   it('falls back to a snapshot with a note when replay does not reproduce the solids', () => {
     let doc = run(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });
     doc = run(doc, 'add_sphere', { radius: 1 });
@@ -282,26 +237,20 @@ describe('history lowering', () => {
     expect(p.features.every((f) => f.step === null)).toBe(true);
     expect(p.notes[0]).toContain('replays to 1 solid(s) but the document has 2');
   });
-
   it('exports a mesh with a note when the history creates a mesh', () => {
-    const doc = run(createEmptyDocument(), 'import_mesh', {
-      bodies: [{ positions: [0, 0, 0, 1, 0, 0, 0, 1, 0] }],
-    });
+    const doc = run(createEmptyDocument(), 'import_mesh', { bodies: [{ positions: [0, 0, 0, 1, 0, 0, 0, 1, 0] }] });
     const p = program(doc);
     const solid = p.features[0] as Extract<Feature, { op: 'solid' }>;
     expect(solid.shape.kind).toBe('mesh');
     expect(solid.position.map((x) => x.value)).toEqual([0, 0, 0]);
     expect(p.notes[0]).toContain("mesh '");
   });
-
   it('is pure: the document is not mutated', () => {
     const doc = project(createEmptyDocument(), [
       { command: 'set_parameter', params: { name: 'w', expression: '3' } },
       { command: 'add_box', params: { size: ['=w', 1, 1] } },
     ]);
-    const before = JSON.stringify(doc);
-    program(doc);
-    expect(JSON.stringify(doc)).toBe(before);
+    expectPure(doc, () => program(doc));
   });
 });
 
@@ -318,7 +267,6 @@ describe('format helpers', () => {
     expect(formatDegrees(t(0), 'PI')).toBe('0');
     expect(formatDegrees(t(1, 'a + b'), 'math.pi')).toBe('(a + b) * 180 / math.pi');
   });
-
   it('packs numbers into rows and numbers step headings', () => {
     expect(numberRows([1, 2, 3, 4, 5], 2)).toEqual(['1, 2', '3, 4', '5']);
     const a: Feature = { op: 'remove', step: 2, command: 'x', variable: 'v' };
@@ -370,40 +318,10 @@ function handProgram(rotation: readonly [Term, Term, Term]): FeatureProgram {
     }),
   );
   features.push(
-    {
-      op: 'boolean',
-      step: 20,
-      command: 'boolean',
-      variable: 's0',
-      kind: 'union',
-      left: 's0',
-      right: 's1',
-    },
-    {
-      op: 'boolean',
-      step: 21,
-      command: 'boolean',
-      variable: 's0',
-      kind: 'cut',
-      left: 's0',
-      right: 's2',
-    },
-    {
-      op: 'boolean',
-      step: 22,
-      command: 'boolean',
-      variable: 's0',
-      kind: 'intersect',
-      left: 's0',
-      right: 's3',
-    },
-    {
-      op: 'translate',
-      step: 23,
-      command: 'move_entities',
-      variable: 's4',
-      delta: [t(1, 'w'), t(0), t(0)],
-    },
+    { op: 'boolean', step: 20, command: 'boolean', variable: 's0', kind: 'union', left: 's0', right: 's1' },
+    { op: 'boolean', step: 21, command: 'boolean', variable: 's0', kind: 'cut', left: 's0', right: 's2' },
+    { op: 'boolean', step: 22, command: 'boolean', variable: 's0', kind: 'intersect', left: 's0', right: 's3' },
+    { op: 'translate', step: 23, command: 'move_entities', variable: 's4', delta: [t(1, 'w'), t(0), t(0)] },
     { op: 'remove', step: 24, command: 'delete_entities', variable: 's5' },
     { op: 'label', step: 25, command: 'set_entity_name', variable: 's6', name: 'L' },
   );
@@ -427,90 +345,90 @@ function handProgram(rotation: readonly [Term, Term, Term]): FeatureProgram {
 describe('emitters', () => {
   const plain = handProgram(origin3);
   const rotated = handProgram([t(Math.PI / 2), t(0, 'a'), t(Math.PI, 'h')]);
-
   it('emits Python for every shape kind, with names, notes and rotation degrees', () => {
     for (const backend of ['cadquery', 'build123d'] as const) {
       const text = emitPython(plain, backend);
-      expect(text).toContain('a note');
-      expect(text).toContain('w = param("w", 2)');
-      expect(text).toContain('h = param("h", w)');
-      expect(text).toContain(
+      for (const s of [
+        'a note',
+        'w = param("w", 2)',
+        'h = param("h", w)',
         's0 = box((1, 2, d), position=(1, 0, 0), color="#aabbcc", name="First \\"one\\"")',
-      );
-      expect(text).toContain('s1 = cylinder(1, 2, position=(1, 0, 0)');
-      expect(text).toContain('s2 = sphere(1,');
+        's1 = cylinder(1, 2, position=(1, 0, 0)',
+        's2 = sphere(1,',
+      ])
+        expect(text).toContain(s);
       for (const line of PYTHON_SOLID_LINES) expect(text).toContain(line);
-      expect(text).toContain(
+      for (const s of [
         's8 = revolve([(1, 0), (3, 0), (3, h)], axis="x", angle=180, segments=16',
-      );
-      expect(text).toContain('axis="y"');
-      expect(text).toContain('angle=(h) * 180 / math.pi, segments=16');
-      expect(text).toContain('s11 = mesh([\n    0, 0, 0, 1, 0, 0, 0, 1, 0,\n], color="#aabbcc")');
-      expect(text).toContain('s0 = union(s0, s1)');
-      expect(text).toContain('s0 = cut(s0, s2)');
-      expect(text).toContain('s0 = intersect(s0, s3)');
-      expect(text).toContain('s4 = translate(s4, (w, 0, 0))');
-      expect(text).toContain('remove(s5)');
-      expect(text).toContain('label(s6, "L")');
+        'axis="y"',
+        'angle=(h) * 180 / math.pi, segments=16',
+        's11 = mesh([\n    0, 0, 0, 1, 0, 0, 0, 1, 0,\n], color="#aabbcc")',
+        's0 = union(s0, s1)',
+        's0 = cut(s0, s2)',
+        's0 = intersect(s0, s3)',
+        's4 = translate(s4, (w, 0, 0))',
+        'remove(s5)',
+        'label(s6, "L")',
+      ])
+        expect(text).toContain(s);
       expect(text.split('# ── MODEL')[1]).not.toContain('rotation=');
       const spun = emitPython(rotated, backend);
       expect(spun).toContain('rotation=(90, (a) * 180 / math.pi, (h) * 180 / math.pi)');
     }
   });
-
   it('emits OpenSCAD for every shape kind, nesting rotations Rz then Ry then Rx', () => {
     const text = emitOpenScad(plain);
-    expect(text).toContain('module s0_v1() translate([1, 0, 0]) cube([1, 2, d], center = true);');
-    expect(text).toContain('cylinder(h = 2, r = 1, center = true)');
-    expect(text).toContain('sphere(r = 1)');
-    expect(text).toContain('cylinder(h = 2, r1 = 1, r2 = 0)');
-    expect(text).toContain('rotate_extrude() translate([5, 0]) circle(r = 1)');
-    expect(text).toContain(
+    for (const s of [
+      'module s0_v1() translate([1, 0, 0]) cube([1, 2, d], center = true);',
+      'cylinder(h = 2, r = 1, center = true)',
+      'sphere(r = 1)',
+      'cylinder(h = 2, r1 = 1, r2 = 0)',
+      'rotate_extrude() translate([5, 0]) circle(r = 1)',
       'rotate([90, 0, 90]) linear_extrude(height = 1) polygon([[0, 0], [2, 0], [0, 3]])',
-    );
-    expect(text).toContain('[-(w) / 2, -1.5, 0]');
-    expect(text).toContain('[(w) / 2, 1.5, 0]');
-    expect(text).toContain('linear_extrude(height = 5) polygon([[1, 0], [3, 0], [3, h]])');
-    expect(text).toContain('rotate([90, 0, 90]) rotate_extrude(angle = 180)');
-    expect(text).toContain('rotate([-90, 0, 0]) rotate_extrude(angle = -(180))');
-    expect(text).toContain('rotate_extrude(angle = (h) * 180 / PI)');
-    expect(text).toContain(
+      '[-(w) / 2, -1.5, 0]',
+      '[(w) / 2, 1.5, 0]',
+      'linear_extrude(height = 5) polygon([[1, 0], [3, 0], [3, h]])',
+      'rotate([90, 0, 90]) rotate_extrude(angle = 180)',
+      'rotate([-90, 0, 0]) rotate_extrude(angle = -(180))',
+      'rotate_extrude(angle = (h) * 180 / PI)',
       'polyhedron(points = [\n    [0, 0, 0],\n    [1, 0, 0],\n    [0, 1, 0]\n  ], faces = [[0, 2, 1]])',
-    );
-    expect(text).toContain('module s0_v2() union() { s0_v1(); s1_v1(); }');
-    expect(text).toContain('difference() { s0_v2(); s2_v1(); }');
-    expect(text).toContain('intersection() { s0_v3(); s3_v1(); }');
-    expect(text).toContain('module s4_v2() translate([w, 0, 0]) s4_v1();');
-    expect(text).toContain('// s5 removed');
-    expect(text).toContain('// s6 labelled "L"');
-    expect(text).toContain('color("#aabbcc") s0_v4(); // First');
-    expect(text).toContain('// Note: a note');
+      'module s0_v2() union() { s0_v1(); s1_v1(); }',
+      'difference() { s0_v2(); s2_v1(); }',
+      'intersection() { s0_v3(); s3_v1(); }',
+      'module s4_v2() translate([w, 0, 0]) s4_v1();',
+      '// s5 removed',
+      '// s6 labelled "L"',
+      'color("#aabbcc") s0_v4(); // First',
+      '// Note: a note',
+    ])
+      expect(text).toContain(s);
     const spun = emitOpenScad(rotated);
-    expect(spun).toContain(
-      'translate([1, 0, 0]) rotate([90, 0, 0]) rotate([0, (a) * 180 / PI, 0]) rotate([0, 0, (h) * 180 / PI]) cube(',
-    );
+    expect(spun).toContain('translate([1, 0, 0]) rotate([90, 0, 0]) rotate([0, (a) * 180 / PI, 0]) rotate([0, 0, (h) * 180 / PI]) cube(');
   });
-
   it('emits a FreeCAD macro for every shape kind', () => {
     const text = emitFreeCad(plain);
-    expect(text).toContain('w = 2  # w');
-    expect(text).toContain('h = w  # h');
-    expect(text).toContain('s0 = box((1, 2, d), position=(1, 0, 0))');
-    expect(text).toContain('s1 = cylinder(1, 2, position=(1, 0, 0))');
-    expect(text).toContain('s2 = sphere(1, position=(1, 0, 0))');
+    for (const s of [
+      'w = 2  # w',
+      'h = w  # h',
+      's0 = box((1, 2, d), position=(1, 0, 0))',
+      's1 = cylinder(1, 2, position=(1, 0, 0))',
+      's2 = sphere(1, position=(1, 0, 0))',
+    ])
+      expect(text).toContain(s);
     for (const line of PYTHON_SOLID_LINES) expect(text).toContain(line);
-    expect(text).toContain('s8 = revolve([(1, 0), (3, 0), (3, h)], axis="x", angle=180,');
-    expect(text).toContain('s11 = mesh([\n    0, 0, 0, 1, 0, 0, 0, 1, 0,\n])');
-    expect(text).toContain('s0 = s0.fuse(s1).removeSplitter()');
-    expect(text).toContain('s0 = s0.cut(s2).removeSplitter()');
-    expect(text).toContain('s0 = s0.common(s3).removeSplitter()');
-    expect(text).toContain('s4 = s4.translated(_vec(w, 0, 0))');
-    expect(text).toContain('s5 = None');
-    expect(text).toContain('# s6 labelled "L"');
-    expect(text).toContain('show(s0, "First", "#aabbcc")');
-    expect(text).toContain('show(s6, "solid_2", "#000000")');
-    expect(emitFreeCad(rotated)).toContain(
-      'rotation=(90, (a) * 180 / math.pi, (h) * 180 / math.pi)',
-    );
+    for (const s of [
+      's8 = revolve([(1, 0), (3, 0), (3, h)], axis="x", angle=180,',
+      's11 = mesh([\n    0, 0, 0, 1, 0, 0, 0, 1, 0,\n])',
+      's0 = s0.fuse(s1).removeSplitter()',
+      's0 = s0.cut(s2).removeSplitter()',
+      's0 = s0.common(s3).removeSplitter()',
+      's4 = s4.translated(_vec(w, 0, 0))',
+      's5 = None',
+      '# s6 labelled "L"',
+      'show(s0, "First", "#aabbcc")',
+      'show(s6, "solid_2", "#000000")',
+    ])
+      expect(text).toContain(s);
+    expect(emitFreeCad(rotated)).toContain('rotation=(90, (a) * 180 / math.pi, (h) * 180 / math.pi)');
   });
 });

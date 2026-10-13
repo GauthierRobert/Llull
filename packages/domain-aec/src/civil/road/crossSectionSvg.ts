@@ -1,8 +1,6 @@
 /**
- * Cross-section sheet as SVG: one panel per station with the ground line, the road template with
- * batters to daylight, and the cut / fill areas, all drawn at one common 1:1 scale.
- * @layer domain-aec/civil
- * @pure
+ * Cross-section sheet as SVG: one panel per station with the ground line, the road template with batters to daylight, and the cut / fill
+ * areas, all drawn at one common 1:1 scale.
  */
 
 import type { CadDocument } from '@core/model/types';
@@ -45,12 +43,7 @@ export function crossSectionSvg(
   const scale = Math.min((PANEL_WIDTH - 40) / (2 * halfWidth), (PANEL_HEIGHT - 70) / spanZ);
   const rowsCount = Math.ceil(entries.length / COLUMNS);
   const body: string[] = [
-    svgText(
-      MARGIN,
-      18,
-      `Cross sections - ${alignment.name} (scale 1:${Math.round(1 / scale)} H = V, m)`,
-      { size: 13, weight: 'bold' },
-    ),
+    svgText(MARGIN, 18, `Cross sections - ${alignment.name} (scale 1:${Math.round(1 / scale)} H = V, m)`, { size: 13, weight: 'bold' }),
   ];
   entries.forEach((entry, index) => {
     const { cross, areas } = entry;
@@ -63,12 +56,7 @@ export function crossSectionSvg(
     const px = (offset: number): number => centreX + offset * metre * scale;
     const py = (z: number): number => baseY - (z * metre - designM) * scale;
     body.push(svgRect(left, top, PANEL_WIDTH, PANEL_HEIGHT, '#bbb'));
-    body.push(
-      svgText(left + 6, top + 14, `${stationText(doc, cross.station)}  CL ${designM.toFixed(2)}`, {
-        size: 10,
-        weight: 'bold',
-      }),
-    );
+    body.push(svgText(left + 6, top + 14, `${stationText(doc, cross.station)}  CL ${designM.toFixed(2)}`, { size: 10, weight: 'bold' }));
     body.push(svgLine([centreX, top + 22], [centreX, top + PANEL_HEIGHT - 28], '#ddd', 1, '4,3'));
     const designLine = cross.design.map((node): Pair => [px(node.offset), py(node.z)]);
     if (tin) {
@@ -87,21 +75,8 @@ export function crossSectionSvg(
       ? `Cut ${(areas.cutArea * metre * metre).toFixed(2)} m2   Fill ${(areas.fillArea * metre * metre).toFixed(2)} m2`
       : 'no existing ground';
     body.push(svgText(left + 6, top + PANEL_HEIGHT - 8, notes, { size: 9 }));
-    const day = [cross.right, cross.left].map((node) =>
-      node ? `${(Math.abs(node.offset) * metre).toFixed(1)}` : '-',
-    );
-    body.push(
-      svgText(
-        left + PANEL_WIDTH - 6,
-        top + PANEL_HEIGHT - 8,
-        `daylight R ${day[0]} / L ${day[1]} m`,
-        { size: 9, anchor: 'end' },
-      ),
-    );
+    const day = [cross.right, cross.left].map((node) => (node ? `${(Math.abs(node.offset) * metre).toFixed(1)}` : '-'));
+    body.push(svgText(left + PANEL_WIDTH - 6, top + PANEL_HEIGHT - 8, `daylight R ${day[0]} / L ${day[1]} m`, { size: 9, anchor: 'end' }));
   });
-  return svgDocument(
-    MARGIN * 2 + COLUMNS * (PANEL_WIDTH + 10),
-    40 + rowsCount * (PANEL_HEIGHT + 10),
-    body,
-  );
+  return svgDocument(MARGIN * 2 + COLUMNS * (PANEL_WIDTH + 10), 40 + rowsCount * (PANEL_HEIGHT + 10), body);
 }

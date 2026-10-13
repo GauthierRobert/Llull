@@ -1,36 +1,18 @@
-/**
- * Footing and base-plate check rows of the analysed columns of a level (soil, uplift, sliding, tie, plate, settlement).
- * @layer domain-aec
- * @pure
- */
+/** Footing and base-plate check rows of the analysed columns of a level (soil, uplift, sliding, tie, plate, settlement). */
 
 import type { CadDocument } from '@core/model/types';
 import { getBuilding, levelElementsOf } from '../../building/model';
 import type { FrameLoads } from '../frames/frameModelTypes';
 import { baseReactions } from '../frames/frameModelSolve';
-import {
-  type ClayLayer,
-  type FoundationRow,
-  MAX_UTILISATION,
-  type PadSettlement,
-} from './foundationModel';
+import { type ClayLayer, type FoundationRow, MAX_UTILISATION, type PadSettlement } from './foundationModel';
 import { differentialRows, footingRows } from './foundationRows';
 import { plateRows } from './foundationPlateRows';
 import { reactionColumn, slabSharePerColumn, slidingHorizontalOf } from './foundationThrust';
-import {
-  combine,
-  findFooting,
-  findPlate,
-  hasCase,
-  ultimateCombinations,
-} from './foundationCombinations';
+import { combine, findFooting, findPlate, hasCase, ultimateCombinations } from './foundationCombinations';
 import { footingSettlementParts } from './foundationSettlement';
 import { round } from '../../shared/numeric';
 
-/**
- * Checks footings and base plates of the columns of a level.
- * @pure
- */
+/** Checks footings and base plates of the columns of a level. */
 export function checkFoundations(
   doc: CadDocument,
   levelId: string,
@@ -66,13 +48,7 @@ export function checkFoundations(
         false,
       ).filter((combination) => !/W/.test(combination.name));
       const tie = gravity
-        .flatMap((combination) =>
-          siblings.map((other) => ({
-            other,
-            combination,
-            force: Math.abs(combine(other, combination.factors).h),
-          })),
-        )
+        .flatMap((combination) => siblings.map((other) => ({ other, combination, force: Math.abs(combine(other, combination.factors).h) })))
         .reduce((best, item) => (item.force > best.force ? item : best));
       rows.push({
         column: reaction.frame,
@@ -90,20 +66,7 @@ export function checkFoundations(
       footings += 1;
       checkedFootings.add(footing.id);
       rows.push(
-        ...footingRows(
-          {
-            doc,
-            reaction,
-            wind,
-            soilBearing,
-            soilModulus,
-            clayLayer,
-            slidingHorizontal,
-            slabShare,
-          },
-          footing,
-          column.mark,
-        ),
+        ...footingRows({ doc, reaction, wind, soilBearing, soilModulus, clayLayer, slidingHorizontal, slabShare }, footing, column.mark),
       );
       settlements.push({
         frame: reaction.frame,
@@ -115,14 +78,10 @@ export function checkFoundations(
     }
     if (plate) {
       plates += 1;
-      rows.push(
-        ...plateRows(doc, building, reaction, column.mark, footing?.mark ?? '—', plate, wind),
-      );
+      rows.push(...plateRows(doc, building, reaction, column.mark, footing?.mark ?? '—', plate, wind));
     }
   }
   rows.push(...differentialRows(doc, settlements));
-  const unchecked = levelElementsOf(building, 'footing', levelId).filter(
-    (element) => !checkedFootings.has(element.id),
-  ).length;
+  const unchecked = levelElementsOf(building, 'footing', levelId).filter((element) => !checkedFootings.has(element.id)).length;
   return { rows, footings, plates, unchecked };
 }

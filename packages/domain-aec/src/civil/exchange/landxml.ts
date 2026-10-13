@@ -1,20 +1,11 @@
 /**
- * LandXML 1.2 writer of the civil model: point groups (CgPoints), TIN surfaces, gravity pipe
- * networks and (via the roads module) alignments. LandXML coordinates are "northing easting
- * elevation" in metres.
- * @layer domain-aec/civil
- * @pure
+ * LandXML 1.2 writer of the civil model: point groups (CgPoints), TIN surfaces, gravity pipe networks and (via the roads module)
+ * alignments. LandXML coordinates are "northing easting elevation" in metres.
  */
 
 import { compactNumber, fixedNumber } from '@lib/compactNumber';
 import type { CadDocument } from '@core/model/types';
-import type {
-  CivilModel,
-  ManholeObject,
-  PipeObject,
-  PointGroupObject,
-  SurfaceObject,
-} from '@core/model/civil';
+import type { CivilModel, ManholeObject, PipeObject, PointGroupObject, SurfaceObject } from '@core/model/civil';
 import { escapeXml } from '@lib/escapeXml';
 import { toMetres } from '@core/model/units';
 import { civilObjectsOf, getCivil } from '../model';
@@ -43,9 +34,7 @@ function uniqueNames(objects: ReadonlyArray<{ id: string; name: string }>): Map<
   return new Map(
     objects.map((object) => [
       object.id,
-      (counts.get(object.name) ?? 0) > 1 || object.name === ''
-        ? `${object.name} (${object.id})`.trim()
-        : object.name,
+      (counts.get(object.name) ?? 0) > 1 || object.name === '' ? `${object.name} (${object.id})`.trim() : object.name,
     ]),
   );
 }
@@ -67,8 +56,7 @@ function surfaceXml(doc: Doc, civil: CivilModel, surface: SurfaceObject): string
   const elevations = tin.points.map((point) => point[2]);
   const range =
     elevations.length > 0
-      ? attr('elevMin', metres(doc, Math.min(...elevations))) +
-        attr('elevMax', metres(doc, Math.max(...elevations)))
+      ? attr('elevMin', metres(doc, Math.min(...elevations))) + attr('elevMax', metres(doc, Math.max(...elevations)))
       : '';
   const faces: string[] = [];
   for (let k = 0; k + 2 < tin.triangles.length; k += 3) {
@@ -80,8 +68,7 @@ function surfaceXml(doc: Doc, civil: CivilModel, surface: SurfaceObject): string
     `      <Definition surfType="TIN"${range}>`,
     '        <Pnts>',
     ...tin.points.map(
-      (point, index) =>
-        `          <P id="${index + 1}">${northEast(doc, [point[0], point[1]])} ${metres(doc, point[2])}</P>`,
+      (point, index) => `          <P id="${index + 1}">${northEast(doc, [point[0], point[1]])} ${metres(doc, point[2])}</P>`,
     ),
     '        </Pnts>',
     '        <Faces>',
@@ -92,31 +79,21 @@ function surfaceXml(doc: Doc, civil: CivilModel, surface: SurfaceObject): string
   ];
 }
 
-function structXml(
-  doc: Doc,
-  manhole: ManholeObject,
-  pipes: ReadonlyArray<PipeObject>,
-  names: ReadonlyMap<string, string>,
-): string[] {
+function structXml(doc: Doc, manhole: ManholeObject, pipes: ReadonlyArray<PipeObject>, names: ReadonlyMap<string, string>): string[] {
   const inverts = pipes.flatMap((pipe) => {
     const name = names.get(pipe.id) ?? pipe.id;
     const result: string[] = [];
     if (pipe.toId === manhole.id) {
-      result.push(
-        `          <Invert${attr('elev', metres(doc, pipe.invertTo))} flowDir="in"${attr('refPipe', name)}/>`,
-      );
+      result.push(`          <Invert${attr('elev', metres(doc, pipe.invertTo))} flowDir="in"${attr('refPipe', name)}/>`);
     }
     if (pipe.fromId === manhole.id) {
-      result.push(
-        `          <Invert${attr('elev', metres(doc, pipe.invertFrom))} flowDir="out"${attr('refPipe', name)}/>`,
-      );
+      result.push(`          <Invert${attr('elev', metres(doc, pipe.invertFrom))} flowDir="out"${attr('refPipe', name)}/>`);
     }
     return result;
   });
   return [
-    `        <Struct${attr('name', names.get(manhole.id) ?? manhole.id)}` +
-      `${attr('elevRim', metres(doc, manhole.rimElevation))}` +
-      `${attr('elevSump', metres(doc, manhole.invertElevation))}>`,
+    '        ' +
+      `<Struct${attr('name', names.get(manhole.id) ?? manhole.id)}${attr('elevRim', metres(doc, manhole.rimElevation))}${attr('elevSump', metres(doc, manhole.invertElevation))}>`,
     `          <Center>${northEast(doc, manhole.position)}</Center>`,
     `          <CircStruct${attr('diameter', fixedNumber(toMetres(doc, manhole.diameter) * 1000, 1))}/>`,
     ...inverts,
@@ -124,36 +101,22 @@ function structXml(
   ];
 }
 
-function pipeXml(
-  doc: Doc,
-  pipe: PipeObject,
-  manholes: ReadonlyMap<string, ManholeObject>,
-  names: ReadonlyMap<string, string>,
-): string[] {
+function pipeXml(doc: Doc, pipe: PipeObject, manholes: ReadonlyMap<string, ManholeObject>, names: ReadonlyMap<string, string>): string[] {
   const from = manholes.get(pipe.fromId);
   const to = manholes.get(pipe.toId);
-  const planLength =
-    from && to
-      ? Math.hypot(to.position[0] - from.position[0], to.position[1] - from.position[1])
-      : 0;
+  const planLength = from && to ? Math.hypot(to.position[0] - from.position[0], to.position[1] - from.position[1]) : 0;
   // Percent, per the LandXML 2.0 schema annotation and the buildingSMART InfraModel profile.
   const slopePercent = planLength > 0 ? ((pipe.invertFrom - pipe.invertTo) / planLength) * 100 : 0;
   return [
-    `        <Pipe${attr('name', names.get(pipe.id) ?? pipe.id)}` +
-      `${attr('refStart', names.get(pipe.fromId) ?? pipe.fromId)}` +
-      `${attr('refEnd', names.get(pipe.toId) ?? pipe.toId)}` +
-      `${attr('length', metres(doc, planLength))}${attr('slope', compactNumber(slopePercent))}>`,
+    '        ' +
+      `<Pipe${attr('name', names.get(pipe.id) ?? pipe.id)}${attr('refStart', names.get(pipe.fromId) ?? pipe.fromId)}${attr('refEnd', names.get(pipe.toId) ?? pipe.toId)}${attr('length', metres(doc, planLength))}${attr('slope', compactNumber(slopePercent))}>`,
     `          <CircPipe${attr('diameter', fixedNumber(toMetres(doc, pipe.diameter) * 1000, 1))}` +
       `${attr('material', pipe.material)}${attr('mannings', String(pipe.manningN))}/>`,
     '        </Pipe>',
   ];
 }
 
-function pipeNetworkXml(
-  doc: Doc,
-  manholes: ReadonlyArray<ManholeObject>,
-  pipes: ReadonlyArray<PipeObject>,
-): string[] {
+function pipeNetworkXml(doc: Doc, manholes: ReadonlyArray<ManholeObject>, pipes: ReadonlyArray<PipeObject>): string[] {
   if (manholes.length === 0 && pipes.length === 0) return [];
   const names = new Map([...uniqueNames(manholes), ...uniqueNames(pipes)]);
   const byId = new Map(manholes.map((manhole) => [manhole.id, manhole]));
@@ -183,17 +146,13 @@ function coordinateSystemXml(doc: Doc, frame: CoordinateFrame): string[] {
   const crs = doc.civil?.crs;
   if (!crs || (crs.calibration && frame === 'local')) return [];
   return [
-    `  <CoordinateSystem${attr('name', crs.name)}` +
-      `${crs.epsg !== undefined ? attr('epsgCode', String(crs.epsg)) : ''}` +
-      `${crs.verticalDatum !== undefined ? attr('verticalDatum', crs.verticalDatum) : ''}/>`,
+    '  ' +
+      `<CoordinateSystem${attr('name', crs.name)}${crs.epsg !== undefined ? attr('epsgCode', String(crs.epsg)) : ''}${crs.verticalDatum !== undefined ? attr('verticalDatum', crs.verticalDatum) : ''}/>`,
   ];
 }
 
 /** The LandXML 1.2 document of the civil model, with element counts. */
-export function buildLandXml(
-  doc: Doc,
-  { projectName, date, coordinates }: LandXmlOptions,
-): { text: string; counts: LandXmlCounts } {
+export function buildLandXml(doc: Doc, { projectName, date, coordinates }: LandXmlOptions): { text: string; counts: LandXmlCounts } {
   const frame = resolveFrame(doc, coordinates);
   const calibration = doc.civil?.crs?.calibration;
   const source = getCivil(doc);
@@ -209,9 +168,8 @@ export function buildLandXml(
     '<?xml version="1.0" encoding="UTF-8"?>',
     `<LandXML xmlns="${LANDXML_NAMESPACE}" version="1.2"${attr('date', date)} time="00:00:00">`,
     '  <Units>',
-    '    <Metric linearUnit="meter" areaUnit="squareMeter" volumeUnit="cubicMeter" ' +
-      'temperatureUnit="celsius" pressureUnit="milliBars" diameterUnit="millimeter" ' +
-      'angularUnit="decimal degrees" directionUnit="decimal degrees"/>',
+    '    <Metric linearUnit="meter" areaUnit="squareMeter" volumeUnit="cubicMeter" temperatureUnit="celsius" pressureUnit="milliBars" ' +
+      'diameterUnit="millimeter" angularUnit="decimal degrees" directionUnit="decimal degrees"/>',
     '  </Units>',
     ...coordinateSystemXml(doc, frame),
     `  <Project${attr('name', projectName)}/>`,

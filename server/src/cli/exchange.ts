@@ -1,5 +1,4 @@
 /**
- * @layer server
  * The exchange tools (export_step, import_step, import_dwg, import_code) in the `llull` CLI. They
  * are not registry commands — Python / DWG I/O sits behind ports — so the CLI runs the same MCP-
  * layer handlers: in-process for a local --doc (document changes via `execute`), `POST /exchange`
@@ -54,15 +53,8 @@ interface LocalExchangeContext {
 }
 
 /** Run an exchange tool in-process against a local document. */
-export async function runLocalExchange(
-  name: string,
-  params: unknown,
-  context: LocalExchangeContext,
-): Promise<CommandOutcome> {
-  const outcome = await runExchangeTool(name, params, context.options, {
-    getDoc: context.getDoc,
-    applyCommand: context.runCommand,
-  });
+export async function runLocalExchange(name: string, params: unknown, context: LocalExchangeContext): Promise<CommandOutcome> {
+  const outcome = await runExchangeTool(name, params, context.options, { getDoc: context.getDoc, applyCommand: context.runCommand });
   if (outcome === null) throw new Error(`${name} is not an exchange tool.`);
   return outcome;
 }

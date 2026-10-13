@@ -18,7 +18,6 @@ describe('nativeObject', () => {
     expect(() => release(native(log, 'b', true))).not.toThrow();
     expect(log).toEqual(['a', 'b']);
   });
-
   it('withOwned returns the body result and frees every registered object', () => {
     const log: string[] = [];
     const result = withOwned((own) => {
@@ -30,7 +29,6 @@ describe('nativeObject', () => {
     expect(result).toBe(42);
     expect(log).toEqual(['a', 'b']);
   });
-
   it('withOwned maps a throw to null, reports it and still frees', () => {
     const log: string[] = [];
     const errors: unknown[] = [];

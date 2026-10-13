@@ -1,10 +1,4 @@
-/**
- * @layer ui/viewport/2d
- *
- * The inputs every 2D click-pick shares: the live document, the pick tolerance in world units for
- * the current zoom, and the "is this entity drawn" filter (layers + local hiding, same as
- * Entities2D). Read at click time from the stores, so handlers never close over stale state.
- */
+// Shared click-pick inputs read at click time (never stale): live document, zoom tolerance, Entities2D visibility filter.
 
 import type { CadDocument, Entity } from '@core/model/types';
 import { useStore, useViewportStore } from '@ui/store';
@@ -13,9 +7,9 @@ import { PICK_RADIUS_PX } from './modifyHelpers';
 
 interface PickContext {
   document: CadDocument;
-  /** Pick radius in document units. */
+  /** Document units. */
   tolerance: number;
-  /** Visible entities, further narrowed by `extraFilter` when given. */
+  /** Visible, narrowed by `extraFilter`. */
   accepts: (entity: Entity) => boolean;
 }
 
@@ -26,8 +20,6 @@ export function pickContext(zoom: number, extraFilter?: (entity: Entity) => bool
   return {
     document,
     tolerance: PICK_RADIUS_PX / (zoom > 0 ? zoom : 1),
-    accepts: (entity) =>
-      (extraFilter?.(entity) ?? true) &&
-      isEntityVisible(entity, layers, hiddenLayerIds, hiddenEntityIds),
+    accepts: (entity) => (extraFilter?.(entity) ?? true) && isEntityVisible(entity, layers, hiddenLayerIds, hiddenEntityIds),
   };
 }

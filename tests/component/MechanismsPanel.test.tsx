@@ -1,21 +1,3 @@
-/**
- * Component tests for <MechanismsPanel />.
- *
- * Verifies observable behavior (workflow W3, react R11):
- *   - Each section shows an empty-state hint when the doc has nothing.
- *   - A constraint row renders with the correct kind chip and entity refs.
- *   - "Solve" button dispatches solve_constraints (whole-doc).
- *   - "Delete" constraint button dispatches delete_constraint with the correct id.
- *   - A joint row renders with kind chip, instance ids, axis, current value.
- *   - Editing the joint value input and blurring dispatches set_joint_value.
- *   - "Delete" joint button dispatches delete_joint with the correct id.
- *   - A drive-relation row renders with driver, driven, and ratio.
- *   - "Delete" drive-relation button dispatches delete_drive_relation with the correct id.
- *
- * No geometry math or internals — behavioral testing only.
- * @layer tests/component
- */
-
 import { resetStore } from '../helpers/componentEntities';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { act, render, screen, fireEvent } from '@testing-library/react';
@@ -35,12 +17,7 @@ function buildConstraint(): { constraintId: string; boxId: string; sphereId: str
   const boxId = r1.affected[0]!;
   const sphereId = r2.affected[0]!;
   const rc = localDispatch('add_constraint', {
-    constraint: {
-      kind: 'distance',
-      a: { entityId: boxId },
-      b: { entityId: sphereId },
-      value: '5',
-    },
+    constraint: { kind: 'distance', a: { entityId: boxId }, b: { entityId: sphereId }, value: '5' },
   });
   const constraintId = rc.affected[0]!;
   return { constraintId, boxId, sphereId };
@@ -60,12 +37,7 @@ function buildJoint(): { jointId: string; jointAId: string; jointBId: string } {
   const ri2 = localDispatch('insert_instance', { componentId: compBId });
   const jointAId = ri1.affected[0]!;
   const jointBId = ri2.affected[0]!;
-  const rj = localDispatch('add_joint', {
-    kind: 'revolute',
-    a: { instanceId: jointAId },
-    b: { instanceId: jointBId },
-    axis: 'z',
-  });
+  const rj = localDispatch('add_joint', { kind: 'revolute', a: { instanceId: jointAId }, b: { instanceId: jointBId }, axis: 'z' });
   return { jointId: rj.affected[0]!, jointAId, jointBId };
 }
 
@@ -89,11 +61,7 @@ function buildDriveRelation(driverJointId: string): { driveId: string; drivenJoi
     axis: 'x',
   });
   const drivenJointId = rj2.affected[0]!;
-  const rd = localDispatch('add_drive_relation', {
-    driver: driverJointId,
-    driven: drivenJointId,
-    ratio: 2.0,
-  });
+  const rd = localDispatch('add_drive_relation', { driver: driverJointId, driven: drivenJointId, ratio: 2.0 });
   return { driveId: rd.affected[0]!, drivenJointId };
 }
 
@@ -124,14 +92,12 @@ describe('MechanismsPanel — empty state', () => {
     resetStore();
     useViewportStore.setState({ mechanismSelection: null });
   });
-
   it('shows empty hints for all three sections when document is empty', () => {
     render(<MechanismsPanel />);
     expect(screen.getByText('No constraints defined.')).toBeDefined();
     expect(screen.getByText('No joints defined.')).toBeDefined();
     expect(screen.getByText('No drive relations defined.')).toBeDefined();
   });
-
   it('shows section titles', () => {
     render(<MechanismsPanel />);
     expect(screen.getByText('Constraints')).toBeDefined();
@@ -147,7 +113,6 @@ describe('MechanismsPanel — constraints section', () => {
     resetStore();
     useViewportStore.setState({ mechanismSelection: null });
   });
-
   it('renders a constraint row with the kind chip', () => {
     const { constraintId } = buildFullDoc();
     render(<MechanismsPanel />);
@@ -155,7 +120,6 @@ describe('MechanismsPanel — constraints section', () => {
     expect(row).toBeDefined();
     expect(row.textContent).toContain('distance');
   });
-
   it('"Solve" button dispatches solve_constraints', () => {
     const { constraintId } = buildFullDoc();
     const dispatchSpy = spyDispatch();
@@ -164,7 +128,6 @@ describe('MechanismsPanel — constraints section', () => {
     fireEvent.click(solveBtn);
     expect(dispatchSpy).toHaveBeenCalledWith('solve_constraints', {});
   });
-
   it('"Delete" button dispatches delete_constraint with the correct id', () => {
     const { constraintId } = buildFullDoc();
     const dispatchSpy = spyDispatch();
@@ -182,7 +145,6 @@ describe('MechanismsPanel — joints section', () => {
     resetStore();
     useViewportStore.setState({ mechanismSelection: null });
   });
-
   it('renders a joint row with the kind chip', () => {
     const { jointId } = buildFullDoc();
     render(<MechanismsPanel />);
@@ -190,7 +152,6 @@ describe('MechanismsPanel — joints section', () => {
     expect(row).toBeDefined();
     expect(row.textContent).toContain('revolute');
   });
-
   it('labels a prismatic joint value with the document unit, not a fixed mm', () => {
     const { jointId } = buildFullDoc();
     localDispatch('set_units', { units: 'm' });
@@ -198,14 +159,12 @@ describe('MechanismsPanel — joints section', () => {
     render(<MechanismsPanel />);
     expect(screen.getByLabelText(`Joint value for ${drivenJointId} (m)`)).toBeDefined();
   });
-
   it('joint row input shows current angle value', () => {
     const { jointId } = buildFullDoc();
     render(<MechanismsPanel />);
     const input = screen.getByTestId(`joint-value-${jointId}`) as HTMLInputElement;
     expect(input.value).toBe('0');
   });
-
   it('editing joint value and blurring dispatches set_joint_value', () => {
     const { jointId } = buildFullDoc();
     const dispatchSpy = spyDispatch();
@@ -214,12 +173,8 @@ describe('MechanismsPanel — joints section', () => {
     // The field is in degrees; the command receives radians.
     fireEvent.change(input, { target: { value: '90' } });
     fireEvent.blur(input);
-    expect(dispatchSpy).toHaveBeenCalledWith('set_joint_value', {
-      id: jointId,
-      value: Math.PI / 2,
-    });
+    expect(dispatchSpy).toHaveBeenCalledWith('set_joint_value', { id: jointId, value: Math.PI / 2 });
   });
-
   it('does not re-dispatch an unchanged value on blur', () => {
     const { jointId } = buildFullDoc();
     const dispatchSpy = spyDispatch();
@@ -227,7 +182,6 @@ describe('MechanismsPanel — joints section', () => {
     fireEvent.blur(screen.getByTestId(`joint-value-${jointId}`));
     expect(dispatchSpy).not.toHaveBeenCalled();
   });
-
   it('shows the new document value after an external change (undo / agent edit)', () => {
     const { jointId } = buildFullDoc();
     render(<MechanismsPanel />);
@@ -239,7 +193,6 @@ describe('MechanismsPanel — joints section', () => {
     expect(input.value).toBe('28.64789');
     expect(screen.getByLabelText(`Joint value for ${jointId} (°)`)).toBeDefined();
   });
-
   it('highlight is a keyboard-operable toggle button, not a listbox option', () => {
     const { jointId } = buildFullDoc();
     render(<MechanismsPanel />);
@@ -250,7 +203,6 @@ describe('MechanismsPanel — joints section', () => {
     expect(useViewportStore.getState().mechanismSelection).toEqual({ kind: 'joint', id: jointId });
     expect(button.getAttribute('aria-pressed')).toBe('true');
   });
-
   it('"Delete" button dispatches delete_joint with the correct id', () => {
     const { jointId } = buildFullDoc();
     const dispatchSpy = spyDispatch();
@@ -268,7 +220,6 @@ describe('MechanismsPanel — drive relations section', () => {
     resetStore();
     useViewportStore.setState({ mechanismSelection: null });
   });
-
   it('renders a drive-relation row with ratio', () => {
     const { driveId } = buildFullDoc();
     render(<MechanismsPanel />);
@@ -277,7 +228,6 @@ describe('MechanismsPanel — drive relations section', () => {
     expect(row.textContent).toContain('ratio');
     expect(row.textContent).toContain('2.0000');
   });
-
   it('"Delete" button dispatches delete_drive_relation with the correct id', () => {
     const { driveId } = buildFullDoc();
     const dispatchSpy = spyDispatch();

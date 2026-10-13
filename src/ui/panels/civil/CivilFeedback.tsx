@@ -1,10 +1,4 @@
-/**
- * @layer ui/panels/civil
- *
- * CivilFeedback — the pilot "Feedback" button of the Civil / Site panel header: a short text box
- * and a mailto: link prefilled with the app version and anonymous document statistics (no document
- * content). Presentation only: reads the store, never changes the document.
- */
+// Pilot "Feedback" button: text box + mailto: with app version and anonymous statistics (no document content).
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
@@ -23,11 +17,7 @@ function FeedbackForm({ onSent }: { onSent: () => void }): React.ReactElement {
         aria-label="Feedback text"
         onChange={(event) => setText(event.target.value)}
       />
-      <a
-        className="btn btn--primary btn--sm"
-        href={feedbackMailto(text, feedbackStats(document))}
-        onClick={onSent}
-      >
+      <a className="btn btn--primary btn--sm" href={feedbackMailto(text, feedbackStats(document))} onClick={onSent}>
         Send by e-mail
       </a>
     </div>

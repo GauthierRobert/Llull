@@ -1,10 +1,5 @@
-/**
- * @layer ui/panels/civil
- *
- * Pilot feedback e-mail: a `mailto:` link prefilled with the app version, anonymous document
- * statistics (entity count, unit, civil object counts per category) and the user's text. Never
- * includes document content (names, coordinates, survey data).
- */
+// Pilot feedback mailto: app version, anonymous statistics (entity count, unit, civil counts) + the user's text; never
+// document content.
 
 import { CIVIL_CATEGORIES, type CivilCategory } from '@core/model/civil';
 import type { CadDocument } from '@core/model/types';
@@ -23,10 +18,7 @@ export interface FeedbackStats {
 }
 
 export function feedbackStats(doc: CadDocument): FeedbackStats {
-  const civil = Object.fromEntries(CIVIL_CATEGORIES.map((category) => [category, 0])) as Record<
-    CivilCategory,
-    number
-  >;
+  const civil = Object.fromEntries(CIVIL_CATEGORIES.map((category) => [category, 0])) as Record<CivilCategory, number>;
   for (const id of doc.civil?.order ?? []) {
     const category = doc.civil?.objects[id]?.category;
     if (category !== undefined) civil[category] += 1;
@@ -46,11 +38,7 @@ function feedbackBody(text: string, stats: FeedbackStats): string {
   ].join('\n');
 }
 
-export function feedbackMailto(
-  text: string,
-  stats: FeedbackStats,
-  recipient: string = FEEDBACK_RECIPIENT,
-): string {
+export function feedbackMailto(text: string, stats: FeedbackStats, recipient: string = FEEDBACK_RECIPIENT): string {
   const subject = `llull pilot feedback (v${APP_VERSION})`;
   return (
     `mailto:${encodeURIComponent(recipient).replace(/%40/g, '@')}` +

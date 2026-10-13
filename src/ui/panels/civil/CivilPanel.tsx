@@ -1,10 +1,4 @@
-/**
- * @layer ui/panels/civil
- *
- * CivilPanel — the civil / site-engineering workspace, in workflow order: 1 survey, 2 terrain,
- * 3 earthworks, 4 roads, 5 drainage, 6 exports. Every change goes through dispatch (PRIME
- * DIRECTIVE); reports and exports run read-only commands locally.
- */
+// Civil / site workspace in workflow order: 1 survey, 2 terrain, 3 earthworks, 4 roads, 5 drainage, 6 exports.
 
 import React from 'react';
 import { classNames } from '@ui/classNames';
@@ -23,11 +17,7 @@ export function CivilPanel({ className }: { className?: string }): React.ReactEl
   const objectCount = useStore((s) => s.document.civil?.order.length ?? 0);
   return (
     <div className={classNames('panel civil-panel', className)} data-testid="civil-panel">
-      <PanelHeader
-        title="Civil / Site"
-        count={objectCount}
-        countLabel={`${objectCount} civil objects`}
-      >
+      <PanelHeader title="Civil / Site" count={objectCount} countLabel={`${objectCount} civil objects`}>
         <CivilFeedback />
       </PanelHeader>
       {objectCount === 0 && (

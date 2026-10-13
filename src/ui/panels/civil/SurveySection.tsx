@@ -1,10 +1,4 @@
-/**
- * @layer ui/panels/civil
- *
- * SurveySection — switch the document to metres (`set_units`) for real survey coordinates, load a
- * survey file (.csv / .txt, or paste it), choose its column format and unit, dispatch
- * `import_survey_points`; lists the point groups.
- */
+// Metres (`set_units`), survey file (.csv / .txt or pasted) with column format + unit → `import_survey_points`; groups.
 
 import React, { useState } from 'react';
 import { DOCUMENT_UNITS, type DocumentUnit } from '@core/model/types';
@@ -45,12 +39,7 @@ export function SurveySection(): React.ReactElement {
   const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
     if (text.trim() === '') return;
-    dispatch('import_survey_points', {
-      text,
-      format,
-      sourceUnit: unit,
-      ...optionalText('name', name),
-    });
+    dispatch('import_survey_points', { text, format, sourceUnit: unit, ...optionalText('name', name) });
     setText('');
     setName('');
   };
@@ -67,14 +56,8 @@ export function SurveySection(): React.ReactElement {
     >
       {documentUnit !== 'm' && (
         <div className="building-actions">
-          <span className="panel__empty-hint">
-            The document is in {documentUnit}; site work reads best in metres.
-          </span>
-          <button
-            type="button"
-            className="btn btn--ghost btn--sm"
-            onClick={() => dispatch('set_units', { units: 'm' })}
-          >
+          <span className="panel__empty-hint">The document is in {documentUnit}; site work reads best in metres.</span>
+          <button type="button" className="btn btn--ghost btn--sm" onClick={() => dispatch('set_units', { units: 'm' })}>
             Work in metres
           </button>
         </div>
@@ -96,12 +79,7 @@ export function SurveySection(): React.ReactElement {
             optionLabel={(option) => `${option} — ${FORMAT_HINT[option]}`}
             onChange={setFormat}
           />
-          <OptionSelect
-            value={unit}
-            options={DOCUMENT_UNITS}
-            label="Survey unit"
-            onChange={setUnit}
-          />
+          <OptionSelect value={unit} options={DOCUMENT_UNITS} label="Survey unit" onChange={setUnit} />
           <TextField value={name} set={setName} hint="Group name" label="Point group name" />
           <button type="submit" className="btn btn--primary btn--sm" disabled={text.trim() === ''}>
             Import points
@@ -112,11 +90,7 @@ export function SurveySection(): React.ReactElement {
       {groups.length > 0 && (
         <ul className="civil-list" aria-label="Point groups">
           {groups.map((group) => (
-            <CivilObjectRow
-              key={group.id}
-              object={group}
-              detail={`${group.points.length} points`}
-            />
+            <CivilObjectRow key={group.id} object={group} detail={`${group.points.length} points`} />
           ))}
         </ul>
       )}

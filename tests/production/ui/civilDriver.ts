@@ -6,8 +6,6 @@ import { runViaPalette } from './palette';
 import type { UiSession } from './session';
 
 /**
- * @layer tests/production/ui
- *
  * Maps each scripted civil tool call to the Civil / Site panel control an engineer uses: the survey
  * file input, the terrain, platform, alignment, manhole and pipe forms, the alignment editor
  * (profile, template, superelevation, report, plan-profile sheet) and the drainage check / sizing
@@ -17,8 +15,7 @@ import type { UiSession } from './session';
 
 const asNumbers = (value: unknown): number[] => (Array.isArray(value) ? value.map(Number) : []);
 const text = (value: unknown): string => (value === undefined ? '' : String(value));
-const points = (value: unknown): string =>
-  (Array.isArray(value) ? value : []).map((point) => asNumbers(point).join(',')).join('; ');
+const points = (value: unknown): string => (Array.isArray(value) ? value : []).map((point) => asNumbers(point).join(',')).join('; ');
 const list = (value: unknown): string => asNumbers(value).join(', ');
 
 export class CivilUiDriver {
@@ -27,18 +24,15 @@ export class CivilUiDriver {
   readonly provided: Record<DeliverableId, string> = {};
   readonly fileNames: Record<string, string> = {};
   private readonly building: BuildingPanel;
-
   constructor(
     private readonly session: UiSession,
     private readonly intent: CivilIntent,
   ) {
     this.building = new BuildingPanel(session);
   }
-
   get uiGaps(): string[] {
     return [...this.gaps];
   }
-
   async perform(call: ToolCall): Promise<string> {
     const paletteBefore = this.steps.palette;
     const summary = await this.route(call);
@@ -48,52 +42,41 @@ export class CivilUiDriver {
     }
     return summary;
   }
-
   private get page(): UiSession['page'] {
     return this.session.page;
   }
-
   private button(name: string): Locator {
     return this.page.getByRole('button', { name, exact: true });
   }
-
   private async fill(label: string, value: string): Promise<void> {
     await this.page.getByLabel(label, { exact: true }).fill(value);
   }
-
   private act(what: string, name: string): Promise<string> {
     return this.session.acting(what, () => this.button(name).click());
   }
-
   private async openSite(): Promise<void> {
     const panel = this.page.getByTestId('civil-panel');
     if (!(await panel.isVisible())) await this.page.getByRole('tab', { name: /site/i }).click();
     await expect(panel).toBeVisible();
   }
-
   private async take(id: DeliverableId, name: string): Promise<string> {
     const file = await this.session.download(() => this.button(name).click());
     this.provided[id] = file.text;
     this.fileNames[id] = file.name;
     return file.name;
   }
-
   private unsupported(tool: string, keys: string[], args: Record<string, unknown>): void {
     for (const key of keys) {
       if (args[key] !== undefined) this.gaps.add(`Civil panel: ${tool} has no field for ${key}.`);
     }
   }
-
   private async route(call: ToolCall): Promise<string> {
     const args = call.args;
     if (call.tool === 'set_project_info') {
       const building = this.page.getByTestId('building-panel');
-      if (!(await building.isVisible()))
-        await this.page.getByRole('tab', { name: 'Building' }).click();
+      if (!(await building.isVisible())) await this.page.getByRole('tab', { name: 'Building' }).click();
       await expect(building).toBeVisible();
-      return this.building.setProjectInfo(
-        Object.fromEntries(Object.entries(args).map(([key, value]) => [key, text(value)])),
-      );
+      return this.building.setProjectInfo(Object.fromEntries(Object.entries(args).map(([key, value]) => [key, text(value)])));
     }
     await this.openSite();
     const alignment = this.intent.road.name;
@@ -113,9 +96,7 @@ export class CivilUiDriver {
         await this.fill('Major contour every', text(args['majorEvery']));
         return this.act('create surface', 'Create surface');
       case 'surface_report':
-        return (
-          (await this.page.getByTestId(`civil-row-${text(args['surfaceId'])}`).textContent()) ?? ''
-        );
+        return (await this.page.getByTestId(`civil-row-${text(args['surfaceId'])}`).textContent()) ?? '';
       case 'add_platform':
         await this.fill('Platform outline', points(args['boundary']));
         await this.fill('Platform elevation', text(args['elevation']));
@@ -153,9 +134,7 @@ export class CivilUiDriver {
       case 'alignment_report':
         await this.fill(`Design speed of ${alignment}`, text(args['designSpeedKmh']));
         await this.session.download(() => this.button('Report CSV').click());
-        return (
-          (await this.page.getByTestId(`civil-alignment-status-alignment-1`).textContent()) ?? ''
-        );
+        return (await this.page.getByTestId(`civil-alignment-status-alignment-1`).textContent()) ?? '';
       case 'add_manhole': {
         await this.fill('Manhole position', asNumbers(args['location']).join(','));
         await this.fill('Manhole invert', text(args['invertElevation']));
@@ -182,21 +161,15 @@ export class CivilUiDriver {
         return (await this.page.getByTestId('civil-drainage-status').textContent()) ?? '';
       case 'export_plan_profile_sheet':
         await this.page.getByLabel(`Sheet paper of ${alignment}`).selectOption(text(args['paper']));
-        return this.take(
-          `plan-profile:${text(args['alignmentId'])}:${text(args['paper'])}`,
-          'Plan-profile sheet',
-        );
+        return this.take(`plan-profile:${text(args['alignmentId'])}:${text(args['paper'])}`, 'Plan-profile sheet');
       case 'export_landxml':
         return this.take('landxml', 'LandXML');
       default:
-        this.gaps.add(
-          `No Civil panel control for ${call.tool}: reachable only through the command palette.`,
-        );
+        this.gaps.add(`No Civil panel control for ${call.tool}: reachable only through the command palette.`);
         this.steps.palette += 1;
         return runViaPalette(this.session, call.tool, args);
     }
   }
-
   private async fillStorm(args: Record<string, unknown>): Promise<void> {
     const idf = (args['idf'] ?? {}) as Record<string, unknown>;
     for (const key of ['a', 'b', 'c']) await this.fill(`IDF ${key}`, text(idf[key]));

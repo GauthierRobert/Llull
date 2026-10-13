@@ -1,12 +1,10 @@
 /**
  * Python runtime embedded at the top of generated CadQuery / build123d scripts.
- *
- * @layer core/codegen
- * @invariant the TRACE half is backend-independent: every helper records the llull command it maps
- *   to (`LLULL_TRACE`), so running the script reproduces the llull feature history exactly.
- * @invariant a BACKEND block only wraps library calls (`_polygon_face`, `_extrude`, `_revolve`,
- *   `_solid_from_faces`, `_make_box`…`_make_torus`, `_place`, `_wrap`, `_assemble`); SHARED_GEOMETRY
- *   holds the llull frame conventions and the OCP fillet / chamfer / shell once for both libraries.
+ * @invariant the TRACE half is backend-independent: every helper records the llull command it maps to (`LLULL_TRACE`), so running the
+ *   script reproduces the llull feature history exactly.
+ * @invariant a BACKEND block only wraps library calls (`_polygon_face`, `_extrude`, `_revolve`, `_solid_from_faces`,
+ *   `_make_box`…`_make_torus`, `_place`, `_wrap`, `_assemble`); SHARED_GEOMETRY holds the llull frame conventions and the OCP fillet /
+ *   chamfer / shell once for both libraries.
  * @see apply_code_trace (consumes LLULL_TRACE), server/python/llull_bridge.py (runs the script)
  */
 
@@ -269,8 +267,10 @@ def finish():
     return _assemble(list(LLULL_LIVE.values()))
 `;
 
-/** Library-independent geometry, built on the backend primitives (`_polygon_face`, `_extrude`,
- * `_revolve`, `_solid_from_faces`) so every llull frame convention lives in one place. */
+/**
+ * Library-independent geometry, built on the backend primitives (`_polygon_face`, `_extrude`, `_revolve`, `_solid_from_faces`) so every
+ * llull frame convention lives in one place.
+ */
 const SHARED_GEOMETRY = String.raw`
 def _make_wedge(w, h, d):
     return _extrude(_polygon_face([(0, 0, 0), (0, h, 0), (0, 0, d)]), (w, 0, 0))
@@ -539,15 +539,7 @@ def export_step(model, path):
 /** Full runtime block for a backend: geometry builders first, then the traced helpers. */
 export function pythonRuntime(backend: PythonBackend): string {
   const builders = backend === 'cadquery' ? CADQUERY_BACKEND : BUILD123D_BACKEND;
-  return [
-    'import math',
-    builders,
-    SHARED_GEOMETRY,
-    SUBDIVISION_PY,
-    OCP_SUBDIVISION_PY,
-    TRACE_RUNTIME,
-    SUBDIVISION_TRACE_PY,
-  ]
+  return ['import math', builders, SHARED_GEOMETRY, SUBDIVISION_PY, OCP_SUBDIVISION_PY, TRACE_RUNTIME, SUBDIVISION_TRACE_PY]
     .map((block) => block.trim())
     .join('\n\n\n')
     .concat('\n');

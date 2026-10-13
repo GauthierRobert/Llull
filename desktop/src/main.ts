@@ -1,19 +1,9 @@
-/**
- * @layer desktop
- * Electron main process — wiring only. The app is the unchanged web app served by the unchanged
- * llull server, running locally in a utility process with a per-launch token; files, menus and
- * the CLI hand-off live in the Electron-free modules next to this file (tested without Electron).
- */
-
+/** Electron main: wiring only (unchanged server in a utility process + per-launch token); logic is in Electron-free modules. */
 import { app, BrowserWindow, dialog, Menu, shell, utilityProcess } from 'electron';
 import { randomBytes } from 'crypto';
 import path from 'path';
 import { errorMessage } from '@lib/errorMessage';
-import {
-  llullHome,
-  removeDesktopDiscovery,
-  writeDesktopDiscovery,
-} from '@server/cli/desktopDiscovery';
+import { llullHome, removeDesktopDiscovery, writeDesktopDiscovery } from '@server/cli/desktopDiscovery';
 import { chooseBackendPort, startBackend, type RunningBackend } from './backend';
 import { backendEnv, backendOrigin } from './backendEnv';
 import { cliShimFor, installCliShim } from './cliShim';
@@ -56,13 +46,7 @@ function refreshTitleAndDiscovery(): void {
   const current = session.currentPath();
   window?.setTitle(`${current !== null ? path.basename(current) : 'Untitled'} — llull`);
   try {
-    writeDesktopDiscovery(home, {
-      url: backend.url,
-      token,
-      pid: process.pid,
-      documentPath: current,
-      version: app.getVersion(),
-    });
+    writeDesktopDiscovery(home, { url: backend.url, token, pid: process.pid, documentPath: current, version: app.getVersion() });
   } catch (error) {
     // The CLI hand-off is best effort: it must never turn a successful Open/Save into an error.
     console.warn(`[llull-desktop] cannot write ${home}/desktop.json: ${errorMessage(error)}`);
@@ -88,9 +72,7 @@ async function confirmDiscard(): Promise<boolean> {
     cancelId: 2,
     message: 'Save changes to this document?',
   });
-  if (response === 2) return false;
-  if (response === 0) return saveDocument(false);
-  return true;
+  return response === 2 ? false : response === 0 ? saveDocument(false) : true;
 }
 
 /** Unsaved-changes check for quitting; a backend that cannot answer must never trap the user. */
@@ -112,8 +94,10 @@ async function confirmQuit(): Promise<boolean> {
 
 let confirmingQuit = false;
 
-/** The one quit path (window close, menu Quit, Cmd+Q): confirm, then quit for real. */
-function requestQuit(): void {
+/** The one quit path (window close, menu Quit, Cmd+Q, OS shutdown): confirm, then quit for real. */
+function interceptQuit(event: { preventDefault(): void }): void {
+  if (quitting) return;
+  event.preventDefault();
   if (confirmingQuit) return;
   confirmingQuit = true;
   void confirmQuit().then((proceed) => {
@@ -128,10 +112,7 @@ async function saveDocument(forceDialog: boolean): Promise<boolean> {
   if (session === null) return false;
   let target = forceDialog ? null : session.currentPath();
   if (target === null) {
-    const result = await dialog.showSaveDialog({
-      defaultPath: DEFAULT_SAVE_NAME,
-      filters: FILE_FILTERS,
-    });
+    const result = await dialog.showSaveDialog({ defaultPath: DEFAULT_SAVE_NAME, filters: FILE_FILTERS });
     if (result.canceled || result.filePath === undefined) return false;
     target = result.filePath;
   }
@@ -172,12 +153,7 @@ async function newDocument(): Promise<void> {
 function installCli(): void {
   const shim = cliShimFor(process.platform, process.execPath, layout.cliEntry);
   try {
-    const installed = installCliShim(
-      path.join(home, 'bin'),
-      shim,
-      process.platform,
-      process.env['PATH'],
-    );
+    const installed = installCliShim(path.join(home, 'bin'), shim, process.platform, process.env['PATH']);
     cliInstalled = true;
     void dialog.showMessageBox({
       type: 'info',
@@ -210,11 +186,7 @@ function createWindow(url: string): BrowserWindow {
   created.webContents.on('will-navigate', (event, target) => {
     if (navigationDecision(target, origin) !== 'app') event.preventDefault();
   });
-  created.on('close', (event) => {
-    if (quitting) return;
-    event.preventDefault();
-    requestQuit();
-  });
+  created.on('close', interceptQuit);
   void created.loadURL(`${url}/#token=${token}`);
   return created;
 }
@@ -224,8 +196,7 @@ async function boot(): Promise<void> {
   const port = await chooseBackendPort(userData);
   const url = backendOrigin(port);
   backend = await startBackend(
-    (entry, env) =>
-      utilityProcess.fork(entry, [], { env, serviceName: 'llull-backend', stdio: 'inherit' }),
+    (entry, env) => utilityProcess.fork(entry, [], { env, serviceName: 'llull-backend', stdio: 'inherit' }),
     layout.serverEntry,
     backendEnv({ port, token, layout, userDataDir: userData, baseEnv: process.env }),
     url,
@@ -241,11 +212,7 @@ async function boot(): Promise<void> {
           saveAs: () => void saveDocument(true),
           installCli,
           showAgentHelp: () =>
-            void dialog.showMessageBox({
-              type: 'info',
-              message: 'Use llull with Claude Code',
-              detail: agentHelpText(cliInstalled),
-            }),
+            void dialog.showMessageBox({ type: 'info', message: 'Use llull with Claude Code', detail: agentHelpText(cliInstalled) }),
           openDataFolder: () => void shell.openPath(userData),
         },
         process.platform,
@@ -276,12 +243,7 @@ if (!app.requestSingleInstanceLock()) {
     void openDocument(filePath);
   });
   app.on('window-all-closed', () => app.quit());
-  // Menu Quit / Cmd+Q / OS shutdown: ask about unsaved changes before any window closes.
-  app.on('before-quit', (event) => {
-    if (quitting) return;
-    event.preventDefault();
-    requestQuit();
-  });
+  app.on('before-quit', interceptQuit); // before any window closes
   app.on('will-quit', (event) => {
     if (backend === null) return;
     event.preventDefault();

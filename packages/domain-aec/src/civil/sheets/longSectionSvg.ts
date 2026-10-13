@@ -1,20 +1,12 @@
 /**
- * Long-section (profile) drawing as SVG: ground line, design line with PVIs, vertical curves and
- * grades, a station axis and a station / ground / design / cut-fill table band.
- * @layer domain-aec/civil
- * @pure
+ * Long-section (profile) drawing as SVG: ground line, design line with PVIs, vertical curves and grades, a station axis and a station /
+ * ground / design / cut-fill table band.
  */
 
 import type { CadDocument } from '@core/model/types';
 import type { AlignmentObject, CivilModel } from '@core/model/civil';
 import { endStation, pointAtStation } from '../alignment/alignmentGeometry';
-import {
-  designElevation,
-  grades,
-  validateProfile,
-  verticalCurves,
-  verticalCurveStations,
-} from '../alignment/profileGeometry';
+import { designElevation, grades, validateProfile, verticalCurves, verticalCurveStations } from '../alignment/profileGeometry';
 import { surfaceTinById } from '../surface/surfaceTin';
 import { elevationAt } from '../surface/tin';
 import type { ReportRow } from '../road/roadReport';
@@ -45,18 +37,13 @@ const MAX_PLOT_HEIGHT = 480;
 
 type Pair = readonly [number, number];
 
-function samples(
-  doc: CadDocument,
-  civil: CivilModel,
-  alignment: AlignmentObject,
-): { ground: Pair[]; design: Pair[] } {
+function samples(doc: CadDocument, civil: CivilModel, alignment: AlignmentObject): { ground: Pair[]; design: Pair[] } {
   const start = alignment.startStation;
   const end = endStation(alignment);
   const tin = alignment.surfaceId ? surfaceTinById(civil, alignment.surfaceId) : null;
   const extra = verticalCurveStations(alignment.profile);
   const stations = new Set<number>([start, end, ...extra.filter((s) => s > start && s < end)]);
-  for (const pvi of alignment.profile)
-    if (pvi.station >= start && pvi.station <= end) stations.add(pvi.station);
+  for (const pvi of alignment.profile) if (pvi.station >= start && pvi.station <= end) stations.add(pvi.station);
   const count = 300;
   for (let k = 1; k < count; k++) stations.add(start + ((end - start) * k) / count);
   const ground: Pair[] = [];
@@ -88,9 +75,7 @@ export function longSectionSvg(
   const lengthM = toMetres(doc, endStation(alignment)) - startM;
   const all = [...ground, ...design].map((p) => p[1]);
   const { rangeM, zTop } = levelFrame(all);
-  const hScale =
-    horizontalScale ??
-    Math.min(MAX_PLOT_WIDTH / lengthM, MAX_PLOT_HEIGHT / (rangeM * verticalExaggeration));
+  const hScale = horizontalScale ?? Math.min(MAX_PLOT_WIDTH / lengthM, MAX_PLOT_HEIGHT / (rangeM * verticalExaggeration));
   const vScale = hScale * verticalExaggeration;
   const plotWidth = lengthM * hScale;
   const plotHeight = rangeM * vScale;
@@ -135,12 +120,11 @@ export function longSectionSvg(
     body.push(`<circle cx="${px.toFixed(2)}" cy="${py.toFixed(2)}" r="3" fill="#d02020"/>`);
     body.push(svgLine([px, py], [px, TOP + plotHeight], '#d9a0a0', 1, '3,3'));
     body.push(
-      svgText(
-        px,
-        TOP + 10 + (index % 2) * 10,
-        `PVI ${stationText(doc, pvi.station)} / ${toMetres(doc, pvi.elevation).toFixed(2)}`,
-        { anchor: 'middle', size: 8, fill: '#a01818' },
-      ),
+      svgText(px, TOP + 10 + (index % 2) * 10, `PVI ${stationText(doc, pvi.station)} / ${toMetres(doc, pvi.elevation).toFixed(2)}`, {
+        anchor: 'middle',
+        size: 8,
+        fill: '#a01818',
+      }),
     );
     const next = alignment.profile[index + 1];
     const grade = segmentGrades[index];
@@ -172,14 +156,7 @@ export function longSectionSvg(
     );
   }
   const bandTop = TOP + plotHeight + 12;
-  pushTableLabels(
-    body,
-    ['Station', 'Ground', 'Design', 'Cut(-)/Fill(+)'],
-    LEFT,
-    plotWidth,
-    bandTop,
-    ROW_HEIGHT,
-  );
+  pushTableLabels(body, ['Station', 'Ground', 'Design', 'Cut(-)/Fill(+)'], LEFT, plotWidth, bandTop, ROW_HEIGHT);
   body.push(svgLine([LEFT, bandTop], [LEFT + plotWidth, bandTop], '#444'));
   const stride = Math.max(1, Math.ceil(64 / Math.max(1, plotWidth / Math.max(1, rows.length - 1))));
   rows.forEach((row, index) => {

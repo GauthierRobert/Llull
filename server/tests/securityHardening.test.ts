@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Auth/guard hardening: remote-peer guard, bearer verifier, Host allowlist, bind safety,
  * autosave stop mode, browser mutation guard.
  */
@@ -41,10 +40,8 @@ function runGuard(req: Request): { status: number | null; nextCalled: boolean } 
 
 describe('isLoopbackAddress', () => {
   it('classifies addresses', () => {
-    for (const a of ['127.0.0.1', '127.5.6.7', '::1', '::ffff:127.0.0.1', 'localhost'])
-      expect(isLoopbackAddress(a)).toBe(true);
-    for (const a of ['10.0.0.5', '::ffff:10.0.0.5', '0.0.0.0', undefined])
-      expect(isLoopbackAddress(a)).toBe(false);
+    for (const a of ['127.0.0.1', '127.5.6.7', '::1', '::ffff:127.0.0.1', 'localhost']) expect(isLoopbackAddress(a)).toBe(true);
+    for (const a of ['10.0.0.5', '::ffff:10.0.0.5', '0.0.0.0', undefined]) expect(isLoopbackAddress(a)).toBe(false);
   });
 });
 
@@ -110,24 +107,15 @@ describe('checkBindSafety', () => {
 
 describe('browser mutation guard (/command)', () => {
   it('blocks a disallowed Origin', async () => {
-    const res = await request(app)
-      .post('/command')
-      .set('Origin', 'http://evil.example')
-      .send({ name: 'describe_scene', params: {} });
+    const res = await request(app).post('/command').set('Origin', 'http://evil.example').send({ name: 'describe_scene', params: {} });
     expect(res.status).toBe(403);
   });
 
   it('uses the shared bearer verifier (case-insensitive scheme)', async () => {
     process.env['MCP_AUTH_TOKEN'] = 'secret';
-    const ok = await request(app)
-      .post('/command')
-      .set('Authorization', 'bearer secret')
-      .send({ name: 'describe_scene', params: {} });
+    const ok = await request(app).post('/command').set('Authorization', 'bearer secret').send({ name: 'describe_scene', params: {} });
     expect(ok.status).toBe(200);
-    const bad = await request(app)
-      .post('/command')
-      .set('Authorization', 'Bearer nope')
-      .send({ name: 'describe_scene', params: {} });
+    const bad = await request(app).post('/command').set('Authorization', 'Bearer nope').send({ name: 'describe_scene', params: {} });
     expect(bad.status).toBe(401);
   });
 });
@@ -137,11 +125,7 @@ describe('autosaver stop mode', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'llull-stop-'));
     try {
       const file = path.join(dir, 's.json');
-      const saver = createAutosaver({
-        filePath: file,
-        debounceMs: 60_000,
-        serialize: () => '{"late":1}',
-      });
+      const saver = createAutosaver({ filePath: file, debounceMs: 60_000, serialize: () => '{"late":1}' });
       saver.stop();
       expect(fs.existsSync(file)).toBe(false);
       saver.schedule(createEmptyDocument());
@@ -155,11 +139,7 @@ describe('autosaver stop mode', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'llull-stop-'));
     try {
       const file = path.join(dir, 't.json');
-      const saver = createAutosaver({
-        filePath: file,
-        debounceMs: 60_000,
-        serialize: () => '{"p":1}',
-      });
+      const saver = createAutosaver({ filePath: file, debounceMs: 60_000, serialize: () => '{"p":1}' });
       saver.schedule(createEmptyDocument());
       saver.stop();
       expect(fs.readFileSync(file, 'utf8')).toBe('{"p":1}');

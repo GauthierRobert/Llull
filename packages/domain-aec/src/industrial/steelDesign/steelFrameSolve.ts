@@ -1,9 +1,7 @@
 /**
- * Load cases of a moment frame: ULS 1.35 G + 1.5 Q with the equivalent horizontal forces of EN
- * 1993-1-1 §5.3.2 (φ × the vertical load at each level, both directions), SLS G + Q (+ the same
- * forces for the storey drift), and αcr from the drift under V/200 (Horne, EN 1993-1-1 §5.2.1(4)B).
- * @layer domain-aec
- * @pure
+ * Load cases of a moment frame: ULS 1.35 G + 1.5 Q with the equivalent horizontal forces of EN 1993-1-1 §5.3.2 (φ × the vertical load at
+ * each level, both directions), SLS G + Q (+ the same forces for the storey drift), and αcr from the drift under V/200 (Horne, EN 1993-1-1
+ * §5.2.1(4)B).
  */
 
 import { solveFrame, type FrameResult } from '@lib/frame2d';
@@ -51,28 +49,20 @@ function solveCase(system: FrameSystem, factors: LoadFactors, sway: number): Fra
     system.nodes.map((node, index) => ({ ...node, load: loads[index] ?? { fx: 0, fy: 0, mz: 0 } })),
     system.members.map((member) => ({
       ...member.geometry,
-      load: {
-        qx: 0,
-        qy: -(factors.permanent * member.permanent + factors.imposed * member.imposed),
-      },
+      load: { qx: 0, qy: -(factors.permanent * member.permanent + factors.imposed * member.imposed) },
     })),
   );
 }
 
 /** Relative horizontal displacement over a storey piece, mm. */
 export const driftOf = (result: FrameResult, piece: StoreyPiece): number =>
-  Math.abs(
-    (result.displacements[piece.top]?.[0] ?? 0) - (result.displacements[piece.bottom]?.[0] ?? 0),
-  );
+  Math.abs((result.displacements[piece.top]?.[0] ?? 0) - (result.displacements[piece.bottom]?.[0] ?? 0));
 
 /**
  * @param notionalFactor φ of the equivalent horizontal forces
  * @returns null when the frame is a mechanism (some case cannot be solved)
  */
-export function solveFrameSystem(
-  system: FrameSystem,
-  notionalFactor: number,
-): FrameSolutions | null {
+export function solveFrameSystem(system: FrameSystem, notionalFactor: number): FrameSolutions | null {
   const cases = [
     solveCase(system, ULS, notionalFactor),
     solveCase(system, ULS, -notionalFactor),
@@ -90,13 +80,9 @@ export function solveFrameSystem(
     const to = layout.nodes.indexOf(piece.top);
     const compression = Math.max(
       0,
-      ...layout.members
-        .slice(from, to)
-        .flatMap((index) => (ulsPlus.members[index]?.axial ?? []).map((axial) => -axial)),
+      ...layout.members.slice(from, to).flatMap((index) => (ulsPlus.members[index]?.axial ?? []).map((axial) => -axial)),
     );
-    return [
-      { id: piece.columnId, height: piece.height, compression, drift: driftOf(horne, piece) },
-    ];
+    return [{ id: piece.columnId, height: piece.height, compression, drift: driftOf(horne, piece) }];
   });
   const { alpha: alphaCritical, id: criticalColumn } = horneAlphaCritical(storeys);
   return {

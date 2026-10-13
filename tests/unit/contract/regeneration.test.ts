@@ -1,20 +1,12 @@
-/** Incremental regeneration: parameter edits regenerate dependents; replay reuses prefixes. */
 import { describe, it, expect } from 'vitest';
 import { type BoxEntity, type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import { createReplayCache } from '@core/commands/history/replayCache';
-import {
-  changedParameters,
-  parametersReadBy,
-  stepsReading,
-} from '@core/commands/history/dependents';
+import { changedParameters, parametersReadBy, stepsReading } from '@core/commands/history/dependents';
 
 function parametricBox(): CadDocument {
-  let doc = execute(createEmptyDocument(), 'set_parameter', {
-    name: 'w',
-    expression: '10',
-  }).document;
+  let doc = execute(createEmptyDocument(), 'set_parameter', { name: 'w', expression: '10' }).document;
   doc = execute(doc, 'build_project', {
     actions: [
       { command: 'add_sphere', params: { radius: 1 } },
@@ -26,33 +18,20 @@ function parametricBox(): CadDocument {
 
 describe('parameter dependents', () => {
   it('finds parameters read by nested =expr params', () => {
-    expect([
-      ...parametersReadBy({ size: ['=w * 2', 3], nested: { h: '=h + w' }, label: 'w' }),
-    ]).toEqual(['w', 'h']);
+    expect([...parametersReadBy({ size: ['=w * 2', 3], nested: { h: '=h + w' }, label: 'w' })]).toEqual(['w', 'h']);
   });
-
   it('detects changed, added and removed parameter values', () => {
-    const a = {
-      w: { name: 'w', expression: '1', value: 1 },
-      h: { name: 'h', expression: '2', value: 2 },
-    };
-    const b = {
-      w: { name: 'w', expression: '5', value: 5 },
-      d: { name: 'd', expression: '1', value: 1 },
-    };
+    const a = { w: { name: 'w', expression: '1', value: 1 }, h: { name: 'h', expression: '2', value: 2 } };
+    const b = { w: { name: 'w', expression: '5', value: 5 }, d: { name: 'd', expression: '1', value: 1 } };
     expect([...changedParameters(a, b)].sort()).toEqual(['d', 'h', 'w']);
   });
-
   it('lists only live steps that read a changed parameter', () => {
     const doc = parametricBox();
-    expect(stepsReading(doc.featureHistory, new Set(['w'])).map((s) => s.name)).toEqual([
-      'add_box',
-    ]);
+    expect(stepsReading(doc.featureHistory, new Set(['w'])).map((s) => s.name)).toEqual(['add_box']);
     expect(stepsReading(doc.featureHistory, new Set())).toEqual([]);
     const suppressed = doc.featureHistory.map((s) => ({ ...s, suppressed: true }));
     expect(stepsReading(suppressed, new Set(['w']))).toEqual([]);
   });
-
   it('set_parameter regenerates the geometry that reads it', () => {
     const doc = parametricBox();
     const result = execute(doc, 'set_parameter', { name: 'w', expression: '40' });
@@ -60,7 +39,6 @@ describe('parameter dependents', () => {
     expect(box.size[0]).toBe(40);
     expect(result.summary).toContain('regenerated 1 dependent feature step');
   });
-
   it('set_parameter on an unused parameter leaves the geometry untouched', () => {
     const doc = parametricBox();
     const result = execute(doc, 'set_parameter', { name: 'unused', expression: '3' });
@@ -83,7 +61,6 @@ describe('replay prefix cache', () => {
     const cold = execute(doc, 'replay_history', {}, { ...defaultContext(), replayCache: null });
     expect(cold.document.entities).toEqual(first.entities);
   });
-
   it('evicts the least recently used state beyond capacity', () => {
     const cache = createReplayCache(1);
     const state = { doc: createEmptyDocument(), idMap: new Map<string, string>(), inert: false };

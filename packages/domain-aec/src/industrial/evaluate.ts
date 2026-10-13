@@ -1,9 +1,4 @@
-/**
- * Evaluation of industrial elements: steel members, footings, cladding panels, equipment, pipes,
- * cable trays.
- * @layer domain-aec
- * @pure
- */
+/** Evaluation of industrial elements: steel members, footings, cladding panels, equipment, pipes, cable trays. */
 
 import type { CadDocument, Entity, SphereEntity, Vec2, Vec3 } from '@core/model/types';
 import type {
@@ -17,13 +12,7 @@ import type {
   SteelMemberElement,
 } from '@core/model/building';
 import { fromMm, toMm } from '@core/model/units';
-import {
-  base,
-  colorForMaterial,
-  MEMBER_LAYER,
-  meshEntity,
-  orientedBox,
-} from '../building/evaluate/entities';
+import { base, colorForMaterial, MEMBER_LAYER, meshEntity, orientedBox } from '../building/evaluate/entities';
 import { prismMesh, sweepMesh } from '../shared/mesh';
 import { circlePolygon } from '@lib/arc';
 import { findProfile, profileOutline } from '../steel/profiles';
@@ -31,14 +20,9 @@ import { cross3, dot3, sub3 } from '@lib/vec3';
 import { normalize } from '../shared/vec3';
 import { shapeOf } from './equipment/equipmentShape';
 
+// prettier-ignore
 const ROLE_LABEL: Readonly<Record<MemberRole, string>> = {
-  column: 'Column',
-  rafter: 'Rafter',
-  beam: 'Beam',
-  brace: 'Brace',
-  purlin: 'Purlin',
-  rail: 'Side rail',
-  crane: 'Crane beam',
+  column: 'Column', rafter: 'Rafter', beam: 'Beam', brace: 'Brace', purlin: 'Purlin', rail: 'Side rail', crane: 'Crane beam',
 };
 
 /** World position of a level-relative point. */
@@ -46,31 +30,16 @@ export function atLevel(level: BuildingLevel, point: Vec3): Vec3 {
   return [point[0], point[1], level.elevation + point[2]];
 }
 
-export function evaluateMember(
-  doc: CadDocument,
-  member: SteelMemberElement,
-  level: BuildingLevel,
-): Entity[] {
+export function evaluateMember(doc: CadDocument, member: SteelMemberElement, level: BuildingLevel): Entity[] {
   const profile = findProfile(member.profile);
   if (!profile) return [];
   const { outer, holes } = profileOutline(profile);
-  const mesh = sweepMesh(
-    outer,
-    holes,
-    atLevel(level, member.start),
-    atLevel(level, member.end),
-    member.roll,
-    fromMm(doc, 1),
-  );
+  const mesh = sweepMesh(outer, holes, atLevel(level, member.start), atLevel(level, member.end), member.roll, fromMm(doc, 1));
   if (!mesh) return [];
   return [
     meshEntity(
       member,
-      {
-        part: 'body',
-        label: `${ROLE_LABEL[member.role]} ${member.mark} ${profile.name}`,
-        layer: MEMBER_LAYER[member.role].name,
-      },
+      { part: 'body', label: `${ROLE_LABEL[member.role]} ${member.mark} ${profile.name}`, layer: MEMBER_LAYER[member.role].name },
       mesh,
       colorForMaterial(member.material, '#6e8296'),
     ),
@@ -82,11 +51,7 @@ export function evaluateFooting(footing: FootingElement, level: BuildingLevel): 
     orientedBox(
       footing,
       { part: 'body', label: `Footing ${footing.mark}` },
-      [
-        footing.location[0],
-        footing.location[1],
-        level.elevation + footing.topOffset - footing.thickness / 2,
-      ],
+      [footing.location[0], footing.location[1], level.elevation + footing.topOffset - footing.thickness / 2],
       0,
       [footing.width, footing.length, footing.thickness],
       colorForMaterial(footing.material, '#b4b2aa'),
@@ -107,12 +72,7 @@ export function polygonNormal(points: ReadonlyArray<Vec3>): Vec3 {
 }
 
 /** Local plane frame of a panel: origin, in-plane axes (e1, e2) and unit normal. */
-export function panelFrame(corners: ReadonlyArray<Vec3>): {
-  origin: Vec3;
-  e1: Vec3;
-  e2: Vec3;
-  normal: Vec3;
-} | null {
+export function panelFrame(corners: ReadonlyArray<Vec3>): { origin: Vec3; e1: Vec3; e2: Vec3; normal: Vec3 } | null {
   const normalVector = polygonNormal(corners);
   if (Math.hypot(...normalVector) < 1e-9 || corners.length < 3) return null;
   const normal = normalize(normalVector);
@@ -150,8 +110,8 @@ const VESSEL_SEGMENTS = 40;
 const EQUIPMENT_COLOR = '#c27c2c';
 
 /**
- * @invariant box -> oriented box; vessels -> watertight cylinder mesh inscribed in `size`
- * (vertical: axis +Z from the level; horizontal: axis along local x at mid-height, bottom on the level)
+ * @invariant box -> oriented box; vessels -> watertight cylinder mesh inscribed in `size` (vertical: axis +Z from the level; horizontal:
+ * axis along local x at mid-height, bottom on the level)
  */
 export function evaluateEquipment(equipment: EquipmentElement, level: BuildingLevel): Entity[] {
   const [length, width, height] = equipment.size;
@@ -175,11 +135,7 @@ export function evaluateEquipment(equipment: EquipmentElement, level: BuildingLe
   const [cos, sin] = [Math.cos(equipment.angle), Math.sin(equipment.angle)];
   const mesh =
     shape === 'vertical_vessel'
-      ? prismMesh(
-          circle,
-          [],
-          ([x, y], side): Vec3 => [cx + x, cy + y, level.elevation + side * height],
-        )
+      ? prismMesh(circle, [], ([x, y], side): Vec3 => [cx + x, cy + y, level.elevation + side * height])
       : prismMesh(
           circle,
           [],
@@ -218,13 +174,7 @@ export function evaluatePipe(pipe: PipeElement, level: BuildingLevel): Entity[] 
   const entities = sweepRun(pipe, circle, points, `Pipe ${pipe.mark} ${pipe.service}`, color);
   for (let index = 1; index + 1 < points.length; index++) {
     const joint: SphereEntity = {
-      ...base(
-        pipe,
-        { part: `joint-${index}`, label: `Pipe ${pipe.mark} bend` },
-        points[index] as Vec3,
-        [0, 0, 0],
-        color,
-      ),
+      ...base(pipe, { part: `joint-${index}`, label: `Pipe ${pipe.mark} bend` }, points[index] as Vec3, [0, 0, 0], color),
       kind: 'sphere',
       radius,
     };
@@ -248,11 +198,7 @@ export function trayOutline(width: number, height: number, sheet: number): Vec2[
   ];
 }
 
-export function evaluateTray(
-  doc: Pick<CadDocument, 'units'>,
-  tray: CableTrayElement,
-  level: BuildingLevel,
-): Entity[] {
+export function evaluateTray(doc: Pick<CadDocument, 'units'>, tray: CableTrayElement, level: BuildingLevel): Entity[] {
   return sweepRun(
     tray,
     trayOutline(tray.width, tray.height, fromMm(doc, 2)),

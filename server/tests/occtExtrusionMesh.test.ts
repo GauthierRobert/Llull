@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Live OpenCascade vs Manifold: extrusions (either winding, concave profiles) and mesh entities
  * are valid boolean operands, placed like the other kernel, and degenerate input is rejected.
  */
@@ -46,34 +45,25 @@ describe.each([
   ['counter-clockwise', L_SHAPE],
   ['clockwise', [...L_SHAPE].reverse()],
 ] as Array<[string, Profile]>)('occt extrusion (%s profile)', (_name, profile) => {
-  it.each(placements)(
-    'has the analytic volume and Manifold bounds (%s)',
-    (_l, position, rotation) => {
-      const entity = extrusion(profile, position, rotation);
-      const { fromOcct, fromManifold } = bothMeshes(kernels, entity);
-      expect(volume(fromOcct)).toBeCloseTo(L_AREA * 4, 4);
-      const [a, b] = [bounds(fromOcct), bounds(fromManifold)];
-      for (let k = 0; k < 3; k++) {
-        expect(a.min[k]).toBeCloseTo(b.min[k] ?? NaN, 4);
-        expect(a.max[k]).toBeCloseTo(b.max[k] ?? NaN, 4);
-      }
-    },
-  );
+  it.each(placements)('has the analytic volume and Manifold bounds (%s)', (_l, position, rotation) => {
+    const entity = extrusion(profile, position, rotation);
+    const { fromOcct, fromManifold } = bothMeshes(kernels, entity);
+    expect(volume(fromOcct)).toBeCloseTo(L_AREA * 4, 4);
+    const [a, b] = [bounds(fromOcct), bounds(fromManifold)];
+    for (let k = 0; k < 3; k++) {
+      expect(a.min[k]).toBeCloseTo(b.min[k] ?? NaN, 4);
+      expect(a.max[k]).toBeCloseTo(b.max[k] ?? NaN, 4);
+    }
+  });
 
-  it.each(['union', 'subtract', 'intersect'] as const)(
-    '%s with a box agrees with Manifold',
-    (op) => {
-      const entity = extrusion(profile, [0, 0, 0], [0, 0, 0]);
-      const other = box([1, 1, 2], [3, 3, 2.5]);
-      const [fromOcct, fromManifold] = [
-        booleanMesh(kernels.occt, op, entity, other),
-        booleanMesh(kernels.manifold, op, entity, other),
-      ];
-      expect(fromOcct).not.toBeNull();
-      expect(fromManifold).not.toBeNull();
-      expect(volume(fromOcct!)).toBeCloseTo(volume(fromManifold!), 3);
-    },
-  );
+  it.each(['union', 'subtract', 'intersect'] as const)('%s with a box agrees with Manifold', (op) => {
+    const entity = extrusion(profile, [0, 0, 0], [0, 0, 0]);
+    const other = box([1, 1, 2], [3, 3, 2.5]);
+    const [fromOcct, fromManifold] = [booleanMesh(kernels.occt, op, entity, other), booleanMesh(kernels.manifold, op, entity, other)];
+    expect(fromOcct).not.toBeNull();
+    expect(fromManifold).not.toBeNull();
+    expect(volume(fromOcct!)).toBeCloseTo(volume(fromManifold!), 3);
+  });
 });
 
 describe('occt extrusion rejects bad input', () => {

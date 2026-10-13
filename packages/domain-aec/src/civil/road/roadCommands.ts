@@ -1,8 +1,4 @@
-/**
- * Road alignment, profile and cross-section commands (create / edit); queries and drawings live in
- * roadReportCommands.ts.
- * @layer domain-aec/civil
- */
+/** Road alignment, profile and cross-section commands (create / edit); queries and drawings live in roadReportCommands.ts. */
 
 import { compactNumber } from '@lib/compactNumber';
 import type { CadDocument } from '@core/model/types';
@@ -44,27 +40,20 @@ function surfaceProblem(doc: CadDocument, surfaceId: string | undefined): string
 }
 
 /**
- * @command add_alignment
- * @pure
  * @affects creates 1 alignment: centreline, station ticks + labels, curve annotations
  * @failure fewer than 2 points / radii count mismatch / curves that do not fit / unknown surface -> no-op
  */
 export const addAlignment = defineCommand({
   name: 'add_alignment',
   description:
-    'Create a road / channel alignment from points of intersection (PIs, document units). Each ' +
-    'interior PI can carry a simple circular curve of the given radius (0 = sharp corner). Draws the ' +
-    'centreline, station ticks labelled km+mmm.mm every `stationInterval`, and PC / PT / R labels. ' +
-    'Optional `spirals` adds a symmetric clothoid transition (TS-SC ... CS-ST, length Ls each side) per ' +
-    'curved PI; the deflection must be at least twice the spiral angle Ls / (2 R). ' +
-    'Add a design profile with set_alignment_profile and a road template with set_road_section to get ' +
-    'the corridor, batters to daylight and earthworks; report with alignment_report.',
+    'Create a road / channel alignment from points of intersection (PIs, document units). Each interior PI can carry a simple circular ' +
+    'curve of the given radius (0 = sharp corner). Draws the centreline, station ticks labelled km+mmm.mm every `stationInterval`, and ' +
+    'PC / PT / R labels. Optional `spirals` adds a symmetric clothoid transition (TS-SC ... CS-ST, length Ls each side) per curved PI; ' +
+    'the deflection must be at least twice the spiral angle Ls / (2 R). Add a design profile with set_alignment_profile and a road ' +
+    'template with set_road_section to get the corridor, batters to daylight and earthworks; report with alignment_report.',
   params: z.object({
     points: pointsInput().describe('PIs from start to end, at least 2: [[x, y], ...].'),
-    radii: z
-      .array(z.number())
-      .optional()
-      .describe('Curve radius per interior PI (length = points - 2); 0 = no curve. Default all 0.'),
+    radii: z.array(z.number()).optional().describe('Curve radius per interior PI (length = points - 2); 0 = no curve. Default all 0.'),
     spirals: z
       .array(z.number())
       .optional()
@@ -72,14 +61,8 @@ export const addAlignment = defineCommand({
         'Clothoid length on each side of the circular curve per interior PI (length = points - 2); ' +
           '0 = no spiral; needs radius > 0. Default all 0.',
       ),
-    startStation: z
-      .number()
-      .optional()
-      .describe('Station of the first point, document units. Default 0.'),
-    stationInterval: z
-      .number()
-      .optional()
-      .describe('Station tick / section spacing (> 0). Default 20 m.'),
+    startStation: z.number().optional().describe('Station of the first point, document units. Default 0.'),
+    stationInterval: z.number().optional().describe('Station tick / section spacing (> 0). Default 20 m.'),
     surfaceId: z.string().optional().describe('Existing-ground surface id (from create_surface).'),
     name: z.string().optional().describe('Alignment name. Default "Alignment <n>".'),
   }),
@@ -92,8 +75,7 @@ export const addAlignment = defineCommand({
     const interval = params.stationInterval ?? fromMetres(doc, 20);
     if (!(interval > 0)) return noop(doc, 'add_alignment failed: stationInterval must be > 0.');
     const startStation = params.startStation ?? 0;
-    if (!Number.isFinite(startStation))
-      return noop(doc, 'add_alignment failed: startStation must be a number.');
+    if (!Number.isFinite(startStation)) return noop(doc, 'add_alignment failed: startStation must be a number.');
     const surface = surfaceProblem(doc, params.surfaceId);
     if (surface !== null) return noop(doc, `add_alignment failed: ${surface}`);
     const id = nextCivilId(civil, 'alignment');
@@ -115,37 +97,30 @@ export const addAlignment = defineCommand({
       doc,
       withObject(getCivil(doc), alignment),
       [id],
-      `Created alignment ${alignment.name} (${id}): ${params.points.length} PIs, ` +
-        `${radii.filter((radius) => radius > 0).length} curve(s)` +
-        `${spirals.some((length) => length > 0) ? ` (${spirals.filter((length) => length > 0).length} with spirals)` : ''}, length ${lengthM.toFixed(2)} m, ` +
-        `stations ${stationText(doc, startStation)} to ${stationText(doc, endStation(alignment))}.`,
+      `Created alignment ${alignment.name} (${id}): ${params.points.length} PIs, ${radii.filter((radius) => radius > 0).length} ` +
+        `curve(s)${spirals.some((length) => length > 0) ? ` (${spirals.filter((length) => length > 0).length} with spirals)` : ''}, ` +
+        `length ${lengthM.toFixed(2)} m, stations ${stationText(doc, startStation)} to ${stationText(doc, endStation(alignment))}.`,
       { alignmentId: id, lengthM: Number(lengthM.toFixed(3)) },
     );
   },
 });
 
 /**
- * @command update_alignment
- * @pure
  * @affects regenerates 1 alignment (centreline, ticks, corridor, daylight)
  * @failure unknown alignment / invalid geometry / unknown surface / no change -> no-op
  */
 export const updateAlignment = defineCommand({
   name: 'update_alignment',
   description:
-    'Edit an alignment: new PI `points`, curve `radii`, `startStation`, `stationInterval`, linked ' +
-    '`surfaceId` ("" removes the link) or `name`. `spirals` sets the clothoid length on each side of ' +
-    'each curve (per interior PI, 0 = none; deflection must be >= 2 x Ls / (2 R)). Profile, road section and everything derived ' +
-    '(corridor, batters, report) follow. If `points` changes length without `radii`, radii are padded ' +
-    'with 0 / truncated.',
+    'Edit an alignment: new PI `points`, curve `radii`, `startStation`, `stationInterval`, linked `surfaceId` ("" removes the link) or ' +
+    '`name`. `spirals` sets the clothoid length on each side of each curve (per interior PI, 0 = none; deflection must be >= 2 x Ls / (2 ' +
+    'R)). Profile, road section and everything derived (corridor, batters, report) follow. If `points` changes length without `radii`, ' +
+    'radii are padded with 0 / truncated.',
   params: z.object({
     alignmentId: alignmentIdParam,
     points: pointsInput().optional().describe('New PIs, at least 2.'),
     radii: z.array(z.number()).optional().describe('New radii (length = points - 2).'),
-    spirals: z
-      .array(z.number())
-      .optional()
-      .describe('New clothoid lengths per interior PI (length = points - 2); 0 = no spiral.'),
+    spirals: z.array(z.number()).optional().describe('New clothoid lengths per interior PI (length = points - 2); 0 = no spiral.'),
     startStation: z.number().optional().describe('New start station, document units.'),
     stationInterval: z.number().optional().describe('New station spacing (> 0).'),
     surfaceId: z.string().optional().describe('Ground surface id; "" removes the link.'),
@@ -155,25 +130,18 @@ export const updateAlignment = defineCommand({
     const alignment = civilObjectOrNoop(doc, params.alignmentId, 'alignment', 'update_alignment');
     if ('summary' in alignment) return alignment;
     const points = params.points ?? alignment.points;
-    const fitted = Array.from(
-      { length: Math.max(points.length - 2, 0) },
-      (_, i) => alignment.radii[i] ?? 0,
-    );
+    const fitted = Array.from({ length: Math.max(points.length - 2, 0) }, (_, i) => alignment.radii[i] ?? 0);
     const radii = params.radii ?? fitted;
-    const spirals =
-      params.spirals ??
-      fitted.map((_, i) => ((radii[i] ?? 0) > 0 ? (alignment.spirals?.[i] ?? 0) : 0));
+    const spirals = params.spirals ?? fitted.map((_, i) => ((radii[i] ?? 0) > 0 ? (alignment.spirals?.[i] ?? 0) : 0));
     const problem = validateHorizontal(points, radii, spirals);
     if (problem !== null) return noop(doc, `update_alignment failed: ${problem}`);
     const interval = params.stationInterval ?? alignment.stationInterval;
     if (!(interval > 0)) return noop(doc, 'update_alignment failed: stationInterval must be > 0.');
     const startStation = params.startStation ?? alignment.startStation;
-    if (!Number.isFinite(startStation))
-      return noop(doc, 'update_alignment failed: startStation must be a number.');
+    if (!Number.isFinite(startStation)) return noop(doc, 'update_alignment failed: startStation must be a number.');
     const surface = surfaceProblem(doc, params.surfaceId);
     if (surface !== null) return noop(doc, `update_alignment failed: ${surface}`);
-    const surfaceId =
-      params.surfaceId === undefined ? alignment.surfaceId : params.surfaceId || undefined;
+    const surfaceId = params.surfaceId === undefined ? alignment.surfaceId : params.surfaceId || undefined;
     const updated: AlignmentObject = {
       id: alignment.id,
       category: 'alignment',
@@ -189,21 +157,17 @@ export const updateAlignment = defineCommand({
       ...(alignment.section ? { section: alignment.section } : {}),
       ...(alignment.superelevation ? { superelevation: alignment.superelevation } : {}),
     };
-    if (JSON.stringify(updated) === JSON.stringify(alignment))
-      return noop(doc, `update_alignment: nothing to change on ${alignment.id}.`);
+    if (JSON.stringify(updated) === JSON.stringify(alignment)) return noop(doc, `update_alignment: nothing to change on ${alignment.id}.`);
     const last = alignment.profile[alignment.profile.length - 1];
     const outside =
-      last &&
-      (last.station > endStation(updated) + 1e-6 ||
-        (alignment.profile[0]?.station ?? 0) < startStation - 1e-6)
+      last && (last.station > endStation(updated) + 1e-6 || (alignment.profile[0]?.station ?? 0) < startStation - 1e-6)
         ? ' Warning: the profile now extends beyond the alignment stations.'
         : '';
     return commitCivil(
       doc,
       withObject(getCivil(doc), updated),
       [updated.id],
-      `Updated alignment ${updated.name} (${updated.id}): length ` +
-        `${toMetres(doc, alignmentLength(updated)).toFixed(2)} m.${outside}`,
+      `Updated alignment ${updated.name} (${updated.id}): length ` + `${toMetres(doc, alignmentLength(updated)).toFixed(2)} m.${outside}`,
     );
   },
 });
@@ -213,10 +177,7 @@ function gradeSummary(doc: CadDocument, profile: ReadonlyArray<ProfilePvi>): str
     .map((g) => `${(g * 100).toFixed(2)}%`)
     .join(', ');
   const curves = verticalCurves(profile)
-    .map(
-      (c) =>
-        `${c.kind} PVI ${stationText(doc, c.pviStation)} L=${toMetres(doc, c.length).toFixed(1)} m K=${c.k.toFixed(1)}`,
-    )
+    .map((c) => `${c.kind} PVI ${stationText(doc, c.pviStation)} L=${toMetres(doc, c.length).toFixed(1)} m K=${c.k.toFixed(1)}`)
     .join('; ');
   return `Grades: ${gradeText}.${curves ? ` Vertical curves: ${curves}.` : ' No vertical curves.'}`;
 }
@@ -225,18 +186,15 @@ function gradeSummary(doc: CadDocument, profile: ReadonlyArray<ProfilePvi>): str
 const PVI_END_SNAP_M = 0.05;
 
 /**
- * @command set_alignment_profile
- * @pure
  * @affects replaces the design profile of 1 alignment (corridor, batters regenerate)
  * @failure unknown alignment / fewer than 2 PVIs / unordered or overlapping PVIs / PVIs more than 5 cm outside the alignment -> no-op
  */
 export const setAlignmentProfile = defineCommand({
   name: 'set_alignment_profile',
   description:
-    'Set the vertical design profile of an alignment from PVIs [{ station, elevation, curveLength? }] ' +
-    '(document units). Grades are straight between PVIs; an interior PVI with `curveLength` > 0 gets a ' +
-    'symmetric parabolic vertical curve centred on it (first / last PVI cannot). The first and last ' +
-    'PVI stations must lie within the alignment stations. The summary lists grades and K values.',
+    'Set the vertical design profile of an alignment from PVIs [{ station, elevation, curveLength? }] (document units). Grades are ' +
+    'straight between PVIs; an interior PVI with `curveLength` > 0 gets a symmetric parabolic vertical curve centred on it (first / last ' +
+    'PVI cannot). The first and last PVI stations must lie within the alignment stations. The summary lists grades and K values.',
   params: z.object({
     alignmentId: alignmentIdParam,
     pvis: z
@@ -259,8 +217,7 @@ export const setAlignmentProfile = defineCommand({
     const profile = pvis
       .map((pvi): ProfilePvi => {
         const outside = pvi.station < start ? start - pvi.station : pvi.station - end;
-        const station =
-          outside > 0 && outside <= snap ? (pvi.station < start ? start : end) : pvi.station;
+        const station = outside > 0 && outside <= snap ? (pvi.station < start ? start : end) : pvi.station;
         return { station, elevation: pvi.elevation, curveLength: pvi.curveLength ?? 0 };
       })
       .sort((a, b) => a.station - b.station);
@@ -284,26 +241,20 @@ export const setAlignmentProfile = defineCommand({
 });
 
 /**
- * @command set_road_section
- * @pure
  * @affects sets the road template of 1 alignment (corridor, batters regenerate)
  * @failure unknown alignment / non-positive width or slope / crossfall outside 0..0.3 -> no-op
  */
 export const setRoadSection = defineCommand({
   name: 'set_road_section',
   description:
-    'Set the symmetric road template of an alignment: carriageway `laneWidth` and `shoulderWidth` each ' +
-    'side of the centreline (document units), `crossfall` (ratio falling away from the centreline, ' +
-    '0.025 = 2.5 %), and the `cutSlope` / `fillSlope` batters (horizontal per 1 vertical). Defaults: ' +
-    '3.5 m lane, 1.0 m shoulder, 0.025, 1.5, 2.0 - or the current template values. With a profile the ' +
+    'Set the symmetric road template of an alignment: carriageway `laneWidth` and `shoulderWidth` each side of the centreline (document ' +
+    'units), `crossfall` (ratio falling away from the centreline, 0.025 = 2.5 %), and the `cutSlope` / `fillSlope` batters (horizontal ' +
+    'per 1 vertical). Defaults: 3.5 m lane, 1.0 m shoulder, 0.025, 1.5, 2.0 - or the current template values. With a profile the ' +
     'corridor is drawn; with a surface too, batters run to daylight.',
   params: z.object({
     alignmentId: alignmentIdParam,
     laneWidth: z.number().optional().describe('Carriageway width each side (> 0). Default 3.5 m.'),
-    shoulderWidth: z
-      .number()
-      .optional()
-      .describe('Shoulder width each side (>= 0). Default 1.0 m.'),
+    shoulderWidth: z.number().optional().describe('Shoulder width each side (>= 0). Default 1.0 m.'),
     crossfall: z.number().optional().describe('Crossfall ratio 0..0.3. Default 0.025.'),
     cutSlope: z.number().optional().describe('Cut batter H per 1 V (> 0). Default 1.5.'),
     fillSlope: z.number().optional().describe('Fill batter H per 1 V (> 0). Default 2.0.'),
@@ -328,10 +279,7 @@ export const setRoadSection = defineCommand({
       section.fillSlope > 0 &&
       Object.values(section).every(Number.isFinite);
     if (!valid) {
-      return noop(
-        doc,
-        'set_road_section failed: laneWidth and slopes must be > 0, shoulderWidth >= 0, crossfall between 0 and 0.3.',
-      );
+      return noop(doc, 'set_road_section failed: laneWidth and slopes must be > 0, shoulderWidth >= 0, crossfall between 0 and 0.3.');
     }
     return commitCivil(
       doc,

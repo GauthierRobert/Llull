@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { Vec2, Vec3 } from '@core/model/types';
 import { toCounterClockwise } from '@lib/polygon';
 import { round } from '../../shared/numeric';
@@ -34,8 +30,7 @@ export function ifcString(text: string): string {
     if (character === "'") out += "''";
     else if (character === '\\') out += '\\\\';
     else if (code >= 32 && code < 127) out += character;
-    else if (code > 0xffff)
-      out += `\\X4\\${code.toString(16).toUpperCase().padStart(8, '0')}\\X0\\`;
+    else if (code > 0xffff) out += `\\X4\\${code.toString(16).toUpperCase().padStart(8, '0')}\\X0\\`;
     else out += `\\X2\\${code.toString(16).toUpperCase().padStart(4, '0')}\\X0\\`;
   }
   return `'${out}'`;
@@ -91,68 +86,28 @@ export function point2(context: Context, [x, y]: Vec2): string {
 
 function axis3(context: Context, origin: string, angle = 0): string {
   const reference =
-    angle === 0
-      ? context.xAxis
-      : context.writer.add(
-          `IFCDIRECTION((${ifcReal(Math.cos(angle))},${ifcReal(Math.sin(angle))},0.))`,
-        );
+    angle === 0 ? context.xAxis : context.writer.add(`IFCDIRECTION((${ifcReal(Math.cos(angle))},${ifcReal(Math.sin(angle))},0.))`);
   return context.writer.add(`IFCAXIS2PLACEMENT3D(${origin},${context.zAxis},${reference})`);
 }
 
-export function placement(
-  context: Context,
-  relativeTo: string,
-  x: number,
-  y: number,
-  z: number,
-  angle = 0,
-): string {
-  return context.writer.add(
-    `IFCLOCALPLACEMENT(${relativeTo},${axis3(context, point3(context, x, y, z), angle)})`,
-  );
+export function placement(context: Context, relativeTo: string, x: number, y: number, z: number, angle = 0): string {
+  return context.writer.add(`IFCLOCALPLACEMENT(${relativeTo},${axis3(context, point3(context, x, y, z), angle)})`);
 }
 
 /** Placement at plan `location` (document units) and height `zMm` (mm); `angle` turns it about Z. */
-export function placementAt(
-  context: Context,
-  relativeTo: string,
-  location: readonly [number, number],
-  zMm: number,
-  angle = 0,
-): string {
-  return placement(
-    context,
-    relativeTo,
-    context.mm(location[0]),
-    context.mm(location[1]),
-    zMm,
-    angle,
-  );
+export function placementAt(context: Context, relativeTo: string, location: readonly [number, number], zMm: number, angle = 0): string {
+  return placement(context, relativeTo, context.mm(location[0]), context.mm(location[1]), zMm, angle);
 }
 
-export function extrusion(
-  context: Context,
-  profile: string,
-  depth: number,
-  x = 0,
-  y = 0,
-  z = 0,
-): string {
+export function extrusion(context: Context, profile: string, depth: number, x = 0, y = 0, z = 0): string {
   return context.writer.add(
     `IFCEXTRUDEDAREASOLID(${profile},${axis3(context, point3(context, x, y, z))},${context.zAxis},${ifcReal(depth)})`,
   );
 }
 
-export function rectangleProfile(
-  context: Context,
-  center: Vec2,
-  xDim: number,
-  yDim: number,
-): string {
+export function rectangleProfile(context: Context, center: Vec2, xDim: number, yDim: number): string {
   const position = context.writer.add(`IFCAXIS2PLACEMENT2D(${point2(context, center)},$)`);
-  return context.writer.add(
-    `IFCRECTANGLEPROFILEDEF(.AREA.,$,${position},${ifcReal(xDim)},${ifcReal(yDim)})`,
-  );
+  return context.writer.add(`IFCRECTANGLEPROFILEDEF(.AREA.,$,${position},${ifcReal(xDim)},${ifcReal(yDim)})`);
 }
 
 export function polygonProfile(context: Context, points: ReadonlyArray<Vec2>): string {
@@ -162,9 +117,7 @@ export function polygonProfile(context: Context, points: ReadonlyArray<Vec2>): s
 }
 
 export function shape(context: Context, items: ReadonlyArray<string>): string {
-  const representation = context.writer.add(
-    `IFCSHAPEREPRESENTATION(${context.body},'Body','SweptSolid',(${items.join(',')}))`,
-  );
+  const representation = context.writer.add(`IFCSHAPEREPRESENTATION(${context.body},'Body','SweptSolid',(${items.join(',')}))`);
   return context.writer.add(`IFCPRODUCTDEFINITIONSHAPE($,$,(${representation}))`);
 }
 
@@ -177,12 +130,8 @@ export function addPropertySet(
 ): void {
   const { writer } = context;
   const refs = properties.map((property) => writer.add(property));
-  const propertySet = writer.add(
-    `IFCPROPERTYSET('${context.guid(`${owner.id}:pset`)}',$,'${name}',$,(${refs.join(',')}))`,
-  );
-  writer.add(
-    `IFCRELDEFINESBYPROPERTIES('${context.guid(`${owner.id}:rel-pset`)}',$,$,$,(${owner.ref}),${propertySet})`,
-  );
+  const propertySet = writer.add(`IFCPROPERTYSET('${context.guid(`${owner.id}:pset`)}',$,'${name}',$,(${refs.join(',')}))`);
+  writer.add(`IFCRELDEFINESBYPROPERTIES('${context.guid(`${owner.id}:rel-pset`)}',$,$,$,(${owner.ref}),${propertySet})`);
 }
 
 export function direction(context: Context, [x, y, z]: Vec3): string {
@@ -190,13 +139,7 @@ export function direction(context: Context, [x, y, z]: Vec3): string {
 }
 
 /** Local placement at `origin` (mm) with local Z = `axis` and local X = `reference`. */
-export function framePlacement(
-  context: Context,
-  relativeTo: string,
-  origin: Vec3,
-  axis: Vec3,
-  reference: Vec3,
-): string {
+export function framePlacement(context: Context, relativeTo: string, origin: Vec3, axis: Vec3, reference: Vec3): string {
   const axes = context.writer.add(
     `IFCAXIS2PLACEMENT3D(${point3(context, origin[0], origin[1], origin[2])},${direction(context, axis)},${direction(context, reference)})`,
   );

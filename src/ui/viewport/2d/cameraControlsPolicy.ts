@@ -1,5 +1,3 @@
-/** @layer ui/viewport/2d — which camera gestures stay enabled while a draw/modify tool is armed. */
-
 interface CameraGestures {
   /** Left-drag pan. Off while a tool is armed: a drag must not be read as a click-placed point. */
   readonly enablePan: boolean;
@@ -19,7 +17,6 @@ export const MAP_CONTROLS_CONFIG = {
   panSpeed: 1.0,
 } as const;
 
-/** @pure */
 export function cameraGestures(toolArmed: boolean): CameraGestures {
   return { enablePan: !toolArmed, enableZoom: true };
 }

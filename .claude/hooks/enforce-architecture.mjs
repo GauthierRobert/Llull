@@ -28,33 +28,19 @@ async function main() {
 
   if (inPackage) {
     const inCore = /(^|\/)packages\/core\/src\//.test(filePath);
-    if (
-      /from\s+['"]react(-dom)?['"]/.test(newText) ||
-      /from\s+['"]@react-three\//.test(newText) ||
-      /^\s*import\s+React\b/m.test(newText)
-    )
+    if (/from\s+['"]react(-dom)?['"]/.test(newText) || /from\s+['"]@react-three\//.test(newText) || /^\s*import\s+React\b/m.test(newText))
       violations.push('react / react-three import in a library package (architecture L2)');
-    if (/\bfetch\s*\(/.test(newText))
-      violations.push('fetch() in a library package (architecture L2)');
-    if (/\bwindow\./.test(newText))
-      violations.push('window.* in a library package (architecture L2)');
-    if (/\blocalStorage\b/.test(newText))
-      violations.push('localStorage in a library package (architecture L2)');
-    if (
-      /\bdocument\.(getElementById|querySelector|createElement|body|cookie|addEventListener)\b/.test(
-        newText,
-      )
-    )
+    if (/\bfetch\s*\(/.test(newText)) violations.push('fetch() in a library package (architecture L2)');
+    if (/\bwindow\./.test(newText)) violations.push('window.* in a library package (architecture L2)');
+    if (/\blocalStorage\b/.test(newText)) violations.push('localStorage in a library package (architecture L2)');
+    if (/\bdocument\.(getElementById|querySelector|createElement|body|cookie|addEventListener)\b/.test(newText))
       violations.push('document.* DOM global in a library package (architecture L2)');
     if (inCore && /from\s+['"]@(aec|mcp|kernel-manifold|kernel-occt)\//.test(newText))
-      violations.push(
-        'packages/core importing another package — core must not depend on plugins/kernels/mcp (architecture L2/L10)',
-      );
+      violations.push('packages/core importing another package — core must not depend on plugins/kernels/mcp (architecture L2/L10)');
   }
 
   const oldText = collectOldText(input, filePath);
-  const introduced = (re) =>
-    count(stripStringsAndComments(newText), re) > count(stripStringsAndComments(oldText), re);
+  const introduced = (re) => count(stripStringsAndComments(newText), re) > count(stripStringsAndComments(oldText), re);
   const introducedRaw = (re) => count(newText, re) > count(oldText, re);
 
   if (
@@ -63,30 +49,18 @@ async function main() {
     /(^|\/)(packages\/[^/]+\/src|src|server\/src)\//.test(filePath) &&
     introduced(/(:\s*any\b|\bas\s+any\b|<any>|\bany\[\])/g)
   )
-    violations.push(
-      '`any` type introduced — use `unknown` + narrowing or a precise type (conventions C1)',
-    );
+    violations.push('`any` type introduced — use `unknown` + narrowing or a precise type (conventions C1)');
   if (introducedRaw(/eslint-disable[^\n]*max-lines/g))
-    violations.push(
-      'eslint-disable of max-lines — split the file by concern instead (conventions C6)',
-    );
+    violations.push('eslint-disable of max-lines — split the file by concern instead (conventions C6)');
   if (isTest && introduced(/\b(it|test|describe)\.(only|skip)\s*\(/g))
-    violations.push(
-      '.only( / .skip( introduced in a test — never focus or skip tests to get green (workflow W1)',
-    );
+    violations.push('.only( / .skip( introduced in a test — never focus or skip tests to get green (workflow W1)');
 
   if (violations.length === 0) return ok();
   const reason =
     `llull guard blocked edit to ${filePath}:\n- ${violations.join('\n- ')}\n` +
     `See .claude/rules/. If this is a genuine exception, ask the user.`;
   process.stdout.write(
-    JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: 'PreToolUse',
-        permissionDecision: 'deny',
-        permissionDecisionReason: reason,
-      },
-    }),
+    JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: reason } }),
   );
   process.stderr.write(reason + '\n');
   process.exit(2);

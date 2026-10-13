@@ -1,11 +1,5 @@
-/**
- * @layer ui/panels
- *
- * LayersPanel — layer list (name, visibility, lock, color swatch, entity count) with controls that
- * dispatch the layer commands: add_layer, update_layer, delete_layer.
- * The eye toggle is a LOCAL viewport filter (`useViewportStore.hiddenLayerIds`): it dispatches no
- * command and never changes the document's `layer.visible`.
- */
+// Layer list (name, visibility, lock, color, count) → add_layer / update_layer / delete_layer. The eye is a LOCAL
+// viewport filter (hiddenLayerIds): no command, the document's `layer.visible` never changes.
 
 import React, { memo, useMemo, useState } from 'react';
 import { classNames } from '@ui/classNames';
@@ -31,20 +25,13 @@ function useLayerEntityCounts(): Record<string, number> {
   }, [entities]);
 }
 
-interface LayerRowProps {
-  layer: Layer;
-  entityCount: number;
-}
-
-const LayerRow = memo(function LayerRow({ layer, entityCount }: LayerRowProps): React.ReactElement {
+const LayerRow = memo(function LayerRow({ layer, entityCount }: { layer: Layer; entityCount: number }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const isLocallyHidden = useViewportStore((s) => s.hiddenLayerIds.has(layer.id));
   const toggleLayerVisibility = useViewportStore((s) => s.toggleLayerVisibility);
   const [renaming, setRenaming] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
-  // Local viewport visibility: starts from the document's layer.visible, then
-  // the user can toggle it locally without touching the server document.
   const effectivelyVisible = layer.visible && !isLocallyHidden;
   const isDefaultLayer = layer.id === DEFAULT_LAYER_ID;
 
@@ -57,19 +44,10 @@ const LayerRow = memo(function LayerRow({ layer, entityCount }: LayerRowProps): 
       <IconButton
         icon={effectivelyVisible ? 'eye' : 'eyeOff'}
         size={14}
-        className={classNames(
-          'layer-visibility-btn',
-          !effectivelyVisible && 'layer-visibility-btn--hidden',
-        )}
+        className={classNames('layer-visibility-btn', !effectivelyVisible && 'layer-visibility-btn--hidden')}
         pressed={effectivelyVisible}
-        label={
-          effectivelyVisible
-            ? `Hide layer ${layer.name} in viewport`
-            : `Show layer ${layer.name} in viewport`
-        }
-        title={
-          effectivelyVisible ? 'Hide layer in viewport (local)' : 'Show layer in viewport (local)'
-        }
+        label={effectivelyVisible ? `Hide layer ${layer.name} in viewport` : `Show layer ${layer.name} in viewport`}
+        title={effectivelyVisible ? 'Hide layer in viewport (local)' : 'Show layer in viewport (local)'}
         onClick={() => toggleLayerVisibility(layer.id)}
       />
 
@@ -110,10 +88,7 @@ const LayerRow = memo(function LayerRow({ layer, entityCount }: LayerRowProps): 
         <span className="panel__row-main layer-name">{layer.name}</span>
       )}
 
-      <span
-        className="panel__row-meta"
-        title={`${entityCount} ${entityCount === 1 ? 'entity' : 'entities'} on this layer`}
-      >
+      <span className="panel__row-meta" title={`${entityCount} ${entityCount === 1 ? 'entity' : 'entities'} on this layer`}>
         {entityCount}
         <span className="visually-hidden">{entityCount === 1 ? ' entity' : ' entities'}</span>
       </span>
@@ -179,13 +154,7 @@ function AddLayerForm(): React.ReactElement {
           aria-label="New layer name"
           autoComplete="off"
         />
-        <button
-          type="submit"
-          className="btn btn--primary"
-          disabled={trimmed === ''}
-          aria-label="Add layer"
-          title="Add layer"
-        >
+        <button type="submit" className="btn btn--primary" disabled={trimmed === ''} aria-label="Add layer" title="Add layer">
           <Icon name="plus" size={14} />
         </button>
       </div>
@@ -193,22 +162,14 @@ function AddLayerForm(): React.ReactElement {
   );
 }
 
-interface LayersPanelProps {
-  className?: string;
-}
-
-export function LayersPanel({ className }: LayersPanelProps): React.ReactElement {
+export function LayersPanel({ className }: { className?: string }): React.ReactElement {
   const layers = useStore((s) => s.document.layers);
   const layerOrder = useStore((s) => s.document.layerOrder);
   const entityCounts = useLayerEntityCounts();
 
   return (
     <aside className={classNames('panel layers-panel', className)} aria-label="Layers">
-      <PanelHeader
-        title="Layers"
-        count={layerOrder.length}
-        countLabel={`${layerOrder.length} layers`}
-      />
+      <PanelHeader title="Layers" count={layerOrder.length} countLabel={`${layerOrder.length} layers`} />
 
       <ul className="panel__list" aria-label="Layer list" role="list">
         {orderedValues(layerOrder, layers).map((layer) => (

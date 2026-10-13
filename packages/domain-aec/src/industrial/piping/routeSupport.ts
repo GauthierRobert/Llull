@@ -1,8 +1,4 @@
-/**
- * Polyline routes of pipes and cable trays: parsing, repeated-point test, length.
- * @layer domain-aec
- * @pure
- */
+/** Polyline routes of pipes and cable trays: parsing, repeated-point test, length. */
 
 import { clamp01 } from '@lib/clamp';
 import type { Vec3 } from '@core/model/types';
@@ -19,11 +15,7 @@ function parseRoute(points: ReadonlyArray<unknown>): Vec3[] | null {
 }
 
 /** `parseRoute` plus the point cap, as a ready failure text (`tool` failed: …) for the command. */
-export function routeOrFailure(
-  tool: string,
-  points: ReadonlyArray<unknown>,
-  split: 'line' | 'run',
-): Vec3[] | string {
+export function routeOrFailure(tool: string, points: ReadonlyArray<unknown>, split: 'line' | 'run'): Vec3[] | string {
   const route = parseRoute(points);
   if (!route) return `${tool} failed: points must be ≥ 2 [x, y, z] points.`;
   return route.length > MAX_ROUTE_POINTS
@@ -34,12 +26,7 @@ export function routeOrFailure(
 export const hasRepeatedPoint = (route: ReadonlyArray<Vec3>): boolean =>
   route.some((point, index) => {
     const previous = route[index - 1];
-    return (
-      previous !== undefined &&
-      point[0] === previous[0] &&
-      point[1] === previous[1] &&
-      point[2] === previous[2]
-    );
+    return previous !== undefined && point[0] === previous[0] && point[1] === previous[1] && point[2] === previous[2];
   });
 
 export const routeLength = (route: ReadonlyArray<Vec3>): number => arcLengths(route).at(-1) ?? 0;
@@ -58,12 +45,7 @@ function segmentsOf(route: ReadonlyArray<Vec3>): Segment[] {
     const a = route[index] as Vec3;
     const delta = sub3(b, a);
     const length = Math.hypot(...delta);
-    return {
-      a,
-      delta,
-      length,
-      direction: [delta[0] / length, delta[1] / length, delta[2] / length],
-    };
+    return { a, delta, length, direction: [delta[0] / length, delta[1] / length, delta[2] / length] };
   });
 }
 
@@ -102,10 +84,7 @@ export function nearestOnRoute(route: ReadonlyArray<Vec3>, point: Vec3): RouteSn
 }
 
 /** Point and segment direction at arc length `arc` of `route` (clamped to its ends). */
-export function pointAtArc(
-  route: ReadonlyArray<Vec3>,
-  arc: number,
-): { point: Vec3; direction: Vec3; segment: number } | null {
+export function pointAtArc(route: ReadonlyArray<Vec3>, arc: number): { point: Vec3; direction: Vec3; segment: number } | null {
   let travelled = 0;
   let last: { point: Vec3; direction: Vec3; segment: number } | null = null;
   for (const [index, { a, delta, length, direction }] of segmentsOf(route).entries()) {
@@ -132,8 +111,8 @@ export function arcLengths(route: ReadonlyArray<Vec3>): number[] {
 export const RISER_SLOPE = 0.7;
 
 /**
- * Span coordinate at arc length `arc`: the arc length travelled on segments that are not risers
- * (a vertical pipe does not sag, so its length adds no span).
+ * Span coordinate at arc length `arc`: the arc length travelled on segments that are not risers (a vertical pipe does not sag, so its
+ * length adds no span).
  */
 export function spanCoordinate(route: ReadonlyArray<Vec3>, arc: number): number {
   let travelled = 0;
@@ -172,13 +151,7 @@ export function riserRuns(route: ReadonlyArray<Vec3>): RiserRun[] {
     open = null;
     const [startArc, endArc] = [arcs[fromIndex] as number, arcs[toIndex] as number];
     if (endArc - startArc < MIN_RISER_LENGTH) return;
-    runs.push({
-      startArc,
-      endArc,
-      length: endArc - startArc,
-      from: route[fromIndex] as Vec3,
-      to: route[toIndex] as Vec3,
-    });
+    runs.push({ startArc, endArc, length: endArc - startArc, from: route[fromIndex] as Vec3, to: route[toIndex] as Vec3 });
   };
   segmentsOf(route).forEach(({ delta, length }, index) => {
     const steep = length > 0 && Math.abs(delta[2]) / length > RISER_SLOPE;

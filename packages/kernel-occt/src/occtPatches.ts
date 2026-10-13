@@ -1,5 +1,4 @@
 /**
- * @layer kernel
  * Exact freeform solids: each bicubic Bézier patch of a subdivision solid (core
  * subdivisionPatches) becomes one B-spline face; neighbours share their boundary poles, so the
  * faces sew into a closed shell and a solid with true B_SPLINE_SURFACE geometry (STEP, booleans).
@@ -60,10 +59,9 @@ function placeholderBoundaries(api: OccApi): OccHandle[] {
 
 /** B-spline face whose poles are `patch` (u along i, v along j); null when OCC refuses it. */
 function patchFace(api: OccApi, patch: BezierPatch, boundaries: OccHandle[]): OccShape | null {
-  const filling = new api.GeomFill_BSplineCurves_2(
-    ...boundaries,
-    api.GeomFill_FillingStyle.GeomFill_CoonsStyle,
-  ) as OccHandle & { Surface(): OccHandle & { get(): OccBSplineSurface } };
+  const filling = new api.GeomFill_BSplineCurves_2(...boundaries, api.GeomFill_FillingStyle.GeomFill_CoonsStyle) as OccHandle & {
+    Surface(): OccHandle & { get(): OccBSplineSurface };
+  };
   const surfaceHandle = filling.Surface();
   const surface = surfaceHandle.get();
   try {

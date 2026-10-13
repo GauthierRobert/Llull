@@ -1,7 +1,4 @@
-/**
- * Equipment shapes (box, vertical vessel, horizontal vessel) and size normalisation.
- * @layer domain-aec
- */
+/** Equipment shapes (box, vertical vessel, horizontal vessel) and size normalisation. */
 
 import type { EquipmentElement, EquipmentShape } from '@core/model/building';
 import type { Vec3 } from '@core/model/types';
@@ -13,10 +10,9 @@ export const equipmentShapeSchema = z.enum(['box', 'vertical_vessel', 'horizonta
 export const EQUIPMENT_SHAPES: ReadonlyArray<string> = equipmentShapeSchema.options;
 
 export const SHAPE_PARAM_TEXT =
-  'Shape: "box" (default), "vertical_vessel" (cylinder, axis along Z: size = [diameter, ignored, ' +
-  'height]; the width is set equal to the diameter) or "horizontal_vessel" (cylinder, axis along its ' +
-  'local x: size = [length, diameter, ignored]; the height is set equal to the diameter and the ' +
-  'bottom rests on the level). Plans draw a vertical vessel as a circle.';
+  'Shape: "box" (default), "vertical_vessel" (cylinder, axis along Z: size = [diameter, ignored, height]; the width is set equal to the ' +
+  'diameter) or "horizontal_vessel" (cylinder, axis along its local x: size = [length, diameter, ignored]; the height is set equal to ' +
+  'the diameter and the bottom rests on the level). Plans draw a vertical vessel as a circle.';
 
 export function shapeOf(equipment: Pick<EquipmentElement, 'shape'>): EquipmentShape {
   return equipment.shape ?? 'box';

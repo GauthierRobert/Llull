@@ -13,6 +13,5 @@ describe('golden replay corpus (Manifold kernel)', () => {
   }, 60_000);
 
   afterAll(() => setGeometryKernel(previousKernel));
-
   describePlans(kernelPlans);
 });

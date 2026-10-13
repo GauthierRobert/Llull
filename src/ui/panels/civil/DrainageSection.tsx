@@ -1,11 +1,5 @@
-/**
- * @layer ui/panels/civil
- *
- * DrainageSection — storm network: manhole / pipe forms and lists, network check
- * (`check_drainage_network`: failures + CSV, design storm as a constant intensity or an IDF curve,
- * outfall tailwater for the HGL), automatic sizing (`size_drainage_pipes`) and the structure / pipe
- * schedule CSV (`drainage_schedule`).
- */
+// Storm network: manhole / pipe forms + lists, `check_drainage_network` (failures + CSV; constant intensity or IDF storm;
+// outfall tailwater for the HGL), `size_drainage_pipes`, `drainage_schedule` CSV.
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
@@ -34,20 +28,13 @@ function NetworkChecks(): React.ReactElement {
   };
 
   const checkCsv = (): void => {
-    setStatus(
-      downloadCsvQuery('check_drainage_network', checkParams, 'drainage-check.csv').summary,
-    );
+    setStatus(downloadCsvQuery('check_drainage_network', checkParams, 'drainage-check.csv').summary);
   };
 
   return (
     <>
       <div className="building-actions">
-        <NumberTextField
-          value={rainfall}
-          set={setRainfall}
-          hint="Rainfall mm/h (50)"
-          label="Rainfall intensity"
-        />
+        <NumberTextField value={rainfall} set={setRainfall} hint="Rainfall mm/h (50)" label="Rainfall intensity" />
         {IDF_FIELDS.map((key) => (
           <input
             key={key}
@@ -94,7 +81,7 @@ function NetworkChecks(): React.ReactElement {
       {failures.length > 0 && (
         <ul className="civil-failures" aria-label="Drainage failures">
           {failures.map((failure, index) => (
-            // Messages may repeat, so the position disambiguates the key.
+            // Messages may repeat: the position disambiguates the key.
             <li key={`${index}:${failure}`} className="panel__error">
               {failure}
             </li>
@@ -124,11 +111,7 @@ export function DrainageSection(): React.ReactElement {
       {manholes.length > 0 && (
         <ul className="civil-list" aria-label="Manholes">
           {manholes.map((manhole) => (
-            <CivilObjectRow
-              key={manhole.id}
-              object={manhole}
-              detail={`invert ${manhole.invertElevation}, rim ${manhole.rimElevation}`}
-            />
+            <CivilObjectRow key={manhole.id} object={manhole} detail={`invert ${manhole.invertElevation}, rim ${manhole.rimElevation}`} />
           ))}
         </ul>
       )}

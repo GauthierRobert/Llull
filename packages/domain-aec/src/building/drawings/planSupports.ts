@@ -1,9 +1,7 @@
 /**
- * Plan symbols of pipe supports on layer P-SUPP, drawn on the plan of the support's level (as its
- * pipe): shoe = filled (cut-style) square, hanger = circle with a cross, guide = square with a tick along each
- * side of the pipe, anchor = hatched square with both diagonals; the support mark beside it.
- * @layer domain-aec
- * @pure
+ * Plan symbols of pipe supports on layer P-SUPP, drawn on the plan of the support's level (as its pipe): shoe = filled (cut-style) square,
+ * hanger = circle with a cross, guide = square with a tick along each side of the pipe, anchor = hatched square with both diagonals; the
+ * support mark beside it.
  */
 
 import { planPoint } from '@lib/vec2';
@@ -18,11 +16,7 @@ import { pipeAngle } from '../../industrial/piping/supportParts';
 const SYMBOL_SIZE = 300;
 const LABEL_HEIGHT = 150;
 
-export function supportPrimitives(
-  doc: PlanSource,
-  building: BuildingModel,
-  support: PipeSupportElement,
-): DrawingPrimitive[] {
+export function supportPrimitives(doc: PlanSource, building: BuildingModel, support: PipeSupportElement): DrawingPrimitive[] {
   const pipe = building.elements[support.pipeId];
   const angle = pipe?.category === 'pipe' ? pipeAngle(pipe, support.position) : 0;
   const half = fromMm(doc, SYMBOL_SIZE) / 2;
@@ -57,13 +51,5 @@ export function supportPrimitives(
         ];
     }
   })();
-  return [
-    ...symbol,
-    annotationText(
-      layer,
-      [centre[0] + half * 1.6, centre[1] + half * 1.6],
-      fromMm(doc, LABEL_HEIGHT),
-      support.mark,
-    ),
-  ];
+  return [...symbol, annotationText(layer, [centre[0] + half * 1.6, centre[1] + half * 1.6], fromMm(doc, LABEL_HEIGHT), support.mark)];
 }

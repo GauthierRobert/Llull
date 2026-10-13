@@ -1,9 +1,6 @@
 /**
- * Lower a kernel result's exact construction (`mesh.brep`) — or one fillet / chamfer / shell step —
- * to feature-program ops, so generated code rebuilds the B-rep instead of a triangle soup.
- *
- * @layer core/codegen
- * @pure the kernel is only queried (edge mid points, display triangles), never asked to change
+ * Lower a kernel result's exact construction (`mesh.brep`) — or one fillet / chamfer / shell step — to feature-program ops, so generated
+ * code rebuilds the B-rep instead of a triangle soup.
  * @failure a node no program op expresses (a rotated placement, a scale) -> null (caller falls back)
  */
 
@@ -34,11 +31,7 @@ export function meshSoup(mesh: MeshData): number[] {
 }
 
 /** Mid points of the selected edges of `source`, when the kernel has exact topology. */
-function edgeMidPoints(
-  kernel: GeometryKernel | null,
-  source: ShapeRecipe,
-  edges: readonly number[],
-): Vec3[] | undefined {
+function edgeMidPoints(kernel: GeometryKernel | null, source: ShapeRecipe, edges: readonly number[]): Vec3[] | undefined {
   if (kernel === null || edges.length === 0) return undefined;
   const shape = kernel.evaluate(source);
   const topology = shape === null ? null : kernel.topology(shape);
@@ -64,14 +57,7 @@ export function modificationFeature(
   const fallback = mesh === undefined ? {} : { mesh };
   if (recipe.op === 'shell') return { ...base, op: 'shell', thickness: size, ...fallback };
   const near = edgeMidPoints(kernel, recipe.source, recipe.edges);
-  return {
-    ...base,
-    op: recipe.op,
-    edges: recipe.edges,
-    size,
-    ...(near === undefined ? {} : { near }),
-    ...fallback,
-  };
+  return { ...base, op: recipe.op, edges: recipe.edges, size, ...(near === undefined ? {} : { near }), ...fallback };
 }
 
 interface Lowered {
@@ -108,23 +94,14 @@ export function lowerRecipe(recipe: ShapeRecipe, lowering: RecipeLowering): Lowe
       const source = lowerRecipe(recipe.source, lowering);
       if (source === null) return null;
       const base = lowering.base(source.variable);
-      const feature = modificationFeature(
-        recipe,
-        base,
-        lowering.kernel,
-        soupOf(lowering.kernel, recipe),
-      );
+      const feature = modificationFeature(recipe, base, lowering.kernel, soupOf(lowering.kernel, recipe));
       return { features: [...source.features, feature], variable: source.variable };
     }
     case 'place': {
       if (recipe.rotation.some((angle) => angle !== 0)) return null;
       const source = lowerRecipe(recipe.source, lowering);
       if (source === null) return null;
-      const delta = recipe.position.map((value) => ({ value })) as [
-        { value: number },
-        { value: number },
-        { value: number },
-      ];
+      const delta = recipe.position.map((value) => ({ value })) as [{ value: number }, { value: number }, { value: number }];
       const feature: Feature = { ...lowering.base(source.variable), op: 'translate', delta };
       return { features: [...source.features, feature], variable: source.variable };
     }

@@ -1,10 +1,4 @@
-/**
- * @layer ui/panels
- *
- * AssemblyPanel — component library + instance tree.
- * Components: name, entity count, "Insert" (insert_instance at the origin).
- * Instances: component name + position; click selects, "Explode" dispatches explode_instance.
- */
+// Component library (Insert → insert_instance at the origin) + instance tree (click selects, Explode → explode_instance).
 
 import React from 'react';
 import { classNames } from '@ui/classNames';
@@ -15,11 +9,7 @@ import { Icon } from '@ui/components/Icon';
 import { PanelEmpty, PanelHeader, PanelSection } from '@ui/panels/PanelParts';
 import { orderedValues } from '@ui/panels/orderedValues';
 
-interface ComponentRowProps {
-  component: Component;
-}
-
-function ComponentRow({ component }: ComponentRowProps): React.ReactElement {
+function ComponentRow({ component }: { component: Component }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
 
   const entityCount = component.order.length;
@@ -57,13 +47,15 @@ function ComponentRow({ component }: ComponentRowProps): React.ReactElement {
   );
 }
 
-interface InstanceRowProps {
+function InstanceRow({
+  instance,
+  componentName,
+  selected,
+}: {
   instance: InstanceEntity;
   componentName: string;
   selected: boolean;
-}
-
-function InstanceRow({ instance, componentName, selected }: InstanceRowProps): React.ReactElement {
+}): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const select = useStore((s) => s.select);
 
@@ -84,12 +76,7 @@ function InstanceRow({ instance, componentName, selected }: InstanceRowProps): R
       <span className="panel__row-icon" aria-hidden="true">
         <Icon name="assembly" size={14} />
       </span>
-      <button
-        type="button"
-        className="assembly-instance-info"
-        aria-pressed={selected}
-        aria-label={`Select instance of ${componentName}`}
-      >
+      <button type="button" className="assembly-instance-info" aria-pressed={selected} aria-label={`Select instance of ${componentName}`}>
         <span className="assembly-instance-name" title={componentName}>
           {componentName}
         </span>
@@ -111,31 +98,21 @@ function InstanceRow({ instance, componentName, selected }: InstanceRowProps): R
   );
 }
 
-interface AssemblyPanelProps {
-  className?: string;
-}
-
-export function AssemblyPanel({ className }: AssemblyPanelProps): React.ReactElement {
+export function AssemblyPanel({ className }: { className?: string }): React.ReactElement {
   const components = useStore((s) => s.document.components);
   const entities = useStore((s) => s.document.entities);
   const order = useStore((s) => s.document.order);
 
   const componentList = Object.values(components);
 
-  const instanceList = orderedValues(order, entities).filter(
-    (entity): entity is InstanceEntity => entity.kind === 'instance',
-  );
+  const instanceList = orderedValues(order, entities).filter((entity): entity is InstanceEntity => entity.kind === 'instance');
 
   const selectionSet = useSelectionSet();
 
   return (
     <aside className={classNames('panel assembly-panel', className)} aria-label="Assembly">
       <PanelHeader title="Assembly" />
-      <PanelSection
-        title="Components"
-        count={componentList.length}
-        countLabel={`${componentList.length} components`}
-      >
+      <PanelSection title="Components" count={componentList.length} countLabel={`${componentList.length} components`}>
         {componentList.length === 0 ? (
           <PanelEmpty compact icon="assembly" message="No components defined." />
         ) : (
@@ -147,11 +124,7 @@ export function AssemblyPanel({ className }: AssemblyPanelProps): React.ReactEle
         )}
       </PanelSection>
 
-      <PanelSection
-        title="Instances"
-        count={instanceList.length}
-        countLabel={`${instanceList.length} instances`}
-      >
+      <PanelSection title="Instances" count={instanceList.length} countLabel={`${instanceList.length} instances`}>
         {instanceList.length === 0 ? (
           <PanelEmpty compact icon="assembly" message="No instances in the scene." />
         ) : (
@@ -159,14 +132,7 @@ export function AssemblyPanel({ className }: AssemblyPanelProps): React.ReactEle
             {instanceList.map((inst) => {
               const comp = components[inst.componentId];
               const compName = comp ? comp.name : inst.componentId;
-              return (
-                <InstanceRow
-                  key={inst.id}
-                  instance={inst}
-                  componentName={compName}
-                  selected={selectionSet.has(inst.id)}
-                />
-              );
+              return <InstanceRow key={inst.id} instance={inst} componentName={compName} selected={selectionSet.has(inst.id)} />;
             })}
           </ul>
         )}

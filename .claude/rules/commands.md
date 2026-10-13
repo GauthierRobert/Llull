@@ -15,8 +15,6 @@ import type { CommandResult } from './types';
 import { defineCommand, z, vec3 } from './schema'; // plugins: '@core/commands/schema'
 
 /**
- * @command foo_thing
- * @pure
  * @affects modifies 1 entity
  * @failure missing id -> no-op, affected:[]
  */
@@ -37,7 +35,7 @@ export const fooThing = defineCommand({
 });
 ```
 
-- Doc-comment tags (only those that apply): `@command @pure @layer @affects @invariant @failure`.
+- Doc-comment tags (only those that apply): `@affects @invariant @failure` (path = layer, name = command; all commands are pure).
   No narrative comments; delete any that restate the code.
 - Schema helpers (`@core/commands/schema`): `vec2`/`vec3` (exact tuples), `looseVec2`/`looseVec3`
   (`run` checks length), `untypedArray` (`run` validates), `tolerant(schema)` (never rejected).

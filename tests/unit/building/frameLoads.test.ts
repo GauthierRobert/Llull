@@ -8,20 +8,22 @@ import {
   lateralTorsionalReduction,
   memberBuckling,
   sectionResistance,
+  boltResistance,
+  yieldStrength,
 } from '@aec/industrial/steelDesign/steelDesign';
 import { framesOf } from '@aec/industrial/frames/frameModelFrames';
-import {
-  craneActions,
-  valleyLines,
-  craneCapacityOf,
-  DOWNWIND_ROOF_FACTOR,
-} from '@aec/industrial/frames/frameModelTypes';
+import { craneActions, valleyLines, craneCapacityOf, DOWNWIND_ROOF_FACTOR } from '@aec/industrial/frames/frameModelTypes';
 import { baseReactions } from '@aec/industrial/frames/frameModelSolve';
 import { frameRoofAverage } from '@aec/industrial/common/windCoefficients';
 import { findProfile, sectionProperties } from '@aec/steel/profiles';
-import type { SteelMemberElement } from '@core/model/building';
+import type { SteelMemberElement, MomentConnectionElement } from '@core/model/building';
 import { GRAVITY } from '@aec/shared/numeric';
 import { hall } from './hallFixtures';
+import { xyz } from '../../helpers/xy';
+import { nextProfile } from '@aec/industrial/common/profileGroups';
+import { connectionWelds } from '@aec/industrial/connections/connections';
+import type { TakeoffLine } from '@aec/building/quantities/takeoffBasics';
+import { expectNoOp } from '../../helpers/expectNoOp';
 
 const HOIST_10T = 10 * GRAVITY * 1000;
 
@@ -47,7 +49,6 @@ describe('member buckling (EN 1993-1-1 §6.3)', () => {
     expect(bucklingReduction(1, 0.49)).toBeCloseTo(0.54, 3);
     expect(bucklingReduction(2, 0.49)).toBeCloseTo(0.196, 3);
   });
-
   it('reduces the axial resistance of slender columns and interacts with bending', () => {
     const profile = findProfile('HEA240')!;
     const npl = sectionResistance(profile, 355).axial;
@@ -57,41 +58,22 @@ describe('member buckling (EN 1993-1-1 §6.3)', () => {
     expect(slender.chiMinor).toBeLessThan(slender.chiMajor);
     expect(slender.utilisation).toBeGreaterThan(1);
     // Restrained flange (short LTB length): kzy = 1 governs pure bending.
-    const bending = memberBuckling(profile, 355, 0, 1e8, {
-      major: 8000,
-      minor: 8000,
-      lateralTorsional: 100,
-    });
+    const bending = memberBuckling(profile, 355, 0, 1e8, { major: 8000, minor: 8000, lateralTorsional: 100 });
     expect(bending.chiLateralTorsional).toBe(1);
     expect(bending.utilisation).toBeCloseTo(1e8 / sectionResistance(profile, 355).moment);
     // Hollow and other shapes use their own curves.
-    expect(
-      memberBuckling(findProfile('SHS100x5')!, 355, 1e5, 0, { major: 3000, minor: 3000 }).chiMajor,
-    ).toBeLessThan(1);
-    expect(
-      memberBuckling(findProfile('L100x10')!, 355, 1e5, 0, { major: 3000, minor: 3000 }).chiMinor,
-    ).toBeLessThan(1);
-    expect(
-      memberBuckling(findProfile('IPE300')!, 355, 1e5, 0, { major: 3000, minor: 3000 }).chiMajor,
-    ).toBeGreaterThan(0.9);
+    expect(memberBuckling(findProfile('SHS100x5')!, 355, 1e5, 0, { major: 3000, minor: 3000 }).chiMajor).toBeLessThan(1);
+    expect(memberBuckling(findProfile('L100x10')!, 355, 1e5, 0, { major: 3000, minor: 3000 }).chiMinor).toBeLessThan(1);
+    expect(memberBuckling(findProfile('IPE300')!, 355, 1e5, 0, { major: 3000, minor: 3000 }).chiMajor).toBeGreaterThan(0.9);
   });
-
   it('uses the class 3 interaction factor for class 3 sections', () => {
     const profile = findProfile('HEA300')!;
     const resistance = sectionResistance(profile, 355);
     expect(resistance.sectionClass).toBe(3);
     const lengths = { major: 6000, minor: 100 };
-    const result = memberBuckling(
-      profile,
-      355,
-      0.3 * resistance.axial,
-      0.3 * resistance.moment,
-      lengths,
-    );
+    const result = memberBuckling(profile, 355, 0.3 * resistance.axial, 0.3 * resistance.moment, lengths);
     const n = 0.3 / result.chiMajor;
-    const lambda = Math.sqrt(
-      resistance.axial / ((Math.PI ** 2 * 210000 * sectionProperties(profile).inertia) / 6000 ** 2),
-    );
+    const lambda = Math.sqrt(resistance.axial / ((Math.PI ** 2 * 210000 * sectionProperties(profile).inertia) / 6000 ** 2));
     expect(result.utilisation).toBeCloseTo(n + 0.9 * (1 + 0.6 * Math.min(lambda, 1) * n) * 0.3, 6);
   });
 });
@@ -109,14 +91,9 @@ describe('lateral-torsional buckling (EN 1993-1-1 §6.3.2)', () => {
     expect(long).toBeLessThan(0.5);
     expect(lateralTorsionalReduction(profile, 355, 500)).toBe(1);
     expect(lateralTorsionalReduction(findProfile('CHS76.1x3.6')!, 355, 6000)).toBe(1);
-    const free = memberBuckling(profile, 355, 0, 5e7, {
-      major: 6000,
-      minor: 6000,
-      lateralTorsional: 6000,
-    });
+    const free = memberBuckling(profile, 355, 0, 5e7, { major: 6000, minor: 6000, lateralTorsional: 6000 });
     expect(free.utilisation).toBeCloseTo(5e7 / (long * sectionResistance(profile, 355).moment), 6);
   });
-
   it('restrains columns at the side rails and rafters at the purlins', () => {
     const rows = check(hall()).rows;
     const column = row({ rows } as CheckData, 'SC5', 'column');
@@ -138,7 +115,6 @@ describe('load combinations', () => {
     expect(deflection.utilisation).toBeLessThan(1);
     expect(data.rows.some((candidate) => candidate.kind === 'stability')).toBe(true);
   });
-
   it('adds wind (both directions, uplift) with eaves sway checks', () => {
     const doc = hall();
     const calm = check(doc, { snowLoad: 0 });
@@ -146,62 +122,50 @@ describe('load combinations', () => {
     expect(windy.combinations).toHaveLength(10);
     expect(windy.combinations).toContain('1.0G+1.5W←(cpi−0.3)');
     expect(windy.combinations).toContain('1.0G+1.5W→');
-    expect(row(windy, 'SC5', 'column').utilisation).toBeGreaterThan(
-      row(calm, 'SC5', 'column').utilisation,
-    );
+    expect(row(windy, 'SC5', 'column').utilisation).toBeGreaterThan(row(calm, 'SC5', 'column').utilisation);
     const sway = windy.rows.find((candidate) => candidate.check.startsWith('eaves sway'))!;
     expect(sway.combination).toMatch(/^SLS W/);
     expect(sway.utilisation).toBeGreaterThan(0);
     // Uplift reverses the apex moment: the bolt group sees both signs.
-    const apex = windy.rows.find(
-      (candidate) => candidate.kind === 'connection' && candidate.check.startsWith('apex'),
-    )!;
+    const apex = windy.rows.find((candidate) => candidate.kind === 'connection' && candidate.check.startsWith('apex'))!;
     const moments = apex.forces!.map((force) => force.moment);
     expect(Math.max(...moments)).toBeGreaterThan(0);
     expect(Math.min(...moments)).toBeLessThan(0);
-    expect(execute(doc, 'check_portal_frames', { windPressure: 1 }).summary).toMatch(
-      /qp = 1 kN\/m²/,
-    );
+    expect(execute(doc, 'check_portal_frames', { windPressure: 1 }).summary).toMatch(/qp = 1 kN\/m²/);
   });
-
   it('applies crane actions from the runway at the brackets', () => {
     const doc = hall({ crane: { capacity: 16, railHeight: 6000 } });
     const withCrane = check(doc);
     const without = check(doc, { craneCapacity: 0 });
     expect(withCrane.combinations).toHaveLength(10);
-    expect(withCrane.combinations).toContain('1.35G+1.35C(right)');
-    expect(withCrane.combinations).toContain('1.35G+1.35C5(left)');
-    expect(withCrane.combinations).toContain('1.35G+1.35C5(right)+0.75S');
+    for (const s of ['1.35G+1.35C(right)', '1.35G+1.35C5(left)', '1.35G+1.35C5(right)+0.75S']) expect(withCrane.combinations).toContain(s);
     expect(withCrane.combinations[2]).toBe('1.35G+1.35C(left)+0.75S');
     expect(without.combinations).toHaveLength(2);
     const rail = withCrane.rows.find((candidate) => candidate.check.startsWith('rail-level'))!;
     expect(rail.check).toMatch(/h\/400/);
     // A heavy crane governs the columns.
     const heavier = check(doc, { craneCapacity: 50 });
-    expect(row(heavier, 'SC5', 'column').utilisation).toBeGreaterThan(
-      row(without, 'SC5', 'column').utilisation,
-    );
+    expect(row(heavier, 'SC5', 'column').utilisation).toBeGreaterThan(row(without, 'SC5', 'column').utilisation);
     expect(row(heavier, 'SC5', 'column').combination).toMatch(/^1\.35G\+1\.35C/);
-    expect(rail.utilisation).toBeLessThan(
-      heavier.rows.find((candidate) => candidate.check.startsWith('rail-level'))!.utilisation,
-    );
+    expect(rail.utilisation).toBeLessThan(heavier.rows.find((candidate) => candidate.check.startsWith('rail-level'))!.utilisation);
     const both = check(doc, { windPressure: 0.8 });
     expect(both.combinations).toHaveLength(66);
-    expect(both.combinations).toContain('1.35G+1.35C(right)+0.75S+0.9W→');
-    expect(both.combinations).toContain('1.35G+1.5W←+0.75S+1.35C(left)');
-    expect(both.combinations).toContain('1.35G+1.35C5(left)+0.9W→');
-    expect(both.combinations).toContain('1.35G+1.5W←+0.75S+1.35C5(right)');
+    for (const s of [
+      '1.35G+1.35C(right)+0.75S+0.9W→',
+      '1.35G+1.5W←+0.75S+1.35C(left)',
+      '1.35G+1.35C5(left)+0.9W→',
+      '1.35G+1.5W←+0.75S+1.35C5(right)',
+    ])
+      expect(both.combinations).toContain(s);
     // Crane reactions enter below the column tops: they lower αcr (storey-wise Horne).
     expect(heavier.alphaCritical!).toBeLessThan(without.alphaCritical!);
   });
-
   it('reads crane capacities from the runway note', () => {
     const member = { note: 'Crane 12.5 t, rail top 6000' } as SteelMemberElement;
     expect(craneCapacityOf(member)).toBe(12.5);
     expect(craneCapacityOf({ note: 'crane bracket' } as SteelMemberElement)).toBeNull();
     expect(craneCapacityOf({} as SteelMemberElement)).toBeNull();
   });
-
   it('derives the EN 1991-3 crane actions by statics (hand check)', () => {
     const [hoist, span] = [10 * GRAVITY * 1000, 24000];
     const actions = craneActions(10, span);
@@ -212,14 +176,8 @@ describe('load combinations', () => {
     expect(actions.selfWeight).toBeCloseTo(self, 6);
     expect(actions.staticMax).toBeCloseTo(0.4 * self + (0.2 * self + hoist) * near, 3);
     expect(actions.staticMax + actions.staticMin).toBeCloseTo(self + hoist, 3);
-    expect(actions.group1.max).toBeCloseTo(
-      1.1 * (0.4 * self + 0.2 * self * near) + 1.134 * hoist * near,
-      3,
-    );
-    expect(actions.group1.min).toBeCloseTo(
-      1.1 * (0.4 * self + 0.2 * self * far) + 1.134 * hoist * far,
-      3,
-    );
+    expect(actions.group1.max).toBeCloseTo(1.1 * (0.4 * self + 0.2 * self * near) + 1.134 * hoist * near, 3);
+    expect(actions.group1.min).toBeCloseTo(1.1 * (0.4 * self + 0.2 * self * far) + 1.134 * hoist * far, 3);
     expect(actions.group1.max).toBeGreaterThan(actions.group1.min);
     // Drive: K = μ Σ driven = 0.2 Rmin, HL = φ5 K / 2, HT = φ5 ξ M / a with M = K (ξ1 − 0.5) l.
     const drive = 0.2 * actions.staticMin;
@@ -235,7 +193,6 @@ describe('load combinations', () => {
     expect(actions.group5.skewMax).toBeCloseTo((f * (1 - xi1) * (self + hoist)) / 2, 6);
     expect(actions.group5.skewMin).toBeCloseTo((f * xi1 * (self + hoist)) / 2, 6);
   });
-
   it('honours the hoisting class, self-weight, hook approach and wheel base overrides', () => {
     const heavy = craneActions(10, 24000, {
       hoistingClass: 'HC4',
@@ -248,20 +205,15 @@ describe('load combinations', () => {
     expect(heavy.selfWeight).toBe(100000);
     expect(heavy.staticMax + heavy.staticMin).toBeCloseTo(100000 + HOIST_10T, 3);
     expect(heavy.staticMin).toBeCloseTo(0.4 * 100000 + (20000 + HOIST_10T) * (2 / 24), 3);
-    expect(heavy.group1.transverseMax).toBeLessThan(
-      craneActions(10, 24000).group1.transverseMax * 2,
-    );
+    expect(heavy.group1.transverseMax).toBeLessThan(craneActions(10, 24000).group1.transverseMax * 2);
     // Hook approach beyond the span is clamped: all load on one rail side, no negative reaction.
     expect(craneActions(10, 24000, { minHookApproach: 99 }).staticMin).toBeGreaterThan(0);
   });
-
   it('carries both crane load groups into the frame model and the base reactions', () => {
     const doc = hall({ crane: { capacity: 10, railHeight: 6000 } });
     const building = doc.building!;
     const loads = { deadLoad: 0.5, snowLoad: 0.8, windPressure: 0 };
-    const reactions = baseReactions(doc, building, building.levelOrder[0]!, loads).filter(
-      (reaction) => reaction.frame === 'frame 3',
-    );
+    const reactions = baseReactions(doc, building, building.levelOrder[0]!, loads).filter((reaction) => reaction.frame === 'frame 3');
     const vertical = (key: 'CL' | 'CR' | 'CL5' | 'CR5'): number =>
       reactions.reduce((sum, reaction) => sum + (reaction.cases[key]?.vertical ?? 0), 0);
     const horizontal = (key: 'CL' | 'CL5' | 'CR'): number =>
@@ -274,14 +226,10 @@ describe('load combinations', () => {
     expect(vertical('CR5')).toBeCloseTo(vertical('CL5'), -1);
     // Group 1 transverse HT = both rails in +x (CL) / −x (CR); skewing HS (group 5) is a couple.
     const actions = craneActions(10, 22610);
-    expect(horizontal('CL')).toBeCloseTo(
-      -(actions.group1.transverseMax + actions.group1.transverseMin),
-      -1,
-    );
+    expect(horizontal('CL')).toBeCloseTo(-(actions.group1.transverseMax + actions.group1.transverseMin), -1);
     expect(horizontal('CR')).toBeCloseTo(-horizontal('CL'), -1);
     expect(Math.abs(horizontal('CL5'))).toBeLessThan(Math.abs(horizontal('CL')));
   });
-
   it('flags sway-sensitive frames (αcr < 3) and amplifies their moments', () => {
     const data = check(hall({ rafterProfile: 'IPE300', columnProfile: 'HEA240' }));
     expect(data.alphaCritical).toBeLessThan(3);
@@ -289,41 +237,22 @@ describe('load combinations', () => {
     expect(Math.max(...stability.map((candidate) => candidate.utilisation))).toBeGreaterThan(1);
     expect(row(data, 'RF5', 'rafter').check).toMatch(/sway ×\d\.\d\d/);
   });
-
   it('caps αcr by rafter buckling where Horne does not apply (steep roofs)', () => {
     const steep = check(hall({ roofPitch: 30 }));
     const stability = steep.rows.find((candidate) => candidate.kind === 'stability')!;
     expect(stability.check).toMatch(/modified Horne 0\.8 αH \(1 − N\/Ncr\), roof slope > 26°/);
-    expect(check(hall()).rows.find((candidate) => candidate.kind === 'stability')!.check).toMatch(
-      /\(Horne;/,
-    );
+    expect(check(hall()).rows.find((candidate) => candidate.kind === 'stability')!.check).toMatch(/\(Horne;/);
   });
-
   it('reports frames that are mechanisms as unstable', () => {
     let doc = createEmptyDocument();
     for (const y of [0, 6000]) {
-      for (const [start, end] of [
-        [
-          [0, y, 6000],
-          [6000, y, 6500],
-        ],
-        [
-          [6000, y, 6500],
-          [12000, y, 6000],
-        ],
-      ]) {
-        doc = execute(doc, 'add_steel_member', {
-          profile: 'IPE300',
-          role: 'rafter',
-          start,
-          end,
-        }).document;
+      for (const [start, end] of [xyz(0, y, 6000, 6000, y, 6500), xyz(6000, y, 6500, 12000, y, 6000)]) {
+        doc = execute(doc, 'add_steel_member', { profile: 'IPE300', role: 'rafter', start, end }).document;
       }
     }
     const result = execute(doc, 'check_portal_frames', {});
     expect(result.summary).toMatch(/no analysable portal frame.*\(unstable\)/);
   });
-
   it('passes the crane model parameters and rejects invalid ones', () => {
     const doc = hall({ crane: { capacity: 10, railHeight: 6000 } });
     const base = check(doc, { windPressure: 0.8 });
@@ -352,15 +281,10 @@ describe('load combinations', () => {
       expect(result.summary).toMatch(/^check_portal_frames (failed|rejected): /);
     }
   });
-
   it('rejects negative wind or crane input', () => {
     const doc = hall();
-    expect(execute(doc, 'check_portal_frames', { windPressure: -1 }).summary).toMatch(
-      /must be >= 0/,
-    );
-    expect(execute(doc, 'design_portal_frames', { craneCapacity: -2 }).summary).toMatch(
-      /must be >= 0/,
-    );
+    expect(execute(doc, 'check_portal_frames', { windPressure: -1 }).summary).toMatch(/must be >= 0/);
+    expect(execute(doc, 'design_portal_frames', { craneCapacity: -2 }).summary).toMatch(/must be >= 0/);
   });
 });
 
@@ -381,18 +305,14 @@ describe('internal pressure (EN 1991-1-4 §7.2.9)', () => {
   it('loads the windward column harder with internal suction and lifts the roof more with pressure', () => {
     const doc = hall();
     const building = doc.building!;
-    const reactions = baseReactions(doc, building, building.levelOrder[0]!, {
-      deadLoad: 0.5,
-      snowLoad: 0.8,
-      windPressure: 1,
-    }).filter((reaction) => reaction.frame === 'frame 3');
+    const reactions = baseReactions(doc, building, building.levelOrder[0]!, { deadLoad: 0.5, snowLoad: 0.8, windPressure: 1 }).filter(
+      (reaction) => reaction.frame === 'frame 3',
+    );
     // Same net sway (cpi acts on both walls): equal total horizontal reaction.
-    const total = (key: 'WL' | 'WLs'): number =>
-      reactions.reduce((sum, reaction) => sum + reaction.cases[key]!.horizontal, 0);
+    const total = (key: 'WL' | 'WLs'): number => reactions.reduce((sum, reaction) => sum + reaction.cases[key]!.horizontal, 0);
     expect(total('WLs')).toBeCloseTo(total('WL'), 0);
     // Roof uplift (cpi − cpe over both slopes, 6°): windward H, leeward I/J average.
-    const uplift = (key: 'WL' | 'WLs'): number =>
-      reactions.reduce((sum, reaction) => sum + reaction.cases[key]!.vertical, 0);
+    const uplift = (key: 'WL' | 'WLs'): number => reactions.reduce((sum, reaction) => sum + reaction.cases[key]!.vertical, 0);
     const roof = windward + leeward;
     expect(uplift('WL') / uplift('WLs')).toBeCloseTo((0.4 - roof) / (-0.6 - roof), 3);
   });
@@ -402,16 +322,11 @@ describe('baseReactions', () => {
   it('balances the applied loads per case', () => {
     const doc = hall();
     const building = doc.building!;
-    const reactions = baseReactions(
-      doc,
-      building,
-      building.activeLevelId ?? building.levelOrder[0]!,
-      {
-        deadLoad: 0.5,
-        snowLoad: 0.8,
-        windPressure: 1,
-      },
-    );
+    const reactions = baseReactions(doc, building, building.activeLevelId ?? building.levelOrder[0]!, {
+      deadLoad: 0.5,
+      snowLoad: 0.8,
+      windPressure: 1,
+    });
     const frame = reactions.filter((reaction) => reaction.frame === 'frame 3');
     expect(frame).toHaveLength(2);
     // Snow 0.8 kN/m² × 6 m × 24 m on plan.
@@ -420,9 +335,7 @@ describe('baseReactions', () => {
     // Wind on both walls (0.8 + 0.5) × 1 kN/m² × 6 m × eaves height, resisted horizontally.
     const horizontal = frame.reduce((sum, reaction) => sum + reaction.cases.WL!.horizontal, 0);
     expect(horizontal / 1000).toBeCloseTo(-(0.8 + 0.5) * 6 * 7, 0);
-    expect(
-      frame.every((reaction) => reaction.cases.WL!.vertical < reaction.cases.G!.vertical),
-    ).toBe(true);
+    expect(frame.every((reaction) => reaction.cases.WL!.vertical < reaction.cases.G!.vertical)).toBe(true);
   });
 });
 
@@ -440,7 +353,6 @@ describe('multi-span roof wind (EN 1991-1-4 §7.2.7, Fig. 7.10 simplified)', () 
       .sort((a, b) => (frame.nodes[a.geometry.a]?.x ?? 0) - (frame.nodes[b.geometry.a]?.x ?? 0))
       .map((member) => member.loads[windCase]!.qy);
   };
-
   it('finds the valleys between roofs from the rafter low ends', () => {
     expect(
       valleyLines([
@@ -452,7 +364,6 @@ describe('multi-span roof wind (EN 1991-1-4 §7.2.7, Fig. 7.10 simplified)', () 
       ]),
     ).toEqual([20000]);
   });
-
   it('loads the downwind spans with 0.6x the suction of the windward span', () => {
     const doc = hall({ spans: [20000, 20000, 20000], span: undefined });
     const frame = frameOf(doc);
@@ -460,20 +371,9 @@ describe('multi-span roof wind (EN 1991-1-4 §7.2.7, Fig. 7.10 simplified)', () 
     const wind = uplifts(doc, 'WL');
     expect(wind).toHaveLength(6);
     // Windward span: slopes (cpi − H) and (cpi − I/J); downwind spans (spans 2, 3): the same × 0.6 on the suction.
-    const [windwardSlope, leewardSlope, downwindWindward, downwindLeeward] = wind as [
-      number,
-      number,
-      number,
-      number,
-    ];
-    expect(downwindWindward / windwardSlope).toBeCloseTo(
-      (0.2 - DOWNWIND_ROOF_FACTOR * windward) / (0.2 - windward),
-      6,
-    );
-    expect(downwindLeeward / leewardSlope).toBeCloseTo(
-      (0.2 - DOWNWIND_ROOF_FACTOR * leeward) / (0.2 - leeward),
-      6,
-    );
+    const [windwardSlope, leewardSlope, downwindWindward, downwindLeeward] = wind as [number, number, number, number];
+    expect(downwindWindward / windwardSlope).toBeCloseTo((0.2 - DOWNWIND_ROOF_FACTOR * windward) / (0.2 - windward), 6);
+    expect(downwindLeeward / leewardSlope).toBeCloseTo((0.2 - DOWNWIND_ROOF_FACTOR * leeward) / (0.2 - leeward), 6);
     expect(wind[4]).toBeCloseTo(downwindWindward, 9);
     expect(wind[5]).toBeCloseTo(downwindLeeward, 9);
     // Wind from the right mirrors it: the last span is windward.
@@ -484,18 +384,12 @@ describe('multi-span roof wind (EN 1991-1-4 §7.2.7, Fig. 7.10 simplified)', () 
     expect(mirrored[0]).toBeCloseTo(downwindLeeward, 9);
     // Internal suction cpi = −0.3.
     const suction = uplifts(doc, 'WLs');
-    expect(suction[2]! / suction[0]!).toBeCloseTo(
-      (-0.3 - DOWNWIND_ROOF_FACTOR * windward) / (-0.3 - windward),
-      6,
-    );
+    expect(suction[2]! / suction[0]!).toBeCloseTo((-0.3 - DOWNWIND_ROOF_FACTOR * windward) / (-0.3 - windward), 6);
   });
-
   it('puts wall pressure on the outer columns only', () => {
     const frame = frameOf(hall({ spans: [20000, 20000, 20000], span: undefined }));
     const columns = frame.members.filter((member) => member.role === 'column');
-    const xs = [...new Set(columns.map((member) => frame.nodes[member.geometry.a]?.x))].sort(
-      (a, b) => (a ?? 0) - (b ?? 0),
-    );
+    const xs = [...new Set(columns.map((member) => frame.nodes[member.geometry.a]?.x))].sort((a, b) => (a ?? 0) - (b ?? 0));
     expect(xs).toHaveLength(4);
     for (const column of columns) {
       const x = frame.nodes[column.geometry.a]?.x;
@@ -503,7 +397,6 @@ describe('multi-span roof wind (EN 1991-1-4 §7.2.7, Fig. 7.10 simplified)', () 
       expect(column.loads.WL !== undefined).toBe(outer);
     }
   });
-
   it('leaves a single span unreduced: windward slope H, leeward slope I/J, mirrored by the wind side', () => {
     const doc = hall();
     const wind = uplifts(doc, 'WL');
@@ -513,5 +406,174 @@ describe('multi-span roof wind (EN 1991-1-4 §7.2.7, Fig. 7.10 simplified)', () 
     expect(mirrored[1]).toBeCloseTo(wind[0]!, 9);
     expect(mirrored[0]).toBeCloseTo(wind[1]!, 9);
     expect(uplifts(doc, 'WLs')[0]! / wind[0]!).toBeCloseTo((-0.3 - windward) / (0.2 - windward), 6);
+  });
+});
+
+describe('design helpers', () => {
+  it('reads yield strengths, bolt resistances and the next section size', () => {
+    expect(yieldStrength('S275')).toBe(275);
+    expect(yieldStrength('steel')).toBe(355);
+    const m20 = boltResistance(20);
+    expect(m20.tension / 1000).toBeCloseTo(141.1, 1);
+    expect(m20.shear / 1000).toBeCloseTo(94.1, 1);
+    expect(boltResistance(23).tension).toBe(boltResistance(22).tension);
+    expect(nextProfile('IPE450')).toBe('IPE500');
+    expect(nextProfile('IPE600')).toMatch(/^HE[AB]/);
+    expect(nextProfile('NOPE')).toBeNull();
+  });
+});
+
+describe('check_portal_frames', () => {
+  it('analyses every frame and checks members and connections (read-only)', () => {
+    const doc = hall();
+    const snapshot = JSON.stringify(doc);
+    const result = execute(doc, 'check_portal_frames', {});
+    expect(JSON.stringify(doc)).toBe(snapshot);
+    expect(result.document).toBe(doc);
+    expect(result.summary).toMatch(
+      /^Checked 6 frame\(s\), \d+ check\(s\) over 2 ULS combination\(s\) \+ SLS \(G = 0\.5 kN\/m² \+ self-weight, S = 0\.8 kN\/m², no wind/,
+    );
+    const rows = (result.data as { rows: CheckRow[] }).rows;
+    // Internal frame (6 m bay): eaves moment ≈ 491 kNm, IPE450 rafter at ≈ 0.88.
+    const rafter = rows.find((row) => row.mark === 'RF3')!;
+    expect(rafter.moment).toBeGreaterThan(450);
+    expect(rafter.moment).toBeLessThan(530);
+    expect(rafter.utilisation).toBeGreaterThan(0.8);
+    expect(rafter.utilisation).toBeLessThan(0.95);
+    // End frames carry half the load.
+    const endRafter = rows.find((row) => row.mark === 'RF1')!;
+    expect(endRafter.moment).toBeLessThan(rafter.moment * 0.6);
+    // Default bolt groups are under-sized at the apex of internal frames.
+    expect(rows.some((row) => row.kind === 'connection' && row.utilisation > 1)).toBe(true);
+    expect((result.data as { csv: string }).csv.split('\n')[0]).toBe(
+      'Frame,Mark,Type,N (kN),M (kNm),V (kN),Utilisation,Status,Combination,Check',
+    );
+  });
+  it('scales with the loads and rejects bad input', () => {
+    const doc = hall();
+    const light = execute(doc, 'check_portal_frames', { deadLoad: 0.2, snowLoad: 0 });
+    const heavy = execute(doc, 'check_portal_frames', { deadLoad: 0.5, snowLoad: 2 });
+    const max = (result: ReturnType<typeof execute>): number => (result.data as { maxUtilisation: number }).maxUtilisation;
+    expect(max(heavy)).toBeGreaterThan(max(light));
+    expect(execute(doc, 'check_portal_frames', { snowLoad: -1 }).data).toBeUndefined();
+    expect(execute(doc, 'check_portal_frames', { levelId: 'nope' }).summary).toMatch(/no level/);
+    expect(execute(createEmptyDocument(), 'check_portal_frames', {}).summary).toMatch(/failed/);
+  });
+});
+
+describe('design_portal_frames', () => {
+  it('sizes the bolt groups so every element of the default hall passes', () => {
+    const before = hall();
+    const result = execute(before, 'design_portal_frames', {});
+    expect(result.summary).toMatch(/eaves connections: \d+ × M\d+; apex connections: \d+ × M\d+/);
+    expect(result.summary).toMatch(/Max utilisation now 0\.\d\d\./);
+    const check = execute(result.document, 'check_portal_frames', {});
+    expect(check.summary).toMatch(/all OK/);
+    expect(result.affected.length).toBeGreaterThan(0);
+  });
+  it('up-sizes undersized sections uniformly and refits the base plates', () => {
+    const doc = hall({ rafterProfile: 'IPE300', columnProfile: 'HEA240' });
+    const result = execute(doc, 'design_portal_frames', {});
+    expect(result.summary).toMatch(/rafters IPE300 → IPE330/);
+    expect(result.summary).toMatch(/columns HEA240 → HEA260/);
+    const rafters = Object.values(result.document.building!.elements).filter(
+      (element) => element.category === 'member' && element.role === 'rafter',
+    );
+    expect(new Set(rafters.map((rafter) => rafter.category === 'member' && rafter.profile)).size).toBe(1);
+    const check = (execute(result.document, 'check_portal_frames', {}).data as { maxUtilisation: number }).maxUtilisation;
+    expect(check).toBeLessThanOrEqual(0.95);
+  });
+  it('reports elements it cannot make pass and rejects bad input', () => {
+    const doc = hall({ spans: [30000, 30000], eaveHeight: 10000 });
+    const result = execute(doc, 'design_portal_frames', { snowLoad: 1.2 });
+    expect(result.summary).toMatch(/largest available size reached/);
+    expect(execute(doc, 'design_portal_frames', { targetUtilisation: 2 }).affected).toEqual([]);
+    expect(execute(doc, 'design_portal_frames', { levelId: 'nope' }).affected).toEqual([]);
+    expect(execute(createEmptyDocument(), 'design_portal_frames', {}).affected).toEqual([]);
+  });
+});
+
+describe('weld detailing', () => {
+  it('sizes full-strength fillet welds and reports them in the schedule and takeoff', () => {
+    const doc = hall();
+    const connection = Object.values(doc.building!.elements).find(
+      (element): element is MomentConnectionElement => element.category === 'connection' && element.kind === 'eaves',
+    )!;
+    // IPE450: tf 14.6 → a9, tw 9.4 → a6.
+    const welds = connectionWelds(doc, doc.building!, connection)!;
+    expect(welds).toMatchObject({ flangeThroat: 9, webThroat: 6 });
+    expect(welds.length).toBeGreaterThan(2000);
+    expect(welds.metal).toBeGreaterThan(0.5);
+    const schedule = execute(doc, 'building_schedule', { kind: 'connection' }).data as { rows: unknown[][] };
+    expect(schedule.rows[0]?.[9]).toMatch(/^a9 flanges \/ a6 web · \d+\.\d m$/);
+    const lines = (execute(doc, 'quantity_takeoff', {}).data as { lines: TakeoffLine[] }).lines;
+    expect(lines.find((line) => line.key === 'connection.weld.m')?.quantity).toBeGreaterThan(10);
+    expect(lines.find((line) => line.key === 'connection.weld metal.kg')?.quantity).toBeGreaterThan(5);
+  });
+});
+
+describe('structural review regressions', () => {
+  it('gives mirror-image eaves the same (hogging) moment sign', () => {
+    const rows = (execute(hall(), 'check_portal_frames', {}).data as { rows: CheckRow[] }).rows;
+    const eaves = rows.filter((row) => row.kind === 'connection' && row.frame === 'frame 2' && row.check.startsWith('eaves'));
+    expect(eaves).toHaveLength(2);
+    expect(eaves.every((row) => row.forces!.every((force) => force.moment < 0))).toBe(true);
+    // Left eaves under the → imperfection mirrors the right eaves under ←.
+    expect(eaves[0]!.forces![0]!.moment / eaves[1]!.forces![1]!.moment).toBeCloseTo(1, 2);
+    const apex = rows.filter((row) => row.kind === 'connection' && row.frame === 'frame 2' && row.check.startsWith('apex'));
+    expect(apex.every((row) => row.forces!.every((force) => force.moment > 0))).toBe(true);
+  });
+  it('re-seats purlins, rails and gable posts and keeps gable posts unchanged', () => {
+    const doc = hall({ rafterProfile: 'IPE300', columnProfile: 'HEA240', gablePostProfile: 'HEA240' });
+    const result = execute(doc, 'design_portal_frames', {});
+    expect(result.summary).toMatch(/gable posts are not analysed/);
+    expect(result.summary).toMatch(/Frames only/);
+    const members = (d: CadDocument): SteelMemberElement[] =>
+      Object.values(d.building!.elements).flatMap((e) => (e.category === 'member' ? [e] : []));
+    const before = new Map(members(doc).map((m) => [m.id, m]));
+    const after = members(result.document);
+    const gablePosts = after.filter((m) => m.role === 'column' && m.start[0] !== 0 && m.start[0] !== 24000);
+    expect(gablePosts.length).toBeGreaterThan(0);
+    expect(gablePosts.every((m) => m.profile === 'HEA240')).toBe(true);
+    // Gable post tops drop by half the rafter depth increase (on the slope).
+    const post = gablePosts[0]!;
+    expect(Math.max(post.start[2], post.end[2])).toBeLessThan(Math.max(before.get(post.id)!.start[2], before.get(post.id)!.end[2]));
+    // Purlins move up with the deeper rafter; rails move out with the deeper column.
+    const purlin = after.find((m) => m.role === 'purlin')!;
+    expect(purlin.start[2]).toBeGreaterThan(before.get(purlin.id)!.start[2]);
+    const rail = after.find((m) => m.role === 'rail' && m.start[0] < 0)!;
+    expect(rail.start[0]).toBeLessThan(before.get(rail.id)!.start[0]);
+  });
+  it('skips single-frame halls and keeps tributary widths per hall', () => {
+    const single = execute(createEmptyDocument(), 'add_steel_member', {
+      profile: 'IPE400',
+      role: 'rafter',
+      start: [0, 0, 6000],
+      end: [6000, 0, 6600],
+    }).document;
+    expect(execute(single, 'check_portal_frames', {}).summary).toMatch(/single frame: no tributary width/);
+    let two = hall();
+    two = execute(two, 'add_portal_frame_building', { origin: [40000, 0], span: 24000, length: 30000, baySpacing: 5000 }).document;
+    const rows = (execute(two, 'check_portal_frames', {}).data as { rows: CheckRow[] }).rows;
+    const internal = (mark: string): number => rows.find((row) => row.mark === mark)!.moment;
+    // First hall: 6 m bays; second hall: 5 m bays → smaller internal-frame moments.
+    expect(internal('RF3')).toBeGreaterThan(internal('RF15') * 1.1);
+  });
+  it('returns the unchanged document when nothing needs designing', () => {
+    const designed = execute(hall(), 'design_portal_frames', {}).document;
+    const again = execute(designed, 'design_portal_frames', {});
+    expectNoOp(again, designed);
+    expect(again.summary).toMatch(/no change needed/);
+  });
+  it('sizes weld throats by steel grade', async () => {
+    const { fullStrengthFactor } = await import('@aec/industrial/connections/connections');
+    expect(fullStrengthFactor(235)).toBeCloseTo(0.46, 2);
+    expect(fullStrengthFactor(355)).toBeCloseTo(0.58, 2);
+    expect(fullStrengthFactor(460)).toBeCloseTo(0.75, 2);
+  });
+  it('labels every connection schedule column', () => {
+    const data = execute(hall(), 'building_schedule', { kind: 'connection' }).data as { columns: string[]; rows: unknown[][] };
+    expect(data.columns).toHaveLength(data.rows[0]!.length);
+    expect(data.columns.at(-1)).toBe('Welds');
   });
 });

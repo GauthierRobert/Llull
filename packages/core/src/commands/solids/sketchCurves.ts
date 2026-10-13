@@ -1,7 +1,6 @@
 /**
- * @layer core/commands
- * 2D sketch entities → exact curve chains: one closed loop for profiles (extrude / revolve /
- * sweep sections) or an open 3D path for sweeps. Pure helpers, no document mutation.
+ * 2D sketch entities → exact curve chains: one closed loop for profiles (extrude / revolve / sweep sections) or an open 3D path for sweeps.
+ * Pure helpers, no document mutation.
  */
 
 import type { CurveSegment } from '../../model/curve';
@@ -10,14 +9,7 @@ import { inverseEulerXYZ } from '../../lib/eulerRotation';
 import { distance3, sub3 } from '../../lib/vec3';
 import { positiveSweep } from '../../lib/angle';
 import { polar } from '../../lib/arc';
-import {
-  JOINT_TOLERANCE,
-  catmullRomBeziers,
-  chainIssue,
-  mapSegment,
-  reverseChain,
-  sampleProfile,
-} from '../../geometry/curveSegments';
+import { JOINT_TOLERANCE, catmullRomBeziers, chainIssue, mapSegment, reverseChain, sampleProfile } from '../../geometry/curveSegments';
 import { MAX_PROFILE_POINTS } from '../limits';
 import { planeToWorld } from '../../geometry/workPlane';
 
@@ -60,28 +52,15 @@ function ellipseCurves(center: Vec2, rx: number, ry: number): CurveSegment<Vec2>
  * Exact curves of one 2D entity in its local plane, and whether they already close.
  * @failure kinds without a curve (point, text, dimension, solids) -> null
  */
-export function entityCurves(
-  entity: Entity,
-): { curves: CurveSegment<Vec2>[]; closed: boolean } | null {
+export function entityCurves(entity: Entity): { curves: CurveSegment<Vec2>[]; closed: boolean } | null {
   switch (entity.kind) {
     case 'line':
       return { curves: [line(entity.start, entity.end)], closed: false };
     case 'arc': {
       const sweep = positiveSweep(entity.endAngle - entity.startAngle);
       const { center, radius, startAngle } = entity;
-      return {
-        curves: [
-          {
-            type: 'arc',
-            points: [
-              polar(center, radius, startAngle),
-              polar(center, radius, startAngle + sweep / 2),
-              polar(center, radius, startAngle + sweep),
-            ],
-          },
-        ],
-        closed: false,
-      };
+      const at = (t: number): Vec2 => polar(center, radius, startAngle + sweep * t);
+      return { curves: [{ type: 'arc', points: [at(0), at(0.5), at(1)] }], closed: false };
     }
     case 'circle': {
       const { center, radius } = entity;
@@ -108,9 +87,9 @@ export function entityCurves(
     case 'polyline': {
       const pts = entity.points;
       const count = entity.closed ? pts.length : pts.length - 1;
-      const curves = Array.from({ length: Math.max(0, count) }, (_, i) =>
-        line(pts[i] as Vec2, pts[(i + 1) % pts.length] as Vec2),
-      ).filter(({ points: [a, b] }) => Math.hypot(b[0] - a[0], b[1] - a[1]) > JOINT_TOLERANCE);
+      const curves = Array.from({ length: Math.max(0, count) }, (_, i) => line(pts[i] as Vec2, pts[(i + 1) % pts.length] as Vec2)).filter(
+        ({ points: [a, b] }) => Math.hypot(b[0] - a[0], b[1] - a[1]) > JOINT_TOLERANCE,
+      );
       return { curves, closed: entity.closed };
     }
     case 'spline':
@@ -122,10 +101,7 @@ export function entityCurves(
   }
 }
 
-const unrotate = inverseEulerXYZ;
-
-const firstPoint = (chain: ReadonlyArray<CurveSegment<Vec2>>): Vec2 | undefined =>
-  chain[0]?.points[0];
+const firstPoint = (chain: ReadonlyArray<CurveSegment<Vec2>>): Vec2 | undefined => chain[0]?.points[0];
 const lastPoint = (chain: ReadonlyArray<CurveSegment<Vec2>>): Vec2 | undefined => {
   const last = chain[chain.length - 1];
   return last?.points[last.points.length - 1];
@@ -153,9 +129,7 @@ function joinPieces(pieces: CurveSegment<Vec2>[][]): CurveSegment<Vec2>[] | null
   const remaining = [...rest];
   while (remaining.length > 0) {
     const tail = lastPoint(chain);
-    const index = remaining.findIndex(
-      (piece) => near(firstPoint(piece), tail) || near(lastPoint(piece), tail),
-    );
+    const index = remaining.findIndex((piece) => near(firstPoint(piece), tail) || near(lastPoint(piece), tail));
     if (index < 0) return null;
     const [piece] = remaining.splice(index, 1) as [CurveSegment<Vec2>[]];
     const oriented = near(firstPoint(piece), tail) ? piece : reverseChain(piece);
@@ -163,21 +137,19 @@ function joinPieces(pieces: CurveSegment<Vec2>[][]): CurveSegment<Vec2>[] | null
   }
   const head = firstPoint(chain);
   const last = chain[chain.length - 1];
-  if (head !== undefined && last !== undefined && near(lastPoint(chain), head))
-    chain[chain.length - 1] = snapEnd(last, head);
+  if (head !== undefined && last !== undefined && near(lastPoint(chain), head)) chain[chain.length - 1] = snapEnd(last, head);
   return chain;
 }
 
 /**
- * Closed loop from coplanar 2D entities (one closed shape, or open pieces that join end to end).
- * Coordinates are in the first entity's plane, relative to its position.
+ * Closed loop from coplanar 2D entities (one closed shape, or open pieces that join end to end). Coordinates are in the first entity's
+ * plane, relative to its position.
  * @failure missing / non-curve entity, different planes, gaps, not closed, too many points -> message
  */
 export function sketchLoop(doc: CadDocument, ids: readonly string[]): SketchLoop | string {
   const entities = ids.map((id) => doc.entities[id]);
   const first = entities[0];
-  if (first === undefined)
-    return ids.length === 0 ? 'no profile ids given' : `no entity "${ids[0]}"`;
+  if (first === undefined) return ids.length === 0 ? 'no profile ids given' : `no entity "${ids[0]}"`;
   const pieces: CurveSegment<Vec2>[][] = [];
   for (let i = 0; i < entities.length; i++) {
     const entity = entities[i];
@@ -186,7 +158,7 @@ export function sketchLoop(doc: CadDocument, ids: readonly string[]): SketchLoop
     if (own === null) return `entity "${entity.id}" (kind="${entity.kind}") is not a 2D curve`;
     if (entity.rotation.some((angle, k) => Math.abs(angle - (first.rotation[k] ?? 0)) > 1e-9))
       return `entity "${entity.id}" is not in the same work plane as "${first.id}" (different rotation)`;
-    const [dx, dy, dz] = unrotate(sub3(entity.position, first.position), first.rotation);
+    const [dx, dy, dz] = inverseEulerXYZ(sub3(entity.position, first.position), first.rotation);
     if (Math.abs(dz) > JOINT_TOLERANCE)
       return `entity "${entity.id}" is not in the same work plane as "${first.id}" (offset ${dz.toFixed(4)} off the plane)`;
     pieces.push(own.curves.map((s) => mapSegment(s, ([x, y]): Vec2 => [x + dx, y + dy])));
@@ -194,20 +166,13 @@ export function sketchLoop(doc: CadDocument, ids: readonly string[]): SketchLoop
   const curves = joinPieces(pieces);
   if (curves === null) return 'the entities do not join end to end into one chain';
   const issue = chainIssue(curves, true);
-  if (issue !== null)
-    return /zero length|collinear/.test(issue) ? `profile encloses no area (${issue})` : issue;
+  if (issue !== null) return /zero length|collinear/.test(issue) ? `profile encloses no area (${issue})` : issue;
   const profile = sampleProfile(curves);
   if (profile.length < 3) return 'the loop has fewer than 3 distinct points';
   if (profile.length > MAX_PROFILE_POINTS)
     return `the loop tessellates to ${profile.length} points, exceeding MAX_PROFILE_POINTS (${MAX_PROFILE_POINTS})`;
-  const [ox, oy] = unrotate(first.position, first.rotation);
-  return {
-    curves,
-    profile,
-    origin: first.position,
-    rotation: first.rotation,
-    planeOffset: [ox, oy],
-  };
+  const [ox, oy] = inverseEulerXYZ(first.position, first.rotation);
+  return { curves, profile, origin: first.position, rotation: first.rotation, planeOffset: [ox, oy] };
 }
 
 /**

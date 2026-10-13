@@ -7,9 +7,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 async function controlledPage(page: Page): Promise<void> {
   await page.goto('/');
-  await page.waitForFunction(
-    async () => (await navigator.serviceWorker.getRegistration())?.active?.state === 'activated',
-  );
+  await page.waitForFunction(async () => (await navigator.serviceWorker.getRegistration())?.active?.state === 'activated');
   await page.reload();
   await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
 }
@@ -28,17 +26,14 @@ test.describe('service worker', () => {
     expect(entries).toContain('/index.html');
     expect(entries.some((path) => /^\/assets\/index-.+\.js$/.test(path))).toBe(true);
     expect(entries.some((path) => /occt|opencascade|\.wasm$/.test(path))).toBe(false);
-
     await context.setOffline(true);
     await page.reload();
     await expect(page.getByRole('main', { name: 'Viewport' })).toBeVisible();
   });
-
   test('a newer build waits for Reload, then replaces the old cache', async ({ page }) => {
     await controlledPage(page);
     const [before] = await cacheNames(page);
     await expect(page.locator('.update-banner')).toHaveCount(0);
-
     // The next deploy: the server now hands out a re-versioned sw.js.
     await page.request.post('/__test/next-build');
     await page.evaluate(async () => {
@@ -47,11 +42,7 @@ test.describe('service worker', () => {
     await expect(page.locator('.update-banner')).toContainText('A new version of llull is ready');
     // Installed but waiting: its cache is filled, the old build's cache still serves the page.
     expect((await cacheNames(page)).sort()).toEqual([before, `${before ?? ''}-next`].sort());
-
-    await Promise.all([
-      page.waitForEvent('framenavigated'),
-      page.getByRole('button', { name: 'Reload' }).click(),
-    ]);
+    await Promise.all([page.waitForEvent('framenavigated'), page.getByRole('button', { name: 'Reload' }).click()]);
     await expect(page.getByRole('main', { name: 'Viewport' })).toBeVisible();
     await expect.poll(() => cacheNames(page)).toEqual([`${before ?? ''}-next`]);
     await expect(page.locator('.update-banner')).toHaveCount(0);

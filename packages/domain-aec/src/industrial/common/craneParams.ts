@@ -1,8 +1,4 @@
-/**
- * Crane parameters shared by the runway, bracing and portal-frame checks: schema fields and validation.
- * @layer domain-aec
- * @pure
- */
+/** Crane parameters shared by the runway, bracing and portal-frame checks: schema fields and validation. */
 
 import { z } from '@core/commands/schema';
 import { isNonNegativeNumber } from '@lib/isFiniteNumber';
@@ -16,24 +12,17 @@ export const hoistingClassField = z
       'HC2 1.10 + 0.34 vh, HC3 1.15 + 0.51 vh, HC4 1.20 + 0.68 vh). Default HC2.',
   );
 
-export const hoistingSpeedField = z
-  .number()
-  .optional()
-  .describe('Hoisting speed vh in m/s (>= 0) for φ2. Default 0.1.');
+export const hoistingSpeedField = z.number().optional().describe('Hoisting speed vh in m/s (>= 0) for φ2. Default 0.1.');
 
 export const craneSelfWeightField = z
   .number()
   .optional()
-  .describe(
-    'Crane self-weight Gc in kN (> 0, bridge + trolley; trolley = 0.2 Gc). Default 0.5 Q + 20 kN.',
-  );
+  .describe('Crane self-weight Gc in kN (> 0, bridge + trolley; trolley = 0.2 Gc). Default 0.5 Q + 20 kN.');
 
 export const minHookApproachField = z
   .number()
   .optional()
-  .describe(
-    'Minimum approach of the hook to a rail in m (>= 0): the trolley position that maximises the wheel load. Default 1.0.',
-  );
+  .describe('Minimum approach of the hook to a rail in m (>= 0): the trolley position that maximises the wheel load. Default 1.0.');
 
 export const wheelBaseField = z
   .number()
@@ -45,16 +34,12 @@ export const wheelBaseField = z
 export const travelSpeedField = z
   .number()
   .optional()
-  .describe(
-    'Crane long travel speed in m/s (> 0) for the buffer force HB,1 (v1 = 0.7 × travelSpeed). Default 0.63 (about 38 m/min).',
-  );
+  .describe('Crane long travel speed in m/s (> 0) for the buffer force HB,1 (v1 = 0.7 × travelSpeed). Default 0.63 (about 38 m/min).');
 
 export const bufferStiffnessField = z
   .number()
   .optional()
-  .describe(
-    'Buffer spring constant SB in kN/m (> 0) for HB,1 = φ7 v1 √(mc SB). Default 1000 kN/m.',
-  );
+  .describe('Buffer spring constant SB in kN/m (> 0) for HB,1 = φ7 v1 √(mc SB). Default 1000 kN/m.');
 
 type CraneValues = Partial<
   Record<

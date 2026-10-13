@@ -1,8 +1,4 @@
-/**
- * @layer ui/panels/civil
- *
- * Live civil report hook over the local read-only queries (`@ui/services/localQuery`).
- */
+/** Live civil report hook over the local read-only queries (`@ui/services/localQuery`). */
 
 import { useMemo } from 'react';
 import { useStore } from '@ui/store';

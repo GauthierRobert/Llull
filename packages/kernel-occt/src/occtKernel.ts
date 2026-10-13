@@ -1,18 +1,10 @@
 /**
- * OpenCascade.js (OCC WASM) geometry kernel, opt-in via `?kernel=occt` / `LLULL_KERNEL=occt`
- * (Manifold is the default). Measurements and API notes: docs/decisions/KI4-occt-spike.md.
- *
- * The kernel boundary is the exact shape: recipes evaluate to TopoDS_Shapes cached by recipe key
- * (`kernelFromOps`); booleans, fillets, chamfers and shells run on those B-reps (true edges and faces,
- * never re-sewn triangles); meshes only come out for display; STEP is written from the B-rep.
- *
- * @layer kernel
+ * OpenCascade.js kernel (opt-in `?kernel=occt` / `LLULL_KERNEL=occt`; notes: docs/decisions/KI4-occt-spike.md).
+ * Recipes evaluate to TopoDS_Shapes; booleans/fillets/chamfers/shells run on the B-rep; meshes only come out.
  * @invariant exact for every solid kind but `mesh` without `brep` and `pyramid` (sewn planar triangles)
  * @failure unsupported kind / non-manifold mesh / OCC refusal or failure -> null
  */
-
-import type { BooleanOp, ShapeRecipe } from '@core/model/types';
-import type { Vec3 } from '@core/model/types';
+import type { BooleanOp, ShapeRecipe, Vec3 } from '@core/model/types';
 import { kernelFromOps, type CachingKernel, type KernelOps } from '@core/geometry/shapeKernel';
 import { errorMessage } from '@lib/errorMessage';
 import { clearTangentContact } from './tangentGuard';
@@ -34,13 +26,11 @@ import {
   type OccShape,
 } from './occtTypes';
 
-/** Injected loader inputs: core never fetches; the caller supplies WASM bytes or a locator. */
+/** Injected loader inputs (core never fetches): Node passes `wasmBinary`, the browser `locateFile`. */
 interface OcctKernelOptions {
-  /** Pre-loaded WASM bytes (Node). */
   readonly wasmBinary?: ArrayBuffer | Uint8Array;
-  /** Maps an asset path to a URL/path (browser). */
   readonly locateFile?: (path: string) => string;
-  /** Emscripten factory of the OCC glue; defaults to `opencascade.js/dist/opencascade.wasm.js`. */
+  /** Defaults to `opencascade.js/dist/opencascade.wasm.js`. */
   readonly factory?: OcctFactory;
 }
 
@@ -48,30 +38,15 @@ export type OcctFactory = (moduleOptions: Record<string, unknown>) => Promise<Oc
 
 let _modulePromise: Promise<OccApi> | null = null;
 
-/**
- * Load and initialise the OpenCascade.js WASM module once, then cache.
- * Returns the OCC API object. Throws if the WASM cannot be loaded.
- *
- * Note: In a browser, the 63 MB WASM must be served as a static asset.
- * In Vite, add the WASM file to `publicDir` or use `vite-plugin-wasm`.
- * In Node.js (server/tests), pass the WASM as `wasmBinary` — see
- * server/src/occtNode.ts for the pattern.
- */
-async function getOccModule(options: OcctKernelOptions): Promise<OccApi> {
-  if (_modulePromise) return _modulePromise;
-
-  _modulePromise = (async () => {
-    const factory: OcctFactory =
-      options.factory ?? (await import('opencascade.js/dist/opencascade.wasm.js')).default;
-
-    const opts: Record<string, unknown> = {};
+/** Load the OCC WASM module once (cached; throws if it cannot load). Node: see server/src/occtNode.ts. */
+function getOccModule(options: OcctKernelOptions): Promise<OccApi> {
+  _modulePromise ??= (async () => {
+    const factory: OcctFactory = options.factory ?? (await import('opencascade.js/dist/opencascade.wasm.js')).default;
+    const opts: Record<string, unknown> = { print: () => undefined }; // silence STEP transfer statistics
     if (options.wasmBinary) opts['wasmBinary'] = options.wasmBinary;
     if (options.locateFile) opts['locateFile'] = options.locateFile;
-    opts['print'] = () => undefined; // OCC's stdout chatter (STEP transfer statistics)
-
     return factory(opts);
   })();
-
   return _modulePromise;
 }
 
@@ -81,60 +56,41 @@ const BOOLEAN_BUILDERS: Readonly<Record<BooleanOp, string>> = {
   intersect: 'BRepAlgoAPI_Common_3',
 };
 
-/**
- * Whether `error` (thrown by an OCC call) means the WASM module itself is degraded, as opposed to
- * OCC gracefully refusing the input. This build has no C++ exception support, so ANY thrown C++
- * exception (StdFail_NotDone, e.g. a fillet radius that is too large) surfaces as a JS
- * `ReferenceError` for a missing `___cxa_*` import; those are graceful refusals for fillet/chamfer/
- * shell. Booleans on near-tangent input are different: the same `___cxa_*` failure there (while
- * building, or later while meshing / exploring / writing the suspect result) leaves the module
- * returning spurious nulls (cone apex on a face), so it counts. A WASM trap
- * (`WebAssembly.RuntimeError`) or a thrown non-Error always counts; other JS Errors are
- * binding/programming faults that do not touch module state.
- */
 /** `WebAssembly.RuntimeError` (a trap), read from the global: not every TS lib declares the value. */
-const TrapError = (globalThis as { WebAssembly?: { RuntimeError?: new () => Error } }).WebAssembly
-  ?.RuntimeError;
+const TrapError = (globalThis as { WebAssembly?: { RuntimeError?: new () => Error } }).WebAssembly?.RuntimeError;
 
+/**
+ * Whether an OCC throw degraded the WASM module (vs a graceful refusal). This build has no C++ exception
+ * support: any C++ exception surfaces as a `ReferenceError` for a missing `___cxa_*` import — a graceful
+ * refusal for fillet/chamfer/shell, but degrading for 'fragile' ops (booleans on near-tangent input then
+ * return spurious nulls). A WASM trap or non-Error throw always degrades; other JS Errors are binding faults.
+ */
 function degradesModule(error: unknown, operation: OperationClass): boolean {
   if (!(error instanceof Error)) return true;
   if (TrapError !== undefined && error instanceof TrapError) return true; // a WASM trap
-  return (
-    operation === 'fragile' && error instanceof ReferenceError && /___cxa_/.test(error.message)
-  );
+  return operation === 'fragile' && error instanceof ReferenceError && /___cxa_/.test(error.message);
 }
 
 /** 'refusal': a C++ exception is a graceful no; 'fragile': it may have degraded the module. */
 type OperationClass = 'fragile' | 'refusal';
 
 /** Run `body`, mapping any OCC exception to null and releasing every handle it registered. */
-function guarded<T>(
-  operation: OperationClass,
-  body: (own: <H extends OccHandle | null>(handle: H) => H) => T | null,
-): T | null {
+function guarded<T>(operation: OperationClass, body: (own: <H extends OccHandle | null>(handle: H) => H) => T | null): T | null {
   return withOwned(body, (error) => {
     if (degradesModule(error, operation)) nativeFailures++;
-    if (error instanceof Error)
-      console.warn(`[occtKernel] OCC operation failed: ${errorMessage(error)}`);
+    if (error instanceof Error) console.warn(`[occtKernel] OCC operation failed: ${errorMessage(error)}`);
   });
 }
 
 let nativeFailures = 0;
 
-/**
- * Operations that left the WASM module degraded since load (a trap, a non-Error throw, or a boolean
- * that died in a C++ exception). After one, later booleans on the same module can fail spuriously,
- * so a host that can restart the module (the worker-thread kernel) should do so when this count
- * grows. Graceful refusals (fillet radius too large, boolean `IsDone() == false`) are not counted.
- */
+/** Operations that degraded the module since load; a host that can restart it (worker kernel) should when this grows. */
 export function nativeFailureCount(): number {
   return nativeFailures;
 }
 
 /**
- * Fillet or chamfer the selected unique edges of an exact solid (both builders share
- * `Add_2(size, edge)`; a fillet with `sizeEnd` uses `Add_3(size, sizeEnd, edge)`, a radius varying
- * linearly along the edge); the input shape is left untouched.
+ * Fillet/chamfer the selected unique edges (all when empty); `sizeEnd` = radius varying linearly along the edge.
  * @failure size <= 0, a selected index out of range, no edge, builder not done -> null
  */
 function roundEdges(
@@ -158,7 +114,7 @@ function roundEdges(
         if (sizeEnd === undefined) maker.Add_2(size, edge);
         else maker.Add_3(size, sizeEnd, edge);
       } catch {
-        // Degenerate or seam edge: skip.
+        /* degenerate or seam edge */
       }
     }
     maker.Build();
@@ -166,17 +122,8 @@ function roundEdges(
   });
 }
 
-/**
- * `shape` when BRepCheck finds it valid, else null. OCC fillets/chamfers can report done yet
- * return a broken solid (a negative-area face, a self-intersecting blend where a fillet meets a
- * tangent cylinder): its tessellation has holes and every later boolean on it can hang, so it is
- * refused like any other failed fillet.
- */
-function validOrNull(
-  api: OccApi,
-  shape: OccShape,
-  own: <H extends OccHandle | null>(handle: H) => H,
-): OccShape | null {
+/** `shape` when BRepCheck finds it valid: OCC fillets can report done yet return a broken solid on which later booleans hang. */
+function validOrNull(api: OccApi, shape: OccShape, own: <H extends OccHandle | null>(handle: H) => H): OccShape | null {
   const check = own(new api.BRepCheck_Analyzer(shape, true) as OccValidity);
   return check.IsValid_2() ? shape : null;
 }
@@ -197,11 +144,8 @@ function filletAll(
 }
 
 /**
- * One-piece union of `shapes` (a single multi-argument BRepAlgoAPI_Fuse) whose section edges — the
- * new joint curves where the solids meet — are filleted by `radius`.
- * Buried intersection curves (inside the union) are dropped. The fillet tries all joints at once (rational, then polynomial sections), then one joint at a
- * time; it never returns a partly blended solid. Disjoint solids have no joints: their plain union
- * is returned.
+ * One multi-argument fuse of `shapes` whose boundary section edges (joints) are filleted by `radius`;
+ * buried intersection curves are dropped; disjoint solids return their plain union.
  * @failure fuse not done, every fillet strategy refused -> null
  */
 function blendedUnion(api: OccApi, shapes: readonly OccShape[], radius: number): OccShape | null {
@@ -220,7 +164,6 @@ function blendedUnion(api: OccApi, shapes: readonly OccShape[], radius: number):
     const fused = fuse.Shape();
     const list = own(new api.TopTools_ListOfShape_1() as OccShapeList);
     list.Assign(fuse.SectionEdges());
-    // Section edges include intersection curves buried inside the union; only boundary edges blend.
     const boundary = uniqueSubShapes(api, fused, 'TopAbs_EDGE').map(own);
     const joints: OccShape[] = [];
     while (list.Size() > 0) {
@@ -234,21 +177,10 @@ function blendedUnion(api: OccApi, shapes: readonly OccShape[], radius: number):
   });
 }
 
-/**
- * `shape` with coplanar / co-cylindrical faces and collinear edges merged
- * (ShapeUpgrade_UnifySameDomain), the clean-up every CAD kernel runs after a boolean: without it a
- * union leaves the seam between two fused boxes as a split face, so one visible edge is two B-rep
- * edges and a fillet on it rounds only half. Falls back to `shape` when unification fails.
- */
-function unified(
-  api: OccApi,
-  shape: OccShape,
-  own: <H extends OccHandle | null>(handle: H) => H,
-): OccShape {
+/** Post-boolean ShapeUpgrade_UnifySameDomain (else a fused seam splits an edge and a fillet rounds half); `shape` on failure. */
+function unified(api: OccApi, shape: OccShape, own: <H extends OccHandle | null>(handle: H) => H): OccShape {
   try {
-    const unifier = own(
-      new api.ShapeUpgrade_UnifySameDomain_2(shape, true, true, false) as OccUnifier,
-    );
+    const unifier = own(new api.ShapeUpgrade_UnifySameDomain_2(shape, true, true, false) as OccUnifier);
     unifier.AllowInternalEdges(false);
     unifier.Build();
     return unifier.Shape();
@@ -275,7 +207,6 @@ function hollow(api: OccApi, solid: OccShape, thickness: number): OccShape | nul
     return offset.IsDone() ? offset.Shape() : null;
   });
   if (cavity === null) return null;
-  // The cut is a boolean: a native failure there may degrade the module (see degradesModule).
   return guarded('fragile', (own) => {
     own(cavity);
     const cut = own(new api.BRepAlgoAPI_Cut_3(solid, cavity) as OccBuilder);
@@ -284,12 +215,7 @@ function hollow(api: OccApi, solid: OccShape, thickness: number): OccShape | nul
   });
 }
 
-/** Copy of `shape` under a transform built by `makeTransform` (released afterwards). */
-function transformed(
-  api: OccApi,
-  shape: OccShape,
-  makeTransform: () => OccHandle,
-): OccShape | null {
+function transformed(api: OccApi, shape: OccShape, makeTransform: () => OccHandle): OccShape | null {
   return guarded('refusal', (own) => transformedCopy(api, shape, own(makeTransform())));
 }
 
@@ -297,13 +223,9 @@ function transformed(
 function untangle(a: ShapeRecipe, b: ShapeRecipe): [ShapeRecipe, ShapeRecipe] {
   if (a.op !== 'solid' || b.op !== 'solid') return [a, b];
   const [entityA, entityB] = clearTangentContact(a.entity, b.entity);
-  return [
-    entityA === a.entity ? a : { op: 'solid', entity: entityA },
-    entityB === b.entity ? b : { op: 'solid', entity: entityB },
-  ];
+  return [entityA === a.entity ? a : { op: 'solid', entity: entityA }, entityB === b.entity ? b : { op: 'solid', entity: entityB }];
 }
 
-/** Native OCC operations behind the recipe evaluator. */
 export function occtOps(api: OccApi): KernelOps<OccShape> {
   return {
     failureEpoch: nativeFailureCount,
@@ -324,11 +246,9 @@ export function occtOps(api: OccApi): KernelOps<OccShape> {
         radiusEnd,
       ),
     blend: (shapes, radius) => blendedUnion(api, shapes, radius),
-    chamfer: (shape, edges, distance) =>
-      roundEdges(api, shape, edges, distance, (solid) => new api.BRepFilletAPI_MakeChamfer(solid)),
+    chamfer: (shape, edges, distance) => roundEdges(api, shape, edges, distance, (solid) => new api.BRepFilletAPI_MakeChamfer(solid)),
     shell: (shape, thickness) => hollow(api, shape, thickness),
-    place: (shape, position: Vec3, rotation: Vec3) =>
-      transformed(api, shape, () => placementTransform(api, rotation, position)),
+    place: (shape, position: Vec3, rotation: Vec3) => transformed(api, shape, () => placementTransform(api, rotation, position)),
     scale: (shape, factor) =>
       factor > 0
         ? transformed(api, shape, () => {
@@ -346,10 +266,6 @@ export function occtOps(api: OccApi): KernelOps<OccShape> {
   };
 }
 
-/**
- * Create an OCC-backed geometry kernel.
- * @param options injected `wasmBinary` / `locateFile` (see OcctKernelOptions)
- */
 export async function createOcctKernel(options: OcctKernelOptions = {}): Promise<CachingKernel> {
   const api = await getOccModule(options);
   return kernelFromOps(occtOps(api));

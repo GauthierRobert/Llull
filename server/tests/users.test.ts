@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Named users and roles: 401 unknown token, 403 insufficient role, viewer read-only (REST + MCP),
  * editor commands, admin endpoints, token hashing, license seat refusal, live event attribution.
  */
@@ -8,15 +7,7 @@ import request from 'supertest';
 import fs from 'fs';
 import { app } from '../src/index';
 import { authenticateToken, loadUsers } from '../src/users';
-import {
-  ADMIN,
-  EDITOR,
-  VIEWER,
-  bearer,
-  installUsersFile,
-  sha256,
-  withUserFixture,
-} from './userTestSupport';
+import { ADMIN, EDITOR, VIEWER, bearer, installUsersFile, sha256, withUserFixture } from './userTestSupport';
 import { subscribeLive } from '../src/liveDocument';
 import type { Response } from 'express';
 import { mcpRequest } from './mcpTestSupport';
@@ -46,10 +37,7 @@ describe('named-user authentication', () => {
   });
 
   it('ignores malformed user entries', () => {
-    fs.writeFileSync(
-      process.env['LLULL_USERS_FILE'] as string,
-      JSON.stringify([{ id: 'x', name: 'x', role: 'boss', tokenSha256: 'abc' }]),
-    );
+    fs.writeFileSync(process.env['LLULL_USERS_FILE'] as string, JSON.stringify([{ id: 'x', name: 'x', role: 'boss', tokenSha256: 'abc' }]));
     expect(loadUsers()).toHaveLength(0);
   });
 
@@ -138,10 +126,7 @@ describe('roles over REST', () => {
 describe('live attribution', () => {
   it('command events carry the acting user', async () => {
     const frames: string[] = [];
-    const res = {
-      write: (chunk: string) => frames.push(chunk),
-      writableLength: 0,
-    } as unknown as Response;
+    const res = { write: (chunk: string) => frames.push(chunk), writableLength: 0 } as unknown as Response;
     const unsubscribe = subscribeLive(res);
     await request(app)
       .post('/command')
@@ -162,11 +147,7 @@ async function mcp(token: string, body: object, session?: string): Promise<reque
     .send(body);
 }
 
-function rpcResult(text: string): {
-  isError?: boolean;
-  content?: { text: string }[];
-  tools?: { name: string }[];
-} {
+function rpcResult(text: string): { isError?: boolean; content?: { text: string }[]; tools?: { name: string }[] } {
   const line = text.split('\n').find((l) => l.startsWith('data: ')) ?? 'data: {}';
   return (JSON.parse(line.slice(6)) as { result: never }).result;
 }
@@ -176,11 +157,7 @@ async function openSession(token: string): Promise<string> {
     jsonrpc: '2.0',
     id: 1,
     method: 'initialize',
-    params: {
-      protocolVersion: '2024-11-05',
-      capabilities: {},
-      clientInfo: { name: 't', version: '1' },
-    },
+    params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 't', version: '1' } },
   });
   expect(init.status).toBe(200);
   const session = init.headers['mcp-session-id'] as string;
@@ -191,12 +168,7 @@ async function openSession(token: string): Promise<string> {
 async function callAddBox(token: string, session: string): Promise<ReturnType<typeof rpcResult>> {
   const response = await mcp(
     token,
-    {
-      jsonrpc: '2.0',
-      id: 3,
-      method: 'tools/call',
-      params: { name: 'add_box', arguments: { size: [1, 1, 1] } },
-    },
+    { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'add_box', arguments: { size: [1, 1, 1] } } },
     session,
   );
   return rpcResult(response.text);
@@ -209,15 +181,7 @@ describe('roles over MCP', () => {
 
   it('viewer sees and may call read-only tools only', async () => {
     const session = await openSession(VIEWER.token);
-    const list = rpcResult(
-      (
-        await mcp(
-          VIEWER.token,
-          { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} },
-          session,
-        )
-      ).text,
-    );
+    const list = rpcResult((await mcp(VIEWER.token, { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }, session)).text);
     const names = (list.tools ?? []).map((t) => t.name);
     expect(names).not.toContain('add_box');
     expect(names).toContain('search_tools');
@@ -230,11 +194,7 @@ describe('roles over MCP', () => {
     const session = await openSession(EDITOR.token);
     const call = await callAddBox(EDITOR.token, session);
     expect(call.isError).toBe(false);
-    const stolen = await mcp(
-      VIEWER.token,
-      { jsonrpc: '2.0', id: 4, method: 'tools/list', params: {} },
-      session,
-    );
+    const stolen = await mcp(VIEWER.token, { jsonrpc: '2.0', id: 4, method: 'tools/list', params: {} }, session);
     expect(stolen.status).toBe(403);
   });
 });

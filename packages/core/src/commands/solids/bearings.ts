@@ -1,24 +1,14 @@
-/**
- * add_bearing: rolling bearing (inner ring, outer ring, rolling elements) grouped under one name.
- *
- * @layer core/commands
- */
+/** add_bearing: rolling bearing (inner ring, outer ring, rolling elements) grouped under one name. */
 
 import type { CadDocument, Entity, EntityGroup, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z, looseVec3 as vec3, colorField } from '../schema';
 import { nextId } from '../../lib/id';
 import { MM_PER_UNIT } from '../../model/units';
-import { ORIGIN } from '../../lib/vec3';
-import {
-  applyMat3,
-  eulerFromAxis,
-  eulerFromMat,
-  matFromAxis,
-  unitAxisOrNull,
-} from '../../lib/axisRotation';
+import { ORIGIN, add3 } from '../../lib/vec3';
+import { applyMat3, eulerFromAxis, eulerFromMat, matFromAxis, unitAxisOrNull } from '../../lib/axisRotation';
 import { compactNumber as fmt, vecText } from '../../lib/compactNumber';
-import { withEntity } from '../entity/entityOps';
+import { withEntities } from '../entity/entityOps';
 import { positionField } from './shared';
 import { newEntity } from '../entity/newEntity';
 import { failer } from '../noop';
@@ -54,18 +44,9 @@ function layoutOf({ bore, outerDiameter, width, type }: Section): Layout {
   const h = width / 2;
   const isBall = type === 'deep_groove_ball';
   const tilt = type === 'tapered_roller' ? TAPER_ANGLE : 0;
-  const elementDiameter = Math.min(
-    isBall ? 0.32 * (outerDiameter - bore) : 0.28 * (outerDiameter - bore),
-    0.6 * width,
-  );
+  const elementDiameter = Math.min(isBall ? 0.32 * (outerDiameter - bore) : 0.28 * (outerDiameter - bore), 0.6 * width);
   const elementRadius = elementDiameter / 2;
-  const count = Math.max(
-    6,
-    Math.min(
-      MAX_ROLLING_ELEMENTS,
-      Math.floor((2 * Math.PI * pitchRadius) / (elementDiameter * 1.3)),
-    ),
-  );
+  const count = Math.max(6, Math.min(MAX_ROLLING_ELEMENTS, Math.floor((2 * Math.PI * pitchRadius) / (elementDiameter * 1.3))));
   if (isBall) {
     const lip = 0.8 * elementRadius;
     const ri = pitchRadius - 0.6 * elementRadius;
@@ -121,9 +102,7 @@ function layoutOf({ bore, outerDiameter, width, type }: Section): Layout {
   };
 }
 
-type Resolution =
-  | { readonly section: Section; readonly designation?: string }
-  | { readonly error: string };
+type Resolution = { readonly section: Section; readonly designation?: string } | { readonly error: string };
 
 function resolveSection(
   doc: CadDocument,
@@ -137,46 +116,29 @@ function resolveSection(
 ): Resolution {
   if (p.designation !== undefined) {
     const entry = lookupBearing(p.designation);
-    if (!entry) {
+    if (!entry)
       return {
         error: `unknown designation "${p.designation}"; known: ${[...BEARING_TABLE.keys()].join(', ')}. Pass bore, outerDiameter and width instead`,
       };
-    }
-    if (p.type !== undefined && p.type !== entry.type) {
+    if (p.type !== undefined && p.type !== entry.type)
       return { error: `designation ${p.designation} is a ${entry.type} bearing, not ${p.type}` };
-    }
     const f = 1 / (MM_PER_UNIT[doc.units] ?? 1);
     return {
       designation: p.designation.trim().toUpperCase(),
-      section: {
-        type: entry.type,
-        bore: entry.bore * f,
-        outerDiameter: entry.outerDiameter * f,
-        width: entry.width * f,
-      },
+      section: { type: entry.type, bore: entry.bore * f, outerDiameter: entry.outerDiameter * f, width: entry.width * f },
     };
   }
   const { bore, outerDiameter, width } = p;
-  if (bore === undefined || outerDiameter === undefined || width === undefined) {
+  if (bore === undefined || outerDiameter === undefined || width === undefined)
     return { error: 'give a designation, or all of bore, outerDiameter and width' };
-  }
-  if (![bore, outerDiameter, width].every((v) => Number.isFinite(v) && v > 0)) {
-    return {
-      error: `bore, outerDiameter and width must be finite and > 0, got ${bore}, ${outerDiameter}, ${width}`,
-    };
-  }
-  if (outerDiameter - bore < 0.2 * outerDiameter) {
-    return {
-      error: `outerDiameter ${outerDiameter} must exceed bore ${bore} by at least 20% of outerDiameter`,
-    };
-  }
+  if (![bore, outerDiameter, width].every((v) => Number.isFinite(v) && v > 0))
+    return { error: `bore, outerDiameter and width must be finite and > 0, got ${bore}, ${outerDiameter}, ${width}` };
+  if (outerDiameter - bore < 0.2 * outerDiameter)
+    return { error: `outerDiameter ${outerDiameter} must exceed bore ${bore} by at least 20% of outerDiameter` };
   return { section: { type: p.type ?? 'deep_groove_ball', bore, outerDiameter, width } };
 }
 
 /**
- * @command add_bearing
- * @pure
- * @layer core/commands
  * @affects creates 2 revolution rings + N rolling elements (sphere/cylinder) and 1 group
  * @invariant bore < outerDiameter; rolling elements sit between the raceways; affected = member ids then group id
  * @failure unknown designation, type mismatch, bad dimensions or zero axis -> no-op, affected:[]
@@ -197,110 +159,60 @@ export const addBearing = defineCommand({
   params: z.object({
     type: z
       .enum(BEARING_TYPES)
-      .describe(
-        'Bearing type. Optional when designation is given (inferred); must match it if both are given.',
-      )
+      .describe('Bearing type. Optional when designation is given (inferred); must match it if both are given.')
       .optional(),
     designation: z
       .string()
-      .describe(
-        'Bearing designation, e.g. "6205", "22220", "30210", "NU210". Dimensions in mm, scaled to document units.',
-      )
+      .describe('Bearing designation, e.g. "6205", "22220", "30210", "NU210". Dimensions in mm, scaled to document units.')
       .optional(),
     bore: z
       .number()
-      .describe(
-        'Bore (inner diameter) in document units. Needed with outerDiameter and width when no designation.',
-      )
+      .describe('Bore (inner diameter) in document units. Needed with outerDiameter and width when no designation.')
       .optional(),
-    outerDiameter: z
-      .number()
-      .describe('Outer diameter in document units. Must exceed bore by >= 20% of itself.')
-      .optional(),
+    outerDiameter: z.number().describe('Outer diameter in document units. Must exceed bore by >= 20% of itself.').optional(),
     width: z.number().describe('Bearing width along the axis in document units.').optional(),
     position: positionField('Center of the bearing (mid-width on its axis). '),
-    axis: vec3(
-      'Rotation axis direction [dx, dy, dz] (non-zero, normalized) of the bearing. Defaults to [0, 0, 1].',
-    ).optional(),
+    axis: vec3('Rotation axis direction [dx, dy, dz] (non-zero, normalized) of the bearing. Defaults to [0, 0, 1].').optional(),
     color: colorField('#b0b6bf'),
-    name: z
-      .string()
-      .describe('Optional group name. Defaults to "Bearing <designation|type>".')
-      .optional(),
+    name: z.string().describe('Optional group name. Defaults to "Bearing <designation|type>".').optional(),
   }),
-  run: (
-    doc,
-    {
-      type,
-      designation,
-      bore,
-      outerDiameter,
-      width,
-      position = ORIGIN,
-      axis,
-      color = '#b0b6bf',
-      name,
-    },
-  ): CommandResult => {
+  run: (doc, { type, designation, bore, outerDiameter, width, position = ORIGIN, axis, color = '#b0b6bf', name }): CommandResult => {
     const fail = failer(doc, 'add_bearing');
     const resolved = resolveSection(doc, { type, designation, bore, outerDiameter, width });
     if ('error' in resolved) return fail(resolved.error);
     const unitAxis = axis === undefined ? ([0, 0, 1] as Vec3) : unitAxisOrNull(axis);
     if (!unitAxis) return fail('axis must be 3 finite numbers with non-zero length');
-    if (position.length !== 3 || !position.every(Number.isFinite)) {
-      return fail('position must be 3 finite numbers');
-    }
-
+    if (position.length !== 3 || !position.every(Number.isFinite)) return fail('position must be 3 finite numbers');
     const { section } = resolved;
     const layout = layoutOf(section);
     const matrix = matFromAxis(unitAxis);
-    const worldAt = (local: Vec3): Vec3 => {
-      const [x, y, z] = applyMat3(matrix, local);
-      return [position[0] + x, position[1] + y, position[2] + z];
-    };
+    const worldAt = (local: Vec3): Vec3 => add3(position, applyMat3(matrix, local));
     const ringRotation = eulerFromMat(matrix);
     const label = resolved.designation ?? section.type;
     const members: Entity[] = [];
     const ring = (prefix: string, profile: Profile, role: string): void => {
       members.push(
-        newEntity(
-          'revolution',
-          nextId(prefix),
-          { profile, axis: [0, 0, 1], angle: 2 * Math.PI, segments: 48 },
-          position,
-          color,
-          { rotation: ringRotation, name: `${label} ${role}` },
-        ),
+        newEntity('revolution', nextId(prefix), { profile, axis: [0, 0, 1], angle: 2 * Math.PI, segments: 48 }, position, color, {
+          rotation: ringRotation,
+          name: `${label} ${role}`,
+        }),
       );
     };
     ring('brg-in', layout.inner, 'inner ring');
     ring('brg-out', layout.outer, 'outer ring');
     for (let i = 0; i < layout.count; i++) {
       const phi = (2 * Math.PI * i) / layout.count;
-      const centerLocal: Vec3 = [
-        layout.pitchRadius * Math.cos(phi),
-        layout.pitchRadius * Math.sin(phi),
-        0,
-      ];
+      const centerLocal: Vec3 = [layout.pitchRadius * Math.cos(phi), layout.pitchRadius * Math.sin(phi), 0];
       const elementName = `${label} rolling element ${i + 1}`;
       if (section.type === 'deep_groove_ball') {
         members.push(
-          newEntity(
-            'sphere',
-            nextId('brg-el'),
-            { radius: layout.elementRadius },
-            worldAt(centerLocal),
-            ROLLING_COLOR,
-            { name: elementName },
-          ),
+          newEntity('sphere', nextId('brg-el'), { radius: layout.elementRadius }, worldAt(centerLocal), ROLLING_COLOR, {
+            name: elementName,
+          }),
         );
         continue;
       }
-      const dirLocal: Vec3 = [
-        -Math.sin(layout.tilt) * Math.cos(phi),
-        -Math.sin(layout.tilt) * Math.sin(phi),
-        Math.cos(layout.tilt),
-      ];
+      const dirLocal: Vec3 = [-Math.sin(layout.tilt) * Math.cos(phi), -Math.sin(layout.tilt) * Math.sin(phi), Math.cos(layout.tilt)];
       members.push(
         newEntity(
           'cylinder',
@@ -312,14 +224,10 @@ export const addBearing = defineCommand({
         ),
       );
     }
-
     const groupId = nextId('group');
     const memberIds = members.map((m) => m.id);
     const group: EntityGroup = { id: groupId, name: name ?? `Bearing ${label}`, memberIds };
-    const document: CadDocument = {
-      ...members.reduce<CadDocument>((d, m) => withEntity(d, m), doc),
-      groups: { ...doc.groups, [groupId]: group },
-    };
+    const document: CadDocument = { ...withEntities(doc, members), groups: { ...doc.groups, [groupId]: group } };
     const [innerRingId, outerRingId, ...rollingElementIds] = memberIds;
     const data = {
       groupId,

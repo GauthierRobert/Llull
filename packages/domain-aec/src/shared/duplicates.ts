@@ -1,15 +1,10 @@
-/**
- * Exact-duplicate detection for add_* commands (a twin element double-counts takeoff and clashes).
- * @layer domain-aec
- * @pure
- */
+/** Exact-duplicate detection for add_* commands (a twin element double-counts takeoff and clashes). */
 
 import type { BuildingElement, BuildingModel } from '@core/model/building';
 
 type Point = ReadonlyArray<number>;
 
-export const samePoint = (a: Point, b: Point): boolean =>
-  a.length === b.length && a.every((value, index) => value === b[index]);
+export const samePoint = (a: Point, b: Point): boolean => a.length === b.length && a.every((value, index) => value === b[index]);
 
 /** Same two end points in either direction. */
 export const sameSegment = (a0: Point, a1: Point, b0: Point, b1: Point): boolean =>
@@ -26,12 +21,7 @@ export const sameRing = (a: ReadonlyArray<Point>, b: ReadonlyArray<Point>): bool
   a.length === b.length &&
   [1, -1].some((direction) =>
     a.some((_, shift) =>
-      a.every((point, index) =>
-        samePoint(
-          point,
-          b[(((shift + direction * index) % b.length) + b.length) % b.length] as Point,
-        ),
-      ),
+      a.every((point, index) => samePoint(point, b[(((shift + direction * index) % b.length) + b.length) % b.length] as Point)),
     ),
   );
 

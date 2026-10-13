@@ -1,10 +1,8 @@
 /**
- * @layer desktop
  * The environment the desktop app gives its local backend (server/dist/index.js). The backend is
  * the unchanged llull server: same routes, same command bus. Hardening for a single-user desktop:
  * loopback only, a per-launch token required on every REST call (other local processes and
  * websites cannot drive the document), and the app's own origin as the only browser origin.
- * @pure
  */
 
 import path from 'path';
@@ -30,8 +28,7 @@ export function backendOrigin(port: number): string {
 export function backendEnv(input: BackendEnvInput): Record<string, string> {
   const inherited = Object.fromEntries(
     Object.entries(input.baseEnv).filter(
-      (entry): entry is [string, string] =>
-        entry[1] !== undefined && !entry[0].startsWith('LLULL_') && entry[0] !== 'MCP_AUTH_TOKEN',
+      (entry): entry is [string, string] => entry[1] !== undefined && !entry[0].startsWith('LLULL_') && entry[0] !== 'MCP_AUTH_TOKEN',
     ),
   );
   return {
@@ -47,8 +44,6 @@ export function backendEnv(input: BackendEnvInput): Record<string, string> {
     LLULL_BODY_LIMIT: DESKTOP_BODY_LIMIT,
     LLULL_PYTHON: input.layout.python,
     // import_code runs arbitrary Python: off unless the user launched the app with it set to 1.
-    ...(input.baseEnv['LLULL_ALLOW_CODE_EXECUTION'] === '1'
-      ? { LLULL_ALLOW_CODE_EXECUTION: '1' }
-      : {}),
+    ...(input.baseEnv['LLULL_ALLOW_CODE_EXECUTION'] === '1' ? { LLULL_ALLOW_CODE_EXECUTION: '1' } : {}),
   };
 }

@@ -109,7 +109,7 @@ AI control — there is no in-app AI bridge).**
 - [x] Wind / crane load cases, buckling, sway stability and deflection checks
 - [x] Lateral-torsional buckling, crane runway fatigue, bracing and foundation checks
 
-## Target architecture migration (Wave 7) — see docs/MIGRATION_PLAN.md
+## Target architecture migration (Wave 7; plan in git history: docs/MIGRATION_PLAN.md)
 
 - [x] Golden replay corpus, schema conformance and tool-schema snapshot tests
 - [x] Execution context: kernel, ids and registry injected per `execute`; one kernel choice for browser and server

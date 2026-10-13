@@ -1,8 +1,4 @@
-/**
- * @layer ui/panels
- * @pure "Send only the changed fields" param gathering for the edit forms: each helper returns an
- * object to spread into the command params (`{}` when the field is unchanged or unusable).
- */
+/** object to spread into the command params (`{}` when the field is unchanged or unusable). */
 
 import { parseNumber } from '@ui/numberText';
 

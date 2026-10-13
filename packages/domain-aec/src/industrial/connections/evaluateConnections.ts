@@ -1,18 +1,8 @@
-/**
- * Evaluation of bolted steel connections: base plates with anchor bolts and moment end-plate joints.
- * @layer domain-aec
- * @pure
- */
+/** Evaluation of bolted steel connections: base plates with anchor bolts and moment end-plate joints. */
 
 import { planPoint } from '@lib/vec2';
 import type { CadDocument, CylinderEntity, Entity, Vec2, Vec3 } from '@core/model/types';
-import type {
-  BasePlateElement,
-  BuildingLevel,
-  BuildingModel,
-  MomentConnectionElement,
-  SteelMemberElement,
-} from '@core/model/building';
+import type { BasePlateElement, BuildingLevel, BuildingModel, MomentConnectionElement, SteelMemberElement } from '@core/model/building';
 import { fromMm } from '@core/model/units';
 import { base, colorForMaterial, meshEntity, orientedBox } from '../../building/evaluate/entities';
 import { prismMesh, sweepFrame, type SweepFrame } from '../../shared/mesh';
@@ -50,10 +40,7 @@ export function plateLayout(
   const bolts: Vec2[] = [];
   for (const side of [-1, 1]) {
     for (let index = 0; index < columns; index++) {
-      const along =
-        columns === 1
-          ? 0
-          : -plate.length / 2 + edge + ((plate.length - 2 * edge) * index) / (columns - 1);
+      const along = columns === 1 ? 0 : -plate.length / 2 + edge + ((plate.length - 2 * edge) * index) / (columns - 1);
       const across = side * (plate.width / 2 - edge);
       bolts.push(planPoint(foot, angle, [along, across]));
     }
@@ -92,10 +79,7 @@ export function evaluatePlate(
       (bolt, index): CylinderEntity => ({
         ...base(
           plate,
-          {
-            part: `bolt-${index}`,
-            label: `Anchor bolt ${plate.mark} ${boltSize(doc, plate.boltDiameter)}`,
-          },
+          { part: `bolt-${index}`, label: `Anchor bolt ${plate.mark} ${boltSize(doc, plate.boltDiameter)}` },
           [bolt[0], bolt[1], (top + layout.boltAbove + bottom - layout.boltBelow) / 2],
           [0, 0, 0],
           '#3d4650',
@@ -139,11 +123,7 @@ export function connectionSolids(...args: ConnectionSolidsArgs): ConnectionSolid
   const into = (
     member: SteelMemberElement,
     end: 'start' | 'end',
-  ): {
-    joint: Vec3;
-    frame: SweepFrame;
-    plate: { x: Vec3; y: Vec3; along: Vec3; slope: number };
-  } | null => {
+  ): { joint: Vec3; frame: SweepFrame; plate: { x: Vec3; y: Vec3; along: Vec3; slope: number } } | null => {
     const [start, finish] = [atLevel(level, member.start), atLevel(level, member.end)];
     const [joint, away] = end === 'start' ? [start, finish] : [finish, start];
     const frame = sweepFrame(joint, away, member.roll);
@@ -174,8 +154,7 @@ export function connectionSolids(...args: ConnectionSolidsArgs): ConnectionSolid
   const t = connection.plateThickness;
   // Eaves: the end plate sits on the column flange face.
   const columnProfile = other ? findProfile(other.profile) : undefined;
-  const offset =
-    connection.kind === 'eaves' && columnProfile ? mm(columnProfile.h) / 2 / plate.slope : 0;
+  const offset = connection.kind === 'eaves' && columnProfile ? mm(columnProfile.h) / 2 / plate.slope : 0;
   const face = add3(joint, scale3(frame.d, offset));
   const rectangle = (x0: number, x1: number, y0: number, y1: number): Vec2[] => [
     [x0, y0],
@@ -196,10 +175,7 @@ export function connectionSolids(...args: ConnectionSolidsArgs): ConnectionSolid
   ];
   if (connection.kind === 'apex' && other) {
     const distanceTo = (point: Vec3): number => distance3(point, joint);
-    const nearerEnd =
-      distanceTo(atLevel(level, other.start)) <= distanceTo(atLevel(level, other.end))
-        ? 'start'
-        : 'end';
+    const nearerEnd = distanceTo(atLevel(level, other.start)) <= distanceTo(atLevel(level, other.end)) ? 'start' : 'end';
     const far = into(other, nearerEnd);
     if (far) {
       solids.push({

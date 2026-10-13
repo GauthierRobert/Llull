@@ -1,5 +1,3 @@
-/** @layer ui/store JSON in localStorage for presentation preferences; never throws (storage may be unavailable). */
-
 /** The JSON value stored under `key`; `undefined` when absent, malformed or storage is unavailable. */
 export function readStored(key: string): unknown {
   try {

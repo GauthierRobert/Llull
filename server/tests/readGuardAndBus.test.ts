@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * guardRead (token / loopback / proxy), SSE backpressure + subscriber cap, idempotency cache rules,
  * MCP session cap, unreadable-autosave quarantine.
  */
@@ -10,12 +9,7 @@ import os from 'os';
 import path from 'path';
 import request from 'supertest';
 import { app } from '../src/index';
-import {
-  _resetLiveDoc,
-  subscribeLive,
-  _subscriberCount,
-  MAX_LIVE_SUBSCRIBERS,
-} from '../src/liveDocument';
+import { _resetLiveDoc, subscribeLive, liveSubscriberCount, MAX_LIVE_SUBSCRIBERS } from '../src/liveDocument';
 import { _resetHistory, applyCommand, canUndo, undo } from '../src/commandBus';
 import { evictForCapacity, sessions } from '../src/mcp/sessions';
 import type { Response } from 'express';
@@ -62,36 +56,26 @@ describe('guardRead', () => {
   it('with a token: a proxied request (X-Forwarded-For / Forwarded) is not trusted as loopback', async () => {
     process.env['MCP_AUTH_TOKEN'] = TOKEN;
     const origin = 'http://localhost:5173';
-    const xff = await request(app)
-      .get('/live/snapshot')
-      .set('Origin', origin)
-      .set('X-Forwarded-For', '203.0.113.9');
+    const xff = await request(app).get('/live/snapshot').set('Origin', origin).set('X-Forwarded-For', '203.0.113.9');
     expect(xff.status).toBe(401);
-    const fwd = await request(app)
-      .post('/command')
-      .set('Origin', origin)
-      .set('Forwarded', 'for=203.0.113.9')
-      .send({ name: 'add_box' });
+    const fwd = await request(app).post('/command').set('Origin', origin).set('Forwarded', 'for=203.0.113.9').send({ name: 'add_box' });
     expect(fwd.status).toBe(401);
   });
 });
 
 describe('SSE backpressure and cap', () => {
-  const fakeResponse = (writableLength: number): Response =>
-    ({ write: vi.fn(), destroy: vi.fn(), writableLength }) as unknown as Response;
+  const fakeResponse = (writableLength: number): Response => ({ write: vi.fn(), destroy: vi.fn(), writableLength }) as unknown as Response;
 
   it('drops and destroys a subscriber whose backlog exceeds 8 MB', () => {
     const slow = fakeResponse(9 * 1024 * 1024);
-    const before = _subscriberCount();
+    const before = liveSubscriberCount();
     subscribeLive(slow);
     expect(slow.destroy).toHaveBeenCalled();
-    expect(_subscriberCount()).toBe(before);
+    expect(liveSubscriberCount()).toBe(before);
   });
 
   it('GET /live answers 503 at the subscriber cap', async () => {
-    const unsubscribers = Array.from({ length: MAX_LIVE_SUBSCRIBERS }, () =>
-      subscribeLive(fakeResponse(0)),
-    );
+    const unsubscribers = Array.from({ length: MAX_LIVE_SUBSCRIBERS }, () => subscribeLive(fakeResponse(0)));
     const res = await request(app).get('/live');
     expect(res.status).toBe(503);
     for (const unsubscribe of unsubscribers) unsubscribe();

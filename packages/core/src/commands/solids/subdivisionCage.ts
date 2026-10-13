@@ -3,7 +3,7 @@ import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
 import { entityOfKind } from '../entity/entityOfKind';
 import { changed, failer } from '../noop';
-import { add3, distance3, map3, scale3, sub3 } from '../../lib/vec3';
+import { add3, centroid3, distance3, map3, scale3, sub3 } from '../../lib/vec3';
 import { inverseEulerXYZ } from '../../lib/eulerRotation';
 import { replaceEntity } from '../entity/entityOps';
 import { edgeKey } from '../../geometry/subdivision';
@@ -18,9 +18,7 @@ function selectionWeights(
 ): number[] {
   const inRegion = (p: Vec3): number => {
     if (region === undefined) return 0;
-    const outside = p.map((value, axis) =>
-      Math.max((region.min[axis] as number) - value, 0, value - (region.max[axis] as number)),
-    );
+    const outside = p.map((value, axis) => Math.max((region.min[axis] as number) - value, 0, value - (region.max[axis] as number)));
     return Math.hypot(...outside);
   };
   const picked = new Set(vertexIndices ?? []);
@@ -41,15 +39,11 @@ function selectionWeights(
 }
 
 /** Crease list with edges between fully selected vertices added (`on`) or removed. */
-function recreased(
-  entity: SubdivisionEntity,
-  selected: ReadonlySet<number>,
-  on: boolean,
-): Array<readonly [number, number]> {
+function recreased(entity: SubdivisionEntity, selected: ReadonlySet<number>, on: boolean): Array<readonly [number, number]> {
   const kept = entity.creases.filter(([a, b]) => on || !(selected.has(a) && selected.has(b)));
   if (!on) return kept;
   const keys = new Set(kept.map(([a, b]) => edgeKey(a, b)));
-  for (const face of entity.faces) {
+  for (const face of entity.faces)
     face.forEach((a, i) => {
       const b = face[(i + 1) % face.length] as number;
       if (selected.has(a) && selected.has(b) && !keys.has(edgeKey(a, b))) {
@@ -57,18 +51,11 @@ function recreased(
         kept.push([a, b]);
       }
     });
-  }
   return kept;
 }
 
 /** The edited document, summary and cage data of an edit. */
-function reported(
-  doc: CadDocument,
-  id: string,
-  updated: SubdivisionEntity,
-  selected: number[],
-  moved: number,
-): CommandResult {
+function reported(doc: CadDocument, id: string, updated: SubdivisionEntity, selected: number[], moved: number): CommandResult {
   return {
     ...changed(
       replaceEntity(doc, updated),
@@ -81,14 +68,7 @@ function reported(
   };
 }
 
-function subdivisionTarget(doc: CadDocument, id: string): SubdivisionEntity | string {
-  return entityOfKind(doc, id, ['subdivision']);
-}
-
 /**
- * @command edit_subdivision_cage
- * @pure
- * @layer core/commands
  * @affects modifies 1 subdivision entity (cage vertices, creases, levels; topology unchanged)
  * @failure missing / non-subdivision id, bad indices, empty selection, nothing to do, bad levels -> no-op
  */
@@ -104,10 +84,7 @@ export const editSubdivisionCage = defineCommand({
     'vertices, selected } (world cage vertices; indices of fully selected vertices).',
   params: z.object({
     id: z.string().describe('Id of the subdivision solid.'),
-    vertexIndices: z
-      .array(z.number().int())
-      .describe('Cage vertex indices to select (from the data of add_subdivision_solid).')
-      .optional(),
+    vertexIndices: z.array(z.number().int()).describe('Cage vertex indices to select (from the data of add_subdivision_solid).').optional(),
     region: z
       .object({
         min: vec3('World-space minimum corner [x, y, z] of the selection box.'),
@@ -117,43 +94,26 @@ export const editSubdivisionCage = defineCommand({
       .optional(),
     falloff: z
       .number()
-      .describe(
-        'Soft-selection distance (>= 0, default 0): vertices this close to the selection move partly (smoothstep).',
-      )
+      .describe('Soft-selection distance (>= 0, default 0): vertices this close to the selection move partly (smoothstep).')
       .optional(),
     translate: vec3('World-space move [dx, dy, dz] of the selection.').optional(),
-    scale: vec3(
-      'Scale factors [sx, sy, sz] (> 0) along the solid axes about the pivot (e.g. [0.6, 0.6, 1] narrows).',
-    ).optional(),
-    pivot: vec3(
-      'World-space scale centre. Default: centre of the fully selected vertices.',
-    ).optional(),
-    crease: z
-      .boolean()
-      .describe('true: make edges between selected vertices sharp; false: make them smooth.')
-      .optional(),
+    scale: vec3('Scale factors [sx, sy, sz] (> 0) along the solid axes about the pivot (e.g. [0.6, 0.6, 1] narrows).').optional(),
+    pivot: vec3('World-space scale centre. Default: centre of the fully selected vertices.').optional(),
+    crease: z.boolean().describe('true: make edges between selected vertices sharp; false: make them smooth.').optional(),
     levels: levelsField.optional(),
   }),
   run: (doc, params): CommandResult => {
     const fail = failer(doc, 'edit_subdivision_cage');
-    const entity = subdivisionTarget(doc, params.id);
+    const entity = entityOfKind(doc, params.id, ['subdivision']);
     if (typeof entity === 'string') return fail(entity);
     const { vertexIndices, region, falloff = 0, translate, scale, pivot, crease } = params;
-    if (
-      translate === undefined &&
-      scale === undefined &&
-      crease === undefined &&
-      params.levels === undefined
-    )
+    if (translate === undefined && scale === undefined && crease === undefined && params.levels === undefined)
       return fail('give at least one of translate, scale, crease or levels');
-    if (vertexIndices !== undefined && region !== undefined)
-      return fail('give vertexIndices or region, not both');
+    if (vertexIndices !== undefined && region !== undefined) return fail('give vertexIndices or region, not both');
     const outOfRange = (vertexIndices ?? []).find((v) => v < 0 || v >= entity.vertices.length);
-    if (outOfRange !== undefined)
-      return fail(`vertex ${outOfRange} is outside 0..${entity.vertices.length - 1}`);
+    if (outOfRange !== undefined) return fail(`vertex ${outOfRange} is outside 0..${entity.vertices.length - 1}`);
     if (!(falloff >= 0)) return fail(`falloff must be >= 0 (got ${falloff})`);
-    if (scale !== undefined && !scale.every((s) => s > 0))
-      return fail(`scale factors must be > 0 (got [${scale}])`);
+    if (scale !== undefined && !scale.every((s) => s > 0)) return fail(`scale factors must be > 0 (got [${scale}])`);
     const levels = params.levels ?? entity.levels;
     const levelProblem = sizeProblem(entity, levels);
     if (levelProblem !== null) return fail(levelProblem);
@@ -162,22 +122,13 @@ export const editSubdivisionCage = defineCommand({
     const selected = weights.flatMap((w, v) => (w === 1 ? [v] : []));
     const moving = translate !== undefined || scale !== undefined || crease !== undefined;
     if (moving && selected.length === 0) return fail('the selection is empty');
-    const centre = scale3(
-      selected.reduce<Vec3>((sum, v) => add3(sum, world[v] as Vec3), [0, 0, 0]),
-      1 / Math.max(1, selected.length),
-    );
+    const centre = centroid3(selected.map((v) => world[v] as Vec3));
     const localPivot = inverseEulerXYZ(sub3(pivot ?? centre, entity.position), entity.rotation);
     const localMove = inverseEulerXYZ(translate ?? [0, 0, 0], entity.rotation);
     const factors = scale ?? [1, 1, 1];
-    if (translate === undefined && scale === undefined) {
-      const updated: SubdivisionEntity = {
-        ...entity,
-        creases:
-          crease === undefined ? entity.creases : recreased(entity, new Set(selected), crease),
-        levels,
-      };
-      return reported(doc, entity.id, updated, selected, selected.length);
-    }
+    const creases = crease === undefined ? entity.creases : recreased(entity, new Set(selected), crease);
+    if (translate === undefined && scale === undefined)
+      return reported(doc, entity.id, { ...entity, creases, levels }, selected, selected.length);
     const vertices = entity.vertices.map((p, v): Vec3 => {
       const w = weights[v] as number;
       if (w === 0) return p;
@@ -190,8 +141,6 @@ export const editSubdivisionCage = defineCommand({
         scale3(localMove, w),
       );
     });
-    const creases =
-      crease === undefined ? entity.creases : recreased(entity, new Set(selected), crease);
     const moved = weights.filter((w) => w > 0).length;
     return reported(doc, entity.id, { ...entity, vertices, creases, levels }, selected, moved);
   },

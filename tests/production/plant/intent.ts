@@ -2,8 +2,6 @@ import type { Vec2, Vec3 } from '@core/model/types';
 import type { MemberRole } from '@core/model/building';
 
 /**
- * @layer tests/production/plant
- *
  * Design intent of a process-plant structure job, in absolute millimetres. One intent feeds the
  * agent brief (`brief.ts`), the scripted tool calls (`script.ts`) and the acceptance criteria
  * (`criteria/*.ts`), so the three can never disagree.
@@ -90,14 +88,7 @@ interface IntentStair {
 }
 
 export interface PlantIntent {
-  project: {
-    name: string;
-    client: string;
-    author: string;
-    drawingNumber: string;
-    revision: string;
-    date: string;
-  };
+  project: { name: string; client: string; author: string; drawingNumber: string; revision: string; date: string };
   levels: IntentLevel[];
   grid: { xSpacings: number[]; ySpacings: number[] };
   members: IntentMember[];

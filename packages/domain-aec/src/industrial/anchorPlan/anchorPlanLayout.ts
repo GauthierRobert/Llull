@@ -1,13 +1,4 @@
-/**
- * @layer domain-aec
- */
-
-import type {
-  BasePlateElement,
-  BuildingLevel,
-  GridElement,
-  SteelMemberElement,
-} from '@core/model/building';
+import type { BasePlateElement, BuildingLevel, GridElement, SteelMemberElement } from '@core/model/building';
 import type { CadDocument, Vec2 } from '@core/model/types';
 import { elementsOf, getBuilding } from '../../building/model';
 import { plateLayout } from '../connections/evaluateConnections';
@@ -22,11 +13,7 @@ export const INSET = 28;
 export const BAND_STEP = 6;
 export const OFFSET_TOLERANCE_MM = 1;
 
-export interface BandDim {
-  readonly from: number;
-  readonly to: number;
-  readonly label: string;
-}
+export type BandDim = { readonly from: number; readonly to: number; readonly label: string };
 
 /** Greedy interval packing: dimensions that overlap along the band get separate stack levels. */
 export function packBands(dims: ReadonlyArray<BandDim>): Array<{ dim: BandDim; level: number }> {
@@ -71,22 +58,13 @@ export interface GridAxis {
 }
 
 /** Dimension spans between neighbouring grid axes, plus an overall span when there are more than two. */
-export function gridSpans(
-  axes: ReadonlyArray<GridAxis>,
-): Array<{ from: number; to: number; overall: boolean }> {
-  const spans = axes.slice(1).map((axis, index) => ({
-    from: (axes[index] as GridAxis).position,
-    to: axis.position,
-    overall: false,
-  }));
+export function gridSpans(axes: ReadonlyArray<GridAxis>): Array<{ from: number; to: number; overall: boolean }> {
+  const spans = axes.slice(1).map((axis, index) => ({ from: (axes[index] as GridAxis).position, to: axis.position, overall: false }));
   const [first, last] = [axes[0], axes[axes.length - 1]];
-  return first && last && axes.length > 2
-    ? [...spans, { from: first.position, to: last.position, overall: true }]
-    : spans;
+  return first && last && axes.length > 2 ? [...spans, { from: first.position, to: last.position, overall: true }] : spans;
 }
 
-export const compareMark = (a: string, b: string): number =>
-  a.localeCompare(b, undefined, { numeric: true });
+export const compareMark = (a: string, b: string): number => a.localeCompare(b, undefined, { numeric: true });
 
 export function nearest(axes: ReadonlyArray<GridAxis>, value: number): GridAxis | null {
   let best: GridAxis | null = null;
@@ -109,30 +87,17 @@ export function gridAxes(
       [mm(grid.end[0]), mm(grid.end[1])],
     ];
     const isVertical = Math.abs(end[0] - start[0]) < Math.abs(end[1] - start[1]);
-    const [from, to] = (isVertical ? start[1] <= end[1] : start[0] <= end[0])
-      ? [start, end]
-      : [end, start];
-    const axis: GridAxis = {
-      mark: grid.mark,
-      position: isVertical ? (start[0] + end[0]) / 2 : (start[1] + end[1]) / 2,
-      from,
-      to,
-    };
+    const [from, to] = (isVertical ? start[1] <= end[1] : start[0] <= end[0]) ? [start, end] : [end, start];
+    const axis: GridAxis = { mark: grid.mark, position: isVertical ? (start[0] + end[0]) / 2 : (start[1] + end[1]) / 2, from, to };
     (isVertical ? vertical : horizontal).push(axis);
   }
   const byPosition = (a: GridAxis, b: GridAxis): number => a.position - b.position;
   return { vertical: vertical.sort(byPosition), horizontal: horizontal.sort(byPosition) };
 }
 
-export function placePlates(
-  doc: CadDocument,
-  level: BuildingLevel,
-  mm: (value: number) => number,
-): PlacedPlate[] {
+export function placePlates(doc: CadDocument, level: BuildingLevel, mm: (value: number) => number): PlacedPlate[] {
   const building = getBuilding(doc);
-  const footings = elementsOf(building, 'footing').filter(
-    (footing) => footing.levelId === level.id,
-  );
+  const footings = elementsOf(building, 'footing').filter((footing) => footing.levelId === level.id);
   const placed: PlacedPlate[] = [];
   for (const plate of elementsOf(building, 'plate')) {
     if (plate.levelId !== level.id) continue;
@@ -151,10 +116,7 @@ export function placePlates(
         [-1, 1],
       ] as const
     ).map(
-      ([a, b]): Vec2 => [
-        centre[0] + a * halfLength * cos - b * halfWidth * sin,
-        centre[1] + a * halfLength * sin + b * halfWidth * cos,
-      ],
+      ([a, b]): Vec2 => [centre[0] + a * halfLength * cos - b * halfWidth * sin, centre[1] + a * halfLength * sin + b * halfWidth * cos],
     );
     const footing = footings.find(
       (candidate) =>
@@ -177,5 +139,4 @@ export function placePlates(
   return placed;
 }
 
-export const metres = (millimetres: number): string =>
-  `${millimetres < 0 ? '-' : '+'}${(Math.abs(millimetres) / 1000).toFixed(3)}`;
+export const metres = (millimetres: number): string => `${millimetres < 0 ? '-' : '+'}${(Math.abs(millimetres) / 1000).toFixed(3)}`;

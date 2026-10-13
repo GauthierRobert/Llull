@@ -1,10 +1,4 @@
-/**
- * @layer ui/viewport/3d
- *
- * Pure three.js geometry builders for primitive solids, in the model's +Z-up local frame
- * (same placement as core/geometry/tessellation + export). Local origin = entity.position.
- * Memoized and disposed by the mesh components.
- */
+// three.js builders for primitive solids in the +Z-up local frame (origin = entity.position), same placement as core tessellation.
 
 import { clamp } from '@lib/clamp';
 import * as THREE from 'three';
@@ -14,23 +8,14 @@ import { radialSegmentsForDiag, cylinderDiag, sphereDiag, torusDiag } from '../l
 
 /** Cylinder: axis along +Z, centered at the origin. */
 export function buildCylinderGeometry(radius: number, height: number): THREE.BufferGeometry {
-  const geo = new THREE.CylinderGeometry(
-    radius,
-    radius,
-    height,
-    radialSegmentsForDiag(cylinderDiag(radius, height)),
-  );
+  const geo = new THREE.CylinderGeometry(radius, radius, height, radialSegmentsForDiag(cylinderDiag(radius, height)));
   geo.rotateX(Math.PI / 2);
   return geo;
 }
 
 /** Cone: base circle in XY at the origin, apex at (0, 0, height). */
 export function buildConeGeometry(radius: number, height: number): THREE.BufferGeometry {
-  const geo = new THREE.ConeGeometry(
-    radius,
-    height,
-    radialSegmentsForDiag(cylinderDiag(radius, height)),
-  );
+  const geo = new THREE.ConeGeometry(radius, height, radialSegmentsForDiag(cylinderDiag(radius, height)));
   geo.rotateX(Math.PI / 2);
   geo.translate(0, 0, height / 2);
   return geo;
@@ -52,95 +37,41 @@ export function buildTorusGeometry(ringRadius: number, tubeRadius: number): THRE
   return new THREE.TorusGeometry(ringRadius, tubeRadius, radialSegments, tubularSegments);
 }
 
-/**
- * Build a rectangular pyramid BufferGeometry: base centered on the local origin in XY (z=0),
- * apex at (0, 0, height).
- *
- * Base corners (z=0):
- *   v0 = (-hw, -hd, 0)   v1 = ( hw, -hd, 0)
- *   v2 = ( hw,  hd, 0)   v3 = (-hw,  hd, 0)
- * Apex: v4 = (0, 0, height)
- *
- * 6 triangles total: 2 for the base, 4 for the side faces.
- */
-export function buildPyramidGeometry(
-  baseWidth: number,
-  baseDepth: number,
-  height: number,
-): THREE.BufferGeometry {
+/** Base centered on the origin at z=0, apex (0,0,height); rows: base ×2, then -Y, +X, +Y, -X sides. */
+export function buildPyramidGeometry(baseWidth: number, baseDepth: number, height: number): THREE.BufferGeometry {
   const hw = baseWidth / 2;
   const hd = baseDepth / 2;
-
   // prettier-ignore
   const geo = positionsGeometry([
-    // Base (faces -Z)
     -hw, -hd, 0,  -hw,  hd, 0,   hw,  hd, 0,
     -hw, -hd, 0,   hw,  hd, 0,   hw, -hd, 0,
-
-    // Front side (-Y)
     -hw, -hd, 0,   hw, -hd, 0,   0, 0, height,
-
-    // Right side (+X)
      hw, -hd, 0,   hw,  hd, 0,   0, 0, height,
-
-    // Back side (+Y)
      hw,  hd, 0,  -hw,  hd, 0,   0, 0, height,
-
-    // Left side (-X)
     -hw,  hd, 0,  -hw, -hd, 0,   0, 0, height,
   ]);
   geo.computeVertexNormals();
   return geo;
 }
 
-/**
- * Build a right-triangular prism BufferGeometry.
- *
- * Vertices (local coords, position=lower-front-left corner):
- *   Front face (z=0): v0=(0,0,0), v1=(w,0,0), v2=(0,h,0), v3=(w,h,0)
- *   Back edge (z=d):  v4=(0,0,d), v5=(w,0,d)
- *
- * 5 faces total: bottom, front, left slope-top, right slope-top, back (actually
- * the sloped top face) and two triangular side faces (left/right).
- *
- * Triangles (wound counter-clockwise from outside):
- *   Bottom   : v0,v5,v4  v0,v1,v5
- *   Front    : v0,v2,v3  v0,v3,v1
- *   Left side: v0,v4,v2
- *   Right side: v1,v3,v5
- *   Slope top: v2,v4,v5  v2,v5,v3
- *
- * Using computeVertexNormals() for correct smooth-ish lighting.
- */
+/** Right-triangular prism (ramp); `position` = lower-front-left; full height at z=0 tapering to 0 at z=d. Rows: bottom ×2, front ×2, -X side, +X side, slope ×2 (CCW from outside). */
 export function buildWedgeGeometry(w: number, h: number, d: number): THREE.BufferGeometry {
   // prettier-ignore
   const geo = positionsGeometry([
-    // Bottom face — two triangles
-    0, 0, 0,   w, 0, d,   0, 0, d,   // tri 0 (v0,v5,v4)
-    0, 0, 0,   w, 0, 0,   w, 0, d,   // tri 1 (v0,v1,v5)
-
-    // Front face (z=0) — one quad = two triangles
-    0, 0, 0,   0, h, 0,   w, h, 0,   // tri 2 (v0,v2,v3)
-    0, 0, 0,   w, h, 0,   w, 0, 0,   // tri 3 (v0,v3,v1)
-
-    // Left triangular side (x=0)
-    0, 0, 0,   0, 0, d,   0, h, 0,   // tri 4 (v0,v4,v2)
-
-    // Right triangular side (x=w)
-    w, 0, 0,   w, h, 0,   w, 0, d,   // tri 5 (v1,v3,v5)
-
-    // Sloped top face — one quad = two triangles
-    0, h, 0,   0, 0, d,   w, 0, d,   // tri 6 (v2,v4,v5)
-    0, h, 0,   w, 0, d,   w, h, 0,   // tri 7 (v2,v5,v3)  — v3=(w,h,0) but slope meets at (w,0,d)
+    0, 0, 0,   w, 0, d,   0, 0, d,
+    0, 0, 0,   w, 0, 0,   w, 0, d,
+    0, 0, 0,   0, h, 0,   w, h, 0,
+    0, 0, 0,   w, h, 0,   w, 0, 0,
+    0, 0, 0,   0, 0, d,   0, h, 0,
+    w, 0, 0,   w, h, 0,   w, 0, d,
+    0, h, 0,   0, 0, d,   w, 0, d,
+    0, h, 0,   w, 0, d,   w, h, 0,
   ]);
   geo.computeVertexNormals();
   return geo;
 }
 
-/**
- * Surface of revolution in the entity-local frame (origin = entity.position, no axis quaternion).
- * Sampling comes from core/geometry/revolution (shared with export.ts + render.ts).
- */
+/** Entity-local surface of revolution (no axis quaternion), sampled by core/geometry/revolution. */
 export function buildRevolutionGeometry(
   profile: ReadonlyArray<readonly [number, number]>,
   axis: readonly [number, number, number],
@@ -148,9 +79,7 @@ export function buildRevolutionGeometry(
   segments: number,
 ): THREE.BufferGeometry {
   if (profile.length < 3) return new THREE.BufferGeometry();
-  const geo = positionsGeometry(
-    revolutionTriangles(profile, axis, angle, segments).flatMap((triangle) => triangle.flat()),
-  );
+  const geo = positionsGeometry(revolutionTriangles(profile, axis, angle, segments).flatMap((triangle) => triangle.flat()));
   geo.computeVertexNormals();
   return geo;
 }

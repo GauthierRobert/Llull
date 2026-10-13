@@ -1,20 +1,3 @@
-/**
- * Component tests for <McpConnect /> and <McpConnectButton />.
- *
- * Asserts observable behavior (workflow W3, react R11):
- *   - McpConnectButton opens the modal on click.
- *   - Modal: correct role/aria attributes present.
- *   - Modal: first focusable element receives focus on open.
- *   - Focus trap: Tab from last element loops to first.
- *   - Focus trap: Shift-Tab from first element loops to last.
- *   - Esc closes the modal.
- *   - Backdrop click closes the modal.
- *   - Focus is restored to the trigger button after close.
- *   - Copy buttons call navigator.clipboard.writeText with the correct strings.
- *   - Quickstart sections: server install command, endpoint URL, agent loop steps.
- *   - No document mutation (PRIME DIRECTIVE).
- */
-
 import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { listCommands } from '@core/commands/registry';
@@ -22,17 +5,11 @@ import { McpConnect, McpConnectButton } from '@ui/components/McpConnect';
 
 // Mock clipboard
 
-const writeTextMock: Mock<(text: string) => Promise<void>> = vi.fn((_text: string) =>
-  Promise.resolve(),
-);
+const writeTextMock: Mock<(text: string) => Promise<void>> = vi.fn((_text: string) => Promise.resolve());
 
 beforeEach(() => {
   writeTextMock.mockClear();
-  Object.defineProperty(navigator, 'clipboard', {
-    value: { writeText: writeTextMock },
-    writable: true,
-    configurable: true,
-  });
+  Object.defineProperty(navigator, 'clipboard', { value: { writeText: writeTextMock }, writable: true, configurable: true });
 });
 
 // McpConnect modal — structure
@@ -44,7 +21,6 @@ describe('McpConnect — structure', () => {
     expect(dialog).toBeDefined();
     expect(dialog.getAttribute('aria-modal')).toBe('true');
   });
-
   it('has aria-labelledby pointing at the title element', () => {
     render(<McpConnect onClose={() => undefined} />);
     const dialog = screen.getByRole('dialog');
@@ -54,18 +30,11 @@ describe('McpConnect — structure', () => {
     expect(titleEl).toBeTruthy();
     expect(titleEl?.textContent).toMatch(/connect an mcp agent/i);
   });
-
   it.each<[string, () => string | RegExp]>([
     ['the title "Connect an MCP agent"', () => /connect an mcp agent/i],
-    [
-      'the server install and start command in a code block',
-      () => 'npm --prefix server install && npm --prefix server run dev',
-    ],
+    ['the server install and start command in a code block', () => 'npm --prefix server install && npm --prefix server run dev'],
     ['the endpoint URL in a code block', () => 'http://localhost:3001/mcp'],
-    [
-      'the live registry command count as a capability badge',
-      () => `${listCommands().length} commands`,
-    ],
+    ['the live registry command count as a capability badge', () => `${listCommands().length} commands`],
     ['the "structuredContent" capability badge', () => 'structuredContent'],
     ['the "prompts (EN2)" capability badge', () => 'prompts (EN2)'],
     ['the "session isolation" capability badge', () => 'session isolation'],
@@ -73,12 +42,10 @@ describe('McpConnect — structure', () => {
     render(<McpConnect onClose={() => undefined} />);
     expect(screen.getByText(text())).toBeDefined();
   });
-
   it('has a close button', () => {
     render(<McpConnect onClose={() => undefined} />);
     expect(screen.getByRole('button', { name: /close dialog/i })).toBeDefined();
   });
-
   it('has multiple Copy buttons (at least one per copyable block)', () => {
     render(<McpConnect onClose={() => undefined} />);
     const copyBtns = screen.getAllByRole('button', { name: /copy/i });
@@ -96,7 +63,6 @@ describe('McpConnect — close behavior', () => {
     fireEvent.click(screen.getByRole('button', { name: /close dialog/i }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
-
   it('calls onClose when Esc is pressed', () => {
     const onClose = vi.fn();
     render(<McpConnect onClose={onClose} />);
@@ -104,7 +70,6 @@ describe('McpConnect — close behavior', () => {
     fireEvent.keyDown(dialog, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
-
   it('calls onClose when the backdrop is clicked', () => {
     const onClose = vi.fn();
     const { container } = render(<McpConnect onClose={onClose} />);
@@ -115,7 +80,6 @@ describe('McpConnect — close behavior', () => {
     fireEvent.click(backdrop!);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
-
   it('does NOT call onClose when clicking inside the dialog panel', () => {
     const onClose = vi.fn();
     render(<McpConnect onClose={onClose} />);
@@ -141,21 +105,17 @@ describe('McpConnect — focus management', () => {
       expect(document.activeElement).toBe(firstBtn);
     });
   });
-
   it('wraps Tab from the last focusable element back to the first', async () => {
     const dialog = await openDialog();
     const buttons = Array.from(dialog.querySelectorAll<HTMLElement>('button'));
     const last = buttons[buttons.length - 1];
     expect(last).toBeTruthy();
-
     // Focus the last button manually, then press Tab.
     last!.focus();
     expect(document.activeElement).toBe(last);
-
     fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: false });
     expect(document.activeElement).toBe(buttons[0]);
   });
-
   it('wraps Shift+Tab from the first focusable element back to the last', async () => {
     const dialog = await openDialog();
     const buttons = Array.from(dialog.querySelectorAll<HTMLElement>('button'));
@@ -163,12 +123,10 @@ describe('McpConnect — focus management', () => {
     const last = buttons[buttons.length - 1];
     expect(first).toBeTruthy();
     expect(last).toBeTruthy();
-
     // Wait for the useEffect focus to land.
     await waitFor(() => {
       expect(document.activeElement).toBe(first);
     });
-
     fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true });
     expect(document.activeElement).toBe(last);
   });
@@ -181,12 +139,10 @@ describe('McpConnect — quickstart content', () => {
     render(<McpConnect onClose={() => undefined} />);
     expect(screen.getByText(/install.*start the mcp server/i)).toBeDefined();
   });
-
   it('shows the recommended agent loop section', () => {
     render(<McpConnect onClose={() => undefined} />);
     expect(screen.getByRole('region', { name: /recommended agent loop/i })).toBeDefined();
   });
-
   it.each<[string, string | RegExp]>([
     ['the cad://conventions step', 'read cad://conventions'],
     ['the describe_scene step', /describe_scene/],
@@ -206,18 +162,15 @@ describe('McpConnectButton', () => {
     render(<McpConnectButton />);
     expect(screen.getByRole('button', { name: /^connect agent/i })).toBeDefined();
   });
-
   it('does not show the modal initially', () => {
     render(<McpConnectButton />);
     expect(screen.queryByRole('dialog')).toBeNull();
   });
-
   it('opens the modal when the trigger is clicked', () => {
     render(<McpConnectButton />);
     fireEvent.click(screen.getByRole('button', { name: /^connect agent/i }));
     expect(screen.getByRole('dialog')).toBeDefined();
   });
-
   it('closes the modal when Esc is pressed inside the modal', () => {
     render(<McpConnectButton />);
     fireEvent.click(screen.getByRole('button', { name: /^connect agent/i }));
@@ -225,16 +178,13 @@ describe('McpConnectButton', () => {
     fireEvent.keyDown(dialog, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();
   });
-
   it('restores focus to the trigger button after close', async () => {
     render(<McpConnectButton />);
     const trigger = screen.getByRole('button', { name: /^connect agent/i });
     trigger.focus();
     fireEvent.click(trigger);
-
     const dialog = screen.getByRole('dialog');
     fireEvent.keyDown(dialog, { key: 'Escape' });
-
     // Focus restore uses setTimeout(0); wait one tick.
     await waitFor(() => {
       expect(document.activeElement).toBe(trigger);
@@ -252,11 +202,7 @@ describe('McpConnect — copy buttons', () => {
       'npm --prefix server install && npm --prefix server run dev',
     ],
     ['endpoint URL (the correct port-3001 URL)', /copy endpoint url/i, 'http://localhost:3001/mcp'],
-    [
-      'read cad://conventions (the tool name)',
-      /copy read cad:\/\/conventions tool name/i,
-      'read cad://conventions',
-    ],
+    ['read cad://conventions (the tool name)', /copy read cad:\/\/conventions tool name/i, 'read cad://conventions'],
   ])('Copy button for %s calls clipboard.writeText', async (_label, name, expected) => {
     render(<McpConnect onClose={() => undefined} />);
     const copyBtns = screen.getAllByRole('button', { name });
@@ -264,16 +210,12 @@ describe('McpConnect — copy buttons', () => {
     fireEvent.click(copyBtns[0]!);
     await waitFor(() => expect(writeTextMock).toHaveBeenCalledWith(expected));
   });
-
   it('Copy button shows "Copied!" label after click', async () => {
     render(<McpConnect onClose={() => undefined} />);
     const [firstCopy] = screen.getAllByRole('button', { name: /copy install and start command/i });
     fireEvent.click(firstCopy!);
-
     await waitFor(() => {
-      expect(
-        screen.getByRole('button', { name: /install and start command copied/i }),
-      ).toBeDefined();
+      expect(screen.getByRole('button', { name: /install and start command copied/i })).toBeDefined();
     });
   });
 });
@@ -287,9 +229,7 @@ describe('copy button robustness', () => {
     fireEvent.click(copyButtons[0] as HTMLElement);
     await waitFor(() => expect(writeTextMock).toHaveBeenCalled());
     fireEvent.click(screen.getAllByRole('button', { name: /^copy /i })[1] as HTMLElement);
-    await waitFor(() =>
-      expect(screen.getAllByRole('button', { name: /copied$/i })).toHaveLength(1),
-    );
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /copied$/i })).toHaveLength(1));
     unmount();
   });
 });

@@ -1,9 +1,7 @@
 /**
- * @layer core/geometry
- * Decal projection (like three.js DecalGeometry): the solid's triangles facing the decal are
- * clipped to the decal box (±width/2, ±height/2, ±depth/2 around `center`, z along `normal`) and
- * given UVs in glTF convention (u right, v down from the top of the image). The patch is lifted
- * slightly off the surface so it never z-fights. Pure; the viewport and glTF export share it.
+ * Decal projection (like three.js DecalGeometry): the solid's triangles facing the decal are clipped to the decal box (±width/2, ±height/2,
+ * ±depth/2 around `center`, z along `normal`) and given UVs in glTF convention (u right, v down from the top of the image). The patch is
+ * lifted slightly off the surface so it never z-fights. Pure; the viewport and glTF export share it.
  */
 
 import type { Decal, Vec3 } from '../model/types';
@@ -35,21 +33,17 @@ function clip(polygon: Vec3[], axis: 0 | 1 | 2, sign: 1 | -1, limit: number): Ve
 }
 
 /**
- * The decal patch over `triangles` (same frame as the decal): triangles with positions and UVs.
- * Only faces turned toward the decal (normal · decal normal > 0.2) receive it.
+ * The decal patch over `triangles` (same frame as the decal): triangles with positions and UVs. Only faces turned toward the decal (normal
+ * · decal normal > 0.2) receive it.
  */
-export function decalPatch(
-  decal: Decal,
-  triangles: readonly Triangle[],
-): { positions: number[]; uvs: number[] } {
+export function decalPatch(decal: Decal, triangles: readonly Triangle[]): { positions: number[]; uvs: number[] } {
   const { x, y, z } = decalAxes(decal);
   const toLocal = (p: Vec3): Vec3 => {
     const d = sub3(p, decal.center);
     return [dot3(d, x), dot3(d, y), dot3(d, z)];
   };
   const lift = Math.max(decal.width, decal.height) * 1e-3;
-  const toWorld = (q: Vec3): Vec3 =>
-    add3(decal.center, add3(add3(scale3(x, q[0]), scale3(y, q[1])), scale3(z, q[2] + lift)));
+  const toWorld = (q: Vec3): Vec3 => add3(decal.center, add3(add3(scale3(x, q[0]), scale3(y, q[1])), scale3(z, q[2] + lift)));
   const positions: number[] = [];
   const uvs: number[] = [];
   const [hw, hh, hd] = [decal.width / 2, decal.height / 2, decal.depth / 2];

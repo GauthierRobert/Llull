@@ -1,18 +1,8 @@
-/**
- * Wind zone selection of one roof purlin (EN 1991-1-4 via windCoefficients).
- * @layer domain-aec
- */
+/** Wind zone selection of one roof purlin (EN 1991-1-4 via windCoefficients). */
 
 import { FLAT_ROOF_LIMIT, roofCoefficients, type ZoneCpe } from '../common/windCoefficients';
 import { DOWNWIND_ROOF_FACTOR } from '../frames/frameModelTypes';
-import {
-  type Located,
-  type WindOption,
-  pressureOf,
-  suctionOf,
-  TOLERANCE,
-  zoneOf,
-} from './purlinModel';
+import { type Located, type WindOption, pressureOf, suctionOf, TOLERANCE, zoneOf } from './purlinModel';
 import { round } from '../../shared/numeric';
 
 interface HallEnvelope {
@@ -37,20 +27,15 @@ interface PurlinWindInput {
   readonly envelope: HallEnvelope;
 }
 
-interface PurlinWind {
-  readonly zone: string;
-  readonly direction: string;
-  readonly cpe: number;
-  readonly pressureOption: WindOption;
-}
+type PurlinWind = { readonly zone: string; readonly direction: string; readonly cpe: number; readonly pressureOption: WindOption };
 
 /** Candidate of a roof zone: its governing suction and the positive pressure (0 = none) it brings. */
-const optionOf = (
-  zone: string,
-  coefficient: ZoneCpe | undefined,
-  pressure = 0,
-  direction = '',
-): WindOption => ({ zone, cpe: suctionOf(coefficient), pressure, direction });
+const optionOf = (zone: string, coefficient: ZoneCpe | undefined, pressure = 0, direction = ''): WindOption => ({
+  zone,
+  cpe: suctionOf(coefficient),
+  pressure,
+  direction,
+});
 
 /** Governing uplift zone and the worst downward-pressure zone of a purlin. */
 export function purlinWind(input: PurlinWindInput): PurlinWind {
@@ -59,8 +44,7 @@ export function purlinWind(input: PurlinWindInput): PurlinWind {
   // Wind zones (EN 1991-1-4 via windCoefficients.ts at this purlin's pitch).
   const horizontalEaves = Math.abs(purlin.start[0] - eavesEnd.start[0]);
   const horizontalRidge = Math.abs(purlin.start[0] - highEnd.start[0]);
-  const nearGable = (distance: number): boolean =>
-    purlin.yMin - y0 < distance - TOLERANCE || yEnd - purlin.yMax < distance - TOLERANCE;
+  const nearGable = (distance: number): boolean => purlin.yMin - y0 < distance - TOLERANCE || yEnd - purlin.yMax < distance - TOLERANCE;
   const along = roofCoefficients(monopitch ? 'monopitch' : 'duopitch', pitchDegrees, 90);
   const alongZone: 'F' | 'G' | 'H' | 'I' = nearGable(eAlong / 10)
     ? horizontalEaves <= eAlong / 4 + TOLERANCE
@@ -79,31 +63,13 @@ export function purlinWind(input: PurlinWindInput): PurlinWind {
     const edgeY = Math.min(purlin.yMin - y0, yEnd - purlin.yMax);
     const [nearest, farthest] = [Math.min(edgeX, edgeY), Math.max(edgeX, edgeY)];
     const flatZone: 'F' | 'G' | 'H' | 'I' =
-      nearest <= eFlat / 10 + TOLERANCE
-        ? farthest <= eFlat / 4 + TOLERANCE
-          ? 'F'
-          : 'G'
-        : nearest <= eFlat / 2
-          ? 'H'
-          : 'I';
-    options = [
-      optionOf(
-        flatZone === 'H' || flatZone === 'I' ? 'H/I' : flatZone,
-        flat[flatZone],
-        pressureOf(flat[flatZone]),
-      ),
-    ];
+      nearest <= eFlat / 10 + TOLERANCE ? (farthest <= eFlat / 4 + TOLERANCE ? 'F' : 'G') : nearest <= eFlat / 2 ? 'H' : 'I';
+    options = [optionOf(flatZone === 'H' || flatZone === 'I' ? 'H/I' : flatZone, flat[flatZone], pressureOf(flat[flatZone]))];
   } else if (monopitch) {
     const monopitchZone = (distance: number): 'F' | 'G' | 'H' =>
       distance <= eAcross / 10 + TOLERANCE ? (nearGable(eAcross / 4) ? 'F' : 'G') : 'H';
-    const [low, high] = [
-      roofCoefficients('monopitch', pitchDegrees, 0),
-      roofCoefficients('monopitch', pitchDegrees, 180),
-    ];
-    const [lowZone, highZone] = [
-      monopitchZone(horizontalEaves),
-      monopitchZone(Math.abs(purlin.start[0] - highEnd.start[0])),
-    ];
+    const [low, high] = [roofCoefficients('monopitch', pitchDegrees, 0), roofCoefficients('monopitch', pitchDegrees, 180)];
+    const [lowZone, highZone] = [monopitchZone(horizontalEaves), monopitchZone(Math.abs(purlin.start[0] - highEnd.start[0]))];
     options = [
       optionOf(lowZone, low[lowZone], pressureOf(low[lowZone]), ' (θ = 0°, wind on the low eaves)'),
       optionOf(highZone, high[highZone], 0, ' (θ = 180°, wind on the high eaves)'),
@@ -116,36 +82,21 @@ export function purlinWind(input: PurlinWindInput): PurlinWind {
     const spanIndex = valleys.filter((valley) => valley < purlin.start[0]).length;
     if (spanIndex > 0 && spanIndex < valleys.length) {
       options = [
-        {
-          zone: 'H/I',
-          cpe: DOWNWIND_ROOF_FACTOR * Math.min(suctionOf(across.H), suctionOf(across.I)),
-          pressure: 0,
-          direction: '',
-        },
+        { zone: 'H/I', cpe: DOWNWIND_ROOF_FACTOR * Math.min(suctionOf(across.H), suctionOf(across.I)), pressure: 0, direction: '' },
       ];
     } else {
-      const windwardZone: 'F' | 'G' | 'H' =
-        horizontalEaves <= eAcross / 10 + TOLERANCE ? (nearGable(eAcross / 4) ? 'F' : 'G') : 'H';
+      const windwardZone: 'F' | 'G' | 'H' = horizontalEaves <= eAcross / 10 + TOLERANCE ? (nearGable(eAcross / 4) ? 'F' : 'G') : 'H';
       const leewardZone: 'I' | 'J' = horizontalRidge <= eAcross / 10 + TOLERANCE ? 'J' : 'I';
       options = [
-        optionOf(
-          windwardZone === 'H' ? 'H/I' : windwardZone,
-          across[windwardZone],
-          pressureOf(across[windwardZone]),
-        ),
+        optionOf(windwardZone === 'H' ? 'H/I' : windwardZone, across[windwardZone], pressureOf(across[windwardZone])),
         optionOf(leewardZone === 'I' ? 'H/I' : leewardZone, across[leewardZone]),
       ];
     }
   }
-  const candidates =
-    monopitch || pitchDegrees < FLAT_ROOF_LIMIT ? options : [...options, alongOption];
-  const upliftOption = candidates.reduce((worstCase, option) =>
-    option.cpe < worstCase.cpe ? option : worstCase,
-  );
+  const candidates = monopitch || pitchDegrees < FLAT_ROOF_LIMIT ? options : [...options, alongOption];
+  const upliftOption = candidates.reduce((worstCase, option) => (option.cpe < worstCase.cpe ? option : worstCase));
   const { zone, direction } = upliftOption;
   const cpe = round(upliftOption.cpe, 3);
-  const pressureOption = options.reduce((best, option) =>
-    option.pressure > best.pressure ? option : best,
-  );
+  const pressureOption = options.reduce((best, option) => (option.pressure > best.pressure ? option : best));
   return { zone, direction, cpe, pressureOption };
 }

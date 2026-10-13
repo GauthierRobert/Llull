@@ -1,13 +1,4 @@
-/**
- * @layer ui/viewport/3d
- *
- * NamedViews — savable camera bookmarks for the 3D viewport.
- *
- * `NamedViewsOverlay` is mounted OUTSIDE the Canvas; it reads `useNamedViewStore` and drives the
- * camera through `cameraBridge` (placeCamera / getCameraSnapshot).
- *
- * Purely presentational: reads stores and never mutates the document (PRIME DIRECTIVE).
- */
+// DOM overlay of camera bookmarks (useNamedViewStore), driving the camera through cameraBridge.
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useNamedViewStore } from '@ui/store';
@@ -15,7 +6,6 @@ import { Icon } from '@ui/components/Icon';
 import { enterEscapeKeys } from '../enterEscapeKeys';
 import { getCameraSnapshot, placeCamera } from './cameraBridge';
 
-/** Rendered OUTSIDE the Canvas as a DOM overlay. */
 export function NamedViewsOverlay(): React.ReactElement {
   const namedViews = useNamedViewStore((s) => s.namedViews);
   const saveNamedView = useNamedViewStore((s) => s.saveNamedView);
@@ -26,14 +16,13 @@ export function NamedViewsOverlay(): React.ReactElement {
   const [isExpanded, setIsExpanded] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Focus the name field once the panel opens.
   useEffect(() => {
     if (isExpanded) inputRef.current?.focus();
   }, [isExpanded]);
 
   const handleSave = (): void => {
     const trimmed = newName.trim();
-    if (trimmed === '') return; // ignore blank names — don't silently create a "View"
+    if (trimmed === '') return; // no silent "View"
     saveNamedView(trimmed, getCameraSnapshot);
     setNewName('');
   };
@@ -54,12 +43,7 @@ export function NamedViewsOverlay(): React.ReactElement {
       </button>
 
       {isExpanded && (
-        <div
-          id="named-views-panel"
-          className="vp-popover named-views-panel"
-          role="region"
-          aria-label="Named views panel"
-        >
+        <div id="named-views-panel" className="vp-popover named-views-panel" role="region" aria-label="Named views panel">
           <div className="named-views-save-row">
             <label className="visually-hidden" htmlFor="named-view-name-input">
               Name

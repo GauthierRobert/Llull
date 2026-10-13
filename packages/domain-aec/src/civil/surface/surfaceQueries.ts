@@ -1,7 +1,4 @@
-/**
- * Read-only terrain queries: spot elevations / slopes and a surface statistics report.
- * @layer domain-aec/civil
- */
+/** Read-only terrain queries: spot elevations / slopes and a surface statistics report. */
 
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
@@ -13,8 +10,6 @@ import { toMetres } from '@core/model/units';
 import { round } from '../../shared/numeric';
 
 /**
- * @command surface_elevation
- * @pure
  * @affects none (read-only)
  * @failure unknown surface -> no-op
  */
@@ -46,9 +41,7 @@ export const surfaceElevation = defineCommand({
     const listed = samples
       .slice(0, 5)
       .map((sample) =>
-        sample.elevation === null
-          ? 'outside'
-          : `${toMetres(doc, sample.elevation).toFixed(3)} m (${sample.slopePercent} %)`,
+        sample.elevation === null ? 'outside' : `${toMetres(doc, sample.elevation).toFixed(3)} m (${sample.slopePercent} %)`,
       )
       .join('; ');
     return report(
@@ -60,8 +53,6 @@ export const surfaceElevation = defineCommand({
 });
 
 /**
- * @command surface_report
- * @pure
  * @affects none (read-only)
  * @failure unknown surface -> no-op
  */
@@ -111,9 +102,8 @@ export const surfaceReport = defineCommand({
     };
     return report(
       doc,
-      `${surface.name}: ${data.points} points, ${data.triangles} triangles, ${data.planAreaM2} m²; ` +
-        `elevation ${data.minElevationM}–${data.maxElevationM} m (mean ${data.meanElevationM} m); ` +
-        `mean slope ${data.meanSlopePercent} %.`,
+      `${surface.name}: ${data.points} points, ${data.triangles} triangles, ${data.planAreaM2} m²; elevation ` +
+        `${data.minElevationM}–${data.maxElevationM} m (mean ${data.meanElevationM} m); mean slope ${data.meanSlopePercent} %.`,
       data,
     );
   },

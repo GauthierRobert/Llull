@@ -1,14 +1,7 @@
 /**
- * @layer ui/viewport/2d
- *
- * Shift + drag in the 2D view while no draw or modify tool is armed: a rubber-band box selects
- * entities — drag left -> right = window (solid outline, fully inside), right -> left = crossing
- * (dashed outline, touching). The selection is ADDED to the current one (Shift = additive).
- * Shift is the gesture because MapControls ignore a Shift-press with rotation disabled, so the
- * drag never pans; a plain drag still pans and a plain click still selects (SelectPickInteraction
- * ignores clicks that travelled).
- *
- * Presentation only — selection is view state set through the store's `select` (R1).
+ * Shift + drag (no tool armed): rubber-band box ADDED to the selection — left→right window (solid, fully inside),
+ * right→left crossing (dashed, touching). Shift because MapControls ignore it with rotation off, so it never pans;
+ * a plain drag pans and a plain click selects (SelectPickInteraction ignores travelled clicks).
  */
 
 import { useCallback, useState } from 'react';
@@ -27,17 +20,11 @@ import { useCaptureKeydown } from '@ui/hooks/useCaptureKeydown';
 const DASH_PX = 6;
 
 interface BoxSelectInteractionProps {
-  /** Current ortho camera zoom (px per world unit) — scales the dash length. */
+  /** Px per world unit; scales the dash. */
   zoom: number;
 }
 
-interface RubberBandProps {
-  start: Vec2;
-  end: Vec2;
-  zoom: number;
-}
-
-function RubberBand({ start, end, zoom }: RubberBandProps): React.ReactElement {
+function RubberBand({ start, end, zoom }: { start: Vec2; end: Vec2; zoom: number }): React.ReactElement {
   const crossing = boxSelectMode(start, end) === 'crossing';
   const solid = useOverlayMaterial(OVERLAY_ACCENT, 0.9);
   const dash = pixelsToWorld(DASH_PX, zoom);
@@ -78,7 +65,7 @@ export function BoxSelectInteraction({ zoom }: BoxSelectInteractionProps): React
   const [drag, setDrag] = useState<{ start: Vec2; end: Vec2 } | null>(null);
   const dragging = drag !== null;
 
-  // Esc cancels the box in progress (and only that): the release then selects nothing.
+  // Esc cancels only the box in progress: the release then selects nothing.
   const cancelOnEscape = useCallback((e: KeyboardEvent): void => {
     if (e.key !== 'Escape') return;
     e.preventDefault();

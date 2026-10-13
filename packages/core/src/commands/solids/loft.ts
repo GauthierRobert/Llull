@@ -1,17 +1,11 @@
+import { idOrNext } from '../entity/explicitId';
 import type { CadDocument, Vec2, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
 import { failer } from '../noop';
 import { centroid3, distance3, dot3, sub3 } from '../../lib/vec3';
 import { newEntity } from '../entity/newEntity';
-import {
-  DEFAULT_SOLID_COLOR,
-  commitSolid,
-  existingLayerOrDefault,
-  solidStyleFields,
-  explicitIdOrNext,
-  explicitIdTaken,
-} from './shared';
+import { DEFAULT_SOLID_COLOR, commitSolid, existingLayerOrDefault, solidStyleFields, explicitIdTaken } from './shared';
 import { sketchLoop } from './sketchCurves';
 import { type SectionSpec, sectionSpecFields, specPolygon } from './sectionSpecs';
 import { alignRing, resampleRing } from '../../geometry/sectionRing';
@@ -34,11 +28,9 @@ function placedSections(
   sectionIds: readonly string[] | undefined,
   sections: readonly InlineSection[] | undefined,
 ): PlacedSection[] | string {
-  if ((sectionIds === undefined) === (sections === undefined))
-    return 'give exactly one of sectionIds or sections';
+  if ((sectionIds === undefined) === (sections === undefined)) return 'give exactly one of sectionIds or sections';
   const count = (sectionIds ?? sections ?? []).length;
-  if (count < 2 || count > MAX_LOFT_SECTIONS)
-    return `a loft needs 2..${MAX_LOFT_SECTIONS} sections (got ${count})`;
+  if (count < 2 || count > MAX_LOFT_SECTIONS) return `a loft needs 2..${MAX_LOFT_SECTIONS} sections (got ${count})`;
   const placed: PlacedSection[] = [];
   for (let i = 0; i < count; i++) {
     if (sectionIds !== undefined) {
@@ -60,9 +52,7 @@ function placedSections(
  * aligned to their predecessor (no twist); or an error message.
  */
 function loftRingsOf(placed: readonly PlacedSection[]): Vec3[][] | string {
-  const raw = placed.map(({ polygon, origin, rotation }) =>
-    resampleRing(polygon).map((local) => planeToWorld(origin, rotation, local)),
-  );
+  const raw = placed.map(({ polygon, origin, rotation }) => resampleRing(polygon).map((local) => planeToWorld(origin, rotation, local)));
   const centres = raw.map((ring) => centroid3(ring));
   for (let i = 1; i < centres.length; i++) {
     if (distance3(centres[i] as Vec3, centres[i - 1] as Vec3) < 1e-6)
@@ -73,8 +63,7 @@ function loftRingsOf(placed: readonly PlacedSection[]): Vec3[][] | string {
     const ahead = centres[Math.min(i + 1, centres.length - 1)] as Vec3;
     const behind = centres[Math.max(i - 1, 0)] as Vec3;
     const travel = sub3(ahead, behind);
-    const oriented =
-      dot3(ringNormal(ring), travel) >= 0 ? ring : [ring[0] as Vec3, ...ring.slice(1).reverse()];
+    const oriented = dot3(ringNormal(ring), travel) >= 0 ? ring : [ring[0] as Vec3, ...ring.slice(1).reverse()];
     const previous = rings[i - 1];
     rings.push(previous === undefined ? oriented : alignRing(oriented, previous));
   });
@@ -82,9 +71,6 @@ function loftRingsOf(placed: readonly PlacedSection[]): Vec3[][] | string {
 }
 
 /**
- * @command loft_sections
- * @pure
- * @layer core/commands
  * @affects creates 1 loft entity positioned at the first section's centre
  * @invariant >= 2 sections with distinct centres; rings share point count, winding and start
  * @failure fewer than 2 / ambiguous / invalid sections, coincident centres, duplicate id -> no-op
@@ -104,34 +90,22 @@ export const loftSections = defineCommand({
   params: z.object({
     sectionIds: z
       .array(z.string())
-      .describe(
-        'Ids of closed 2D sketches, in loft order, each in its own (parallel or tilted) plane.',
-      )
+      .describe('Ids of closed 2D sketches, in loft order, each in its own (parallel or tilted) plane.')
       .optional(),
     sections: z
       .array(
         z.object({
           center: vec3('Section plane origin [x, y, z] in world coordinates.'),
-          rotation: vec3(
-            'Section plane rotation, Euler XYZ radians; [0, 0, 0] lays the section in the XY plane.',
-          ).optional(),
+          rotation: vec3('Section plane rotation, Euler XYZ radians; [0, 0, 0] lays the section in the XY plane.').optional(),
           ...sectionSpecFields,
         }),
       )
       .describe('Inline sections in loft order (alternative to sectionIds).')
       .optional(),
-    ruled: z
-      .boolean()
-      .describe(
-        'true: straight lines between neighbouring sections; false (default): smooth blend.',
-      )
-      .optional(),
+    ruled: z.boolean().describe('true: straight lines between neighbouring sections; false (default): smooth blend.').optional(),
     ...solidStyleFields(),
   }),
-  run: (
-    doc,
-    { sectionIds, sections, ruled = false, layerId, color = DEFAULT_SOLID_COLOR, id: explicitId },
-  ): CommandResult => {
+  run: (doc, { sectionIds, sections, ruled = false, layerId, color = DEFAULT_SOLID_COLOR, id: explicitId }): CommandResult => {
     const fail = failer(doc, 'loft_sections');
     if (explicitIdTaken(doc, explicitId)) return fail(`entity id "${explicitId}" already exists`);
     const placed = placedSections(doc, sectionIds, sections);
@@ -140,10 +114,8 @@ export const loftSections = defineCommand({
     if (typeof world === 'string') return fail(world);
     const origin = centroid3(world[0] as Vec3[]);
     const rings = world.map((ring) => ring.map((p) => sub3(p, origin)));
-    const id = explicitIdOrNext(explicitId, 'loft');
-    const entity = newEntity('loft', id, { rings, ruled }, origin, color, {
-      layerId: existingLayerOrDefault(doc, layerId),
-    });
+    const id = idOrNext(explicitId, 'loft');
+    const entity = newEntity('loft', id, { rings, ruled }, origin, color, { layerId: existingLayerOrDefault(doc, layerId) });
     const span = distance3(origin, centroid3(world[world.length - 1] as Vec3[]));
     return commitSolid(
       doc,

@@ -1,5 +1,4 @@
 /**
- * @layer server
  * Environment parsing shared by every server module: one definition of "a positive number from an
  * env variable", of the exchange directory and of "this process is a test run".
  */

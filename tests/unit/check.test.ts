@@ -1,416 +1,91 @@
-/**
- * Unit tests for the `check_model` command and `runModelChecks` helper.
- *
- * Strategy (workflow W3):
- *  - One test per issue code: construct the minimal doc that exhibits it, assert
- *    the right severity and code appear.
- *  - Happy path: a clean doc → ok:true, issues:[].
- *  - Purity: same doc reference returned, affected:[].
- *  - ids are step-scoped (deterministic per document), no counter reset needed.
- */
-
 import { describe, it, expect } from 'vitest';
 import { type CadDocument, type Entity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { withEntity } from '@core/commands/entity/entityOps';
 import { groupedBoxes } from '../helpers/groupedBoxes';
 import { type CheckResult, runModelChecks } from '@core/commands/inspect/checkModel';
+import { expectNoOp, expectPure } from '../helpers/expectNoOp';
+import { build, pline } from '../helpers/addEntity';
+import { xy } from '../helpers/xy';
 
-// Helpers
+const BASE = { position: [0, 0, 0] as const, rotation: [0, 0, 0] as const, layerId: 'layer-default', color: '#ffffff' };
+const raw = (e: Record<string, unknown>): CadDocument => withEntity(createEmptyDocument(), { ...BASE, id: 'x', ...e } as Entity);
+const issues = (doc: CadDocument, code: string, far = 1e6): CheckResult['issues'] =>
+  runModelChecks(doc, far).issues.filter((i) => i.code === code);
 
-const BASE = {
-  position: [0, 0, 0] as const,
-  rotation: [0, 0, 0] as const,
-  layerId: 'layer-default',
-  color: '#ffffff',
-};
-
-// check_model — happy path
-
-describe('check_model — clean document', () => {
-  it('returns ok:true for an empty document (empty-layer info does not make ok=false)', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'check_model', {});
-    const data = result.data as CheckResult;
-    // An empty document has one empty layer → one info issue. ok is still true (no errors).
+describe('check_model', () => {
+  it('is a pure query; empty and well-formed documents are ok (empty-layer info only)', () => {
+    const empty = createEmptyDocument();
+    expectPure(empty, () => expectNoOp(execute(empty, 'check_model', {}), empty));
+    const data = execute(empty, 'check_model', {}).data as CheckResult;
     expect(data.ok).toBe(true);
     expect(data.issues.filter((i) => i.severity === 'error')).toHaveLength(0);
+    const solids = build(['add_box', { size: [2, 2, 2] }], ['add_cylinder', { radius: 1, height: 3 }], ['add_sphere', { radius: 1.5 }]).doc;
+    expect(execute(solids, 'check_model', {}).data).toMatchObject({ ok: true, issues: [] });
   });
 
-  it('returns ok:true for a document with well-formed entities', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
-    doc = execute(doc, 'add_cylinder', { radius: 1, height: 3 }).document;
-    doc = execute(doc, 'add_sphere', { radius: 1.5 }).document;
-    const result = execute(doc, 'check_model', {});
-    const data = result.data as CheckResult;
+  it.each<[string, Record<string, unknown>]>([
+    ['degenerate_size', { kind: 'box', size: [1, 0, 1] }],
+    ['degenerate_size', { kind: 'cylinder', radius: -1, height: 5 }],
+    ['degenerate_size', { kind: 'cylinder', radius: 2, height: 0 }],
+    ['degenerate_size', { kind: 'sphere', radius: 0 }],
+    ['degenerate_size', { kind: 'extrusion', profile: xy(0, 0, 1, 0, 1, 1, 0, 1), depth: 0 }],
+    ['degenerate_size', { kind: 'circle', center: [0, 0], radius: -2 }],
+    ['degenerate_size', { kind: 'arc', center: [0, 0], radius: 0, startAngle: 0, endAngle: 1 }],
+    ['degenerate_size', { kind: 'ellipse', center: [0, 0], radiusX: 0, radiusY: 1 }],
+    ['degenerate_size', { kind: 'ellipse', center: [0, 0], radiusX: 1, radiusY: -1 }],
+    ['insufficient_points', { kind: 'polyline', points: [[0, 0]], closed: false }],
+    ['insufficient_points', { kind: 'polyline', points: [], closed: false }],
+    ['insufficient_points', { kind: 'spline', points: [[0, 0]], closed: false }],
+  ])('flags %s as an error for %j (ok=false, summary counts)', (code, e) => {
+    const doc = raw(e);
+    expect(issues(doc, code)).toEqual([expect.objectContaining({ entityId: 'x', severity: 'error' })]);
+    expect(runModelChecks(doc, 1e6).ok).toBe(false);
+    const { summary } = execute(doc, 'check_model', {});
+    expect(summary).toContain('error');
+    expect(summary).toContain('ok=');
+  });
+
+  it.each<[string, Array<readonly [string, unknown]>]>([
+    ['degenerate_size', [['add_box', { size: [1, 2, 3] }]]],
+    ['open_profile', [pline([0, 0, 1, 0, 1, 1], { closed: true })]],
+    ['insufficient_points', [pline([0, 0, 1, 0])]],
+    ['far_from_origin', [['add_box', { size: [1, 1, 1], position: [0, 0, 0] }]]],
+    ['empty_layer', [['add_box', { size: [1, 1, 1] }]]],
+    ['parameter_error', [['set_parameter', { name: 'width', expression: '10' }]]],
+  ])('does not flag %s on a healthy model', (code, steps) => expect(issues(build(...steps).doc, code)).toHaveLength(0));
+
+  it('warns on open profiles (still ok) and far-from-origin entities (custom threshold too)', () => {
+    const open = build(pline([0, 0, 1, 0, 1, 1], { closed: false })).doc;
+    expect(issues(open, 'open_profile')).toEqual([expect.objectContaining({ severity: 'warning' })]);
+    const data = runModelChecks(open, 1e6);
+    expect(data.issues.filter((i) => i.severity === 'error')).toHaveLength(0);
     expect(data.ok).toBe(true);
-    expect(data.issues).toHaveLength(0);
-  });
-});
-
-// Purity
-
-describe('check_model — purity', () => {
-  it('returns the SAME doc reference and affected:[]', () => {
-    const doc = createEmptyDocument();
-    const snapshot = JSON.stringify(doc);
-    const result = execute(doc, 'check_model', {});
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-});
-
-// degenerate_size
-
-describe('check_model — degenerate_size', () => {
-  it('flags a box with a zero size component', () => {
-    const badBox: Entity = { ...BASE, id: 'b1', kind: 'box', size: [1, 0, 1] };
-    const doc = withEntity(createEmptyDocument(), badBox);
-    const { issues } = runModelChecks(doc, 1e6);
-    const hit = issues.find((i) => i.code === 'degenerate_size' && i.entityId === 'b1');
-    expect(hit).toBeDefined();
-    expect(hit!.severity).toBe('error');
+    expect(issues(build(['add_box', { size: [1, 1, 1], position: [2e6, 0, 0] }]).doc, 'far_from_origin')).toEqual([
+      expect.objectContaining({ severity: 'warning' }),
+    ]);
+    const near = build(['add_box', { size: [1, 1, 1], position: [500, 0, 0] }]).doc;
+    const tight = execute(near, 'check_model', { farThreshold: 100 }).data as CheckResult;
+    expect(tight.issues.some((i) => i.code === 'far_from_origin')).toBe(true);
+    expect((execute(near, 'check_model', {}).data as CheckResult).issues.some((i) => i.code === 'far_from_origin')).toBe(false);
   });
 
-  it('flags a cylinder with radius ≤ 0', () => {
-    const bad: Entity = { ...BASE, id: 'c1', kind: 'cylinder', radius: -1, height: 5 };
-    const doc = withEntity(createEmptyDocument(), bad);
-    const { issues } = runModelChecks(doc, 1e6);
-    const hit = issues.find((i) => i.code === 'degenerate_size' && i.entityId === 'c1');
-    expect(hit).toBeDefined();
-    expect(hit!.severity).toBe('error');
-  });
-
-  it('flags a cylinder with height ≤ 0', () => {
-    const bad: Entity = { ...BASE, id: 'c2', kind: 'cylinder', radius: 2, height: 0 };
-    const doc = withEntity(createEmptyDocument(), bad);
-    const { issues } = runModelChecks(doc, 1e6);
-    const hit = issues.find((i) => i.code === 'degenerate_size' && i.entityId === 'c2');
-    expect(hit).toBeDefined();
-    expect(hit!.severity).toBe('error');
-  });
-
-  it('flags a sphere with radius ≤ 0', () => {
-    const bad: Entity = { ...BASE, id: 's1', kind: 'sphere', radius: 0 };
-    const doc = withEntity(createEmptyDocument(), bad);
-    const { issues } = runModelChecks(doc, 1e6);
-    const hit = issues.find((i) => i.code === 'degenerate_size' && i.entityId === 's1');
-    expect(hit).toBeDefined();
-    expect(hit!.severity).toBe('error');
-  });
-
-  it('flags an extrusion with depth ≤ 0', () => {
-    const bad: Entity = {
-      ...BASE,
-      id: 'e1',
-      kind: 'extrusion',
-      profile: [
-        [0, 0],
-        [1, 0],
-        [1, 1],
-        [0, 1],
-      ],
-      depth: 0,
-    };
-    const doc = withEntity(createEmptyDocument(), bad);
-    const { issues } = runModelChecks(doc, 1e6);
-    const hit = issues.find((i) => i.code === 'degenerate_size' && i.entityId === 'e1');
-    expect(hit).toBeDefined();
-    expect(hit!.severity).toBe('error');
-  });
-
-  it('flags a circle with radius ≤ 0', () => {
-    const bad: Entity = { ...BASE, id: 'ci1', kind: 'circle', center: [0, 0], radius: -2 };
-    const doc = withEntity(createEmptyDocument(), bad);
-    const { issues } = runModelChecks(doc, 1e6);
-    const hit = issues.find((i) => i.code === 'degenerate_size' && i.entityId === 'ci1');
-    expect(hit).toBeDefined();
-    expect(hit!.severity).toBe('error');
-  });
-
-  it('flags an arc with radius ≤ 0', () => {
-    const bad: Entity = {
-      ...BASE,
-      id: 'a1',
-      kind: 'arc',
-      center: [0, 0],
-      radius: 0,
-      startAngle: 0,
-      endAngle: 1,
-    };
-    const doc = withEntity(createEmptyDocument(), bad);
-    const { issues } = runModelChecks(doc, 1e6);
-    const hit = issues.find((i) => i.code === 'degenerate_size' && i.entityId === 'a1');
-    expect(hit).toBeDefined();
-    expect(hit!.severity).toBe('error');
-  });
-
-  it('flags an ellipse with radiusX ≤ 0', () => {
-    const bad: Entity = {
-      ...BASE,
-      id: 'el1',
-      kind: 'ellipse',
-      center: [0, 0],
-      radiusX: 0,
-      radiusY: 1,
-    };
-    const doc = withEntity(createEmptyDocument(), bad);
-    const { issues } = runModelChecks(doc, 1e6);
-    const hit = issues.find((i) => i.code === 'degenerate_size' && i.entityId === 'el1');
-    expect(hit).toBeDefined();
-    expect(hit!.severity).toBe('error');
-  });
-
-  it('flags an ellipse with radiusY ≤ 0', () => {
-    const bad: Entity = {
-      ...BASE,
-      id: 'el2',
-      kind: 'ellipse',
-      center: [0, 0],
-      radiusX: 1,
-      radiusY: -1,
-    };
-    const doc = withEntity(createEmptyDocument(), bad);
-    const { issues } = runModelChecks(doc, 1e6);
-    const hit = issues.find((i) => i.code === 'degenerate_size' && i.entityId === 'el2');
-    expect(hit).toBeDefined();
-    expect(hit!.severity).toBe('error');
-  });
-
-  it('does NOT flag a well-formed box', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 2, 3] }).document;
-    const { issues } = runModelChecks(doc, 1e6);
-    expect(issues.filter((i) => i.code === 'degenerate_size')).toHaveLength(0);
-  });
-});
-
-// open_profile
-
-describe('check_model — open_profile', () => {
-  it('flags an open polyline with a warning', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'draw_polyline', {
-      points: [
-        [0, 0],
-        [1, 0],
-        [1, 1],
-      ],
-      closed: false,
-    }).document;
-    const { issues } = runModelChecks(doc, 1e6);
-    const hit = issues.find((i) => i.code === 'open_profile');
-    expect(hit).toBeDefined();
-    expect(hit!.severity).toBe('warning');
-  });
-
-  it('does NOT flag a closed polyline', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'draw_polyline', {
-      points: [
-        [0, 0],
-        [1, 0],
-        [1, 1],
-      ],
-      closed: true,
-    }).document;
-    const { issues } = runModelChecks(doc, 1e6);
-    expect(issues.filter((i) => i.code === 'open_profile')).toHaveLength(0);
-  });
-});
-
-// insufficient_points
-
-describe('check_model — insufficient_points', () => {
-  it('flags a polyline with fewer than 2 points', () => {
-    const bad: Entity = { ...BASE, id: 'pl1', kind: 'polyline', points: [[0, 0]], closed: false };
-    const doc = withEntity(createEmptyDocument(), bad);
-    const { issues } = runModelChecks(doc, 1e6);
-    const hit = issues.find((i) => i.code === 'insufficient_points' && i.entityId === 'pl1');
-    expect(hit).toBeDefined();
-    expect(hit!.severity).toBe('error');
-  });
-
-  it('flags a polyline with zero points', () => {
-    const bad: Entity = { ...BASE, id: 'pl2', kind: 'polyline', points: [], closed: false };
-    const doc = withEntity(createEmptyDocument(), bad);
-    const { issues } = runModelChecks(doc, 1e6);
-    const hit = issues.find((i) => i.code === 'insufficient_points' && i.entityId === 'pl2');
-    expect(hit).toBeDefined();
-    expect(hit!.severity).toBe('error');
-  });
-
-  it('flags a spline with fewer than 2 points', () => {
-    const bad: Entity = { ...BASE, id: 'sp1', kind: 'spline', points: [[0, 0]], closed: false };
-    const doc = withEntity(createEmptyDocument(), bad);
-    const { issues } = runModelChecks(doc, 1e6);
-    const hit = issues.find((i) => i.code === 'insufficient_points' && i.entityId === 'sp1');
-    expect(hit).toBeDefined();
-    expect(hit!.severity).toBe('error');
-  });
-
-  it('does NOT flag a polyline with 2 or more points', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'draw_polyline', {
-      points: [
-        [0, 0],
-        [1, 0],
-      ],
-    }).document;
-    const { issues } = runModelChecks(doc, 1e6);
-    expect(issues.filter((i) => i.code === 'insufficient_points')).toHaveLength(0);
-  });
-});
-
-// far_from_origin
-
-describe('check_model — far_from_origin', () => {
-  it('flags an entity whose bounding-box center exceeds the threshold', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1], position: [2e6, 0, 0] }).document;
-    const { issues } = runModelChecks(doc, 1e6);
-    const hit = issues.find((i) => i.code === 'far_from_origin');
-    expect(hit).toBeDefined();
-    expect(hit!.severity).toBe('warning');
-  });
-
-  it('does NOT flag an entity within the threshold', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] }).document;
-    const { issues } = runModelChecks(doc, 1e6);
-    expect(issues.filter((i) => i.code === 'far_from_origin')).toHaveLength(0);
-  });
-
-  it('respects a custom farThreshold param', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1], position: [500, 0, 0] }).document;
-    // tight threshold: 100
-    const result = execute(doc, 'check_model', { farThreshold: 100 });
-    const data = result.data as CheckResult;
-    const hit = data.issues.find((i) => i.code === 'far_from_origin');
-    expect(hit).toBeDefined();
-    // same entity is clean with default (1e6) threshold
-    const clean = execute(doc, 'check_model', {});
-    const cleanData = clean.data as CheckResult;
-    expect(cleanData.issues.filter((i) => i.code === 'far_from_origin')).toHaveLength(0);
-  });
-});
-
-// empty_layer
-
-describe('check_model — empty_layer', () => {
-  it('flags a layer with no entities as info', () => {
-    // The empty document has 'layer-default' with no entities.
-    const doc = createEmptyDocument();
-    const { issues } = runModelChecks(doc, 1e6);
-    const hit = issues.find((i) => i.code === 'empty_layer');
-    expect(hit).toBeDefined();
-    expect(hit!.severity).toBe('info');
-    expect(hit!.message).toContain('layer-default');
-  });
-
-  it('does NOT flag a layer that has entities', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    const { issues } = runModelChecks(doc, 1e6);
-    expect(issues.filter((i) => i.code === 'empty_layer')).toHaveLength(0);
-  });
-});
-
-// orphaned_group_member
-
-describe('check_model — orphaned_group_member', () => {
-  it('flags a group that references a missing entity id', () => {
-    const doc: CadDocument = {
+  it('reports empty layers (info), orphaned group members and parameter errors', () => {
+    expect(issues(createEmptyDocument(), 'empty_layer')).toEqual([
+      expect.objectContaining({ severity: 'info', message: expect.stringContaining('layer-default') }),
+    ]);
+    const orphan: CadDocument = { ...createEmptyDocument(), groups: { g1: { id: 'g1', name: 'Broken Group', memberIds: ['ghost-id'] } } };
+    expect(issues(orphan, 'orphaned_group_member')).toEqual([
+      expect.objectContaining({ severity: 'error', entityId: 'ghost-id', message: expect.stringContaining('ghost-id') }),
+    ]);
+    expect(issues(groupedBoxes('Good').doc, 'orphaned_group_member')).toHaveLength(0);
+    const broken: CadDocument = {
       ...createEmptyDocument(),
-      groups: {
-        g1: { id: 'g1', name: 'Broken Group', memberIds: ['ghost-id'] },
-      },
+      parameters: { broken: { name: 'broken', expression: 'unknown_ref * 2', value: 0, error: 'unknown parameter: unknown_ref' } },
     };
-    const { issues } = runModelChecks(doc, 1e6);
-    const hit = issues.find((i) => i.code === 'orphaned_group_member');
-    expect(hit).toBeDefined();
-    expect(hit!.severity).toBe('error');
-    expect(hit!.entityId).toBe('ghost-id');
-    expect(hit!.message).toContain('ghost-id');
-  });
-
-  it('does NOT flag a group whose members all exist', () => {
-    const { doc } = groupedBoxes('Good');
-    const { issues } = runModelChecks(doc, 1e6);
-    expect(issues.filter((i) => i.code === 'orphaned_group_member')).toHaveLength(0);
-  });
-});
-
-// parameter_error
-
-describe('check_model — parameter_error', () => {
-  it('flags a parameter whose error field is set', () => {
-    const doc: CadDocument = {
-      ...createEmptyDocument(),
-      parameters: {
-        broken: {
-          name: 'broken',
-          expression: 'unknown_ref * 2',
-          value: 0,
-          error: 'unknown parameter: unknown_ref',
-        },
-      },
-    };
-    const { issues } = runModelChecks(doc, 1e6);
-    const hit = issues.find((i) => i.code === 'parameter_error');
-    expect(hit).toBeDefined();
-    expect(hit!.severity).toBe('error');
+    const [hit] = issues(broken, 'parameter_error');
+    expect(hit).toMatchObject({ severity: 'error' });
     expect(hit!.message).toContain('broken');
     expect(hit!.message).toContain('unknown parameter');
-  });
-
-  it('does NOT flag a parameter with no error', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'set_parameter', { name: 'width', expression: '10' }).document;
-    const { issues } = runModelChecks(doc, 1e6);
-    expect(issues.filter((i) => i.code === 'parameter_error')).toHaveLength(0);
-  });
-});
-
-// ok flag
-
-describe('check_model — ok flag', () => {
-  it('ok is false when there are error-severity issues', () => {
-    const bad: Entity = { ...BASE, id: 'b1', kind: 'box', size: [0, 1, 1] };
-    const doc = withEntity(createEmptyDocument(), bad);
-    const data = runModelChecks(doc, 1e6);
-    expect(data.ok).toBe(false);
-  });
-
-  it('ok is true when there are only warnings/info but no errors', () => {
-    let doc = createEmptyDocument();
-    // open polyline → warning; empty layer-default has entity now so no empty-layer info
-    doc = execute(doc, 'draw_polyline', {
-      points: [
-        [0, 0],
-        [1, 0],
-        [1, 1],
-      ],
-      closed: false,
-    }).document;
-    const data = runModelChecks(doc, 1e6);
-    // no error issues
-    expect(data.issues.filter((i) => i.severity === 'error')).toHaveLength(0);
-    expect(data.ok).toBe(true);
-  });
-});
-
-// summary string
-
-describe('check_model — summary', () => {
-  it('summary mentions counts when issues are present', () => {
-    const bad: Entity = { ...BASE, id: 'b1', kind: 'box', size: [-1, 1, 1] };
-    const doc = withEntity(createEmptyDocument(), bad);
-    const result = execute(doc, 'check_model', {});
-    expect(result.summary).toContain('error');
-    expect(result.summary).toContain('ok=');
   });
 });

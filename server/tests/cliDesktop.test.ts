@@ -1,7 +1,4 @@
-/**
- * @layer server/tests
- * The CLI ⇄ desktop app hand-off: the discovery file (~/.llull/desktop.json) and `--app` / `status`.
- */
+/** The CLI ⇄ desktop app hand-off: the discovery file (~/.llull/desktop.json) and `--app` / `status`. */
 
 import { describe, expect, it } from 'vitest';
 import { mkdtempSync, statSync, writeFileSync, existsSync } from 'node:fs';
@@ -17,20 +14,9 @@ import {
 import { EXIT_OK, EXIT_USAGE, runCli, type CliIo } from '../src/cli/main';
 
 const newHome = (): string => mkdtempSync(path.join(tmpdir(), 'llull-home-'));
-const app = {
-  url: 'http://127.0.0.1:47827',
-  token: 'launch-token',
-  pid: process.pid,
-  documentPath: null,
-  version: '0.1.0',
-};
+const app = { url: 'http://127.0.0.1:47827', token: 'launch-token', pid: process.pid, documentPath: null, version: '0.1.0' };
 
-function capture(env: Record<string, string>): {
-  io: CliIo;
-  out: string[];
-  err: string[];
-  calls: { url: string; auth: string | null }[];
-} {
+function capture(env: Record<string, string>): { io: CliIo; out: string[]; err: string[]; calls: { url: string; auth: string | null }[] } {
   const out: string[] = [];
   const err: string[] = [];
   const calls: { url: string; auth: string | null }[] = [];
@@ -46,11 +32,7 @@ function capture(env: Record<string, string>): {
       prepareKernel: () => Promise.resolve(),
       fetchImpl: (url, init) => {
         calls.push({ url, auth: new Headers(init.headers).get('Authorization') });
-        return Promise.resolve(
-          new Response(
-            JSON.stringify({ summary: 'ok', affected: [], isError: false, changed: true }),
-          ),
-        );
+        return Promise.resolve(new Response(JSON.stringify({ summary: 'ok', affected: [], isError: false, changed: true })));
       },
     },
   };
@@ -61,8 +43,7 @@ describe('desktop discovery file', () => {
     const home = newHome();
     writeDesktopDiscovery(home, app);
     expect(readDesktopDiscovery(home)).toEqual(app);
-    if (process.platform !== 'win32')
-      expect(statSync(desktopDiscoveryPath(home)).mode & 0o077).toBe(0);
+    if (process.platform !== 'win32') expect(statSync(desktopDiscoveryPath(home)).mode & 0o077).toBe(0);
     removeDesktopDiscovery(home, process.pid + 1);
     expect(existsSync(desktopDiscoveryPath(home))).toBe(true);
     removeDesktopDiscovery(home, process.pid);
@@ -77,10 +58,7 @@ describe('desktop discovery file', () => {
     expect(readDesktopDiscovery(home)).toBeNull();
     writeFileSync(desktopDiscoveryPath(home), '[]');
     expect(readDesktopDiscovery(home)).toBeNull();
-    writeFileSync(
-      desktopDiscoveryPath(home),
-      JSON.stringify({ url: 'u', token: 't', pid: process.pid }),
-    );
+    writeFileSync(desktopDiscoveryPath(home), JSON.stringify({ url: 'u', token: 't', pid: process.pid }));
     expect(readDesktopDiscovery(home)).toMatchObject({ documentPath: null, version: 'unknown' });
   });
 
@@ -116,9 +94,7 @@ describe('llull --app', () => {
     const home = newHome();
     writeDesktopDiscovery(home, app);
     expect(await runCli(['new', '--app'], capture({ LLULL_HOME: home }).io)).toBe(EXIT_USAGE);
-    expect(await runCli(['add_box', '--app', '--dry-run'], capture({ LLULL_HOME: home }).io)).toBe(
-      EXIT_USAGE,
-    );
+    expect(await runCli(['add_box', '--app', '--dry-run'], capture({ LLULL_HOME: home }).io)).toBe(EXIT_USAGE);
   });
 });
 
@@ -137,17 +113,13 @@ describe('llull status', () => {
     const doc = path.join(home, 'part.llull');
     const before = capture({ LLULL_HOME: home, LLULL_DOC: doc });
     await runCli(['status'], before.io);
-    expect(before.out[0]).toMatch(
-      /Desktop app: not running\.\nLocal document: .*part\.llull \(not created yet\)\./,
-    );
+    expect(before.out[0]).toMatch(/Desktop app: not running\.\nLocal document: .*part\.llull \(not created yet\)\./);
 
     writeDesktopDiscovery(home, { ...app, documentPath: '/plans/bracket.llull' });
     writeFileSync(doc, '{}');
     const after = capture({ LLULL_HOME: home, LLULL_DOC: doc });
     await runCli(['status'], after.io);
-    expect(after.out[0]).toMatch(
-      /running at http:\/\/127\.0\.0\.1:47827 .*bracket\.llull — use --app/,
-    );
+    expect(after.out[0]).toMatch(/running at http:\/\/127\.0\.0\.1:47827 .*bracket\.llull — use --app/);
 
     const json = capture({ LLULL_HOME: home, LLULL_DOC: doc });
     await runCli(['status', '--json'], json.io);

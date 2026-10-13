@@ -1,10 +1,7 @@
 /**
- * Clothoid (Euler spiral) transition geometry: exact Fresnel-series coordinates, the shift / tangent
- * length of a symmetric spiral-circular curve-spiral, and spiral element evaluation.
- * A spiral of length L ending at radius R has constant A^2 = R L, curvature l / A^2 at distance l and
- * heading change theta = l^2 / (2 A^2) from the tangent end.
- * @layer domain-aec/civil
- * @pure
+ * Clothoid (Euler spiral) transition geometry: exact Fresnel-series coordinates, the shift / tangent length of a symmetric spiral-circular
+ * curve-spiral, and spiral element evaluation. A spiral of length L ending at radius R has constant A^2 = R L, curvature l / A^2 at
+ * distance l and heading change theta = l^2 / (2 A^2) from the tangent end.
  */
 
 import type { Vec2 } from '@core/model/types';
@@ -69,11 +66,7 @@ export function clothoidLocal(along: number, radius: number, length: number): Ve
 }
 
 /** Spiral-curve constants for `radius`, spiral `length` and total `deflection`; null when deflection < 2 theta. */
-export function spiralCurve(
-  radius: number,
-  length: number,
-  deflection: number,
-): SpiralCurve | null {
+export function spiralCurve(radius: number, length: number, deflection: number): SpiralCurve | null {
   const theta = length / (2 * radius);
   if (deflection < 2 * theta - ANGLE_SLACK) return null;
   const [xs, ys] = clothoidLocal(length, radius, length);
@@ -101,10 +94,7 @@ export function spiralSweep(element: SpiralElement): number {
 }
 
 /** Point and travel direction on a spiral at `along` (0..length) from its start. */
-export function spiralPointAt(
-  element: SpiralElement,
-  along: number,
-): { point: Vec2; direction: number } {
+export function spiralPointAt(element: SpiralElement, along: number): { point: Vec2; direction: number } {
   const radius = finiteRadius(element);
   const turn = element.rotation === 'ccw' ? 1 : -1;
   const entry = element.radiusStart === Infinity;
@@ -115,10 +105,7 @@ export function spiralPointAt(
   const sin = Math.sin(element.tangentHeading);
   const local: Vec2 = entry ? [x, turn * y] : [-x, turn * y];
   return {
-    point: [
-      element.tangentPoint[0] + local[0] * cos - local[1] * sin,
-      element.tangentPoint[1] + local[0] * sin + local[1] * cos,
-    ],
+    point: [element.tangentPoint[0] + local[0] * cos - local[1] * sin, element.tangentPoint[1] + local[0] * sin + local[1] * cos],
     direction: element.tangentHeading + (entry ? turn * theta : -turn * theta),
   };
 }
@@ -132,9 +119,7 @@ export function nearestAlongSpiral(element: SpiralElement, xy: Vec2): number {
   const samples = 32;
   let best = 0;
   for (let i = 1; i <= samples; i++) {
-    if (distance((element.length * i) / samples) < distance((element.length * best) / samples)) {
-      best = i;
-    }
+    if (distance((element.length * i) / samples) < distance((element.length * best) / samples)) best = i;
   }
   let low = (element.length * Math.max(best - 1, 0)) / samples;
   let high = (element.length * Math.min(best + 1, samples)) / samples;

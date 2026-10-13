@@ -1,8 +1,5 @@
 /**
- * @layer server
- * Express entry point: middleware + route mounting only. No business logic — every document
- * change goes through the command registry (architecture L1, L6).
- *
+ * Express entry: middleware + route mounting only (L1, L6).
  *   GET /health            liveness + active kernel
  *   /license /admin/*      `adminRoutes.ts` (license status; admin: users, audit, license)
  *   /live /command /undo /redo   `liveRoutes.ts`      /export/*   `exportRoutes.ts`
@@ -30,38 +27,27 @@ import { buildExportRouter } from './exportRoutes';
 import { buildAdminRouter } from './adminRoutes';
 import { errorMessage } from '@lib/errorMessage';
 import { startServer } from './lifecycle';
-import {
-  getAllowedOrigins,
-  hostAllowlist,
-  buildRestRateLimiter,
-  jsonErrorHandler,
-} from './security';
+import { getAllowedOrigins, hostAllowlist, buildRestRateLimiter, jsonErrorHandler } from './security';
 
 const app = express();
 
 app.use(hostAllowlist());
-// Disallowed origins simply get no CORS headers (the browser blocks them); no error is raised.
-// Before the body parser so its 400/413 JSON errors also carry CORS headers (the browser UI can
-// then read them instead of seeing an opaque network failure).
+// Disallowed origins get no CORS headers. Before the body parser so its 400/413 errors stay readable by the UI.
 app.use(
   cors({
-    origin: (origin, callback) => {
-      callback(null, !origin || getAllowedOrigins().includes(origin));
-    },
+    origin: (origin, callback) => callback(null, !origin || getAllowedOrigins().includes(origin)),
     methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   }),
 );
 const jsonBody = express.json({ limit: process.env['LLULL_BODY_LIMIT'] ?? '2mb' });
-// /import/dwg parses its own (much larger) body; the default JSON limit must not reject it first.
+// /import/dwg parses its own (much larger) body.
 app.use((req, res, next) => (req.path === '/import/dwg' ? next() : jsonBody(req, res, next)));
 
 const restLimiter = buildRestRateLimiter();
 const exchange = exchangeOptionsWithDwg();
 
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', kernel: getActiveKernelName() });
-});
+app.get('/health', (_req, res) => void res.json({ status: 'ok', kernel: getActiveKernelName() }));
 app.use(buildLiveRouter(restLimiter));
 app.use(buildAdminRouter(restLimiter));
 app.use('/export', restLimiter, buildExportRouter(exchange));
@@ -72,16 +58,12 @@ app.use('/mcp', buildMcpRouter(exchange));
 const staticDir = process.env['LLULL_STATIC_DIR'];
 if (staticDir !== undefined && staticDir !== '') {
   app.use(express.static(staticDir));
-  app.get('/{*path}', (req, res, next) =>
-    req.accepts('html') === 'html' ? res.sendFile(path.resolve(staticDir, 'index.html')) : next(),
-  );
+  app.get('/{*path}', (req, res, next) => (req.accepts('html') === 'html' ? res.sendFile(path.resolve(staticDir, 'index.html')) : next()));
 }
-app.use((req, res) => {
-  res.status(404).json({ error: `Not found: ${req.method} ${req.path}` });
-});
+app.use((req, res) => void res.status(404).json({ error: `Not found: ${req.method} ${req.path}` }));
 app.use(jsonErrorHandler);
 
-/** Only listen when run as the entry point (tests import `app` and use supertest). */
+// Tests import `app` (supertest).
 if (require.main === module && process.env['TEST'] !== 'true') {
   const port = process.env['PORT'] ? parseInt(process.env['PORT'], 10) : 3001;
   startServer(app, port, process.env['HOST'] ?? '127.0.0.1').catch((err: unknown) => {

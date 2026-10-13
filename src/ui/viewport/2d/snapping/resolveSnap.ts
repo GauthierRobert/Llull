@@ -1,18 +1,10 @@
-/**
- * @layer ui/viewport/2d
- *
- * Pick the best snap for a cursor position, and apply ortho / polar tracking.
- */
+// Best snap for a cursor (geometric by distance then type priority, else grid) and ortho / polar tracking.
 
 import type { Vec2 } from '@core/model/types';
 import { nearestSnap } from '../../nearestSnap';
 import type { OrthoPolarOpts, SnapPoint, SnapResult, SnapType } from './types';
 
-/**
- * Snap type priority order — geometric snaps beat grid.
- * Lower index = higher priority when distances are equal.
- * Priority: endpoint > midpoint > center > intersection > perpendicular > tangent > extension > nearest > grid
- */
+/** Lower = wins a distance tie; geometric snaps beat grid. */
 const SNAP_TYPE_PRIORITY: Record<SnapType, number> = {
   endpoint: 0,
   midpoint: 1,
@@ -25,54 +17,22 @@ const SNAP_TYPE_PRIORITY: Record<SnapType, number> = {
   grid: 8,
 };
 
-/**
- * Find the best snap for a cursor position.
- *
- * Priority: endpoint > midpoint > center > intersection > perpendicular > tangent >
- * extension > nearest > grid.
- * Falls back to the nearest grid point when no geometric candidate is within tolerance.
- *
- * @pure deterministic, no side effects
- */
-export function snap(
-  cursor: Vec2,
-  candidates: SnapPoint[],
-  gridSize: number,
-  tolerance: number,
-): SnapResult {
+/** Nearest geometric candidate within tolerance, else the nearest grid point. */
+export function snap(cursor: Vec2, candidates: SnapPoint[], gridSize: number, tolerance: number): SnapResult {
   const cx = cursor[0];
   const cy = cursor[1];
 
-  const best = nearestSnap(
-    candidates,
-    (candidate) => Math.hypot(candidate.x - cx, candidate.y - cy),
-    tolerance,
-    SNAP_TYPE_PRIORITY,
-  );
+  const best = nearestSnap(candidates, (candidate) => Math.hypot(candidate.x - cx, candidate.y - cy), tolerance, SNAP_TYPE_PRIORITY);
 
   if (best !== null) return { x: best.x, y: best.y, type: best.type, snapped: true };
 
-  // No geometric snap — fall back to nearest grid point.
-  if (gridSize > 0) {
-    const gx = Math.round(cx / gridSize) * gridSize;
-    const gy = Math.round(cy / gridSize) * gridSize;
-    return { x: gx, y: gy, type: 'grid', snapped: true };
-  }
+  if (gridSize > 0)
+    return { x: Math.round(cx / gridSize) * gridSize, y: Math.round(cy / gridSize) * gridSize, type: 'grid', snapped: true };
 
   return { x: cx, y: cy, type: null, snapped: false };
 }
 
-/**
- * Apply ortho / polar tracking to a raw cursor position relative to an origin.
- *
- * - Ortho: constrain to the nearest horizontal or vertical from `origin`.
- * - Polar: constrain to the nearest angle increment from `origin`
- *   (default 15°, i.e. every 15° step from 0°).
- * - When both are false, returns cursor unchanged.
- * - When both are true, ortho takes precedence (ortho is a subset of polar at 90°).
- *
- * @pure deterministic, no side effects
- */
+/** Ortho (wins when both are set) snaps to the nearest horizontal/vertical from `origin`; polar to the nearest increment (default 15°). */
 export function applyOrthoPolar(origin: Vec2, cursor: Vec2, opts: OrthoPolarOpts): Vec2 {
   if (!opts.ortho && !opts.polar) return cursor;
 
@@ -80,23 +40,12 @@ export function applyOrthoPolar(origin: Vec2, cursor: Vec2, opts: OrthoPolarOpts
   const dy = cursor[1] - origin[1];
   const length = Math.sqrt(dx * dx + dy * dy);
 
-  if (length < 1e-10) return cursor; // cursor is exactly at origin
+  if (length < 1e-10) return cursor;
 
-  if (opts.ortho) {
-    // Constrain to horizontal (dy→0) or vertical (dx→0), whichever is closer.
-    if (Math.abs(dx) >= Math.abs(dy)) {
-      // Closer to horizontal.
-      return [origin[0] + dx, origin[1]];
-    } else {
-      // Closer to vertical.
-      return [origin[0], origin[1] + dy];
-    }
-  }
+  if (opts.ortho) return Math.abs(dx) >= Math.abs(dy) ? [origin[0] + dx, origin[1]] : [origin[0], origin[1] + dy];
 
-  // Polar tracking. Treat a missing OR non-positive increment as the 15° default
-  // (a 0 increment from an uninitialized UI field would otherwise yield NaN).
-  const increment =
-    opts.polarIncrement && opts.polarIncrement > 0 ? opts.polarIncrement : Math.PI / 12;
+  // A missing or non-positive increment means 15° (0 from an uninitialized field would yield NaN).
+  const increment = opts.polarIncrement && opts.polarIncrement > 0 ? opts.polarIncrement : Math.PI / 12;
   const rawAngle = Math.atan2(dy, dx);
   const snappedAngle = Math.round(rawAngle / increment) * increment;
   return [origin[0] + length * Math.cos(snappedAngle), origin[1] + length * Math.sin(snappedAngle)];

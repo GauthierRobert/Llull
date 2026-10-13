@@ -1,16 +1,9 @@
-/**
- * @layer ui/viewport/2d
- * Float32-safe origin for a building plan: all plan vertices are stored relative to the first
- * primitive's first point and the group is positioned at that point (float64 on the CPU).
- */
+// Float32-safe plan origin: vertices relative to the first primitive's first point, the group placed there.
 
 import type { Vec2 } from '@core/model/types';
 import type { DrawingPrimitive } from '@core/model/drawing';
 
-/**
- * First XY point found in `primitives`, or [0, 0] when there is none.
- * @pure
- */
+/** First XY point found in `primitives`, or [0, 0] when there is none. */
 export function planAnchor(primitives: ReadonlyArray<DrawingPrimitive>): Vec2 {
   for (const primitive of primitives) {
     switch (primitive.type) {

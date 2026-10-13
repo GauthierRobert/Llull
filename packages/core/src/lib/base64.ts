@@ -1,6 +1,5 @@
 const B64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
-/** @pure base64 of `bytes` — no Node Buffer, no DOM (browser-safe for core). */
 export function uint8ArrayToBase64(bytes: Uint8Array): string {
   const out: string[] = [];
   const len = bytes.length;
@@ -23,10 +22,7 @@ const B64_VALUES: Int8Array = (() => {
   return table;
 })();
 
-/**
- * @pure bytes of standard padded base64 `text` (inverse of `uint8ArrayToBase64`), or null when
- * `text` is not valid base64.
- */
+/** `text` is not valid base64. */
 export function base64ToUint8Array(text: string): Uint8Array | null {
   if (text.length % 4 !== 0) return null;
   const padding = text.endsWith('==') ? 2 : text.endsWith('=') ? 1 : 0;
@@ -40,8 +36,7 @@ export function base64ToUint8Array(text: string): Uint8Array | null {
     if (value < 0) return null;
     triple = (triple << 6) | value;
     if (i % 4 === 3) {
-      for (const shift of [16, 8, 0])
-        if (out < bytes.length) bytes[out++] = (triple >> shift) & 0xff;
+      for (const shift of [16, 8, 0]) if (out < bytes.length) bytes[out++] = (triple >> shift) & 0xff;
       triple = 0;
     }
   }

@@ -1,6 +1,4 @@
 /**
- * @layer server/tests
- *
  * HTTP + MCP end-to-end tests for the CAD-exchange surface:
  *   GET /export/code, GET /export/step, MCP tools export_step / import_step / import_code.
  *
@@ -15,11 +13,10 @@ import path from 'node:path';
 import request from 'supertest';
 import type { Express } from 'express';
 import { BUILD123D_PYTHON, CADQUERY_PYTHON, parseBuffer, probePython } from './exchangeTestSupport';
-import { mcpRequest } from './mcpTestSupport';
+import { callMcpTool, mcpRpc, openMcpSession, type McpToolResult } from './mcpTestSupport';
 
 const hasCadQuery = probePython(CADQUERY_PYTHON).cadquery !== null;
-const hasBuild123d =
-  BUILD123D_PYTHON !== undefined && probePython(BUILD123D_PYTHON).build123d !== null;
+const hasBuild123d = BUILD123D_PYTHON !== undefined && probePython(BUILD123D_PYTHON).build123d !== null;
 
 interface LoadedServer {
   app: Express;
@@ -30,12 +27,7 @@ interface LoadedServer {
 
 async function loadServer(env: Record<string, string | undefined>): Promise<LoadedServer> {
   vi.resetModules();
-  const keys = [
-    'LLULL_PYTHON',
-    'LLULL_PYTHON_BUILD123D',
-    'LLULL_ALLOW_CODE_EXECUTION',
-    'LLULL_EXCHANGE_DIR',
-  ];
+  const keys = ['LLULL_PYTHON', 'LLULL_PYTHON_BUILD123D', 'LLULL_ALLOW_CODE_EXECUTION', 'LLULL_EXCHANGE_DIR'];
   for (const key of keys) vi.stubEnv(key, env[key]);
   const { app } = await import('../src/index');
   const bus = await import('../src/commandBus');
@@ -55,11 +47,7 @@ async function loadServer(env: Record<string, string | undefined>): Promise<Load
   };
 }
 
-/**
- * The first import of the whole server graph is a cold transform (seconds, much more under a
- * parallel run); do it once here, under a generous hook timeout, so no test pays for it against
- * the 5 s test timeout. Later `vi.resetModules()` + imports reuse the transformed modules.
- */
+/** Pay the cold transform of the server graph once, under a generous hook timeout. */
 beforeAll(async () => {
   await import('../src/index');
   await import('../src/geometryKernel');
@@ -70,23 +58,13 @@ afterEach(() => {
 });
 
 function seedPlateWithHole(server: LoadedServer): void {
-  const plate = server.applyCommand('add_box', {
-    size: [40, 20, 8],
-    position: [0, 0, 4],
-    color: '#336699',
-  });
+  const plate = server.applyCommand('add_box', { size: [40, 20, 8], position: [0, 0, 4], color: '#336699' });
   const hole = server.applyCommand('add_cylinder', { radius: 4, height: 20, position: [0, 0, 4] });
-  const cut = server.applyCommand('boolean', {
-    op: 'subtract',
-    a: plate.affected[0],
-    b: hole.affected[0],
-  });
+  const cut = server.applyCommand('boolean', { op: 'subtract', a: plate.affected[0], b: hole.affected[0] });
   expect(cut.isError).toBe(false);
   expect(cut.affected).toHaveLength(1);
   server.applyCommand('set_entity_name', { id: cut.affected[0], name: 'Base plate' });
 }
-
-// GET /export/code
 
 describe('GET /export/code', () => {
   it('defaults to cadquery and sends an attachment', async () => {
@@ -117,9 +95,7 @@ describe('GET /export/code', () => {
   it('unknown language is a 400; name is sanitized into the filename', async () => {
     const server = await loadServer({ LLULL_PYTHON: 'off' });
     server.applyCommand('add_box', { size: [1, 2, 3] });
-    const res = await request(server.app)
-      .get('/export/code')
-      .query({ language: 'cobol', name: 'my part/../x' });
+    const res = await request(server.app).get('/export/code').query({ language: 'cobol', name: 'my part/../x' });
     expect(res.status).toBe(400);
     const ok = await request(server.app).get('/export/code').query({ name: 'my part/../x' });
     expect(ok.status).toBe(200);
@@ -136,8 +112,6 @@ describe('GET /export/code', () => {
     expect(res.text.length).toBeGreaterThan(0);
   });
 });
-
-// GET /export/step
 
 describe('GET /export/step without Python', () => {
   it('returns 503 with an explanatory error when LLULL_PYTHON=off', async () => {
@@ -174,11 +148,7 @@ describe.skipIf(!hasCadQuery)('GET /export/step with CadQuery', () => {
   it('returns a real STEP file as an attachment', async () => {
     const server = await loadServer({ LLULL_PYTHON: CADQUERY_PYTHON });
     seedPlateWithHole(server);
-    const res = await request(server.app)
-      .get('/export/step')
-      .query({ name: 'plate' })
-      .buffer(true)
-      .parse(parseBuffer);
+    const res = await request(server.app).get('/export/step').query({ name: 'plate' }).buffer(true).parse(parseBuffer);
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toBe('model/step');
     expect(res.headers['content-disposition']).toBe('attachment; filename="plate.step"');
@@ -198,77 +168,17 @@ describe.skipIf(!hasCadQuery)('GET /export/step with CadQuery', () => {
 
 describe.skipIf(!hasBuild123d)('GET /export/step with build123d', () => {
   it('uses LLULL_PYTHON_BUILD123D for language=build123d', async () => {
-    const server = await loadServer({
-      LLULL_PYTHON: CADQUERY_PYTHON,
-      LLULL_PYTHON_BUILD123D: BUILD123D_PYTHON,
-    });
+    const server = await loadServer({ LLULL_PYTHON: CADQUERY_PYTHON, LLULL_PYTHON_BUILD123D: BUILD123D_PYTHON });
     seedPlateWithHole(server);
-    const res = await request(server.app)
-      .get('/export/step')
-      .query({ language: 'build123d' })
-      .buffer(true)
-      .parse(parseBuffer);
+    const res = await request(server.app).get('/export/step').query({ language: 'build123d' }).buffer(true).parse(parseBuffer);
     expect(res.status).toBe(200);
     expect((res.body as Buffer).subarray(0, 13).toString('utf8')).toBe('ISO-10303-21;');
   }, 120_000);
 });
 
-// MCP end-to-end
-
-interface ToolResult {
-  content: Array<{ type: string; text?: string }>;
-  isError?: boolean;
-  structuredContent?: Record<string, unknown>;
-}
-
-let rpcId = 1;
-
-function parseSse(text: string, id: number): unknown {
-  for (const line of text.split('\n')) {
-    if (!line.startsWith('data: ')) continue;
-    const parsed = JSON.parse(line.slice(6)) as { id?: number; result?: unknown };
-    if (parsed.id === id) return parsed.result;
-  }
-  return undefined;
-}
-
-async function rpc(
-  app: Express,
-  sessionId: string | null,
-  method: string,
-  params: Record<string, unknown>,
-): Promise<{ result: unknown; sessionId: string | null }> {
-  const id = rpcId++;
-  const res = await mcpRequest(app, sessionId).send({ jsonrpc: '2.0', id, method, params });
-  expect(res.status).toBe(200);
-  const header = res.headers['mcp-session-id'];
-  return { result: parseSse(res.text, id), sessionId: typeof header === 'string' ? header : null };
-}
-
-async function mcpSession(app: Express): Promise<string> {
-  const init = await rpc(app, null, 'initialize', {
-    protocolVersion: '2024-11-05',
-    capabilities: {},
-    clientInfo: { name: 'exchange-test', version: '0.0.1' },
-  });
-  expect(init.sessionId).not.toBeNull();
-  await mcpRequest(app, init.sessionId).send({
-    jsonrpc: '2.0',
-    method: 'notifications/initialized',
-  });
-  return init.sessionId as string;
-}
-
-async function callTool(
-  app: Express,
-  sessionId: string,
-  name: string,
-  args: Record<string, unknown>,
-): Promise<ToolResult> {
-  const { result } = await rpc(app, sessionId, 'tools/call', { name, arguments: args });
-  expect(result).toBeDefined();
-  return result as ToolResult;
-}
+const mcpSession = (app: Express): Promise<string> => openMcpSession(app);
+const callTool = callMcpTool;
+type ToolResult = McpToolResult;
 
 function textOf(result: ToolResult): string {
   return result.content.map((block) => block.text ?? '').join('\n');
@@ -305,11 +215,9 @@ describe('MCP exchange tools without Python', () => {
   it('tools/list serves the exchange tools', async () => {
     const server = await loadServer({ LLULL_PYTHON: 'off' });
     const sessionId = await mcpSession(server.app);
-    const { result } = await rpc(server.app, sessionId, 'tools/list', {});
+    const { result } = await mcpRpc(server.app, sessionId, 'tools/list', {});
     const names = (result as { tools: Array<{ name: string }> }).tools.map((t) => t.name);
-    for (const tool of ['export_step', 'import_step', 'import_code']) {
-      expect(names).toContain(tool);
-    }
+    for (const tool of ['export_step', 'import_step', 'import_code']) expect(names).toContain(tool);
   });
 });
 
@@ -383,9 +291,7 @@ describe.skipIf(!hasCadQuery)('MCP exchange tools with CadQuery', () => {
   it('import_code surfaces script errors and leaves the document unchanged', async () => {
     server.reset();
     server.applyCommand('add_sphere', { radius: 3 });
-    const result = await callTool(server.app, sessionId, 'import_code', {
-      code: 'raise RuntimeError("kaboom 7")\n',
-    });
+    const result = await callTool(server.app, sessionId, 'import_code', { code: 'raise RuntimeError("kaboom 7")\n' });
     expect(result.isError).toBe(true);
     expect(textOf(result)).toMatch(/kaboom 7/);
     expect(Object.values(server.getLiveDoc().entities).map((e) => e.kind)).toEqual(['sphere']);
@@ -399,11 +305,7 @@ describe.skipIf(!hasCadQuery)('MCP exchange tools with an exchange directory', (
 
   beforeAll(async () => {
     exchangeDir = await mkdtemp(path.join(tmpdir(), 'llull-xchg-'));
-    server = await loadServer({
-      LLULL_PYTHON: CADQUERY_PYTHON,
-      LLULL_ALLOW_CODE_EXECUTION: '1',
-      LLULL_EXCHANGE_DIR: exchangeDir,
-    });
+    server = await loadServer({ LLULL_PYTHON: CADQUERY_PYTHON, LLULL_ALLOW_CODE_EXECUTION: '1', LLULL_EXCHANGE_DIR: exchangeDir });
     sessionId = await mcpSession(server.app);
   }, 60_000);
 
@@ -417,9 +319,7 @@ describe.skipIf(!hasCadQuery)('MCP exchange tools with an exchange directory', (
     const exported = await callTool(server.app, sessionId, 'export_step', { name: 'saved' });
     expect(exported.isError).toBeFalsy();
     expect(exported.structuredContent?.['savedTo']).toBe(path.join(exchangeDir, 'saved.step'));
-    expect(
-      (await readFile(path.join(exchangeDir, 'saved.step'), 'utf8')).startsWith('ISO-10303-21'),
-    ).toBe(true);
+    expect((await readFile(path.join(exchangeDir, 'saved.step'), 'utf8')).startsWith('ISO-10303-21')).toBe(true);
     server.reset();
     const imported = await callTool(server.app, sessionId, 'import_step', { path: 'saved.step' });
     expect(imported.isError).toBeFalsy();
@@ -428,10 +328,7 @@ describe.skipIf(!hasCadQuery)('MCP exchange tools with an exchange directory', (
 
   it('import_code reads a script by path', async () => {
     server.reset();
-    await writeFile(
-      path.join(exchangeDir, 'raw.py'),
-      'import cadquery as cq\nresult = cq.Workplane().box(5,5,5)\n',
-    );
+    await writeFile(path.join(exchangeDir, 'raw.py'), 'import cadquery as cq\nresult = cq.Workplane().box(5,5,5)\n');
     const result = await callTool(server.app, sessionId, 'import_code', { path: 'raw.py' });
     expect(result.isError).toBeFalsy();
     expect(Object.keys(server.getLiveDoc().entities)).toHaveLength(1);

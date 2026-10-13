@@ -1,9 +1,4 @@
-/**
- * @layer ui/panels
- *
- * MaterialsPanel — lists `document.materials` (swatch, name, density); creates
- * (create_material) and assigns them to the selection (assign_material).
- */
+// `document.materials` (swatch, name, density): create_material, assign_material to the selection.
 
 import React, { memo, useCallback, useState } from 'react';
 import { classNames } from '@ui/classNames';
@@ -16,24 +11,22 @@ import { LabeledInput } from '@ui/panels/LabeledInput';
 import { parseNumber } from '@ui/numberText';
 import { significantNumber } from '@lib/compactNumber';
 
-/** 3 significant digits without exponent notation for ordinary magnitudes (7850, not "7.85e+3"). */
+/** 3 significant digits, no exponent for ordinary magnitudes (7850, not "7.85e+3"). */
 function formatDensity(density: number): string {
   return significantNumber(density, 3);
-}
-
-interface MaterialRowProps {
-  material: Material;
-  isSelected: boolean;
-  onSelect: (name: string) => void;
 }
 
 const MaterialRow = memo(function MaterialRow({
   material,
   isSelected,
   onSelect,
-}: MaterialRowProps): React.ReactElement {
+}: {
+  material: Material;
+  isSelected: boolean;
+  onSelect: (name: string) => void;
+}): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
-  // A count (not the id array) keeps rows from re-rendering on every selection change.
+  // A count, not the id array: rows do not re-render on every selection change.
   const selectedCount = useStore((s) => s.document.selection.length);
 
   const handleAssign = (): void => {
@@ -56,12 +49,7 @@ const MaterialRow = memo(function MaterialRow({
         aria-label={`Select material ${material.name}`}
         title={material.name}
       >
-        <span
-          className="material-swatch"
-          style={{ background: material.color }}
-          aria-hidden="true"
-          title={material.color}
-        />
+        <span className="material-swatch" style={{ background: material.color }} aria-hidden="true" title={material.color} />
         <span className="material-name" title={material.name}>
           {material.name}
         </span>
@@ -77,9 +65,7 @@ const MaterialRow = memo(function MaterialRow({
         disabled={selectedCount === 0}
         aria-label={`Assign material ${material.name} to selected entities`}
         title={
-          selectedCount === 0
-            ? 'Select entities in the viewport first'
-            : `Assign "${material.name}" to ${selectedCount} selected entity`
+          selectedCount === 0 ? 'Select entities in the viewport first' : `Assign "${material.name}" to ${selectedCount} selected entity`
         }
       >
         Assign
@@ -88,13 +74,7 @@ const MaterialRow = memo(function MaterialRow({
   );
 });
 
-const EMPTY_FORM = {
-  name: '',
-  density: '',
-  color: '#b0b0b0',
-  metalness: '0.08',
-  roughness: '0.45',
-};
+const EMPTY_FORM = { name: '', density: '', color: '#b0b0b0', metalness: '0.08', roughness: '0.45' };
 
 const SLIDERS = [
   { field: 'metalness', title: 'Metalness' },
@@ -111,7 +91,7 @@ function CreateMaterialForm(): React.ReactElement {
 
   const draft = materialDraftOf(form);
 
-  // A rejected create (e.g. duplicate name) keeps the typed values for correction.
+  // A rejected create (e.g. duplicate name) keeps the typed values.
   const handleSubmit = useDraftSubmit('create_material', draft, () => setForm(EMPTY_FORM));
 
   return (
@@ -140,12 +120,7 @@ function CreateMaterialForm(): React.ReactElement {
         onChange={setField('density')}
         placeholder="e.g. 0.00785"
         ariaLabel="Material density (g/mm³)"
-        inputProps={{
-          step: 'any',
-          min: '0',
-          className: 'material-create-input',
-          autoComplete: 'off',
-        }}
+        inputProps={{ step: 'any', min: '0', className: 'material-create-input', autoComplete: 'off' }}
       />
       <LabeledInput
         label="Color"
@@ -168,14 +143,7 @@ function CreateMaterialForm(): React.ReactElement {
           value={form[field]}
           onChange={setField(field)}
           ariaLabel={`Material ${field} (0 to 1)`}
-          inputProps={{
-            min: '0',
-            max: '1',
-            step: '0.01',
-            className: 'material-create-range',
-            'aria-valuemin': 0,
-            'aria-valuemax': 1,
-          }}
+          inputProps={{ min: '0', max: '1', step: '0.01', className: 'material-create-range', 'aria-valuemin': 0, 'aria-valuemax': 1 }}
         >
           <span className="field__value">{(parseNumber(form[field]) ?? 0).toFixed(2)}</span>
         </LabeledInput>
@@ -194,20 +162,13 @@ function CreateMaterialForm(): React.ReactElement {
   );
 }
 
-interface MaterialsPanelProps {
-  className?: string;
-}
-
-export function MaterialsPanel({ className }: MaterialsPanelProps): React.ReactElement {
+export function MaterialsPanel({ className }: { className?: string }): React.ReactElement {
   const materials = useStore((s) => s.document.materials);
   const materialList = Object.values(materials);
 
   const [activeMaterialName, setActiveMaterialName] = useState<string | null>(null);
 
-  const handleMaterialSelect = useCallback(
-    (name: string): void => setActiveMaterialName((prev) => (prev === name ? null : name)),
-    [],
-  );
+  const handleMaterialSelect = useCallback((name: string): void => setActiveMaterialName((prev) => (prev === name ? null : name)), []);
 
   return (
     <aside className={classNames('panel materials-panel', className)} aria-label="Materials">
@@ -218,11 +179,7 @@ export function MaterialsPanel({ className }: MaterialsPanelProps): React.ReactE
       />
 
       {materialList.length === 0 ? (
-        <PanelEmpty
-          icon="materials"
-          message="No materials defined."
-          hint="Create one below, then assign it to the selection."
-        />
+        <PanelEmpty icon="materials" message="No materials defined." hint="Create one below, then assign it to the selection." />
       ) : (
         <ul className="panel__list" aria-label="Material list" role="list">
           {materialList.map((material) => (

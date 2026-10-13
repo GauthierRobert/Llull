@@ -1,27 +1,14 @@
 /**
- * @layer ui/hooks
- *
- * useAutosave — debounced autosave of the working document, restore at startup, and the
- * unsaved-changes tracking behind the `beforeunload` warning and the TopBar indicator.
- *
- * - Saves 1.5 s after the last change and on `pagehide` / `visibilitychange` (hidden).
- * - Restore happens once, when the live-server connection attempt fails (offline / local mode) and
- *   the document is empty: `dispatch('load_document')` (PRIME DIRECTIVE), `localOnly` so a later
- *   outbox flush never replaces the shared server document with it. When a live server is
- *   connected the server document is the truth: nothing is restored, saved or marked unsaved.
+ * Debounced autosave (1.5 s, and on pagehide / hidden), startup restore and unsaved-changes tracking (beforeunload,
+ * TopBar). Restore runs once when the live connection fails with an empty document: `load_document` with `localOnly`,
+ * so a later flush never replaces the shared server document. With a live server, nothing is restored/saved/marked.
  */
 
 import { useEffect } from 'react';
 import { serializeDocument } from '@core/commands/persistence/serialization';
 import { useStore } from '@ui/store';
 import { useSessionStore } from '@ui/store/sessionStore';
-import {
-  type KeyValueStorage,
-  browserStorage,
-  clearAutosave,
-  readAutosave,
-  writeAutosave,
-} from '@ui/store/autosave';
+import { type KeyValueStorage, browserStorage, clearAutosave, readAutosave, writeAutosave } from '@ui/store/autosave';
 
 export const AUTOSAVE_DELAY_MS = 1500;
 
@@ -35,17 +22,12 @@ export function useAutosave(storage: KeyValueStorage | null = browserStorage()):
       if (timer !== null) clearTimeout(timer);
       timer = null;
       const state = useStore.getState();
-      if (storage === null || !restoreDecided || !pending || state.liveStatus === 'connected')
-        return;
+      if (storage === null || !restoreDecided || !pending || state.liveStatus === 'connected') return;
       pending = false;
       if (state.document.order.length === 0) clearAutosave(storage);
       else {
         const clean = !useSessionStore.getState().dirty;
-        writeAutosave(storage, {
-          savedAt: Date.now(),
-          json: serializeDocument(state.document),
-          ...(clean ? { clean: true } : {}),
-        });
+        writeAutosave(storage, { savedAt: Date.now(), json: serializeDocument(state.document), ...(clean ? { clean: true } : {}) });
       }
     };
 
@@ -69,7 +51,7 @@ export function useAutosave(storage: KeyValueStorage | null = browserStorage()):
               return;
             }
             if (record.clean === true) {
-              // Identical to the last saved file: nothing unsaved to announce.
+              // Identical to the last saved file.
               useSessionStore.getState().markSaved();
             } else {
               useSessionStore.getState().setRestoredAt(record.savedAt);

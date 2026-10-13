@@ -1,28 +1,18 @@
-/**
- * @layer ui/actions
- *
- * Actions on the current selection, shared by the main toolbar, keyboard shortcuts and the
- * properties panel. Each one only gathers params and dispatches commands (PRIME DIRECTIVE).
- */
+// Selection actions shared by toolbar, shortcuts and properties panel: gather params → dispatch.
 
 import type { Vec3 } from '@core/model/types';
 import { buildingElementOf } from '@aec/index';
 import { rotatedEntityBounds } from '@core/geometry/rotatedBounds';
 import { useStore } from '@ui/store';
 
-/**
- * Delete the selection in as few commands as possible. Generated building geometry is deleted
- * through its element (walls take their openings).
- * @affects dispatches delete_building_element and/or delete_entities; no-op on empty selection
- */
+/** Fewest commands; generated building geometry is deleted through its element (walls take their openings). */
 export function deleteSelection(): void {
   const parts = partitionSelection();
   if (parts === null) return;
   const { elementIds, entityIds } = parts;
   if (elementIds.length > 0) dispatchStep('delete_building_element', { elementIds }, false);
   // A mixed selection is two commands but one local undo step.
-  if (entityIds.length > 0)
-    dispatchStep('delete_entities', { ids: entityIds }, elementIds.length > 0);
+  if (entityIds.length > 0) dispatchStep('delete_entities', { ids: entityIds }, elementIds.length > 0);
 }
 
 /** Dispatch one command of a multi-command action; `joinPrevious` folds it into the last local undo step. */
@@ -32,13 +22,9 @@ function dispatchStep(name: string, params: unknown, joinPrevious: boolean): voi
   else dispatch(name, params);
 }
 
-/** Gap (document units) between a duplicated selection and its originals. */
-const DUPLICATE_GAP = 1.5;
+const DUPLICATE_GAP = 1.5; // document units
 
-/**
- * Selection ids split into building elements (owning generated geometry) and plain entities;
- * null when nothing is selected.
- */
+/** Selection split into building elements (owning generated geometry) and plain entities; null when empty. */
 function partitionSelection(): { elementIds: string[]; entityIds: string[] } | null {
   const { document } = useStore.getState();
   if (document.selection.length === 0) return null;
@@ -68,26 +54,15 @@ function duplicateOffset(): Vec3 {
   return [width + DUPLICATE_GAP, 0, 0];
 }
 
-/**
- * Copy every selected entity beside the originals; a single copy becomes the new selection.
- * @affects dispatches one duplicate_entities (one undo step); no-op on empty selection
- */
+/** Copies beside the originals in one undo step; a single copy becomes the selection. */
 export function duplicateSelection(): void {
   const state = useStore.getState();
   const selection = state.document.selection;
   if (selection.length === 0) return;
-  state.dispatch(
-    'duplicate_entities',
-    { ids: [...selection], offset: duplicateOffset() },
-    { selectAffected: selection.length === 1 },
-  );
+  state.dispatch('duplicate_entities', { ids: [...selection], offset: duplicateOffset() }, { selectAffected: selection.length === 1 });
 }
 
-/**
- * Translate the selection by `delta` in one undo step per kind: plain entities via move_entities,
- * generated building geometry via its element (plan move — skipped when delta has a Z component).
- * @affects dispatches move_entities and/or move_building_element; no-op on empty selection
- */
+/** One undo step per kind; building geometry moves through its element (plan move, skipped when delta has Z). */
 export function moveSelection(delta: Vec3, options: { joinPrevious?: boolean } = {}): void {
   const parts = partitionSelection();
   if (parts === null) return;
@@ -95,11 +70,7 @@ export function moveSelection(delta: Vec3, options: { joinPrevious?: boolean } =
   const joinPrevious = options.joinPrevious === true;
   let dispatched = false;
   if (elementIds.length > 0 && delta[2] === 0) {
-    dispatchStep(
-      'move_building_element',
-      { elementIds, delta: [delta[0], delta[1]] },
-      joinPrevious,
-    );
+    dispatchStep('move_building_element', { elementIds, delta: [delta[0], delta[1]] }, joinPrevious);
     dispatched = true;
   }
   // Local undo: a mixed move is one step; a held arrow key (`joinPrevious`) is one step too.

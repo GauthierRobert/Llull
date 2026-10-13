@@ -1,8 +1,4 @@
-/**
- * Browser loader for the OCC kernel: supplies the WASM asset URL core must not know about.
- *
- * @layer ui/geometry
- */
+/** Browser loader for the OCC kernel: supplies the WASM asset URL core must not know about. */
 
 import type { GeometryKernel } from '@core/geometry/kernel';
 import { createOcctKernel } from '@kernel-occt/occtKernel';

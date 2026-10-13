@@ -1,7 +1,4 @@
-/**
- * Civil regeneration: evaluates every civil object into entities and replaces the stale ones.
- * @layer domain-aec/civil
- */
+/** Civil regeneration: evaluates every civil object into entities and replaces the stale ones. */
 
 import type { CadDocument, Entity } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
@@ -34,7 +31,6 @@ function evaluateObject(context: CivilContext, object: CivilObject): Entity[] {
 
 /**
  * Replaces all previously evaluated civil entities with a fresh evaluation of `civil`.
- * @pure
  * @returns the new document; each object's `entityIds` lists the entities generated for it
  */
 export function regenerateCivil(doc: CadDocument, civil: CivilModel): CadDocument {
@@ -59,7 +55,5 @@ export function commitCivil(
 ): CommandResult {
   const document = regenerateCivil(doc, model);
   const affected = civilAffected(document, objectIds);
-  return data === undefined
-    ? { document, summary, affected }
-    : { document, summary, affected, data };
+  return data === undefined ? { document, summary, affected } : { document, summary, affected, data };
 }

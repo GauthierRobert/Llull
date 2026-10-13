@@ -5,8 +5,6 @@ import { runViaPalette } from './palette';
 import type { UiSession } from './session';
 
 /**
- * @layer tests/production/ui
- *
  * Maps each scripted tool call to the control an engineer uses: Building panel forms (placement is
  * explicit: every form has its own Level selector). The command palette is the fallback when a
  * panel has no control for a call; every such detour is a `uiGap`. No document is injected and no
@@ -14,12 +12,10 @@ import type { UiSession } from './session';
  */
 
 const GAP = {
-  levelElevation:
-    "Levels list 'Add level' form has only name + height (no elevation): levels can only stack on the top one.",
+  levelElevation: "Levels list 'Add level' form has only name + height (no elevation): levels can only stack on the top one.",
   historyEdit:
     'No panel edits a history step: the only identity-preserving change of anything but an equipment is the command palette edit_step_params with hand-typed JSON and a step id.',
-  unmapped: (tool: string): string =>
-    `No panel control for ${tool}: reachable only through the command palette.`,
+  unmapped: (tool: string): string => `No panel control for ${tool}: reachable only through the command palette.`,
 } as const;
 
 const asNumbers = (value: unknown): number[] => (Array.isArray(value) ? value.map(Number) : []);
@@ -28,18 +24,10 @@ const degrees = (radians: number): string => String(toDegrees(radians));
 /** The form fields of a boundary given by its first and third points (opposite corners). */
 const rectangleFields = (boundary: unknown): Record<string, string> => {
   const [first, , third] = (Array.isArray(boundary) ? boundary : []).map(asNumbers);
-  return {
-    x1: text(first?.[0]),
-    y1: text(first?.[1]),
-    x2: text(third?.[0]),
-    y2: text(third?.[1]),
-  };
+  return { x1: text(first?.[0]), y1: text(first?.[1]), x2: text(third?.[0]), y2: text(third?.[1]) };
 };
 /** The equipment form fields (all but `mark`) of a step's params. */
-const equipmentFields = (
-  params: Record<string, unknown>,
-  weight: string,
-): Record<string, string> => {
+const equipmentFields = (params: Record<string, unknown>, weight: string): Record<string, string> => {
   const [location, size] = [asNumbers(params['location']), asNumbers(params['size'])];
   return {
     name: text(params['name']),
@@ -54,16 +42,12 @@ const equipmentFields = (
 };
 const levelOf = (args: Record<string, unknown>): Record<string, string> =>
   typeof args['levelId'] === 'string' ? { levelId: args['levelId'] } : {};
-const route = (points: unknown): string =>
-  (Array.isArray(points) ? points : []).map((point) => asNumbers(point).join(',')).join('; ');
+const route = (points: unknown): string => (Array.isArray(points) ? points : []).map((point) => asNumbers(point).join(',')).join('; ');
 
 /** Joint selects exist for beams, the base fixity select for columns (the form hides the others). */
 function memberFixity(args: Record<string, unknown>): Record<string, string> {
   if (args['role'] === 'beam') {
-    return {
-      startJoint: text(args['startJoint'] ?? ''),
-      endJoint: text(args['endJoint'] ?? ''),
-    };
+    return { startJoint: text(args['startJoint'] ?? ''), endJoint: text(args['endJoint'] ?? '') };
   }
   return args['role'] === 'column' ? { baseFixity: text(args['baseFixity'] ?? '') } : {};
 }
@@ -74,11 +58,9 @@ export class UiDriver {
   readonly steps = { panel: 0, palette: 0 };
   private readonly panel: BuildingPanel;
   private levelTop = 0;
-
   constructor(private readonly session: UiSession) {
     this.panel = new BuildingPanel(session);
   }
-
   get uiGaps(): string[] {
     return [...this.gaps];
   }
@@ -87,7 +69,6 @@ export class UiDriver {
   startFromProject(levels: ReadonlyArray<{ elevation: number; height: number }>): void {
     this.levelTop = Math.max(0, ...levels.map((level) => level.elevation + level.height));
   }
-
   async perform(call: ToolCall): Promise<string> {
     const paletteBefore = this.steps.palette;
     const started = Date.now();
@@ -98,19 +79,15 @@ export class UiDriver {
     }
     return summary;
   }
-
   private palette(command: string, args: Record<string, unknown>): Promise<string> {
     this.steps.palette += 1;
     return runViaPalette(this.session, command, args);
   }
-
   private async route(call: ToolCall): Promise<string> {
     const args = call.args;
     switch (call.tool) {
       case 'set_project_info':
-        return this.panel.setProjectInfo(
-          Object.fromEntries(Object.entries(args).map(([key, value]) => [key, text(value)])),
-        );
+        return this.panel.setProjectInfo(Object.fromEntries(Object.entries(args).map(([key, value]) => [key, text(value)])));
       case 'add_level':
         return this.addLevel(args);
       case 'add_grid_system':
@@ -131,12 +108,7 @@ export class UiDriver {
             z2: text(end[2]),
             roll: degrees(Number(args['roll'] ?? 0)),
           },
-          {
-            role: text(args['role']),
-            profile: text(args['profile']),
-            ...memberFixity(args),
-            ...levelOf(args),
-          },
+          { role: text(args['role']), profile: text(args['profile']), ...memberFixity(args), ...levelOf(args) },
         );
       }
       case 'add_pipe_support':
@@ -156,12 +128,7 @@ export class UiDriver {
         const start = asNumbers(args['start']);
         return this.panel.applyTool(
           'stair',
-          {
-            x: text(start[0]),
-            y: text(start[1]),
-            direction: degrees(Number(args['angle'] ?? 0)),
-            width: text(args['width']),
-          },
+          { x: text(start[0]), y: text(start[1]), direction: degrees(Number(args['angle'] ?? 0)), width: text(args['width']) },
           levelOf(args),
         );
       }
@@ -181,12 +148,7 @@ export class UiDriver {
       case 'add_cable_tray':
         return this.panel.applyTool(
           'tray',
-          {
-            points: route(args['points']),
-            width: text(args['width']),
-            height: text(args['height']),
-            system: text(args['system']),
-          },
+          { points: route(args['points']), width: text(args['width']), height: text(args['height']), system: text(args['system']) },
           levelOf(args),
         );
       case 'check_clashes':
@@ -211,16 +173,12 @@ export class UiDriver {
       this.gaps.add(GAP.historyEdit);
       return this.palette('edit_step_params', args);
     }
-    return this.panel.editEquipment(
-      record['mark'],
-      equipmentFields(record, text(record['weight'])),
-    );
+    return this.panel.editEquipment(record['mark'], equipmentFields(record, text(record['weight'])));
   }
 
   /** One submission of the Pipe support form: the line, the type and the points (or a spacing). */
   private async addPipeSupport(args: Record<string, unknown>): Promise<string> {
-    const pipe =
-      typeof args['line'] === 'string' ? `line:${args['line']}` : `pipe:${text(args['pipeId'])}`;
+    const pipe = typeof args['line'] === 'string' ? `line:${args['line']}` : `pipe:${text(args['pipeId'])}`;
     return this.panel.applyTool(
       'pipeSupport',
       {
@@ -232,7 +190,6 @@ export class UiDriver {
       { pipe, type: text(args['type'] ?? 'shoe') },
     );
   }
-
   private async addLevel(args: Record<string, unknown>): Promise<string> {
     if (args['elevation'] !== undefined && Number(args['elevation']) !== this.levelTop) {
       this.gaps.add(GAP.levelElevation);
@@ -247,22 +204,14 @@ export class UiDriver {
   private async addSlab(args: Record<string, unknown>): Promise<string> {
     return this.panel.applyTool(
       'slab',
-      {
-        ...rectangleFields(args['boundary']),
-        thickness: text(args['thickness']),
-        material: text(args['material'] ?? ''),
-      },
+      { ...rectangleFields(args['boundary']), thickness: text(args['thickness']), material: text(args['material'] ?? '') },
       { source: 'rectangle', ...levelOf(args) },
     );
   }
-
   private async addSlabOpening(args: Record<string, unknown>): Promise<string> {
     if (typeof args['stairId'] === 'string') {
       return this.panel.applyTool('slabOpening', {}, { source: 'stair', stairId: args['stairId'] });
     }
-    return this.panel.applyTool('slabOpening', rectangleFields(args['boundary']), {
-      source: 'rectangle',
-      slabId: text(args['slabId']),
-    });
+    return this.panel.applyTool('slabOpening', rectangleFields(args['boundary']), { source: 'rectangle', slabId: text(args['slabId']) });
   }
 }

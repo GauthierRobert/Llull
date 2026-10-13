@@ -1,8 +1,6 @@
 /**
- * Elevations and sections of the 3D model: the core technical view (hidden lines removed, cut
- * faces hatched) seen from a compass side, hidden edges omitted (building convention), steel cut
- * faces filled solid.
- * @layer domain-aec
+ * Elevations and sections of the 3D model: the core technical view (hidden lines removed, cut faces hatched) seen from a compass side,
+ * hidden edges omitted (building convention), steel cut faces filled solid.
  */
 
 import type { CadDocument, Entity, Vec3 } from '@core/model/types';
@@ -43,17 +41,10 @@ function categoryOf(tags: ReadonlyArray<string> | undefined): string | null {
   return tags?.includes('bim') === true ? (tags[1] ?? null) : null;
 }
 
-/**
- * @pure
- * @returns the elevation / section line drawing, or null when no 3D geometry remains
- */
+/** @returns the elevation / section line drawing, or null when no 3D geometry remains */
 export function buildElevationDrawing(
   doc: CadDocument,
-  options: {
-    direction: ElevationDirection;
-    cutAt?: number | undefined;
-    exclude?: ReadonlyArray<string> | undefined;
-  },
+  options: { direction: ElevationDirection; cutAt?: number | undefined; exclude?: ReadonlyArray<string> | undefined },
 ): ElevationDrawing | null {
   const projection = PROJECTIONS[options.direction];
   const frame: ViewFrame = {
@@ -68,17 +59,13 @@ export function buildElevationDrawing(
     return category !== null && excluded.has(category) ? [] : [entity];
   });
   const cutDepth = options.cutAt !== undefined ? projection.sign * options.cutAt : undefined;
-  const primitives = technicalView(doc, solids, { frame, cutDepth }).flatMap(
-    ({ entityId, primitives: drawn }) => {
-      const steel = isSteel(categoryOf(doc.entities[entityId]?.tags));
-      return drawn.flatMap((primitive): DrawingPrimitive[] => {
-        if (primitive.style === 'hidden') return [];
-        return steel && primitive.type === 'polygon' && primitive.fill === 'hatch'
-          ? [{ ...primitive, fill: 'solid' }]
-          : [primitive];
-      });
-    },
-  );
+  const primitives = technicalView(doc, solids, { frame, cutDepth }).flatMap(({ entityId, primitives: drawn }) => {
+    const steel = isSteel(categoryOf(doc.entities[entityId]?.tags));
+    return drawn.flatMap((primitive): DrawingPrimitive[] => {
+      if (primitive.style === 'hidden') return [];
+      return steel && primitive.type === 'polygon' && primitive.fill === 'hatch' ? [{ ...primitive, fill: 'solid' }] : [primitive];
+    });
+  });
   if (primitives.length === 0) return null;
   return { primitives, bounds: drawingBounds(primitives), projection };
 }

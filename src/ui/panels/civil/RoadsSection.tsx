@@ -1,21 +1,9 @@
-/**
- * @layer ui/panels/civil
- *
- * RoadsSection — `add_alignment` (PIs typed or taken from the selected polyline, curve radii,
- * clothoid spiral lengths, ground surface) and one AlignmentEditor per alignment.
- */
+// `add_alignment` (PIs typed or from the selected polyline, radii, spirals, ground) + one AlignmentEditor each.
 
 import React from 'react';
 import { useStore } from '@ui/store';
 import { PanelSection, FormError } from '@ui/panels/PanelParts';
-import {
-  CivilObjectSelect,
-  useCivilObjects,
-  NumberTextField,
-  PointsFromSelectionRow,
-  TextField,
-  useChosenId,
-} from './CivilParts';
+import { CivilObjectSelect, useCivilObjects, NumberTextField, PointsFromSelectionRow, TextField, useChosenId } from './CivilParts';
 import { alignmentParamsOf } from './civilRules';
 import { AlignmentEditor } from './AlignmentEditor';
 import { useFormValues } from '@ui/panels/useFormValues';
@@ -59,11 +47,7 @@ export function RoadsSection(): React.ReactElement {
         />
         <div className="building-inline-form">
           <TextField {...field('radii')} hint="Radii per interior PI" label="Curve radii" />
-          <TextField
-            {...field('spirals')}
-            hint="Spiral lengths (clothoid)"
-            label="Spiral lengths"
-          />
+          <TextField {...field('spirals')} hint="Spiral lengths (clothoid)" label="Spiral lengths" />
           <CivilObjectSelect
             objects={surfaces}
             value={surfaceId}
@@ -71,11 +55,7 @@ export function RoadsSection(): React.ReactElement {
             emptyLabel="No ground surface"
             onChange={setSurface}
           />
-          <NumberTextField
-            {...field('interval')}
-            hint="Station interval"
-            label="Station interval"
-          />
+          <NumberTextField {...field('interval')} hint="Station interval" label="Station interval" />
           <TextField {...field('name')} hint="Name" label="Alignment name" />
           <button type="submit" className="btn btn--primary btn--sm">
             Add alignment

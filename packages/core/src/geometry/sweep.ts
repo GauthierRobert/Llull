@@ -1,10 +1,8 @@
 /**
- * @layer core/geometry
- * Sweep tessellation shared by export, kernels' mesh path and the viewport: the section is carried
- * along the sampled path by a rotation-minimizing frame (double reflection, Wang et al. 2008).
- * Start frame: binormal (section +y) is world +Z projected off the tangent (+Y when the path starts
- * vertical), normal (section +x) = binormal × tangent. Variable sections (`stations`) blend
- * section rings (./sectionRing) along the arc length and are skinned by ./skin.
+ * Sweep tessellation shared by export, kernels' mesh path and the viewport: the section is carried along the sampled path by a
+ * rotation-minimizing frame (double reflection, Wang et al. 2008). Start frame: binormal (section +y) is world +Z projected off the tangent
+ * (+Y when the path starts vertical), normal (section +x) = binormal × tangent. Variable sections (`stations`) blend section rings
+ * (./sectionRing) along the arc length and are skinned by ./skin.
  */
 
 import type { CurveSegment } from '../model/curve';
@@ -48,13 +46,8 @@ export function sweepFrames(path: ReadonlyArray<CurveSegment<Vec3>>): SweepFrame
   const samples: Array<{ point: Vec3; tangent: Vec3; segment: number }> = [];
   path.forEach((segment, index) => {
     const steps = segmentSteps(segment);
-    for (let s = index === 0 ? 0 : 1; s <= steps; s++) {
-      samples.push({
-        point: segmentPoint(segment, s / steps),
-        tangent: segmentTangent(segment, s / steps),
-        segment: index,
-      });
-    }
+    for (let s = index === 0 ? 0 : 1; s <= steps; s++)
+      samples.push({ point: segmentPoint(segment, s / steps), tangent: segmentTangent(segment, s / steps), segment: index });
   });
   const first = samples[0];
   if (first === undefined) return [];
@@ -78,25 +71,18 @@ export function sweepFrames(path: ReadonlyArray<CurveSegment<Vec3>>): SweepFrame
 }
 
 /**
- * Frames of a closed path: the duplicated end sample is dropped and the rotation-minimizing
- * frame's holonomy (the twist it gains going once round) is spread linearly along the arc length,
- * so the last frame meets the first without a jump.
+ * Frames of a closed path: the duplicated end sample is dropped and the rotation-minimizing frame's holonomy (the twist it gains going once
+ * round) is spread linearly along the arc length, so the last frame meets the first without a jump.
  */
 function closeFrames(frames: SweepFrame[]): SweepFrame[] {
   const open = frames.slice(0, -1);
   const first = open[0] as SweepFrame;
   const last = frames[frames.length - 1] as SweepFrame;
-  const twist = Math.atan2(
-    dot3(cross3(first.normal, last.normal), first.tangent),
-    dot3(first.normal, last.normal),
-  );
+  const twist = Math.atan2(dot3(cross3(first.normal, last.normal), first.tangent), dot3(first.normal, last.normal));
   const fractions = frameFractions(frames);
   return open.map((frame, i) => {
     const angle = -twist * (fractions[i] as number);
-    const normal = add3(
-      scale3(frame.normal, Math.cos(angle)),
-      scale3(cross3(frame.tangent, frame.normal), Math.sin(angle)),
-    );
+    const normal = add3(scale3(frame.normal, Math.cos(angle)), scale3(cross3(frame.tangent, frame.normal), Math.sin(angle)));
     return { ...frame, normal, binormal: cross3(frame.tangent, normal) };
   });
 }
@@ -113,15 +99,12 @@ function sectionLoops(section: SweepSection): { outer: Vec2[]; inner: Vec2[] | n
       return [radius * Math.cos(angle), radius * Math.sin(angle)];
     });
   const bore = section.innerRadius;
-  return {
-    outer: ring(section.radius),
-    inner: bore !== undefined && bore > 0 && bore < section.radius ? ring(bore) : null,
-  };
+  return { outer: ring(section.radius), inner: bore !== undefined && bore > 0 && bore < section.radius ? ring(bore) : null };
 }
 
 /**
- * Outer section rings grouped per path segment (each group includes the joint ring it starts
- * from), carried by the same continuous frames as `sweepTriangles`.
+ * Outer section rings grouped per path segment (each group includes the joint ring it starts from), carried by the same continuous frames
+ * as `sweepTriangles`.
  */
 export function sweepSegmentRings(sweep: SweepShape): Vec3[][] {
   const { path, section, stations } = sweep;
@@ -129,24 +112,18 @@ export function sweepSegmentRings(sweep: SweepShape): Vec3[][] {
   const fractions = frameFractions(frames);
   const { outer } = sectionLoops(section);
   const loopAt = (i: number): Vec2[] =>
-    stations !== undefined && stations.length >= 2
-      ? stationLoopAt(stations, fractions[i] as number)
-      : outer;
+    stations !== undefined && stations.length >= 2 ? stationLoopAt(stations, fractions[i] as number) : outer;
   return path.map((_, index) =>
     frames
       .filter((frame, i) => frame.segment === index || frames[i + 1]?.segment === index)
       .flatMap((frame) =>
-        loopAt(frames.indexOf(frame)).map(([x, y]) =>
-          add3(frame.point, add3(scale3(frame.normal, x), scale3(frame.binormal, y))),
-        ),
+        loopAt(frames.indexOf(frame)).map(([x, y]) => add3(frame.point, add3(scale3(frame.normal, x), scale3(frame.binormal, y)))),
       ),
   );
 }
 
 /** What a sweep's geometry depends on (a SweepEntity satisfies it). */
-export type SweepShape = Pick<SweepEntity, 'path' | 'section'> & {
-  readonly stations?: SweepEntity['stations'];
-};
+export type SweepShape = Pick<SweepEntity, 'path' | 'section'> & { readonly stations?: SweepEntity['stations'] };
 
 /** Arc-length fraction (0..1) of every frame along the path. */
 function frameFractions(frames: readonly SweepFrame[]): number[] {
@@ -158,10 +135,7 @@ function frameFractions(frames: readonly SweepFrame[]): number[] {
 }
 
 /** Point and section axes at path fraction `t` (0..1), interpolated between sampled frames. */
-export function frameAtFraction(
-  path: ReadonlyArray<CurveSegment<Vec3>>,
-  t: number,
-): Pick<SweepFrame, 'point' | 'normal' | 'binormal'> {
+export function frameAtFraction(path: ReadonlyArray<CurveSegment<Vec3>>, t: number): Pick<SweepFrame, 'point' | 'normal' | 'binormal'> {
   const open = sweepFrames(path);
   // A loop's last span runs back to the first frame (the twist correction makes them meet).
   const frames = isClosedChain(path) && open[0] !== undefined ? [...open, open[0]] : open;
@@ -179,8 +153,8 @@ export function frameAtFraction(
 }
 
 /**
- * Section ring (SECTION_RING_POINTS points, section coordinates) at path fraction `t`: the two
- * neighbouring station rings blended with a smoothstep weight (tangent-continuous at stations).
+ * Section ring (SECTION_RING_POINTS points, section coordinates) at path fraction `t`: the two neighbouring station rings blended with a
+ * smoothstep weight (tangent-continuous at stations).
  */
 export function stationRingAt(stations: ReadonlyArray<SweepStation>, t: number): Vec2[] {
   let span = 0;
@@ -206,8 +180,7 @@ function closedWalls(outerRings: Vec3[][], innerRings: Vec3[][] | null): Triangl
   for (let i = 0; i < outerRings.length; i++) {
     const next = (i + 1) % outerRings.length;
     triangles.push(...walls(outerRings[i] as Vec3[], outerRings[next] as Vec3[], false));
-    if (innerRings !== null)
-      triangles.push(...walls(innerRings[i] as Vec3[], innerRings[next] as Vec3[], true));
+    if (innerRings !== null) triangles.push(...walls(innerRings[i] as Vec3[], innerRings[next] as Vec3[], true));
   }
   return triangles;
 }
@@ -233,31 +206,23 @@ export function sweepTriangles(sweep: SweepShape, origin: Vec3 = [0, 0, 0]): Tri
   const { outer, inner } = sectionLoops(section);
   if (frames.length < 2 || outer.length < 3) return [];
   const ringAt = (frame: SweepFrame, loop: readonly Vec2[]): Vec3[] =>
-    loop.map(([x, y]) =>
-      add3(origin, add3(frame.point, add3(scale3(frame.normal, x), scale3(frame.binormal, y)))),
-    );
+    loop.map(([x, y]) => add3(origin, add3(frame.point, add3(scale3(frame.normal, x), scale3(frame.binormal, y)))));
   const outerRings = frames.map((frame) => ringAt(frame, outer));
   const innerRings = inner === null ? null : frames.map((frame) => ringAt(frame, inner));
   if (isClosedChain(path)) return closedWalls(outerRings, innerRings);
   const triangles: Triangle[] = [];
   for (let i = 0; i + 1 < frames.length; i++) {
     triangles.push(...walls(outerRings[i] as Vec3[], outerRings[i + 1] as Vec3[], false));
-    if (innerRings !== null)
-      triangles.push(...walls(innerRings[i] as Vec3[], innerRings[i + 1] as Vec3[], true));
+    if (innerRings !== null) triangles.push(...walls(innerRings[i] as Vec3[], innerRings[i + 1] as Vec3[], true));
   }
   const [startOuter, endOuter] = [outerRings[0] as Vec3[], outerRings[frames.length - 1] as Vec3[]];
   if (innerRings !== null) {
-    const [startInner, endInner] = [
-      innerRings[0] as Vec3[],
-      innerRings[frames.length - 1] as Vec3[],
-    ];
+    const [startInner, endInner] = [innerRings[0] as Vec3[], innerRings[frames.length - 1] as Vec3[]];
     outer.forEach((_, j) => {
       const k = (j + 1) % outer.length;
       const at = (ring: Vec3[], index: number): Vec3 => ring[index] as Vec3;
       triangles.push(...quad(at(endOuter, j), at(endOuter, k), at(endInner, k), at(endInner, j)));
-      triangles.push(
-        ...quad(at(startInner, j), at(startInner, k), at(startOuter, k), at(startOuter, j)),
-      );
+      triangles.push(...quad(at(startInner, j), at(startInner, k), at(startOuter, k), at(startOuter, j)));
     });
     return triangles;
   }

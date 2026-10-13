@@ -1,9 +1,4 @@
-/**
- * Work-plane placement of 2D geometry.
- *
- * @layer geometry
- * @pure
- */
+/** Work-plane placement of 2D geometry. */
 
 import type { Vec2, Vec3 } from '../model/vectors';
 import { applyEulerXYZ } from '../lib/eulerRotation';

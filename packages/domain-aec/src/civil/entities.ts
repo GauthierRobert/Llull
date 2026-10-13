@@ -1,8 +1,6 @@
 /**
- * Entity factory for evaluated civil objects: US National CAD Standard civil layers and the common
- * fields (`<objectId>:<part>` ids, `civil` + `civil:<id>` tags).
- * @layer domain-aec/civil
- * @pure
+ * Entity factory for evaluated civil objects: US National CAD Standard civil layers and the common fields (`<objectId>:<part>` ids, `civil`
+ * + `civil:<id>` tags).
  */
 
 import type {
@@ -19,19 +17,14 @@ import type {
 import type { CivilObject } from '@core/model/civil';
 
 /** Civil layer name -> colour (NCS discipline C). */
+// prettier-ignore
 export const CIVIL_LAYERS = {
-  points: { name: 'C-TOPO-PNTS', color: '#c8553d' },
-  tin: { name: 'C-TOPO-TINN', color: '#8d9b6a' },
-  minor: { name: 'C-TOPO-MINR', color: '#a88b63' },
-  major: { name: 'C-TOPO-MAJR', color: '#7a5a32' },
-  grading: { name: 'C-GRAD', color: '#b9a27a' },
-  daylight: { name: 'C-GRAD-DAYL', color: '#d07a2c' },
-  centreline: { name: 'C-ROAD-CNTR', color: '#d04a4a' },
-  stations: { name: 'C-ROAD-STAN', color: '#5a5a5a' },
-  corridor: { name: 'C-ROAD', color: '#6b6b6b' },
-  structures: { name: 'C-STRM-STRC', color: '#2f6f9c' },
-  pipes: { name: 'C-STRM-PIPE', color: '#2f9c8f' },
-  annotation: { name: 'C-ANNO-TEXT', color: '#3a3a3a' },
+  points: { name: 'C-TOPO-PNTS', color: '#c8553d' }, tin: { name: 'C-TOPO-TINN', color: '#8d9b6a' },
+  minor: { name: 'C-TOPO-MINR', color: '#a88b63' }, major: { name: 'C-TOPO-MAJR', color: '#7a5a32' },
+  grading: { name: 'C-GRAD', color: '#b9a27a' }, daylight: { name: 'C-GRAD-DAYL', color: '#d07a2c' },
+  centreline: { name: 'C-ROAD-CNTR', color: '#d04a4a' }, stations: { name: 'C-ROAD-STAN', color: '#5a5a5a' },
+  corridor: { name: 'C-ROAD', color: '#6b6b6b' }, structures: { name: 'C-STRM-STRC', color: '#2f6f9c' },
+  pipes: { name: 'C-STRM-PIPE', color: '#2f9c8f' }, annotation: { name: 'C-ANNO-TEXT', color: '#3a3a3a' },
 } as const;
 
 export type CivilLayerKey = keyof typeof CIVIL_LAYERS;
@@ -42,14 +35,7 @@ export const CIVIL_LAYER_COLOR: ReadonlyMap<string, string> = new Map(
 
 type Common = Omit<BaseEntity, 'kind'>;
 
-function common(
-  object: CivilObject,
-  part: string,
-  label: string,
-  layer: CivilLayerKey,
-  position: Vec3,
-  color?: string,
-): Common {
+function common(object: CivilObject, part: string, label: string, layer: CivilLayerKey, position: Vec3, color?: string): Common {
   const spec = CIVIL_LAYERS[layer];
   return {
     id: `${object.id}:${part}`,
@@ -104,13 +90,7 @@ export function civilLine(
   return { ...common(object, part, label, layer, [0, 0, elevation]), kind: 'line', start, end };
 }
 
-export function civilPoint(
-  object: CivilObject,
-  part: string,
-  label: string,
-  layer: CivilLayerKey,
-  position: Vec3,
-): PointEntity {
+export function civilPoint(object: CivilObject, part: string, label: string, layer: CivilLayerKey, position: Vec3): PointEntity {
   return { ...common(object, part, label, layer, position), kind: 'point' };
 }
 

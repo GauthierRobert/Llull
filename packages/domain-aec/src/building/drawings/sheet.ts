@@ -1,7 +1,6 @@
 /**
- * Printable floor-plan sheet: SVG at a true architectural scale on ISO A paper, with title block,
- * north arrow, scale bar and dimensions. Print / save as PDF from any browser.
- * @layer domain-aec
+ * Printable floor-plan sheet: SVG at a true architectural scale on ISO A paper, with title block, north arrow, scale bar and dimensions.
+ * Print / save as PDF from any browser.
  */
 
 import type { CadDocument } from '@core/model/types';
@@ -36,10 +35,7 @@ export interface PlanSheet {
   readonly fits: boolean;
 }
 
-/**
- * @pure
- * @failure unknown level, invalid paper or scale -> null
- */
+/** @failure unknown level, invalid paper or scale -> null */
 function buildPlanSheet(
   doc: CadDocument,
   levelId: string | undefined,
@@ -53,14 +49,9 @@ function buildPlanSheet(
   const viewport = sheetDrawingArea(width, height);
   const millimetresPerUnit = toMm(doc, 1);
   const [minX, minY, maxX, maxY] = drawing.bounds;
-  const scale =
-    requestedScale ??
-    fitScale((maxX - minX) * millimetresPerUnit, (maxY - minY) * millimetresPerUnit, viewport);
+  const scale = requestedScale ?? fitScale((maxX - minX) * millimetresPerUnit, (maxY - minY) * millimetresPerUnit, viewport);
   const paperPerUnit = millimetresPerUnit / scale;
-  const painter = new DrawingPainter(
-    paperMap(viewport, [(minX + maxX) / 2, (minY + maxY) / 2], paperPerUnit),
-    paperPerUnit,
-  );
+  const painter = new DrawingPainter(paperMap(viewport, [(minX + maxX) / 2, (minY + maxY) / 2], paperPerUnit), paperPerUnit);
   for (const primitive of drawing.primitives) painter.paint(primitive);
   const title = requestedTitle?.trim() || `${drawing.level.name} — Floor plan`;
   const svg = composeSheetSvg(doc, {
@@ -81,15 +72,11 @@ function buildPlanSheet(
     paper,
     scale,
     levelId: drawing.level.id,
-    fits:
-      ((maxX - minX) * millimetresPerUnit) / scale <= viewport.width &&
-      ((maxY - minY) * millimetresPerUnit) / scale <= viewport.height,
+    fits: ((maxX - minX) * millimetresPerUnit) / scale <= viewport.width && ((maxY - minY) * millimetresPerUnit) / scale <= viewport.height,
   };
 }
 
 /**
- * @command export_plan_sheet
- * @pure read-only
  * @affects none; data = { filename, svg, paper, scale, levelId }
  * @failure unknown level / paper / invalid scale -> no data
  */
@@ -97,10 +84,9 @@ export const exportPlanSheet = defineCommand({
   name: 'export_plan_sheet',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Produce a printable floor-plan drawing sheet (SVG in real millimetres, print to PDF at 100%): the ' +
-    'level plan at a true scale (1:50, 1:100…; auto-fitted when omitted) on ISO paper A4–A0 landscape, with ' +
-    'wall poché, doors, windows, grids, room tags, dimensions in mm, north arrow, scale bar and a title block ' +
-    'filled from set_project_info. data.svg holds the file text.',
+    'Produce a printable floor-plan drawing sheet (SVG in real millimetres, print to PDF at 100%): the level plan at a true scale (1:50, ' +
+    '1:100…; auto-fitted when omitted) on ISO paper A4–A0 landscape, with wall poché, doors, windows, grids, room tags, dimensions in ' +
+    'mm, north arrow, scale bar and a title block filled from set_project_info. data.svg holds the file text.',
   params: z.object({
     levelId: z.string().optional().describe('Level to draw. Default: active level.'),
     paper: PAPER_FIELD,
@@ -109,12 +95,7 @@ export const exportPlanSheet = defineCommand({
   }),
   run: (doc, { levelId, paper = 'A3', scale, title }): CommandResult => {
     const sheet = buildPlanSheet(doc, levelId, paper, scale, title);
-    if (!sheet) {
-      return noop(
-        doc,
-        'export_plan_sheet failed: no such level (add_level / draw_walls first) or invalid scale (must be > 0).',
-      );
-    }
+    if (!sheet) return noop(doc, 'export_plan_sheet failed: no such level (add_level / draw_walls first) or invalid scale (must be > 0).');
     return report(
       doc,
       `Plan sheet ${sheet.filename}: level ${sheet.levelId} at 1:${sheet.scale} on ${sheet.paper}.${sheetFitWarning(sheet.fits, 'drawing')}`,

@@ -1,11 +1,5 @@
-/**
- * @layer ui/components/toolbar
- *
- * Main toolbar — the one place a user creates and edits things: labeled groups for selection,
- * 2D drawing, 3D solids, transforms and edit actions. Drawing arms a 2D tool (switching to the
- * 2D view); a solid button creates the primitive in view, selects it and shows the move gizmo.
- * Param-gathering + dispatch only (react R1).
- */
+// Main toolbar: selection, 2D drawing (arms a tool, switches to 2D), 3D solids (created in view, selected, move gizmo),
+// transforms, edit actions.
 
 import React from 'react';
 import { type GizmoMode, useStore, useToolStore } from '@ui/store';
@@ -19,7 +13,7 @@ import { createSolid } from '@ui/actions/createSolid';
 interface ToolButtonProps {
   label: string;
   icon: IconName;
-  /** Tooltip body; the shortcut key is appended when given. */
+  /** The shortcut key is appended when given. */
   tip: string;
   shortcut?: string | undefined;
   pressed?: boolean | undefined;
@@ -27,15 +21,7 @@ interface ToolButtonProps {
   onClick: () => void;
 }
 
-function ToolButton({
-  label,
-  icon,
-  tip,
-  shortcut,
-  pressed,
-  disabled = false,
-  onClick,
-}: ToolButtonProps): React.ReactElement {
+function ToolButton({ label, icon, tip, shortcut, pressed, disabled = false, onClick }: ToolButtonProps): React.ReactElement {
   const title = shortcut === undefined ? `${label} — ${tip}` : `${label} (${shortcut}) — ${tip}`;
   return (
     <button
@@ -53,13 +39,7 @@ function ToolButton({
   );
 }
 
-function ToolGroup({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}): React.ReactElement {
+function ToolGroup({ title, children }: { title: string; children: React.ReactNode }): React.ReactElement {
   return (
     <div className="tb-group" role="group" aria-label={title}>
       <div className="tb-group__buttons">{children}</div>
@@ -164,11 +144,7 @@ function SelectTransformGroup(): React.ReactElement {
             key={mode}
             label={label}
             icon={icon}
-            tip={
-              selectionCount === 1
-                ? 'drag the gizmo handles on the selected object'
-                : 'select one object, then drag the gizmo handles'
-            }
+            tip={selectionCount === 1 ? 'drag the gizmo handles on the selected object' : 'select one object, then drag the gizmo handles'}
             shortcut={GIZMO_KEYS[mode]}
             pressed={gizmoMode === mode}
             onClick={() => setGizmoMode(mode)}
@@ -203,22 +179,8 @@ function EditGroup(): React.ReactElement {
         disabled={nothingSelected}
         onClick={deleteSelection}
       />
-      <ToolButton
-        label="Undo"
-        icon="undo"
-        tip="step back"
-        shortcut="Ctrl Z"
-        disabled={!canUndo}
-        onClick={undo}
-      />
-      <ToolButton
-        label="Redo"
-        icon="redo"
-        tip="step forward"
-        shortcut="Ctrl Y"
-        disabled={!canRedo}
-        onClick={redo}
-      />
+      <ToolButton label="Undo" icon="undo" tip="step back" shortcut="Ctrl Z" disabled={!canUndo} onClick={undo} />
+      <ToolButton label="Redo" icon="redo" tip="step forward" shortcut="Ctrl Y" disabled={!canRedo} onClick={redo} />
     </ToolGroup>
   );
 }

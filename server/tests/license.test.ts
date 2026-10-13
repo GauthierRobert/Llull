@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Offline Ed25519 license verification: valid, expired, tampered, wrong key, seat limit,
  * evaluation default, and the public GET /license.
  */
@@ -14,10 +13,7 @@ import { ADMIN, EDITOR, VIEWER, clearEnv, installUsersFile, tempDir } from './us
 
 const keys = crypto.generateKeyPairSync('ed25519');
 const publicPem = keys.publicKey.export({ type: 'spki', format: 'pem' }).toString();
-const otherPublicPem = crypto
-  .generateKeyPairSync('ed25519')
-  .publicKey.export({ type: 'spki', format: 'pem' })
-  .toString();
+const otherPublicPem = crypto.generateKeyPairSync('ed25519').publicKey.export({ type: 'spki', format: 'pem' }).toString();
 
 function sign(payload: object, key = keys.privateKey): string {
   const bytes = Buffer.from(JSON.stringify(payload));
@@ -55,9 +51,7 @@ describe('verifyLicense', () => {
     const expired = verifyLicense(license, publicPem, new Date('2024-01-02T00:00:00Z'));
     expect(expired).toMatchObject({ mode: 'evaluation', seats: EVALUATION_SEATS });
     expect(expired.warning).toMatch(/expired/);
-    expect(verifyLicense(license, publicPem, new Date('2024-01-01T12:00:00Z')).mode).toBe(
-      'licensed',
-    );
+    expect(verifyLicense(license, publicPem, new Date('2024-01-01T12:00:00Z')).mode).toBe('licensed');
   });
 
   it('rejects a tampered payload and a wrong public key', () => {
@@ -83,13 +77,7 @@ describe('getLicense / GET /license', () => {
 
   it('defaults to evaluation with 3 users and a banner flag', async () => {
     const res = await request(app).get('/license');
-    expect(res.body).toMatchObject({
-      mode: 'evaluation',
-      seats: 3,
-      customer: null,
-      evaluation: true,
-      label: 'Evaluation — 3 users',
-    });
+    expect(res.body).toMatchObject({ mode: 'evaluation', seats: 3, customer: null, evaluation: true, label: 'Evaluation — 3 users' });
   });
 
   it('reports a valid license publicly (no features, no warning)', async () => {
@@ -116,8 +104,7 @@ describe('getLicense / GET /license', () => {
   it('enforces seats: evaluation caps named users at 3, a license raises it', async () => {
     const fourth = { ...VIEWER, id: 'v2', token: 'tok-v2' };
     installUsersFile(dir, [ADMIN, EDITOR, VIEWER, fourth]);
-    const asFourth = (): Promise<request.Response> =>
-      request(app).get('/live/snapshot').set('Authorization', 'Bearer tok-v2');
+    const asFourth = (): Promise<request.Response> => request(app).get('/live/snapshot').set('Authorization', 'Bearer tok-v2');
     expect((await asFourth()).status).toBe(402);
     installLicense(sign(PAYLOAD));
     expect((await asFourth()).status).toBe(200);

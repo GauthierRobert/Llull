@@ -1,5 +1,4 @@
 /**
- * @layer server
  * License + administration endpoints (transport only, no business logic):
  *
  *   GET /license         public: { mode, customer, seats, expires, label, evaluation, warning? }
@@ -28,21 +27,22 @@ export function buildAdminRouter(restLimiter: RequestHandler): Router {
     const license = getLicense();
     const users = loadUsers();
     const licensed = licensedUserIds(users, license.seats);
-    res.status(200).json({
-      ...license,
-      namedUsers: users.length,
-      seatsUsed: licensed.size,
-      usersWithoutSeat: users.filter((user) => !licensed.has(user.id)).map((user) => user.id),
-    });
+    res
+      .status(200)
+      .json({
+        ...license,
+        namedUsers: users.length,
+        seatsUsed: licensed.size,
+        usersWithoutSeat: users.filter((user) => !licensed.has(user.id)).map((user) => user.id),
+      });
   });
 
   router.get('/admin/users', restLimiter, adminGuard, (_req, res) => {
     const users = loadUsers();
     const licensed = licensedUserIds(users, getLicense().seats);
-    res.status(200).json({
-      userMode: isUserMode(),
-      users: users.map(({ id, name, role }) => ({ id, name, role, licensed: licensed.has(id) })),
-    });
+    res
+      .status(200)
+      .json({ userMode: isUserMode(), users: users.map(({ id, name, role }) => ({ id, name, role, licensed: licensed.has(id) })) });
   });
 
   router.get('/admin/audit', restLimiter, adminGuard, (req, res) => {
@@ -55,10 +55,7 @@ export function buildAdminRouter(restLimiter: RequestHandler): Router {
     const entries = readAudit({
       ...(typeof since === 'string' ? { since } : {}),
       ...(typeof user === 'string' && user !== '' ? { user } : {}),
-      limit: Math.min(
-        Number.isFinite(requested) && requested > 0 ? requested : 100,
-        MAX_AUDIT_LIMIT,
-      ),
+      limit: Math.min(Number.isFinite(requested) && requested > 0 ? requested : 100, MAX_AUDIT_LIMIT),
     });
     res.status(200).json({ count: entries.length, entries });
   });

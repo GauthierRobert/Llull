@@ -1,9 +1,7 @@
 /**
- * @layer desktop
  * Where the desktop app finds its parts: the built web app, the server bundle, the CLI bundle and
  * the bundled Python. Packaged: under `process.resourcesPath` (electron-builder `extraResources`).
  * Development (`npm start`): the repo checkout.
- * @pure
  */
 
 import path from 'path';
@@ -32,9 +30,7 @@ interface LayoutInput {
 
 /** The interpreter inside a python-build-standalone tree (`install_only` layout). */
 export function bundledPythonOf(pythonRoot: string, platform: NodeJS.Platform): string {
-  return platform === 'win32'
-    ? path.join(pythonRoot, 'python.exe')
-    : path.join(pythonRoot, 'bin', 'python3');
+  return platform === 'win32' ? path.join(pythonRoot, 'python.exe') : path.join(pythonRoot, 'bin', 'python3');
 }
 
 export function desktopLayout(input: LayoutInput): DesktopLayout {
@@ -52,8 +48,6 @@ export function desktopLayout(input: LayoutInput): DesktopLayout {
     webDir: path.join(root, 'dist'),
     serverEntry: path.join(root, 'server', 'dist', 'index.js'),
     cliEntry: path.join(root, 'server', 'dist', 'cli.js'),
-    python:
-      input.pythonOverride ??
-      bundledPythonOf(path.join(root, 'desktop', 'build', 'python'), input.platform),
+    python: input.pythonOverride ?? bundledPythonOf(path.join(root, 'desktop', 'build', 'python'), input.platform),
   };
 }

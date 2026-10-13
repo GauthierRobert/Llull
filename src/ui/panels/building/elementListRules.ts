@@ -1,5 +1,3 @@
-/** @layer ui/panels/building Pure rules of the element list: which rows show and which are selected. */
-
 import type { BuildingElement, BuildingModel } from '@core/model/building';
 import { orderedValues } from '@ui/panels/orderedValues';
 
@@ -8,16 +6,12 @@ export function elementsOnActiveLevel(building: BuildingModel | undefined): Buil
   if (!building) return [];
   return orderedValues(building.elementOrder, building.elements).filter((element) => {
     const host = 'hostId' in element ? building.elements[element.hostId] : undefined;
-    const levelId =
-      'levelId' in element ? element.levelId : host && 'levelId' in host ? host.levelId : null;
+    const levelId = 'levelId' in element ? element.levelId : host && 'levelId' in host ? host.levelId : null;
     return levelId === null || levelId === building.activeLevelId;
   });
 }
 
 /** True when the element has geometry and every one of its entities is in `selected`. */
-export function isElementSelected(
-  element: BuildingElement,
-  selected: ReadonlySet<string>,
-): boolean {
+export function isElementSelected(element: BuildingElement, selected: ReadonlySet<string>): boolean {
   return element.entityIds.length > 0 && element.entityIds.every((id) => selected.has(id));
 }

@@ -1,9 +1,4 @@
-/**
- * @layer ui/panels/building
- *
- * Form-spec types and field-reading helpers shared by the element and industrial tool
- * specs (param-gathering only, react R1).
- */
+// Form-spec types + field readers shared by the element and industrial tool specs.
 
 import { parseNumber, parseNumberList } from '@ui/numberText';
 
@@ -58,12 +53,7 @@ export function txt(key: string, label: string, defaultValue = '', optional = fa
   return { key, label, kind: 'text', defaultValue, optional };
 }
 
-export function select(
-  key: string,
-  label: string,
-  defaultValue: string,
-  options: NonNullable<ToolField['options']>,
-): ToolField {
+export function select(key: string, label: string, defaultValue: string, options: NonNullable<ToolField['options']>): ToolField {
   return { key, label, kind: 'select', defaultValue, options };
 }
 
@@ -84,19 +74,14 @@ export function defaultedSelect(
   options: ReadonlyArray<readonly [string, string]>,
   showWhen?: ToolField['showWhen'],
 ): ToolField {
-  return {
-    ...select(key, label, '', [['', blankLabel], ...options]),
-    ...(showWhen !== undefined ? { showWhen } : {}),
-  };
+  return { ...select(key, label, '', [['', blankLabel], ...options]), ...(showWhen !== undefined ? { showWhen } : {}) };
 }
 
 /** Picker group of the steel hall / plant tools. */
 export const INDUSTRIAL_TOOL_GROUP = 'Industrial / steel';
 
 export function isFieldShown(field: ToolField, values: Readonly<Record<string, string>>): boolean {
-  return (
-    field.showWhen === undefined || field.showWhen.values.includes(values[field.showWhen.key] ?? '')
-  );
+  return field.showWhen === undefined || field.showWhen.values.includes(values[field.showWhen.key] ?? '');
 }
 
 export class FieldReader {
@@ -142,26 +127,16 @@ export class FieldReader {
       .map((part) => part.trim())
       .filter((part) => part !== '')
       .map((part) => part.split(/[,\s]+/).map(Number));
-    if (
-      points.length < minimum ||
-      points.some((point) => point.length !== 3 || point.some((value) => !Number.isFinite(value)))
-    ) {
+    if (points.length < minimum || points.some((point) => point.length !== 3 || point.some((value) => !Number.isFinite(value)))) {
       this.missing.push(key);
     }
     return points.map((point) => [point[0] ?? 0, point[1] ?? 0, point[2] ?? 0]);
   }
 }
 
-export function result(
-  reader: FieldReader,
-  command: string,
-  params: Record<string, unknown>,
-): ToolCommand {
-  if (reader.missing.length > 0)
-    return { ok: false, reason: `Check: ${reader.missing.join(', ')}` };
-  const cleaned = Object.fromEntries(
-    Object.entries(params).filter(([, value]) => value !== undefined),
-  );
+export function result(reader: FieldReader, command: string, params: Record<string, unknown>): ToolCommand {
+  if (reader.missing.length > 0) return { ok: false, reason: `Check: ${reader.missing.join(', ')}` };
+  const cleaned = Object.fromEntries(Object.entries(params).filter(([, value]) => value !== undefined));
   return { ok: true, command, params: cleaned };
 }
 

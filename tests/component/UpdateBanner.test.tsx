@@ -1,7 +1,3 @@
-/**
- * appUpdates (the single service-worker owner) + UpdateBanner: a waiting build shows the banner,
- * Reload posts SKIP_WAITING, and the resulting controller change reloads the page exactly once.
- */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 
@@ -10,10 +6,7 @@ type Banner = typeof import('@ui/components/UpdateBanner');
 
 async function load(): Promise<AppUpdates & Banner> {
   vi.resetModules();
-  return {
-    ...(await import('@ui/services/appUpdates')),
-    ...(await import('@ui/components/UpdateBanner')),
-  };
+  return { ...(await import('@ui/services/appUpdates')), ...(await import('@ui/components/UpdateBanner')) };
 }
 
 class FakeWorker extends EventTarget {
@@ -36,10 +29,7 @@ function fakeContainer(
     installing: null,
     update: vi.fn(async () => undefined),
   });
-  const container = Object.assign(new EventTarget(), {
-    controller: controlled ? {} : null,
-    register: vi.fn(async () => registration),
-  });
+  const container = Object.assign(new EventTarget(), { controller: controlled ? {} : null, register: vi.fn(async () => registration) });
   return { registration, container: container as unknown as ServiceWorkerContainer };
 }
 
@@ -55,7 +45,6 @@ describe('UpdateBanner + appUpdates', () => {
     const { container } = render(<UpdateBanner />);
     expect(container.innerHTML).toBe('');
   });
-
   it('shows a waiting build; Reload activates it and the controller change reloads once', async () => {
     const { registerAppServiceWorker, UpdateBanner } = await load();
     const waiting = new FakeWorker();
@@ -74,7 +63,6 @@ describe('UpdateBanner + appUpdates', () => {
     expect(reload).toHaveBeenCalledTimes(1);
     stop();
   });
-
   it('a build installed later becomes available; the first install does not', async () => {
     const { registerAppServiceWorker, useAppUpdateAvailable } = await load();
     function Probe(): React.ReactElement {
@@ -93,7 +81,6 @@ describe('UpdateBanner + appUpdates', () => {
       worker.dispatchEvent(new Event('statechange'));
     });
     expect(screen.getByRole('status').textContent).toBe('yes');
-
     const first = await load();
     const fresh = fakeContainer(null, false);
     await first.registerAppServiceWorker(fresh.container, vi.fn());
@@ -105,7 +92,6 @@ describe('UpdateBanner + appUpdates', () => {
     first.applyAppUpdate();
     expect(firstWorker.postMessage).not.toHaveBeenCalled();
   });
-
   it('checks for updates every hour until stopped', async () => {
     vi.useFakeTimers();
     const { registerAppServiceWorker } = await load();

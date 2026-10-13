@@ -1,7 +1,5 @@
 /* eslint-disable no-console -- this is a runnable CLI demo; console output is its product. */
 /**
- * @layer server/examples
- *
  * Standalone MCP agent script — end-to-end proof that an external agent can
  * drive the llull document over the MCP Streamable HTTP transport.
  *
@@ -53,19 +51,13 @@ function parseToolResult(result: { content: ContentItem[]; isError?: boolean }):
 
   // The server appends "Affected entity ids: id1, id2" as a second text block.
   const affectedLine = texts.find((t) => t.startsWith('Affected entity ids:'));
-  const affected: string[] = affectedLine
-    ? affectedLine.replace('Affected entity ids:', '').trim().split(/,\s*/)
-    : [];
+  const affected: string[] = affectedLine ? affectedLine.replace('Affected entity ids:', '').trim().split(/,\s*/) : [];
 
   return { summary, affected, isError: result.isError === true };
 }
 
 /** tools/call, with the SDK's compatibility result narrowed to the content form. */
-async function callAndParse(
-  client: Client,
-  name: string,
-  args: Record<string, unknown>,
-): Promise<ParsedToolResult> {
+async function callAndParse(client: Client, name: string, args: Record<string, unknown>): Promise<ParsedToolResult> {
   const raw = await client.callTool({ name, arguments: args });
   return parseToolResult(raw as { content: ContentItem[]; isError?: boolean });
 }
@@ -91,14 +83,9 @@ async function main(): Promise<void> {
     headers['Authorization'] = `Bearer ${authToken}`;
   }
 
-  const transport = new StreamableHTTPClientTransport(new URL(mcpUrl), {
-    requestInit: { headers },
-  });
+  const transport = new StreamableHTTPClientTransport(new URL(mcpUrl), { requestInit: { headers } });
 
-  const client = new Client(
-    { name: 'llull-example-agent', version: '0.1.0' },
-    { capabilities: {} },
-  );
+  const client = new Client({ name: 'llull-example-agent', version: '0.1.0' }, { capabilities: {} });
 
   console.log(`Connecting to llull MCP server at ${mcpUrl} ...`);
   // Cast to Transport: StreamableHTTPClientTransport's `sessionId` getter returns
@@ -129,10 +116,7 @@ async function main(): Promise<void> {
     await client.callTool({ name: 'enable_toolset', arguments: { toolset } });
   }
 
-  const boxResult = await callAndParse(client, 'add_box', {
-    size: [2, 2, 2],
-    position: [0, 0, 0],
-  });
+  const boxResult = await callAndParse(client, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
   printStep(1, 'add_box', boxResult);
 
   const circleResult = await callAndParse(client, 'draw_arc', { center: [0, 0], radius: 1 });

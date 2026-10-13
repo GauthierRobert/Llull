@@ -1,9 +1,4 @@
-/**
- * @layer ui/panels
- *
- * ConfigurationsPanel — lists `document.configurations`; creates (create_configuration) and
- * activates (activate_configuration) them.
- */
+// `document.configurations`: create_configuration, activate_configuration.
 
 import React, { useRef, useState } from 'react';
 import { classNames } from '@ui/classNames';
@@ -50,10 +45,7 @@ function ConfigurationRow({ config, active }: ConfigurationRowProps): React.Reac
       </div>
 
       {paramEntries.length > 0 && (
-        <ul
-          className="config-param-list"
-          aria-label={`Parameters for configuration ${config.name}`}
-        >
+        <ul className="config-param-list" aria-label={`Parameters for configuration ${config.name}`}>
           {paramEntries.map(([paramName, expression]) => (
             <li key={paramName} className="config-param-entry">
               <span className="config-param-name" title={paramName}>
@@ -88,13 +80,7 @@ interface ParameterValueRowProps {
   canRemove: boolean;
 }
 
-function ParameterValueRow({
-  index,
-  entry,
-  onChange,
-  onRemove,
-  canRemove,
-}: ParameterValueRowProps): React.ReactElement {
+function ParameterValueRow({ index, entry, onChange, onRemove, canRemove }: ParameterValueRowProps): React.ReactElement {
   return (
     <div className="config-pv-row" data-testid={`config-pv-row-${index}`}>
       <input
@@ -143,8 +129,7 @@ function CreateConfigurationForm(): React.ReactElement {
   const updateRow = (index: number, patch: Partial<PvEntry>): void =>
     setPvRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   const handleAddRow = (): void => setPvRows((prev) => [...prev, newRow()]);
-  const handleRemoveRow = (index: number): void =>
-    setPvRows((prev) => prev.filter((_, i) => i !== index));
+  const handleRemoveRow = (index: number): void => setPvRows((prev) => prev.filter((_, i) => i !== index));
 
   const draft = configurationDraftOf(configName, pvRows);
 
@@ -211,37 +196,21 @@ function CreateConfigurationForm(): React.ReactElement {
   );
 }
 
-interface ConfigurationsPanelProps {
-  className?: string;
-}
-
-export function ConfigurationsPanel({ className }: ConfigurationsPanelProps): React.ReactElement {
+export function ConfigurationsPanel({ className }: { className?: string }): React.ReactElement {
   const configurations = useStore((s) => s.document.configurations);
   const parameters = useStore((s) => s.document.parameters);
   const configList = Object.values(configurations);
 
   return (
     <aside className={classNames('panel configs-panel', className)} aria-label="Configurations">
-      <PanelHeader
-        title="Configurations"
-        count={configList.length}
-        countLabel={`${configList.length} configurations`}
-      />
+      <PanelHeader title="Configurations" count={configList.length} countLabel={`${configList.length} configurations`} />
 
       {configList.length === 0 ? (
-        <PanelEmpty
-          icon="configurations"
-          message="No configurations defined."
-          hint="A configuration is a named set of parameter values."
-        />
+        <PanelEmpty icon="configurations" message="No configurations defined." hint="A configuration is a named set of parameter values." />
       ) : (
         <ul className="config-list" aria-label="Configuration list" role="list">
           {configList.map((config) => (
-            <ConfigurationRow
-              key={config.name}
-              config={config}
-              active={isConfigurationActive(config, parameters)}
-            />
+            <ConfigurationRow key={config.name} config={config} active={isConfigurationActive(config, parameters)} />
           ))}
         </ul>
       )}

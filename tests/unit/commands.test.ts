@@ -1,244 +1,122 @@
 import { describe, it, expect, vi } from 'vitest';
-import { type Entity, type TextEntity, createEmptyDocument, is2D } from '@core/model/types';
+import { type CadDocument, type Entity, type TextEntity, createEmptyDocument, is2D } from '@core/model/types';
 import { execute, toToolSchemas, listCommands, getCommand } from '@core/commands/registry';
 import { entityBounds } from '@core/geometry/bounds';
+import { evaluateExpression, extractReferences } from '@core/commands/parametric/expression';
+import { serializeDocument, deserializeDocument } from '@core/commands/persistence/serialization';
+import { resolveStepParams, buildParamEnv, remapIds } from '@core/commands/history/regenerate';
+import { expectNoOp, expectPure, expectSingleEntity } from '../helpers/expectNoOp';
+import { add } from '../helpers/addEntity';
+import { run } from '../helpers/runFixtures';
+import { xy, xyz } from '../helpers/xy';
+
+type Loose = Entity & Record<string, unknown>;
+const empty = createEmptyDocument;
+const first = (r: ReturnType<typeof execute>): Loose => r.document.entities[r.affected[0]!] as Loose;
+const box = (doc: CadDocument = empty(), size = [1, 1, 1]): { doc: CadDocument; id: string } => add(doc, 'add_box', { size });
+const boxes = (n: number): { doc: CadDocument; ids: string[] } => {
+  let doc = empty();
+  const ids: string[] = [];
+  for (let i = 0; i < n; i++) ({ doc, id: ids[i] } = box(doc));
+  return { doc, ids };
+};
+const { doc: boxDoc, id: boxId } = box();
 
 describe('command layer', () => {
-  it('add_box creates one entity and reports it as affected', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_box', { size: [2, 2, 2] });
-
-    expect(result.affected).toHaveLength(1);
-    expect(result.document.order).toHaveLength(1);
-    const id = result.affected[0]!;
-    expect(result.document.entities[id]!.kind).toBe('box');
+  it.each<[string, object, Record<string, unknown>, string[]]>([
+    ['add_box', { size: [2, 2, 2] }, { kind: 'box' }, []],
+    ['add_cylinder', { radius: 2, height: 5 }, { kind: 'cylinder', radius: 2, height: 5 }, []],
+    ['add_sphere', { radius: 4 }, { kind: 'sphere', radius: 4 }, []],
+    ['add_cone', { radius: 3, height: 7 }, { kind: 'cone', radius: 3, height: 7 }, ['3', '7']],
+    ['add_torus', { ringRadius: 5, tubeRadius: 1.5 }, { kind: 'torus', ringRadius: 5, tubeRadius: 1.5 }, []],
+    ['add_wedge', { size: [4, 3, 6] }, { kind: 'wedge', size: [4, 3, 6] }, ['4×3×6']],
+    ['add_pyramid', { baseWidth: 6, baseDepth: 4, height: 8 }, { kind: 'pyramid', baseWidth: 6, baseDepth: 4, height: 8 }, ['6', '4', '8']],
+  ])('%s creates one entity, purely', (name, params, shape, summary) => {
+    const doc = empty();
+    const r = execute(doc, name, params);
+    expectSingleEntity(r, shape['kind'] as string);
+    expect(first(r)).toMatchObject(shape);
+    for (const s of name === 'add_box' ? summary : [r.affected[0]!, ...summary]) expect(r.summary).toContain(s);
+    expectPure(doc, () => execute(doc, name, params));
   });
 
-  it('is pure — the input document is never mutated', () => {
-    const doc = createEmptyDocument();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'add_box', { size: [1, 1, 1] });
-    expect(JSON.stringify(doc)).toBe(snapshot);
+  it.each<[string, object, ...string[]]>([
+    ['add_cylinder', { radius: 0, height: 5 }, 'radius'],
+    ['add_cylinder', { radius: 3, height: -1 }, 'height'],
+    ['add_sphere', { radius: -5 }, 'radius'],
+    ['add_sphere', { radius: 0 }],
+    ['add_cone', { radius: 0, height: 5 }, 'radius'],
+    ['add_cone', { radius: 3, height: -1 }, 'height'],
+    ['add_torus', { ringRadius: 0, tubeRadius: 1 }, 'ringRadius'],
+    ['add_torus', { ringRadius: 3, tubeRadius: -0.5 }, 'tubeRadius'],
+    ['add_wedge', { size: [0, 3, 5] }, 'size'],
+    ['add_wedge', { size: [2, -1, 5] }],
+    ['add_pyramid', { baseWidth: 0, baseDepth: 3, height: 5 }, 'baseWidth'],
+    ['add_pyramid', { baseWidth: 3, baseDepth: -2, height: 5 }, 'baseDepth'],
+    ['add_pyramid', { baseWidth: 3, baseDepth: 4, height: 0 }, 'height'],
+    ['move_entities', { ids: ['nope'], delta: [1, 1, 1] }],
+    ['delete_entities', { ids: ['ghost'] }, 'ghost'],
+    ['set_entity_name', { id: 'ghost', name: 'Nope' }, 'ghost'],
+    ['find_entities', { bboxMin: [0, 0, 0] }, 'bboxMin', 'bboxMax'],
+    ['set_parameter', { name: '1invalid', expression: '10' }, 'invalid'],
+    ['set_parameter', { name: 'x', expression: '' }],
+    ['delete_parameter', { name: 'nonexistent' }, 'nonexistent'],
+    ['draw_ellipse', { center: [0, 0], radiusX: 0, radiusY: 3 }, 'radiusX'],
+    ['draw_ellipse', { center: [0, 0], radiusX: 3, radiusY: -1 }, 'radiusY'],
+    ['draw_spline', { points: [[0, 0]] }, '2'],
+    ['draw_spline', { points: [] }],
+    ['animate', { mode: 'spin', targetId: 'no-such-id', speed: 1.0 }, 'no-such-id'],
+    ['animate', { mode: 'oscillate', targetId: 'ghost', amplitude: 1.0, frequency: 1.0 }, 'ghost'],
+    ['animate', { mode: 'oscillate', targetId: boxId, amplitude: 0, frequency: 1.0 }, 'amplitude'],
+    ['animate', { mode: 'oscillate', targetId: boxId, amplitude: 1.0, frequency: -1 }, 'frequency'],
+    ['animate', { mode: 'spin', targetId: boxId }, 'speed'],
+    ['animate', { mode: 'oscillate', targetId: boxId, frequency: 1 }, 'amplitude'],
+    ['animate', { mode: 'oscillate', targetId: boxId, amplitude: 1 }, 'frequency'],
+    ['stop_animation', { animationId: 'anim-ghost' }, 'anim-ghost', 'not found'],
+  ])('%s %j is a safe no-op', (name, params, ...summary) => {
+    const r = execute(boxDoc, name, params);
+    expectNoOp(r, boxDoc);
+    for (const s of summary) expect(r.summary).toContain(s);
   });
 
-  it('move_entities translates an existing entity', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    doc = created.document;
-    const id = created.affected[0]!;
-
-    const moved = execute(doc, 'move_entities', { ids: [id], delta: [5, 0, -2] });
-    expect(moved.document.entities[id]!.position).toEqual([5, 0, -2]);
+  it('move_entities translates; delete_entities removes from entities, order, selection', () => {
+    const { doc, id } = box();
+    expect(run(doc, 'move_entities', { ids: [id], delta: [5, 0, -2] }).entities[id]!.position).toEqual([5, 0, -2]);
+    const d = execute({ ...doc, selection: [id] }, 'delete_entities', { ids: [id] }).document;
+    expect([d.entities[id], d.order, d.selection]).toEqual([undefined, [], []]);
   });
 
-  it('move_entities on a missing id is a safe no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'move_entities', { ids: ['nope'], delta: [1, 1, 1] });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('delete_entities removes from entities, order, and selection', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = { ...created.document, selection: created.affected };
-    const id = created.affected[0]!;
-
-    const result = execute(doc, 'delete_entities', { ids: [id] });
-    expect(result.document.entities[id]).toBeUndefined();
-    expect(result.document.order).not.toContain(id);
-    expect(result.document.selection).not.toContain(id);
-  });
-
-  it('delete_entities on a missing id is a safe no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'delete_entities', { ids: ['ghost'] });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('ghost');
-  });
-
-  it('delete_entities removes deleted id from group memberIds and dissolves group when < 2 members remain', () => {
-    let doc = createEmptyDocument();
-    const a = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = a.document;
-    const b = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = b.document;
-    const idA = a.affected[0]!;
-    const idB = b.affected[0]!;
-
-    // Group the two entities (exactly 2 members).
-    const grouped = execute(doc, 'group_entities', { ids: [idA, idB], name: 'Pair' });
-    doc = grouped.document;
-    const groupId = grouped.affected[0]!;
-    expect(doc.groups[groupId]!.memberIds).toEqual([idA, idB]);
-
-    // Delete one member — group drops to 1 member and must be dissolved.
-    const result = execute(doc, 'delete_entities', { ids: [idA] });
-    expect(result.document.entities[idA]).toBeUndefined();
-    expect(result.document.order).not.toContain(idA);
-    expect(result.document.groups[groupId]).toBeUndefined();
-    expect(result.summary).toContain(groupId);
-  });
-
-  it('delete_entities removes deleted id from group memberIds but keeps group when >= 2 members remain', () => {
-    let doc = createEmptyDocument();
-    const a = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = a.document;
-    const b = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = b.document;
-    const c = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = c.document;
-    const idA = a.affected[0]!;
-    const idB = b.affected[0]!;
-    const idC = c.affected[0]!;
-
-    // Group all three (3 members).
-    const grouped = execute(doc, 'group_entities', { ids: [idA, idB, idC], name: 'Trio' });
-    doc = grouped.document;
-    const groupId = grouped.affected[0]!;
-
-    // Delete one member — group drops to 2 members, must survive without deleted id.
-    const result = execute(doc, 'delete_entities', { ids: [idA] });
-    expect(result.document.entities[idA]).toBeUndefined();
-    const surviving = result.document.groups[groupId];
-    expect(surviving).toBeDefined();
-    expect(surviving!.memberIds).not.toContain(idA);
-    expect(surviving!.memberIds).toEqual([idB, idC]);
+  it.each([
+    [2, [0], undefined],
+    [3, [0], [1, 2]],
+  ])('delete_entities prunes group members (%i members, delete %j)', (n, del, survivors) => {
+    const { doc: d0, ids } = boxes(n);
+    const g = execute(d0, 'group_entities', { ids, name: 'G' });
+    const groupId = g.affected[0]!;
+    expect(g.document.groups[groupId]!.memberIds).toEqual(ids);
+    const r = execute(g.document, 'delete_entities', { ids: del.map((i) => ids[i]!) });
+    expect(r.document.entities[ids[0]!]).toBeUndefined();
+    expect(r.document.order).not.toContain(ids[0]);
+    expect(r.document.groups[groupId]?.memberIds).toEqual(survivors?.map((i) => ids[i]));
+    if (!survivors) expect(r.summary).toContain(groupId);
+    expectPure(g.document, () => execute(g.document, 'delete_entities', { ids: [ids[0]!] }));
   });
 
   it('delete_entities on an ungrouped entity leaves groups unchanged', () => {
-    let doc = createEmptyDocument();
-    const a = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = a.document;
-    const b = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = b.document;
-    const extra = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = extra.document;
-    const idA = a.affected[0]!;
-    const idB = b.affected[0]!;
-    const idExtra = extra.affected[0]!;
-
-    // Group only A and B; extra is ungrouped.
-    const grouped = execute(doc, 'group_entities', { ids: [idA, idB] });
-    doc = grouped.document;
-    const groupId = grouped.affected[0]!;
-    const groupsBefore = JSON.stringify(doc.groups);
-
-    // Delete the ungrouped entity.
-    const result = execute(doc, 'delete_entities', { ids: [idExtra] });
-    expect(result.document.entities[idExtra]).toBeUndefined();
-    // groups must be identical in shape
-    expect(JSON.stringify(result.document.groups)).toBe(groupsBefore);
-    expect(result.document.groups[groupId]!.memberIds).toEqual([idA, idB]);
+    const { doc: d0, ids } = boxes(3);
+    const doc = run(d0, 'group_entities', { ids: ids.slice(0, 2) });
+    const r = execute(doc, 'delete_entities', { ids: [ids[2]!] });
+    expect(r.document.entities[ids[2]!]).toBeUndefined();
+    expect(JSON.stringify(r.document.groups)).toBe(JSON.stringify(doc.groups));
   });
 
-  it('delete_entities group pruning is pure — input doc is not mutated', () => {
-    let doc = createEmptyDocument();
-    const a = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = a.document;
-    const b = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = b.document;
-    const grouped = execute(doc, 'group_entities', { ids: [a.affected[0]!, b.affected[0]!] });
-    doc = grouped.document;
-
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'delete_entities', { ids: [a.affected[0]!] });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  // ── add_cylinder ─────────────────────────────────────────────────────────
-
-  it('add_cylinder creates one cylinder entity with the given dimensions', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_cylinder', { radius: 2, height: 5 });
-
-    expect(result.affected).toHaveLength(1);
-    expect(result.document.order).toHaveLength(1);
-    const id = result.affected[0]!;
-    const entity = result.document.entities[id]!;
-    expect(entity.kind).toBe('cylinder');
-    // @ts-expect-error narrowing through discriminated union not needed in test
-    expect(entity.radius).toBe(2);
-    // @ts-expect-error same
-    expect(entity.height).toBe(5);
-    expect(result.summary).toContain(id);
-  });
-
-  it('add_cylinder is pure — input document is not mutated', () => {
-    const doc = createEmptyDocument();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'add_cylinder', { radius: 3, height: 4 });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('add_cylinder with radius <= 0 is a safe no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_cylinder', { radius: 0, height: 5 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('radius');
-  });
-
-  it('add_cylinder with height <= 0 is a safe no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_cylinder', { radius: 3, height: -1 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('height');
-  });
-
-  // ── add_sphere ───────────────────────────────────────────────────────────
-
-  it('add_sphere creates one sphere entity with the given radius', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_sphere', { radius: 4 });
-
-    expect(result.affected).toHaveLength(1);
-    expect(result.document.order).toHaveLength(1);
-    const id = result.affected[0]!;
-    const entity = result.document.entities[id]!;
-    expect(entity.kind).toBe('sphere');
-    // @ts-expect-error narrowing through discriminated union not needed in test
-    expect(entity.radius).toBe(4);
-    expect(result.summary).toContain(id);
-  });
-
-  it('add_sphere is pure — input document is not mutated', () => {
-    const doc = createEmptyDocument();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'add_sphere', { radius: 2 });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('add_sphere with radius <= 0 is a safe no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_sphere', { radius: -5 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('radius');
-  });
-
-  it('add_sphere with radius = 0 is a safe no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_sphere', { radius: 0 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('unknown commands fail gracefully', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'frobnicate', {});
-    expect(result.summary).toContain('Unknown command');
-    expect(result.document).toBe(doc);
-  });
-
-  it('getCommand returns a definition by name and undefined for unknown', () => {
+  it('unknown commands fail gracefully; getCommand; every command exposes a tool schema', () => {
+    const doc = empty();
+    const r = execute(doc, 'frobnicate', {});
+    expect(r.summary).toContain('Unknown command');
+    expect(r.document).toBe(doc);
     expect(getCommand('add_box')?.name).toBe('add_box');
     expect(getCommand('frobnicate')).toBeUndefined();
-  });
-
-  it('every registered command exposes an AI/MCP tool schema', () => {
     const schemas = toToolSchemas();
     expect(schemas).toHaveLength(listCommands().length);
     for (const s of schemas) {
@@ -247,7935 +125,2057 @@ describe('command layer', () => {
     }
   });
 
-  // ── set_entity_name ───────────────────────────────────────────────────────
+  it('set_entity_name sets, keeps (omitted) and clears (empty) name and tags, purely', () => {
+    const { doc, id } = box();
+    const r = execute(doc, 'set_entity_name', { id, name: 'Left wall', tags: ['structural', 'visible'] });
+    expect(r.affected).toEqual([id]);
+    expect(first(r)).toMatchObject({ name: 'Left wall', tags: ['structural', 'visible'] });
+    expect(r.summary).toContain(id);
+    expect(r.summary).toContain('Left wall');
+    const kept = execute(r.document, 'set_entity_name', { id });
+    expect(kept.affected).toEqual([id]);
+    expect(first(kept)).toMatchObject({ name: 'Left wall', tags: ['structural', 'visible'] });
+    const cleared = run(r.document, 'set_entity_name', { id, name: '', tags: [] }).entities[id]!;
+    expect([cleared.name, cleared.tags]).toEqual([undefined, undefined]);
+    expectPure(doc, () => execute(doc, 'set_entity_name', { id, name: 'Test', tags: ['a'] }));
+  });
 
-  it('set_entity_name sets name and tags on an existing entity', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = created.document;
-    const id = created.affected[0]!;
-
-    const result = execute(doc, 'set_entity_name', {
-      id,
-      name: 'Left wall',
-      tags: ['structural', 'visible'],
+  describe('find_entities', () => {
+    const { doc: d1, id: id1 } = box(empty(), [2, 2, 2]);
+    const doc = run(run(d1, 'add_sphere', { radius: 1, position: [10, 0, 0] }), 'set_entity_name', {
+      id: id1,
+      name: 'Left Wall',
+      tags: ['structural'],
     });
-    expect(result.affected).toEqual([id]);
-    const entity = result.document.entities[id]!;
-    expect(entity.name).toBe('Left wall');
-    expect(entity.tags).toEqual(['structural', 'visible']);
-    expect(result.summary).toContain(id);
-    expect(result.summary).toContain('Left wall');
-  });
+    const find = (p: object): { count: number; matches: Array<Record<string, unknown>> } =>
+      execute(doc, 'find_entities', p).data as { count: number; matches: Array<Record<string, unknown>> };
 
-  it('set_entity_name clears name when empty string is passed', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = created.document;
-    const id = created.affected[0]!;
+    it.each<[object, number, Record<string, unknown>?]>([
+      [{}, 2],
+      [{ kind: 'box' }, 1, { kind: 'box' }],
+      [{ name: 'wall' }, 1, { id: id1, name: 'Left Wall' }],
+      [{ name: 'Left Wall', nameExact: true }, 1],
+      [{ name: 'left wall', nameExact: true }, 0],
+      [{ tag: 'structural' }, 1, { id: id1 }],
+      [{ layerId: 'layer-default' }, 2],
+      [{ layerId: 'layer-nonexistent' }, 0],
+      [{ bboxMin: [-2, -2, -2], bboxMax: [2, 2, 2] }, 1, { kind: 'box' }],
+    ])('%j → %i match(es)', (filter, count, match) => {
+      const data = find(filter);
+      expect(data.count).toBe(count);
+      expect(data.matches).toHaveLength(count);
+      if (match) expect(data.matches[0]).toMatchObject(match);
+    });
 
-    doc = execute(doc, 'set_entity_name', { id, name: 'Temp' }).document;
-    const result = execute(doc, 'set_entity_name', { id, name: '' });
-    expect(result.document.entities[id]!.name).toBeUndefined();
-  });
-
-  it('set_entity_name clears tags when empty array is passed', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = created.document;
-    const id = created.affected[0]!;
-
-    doc = execute(doc, 'set_entity_name', { id, tags: ['keep'] }).document;
-    const result = execute(doc, 'set_entity_name', { id, tags: [] });
-    expect(result.document.entities[id]!.tags).toBeUndefined();
-  });
-
-  it('set_entity_name on missing id is a safe no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'set_entity_name', { id: 'ghost', name: 'Nope' });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('ghost');
-  });
-
-  it('set_entity_name omitting name leaves existing name unchanged', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = created.document;
-    const id = created.affected[0]!;
-
-    doc = execute(doc, 'set_entity_name', { id, name: 'Temp' }).document;
-    const result = execute(doc, 'set_entity_name', { id });
-    expect(result.document.entities[id]!.name).toBe('Temp');
-    expect(result.affected).toEqual([id]);
-  });
-
-  it('set_entity_name omitting tags leaves existing tags unchanged', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = created.document;
-    const id = created.affected[0]!;
-
-    doc = execute(doc, 'set_entity_name', { id, tags: ['a'] }).document;
-    const result = execute(doc, 'set_entity_name', { id });
-    expect(result.document.entities[id]!.tags).toEqual(['a']);
-    expect(result.affected).toEqual([id]);
-  });
-
-  it('set_entity_name is pure — input document is not mutated', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = created.document;
-    const id = created.affected[0]!;
-
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'set_entity_name', { id, name: 'Test', tags: ['a'] });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  // ── find_entities ─────────────────────────────────────────────────────────
-
-  it('find_entities returns all entities when no filters are given', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    doc = execute(doc, 'add_sphere', { radius: 2 }).document;
-
-    const result = execute(doc, 'find_entities', {});
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    const data = result.data as { matches: unknown[]; count: number };
-    expect(data.count).toBe(2);
-    expect(data.matches).toHaveLength(2);
-  });
-
-  it('find_entities filters by kind', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    doc = execute(doc, 'add_sphere', { radius: 2 }).document;
-
-    const result = execute(doc, 'find_entities', { kind: 'box' });
-    const data = result.data as { matches: Array<{ kind: string }>; count: number };
-    expect(data.count).toBe(1);
-    expect(data.matches[0]!.kind).toBe('box');
-  });
-
-  it('find_entities filters by name substring (case-insensitive)', () => {
-    let doc = createEmptyDocument();
-    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = r1.document;
-    const id1 = r1.affected[0]!;
-    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
-
-    doc = execute(doc, 'set_entity_name', { id: id1, name: 'Left Wall' }).document;
-
-    const result = execute(doc, 'find_entities', { name: 'wall' });
-    const data = result.data as { matches: Array<{ id: string; name: string }>; count: number };
-    expect(data.count).toBe(1);
-    expect(data.matches[0]!.id).toBe(id1);
-    expect(data.matches[0]!.name).toBe('Left Wall');
-  });
-
-  it('find_entities nameExact=true requires exact match', () => {
-    let doc = createEmptyDocument();
-    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = r1.document;
-    const id1 = r1.affected[0]!;
-    doc = execute(doc, 'set_entity_name', { id: id1, name: 'Left Wall' }).document;
-
-    const exact = execute(doc, 'find_entities', { name: 'Left Wall', nameExact: true });
-    expect((exact.data as { count: number }).count).toBe(1);
-
-    const noMatch = execute(doc, 'find_entities', { name: 'left wall', nameExact: true });
-    expect((noMatch.data as { count: number }).count).toBe(0);
-  });
-
-  it('find_entities filters by tag', () => {
-    let doc = createEmptyDocument();
-    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = r1.document;
-    const id1 = r1.affected[0]!;
-    doc = execute(doc, 'add_sphere', { radius: 1 }).document;
-    doc = execute(doc, 'set_entity_name', { id: id1, tags: ['structural'] }).document;
-
-    const result = execute(doc, 'find_entities', { tag: 'structural' });
-    const data = result.data as { matches: Array<{ id: string }>; count: number };
-    expect(data.count).toBe(1);
-    expect(data.matches[0]!.id).toBe(id1);
-  });
-
-  it('find_entities filters by layerId', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-
-    const result = execute(doc, 'find_entities', { layerId: 'layer-default' });
-    expect((result.data as { count: number }).count).toBe(1);
-
-    const none = execute(doc, 'find_entities', { layerId: 'layer-nonexistent' });
-    expect((none.data as { count: number }).count).toBe(0);
-  });
-
-  it('find_entities filters by bounding box', () => {
-    let doc = createEmptyDocument();
-    // box at origin, size 2x2x2 → AABB [-1,-1,-1] to [1,1,1]
-    const r1 = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
-    doc = r1.document;
-    // sphere at [10,0,0] radius 1 → AABB [9,-1,-1] to [11,1,1]
-    doc = execute(doc, 'add_sphere', { radius: 1, position: [10, 0, 0] }).document;
-
-    // bbox that only overlaps the box at origin
-    const result = execute(doc, 'find_entities', { bboxMin: [-2, -2, -2], bboxMax: [2, 2, 2] });
-    const data = result.data as { matches: Array<{ kind: string }>; count: number };
-    expect(data.count).toBe(1);
-    expect(data.matches[0]!.kind).toBe('box');
-  });
-
-  it('find_entities returns error summary when only one bbox bound is given', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'find_entities', { bboxMin: [0, 0, 0] });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('bboxMin');
-    expect(result.summary).toContain('bboxMax');
-  });
-
-  it('find_entities is pure — input document is not mutated', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'find_entities', { kind: 'box' });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('find_entities on empty document returns count 0', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'find_entities', {});
-    const data = result.data as { count: number };
-    expect(data.count).toBe(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('find_entities summary includes filter description and match count', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-
-    const result = execute(doc, 'find_entities', { kind: 'sphere' });
-    expect(result.summary).toContain('kind=sphere');
-    expect(result.summary).toContain('0 match');
+    it('is a pure query with a descriptive summary', () => {
+      const r = execute(doc, 'find_entities', { kind: 'cone' });
+      expectNoOp(r, doc, 'kind=cone');
+      expect(r.summary).toContain('0 match');
+      expect((execute(empty(), 'find_entities', {}).data as { count: number }).count).toBe(0);
+      expectPure(doc, () => execute(doc, 'find_entities', { kind: 'box' }));
+    });
   });
 });
 
-// Expression evaluator unit tests
+describe('evaluateExpression / extractReferences', () => {
+  it.each<[string, Record<string, number>, number]>([
+    ['42', {}, 42],
+    ['3.14', {}, 3.14],
+    ['1 + 2', {}, 3],
+    ['10 - 4', {}, 6],
+    ['3 * 4', {}, 12],
+    ['10 / 4', {}, 2.5],
+    ['2 + 3 * 4', {}, 14],
+    ['(2 + 3) * 4', {}, 20],
+    ['-5', {}, -5],
+    ['10 + -3', {}, 7],
+    ['((2 + 3) * (1 + 1))', {}, 10],
+    ['width', { width: 15 }, 15],
+    ['width * 2 + 5', { width: 10 }, 25],
+  ])('%s = %d', (src, env, value) => expect(evaluateExpression(src, env)).toEqual({ ok: true, value: expect.closeTo(value, 9) }));
 
-import { evaluateExpression, extractReferences } from '@core/commands/parametric/expression';
-
-describe('evaluateExpression', () => {
-  it('evaluates a plain integer literal', () => {
-    const r = evaluateExpression('42', {});
-    expect(r.ok).toBe(true);
-    if (r.ok) expect(r.value).toBe(42);
-  });
-
-  it('evaluates a decimal literal', () => {
-    const r = evaluateExpression('3.14', {});
-    expect(r.ok).toBe(true);
-    if (r.ok) expect(r.value).toBeCloseTo(3.14);
-  });
-
-  it('addition', () => {
-    const r = evaluateExpression('1 + 2', {});
-    expect(r.ok).toBe(true);
-    if (r.ok) expect(r.value).toBe(3);
-  });
-
-  it('subtraction', () => {
-    const r = evaluateExpression('10 - 4', {});
-    expect(r.ok).toBe(true);
-    if (r.ok) expect(r.value).toBe(6);
-  });
-
-  it('multiplication', () => {
-    const r = evaluateExpression('3 * 4', {});
-    expect(r.ok).toBe(true);
-    if (r.ok) expect(r.value).toBe(12);
-  });
-
-  it('division', () => {
-    const r = evaluateExpression('10 / 4', {});
-    expect(r.ok).toBe(true);
-    if (r.ok) expect(r.value).toBe(2.5);
-  });
-
-  it('operator precedence: * before +', () => {
-    const r = evaluateExpression('2 + 3 * 4', {});
-    expect(r.ok).toBe(true);
-    if (r.ok) expect(r.value).toBe(14);
-  });
-
-  it('parentheses override precedence', () => {
-    const r = evaluateExpression('(2 + 3) * 4', {});
-    expect(r.ok).toBe(true);
-    if (r.ok) expect(r.value).toBe(20);
-  });
-
-  it('unary minus on a literal', () => {
-    const r = evaluateExpression('-5', {});
-    expect(r.ok).toBe(true);
-    if (r.ok) expect(r.value).toBe(-5);
-  });
-
-  it('unary minus in an expression', () => {
-    const r = evaluateExpression('10 + -3', {});
-    expect(r.ok).toBe(true);
-    if (r.ok) expect(r.value).toBe(7);
-  });
-
-  it('nested parentheses', () => {
-    const r = evaluateExpression('((2 + 3) * (1 + 1))', {});
-    expect(r.ok).toBe(true);
-    if (r.ok) expect(r.value).toBe(10);
-  });
-
-  it('reference to an env variable', () => {
-    const r = evaluateExpression('width', { width: 15 });
-    expect(r.ok).toBe(true);
-    if (r.ok) expect(r.value).toBe(15);
-  });
-
-  it('expression using env reference in formula', () => {
-    const r = evaluateExpression('width * 2 + 5', { width: 10 });
-    expect(r.ok).toBe(true);
-    if (r.ok) expect(r.value).toBe(25);
-  });
-
-  it('unknown reference returns EvalErr with descriptive message', () => {
-    const r = evaluateExpression('unknown_var', {});
+  it.each([
+    ['unknown_var', 'unknown parameter: unknown_var'],
+    ['1 / 0', 'not a finite number'],
+    ['', 'empty'],
+    ['2 @ 3', '@'],
+    ['(2 + 3', ''],
+    ['2 + 3 )', ''],
+  ])('%j is an error', (src, error) => {
+    const r = evaluateExpression(src, {});
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toContain('unknown parameter: unknown_var');
+    if (!r.ok) expect(r.error).toContain(error);
   });
 
-  it('divide by zero is an error (non-finite result)', () => {
-    const r = evaluateExpression('1 / 0', {});
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toContain('not a finite number');
-  });
-
-  it('empty expression returns EvalErr', () => {
-    const r = evaluateExpression('', {});
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toContain('empty');
-  });
-
-  it('unexpected character returns EvalErr', () => {
-    const r = evaluateExpression('2 @ 3', {});
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toContain('@');
-  });
-
-  it('mismatched parenthesis returns EvalErr', () => {
-    const r = evaluateExpression('(2 + 3', {});
-    expect(r.ok).toBe(false);
-  });
-
-  it('trailing garbage returns EvalErr', () => {
-    const r = evaluateExpression('2 + 3 )', {});
-    expect(r.ok).toBe(false);
-  });
+  it.each([
+    ['42', []],
+    ['width * 2', ['width']],
+    ['a + b * c', ['a', 'b', 'c']],
+    ['@@garbage@@', []],
+  ])('extractReferences(%j)', (src, refs) => expect([...extractReferences(src)].sort()).toEqual(refs));
 });
 
-describe('extractReferences', () => {
-  it('returns empty set for a plain literal', () => {
-    const refs = extractReferences('42');
-    expect(refs.size).toBe(0);
+const params = (...pairs: Array<[string, string]>): CadDocument =>
+  pairs.reduce((doc, [name, expression]) => run(doc, 'set_parameter', { name, expression }), empty());
+
+describe('set_parameter / delete_parameter', () => {
+  it('creates a literal parameter and reports it', () => {
+    const r = execute(empty(), 'set_parameter', { name: 'width', expression: '10' });
+    expect(r.document.parameters['width']).toMatchObject({ value: 10, expression: '10' });
+    expect(r.document.parameters['width']!.error).toBeUndefined();
+    expect(r.summary).toContain('width');
+    expect(r.summary).toContain('10');
   });
 
-  it('returns single reference', () => {
-    const refs = extractReferences('width * 2');
-    expect(refs.has('width')).toBe(true);
-    expect(refs.size).toBe(1);
+  it('references and transitive re-evaluation', () => {
+    const doc = params(['a', '2'], ['b', 'a * 3'], ['c', 'b + 1']);
+    expect([doc.parameters['b']!.value, doc.parameters['c']!.value, doc.parameters['b']!.error]).toEqual([6, 7, undefined]);
+    const r = execute(doc, 'set_parameter', { name: 'a', expression: '4' });
+    expect(['a', 'b', 'c'].map((k) => r.document.parameters[k]!.value)).toEqual([4, 12, 13]);
+    const updated = run(params(['r', '5']), 'set_parameter', { name: 'r', expression: '7' });
+    expect(updated.parameters).toEqual({ r: expect.objectContaining({ value: 7 }) });
   });
 
-  it('returns multiple references', () => {
-    const refs = extractReferences('a + b * c');
-    expect(refs.has('a')).toBe(true);
-    expect(refs.has('b')).toBe(true);
-    expect(refs.has('c')).toBe(true);
+  it('stores errors for unknown references and cycles; refuses parse errors without calling them cycles', () => {
+    const r = execute(empty(), 'set_parameter', { name: 'x', expression: 'ghost * 2' });
+    expect(r.document.parameters['x']!.error).toContain('unknown parameter');
+    expect(r.summary).toContain('could not be evaluated');
+    const cyc = run(params(['a', 'b']), 'set_parameter', { name: 'b', expression: 'a' }).parameters;
+    expect(cyc['a']!.error !== undefined || cyc['b']!.error !== undefined).toBe(true);
+    const doc = params(['width', '10']);
+    const bad = execute(doc, 'set_parameter', { name: 'x', expression: 'width +' });
+    expect(bad.document).toBe(doc);
+    expect(bad.document.parameters['x']).toBeUndefined();
+    expect(bad.summary).toContain('is invalid');
+    expect(bad.summary).not.toContain('cycle');
   });
 
-  it('returns empty set for unparseable input', () => {
-    const refs = extractReferences('@@garbage@@');
-    expect(refs.size).toBe(0);
-  });
-});
-
-// set_parameter / delete_parameter command tests
-
-describe('set_parameter', () => {
-  it('creates a literal parameter and reports it in summary', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'set_parameter', { name: 'width', expression: '10' });
-
-    expect(result.document.parameters['width']).toBeDefined();
-    expect(result.document.parameters['width']!.value).toBe(10);
-    expect(result.document.parameters['width']!.expression).toBe('10');
-    expect(result.document.parameters['width']!.error).toBeUndefined();
-    expect(result.summary).toContain('width');
-    expect(result.summary).toContain('10');
-  });
-
-  it('creates a parameter referencing another parameter', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'set_parameter', { name: 'width', expression: '10' }).document;
-    const result = execute(doc, 'set_parameter', { name: 'height', expression: 'width * 2' });
-
-    expect(result.document.parameters['height']!.value).toBe(20);
-    expect(result.document.parameters['height']!.error).toBeUndefined();
-  });
-
-  it('changing a base parameter re-evaluates dependents transitively', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'set_parameter', { name: 'base', expression: '5' }).document;
-    doc = execute(doc, 'set_parameter', { name: 'derived', expression: 'base * 3' }).document;
-    expect(doc.parameters['derived']!.value).toBe(15);
-
-    // Now change base — derived must re-evaluate.
-    const result = execute(doc, 'set_parameter', { name: 'base', expression: '10' });
-    expect(result.document.parameters['base']!.value).toBe(10);
-    expect(result.document.parameters['derived']!.value).toBe(30);
-  });
-
-  it('three-level chain re-evaluates fully', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'set_parameter', { name: 'a', expression: '2' }).document;
-    doc = execute(doc, 'set_parameter', { name: 'b', expression: 'a * 3' }).document;
-    doc = execute(doc, 'set_parameter', { name: 'c', expression: 'b + 1' }).document;
-    expect(doc.parameters['c']!.value).toBe(7);
-
-    // Change a: b = 4*3=12, c = 12+1=13.
-    const result = execute(doc, 'set_parameter', { name: 'a', expression: '4' });
-    expect(result.document.parameters['b']!.value).toBe(12);
-    expect(result.document.parameters['c']!.value).toBe(13);
-  });
-
-  it('stores error when expression references an unknown parameter', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'set_parameter', { name: 'x', expression: 'ghost * 2' });
-
-    expect(result.document.parameters['x']!.error).toBeDefined();
-    expect(result.document.parameters['x']!.error).toContain('unknown parameter');
-    expect(result.summary).toContain('could not be evaluated');
-  });
-
-  it('detects a direct cycle and stores error on both parameters', () => {
-    let doc = createEmptyDocument();
-    // a = b (b not yet defined, will fail)
-    doc = execute(doc, 'set_parameter', { name: 'a', expression: 'b' }).document;
-    // b = a → cycle
-    const result = execute(doc, 'set_parameter', { name: 'b', expression: 'a' });
-
-    const paramA = result.document.parameters['a']!;
-    const paramB = result.document.parameters['b']!;
-    // At least one of them must have an error (cycle detected).
-    const hasCycleError = paramA.error !== undefined || paramB.error !== undefined;
-    expect(hasCycleError).toBe(true);
-  });
-
-  it('parse error on a syntactically-invalid expression is NOT mislabeled as a cycle', () => {
-    // width is a valid known parameter; "width +" is a parse error, not a cycle.
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'set_parameter', { name: 'width', expression: '10' }).document;
-    const result = execute(doc, 'set_parameter', { name: 'x', expression: 'width +' });
-
-    // A malformed expression is refused outright (no parameter created), never labeled a cycle.
-    expect(result.document).toBe(doc);
-    expect(result.document.parameters['x']).toBeUndefined();
-    expect(result.summary).toContain('is invalid');
-    expect(result.summary).not.toContain('cycle');
-  });
-
-  it('rejects an invalid parameter name (starts with digit)', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'set_parameter', { name: '1invalid', expression: '10' });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('invalid');
-  });
-
-  it('rejects an empty expression', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'set_parameter', { name: 'x', expression: '' });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('is pure — the input document is not mutated', () => {
-    const doc = createEmptyDocument();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'set_parameter', { name: 'width', expression: '10' });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('updates an existing parameter in-place', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'set_parameter', { name: 'r', expression: '5' }).document;
-    const result = execute(doc, 'set_parameter', { name: 'r', expression: '7' });
-    expect(result.document.parameters['r']!.value).toBe(7);
-    expect(Object.keys(result.document.parameters)).toHaveLength(1);
-  });
-
-  it('parameters round-trip through serialize/deserialize', async () => {
-    const { serializeDocument, deserializeDocument } =
-      await import('@core/commands/persistence/serialization');
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'set_parameter', { name: 'width', expression: '10' }).document;
-    doc = execute(doc, 'set_parameter', { name: 'height', expression: 'width * 2' }).document;
-
-    const json = serializeDocument(doc);
-    const restored = deserializeDocument(json);
-
+  it('is pure; parameters round-trip; legacy envelopes default parameters, featureHistory, configurations, materials', () => {
+    const doc = empty();
+    expectPure(doc, () => execute(doc, 'set_parameter', { name: 'width', expression: '10' }));
+    const restored = deserializeDocument(serializeDocument(params(['width', '10'], ['height', 'width * 2'])));
     expect(restored.parameters['width']!.value).toBe(10);
-    expect(restored.parameters['height']!.value).toBe(20);
-    expect(restored.parameters['height']!.expression).toBe('width * 2');
+    expect(restored.parameters['height']).toMatchObject({ value: 20, expression: 'width * 2' });
+    const { entities, order, layers, layerOrder, selection, camera } = doc;
+    const legacy = { format: 'llull-document', version: 1, document: { entities, order, layers, layerOrder, selection, camera } };
+    expect(deserializeDocument(JSON.stringify(legacy))).toMatchObject({
+      parameters: {},
+      featureHistory: [],
+      configurations: {},
+      materials: {},
+    });
   });
 
-  it('deserializing a pre-Q1 document without parameters key yields parameters: {}', async () => {
-    const { deserializeDocument } = await import('@core/commands/persistence/serialization');
-    const doc = createEmptyDocument();
-    // Manually build an envelope that lacks the parameters field (older format).
-    const envelope = {
-      format: 'llull-document',
-      version: 1,
-      document: {
-        entities: doc.entities,
-        order: doc.order,
-        layers: doc.layers,
-        layerOrder: doc.layerOrder,
-        selection: doc.selection,
-        camera: doc.camera,
-        // no parameters key
-      },
-    };
-    const restored = deserializeDocument(JSON.stringify(envelope));
-    expect(restored.parameters).toBeDefined();
-    expect(restored.parameters).toEqual({});
-  });
-});
-
-describe('delete_parameter', () => {
-  it('removes an existing parameter', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'set_parameter', { name: 'x', expression: '5' }).document;
-    const result = execute(doc, 'delete_parameter', { name: 'x' });
-
-    expect(result.document.parameters['x']).toBeUndefined();
-    expect(result.summary).toContain('x');
-    expect(result.summary).toContain('removed');
-  });
-
-  it('no-op when the parameter does not exist', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'delete_parameter', { name: 'nonexistent' });
-
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('nonexistent');
-  });
-
-  it('dependents receive an error after their dependency is deleted', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'set_parameter', { name: 'base', expression: '10' }).document;
-    doc = execute(doc, 'set_parameter', { name: 'derived', expression: 'base * 2' }).document;
+  it('delete_parameter removes, errors dependents, leaves others, purely', () => {
+    const doc = params(['base', '10'], ['derived', 'base * 2'], ['other', '7']);
     expect(doc.parameters['derived']!.value).toBe(20);
-
-    const result = execute(doc, 'delete_parameter', { name: 'base' });
-
-    expect(result.document.parameters['base']).toBeUndefined();
-    expect(result.document.parameters['derived']!.error).toBeDefined();
-    expect(result.document.parameters['derived']!.error).toContain('base');
-    expect(result.summary).toContain('derived');
-  });
-
-  it('non-dependent parameters are unaffected by deletion', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'set_parameter', { name: 'a', expression: '3' }).document;
-    doc = execute(doc, 'set_parameter', { name: 'b', expression: '7' }).document;
-
-    const result = execute(doc, 'delete_parameter', { name: 'a' });
-
-    expect(result.document.parameters['a']).toBeUndefined();
-    expect(result.document.parameters['b']!.value).toBe(7);
-    expect(result.document.parameters['b']!.error).toBeUndefined();
-  });
-
-  it('is pure — the input document is not mutated', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'set_parameter', { name: 'w', expression: '10' }).document;
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'delete_parameter', { name: 'w' });
-    expect(JSON.stringify(doc)).toBe(snapshot);
+    const r = execute(doc, 'delete_parameter', { name: 'base' });
+    expect(r.document.parameters['base']).toBeUndefined();
+    expect(r.document.parameters['derived']!.error).toContain('base');
+    expect([r.document.parameters['other']!.value, r.document.parameters['other']!.error]).toEqual([7, undefined]);
+    expect(r.summary).toContain('derived');
+    const x = execute(params(['x', '5']), 'delete_parameter', { name: 'x' });
+    expect(x.document.parameters['x']).toBeUndefined();
+    expect(x.summary).toContain('x');
+    expect(x.summary).toContain('removed');
+    expectPure(doc, () => execute(doc, 'delete_parameter', { name: 'base' }));
   });
 });
 
-// draw_ellipse
-
-describe('draw_ellipse', () => {
-  it('creates one ellipse entity with correct geometry', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_ellipse', { center: [1, 2], radiusX: 5, radiusY: 3 });
-
-    expect(result.affected).toHaveLength(1);
-    expect(result.document.order).toHaveLength(1);
-    const id = result.affected[0]!;
-    const entity = result.document.entities[id]!;
-    expect(entity.kind).toBe('ellipse');
-    if (entity.kind === 'ellipse') {
-      expect(entity.center).toEqual([1, 2]);
-      expect(entity.radiusX).toBe(5);
-      expect(entity.radiusY).toBe(3);
-    }
-    expect(result.summary).toContain(id);
-    expect(result.summary).toContain('5');
-    expect(result.summary).toContain('3');
+describe('draw_ellipse / draw_spline / scale_entity', () => {
+  it('draw_ellipse creates one 2D ellipse at the default position, purely', () => {
+    const doc = empty();
+    const r = execute(doc, 'draw_ellipse', { center: [1, 2], radiusX: 5, radiusY: 3 });
+    expectSingleEntity(r, 'ellipse');
+    expect(first(r)).toMatchObject({ center: [1, 2], radiusX: 5, radiusY: 3, position: [0, 0, 0] });
+    expect(is2D(first(r))).toBe(true);
+    for (const s of [r.affected[0]!, '5', '3']) expect(r.summary).toContain(s);
+    expectPure(doc, () => execute(doc, 'draw_ellipse', { center: [0, 0], radiusX: 4, radiusY: 2 }));
   });
 
-  it('is2D returns true for an ellipse entity', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_ellipse', { center: [0, 0], radiusX: 2, radiusY: 1 });
-    const id = result.affected[0]!;
-    const entity = result.document.entities[id]!;
-    expect(is2D(entity)).toBe(true);
+  it('draw_spline creates an open or closed 2D spline, purely', () => {
+    const doc = empty();
+    const r = execute(doc, 'draw_spline', { points: xy(0, 0, 1, 2, 3, 1, 4, 3) });
+    expectSingleEntity(r, 'spline');
+    expect(first(r)).toMatchObject({ closed: false, points: xy(0, 0, 1, 2, 3, 1, 4, 3) });
+    expect(is2D(first(r))).toBe(true);
+    expect(r.summary).toContain(r.affected[0]);
+    expect(r.summary).toContain('4');
+    const closed = execute(doc, 'draw_spline', { points: xy(0, 0, 1, 1, 2, 0), closed: true });
+    expect(first(closed).closed).toBe(true);
+    expect(closed.summary).toContain('closed');
+    expectPure(doc, () => execute(doc, 'draw_spline', { points: xy(0, 0, 1, 1, 2, 0) }));
   });
 
-  it('no-op when radiusX <= 0', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_ellipse', { center: [0, 0], radiusX: 0, radiusY: 3 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('radiusX');
+  it.each<[string, object, number, Record<string, unknown>, string[]]>([
+    ['draw_ellipse', { center: [2, 4], radiusX: 3, radiusY: 1 }, 2, { center: [4, 8], radiusX: 6, radiusY: 2 }, ['radiusX', '6']],
+    ['draw_spline', { points: xy(1, 0, 2, 2, 3, 0) }, 3, { points: xy(3, 0, 6, 6, 9, 0) }, ['3 points']],
+    ['add_cone', { radius: 2, height: 4 }, 3, { radius: 6, height: 12 }, ['$id']],
+    ['add_torus', { ringRadius: 4, tubeRadius: 1 }, 2, { ringRadius: 8, tubeRadius: 2 }, []],
+    ['add_wedge', { size: [2, 3, 4] }, 2, { size: [4, 6, 8] }, []],
+    ['add_pyramid', { baseWidth: 3, baseDepth: 4, height: 6 }, 2, { baseWidth: 6, baseDepth: 8, height: 12 }, []],
+  ])('scale_entity scales %s, purely', (name, p, factor, shape, summary) => {
+    const { doc, id } = add(empty(), name, p);
+    const r = execute(doc, 'scale_entity', { id, factor });
+    expect(r.affected).toEqual([id]);
+    expect(first(r)).toMatchObject(shape);
+    for (const s of summary) expect(r.summary).toContain(s === '$id' ? id : s);
+    expectPure(doc, () => execute(doc, 'scale_entity', { id, factor }));
   });
 
-  it('no-op when radiusY <= 0', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_ellipse', { center: [0, 0], radiusX: 3, radiusY: -1 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('radiusY');
-  });
-
-  it('is pure — the input document is not mutated', () => {
-    const doc = createEmptyDocument();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'draw_ellipse', { center: [0, 0], radiusX: 4, radiusY: 2 });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('uses default position [0,0,0] when not provided', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_ellipse', { center: [0, 0], radiusX: 1, radiusY: 1 });
-    const id = result.affected[0]!;
-    expect(result.document.entities[id]!.position).toEqual([0, 0, 0]);
+  it.each([
+    ['add_cone', { radius: 3, height: 4 }, (Math.PI * 3 * 3 * 4) / 3],
+    ['add_torus', { ringRadius: 4, tubeRadius: 1 }, 2 * Math.PI * Math.PI * 4],
+    ['add_wedge', { size: [4, 3, 6] }, (4 * 3 * 6) / 2],
+    ['add_pyramid', { baseWidth: 6, baseDepth: 4, height: 9 }, (6 * 4 * 9) / 3],
+  ])('mass_properties volume of %s', (name, p, volume) => {
+    const { doc, id } = add(empty(), name, p);
+    const r = execute(doc, 'mass_properties', { entityId: id });
+    expectNoOp(r, doc);
+    expect(r.data).toMatchObject({ volume: expect.closeTo(volume, 6), volumeUnit: expect.stringContaining('mm') });
   });
 });
 
-// draw_spline
+describe('animate / stop_animation', () => {
+  const anims = (doc: CadDocument): Array<Record<string, unknown>> =>
+    Object.values(doc.animations) as unknown as Array<Record<string, unknown>>;
 
-describe('draw_spline', () => {
-  it('creates one spline entity with correct through-points', () => {
-    const doc = createEmptyDocument();
-    const pts = [
-      [0, 0],
-      [1, 2],
-      [3, 1],
-      [4, 3],
-    ];
-    const result = execute(doc, 'draw_spline', { points: pts });
-
-    expect(result.affected).toHaveLength(1);
-    expect(result.document.order).toHaveLength(1);
-    const id = result.affected[0]!;
-    const entity = result.document.entities[id]!;
-    expect(entity.kind).toBe('spline');
-    if (entity.kind === 'spline') {
-      expect(entity.points).toHaveLength(4);
-      expect(entity.closed).toBe(false);
-      expect(entity.points[0]).toEqual([0, 0]);
-      expect(entity.points[2]).toEqual([3, 1]);
-    }
-    expect(result.summary).toContain(id);
-    expect(result.summary).toContain('4');
+  it.each<[object, Record<string, unknown>, string[]]>([
+    [
+      { mode: 'spin', speed: 1.0 },
+      { mode: 'spin', channel: 'rotation', speed: 1.0, amplitude: 0, frequency: 0, trigger: 'auto', axis: [0, 1, 0] },
+      [boxId, 'rad/s'],
+    ],
+    [
+      { mode: 'spin', speed: 2.0, axis: [1, 0, 0], channel: 'position', pivot: [0, 0, 5], trigger: 'click' },
+      { axis: [1, 0, 0], channel: 'position', pivot: [0, 0, 5], trigger: 'click' },
+      ['units/s'],
+    ],
+    [
+      { mode: 'oscillate', amplitude: 0.5, frequency: 2.0 },
+      { mode: 'oscillate', channel: 'rotation', amplitude: 0.5, frequency: 2.0, speed: 0, trigger: 'auto' },
+      [boxId, 'Hz'],
+    ],
+    [
+      { mode: 'oscillate', amplitude: 1.0, frequency: 0.5, axis: [0, 0, 1], channel: 'position', pivot: [1, 2, 3], trigger: 'click' },
+      { axis: [0, 0, 1], channel: 'position', pivot: [1, 2, 3], trigger: 'click' },
+      ['units'],
+    ],
+  ])('animate %j adds one animation record, purely', (p, shape, summary) => {
+    const r = execute(boxDoc, 'animate', { ...p, targetId: boxId });
+    expect(r.affected).toHaveLength(0);
+    expect(r.document).not.toBe(boxDoc);
+    const list = anims(r.document);
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ ...shape, targetId: boxId, targetKind: 'entity' });
+    if (!('pivot' in p)) expect('pivot' in list[0]!).toBe(false);
+    for (const s of summary) expect(r.summary).toContain(s);
+    expectPure(boxDoc, () => execute(boxDoc, 'animate', { ...p, targetId: boxId }));
   });
 
-  it('creates a closed spline when closed=true', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_spline', {
-      points: [
-        [0, 0],
-        [1, 1],
-        [2, 0],
-      ],
-      closed: true,
-    });
-    const id = result.affected[0]!;
-    const entity = result.document.entities[id]!;
-    if (entity.kind === 'spline') {
-      expect(entity.closed).toBe(true);
-    }
-    expect(result.summary).toContain('closed');
+  it('animate on a group resolves targetKind group', () => {
+    const { doc, ids } = boxes(2);
+    const g = execute(doc, 'group_entities', { ids, name: 'Wheel' });
+    const list = anims(run(g.document, 'animate', { mode: 'spin', targetId: g.affected[0], speed: 6.283 }));
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ targetKind: 'group', targetId: g.affected[0] });
   });
 
-  it('is2D returns true for a spline entity', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_spline', {
-      points: [
-        [0, 0],
-        [1, 1],
-      ],
-    });
-    const id = result.affected[0]!;
-    const entity = result.document.entities[id]!;
-    expect(is2D(entity)).toBe(true);
+  it('stop_animation by animationId, by targetId, or all; no-ops explain themselves; pure', () => {
+    const { doc: d0, ids } = boxes(2);
+    const [a, b] = ids as [string, string];
+    const doc = [
+      { targetId: a, speed: 1 },
+      { targetId: a, speed: 2 },
+      { targetId: b, speed: 3 },
+    ].reduce((d, p) => run(d, 'animate', { mode: 'spin', ...p }), d0);
+    const [anim1, anim2] = Object.keys(doc.animations) as [string, string];
+    const byId = execute(doc, 'stop_animation', { animationId: anim1 });
+    expect([byId.document.animations[anim1], !!byId.document.animations[anim2]]).toEqual([undefined, true]);
+    expect(byId.summary).toContain(anim1);
+    const byTarget = execute(doc, 'stop_animation', { targetId: a });
+    expect(anims(byTarget.document).map((x) => x['targetId'])).toEqual([b]);
+    expect(byTarget.summary).toContain('2');
+    expect(byTarget.summary).toContain(a);
+    const none = execute(doc, 'stop_animation', { targetId: 'other-entity' });
+    expect(none.document).toBe(doc);
+    expect(none.summary).toContain('other-entity');
+    const all = execute(doc, 'stop_animation', {});
+    expect(all.document.animations).toEqual({});
+    expect(all.summary).toContain('3');
+    expect(all.summary).toContain('cleared');
+    const nothing = execute(boxDoc, 'stop_animation', {});
+    expect(nothing.document).toBe(boxDoc);
+    expect(nothing.summary).toContain('no animations');
+    expectPure(doc, () => execute(doc, 'stop_animation', { animationId: anim1 }));
   });
 
-  it('no-op when fewer than 2 points are provided', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_spline', { points: [[0, 0]] });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('2');
-  });
-
-  it('no-op when points array is empty', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'draw_spline', { points: [] });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('is pure — the input document is not mutated', () => {
-    const doc = createEmptyDocument();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'draw_spline', {
-      points: [
-        [0, 0],
-        [1, 1],
-        [2, 0],
-      ],
-    });
-    expect(JSON.stringify(doc)).toBe(snapshot);
+  it('describe_scene lists animations and counts them', () => {
+    const before = execute(boxDoc, 'describe_scene', {});
+    expect((before.data as { animations: unknown[] }).animations).toHaveLength(0);
+    expect(before.summary).toContain('0 animation');
+    const after = execute(run(boxDoc, 'animate', { mode: 'spin', targetId: boxId, speed: 2.0 }), 'describe_scene', {});
+    expect((after.data as { animations: unknown[] }).animations).toEqual([
+      expect.objectContaining({ targetId: boxId, targetKind: 'entity', channel: 'rotation', mode: 'spin' }),
+    ]);
+    expect(after.summary).toContain('1 animation');
   });
 });
 
-// scale_entity — ellipse and spline branches
-
-describe('scale_entity — ellipse and spline', () => {
-  it('scales ellipse radiusX, radiusY, and center by factor', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'draw_ellipse', { center: [2, 4], radiusX: 3, radiusY: 1 }).document;
-    const id = Object.keys(doc.entities)[0]!;
-
-    const result = execute(doc, 'scale_entity', { id, factor: 2 });
-    expect(result.affected).toEqual([id]);
-    const entity = result.document.entities[id]!;
-    if (entity.kind === 'ellipse') {
-      expect(entity.center).toEqual([4, 8]);
-      expect(entity.radiusX).toBe(6);
-      expect(entity.radiusY).toBe(2);
-    }
-    expect(result.summary).toContain('radiusX');
-    expect(result.summary).toContain('6');
-  });
-
-  it('scales spline points uniformly by factor', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'draw_spline', {
-      points: [
-        [1, 0],
-        [2, 2],
-        [3, 0],
-      ],
-    }).document;
-    const id = Object.keys(doc.entities)[0]!;
-
-    const result = execute(doc, 'scale_entity', { id, factor: 3 });
-    expect(result.affected).toEqual([id]);
-    const entity = result.document.entities[id]!;
-    if (entity.kind === 'spline') {
-      expect(entity.points[0]).toEqual([3, 0]);
-      expect(entity.points[1]).toEqual([6, 6]);
-      expect(entity.points[2]).toEqual([9, 0]);
-    }
-    expect(result.summary).toContain('3 points');
-  });
-
-  it('scale_entity on ellipse is pure', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'draw_ellipse', { center: [0, 0], radiusX: 2, radiusY: 1 }).document;
-    const id = Object.keys(doc.entities)[0]!;
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'scale_entity', { id, factor: 2 });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('scale_entity on spline is pure', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'draw_spline', {
-      points: [
-        [0, 0],
-        [1, 1],
-      ],
-    }).document;
-    const id = Object.keys(doc.entities)[0]!;
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'scale_entity', { id, factor: 0.5 });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  // ── add_cone ──────────────────────────────────────────────────────────────
-
-  it('add_cone creates one cone entity with the given radius and height', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_cone', { radius: 3, height: 7 });
-
-    expect(result.affected).toHaveLength(1);
-    expect(result.document.order).toHaveLength(1);
-    const id = result.affected[0]!;
-    const entity = result.document.entities[id]!;
-    expect(entity.kind).toBe('cone');
-    // @ts-expect-error narrowing not needed in test
-    expect(entity.radius).toBe(3);
-    // @ts-expect-error same
-    expect(entity.height).toBe(7);
-    expect(result.summary).toContain(id);
-    expect(result.summary).toContain('3');
-    expect(result.summary).toContain('7');
-  });
-
-  it('add_cone is pure — input document is not mutated', () => {
-    const doc = createEmptyDocument();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'add_cone', { radius: 2, height: 5 });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('add_cone with radius <= 0 is a safe no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_cone', { radius: 0, height: 5 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('radius');
-  });
-
-  it('add_cone with height <= 0 is a safe no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_cone', { radius: 3, height: -1 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('height');
-  });
-
-  it('scale_entity on cone scales radius and height', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_cone', { radius: 2, height: 4 });
-    doc = created.document;
-    const id = created.affected[0]!;
-
-    const result = execute(doc, 'scale_entity', { id, factor: 3 });
-    const entity = result.document.entities[id]!;
-    // @ts-expect-error narrowing not needed in test
-    expect(entity.radius).toBeCloseTo(6);
-    // @ts-expect-error same
-    expect(entity.height).toBeCloseTo(12);
-    expect(result.summary).toContain(id);
-  });
-
-  it('scale_entity on cone is pure', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_cone', { radius: 1, height: 2 }).document;
-    const id = Object.keys(doc.entities)[0]!;
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'scale_entity', { id, factor: 2 });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('mass_properties for cone = π r² h / 3', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_cone', { radius: 3, height: 4 });
-    doc = created.document;
-    const id = created.affected[0]!;
-
-    const result = execute(doc, 'mass_properties', { entityId: id });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    const data = result.data as { volume: number; volumeUnit: string };
-    const expected = (Math.PI * 3 * 3 * 4) / 3;
-    expect(data.volume).toBeCloseTo(expected, 6);
-    expect(data.volumeUnit).toContain('mm');
-  });
-
-  // ── add_torus ─────────────────────────────────────────────────────────────
-
-  it('add_torus creates one torus entity with the given dimensions', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_torus', { ringRadius: 5, tubeRadius: 1.5 });
-
-    expect(result.affected).toHaveLength(1);
-    expect(result.document.order).toHaveLength(1);
-    const id = result.affected[0]!;
-    const entity = result.document.entities[id]!;
-    expect(entity.kind).toBe('torus');
-    // @ts-expect-error narrowing not needed in test
-    expect(entity.ringRadius).toBe(5);
-    // @ts-expect-error same
-    expect(entity.tubeRadius).toBe(1.5);
-    expect(result.summary).toContain(id);
-  });
-
-  it('add_torus is pure — input document is not mutated', () => {
-    const doc = createEmptyDocument();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'add_torus', { ringRadius: 4, tubeRadius: 1 });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('add_torus with ringRadius <= 0 is a safe no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_torus', { ringRadius: 0, tubeRadius: 1 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('ringRadius');
-  });
-
-  it('add_torus with tubeRadius <= 0 is a safe no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_torus', { ringRadius: 3, tubeRadius: -0.5 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('tubeRadius');
-  });
-
-  it('scale_entity on torus scales ringRadius and tubeRadius', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_torus', { ringRadius: 4, tubeRadius: 1 });
-    doc = created.document;
-    const id = created.affected[0]!;
-
-    const result = execute(doc, 'scale_entity', { id, factor: 2 });
-    const entity = result.document.entities[id]!;
-    // @ts-expect-error narrowing not needed in test
-    expect(entity.ringRadius).toBeCloseTo(8);
-    // @ts-expect-error same
-    expect(entity.tubeRadius).toBeCloseTo(2);
-  });
-
-  it('scale_entity on torus is pure', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_torus', { ringRadius: 3, tubeRadius: 1 }).document;
-    const id = Object.keys(doc.entities)[0]!;
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'scale_entity', { id, factor: 2 });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('mass_properties for torus = 2 π² · ringRadius · tubeRadius²', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_torus', { ringRadius: 4, tubeRadius: 1 });
-    doc = created.document;
-    const id = created.affected[0]!;
-
-    const result = execute(doc, 'mass_properties', { entityId: id });
-    const data = result.data as { volume: number; unit: string };
-    const expected = 2 * Math.PI * Math.PI * 4 * 1 * 1;
-    expect(data.volume).toBeCloseTo(expected, 6);
-  });
-
-  // ── add_wedge ─────────────────────────────────────────────────────────────
-
-  it('add_wedge creates one wedge entity with the given size', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_wedge', { size: [4, 3, 6] });
-
-    expect(result.affected).toHaveLength(1);
-    expect(result.document.order).toHaveLength(1);
-    const id = result.affected[0]!;
-    const entity = result.document.entities[id]!;
-    expect(entity.kind).toBe('wedge');
-    // @ts-expect-error narrowing not needed in test
-    expect(entity.size).toEqual([4, 3, 6]);
-    expect(result.summary).toContain(id);
-    expect(result.summary).toContain('4×3×6');
-  });
-
-  it('add_wedge is pure — input document is not mutated', () => {
-    const doc = createEmptyDocument();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'add_wedge', { size: [2, 2, 2] });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('add_wedge with a zero size component is a safe no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_wedge', { size: [0, 3, 5] });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('size');
-  });
-
-  it('add_wedge with a negative size component is a safe no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_wedge', { size: [2, -1, 5] });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('scale_entity on wedge scales all size components', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_wedge', { size: [2, 3, 4] });
-    doc = created.document;
-    const id = created.affected[0]!;
-
-    const result = execute(doc, 'scale_entity', { id, factor: 2 });
-    const entity = result.document.entities[id]!;
-    // @ts-expect-error narrowing not needed in test
-    expect(entity.size).toEqual([4, 6, 8]);
-  });
-
-  it('scale_entity on wedge is pure', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_wedge', { size: [1, 2, 3] }).document;
-    const id = Object.keys(doc.entities)[0]!;
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'scale_entity', { id, factor: 3 });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('mass_properties for wedge = w×h×d / 2', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_wedge', { size: [4, 3, 6] });
-    doc = created.document;
-    const id = created.affected[0]!;
-
-    const result = execute(doc, 'mass_properties', { entityId: id });
-    const data = result.data as { volume: number; unit: string };
-    const expected = (4 * 3 * 6) / 2;
-    expect(data.volume).toBeCloseTo(expected, 6);
-  });
-
-  // ── add_pyramid ───────────────────────────────────────────────────────────
-
-  it('add_pyramid creates one pyramid entity with the given dimensions', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_pyramid', { baseWidth: 6, baseDepth: 4, height: 8 });
-
-    expect(result.affected).toHaveLength(1);
-    expect(result.document.order).toHaveLength(1);
-    const id = result.affected[0]!;
-    const entity = result.document.entities[id]!;
-    expect(entity.kind).toBe('pyramid');
-    // @ts-expect-error narrowing not needed in test
-    expect(entity.baseWidth).toBe(6);
-    // @ts-expect-error same
-    expect(entity.baseDepth).toBe(4);
-    // @ts-expect-error same
-    expect(entity.height).toBe(8);
-    expect(result.summary).toContain(id);
-    expect(result.summary).toContain('6');
-    expect(result.summary).toContain('4');
-    expect(result.summary).toContain('8');
-  });
-
-  it('add_pyramid is pure — input document is not mutated', () => {
-    const doc = createEmptyDocument();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'add_pyramid', { baseWidth: 2, baseDepth: 2, height: 3 });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('add_pyramid with baseWidth <= 0 is a safe no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_pyramid', { baseWidth: 0, baseDepth: 3, height: 5 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('baseWidth');
-  });
-
-  it('add_pyramid with baseDepth <= 0 is a safe no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_pyramid', { baseWidth: 3, baseDepth: -2, height: 5 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('baseDepth');
-  });
-
-  it('add_pyramid with height <= 0 is a safe no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_pyramid', { baseWidth: 3, baseDepth: 4, height: 0 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('height');
-  });
-
-  it('scale_entity on pyramid scales baseWidth, baseDepth, and height', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_pyramid', { baseWidth: 3, baseDepth: 4, height: 6 });
-    doc = created.document;
-    const id = created.affected[0]!;
-
-    const result = execute(doc, 'scale_entity', { id, factor: 2 });
-    const entity = result.document.entities[id]!;
-    // @ts-expect-error narrowing not needed in test
-    expect(entity.baseWidth).toBeCloseTo(6);
-    // @ts-expect-error same
-    expect(entity.baseDepth).toBeCloseTo(8);
-    // @ts-expect-error same
-    expect(entity.height).toBeCloseTo(12);
-  });
-
-  it('scale_entity on pyramid is pure', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_pyramid', { baseWidth: 2, baseDepth: 3, height: 4 }).document;
-    const id = Object.keys(doc.entities)[0]!;
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'scale_entity', { id, factor: 2 });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('mass_properties for pyramid = baseWidth × baseDepth × height / 3', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_pyramid', { baseWidth: 6, baseDepth: 4, height: 9 });
-    doc = created.document;
-    const id = created.affected[0]!;
-
-    const result = execute(doc, 'mass_properties', { entityId: id });
-    const data = result.data as { volume: number; unit: string };
-    const expected = (6 * 4 * 9) / 3;
-    expect(data.volume).toBeCloseTo(expected, 6);
-  });
-
-  // ── animate spin ─────────────────────────────────────────────────────────
-
-  it('animate spin on an entity adds one animation record', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = created.document;
-    const entityId = created.affected[0]!;
-
-    const result = execute(doc, 'animate', { mode: 'spin', targetId: entityId, speed: 1.0 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).not.toBe(doc);
-    const animIds = Object.keys(result.document.animations);
-    expect(animIds).toHaveLength(1);
-    const anim = result.document.animations[animIds[0]!]!;
-    expect(anim.targetId).toBe(entityId);
-    expect(anim.targetKind).toBe('entity');
-    expect(anim.mode).toBe('spin');
-    expect(anim.channel).toBe('rotation');
-    expect(anim.speed).toBe(1.0);
-    expect(anim.amplitude).toBe(0);
-    expect(anim.frequency).toBe(0);
-    expect(anim.trigger).toBe('auto');
-    expect(anim.axis).toEqual([0, 1, 0]);
-    expect(result.summary).toContain(entityId);
-    expect(result.summary).toContain('rad/s');
-  });
-
-  it('animate spin on a group resolves targetKind as group', () => {
-    let doc = createEmptyDocument();
-    const a = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = a.document;
-    const b = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = b.document;
-    const grouped = execute(doc, 'group_entities', {
-      ids: [a.affected[0]!, b.affected[0]!],
-      name: 'Wheel',
-    });
-    doc = grouped.document;
-    const groupId = grouped.affected[0]!;
-
-    const result = execute(doc, 'animate', { mode: 'spin', targetId: groupId, speed: 6.283 });
-    const animIds = Object.keys(result.document.animations);
-    expect(animIds).toHaveLength(1);
-    const anim = result.document.animations[animIds[0]!]!;
-    expect(anim.targetKind).toBe('group');
-    expect(anim.targetId).toBe(groupId);
-  });
-
-  it('animate spin with custom axis, channel, pivot, and trigger', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = created.document;
-    const entityId = created.affected[0]!;
-
-    const result = execute(doc, 'animate', {
-      mode: 'spin',
-      targetId: entityId,
-      speed: 2.0,
-      axis: [1, 0, 0],
-      channel: 'position',
-      pivot: [0, 0, 5],
-      trigger: 'click',
-    });
-    const anim = Object.values(result.document.animations)[0]!;
-    expect(anim.axis).toEqual([1, 0, 0]);
-    expect(anim.channel).toBe('position');
-    expect(anim.pivot).toEqual([0, 0, 5]);
-    expect(anim.trigger).toBe('click');
-    expect(result.summary).toContain('units/s');
-  });
-
-  it('animate spin omits pivot key when not supplied (exactOptionalPropertyTypes safe)', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = created.document;
-    const entityId = created.affected[0]!;
-
-    const result = execute(doc, 'animate', { mode: 'spin', targetId: entityId, speed: 1.0 });
-    const anim = Object.values(result.document.animations)[0]!;
-    expect('pivot' in anim).toBe(false);
-  });
-
-  it('animate spin on a missing id is a safe no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'animate', { mode: 'spin', targetId: 'no-such-id', speed: 1.0 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(Object.keys(result.document.animations)).toHaveLength(0);
-    expect(result.summary).toContain('no-such-id');
-  });
-
-  it('animate spin is pure — input document is not mutated', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = created.document;
-    const entityId = created.affected[0]!;
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'animate', { mode: 'spin', targetId: entityId, speed: 3.14 });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  // ── animate oscillate ────────────────────────────────────────────────────
-
-  it('animate oscillate on an entity adds one animation record', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = created.document;
-    const entityId = created.affected[0]!;
-
-    const result = execute(doc, 'animate', {
-      mode: 'oscillate',
-      targetId: entityId,
-      amplitude: 0.5,
-      frequency: 2.0,
-    });
-    expect(result.affected).toHaveLength(0);
-    const animIds = Object.keys(result.document.animations);
-    expect(animIds).toHaveLength(1);
-    const anim = result.document.animations[animIds[0]!]!;
-    expect(anim.targetId).toBe(entityId);
-    expect(anim.targetKind).toBe('entity');
-    expect(anim.mode).toBe('oscillate');
-    expect(anim.channel).toBe('rotation');
-    expect(anim.amplitude).toBe(0.5);
-    expect(anim.frequency).toBe(2.0);
-    expect(anim.speed).toBe(0);
-    expect(anim.trigger).toBe('auto');
-    expect(result.summary).toContain(entityId);
-    expect(result.summary).toContain('Hz');
-  });
-
-  it('animate oscillate with custom axis, channel, pivot, trigger', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = created.document;
-    const entityId = created.affected[0]!;
-
-    const result = execute(doc, 'animate', {
-      mode: 'oscillate',
-      targetId: entityId,
-      amplitude: 1.0,
-      frequency: 0.5,
-      axis: [0, 0, 1],
-      channel: 'position',
-      pivot: [1, 2, 3],
-      trigger: 'click',
-    });
-    const anim = Object.values(result.document.animations)[0]!;
-    expect(anim.axis).toEqual([0, 0, 1]);
-    expect(anim.channel).toBe('position');
-    expect(anim.pivot).toEqual([1, 2, 3]);
-    expect(anim.trigger).toBe('click');
-    expect(result.summary).toContain('units');
-  });
-
-  it('animate oscillate omits pivot key when not supplied', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = created.document;
-    const entityId = created.affected[0]!;
-
-    const result = execute(doc, 'animate', {
-      mode: 'oscillate',
-      targetId: entityId,
-      amplitude: 0.3,
-      frequency: 1.0,
-    });
-    const anim = Object.values(result.document.animations)[0]!;
-    expect('pivot' in anim).toBe(false);
-  });
-
-  it('animate oscillate on a missing id is a safe no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'animate', {
-      mode: 'oscillate',
-      targetId: 'ghost',
-      amplitude: 1.0,
-      frequency: 1.0,
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('ghost');
-  });
-
-  it('animate oscillate with amplitude <= 0 is a safe no-op', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = created.document;
-    const entityId = created.affected[0]!;
-
-    const result = execute(doc, 'animate', {
-      mode: 'oscillate',
-      targetId: entityId,
-      amplitude: 0,
-      frequency: 1.0,
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('amplitude');
-  });
-
-  it('animate oscillate with frequency <= 0 is a safe no-op', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = created.document;
-    const entityId = created.affected[0]!;
-
-    const result = execute(doc, 'animate', {
-      mode: 'oscillate',
-      targetId: entityId,
-      amplitude: 1.0,
-      frequency: -1,
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('frequency');
-  });
-
-  it('animate spin without a speed, or oscillate without amplitude/frequency, is a safe no-op', () => {
-    const created = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });
-    const doc = created.document;
-    const targetId = created.affected[0]!;
-    const spin = execute(doc, 'animate', { mode: 'spin', targetId });
-    expect(spin.document).toBe(doc);
-    expect(spin.summary).toContain('speed');
-    const rock = execute(doc, 'animate', { mode: 'oscillate', targetId, frequency: 1 });
-    expect(rock.document).toBe(doc);
-    expect(rock.summary).toContain('amplitude');
-    expect(
-      execute(doc, 'animate', { mode: 'oscillate', targetId, amplitude: 1 }).summary,
-    ).toContain('frequency');
-  });
-
-  it('animate oscillate is pure — input document is not mutated', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = created.document;
-    const entityId = created.affected[0]!;
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'animate', {
-      mode: 'oscillate',
-      targetId: entityId,
-      amplitude: 0.5,
-      frequency: 1.0,
-    });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  // ── stop_animation ───────────────────────────────────────────────────────
-
-  it('stop_animation by animationId removes only that animation', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = created.document;
-    const entityId = created.affected[0]!;
-
-    doc = execute(doc, 'animate', { mode: 'spin', targetId: entityId, speed: 1.0 }).document;
-    doc = execute(doc, 'animate', { mode: 'spin', targetId: entityId, speed: 2.0 }).document;
-    const [animId1, animId2] = Object.keys(doc.animations);
-
-    const result = execute(doc, 'stop_animation', { animationId: animId1 });
-    expect(result.document.animations[animId1!]).toBeUndefined();
-    expect(result.document.animations[animId2!]).toBeDefined();
-    expect(result.summary).toContain(animId1!);
-  });
-
-  it('stop_animation by animationId for a missing id is a no-op with explanatory summary', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'stop_animation', { animationId: 'anim-ghost' });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('anim-ghost');
-    expect(result.summary).toContain('not found');
-  });
-
-  it('stop_animation by targetId removes all animations for that target', () => {
-    let doc = createEmptyDocument();
-    const boxA = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = boxA.document;
-    const boxB = execute(doc, 'add_box', { size: [2, 2, 2] });
-    doc = boxB.document;
-    const idA = boxA.affected[0]!;
-    const idB = boxB.affected[0]!;
-
-    doc = execute(doc, 'animate', { mode: 'spin', targetId: idA, speed: 1.0 }).document;
-    doc = execute(doc, 'animate', { mode: 'spin', targetId: idA, speed: 2.0 }).document;
-    doc = execute(doc, 'animate', { mode: 'spin', targetId: idB, speed: 3.0 }).document;
-    expect(Object.keys(doc.animations)).toHaveLength(3);
-
-    const result = execute(doc, 'stop_animation', { targetId: idA });
-    const remaining = Object.values(result.document.animations);
-    expect(remaining).toHaveLength(1);
-    expect(remaining[0]!.targetId).toBe(idB);
-    expect(result.summary).toContain('2');
-    expect(result.summary).toContain(idA);
-  });
-
-  it('stop_animation by targetId with no matches is a no-op with explanatory summary', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = created.document;
-    const entityId = created.affected[0]!;
-    doc = execute(doc, 'animate', { mode: 'spin', targetId: entityId, speed: 1.0 }).document;
-
-    const result = execute(doc, 'stop_animation', { targetId: 'other-entity' });
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('other-entity');
-  });
-
-  it('stop_animation with no params clears ALL animations', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = created.document;
-    const entityId = created.affected[0]!;
-
-    doc = execute(doc, 'animate', { mode: 'spin', targetId: entityId, speed: 1.0 }).document;
-    doc = execute(doc, 'animate', {
-      mode: 'oscillate',
-      targetId: entityId,
-      amplitude: 0.5,
-      frequency: 1.0,
-    }).document;
-    expect(Object.keys(doc.animations)).toHaveLength(2);
-
-    const result = execute(doc, 'stop_animation', {});
-    expect(Object.keys(result.document.animations)).toHaveLength(0);
-    expect(result.summary).toContain('2');
-    expect(result.summary).toContain('cleared');
-  });
-
-  it('stop_animation clear-all on empty document is a graceful no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'stop_animation', {});
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('no animations');
-  });
-
-  it('stop_animation is pure — input document is not mutated', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = created.document;
-    const entityId = created.affected[0]!;
-    doc = execute(doc, 'animate', { mode: 'spin', targetId: entityId, speed: 1.0 }).document;
-    const snapshot = JSON.stringify(doc);
-
-    const animId = Object.keys(doc.animations)[0]!;
-    execute(doc, 'stop_animation', { animationId: animId });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  // ── describe_scene — animations field ───────────────────────────────────
-
-  it('describe_scene includes animations array and count in summary', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = created.document;
-    const entityId = created.affected[0]!;
-
-    // No animations yet.
-    let result = execute(doc, 'describe_scene', {});
-    const snapshot = result.data as { animations: unknown[] };
-    expect(snapshot.animations).toHaveLength(0);
-    expect(result.summary).toContain('0 animation');
-
-    // Add one spin animation.
-    doc = execute(doc, 'animate', { mode: 'spin', targetId: entityId, speed: 2.0 }).document;
-    result = execute(doc, 'describe_scene', {});
-    const snapshot2 = result.data as {
-      animations: Array<{
-        id: string;
-        targetId: string;
-        targetKind: string;
-        channel: string;
-        mode: string;
-      }>;
-    };
-    expect(snapshot2.animations).toHaveLength(1);
-    expect(snapshot2.animations[0]!.targetId).toBe(entityId);
-    expect(snapshot2.animations[0]!.targetKind).toBe('entity');
-    expect(snapshot2.animations[0]!.channel).toBe('rotation');
-    expect(snapshot2.animations[0]!.mode).toBe('spin');
-    expect(result.summary).toContain('1 animation');
-  });
-});
-
-// render_view
+type RenderData = {
+  svg: string;
+  view: string;
+  width: number;
+  height: number;
+  entityCount: number;
+  bounds: unknown;
+  camera: { position: number[]; target: number[]; up: number[] };
+};
+const render = (doc: CadDocument, p: object = {}): RenderData => execute(doc, 'render_view', p).data as RenderData;
+const chain = (...steps: Array<[string, object]>): CadDocument => steps.reduce((doc, [name, p]) => run(doc, name, p), empty());
 
 describe('render_view', () => {
-  it('empty doc returns a valid SVG, entityCount 0, bounds null', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'render_view', {});
-
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc); // referential equality — pure
-
-    const data = result.data as {
-      svg: string;
-      view: string;
-      width: number;
-      height: number;
-      entityCount: number;
-      bounds: null;
-      camera: {
-        position: [number, number, number];
-        target: [number, number, number];
-        up: [number, number, number];
-      };
-    };
-
-    expect(data.entityCount).toBe(0);
-    expect(data.bounds).toBeNull();
-    expect(data.view).toBe('iso');
-    expect(data.width).toBe(800);
-    expect(data.height).toBe(600);
-    expect(data.svg).toContain('<svg');
-    expect(data.svg).toContain('xmlns="http://www.w3.org/2000/svg"');
-    expect(data.svg).toContain('</svg>');
-    expect(data.svg).toContain('width="800"');
-    expect(data.svg).toContain('height="600"');
-    expect(result.summary).toContain('0 entit');
-    expect(result.summary).toContain('800×600');
+  it('empty doc: valid 800×600 iso SVG, entityCount 0, bounds null, pure', () => {
+    const doc = empty();
+    const r = execute(doc, 'render_view', {});
+    expectNoOp(r, doc, '0 entit');
+    expect(r.summary).toContain('800×600');
+    expect(r.data).toMatchObject({ entityCount: 0, bounds: null, view: 'iso', width: 800, height: 600 });
+    for (const s of ['<svg', 'xmlns="http://www.w3.org/2000/svg"', '</svg>', 'width="800"', 'height="600"'])
+      expect(render(doc).svg).toContain(s);
   });
 
-  it('doc with a box produces polygon elements, correct entityCount, populated bounds and camera', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] }).document;
-
-    const result = execute(doc, 'render_view', { view: 'iso' });
-    const data = result.data as {
-      svg: string;
-      entityCount: number;
-      bounds: { min: [number, number, number]; max: [number, number, number] };
-      camera: {
-        position: [number, number, number];
-        target: [number, number, number];
-        up: [number, number, number];
-      };
-    };
-
-    expect(data.entityCount).toBe(1);
-    expect(data.bounds).not.toBeNull();
+  it('a box: polygons, bounds, camera, every view distinct, pure', () => {
+    const doc = chain(['add_box', { size: [2, 2, 2], position: [0, 0, 0] }]);
+    const r = execute(doc, 'render_view', { view: 'iso' });
+    const data = r.data as RenderData;
+    expect([data.entityCount, data.bounds === null]).toEqual([1, false]);
     expect(data.svg).toContain('<polygon');
-    expect(data.camera.position).toHaveLength(3);
-    expect(data.camera.target).toHaveLength(3);
-    expect(data.camera.up).toHaveLength(3);
-    expect(result.summary).toContain('1 entity');
-  });
-
-  it('renders all seven views and each produces a different SVG', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-
-    const views = ['top', 'bottom', 'front', 'back', 'left', 'right', 'iso'] as const;
-    const svgs = views.map((v) => {
-      const r = execute(doc, 'render_view', { view: v });
-      return (r.data as { svg: string }).svg;
-    });
-
-    // top vs front must differ
+    expect([data.camera.position.length, data.camera.target.length, data.camera.up.length]).toEqual([3, 3, 3]);
+    expect(r.summary).toContain('1 entity');
+    const svgs = (['top', 'bottom', 'front', 'back', 'left', 'right', 'iso'] as const).map((view) => render(doc, { view }).svg);
     expect(svgs[0]).not.toBe(svgs[2]);
-    // iso vs top must differ
     expect(svgs[6]).not.toBe(svgs[0]);
-    // all must contain <svg
-    for (const svg of svgs) {
-      expect(svg).toContain('<svg');
+    for (const svg of svgs) expect(svg).toContain('<svg');
+    expectPure(doc, () => execute(doc, 'render_view', { view: 'iso' }));
+    expectNoOp(execute(doc, 'render_view', { view: 'top' }), doc);
+  });
+
+  it('view names, size clamps, camera per axis view, invalid view rejected', () => {
+    const doc = empty();
+    expect(render(doc, { view: 'front' }).view).toBe('front');
+    expect(render(doc, { view: 'top' }).view).toBe('top');
+    for (const [p, size] of [
+      [{ width: 5000, height: 9999 }, 2000],
+      [{ width: 1, height: 5 }, 64],
+    ] as const) {
+      const data = render(doc, p);
+      expect([data.width, data.height]).toEqual([size, size]);
+      expect(data.svg).toContain(`width="${size}"`);
+      expect(data.svg).toContain(`height="${size}"`);
     }
+    const cams = (['top', 'bottom', 'front', 'back', 'left', 'right'] as const).map((view) => JSON.stringify(render(doc, { view }).camera));
+    expect(new Set(cams).size).toBe(6);
+    const bad = execute(doc, 'render_view', { view: 'diagonal' });
+    expectNoOp(bad, doc, 'render_view rejected: invalid params');
+    expect(bad.data).toBeUndefined();
+    expect(toToolSchemas().find((s) => s.name === 'render_view')?.input_schema.required).toEqual([]);
   });
 
-  it('resolved view name is present in the data.view field', () => {
-    const doc = createEmptyDocument();
-    const frontResult = execute(doc, 'render_view', { view: 'front' });
-    expect((frontResult.data as { view: string }).view).toBe('front');
-
-    const topResult = execute(doc, 'render_view', { view: 'top' });
-    expect((topResult.data as { view: string }).view).toBe('top');
-  });
-
-  it('width and height are clamped: too large → 2000, too small → 64', () => {
-    const doc = createEmptyDocument();
-
-    const large = execute(doc, 'render_view', { width: 5000, height: 9999 });
-    const largeData = large.data as { width: number; height: number; svg: string };
-    expect(largeData.width).toBe(2000);
-    expect(largeData.height).toBe(2000);
-    expect(largeData.svg).toContain('width="2000"');
-    expect(largeData.svg).toContain('height="2000"');
-
-    const small = execute(doc, 'render_view', { width: 1, height: 5 });
-    const smallData = small.data as { width: number; height: number; svg: string };
-    expect(smallData.width).toBe(64);
-    expect(smallData.height).toBe(64);
-    expect(smallData.svg).toContain('width="64"');
-    expect(smallData.svg).toContain('height="64"');
-  });
-
-  it('unknown view name is rejected as a no-op without throwing', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'render_view', { view: 'diagonal' });
-    expect(result.document).toBe(doc);
-    expect(result.affected).toEqual([]);
-    expect(result.data).toBeUndefined();
-    expect(result.summary).toContain('render_view rejected: invalid params');
-  });
-
-  it('is pure — the input document is returned unchanged (referential equality)', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    const snapshot = JSON.stringify(doc);
-
-    execute(doc, 'render_view', { view: 'iso' });
-
-    expect(JSON.stringify(doc)).toBe(snapshot);
-    const result = execute(doc, 'render_view', { view: 'top' });
-    expect(result.document).toBe(doc);
-    expect(result.affected).toEqual([]);
-  });
-
-  it('SVG contains 2D shape stroked paths when doc has a circle', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'draw_arc', { center: [0, 0], radius: 3 }).document;
-
-    const result = execute(doc, 'render_view', { view: 'top' });
-    const svg = (result.data as { svg: string }).svg;
-    expect(svg).toContain('<polyline');
-  });
-
-  it('doc with multiple entity kinds (box + cylinder + cone) renders all', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
-    doc = execute(doc, 'add_cylinder', { radius: 1, height: 3 }).document;
-    doc = execute(doc, 'add_cone', { radius: 1, height: 2 }).document;
-
-    const result = execute(doc, 'render_view', { view: 'iso' });
-    const data = result.data as { entityCount: number; svg: string };
-    expect(data.entityCount).toBe(3);
-    expect(data.svg).toContain('<polygon');
-    expect(result.summary).toContain('3 entit');
-  });
-
-  it('toToolSchemas() still maps 1:1 with listCommands() after registration', () => {
-    const schemas = toToolSchemas();
-    const commands = listCommands();
-    expect(schemas).toHaveLength(commands.length);
-    const renderSchema = schemas.find((s) => s.name === 'render_view');
-    expect(renderSchema).toBeDefined();
-    expect(renderSchema?.input_schema.required).toEqual([]);
-  });
-
-  it('renders sphere, torus, wedge, pyramid without throwing', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_sphere', { radius: 1 }).document;
-    doc = execute(doc, 'add_torus', { ringRadius: 2, tubeRadius: 0.5 }).document;
-    doc = execute(doc, 'add_wedge', { size: [2, 1, 3] }).document;
-    doc = execute(doc, 'add_pyramid', { baseWidth: 2, baseDepth: 2, height: 3 }).document;
-
-    const result = execute(doc, 'render_view', { view: 'iso' });
-    const data = result.data as { entityCount: number; svg: string };
-    expect(data.entityCount).toBe(4);
-    expect(data.svg).toContain('<polygon');
-    expect(result.affected).toEqual([]);
-    expect(result.document).toBe(doc);
-  });
-
-  it('renders extrusion without throwing', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'extrude_profile', {
-      profile: [
-        [0, 0],
-        [2, 0],
-        [2, 2],
-        [0, 2],
+  it.each<[string, Array<[string, object]>, string, string, number?]>([
+    ['circle arc', [['draw_arc', { center: [0, 0], radius: 3 }]], 'top', '<polyline'],
+    [
+      'box + cylinder + cone',
+      [
+        ['add_box', { size: [2, 2, 2] }],
+        ['add_cylinder', { radius: 1, height: 3 }],
+        ['add_cone', { radius: 1, height: 2 }],
       ],
-      depth: 1,
-    }).document;
-
-    const result = execute(doc, 'render_view', { view: 'front' });
-    const data = result.data as { entityCount: number; svg: string };
-    expect(data.entityCount).toBe(1);
-    expect(data.svg).toContain('<polygon');
-  });
-
-  it('renders 2D rectangle, ellipse, spline, point, arc, line, polyline without throwing', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'draw_rectangle', { width: 2, height: 1 }).document;
-    doc = execute(doc, 'draw_ellipse', { center: [0, 0], radiusX: 1, radiusY: 2 }).document;
-    doc = execute(doc, 'draw_spline', {
-      points: [
-        [0, 0],
-        [1, 1],
-        [2, 0],
+      'iso',
+      '<polygon',
+      3,
+    ],
+    [
+      'sphere, torus, wedge, pyramid',
+      [
+        ['add_sphere', { radius: 1 }],
+        ['add_torus', { ringRadius: 2, tubeRadius: 0.5 }],
+        ['add_wedge', { size: [2, 1, 3] }],
+        ['add_pyramid', { baseWidth: 2, baseDepth: 2, height: 3 }],
       ],
-    }).document;
-    doc = execute(doc, 'draw_point', { position: [0, 0, 0] }).document;
-    doc = execute(doc, 'draw_arc', {
-      center: [0, 0],
-      radius: 1,
-      startAngle: 0,
-      endAngle: 1,
-    }).document;
-    doc = execute(doc, 'draw_polyline', {
-      points: [
-        [0, 0],
-        [1, 1],
+      'iso',
+      '<polygon',
+      4,
+    ],
+    ['square extrusion', [['extrude_profile', { profile: xy(0, 0, 2, 0, 2, 2, 0, 2), depth: 1 }]], 'front', '<polygon', 1],
+    ['triangle extrusion', [['extrude_profile', { profile: xy(0, 0, 1, 0, 1, 1), depth: 2 }]], 'iso', '<polygon'],
+    [
+      '2D rectangle, ellipse, spline, point, arc, line, polyline',
+      [
+        ['draw_rectangle', { width: 2, height: 1 }],
+        ['draw_ellipse', { center: [0, 0], radiusX: 1, radiusY: 2 }],
+        ['draw_spline', { points: xy(0, 0, 1, 1, 2, 0) }],
+        ['draw_point', { position: [0, 0, 0] }],
+        ['draw_arc', { center: [0, 0], radius: 1, startAngle: 0, endAngle: 1 }],
+        ['draw_polyline', { points: xy(0, 0, 1, 1) }],
+        ['draw_polyline', { points: xy(0, 0, 1, 0, 1, 1) }],
       ],
-    }).document;
-    doc = execute(doc, 'draw_polyline', {
-      points: [
-        [0, 0],
-        [1, 0],
-        [1, 1],
+      'top',
+      '<polyline',
+      7,
+    ],
+    [
+      'closed polyline and spline',
+      [
+        ['draw_polyline', { points: xy(0, 0, 1, 0, 0.5, 1), closed: true }],
+        ['draw_spline', { points: xy(0, 0, 1, 0, 0.5, 1), closed: true }],
       ],
-    }).document;
-
-    const result = execute(doc, 'render_view', { view: 'top' });
-    const data = result.data as { entityCount: number; svg: string };
-    expect(data.entityCount).toBe(7);
-    // All 2D shapes produce <polyline> stroke elements
-    expect(data.svg).toContain('<polyline');
-    expect(result.document).toBe(doc);
+      'top',
+      '<polyline',
+    ],
+    ['arc with endAngle < startAngle', [['draw_arc', { center: [0, 0], radius: 2, startAngle: 3, endAngle: 1 }]], 'front', '<polyline'],
+  ])('renders %s', (_, steps, view, element, count) => {
+    const doc = chain(...steps);
+    const r = execute(doc, 'render_view', { view });
+    const data = r.data as RenderData;
+    expectNoOp(r, doc);
+    expect(data.svg).toContain('<svg');
+    expect(data.svg).toContain(element);
+    if (count !== undefined) expect(data.entityCount).toBe(count);
+    if (count === 3) expect(r.summary).toContain('3 entit');
   });
 
-  it('closed polyline and closed spline add the closing vertex', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'draw_polyline', {
-      points: [
-        [0, 0],
-        [1, 0],
-        [0.5, 1],
-      ],
-      closed: true,
-    }).document;
-    doc = execute(doc, 'draw_spline', {
-      points: [
-        [0, 0],
-        [1, 0],
-        [0.5, 1],
-      ],
-      closed: true,
-    }).document;
+  it('painter depth sort is descending: the far (blue) box is drawn before the near (red) one in top view', () => {
+    const doc = chain(
+      ['add_box', { size: [2, 2, 2], position: [0, 0, -5], color: '#0000ff' }],
+      ['add_box', { size: [2, 2, 2], position: [0, 0, 5], color: '#ff0000' }],
+    );
+    const svg = render(doc, { view: 'top' }).svg;
+    const [blue, red] = [svg.indexOf('rgb(0,0,'), svg.indexOf(',0,0)')];
+    expect(blue).toBeGreaterThan(-1);
+    expect(red).toBeGreaterThan(-1);
+    expect(blue).toBeLessThan(red);
+  });
+});
 
-    const result = execute(doc, 'render_view', { view: 'top' });
-    const data = result.data as { svg: string };
-    expect(data.svg).toContain('<polyline');
+describe('add_text', () => {
+  const text = (p: object): ReturnType<typeof execute> => execute(empty(), 'add_text', { position: [0, 0, 0], height: 1, ...p });
+
+  it('creates a 2D text entity with fields and defaults, purely', () => {
+    const r = text({ content: 'Hello World', position: [1, 2, 0], height: 5, anchor: 'center', color: '#ff0000' });
+    expectSingleEntity(r, 'text');
+    expect(first(r)).toMatchObject({ content: 'Hello World', height: 5, position: [1, 2, 0], anchor: 'center', color: '#ff0000' });
+    expect(r.summary).toContain(r.affected[0]);
+    expect(r.summary).toContain('Hello World');
+    const d = text({ content: 'Label', height: 2 });
+    expect(first(d)).toMatchObject({ anchor: 'left', rotation: [0, 0, 0], color: '#333333' });
+    expect(is2D(first(d))).toBe(true);
+    const doc = empty();
+    expectPure(doc, () => execute(doc, 'add_text', { content: 'Test', position: [0, 0, 0], height: 1 }));
   });
 
-  it('arc with endAngle < startAngle wraps span correctly', () => {
-    let doc = createEmptyDocument();
-    // endAngle < startAngle → span goes negative → must add 2π
-    doc = execute(doc, 'draw_arc', {
-      center: [0, 0],
-      radius: 2,
-      startAngle: 3,
-      endAngle: 1,
-    }).document;
-
-    const result = execute(doc, 'render_view', { view: 'front' });
-    expect(result.affected).toEqual([]);
-    expect((result.data as { svg: string }).svg).toContain('<polyline');
+  it.each([
+    [{ content: '' }, 'non-empty'],
+    [{ content: '   ' }, ''],
+    [{ content: 'Hi', height: 0 }, 'height'],
+    [{ content: 'Hi', height: -3 }, ''],
+    [{ content: 'Hi', position: null }, 'position'],
+    [{ content: 'Hi', position: [0] }, ''],
+  ])('%j is a no-op', (p, summary) => {
+    const doc = empty();
+    expectNoOp(execute(doc, 'add_text', { position: [0, 0, 0], height: 1, ...p }), doc, summary);
   });
 
-  it('extrusion with valid profile renders polygons and returns valid SVG', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'extrude_profile', {
-      profile: [
-        [0, 0],
-        [1, 0],
-        [1, 1],
-      ],
-      depth: 2,
-    }).document;
+  it('scale_entity scales text height', () => {
+    const { doc, id } = add(empty(), 'add_text', { content: 'Scale me', position: [0, 0, 0], height: 4 });
+    const r = execute(doc, 'scale_entity', { id, factor: 2.5 });
+    expect(r.affected).toEqual([id]);
+    expect((r.document.entities[id] as TextEntity).height).toBeCloseTo(10);
+    expect(r.summary).toContain('height');
+  });
+});
 
-    const result = execute(doc, 'render_view', { view: 'iso' });
-    expect((result.data as { svg: string }).svg).toContain('<svg');
-    expect((result.data as { svg: string }).svg).toContain('<polygon');
+type MotionStudyData = import('@core/commands/motion/motionStudy').MotionStudyData;
+type Joint = CadDocument['joints'][string];
+
+/** Two instances of one component: A (the seed box) and B inserted at `at`. */
+function instances(at = [2, 0, 0], seed: object = { size: [1, 1, 1] }): { doc: CadDocument; idA: string; idB: string } {
+  const s = add(empty(), 'add_box', seed);
+  const comp = execute(s.doc, 'create_component', { name: 'Part', entityIds: [s.id] });
+  const b = add(comp.document, 'insert_instance', { componentId: Object.keys(comp.document.components)[0], position: at });
+  return { doc: b.doc, idA: comp.affected[0]!, idB: b.id };
+}
+
+function joint(doc: CadDocument, a: string, b: string, kind: string, axis: unknown, value?: unknown): { doc: CadDocument; jid: string } {
+  let d = run(doc, 'add_joint', { kind, a: { instanceId: a }, b: { instanceId: b }, axis });
+  const jid = d.jointOrder.at(-1)!;
+  if (value !== undefined) d = run(d, 'set_joint_value', { id: jid, value });
+  return { doc: d, jid };
+}
+
+/** Instances + revolute j1 (z, value v1) + revolute/prismatic j2 + optional drive j1→j2. */
+function coupled(
+  ratio?: number,
+  v1?: number,
+  kind2 = 'revolute',
+  axis2: unknown = 'y',
+  extra: object = {},
+): Record<'jid1' | 'jid2' | 'drid', string> & { doc: CadDocument } {
+  const { doc: d0, idA, idB } = instances();
+  const j1 = joint(d0, idA, idB, 'revolute', 'z', v1);
+  const j2 = joint(j1.doc, idA, idB, kind2, axis2);
+  const doc = ratio === undefined ? j2.doc : run(j2.doc, 'add_drive_relation', { driver: j1.jid, driven: j2.jid, ratio, ...extra });
+  return { doc, jid1: j1.jid, jid2: j2.jid, drid: doc.driveRelationOrder[0]! };
+}
+
+describe('joints, drive relations, motion', () => {
+  const { doc: idoc, idA, idB } = instances();
+  const { doc: jdoc, jid } = joint(idoc, idA, idB, 'revolute', 'z');
+
+  it.each([
+    ['revolute', 'z'],
+    ['prismatic', [0, 1, 0]],
+  ])('add_joint %s creates a joint in jointOrder, purely', (kind, axis) => {
+    const r = execute(idoc, 'add_joint', { kind, a: { instanceId: idA }, b: { instanceId: idB }, axis });
+    expect(r.affected).toHaveLength(1);
+    const j = r.affected[0]!;
+    expect(r.document.joints[j]!.kind).toBe(kind);
+    expect(r.document.jointOrder).toContain(j);
+    expect(r.summary).toContain(j);
+    if (kind === 'prismatic') expect((r.document.joints[j] as Extract<Joint, { kind: 'prismatic' }>).displacement).toBe(0);
+    expectPure(idoc, () => execute(idoc, 'add_joint', { kind, a: { instanceId: idA }, b: { instanceId: idB }, axis }));
   });
 
-  it('all six axis views produce different camera positions', () => {
-    const doc = createEmptyDocument();
-    const views = ['top', 'bottom', 'front', 'back', 'left', 'right'] as const;
-    const cameras = views.map((v) => {
-      const r = execute(doc, 'render_view', { view: v });
-      return JSON.stringify((r.data as { camera: unknown }).camera);
-    });
-    // Each view must have a unique camera
-    const unique = new Set(cameras);
-    expect(unique.size).toBe(6);
+  it.each<[string, () => object, string?]>([
+    ['add_joint', () => ({ kind: 'revolute', a: { instanceId: 'ghost' }, b: { instanceId: idB }, axis: 'x' }), 'ghost'],
+    ['add_joint', () => ({ kind: 'revolute', a: { instanceId: idA }, b: { instanceId: 'ghost' }, axis: 'y' }), 'ghost'],
+    ['add_joint', () => ({ kind: 'weld', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'z' })],
+    ['add_joint', () => ({ kind: 'revolute', a: { instanceId: idA }, b: { instanceId: idB }, axis: 'diagonal' })],
+    ['set_joint_value', () => ({ id: 'no-such-joint', value: 1 })],
+    ['delete_joint', () => ({ id: 'ghost-joint' })],
+    ['delete_drive_relation', () => ({ id: 'ghost-dr' })],
+    ['add_drive_relation', () => ({ driver: jid, driven: jid, ratio: 1 }), 'same joint'],
+    ['add_drive_relation', () => ({ driver: 'ghost', driven: jid, ratio: 1 })],
+    ['motion_study', () => ({ mode: 'joint', target: 'ghost-joint', start: 0, end: Math.PI, steps: 5 }), 'ghost-joint'],
+    ['motion_study', () => ({ mode: 'parameter', target: 'no_such_param', start: 0, end: 1 }), 'no_such_param'],
+  ])('%s is a no-op (%#)', (name, p, summary) => expectNoOp(execute(jdoc, name, p()), jdoc, summary));
+
+  it('set_joint_value takes numbers or parameter expressions', () => {
+    const r = execute(jdoc, 'set_joint_value', { id: jid, value: Math.PI / 2 });
+    expect(r.affected).toEqual([jid]);
+    expect(r.document.joints[jid]).toMatchObject({ kind: 'revolute', angle: expect.closeTo(Math.PI / 2, 9) });
+    const withParam = run(jdoc, 'set_parameter', { name: 'angle', expression: '1.5708' });
+    const e = execute(withParam, 'set_joint_value', { id: jid, value: 'angle' });
+    expect(e.affected).toEqual([jid]);
+    expect((e.document.joints[jid] as Extract<Joint, { kind: 'revolute' }>).angle).toBeCloseTo(1.5708, 3);
   });
 
-  it('default params (no args) work and produce 800×600 iso SVG', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'render_view', {});
-    const data = result.data as { view: string; width: number; height: number; svg: string };
-    expect(data.view).toBe('iso');
-    expect(data.width).toBe(800);
-    expect(data.height).toBe(600);
-    expect(data.svg).toContain('width="800"');
-  });
-
-  // Regression: painter's-algorithm depth sort must be DESCENDING (farthest drawn
-  // first so nearest paints on top). The bug sorted ASCENDING, letting far faces
-  // overwrite near ones.
-  //
-  // Setup (top view, camera looking down -Z):
-  //   BLUE box centered at z = -5  (far from camera — all its faces have LARGE depth)
-  //   RED  box centered at z = +5  (near the camera — all its faces have SMALL depth)
-  //
-  // Separation of 10 units guarantees no face of the red box is farther than any face
-  // of the blue box. With correct DESCENDING depth sort:
-  //   blue (farther, larger depth) → drawn FIRST → appears EARLIER in the SVG
-  //   red  (nearer,  smaller depth) → drawn LAST  → appears LATER  in the SVG
-  //
-  // The shaded fill of pure blue (#0000ff) produces "rgb(0,0," and pure red (#ff0000)
-  // produces ",0,0)" (zero green, zero blue). These tokens are mutually exclusive,
-  // making the first-occurrence index comparison unambiguous.
-  //
-  // If the sort were reverted to ASCENDING, red (smaller depth) would sort FIRST
-  // and blue LAST, flipping the index order and failing the assertion.
-  it('painter depth sort (descending) — nearer object polygons appear later in SVG than farther ones', () => {
-    let doc = createEmptyDocument();
-    // Blue box: centered at z = -5 (FAR from top camera — all faces have large depth)
-    doc = execute(doc, 'add_box', {
-      size: [2, 2, 2],
-      position: [0, 0, -5],
-      color: '#0000ff',
-    }).document;
-    // Red box: centered at z = +5 (NEAR the top camera — all faces have small depth)
-    doc = execute(doc, 'add_box', {
-      size: [2, 2, 2],
-      position: [0, 0, 5],
-      color: '#ff0000',
-    }).document;
-
-    const result = execute(doc, 'render_view', { view: 'top' });
-    const svg = (result.data as { svg: string }).svg;
-
-    // Shading #ff0000 via tintHex always yields "rgb(NNN,0,0)" — zero green, zero blue.
-    // Shading #0000ff via tintHex always yields "rgb(0,0,NNN)" — zero red, zero green.
-    // ",0,0)" uniquely identifies red faces; "rgb(0,0," uniquely identifies blue faces.
-    const redSignature = ',0,0)';
-    const blueSignature = 'rgb(0,0,';
-
-    expect(svg).toContain(redSignature);
-    expect(svg).toContain(blueSignature);
-
-    const firstBlueIdx = svg.indexOf(blueSignature);
-    const firstRedIdx = svg.indexOf(redSignature);
-
-    expect(firstBlueIdx).toBeGreaterThan(-1);
-    expect(firstRedIdx).toBeGreaterThan(-1);
-
-    // Blue (farther) must appear BEFORE red (nearer) in the SVG output.
-    // This fails with an ascending sort (the original bug).
-    expect(firstBlueIdx).toBeLessThan(firstRedIdx);
-  });
-
-  // add_text
-
-  it('add_text — happy path: creates text entity with correct fields', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_text', {
-      content: 'Hello World',
-      position: [1, 2, 0],
-      height: 5,
-      anchor: 'center',
-      color: '#ff0000',
-    });
-
-    expect(result.affected).toHaveLength(1);
-    expect(result.document.order).toHaveLength(1);
-    const id = result.affected[0]!;
-    const e = result.document.entities[id]! as TextEntity;
-    expect(e.kind).toBe('text');
-    expect(e.content).toBe('Hello World');
-    expect(e.height).toBe(5);
-    expect(e.position).toEqual([1, 2, 0]);
-    expect(e.anchor).toBe('center');
-    expect(e.color).toBe('#ff0000');
-    expect(result.summary).toContain(id);
-    expect(result.summary).toContain('Hello World');
-  });
-
-  it('add_text — defaults: anchor=left, rotation=[0,0,0], color=#333333', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_text', {
-      content: 'Label',
-      position: [0, 0, 0],
-      height: 2,
-    });
-
-    const id = result.affected[0]!;
-    const e = result.document.entities[id]! as TextEntity;
-    expect(e.anchor).toBe('left');
-    expect(e.rotation).toEqual([0, 0, 0]);
-    expect(e.color).toBe('#333333');
-  });
-
-  it('add_text — is pure: input document is not mutated', () => {
-    const doc = createEmptyDocument();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'add_text', { content: 'Test', position: [0, 0, 0], height: 1 });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('add_text — is2D: created entity is classified as 2D', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_text', { content: 'X', position: [0, 0, 0], height: 1 });
-    const id = result.affected[0]!;
-    const e = result.document.entities[id]!;
-    expect(is2D(e)).toBe(true);
-  });
-
-  it('add_text — failure: empty content is a no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_text', { content: '', position: [0, 0, 0], height: 1 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('non-empty');
-  });
-
-  it('add_text — failure: whitespace-only content is a no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_text', { content: '   ', position: [0, 0, 0], height: 1 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('add_text — failure: height=0 is a no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_text', { content: 'Hi', position: [0, 0, 0], height: 0 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('height');
-  });
-
-  it('add_text — failure: negative height is a no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_text', { content: 'Hi', position: [0, 0, 0], height: -3 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('add_text — failure: missing position is a no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_text', { content: 'Hi', position: null, height: 1 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('position');
-  });
-
-  it('add_text — failure: 1-element position array is a no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_text', { content: 'Hi', position: [0], height: 1 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('scale_entity — text: scales height by factor', () => {
-    let doc = createEmptyDocument();
-    const created = execute(doc, 'add_text', {
-      content: 'Scale me',
-      position: [0, 0, 0],
-      height: 4,
-    });
-    doc = created.document;
-    const id = created.affected[0]!;
-
-    const scaled = execute(doc, 'scale_entity', { id, factor: 2.5 });
-    expect(scaled.affected).toEqual([id]);
-    const e = scaled.document.entities[id]! as TextEntity;
-    expect(e.height).toBeCloseTo(10);
-    expect(scaled.summary).toContain('height');
-  });
-
-  // Kinematic joints + drive relations
-
-  /**
-   * Helper: build a minimal doc with two InstanceEntities.
-   * Returns { doc, idA, idB } where idA and idB are instance ids.
-   */
-  function makeDocWithInstances(): {
-    doc: ReturnType<typeof createEmptyDocument>;
-    idA: string;
-    idB: string;
-  } {
-    let doc = createEmptyDocument();
-    // Build a Component out of a real entity (create_component requires entityIds).
-    const seed = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = seed.document;
-    const seedId = seed.affected[0]!;
-    const compResult = execute(doc, 'create_component', { name: 'Part', entityIds: [seedId] });
-    doc = compResult.document;
-    // create_component replaces the source entities with a single instance.
-    const compId = Object.keys(doc.components)[0]!;
-    const idA = compResult.affected[0]!;
-    const instB = execute(doc, 'insert_instance', { componentId: compId, position: [2, 0, 0] });
-    doc = instB.document;
-    const idB = instB.affected[0]!;
-    return { doc, idA, idB };
-  }
-
-  it('add_joint — revolute happy path: creates joint, appends to jointOrder', () => {
-    const { doc, idA, idB } = makeDocWithInstances();
-    const result = execute(doc, 'add_joint', {
-      kind: 'revolute',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'z',
-    });
-    expect(result.affected).toHaveLength(1);
-    const jid = result.affected[0]!;
-    expect(result.document.joints[jid]).toBeDefined();
-    expect(result.document.joints[jid]!.kind).toBe('revolute');
-    expect(result.document.jointOrder).toContain(jid);
-    expect(result.summary).toContain(jid);
-  });
-
-  it('add_joint — prismatic happy path: creates joint with Vec3 axis', () => {
-    const { doc, idA, idB } = makeDocWithInstances();
-    const result = execute(doc, 'add_joint', {
-      kind: 'prismatic',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: [0, 1, 0],
-    });
-    expect(result.affected).toHaveLength(1);
-    const jid = result.affected[0]!;
-    expect(result.document.joints[jid]!.kind).toBe('prismatic');
-    expect(
-      (result.document.joints[jid] as Extract<
-        (typeof result.document.joints)[string],
-        { kind: 'prismatic' }
-      >)!.displacement,
-    ).toBe(0);
-  });
-
-  it('add_joint — failure: unknown instanceId a is a no-op', () => {
-    const { doc, idB } = makeDocWithInstances();
-    const result = execute(doc, 'add_joint', {
-      kind: 'revolute',
-      a: { instanceId: 'ghost' },
-      b: { instanceId: idB },
-      axis: 'x',
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('ghost');
-  });
-
-  it('add_joint — failure: unknown instanceId b is a no-op', () => {
-    const { doc, idA } = makeDocWithInstances();
-    const result = execute(doc, 'add_joint', {
-      kind: 'revolute',
-      a: { instanceId: idA },
-      b: { instanceId: 'ghost' },
-      axis: 'y',
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('ghost');
-  });
-
-  it('add_joint — failure: invalid kind is a no-op', () => {
-    const { doc, idA, idB } = makeDocWithInstances();
-    const result = execute(doc, 'add_joint', {
-      kind: 'weld',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'z',
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('add_joint — failure: invalid axis is a no-op', () => {
-    const { doc, idA, idB } = makeDocWithInstances();
-    const result = execute(doc, 'add_joint', {
-      kind: 'revolute',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'diagonal',
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('is pure — add_joint does not mutate input doc', () => {
-    const { doc, idA, idB } = makeDocWithInstances();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'add_joint', {
-      kind: 'revolute',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'z',
-    });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('set_joint_value — numeric value updates revolute angle', () => {
-    const { doc: d0, idA, idB } = makeDocWithInstances();
-    const doc = execute(d0, 'add_joint', {
-      kind: 'revolute',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'z',
-    }).document;
-    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
-
-    const result = execute(doc, 'set_joint_value', { id: jid, value: Math.PI / 2 });
-    expect(result.affected).toEqual([jid]);
-    const joint = result.document.joints[jid]!;
-    expect(joint.kind).toBe('revolute');
-    expect((joint as Extract<typeof joint, { kind: 'revolute' }>).angle).toBeCloseTo(Math.PI / 2);
-  });
-
-  it('set_joint_value — expression string resolves via doc.parameters', () => {
-    const { doc: d0, idA, idB } = makeDocWithInstances();
-    let doc = execute(d0, 'set_parameter', { name: 'angle', expression: '1.5708' }).document;
-    doc = execute(doc, 'add_joint', {
-      kind: 'revolute',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'z',
-    }).document;
-    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
-
-    const result = execute(doc, 'set_joint_value', { id: jid, value: 'angle' });
-    expect(result.affected).toEqual([jid]);
-    const joint = result.document.joints[jid]! as Extract<
-      (typeof result.document.joints)[string],
-      { kind: 'revolute' }
-    >;
-    expect(joint.angle).toBeCloseTo(1.5708, 3);
-  });
-
-  it('set_joint_value — failure: unknown joint id is a no-op', () => {
-    const { doc } = makeDocWithInstances();
-    const result = execute(doc, 'set_joint_value', { id: 'no-such-joint', value: 1 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('delete_joint — removes joint and cascades dependent drive relations', () => {
-    const { doc: d0, idA, idB } = makeDocWithInstances();
-    let doc = execute(d0, 'add_joint', {
-      kind: 'revolute',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'z',
-    }).document;
-    const jid1 = doc.jointOrder[doc.jointOrder.length - 1]!;
-
-    // Add a second joint so we can add a drive relation
-    doc = execute(doc, 'add_joint', {
-      kind: 'revolute',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'y',
-    }).document;
-    const jid2 = doc.jointOrder[doc.jointOrder.length - 1]!;
-
-    // Add a drive relation from jid1 → jid2
-    doc = execute(doc, 'add_drive_relation', { driver: jid1, driven: jid2, ratio: 2 }).document;
-    const drid = doc.driveRelationOrder[0]!;
+  it('drive relations: ratio propagates, cycles are rejected, delete_joint cascades, delete_drive_relation keeps joints', () => {
+    const { doc, jid1, jid2, drid } = coupled(2, Math.PI / 2);
     expect(doc.driveRelations[drid]).toBeDefined();
-
-    // Delete jid1 — must cascade-remove the drive relation
-    const result = execute(doc, 'delete_joint', { id: jid1 });
-    expect(result.document.joints[jid1]).toBeUndefined();
-    expect(result.document.jointOrder).not.toContain(jid1);
-    expect(result.document.driveRelations[drid]).toBeUndefined();
-    expect(result.summary).toContain(drid);
+    const ev = execute(doc, 'evaluate_motion', {});
+    expect(ev.document).toBe(doc);
+    expect((ev.data as { resolvedJoints: Record<string, number> }).resolvedJoints[jid2]).toBeCloseTo(Math.PI, 5);
+    expectNoOp(execute(doc, 'add_drive_relation', { driver: jid2, driven: jid1, ratio: 1 }), doc, 'cycle');
+    const del = execute(doc, 'delete_joint', { id: jid1 });
+    expect([del.document.joints[jid1], del.document.driveRelations[drid]]).toEqual([undefined, undefined]);
+    expect(del.document.jointOrder).not.toContain(jid1);
+    expect(del.summary).toContain(drid);
+    const dr = run(doc, 'delete_drive_relation', { id: drid });
+    expect(dr.driveRelations[drid]).toBeUndefined();
+    expect(dr.driveRelationOrder).not.toContain(drid);
+    expect([!!dr.joints[jid1], !!dr.joints[jid2]]).toEqual([true, true]);
   });
 
-  it('delete_joint — failure: unknown joint id is a no-op', () => {
-    const { doc } = makeDocWithInstances();
-    const result = execute(doc, 'delete_joint', { id: 'ghost-joint' });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
+  it('evaluate_motion / bake_motion: queries are pure, prismatic offsets move B, bake writes positions', () => {
+    const doc = empty();
+    const r = execute(doc, 'evaluate_motion', {});
+    expectNoOp(r, doc);
+    expect(r.data).toEqual(expect.objectContaining({ resolvedJoints: {}, instancePositions: {} }));
+    expectNoOp(execute(doc, 'bake_motion', {}), doc);
+    const rev = joint(idoc, idA, idB, 'revolute', 'z', Math.PI / 4).doc;
+    expectPure(rev, () => expect(execute(rev, 'evaluate_motion', {}).document).toBe(rev));
+    expectPure(rev, () => execute(rev, 'bake_motion', {}));
+    const px = joint(idoc, idA, idB, 'prismatic', 'x', 5).doc;
+    const pos = (execute(px, 'evaluate_motion', {}).data as { instancePositions: Record<string, number[]> }).instancePositions;
+    expect(pos[idB]![0]).toBeCloseTo(5, 5);
+    const baked = execute(joint(idoc, idA, idB, 'prismatic', 'y', 3).doc, 'bake_motion', {});
+    expect(baked.affected).toContain(idB);
+    expect(baked.document.entities[idB]!.position[1]).toBeCloseTo(3, 5);
   });
 
-  it('add_drive_relation — ratio applied: driver=π/2, ratio=2 → driven=π', () => {
-    const { doc: d0, idA, idB } = makeDocWithInstances();
-    let doc = execute(d0, 'add_joint', {
-      kind: 'revolute',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'z',
-    }).document;
-    const jid1 = doc.jointOrder[doc.jointOrder.length - 1]!;
-    doc = execute(doc, 'set_joint_value', { id: jid1, value: Math.PI / 2 }).document;
-
-    doc = execute(doc, 'add_joint', {
-      kind: 'revolute',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'y',
-    }).document;
-    const jid2 = doc.jointOrder[doc.jointOrder.length - 1]!;
-
-    doc = execute(doc, 'add_drive_relation', { driver: jid1, driven: jid2, ratio: 2 }).document;
-    const drid = doc.driveRelationOrder[0]!;
-    expect(doc.driveRelations[drid]).toBeDefined();
-
-    // evaluate_motion should propagate: jid2 = (π/2) * 2 = π
-    const evalResult = execute(doc, 'evaluate_motion', {});
-    expect(evalResult.document).toBe(doc); // query — no mutation
-    const data = evalResult.data as { resolvedJoints: Record<string, number> };
-    expect(data.resolvedJoints[jid2]).toBeCloseTo(Math.PI, 5);
-  });
-
-  it('add_drive_relation — cycle detection rejects A→B→A', () => {
-    const { doc: d0, idA, idB } = makeDocWithInstances();
-    let doc = execute(d0, 'add_joint', {
-      kind: 'revolute',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'z',
-    }).document;
-    const jid1 = doc.jointOrder[doc.jointOrder.length - 1]!;
-    doc = execute(doc, 'add_joint', {
-      kind: 'revolute',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'y',
-    }).document;
-    const jid2 = doc.jointOrder[doc.jointOrder.length - 1]!;
-
-    // jid1 → jid2
-    doc = execute(doc, 'add_drive_relation', { driver: jid1, driven: jid2, ratio: 1 }).document;
-    // jid2 → jid1 should be rejected (cycle)
-    const result = execute(doc, 'add_drive_relation', { driver: jid2, driven: jid1, ratio: 1 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('cycle');
-  });
-
-  it('add_drive_relation — failure: self-coupling is a no-op', () => {
-    const { doc: d0, idA, idB } = makeDocWithInstances();
-    const doc = execute(d0, 'add_joint', {
-      kind: 'revolute',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'z',
-    }).document;
-    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
-
-    const result = execute(doc, 'add_drive_relation', { driver: jid, driven: jid, ratio: 1 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('same joint');
-  });
-
-  it('add_drive_relation — failure: unknown driver joint is a no-op', () => {
-    const { doc: d0, idA, idB } = makeDocWithInstances();
-    const doc = execute(d0, 'add_joint', {
-      kind: 'revolute',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'z',
-    }).document;
-    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
-
-    const result = execute(doc, 'add_drive_relation', { driver: 'ghost', driven: jid, ratio: 1 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('delete_drive_relation — removes coupling, leaves joints intact', () => {
-    const { doc: d0, idA, idB } = makeDocWithInstances();
-    let doc = execute(d0, 'add_joint', {
-      kind: 'revolute',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'z',
-    }).document;
-    const jid1 = doc.jointOrder[doc.jointOrder.length - 1]!;
-    doc = execute(doc, 'add_joint', {
-      kind: 'revolute',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'y',
-    }).document;
-    const jid2 = doc.jointOrder[doc.jointOrder.length - 1]!;
-    doc = execute(doc, 'add_drive_relation', { driver: jid1, driven: jid2, ratio: 3 }).document;
-    const drid = doc.driveRelationOrder[0]!;
-
-    const result = execute(doc, 'delete_drive_relation', { id: drid });
-    expect(result.document.driveRelations[drid]).toBeUndefined();
-    expect(result.document.driveRelationOrder).not.toContain(drid);
-    // Joints still exist
-    expect(result.document.joints[jid1]).toBeDefined();
-    expect(result.document.joints[jid2]).toBeDefined();
-  });
-
-  it('delete_drive_relation — failure: unknown id is a no-op', () => {
-    const { doc } = makeDocWithInstances();
-    const result = execute(doc, 'delete_drive_relation', { id: 'ghost-dr' });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('evaluate_motion — no joints returns empty data without mutation', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'evaluate_motion', {});
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-    const data = result.data as {
-      resolvedJoints: Record<string, number>;
-      instancePositions: Record<string, unknown>;
-    };
-    expect(Object.keys(data.resolvedJoints)).toHaveLength(0);
-    expect(Object.keys(data.instancePositions)).toHaveLength(0);
-  });
-
-  it('evaluate_motion — does not mutate doc even when joints are present', () => {
-    const { doc: d0, idA, idB } = makeDocWithInstances();
-    let doc = execute(d0, 'add_joint', {
-      kind: 'revolute',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'z',
-    }).document;
-    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
-    doc = execute(doc, 'set_joint_value', { id: jid, value: Math.PI / 4 }).document;
-
-    const snapshot = JSON.stringify(doc);
-    const result = execute(doc, 'evaluate_motion', {});
-    expect(JSON.stringify(doc)).toBe(snapshot); // input not mutated
-    expect(result.document).toBe(doc); // same reference returned
-  });
-
-  it('evaluate_motion — returns position delta for prismatic joint', () => {
-    const { doc: d0, idA, idB } = makeDocWithInstances();
-    let doc = execute(d0, 'add_joint', {
-      kind: 'prismatic',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'x',
-    }).document;
-    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
-    doc = execute(doc, 'set_joint_value', { id: jid, value: 5 }).document;
-
-    const result = execute(doc, 'evaluate_motion', {});
-    const data = result.data as { instancePositions: Record<string, [number, number, number]> };
-    // Instance a is at [0,0,0]; b should move to [0+5, 0, 0] = [5, 0, 0]
-    expect(data.instancePositions[idB]).toBeDefined();
-    expect(data.instancePositions[idB]![0]).toBeCloseTo(5, 5);
-  });
-
-  it('bake_motion — updates instance positions in the document', () => {
-    const { doc: d0, idA, idB } = makeDocWithInstances();
-    let doc = execute(d0, 'add_joint', {
-      kind: 'prismatic',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'y',
-    }).document;
-    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
-    doc = execute(doc, 'set_joint_value', { id: jid, value: 3 }).document;
-
-    const result = execute(doc, 'bake_motion', {});
-    expect(result.affected).toContain(idB);
-    // Instance a is at [0,0,0]; b.position should be [0, 3, 0]
-    expect(result.document.entities[idB]!.position[1]).toBeCloseTo(3, 5);
-  });
-
-  it('bake_motion — no joints is a no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'bake_motion', {});
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-  });
-
-  it('bake_motion — is pure: does not mutate input doc', () => {
-    const { doc: d0, idA, idB } = makeDocWithInstances();
-    let doc = execute(d0, 'add_joint', {
-      kind: 'revolute',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'z',
-    }).document;
-    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
-    doc = execute(doc, 'set_joint_value', { id: jid, value: 1 }).document;
-
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'bake_motion', {});
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('round-trip save/load preserves joints and driveRelations', async () => {
-    const { doc: d0, idA, idB } = makeDocWithInstances();
-    let doc = execute(d0, 'add_joint', {
-      kind: 'revolute',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'z',
-    }).document;
-    const jid1 = doc.jointOrder[doc.jointOrder.length - 1]!;
-    doc = execute(doc, 'add_joint', {
-      kind: 'prismatic',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'x',
-    }).document;
-    const jid2 = doc.jointOrder[doc.jointOrder.length - 1]!;
-    doc = execute(doc, 'add_drive_relation', {
-      driver: jid1,
-      driven: jid2,
-      ratio: 0.5,
-      offset: 1,
-    }).document;
-    const drid = doc.driveRelationOrder[0]!;
-
-    // Save then reload
-    const { serializeDocument } = await import('@core/commands/persistence/serialization');
-    const json = serializeDocument(doc);
-    const loaded = execute(createEmptyDocument(), 'load_document', { json });
-    const reloaded = loaded.document;
-
-    expect(reloaded.joints[jid1]).toBeDefined();
-    expect(reloaded.joints[jid2]).toBeDefined();
-    expect(reloaded.driveRelations[drid]).toBeDefined();
-    expect(reloaded.driveRelations[drid]!.ratio).toBe(0.5);
-    expect(reloaded.driveRelations[drid]!.offset).toBe(1);
+  it('round-trip save/load preserves joints and driveRelations', () => {
+    const { doc, jid1, jid2, drid } = coupled(0.5, undefined, 'prismatic', 'x', { offset: 1 });
+    const reloaded = run(empty(), 'load_document', { json: serializeDocument(doc) });
+    expect([!!reloaded.joints[jid1], !!reloaded.joints[jid2]]).toEqual([true, true]);
+    expect(reloaded.driveRelations[drid]).toMatchObject({ ratio: 0.5, offset: 1 });
     expect(reloaded.jointOrder).toContain(jid1);
     expect(reloaded.driveRelationOrder).toContain(drid);
   });
 
-  // motion_study
+  describe('motion_study', () => {
+    const doc0 = joint(idoc, idA, idB, 'revolute', 'z', 0);
+    const study = (doc: CadDocument, p: object): { r: ReturnType<typeof execute>; data: MotionStudyData } => {
+      const r = execute(doc, 'motion_study', p);
+      return { r, data: r.data as MotionStudyData };
+    };
 
-  it('motion_study — joint sweep: instanceRotations change monotonically and doc is unchanged', () => {
-    // A revolute joint swept from π/4 to 3π/4 in 5 steps.
-    // Instance b starts at [2, 0, 0] (offset from a at [0,0,0]).
-    const { doc: d0, idA, idB } = makeDocWithInstances();
-    let doc = execute(d0, 'add_joint', {
-      kind: 'revolute',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'z',
-    }).document;
-    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
-    doc = execute(doc, 'set_joint_value', { id: jid, value: 0 }).document;
-
-    const snapshot = JSON.stringify(doc);
-    const result = execute(doc, 'motion_study', {
-      mode: 'joint',
-      target: jid,
-      start: Math.PI / 4,
-      end: (3 * Math.PI) / 4,
-      steps: 5,
+    it('joint sweep: monotonic rotations and sweep values, pure', () => {
+      const { doc, jid: j } = doc0;
+      let res!: ReturnType<typeof study>;
+      expectPure(doc, () => (res = study(doc, { mode: 'joint', target: j, start: Math.PI / 4, end: (3 * Math.PI) / 4, steps: 5 })));
+      expectNoOp(res.r, doc);
+      expect(res.data.steps).toHaveLength(5);
+      for (const series of [
+        res.data.steps.map((s) => (s.instanceRotations[idB] ?? [0, 0, 0])[2]!),
+        res.data.steps.map((s) => s.sweepValue),
+      ])
+        for (let i = 1; i < series.length; i++) expect(series[i]!).toBeGreaterThan(series[i - 1]!);
+      expectPure(doc, () =>
+        expect(execute(doc, 'motion_study', { mode: 'joint', target: j, start: 0, end: Math.PI, steps: 8 }).document).toBe(doc),
+      );
     });
 
-    // Purity: input doc unchanged
-    expect(JSON.stringify(doc)).toBe(snapshot);
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-
-    const data = result.data as import('@core/commands/motion/motionStudy').MotionStudyData;
-    expect(data.steps).toHaveLength(5);
-
-    // Rotation of idB about Z increases monotonically as sweep value grows
-    const zRotations = data.steps.map((s) => (s.instanceRotations[idB] ?? [0, 0, 0])[2]);
-    for (let i = 1; i < zRotations.length; i++) {
-      expect(zRotations[i]!).toBeGreaterThan(zRotations[i - 1]!);
-    }
-
-    // Sweep values are monotonically increasing
-    const sweepValues = data.steps.map((s) => s.sweepValue);
-    for (let i = 1; i < sweepValues.length; i++) {
-      expect(sweepValues[i]!).toBeGreaterThan(sweepValues[i - 1]!);
-    }
-  });
-
-  it('motion_study — parameter sweep: downstream joint resolvedJoints vary with the parameter', () => {
-    // Set parameter "angle" and couple a revolute joint to it via set_joint_value.
-    // Sweep "angle" from 0 to π in 4 steps; check that resolvedJoints[jid] changes.
-    const { doc: d0, idA, idB } = makeDocWithInstances();
-    let doc = execute(d0, 'set_parameter', { name: 'angle', expression: '0' }).document;
-    doc = execute(doc, 'add_joint', {
-      kind: 'revolute',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'z',
-    }).document;
-    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
-    // Manually set the joint value to match the parameter value (0 → 0).
-    doc = execute(doc, 'set_joint_value', { id: jid, value: 0 }).document;
-
-    const result = execute(doc, 'motion_study', {
-      mode: 'parameter',
-      target: 'angle',
-      start: 0,
-      end: Math.PI,
-      steps: 4,
+    it('parameter sweep covers start..end', () => {
+      const doc = run(doc0.doc, 'set_parameter', { name: 'angle', expression: '0' });
+      const { r, data } = study(doc, { mode: 'parameter', target: 'angle', start: 0, end: Math.PI, steps: 4 });
+      expectNoOp(r, doc);
+      expect([data.steps.length, data.summary.totalSteps]).toEqual([4, 4]);
+      expect(data.steps[0]!.sweepValue).toBeCloseTo(0);
+      expect(data.steps[3]!.sweepValue).toBeCloseTo(Math.PI, 5);
     });
 
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-
-    const data = result.data as import('@core/commands/motion/motionStudy').MotionStudyData;
-    expect(data.steps).toHaveLength(4);
-    expect(data.summary.totalSteps).toBe(4);
-
-    // Steps should include the full range including start and end
-    expect(data.steps[0]!.sweepValue).toBeCloseTo(0);
-    expect(data.steps[3]!.sweepValue).toBeCloseTo(Math.PI, 5);
-  });
-
-  it('motion_study — interference: two overlapping boxes produce at least one flagged frame', () => {
-    // Build two instances very close together so they overlap at the start position.
-    // Use a prismatic joint with a zero displacement — they should already overlap.
-    let doc = createEmptyDocument();
-    const seedA = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
-    doc = seedA.document;
-    const compA = execute(doc, 'create_component', {
-      name: 'PartA',
-      entityIds: [seedA.affected[0]!],
-    });
-    doc = compA.document;
-    const compId = Object.keys(doc.components)[0]!;
-    const idA = compA.affected[0]!;
-
-    // Place instance B at [0.5, 0, 0] — overlaps with a 2×2×2 box at origin
-    const instB = execute(doc, 'insert_instance', { componentId: compId, position: [0.5, 0, 0] });
-    doc = instB.document;
-    const idB = instB.affected[0]!;
-
-    // Add a prismatic joint along X; sweep from 0 to 0 (same position) — already overlapping
-    doc = execute(doc, 'add_joint', {
-      kind: 'prismatic',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'x',
-    }).document;
-    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
-    doc = execute(doc, 'set_joint_value', { id: jid, value: 0 }).document;
-
-    const result = execute(doc, 'motion_study', {
-      mode: 'joint',
-      target: jid,
-      start: 0,
-      end: 0.1,
-      steps: 3,
-      interferenceCheck: true,
+    it.each([
+      [[0.5, 0, 0], [2, 2, 2], 0, 0.1, 3, true],
+      [[0, 0, 0], [1, 1, 1], 500, 501, 5, false],
+    ])('interference: B at %j (box %j) sweeping %d..%d → flagged %s', (at, size, start, end, steps, hit) => {
+      const { doc: d, idA: a, idB: b } = instances(at, { size, position: [0, 0, 0] });
+      const { doc, jid: j } = joint(d, a, b, 'prismatic', 'x', hit ? 0 : undefined);
+      const { data } = study(doc, { mode: 'joint', target: j, start, end, steps, interferenceCheck: true });
+      expect(data.interferences.length > 0).toBe(hit);
+      expect(data.summary.framesWithInterference > 0).toBe(hit);
     });
 
-    const data = result.data as import('@core/commands/motion/motionStudy').MotionStudyData;
-    // At least one step should detect the overlap (both instances share the same component
-    // bounds centered at [0,0,0] with half-extents [1,1,1], instance B at [0.5,0,0])
-    expect(data.interferences.length).toBeGreaterThan(0);
-    expect(data.summary.framesWithInterference).toBeGreaterThan(0);
-  });
-
-  it('motion_study — interference: non-overlapping instances produce zero interference frames', () => {
-    // A prismatic joint along X sweeps B from [500, 0, 0] to [501, 0, 0].
-    // A is at [0, 0, 0]. With a 1×1×1 component (half-extent 0.5), A occupies
-    // roughly [-0.5, 0.5] in X. B at 500+ never overlaps A.
-    let doc = createEmptyDocument();
-    const seedA = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    doc = seedA.document;
-    const compA = execute(doc, 'create_component', {
-      name: 'PartA',
-      entityIds: [seedA.affected[0]!],
+    it('graceful failures: non-numeric parameter, steps=1, zero-length range', () => {
+      const bad = run(empty(), 'set_parameter', { name: 'bad', expression: 'unknown_ref * 2' });
+      expectNoOp(execute(bad, 'motion_study', { mode: 'parameter', target: 'bad', start: 0, end: 1 }), bad);
+      const { doc, jid: j } = joint(idoc, idA, idB, 'revolute', 'z');
+      for (const [p, summary] of [
+        [{ start: 0, end: Math.PI, steps: 1 }, undefined],
+        [{ start: 1.0, end: 1.0 }, 'zero length'],
+      ] as const) {
+        const { r, data } = study(doc, { mode: 'joint', target: j, ...p });
+        expectNoOp(r, doc, summary);
+        expect(data.steps).toHaveLength(0);
+      }
     });
-    doc = compA.document;
-    const compId = Object.keys(doc.components)[0]!;
-    const idA = compA.affected[0]!;
-
-    // B: insert at an arbitrary position; the joint will place it relative to A.
-    const instB = execute(doc, 'insert_instance', { componentId: compId, position: [0, 0, 0] });
-    doc = instB.document;
-    const idB = instB.affected[0]!;
-
-    // Prismatic joint along X: B's evaluated position = A.pos + axis * sweepValue.
-    // Sweep from 500 to 501 — B stays far from A (which is at [0,0,0]).
-    doc = execute(doc, 'add_joint', {
-      kind: 'prismatic',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'x',
-    }).document;
-    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
-
-    const result = execute(doc, 'motion_study', {
-      mode: 'joint',
-      target: jid,
-      start: 500,
-      end: 501,
-      steps: 5,
-      interferenceCheck: true,
-    });
-
-    const data = result.data as import('@core/commands/motion/motionStudy').MotionStudyData;
-    expect(data.summary.framesWithInterference).toBe(0);
-    expect(data.interferences).toHaveLength(0);
-  });
-
-  it('motion_study — failure: unknown joint id is a graceful no-op', () => {
-    const { doc } = makeDocWithInstances();
-    const result = execute(doc, 'motion_study', {
-      mode: 'joint',
-      target: 'ghost-joint',
-      start: 0,
-      end: Math.PI,
-      steps: 5,
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('ghost-joint');
-  });
-
-  it('motion_study — failure: non-numeric parameter is a graceful no-op', () => {
-    // A parameter with an error (expression referencing an unknown name) is non-numeric.
-    let doc = createEmptyDocument();
-    // Force an error by referencing an unknown parameter
-    doc = execute(doc, 'set_parameter', { name: 'bad', expression: 'unknown_ref * 2' }).document;
-    const result = execute(doc, 'motion_study', {
-      mode: 'parameter',
-      target: 'bad',
-      start: 0,
-      end: 1,
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('motion_study — failure: unknown parameter name is a graceful no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'motion_study', {
-      mode: 'parameter',
-      target: 'no_such_param',
-      start: 0,
-      end: 1,
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('no_such_param');
-  });
-
-  it('motion_study — failure: steps=1 is a graceful no-op', () => {
-    const { doc: d0, idA, idB } = makeDocWithInstances();
-    const doc = execute(d0, 'add_joint', {
-      kind: 'revolute',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'z',
-    }).document;
-    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
-    const result = execute(doc, 'motion_study', {
-      mode: 'joint',
-      target: jid,
-      start: 0,
-      end: Math.PI,
-      steps: 1,
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    const data = result.data as import('@core/commands/motion/motionStudy').MotionStudyData;
-    expect(data.steps).toHaveLength(0);
-  });
-
-  it('motion_study — failure: start === end returns friendly summary with empty steps', () => {
-    const { doc: d0, idA, idB } = makeDocWithInstances();
-    const doc = execute(d0, 'add_joint', {
-      kind: 'revolute',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'z',
-    }).document;
-    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
-    const result = execute(doc, 'motion_study', {
-      mode: 'joint',
-      target: jid,
-      start: 1.0,
-      end: 1.0,
-    });
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-    expect(result.summary).toContain('zero length');
-    const data = result.data as import('@core/commands/motion/motionStudy').MotionStudyData;
-    expect(data.steps).toHaveLength(0);
-  });
-
-  it('motion_study — purity: result.document === input doc', () => {
-    const { doc: d0, idA, idB } = makeDocWithInstances();
-    let doc = execute(d0, 'add_joint', {
-      kind: 'revolute',
-      a: { instanceId: idA },
-      b: { instanceId: idB },
-      axis: 'z',
-    }).document;
-    const jid = doc.jointOrder[doc.jointOrder.length - 1]!;
-    doc = execute(doc, 'set_joint_value', { id: jid, value: 0 }).document;
-
-    const snapshot = JSON.stringify(doc);
-    const result = execute(doc, 'motion_study', {
-      mode: 'joint',
-      target: jid,
-      start: 0,
-      end: Math.PI,
-      steps: 8,
-    });
-
-    // result.document is the exact same reference
-    expect(result.document).toBe(doc);
-    // The original doc object was not mutated
-    expect(JSON.stringify(doc)).toBe(snapshot);
   });
 });
 
-// add_dimension
+type DimensionEntity = import('@core/model/types').DimensionEntity;
 
 describe('add_dimension', () => {
-  // Helpers to seed reference entities
-  // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-  function makeDoc() {
-    let doc = createEmptyDocument();
-    // Two point entities for linear/aligned/angular
-    const p1 = execute(doc, 'draw_point', { position: [0, 0, 0] });
-    doc = p1.document;
-    const p2 = execute(doc, 'draw_point', { position: [10, 0, 0] });
-    doc = p2.document;
-    const p3 = execute(doc, 'draw_point', { position: [5, 5, 0] });
-    doc = p3.document;
-    // A circle for radial
-    const circ = execute(doc, 'draw_arc', { center: [0, 0], radius: 5 });
-    doc = circ.document;
-    // A line for linear/aligned/angular
-    const ln = execute(doc, 'draw_polyline', {
-      points: [
-        [0, 0],
-        [10, 0],
-      ],
-    });
-    doc = ln.document;
-    return {
-      doc,
-      pointId1: p1.affected[0]!,
-      pointId2: p2.affected[0]!,
-      pointId3: p3.affected[0]!,
-      circleId: circ.affected[0]!,
-      lineId: ln.affected[0]!,
-    };
-  }
+  const doc = chain(
+    ['draw_point', { position: [0, 0, 0] }],
+    ['draw_point', { position: [10, 0, 0] }],
+    ['draw_point', { position: [5, 5, 0] }],
+    ['draw_arc', { center: [0, 0], radius: 5 }],
+    ['draw_polyline', { points: xy(0, 0, 10, 0) }],
+    ['draw_polyline', { points: xy(0, 5, 10, 5) }],
+    ['draw_polyline', { points: xy(0, 0, 0, 10) }],
+    ['draw_arc', { center: [0, 0], radius: 3, startAngle: 0, endAngle: Math.PI }],
+    ['add_box', { size: [1, 1, 1] }],
+    ['add_box', { size: [2, 2, 2] }],
+  );
+  const [p1, p2, p3, circle, line, line2, vline, arc, box1, box2] = doc.order as string[] & { length: 10 };
+  const dim = (p: object): ReturnType<typeof execute> => execute(doc, 'add_dimension', p);
 
-  // Happy paths
-
-  it('linear — creates a dimension entity referencing 2 point entities', () => {
-    const { doc, pointId1, pointId2 } = makeDoc();
-    const result = execute(doc, 'add_dimension', {
-      dimensionKind: 'linear',
-      entityIds: [pointId1, pointId2],
-      offset: 8,
-    });
-    expect(result.affected).toHaveLength(1);
-    const id = result.affected[0]!;
-    const e = result.document.entities[id]! as import('@core/model/types').DimensionEntity;
-    expect(e.kind).toBe('dimension');
-    expect(e.dimensionKind).toBe('linear');
-    expect(e.entityIds).toEqual([pointId1, pointId2]);
-    expect(e.offset).toBe(8);
-    expect(result.document.order).toContain(id);
-    expect(result.summary).toContain(id);
-    expect(result.summary).toContain('linear');
-  });
-
-  it('linear — works with 2 line entities', () => {
-    const { doc, lineId } = makeDoc();
-    // Need a second line
-    const ln2 = execute(doc, 'draw_polyline', {
-      points: [
-        [0, 5],
-        [10, 5],
-      ],
-    });
-    const result = execute(ln2.document, 'add_dimension', {
-      dimensionKind: 'linear',
-      entityIds: [lineId, ln2.affected[0]!],
-    });
-    expect(result.affected).toHaveLength(1);
-    const e = result.document.entities[
-      result.affected[0]!
-    ]! as import('@core/model/types').DimensionEntity;
-    expect(e.dimensionKind).toBe('linear');
-  });
-
-  it('aligned — creates a dimension entity referencing 2 point entities', () => {
-    const { doc, pointId1, pointId2 } = makeDoc();
-    const result = execute(doc, 'add_dimension', {
-      dimensionKind: 'aligned',
-      entityIds: [pointId1, pointId2],
-    });
-    expect(result.affected).toHaveLength(1);
-    const e = result.document.entities[
-      result.affected[0]!
-    ]! as import('@core/model/types').DimensionEntity;
-    expect(e.kind).toBe('dimension');
-    expect(e.dimensionKind).toBe('aligned');
-  });
-
-  it('radial — creates a dimension entity referencing a circle', () => {
-    const { doc, circleId } = makeDoc();
-    const result = execute(doc, 'add_dimension', {
-      dimensionKind: 'radial',
-      entityIds: [circleId],
-      label: 'R5',
-    });
-    expect(result.affected).toHaveLength(1);
-    const e = result.document.entities[
-      result.affected[0]!
-    ]! as import('@core/model/types').DimensionEntity;
-    expect(e.dimensionKind).toBe('radial');
-    expect(e.entityIds).toEqual([circleId]);
-    expect(e.label).toBe('R5');
-  });
-
-  it('radial — accepts an arc entity', () => {
-    let doc = createEmptyDocument();
-    const arc = execute(doc, 'draw_arc', {
-      center: [0, 0],
-      radius: 3,
-      startAngle: 0,
-      endAngle: Math.PI,
-    });
-    doc = arc.document;
-    const result = execute(doc, 'add_dimension', {
-      dimensionKind: 'radial',
-      entityIds: [arc.affected[0]!],
-    });
-    expect(result.affected).toHaveLength(1);
-  });
-
-  it('angular — creates a dimension entity referencing 3 point entities', () => {
-    const { doc, pointId1, pointId2, pointId3 } = makeDoc();
-    const result = execute(doc, 'add_dimension', {
-      dimensionKind: 'angular',
-      entityIds: [pointId1, pointId2, pointId3],
-      precision: 1,
-    });
-    expect(result.affected).toHaveLength(1);
-    const e = result.document.entities[
-      result.affected[0]!
-    ]! as import('@core/model/types').DimensionEntity;
-    expect(e.dimensionKind).toBe('angular');
-    expect(e.entityIds).toHaveLength(3);
-    expect(e.precision).toBe(1);
-  });
-
-  it('angular — accepts line entities', () => {
-    const { doc, lineId, pointId1 } = makeDoc();
-    const ln2 = execute(doc, 'draw_polyline', {
-      points: [
-        [0, 0],
-        [0, 10],
-      ],
-    });
-    const result = execute(ln2.document, 'add_dimension', {
-      dimensionKind: 'angular',
-      entityIds: [pointId1, lineId, ln2.affected[0]!],
-    });
-    expect(result.affected).toHaveLength(1);
-  });
-
-  it('optional fields — label, precision, offset stored on entity', () => {
-    const { doc, pointId1, pointId2 } = makeDoc();
-    const result = execute(doc, 'add_dimension', {
-      dimensionKind: 'linear',
-      entityIds: [pointId1, pointId2],
-      offset: 12,
-      precision: 2,
-      label: '≈ 10 mm',
-    });
-    const e = result.document.entities[
-      result.affected[0]!
-    ]! as import('@core/model/types').DimensionEntity;
-    expect(e.offset).toBe(12);
-    expect(e.precision).toBe(2);
-    expect(e.label).toBe('≈ 10 mm');
-  });
-
-  it('is2D — created entity is classified as 2D', () => {
-    const { doc, pointId1, pointId2 } = makeDoc();
-    const result = execute(doc, 'add_dimension', {
-      dimensionKind: 'linear',
-      entityIds: [pointId1, pointId2],
-    });
-    const e = result.document.entities[result.affected[0]!]!;
+  it.each<[string, string[], Record<string, unknown>]>([
+    ['linear', [p1!, p2!], { offset: 8 }],
+    ['linear', [line!, line2!], {}],
+    ['aligned', [p1!, p2!], {}],
+    ['radial', [circle!], { label: 'R5' }],
+    ['radial', [arc!], {}],
+    ['angular', [p1!, p2!, p3!], { precision: 1 }],
+    ['angular', [p1!, line!, vline!], {}],
+    ['linear', [p1!, p2!], { offset: 12, precision: 2, label: '≈ 10 mm' }],
+  ])('%s on %j creates a 2D dimension', (dimensionKind, entityIds, extra) => {
+    const r = dim({ dimensionKind, entityIds, ...extra });
+    expect(r.affected).toHaveLength(1);
+    const e = first(r) as unknown as DimensionEntity;
+    expect(e).toMatchObject({ kind: 'dimension', dimensionKind, entityIds, ...extra });
     expect(is2D(e)).toBe(true);
+    expect(r.document.order).toContain(e.id);
+    expect(r.summary).toContain(e.id);
+    expect(r.summary).toContain(dimensionKind);
   });
 
-  // Purity
-
-  it('is pure — input document is not mutated', () => {
-    const { doc, pointId1, pointId2 } = makeDoc();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'add_dimension', { dimensionKind: 'linear', entityIds: [pointId1, pointId2] });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  // Failure paths
-
-  it('failure — unknown dimensionKind is a no-op', () => {
-    const { doc, pointId1, pointId2 } = makeDoc();
-    const result = execute(doc, 'add_dimension', {
-      dimensionKind: 'diagonal',
-      entityIds: [pointId1, pointId2],
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('diagonal');
-  });
-
-  it('failure — wrong entityIds count for linear (1 instead of 2) is a no-op', () => {
-    const { doc, pointId1 } = makeDoc();
-    const result = execute(doc, 'add_dimension', {
-      dimensionKind: 'linear',
-      entityIds: [pointId1],
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('2');
-  });
-
-  it('failure — wrong entityIds count for radial (2 instead of 1) is a no-op', () => {
-    const { doc, circleId, pointId1 } = makeDoc();
-    const result = execute(doc, 'add_dimension', {
-      dimensionKind: 'radial',
-      entityIds: [circleId, pointId1],
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('1');
-  });
-
-  it('failure — wrong entityIds count for angular (2 instead of 3) is a no-op', () => {
-    const { doc, pointId1, pointId2 } = makeDoc();
-    const result = execute(doc, 'add_dimension', {
-      dimensionKind: 'angular',
-      entityIds: [pointId1, pointId2],
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('3');
-  });
-
-  it('failure — empty entityIds array is a no-op', () => {
-    const { doc } = makeDoc();
-    const result = execute(doc, 'add_dimension', {
-      dimensionKind: 'linear',
-      entityIds: [],
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('failure — missing referenced entity id is a no-op', () => {
-    const { doc, pointId1 } = makeDoc();
-    const result = execute(doc, 'add_dimension', {
-      dimensionKind: 'linear',
-      entityIds: [pointId1, 'ghost-id'],
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('ghost-id');
-  });
-
-  it('failure — radial on a non-circle/arc/ellipse entity (box) is a no-op', () => {
-    let doc = createEmptyDocument();
-    const box = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = box.document;
-    const result = execute(doc, 'add_dimension', {
-      dimensionKind: 'radial',
-      entityIds: [box.affected[0]!],
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('radial');
-  });
-
-  it('failure — linear on an incompatible entity kind (box) is a no-op', () => {
-    let doc = createEmptyDocument();
-    const b1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = b1.document;
-    const b2 = execute(doc, 'add_box', { size: [2, 2, 2] });
-    doc = b2.document;
-    const result = execute(doc, 'add_dimension', {
-      dimensionKind: 'linear',
-      entityIds: [b1.affected[0]!, b2.affected[0]!],
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('linear');
-  });
-
-  it('failure — angular on an incompatible entity kind (circle) is a no-op', () => {
-    const { doc, circleId, pointId1, pointId2 } = makeDoc();
-    const result = execute(doc, 'add_dimension', {
-      dimensionKind: 'angular',
-      entityIds: [pointId1, pointId2, circleId],
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('angular');
-  });
-
-  // scale_entity on dimension
-
-  it('scale_entity — dimension: scales offset, leaves entityIds unchanged', () => {
-    const { doc, pointId1, pointId2 } = makeDoc();
-    const created = execute(doc, 'add_dimension', {
-      dimensionKind: 'linear',
-      entityIds: [pointId1, pointId2],
-      offset: 10,
-    });
-    const dimId = created.affected[0]!;
-    const scaled = execute(created.document, 'scale_entity', { id: dimId, factor: 2 });
-    expect(scaled.affected).toEqual([dimId]);
-    const e = scaled.document.entities[dimId]! as import('@core/model/types').DimensionEntity;
-    expect(e.offset).toBeCloseTo(20);
-    expect(e.entityIds).toEqual([pointId1, pointId2]);
-    expect(scaled.summary).toContain('offset');
-  });
-
-  it('scale_entity — dimension without offset: returns entity unchanged (no offset field)', () => {
-    const { doc, pointId1, pointId2 } = makeDoc();
-    const created = execute(doc, 'add_dimension', {
-      dimensionKind: 'linear',
-      entityIds: [pointId1, pointId2],
-    });
-    const dimId = created.affected[0]!;
-    const scaled = execute(created.document, 'scale_entity', { id: dimId, factor: 3 });
-    expect(scaled.affected).toEqual([dimId]);
-    const e = scaled.document.entities[dimId]! as import('@core/model/types').DimensionEntity;
-    expect(e.offset).toBeUndefined();
-  });
-
-  // check_model — dangling_dimension_ref
-
-  it('check_model — flags dangling_dimension_ref when a referenced entity is deleted', () => {
-    const { doc, pointId1, pointId2 } = makeDoc();
-    // Create dimension
-    const dimCreated = execute(doc, 'add_dimension', {
-      dimensionKind: 'linear',
-      entityIds: [pointId1, pointId2],
-    });
-    // Delete one of the referenced entities
-    const afterDelete = execute(dimCreated.document, 'delete_entities', { ids: [pointId1] });
-    // Check model
-    const checkResult = execute(afterDelete.document, 'check_model', {});
-    const data = checkResult.data as import('@core/commands/inspect/checkModel').CheckResult;
-    const danglingIssues = data.issues.filter((i) => i.code === 'dangling_dimension_ref');
-    expect(danglingIssues).toHaveLength(1);
-    expect(danglingIssues[0]!.severity).toBe('error');
-    expect(danglingIssues[0]!.message).toContain(pointId1);
-    expect(data.ok).toBe(false);
-  });
-
-  it('check_model — no dangling_dimension_ref when all references are intact', () => {
-    const { doc, pointId1, pointId2 } = makeDoc();
-    const dimCreated = execute(doc, 'add_dimension', {
-      dimensionKind: 'linear',
-      entityIds: [pointId1, pointId2],
-    });
-    const checkResult = execute(dimCreated.document, 'check_model', {});
-    const data = checkResult.data as import('@core/commands/inspect/checkModel').CheckResult;
-    const danglingIssues = data.issues.filter((i) => i.code === 'dangling_dimension_ref');
-    expect(danglingIssues).toHaveLength(0);
-  });
-
-  // ── Feature history ──────────────────────────────────────────────────
-
-  it('featureHistory — fresh document has empty featureHistory', () => {
-    const doc = createEmptyDocument();
-    expect(doc.featureHistory).toEqual([]);
-  });
-
-  it('featureHistory — add_box appends one step to featureHistory', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_box', { size: [2, 2, 2] });
-    expect(result.document.featureHistory).toHaveLength(1);
-    expect(result.document.featureHistory[0]!.name).toBe('add_box');
-    expect(result.document.featureHistory[0]!.suppressed).toBe(false);
-  });
-
-  it('featureHistory — two add_box calls produce two steps', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
-    expect(doc.featureHistory).toHaveLength(2);
-    expect(doc.featureHistory[0]!.name).toBe('add_box');
-    expect(doc.featureHistory[1]!.name).toBe('add_box');
-  });
-
-  it('featureHistory — failed command (no-op) does NOT append a step', () => {
-    const doc = createEmptyDocument();
-    // move_entities on missing id returns same doc ref => no step
-    const result = execute(doc, 'move_entities', { ids: ['ghost'], delta: [1, 0, 0] });
-    expect(result.document.featureHistory).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('featureHistory — read-only command (measure_distance) does NOT append a step', () => {
-    let doc = createEmptyDocument();
-    const r1 = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    doc = r1.document;
-    const r2 = execute(doc, 'add_box', { size: [1, 1, 1], position: [5, 0, 0] });
-    doc = r2.document;
-    const stepsBefore = doc.featureHistory.length;
-    const id1 = r1.affected[0]!;
-    const id2 = r2.affected[0]!;
-    const measured = execute(doc, 'measure_distance', { fromId: id1, toId: id2 });
-    // measure_distance is readOnly — doc ref must be the same, no new step
-    expect(measured.document).toBe(doc);
-    expect(measured.document.featureHistory).toHaveLength(stepsBefore);
-  });
-
-  it('featureHistory — set_parameter/delete_parameter do NOT append steps (metaHistory; parameters are document state, not recipe steps)', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'set_parameter', { name: 'w', expression: '10' }).document;
-    expect(doc.featureHistory).toHaveLength(0);
-    expect(doc.parameters['w']?.value).toBe(10);
-    // Updating it again must still not append (idempotent in the recipe).
-    doc = execute(doc, 'set_parameter', { name: 'w', expression: '20' }).document;
-    expect(doc.featureHistory).toHaveLength(0);
-    expect(doc.parameters['w']?.value).toBe(20);
-    doc = execute(doc, 'delete_parameter', { name: 'w' }).document;
-    expect(doc.featureHistory).toHaveLength(0);
-    expect(doc.parameters['w']).toBeUndefined();
-  });
-
-  it('featureHistory — input document is never mutated (purity)', () => {
-    const doc = createEmptyDocument();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'add_box', { size: [1, 1, 1] });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  // ── replay_history ────────────────────────────────────────────────────────
-
-  it('replay_history — empty history returns doc unchanged with summary', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'replay_history', {});
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-    expect(result.summary).toContain('empty');
-  });
-
-  it('replay_history — replaying two add_box steps regenerates both entities', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
-    expect(doc.featureHistory).toHaveLength(2);
-
-    const replayed = execute(doc, 'replay_history', {});
-    expect(Object.keys(replayed.document.entities)).toHaveLength(2);
-    expect(replayed.document.featureHistory).toHaveLength(2);
-    expect(replayed.summary).toContain('2 step');
-  });
-
-  it('replay_history — meta-command does NOT append a featureHistory step', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    const stepsBefore = doc.featureHistory.length;
-    const result = execute(doc, 'replay_history', {});
-    // replay_history is metaHistory — must not grow the list
-    expect(result.document.featureHistory).toHaveLength(stepsBefore);
-  });
-
-  // ── set_step_suppressed ───────────────────────────────────────────────────
-
-  it('set_step_suppressed — suppressing step 0 removes that entity from regenerated doc', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
-    expect(doc.featureHistory).toHaveLength(2);
-
-    const step0Id = doc.featureHistory[0]!.id;
-    const result = execute(doc, 'set_step_suppressed', { stepId: step0Id, suppressed: true });
-
-    // Second box still exists; first is gone.
-    expect(Object.keys(result.document.entities)).toHaveLength(1);
-    expect(result.document.featureHistory[0]!.suppressed).toBe(true);
-    expect(result.document.featureHistory).toHaveLength(2);
-  });
-
-  it('set_step_suppressed — un-suppressing restores the entity', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [3, 3, 3] }).document;
-    const stepId = doc.featureHistory[0]!.id;
-
-    // Suppress then un-suppress.
-    doc = execute(doc, 'set_step_suppressed', { stepId, suppressed: true }).document;
-    expect(Object.keys(doc.entities)).toHaveLength(0);
-
-    const restored = execute(doc, 'set_step_suppressed', { stepId, suppressed: false });
-    expect(Object.keys(restored.document.entities)).toHaveLength(1);
-    expect(restored.document.featureHistory[0]!.suppressed).toBe(false);
-  });
-
-  it('set_step_suppressed — unknown stepId is a graceful no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'set_step_suppressed', { stepId: 'ghost', suppressed: true });
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-    expect(result.summary).toContain('ghost');
-  });
-
-  it('set_step_suppressed — meta-command does NOT append a featureHistory step', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    const stepId = doc.featureHistory[0]!.id;
-    const stepsBefore = doc.featureHistory.length;
-    const result = execute(doc, 'set_step_suppressed', { stepId, suppressed: true });
-    expect(result.document.featureHistory).toHaveLength(stepsBefore);
-  });
-
-  // ── edit_step_params ──────────────────────────────────────────────────────
-
-  it('edit_step_params — changing size of box step regenerates with new size', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    const stepId = doc.featureHistory[0]!.id;
-
-    const result = execute(doc, 'edit_step_params', {
-      stepId,
-      params: { size: [20, 20, 20] },
-    });
-
-    expect(Object.keys(result.document.entities)).toHaveLength(1);
-    const entityId = result.document.order[0]!;
-    const entity = result.document.entities[entityId]!;
-    // @ts-expect-error narrowing not needed in test
-    expect(entity.size).toEqual([20, 20, 20]);
-    expect(result.document.featureHistory[0]!.params).toEqual({ size: [20, 20, 20] });
-  });
-
-  it('edit_step_params — unknown stepId is a graceful no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'edit_step_params', { stepId: 'ghost', params: {} });
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-    expect(result.summary).toContain('ghost');
-  });
-
-  it('edit_step_params — meta-command does NOT append a featureHistory step', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    const stepId = doc.featureHistory[0]!.id;
-    const stepsBefore = doc.featureHistory.length;
-    const result = execute(doc, 'edit_step_params', { stepId, params: { size: [5, 5, 5] } });
-    expect(result.document.featureHistory).toHaveLength(stepsBefore);
-  });
-
-  // ── reorder_step ──────────────────────────────────────────────────────────
-
-  it('reorder_step — moves step from index 0 to index 1 and regenerates', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    doc = execute(doc, 'add_cylinder', { radius: 2, height: 4 }).document;
-    expect(doc.featureHistory).toHaveLength(2);
-
-    const step0Id = doc.featureHistory[0]!.id;
-    const step1Id = doc.featureHistory[1]!.id;
-
-    const result = execute(doc, 'reorder_step', { stepId: step0Id, newIndex: 1 });
-    // After reorder: step1 is now first, step0 is second.
-    expect(result.document.featureHistory[0]!.id).toBe(step1Id);
-    expect(result.document.featureHistory[1]!.id).toBe(step0Id);
-    expect(Object.keys(result.document.entities)).toHaveLength(2);
-  });
-
-  it('reorder_step — moving to same index is a no-op returning same doc ref', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    const stepId = doc.featureHistory[0]!.id;
-    const result = execute(doc, 'reorder_step', { stepId, newIndex: 0 });
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-  });
-
-  it('reorder_step — unknown stepId is a graceful no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'reorder_step', { stepId: 'ghost', newIndex: 0 });
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-    expect(result.summary).toContain('ghost');
-  });
-
-  it('reorder_step — meta-command does NOT append a featureHistory step', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
-    const stepId = doc.featureHistory[0]!.id;
-    const stepsBefore = doc.featureHistory.length;
-    const result = execute(doc, 'reorder_step', { stepId, newIndex: 1 });
-    expect(result.document.featureHistory).toHaveLength(stepsBefore);
-  });
-
-  // ── delete_step ───────────────────────────────────────────────────────────
-
-  it('delete_step — removes a step and regenerates without that entity', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
-    const step0Id = doc.featureHistory[0]!.id;
-
-    const result = execute(doc, 'delete_step', { stepId: step0Id });
-    expect(result.document.featureHistory).toHaveLength(1);
-    expect(Object.keys(result.document.entities)).toHaveLength(1);
-    expect(result.summary).toContain(step0Id);
-  });
-
-  it('delete_step — unknown stepId is a graceful no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'delete_step', { stepId: 'ghost' });
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-    expect(result.summary).toContain('ghost');
-  });
-
-  it('delete_step — meta-command does NOT append a featureHistory step', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
-    const stepId = doc.featureHistory[0]!.id;
-    const result = execute(doc, 'delete_step', { stepId });
-    // After deleting step 0 we have 1 step remaining — NOT 2 (no append from execute)
-    expect(result.document.featureHistory).toHaveLength(1);
-  });
-
-  // ── insert_step ───────────────────────────────────────────────────────────
-
-  it('insert_step — appends a new step when afterStepId omitted', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    expect(doc.featureHistory).toHaveLength(1);
-
-    const result = execute(doc, 'insert_step', {
-      name: 'add_box',
-      params: { size: [5, 5, 5] },
-    });
-    expect(result.document.featureHistory).toHaveLength(2);
-    expect(Object.keys(result.document.entities)).toHaveLength(2);
-  });
-
-  it('insert_step — inserts after a specific step', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
-    const step0Id = doc.featureHistory[0]!.id;
-
-    const result = execute(doc, 'insert_step', {
-      afterStepId: step0Id,
-      name: 'add_sphere',
-      params: { radius: 3 },
-    });
-    // History: [step0, newSphere, step1]
-    expect(result.document.featureHistory).toHaveLength(3);
-    expect(result.document.featureHistory[1]!.name).toBe('add_sphere');
-    expect(Object.keys(result.document.entities)).toHaveLength(3);
-  });
-
-  it('insert_step — unknown afterStepId is a graceful no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'insert_step', {
-      afterStepId: 'ghost',
-      name: 'add_box',
-      params: { size: [1, 1, 1] },
-    });
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-    expect(result.summary).toContain('ghost');
-  });
-
-  it('insert_step — unknown command name is stored but skipped during replay', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'insert_step', {
-      name: 'nonexistent_command_xyz',
-      params: {},
-    });
-    // Step is inserted but replay skips it — no entity created
-    expect(result.document.featureHistory).toHaveLength(1);
-    expect(result.document.featureHistory[0]!.name).toBe('nonexistent_command_xyz');
-    expect(Object.keys(result.document.entities)).toHaveLength(0);
-  });
-
-  it('insert_step — meta-command does NOT append a featureHistory step', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    const stepsBefore = doc.featureHistory.length;
-    const result = execute(doc, 'insert_step', {
-      name: 'add_box',
-      params: { size: [2, 2, 2] },
-    });
-    // insert_step adds exactly 1 step (the inserted one), not 2 (no execute-append)
-    expect(result.document.featureHistory).toHaveLength(stepsBefore + 1);
-  });
-
-  // ── integration: suppressed step + downstream move ────────────────────────
-
-  it('featureHistory — move referencing suppressed entity does not throw', () => {
-    let doc = createEmptyDocument();
-    // Step 0: create a box
-    doc = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] }).document;
-    const boxEntityId = doc.order[0]!;
-    // Step 1: move that box
-    doc = execute(doc, 'move_entities', { ids: [boxEntityId], delta: [5, 0, 0] }).document;
-    expect(doc.featureHistory).toHaveLength(2);
-
-    // Now suppress step 0 — box is no longer created, move becomes a no-op
-    const step0Id = doc.featureHistory[0]!.id;
-    const result = execute(doc, 'set_step_suppressed', { stepId: step0Id, suppressed: true });
-
-    // Should not throw; no entities in document (move silently no-ops)
-    expect(() => result).not.toThrow();
-    expect(Object.keys(result.document.entities)).toHaveLength(0);
-  });
-
-  // ── persistence: featureHistory round-trips through serializeDocument ─────
-
-  it('featureHistory — round-trips through serializeDocument / deserializeDocument', async () => {
-    const { serializeDocument, deserializeDocument } =
-      await import('@core/commands/persistence/serialization');
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [3, 3, 3] }).document;
-    const json = serializeDocument(doc);
-    const loaded = deserializeDocument(json);
-    expect(loaded.featureHistory).toHaveLength(1);
-    expect(loaded.featureHistory[0]!.name).toBe('add_box');
-  });
-
-  it('featureHistory — deserializeDocument defaults to [] when featureHistory absent', async () => {
-    const { deserializeDocument } = await import('@core/commands/persistence/serialization');
-    // Simulate an old doc that has no featureHistory field.
-    const oldDoc = {
-      format: 'llull-document',
-      version: 1,
-      document: {
-        entities: {},
-        order: [],
-        layers: {
-          'layer-default': { id: 'layer-default', name: 'Layer 0', visible: true, locked: false },
-        },
-        layerOrder: ['layer-default'],
-        selection: [],
-        camera: { target: [0, 0, 0], azimuth: 0, polar: 0, distance: 10 },
-        // featureHistory intentionally absent
-      },
-    };
-    const loaded = deserializeDocument(JSON.stringify(oldDoc));
-    expect(loaded.featureHistory).toEqual([]);
+  it.each<[string, string[], string?]>([
+    ['diagonal', [p1!, p2!], 'diagonal'],
+    ['linear', [p1!], '2'],
+    ['radial', [circle!, p1!], '1'],
+    ['angular', [p1!, p2!], '3'],
+    ['linear', []],
+    ['linear', [p1!, 'ghost-id'], 'ghost-id'],
+    ['radial', [box1!], 'radial'],
+    ['linear', [box1!, box2!], 'linear'],
+    ['angular', [p1!, p2!, circle!], 'angular'],
+  ])('%s on %j is a no-op', (dimensionKind, entityIds, summary) => expectNoOp(dim({ dimensionKind, entityIds }), doc, summary));
+
+  it('is pure; scale_entity scales offset only; check_model flags dangling refs', () => {
+    expectPure(doc, () => dim({ dimensionKind: 'linear', entityIds: [p1, p2] }));
+    for (const [offset, factor, scaled] of [
+      [10, 2, 20],
+      [undefined, 3, undefined],
+    ] as const) {
+      const c = dim({ dimensionKind: 'linear', entityIds: [p1, p2], ...(offset === undefined ? {} : { offset }) });
+      const r = execute(c.document, 'scale_entity', { id: c.affected[0], factor });
+      expect(r.affected).toEqual(c.affected);
+      expect(first(r)).toMatchObject({ entityIds: [p1, p2] });
+      expect(first(r).offset).toBe(scaled);
+      if (scaled) expect(r.summary).toContain('offset');
+    }
+    const withDim = run(doc, 'add_dimension', { dimensionKind: 'linear', entityIds: [p1, p2] });
+    const dangling = (d: CadDocument): import('@core/commands/inspect/checkModel').CheckResult =>
+      execute(d, 'check_model', {}).data as import('@core/commands/inspect/checkModel').CheckResult;
+    expect(dangling(withDim).issues.filter((i) => i.code === 'dangling_dimension_ref')).toHaveLength(0);
+    const broken = dangling(run(withDim, 'delete_entities', { ids: [p1] }));
+    const issues = broken.issues.filter((i) => i.code === 'dangling_dimension_ref');
+    expect(issues).toHaveLength(1);
+    expect(issues[0]!.severity).toBe('error');
+    expect(issues[0]!.message).toContain(p1);
+    expect(broken.ok).toBe(false);
   });
 });
 
-// Constructive vs evaluated geometry: =expr resolution in replay
+describe('feature history', () => {
+  const steps = (doc: CadDocument): string[] => doc.featureHistory.map((s) => s.name);
+  const twoBoxes = chain(['add_box', { size: [1, 1, 1] }], ['add_box', { size: [2, 2, 2] }]);
+  const [s0, s1] = twoBoxes.featureHistory.map((s) => s.id) as [string, string];
 
-import { resolveStepParams, buildParamEnv } from '@core/commands/history/regenerate';
+  it('mutating commands append steps; no-ops, read-only and parameter commands do not; purity', () => {
+    expect(empty().featureHistory).toEqual([]);
+    expect(twoBoxes.featureHistory.map((s) => [s.name, s.suppressed])).toEqual([
+      ['add_box', false],
+      ['add_box', false],
+    ]);
+    const doc = empty();
+    expect(execute(doc, 'move_entities', { ids: ['ghost'], delta: [1, 0, 0] }).document).toBe(doc);
+    const measured = execute(twoBoxes, 'measure_distance', { fromId: twoBoxes.order[0], toId: twoBoxes.order[1] });
+    expect(measured.document).toBe(twoBoxes);
+    let p = run(doc, 'set_parameter', { name: 'w', expression: '10' });
+    expect([p.featureHistory.length, p.parameters['w']?.value]).toEqual([0, 10]);
+    p = run(p, 'set_parameter', { name: 'w', expression: '20' });
+    expect([p.featureHistory.length, p.parameters['w']?.value]).toEqual([0, 20]);
+    p = run(p, 'delete_parameter', { name: 'w' });
+    expect([p.featureHistory.length, p.parameters['w']]).toEqual([0, undefined]);
+    expectPure(doc, () => execute(doc, 'add_box', { size: [1, 1, 1] }));
+  });
 
-describe('=expr param resolution in replay_history', () => {
-  // ── AC1: headline round-trip ─────────────────────────────────────────────
+  it.each<[string, object, string]>([
+    ['replay_history', {}, 'empty'],
+    ['set_step_suppressed', { stepId: 'ghost', suppressed: true }, 'ghost'],
+    ['edit_step_params', { stepId: 'ghost', params: {} }, 'ghost'],
+    ['reorder_step', { stepId: 'ghost', newIndex: 0 }, 'ghost'],
+    ['delete_step', { stepId: 'ghost' }, 'ghost'],
+    ['insert_step', { afterStepId: 'ghost', name: 'add_box', params: { size: [1, 1, 1] } }, 'ghost'],
+  ])('%s on an empty/unknown target is a no-op', (name, p, summary) => {
+    const doc = empty();
+    expectNoOp(execute(doc, name, p), doc, summary);
+  });
 
-  it('AC1 round-trip: =expr param in a step reflects updated parameter after replay', () => {
-    // Step 1: set a parameter `side = 4`
-    // Step 2: add_box with size stored as `=expr` strings — done via insert_step so
-    //         the stored params literally contain `=side` strings.
-    // Step 3: set_parameter changes `side` to 8
-    // Step 4: replay_history → box size should be [8, 8, 8]
+  it('replay_history regenerates every step without appending one', () => {
+    const r = execute(twoBoxes, 'replay_history', {});
+    expect(Object.keys(r.document.entities)).toHaveLength(2);
+    expect(r.document.featureHistory).toHaveLength(2);
+    expect(r.summary).toContain('2 step');
+  });
 
-    let doc = createEmptyDocument();
+  it('set_step_suppressed drops / restores the step entity without appending', () => {
+    const r = execute(twoBoxes, 'set_step_suppressed', { stepId: s0, suppressed: true });
+    expect(Object.keys(r.document.entities)).toHaveLength(1);
+    expect(r.document.featureHistory.map((s) => s.suppressed)).toEqual([true, false]);
+    const restored = run(r.document, 'set_step_suppressed', { stepId: s0, suppressed: false });
+    expect(Object.keys(restored.entities)).toHaveLength(2);
+    expect(restored.featureHistory[0]!.suppressed).toBe(false);
+  });
 
-    // Set the parameter. set_parameter is metaHistory (parameters are document
-    // INPUT state, not a geometry-recipe step) so it does NOT append to
-    // featureHistory — its current value is carried into replay.
-    doc = execute(doc, 'set_parameter', { name: 'side', expression: '4' }).document;
+  it('edit_step_params regenerates with new params without appending', () => {
+    const r = execute(twoBoxes, 'edit_step_params', { stepId: s0, params: { size: [20, 20, 20] } });
+    expect(Object.keys(r.document.entities)).toHaveLength(2);
+    expect(r.document.entities[r.document.order[0]!]).toMatchObject({ size: [20, 20, 20] });
+    expect(r.document.featureHistory[0]!.params).toEqual({ size: [20, 20, 20] });
+    expect(r.document.featureHistory).toHaveLength(2);
+  });
 
-    // Insert a step whose params reference the parameter via =expr.
-    // We use insert_step (a meta-command) to plant literal =expr strings.
-    doc = execute(doc, 'insert_step', {
+  it('reorder_step moves a step and regenerates; same index is a no-op', () => {
+    const doc = chain(['add_box', { size: [1, 1, 1] }], ['add_cylinder', { radius: 2, height: 4 }]);
+    const [a, b] = doc.featureHistory.map((s) => s.id);
+    const r = execute(doc, 'reorder_step', { stepId: a, newIndex: 1 });
+    expect(r.document.featureHistory.map((s) => s.id)).toEqual([b, a]);
+    expect(Object.keys(r.document.entities)).toHaveLength(2);
+    expectNoOp(execute(doc, 'reorder_step', { stepId: a, newIndex: 0 }), doc);
+  });
+
+  it('delete_step removes a step and its entity', () => {
+    const r = execute(twoBoxes, 'delete_step', { stepId: s0 });
+    expect(r.document.featureHistory.map((s) => s.id)).toEqual([s1]);
+    expect(Object.keys(r.document.entities)).toHaveLength(1);
+    expect(r.summary).toContain(s0);
+  });
+
+  it('insert_step appends or inserts after a step; unknown commands are kept but skipped', () => {
+    const appended = run(twoBoxes, 'insert_step', { name: 'add_box', params: { size: [5, 5, 5] } });
+    expect([appended.featureHistory.length, Object.keys(appended.entities).length]).toEqual([3, 3]);
+    const inserted = run(twoBoxes, 'insert_step', { afterStepId: s0, name: 'add_sphere', params: { radius: 3 } });
+    expect(steps(inserted)).toEqual(['add_box', 'add_sphere', 'add_box']);
+    expect(Object.keys(inserted.entities)).toHaveLength(3);
+    const unknown = run(empty(), 'insert_step', { name: 'nonexistent_command_xyz', params: {} });
+    expect(steps(unknown)).toEqual(['nonexistent_command_xyz']);
+    expect(unknown.entities).toEqual({});
+  });
+
+  it('suppressing the creating step makes a downstream move a silent no-op; history round-trips', () => {
+    const doc = chain(['add_box', { size: [1, 1, 1], position: [0, 0, 0] }]);
+    const moved = run(doc, 'move_entities', { ids: [doc.order[0]], delta: [5, 0, 0] });
+    expect(moved.featureHistory).toHaveLength(2);
+    expect(run(moved, 'set_step_suppressed', { stepId: moved.featureHistory[0]!.id, suppressed: true }).entities).toEqual({});
+    expect(steps(deserializeDocument(serializeDocument(doc)))).toEqual(['add_box']);
+  });
+});
+
+const STEEL = { name: 'steel', density: 0.00785, color: '#808080', metalness: 0.9, roughness: 0.3 };
+const ALU = { name: 'aluminium', density: 0.0027, color: '#c0c0c0', metalness: 0.8, roughness: 0.2 };
+
+describe('=expr params in replay_history', () => {
+  const only = (doc: CadDocument): Loose => {
+    expect(doc.order).toHaveLength(1);
+    return doc.entities[doc.order[0]!] as Loose;
+  };
+
+  it('=expr step params follow parameter changes on replay (size and position)', () => {
+    let doc = run(params(['side', '4'], ['xpos', '15']), 'insert_step', {
       name: 'add_box',
-      params: { size: ['=side', '=side', '=side'] },
+      params: { size: ['=side', '=side', '=side'], position: ['=xpos', 0, 0] },
       label: 'Parametric box',
-    }).document;
-
-    // Verify the box was created with resolved size [4, 4, 4].
-    expect(Object.keys(doc.entities)).toHaveLength(1);
-    const boxId = doc.order[0]!;
-    const box = doc.entities[boxId]!;
-    expect(box.kind).toBe('box');
-    if (box.kind === 'box') {
-      expect(box.size).toEqual([4, 4, 4]);
-    }
-
-    // Now change the parameter.
-    doc = execute(doc, 'set_parameter', { name: 'side', expression: '8' }).document;
-
-    // Replay — the =expr params must be re-evaluated against the new `side = 8`.
-    const result = execute(doc, 'replay_history', {});
-    expect(result.affected.length).toBeGreaterThan(0);
-
-    // Find the box entity (there must be exactly one entity).
-    const entityIds = Object.keys(result.document.entities);
-    expect(entityIds).toHaveLength(1);
-    const updatedBox = result.document.entities[entityIds[0]!]!;
-    expect(updatedBox.kind).toBe('box');
-    if (updatedBox.kind === 'box') {
-      expect(updatedBox.size).toEqual([8, 8, 8]);
-    }
-    expect(result.summary).toContain('replayed');
+    });
+    expect(only(doc)).toMatchObject({ kind: 'box', size: [4, 4, 4], position: [15, 0, 0] });
+    doc = run(run(doc, 'set_parameter', { name: 'side', expression: '8' }), 'set_parameter', { name: 'xpos', expression: '30' });
+    const r = execute(doc, 'replay_history', {});
+    expect(r.affected.length).toBeGreaterThan(0);
+    expect(only(r.document)).toMatchObject({ kind: 'box', size: [8, 8, 8], position: [30, 0, 0] });
+    expect(r.summary).toContain('replayed');
+    expect(r.summary).not.toContain('Unresolved');
   });
 
-  // ── AC2: reproducibility ─────────────────────────────────────────────────
-
-  it('AC2: replaying featureHistory from empty reproduces entities deterministically', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [2, 3, 4] }).document;
-    doc = execute(doc, 'add_sphere', { radius: 5 }).document;
-    expect(Object.keys(doc.entities)).toHaveLength(2);
-
-    // Replay should reproduce the same entity count and kinds.
-    const result = execute(doc, 'replay_history', {});
-    expect(Object.keys(result.document.entities)).toHaveLength(2);
-    const kinds = Object.values(result.document.entities)
-      .map((e) => e.kind)
-      .sort();
-    expect(kinds).toEqual(['box', 'sphere']);
+  it('replay reproduces entities deterministically, purely; unresolved =expr is reported', () => {
+    const doc = chain(['add_box', { size: [2, 3, 4] }], ['add_sphere', { radius: 5 }]);
+    const r = execute(doc, 'replay_history', {});
+    expect(
+      Object.values(r.document.entities)
+        .map((e) => e.kind)
+        .sort(),
+    ).toEqual(['box', 'sphere']);
+    expectPure(doc, () => execute(doc, 'replay_history', {}));
+    const bad = execute(run(empty(), 'insert_step', { name: 'add_box', params: { size: ['=nonexistent', 2, 2] } }), 'replay_history', {});
+    expect(bad.summary).toContain('Unresolved');
+    expect(bad.summary).toContain('nonexistent');
+    expect(bad.document).toBeDefined();
   });
 
-  // ── AC3 / purity ─────────────────────────────────────────────────────────
-
-  it('purity: resolveStepParams does not mutate the input params', () => {
-    const original = { size: ['=width', 1, 2], label: 'test' };
-    const env = { width: 10 };
-    const snapshot = JSON.stringify(original);
-    resolveStepParams(original, env);
-    expect(JSON.stringify(original)).toBe(snapshot);
+  it.each<[Record<string, unknown>, Record<string, number>, Record<string, unknown>, string[]?]>([
+    [{ radius: 5 }, {}, { radius: 5 }],
+    [{ label: 'hello' }, {}, { label: 'hello' }],
+    [{ radius: '=r' }, { r: 7 }, { radius: 7 }],
+    [{ size: '=width * 2' }, { width: 5 }, { size: 10 }],
+    [{ position: ['=x', 0, '=z'] }, { x: 3, z: 7 }, { position: [3, 0, 7] }],
+    [{ outer: { inner: '=val' } }, { val: 42 }, { outer: { inner: 42 } }],
+    [{ flag: true, nothing: null }, {}, { flag: true, nothing: null }],
+    [{ radius: '=missing_param' }, {}, { radius: '=missing_param' }, ['radius']],
+    [{ size: '=width +' }, { width: 5 }, { size: '=width +' }, ['size']],
+    [{ size: ['=a', '=b', '=c'] }, { a: 1 }, { size: [1, '=b', '=c'] }, ['size[1]', 'size[2]']],
+  ])('resolveStepParams(%j, %j)', (input, env, resolved, errorPaths = []) => {
+    const snapshot = JSON.stringify(input);
+    const r = resolveStepParams(input, env);
+    expect(JSON.stringify(input)).toBe(snapshot);
+    expect(r.resolved).toEqual(resolved);
+    expect(r.errors.map((e) => e.path).sort()).toEqual(errorPaths);
+    if (input['radius'] === '=missing_param')
+      expect(r.errors[0]).toMatchObject({ expression: '=missing_param', reason: expect.stringContaining('unknown parameter') });
   });
 
-  it('purity: replay_history is pure — input doc is not mutated', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'replay_history', {});
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  // ── resolveStepParams unit tests ─────────────────────────────────────────
-
-  it('resolveStepParams: plain number value passes through unchanged', () => {
-    const { resolved, errors } = resolveStepParams({ radius: 5 }, {});
-    expect(errors).toHaveLength(0);
-    expect((resolved as { radius: number }).radius).toBe(5);
-  });
-
-  it('resolveStepParams: plain string (no =) passes through unchanged', () => {
-    const { resolved, errors } = resolveStepParams({ label: 'hello' }, {});
-    expect(errors).toHaveLength(0);
-    expect((resolved as { label: string }).label).toBe('hello');
-  });
-
-  it('resolveStepParams: =expr string is replaced by evaluated number', () => {
-    const { resolved, errors } = resolveStepParams({ radius: '=r' }, { r: 7 });
-    expect(errors).toHaveLength(0);
-    expect((resolved as { radius: number }).radius).toBe(7);
-  });
-
-  it('resolveStepParams: =expr arithmetic expression is evaluated correctly', () => {
-    const { resolved, errors } = resolveStepParams({ size: '=width * 2' }, { width: 5 });
-    expect(errors).toHaveLength(0);
-    expect((resolved as { size: number }).size).toBe(10);
-  });
-
-  it('resolveStepParams: array elements with =expr strings are resolved', () => {
-    const { resolved, errors } = resolveStepParams({ position: ['=x', 0, '=z'] }, { x: 3, z: 7 });
-    expect(errors).toHaveLength(0);
-    expect((resolved as { position: number[] }).position).toEqual([3, 0, 7]);
-  });
-
-  it('resolveStepParams: nested object keys are resolved recursively', () => {
-    const { resolved, errors } = resolveStepParams({ outer: { inner: '=val' } }, { val: 42 });
-    expect(errors).toHaveLength(0);
-    expect((resolved as { outer: { inner: number } }).outer.inner).toBe(42);
-  });
-
-  it('resolveStepParams: unknown parameter reference → error recorded, original string kept', () => {
-    const { resolved, errors } = resolveStepParams({ radius: '=missing_param' }, {});
-    expect(errors).toHaveLength(1);
-    expect(errors[0]!.expression).toBe('=missing_param');
-    expect(errors[0]!.reason).toContain('unknown parameter');
-    // The original =expr string is kept so the caller knows which param failed.
-    expect((resolved as { radius: string }).radius).toBe('=missing_param');
-  });
-
-  it('resolveStepParams: malformed =expr → error recorded, original string kept', () => {
-    const { resolved, errors } = resolveStepParams({ size: '=width +' }, { width: 5 });
-    expect(errors).toHaveLength(1);
-    expect(errors[0]!.path).toBe('size');
-    expect((resolved as { size: string }).size).toBe('=width +');
-  });
-
-  it('resolveStepParams: boolean and null values pass through unchanged', () => {
-    const { resolved, errors } = resolveStepParams({ flag: true, nothing: null }, {});
-    expect(errors).toHaveLength(0);
-    const r = resolved as { flag: boolean; nothing: null };
-    expect(r.flag).toBe(true);
-    expect(r.nothing).toBeNull();
-  });
-
-  it('resolveStepParams: error path is correct for array element', () => {
-    const { errors } = resolveStepParams(
-      { size: ['=a', '=b', '=c'] },
-      { a: 1 }, // b and c are missing
-    );
-    expect(errors).toHaveLength(2);
-    const paths = errors.map((e) => e.path).sort();
-    expect(paths).toEqual(['size[1]', 'size[2]']);
-  });
-
-  // ── buildParamEnv unit tests ─────────────────────────────────────────────
-
-  it('buildParamEnv: includes only parameters without errors', () => {
-    const parameters = {
+  it('buildParamEnv keeps only error-free parameters', () => {
+    const env = buildParamEnv({
       width: { name: 'width', expression: '10', value: 10 },
       bad: { name: 'bad', expression: '=ghost', value: 0, error: 'unknown parameter: ghost' },
-    };
-    const env = buildParamEnv(parameters);
-    expect(env['width']).toBe(10);
-    expect('bad' in env).toBe(false);
-  });
-
-  it('buildParamEnv: returns empty object when no parameters', () => {
-    const env = buildParamEnv({});
-    expect(Object.keys(env)).toHaveLength(0);
-  });
-
-  // ── replay with unresolvable =expr: graceful, summary reports it ─────────
-
-  it('replay_history reports unresolved =expr in summary without throwing', () => {
-    let doc = createEmptyDocument();
-    // Insert a step with an =expr referencing a parameter that does not exist.
-    doc = execute(doc, 'insert_step', {
-      name: 'add_box',
-      params: { size: ['=nonexistent', 2, 2] },
-    }).document;
-
-    const result = execute(doc, 'replay_history', {});
-    // Must not throw; must surface the warning in summary.
-    expect(result.summary).toContain('Unresolved');
-    expect(result.summary).toContain('nonexistent');
-    // The add_box guard catches the unresolved =expr string
-    // (non-finite/non-numeric size → graceful no-op). The contract under test here is the
-    // REPLAY level: it completes without throwing and reports the failure.
-    expect(result.document).toBeDefined();
-  });
-
-  // ── =expr in nested position array (e.g. position: ["=x", 0, 0]) ─────────
-
-  it('=expr in position array is resolved and applied to entity position', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'set_parameter', { name: 'xpos', expression: '15' }).document;
-
-    doc = execute(doc, 'insert_step', {
-      name: 'add_box',
-      params: { size: [1, 1, 1], position: ['=xpos', 0, 0] },
-    }).document;
-
-    const entityIds = Object.keys(doc.entities);
-    expect(entityIds).toHaveLength(1);
-    const entity = doc.entities[entityIds[0]!]!;
-    expect(entity.position).toEqual([15, 0, 0]);
-
-    // Change the parameter and replay — position must update.
-    doc = execute(doc, 'set_parameter', { name: 'xpos', expression: '30' }).document;
-    const result = execute(doc, 'replay_history', {});
-
-    const updatedIds = Object.keys(result.document.entities);
-    expect(updatedIds).toHaveLength(1);
-    expect(result.document.entities[updatedIds[0]!]!.position).toEqual([30, 0, 0]);
-    expect(result.summary).not.toContain('Unresolved');
-  });
-
-  // ── create_configuration ─────────────────────────────────────────────────
-
-  it('create_configuration stores a new configuration in the document', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'create_configuration', {
-      name: 'small',
-      parameterValues: { w: '10' },
     });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document.configurations['small']).toBeDefined();
-    expect(result.document.configurations['small']!.name).toBe('small');
-    expect(result.document.configurations['small']!.parameterValues).toEqual({ w: '10' });
-    expect(result.summary).toContain('small');
-    expect(result.summary).toContain('w');
-  });
-
-  it('create_configuration replaces an existing configuration with the same name', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'create_configuration', {
-      name: 'cfg',
-      parameterValues: { w: '10' },
-    }).document;
-    const result = execute(doc, 'create_configuration', {
-      name: 'cfg',
-      parameterValues: { w: '99' },
-    });
-    expect(result.document.configurations['cfg']!.parameterValues).toEqual({ w: '99' });
-  });
-
-  it('create_configuration is pure — input document is not mutated', () => {
-    const doc = createEmptyDocument();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'create_configuration', { name: 'small', parameterValues: { w: '10' } });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('create_configuration with blank name is a no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'create_configuration', { name: '', parameterValues: { w: '10' } });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('non-empty');
-  });
-
-  it('create_configuration with non-object parameterValues is a no-op', () => {
-    const doc = createEmptyDocument();
-    // Pass an array instead of a plain object.
-    const result = execute(doc, 'create_configuration', {
-      name: 'bad',
-      parameterValues: ['w', '10'] as unknown as Record<string, string>,
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('parameterValues');
-  });
-
-  it('create_configuration with non-string value in parameterValues is a no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'create_configuration', {
-      name: 'bad',
-      parameterValues: { w: 42 as unknown as string },
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain("parameterValues['w']");
-  });
-
-  // ── activate_configuration ───────────────────────────────────────────────
-
-  it('activate_configuration AC1 round-trip: small→10³ then large→40³', () => {
-    let doc = createEmptyDocument();
-
-    // Define parameter w and a box whose size uses =w.
-    doc = execute(doc, 'set_parameter', { name: 'w', expression: '10' }).document;
-    doc = execute(doc, 'insert_step', {
-      name: 'add_box',
-      params: { size: ['=w', '=w', '=w'] },
-    }).document;
-
-    // Create two configurations.
-    doc = execute(doc, 'create_configuration', {
-      name: 'small',
-      parameterValues: { w: '10' },
-    }).document;
-    doc = execute(doc, 'create_configuration', {
-      name: 'large',
-      parameterValues: { w: '40' },
-    }).document;
-
-    // Activate small — box should be 10×10×10.
-    const smallResult = execute(doc, 'activate_configuration', { name: 'small' });
-    const smallIds = Object.keys(smallResult.document.entities);
-    expect(smallIds).toHaveLength(1);
-    // @ts-expect-error narrowing through discriminated union not needed in test
-    expect(smallResult.document.entities[smallIds[0]!]!.size).toEqual([10, 10, 10]);
-    expect(smallResult.summary).toContain('small');
-
-    // Activate large — box should be 40×40×40.
-    const largeResult = execute(doc, 'activate_configuration', { name: 'large' });
-    const largeIds = Object.keys(largeResult.document.entities);
-    expect(largeIds).toHaveLength(1);
-    // @ts-expect-error narrowing through discriminated union not needed in test
-    expect(largeResult.document.entities[largeIds[0]!]!.size).toEqual([40, 40, 40]);
-    expect(largeResult.summary).toContain('large');
-  });
-
-  it('activate_configuration updates doc.parameters to the config values', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'set_parameter', { name: 'w', expression: '5' }).document;
-    doc = execute(doc, 'create_configuration', {
-      name: 'big',
-      parameterValues: { w: '100' },
-    }).document;
-
-    const result = execute(doc, 'activate_configuration', { name: 'big' });
-    expect(result.document.parameters['w']!.expression).toBe('100');
-    expect(result.document.parameters['w']!.value).toBe(100);
-  });
-
-  it('activate_configuration preserves featureHistory unchanged', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'set_parameter', { name: 'w', expression: '5' }).document;
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    doc = execute(doc, 'create_configuration', {
-      name: 'v',
-      parameterValues: { w: '20' },
-    }).document;
-
-    const historyBefore = JSON.stringify(doc.featureHistory);
-    const result = execute(doc, 'activate_configuration', { name: 'v' });
-    expect(JSON.stringify(result.document.featureHistory)).toBe(historyBefore);
-  });
-
-  it('activate_configuration is pure — input document is not mutated', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'set_parameter', { name: 'w', expression: '5' }).document;
-    doc = execute(doc, 'create_configuration', {
-      name: 'v',
-      parameterValues: { w: '20' },
-    }).document;
-
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'activate_configuration', { name: 'v' });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('activate_configuration with unknown config name is a graceful no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'activate_configuration', { name: 'ghost' });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('ghost');
-    expect(result.summary).toContain('not found');
-  });
-
-  it('activate_configuration with blank name is a no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'activate_configuration', { name: '' });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('non-empty');
-  });
-
-  it('activate_configuration referencing unknown parameter surfaces note in summary without throwing', () => {
-    let doc = createEmptyDocument();
-    // Config references "phantom" which does not exist in doc.parameters.
-    doc = execute(doc, 'create_configuration', {
-      name: 'test',
-      parameterValues: { phantom: '99' },
-    }).document;
-
-    const result = execute(doc, 'activate_configuration', { name: 'test' });
-    // Must not throw; must report the new parameter in the summary.
-    expect(result.document).toBeDefined();
-    expect(result.summary).toContain('phantom');
-    // The phantom parameter should have been created.
-    expect(result.document.parameters['phantom']).toBeDefined();
-    expect(result.document.parameters['phantom']!.value).toBe(99);
-  });
-
-  // ── persistence round-trip includes configurations ───────────────────────
-
-  it('persistence round-trip: configurations survive serialize/deserialize', async () => {
-    const { serializeDocument, deserializeDocument } =
-      await import('@core/commands/persistence/serialization');
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'create_configuration', {
-      name: 'large',
-      parameterValues: { w: '40', h: '20' },
-    }).document;
-
-    const json = serializeDocument(doc);
-    const loaded = deserializeDocument(json);
-    expect(loaded.configurations['large']).toBeDefined();
-    expect(loaded.configurations['large']!.parameterValues).toEqual({ w: '40', h: '20' });
-  });
-
-  it('persistence: deserializeDocument defaults configurations to {} for old docs without it', async () => {
-    const { deserializeDocument } = await import('@core/commands/persistence/serialization');
-    // Simulate an old document envelope without a configurations field.
-    const oldDoc = {
-      format: 'llull-document',
-      version: 1,
-      document: {
-        entities: {},
-        order: [],
-        layers: {
-          'layer-default': { id: 'layer-default', name: 'Layer 0', visible: true, locked: false },
-        },
-        layerOrder: ['layer-default'],
-        selection: [],
-        camera: { target: [0, 0, 0], azimuth: 0, polar: 0, distance: 10 },
-        // no configurations field
-      },
-    };
-    const loaded = deserializeDocument(JSON.stringify(oldDoc));
-    expect(loaded.configurations).toEqual({});
-  });
-
-  // ── create_material ───────────────────────────────────────────────────────
-
-  it('create_material: happy path — adds material to doc.materials', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'create_material', {
-      name: 'steel',
-      density: 0.00785,
-      color: '#808080',
-      metalness: 0.9,
-      roughness: 0.3,
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document.materials['steel']).toBeDefined();
-    expect(result.document.materials['steel']!.density).toBe(0.00785);
-    expect(result.document.materials['steel']!.color).toBe('#808080');
-    expect(result.document.materials['steel']!.metalness).toBe(0.9);
-    expect(result.document.materials['steel']!.roughness).toBe(0.3);
-    expect(result.summary).toContain('steel');
-    expect(result.summary).toContain('created');
-  });
-
-  it('create_material: replaces existing material with same name', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'create_material', {
-      name: 'steel',
-      density: 0.00785,
-      color: '#808080',
-      metalness: 0.9,
-      roughness: 0.3,
-    }).document;
-    const result = execute(doc, 'create_material', {
-      name: 'steel',
-      density: 0.008,
-      color: '#a0a0a0',
-      metalness: 1.0,
-      roughness: 0.2,
-    });
-    expect(result.document.materials['steel']!.density).toBe(0.008);
-    expect(result.summary).toContain('replaced');
-  });
-
-  it('create_material: failure — blank name', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'create_material', {
-      name: '',
-      density: 0.00785,
-      color: '#808080',
-      metalness: 0.9,
-      roughness: 0.3,
-    });
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-    expect(result.summary).toContain('non-empty');
-  });
-
-  it('create_material: failure — density <= 0', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'create_material', {
-      name: 'bad',
-      density: -1,
-      color: '#808080',
-      metalness: 0.5,
-      roughness: 0.5,
-    });
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-    expect(result.summary).toContain('density');
-  });
-
-  it('create_material: failure — density = 0', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'create_material', {
-      name: 'bad',
-      density: 0,
-      color: '#808080',
-      metalness: 0.5,
-      roughness: 0.5,
-    });
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-  });
-
-  it('create_material: failure — metalness out of range', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'create_material', {
-      name: 'bad',
-      density: 0.001,
-      color: '#808080',
-      metalness: 1.5,
-      roughness: 0.5,
-    });
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('metalness');
-  });
-
-  it('create_material: failure — roughness out of range', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'create_material', {
-      name: 'bad',
-      density: 0.001,
-      color: '#808080',
-      metalness: 0.5,
-      roughness: -0.1,
-    });
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('roughness');
-  });
-
-  it('create_material: failure — invalid hex color', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'create_material', {
-      name: 'bad',
-      density: 0.001,
-      color: 'not-a-color',
-      metalness: 0.5,
-      roughness: 0.5,
-    });
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('color');
-  });
-
-  it('create_material: failure — hex color wrong length (3 digits)', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'create_material', {
-      name: 'bad',
-      density: 0.001,
-      color: '#abc',
-      metalness: 0.5,
-      roughness: 0.5,
-    });
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('color');
-  });
-
-  it('create_material is pure — input doc not mutated', () => {
-    const doc = createEmptyDocument();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'create_material', {
-      name: 'steel',
-      density: 0.00785,
-      color: '#808080',
-      metalness: 0.9,
-      roughness: 0.3,
-    });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  // ── assign_material ───────────────────────────────────────────────────────
-
-  it('assign_material: happy path — single entity', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'create_material', {
-      name: 'aluminium',
-      density: 0.0027,
-      color: '#c0c0c0',
-      metalness: 0.8,
-      roughness: 0.2,
-    }).document;
-    const boxResult = execute(doc, 'add_box', { size: [10, 10, 10] });
-    doc = boxResult.document;
-    const boxId = boxResult.affected[0]!;
-
-    const result = execute(doc, 'assign_material', {
-      materialName: 'aluminium',
-      entityIds: [boxId],
-    });
-    expect(result.affected).toEqual([boxId]);
-    expect(result.document.entities[boxId]!.materialId).toBe('aluminium');
-    expect(result.summary).toContain('aluminium');
-    expect(result.summary).toContain(boxId);
-  });
-
-  it('assign_material: happy path — multiple entities', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'create_material', {
-      name: 'steel',
-      density: 0.00785,
-      color: '#808080',
-      metalness: 0.9,
-      roughness: 0.3,
-    }).document;
-    const r1 = execute(doc, 'add_box', { size: [5, 5, 5] });
-    doc = r1.document;
-    const r2 = execute(doc, 'add_box', { size: [5, 5, 5] });
-    doc = r2.document;
-    const id1 = r1.affected[0]!;
-    const id2 = r2.affected[0]!;
-
-    const result = execute(doc, 'assign_material', {
-      materialName: 'steel',
-      entityIds: [id1, id2],
-    });
-    expect(result.affected).toHaveLength(2);
-    expect(result.document.entities[id1]!.materialId).toBe('steel');
-    expect(result.document.entities[id2]!.materialId).toBe('steel');
-  });
-
-  it('assign_material: partial success — unknown ids are skipped, valid ids assigned', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'create_material', {
-      name: 'steel',
-      density: 0.00785,
-      color: '#808080',
-      metalness: 0.9,
-      roughness: 0.3,
-    }).document;
-    const r = execute(doc, 'add_box', { size: [5, 5, 5] });
-    doc = r.document;
-    const validId = r.affected[0]!;
-
-    const result = execute(doc, 'assign_material', {
-      materialName: 'steel',
-      entityIds: [validId, 'ghost-id'],
-    });
-    expect(result.affected).toEqual([validId]);
-    expect(result.document.entities[validId]!.materialId).toBe('steel');
-    expect(result.summary).toContain('ghost-id');
-  });
-
-  it('assign_material: failure — unknown material', () => {
-    let doc = createEmptyDocument();
-    const r = execute(doc, 'add_box', { size: [5, 5, 5] });
-    doc = r.document;
-    const boxId = r.affected[0]!;
-
-    const result = execute(doc, 'assign_material', {
-      materialName: 'nonexistent',
-      entityIds: [boxId],
-    });
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-    expect(result.summary).toContain('nonexistent');
-    expect(result.summary).toContain('not found');
-  });
-
-  it('assign_material: failure — all entity ids unknown', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'create_material', {
-      name: 'steel',
-      density: 0.00785,
-      color: '#808080',
-      metalness: 0.9,
-      roughness: 0.3,
-    }).document;
-
-    const result = execute(doc, 'assign_material', {
-      materialName: 'steel',
-      entityIds: ['ghost-1', 'ghost-2'],
-    });
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-    expect(result.summary).toContain('ghost-1');
-  });
-
-  it('assign_material: failure — empty entityIds array', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'create_material', {
-      name: 'steel',
-      density: 0.00785,
-      color: '#808080',
-      metalness: 0.9,
-      roughness: 0.3,
-    }).document;
-
-    const result = execute(doc, 'assign_material', {
-      materialName: 'steel',
-      entityIds: [],
-    });
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-  });
-
-  it('assign_material: failure — blank materialName', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'assign_material', {
-      materialName: '',
-      entityIds: ['anything'],
-    });
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-  });
-
-  it('assign_material is pure — input doc not mutated', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'create_material', {
-      name: 'steel',
-      density: 0.00785,
-      color: '#808080',
-      metalness: 0.9,
-      roughness: 0.3,
-    }).document;
-    const r = execute(doc, 'add_box', { size: [5, 5, 5] });
-    doc = r.document;
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'assign_material', { materialName: 'steel', entityIds: [r.affected[0]!] });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  // ── AC1: steel vs aluminium mass difference ────────────────────────────────
-
-  it('AC1: mass_properties uses assigned material density — steel vs aluminium on identical boxes', () => {
-    let doc = createEmptyDocument();
-
-    // Define two materials with different densities.
-    doc = execute(doc, 'create_material', {
-      name: 'steel',
-      density: 0.00785,
-      color: '#808080',
-      metalness: 0.9,
-      roughness: 0.3,
-    }).document;
-    doc = execute(doc, 'create_material', {
-      name: 'aluminium',
-      density: 0.0027,
-      color: '#c0c0c0',
-      metalness: 0.8,
-      roughness: 0.2,
-    }).document;
-
-    // Create two identical boxes.
-    const r1 = execute(doc, 'add_box', { size: [10, 10, 10] });
-    doc = r1.document;
-    const r2 = execute(doc, 'add_box', { size: [10, 10, 10] });
-    doc = r2.document;
-    const steelId = r1.affected[0]!;
-    const alumId = r2.affected[0]!;
-
-    // Assign different materials.
-    doc = execute(doc, 'assign_material', { materialName: 'steel', entityIds: [steelId] }).document;
-    doc = execute(doc, 'assign_material', {
-      materialName: 'aluminium',
-      entityIds: [alumId],
-    }).document;
-
-    // Compute mass — pass a dummy density; should be overridden by the assigned material.
-    const steelResult = execute(doc, 'mass_properties', { entityId: steelId, density: 1 });
-    const alumResult = execute(doc, 'mass_properties', { entityId: alumId, density: 1 });
-
-    const steelData = steelResult.data as { mass: number; density: number; volume: number };
-    const alumData = alumResult.data as { mass: number; density: number; volume: number };
-
-    // Volumes must be equal (same box size).
-    expect(steelData.volume).toBeCloseTo(alumData.volume, 6);
-
-    // Densities must reflect the assigned materials.
-    expect(steelData.density).toBe(0.00785);
-    expect(alumData.density).toBe(0.0027);
-
-    // Masses must differ proportionally to the density ratio.
-    const ratio = steelData.mass / alumData.mass;
-    expect(ratio).toBeCloseTo(0.00785 / 0.0027, 4);
-
-    // Steel must be heavier.
-    expect(steelData.mass).toBeGreaterThan(alumData.mass);
-
-    // Summary must mention material source.
-    expect(steelResult.summary).toContain("material 'steel'");
-    expect(alumResult.summary).toContain("material 'aluminium'");
-  });
-
-  // ── mass_properties back-compat: explicit density param still works ────────
-
-  it('mass_properties back-compat: explicit density param used when no material assigned', () => {
-    let doc = createEmptyDocument();
-    const r = execute(doc, 'add_box', { size: [10, 10, 10] });
-    doc = r.document;
-    const boxId = r.affected[0]!;
-
-    const result = execute(doc, 'mass_properties', { entityId: boxId, density: 0.00785 });
-    expect(result.data).toBeDefined();
-    const data = result.data as { mass: number; density: number };
-    expect(data.density).toBe(0.00785);
-    expect(data.mass).toBeCloseTo(1000 * 0.00785, 6);
-    // density source should say 'param'
-    expect(result.summary).toContain('param');
-  });
-
-  it('mass_properties: density param still required and validated even when material is assigned', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'create_material', {
-      name: 'steel',
-      density: 0.00785,
-      color: '#808080',
-      metalness: 0.9,
-      roughness: 0.3,
-    }).document;
-    const r = execute(doc, 'add_box', { size: [5, 5, 5] });
-    doc = r.document;
-    const boxId = r.affected[0]!;
-    doc = execute(doc, 'assign_material', { materialName: 'steel', entityIds: [boxId] }).document;
-
-    // Even though material is assigned, density param must be > 0.
-    const result = execute(doc, 'mass_properties', { entityId: boxId, density: -1 });
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-    expect(result.summary).toContain('density');
-  });
-
-  // ── persistence round-trip includes materials ────────────────────────────
-
-  it('persistence round-trip: materials survive serialize/deserialize', async () => {
-    const { serializeDocument, deserializeDocument } =
-      await import('@core/commands/persistence/serialization');
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'create_material', {
-      name: 'steel',
-      density: 0.00785,
-      color: '#808080',
-      metalness: 0.9,
-      roughness: 0.3,
-    }).document;
-    const r = execute(doc, 'add_box', { size: [5, 5, 5] });
-    doc = r.document;
-    doc = execute(doc, 'assign_material', {
-      materialName: 'steel',
-      entityIds: [r.affected[0]!],
-    }).document;
-
-    const json = serializeDocument(doc);
-    const loaded = deserializeDocument(json);
-
-    expect(loaded.materials['steel']).toBeDefined();
-    expect(loaded.materials['steel']!.density).toBe(0.00785);
-    expect(loaded.entities[r.affected[0]!]!.materialId).toBe('steel');
-  });
-
-  it('persistence: deserializeDocument defaults materials to {} for old docs without it', async () => {
-    const { deserializeDocument } = await import('@core/commands/persistence/serialization');
-    const oldDoc = {
-      format: 'llull-document',
-      version: 1,
-      document: {
-        entities: {},
-        order: [],
-        layers: {
-          'layer-default': { id: 'layer-default', name: 'Layer 0', visible: true, locked: false },
-        },
-        layerOrder: ['layer-default'],
-        selection: [],
-        camera: { target: [0, 0, 0], azimuth: 0, polar: 0, distance: 10 },
-        // no materials field
-      },
-    };
-    const loaded = deserializeDocument(JSON.stringify(oldDoc));
-    expect(loaded.materials).toEqual({});
-  });
-
-  // ── registry 1:1 invariant still holds ───────────────────────────────────
-
-  it('toToolSchemas length equals listCommands length after configuration commands added', () => {
-    expect(toToolSchemas().length).toBe(listCommands().length);
+    expect(env).toEqual({ width: 10 });
+    expect(buildParamEnv({})).toEqual({});
   });
 });
 
-// Stable entity ids across replayHistory (id-remapping)
-
-describe('Q4 — replayHistory id-remapping', () => {
-  // ── AC1: move + assign_material + delete all survive replay ─────────────
-
-  it('AC1: move_entities applied to a replayed entity lands at the correct position', () => {
-    let doc = createEmptyDocument();
-    // Step 1: create box
-    const r1 = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
-    doc = r1.document;
-    const originalId = r1.affected[0]!;
-
-    // Step 2: move it
-    doc = execute(doc, 'move_entities', { ids: [originalId], delta: [5, 0, 0] }).document;
-
-    // Replay: the box gets a new id, but move must be remapped to the new id.
-    const replayed = execute(doc, 'replay_history', {});
-    const entities = Object.values(replayed.document.entities);
-    expect(entities).toHaveLength(1);
-    expect(entities[0]!.position).toEqual([5, 0, 0]);
+describe('configurations', () => {
+  it('create_configuration stores and replaces by name, purely', () => {
+    const doc = empty();
+    const r = execute(doc, 'create_configuration', { name: 'small', parameterValues: { w: '10' } });
+    expect(r.affected).toHaveLength(0);
+    expect(r.document.configurations['small']).toMatchObject({ name: 'small', parameterValues: { w: '10' } });
+    expect(r.summary).toContain('small');
+    expect(r.summary).toContain('w');
+    const replaced = run(r.document, 'create_configuration', { name: 'small', parameterValues: { w: '99' } });
+    expect(replaced.configurations['small']!.parameterValues).toEqual({ w: '99' });
+    expectPure(doc, () => execute(doc, 'create_configuration', { name: 'small', parameterValues: { w: '10' } }));
   });
 
-  it('AC1: assign_material survives replay — entity retains materialId', () => {
-    let doc = createEmptyDocument();
-    // Create material
-    doc = execute(doc, 'create_material', {
-      name: 'steel',
-      density: 0.00785,
-      color: '#808080',
-      metalness: 0.9,
-      roughness: 0.1,
-    }).document;
-    // Create box
-    const r1 = execute(doc, 'add_box', { size: [3, 3, 3] });
-    doc = r1.document;
-    const originalId = r1.affected[0]!;
-    // Assign material using the original id
-    doc = execute(doc, 'assign_material', {
-      materialName: 'steel',
-      entityIds: [originalId],
-    }).document;
-    // Verify live doc has the material assignment
-    expect(doc.entities[originalId]!.materialId).toBe('steel');
-
-    // Replay: box gets new id; assign_material step must be remapped to new id.
-    const replayed = execute(doc, 'replay_history', {});
-    const entities = Object.values(replayed.document.entities);
-    expect(entities).toHaveLength(1);
-    expect(entities[0]!.materialId).toBe('steel');
+  it.each([
+    ['create_configuration', { name: '', parameterValues: { w: '10' } }, 'non-empty'],
+    ['create_configuration', { name: 'bad', parameterValues: ['w', '10'] }, 'parameterValues'],
+    ['create_configuration', { name: 'bad', parameterValues: { w: 42 } }, "parameterValues['w']"],
+    ['activate_configuration', { name: 'ghost' }, 'ghost'],
+    ['activate_configuration', { name: 'ghost' }, 'not found'],
+    ['activate_configuration', { name: '' }, 'non-empty'],
+  ])('%s %j is a no-op', (name, p, summary) => {
+    const doc = empty();
+    expectNoOp(execute(doc, name, p), doc, summary);
   });
 
-  it('AC1: delete_entities step is faithfully replayed — entity is absent after replay', () => {
-    let doc = createEmptyDocument();
-    // Create two boxes
-    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = r1.document;
-    const r2 = execute(doc, 'add_box', { size: [2, 2, 2] });
-    doc = r2.document;
-    const idToDelete = r1.affected[0]!;
-
-    // Delete the first box
-    doc = execute(doc, 'delete_entities', { ids: [idToDelete] }).document;
-    expect(Object.keys(doc.entities)).toHaveLength(1);
-
-    // Replay: only 1 entity should remain (the deletion is faithfully applied)
-    const replayed = execute(doc, 'replay_history', {});
-    expect(Object.keys(replayed.document.entities)).toHaveLength(1);
-    const remaining = Object.values(replayed.document.entities)[0]!;
-    expect(remaining.kind).toBe('box');
+  it('activate_configuration regenerates, updates parameters, keeps history, purely', () => {
+    const doc = [
+      ['create_configuration', { name: 'small', parameterValues: { w: '10' } }],
+      ['create_configuration', { name: 'large', parameterValues: { w: '40' } }],
+    ].reduce(
+      (d, [n, p]) => run(d, n as string, p),
+      run(params(['w', '5']), 'insert_step', { name: 'add_box', params: { size: ['=w', '=w', '=w'] } }),
+    );
+    for (const [name, w] of [
+      ['small', 10],
+      ['large', 40],
+    ] as const) {
+      const r = execute(doc, 'activate_configuration', { name });
+      expect(Object.values(r.document.entities).map((e) => (e as Loose)['size'])).toEqual([[w, w, w]]);
+      expect(r.summary).toContain(name);
+      expect(r.document.parameters['w']).toMatchObject({ expression: String(w), value: w });
+    }
+    const boxed = run(run(doc, 'add_box', { size: [1, 1, 1] }), 'create_configuration', { name: 'v', parameterValues: { w: '20' } });
+    expect(JSON.stringify(run(boxed, 'activate_configuration', { name: 'v' }).featureHistory)).toBe(JSON.stringify(boxed.featureHistory));
+    expectPure(doc, () => execute(doc, 'activate_configuration', { name: 'large' }));
   });
 
-  it('AC1: combined — add_box → move → assign_material → delete another box all survive replay', () => {
-    let doc = createEmptyDocument();
-    // Create material
-    doc = execute(doc, 'create_material', {
-      name: 'aluminium',
-      density: 0.0027,
-      color: '#c0c0c0',
-      metalness: 0.8,
-      roughness: 0.2,
-    }).document;
-    // Add box A
-    const rA = execute(doc, 'add_box', { size: [4, 4, 4], position: [0, 0, 0] });
-    doc = rA.document;
-    const idA = rA.affected[0]!;
-    // Add box B
-    const rB = execute(doc, 'add_box', { size: [1, 1, 1], position: [10, 0, 0] });
-    doc = rB.document;
-    const idB = rB.affected[0]!;
-    // Move box A
-    doc = execute(doc, 'move_entities', { ids: [idA], delta: [3, 3, 0] }).document;
-    // Assign material to box A
-    doc = execute(doc, 'assign_material', {
-      materialName: 'aluminium',
-      entityIds: [idA],
-    }).document;
-    // Delete box B
-    doc = execute(doc, 'delete_entities', { ids: [idB] }).document;
-
-    // Live doc assertions
-    expect(Object.keys(doc.entities)).toHaveLength(1);
-    expect(doc.entities[idA]!.position).toEqual([3, 3, 0]);
-    expect(doc.entities[idA]!.materialId).toBe('aluminium');
-
-    // Replay assertions
-    const replayed = execute(doc, 'replay_history', {});
-    const replayedEntities = Object.values(replayed.document.entities);
-    expect(replayedEntities).toHaveLength(1);
-    expect(replayedEntities[0]!.position).toEqual([3, 3, 0]);
-    expect(replayedEntities[0]!.materialId).toBe('aluminium');
+  it('activate_configuration creates unknown parameters and notes them', () => {
+    const r = execute(
+      run(empty(), 'create_configuration', { name: 'test', parameterValues: { phantom: '99' } }),
+      'activate_configuration',
+      { name: 'test' },
+    );
+    expect(r.summary).toContain('phantom');
+    expect(r.document.parameters['phantom']!.value).toBe(99);
   });
 
-  // ── AC2: multi-id creation step (duplicate_entities) survives ─────────────
+  it('configurations and materials round-trip through persistence', () => {
+    const doc = run(
+      run(run(empty(), 'create_configuration', { name: 'large', parameterValues: { w: '40', h: '20' } }), 'create_material', STEEL),
+      'add_box',
+      { size: [5, 5, 5] },
+    );
+    const id = doc.order[0]!;
+    const loaded = deserializeDocument(serializeDocument(run(doc, 'assign_material', { materialName: 'steel', entityIds: [id] })));
+    expect(loaded.configurations['large']!.parameterValues).toEqual({ w: '40', h: '20' });
+    expect(loaded.materials['steel']!.density).toBe(0.00785);
+    expect(loaded.entities[id]!.materialId).toBe('steel');
+  });
+});
 
-  it('AC2: duplicate_entities — subsequent move of the duplicate survives replay', () => {
-    let doc = createEmptyDocument();
-    // Create original
-    const r1 = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
-    doc = r1.document;
-    const originalId = r1.affected[0]!;
-    // Duplicate it
-    const rDup = execute(doc, 'duplicate_entities', { ids: [originalId], offset: [5, 0, 0] });
-    doc = rDup.document;
-    const dupId = rDup.affected[0]!;
-    // Move the duplicate
-    doc = execute(doc, 'move_entities', { ids: [dupId], delta: [0, 3, 0] }).document;
+describe('materials', () => {
+  const withSteel = run(empty(), 'create_material', STEEL);
+  const { doc: steelBoxes, ids } = ((): { doc: CadDocument; ids: string[] } => {
+    const a = box(withSteel, [5, 5, 5]);
+    const b = box(a.doc, [5, 5, 5]);
+    return { doc: b.doc, ids: [a.id, b.id] };
+  })();
 
-    // Live doc: duplicate should be at [5, 3, 0]
-    expect(doc.entities[dupId]!.position).toEqual([5, 3, 0]);
-
-    // Replay: both entities present; moved duplicate is at [5, 3, 0]
-    const replayed = execute(doc, 'replay_history', {});
-    const replayedEntities = Object.values(replayed.document.entities);
-    expect(replayedEntities).toHaveLength(2);
-    const movedEntity = replayedEntities.find((e) => e.position[1] === 3);
-    expect(movedEntity).toBeDefined();
-    expect(movedEntity!.position).toEqual([5, 3, 0]);
+  it('create_material adds or replaces, purely', () => {
+    const doc = empty();
+    const r = execute(doc, 'create_material', STEEL);
+    expect(r.affected).toHaveLength(0);
+    expect(r.document.materials['steel']).toMatchObject({ density: 0.00785, color: '#808080', metalness: 0.9, roughness: 0.3 });
+    expect(r.summary).toContain('steel');
+    expect(r.summary).toContain('created');
+    const again = execute(r.document, 'create_material', { ...STEEL, density: 0.008, color: '#a0a0a0', metalness: 1.0, roughness: 0.2 });
+    expect(again.document.materials['steel']!.density).toBe(0.008);
+    expect(again.summary).toContain('replaced');
+    expectPure(doc, () => execute(doc, 'create_material', STEEL));
   });
 
-  // ── AC3: back-compat — steps without affected degrade gracefully ─────────
-
-  it('AC3: steps without affected field (old doc) replay without throwing', () => {
-    // Build a doc via execute (steps have affected), then strip affected from steps
-    // to simulate an old saved document.
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
-    doc = execute(doc, 'add_sphere', { radius: 3 }).document;
-
-    // Strip affected from all steps to simulate old format.
-    const strippedHistory = doc.featureHistory.map((step) => {
-      const { affected: _affected, ...rest } = step as typeof step & { affected?: unknown };
-      void _affected;
-      return rest;
-    });
-    const oldDoc = { ...doc, featureHistory: strippedHistory };
-
-    // Should not throw; should replay both entities (add_box + add_sphere don't
-    // reference prior ids so they succeed regardless of idMap).
-    const replayed = execute(oldDoc, 'replay_history', {});
-    expect(Object.keys(replayed.document.entities)).toHaveLength(2);
+  it.each<[object, string?]>([
+    [{ name: '' }, 'non-empty'],
+    [{ name: 'bad', density: -1 }, 'density'],
+    [{ name: 'bad', density: 0 }],
+    [{ name: 'bad', metalness: 1.5 }, 'metalness'],
+    [{ name: 'bad', roughness: -0.1 }, 'roughness'],
+    [{ name: 'bad', color: 'not-a-color' }, 'color'],
+    [{ name: 'bad', color: '#abc' }, 'color'],
+  ])('create_material %j is a no-op', (p, summary) => {
+    const doc = empty();
+    expectNoOp(execute(doc, 'create_material', { ...STEEL, ...p }), doc, summary);
   });
 
-  // ── remapIds unit tests ───────────────────────────────────────────────────
-
-  it('remapIds: replaces a string value that is a key in idMap', async () => {
-    const { remapIds } = await import('@core/commands/history/regenerate');
-    const idMap = new Map([['old-1', 'new-1']]);
-    const result = remapIds({ id: 'old-1', size: [1, 1, 1] }, idMap) as {
-      id: string;
-      size: number[];
-    };
-    expect(result.id).toBe('new-1');
-    expect(result.size).toEqual([1, 1, 1]);
+  it('assign_material assigns one or many, skipping unknown ids, purely', () => {
+    const one = execute(run(steelBoxes, 'create_material', ALU), 'assign_material', { materialName: 'aluminium', entityIds: [ids[0]] });
+    expect(one.affected).toEqual([ids[0]]);
+    expect(one.document.entities[ids[0]!]!.materialId).toBe('aluminium');
+    expect(one.summary).toContain('aluminium');
+    expect(one.summary).toContain(ids[0]);
+    const both = execute(steelBoxes, 'assign_material', { materialName: 'steel', entityIds: ids });
+    expect(ids.map((id) => both.document.entities[id]!.materialId)).toEqual(['steel', 'steel']);
+    const partial = execute(steelBoxes, 'assign_material', { materialName: 'steel', entityIds: [ids[0], 'ghost-id'] });
+    expect(partial.affected).toEqual([ids[0]]);
+    expect(partial.document.entities[ids[0]!]!.materialId).toBe('steel');
+    expect(partial.summary).toContain('ghost-id');
+    expectPure(steelBoxes, () => execute(steelBoxes, 'assign_material', { materialName: 'steel', entityIds: [ids[0]] }));
   });
 
-  it('remapIds: does not touch strings that are NOT in idMap', async () => {
-    const { remapIds } = await import('@core/commands/history/regenerate');
-    const idMap = new Map([['old-1', 'new-1']]);
-    const result = remapIds({ id: 'some-label', count: 3 }, idMap) as { id: string };
-    expect(result.id).toBe('some-label');
+  it.each<[object, string[]]>([
+    [{ materialName: 'nonexistent', entityIds: ['$0'] }, ['nonexistent', 'not found']],
+    [{ materialName: 'steel', entityIds: ['ghost-1', 'ghost-2'] }, ['ghost-1']],
+    [{ materialName: 'steel', entityIds: [] }, []],
+    [{ materialName: '', entityIds: ['anything'] }, []],
+  ])('assign_material %j is a no-op', (p, summary) => {
+    const r = execute(steelBoxes, 'assign_material', JSON.parse(JSON.stringify(p).replace('$0', ids[0]!)));
+    expectNoOp(r, steelBoxes);
+    for (const s of summary) expect(r.summary).toContain(s);
   });
 
-  it('remapIds: remaps ids inside arrays', async () => {
-    const { remapIds } = await import('@core/commands/history/regenerate');
+  it('mass_properties uses the assigned material density, else the density param (still validated)', () => {
+    const doc = [
+      { materialName: 'steel', entityIds: [ids[0]] },
+      { materialName: 'aluminium', entityIds: [ids[1]] },
+    ].reduce((d, p) => run(d, 'assign_material', p), run(steelBoxes, 'create_material', ALU));
+    const [steel, alu] = ids.map((entityId) => execute(doc, 'mass_properties', { entityId, density: 1 })) as [
+      ReturnType<typeof execute>,
+      ReturnType<typeof execute>,
+    ];
+    type Mass = { mass: number; density: number; volume: number };
+    const [s, a] = [steel.data as Mass, alu.data as Mass];
+    expect(s.volume).toBeCloseTo(a.volume, 6);
+    expect([s.density, a.density]).toEqual([0.00785, 0.0027]);
+    expect(s.mass / a.mass).toBeCloseTo(0.00785 / 0.0027, 4);
+    expect(s.mass).toBeGreaterThan(a.mass);
+    expect(steel.summary).toContain("material 'steel'");
+    expect(alu.summary).toContain("material 'aluminium'");
+    expectNoOp(execute(doc, 'mass_properties', { entityId: ids[0], density: -1 }), doc, 'density');
+    const plain = box(empty(), [10, 10, 10]);
+    const r = execute(plain.doc, 'mass_properties', { entityId: plain.id, density: 0.00785 });
+    expect(r.data).toMatchObject({ density: 0.00785, mass: expect.closeTo(1000 * 0.00785, 6) });
+    expect(r.summary).toContain('param');
+  });
+
+  it('toToolSchemas maps 1:1 onto listCommands', () => expect(toToolSchemas().length).toBe(listCommands().length));
+});
+
+describe('replayHistory id-remapping', () => {
+  const replayed = (doc: CadDocument): Loose[] => Object.values(run(doc, 'replay_history', {}).entities) as Loose[];
+
+  it('move, assign_material and delete steps survive replay', () => {
+    let doc = run(empty(), 'create_material', ALU);
+    const a = add(doc, 'add_box', { size: [4, 4, 4], position: [0, 0, 0] });
+    const b = add(a.doc, 'add_box', { size: [1, 1, 1], position: [10, 0, 0] });
+    doc = [
+      ['move_entities', { ids: [a.id], delta: [3, 3, 0] }],
+      ['assign_material', { materialName: 'aluminium', entityIds: [a.id] }],
+      ['delete_entities', { ids: [b.id] }],
+    ].reduce((d, [n, p]) => run(d, n as string, p), b.doc);
+    expect(Object.keys(doc.entities)).toEqual([a.id]);
+    expect(doc.entities[a.id]).toMatchObject({ position: [3, 3, 0], materialId: 'aluminium' });
+    expect(replayed(doc)).toEqual([expect.objectContaining({ kind: 'box', position: [3, 3, 0], materialId: 'aluminium' })]);
+  });
+
+  it('multi-id producers: moved duplicate / Nth array copy survive replay', () => {
+    const o = add(empty(), 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
+    const dup = add(o.doc, 'duplicate_entities', { ids: [o.id], offset: [5, 0, 0] });
+    const doc = run(dup.doc, 'move_entities', { ids: [dup.id], delta: [0, 3, 0] });
+    expect(doc.entities[dup.id]!.position).toEqual([5, 3, 0]);
+    const ents = replayed(doc);
+    expect(ents).toHaveLength(2);
+    expect(ents.find((e) => e.position[1] === 3)?.position).toEqual([5, 3, 0]);
+    const arr = execute(o.doc, 'array_linear', { id: o.id, count: 3, offset: [5, 0, 0] });
+    expect(arr.affected.length).toBeGreaterThanOrEqual(2);
+    const moved = run(arr.document, 'move_entities', { ids: [arr.affected[1]], delta: [0, 7, 0] });
+    expect(moved.entities[arr.affected[1]!]!.position[1]).toBe(7);
+    const again = replayed(moved);
+    expect(again.filter((e) => e.position[1] === 7)).toHaveLength(1);
+    expect(again).toHaveLength(Object.keys(moved.entities).length);
+  });
+
+  it('steps without `affected` (old docs) replay without throwing', () => {
+    const doc = chain(['add_box', { size: [2, 2, 2] }], ['add_sphere', { radius: 3 }]);
+    const featureHistory = doc.featureHistory.map(({ affected: _affected, ...rest }) => rest);
+    expect(replayed({ ...doc, featureHistory } as CadDocument)).toHaveLength(2);
+  });
+
+  it('remapIds replaces mapped ids (incl. arrays), keeps others, never mutates, fast-paths an empty map', () => {
     const idMap = new Map([
+      ['old-1', 'new-1'],
       ['a', 'x'],
       ['b', 'y'],
     ]);
-    const result = remapIds({ entityIds: ['a', 'b', 'c'] }, idMap) as {
-      entityIds: string[];
-    };
-    expect(result.entityIds).toEqual(['x', 'y', 'c']);
+    const p = { id: 'old-1', size: [1, 1, 1], label: 'some-label', entityIds: ['a', 'b', 'c'], nested: { ref: 'old-1' } };
+    const snapshot = JSON.stringify(p);
+    expect(remapIds(p, idMap)).toEqual({ ...p, id: 'new-1', entityIds: ['x', 'y', 'c'], nested: { ref: 'new-1' } });
+    expect(JSON.stringify(p)).toBe(snapshot);
+    expect(remapIds(p, new Map())).toBe(p);
   });
 
-  it('remapIds: does not mutate the input params', async () => {
-    const { remapIds } = await import('@core/commands/history/regenerate');
-    const idMap = new Map([['old-1', 'new-1']]);
-    const params = { id: 'old-1', nested: { ref: 'old-1' } };
-    const snapshot = JSON.stringify(params);
-    remapIds(params, idMap);
-    expect(JSON.stringify(params)).toBe(snapshot);
-  });
-
-  it('remapIds: empty idMap returns params unchanged (fast path)', async () => {
-    const { remapIds } = await import('@core/commands/history/regenerate');
-    const params = { id: 'some-id', size: [1, 2, 3] };
-    const result = remapIds(params, new Map());
-    // Fast path: same reference when idMap is empty.
-    expect(result).toBe(params);
-  });
-
-  // ── FeatureStep.affected is stored by execute() ──────────────────────────
-
-  it('execute() stores result.affected on the FeatureStep', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_box', { size: [1, 1, 1] });
-    const step = result.document.featureHistory[0]!;
-    expect(step.affected).toBeDefined();
-    expect(step.affected).toEqual(result.affected);
-  });
-
-  it('execute() stores affected for move_entities (single entity mutation)', () => {
-    let doc = createEmptyDocument();
-    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = r1.document;
-    const id = r1.affected[0]!;
-    const result = execute(doc, 'move_entities', { ids: [id], delta: [1, 0, 0] });
-    const moveStep = result.document.featureHistory[1]!;
-    expect(moveStep.name).toBe('move_entities');
-    expect(moveStep.affected).toEqual([id]);
-  });
-
-  it('AC2: multi-id producer (array_linear) — moving the Nth copy survives replay (locks positional-zip ordering)', () => {
-    let doc = createEmptyDocument();
-    const rBox = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    doc = rBox.document;
-    const baseId = rBox.affected[0]!;
-    // Array into 3 (count-1 = 2 new copies) along +X: affected lists the new copies in order.
-    const rArr = execute(doc, 'array_linear', { id: baseId, count: 3, offset: [5, 0, 0] });
-    doc = rArr.document;
-    expect(rArr.affected.length).toBeGreaterThanOrEqual(2);
-    const secondCopyId = rArr.affected[1]!; // a specific copy by position in `affected`
-    // Move exactly that copy up in Y.
-    doc = execute(doc, 'move_entities', { ids: [secondCopyId], delta: [0, 7, 0] }).document;
-    const liveY = doc.entities[secondCopyId]!.position[1];
-    expect(liveY).toBe(7);
-
-    // Replay: the moved copy must still be the one displaced by +7 in Y (positional
-    // zip of array_linear's `affected` must map the SAME copy across regeneration).
-    const replayed = execute(doc, 'replay_history', {});
-    const movedInReplay = Object.values(replayed.document.entities).filter(
-      (e) => e.position[1] === 7,
-    );
-    expect(movedInReplay).toHaveLength(1);
-    // And exactly one entity is displaced — no other copy accidentally got the move.
-    const total = Object.keys(replayed.document.entities).length;
-    expect(total).toBe(Object.keys(doc.entities).length);
+  it('execute() stores result.affected on each FeatureStep', () => {
+    const r = execute(empty(), 'add_box', { size: [1, 1, 1] });
+    expect(r.document.featureHistory[0]!.affected).toEqual(r.affected);
+    const id = r.affected[0]!;
+    const moved = run(r.document, 'move_entities', { ids: [id], delta: [1, 0, 0] }).featureHistory[1]!;
+    expect([moved.name, moved.affected]).toEqual(['move_entities', [id]]);
   });
 });
 
+type StlData = { format: string; triangleCount: number; stl?: string; stlBase64?: string };
+const stl = (doc: CadDocument, p: object = {}): StlData => execute(doc, 'export_stl', p).data as StlData;
+const stlBytes = (doc: CadDocument, p: object = {}): DataView => {
+  const b = Buffer.from(stl(doc, { format: 'binary', ...p }).stlBase64!, 'base64');
+  return new DataView(b.buffer, b.byteOffset, b.byteLength);
+};
+
 describe('export_stl', () => {
-  // ── helpers ───────────────────────────────────────────────────────────────
-
-  /** Decode a base64 string into a Uint8Array (pure, mirrors uint8ArrayToBase64). */
-  function base64ToUint8Array(b64: string): Uint8Array {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-    const out: number[] = [];
-    let i = 0;
-    const raw = b64.replace(/=+$/, '');
-    while (i < raw.length) {
-      const c0 = chars.indexOf(raw[i++]!);
-      const c1 = chars.indexOf(raw[i++]!);
-      const c2 = i <= raw.length ? chars.indexOf(raw[i++]!) : 0;
-      const c3 = i <= raw.length ? chars.indexOf(raw[i++]!) : 0;
-      const n = (c0 << 18) | (c1 << 12) | (c2 << 6) | c3;
-      out.push((n >> 16) & 0xff);
-      if (raw[i - 2] !== undefined) out.push((n >> 8) & 0xff);
-      if (raw[i - 1] !== undefined) out.push(n & 0xff);
-    }
-    return new Uint8Array(out);
-  }
-
-  type StlData = { format: string; triangleCount: number; stl?: string; stlBase64?: string };
-
-  // ── ASCII box ─────────────────────────────────────────────────────────────
-
-  it('ASCII STL for a box: well-formed, 12 triangles, correct structure', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
-
-    const result = execute(doc, 'export_stl', { format: 'ascii' });
-    expect(result.affected).toEqual([]);
-    expect(result.document).toBe(doc); // same reference — read-only
-
-    const data = result.data as StlData;
-    expect(data.format).toBe('ascii');
-    expect(data.triangleCount).toBe(12); // 6 faces × 2 triangles
-
-    const stl = data.stl!;
-    expect(stl).toBeDefined();
-    expect(stl.startsWith('solid ')).toBe(true);
-    expect(stl.endsWith('endsolid llull')).toBe(true);
-
-    // Count facet/vertex lines
-    const facetMatches = stl.match(/^\s*facet normal/gm);
-    const vertexMatches = stl.match(/^\s*vertex /gm);
-    expect(facetMatches).toHaveLength(12);
-    expect(vertexMatches).toHaveLength(36); // 3 vertices per facet
+  it('ASCII STL for a box: 12 facets, 36 vertices, read-only and pure', () => {
+    const doc = chain(['add_box', { size: [2, 2, 2] }]);
+    const r = execute(doc, 'export_stl', { format: 'ascii' });
+    expectNoOp(r, doc);
+    const data = r.data as StlData;
+    expect([data.format, data.triangleCount]).toEqual(['ascii', 12]);
+    expect(data.stl!.startsWith('solid ')).toBe(true);
+    expect(data.stl!.endsWith('endsolid llull')).toBe(true);
+    expect(data.stl!.match(/^\s*facet normal/gm)).toHaveLength(12);
+    expect(data.stl!.match(/^\s*vertex /gm)).toHaveLength(36);
+    expectPure(doc, () => [execute(doc, 'export_stl', { format: 'ascii' }), execute(doc, 'export_stl', { format: 'binary' })]);
+    const named = stl(doc, { name: 'my_part' }).stl!;
+    expect(named.startsWith('solid my_part')).toBe(true);
+    expect(named.endsWith('endsolid my_part')).toBe(true);
+    const schema = toToolSchemas().find((s) => s.name === 'export_stl');
+    expect(schema?.annotations?.readOnlyHint).toBe(true);
   });
 
-  // ── cylinder ──────────────────────────────────────────────────────────────
-
-  it('cylinder produces > 0 triangles and well-formed ASCII STL', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_cylinder', { radius: 1, height: 2 }).document;
-
-    const result = execute(doc, 'export_stl', {});
-    const data = result.data as StlData;
+  it.each<[string, object]>([
+    ['add_cylinder', { radius: 1, height: 2 }],
+    ['add_sphere', { radius: 1 }],
+    ['extrude_profile', { profile: xy(0, 0, 2, 0, 2, 2, 0, 2), depth: 1 }],
+    ['add_cone', { radius: 1, height: 2 }],
+    ['add_torus', { ringRadius: 2, tubeRadius: 0.5 }],
+    ['add_wedge', { size: [2, 1, 3] }],
+    ['add_pyramid', { baseWidth: 2, baseDepth: 2, height: 3 }],
+  ])('%s exports a well-formed, non-empty solid', (name, p) => {
+    const data = stl(run(empty(), name, p));
     expect(data.triangleCount).toBeGreaterThan(0);
+    expect(data.stl!.split('facet normal').length - 1).toBe(data.triangleCount);
     expect(data.stl).toContain('solid llull');
     expect(data.stl).toContain('endsolid llull');
   });
 
-  // ── sphere ────────────────────────────────────────────────────────────────
-
-  it('sphere produces > 0 triangles and well-formed ASCII STL', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_sphere', { radius: 1 }).document;
-
-    const result = execute(doc, 'export_stl', {});
-    const data = result.data as StlData;
-    expect(data.triangleCount).toBeGreaterThan(0);
-    expect(data.stl!.split('facet normal').length - 1).toBe(data.triangleCount);
+  it('a boolean-union mesh exports triangles when the union yields a mesh', () => {
+    const { doc, ids } = boxes(1);
+    const b = add(doc, 'add_box', { size: [2, 2, 2], position: [1, 0, 0] });
+    const u = execute(b.doc, 'boolean', { op: 'union', entityIds: [ids[0], b.id] });
+    if (u.affected.length > 0 && first(u).kind === 'mesh') expect(stl(u.document).triangleCount).toBeGreaterThan(0);
   });
 
-  // ── extrusion ─────────────────────────────────────────────────────────────
-
-  it('extrusion produces > 0 triangles', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'extrude_profile', {
-      profile: [
-        [0, 0],
-        [2, 0],
-        [2, 2],
-        [0, 2],
-      ],
-      depth: 1,
-    }).document;
-
-    const result = execute(doc, 'export_stl', {});
-    const data = result.data as StlData;
-    expect(data.triangleCount).toBeGreaterThan(0);
+  it('bakes the world transform (position, rotation) into vertices', () => {
+    const xs = [
+      ...stl(chain(['add_box', { size: [2, 2, 2], position: [10, 0, 0] }]), { format: 'ascii' }).stl!.matchAll(/vertex\s+(\S+)/g),
+    ].map((m) => parseFloat(m[1]!));
+    expect(xs.length).toBeGreaterThan(0);
+    for (const x of xs) expect(x >= 9 - 1e-5 && x <= 11 + 1e-5).toBe(true);
+    const a = add(empty(), 'add_box', { size: [2, 1, 1], position: [0, 0, 0] });
+    const rotated = stl(run(a.doc, 'rotate_entity', { id: a.id, delta: [0, 0, Math.PI / 4] }), { format: 'ascii' });
+    expect(stl(a.doc, { format: 'ascii' }).stl).not.toBe(rotated.stl);
+    expect(rotated.triangleCount).toBe(12);
   });
 
-  // ── mesh ──────────────────────────────────────────────────────────────────
-
-  it('mesh entity produces > 0 triangles', () => {
-    let doc = createEmptyDocument();
-    // Boolean union produces a mesh entity
-    const r1 = execute(doc, 'add_box', { size: [2, 2, 2] });
-    doc = r1.document;
-    const r2 = execute(doc, 'add_box', { size: [2, 2, 2], position: [1, 0, 0] });
-    doc = r2.document;
-    const u = execute(doc, 'boolean', {
-      op: 'union',
-      entityIds: [r1.affected[0]!, r2.affected[0]!],
-    });
-    if (u.affected.length > 0) {
-      // Only assert if boolean union produced a mesh (OCC might not be available)
-      const meshEntity = u.document.entities[u.affected[0]!];
-      if (meshEntity?.kind === 'mesh') {
-        doc = u.document;
-        const result = execute(doc, 'export_stl', {});
-        const data = result.data as StlData;
-        expect(data.triangleCount).toBeGreaterThan(0);
-      }
-    }
-    // Always verify the command doesn't throw, even with no mesh
-    expect(true).toBe(true);
+  it('entityIds selects a subset; default exports every 3D entity', () => {
+    const { doc, id } = box();
+    expect(stl(run(doc, 'add_sphere', { radius: 2 }), { entityIds: [id] }).triangleCount).toBe(12);
+    expect(stl(boxes(2).doc).triangleCount).toBe(24);
   });
 
-  // ── world transform ───────────────────────────────────────────────────────
-
-  it('world transform: box at position [10,0,0] has vertices offset by 10 in X', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', {
-      size: [2, 2, 2],
-      position: [10, 0, 0],
-    }).document;
-
-    const result = execute(doc, 'export_stl', { format: 'ascii' });
-    const stl = (result.data as StlData).stl!;
-
-    // Extract all vertex X values from the STL
-    const vertexLines = stl.match(/vertex\s+([-\d.e+]+)\s+([-\d.e+]+)\s+([-\d.e+]+)/g) ?? [];
-    expect(vertexLines.length).toBeGreaterThan(0);
-
-    for (const line of vertexLines) {
-      const parts = line.replace('vertex', '').trim().split(/\s+/);
-      const x = parseFloat(parts[0]!);
-      // Box of size [2,2,2] centered at [10,0,0] has X in [9, 11]
-      expect(x).toBeGreaterThanOrEqual(9 - 1e-5);
-      expect(x).toBeLessThanOrEqual(11 + 1e-5);
-    }
+  it('binary STL: 84 + 50n bytes, count at 80, name header, little-endian vertices', () => {
+    const doc = chain(['add_box', { size: [2, 2, 2], position: [0, 0, 0] }]);
+    const data = stl(doc, { format: 'binary' });
+    expect([data.format, data.triangleCount]).toEqual(['binary', 12]);
+    const view = stlBytes(doc);
+    expect(view.byteLength).toBe(84 + 50 * 12);
+    expect(view.getUint32(80, true)).toBe(12);
+    const named = stlBytes(doc, { name: 'widget' });
+    expect(String.fromCharCode(...new Uint8Array(named.buffer, named.byteOffset, 6))).toBe('widget');
+    for (const o of [12, 16, 20]) expect(Math.abs(view.getFloat32(84 + o, true))).toBeCloseTo(1, 5);
   });
 
-  it('world transform: rotated box vertices differ from unrotated', () => {
-    let doc = createEmptyDocument();
-    // Box without rotation
-    doc = execute(doc, 'add_box', { size: [2, 1, 1], position: [0, 0, 0] }).document;
-    const noRot = execute(doc, 'export_stl', { format: 'ascii' });
+  it('2D-only, unknown and empty selections yield an empty, well-formed solid', () => {
+    const doc = chain(['draw_polyline', { points: xy(0, 0, 5, 5) }], ['draw_arc', { center: [0, 0], radius: 3 }]);
+    const r = execute(doc, 'export_stl', {});
+    expectNoOp(r, doc);
+    expect((r.data as StlData).triangleCount).toBe(0);
+    expect((r.data as StlData).stl).toContain('endsolid');
+    const skipped = execute(doc, 'export_stl', { entityIds: [doc.order[0]] });
+    expect((skipped.data as StlData).triangleCount).toBe(0);
+    expect(skipped.summary).toContain('skipped');
+    const e = empty();
+    const ghost = execute(e, 'export_stl', { entityIds: ['ghost-id'] });
+    expectNoOp(ghost, e, 'ghost-id');
+    expect((ghost.data as StlData).triangleCount).toBe(0);
+    expect(stl(e).triangleCount).toBe(0);
+  });
+});
 
-    // Same box, then rotate 45° about Z via rotate_entity (add_box does not accept a
-    // rotation param — rotation is applied by the transform command). export_stl must
-    // bake the entity rotation into the world-space STL vertices.
-    doc = createEmptyDocument();
-    const added = execute(doc, 'add_box', { size: [2, 1, 1], position: [0, 0, 0] });
-    doc = added.document;
-    doc = execute(doc, 'rotate_entity', {
-      id: added.affected[0]!,
-      delta: [0, 0, Math.PI / 4],
-    }).document;
-    const withRot = execute(doc, 'export_stl', { format: 'ascii' });
-
-    // The STL vertex data should differ
-    expect((noRot.data as StlData).stl).not.toBe((withRot.data as StlData).stl);
-    expect((withRot.data as StlData).triangleCount).toBe(12);
+describe('recipes', () => {
+  const recipeOf = (...steps: Array<[string, object]>): CadDocument => ({
+    ...empty(),
+    recipes: run(chain(...steps), 'save_recipe', { name: 'r' }).recipes,
   });
 
-  // ── entityIds subset selection ────────────────────────────────────────────
-
-  it('entityIds subset: export only selected entities', () => {
-    let doc = createEmptyDocument();
-    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = r1.document;
-    const r2 = execute(doc, 'add_sphere', { radius: 2 });
-    doc = r2.document;
-    const boxId = r1.affected[0]!;
-
-    // Export only the box (12 triangles)
-    const result = execute(doc, 'export_stl', { entityIds: [boxId] });
-    const data = result.data as StlData;
-    expect(data.triangleCount).toBe(12);
+  it('save_recipe snapshots featureHistory (label, empty note, replace), purely, as a deep copy', () => {
+    const doc = chain(['add_box', { size: [2, 2, 2] }], ['add_sphere', { radius: 1 }]);
+    const r = execute(doc, 'save_recipe', { name: 'my_bracket', label: 'A simple box recipe' });
+    expect(r.affected).toHaveLength(0);
+    expect(r.document.recipes['my_bracket']).toMatchObject({ name: 'my_bracket', label: 'A simple box recipe', steps: [{}, {}] });
+    expect(r.summary).toContain('my_bracket');
+    expect(r.summary).toContain('2 step');
+    const e = execute(empty(), 'save_recipe', { name: 'empty_recipe' });
+    expect(e.document.recipes['empty_recipe']!.steps).toHaveLength(0);
+    expect(e.summary).toContain('empty');
+    const one = run(chain(['add_box', { size: [1, 1, 1] }]), 'save_recipe', { name: 'r' });
+    expect(one.recipes['r']!.steps).toHaveLength(1);
+    const grown = run(one, 'add_sphere', { radius: 2 });
+    expect(one.recipes['r']!.steps).toHaveLength(1);
+    expect(run(grown, 'save_recipe', { name: 'r' }).recipes['r']!.steps).toHaveLength(2);
+    expectPure(doc, () => execute(doc, 'save_recipe', { name: 'purity_check' }));
   });
 
-  it('entityIds default (omit) exports all 3D entities', () => {
-    let doc = createEmptyDocument();
-    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = r1.document;
-    const r2 = execute(doc, 'add_box', { size: [2, 2, 2] });
-    doc = r2.document;
-
-    // Two boxes = 24 triangles total
-    const result = execute(doc, 'export_stl', {});
-    const data = result.data as StlData;
-    expect(data.triangleCount).toBe(24);
+  it.each([
+    ['save_recipe', { name: '' }, 'failed'],
+    ['save_recipe', { name: '   ' }, ''],
+    ['instantiate_recipe', { name: 'does_not_exist' }, 'does_not_exist'],
+    ['instantiate_recipe', { name: 'does_not_exist' }, 'not found'],
+    ['instantiate_recipe', { name: '' }, ''],
+  ])('%s %j is a no-op', (name, p, summary) => {
+    const doc = empty();
+    expectNoOp(execute(doc, name, p), doc, summary);
   });
 
-  // ── binary format ─────────────────────────────────────────────────────────
-
-  it('binary STL: base64 decodes to correct byte length (84 + 50*triangleCount)', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-
-    const result = execute(doc, 'export_stl', { format: 'binary' });
-    const data = result.data as StlData;
-    expect(data.format).toBe('binary');
-    expect(data.stlBase64).toBeDefined();
-    expect(data.triangleCount).toBe(12);
-
-    const bytes = base64ToUint8Array(data.stlBase64!);
-    expect(bytes.length).toBe(84 + 50 * 12);
-  });
-
-  it('binary STL: uint32 at offset 80 equals triangleCount', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-
-    const result = execute(doc, 'export_stl', { format: 'binary' });
-    const data = result.data as StlData;
-    const bytes = base64ToUint8Array(data.stlBase64!);
-    const view = new DataView(bytes.buffer);
-    const count = view.getUint32(80, true); // little-endian
-    expect(count).toBe(data.triangleCount);
-  });
-
-  it('binary STL: 80-byte header carries the solid name (ASCII)', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    const result = execute(doc, 'export_stl', { format: 'binary', name: 'widget' });
-    const bytes = base64ToUint8Array((result.data as StlData).stlBase64!);
-    const header = Array.from(bytes.slice(0, 6))
-      .map((b) => String.fromCharCode(b))
-      .join('');
-    expect(header).toBe('widget');
-  });
-
-  it('binary STL: a vertex round-trips little-endian (locks the 50-byte record layout)', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] }).document;
-    const bytes = base64ToUint8Array(
-      (execute(doc, 'export_stl', { format: 'binary' }).data as StlData).stlBase64!,
+  it('instantiate_recipe adds fresh ids, remaps step ids, is additive, repeatable, one history step, pure', () => {
+    const one = recipeOf(['add_box', { size: [3, 3, 3] }]);
+    const r = execute(one, 'instantiate_recipe', { name: 'r' });
+    expectSingleEntity(r, 'box');
+    expect(r.summary).toContain('1 step');
+    expect(r.document.featureHistory.map((s) => s.name)).toEqual(['instantiate_recipe']);
+    const twice = run(r.document, 'instantiate_recipe', { name: 'r' });
+    expect(new Set(twice.order).size).toBe(2);
+    const sphere = run(one, 'add_sphere', { radius: 2 });
+    const additive = run(sphere, 'instantiate_recipe', { name: 'r' });
+    expect(additive.order).toHaveLength(2);
+    expect(additive.entities[sphere.order[0]!]!.kind).toBe('sphere');
+    expectPure(one, () => execute(one, 'instantiate_recipe', { name: 'r' }));
+    const b = box();
+    const moved = execute(
+      recipeOf(['add_box', { size: [1, 1, 1] }], ['move_entities', { ids: [b.id], delta: [5, 0, 0] }]),
+      'instantiate_recipe',
+      { name: 'r' },
     );
-    const view = new DataView(bytes.buffer);
-    // First triangle's first vertex begins at offset 84 + 12 (after the 3-float normal).
-    const vx = view.getFloat32(84 + 12, true);
-    const vy = view.getFloat32(84 + 16, true);
-    const vz = view.getFloat32(84 + 20, true);
-    // A 2×2×2 box centered at origin has all vertices at ±1.
-    for (const c of [vx, vy, vz]) expect(Math.abs(c)).toBeCloseTo(1, 5);
+    expect(moved.affected).toHaveLength(1);
+    expect(first(moved).position).toEqual([5, 0, 0]);
   });
 
-  // ── 2D entities skipped ───────────────────────────────────────────────────
-
-  it('2D-only document: valid empty solid with triangleCount:0', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'draw_polyline', {
-      points: [
-        [0, 0],
-        [5, 5],
-      ],
-    }).document;
-    doc = execute(doc, 'draw_arc', { center: [0, 0], radius: 3 }).document;
-
-    const result = execute(doc, 'export_stl', {});
-    const data = result.data as StlData;
-    expect(data.triangleCount).toBe(0);
-    expect(result.affected).toEqual([]);
-    expect(result.document).toBe(doc);
-    // ASCII STL is still well-formed
-    expect(data.stl).toContain('solid');
-    expect(data.stl).toContain('endsolid');
-  });
-
-  it('2D entities in entityIds list are silently skipped', () => {
-    let doc = createEmptyDocument();
-    const rLine = execute(doc, 'draw_polyline', {
-      points: [
-        [0, 0],
-        [1, 1],
-      ],
-    });
-    doc = rLine.document;
-    const lineId = rLine.affected[0]!;
-
-    const result = execute(doc, 'export_stl', { entityIds: [lineId] });
-    const data = result.data as StlData;
-    expect(data.triangleCount).toBe(0);
-    expect(result.summary).toContain('skipped');
-  });
-
-  // ── unknown / empty selection ─────────────────────────────────────────────
-
-  it('unknown ids in entityIds: graceful result, triangleCount:0, summary mentions id', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'export_stl', { entityIds: ['ghost-id'] });
-    const data = result.data as StlData;
-    expect(data.triangleCount).toBe(0);
-    expect(result.affected).toEqual([]);
-    expect(result.summary).toContain('ghost-id');
-  });
-
-  it('empty document: valid empty solid (triangleCount:0), no throw', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'export_stl', {});
-    const data = result.data as StlData;
-    expect(data.triangleCount).toBe(0);
-    expect(result.affected).toEqual([]);
-    expect(result.document).toBe(doc);
-  });
-
-  // ── read-only / purity ────────────────────────────────────────────────────
-
-  it('read-only: same doc reference returned, affected:[]', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-
-    const result = execute(doc, 'export_stl', {});
-    expect(result.document).toBe(doc);
-    expect(result.affected).toEqual([]);
-  });
-
-  it('is pure: input document is not mutated', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
-    const snapshot = JSON.stringify(doc);
-
-    execute(doc, 'export_stl', { format: 'ascii' });
-    execute(doc, 'export_stl', { format: 'binary' });
-
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  // ── cone / torus / wedge / pyramid ───────────────────────────────────────
-
-  it('cone produces > 0 triangles', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_cone', { radius: 1, height: 2 }).document;
-    const data = execute(doc, 'export_stl', {}).data as StlData;
-    expect(data.triangleCount).toBeGreaterThan(0);
-  });
-
-  it('torus produces > 0 triangles', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_torus', { ringRadius: 2, tubeRadius: 0.5 }).document;
-    const data = execute(doc, 'export_stl', {}).data as StlData;
-    expect(data.triangleCount).toBeGreaterThan(0);
-  });
-
-  it('wedge produces > 0 triangles', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_wedge', { size: [2, 1, 3] }).document;
-    const data = execute(doc, 'export_stl', {}).data as StlData;
-    expect(data.triangleCount).toBeGreaterThan(0);
-  });
-
-  it('pyramid produces > 0 triangles', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_pyramid', { baseWidth: 2, baseDepth: 2, height: 3 }).document;
-    const data = execute(doc, 'export_stl', {}).data as StlData;
-    expect(data.triangleCount).toBeGreaterThan(0);
-  });
-
-  // ── custom solid name ─────────────────────────────────────────────────────
-
-  it('custom name: solid name embedded in ASCII STL header', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    const result = execute(doc, 'export_stl', { name: 'my_part' });
-    const stl = (result.data as StlData).stl!;
-    expect(stl.startsWith('solid my_part')).toBe(true);
-    expect(stl.endsWith('endsolid my_part')).toBe(true);
-  });
-
-  // ── registry 1:1 invariant ────────────────────────────────────────────────
-
-  it('toToolSchemas() still 1:1 with listCommands() after export_stl registered', () => {
-    expect(toToolSchemas().length).toBe(listCommands().length);
-    const schema = toToolSchemas().find((s) => s.name === 'export_stl');
-    expect(schema).toBeDefined();
-    expect(schema?.annotations?.readOnlyHint).toBe(true);
-  });
-
-  // ── save_recipe ───────────────────────────────────────────────────────────
-
-  describe('save_recipe', () => {
-    it('happy path: snapshots featureHistory into doc.recipes with correct step count', () => {
-      let doc = createEmptyDocument();
-      doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
-      doc = execute(doc, 'add_sphere', { radius: 1 }).document;
-      expect(doc.featureHistory).toHaveLength(2);
-
-      const result = execute(doc, 'save_recipe', { name: 'my_bracket' });
-
-      // save_recipe is metaHistory — the doc ref changes for recipes but featureHistory grows only from non-meta commands
-      expect(result.affected).toHaveLength(0);
-      const recipe = result.document.recipes['my_bracket'];
-      expect(recipe).toBeDefined();
-      expect(recipe!.name).toBe('my_bracket');
-      expect(recipe!.steps).toHaveLength(2);
-      expect(result.summary).toContain('my_bracket');
-      expect(result.summary).toContain('2 step');
-    });
-
-    it('happy path: optional label is stored on the recipe', () => {
-      let doc = createEmptyDocument();
-      doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-
-      const result = execute(doc, 'save_recipe', {
-        name: 'labelled',
-        label: 'A simple box recipe',
-      });
-      const recipe = result.document.recipes['labelled'];
-      expect(recipe!.label).toBe('A simple box recipe');
-    });
-
-    it('empty featureHistory: still saves recipe but summary notes it is empty', () => {
-      const doc = createEmptyDocument();
-      expect(doc.featureHistory).toHaveLength(0);
-
-      const result = execute(doc, 'save_recipe', { name: 'empty_recipe' });
-      const recipe = result.document.recipes['empty_recipe'];
-      expect(recipe).toBeDefined();
-      expect(recipe!.steps).toHaveLength(0);
-      expect(result.summary).toContain('empty');
-    });
-
-    it('replaces an existing recipe with the same name', () => {
-      let doc = createEmptyDocument();
-      doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-      doc = execute(doc, 'save_recipe', { name: 'r' }).document;
-      expect(doc.recipes['r']!.steps).toHaveLength(1);
-
-      // Add another entity then re-save under the same name.
-      doc = execute(doc, 'add_sphere', { radius: 2 }).document;
-      const result = execute(doc, 'save_recipe', { name: 'r' });
-      expect(result.document.recipes['r']!.steps).toHaveLength(2);
-    });
-
-    it('failure: blank name → no-op, affected:[], unchanged doc', () => {
-      const doc = createEmptyDocument();
-
-      const result = execute(doc, 'save_recipe', { name: '' });
-      expect(result.affected).toHaveLength(0);
-      expect(result.document).toBe(doc);
-      expect(result.summary).toContain('failed');
-    });
-
-    it('failure: whitespace-only name → no-op', () => {
-      const doc = createEmptyDocument();
-      const result = execute(doc, 'save_recipe', { name: '   ' });
-      expect(result.affected).toHaveLength(0);
-      expect(result.document).toBe(doc);
-    });
-
-    it('is pure: input document is not mutated', () => {
-      let doc = createEmptyDocument();
-      doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-      const snapshot = JSON.stringify(doc);
-
-      execute(doc, 'save_recipe', { name: 'purity_check' });
-      expect(JSON.stringify(doc)).toBe(snapshot);
-    });
-
-    it('steps are a deep copy: mutating featureHistory after save does not corrupt the recipe', () => {
-      let doc = createEmptyDocument();
-      doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-      const saved = execute(doc, 'save_recipe', { name: 'copy_test' }).document;
-      const recipeStepsBefore = saved.recipes['copy_test']!.steps.length;
-
-      // Add another step to the doc — recipe must be unaffected.
-      const updated = execute(saved, 'add_sphere', { radius: 1 }).document;
-      expect(updated.featureHistory).toHaveLength(2);
-      expect(saved.recipes['copy_test']!.steps).toHaveLength(recipeStepsBefore);
-    });
-  });
-
-  // ── instantiate_recipe ────────────────────────────────────────────────────
-
-  describe('instantiate_recipe', () => {
-    it('happy path: 1-step recipe creates one entity with a fresh id', () => {
-      let doc = createEmptyDocument();
-      // Build a box, save as recipe.
-      const boxResult = execute(doc, 'add_box', { size: [3, 3, 3] });
-      doc = boxResult.document;
-      doc = execute(doc, 'save_recipe', { name: 'one_box' }).document;
-
-      // Start fresh — wipe the existing entity to prove instantiate adds independently.
-      let freshDoc = createEmptyDocument();
-      freshDoc = { ...freshDoc, recipes: doc.recipes };
-
-      const result = execute(freshDoc, 'instantiate_recipe', { name: 'one_box' });
-      expect(result.affected).toHaveLength(1);
-      expect(result.document.order).toHaveLength(1);
-      const id = result.affected[0]!;
-      expect(result.document.entities[id]!.kind).toBe('box');
-      expect(result.summary).toContain('one_box');
-      expect(result.summary).toContain('1 step');
-    });
-
-    it('happy path: 2-step recipe (add_box + move_entities) correctly remaps ids', () => {
-      let doc = createEmptyDocument();
-      // Step 1: create a box.
-      const boxResult = execute(doc, 'add_box', { size: [1, 1, 1] });
-      doc = boxResult.document;
-      const originalBoxId = boxResult.affected[0]!;
-      // Step 2: move the box — references the original box id.
-      doc = execute(doc, 'move_entities', { ids: [originalBoxId], delta: [5, 0, 0] }).document;
-      expect(doc.featureHistory).toHaveLength(2);
-
-      // Save the recipe then instantiate onto a clean doc.
-      doc = execute(doc, 'save_recipe', { name: 'box_with_move' }).document;
-      let targetDoc = createEmptyDocument();
-      targetDoc = { ...targetDoc, recipes: doc.recipes };
-
-      const result = execute(targetDoc, 'instantiate_recipe', { name: 'box_with_move' });
-      expect(result.affected).toHaveLength(1); // move_entities doesn't add a new entity
-      expect(result.document.order).toHaveLength(1);
-      const newId = result.affected[0]!;
-      // The box should be at position [5, 0, 0] (moved) — proves id remapping worked.
-      expect(result.document.entities[newId]!.position).toEqual([5, 0, 0]);
-    });
-
-    it('additive: instantiating onto a doc with existing entities leaves them untouched', () => {
-      let doc = createEmptyDocument();
-      // Pre-existing sphere.
-      doc = execute(doc, 'add_sphere', { radius: 2 }).document;
-      const existingId = doc.order[0]!;
-
-      // Save a 1-box recipe.
-      let recipeDoc = createEmptyDocument();
-      recipeDoc = execute(recipeDoc, 'add_box', { size: [1, 1, 1] }).document;
-      recipeDoc = execute(recipeDoc, 'save_recipe', { name: 'just_box' }).document;
-
-      // Merge the recipe into doc.
-      doc = { ...doc, recipes: recipeDoc.recipes };
-      const result = execute(doc, 'instantiate_recipe', { name: 'just_box' });
-
-      // Both the original sphere and the new box are present.
-      expect(result.document.order).toHaveLength(2);
-      expect(result.document.entities[existingId]).toBeDefined();
-      expect(result.document.entities[existingId]!.kind).toBe('sphere');
-    });
-
-    it('idempotency: instantiating twice yields two independent copies', () => {
-      let doc = createEmptyDocument();
-      doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
-      doc = execute(doc, 'save_recipe', { name: 'dup' }).document;
-
-      let targetDoc = createEmptyDocument();
-      targetDoc = { ...targetDoc, recipes: doc.recipes };
-
-      const r1 = execute(targetDoc, 'instantiate_recipe', { name: 'dup' });
-      const r2 = execute(r1.document, 'instantiate_recipe', { name: 'dup' });
-
-      expect(r2.document.order).toHaveLength(2);
-      // The two ids must be different.
-      const [id1, id2] = r2.document.order;
-      expect(id1).not.toBe(id2);
-    });
-
-    it('failure: unknown recipe name → no-op, affected:[], summary mentions name', () => {
-      const doc = createEmptyDocument();
-      const result = execute(doc, 'instantiate_recipe', { name: 'does_not_exist' });
-      expect(result.affected).toHaveLength(0);
-      expect(result.document).toBe(doc);
-      expect(result.summary).toContain('does_not_exist');
-      expect(result.summary).toContain('not found');
-    });
-
-    it('failure: blank name → no-op', () => {
-      const doc = createEmptyDocument();
-      const result = execute(doc, 'instantiate_recipe', { name: '' });
-      expect(result.affected).toHaveLength(0);
-      expect(result.document).toBe(doc);
-    });
-
-    it('is pure: input document is not mutated', () => {
-      let doc = createEmptyDocument();
-      doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-      doc = execute(doc, 'save_recipe', { name: 'pure_test' }).document;
-      const snapshot = JSON.stringify(doc);
-
-      execute(doc, 'instantiate_recipe', { name: 'pure_test' });
-      expect(JSON.stringify(doc)).toBe(snapshot);
-    });
-
-    it('featureHistory records instantiate_recipe as a single step', () => {
-      let doc = createEmptyDocument();
-      doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-      doc = execute(doc, 'save_recipe', { name: 'hist_test' }).document;
-
-      let targetDoc = createEmptyDocument();
-      targetDoc = { ...targetDoc, recipes: doc.recipes };
-
-      const result = execute(targetDoc, 'instantiate_recipe', { name: 'hist_test' });
-      // instantiate_recipe is a normal (non-meta) command, so execute() appends one step.
-      expect(result.document.featureHistory).toHaveLength(1);
-      expect(result.document.featureHistory[0]!.name).toBe('instantiate_recipe');
-    });
-  });
-
-  // ── replay survival (critical integration test) ───────────────────────────
-
-  describe('recipe replay survival', () => {
-    it('instantiated entities survive replay_history (recipes: base.recipes fix)', () => {
-      // 1. Build a 2-step recipe.
-      let doc = createEmptyDocument();
-      doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
-      doc = execute(doc, 'add_sphere', { radius: 1 }).document;
-      doc = execute(doc, 'save_recipe', { name: 'survival_test' }).document;
-
-      // 2. Fresh doc — carry only the recipes dict.
-      let freshDoc = createEmptyDocument();
-      freshDoc = { ...freshDoc, recipes: doc.recipes };
-
-      // 3. Instantiate the recipe — records one featureHistory step.
-      const instantiated = execute(freshDoc, 'instantiate_recipe', { name: 'survival_test' });
-      const docAfterInstantiate = instantiated.document;
-      expect(docAfterInstantiate.order).toHaveLength(2);
-      expect(docAfterInstantiate.featureHistory).toHaveLength(1);
-
-      // 4. replay_history replays the single instantiate_recipe step.
-      //    Without the `recipes: base.recipes` fix in replayHistory, the recipes dict
-      //    would be {} in the base and instantiate_recipe would find no recipe → 0 entities.
-      const replayed = execute(docAfterInstantiate, 'replay_history', {});
-      expect(replayed.document.order).toHaveLength(2);
-      expect(replayed.summary).toContain('2 entit');
-    });
-
-    it('recipe count and entity count survive serialise → deserialise round-trip', async () => {
-      const { serializeDocument, deserializeDocument } =
-        await import('@core/commands/persistence/serialization');
-
-      let doc = createEmptyDocument();
-      doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-      doc = execute(doc, 'save_recipe', { name: 'round_trip' }).document;
-
-      const json = serializeDocument(doc);
-      const loaded = deserializeDocument(json);
-
-      expect(Object.keys(loaded.recipes)).toHaveLength(1);
-      expect(loaded.recipes['round_trip']!.steps).toHaveLength(1);
-    });
-  });
-
-  // ── toToolSchemas 1:1 invariant (recipes) ────────────────────────────────
-
-  it('toToolSchemas() still 1:1 with listCommands() after save_recipe and instantiate_recipe registered', () => {
-    expect(toToolSchemas().length).toBe(listCommands().length);
-    const saveSchema = toToolSchemas().find((s) => s.name === 'save_recipe');
-    const instantiateSchema = toToolSchemas().find((s) => s.name === 'instantiate_recipe');
-    expect(saveSchema).toBeDefined();
-    expect(instantiateSchema).toBeDefined();
-    // save_recipe is idempotent (meta); instantiate_recipe is not
-    expect(saveSchema?.annotations?.idempotentHint).toBe(true);
-    expect(instantiateSchema?.annotations?.idempotentHint).toBeUndefined();
+  it('instantiated entities survive replay_history; recipes survive persistence', () => {
+    const inst = run(recipeOf(['add_box', { size: [2, 2, 2] }], ['add_sphere', { radius: 1 }]), 'instantiate_recipe', { name: 'r' });
+    expect([inst.order.length, inst.featureHistory.length]).toEqual([2, 1]);
+    const replayed = execute(inst, 'replay_history', {});
+    expect(replayed.document.order).toHaveLength(2);
+    expect(replayed.summary).toContain('2 entit');
+    const loaded = deserializeDocument(serializeDocument(recipeOf(['add_box', { size: [1, 1, 1] }])));
+    expect(Object.keys(loaded.recipes)).toEqual(['r']);
+    expect(loaded.recipes['r']!.steps).toHaveLength(1);
+    const schemas = toToolSchemas();
+    expect(schemas.find((s) => s.name === 'save_recipe')?.annotations?.idempotentHint).toBe(true);
+    expect(schemas.find((s) => s.name === 'instantiate_recipe')?.annotations?.idempotentHint).toBeUndefined();
   });
 });
 
-// Rotation param at creation + AABB in summaries
+const closeVec = (actual: readonly number[], expected: readonly number[]): void => {
+  expect(actual).toHaveLength(expected.length);
+  expected.forEach((v, i) => expect(actual[i]!).toBeCloseTo(v, 9));
+};
+const RECT = xy(0, 0, 4, 0, 4, 3, 0, 3);
 
-describe('W4A/W4C — rotation at creation and AABB summaries', () => {
-  // ── add_box ──────────────────────────────────────────────────────────────
-
-  it('add_box stores non-zero rotation on the entity', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_box', { size: [2, 4, 6], rotation: [0.1, 0.2, 0.3] });
-    const id = result.affected[0]!;
-    expect(result.document.entities[id]!.rotation).toEqual([0.1, 0.2, 0.3]);
+describe('rotation at creation and AABB summaries', () => {
+  it.each<[string, object, number[], unknown]>([
+    ['add_box', { size: [2, 4, 6], position: [1, 2, 3] }, [0.1, 0.2, 0.3], [Infinity, 0, 0]],
+    ['add_box', { size: [2, 2, 2] }, [0, 0, 0.5], [0.5, 0.5]],
+    ['add_cylinder', { radius: 3, height: 5 }, [0, 0, Math.PI / 2], 'bad'],
+    ['add_sphere', { radius: 5 }, [Math.PI, 0, 0], [NaN, 0, 0]],
+    ['add_cone', { radius: 2, height: 5 }, [0, Math.PI / 4, 0], [0, 0, 0, 0]],
+    ['add_torus', { ringRadius: 5, tubeRadius: 1 }, [0.5, 0, 0], [0, NaN, 0]],
+    ['add_wedge', { size: [4, 3, 5], position: [1, 0, 0] }, [0, 0, Math.PI], null],
+    ['add_pyramid', { baseWidth: 4, baseDepth: 3, height: 5 }, [Math.PI / 6, 0, 0], [Infinity, Infinity, Infinity]],
+    ['extrude_profile', { profile: RECT, depth: 5 }, [0, Math.PI / 3, 0], [0, Infinity, 0]],
+  ])('%s stores rotation, ignores malformed rotation %#, reports a world AABB', (name, p, rotation, bad) => {
+    const r = execute(empty(), name, { ...p, rotation });
+    closeVec(first(r).rotation, rotation);
+    expect(r.summary).toContain('world AABB');
+    expect(first(execute(empty(), name, p)).rotation).toEqual([0, 0, 0]);
+    const ignored = execute(empty(), name, { ...p, rotation: bad });
+    expect(ignored.affected).toHaveLength(1);
+    expect(first(ignored).rotation).toEqual([0, 0, 0]);
   });
 
-  it('add_box defaults to rotation [0,0,0] when omitted', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_box', { size: [1, 1, 1] });
-    const id = result.affected[0]!;
-    expect(result.document.entities[id]!.rotation).toEqual([0, 0, 0]);
+  it.each([
+    [{ profile: xy(0, 0, 1, 0), depth: 4 }, /at least 3/i],
+    [{ profile: xy(0, 0, 2, 0, 1, 2), depth: 0 }, /> 0/],
+  ])('extrude_profile %j is a no-op', (p, summary) => {
+    const doc = empty();
+    const r = execute(doc, 'extrude_profile', p);
+    expectNoOp(r, doc);
+    expect(r.summary).toMatch(summary);
   });
 
-  it('add_box ignores non-finite rotation and still creates the entity', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_box', { size: [2, 2, 2], rotation: [Infinity, 0, 0] });
-    expect(result.affected).toHaveLength(1);
-    const id = result.affected[0]!;
-    expect(result.document.entities[id]!.rotation).toEqual([0, 0, 0]);
-  });
-
-  it('add_box ignores wrong-length rotation array and still creates the entity', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_box', { size: [2, 2, 2], rotation: [0.5, 0.5] });
-    expect(result.affected).toHaveLength(1);
-    const id = result.affected[0]!;
-    expect(result.document.entities[id]!.rotation).toEqual([0, 0, 0]);
-  });
-
-  it('add_box summary contains world AABB', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_box', { size: [2, 4, 6], position: [1, 2, 3] });
-    // box center [1,2,3], size [2,4,6] → min [-1,0,0] max [3,4,6]
-    expect(result.summary).toContain('world AABB');
-    expect(result.summary).toContain('min');
-    expect(result.summary).toContain('max');
-  });
-
-  // ── add_cylinder ─────────────────────────────────────────────────────────
-
-  it('add_cylinder stores non-zero rotation on the entity', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_cylinder', {
-      radius: 3,
-      height: 5,
-      rotation: [0, 0, Math.PI / 2],
-    });
-    const id = result.affected[0]!;
-    const r = result.document.entities[id]!.rotation;
-    expect(r[0]).toBeCloseTo(0);
-    expect(r[1]).toBeCloseTo(0);
-    expect(r[2]).toBeCloseTo(Math.PI / 2);
-  });
-
-  it('add_cylinder ignores malformed rotation and still creates the entity', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_cylinder', { radius: 1, height: 2, rotation: 'bad' });
-    expect(result.affected).toHaveLength(1);
-    expect(result.document.entities[result.affected[0]!]!.rotation).toEqual([0, 0, 0]);
-  });
-
-  it('add_cylinder summary contains world AABB', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_cylinder', { radius: 2, height: 6, position: [0, 0, 0] });
-    expect(result.summary).toContain('world AABB');
-  });
-
-  // ── add_sphere ───────────────────────────────────────────────────────────
-
-  it('add_sphere stores non-zero rotation on the entity', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_sphere', { radius: 5, rotation: [Math.PI, 0, 0] });
-    const id = result.affected[0]!;
-    expect(result.document.entities[id]!.rotation[0]).toBeCloseTo(Math.PI);
-  });
-
-  it('add_sphere ignores rotation with NaN component and still creates entity', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_sphere', { radius: 3, rotation: [NaN, 0, 0] });
-    expect(result.affected).toHaveLength(1);
-    expect(result.document.entities[result.affected[0]!]!.rotation).toEqual([0, 0, 0]);
-  });
-
-  it('add_sphere summary contains world AABB', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_sphere', { radius: 4 });
-    expect(result.summary).toContain('world AABB');
-  });
-
-  // ── add_cone ─────────────────────────────────────────────────────────────
-
-  it('add_cone stores non-zero rotation on the entity', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_cone', {
-      radius: 2,
-      height: 5,
-      rotation: [0, Math.PI / 4, 0],
-    });
-    const id = result.affected[0]!;
-    expect(result.document.entities[id]!.rotation[1]).toBeCloseTo(Math.PI / 4);
-  });
-
-  it('add_cone ignores malformed rotation (wrong length) and still creates entity', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_cone', { radius: 2, height: 5, rotation: [0, 0, 0, 0] });
-    expect(result.affected).toHaveLength(1);
-    expect(result.document.entities[result.affected[0]!]!.rotation).toEqual([0, 0, 0]);
-  });
-
-  it('add_cone summary contains world AABB', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_cone', { radius: 3, height: 7 });
-    expect(result.summary).toContain('world AABB');
-  });
-
-  // ── add_torus ────────────────────────────────────────────────────────────
-
-  it('add_torus stores non-zero rotation on the entity', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_torus', {
-      ringRadius: 5,
-      tubeRadius: 1,
-      rotation: [0.5, 0, 0],
-    });
-    const id = result.affected[0]!;
-    expect(result.document.entities[id]!.rotation[0]).toBeCloseTo(0.5);
-  });
-
-  it('add_torus ignores non-finite rotation and still creates entity', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_torus', {
-      ringRadius: 4,
-      tubeRadius: 1,
-      rotation: [0, NaN, 0],
-    });
-    expect(result.affected).toHaveLength(1);
-    expect(result.document.entities[result.affected[0]!]!.rotation).toEqual([0, 0, 0]);
-  });
-
-  it('add_torus summary contains world AABB', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_torus', { ringRadius: 4, tubeRadius: 1 });
-    expect(result.summary).toContain('world AABB');
-  });
-
-  // ── add_wedge ────────────────────────────────────────────────────────────
-
-  it('add_wedge stores non-zero rotation on the entity', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_wedge', { size: [4, 3, 5], rotation: [0, 0, Math.PI] });
-    const id = result.affected[0]!;
-    expect(result.document.entities[id]!.rotation[2]).toBeCloseTo(Math.PI);
-  });
-
-  it('add_wedge ignores malformed rotation (non-array) and still creates entity', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_wedge', { size: [2, 2, 2], rotation: null });
-    expect(result.affected).toHaveLength(1);
-    expect(result.document.entities[result.affected[0]!]!.rotation).toEqual([0, 0, 0]);
-  });
-
-  it('add_wedge summary contains world AABB', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_wedge', { size: [4, 3, 6], position: [1, 0, 0] });
-    expect(result.summary).toContain('world AABB');
-  });
-
-  // ── add_pyramid ──────────────────────────────────────────────────────────
-
-  it('add_pyramid stores non-zero rotation on the entity', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_pyramid', {
-      baseWidth: 4,
-      baseDepth: 3,
-      height: 5,
-      rotation: [Math.PI / 6, 0, 0],
-    });
-    const id = result.affected[0]!;
-    expect(result.document.entities[id]!.rotation[0]).toBeCloseTo(Math.PI / 6);
-  });
-
-  it('add_pyramid ignores non-finite rotation and still creates entity', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_pyramid', {
-      baseWidth: 2,
-      baseDepth: 2,
-      height: 3,
-      rotation: [Infinity, Infinity, Infinity],
-    });
-    expect(result.affected).toHaveLength(1);
-    expect(result.document.entities[result.affected[0]!]!.rotation).toEqual([0, 0, 0]);
-  });
-
-  it('add_pyramid summary contains world AABB', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_pyramid', { baseWidth: 6, baseDepth: 4, height: 8 });
-    expect(result.summary).toContain('world AABB');
-  });
-
-  // ── extrude_profile ───────────────────────────────────────────────────────
-
-  it('extrude_profile stores non-zero rotation on the entity', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'extrude_profile', {
-      profile: [
-        [0, 0],
-        [4, 0],
-        [4, 3],
-        [0, 3],
-      ],
-      depth: 5,
-      rotation: [0, Math.PI / 3, 0],
-    });
-    const id = result.affected[0]!;
-    expect(result.document.entities[id]!.rotation[1]).toBeCloseTo(Math.PI / 3);
-  });
-
-  it('extrude_profile ignores malformed rotation and still creates entity', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'extrude_profile', {
-      profile: [
-        [0, 0],
-        [2, 0],
-        [1, 2],
-      ],
-      depth: 3,
-      rotation: [0, Infinity, 0],
-    });
-    expect(result.affected).toHaveLength(1);
-    expect(result.document.entities[result.affected[0]!]!.rotation).toEqual([0, 0, 0]);
-  });
-
-  it('extrude_profile summary contains world AABB', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'extrude_profile', {
-      profile: [
-        [0, 0],
-        [3, 0],
-        [3, 2],
-        [0, 2],
-      ],
-      depth: 4,
-    });
-    expect(result.summary).toContain('world AABB');
-  });
-
-  it('extrude_profile no-ops on a profile with fewer than 3 points', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'extrude_profile', {
-      profile: [
-        [0, 0],
-        [1, 0],
-      ],
-      depth: 4,
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toMatch(/at least 3/i);
-  });
-
-  it('extrude_profile no-ops on non-positive depth', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'extrude_profile', {
-      profile: [
-        [0, 0],
-        [2, 0],
-        [1, 2],
-      ],
-      depth: 0,
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toMatch(/> 0/);
+  it('add_box summary lists AABB min and max', () => {
+    const s = execute(empty(), 'add_box', { size: [2, 4, 6], position: [1, 2, 3] }).summary;
+    for (const t of ['world AABB', 'min', 'max']) expect(s).toContain(t);
   });
 });
 
-// Unified placement anchor ('center' | 'min' | 'base-center')
-// Each add_* command keeps its CURRENT default placement when `anchor` is
-// omitted (back-compat lock); an explicit anchor places the corresponding
-// point of the world AABB at the supplied `position`.
+describe('unified placement anchor', () => {
+  const bounds = (name: string, p: object): { e: Entity; min: readonly number[]; max: readonly number[] } => {
+    const r = execute(empty(), name, p);
+    expect(r.affected).toHaveLength(1);
+    const e = first(r);
+    return { e, ...entityBounds(e) };
+  };
 
-describe('W4B — unified placement anchor', () => {
-  /** Per-component near-equality on a Vec3 (avoids -0 / float noise). */
-  function expectVec(actual: readonly number[], expected: readonly number[]): void {
-    expect(actual).toHaveLength(expected.length);
-    expected.forEach((v, i) => expect(actual[i]!).toBeCloseTo(v, 9));
-  }
-
-  /** Resolve the single created entity from a command result. */
-  function createdEntity(
-    doc: ReturnType<typeof createEmptyDocument>,
-    name: string,
-    params: object,
-  ): Entity {
-    const result = execute(doc, name, params);
-    expect(result.affected).toHaveLength(1);
-    return result.document.entities[result.affected[0]!]!;
-  }
-
-  // ── Back-compat: omitting anchor reproduces today's stored position ──────
-
-  it('add_box default (no anchor) keeps "center" — stored position === position', () => {
-    const e = createdEntity(createEmptyDocument(), 'add_box', {
-      size: [2, 4, 6],
-      position: [5, 6, 7],
-    });
-    expectVec(e.position, [5, 6, 7]);
+  it.each<[string, object, number[], number[]?]>([
+    ['add_box', { size: [2, 4, 6], position: [5, 6, 7] }, [5, 6, 7]],
+    ['add_cylinder', { radius: 1, height: 4, position: [1, 2, 3] }, [1, 2, 3]],
+    ['add_sphere', { radius: 2, position: [1, 2, 3] }, [1, 2, 3]],
+    ['add_torus', { ringRadius: 3, tubeRadius: 1, position: [1, 1, 1] }, [1, 1, 1]],
+    ['add_cone', { radius: 1, height: 4, position: [0, 0, 4] }, [0, 0, 4], [-1, -1, 4]],
+    ['add_pyramid', { baseWidth: 2, baseDepth: 2, height: 2, position: [0, 0, 3] }, [0, 0, 3], [-1, -1, 3]],
+    ['add_wedge', { size: [2, 2, 2], position: [2, 2, 2] }, [2, 2, 2], [2, 2, 2]],
+    ['add_box', { size: [2, 2, 2], position: [3, 3, 3], anchor: 'garbage' }, [3, 3, 3]],
+    ['add_box', { size: [2, 2, 2], position: [3, 3, 3], anchor: 123 }, [3, 3, 3]],
+  ])('%s keeps its default anchor (%j)', (name, p, position, min) => {
+    const b = bounds(name, p);
+    closeVec(b.e.position, position);
+    if (min) expect(b.min[2]).toBeCloseTo(min[2]!, 9);
+    if (name === 'add_wedge') closeVec(b.min, min!);
   });
 
-  it('add_cylinder default keeps "center"', () => {
-    const e = createdEntity(createEmptyDocument(), 'add_cylinder', {
-      radius: 1,
-      height: 4,
-      position: [1, 2, 3],
-    });
-    expectVec(e.position, [1, 2, 3]);
+  it.each<[string, object, number[] | null, number[] | null, [number, number]?]>([
+    ['add_box', { size: [2, 4, 6], anchor: 'min' }, [0, 0, 0], [2, 4, 6]],
+    ['add_box', { size: [2, 2, 2], position: [1, 1, 0], anchor: 'base-center' }, [0, 0, 0], [2, 2, 2]],
+    ['add_cylinder', { radius: 1, height: 4, anchor: 'min' }, [0, 0, 0], [2, 2, 4]],
+    ['add_sphere', { radius: 1, anchor: 'min' }, [0, 0, 0], [2, 2, 2]],
+    ['add_cone', { radius: 1, height: 4, anchor: 'center' }, null, null, [-2, 2]],
+    ['add_pyramid', { baseWidth: 2, baseDepth: 2, height: 2, anchor: 'min' }, [0, 0, 0], null],
+    ['add_wedge', { size: [2, 2, 2], anchor: 'center' }, [-1, -1, -1], [1, 1, 1]],
+  ])('%s %j places that AABB point at position', (name, p, min, max, z) => {
+    const b = bounds(name, { position: [0, 0, 0], ...p });
+    if (min) closeVec(b.min, min);
+    if (max) closeVec(b.max, max);
+    if (z) closeVec([b.min[2]!, b.max[2]!], z);
   });
 
-  it('add_sphere default keeps "center"', () => {
-    const e = createdEntity(createEmptyDocument(), 'add_sphere', {
-      radius: 2,
-      position: [1, 2, 3],
-    });
-    expectVec(e.position, [1, 2, 3]);
-  });
-
-  it('add_torus default keeps "center"', () => {
-    const e = createdEntity(createEmptyDocument(), 'add_torus', {
-      ringRadius: 3,
-      tubeRadius: 1,
-      position: [1, 1, 1],
-    });
-    expectVec(e.position, [1, 1, 1]);
-  });
-
-  it('add_cone default keeps "base-center" — base sits at position.z', () => {
-    const result = execute(createEmptyDocument(), 'add_cone', {
-      radius: 1,
-      height: 4,
-      position: [0, 0, 4],
-    });
-    const e = result.document.entities[result.affected[0]!]!;
-    expectVec(e.position, [0, 0, 4]);
-    expect(entityBounds(e).min[2]).toBeCloseTo(4, 9); // base at z = position.z
-  });
-
-  it('add_pyramid default keeps "base-center" — base sits at position.z', () => {
-    const result = execute(createEmptyDocument(), 'add_pyramid', {
-      baseWidth: 2,
-      baseDepth: 2,
-      height: 2,
-      position: [0, 0, 3],
-    });
-    const e = result.document.entities[result.affected[0]!]!;
-    expectVec(e.position, [0, 0, 3]);
-    expect(entityBounds(e).min[2]).toBeCloseTo(3, 9);
-  });
-
-  it('add_wedge default keeps "min" — AABB min corner at position', () => {
-    const result = execute(createEmptyDocument(), 'add_wedge', {
-      size: [2, 2, 2],
-      position: [2, 2, 2],
-    });
-    const e = result.document.entities[result.affected[0]!]!;
-    expectVec(e.position, [2, 2, 2]);
-    expectVec(entityBounds(e).min, [2, 2, 2]);
-  });
-
-  // ── Explicit anchors place the right AABB point at position ──────────────
-
-  it('add_box anchor "min" puts the AABB min corner at position', () => {
-    const e = createdEntity(createEmptyDocument(), 'add_box', {
-      size: [2, 4, 6],
-      position: [0, 0, 0],
-      anchor: 'min',
-    });
-    const b = entityBounds(e);
-    expectVec(b.min, [0, 0, 0]);
-    expectVec(b.max, [2, 4, 6]);
-  });
-
-  it('add_box anchor "base-center" centers XY and puts AABB min-Z at position', () => {
-    const e = createdEntity(createEmptyDocument(), 'add_box', {
-      size: [2, 2, 2],
-      position: [1, 1, 0],
-      anchor: 'base-center',
-    });
-    const b = entityBounds(e);
-    expectVec(b.min, [0, 0, 0]);
-    expectVec(b.max, [2, 2, 2]);
-  });
-
-  it('add_cylinder anchor "min" puts the AABB min corner at position', () => {
-    const e = createdEntity(createEmptyDocument(), 'add_cylinder', {
-      radius: 1,
-      height: 4,
-      position: [0, 0, 0],
-      anchor: 'min',
-    });
-    const b = entityBounds(e);
-    expectVec(b.min, [0, 0, 0]);
-    expectVec(b.max, [2, 2, 4]);
-  });
-
-  it('add_sphere anchor "min" puts the AABB min corner at position', () => {
-    const e = createdEntity(createEmptyDocument(), 'add_sphere', {
-      radius: 1,
-      position: [0, 0, 0],
-      anchor: 'min',
-    });
-    const b = entityBounds(e);
-    expectVec(b.min, [0, 0, 0]);
-    expectVec(b.max, [2, 2, 2]);
-  });
-
-  it('add_cone anchor "center" centers the AABB on position', () => {
-    const e = createdEntity(createEmptyDocument(), 'add_cone', {
-      radius: 1,
-      height: 4,
-      position: [0, 0, 0],
-      anchor: 'center',
-    });
-    const b = entityBounds(e);
-    expect(b.min[2]).toBeCloseTo(-2, 9);
-    expect(b.max[2]).toBeCloseTo(2, 9);
-  });
-
-  it('add_pyramid anchor "min" puts the AABB min corner at position', () => {
-    const e = createdEntity(createEmptyDocument(), 'add_pyramid', {
-      baseWidth: 2,
-      baseDepth: 2,
-      height: 2,
-      position: [0, 0, 0],
-      anchor: 'min',
-    });
-    expectVec(entityBounds(e).min, [0, 0, 0]);
-  });
-
-  it('add_wedge anchor "center" centers the AABB on position', () => {
-    const e = createdEntity(createEmptyDocument(), 'add_wedge', {
-      size: [2, 2, 2],
-      position: [0, 0, 0],
-      anchor: 'center',
-    });
-    const b = entityBounds(e);
-    expectVec(b.min, [-1, -1, -1]);
-    expectVec(b.max, [1, 1, 1]);
-  });
-
-  // ── Failure / robustness: unknown or non-string anchor → command default ─
-
-  it('add_box with an unknown anchor string falls back to "center" (no throw)', () => {
-    const e = createdEntity(createEmptyDocument(), 'add_box', {
-      size: [2, 2, 2],
-      position: [3, 3, 3],
-      anchor: 'garbage',
-    });
-    expectVec(e.position, [3, 3, 3]); // identical to the default-center placement
-  });
-
-  it('add_box with a non-string anchor falls back to "center"', () => {
-    const e = createdEntity(createEmptyDocument(), 'add_box', {
-      size: [2, 2, 2],
-      position: [3, 3, 3],
-      anchor: 123,
-    } as object);
-    expectVec(e.position, [3, 3, 3]);
-  });
-
-  it('is pure — using anchor does not mutate the input document', () => {
-    const doc = createEmptyDocument();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'add_box', { size: [2, 2, 2], position: [1, 1, 1], anchor: 'min' });
-    expect(JSON.stringify(doc)).toBe(snapshot);
+  it('is pure', () => {
+    const doc = empty();
+    expectPure(doc, () => execute(doc, 'add_box', { size: [2, 2, 2], position: [1, 1, 1], anchor: 'min' }));
   });
 });
-
-// ── clear_document ──────────────────────────────────────────────────────────
 
 describe('clear_document', () => {
-  it('clears all entities, order, selection, groups and resets layers', () => {
-    let doc = createEmptyDocument();
-    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = r1.document;
-    const r2 = execute(doc, 'add_cylinder', { radius: 1, height: 2 });
-    doc = r2.document;
-
-    const result = execute(doc, 'clear_document', {});
-    expect(result.affected).toHaveLength(0);
-    expect(result.document.entities).toEqual({});
-    expect(result.document.order).toEqual([]);
-    expect(result.document.selection).toEqual([]);
-    expect(result.document.groups).toEqual({});
-  });
-
-  it('resets layers to a single default layer when keepLayers is false (default)', () => {
-    let doc = createEmptyDocument();
-    // Add a second layer and an entity.
-    const layerResult = execute(doc, 'add_layer', { name: 'Extra Layer' });
-    doc = layerResult.document;
+  it('clears entities, order, selection, groups; resets or keeps layers; keeps units and camera; reports counts; pure', () => {
+    const doc = chain(
+      ['set_units', { units: 'cm' }],
+      ['add_layer', { name: 'Extra' }],
+      ['add_box', { size: [1, 1, 1] }],
+      ['add_cylinder', { radius: 1, height: 2 }],
+      ['add_box', { size: [1, 1, 1] }],
+    );
     expect(Object.keys(doc.layers)).toHaveLength(2);
-
-    const result = execute(doc, 'clear_document', {});
-    expect(Object.keys(result.document.layers)).toHaveLength(1);
-    expect(result.document.layerOrder).toHaveLength(1);
-  });
-
-  it('preserves layers when keepLayers is true', () => {
-    let doc = createEmptyDocument();
-    const layerResult = execute(doc, 'add_layer', { name: 'Keep Me' });
-    doc = layerResult.document;
-    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = r1.document;
-    expect(Object.keys(doc.layers)).toHaveLength(2);
-
-    const result = execute(doc, 'clear_document', { keepLayers: true });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document.entities).toEqual({});
-    expect(Object.keys(result.document.layers)).toHaveLength(2);
-    expect(result.document.layerOrder).toHaveLength(2);
-  });
-
-  it('preserves units and camera', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'set_units', { units: 'in' }).document;
-    const r1 = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = r1.document;
-    const originalCamera = doc.camera;
-
-    const result = execute(doc, 'clear_document', {});
-    expect(result.document.units).toBe('in');
-    expect(result.document.camera).toEqual(originalCamera);
-  });
-
-  it('is idempotent — already-empty doc returns no-op summary and same reference', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'clear_document', {});
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-    expect(result.summary).toContain('already empty');
-  });
-
-  it('summary is factual — includes entity count, layer count, and units', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'set_units', { units: 'cm' }).document;
-    for (let i = 0; i < 3; i++) {
-      doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    }
-
-    const result = execute(doc, 'clear_document', {});
-    expect(result.summary).toContain('3');
-    expect(result.summary).toContain('cm');
-  });
-
-  it('is pure — input document is never mutated', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'clear_document', {});
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('tool schema round-trips through toToolSchemas()', () => {
-    const schemas = toToolSchemas();
-    const schema = schemas.find((s) => s.name === 'clear_document');
-    expect(schema).toBeDefined();
+    const r = execute(doc, 'clear_document', {});
+    expect(r.affected).toHaveLength(0);
+    expect([r.document.entities, r.document.order, r.document.selection, r.document.groups]).toEqual([{}, [], [], {}]);
+    expect([Object.keys(r.document.layers).length, r.document.layerOrder.length]).toEqual([1, 1]);
+    expect([r.document.units, r.document.camera]).toEqual(['cm', doc.camera]);
+    expect(r.summary).toContain('3');
+    expect(r.summary).toContain('cm');
+    const kept = execute(doc, 'clear_document', { keepLayers: true });
+    expect(kept.affected).toHaveLength(0);
+    expect(kept.document.entities).toEqual({});
+    expect([Object.keys(kept.document.layers).length, kept.document.layerOrder.length]).toEqual([2, 2]);
+    expectPure(doc, () => execute(doc, 'clear_document', {}));
+    const e = empty();
+    expectNoOp(execute(e, 'clear_document', {}), e, 'already empty');
+    const schema = toToolSchemas().find((s) => s.name === 'clear_document');
     expect(schema!.description).toBeTruthy();
     expect(schema!.annotations?.destructiveHint).toBe(true);
   });
 });
 
-// set_camera
+const unitBox = chain(['add_box', { size: [1, 1, 1] }]);
 
 describe('set_camera', () => {
-  it('updates all four camera fields when all are provided', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'set_camera', {
-      target: [1, 2, 3],
-      azimuth: 0.5,
-      polar: 1.0,
-      distance: 20,
-    });
-
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).not.toBe(doc);
-    expect(result.document.camera.target).toEqual([1, 2, 3]);
-    expect(result.document.camera.azimuth).toBe(0.5);
-    expect(result.document.camera.polar).toBe(1.0);
-    expect(result.document.camera.distance).toBe(20);
-    expect(result.summary).toContain('target');
+  it.each<[object, Record<string, unknown>, string?]>([
+    [
+      { target: [1, 2, 3], azimuth: 0.5, polar: 1.0, distance: 20 },
+      { target: [1, 2, 3], azimuth: 0.5, polar: 1.0, distance: 20 },
+      'target',
+    ],
+    [{ azimuth: 1.2 }, { azimuth: 1.2 }],
+    [{ target: [5, 10, 0] }, { target: [5, 10, 0] }],
+    [
+      { target: [0, 0, 0], azimuth: 1.57, polar: 0.8 },
+      { azimuth: 1.57, polar: 0.8 },
+    ],
+    [{ distance: 15 }, { distance: 15 }],
+  ])('%j sets those fields, keeps the rest, appends no history, purely', (p, set, summary) => {
+    const doc = empty();
+    const r = execute(doc, 'set_camera', p);
+    expect(r.affected).toHaveLength(0);
+    expect(r.document).not.toBe(doc);
+    expect(r.document.camera).toEqual({ ...doc.camera, ...set });
+    expect(r.document.featureHistory).toHaveLength(0);
+    if (summary) expect(r.summary).toContain(summary);
+    expectPure(doc, () => execute(doc, 'set_camera', p));
   });
 
-  it('preserves unspecified fields', () => {
-    const doc = createEmptyDocument();
-    const prev = doc.camera;
-    const result = execute(doc, 'set_camera', { azimuth: 1.2 });
-
-    expect(result.document.camera.target).toEqual(prev.target);
-    expect(result.document.camera.polar).toBe(prev.polar);
-    expect(result.document.camera.distance).toBe(prev.distance);
-    expect(result.document.camera.azimuth).toBe(1.2);
+  it.each([
+    [{ distance: 0 }, 'distance'],
+    [{}, 'no fields'],
+    [{ target: [1, 2] }, ''],
+    [{ target: [1, Infinity, 0] }, ''],
+  ])('%j is a no-op', (p, summary) => {
+    const doc = empty();
+    expectNoOp(execute(doc, 'set_camera', p), doc, summary);
   });
 
-  it('is pure — input document is never mutated', () => {
-    const doc = createEmptyDocument();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'set_camera', { distance: 50, azimuth: 1 });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('does NOT append to featureHistory', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'set_camera', { distance: 15 });
-    expect(result.document.featureHistory).toHaveLength(0);
-  });
-
-  it('graceful no-op when distance <= 0', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'set_camera', { distance: 0 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('distance');
-  });
-
-  it('graceful no-op when no fields are specified', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'set_camera', {});
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('tool schema is present and has idempotentHint', () => {
-    const schemas = toToolSchemas();
-    const schema = schemas.find((s) => s.name === 'set_camera');
-    expect(schema).toBeDefined();
-    expect(schema!.annotations?.idempotentHint).toBe(true);
+  it('tool schema is idempotent with an optional target', () => {
+    const schema = toToolSchemas().find((s) => s.name === 'set_camera')!;
+    expect(schema.annotations?.idempotentHint).toBe(true);
+    expect(schema.input_schema.required ?? []).not.toContain('target');
   });
 });
-
-// set_camera: target-only re-centring
-
-describe('set_camera target', () => {
-  it('sets target and preserves distance', () => {
-    const doc = createEmptyDocument();
-    const prevDistance = doc.camera.distance;
-    const result = execute(doc, 'set_camera', { target: [5, 10, 0] });
-
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).not.toBe(doc);
-    expect(result.document.camera.target).toEqual([5, 10, 0]);
-    expect(result.document.camera.distance).toBe(prevDistance);
-  });
-
-  it('optionally overrides azimuth and polar', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'set_camera', { target: [0, 0, 0], azimuth: 1.57, polar: 0.8 });
-
-    expect(result.document.camera.azimuth).toBeCloseTo(1.57);
-    expect(result.document.camera.polar).toBeCloseTo(0.8);
-  });
-
-  it('preserves existing azimuth/polar when not specified', () => {
-    const doc = createEmptyDocument();
-    const prev = doc.camera;
-    const result = execute(doc, 'set_camera', { target: [3, 3, 3] });
-
-    expect(result.document.camera.azimuth).toBe(prev.azimuth);
-    expect(result.document.camera.polar).toBe(prev.polar);
-  });
-
-  it('is pure — input document is never mutated', () => {
-    const doc = createEmptyDocument();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'set_camera', { target: [1, 2, 3] });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('does NOT append to featureHistory', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'set_camera', { target: [0, 0, 0] });
-    expect(result.document.featureHistory).toHaveLength(0);
-  });
-
-  it('graceful no-op when no field is given', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'set_camera', {});
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('no fields');
-  });
-
-  it('graceful no-op when target has wrong length', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'set_camera', {
-      target: [1, 2] as unknown as [number, number, number],
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('graceful no-op when target contains non-finite value', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'set_camera', { target: [1, Infinity, 0] });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('tool schema is present and target is optional', () => {
-    const schemas = toToolSchemas();
-    const schema = schemas.find((s) => s.name === 'set_camera');
-    expect(schema).toBeDefined();
-    expect(schema!.input_schema.required ?? []).not.toContain('target');
-  });
-});
-
-// fit_view
 
 describe('fit_view', () => {
-  it('fits all entities — target near scene centre, distance > 0', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] }).document;
+  const cam = (doc: CadDocument, p: object): CadDocument['camera'] => run(doc, 'fit_view', p).camera;
+  const eye = ({ azimuth, polar }: { azimuth: number; polar: number }): number[] => [
+    Math.sin(polar) * Math.sin(azimuth),
+    Math.sin(polar) * Math.cos(azimuth),
+    Math.cos(polar),
+  ];
 
-    const result = execute(doc, 'fit_view', { direction: 'iso' });
-
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).not.toBe(doc);
-    expect(result.document.camera.distance).toBeGreaterThan(0);
-    // Target should be near the box centre [0,0,0].
-    const t = result.document.camera.target;
-    expect(t[0]).toBeCloseTo(0, 3);
-    expect(t[1]).toBeCloseTo(0, 3);
-    expect(t[2]).toBeCloseTo(0, 3);
-    expect(result.summary).toContain('iso');
+  it('frames the scene centre at distance > 0, appends no history, purely', () => {
+    const doc = chain(['add_box', { size: [2, 2, 2], position: [0, 0, 0] }]);
+    const r = execute(doc, 'fit_view', { direction: 'iso' });
+    expect(r.affected).toHaveLength(0);
+    expect(r.document).not.toBe(doc);
+    expect(r.document.camera.distance).toBeGreaterThan(0);
+    for (const t of r.document.camera.target) expect(t).toBeCloseTo(0, 3);
+    expect(r.summary).toContain('iso');
+    expect(r.document.featureHistory.map((s) => s.name)).toEqual(['add_box']);
+    expect(cam(doc, { direction: 'iso', padding: 2.0 }).distance).toBeCloseTo(cam(doc, { direction: 'iso', padding: 1.0 }).distance * 2, 5);
+    expectPure(doc, () => execute(doc, 'fit_view', {}));
   });
 
-  it('applies correct azimuth/polar for front preset', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    const result = execute(doc, 'fit_view', { direction: 'front' });
-
-    expect(result.document.camera.azimuth).toBeCloseTo(Math.PI, 5);
-    expect(result.document.camera.polar).toBeCloseTo(Math.PI / 2, 5);
+  it('presets put the eye on the Z-up CAD side; current keeps angles; default camera is unmirrored', () => {
+    expect(cam(unitBox, { direction: 'front' })).toMatchObject({
+      azimuth: expect.closeTo(Math.PI, 5),
+      polar: expect.closeTo(Math.PI / 2, 5),
+    });
+    expect(cam(unitBox, { direction: 'top' }).polar).toBeCloseTo(0.01, 5);
+    const at = (direction: string): number[] => eye(cam(unitBox, { direction }));
+    expect(at('front')[1]).toBeLessThan(-0.99);
+    expect(at('back')[1]).toBeGreaterThan(0.99);
+    expect(at('right')[0]).toBeGreaterThan(0.99);
+    expect(at('left')[0]).toBeLessThan(-0.99);
+    expect(at('top')[2]).toBeGreaterThan(0.99);
+    expect(at('top')[1]).toBeLessThan(0);
+    for (const e of [at('iso'), eye(empty().camera)]) expect(e.map(Math.sign)).toEqual([1, -1, 1]);
+    const current = cam(run(run(empty(), 'set_camera', { azimuth: 1.1, polar: 0.7 }), 'add_box', { size: [3, 3, 3] }), {
+      direction: 'current',
+    });
+    expect(current).toMatchObject({ azimuth: expect.closeTo(1.1, 5), polar: expect.closeTo(0.7, 5) });
+    expect(current.distance).toBeGreaterThan(0);
   });
 
-  it('places the eye on the Z-up CAD side for each preset (front -Y, right +X, iso +X-Y+Z)', () => {
-    const eyeOffset = (azimuth: number, polar: number): [number, number, number] => [
-      Math.sin(polar) * Math.sin(azimuth),
-      Math.sin(polar) * Math.cos(azimuth),
-      Math.cos(polar),
-    ];
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    const eyeFor = (direction: string): [number, number, number] => {
-      const { azimuth, polar } = execute(doc, 'fit_view', { direction }).document.camera;
-      return eyeOffset(azimuth, polar);
-    };
-    expect(eyeFor('front')[1]).toBeLessThan(-0.99);
-    expect(eyeFor('back')[1]).toBeGreaterThan(0.99);
-    expect(eyeFor('right')[0]).toBeGreaterThan(0.99);
-    expect(eyeFor('left')[0]).toBeLessThan(-0.99);
-    const top = eyeFor('top');
-    expect(top[2]).toBeGreaterThan(0.99);
-    expect(top[1]).toBeLessThan(0);
-    const iso = eyeFor('iso');
-    expect(iso[0]).toBeGreaterThan(0);
-    expect(iso[1]).toBeLessThan(0);
-    expect(iso[2]).toBeGreaterThan(0);
+  it('an empty document falls back to default framing', () => {
+    const doc = empty();
+    const r = execute(doc, 'fit_view', { direction: 'front' });
+    expect(r.document).not.toBe(doc);
+    expect(r.document.camera).toMatchObject({ distance: 10, target: [0, 0, 0] });
+    expect(r.summary).toContain('empty');
   });
 
-  it('default camera views the XY plane unmirrored (eye at +X, -Y, +Z)', () => {
-    const { azimuth, polar } = createEmptyDocument().camera;
-    expect(Math.sin(polar) * Math.sin(azimuth)).toBeGreaterThan(0);
-    expect(Math.sin(polar) * Math.cos(azimuth)).toBeLessThan(0);
-    expect(Math.cos(polar)).toBeGreaterThan(0);
+  it.each([
+    [{ direction: 'diagonal' }, 'diagonal'],
+    [{ padding: 0 }, 'padding'],
+  ])('%j is a no-op', (p, summary) => {
+    const doc = empty();
+    expectNoOp(execute(doc, 'fit_view', p), doc, summary);
   });
 
-  it('applies correct azimuth/polar for top preset', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    const result = execute(doc, 'fit_view', { direction: 'top' });
-
-    expect(result.document.camera.polar).toBeCloseTo(0.01, 5);
-  });
-
-  it('"current" direction preserves existing azimuth and polar', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'set_camera', { azimuth: 1.1, polar: 0.7 }).document;
-    doc = execute(doc, 'add_box', { size: [3, 3, 3] }).document;
-
-    const result = execute(doc, 'fit_view', { direction: 'current' });
-    expect(result.document.camera.azimuth).toBeCloseTo(1.1, 5);
-    expect(result.document.camera.polar).toBeCloseTo(0.7, 5);
-    expect(result.document.camera.distance).toBeGreaterThan(0);
-  });
-
-  it('padding scales the computed distance', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
-
-    const tight = execute(doc, 'fit_view', { direction: 'iso', padding: 1.0 });
-    const loose = execute(doc, 'fit_view', { direction: 'iso', padding: 2.0 });
-
-    expect(loose.document.camera.distance).toBeCloseTo(tight.document.camera.distance * 2, 5);
-  });
-
-  it('empty document falls back to default framing with explanatory summary', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'fit_view', { direction: 'front' });
-
-    expect(result.document).not.toBe(doc);
-    expect(result.document.camera.distance).toBe(10);
-    expect(result.document.camera.target).toEqual([0, 0, 0]);
-    expect(result.summary).toContain('empty');
-  });
-
-  it('is pure — input document is never mutated', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'fit_view', {});
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('does NOT append to featureHistory', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-    const result = execute(doc, 'fit_view', { direction: 'iso' });
-    // featureHistory should only contain the add_box step, not fit_view.
-    expect(result.document.featureHistory).toHaveLength(1);
-    expect(result.document.featureHistory[0]!.name).toBe('add_box');
-  });
-
-  it('graceful no-op for unknown direction', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'fit_view', { direction: 'diagonal' as 'front' });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('diagonal');
-  });
-
-  it('graceful no-op when padding <= 0', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'fit_view', { padding: 0 });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('padding');
-  });
-
-  it('tool schema is present and lists all valid direction enum values', () => {
-    const schemas = toToolSchemas();
-    const schema = schemas.find((s) => s.name === 'fit_view');
-    expect(schema).toBeDefined();
-    const dirProp = schema!.input_schema.properties['direction'];
-    expect(dirProp).toBeDefined();
-    expect(dirProp!.enum).toEqual(
-      expect.arrayContaining(['front', 'back', 'left', 'right', 'top', 'bottom', 'iso', 'current']),
-    );
+  it('tool schema lists every direction', () => {
+    const dir = toToolSchemas().find((s) => s.name === 'fit_view')!.input_schema.properties['direction'];
+    expect(dir!.enum).toEqual(expect.arrayContaining(['front', 'back', 'left', 'right', 'top', 'bottom', 'iso', 'current']));
   });
 });
 
-// export_obj — Wavefront OBJ export
+type ObjData = { format: string; text: string; triangleCount: number };
+type GltfData = { format: string; triangleCount: number; text?: string; base64?: string };
+const revolved = (segments: number): CadDocument =>
+  chain(['revolve_profile', { profile: xy(1, 0, 2, 0, 2, 1, 1, 1), axis: 'z', angle: Math.PI * 2, segments }]);
 
-describe('export_obj', () => {
-  /** Helper: decode base64 to Uint8Array (same as in export_stl tests). */
-  function base64ToUint8Array(b64: string): Uint8Array {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-    const out: number[] = [];
-    let i = 0;
-    const raw = b64.replace(/=+$/, '');
-    while (i < raw.length) {
-      const c0 = chars.indexOf(raw[i++]!);
-      const c1 = chars.indexOf(raw[i++]!);
-      const c2 = i <= raw.length ? chars.indexOf(raw[i++]!) : 0;
-      const c3 = i <= raw.length ? chars.indexOf(raw[i++]!) : 0;
-      const n = (c0 << 18) | (c1 << 12) | (c2 << 6) | c3;
-      out.push((n >> 16) & 0xff);
-      if (raw[i - 2] !== undefined) out.push((n >> 8) & 0xff);
-      if (raw[i - 1] !== undefined) out.push(n & 0xff);
+describe('export_obj / export_gltf', () => {
+  const boxDoc2 = chain(['add_box', { size: [2, 2, 2] }]);
+  const glb = (doc: CadDocument): { data: GltfData; view: DataView } => {
+    const data = execute(doc, 'export_gltf', { binary: true }).data as GltfData;
+    const b = Buffer.from(data.base64!, 'base64');
+    return { data, view: new DataView(b.buffer, b.byteOffset, b.byteLength) };
+  };
+
+  it.each(['export_obj', 'export_gltf'])('%s is read-only, pure, and flagged readOnlyHint', (name) => {
+    const r = execute(boxDoc2, name, {});
+    expectNoOp(r, boxDoc2);
+    expectPure(boxDoc2, () => [execute(boxDoc2, name, {}), execute(boxDoc2, name, { binary: true })]);
+    expect(toToolSchemas().find((s) => s.name === name)?.annotations?.readOnlyHint).toBe(true);
+  });
+
+  it.each([
+    ['export_obj', 'obj'],
+    ['export_gltf', 'gltf'],
+  ])('%s: empty doc, unknown ids and 2D-only docs export 0 triangles', (name, format) => {
+    const doc = empty();
+    const r = execute(doc, name, {});
+    expectNoOp(r, doc);
+    expect(r.data).toMatchObject({ triangleCount: 0, format });
+    const ghost = execute(doc, name, { entityIds: ['ghost-id'] });
+    expect((ghost.data as ObjData).triangleCount).toBe(0);
+    expect(ghost.affected).toEqual([]);
+    expect(ghost.summary).toContain('ghost-id');
+    expect((execute(chain(['draw_polyline', { points: xy(0, 0, 5, 5) }]), name, {}).data as ObjData).triangleCount).toBe(0);
+  });
+
+  it('OBJ: box has 36 v, 12 f records; spheres, subsets and revolutions export', () => {
+    const data = execute(boxDoc2, 'export_obj', {}).data as ObjData;
+    expect([data.format, data.triangleCount]).toEqual(['obj', 12]);
+    for (const t of ['v ', 'vn ', 'f ']) expect(data.text).toContain(t);
+    const lines = data.text.split('\n');
+    expect(lines.filter((l) => /^v /.test(l))).toHaveLength(36);
+    expect(lines.filter((l) => /^f /.test(l))).toHaveLength(12);
+    const sphere = execute(run(empty(), 'add_sphere', { radius: 1 }), 'export_obj', {}).data as ObjData;
+    expect(sphere.triangleCount).toBeGreaterThan(0);
+    expect(sphere.text.length).toBeGreaterThan(0);
+    const both = run(boxDoc2, 'add_sphere', { radius: 1 });
+    expect((execute(both, 'export_obj', { entityIds: [both.order[0]] }).data as ObjData).triangleCount).toBe(12);
+    for (const segments of [8, 12]) {
+      const rev = execute(revolved(segments), 'export_obj', {}).data as ObjData;
+      expect(rev.triangleCount).toBeGreaterThan(0);
+      expect(rev.text).toContain('v ');
+      expect(rev.text).toContain('f ');
     }
-    return new Uint8Array(out);
-  }
-  void base64ToUint8Array; // used only in gltf tests below but defined here too
-
-  type ObjData = { format: string; text: string; triangleCount: number };
-
-  // ── happy path: box ───────────────────────────────────────────────────────
-
-  it('box: format=obj, triangleCount=12, well-formed OBJ text', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
-
-    const result = execute(doc, 'export_obj', {});
-    expect(result.affected).toEqual([]);
-    expect(result.document).toBe(doc); // same reference — read-only
-
-    const data = result.data as ObjData;
-    expect(data.format).toBe('obj');
-    expect(data.triangleCount).toBe(12);
-
-    // OBJ text must contain v / vn / f records
-    expect(data.text).toContain('v ');
-    expect(data.text).toContain('vn ');
-    expect(data.text).toContain('f ');
-
-    // Vertex count: 12 triangles × 3 vertices = 36
-    const vLines = data.text.split('\n').filter((l) => /^v /.test(l));
-    expect(vLines).toHaveLength(36);
-
-    // Face count: 12 (one f-record per triangle)
-    const fLines = data.text.split('\n').filter((l) => /^f /.test(l));
-    expect(fLines).toHaveLength(12);
   });
 
-  it('sphere: triangleCount > 0, OBJ text non-empty', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_sphere', { radius: 1 }).document;
-
-    const data = execute(doc, 'export_obj', {}).data as ObjData;
-    expect(data.triangleCount).toBeGreaterThan(0);
-    expect(data.text.length).toBeGreaterThan(0);
-  });
-
-  // ── failure path: empty doc ───────────────────────────────────────────────
-
-  it('empty document: triangleCount=0, affected:[], doc unchanged', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'export_obj', {});
-
-    expect(result.document).toBe(doc);
-    expect(result.affected).toEqual([]);
-    const data = result.data as ObjData;
-    expect(data.triangleCount).toBe(0);
-    expect(data.format).toBe('obj');
-  });
-
-  it('unknown entityIds: graceful no-op, triangleCount=0, summary mentions id', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'export_obj', { entityIds: ['ghost-id'] });
-
-    const data = result.data as ObjData;
-    expect(data.triangleCount).toBe(0);
-    expect(result.affected).toEqual([]);
-    expect(result.summary).toContain('ghost-id');
-  });
-
-  it('2D-only entities skipped, triangleCount=0', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'draw_polyline', {
-      points: [
-        [0, 0],
-        [5, 5],
-      ],
-    }).document;
-
-    const data = execute(doc, 'export_obj', {}).data as ObjData;
-    expect(data.triangleCount).toBe(0);
-  });
-
-  // ── purity ────────────────────────────────────────────────────────────────
-
-  it('is pure — input document is not mutated', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'export_obj', {});
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  // ── entityIds subset ──────────────────────────────────────────────────────
-
-  it('entityIds subset: only exports specified entities', () => {
-    let doc = createEmptyDocument();
-    const r1 = execute(doc, 'add_box', { size: [2, 2, 2] });
-    doc = r1.document;
-    doc = execute(doc, 'add_sphere', { radius: 1 }).document;
-    const boxId = r1.affected[0]!;
-
-    const data = execute(doc, 'export_obj', { entityIds: [boxId] }).data as ObjData;
-    expect(data.triangleCount).toBe(12); // only the box
-  });
-
-  // ── read-only annotation ──────────────────────────────────────────────────
-
-  it('toToolSchemas includes export_obj with readOnlyHint', () => {
-    const schema = toToolSchemas().find((s) => s.name === 'export_obj');
-    expect(schema).toBeDefined();
-    expect(schema?.annotations?.readOnlyHint).toBe(true);
-  });
-
-  // ── revolution regression ─────────────────────────────────────────────────
-
-  it('revolution entity: triangleCount > 0 in OBJ export', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'revolve_profile', {
-      profile: [
-        [1, 0],
-        [2, 0],
-        [2, 1],
-        [1, 1],
-      ],
-      axis: 'z',
-      angle: Math.PI * 2,
-      segments: 8,
-    }).document;
-
-    const data = execute(doc, 'export_obj', {}).data as ObjData;
-    expect(data.triangleCount).toBeGreaterThan(0);
-    expect(data.text).toContain('v ');
-  });
-});
-
-// export_gltf — glTF 2.0 / GLB export
-
-describe('export_gltf', () => {
-  /** Decode base64 → Uint8Array. */
-  function base64ToUint8Array(b64: string): Uint8Array {
-    return new Uint8Array(Buffer.from(b64, 'base64'));
-  }
-
-  type GltfData = { format: string; triangleCount: number; text?: string; base64?: string };
-
-  // ── happy path: box (glTF JSON) ───────────────────────────────────────────
-
-  it('box + sphere: format=gltf, triangleCount > 12, valid JSON with asset.version=2.0', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
-    doc = execute(doc, 'add_sphere', { radius: 1 }).document;
-
-    const result = execute(doc, 'export_gltf', {});
-    expect(result.affected).toEqual([]);
-    expect(result.document).toBe(doc);
-
-    const data = result.data as GltfData;
-    expect(data.format).toBe('gltf');
-    expect(data.triangleCount).toBeGreaterThan(12); // box alone = 12
-
-    // Must be parseable JSON
-    expect(() => JSON.parse(data.text!)).not.toThrow();
-    const gltf = JSON.parse(data.text!) as Record<string, unknown>;
-
-    // Minimal valid glTF 2.0 structure
-    expect((gltf['asset'] as Record<string, unknown>)['version']).toBe('2.0');
-    expect(gltf['scene']).toBe(0);
-    expect(Array.isArray(gltf['scenes'])).toBe(true);
-    expect(Array.isArray(gltf['meshes'])).toBe(true);
-    expect(Array.isArray(gltf['accessors'])).toBe(true);
-    expect(Array.isArray(gltf['bufferViews'])).toBe(true);
-    expect(Array.isArray(gltf['buffers'])).toBe(true);
-
-    // BIN buffer inlined as data: URI
-    const buffers = gltf['buffers'] as Array<Record<string, unknown>>;
-    expect((buffers[0]!['uri'] as string).startsWith('data:application/octet-stream;base64,')).toBe(
-      true,
-    );
-  });
-
-  it('box: triangleCount=12 in glTF JSON mode', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-
-    const data = execute(doc, 'export_gltf', { binary: false }).data as GltfData;
-    expect(data.triangleCount).toBe(12);
-    expect(data.format).toBe('gltf');
-    expect(data.text).toBeDefined();
-  });
-
-  // ── GLB binary mode ───────────────────────────────────────────────────────
-
-  it('box: GLB mode — format=glb, base64 defined, magic bytes correct', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-
-    const result = execute(doc, 'export_gltf', { binary: true });
-    const data = result.data as GltfData;
-    expect(data.format).toBe('glb');
-    expect(data.base64).toBeDefined();
-    expect(data.triangleCount).toBe(12);
-
-    // Decode and check GLB magic 0x46546C67 ('glTF') at offset 0
-    const bytes = base64ToUint8Array(data.base64!);
-    const view = new DataView(bytes.buffer);
-    expect(view.getUint32(0, true)).toBe(0x46546c67); // 'glTF' little-endian
-    expect(view.getUint32(4, true)).toBe(2); // version 2
-  });
-
-  it('GLB total byte length matches header field', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
-
-    const data = execute(doc, 'export_gltf', { binary: true }).data as GltfData;
-    const bytes = base64ToUint8Array(data.base64!);
-    const view = new DataView(bytes.buffer);
-    const headerLength = view.getUint32(8, true);
-    expect(headerLength).toBe(bytes.length);
-  });
-
-  it('GLB JSON chunk type is 0x4E4F534A', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-
-    const data = execute(doc, 'export_gltf', { binary: true }).data as GltfData;
-    const bytes = base64ToUint8Array(data.base64!);
-    const view = new DataView(bytes.buffer);
-    // First chunk type at offset 16
-    expect(view.getUint32(16, true)).toBe(0x4e4f534a); // 'JSON'
-  });
-
-  // ── failure path: empty doc ───────────────────────────────────────────────
-
-  it('empty document: triangleCount=0, affected:[], doc unchanged', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'export_gltf', {});
-
-    expect(result.document).toBe(doc);
-    expect(result.affected).toEqual([]);
-    const data = result.data as GltfData;
-    expect(data.triangleCount).toBe(0);
-    expect(data.format).toBe('gltf');
-    // JSON still parseable
-    expect(() => JSON.parse(data.text!)).not.toThrow();
-  });
-
-  it('empty document GLB: still has valid header', () => {
-    const doc = createEmptyDocument();
-    const data = execute(doc, 'export_gltf', { binary: true }).data as GltfData;
-    expect(data.triangleCount).toBe(0);
-    expect(data.base64).toBeDefined();
-
-    const bytes = base64ToUint8Array(data.base64!);
-    const view = new DataView(bytes.buffer);
-    expect(view.getUint32(0, true)).toBe(0x46546c67); // valid GLB magic
-  });
-
-  it('unknown entityIds: triangleCount=0, summary mentions id', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'export_gltf', { entityIds: ['ghost-id'] });
-
-    expect((result.data as GltfData).triangleCount).toBe(0);
-    expect(result.affected).toEqual([]);
-    expect(result.summary).toContain('ghost-id');
-  });
-
-  // ── purity ────────────────────────────────────────────────────────────────
-
-  it('is pure — input document is not mutated', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'add_box', { size: [2, 2, 2] }).document;
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'export_gltf', {});
-    execute(doc, 'export_gltf', { binary: true });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  // ── read-only annotation ──────────────────────────────────────────────────
-
-  it('toToolSchemas includes export_gltf with readOnlyHint', () => {
-    const schema = toToolSchemas().find((s) => s.name === 'export_gltf');
-    expect(schema).toBeDefined();
-    expect(schema?.annotations?.readOnlyHint).toBe(true);
-  });
-
-  // ── registry 1:1 invariant ────────────────────────────────────────────────
-
-  it('toToolSchemas() still 1:1 with listCommands() after export_gltf registered', () => {
-    expect(toToolSchemas().length).toBe(listCommands().length);
-  });
-
-  // ── revolution regression: all three exporters ────────────────────────────
-
-  it('revolution entity: triangleCount > 0 in glTF JSON export', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'revolve_profile', {
-      profile: [
-        [1, 0],
-        [2, 0],
-        [2, 1],
-        [1, 1],
-      ],
-      axis: 'z',
-      angle: Math.PI * 2,
-      segments: 8,
-    }).document;
-
+  it('glTF JSON: valid 2.0 structure with an inlined data: buffer', () => {
+    const doc = run(boxDoc2, 'add_sphere', { radius: 1 });
     const data = execute(doc, 'export_gltf', {}).data as GltfData;
-    expect(data.triangleCount).toBeGreaterThan(0);
+    expect(data.format).toBe('gltf');
+    expect(data.triangleCount).toBeGreaterThan(12);
+    const gltf = JSON.parse(data.text!) as Record<string, unknown>;
+    expect(gltf).toMatchObject({ asset: { version: '2.0' }, scene: 0 });
+    for (const k of ['scenes', 'meshes', 'accessors', 'bufferViews', 'buffers']) expect(Array.isArray(gltf[k])).toBe(true);
+    expect((gltf['buffers'] as Array<{ uri: string }>)[0]!.uri.startsWith('data:application/octet-stream;base64,')).toBe(true);
+    expect(execute(unitBox, 'export_gltf', { binary: false }).data).toMatchObject({
+      triangleCount: 12,
+      format: 'gltf',
+      text: expect.any(String),
+    });
+    expect(() => JSON.parse((execute(empty(), 'export_gltf', {}).data as GltfData).text!)).not.toThrow();
+    for (const segments of [8, 12]) {
+      const rev = execute(revolved(segments), 'export_gltf', {}).data as GltfData;
+      expect(rev.triangleCount).toBeGreaterThan(0);
+      expect((JSON.parse(rev.text!) as { asset: { version: string } }).asset.version).toBe('2.0');
+    }
   });
 
-  it('revolution entity: triangleCount > 0 in GLB export', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'revolve_profile', {
-      profile: [
-        [1, 0],
-        [2, 0],
-        [2, 1],
-        [1, 1],
-      ],
-      axis: 'z',
-      angle: Math.PI * 2,
-      segments: 8,
-    }).document;
-
-    const data = execute(doc, 'export_gltf', { binary: true }).data as GltfData;
-    expect(data.triangleCount).toBeGreaterThan(0);
+  it('GLB: magic, version, length and JSON chunk header; empty docs still get a header', () => {
+    const { data, view } = glb(unitBox);
+    expect([data.format, data.triangleCount, data.base64 !== undefined]).toEqual(['glb', 12, true]);
+    expect([view.getUint32(0, true), view.getUint32(4, true), view.getUint32(16, true)]).toEqual([0x46546c67, 2, 0x4e4f534a]);
+    const big = glb(boxDoc2).view;
+    expect(big.getUint32(8, true)).toBe(big.byteLength);
+    const e = glb(empty());
+    expect(e.data.triangleCount).toBe(0);
+    expect(e.view.getUint32(0, true)).toBe(0x46546c67);
+    expect(glb(revolved(8)).data.triangleCount).toBeGreaterThan(0);
   });
-});
 
-// export_stl + export_obj + export_gltf — revolution regression (all three)
-
-describe('export revolution regression', () => {
-  type StlData = { format: string; triangleCount: number; stl?: string };
-  type ObjData = { format: string; text: string; triangleCount: number };
-  type GltfData = { format: string; triangleCount: number; text?: string; base64?: string };
-
-  it('revolve_profile entity serialises non-empty in export_stl', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'revolve_profile', {
-      profile: [
-        [1, 0],
-        [2, 0],
-        [2, 1],
-        [1, 1],
-      ],
-      axis: 'z',
-      angle: Math.PI * 2,
-      segments: 12,
-    }).document;
-
-    const data = execute(doc, 'export_stl', {}).data as StlData;
+  it('revolutions export to STL', () => {
+    const data = stl(revolved(12));
     expect(data.triangleCount).toBeGreaterThan(0);
     expect(data.stl).toContain('facet normal');
   });
-
-  it('revolve_profile entity serialises non-empty in export_obj', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'revolve_profile', {
-      profile: [
-        [1, 0],
-        [2, 0],
-        [2, 1],
-        [1, 1],
-      ],
-      axis: 'z',
-      angle: Math.PI * 2,
-      segments: 12,
-    }).document;
-
-    const data = execute(doc, 'export_obj', {}).data as ObjData;
-    expect(data.triangleCount).toBeGreaterThan(0);
-    expect(data.text).toContain('f ');
-  });
-
-  it('revolve_profile entity serialises non-empty in export_gltf', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'revolve_profile', {
-      profile: [
-        [1, 0],
-        [2, 0],
-        [2, 1],
-        [1, 1],
-      ],
-      axis: 'z',
-      angle: Math.PI * 2,
-      segments: 12,
-    }).document;
-
-    const data = execute(doc, 'export_gltf', {}).data as GltfData;
-    expect(data.triangleCount).toBeGreaterThan(0);
-    const gltf = JSON.parse(data.text!) as Record<string, unknown>;
-    expect((gltf['asset'] as Record<string, unknown>)['version']).toBe('2.0');
-  });
 });
 
-// align
+/** Boxes at the given [size, position] pairs. */
+function placed(...specs: number[][][]): { doc: CadDocument; ids: string[] } {
+  let doc = empty();
+  const ids: string[] = [];
+  for (const [size, position] of specs) ({ doc, id: ids[ids.length] } = add(doc, 'add_box', { size, position }));
+  return { doc, ids };
+}
+const pos = (doc: CadDocument, id: string): readonly number[] => doc.entities[id]!.position;
+const gap = (doc: CadDocument, a: string, b: string): number =>
+  Math.hypot(pos(doc, a)[0]! - pos(doc, b)[0]!, pos(doc, a)[1]! - pos(doc, b)[1]!);
 
-describe('align', () => {
-  it('aligns min-x of targets to reference min-x', () => {
-    let doc = createEmptyDocument();
-    const refR = execute(doc, 'add_box', { size: [2, 2, 2], position: [10, 0, 0] });
-    doc = refR.document;
-    const refId = refR.affected[0]!;
-
-    const tR = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
-    doc = tR.document;
-    const tId = tR.affected[0]!;
-
-    const result = execute(doc, 'align', { targetIds: [tId], edge: 'min-x', referenceId: refId });
-    expect(result.affected).toContain(tId);
-    // refId box: position [10,0,0], size [2,2,2] → bounds.min.x = 10 - 1 = 9
-    // tId should now have bounds.min.x = 9 → position.x = 9 + 1 = 10
-    expect(result.document.entities[tId]!.position[0]).toBeCloseTo(10);
+describe('align / distribute / stack_on', () => {
+  it.each<[string, number[][][], (ids: string[]) => object, number, number, number[]?]>([
+    [
+      'align min-x',
+      [xyz(2, 2, 2, 10, 0, 0), xyz(2, 2, 2, 0, 0, 0)],
+      ([r, t]) => ({ targetIds: [t], edge: 'min-x', referenceId: r }),
+      1,
+      0,
+      [10],
+    ],
+    [
+      'align center-z',
+      [xyz(2, 2, 4, 0, 0, 10), xyz(2, 2, 2, 5, 0, 0)],
+      ([r, t]) => ({ targetIds: [t], edge: 'center-z', referenceId: r }),
+      1,
+      2,
+      [10],
+    ],
+    [
+      'distribute equal-spacing x',
+      [xyz(2, 2, 2, 0, 0, 0), xyz(2, 2, 2, 5, 0, 0), xyz(2, 2, 2, 20, 0, 0)],
+      (ids) => ({ targetIds: ids, axis: 'x', mode: 'equal-spacing' }),
+      1,
+      0,
+      [10],
+    ],
+    [
+      'distribute equal-gap z',
+      [xyz(2, 2, 2, 0, 0, 0), xyz(2, 2, 2, 0, 0, 3), xyz(2, 2, 2, 0, 0, 20)],
+      (ids) => ({ targetIds: ids, axis: 'z', mode: 'equal-gap' }),
+      1,
+      2,
+      [10],
+    ],
+    ['stack_on z', [xyz(4, 4, 2, 0, 0, 0), xyz(2, 2, 2, 0, 0, 0)], ([b, m]) => ({ movingId: m, baseId: b }), 1, 2, [2]],
+    ['stack_on x', [xyz(4, 2, 2, 0, 0, 0), xyz(2, 2, 2, 0, 0, 0)], ([b, m]) => ({ movingId: m, baseId: b, axis: 'x' }), 1, 0, [3]],
+  ])('%s moves the target, purely', (label, specs, p, moved, axis, [value] = []) => {
+    const { doc, ids } = placed(...specs);
+    const name = label.split(' ')[0]!;
+    const r = execute(doc, name, p(ids));
+    expect(r.affected).toContain(ids[moved]);
+    if (name === 'stack_on') expect(r.affected).toEqual([ids[moved]]);
+    if (name === 'distribute' && label.endsWith('x')) for (const i of [0, 2]) expect(r.affected).not.toContain(ids[i]);
+    expect(pos(r.document, ids[moved]!)[axis]).toBeCloseTo(value!);
+    expectPure(doc, () => execute(doc, name, p(ids)));
   });
 
-  it('aligns center-z of targets to reference center-z', () => {
-    let doc = createEmptyDocument();
-    const refR = execute(doc, 'add_box', { size: [2, 2, 4], position: [0, 0, 10] });
-    doc = refR.document;
-    const refId = refR.affected[0]!;
-
-    const tR = execute(doc, 'add_box', { size: [2, 2, 2], position: [5, 0, 0] });
-    doc = tR.document;
-    const tId = tR.affected[0]!;
-
-    const result = execute(doc, 'align', {
-      targetIds: [tId],
-      edge: 'center-z',
-      referenceId: refId,
-    });
-    expect(result.affected).toContain(tId);
-    // ref center-z = 10; target should now have position.z such that center = 10
-    expect(result.document.entities[tId]!.position[2]).toBeCloseTo(10);
-  });
-
-  it('returns affected:[] and unchanged doc when reference is missing', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'align', {
-      targetIds: ['some-id'],
-      edge: 'min-x',
-      referenceId: 'no-such',
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('no-such');
-  });
-
-  it('returns affected:[] when a target id is missing', () => {
-    let doc = createEmptyDocument();
-    const refR = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
-    doc = refR.document;
-    const result = execute(doc, 'align', {
-      targetIds: ['ghost'],
-      edge: 'max-x',
-      referenceId: refR.affected[0]!,
-    });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('is pure — input document is not mutated', () => {
-    let doc = createEmptyDocument();
-    const refR = execute(doc, 'add_box', { size: [2, 2, 2], position: [10, 0, 0] });
-    doc = refR.document;
-    const tR = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
-    doc = tR.document;
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'align', {
-      targetIds: [tR.affected[0]!],
-      edge: 'min-x',
-      referenceId: refR.affected[0]!,
-    });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
+  it.each<[string, (id: string) => object, string?]>([
+    ['align', () => ({ targetIds: ['some-id'], edge: 'min-x', referenceId: 'no-such' }), 'no-such'],
+    ['align', (id) => ({ targetIds: ['ghost'], edge: 'max-x', referenceId: id })],
+    ['distribute', (id) => ({ targetIds: [id], axis: 'x' }), 'at least 2'],
+    ['distribute', (id) => ({ targetIds: [id, 'ghost'], axis: 'y' })],
+    ['stack_on', (id) => ({ movingId: 'ghost', baseId: id })],
+    ['stack_on', (id) => ({ movingId: id, baseId: 'ghost' })],
+  ])('%s is a no-op (%#)', (name, p, summary) => expectNoOp(execute(boxDoc, name, p(boxId)), boxDoc, summary));
 });
-
-// distribute
-
-describe('distribute', () => {
-  it('distributes 3 boxes with equal-spacing along x', () => {
-    let doc = createEmptyDocument();
-    // Place boxes at x=0, x=5, x=20 (not evenly spaced); distribute should move middle to x=10.
-    const r0 = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
-    doc = r0.document;
-    const r1 = execute(doc, 'add_box', { size: [2, 2, 2], position: [5, 0, 0] });
-    doc = r1.document;
-    const r2 = execute(doc, 'add_box', { size: [2, 2, 2], position: [20, 0, 0] });
-    doc = r2.document;
-
-    const ids = [r0.affected[0]!, r1.affected[0]!, r2.affected[0]!];
-    const result = execute(doc, 'distribute', { targetIds: ids, axis: 'x', mode: 'equal-spacing' });
-    // Middle entity should be moved to center between 0 and 20 → x=10.
-    expect(result.affected).toContain(ids[1]);
-    expect(result.document.entities[ids[1]!]!.position[0]).toBeCloseTo(10);
-    // Anchors (first and last by position) should not appear in affected.
-    expect(result.affected).not.toContain(ids[0]);
-    expect(result.affected).not.toContain(ids[2]);
-  });
-
-  it('distributes 3 boxes with equal-gap along z', () => {
-    let doc = createEmptyDocument();
-    // size [2,2,2] boxes: place at z=0, z=3, z=20; equal-gap should space gaps evenly.
-    const r0 = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
-    doc = r0.document;
-    const r1 = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 3] });
-    doc = r1.document;
-    const r2 = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 20] });
-    doc = r2.document;
-
-    const ids = [r0.affected[0]!, r1.affected[0]!, r2.affected[0]!];
-    const result = execute(doc, 'distribute', { targetIds: ids, axis: 'z', mode: 'equal-gap' });
-    expect(result.affected).toContain(ids[1]);
-    // totalSpan = (20+1)-(0-1)=22; entityWidths = 3*2=6; remaining=16; gap=8
-    // first right edge = 0+1=1; first entity ends at 1; gap=8; second entity center = 1+8+1=10
-    expect(result.document.entities[ids[1]!]!.position[2]).toBeCloseTo(10);
-  });
-
-  it('returns affected:[] when targetIds < 2', () => {
-    let doc = createEmptyDocument();
-    const r = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = r.document;
-    const result = execute(doc, 'distribute', { targetIds: [r.affected[0]!], axis: 'x' });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    expect(result.summary).toContain('at least 2');
-  });
-
-  it('returns affected:[] when an entity id is missing', () => {
-    let doc = createEmptyDocument();
-    const r = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = r.document;
-    const result = execute(doc, 'distribute', { targetIds: [r.affected[0]!, 'ghost'], axis: 'y' });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('is pure — input document is not mutated', () => {
-    let doc = createEmptyDocument();
-    const r0 = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
-    doc = r0.document;
-    const r1 = execute(doc, 'add_box', { size: [2, 2, 2], position: [5, 0, 0] });
-    doc = r1.document;
-    const r2 = execute(doc, 'add_box', { size: [2, 2, 2], position: [20, 0, 0] });
-    doc = r2.document;
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'distribute', {
-      targetIds: [r0.affected[0]!, r1.affected[0]!, r2.affected[0]!],
-      axis: 'x',
-    });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-});
-
-// stack_on
-
-describe('stack_on', () => {
-  it('stacks a box on top of another box along z (default)', () => {
-    let doc = createEmptyDocument();
-    // base: position [0,0,0], size [4,4,2] → bounds.max.z = 1
-    const baseR = execute(doc, 'add_box', { size: [4, 4, 2], position: [0, 0, 0] });
-    doc = baseR.document;
-    const baseId = baseR.affected[0]!;
-    // moving: position [0,0,0], size [2,2,2] → bounds.min.z = -1
-    const movR = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
-    doc = movR.document;
-    const movId = movR.affected[0]!;
-
-    const result = execute(doc, 'stack_on', { movingId: movId, baseId });
-    expect(result.affected).toEqual([movId]);
-    // After stacking: movingBounds.min.z should equal baseBounds.max.z = 1
-    // box center positioned so min.z = 1 → position.z = 1 + 1 = 2
-    expect(result.document.entities[movId]!.position[2]).toBeCloseTo(2);
-  });
-
-  it('stacks along x axis', () => {
-    let doc = createEmptyDocument();
-    const baseR = execute(doc, 'add_box', { size: [4, 2, 2], position: [0, 0, 0] });
-    doc = baseR.document;
-    const movR = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
-    doc = movR.document;
-
-    const result = execute(doc, 'stack_on', {
-      movingId: movR.affected[0]!,
-      baseId: baseR.affected[0]!,
-      axis: 'x',
-    });
-    expect(result.affected).toEqual([movR.affected[0]!]);
-    // base max-x = 0 + 4/2 = 2; moving min-x after move = 2 → position.x = 2 + 1 = 3
-    expect(result.document.entities[movR.affected[0]!]!.position[0]).toBeCloseTo(3);
-  });
-
-  it('returns affected:[] when moving entity is missing', () => {
-    let doc = createEmptyDocument();
-    const baseR = execute(doc, 'add_box', { size: [2, 2, 2] });
-    doc = baseR.document;
-    const result = execute(doc, 'stack_on', { movingId: 'ghost', baseId: baseR.affected[0]! });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('returns affected:[] when base entity is missing', () => {
-    let doc = createEmptyDocument();
-    const movR = execute(doc, 'add_box', { size: [2, 2, 2] });
-    doc = movR.document;
-    const result = execute(doc, 'stack_on', { movingId: movR.affected[0]!, baseId: 'ghost' });
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-  });
-
-  it('is pure — input document is not mutated', () => {
-    let doc = createEmptyDocument();
-    const baseR = execute(doc, 'add_box', { size: [4, 4, 2], position: [0, 0, 0] });
-    doc = baseR.document;
-    const movR = execute(doc, 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
-    doc = movR.document;
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'stack_on', { movingId: movR.affected[0]!, baseId: baseR.affected[0]! });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-});
-
-// build_project — repeat / for_each control-flow
 
 describe('build_project repeat/for_each', () => {
-  it('repeat: creates 5 boxes using count literal', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'build_project', {
-      actions: [
-        {
-          repeat: { count: 5 },
-          step: { command: 'add_box', params: { size: [1, 1, 1] } },
-        },
-      ],
-    });
-    expect(result.document.order.length).toBe(5);
-    expect(result.affected).toHaveLength(5);
+  const plan = (doc: CadDocument, actions: unknown[], extra: object = {}): ReturnType<typeof execute> =>
+    execute(doc, 'build_project', { actions, ...extra });
+  const boxStep = { command: 'add_box', params: { size: [1, 1, 1] } };
+  const xs = (r: ReturnType<typeof execute>): number[] => r.affected.map((id) => r.document.entities[id]!.position[0]);
+  const radii = (r: ReturnType<typeof execute>): unknown[] => r.affected.map((id) => (r.document.entities[id] as Loose)['radius']);
+
+  it('repeat: literal and parameter counts, $i in params, purely', () => {
+    const r = plan(empty(), [{ repeat: { count: 5 }, step: boxStep }]);
+    expect([r.document.order.length, r.affected.length]).toEqual([5, 5]);
+    const positioned = plan(empty(), [
+      { repeat: { count: 3 }, step: { command: 'add_box', params: { size: [1, 1, 1], position: ['=i * 3', 0, 0] } } },
+    ]);
+    expect(xs(positioned)).toEqual([0, 3, 6]);
+    expect(plan(params(['N', '4']), [{ repeat: { count: '=N + 1' }, step: boxStep }]).affected).toHaveLength(5);
+    const doc = empty();
+    expectPure(doc, () => plan(doc, [{ repeat: { count: 3 }, step: boxStep }]));
   });
 
-  it('repeat: uses $i expression in params to position cubes', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'build_project', {
-      actions: [
-        {
-          repeat: { count: 3 },
-          step: { command: 'add_box', params: { size: [1, 1, 1], position: ['=i * 3', 0, 0] } },
-        },
-      ],
-    });
-    expect(result.affected).toHaveLength(3);
-    // Positions should be at x=0, x=3, x=6.
-    const positions = result.affected.map((id) => result.document.entities[id]!.position[0]);
-    expect(positions[0]).toBeCloseTo(0);
-    expect(positions[1]).toBeCloseTo(3);
-    expect(positions[2]).toBeCloseTo(6);
-  });
-
-  it('repeat: count expression evaluated against doc.parameters', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'set_parameter', { name: 'N', expression: '4' }).document;
-
-    const result = execute(doc, 'build_project', {
-      actions: [
-        {
-          repeat: { count: '=N + 1' },
-          step: { command: 'add_box', params: { size: [1, 1, 1] } },
-        },
-      ],
-    });
-    // N=4, count=5
-    expect(result.affected).toHaveLength(5);
-  });
-
-  it('repeat: count < 0 is a graceful no-op step', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'build_project', {
-      actions: [
-        {
-          repeat: { count: -1 },
-          step: { command: 'add_box', params: { size: [1, 1, 1] } },
-        },
-      ],
-      onError: 'continue',
-    });
-    // No entities created; step should be reported as failed.
-    expect(result.document.order).toHaveLength(0);
-    expect(result.affected).toHaveLength(0);
-  });
-
-  it('for_each: iterates over array of radii', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'build_project', {
-      actions: [
-        {
-          for_each: { values: [1, 2, 4], as: 'r' },
-          step: { command: 'add_sphere', params: { radius: '=$r' } },
-        },
-      ],
-    });
-    expect(result.affected).toHaveLength(3);
-    // Check radii: 1, 2, 4
-    const radii = result.affected.map((id) => {
-      const e = result.document.entities[id] as { radius: number };
-      return e.radius;
-    });
-    expect(radii[0]).toBeCloseTo(1);
-    expect(radii[1]).toBeCloseTo(2);
-    expect(radii[2]).toBeCloseTo(4);
-  });
-
-  it('for_each: exposes $i (index) in expressions', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'build_project', {
-      actions: [
-        {
-          for_each: { values: [10, 20, 30], as: 'val' },
-          step: { command: 'add_box', params: { size: [1, 1, 1], position: ['=i * 5', 0, 0] } },
-        },
-      ],
-    });
-    expect(result.affected).toHaveLength(3);
-    const positions = result.affected.map((id) => result.document.entities[id]!.position[0]);
-    expect(positions[0]).toBeCloseTo(0);
-    expect(positions[1]).toBeCloseTo(5);
-    expect(positions[2]).toBeCloseTo(10);
-  });
-
-  it('for_each: non-array values resolved via expression string', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'set_parameter', { name: 'radius', expression: '7' }).document;
-
-    const result = execute(doc, 'build_project', {
-      actions: [
-        {
-          for_each: { values: '=radius', as: 'r' },
-          step: { command: 'add_sphere', params: { radius: '=$r' } },
-        },
-      ],
-    });
-    // Expression evaluates to scalar 7, wrapped as [7] → 1 iteration.
-    expect(result.affected).toHaveLength(1);
-    const e = result.document.entities[result.affected[0]!] as { radius: number };
-    expect(e.radius).toBeCloseTo(7);
-  });
-
-  it('for_each: non-array literal string (non-resolvable) is a graceful no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'build_project', {
-      actions: [
-        {
-          for_each: { values: '=unknown_param_xyz', as: 'r' },
-          step: { command: 'add_sphere', params: { radius: 1 } },
-        },
-      ],
-      onError: 'continue',
-    });
-    expect(result.document.order).toHaveLength(0);
-    expect(result.affected).toHaveLength(0);
-  });
-
-  it('build_project repeat/for_each is pure — input doc not mutated', () => {
-    const doc = createEmptyDocument();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'build_project', {
-      actions: [
-        {
-          repeat: { count: 3 },
-          step: { command: 'add_box', params: { size: [1, 1, 1] } },
-        },
-      ],
-    });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('abort on first repeat failure rolls back the whole document', () => {
-    const doc = createEmptyDocument();
-    // First action succeeds; repeat step creates a box but then the repeat itself
-    // uses a bad count expression which will fail → rollback.
-    const result = execute(doc, 'build_project', {
-      actions: [
-        { command: 'add_box', params: { size: [1, 1, 1] } },
-        {
-          repeat: { count: -2 },
-          step: { command: 'add_box', params: { size: [1, 1, 1] } },
-        },
-      ],
-      onError: 'abort',
-    });
-    // Rolled back: document should be unchanged.
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-  });
-
-  // ── add_constraint ────────────────────────────────────────────────────────
-
-  it('add_constraint (coincident) appends to constraints and constraintOrder', () => {
-    let doc = createEmptyDocument();
-    const a = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    doc = a.document;
-    const b = execute(doc, 'add_box', { size: [1, 1, 1], position: [3, 0, 0] });
-    doc = b.document;
-    const idA = a.affected[0]!;
-    const idB = b.affected[0]!;
-
-    const result = execute(doc, 'add_constraint', {
-      constraint: { kind: 'coincident', a: { entityId: idA }, b: { entityId: idB } },
-    });
-
-    expect(result.affected).toHaveLength(1);
-    const cid = result.affected[0]!;
-    expect(result.document.constraints[cid]).toBeDefined();
-    expect(result.document.constraints[cid]!.kind).toBe('coincident');
-    expect(result.document.constraintOrder).toContain(cid);
-    expect(result.summary).toContain(cid);
-  });
-
-  it('add_constraint (distance) stores value field', () => {
-    let doc = createEmptyDocument();
-    const a = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    doc = a.document;
-    const b = execute(doc, 'add_box', { size: [1, 1, 1], position: [5, 0, 0] });
-    doc = b.document;
-    const idA = a.affected[0]!;
-    const idB = b.affected[0]!;
-
-    const result = execute(doc, 'add_constraint', {
-      constraint: { kind: 'distance', a: { entityId: idA }, b: { entityId: idB }, value: 10 },
-    });
-
-    const cid = result.affected[0]!;
-    const c = result.document.constraints[cid]!;
-    expect(c.kind).toBe('distance');
-    // @ts-expect-error narrowing via discriminated union not needed in test
-    expect(c.value).toBe(10);
-  });
-
-  it('add_constraint with explicit id uses that id', () => {
-    let doc = createEmptyDocument();
-    const a = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = a.document;
-    const b = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = b.document;
-
-    const result = execute(doc, 'add_constraint', {
-      constraint: {
-        kind: 'coincident',
-        a: { entityId: a.affected[0]! },
-        b: { entityId: b.affected[0]! },
+  it('for_each: values array, $i, scalar expression values', () => {
+    const sphereR = { command: 'add_sphere', params: { radius: '=$r' } };
+    expect(radii(plan(empty(), [{ for_each: { values: [1, 2, 4], as: 'r' }, step: sphereR }]))).toEqual([1, 2, 4]);
+    const indexed = plan(empty(), [
+      {
+        for_each: { values: [10, 20, 30], as: 'val' },
+        step: { command: 'add_box', params: { size: [1, 1, 1], position: ['=i * 5', 0, 0] } },
       },
-      id: 'my-constraint',
-    });
-
-    expect(result.affected[0]).toBe('my-constraint');
-    expect(result.document.constraints['my-constraint']).toBeDefined();
+    ]);
+    expect(xs(indexed)).toEqual([0, 5, 10]);
+    expect(radii(plan(params(['radius', '7']), [{ for_each: { values: '=radius', as: 'r' }, step: sphereR }]))).toEqual([7]);
   });
 
-  it('add_constraint with duplicate explicit id is a no-op', () => {
-    let doc = createEmptyDocument();
-    const a = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = a.document;
-    const b = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = b.document;
-    const first = execute(doc, 'add_constraint', {
-      constraint: {
-        kind: 'coincident',
-        a: { entityId: a.affected[0]! },
-        b: { entityId: b.affected[0]! },
-      },
+  it.each<[unknown[], string]>([
+    [[{ repeat: { count: -1 }, step: boxStep }], 'continue'],
+    [[{ for_each: { values: '=unknown_param_xyz', as: 'r' }, step: { command: 'add_sphere', params: { radius: 1 } } }], 'continue'],
+    [[boxStep, { repeat: { count: -2 }, step: boxStep }], 'abort'],
+  ])('a failing control-flow step creates nothing (%#)', (actions, onError) => {
+    const doc = empty();
+    const r = plan(doc, actions, { onError });
+    expect([r.document.order.length, r.affected.length]).toEqual([0, 0]);
+    if (onError === 'abort') expect(r.document).toBe(doc);
+  });
+});
+
+describe('constraints', () => {
+  const pair = placed(
+    [
+      [1, 1, 1],
+      [0, 0, 0],
+    ],
+    [
+      [1, 1, 1],
+      [5, 0, 0],
+    ],
+  );
+  const [a, b] = pair.ids as [string, string];
+  const constrain = (doc: CadDocument, kind: string, x: string, y: string, extra: object = {}): ReturnType<typeof execute> =>
+    execute(doc, 'add_constraint', { constraint: { kind, a: { entityId: x }, b: { entityId: y }, ...extra } });
+  const solve = (doc: CadDocument): { doc: CadDocument; data: { residual: number; iterations: number; converged: boolean } } => {
+    const r = execute(doc, 'solve_constraints', {});
+    return { doc: r.document, data: r.data as { residual: number; iterations: number; converged: boolean } };
+  };
+  const coincident = constrain(pair.doc, 'coincident', a, b);
+  const distance = constrain(pair.doc, 'distance', a, b, { value: 5 });
+
+  it('add_constraint stores coincident / distance constraints (explicit ids too), purely', () => {
+    const cid = coincident.affected[0]!;
+    expect(coincident.affected).toHaveLength(1);
+    expect(coincident.document.constraints[cid]!.kind).toBe('coincident');
+    expect(coincident.document.constraintOrder).toContain(cid);
+    expect(coincident.summary).toContain(cid);
+    const d10 = constrain(pair.doc, 'distance', a, b, { value: 10 });
+    expect(d10.document.constraints[d10.affected[0]!]).toMatchObject({ kind: 'distance', value: 10 });
+    const named = execute(pair.doc, 'add_constraint', {
+      constraint: { kind: 'coincident', a: { entityId: a }, b: { entityId: b } },
       id: 'dup',
     });
-    doc = first.document;
-
-    const second = execute(doc, 'add_constraint', {
-      constraint: {
-        kind: 'coincident',
-        a: { entityId: a.affected[0]! },
-        b: { entityId: b.affected[0]! },
-      },
-      id: 'dup',
-    });
-
-    expect(second.document).toBe(doc);
-    expect(second.affected).toHaveLength(0);
+    expect(named.affected).toEqual(['dup']);
+    expect(named.document.constraints['dup']).toBeDefined();
+    expectNoOp(
+      execute(named.document, 'add_constraint', { constraint: { kind: 'coincident', a: { entityId: a }, b: { entityId: b } }, id: 'dup' }),
+      named.document,
+    );
+    expectPure(pair.doc, () => constrain(pair.doc, 'coincident', a, b));
   });
 
-  it('add_constraint with malformed kind is a no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_constraint', {
-      constraint: { kind: 'invalid_kind', a: { entityId: 'e1' }, b: { entityId: 'e2' } },
-    });
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-    expect(result.summary).toContain('invalid_kind');
+  it.each<[string, object, string?]>([
+    ['add_constraint', { constraint: { kind: 'invalid_kind', a: { entityId: 'e1' }, b: { entityId: 'e2' } } }, 'invalid_kind'],
+    ['add_constraint', { constraint: { kind: 'distance', a: { entityId: 'e1' }, b: { entityId: 'e2' } } }],
+    ['delete_constraint', { id: 'ghost-con' }, 'ghost-con'],
+    ['update_constraint', { id: 'no-such', patch: { value: 5 } }, 'no-such'],
+  ])('%s %j is a no-op', (name, p, summary) => {
+    const doc = empty();
+    expectNoOp(execute(doc, name, p), doc, summary);
   });
 
-  it('add_constraint distance without value is a no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'add_constraint', {
-      constraint: { kind: 'distance', a: { entityId: 'e1' }, b: { entityId: 'e2' } },
-    });
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
+  it('delete_constraint removes it from constraints and order, purely', () => {
+    const cid = coincident.affected[0]!;
+    const r = execute(coincident.document, 'delete_constraint', { id: cid });
+    expect(r.document.constraints[cid]).toBeUndefined();
+    expect(r.document.constraintOrder).not.toContain(cid);
+    expect(r.affected).toHaveLength(0);
+    expect(r.summary).toContain(cid);
+    expectPure(coincident.document, () => execute(coincident.document, 'delete_constraint', { id: cid }));
   });
 
-  it('add_constraint is pure — input document is not mutated', () => {
-    let doc = createEmptyDocument();
-    const a = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = a.document;
-    const b = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = b.document;
-    const snapshot = JSON.stringify(doc);
-
-    execute(doc, 'add_constraint', {
-      constraint: {
-        kind: 'coincident',
-        a: { entityId: a.affected[0]! },
-        b: { entityId: b.affected[0]! },
-      },
+  it('update_constraint patches distance values (numbers or parameter names), refuses geometric ones, purely', () => {
+    const cid = distance.affected[0]!;
+    const r = execute(distance.document, 'update_constraint', { id: cid, patch: { value: 12 } });
+    expect(r.affected).toContain(cid);
+    expect(r.document.constraints[cid]).toMatchObject({ value: 12 });
+    expect(r.summary).toContain(cid);
+    expect(run(distance.document, 'update_constraint', { id: cid, patch: { value: 'gap' } }).constraints[cid]).toMatchObject({
+      value: 'gap',
     });
-
-    expect(JSON.stringify(doc)).toBe(snapshot);
+    expectNoOp(
+      execute(coincident.document, 'update_constraint', { id: coincident.affected[0], patch: { value: 99 } }),
+      coincident.document,
+    );
+    expectPure(distance.document, () => execute(distance.document, 'update_constraint', { id: cid, patch: { value: 20 } }));
   });
 
-  // ── delete_constraint ─────────────────────────────────────────────────────
-
-  it('delete_constraint removes the constraint and its order entry', () => {
-    let doc = createEmptyDocument();
-    const a = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = a.document;
-    const b = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = b.document;
-    const added = execute(doc, 'add_constraint', {
-      constraint: {
-        kind: 'coincident',
-        a: { entityId: a.affected[0]! },
-        b: { entityId: b.affected[0]! },
-      },
-    });
-    doc = added.document;
-    const cid = added.affected[0]!;
-
-    const result = execute(doc, 'delete_constraint', { id: cid });
-
-    expect(result.document.constraints[cid]).toBeUndefined();
-    expect(result.document.constraintOrder).not.toContain(cid);
-    expect(result.affected).toHaveLength(0);
-    expect(result.summary).toContain(cid);
+  it('solve_constraints: trivially converged when empty; coincident converges; always reports residual/iterations, purely', () => {
+    const e = solve(empty());
+    expect(e.doc.entities).toEqual({});
+    expect(e.data).toMatchObject({ converged: true, iterations: 0 });
+    const c = solve(coincident.document);
+    expect(gap(c.doc, a, b)).toBeLessThan(0.01);
+    expect(c.data.converged).toBe(true);
+    expect(c.data.residual).toBeLessThan(1e-6);
+    expect(c.data.iterations).toBeGreaterThan(0);
+    expect(typeof c.data.residual).toBe('number');
+    const same = placed(
+      [
+        [1, 1, 1],
+        [0, 0, 0],
+      ],
+      [
+        [1, 1, 1],
+        [0, 0, 0],
+      ],
+    );
+    expect(typeof solve(constrain(same.doc, 'distance', same.ids[0]!, same.ids[1]!, { value: 10 }).document).data.residual).toBe('number');
+    expectPure(coincident.document, () => execute(coincident.document, 'solve_constraints', {}));
   });
 
-  it('delete_constraint on unknown id is a no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'delete_constraint', { id: 'ghost-con' });
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-    expect(result.summary).toContain('ghost-con');
+  it('solve_constraints follows parameter changes', () => {
+    const start = placed(
+      [
+        [1, 1, 1],
+        [0, 0, 0],
+      ],
+      [
+        [1, 1, 1],
+        [2, 0, 0],
+      ],
+    );
+    const [x, y] = start.ids as [string, string];
+    const withGap = (doc: CadDocument, value: number): CadDocument => ({
+      ...doc,
+      parameters: { gap: { name: 'gap', expression: String(value), value } },
+    });
+    const s1 = solve(constrain(withGap(start.doc, 8), 'distance', x, y, { value: 'gap' }).document).doc;
+    const d1 = gap(s1, x, y);
+    expect(d1).toBeGreaterThan(2);
+    expect(gap(solve(withGap(s1, 4)).doc, x, y)).toBeLessThan(d1 + 0.1);
   });
 
-  it('delete_constraint is pure — input document is not mutated', () => {
-    let doc = createEmptyDocument();
-    const a = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = a.document;
-    const b = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = b.document;
-    const added = execute(doc, 'add_constraint', {
-      constraint: {
-        kind: 'coincident',
-        a: { entityId: a.affected[0]! },
-        b: { entityId: b.affected[0]! },
-      },
-    });
-    doc = added.document;
-    const snapshot = JSON.stringify(doc);
+  it.each<[string, object, number, number]>([
+    ['coincident', {}, 0, 0.01],
+    ['distance', { value: 5 }, 3, 7],
+  ])('%s mates between assembly instances solve', (kind, extra, min, max) => {
+    let doc = empty();
+    const insts: string[] = [];
+    for (const [name, dx] of [
+      ['A', 2],
+      ['B', 8],
+    ] as const) {
+      const s = box(doc);
+      const c = execute(s.doc, 'create_component', { name, entityIds: [s.id] });
+      insts.push(c.affected[0]!);
+      doc = run(c.document, 'move_entities', { ids: [c.affected[0]], delta: [kind === 'distance' ? (name === 'B' ? 20 : 0) : dx, 0, 0] });
+    }
+    const [ia, ib] = insts as [string, string];
+    const mate = constrain(doc, kind, ia, ib, extra);
+    expect(mate.affected).toHaveLength(1);
+    expect(mate.document.constraints[mate.affected[0]!]).toMatchObject({ kind, ...extra });
+    expect(mate.document.constraintOrder).toContain(mate.affected[0]);
+    const d = gap(solve(mate.document).doc, ia, ib);
+    expect(d).toBeGreaterThanOrEqual(min);
+    expect(d).toBeLessThan(max);
+  });
+});
 
-    execute(doc, 'delete_constraint', { id: added.affected[0]! });
-    expect(JSON.stringify(doc)).toBe(snapshot);
+describe('bill_of_materials', () => {
+  type Bom = {
+    rows: Array<{
+      componentId: string;
+      componentName: string;
+      count: number;
+      orphan?: boolean;
+      perEntityKindCounts: Record<string, number>;
+    }>;
+    totalInstances: number;
+    distinctComponents: number;
+  };
+  const bom = (doc: CadDocument): { r: ReturnType<typeof execute>; data: Bom } => {
+    const r = execute(doc, 'bill_of_materials', {});
+    return { r, data: r.data as Bom };
+  };
+  const component = (doc: CadDocument, name: string, kind: string, p: object, extra = 0): CadDocument => {
+    const s = add(doc, kind, p);
+    let d = run(s.doc, 'create_component', { name, entityIds: [s.id] });
+    const componentId = Object.values(d.components).find((c) => c.name === name)!.id;
+    for (let i = 0; i < extra; i++) d = run(d, 'insert_instance', { componentId });
+    return d;
+  };
+
+  it('no instances → empty rows, read-only', () => {
+    const { r, data } = bom(boxDoc);
+    expectNoOp(r, boxDoc);
+    expect(data).toMatchObject({ rows: [], totalInstances: 0, distinctComponents: 0 });
   });
 
-  // ── update_constraint ─────────────────────────────────────────────────────
-
-  it('update_constraint changes the value of a distance constraint', () => {
-    let doc = createEmptyDocument();
-    const a = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    doc = a.document;
-    const b = execute(doc, 'add_box', { size: [1, 1, 1], position: [5, 0, 0] });
-    doc = b.document;
-    const added = execute(doc, 'add_constraint', {
-      constraint: {
-        kind: 'distance',
-        a: { entityId: a.affected[0]! },
-        b: { entityId: b.affected[0]! },
-        value: 5,
-      },
+  it('groups instances per component with per-kind counts; summary names them; pure', () => {
+    const one = component(empty(), 'Bracket', 'add_box', { size: [1, 1, 1] });
+    expect(bom(one).r.summary).toContain('1');
+    expect(bom(one).r.summary).toContain('Bracket');
+    expectPure(one, () => execute(one, 'bill_of_materials', {}));
+    const bolt = bom(component(empty(), 'Bolt', 'add_box', { size: [1, 1, 1] }, 1)).data;
+    expect(bolt).toMatchObject({
+      totalInstances: 2,
+      distinctComponents: 1,
+      rows: [{ componentName: 'Bolt', count: 2, perEntityKindCounts: { box: 1 } }],
     });
-    doc = added.document;
-    const cid = added.affected[0]!;
-
-    const result = execute(doc, 'update_constraint', { id: cid, patch: { value: 12 } });
-
-    expect(result.affected).toContain(cid);
-    const updated = result.document.constraints[cid]!;
-    // @ts-expect-error narrowing via discriminated union not needed in test
-    expect(updated.value).toBe(12);
-    expect(result.summary).toContain(cid);
+    const mixed = bom(
+      component(component(empty(), 'Wheel', 'add_cylinder', { radius: 1, height: 0.5 }, 1), 'Hub', 'add_sphere', { radius: 0.5 }, 1),
+    ).data;
+    expect([mixed.totalInstances, mixed.distinctComponents]).toEqual([4, 2]);
+    expect(mixed.rows.find((r) => r.componentName === 'Wheel')).toMatchObject({ count: 2, perEntityKindCounts: { cylinder: 1 } });
+    expect(mixed.rows.find((r) => r.componentName === 'Hub')).toMatchObject({ count: 2, perEntityKindCounts: { sphere: 1 } });
   });
 
-  it('update_constraint with a parameter expression string is accepted', () => {
-    let doc = createEmptyDocument();
-    const a = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = a.document;
-    const b = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = b.document;
-    execute(doc, 'set_parameter', { name: 'gap', expression: '7' });
-    const added = execute(doc, 'add_constraint', {
-      constraint: {
-        kind: 'distance',
-        a: { entityId: a.affected[0]! },
-        b: { entityId: b.affected[0]! },
-        value: 5,
-      },
-    });
-    doc = added.document;
-    const cid = added.affected[0]!;
-
-    const result = execute(doc, 'update_constraint', { id: cid, patch: { value: 'gap' } });
-
-    const updated = result.document.constraints[cid]!;
-    // @ts-expect-error narrowing via discriminated union not needed in test
-    expect(updated.value).toBe('gap');
-  });
-
-  it('update_constraint on unknown id is a no-op', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'update_constraint', { id: 'no-such', patch: { value: 5 } });
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-    expect(result.summary).toContain('no-such');
-  });
-
-  it('update_constraint setting value on a geometric constraint is a no-op', () => {
-    let doc = createEmptyDocument();
-    const a = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = a.document;
-    const b = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = b.document;
-    const added = execute(doc, 'add_constraint', {
-      constraint: {
-        kind: 'coincident',
-        a: { entityId: a.affected[0]! },
-        b: { entityId: b.affected[0]! },
-      },
-    });
-    doc = added.document;
-    const cid = added.affected[0]!;
-
-    const result = execute(doc, 'update_constraint', { id: cid, patch: { value: 99 } });
-    expect(result.document).toBe(doc);
-    expect(result.affected).toHaveLength(0);
-  });
-
-  it('update_constraint is pure — input document is not mutated', () => {
-    let doc = createEmptyDocument();
-    const a = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = a.document;
-    const b = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = b.document;
-    const added = execute(doc, 'add_constraint', {
-      constraint: {
-        kind: 'distance',
-        a: { entityId: a.affected[0]! },
-        b: { entityId: b.affected[0]! },
-        value: 5,
-      },
-    });
-    doc = added.document;
-    const snapshot = JSON.stringify(doc);
-
-    execute(doc, 'update_constraint', { id: added.affected[0]!, patch: { value: 20 } });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  // ── solve_constraints ─────────────────────────────────────────────────────
-
-  it('solve_constraints with no constraints returns converged:true and same doc reference', () => {
-    const doc = createEmptyDocument();
-    const result = execute(doc, 'solve_constraints', {});
-
-    expect(result.affected).toHaveLength(0);
-    // No constraints — document content unchanged (solver returns same entities).
-    expect(result.document.entities).toEqual(doc.entities);
-    expect((result.data as { converged: boolean }).converged).toBe(true);
-    expect((result.data as { iterations: number }).iterations).toBe(0);
-  });
-
-  it('solve_constraints (coincident) moves one entity toward the other', () => {
-    let doc = createEmptyDocument();
-    const a = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    doc = a.document;
-    const b = execute(doc, 'add_box', { size: [1, 1, 1], position: [4, 0, 0] });
-    doc = b.document;
-    const idA = a.affected[0]!;
-    const idB = b.affected[0]!;
-
-    const constrained = execute(doc, 'add_constraint', {
-      constraint: { kind: 'coincident', a: { entityId: idA }, b: { entityId: idB } },
-    });
-    doc = constrained.document;
-
-    const solved = execute(doc, 'solve_constraints', {});
-    const data = solved.data as { residual: number; converged: boolean };
-
-    // After solving, the two entities should be much closer together.
-    const posA = solved.document.entities[idA]!.position;
-    const posB = solved.document.entities[idB]!.position;
-    const dist = Math.sqrt((posA[0] - posB[0]) ** 2 + (posA[1] - posB[1]) ** 2);
-    expect(dist).toBeLessThan(0.01);
-    expect(data.converged).toBe(true);
-    expect(data.residual).toBeLessThan(1e-6);
-  });
-
-  it('solve_constraints (distance) moves entities to satisfy target distance', () => {
-    let doc = createEmptyDocument();
-    const a = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    doc = a.document;
-    const b = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    doc = b.document;
-    const idA = a.affected[0]!;
-    const idB = b.affected[0]!;
-
-    const constrained = execute(doc, 'add_constraint', {
-      constraint: { kind: 'distance', a: { entityId: idA }, b: { entityId: idB }, value: 10 },
-    });
-    doc = constrained.document;
-
-    const solved = execute(doc, 'solve_constraints', {});
-    const posA = solved.document.entities[idA]!.position;
-    const posB = solved.document.entities[idB]!.position;
-    void posA;
-    void posB;
-    // The solver should have moved the entities apart toward the target distance.
-    // When starting at same position the gradient is zero so solver won't converge,
-    // but at least no error is thrown and data.residual is defined.
-    expect(typeof (solved.data as { residual: number }).residual).toBe('number');
-  });
-
-  it('solve_constraints integration: parameter change + solve updates entity position', () => {
-    // Set up: parameter 'gap' = 8, two boxes, distance constraint = 'gap'.
-    let doc = createEmptyDocument();
-    execute(doc, 'set_parameter', { name: 'gap', expression: '8' });
-    // Note: set_parameter is metaHistory, we apply it directly for test setup.
-    doc = { ...doc, parameters: { gap: { name: 'gap', expression: '8', value: 8 } } };
-
-    const a = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    doc = a.document;
-    const b = execute(doc, 'add_box', { size: [1, 1, 1], position: [2, 0, 0] });
-    doc = b.document;
-    const idA = a.affected[0]!;
-    const idB = b.affected[0]!;
-
-    // Add distance constraint referencing the parameter.
-    const constrained = execute(doc, 'add_constraint', {
-      constraint: { kind: 'distance', a: { entityId: idA }, b: { entityId: idB }, value: 'gap' },
-    });
-    doc = constrained.document;
-
-    // Solve — entities start 2 units apart, target is 8.
-    const solved1 = execute(doc, 'solve_constraints', {});
-    const pos1A = solved1.document.entities[idA]!.position;
-    const pos1B = solved1.document.entities[idB]!.position;
-    const dist1 = Math.sqrt((pos1A[0] - pos1B[0]) ** 2 + (pos1A[1] - pos1B[1]) ** 2);
-    // Should be closer to 8 than the initial 2.
-    expect(dist1).toBeGreaterThan(2);
-
-    // Now change the parameter to gap = 4 and re-solve.
-    doc = solved1.document;
-    doc = { ...doc, parameters: { gap: { name: 'gap', expression: '4', value: 4 } } };
-    const solved2 = execute(doc, 'solve_constraints', {});
-    const pos2A = solved2.document.entities[idA]!.position;
-    const pos2B = solved2.document.entities[idB]!.position;
-    const dist2 = Math.sqrt((pos2A[0] - pos2B[0]) ** 2 + (pos2A[1] - pos2B[1]) ** 2);
-    // After re-solve with gap=4, distance should be closer to 4.
-    expect(dist2).toBeLessThan(dist1 + 0.1); // moved toward the new target
-  });
-
-  it('solve_constraints is pure — input document is not mutated', () => {
-    let doc = createEmptyDocument();
-    const a = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    doc = a.document;
-    const b = execute(doc, 'add_box', { size: [1, 1, 1], position: [4, 0, 0] });
-    doc = b.document;
-    const constrained = execute(doc, 'add_constraint', {
-      constraint: {
-        kind: 'coincident',
-        a: { entityId: a.affected[0]! },
-        b: { entityId: b.affected[0]! },
-      },
-    });
-    doc = constrained.document;
-    const snapshot = JSON.stringify(doc);
-
-    execute(doc, 'solve_constraints', {});
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('solve_constraints data always has residual, iterations, converged fields', () => {
-    let doc = createEmptyDocument();
-    const a = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    doc = a.document;
-    const b = execute(doc, 'add_box', { size: [1, 1, 1], position: [6, 0, 0] });
-    doc = b.document;
-    const constrained = execute(doc, 'add_constraint', {
-      constraint: {
-        kind: 'coincident',
-        a: { entityId: a.affected[0]! },
-        b: { entityId: b.affected[0]! },
-      },
-    });
-    doc = constrained.document;
-
-    const result = execute(doc, 'solve_constraints', {});
-    const data = result.data as { residual: number; iterations: number; converged: boolean };
-    expect(typeof data.residual).toBe('number');
-    expect(typeof data.iterations).toBe('number');
-    expect(typeof data.converged).toBe('boolean');
-    expect(data.iterations).toBeGreaterThan(0);
-  });
-
-  // ── constraints between assembly instances ───────────────────────────────
-
-  it('add_constraint (coincident) between instances: solve_constraints converges', () => {
-    let doc = createEmptyDocument();
-    // Create two components and insert instances at different positions
-    const boxA = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    doc = boxA.document;
-    const compA = execute(doc, 'create_component', {
-      name: 'CompA',
-      entityIds: [boxA.affected[0]!],
-    });
-    doc = compA.document;
-    const instA = compA.affected[0]!;
-
-    // Move instance A to [2, 0, 0]
-    doc = execute(doc, 'move_entities', { ids: [instA], delta: [2, 0, 0] }).document;
-
-    const boxB = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    doc = boxB.document;
-    const compB = execute(doc, 'create_component', {
-      name: 'CompB',
-      entityIds: [boxB.affected[0]!],
-    });
-    doc = compB.document;
-    const instB = compB.affected[0]!;
-
-    // Move instance B to [8, 0, 0]
-    doc = execute(doc, 'move_entities', { ids: [instB], delta: [8, 0, 0] }).document;
-
-    // Verify they start apart
-    expect(doc.entities[instA]!.position[0]).toBe(2);
-    expect(doc.entities[instB]!.position[0]).toBe(8);
-
-    // Add coincident mate
-    const mateResult = execute(doc, 'add_constraint', {
-      constraint: { kind: 'coincident', a: { entityId: instA }, b: { entityId: instB } },
-    });
-    expect(mateResult.affected).toHaveLength(1);
-    const mateId = mateResult.affected[0]!;
-    doc = mateResult.document;
-
-    // Verify constraint stored
-    expect(doc.constraints[mateId]).toBeDefined();
-    expect(doc.constraints[mateId]!.kind).toBe('coincident');
-    expect(doc.constraintOrder).toContain(mateId);
-
-    // Solve — instances should converge toward the same XY position
-    const solved = execute(doc, 'solve_constraints', {});
-    const posA = solved.document.entities[instA]!.position;
-    const posB = solved.document.entities[instB]!.position;
-    const dist = Math.sqrt((posA[0] - posB[0]) ** 2 + (posA[1] - posB[1]) ** 2);
-    expect(dist).toBeLessThan(0.01);
-  });
-
-  it('add_constraint (distance) between instances: kept apart at target value', () => {
-    let doc = createEmptyDocument();
-    const boxA = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    doc = boxA.document;
-    const compA = execute(doc, 'create_component', {
-      name: 'PartA',
-      entityIds: [boxA.affected[0]!],
-    });
-    doc = compA.document;
-    const instA = compA.affected[0]!;
-
-    const boxB = execute(doc, 'add_box', { size: [1, 1, 1], position: [0, 0, 0] });
-    doc = boxB.document;
-    const compB = execute(doc, 'create_component', {
-      name: 'PartB',
-      entityIds: [boxB.affected[0]!],
-    });
-    doc = compB.document;
-    const instB = compB.affected[0]!;
-
-    // Start them far apart
-    doc = execute(doc, 'move_entities', { ids: [instA], delta: [0, 0, 0] }).document;
-    doc = execute(doc, 'move_entities', { ids: [instB], delta: [20, 0, 0] }).document;
-
-    const mateResult = execute(doc, 'add_constraint', {
-      constraint: { kind: 'distance', a: { entityId: instA }, b: { entityId: instB }, value: 5 },
-    });
-    expect(mateResult.affected).toHaveLength(1);
-    doc = mateResult.document;
-
-    // Constraint stored with value
-    const mateId = mateResult.affected[0]!;
-    const storedConstraint = doc.constraints[mateId]!;
-    expect(storedConstraint.kind).toBe('distance');
-    expect((storedConstraint as { value: unknown }).value).toBe(5);
-
-    // Solve — distance should approach 5
-    const solved = execute(doc, 'solve_constraints', {});
-    const posA = solved.document.entities[instA]!.position;
-    const posB = solved.document.entities[instB]!.position;
-    const dist = Math.sqrt((posA[0] - posB[0]) ** 2 + (posA[1] - posB[1]) ** 2);
-    expect(dist).toBeGreaterThan(3);
-    expect(dist).toBeLessThan(7);
-  });
-
-  // ── bill_of_materials ─────────────────────────────────────────────────────
-
-  it('bill_of_materials: 0 instances → empty rows and zero totals', () => {
-    let doc = createEmptyDocument();
-    // Add some raw geometry (no instances)
-    doc = execute(doc, 'add_box', { size: [1, 1, 1] }).document;
-
-    const result = execute(doc, 'bill_of_materials', {});
-    expect(result.affected).toHaveLength(0);
-    expect(result.document).toBe(doc);
-    const data = result.data as {
-      rows: unknown[];
-      totalInstances: number;
-      distinctComponents: number;
-    };
-    expect(data.rows).toHaveLength(0);
-    expect(data.totalInstances).toBe(0);
-    expect(data.distinctComponents).toBe(0);
-  });
-
-  it('bill_of_materials: is pure — input document is not mutated', () => {
-    let doc = createEmptyDocument();
-    const box = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = box.document;
-    const comp = execute(doc, 'create_component', {
-      name: 'Widget',
-      entityIds: [box.affected[0]!],
-    });
-    doc = comp.document;
-
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'bill_of_materials', {});
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
-
-  it('bill_of_materials: single component with 2 instances → count=2', () => {
-    let doc = createEmptyDocument();
-    const box = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = box.document;
-    const comp = execute(doc, 'create_component', { name: 'Bolt', entityIds: [box.affected[0]!] });
-    doc = comp.document;
-    const compId = Object.keys(doc.components)[0]!;
-
-    // Insert a second instance of the same component
-    doc = execute(doc, 'insert_instance', { componentId: compId }).document;
-
-    const result = execute(doc, 'bill_of_materials', {});
-    const data = result.data as {
-      rows: Array<{
-        componentId: string;
-        componentName: string;
-        count: number;
-        perEntityKindCounts: Record<string, number>;
-      }>;
-      totalInstances: number;
-      distinctComponents: number;
-    };
-    expect(data.totalInstances).toBe(2);
-    expect(data.distinctComponents).toBe(1);
-    expect(data.rows).toHaveLength(1);
-    expect(data.rows[0]!.componentName).toBe('Bolt');
-    expect(data.rows[0]!.count).toBe(2);
-    // The component contains 1 box entity
-    expect(data.rows[0]!.perEntityKindCounts['box']).toBe(1);
-  });
-
-  it('bill_of_materials: mixed components → grouped counts with correct names', () => {
-    let doc = createEmptyDocument();
-
-    // Component 1: "Wheel" — 1 cylinder
-    const cyl = execute(doc, 'add_cylinder', { radius: 1, height: 0.5 });
-    doc = cyl.document;
-    const wheelComp = execute(doc, 'create_component', {
-      name: 'Wheel',
-      entityIds: [cyl.affected[0]!],
-    });
-    doc = wheelComp.document;
-    const wheelCompId = Object.keys(doc.components)[0]!;
-
-    // Component 2: "Hub" — 1 sphere
-    const sph = execute(doc, 'add_sphere', { radius: 0.5 });
-    doc = sph.document;
-    const hubComp = execute(doc, 'create_component', {
-      name: 'Hub',
-      entityIds: [sph.affected[0]!],
-    });
-    doc = hubComp.document;
-    const hubCompId = Object.keys(doc.components).find((id) => id !== wheelCompId)!;
-
-    // After create_component each component already has 1 instance.
-    // Insert one more of each to get 2 + 2.
-    doc = execute(doc, 'insert_instance', { componentId: wheelCompId }).document;
-    doc = execute(doc, 'insert_instance', { componentId: hubCompId }).document;
-
-    const result = execute(doc, 'bill_of_materials', {});
-    const data = result.data as {
-      rows: Array<{
-        componentId: string;
-        componentName: string;
-        count: number;
-        perEntityKindCounts: Record<string, number>;
-      }>;
-      totalInstances: number;
-      distinctComponents: number;
-    };
-
-    expect(data.totalInstances).toBe(4); // 2 wheels + 2 extra hubs + 1 initial wheel inst + 1 initial hub inst = 4
-    expect(data.distinctComponents).toBe(2);
-
-    const wheelRow = data.rows.find((r) => r.componentName === 'Wheel')!;
-    const hubRow = data.rows.find((r) => r.componentName === 'Hub')!;
-
-    expect(wheelRow).toBeDefined();
-    expect(wheelRow.count).toBe(2);
-    expect(wheelRow.perEntityKindCounts['cylinder']).toBe(1);
-
-    expect(hubRow).toBeDefined();
-    expect(hubRow.count).toBe(2);
-    expect(hubRow.perEntityKindCounts['sphere']).toBe(1);
-  });
-
-  it('bill_of_materials: orphan instance (missing componentId) → warning row, no throw', () => {
-    let doc = createEmptyDocument();
-
-    // Manually inject an instance whose componentId does not exist in doc.components
-    const orphanInst = {
+  it('an orphan instance yields a warning row', () => {
+    const orphan = {
       id: 'orphan-inst-1',
-      kind: 'instance' as const,
+      kind: 'instance',
       componentId: 'ghost-comp-id',
-      position: [0, 0, 0] as [number, number, number],
-      rotation: [0, 0, 0] as [number, number, number],
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
       layerId: 'layer-default',
       color: '#c8553d',
     };
-    doc = {
-      ...doc,
-      entities: { ...doc.entities, 'orphan-inst-1': orphanInst },
-      order: [...doc.order, 'orphan-inst-1'],
-    };
-
-    const result = execute(doc, 'bill_of_materials', {});
-    expect(result.affected).toHaveLength(0);
-    const data = result.data as {
-      rows: Array<{ componentId: string; componentName: string; count: number; orphan?: boolean }>;
-      totalInstances: number;
-      distinctComponents: number;
-    };
-    expect(data.totalInstances).toBe(1);
-    expect(data.distinctComponents).toBe(0); // orphan rows don't count
-    expect(data.rows).toHaveLength(1);
-    expect(data.rows[0]!.orphan).toBe(true);
-    expect(data.rows[0]!.componentName).toBe('(missing)');
-    expect(data.rows[0]!.componentId).toBe('ghost-comp-id');
-  });
-
-  it('bill_of_materials: summary contains instance count and component count', () => {
-    let doc = createEmptyDocument();
-    const box = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = box.document;
-    const comp = execute(doc, 'create_component', {
-      name: 'Bracket',
-      entityIds: [box.affected[0]!],
+    const doc = { ...empty(), entities: { 'orphan-inst-1': orphan as unknown as Entity }, order: ['orphan-inst-1'] };
+    const { r, data } = bom(doc);
+    expect(r.affected).toHaveLength(0);
+    expect(data).toMatchObject({
+      totalInstances: 1,
+      distinctComponents: 0,
+      rows: [{ orphan: true, componentName: '(missing)', componentId: 'ghost-comp-id' }],
     });
-    doc = comp.document;
-
-    const result = execute(doc, 'bill_of_materials', {});
-    expect(result.summary).toContain('1');
-    expect(result.summary).toContain('Bracket');
   });
 });
 
 describe('replayHistory preserves non-regenerated document state', () => {
-  const steel = {
-    name: 'steel',
-    density: 0.00785,
-    color: '#808080',
-    metalness: 0.9,
-    roughness: 0.1,
-  };
+  const steel = { ...STEEL, roughness: 0.1 };
 
   it('configurations, materials and components survive edit_step_params without duplication', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'create_configuration', {
-      name: 'small',
-      parameterValues: { w: '10' },
-    }).document;
-    doc = execute(doc, 'create_material', steel).document;
-    const first = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = first.document;
-    doc = execute(doc, 'create_component', { name: 'Unit', entityIds: first.affected }).document;
-    const second = execute(doc, 'add_box', { size: [2, 2, 2] });
-    doc = second.document;
-    const stepId = doc.featureHistory[doc.featureHistory.length - 1]!.id;
-
-    const edited = execute(doc, 'edit_step_params', {
-      stepId,
-      params: { size: [3, 3, 3] },
-    }).document;
-
+    const s = box(run(run(empty(), 'create_configuration', { name: 'small', parameterValues: { w: '10' } }), 'create_material', steel));
+    const doc = run(run(s.doc, 'create_component', { name: 'Unit', entityIds: [s.id] }), 'add_box', { size: [2, 2, 2] });
+    const edited = run(doc, 'edit_step_params', { stepId: doc.featureHistory.at(-1)!.id, params: { size: [3, 3, 3] } });
     expect(edited.configurations['small']).toBeDefined();
     expect(edited.materials['steel']).toBeDefined();
     expect(Object.keys(edited.components)).toHaveLength(1);
-    expect(Object.keys(edited.components)).toHaveLength(Object.keys(doc.components).length);
+    expect(Object.keys(doc.components)).toHaveLength(1);
   });
 
-  it('orphan materials, components and joints (no producing step) survive suppress', () => {
-    let doc = createEmptyDocument();
-    const box = execute(doc, 'add_box', { size: [1, 1, 1] });
-    doc = {
-      ...box.document,
+  it('orphan materials, components and constraints survive suppress; step-produced materials do not', () => {
+    const doc: CadDocument = {
+      ...boxDoc,
       materials: { loaded: { ...steel, name: 'loaded' } },
       components: { 'comp-x': { id: 'comp-x', name: 'X', entities: {}, order: [] } },
       constraints: { 'con-x': { id: 'con-x' } as never },
       constraintOrder: ['con-x'],
     };
-    const stepId = doc.featureHistory[0]!.id;
-    const result = execute(doc, 'set_step_suppressed', { stepId, suppressed: true }).document;
-    expect(Object.keys(result.entities)).toHaveLength(0);
-    expect(result.materials['loaded']).toBeDefined();
-    expect(result.components['comp-x']).toBeDefined();
-    expect(result.constraintOrder).toEqual(['con-x']);
-    expect(result.constraints['con-x']).toBeDefined();
-  });
-
-  it('a material produced by a history step is regenerated, so suppressing its step removes it', () => {
-    let doc = createEmptyDocument();
-    doc = execute(doc, 'create_material', steel).document;
-    const stepId = doc.featureHistory[0]!.id;
-    const result = execute(doc, 'set_step_suppressed', { stepId, suppressed: true }).document;
-    expect(result.materials['steel']).toBeUndefined();
+    const r = run(doc, 'set_step_suppressed', { stepId: doc.featureHistory[0]!.id, suppressed: true });
+    expect(r.entities).toEqual({});
+    expect([!!r.materials['loaded'], !!r.components['comp-x'], !!r.constraints['con-x']]).toEqual([true, true, true]);
+    expect(r.constraintOrder).toEqual(['con-x']);
+    const m = run(empty(), 'create_material', steel);
+    expect(run(m, 'set_step_suppressed', { stepId: m.featureHistory[0]!.id, suppressed: true }).materials['steel']).toBeUndefined();
   });
 });
 
-describe('build_project / template / spline / recipe allocation limits', () => {
-  const box = { command: 'add_box', params: { size: [1, 1, 1] } };
+describe('allocation limits', () => {
+  const boxStep = { command: 'add_box', params: { size: [1, 1, 1] } };
+  let nested: unknown = boxStep;
+  for (let i = 0; i < 6; i++) nested = { command: 'build_project', params: { actions: [nested] } };
 
-  it('build_project rejects more than MAX_PROJECT_ACTIONS actions', () => {
-    const doc = createEmptyDocument();
-    const r = execute(doc, 'build_project', { actions: Array.from({ length: 1001 }, () => box) });
-    expect(r.document).toBe(doc);
-    expect(r.affected).toEqual([]);
-    expect(r.summary).toContain('MAX_PROJECT_ACTIONS');
+  it.each<[string, object, string]>([
+    ['build_project', { actions: Array.from({ length: 1001 }, () => boxStep) }, 'MAX_PROJECT_ACTIONS'],
+    ['build_project', { actions: [{ repeat: { count: 1_000_000 }, step: boxStep }] }, 'MAX_PROJECT_STEPS'],
+    ['build_project', { actions: [{ for_each: { values: new Array(10_001).fill(1), as: 'v' }, step: boxStep }] }, 'MAX_PROJECT_STEPS'],
+    ['build_project', { actions: [nested] }, 'MAX_PROJECT_DEPTH'],
+    ['draw_spline', { points: Array.from({ length: 10_001 }, (_, i) => [i, 0]) }, 'MAX_SPLINE_CONTROL_POINTS'],
+  ])('%s over the limit is rejected (%s)', (name, p, summary) => {
+    const doc = empty();
+    expectNoOp(execute(doc, name, p), doc, summary);
   });
 
-  it('build_project rejects a repeat expanding past MAX_PROJECT_STEPS', () => {
-    const doc = createEmptyDocument();
-    const r = execute(doc, 'build_project', {
-      actions: [{ repeat: { count: 1_000_000 }, step: box }],
-    });
-    expect(r.document).toBe(doc);
-    expect(r.summary).toContain('MAX_PROJECT_STEPS');
-  });
-
-  it('build_project rejects a for_each expanding past MAX_PROJECT_STEPS', () => {
-    const doc = createEmptyDocument();
-    const r = execute(doc, 'build_project', {
-      actions: [{ for_each: { values: new Array(10_001).fill(1), as: 'v' }, step: box }],
-    });
-    expect(r.document).toBe(doc);
-    expect(r.summary).toContain('MAX_PROJECT_STEPS');
-  });
-
-  it('build_project still runs a plan within limits', () => {
-    const r = execute(createEmptyDocument(), 'build_project', {
-      actions: [{ repeat: { count: 3 }, step: box }],
-    });
-    expect(r.affected).toHaveLength(3);
-  });
-
-  it('build_project aborts when nested build_project exceeds MAX_PROJECT_DEPTH', () => {
-    let plan: unknown = box;
-    for (let i = 0; i < 6; i++) {
-      plan = { command: 'build_project', params: { actions: [plan] } };
-    }
-    const doc = createEmptyDocument();
-    const r = execute(doc, 'build_project', { actions: [plan] });
-    expect(r.document).toBe(doc);
-    expect(r.summary).toContain('MAX_PROJECT_DEPTH');
-  });
-
-  it('draw_spline rejects more than MAX_SPLINE_CONTROL_POINTS points', () => {
-    const doc = createEmptyDocument();
-    const points = Array.from({ length: 10_001 }, (_, i) => [i, 0]);
-    const r = execute(doc, 'draw_spline', { points });
-    expect(r.document).toBe(doc);
-    expect(r.summary).toContain('MAX_SPLINE_CONTROL_POINTS');
-  });
-
-  it('instantiate_recipe stops self-referential recipes at MAX_PROJECT_DEPTH', () => {
-    let doc = createEmptyDocument();
-    doc = {
-      ...doc,
-      recipes: {
-        loop: {
-          name: 'loop',
-          steps: [
-            {
-              id: 's1',
-              name: 'instantiate_recipe',
-              params: { name: 'loop' },
-              suppressed: false,
-              affected: [],
-            },
-          ],
-        } as never,
-      },
+  it('plans within limits run; self-referential recipes stop', () => {
+    expect(execute(empty(), 'build_project', { actions: [{ repeat: { count: 3 }, step: boxStep }] }).affected).toHaveLength(3);
+    const loop = {
+      name: 'loop',
+      steps: [{ id: 's1', name: 'instantiate_recipe', params: { name: 'loop' }, suppressed: false, affected: [] }],
     };
-    const r = execute(doc, 'instantiate_recipe', { name: 'loop' });
+    const r = execute({ ...empty(), recipes: { loop: loop as never } }, 'instantiate_recipe', { name: 'loop' });
     expect(r.summary).toBeDefined();
     expect(r.affected).toEqual([]);
   });
 });
 
 describe('guardCommand contract', () => {
-  it('free text equal to an Object.prototype key is accepted (add_text, set_entity_name, add_layer)', () => {
-    const text = execute(createEmptyDocument(), 'add_text', {
-      content: 'constructor',
-      position: [0, 0, 0],
-      height: 1,
-    });
+  it('free text equal to an Object.prototype key is accepted', () => {
+    const text = execute(empty(), 'add_text', { content: 'constructor', position: [0, 0, 0], height: 1 });
     expect(text.affected).toHaveLength(1);
-    const named = execute(text.document, 'set_entity_name', {
-      id: text.affected[0],
-      name: 'valueOf',
+    expect(execute(text.document, 'set_entity_name', { id: text.affected[0], name: 'valueOf' }).affected).toHaveLength(1);
+    expect(execute(empty(), 'add_layer', { name: 'hasOwnProperty' }).document).not.toEqual(empty());
+    const plan = execute(empty(), 'build_project', {
+      actions: [{ command: 'add_text', params: { content: 'toString', position: [0, 0, 0], height: 1 } }],
     });
-    expect(named.affected).toHaveLength(1);
-    const layer = execute(createEmptyDocument(), 'add_layer', { name: 'hasOwnProperty' });
-    expect(layer.document).not.toBe(createEmptyDocument());
+    expect(plan.affected).toHaveLength(1);
+    expect(execute(empty(), 'describe_scene', {}).data).toBeDefined();
   });
 
-  it('a build_project plan containing prototype-key free text still runs', () => {
-    const r = execute(createEmptyDocument(), 'build_project', {
-      actions: [
-        { command: 'add_text', params: { content: 'toString', position: [0, 0, 0], height: 1 } },
-      ],
-    });
-    expect(r.affected).toHaveLength(1);
-  });
-
-  it('id-like params equal to a prototype key are a no-op', () => {
-    const doc = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document;
-    for (const id of ['constructor', '__proto__', 'toString']) {
-      const r = execute(doc, 'delete_entities', { ids: [id] });
-      expect(r.document).toBe(doc);
-      expect(r.affected).toEqual([]);
-    }
-    const many = execute(doc, 'delete_entities', { ids: ['constructor'] });
-    expect(many.document).toBe(doc);
-  });
-
-  it('non-array or 1-element position is a no-op; [x, y] is padded to z=0', () => {
-    const doc = createEmptyDocument();
-    for (const position of ['abc', [1], 5]) {
-      const r = execute(doc, 'add_box', { size: [1, 1, 1], position });
-      expect(r.document).toBe(doc);
-      expect(r.affected).toEqual([]);
-    }
-    const planar = execute(doc, 'add_box', { size: [1, 1, 1], position: [2, 3] });
-    expect(planar.document.entities[planar.affected[0]!]!.position).toEqual([2, 3, 0]);
-  });
-
-  it('position schema descriptions state the [x, y] shorthand contract', () => {
-    const box = toToolSchemas().find((t) => t.name === 'add_box')!;
-    expect(box.input_schema.properties['position']!.description).toContain(
-      '[x, y] is accepted and placed at z=0',
-    );
-  });
-
-  it('query command data survives the guard', () => {
-    const r = execute(createEmptyDocument(), 'describe_scene', {});
-    expect(r.data).toBeDefined();
+  it('prototype-key ids and malformed positions are no-ops; [x, y] pads z=0', () => {
+    for (const id of ['constructor', '__proto__', 'toString']) expectNoOp(execute(boxDoc, 'delete_entities', { ids: [id] }), boxDoc);
+    const doc = empty();
+    for (const position of ['abc', [1], 5]) expectNoOp(execute(doc, 'add_box', { size: [1, 1, 1], position }), doc);
+    expect(execute(doc, 'add_box', { size: [1, 1, 1], position: [1] }).summary).toContain('malformed position');
+    expect(first(execute(doc, 'add_box', { size: [1, 1, 1], position: [2, 3] })).position).toEqual([2, 3, 0]);
+    const schema = toToolSchemas().find((t) => t.name === 'add_box')!;
+    expect(schema.input_schema.properties['position']!.description).toContain('[x, y] is accepted and placed at z=0');
   });
 
   it('a throwing command yields the no-op path and warns with the command name', () => {
-    const doc = createEmptyDocument();
+    const doc = empty();
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const params = {};
-    Object.defineProperty(params, 'size', {
+    const p = {};
+    Object.defineProperty(p, 'size', {
       enumerable: false,
       get(): never {
         throw new Error('boom');
       },
     });
-    const r = execute(doc, 'add_box', params);
-    expect(r.document).toBe(doc);
-    expect(r.affected).toEqual([]);
+    const r = execute(doc, 'add_box', p);
+    expectNoOp(r, doc);
     expect(r.summary).toBe('add_box rejected: invalid params — boom');
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('add_box'), expect.anything());
     warn.mockRestore();
   });
-
-  it('corruption rejection names the specific cause', () => {
-    const doc = createEmptyDocument();
-    const r = execute(doc, 'add_box', { size: [1, 1, 1], position: [1] });
-    expect(r.summary).toContain('malformed position');
-  });
 });
 
-describe('delete_entities', () => {
-  function threeBoxes(): { doc: ReturnType<typeof createEmptyDocument>; ids: string[] } {
-    let doc = createEmptyDocument();
-    const ids: string[] = [];
-    for (let i = 0; i < 3; i++) {
-      const r = execute(doc, 'add_box', { size: [1, 1, 1] });
-      doc = r.document;
-      ids.push(r.affected[0]!);
-    }
-    return { doc, ids };
-  }
+describe('delete_entities (batch)', () => {
+  const { doc, ids } = boxes(3);
 
-  it('deletes several entities in one history step, skipping missing ids', () => {
-    const { doc, ids } = threeBoxes();
-    const before = doc.featureHistory.length;
-    const r = execute(doc, 'delete_entities', { ids: [ids[0]!, ids[1]!, 'ghost', ids[0]!] });
+  it('deletes several in one history step, skipping missing ids, pruning selection and dissolving groups, purely', () => {
+    const r = execute(doc, 'delete_entities', { ids: [ids[0], ids[1], 'ghost', ids[0]] });
     expect(r.affected).toEqual([ids[0], ids[1]]);
     expect(r.document.order).toEqual([ids[2]]);
     expect(Object.keys(r.document.entities)).toEqual([ids[2]]);
-    expect(r.document.featureHistory).toHaveLength(before + 1);
+    expect(r.document.featureHistory).toHaveLength(doc.featureHistory.length + 1);
     expect(r.summary).toContain('Skipped missing: [ghost]');
+    const grouped = { ...run(doc, 'group_entities', { ids: [ids[0], ids[1]] }), selection: [ids[0]!, ids[2]!] };
+    const g = execute(grouped, 'delete_entities', { ids: [ids[0]] });
+    expect(g.document.selection).toEqual([ids[2]]);
+    expect(g.document.groups).toEqual({});
+    expect(g.summary).toContain('Dissolved');
+    expectPure(doc, () => execute(doc, 'delete_entities', { ids }));
   });
 
-  it('prunes selection and dissolves groups that fall below 2 members', () => {
-    const { doc, ids } = threeBoxes();
-    const grouped = execute(doc, 'group_entities', { ids: [ids[0]!, ids[1]!] }).document;
-    const selected = { ...grouped, selection: [ids[0]!, ids[2]!] };
-    const r = execute(selected, 'delete_entities', { ids: [ids[0]!] });
-    expect(r.document.selection).toEqual([ids[2]]);
-    expect(Object.keys(r.document.groups)).toHaveLength(0);
-    expect(r.summary).toContain('Dissolved');
-  });
-
-  it('is a no-op for empty, malformed, oversized or all-missing ids', () => {
-    const { doc } = threeBoxes();
-    const cases: unknown[] = [[], 'a', [1], ['ghost'], new Array(10_001).fill('x')];
-    for (const ids of cases) {
-      const r = execute(doc, 'delete_entities', { ids });
-      expect(r.document).toBe(doc);
-      expect(r.affected).toEqual([]);
-    }
-  });
-
-  it('is pure', () => {
-    const { doc, ids } = threeBoxes();
-    const snapshot = JSON.stringify(doc);
-    execute(doc, 'delete_entities', { ids });
-    expect(JSON.stringify(doc)).toBe(snapshot);
-  });
+  it.each<[unknown]>([[[]], ['a'], [[1]], [['ghost']], [new Array(10_001).fill('x')]])('ids %# is a no-op', (bad) =>
+    expectNoOp(execute(doc, 'delete_entities', { ids: bad }), doc),
+  );
 });

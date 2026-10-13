@@ -1,16 +1,6 @@
-/**
- * @layer ui/viewport/2d
- *
- * Render branch for `kind:'text'` entities in the 2D orthographic drafting viewport, using
- * drei's <Text> SDF renderer (it manages its own geometry and disposal).
- * - Anchored at entity.position; only rotation[2] applies (2D entities rotate within the work plane).
- * - fontSize = entity.height (cap-height in model units); anchorX from entity.anchor (default
- *   'left'); anchorY always 'middle'. Uses the self-hosted font (`TEXT_FONT_URL`): troika would fetch
- *   a CDN font otherwise, which hangs offline.
- * - Scaled about its anchor so it never drops below the minimum on-screen size when zoomed out
- *   (same readability rule as dimension text).
- * - Must be rendered inside the -renderOrigin group in Viewport2D.tsx (U4 convention).
- */
+// 2D `kind:'text'`: drei <Text> (self-managed geometry) with the self-hosted font (troika's CDN default hangs offline);
+// rotation[2] only, fontSize = cap height, anchorY 'middle'; scaled about its anchor to a minimum on-screen size like
+// dimension text. Lives inside Viewport2D's -renderOrigin group.
 
 import { useRef } from 'react';
 import type * as THREE from 'three';

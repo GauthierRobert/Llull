@@ -1,5 +1,4 @@
 /**
- * @layer server
  * Crash-safe file replacement shared by the autosaver, the CLI, desktop discovery and the desktop
  * app: the one atomic writer.
  */

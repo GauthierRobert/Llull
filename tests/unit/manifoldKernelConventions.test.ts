@@ -6,6 +6,7 @@ import { entityToTriangles } from '@core/geometry/entityTriangles';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { meshOf, booleanMesh } from '../helpers/manifoldMesh';
 import { meshBounds } from '../helpers/meshBounds';
+import { xy } from '../helpers/xy';
 
 let kernel: GeometryKernel;
 
@@ -44,30 +45,16 @@ function volume(mesh: MeshData): number {
 
 const cases: Array<[string, Entity]> = [
   ['cylinder along +Z', solid({ kind: 'cylinder', radius: 2, height: 10, position: [1, 2, 3] })],
-  [
-    'box rotated about all three axes',
-    solid({ kind: 'box', size: [10, 4, 2], position: [5, 0, 0], rotation: [0.3, 0.5, 0.7] }),
-  ],
-  [
-    'cone rotated',
-    solid({ kind: 'cone', radius: 3, height: 8, position: [0, 0, 0], rotation: [0, 0.4, 0.2] }),
-  ],
+  ['box rotated about all three axes', solid({ kind: 'box', size: [10, 4, 2], position: [5, 0, 0], rotation: [0.3, 0.5, 0.7] })],
+  ['cone rotated', solid({ kind: 'cone', radius: 3, height: 8, position: [0, 0, 0], rotation: [0, 0.4, 0.2] })],
   ['torus', solid({ kind: 'torus', ringRadius: 6, tubeRadius: 1.5, position: [0, 0, 2] })],
   ['wedge', solid({ kind: 'wedge', size: [4, 3, 6], position: [1, 1, 1], rotation: [0.2, 0, 0] })],
-  [
-    'pyramid',
-    solid({ kind: 'pyramid', baseWidth: 4, baseDepth: 2, height: 5, position: [0, 0, 0] }),
-  ],
+  ['pyramid', solid({ kind: 'pyramid', baseWidth: 4, baseDepth: 2, height: 5, position: [0, 0, 0] })],
   [
     'partial revolution about y',
     solid({
       kind: 'revolution',
-      profile: [
-        [2, 0],
-        [4, 0],
-        [4, 3],
-        [2, 3],
-      ],
+      profile: xy(2, 0, 4, 0, 4, 3, 2, 3),
       axis: [0, 1, 0],
       angle: Math.PI / 2,
       segments: 16,
@@ -87,7 +74,6 @@ describe('manifold kernel follows llull geometry conventions', () => {
       expect(actual.max[k]).toBeCloseTo(expected.max[k]!, 1);
     }
   });
-
   it('cuts a +Z hole through a plate (cylinder axis is Z, not Y)', () => {
     const plate = solid({ kind: 'box', size: [20, 20, 2], position: [0, 0, 0] });
     const hole = solid({ kind: 'cylinder', radius: 3, height: 10, position: [0, 0, 0] });
@@ -98,7 +84,6 @@ describe('manifold kernel follows llull geometry conventions', () => {
     // A Y-axis cylinder would cut a full-length channel instead and leave the z extent intact
     // but remove ~2·r·20·2 of material; the volume check above distinguishes the two.
   });
-
   it('accepts a triangle-soup mesh (welds shared corners) as a boolean operand', () => {
     const box = solid({ kind: 'box', size: [2, 2, 2], position: [0, 0, 0] });
     const positions: number[] = [];

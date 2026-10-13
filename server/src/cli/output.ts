@@ -1,8 +1,6 @@
 /**
- * @layer server
  * How the `llull` CLI prints a result. Text mode reuses the MCP shaping (`shapeToolCallContent`:
  * the same size caps an agent gets over MCP); `--json` prints one machine-readable object.
- * @pure string builders only
  */
 
 import { shapeToolCallContent } from '@mcp/index';
@@ -33,9 +31,7 @@ export function resultJson(result: PrintableResult): string {
     changed: result.changed,
     ...(result.data !== undefined ? { data: result.data } : {}),
     ...(result.saved !== undefined ? { saved: result.saved } : {}),
-    ...(result.planAliases !== undefined
-      ? { aliases: result.planAliases.aliases, consumedAliases: result.planAliases.consumed }
-      : {}),
+    ...(result.planAliases !== undefined ? { aliases: result.planAliases.aliases, consumedAliases: result.planAliases.consumed } : {}),
   });
 }
 

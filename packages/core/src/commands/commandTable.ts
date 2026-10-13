@@ -1,8 +1,7 @@
 /**
- * @layer core/commands
- * The command table: every registered (guarded) definition, looked up by name. It imports no
- * command, so the engine (`execute`), the context and commands that run other commands can all
- * read it without an import cycle. `registry.ts` fills it with the core catalog and plugins.
+ * The command table: every registered (guarded) definition, looked up by name. It imports no command, so the engine (`execute`), the
+ * context and commands that run other commands can all read it without an import cycle. `registry.ts` fills it with the core catalog and
+ * plugins.
  * @invariant names are unique; registration order is preserved (core first, then plugins)
  * @invariant filled only by importing `registry.ts`; surfaces import the API from there
  */
@@ -17,14 +16,9 @@ const byName = new Map<string, CommandDefinition<unknown>>();
  * Register `commands` (each wrapped by `guardCommand`), all or nothing.
  * @failure a name already registered, or repeated within `commands` -> throws, nothing registered
  */
-export function registerCommands(
-  source: string,
-  commands: ReadonlyArray<CommandDefinition<unknown>>,
-): void {
+export function registerCommands(source: string, commands: ReadonlyArray<CommandDefinition<unknown>>): void {
   const names = commands.map((command) => command.name);
-  const clash = commands.find(
-    (command, index) => byName.has(command.name) || names.indexOf(command.name) !== index,
-  );
+  const clash = commands.find((command, index) => byName.has(command.name) || names.indexOf(command.name) !== index);
   if (clash) throw new Error(`${source}: command '${clash.name}' is already registered`);
   for (const command of commands) {
     const guarded = guardCommand(command);
@@ -61,11 +55,6 @@ function toolAnnotations(def: CommandDefinition<unknown>): ToolSchema['annotatio
 export function toToolSchemas(): ToolSchema[] {
   return definitions.map((d) => {
     const annotations = toolAnnotations(d);
-    return {
-      name: d.name,
-      description: d.description,
-      input_schema: d.paramsSchema,
-      ...(annotations ? { annotations } : {}),
-    };
+    return { name: d.name, description: d.description, input_schema: d.paramsSchema, ...(annotations ? { annotations } : {}) };
   });
 }

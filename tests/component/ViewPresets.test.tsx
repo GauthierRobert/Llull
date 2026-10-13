@@ -1,7 +1,3 @@
-/**
- * View preset buttons frame the scene (not a fixed origin / distance 10), so Front/Top/Right/Iso
- * work for mm-scale models. The r3f camera is faked through a mocked useThree.
- */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import * as THREE from 'three';
@@ -16,9 +12,7 @@ const fake = vi.hoisted(() => ({
   get: () => ({ size: { width: 800, height: 600 } }),
 }));
 
-vi.mock('@react-three/fiber', () => ({
-  useThree: () => fake,
-}));
+vi.mock('@react-three/fiber', () => ({ useThree: () => fake }));
 
 import { CameraBridge } from '@ui/viewport/3d/cameraBridge';
 import { ViewPresetsOverlay } from '@ui/viewport/3d/ViewPresets';
@@ -34,7 +28,6 @@ describe('view presets', () => {
     orbit.target.set(0, 0, 0);
     useStore.setState({ document: createEmptyDocument(), renderOrigin: [0, 0, 0] });
   });
-
   function mount(): void {
     render(
       <>
@@ -43,13 +36,11 @@ describe('view presets', () => {
       </>,
     );
   }
-
   it('keeps origin / distance 10 for an empty scene', () => {
     mount();
     fireEvent.click(screen.getByRole('button', { name: 'Top view' }));
     expect(camera.position.distanceTo(orbit.target)).toBeCloseTo(10);
   });
-
   it('frames a large model: target at its centre, distance scaled to its size', () => {
     localDispatch('add_box', { size: [4000, 4000, 4000], position: [10000, 0, 0] });
     mount();

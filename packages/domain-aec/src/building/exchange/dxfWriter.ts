@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import { toDegrees } from '@lib/angle';
 import type { DocumentUnit, Vec2, Vec3 } from '@core/model/types';
 import { ansi31Hatch } from '@lib/hatch';
@@ -14,29 +10,13 @@ import { TECHNICAL_LAYERS } from '@core/geometry/technicalView';
 import { DIMENSION_LAYER } from '../drawings/planModel';
 
 /** AutoCAD $INSUNITS codes. */
-export const INSUNITS: Readonly<Record<DocumentUnit, number>> = {
-  in: 1,
-  ft: 2,
-  mm: 4,
-  cm: 5,
-  m: 6,
-};
+export const INSUNITS: Readonly<Record<DocumentUnit, number>> = { in: 1, ft: 2, mm: 4, cm: 5, m: 6 };
 
 /** AutoCAD Color Index per standard layer. */
+// prettier-ignore
 const LAYER_COLOR: Readonly<Record<string, number>> = {
-  'A-WALL': 7,
-  'A-DOOR': 30,
-  'A-GLAZ': 5,
-  'S-GRID': 1,
-  'S-COLS': 8,
-  'S-BEAM': 4,
-  'S-SLAB': 9,
-  'A-FLOR-STRS': 6,
-  'A-AREA': 3,
-  [DIMENSION_LAYER]: 2,
-  [TECHNICAL_LAYERS.visible]: 7,
-  [TECHNICAL_LAYERS.hidden]: 8,
-  [TECHNICAL_LAYERS.center]: 1,
+  'A-WALL': 7, 'A-DOOR': 30, 'A-GLAZ': 5, 'S-GRID': 1, 'S-COLS': 8, 'S-BEAM': 4, 'S-SLAB': 9, 'A-FLOR-STRS': 6, 'A-AREA': 3,
+  [DIMENSION_LAYER]: 2, [TECHNICAL_LAYERS.visible]: 7, [TECHNICAL_LAYERS.hidden]: 8, [TECHNICAL_LAYERS.center]: 1,
   [TECHNICAL_LAYERS.cut]: 7,
 };
 
@@ -81,8 +61,8 @@ export class DxfWriter {
   }
 
   /**
-   * R12 name of a source layer. Sources whose sanitised names collide ("A B" / "A_B") keep distinct
-   * layers: later ones get `_2`, `_3`, … in first-seen order.
+   * R12 name of a source layer. Sources whose sanitised names collide ("A B" / "A_B") keep distinct layers: later ones get `_2`, `_3`, … in
+   * first-seen order.
    */
   private layerName(layer: string): string {
     const known = this.layerNames.get(layer);
@@ -134,15 +114,7 @@ export class DxfWriter {
     this.pair(51, toDegrees(endAngle));
   }
 
-  text(
-    layer: string,
-    at: Vec2,
-    height: number,
-    content: string,
-    align: 'left' | 'center' | 'right',
-    rotation = 0,
-    z = 0,
-  ): void {
+  text(layer: string, at: Vec2, height: number, content: string, align: 'left' | 'center' | 'right', rotation = 0, z = 0): void {
     this.start('TEXT', layer);
     this.point(10, at, z);
     this.pair(40, height);
@@ -198,10 +170,7 @@ export class DxfWriter {
   }
 }
 
-function writeDimension(
-  writer: DxfWriter,
-  primitive: Extract<DrawingPrimitive, { type: 'dimension' }>,
-): void {
+function writeDimension(writer: DxfWriter, primitive: Extract<DrawingPrimitive, { type: 'dimension' }>): void {
   const { segments, label } = dimensionGeometry(primitive);
   for (const [a, b] of segments) writer.line(primitive.layer, a, b);
   writer.text(primitive.layer, label.at, label.height, primitive.label, 'center', label.angle);
@@ -227,32 +196,16 @@ function writeFill(
   }
   const { vertices, triangles } = triangulatePolygon(outer, holes);
   for (const [i, j, k] of triangles) {
-    writer.solid(
-      patternLayer(layer),
-      vertices[i] as Vec2,
-      vertices[j] as Vec2,
-      vertices[k] as Vec2,
-    );
+    writer.solid(patternLayer(layer), vertices[i] as Vec2, vertices[j] as Vec2, vertices[k] as Vec2);
   }
 }
 
-export function writePrimitive(
-  writer: DxfWriter,
-  primitive: DrawingPrimitive,
-  hatchSpacing: number,
-): void {
+export function writePrimitive(writer: DxfWriter, primitive: DrawingPrimitive, hatchSpacing: number): void {
   switch (primitive.type) {
     case 'polygon':
       writer.polyline(primitive.layer, primitive.points, true);
       if (primitive.fill !== undefined) {
-        writeFill(
-          writer,
-          primitive.layer,
-          primitive.points,
-          primitive.holes ?? [],
-          primitive.fill,
-          hatchSpacing,
-        );
+        writeFill(writer, primitive.layer, primitive.points, primitive.holes ?? [], primitive.fill, hatchSpacing);
       }
       return;
     case 'polyline':
@@ -262,13 +215,7 @@ export function writePrimitive(
       writer.line(primitive.layer, primitive.a, primitive.b);
       return;
     case 'arc':
-      writer.arc(
-        primitive.layer,
-        primitive.center,
-        primitive.radius,
-        primitive.startAngle,
-        primitive.endAngle,
-      );
+      writer.arc(primitive.layer, primitive.center, primitive.radius, primitive.startAngle, primitive.endAngle);
       return;
     case 'circle':
       writer.circle(primitive.layer, primitive.center, primitive.radius);

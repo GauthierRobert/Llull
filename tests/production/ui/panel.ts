@@ -1,8 +1,6 @@
 import type { UiSession } from './session';
 
 /**
- * @layer tests/production/ui
- *
  * Building panel controls: "Add element" tool forms, levels list, project information form,
  * equipment editor.
  * Fields keep their value between submissions (as for a human), so only changed ones are retyped.
@@ -13,7 +11,6 @@ type FieldValues = Record<string, string>;
 export class BuildingPanel {
   private tool = '';
   private typed: FieldValues = {};
-
   constructor(private readonly session: UiSession) {}
 
   /** Pick an "Add element" tool, set its fields (selects by value) and press its Add button. */
@@ -47,28 +44,20 @@ export class BuildingPanel {
     for (const [key, value] of Object.entries(fields)) {
       await section.getByTestId(`equipment-edit-${key}`).fill(value);
     }
-    return this.session.acting(`edit equipment ${mark}`, () =>
-      section.getByTestId('equipment-save').click(),
-    );
+    return this.session.acting(`edit equipment ${mark}`, () => section.getByTestId('equipment-save').click());
   }
-
   async addLevel(name: string, height: number): Promise<string> {
     const { page } = this.session;
     await page.getByLabel('New level name').fill(name);
     await page.getByLabel('New level height').fill(String(height));
-    return this.session.acting(`add level ${name}`, () =>
-      page.getByRole('button', { name: 'Add level', exact: true }).click(),
-    );
+    return this.session.acting(`add level ${name}`, () => page.getByRole('button', { name: 'Add level', exact: true }).click());
   }
-
   async setProjectInfo(info: Record<string, string>): Promise<string> {
     const { page } = this.session;
     for (const [key, value] of Object.entries(info)) {
       await page.getByTestId(`project-${key}`).fill(value);
     }
-    return this.session.acting('project information', () =>
-      page.getByRole('button', { name: 'Save project info' }).click(),
-    );
+    return this.session.acting('project information', () => page.getByRole('button', { name: 'Save project info' }).click());
   }
 
   /** Clash section: run the check and read its own result line. */

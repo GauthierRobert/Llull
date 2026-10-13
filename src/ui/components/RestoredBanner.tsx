@@ -1,9 +1,4 @@
-/**
- * @layer ui/components
- *
- * RestoredBanner — tells the user their unsaved work was restored from autosave and offers
- * "Start fresh" (dispatches `clear_document`, drops the autosave). Presentation only.
- */
+// "Restored from autosave" banner with "Start fresh" (dispatches `clear_document`, drops the autosave).
 
 import React, { useEffect } from 'react';
 import { useStore } from '@ui/store';
@@ -41,13 +36,7 @@ export function RestoredBanner(): React.ReactElement | null {
       <button type="button" className="btn btn--ghost btn--sm" onClick={startFresh}>
         Start fresh
       </button>
-      <IconButton
-        icon="close"
-        size={12}
-        label="Dismiss restore notice"
-        title="Dismiss"
-        onClick={() => setRestoredAt(null)}
-      />
+      <IconButton icon="close" size={12} label="Dismiss restore notice" title="Dismiss" onClick={() => setRestoredAt(null)} />
     </div>
   );
 }

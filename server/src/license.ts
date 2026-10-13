@@ -1,11 +1,7 @@
 /**
- * @layer server
- * Offline license verification. A license is `<base64url payload>.<base64url Ed25519 signature>`
- * over the payload bytes `{ customer, seats, expires (ISO date), features[] }`, checked against the
- * public key in `LLULL_LICENSE_PUBLIC_KEY` (PEM, `\n` escapes allowed, or a path to a PEM file).
- * Anything missing, expired or tampered falls back to evaluation mode (3 named users).
+ * Offline license: `<base64url payload>.<base64url Ed25519 signature>`, payload `{ customer, seats, expires, features[] }`,
+ * key `LLULL_LICENSE_PUBLIC_KEY` (PEM with `\n` escapes, or a PEM path). Missing/expired/tampered -> evaluation (3 users).
  */
-
 import crypto from 'crypto';
 import fs from 'fs';
 import { isRecord } from '@lib/isRecord';
@@ -20,10 +16,8 @@ export interface LicenseStatus {
   readonly seats: number;
   readonly expires: string | null;
   readonly features: readonly string[];
-  /** Short text for the UI status bar / banner. */
-  readonly label: string;
-  /** Why a configured license was not accepted (also logged once). */
-  readonly warning?: string;
+  readonly label: string; // UI status bar / banner
+  readonly warning?: string; // why a configured license was not accepted (logged once)
 }
 
 interface LicensePayload {
@@ -48,8 +42,7 @@ function evaluation(warning?: string): LicenseStatus {
 function publicKeyPem(): string | undefined {
   const raw = process.env['LLULL_LICENSE_PUBLIC_KEY']?.trim();
   if (raw === undefined || raw === '') return undefined;
-  if (raw.includes('BEGIN')) return raw.replace(/\\n/g, '\n');
-  return fs.readFileSync(raw, 'utf8');
+  return raw.includes('BEGIN') ? raw.replace(/\\n/g, '\n') : fs.readFileSync(raw, 'utf8');
 }
 
 function parsePayload(bytes: Buffer): LicensePayload {
@@ -57,46 +50,28 @@ function parsePayload(bytes: Buffer): LicensePayload {
   if (!isRecord(value)) throw new Error('payload is not an object');
   const { customer, seats, expires, features } = value;
   if (typeof customer !== 'string' || customer === '') throw new Error('customer missing');
-  if (typeof seats !== 'number' || !Number.isInteger(seats) || seats < 1) {
-    throw new Error('seats must be a positive integer');
-  }
-  if (typeof expires !== 'string' || Number.isNaN(Date.parse(expires))) {
-    throw new Error('expires must be an ISO date');
-  }
-  if (!Array.isArray(features) || features.some((f) => typeof f !== 'string')) {
-    throw new Error('features must be a string array');
-  }
+  if (typeof seats !== 'number' || !Number.isInteger(seats) || seats < 1) throw new Error('seats must be a positive integer');
+  if (typeof expires !== 'string' || Number.isNaN(Date.parse(expires))) throw new Error('expires must be an ISO date');
+  if (!Array.isArray(features) || features.some((f) => typeof f !== 'string')) throw new Error('features must be a string array');
   return { customer, seats, expires, features: features as string[] };
 }
 
 /** Pure verification of a license string. @failure any problem -> evaluation status + warning */
-export function verifyLicense(
-  license: string,
-  publicKeyPemText: string,
-  now: Date = new Date(),
-): LicenseStatus {
+export function verifyLicense(license: string, publicKeyPemText: string, now: Date = new Date()): LicenseStatus {
   try {
     const [payloadPart, signaturePart, ...extra] = license.trim().split('.');
-    if (payloadPart === undefined || signaturePart === undefined || extra.length > 0) {
+    if (payloadPart === undefined || signaturePart === undefined || extra.length > 0)
       throw new Error('malformed license (expected <payload>.<signature>)');
-    }
     const payloadBytes = Buffer.from(payloadPart, 'base64url');
-    const key = crypto.createPublicKey(publicKeyPemText);
-    if (!crypto.verify(null, payloadBytes, key, Buffer.from(signaturePart, 'base64url'))) {
+    if (!crypto.verify(null, payloadBytes, crypto.createPublicKey(publicKeyPemText), Buffer.from(signaturePart, 'base64url'))) {
       throw new Error('signature does not match the public key');
     }
     const payload = parsePayload(payloadBytes);
     const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(payload.expires);
-    const expiry = Date.parse(dateOnly ? `${payload.expires}T23:59:59.999Z` : payload.expires);
-    if (expiry < now.getTime()) throw new Error(`license expired on ${payload.expires}`);
-    return {
-      mode: 'licensed',
-      customer: payload.customer,
-      seats: payload.seats,
-      expires: payload.expires,
-      features: payload.features,
-      label: payload.customer,
-    };
+    if (Date.parse(dateOnly ? `${payload.expires}T23:59:59.999Z` : payload.expires) < now.getTime()) {
+      throw new Error(`license expired on ${payload.expires}`);
+    }
+    return { mode: 'licensed', ...payload, label: payload.customer };
   } catch (err) {
     return evaluation(`Invalid license, running in evaluation mode: ${errorMessage(err)}`);
   }
@@ -141,14 +116,6 @@ export function getLicense(now: Date = new Date()): LicenseStatus {
 }
 
 /** Body of the public `GET /license`. */
-export function publicLicenseBody(status: LicenseStatus): LicenseResponseBody {
-  return {
-    mode: status.mode,
-    customer: status.customer,
-    seats: status.seats,
-    expires: status.expires,
-    label: status.label,
-    evaluation: status.mode === 'evaluation',
-    ...(status.warning !== undefined ? { warning: status.warning } : {}),
-  };
+export function publicLicenseBody({ mode, customer, seats, expires, label, warning }: LicenseStatus): LicenseResponseBody {
+  return { mode, customer, seats, expires, label, evaluation: mode === 'evaluation', ...(warning !== undefined ? { warning } : {}) };
 }

@@ -1,7 +1,4 @@
-/**
- * @layer desktop/tests
- * Electron-free desktop modules: layout, backend env, port choice, CLI shim, menu.
- */
+/** Electron-free desktop modules: layout, backend env, port choice, CLI shim, menu. */
 
 import { describe, expect, it } from 'vitest';
 import { mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
@@ -20,12 +17,7 @@ const scratch = (): string => mkdtempSync(path.join(tmpdir(), 'llull-desktop-'))
 
 describe('desktopLayout', () => {
   it('reads every part from resources when packaged', () => {
-    const layout = desktopLayout({
-      packaged: true,
-      resourcesPath: '/r',
-      repoRoot: '/repo',
-      platform: 'linux',
-    });
+    const layout = desktopLayout({ packaged: true, resourcesPath: '/r', repoRoot: '/repo', platform: 'linux' });
     expect(layout).toEqual({
       webDir: path.join('/r', 'web'),
       serverEntry: path.join('/r', 'server', 'dist', 'index.js'),
@@ -44,22 +36,16 @@ describe('desktopLayout', () => {
     });
     expect(layout.webDir).toBe(path.join('/repo', 'dist'));
     expect(layout.python).toBe('/usr/bin/python3');
-    expect(
-      desktopLayout({ packaged: false, resourcesPath: '', repoRoot: '/repo', platform: 'linux' })
-        .python,
-    ).toBe(path.join('/repo', 'desktop', 'build', 'python', 'bin', 'python3'));
+    expect(desktopLayout({ packaged: false, resourcesPath: '', repoRoot: '/repo', platform: 'linux' }).python).toBe(
+      path.join('/repo', 'desktop', 'build', 'python', 'bin', 'python3'),
+    );
     expect(bundledPythonOf('C:\\py', 'win32')).toMatch(/python\.exe$/);
   });
 });
 
 describe('backendEnv', () => {
   it('locks the backend to loopback with a required token and the app origin', () => {
-    const layout = desktopLayout({
-      packaged: true,
-      resourcesPath: '/r',
-      repoRoot: '',
-      platform: 'linux',
-    });
+    const layout = desktopLayout({ packaged: true, resourcesPath: '/r', repoRoot: '', platform: 'linux' });
     const env = backendEnv({
       port: 4000,
       token: 'tok',
@@ -80,13 +66,7 @@ describe('backendEnv', () => {
     });
     expect(env['LLULL_KERNEL']).toBeUndefined();
     expect(env['LLULL_ALLOW_CODE_EXECUTION']).toBeUndefined();
-    const optedIn = backendEnv({
-      port: 1,
-      token: 't',
-      layout,
-      userDataDir: '/u',
-      baseEnv: { LLULL_ALLOW_CODE_EXECUTION: '1' },
-    });
+    const optedIn = backendEnv({ port: 1, token: 't', layout, userDataDir: '/u', baseEnv: { LLULL_ALLOW_CODE_EXECUTION: '1' } });
     expect(optedIn['LLULL_ALLOW_CODE_EXECUTION']).toBe('1');
     expect('EMPTY' in env).toBe(false);
     expect(backendOrigin(1)).toBe('http://127.0.0.1:1');
@@ -133,9 +113,7 @@ describe('chooseBackendPort', () => {
     try {
       const port = await chooseBackendPort(userData);
       if (blocked) expect(port).not.toBe(DEFAULT_DESKTOP_PORT);
-      const remembered = JSON.parse(
-        readFileSync(path.join(userData, 'desktop-settings.json'), 'utf8'),
-      ) as { port: number };
+      const remembered = JSON.parse(readFileSync(path.join(userData, 'desktop-settings.json'), 'utf8')) as { port: number };
       expect(remembered.port).toBe(port);
       expect(await chooseBackendPort(userData)).toBe(port);
     } finally {
@@ -152,23 +130,15 @@ describe('chooseBackendPort', () => {
 
 describe('cliShim', () => {
   it('runs the bundled CLI with the app runtime on POSIX, quoting paths', () => {
-    const shim = cliShimFor(
-      'darwin',
-      '/Applications/llull.app/Contents/MacOS/llull',
-      '/R "x"/bin.js',
-    );
+    const shim = cliShimFor('darwin', '/Applications/llull.app/Contents/MacOS/llull', '/R "x"/bin.js');
     expect(shim.fileName).toBe('llull');
-    expect(shim.content).toContain(
-      'ELECTRON_RUN_AS_NODE=1 exec "/Applications/llull.app/Contents/MacOS/llull" "/R \\"x\\"/bin.js" "$@"',
-    );
+    expect(shim.content).toContain('ELECTRON_RUN_AS_NODE=1 exec "/Applications/llull.app/Contents/MacOS/llull" "/R \\"x\\"/bin.js" "$@"');
   });
 
   it('writes a .cmd launcher on Windows', () => {
     const shim = cliShimFor('win32', 'C:\\llull\\llull.exe', 'C:\\llull\\resources\\bin.js');
     expect(shim.fileName).toBe('llull.cmd');
-    expect(shim.content).toContain(
-      'set ELECTRON_RUN_AS_NODE=1\r\n"C:\\llull\\llull.exe" "C:\\llull\\resources\\bin.js" %*',
-    );
+    expect(shim.content).toContain('set ELECTRON_RUN_AS_NODE=1\r\n"C:\\llull\\llull.exe" "C:\\llull\\resources\\bin.js" %*');
   });
 
   it('installs an executable shim and reports whether its directory is on PATH', () => {
@@ -179,9 +149,7 @@ describe('cliShim', () => {
     expect(off.onPath).toBe(false);
     expect(off.pathHint).toContain(`export PATH="${bin}:$PATH"`);
     expect(installCliShim(bin, shim, 'linux', `/usr/bin:${bin}`).onPath).toBe(true);
-    expect(installCliShim(bin, cliShimFor('win32', 'a', 'b'), 'win32', undefined).pathHint).toMatch(
-      /user PATH/,
-    );
+    expect(installCliShim(bin, cliShimFor('win32', 'a', 'b'), 'win32', undefined).pathHint).toMatch(/user PATH/);
   });
 });
 
@@ -202,13 +170,7 @@ describe('menuTemplate', () => {
 
   it('has File and Help menus wired to the handlers, an app menu only on macOS', () => {
     const linux = menuTemplate(handlers, 'linux', 'llull');
-    expect(linux.map((item) => item.label ?? item.role)).toEqual([
-      'File',
-      'editMenu',
-      'viewMenu',
-      'windowMenu',
-      'Help',
-    ]);
+    expect(linux.map((item) => item.label ?? item.role)).toEqual(['File', 'editMenu', 'viewMenu', 'windowMenu', 'Help']);
     expect(menuTemplate(handlers, 'darwin', 'llull')[0]?.role).toBe('appMenu');
     const items = linux.flatMap((menu) => (Array.isArray(menu.submenu) ? menu.submenu : []));
     for (const item of items) if (typeof item.click === 'function') (item.click as () => void)();

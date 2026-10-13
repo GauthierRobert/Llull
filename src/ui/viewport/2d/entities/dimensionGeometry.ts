@@ -1,21 +1,8 @@
-/**
- * @layer ui/viewport/2d
- * Pure drawing of 2D dimension entities: the measured value, the label anchor and the
- * LineSegments (dimension / extension lines, arrowheads) for each dimension kind.
- */
+// Pure drawing of 2D dimensions: value, label anchor and LineSegments (dimension / extension lines, arrowheads) per kind.
 
 import { toDegrees } from '@lib/angle';
 import * as THREE from 'three';
-import type {
-  ArcEntity,
-  CircleEntity,
-  DimensionEntity,
-  EllipseEntity,
-  Entity,
-  LineEntity,
-  PointEntity,
-  Vec2,
-} from '@core/model/types';
+import type { ArcEntity, CircleEntity, DimensionEntity, EllipseEntity, Entity, LineEntity, PointEntity, Vec2 } from '@core/model/types';
 import { anchoredGeometry, chainSegments } from '../../lineGeometry';
 
 const ARROWHEAD_SIZE = 0.3;
@@ -24,12 +11,12 @@ const EPSILON = 1e-9;
 export const DEFAULT_OFFSET = 5;
 
 interface DimensionDrawing {
-  /** Measured value: a length, a radius, or an angle in degrees. */
+  /** Length, radius, or angle in degrees. */
   value: number;
   /** Label anchor in the entity's XY plane. */
   textX: number;
   textY: number;
-  /** Null when the measured geometry is degenerate (only the label is drawn). */
+  /** Null when degenerate (label only). */
   lines: THREE.LineSegments | null;
 }
 
@@ -51,7 +38,7 @@ function centroid(entity: Locatable): Vec2 {
   return [px + (entity.start[0] + entity.end[0]) / 2, py + (entity.start[1] + entity.end[1]) / 2];
 }
 
-/** The two wing segments of an arrowhead with its tip at `tip`, pointing along (dx, dy). */
+/** Wings of an arrowhead at `tip` pointing along (dx, dy). */
 function arrowhead(tip: Vec2, dx: number, dy: number): Vec2[] {
   const length = Math.sqrt(dx * dx + dy * dy);
   if (length < EPSILON) return [tip, tip, tip, tip];
@@ -76,25 +63,15 @@ function drawLines(vertices: ReadonlyArray<Vec2>, color: string): THREE.LineSegm
 }
 
 /** Linear: horizontal distance, line above the higher ref. Aligned: true distance, line parallel. */
-function linearDrawing(
-  a: Vec2,
-  b: Vec2,
-  offset: number,
-  aligned: boolean,
-  color: string,
-): DimensionDrawing {
+function linearDrawing(a: Vec2, b: Vec2, offset: number, aligned: boolean, color: string): DimensionDrawing {
   const dx = b[0] - a[0];
   const dy = b[1] - a[1];
   const length = Math.sqrt(dx * dx + dy * dy);
   const degenerate = length < EPSILON;
   const perp: Vec2 = degenerate ? [0, 1] : [-dy / length, dx / length];
   const topY = Math.max(a[1], b[1]);
-  const dimA: Vec2 = aligned
-    ? [a[0] + perp[0] * offset, a[1] + perp[1] * offset]
-    : [a[0], topY + offset];
-  const dimB: Vec2 = aligned
-    ? [b[0] + perp[0] * offset, b[1] + perp[1] * offset]
-    : [b[0], topY + offset];
+  const dimA: Vec2 = aligned ? [a[0] + perp[0] * offset, a[1] + perp[1] * offset] : [a[0], topY + offset];
+  const dimB: Vec2 = aligned ? [b[0] + perp[0] * offset, b[1] + perp[1] * offset] : [b[0], topY + offset];
   const dirX = dimB[0] - dimA[0];
   const dirY = dimB[1] - dimA[1];
   return {
@@ -103,19 +80,7 @@ function linearDrawing(
     textY: aligned ? (a[1] + b[1]) / 2 + perp[1] * offset : topY + offset,
     lines: degenerate
       ? null
-      : drawLines(
-          [
-            a,
-            dimA,
-            b,
-            dimB,
-            dimA,
-            dimB,
-            ...arrowhead(dimA, -dirX, -dirY),
-            ...arrowhead(dimB, dirX, dirY),
-          ],
-          color,
-        ),
+      : drawLines([a, dimA, b, dimB, dimA, dimB, ...arrowhead(dimA, -dirX, -dirY), ...arrowhead(dimB, dirX, dirY)], color),
   };
 }
 
@@ -135,13 +100,7 @@ function radialDrawing(ref: Radial, offset: number, color: string): DimensionDra
 }
 
 /** Angular: minor arc between the two arms, with extension lines from the vertex. */
-function angularDrawing(
-  vertex: Vec2,
-  armA: Vec2,
-  armB: Vec2,
-  offset: number,
-  color: string,
-): DimensionDrawing {
+function angularDrawing(vertex: Vec2, armA: Vec2, armB: Vec2, offset: number, color: string): DimensionDrawing {
   const [vx, vy] = vertex;
   const angleA = Math.atan2(armA[1] - vy, armA[0] - vx);
   const angleB = Math.atan2(armB[1] - vy, armB[0] - vx);
@@ -156,26 +115,17 @@ function angularDrawing(
   const arc = new THREE.EllipseCurve(vx, vy, arcRadius, arcRadius, startAngle, endAngle, false, 0)
     .getPoints(ANGULAR_ARC_SEGMENTS)
     .map(({ x, y }): Vec2 => [x, y]);
-  const arcEnd = (angle: number): Vec2 => [
-    vx + Math.cos(angle) * arcRadius,
-    vy + Math.sin(angle) * arcRadius,
-  ];
+  const arcEnd = (angle: number): Vec2 => [vx + Math.cos(angle) * arcRadius, vy + Math.sin(angle) * arcRadius];
   const midAngle = startAngle + minorSweep / 2;
   return {
     value: toDegrees(minorSweep),
     textX: vx + Math.cos(midAngle) * arcRadius * 1.4,
     textY: vy + Math.sin(midAngle) * arcRadius * 1.4,
-    lines: drawLines(
-      [...chainSegments(arc), vertex, arcEnd(startAngle), vertex, arcEnd(endAngle)],
-      color,
-    ),
+    lines: drawLines([...chainSegments(arc), vertex, arcEnd(startAngle), vertex, arcEnd(endAngle)], color),
   };
 }
 
-/**
- * Drawing of one dimension entity from the entities it references (null entries = dangling).
- * @failure missing or wrong-kind references -> null (nothing is drawn)
- */
+/** `null` references = dangling. @failure missing or wrong-kind references -> null */
 export function dimensionDrawing(
   kind: DimensionEntity['dimensionKind'],
   refs: ReadonlyArray<Entity | null | undefined>,

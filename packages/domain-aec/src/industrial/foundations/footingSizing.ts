@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import { unitsToMm } from '../../shared/numeric';
 import type { FootingElement } from '@core/model/building';
 import type { CadDocument } from '@core/model/types';
@@ -24,11 +20,7 @@ import {
 import { designMat } from './footingMat';
 import { maxUtilisation } from '../common/utilisation';
 
-export function geometryOf(
-  doc: CadDocument,
-  footing: FootingElement,
-  face: { x: number; y: number },
-): Geometry {
+export function geometryOf(doc: CadDocument, footing: FootingElement, face: { x: number; y: number }): Geometry {
   const toMm = unitsToMm(doc);
   return {
     widthMm: toMm(footing.width),
@@ -41,16 +33,10 @@ export function geometryOf(
 }
 
 /** Net ULS loads (no footing / backfill weight) of the compression combinations. */
-export function netLoads(
-  reaction: BaseReaction,
-  combinations: ReadonlyArray<Combination>,
-  leverM: number,
-): Load[] {
+export function netLoads(reaction: BaseReaction, combinations: ReadonlyArray<Combination>, leverM: number): Load[] {
   return combinations.flatMap((combination) => {
     const { v, h, m } = combine(reaction, combination.factors);
-    return v > 0
-      ? [{ combination: combination.name, normal: v, moment: footingMoment(m, h, leverM) }]
-      : [];
+    return v > 0 ? [{ combination: combination.name, normal: v, moment: footingMoment(m, h, leverM) }] : [];
   });
 }
 
@@ -73,10 +59,7 @@ interface PadVerdict {
 }
 
 /** Soil rows (same rows as check_foundations) and, when they pass, the reinforced mat of a trial size. */
-export function evaluatePad(
-  context: SizingContext,
-  size: PadSize,
-): PadVerdict & { passes: boolean } {
+export function evaluatePad(context: SizingContext, size: PadSize): PadVerdict & { passes: boolean } {
   const [widthMm, lengthMm, thicknessMm] = size;
   const { doc, footing } = context;
   const trial: FootingElement = {
@@ -89,44 +72,24 @@ export function evaluatePad(
   const soilUtilisation = maxUtilisation(rows);
   if (soilUtilisation > 1) return { soilUtilisation, mat: null, passes: false };
   const geometry = geometryOf(doc, trial, context.face);
-  const net = netLoads(
-    context.reaction,
-    ultimateCombinations(context.wind, context.crane, false),
-    geometry.leverM,
-  );
+  const net = netLoads(context.reaction, ultimateCombinations(context.wind, context.crane, false), geometry.leverM);
   const mat = designMat(geometry, net);
   return { soilUtilisation, mat, passes: mat.chosen !== null };
 }
 
 /** Trial sizes at the current aspect ratio, ascending concrete volume (wider plan first on ties). */
-export function trialSizes(
-  current: PadSize,
-  face: { x: number; y: number },
-  grow: boolean,
-): PadSize[] {
+export function trialSizes(current: PadSize, face: { x: number; y: number }, grow: boolean): PadSize[] {
   const [currentWidth, currentLength, currentThickness] = current;
   const ratio = currentLength / currentWidth;
-  const footprintWidth = Math.max(
-    face.x + 2 * PLAN_MARGIN_MM,
-    (face.y + 2 * PLAN_MARGIN_MM) / ratio,
-  );
-  const firstWidth = roundUp(
-    grow ? Math.max(footprintWidth, currentWidth) : footprintWidth,
-    PLAN_STEP_MM,
-  );
-  const firstThickness = grow
-    ? Math.max(MIN_THICKNESS_MM, roundUp(currentThickness, THICKNESS_STEP_MM))
-    : MIN_THICKNESS_MM;
+  const footprintWidth = Math.max(face.x + 2 * PLAN_MARGIN_MM, (face.y + 2 * PLAN_MARGIN_MM) / ratio);
+  const firstWidth = roundUp(grow ? Math.max(footprintWidth, currentWidth) : footprintWidth, PLAN_STEP_MM);
+  const firstThickness = grow ? Math.max(MIN_THICKNESS_MM, roundUp(currentThickness, THICKNESS_STEP_MM)) : MIN_THICKNESS_MM;
   const sizes: PadSize[] = [];
   for (let width = firstWidth; width <= MAX_PLAN_MM; width += PLAN_STEP_MM) {
     const length = roundUp(width * ratio, PLAN_STEP_MM);
     if (length > MAX_PLAN_MM) break;
     if (grow && length < currentLength) continue;
-    for (
-      let thickness = firstThickness;
-      thickness <= MAX_THICKNESS_MM;
-      thickness += THICKNESS_STEP_MM
-    ) {
+    for (let thickness = firstThickness; thickness <= MAX_THICKNESS_MM; thickness += THICKNESS_STEP_MM) {
       sizes.push([width, length, thickness]);
     }
   }

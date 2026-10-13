@@ -1,15 +1,4 @@
-/**
- * @layer ui/viewport/2d
- *
- * Modify-tool palette for the 2D drafting viewport.
- *
- * Renders as an HTML overlay inside the viewport container (not inside the
- * r3f Canvas). Provides accessible buttons for each modify tool, plus a
- * minimal numeric input for tools that need a distance / radius.
- *
- * Presentation only — no document mutations (R1). All state changes go
- * through the passed callbacks.
- */
+// HTML overlay palette of the 2D modify tools, with a numeric input for distance / radius; state via callbacks.
 
 import React, { useRef, useEffect } from 'react';
 import { type IconName, Icon } from '@ui/components/Icon';
@@ -89,7 +78,7 @@ export function ModifyTools({
 }: ModifyToolsProps): React.ReactElement {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Auto-focus the input when the enter-value phase begins.
+  // Focus the input when the enter-value phase begins.
   useEffect(() => {
     if (phase === 'enter-value' && inputRef.current) {
       inputRef.current.focus();
@@ -101,11 +90,7 @@ export function ModifyTools({
 
   return (
     <>
-      <div
-        className="vp-tool-palette vp-tool-palette--modify"
-        role="toolbar"
-        aria-label="2D modify tools"
-      >
+      <div className="vp-tool-palette vp-tool-palette--modify" role="toolbar" aria-label="2D modify tools">
         {TOOL_BUTTONS.map(({ tool, label, hint: kbHint, icon }) => (
           <button
             key={tool}
@@ -136,12 +121,7 @@ export function ModifyTools({
               onKeyDown={enterEscapeKeys({ onEnter: onCommitValue })}
               aria-label={`${valueLabel(activeTool)} value`}
             />
-            <button
-              type="button"
-              className="vp-primary-btn"
-              onClick={onCommitValue}
-              aria-label="Apply"
-            >
+            <button type="button" className="vp-primary-btn" onClick={onCommitValue} aria-label="Apply">
               Apply
             </button>
           </div>

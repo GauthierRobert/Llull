@@ -6,84 +6,36 @@
       "#1": {
         "id": "#1",
         "kind": "box",
-        "size": [
-          1,
-          1,
-          1
-        ],
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
+        "size": [1,1,1],
+        "position": [0,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#6b8f9c"
       },
       "#3": {
         "id": "#3",
         "kind": "box",
-        "size": [
-          1,
-          1,
-          1
-        ],
-        "position": [
-          3,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
+        "size": [1,1,1],
+        "position": [3,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#6b8f9c"
       },
       "#4": {
         "id": "#4",
         "kind": "box",
-        "size": [
-          1,
-          1,
-          1
-        ],
-        "position": [
-          6,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
+        "size": [1,1,1],
+        "position": [6,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#6b8f9c"
       },
       "#5": {
         "id": "#5",
         "kind": "box",
-        "size": [
-          1,
-          1,
-          1
-        ],
-        "position": [
-          9,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
+        "size": [1,1,1],
+        "position": [9,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#6b8f9c"
       },
@@ -92,16 +44,8 @@
         "kind": "cylinder",
         "radius": 0.5,
         "height": 2,
-        "position": [
-          5,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
+        "position": [5,0,0],
+        "rotation": [0,0,0],
         "layerId": "#2",
         "color": "#6b8f9c"
       },
@@ -110,16 +54,8 @@
         "kind": "cylinder",
         "radius": 0.5,
         "height": 2,
-        "position": [
-          2.5,
-          4.33012702,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          1.04719755
-        ],
+        "position": [2.5,4.33012702,0],
+        "rotation": [0,0,1.04719755],
         "layerId": "#2",
         "color": "#6b8f9c"
       },
@@ -128,16 +64,8 @@
         "kind": "cylinder",
         "radius": 0.5,
         "height": 2,
-        "position": [
-          -2.5,
-          4.33012702,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          2.0943951
-        ],
+        "position": [-2.5,4.33012702,0],
+        "rotation": [0,0,2.0943951],
         "layerId": "#2",
         "color": "#6b8f9c"
       },
@@ -146,16 +74,8 @@
         "kind": "cylinder",
         "radius": 0.5,
         "height": 2,
-        "position": [
-          -5,
-          6.123234e-16,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          3.14159265
-        ],
+        "position": [-5,6.123234e-16,0],
+        "rotation": [0,0,3.14159265],
         "layerId": "#2",
         "color": "#6b8f9c"
       },
@@ -164,16 +84,8 @@
         "kind": "cylinder",
         "radius": 0.5,
         "height": 2,
-        "position": [
-          -2.5,
-          -4.33012702,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          4.1887902
-        ],
+        "position": [-2.5,-4.33012702,0],
+        "rotation": [0,0,4.1887902],
         "layerId": "#2",
         "color": "#6b8f9c"
       },
@@ -182,16 +94,8 @@
         "kind": "cylinder",
         "radius": 0.5,
         "height": 2,
-        "position": [
-          2.5,
-          -4.33012702,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          5.23598776
-        ],
+        "position": [2.5,-4.33012702,0],
+        "rotation": [0,0,5.23598776],
         "layerId": "#2",
         "color": "#6b8f9c"
       }
@@ -239,74 +143,30 @@
       {
         "id": "#12",
         "name": "add_box",
-        "params": {
-          "size": [
-            1,
-            1,
-            1
-          ]
-        },
+        "params": {"size":[1,1,1]},
         "suppressed": false,
-        "affected": [
-          "#1"
-        ]
+        "affected": ["#1"]
       },
       {
         "id": "#13",
         "name": "array_linear",
-        "params": {
-          "id": "#1",
-          "count": 4,
-          "offset": [
-            3,
-            0,
-            0
-          ]
-        },
+        "params": {"id":"#1","count":4,"offset":[3,0,0]},
         "suppressed": false,
-        "affected": [
-          "#3",
-          "#4",
-          "#5"
-        ]
+        "affected": ["#3","#4","#5"]
       },
       {
         "id": "#14",
         "name": "add_cylinder",
-        "params": {
-          "radius": 0.5,
-          "height": 2,
-          "position": [
-            5,
-            0,
-            0
-          ]
-        },
+        "params": {"radius":0.5,"height":2,"position":[5,0,0]},
         "suppressed": false,
-        "affected": [
-          "#6"
-        ]
+        "affected": ["#6"]
       },
       {
         "id": "#15",
         "name": "array_polar",
-        "params": {
-          "id": "#6",
-          "count": 6,
-          "center": [
-            0,
-            0,
-            0
-          ]
-        },
+        "params": {"id":"#6","count":6,"center":[0,0,0]},
         "suppressed": false,
-        "affected": [
-          "#7",
-          "#8",
-          "#9",
-          "#10",
-          "#11"
-        ]
+        "affected": ["#7","#8","#9","#10","#11"]
       }
     ],
     "configurations": {},

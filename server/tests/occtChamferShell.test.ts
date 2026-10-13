@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Live OpenCascade chamfer, fillet and shell on EXACT shapes (B-rep edges, not mesh triangles),
  * checked against closed-form volumes; the sewn-mesh leaf stays a working fallback.
  */
@@ -36,17 +35,8 @@ const drill = (): Entity =>
     layerId: 'layer-default',
     color: '#888888',
   }) as unknown as Entity;
-const shell = (source: ShapeRecipe, thickness: number): ShapeRecipe => ({
-  op: 'shell',
-  source,
-  thickness,
-});
-const chamfer = (source: ShapeRecipe, edges: number[], size: number): ShapeRecipe => ({
-  op: 'chamfer',
-  source,
-  edges,
-  size,
-});
+const shell = (source: ShapeRecipe, thickness: number): ShapeRecipe => ({ op: 'shell', source, thickness });
+const chamfer = (source: ShapeRecipe, edges: number[], size: number): ShapeRecipe => ({ op: 'chamfer', source, edges, size });
 
 let occt: GeometryKernel;
 let cubeMesh: MeshData;
@@ -84,11 +74,8 @@ describe('occt chamfer / fillet on true B-rep edges', () => {
   });
 
   it('flags the seam of a cylinder and the poles of a sphere (nothing to round there)', () => {
-    const round = (kind: string, extra: object): Entity =>
-      ({ ...cubeEntity(1), kind, ...extra }) as unknown as Entity;
-    const cylinder = occt.topology(
-      occt.evaluate(leaf(round('cylinder', { radius: 1, height: 2 })))!,
-    )!;
+    const round = (kind: string, extra: object): Entity => ({ ...cubeEntity(1), kind, ...extra }) as unknown as Entity;
+    const cylinder = occt.topology(occt.evaluate(leaf(round('cylinder', { radius: 1, height: 2 })))!)!;
     expect(cylinder.edges.filter((edge) => edge.seam)).toHaveLength(1);
     expect(cylinder.edges.filter((edge) => edge.curve === 'circle' && !edge.seam)).toHaveLength(2);
     const sphere = occt.topology(occt.evaluate(leaf(round('sphere', { radius: 1 })))!)!;
@@ -107,12 +94,7 @@ describe('occt chamfer / fillet on true B-rep edges', () => {
     const topology = occt.topology(occt.evaluate(drilled)!)!;
     const lip = topology.edges.find((edge) => edge.curve === 'circle');
     expect(lip).toBeDefined();
-    const filleted = occt.evaluate({
-      op: 'fillet',
-      source: drilled,
-      edges: [lip!.index],
-      size: 0.3,
-    });
+    const filleted = occt.evaluate({ op: 'fillet', source: drilled, edges: [lip!.index], size: 0.3 });
     expect(filleted).not.toBeNull();
     const after = occt.topology(filleted!)!;
     expect(after.faces.some((face) => face.surface === 'torus')).toBe(true);
@@ -125,12 +107,7 @@ describe('occt chamfer / fillet on true B-rep edges', () => {
   });
 
   it('writes exact STEP: analytic planes and a cylinder, no triangulated faces', () => {
-    const drilled = occt.evaluate({
-      op: 'boolean',
-      boolean: 'subtract',
-      a: cube,
-      b: leaf(drill()),
-    })!;
+    const drilled = occt.evaluate({ op: 'boolean', boolean: 'subtract', a: cube, b: leaf(drill()) })!;
     const step = occt.exportStep([drilled]);
     expect(step).toMatch(/^ISO-10303-21;/);
     expect(step).toMatch(/CYLINDRICAL_SURFACE/);

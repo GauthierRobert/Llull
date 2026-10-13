@@ -1,23 +1,12 @@
-/**
- * @layer ui/viewport/3d
- * 3D perspective viewport: one r3f <Canvas frameloop="demand"> repainted by the store
- * invalidators. Quality tier (useRenderQuality) scales shadows/environment to the entity count.
- * Entities + gizmo sit in a group offset by -renderOrigin (float32-safe floating origin).
- * Presentational only: changes go through dispatch.
- */
+// 3D perspective viewport: one <Canvas frameloop="demand"> repainted by store invalidators; quality tier scales
+// shadows/environment. Entities + gizmo sit in a group offset by -renderOrigin (float32-safe floating origin).
 
 import { Suspense, useCallback, useMemo, useState } from 'react';
 // First among the three.js imports: its three-mesh-bvh typings must win over drei's older copy.
 import { ensureBvhSetup } from './bvhSetup';
 import { VIEWPORT_FOV_DEGREES } from '@core/model/viewport';
 import { Canvas } from '@react-three/fiber';
-import {
-  OrbitControls,
-  Grid,
-  GizmoHelper,
-  GizmoViewport,
-  PerspectiveCamera,
-} from '@react-three/drei';
+import { OrbitControls, Grid, GizmoHelper, GizmoViewport, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { type GizmoMode, useStore, useToolStore } from '@ui/store';
 import { Entities } from './Entities';
@@ -36,28 +25,23 @@ import { MechanismOverlay } from './MechanismOverlay';
 import { useViewportPalette } from '@ui/viewport/viewportPalette';
 import { StoreInvalidator, ViewportStoreInvalidator } from '../StoreInvalidator';
 
-// Engage BVH prototype patch once at module load — idempotent, safe under StrictMode.
+// Idempotent, StrictMode-safe.
 ensureBvhSetup();
 
 interface SceneContentsProps {
-  /** When false, OrbitControls is disabled (gizmo drag in progress). */
+  /** False while a gizmo drag is in progress. */
   orbitEnabled: boolean;
   gizmoMode: GizmoMode;
   onDraggingChanged: (dragging: boolean) => void;
 }
 
-function SceneContents({
-  orbitEnabled,
-  gizmoMode,
-  onDraggingChanged,
-}: SceneContentsProps): React.ReactElement {
+function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneContentsProps): React.ReactElement {
   const renderOrigin = useStore((s) => s.renderOrigin);
 
-  // R3 narrow selector: quality settings derived from entity count + user override.
   const quality = useRenderQuality();
   const palette = useViewportPalette();
 
-  // Initial camera only: later camera changes are applied imperatively by CameraReactor.
+  // Initial camera only: CameraReactor applies later changes imperatively.
   const [initialCamera] = useState(() => {
     const cam = useStore.getState().document.camera;
     return {
@@ -66,15 +50,8 @@ function SceneContents({
     };
   });
 
-  // The entities + gizmo group is offset by -renderOrigin so that all entity
-  // positions (expressed in document world coords) become relative to the
-  // render origin — keeping float32 mesh positions small (avoids jitter).
-  // Raycasting is automatically correct: three.js resolves click events in
-  // world space using the mesh's matrixWorld, which accounts for the group offset.
-  const groupOffset = useMemo(
-    () => new THREE.Vector3(-renderOrigin[0], -renderOrigin[1], -renderOrigin[2]),
-    [renderOrigin],
-  );
+  // Small float32 positions (no jitter); raycasts resolve in world space through matrixWorld, so picking stays correct.
+  const groupOffset = useMemo(() => new THREE.Vector3(-renderOrigin[0], -renderOrigin[1], -renderOrigin[2]), [renderOrigin]);
 
   return (
     <>
@@ -82,14 +59,7 @@ function SceneContents({
 
       {/* up={[0,0,1]}: world up is +Z (right-handed, Z-up document convention); OrbitControls
           orbits about the camera's up. */}
-      <PerspectiveCamera
-        makeDefault
-        fov={VIEWPORT_FOV_DEGREES}
-        near={0.01}
-        far={1e8}
-        position={initialCamera.position}
-        up={[0, 0, 1]}
-      />
+      <PerspectiveCamera makeDefault fov={VIEWPORT_FOV_DEGREES} near={0.01} far={1e8} position={initialCamera.position} up={[0, 0, 1]} />
       <OrbitControls
         makeDefault
         target={initialCamera.target}
@@ -133,17 +103,10 @@ function SceneContents({
         infiniteGrid
       />
 
-      {/* ---- Entities + gizmo, offset by -renderOrigin ----
-           Entity positions are document world coords; the group subtracts
-           renderOrigin so three.js sees float32-safe local values.
-           Raycasts work correctly: three.js resolves hits via matrixWorld which
-           includes the group transform. */}
       <group position={groupOffset}>
         <Entities />
         <TransformGizmo mode={gizmoMode} onDraggingChanged={onDraggingChanged} />
-        {/* Measurement bbox wireframe — shown when measure_bounding_box result is present */}
         <MeasureBBoxWireframe />
-        {/* Mechanism overlay — constraint line or joint arrow for the highlighted mechanism item */}
         <MechanismOverlay />
       </group>
 
@@ -158,7 +121,6 @@ export function Viewport3D(): React.ReactElement {
   const clearSelection = useStore((s) => s.clearSelection);
   const gizmoMode = useToolStore((s) => s.gizmoMode);
 
-  // Disable OrbitControls while the gizmo is being dragged.
   const [orbitEnabled, setOrbitEnabled] = useState(true);
 
   const handleDraggingChanged = useCallback((dragging: boolean): void => {
@@ -174,29 +136,18 @@ export function Viewport3D(): React.ReactElement {
       <Canvas
         frameloop="demand"
         shadows
-        gl={{
-          antialias: true,
-          alpha: false,
-          toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.1,
-        }}
+        gl={{ antialias: true, alpha: false, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1 }}
         dpr={[1, 2]}
         style={{ width: '100%', height: '100%' }}
         onPointerMissed={handlePointerMissed}
       >
         <Suspense fallback={null}>
-          <SceneContents
-            orbitEnabled={orbitEnabled}
-            gizmoMode={gizmoMode}
-            onDraggingChanged={handleDraggingChanged}
-          />
+          <SceneContents orbitEnabled={orbitEnabled} gizmoMode={gizmoMode} onDraggingChanged={handleDraggingChanged} />
         </Suspense>
       </Canvas>
 
-      {/* View presets, fit and named views (top-right) */}
       <ViewPresetsOverlay />
 
-      {/* Display mode + section plane controls (top-left) */}
       <ViewportControls />
     </div>
   );

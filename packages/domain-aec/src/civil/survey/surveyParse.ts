@@ -1,8 +1,4 @@
-/**
- * Survey point file parsing (PENZD / PNEZD / ENZ / NEZ, comma / tab / space / semicolon separated).
- * @layer domain-aec/civil
- * @pure
- */
+/** Survey point file parsing (PENZD / PNEZD / ENZ / NEZ, comma / tab / space / semicolon separated). */
 
 export const SURVEY_FORMATS = ['PENZD', 'PNEZD', 'PENZ', 'PNEZ', 'ENZ', 'NEZ'] as const;
 
@@ -23,13 +19,7 @@ export interface ParsedSurvey {
 }
 
 function splitFields(line: string): string[] {
-  const delimiter = line.includes(',')
-    ? ','
-    : line.includes(';')
-      ? ';'
-      : line.includes('\t')
-        ? '\t'
-        : /\s+/;
+  const delimiter = line.includes(',') ? ',' : line.includes(';') ? ';' : line.includes('\t') ? '\t' : /\s+/;
   return line
     .split(delimiter)
     .map((field) => field.trim())

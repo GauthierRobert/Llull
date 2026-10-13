@@ -1,10 +1,5 @@
-/**
- * @layer ui/components
- *
- * TopBar — application header: sidebar toggle, brand, file breadcrumbs, command-palette trigger
- * (Ctrl/Cmd+K), agent pill (liveStatus), project / export / connect actions, theme and inspector
- * toggles. Presentation only (react R1).
- */
+// Header: sidebar toggle, brand, breadcrumbs, palette trigger (Ctrl/Cmd+K), agent pill (liveStatus), project / export /
+// connect actions, theme and inspector toggles.
 
 import React from 'react';
 import { classNames } from '@ui/classNames';
@@ -27,18 +22,12 @@ function AgentPill({ status }: { status: LiveStatus }): React.ReactElement {
 
   return (
     <div
-      className={classNames(
-        'agent-pill',
-        isConnected && 'agent-pill--connected',
-        isConnecting && 'agent-pill--connecting',
-      )}
+      className={classNames('agent-pill', isConnected && 'agent-pill--connected', isConnecting && 'agent-pill--connecting')}
       aria-label={label}
       title={label}
     >
       <span className="agent-pill__dot" aria-hidden="true" />
-      <span className="agent-pill__text">
-        {isConnected ? 'claude-mcp' : isConnecting ? 'connecting…' : 'offline'}
-      </span>
+      <span className="agent-pill__text">{isConnected ? 'claude-mcp' : isConnecting ? 'connecting…' : 'offline'}</span>
     </div>
   );
 }
@@ -110,12 +99,7 @@ export function TopBar(): React.ReactElement {
           <div className="brand-mark" aria-hidden="true">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
               <path d="M12 2.5 3.5 7v10L12 21.5 20.5 17V7L12 2.5Z" fill="currentColor" />
-              <path
-                d="M3.5 7 12 11.5 20.5 7M12 11.5v10"
-                stroke="var(--surface-1)"
-                strokeWidth="1.6"
-                strokeLinejoin="round"
-              />
+              <path d="M3.5 7 12 11.5 20.5 7M12 11.5v10" stroke="var(--surface-1)" strokeWidth="1.6" strokeLinejoin="round" />
             </svg>
           </div>
           <h1 className="brand-wordmark">Llull</h1>
@@ -126,12 +110,7 @@ export function TopBar(): React.ReactElement {
         <nav className="file-crumbs" aria-label="File location">
           <span className="file-crumb file-crumb--active">{projectName ?? 'Untitled'}</span>
           {isDirty && (
-            <span
-              className="unsaved-dot"
-              role="status"
-              aria-label="Unsaved changes"
-              title="Unsaved changes"
-            >
+            <span className="unsaved-dot" role="status" aria-label="Unsaved changes" title="Unsaved changes">
               ●<span className="unsaved-dot__label"> unsaved</span>
             </span>
           )}

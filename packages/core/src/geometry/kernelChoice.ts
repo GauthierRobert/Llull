@@ -1,9 +1,4 @@
-/**
- * Which geometry kernel a surface installs; one setting for browser (`?kernel=`) and server
- * (`LLULL_KERNEL`).
- *
- * @layer core/geometry
- */
+/** Which geometry kernel a surface installs; one setting for browser (`?kernel=`) and server (`LLULL_KERNEL`). */
 
 export type KernelChoice = 'manifold' | 'occt';
 

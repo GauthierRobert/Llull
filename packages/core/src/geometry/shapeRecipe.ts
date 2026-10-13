@@ -1,21 +1,12 @@
 /**
- * Shape recipe: the serializable construction tree of a solid (primitive leaves, boolean / fillet /
- * chamfer / shell / placement / scale nodes). The kernel evaluates it to an exact, kernel-owned shape
- * (`ShapeHandle`); the document stores the recipe on result `mesh` entities (`brep`), never the shape.
- *
- * @layer core/geometry
- * @pure
- * @invariant `recipeKey` covers every input a kernel reads; presentation fields (id, name, color,
- *   layer, tags, material) never reach it, so a recolored operand reuses the cached shape
+ * Shape recipe: the serializable construction tree of a solid (primitive leaves, boolean / fillet / chamfer / shell / placement / scale
+ * nodes). The kernel evaluates it to an exact, kernel-owned shape (`ShapeHandle`); the document stores the recipe on result `mesh` entities
+ * (`brep`), never the shape.
+ * @invariant `recipeKey` covers every input a kernel reads; presentation fields (id, name, color, layer, tags, material) never reach it, so
+ *   a recolored operand reuses the cached shape
  */
 
-import {
-  type Entity,
-  type MeshSolidEntity,
-  type ShapeRecipe,
-  type Vec3,
-  SOLID_KINDS,
-} from '../model/types';
+import { type Entity, type MeshSolidEntity, type ShapeRecipe, type Vec3, SOLID_KINDS } from '../model/types';
 import { hashText } from '../lib/hash';
 import { isRecord } from '../lib/isRecord';
 import { isFiniteNumber } from '../lib/isFiniteNumber';
@@ -97,8 +88,7 @@ const MAX_RECIPE_DEPTH = 256;
 export type LeafValidator = (entity: Record<string, unknown>) => string | null;
 
 const isIndexArray = (v: unknown, vertexCount: number): boolean =>
-  Array.isArray(v) &&
-  v.every((i) => Number.isInteger(i) && (i as number) >= 0 && (i as number) < vertexCount);
+  Array.isArray(v) && v.every((i) => Number.isInteger(i) && (i as number) >= 0 && (i as number) < vertexCount);
 
 /** A leaf must be a 3D solid (not an instance); a mesh leaf needs well-formed triangle arrays. */
 function leafError(entity: Record<string, unknown>, validateLeaf: LeafValidator): string | null {
@@ -116,38 +106,28 @@ function leafError(entity: Record<string, unknown>, validateLeaf: LeafValidator)
   return validateLeaf(entity);
 }
 
-function nodeError(
-  node: Record<string, unknown>,
-  depth: number,
-  validateLeaf: LeafValidator,
-): string | null {
+function nodeError(node: Record<string, unknown>, depth: number, validateLeaf: LeafValidator): string | null {
   const child = (value: unknown): string | null => check(value, depth + 1, validateLeaf);
   switch (node['op']) {
     case 'solid':
-      return isRecord(node['entity'])
-        ? leafError(node['entity'], validateLeaf)
-        : 'solid leaf needs an entity';
+      return isRecord(node['entity']) ? leafError(node['entity'], validateLeaf) : 'solid leaf needs an entity';
     case 'boolean':
-      if (!['union', 'subtract', 'intersect'].includes(String(node['boolean'])))
-        return `unknown boolean '${String(node['boolean'])}'`;
+      if (!['union', 'subtract', 'intersect'].includes(String(node['boolean']))) return `unknown boolean '${String(node['boolean'])}'`;
       return child(node['a']) ?? child(node['b']);
     case 'fillet':
     case 'chamfer': {
       const edges = node['edges'];
       if (!Array.isArray(edges) || !edges.every((e) => Number.isInteger(e) && (e as number) >= 0))
         return `${String(node['op'])}: edges must be non-negative integers`;
-      if (!isFiniteNumber(node['size']) || node['size'] <= 0)
-        return `${String(node['op'])}: size must be > 0`;
+      if (!isFiniteNumber(node['size']) || node['size'] <= 0) return `${String(node['op'])}: size must be > 0`;
       const sizeEnd = node['sizeEnd'];
-      if (sizeEnd !== undefined && (!isFiniteNumber(sizeEnd) || sizeEnd <= 0))
-        return `${String(node['op'])}: sizeEnd must be > 0`;
+      if (sizeEnd !== undefined && (!isFiniteNumber(sizeEnd) || sizeEnd <= 0)) return `${String(node['op'])}: sizeEnd must be > 0`;
       return child(node['source']);
     }
     case 'blend': {
       const sources = node['sources'];
       if (!Array.isArray(sources) || sources.length < 2) return 'blend: needs >= 2 sources';
-      if (!isFiniteNumber(node['radius']) || node['radius'] <= 0)
-        return 'blend: radius must be > 0';
+      if (!isFiniteNumber(node['radius']) || node['radius'] <= 0) return 'blend: radius must be > 0';
       for (const source of sources) {
         const problem = child(source);
         if (problem !== null) return problem;
@@ -155,16 +135,13 @@ function nodeError(
       return null;
     }
     case 'shell':
-      if (!isFiniteNumber(node['thickness']) || node['thickness'] <= 0)
-        return 'shell: thickness must be > 0';
+      if (!isFiniteNumber(node['thickness']) || node['thickness'] <= 0) return 'shell: thickness must be > 0';
       return child(node['source']);
     case 'place':
-      if (!isVec3(node['position']) || !isVec3(node['rotation']))
-        return 'place: position and rotation must be finite Vec3';
+      if (!isVec3(node['position']) || !isVec3(node['rotation'])) return 'place: position and rotation must be finite Vec3';
       return child(node['source']);
     case 'scale':
-      if (!isFiniteNumber(node['factor']) || node['factor'] <= 0)
-        return 'scale: factor must be > 0';
+      if (!isFiniteNumber(node['factor']) || node['factor'] <= 0) return 'scale: factor must be > 0';
       return child(node['source']);
     default:
       return `unknown recipe op '${String(node['op'])}'`;
@@ -182,9 +159,6 @@ function check(value: unknown, depth: number, validateLeaf: LeafValidator): stri
  * every leaf a 3D solid (mesh arrays well-formed), plus `validateLeaf` (the persistence entity check).
  * @failure malformed node / leaf / depth > MAX_RECIPE_DEPTH -> error text, else null
  */
-export function validateShapeRecipe(
-  value: unknown,
-  validateLeaf: LeafValidator = () => null,
-): string | null {
+export function validateShapeRecipe(value: unknown, validateLeaf: LeafValidator = () => null): string | null {
   return check(value, 0, validateLeaf);
 }

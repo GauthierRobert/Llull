@@ -1,22 +1,11 @@
-/**
- * Walls: straight, parametric, joined at corners, hosting doors and windows.
- * @layer domain-aec
- */
+/** Walls: straight, parametric, joined at corners, hosting doors and windows. */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
 import type { BuildingModel, OpeningElement, WallElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
 import { fromMm } from '@core/model/units';
-import {
-  getBuilding,
-  isVec2List,
-  nextElementId,
-  nextMark,
-  resolveLevel,
-  toVec2,
-  withElement,
-} from '../model';
+import { getBuilding, isVec2List, nextElementId, nextMark, resolveLevel, toVec2, withElement } from '../model';
 import { distance } from '@lib/polygon';
 import { findTwin, sameSegment } from '../../shared/duplicates';
 import { noop } from '@core/commands/noop';
@@ -52,30 +41,14 @@ export function openingFitError(
 }
 
 const WALL_OPTION_SHAPE = {
-  thickness: z
-    .number()
-    .optional()
-    .describe('Wall thickness (document units, > 0). Default 200 mm.'),
-  height: z
-    .number()
-    .optional()
-    .describe('Wall height above its base (document units, > 0). Default: the level height.'),
-  levelId: z
-    .string()
-    .optional()
-    .describe(
-      'Level to place the wall on. Default: active level (a "Level 0" is created if none).',
-    ),
-  baseOffset: z
-    .number()
-    .optional()
-    .describe('Base offset above the level elevation, in document units. Default 0.'),
+  thickness: z.number().optional().describe('Wall thickness (document units, > 0). Default 200 mm.'),
+  height: z.number().optional().describe('Wall height above its base (document units, > 0). Default: the level height.'),
+  levelId: z.string().optional().describe('Level to place the wall on. Default: active level (a "Level 0" is created if none).'),
+  baseOffset: z.number().optional().describe('Base offset above the level elevation, in document units. Default 0.'),
   material: z
     .string()
     .optional()
-    .describe(
-      'Material name used by quantities/cost: concrete (default), masonry, brick, block, timber, steel, gypsum…',
-    ),
+    .describe('Material name used by quantities/cost: concrete (default), masonry, brick, block, timber, steel, gypsum…'),
 };
 
 type WallOptions = z.output<z.ZodObject<typeof WALL_OPTION_SHAPE>>;
@@ -90,35 +63,26 @@ type WallBuild =
     }
   | { readonly ok: false; readonly reason: string };
 
-const segmentLabel = ([start, end]: readonly [Vec2, Vec2]): string =>
-  `[${start.join(', ')}]→[${end.join(', ')}]`;
+const segmentLabel = ([start, end]: readonly [Vec2, Vec2]): string => `[${start.join(', ')}]→[${end.join(', ')}]`;
 
-function buildWalls(
-  doc: CadDocument,
-  segments: ReadonlyArray<readonly [Vec2, Vec2]>,
-  options: WallOptions,
-): WallBuild {
+function buildWalls(doc: CadDocument, segments: ReadonlyArray<readonly [Vec2, Vec2]>, options: WallOptions): WallBuild {
   const thickness = options.thickness ?? fromMm(doc, 200);
   const baseOffset = options.baseOffset ?? 0;
-  if (thickness <= 0)
-    return { ok: false, reason: `thickness must be > 0 (got ${String(options.thickness)})` };
+  if (thickness <= 0) return { ok: false, reason: `thickness must be > 0 (got ${String(options.thickness)})` };
   const resolution = resolveLevel(doc, getBuilding(doc), options.levelId);
   if (!resolution.ok) return { ok: false, reason: resolution.reason };
   const height = options.height ?? resolution.level.height;
-  if (height <= 0)
-    return { ok: false, reason: `height must be > 0 (got ${String(options.height)})` };
+  if (height <= 0) return { ok: false, reason: `height must be > 0 (got ${String(options.height)})` };
   let building = resolution.building;
   const wallIds: string[] = [];
   const skippedAs: string[] = [];
   for (const [start, end] of segments) {
-    if (distance(start, end) <= 0)
-      return { ok: false, reason: `segment ${segmentLabel([start, end])} has zero length` };
+    if (distance(start, end) <= 0) return { ok: false, reason: `segment ${segmentLabel([start, end])} has zero length` };
     const twin = findTwin(
       building,
       'wall',
       resolution.level.id,
-      (element) =>
-        element.baseOffset === baseOffset && sameSegment(element.start, element.end, start, end),
+      (element) => element.baseOffset === baseOffset && sameSegment(element.start, element.end, start, end),
     );
     if (twin) {
       skippedAs.push(twin.id);
@@ -175,50 +139,35 @@ function wallResult(doc: CadDocument, build: Extract<WallBuild, { ok: true }>): 
     build.building,
     build.wallIds,
     summarize,
-    build.skippedAs.length === 0
-      ? { wallIds: build.wallIds }
-      : { wallIds: build.wallIds, skippedDuplicatesOf: build.skippedAs },
+    build.skippedAs.length === 0 ? { wallIds: build.wallIds } : { wallIds: build.wallIds, skippedDuplicatesOf: build.skippedAs },
   );
 }
 
 const MAX_WALL_POINTS = 500;
 
 /**
- * @command draw_walls
- * @pure
  * @affects creates (points.length - 1) walls, +1 when closed, minus segments duplicating a wall (skipped)
  * @failure < 2 points / zero-length segment / every segment a duplicate -> no-op
  */
 export const drawWalls = defineCommand({
   name: 'draw_walls',
   description:
-    'Draw a chain of joined walls through plan points ([[x, y], …]); closed: true adds the closing ' +
-    'wall (e.g. a building perimeter); two points make one straight wall. Walls meeting at endpoints ' +
-    '(L/T/X corners) are joined automatically; doors and windows are then hosted with add_door / ' +
-    'add_window. A segment that duplicates an ' +
-    'existing wall (same end points either way, same base offset, same level) is skipped and ' +
-    'reported, so adjacent rooms can each be drawn as a closed loop sharing an edge; refused only ' +
-    'if every segment is a duplicate.',
+    'Draw a chain of joined walls through plan points ([[x, y], …]); closed: true adds the closing wall (e.g. a building perimeter); two ' +
+    'points make one straight wall. Walls meeting at endpoints (L/T/X corners) are joined automatically; doors and windows are then ' +
+    'hosted with add_door / add_window. A segment that duplicates an existing wall (same end points either way, same base offset, same ' +
+    'level) is skipped and reported, so adjacent rooms can each be drawn as a closed loop sharing an edge; refused only if every segment ' +
+    'is a duplicate.',
   params: z.object({
     points: z.array(z.array(z.number())).describe('Centerline vertices [[x, y], …], 2 to 500.'),
-    closed: z
-      .boolean()
-      .optional()
-      .describe('Close the loop back to the first point. Default false.'),
+    closed: z.boolean().optional().describe('Close the loop back to the first point. Default false.'),
     ...WALL_OPTION_SHAPE,
   }),
   run: (doc, { points, closed = false, ...options }): CommandResult => {
     if (!isVec2List(points, 2) || (closed && points.length < 3)) {
-      return noop(
-        doc,
-        'draw_walls failed: points must be a list of [x, y] (at least 2, or 3 when closed).',
-      );
+      return noop(doc, 'draw_walls failed: points must be a list of [x, y] (at least 2, or 3 when closed).');
     }
     if (points.length > MAX_WALL_POINTS) {
-      return noop(
-        doc,
-        `draw_walls failed: at most ${MAX_WALL_POINTS} points per call (got ${points.length}); split the outline.`,
-      );
+      return noop(doc, `draw_walls failed: at most ${MAX_WALL_POINTS} points per call (got ${points.length}); split the outline.`);
     }
     const segments: Array<readonly [Vec2, Vec2]> = [];
     for (let index = 0; index < points.length - 1; index++) {
@@ -231,8 +180,6 @@ export const drawWalls = defineCommand({
 });
 
 /**
- * @command update_wall
- * @pure
  * @affects regenerates the wall, its openings and the walls joined to it
  * @failure unknown wall / invalid values / hosted opening would no longer fit -> no-op
  */
@@ -251,25 +198,18 @@ export const updateWall = defineCommand({
     material: z.string().optional().describe('New material name.'),
     levelId: z.string().optional().describe('Move the wall to another level.'),
   }),
-  run: (
-    doc,
-    { wallId, start, end, thickness, height, baseOffset, material, levelId },
-  ): CommandResult => {
+  run: (doc, { wallId, start, end, thickness, height, baseOffset, material, levelId }): CommandResult => {
     const building = getBuilding(doc);
     const wall = building.elements[wallId];
-    if (!wall || wall.category !== 'wall')
-      return noop(doc, `update_wall failed: no wall '${wallId}'.`);
+    if (!wall || wall.category !== 'wall') return noop(doc, `update_wall failed: no wall '${wallId}'.`);
     if ((thickness !== undefined && thickness <= 0) || (height !== undefined && height <= 0))
       return noop(doc, 'update_wall failed: thickness/height must be > 0.');
-    if (levelId !== undefined && !building.levels[levelId])
-      return noop(doc, `update_wall failed: no level '${levelId}'.`);
+    if (levelId !== undefined && !building.levels[levelId]) return noop(doc, `update_wall failed: no level '${levelId}'.`);
     // A new overall thickness or material no longer matches a build-up: the wall becomes
     // single-layer.
     const { layers, ...single } = wall;
     const newMaterial = material?.trim();
-    const keepLayers =
-      (thickness === undefined || thickness === wall.thickness) &&
-      (!newMaterial || newMaterial === wall.material);
+    const keepLayers = (thickness === undefined || thickness === wall.thickness) && (!newMaterial || newMaterial === wall.material);
     const updated: WallElement = {
       ...single,
       ...(keepLayers && layers ? { layers } : {}),
@@ -281,8 +221,7 @@ export const updateWall = defineCommand({
       material: material?.trim() || wall.material,
       levelId: levelId ?? wall.levelId,
     };
-    if (distance(updated.start, updated.end) <= 0)
-      return noop(doc, 'update_wall failed: start and end would coincide.');
+    if (distance(updated.start, updated.end) <= 0) return noop(doc, 'update_wall failed: start and end would coincide.');
     if (
       updated.start.every((value, index) => value === wall.start[index]) &&
       updated.end.every((value, index) => value === wall.end[index]) &&
@@ -301,17 +240,13 @@ export const updateWall = defineCommand({
       doc,
       next,
       [wallId],
-      `Updated wall ${updated.mark} (${wallId}): [${updated.start.join(', ')}]→[${updated.end.join(', ')}], ` +
-        `thickness ${updated.thickness}, height ${updated.height}, ${updated.material}` +
-        `${!keepLayers && layers ? ' (build-up removed)' : ''}.`,
+      `Updated wall ${updated.mark} (${wallId}): [${updated.start.join(', ')}]→[${updated.end.join(', ')}], thickness ` +
+        `${updated.thickness}, height ${updated.height}, ${updated.material}${!keepLayers && layers ? ' (build-up removed)' : ''}.`,
     );
   },
 });
 
-/**
- * Every hosted opening on `levelIds` that no longer fits its wall's built extent / height.
- * @pure
- */
+/** Every hosted opening on `levelIds` that no longer fits its wall's built extent / height. */
 export function openingFitIssues(building: BuildingModel, levelIds: ReadonlySet<string>): string[] {
   const issues: string[] = [];
   for (const element of Object.values(building.elements)) {

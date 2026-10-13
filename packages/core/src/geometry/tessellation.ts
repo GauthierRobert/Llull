@@ -1,10 +1,6 @@
 /**
- * Tessellation constants and low-level pure geometry helpers shared by the SVG renderer
- * (`renderTessellation.ts`) and the triangle exporters (`exportTriangulate.ts`), so both
- * segment and wind every primitive the same way.
- *
- * @layer core/commands
- * @pure all exports are side-effect-free pure functions
+ * Tessellation constants and low-level pure geometry helpers shared by the SVG renderer (`renderTessellation.ts`) and the triangle
+ * exporters (`exportTriangulate.ts`), so both segment and wind every primitive the same way.
  */
 
 import type { Vec3 } from '../model/types';
@@ -13,31 +9,13 @@ import { signedArea, toCounterClockwise } from '../lib/polygon';
 import { triangulatePolygon } from '../lib/triangulate';
 import { circlePolygon } from '../lib/arc';
 
-/** Segments used for circular cross-sections (cylinder, cone, torus ring). */
+/** Segments of circular cross-sections (cylinder, cone, torus ring), sphere latitude bands / longitude slices, torus tube sections. */
 export const SEG_CIRCLE = 24;
-
-/** Latitude bands for sphere tessellation. */
 export const SEG_SPHERE_LAT = 12;
-
-/** Longitude slices for sphere tessellation. */
 export const SEG_SPHERE_LON = 16;
-
-/** Tube cross-section segments for torus tessellation. */
 export const SEG_TORUS_TUBE = 12;
 
-/**
- * Generate `segs` equally-spaced vertices on a circle in the XY plane at height `cz` (Z-up).
- *
- * The first vertex is at angle 0 (positive-X direction).
- * Points are in counter-clockwise order when viewed from above.
- *
- * @pure
- * @param cx - X coordinate of the circle centre
- * @param cy - Y coordinate of the circle centre
- * @param cz - Z coordinate (height) of the circle plane
- * @param r  - Circle radius
- * @param segs - Number of vertices (== number of segments)
- */
+/** `segs` equally spaced vertices of the circle (cx, cy, r) in the plane z = cz, from angle 0 (+X), counter-clockwise from above. */
 export function circlePoints(cx: number, cy: number, cz: number, r: number, segs: number): Vec3[] {
   return circlePolygon([cx, cy], r, segs).map(([x, y]): Vec3 => [x, y, cz]);
 }
@@ -53,44 +31,26 @@ export function ringEdges(ring: readonly Vec3[]): Array<[Vec3, Vec3]> {
 }
 
 /** Side wall between two equal-length rings: one quad `[bottom[i], bottom[j], top[j], top[i]]` per edge (j = i + 1, wrapping). */
-export function sideQuads(
-  bottom: readonly Vec3[],
-  top: readonly Vec3[],
-): Array<[Vec3, Vec3, Vec3, Vec3]> {
+export function sideQuads(bottom: readonly Vec3[], top: readonly Vec3[]): Array<[Vec3, Vec3, Vec3, Vec3]> {
   return bottom.map((_, i) => {
     const j = (i + 1) % bottom.length;
     return [bottom[i] as Vec3, bottom[j] as Vec3, top[j] as Vec3, top[i] as Vec3];
   });
 }
 
-/**
- * Triangulation of a simple (non-self-intersecting) 2D polygon, convex or not (`lib/triangulate`).
- *
- * Returns [ia, ib, ic] index triplets into `pts`; every triangle is counter-clockwise (CCW,
- * normal +Z) regardless of the input winding.
- *
- * @pure
- * @param pts - 2D polygon vertices in order; the polygon is treated as closed.
- */
-export function earClipTriangulate(
-  pts: ReadonlyArray<readonly [number, number]>,
-): Array<[number, number, number]> {
+/** Index triplets into the closed simple polygon `pts` (convex or not), every triangle counter-clockwise (+Z) whatever the input winding. */
+export function earClipTriangulate(pts: ReadonlyArray<readonly [number, number]>): Array<[number, number, number]> {
   const n = pts.length;
   if (n < 3) return [];
   const clockwise = signedArea(pts) < 0;
   const ordered = clockwise ? [...pts].reverse() : pts;
   const original = (index: number): number => (clockwise ? n - 1 - index : index);
-  return triangulatePolygon(ordered).triangles.map(([a, b, c]) => [
-    original(a),
-    original(b),
-    original(c),
-  ]);
+  return triangulatePolygon(ordered).triangles.map(([a, b, c]) => [original(a), original(b), original(c)]);
 }
 
 /**
- * Triangles of a mesh entity's data. Kernel output is indexed (shared vertices); an empty
- * `indices` means `positions` is a triangle soup (9 numbers per triangle).
- * @pure
+ * Triangles of a mesh entity's data. Kernel output is indexed (shared vertices); an empty `indices` means `positions` is a triangle soup (9
+ * numbers per triangle).
  */
 export function meshTriangles(mesh: {
   readonly positions: readonly number[];
@@ -102,88 +62,30 @@ export function meshTriangles(mesh: {
   const cornerCount = indexed ? mesh.indices.length : Math.floor(p.length / 3);
   const corner = (n: number): number => (indexed ? (mesh.indices[n] ?? 0) : n);
   const triangles: Array<[Vec3, Vec3, Vec3]> = [];
-  for (let n = 0; n + 2 < cornerCount; n += 3) {
-    triangles.push([vertex(corner(n)), vertex(corner(n + 1)), vertex(corner(n + 2))]);
-  }
+  for (let n = 0; n + 2 < cornerCount; n += 3) triangles.push([vertex(corner(n)), vertex(corner(n + 1)), vertex(corner(n + 2))]);
   return triangles;
 }
 
-/** Axis-aligned extents of a box centred at `position`. */
-function boxExtents(
-  position: Vec3,
-  size: Vec3,
-): { x0: number; x1: number; y0: number; y1: number; z0: number; z1: number } {
-  const [px, py, pz] = position;
-  const [w, h, d] = size;
-  return {
-    x0: px - w / 2,
-    x1: px + w / 2,
-    y0: py - h / 2,
-    y1: py + h / 2,
-    z0: pz - d / 2,
-    z1: pz + d / 2,
-  };
-}
-
 /** The six corners of a wedge whose lower-front-left corner is at `position` (size = [w, h, d]). */
-function wedgeCorners(
-  position: Vec3,
-  size: Vec3,
-): { f00: Vec3; f10: Vec3; f11: Vec3; f01: Vec3; b00: Vec3; b10: Vec3 } {
+function wedgeCorners(position: Vec3, size: Vec3): { f00: Vec3; f10: Vec3; f11: Vec3; f01: Vec3; b00: Vec3; b10: Vec3 } {
   const [px, py, pz] = position;
   const [w, h, d] = size;
   const p = (dx: number, dy: number, dz: number): Vec3 => [px + dx, py + dy, pz + dz];
-  return {
-    f00: p(0, 0, 0),
-    f10: p(w, 0, 0),
-    f11: p(w, h, 0),
-    f01: p(0, h, 0),
-    b00: p(0, 0, d),
-    b10: p(w, 0, d),
-  };
+  return { f00: p(0, 0, 0), f10: p(w, 0, 0), f11: p(w, h, 0), f01: p(0, h, 0), b00: p(0, 0, d), b10: p(w, 0, d) };
 }
 
 /** Six outward-facing quads of a box centred at `position` (counter-clockwise from outside): -Z, +Z, -Y, +Y, -X, +X. */
 export function boxFaces(position: Vec3, size: Vec3): Vec3[][] {
-  const { x0, x1, y0, y1, z0, z1 } = boxExtents(position, size);
-  return [
-    [
-      [x0, y0, z0],
-      [x0, y1, z0],
-      [x1, y1, z0],
-      [x1, y0, z0],
-    ],
-    [
-      [x0, y0, z1],
-      [x1, y0, z1],
-      [x1, y1, z1],
-      [x0, y1, z1],
-    ],
-    [
-      [x0, y0, z0],
-      [x1, y0, z0],
-      [x1, y0, z1],
-      [x0, y0, z1],
-    ],
-    [
-      [x0, y1, z0],
-      [x0, y1, z1],
-      [x1, y1, z1],
-      [x1, y1, z0],
-    ],
-    [
-      [x0, y0, z0],
-      [x0, y0, z1],
-      [x0, y1, z1],
-      [x0, y1, z0],
-    ],
-    [
-      [x1, y0, z0],
-      [x1, y1, z0],
-      [x1, y1, z1],
-      [x1, y0, z1],
-    ],
+  const [px, py, pz] = position;
+  const [w, h, d] = size;
+  // Corner code "xyz": 0 = min side, 1 = max side of each axis.
+  const corner = (code: string): Vec3 => [
+    code[0] === '1' ? px + w / 2 : px - w / 2,
+    code[1] === '1' ? py + h / 2 : py - h / 2,
+    code[2] === '1' ? pz + d / 2 : pz - d / 2,
   ];
+  const faces = ['000 010 110 100', '001 101 111 011', '000 100 101 001', '010 011 111 110', '000 001 011 010', '100 110 111 101'];
+  return faces.map((face) => face.split(' ').map(corner));
 }
 
 /** Outward-facing faces of a wedge (counter-clockwise from outside): front, bottom, top slope, then the -X / +X triangles. */
@@ -199,15 +101,9 @@ export function wedgeFaces(position: Vec3, size: Vec3): Vec3[][] {
 }
 
 /** Faces of a pyramid whose base centre is `position` (base face down, then 4 sides to the apex). */
-export function pyramidFaces(e: {
-  position: Vec3;
-  baseWidth: number;
-  baseDepth: number;
-  height: number;
-}): Vec3[][] {
+export function pyramidFaces(e: { position: Vec3; baseWidth: number; baseDepth: number; height: number }): Vec3[][] {
   const [px, py, pz] = e.position;
-  const hw = e.baseWidth / 2,
-    hd = e.baseDepth / 2;
+  const [hw, hd] = [e.baseWidth / 2, e.baseDepth / 2];
   const b00: Vec3 = [px - hw, py - hd, pz];
   const b10: Vec3 = [px + hw, py - hd, pz];
   const b11: Vec3 = [px + hw, py + hd, pz];
@@ -223,8 +119,8 @@ export function pyramidFaces(e: {
 }
 
 /**
- * Z-up cone: base ring (CCW from +Z, at position.z), its centre, and one outward side triangle per
- * base edge up to the apex at position + [0, 0, height].
+ * Z-up cone: base ring (CCW from +Z, at position.z), its centre, and one outward side triangle per base edge up to the apex at position +
+ * [0, 0, height].
  */
 export function coneSurface(e: { position: Vec3; radius: number; height: number }): {
   center: Vec3;
@@ -234,18 +130,11 @@ export function coneSurface(e: { position: Vec3; radius: number; height: number 
   const [px, py, pz] = e.position;
   const base = circlePoints(px, py, pz, e.radius, SEG_CIRCLE);
   const apex: Vec3 = [px, py, pz + e.height];
-  return {
-    center: [px, py, pz],
-    base,
-    sides: ringEdges(base).map(([from, to]): [Vec3, Vec3, Vec3] => [from, to, apex]),
-  };
+  return { center: [px, py, pz], base, sides: ringEdges(base).map(([from, to]): [Vec3, Vec3, Vec3] => [from, to, apex]) };
 }
 
 /** Bottom and top rings (CCW from +Z) of a Z-up cylinder centred on `position`. */
-export function cylinderRings(e: { position: Vec3; radius: number; height: number }): {
-  bottom: Vec3[];
-  top: Vec3[];
-} {
+export function cylinderRings(e: { position: Vec3; radius: number; height: number }): { bottom: Vec3[]; top: Vec3[] } {
   const [px, py, pz] = e.position;
   return {
     bottom: circlePoints(px, py, pz - e.height / 2, e.radius, SEG_CIRCLE),
@@ -254,14 +143,13 @@ export function cylinderRings(e: { position: Vec3; radius: number; height: numbe
 }
 
 /**
- * Bottom (z = position.z) and top (z + depth) vertex rings of an extruded profile, both
- * counter-clockwise seen from +Z (a clockwise profile is reversed) so side quads face outward.
+ * Bottom (z = position.z) and top (z + depth) vertex rings of an extruded profile, both counter-clockwise seen from +Z (a clockwise profile
+ * is reversed) so side quads face outward.
  */
-export function extrusionRings(e: {
-  position: Vec3;
-  profile: ReadonlyArray<readonly [number, number]>;
-  depth: number;
-}): { bottom: Vec3[]; top: Vec3[] } {
+export function extrusionRings(e: { position: Vec3; profile: ReadonlyArray<readonly [number, number]>; depth: number }): {
+  bottom: Vec3[];
+  top: Vec3[];
+} {
   const [px, py, pz] = e.position;
   const profile = toCounterClockwise(e.profile);
   return {
@@ -277,26 +165,16 @@ export function sphereQuads(position: Vec3, radius: number): Array<[Vec3, Vec3, 
   const at = (lat: number, lon: number): Vec3 => {
     const a = (Math.PI * lat) / SEG_SPHERE_LAT - Math.PI / 2;
     const b = (2 * Math.PI * lon) / SEG_SPHERE_LON;
-    return [
-      px + radius * Math.cos(a) * Math.cos(b),
-      py + radius * Math.cos(a) * Math.sin(b),
-      pz + radius * Math.sin(a),
-    ];
+    return [px + radius * Math.cos(a) * Math.cos(b), py + radius * Math.cos(a) * Math.sin(b), pz + radius * Math.sin(a)];
   };
   for (let lat = 0; lat < SEG_SPHERE_LAT; lat++) {
-    for (let lon = 0; lon < SEG_SPHERE_LON; lon++) {
-      quads.push([at(lat, lon), at(lat, lon + 1), at(lat + 1, lon + 1), at(lat + 1, lon)]);
-    }
+    for (let lon = 0; lon < SEG_SPHERE_LON; lon++) quads.push([at(lat, lon), at(lat, lon + 1), at(lat + 1, lon + 1), at(lat + 1, lon)]);
   }
   return quads;
 }
 
 /** One quad per ring/tube cell of a torus (ring in XY, tube in Z), as [v00, v10, v11, v01]. */
-export function torusQuads(
-  position: Vec3,
-  ringRadius: number,
-  tubeRadius: number,
-): Array<[Vec3, Vec3, Vec3, Vec3]> {
+export function torusQuads(position: Vec3, ringRadius: number, tubeRadius: number): Array<[Vec3, Vec3, Vec3, Vec3]> {
   const [px, py, pz] = position;
   const quads: Array<[Vec3, Vec3, Vec3, Vec3]> = [];
   const at = (ring: number, tube: number): Vec3 => {
@@ -306,9 +184,7 @@ export function torusQuads(
     return [px + radial * Math.cos(a), py + radial * Math.sin(a), pz + tubeRadius * Math.sin(b)];
   };
   for (let i = 0; i < SEG_CIRCLE; i++) {
-    for (let j = 0; j < SEG_TORUS_TUBE; j++) {
-      quads.push([at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j + 1)]);
-    }
+    for (let j = 0; j < SEG_TORUS_TUBE; j++) quads.push([at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j + 1)]);
   }
   return quads;
 }

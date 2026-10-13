@@ -1,5 +1,3 @@
-/** @layer ui — membership toggles for view state and form checklists. @pure */
-
 /** A copy of `list` with `value` removed if present, else appended (order kept). */
 export function toggledInList<Value>(list: ReadonlyArray<Value>, value: Value): Value[] {
   return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];

@@ -1,9 +1,6 @@
 /**
- * Linear-elastic 2D frame analysis (direct stiffness method, 3 DOF per node).
- * Units are the caller's (e.g. N, mm). Member loads are uniformly distributed, global components
- * per unit member length.
- * @layer lib
- * @pure
+ * Linear-elastic 2D frame analysis (direct stiffness method, 3 DOF per node). Units are the caller's (e.g. N, mm). Member loads are
+ * uniformly distributed, global components per unit member length.
  */
 
 export interface FrameNode {
@@ -57,11 +54,7 @@ function solveLinear(matrix: number[][], rhs: number[]): number[] | null {
   for (let column = 0; column < n; column++) {
     let pivot = column;
     for (let row = column + 1; row < n; row++) {
-      if (
-        Math.abs((a[row] as number[])[column] as number) >
-        Math.abs((a[pivot] as number[])[column] as number)
-      )
-        pivot = row;
+      if (Math.abs((a[row] as number[])[column] as number) > Math.abs((a[pivot] as number[])[column] as number)) pivot = row;
     }
     const pivotRow = a[pivot] as number[];
     if (Math.abs(pivotRow[column] as number) < tolerance) return null;
@@ -70,8 +63,7 @@ function solveLinear(matrix: number[][], rhs: number[]): number[] | null {
     for (let row = column + 1; row < n; row++) {
       const target = a[row] as number[];
       const factor = (target[column] as number) / (current[column] as number);
-      for (let k = column; k <= n; k++)
-        target[k] = (target[k] as number) - factor * (current[k] as number);
+      for (let k = column; k <= n; k++) target[k] = (target[k] as number) - factor * (current[k] as number);
     }
   }
   const x = new Array<number>(n).fill(0);
@@ -106,18 +98,9 @@ function condense(k: number[][], f0: number[], r: number): { k: number[][]; f0: 
   const pivot = (k[r] as number[])[r] as number;
   const column = k.map((row) => row[r] as number);
   const reduced = k.map((row, i) =>
-    row.map((value, j) =>
-      i === r || j === r
-        ? 0
-        : value - ((column[i] as number) * ((k[r] as number[])[j] as number)) / pivot,
-    ),
+    row.map((value, j) => (i === r || j === r ? 0 : value - ((column[i] as number) * ((k[r] as number[])[j] as number)) / pivot)),
   );
-  return {
-    k: reduced,
-    f0: f0.map((value, i) =>
-      i === r ? 0 : value - ((column[i] as number) * (f0[r] as number)) / pivot,
-    ),
-  };
+  return { k: reduced, f0: f0.map((value, i) => (i === r ? 0 : value - ((column[i] as number) * (f0[r] as number)) / pivot)) };
 }
 
 function localOf(nodes: ReadonlyArray<FrameNode>, member: FrameMember): Local | null {
@@ -150,43 +133,27 @@ function localOf(nodes: ReadonlyArray<FrameNode>, member: FrameMember): Local | 
     (qTransverse * L) / 2,
     (-qTransverse * L * L) / 12,
   ];
-  const released = [
-    member.releaseA === true ? ROTATION_A : -1,
-    member.releaseB === true ? ROTATION_B : -1,
-  ];
-  const condensed = released
-    .filter((index) => index >= 0)
-    .reduce((state, index) => condense(state.k, state.f0, index), { k, f0 });
+  const released = [member.releaseA === true ? ROTATION_A : -1, member.releaseB === true ? ROTATION_B : -1];
+  const condensed = released.filter((index) => index >= 0).reduce((state, index) => condense(state.k, state.f0, index), { k, f0 });
   return { length, c, s, k: condensed.k, f0: condensed.f0, qAxial, qTransverse, full: { k, f0 } };
 }
 
 /** Local end displacements with the rotations of released ends recovered from the full member. */
 function withReleasedRotations(local: Local, member: FrameMember, d: number[]): number[] {
   const result = [...d];
-  const released = [
-    ...(member.releaseA === true ? [ROTATION_A] : []),
-    ...(member.releaseB === true ? [ROTATION_B] : []),
-  ];
+  const released = [...(member.releaseA === true ? [ROTATION_A] : []), ...(member.releaseB === true ? [ROTATION_B] : [])];
   if (released.length === 0) return result;
   const { k, f0 } = local.full;
   const rhs = released.map(
     (r) =>
-      (f0[r] as number) -
-      (k[r] as number[]).reduce(
-        (sum, value, j) => (released.includes(j) ? sum : sum + value * (d[j] as number)),
-        0,
-      ),
+      (f0[r] as number) - (k[r] as number[]).reduce((sum, value, j) => (released.includes(j) ? sum : sum + value * (d[j] as number)), 0),
   );
-  const entry = (i: number, j: number): number =>
-    (k[released[i] as number] as number[])[released[j] as number] as number;
-  if (released.length === 1) {
-    result[released[0] as number] = (rhs[0] as number) / entry(0, 0);
-  } else {
+  const entry = (i: number, j: number): number => (k[released[i] as number] as number[])[released[j] as number] as number;
+  if (released.length === 1) result[released[0] as number] = (rhs[0] as number) / entry(0, 0);
+  else {
     const determinant = entry(0, 0) * entry(1, 1) - entry(0, 1) * entry(1, 0);
-    result[released[0] as number] =
-      ((rhs[0] as number) * entry(1, 1) - entry(0, 1) * (rhs[1] as number)) / determinant;
-    result[released[1] as number] =
-      (entry(0, 0) * (rhs[1] as number) - entry(1, 0) * (rhs[0] as number)) / determinant;
+    result[released[0] as number] = ((rhs[0] as number) * entry(1, 1) - entry(0, 1) * (rhs[1] as number)) / determinant;
+    result[released[1] as number] = (entry(0, 0) * (rhs[1] as number) - entry(1, 0) * (rhs[0] as number)) / determinant;
   }
   return result;
 }
@@ -194,27 +161,13 @@ function withReleasedRotations(local: Local, member: FrameMember, d: number[]): 
 /** local = T · global for one 6-vector. */
 function toLocal(c: number, s: number, global: ReadonlyArray<number>): number[] {
   const g = (index: number): number => global[index] as number;
-  return [
-    c * g(0) + s * g(1),
-    -s * g(0) + c * g(1),
-    g(2),
-    c * g(3) + s * g(4),
-    -s * g(3) + c * g(4),
-    g(5),
-  ];
+  return [c * g(0) + s * g(1), -s * g(0) + c * g(1), g(2), c * g(3) + s * g(4), -s * g(3) + c * g(4), g(5)];
 }
 
 /** global = Tᵀ · local for one 6-vector. */
 function toGlobal(c: number, s: number, local: ReadonlyArray<number>): number[] {
   const l = (index: number): number => local[index] as number;
-  return [
-    c * l(0) - s * l(1),
-    s * l(0) + c * l(1),
-    l(2),
-    c * l(3) - s * l(4),
-    s * l(3) + c * l(4),
-    l(5),
-  ];
+  return [c * l(0) - s * l(1), s * l(0) + c * l(1), l(2), c * l(3) - s * l(4), s * l(3) + c * l(4), l(5)];
 }
 
 function memberDofs(member: FrameMember): number[] {
@@ -222,13 +175,8 @@ function memberDofs(member: FrameMember): number[] {
   return [a, a + 1, a + 2, b, b + 1, b + 2];
 }
 
-/**
- * @returns displacements and member forces, or null for a mechanism / invalid model
- */
-export function solveFrame(
-  nodes: ReadonlyArray<FrameNode>,
-  members: ReadonlyArray<FrameMember>,
-): FrameResult | null {
+/** @returns displacements and member forces, or null for a mechanism / invalid model */
+export function solveFrame(nodes: ReadonlyArray<FrameNode>, members: ReadonlyArray<FrameMember>): FrameResult | null {
   const size = nodes.length * 3;
   const K = Array.from({ length: size }, () => new Array<number>(size).fill(0));
   const F = new Array<number>(size).fill(0);
@@ -246,9 +194,7 @@ export function solveFrame(
       const unit = new Array<number>(6).fill(0);
       unit[j] = 1;
       const localUnit = toLocal(local.c, local.s, unit);
-      const kLocal = local.k.map((row) =>
-        row.reduce((sum, value, index) => sum + value * (localUnit[index] as number), 0),
-      );
+      const kLocal = local.k.map((row) => row.reduce((sum, value, index) => sum + value * (localUnit[index] as number), 0));
       const column = toGlobal(local.c, local.s, kLocal);
       for (let i = 0; i < 6; i++) {
         const [row, col] = [dofs[i] as number, dofs[j] as number];
@@ -282,10 +228,7 @@ export function solveFrame(
     return diagonal > 0 ? 1 / Math.sqrt(diagonal) : 1;
   });
   const reduced = free.map((row, i) =>
-    free.map(
-      (col, j) =>
-        ((K[row] as number[])[col] as number) * (scale[i] as number) * (scale[j] as number),
-    ),
+    free.map((col, j) => ((K[row] as number[])[col] as number) * (scale[i] as number) * (scale[j] as number)),
   );
   const scaled =
     free.length > 0
@@ -305,10 +248,7 @@ export function solveFrame(
     const global = memberDofs(member).map((dof) => u[dof] as number);
     const nodal = toLocal(local.c, local.s, global);
     const d = withReleasedRotations(local, member, nodal);
-    const end = local.k.map(
-      (row, i) =>
-        row.reduce((sum, value, j) => sum + value * (d[j] as number), 0) - (local.f0[i] as number),
-    );
+    const end = local.k.map((row, i) => row.reduce((sum, value, j) => sum + value * (d[j] as number), 0) - (local.f0[i] as number));
     const [Na, Va, Ma, Nb, , Mb] = end as [number, number, number, number, number, number];
     const momentAt = (x: number): number => -Ma + Va * x + (local.qTransverse * x * x) / 2;
     const L = local.length;
@@ -331,14 +271,8 @@ export function solveFrame(
       maxMoment = Math.max(maxMoment, Math.abs(momentAt(x)));
       const axialDisplacement = (d[0] as number) + ((d[3] as number) - (d[0] as number)) * (x / L);
       const transverse = transverseAt(x);
-      maxDisplacement.x = Math.max(
-        maxDisplacement.x,
-        Math.abs(local.c * axialDisplacement - local.s * transverse),
-      );
-      maxDisplacement.y = Math.max(
-        maxDisplacement.y,
-        Math.abs(local.s * axialDisplacement + local.c * transverse),
-      );
+      maxDisplacement.x = Math.max(maxDisplacement.x, Math.abs(local.c * axialDisplacement - local.s * transverse));
+      maxDisplacement.y = Math.max(maxDisplacement.y, Math.abs(local.s * axialDisplacement + local.c * transverse));
     }
     return {
       axial: [-Na, Nb],
@@ -350,10 +284,7 @@ export function solveFrame(
     };
   });
   return {
-    displacements: nodes.map(
-      (_, index) =>
-        [u[3 * index] as number, u[3 * index + 1] as number, u[3 * index + 2] as number] as const,
-    ),
+    displacements: nodes.map((_, index) => [u[3 * index] as number, u[3 * index + 1] as number, u[3 * index + 2] as number] as const),
     members: results,
   };
 }

@@ -1,10 +1,7 @@
 /**
- * Area-load path of floor slabs and equipment onto the beams under them.
- * Every load is rastered into small cells; a cell bears on the NEAREST supporting beam in plan,
- * which for a rectangular bay is the 45° tributary rule (two triangles on the short sides, two
- * trapezoids on the long sides). Cells equidistant from two beams split between them.
- * @layer domain-aec
- * @pure
+ * Area-load path of floor slabs and equipment onto the beams under them. Every load is rastered into small cells; a cell bears on the
+ * NEAREST supporting beam in plan, which for a rectangular bay is the 45° tributary rule (two triangles on the short sides, two trapezoids
+ * on the long sides). Cells equidistant from two beams split between them.
  */
 
 import { clamp } from '@lib/clamp';
@@ -44,11 +41,7 @@ export interface EquipmentLoadReport {
   readonly support: 'floor' | 'beams' | 'mixed' | 'grade';
 }
 
-interface AreaLoadResult {
-  readonly floors: FloorLoadReport[];
-  readonly equipment: EquipmentLoadReport[];
-  readonly warnings: string[];
-}
+type AreaLoadResult = { readonly floors: FloorLoadReport[]; readonly equipment: EquipmentLoadReport[]; readonly warnings: string[] };
 
 interface Surface {
   readonly slabId: string;
@@ -60,26 +53,17 @@ interface Surface {
   readonly beams: BeamLoads[];
 }
 
-interface Footprint {
-  readonly center: Point2;
-  readonly size: readonly [number, number];
-  readonly angle: number;
-  readonly base: number;
-}
+type Footprint = { readonly center: Point2; readonly size: readonly [number, number]; readonly angle: number; readonly base: number };
 
 const TIE = 1e-6;
 const BEAM_BAND_BELOW = 60;
 const BEAM_BAND_ABOVE = 20;
 const STAND_ON_TOLERANCE = 100;
 
-const toPoint2 = (point: readonly number[], toMm: (value: number) => number): Point2 => [
-  toMm(point[0] ?? 0),
-  toMm(point[1] ?? 0),
-];
+const toPoint2 = (point: readonly number[], toMm: (value: number) => number): Point2 => [toMm(point[0] ?? 0), toMm(point[1] ?? 0)];
 
 const insidePlan = (point: Point2, surface: Pick<Surface, 'polygon' | 'openings'>): boolean =>
-  pointInPolygon(point, surface.polygon) &&
-  !surface.openings.some((opening) => pointInPolygon(point, opening));
+  pointInPolygon(point, surface.polygon) && !surface.openings.some((opening) => pointInPolygon(point, opening));
 
 /** True when `point` lies in the (rotated) rectangle of the footprint. */
 function insideFootprint(point: Point2, footprint: Footprint): boolean {
@@ -94,19 +78,11 @@ function insideFootprint(point: Point2, footprint: Footprint): boolean {
 
 /** Beams whose top of steel lies within the band under a surface at `top` (thickness folded in). */
 function beamsUnder(beams: ReadonlyArray<BeamLoads>, bottom: number, top: number): BeamLoads[] {
-  return beams.filter(
-    (beam) => beam.top >= bottom - BEAM_BAND_BELOW && beam.top <= top + BEAM_BAND_ABOVE,
-  );
+  return beams.filter((beam) => beam.top >= bottom - BEAM_BAND_BELOW && beam.top <= top + BEAM_BAND_ABOVE);
 }
 
 /** Deposit `permanent` / `imposed` kN of the cell at `point` on its nearest beam(s). */
-function bear(
-  point: Point2,
-  beams: ReadonlyArray<BeamLoads>,
-  permanent: number,
-  imposed: number,
-  floor: boolean,
-): void {
+function bear(point: Point2, beams: ReadonlyArray<BeamLoads>, permanent: number, imposed: number, floor: boolean): void {
   const found = beams.map((beam) => ({ beam, ...projectOntoSegment(point, beam.a, beam.b) }));
   const nearest = Math.min(...found.map((entry) => entry.distance));
   const tied = found.filter((entry) => entry.distance <= nearest + TIE);
@@ -145,9 +121,7 @@ function surfacesOf(units: ModelUnits, beams: ReadonlyArray<BeamLoads>): Surface
       mark: slab.mark,
       levelId: slab.levelId,
       polygon: slab.boundary.map((point) => toPoint2(point, toMm)),
-      openings: (slab.openings ?? []).map((opening) =>
-        opening.map((point) => toPoint2(point, toMm)),
-      ),
+      openings: (slab.openings ?? []).map((opening) => opening.map((point) => toPoint2(point, toMm))),
       top,
       beams: beamsUnder(beams, top - toMm(slab.thickness), top),
     });
@@ -187,9 +161,7 @@ function applyFloors(
       );
       return { ...report, areaM2: area, deadKn: 0, imposedKn: 0, supportingBeams: 0 };
     }
-    const standing = footprints.filter(
-      (footprint) => Math.abs(footprint.base - surface.top) <= STAND_ON_TOLERANCE,
-    );
+    const standing = footprints.filter((footprint) => Math.abs(footprint.base - surface.top) <= STAND_ON_TOLERANCE);
     const cellArea = area / centres.length;
     let deadKn = 0;
     let imposedKn = 0;
@@ -201,9 +173,7 @@ function applyFloors(
       deadKn += dead;
       imposedKn += imposed;
     }
-    const supporting = new Set(
-      surface.beams.filter((beam) => beam.floorSupport).map((beam) => beam.bar.id),
-    );
+    const supporting = new Set(surface.beams.filter((beam) => beam.floorSupport).map((beam) => beam.bar.id));
     return { ...report, areaM2: area, deadKn, imposedKn, supportingBeams: supporting.size };
   });
 }
@@ -235,9 +205,7 @@ function applyEquipment(
         const point: Point2 = planPoint(footprint.center, footprint.angle, [u, v]);
         const surface = surfaces.find(
           (candidate) =>
-            Math.abs(candidate.top - footprint.base) <= STAND_ON_TOLERANCE &&
-            candidate.beams.length > 0 &&
-            insidePlan(point, candidate),
+            Math.abs(candidate.top - footprint.base) <= STAND_ON_TOLERANCE && candidate.beams.length > 0 && insidePlan(point, candidate),
         );
         const target = surface?.beams ?? onBeams;
         if (target.length === 0) continue;
@@ -246,8 +214,7 @@ function applyEquipment(
         if (surface) viaFloor += share;
       }
     }
-    const support =
-      carried === 0 ? 'grade' : viaFloor === carried ? 'floor' : viaFloor === 0 ? 'beams' : 'mixed';
+    const support = carried === 0 ? 'grade' : viaFloor === carried ? 'floor' : viaFloor === 0 ? 'beams' : 'mixed';
     if (weightKn > 0 && carried < weightKn * 0.999) {
       warnings.push(
         carried === 0
@@ -272,11 +239,7 @@ function applyEquipment(
  * Deposit floor dead / imposed load and equipment weight on the beams.
  * @invariant carried equipment weight = weight × share of its footprint cells over a floor or beams
  */
-export function applyAreaLoads(
-  units: ModelUnits,
-  beams: ReadonlyArray<BeamLoads>,
-  params: AreaLoadParams,
-): AreaLoadResult {
+export function applyAreaLoads(units: ModelUnits, beams: ReadonlyArray<BeamLoads>, params: AreaLoadParams): AreaLoadResult {
   const warnings: string[] = [];
   const surfaces = surfacesOf(units, beams);
   const floors = applyFloors(

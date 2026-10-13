@@ -1,5 +1,4 @@
 /**
- * @layer server
  * The Node-side REST client of an llull server (CLI backend, desktop documents, health probes):
  * one place for the auth header, the timeout and the JSON-or-error-text body. Bodies become a
  * `CommandOutcome` through `parseCommandResponse` (`@mcp/restProtocol`).
@@ -48,15 +47,9 @@ export async function requestJson(url: string, request: RestRequest = {}): Promi
 }
 
 /** `GET <url>/health` answers 2xx within `timeoutMs`. */
-export async function isHealthy(
-  url: string,
-  fetchImpl?: FetchLike,
-  timeoutMs = 2_000,
-): Promise<boolean> {
+export async function isHealthy(url: string, fetchImpl?: FetchLike, timeoutMs = 2_000): Promise<boolean> {
   try {
-    const response = await (fetchImpl ?? globalFetch)(`${url}/health`, {
-      signal: AbortSignal.timeout(timeoutMs),
-    });
+    const response = await (fetchImpl ?? globalFetch)(`${url}/health`, { signal: AbortSignal.timeout(timeoutMs) });
     return response.ok;
   } catch {
     return false;

@@ -1,18 +1,11 @@
-/**
- * The TIN of a surface object, memoized on the (immutable) surface and point-group objects.
- * @layer domain-aec/civil
- * @pure
- */
+/** The TIN of a surface object, memoized on the (immutable) surface and point-group objects. */
 
 import type { Vec3 } from '@core/model/types';
 import type { CivilModel, PointGroupObject, SurfaceObject } from '@core/model/civil';
 import { buildTin, type Tin } from './tin';
 import { civilObject } from '../model';
 
-interface Memo {
-  readonly groups: ReadonlyArray<PointGroupObject | undefined>;
-  readonly tin: Tin;
-}
+type Memo = { readonly groups: ReadonlyArray<PointGroupObject | undefined>; readonly tin: Tin };
 
 const memo = new WeakMap<SurfaceObject, Memo>();
 
@@ -29,13 +22,7 @@ export function surfacePoints(civil: CivilModel, surface: SurfaceObject): Vec3[]
 export function surfaceTin(civil: CivilModel, surface: SurfaceObject): Tin {
   const groups = surface.pointGroupIds.map((id) => civilObject(civil, id, 'pointGroup'));
   const cached = memo.get(surface);
-  if (
-    cached &&
-    cached.groups.length === groups.length &&
-    cached.groups.every((group, index) => group === groups[index])
-  ) {
-    return cached.tin;
-  }
+  if (cached && cached.groups.length === groups.length && cached.groups.every((group, index) => group === groups[index])) return cached.tin;
   const tin = buildTin(surfacePoints(civil, surface), {
     ...(surface.boundary !== undefined ? { boundary: surface.boundary } : {}),
     ...(surface.maxEdgeLength !== undefined ? { maxEdgeLength: surface.maxEdgeLength } : {}),

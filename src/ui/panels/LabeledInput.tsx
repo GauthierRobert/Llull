@@ -1,7 +1,4 @@
-/**
- * @layer ui/panels
- * LabeledInput — the `field` label + input pair of the panel forms (text, number, color or range).
- */
+/** LabeledInput — the `field` label + input pair of the panel forms (text, number, color or range). */
 
 import React from 'react';
 
@@ -19,10 +16,7 @@ interface LabeledInputProps {
   /** Extra class on the `field` wrapper. */
   className?: string | undefined;
   /** Native attributes of the input (`min`, `max`, `step`, `autoComplete`, `className`…). */
-  inputProps?: Omit<
-    React.InputHTMLAttributes<HTMLInputElement>,
-    'type' | 'value' | 'onChange' | 'placeholder' | 'aria-label'
-  >;
+  inputProps?: Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type' | 'value' | 'onChange' | 'placeholder' | 'aria-label'>;
   /** Rendered after the input (value readout, hex code…). */
   children?: React.ReactNode;
 }

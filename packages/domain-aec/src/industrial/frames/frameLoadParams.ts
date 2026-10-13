@@ -1,8 +1,4 @@
-/**
- * Load parameters shared by the portal-frame, foundation and footing commands: schema, validation, description.
- * @layer domain-aec
- * @pure
- */
+/** Load parameters shared by the portal-frame, foundation and footing commands: schema, validation, description. */
 
 import type { CadDocument } from '@core/model/types';
 import { z } from '@core/commands/schema';
@@ -21,10 +17,7 @@ import { existingLevelIdParam } from '../../building/levelParams';
 
 /** Load parameters shared by check_portal_frames and design_portal_frames. */
 export const FRAME_LOAD_SHAPE = {
-  deadLoad: z
-    .number()
-    .optional()
-    .describe('Roof dead load (build-up, purlins, services), kN/m². Default 0.5.'),
+  deadLoad: z.number().optional().describe('Roof dead load (build-up, purlins, services), kN/m². Default 0.5.'),
   snowLoad: z.number().optional().describe('Roof snow load, kN/m². Default 0.8.'),
   windPressure: z
     .number()
@@ -52,10 +45,7 @@ export const FRAME_LOAD_SHAPE = {
 type FrameLoadParams = z.output<z.ZodObject<typeof FRAME_LOAD_SHAPE>>;
 
 /** Validated loads + level, or the failure reason. */
-export function resolveFrameLoads(
-  doc: CadDocument,
-  params: FrameLoadParams,
-): { loads: FrameLoads; levelId: string } | { reason: string } {
+export function resolveFrameLoads(doc: CadDocument, params: FrameLoadParams): { loads: FrameLoads; levelId: string } | { reason: string } {
   const { deadLoad = 0.5, snowLoad = 0.8, windPressure = 0, craneCapacity } = params;
   if (
     !isNonNegativeNumber(deadLoad) ||
@@ -66,12 +56,7 @@ export function resolveFrameLoads(
     return { reason: 'deadLoad, snowLoad, windPressure and craneCapacity must be >= 0' };
   }
   const { hoistingClass, hoistingSpeed, craneSelfWeight, minHookApproach, wheelBase } = params;
-  const craneProblem = craneValueProblem({
-    hoistingSpeed,
-    minHookApproach,
-    craneSelfWeight,
-    wheelBase,
-  });
+  const craneProblem = craneValueProblem({ hoistingSpeed, minHookApproach, craneSelfWeight, wheelBase });
   if (craneProblem !== undefined) return { reason: craneProblem };
   const building = getBuilding(doc);
   const levelId = existingLevelId(building, params.levelId);

@@ -22,10 +22,9 @@ export type SolidVolume =
   | { readonly error: string };
 
 /**
- * Exact volume of a kernel result (a mesh entity that keeps its B-rep recipe), or null when no
- * kernel with exact topology (OCC) is installed. The display mesh is a coarse tessellation (0.1
- * linear / 0.5 rad angular deflection), so its volume is off by up to ~1 % on small curved parts —
- * too much for a mass check against a drawing.
+ * Exact volume of a kernel result (a mesh entity that keeps its B-rep recipe), or null when no kernel with exact topology (OCC) is
+ * installed. The display mesh is a coarse tessellation (0.1 linear / 0.5 rad angular deflection), so its volume is off by up to ~1 % on
+ * small curved parts — too much for a mass check against a drawing.
  */
 function exactVolume(e: Entity, ctx: ExecutionContext | undefined): number | null {
   if (e.kind !== 'mesh' || e.brep === undefined) return null;
@@ -52,21 +51,15 @@ function closedMeshVolume(positions: number[]): number {
 
 /**
  * Volume of one solid entity (instances: the sum of their baked solid children).
- * @pure
  * @failure instance with a missing component, or a non-solid kind -> { error }
  */
-export function solidVolume(
-  doc: CadDocument,
-  e: Entity,
-  ctx: ExecutionContext | undefined,
-): SolidVolume {
-  if (is2D(e)) {
+export function solidVolume(doc: CadDocument, e: Entity, ctx: ExecutionContext | undefined): SolidVolume {
+  if (is2D(e))
     return {
       error:
         `entity '${e.id}' is kind '${e.kind}'; ` +
         "supported kinds are 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', 'subdivision', 'instance'.",
     };
-  }
   switch (e.kind) {
     case 'box':
       return { volume: e.size[0] * e.size[1] * e.size[2] };
@@ -92,31 +85,24 @@ export function solidVolume(
       return { volume: (e.baseWidth * e.baseDepth * e.height) / 3 };
     case 'instance': {
       const component = doc.components[e.componentId];
-      if (!component)
-        return { error: `instance '${e.id}' references missing component '${e.componentId}'.` };
+      if (!component) return { error: `instance '${e.id}' references missing component '${e.componentId}'.` };
       // Bake the instance (scale, rotation, translation) and sum its solid children.
       let volume = 0;
       for (const child of expandInstance(e, component)) volume += childVolume(doc, child, ctx);
       return { volume };
     }
     case 'revolution': {
-      // Pappus: V = sweepAngle * |centroid x| * profile area; profile x = distance from the axis.
-      // A profile crossing the axis falls back to the bounding-box volume.
+      // Pappus: V = sweepAngle * |centroid x| * profile area; profile x = distance from the axis. A profile crossing the axis falls back to
+      // the bounding-box volume.
       if (e.profile.some(([x]) => x < 0)) {
         const b = entityBounds(e);
         return {
           volume: (b.max[0] - b.min[0]) * (b.max[1] - b.min[1]) * (b.max[2] - b.min[2]),
-          approximation:
-            'bounding-box approximation — profile crosses revolution axis; Pappus requires profile x ≥ 0',
+          approximation: 'bounding-box approximation — profile crosses revolution axis; Pappus requires profile x ≥ 0',
         };
       }
       const profileArea = polygonArea(e.profile);
-      return {
-        volume:
-          profileArea < 1e-12
-            ? 0
-            : (e.angle ?? 2 * Math.PI) * Math.abs(polygonCentroid(e.profile)[0]) * profileArea,
-      };
+      return { volume: profileArea < 1e-12 ? 0 : (e.angle ?? 2 * Math.PI) * Math.abs(polygonCentroid(e.profile)[0]) * profileArea };
     }
     case 'sweep':
       return { volume: sweepVolume(e) };
@@ -128,11 +114,7 @@ export function solidVolume(
 }
 
 /** Volume of a baked instance child; 2D and unsupported children weigh nothing. */
-export function childVolume(
-  doc: CadDocument,
-  child: Entity,
-  ctx: ExecutionContext | undefined,
-): number {
+export function childVolume(doc: CadDocument, child: Entity, ctx: ExecutionContext | undefined): number {
   const part = solidVolume({ ...doc, entities: { [child.id]: child } }, child, ctx);
   return 'error' in part ? 0 : part.volume;
 }

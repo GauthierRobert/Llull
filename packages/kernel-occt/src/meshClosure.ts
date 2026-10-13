@@ -1,5 +1,4 @@
 /**
- * @layer kernel
  * Watertightness of a triangle mesh: every edge shared by two triangles once vertices are welded
  * by position. Pure; used to refuse an OCC solid whose display mesh came out holed.
  */
@@ -24,8 +23,7 @@ export function openEdgeCount({ positions, indices }: MeshData, offset: number):
   const welded = new Int32Array(vertexCount);
   const ids = new Map<string, number>();
   for (let v = 0; v < vertexCount; v++) {
-    const cell = (axis: number): number =>
-      Math.round((positions[v * 3 + axis] ?? 0) * GRID + offset);
+    const cell = (axis: number): number => Math.round((positions[v * 3 + axis] ?? 0) * GRID + offset);
     // `${-0}` is "0", so -1e-12 and +1e-12 share a key (toFixed would print "-0.00000").
     const key = `${cell(0)},${cell(1)},${cell(2)}`;
     const known = ids.get(key);

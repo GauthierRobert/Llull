@@ -1,7 +1,3 @@
-/**
- * @layer domain-aec
- */
-
 import type { WallElement } from '@core/model/building';
 import { fromMm } from '@core/model/units';
 import { elementsOf, existingLevelId, getBuilding, orderedElements } from '../model';
@@ -25,11 +21,7 @@ import { supportPrimitives } from './planSupports';
  * Builds the plan of `levelId` (or the active / lowest level).
  * @failure no such level -> null
  */
-export function buildPlanDrawing(
-  doc: PlanSource,
-  levelId: string | undefined,
-  options: { dimensions?: boolean } = {},
-): PlanDrawing | null {
+export function buildPlanDrawing(doc: PlanSource, levelId: string | undefined, options: { dimensions?: boolean } = {}): PlanDrawing | null {
   const building = getBuilding(doc);
   const resolvedId = existingLevelId(building, levelId);
   const level = resolvedId !== undefined ? building.levels[resolvedId] : undefined;

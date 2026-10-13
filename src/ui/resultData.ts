@@ -1,8 +1,4 @@
-/**
- * @layer ui
- * @pure Runtime type guards for `CommandResult.data` (`unknown` at the registry boundary).
- * A failed guard means the command refused or returned another shape: callers show `summary`.
- */
+/** A failed guard means the command refused or returned another shape: callers show `summary`. */
 
 import type { CostLine } from '@aec/index';
 import type { Clash } from '@aec/industrial/clash/clash';
@@ -51,28 +47,20 @@ export function isClashData(value: unknown): value is { clashes: Clash[] } {
 export function stringFields(value: unknown): Record<string, string> | null {
   if (!isRecord(value)) return null;
   const fields: Record<string, string> = {};
-  for (const [key, field] of Object.entries(value))
-    if (typeof field === 'string') fields[key] = field;
+  for (const [key, field] of Object.entries(value)) if (typeof field === 'string') fields[key] = field;
   return fields;
 }
 
-export function isNcFilesData(
-  value: unknown,
-): value is { files: ReadonlyArray<{ name: string; content: string }> } {
+export function isNcFilesData(value: unknown): value is { files: ReadonlyArray<{ name: string; content: string }> } {
   return (
     isRecord(value) &&
     Array.isArray(value['files']) &&
-    value['files'].every(
-      (file) =>
-        isRecord(file) && typeof file['name'] === 'string' && typeof file['content'] === 'string',
-    )
+    value['files'].every((file) => isRecord(file) && typeof file['name'] === 'string' && typeof file['content'] === 'string')
   );
 }
 
 export function isCodeExportData(value: unknown): value is { text: string; fileName: string } {
-  return (
-    isRecord(value) && typeof value['text'] === 'string' && typeof value['fileName'] === 'string'
-  );
+  return isRecord(value) && typeof value['text'] === 'string' && typeof value['fileName'] === 'string';
 }
 
 type Triple = [number, number, number];

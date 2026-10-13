@@ -1,9 +1,8 @@
 import { type BaseEntity, type Entity, type Vec3, DEFAULT_LAYER_ID } from '../../model/types';
 
 /**
- * A fresh entity (default layer unless `layerId`): `geometry` is the kind-specific part, the shared base
- * fields (`position`, `rotation`, `layerId`, `color`, non-empty `name`) are filled in.
- * @pure
+ * A fresh entity (default layer unless `layerId`): `geometry` is the kind-specific part, the shared base fields (`position`, `rotation`,
+ * `layerId`, `color`, non-empty `name`) are filled in.
  */
 export function newEntity<K extends Entity['kind']>(
   kind: K,
@@ -11,20 +10,7 @@ export function newEntity<K extends Entity['kind']>(
   geometry: Omit<Extract<Entity, { kind: K }>, keyof BaseEntity>,
   position: Vec3,
   color: string,
-  {
-    rotation = [0, 0, 0],
-    name,
-    layerId = DEFAULT_LAYER_ID,
-  }: { rotation?: Vec3; name?: string | undefined; layerId?: string } = {},
+  { rotation = [0, 0, 0], name, layerId = DEFAULT_LAYER_ID }: { rotation?: Vec3; name?: string | undefined; layerId?: string } = {},
 ): Entity {
-  return {
-    id,
-    kind,
-    ...geometry,
-    position,
-    rotation,
-    layerId,
-    color,
-    ...(name !== undefined && name !== '' ? { name } : {}),
-  } as Entity;
+  return { id, kind, ...geometry, position, rotation, layerId, color, ...(name !== undefined && name !== '' ? { name } : {}) } as Entity;
 }

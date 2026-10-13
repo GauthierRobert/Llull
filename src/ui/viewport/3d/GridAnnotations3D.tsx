@@ -1,10 +1,4 @@
-/**
- * @layer ui/viewport/3d
- *
- * GridAnnotations3D — structural grid (layer S-GRID) in the 3D view: continuous screen-space
- * lines at ground level plus camera-facing bubbles with readable labels, sized relative to the
- * grid extent. Presentation only; the entities come from `add_grid_system` / `add_grid_line`.
- */
+// Structural grid (S-GRID) in 3D: screen-space ground lines + camera-facing labelled bubbles sized to the grid extent.
 
 import { useMemo } from 'react';
 import { Billboard, Line, Text } from '@react-three/drei';
@@ -17,7 +11,7 @@ import { collectGridAnnotations, GRID_LAYER_NAME } from './gridAnnotations';
 
 const CIRCLE_SEGMENTS = 40;
 
-/** Closed bubble outline (first point repeated). */
+/** First point repeated. */
 function bubbleOutline(radius: number): Vec3[] {
   return closeLoop(circlePoints(0, 0, 0, radius, CIRCLE_SEGMENTS));
 }
@@ -38,10 +32,9 @@ export function GridAnnotations3D({ document }: { document: CadDocument }): Reac
       });
     return collectGridAnnotations(gridEntities);
   }, [order, entities, layers, hiddenLayerIds, hiddenEntityIds]);
-  // One outline per bubble radius (R9: no geometry rebuilt every render).
+  // One outline per bubble radius.
   const outlines = useMemo(
-    () =>
-      new Map(annotations.bubbles.map((bubble) => [bubble.radius, bubbleOutline(bubble.radius)])),
+    () => new Map(annotations.bubbles.map((bubble) => [bubble.radius, bubbleOutline(bubble.radius)])),
     [annotations],
   );
 
@@ -59,10 +52,7 @@ export function GridAnnotations3D({ document }: { document: CadDocument }): Reac
         />
       ))}
       {annotations.bubbles.map((bubble) => (
-        <Billboard
-          key={bubble.id}
-          position={[bubble.center[0], bubble.center[1], bubble.center[2] + bubble.radius]}
-        >
+        <Billboard key={bubble.id} position={[bubble.center[0], bubble.center[1], bubble.center[2] + bubble.radius]}>
           <Line
             points={outlines.get(bubble.radius) ?? bubbleOutline(bubble.radius)}
             color={bubble.color}

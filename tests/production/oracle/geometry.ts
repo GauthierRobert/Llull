@@ -1,14 +1,7 @@
 import type { CadDocument, Vec2, Vec3 } from '@core/model/types';
-import type {
-  BuildingElement,
-  BuildingLevel,
-  BuildingModel,
-  EquipmentElement,
-} from '@core/model/building';
+import type { BuildingElement, BuildingLevel, BuildingModel, EquipmentElement } from '@core/model/building';
 
 /**
- * @layer tests/production/oracle
- *
  * Plain-maths geometry over the building model (absolute coordinates, document units = mm).
  * Criteria compare the model with the design intent through these helpers only.
  */
@@ -19,15 +12,7 @@ export interface Box3 {
 }
 
 const EMPTY_BUILDING: BuildingModel = {
-  project: {
-    name: '',
-    client: '',
-    address: '',
-    author: '',
-    drawingNumber: '',
-    revision: '',
-    date: '',
-  },
+  project: { name: '', client: '', address: '', author: '', drawingNumber: '', revision: '', date: '' },
   levels: {},
   levelOrder: [],
   activeLevelId: null,
@@ -107,9 +92,7 @@ export function equipmentBox(doc: CadDocument, equipment: EquipmentElement): Box
 
 export function insideBox(point: Vec3, box: Box3, tolerance = 0): boolean {
   return [0, 1, 2].every(
-    (axis) =>
-      (point[axis] ?? 0) >= (box.min[axis] ?? 0) - tolerance &&
-      (point[axis] ?? 0) <= (box.max[axis] ?? 0) + tolerance,
+    (axis) => (point[axis] ?? 0) >= (box.min[axis] ?? 0) - tolerance && (point[axis] ?? 0) <= (box.max[axis] ?? 0) + tolerance,
   );
 }
 
@@ -153,12 +136,7 @@ export function planCorners(box: Box3): Vec2[] {
 export function planOverlaps(box: Box3, polygon: Vec2[]): boolean {
   const xs = polygon.map((p) => p[0]);
   const ys = polygon.map((p) => p[1]);
-  return (
-    box.min[0] < Math.max(...xs) &&
-    box.max[0] > Math.min(...xs) &&
-    box.min[1] < Math.max(...ys) &&
-    box.max[1] > Math.min(...ys)
-  );
+  return box.min[0] < Math.max(...xs) && box.max[0] > Math.min(...xs) && box.min[1] < Math.max(...ys) && box.max[1] > Math.min(...ys);
 }
 
 export const round = (value: number, digits = 1): number => {

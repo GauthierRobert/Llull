@@ -3,10 +3,10 @@ import { createEmptyDocument } from '@core/model/types';
 import type { SweepEntity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { rotatedEntityBounds } from '@core/geometry/rotatedBounds';
+import { expectPure } from '../helpers/expectNoOp';
 
 describe('add_helix_spring', () => {
   const spec = { wireDiameter: 2, coilRadius: 10, pitch: 5, turns: 8 };
-
   it('builds a sweep spring with the requested bounds and data', () => {
     const r = execute(createEmptyDocument(), 'add_helix_spring', spec);
     expect(r.affected).toHaveLength(1);
@@ -22,7 +22,6 @@ describe('add_helix_spring', () => {
     expect(b.max[2]).toBeCloseTo(42, 0);
     expect(r.data).toMatchObject({ freeLength: 42, turns: 8, pitch: 5, outerDiameter: 22 });
   });
-
   it('samples the path per turn (turn count)', () => {
     const r = execute(createEmptyDocument(), 'add_helix_spring', spec);
     const e = r.document.entities[r.affected[0]!] as SweepEntity;
@@ -31,7 +30,6 @@ describe('add_helix_spring', () => {
     expect(last[2]).toBeCloseTo(40);
     expect(Math.hypot(last[0], last[1])).toBeLessThan(1e-6);
   });
-
   it('resolves turns from length, honors axis and position', () => {
     const r = execute(createEmptyDocument(), 'add_helix_spring', {
       wireRadius: 1,
@@ -51,17 +49,10 @@ describe('add_helix_spring', () => {
     expect(b.max[1]).toBeLessThan(9.3);
     expect((r.data as { pitch: number }).pitch).toBeCloseTo(6);
   });
-
   it('resolves turns from pitch and length', () => {
-    const r = execute(createEmptyDocument(), 'add_helix_spring', {
-      wireRadius: 1,
-      coilRadius: 8,
-      pitch: 4,
-      length: 22,
-    });
+    const r = execute(createEmptyDocument(), 'add_helix_spring', { wireRadius: 1, coilRadius: 8, pitch: 4, length: 22 });
     expect((r.data as { turns: number }).turns).toBeCloseTo(5);
   });
-
   it('closedEnds keeps the length and flattens end coils', () => {
     const r = execute(createEmptyDocument(), 'add_helix_spring', {
       wireDiameter: 2,
@@ -74,12 +65,9 @@ describe('add_helix_spring', () => {
     expect(b.max[2]).toBeCloseTo(60, 0);
     expect((r.data as { pitch: number }).pitch).toBeCloseTo((58 - 4) / 6);
   });
-
   it('is pure and rejects bad input with a no-op', () => {
     const doc = createEmptyDocument();
-    const before = JSON.stringify(doc);
-    execute(doc, 'add_helix_spring', spec);
-    expect(JSON.stringify(doc)).toBe(before);
+    expectPure(doc, () => execute(doc, 'add_helix_spring', spec));
     const bad: Array<Record<string, unknown>> = [
       { coilRadius: 10, pitch: 5, turns: 8 },
       { ...spec, coilRadius: 0.5 },

@@ -4,10 +4,7 @@ import { buildMeshSolidGeometry } from '@ui/viewport/3d/entities/meshSolidGeomet
 /** Unit cube with 8 SHARED vertices, 12 outward-facing triangles. */
 const CUBE = {
   positions: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1],
-  indices: [
-    0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 2, 3, 7, 2, 7, 6, 1, 2, 6, 1, 6, 5, 3, 0,
-    4, 3, 4, 7,
-  ],
+  indices: [0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 2, 3, 7, 2, 7, 6, 1, 2, 6, 1, 6, 5, 3, 0, 4, 3, 4, 7],
 };
 
 describe('buildMeshSolidGeometry', () => {
@@ -19,7 +16,6 @@ describe('buildMeshSolidGeometry', () => {
       expect(Math.max(...components)).toBeCloseTo(1);
     }
   });
-
   it('keeps the triangle positions', () => {
     const geometry = buildMeshSolidGeometry(CUBE);
     expect(geometry.getAttribute('position').count).toBe(36);

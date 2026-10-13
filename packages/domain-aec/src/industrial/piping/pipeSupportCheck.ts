@@ -1,7 +1,4 @@
-/**
- * check_pipe_supports: support spacing of every pipe against the water-filled steel pipe span table.
- * @layer domain-aec
- */
+/** check_pipe_supports: support spacing of every pipe against the water-filled steel pipe span table. */
 
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
@@ -76,9 +73,7 @@ function rowOf(
   const stations = supportStations(units, run, supportsOfPipe(units, element.id));
   const unattached = stations.filter((station) => !station.attached);
   const weightBearing = weightSupportsOf(units, run).length > 0;
-  const explicitArcs = stations
-    .filter((station) => station.attached && !isLateralOnly(station))
-    .map((station) => station.arc);
+  const explicitArcs = stations.filter((station) => station.attached && !isLateralOnly(station)).map((station) => station.arc);
   const resting = weightBearing ? [] : restingArcs(units, element, beams);
   const arcs = (weightBearing ? explicitArcs : resting).sort((a, b) => a - b);
   const carriers = endCarriers(units, run, runs);
@@ -94,23 +89,15 @@ function rowOf(
   const length = spanCoordinate(run.points, run.lengthMm);
   const spans = arcs.map((arc) => spanCoordinate(run.points, arc));
   const stretch = [...(carriers[0] ? [0] : []), ...spans, ...(carriers[1] ? [length] : [])];
-  const largest = stretch.reduce(
-    (best, arc, index) => Math.max(best, arc - (stretch[index - 1] ?? arc)),
-    0,
-  );
-  const overhang = {
-    start: carriers[0] ? null : (spans[0] ?? length),
-    end: carriers[1] ? null : length - (spans.at(-1) ?? 0),
-  };
+  const largest = stretch.reduce((best, arc, index) => Math.max(best, arc - (stretch[index - 1] ?? arc)), 0);
+  const overhang = { start: carriers[0] ? null : (spans[0] ?? length), end: carriers[1] ? null : length - (spans.at(-1) ?? 0) };
   const issues: string[] = [];
   const notes: string[] = [];
   if (arcs.length === 0 && carriers[0] === null && carriers[1] === null) {
     issues.push(`no support: ${shown(length)} m of pipe rest on nothing`);
   }
   if (largest / 1000 > allowed + 1e-9) {
-    issues.push(
-      `span ${shown(largest)} m exceeds ${allowed.toFixed(2)} m allowed for DN${limit.dn} (table ${limit.spanM} m)`,
-    );
+    issues.push(`span ${shown(largest)} m exceeds ${allowed.toFixed(2)} m allowed for DN${limit.dn} (table ${limit.spanM} m)`);
   }
   for (const [end, value] of [
     ['start', overhang.start],
@@ -121,20 +108,14 @@ function rowOf(
       (arcs.length > 0 || carriers[0] !== null || carriers[1] !== null) &&
       value / 1000 > allowed * overhangRatio + 1e-9
     ) {
-      issues.push(
-        `${end} overhang ${shown(value)} m exceeds ${(allowed * overhangRatio).toFixed(2)} m (${overhangRatio} × allowed span)`,
-      );
+      issues.push(`${end} overhang ${shown(value)} m exceeds ${(allowed * overhangRatio).toFixed(2)} m (${overhangRatio} × allowed span)`);
     }
   }
   for (const station of unattached) {
     issues.push(`support ${station.mark} (${station.type}) is attached to no steel member`);
   }
-  if (limit.approximated) {
-    notes.push(`DN not tabulated: span of DN${limit.dn} used (next smaller size)`);
-  }
-  if (run.lengthMm - length > 1) {
-    notes.push(`risers (${shown(run.lengthMm - length)} m) are not counted in the spans`);
-  }
+  if (limit.approximated) notes.push(`DN not tabulated: span of DN${limit.dn} used (next smaller size)`);
+  if (run.lengthMm - length > 1) notes.push(`risers (${shown(run.lengthMm - length)} m) are not counted in the spans`);
   const risers = riserRows(run, stations, carriers, allowed * 1000, overhangRatio);
   issues.push(...risers.flatMap((riser) => riser.issues));
   if (basis === 'resting') notes.push('no supports: the beams the pipe rests on are used');
@@ -163,8 +144,6 @@ function rowOf(
 }
 
 /**
- * @command check_pipe_supports
- * @pure read-only
  * @affects none; data = { ok, pipes: PipeSupportRow[], totals, csv, assumptions }
  * @invariant every pipe (of the level / line filter) has exactly one row
  * @failure no pipes / unknown level / line without pipes / spanFactor <= 0 / overhangRatio < 0 -> no-op, no data
@@ -173,44 +152,34 @@ export const checkPipeSupports = defineCommand({
   name: 'check_pipe_supports',
   annotations: { readOnly: true, idempotent: true },
   description:
-    'Read-only support-spacing check of every pipe (add_pipe_run) against the standard maximum span of water-filled ' +
-    'standard-wall steel pipe by DN (MSS SP-69 Table 3 / ASME B31.1 Table 121.5: DN25 2.1 m, DN50 3.0 m, DN80 3.7 m, ' +
-    "DN100 4.3 m, DN150 5.2 m, DN200 5.8 m, DN250 6.7 m, DN300 7.0 m …). Uses the pipe's add_pipe_support supports " +
-    '(only those bearing on steel count), else the beams it rests on. Ends inside equipment (nozzle) or on another pipe ' +
-    'are carried; a free end needs a support within overhangRatio × allowed span. Returns data.pipes: one row per pipe ' +
-    '{ id, mark, line, dn, lengthM, maxSpanM (table), allowedSpanM (table × spanFactor), largestSpanM (actual), ' +
-    'overhangM, supports, unattached, basis ("supports" | "resting" | "nozzles" | "none"), risers, ok, issues, notes }; data.ok is true ' +
-    'only when every pipe passes. RISERS (runs ≥ 0.5 m steeper than 44° from horizontal) are checked too: ' +
-    'risers[] = { fromZM, toZM, lengthM, guides, maxGuideSpacingM, allowedSpacingM, weightKn, weightBy ("carried end" | ' +
-    '"clamp" | "elbow support" | null), ok, issues }; they need lateral guides (add_pipe_support type "guide" at a point on the ' +
-    'riser, bracketed to steel beside it) at most the span table value apart and at most overhangRatio × span from a free ' +
-    'elbow, and their weight carried by an end in equipment, a shoe / anchor clamp on the riser or a support within overhangRatio × span of an ' +
-    'elbow; the pipe ok includes its risers. Fix a failing pipe with add_pipe_support (spacing or at points).',
+    'Read-only support-spacing check of every pipe (add_pipe_run) against the standard maximum span of water-filled standard-wall steel ' +
+    'pipe by DN (MSS SP-69 Table 3 / ASME B31.1 Table 121.5: DN25 2.1 m, DN50 3.0 m, DN80 3.7 m, DN100 4.3 m, DN150 5.2 m, DN200 5.8 m, ' +
+    "DN250 6.7 m, DN300 7.0 m …). Uses the pipe's add_pipe_support supports (only those bearing on steel count), else the beams it " +
+    'rests on. Ends inside equipment (nozzle) or on another pipe are carried; a free end needs a support within overhangRatio × allowed ' +
+    'span. Returns data.pipes: one row per pipe { id, mark, line, dn, lengthM, maxSpanM (table), allowedSpanM (table × spanFactor), ' +
+    'largestSpanM (actual), overhangM, supports, unattached, basis ("supports" | "resting" | "nozzles" | "none"), risers, ok, issues, ' +
+    'notes }; data.ok is true only when every pipe passes. RISERS (runs ≥ 0.5 m steeper than 44° from horizontal) are checked too: ' +
+    'risers[] = { fromZM, toZM, lengthM, guides, maxGuideSpacingM, allowedSpacingM, weightKn, weightBy ("carried end" | "clamp" | "elbow ' +
+    'support" | null), ok, issues }; they need lateral guides (add_pipe_support type "guide" at a point on the riser, bracketed to steel ' +
+    'beside it) at most the span table value apart and at most overhangRatio × span from a free elbow, and their weight carried by an ' +
+    'end in equipment, a shoe / anchor clamp on the riser or a support within overhangRatio × span of an elbow; the pipe ok includes its ' +
+    'risers. Fix a failing pipe with add_pipe_support (spacing or at points).',
   params: z.object({
     spanFactor: z
       .number()
       .optional()
-      .describe(
-        'Multiplier on the table span, > 0, e.g. 0.8 for insulated lines or many valves. Default 1.',
-      ),
+      .describe('Multiplier on the table span, > 0, e.g. 0.8 for insulated lines or many valves. Default 1.'),
     overhangRatio: z
       .number()
       .optional()
-      .describe(
-        'Largest overhang of a free pipe end beyond its last support, as a fraction of the allowed span, ≥ 0. Default 0.5.',
-      ),
+      .describe('Largest overhang of a free pipe end beyond its last support, as a fraction of the allowed span, ≥ 0. Default 0.5.'),
     line: z.string().optional().describe('Only the pipe(s) with this line number, e.g. "L-101".'),
-    levelId: z
-      .string()
-      .optional()
-      .describe('Only the pipes of this level id. Default: every level.'),
+    levelId: z.string().optional().describe('Only the pipes of this level id. Default: every level.'),
   }),
   run: (doc: CadDocument, params): CommandResult => {
     const { spanFactor = 1, overhangRatio = 0.5 } = params;
-    if (!isPositiveNumber(spanFactor))
-      return noop(doc, 'check_pipe_supports failed: spanFactor must be a number > 0.');
-    if (!isNonNegativeNumber(overhangRatio))
-      return noop(doc, 'check_pipe_supports failed: overhangRatio must be a number >= 0.');
+    if (!isPositiveNumber(spanFactor)) return noop(doc, 'check_pipe_supports failed: spanFactor must be a number > 0.');
+    if (!isNonNegativeNumber(overhangRatio)) return noop(doc, 'check_pipe_supports failed: overhangRatio must be a number >= 0.');
     const unknownLevel = unknownLevelFailure(doc, 'check_pipe_supports', params.levelId);
     if (unknownLevel) return unknownLevel;
     const units = modelUnits(doc);
@@ -235,17 +204,7 @@ export const checkPipeSupports = defineCommand({
     const failing = pipes.filter((row) => !row.ok);
     const unattached = pipes.reduce((sum, row) => sum + row.unattached, 0);
     const csv = toCsv(
-      [
-        'Mark',
-        'Line',
-        'DN',
-        'Length (m)',
-        'Allowed span (m)',
-        'Largest span (m)',
-        'Supports',
-        'Status',
-        'Issues',
-      ],
+      ['Mark', 'Line', 'DN', 'Length (m)', 'Allowed span (m)', 'Largest span (m)', 'Supports', 'Status', 'Issues'],
       pipes.map((row) => [
         row.mark,
         row.line,
@@ -258,10 +217,7 @@ export const checkPipeSupports = defineCommand({
         row.issues.join('; '),
       ]),
     );
-    const list = briefList(
-      failing,
-      (row) => `${row.mark}${row.line === '' ? '' : ` ${row.line}`} (${row.issues[0] ?? ''})`,
-    );
+    const list = briefList(failing, (row) => `${row.mark}${row.line === '' ? '' : ` ${row.line}`} (${row.issues[0] ?? ''})`);
     return report(
       doc,
       `Pipe support check (span table × ${spanFactor}): ${pipes.length} pipe(s), ${pipes.length - failing.length} ok` +

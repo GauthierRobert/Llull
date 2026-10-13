@@ -1,9 +1,4 @@
-/**
- * @layer ui/panels/civil
- *
- * CivilReportRow — a civil object row with its live read-only report, one number field and one
- * action button (surface contour interval, platform swell factor). Presentation only.
- */
+// Civil object row with its live read-only report, one number field and one action (contour interval, swell factor).
 
 import React, { useState } from 'react';
 import type { CivilObject } from '@core/model/civil';
@@ -23,12 +18,7 @@ interface CivilReportRowProps {
   };
 }
 
-export function CivilReportRow({
-  object,
-  report,
-  field,
-  action,
-}: CivilReportRowProps): React.ReactElement {
+export function CivilReportRow({ object, report, field, action }: CivilReportRowProps): React.ReactElement {
   const [text, setText] = useState('');
   const detail = useCivilReport(report.command, report.idKey, object.id);
   return (

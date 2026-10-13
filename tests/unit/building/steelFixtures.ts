@@ -17,37 +17,14 @@ export function step(doc: CadDocument, tool: string, args: Record<string, unknow
 export function twoLevels(): CadDocument {
   let doc = createEmptyDocument();
   doc = step(doc, 'add_level', { name: 'Ground', elevation: 0, height: 3000, makeActive: false });
-  return step(doc, 'add_level', {
-    name: 'Floor',
-    elevation: 3000,
-    height: 3000,
-    makeActive: false,
-  });
+  return step(doc, 'add_level', { name: 'Floor', elevation: 3000, height: 3000, makeActive: false });
 }
 
-export const column = (
-  doc: CadDocument,
-  x: number,
-  y: number,
-  profile = 'HEB200',
-  top = 3000,
-): CadDocument =>
-  step(doc, 'add_steel_member', {
-    role: 'column',
-    profile,
-    start: [x, y, 0],
-    end: [x, y, top],
-    levelId: 'level-1',
-  });
+export const column = (doc: CadDocument, x: number, y: number, profile = 'HEB200', top = 3000): CadDocument =>
+  step(doc, 'add_steel_member', { role: 'column', profile, start: [x, y, 0], end: [x, y, top], levelId: 'level-1' });
 
 /** Beam on level-2 whose top of steel sits 30 mm under the floor (grating). */
-export const beam = (
-  doc: CadDocument,
-  from: [number, number],
-  to: [number, number],
-  profile = 'IPE300',
-  depth = 300,
-): CadDocument =>
+export const beam = (doc: CadDocument, from: [number, number], to: [number, number], profile = 'IPE300', depth = 300): CadDocument =>
   step(doc, 'add_steel_member', {
     role: 'beam',
     profile,
@@ -61,14 +38,7 @@ export const brace = (
   from: [number, number, number],
   to: [number, number, number],
   profile = 'CHS139.7x5',
-): CadDocument =>
-  step(doc, 'add_steel_member', {
-    role: 'brace',
-    profile,
-    start: from,
-    end: to,
-    levelId: 'level-1',
-  });
+): CadDocument => step(doc, 'add_steel_member', { role: 'brace', profile, start: from, end: to, levelId: 'level-1' });
 
 /** Two levels; at each x a pair of HEB200 columns (y = 0, 4000) carrying an IPE300 beam along Y. */
 export function beamOnColumns(xs: readonly number[] = [3000]): CadDocument {
@@ -95,12 +65,7 @@ export function squareBay(options: { slab?: boolean; equipmentKg?: number } = {}
     doc = beam(doc, corner, corners[(index + 1) % 4] as [number, number]);
   });
   if (options.slab !== false) {
-    doc = step(doc, 'add_slab', {
-      levelId: 'level-2',
-      boundary: corners,
-      thickness: 30,
-      material: 'grating',
-    });
+    doc = step(doc, 'add_slab', { levelId: 'level-2', boundary: corners, thickness: 30, material: 'grating' });
   }
   if (options.equipmentKg !== undefined) {
     doc = step(doc, 'add_equipment', {
@@ -143,23 +108,12 @@ export function rowsByRole(data: CheckData, role: string): MemberRow[] {
 }
 
 /** Replace a member's profile name without the catalogue check of the command. */
-export function withMember(
-  doc: CadDocument,
-  mark: string,
-  patch: Partial<SteelMemberElement>,
-): CadDocument {
+export function withMember(doc: CadDocument, mark: string, patch: Partial<SteelMemberElement>): CadDocument {
   const building = doc.building;
   if (!building) throw new Error('no building');
   const entry = Object.values(building.elements).find(
-    (element): element is SteelMemberElement =>
-      element.category === 'member' && element.mark === mark,
+    (element): element is SteelMemberElement => element.category === 'member' && element.mark === mark,
   );
   if (!entry) throw new Error(`no member ${mark}`);
-  return {
-    ...doc,
-    building: {
-      ...building,
-      elements: { ...building.elements, [entry.id]: { ...entry, ...patch } },
-    },
-  };
+  return { ...doc, building: { ...building, elements: { ...building.elements, [entry.id]: { ...entry, ...patch } } } };
 }

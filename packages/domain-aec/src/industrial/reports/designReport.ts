@@ -1,8 +1,4 @@
-/**
- * Result reporting shared by the iterative design commands (design_portal_frames, design_purlins).
- * @layer domain-aec
- * @pure
- */
+/** Result reporting shared by the iterative design commands (design_portal_frames, design_purlins). */
 
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
@@ -12,17 +8,11 @@ import { failingRows, maxUtilisation } from '../common/utilisation';
 
 const LIMITED_NOTE = 'largest available size reached for some elements';
 
-interface UtilisationStats {
-  maxUtilisation: number;
-  failures: number;
-}
+type UtilisationStats = { maxUtilisation: number; failures: number };
 
 /** Maximum utilisation and number of rows above 1. */
 export function utilisationStats(rows: ReadonlyArray<{ utilisation: number }>): UtilisationStats {
-  return {
-    maxUtilisation: maxUtilisation(rows),
-    failures: failingRows(rows).length,
-  };
+  return { maxUtilisation: maxUtilisation(rows), failures: failingRows(rows).length };
 }
 
 /**
@@ -51,23 +41,13 @@ export function designResult(
   changes: ReadonlyArray<string>,
   stats: UtilisationStats,
 ): CommandResult {
-  return {
-    document,
-    summary,
-    affected: elementAffected(document, [...changed]),
-    data: { changes, ...stats },
-  };
+  return { document, summary, affected: elementAffected(document, [...changed]), data: { changes, ...stats } };
 }
 
 /** Tail of the changed-design summary: "Max utilisation now x[, n <noun> still failing][ (limited)].". */
-export function finalUtilisationText(
-  stats: UtilisationStats,
-  failingNoun: string,
-  limited: boolean,
-): string {
+export function finalUtilisationText(stats: UtilisationStats, failingNoun: string, limited: boolean): string {
   return (
-    `Max utilisation now ${stats.maxUtilisation.toFixed(2)}` +
-    `${stats.failures > 0 ? `, ${stats.failures} ${failingNoun} still failing` : ''}` +
-    `${limited ? ` (${LIMITED_NOTE})` : ''}.`
+    'Max utilisation now ' +
+    `${stats.maxUtilisation.toFixed(2)}${stats.failures > 0 ? `, ${stats.failures} ${failingNoun} still failing` : ''}${limited ? ` (${LIMITED_NOTE})` : ''}.`
   );
 }

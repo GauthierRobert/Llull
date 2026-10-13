@@ -1,23 +1,10 @@
-/**
- * @layer ui/panels/civil
- *
- * EarthworksSection — `add_platform` (outline typed or taken from the selected polyline), each
- * platform's cut / fill (`platform_earthworks`) with a Balance button (`balance_platform`), and a
- * surface-to-surface volume comparison (`compare_surfaces`).
- */
+// `add_platform` (typed or selected-polyline outline), cut / fill + Balance per platform, `compare_surfaces` volumes.
 
 import React, { useState } from 'react';
 import type { PlatformObject } from '@core/model/civil';
 import { useStore } from '@ui/store';
 import { PanelSection, FormError, StatusLine } from '@ui/panels/PanelParts';
-import {
-  CivilObjectSelect,
-  useCivilObjects,
-  NumberTextField,
-  PointsFromSelectionRow,
-  TextField,
-  useChosenId,
-} from './CivilParts';
+import { CivilObjectSelect, useCivilObjects, NumberTextField, PointsFromSelectionRow, TextField, useChosenId } from './CivilParts';
 import { optionalNumber, parseNumber, optionalText } from '@ui/numberText';
 import { parsePoints } from './civilInput';
 import { useFormValues } from '@ui/panels/useFormValues';
@@ -37,10 +24,7 @@ function PlatformRow({ platform }: { platform: PlatformObject }): React.ReactEle
         label: 'Balance',
         title: 'Set the pad level so that cut and fill balance',
         run: (text) => {
-          dispatch('balance_platform', {
-            platformId: platform.id,
-            ...optionalNumber('swellFactor', text),
-          });
+          dispatch('balance_platform', { platformId: platform.id, ...optionalNumber('swellFactor', text) });
           return false;
         },
       }}
@@ -55,30 +39,13 @@ function CompareSurfaces(): React.ReactElement {
   const [status, setStatus] = useState('');
   return (
     <div className="building-inline-form" aria-label="Compare surfaces">
-      <CivilObjectSelect
-        objects={surfaces}
-        value={baseId}
-        label="Base surface"
-        onChange={setBase}
-      />
-      <CivilObjectSelect
-        objects={surfaces}
-        value={comparisonId}
-        label="Comparison surface"
-        onChange={setComparison}
-      />
+      <CivilObjectSelect objects={surfaces} value={baseId} label="Base surface" onChange={setBase} />
+      <CivilObjectSelect objects={surfaces} value={comparisonId} label="Comparison surface" onChange={setComparison} />
       <button
         type="button"
         className="btn btn--ghost btn--sm"
         disabled={surfaces.length < 2}
-        onClick={() =>
-          setStatus(
-            runQuery('compare_surfaces', {
-              baseSurfaceId: baseId,
-              comparisonSurfaceId: comparisonId,
-            }).summary,
-          )
-        }
+        onClick={() => setStatus(runQuery('compare_surfaces', { baseSurfaceId: baseId, comparisonSurfaceId: comparisonId }).summary)}
       >
         Compare volumes
       </button>
@@ -134,19 +101,10 @@ export function EarthworksSection(): React.ReactElement {
           noSelectionError="Select one closed polyline first."
           setError={setError}
         >
-          <CivilObjectSelect
-            objects={surfaces}
-            value={surfaceId}
-            label="Platform surface"
-            onChange={setSurface}
-          />
+          <CivilObjectSelect objects={surfaces} value={surfaceId} label="Platform surface" onChange={setSurface} />
         </PointsFromSelectionRow>
         <div className="building-inline-form">
-          <NumberTextField
-            {...field('elevation')}
-            hint="Pad elevation"
-            label="Platform elevation"
-          />
+          <NumberTextField {...field('elevation')} hint="Pad elevation" label="Platform elevation" />
           <NumberTextField {...field('cutSlope')} hint="Cut H:1V (1.5)" label="Cut slope" />
           <NumberTextField {...field('fillSlope')} hint="Fill H:1V (2)" label="Fill slope" />
           <TextField {...field('name')} hint="Name" label="Platform name" />

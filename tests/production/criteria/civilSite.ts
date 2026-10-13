@@ -16,8 +16,6 @@ import { parseLandXml } from '../oracle/landxml';
 import { paperName, parseSheet, printedScales, STANDARD_SCALES } from '../oracle/svg';
 
 /**
- * @layer tests/production/criteria
- *
  * Acceptance criteria of a civil office's site job (survey → terrain → balanced pad → road →
  * storm network → sheets + LandXML). Engineering references are computed here, independently of
  * llull's code paths: convex-hull area, survey statistics, Barnett spiral length, Manning full-bore
@@ -26,10 +24,7 @@ import { paperName, parseSheet, printedScales, STANDARD_SCALES } from '../oracle
  * the office's thresholds.
  */
 
-function objects<C extends CivilCategory>(
-  doc: CadDocument,
-  category: C,
-): Extract<CivilObject, { category: C }>[] {
+function objects<C extends CivilCategory>(doc: CadDocument, category: C): Extract<CivilObject, { category: C }>[] {
   const civil = doc.civil;
   return (civil?.order ?? [])
     .map((id) => civil?.objects[id])
@@ -38,18 +33,15 @@ function objects<C extends CivilCategory>(
 
 const pass = (detail: string): CheckOutcome => ({ pass: true, detail });
 const fail = (detail: string): CheckOutcome => ({ pass: false, detail });
-const near = (a: Vec2, b: Vec2, tolerance: number): boolean =>
-  Math.hypot(a[0] - b[0], a[1] - b[1]) <= tolerance;
+const near = (a: Vec2, b: Vec2, tolerance: number): boolean => Math.hypot(a[0] - b[0], a[1] - b[1]) <= tolerance;
 
 function convexHullArea(points: Vec2[]): number {
   const sorted = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-  const cross = (o: Vec2, a: Vec2, b: Vec2): number =>
-    (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const cross = (o: Vec2, a: Vec2, b: Vec2): number => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
   const half = (input: Vec2[]): Vec2[] => {
     const hull: Vec2[] = [];
     for (const p of input) {
-      while (hull.length >= 2 && cross(hull[hull.length - 2]!, hull[hull.length - 1]!, p) <= 0)
-        hull.pop();
+      while (hull.length >= 2 && cross(hull[hull.length - 2]!, hull[hull.length - 1]!, p) <= 0) hull.pop();
       hull.push(p);
     }
     return hull.slice(0, -1);
@@ -68,23 +60,16 @@ function surveyCheck(intent: CivilIntent, { document }: GradeContext): CheckOutc
   const groups = objects(document, 'pointGroup') as PointGroupObject[];
   const group = groups.find((g) => g.points.length === rows.length);
   if (!group) {
-    return fail(
-      `no point group holds the ${rows.length} surveyed points (${groups.map((g) => g.points.length).join(', ') || 'none'})`,
-    );
+    return fail(`no point group holds the ${rows.length} surveyed points (${groups.map((g) => g.points.length).join(', ') || 'none'})`);
   }
-  const key = (e: number, n: number, z: number): string =>
-    `${e.toFixed(3)} ${n.toFixed(3)} ${z.toFixed(3)}`;
+  const key = (e: number, n: number, z: number): string => `${e.toFixed(3)} ${n.toFixed(3)} ${z.toFixed(3)}`;
   const surveyed = new Set(rows.map((r) => key(r.e, r.n, r.z)));
   const missing = group.points.filter((p) => !surveyed.has(key(...p.position))).length;
   const codes = new Map<string, number>();
   for (const r of rows) codes.set(r.code, (codes.get(r.code) ?? 0) + 1);
-  const coded = [...codes].every(
-    ([code, count]) => group.points.filter((p) => p.code === code).length === count,
-  );
+  const coded = [...codes].every(([code, count]) => group.points.filter((p) => p.code === code).length === count);
   return missing === 0 && coded
-    ? pass(
-        `${rows.length} points at their surveyed E/N/Z, codes ${[...codes].map(([c, n]) => `${c} ${n}`).join(', ')}`,
-      )
+    ? pass(`${rows.length} points at their surveyed E/N/Z, codes ${[...codes].map(([c, n]) => `${c} ${n}`).join(', ')}`)
     : fail(`${missing} point(s) off their surveyed position; codes kept: ${coded}`);
 }
 
@@ -118,9 +103,7 @@ function padCheck(intent: CivilIntent, { document, run }: GradeContext): CheckOu
     intent.pad.boundary.every((v) => p.boundary.some((b) => near(v, b, 0.01))),
   );
   if (!pad) return fail('no platform on the brief outline');
-  const data = run('platform_earthworks', { platformId: pad.id }).data as
-    | { cutM3: number; fillM3: number }
-    | undefined;
+  const data = run('platform_earthworks', { platformId: pad.id }).data as { cutM3: number; fillM3: number } | undefined;
   if (!data) return fail('platform_earthworks returned no data');
   const residual = data.cutM3 * intent.pad.swellFactor - data.fillM3;
   const ratio = Math.abs(residual) / Math.max(data.fillM3, 1);
@@ -135,9 +118,7 @@ function padCheck(intent: CivilIntent, { document, run }: GradeContext): CheckOu
 
 function roadOf(intent: CivilIntent, doc: CadDocument): AlignmentObject | undefined {
   return (objects(doc, 'alignment') as AlignmentObject[]).find(
-    (a) =>
-      a.points.length === intent.road.points.length &&
-      intent.road.points.every((p, i) => near(p, a.points[i] ?? [NaN, NaN], 0.01)),
+    (a) => a.points.length === intent.road.points.length && intent.road.points.every((p, i) => near(p, a.points[i] ?? [NaN, NaN], 0.01)),
   );
 }
 
@@ -154,10 +135,7 @@ function roadGeometryCheck(intent: CivilIntent, { document }: GradeContext): Che
   });
   const section = road.section;
   if (!section) problems.push('no road template');
-  else if (
-    section.laneWidth !== intent.road.laneWidth ||
-    section.shoulderWidth !== intent.road.shoulderWidth
-  )
+  else if (section.laneWidth !== intent.road.laneWidth || section.shoulderWidth !== intent.road.shoulderWidth)
     problems.push(`template ${section.laneWidth} + ${section.shoulderWidth} m`);
   if (road.superelevation?.maxRate !== intent.road.maxSuperelevation)
     problems.push(`superelevation ${road.superelevation?.maxRate ?? 'none'}`);
@@ -171,10 +149,7 @@ function roadGeometryCheck(intent: CivilIntent, { document }: GradeContext): Che
 function roadReportCheck(intent: CivilIntent, { document, run }: GradeContext): CheckOutcome {
   const road = roadOf(intent, document);
   if (!road) return fail('no alignment through the brief PIs');
-  const report = run('alignment_report', {
-    alignmentId: road.id,
-    designSpeedKmh: intent.road.designSpeedKmh,
-  });
+  const report = run('alignment_report', { alignmentId: road.id, designSpeedKmh: intent.road.designSpeedKmh });
   const data = report.data as
     | {
         rows: { station: number; designM: number | null; superelevationPercent: number | null }[];
@@ -188,15 +163,12 @@ function roadReportCheck(intent: CivilIntent, { document, run }: GradeContext): 
   for (let i = 1; i < designed.length; i++) {
     const a = designed[i - 1]!;
     const b = designed[i]!;
-    if (b.station > a.station)
-      maxGrade = Math.max(maxGrade, Math.abs((b.designM! - a.designM!) / (b.station - a.station)));
+    if (b.station > a.station) maxGrade = Math.max(maxGrade, Math.abs((b.designM! - a.designM!) / (b.station - a.station)));
   }
   const banked = Math.max(...data.rows.map((r) => Math.abs(r.superelevationPercent ?? 0)));
   // The profile must run the whole road; the end station is printed to 1 cm, so a profile ending
   // within 5 cm of it is complete for the office.
-  const undesigned = data.rows.filter(
-    (r) => r.designM === null && r.station < data.totals.lengthM - 0.05,
-  );
+  const undesigned = data.rows.filter((r) => r.designM === null && r.station < data.totals.lengthM - 0.05);
   const fullLength = undesigned.length === 0;
   const ok =
     data.checks.failures.length === 0 &&
@@ -211,9 +183,7 @@ function roadReportCheck(intent: CivilIntent, { document, run }: GradeContext): 
 
 function networkOf(intent: CivilIntent, doc: CadDocument): (ManholeObject | undefined)[] {
   const manholes = objects(doc, 'manhole') as ManholeObject[];
-  return intent.drainage.manholes.map((m) =>
-    manholes.find((h) => near(h.position, m.location, 0.5)),
-  );
+  return intent.drainage.manholes.map((m) => manholes.find((h) => near(h.position, m.location, 0.5)));
 }
 
 function networkCheck(intent: CivilIntent, { document }: GradeContext): CheckOutcome {
@@ -227,10 +197,7 @@ function networkCheck(intent: CivilIntent, { document }: GradeContext): CheckOut
     const a = placed[from];
     const b = placed[to];
     const pipe = pipes.find((p) => p.fromId === a?.id && p.toId === b?.id);
-    if (!pipe)
-      problems.push(
-        `no pipe ${intent.drainage.manholes[from]?.name} → ${intent.drainage.manholes[to]?.name}`,
-      );
+    if (!pipe) problems.push(`no pipe ${intent.drainage.manholes[from]?.name} → ${intent.drainage.manholes[to]?.name}`);
     else if (!(pipe.invertFrom > pipe.invertTo)) problems.push(`${pipe.name} not falling`);
     else if (!intent.drainage.diametersMm.some((d) => Math.abs(d / 1000 - pipe.diameter) < 1e-6))
       problems.push(`${pipe.name} Ø${pipe.diameter * 1000} mm not a commercial size`);
@@ -254,38 +221,28 @@ interface PipeRow {
 function hydraulicsCheck(intent: CivilIntent, { document, run }: GradeContext): CheckOutcome {
   const { idf, outfallLevel, minCoverM, minVelocity } = intent.drainage;
   const result = run('check_drainage_network', { idf, outfallLevel, minCoverM, minVelocity });
-  const data = result.data as
-    | { pipes: PipeRow[]; manholes: { flooding: boolean; name: string }[]; failures: string[] }
-    | undefined;
+  const data = result.data as { pipes: PipeRow[]; manholes: { flooding: boolean; name: string }[]; failures: string[] } | undefined;
   if (!data) return fail(`no network check: ${result.summary}`);
   const pipes = objects(document, 'pipe') as PipeObject[];
   const capacityShort: string[] = [];
   for (const row of data.pipes) {
     const pipe = pipes.find((p) => p.id === row.id);
     if (!pipe) continue;
-    const from = (objects(document, 'manhole') as ManholeObject[]).find(
-      (m) => m.id === pipe.fromId,
-    );
+    const from = (objects(document, 'manhole') as ManholeObject[]).find((m) => m.id === pipe.fromId);
     const to = (objects(document, 'manhole') as ManholeObject[]).find((m) => m.id === pipe.toId);
     if (!from || !to) continue;
     const length = Math.hypot(to.position[0] - from.position[0], to.position[1] - from.position[1]);
     const slope = (pipe.invertFrom - pipe.invertTo) / length;
     const area = (Math.PI * pipe.diameter ** 2) / 4;
-    const capacityLps =
-      (1000 / pipe.manningN) * area * (pipe.diameter / 4) ** (2 / 3) * Math.sqrt(slope);
-    if (capacityLps < row.designLps)
-      capacityShort.push(`${row.name} ${round(capacityLps, 1)} < ${row.designLps} L/s`);
+    const capacityLps = (1000 / pipe.manningN) * area * (pipe.diameter / 4) ** (2 / 3) * Math.sqrt(slope);
+    if (capacityLps < row.designLps) capacityShort.push(`${row.name} ${round(capacityLps, 1)} < ${row.designLps} L/s`);
   }
   const surcharged = data.pipes.filter((p) => p.surcharged).map((p) => p.name);
   const flooding = [
     ...data.pipes.filter((p) => p.flooding).map((p) => p.name),
     ...data.manholes.filter((m) => m.flooding).map((m) => m.name),
   ];
-  const ok =
-    surcharged.length === 0 &&
-    flooding.length === 0 &&
-    data.failures.length === 0 &&
-    capacityShort.length === 0;
+  const ok = surcharged.length === 0 && flooding.length === 0 && data.failures.length === 0 && capacityShort.length === 0;
   return {
     pass: ok,
     detail: `IDF i = ${idf.a}/(t+${idf.b})^${idf.c}, tailwater ${outfallLevel} m: design ${data.pipes.map((p) => `${p.name} ${p.designLps} L/s`).join(', ')}; surcharged ${surcharged.length}, flooding ${flooding.length}, check failures ${data.failures.length === 0 ? 'none' : data.failures.join(' ')}${capacityShort.length > 0 ? `; Manning full-bore short: ${capacityShort.join(', ')}` : '; Manning full-bore capacity ≥ design flow'}`,
@@ -318,30 +275,23 @@ function landXmlCheck(intent: CivilIntent, { document, deliverable }: GradeConte
   const pipes = objects(document, 'pipe') as PipeObject[];
   const problems: string[] = [...xml.errors];
   if (xml.cgPoints !== rows.length) problems.push(`${xml.cgPoints} CgPoints vs ${rows.length}`);
-  if (xml.surfaces.length === 0 || xml.surfaces.some((s) => s.faces === 0))
-    problems.push('no TIN Surface');
+  if (xml.surfaces.length === 0 || xml.surfaces.some((s) => s.faces === 0)) problems.push('no TIN Surface');
   const road = xml.alignments.find((a) => a.name === intent.road.name);
   if (!road) problems.push('no Alignment');
   else if (road.spirals < 2 * intent.road.spirals.filter((s) => s > 0).length || !road.profile)
     problems.push(`Alignment spirals ${road.spirals}, profile ${road.profile}`);
-  if (
-    xml.structs !== intent.drainage.manholes.length ||
-    xml.pipes.length !== intent.drainage.pipes.length
-  )
+  if (xml.structs !== intent.drainage.manholes.length || xml.pipes.length !== intent.drainage.pipes.length)
     problems.push(`PipeNetwork ${xml.structs} structs / ${xml.pipes.length} pipes`);
   // Slope convention: llull writes a ratio (0.01 = 1 %) — check it against the inverts.
   for (const pipe of xml.pipes) {
     const model = pipes.find((p) => p.name === pipe.name);
     if (!model) continue;
-    const from = (objects(document, 'manhole') as ManholeObject[]).find(
-      (m) => m.id === model.fromId,
-    );
+    const from = (objects(document, 'manhole') as ManholeObject[]).find((m) => m.id === model.fromId);
     const to = (objects(document, 'manhole') as ManholeObject[]).find((m) => m.id === model.toId);
     if (!from || !to) continue;
     const length = Math.hypot(to.position[0] - from.position[0], to.position[1] - from.position[1]);
     const slope = ((model.invertFrom - model.invertTo) / length) * 100;
-    if (Math.abs(pipe.slope - slope) > 1e-2)
-      problems.push(`${pipe.name} slope ${pipe.slope} vs ${round(slope, 5)}`);
+    if (Math.abs(pipe.slope - slope) > 1e-2) problems.push(`${pipe.name} slope ${pipe.slope} vs ${round(slope, 5)}`);
   }
   return problems.length === 0
     ? pass(
@@ -358,12 +308,7 @@ export function civilSiteCriteria(intent: CivilIntent): Criterion[] {
     check: (intent: CivilIntent, ctx: GradeContext) => CheckOutcome,
   ): Criterion => ({ id, area, requirement, check: (ctx) => check(intent, ctx) });
   return [
-    criterion(
-      'survey-import',
-      'survey',
-      'Every surveyed point is imported at its E/N/Z with its field code.',
-      surveyCheck,
-    ),
+    criterion('survey-import', 'survey', 'Every surveyed point is imported at its E/N/Z with its field code.', surveyCheck),
     criterion(
       'terrain',
       'survey',

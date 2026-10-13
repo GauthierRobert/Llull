@@ -1,9 +1,4 @@
-/**
- * export_obj: read-only export of the world-space triangles (document returned unchanged,
- * affected: []).
- *
- * @layer core/commands
- */
+/** export_obj: read-only export of the world-space triangles (document returned unchanged, affected: []). */
 
 import type { CommandResult } from '../types';
 import { report } from '../noop';
@@ -49,9 +44,6 @@ function buildObjText(parts: readonly ExportPart[], header: string): string {
 }
 
 /**
- * @command export_obj
- * @pure
- * @layer core/commands
  * @affects nothing — read-only; document returned unchanged, affected:[]
  * @invariant data.format === 'obj'; data.triangleCount >= 0
  * @invariant data.text is valid Wavefront OBJ with v/vn/f records
@@ -69,8 +61,7 @@ export const exportObj = defineCommand({
     '  format ("obj"), triangleCount, text (the full OBJ string with v/vn/f records). ' +
     'Each entity is one OBJ object (`o <entity name or id>`). ' +
     'entityIds: omit to export all 3D entities; provide an array to export a subset. ' +
-    'units: optional units label embedded in the OBJ comment (defaults to doc units). ' +
-    'Does NOT modify the document.',
+    'units: optional units label embedded in the OBJ comment (defaults to doc units). Does NOT modify the document.',
   params: z.object({
     entityIds: entityIdsField,
     units: z
@@ -85,13 +76,11 @@ export const exportObj = defineCommand({
     const { entityIds, units } = params;
     // One comment line only: a newline in the label would inject arbitrary OBJ records.
     const unitLabel = (units ?? doc.units).replace(/[\r\n\u2028\u2029]+/g, ' ').trim() || doc.units;
-
     const collected = collectExportParts(doc, entityIds);
     const tris = collected.parts.flatMap((part) => part.tris);
     const triangleCount = tris.length;
     const text = buildObjText(collected.parts, `# llull OBJ export — units: ${unitLabel}`);
     const summary = exportSummary('export_obj', 'obj', { ...collected, tris });
-
     return report(doc, summary, { format: 'obj', text, triangleCount });
   },
 });

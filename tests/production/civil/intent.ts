@@ -3,8 +3,6 @@ import path from 'node:path';
 import type { Vec2 } from '@core/model/types';
 
 /**
- * @layer tests/production/civil
- *
  * Design intent of the civil-office job (site development): the survey the client supplies and the
  * engineer's layout decisions. The brief, the scripted calls and the acceptance criteria are all
  * generated from it, so they cannot disagree. Survey: public/samples/pilot-site-survey.csv
@@ -109,24 +107,9 @@ export const civilSiteIntent: CivilIntent = {
   },
   drainage: {
     manholes: [
-      {
-        name: 'MH1',
-        location: at(178, 100),
-        invert: 107.0,
-        catchment: { areaHa: 0.2, runoffCoefficient: 0.9 },
-      },
-      {
-        name: 'MH2',
-        location: at(180, 40),
-        invert: 104.3,
-        catchment: { areaHa: 0.12, runoffCoefficient: 0.85 },
-      },
-      {
-        name: 'MH3',
-        location: at(120, 12),
-        invert: 101.8,
-        catchment: { areaHa: 0.6, runoffCoefficient: 0.4 },
-      },
+      { name: 'MH1', location: at(178, 100), invert: 107.0, catchment: { areaHa: 0.2, runoffCoefficient: 0.9 } },
+      { name: 'MH2', location: at(180, 40), invert: 104.3, catchment: { areaHa: 0.12, runoffCoefficient: 0.85 } },
+      { name: 'MH3', location: at(120, 12), invert: 101.8, catchment: { areaHa: 0.6, runoffCoefficient: 0.4 } },
       { name: 'Outfall', location: at(72, 12), invert: 100.45 },
     ],
     pipes: [
@@ -145,9 +128,7 @@ export const civilSiteIntent: CivilIntent = {
 };
 
 /** Survey rows of the supplied file (header and blank lines excluded). */
-export function surveyRows(
-  intent: CivilIntent,
-): { e: number; n: number; z: number; code: string }[] {
+export function surveyRows(intent: CivilIntent): { e: number; n: number; z: number; code: string }[] {
   return intent.surveyText
     .split(/\r?\n/)
     .slice(1)

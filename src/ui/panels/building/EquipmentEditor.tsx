@@ -1,8 +1,4 @@
-/**
- * @layer ui/panels/building
- * Equipment editor form: Save dispatches `update_equipment` with only the changed fields.
- * Used by the Equipment list and the Properties inspector.
- */
+// Equipment form (Equipment list + inspector): Save dispatches `update_equipment` with the changed fields.
 
 import React from 'react';
 import { useStore } from '@ui/store';
@@ -12,20 +8,16 @@ import { useFormValues } from '@ui/panels/useFormValues';
 import { LabeledInput } from '@ui/panels/LabeledInput';
 import { LabeledSelect } from '@ui/panels/LabeledSelect';
 import { LevelSelect } from './LevelSelect';
-import {
-  EQUIPMENT_EDIT_FIELDS,
-  buildEquipmentUpdate,
-  equipmentValues,
-  type EquipmentEditValues,
-} from './equipmentEdit';
+import { EQUIPMENT_EDIT_FIELDS, buildEquipmentUpdate, equipmentValues, type EquipmentEditValues } from './equipmentEdit';
 import { EQUIPMENT_SHAPE_OPTIONS } from './industrialTools';
 
-interface EquipmentEditorProps {
+export function EquipmentEditor({
+  element,
+  levels,
+}: {
   element: EquipmentElement;
   levels: ReadonlyArray<BuildingLevel>;
-}
-
-export function EquipmentEditor({ element, levels }: EquipmentEditorProps): React.ReactElement {
+}): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const initial = equipmentValues(element);
   const { values, error, setError, change } = useFormValues<EquipmentEditValues>(() => initial);

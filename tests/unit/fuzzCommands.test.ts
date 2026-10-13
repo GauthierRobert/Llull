@@ -1,10 +1,8 @@
-/**
- * Fuzz contract: every registered command, given garbage params, must never throw,
- * never mutate the input document, and never emit non-finite numbers into the document.
- */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute, listCommands } from '@core/commands/registry';
+import { expectNoOp } from '../helpers/expectNoOp';
+import { xy, xyz } from '../helpers/xy';
 
 // The guard warns (with stack) when a command throws on garbage input; silence the expected noise.
 beforeAll(() => {
@@ -14,35 +12,12 @@ afterAll(() => {
   vi.restoreAllMocks();
 });
 
-const GARBAGE: unknown[] = [
-  undefined,
-  null,
-  NaN,
-  Infinity,
-  -Infinity,
-  -1,
-  0,
-  1e12,
-  '',
-  'abc',
-  '5',
-  [],
-  {},
-  true,
-  [NaN, 1, 2],
-  ['x'],
-  [{}],
-];
+const GARBAGE: unknown[] = [undefined, null, NaN, Infinity, -Infinity, -1, 0, 1e12, '', 'abc', '5', [], {}, true, [NaN, 1, 2], ['x'], [{}]];
 
 function seeded(): CadDocument {
   let doc = createEmptyDocument();
   doc = execute(doc, 'add_box', { size: [10, 10, 10] }).document;
-  doc = execute(doc, 'draw_polyline', {
-    points: [
-      [0, 0],
-      [10, 0],
-    ],
-  }).document;
+  doc = execute(doc, 'draw_polyline', { points: xy(0, 0, 10, 0) }).document;
   doc = execute(doc, 'draw_arc', { center: [0, 0], radius: 5 }).document;
   return doc;
 }
@@ -82,9 +57,7 @@ describe('fuzz: every command tolerates garbage params', () => {
         try {
           result = execute(doc, def.name, params);
         } catch (e) {
-          throw new Error(`${def.name} threw on ${JSON.stringify(params)}: ${String(e)}`, {
-            cause: e,
-          });
+          throw new Error(`${def.name} threw on ${JSON.stringify(params)}: ${String(e)}`, { cause: e });
         }
         expect(JSON.stringify(doc), `${def.name} mutated input`).toBe(snapshot);
         expect(typeof result.summary).toBe('string');
@@ -105,24 +78,10 @@ describe('resource caps: huge counts are rejected, not allocated', () => {
   const cases: Array<[string, (id: string) => unknown]> = [
     ['array_linear', (id) => ({ id, count: 5e6, offset: [1, 0, 0] })],
     ['array_polar', (id) => ({ id, count: 5e6, center: [0, 0] })],
+    ['pattern_along_path', (id) => ({ sourceId: id, path: xyz(0, 0, 0, 1, 0, 0), count: 5e6 })],
     [
       'pattern_along_path',
-      (id) => ({
-        sourceId: id,
-        path: [
-          [0, 0, 0],
-          [1, 0, 0],
-        ],
-        count: 5e6,
-      }),
-    ],
-    [
-      'pattern_along_path',
-      (id) => ({
-        sourceId: id,
-        arc: { center: [0, 0, 0], normal: [0, 0, 1], radius: 1, startAngle: 0, endAngle: 3 },
-        count: 5e6,
-      }),
+      (id) => ({ sourceId: id, arc: { center: [0, 0, 0], normal: [0, 0, 1], radius: 1, startAngle: 0, endAngle: 3 }, count: 5e6 }),
     ],
     ['draw_involute', () => ({ baseRadius: 1, startAngle: 0, endAngle: 1, samples: 5e6 })],
     ['add_spur_gear', () => ({ module: 1, teeth: 5e6, faceWidth: 1 })],
@@ -130,9 +89,7 @@ describe('resource caps: huge counts are rejected, not allocated', () => {
   for (const [name, make] of cases) {
     it(`${name} rejects count 5e6 as a no-op`, () => {
       const { doc, id } = base();
-      const r = execute(doc, name, make(id));
-      expect(r.document).toBe(doc);
-      expect(r.affected).toEqual([]);
+      expectNoOp(execute(doc, name, make(id)), doc);
     });
   }
 });
@@ -151,22 +108,15 @@ describe('registry guard: prototype keys and short vectors', () => {
       }
     }
   });
-
   it('rejects a 1-component position instead of storing an undefined y/z', () => {
     const doc = createEmptyDocument();
-    const r = execute(doc, 'add_box', { size: [1, 1, 1], position: [1] });
-    expect(r.document).toBe(doc);
-    expect(r.affected).toEqual([]);
+    expectNoOp(execute(doc, 'add_box', { size: [1, 1, 1], position: [1] }), doc);
   });
 });
 
 describe('registry guard: planar position shorthand', () => {
   it('pads a 2-element position to [x, y, 0] for draw_rectangle', () => {
-    const r = execute(createEmptyDocument(), 'draw_rectangle', {
-      position: [5, 6],
-      width: 4,
-      height: 3,
-    });
+    const r = execute(createEmptyDocument(), 'draw_rectangle', { position: [5, 6], width: 4, height: 3 });
     expect(r.affected).toHaveLength(1);
     expect(r.document.entities[r.affected[0]!]!.position).toEqual([5, 6, 0]);
   });

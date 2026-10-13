@@ -1,8 +1,3 @@
-/**
- * @layer ui/viewport
- * @pure Single visibility rule shared by every renderer, picker and snap collector.
- */
-
 import type { CadDocument, Entity } from '@core/model/types';
 
 /**

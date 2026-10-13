@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * The OCC kernel runs in a worker thread: a forced WASM-style abort (Emscripten `process.exit`) or
  * a hang kills only the worker, the call returns null, and the next call respawns it.
  */
@@ -26,10 +25,7 @@ const box = (size: number): Entity =>
 
 const kernels: IsolatedKernel[] = [];
 const make = (callTimeoutMs?: number): IsolatedKernel => {
-  const kernel = createIsolatedKernel({
-    testHooks: true,
-    ...(callTimeoutMs !== undefined ? { callTimeoutMs } : {}),
-  });
+  const kernel = createIsolatedKernel({ testHooks: true, ...(callTimeoutMs !== undefined ? { callTimeoutMs } : {}) });
   kernels.push(kernel);
   return kernel;
 };
@@ -40,10 +36,7 @@ describe('isolated OCC kernel', () => {
   it('tessellates and runs booleans through the worker', () => {
     const kernel = make();
     expect(meshOf(kernel, box(2))?.indices).toHaveLength(36);
-    const union = booleanMesh(kernel, 'union', box(2), {
-      ...box(2),
-      position: [1, 0, 0],
-    } as Entity);
+    const union = booleanMesh(kernel, 'union', box(2), { ...box(2), position: [1, 0, 0] } as Entity);
     expect(union).not.toBeNull();
     expect(kernel.crashCount()).toBe(0);
   }, 120_000);
@@ -107,9 +100,7 @@ describe('isolated OCC kernel', () => {
   it('does not recycle the worker for a graceful refusal such as an oversized fillet', () => {
     const kernel = make();
     expect(meshOf(kernel, box(10))).not.toBeNull();
-    expect(
-      kernel.evaluate({ op: 'fillet', source: leaf(box(10)), edges: [], size: 50 }),
-    ).toBeNull();
+    expect(kernel.evaluate({ op: 'fillet', source: leaf(box(10)), edges: [], size: 50 })).toBeNull();
     expect(kernel.recycleCount()).toBe(0);
     expect(kernel.crashCount()).toBe(0);
     expect(meshOf(kernel, box(2))).not.toBeNull();
@@ -137,8 +128,7 @@ describe('isolated OCC kernel', () => {
   }, 120_000);
 
   describe('a worker that dies while idle', () => {
-    const sleepSync = (ms: number): void =>
-      void Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+    const sleepSync = (ms: number): void => void Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
     it('is replaced on the next call (event loop blocked: status word flags the death)', () => {
       const kernel = make(20_000);
@@ -177,11 +167,7 @@ describe('isolated OCC kernel', () => {
   it('retries once when the background-loaded replacement worker dies on start', () => {
     const counterFile = path.join(os.tmpdir(), `llull-flaky-worker-${process.pid}`);
     rmSync(counterFile, { force: true });
-    const kernel = createIsolatedKernel({
-      entry: path.join(__dirname, 'fixtures', 'flakyStartWorker.cjs'),
-      execArgv: [],
-      testHooks: true,
-    });
+    const kernel = createIsolatedKernel({ entry: path.join(__dirname, 'fixtures', 'flakyStartWorker.cjs'), execArgv: [], testHooks: true });
     kernels.push(kernel);
     try {
       expect(kernel.topology(handleOf(leaf(box(2))))).toEqual({ loads: 0 });
@@ -194,10 +180,7 @@ describe('isolated OCC kernel', () => {
   }, 60_000);
 
   it('returns null promptly instead of throwing when the worker cannot load', () => {
-    const kernel = createIsolatedKernel({
-      entry: path.join(__dirname, 'missing-worker.js'),
-      startTimeoutMs: 30_000,
-    });
+    const kernel = createIsolatedKernel({ entry: path.join(__dirname, 'missing-worker.js'), startTimeoutMs: 30_000 });
     const started = Date.now();
     expect(meshOf(kernel, box(2))).toBeNull();
     expect(Date.now() - started).toBeLessThan(15_000);

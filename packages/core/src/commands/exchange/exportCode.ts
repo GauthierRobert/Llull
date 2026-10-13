@@ -1,9 +1,6 @@
 /**
- * export_code — the document as parametric source code: CadQuery / build123d / OpenSCAD / FreeCAD
- * (parameters → variables, `=expr` dimensions → expressions, features in history order).
- * The reverse direction is apply_code_trace (code_trace.ts).
- *
- * @layer core/commands
+ * export_code — the document as parametric source code: CadQuery / build123d / OpenSCAD / FreeCAD (parameters → variables, `=expr`
+ * dimensions → expressions, features in history order). The reverse direction is apply_code_trace (code_trace.ts).
  */
 
 import type { CommandResult } from '../types';
@@ -19,20 +16,12 @@ import { report } from '../noop';
 
 type CodeLanguage = 'cadquery' | 'build123d' | 'openscad' | 'freecad';
 
-const FILE_EXTENSIONS: Readonly<Record<CodeLanguage, string>> = {
-  cadquery: 'py',
-  build123d: 'py',
-  openscad: 'scad',
-  freecad: 'FCMacro',
-};
+const FILE_EXTENSIONS: Readonly<Record<CodeLanguage, string>> = { cadquery: 'py', build123d: 'py', openscad: 'scad', freecad: 'FCMacro' };
 
 /**
- * @command export_code
- * @pure
- * @layer core/commands
  * @affects nothing — read-only; document returned unchanged, affected:[]
- * @invariant data.text regenerates the document's 3D solids; data.source tells whether it came
- *   from the feature history ('history', parametric) or the current geometry ('snapshot')
+ * @invariant data.text regenerates the document's 3D solids; data.source tells whether it came from the feature history ('history',
+ *   parametric) or the current geometry ('snapshot')
  * @failure unknown language -> no-op with summary, affected:[]
  */
 export const exportCode = defineCommand({
@@ -48,20 +37,13 @@ export const exportCode = defineCommand({
     language: z
       .enum(['cadquery', 'build123d', 'openscad', 'freecad'])
       .describe('Target: "cadquery" | "build123d" | "openscad" | "freecad".'),
-    name: z
-      .string()
-      .optional()
-      .describe('Base file name without extension (sanitized). Default "model".'),
+    name: z.string().optional().describe('Base file name without extension (sanitized). Default "model".'),
   }),
   annotations: { readOnly: true, idempotent: true },
   run: (doc, { language, name }, ctx): CommandResult => {
     const program = buildFeatureProgram(doc, getCommand, (ctx ?? currentContext()).kernel);
     const text =
-      language === 'openscad'
-        ? emitOpenScad(program)
-        : language === 'freecad'
-          ? emitFreeCad(program)
-          : emitPython(program, language);
+      language === 'openscad' ? emitOpenScad(program) : language === 'freecad' ? emitFreeCad(program) : emitPython(program, language);
     const base = safeFileName(name, 'model');
     const fileName = `${base}.${FILE_EXTENSIONS[language]}`;
     const notes = program.notes.length > 0 ? ` Notes: ${program.notes.join(' ')}` : '';

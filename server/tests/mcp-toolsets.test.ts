@@ -1,78 +1,35 @@
-/**
- * @layer server/tests
- * LLULL_TOOLSETS filtering over the real MCP Streamable HTTP transport.
- */
+/** LLULL_TOOLSETS filtering over the real MCP Streamable HTTP transport. */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
-import type request from 'supertest';
 import { buildMcpRouter, toolsetsFromEnv } from '../src/mcp';
 import { getLiveDoc, _resetLiveDoc } from '../src/liveDocument';
 import { _resetHistory } from '../src/commandBus';
 import { TOOLSET_NAMES, TOOLSETS } from '@mcp/index';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { mcpRequest } from './mcpTestSupport';
+import { mcpRpc, openMcpSession } from './mcpTestSupport';
 
 const app = express();
 app.use(express.json());
 app.use('/mcp', buildMcpRouter({ port: null, allowCodeExecution: false }, toolsetsFromEnv('3d')));
-
-function parseSseResult(text: string, rpcId: number): unknown {
-  for (const line of text.split('\n')) {
-    if (!line.startsWith('data: ')) continue;
-    const parsed = JSON.parse(line.slice('data: '.length)) as { id?: number; result?: unknown };
-    if (parsed.id === rpcId) return parsed.result;
-  }
-  return undefined;
-}
-
-let rpcId = 1;
 
 beforeEach(() => {
   _resetLiveDoc();
   _resetHistory();
 });
 
-type RpcApp = Parameters<typeof request>[0];
-
-async function rpcOn(
-  target: RpcApp,
-  sessionId: string | null,
-  method: string,
-  params: object,
-): Promise<unknown> {
-  const id = rpcId++;
-  const res = await mcpRequest(target, sessionId).send({ jsonrpc: '2.0', id, method, params });
-  expect(res.status).toBe(200);
-  if (sessionId === null) return res.headers['mcp-session-id'];
-  return parseSseResult(res.text, id);
-}
-
-const rpc = (sessionId: string | null, method: string, params: object): Promise<unknown> =>
-  rpcOn(app, sessionId, method, params);
-
-async function openSession(): Promise<string> {
-  return (await rpc(null, 'initialize', {
-    protocolVersion: '2024-11-05',
-    capabilities: {},
-    clientInfo: { name: 'toolsets-test', version: '0.0.1' },
-  })) as string;
-}
-
 const coreApp = express();
 coreApp.use(express.json());
 coreApp.use('/mcp', buildMcpRouter({ port: null, allowCodeExecution: false }, toolsetsFromEnv('')));
 
-const coreRpc = (sessionId: string | null, method: string, params: object): Promise<unknown> =>
-  rpcOn(coreApp, sessionId, method, params);
-
-async function openCoreSession(): Promise<string> {
-  return (await coreRpc(null, 'initialize', {
-    protocolVersion: '2024-11-05',
-    capabilities: {},
-    clientInfo: { name: 'discovery-test', version: '0.0.1' },
-  })) as string;
-}
+const rpcOn =
+  (target: express.Express) =>
+  async (sessionId: string, method: string, params: object): Promise<unknown> =>
+    (await mcpRpc(target, sessionId, method, params)).result;
+const rpc = rpcOn(app);
+const coreRpc = rpcOn(coreApp);
+const openSession = (): Promise<string> => openMcpSession(app, false);
+const openCoreSession = (): Promise<string> => openMcpSession(coreApp, false);
 
 async function listNames(sessionId: string): Promise<string[]> {
   const { tools } = (await coreRpc(sessionId, 'tools/list', {})) as { tools: { name: string }[] };
@@ -92,10 +49,7 @@ describe('MCP tool discovery (default core-only exposure)', () => {
 
   it('search_tools finds tools of disabled toolsets with their toolset', async () => {
     const sessionId = await openCoreSession();
-    const result = (await coreRpc(sessionId, 'tools/call', {
-      name: 'search_tools',
-      arguments: { query: 'wall' },
-    })) as {
+    const result = (await coreRpc(sessionId, 'tools/call', { name: 'search_tools', arguments: { query: 'wall' } })) as {
       isError?: boolean;
       structuredContent: { results: { name: string; toolset: string; enabled: boolean }[] };
     };
@@ -107,29 +61,25 @@ describe('MCP tool discovery (default core-only exposure)', () => {
   it('enable_toolset adds the toolset to tools/list and sends tools/list_changed', async () => {
     const notify = vi.spyOn(Server.prototype, 'sendToolListChanged').mockResolvedValue(undefined);
     const sessionId = await openCoreSession();
-    const result = (await coreRpc(sessionId, 'tools/call', {
-      name: 'enable_toolset',
-      arguments: { toolset: 'building' },
-    })) as { isError?: boolean };
+    const result = (await coreRpc(sessionId, 'tools/call', { name: 'enable_toolset', arguments: { toolset: 'building' } })) as {
+      isError?: boolean;
+    };
     expect(result.isError).toBe(false);
     expect(notify).toHaveBeenCalledTimes(1);
     expect(await listNames(sessionId)).toContain('draw_walls');
     // Another session is unaffected.
     expect(await listNames(await openCoreSession())).not.toContain('draw_walls');
     // Re-enabling is a no-op: no second notification.
-    await coreRpc(sessionId, 'tools/call', {
-      name: 'enable_toolset',
-      arguments: { toolset: 'building' },
-    });
+    await coreRpc(sessionId, 'tools/call', { name: 'enable_toolset', arguments: { toolset: 'building' } });
     expect(notify).toHaveBeenCalledTimes(1);
     notify.mockRestore();
   });
 
   it('enable_toolset with an unknown toolset is an error listing the valid ones', async () => {
-    const result = (await coreRpc(await openCoreSession(), 'tools/call', {
-      name: 'enable_toolset',
-      arguments: { toolset: 'bogus' },
-    })) as { isError?: boolean; content: { text?: string }[] };
+    const result = (await coreRpc(await openCoreSession(), 'tools/call', { name: 'enable_toolset', arguments: { toolset: 'bogus' } })) as {
+      isError?: boolean;
+      content: { text?: string }[];
+    };
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain('Valid toolsets');
     expect(result.content[0]?.text).toContain('building');
@@ -138,30 +88,19 @@ describe('MCP tool discovery (default core-only exposure)', () => {
   it('a disabled tool call points at enable_toolset, and works once enabled', async () => {
     const sessionId = await openCoreSession();
     const call = { name: 'add_box', arguments: { size: [1, 1, 1] } };
-    const refused = (await coreRpc(sessionId, 'tools/call', call)) as {
-      isError?: boolean;
-      content: { text?: string }[];
-    };
+    const refused = (await coreRpc(sessionId, 'tools/call', call)) as { isError?: boolean; content: { text?: string }[] };
     expect(refused.isError).toBe(true);
     expect(refused.content[0]?.text).toContain('enable_toolset');
-    await coreRpc(sessionId, 'tools/call', {
-      name: 'enable_toolset',
-      arguments: { toolset: '3d' },
-    });
+    await coreRpc(sessionId, 'tools/call', { name: 'enable_toolset', arguments: { toolset: '3d' } });
     const ok = (await coreRpc(sessionId, 'tools/call', call)) as { isError?: boolean };
     expect(ok.isError).toBe(false);
   });
 
   it('prompts/list follows the session toolsets', async () => {
     const sessionId = await openCoreSession();
-    const before = (await coreRpc(sessionId, 'prompts/list', {})) as {
-      prompts: { name: string }[];
-    };
+    const before = (await coreRpc(sessionId, 'prompts/list', {})) as { prompts: { name: string }[] };
     expect(before.prompts.map((p) => p.name)).not.toContain('design_building');
-    await coreRpc(sessionId, 'tools/call', {
-      name: 'enable_toolset',
-      arguments: { toolset: 'building' },
-    });
+    await coreRpc(sessionId, 'tools/call', { name: 'enable_toolset', arguments: { toolset: 'building' } });
     const after = (await coreRpc(sessionId, 'prompts/list', {})) as { prompts: { name: string }[] };
     expect(after.prompts.map((p) => p.name)).toContain('design_building');
   });
@@ -181,15 +120,9 @@ describe('MCP toolsets', () => {
 
   it('tools/list advertises registry annotations', async () => {
     const sessionId = await openSession();
-    const { tools } = (await rpc(sessionId, 'tools/list', {})) as {
-      tools: { name: string; annotations?: { readOnlyHint?: boolean } }[];
-    };
-    expect(tools.find((tool) => tool.name === 'describe_scene')?.annotations?.readOnlyHint).toBe(
-      true,
-    );
-    expect(
-      tools.find((tool) => tool.name === 'add_box')?.annotations?.readOnlyHint,
-    ).toBeUndefined();
+    const { tools } = (await rpc(sessionId, 'tools/list', {})) as { tools: { name: string; annotations?: { readOnlyHint?: boolean } }[] };
+    expect(tools.find((tool) => tool.name === 'describe_scene')?.annotations?.readOnlyHint).toBe(true);
+    expect(tools.find((tool) => tool.name === 'add_box')?.annotations?.readOnlyHint).toBeUndefined();
   });
 
   it('tools/call refuses a tool of a disabled toolset and names it', async () => {
@@ -227,9 +160,7 @@ describe('MCP toolsets', () => {
       },
     })) as { isError?: boolean; content: { text?: string }[] };
     expect(result.isError).toBe(false);
-    expect(Object.values(getLiveDoc().entities).some((entity) => entity.kind === 'line')).toBe(
-      true,
-    );
+    expect(Object.values(getLiveDoc().entities).some((entity) => entity.kind === 'line')).toBe(true);
   });
 
   it('advertises the render_view enrichment params in the filtered list', async () => {
@@ -243,9 +174,7 @@ describe('MCP toolsets', () => {
 
   it('prompts/list hides workflows that need a disabled toolset', async () => {
     const sessionId = await openSession();
-    const { prompts } = (await rpc(sessionId, 'prompts/list', {})) as {
-      prompts: { name: string }[];
-    };
+    const { prompts } = (await rpc(sessionId, 'prompts/list', {})) as { prompts: { name: string }[] };
     const names = prompts.map((prompt) => prompt.name);
     expect(names).toContain('model_bracket');
     expect(names).not.toContain('design_building');

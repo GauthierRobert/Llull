@@ -1,8 +1,6 @@
 /**
- * Value validation of a raw (loaded) civil model: persistence rejects files with errors, so a
- * crafted or corrupt file can never reach regeneration with values it cannot evaluate.
- * @layer domain-aec/civil
- * @pure
+ * Value validation of a raw (loaded) civil model: persistence rejects files with errors, so a crafted or corrupt file can never reach
+ * regeneration with values it cannot evaluate.
  */
 
 import { type ProfilePvi, CIVIL_CATEGORIES } from '@core/model/civil';
@@ -16,8 +14,7 @@ import { MAX_SURFACE_POINTS } from './model';
 
 type Check = (object: Record<string, unknown>) => string | null;
 
-const optional = (value: unknown, test: (value: unknown) => boolean): boolean =>
-  value === undefined || test(value);
+const optional = (value: unknown, test: (value: unknown) => boolean): boolean => value === undefined || test(value);
 
 function isVecList(value: unknown, size: number, minimum: number): boolean {
   return (
@@ -38,11 +35,7 @@ function demand(condition: boolean, message: string): string | null {
 function profileError(value: unknown): string | null {
   if (!Array.isArray(value)) return 'profile must be an array';
   const valid = value.every(
-    (pvi) =>
-      isRecord(pvi) &&
-      isFiniteNumber(pvi['station']) &&
-      isFiniteNumber(pvi['elevation']) &&
-      isFiniteNumber(pvi['curveLength']),
+    (pvi) => isRecord(pvi) && isFiniteNumber(pvi['station']) && isFiniteNumber(pvi['elevation']) && isFiniteNumber(pvi['curveLength']),
   );
   if (!valid) return 'profile entries must be { station, elevation, curveLength } numbers';
   return value.length === 0 ? null : validateProfile(value as ProfilePvi[]);
@@ -91,14 +84,9 @@ const CHECKS: Readonly<Record<(typeof CIVIL_CATEGORIES)[number], readonly Check[
     (o) => demand(isStringList(o['pointGroupIds']), 'pointGroupIds must be strings'),
     (o) => demand(isVecList(o['extraPoints'], 3, 0), 'extraPoints must be [x, y, z] points'),
     (o) => demand(isPositiveNumber(o['contourInterval']), 'contourInterval must be > 0'),
+    (o) => demand(isFiniteNumber(o['majorEvery']) && (o['majorEvery'] as number) >= 0, 'bad majorEvery'),
     (o) =>
-      demand(isFiniteNumber(o['majorEvery']) && (o['majorEvery'] as number) >= 0, 'bad majorEvery'),
-    (o) =>
-      demand(
-        o['boundary'] === undefined ||
-          (isVecList(o['boundary'], 2, 3) && isValidPolygon(o['boundary'] as Vec2[])),
-        'bad boundary',
-      ),
+      demand(o['boundary'] === undefined || (isVecList(o['boundary'], 2, 3) && isValidPolygon(o['boundary'] as Vec2[])), 'bad boundary'),
     (o) => demand(optional(o['maxEdgeLength'], isPositiveNumber), 'maxEdgeLength must be > 0'),
   ],
   platform: [
@@ -109,25 +97,14 @@ const CHECKS: Readonly<Record<(typeof CIVIL_CATEGORIES)[number], readonly Check[
         'boundary must be a simple polygon of >= 3 [x, y] points',
       ),
     (o) => demand(isFiniteNumber(o['elevation']), 'elevation must be a number'),
-    (o) =>
-      demand(
-        isPositiveNumber(o['cutSlope']) && isPositiveNumber(o['fillSlope']),
-        'slopes must be > 0',
-      ),
+    (o) => demand(isPositiveNumber(o['cutSlope']) && isPositiveNumber(o['fillSlope']), 'slopes must be > 0'),
   ],
   alignment: [
     (o) => demand(isVecList(o['points'], 2, 2), 'points must have >= 2 [x, y] points'),
+    (o) => demand(Array.isArray(o['radii']) && (o['radii'] as unknown[]).every(isFiniteNumber), 'radii must be numbers'),
     (o) =>
       demand(
-        Array.isArray(o['radii']) && (o['radii'] as unknown[]).every(isFiniteNumber),
-        'radii must be numbers',
-      ),
-    (o) =>
-      demand(
-        optional(
-          o['spirals'],
-          (spirals) => Array.isArray(spirals) && spirals.every(isFiniteNumber),
-        ),
+        optional(o['spirals'], (spirals) => Array.isArray(spirals) && spirals.every(isFiniteNumber)),
         'spirals must be numbers',
       ),
     (o) =>
@@ -135,9 +112,7 @@ const CHECKS: Readonly<Record<(typeof CIVIL_CATEGORIES)[number], readonly Check[
         ? validateHorizontal(
             o['points'] as Vec2[],
             o['radii'] as number[],
-            Array.isArray(o['spirals']) && (o['spirals'] as unknown[]).every(isFiniteNumber)
-              ? (o['spirals'] as number[])
-              : [],
+            Array.isArray(o['spirals']) && (o['spirals'] as unknown[]).every(isFiniteNumber) ? (o['spirals'] as number[]) : [],
           )
         : null,
     (o) => demand(isFiniteNumber(o['startStation']), 'startStation must be a number'),
@@ -153,11 +128,7 @@ const CHECKS: Readonly<Record<(typeof CIVIL_CATEGORIES)[number], readonly Check[
   ],
   manhole: [
     (o) => demand(isVecList([o['position']], 2, 1), 'position must be [x, y]'),
-    (o) =>
-      demand(
-        isFiniteNumber(o['rimElevation']) && isFiniteNumber(o['invertElevation']),
-        'bad elevations',
-      ),
+    (o) => demand(isFiniteNumber(o['rimElevation']) && isFiniteNumber(o['invertElevation']), 'bad elevations'),
     (o) => demand(isPositiveNumber(o['diameter']), 'diameter must be > 0'),
     (o) =>
       demand(
@@ -186,11 +157,7 @@ const CHECKS: Readonly<Record<(typeof CIVIL_CATEGORIES)[number], readonly Check[
   pipe: [
     (o) => demand(typeof o['fromId'] === 'string' && typeof o['toId'] === 'string', 'bad ends'),
     (o) => demand(typeof o['material'] === 'string', 'material must be a string'),
-    (o) =>
-      demand(
-        isPositiveNumber(o['diameter']) && isPositiveNumber(o['manningN']),
-        'bad diameter / n',
-      ),
+    (o) => demand(isPositiveNumber(o['diameter']) && isPositiveNumber(o['manningN']), 'bad diameter / n'),
     (o) => demand(isFiniteNumber(o['invertFrom']) && isFiniteNumber(o['invertTo']), 'bad inverts'),
   ],
 };
@@ -206,9 +173,7 @@ function pointTotalErrors(objects: Record<string, unknown>): string[] {
     const groups = Array.isArray(object['pointGroupIds']) ? object['pointGroupIds'] : [];
     const extra = Array.isArray(object['extraPoints']) ? object['extraPoints'].length : 0;
     const total = groups.reduce((sum: number, group) => sum + groupSize(group), extra);
-    if (total > MAX_SURFACE_POINTS) {
-      errors.push(`civil.objects.${id}: ${total} points exceed the ${MAX_SURFACE_POINTS} limit`);
-    }
+    if (total > MAX_SURFACE_POINTS) errors.push(`civil.objects.${id}: ${total} points exceed the ${MAX_SURFACE_POINTS} limit`);
   }
   return errors;
 }
@@ -220,9 +185,7 @@ function crsErrors(raw: unknown): string[] {
   if (!optional(raw['epsg'], (code) => Number.isInteger(code) && (code as number) > 0)) {
     errors.push('civil.crs.epsg must be a positive integer');
   }
-  if (!optional(raw['verticalDatum'], (datum) => typeof datum === 'string')) {
-    errors.push('civil.crs.verticalDatum must be a string');
-  }
+  if (!optional(raw['verticalDatum'], (datum) => typeof datum === 'string')) errors.push('civil.crs.verticalDatum must be a string');
   const calibration = raw['calibration'];
   if (
     calibration !== undefined &&
@@ -246,8 +209,7 @@ export function civilErrors(raw: unknown): string[] {
   if (!isRecord(objects)) return ['civil.objects must be an object'];
   if (!isStringList(order)) return ['civil.order must be an array of ids'];
   const counters = raw['counters'];
-  if (!isRecord(counters) || !Object.values(counters).every(isFiniteNumber))
-    return ['civil.counters must map prefixes to numbers'];
+  if (!isRecord(counters) || !Object.values(counters).every(isFiniteNumber)) return ['civil.counters must map prefixes to numbers'];
   const errors: string[] = crsErrors(raw['crs']);
   const ids = order as string[];
   if (new Set(ids).size !== ids.length) errors.push('civil.order lists an id twice');

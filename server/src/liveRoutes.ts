@@ -1,7 +1,5 @@
 /**
- * @layer server
- * The shared live document over REST + SSE (protocol: `@mcp/liveSync`).
- *
+ * The live document over REST + SSE (protocol: `@mcp/liveSync`).
  *   GET  /live           SSE: `snapshot` on connect / undo / redo; `command` per mutation.
  *                        guardRead: Bearer or `?access_token=` (EventSource cannot set headers).
  *   GET  /live/snapshot  `{ seq, stateHash, document }` for resync after a gap or hash mismatch
@@ -12,28 +10,19 @@
 import { Router, type RequestHandler } from 'express';
 import { isRecord } from '@lib/isRecord';
 import { applyCommand, undo, redo } from './commandBus';
-import {
-  subscribeLive,
-  getLiveSnapshot,
-  liveSubscriberCount,
-  MAX_LIVE_SUBSCRIBERS,
-} from './liveDocument';
+import { subscribeLive, getLiveSnapshot, liveSubscriberCount, MAX_LIVE_SUBSCRIBERS } from './liveDocument';
 import { guardMutation, guardRead } from './security';
 import { actorOf } from './audit';
 
 const KEEPALIVE_MS = 25_000;
 
-/** @param restLimiter shared REST rate limiter (one counter across every REST route). */
 export function buildLiveRouter(restLimiter: RequestHandler): Router {
   const router = Router();
   const mutationGuard = guardMutation();
   const readGuard = guardRead();
 
   router.get('/live', restLimiter, readGuard, (req, res) => {
-    if (liveSubscriberCount() >= MAX_LIVE_SUBSCRIBERS) {
-      res.status(503).json({ error: 'Too many live subscribers.' });
-      return;
-    }
+    if (liveSubscriberCount() >= MAX_LIVE_SUBSCRIBERS) return void res.status(503).json({ error: 'Too many live subscribers.' });
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -47,35 +36,22 @@ export function buildLiveRouter(restLimiter: RequestHandler): Router {
     });
   });
 
-  router.get('/live/snapshot', restLimiter, readGuard, (_req, res) => {
-    res.status(200).json(getLiveSnapshot());
-  });
+  router.get('/live/snapshot', restLimiter, readGuard, (_req, res) => void res.status(200).json(getLiveSnapshot()));
 
   router.post('/command', restLimiter, mutationGuard, (req, res) => {
     const body = req.body as unknown;
-    if (!isRecord(body) || !('name' in body)) {
-      res.status(400).json({ error: 'Request body must be an object with a "name" field.' });
-      return;
-    }
+    if (!isRecord(body) || !('name' in body))
+      return void res.status(400).json({ error: 'Request body must be an object with a "name" field.' });
     const { name, params, commandId } = body;
-    if (typeof name !== 'string' || name.length === 0) {
-      res.status(400).json({ error: '"name" must be a non-empty string.' });
-      return;
-    }
+    if (typeof name !== 'string' || name.length === 0) return void res.status(400).json({ error: '"name" must be a non-empty string.' });
     if (commandId !== undefined && (typeof commandId !== 'string' || commandId.length === 0)) {
-      res.status(400).json({ error: '"commandId" must be a non-empty string when present.' });
-      return;
+      return void res.status(400).json({ error: '"commandId" must be a non-empty string when present.' });
     }
     res.status(200).json(applyCommand(name, params ?? {}, commandId, actorOf(res, 'rest')));
   });
 
-  router.post('/undo', restLimiter, mutationGuard, (_req, res) => {
-    res.status(200).json(undo(actorOf(res, 'rest')));
-  });
-
-  router.post('/redo', restLimiter, mutationGuard, (_req, res) => {
-    res.status(200).json(redo(actorOf(res, 'rest')));
-  });
+  router.post('/undo', restLimiter, mutationGuard, (_req, res) => void res.status(200).json(undo(actorOf(res, 'rest'))));
+  router.post('/redo', restLimiter, mutationGuard, (_req, res) => void res.status(200).json(redo(actorOf(res, 'rest'))));
 
   return router;
 }

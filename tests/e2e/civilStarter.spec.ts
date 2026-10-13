@@ -6,12 +6,9 @@ test('Civil site starter builds survey, terrain, pad, road and storm network', a
   await page.addInitScript(() => window.localStorage.clear());
   await page.goto('/');
   await page.getByRole('button', { name: /civil site starter/i }).click();
-
   const panel = page.getByTestId('civil-panel');
   await expect(panel).toBeVisible();
-  await expect(panel.getByRole('img', { name: '11 civil objects' })).toBeVisible({
-    timeout: 30_000,
-  });
+  await expect(panel.getByRole('img', { name: '11 civil objects' })).toBeVisible({ timeout: 30_000 });
   await expect(panel.getByLabel('1 point groups', { exact: true })).toBeVisible();
   await expect(panel.getByLabel('1 surfaces', { exact: true })).toBeVisible();
   await expect(panel.getByLabel('1 platforms', { exact: true })).toBeVisible();

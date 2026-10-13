@@ -1,5 +1,3 @@
-/** PanelParts: the shared list row, delete button and status line. */
-
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { DeleteButton, ListRow, StatusLine } from '@ui/panels/PanelParts';
@@ -20,16 +18,12 @@ describe('ListRow', () => {
     expect(row).toHaveClass('panel__row--selected');
     expect(row).toHaveAttribute('aria-current', 'true');
   });
-
   it('keeps row actions out of the main button and does not select on delete', () => {
     const onSelect = vi.fn();
     const onDelete = vi.fn();
     render(
       <ul>
-        <ListRow
-          onSelect={onSelect}
-          actions={<DeleteButton label="Delete wall W1" onDelete={onDelete} />}
-        >
+        <ListRow onSelect={onSelect} actions={<DeleteButton label="Delete wall W1" onDelete={onDelete} />}>
           W1
         </ListRow>
       </ul>,

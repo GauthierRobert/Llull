@@ -1,7 +1,4 @@
-/**
- * Curved (arc) walls: centreline arc through start, a point on the arc and end.
- * @layer domain-aec
- */
+/** Curved (arc) walls: centreline arc through start, a point on the arc and end. */
 
 import { toDegrees } from '@lib/angle';
 import type { CurvedWallElement } from '@core/model/building';
@@ -16,19 +13,16 @@ import { curvedWallArc, curvedWallBand, curvedWallLength } from '../geometry/cur
 import { levelIdParam } from '../levelParams';
 
 /**
- * @command add_curved_wall
- * @pure
  * @affects creates 1 curved wall (mesh on layer A-WALL)
  * @failure collinear points / thickness >= diameter / sizes <= 0 -> no-op
  */
 export const addCurvedWall = defineCommand({
   name: 'add_curved_wall',
   description:
-    'Add a curved (arc) wall on a level: its centreline is the circular arc from start through a point ' +
-    'on the arc to end (all [x, y]). Thickness, height (default: level height), base offset and ' +
-    'material as for draw_walls. Counted with the walls in quantities and schedules. Hosts doors and ' +
-    'windows (add_door / add_window with its id; offset = distance along the arc). Refused if the same ' +
-    'arc (either direction) and base offset already exists on the level.',
+    'Add a curved (arc) wall on a level: its centreline is the circular arc from start through a point on the arc to end (all [x, y]). ' +
+    'Thickness, height (default: level height), base offset and material as for draw_walls. Counted with the walls in quantities and ' +
+    'schedules. Hosts doors and windows (add_door / add_window with its id; offset = distance along the arc). Refused if the same arc ' +
+    '(either direction) and base offset already exists on the level.',
   params: z.object({
     start: vec2('Arc start [x, y].'),
     through: vec2('Any point on the arc between start and end [x, y] (sets the curvature).'),
@@ -44,8 +38,7 @@ export const addCurvedWall = defineCommand({
     if (!resolution.ok) return noop(doc, `add_curved_wall failed: ${resolution.reason}.`);
     const thickness = params.thickness ?? fromMm(doc, 200);
     const height = params.height ?? resolution.level.height;
-    if (thickness <= 0 || height <= 0)
-      return noop(doc, 'add_curved_wall failed: thickness and height must be > 0.');
+    if (thickness <= 0 || height <= 0) return noop(doc, 'add_curved_wall failed: thickness and height must be > 0.');
     const wall: CurvedWallElement = {
       id: nextElementId(resolution.building, 'curvedWall'),
       category: 'curvedWall',
@@ -61,10 +54,8 @@ export const addCurvedWall = defineCommand({
       material: params.material?.trim() || 'concrete',
     };
     const arc = curvedWallArc(wall);
-    if (!arc)
-      return noop(doc, 'add_curved_wall failed: start, through and end must not be collinear.');
-    if (!curvedWallBand(wall))
-      return noop(doc, 'add_curved_wall failed: thickness must be smaller than the diameter.');
+    if (!arc) return noop(doc, 'add_curved_wall failed: start, through and end must not be collinear.');
+    if (!curvedWallBand(wall)) return noop(doc, 'add_curved_wall failed: thickness must be smaller than the diameter.');
     const twin = findTwin(
       resolution.building,
       'curvedWall',
@@ -74,8 +65,7 @@ export const addCurvedWall = defineCommand({
         samePoint(element.through, wall.through) &&
         sameSegment(element.start, element.end, wall.start, wall.end),
     );
-    if (twin)
-      return noop(doc, duplicateSummary('add_curved_wall', twin, 'a curved wall on this arc'));
+    if (twin) return noop(doc, duplicateSummary('add_curved_wall', twin, 'a curved wall on this arc'));
     return commitBuilding(
       doc,
       withElement(resolution.building, wall),

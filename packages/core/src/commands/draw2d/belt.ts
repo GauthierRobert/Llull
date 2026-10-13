@@ -15,15 +15,12 @@ import { noop } from '../noop';
 import { elementAt } from '../../lib/elementAt';
 import type { Vec2 as Point } from '../../model/vectors';
 
-/** One pulley/sprocket specification: center in local 2D frame + radius. */
-interface PulleySpec {
-  center: [number, number];
-  radius: number;
-}
+/** Pulley/sprocket: center in the local 2D frame + radius. */
+type PulleySpec = { center: [number, number]; radius: number };
 
 /**
- * The two external tangent points of a pair of circles (same-side, "open belt" convention): [tp1, tp2]
- * on `p1` and `p2`, on the CCW outer envelope side (angle = θ + π/2 + α, α = asin((r1−r2)/d)).
+ * The two external tangent points of a pair of circles (same-side, "open belt" convention): [tp1, tp2] on `p1` and `p2`, on the CCW outer
+ * envelope side (angle = θ + π/2 + α, α = asin((r1−r2)/d)).
  * @invariant centers distinct and neither circle inside the other (checked by the caller)
  */
 function externalTangentPoints(p1: PulleySpec, p2: PulleySpec): readonly [Point, Point] {
@@ -48,9 +45,6 @@ function ccwSweep(startAngle: number, endAngle: number): number {
 }
 
 /**
- * @command draw_belt_around
- * @pure
- * @layer core/commands
  * @affects creates 1 closed polyline entity tracing the belt/chain centerline
  * @invariant pulleys.length >= 2; each radius > 0; no coincident centers; no pulley inside another
  * @failure pulleys < 2, non-positive radius, non-finite inputs, coincident centers, pulley-inside-pulley -> no-op, affected:[]
@@ -64,19 +58,16 @@ export const drawBeltAround = defineCommand({
     'same-direction rotation convention, CCW outer envelope), then samples the wrap arc on each pulley ' +
     'between the two tangent touch-points. The result is one `polyline` with `closed: true`. ' +
     'pulleys is an ordered array of {center:[x,y], radius} objects; the belt wraps them in that order ' +
-    'and closes back to the first. ' +
-    'arcSamples controls chord resolution per wrap arc (default 12, minimum 2). ' +
+    'and closes back to the first. arcSamples controls chord resolution per wrap arc (default 12, minimum 2). ' +
     'position/rotation place the entity in 3D world space (default [0,0,0]). ' +
     'Fails gracefully (no-op) when: fewer than 2 pulleys, non-positive or non-finite radius, ' +
-    'non-finite center coordinates, coincident centers, or any pulley is contained inside another ' +
-    '(no external tangent exists).',
+    'non-finite center coordinates, coincident centers, or any pulley is contained inside another (no external tangent exists).',
   params: z.object({
     pulleys: z
       .array(z.record(z.string(), z.unknown()))
       .describe(
         'Ordered list of pulleys the belt wraps around. Each entry is an object ' +
-          '{ center: [x, y], radius: number } where center is a 2D point in the work plane ' +
-          'and radius is a finite positive number. ' +
+          '{ center: [x, y], radius: number } where center is a 2D point in the work plane and radius is a finite positive number. ' +
           'The belt wraps them in the given order and closes back to the first. Minimum 2 pulleys.',
       ),
     arcSamples: z
@@ -90,106 +81,58 @@ export const drawBeltAround = defineCommand({
   }),
   run: (
     doc,
-    {
-      pulleys: pulleyInput,
-      arcSamples = 12,
-      position = ORIGIN,
-      rotation = ORIGIN,
-      color = DEFAULT_DRAW_COLOR,
-      name,
-    },
+    { pulleys: pulleyInput, arcSamples = 12, position = ORIGIN, rotation = ORIGIN, color = DEFAULT_DRAW_COLOR, name },
   ): CommandResult => {
     const pulleys = pulleyInput as unknown as PulleySpec[];
     const n = pulleys.length;
     if (n < 2) return noop(doc, `draw_belt_around: requires at least 2 pulleys (got ${n}).`);
-
-    if (arcSamples < 2 || arcSamples > MAX_CURVE_SAMPLES) {
-      return noop(
-        doc,
-        `draw_belt_around: arcSamples must be a finite number in [2, ${MAX_CURVE_SAMPLES}] (got ${String(arcSamples)}).`,
-      );
-    }
+    if (arcSamples < 2 || arcSamples > MAX_CURVE_SAMPLES)
+      return noop(doc, `draw_belt_around: arcSamples must be a finite number in [2, ${MAX_CURVE_SAMPLES}] (got ${String(arcSamples)}).`);
     const samplesInt = Math.round(arcSamples);
-
     for (let i = 0; i < n; i++) {
       const p = elementAt(pulleys, i);
-      if (p.center.length < 2)
-        return noop(doc, `draw_belt_around: pulley[${i}] center must be a [x, y] array.`);
+      if (p.center.length < 2) return noop(doc, `draw_belt_around: pulley[${i}] center must be a [x, y] array.`);
       const [cx, cy] = p.center;
-      if (!Number.isFinite(cx) || !Number.isFinite(cy)) {
-        return noop(
-          doc,
-          `draw_belt_around: pulley[${i}] center contains non-finite coordinate (${cx}, ${cy}).`,
-        );
-      }
-      if (!Number.isFinite(p.radius) || p.radius <= 0) {
-        return noop(
-          doc,
-          `draw_belt_around: pulley[${i}] radius must be a finite positive number (got ${String(p.radius)}).`,
-        );
-      }
+      if (!Number.isFinite(cx) || !Number.isFinite(cy))
+        return noop(doc, `draw_belt_around: pulley[${i}] center contains non-finite coordinate (${cx}, ${cy}).`);
+      if (!Number.isFinite(p.radius) || p.radius <= 0)
+        return noop(doc, `draw_belt_around: pulley[${i}] radius must be a finite positive number (got ${String(p.radius)}).`);
     }
-
     for (let i = 0; i < n; i++) {
       const ni = (i + 1) % n;
       const p1 = elementAt(pulleys, i);
       const p2 = elementAt(pulleys, ni);
-      const dx = p2.center[0] - p1.center[0];
-      const dy = p2.center[1] - p1.center[1];
-      const d = len2([dx, dy]);
-      if (d === 0) {
-        return noop(
-          doc,
-          `draw_belt_around: pulleys[${i}] and pulleys[${ni}] have coincident centers.`,
-        );
-      }
-      if (d < Math.abs(p1.radius - p2.radius)) {
+      const d = len2([p2.center[0] - p1.center[0], p2.center[1] - p1.center[1]]);
+      if (d === 0) return noop(doc, `draw_belt_around: pulleys[${i}] and pulleys[${ni}] have coincident centers.`);
+      if (d < Math.abs(p1.radius - p2.radius))
         return noop(
           doc,
           `draw_belt_around: pulley[${ni}] is inside pulley[${i}] (d=${compactNumber(d)} < |r1−r2|=${compactNumber(Math.abs(p1.radius - p2.radius))}); no external tangent.`,
         );
-      }
     }
-
     // tangentPairs[i] = [outgoing TP on pulleys[i], incoming TP on pulleys[(i+1)%n]]
-    const tangentPairs = pulleys.map((pulley, i) =>
-      externalTangentPoints(pulley, elementAt(pulleys, (i + 1) % n)),
-    );
-
+    const tangentPairs = pulleys.map((pulley, i) => externalTangentPoints(pulley, elementAt(pulleys, (i + 1) % n)));
     const points: Point[] = [];
     let totalLength = 0;
     for (let i = 0; i < n; i++) {
       const ni = (i + 1) % n;
       const [outTP, inTP] = elementAt(tangentPairs, i);
       points.push(outTP);
-
-      const tdx = inTP[0] - outTP[0];
-      const tdy = inTP[1] - outTP[1];
-      totalLength += len2([tdx, tdy]);
-
+      totalLength += len2([inTP[0] - outTP[0], inTP[1] - outTP[1]]);
       // Wrap arc on pulleys[ni] from its incoming tangent point to its outgoing one.
       const pni = elementAt(pulleys, ni);
       const outTPni = elementAt(tangentPairs, ni)[0];
       const inAngle = Math.atan2(inTP[1] - pni.center[1], inTP[0] - pni.center[0]);
-      const outAngle = Math.atan2(outTPni[1] - pni.center[1], outTPni[0] - pni.center[0]);
-      points.push(
-        ...sampleArc(pni.center, pni.radius, inAngle, ccwSweep(inAngle, outAngle), samplesInt),
-      );
-      totalLength += pni.radius * ccwSweep(inAngle, outAngle);
+      const sweep = ccwSweep(inAngle, Math.atan2(outTPni[1] - pni.center[1], outTPni[0] - pni.center[0]));
+      points.push(...sampleArc(pni.center, pni.radius, inAngle, sweep, samplesInt));
+      totalLength += pni.radius * sweep;
     }
-
     const { minX, minY, maxX, maxY } = pointsExtent(points);
-
     const id = nextId('belt');
-    const entity = newEntity(
-      'polyline',
-      id,
-      { points, closed: true },
-      finiteVec3OrZero(position, true),
-      color,
-      { rotation: finiteVec3OrZero(rotation, true), name },
-    );
-
+    const entity = newEntity('polyline', id, { points, closed: true }, finiteVec3OrZero(position, true), color, {
+      rotation: finiteVec3OrZero(rotation, true),
+      name,
+    });
     return commitEntity(
       doc,
       entity,

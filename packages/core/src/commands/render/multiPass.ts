@@ -1,7 +1,6 @@
 /**
- * @layer core/commands
- * Multi-pass render_view compositions: turntable strip, isolate, section. Each re-renders
- * partial / transformed copies of the document; the input document is never mutated.
+ * Multi-pass render_view compositions: turntable strip, isolate, section. Each re-renders partial / transformed copies of the document; the
+ * input document is never mutated.
  */
 
 import type { CadDocument, Vec3 } from '../../model/types';
@@ -68,10 +67,7 @@ function rotateCut(cut: CutSpec, cx: number, cy: number, angleRad: number): CutS
       const pointOffset = offset / (lengthSq || 1);
       const p: Vec3 = [nx * pointOffset - cx, ny * pointOffset - cy, nz * pointOffset];
       const moved: Vec3 = [cx + cos * p[0] - sin * p[1], cy + sin * p[0] + cos * p[1], p[2]];
-      return {
-        normal: turned,
-        offset: dot3(turned, moved),
-      };
+      return { normal: turned, offset: dot3(turned, moved) };
     }),
   };
 }
@@ -105,10 +101,7 @@ export function buildTurntableSvg(
     );
   }
   const totalWidth = width * frames;
-  return {
-    svg: svgDocument(totalWidth, height, [...layers, ...angleLabels], backgroundOf(options)),
-    width: totalWidth,
-  };
+  return { svg: svgDocument(totalWidth, height, [...layers, ...angleLabels], backgroundOf(options)), width: totalWidth };
 }
 
 /** Highlighted entities at full color over the rest at low opacity, with an ISOLATED caption. */
@@ -147,8 +140,7 @@ export function buildSectionSvg(
   options: RenderOptions = {},
 ): string {
   const axisIndex = 'xyz'.indexOf(axis);
-  const onKeptSide = (id: string): boolean =>
-    (doc.entities[id]?.position[axisIndex] ?? 0) >= offset;
+  const onKeptSide = (id: string): boolean => (doc.entities[id]?.position[axisIndex] ?? 0) >= offset;
   const kept = renderSubset(doc, onKeptSide, view, width, height, options);
   const cut = renderSubset(doc, (id) => !onKeptSide(id), view, width, height, options);
   return svgDocument(
@@ -168,12 +160,7 @@ function sectionPlaneLine(data: RenderViewData, axis: 'x' | 'y' | 'z', offset: n
   const { bounds } = data;
   const ext = bounds ? boundsExtent(bounds) * 1.5 : 10;
   const [cx, cy, cz] = bounds ? boundsCenter(bounds) : ORIGIN;
-  const along = (t: number): Vec3 =>
-    axis === 'z'
-      ? [cx + t, cy, offset]
-      : axis === 'y'
-        ? [cx + t, offset, cz]
-        : [offset, cy + t, cz];
+  const along = (t: number): Vec3 => (axis === 'z' ? [cx + t, cy, offset] : axis === 'y' ? [cx + t, offset, cz] : [offset, cy + t, cz]);
   const project = makeProjector(data.camera, data.orthoHalf, data.width, data.height);
   const s0 = project(along(-ext));
   const s1 = project(along(ext));

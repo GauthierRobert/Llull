@@ -1,58 +1,29 @@
-/**
- * Slabs, columns, beams and stairs.
- * @layer domain-aec
- */
+/** Slabs, columns, beams and stairs. */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
-import type {
-  BeamElement,
-  BuildingModel,
-  ColumnElement,
-  SlabElement,
-  StairElement,
-  WallElement,
-} from '@core/model/building';
+import type { BeamElement, BuildingModel, ColumnElement, SlabElement, StairElement, WallElement } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, vec2 } from '@core/commands/schema';
 import { distance, isValidPolygon, offsetPolygon } from '@lib/polygon';
 import { fromMm, toMm } from '@core/model/units';
 import { planAreaM2 } from '../../shared/planArea';
-import {
-  getBuilding,
-  isVec2List,
-  nextElementId,
-  nextMark,
-  resolveLevel,
-  toVec2,
-  withElement,
-  levelElementsOf,
-} from '../model';
+import { getBuilding, isVec2List, nextElementId, nextMark, resolveLevel, toVec2, withElement, levelElementsOf } from '../model';
 import { noop } from '@core/commands/noop';
-import {
-  duplicateSummary,
-  findTwin,
-  samePoint,
-  sameRing,
-  sameSegment,
-} from '../../shared/duplicates';
+import { duplicateSummary, findTwin, samePoint, sameRing, sameSegment } from '../../shared/duplicates';
 import { commitBuilding } from '../evaluate/evaluateElements';
 import { levelIdParam } from '../levelParams';
 
 const concreteMaterialParam = z.string().optional().describe('Material. Default concrete.');
 
 /**
- * Drops walls with a free endpoint (one touching no other wall's endpoint) until none remain —
- * removes partitions T-joined to a perimeter so the enclosing loop is left.
+ * Drops walls with a free endpoint (one touching no other wall's endpoint) until none remain — removes partitions T-joined to a perimeter
+ * so the enclosing loop is left.
  */
 function pruneDanglingWalls(walls: ReadonlyArray<WallElement>, tolerance: number): WallElement[] {
   let kept = [...walls];
   for (;;) {
     const joined = (point: Vec2, self: WallElement): boolean =>
-      kept.some(
-        (other) =>
-          other !== self &&
-          (distance(other.start, point) <= tolerance || distance(other.end, point) <= tolerance),
-      );
+      kept.some((other) => other !== self && (distance(other.start, point) <= tolerance || distance(other.end, point) <= tolerance));
     const next = kept.filter((wall) => joined(wall.start, wall) && joined(wall.end, wall));
     if (next.length === kept.length) return kept;
     kept = next;
@@ -72,10 +43,7 @@ export function wallLoop(walls: ReadonlyArray<WallElement>): Vec2[] | null {
   const loop: Vec2[] = [first.start];
   let cursor = first.end;
   while (remaining.length > 0) {
-    const index = remaining.findIndex(
-      (wall) =>
-        distance(wall.start, cursor) <= tolerance || distance(wall.end, cursor) <= tolerance,
-    );
+    const index = remaining.findIndex((wall) => distance(wall.start, cursor) <= tolerance || distance(wall.end, cursor) <= tolerance);
     if (index < 0) return null;
     const wall = remaining.splice(index, 1)[0] as WallElement;
     loop.push(cursor);
@@ -107,14 +75,8 @@ function resolveOutline(
     };
   }
   const walls = (source.wallIds ?? []).map((id) => building.elements[id]);
-  if (
-    source.wallIds === undefined ||
-    !walls.every((wall): wall is WallElement => wall?.category === 'wall')
-  ) {
-    return { outline: null };
-  }
-  if (new Set(walls.map((wall) => wall.levelId)).size > 1)
-    return { outline: null, failure: 'wallIds belong to different levels' };
+  if (source.wallIds === undefined || !walls.every((wall): wall is WallElement => wall?.category === 'wall')) return { outline: null };
+  if (new Set(walls.map((wall) => wall.levelId)).size > 1) return { outline: null, failure: 'wallIds belong to different levels' };
   const loop = wallLoop(walls);
   const shift = wallShift(Math.max(...walls.map((wall) => wall.thickness)) / 2);
   const outline = loop ? (shift === 0 ? loop : offsetPolygon(loop, shift)) : null;
@@ -130,25 +92,15 @@ export function outlineOrNoop(
   tool: string,
   dropRepeatedPoints = false,
 ): { outline: Vec2[]; wallLevelId: string | undefined } | CommandResult {
-  const { outline, wallLevelId, failure } = resolveOutline(
-    building,
-    source,
-    wallShift,
-    dropRepeatedPoints,
-  );
+  const { outline, wallLevelId, failure } = resolveOutline(building, source, wallShift, dropRepeatedPoints);
   if (failure) return noop(doc, `${tool} failed: ${failure}.`);
   if (!outline || !isValidPolygon(outline)) {
-    return noop(
-      doc,
-      `${tool} failed: give a boundary of ≥ 3 non-collinear [x, y] points, or wallIds forming a closed loop.`,
-    );
+    return noop(doc, `${tool} failed: give a boundary of ≥ 3 non-collinear [x, y] points, or wallIds forming a closed loop.`);
   }
   return { outline, wallLevelId };
 }
 
 /**
- * @command add_slab
- * @pure
  * @affects creates 1 slab (extrusion on layer S-SLAB)
  * @failure no valid boundary / walls not a closed loop / thickness <= 0 -> no-op
  */
@@ -159,14 +111,8 @@ export const addSlab = defineCommand({
     'a plan boundary polygon or wallIds forming a closed loop (edge at the wall centerlines by default, see wallFace). ' +
     'Refused if a slab with the same outline, offset and role already exists on the level.',
   params: z.object({
-    boundary: z
-      .array(z.array(z.number()))
-      .optional()
-      .describe('Closed plan polygon [[x, y], …] (≥ 3 vertices).'),
-    wallIds: z
-      .array(z.string())
-      .optional()
-      .describe('Alternative to boundary: wall ids forming a closed loop.'),
+    boundary: z.array(z.array(z.number())).optional().describe('Closed plan polygon [[x, y], …] (≥ 3 vertices).'),
+    wallIds: z.array(z.string()).optional().describe('Alternative to boundary: wall ids forming a closed loop.'),
     wallFace: z
       .enum(['outer', 'center', 'inner'])
       .optional()
@@ -174,35 +120,12 @@ export const addSlab = defineCommand({
         'With wallIds: slab edge at the outer wall faces, the wall centerlines (default — the slab bears into the walls), or the inner faces.',
       ),
     levelId: levelIdParam,
-    thickness: z
-      .number()
-      .optional()
-      .describe('Slab thickness (> 0), in document units. Default 200 mm.'),
-    offset: z
-      .number()
-      .optional()
-      .describe(
-        'Top-of-slab offset from the level elevation. Default 0 (roof: put it on the level above).',
-      ),
-    role: z
-      .enum(['floor', 'roof', 'foundation'])
-      .optional()
-      .describe('Slab role used in schedules and IFC. Default floor.'),
+    thickness: z.number().optional().describe('Slab thickness (> 0), in document units. Default 200 mm.'),
+    offset: z.number().optional().describe('Top-of-slab offset from the level elevation. Default 0 (roof: put it on the level above).'),
+    role: z.enum(['floor', 'roof', 'foundation']).optional().describe('Slab role used in schedules and IFC. Default floor.'),
     material: concreteMaterialParam,
   }),
-  run: (
-    doc,
-    {
-      boundary,
-      wallIds,
-      wallFace = 'center',
-      levelId,
-      thickness,
-      offset = 0,
-      role = 'floor',
-      material,
-    },
-  ): CommandResult => {
+  run: (doc, { boundary, wallIds, wallFace = 'center', levelId, thickness, offset = 0, role = 'floor', material }): CommandResult => {
     const building = getBuilding(doc);
     const resolved = outlineOrNoop(
       doc,
@@ -222,11 +145,9 @@ export const addSlab = defineCommand({
       resolution.building,
       'slab',
       resolution.level.id,
-      (element) =>
-        element.offset === offset && element.role === role && sameRing(element.boundary, outline),
+      (element) => element.offset === offset && element.role === role && sameRing(element.boundary, outline),
     );
-    if (slabTwin)
-      return noop(doc, duplicateSummary('add_slab', slabTwin, 'a slab with this outline'));
+    if (slabTwin) return noop(doc, duplicateSummary('add_slab', slabTwin, 'a slab with this outline'));
     const slab: SlabElement = {
       id: nextElementId(resolution.building, 'slab'),
       category: 'slab',
@@ -262,10 +183,8 @@ export function gridIntersections(building: BuildingModel): Vec2[] {
       const d2: Vec2 = [b.end[0] - b.start[0], b.end[1] - b.start[1]];
       const denominator = d1[0] * d2[1] - d1[1] * d2[0];
       if (Math.abs(denominator) < 1e-12) continue;
-      const t =
-        ((b.start[0] - a.start[0]) * d2[1] - (b.start[1] - a.start[1]) * d2[0]) / denominator;
-      const u =
-        ((b.start[0] - a.start[0]) * d1[1] - (b.start[1] - a.start[1]) * d1[0]) / denominator;
+      const t = ((b.start[0] - a.start[0]) * d2[1] - (b.start[1] - a.start[1]) * d2[0]) / denominator;
+      const u = ((b.start[0] - a.start[0]) * d1[1] - (b.start[1] - a.start[1]) * d1[0]) / denominator;
       if (t < 0 || t > 1 || u < 0 || u > 1) continue;
       points.push([a.start[0] + t * d1[0], a.start[1] + t * d1[1]]);
     }
@@ -274,8 +193,6 @@ export function gridIntersections(building: BuildingModel): Vec2[] {
 }
 
 /**
- * @command add_column
- * @pure
  * @affects creates 1 column, or one per grid intersection
  * @failure no location and no grid intersections / invalid size -> no-op
  */
@@ -287,36 +204,17 @@ export const addColumn = defineCommand({
     'Locations that already hold a column on the level are skipped (listed in the summary); refused when all are occupied.',
   params: z.object({
     location: vec2('Column center [x, y].').optional(),
-    atGridIntersections: z
-      .boolean()
-      .optional()
-      .describe('Place one column at every grid-axis intersection instead of at location.'),
-    shape: z
-      .enum(['rectangular', 'circular'])
-      .optional()
-      .describe('Section shape. Default rectangular.'),
-    width: z
-      .number()
-      .optional()
-      .describe('Section width (diameter if circular), in document units. Default 300 mm.'),
-    depth: z
-      .number()
-      .optional()
-      .describe('Section depth (rectangular), in document units. Default = width.'),
-    height: z
-      .number()
-      .optional()
-      .describe('Column height, in document units. Default: the level height.'),
+    atGridIntersections: z.boolean().optional().describe('Place one column at every grid-axis intersection instead of at location.'),
+    shape: z.enum(['rectangular', 'circular']).optional().describe('Section shape. Default rectangular.'),
+    width: z.number().optional().describe('Section width (diameter if circular), in document units. Default 300 mm.'),
+    depth: z.number().optional().describe('Section depth (rectangular), in document units. Default = width.'),
+    height: z.number().optional().describe('Column height, in document units. Default: the level height.'),
     levelId: levelIdParam,
     material: concreteMaterialParam,
   }),
   run: (doc, params): CommandResult => {
     const building = getBuilding(doc);
-    const locations = params.atGridIntersections
-      ? gridIntersections(building)
-      : params.location
-        ? [params.location]
-        : [];
+    const locations = params.atGridIntersections ? gridIntersections(building) : params.location ? [params.location] : [];
     if (locations.length === 0) {
       return noop(
         doc,
@@ -336,9 +234,7 @@ export const addColumn = defineCommand({
     const ids: string[] = [];
     const existing = levelElementsOf(next, 'column', resolution.level.id);
     const occupied = (location: Vec2): ColumnElement | undefined =>
-      existing.find(
-        (column) => column.location[0] === location[0] && column.location[1] === location[1],
-      );
+      existing.find((column) => column.location[0] === location[0] && column.location[1] === location[1]);
     const skipped = locations.flatMap((location) => {
       const twin = occupied(location);
       return twin ? [`[${location.join(', ')}] (${twin.id})`] : [];
@@ -372,17 +268,13 @@ export const addColumn = defineCommand({
       next,
       ids,
       `Added ${ids.length} ${shape} column(s) ${ids.join(', ')} on ${resolution.level.name}.` +
-        (skipped.length > 0
-          ? ` Skipped ${skipped.length} occupied location(s): ${skipped.join(', ')}.`
-          : ''),
+        (skipped.length > 0 ? ` Skipped ${skipped.length} occupied location(s): ${skipped.join(', ')}.` : ''),
       { elementIds: ids },
     );
   },
 });
 
 /**
- * @command add_beam
- * @pure
  * @affects creates 1 beam (box on layer S-BEAM)
  * @failure zero length / size <= 0 -> no-op
  */
@@ -397,28 +289,22 @@ export const addBeam = defineCommand({
     end: vec2('Beam axis end [x, y].'),
     width: z.number().optional().describe('Section width, in document units. Default 300 mm.'),
     depth: z.number().optional().describe('Section depth, in document units. Default 500 mm.'),
-    topOffset: z
-      .number()
-      .optional()
-      .describe('Offset of the beam top from the top of the level, in document units. Default 0.'),
+    topOffset: z.number().optional().describe('Offset of the beam top from the top of the level, in document units. Default 0.'),
     levelId: levelIdParam,
     material: concreteMaterialParam,
   }),
   run: (doc, { start, end, width, depth, topOffset = 0, levelId, material }): CommandResult => {
-    if (distance(start, end) <= 0)
-      return noop(doc, 'add_beam failed: start and end must be distinct [x, y] points.');
+    if (distance(start, end) <= 0) return noop(doc, 'add_beam failed: start and end must be distinct [x, y] points.');
     const resolvedWidth = width ?? fromMm(doc, 300);
     const resolvedDepth = depth ?? fromMm(doc, 500);
-    if (resolvedWidth <= 0 || resolvedDepth <= 0)
-      return noop(doc, 'add_beam failed: width and depth must be > 0.');
+    if (resolvedWidth <= 0 || resolvedDepth <= 0) return noop(doc, 'add_beam failed: width and depth must be > 0.');
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noop(doc, `add_beam failed: ${resolution.reason}.`);
     const twin = findTwin(
       resolution.building,
       'beam',
       resolution.level.id,
-      (element) =>
-        element.topOffset === topOffset && sameSegment(element.start, element.end, start, end),
+      (element) => element.topOffset === topOffset && sameSegment(element.start, element.end, start, end),
     );
     if (twin) return noop(doc, duplicateSummary('add_beam', twin, 'a beam over this span'));
     const beam: BeamElement = {
@@ -447,44 +333,25 @@ export const addBeam = defineCommand({
 const MAX_RISERS = 200;
 
 /**
- * @command add_stair
- * @pure
  * @affects creates riserCount step solids on layer A-FLOR-STRS
  * @failure invalid start / riserCount < 2 / sizes <= 0 -> no-op
  */
 export const addStair = defineCommand({
   name: 'add_stair',
   description:
-    'Add a straight-run stair climbing one full level. Riser count defaults to the level height ÷ 175 mm ' +
-    '(rounded up), so risers are equal; tread default 280 mm. The summary reports the Blondel rule ' +
-    '(2R + G, comfortable between 600 and 650 mm). Refused above 200 risers or if a stair with the same ' +
-    'start and angle already exists on the level.',
+    'Add a straight-run stair climbing one full level. Riser count defaults to the level height ÷ 175 mm (rounded up), so risers are ' +
+    'equal; tread default 280 mm. The summary reports the Blondel rule (2R + G, comfortable between 600 and 650 mm). Refused above 200 ' +
+    'risers or if a stair with the same start and angle already exists on the level.',
   params: z.object({
     start: vec2('Plan point [x, y] at the middle of the first riser.'),
-    angle: z
-      .number()
-      .optional()
-      .describe(
-        'Run direction in radians, counter-clockwise from +X. Default 0 (climbs toward +X).',
-      ),
+    angle: z.number().optional().describe('Run direction in radians, counter-clockwise from +X. Default 0 (climbs toward +X).'),
     width: z.number().optional().describe('Stair width, in document units. Default 1000 mm.'),
-    riserCount: z
-      .number()
-      .optional()
-      .describe(
-        'Number of risers (integer, 2 to 200). Default: level height ÷ 175 mm, rounded up.',
-      ),
-    treadDepth: z
-      .number()
-      .optional()
-      .describe('Tread (going) depth, in document units. Default 280 mm.'),
+    riserCount: z.number().optional().describe('Number of risers (integer, 2 to 200). Default: level height ÷ 175 mm, rounded up.'),
+    treadDepth: z.number().optional().describe('Tread (going) depth, in document units. Default 280 mm.'),
     levelId: levelIdParam,
     material: concreteMaterialParam,
   }),
-  run: (
-    doc,
-    { start, angle = 0, width, riserCount, treadDepth, levelId, material },
-  ): CommandResult => {
+  run: (doc, { start, angle = 0, width, riserCount, treadDepth, levelId, material }): CommandResult => {
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noop(doc, `add_stair failed: ${resolution.reason}.`);
     const levelHeight = resolution.level.height;
@@ -492,10 +359,7 @@ export const addStair = defineCommand({
     const resolvedWidth = width ?? fromMm(doc, 1000);
     const resolvedTread = treadDepth ?? fromMm(doc, 280);
     if (!Number.isInteger(count) || count < 2 || resolvedWidth <= 0 || resolvedTread <= 0) {
-      return noop(
-        doc,
-        'add_stair failed: riserCount must be an integer ≥ 2, width and treadDepth > 0.',
-      );
+      return noop(doc, 'add_stair failed: riserCount must be an integer ≥ 2, width and treadDepth > 0.');
     }
     if (count > MAX_RISERS) {
       return noop(
@@ -510,12 +374,7 @@ export const addStair = defineCommand({
       resolution.level.id,
       (element) => element.angle === angle && samePoint(element.start, start),
     );
-    if (stairTwin) {
-      return noop(
-        doc,
-        duplicateSummary('add_stair', stairTwin, 'a stair from this start and angle'),
-      );
-    }
+    if (stairTwin) return noop(doc, duplicateSummary('add_stair', stairTwin, 'a stair from this start and angle'));
     const stair: StairElement = {
       id: nextElementId(resolution.building, 'stair'),
       category: 'stair',

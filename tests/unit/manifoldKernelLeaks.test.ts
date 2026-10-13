@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Entity, Vec3 } from '@core/model/types';
 import { meshOf, booleanMesh } from '../helpers/manifoldMesh';
+import { xy } from '../helpers/xy';
 
 interface Shape {
   delete(): void;
@@ -24,9 +25,7 @@ vi.mock('manifold-3d', async (importOriginal) => {
 
 /** Wrap every Manifold/CrossSection factory and derived-shape method; report what was never freed. */
 async function instrumentedKernel(): Promise<{
-  kernel: Awaited<
-    ReturnType<typeof import('@kernel-manifold/manifoldKernel').createManifoldKernel>
-  >;
+  kernel: Awaited<ReturnType<typeof import('@kernel-manifold/manifoldKernel').createManifoldKernel>>;
   leaked: () => number;
   created: () => number;
 }> {
@@ -36,7 +35,6 @@ async function instrumentedKernel(): Promise<{
   const created = new Set<Shape>();
   const deleted = new Set<Shape>();
   const derivedMethods = ['add', 'subtract', 'intersect', 'translate', 'rotate', 'extrude'];
-
   const track = (shape: Shape): Shape => {
     created.add(shape);
     const target = shape as unknown as Record<string, (...args: unknown[]) => unknown>;
@@ -53,7 +51,6 @@ async function instrumentedKernel(): Promise<{
     }
     return shape;
   };
-
   for (const factory of ['ofMesh', 'cube', 'cylinder', 'sphere']) {
     const original = loaded.Manifold[factory]!.bind(loaded.Manifold);
     loaded.Manifold[factory] = (...args: unknown[]): Shape => track(original(...args));
@@ -62,19 +59,11 @@ async function instrumentedKernel(): Promise<{
   loaded.CrossSection = function (...args: unknown[]): Shape {
     return track(new OriginalSection(...args));
   } as unknown as Loaded['CrossSection'];
-
-  return {
-    kernel,
-    leaked: () => [...created].filter((shape) => !deleted.has(shape)).length,
-    created: () => created.size,
-  };
+  return { kernel, leaked: () => [...created].filter((shape) => !deleted.has(shape)).length, created: () => created.size };
 }
 
 const common = { layerId: 'layer-default', color: '#888888' };
-const placed = (
-  position: Vec3,
-  rotation: Vec3 = [0.2, 0.1, 0.3],
-): Pick<Entity, 'position' | 'rotation' | 'layerId' | 'color'> => ({
+const placed = (position: Vec3, rotation: Vec3 = [0.2, 0.1, 0.3]): Pick<Entity, 'position' | 'rotation' | 'layerId' | 'color'> => ({
   position,
   rotation,
   ...common,
@@ -89,35 +78,16 @@ const entities = (position: Vec3): Entity[] =>
     {
       id: 'm',
       kind: 'mesh',
-      mesh: {
-        positions: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
-        indices: [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3],
-      },
+      mesh: { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1], indices: [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3] },
       ...placed(position),
     },
     { id: 'w', kind: 'wedge', size: [2, 2, 2], ...placed(position) },
     { id: 'p', kind: 'pyramid', baseWidth: 2, baseDepth: 2, height: 2, ...placed(position) },
-    {
-      id: 'e',
-      kind: 'extrusion',
-      profile: [
-        [0, 0],
-        [2, 0],
-        [2, 1],
-        [0, 1],
-      ],
-      depth: 2,
-      ...placed(position),
-    },
+    { id: 'e', kind: 'extrusion', profile: xy(0, 0, 2, 0, 2, 1, 0, 1), depth: 2, ...placed(position) },
     {
       id: 'r',
       kind: 'revolution',
-      profile: [
-        [1, 0],
-        [2, 0],
-        [2, 2],
-        [1, 2],
-      ],
+      profile: xy(1, 0, 2, 0, 2, 2, 1, 2),
       axis: [0, 0, 1],
       angle: Math.PI * 2,
       segments: 12,
@@ -149,7 +119,6 @@ describe('manifold kernel frees every WASM object', () => {
     kernel.clear();
     expect(leaked()).toBe(0);
   }, 120_000);
-
   it('frees objects on the failure paths too (open mesh, degenerate sizes, unsupported kinds)', async () => {
     const { kernel, leaked } = await instrumentedKernel();
     const openMesh = {
@@ -158,19 +127,8 @@ describe('manifold kernel frees every WASM object', () => {
       mesh: { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] },
       ...placed([0, 0, 0], [0, 0, 0]),
     } as unknown as Entity;
-    const flat = {
-      id: 'f',
-      kind: 'box',
-      size: [0, 1, 1],
-      ...placed([0, 0, 0]),
-    } as unknown as Entity;
-    const line = {
-      id: 'l',
-      kind: 'line',
-      start: [0, 0],
-      end: [1, 1],
-      ...placed([0, 0, 0]),
-    } as unknown as Entity;
+    const flat = { id: 'f', kind: 'box', size: [0, 1, 1], ...placed([0, 0, 0]) } as unknown as Entity;
+    const line = { id: 'l', kind: 'line', start: [0, 0], end: [1, 1], ...placed([0, 0, 0]) } as unknown as Entity;
     const [box] = entities([0, 0, 0]);
     for (const bad of [openMesh, flat, line]) {
       expect(meshOf(kernel, bad)).toBeNull();

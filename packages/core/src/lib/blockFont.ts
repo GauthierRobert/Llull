@@ -1,10 +1,6 @@
 /**
- * Built-in 5×7 block font and a text rasterizer (RGBA, transparent or solid background), used for
- * text decals so the viewport and the glTF export show identical pixels without a font engine.
- * Lower-case letters render as capitals; unknown characters render as a blank.
- *
- * @layer lib
- * @pure
+ * Built-in 5×7 block font and a text rasterizer (RGBA, transparent or solid background), used for text decals so the viewport and the glTF
+ * export show identical pixels without a font engine. Lower-case letters render as capitals; unknown characters render as a blank.
  */
 
 import { parseHexRgb } from './isHexColor';
@@ -80,8 +76,8 @@ function hexRgba(hex: string | undefined, alpha: number): Rgba {
 }
 
 /**
- * RGBA image of one line of `text` in `color` over `background` (transparent when absent).
- * Width/height are powers of two so the texture mipmaps; `aspect` is the inked width / height.
+ * RGBA image of one line of `text` in `color` over `background` (transparent when absent). Width/height are powers of two so the texture
+ * mipmaps; `aspect` is the inked width / height.
  */
 export function rasterizeText(
   text: string,
@@ -104,13 +100,7 @@ export function rasterizeText(
       const glyph = GLYPHS[chars[Math.floor((ix - 1) / CELL_W)] ?? ' '];
       const col = (ix - 1) % CELL_W;
       const row = iy - 1;
-      const on =
-        glyph !== undefined &&
-        ix >= 1 &&
-        col < 5 &&
-        row >= 0 &&
-        row < 7 &&
-        (((glyph[row] as number) >> (4 - col)) & 1) === 1;
+      const on = glyph !== undefined && ix >= 1 && col < 5 && row >= 0 && row < 7 && (((glyph[row] as number) >> (4 - col)) & 1) === 1;
       rgba.set(on ? fill : back, (y * width + x) * 4);
     }
   }

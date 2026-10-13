@@ -1,180 +1,39 @@
 /**
- * @layer mcp
- *
- * MCP toolsets — named domain groups of tools. A host exposes a subset of the registry
- * (e.g. `core,3d,measure`) to keep `tools/list` small for clients that load every schema.
- * Filtering is a VIEW of the registry: commands stay registered and callable through
- * `execute()` (build_project steps, UI) whatever the MCP toolsets.
- *
+ * MCP toolsets: named tool groups a host exposes (e.g. `core,3d,measure`) to keep `tools/list` small. A VIEW of
+ * the registry: every command stays callable through `execute()` (build_project steps, UI).
  * @invariant every registered command + exchange tool belongs to exactly one toolset
  * @invariant `core` is always enabled
- * @pure
  */
 
 import { pluginToolNames } from '@core/plugins/host';
 
-export const TOOLSET_NAMES = [
-  'core',
-  '2d',
-  '3d',
-  'measure',
-  'parametric',
-  'assembly',
-  'exchange',
-  'building',
-  'civil',
-] as const;
+export const TOOLSET_NAMES = ['core', '2d', '3d', 'measure', 'parametric', 'assembly', 'exchange', 'building', 'civil'] as const;
 
 export type ToolsetName = (typeof TOOLSET_NAMES)[number];
 
-/** Tool names per toolset. `building` is derived from the building command module. */
+const words = (list: string): readonly string[] => list.split(' ');
+
+/** Tool names per toolset; `building` / `civil` come from their plugins. */
 export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
-  core: [
-    'search_tools',
-    'enable_toolset',
-    'describe_scene',
-    'find_entities',
-    'build_project',
-    'check_model',
-    'render_view',
-    'set_units',
-    'load_document',
-    'clear_document',
-    'move_entities',
-    'rotate_entity',
-    'scale_entity',
-    'mirror_entity',
-    'duplicate_entities',
-    'delete_entities',
-    'array_linear',
-    'array_polar',
-    'group_entities',
-    'ungroup_entities',
-    'set_entity_name',
-    'align',
-    'distribute',
-    'stack_on',
-    'set_parameter',
-    'delete_parameter',
-    'add_layer',
-    'update_layer',
-    'set_entity_layer',
-    'delete_layer',
-    'set_camera',
-    'fit_view',
-  ],
-  '2d': [
-    'draw_polyline',
-    'draw_arc',
-    'draw_rectangle',
-    'draw_point',
-    'draw_ellipse',
-    'draw_spline',
-    'draw_involute',
-    'draw_belt_around',
-    'explode_polyline',
-    'offset_2d',
-    'trim',
-    'extend',
-    'fillet_2d',
-    'chamfer_2d',
-    'add_text',
-    'add_dimension',
-    'add_image_underlay',
-    'calibrate_underlay',
-    'set_underlay',
-    'image_to_world',
-  ],
-  '3d': [
-    'add_box',
-    'add_cylinder',
-    'add_sphere',
-    'add_cone',
-    'add_torus',
-    'add_helix_spring',
-    'add_bearing',
-    'add_wedge',
-    'add_pyramid',
-    'extrude_profile',
-    'revolve_profile',
-    'sweep_profile',
-    'loft_sections',
-    'boolean',
-    'blend_union',
-    'fillet_edge',
-    'chamfer_edge',
-    'shell_solid',
-    'inspect_topology',
-    'add_spur_gear',
-    'add_internal_gear',
-    'add_planetary_gearset',
-    'add_bevel_gear',
-    'add_bevel_gear_pair',
-    'add_spline_shaft',
-    'add_keyed_shaft',
-    'pattern_along_path',
-    'create_material',
-    'assign_material',
-    'add_decal',
-    'remove_decal',
-    'add_subdivision_solid',
-    'edit_subdivision_cage',
-    'surface_from_curves',
-  ],
-  measure: [
-    'measure_distance',
-    'measure_angle',
-    'measure_area',
-    'measure_perimeter',
-    'measure_bounding_box',
-    'mass_properties',
-  ],
-  parametric: [
-    'replay_history',
-    'set_step_suppressed',
-    'edit_step_params',
-    'reorder_step',
-    'delete_step',
-    'insert_step',
-    'create_configuration',
-    'activate_configuration',
-    'add_constraint',
-    'delete_constraint',
-    'update_constraint',
-    'solve_constraints',
-    'save_recipe',
-    'instantiate_recipe',
-  ],
-  assembly: [
-    'create_component',
-    'insert_instance',
-    'explode_instance',
-    'bill_of_materials',
-    'add_joint',
-    'delete_joint',
-    'set_joint_value',
-    'add_drive_relation',
-    'delete_drive_relation',
-    'evaluate_motion',
-    'bake_motion',
-    'motion_study',
-    'animate',
-    'stop_animation',
-  ],
-  exchange: [
-    'export_stl',
-    'export_obj',
-    'export_gltf',
-    'export_step_exact',
-    'export_code',
-    'apply_code_trace',
-    'import_mesh',
-    'import_dxf',
-    'export_step',
-    'import_step',
-    'import_dwg',
-    'import_code',
-  ],
+  core: words(
+    'search_tools enable_toolset describe_scene find_entities build_project check_model render_view set_units load_document clear_document move_entities rotate_entity scale_entity mirror_entity duplicate_entities delete_entities array_linear array_polar group_entities ungroup_entities set_entity_name align distribute stack_on set_parameter delete_parameter add_layer update_layer set_entity_layer delete_layer set_camera fit_view',
+  ),
+  '2d': words(
+    'draw_polyline draw_arc draw_rectangle draw_point draw_ellipse draw_spline draw_involute draw_belt_around explode_polyline offset_2d trim extend fillet_2d chamfer_2d add_text add_dimension add_image_underlay calibrate_underlay set_underlay image_to_world',
+  ),
+  '3d': words(
+    'add_box add_cylinder add_sphere add_cone add_torus add_helix_spring add_bearing add_wedge add_pyramid extrude_profile revolve_profile sweep_profile loft_sections boolean blend_union fillet_edge chamfer_edge shell_solid inspect_topology add_spur_gear add_internal_gear add_planetary_gearset add_bevel_gear add_bevel_gear_pair add_spline_shaft add_keyed_shaft pattern_along_path create_material assign_material add_decal remove_decal add_subdivision_solid edit_subdivision_cage surface_from_curves',
+  ),
+  measure: words('measure_distance measure_angle measure_area measure_perimeter measure_bounding_box mass_properties'),
+  parametric: words(
+    'replay_history set_step_suppressed edit_step_params reorder_step delete_step insert_step create_configuration activate_configuration add_constraint delete_constraint update_constraint solve_constraints save_recipe instantiate_recipe',
+  ),
+  assembly: words(
+    'create_component insert_instance explode_instance bill_of_materials add_joint delete_joint set_joint_value add_drive_relation delete_drive_relation evaluate_motion bake_motion motion_study animate stop_animation',
+  ),
+  exchange: words(
+    'export_stl export_obj export_gltf export_step_exact export_code apply_code_trace import_mesh import_dxf export_step import_step import_dwg import_code',
+  ),
   /** Contributed by the installed building + industrial plugins. */
   get building(): readonly string[] {
     return pluginToolNames('building');
@@ -186,13 +45,10 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
 };
 
 interface ParsedToolsets {
-  /** Enabled toolsets; always contains `core`. */
-  readonly enabled: ReadonlySet<ToolsetName>;
-  /** Requested names that are not toolsets (ignored). */
-  readonly unknown: readonly string[];
+  readonly enabled: ReadonlySet<ToolsetName>; // always contains `core`
+  readonly unknown: readonly string[]; // ignored
 }
 
-/** `value` names a toolset. */
 export function isToolsetName(value: string): value is ToolsetName {
   return (TOOLSET_NAMES as readonly string[]).includes(value);
 }
@@ -209,9 +65,10 @@ export function parseToolsets(raw: string | undefined): ParsedToolsets {
     .map((part) => part.trim().toLowerCase())
     .filter((part) => part.length > 0);
   const unknown = requested.filter((name) => name !== 'all' && !isToolsetName(name));
-  if (requested.includes('all')) return { enabled: new Set(TOOLSET_NAMES), unknown };
-  const enabled = new Set<ToolsetName>(['core', ...requested.filter(isToolsetName)]);
-  return { enabled, unknown };
+  return {
+    enabled: requested.includes('all') ? new Set(TOOLSET_NAMES) : new Set<ToolsetName>(['core', ...requested.filter(isToolsetName)]),
+    unknown,
+  };
 }
 
 /** The toolset a tool belongs to, or `undefined` for a tool no toolset lists. */
@@ -219,10 +76,7 @@ export function toolsetOf(toolName: string): ToolsetName | undefined {
   return TOOLSET_NAMES.find((toolset) => TOOLSETS[toolset].includes(toolName));
 }
 
-/**
- * True when `toolName` is exposed under `enabled`.
- * @invariant a tool no toolset lists is always enabled (fail open: never hide a new tool)
- */
+/** @invariant a tool no toolset lists is always enabled (fail open: never hide a new tool) */
 export function isToolEnabled(toolName: string, enabled: ReadonlySet<ToolsetName>): boolean {
   const toolset = toolsetOf(toolName);
   return toolset === undefined || enabled.has(toolset);

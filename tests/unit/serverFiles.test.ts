@@ -17,21 +17,16 @@ describe('serverFiles', () => {
     const fetchMock = vi.mocked(fetch);
     expect(String(fetchMock.mock.calls[0]?.[0])).toMatch(/\/export\/step\?name=my%20part$/);
   });
-
   it('fetchStepExport reports the server error, the HTTP status, or the offline hint', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ error: 'No Python.' }, 503)));
     expect(await fetchStepExport('m')).toEqual({ ok: false, message: 'No Python.' });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('oops', { status: 500 })));
-    expect(await fetchStepExport('m')).toEqual({
-      ok: false,
-      message: 'STEP export failed (HTTP 500).',
-    });
+    expect(await fetchStepExport('m')).toEqual({ ok: false, message: 'STEP export failed (HTTP 500).' });
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('refused')));
     const offline = await fetchStepExport('m');
     expect(offline.ok).toBe(false);
     expect(offline.message).toMatch(/needs the llull server/);
   });
-
   it('uploadDwg posts the bytes with target, unit and survey name', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ summary: 'Imported 3 lines.' })));
     const file = new File(['AC1032'], 'site.dwg');
@@ -41,7 +36,6 @@ describe('serverFiles', () => {
     expect(init?.method).toBe('POST');
     expect(init?.body).toBe(file);
   });
-
   it('uploadDwg reports failures', async () => {
     const file = new File(['x'], 'a.dwg');
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ error: 'Bad magic.' }, 400)));
@@ -51,7 +45,6 @@ describe('serverFiles', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('refused')));
     expect(await uploadDwg(file, 'drawing', 'mm')).toMatch(/needs the llull server/);
   });
-
   it('fetchLicenseLabel returns the label, or null on any failure', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ label: 'Evaluation' })));
     expect(await fetchLicenseLabel()).toBe('Evaluation');

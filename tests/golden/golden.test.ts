@@ -9,9 +9,7 @@ import type { GoldenAction } from './plans';
 describe('golden replay corpus', () => describePlans(plans));
 
 describe('loops_polar_pattern parametric regeneration', () => {
-  const cylinderCount = (doc: CadDocument): number =>
-    Object.values(doc.entities).filter((e) => e.kind === 'cylinder').length;
-
+  const cylinderCount = (doc: CadDocument): number => Object.values(doc.entities).filter((e) => e.kind === 'cylinder').length;
   it('set_parameter n=9 regenerates nine radial cylinders (and n=4 four)', () => {
     const built = runPlan(plans['loops_polar_pattern'] as GoldenAction[]).document;
     expect(cylinderCount(built)).toBe(7);

@@ -1,5 +1,4 @@
 /**
- * @layer mcp
  * MCP resources — read-only views of the live document, so an agent can orient without calling a
  * mutating tool first. Pure over the document; transport wiring lives in `server/`.
  *
@@ -7,8 +6,6 @@
  *   cad://scene        structured SceneSnapshot (entity ids/kinds/bounds/layers/groups/selection)
  *   cad://selection    selected entity ids + their kind/position summaries
  *   cad://conventions  static agent modeling guide (Markdown)
- *
- * @pure
  */
 
 import type { CadDocument } from '@core/model/types';
@@ -38,7 +35,6 @@ export const CAD_RESOURCE_URIS = {
   conventions: CONVENTIONS_URI,
 } as const;
 
-/** @pure static metadata; needs no document */
 export function listMcpResources(): McpResourceDescriptor[] {
   return [
     {
@@ -61,8 +57,7 @@ export function listMcpResources(): McpResourceDescriptor[] {
       uri: CAD_RESOURCE_URIS.selection,
       name: 'Current Selection',
       description:
-        'The currently selected entity ids and a brief summary (kind, position) for each. ' +
-        'Empty array when nothing is selected.',
+        'The currently selected entity ids and a brief summary (kind, position) for each. ' + 'Empty array when nothing is selected.',
       mimeType: 'application/json',
     },
     {
@@ -79,11 +74,7 @@ export function listMcpResources(): McpResourceDescriptor[] {
   ];
 }
 
-const jsonResource = (uri: string, text: string): McpResourceContent => ({
-  uri,
-  mimeType: 'application/json',
-  text,
-});
+const jsonResource = (uri: string, text: string): McpResourceContent => ({ uri, mimeType: 'application/json', text });
 
 /** Lists in `cad://scene` / `cad://selection` are cut here so a huge model cannot flood a context. */
 export const MAX_RESOURCE_ITEMS = 500;
@@ -92,8 +83,7 @@ export const MAX_RESOURCE_ITEMS = 500;
 function boundedScene(doc: CadDocument): Record<string, unknown> {
   const snapshot = computeSceneSnapshot(doc);
   const cut = (items: readonly unknown[]): boolean => items.length > MAX_RESOURCE_ITEMS;
-  if (!cut(snapshot.entities) && !cut(snapshot.selection) && !cut(snapshot.animations))
-    return { ...snapshot };
+  if (!cut(snapshot.entities) && !cut(snapshot.selection) && !cut(snapshot.animations)) return { ...snapshot };
   return {
     ...snapshot,
     entities: snapshot.entities.slice(0, MAX_RESOURCE_ITEMS),
@@ -121,8 +111,6 @@ function selectionSummary(doc: CadDocument): { count: number; entities: unknown[
 /**
  * Dispatch a resource read by URI. Document-independent resources (conventions) ignore `doc`.
  *
- * @pure over doc
- * @layer mcp
  * @failure unknown URI -> null (the transport replies with an error)
  */
 export function readMcpResource(doc: CadDocument, uri: string): McpResourceContent | null {

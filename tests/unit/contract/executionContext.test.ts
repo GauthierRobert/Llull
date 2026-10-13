@@ -1,7 +1,3 @@
-/**
- * Execution context: kernel, ids and registry come from the context passed to `execute`
- * (or inherited by nested executes), never from a module singleton.
- */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { type CadDocument, type MeshSolidEntity, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
@@ -10,6 +6,7 @@ import type { ExecutionContext } from '@core/commands/types';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import type { IdSource } from '@lib/id';
 import { triangleKernel } from '../../helpers/fakeKernel';
+import { expectNoOp } from '../../helpers/expectNoOp';
 
 function prefixedIds(tag: string): IdSource {
   let n = 0;
@@ -33,7 +30,6 @@ describe('ExecutionContext', () => {
     setGeometryKernel(null);
   });
   afterEach(() => setGeometryKernel(null));
-
   it('a recorded command runs as step-<n> and mints step-scoped ids', () => {
     const first = execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] });
     expect(first.document.featureHistory[0]?.id).toBe('step-1');
@@ -42,7 +38,6 @@ describe('ExecutionContext', () => {
     const second = execute(first.document, 'add_box', { size: [1, 1, 1] });
     expect(second.affected[0]).toBe('box-2.1');
   });
-
   it('build_project inner steps each get their own step number', () => {
     const result = execute(createEmptyDocument(), 'build_project', {
       actions: [
@@ -53,7 +48,6 @@ describe('ExecutionContext', () => {
     expect(result.document.featureHistory.map((step) => step.id)).toEqual(['step-1', 'step-2']);
     expect(result.affected).toEqual(['box-1.1', 'box-2.1']);
   });
-
   it('non-step commands mint through ctx.ids', () => {
     let seen = 0;
     const counting: IdSource = { next: (prefix) => `${prefix}-ctx-${++seen}` };
@@ -62,47 +56,25 @@ describe('ExecutionContext', () => {
     expect(seen).toBe(0);
     expect(contextWith({ ids: counting }).ids.next('x')).toBe('x-ctx-1');
   });
-
   it('uses ctx.kernel even when no process kernel is installed', () => {
     const { doc, a, b } = twoBoxes();
-    const result = execute(
-      doc,
-      'boolean',
-      { op: 'union', a, b },
-      contextWith({ kernel: triangleKernel() }),
-    );
+    const result = execute(doc, 'boolean', { op: 'union', a, b }, contextWith({ kernel: triangleKernel() }));
     const created = result.document.entities[result.affected[0] ?? ''] as MeshSolidEntity;
     expect(created.kind).toBe('mesh');
   });
-
   it('no-ops a requiresKernel command with an explicit summary when no kernel is available', () => {
     const { doc, a, b } = twoBoxes();
-    const result = execute(doc, 'boolean', { op: 'union', a, b });
-    expect(result.document).toBe(doc);
-    expect(result.affected).toEqual([]);
-    expect(result.summary).toContain('kernel not available');
+    expectNoOp(execute(doc, 'boolean', { op: 'union', a, b }), doc, 'kernel not available');
   });
-
   it('replay refuses to regenerate kernel-dependent history without a kernel', () => {
     const { doc, a, b } = twoBoxes();
-    const unioned = execute(
-      doc,
-      'boolean',
-      { op: 'union', a, b },
-      contextWith({ kernel: triangleKernel() }),
-    );
+    const unioned = execute(doc, 'boolean', { op: 'union', a, b }, contextWith({ kernel: triangleKernel() }));
     const replayed = execute(unioned.document, 'replay_history', {});
     expect(Object.keys(replayed.document.entities)).toEqual(Object.keys(unioned.document.entities));
   });
-
   it('restores the outer context after execute returns', () => {
     const outer = currentContext();
-    execute(
-      createEmptyDocument(),
-      'add_box',
-      { size: [1, 1, 1] },
-      contextWith({ ids: prefixedIds('x') }),
-    );
+    execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }, contextWith({ ids: prefixedIds('x') }));
     expect(currentContext().ids).toBe(outer.ids);
   });
 });

@@ -1,9 +1,7 @@
 /**
- * Retired commands: tools merged into a more general command. Saved documents still name them in
- * feature-history and recipe steps (and in the actions of recorded `build_project` plans), so
- * `migrate()` rewrites every such call onto its replacement before the document is validated.
- *
- * @layer core/commands
+ * Retired commands: tools merged into a more general command. Saved documents still name them in feature-history and recipe steps (and in
+ * the actions of recorded `build_project` plans), so `migrate()` rewrites every such call onto its replacement before the document is
+ * validated.
  */
 
 import type { RetiredCommandRewrite } from '../types';
@@ -44,12 +42,7 @@ interface Call {
 }
 
 /** The call with its nested plan calls rewritten, then itself rewritten while its name is retired. */
-function rewriteCall(
-  name: string,
-  params: unknown,
-  table: RewriteTable,
-  step?: { readonly id: string },
-): Call {
+function rewriteCall(name: string, params: unknown, table: RewriteTable, step?: { readonly id: string }): Call {
   const nested = rewriteNested(params, table);
   const rewrite = Object.hasOwn(table, name) ? table[name] : undefined;
   if (!rewrite || !isRecord(nested)) return { name, params: nested };
@@ -83,17 +76,13 @@ function retiredTable(): RewriteTable {
   return { ...CORE_RETIRED_COMMANDS, ...pluginRetiredCommands() };
 }
 
-/**
- * Rewrite every retired `{ command, params }` call nested in `value` (plan actions, code traces).
- * @pure
- */
+/** Rewrite every retired `{ command, params }` call nested in `value` (plan actions, code traces). */
 export function migrateRetiredCalls(value: unknown): unknown {
   return rewriteNested(value, retiredTable());
 }
 
 /**
  * Rewrite retired command calls in `featureHistory` and every recipe's `steps`.
- * @pure
  * @invariant a document naming no retired command is returned with equal content
  */
 export function migrateRetiredCommands(raw: Record<string, unknown>): Record<string, unknown> {
@@ -107,9 +96,7 @@ export function migrateRetiredCommands(raw: Record<string, unknown>): Record<str
           recipes: Object.fromEntries(
             Object.entries(recipes).map(([key, recipe]) => [
               key,
-              isRecord(recipe)
-                ? { ...recipe, steps: migrateSteps(recipe['steps'], table, false) }
-                : recipe,
+              isRecord(recipe) ? { ...recipe, steps: migrateSteps(recipe['steps'], table, false) } : recipe,
             ]),
           ),
         }

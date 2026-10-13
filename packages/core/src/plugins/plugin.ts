@@ -1,8 +1,6 @@
 /**
- * Plugin contract: a domain (building, industrial, …) extends the CAD core by contributing
- * commands, an MCP toolset, derivation guards and a deriver — without the core importing it.
- *
- * @layer core/plugins
+ * Plugin contract: a domain (building, industrial, …) extends the CAD core by contributing commands, an MCP toolset, derivation guards and
+ * a deriver — without the core importing it.
  * @invariant core/** never imports a plugin; the app composition root installs plugins
  */
 

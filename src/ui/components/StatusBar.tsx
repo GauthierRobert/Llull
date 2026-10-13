@@ -1,25 +1,18 @@
-/**
- * @layer ui/components
- *
- * StatusBar — slim bottom bar: live / syncing / sync-failed indicator, last command summary,
- * entity + selection counts, units. Presentation only (PRIME DIRECTIVE).
- */
+// Bottom bar: live / syncing / sync-failed, last summary, entity + selection counts, units.
 
 import React, { useEffect, useState } from 'react';
 import { useStore } from '@ui/store';
 import { fetchLicenseLabel } from '@ui/services/serverFiles';
 
-interface StatusItemProps {
-  label: string;
-  value: string;
-  'aria-label'?: string;
-}
-
 function StatusItem({
   label,
   value,
   'aria-label': ariaLabel,
-}: StatusItemProps): React.ReactElement {
+}: {
+  label: string;
+  value: string;
+  'aria-label'?: string;
+}): React.ReactElement {
   return (
     <span className="status-item" aria-label={ariaLabel ?? `${label}: ${value}`}>
       <span className="status-item__label">{label}</span>
@@ -87,31 +80,19 @@ export function StatusBar(): React.ReactElement {
   const displayPrecision = useStore((s) => s.document.displayPrecision);
   const entityCount = useStore((s) => s.document.order.length);
   // Building commands also put element ids in the selection; count only real entities.
-  const selectionCount = useStore(
-    (s) => s.document.selection.filter((id) => id in s.document.entities).length,
-  );
+  const selectionCount = useStore((s) => s.document.selection.filter((id) => id in s.document.entities).length);
   const lastSummary = useStore((s) => s.lastSummary);
 
   const unitLabel = `${units} (${displayPrecision}dp)`;
   const entityLabel = `${entityCount}`;
-  const selectionLabel =
-    selectionCount === 0
-      ? 'None'
-      : selectionCount === 1
-        ? '1 entity'
-        : `${selectionCount} entities`;
+  const selectionLabel = selectionCount === 0 ? 'None' : selectionCount === 1 ? '1 entity' : `${selectionCount} entities`;
 
   return (
     <footer className="status-bar-bottom" aria-label="Document status">
       <div className="status-bar-bottom__items">
         <LiveIndicator />
         {lastSummary !== null && (
-          <span
-            className="status-summary"
-            aria-live="polite"
-            aria-label={`Last command: ${lastSummary}`}
-            title={lastSummary}
-          >
+          <span className="status-summary" aria-live="polite" aria-label={`Last command: ${lastSummary}`} title={lastSummary}>
             {lastSummary}
           </span>
         )}
@@ -120,11 +101,7 @@ export function StatusBar(): React.ReactElement {
         <LicenseBadge />
         <StatusItem label="Entities" value={entityLabel} aria-label={`Entities: ${entityLabel}`} />
         <span className="status-divider" aria-hidden="true" />
-        <StatusItem
-          label="Selection"
-          value={selectionLabel}
-          aria-label={`Selection: ${selectionLabel}`}
-        />
+        <StatusItem label="Selection" value={selectionLabel} aria-label={`Selection: ${selectionLabel}`} />
         <span className="status-divider" aria-hidden="true" />
         <StatusItem label="Units" value={unitLabel} aria-label={`Units: ${unitLabel}`} />
       </div>

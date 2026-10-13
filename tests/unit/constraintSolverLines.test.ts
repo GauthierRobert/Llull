@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { type CadDocument, type LineEntity, createEmptyDocument } from '@core/model/types';
+import { createEmptyDocument, type CadDocument, type LineEntity } from '@core/model/types';
 import { execute } from '@core/commands/registry';
+import { expectNoOp } from '../helpers/expectNoOp';
+import { xy } from '../helpers/xy';
 
 function twoLines(
   a: { start: [number, number]; end: [number, number] },
@@ -11,20 +13,9 @@ function twoLines(
   return { doc: second.document, idA: first.affected[0]!, idB: second.affected[0]! };
 }
 
-function constrain(
-  doc: CadDocument,
-  kind: string,
-  idA: string,
-  idB: string,
-  value?: number,
-): CadDocument {
+function constrain(doc: CadDocument, kind: string, idA: string, idB: string, value?: number): CadDocument {
   return execute(doc, 'add_constraint', {
-    constraint: {
-      kind,
-      a: { entityId: idA },
-      b: { entityId: idB },
-      ...(value === undefined ? {} : { value }),
-    },
+    constraint: { kind, a: { entityId: idA }, b: { entityId: idB }, ...(value === undefined ? {} : { value }) },
   }).document;
 }
 
@@ -41,23 +32,13 @@ function lineLength(doc: CadDocument, id: string): number {
   return Math.hypot(line.end[0] - line.start[0], line.end[1] - line.start[1]);
 }
 
-function solve(doc: CadDocument): {
-  document: CadDocument;
-  data: { converged: boolean; residual: number };
-} {
+function solve(doc: CadDocument): { document: CadDocument; data: { converged: boolean; residual: number } } {
   const result = execute(doc, 'solve_constraints', {});
-  return {
-    document: result.document,
-    data: result.data as { converged: boolean; residual: number },
-  };
+  return { document: result.document, data: result.data as { converged: boolean; residual: number } };
 }
 
 describe('solve_constraints on line orientation constraints', () => {
-  const { doc, idA, idB } = twoLines(
-    { start: [0, 0], end: [10, 0] },
-    { start: [0, 5], end: [10, 8] },
-  );
-
+  const { doc, idA, idB } = twoLines({ start: [0, 0], end: [10, 0] }, { start: [0, 5], end: [10, 8] });
   it('parallel rotates line b until it is parallel to line a, keeping its length', () => {
     const solved = solve(constrain(doc, 'parallel', idA, idB));
     expect(solved.data.converged).toBe(true);
@@ -65,27 +46,23 @@ describe('solve_constraints on line orientation constraints', () => {
     expect(Math.abs(bx * 0 - by * 1)).toBeLessThan(1e-3);
     expect(lineLength(solved.document, idB)).toBeCloseTo(lineLength(doc, idB), 6);
   });
-
   it('parallel also accepts an anti-parallel line', () => {
     const flipped = twoLines({ start: [0, 0], end: [10, 0] }, { start: [10, 4], end: [0, 5] });
     const solved = solve(constrain(flipped.doc, 'parallel', flipped.idA, flipped.idB));
     expect(solved.data.converged).toBe(true);
     expect(Math.abs(direction(solved.document, flipped.idB)[1])).toBeLessThan(1e-3);
   });
-
   it('perpendicular rotates line b to 90 degrees from line a', () => {
     const solved = solve(constrain(doc, 'perpendicular', idA, idB));
     expect(solved.data.converged).toBe(true);
     expect(Math.abs(direction(solved.document, idB)[0])).toBeLessThan(1e-3);
   });
-
   it('angle rotates line b to the requested angle from line a', () => {
     const solved = solve(constrain(doc, 'angle', idA, idB, Math.PI / 4));
     expect(solved.data.converged).toBe(true);
     const [bx, by] = direction(solved.document, idB);
     expect(Math.atan2(by, bx)).toBeCloseTo(Math.PI / 4, 3);
   });
-
   it('leaves line a untouched and does not mutate the input document', () => {
     const constrained = constrain(doc, 'parallel', idA, idB);
     const snapshot = JSON.stringify(constrained);
@@ -93,7 +70,6 @@ describe('solve_constraints on line orientation constraints', () => {
     expect(JSON.stringify(constrained)).toBe(snapshot);
     expect(solved.document.entities[idA]).toEqual(constrained.entities[idA]);
   });
-
   it('conflicting constraints report non-convergence with a residual describing the returned document', () => {
     let conflicted = constrain(doc, 'parallel', idA, idB);
     conflicted = constrain(conflicted, 'perpendicular', idA, idB);
@@ -102,11 +78,60 @@ describe('solve_constraints on line orientation constraints', () => {
     expect(solved.data.residual).toBeGreaterThan(1e-3);
     expect(Number.isFinite(solved.data.residual)).toBe(true);
   });
-
   it('constraints on a point-sized or missing line are skipped without NaN', () => {
     const degenerate = twoLines({ start: [0, 0], end: [10, 0] }, { start: [3, 3], end: [3, 3] });
     const solved = solve(constrain(degenerate.doc, 'parallel', degenerate.idA, degenerate.idB));
     const line = solved.document.entities[degenerate.idB] as LineEntity;
     expect(line.start.every(Number.isFinite) && line.end.every(Number.isFinite)).toBe(true);
+  });
+});
+
+function twoLines2(): { doc: CadDocument; a: string; b: string } {
+  const first = execute(createEmptyDocument(), 'draw_polyline', { points: xy(0, 0, 10, 0) });
+  const second = execute(first.document, 'draw_polyline', { points: xy(0, 5, 10, 5) });
+  return { doc: second.document, a: first.affected[0]!, b: second.affected[0]! };
+}
+
+describe('add_constraint input validation', () => {
+  const { doc, a, b } = twoLines2();
+  it('refuses a reference to an entity that does not exist', () => {
+    expectNoOp(
+      execute(doc, 'add_constraint', { constraint: { kind: 'parallel', a: { entityId: a }, b: { entityId: 'ghost' } } }),
+      doc,
+      "entity 'ghost' does not exist",
+    );
+  });
+  it('refuses a malformed value expression', () => {
+    const result = execute(doc, 'add_constraint', {
+      constraint: { kind: 'distance', a: { entityId: a }, b: { entityId: b }, value: '2*' },
+    });
+    expect(result.document).toBe(doc);
+    expect(result.summary).toContain('not a valid expression');
+  });
+  it('accepts numeric, parameter-expression and scientific-notation values', () => {
+    for (const value of [5, 'width / 2', '1e-3']) {
+      const result = execute(doc, 'add_constraint', { constraint: { kind: 'distance', a: { entityId: a }, b: { entityId: b }, value } });
+      expect(result.affected).toHaveLength(1);
+    }
+  });
+});
+
+describe('update_constraint input validation', () => {
+  const { doc, a, b } = twoLines2();
+  const added = execute(doc, 'add_constraint', { constraint: { kind: 'distance', a: { entityId: a }, b: { entityId: b }, value: 5 } });
+  const constraintId = added.affected[0]!;
+  it('refuses retargeting to a missing entity', () => {
+    const result = execute(added.document, 'update_constraint', { id: constraintId, patch: { b: { entityId: 'ghost' } } });
+    expect(result.document).toBe(added.document);
+    expect(result.summary).toContain("entity 'ghost' does not exist");
+  });
+  it('refuses a malformed value expression and keeps the old value', () => {
+    const result = execute(added.document, 'update_constraint', { id: constraintId, patch: { value: '(1+' } });
+    expect(result.document).toBe(added.document);
+    expect(result.summary).toContain('not a valid expression');
+  });
+  it('still applies a valid patch', () => {
+    const result = execute(added.document, 'update_constraint', { id: constraintId, patch: { value: 8, b: { entityId: a } } });
+    expect(result.document.constraints[constraintId]).toMatchObject({ value: 8 });
   });
 });

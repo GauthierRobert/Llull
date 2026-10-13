@@ -1,8 +1,6 @@
 /**
- * World-space triangles of single solids (no instance resolution: see ./instanceExpansion and
- * ./exportTriangulate `entityToTriangles`). Counter-clockwise from outside (outward normals).
- *
- * @layer core/commands
+ * World-space triangles of single solids (no instance resolution: see ./instanceExpansion and ./exportTriangulate `entityToTriangles`).
+ * Counter-clockwise from outside (outward normals).
  */
 
 import { type Entity, type Vec3, is2D } from '../model/types';
@@ -28,10 +26,6 @@ import { type Triangle, fanTriangulate, earClipTriangulateVerts } from './triang
 
 type Kind<K extends Entity['kind']> = Extract<Entity, { kind: K }>;
 
-function triangulateBox(e: Kind<'box'>): Triangle[] {
-  return boxFaces(e.position, e.size).flatMap(fanTriangulate);
-}
-
 function triangulateCylinder(e: Kind<'cylinder'>): Triangle[] {
   const [px, py, pz] = e.position;
   const zb = pz - e.height / 2;
@@ -44,25 +38,9 @@ function triangulateCylinder(e: Kind<'cylinder'>): Triangle[] {
   ];
 }
 
-function triangulateSphere(e: Kind<'sphere'>): Triangle[] {
-  return sphereQuads(e.position, e.radius).flatMap(fanTriangulate);
-}
-
 function triangulateCone(e: Kind<'cone'>): Triangle[] {
   const { center, base, sides } = coneSurface(e);
   return [...ringEdges(base).map(([from, to]): Triangle => [center, to, from]), ...sides];
-}
-
-function triangulateTorus(e: Kind<'torus'>): Triangle[] {
-  return torusQuads(e.position, e.ringRadius, e.tubeRadius).flatMap(fanTriangulate);
-}
-
-function triangulateWedge(e: Kind<'wedge'>): Triangle[] {
-  return wedgeFaces(e.position, e.size).flatMap(fanTriangulate);
-}
-
-function triangulatePyramid(e: Kind<'pyramid'>): Triangle[] {
-  return pyramidFaces(e).flatMap(fanTriangulate);
 }
 
 function triangulateExtrusion(e: Kind<'extrusion'>): Triangle[] {
@@ -87,19 +65,19 @@ function unrotatedTriangles(e: Entity): Triangle[] {
   if (is2D(e)) return [];
   switch (e.kind) {
     case 'box':
-      return triangulateBox(e);
+      return boxFaces(e.position, e.size).flatMap(fanTriangulate);
     case 'cylinder':
       return triangulateCylinder(e);
     case 'sphere':
-      return triangulateSphere(e);
+      return sphereQuads(e.position, e.radius).flatMap(fanTriangulate);
     case 'cone':
       return triangulateCone(e);
     case 'torus':
-      return triangulateTorus(e);
+      return torusQuads(e.position, e.ringRadius, e.tubeRadius).flatMap(fanTriangulate);
     case 'wedge':
-      return triangulateWedge(e);
+      return wedgeFaces(e.position, e.size).flatMap(fanTriangulate);
     case 'pyramid':
-      return triangulatePyramid(e);
+      return pyramidFaces(e).flatMap(fanTriangulate);
     case 'extrusion':
       return triangulateExtrusion(e);
     case 'mesh':

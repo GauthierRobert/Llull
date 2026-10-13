@@ -1,12 +1,5 @@
-/**
- * @layer ui/services
- *
- * The ONE owner of the service worker (serviceWorker/sw.js): registration, periodic update
- * checks, "a new version is waiting" state, and applying it. Components read the state through
- * `useAppUpdateAvailable()` and call `applyAppUpdate()` — nothing else touches
- * `navigator.serviceWorker`. A new version never takes over on its own: the user chooses when
- * to reload, so an in-progress drawing is not interrupted.
- */
+// The ONE owner of the service worker (sw.js): registration, update checks, waiting-build state, apply. A new version
+// never takes over on its own: the user picks when to reload, so in-progress work is not interrupted.
 
 import { useSyncExternalStore } from 'react';
 
@@ -35,10 +28,7 @@ export function useAppUpdateAvailable(): boolean {
 }
 
 /** A worker that finished installing while another one controls the page is an update. */
-function watchInstalling(
-  registration: ServiceWorkerRegistration,
-  container: ServiceWorkerContainer,
-): void {
+function watchInstalling(registration: ServiceWorkerRegistration, container: ServiceWorkerContainer): void {
   const worker = registration.installing;
   if (worker === null) return;
   worker.addEventListener('statechange', () => {
@@ -48,10 +38,7 @@ function watchInstalling(
   });
 }
 
-/**
- * Registers `/sw.js` and starts hourly update checks. No-op without service-worker support.
- * @returns stops the update checks (the registration itself stays).
- */
+/** Hourly update checks; no-op without service-worker support. @returns stops the checks (registration stays). */
 export async function registerAppServiceWorker(
   container: ServiceWorkerContainer | undefined = globalThis.navigator?.serviceWorker,
   reload: () => void = () => window.location.reload(),
@@ -74,7 +61,7 @@ export async function registerAppServiceWorker(
   return () => clearInterval(timer);
 }
 
-/** Activates the waiting build; the `controllerchange` it triggers reloads the page once. */
+/** The `controllerchange` it triggers reloads the page once. */
 export function applyAppUpdate(): void {
   waitingWorker?.postMessage(SKIP_WAITING);
 }

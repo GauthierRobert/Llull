@@ -1,17 +1,11 @@
+import { idOrNext } from '../entity/explicitId';
 import { type CadDocument, type SubdivisionEntity, type Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
 import { failer } from '../noop';
 import { centroid3, distance3, sub3 } from '../../lib/vec3';
 import { newEntity } from '../entity/newEntity';
-import {
-  DEFAULT_SOLID_COLOR,
-  commitSolid,
-  existingLayerOrDefault,
-  namedSolidStyleFields,
-  explicitIdOrNext,
-  explicitIdTaken,
-} from './shared';
+import { DEFAULT_SOLID_COLOR, commitSolid, existingLayerOrDefault, namedSolidStyleFields, explicitIdTaken } from './shared';
 import { sketchPath } from './sketchCurves';
 import { catmullRomBeziers, sampleChain } from '../../geometry/curveSegments';
 import { boundaryPatchCage, coonsSides } from '../../geometry/boundaryPatch';
@@ -21,18 +15,11 @@ import { cageData, cageText, levelsField, sizeProblem } from './subdivision';
 const MAX_PATCH_CELLS = 24;
 
 /** Dense polylines of the boundary curves (inline points or 2D sketch curves), or an error. */
-function boundaryPolylines(
-  doc: CadDocument,
-  curves: Vec3[][] | undefined,
-  curveIds: string[] | undefined,
-): Vec3[][] | string {
-  if ((curves === undefined) === (curveIds === undefined))
-    return 'give exactly one of curves or curveIds';
+function boundaryPolylines(doc: CadDocument, curves: Vec3[][] | undefined, curveIds: string[] | undefined): Vec3[][] | string {
+  if ((curves === undefined) === (curveIds === undefined)) return 'give exactly one of curves or curveIds';
   if (curves !== undefined) {
     if (curves.some((points) => points.length < 2)) return 'every curve needs at least 2 points';
-    return curves.map((points) =>
-      points.length === 2 ? points : sampleChain(catmullRomBeziers(points, false), false),
-    );
+    return curves.map((points) => (points.length === 2 ? points : sampleChain(catmullRomBeziers(points, false), false)));
   }
   const polylines: Vec3[][] = [];
   for (const id of curveIds ?? []) {
@@ -44,9 +31,6 @@ function boundaryPolylines(
 }
 
 /**
- * @command surface_from_curves
- * @pure
- * @layer core/commands
  * @affects creates 1 subdivision entity (a thickened boundary patch) at the patch centre
  * @invariant 2 opposite curves or 4 curves closing a loop; cells 1..24 per direction; thickness > 0
  * @failure wrong curve count / open loop / degenerate patch / bad sizes / duplicate id -> no-op
@@ -68,20 +52,12 @@ export const surfaceFromCurves = defineCommand({
       .array(z.array(vec3('Curve point [x, y, z] in world coordinates.')))
       .describe('2 or 4 boundary curves as world point lists (alternative to curveIds).')
       .optional(),
-    curveIds: z
-      .array(z.string())
-      .describe('2 or 4 ids of 2D sketch curves bounding the patch (alternative to curves).')
-      .optional(),
+    curveIds: z.array(z.string()).describe('2 or 4 ids of 2D sketch curves bounding the patch (alternative to curves).').optional(),
     thickness: z.number().describe('Wall thickness in document units (> 0).'),
-    flip: z
-      .boolean()
-      .describe('Thicken toward the other side of the surface (default false).')
-      .optional(),
+    flip: z.boolean().describe('Thicken toward the other side of the surface (default false).').optional(),
     cells: z
       .tuple([z.number().int(), z.number().int()])
-      .describe(
-        `Cage cells [along the first curve, across] (1..${MAX_PATCH_CELLS} each; default [8, 8]).`,
-      )
+      .describe(`Cage cells [along the first curve, across] (1..${MAX_PATCH_CELLS} each; default [8, 8]).`)
       .optional(),
     levels: levelsField.optional(),
     ...namedSolidStyleFields(),
@@ -105,28 +81,16 @@ export const surfaceFromCurves = defineCommand({
     const problem = sizeProblem(cage, levels) ?? cageProblem(cage);
     if (problem !== null) return fail(problem);
     const origin = centroid3(cage.vertices);
-    const id = explicitIdOrNext(explicitId, 'subd');
+    const id = idOrNext(explicitId, 'subd');
     const entity = newEntity(
       'subdivision',
       id,
-      {
-        vertices: cage.vertices.map((p) => sub3(p, origin)),
-        faces: cage.faces,
-        creases: cage.creases,
-        levels,
-      },
+      { vertices: cage.vertices.map((p) => sub3(p, origin)), faces: cage.faces, creases: cage.creases, levels },
       origin,
       params.color ?? DEFAULT_SOLID_COLOR,
-      {
-        name,
-        layerId: existingLayerOrDefault(doc, layerId),
-      },
+      { name, layerId: existingLayerOrDefault(doc, layerId) },
     ) as SubdivisionEntity;
-    const result = commitSolid(
-      doc,
-      entity,
-      `surface_from_curves: created "${id}" from ${polylines.length} curves, ${thickness} thick (${cageText(cage, levels)})`,
-    );
-    return { ...result, data: cageData(entity) };
+    const summary = `surface_from_curves: created "${id}" from ${polylines.length} curves, ${thickness} thick (${cageText(cage, levels)})`;
+    return { ...commitSolid(doc, entity, summary), data: cageData(entity) };
   },
 });

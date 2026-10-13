@@ -1,12 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { inflateSync } from 'node:zlib';
-import {
-  type CadDocument,
-  type Entity,
-  type Material,
-  FINISH_PATTERNS,
-  createEmptyDocument,
-} from '@core/model/types';
+import { type CadDocument, type Entity, type Material, FINISH_PATTERNS, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { serializeDocument } from '@core/commands/persistence/serialization';
 import { encodePng } from '@lib/png';
@@ -49,7 +43,9 @@ function decodePng(png: Uint8Array): { width: number; height: number; rgba: Uint
   return { width, height, rgba };
 }
 
-function gltfOf(doc: CadDocument): Record<string, unknown> & {
+function gltfOf(
+  doc: CadDocument,
+): Record<string, unknown> & {
   materials: Array<Record<string, unknown>>;
   meshes: Array<{ primitives: Array<{ attributes: Record<string, number>; material: number }> }>;
   images?: unknown[];
@@ -70,10 +66,7 @@ describe('PNG encoder', () => {
 
 describe('finish maps', () => {
   it.each(FINISH_PATTERNS)('%s builds tileable size² RGBA maps with unit normals', (pattern) => {
-    const maps = finishMaps(
-      { color: '#336699', metalness: 0.5, roughness: 0.4, finish: { pattern, scale: 10 } },
-      32,
-    );
+    const maps = finishMaps({ color: '#336699', metalness: 0.5, roughness: 0.4, finish: { pattern, scale: 10 } }, 32);
     expect(maps).not.toBeNull();
     expect(maps?.albedo).toHaveLength(32 * 32 * 4);
     const n = maps?.normal ?? new Uint8Array();
@@ -84,22 +77,15 @@ describe('finish maps', () => {
     }
     expect(maps?.metallicRoughness[2]).toBe(Math.round(0.5 * 255));
   });
-
   it('is null without a finish and tints alternate tows with color2', () => {
     expect(finishMaps({ color: '#000000', metalness: 0, roughness: 1 })).toBeNull();
     const checker = finishMaps(
-      {
-        color: '#000000',
-        metalness: 0,
-        roughness: 1,
-        finish: { pattern: 'checker', scale: 1, color2: '#ffffff' },
-      },
+      { color: '#000000', metalness: 0, roughness: 1, finish: { pattern: 'checker', scale: 1, color2: '#ffffff' } },
       16,
     );
     expect(checker?.albedo[0]).toBe(0);
     expect(checker?.albedo[(0 * 16 + 2) * 4]).toBe(255);
   });
-
   it('box UVs project on the plane of the dominant normal axis', () => {
     expect(boxUv([2, 4, 6], [0, 0, 1], 2)).toEqual([1, 2]);
     expect(boxUv([2, 4, 6], [0, 1, 0], 2)).toEqual([1, 3]);
@@ -114,7 +100,6 @@ describe('create_material finish', () => {
     expect(material.finish).toEqual({ pattern: 'carbon_twill', scale: 20, clearcoat: 1 });
     expect(result.summary).toContain('finish=carbon_twill every 20 mm');
   });
-
   it.each([
     ['scale', { finishScale: 0 }, 'finishScale must be > 0'],
     ['color2', { color2: 'red' }, 'color2 must be'],
@@ -125,23 +110,15 @@ describe('create_material finish', () => {
     const doc = createEmptyDocument();
     expectNoOp(execute(doc, 'create_material', { ...CARBON, ...patch }), doc, text);
   });
-
   it('is pure', () => {
     const doc = createEmptyDocument();
     const before = structuredClone(doc);
     execute(doc, 'create_material', CARBON);
     expect(doc).toEqual(before);
   });
-
   it('round-trips and refuses corrupt saved finishes', () => {
-    const doc = execute(createEmptyDocument(), 'create_material', {
-      ...CARBON,
-      color2: '#222222',
-      normalStrength: 1.5,
-    }).document;
-    const loaded = execute(createEmptyDocument(), 'load_document', {
-      json: serializeDocument(doc),
-    }).document;
+    const doc = execute(createEmptyDocument(), 'create_material', { ...CARBON, color2: '#222222', normalStrength: 1.5 }).document;
+    const loaded = execute(createEmptyDocument(), 'load_document', { json: serializeDocument(doc) }).document;
     expect(loaded.materials['carbon']).toEqual(doc.materials['carbon']);
     for (const finish of [
       { pattern: 'wood', scale: 1 },
@@ -149,13 +126,8 @@ describe('create_material finish', () => {
       { pattern: 'checker', scale: 1, color2: 'x' },
       { pattern: 'checker', scale: 1, clearcoat: 5 },
     ]) {
-      const broken = {
-        ...doc,
-        materials: { carbon: { ...(doc.materials['carbon'] as Material), finish } as Material },
-      };
-      const result = execute(createEmptyDocument(), 'load_document', {
-        json: serializeDocument(broken),
-      });
+      const broken = { ...doc, materials: { carbon: { ...(doc.materials['carbon'] as Material), finish } as Material } };
+      const result = execute(createEmptyDocument(), 'load_document', { json: serializeDocument(broken) });
       expect(result.affected).toHaveLength(0);
       expect(result.summary).toContain('finish');
     }
@@ -189,7 +161,6 @@ describe('text decals', () => {
     return { doc: result.document, id: result.affected[0] as string };
   };
   const onTop = { text: 'Van Rysel', at: [0, 0, 10], normal: [0, 0, 1], height: 8 };
-
   it('paints a decal in the solid frame and exports it as a blended textured overlay', () => {
     const { doc, id } = base();
     const result = execute(doc, 'add_decal', { id, ...onTop, color: '#ff0000' });
@@ -203,26 +174,17 @@ describe('text decals', () => {
     expect(gltf.meshes).toHaveLength(2);
     expect(gltf.meshes[1]?.primitives[0]?.attributes['TEXCOORD_0']).toBeDefined();
   });
-
   it('converts world placement into the frame of a moved and rotated solid', () => {
     const { doc, id } = base();
-    const moved = execute(
-      execute(doc, 'move_entities', { ids: [id], delta: [5, 0, 0] }).document,
-      'rotate_entity',
-      { id, delta: [0, 0, Math.PI / 2] },
-    ).document;
-    const result = execute(moved, 'add_decal', {
+    const moved = execute(execute(doc, 'move_entities', { ids: [id], delta: [5, 0, 0] }).document, 'rotate_entity', {
       id,
-      text: 'L',
-      at: [5, 50, 0],
-      normal: [0, 1, 0],
-      height: 5,
-    });
+      delta: [0, 0, Math.PI / 2],
+    }).document;
+    const result = execute(moved, 'add_decal', { id, text: 'L', at: [5, 50, 0], normal: [0, 1, 0], height: 5 });
     const decal = result.document.entities[id]?.decals?.[0];
     expect(decal?.center[0]).toBeCloseTo(50, 6);
     expect(decal?.normal[0]).toBeCloseTo(1, 6);
   });
-
   it('notes characters without a glyph and supports a background', () => {
     const { doc, id } = base();
     const result = execute(doc, 'add_decal', { id, ...onTop, text: 'A~B', background: '#000000' });
@@ -232,7 +194,6 @@ describe('text decals', () => {
     expect(image.width & (image.width - 1)).toBe(0);
     expect(image.rgba[3]).toBe(255);
   });
-
   it.each([
     ['missing entity', { id: 'nope' }, 'not found'],
     ['empty text', { text: '  ' }, 'text must be'],
@@ -246,7 +207,6 @@ describe('text decals', () => {
     const { doc, id } = base();
     expectNoOp(execute(doc, 'add_decal', { id, ...onTop, ...patch }), doc, text);
   });
-
   it('add_decal and remove_decal are pure', () => {
     const { doc, id } = base();
     const before = structuredClone(doc);
@@ -257,15 +217,10 @@ describe('text decals', () => {
     execute(painted, 'remove_decal', { id, decalId });
     expect(painted).toEqual(paintedBefore);
   });
-
   it('refuses 2D targets, removes decals, scales them and validates saved ones', () => {
     const { doc, id } = base();
     const sketch = execute(doc, 'draw_arc', { center: [0, 0], radius: 1 });
-    expectNoOp(
-      execute(sketch.document, 'add_decal', { id: sketch.affected[0], ...onTop }),
-      sketch.document,
-      'not a solid',
-    );
+    expectNoOp(execute(sketch.document, 'add_decal', { id: sketch.affected[0], ...onTop }), sketch.document, 'not a solid');
     const painted = execute(doc, 'add_decal', { id, ...onTop }).document;
     const decalId = painted.entities[id]?.decals?.[0]?.id as string;
     const scaled = execute(painted, 'scale_entity', { id, factor: 2 }).document;
@@ -277,9 +232,7 @@ describe('text decals', () => {
     const twice = execute(painted, 'add_decal', { id, ...onTop, at: [20, 0, 10] }).document;
     const one = execute(twice, 'remove_decal', { id, decalId });
     expect(one.document.entities[id]?.decals).toHaveLength(1);
-    const loaded = execute(createEmptyDocument(), 'load_document', {
-      json: serializeDocument(painted),
-    }).document;
+    const loaded = execute(createEmptyDocument(), 'load_document', { json: serializeDocument(painted) }).document;
     expect(loaded.entities[id]).toEqual(painted.entities[id]);
     for (const decals of [
       'x',
@@ -290,32 +243,16 @@ describe('text decals', () => {
       [{ ...painted.entities[id]?.decals?.[0], text: ' ' }],
       [{ ...painted.entities[id]?.decals?.[0], normal: [0, 0, 0] }],
     ]) {
-      const broken = {
-        ...painted,
-        entities: { [id]: { ...painted.entities[id], decals } as unknown as Entity },
-      };
-      const result = execute(createEmptyDocument(), 'load_document', {
-        json: serializeDocument(broken),
-      });
+      const broken = { ...painted, entities: { [id]: { ...painted.entities[id], decals } as unknown as Entity } };
+      const result = execute(createEmptyDocument(), 'load_document', { json: serializeDocument(broken) });
       expect(result.affected).toHaveLength(0);
     }
   });
-
   it('decal patches stay inside the decal box with UVs in [0, 1]', () => {
     const axes = decalAxes({ normal: [0, 0, 1], angle: Math.PI / 2 });
     expect(axes.x[1]).toBeCloseTo(1, 9);
     const patch = decalPatch(
-      {
-        id: 'd',
-        text: 'X',
-        center: [0, 0, 0],
-        normal: [0, 0, 1],
-        angle: 0,
-        width: 2,
-        height: 2,
-        depth: 1,
-        color: '#ffffff',
-      },
+      { id: 'd', text: 'X', center: [0, 0, 0], normal: [0, 0, 1], angle: 0, width: 2, height: 2, depth: 1, color: '#ffffff' },
       [
         [
           [-5, -5, 0],

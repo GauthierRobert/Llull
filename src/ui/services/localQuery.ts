@@ -1,9 +1,4 @@
-/**
- * @layer ui/services
- *
- * Read-only commands run locally on the current store document (reports, exports) and the browser
- * download of their file payload. Never changes the document.
- */
+// Read-only commands on the store document (reports, exports) + browser download of their payload.
 
 import { execute } from '@core/commands/registry';
 import type { CommandResult } from '@core/commands/types';
@@ -11,17 +6,11 @@ import { useStore } from '@ui/store';
 import { downloadText } from '@ui/download';
 import { isCsvData, stringFields } from '@ui/resultData';
 
-/** Runs a read-only command on the current store document. */
 export function runQuery(command: string, params: Record<string, unknown> = {}): CommandResult {
   return execute(useStore.getState().document, command, params);
 }
 
-/**
- * Runs `command` and downloads `data[field]` as the file name the command reports (civil commands
- * return `fileName`, building exporters `filename`) or `fallbackName`; with a null fallback and no
- * reported name nothing is downloaded.
- * @returns the command summary (shown as status).
- */
+/** Downloads `data[field]` as the reported name (civil `fileName`, building `filename`) or `fallbackName`; null fallback + no name = no download. @returns the summary */
 export function downloadQuery(
   command: string,
   params: Record<string, unknown>,
@@ -37,10 +26,7 @@ export function downloadQuery(
   return result.summary;
 }
 
-/**
- * Runs `command` and downloads its `csv` payload as `fileName`.
- * @returns the command summary and whether a file was downloaded (false: the command refused).
- */
+/** @returns the summary and whether a file was downloaded (false: refused). */
 export function downloadCsvQuery(
   command: string,
   params: Record<string, unknown>,

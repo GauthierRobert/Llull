@@ -8,15 +8,11 @@ export type GirderType = 'rolled' | 'welded-full' | 'welded-fillet';
 export type RailSize = 'A45' | 'A55' | 'A65' | 'A75' | 'A100' | 'flat50x30';
 
 /** Approximate crane-rail data (DIN 536 Form A; flat bar 50x30): height mm, foot width mm, kg/m, Ir mm⁴. */
-export const RAILS: Readonly<
-  Record<RailSize, { height: number; foot: number; mass: number; inertia: number }>
-> = {
-  A45: { height: 55, foot: 125, mass: 22.1, inertia: 90e4 },
-  A55: { height: 65, foot: 150, mass: 31.8, inertia: 178e4 },
-  A65: { height: 75, foot: 175, mass: 43.1, inertia: 319e4 },
-  A75: { height: 85, foot: 200, mass: 56.2, inertia: 531e4 },
-  A100: { height: 95, foot: 200, mass: 74.3, inertia: 856e4 },
-  flat50x30: { height: 30, foot: 50, mass: 11.8, inertia: 11.25e4 },
+// prettier-ignore
+export const RAILS: Readonly<Record<RailSize, { height: number; foot: number; mass: number; inertia: number }>> = {
+  A45: { height: 55, foot: 125, mass: 22.1, inertia: 90e4 }, A55: { height: 65, foot: 150, mass: 31.8, inertia: 178e4 },
+  A65: { height: 75, foot: 175, mass: 43.1, inertia: 319e4 }, A75: { height: 85, foot: 200, mass: 56.2, inertia: 531e4 },
+  A100: { height: 95, foot: 200, mass: 74.3, inertia: 856e4 }, flat50x30: { height: 30, foot: 50, mass: 11.8, inertia: 11.25e4 },
 };
 
 export interface RunwayCheckRow {
@@ -48,11 +44,7 @@ export const GAMMA_MF = 1.15;
 export const GAMMA_M0 = 1;
 
 /** EN 1993-1-9 Tab. 8.10: rolled 160; welded full-penetration tee-butt 71; fillet / partial penetration 36. */
-export const LOCAL_CATEGORIES: Readonly<Record<GirderType, number>> = {
-  rolled: 160,
-  'welded-full': 71,
-  'welded-fillet': 36,
-};
+export const LOCAL_CATEGORIES: Readonly<Record<GirderType, number>> = { rolled: 160, 'welded-full': 71, 'welded-fillet': 36 };
 
 /** 2^(1/3) on λ: two stress cycles per wheel passage (EN 1993-6 §9.4.2). */
 export const LOCAL_LAMBDA_FACTOR = 1.26;
@@ -87,23 +79,17 @@ export const STATIC_TEST_FACTOR = 1.25;
 export const DYNAMIC_TEST_FACTOR = 1.1;
 
 /**
- * Total buffer force HB,1 = φ7 v1 √(mc SB) (N) of the crane at both end stops of a runway.
- * mc = crane mass only (free hook); v1 = 0.7 × travelSpeed (m/s); stiffness in kN/m.
+ * Total buffer force HB,1 = φ7 v1 √(mc SB) (N) of the crane at both end stops of a runway. mc = crane mass only (free hook); v1 = 0.7 ×
+ * travelSpeed (m/s); stiffness in kN/m.
  */
-export function bufferForce(
-  craneSelfWeightNewton: number,
-  travelSpeed: number,
-  stiffnessKnPerM: number,
-): number {
+export function bufferForce(craneSelfWeightNewton: number, travelSpeed: number, stiffnessKnPerM: number): number {
   const mass = craneSelfWeightNewton / GRAVITY;
   return PHI7 * BUFFER_SPEED_RATIO * travelSpeed * Math.sqrt(mass * stiffnessKnPerM * 1000);
 }
 
 /** Maximum moment (N·mm) of two wheel loads P at spacing a on a simply supported span L. */
 export function wheelMoment(load: number, spacing: number, span: number): number {
-  return spacing < 0.586 * span
-    ? (load * (span - spacing / 2) ** 2) / (2 * span)
-    : (load * span) / 4;
+  return spacing < 0.586 * span ? (load * (span - spacing / 2) ** 2) / (2 * span) : (load * span) / 4;
 }
 
 /** Maximum support shear (N) of two wheel loads P at spacing a on span L (one wheel at support). */
@@ -112,12 +98,7 @@ export function wheelShear(load: number, spacing: number, span: number): number 
 }
 
 /** Midspan deflection (mm) of two wheel loads P placed symmetrically about midspan (exact). */
-export function wheelDeflection(
-  load: number,
-  spacing: number,
-  span: number,
-  inertia: number,
-): number {
+export function wheelDeflection(load: number, spacing: number, span: number, inertia: number): number {
   const wheels = spacing < span ? 2 : 1;
   const x = wheels === 2 ? (span - spacing) / 2 : span / 2;
   return (wheels * load * x * (3 * span ** 2 - 4 * x ** 2)) / (48 * E_STEEL * inertia);

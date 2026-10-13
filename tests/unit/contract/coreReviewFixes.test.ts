@@ -1,15 +1,6 @@
-/** Regression tests for the core command-layer review (expressions, rotations, exports, refs). */
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
-import type {
-  CadDocument,
-  Constraint,
-  Entity,
-  ExtrusionEntity,
-  Joint,
-  RectangleEntity,
-  Vec3,
-} from '@core/model/types';
+import type { CadDocument, Constraint, Entity, ExtrusionEntity, Joint, RectangleEntity, Vec3 } from '@core/model/types';
 import { execute, listCommands } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import { evaluateExpression } from '@core/commands/parametric/expression';
@@ -19,11 +10,10 @@ import { isVec2, isVec2List } from '@lib/vec2';
 import { elementAt } from '@lib/elementAt';
 import { sampleArc } from '@lib/arc';
 import { sub3, cross3, dot3 } from '@lib/vec3';
+import { xy } from '../../helpers/xy';
 
-const run = (doc: CadDocument, name: string, params: unknown): ReturnType<typeof execute> =>
-  execute(doc, name, params);
-const only = (doc: CadDocument, kind: string): Entity =>
-  Object.values(doc.entities).find((e) => e.kind === kind) as Entity;
+const run = (doc: CadDocument, name: string, params: unknown): ReturnType<typeof execute> => execute(doc, name, params);
+const only = (doc: CadDocument, kind: string): Entity => Object.values(doc.entities).find((e) => e.kind === kind) as Entity;
 
 describe('expressions: own numeric names and finite results', () => {
   it('rejects divide-by-zero and inherited names', () => {
@@ -32,31 +22,24 @@ describe('expressions: own numeric names and finite results', () => {
     expect(evaluateExpression('valueOf + 1', {}).ok).toBe(false);
     expect(evaluateExpression('a * 2', { a: 4 })).toEqual({ ok: true, value: 8 });
   });
-
   it('set_parameter refuses the __proto__ name', () => {
-    const result = run(createEmptyDocument(), 'set_parameter', {
-      name: '__proto__',
-      expression: '1',
-    });
+    const result = run(createEmptyDocument(), 'set_parameter', { name: '__proto__', expression: '1' });
     expect(result.affected).toEqual([]);
     expect(Object.keys(result.document.parameters)).toEqual([]);
   });
-
   it('set_parameter refuses a constant divide by zero, never storing Infinity', () => {
     const doc = run(createEmptyDocument(), 'set_parameter', { name: 'p', expression: '1/0' });
     expect(doc.document.parameters.p).toBeUndefined();
     expect(doc.summary).toContain('not a finite number');
-    const reference = run(
-      run(createEmptyDocument(), 'set_parameter', { name: 'z', expression: '0' }).document,
-      'set_parameter',
-      { name: 'q', expression: '1/z' },
-    );
+    const reference = run(run(createEmptyDocument(), 'set_parameter', { name: 'z', expression: '0' }).document, 'set_parameter', {
+      name: 'q',
+      expression: '1/z',
+    });
     expect(reference.document.parameters.q?.error).toBeDefined();
     expect(Number.isFinite(reference.document.parameters.q?.value)).toBe(true);
     const ok = run(createEmptyDocument(), 'set_parameter', { name: 'p', expression: '6/3' });
     expect(ok.document.parameters.p?.value).toBe(2);
   });
-
   it('delete_parameter ignores prototype names', () => {
     const doc = createEmptyDocument();
     const result = run(doc, 'delete_parameter', { name: 'toString' });
@@ -71,20 +54,14 @@ describe('world-Z rotation helper', () => {
     const tilted: Vec3 = [Math.PI / 2, 0, 0];
     const rotated = rotateEulerAboutWorldZ(tilted, Math.PI / 2);
     const viaEuler = applyEulerXYZ([1, 2, 3], [0, 0, 0], rotated);
-    const direct = applyEulerXYZ(
-      applyEulerXYZ([1, 2, 3], [0, 0, 0], tilted),
-      [0, 0, 0],
-      [0, 0, Math.PI / 2],
-    );
+    const direct = applyEulerXYZ(applyEulerXYZ([1, 2, 3], [0, 0, 0], tilted), [0, 0, 0], [0, 0, Math.PI / 2]);
     direct.forEach((v, i) => expect(viaEuler[i]).toBeCloseTo(v));
     expect(composeEulerXYZ([0.1, 0.2, 0.3], [0, 0, 0])).toEqual([0.1, 0.2, 0.3]);
   });
-
   it('never returns negative zero', () => {
     expect(Object.is(rotateEulerAboutWorldZ([0, 0, 0.5], 1)[0], 0)).toBe(true);
     expect(Object.is(rotateEulerAboutWorldZ([0, 0, 0.5], 1)[1], 0)).toBe(true);
   });
-
   it('array_polar rotates the copy axes of a tilted part about world Z', () => {
     let doc = run(createEmptyDocument(), 'add_cylinder', {
       radius: 1,
@@ -104,12 +81,9 @@ describe('world-Z rotation helper', () => {
     expect(ay).toBeCloseTo(0);
     expect(quarter.position[1]).toBeCloseTo(10);
   });
-
   it('array_polar failure: missing id is a no-op', () => {
     const doc = createEmptyDocument();
-    expect(run(doc, 'array_polar', { id: 'nope', count: 3, center: [0, 0, 0] }).affected).toEqual(
-      [],
-    );
+    expect(run(doc, 'array_polar', { id: 'nope', count: 3, center: [0, 0, 0] }).affected).toEqual([]);
   });
 });
 
@@ -118,17 +92,13 @@ describe('offset_2d on a rotated rectangle', () => {
     const base = run(createEmptyDocument(), 'draw_rectangle', { width: 4, height: 2 }).document;
     const id = base.order[0] as string;
     const rect = base.entities[id] as RectangleEntity;
-    const doc = {
-      ...base,
-      entities: { ...base.entities, [id]: { ...rect, rotation: [0, 0, Math.PI / 2] as Vec3 } },
-    };
+    const doc = { ...base, entities: { ...base.entities, [id]: { ...rect, rotation: [0, 0, Math.PI / 2] as Vec3 } } };
     const result = run(doc, 'offset_2d', { id, distance: 1 });
     const copy = result.document.entities[result.affected[0] as string] as RectangleEntity;
     expect(copy.position[0]).toBeCloseTo(-1);
     expect(copy.position[1]).toBeCloseTo(-1);
     expect(copy.width).toBe(6);
   });
-
   it('failure: degenerate inward offset is a no-op', () => {
     const base = run(createEmptyDocument(), 'draw_rectangle', { width: 4, height: 2 }).document;
     const result = run(base, 'offset_2d', { id: base.order[0], distance: -5 });
@@ -141,27 +111,15 @@ describe('extrude_profile does not inherit the sketch rotation', () => {
     const base = run(createEmptyDocument(), 'draw_rectangle', { width: 4, height: 2 }).document;
     const id = base.order[0] as string;
     const rect = base.entities[id] as RectangleEntity;
-    return {
-      id,
-      doc: {
-        ...base,
-        entities: { ...base.entities, [id]: { ...rect, rotation: [Math.PI / 2, 0, 0] as Vec3 } },
-      },
-    };
+    return { id, doc: { ...base, entities: { ...base.entities, [id]: { ...rect, rotation: [Math.PI / 2, 0, 0] as Vec3 } } } };
   };
-
   it('defaults to [0, 0, 0] and uses an explicit rotation verbatim', () => {
     const { doc, id } = sketch();
     const plain = run(doc, 'extrude_profile', { id, depth: 3 });
     expect((only(plain.document, 'extrusion') as ExtrusionEntity).rotation).toEqual([0, 0, 0]);
     const rotated = run(doc, 'extrude_profile', { id, depth: 3, rotation: [0, 0, Math.PI / 2] });
-    expect((only(rotated.document, 'extrusion') as ExtrusionEntity).rotation).toEqual([
-      0,
-      0,
-      Math.PI / 2,
-    ]);
+    expect((only(rotated.document, 'extrusion') as ExtrusionEntity).rotation).toEqual([0, 0, Math.PI / 2]);
   });
-
   it('failure: depth <= 0 is a no-op', () => {
     const { doc, id } = sketch();
     expect(run(doc, 'extrude_profile', { id, depth: 0 }).document).toBe(doc);
@@ -169,38 +127,16 @@ describe('extrude_profile does not inherit the sketch rotation', () => {
 });
 
 describe('exported extrusion facets face outward', () => {
-  const square = (clockwise: boolean): Array<[number, number]> =>
-    clockwise
-      ? [
-          [0, 0],
-          [0, 2],
-          [2, 2],
-          [2, 0],
-        ]
-      : [
-          [0, 0],
-          [2, 0],
-          [2, 2],
-          [0, 2],
-        ];
-
+  const square = (clockwise: boolean): Array<[number, number]> => (clockwise ? xy(0, 0, 0, 2, 2, 2, 2, 0) : xy(0, 0, 2, 0, 2, 2, 0, 2));
   for (const clockwise of [false, true]) {
     it(`${clockwise ? 'clockwise' : 'counter-clockwise'} profile: every facet normal points away from the centre`, () => {
-      const doc = run(createEmptyDocument(), 'extrude_profile', {
-        profile: square(clockwise),
-        depth: 2,
-        position: [0, 0, 0],
-      }).document;
+      const doc = run(createEmptyDocument(), 'extrude_profile', { profile: square(clockwise), depth: 2, position: [0, 0, 0] }).document;
       const triangles = entityToTriangles(only(doc, 'extrusion'), doc);
       expect(triangles.length).toBeGreaterThanOrEqual(12);
       const centre: Vec3 = [1, 1, 1];
       for (const [a, b, c] of triangles) {
         const normal = cross3(sub3(b, a), sub3(c, a));
-        const middle: Vec3 = [
-          (a[0] + b[0] + c[0]) / 3,
-          (a[1] + b[1] + c[1]) / 3,
-          (a[2] + b[2] + c[2]) / 3,
-        ];
+        const middle: Vec3 = [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3];
         expect(dot3(normal, sub3(middle, centre))).toBeGreaterThan(0);
       }
     });
@@ -213,15 +149,9 @@ describe('profile validation', () => {
     expect(isVec2([1, 2, 3])).toBe(false);
     expect(isVec2('a')).toBe(false);
     expect(isVec2([1, Number.NaN])).toBe(false);
-    expect(
-      isVec2List([
-        [0, 0],
-        [1, 1],
-      ]),
-    ).toBe(true);
+    expect(isVec2List(xy(0, 0, 1, 1))).toBe(true);
     expect(isVec2List([[0, 0], 'a'])).toBe(false);
   });
-
   it('extrude_profile / revolve_profile name the bad point', () => {
     const doc = createEmptyDocument();
     for (const profile of [
@@ -239,25 +169,13 @@ describe('profile validation', () => {
       expect(revolved.document).toBe(doc);
       expect(revolved.summary).toContain('profile point');
     }
-    const good = run(doc, 'extrude_profile', {
-      profile: [
-        [0, 0],
-        [1, 0],
-        [0, 1],
-      ],
-      depth: 1,
-    });
+    const good = run(doc, 'extrude_profile', { profile: xy(0, 0, 1, 0, 0, 1), depth: 1 });
     expect(good.affected).toHaveLength(1);
   });
 });
 
 describe('revolve_profile ids and layers', () => {
-  const profile = [
-    [1, 0],
-    [2, 0],
-    [2, 1],
-  ];
-
+  const profile = xy(1, 0, 2, 0, 2, 1);
   it('refuses an id that already exists and keeps order duplicate-free', () => {
     const first = run(createEmptyDocument(), 'revolve_profile', { profile, id: 'rev-a' });
     expect(first.affected).toEqual(['rev-a']);
@@ -267,7 +185,6 @@ describe('revolve_profile ids and layers', () => {
     const proto = run(first.document, 'revolve_profile', { profile, id: 'toString' });
     expect(proto.document).toBe(first.document);
   });
-
   it('unknown layer falls back to the default layer', () => {
     const result = run(createEmptyDocument(), 'revolve_profile', { profile, layerId: 'ghost' });
     expect(only(result.document, 'revolution').layerId).toBe('layer-default');
@@ -297,13 +214,7 @@ describe('move_entities', () => {
 
 describe('explode_polyline prunes group membership', () => {
   it('removes the polyline from groups', () => {
-    let doc = run(createEmptyDocument(), 'draw_polyline', {
-      points: [
-        [0, 0],
-        [1, 0],
-        [1, 1],
-      ],
-    }).document;
+    let doc = run(createEmptyDocument(), 'draw_polyline', { points: xy(0, 0, 1, 0, 1, 1) }).document;
     doc = run(doc, 'draw_arc', { center: [0, 0], radius: 1 }).document;
     const [poly, circle] = doc.order as [string, string];
     doc = run(doc, 'group_entities', { ids: [poly, circle, poly] }).document;
@@ -315,7 +226,6 @@ describe('explode_polyline prunes group membership', () => {
       expect(g.memberIds).not.toContain(poly);
     }
   });
-
   it('failure: unknown id', () => {
     const doc = createEmptyDocument();
     expect(run(doc, 'explode_polyline', { id: 'x' }).document).toBe(doc);
@@ -336,20 +246,8 @@ describe('deleting entities prunes constraints, joints and drives', () => {
     doc = run(doc, 'draw_arc', { center: [0, 0], radius: 1 }).document;
     doc = run(doc, 'draw_arc', { center: [5, 0], radius: 1 }).document;
     const [a, b] = doc.order as [string, string];
-    const constraint: Constraint = {
-      id: 'c1',
-      kind: 'coincident',
-      a: { entityId: a },
-      b: { entityId: b },
-    };
-    const joint = (id: string): Joint => ({
-      id,
-      kind: 'revolute',
-      a: { instanceId: a },
-      b: { instanceId: b },
-      axis: 'z',
-      angle: 0,
-    });
+    const constraint: Constraint = { id: 'c1', kind: 'coincident', a: { entityId: a }, b: { entityId: b } };
+    const joint = (id: string): Joint => ({ id, kind: 'revolute', a: { instanceId: a }, b: { instanceId: b }, axis: 'z', angle: 0 });
     return {
       ...doc,
       constraints: { c1: constraint },
@@ -360,7 +258,6 @@ describe('deleting entities prunes constraints, joints and drives', () => {
       driveRelationOrder: ['d1'],
     };
   };
-
   it('delete_entities removes dependent records and reports them', () => {
     const doc = build();
     const result = run(doc, 'delete_entities', { ids: [doc.order[0]] });
@@ -372,15 +269,12 @@ describe('deleting entities prunes constraints, joints and drives', () => {
     const check = run(result.document, 'check_model', {});
     expect((check.data as { issues: Array<{ code: string }> }).issues).toEqual([]);
   });
-
   it('check_model flags dangling references left by a hand edit', () => {
     const doc = build();
     const broken = { ...doc, entities: {}, order: [] };
-    const issues = (run(broken, 'check_model', {}).data as { issues: Array<{ code: string }> })
-      .issues;
+    const issues = (run(broken, 'check_model', {}).data as { issues: Array<{ code: string }> }).issues;
     expect(issues.filter((i) => i.code === 'dangling_reference').length).toBeGreaterThanOrEqual(3);
   });
-
   it('delete_entities keeps unrelated records', () => {
     const doc = run(build(), 'draw_arc', { center: [9, 9], radius: 1 }).document;
     const extra = doc.order[2] as string;
@@ -436,22 +330,15 @@ describe('execute marks refusals as rejected', () => {
     expect(run(doc, 'add_box', { size: 'big' }).rejected).toBe(true);
     expect(run(doc, 'delete_entities', { ids: ['constructor'] }).rejected).toBe(true);
   });
-
   it('a command-level no-op and a success are not rejected', () => {
     const doc = createEmptyDocument();
     expect(run(doc, 'delete_entities', { ids: ['ghost'] }).rejected).toBeUndefined();
     expect(run(doc, 'add_box', { size: [1, 1, 1] }).rejected).toBeUndefined();
   });
-
   it('requiresKernel without a kernel', () => {
     const kernelCommand = listCommands().find((c) => c.annotations?.requiresKernel === true);
     expect(kernelCommand).toBeDefined();
-    const result = execute(
-      createEmptyDocument(),
-      (kernelCommand as { name: string }).name,
-      {},
-      { ...defaultContext(), kernel: null },
-    );
+    const result = execute(createEmptyDocument(), (kernelCommand as { name: string }).name, {}, { ...defaultContext(), kernel: null });
     expect(result.rejected).toBe(true);
     expect(result.summary).toContain('kernel not available');
   });
@@ -459,10 +346,7 @@ describe('execute marks refusals as rejected', () => {
 
 describe('export_code file name', () => {
   it('collapses runs of unsafe characters', () => {
-    const result = run(createEmptyDocument(), 'export_code', {
-      language: 'openscad',
-      name: 'my  weird/name',
-    });
+    const result = run(createEmptyDocument(), 'export_code', { language: 'openscad', name: 'my  weird/name' });
     expect(result.summary).toContain('my_weird_name.scad');
   });
 });

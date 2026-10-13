@@ -7,8 +7,6 @@ import type { UiRun } from './grading';
 import type { UiSession } from './session';
 
 /**
- * @layer tests/production/ui
- *
  * civil-site-development through the UI: from an empty app, the engineer fills the project title
  * block (Building panel), then works down the Civil / Site panel — survey file, terrain, pad and
  * balance, road (spirals, profile, template, superelevation, report), manholes and pipes, IDF sizing

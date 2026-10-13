@@ -6,10 +6,7 @@ function isIllegalXmlChar(code: number, next: number): boolean {
   return code >= 0xd800 && code <= 0xdbff && !(next >= 0xdc00 && next <= 0xdfff);
 }
 
-/**
- * @pure escape `& < > "` for XML/SVG text and attribute values and drop characters XML 1.0
- * forbids (which would make the whole document unparseable); `\t \n \r` and astral characters stay.
- */
+/** forbids (which would make the whole document unparseable); `\t \n \r` and astral characters stay. */
 export function escapeXml(text: string): string {
   let kept = '';
   for (let i = 0; i < text.length; i++) {
@@ -17,13 +14,7 @@ export function escapeXml(text: string): string {
     if (code >= 0xd800 && code <= 0xdbff && !isIllegalXmlChar(code, text.charCodeAt(i + 1))) {
       kept += text.slice(i, i + 2); // valid surrogate pair
       i++;
-    } else if (!isIllegalXmlChar(code, 0)) {
-      kept += text[i];
-    }
+    } else if (!isIllegalXmlChar(code, 0)) kept += text[i];
   }
-  return kept
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  return kept.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }

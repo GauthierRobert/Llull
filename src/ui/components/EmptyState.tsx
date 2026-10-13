@@ -1,11 +1,5 @@
-/**
- * @layer ui/components
- *
- * EmptyState — a centered "start here" card over the viewport while the document has no entities.
- * Offers one-click starts (add a box, draw a rectangle) and explains how to move things and how to
- * let an MCP agent build the model. Auto-hides once any entity exists; dismissal is local state.
- * Actions only dispatch through the shared toolbar helpers (PRIME DIRECTIVE).
- */
+// Centered "start here" card while the document is empty: one-click starts, how to move things, how to let an MCP agent
+// build. Dismissal is local state.
 
 import React, { useState } from 'react';
 import { useLayoutStore, useStore, useToolStore } from '@ui/store';
@@ -16,13 +10,7 @@ import { SOLID_PRESETS } from '@ui/components/toolbar/solidPresets';
 import { createSolid } from '@ui/actions/createSolid';
 import { startCivilSite } from '@ui/actions/civilStarter';
 
-function Tip({
-  icon,
-  children,
-}: {
-  icon: IconName;
-  children: React.ReactNode;
-}): React.ReactElement {
+function Tip({ icon, children }: { icon: IconName; children: React.ReactNode }): React.ReactElement {
   return (
     <li className="empty-state__tip">
       <span className="empty-state__tip-icon" aria-hidden="true">
@@ -41,7 +29,7 @@ export function EmptyState(): React.ReactElement | null {
   const [dismissed, setDismissed] = useState(false);
   const [civilLoading, setCivilLoading] = useState(false);
 
-  // Hidden while a 2D tool is armed so the card never covers the drawing area.
+  // Never covers the drawing area while a 2D tool is armed.
   if (entityCount > 0 || dismissed || drawToolArmed) return null;
 
   const showBuildingTab = (): void => {
@@ -73,27 +61,17 @@ export function EmptyState(): React.ReactElement | null {
         </div>
 
         <h2 className="empty-state__heading">Start your model</h2>
-        <p className="empty-state__subheading">
-          Everything you can create is in the toolbar above. Try one:
-        </p>
+        <p className="empty-state__subheading">Everything you can create is in the toolbar above. Try one:</p>
 
         <div className="empty-state__actions">
           {boxPreset !== undefined && (
-            <button
-              type="button"
-              className="empty-state__action"
-              onClick={() => createSolid(boxPreset)}
-            >
+            <button type="button" className="empty-state__action" onClick={() => createSolid(boxPreset)}>
               <Icon name="cube" size={18} />
               <span className="empty-state__action-title">Add a 3D box</span>
               <span className="empty-state__action-sub">then drag its arrows to move it</span>
             </button>
           )}
-          <button
-            type="button"
-            className="empty-state__action"
-            onClick={() => setDrawTool('rectangle')}
-          >
+          <button type="button" className="empty-state__action" onClick={() => setDrawTool('rectangle')}>
             <Icon name="drawRectangle" size={18} />
             <span className="empty-state__action-title">Draw a 2D rectangle</span>
             <span className="empty-state__action-sub">click two corners on the grid</span>
@@ -142,17 +120,15 @@ export function EmptyState(): React.ReactElement | null {
 
         <ul className="empty-state__tips" aria-label="Tips">
           <Tip icon="transformMove">
-            <strong>Move things:</strong> click an object, then drag the gizmo arrows (3D) or press{' '}
-            <kbd className="kbd">M</kbd> (2D). Arrow keys nudge, the Properties panel takes exact
-            coordinates.
+            <strong>Move things:</strong> click an object, then drag the gizmo arrows (3D) or press <kbd className="kbd">M</kbd> (2D). Arrow
+            keys nudge, the Properties panel takes exact coordinates.
           </Tip>
           <Tip icon="plug">
-            <strong>Or let AI build it:</strong> use <em>Connect agent</em> (top right) and ask
-            Claude to model something.
+            <strong>Or let AI build it:</strong> use <em>Connect agent</em> (top right) and ask Claude to model something.
           </Tip>
           <Tip icon="search">
-            Press <kbd className="kbd">{PALETTE_SHORTCUT_LABEL}</kbd> to search and run any of
-            llull’s commands, or <kbd className="kbd">?</kbd> for keyboard shortcuts.
+            Press <kbd className="kbd">{PALETTE_SHORTCUT_LABEL}</kbd> to search and run any of llull’s commands, or{' '}
+            <kbd className="kbd">?</kbd> for keyboard shortcuts.
           </Tip>
         </ul>
       </div>

@@ -1,5 +1,4 @@
 /**
- * @layer server
  * Process entry of the `llull` CLI (launched by `server/bin/llull.cjs`). A local run with
  * `--timeout` is supervised: the CLI re-runs itself as a child and kills it shortly after the
  * deadline, because a single slow step (an OCC boolean) blocks the child's event loop and could
@@ -17,9 +16,7 @@ const KILL_GRACE_SECONDS = 5;
 
 function graceSeconds(env: NodeJS.ProcessEnv): number {
   const override = Number(env['LLULL_CLI_KILL_GRACE_SECONDS']);
-  return env['LLULL_CLI_KILL_GRACE_SECONDS'] !== undefined && override >= 0
-    ? override
-    : KILL_GRACE_SECONDS;
+  return env['LLULL_CLI_KILL_GRACE_SECONDS'] !== undefined && override >= 0 ? override : KILL_GRACE_SECONDS;
 }
 
 /** Seconds of a `--timeout` that needs supervising (a local run, not yet supervised), else undefined. */
@@ -32,10 +29,7 @@ function supervisedTimeout(argv: readonly string[], env: NodeJS.ProcessEnv): num
 }
 
 function supervise(seconds: number): void {
-  const child = spawn(process.execPath, process.argv.slice(1), {
-    stdio: 'inherit',
-    env: { ...process.env, [CHILD_ENV]: '1' },
-  });
+  const child = spawn(process.execPath, process.argv.slice(1), { stdio: 'inherit', env: { ...process.env, [CHILD_ENV]: '1' } });
   let killed = false;
   const timer = setTimeout(
     () => {
@@ -46,10 +40,7 @@ function supervise(seconds: number): void {
   );
   child.on('exit', (code) => {
     clearTimeout(timer);
-    if (killed)
-      process.stderr.write(
-        `llull: timed out after ${seconds}s (--timeout); the run was killed, nothing was saved.\n`,
-      );
+    if (killed) process.stderr.write(`llull: timed out after ${seconds}s (--timeout); the run was killed, nothing was saved.\n`);
     process.exit(killed ? 1 : (code ?? 1));
   });
 }

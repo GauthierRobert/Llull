@@ -1,4 +1,3 @@
-/** Plugin contract: domains extend the core through installPlugin, not imports. */
 import { describe, it, expect } from 'vitest';
 import { createEmptyDocument } from '@core/model/types';
 import { execute, getCommand, listCommands } from '@core/commands/registry';
@@ -30,7 +29,6 @@ describe('plugins', () => {
     expect(TOOLSETS.building).toContain('check_portal_frames');
     expect(toolsetOf('draw_walls')).toBe('building');
   });
-
   it('installing a plugin registers its guarded commands once', () => {
     const before = listCommands().length;
     installPlugin(echoPlugin);
@@ -42,13 +40,8 @@ describe('plugins', () => {
     const invalid = execute(createEmptyDocument(), 'test_echo_plugin', { text: 3 });
     expect(invalid.summary).toMatch(/rejected: invalid params/);
   });
-
   it('refuses a plugin command that collides with an existing name', () => {
-    const clash: CadPlugin = {
-      ...echoPlugin,
-      name: 'test-clash',
-      commands: [{ ...echoPlugin.commands[0]!, name: 'add_box' }],
-    };
+    const clash: CadPlugin = { ...echoPlugin, name: 'test-clash', commands: [{ ...echoPlugin.commands[0]!, name: 'add_box' }] };
     const before = listCommands().length;
     expect(() => installPlugin(clash)).toThrow(/add_box/);
     expect(listCommands().length).toBe(before);

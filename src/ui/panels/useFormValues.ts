@@ -1,8 +1,4 @@
-/**
- * @layer ui/panels
- * Controlled form state shared by the panel forms: field values, one inline error that clears on
- * every edit.
- */
+// Controlled panel form state: field values + one inline error cleared on every edit.
 
 import { useState } from 'react';
 
@@ -15,9 +11,7 @@ interface FormValues<V extends Readonly<Record<string, string>>> {
   field: (key: keyof V & string) => { value: string; set: (value: string) => void };
 }
 
-export function useFormValues<V extends Readonly<Record<string, string>>>(
-  initial: () => V,
-): FormValues<V> {
+export function useFormValues<V extends Readonly<Record<string, string>>>(initial: () => V): FormValues<V> {
   const [values, setValues] = useState<V>(initial);
   const [error, setError] = useState('');
   const change = (key: keyof V & string, value: string): void => {

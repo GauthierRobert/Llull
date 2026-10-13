@@ -9,9 +9,6 @@ import { DEFAULT_DRAW_COLOR, drawPointSeries, workPlaneStyleFields } from './sha
 import { noop } from '../noop';
 
 /**
- * @command draw_polyline
- * @pure
- * @layer core/commands
  * @affects creates 1 polyline entity, or 1 line entity for an open 2-point series
  * @invariant points.length >= 2; each point is a 2-element [x,y] array
  * @failure fewer than 2 points -> no-op, affected:[]
@@ -27,45 +24,25 @@ export const drawPolyline = defineCommand({
   params: z.object({
     points: z
       .array(z.array(z.number()))
-      .describe(
-        'Ordered list of [x, y] vertices in local 2D work-plane coordinates. Minimum 2 points required.',
-      ),
+      .describe('Ordered list of [x, y] vertices in local 2D work-plane coordinates. Minimum 2 points required.'),
     closed: z
       .boolean()
-      .describe(
-        'When true, the last point connects back to the first point, forming a closed loop. Defaults to false.',
-      )
+      .describe('When true, the last point connects back to the first point, forming a closed loop. Defaults to false.')
       .optional(),
     ...workPlaneStyleFields(),
   }),
-  run: (
-    doc,
-    { points, closed = false, position = ORIGIN, color = DEFAULT_DRAW_COLOR },
-  ): CommandResult => {
+  run: (doc, { points, closed = false, position = ORIGIN, color = DEFAULT_DRAW_COLOR }): CommandResult => {
     const [start, end] = points;
     if (points.length === 2 && !closed && start && end) {
       const id = nextId('line');
-      const entity = newEntity(
-        'line',
-        id,
-        { start: [start[0] ?? 0, start[1] ?? 0], end: [end[0] ?? 0, end[1] ?? 0] },
-        position,
-        color,
-      );
-      return commitEntity(
-        doc,
-        entity,
-        `Drew line ${id} from [${start.join(', ')}] to [${end.join(', ')}].`,
-      );
+      const entity = newEntity('line', id, { start: [start[0] ?? 0, start[1] ?? 0], end: [end[0] ?? 0, end[1] ?? 0] }, position, color);
+      return commitEntity(doc, entity, `Drew line ${id} from [${start.join(', ')}] to [${end.join(', ')}].`);
     }
     return drawPointSeries(doc, 'polyline', points, closed, position, color);
   },
 });
 
 /**
- * @command draw_arc
- * @pure
- * @layer core/commands
  * @affects creates 1 arc entity, or 1 circle entity when both angles are omitted
  * @invariant radius > 0; a sweep |endAngle - startAngle| > 2π is stored wrapped into (0, 2π] (the
  *   CCW sweep every consumer — render, measure, extrude — reads)
@@ -96,26 +73,13 @@ export const drawArc = defineCommand({
       .optional(),
     ...workPlaneStyleFields(),
   }),
-  run: (
-    doc,
-    { center, radius, startAngle, endAngle, position = ORIGIN, color = DEFAULT_DRAW_COLOR },
-  ): CommandResult => {
+  run: (doc, { center, radius, startAngle, endAngle, position = ORIGIN, color = DEFAULT_DRAW_COLOR }): CommandResult => {
     if (radius <= 0) return noop(doc, `draw_arc: radius must be > 0 (got ${radius}).`);
     if (startAngle === undefined && endAngle === undefined) {
       const circleId = nextId('circ');
       const circleCenter: Vec2 = [center[0], center[1]];
-      const circle = newEntity(
-        'circle',
-        circleId,
-        { center: circleCenter, radius },
-        position,
-        color,
-      );
-      return commitEntity(
-        doc,
-        circle,
-        `Drew circle ${circleId} center [${circleCenter.join(', ')}] radius ${radius}.`,
-      );
+      const circle = newEntity('circle', circleId, { center: circleCenter, radius }, position, color);
+      return commitEntity(doc, circle, `Drew circle ${circleId} center [${circleCenter.join(', ')}] radius ${radius}.`);
     }
     if (startAngle === undefined || endAngle === undefined)
       return noop(doc, 'draw_arc: give both startAngle and endAngle (arc) or neither (circle).');
@@ -129,28 +93,17 @@ export const drawArc = defineCommand({
     const end = wrapped ? startAngle + (rest < 1e-6 || tau - rest < 1e-6 ? tau : rest) : endAngle;
     const id = nextId('arc');
     const safeCenter: Vec2 = [center[0], center[1]];
-    const entity = newEntity(
-      'arc',
-      id,
-      { center: safeCenter, radius, startAngle, endAngle: end },
-      position,
-      color,
-    );
+    const entity = newEntity('arc', id, { center: safeCenter, radius, startAngle, endAngle: end }, position, color);
     return commitEntity(
       doc,
       entity,
       `Drew arc ${id} center [${safeCenter.join(', ')}] radius ${radius} from ${startAngle.toFixed(3)} to ${end.toFixed(3)} rad.` +
-        (wrapped
-          ? ` The requested sweep ${span.toFixed(3)} rad exceeded 2π: wrapped to ${(end - startAngle).toFixed(3)} rad CCW.`
-          : ''),
+        (wrapped ? ` The requested sweep ${span.toFixed(3)} rad exceeded 2π: wrapped to ${(end - startAngle).toFixed(3)} rad CCW.` : ''),
     );
   },
 });
 
 /**
- * @command draw_rectangle
- * @pure
- * @layer core/commands
  * @affects creates 1 rectangle entity
  * @invariant width > 0 and height > 0
  * @failure width <= 0 or height <= 0 -> no-op, affected:[]
@@ -162,38 +115,20 @@ export const drawRectangle = defineCommand({
     'The origin is at the lower-left corner; width extends along +X, height along +Y. ' +
     'position places the work-plane origin in 3D space. Both width and height must be > 0.',
   params: z.object({
-    width: z
-      .number()
-      .describe('Width of the rectangle along the local X axis. Must be greater than 0.'),
-    height: z
-      .number()
-      .describe('Height of the rectangle along the local Y axis. Must be greater than 0.'),
-    position: vec3(
-      'World-space position [x, y, z] of the work-plane origin (lower-left corner). Defaults to [0,0,0].',
-    ).optional(),
+    width: z.number().describe('Width of the rectangle along the local X axis. Must be greater than 0.'),
+    height: z.number().describe('Height of the rectangle along the local Y axis. Must be greater than 0.'),
+    position: vec3('World-space position [x, y, z] of the work-plane origin (lower-left corner). Defaults to [0,0,0].').optional(),
     color: colorField(DEFAULT_DRAW_COLOR),
   }),
   run: (doc, { width, height, position = ORIGIN, color = DEFAULT_DRAW_COLOR }): CommandResult => {
-    if (width <= 0 || height <= 0) {
-      return noop(
-        doc,
-        `draw_rectangle: width and height must both be > 0 (got ${width}×${height}).`,
-      );
-    }
+    if (width <= 0 || height <= 0) return noop(doc, `draw_rectangle: width and height must both be > 0 (got ${width}×${height}).`);
     const id = nextId('rect');
     const entity = newEntity('rectangle', id, { width, height }, position, color);
-    return commitEntity(
-      doc,
-      entity,
-      `Drew rectangle ${id} ${width}×${height} at [${position.join(', ')}].`,
-    );
+    return commitEntity(doc, entity, `Drew rectangle ${id} ${width}×${height} at [${position.join(', ')}].`);
   },
 });
 
 /**
- * @command draw_point
- * @pure
- * @layer core/commands
  * @affects creates 1 point entity
  * @invariant position is a 3-element [x,y,z] array (defaults to [0,0,0])
  */

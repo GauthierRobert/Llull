@@ -1,9 +1,4 @@
-/**
- * @layer ui/viewport/2d
- *
- * Shared body of the circle / arc / ellipse render branches: an EllipseCurve outline in the
- * entity's XY plane, memoized on its inputs.
- */
+// Shared circle / arc / ellipse body: a memoized EllipseCurve outline in the entity's XY plane.
 
 import { useMemo } from 'react';
 import * as THREE from 'three';
@@ -37,26 +32,9 @@ export function EllipticalCurve({
 }: EllipticalCurveProps): React.ReactElement {
   const [centerX, centerY] = center;
   const positions = useMemo(() => {
-    const curve = new THREE.EllipseCurve(
-      centerX,
-      centerY,
-      radiusX,
-      radiusY,
-      startAngle,
-      endAngle,
-      false,
-      0,
-    );
+    const curve = new THREE.EllipseCurve(centerX, centerY, radiusX, radiusY, startAngle, endAngle, false, 0);
     return curve.getPoints(CURVE_SEGMENTS).flatMap(({ x, y }) => [x, y, 0]);
   }, [centerX, centerY, radiusX, radiusY, startAngle, endAngle]);
 
-  return (
-    <ShapeLine
-      positions={positions}
-      position={position}
-      rotation={rotation}
-      color={color}
-      selected={selected}
-    />
-  );
+  return <ShapeLine positions={positions} position={position} rotation={rotation} color={color} selected={selected} />;
 }

@@ -1,18 +1,10 @@
-/**
- * @layer ui/viewport/2d
- *
- * Derive snap candidate points from the 2D entities of a document.
- */
+// World-space 2D snap candidates of a document's entities.
 
 import type { CadDocument, Vec2 } from '@core/model/types';
 import { wrapAngle } from '@lib/angle';
 import { solidSnaps } from '../solidDrawing';
 import type { CollectOpts, SnapPoint, SnapType } from './types';
-import {
-  curveCurveIntersections,
-  segmentCurveIntersections,
-  type CircularCurve,
-} from './curveIntersections';
+import { curveCurveIntersections, segmentCurveIntersections, type CircularCurve } from './curveIntersections';
 import { allSegmentIntersections } from './segmentSweep';
 import {
   entityToSegments,
@@ -27,15 +19,7 @@ import {
   type Segment,
 } from './geometry';
 
-/**
- * Derive all snap candidate points from the 2D entities in a document.
- * Returns world-space 2D snap points (entity position offset applied).
- *
- * Advanced snaps (perpendicular, tangent, extension, nearest) require a
- * `fromPoint` — the last placed point in an ongoing draw operation.
- *
- * @pure deterministic, no side effects
- */
+/** Perpendicular / tangent need `fromPoint` (the last placed point); extension / nearest need `cursor`. */
 export function collectSnapCandidates(
   document: Pick<CadDocument, 'entities' | 'order' | 'components'>,
   opts: CollectOpts = {},
@@ -61,11 +45,9 @@ export function collectSnapCandidates(
     candidates.push({ x, y, type });
   };
 
-  // Collect all line segments first (needed for intersection computation).
   const allSegments: Segment[] = [];
   const allCurves: CircularCurve[] = [];
 
-  /** Perpendicular / extension / nearest snaps for each segment, then register it for intersections. */
   const addSegmentSnaps = (segments: ReadonlyArray<Segment>): void => {
     for (const [ax, ay, bx, by] of segments) {
       if (doPerpendiculars) {
@@ -83,15 +65,8 @@ export function collectSnapCandidates(
     allSegments.push(...segments);
   };
 
-  /** Tangent + nearest snaps shared by arcs (full = false) and circles (full = true). */
-  const addCurveSnaps = (
-    cx: number,
-    cy: number,
-    r: number,
-    startAngle: number,
-    endAngle: number,
-    full: boolean,
-  ): void => {
+  /** Arcs (full = false) and circles. */
+  const addCurveSnaps = (cx: number, cy: number, r: number, startAngle: number, endAngle: number, full: boolean): void => {
     allCurves.push({ cx, cy, r, startAngle, endAngle, full });
     if (doTangents) {
       for (const snap of snapTangentToCircle(from, cx, cy, r)) {
@@ -109,7 +84,6 @@ export function collectSnapCandidates(
     const entity = document.entities[id];
     if (!entity || !isVisible(entity)) continue;
 
-    // Entity-local -> world XY (rotation about Z, then position).
     const world = (lx: number, ly: number): [number, number] => localToWorld2D(entity, lx, ly);
     const rotationZ = entity.rotation[2] ?? 0;
 
@@ -150,20 +124,15 @@ export function collectSnapCandidates(
         const { radius: r } = entity;
         const startAngle = entity.startAngle + rotationZ;
         const endAngle = entity.endAngle + rotationZ;
-        const onArc = (angle: number): [number, number] => [
-          cx + r * Math.cos(angle),
-          cy + r * Math.sin(angle),
-        ];
+        const onArc = (angle: number): [number, number] => [cx + r * Math.cos(angle), cy + r * Math.sin(angle)];
 
         if (doCenters) add('center', cx, cy);
         if (doEndpoints) {
           add('endpoint', ...onArc(startAngle));
           add('endpoint', ...onArc(endAngle));
         }
-        // Midpoint along the SWEPT arc (direction-respecting), so an arc that crosses the 0/2π
-        // wrap still lands on the arc itself rather than the opposite side.
-        if (doMidpoints)
-          add('midpoint', ...onArc(startAngle + wrapAngle(endAngle - startAngle) / 2));
+        // Middle of the SWEPT arc, so an arc crossing the 0/2π wrap lands on itself, not the opposite side.
+        if (doMidpoints) add('midpoint', ...onArc(startAngle + wrapAngle(endAngle - startAngle) / 2));
         addCurveSnaps(cx, cy, r, startAngle, endAngle, false);
         break;
       }
@@ -173,7 +142,7 @@ export function collectSnapCandidates(
         const r = entity.radius;
 
         if (doCenters) add('center', cx, cy);
-        // Cardinal points (in the entity's local axes) as endpoints.
+        // Cardinal points in local axes.
         if (doEndpoints) {
           add('endpoint', ...world(entity.center[0] + r, entity.center[1]));
           add('endpoint', ...world(entity.center[0] - r, entity.center[1]));
@@ -232,19 +201,13 @@ export function collectSnapCandidates(
       default:
         if (!doSolidSnaps) break;
         for (const snap of solidSnaps(document, entity, opts.cutDepth)) {
-          const wanted =
-            snap.type === 'endpoint'
-              ? doEndpoints
-              : snap.type === 'midpoint'
-                ? doMidpoints
-                : doCenters;
+          const wanted = snap.type === 'endpoint' ? doEndpoints : snap.type === 'midpoint' ? doMidpoints : doCenters;
           if (wanted) candidates.push(snap);
         }
         break;
     }
   }
 
-  // Segment × segment intersections.
   if (doIntersections) {
     for (const pt of allSegmentIntersections(allSegments)) add('intersection', ...pt);
     for (const [i, curve] of allCurves.entries()) {

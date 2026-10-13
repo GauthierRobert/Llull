@@ -1,8 +1,6 @@
 /**
- * Gravity-pipe hydraulics in SI (metres, seconds, litres per second): Manning full-bore capacity,
- * partial-flow depth in a circular section, rational-method runoff.
- * @layer domain-aec/civil
- * @pure
+ * Gravity-pipe hydraulics in SI (metres, seconds, litres per second): Manning full-bore capacity, partial-flow depth in a circular section,
+ * rational-method runoff.
  */
 import { bisect } from '@lib/bisect';
 
@@ -36,12 +34,7 @@ function wettedArea(diameter: number, ratio: number): { area: number; theta: num
 }
 
 /** Discharge (m^3/s) at depth ratio `ratio` (0..1) of a circular section. */
-export function partialFlowDischarge(
-  diameter: number,
-  slope: number,
-  manningN: number,
-  ratio: number,
-): number {
+export function partialFlowDischarge(diameter: number, slope: number, manningN: number, ratio: number): number {
   if (!(slope > 0) || !(ratio > 0)) return 0;
   const { area, theta } = wettedArea(diameter, ratio);
   const radius = area / ((diameter * theta) / 2);
@@ -49,35 +42,20 @@ export function partialFlowDischarge(
 }
 
 /**
- * Depth ratio and velocity for discharge `flow` (m^3/s). Bisection on the rising branch of the
- * discharge curve; flows above the open-channel maximum are reported surcharged at ratio 1.
+ * Depth ratio and velocity for discharge `flow` (m^3/s). Bisection on the rising branch of the discharge curve; flows above the
+ * open-channel maximum are reported surcharged at ratio 1.
  */
-export function solvePartialFlow(
-  diameter: number,
-  slope: number,
-  manningN: number,
-  flow: number,
-): PartialFlow {
+export function solvePartialFlow(diameter: number, slope: number, manningN: number, flow: number): PartialFlow {
   if (!(flow > 0)) return { depthRatio: 0, velocity: 0, surcharged: false };
-  if (!(slope > 0) || !(diameter > 0) || !(manningN > 0))
-    return { depthRatio: 1, velocity: 0, surcharged: true };
+  if (!(slope > 0) || !(diameter > 0) || !(manningN > 0)) return { depthRatio: 1, velocity: 0, surcharged: true };
   const maximum = partialFlowDischarge(diameter, slope, manningN, MAX_DISCHARGE_DEPTH_RATIO);
-  if (flow > maximum)
-    return { depthRatio: 1, velocity: flow / fullArea(diameter), surcharged: true };
-  const { low, high } = bisect(
-    (ratio) => partialFlowDischarge(diameter, slope, manningN, ratio) < flow,
-    0,
-    MAX_DISCHARGE_DEPTH_RATIO,
-  );
+  if (flow > maximum) return { depthRatio: 1, velocity: flow / fullArea(diameter), surcharged: true };
+  const { low, high } = bisect((ratio) => partialFlowDischarge(diameter, slope, manningN, ratio) < flow, 0, MAX_DISCHARGE_DEPTH_RATIO);
   const depthRatio = (low + high) / 2;
   return { depthRatio, velocity: flow / wettedArea(diameter, depthRatio).area, surcharged: false };
 }
 
 /** Rational method Q = C i A / 360 -> litres per second (i in mm/h, A in hectares). */
-export function rationalFlowLps(
-  runoffCoefficient: number,
-  intensityMmPerHour: number,
-  areaHa: number,
-): number {
+export function rationalFlowLps(runoffCoefficient: number, intensityMmPerHour: number, areaHa: number): number {
   return ((runoffCoefficient * intensityMmPerHour * areaHa) / 360) * 1000;
 }

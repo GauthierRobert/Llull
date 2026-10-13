@@ -1,9 +1,5 @@
-/**
- * @layer ui/viewport/3d
- * Cue for the constraint/joint highlighted in the MechanismsPanel: a dashed line + kind label
- * between the two constrained entities, or an axis arrow at joint instance `a` (revolute = cyan,
- * prismatic = magenta). Presentational only; mounted inside the floating-origin group.
- */
+// Cue for the MechanismsPanel highlight: dashed line + kind label between constrained entities, or an axis arrow at
+// joint instance `a` (revolute cyan, prismatic magenta); inside the floating-origin group.
 
 import { useEffect } from 'react';
 import { useThree } from '@react-three/fiber';
@@ -20,7 +16,6 @@ const REVOLUTE_COLOR = '#00e5ff';
 const PRISMATIC_COLOR = '#e040fb';
 const CONSTRAINT_COLOR = '#ffd740';
 
-/** Resolve a joint axis (shorthand or Vec3) to a THREE.Vector3. */
 function jointAxisDirection(axis: Joint['axis']): THREE.Vector3 {
   return new THREE.Vector3(...axisVector(axis)).normalize();
 }
@@ -29,18 +24,12 @@ type Entities = CadDocument['entities'];
 
 const ORIGIN: Vec3 = [0, 0, 0];
 
-/** Position of an entity (stable reference while it is unedited), or the origin if missing. */
+/** Stable while unedited; origin when missing. */
 function positionOf(entityId: string, entities: Entities): Vec3 {
   return entities[entityId]?.position ?? ORIGIN;
 }
 
-function ConstraintLine({
-  constraint,
-  entities,
-}: {
-  constraint: Constraint;
-  entities: Entities;
-}): React.ReactElement | null {
+function ConstraintLine({ constraint, entities }: { constraint: Constraint; entities: Entities }): React.ReactElement | null {
   const posA = positionOf(constraint.a.entityId, entities);
   const posB = positionOf(constraint.b.entityId, entities);
 
@@ -65,11 +54,7 @@ function ConstraintLine({
       <lineSegments geometry={geometry} material={material} renderOrder={998} />
       <Text
         font={TEXT_FONT_URL}
-        position={[
-          (posA[0] + posB[0]) / 2,
-          (posA[1] + posB[1]) / 2,
-          (posA[2] + posB[2]) / 2 + 0.25,
-        ]}
+        position={[(posA[0] + posB[0]) / 2, (posA[1] + posB[1]) / 2, (posA[2] + posB[2]) / 2 + 0.25]}
         fontSize={0.35}
         color={CONSTRAINT_COLOR}
         anchorX="center"
@@ -108,7 +93,7 @@ function JointArrow({ joint, entities }: { joint: Joint; entities: Entities }): 
   return <primitive object={arrowHelper} renderOrder={998} />;
 }
 
-/** Renders the overlay for the viewport-store `mechanismSelection`; invalidates the demand canvas on change. */
+/** Invalidates the demand canvas on change. */
 export function MechanismOverlay(): React.ReactElement | null {
   const mechanismSelection = useViewportStore((s) => s.mechanismSelection);
   const entities = useStore((s) => s.document.entities);

@@ -1,8 +1,6 @@
 /**
- * @layer server
  * The `as` aliases of a `run` plan that still name an entity in the final document, so an agent can
  * keep working with them (`llull mass_properties entityId=<id>`) after `$alias` is gone.
- * @pure reads the plan and the `build_project` report only
  */
 
 import { isRecord } from '@lib/isRecord';
@@ -31,9 +29,7 @@ export function planAliases(actions: unknown, data: unknown): PlanAliases | null
   const scene = data['scene'];
   const steps = data['steps'];
   if (!isRecord(scene) || !Array.isArray(scene['entities']) || !Array.isArray(steps)) return null;
-  const present = new Set(
-    scene['entities'].map((entity) => (isRecord(entity) ? String(entity['id']) : '')),
-  );
+  const present = new Set(scene['entities'].map((entity) => (isRecord(entity) ? String(entity['id']) : '')));
   const aliases: Record<string, string[]> = {};
   const consumed: string[] = [];
   actions.forEach((action, index) => {

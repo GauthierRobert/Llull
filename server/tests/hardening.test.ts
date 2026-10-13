@@ -1,5 +1,4 @@
 /**
- * @layer server/tests
  * Hardening: CORS, filename sanitizing, JSON errors, mutation guard, rate limit,
  * thrown-command handling, debounced atomic autosave, shutdown helpers.
  */
@@ -11,12 +10,7 @@ import os from 'os';
 import path from 'path';
 import express from 'express';
 import { app } from '../src/index';
-import {
-  _resetLiveDoc,
-  subscribeLive,
-  _subscriberCount,
-  closeAllSubscribers,
-} from '../src/liveDocument';
+import { _resetLiveDoc, subscribeLive, liveSubscriberCount, closeAllSubscribers } from '../src/liveDocument';
 import { _resetHistory, applyCommand } from '../src/commandBus';
 import { guardMutation, buildRestRateLimiter, getAllowedOrigins } from '../src/security';
 import { safeFileName as sanitizeFilename } from '@lib/safeFileName';
@@ -25,12 +19,7 @@ import { closeAllSessions, sessions } from '../src/mcp/sessions';
 import { createEmptyDocument } from '@core/model/types';
 import * as registry from '@core/commands/registry';
 
-const ENV_KEYS = [
-  'MCP_AUTH_TOKEN',
-  'LLULL_ALLOWED_ORIGINS',
-  'LLULL_REQUIRE_TOKEN_FOR_REST',
-  'LLULL_REST_RATE_LIMIT_MAX',
-];
+const ENV_KEYS = ['MCP_AUTH_TOKEN', 'LLULL_ALLOWED_ORIGINS', 'LLULL_REQUIRE_TOKEN_FOR_REST', 'LLULL_REST_RATE_LIMIT_MAX'];
 beforeEach(() => {
   _resetLiveDoc();
   _resetHistory();
@@ -78,10 +67,7 @@ describe('sanitizeFilename / GET /export/stl', () => {
 
 describe('JSON error handling', () => {
   it('returns 400 JSON for malformed JSON', async () => {
-    const res = await request(app)
-      .post('/command')
-      .set('Content-Type', 'application/json')
-      .send('{"name": ');
+    const res = await request(app).post('/command').set('Content-Type', 'application/json').send('{"name": ');
     expect(res.status).toBe(400);
     expect(res.headers['content-type']).toMatch(/json/);
     expect(res.body.error).toMatch(/Malformed JSON/);
@@ -123,38 +109,23 @@ describe('mutation guard (/command, /undo, /redo)', () => {
   });
 
   it('allows an allowed Origin and no-Origin when no token is configured', async () => {
-    expect(
-      (await request(app).post('/command').set('Origin', 'http://localhost:5173').send(body))
-        .status,
-    ).toBe(200);
+    expect((await request(app).post('/command').set('Origin', 'http://localhost:5173').send(body)).status).toBe(200);
     expect((await request(app).post('/command').send(body)).status).toBe(200);
   });
 
   it('with a token: allowed Origin passes, bare client gets 401, bearer passes', async () => {
     process.env['MCP_AUTH_TOKEN'] = 's3cret';
-    expect(
-      (await request(app).post('/command').set('Origin', 'http://localhost:5173').send(body))
-        .status,
-    ).toBe(200);
+    expect((await request(app).post('/command').set('Origin', 'http://localhost:5173').send(body)).status).toBe(200);
     expect((await request(app).post('/command').send(body)).status).toBe(401);
-    expect(
-      (await request(app).post('/command').set('Authorization', 'Bearer wrong').send(body)).status,
-    ).toBe(401);
-    expect(
-      (await request(app).post('/command').set('Authorization', 'Bearer s3cret').send(body)).status,
-    ).toBe(200);
+    expect((await request(app).post('/command').set('Authorization', 'Bearer wrong').send(body)).status).toBe(401);
+    expect((await request(app).post('/command').set('Authorization', 'Bearer s3cret').send(body)).status).toBe(200);
   });
 
   it('strict mode requires the bearer even from an allowed Origin; foreign Origin + bearer passes', async () => {
     process.env['MCP_AUTH_TOKEN'] = 's3cret';
     process.env['LLULL_REQUIRE_TOKEN_FOR_REST'] = 'true';
-    expect(
-      (await request(app).post('/command').set('Origin', 'http://localhost:5173').send(body))
-        .status,
-    ).toBe(401);
-    expect((await request(app).post('/undo').set('Authorization', 'Bearer s3cret')).status).toBe(
-      200,
-    );
+    expect((await request(app).post('/command').set('Origin', 'http://localhost:5173').send(body)).status).toBe(401);
+    expect((await request(app).post('/undo').set('Authorization', 'Bearer s3cret')).status).toBe(200);
   });
 
   it('does not guard read routes', async () => {
@@ -220,11 +191,7 @@ describe('createAutosaver', () => {
 
   it('flush writes pending doc immediately; flush with nothing pending is a no-op', () => {
     const file = path.join(dir, 'b.json');
-    const saver = createAutosaver({
-      filePath: file,
-      debounceMs: 60_000,
-      serialize: () => '{"x":1}',
-    });
+    const saver = createAutosaver({ filePath: file, debounceMs: 60_000, serialize: () => '{"x":1}' });
     saver.flush();
     expect(fs.existsSync(file)).toBe(false);
     saver.schedule(createEmptyDocument());
@@ -255,10 +222,10 @@ describe('shutdown helpers', () => {
     const end = vi.fn();
     const fakeRes = { write: vi.fn(), end } as unknown as Parameters<typeof subscribeLive>[0];
     subscribeLive(fakeRes);
-    expect(_subscriberCount()).toBe(1);
+    expect(liveSubscriberCount()).toBe(1);
     closeAllSubscribers();
     expect(end).toHaveBeenCalled();
-    expect(_subscriberCount()).toBe(0);
+    expect(liveSubscriberCount()).toBe(0);
   });
 
   it('closeAllSessions leaves no sessions', async () => {

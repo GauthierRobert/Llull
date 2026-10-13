@@ -1,9 +1,7 @@
 /**
- * @layer mcp
  * The `instructions` string every MCP session returns from `initialize`: the first thing an agent
  * reads about llull. Names only real tools, params and resources (guarded by
  * `tests/unit/mcpTextReferences.test.ts`).
- * @pure
  */
 
 export const SERVER_INSTRUCTIONS: string = [

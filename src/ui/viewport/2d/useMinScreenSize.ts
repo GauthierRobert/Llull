@@ -1,8 +1,4 @@
-/**
- * @layer ui/viewport/2d
- * Keeps annotation text readable when zoomed out: scales the referenced object (per frame, no
- * React state) so text of `worldHeight` never appears smaller than `minPixels` on screen.
- */
+// Scales an object per frame so text of `worldHeight` never appears below `minPixels` when zoomed out.
 
 import type { RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -16,11 +12,7 @@ export function minScreenScale(worldHeight: number, zoom: number, minPixels: num
   return Math.max(1, minPixels / (worldHeight * zoom));
 }
 
-export function useMinScreenSize(
-  target: RefObject<THREE.Object3D | null>,
-  worldHeight: number,
-  minPixels: number = MIN_TEXT_PIXELS,
-): void {
+export function useMinScreenSize(target: RefObject<THREE.Object3D | null>, worldHeight: number, minPixels: number = MIN_TEXT_PIXELS): void {
   useFrame(({ camera }) => {
     const object = target.current;
     if (!object) return;

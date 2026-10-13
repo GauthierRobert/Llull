@@ -1,7 +1,4 @@
-/**
- * Starter building templates composed from the building commands (one undo step).
- * @layer domain-aec
- */
+/** Starter building templates composed from the building commands (one undo step). */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
@@ -23,15 +20,10 @@ type Step = (doc: CadDocument) => CommandResult;
 type BuildingTemplate = 'house' | 'office';
 
 /**
- * Template steps. Ids are looked up in `created` (filled by the run loop with the element / level ids
- * each step actually created, per kind, in order) — never predicted.
+ * Template steps. Ids are looked up in `created` (filled by the run loop with the element / level ids each step actually created, per kind,
+ * in order) — never predicted.
  */
-function steps(
-  doc: CadDocument,
-  template: BuildingTemplate,
-  origin: Vec2,
-  created: Record<string, string[]>,
-): Step[] {
+function steps(doc: CadDocument, template: BuildingTemplate, origin: Vec2, created: Record<string, string[]>): Step[] {
   const mm = (value: number): number => fromMm(doc, value);
   const at = (x: number, y: number): [number, number] => [origin[0] + mm(x), origin[1] + mm(y)];
   const rectangle = (x0: number, y0: number, x1: number, y1: number): [number, number][] => [
@@ -63,28 +55,14 @@ function steps(
   const gridStep =
     (xSpacings: number[], ySpacings: number[]): Step =>
     (d) =>
-      addGridSystem.run(d, {
-        xSpacings: xSpacings.map(mm),
-        ySpacings: ySpacings.map(mm),
-        origin: at(0, 0),
-      });
+      addGridSystem.run(d, { xSpacings: xSpacings.map(mm), ySpacings: ySpacings.map(mm), origin: at(0, 0) });
   const perimeterWallsStep =
     (width: number, depth: number, thickness: number, material: string): Step =>
     (d) =>
-      drawWalls.run(d, {
-        points: rectangle(0, 0, width, depth),
-        closed: true,
-        thickness: mm(thickness),
-        material,
-      });
+      drawWalls.run(d, { points: rectangle(0, 0, width, depth), closed: true, thickness: mm(thickness), material });
   const naming: Step[] =
     building.project.name === 'Untitled project'
-      ? [
-          (d) =>
-            setProjectInfo.run(d, {
-              name: template === 'house' ? 'Two-storey house' : 'Office building',
-            }),
-        ]
+      ? [(d) => setProjectInfo.run(d, { name: template === 'house' ? 'Two-storey house' : 'Office building' })]
       : [];
   if (template === 'house') {
     return [
@@ -94,12 +72,7 @@ function steps(
       levelStep('Roof', 5800, 1000),
       gridStep([5000, 5000], [8000]),
       perimeterWallsStep(10000, 8000, 300, 'masonry'),
-      (d) =>
-        drawWalls.run(d, {
-          points: [at(5000, 0), at(5000, 8000)],
-          thickness: mm(100),
-          material: 'gypsum',
-        }),
+      (d) => drawWalls.run(d, { points: [at(5000, 0), at(5000, 8000)], thickness: mm(100), material: 'gypsum' }),
       (d) => addDoor.run(d, { wallId: wall(1), offset: mm(2500) }),
       (d) => addDoor.run(d, { wallId: wall(5), offset: mm(4000), swing: 'right', width: mm(800) }),
       windowStep(1, 7500, 1800),
@@ -108,31 +81,15 @@ function steps(
       windowStep(3, 7500, 1800),
       windowStep(4, 4000, 1400),
       (d) => addSlab.run(d, { wallIds: perimeter(), thickness: mm(200) }),
-      (d) =>
-        addStair.run(d, { start: at(5400, 6900), angle: 0, width: mm(900), treadDepth: mm(250) }),
+      (d) => addStair.run(d, { start: at(5400, 6900), angle: 0, width: mm(900), treadDepth: mm(250) }),
       (d) => addRoom.run(d, { name: 'Living room', boundary: rectangle(150, 150, 4950, 7850) }),
       (d) => addRoom.run(d, { name: 'Kitchen', boundary: rectangle(5050, 150, 9850, 7850) }),
-      (d) =>
-        copyLevelElements.run(d, {
-          sourceLevelId: level(1),
-          targetLevelIds: [level(2)],
-          categories: ['wall', 'slab'],
-        }),
+      (d) => copyLevelElements.run(d, { sourceLevelId: level(1), targetLevelIds: [level(2)], categories: ['wall', 'slab'] }),
       (d) => deleteBuildingElement.run(d, { elementIds: [door(3)] }),
       (d) => addSlabOpening.run(d, { stairId: stair(1) }),
       windowStep(6, 2500, 1400),
-      (d) =>
-        addRoom.run(d, {
-          name: 'Bedroom',
-          boundary: rectangle(150, 150, 4950, 7850),
-          levelId: level(2),
-        }),
-      (d) =>
-        addRoom.run(d, {
-          name: 'Bedroom',
-          boundary: rectangle(5050, 150, 9850, 7850),
-          levelId: level(2),
-        }),
+      (d) => addRoom.run(d, { name: 'Bedroom', boundary: rectangle(150, 150, 4950, 7850), levelId: level(2) }),
+      (d) => addRoom.run(d, { name: 'Bedroom', boundary: rectangle(5050, 150, 9850, 7850), levelId: level(2) }),
       (d) =>
         addSlab.run(d, {
           boundary: rectangle(-300, -300, 10300, 8300),
@@ -152,16 +109,13 @@ function steps(
     gridStep([7500, 7500, 7500], [7500, 5000]),
     perimeterWallsStep(22500, 12500, 250, 'concrete'),
     (d) => addColumn.run(d, { atGridIntersections: true, width: mm(400) }),
-    (d) =>
-      addBeam.run(d, { start: at(0, 7500), end: at(22500, 7500), width: mm(300), depth: mm(600) }),
-    (d) =>
-      addDoor.run(d, { wallId: wall(1), offset: mm(11250), width: mm(1800), height: mm(2400) }),
+    (d) => addBeam.run(d, { start: at(0, 7500), end: at(22500, 7500), width: mm(300), depth: mm(600) }),
+    (d) => addDoor.run(d, { wallId: wall(1), offset: mm(11250), width: mm(1800), height: mm(2400) }),
     ...[3750, 7500 + 3750, 15000 + 3750].map((offset) => windowStep(3, offset, 3000, 1800)),
     windowStep(1, 3750, 3000, 1800),
     windowStep(1, 18750, 3000, 1800),
     (d) => addSlab.run(d, { wallIds: perimeter(), thickness: mm(250) }),
-    (d) =>
-      addStair.run(d, { start: at(16000, 9000), angle: 0, width: mm(1200), treadDepth: mm(280) }),
+    (d) => addStair.run(d, { start: at(16000, 9000), angle: 0, width: mm(1200), treadDepth: mm(280) }),
     (d) => addRoom.run(d, { name: 'Open office', boundary: rectangle(125, 125, 22375, 7300) }),
     (d) => addRoom.run(d, { name: 'Meeting', boundary: rectangle(125, 7700, 15000, 12375) }),
     (d) =>
@@ -185,8 +139,6 @@ function steps(
 }
 
 /**
- * @command add_building_template
- * @pure
  * @affects creates a complete multi-level building (all-or-nothing)
  * @failure unknown template / any step fails -> no-op with the failing step's summary
  */
@@ -208,8 +160,7 @@ export const addBuildingTemplate = defineCommand({
     for (const [index, step] of steps(doc, template, origin, created).entries()) {
       const before = getBuilding(current);
       const result = step(current);
-      if (result.document === current)
-        return noop(doc, `add_building_template failed at step ${index + 1}: ${result.summary}`);
+      if (result.document === current) return noop(doc, `add_building_template failed at step ${index + 1}: ${result.summary}`);
       current = result.document;
       const after = getBuilding(current);
       const fresh = [

@@ -1,16 +1,8 @@
 import type { Vec3 } from '@core/model/types';
 import { section } from '../oracle/steel';
-import {
-  gridCoordinates,
-  type IntentMember,
-  type IntentSupport,
-  type IntentPipe,
-  type PlantIntent,
-} from '../plant/intent';
+import { gridCoordinates, type IntentMember, type IntentSupport, type IntentPipe, type PlantIntent } from '../plant/intent';
 
 /**
- * @layer tests/production/scenarios
- *
  * Solvent extraction building of a soybean crushing plant — the typical first deliverable of a
  * process-plant engineering office: a 4 × 2-bay multi-storey steel structure with gratings,
  * carrying the extractor, the desolventizer-toaster, the miscella tank and the conditioner, with
@@ -39,13 +31,7 @@ function members(): IntentMember[] {
   const result: IntentMember[] = [];
   for (const x of X) {
     for (const y of Y) {
-      result.push({
-        role: 'column',
-        profile: COLUMN,
-        start: [x, y, 0],
-        end: [x, y, 18000],
-        level: 0,
-      });
+      result.push({ role: 'column', profile: COLUMN, start: [x, y, 0], end: [x, y, 18000], level: 0 });
     }
   }
   FLOORS.forEach((floor, index) => {
@@ -74,20 +60,8 @@ function members(): IntentMember[] {
     const bottom = nodes[storey] ?? 0;
     const top = nodes[storey + 1] ?? 0;
     const cross = (a: [number, number], b: [number, number]): void => {
-      result.push({
-        role: 'brace',
-        profile: BRACE,
-        start: [...a, bottom],
-        end: [...b, top],
-        level: storey,
-      });
-      result.push({
-        role: 'brace',
-        profile: BRACE,
-        start: [...b, bottom],
-        end: [...a, top],
-        level: storey,
-      });
+      result.push({ role: 'brace', profile: BRACE, start: [...a, bottom], end: [...b, top], level: storey });
+      result.push({ role: 'brace', profile: BRACE, start: [...b, bottom], end: [...a, top], level: storey });
     };
     for (const y of [Y[0] ?? 0, Y[2] ?? 0]) {
       cross([X[0] ?? 0, y], [X[1] ?? 0, y]);
@@ -110,50 +84,15 @@ function supportSteel(): IntentMember[] {
     level: 1,
     purpose,
   }));
-  members.push({
-    role: 'beam',
-    profile: 'IPE160',
-    start: [15000, 9250, 5790],
-    end: [18000, 9250, 5790],
-    level: 1,
-    purpose,
-  });
+  members.push({ role: 'beam', profile: 'IPE160', start: [15000, 9250, 5790], end: [18000, 9250, 5790], level: 1, purpose });
   for (const y of [8700, 6200]) {
-    members.push({
-      role: 'column',
-      profile: 'HEA100',
-      start: [17500, y, 0],
-      end: [17500, y, 1955.5],
-      level: 0,
-      purpose,
-    });
+    members.push({ role: 'column', profile: 'HEA100', start: [17500, y, 0], end: [17500, y, 1955.5], level: 0, purpose });
   }
   // Riser guide posts: L-103 into the extractor, L-104 out of the desolventizer (the second post
   // stands on a short IPE200 at Floor +12, 100 mm under the floor beams like the hanger beams).
-  members.push({
-    role: 'column',
-    profile: 'HEA100',
-    start: [17900, 4500, 0],
-    end: [17900, 4500, 3600],
-    level: 0,
-    purpose,
-  });
-  members.push({
-    role: 'beam',
-    profile: 'IPE200',
-    start: [0, 11750, 11770],
-    end: [6000, 11750, 11770],
-    level: 2,
-    purpose,
-  });
-  members.push({
-    role: 'column',
-    profile: 'HEA100',
-    start: [3000, 11750, 11870],
-    end: [3000, 11750, 16500],
-    level: 2,
-    purpose,
-  });
+  members.push({ role: 'column', profile: 'HEA100', start: [17900, 4500, 0], end: [17900, 4500, 3600], level: 0, purpose });
+  members.push({ role: 'beam', profile: 'IPE200', start: [0, 11750, 11770], end: [6000, 11750, 11770], level: 2, purpose });
+  members.push({ role: 'column', profile: 'HEA100', start: [3000, 11750, 11870], end: [3000, 11750, 16500], level: 2, purpose });
   return members;
 }
 
@@ -167,11 +106,7 @@ const SUPPORTS: IntentSupport[] = [
       [17000, 9250, 4500],
     ],
   },
-  {
-    line: 'L-102',
-    type: 'hanger',
-    at: [24000, 21000, 18000, 15000, 12000, 9000, 6000].map((x): Vec3 => [x, 14200, 4500]),
-  },
+  { line: 'L-102', type: 'hanger', at: [24000, 21000, 18000, 15000, 12000, 9000, 6000].map((x): Vec3 => [x, 14200, 4500]) },
   {
     line: 'L-103',
     type: 'shoe',
@@ -270,15 +205,7 @@ export const extractionIntent: PlantIntent = {
     material: 'grating',
   })),
   equipment: [
-    {
-      tag: 'E-301',
-      name: 'Extractor',
-      level: 1,
-      location: [13500, 3750],
-      size: [15000, 3200, 4000],
-      weight: 60000,
-      clearance: 800,
-    },
+    { tag: 'E-301', name: 'Extractor', level: 1, location: [13500, 3750], size: [15000, 3200, 4000], weight: 60000, clearance: 800 },
     {
       tag: 'E-401',
       name: 'Desolventizer-toaster',
@@ -288,24 +215,8 @@ export const extractionIntent: PlantIntent = {
       weight: 55000,
       clearance: 800,
     },
-    {
-      tag: 'E-501',
-      name: 'Miscella tank',
-      level: 0,
-      location: [15000, 11250],
-      size: [2500, 2500, 3500],
-      weight: 22000,
-      clearance: 800,
-    },
-    {
-      tag: 'E-201',
-      name: 'Conditioner',
-      level: 2,
-      location: [15000, 12500],
-      size: [8000, 2500, 2500],
-      weight: 25000,
-      clearance: 800,
-    },
+    { tag: 'E-501', name: 'Miscella tank', level: 0, location: [15000, 11250], size: [2500, 2500, 3500], weight: 22000, clearance: 800 },
+    { tag: 'E-201', name: 'Conditioner', level: 2, location: [15000, 12500], size: [8000, 2500, 2500], weight: 25000, clearance: 800 },
   ],
   pipes: PIPES,
   supports: SUPPORTS,

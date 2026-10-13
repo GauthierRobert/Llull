@@ -1,7 +1,4 @@
 /**
- * @command clear_document
- * @pure
- * @layer core/commands
  * @affects nothing surfaced; affected:[]
  * @invariant keeps units, camera, displayPrecision; resets layers to the default unless keepLayers
  * @failure already-empty document -> no-op, affected:[]
@@ -16,8 +13,7 @@ export const clearDocument = defineCommand({
   name: 'clear_document',
   description:
     'Reset the working document to an empty state, removing all entities, groups, ' +
-    'animations, parameters, configurations, materials, recipes, components, constraints, joints, ' +
-    'and drive relations. ' +
+    'animations, parameters, configurations, materials, recipes, components, constraints, joints, and drive relations. ' +
     'Preserves units, camera, and displayPrecision so view framing survives. ' +
     'Set keepLayers=true to also preserve layers and the active layer scheme; ' +
     'by default layers are reset to a single default "Layer 0".',
@@ -28,19 +24,15 @@ export const clearDocument = defineCommand({
       .optional()
       .describe(
         'When true, the document layers and layerOrder are preserved unchanged. ' +
-          'Useful for serial iterations that share a layer scheme. ' +
-          'Default: false — layers are reset to a single default "Layer 0".',
+          'Useful for serial iterations that share a layer scheme. Default: false — layers are reset to a single default "Layer 0".',
       ),
   }),
   run: (doc, params): CommandResult => {
     const keepLayers = params.keepLayers === true;
-
     const entityCount = Object.keys(doc.entities).length;
     const layerCount = Object.keys(doc.layers).length;
-
     const fresh = createEmptyDocument();
-    const isLayersDefault =
-      layerCount === 1 && doc.layerOrder.length === 1 && doc.layerOrder[0] === fresh.layerOrder[0];
+    const isLayersDefault = layerCount === 1 && doc.layerOrder.length === 1 && doc.layerOrder[0] === fresh.layerOrder[0];
     const isAlreadyEmpty =
       [
         doc.entities,
@@ -59,9 +51,7 @@ export const clearDocument = defineCommand({
       doc.building === undefined &&
       doc.civil === undefined &&
       (keepLayers || isLayersDefault);
-
     if (isAlreadyEmpty) return noop(doc, 'Document is already empty.');
-
     const nextDoc: CadDocument = {
       ...doc,
       ...fresh,
@@ -72,11 +62,7 @@ export const clearDocument = defineCommand({
     };
     delete nextDoc.building;
     delete nextDoc.civil;
-
-    const layerPart = keepLayers
-      ? `kept ${layerCount} layer${layerCount === 1 ? '' : 's'}`
-      : `reset to default layer`;
-
+    const layerPart = keepLayers ? `kept ${layerCount} layer${layerCount === 1 ? '' : 's'}` : `reset to default layer`;
     return report(
       nextDoc,
       `Cleared ${entityCount} entit${entityCount === 1 ? 'y' : 'ies'} and ${layerCount} layer${layerCount === 1 ? '' : 's'}; ${layerPart}; kept units (${doc.units}) and camera.`,

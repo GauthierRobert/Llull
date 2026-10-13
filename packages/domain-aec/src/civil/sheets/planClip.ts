@@ -1,17 +1,8 @@
-/**
- * Rectangle clipping of plan linework in paper millimetres (Liang-Barsky).
- * @layer domain-aec/civil
- * @pure
- */
+/** Rectangle clipping of plan linework in paper millimetres (Liang-Barsky). */
 
 import type { Vec2 } from '@core/model/types';
 
-export interface ClipRect {
-  readonly x: number;
-  readonly y: number;
-  readonly width: number;
-  readonly height: number;
-}
+export type ClipRect = { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
 
 export function insideRect([x, y]: Vec2, rect: ClipRect): boolean {
   return x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;
@@ -50,11 +41,7 @@ export function clipSegment(a: Vec2, b: Vec2, rect: ClipRect): [Vec2, Vec2] | nu
 }
 
 /** Connected runs of `points` (optionally closed) that lie inside `rect`. */
-export function clipPolyline(
-  points: ReadonlyArray<Vec2>,
-  closed: boolean,
-  rect: ClipRect,
-): Vec2[][] {
+export function clipPolyline(points: ReadonlyArray<Vec2>, closed: boolean, rect: ClipRect): Vec2[][] {
   const runs: Vec2[][] = [];
   const count = closed ? points.length : points.length - 1;
   let open: Vec2[] | null = null;
@@ -69,10 +56,7 @@ export function clipPolyline(
       continue;
     }
     const [start, end] = clipped;
-    const continues =
-      open !== null &&
-      previousEnd !== null &&
-      Math.hypot(previousEnd[0] - start[0], previousEnd[1] - start[1]) < 1e-6;
+    const continues = open !== null && previousEnd !== null && Math.hypot(previousEnd[0] - start[0], previousEnd[1] - start[1]) < 1e-6;
     if (open !== null && continues) {
       open.push(end);
     } else {

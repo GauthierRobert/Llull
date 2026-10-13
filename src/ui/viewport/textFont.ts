@@ -1,8 +1,4 @@
-/**
- * @layer ui/viewport
- * Self-hosted font for drei <Text> (troika). Without it troika fetches a default font from a
- * CDN at runtime, which fails offline. troika needs woff/ttf/otf (not woff2).
- */
+// Self-hosted troika font (woff/ttf/otf, not woff2): troika's default is fetched from a CDN and fails offline.
 import geistSansLatin400Url from '@fontsource/geist-sans/files/geist-sans-latin-400-normal.woff?url';
 import type { TextEntity } from '@core/model/types';
 

@@ -1,10 +1,4 @@
-/**
- * @layer ui/panels/building
- *
- * BuildingExportsSection — downloads of the read-only exporters: DXF plan, IFC4 model, the
- * printable SVG plan sheet, elevation / section sheets and anchor bolt plan (paper + scale) and
- * DSTV NC1 fabrication files (one download per part). Presentation only.
- */
+// Read-only exporter downloads: DXF plan, IFC4, SVG plan / elevation / section sheets, anchor bolt plan, DSTV NC1 per part.
 
 import React, { useState } from 'react';
 import { PAPER_SIZES } from '@aec/shared/sheetFrame';
@@ -31,10 +25,7 @@ export function BuildingExportsSection(): React.ReactElement {
   const [cutAt, setCutAt] = useState('');
   const [hideCladding, setHideCladding] = useState(false);
   const [levelChoice, setLevelChoice] = useState('');
-  const levelParams =
-    levelChoice !== '' && levels.some((level) => level.id === levelChoice)
-      ? { levelId: levelChoice }
-      : {};
+  const levelParams = levelChoice !== '' && levels.some((level) => level.id === levelChoice) ? { levelId: levelChoice } : {};
   const scaleParams = scale === 'auto' ? {} : { scale: Number(scale) };
 
   const exportNcFiles = (): void => {
@@ -90,13 +81,7 @@ export function BuildingExportsSection(): React.ReactElement {
         />
       </div>
       <div className="building-inline-form">
-        <OptionSelect
-          value={direction}
-          options={DIRECTIONS}
-          label="Elevation direction"
-          optionLabel={capitalize}
-          onChange={setDirection}
-        />
+        <OptionSelect value={direction} options={DIRECTIONS} label="Elevation direction" optionLabel={capitalize} onChange={setDirection} />
         <input
           type="number"
           value={cutAt}
@@ -105,24 +90,14 @@ export function BuildingExportsSection(): React.ReactElement {
           aria-label="Section cut position"
         />
         <label className="field">
-          <input
-            type="checkbox"
-            checked={hideCladding}
-            onChange={(event) => setHideCladding(event.target.checked)}
-          />
+          <input type="checkbox" checked={hideCladding} onChange={(event) => setHideCladding(event.target.checked)} />
           <span>Hide cladding</span>
         </label>
         <QueryDownloadButton
           primary
           label={cutAt.trim() === '' ? 'Elevation sheet' : 'Section sheet'}
           command="export_elevation_sheet"
-          params={{
-            direction,
-            paper,
-            ...scaleParams,
-            ...optionalNumber('cutAt', cutAt),
-            ...(hideCladding ? { exclude: ['panel'] } : {}),
-          }}
+          params={{ direction, paper, ...scaleParams, ...optionalNumber('cutAt', cutAt), ...(hideCladding ? { exclude: ['panel'] } : {}) }}
           field="svg"
           fallbackName={null}
           mimeType="image/svg+xml"

@@ -11,7 +11,7 @@ small files, discovery by name/path over prose. Command skeleton + tags: `rules/
 
 ## C2 — Comments
 
-Structured tags on commands (`@command @pure @layer @affects @invariant @failure`), not narration.
+Structured tags on commands (`@affects @invariant @failure` (path = layer, name = command; all commands are pure)), not narration.
 If a comment restates the code, delete it. Prose belongs in `docs/` (the human layer).
 
 ## C3 — Naming
@@ -31,7 +31,7 @@ imports. Aliases are defined once, in `tsconfig.base.json` (extended by `tsconfi
 
 ## C5 — Formatting
 
-Prettier: semicolons, single quotes, trailing commas `all`, printWidth 100, tabWidth 2. A
+Prettier: semicolons, single quotes, trailing commas `all`, printWidth 140, objectWrap collapse, tabWidth 2. A
 PostToolUse hook formats each edited file; never hand-format or fight it.
 
 ## C6 — Files & design
