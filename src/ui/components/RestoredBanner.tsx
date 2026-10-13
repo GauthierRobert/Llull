@@ -35,7 +35,12 @@ export function RestoredBanner(): React.ReactElement | null {
         {
           onResult: ({ changed }) => {
             useSessionStore.getState().setPendingLocalCopy(null);
-            if (!changed) return;
+            if (!changed) {
+              const storage = browserStorage();
+              if (storage !== null) clearAutosave(storage);
+              useStore.getState().setStatusMessage('Could not restore the local copy; it was discarded');
+              return;
+            }
             useSessionStore.getState().setRestoredAt(pendingLocalCopy.savedAt);
             const storage = browserStorage();
             // Online the server now holds it; offline the next autosave rewrites it.

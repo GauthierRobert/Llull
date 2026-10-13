@@ -82,7 +82,7 @@ describe('useAutosave', () => {
     vi.useFakeTimers();
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     useStore.getState().setDocument(createEmptyDocument());
-    useStore.setState({ liveStatus: 'disconnected', lastSummary: null });
+    useStore.setState({ liveStatus: 'disconnected', lastSummary: null, liveSeq: -1, hasUnsyncedLocalEdits: false, localOutbox: [] });
     useSessionStore.setState({ dirty: false, restoredAt: null, pendingLocalCopy: null });
   });
   afterEach(() => {
@@ -118,12 +118,12 @@ describe('useAutosave', () => {
     expect(useStore.getState().document.order.length).toBe(1);
   });
   it('does not restore when a live server is connected', () => {
-    useStore.setState({ liveStatus: 'connected' });
+    useStore.setState({ liveStatus: 'connected', liveSeq: 0 });
     renderWithAutosave(1);
     expect(useStore.getState().document.order.length).toBe(0);
   });
   it('offers an unsaved local copy when a live server is connected, and restores it on request', () => {
-    useStore.setState({ liveStatus: 'connected' });
+    useStore.setState({ liveStatus: 'connected', liveSeq: 0 });
     const storage = fakeStorage();
     writeAutosave(storage, { savedAt: 1, json: savedBoxJson() });
     const realDispatch = useStore.getState().dispatch;
@@ -136,7 +136,7 @@ describe('useAutosave', () => {
     useStore.setState({ dispatch: realDispatch });
   });
   it('discarding the offered local copy drops the record', () => {
-    useStore.setState({ liveStatus: 'connected' });
+    useStore.setState({ liveStatus: 'connected', liveSeq: 0 });
     const storage = fakeStorage();
     writeAutosave(storage, { savedAt: 1, json: savedBoxJson() });
     const stored = storage.data[AUTOSAVE_KEY] ?? '';
@@ -147,7 +147,7 @@ describe('useAutosave', () => {
     expect(window.localStorage.getItem(AUTOSAVE_KEY)).toBeNull();
   });
   it('does not offer a clean record or one equal to the current document', () => {
-    useStore.setState({ liveStatus: 'connected' });
+    useStore.setState({ liveStatus: 'connected', liveSeq: 0 });
     const storage = fakeStorage();
     writeAutosave(storage, { savedAt: 1, json: savedBoxJson(), clean: true });
     render(<Harness storage={storage} />);
@@ -205,6 +205,59 @@ describe('useAutosave', () => {
       vi.advanceTimersByTime(AUTOSAVE_DELAY_MS + 10);
     });
     expect(readAutosave(storage)?.clean).toBeUndefined();
+  });
+  it('waits for the first snapshot before deciding the offer when connected', () => {
+    useStore.setState({ liveStatus: 'connected', liveSeq: -1 });
+    const storage = fakeStorage();
+    writeAutosave(storage, { savedAt: 1, json: savedBoxJson() });
+    render(<Harness storage={storage} />);
+    expect(useSessionStore.getState().pendingLocalCopy).toBeNull();
+    // The server document equals the record: nothing to offer once hydrated.
+    act(() =>
+      useStore
+        .getState()
+        .hydrateLiveDocument({
+          seq: 0,
+          epoch: 'e',
+          stateHash: 'h',
+          document: execute(createEmptyDocument(), 'add_box', { size: [1, 1, 1] }).document,
+        }),
+    );
+    expect(useSessionStore.getState().pendingLocalCopy).toBeNull();
+  });
+  it('clears the record once the outbox is replayed and acknowledged', () => {
+    const storage = fakeStorage();
+    render(<Harness storage={storage} />);
+    act(() => useStore.getState().dispatch('add_box', { size: [1, 1, 1] }));
+    act(() => {
+      vi.advanceTimersByTime(AUTOSAVE_DELAY_MS + 10);
+    });
+    expect(readAutosave(storage)).not.toBeNull();
+    const entry = { name: 'add_box', params: {}, affected: [], commandId: 'c1' };
+    act(() => useStore.setState({ hasUnsyncedLocalEdits: true, localOutbox: [entry] }));
+    act(() => useStore.setState({ liveStatus: 'connected', liveSeq: 1 }));
+    act(() => useStore.setState({ hasUnsyncedLocalEdits: false, localOutbox: [] }));
+    expect(readAutosave(storage)).toBeNull();
+  });
+  it('shows a status message while autosave is paused by a pending local copy', () => {
+    useStore.setState({ liveStatus: 'connected', liveSeq: 0 });
+    const storage = fakeStorage();
+    writeAutosave(storage, { savedAt: 1, json: savedBoxJson() });
+    render(<Harness storage={storage} />);
+    act(() => useStore.setState({ liveStatus: 'disconnected' }));
+    act(() => useStore.getState().dispatch('add_box', { size: [3, 3, 3] }));
+    act(() => {
+      vi.advanceTimersByTime(AUTOSAVE_DELAY_MS + 10);
+    });
+    expect(useStore.getState().lastSummary).toMatch(/autosave paused/i);
+  });
+  it('a failed Restore clears the record and reports it', () => {
+    window.localStorage.setItem(AUTOSAVE_KEY, '{}');
+    useSessionStore.setState({ pendingLocalCopy: { savedAt: 1, json: 'not a document' } });
+    render(<RestoredBanner />);
+    fireEvent.click(screen.getByRole('button', { name: /restore local copy/i }));
+    expect(window.localStorage.getItem(AUTOSAVE_KEY)).toBeNull();
+    expect(useStore.getState().lastSummary).toMatch(/could not restore/i);
   });
   it('discards an autosave that cannot be loaded', () => {
     const storage = fakeStorage();
