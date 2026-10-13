@@ -12,6 +12,9 @@ import { execute } from '@core/commands/registry';
 import { serializeDocument } from '@core/commands/persistence/serialization';
 import { hashText } from '@lib/hash';
 
+/** Who sent a broadcast command: the REST API (browser, scripts), an MCP agent, or the `llull` CLI. */
+export type LiveCommandSource = 'rest' | 'mcp' | 'cli';
+
 /** SSE `command` event: one mutating command, applied server-side as number `seq`. */
 export interface LiveCommandEvent {
   /** Server process id (random per start); `seq` is only comparable within one epoch. */
@@ -24,6 +27,10 @@ export interface LiveCommandEvent {
   /** Named user who ran the command (server in named-user mode only); clients may ignore it. */
   readonly userId?: string;
   readonly userName?: string;
+  /** Channel the command came in on; clients use it to label remote edits. */
+  readonly source?: LiveCommandSource;
+  /** The sender's idempotency key, echoed so a client can recognise its own commands. */
+  readonly commandId?: string;
 }
 
 /** SSE `snapshot` event and `GET /live/snapshot` body: the full server document at `seq`. */

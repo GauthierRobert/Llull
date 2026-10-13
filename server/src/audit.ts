@@ -11,7 +11,8 @@ import type { Response } from 'express';
 import { requestUser, sha256Hex } from './users';
 import { isTestRun, positiveInteger } from './env';
 
-export type AuditSource = 'rest' | 'mcp';
+/** `cli` = the `llull` CLI over REST: an advisory, self-declared label (its POST body says `client: 'cli'`), not an identity. */
+export type AuditSource = 'rest' | 'mcp' | 'cli';
 
 /** Who is acting; `userId` is `anonymous` when no named-user auth is in play. */
 export interface Actor {

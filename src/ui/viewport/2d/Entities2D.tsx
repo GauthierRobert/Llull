@@ -9,6 +9,12 @@ import { useStableList } from '../useStableByKey';
 import { BatchedLines2D } from './BatchedLines2D';
 import { Shape2DRenderer } from './Shape2DRenderer';
 import { SolidsTechnicalView2D } from './SolidsTechnicalView2D';
+import { useLiveFxStore } from '@ui/store/liveFxStore';
+import { LiveTransitionGroup } from '../liveFx/LiveTransitionGroup';
+import { type GhostRenderer, LiveFxLayer } from '../liveFx/LiveFxLayer';
+
+/** 2D shapes only: solids are projected together by SolidsTechnicalView2D. */
+const renderGhost2D: GhostRenderer = (ghost) => (is2D(ghost.entity) ? <Shape2DRenderer entity={ghost.entity} selected={false} /> : null);
 
 export function Entities2D(): React.ReactElement {
   const order = useStore((s) => s.document.order);
@@ -20,6 +26,7 @@ export function Entities2D(): React.ReactElement {
   const hiddenEntityIds = useViewportStore((s) => s.hiddenEntityIds);
 
   const selectedIds = useMemo(() => new Set<EntityId>(selection), [selection]);
+  const transitions = useLiveFxStore((s) => s.transitions);
 
   const visible = useMemo(
     () =>
@@ -41,19 +48,22 @@ export function Entities2D(): React.ReactElement {
     for (const entity of visible) {
       if (!is2D(entity)) continue;
       const selected = selectedIds.has(entity.id);
-      if (entity.kind === 'line' && !selected) lines.push(entity);
+      if (entity.kind === 'line' && !selected && !transitions.has(entity.id)) lines.push(entity);
       else rest.push({ entity, selected });
     }
     return { batchedLines: lines, individual: rest };
-  }, [visible, selectedIds]);
+  }, [visible, selectedIds, transitions]);
 
   return (
     <group name="entities-2d">
       <BatchedLines2D lines={batchedLines} />
       <SolidsTechnicalView2D solids={solids} selectedIds={selectedIds} />
       {individual.map(({ entity, selected }) => (
-        <Shape2DRenderer key={entity.id} entity={entity} selected={selected} />
+        <LiveTransitionGroup key={entity.id} entity={entity}>
+          <Shape2DRenderer entity={entity} selected={selected} />
+        </LiveTransitionGroup>
       ))}
+      <LiveFxLayer renderGhost={renderGhost2D} />
     </group>
   );
 }

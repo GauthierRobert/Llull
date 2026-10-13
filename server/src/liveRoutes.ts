@@ -47,7 +47,7 @@ export function buildLiveRouter(restLimiter: RequestHandler): Router {
     if (commandId !== undefined && (typeof commandId !== 'string' || commandId.length === 0)) {
       return void res.status(400).json({ error: '"commandId" must be a non-empty string when present.' });
     }
-    res.status(200).json(applyCommand(name, params ?? {}, commandId, actorOf(res, 'rest')));
+    res.status(200).json(applyCommand(name, params ?? {}, commandId, actorOf(res, body.client === 'cli' ? 'cli' : 'rest')));
   });
 
   router.post('/undo', restLimiter, mutationGuard, (_req, res) => void res.status(200).json(undo(actorOf(res, 'rest'))));

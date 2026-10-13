@@ -9,6 +9,7 @@ import { useStore } from '@ui/store';
 import type { LiveCommandEvent, LiveSnapshotEvent } from '@mcp/liveSync';
 import { liveStreamUrl } from '@ui/serverConfig';
 import { fetchLiveSnapshot } from '@ui/store/serverCommands';
+import { isOwnCommandId, markLiveOrigin } from '@ui/store/liveOrigin';
 
 const RETRY_BASE_MS = 1000;
 const RETRY_MAX_MS = 30000;
@@ -34,7 +35,14 @@ export function useMcpLiveDocument(): void {
       }
       resyncInFlight = true;
       void fetchLiveSnapshot()
-        .then(hydrateLiveDocument)
+        .then((snapshot) => {
+          markLiveOrigin({ kind: 'snapshot' });
+          try {
+            hydrateLiveDocument(snapshot);
+          } finally {
+            markLiveOrigin(null);
+          }
+        })
         .catch(() => undefined) // next event or reconnect resyncs
         .finally(() => {
           resyncInFlight = false;
@@ -67,9 +75,13 @@ export function useMcpLiveDocument(): void {
 
       es.addEventListener('snapshot', (e: Event) => {
         try {
-          hydrateLiveDocument(JSON.parse((e as MessageEvent<string>).data) as LiveSnapshotEvent);
+          const snapshot = JSON.parse((e as MessageEvent<string>).data) as LiveSnapshotEvent;
+          markLiveOrigin({ kind: 'snapshot' });
+          hydrateLiveDocument(snapshot);
         } catch {
           // Malformed JSON from server — ignore, stay connected.
+        } finally {
+          markLiveOrigin(null);
         }
       });
 
@@ -80,7 +92,19 @@ export function useMcpLiveDocument(): void {
         } catch {
           return; // Malformed JSON from server — ignore, stay connected.
         }
-        if (applyLiveCommand(event)) return;
+        markLiveOrigin(
+          isOwnCommandId(event.commandId)
+            ? null
+            : {
+                kind: 'remote',
+                name: event.name,
+                source: event.source ?? 'rest',
+                ...(event.userName !== undefined ? { userName: event.userName } : {}),
+              },
+        );
+        const applied = applyLiveCommand(event);
+        markLiveOrigin(null);
+        if (applied) return;
         resync();
       });
 

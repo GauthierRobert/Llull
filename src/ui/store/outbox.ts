@@ -7,6 +7,7 @@ import { errorMessage } from '@lib/errorMessage';
 import { fetchLiveSnapshot, isCommandRefusal, isConnectionRefusal, postCommand } from './serverCommands';
 import type { CadStoreState, OutboxCommand, StoreGet, StoreSet } from './storeTypes';
 import { resetGraceRuns } from './graceRuns';
+import { rememberOwnCommandId } from './liveOrigin';
 
 const SYNC_RETRY_BASE_MS = 1000;
 const SYNC_RETRY_MAX_MS = 30000;
@@ -28,10 +29,15 @@ let poisonedIds = new Map<string, string>();
 /** Local ids of entries the server accepted during this flush (cleared with `flushIdMap`). */
 let ackedLocalIds = new Set<string>();
 
+/** Remembered as this client's own, so its /live echo is not shown as a remote edit. */
 export function newCommandId(): string {
   const cryptoApi = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
-  if (typeof cryptoApi?.randomUUID === 'function') return cryptoApi.randomUUID();
-  return `cmd-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+  const commandId =
+    typeof cryptoApi?.randomUUID === 'function'
+      ? cryptoApi.randomUUID()
+      : `cmd-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+  rememberOwnCommandId(commandId);
+  return commandId;
 }
 
 function cancelSyncRetry(): void {

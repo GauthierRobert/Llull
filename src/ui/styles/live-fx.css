@@ -1,0 +1,191 @@
+/* ==== Live edits: floating "who did it" badge over a changed entity + the remote-activity feed ==== */
+
+.live-fx-badge {
+  --live-fx-accent: var(--agent);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 8px;
+  border-radius: var(--radius-full);
+  background: var(--surface-float);
+  backdrop-filter: blur(10px);
+  border: 1px solid color-mix(in oklch, var(--live-fx-accent) 55%, transparent);
+  box-shadow:
+    0 0 0 3px color-mix(in oklch, var(--live-fx-accent) 18%, transparent),
+    0 0 22px color-mix(in oklch, var(--live-fx-accent) 45%, transparent),
+    var(--shadow-float);
+  color: var(--fg);
+  font: 500 var(--text-xs) / 1.2 var(--font-sans);
+  white-space: nowrap;
+  transform: translateY(-28px);
+  animation: live-fx-badge 2.6s var(--ease) both;
+}
+
+.live-fx-badge__dot,
+.live-activity__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--live-fx-accent);
+  box-shadow: 0 0 8px var(--live-fx-accent);
+  flex: none;
+}
+
+@keyframes live-fx-badge {
+  0% {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.85);
+  }
+  12% {
+    opacity: 1;
+    transform: translateY(-30px) scale(1.04);
+  }
+  20% {
+    transform: translateY(-28px) scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: translateY(-34px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-44px) scale(0.96);
+  }
+}
+
+.live-activity {
+  position: absolute;
+  top: 84px; /* below the top-right view-preset overlay */
+  right: var(--space-3);
+  z-index: 11;
+  width: min(300px, calc(100% - 2 * var(--space-3)));
+  padding: var(--space-2);
+  border-radius: var(--radius-lg);
+  background: var(--surface-float);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-float);
+  box-shadow: var(--shadow-float);
+  color: var(--fg);
+  font-size: var(--text-xs);
+  user-select: none;
+  animation: live-activity-in var(--dur) var(--ease) both;
+}
+
+.live-activity__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 2px var(--space-1) var(--space-2);
+  color: var(--fg-muted);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-size: var(--text-2xs);
+}
+
+.live-activity__pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--success);
+  animation: live-activity-pulse 1.4s ease-out infinite;
+}
+
+.live-activity__toggle {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg-muted);
+  font: inherit;
+  cursor: pointer;
+  transition: var(--transition-colors);
+}
+
+.live-activity__toggle:hover {
+  background: var(--surface-2);
+  color: var(--fg);
+}
+
+.live-activity__list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.live-activity__row {
+  --live-fx-accent: var(--agent);
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: center;
+  gap: 6px;
+  padding: 5px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--live-fx-accent) 10%, transparent);
+  border-left: 2px solid var(--live-fx-accent);
+  animation:
+    live-activity-row-in 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both,
+    live-activity-row-out 600ms var(--ease) calc(var(--live-fx-life, 7s) - 600ms) both;
+}
+
+.live-activity__who {
+  color: var(--fg-muted);
+}
+
+.live-activity__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg);
+  font-family: var(--font-mono);
+}
+
+.live-activity__counts {
+  color: var(--fg-subtle);
+  font-family: var(--font-mono);
+}
+
+@keyframes live-activity-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes live-activity-row-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px) scale(0.96);
+  }
+}
+
+@keyframes live-activity-row-out {
+  to {
+    opacity: 0.25;
+  }
+}
+
+@keyframes live-activity-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--success) 70%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-fx-badge,
+  .live-activity,
+  .live-activity__row,
+  .live-activity__pulse {
+    animation: none;
+  }
+}

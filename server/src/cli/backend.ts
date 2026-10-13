@@ -115,8 +115,8 @@ export function createRemoteBackend(serverUrl: string, options: RemoteOptions): 
   };
   return {
     target: base,
-    run: (name, params) => post('/command', { name, params }),
-    exchange: (name, params) => post('/exchange', { name, params }),
+    run: (name, params) => post('/command', { name, params, client: 'cli' }),
+    exchange: (name, params) => post('/exchange', { name, params, client: 'cli' }),
     undo: () => post('/undo', {}),
     redo: () => post('/redo', {}),
   };

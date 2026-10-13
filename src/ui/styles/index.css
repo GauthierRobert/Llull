@@ -3,6 +3,7 @@
 @import './base.css';
 @import './shell.css';
 @import './viewport.css';
+@import './live-fx.css';
 @import './empty-state.css';
 @import './toolbar.css';
 @import './palette.css';
