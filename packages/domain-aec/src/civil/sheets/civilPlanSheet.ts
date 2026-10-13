@@ -25,6 +25,7 @@ import { niceStep } from '@lib/niceStep';
 import { clipPolyline, insideRect } from './planClip';
 import { gridToLocal, localToGrid } from '../crs/crs';
 import { entityPlanPoint } from '@core/geometry/entityFrame';
+import { pointsExtent } from '@lib/extent';
 
 export interface CivilSheetOptions {
   readonly paper: PaperSize;
@@ -124,13 +125,10 @@ export function buildCivilPlanSheet(doc: CadDocument, options: CivilSheetOptions
   const [width, height] = PAPER_MM[options.paper];
   const area = sheetDrawingArea(width, height);
   const viewport: Viewport = { ...area, width: area.width - LEGEND_WIDTH };
-  const points = items.flatMap(({ entity }) => worldPoints(entity));
-  const xs = points.map((point) => point[0]);
-  const ys = points.map((point) => point[1]);
-  const bounds = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)] as const;
+  const { minX, minY, maxX, maxY } = pointsExtent(items.flatMap(({ entity }) => worldPoints(entity)));
   const mmPerUnit = toMm(doc, 1);
-  const center: Vec2 = options.center ?? [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2];
-  const scale = options.scale ?? fitScale((bounds[2] - bounds[0]) * mmPerUnit, (bounds[3] - bounds[1]) * mmPerUnit, viewport);
+  const center: Vec2 = options.center ?? [(minX + maxX) / 2, (minY + maxY) / 2];
+  const scale = options.scale ?? fitScale((maxX - minX) * mmPerUnit, (maxY - minY) * mmPerUnit, viewport);
   const perUnit = mmPerUnit / scale;
   const toPaper = paperMap(viewport, center, perUnit);
   const counts = { lines: 0, polylines: 0, points: 0, texts: 0 };

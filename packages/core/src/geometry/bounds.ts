@@ -1,6 +1,6 @@
 import type { CadDocument, DimensionEntity, Entity, InstanceEntity, TextEntity, Vec3 } from '../model/types';
 import { instanceToWorld } from './instanceTransform';
-import { tupleExtent } from '../lib/extent';
+import { pointsExtent, tupleExtent } from '../lib/extent';
 import { ORIGIN, add3, sub3, vec3At } from '../lib/vec3';
 import { sweepTriangles } from './sweep';
 import { loftTriangles } from './loft';
@@ -22,13 +22,6 @@ export interface Bounds {
 function positionsExtent(positions: readonly number[]): { min: Vec3; max: Vec3 } {
   const { min, max } = tupleExtent(positions, 3);
   return { min: vec3At(min, 0), max: vec3At(max, 0) };
-}
-
-/** 2D extents of `points`; all zeros for an empty list. */
-export function pointsExtent(points: ReadonlyArray<readonly [number, number]>): { minX: number; minY: number; maxX: number; maxY: number } {
-  if (points.length === 0) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
-  const { min, max } = tupleExtent(points.flat(), 2);
-  return { minX: min[0] as number, minY: min[1] as number, maxX: max[0] as number, maxY: max[1] as number };
 }
 
 const bounds = (min: Vec3, max: Vec3): Bounds => ({ min, max });

@@ -5,6 +5,7 @@ import type { SegmentChain } from '@core/geometry/planeEdges';
 import { type DrawingPrimitive, drawingTolerance } from '@core/model/drawing';
 import type { Vec2 } from '@core/model/types';
 import { quantizedKey } from '@lib/quantize';
+import { distance } from '@lib/polygon';
 import type { SnapPoint } from './snapping/types';
 import { drawingChains } from './solidDrawingEdges';
 
@@ -24,8 +25,6 @@ function turnAt(a: Vec2, b: Vec2, c: Vec2): number {
   const dot = (b[0] - a[0]) * (c[0] - b[0]) + (b[1] - a[1]) * (c[1] - b[1]);
   return Math.abs(Math.atan2(cross, dot));
 }
-
-const distance = (a: Vec2, b: Vec2): number => Math.hypot(b[0] - a[0], b[1] - a[1]);
 
 /**
  * Is `points[i]` an interior vertex of a tessellated curve rather than a corner? Its turn is below

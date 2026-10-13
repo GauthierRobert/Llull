@@ -24,6 +24,7 @@ import {
   memberPiece,
   outlineMean,
 } from './ncMemberPieces';
+import { pointsExtent } from '@lib/extent';
 
 export type NcExport = { readonly files: NcFile[]; readonly count: number };
 
@@ -86,9 +87,7 @@ function endPlatePieces(doc: CadDocument, connection: MomentConnectionElement, s
   const mm = (value: number): number => toMm(doc, value);
   const outline = solids.find((solid) => solid.part === 'plate')?.outline;
   if (!outline) return [];
-  const xs = outline.map((point) => point[0]);
-  const ys = outline.map((point) => point[1]);
-  const [minX, minY] = [Math.min(...xs), Math.min(...ys)];
+  const { minX, minY } = pointsExtent(outline);
   const holes = solids
     .filter((solid) => solid.part.startsWith('bolt-'))
     .map((solid): NcHole => {

@@ -3,6 +3,7 @@
 import type { Vec2 } from '@core/model/types';
 import type { BuildingModel, GridElement } from '@core/model/building';
 import { elementsOf } from '../../building/model';
+import { distance } from '@lib/polygon';
 
 export interface GridCrossing {
   /** Crossing point in plan. */
@@ -53,7 +54,7 @@ export function crossingsOnLine(line: GridElement, lines: ReadonlyArray<GridElem
   });
 }
 
-export const samePlanPoint = (p: Vec2, q: Vec2, tolerance: number): boolean => Math.hypot(p[0] - q[0], p[1] - q[1]) <= tolerance;
+export const samePlanPoint = (p: Vec2, q: Vec2, tolerance: number): boolean => distance(p, q) <= tolerance;
 
 /** "A/1" or "1/A" -> ["A", "1"]; null when not two non-empty labels. */
 export function parseCrossingName(name: string): [string, string] | null {

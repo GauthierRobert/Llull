@@ -9,7 +9,7 @@ import { MAX_CURVE_SAMPLES, MAX_SPLINE_CONTROL_POINTS } from '../limits';
 import { sampleInvolute } from '../../lib/gearOutline';
 import { DEFAULT_DRAW_COLOR, drawPointSeries, workPlaneNamedFields, workPlaneStyleFields } from './shared';
 import { commitEntity } from '../entity/commitEntity';
-import { pointsExtent } from '../../geometry/bounds';
+import { pointsExtent } from '../../lib/extent';
 import { noop } from '../noop';
 
 /**

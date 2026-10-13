@@ -19,6 +19,7 @@ import { stairPoint } from '../geometry/stairGeometry';
 import { layerBoundaries } from '../elements/wallLayers';
 import { DIMENSION_LAYER, type PlanSource, annotationText, band, isCut, layerName, thinLine } from './planModel';
 import type { DrawingPrimitive } from '@core/model/drawing';
+import { pointsExtent } from '@lib/extent';
 
 /** Plan symbol of a door (leaf + swing) or window (three lines) in a straight wall frame. */
 function openingSymbol(wall: Pick<WallElement, 'start' | 'end' | 'thickness'>, opening: OpeningElement): DrawingPrimitive[] {
@@ -85,12 +86,8 @@ export function dimensionPrimitives(doc: PlanSource, building: BuildingModel, wa
   const gap = fromMm(doc, 1200);
   if (walls.length > 0) {
     const half = Math.max(...walls.map((wall) => wall.thickness)) / 2;
-    const xs = walls.flatMap((wall) => [wall.start[0], wall.end[0]]);
-    const ys = walls.flatMap((wall) => [wall.start[1], wall.end[1]]);
-    const minX = Math.min(...xs) - half;
-    const maxX = Math.max(...xs) + half;
-    const minY = Math.min(...ys) - half;
-    const maxY = Math.max(...ys) + half;
+    const extent = pointsExtent(walls.flatMap((wall) => [wall.start, wall.end]));
+    const [minX, minY, maxX, maxY] = [extent.minX - half, extent.minY - half, extent.maxX + half, extent.maxY + half];
     primitives.push(dimension([minX, minY], [maxX, minY], gap, dimensionLabel(doc, maxX - minX)));
     primitives.push(dimension([minX, maxY], [minX, minY], gap, dimensionLabel(doc, maxY - minY)));
   }

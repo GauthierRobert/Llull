@@ -5,11 +5,11 @@ import type { CommandResult } from '../types';
 import { defineCommand, z, looseVec3 as vec3, colorField } from '../schema';
 import { nextId } from '../../lib/id';
 import { MM_PER_UNIT } from '../../model/units';
-import { ORIGIN, add3 } from '../../lib/vec3';
-import { applyMat3, eulerFromAxis, eulerFromMat, matFromAxis, unitAxisOrNull } from '../../lib/axisRotation';
+import { ORIGIN } from '../../lib/vec3';
+import { eulerFromAxis } from '../../lib/axisRotation';
 import { compactNumber as fmt, vecText } from '../../lib/compactNumber';
 import { withEntities } from '../entity/entityOps';
-import { positionField } from './shared';
+import { axisFrame, positionField } from './shared';
 import { newEntity } from '../entity/newEntity';
 import { failer } from '../noop';
 import { BEARING_TABLE, BEARING_TYPES, lookupBearing, type BearingType } from './bearingTable';
@@ -180,14 +180,11 @@ export const addBearing = defineCommand({
     const fail = failer(doc, 'add_bearing');
     const resolved = resolveSection(doc, { type, designation, bore, outerDiameter, width });
     if ('error' in resolved) return fail(resolved.error);
-    const unitAxis = axis === undefined ? ([0, 0, 1] as Vec3) : unitAxisOrNull(axis);
-    if (!unitAxis) return fail('axis must be 3 finite numbers with non-zero length');
-    if (position.length !== 3 || !position.every(Number.isFinite)) return fail('position must be 3 finite numbers');
+    const frame = axisFrame(axis, position);
+    if (typeof frame === 'string') return fail(frame);
     const { section } = resolved;
     const layout = layoutOf(section);
-    const matrix = matFromAxis(unitAxis);
-    const worldAt = (local: Vec3): Vec3 => add3(position, applyMat3(matrix, local));
-    const ringRotation = eulerFromMat(matrix);
+    const { unitAxis, worldAt, directionAt, rotation: ringRotation } = frame;
     const label = resolved.designation ?? section.type;
     const members: Entity[] = [];
     const ring = (prefix: string, profile: Profile, role: string): void => {
@@ -220,7 +217,7 @@ export const addBearing = defineCommand({
           { radius: layout.elementRadius, height: layout.elementLength },
           worldAt(centerLocal),
           ROLLING_COLOR,
-          { rotation: eulerFromAxis(applyMat3(matrix, dirLocal)) ?? [0, 0, 0], name: elementName },
+          { rotation: eulerFromAxis(directionAt(dirLocal)) ?? [0, 0, 0], name: elementName },
         ),
       );
     }

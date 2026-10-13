@@ -1,7 +1,7 @@
 // Structural grid plan bounds: outermost axis crossings (bubble overshoot excluded), else the line endpoints.
 
 import type { BuildingModel, GridElement } from '@core/model/building';
-import { pointsExtent } from '@core/geometry/bounds';
+import { pointsExtent } from '@lib/extent';
 import { crossGridLines } from '@aec/industrial/framing/gridFraming';
 import type { PlanExtent } from './elementToolForm';
 

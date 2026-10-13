@@ -13,6 +13,7 @@ import { buildParamEnv } from '../history/regenerate';
 import { evaluateExpression, extractReferences } from '../parametric/expression';
 import { MAX_TRACE_FEATURES } from '../limits';
 import { isRecord } from '../../lib/isRecord';
+import { isIdentifier } from '../../lib/identifier';
 import { migrateRetiredCalls } from '../persistence/retiredCommands';
 import { changed, noop } from '../noop';
 
@@ -54,8 +55,6 @@ const TRACE_COMMANDS: ReadonlySet<string> = new Set([
   'delete_entities',
   'set_entity_name',
 ]);
-
-const PARAMETER_NAME = /^[A-Za-z_]\w*$/;
 
 interface Lowered {
   /** Params passed to the command (numbers, entity ids). */
@@ -156,7 +155,7 @@ function validateTrace(trace: unknown): string | null {
   if (!Array.isArray(parameters) || !Array.isArray(features)) return 'trace needs "parameters" and "features" arrays';
   if (features.length > MAX_TRACE_FEATURES) return `${features.length} features exceeds MAX_TRACE_FEATURES (${MAX_TRACE_FEATURES})`;
   for (const [i, p] of parameters.entries()) {
-    if (!isRecord(p) || typeof p.name !== 'string' || !PARAMETER_NAME.test(p.name)) return `parameter ${i}: name must be an identifier`;
+    if (!isRecord(p) || typeof p.name !== 'string' || !isIdentifier(p.name)) return `parameter ${i}: name must be an identifier`;
     if (typeof p.expression !== 'string' || p.expression.trim() === '') return `parameter ${p.name}: expression must be a non-empty string`;
   }
   const refs = new Set<string>();

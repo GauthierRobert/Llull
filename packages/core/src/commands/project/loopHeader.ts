@@ -6,9 +6,8 @@
 import { evaluateExpression } from '../parametric/expression';
 import { MAX_LOOP_ITERATIONS } from '../limits';
 import { isRecord } from '../../lib/isRecord';
+import { isIdentifier } from '../../lib/identifier';
 import { type LoopNode } from './types';
-
-const IDENT = /^[A-Za-z_]\w*$/;
 
 /** `{ repeat | for, actions: [...] }` — the nestable loop form (legacy loops use `step`). */
 export function isLoopNode(value: unknown): value is LoopNode {
@@ -34,7 +33,7 @@ const failure = (variable: string, error: string): LoopHeader => ({ variable, va
 
 function resolveRepeat(spec: NonNullable<LoopNode['repeat']>, env: Record<string, number>): LoopHeader {
   const variable = spec.as ?? 'i';
-  if (!IDENT.test(variable)) return failure(variable, `repeat.as "${variable}" is not a valid name`);
+  if (!isIdentifier(variable)) return failure(variable, `repeat.as "${variable}" is not a valid name`);
   const count = evaluate(spec.count, env, 'repeat.count');
   if (typeof count === 'string') return failure(variable, count);
   if (!Number.isInteger(count) || count < 0) return failure(variable, `repeat.count must be a non-negative integer (got ${count})`);
@@ -44,7 +43,7 @@ function resolveRepeat(spec: NonNullable<LoopNode['repeat']>, env: Record<string
 
 function resolveFor(spec: NonNullable<LoopNode['for']>, env: Record<string, number>): LoopHeader {
   const variable = typeof spec.var === 'string' ? spec.var : '';
-  if (!IDENT.test(variable)) return failure(variable, `for.var "${variable}" is not a valid name`);
+  if (!isIdentifier(variable)) return failure(variable, `for.var "${variable}" is not a valid name`);
   const from = evaluate(spec.from, env, 'for.from');
   if (typeof from === 'string') return failure(variable, from);
   const to = evaluate(spec.to, env, 'for.to');

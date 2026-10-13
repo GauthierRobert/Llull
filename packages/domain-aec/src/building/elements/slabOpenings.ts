@@ -12,6 +12,7 @@ import { noop } from '@core/commands/noop';
 import { commitBuilding } from '../evaluate/evaluateElements';
 import { stairPoint } from '../geometry/stairGeometry';
 import { triangulatePolygon } from '@lib/triangulate';
+import { pointsDiagonal } from '@lib/extent';
 
 /** Plan footprint of a stair run, grown by `margin` on every side. */
 function stairFootprint(stair: StairElement, margin: number): Vec2[] {
@@ -39,9 +40,7 @@ export function slabOpeningError(slab: SlabElement, opening: ReadonlyArray<Vec2>
     opening.every((point) => pointInPolygon(point, slab.boundary)) &&
     !edges(opening).some(([p, q]) => edges(slab.boundary).some(([r, s]) => segmentsIntersect(p, q, r, s)));
   if (!inside) return `the opening is not strictly inside slab ${slab.mark}`;
-  const xs = slab.boundary.map((point) => point[0]);
-  const ys = slab.boundary.map((point) => point[1]);
-  const gap = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) * 1e-3;
+  const gap = pointsDiagonal(slab.boundary) * 1e-3;
   const loops = [slab.boundary, ...(slab.openings ?? [])];
   const tooClose = loops.some((loop) =>
     edges(loop).some(

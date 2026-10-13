@@ -13,7 +13,7 @@ import { quantizedKey } from '../lib/quantize';
 import type { Bounds } from './bounds';
 import { rotatedEntityBounds } from './rotatedBounds';
 import { revolutionAxisIndex } from './revolution';
-import { recipeOf } from './shapeRecipe';
+import { MAX_RECIPE_DEPTH, recipeOf } from './shapeRecipe';
 import { type ViewFrame } from './viewProjection';
 
 /** A round feature: `radius` about the line origin + t·direction, t in [from, to]. */
@@ -30,7 +30,6 @@ type Placement = (point: Vec3) => Vec3;
 
 const IDENTITY: Placement = (point) => point;
 const MAX_DEPTH = 8;
-const MAX_RECIPE_DEPTH = 256;
 /** Centre lines overshoot the outline by this fraction of the radius. */
 const OVERSHOOT = 0.25;
 const END_ON = 0.999;
