@@ -234,6 +234,27 @@ describe('createAutosaver', () => {
     vi.restoreAllMocks();
   });
 
+  it('a failed async write is retried by the shutdown flush', async () => {
+    const file = path.join(dir, 'retry.json');
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(fs.promises, 'writeFile').mockRejectedValueOnce(new Error('ENOSPC'));
+    const saver = createAutosaver({ filePath: file, debounceMs: 1, serialize: () => '{"retry":1}' });
+    saver.schedule(createEmptyDocument());
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(fs.existsSync(file)).toBe(false);
+    saver.flush();
+    expect(fs.readFileSync(file, 'utf8')).toBe('{"retry":1}');
+    vi.restoreAllMocks();
+  });
+
+  it('removes async temporaries a crashed earlier process left behind', () => {
+    const file = path.join(dir, 'd.json');
+    fs.writeFileSync(`${file}.12345.async.tmp`, 'stale');
+    fs.writeFileSync(path.join(dir, 'other.json.1.async.tmp'), 'not ours');
+    createAutosaver({ filePath: file, debounceMs: 60_000, serialize: () => '{}' });
+    expect(fs.readdirSync(dir).sort()).toEqual(['other.json.1.async.tmp']);
+  });
+
   it('flush writes pending doc immediately; flush with nothing pending is a no-op', () => {
     const file = path.join(dir, 'b.json');
     const saver = createAutosaver({ filePath: file, debounceMs: 60_000, serialize: () => '{"x":1}' });

@@ -61,8 +61,8 @@ export function buildLiveRouter(restLimiter: RequestHandler): Router {
     });
   });
 
-  router.post('/live/ticket', restLimiter, ticketGuard, (_req, res) => {
-    const ticket = issueTicket(requestUser(res));
+  router.post('/live/ticket', restLimiter, ticketGuard, (req, res) => {
+    const ticket = issueTicket(requestUser(res), req.ip ?? req.socket.remoteAddress ?? 'unknown');
     if (ticket === null) return void res.status(503).json({ error: 'Too many outstanding tickets.' });
     res.status(200).json({ ticket, expiresInMs: TICKET_TTL_MS });
   });

@@ -6,7 +6,7 @@ import type { Request, Response } from 'express';
 import request from 'supertest';
 import { app } from '../src/index';
 import { guardRead } from '../src/security';
-import { MAX_TICKETS, TICKET_TTL_MS, _resetTickets, consumeTicket, issueTicket } from '../src/tickets';
+import { MAX_TICKETS, MAX_TICKETS_PER_OWNER, TICKET_TTL_MS, _resetTickets, consumeTicket, issueTicket } from '../src/tickets';
 import { authenticateToken } from '../src/users';
 import { _resetLiveDoc } from '../src/liveDocument';
 import { VIEWER, bearer, clearEnv, installUsersFile, tempDir } from './userTestSupport';
@@ -55,15 +55,36 @@ describe('POST /live/ticket (shared token)', () => {
 
   it('is single use', async () => {
     const ticket = await mint();
-    expect((await request(app).get('/live/snapshot').query({ ticket })).status).toBe(200);
-    expect((await request(app).get('/live/snapshot').query({ ticket })).status).toBe(401);
+    expect(consumeTicket(ticket)).not.toBeNull();
+    expect(consumeTicket(ticket)).toBeNull();
   });
 
   it('rejects unknown tickets and expired tickets', async () => {
-    expect((await request(app).get('/live/snapshot').query({ ticket: 'forged' })).status).toBe(401);
-    const stale = issueTicket(undefined, Date.now() - TICKET_TTL_MS - 1) as string;
-    expect((await request(app).get('/live/snapshot').query({ ticket: stale })).status).toBe(401);
+    expect((await request(app).get('/live').query({ ticket: 'forged' })).status).toBe(401);
+    const stale = issueTicket(undefined, 'test', Date.now() - TICKET_TTL_MS - 1) as string;
+    expect((await request(app).get('/live').query({ ticket: stale })).status).toBe(401);
     expect(consumeTicket(stale)).toBeNull();
+  });
+
+  it('opens only the live stream: snapshot and exports ignore a ticket', async () => {
+    const ticket = await mint();
+    expect((await request(app).get('/live/snapshot').query({ ticket })).status).toBe(401);
+    expect((await request(app).get('/export/stl').query({ ticket })).status).toBe(401);
+    expect(consumeTicket(ticket)).not.toBeNull(); // not consumed by the refused requests
+  });
+
+  it('judges a request with an Authorization header by that header, not a stray ticket', async () => {
+    const status = await request(app).get('/live/snapshot').query({ ticket: 'forged' }).set('Authorization', `Bearer ${TOKEN}`);
+    expect(status.status).toBe(200);
+  });
+
+  it('caps outstanding tickets per owner, recycling the oldest', () => {
+    const first = issueTicket(undefined, 'one-client') as string;
+    for (let i = 1; i < MAX_TICKETS_PER_OWNER; i += 1) issueTicket(undefined, 'one-client');
+    const other = issueTicket(undefined, 'another-client') as string;
+    expect(issueTicket(undefined, 'one-client')).not.toBeNull();
+    expect(consumeTicket(first)).toBeNull(); // recycled
+    expect(consumeTicket(other)).not.toBeNull();
   });
 
   it('opens the SSE stream with a ticket, and the stream URL carries no token', async () => {
@@ -96,11 +117,11 @@ describe('POST /live/ticket (shared token)', () => {
 
   it('bounds the store and sweeps expired tickets', () => {
     const old = Date.now() - TICKET_TTL_MS - 1;
-    for (let i = 0; i < MAX_TICKETS; i += 1) expect(issueTicket(undefined, old)).not.toBeNull();
-    expect(issueTicket(undefined)).not.toBeNull(); // sweep freed the expired ones
+    for (let i = 0; i < MAX_TICKETS; i += 1) expect(issueTicket(undefined, `c${i}`, old)).not.toBeNull();
+    expect(issueTicket(undefined, 'fresh')).not.toBeNull(); // sweep freed the expired ones
     _resetTickets();
-    for (let i = 0; i < MAX_TICKETS; i += 1) issueTicket(undefined);
-    expect(issueTicket(undefined)).toBeNull();
+    for (let i = 0; i < MAX_TICKETS; i += 1) issueTicket(undefined, `c${i}`);
+    expect(issueTicket(undefined, 'fresh')).toBeNull();
   });
 });
 
@@ -114,7 +135,7 @@ describe('tickets in named-user mode', () => {
       expect(ticket).toBeTruthy();
       const res = { locals: {} as Record<string, unknown>, status: vi.fn(), json: vi.fn() } as unknown as Response;
       const next = vi.fn();
-      guardRead()({ query: { ticket }, headers: {} } as unknown as Request, res, next);
+      guardRead()({ method: 'GET', baseUrl: '', path: '/live', query: { ticket }, headers: {} } as unknown as Request, res, next);
       expect(next).toHaveBeenCalledOnce();
       expect(res.locals['llullUser']).toEqual(authenticateToken(VIEWER.token));
       expect((res.locals['llullUser'] as { role: string }).role).toBe('viewer');

@@ -108,14 +108,17 @@ export function guardMutation(): RequestHandler {
 }
 
 /**
- * Guard for /live, /live/snapshot, /export/*: `guardMutation` policy + a single-use `?ticket=` (EventSource, see tickets.ts)
- * + deprecated `?access_token=`; no token -> open.
+ * Guard for /live, /live/snapshot, /export/*: `guardMutation` policy + deprecated `?access_token=`; no token -> open.
+ * `GET /live` (EventSource cannot send headers) also takes a single-use `?ticket=` (see tickets.ts); a request
+ * carrying an Authorization header is judged by that header alone.
  */
 export function guardRead(): RequestHandler {
   const inner = buildGuard(true, 'viewer');
   return (req, res, next) => {
     const presented = req.query['ticket'];
-    if (typeof presented !== 'string' || presented === '') return inner(req, res, next);
+    const isLiveStream = req.method === 'GET' && req.baseUrl + req.path === '/live';
+    if (typeof presented !== 'string' || presented === '' || !isLiveStream || req.headers.authorization !== undefined)
+      return inner(req, res, next);
     const redeemed = consumeTicket(presented);
     if (redeemed === null) return void res.status(401).json(UNAUTHORIZED_BODY);
     if (redeemed.user !== undefined) res.locals['llullUser'] = redeemed.user;
