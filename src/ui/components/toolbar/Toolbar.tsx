@@ -1,16 +1,20 @@
-// Main toolbar: selection, 2D drawing (arms a tool, switches to 2D), 3D solids (created in view, selected, move gizmo),
-// transforms, edit actions.
+// Tool dock (bottom-center): 3D/2D switch, Select, Sketch and Solid trays, transforms, selection edits, undo/redo,
+// shortcuts. Sketch arms a 2D tool (switching to 2D); Solid adds a primitive, selected, with the move gizmo.
 
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { classNames } from '@ui/classNames';
 import { type GizmoMode, useStore, useToolStore } from '@ui/store';
 import { type IconName, Icon } from '@ui/components/Icon';
 import { deleteSelection, duplicateSelection } from '@ui/actions/selectionActions';
 import { DRAW_TOOL_KEYS, GIZMO_KEYS } from '@ui/hooks/shortcuts';
+import { createSolid } from '@ui/actions/createSolid';
 import { SOLID_PRESETS } from './solidPresets';
 import { DRAW_TOOLS } from './drawTools';
-import { createSolid } from '@ui/actions/createSolid';
+import { type DockTrayItem, DockTray } from './DockTray';
 
-interface ToolButtonProps {
+type TrayId = 'sketch' | 'solid';
+
+interface DockButtonProps {
   label: string;
   icon: IconName;
   /** The shortcut key is appended when given. */
@@ -18,76 +22,138 @@ interface ToolButtonProps {
   shortcut?: string | undefined;
   pressed?: boolean | undefined;
   disabled?: boolean;
+  /** Icon-only: the label is the accessible name and tooltip only. */
+  compact?: boolean;
+  tone?: 'danger';
   onClick: () => void;
 }
 
-function ToolButton({ label, icon, tip, shortcut, pressed, disabled = false, onClick }: ToolButtonProps): React.ReactElement {
+function DockButton({
+  label,
+  icon,
+  tip,
+  shortcut,
+  pressed,
+  disabled = false,
+  compact = false,
+  tone,
+  onClick,
+}: DockButtonProps): React.ReactElement {
   const title = shortcut === undefined ? `${label} — ${tip}` : `${label} (${shortcut}) — ${tip}`;
   return (
     <button
       type="button"
-      className={`tb-btn${pressed === true ? ' tb-btn--active' : ''}`}
+      className={classNames(
+        'dock-btn',
+        compact && 'dock-btn--compact',
+        pressed === true && 'dock-btn--active',
+        tone === 'danger' && 'dock-btn--danger',
+      )}
       aria-label={label}
       aria-pressed={pressed}
       title={title}
       disabled={disabled}
       onClick={onClick}
     >
-      <Icon name={icon} size={18} />
-      <span className="tb-btn__label">{label}</span>
+      <Icon name={icon} size={16} />
+      {!compact && <span className="dock-btn__label">{label}</span>}
     </button>
   );
 }
 
-function ToolGroup({ title, children }: { title: string; children: React.ReactNode }): React.ReactElement {
+function DockDivider(): React.ReactElement {
+  return <span className="dock-divider" aria-hidden="true" />;
+}
+
+function ViewModeSwitch(): React.ReactElement {
+  const viewMode = useToolStore((s) => s.viewMode);
+  const setViewMode = useToolStore((s) => s.setViewMode);
   return (
-    <div className="tb-group" role="group" aria-label={title}>
-      <div className="tb-group__buttons">{children}</div>
-      <span className="tb-group__title" aria-hidden="true">
-        {title}
-      </span>
+    <div className="dock-view" role="group" aria-label="View mode">
+      <button
+        type="button"
+        className="dock-view__btn"
+        aria-pressed={viewMode === '3d'}
+        title="3D view (3)"
+        onClick={() => setViewMode('3d')}
+      >
+        3D
+      </button>
+      <button
+        type="button"
+        className="dock-view__btn"
+        aria-pressed={viewMode === '2d'}
+        title="2D drafting view (2)"
+        onClick={() => setViewMode('2d')}
+      >
+        2D
+      </button>
     </div>
   );
 }
 
-function DrawGroup(): React.ReactElement {
-  const drawTool = useToolStore((s) => s.drawTool);
-  const viewMode = useToolStore((s) => s.viewMode);
-  const setDrawTool = useToolStore((s) => s.setDrawTool);
+interface TrayTriggerProps {
+  tray: TrayId;
+  label: string;
+  caption: string;
+  icon: IconName;
+  open: boolean;
+  armed: boolean;
+  onToggle: (tray: TrayId) => void;
+}
+
+function TrayTrigger({ tray, label, caption, icon, open, armed, onToggle }: TrayTriggerProps): React.ReactElement {
   return (
-    <ToolGroup title="Draw 2D">
-      {DRAW_TOOLS.map((spec) => {
-        const active = viewMode === '2d' && drawTool === spec.tool;
-        return (
-          <ToolButton
-            key={spec.tool}
-            label={spec.label}
-            icon={spec.icon}
-            tip={spec.tip}
-            shortcut={DRAW_TOOL_KEYS[spec.tool]}
-            pressed={active}
-            onClick={() => setDrawTool(active ? 'none' : spec.tool)}
-          />
-        );
-      })}
-    </ToolGroup>
+    <button
+      type="button"
+      className={classNames('dock-btn', (open || armed) && 'dock-btn--active')}
+      aria-label={label}
+      aria-expanded={open}
+      aria-controls={open ? `dock-tray-${tray}` : undefined}
+      title={label}
+      onClick={() => onToggle(tray)}
+    >
+      <Icon name={icon} size={16} />
+      <span className="dock-btn__label">{caption}</span>
+      <Icon name="chevronDown" size={12} className="dock-btn__caret" />
+    </button>
   );
 }
 
-function SolidsGroup(): React.ReactElement {
-  return (
-    <ToolGroup title="Solids 3D">
-      {SOLID_PRESETS.map((preset) => (
-        <ToolButton
-          key={preset.command}
-          label={preset.label}
-          icon={preset.icon}
-          tip="adds one at a free spot near the origin and selects it so you can drag it"
-          onClick={() => createSolid(preset)}
-        />
-      ))}
-    </ToolGroup>
-  );
+function useSketchItems(close: () => void): { items: DockTrayItem[]; armed: { label: string; icon: IconName } | null } {
+  const drawTool = useToolStore((s) => s.drawTool);
+  const viewMode = useToolStore((s) => s.viewMode);
+  const setDrawTool = useToolStore((s) => s.setDrawTool);
+  const armed = viewMode === '2d' ? DRAW_TOOLS.find((spec) => spec.tool === drawTool) : undefined;
+  const items = DRAW_TOOLS.map((spec) => {
+    const active = spec === armed;
+    return {
+      id: spec.tool,
+      label: spec.label,
+      icon: spec.icon,
+      hint: spec.tip,
+      shortcut: DRAW_TOOL_KEYS[spec.tool],
+      active,
+      onPick: () => {
+        setDrawTool(active ? 'none' : spec.tool);
+        close();
+      },
+    };
+  });
+  return { items, armed: armed === undefined ? null : { label: armed.label, icon: armed.icon } };
+}
+
+function solidItems(close: () => void): DockTrayItem[] {
+  return SOLID_PRESETS.map((preset) => ({
+    id: preset.command,
+    label: preset.label,
+    icon: preset.icon,
+    hint: 'adds one at a free spot near the origin and selects it so you can drag it',
+    onPick: () => {
+      createSolid(preset);
+      close();
+    },
+  }));
 }
 
 const GIZMO_BUTTONS: ReadonlyArray<{ mode: GizmoMode; label: string; icon: IconName }> = [
@@ -96,33 +162,23 @@ const GIZMO_BUTTONS: ReadonlyArray<{ mode: GizmoMode; label: string; icon: IconN
   { mode: 'scale', label: 'Scale', icon: 'transformScale' },
 ];
 
-function SelectTransformGroup(): React.ReactElement {
+function TransformButtons(): React.ReactElement {
   const viewMode = useToolStore((s) => s.viewMode);
   const drawTool = useToolStore((s) => s.drawTool);
   const gizmoMode = useToolStore((s) => s.gizmoMode);
-  const setDrawTool = useToolStore((s) => s.setDrawTool);
   const toggleDrawTool = useToolStore((s) => s.toggleDrawTool);
   const setGizmoMode = useToolStore((s) => s.setGizmoMode);
   const selectionCount = useStore((s) => s.document.selection.length);
   const nothingSelected = selectionCount === 0;
-  const is2d = viewMode === '2d';
-
   return (
-    <ToolGroup title="Select & transform">
-      <ToolButton
-        label="Select"
-        icon="cursor"
-        tip="click an object to select it, Shift-click to add more"
-        shortcut={is2d ? DRAW_TOOL_KEYS.none : undefined}
-        pressed={is2d ? drawTool === 'none' : undefined}
-        onClick={() => setDrawTool('none')}
-      />
+    <>
       {GIZMO_BUTTONS.map(({ mode, label, icon }) => {
-        if (is2d) {
+        if (viewMode === '2d') {
           const isMove = mode === 'translate';
           return (
-            <ToolButton
+            <DockButton
               key={mode}
+              compact
               label={label}
               icon={icon}
               tip={
@@ -140,8 +196,9 @@ function SelectTransformGroup(): React.ReactElement {
           );
         }
         return (
-          <ToolButton
+          <DockButton
             key={mode}
+            compact
             label={label}
             icon={icon}
             tip={selectionCount === 1 ? 'drag the gizmo handles on the selected object' : 'select one object, then drag the gizmo handles'}
@@ -151,19 +208,16 @@ function SelectTransformGroup(): React.ReactElement {
           />
         );
       })}
-    </ToolGroup>
+    </>
   );
 }
 
-function EditGroup(): React.ReactElement {
+function EditButtons(): React.ReactElement {
   const nothingSelected = useStore((s) => s.document.selection.length === 0);
-  const canUndo = useStore((s) => s.canUndo);
-  const canRedo = useStore((s) => s.canRedo);
-  const undo = useStore((s) => s.undo);
-  const redo = useStore((s) => s.redo);
   return (
-    <ToolGroup title="Edit">
-      <ToolButton
+    <>
+      <DockButton
+        compact
         label="Duplicate"
         icon="copy"
         tip={nothingSelected ? 'select something first' : 'copy the selection beside itself'}
@@ -171,7 +225,9 @@ function EditGroup(): React.ReactElement {
         disabled={nothingSelected}
         onClick={duplicateSelection}
       />
-      <ToolButton
+      <DockButton
+        compact
+        tone="danger"
         label="Delete"
         icon="trash"
         tip={nothingSelected ? 'select something first' : 'delete the selection'}
@@ -179,31 +235,102 @@ function EditGroup(): React.ReactElement {
         disabled={nothingSelected}
         onClick={deleteSelection}
       />
-      <ToolButton label="Undo" icon="undo" tip="step back" shortcut="Ctrl Z" disabled={!canUndo} onClick={undo} />
-      <ToolButton label="Redo" icon="redo" tip="step forward" shortcut="Ctrl Y" disabled={!canRedo} onClick={redo} />
-    </ToolGroup>
+    </>
   );
 }
 
-export function Toolbar(): React.ReactElement {
+function HistoryButtons(): React.ReactElement {
+  const canUndo = useStore((s) => s.canUndo);
+  const canRedo = useStore((s) => s.canRedo);
+  const undo = useStore((s) => s.undo);
+  const redo = useStore((s) => s.redo);
   const setShortcutsOpen = useToolStore((s) => s.setShortcutsOpen);
   return (
-    <div className="toolbar" role="toolbar" aria-label="Main toolbar">
-      <SelectTransformGroup />
-      <span className="tb-sep" aria-hidden="true" />
-      <SolidsGroup />
-      <span className="tb-sep" aria-hidden="true" />
-      <DrawGroup />
-      <span className="tb-sep" aria-hidden="true" />
-      <EditGroup />
-      <div className="tb-spacer" />
-      <ToolButton
+    <>
+      <DockButton compact label="Undo" icon="undo" tip="step back" shortcut="Ctrl Z" disabled={!canUndo} onClick={undo} />
+      <DockButton compact label="Redo" icon="redo" tip="step forward" shortcut="Ctrl Y" disabled={!canRedo} onClick={redo} />
+      <DockButton
+        compact
         label="Shortcuts"
         icon="keyboard"
         tip="list every keyboard shortcut"
         shortcut="?"
         onClick={() => setShortcutsOpen(true)}
       />
+    </>
+  );
+}
+
+/** Closes the open tray on Escape or a pointer-down outside the dock. */
+function useDismissTray(dockRef: React.RefObject<HTMLDivElement | null>, open: boolean, close: () => void): void {
+  useEffect(() => {
+    if (!open) return undefined;
+    const onPointerDown = (e: PointerEvent): void => {
+      if (!(e.target instanceof Node) || dockRef.current?.contains(e.target) !== true) close();
+    };
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') close();
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [dockRef, open, close]);
+}
+
+export function Toolbar(): React.ReactElement {
+  const [openTray, setOpenTray] = useState<TrayId | null>(null);
+  const dockRef = useRef<HTMLDivElement>(null);
+  const close = React.useCallback(() => setOpenTray(null), []);
+  const toggleTray = (tray: TrayId): void => setOpenTray((current) => (current === tray ? null : tray));
+  useDismissTray(dockRef, openTray !== null, close);
+
+  const viewMode = useToolStore((s) => s.viewMode);
+  const drawTool = useToolStore((s) => s.drawTool);
+  const setDrawTool = useToolStore((s) => s.setDrawTool);
+  const sketch = useSketchItems(close);
+  const is2d = viewMode === '2d';
+
+  return (
+    <div className="dock" ref={dockRef}>
+      {openTray === 'sketch' && <DockTray id="dock-tray-sketch" label="Sketch tools" items={sketch.items} />}
+      {openTray === 'solid' && <DockTray id="dock-tray-solid" label="Solid tools" items={solidItems(close)} />}
+      <div className="dock__bar" role="toolbar" aria-label="Main toolbar">
+        <ViewModeSwitch />
+        <DockButton
+          label="Select"
+          icon="cursor"
+          tip="click an object to select it, Shift-click to add more"
+          shortcut={is2d ? DRAW_TOOL_KEYS.none : undefined}
+          pressed={is2d ? drawTool === 'none' : undefined}
+          onClick={() => setDrawTool('none')}
+        />
+        <TrayTrigger
+          tray="sketch"
+          label="Sketch tools"
+          caption={sketch.armed?.label ?? 'Sketch'}
+          icon={sketch.armed?.icon ?? 'drawPolyline'}
+          open={openTray === 'sketch'}
+          armed={sketch.armed !== null}
+          onToggle={toggleTray}
+        />
+        <TrayTrigger
+          tray="solid"
+          label="Solid tools"
+          caption="Solid"
+          icon="cube"
+          open={openTray === 'solid'}
+          armed={false}
+          onToggle={toggleTray}
+        />
+        <DockDivider />
+        <TransformButtons />
+        <EditButtons />
+        <DockDivider />
+        <HistoryButtons />
+      </div>
     </div>
   );
 }

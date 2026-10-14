@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import { type GizmoMode, useStore, useToolStore } from '@ui/store';
 import { Entities } from './Entities';
 import { TransformGizmo } from './TransformGizmo';
+import { DimensionLens } from './DimensionLens';
 import { RenderOriginSyncer } from '../RenderOriginSyncer';
 import { ViewPresetsOverlay } from './ViewPresets';
 import { CameraBridge } from './cameraBridge';
@@ -112,6 +113,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         <TransformGizmo mode={gizmoMode} onDraggingChanged={onDraggingChanged} />
         <MeasureBBoxWireframe />
         <MechanismOverlay />
+        <DimensionLens />
       </group>
 
       <GizmoHelper alignment="bottom-right" margin={[72, 72]}>

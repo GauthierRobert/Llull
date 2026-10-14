@@ -19,24 +19,24 @@
 
 .vp-overlay {
   position: absolute;
-  top: var(--space-3);
+  top: var(--vp-inset-top, var(--space-3));
   z-index: 10;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  /* keep clear of the centered 2D/3D toggle (~140px wide) */
-  max-width: calc(50% - 88px);
   user-select: none;
 }
 
 .vp-overlay--top-left {
-  left: var(--space-3);
+  left: var(--vp-inset-left, var(--space-3));
   align-items: flex-start;
+  max-width: calc(50% - var(--vp-inset-left, var(--space-3)) - 8px);
 }
 
 .vp-overlay--top-right {
-  right: var(--space-3);
+  right: var(--vp-inset-right, var(--space-3));
   align-items: flex-end;
+  max-width: calc(50% - var(--vp-inset-right, var(--space-3)) - 8px);
 }
 
 /* ---- Glass toolbar -------------------------------------------------------- */
@@ -46,8 +46,8 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 2px;
-  padding: 3px;
-  border-radius: var(--radius);
+  padding: 4px;
+  border-radius: 12px;
 }
 
 .vp-group {
@@ -335,7 +335,7 @@
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-2);
-  padding: var(--space-3);
+  padding: var(--vp-inset-top, var(--space-3)) var(--space-3) var(--space-3) var(--vp-inset-left, var(--space-3));
   pointer-events: none;
 }
 
@@ -402,7 +402,7 @@
 
 .vp-hint {
   position: absolute;
-  bottom: 56px; /* above the global hint bar */
+  bottom: calc(var(--chrome-gap) + 52px + 56px); /* above the dock and the global hint bar */
   left: 50%;
   transform: translateX(-50%);
   z-index: 10;
@@ -420,8 +420,8 @@
 
 .mhud {
   position: absolute;
-  bottom: var(--space-3);
-  left: var(--space-3);
+  bottom: calc(var(--chrome-gap) + 56px);
+  left: var(--vp-inset-left, var(--space-3));
   z-index: 20;
   min-width: 208px;
   max-width: 320px;
@@ -622,4 +622,117 @@
   .named-views-panel {
     width: 224px;
   }
+}
+
+/* ---- Dimension lens (3D, above the sole selection) ------------------------------ */
+
+.lens {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  transform: translate(-50%, calc(-100% - 16px));
+  user-select: none;
+  white-space: nowrap;
+}
+
+.lens__tag {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: var(--dock-bg);
+  color: var(--dock-fg);
+  font-size: var(--text-base);
+  box-shadow: var(--shadow-float);
+}
+
+.lens__name {
+  font-weight: var(--weight-semibold);
+}
+
+.lens__kind {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--dock-fg-muted);
+}
+
+.lens__pills {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.lens-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: var(--radius-full);
+  background: var(--surface-1);
+  border: 1px solid var(--accent-border);
+  box-shadow: var(--shadow-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  line-height: 26px;
+  color: var(--accent-text);
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+button.lens-pill:hover {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+button.lens-pill:hover .lens-pill__label {
+  color: inherit;
+  opacity: 0.75;
+}
+
+.lens-pill__label {
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+
+.lens-pill--driven {
+  border-style: dashed;
+  color: var(--fg-muted);
+  cursor: help;
+}
+
+.lens-pill--editing {
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+  color: var(--fg);
+}
+
+.lens-pill .lens-pill__input {
+  width: auto;
+  height: auto;
+  box-shadow: none;
+  min-width: 2ch;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+}
+
+.lens-pill__unit {
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+
+.lens__refusal {
+  max-width: 320px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: var(--text-xs);
+  white-space: normal;
 }

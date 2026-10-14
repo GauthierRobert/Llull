@@ -32,6 +32,18 @@ function AgentPill({ status }: { status: LiveStatus }): React.ReactElement {
   );
 }
 
+/** Breadcrumb tail: the sole selected entity's name (or id), "<n> selected" for several, null for none. */
+function useSelectionCrumb(): string | null {
+  return useStore((s) => {
+    const ids = s.document.selection.filter((id) => id in s.document.entities);
+    if (ids.length === 0) return null;
+    if (ids.length > 1) return `${ids.length} selected`;
+    const [id] = ids;
+    const entity = id === undefined ? undefined : s.document.entities[id];
+    return entity === undefined ? null : (entity.name ?? entity.id);
+  });
+}
+
 function SidebarToggle(): React.ReactElement {
   const sidebarOpen = useLayoutStore((s) => s.sidebarOpen);
   const toggleSidebar = useLayoutStore((s) => s.toggleSidebar);
@@ -89,6 +101,7 @@ export function TopBar(): React.ReactElement {
   const liveStatus = useStore((s) => s.liveStatus);
   const projectName = useStore((s) => projectNameOf(s.document));
   const isDirty = useSessionStore((s) => s.dirty);
+  const selectionName = useSelectionCrumb();
 
   return (
     <header className="topbar" role="banner">
@@ -97,9 +110,9 @@ export function TopBar(): React.ReactElement {
 
         <div className="brand" aria-label="Llull CAD">
           <div className="brand-mark" aria-hidden="true">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2.5 3.5 7v10L12 21.5 20.5 17V7L12 2.5Z" fill="currentColor" />
-              <path d="M3.5 7 12 11.5 20.5 7M12 11.5v10" stroke="var(--surface-1)" strokeWidth="1.6" strokeLinejoin="round" />
+            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+              <circle cx="11" cy="11" r="9.5" stroke="currentColor" strokeWidth="1.6" />
+              <circle cx="11" cy="11" r="4.5" fill="var(--accent)" />
             </svg>
           </div>
           <h1 className="brand-wordmark">Llull</h1>
@@ -108,7 +121,17 @@ export function TopBar(): React.ReactElement {
         <span className="topbar__sep" aria-hidden="true" />
 
         <nav className="file-crumbs" aria-label="File location">
-          <span className="file-crumb file-crumb--active">{projectName ?? 'Untitled'}</span>
+          <span className={classNames('file-crumb', selectionName === null && 'file-crumb--active')}>{projectName ?? 'Untitled'}</span>
+          {selectionName !== null && (
+            <>
+              <span className="file-crumb-sep" aria-hidden="true">
+                ›
+              </span>
+              <span className="file-crumb file-crumb--active" title={selectionName}>
+                {selectionName}
+              </span>
+            </>
+          )}
           {isDirty && (
             <span className="unsaved-dot" role="status" aria-label="Unsaved changes" title="Unsaved changes">
               ●<span className="unsaved-dot__label"> unsaved</span>

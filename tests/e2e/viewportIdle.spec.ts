@@ -39,6 +39,7 @@ test('selected entity idles, and an orbit coast settles in a bounded frame count
     };
   });
   await page.goto('/');
+  await page.getByRole('button', { name: 'Solid tools' }).click();
   await page.getByRole('button', { name: 'Box', exact: true }).click();
   await expect(page.getByRole('contentinfo', { name: 'Document status' })).toContainText('Selection1 entity');
   await framesUntilIdle(page);

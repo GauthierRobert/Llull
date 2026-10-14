@@ -9,6 +9,7 @@ import { applyTool, downloadText, elementRows, openBuilding, openProjectFile, st
 /** Switches to 2D, arms the Wall tool and returns the canvas with its bounding box. */
 async function armWallTool(page: Page): Promise<{ canvas: ReturnType<Page['locator']>; box: { width: number; height: number } }> {
   await page.getByRole('button', { name: '2D', exact: true }).click();
+  await page.getByRole('button', { name: 'Sketch tools' }).click();
   await page.getByRole('button', { name: 'Wall', exact: true }).click();
   const canvas = page.locator('.viewport-2d-wrapper canvas');
   const box = await canvas.boundingBox();
