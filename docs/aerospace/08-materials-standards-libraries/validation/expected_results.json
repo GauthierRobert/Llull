@@ -626,5 +626,194 @@
    },
    "derivation": "L = stack + 1.5D rounded UP to 1/16 in (open question OQ-MAT-04: nearest vs up); shop head >= 1.5D x 0.5D; edge >= 2D, pitch >= 3D (AC 43.13-1B 4-57c)"
   }
+ ],
+ "agentFirst": [
+  {
+   "id": "VC-MAT-22",
+   "quantity": "unverified flag propagates into mass_properties (AF-32)",
+   "geometry": "box_100x50x10_mm",
+   "expected": [
+    {
+     "densitySource": "aa7075_t6.physical.density_typical_matweb",
+     "basis": "typical",
+     "source": "S12",
+     "massG": 140.5,
+     "massKg": 0.1405,
+     "massLb": 0.3097495,
+     "unverified": true,
+     "unverifiedReasons": [
+      "basis typical"
+     ]
+    },
+    {
+     "densitySource": "aa7075_t6.physical.density_ams4045_supplier",
+     "basis": "supplier_unstated",
+     "source": "S13",
+     "massG": 139.7835,
+     "massKg": 0.1397835,
+     "massLb": 0.3081699,
+     "unverified": true,
+     "unverifiedReasons": [
+      "basis supplier_unstated"
+     ]
+    },
+    {
+     "densitySource": "legacy Material.density 0.00785 g/mm^3 (10 mm cube)",
+     "massG": 7.85,
+     "unverified": true,
+     "unverifiedReasons": [
+      "provenance legacy"
+     ]
+    }
+   ],
+   "check_materials": {
+    "code": "MAT_VALUE_UNVERIFIED",
+    "severity": "warning"
+   },
+   "tolerance": {
+    "relative": 1e-06
+   },
+   "derivation": "mass = V * rho (as VC-MAT-04); unverified iff basis in typical/supplier_unstated/unspecified or provenance legacy (TR-MAT-50)"
+  },
+  {
+   "id": "VC-MAT-23",
+   "quantity": "unverified + reviewRequired on allowables and downstream FEA (AF-32, AF-33)",
+   "expected": [
+    {
+     "call": "get_material_allowable material=aa7075_t6 property=Ftu basis=typical",
+     "valueMPa": 572,
+     "basis": "typical",
+     "unverified": true,
+     "unverifiedReasons": [
+      "basis typical"
+     ],
+     "reviewRequired": true
+    },
+    {
+     "call": "get_material_allowable material=aa7075_t6 property=Ftu basis=typical forCertification=true",
+     "exitCode": 1,
+     "code": "MAT_VALUE_UNVERIFIED",
+     "available": false
+    },
+    {
+     "call": "gap 05 compute_margins with E and Ftu from this record",
+     "rows[*].unverified": true,
+     "rows[*].reviewRequired": true,
+     "check_analysis contains": "FEA_MATERIAL_UNVERIFIED"
+    }
+   ],
+   "derivation": "FR-MAT-25/29; value 572 MPa quoted from S12 (typical)"
+  },
+  {
+   "id": "VC-MAT-24",
+   "quantity": "stable error codes for deliberately wrong inputs (AF-11)",
+   "expected": [
+    {
+     "call": "set_material_property property=density value=2.81 unit=MPa",
+     "code": "MAT_UNIT_DIMENSION"
+    },
+    {
+     "call": "set_material_property property=Ftu value=83 unit=ksi (no basis)",
+     "code": "MAT_BASIS_MISSING"
+    },
+    {
+     "call": "second preferred density on the same key",
+     "code": "MAT_PREFERRED_CONFLICT"
+    },
+    {
+     "call": "get_material_allowable basis=A where only S exists",
+     "code": "MAT_ALLOWABLE_NOT_AVAILABLE"
+    },
+    {
+     "call": "temperature 600 degF on the VC-MAT-16 table",
+     "code": "MAT_TEMPERATURE_OUT_OF_RANGE"
+    },
+    {
+     "call": "import licensed-no-redistribution library with storage=embedded",
+     "code": "MAT_LICENCE_EMBED_FORBIDDEN"
+    },
+    {
+     "call": "select_fastener NAS6204 stack 3.000 in",
+     "code": "FAST_STACK_OUT_OF_RANGE"
+    },
+    {
+     "call": "insert_fastener_row MS20470AD4 pitch 0.30 in",
+     "code": "FAST_PITCH"
+    },
+    {
+     "call": "decode_part_number partNumber=XYZ123",
+     "code": "FAST_PART_NUMBER_UNKNOWN"
+    }
+   ],
+   "assert": "exit code 1; data.code; non-empty data.remediation; data.ids or data.path",
+   "derivation": "TECHNICAL_SPEC 7.1"
+  },
+  {
+   "id": "VC-MAT-25",
+   "quantity": "human gates refuse an agent caller (AF-34)",
+   "expected": [
+    {
+     "call": "export_step_exact on an ITAR-marked document",
+     "exitCode": 1,
+     "code": "MAT_EXPORT_CONTROLLED",
+     "saved": []
+    },
+    {
+     "call": "export_step_exact confirmExportControlled=true (agent, no human token)",
+     "exitCode": 1,
+     "code": "MAT_HUMAN_GATE",
+     "saved": []
+    },
+    {
+     "call": "lower marking ITAR -> none (agent)",
+     "exitCode": 1,
+     "code": "MAT_HUMAN_GATE",
+     "documentChanged": false
+    },
+    {
+     "call": "raise marking none -> EAR99 (agent)",
+     "exitCode": 0,
+     "documentChanged": true
+    }
+   ],
+   "derivation": "FR-MAT-30, TR-MAT-51"
+  },
+  {
+   "id": "VC-MAT-26",
+   "quantity": "named defaults in select_fastener results (AF-31)",
+   "expected": {
+    "maxWasherTotal": {
+     "value": 0.125,
+     "unit": "in",
+     "source": "AC 43.13-1B 7-37",
+     "defaulted": true
+    },
+    "minProtrusion": {
+     "value": "1 thread pitch beyond nut max height",
+     "source": "AC 43.13-1B 7-37 ('at least one thread'); llull reading",
+     "defaulted": true
+    },
+    "rivetLengthRounding": {
+     "value": "up",
+     "step": {
+      "value": 0.0625,
+      "unit": "in"
+     },
+     "source": "llull choice (OQ-MAT-04)",
+     "defaulted": true
+    },
+    "rivetMinEdgeDistance": {
+     "value": "2 D",
+     "source": "AC 43.13-1B 4-57(c)",
+     "defaulted": true
+    },
+    "rivetMinPitch": {
+     "value": "3 D",
+     "source": "AC 43.13-1B 4-57(c)",
+     "defaulted": true
+    }
+   },
+   "derivation": "FR-MAT-28; values from fastener_catalog_sample.json installationRules / rivet selectionRule"
+  }
  ]
 }

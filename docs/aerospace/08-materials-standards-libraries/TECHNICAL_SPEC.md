@@ -154,7 +154,7 @@ private library, `{ libraryId, version, sha256 }` (the hash of the library snaps
 `ctx.libraries.get(libraryId, version, sha256)`:
 
 1. The host (`server/` for CLI and desktop, `src/ui` for the browser) dispatches it right after every `load_document`, and the
-   UI offers it again after the user registers a library (`llull libraries add`).
+   UI offers it again after a library file is registered (`register_material_library file=…`).
 2. For each `libraryRef` whose provider snapshot has the **same sha256**, it fills the records. It is a session command: it is
    not appended to `featureHistory` (today `execute` exempts only `readOnly` and `metaHistory` commands from the
    step append, so this needs a new `session` annotation, OQ-MAT-09) and it is never serialized (TR-MAT-31), so undo/redo and replay never carry private values.

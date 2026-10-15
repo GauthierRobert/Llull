@@ -1117,11 +1117,15 @@
    "value": {
     "agentCaller": {
      "exit": 1,
-     "code": "KRN_HUMAN_GATE",
+     "code": "XCH_HUMAN_GATE",
      "fileWritten": false
     },
     "humanCaller": {
      "proceeds": true
+    },
+    "baselineAcceptByAgent": {
+     "exit": 1,
+     "code": "KRN_HUMAN_GATE"
     }
    },
    "tolerance": null,

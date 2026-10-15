@@ -195,69 +195,87 @@ User stories:
 
 ## 6. Workflows
 
-### 6.1 UI: zone-based skin panel (MVP)
-
-1. Model or import the tool surface (e.g. `add_box` top face, or a 02 SRF lofted skin).
-2. **Composites > Material**: pick T300/5208 from the 08 MAT library, or enter the values (`create_lamina_material`).
-3. **Composites > Rosette**: click the origin, then the 0° direction (`define_rosette`).
-4. **Composites > New part**: pick the tool face and the laminate side (`create_composite_part`).
-5. **Zones**: sketch closed curves on the face, and type the stacking string per zone (`define_zone`). The
-   zone table shows the ply count, thickness and rule status live.
-6. **Ramps**: set the ratio and stagger (`set_ply_drop_rules`), then click **Generate plies**
-   (`generate_plies_from_zones`). The ply tree fills with sequences S1…Sn and ramps are drawn.
-7. **Core sample** tool: hover anywhere to see the ply stack (`core_sample`). Click to pin a sample.
-8. **Analysis** panel: enter loads and get ABD, constants, and FPF margins per criterion (`analyze_laminate`).
-9. **Check** panel: rule findings, with click-to-zoom (`check_laminate_rules`).
-10. **Export**: DXF flat patterns (`export_flat_patterns_dxf`), ply table CSV, and the ply book in V1.
-
-### 6.2 UI: doubly curved woven ply (V1)
-
-1. Composite part on a dome face; material with `lockingAngle`.
-2. `add_ply` with drape settings: seed point, direction and step. The viewport shows the fibre net coloured
-   by shear (green below the warning shear, amber between warning and lock, red above the lock).
-3. `check_producibility` lists over-lock regions per ply. Add a dart curve (`split_ply`) and re-drape.
-4. Export the flat pattern (drape-based) and the laser projection data.
-
-### 6.3 CLI (local agent, KI6)
+### 6.1 CLI (primary: the operator agent), zone-based skin panel (MVP)
 
 ```bash
-llull --app run docs/aerospace/06-composites/validation/plans/cmp-flat-panel-zones.json --validate
-llull --app run docs/aerospace/06-composites/validation/plans/cmp-flat-panel-zones.json --progress
-llull --app core_sample part=part-5.1 point=[300,200,0] --json
-llull --app analyze_laminate '{"part":"part-5.1","point":[50,50,0],"loads":{"Nx":300}}' --json
-llull --doc panel.llull.json export_flat_patterns_dxf part=part-5.1 --save flats.dxf
-llull search laminate ply drape        # discovery ranks the composites toolset
+llull search laminate ply drape                 # ranks the composites toolset
+llull describe create_lamina_material           # units of every param (MPa, mm, deg), refusals, next command
+llull guide                                     # composites section: units, stacking bottom-to-top, minimal plan
+# 1. plan file: material, rosette, part on the tool face, zones, ply-drop rules, generation, core samples, checks
+#    (validation/plans/cmp-flat-panel-zones.json)
+llull run cmp-flat-panel-zones.json --validate --doc panel.llull.json --kernel occt     # step path + param + code
+llull run cmp-flat-panel-zones.json --doc panel.llull.json --kernel occt --progress --json
+# 2. numbers
+llull core_sample part=part-5.1 'point=[300,200,0]' --doc panel.llull.json --kernel occt --json   # 24 plies, thicknessMm 3.0
+llull analyze_laminate '{"part":"part-5.1","point":[50,50,0],"loads":{"Nx":300},"criteria":["tsai_wu"]}' --doc panel.llull.json --json
+#    data.firstPlyFailure.tsai_wu.R, data.unverified, data.reviewRequired, data.provenance
+# 3. closing check: rules R1-R5, ramps, blending, FPF ratio, unverified materials, defaulted thresholds
+llull check_layup part=part-5.1 --doc panel.llull.json --kernel occt --json
+# 4. look at it
+llull render_view view=iso isolate=part-5.1 --doc panel.llull.json --kernel occt --save out/panel.png
+# 5. deliver
+llull export_flat_patterns_dxf part=part-5.1 --doc panel.llull.json --kernel occt --save out/flats.dxf
+llull export_ply_table part=part-5.1 --doc panel.llull.json --save out/plies.csv
+llull export_ply_book part=part-5.1 format=svg --doc panel.llull.json --kernel occt --save out/plybook/
 ```
 
-The verbs (`run`, `exec`/shorthand, `--validate`, `--save`, `--json`) are the existing ones from
-`server/src/cli/usage.ts`. Only the command names are new.
+If a step is refused, the CLI exits 1 with a code from TECHNICAL_SPEC §7.1 and a remediation; the agent edits
+the plan (for example a stacking string named by `CMP_NOTATION_PARSE`) and re-validates. If `check_layup` fails
+on a margin, the agent edits the zone stacks (`edit_zone`) and repeats. It never accepts a failing margin itself:
+that is `request_layup_waiver` plus a human approval in 09 PLM. `--dry-run` tries an edit without writing.
 
-### 6.4 MCP agent (cloud)
+### 6.2 CLI, doubly curved woven ply (V1)
 
-1. `tools/list` with toolset `composites`.
-2. The agent calls `build_project` with a plan: material, rosette, part, zones, generation.
-3. The agent loops: `check_laminate_rules` (read-only), then `analyze_laminate` (read-only). If any margin
-   is ≤ 0 or any rule fails, it edits the zone stacking (`edit_zone`) and repeats.
-4. `export_flat_patterns_dxf`, returning the DXF text or a resource link.
-5. Every step lands in the feature history, and the user can undo any agent step in the desktop app.
+1. Plan `validation/plans/cmp-hemisphere-drape.json`: material with an explicit `lockingAngle` and
+   `warningShear` (no default, FR-CMP-67), part on the dome face, `add_ply` with drape settings (seed point,
+   direction, `stepLength` in mm).
+2. `llull drape_ply ply=<id> output=summary --json`: `data.maxShearDeg`, `data.nodesOverWarning`,
+   `data.nodesOverLock`, `data.overLockRegions[]`; `output=nodes --save net.json` for the full net.
+3. `llull check_producibility part=<id> --json`; add a dart (`split_ply`) and re-drape; `check_layup` lists
+   `CMP_DRAPE_OVER_LOCK` until the counts are acceptable.
+4. `render_view … --save dome.png` to look at the net; export the drape-based flat pattern and the laser
+   projection with `--save`. An over-lock pattern needs `allowOverLock` and carries `reviewRequired`.
+
+### 6.3 MCP agent (cloud)
+
+1. `search_tools laminate ply`, then `enable_toolset composites`.
+2. `build_project` with the same plan; loop `check_layup` (read-only) and `analyze_laminate` (read-only); edit
+   zone stacks with `edit_zone` until no failure remains.
+3. `export_flat_patterns_dxf` returns the DXF text or a resource link.
+4. Every step lands in the feature history; the user can undo any agent step in the desktop app.
+
+### 6.4 UI (review and approval surface)
+
+The desktop app shows the ply tree, zone table, core-sample tooltip and shear-map overlay, all built from the
+same query `data`. The qualified reviewer uses it with the `check_layup` report to accept margins, approve
+waivers and over-lock patterns, and release the ply book through 09 PLM. Ribbon actions for every command exist
+because the UI iterates `listCommands()`; no capability depends on them.
 
 ## 7. Acceptance criteria
 
-| # | Given | When | Then | VC |
-| - | ----- | ---- | ---- | -- |
-| AC-1 | T300/5208 entered with the Tsai-Hahn constants | `analyze_laminate` on a [0]8 core sample | Q11 = 181.8 GPa, Q22 = 10.34 GPa (±0.1 %), Ex = E1 exactly | VC-CMP-01, 02 |
-| AC-2 | A [0/45/-45/90]s and a [0/60/-60]s laminate | ABD computed | A11 = A22 = U1·h, A16 = 0, B = 0, identical Ex = 69 675.7 MPa | VC-CMP-03, 04 |
-| AC-3 | [0/90]T, 0° ply at the bottom | ABD computed | B11 = -1 339.57 N, B22 = +1 339.57 N | VC-CMP-05 |
-| AC-4 | Load Nx = 1 N/mm | FPF requested | Strength ratios equal `clt_reference.json` within 1e-4 and name the critical ply | VC-CMP-06, 07 |
-| AC-5 | 10 stacking strings | Parsed and checked | Expansion and R1-R5 verdicts equal `layup_rules_reference.json` | VC-CMP-08, 09 |
-| AC-6 | The 3-zone flat panel plan | Plies generated; core sample at two points | 8 plies / 1.0 mm and 24 plies / 3.0 mm; ramp widths n·t·20 | VC-CMP-10, 11 |
-| AC-7 | Hemisphere R = 100, seed at the pole, step 1 mm | Drape | Shear at polar 45° on the diagonal = 15.7 ± 0.6°; Gauss-Bonnet residual ≤ 0.5°; max shear 51.9 ± 1.0° | VC-CMP-12 |
-| AC-8 | Locking angle 40° | Producibility check | About 8.5 % of the quadrant is flagged; no flat pattern without `allowOverLock` | VC-CMP-13 |
-| AC-8b | The hemisphere ply split by 4 darts along the generators | Each piece re-draped from the pole along its bisector | 4 pieces; shear 0 ± 0.05° on each bisector, 15.7 ± 0.6° at the piece-edge node near polar 45° | VC-CMP-33 |
-| AC-9 | Cylinder and cone plies | Flat pattern | Width 2πr; cone sector angle 254.558°, area 44 428.8 mm² | VC-CMP-14, 15 |
-| AC-10 | Cone flat pattern | Exported to DXF and re-imported | Area within 0.2 %; layer per ply; INSUNITS = 4 | VC-CMP-16 |
-| AC-11 | Any ply | Laser projection exported | Point spacing ≤ 75 mm, corners present, consistent winding | VC-CMP-17 |
-| AC-12 | Any plan in `validation/plans` | Replayed through UI, CLI and MCP | Identical documents and query data; commands pure | VC-CMP-20, 21 |
+Each criterion is a CLI call with `--json` and an assertion against `validation/expected_results.json`
+(`cli_by_vc` gives the call and JSON path per VC). `D` = `--doc t.llull.json --kernel occt --json`.
+
+| # | Given | When (CLI) | Then (JSON assertion) | VC |
+| - | ----- | ---------- | --------------------- | -- |
+| AC-1 | T300/5208 with the Tsai-Hahn constants | `llull analyze_laminate '{"angles":[0,0,0,0,0,0,0,0],"material":"T300_5208"}' D` | `data.Q.Q11` = 181 800 ± 0.1 % MPa, `data.Q.Q22` = 10 340 ± 0.1 %, `data.constantsMembrane.Ex` = E1 (rel 1e-9) | VC-CMP-01, 02 |
+| AC-2 | [0/45/-45/90]s and [0/60/-60]s | `analyze_laminate` on each | `data.A` A11 = A22 = U1·h, A16 = 0, B = 0; `constantsMembrane.Ex` = 69 675.7 MPa both | VC-CMP-03, 04 |
+| AC-3 | [0/90]T, 0° ply at the bottom | `analyze_laminate` | `data.B[0][0]` = −1 339.57 N, `data.B[1][1]` = +1 339.57 N | VC-CMP-05 |
+| AC-4 | Nx = 1 N/mm | `analyze_laminate … loads={"Nx":1} criteria=[max_stress,tsai_hill,tsai_wu]` | `data.firstPlyFailure.*.R` equal `clt_reference.json` within 1e-4; critical ply named; `data.reviewRequired = true` | VC-CMP-06, 07 |
+| AC-5 | 10 stacking strings | `define_zone` + `check_laminate_rules` per string | expansion and R1-R5 verdicts equal `layup_rules_reference.json`; failing rules carry `CMP_RULE_*` codes | VC-CMP-08, 09 |
+| AC-6 | `cmp-flat-panel-zones` plan | `llull run … D`; `core_sample` at two points | 8 plies / `thicknessMm` 1.0 and 24 plies / 3.0; ramp widths n·t·20 | VC-CMP-10, 11 |
+| AC-7 | hemisphere R = 100, seed at the pole, step 1 mm | `llull drape_ply ply=$p1 output=summary D` | shear at polar 45° on the diagonal 15.7 ± 0.6°; Gauss-Bonnet residual ≤ 0.5°; `data.maxShearDeg` 51.9 ± 1.0 | VC-CMP-12 |
+| AC-8 | locking angle 40° | `check_producibility` / `check_layup` | ≈ 8.5 % of the quadrant flagged; finding `CMP_DRAPE_OVER_LOCK`; `export_flat_patterns_dxf` refused with `CMP_FLAT_OVER_LOCK` unless `allowOverLock` | VC-CMP-13 |
+| AC-8b | hemisphere ply split by 4 darts along the generators | `split_ply` ×4, then `drape_ply` per piece along its bisector | 4 pieces; shear 0 ± 0.05° on each bisector, 15.7 ± 0.6° at the piece-edge node near polar 45° | VC-CMP-33 |
+| AC-9 | cylinder and cone plies | `export_flat_patterns_dxf … --save` + `data` | width 2πr; cone sector angle 254.558°, area 44 428.8 mm² | VC-CMP-14, 15 |
+| AC-10 | cone flat pattern | `export_flat_patterns_dxf --save cone.dxf`, `import_dxf file=cone.dxf`, `measure_area` | area within 0.2 %; layer per ply; `$INSUNITS = 4` | VC-CMP-16 |
+| AC-11 | any ply | `export_laser_projection --save laser.txt` | point spacing ≤ 75 mm, corners present, consistent winding | VC-CMP-17 |
+| AC-12 | any plan in `validation/plans` | CLI, MCP `build_project`, UI dispatch | identical documents and query data; commands pure | VC-CMP-20, 21 |
+| AC-13 | a plan with `[45/-45/0/9O]s` (letter O), ν12 = 1.1 with E1 = E2, and unblendable zones | `llull run bad.plan.json --validate D` / run | exit 1; codes `CMP_NOTATION_PARSE`, `CMP_MATERIAL_NOT_POSITIVE_DEFINITE`, `CMP_ZONES_NOT_BLENDABLE` with path and remediation | VC-CMP-34 |
+| AC-14 | AS4/3501-6 entered with `basis: "mean"` | `analyze_laminate`, `laminate_mass`, `check_layup` | `data.unverified = true` on each; warn `CMP_MATERIAL_UNVERIFIED` not suppressible | VC-CMP-35 |
+| AC-15 | the flat panel, no F12* and no rule thresholds given | `analyze_laminate`, `check_layup purpose=release` | `data.defaults.tsaiWuF12Star = {value: −0.5, defaulted: true, source}`; thresholds named; `reviewRequired = true` with reason | VC-CMP-36 |
+| AC-16 | Nx = 400 N/mm on Z-base (R < 1) | `check_layup`, `request_layup_waiver`, 09 `record_approval` as agent | `CMP_FPF_RATIO_BELOW_ONE` fail; approval refused; `waiverStatus: "pending"` | VC-CMP-37 |
+| AC-17 | every composites command | `llull describe <cmd> --json`, result audit | no numeric param or result number without a unit; `llull search laminate` finds the main commands | VC-CMP-38 |
 
 ## 8. Standards and regulatory alignment
 
@@ -273,10 +291,11 @@ The verbs (`run`, `exec`/shorthand, `--validate`, `--save`, `--json`) are the ex
 
 | KPI | Target |
 | --- | ------ |
-| Validation cases passing on desktop OCC | 100 % of MVP VCs (01-11, 14-16, 18, 20, 21, 31, 32) before MVP release; V1 VCs before V1 |
+| Validation cases passing on desktop OCC | 100 % of MVP VCs (01-11, 14-16, 18, 20, 21, 31, 32, 34-38) before MVP release; V1 VCs before V1 |
 | CLT agreement with the reference generator | rel ≤ 1e-4 on all 14 cases |
 | Time to define a 3-zone, 24-ply panel and export flats (expert user) | ≤ 15 min (baseline: hand-drawn plies in a generic CAD, TBD measure) |
-| Agent success rate (US-7 benchmark prompt, 10 runs) | ≥ 8/10 produce a rule-clean laminate with positive FPF margin |
+| Agent success rate (US-7 benchmark prompt, 10 runs, CLI only) | ≥ 8/10 produce a rule-clean laminate with positive FPF margin, end with `check_layup`, and report `reviewRequired` items to the owner |
+| Self-check coverage | 100 % of refusals carry a code from TECHNICAL_SPEC §7.1; every VC runs from `cli_by_vc` without the UI (AF-23) |
 | Regeneration time of a 200-ply panel | ≤ 2 s |
 | DXF round-trip area error | ≤ 0.2 % |
 
@@ -292,6 +311,7 @@ The verbs (`run`, `exec`/shorthand, `--validate`, `--save`, `--json`) are the ex
 | AP242 composite support in open-source toolchains is immature | V2 export effort | MVP explicit solids + CSV; V2 hand-written AP242 entities validated against CAx-IF |
 | Document size: thousands of plies with flat patterns | Slow saves and sync | Derived geometry is regenerated, not stored (plugin `derivedEntityIds`) |
 | Export-control / proprietary layups | Data leakage | Offline desktop first; nothing leaves the machine unless the user exports |
+| The operator is an agent and the owner is not a stress engineer | Textbook material values or a negative margin reported as "done" | No allowable defaults; `unverified` propagation; `check_layup` ends every job; `reviewRequired` on margins; waivers and releases are human gates (FR-CMP-66..71) |
 
 ## 11. References
 

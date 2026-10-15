@@ -154,6 +154,7 @@ export interface ImportProvenance {
   readonly sourceUnit: DocumentUnit | 'unknown';
   readonly embeddedGvp?: readonly EmbeddedGvp[];
   readonly gvpCheck?: GvpCheck;                  // computed at import time, re-computable by verify
+  readonly unverified: { readonly value: boolean; readonly reasons: readonly ('import_gvp_red' | 'import_gvp_not_checkable' | 'verify_skipped')[] }; // TR-XCH-24
 }
 
 export interface EmbeddedGvp {
@@ -407,7 +408,7 @@ archive process itself (EN 9300-002 requirements) is the organisation's.
 | TR-XCH-23 | MUST | Named defaults `{ value, unit, source, defaulted }` for `policy` (green / yellow from §5.3 with their sources), `schema`, `tessellation`, IGES sewing tolerance; `data.provenance` = `ImportProvenance` (import) or `{ llullVersion, kernel, schemaName, timestamp }` (export) | FR-XCH-26 | VC-XCH-25 |
 | TR-XCH-24 | MUST | `ImportProvenance` gains `unverified: { value, reasons[] }` (`import_gvp_red`, `import_gvp_not_checkable`, `verify_skipped`); 01 `mass_properties` reads it (TR-KRN-103); export GVP and archive manifest entries copy it | FR-XCH-27 | VC-XCH-22 |
 | TR-XCH-25 | MUST | `reviewRequired: { value, reasons[] }` on import reports (band yellow / red / not-checkable), exports with unverified bodies, every archive package (`archive_record`); AF-36 summary order | FR-XCH-28 | VC-XCH-23 |
-| TR-XCH-26 | MUST (V1) | `export_step_ap242 { acceptUnverified: true }` (needed when any exported body is unverified or red) and archive acceptance (09 `release_item`) require `ctx.caller.kind === 'human'` (09 TR-PLM-16; advisory in local CLI runs, enforced on an authenticated server); agent → `XCH_HUMAN_GATE` | FR-XCH-29 | VC-XCH-24 |
+| TR-XCH-26 | MUST (V1) | `export_step_ap242 { acceptUnverified: true }` (needed when any exported body is unverified, red or faceted — 01 KRN uses the same flag for faceted bodies, TR-KRN-105) and archive acceptance (09 `release_item`) require `ctx.caller.kind === 'human'` (09 TR-PLM-16; advisory in local CLI runs, enforced on an authenticated server); agent → `XCH_HUMAN_GATE` | FR-XCH-29 | VC-XCH-24 |
 | TR-XCH-27 | SHOULD | Import stages (read, heal, tree, GVP, PMI) on `--progress`; `--timeout` honoured (01 worker recycle); `--dry-run` works (pure commands); missing JT converter → `XCH_CONVERTER_MISSING` with install hint | FR-XCH-30 | VC-XCH-26 |
 
 ### 7.2 Stable error codes (AF-11)

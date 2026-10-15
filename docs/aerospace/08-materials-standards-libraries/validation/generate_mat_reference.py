@@ -229,6 +229,73 @@ def checkpoint_cases(catalog: dict) -> list[dict]:
     return cases
 
 
+# ---------------------------------------------------------------- agent-first contract (VC-MAT-22..26, AGENT_FIRST.md)
+UNVERIFIED_BASES = ("typical", "supplier_unstated", "unspecified")
+
+
+def agent_first_cases(materials: dict, catalog: dict) -> list[dict]:
+    mat = next(m for m in materials["materials"] if m["id"] == "aa7075_t6")
+    typ = mat["physical"]["density_typical_matweb"]
+    sup = mat["physical"]["density_ams4045_supplier"]
+    rho_typ = typ["value"] / 1000.0
+    rho_sup = lb_in3_to_g_cm3(sup["value"]) / 1000.0
+    volume = 100 * 50 * 10
+    def mass_case(prop_id, prop, rho):
+        reasons = [f"basis {prop['basis']}"] if prop["basis"] in UNVERIFIED_BASES else []
+        m = volume * rho
+        return {"densitySource": f"aa7075_t6.physical.{prop_id}", "basis": prop["basis"], "source": prop["source"],
+                "massG": r(m, 7), "massKg": r(m / 1000.0, 7), "massLb": r(m / G_PER_LB, 7),
+                "unverified": bool(reasons), "unverifiedReasons": reasons}
+    rules = catalog["installationRules"]
+    return [
+        {"id": "VC-MAT-22", "quantity": "unverified flag propagates into mass_properties (AF-32)",
+         "geometry": "box_100x50x10_mm",
+         "expected": [mass_case("density_typical_matweb", typ, rho_typ), mass_case("density_ams4045_supplier", sup, rho_sup),
+                      {"densitySource": "legacy Material.density 0.00785 g/mm^3 (10 mm cube)", "massG": 7.85,
+                       "unverified": True, "unverifiedReasons": ["provenance legacy"]}],
+         "check_materials": {"code": "MAT_VALUE_UNVERIFIED", "severity": "warning"},
+         "tolerance": {"relative": 1e-6},
+         "derivation": "mass = V * rho (as VC-MAT-04); unverified iff basis in typical/supplier_unstated/unspecified or provenance legacy (TR-MAT-50)"},
+        {"id": "VC-MAT-23", "quantity": "unverified + reviewRequired on allowables and downstream FEA (AF-32, AF-33)",
+         "expected": [
+             {"call": "get_material_allowable material=aa7075_t6 property=Ftu basis=typical", "valueMPa": 572, "basis": "typical",
+              "unverified": True, "unverifiedReasons": ["basis typical"], "reviewRequired": True},
+             {"call": "get_material_allowable material=aa7075_t6 property=Ftu basis=typical forCertification=true",
+              "exitCode": 1, "code": "MAT_VALUE_UNVERIFIED", "available": False},
+             {"call": "gap 05 compute_margins with E and Ftu from this record", "rows[*].unverified": True,
+              "rows[*].reviewRequired": True, "check_analysis contains": "FEA_MATERIAL_UNVERIFIED"}],
+         "derivation": "FR-MAT-25/29; value 572 MPa quoted from S12 (typical)"},
+        {"id": "VC-MAT-24", "quantity": "stable error codes for deliberately wrong inputs (AF-11)",
+         "expected": [
+             {"call": "set_material_property property=density value=2.81 unit=MPa", "code": "MAT_UNIT_DIMENSION"},
+             {"call": "set_material_property property=Ftu value=83 unit=ksi (no basis)", "code": "MAT_BASIS_MISSING"},
+             {"call": "second preferred density on the same key", "code": "MAT_PREFERRED_CONFLICT"},
+             {"call": "get_material_allowable basis=A where only S exists", "code": "MAT_ALLOWABLE_NOT_AVAILABLE"},
+             {"call": "temperature 600 degF on the VC-MAT-16 table", "code": "MAT_TEMPERATURE_OUT_OF_RANGE"},
+             {"call": "import licensed-no-redistribution library with storage=embedded", "code": "MAT_LICENCE_EMBED_FORBIDDEN"},
+             {"call": "select_fastener NAS6204 stack 3.000 in", "code": "FAST_STACK_OUT_OF_RANGE"},
+             {"call": "insert_fastener_row MS20470AD4 pitch 0.30 in", "code": "FAST_PITCH"},
+             {"call": "decode_part_number partNumber=XYZ123", "code": "FAST_PART_NUMBER_UNKNOWN"}],
+         "assert": "exit code 1; data.code; non-empty data.remediation; data.ids or data.path",
+         "derivation": "TECHNICAL_SPEC 7.1"},
+        {"id": "VC-MAT-25", "quantity": "human gates refuse an agent caller (AF-34)",
+         "expected": [
+             {"call": "export_step_exact on an ITAR-marked document", "exitCode": 1, "code": "MAT_EXPORT_CONTROLLED", "saved": []},
+             {"call": "export_step_exact confirmExportControlled=true (agent, no human token)", "exitCode": 1, "code": "MAT_HUMAN_GATE", "saved": []},
+             {"call": "lower marking ITAR -> none (agent)", "exitCode": 1, "code": "MAT_HUMAN_GATE", "documentChanged": False},
+             {"call": "raise marking none -> EAR99 (agent)", "exitCode": 0, "documentChanged": True}],
+         "derivation": "FR-MAT-30, TR-MAT-51"},
+        {"id": "VC-MAT-26", "quantity": "named defaults in select_fastener results (AF-31)",
+         "expected": {
+             "maxWasherTotal": {"value": rules["maxCombinedWasherHeight_in"]["value"], "unit": "in", "source": "AC 43.13-1B 7-37", "defaulted": True},
+             "minProtrusion": {"value": "1 thread pitch beyond nut max height", "source": "AC 43.13-1B 7-37 ('at least one thread'); llull reading", "defaulted": True},
+             "rivetLengthRounding": {"value": "up", "step": {"value": 0.0625, "unit": "in"}, "source": "llull choice (OQ-MAT-04)", "defaulted": True},
+             "rivetMinEdgeDistance": {"value": "2 D", "source": "AC 43.13-1B 4-57(c)", "defaulted": True},
+             "rivetMinPitch": {"value": "3 D", "source": "AC 43.13-1B 4-57(c)", "defaulted": True}},
+         "derivation": "FR-MAT-28; values from fastener_catalog_sample.json installationRules / rivet selectionRule"},
+    ]
+
+
 def build() -> dict:
     materials = load("materials_dataset.json")
     catalog = load("fastener_catalog_sample.json")
@@ -241,6 +308,7 @@ def build() -> dict:
         "boltGripSelection": bolt_grip_cases(catalog),
         "hiLokGripSelection": hilok_cases(),
         "rivetSelection": rivet_cases(catalog),
+        "agentFirst": agent_first_cases(materials, catalog),
     }
 
 

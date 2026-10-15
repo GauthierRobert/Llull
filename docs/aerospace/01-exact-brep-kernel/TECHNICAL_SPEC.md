@@ -541,10 +541,10 @@ document instead of inline base64 (V2).
   `unverified` reason, `outside_precision_envelope`, `import_gvp_mismatch`, `tolerance_growth`. The summary appends
   "computed by llull, not approved — needs a qualified engineer" when true; summaries follow AF-36 order (done /
   passed / needs a human) (AF-33, AF-36).
-- **TR-KRN-105 (MUST, V1) — human gates.** Accepting a faceted body into an exact delivery (`acceptFaceted` on 04's
+- **TR-KRN-105 (MUST, V1) — human gates.** Accepting a faceted body into an exact delivery (`acceptUnverified` on 04's
   `export_step_ap242`) and accepting a kernel-regression baseline (`quality:kernel --accept`) require
   `ctx.caller.kind === 'human'` (09 TR-PLM-16; advisory in local CLI runs, enforced on an authenticated server);
-  an agent gets `KRN_HUMAN_GATE` with the prepared request (AF-34).
+  an agent gets `XCH_HUMAN_GATE` (04 export) / `KRN_HUMAN_GATE` (baseline) with the prepared request (AF-34).
 - **TR-KRN-106 (SHOULD, MVP) — loop behaviour.** `import_step_exact` reports progress per stage (read, heal, sew,
   validate, blob) to the CLI `--progress` stream, respects `--timeout` (worker recycled on timeout, existing
   `LLULL_OCC_TIMEOUT_MS`), re-uses blobs by sha256 on re-run; `import_step_exact`, `heal_shape`,
@@ -573,7 +573,7 @@ document instead of inline base64 (V2).
 | `KRN_FACETED_RESULT` | warn (fail for exact export) | `check_model`, exports | an exact recipe fell back to triangles | entity id | run on OCC; or a qualified reviewer accepts it (human gate) |
 | `KRN_INVALID_BREP`, `KRN_SELF_INTERSECTION`, `KRN_SMALL_EDGE`, `KRN_SLIVER_FACE`, `KRN_OPEN_SHELL`, `KRN_NEGATIVE_VOLUME` | fail / warn | `validate_shape`, `check_model` | the TR-KRN-51 checks | entity id, sub-shape (index MVP, `TopoName` V1) | `heal_shape`; rebuild the feature; reviewer if it is imported data |
 | `KRN_MASS_INPUT_UNVERIFIED` | warn | `mass_properties`, `check_model` | TR-KRN-103 reasons | entity ids, reasons | assign a verified material record (08 MAT `assign_material` with a record), use the exact kernel |
-| `KRN_HUMAN_GATE` | fail | `export_step_ap242 { acceptFaceted }`, baseline accept | agent caller on a human-gated act | act, entity ids | hand the prepared request to a qualified reviewer in the desktop app |
+| `KRN_HUMAN_GATE` | fail | kernel-baseline accept (`quality:kernel --accept`) | agent caller on a human-gated act (the faceted-delivery gate is 04's `export_step_ap242 { acceptUnverified }` → `XCH_HUMAN_GATE`) | act, entity ids | hand the prepared request to a qualified reviewer in the desktop app |
 | `KRN_DRIFT_TOPOLOGY` / `KRN_DRIFT_MEASURE` | fail / warn | `quality:kernel` | cross-build drift beyond tolerance | model id, measure | review the drift report; baseline change is a human gate |
 
 Existing lowercase `check_model` codes (`degenerate_size`, …) stay unchanged; new KRN findings use the `KRN_*` codes.
@@ -630,7 +630,7 @@ once in M2 and then ratcheted.
 | Kernel regression (new `quality:kernel`) | signatures + measures vs baseline; cross-version tolerance mode | VC-KRN-10 |
 | Display gate | 10 000-instance scene, 70 m station z-fighting screenshot | VC-KRN-12, TR-KRN-73 |
 | Desktop (`npm --prefix desktop test`) | backend env contains `LLULL_KERNEL=occt`; `kernel_info.active === 'occt'`; forced failure → fallback warning | VC-KRN-11 |
-| Agent-first (CLI scripts, `--json` + exit codes) | wrong calls → codes; legacy-material rib → `unverified`; weight-and-balance purpose → `reviewRequired`; agent `acceptFaceted` → `KRN_HUMAN_GATE`; named defaults + provenance; `--dry-run` / `--timeout` on import | VC-KRN-19 .. 24 |
+| Agent-first (CLI scripts, `--json` + exit codes) | wrong calls → codes; legacy-material rib → `unverified`; weight-and-balance purpose → `reviewRequired`; agent `acceptUnverified` → `KRN_HUMAN_GATE`; named defaults + provenance; `--dry-run` / `--timeout` on import | VC-KRN-19 .. 24 |
 | Production-gate scenario | "Supplier STEP round trip": import NIST CTC 01 AP242 → drill + pocket + fillet → validate → mass → `export_step_ap242` with GVP (04) → re-import → GVP within 1e-6 of the exported values | VC-KRN-04, 09, TR-KRN-80 |
 
 Coverage gate (90/85/90/90) applies to new code in `packages/core/src/{commands,geometry}`.
