@@ -42,7 +42,7 @@ From `dist/Supported APIs.md` of the pinned tag (green = bound):
 | `BRepBuilderAPI_Sewing`, `BRepOffsetAPI_MakeOffsetShape`, `BRepOffsetAPI_DraftAngle`, `BRepExtrema_DistShapeShape`, `GeomAPI_ProjectPointOnSurf`, `BRepAlgoAPI_Section`, `ShapeFix_Shape`, `BRepCheck_Analyzer`, `BRepGProp` | yes | sew, thicken, draft, deviation, trim, validity |
 | `TColgp_Array2OfPnt` | not listed (typedef) | llull already works around 2D pole arrays (`occtPatches.ts`) — keep that technique or custom build |
 
-"Bound" ≠ "works": every class used must get an integration test in `server/tests/` (§9 "Kernel integration").
+"Bound" ≠ "works": every class used must get an integration test in `server/tests/` (TR-SRF-11; §9 "Kernel integration").
 
 ## 2. Target architecture
 
@@ -218,10 +218,10 @@ All names snake_case; all params one inline `z.object`. Tags follow `rules/comma
 | `airfoil_from_naca` | M | – | `designation` (4 digits or 5 digits 210..250 / reflexed COULD), `trailingEdge: 'open'\|'closed'`, `points` (default 161), `spacing: 'cosine'\|'uniform'`, `plane?` (origin, rotation), `chord?` | `aero.airfoils[id]` + derived planar `nurbs_curve` | thickness applied ⟂ mean line; LE at origin, chord along +x | unknown series, t = 0 → no-op |
 | `import_airfoil` | M | – | `text` (file content) or `path` (CLI/desktop exchange), `format: 'auto'\|'selig'\|'lednicer'`, `normalize: 'none'\|'chord'`, `fit` | airfoil def + curve | raw points stored with sha256 | < 5 points, non-numeric data, self-intersection → no-op |
 | `airfoil_properties` | Q | – | `airfoilId` | — | `data {tMax, xTMax, camberMax, xCamberMax, leRadius, teThickness, teAngleDeg, area, centroid, format, pointCount}` | |
-| `create_wing` | M | K for solid | `sections[]` (airfoilId, span, chord, twistDeg, offsets?) and/or `planform {semiSpan, rootChord, tipChord|taper, area?, aspectRatio?, sweepDeg, sweepLocation, dihedralDeg}`, `twistLocation` (0.25), `loft`, `mirror`, `tip`, `origin` | `aero.wings[id]` + derived loft entity (sections exact; TE edge kept) | any 3 independent planform values resolve the rest; sections ordered by span | over/under-determined planform, non-increasing span → no-op |
+| `create_wing` | M | K for solid | `sections[]` (airfoilId, span, chord — omitted when `planform` resolves it, twistDeg, offsets?), `segments[]?` (`{sweepDeg, sweepLocation, dihedralDeg}` per span segment, as `WingDef.segments`) and/or `planform {semiSpan, rootChord, tipChord|taper, area?, aspectRatio?, sweepDeg, sweepLocation, dihedralDeg}`, `twistLocation` (0.25), `loft`, `mirror`, `tip`, `origin` | `aero.wings[id]` + derived loft entity (sections exact; TE edge kept) | any 3 independent planform values resolve the rest; sections ordered by span | over/under-determined planform, non-increasing span → no-op |
 | `edit_wing` | M | per op | `id`, partial WingDef | re-derives | | |
 | `wing_properties` | Q | – (core math from def) / K for wetted area & volume | `id` | — | `data {span, projectedSpan, areaRef, areaPerSide, aspectRatio, taper, mac, yMac, xLeMac, sweepLeDeg, sweepC4Deg, sweepTeDeg, wettedArea?, volume?}` | |
-| `set_aircraft_frame` | M | – | `datum`, axes, `units` | `aero.frame` | right-handed orthonormal | |
+| `set_aircraft_frame` | M | – | `datum`, `fsAxis`, `blAxis`, `wlAxis`, `units` | `aero.frame` | right-handed orthonormal | |
 | `loft_fuselage` | M | K | `stations[] {fs, section}`, `controlCurves?`, `continuity`, `frame?` | `aero.bodies[id]` + derived solid | FS strictly increasing; apex allowed first/last | < 2 stations, conic rho ∉ (0,1) → no-op |
 | `fuselage_section_at` | Q | K | `bodyId`, `fs` | — | `data {curve poles, halfBreadth, crownWl, keelWl, area, perimeter}` | |
 | `import_openvsp_wing` (COULD) | M | – | `text` (.vsp3 XML), `geomName?` | wing def | NACA 4-series / AF-file XSecs only | unsupported XSec type → no-op with list |
@@ -416,12 +416,31 @@ and leaves for `nurbs_surface`/`nurbs_curve`/`loft` v3 entities. `recipeKey` get
 | Python oracle | `server/tests/*.integration.test.ts` with bundled CadQuery/OCP | same STEP evaluated with OCP `GeomLProp_SLProps` / `BRepGProp` to cross-check llull numbers | VC-SRF-11, 12 |
 | Quality gate | `npm run quality` entry: CRM wing-body STEP (downloaded, sha256 pinned on first fetch) → import → curvature/continuity/area | VC-SRF-12 |
 | Production gate | scenario "aero conceptual wing": NACA 23012 root / 0012 tip, 35° sweep, 5° dihedral, −3° washout; export STEP; reimport; volume equal ± 1e-6 rel | VC-SRF-21 |
+| Code export | `export_code language=cadquery` on the NACA 0012 wing plan; run the script with bundled CadQuery/OCP; volume within 1e-4 rel of 0.959117 | VC-SRF-30 |
+
+### 9.1 Technical requirements
+
+Each TR points to the section that specifies it; `validation/expected_results.json` cites them in `proves`.
+
+| Id | Requirement | Spec | VCs |
+| --- | --- | --- | --- |
+| TR-SRF-01 | Pure NURBS library in `lib/nurbs` (validity, evaluation, derivatives, interpolation/approximation, conics, edit ops); no kernel | §2.1, §5.1, §5.2, §5.4 | 06, 07, 08, 14, 25 |
+| TR-SRF-02 | Entity kinds `nurbs_curve` / `nurbs_surface`, `isSheet` / `isCurve3D` predicates, render branches; solid-only commands refuse sheets | §2.3 D1, §3 | 27 |
+| TR-SRF-03 | Loft v3: exact sections (no resampling), TE kept as an edge, apex conditions, post-loft section-fidelity check | §3, §5.5 | 11, 22 |
+| TR-SRF-04 | NACA 4/5-digit equations and airfoil fitting in the plugin (`naca.ts`) | §5.2, §5.3 | 01, 02, 03, 04, 09 |
+| TR-SRF-05 | `@aero` plugin (wing, fuselage, airfoil commands); `AeroModel` type in core `model/aero.ts`; `DocumentExtension`; derived entities read-only and re-derived | §2.1, §3, §4.2 | 10, 11, 13, 14, 28, 29 |
+| TR-SRF-06 | Curve/surface curvature and G0–G3 continuity measures, classification and degenerate-sample handling | §5.6 | 05, 06 |
+| TR-SRF-07 | Optional `GeometryKernel.analysis` port and new `ShapeRecipe` ops, read only via `ctx.kernel` with `requiresKernel`; Manifold refuses | §2.3, §5.8 | 05, 12, 26 |
+| TR-SRF-08 | OCC paths for fill, trim, sew, thicken, deviation and draft with the stated tolerances | §5.7 | 15, 16, 17, 18, 23, 24 |
+| TR-SRF-09 | Interop: `.dat` import (`text` in core, files via `/exchange`), exact STEP B-spline export, `export_code` lowering | §4.3, §6 | 03, 04, 12, 20, 21, 30 |
+| TR-SRF-10 | Purity, deterministic replay, numerical tolerances and performance budgets | §2.3, §5.9, §8 | 12, 19 |
+| TR-SRF-11 | Every OCC class used (§1.2) has a `server/tests/` integration test ("bound" ≠ "works") | §1.2, §9 | 15, 16, 23, 24 |
 
 ## 10. Delivery plan
 
 | Milestone | Content | Depends on | Effort (eng-weeks) |
 | --- | --- | --- | --- |
-| M0 | D1–D3 decisions; `isSheet`; entity kinds; render branches (`add-entity-kind` skill) | — | 2 |
+| M0 | D1–D3 decisions; `isSheet`; entity kinds; render branches (`add-entity-kind` skill); new `packages/domain-aero` workspace: `@aero/*` alias in `tsconfig.base.json`, layer rules in `.dependency-cruiser.cjs` (aero → core public API only), `packages/domain-aero/src/**` added to the 90/85/90/90 coverage gate | — | 2 |
 | M1 | Core NURBS lib (eval, derivatives, interpolate, conic, edit ops) + `create_nurbs_curve`, `interpolate_curve`, `create_conic`, `inspect_nurbs`, `analyze_curve_curvature` (core path) | M0 | 4 |
 | M2 | `@aero` plugin skeleton + `AeroModel` + `airfoil_from_naca`, `import_airfoil`, `airfoil_properties` | M1 | 3 |
 | M3 | Exact loft v3 (no resampling, TE edge, apex) + `create_wing`, `wing_properties` | M2, KRN-M1 (OCC default on desktop) | 4 |

@@ -65,14 +65,17 @@ Tolerances and values are in `expected_results.json` (authoritative); summary he
 | VC-SRF-25 | FR-04 | `surface_from_points` 21×21 torus grid | grid residual 0; mid-cell dev recorded | 1e-9 | interpolation | unit |
 | VC-SRF-26 | FR-29 | Manifold kernel | core queries work; kernel ops refuse | exact | KI5 | unit |
 | VC-SRF-27 | FR-23 | overlays on/off | document unchanged; legend = data range | exact | — | component |
-| VC-SRF-28 | FR-14, FR-16 | edit sweep 0 → 30° | area unchanged; LE sweep 30° | 1e-9 | shear | golden |
+| VC-SRF-28 | FR-14, FR-16 | edit sweep 0 → 30° on a constant-chord wing (taper 1; with taper ≠ 1 give the sweep at `sweepLocation` 0) | area unchanged; LE sweep 30° | 1e-9 | shear | golden |
 | VC-SRF-29 | FR-19 | conic master-line loft | TBD (needs public loftsman example) | TBD | [S18] [S19] paywalled | — |
+| VC-SRF-30 | FR-28 | `plans/target_naca0012_trap_wing.json`, then `export_code language=cadquery`; run the script with bundled CadQuery/OCP | script runs; V = 0.959117 m³ | 1e-4 rel | same derivation as VC-SRF-11 | server (Python oracle) |
 
 FR ↔ VC coverage: FR-01 (07, 08) · FR-02 (08) · FR-03 (08) · FR-04 (25) · FR-05 (11, 22) · FR-06 (15) · FR-07 (23)
 · FR-08 (16) · FR-09 (24) · FR-10 (01, 03, 04) · FR-11 (01, 02) · FR-12 (03) · FR-13 (09) · FR-14 (10, 11, 28) ·
 FR-15 (10, 11) · FR-16 (19, 28) · FR-17 (13, 14) · FR-18 (07, 14) · FR-19 (29) · FR-20 (06) · FR-21 (05, 12) ·
-FR-22 (06, 12) · FR-23 (27) · FR-24 (17) · FR-25 (12, 18) · FR-26 (19) · FR-27 (12, 21) · FR-28 (21) · FR-29 (26) ·
+FR-22 (06, 12) · FR-23 (27) · FR-24 (17) · FR-25 (12, 18) · FR-26 (19) · FR-27 (12, 21) · FR-28 (21, 30) · FR-29 (26) ·
 FR-30 (20) · FR-31 (19) · FR-32 (11, `set_units` unit tests) · FR-33 (19, failure tests) · FR-34 (12, perf budgets TECHNICAL §8) · FR-35 (19, schema snapshot).
+
+TR ↔ VC coverage: see TECHNICAL_SPEC §9.1 (TR-SRF-01..11); `expected_results.json` lists the TR ids per case in `proves`.
 
 ## 4. Findings from the reference scripts (already measured)
 

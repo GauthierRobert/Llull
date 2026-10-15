@@ -16,7 +16,7 @@ Gap id **FEA** · status: specification · written 2026-10-15 · functional spec
 | Child processes | `trackChild()` registry with SIGKILL on shutdown | `server/src/childProcesses.ts` | Ready to reuse for `ccx` |
 | Exchange transport | `CadExchangePort` and hand-written MCP exchange tools that apply document changes through the command bus | `packages/mcp/src/exchangeTools.ts`, `server/src/exchangeRoutes.ts`, `server/src/cli/exchange.ts` | A pattern to copy for `fea_mesh` / `fea_solve` / `fea_import_results` |
 | Desktop | Electron runs the unchanged server, and relocatable CPython plus CadQuery are staged by `desktop/scripts/prepare-python.mjs` (KI6) | `desktop/` | No `ccx` binary and no `gmsh` wheel |
-| MCP toolsets | `core, 2d, 3d, measure, parametric, assembly, exchange, building, …` | `packages/mcp/src/toolsets.ts` | No `analysis` toolset |
+| MCP toolsets | `TOOLSET_NAMES = core, 2d, 3d, measure, parametric, assembly, exchange, building, civil` | `packages/mcp/src/toolsets.ts` | No `analysis` toolset. `TOOLSET_NAMES` must gain `'analysis'` plus a getter returning `pluginToolNames('analysis')` and the ✱ transport names (invariant: every registered command and exchange tool belongs to exactly one toolset) |
 | Plugins | `CadPlugin { name, toolset, commands, guards?, document? }`. `installDefaultPlugins()` installs building, industrial and civil | `packages/core/src/plugins/plugin.ts`, `src/app/plugins.ts` | — |
 
 A `grep` of `packages/`, `server/src` and `server/python` for `nastran|calculix|gmsh|von mises|finite element`
@@ -39,7 +39,7 @@ packages/domain-cae/src  (@cae)  ── CadPlugin "cae", toolset "analysis"
         ▼ (public core API only, L10)
 packages/core/src
    model/analysis.ts      AnalysisModel types (like model/building.ts, model/civil.ts)
-   model/types.ts         Material.elastic?, Material.allowables?, CadDocument.analysis?
+   model/types.ts         CadDocument.analysis?   (materials: gap 08 MaterialRecord, read only — TR-FEA-04)
    geometry/shapeRecipe   + recipe ops 'midsurface', 'defeature' (kernel boundary stays a SHAPE, KI5)
    geometry/kernel.ts     ShapeFace gains centroid + normal (planar) for face matching / facesNear
    lib/meshQuality.ts     Verdict metric port (pure)
@@ -51,7 +51,7 @@ packages/kernel-occt/src  occtMidsurface.ts, occtDefeature.ts (KernelOps), face 
 
 - **L1.** Every document change is a command. Meshing and solving are *transports* outside the document, like
   `import_step` today. They feed results back through the pure commands `record_fe_mesh` and `record_fea_results` on the command
-  bus (undo and broadcast).
+  bus (undo and broadcast), which check the artifact store through an injected read-only port (§4.1).
 - **L2.** `@cae` imports only core's public API. Processes, files and the network live in `server/` and `desktop/`.
 - **L3.** Commands return a new document.
 - **L4.** The `analysis` slice is the only analysis state. The big arrays (mesh, full results) live in a
@@ -73,15 +73,16 @@ packages/kernel-occt/src  occtMidsurface.ts, occtDefeature.ts (KernelOps), face 
 | TR-FEA-01 | MUST | New workspace `packages/domain-cae` with a `CadPlugin { name: 'cae', toolset: 'analysis', commands, guards, document }`. `document.validate`, `restore` and `derivedEntityIds` handle the `analysis` slice. |
 | TR-FEA-02 | MUST | `CadDocument.analysis?: AnalysisModel` stays absent until the first analysis command. A document version bump with migration is not needed because the field is optional. The persistence validation (`commands/persistence/validation.ts`) delegates to the plugin `validate`. |
 | TR-FEA-03 | MUST | `FeaTarget` resolution: `facesNear` picks the face whose surface (sampled tessellation) is nearest to each point. `edgesNear` reuses `edgeSelection.ts`. `pointsNear` picks the nearest B-rep vertex, or a mesh node when no vertex is within tolerance. Ties within 1e-6 × model size are an error. |
-| TR-FEA-04 | MUST | `Material` gains an optional `elastic` and an optional `allowables`. `create_material` gains the matching optional params. Old files load unchanged. |
+| TR-FEA-04 | MUST | FEA defines **no material fields of its own**. It consumes the gap 08 MAT material record (`../08-materials-standards-libraries/TECHNICAL_SPEC.md` TR-MAT-11 record / `PropertyValue` / `Provenance`, TR-MAT-01 units, TR-MAT-10 density resolution, TR-MAT-12 allowable query with no basis substitution). FEA only **reads** a resolved view per part (§3 `FeaMaterialView`): `E`, `nu`, optional `G`, `density`, and for margins `Ftu`/`Fty` (optionally `Fsu`/`Fcy`) with their `basis` and `provenance`. Materials are created and edited only with the gap 08 commands. |
 | TR-FEA-05 | MUST | The FE mesh and results are stored in `FeArtifactStore` (server/desktop: `~/.llull/cache/fea/<sha256>.{mesh,res}.json.gz`, web: IndexedDB) under a `meshHash`/`resultsHash`. The document stores only summaries plus hashes. A missing artifact gives the state `missing` and asks for a re-mesh or re-solve, with no silent recompute. |
 | TR-FEA-06 | MUST | Staleness is computed, never stored: `analysisInputHash = sha256(canonical JSON of {geometry recipeKeys of the analysed entities, idealization, materials used, constraints, loads, mesh controls})`. A mesh is valid iff its `inputHash` equals the current hash minus the loads and BCs. Results are valid iff their `inputHash` equals the full current hash. |
-| TR-FEA-07 | MUST | Units: `unitSystem` is fixed at `create_analysis` from the document unit (mm → `N-mm-t-s`, m → `N-m-kg-s`, in → `lbf-in-slinch-s`). The writers convert materials stored in SI (Pa, kg/m³ from doc density) once, in `@cae/units.ts`. |
+| TR-FEA-07 | MUST | Units: `unitSystem` is fixed at `create_analysis` from the document unit (mm → `N-mm-t-s`, m → `N-m-kg-s`, in → `lbf-in-slinch-s`). The writers convert the gap 08 record quantities (any unit `@lib/quantity` parses, TR-MAT-01) into the analysis system once, in `@cae/units.ts`. |
 | TR-FEA-20 | SHOULD | Midsurface as a `ShapeRecipe` node `midsurface`, evaluated by OCC: a recipe fast path, then face-pairing (§5.2). Manifold returns null. |
 | TR-FEA-21 | SHOULD | Defeature as a recipe node `defeature` (OCC `BRepAlgoAPI_Defeaturing`, or the Gmsh `occ.defeature` fallback) (§5.3). |
 | TR-FEA-30 | MUST | Meshing op in `server/python/llull_bridge.py` (`op: "mesh"`), deterministic (`General.NumThreads = 1`). `meshHash` = sha256 of the canonical node and element arrays (§5.4). |
 | TR-FEA-31 | MUST | `@lib/meshQuality.ts` is a pure port of the Verdict metrics, cross-checked with Gmsh `getElementQualities` (§5.5). |
 | TR-FEA-32 | MUST | llull face to Gmsh surface mapping by area and centroid. Ambiguity is an error (§5.1). |
+| TR-FEA-33 | MUST | `record_fe_mesh` / `record_fea_results` stay registry commands (undo, replay, broadcast) but are **validated against the artifact store** (§4.1 trust model): the referenced artifact must exist in `FeArtifactStore` under `meshHash`/`resultsHash`, its content sha256 must equal that hash, and the summary must equal the one recomputed from the artifact. Otherwise the command is a no-op with a reason. |
 | TR-FEA-40 | MUST | `@cae/decks/inpWriter.ts`: pure and deterministic. Output is byte-identical for identical inputs (§5.6). |
 | TR-FEA-41 | MUST (V1) | `@cae/decks/bdfWriter.ts`: small-field fixed format, verified by pyNastran `read_bdf(xref=True)` (§5.6). |
 | TR-FEA-50 | MUST | `@cae/results/{frdReader,datReader}.ts`: streaming, fixed-column parse (§5.7). |
@@ -92,23 +93,15 @@ packages/kernel-occt/src  occtMidsurface.ts, occtDefeature.ts (KernelOps), face 
 ## 3. Data model
 
 ```ts
-// packages/core/src/model/types.ts (additions)
-export interface ElasticProperties {
-  /** Young's modulus, Pa (SI canonical; writers convert). @invariant > 0 */
-  readonly youngsModulusPa: number;
-  /** @invariant -1 < poissonRatio < 0.5 */
-  readonly poissonRatio: number;
-  /** Shear modulus, Pa; absent = E / (2 (1 + nu)) (isotropic). */
-  readonly shearModulusPa?: number;
+// Materials: NO new core material fields (TR-FEA-04). Gap 08 owns MaterialRecord / PropertyValue / Provenance.
+// @cae/materials.ts builds this read-only view per analysed part from the gap 08 record (Material.recordId):
+export interface FeaMaterialView {
+  readonly materialName: string; readonly recordId: string;
+  /** Preferred PropertyValues, converted to the analysis unit system (TR-FEA-07). G absent = E / (2 (1 + nu)). */
+  readonly E: number; readonly nu: number; readonly G?: number; readonly density: number;
+  /** For compute_margins only; each carries the gap 08 basis + provenance unchanged (shown in MS reports). */
+  readonly allowables: Partial<Record<'Ftu' | 'Fty' | 'Fsu' | 'Fcy', { value: number; basis: string; provenance: string }>>;
 }
-export interface MaterialAllowables {
-  readonly ftuPa?: number; readonly ftyPa?: number; readonly fsuPa?: number; readonly fcyPa?: number;
-  /** e.g. 'A' | 'B' | 'S' | 'typical' | 'user' — free label, shown in MS reports. */
-  readonly basis: string;
-  /** Provenance text (gap 08 MAT library id or user note); required for MS reports. */
-  readonly source: string;
-}
-export interface Material { /* existing fields */ elastic?: ElasticProperties; allowables?: MaterialAllowables }
 export interface CadDocument { /* existing fields */ analysis?: AnalysisModel }
 
 // packages/core/src/model/analysis.ts (new)
@@ -216,7 +209,7 @@ pure commands in the table.
 
 | Name | Kind | Params sketch | Tags |
 | ---- | ---- | ------------- | ---- |
-| `create_material` (extend) | mutating, core | `+ elastic?: { youngsModulusPa, poissonRatio, shearModulusPa? }`, `+ allowables?: { ftuPa?, ftyPa?, fsuPa?, fcyPa?, basis, source }` | @affects materials · @invariant E > 0, −1 < ν < 0.5, allowables > 0 · @failure invalid → rejected, doc unchanged |
+| (gap 08) `define_material_record`, `set_material_property`, `create_material` + `recordId` | mutating, core (owned by gap 08) | see gap 08 TECHNICAL_SPEC §4.1 | FEA adds only a validation rule on `set_material_property`: `E` > 0, `G` > 0, −1 < `nu` < 0.5 → otherwise no-op |
 | `create_analysis` | mutating | `{ name, analysisType, solver?='calculix', unitSystem?, modes?=10, factors?: { ultimate?=1.5, yield?=1.0, extra? } }` | @affects analysis.cases · @invariant unitSystem matches doc units unless explicit · @failure modes ∉ [1, 200] |
 | `delete_analysis` | mutating | `{ analysisId }` | @affects analysis |
 | `set_part_idealization` | mutating | `{ analysisId, entityId, idealization: 'solid'\|'plane_stress'\|'shell', thickness?, sourceFacesNear?, offset?, midsurface? }` | @affects case.parts · @failure non-3D entity, plane_stress source face not planar, shell on Manifold |
@@ -226,19 +219,36 @@ pure commands in the table.
 | `add_fea_load` / `update_fea_load` / `delete_fea_load` | mutating | `{ analysisId, name, kind, loadCase, category, target?, vector?, magnitude?, distribution?, referencePoint? }` | @failure vector missing for force/gravity, magnitude missing for pressure |
 | `set_analysis_factors` | mutating | `{ analysisId, ultimate?, yield?, extra? }` | @invariant every factor ≥ 1, extra needs a justification |
 | `set_mesh_controls` | mutating | `{ analysisId, mesher?, elementFamily, order, globalSize, minSize?, refinements?, optimize? }` | @invariant globalSize > 0, refinement size ≤ globalSize |
-| `record_fe_mesh` | mutating (bus only) | `{ analysisId, summary: MeshSummary }` | @affects case.meshSummary, clears results · @failure inputHash ≠ current (stale mesh) |
-| `record_fea_results` | mutating (bus only) | `{ analysisId, summary: ResultsSummary }` | @failure no mesh, or meshHash mismatch |
+| `record_fe_mesh` | mutating (registry; validated, §4.1) | `{ analysisId, summary: MeshSummary }` | @affects case.meshSummary, clears results · @invariant artifact for `meshHash` exists in the store, its sha256 = `meshHash`, summary = recomputed summary · @failure artifact missing / hash or summary mismatch / inputHash ≠ current → no-op |
+| `record_fea_results` | mutating (registry; validated, §4.1) | `{ analysisId, summary: ResultsSummary }` | @invariant as `record_fe_mesh` for `resultsHash` · @failure no mesh, meshHash mismatch, artifact missing, hash or summary mismatch → no-op |
 | `set_result_view` | mutating (presentation, like `set_camera`) | `{ analysisId, field, loadCase?, mode?, deformationScale? }` | — |
 | `add_result_probe` / `delete_result_probe` | mutating | `{ analysisId, name, point, quantity }` | — |
 | `fea_report` | query | `{ analysisId }` → `data { state: 'unmeshed'\|'meshed'\|'solved'\|'stale'\|'missing', mesh, quality, results, probes }` | read-only |
 | `compute_margins` | query | `{ analysisId, criterion?='von_mises', allowable?: 'ftu'\|'fty'\|number, groupBy?: 'part'\|'target', loadCases? }` → `data { rows[], minMS }` | @failure stale results, material without allowables (unless a number is given) |
 | `analytic_check` | query | `{ check: 'cantilever'\|'ss_beam'\|'ss_plate_buckling'\|'kirsch_kt', inputs }` → value + formula | pure. Matches `generate_fea_analytic.py` |
-| `export_solver_deck` | query (exports) | `{ analysisId, format: 'calculix_inp'\|'nastran_bdf', fileName? }` → `data { text \| path, sha256 }` | ✱ needs the mesh artifact, so in practice it is the `fea_export` transport (§7) |
 | ✱ `fea_mesh` | transport | `{ analysisId }` | runs the Gmsh op, stores the artifact, dispatches `record_fe_mesh` |
 | ✱ `fea_solve` | transport | `{ analysisId, timeoutS?=600, threads? }` | writes the INP, runs `ccx`, parses FRD/DAT, stores the artifact, dispatches `record_fea_results` |
 | ✱ `fea_import_results` | transport | `{ analysisId, path, format: 'frd'\|'op2' }` | external results. They must match `meshHash`, or they are imported as a review-only `foreign` mesh |
-| ✱ `fea_export` | transport | `{ analysisId, format: 'calculix_inp'\|'nastran_bdf'\|'vtu', path }` | pure writers in `@cae/decks` plus a file write |
+| ✱ `fea_export` | transport | `{ analysisId, format: 'calculix_inp'\|'nastran_bdf'\|'vtu', path? }` → `{ text \| path, sha256 }` | the **only** solver-deck export (no registry command: a deck needs the mesh artifact, which is not document data). Pure writers in `@cae/decks` plus a file write. Refuses stale or missing meshes, materials without E/ν, and inverted elements |
 | ✱ `fea_result_field` | transport (read) | `{ analysisId, field, loadCase?, mode? }` → per-vertex scalars of the skin mesh | for UI/MCP rendering. Nothing is stored |
+
+### 4.1 Trust model for `record_fe_mesh` / `record_fea_results` (TR-FEA-33)
+
+They are ordinary registry commands, so any caller (UI, CLI, MCP agent) can reach them through `execute` (L5).
+They are therefore **never trusted on their params alone**:
+
+1. `ctx.feaArtifacts` (an injected read-only port, like `ctx.kernel`; implemented by `server/`/`desktop/` over
+   `FeArtifactStore` and by `src/ui` over IndexedDB) must return the artifact for `meshHash` / `resultsHash`. No port or
+   no artifact → no-op, "artifact not found".
+2. The artifact's content sha256 must equal the hash, and the summary (node/element counts, quality, max values,
+   frequencies) must equal the summary recomputed from it by the pure `@cae` summarisers → otherwise no-op, "summary mismatch".
+3. `inputHash` must equal the current analysis input hash (TR-FEA-06); results also need `meshHash` = the recorded mesh.
+4. Only artifacts written by the host transports (`fea_mesh`, `fea_solve`, `fea_import_results`) enter the store, and each
+   records its producer (mesher/solver name and version, `transport` or `foreign`). An imported foreign result is shown as
+   review-only and is never used by `compute_margins`.
+
+So an agent can replay or re-record a real artifact, but cannot inject a fabricated mesh or result summary. Replay on a
+machine without the artifact leaves the step recorded and the state `missing` (TR-FEA-05), never a guessed value.
 
 ## 5. Kernel / algorithms
 
@@ -304,7 +314,7 @@ The bridge's existing limits (timeout, a queue of 2 concurrent runs, environment
 Jacobian `J√2/λmax`, quad aspect ratio `Lmax·ΣL/(4A)`, quad scaled Jacobian, skew, warpage, triangle minimum angle. For quadratic
 elements it uses the corner nodes, plus Gmsh `minSJ` (the sampled Jacobian, which covers curvature) [R10]. Acceptable ranges come from Verdict:
 tet AR [1, 3], tet SJ [0.5, 1], quad AR [1, 1.3], quad SJ [0.3, 1], skew [0, 0.5], warpage [0.3, 1], tri min angle
-[30°, 60°]. Outside the range raises a warning. **Inverted** (SJ ≤ 0 or minDetJac ≤ 0) **blocks** export and solve.
+[30°, 60°]. Outside the range raises a warning, **except warpage**: Verdict quotes its acceptable range as [0.3, 1], but by its own definition (1 − min(n̂0·n̂2, n̂1·n̂3)³) a flat quad scores 0, so the quoted range would flag every planar quad. Warpage is reported in the histogram only, never as a warning, until open question 10 is settled. **Inverted** (SJ ≤ 0 or minDetJac ≤ 0) **blocks** export and solve.
 Adequacy warnings: fewer than 2 elements through a thickness (solid) or span (the CalculiX simplebeam example is 10 % stiff with 1 element [R30]).
 
 ### 5.6 Deck writers (pure, `@cae/decks`)
@@ -467,7 +477,7 @@ Coverage 90/85/90/90 extends to `packages/domain-cae/src/**` (CLAUDE.md non-nego
 
 | M | Content | Depends on | Effort |
 | - | ------- | ---------- | ------ |
-| M1 | Data model (core types, `Material.elastic/allowables`), plugin skeleton, commands create/idealize(solid, plane_stress)/constraint/load/mesh controls/factors, `facesNear`, face centroid/normal in OCC topology, staleness hashes, unit tests | 01 KRN (exact faces on desktop) | 3 w |
+| M1 | Data model (`CadDocument.analysis`, `FeaMaterialView` over gap 08 records), plugin skeleton, commands create/idealize(solid, plane_stress)/constraint/load/mesh controls/factors, `facesNear`, face centroid/normal in OCC topology, staleness hashes, unit tests | 01 KRN (exact faces on desktop) | 3 w |
 | M2 | Bridge op `mesh` (Gmsh), face map, artifact store, `record_fe_mesh`, Verdict port + quality gate, CLI `fea mesh/quality`, desktop wheel staging | M1 | 3 w |
 | M3 | INP writer, bundled `ccx` (`desktop/scripts/prepare-ccx.mjs`), `fea_solve`, FRD/DAT readers, `record_fea_results`, result overlay, probes, margins, analytic checks, VC-10…14, 20–22, 30, 31, 40–44 | M2 | 4 w |
 | M4 | MCP toolset and prompt, REST routes, golden plans, quality:fea, production-gate scenario, licence packaging | M3 | 2 w |
@@ -475,7 +485,7 @@ Coverage 90/85/90/90 extends to `packages/domain-cae/src/**` (CLAUDE.md non-nego
 | M6 (V1) | Shell idealization: midsurface (fast path, then face-pairing), defeaturing, shell decks (S8/CQUAD8), shell result mapping | M4, 07 FTR (sheet metal recipes help the fast path) | 4 w |
 | V2 | beams (CBAR/B32), composites (06 CMP → PCOMP / `*SHELL SECTION, COMPOSITE`), tied contact, user Nastran/MYSTRAN runner | 06 CMP, 08 MAT | — |
 
-Cross-gap: **08 MAT** supplies allowables (`MaterialAllowables.source` holds the MAT library id). **01 KRN** supplies stable
+Cross-gap: **08 MAT** owns the material record (E, ν, G, density, allowables with basis and provenance); FEA M1 depends on 08 M1–M2. **01 KRN** supplies stable
 exact faces and STEP. **06 CMP** supplies laminates. **09 PLM** stamps results with the revision.
 
 ## 11. Open questions / decisions needed
@@ -493,6 +503,8 @@ exact faces and STEP. **06 CMP** supplies laminates. **09 PLM** stamps results w
 8. **Singularity policy** for MS: what the default exclusion radius is, and whether it is user-overridable with a mandatory note.
 9. **Search-verified sources** (eCFR, NASA-STD-5001B, the NAFEMS vendor manuals) must be re-checked by a human with direct page access
    before the MS report wording is frozen (sources.md marks each one).
+10. **Verdict warpage range**: the manual's acceptable range [0.3, 1] contradicts the metric (flat quad = 0). Decide a llull threshold
+   (with a cited source) or keep warpage informational only (current proposal, §5.5).
 
 ## 12. References
 

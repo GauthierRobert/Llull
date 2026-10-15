@@ -18,7 +18,7 @@
    "proves": [
     "FR-SRF-10",
     "FR-SRF-11",
-    "TR \u00a75.3"
+    "TR-SRF-04"
    ]
   },
   {
@@ -33,7 +33,8 @@
    },
    "source": "(b) generate_naca.py; constants S5; file has 5 decimals",
    "proves": [
-    "FR-SRF-11"
+    "FR-SRF-11",
+    "TR-SRF-04"
    ]
   },
   {
@@ -48,7 +49,9 @@
    "source": "(b) measured by generate_naca.py (data/naca_uiuc_comparison.json); the file is consistent with the analytic section rotated about the TE by about 0.0014 rad; residual after best-fit rotation 8.2e-5 c is unexplained (TBD - check against TM 4741 program output)",
    "proves": [
     "FR-SRF-10",
-    "FR-SRF-12"
+    "FR-SRF-12",
+    "TR-SRF-04",
+    "TR-SRF-09"
    ]
   },
   {
@@ -98,7 +101,9 @@
    "tolerance": "exact",
    "source": "(a) file contents, S8/S7",
    "proves": [
-    "FR-SRF-10"
+    "FR-SRF-10",
+    "TR-SRF-04",
+    "TR-SRF-09"
    ]
   },
   {
@@ -136,7 +141,9 @@
    "unit": "1/length, 1/length^2",
    "source": "(b) closed forms S26 + finite-difference self-check in generate_analytic_refs.py",
    "proves": [
-    "FR-SRF-21"
+    "FR-SRF-21",
+    "TR-SRF-06",
+    "TR-SRF-07"
    ]
   },
   {
@@ -160,7 +167,9 @@
    "source": "(b) analytic",
    "proves": [
     "FR-SRF-20",
-    "FR-SRF-22"
+    "FR-SRF-22",
+    "TR-SRF-01",
+    "TR-SRF-06"
    ]
   },
   {
@@ -185,7 +194,8 @@
    "source": "(b) w = rho/(1-rho), S1/S19",
    "proves": [
     "FR-SRF-01",
-    "FR-SRF-18"
+    "FR-SRF-18",
+    "TR-SRF-01"
    ]
   },
   {
@@ -203,7 +213,8 @@
    "proves": [
     "FR-SRF-01",
     "FR-SRF-02",
-    "FR-SRF-03"
+    "FR-SRF-03",
+    "TR-SRF-01"
    ]
   },
   {
@@ -226,7 +237,8 @@
    "unit": "chord / chord^2",
    "source": "(b) generate_naca.py from S2 equation; LE radius 1.1019 t^2 derived",
    "proves": [
-    "FR-SRF-13"
+    "FR-SRF-13",
+    "TR-SRF-04"
    ]
   },
   {
@@ -258,7 +270,8 @@
    "source": "(b) trapezoid formulas in data/wing_planforms.json; (a) published values S9 (published AR 8.02 vs derived 8.000 from the same table)",
    "proves": [
     "FR-SRF-14",
-    "FR-SRF-15"
+    "FR-SRF-15",
+    "TR-SRF-05"
    ]
   },
   {
@@ -281,7 +294,9 @@
     "FR-SRF-05",
     "FR-SRF-14",
     "FR-SRF-15",
-    "FR-SRF-32"
+    "FR-SRF-32",
+    "TR-SRF-03",
+    "TR-SRF-05"
    ]
   },
   {
@@ -303,7 +318,10 @@
     "FR-SRF-21",
     "FR-SRF-22",
     "FR-SRF-25",
-    "FR-SRF-27"
+    "FR-SRF-27",
+    "TR-SRF-07",
+    "TR-SRF-09",
+    "TR-SRF-10"
    ]
   },
   {
@@ -320,7 +338,8 @@
    },
    "source": "(b) V = 3 pi^2 R^2 L / 16 (Beta function), r(0.25L)/R = 0.75^0.75; S27",
    "proves": [
-    "FR-SRF-17"
+    "FR-SRF-17",
+    "TR-SRF-05"
    ]
   },
   {
@@ -334,7 +353,9 @@
    "source": "(b) VC-SRF-07 identity",
    "proves": [
     "FR-SRF-17",
-    "FR-SRF-18"
+    "FR-SRF-18",
+    "TR-SRF-01",
+    "TR-SRF-05"
    ]
   },
   {
@@ -347,7 +368,9 @@
    "tolerance": "upper bounds (OCC MakeFilling defaults Tol3d 1e-4, TolAng 0.01)",
    "source": "(a) S12 BRepOffsetAPI_MakeFilling header defaults",
    "proves": [
-    "FR-SRF-06"
+    "FR-SRF-06",
+    "TR-SRF-08",
+    "TR-SRF-11"
    ]
   },
   {
@@ -361,7 +384,9 @@
    "tolerance": "1e-6 relative",
    "source": "(b)",
    "proves": [
-    "FR-SRF-08"
+    "FR-SRF-08",
+    "TR-SRF-08",
+    "TR-SRF-11"
    ]
   },
   {
@@ -374,7 +399,8 @@
    "unit": "deg",
    "source": "(b) atan((r1-r2)/h)",
    "proves": [
-    "FR-SRF-24"
+    "FR-SRF-24",
+    "TR-SRF-08"
    ]
   },
   {
@@ -389,7 +415,8 @@
    "unit": "length",
    "source": "(b)",
    "proves": [
-    "FR-SRF-25"
+    "FR-SRF-25",
+    "TR-SRF-08"
    ]
   },
   {
@@ -406,7 +433,8 @@
     "FR-SRF-26",
     "FR-SRF-31",
     "FR-SRF-33",
-    "FR-SRF-35"
+    "FR-SRF-35",
+    "TR-SRF-10"
    ]
   },
   {
@@ -424,7 +452,8 @@
    "tolerance": 0.0001,
    "source": "(a) parameter values stored in TR1208.vsp3 (S8, sha256 in reference_files.json)",
    "proves": [
-    "FR-SRF-30"
+    "FR-SRF-30",
+    "TR-SRF-09"
    ]
   },
   {
@@ -438,7 +467,8 @@
    "source": "(b)",
    "proves": [
     "FR-SRF-27",
-    "FR-SRF-28"
+    "FR-SRF-28",
+    "TR-SRF-09"
    ]
   },
   {
@@ -454,7 +484,8 @@
    },
    "source": "(b) README section 4 estimate; target from TR \u00a75.5",
    "proves": [
-    "FR-SRF-05"
+    "FR-SRF-05",
+    "TR-SRF-03"
    ]
   },
   {
@@ -467,7 +498,9 @@
    "unit": "length^2",
    "source": "(b) pi r^2",
    "proves": [
-    "FR-SRF-07"
+    "FR-SRF-07",
+    "TR-SRF-08",
+    "TR-SRF-11"
    ]
   },
   {
@@ -479,7 +512,9 @@
    "tolerance": "1e-5 relative",
    "source": "(b) 2/3 pi (11^3 - 10^3)",
    "proves": [
-    "FR-SRF-09"
+    "FR-SRF-09",
+    "TR-SRF-08",
+    "TR-SRF-11"
    ]
   },
   {
@@ -492,7 +527,8 @@
    "tolerance": 1e-09,
    "source": "(b) interpolation property",
    "proves": [
-    "FR-SRF-04"
+    "FR-SRF-04",
+    "TR-SRF-01"
    ]
   },
   {
@@ -506,7 +542,8 @@
    "tolerance": "exact",
    "source": "KI5 behaviour",
    "proves": [
-    "FR-SRF-29"
+    "FR-SRF-29",
+    "TR-SRF-07"
    ]
   },
   {
@@ -518,12 +555,13 @@
    "tolerance": "exact",
    "source": "component test",
    "proves": [
-    "FR-SRF-23"
+    "FR-SRF-23",
+    "TR-SRF-02"
    ]
   },
   {
    "vc": "VC-SRF-28",
-   "what": "edit wing sweep 0 -> 30 deg at constant chords",
+   "what": "edit wing sweep 0 -> 30 deg on a constant-chord wing (taper 1); with taper != 1 the sweep must be given at sweepLocation 0 for the LE sweep to read 30 deg",
    "expected": {
     "planform_area_unchanged": true,
     "le_sweep_deg_reported": 30.0
@@ -532,7 +570,8 @@
    "source": "(b) shear preserves area",
    "proves": [
     "FR-SRF-16",
-    "FR-SRF-14"
+    "FR-SRF-14",
+    "TR-SRF-05"
    ]
   },
   {
@@ -540,7 +579,26 @@
    "what": "conic master-line loft",
    "expected": "TBD - define with a loftsman reference case (Liming S18/S19 examples are paywalled)",
    "proves": [
-    "FR-SRF-19"
+    "FR-SRF-19",
+    "TR-SRF-05"
+   ]
+  },
+  {
+   "vc": "VC-SRF-30",
+   "what": "export_code round trip of the NACA 0012 trapezoidal wing (plans/target_naca0012_trap_wing.json)",
+   "setup": "run the plan, then export_code language=cadquery; execute the emitted script with the bundled CadQuery/OCP and measure the solid volume",
+   "expected": {
+    "emitted_script_runs": true,
+    "volume_half_open_te_m3": 0.959117,
+    "bspline_or_loft_calls_present": true
+   },
+   "tolerance": {
+    "volume_relative": 0.0001
+   },
+   "source": "(b) same analytic volume as VC-SRF-11 (V = A_unit b (cr^2 + cr ct + ct^2)/3, data/wing_planforms.json); the code path must reproduce the exact sections, not the 24-point rings",
+   "proves": [
+    "FR-SRF-28",
+    "TR-SRF-09"
    ]
   }
  ]

@@ -10,6 +10,8 @@ Formulas (elementary cone geometry, TECHNICAL_SPEC.md section 5.3):
   material removed by the countersink beyond the hole cylinder  V = pi c/3 (R1^2 + R1 R2 + R2^2) - pi R2^2 c   (R1 = D/2, R2 = d/2)
   conical face area                                       A = pi (R1 + R2) * sqrt((R1 - R2)^2 + c^2)
   knife edge (countersink cuts through the sheet)         c >= T   -> cylindrical land  T - c <= 0
+  removed volume inside the sheet (cone truncated at T)   h = min(c, T), R3 = R1 - h tan(alpha/2)
+                                                          V_T = pi h/3 (R1^2 + R1 R3 + R3^2) - pi R2^2 h   (= V when c <= T)
   drill tip height for point angle beta                   h = (d/2) / tan(beta/2)
 Inputs are ILLUSTRATIVE (not taken from a fastener standard); alpha = 100 is the aerospace flush-head convention to be
 confirmed against the fastener catalogue of gap 08, 82 and 90 are the ASME / ISO screw conventions seen in
@@ -38,7 +40,9 @@ DRILL = [('DP-01', 6.0, 118.0), ('DP-02', 6.0, 135.0), ('DP-03', 3.3, 118.0)]
 def main() -> None:
     out = {
         'description': 'Analytic countersink / drill-point expectations (mm). Tolerance applies to a future add_hole '
-        'command measured with inspect_topology / mass_properties under OCC.',
+        'command measured with inspect_topology / mass_properties under OCC. removed_volume_beyond_hole is the full '
+        'cone frustum (c deep); removed_volume_in_sheet truncates it at the sheet thickness T, which is what a knife-edge '
+        'part (c >= T) actually loses.',
         'generator': 'docs/aerospace/07-sheet-metal-machined-features/validation/generate_countersink.py',
         'tolerance': {'length_abs_mm': 1e-6, 'volume_rel': 1e-6, 'angle_abs_deg': 1e-6},
         'countersinks': [],
@@ -50,11 +54,14 @@ def main() -> None:
         r1, r2 = big_d / 2.0, d / 2.0
         vol = math.pi * c / 3.0 * (r1 * r1 + r1 * r2 + r2 * r2) - math.pi * r2 * r2 * c
         area = math.pi * (r1 + r2) * math.sqrt((r1 - r2) ** 2 + c * c)
+        h = min(c, t)
+        r3 = r1 - h * math.tan(half)
+        vol_t = math.pi * h / 3.0 * (r1 * r1 + r1 * r3 + r3 * r3) - math.pi * r2 * r2 * h
         out['countersinks'].append({
             'id': cid, 'd': d, 'D': big_d, 'alpha_deg': alpha, 'T': t,
             'csk_depth_c': round(c, 9), 'apex_depth_c0': round(big_d / (2.0 * math.tan(half)), 9),
             'cone_semi_angle_deg': alpha / 2.0, 'removed_volume_beyond_hole': round(vol, 9), 'cone_face_area': round(area, 9),
-            'cylindrical_land': round(t - c, 9), 'knife_edge': c >= t,
+            'removed_volume_in_sheet': round(vol_t, 9), 'cylindrical_land': round(t - c, 9), 'knife_edge': c >= t,
         })
     for did, d, beta in DRILL:
         out['drill_points'].append({'id': did, 'd': d, 'point_angle_deg': beta,

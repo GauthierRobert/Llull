@@ -1,5 +1,5 @@
 {
- "description": "Analytic countersink / drill-point expectations (mm). Tolerance applies to a future add_hole command measured with inspect_topology / mass_properties under OCC.",
+ "description": "Analytic countersink / drill-point expectations (mm). Tolerance applies to a future add_hole command measured with inspect_topology / mass_properties under OCC. removed_volume_beyond_hole is the full cone frustum (c deep); removed_volume_in_sheet truncates it at the sheet thickness T, which is what a knife-edge part (c >= T) actually loses.",
  "generator": "docs/aerospace/07-sheet-metal-machined-features/validation/generate_countersink.py",
  "tolerance": {
   "length_abs_mm": 1e-06,
@@ -18,6 +18,7 @@
    "cone_semi_angle_deg": 50.0,
    "removed_volume_beyond_hole": 36.038249378,
    "cone_face_area": 59.424329697,
+   "removed_volume_in_sheet": 36.038249378,
    "cylindrical_land": 8.237890775,
    "knife_edge": false
   },
@@ -32,6 +33,7 @@
    "cone_semi_angle_deg": 50.0,
    "removed_volume_beyond_hole": 36.038249378,
    "cone_face_area": 59.424329697,
+   "removed_volume_in_sheet": 35.79577678,
    "cylindrical_land": -0.162109225,
    "knife_edge": true
   },
@@ -46,6 +48,7 @@
    "cone_semi_angle_deg": 50.0,
    "removed_volume_beyond_hole": 36.038249378,
    "cone_face_area": 59.424329697,
+   "removed_volume_in_sheet": 32.934937026,
    "cylindrical_land": -0.562109225,
    "knife_edge": true
   },
@@ -60,6 +63,7 @@
    "cone_semi_angle_deg": 45.0,
    "removed_volume_beyond_hole": 42.948713167,
    "cone_face_area": 64.377373774,
+   "removed_volume_in_sheet": 42.948713167,
    "cylindrical_land": 7.9,
    "knife_edge": false
   },
@@ -74,6 +78,7 @@
    "cone_semi_angle_deg": 41.0,
    "removed_volume_beyond_hole": 49.406842758,
    "cone_face_area": 69.386557518,
+   "removed_volume_in_sheet": 49.406842758,
    "cylindrical_land": 7.584226345,
    "knife_edge": false
   },
@@ -88,6 +93,7 @@
    "cone_semi_angle_deg": 50.0,
    "removed_volume_beyond_hole": 10.089049077,
    "cone_face_area": 25.744391282,
+   "removed_volume_in_sheet": 9.976645093,
    "cylindrical_land": -0.132784502,
    "knife_edge": true
   },
@@ -102,6 +108,7 @@
    "cone_semi_angle_deg": 50.0,
    "removed_volume_beyond_hole": 85.423998526,
    "cone_face_area": 105.643252795,
+   "removed_volume_in_sheet": 85.423998526,
    "cylindrical_land": 0.650521033,
    "knife_edge": false
   }

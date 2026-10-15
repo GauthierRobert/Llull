@@ -19,7 +19,7 @@ desktop-first, with OCC as the desktop kernel (KI6).
 | Patterns | `commands/edit/` `array_linear`, `array_polar`, `pattern_along_path` | Entity copies | Not feature patterns (no hole pattern on a face) |
 | Queries | `commands/inspect/` `mass_properties`, `measure_*`, `find_entities`, `check_model` | Volume and mass from kernel or mesh | — |
 | OCC kernel | `packages/kernel-occt/src/` (`occtKernel.ts`, `occtShapes.ts`, `occtTopology.ts`, `occtStep.ts`); `opencascade.js@^1.1.1` | Booleans, fillet, chamfer, offset (shell), pipe, thru-sections, prism, revol, STEP write | The package ships no `.d.ts` (llull declares its own ambient module, `opencascade.d.ts`). Review probe of the installed 1.1.1 wasm (2026-10-15, Node): `BRepFeat_MakePrism`, `MakeRevol`, `MakePipe`, `MakeRevolutionForm`, `Gluer`, `SplitShape`, `LocOpe_Prism`, `BRepAdaptor_Surface` construct; `BRepFeat_MakeCylindricalHole` is exported but **cannot be constructed** ("unbound types: BOPAlgo_BOP"); `BRepFeat_MakeLinearForm` is **not exported** (listed in the package's `Supported APIs.md`, absent from the binary); `TopTools_IndexedDataMapOfShapeListOfShape` is not exported, so `TopExp.MapShapesAndAncestors` is unusable (adjacency must be built like `occtTopology.ts` does, by `HashCode`/`IsSame`). `Perform*` calls were not exercised; see D3 |
-| Python bridge | `server/python/llull_bridge.py`, `packages/mcp/src/exchangeTools.ts` | `import_step` / `export_step` via CadQuery (bundled CPython on desktop, KI6) | `import_step` is an exchange tool, not a registry command. It tessellates in Python (`op_import_step` → `_bodies_from` triangles) and replays `import_mesh`: imported parts arrive as `mesh` entities **without** `brep`, so no exact face graph exists for them today (see §2.2, D9) |
+| Python bridge | `server/python/llull_bridge.py`, `packages/mcp/src/exchangeTools.ts` | `import_step` / `export_step` via CadQuery (bundled CPython on desktop, KI6) | `import_step` is an exchange tool, not a registry command. It tessellates in Python (`op_import_step` → `_bodies_from` triangles) and replays `import_mesh`: imported parts arrive as `mesh` entities **without** `brep`, so no exact face graph exists for them today (see §2.2, M0, D9) |
 | DXF | `packages/domain-aec/src/building/exchange/dxfWriter.ts`, `dxfExport.ts` (`export_dxf`), core `import_dxf` | R12 (`$ACADVER` AC1009) writer inside the AEC plugin; entities LINE, CIRCLE, ARC, TEXT, POLYLINE/VERTEX, 3DFACE (no LWPOLYLINE) | A plugin cannot import another plugin (L10), so a generic writer must move to core (D4). The current file also imports `@core/model/types`, `@core/geometry/*`, `@core/model/drawing` and AEC-only `planModel`/`shared/numeric`, so it cannot move to `lib` as is (`lib-is-a-leaf` rule in `.dependency-cruiser.cjs`) |
 | Code export | `packages/core/src/codegen/` (`python.ts`, `recipeLowering.ts`, `freecad.ts`, `openscad.ts`) | CadQuery / build123d / FreeCAD / OpenSCAD emitters | No hole or sheet-metal lowering; CadQuery has `hole`, `cboreHole`, `cskHole` (`cadquery/cq.py` @5f5bc62 [R16]) |
 | Toolsets | `packages/mcp/src/toolsets.ts` | `core, 2d, 3d, measure, parametric, assembly, exchange`, plugin toolsets `building`, `civil` | No `manufacturing` toolset |
@@ -47,7 +47,7 @@ packages/domain-mfg/src/              NEW plugin package (@mfg)                 
   sheetmetal/fold.ts                  graph -> folded ShapeRecipe (profile solids + revolution sectors, union)
   sheetmetal/unfold.ts                graph -> flat 2D outline (analytic); imported B-rep -> graph (via FaceGraph)
   sheetmetal/checks.ts, tables/       min bend radius table schema (+ empty seed), K tables
-packages/kernel-occt/src/occtFeatures.ts   'feature' node via BRepFeat_MakeCylindricalHole / BRepFeat_MakePrism / MakeLinearForm
+packages/kernel-occt/src/occtFeatures.ts   'feature' node (pocket, revolved hole tool) via BRepFeat_MakePrism / BRepFeat_MakeRevol; holes and ribs otherwise lowered
 packages/kernel-occt/src/occtFaceGraph.ts  faceGraph(): BRepAdaptor_Surface params + edge→faces adjacency
 src/app/plugins.ts                    installDefaultPlugins() += sheetMetalPlugin
 src/ui/panels/{HolePanel,PocketPanel,SheetMetalPanel,FeatureTablePanel}.tsx   param gathering only
@@ -72,7 +72,7 @@ Rationale:
 | --- | ---- |
 | 08 Fastener catalogue | `FastenerRef` → hole spec (clearance/fit, countersink D and angle, thread designation). Until 08 lands, `add_hole` takes explicit dimensions and `fastener` is rejected with a clear summary. |
 | Drawings (hole/bend tables, thread callouts) | `data` tables of `recognize_features`, `flat_pattern` and hole features; drawing views of flat patterns |
-| STEP exchange / PMI | **Prerequisite (not true today):** an exact STEP import that keeps a `brep` on the imported entity (e.g. an OCC `STEPControl_Reader` path in the kernel, or a CadQuery path that hands back STEP to the kernel). Today `import_step` returns triangles only (§1). Needed by `recognize_features` on imported parts, `convert_to_sheet_metal` and VC-FTR-18…21, 32 (D9). AP242 PMI association is out of scope here |
+| STEP exchange / PMI | **Prerequisite (not true today):** an exact STEP import that keeps a `brep` on the imported entity, i.e. gap 01 `import_step_brep` (`docs/aerospace/01-exact-brep-kernel/`). Gap 01 owns its design; this gap only consumes the resulting exact solid. Today `import_step` returns triangles only (§1). Needed by `recognize_features` on imported parts, `convert_to_sheet_metal` and VC-FTR-18…21, 32 (milestone M0, D9). AP242 PMI association is out of scope here |
 | Parametric / persistent naming | Face `near` references (KI5 approach) now; BRepTools_History naming later |
 
 ## 3. Data model
@@ -227,7 +227,7 @@ step is appended), Q = query (returns `data`, document unchanged). K = `requires
 | `add_rib` | M, K (SHOULD) | `target`, `plane: {origin, normal}`, `path: Profile2D (open)`, `thickness`, `height \| upToFace`, `symmetric` | same | rib fused (Fuse = 1) | path not on a supporting face |
 | `set_thread` | M | `id`, `featureIndex` or `face`, `thread: ThreadSpec \| null` | entity `features[].thread` only | geometry and `recipeKey` unchanged | designation fails family grammar; face not cylindrical |
 | `recognize_features` | Q, K | `id`, `kinds?`, `mergeSplitFaces = true`, `angularTolerance = 1e-6`, `lengthTolerance = 1e-6` | — | read-only; deterministic order (by type, then axis point lexicographic) | no B-rep (`faceGraph` null) → summary "needs an exact kernel (OCC)" |
-| `check_machining` | Q | `id`, `rules?: { minLand, maxDepthRatio, toolDiameter, … }` | — | read-only | — |
+| `check_machining` | Q, K | `id`, `rules?: { minLand, maxDepthRatio, toolDiameter, … }`, `thickness?` (local material thickness override) | — | read-only; T_local from a kernel ray cast (§5.3) unless `thickness` is given | no exact B-rep and no `thickness` → summary "needs an exact kernel (OCC) or `thickness`" |
 | `hole_table` | Q (SHOULD) | `id`, `origin?` | — | read-only | — |
 
 ### 4.2 Plugin `sheetmetal` (toolset `manufacturing`)
@@ -293,19 +293,20 @@ Bends over 90° use the same formulas. Setback grows as tan(θ/2), and the test 
 ### 5.3 Hole geometry (`lib/holeMath.ts`, `geometry/featureLowering.ts`, `occtFeatures.ts`)
 
 - Countersink depth c = (D − d)/(2·tan(α/2)). Depth to the sharp apex c₀ = D/(2·tan(α/2)). Inverse D = d + 2c·tan(α/2).
-  Removed volume beyond the bore V = πc/3·(R₁² + R₁R₂ + R₂²) − πR₂²c. Drill tip height h = (d/2)/tan(β/2).
+  Removed volume beyond the bore V = πc/3·(R₁² + R₁R₂ + R₂²) − πR₂²c. Inside a sheet of thickness T the cone is truncated at h = min(c, T): R₃ = R₁ − h·tan(α/2), V_T = πh/3·(R₁² + R₁R₃ + R₃²) − πR₂²h (= V when c ≤ T; differs for knife-edge cases). Drill tip height h = (d/2)/tan(β/2).
   (`validation/data/expected_countersink.json`.)
 - **Lowering (always available).** The tool solid is a revolve of a half-section polyline about the hole axis: bore
   radius, counterbore step, countersink cone, drill tip. It is extended by ε = max(1e-3·d, 10·tolerance) above the face
   so the faces are not coplanar, and the plan's `boolean subtract` runs once per position, or once against a compound of
   all positions (preferred for speed). Through-all depth = the extent of the target's bbox along the axis, plus ε.
-- **OCC native (desktop).** `BRepFeat_MakeCylindricalHole` (`PerformThruNext`, `PerformUntilEnd`, `PerformBlind`, with
-  `Validate()` status) covers simple bores. Counterbores and countersinks use `BRepFeat_MakeRevol` or
-  `BRepFeat_MakePrism`, or the revolved-tool boolean. Pockets use `BRepFeat_MakePrism` with Fuse = 0 and `Perform(Until)`
-  for up-to-face. Ribs use `BRepFeat_MakeLinearForm` [R10]. Native and lowered results must match in volume to 1e-6
-  relative (VC-FTR-25).
+- **OCC native (optional optimisation, scoped to the bindings that exist).** In the opencascade.js 1.1.1 build only
+  `BRepFeat_MakePrism` and `BRepFeat_MakeRevol` are constructible (§1). Pockets may use `BRepFeat_MakePrism` with
+  Fuse = 0 and `Perform(Until)` for up-to-face; the revolved hole tool may use `BRepFeat_MakeRevol`. **Holes and ribs are
+  built by recipe lowering** (revolved tool + boolean; rib = prism of the thickened open profile fused to the target),
+  because `BRepFeat_MakeCylindricalHole` cannot be constructed and `BRepFeat_MakeLinearForm` is absent [R10 for the OCCT
+  API only]. Native and lowered results must match in volume to 1e-6 relative (VC-FTR-25).
 - **Countersink knife edge.** Land = T_local − c, where T_local is the material thickness along the axis at the hole
-  (ray cast through the solid). Land ≤ 0 means a knife edge; land < `minLand` gives a warning (threshold is data).
+  (kernel ray cast through the solid, hence `check_machining` is `requiresKernel`; a `thickness` param overrides it). Land ≤ 0 means a knife edge; land < `minLand` gives a warning (threshold is data).
 
 ### 5.4 Joggle (`lib/sheetMath.ts`)
 
@@ -386,8 +387,11 @@ approach of comparing adjacent planes, cylinders, cones and tori [R7].
 - **Toolset `manufacturing`** (MCP view): `add_hole add_pocket add_rib set_thread recognize_features check_machining
   hole_table` + plugin `sheet_metal_calc create_sheet_metal_rule import_bend_radius_table add_sheet_metal_base add_flange
   add_joggle add_sheet_cutout add_flanged_hole add_bead add_relief add_corner_relief convert_to_sheet_metal flat_pattern
-  check_sheet_metal export_flat_pattern_dxf`. Register it in `packages/mcp/src/toolsets.ts` as a plugin-contributed
-  toolset, like `building`.
+  check_sheet_metal export_flat_pattern_dxf`. The toolset **mixes core and plugin commands**, so it cannot be a purely
+  plugin-contributed toolset like `building`: `packages/mcp/src/toolsets.ts` needs `'manufacturing'` added to the fixed
+  `TOOLSET_NAMES` tuple, a core word list for the `commands/features` names, and a getter that appends
+  `pluginToolNames('manufacturing')` for the sheet-metal plugin (keeping the "each tool in exactly one toolset"
+  invariant). The `toToolSchemas()`/toolset contract snapshots change accordingly (VC-FTR-31).
 - **CLI**: no new verbs. `llull <command> …`, `llull run plan.json`, and `--save` for `export_flat_pattern_dxf`. Add one
   `guide` paragraph: the K-factor is explicit, and lengths reference mold lines.
 - **UI**: a Hole panel (type picker with section preview, presets 82/90/100°, fastener picker after gap 08), a Pocket
@@ -429,24 +433,25 @@ to `unclassified[]`. `add_hole` validates all positions first, so it is all-or-n
 
 | Milestone | Content | Depends on | Effort (eng-days) |
 | --------- | ------- | ---------- | ----------------- |
+| M0 Exact STEP import (prerequisite) | Consume gap 01 `import_step_brep` (`docs/aerospace/01-exact-brep-kernel/`): imported STEP solids keep a `brep`. Not designed here | gap 01 | 0 here (effort owned by gap 01); ~1 day integration tests in M4 |
 | M1 Math + calc | `lib/sheetMath.ts`, `lib/holeMath.ts`, `sheet_metal_calc` (plugin skeleton, toolset) | D1 decided | 4 |
 | M2 Holes & pockets (lowered) | `feature` recipe node, `featureLowering.ts`, `add_hole`, `add_pocket`, `set_thread`, `check_machining`, codegen `cskHole`/`cboreHole` | M1 | 8 |
 | M3 Native sheet metal | model, rule, base, flange, fold, analytic unfold, `flat_pattern`, `check_sheet_metal`, radius table import; DXF writer moved to core + `export_flat_pattern_dxf` | M1, D4 | 12 |
-| M4 Face graph + recognition | `faceGraph` (OCC), recognition holes/pockets/fillets/chamfers, split-face merge, NIST tests | M2 | 10 |
-| M5 V1 sheet features | relief, corner relief, joggle, flanged hole, bead, `convert_to_sheet_metal` | M3, M4 | 12 |
+| M4 Face graph + recognition | `faceGraph` (OCC), recognition holes/pockets/fillets/chamfers, split-face merge, NIST tests | M2, M0 | 10 |
+| M5 V1 sheet features | relief, corner relief, joggle, flanged hole, bead, `convert_to_sheet_metal` | M3, M4 (M0 for imported parts) | 12 |
 | M6 Fastener link + tables | `FastenerRef`, hole/bend tables for drawings | gap 08, drawings | 5 |
-| M7 OCC native features | `occtFeatures.ts` (BRepFeat) behind `supports('feature')`, parity tests | D3 spike | 4 |
+| M7 OCC native features | `occtFeatures.ts` with `BRepFeat_MakePrism` (pockets) and `BRepFeat_MakeRevol` (revolved hole tool) behind `supports('feature')`, parity tests vs lowering; holes/ribs stay lowered | D3 spike | 3 |
 | M8 V2 | hem, contour flange, recognised→parametric, modelled thread, isogrid | M5 | 15 |
 
 ## 11. Open questions / decisions needed
 
 | Id | Question | Proposal |
 | -- | -------- | -------- |
-| D1 | New package `packages/domain-mfg` (sheet-metal plugin) vs adding sheet metal to core | New plugin package (L10: a domain with its own model and tables). Needs user approval because it changes the layer map in CLAUDE.md. |
+| D1 | New package `packages/domain-mfg` (sheet-metal plugin) vs adding sheet metal to core | New plugin package (L10: a domain with its own model and tables). Needs user approval because it changes the layer map in CLAUDE.md. Wiring it needs: an `@mfg/*` alias in `tsconfig.base.json` (read by Vite/Vitest through `workspaceAliases.ts`); `packages/domain-mfg/package.json` (picked up by the existing `packages/*` workspace glob); `.dependency-cruiser.cjs` rules extended so `domain-mfg` gets the same L2/L10 constraints as `domain-aec` (core public surface only, no other plugin, no DOM); `.claude/hooks/enforce-architecture.mjs` path rules; CLAUDE.md LAYER MAP + `.claude/rules/architecture.md` L2 line + W5 lane table (Lane 1 owns `packages/domain-mfg/src/**`); coverage gate scope (`packages/domain-mfg/src/**` alongside domain-aec); `installDefaultPlugins()` registration. |
 | D2 | Should `feature` be a recipe node, or should commands emit lowered boolean trees directly? | A recipe node: it keeps semantics for code export, drawings, recognition round trip and native OCC. Lowering stays the fallback. |
 | D3 | Does opencascade.js@1.1.1 expose `BRepFeat_MakePrism` / `MakeCylindricalHole` / `MakeLinearForm`? | Partly answered by the review probe (§1): `MakePrism`/`MakeRevol` construct; `MakeCylindricalHole` is not constructible and `MakeLinearForm` is absent. Remaining 1-day spike (as KI4): exercise `MakePrism`/`MakeRevol` `Perform*` end to end. Holes and ribs stay on lowering in the in-process kernel. On desktop, OCP/CadQuery could be used, but the in-process OCC worker is preferred. |
 | D4 | Move `dxfWriter.ts` from domain-aec to core `lib` | Yes for the generic part only: the low-level R12 writer (`DxfWriter` entity methods, `INSUNITS`, `dxfLayerName`, `dxfText`) moves to `lib` with only `model/vectors` types; `writePrimitive`, layer colours, hatch and dimension handling stay in domain-aec (they import `geometry`/AEC modules, which `lib-is-a-leaf` forbids). domain-aec then imports the writer from core (direction allowed by L2). |
-| D9 | Exact STEP import (keep `brep` on imported parts) | Required before V1 recognition / convert-to-sheet-metal. Options: OCC `STEPControl_Reader` inside the kernel behind a new optional `GeometryKernel` member (not yet probed in opencascade.js 1.1.1), or the CadQuery bridge returning the STEP text to the kernel. Needs a decision and its own spike. |
+| D9 | Exact STEP import (keep `brep` on imported parts) | Use gap 01 `import_step_brep` (`docs/aerospace/01-exact-brep-kernel/`) (milestone M0). Its internals are owned by gap 01; this gap only requires that the imported entity carries a `brep` the kernel can evaluate for `faceGraph`. |
 | D5 | Default countersink preset for aerospace (100°) | Confirm from gap 08 catalogue data / NASM documents before it becomes a default. Until then it is a named preset with the "unverified" note in the UI tooltip. |
 | D6 | Minimum bend radius seed data | Transcribe AC 43.13-1B Table 4-6 from the FAA PDF with dual review. Store `source` and edition per row. |
 | D7 | Thread designation grammar (UNJ, MJ) | Accept free text with a light per-family regex. Full validation only with licensed AS8879 / ISO 5855 data via gap 08. |

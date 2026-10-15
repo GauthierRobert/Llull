@@ -50,7 +50,7 @@ Tolerance column: abs = absolute, rel = relative. FR/TR = what the case proves.
 | VC-FTR-19 | FR-15 | `ftr_joggle_strip.step` | 2 bends R 1.6, φ 20°, joggle offset 1.6, flat 45.440213 (K 0.44) | 0.01 mm | b | same |
 | VC-FTR-20 | FR-24 | NIST CTC-01 (vendored, sha below) | 2 blind holes ∅20 with 118° point (4 half-cone faces → 2 apexes); further features TBD vs PMI | exact count | c | same + `data/step_feature_survey.json` |
 | VC-FTR-21 | FR-24 | NIST CTC-02…05 (pinned) | per-file drill-point apex counts 74 / 0 / 22 / 10 (59° semi-angle), 45° cone seeds 0 / 0 / 42 / 3; no crash, < 5 s each | exact counts (seeds) | c | same |
-| VC-FTR-22 | FR-17, FR-18 | CS-01…07 | countersink depth c, removed volume beyond bore, cone area | 1e-6 abs / 1e-6 rel | b | `data/expected_countersink.json` |
+| VC-FTR-22 | FR-17, FR-18 | CS-01…07 | countersink depth c, removed volume beyond bore (full cone and `removed_volume_in_sheet`, truncated at T for knife-edge cases), cone area | 1e-6 abs / 1e-6 rel | b | `data/expected_countersink.json` |
 | VC-FTR-23 | FR-26 | CS-02/03/06 (thin sheet) vs CS-01/07 | knife edge true for 02/03/06 (land −0.162 / −0.562 / −0.133 mm), false for 01/07 (land 8.238 / 0.651 mm) | exact flag | b | same |
 | VC-FTR-24 | FR-17 | DP-01…03 | tip height 1.802582 / 1.242641 / 0.991420 mm | 1e-6 | b | same |
 | VC-FTR-25 | FR-17, FR-21, TR §5.3 | `plans/draft_machined_plate.json` | volume 55978.529153 mm³ (OCC reference build rel err 1.2e-15); native vs lowered equal | 1e-6 rel | b + c | `expected_test_parts.json` |
@@ -61,7 +61,7 @@ Tolerance column: abs = absolute, rel = relative. FR/TR = what the case proves.
 | VC-FTR-30 | FR-27 | Machined plate with thickness parameter t = 10 → 12 | holes stay through and on the same faces; volume = analytic at t = 12 (generator with lz = 12) | 1e-6 rel | b | — |
 | VC-FTR-31 | FR-28 | All new commands | in `listCommands()`, `toToolSchemas()` snapshot, toolset `manufacturing`, CLI `describe`; happy + failure + `is pure` tests | — | — | — |
 | VC-FTR-32 | FR-25 | Recognised CTC-01 holes converted to `add_hole` steps | volume equal to the imported solid | 1e-6 rel | c | — |
-| VC-FTR-33 | FR-22 | Rib 3 mm × 20 mm on a plate | TBD — measure with OCC `BRepFeat_MakeLinearForm` vs analytic prism volume | 1e-6 rel | TBD | — |
+| VC-FTR-33 | FR-22 | Rib 3 mm × 20 mm on a plate | TBD — measure with OCP (`cadquery-ocp` 8.0.1.1.0, `BRepFeat_MakeLinearForm`) vs analytic prism volume; llull's lowered rib must match | 1e-6 rel | TBD | — |
 | VC-FTR-34 | FR-29 | `hole_table` on the machined plate | 7 rows, coordinates from the top-left corner datum, sorted | exact | b | `expected_feature_recognition.json` |
 | VC-FTR-35 | FR-30 | FP-08…11 entered in an inch document | same values in inch; mm document gives ×25.4 exactly | 1e-9 rel | b | `flat_pattern_cases.csv` |
 | VC-FTR-36 | FR-20 | Modelled thread (V2) | TBD | TBD | TBD | — |

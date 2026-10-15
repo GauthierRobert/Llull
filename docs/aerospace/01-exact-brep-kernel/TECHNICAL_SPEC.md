@@ -144,20 +144,22 @@ export type ShapeRecipe =
 ## 4. Commands
 
 All names snake_case, params one inline `z.object`, structured tags. "Kernel" = `annotations: { requiresKernel: true }`.
+Toolset = MCP toolset in `packages/mcp/src/toolsets.ts` (`TOOLSET_NAMES`: core, 2d, 3d, measure, parametric, assembly,
+exchange, …); existing commands keep their current toolset.
 
 | Command | Kind | Params (sketch) | Data / effect | Toolset |
 | ------- | ---- | --------------- | ------------- | ------- |
-| `kernel_info` | query | `{}` | TR-KRN-04 payload | inspect |
-| `set_modeling_tolerance` | mutating | `{ linear?: number, angular?: number, maxImportTolerance?: number }` | updates `kernelSettings.modelingTolerance` (validated range) | document |
+| `kernel_info` | query | `{}` | TR-KRN-04 payload | core |
+| `set_modeling_tolerance` | mutating | `{ linear?: number, angular?: number, maxImportTolerance?: number }` | updates `kernelSettings.modelingTolerance` (validated range) | core |
 | `import_step_brep` | mutating, kernel | `{ stepBase64?: string, blobId?: string, heal?: boolean = true, sew?: boolean = true, precisionMode?: 'file'|'document' = 'file', keepOriginal?: boolean = false, name?: string }` | one `mesh` entity per solid with `brep: { op:'heal'?, source: { op:'brep', blob } }`, placements/names/colours from XDE; components for repeated parts; `data.report` (§5.2) | exchange |
-| `heal_shape` | mutating, kernel | `{ id: string, precision?: number, maxTolerance?: number, sew?: boolean, fixSmallEdges?: boolean }` | wraps the entity recipe in a `heal` node; `data.report` | brep |
-| `validate_shape` | query, kernel | `{ ids?: string[], selfIntersection?: boolean = false, exact?: boolean = false }` | `data: { results: [{ id, valid, issues: [{ code, subShape: TopoName, detail }], maxTolerance }] }` | inspect |
-| `boolean` (extended) | mutating, kernel | `+ fuzzy?: number` (mm, ≥ 0, ≤ 0.1) | recipe `boolean.fuzzy`; on failure `data.argumentCheck` | brep |
-| `fillet_edge` / `chamfer_edge` (extended) | mutating, kernel | `+ edgeNames?: TopoName[]` | names resolved first, then `edgeIndices`, then `edgesNear`; history stores names | brep |
-| `inspect_topology` (extended) | query, kernel | `+ withNames?: boolean = true` | each face/edge gains `name: TopoName` and `history: 'primitive'|'modified'|'generated'|'imported'` | inspect |
-| `mass_properties` (extended) | query | `+ frame?: 'document'|'entity' = 'document', eps?: number = 1e-9, about?: Vec3` | §5.4 payload | inspect |
+| `heal_shape` | mutating, kernel | `{ id: string, precision?: number, maxTolerance?: number, sew?: boolean, fixSmallEdges?: boolean }` | wraps the entity recipe in a `heal` node; `data.report` | 3d |
+| `validate_shape` | query, kernel | `{ ids?: string[], selfIntersection?: boolean = false, exact?: boolean = false }` | `data: { results: [{ id, valid, issues: [{ code, subShape: TopoName, detail }], maxTolerance }] }` | measure |
+| `boolean` (extended) | mutating, kernel | `+ fuzzy?: number` (mm, ≥ 0, ≤ 0.1) | recipe `boolean.fuzzy`; on failure `data.argumentCheck` | 3d |
+| `fillet_edge` / `chamfer_edge` (extended) | mutating, kernel | `+ edgeNames?: TopoName[]` | names resolved first, then `edgeIndices`, then `edgesNear`; history stores names | 3d |
+| `inspect_topology` (extended) | query, kernel | `+ withNames?: boolean = true` | each face/edge gains `name: TopoName` and `history: 'primitive'|'modified'|'generated'|'imported'` | 3d |
+| `mass_properties` (extended) | query | `+ frame?: 'document'|'entity' = 'document', eps?: number = 1e-9, about?: Vec3` | §5.4 payload | measure |
 | `export_step_exact` (extended) | query, kernel | `+ validationProperties?: boolean = true, assembly?: boolean = true` | AP214/AP242 text with GVP (TR-KRN-80) | exchange |
-| `check_model` (extended) | query | — | adds `faceted_result`, `kernel_mismatch`, `invalid_brep` (when kernel present) issue codes | inspect |
+| `check_model` (extended) | query | — | adds `faceted_result`, `kernel_mismatch`, `invalid_brep` (when kernel present) issue codes | core |
 
 Structured tags (example):
 
@@ -366,7 +368,8 @@ document instead of inline base64 (V2).
   `llull mass_properties '{"entityId":…}'` — compact JSON output (llull-cli skill); `--kernel occt` becomes the
   CLI default for `--doc` runs on desktop installs.
 - **MCP**: tools from the registry (`toToolSchemas`); `import_step` exchange tool `mode` param; toolsets:
-  inspect (kernel_info, validate_shape, mass_properties), exchange (import/export), brep (heal_shape).
+  core (kernel_info, set_modeling_tolerance), measure (validate_shape, mass_properties), exchange (import/export),
+  3d (heal_shape).
 
 ## 8. Performance & robustness budgets
 

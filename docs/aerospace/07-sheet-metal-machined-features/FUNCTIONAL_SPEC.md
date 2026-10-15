@@ -155,7 +155,7 @@ Priority: MUST / SHOULD / COULD. Source = where the requirement or its numbers c
 | FR-FTR-19 | MUST | **Thread attribute (cosmetic)** on a hole or cylindrical boss: designation string (UNJ per AS8879, MJ per ISO 5855, UN, M), class/tolerance, depth, handedness. No B-rep change. Persisted, shown in drawings as a thread callout, listed by queries, and carried into code export as a comment or metadata. | Threads are specified, not modelled, in production CAD. | [R8] (cosmetic vs modelled) |
 | FR-FTR-20 | COULD | **Modelled thread** (helical sweep), for visualisation and export only. | Rarely needed; costly. | [R8] |
 | FR-FTR-21 | MUST | **Pocket**: closed planar profile on a face, depth, up-to-face or through. Vertical corner radius at least the declared tool radius, optional floor fillet with rf ≤ rc, islands SHOULD. | Monolithic part webs. | analytic (expected_pocket.json) |
-| FR-FTR-22 | SHOULD | **Rib**: a rib or web from an open profile with thickness, height up to a face, using OCC `BRepFeat_MakeLinearForm` semantics. COULD: pocket patterns such as isogrid. | Machined stiffeners. | [R10] |
+| FR-FTR-22 | SHOULD | **Rib**: a rib or web from an open profile with thickness, height up to a face (OCC `BRepFeat_MakeLinearForm` semantics; built by recipe lowering, since that class is absent from opencascade.js 1.1.1). COULD: pocket patterns such as isogrid. | Machined stiffeners. | [R10] |
 | FR-FTR-23 | MUST (V1) | **Fastener link**: a hole may reference a fastener catalogue entry (gap 08). Clearance diameter or fit class, countersink diameter and angle, and thread designation derive from it. Changing the entry re-evaluates the holes. | Single source for hole definitions. | gap 08 |
 | FR-FTR-24 | MUST (V1) | **Feature recognition** (`recognize_features`, read-only) on any exact solid, imported STEP included. It returns holes (type, axis, diameters, depth, countersink angle and diameter, drill point, through or blind), pockets (floor, depth, corner and floor radii), fillets, chamfers, and sheet-metal bends and thickness. It merges faces split by the exporter on one analytic surface. | P4 workflow; STEP intake. | [R5][R6]; measured split faces |
 | FR-FTR-25 | COULD | **Convert recognised features** into parametric `add_hole` / `add_pocket` steps on a defeatured base (volume preserved). | Editability of imported parts. | — |
@@ -217,7 +217,7 @@ Priority: MUST / SHOULD / COULD. Source = where the requirement or its numbers c
 llull sheet_metal_calc thickness=0.064 insideRadius=0.25 angle=135 kFactor=0.4475 units=in --json   # SB 0.758 in (AC 43.13-1B)
 llull run validation/plans/draft_sheet_metal_bracket.json --doc bracket.llull.json --json          # build + check + unfold
 llull export_flat_pattern_dxf id=<sm> --doc bracket.llull.json --save bracket_flat.dxf
-llull import_step file=supplier.stp --doc part.llull.json && llull recognize_features id=<id> --doc part.llull.json --json   # needs exact STEP import (TECHNICAL_SPEC §2.2, D9)
+llull import_step file=supplier.stp --doc part.llull.json && llull recognize_features id=<id> --doc part.llull.json --json   # recognition needs gap 01 import_step_brep (TECHNICAL_SPEC M0)
 ```
 
 ### 6.3 MCP agent (cloud)
