@@ -1,0 +1,356 @@
+{
+ "$comment": "Pinned NIST MBE PMI Validation and Conformance Testing STEP files (gap GDT). Source of truth = the NIST zip distributed in the NIST STEP File Analyzer and Viewer repository (usnistgov/SFA, Release/), README dated 'February 2026 Update'. The zip is pinned by sha256; members are pinned individually. Files are NOT committed to llull (0.4-6.1 MB each). NIST README: files are 'NOT reference STEP files without any errors' (SFA reports some syntax errors). Use terms: NIST open licence / data.nist.gov record (see sources.md).",
+ "zip": {
+  "url": "https://raw.githubusercontent.com/usnistgov/SFA/master/Release/NIST-PMI-STEP-Files.zip",
+  "sha256": "1fb91bb8ff0fe02032b948fda0775bc74591cd0bebc0988347d32574e5884f90",
+  "bytes": 12889852,
+  "readmeUpdate": "February 2026"
+ },
+ "projectPage": "https://www.nist.gov/ctl/smart-connected-systems-division/smart-connected-manufacturing-systems-group/mbe-pmi-0",
+ "accessed": "2026-10-15",
+ "files": [
+  {
+   "id": "ctc_01",
+   "family": "CTC (combined test case, not fully toleranced)",
+   "file": "nist_ctc_01_asme1_ap242-e1.stp",
+   "zipPath": "NIST-PMI-STEP-Files/nist_ctc_01_asme1_ap242-e1.stp",
+   "apEdition": "e1",
+   "semanticPmi": true,
+   "sha256": "036683e8358ac27d51a92c35362e175c91bc44d3b600a5c605fb496865edcd37",
+   "bytes": 395283
+  },
+  {
+   "id": "ctc_02",
+   "family": "CTC (combined test case, not fully toleranced)",
+   "file": "nist_ctc_02_asme1_ap242-e2.stp",
+   "zipPath": "NIST-PMI-STEP-Files/nist_ctc_02_asme1_ap242-e2.stp",
+   "apEdition": "e2",
+   "semanticPmi": true,
+   "sha256": "99a0a2079ddeb64d05c2432cbe931fa17c89da60d8b0bcb0b11bd0ed94fa2e68",
+   "bytes": 1981342
+  },
+  {
+   "id": "ctc_03",
+   "family": "CTC (combined test case, not fully toleranced)",
+   "file": "nist_ctc_03_asme1_ap242-e2.stp",
+   "zipPath": "NIST-PMI-STEP-Files/nist_ctc_03_asme1_ap242-e2.stp",
+   "apEdition": "e2",
+   "semanticPmi": true,
+   "sha256": "196b665776e759282f80fc8fb27d7bceb995df77cf78b7ce48347535a4d6cb5f",
+   "bytes": 673846
+  },
+  {
+   "id": "ctc_04",
+   "family": "CTC (combined test case, not fully toleranced)",
+   "file": "nist_ctc_04_asme1_ap242-e2.stp",
+   "zipPath": "NIST-PMI-STEP-Files/nist_ctc_04_asme1_ap242-e2.stp",
+   "apEdition": "e2",
+   "semanticPmi": true,
+   "sha256": "7eaea9d2cf417a73d20f8ee840a9d346b0ee5f558a4ab1bf2326a323bd423182",
+   "bytes": 1287291
+  },
+  {
+   "id": "ctc_05",
+   "family": "CTC (combined test case, not fully toleranced)",
+   "file": "nist_ctc_05_asme1_ap242-e1.stp",
+   "zipPath": "NIST-PMI-STEP-Files/nist_ctc_05_asme1_ap242-e1.stp",
+   "apEdition": "e1",
+   "semanticPmi": true,
+   "sha256": "7f04f14be27918d31aef5b6d9ff74d547382ad469e45495c5b710baaa772323d",
+   "bytes": 878030
+  },
+  {
+   "id": "ftc_06",
+   "family": "FTC (fully-toleranced test case)",
+   "file": "nist_ftc_06_asme1_ap242-e2.stp",
+   "zipPath": "NIST-PMI-STEP-Files/nist_ftc_06_asme1_ap242-e2.stp",
+   "apEdition": "e2",
+   "semanticPmi": true,
+   "sha256": "b87afb7f25adc0d44d12e182209d50f0b085b533c0742fb8ffd58f4c87403447",
+   "bytes": 1971192
+  },
+  {
+   "id": "ftc_07",
+   "family": "FTC (fully-toleranced test case)",
+   "file": "nist_ftc_07_asme1_ap242-e2.stp",
+   "zipPath": "NIST-PMI-STEP-Files/nist_ftc_07_asme1_ap242-e2.stp",
+   "apEdition": "e2",
+   "semanticPmi": true,
+   "sha256": "aa8115c12e12a99cc439477cbfd222916f9ec629fbb3c9002b18e0c264c9a892",
+   "bytes": 1478375
+  },
+  {
+   "id": "ftc_08",
+   "family": "FTC (fully-toleranced test case)",
+   "file": "nist_ftc_08_asme1_ap242-e2.stp",
+   "zipPath": "NIST-PMI-STEP-Files/nist_ftc_08_asme1_ap242-e2.stp",
+   "apEdition": "e2",
+   "semanticPmi": true,
+   "sha256": "7b9283b4288d152fd181d76c39285d7c79fbba34fda1e14a41ac4a983f6d68b3",
+   "bytes": 4722264
+  },
+  {
+   "id": "ftc_08-tg",
+   "family": "FTC (fully-toleranced test case)",
+   "file": "nist_ftc_08_asme1_ap242-e4-tg.stp",
+   "zipPath": "NIST-PMI-STEP-Files/nist_ftc_08_asme1_ap242-e4-tg.stp",
+   "apEdition": "e4-tg",
+   "semanticPmi": false,
+   "sha256": "40cd4e5e2e02b5742e0884ba5b132f2e37d2215c45f57afb48962a05a060c384",
+   "bytes": 2120559
+  },
+  {
+   "id": "ftc_09",
+   "family": "FTC (fully-toleranced test case)",
+   "file": "nist_ftc_09_asme1_ap242-e1.stp",
+   "zipPath": "NIST-PMI-STEP-Files/nist_ftc_09_asme1_ap242-e1.stp",
+   "apEdition": "e1",
+   "semanticPmi": true,
+   "sha256": "f1215fe15a78085a9fa78dd81714caf774b59071be92580b04ebfdc19f52a1bd",
+   "bytes": 6109836
+  },
+  {
+   "id": "ftc_10",
+   "family": "FTC (fully-toleranced test case)",
+   "file": "nist_ftc_10_asme1_ap242-e2.stp",
+   "zipPath": "NIST-PMI-STEP-Files/nist_ftc_10_asme1_ap242-e2.stp",
+   "apEdition": "e2",
+   "semanticPmi": true,
+   "sha256": "9d7711f48e81831c5d1838fdac5c11c0de1aa9b61f3c1d67930a7638b3b25e69",
+   "bytes": 1879881
+  },
+  {
+   "id": "ftc_11",
+   "family": "FTC (fully-toleranced test case)",
+   "file": "nist_ftc_11_asme1_ap242-e3.stp",
+   "zipPath": "NIST-PMI-STEP-Files/nist_ftc_11_asme1_ap242-e3.stp",
+   "apEdition": "e3",
+   "semanticPmi": true,
+   "sha256": "2d05bd399463a9ced7b84a479872a759f170fe92f7a62f8194e83df77f86f117",
+   "bytes": 1946454
+  },
+  {
+   "id": "stc_06",
+   "family": "STC (simplified test case derived from FTC)",
+   "file": "nist_stc_06_asme1_ap242-e3.stp",
+   "zipPath": "NIST-PMI-STEP-Files/nist_stc_06_asme1_ap242-e3.stp",
+   "apEdition": "e3",
+   "semanticPmi": true,
+   "sha256": "71777c28da76da0e8a667e4cbe792d5f72c09b5c56440c9744d3d50ca96ecc8d",
+   "bytes": 1006401
+  },
+  {
+   "id": "stc_07",
+   "family": "STC (simplified test case derived from FTC)",
+   "file": "nist_stc_07_asme1_ap242-e3.stp",
+   "zipPath": "NIST-PMI-STEP-Files/nist_stc_07_asme1_ap242-e3.stp",
+   "apEdition": "e3",
+   "semanticPmi": true,
+   "sha256": "2dddf9b8894bc241f7ffddf3dc4502baa3d49c374e8784039d14b86473d54832",
+   "bytes": 1945387
+  },
+  {
+   "id": "stc_08",
+   "family": "STC (simplified test case derived from FTC)",
+   "file": "nist_stc_08_asme1_ap242-e3.stp",
+   "zipPath": "NIST-PMI-STEP-Files/nist_stc_08_asme1_ap242-e3.stp",
+   "apEdition": "e3",
+   "semanticPmi": true,
+   "sha256": "64f24b914910ce8e20c9e4bd59637b4fd155715c7c7b51689466534ed7db1442",
+   "bytes": 2251152
+  },
+  {
+   "id": "stc_09",
+   "family": "STC (simplified test case derived from FTC)",
+   "file": "nist_stc_09_asme1_ap242-e4.stp",
+   "zipPath": "NIST-PMI-STEP-Files/nist_stc_09_asme1_ap242-e4.stp",
+   "apEdition": "e4",
+   "semanticPmi": true,
+   "sha256": "41026b1f0d81830c6092b5147e0e084d2fa163169161c31af4ce06493d3c7d33",
+   "bytes": 968495
+  },
+  {
+   "id": "stc_10",
+   "family": "STC (simplified test case derived from FTC)",
+   "file": "nist_stc_10_asme1_ap242-e2.stp",
+   "zipPath": "NIST-PMI-STEP-Files/nist_stc_10_asme1_ap242-e2.stp",
+   "apEdition": "e2",
+   "semanticPmi": true,
+   "sha256": "fba4f46cab1ce1402362038036884631b4a41afe1c9efc5681d358c39db7ed5f",
+   "bytes": 4875056
+  }
+ ],
+ "geometryOnlyAp203": [
+  {
+   "file": "nist_ctc_01_asme1_rd.stp",
+   "zipPath": "NIST-PMI-STEP-Files/AP203 geometry only/nist_ctc_01_asme1_rd.stp",
+   "sha256": "e081d518484d5c708c6729353237f94a7d97da2b74a10d60d4c0d146d67a5855",
+   "bytes": 235171
+  },
+  {
+   "file": "nist_ctc_02_asme1_rc.stp",
+   "zipPath": "NIST-PMI-STEP-Files/AP203 geometry only/nist_ctc_02_asme1_rc.stp",
+   "sha256": "e6df6d0ed68fd8a91bd3f8360c7047f2af3d61068b89050d84423fe8ddb93bcf",
+   "bytes": 1154600
+  },
+  {
+   "file": "nist_ctc_03_asme1_rc.stp",
+   "zipPath": "NIST-PMI-STEP-Files/AP203 geometry only/nist_ctc_03_asme1_rc.stp",
+   "sha256": "95a775b1acdbc34de11319cb83b4cf6c6fdd7de8cbfc4af2d0afe5d3565cfdf8",
+   "bytes": 252128
+  },
+  {
+   "file": "nist_ctc_04_asme1_rd.stp",
+   "zipPath": "NIST-PMI-STEP-Files/AP203 geometry only/nist_ctc_04_asme1_rd.stp",
+   "sha256": "cdb59a085a3364941b881f96b511265a7cb5f6e94180c4426bdc3025481f405a",
+   "bytes": 793048
+  },
+  {
+   "file": "nist_ctc_05_asme1_rd.stp",
+   "zipPath": "NIST-PMI-STEP-Files/AP203 geometry only/nist_ctc_05_asme1_rd.stp",
+   "sha256": "5140b8f41fa1d0a069ea978e28c92a597f47220d0a11e667b79ff5f7c7243b86",
+   "bytes": 326817
+  },
+  {
+   "file": "nist_ftc_06_asme1_rd.stp",
+   "zipPath": "NIST-PMI-STEP-Files/AP203 geometry only/nist_ftc_06_asme1_rd.stp",
+   "sha256": "5e30f0903f9470c14a98e70395ca005fe90bcd3fb704c381a80a69958838f169",
+   "bytes": 222799
+  },
+  {
+   "file": "nist_ftc_07_asme1_rd.stp",
+   "zipPath": "NIST-PMI-STEP-Files/AP203 geometry only/nist_ftc_07_asme1_rd.stp",
+   "sha256": "a0bc551656780b26d7a0ee1beedbc07d43f41efa092f74f3c2d8383417f04481",
+   "bytes": 402531
+  },
+  {
+   "file": "nist_ftc_08_asme1_rc.stp",
+   "zipPath": "NIST-PMI-STEP-Files/AP203 geometry only/nist_ftc_08_asme1_rc.stp",
+   "sha256": "4b7011b0b86cf6301058aa954b76a9587d23478b6dee2660f4a80caf0dfe8b73",
+   "bytes": 450741
+  },
+  {
+   "file": "nist_ftc_09_asme1_rd.stp",
+   "zipPath": "NIST-PMI-STEP-Files/AP203 geometry only/nist_ftc_09_asme1_rd.stp",
+   "sha256": "e29c09bd2d454601ff1a0d77c4c4ffaf2ed78eee71031ce49f7b7bb5a6d1d4e8",
+   "bytes": 263916
+  },
+  {
+   "file": "nist_ftc_10_asme1_rb.stp",
+   "zipPath": "NIST-PMI-STEP-Files/AP203 geometry only/nist_ftc_10_asme1_rb.stp",
+   "sha256": "2bd726f9fe86aeb96ab517ce876e5696e7951310df5c4fbca36276d65879067b",
+   "bytes": 323601
+  },
+  {
+   "file": "nist_ftc_11_asme1_rb.stp",
+   "zipPath": "NIST-PMI-STEP-Files/AP203 geometry only/nist_ftc_11_asme1_rb.stp",
+   "sha256": "a5abfea460499dc31bc812aca68917948a117565fea4f5a080e36eb32f39650d",
+   "bytes": 7634
+  }
+ ],
+ "drawingsPdf": [
+  {
+   "file": "nist_ctc_01_asme1_rd.pdf",
+   "zipPath": "NIST-PMI-STEP-Files/PDF/nist_ctc_01_asme1_rd.pdf",
+   "sha256": "5f71e173eff4381afb5dc79d9ff44d213f436a59519bd2142746f378f7d70e93",
+   "bytes": 55077
+  },
+  {
+   "file": "nist_ctc_02_asme1_rc.pdf",
+   "zipPath": "NIST-PMI-STEP-Files/PDF/nist_ctc_02_asme1_rc.pdf",
+   "sha256": "e9aabbf22d9f05b6d3ee40288b10ff99837af203033afbd80a3bcc5754159672",
+   "bytes": 210564
+  },
+  {
+   "file": "nist_ctc_03_asme1_rc.pdf",
+   "zipPath": "NIST-PMI-STEP-Files/PDF/nist_ctc_03_asme1_rc.pdf",
+   "sha256": "675698e729f756659fa99f04ceb065bc3f1445e1219f16841a2877b2499f5491",
+   "bytes": 94974
+  },
+  {
+   "file": "nist_ctc_04_asme1_rd.pdf",
+   "zipPath": "NIST-PMI-STEP-Files/PDF/nist_ctc_04_asme1_rd.pdf",
+   "sha256": "20cadec4d310beb86df89cda103149184c0612e3004dd3eec8d88ce354ea536a",
+   "bytes": 60260
+  },
+  {
+   "file": "nist_ctc_05_asme1_rd.pdf",
+   "zipPath": "NIST-PMI-STEP-Files/PDF/nist_ctc_05_asme1_rd.pdf",
+   "sha256": "82eeafd5167ab590d6e1dc6ecce65aaecff322ecc6069ee6616accda941cee8f",
+   "bytes": 88700
+  },
+  {
+   "file": "nist_ftc_06_asme1_rd.pdf",
+   "zipPath": "NIST-PMI-STEP-Files/PDF/nist_ftc_06_asme1_rd.pdf",
+   "sha256": "501a976013cb1e2c13bfc998b5dfa010b064945a1f0a1eaa303a59d96ddc893c",
+   "bytes": 167608
+  },
+  {
+   "file": "nist_ftc_07_asme1_rd.pdf",
+   "zipPath": "NIST-PMI-STEP-Files/PDF/nist_ftc_07_asme1_rd.pdf",
+   "sha256": "fcb214aa1aee70040b11eed88b65ebe42104f2ce1d0e94cb06668a75f8ec2456",
+   "bytes": 720347
+  },
+  {
+   "file": "nist_ftc_08_asme1_rc.pdf",
+   "zipPath": "NIST-PMI-STEP-Files/PDF/nist_ftc_08_asme1_rc.pdf",
+   "sha256": "db962fc2527457ef5226a1f9d0083b898e86f6622f63b91e9ffa42b1df6b30bf",
+   "bytes": 240361
+  },
+  {
+   "file": "nist_ftc_09_asme1_rd.pdf",
+   "zipPath": "NIST-PMI-STEP-Files/PDF/nist_ftc_09_asme1_rd.pdf",
+   "sha256": "148d43b816d8844b877baf948765896d58cb642d9b0b9c6a7e5f22853914f3ea",
+   "bytes": 314889
+  },
+  {
+   "file": "nist_ftc_10_asme1_rb.pdf",
+   "zipPath": "NIST-PMI-STEP-Files/PDF/nist_ftc_10_asme1_rb.pdf",
+   "sha256": "fdb17aa687bde85db25899e4110588586e228e0a186ea160045095a3009be482",
+   "bytes": 369659
+  },
+  {
+   "file": "nist_ftc_11_asme1_rb.pdf",
+   "zipPath": "NIST-PMI-STEP-Files/PDF/nist_ftc_11_asme1_rb.pdf",
+   "sha256": "f15690050edb2a673b92d31733be86fac207a16a8716b21f13ccd757a002392c",
+   "bytes": 69874
+  }
+ ],
+ "supersededMirror2024": [
+  {
+   "file": "nist_ctc_01_asme1_ap242-e1.stp",
+   "url": "https://media.githubusercontent.com/media/bldrs-ai/test-models/main/step/nist/NIST-PMI-STEP-Files/nist_ctc_01_asme1_ap242-e1.stp",
+   "sha256": "85a5752da05f53c456ca3a9e038c90358e1d5a3141d1f0d6e5f0970f2356e821",
+   "bytes": 396445,
+   "note": "pre-February-2026 version (Git LFS mirror); replaced in the NIST zip"
+  },
+  {
+   "file": "nist_ctc_04_asme1_ap242-e1.stp",
+   "url": "https://media.githubusercontent.com/media/bldrs-ai/test-models/main/step/nist/NIST-PMI-STEP-Files/nist_ctc_04_asme1_ap242-e1.stp",
+   "sha256": "20b43b54ce25d4ed17cff794084c406e831c687f5b62471d3371eef33669e355",
+   "bytes": 1287291,
+   "note": "pre-February-2026 version (Git LFS mirror); replaced in the NIST zip"
+  },
+  {
+   "file": "nist_ctc_05_asme1_ap242-e1.stp",
+   "url": "https://media.githubusercontent.com/media/bldrs-ai/test-models/main/step/nist/NIST-PMI-STEP-Files/nist_ctc_05_asme1_ap242-e1.stp",
+   "sha256": "59bbc09a34621c03106e4c1b2a5bc909fdb67463117c16c4965ee7a6fe5c1521",
+   "bytes": 878030,
+   "note": "pre-February-2026 version (Git LFS mirror); replaced in the NIST zip"
+  },
+  {
+   "file": "nist_ftc_11_asme1_ap242-e2.stp",
+   "url": "https://media.githubusercontent.com/media/bldrs-ai/test-models/main/step/nist/NIST-PMI-STEP-Files/nist_ftc_11_asme1_ap242-e2.stp",
+   "sha256": "20a92edf514ae0989d556f9c7b9f065aed741cfbb361b7fe4cb7938a1eb5c232",
+   "bytes": 1946454,
+   "note": "pre-February-2026 version (Git LFS mirror); replaced in the NIST zip"
+  },
+  {
+   "file": "nist_stc_09_asme1_ap242-e3.stp",
+   "url": "https://media.githubusercontent.com/media/bldrs-ai/test-models/main/step/nist/NIST-PMI-STEP-Files/nist_stc_09_asme1_ap242-e3.stp",
+   "sha256": "737423afcb223b87d92a4ea7646a97d8d55fb21cc24ba2fb72b952336bcf1fad",
+   "bytes": 5287678,
+   "note": "pre-February-2026 version (Git LFS mirror); replaced in the NIST zip"
+  }
+ ]
+}

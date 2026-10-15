@@ -1,0 +1,110 @@
+{
+  "gap": "PLM",
+  "generated_by": "hand-written; hash/signature literals produced by generate_vectors.py and cross-checked by verify_vectors.mjs (Node 22, node:crypto)",
+  "results": [
+    {
+      "vc": "VC-PLM-16",
+      "name": "SHA-256 known answer 'abc'",
+      "value": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+      "tolerance": "exact",
+      "unit": "hex digest",
+      "source": "NIST SHA-256 example ('abc'), FIPS 180-x [R17]"
+    },
+    {
+      "vc": "VC-PLM-16",
+      "name": "Release-scope content hash of validation/sample_document.json",
+      "value": "d3f3a4fa201f96bc92d660646b40a19af92ee7b8eb211957a24e65a02880703f",
+      "tolerance": "exact",
+      "unit": "hex digest",
+      "source": "derived: SHA-256(RFC 8785-style canonical JSON of envelope minus selection/camera/plm), 966 bytes; generate_vectors.py"
+    },
+    {
+      "vc": "VC-PLM-16",
+      "name": "Release-scope hash invariant to camera/selection change and key order",
+      "value": "d3f3a4fa201f96bc92d660646b40a19af92ee7b8eb211957a24e65a02880703f",
+      "tolerance": "exact (must equal the previous row)",
+      "unit": "hex digest",
+      "source": "derived; generate_vectors.py asserts equality"
+    },
+    {
+      "vc": "VC-PLM-16",
+      "name": "Release-scope hash after editing parameter t 4 -> 5",
+      "value": "3fe51bfaefd6362caa0f9d505c273d9e4e695df0fc7e8373dfc47608b6fecbc1",
+      "tolerance": "exact (must differ from the unedited hash)",
+      "unit": "hex digest",
+      "source": "derived; generate_vectors.py"
+    },
+    {
+      "vc": "VC-PLM-17",
+      "name": "Ed25519 RFC 8032 TEST 1/2/3 verify",
+      "value": true,
+      "tolerance": "exact",
+      "unit": "boolean",
+      "source": "RFC 8032 section 7.1 [R15]; vectors re-verified with Python cryptography 50.0.1 and Node 22 node:crypto"
+    },
+    {
+      "vc": "VC-PLM-17",
+      "name": "Sample release manifest hash",
+      "value": "5cf710ffa62c6501613d704f1197e445a95a3027457152edf94cbd08b4af3d81",
+      "tolerance": "exact",
+      "unit": "hex digest",
+      "source": "derived: SHA-256 of canonical manifest body (without manifestSha256, signatures)"
+    },
+    {
+      "vc": "VC-PLM-17",
+      "name": "Sample release manifest Ed25519 signature (RFC 8032 TEST 1 key, deterministic)",
+      "value": "f132e6dc8a3e2ad0e4a656a833a40eee9ab2bf7d2b98f80aefd5a11125b63edd33b883e836af024d34ebc90f1366fb77474667d90dc00747b9b39d76d6c77c0c",
+      "tolerance": "exact (Ed25519 is deterministic, RFC 8032 section 5.1.6)",
+      "unit": "hex signature (64 bytes)",
+      "source": "derived; generate_vectors.py"
+    },
+    {
+      "vc": "VC-PLM-17",
+      "name": "Negative signature cases (tampered manifest, bit flip, wrong key, mismatched RFC vectors)",
+      "value": false,
+      "tolerance": "exact",
+      "unit": "boolean (verify result)",
+      "source": "derived; vectors/ed25519_vectors.json#negative"
+    },
+    {
+      "vc": "VC-PLM-04",
+      "name": "Revision sequence 'asme-alpha': 9th, 14th, 20th, 21st, 420th revision",
+      "value": { "9": "J", "14": "P", "20": "Y", "21": "AA", "420": "YY" },
+      "tolerance": "exact",
+      "unit": "revision label",
+      "source": "derived from the letter-exclusion rule I,O,Q,S,X,Z (secondary sources quoting ASME Y14.35M-1997 [R26]); configurable"
+    },
+    {
+      "vc": "VC-PLM-07",
+      "name": "Effectivity resolution after ECO-0002",
+      "value": { "serial 4": "A", "serial 5": "B", "msn 11": "A", "msn 12": "B", "date 2026-11-01": null, "date 2027-03-01": "B" },
+      "tolerance": "exact",
+      "unit": "revision label",
+      "source": "derived; vectors/effectivity_resolution.json"
+    },
+    {
+      "vc": "VC-PLM-06",
+      "name": "S1 final lifecycle states",
+      "value": { "A": "superseded", "B": "released", "ECO-0002": "implemented" },
+      "tolerance": "exact",
+      "unit": "state",
+      "source": "scenarios/S1_release_eco_revB.json#finalState (state machine of lifecycle_transitions.csv)"
+    },
+    {
+      "vc": "VC-PLM-10",
+      "name": "S3 EBOM total quantity",
+      "value": 5,
+      "tolerance": "exact",
+      "unit": "count",
+      "source": "derived from the S3 given assembly (2 + 1 + 2)"
+    },
+    {
+      "vc": "VC-PLM-19",
+      "name": "Release package open/verify time for 50 MB package",
+      "value": "TBD - measure with verify_release on a 50 MB package on the reference desktop",
+      "tolerance": "budget <= 2 s (TECHNICAL_SPEC section 8)",
+      "unit": "s",
+      "source": "budget, not a measurement"
+    }
+  ]
+}

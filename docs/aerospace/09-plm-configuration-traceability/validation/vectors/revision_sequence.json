@@ -1,0 +1,75 @@
+{
+  "schemes": {
+    "asme-alpha": {
+      "excludedLetters": [
+        "I",
+        "O",
+        "Q",
+        "S",
+        "X",
+        "Z"
+      ],
+      "rule": "single letters A..Y without I,O,Q,S,X,Z (20), then two letters AA..YY with the same alphabet, max 2 chars",
+      "source": "secondary sources quoting ASME Y14.35M-1997; verify against the purchased ASME Y14.35 edition",
+      "first25": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "H",
+        "J",
+        "K",
+        "L",
+        "M",
+        "N",
+        "P",
+        "R",
+        "T",
+        "U",
+        "V",
+        "W",
+        "Y",
+        "AA",
+        "AB",
+        "AC",
+        "AD",
+        "AE"
+      ],
+      "checkpoints": {
+        "1": "A",
+        "8": "H",
+        "9": "J",
+        "14": "P",
+        "15": "R",
+        "16": "T",
+        "20": "Y",
+        "21": "AA",
+        "40": "AY",
+        "41": "BA",
+        "420": "YY"
+      },
+      "capacity": 420
+    },
+    "numeric-2": {
+      "rule": "zero-padded integer",
+      "checkpoints": {
+        "1": "01",
+        "9": "09",
+        "10": "10",
+        "99": "99"
+      }
+    },
+    "iteration": {
+      "rule": "<revision>.<iteration>, iteration restarts at 1 on each new revision (Windchill-style)",
+      "examples": [
+        "A.1",
+        "A.2",
+        "A.3",
+        "B.1"
+      ]
+    }
+  }
+}

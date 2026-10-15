@@ -1,0 +1,16 @@
+from_state,to_state,command,allowed,preconditions,side_effects,vc
+(none),in_work,set_item_identity,yes,"partNumber unique in document; scheme valid","revision = first of scheme; iteration 1",VC-PLM-01
+in_work,in_work,checkpoint_iteration,yes,"definition changed since last checkpoint (else no-op)","iteration += 1; snapshot hash recorded",VC-PLM-01
+in_work,in_review,submit_for_review,yes,"export marking decided (policy.requireMarking); no unresolved parameter errors","checkpoint if dirty; definition locked",VC-PLM-02
+in_review,in_work,reject_review,yes,"comment non-empty","definition unlocked",VC-PLM-02
+in_review,released,release_item,yes,"approvals satisfy policy (roles; checker != author if policy.requireIndependentChecker); changeOrder open (policy.requireChangeOrder) ; all child items released (assemblies)","contentHash frozen; release snapshot stored; effectivity set; ECO implemented when all its items released; previous released revision -> superseded with closed effectivity",VC-PLM-03
+in_work,released,release_item,no,"","refused: submit_for_review first",VC-PLM-08
+released,in_work,revise_item,"yes (creates NEW revision)","open ECO lists the item (policy.requireChangeOrder)","new revision = next(scheme), iteration 1, basedOn = current; old revision stays released",VC-PLM-05
+released,superseded,release_item (of next revision),yes (implicit),"next revision released","effectivity of old revision closed at next.from - 1 (serial/MSN) or the day before (date)",VC-PLM-06
+released,obsolete,set_lifecycle_state,yes,"reason non-empty; changeOrder (policy.requireChangeOrder)","no effectivity remains open",VC-PLM-09
+superseded,obsolete,set_lifecycle_state,yes,"reason non-empty","",VC-PLM-09
+superseded,in_work,set_lifecycle_state,no,"","refused",VC-PLM-08
+released,in_review,set_lifecycle_state,no,"","refused",VC-PLM-08
+obsolete,*,any,no,"","refused: terminal state",VC-PLM-08
+in_work,cancelled,set_lifecycle_state,yes,"revision never released","revision kept for traceability; not resolvable by effectivity",VC-PLM-08
+in_review,cancelled,set_lifecycle_state,no,"","refused: reject_review first",VC-PLM-08

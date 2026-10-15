@@ -1,0 +1,56 @@
+[
+ {
+  "command": "analyze_stackup",
+  "params": {
+   "name": "SU-01 housing gap",
+   "expression": "gap = H - (A + B + C + D)",
+   "lowerSpecLimit": 0,
+   "contributors": [
+    {
+     "name": "H",
+     "nominal": 100.0,
+     "upper": 0.1,
+     "lower": -0.1,
+     "sensitivity": 1
+    },
+    {
+     "name": "A",
+     "nominal": 24.95,
+     "upper": 0.05,
+     "lower": -0.05,
+     "sensitivity": -1
+    },
+    {
+     "name": "B",
+     "nominal": 25.0,
+     "upper": 0.03,
+     "lower": -0.03,
+     "sensitivity": -1
+    },
+    {
+     "name": "C",
+     "nominal": 24.9,
+     "upper": 0.04,
+     "lower": -0.04,
+     "sensitivity": -1
+    },
+    {
+     "name": "D",
+     "nominal": 25.0,
+     "upper": 0.02,
+     "lower": -0.02,
+     "sensitivity": -1
+    }
+   ],
+   "methods": [
+    "worstCase",
+    "rss",
+    "monteCarlo"
+   ],
+   "distribution": "normal",
+   "sigmaPerHalfTolerance": 3,
+   "samples": 200000,
+   "seed": 20261015
+  }
+ }
+]

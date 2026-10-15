@@ -1,0 +1,306 @@
+{
+ "$comment": "XCH exchange validation corpus (pinned). Same shape as quality/corpus.json entries; NIST files are members of one pinned archive (download the zip, check archive sha256, then member sha256). Entity census for IGES computed from the Directory Entry section (odd DE lines, columns 1-8).",
+ "archives": {
+  "nist-pmi-step-files": {
+   "url": "https://raw.githubusercontent.com/usnistgov/SFA/72375d17c09cf7072c30d9393b5c08b7aa272285/Release/NIST-PMI-STEP-Files.zip",
+   "sha256": "1fb91bb8ff0fe02032b948fda0775bc74591cd0bebc0988347d32574e5884f90",
+   "bytes": 12889852
+  }
+ },
+ "unpinned": {
+  "jt": "No openly licensed ISO 14306 sample verified on 2026-10-15 \u2014 TBD (see sources.md)",
+  "qif": "No QIF 3.0 instance file verified on 2026-10-15 \u2014 TBD (qifstandards.org downloads not reachable from this session)"
+ },
+ "files": [
+  {
+   "id": "nist-ctc01-ap242e1",
+   "format": "step",
+   "schema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 1 1 4 }",
+   "tier": "smoke",
+   "archive": "https://raw.githubusercontent.com/usnistgov/SFA/72375d17c09cf7072c30d9393b5c08b7aa272285/Release/NIST-PMI-STEP-Files.zip",
+   "member": "NIST-PMI-STEP-Files/nist_ctc_01_asme1_ap242-e1.stp",
+   "sha256": "036683e8358ac27d51a92c35362e175c91bc44d3b600a5c605fb496865edcd37",
+   "bytes": 395283,
+   "license": "NIST data (US Government work; see NIST copyright/disclaimer page) \u2014 pin, do not commit",
+   "tests": "AP242 e1, semantic+graphic PMI (8 pmi validation properties), part GVP volume/wetted area/centroid",
+   "vc": [
+    "VC-XCH-05",
+    "VC-XCH-07"
+   ]
+  },
+  {
+   "id": "nist-ctc02-ap242e2",
+   "format": "step",
+   "schema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 3 1 4 }",
+   "tier": "full",
+   "archive": "https://raw.githubusercontent.com/usnistgov/SFA/72375d17c09cf7072c30d9393b5c08b7aa272285/Release/NIST-PMI-STEP-Files.zip",
+   "member": "NIST-PMI-STEP-Files/nist_ctc_02_asme1_ap242-e2.stp",
+   "sha256": "99a0a2079ddeb64d05c2432cbe931fa17c89da60d8b0bcb0b11bd0ed94fa2e68",
+   "bytes": 1981342,
+   "license": "NIST data (US Government work; see NIST copyright/disclaimer page) \u2014 pin, do not commit",
+   "tests": "AP242 e2, 85 pmi validation properties, datum targets, GVP incl. independent surface area",
+   "vc": [
+    "VC-XCH-05",
+    "VC-XCH-07",
+    "VC-XCH-08"
+   ]
+  },
+  {
+   "id": "nist-ctc02-ap203",
+   "format": "step",
+   "schema": "AP203_CONFIGURATION_CONTROLLED_3D_DESIGN_OF_MECHANICAL_PARTS_AND_ASSEMBLIES_MIM_LF { 1 0 10303 403 2 1 2 }",
+   "tier": "full",
+   "archive": "https://raw.githubusercontent.com/usnistgov/SFA/72375d17c09cf7072c30d9393b5c08b7aa272285/Release/NIST-PMI-STEP-Files.zip",
+   "member": "NIST-PMI-STEP-Files/AP203 geometry only/nist_ctc_02_asme1_rc.stp",
+   "sha256": "e6df6d0ed68fd8a91bd3f8360c7047f2af3d61068b89050d84423fe8ddb93bcf",
+   "bytes": 1154600,
+   "license": "NIST data (US Government work; see NIST copyright/disclaimer page) \u2014 pin, do not commit",
+   "tests": "AP203 geometry only; GVP from a different CAD system than the AP242 file (cross-CAD variance baseline)",
+   "vc": [
+    "VC-XCH-06"
+   ]
+  },
+  {
+   "id": "nist-ctc03-ap242e2",
+   "format": "step",
+   "schema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 3 1 4 }",
+   "tier": "full",
+   "archive": "https://raw.githubusercontent.com/usnistgov/SFA/72375d17c09cf7072c30d9393b5c08b7aa272285/Release/NIST-PMI-STEP-Files.zip",
+   "member": "NIST-PMI-STEP-Files/nist_ctc_03_asme1_ap242-e2.stp",
+   "sha256": "196b665776e759282f80fc8fb27d7bceb995df77cf78b7ce48347535a4d6cb5f",
+   "bytes": 673846,
+   "license": "NIST data (US Government work; see NIST copyright/disclaimer page) \u2014 pin, do not commit",
+   "tests": "AP242 e2, PMI, GVP; AP203 sibling is in inches (unit handling)",
+   "vc": [
+    "VC-XCH-05",
+    "VC-XCH-07"
+   ]
+  },
+  {
+   "id": "nist-ctc04-ap242e2",
+   "format": "step",
+   "schema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 3 1 4 }",
+   "tier": "full",
+   "archive": "https://raw.githubusercontent.com/usnistgov/SFA/72375d17c09cf7072c30d9393b5c08b7aa272285/Release/NIST-PMI-STEP-Files.zip",
+   "member": "NIST-PMI-STEP-Files/nist_ctc_04_asme1_ap242-e2.stp",
+   "sha256": "7eaea9d2cf417a73d20f8ee840a9d346b0ee5f558a4ab1bf2326a323bd423182",
+   "bytes": 1287291,
+   "license": "NIST data (US Government work; see NIST copyright/disclaimer page) \u2014 pin, do not commit",
+   "tests": "AP242 e2, GVP with bounding box corner points + independent points centroid",
+   "vc": [
+    "VC-XCH-05"
+   ]
+  },
+  {
+   "id": "nist-ctc05-ap242e1",
+   "format": "step",
+   "schema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF {1 0 10303 442 1 1 4 }",
+   "tier": "full",
+   "archive": "https://raw.githubusercontent.com/usnistgov/SFA/72375d17c09cf7072c30d9393b5c08b7aa272285/Release/NIST-PMI-STEP-Files.zip",
+   "member": "NIST-PMI-STEP-Files/nist_ctc_05_asme1_ap242-e1.stp",
+   "sha256": "7f04f14be27918d31aef5b6d9ff74d547382ad469e45495c5b710baaa772323d",
+   "bytes": 878030,
+   "license": "NIST data (US Government work; see NIST copyright/disclaimer page) \u2014 pin, do not commit",
+   "tests": "AP242 e1 in inches, 44 pmi validation properties, no GVP",
+   "vc": [
+    "VC-XCH-07",
+    "VC-XCH-12"
+   ]
+  },
+  {
+   "id": "nist-ctc05-ap203",
+   "format": "step",
+   "schema": "AP203_CONFIGURATION_CONTROLLED_3D_DESIGN_OF_MECHANICAL_PARTS_AND_ASSEMBLIES_MIM_LF { 1 0 10303 403 2 1 2 }",
+   "tier": "full",
+   "archive": "https://raw.githubusercontent.com/usnistgov/SFA/72375d17c09cf7072c30d9393b5c08b7aa272285/Release/NIST-PMI-STEP-Files.zip",
+   "member": "NIST-PMI-STEP-Files/AP203 geometry only/nist_ctc_05_asme1_rd.stp",
+   "sha256": "5140b8f41fa1d0a069ea978e28c92a597f47220d0a11e667b79ff5f7c7243b86",
+   "bytes": 326817,
+   "license": "NIST data (US Government work; see NIST copyright/disclaimer page) \u2014 pin, do not commit",
+   "tests": "AP203 inch part with GVP (unit conversion of validation properties)",
+   "vc": [
+    "VC-XCH-06",
+    "VC-XCH-12"
+   ]
+  },
+  {
+   "id": "nist-ftc06-ap242e2",
+   "format": "step",
+   "schema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 3 1 4 }",
+   "tier": "full",
+   "archive": "https://raw.githubusercontent.com/usnistgov/SFA/72375d17c09cf7072c30d9393b5c08b7aa272285/Release/NIST-PMI-STEP-Files.zip",
+   "member": "NIST-PMI-STEP-Files/nist_ftc_06_asme1_ap242-e2.stp",
+   "sha256": "b87afb7f25adc0d44d12e182209d50f0b085b533c0742fb8ffd58f4c87403447",
+   "bytes": 1971192,
+   "license": "NIST data (US Government work; see NIST copyright/disclaimer page) \u2014 pin, do not commit",
+   "tests": "fully toleranced FTC, 133 pmi validation properties, GVP",
+   "vc": [
+    "VC-XCH-05",
+    "VC-XCH-07"
+   ]
+  },
+  {
+   "id": "nist-ftc07-ap242e2",
+   "format": "step",
+   "schema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 3 1 4 }",
+   "tier": "full",
+   "archive": "https://raw.githubusercontent.com/usnistgov/SFA/72375d17c09cf7072c30d9393b5c08b7aa272285/Release/NIST-PMI-STEP-Files.zip",
+   "member": "NIST-PMI-STEP-Files/nist_ftc_07_asme1_ap242-e2.stp",
+   "sha256": "aa8115c12e12a99cc439477cbfd222916f9ec629fbb3c9002b18e0c264c9a892",
+   "bytes": 1478375,
+   "license": "NIST data (US Government work; see NIST copyright/disclaimer page) \u2014 pin, do not commit",
+   "tests": "small part, GVP with bounding box",
+   "vc": [
+    "VC-XCH-05"
+   ]
+  },
+  {
+   "id": "nist-ftc08-ap242e4-tg",
+   "format": "step",
+   "schema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF {1 0 10303 442 7 1 4 }",
+   "tier": "full",
+   "archive": "https://raw.githubusercontent.com/usnistgov/SFA/72375d17c09cf7072c30d9393b5c08b7aa272285/Release/NIST-PMI-STEP-Files.zip",
+   "member": "NIST-PMI-STEP-Files/nist_ftc_08_asme1_ap242-e4-tg.stp",
+   "sha256": "40cd4e5e2e02b5742e0884ba5b132f2e37d2215c45f57afb48962a05a060c384",
+   "bytes": 2120559,
+   "license": "NIST data (US Government work; see NIST copyright/disclaimer page) \u2014 pin, do not commit",
+   "tests": "AP242 tessellated (faceted) part geometry, 65 pmi validation properties, no B-rep",
+   "vc": [
+    "VC-XCH-09"
+   ]
+  },
+  {
+   "id": "nist-ftc09-ap203",
+   "format": "step",
+   "schema": "AP203_CONFIGURATION_CONTROLLED_3D_DESIGN_OF_MECHANICAL_PARTS_AND_ASSEMBLIES_MIM_LF { 1 0 10303 403 2 1 2 }",
+   "tier": "full",
+   "archive": "https://raw.githubusercontent.com/usnistgov/SFA/72375d17c09cf7072c30d9393b5c08b7aa272285/Release/NIST-PMI-STEP-Files.zip",
+   "member": "NIST-PMI-STEP-Files/AP203 geometry only/nist_ftc_09_asme1_rd.stp",
+   "sha256": "e29c09bd2d454601ff1a0d77c4c4ffaf2ed78eee71031ce49f7b7bb5a6d1d4e8",
+   "bytes": 263916,
+   "license": "NIST data (US Government work; see NIST copyright/disclaimer page) \u2014 pin, do not commit",
+   "tests": "AP203 inch part with GVP",
+   "vc": [
+    "VC-XCH-06"
+   ]
+  },
+  {
+   "id": "nist-stc06-ap242e3",
+   "format": "step",
+   "schema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 4 1 4 }",
+   "tier": "full",
+   "archive": "https://raw.githubusercontent.com/usnistgov/SFA/72375d17c09cf7072c30d9393b5c08b7aa272285/Release/NIST-PMI-STEP-Files.zip",
+   "member": "NIST-PMI-STEP-Files/nist_stc_06_asme1_ap242-e3.stp",
+   "sha256": "71777c28da76da0e8a667e4cbe792d5f72c09b5c56440c9744d3d50ca96ecc8d",
+   "bytes": 1006401,
+   "license": "NIST data (US Government work; see NIST copyright/disclaimer page) \u2014 pin, do not commit",
+   "tests": "AP242 e3 (2022), placeholder zero-valued GVP \u2014 importer must ignore, not fail",
+   "vc": [
+    "VC-XCH-05",
+    "VC-XCH-07"
+   ]
+  },
+  {
+   "id": "nist-stc08-ap242e3",
+   "format": "step",
+   "schema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 4 1 4 }",
+   "tier": "full",
+   "archive": "https://raw.githubusercontent.com/usnistgov/SFA/72375d17c09cf7072c30d9393b5c08b7aa272285/Release/NIST-PMI-STEP-Files.zip",
+   "member": "NIST-PMI-STEP-Files/nist_stc_08_asme1_ap242-e3.stp",
+   "sha256": "64f24b914910ce8e20c9e4bd59637b4fd155715c7c7b51689466534ed7db1442",
+   "bytes": 2251152,
+   "license": "NIST data (US Government work; see NIST copyright/disclaimer page) \u2014 pin, do not commit",
+   "tests": "AP242 e3 with GVP incl. surface centre point",
+   "vc": [
+    "VC-XCH-05",
+    "VC-XCH-07"
+   ]
+  },
+  {
+   "id": "nist-stc10-ap242e2",
+   "format": "step",
+   "schema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 3 1 4 }",
+   "tier": "full",
+   "archive": "https://raw.githubusercontent.com/usnistgov/SFA/72375d17c09cf7072c30d9393b5c08b7aa272285/Release/NIST-PMI-STEP-Files.zip",
+   "member": "NIST-PMI-STEP-Files/nist_stc_10_asme1_ap242-e2.stp",
+   "sha256": "fba4f46cab1ce1402362038036884631b4a41afe1c9efc5681d358c39db7ed5f",
+   "bytes": 4875056,
+   "license": "NIST data (US Government work; see NIST copyright/disclaimer page) \u2014 pin, do not commit",
+   "tests": "AP242 e2 STC with GVP",
+   "vc": [
+    "VC-XCH-05"
+   ]
+  },
+  {
+   "id": "occt-bearing-iges",
+   "format": "iges",
+   "tier": "smoke",
+   "url": "https://raw.githubusercontent.com/Open-Cascade-SAS/OCCT/3d097a0328e71b826377d4814ab05ec3c3d23871/data/iges/bearing.iges",
+   "sha256": "e148b6f4240694049c8a2b894dc9f7c74113bb8991e5a12a5dead160fb9f0106",
+   "bytes": 1284903,
+   "license": "LGPL-2.1-only WITH OCCT-exception-1.0 (OCCT sample data)",
+   "tests": "IGES (Global version flag 9) trimmed-surface model, units MM",
+   "entityCensus": {
+    "102": 426,
+    "110": 826,
+    "126": 1040,
+    "128": 213,
+    "142": 213,
+    "144": 213,
+    "402": 1
+   },
+   "expected": {
+    "trimmedSurfaces144": 213,
+    "faces": "TBD \u2014 measure with OCC IGESControl_Reader + BRepGProp"
+   },
+   "vc": [
+    "VC-XCH-10"
+   ]
+  },
+  {
+   "id": "occt-hammer-iges",
+   "format": "iges",
+   "tier": "smoke",
+   "url": "https://raw.githubusercontent.com/Open-Cascade-SAS/OCCT/3d097a0328e71b826377d4814ab05ec3c3d23871/data/iges/hammer.iges",
+   "sha256": "b62fb4823e109737b56ba2fd18e2d10ecd988776cb16262d59f3e1784feb0a65",
+   "bytes": 1038825,
+   "license": "LGPL-2.1-only WITH OCCT-exception-1.0 (OCCT sample data)",
+   "tests": "IGES trimmed-surface model (type 144 over 128 NURBS), units MM",
+   "entityCensus": {
+    "102": 96,
+    "126": 416,
+    "128": 45,
+    "142": 48,
+    "144": 45,
+    "402": 1
+   },
+   "expected": {
+    "trimmedSurfaces144": 45,
+    "faces": "TBD \u2014 measure with OCC IGESControl_Reader + BRepGProp"
+   },
+   "vc": [
+    "VC-XCH-10"
+   ]
+  },
+  {
+   "id": "as1-oc-214",
+   "format": "step",
+   "tier": "smoke",
+   "reuse": "quality/corpus.json id as1-oc-214",
+   "tests": "AP214 nested assembly, 18 placed parts \u2014 assembly-structure round trip",
+   "vc": [
+    "VC-XCH-04"
+   ]
+  },
+  {
+   "id": "red-cube-blue-cylinder",
+   "format": "step",
+   "tier": "smoke",
+   "reuse": "quality/corpus.json id red-cube-blue-cylinder",
+   "tests": "names + colours through XCAF (currently knownIssues: colors, part-names)",
+   "vc": [
+    "VC-XCH-04"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,14 @@
+[
+ { "command": "set_units", "params": { "units": "mm" } },
+ { "command": "add_sphere", "params": { "radius": 100, "position": [0, 0, 0]}, "as": "tool" },
+ { "command": "create_lamina_material", "params": { "name": "PW_fabric", "form": "woven", "E1": 70000, "E2": 70000, "G12": 5000, "nu12": 0.05,
+   "Xt": 600, "Xc": 570, "Yt": 600, "Yc": 570, "S": 90, "plyThickness": 0.25, "lockingAngle": 40, "warningShear": 30,
+   "source": "illustrative fabric values; only geometry and lockingAngle matter for this plan" } },
+ { "command": "define_rosette", "params": { "name": "Rpole", "origin": [0, 0, 100], "axis0": [1, 0, 0], "normal": [0, 0, 1], "method": "translational" } },
+ { "command": "create_composite_part", "params": { "name": "Dome", "toolSurface": { "entityId": "$tool", "faceNear": [0, 0, 100] }, "rosette": "Rpole" }, "as": "part" },
+ { "command": "add_ply", "params": { "part": "$part", "name": "P1", "material": "PW_fabric", "orientation": 0, "sequence": "S1",
+   "boundary": { "kind": "surface_region", "maxPolarAngleDeg": 90 },
+   "drape": { "method": "kinematic", "seedPoint": [0, 0, 100], "seedDirection": [1, 0, 0], "stepLength": 1.0, "generators": "geodesic" } }, "as": "p1" },
+ { "command": "check_producibility", "params": { "part": "$part", "plies": ["$p1"] } },
+ { "command": "export_flat_patterns_dxf", "params": { "part": "$part", "plies": ["$p1"] } }
+]

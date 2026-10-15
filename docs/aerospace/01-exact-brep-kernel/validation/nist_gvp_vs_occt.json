@@ -1,0 +1,539 @@
+{
+ "$comment": "OCCT 7.9.3 (measure_step_brep.py) vs CAD-written GVP (sibling gap 04 extraction). relDiff > 1e-4 flagged for investigation, not assumed to be an OCCT error.",
+ "rows": [
+  {
+   "file": "nist_ctc_01_asme1_ap242-e1.stp",
+   "lengthUnit": "mm",
+   "gvp": {
+    "volume": 14644822.6361138,
+    "area": 807080.802199914,
+    "centroid": [
+     -2.29264395139875,
+     -1.36345168588643,
+     -32.2974419857648
+    ]
+   },
+   "occt": {
+    "volume": 14644823.305937588,
+    "area": 807080.8219457449,
+    "centroid": [
+     -2.2926444897719387,
+     -1.3634516801922196,
+     -32.29744177870255
+    ]
+   },
+   "volumeRelDiff": 4.5737924230961405e-08,
+   "areaRelDiff": 2.4465742287910283e-08,
+   "centroidAbsDiffMm": 5.383731886965393e-07,
+   "verdict": "agree (<=1e-4 rel)"
+  },
+  {
+   "file": "nist_ctc_02_asme1_ap242-e2.stp",
+   "lengthUnit": "mm",
+   "gvp": {
+    "volume": 47106788.0321802,
+    "area": 2480624.4791306,
+    "centroid": [
+     -0.00415567842900755,
+     358.620787544608,
+     -178.169662485763
+    ]
+   },
+   "occt": {
+    "volume": 45468679.56513147,
+    "area": 2490716.559184648,
+    "centroid": [
+     0.003274642132905713,
+     346.67269057114714,
+     -179.41098118937828
+    ]
+   },
+   "volumeRelDiff": 0.034774361307115254,
+   "areaRelDiff": 0.0040683626800236275,
+   "centroidAbsDiffMm": 11.94809697346085,
+   "verdict": "DISAGREE - investigate (file GVP may be stale or scoped to a shape aspect)"
+  },
+  {
+   "file": "nist_ctc_03_asme1_ap242-e2.stp",
+   "lengthUnit": "mm",
+   "gvp": {
+    "volume": 332122.9076263,
+    "area": 354787.650175344,
+    "centroid": [
+     -118.329746932968,
+     242.86422820302,
+     69.31685776493
+    ]
+   },
+   "occt": {
+    "volume": 332122.9076266054,
+    "area": 354787.6501753441,
+    "centroid": [
+     -118.32974693298678,
+     242.86422820302042,
+     69.31685776613
+    ]
+   },
+   "volumeRelDiff": 9.195860622676855e-13,
+   "areaRelDiff": 1.6406337955873005e-16,
+   "centroidAbsDiffMm": 1.1999929938610876e-09,
+   "verdict": "agree (<=1e-4 rel)"
+  },
+  {
+   "file": "nist_ctc_04_asme1_ap242-e2.stp",
+   "lengthUnit": "mm",
+   "gvp": {
+    "centroid": [
+     -0.0079803627,
+     360.9458561866,
+     -7.8767441293
+    ],
+    "area": 1022497.095954,
+    "volume": 17519780.220394
+   },
+   "occt": {
+    "volume": 17518472.106220625,
+    "area": 1023459.2083351734,
+    "centroid": [
+     -0.014426650894494807,
+     360.94745802203977,
+     -7.876229433149141
+    ]
+   },
+   "volumeRelDiff": 7.466498762652013e-05,
+   "areaRelDiff": 0.0009409438764965427,
+   "centroidAbsDiffMm": 0.006446288194494807,
+   "verdict": "agree (<=1e-4 rel)"
+  },
+  {
+   "file": "nist_ctc_05_asme1_ap242-e1.stp",
+   "lengthUnit": "inch",
+   "gvp": {},
+   "occt": {
+    "volume": 12694917.818574062,
+    "area": 861243.3507515282,
+    "centroid": [
+     -0.004467886790234549,
+     -1.0106187056841376,
+     99.72354966043628
+    ]
+   }
+  },
+  {
+   "file": "nist_ftc_06_asme1_ap242-e2.stp",
+   "lengthUnit": "mm",
+   "gvp": {
+    "volume": 3323556.50526143,
+    "area": 283413.011089723,
+    "centroid": [
+     8.44667839028049e-05,
+     29.008906494,
+     -109.600480952032
+    ]
+   },
+   "occt": {
+    "volume": 3323557.2211351795,
+    "area": 283413.057351207,
+    "centroid": [
+     8.45078655174785e-05,
+     29.00891873677964,
+     -109.60046816559968
+    ]
+   },
+   "volumeRelDiff": 2.153938855342899e-07,
+   "areaRelDiff": 1.632299232076421e-07,
+   "centroidAbsDiffMm": 1.2786432321831853e-05,
+   "verdict": "agree (<=1e-4 rel)"
+  },
+  {
+   "file": "nist_ftc_07_asme1_ap242-e2.stp",
+   "lengthUnit": "mm",
+   "gvp": {
+    "centroid": [
+     0.0302177316,
+     -2.5415861506,
+     0.00138317
+    ],
+    "area": 606.626874,
+    "volume": 105.34209
+   },
+   "occt": {
+    "volume": 1726618.4094427053,
+    "area": 391386.8304113767,
+    "centroid": [
+     0.74998945112339,
+     -64.54377603007887,
+     0.056629945796231956
+    ]
+   },
+   "volumeRelDiff": 0.00021482360075973663,
+   "areaRelDiff": 3.944177262872104e-05,
+   "centroidAbsDiffMm": 0.021497427796231962,
+   "gvpUnitInferred": "inch (volume ratio 16390.6 ~ 25.4^3)",
+   "gvpMm": {
+    "volume": 1726247.5707237597,
+    "area": 391371.39402984,
+    "centroid": [
+     0.76753038264,
+     -64.55628822524,
+     0.035132517999999995
+    ]
+   },
+   "verdict": "DISAGREE - investigate (file GVP may be stale or scoped to a shape aspect)"
+  },
+  {
+   "file": "nist_ftc_08_asme1_ap242-e2.stp",
+   "lengthUnit": "inch",
+   "gvp": {},
+   "occt": {
+    "volume": 503633.02057339705,
+    "area": 191705.94061983464,
+    "centroid": [
+     2.5308735293612483,
+     -0.05917993349383114,
+     25.37954875413247
+    ]
+   }
+  },
+  {
+   "file": "nist_ftc_08_asme1_ap242-e4-tg.stp",
+   "status": "Standard_ConstructionError: Bnd_Box is void"
+  },
+  {
+   "file": "nist_ftc_09_asme1_ap242-e1.stp",
+   "lengthUnit": "mm",
+   "gvp": {},
+   "occt": {
+    "volume": 137066.10869777793,
+    "area": 96761.24488063966,
+    "centroid": [
+     2.444216768552813,
+     1.5154271418827785,
+     4.330124058951723
+    ]
+   }
+  },
+  {
+   "file": "nist_ftc_10_asme1_ap242-e2.stp",
+   "lengthUnit": "mm",
+   "gvp": {},
+   "occt": {
+    "volume": 188171.21837744617,
+    "area": 51244.08088807795,
+    "centroid": [
+     4.786976836355408,
+     14.505224479407268,
+     -0.29674672625857973
+    ]
+   }
+  },
+  {
+   "file": "nist_ftc_11_asme1_ap242-e3.stp",
+   "lengthUnit": "mm",
+   "gvp": {},
+   "occt": {
+    "volume": 5135.058392239693,
+    "area": 5473.599136993476,
+    "centroid": [
+     0.008266784986590137,
+     0.00012391447036452896,
+     -0.35038226066402023
+    ]
+   }
+  },
+  {
+   "file": "nist_stc_06_asme1_ap242-e3.stp",
+   "lengthUnit": "mm",
+   "gvp": {},
+   "occt": {
+    "volume": 3323540.520294126,
+    "area": 283414.45165870804,
+    "centroid": [
+     109.60007546014094,
+     -8.448395405966779e-05,
+     29.008735141817485
+    ]
+   }
+  },
+  {
+   "file": "nist_stc_07_asme1_ap242-e3.stp",
+   "lengthUnit": "mm",
+   "gvp": {},
+   "occt": {
+    "volume": 1726620.2967784407,
+    "area": 391387.00014602556,
+    "centroid": [
+     0.750047996582672,
+     -64.5434692941386,
+     0.05653780124072784
+    ]
+   }
+  },
+  {
+   "file": "nist_stc_08_asme1_ap242-e3.stp",
+   "lengthUnit": "mm",
+   "gvp": {
+    "volume": 503592.175239539,
+    "area": 191687.873141661,
+    "centroid": [
+     2.53109307374693,
+     -0.0591847313749045,
+     25.3789167065934
+    ]
+   },
+   "occt": {
+    "volume": 388154.8232067842,
+    "area": 195094.3172328976,
+    "centroid": [
+     1.9803390075732792,
+     22.83531953216217,
+     23.861368159839426
+    ]
+   },
+   "volumeRelDiff": 0.22922785084546993,
+   "areaRelDiff": 0.017770785576608543,
+   "centroidAbsDiffMm": 22.894504263537076,
+   "verdict": "DISAGREE - investigate (file GVP may be stale or scoped to a shape aspect)"
+  },
+  {
+   "file": "nist_stc_09_asme1_ap242-e4.stp",
+   "lengthUnit": "mm",
+   "gvp": {},
+   "occt": {
+    "volume": 137002.8124019918,
+    "area": 96761.24487959537,
+    "centroid": [
+     2.4118632093161128,
+     1.5157866121943981,
+     4.332091255861658
+    ]
+   }
+  },
+  {
+   "file": "nist_stc_10_asme1_ap242-e2.stp",
+   "lengthUnit": "mm",
+   "gvp": {
+    "volume": 188312.244641244,
+    "area": 48486.2744665371,
+    "centroid": [
+     84.0076805122325,
+     14.6087293037364,
+     37.4990364132354
+    ]
+   },
+   "occt": {
+    "volume": 188312.81476384445,
+    "area": 48486.46282635298,
+    "centroid": [
+     84.00766564045023,
+     14.608746723660374,
+     37.49900523744882
+    ]
+   },
+   "volumeRelDiff": 3.0275386581042796e-06,
+   "areaRelDiff": 3.884806947005011e-06,
+   "centroidAbsDiffMm": 3.117578658162756e-05,
+   "verdict": "agree (<=1e-4 rel)"
+  },
+  {
+   "file": "nist_ctc_01_asme1_rd.stp",
+   "lengthUnit": "mm",
+   "gvp": {},
+   "occt": {
+    "volume": 14642823.568897061,
+    "area": 807968.5577546859,
+    "centroid": [
+     -2.347621267932572,
+     -1.3536833190613324,
+     -32.29852920526425
+    ]
+   }
+  },
+  {
+   "file": "nist_ctc_02_asme1_rc.stp",
+   "lengthUnit": "mm",
+   "gvp": {
+    "area": 2481847.636045,
+    "volume": 47101527.47498,
+    "centroid": [
+     -0.000876966143434,
+     358.6349444541,
+     -178.1588021156
+    ]
+   },
+   "occt": {
+    "volume": 47847994.41949637,
+    "area": 2486260.0067519336,
+    "centroid": [
+     -0.040657234313908185,
+     363.73711522527685,
+     -177.60300306158047
+    ]
+   },
+   "volumeRelDiff": 0.015848041125903906,
+   "areaRelDiff": 0.0017778572072075205,
+   "centroidAbsDiffMm": 5.102170771176873,
+   "verdict": "DISAGREE - investigate (file GVP may be stale or scoped to a shape aspect)"
+  },
+  {
+   "file": "nist_ctc_03_asme1_rc.stp",
+   "lengthUnit": "inch",
+   "gvp": {},
+   "occt": {
+    "volume": 331938.2699998362,
+    "area": 354978.60540151835,
+    "centroid": [
+     -118.20367134685878,
+     242.70162105810283,
+     69.36245904994153
+    ]
+   }
+  },
+  {
+   "file": "nist_ctc_04_asme1_rd.stp",
+   "lengthUnit": "mm",
+   "gvp": {},
+   "occt": {
+    "volume": 17518568.275884874,
+    "area": 1024011.8364119567,
+    "centroid": [
+     -0.01835057041583483,
+     360.9627278433081,
+     -7.87825995339107
+    ]
+   }
+  },
+  {
+   "file": "nist_ctc_05_asme1_rd.stp",
+   "lengthUnit": "inch",
+   "gvp": {
+    "area": 1334.929190494,
+    "volume": 774.6912251592,
+    "centroid": [
+     -0.0001748948720802,
+     -0.03978772720191,
+     3.926126039017
+    ]
+   },
+   "occt": {
+    "volume": 12828990.962436879,
+    "area": 862855.845579028,
+    "centroid": [
+     2.098096424561531,
+     -0.9958026936300081,
+     99.19902363421691
+    ]
+   },
+   "volumeRelDiff": 16559.13460046679,
+   "areaRelDiff": 645.3682506333703,
+   "centroidAbsDiffMm": 95.27289759519991,
+   "verdict": "DISAGREE - investigate (file GVP may be stale or scoped to a shape aspect)"
+  },
+  {
+   "file": "nist_ftc_06_asme1_rd.stp",
+   "lengthUnit": "inch",
+   "gvp": {},
+   "occt": {
+    "volume": 3323546.070780445,
+    "area": 283415.4228714473,
+    "centroid": [
+     8.448372593796222e-05,
+     29.0088382768177,
+     -109.6000727039093
+    ]
+   }
+  },
+  {
+   "file": "nist_ftc_07_asme1_rd.stp",
+   "lengthUnit": "cm",
+   "gvp": {},
+   "occt": {
+    "volume": 1726247.5791699165,
+    "area": 391371.3472783434,
+    "centroid": [
+     0.767526768832027,
+     -64.55627568166527,
+     0.03513163487178356
+    ]
+   }
+  },
+  {
+   "file": "nist_ftc_08_asme1_rc.stp",
+   "lengthUnit": "mm",
+   "gvp": {},
+   "occt": {
+    "volume": 503592.1753531928,
+    "area": 191687.87294412943,
+    "centroid": [
+     2.5310930959127043,
+     -0.059184713306543894,
+     25.37891671048439
+    ]
+   }
+  },
+  {
+   "file": "nist_ftc_09_asme1_rd.stp",
+   "lengthUnit": "inch",
+   "gvp": {
+    "area": 149.7523619055,
+    "volume": 8.326391158987,
+    "centroid": [
+     0.08606042202086,
+     0.05964705664228,
+     0.1793019587974
+    ]
+   },
+   "occt": {
+    "volume": 136445.10482466163,
+    "area": 96614.23380062782,
+    "centroid": [
+     2.185935632036561,
+     1.5150352386525474,
+     4.554269808060527
+    ]
+   },
+   "volumeRelDiff": 9.75300188606727e-11,
+   "areaRelDiff": 6.546207219430344e-11,
+   "centroidAbsDiffMm": 9.127067168712699e-07,
+   "gvpUnitInferred": "inch (volume ratio 16387.1 ~ 25.4^3)",
+   "gvpMm": {
+    "volume": 136445.10481135413,
+    "area": 96614.23380695238,
+    "centroid": [
+     2.185934719329844,
+     1.5150352387139119,
+     4.554269753453959
+    ]
+   },
+   "verdict": "agree (<=1e-4 rel)"
+  },
+  {
+   "file": "nist_ftc_10_asme1_rb.stp",
+   "lengthUnit": "mm",
+   "gvp": {},
+   "occt": {
+    "volume": 188318.0666989932,
+    "area": 48531.23308221566,
+    "centroid": [
+     5.016969089906512,
+     14.610779662821368,
+     0.00981631431418917
+    ]
+   }
+  },
+  {
+   "file": "nist_ftc_11_asme1_rb.stp",
+   "lengthUnit": "mm",
+   "gvp": {},
+   "occt": {
+    "volume": 5129.38613642268,
+    "area": 5474.478682976481,
+    "centroid": [
+     8.588483776705875e-16,
+     5.319318984282348e-15,
+     -0.35126099806956723
+    ]
+   }
+  }
+ ]
+}

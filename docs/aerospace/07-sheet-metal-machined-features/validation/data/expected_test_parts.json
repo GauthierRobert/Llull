@@ -1,0 +1,222 @@
+{
+ "generator": "docs/aerospace/07-sheet-metal-machined-features/validation/generate_test_parts.py",
+ "units": "mm",
+ "licence": "CC0-1.0 (authored for llull)",
+ "tolerance": {
+  "volume_rel": 1e-06
+ },
+ "parts": {
+  "ftr_bracket_L.step": {
+   "params": {
+    "T": 1.6,
+    "R": 4.8,
+    "theta_deg": 90.0,
+    "A_mold": 40.0,
+    "B_mold": 30.0,
+    "W": 50.0
+   },
+   "analytic_volume_mm3": 5279.716754404115,
+   "volume_formula": "W*T*(A+B-2*(R+T)+theta*(R+T/2))  (= W*T*flat length at K=0.5, case FP-04)",
+   "expected_bend_count": 1,
+   "expected_bend_inside_radius_mm": 4.8,
+   "expected_flat_length_by_K": {
+    "0.33": 65.5692028291632,
+    "0.44": 65.8456629826791,
+    "0.5": 65.99645943005142
+   },
+   "expected_flat_extents_mm_K044": [
+    65.8456629826791,
+    50.0
+   ],
+   "occt_volume_mm3": 5279.716754404107,
+   "volume_rel_error": 1.5503582288061946e-15
+  },
+  "ftr_joggle_strip.step": {
+   "params": {
+    "T": 1.6,
+    "R": 1.6,
+    "phi_deg": 20.0,
+    "offset_h": 1.6,
+    "W": 30.0,
+    "L1": 20.0,
+    "L2": 20.0
+   },
+   "analytic_volume_mm3": 2184.347213509194,
+   "volume_formula": "W*T*(L1+L2+s+2*phi*(R+T/2))",
+   "expected_mid_offset_mm": 1.6,
+   "expected_overall_run_mm": 45.24233337852803,
+   "expected_bend_count": 2,
+   "expected_flat_length_K044_mm": 45.44021297149828,
+   "note": "Joggle case JG-01 of expected_flat_pattern.json embedded between two 20 mm flats.",
+   "occt_volume_mm3": 2184.3472135091934,
+   "volume_rel_error": 2.0818455421100576e-16
+  },
+  "ftr_machined_plate.step": {
+   "params": {
+    "block": [
+     100.0,
+     60.0,
+     10.0
+    ]
+   },
+   "analytic_volume_mm3": 55978.529152795934,
+   "volume_formula": "block - sum(hole cylinders + countersink frustum excess + counterbores + pocket prism + drill tip cone)",
+   "countersink_depth_formula": "c = (D - d) / (2 tan(alpha/2))",
+   "expected_features": [
+    {
+     "type": "hole",
+     "subtype": "countersink",
+     "axis_point": [
+      10.0,
+      10.0,
+      10.0
+     ],
+     "axis": [
+      0,
+      0,
+      -1
+     ],
+     "diameter": 4.8,
+     "csk_diameter": 9.0,
+     "csk_angle_deg": 100.0,
+     "csk_depth": 1.762109225472288,
+     "through": true
+    },
+    {
+     "type": "hole",
+     "subtype": "countersink",
+     "axis_point": [
+      90.0,
+      10.0,
+      10.0
+     ],
+     "axis": [
+      0,
+      0,
+      -1
+     ],
+     "diameter": 4.8,
+     "csk_diameter": 9.0,
+     "csk_angle_deg": 100.0,
+     "csk_depth": 1.762109225472288,
+     "through": true
+    },
+    {
+     "type": "hole",
+     "subtype": "countersink",
+     "axis_point": [
+      10.0,
+      50.0,
+      10.0
+     ],
+     "axis": [
+      0,
+      0,
+      -1
+     ],
+     "diameter": 4.8,
+     "csk_diameter": 9.0,
+     "csk_angle_deg": 100.0,
+     "csk_depth": 1.762109225472288,
+     "through": true
+    },
+    {
+     "type": "hole",
+     "subtype": "countersink",
+     "axis_point": [
+      90.0,
+      50.0,
+      10.0
+     ],
+     "axis": [
+      0,
+      0,
+      -1
+     ],
+     "diameter": 4.8,
+     "csk_diameter": 9.0,
+     "csk_angle_deg": 100.0,
+     "csk_depth": 1.762109225472288,
+     "through": true
+    },
+    {
+     "type": "hole",
+     "subtype": "counterbore",
+     "axis_point": [
+      30.0,
+      30.0,
+      10.0
+     ],
+     "axis": [
+      0,
+      0,
+      -1
+     ],
+     "diameter": 5.5,
+     "cbore_diameter": 10.0,
+     "cbore_depth": 5.5,
+     "through": true
+    },
+    {
+     "type": "hole",
+     "subtype": "counterbore",
+     "axis_point": [
+      70.0,
+      30.0,
+      10.0
+     ],
+     "axis": [
+      0,
+      0,
+      -1
+     ],
+     "diameter": 5.5,
+     "cbore_diameter": 10.0,
+     "cbore_depth": 5.5,
+     "through": true
+    },
+    {
+     "type": "pocket",
+     "floor_z": 6.0,
+     "depth": 4.0,
+     "outline": "rounded_rectangle",
+     "size": [
+      40.0,
+      12.0
+     ],
+     "corner_radius": 3.0,
+     "floor_fillet": 0.0,
+     "max_tool_diameter": 6.0
+    },
+    {
+     "type": "hole",
+     "subtype": "simple",
+     "axis_point": [
+      50.0,
+      15.0,
+      10.0
+     ],
+     "axis": [
+      0,
+      0,
+      -1
+     ],
+     "diameter": 6.0,
+     "depth": 6.0,
+     "through": false,
+     "drill_point_angle_deg": 118.0,
+     "tip_height": 1.8025818570826808
+    }
+   ],
+   "expected_counts": {
+    "holes": 7,
+    "countersink": 4,
+    "counterbore": 2,
+    "blind": 1,
+    "pockets": 1
+   },
+   "occt_volume_mm3": 55978.52915279587,
+   "volume_rel_error": 1.1697988410683376e-15
+  }
+ }
+}

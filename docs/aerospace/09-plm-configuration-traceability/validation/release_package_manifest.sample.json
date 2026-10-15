@@ -1,0 +1,77 @@
+{
+  "schema": "llull-release-manifest/0.1",
+  "item": {
+    "partNumber": "LL-1001",
+    "name": "Bracket, hinge fitting",
+    "revision": "A",
+    "iteration": 2
+  },
+  "lifecycleState": "released",
+  "change": {
+    "eco": "ECO-0001",
+    "classification": "initial-release"
+  },
+  "effectivity": [
+    {
+      "kind": "serial",
+      "from": 1,
+      "to": null
+    }
+  ],
+  "baseline": {
+    "id": "BL-PBL-0001",
+    "kind": "product"
+  },
+  "marking": {
+    "exportControl": "NLR-EXAMPLE",
+    "notice": "Example marking only; classification is a user/legal decision"
+  },
+  "releasedAt": "2026-11-02T09:30:00Z",
+  "releasedBy": {
+    "userId": "u-0007",
+    "name": "J. Example",
+    "role": "design-authority"
+  },
+  "members": [
+    {
+      "path": "model/LL-1001_A.llull.json",
+      "role": "native-definition",
+      "mediaType": "application/json",
+      "canonical": true,
+      "sha256": "d3f3a4fa201f96bc92d660646b40a19af92ee7b8eb211957a24e65a02880703f",
+      "bytes": 966
+    },
+    {
+      "path": "drawings/LL-1001_A_sheet1.svg",
+      "role": "drawing",
+      "mediaType": "image/svg+xml",
+      "canonical": false,
+      "sha256": "f087c7779e10c0328ca78eb8385c6c976d68818cc4d6a107bac47324e3db610b",
+      "bytes": 140
+    }
+  ],
+  "documentContentHash": "d3f3a4fa201f96bc92d660646b40a19af92ee7b8eb211957a24e65a02880703f",
+  "tool": {
+    "name": "llull",
+    "version": "TBD",
+    "kernel": "occt",
+    "schemaVersion": 2
+  },
+  "manifestSha256": "5cf710ffa62c6501613d704f1197e445a95a3027457152edf94cbd08b4af3d81",
+  "signatures": [
+    {
+      "alg": "Ed25519",
+      "keyId": "rfc8032-test-1",
+      "publicKey": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+      "meaning": "approval",
+      "signedAt": "2026-11-02T09:30:00Z",
+      "signer": {
+        "userId": "u-0007",
+        "name": "J. Example"
+      },
+      "signedContent": "UTF-8 canonical JSON of the manifest without manifestSha256 and signatures",
+      "signature": "f132e6dc8a3e2ad0e4a656a833a40eee9ab2bf7d2b98f80aefd5a11125b63edd33b883e836af024d34ebc90f1366fb77474667d90dc00747b9b39d76d6c77c0c",
+      "WARNING": "RFC 8032 public TEST 1 key - test only, never trust in production"
+    }
+  ]
+}

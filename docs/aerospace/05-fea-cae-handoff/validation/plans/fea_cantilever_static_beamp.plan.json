@@ -1,0 +1,120 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    1,
+    1,
+    8
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "anchor": "min"
+  },
+  "as": "beam"
+ },
+ {
+  "command": "create_material",
+  "params": {
+   "name": "steel_E210",
+   "density": 0.0078,
+   "color": "#9aa0a6",
+   "metalness": 1,
+   "roughness": 0.4,
+   "elastic": {
+    "youngsModulusPa": 210000000000.0,
+    "poissonRatio": 0.3
+   }
+  }
+ },
+ {
+  "command": "assign_material",
+  "params": {
+   "materialName": "steel_E210",
+   "entityIds": [
+    "$beam"
+   ]
+  }
+ },
+ {
+  "command": "create_analysis",
+  "params": {
+   "name": "beamp_static",
+   "analysisType": "static",
+   "unitSystem": "N-mm-t-s",
+   "solver": "calculix"
+  },
+  "as": "an"
+ },
+ {
+  "command": "set_part_idealization",
+  "params": {
+   "analysisId": "$an",
+   "entityId": "$beam",
+   "idealization": "solid"
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$an",
+   "name": "root",
+   "kind": "fixed",
+   "target": {
+    "entityId": "$beam",
+    "facesNear": [
+     [
+      0.5,
+      0.5,
+      0
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "add_fea_load",
+  "params": {
+   "analysisId": "$an",
+   "name": "tip",
+   "kind": "force",
+   "loadCase": "LC1",
+   "category": "limit",
+   "target": {
+    "entityId": "$beam",
+    "facesNear": [
+     [
+      0.5,
+      0.5,
+      8
+     ]
+    ]
+   },
+   "vector": [
+    0,
+    9,
+    0
+   ],
+   "distribution": "total"
+  }
+ },
+ {
+  "command": "set_mesh_controls",
+  "params": {
+   "analysisId": "$an",
+   "mesher": "gmsh",
+   "elementFamily": "tet",
+   "order": 2,
+   "globalSize": 0.25
+  }
+ }
+]

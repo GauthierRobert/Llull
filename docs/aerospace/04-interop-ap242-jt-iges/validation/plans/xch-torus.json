@@ -1,0 +1,23 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_torus",
+  "params": {
+   "ringRadius": 30.0,
+   "tubeRadius": 5.0
+  },
+  "as": "part"
+ },
+ {
+  "command": "set_entity_name",
+  "params": {
+   "id": "$part",
+   "name": "xch-torus"
+  }
+ }
+]

@@ -1,0 +1,316 @@
+[
+ {
+  "file": "nist_ctc_01_asme1_ap242.stp",
+  "solids": 1,
+  "volume_mm3": 14644823.306,
+  "bbox_mm": [
+   -400.0,
+   -225.0,
+   -100.0,
+   400.0,
+   225.0,
+   50.0
+  ],
+  "face_types": {
+   "cone": 4,
+   "cylinder": 57,
+   "plane": 56
+  },
+  "cylinder_radii_mm": {
+   "5.0": 6,
+   "10.0": 22,
+   "12.5": 8,
+   "17.5": 8,
+   "20.0": 2,
+   "25.0": 4,
+   "50.0": 7
+  },
+  "cone_semi_angles_deg": {
+   "59.0": 4
+  },
+  "cone_adjacency": {
+   "semi=59.0 neighbours=10.0+cone": 4
+  },
+  "distinct_cone_apexes_by_semi_angle": {
+   "59.0": 2
+  }
+ },
+ {
+  "file": "nist_ctc_02_asme1_ap242.stp",
+  "solids": 1,
+  "volume_mm3": 45468679.565,
+  "bbox_mm": [
+   -340.012,
+   -40.003,
+   -360.003,
+   340.012,
+   820.003,
+   40.163
+  ],
+  "face_types": {
+   "bspline": 34,
+   "cone": 158,
+   "cylinder": 314,
+   "plane": 107,
+   "sphere": 24
+  },
+  "cylinder_radii_mm": {
+   "4.19": 84,
+   "5.05": 60,
+   "6.0": 8,
+   "8.0": 6,
+   "10.0": 60,
+   "11.0": 12,
+   "15.0": 4,
+   "18.0": 6,
+   "20.0": 4,
+   "25.0": 32,
+   "26.0": 4,
+   "30.0": 12,
+   "37.5": 4,
+   "50.0": 4,
+   "57.5": 8,
+   "60.0": 6
+  },
+  "cone_semi_angles_deg": {
+   "3.0": 10,
+   "59.0": 148
+  },
+  "cone_adjacency": {
+   "semi=3.0 neighbours=bspline+cone+plane": 4,
+   "semi=3.0 neighbours=bspline+plane": 6,
+   "semi=59.0 neighbours=4.19+cone": 84,
+   "semi=59.0 neighbours=5.05+cone": 60,
+   "semi=59.0 neighbours=6.0+cone": 4
+  },
+  "distinct_cone_apexes_by_semi_angle": {
+   "3.0": 8,
+   "59.0": 74
+  }
+ },
+ {
+  "file": "nist_ctc_03_asme1_ap242.stp",
+  "solids": 1,
+  "volume_mm3": 332122.908,
+  "bbox_mm": [
+   -266.107,
+   -13.259,
+   -0.0,
+   53.402,
+   520.3,
+   162.69
+  ],
+  "face_types": {
+   "cylinder": 58,
+   "plane": 62
+  },
+  "cylinder_radii_mm": {
+   "2.3813": 8,
+   "5.5626": 8,
+   "6.35": 13,
+   "7.9375": 8,
+   "8.2575": 7,
+   "9.525": 4,
+   "12.7": 4,
+   "13.5255": 2,
+   "19.05": 2,
+   "25.4": 2
+  },
+  "cone_semi_angles_deg": {},
+  "cone_adjacency": {},
+  "distinct_cone_apexes_by_semi_angle": {}
+ },
+ {
+  "file": "nist_ctc_04_asme1_ap242.stp",
+  "solids": 1,
+  "volume_mm3": 17518472.106,
+  "bbox_mm": [
+   -250.0,
+   -0.0,
+   -121.964,
+   250.0,
+   780.0,
+   40.0
+  ],
+  "face_types": {
+   "cone": 116,
+   "cylinder": 228,
+   "plane": 89,
+   "sphere": 22,
+   "torus": 29
+  },
+  "cylinder_radii_mm": {
+   "2.5": 2,
+   "3.325": 24,
+   "4.0": 16,
+   "5.0": 77,
+   "5.1": 8,
+   "6.0": 8,
+   "6.05": 4,
+   "7.0": 60,
+   "10.0": 8,
+   "12.5": 2,
+   "13.0": 8,
+   "25.0": 9,
+   "30.0": 2
+  },
+  "cone_semi_angles_deg": {
+   "45.0": 72,
+   "59.0": 44
+  },
+  "cone_adjacency": {
+   "semi=45.0 neighbours=5.0+plane": 12,
+   "semi=45.0 neighbours=7.0+cone+plane": 60,
+   "semi=59.0 neighbours=3.325+cone": 24,
+   "semi=59.0 neighbours=5.1+cone": 8,
+   "semi=59.0 neighbours=6.0+cone": 8,
+   "semi=59.0 neighbours=6.05+cone": 4
+  },
+  "distinct_cone_apexes_by_semi_angle": {
+   "45.0": 42,
+   "59.0": 22
+  }
+ },
+ {
+  "file": "nist_ctc_05_asme1_ap242.stp",
+  "solids": 1,
+  "volume_mm3": 12694917.819,
+  "bbox_mm": [
+   -263.527,
+   -279.402,
+   -0.002,
+   263.527,
+   279.402,
+   482.602
+  ],
+  "face_types": {
+   "bspline": 4,
+   "cone": 13,
+   "cylinder": 67,
+   "plane": 62,
+   "sphere": 4,
+   "torus": 6
+  },
+  "cylinder_radii_mm": {
+   "0.4146": 1,
+   "0.5399": 1,
+   "1.0926": 1,
+   "1.4104": 1,
+   "1.4166": 1,
+   "3.261": 1,
+   "3.5171": 1,
+   "3.9688": 4,
+   "4.1957": 1,
+   "4.5467": 1,
+   "4.5683": 1,
+   "5.3581": 6,
+   "6.35": 15,
+   "9.525": 10,
+   "19.05": 12,
+   "31.75": 1,
+   "127.0": 2,
+   "152.4": 1,
+   "203.2": 4,
+   "279.4": 2
+  },
+  "cone_semi_angles_deg": {
+   "45.0": 3,
+   "59.0": 10
+  },
+  "cone_adjacency": {
+   "semi=45.0 neighbours=127.0+plane": 1,
+   "semi=45.0 neighbours=152.4+plane": 1,
+   "semi=45.0 neighbours=31.75+plane": 1,
+   "semi=59.0 neighbours=3.9688": 4,
+   "semi=59.0 neighbours=5.3581": 6
+  },
+  "distinct_cone_apexes_by_semi_angle": {
+   "45.0": 3,
+   "59.0": 10
+  }
+ },
+ {
+  "file": "ftr_bracket_L.step",
+  "solids": 1,
+  "volume_mm3": 5279.717,
+  "bbox_mm": [
+   -0.0,
+   -0.0,
+   -0.0,
+   40.0,
+   50.0,
+   30.0
+  ],
+  "face_types": {
+   "cylinder": 2,
+   "plane": 8
+  },
+  "cylinder_radii_mm": {
+   "4.8": 1,
+   "6.4": 1
+  },
+  "cone_semi_angles_deg": {},
+  "cone_adjacency": {},
+  "distinct_cone_apexes_by_semi_angle": {}
+ },
+ {
+  "file": "ftr_joggle_strip.step",
+  "solids": 1,
+  "volume_mm3": 2184.347,
+  "bbox_mm": [
+   -0.0,
+   -0.0,
+   -0.8,
+   45.242,
+   30.0,
+   2.4
+  ],
+  "face_types": {
+   "cylinder": 4,
+   "plane": 10
+  },
+  "cylinder_radii_mm": {
+   "1.6": 2,
+   "3.2": 2
+  },
+  "cone_semi_angles_deg": {},
+  "cone_adjacency": {},
+  "distinct_cone_apexes_by_semi_angle": {}
+ },
+ {
+  "file": "ftr_machined_plate.step",
+  "solids": 1,
+  "volume_mm3": 55978.529,
+  "bbox_mm": [
+   -0.0,
+   -0.0,
+   -0.0,
+   100.0,
+   60.0,
+   10.0
+  ],
+  "face_types": {
+   "cone": 5,
+   "cylinder": 13,
+   "plane": 33
+  },
+  "cylinder_radii_mm": {
+   "2.4": 4,
+   "2.75": 2,
+   "3.0": 5,
+   "5.0": 2
+  },
+  "cone_semi_angles_deg": {
+   "50.0": 4,
+   "59.0": 1
+  },
+  "cone_adjacency": {
+   "semi=50.0 neighbours=2.4+plane": 4,
+   "semi=59.0 neighbours=3.0": 1
+  },
+  "distinct_cone_apexes_by_semi_angle": {
+   "50.0": 4,
+   "59.0": 1
+  }
+ }
+]

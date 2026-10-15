@@ -1,0 +1,209 @@
+{
+  "$comment": "XCH validation cases: expected value, tolerance, unit, source/derivation. Values are (a) quoted from a pinned file (nist_pmi_gvp_reference.json, xch_corpus.json), (b) analytic (analytic_gvp_reference.json, generate_analytic_gvp.py), or (c) TBD with the tool that measures them. Tolerance policy: validation/README.md section 3.",
+  "tolerancePolicy": {
+    "sameKernelRoundTrip": { "volumeRel": 1e-9, "areaRel": 1e-9, "centroidAbsPerBboxDiag": 1e-9, "derivation": "OCC writes and reads back the same B-rep; only decimal serialization of REAL values intervenes (llull TR-XCH-05 requires >= 15 significant digits)" },
+    "analyticVsExactKernel": { "volumeRel": 1e-6, "areaRel": 1e-6, "centroidAbsPerBboxDiag": 1e-6, "derivation": "exact analytic surfaces; residual is BRepGProp numerical integration error" },
+    "importVsEmbeddedGvp": {
+      "green": { "volumeRel": 1e-3, "areaRel": 1e-3, "centroidAbsPerBboxDiag": 1e-3 },
+      "yellow": { "volumeRel": 1e-2, "areaRel": 1e-2, "centroidAbsMm": 1.0 },
+      "derivation": "yellow bound = Dassault Systemes CATIA STEP import default (volume and area ratio < 1 %, centroid deviation < 1 mm), [R14]; green bound chosen one order tighter and checked against the observed cross-CAD spread of NIST CTC-02 (VC-XCH-06: 1.12e-4 volume, 4.93e-4 area). CAx-IF three-tier green/yellow/red reporting [R13]."
+    },
+    "tessellatedVsExact": { "volumeRel": 5e-3, "areaRel": 5e-3, "derivation": "COULD-level heuristic; a faceted body under-estimates curved volume; replace with a chord-tolerance-derived bound once VC-XCH-09 is measured" }
+  },
+  "cases": [
+    {
+      "id": "VC-XCH-01",
+      "title": "AP242 exact export -> re-import (same kernel) preserves volume, area, centroid, bbox of 9 analytic parts",
+      "proves": ["FR-XCH-01", "FR-XCH-02", "TR-XCH-01", "TR-XCH-05"],
+      "input": "analytic_gvp_reference.json (all cases) built from plans/*.json",
+      "expected": "per case in analytic_gvp_reference.json",
+      "tolerance": "analyticVsExactKernel for model vs analytic; sameKernelRoundTrip for exported vs re-imported",
+      "unit": "document unit (mm, except xch-inch-box in inch)",
+      "source": "analytic (closed form; derivation per case)"
+    },
+    {
+      "id": "VC-XCH-02",
+      "title": "Exported AP242 file carries one 'geometric validation property' set per solid with volume, surface area, centre point equal to the model",
+      "proves": ["FR-XCH-03", "TR-XCH-06"],
+      "input": "export of plans/xch-plate-offset-hole.json",
+      "expected": { "volume": 113716.81469282041, "area": 19028.31853071796, "centroid": [-1.3813228334244487, 0.0, 0.0] },
+      "tolerance": "analyticVsExactKernel",
+      "unit": "mm, mm^2, mm",
+      "checker": "extract_validation_properties.py (independent of OCC) and NIST SFA validation-properties report",
+      "source": "analytic: V = abt - pi r^2 t; A = 2(ab+bt+ta) - 2 pi r^2 + 2 pi r t; cx = -(pi r^2 t * 25)/V with a=100, b=60, t=20, r=10"
+    },
+    {
+      "id": "VC-XCH-03",
+      "title": "Header and schema conformance of llull AP242 output",
+      "proves": ["FR-XCH-01", "TR-XCH-04"],
+      "expected": {
+        "fileSchemaStartsWith": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF",
+        "sfaSyntaxErrors": 0,
+        "fileNameOriginatingSystem": "contains 'llull'",
+        "fileDescriptionImplementationLevel": "2;1"
+      },
+      "source": "AP242 MIM long-form schema name as written in every NIST AP242 file (nist_pmi_gvp_reference.json fileSchema); implementation level '2;1' as in the NIST FTC-09 header; SFA checks syntax [R10]"
+    },
+    {
+      "id": "VC-XCH-04",
+      "title": "Assembly structure round trip",
+      "proves": ["FR-XCH-04", "TR-XCH-07"],
+      "input": ["plans/xch-assembly-2x.json", "quality corpus as1-oc-214", "quality corpus red-cube-blue-cylinder"],
+      "expected": {
+        "xch-assembly-2x": { "products": 1, "instances": 2, "assemblyVolume": 2000.0, "assemblyCentroid": [50.0, 0.0, 0.0] },
+        "as1-oc-214": { "placedParts": 18 },
+        "red-cube-blue-cylinder": { "parts": 2, "namesPreserved": true, "coloursPreserved": true }
+      },
+      "tolerance": "counts exact; geometry sameKernelRoundTrip",
+      "source": "analytic for xch-assembly-2x; part count from quality/corpus.json description of as1-oc-214; red-cube-blue-cylinder description in quality/corpus.json"
+    },
+    {
+      "id": "VC-XCH-05",
+      "title": "Import of NIST AP242 parts: recomputed GVP vs embedded GVP",
+      "proves": ["FR-XCH-05", "FR-XCH-06", "TR-XCH-08"],
+      "input": "xch_corpus.json NIST entries with GVP",
+      "expected": {
+        "nist_ctc_01_asme1_ap242-e1.stp": { "volume": 14644822.6361138, "area": 807080.802199914, "centroid": [-2.29264395139875, -1.36345168588643, -32.2974419857648], "unit": "mm" },
+        "nist_ctc_02_asme1_ap242-e2.stp": { "volume": 47106788.0321802, "area": 2480624.4791306, "centroid": [-0.00415567842900755, 358.620787544608, -178.169662485763], "unit": "mm" },
+        "nist_ctc_03_asme1_ap242-e2.stp": { "volume": 332122.9076263, "area": 354787.650175344, "centroid": [-118.329746932968, 242.86422820302, 69.31685776493], "unit": "mm" },
+        "nist_ctc_04_asme1_ap242-e2.stp": { "volume": 17519780.220394, "area": 1022497.095954, "centroid": [-0.0079803627, 360.9458561866, -7.8767441293], "bbox": [-250.0, 0.0, -100.5734088324, 250.0, 780.0, 30.0], "unit": "mm" },
+        "nist_ftc_06_asme1_ap242-e2.stp": { "volume": 3323556.50526143, "area": 283413.011089723, "centroid": [8.44667839028049e-05, 29.008906494, -109.600480952032], "unit": "mm" },
+        "nist_stc_08_asme1_ap242-e3.stp": { "volume": 503592.175239539, "area": 191687.873141661, "centroid": [2.53109307374693, -0.0591847313749045, 25.3789167065934], "unit": "mm" },
+        "nist_stc_10_asme1_ap242-e2.stp": { "volume": 188312.244641244, "area": 48486.2744665371, "centroid": [84.0076805122325, 14.6087293037364, 37.4990364132354], "unit": "mm" },
+        "nist_stc_06_asme1_ap242-e3.stp": { "gvp": "all-zero placeholder: reported as 'not checkable', import must succeed" }
+      },
+      "tolerance": "importVsEmbeddedGvp (green expected; yellow = warning, red = failure)",
+      "source": "values written by the originating CAD systems in the pinned NIST files (nist_pmi_gvp_reference.json). 'area' = 'wetted area measure' or 'surface area measure' of the solid; independent-surface areas are compared separately."
+    },
+    {
+      "id": "VC-XCH-06",
+      "title": "Cross-CAD variance baseline: same NIST CTC-02 part exported by two CAD systems (AP203 vs AP242)",
+      "proves": ["FR-XCH-06"],
+      "expected": {
+        "volumeRelDiff": 1.1168549051822634e-4,
+        "solidAreaRelDiff": -4.928412593244942e-4,
+        "centroidDistanceMm": 0.018141545708500635
+      },
+      "tolerance": "exact reproduction of these numbers from the pinned files (1e-12 rel); all three must sit inside the green band of importVsEmbeddedGvp",
+      "source": "computed from nist_ctc_02_asme1_rc.stp (AP203: V 47101527.47498, solid area 2481847.636045, centroid [-0.000876966143434, 358.6349444541, -178.1588021156]) and nist_ctc_02_asme1_ap242-e2.stp (values in VC-XCH-05)"
+    },
+    {
+      "id": "VC-XCH-07",
+      "title": "Semantic PMI import completeness (AP242 -> llull PMI model of gap 03)",
+      "proves": ["FR-XCH-07", "TR-XCH-09"],
+      "input": "nist_ctc_01..05, nist_ftc_06, nist_stc_06, nist_stc_08 AP242 files",
+      "expected": {
+        "nist_ctc_01_asme1_ap242-e1.stp": { "DATUM": 3, "DATUM_FEATURE": 3, "DATUM_SYSTEM": 2, "DIMENSIONAL_SIZE": 9, "DIMENSIONAL_LOCATION": 2, "ANGULAR_LOCATION": 1, "GEOMETRIC_TOLERANCE": 4, "FLATNESS_TOLERANCE": 1, "PERPENDICULARITY_TOLERANCE": 1, "POSITION_TOLERANCE": 2, "SURFACE_PROFILE_TOLERANCE": 2, "TESSELLATED_ANNOTATION_OCCURRENCE": 23 },
+        "other files": "entityCensus in nist_pmi_gvp_reference.json"
+      },
+      "tolerance": "every census record is either mapped to a llull PMI object or listed in the import report as unsupported (no silent drop); mapped count = census count",
+      "source": "entity census computed by extract_validation_properties.py from the pinned files; cross-check against the NIST SFA semantic PMI report which colour-codes expected PMI (README.txt in the NIST archive)"
+    },
+    {
+      "id": "VC-XCH-08",
+      "title": "Semantic PMI export round trip (llull GD&T -> AP242 -> llull)",
+      "proves": ["FR-XCH-08", "TR-XCH-10"],
+      "expected": "TBD — depends on gap 03 (GDT) PMI model; acceptance: re-imported PMI equal to authored PMI, SFA semantic PMI report without errors",
+      "source": "CAx-IF Recommended Practices for the Representation and Presentation of PMI (AP242) v4.1 [R12]"
+    },
+    {
+      "id": "VC-XCH-09",
+      "title": "AP242 tessellated part geometry import (no B-rep)",
+      "proves": ["FR-XCH-09", "TR-XCH-11"],
+      "input": "nist_ftc_08_asme1_ap242-e4-tg.stp",
+      "expected": { "tessellatedSolids": 1, "tessellatedShells": 1, "nonEmptyMesh": true, "triangleCount": "TBD — measure with OCC read.step.tessellated=1", "volumeVsExactFtc08": "TBD — compare with nist_ftc_08_asme1_ap242-e2.stp B-rep volume (TBD — measure with OCC)" },
+      "tolerance": "tessellatedVsExact",
+      "source": "entityCensus of the pinned file (TESSELLATED_SOLID 1, TESSELLATED_SHELL 1); NIST README.txt states this file uses tessellated surfaces instead of exact B-rep"
+    },
+    {
+      "id": "VC-XCH-10",
+      "title": "IGES import (OCCT sample trimmed-surface models)",
+      "proves": ["FR-XCH-10", "TR-XCH-12"],
+      "expected": {
+        "occt-bearing-iges": { "trimmedSurfaceEntities144": 213, "facesAfterImport": ">= 213 (TBD exact — measure with OCC)", "area": "TBD — measure with OCC IGESControl_Reader + BRepGProp" },
+        "occt-hammer-iges": { "trimmedSurfaceEntities144": 45, "facesAfterImport": ">= 45 (TBD exact — measure with OCC)", "area": "TBD — measure with OCC IGESControl_Reader + BRepGProp" }
+      },
+      "source": "entity census of the pinned files (xch_corpus.json); OCC IGES user guide: one face per type-144 root [R7]"
+    },
+    {
+      "id": "VC-XCH-11",
+      "title": "IGES 5.3 export round trip (BRep mode) of analytic parts",
+      "proves": ["FR-XCH-11", "TR-XCH-13"],
+      "input": "plans/xch-plate-offset-hole.json, plans/xch-l-bracket.json",
+      "expected": "analytic_gvp_reference.json values for those cases",
+      "tolerance": "analyticVsExactKernel (IGES carries exact NURBS/analytic surfaces; solids rebuilt by sewing on re-import)",
+      "source": "analytic; OCC IGES writer conforms to IGES 5.3 [R7]"
+    },
+    {
+      "id": "VC-XCH-12",
+      "title": "Units: inch documents and inch files",
+      "proves": ["FR-XCH-12", "TR-XCH-14"],
+      "expected": {
+        "xch-inch-box exported then imported into a mm document": { "volume_mm3": 131096.512, "area_mm2": 18064.48, "centroid_mm": [0.0, 0.0, 12.7] },
+        "nist_ctc_05_asme1_rd.stp imported into a mm document": { "volume_mm3": 12694914.68692222, "area_mm2": 861242.9165391091, "centroid_mm": [-0.00444232975083708, -1.0106082709285138, 99.72360139103179] }
+      },
+      "tolerance": "analyticVsExactKernel for xch-inch-box; importVsEmbeddedGvp for CTC-05",
+      "source": "25.4 mm per inch exactly; xch-inch-box: V = 8 in^3 * 25.4^3, A = 28 in^2 * 25.4^2; CTC-05 embedded GVP (V 774.6912251592 in^3, solid area 1334.929190494 in^2, centroid [-0.0001748948720802, -0.03978772720191, 3.926126039017] in) * 25.4^k"
+    },
+    {
+      "id": "VC-XCH-13",
+      "title": "LOTAR-style archive package: ingest verification and retrieval re-verification",
+      "proves": ["FR-XCH-13", "FR-XCH-14", "TR-XCH-15"],
+      "input": "plans/xch-l-bracket.json",
+      "expected": { "manifestSha256MatchesFile": true, "gvpRecheckOnRetrieval": { "volume": 56000.0, "area": 14800.0, "centroid": [25.0, 20.0, 20.0] }, "verificationReport": "pass" },
+      "tolerance": "sameKernelRoundTrip on retrieval; sha256 exact",
+      "source": "analytic (L-bracket); verification principle of EN 9300-110 level-1 validation properties (volume, centroid, area) per LOTAR overview [R17]"
+    },
+    {
+      "id": "VC-XCH-14",
+      "title": "Robustness: hostile or truncated inputs",
+      "proves": ["FR-XCH-15", "TR-XCH-16"],
+      "expected": { "truncatedStep": "no-op + summary '<cmd> rejected: ...', no crash", "binaryGarbage": "no-op", "oversize": "rejected before parse", "zeroGvp": "import succeeds, GVP reported 'not checkable'" },
+      "source": "llull L1 contract (invalid input => unchanged document + summary)"
+    },
+    {
+      "id": "VC-XCH-15",
+      "title": "JT import (visualization, COULD)",
+      "proves": ["FR-XCH-16"],
+      "expected": "TBD — no openly licensed ISO 14306 sample pinned; requires a JT reader decision (TECHNICAL_SPEC open question Q2)",
+      "source": "ISO 14306 catalogue [R5]"
+    },
+    {
+      "id": "VC-XCH-16",
+      "title": "QIF 3.0 export of characteristics (COULD, V2)",
+      "proves": ["FR-XCH-17"],
+      "expected": "TBD — output validates against the QIF 3.0 XSD from qifstandards.org; characteristic count = llull PMI tolerance count",
+      "source": "ISO 23952:2020 / QIF 3.0 [R6]"
+    },
+    {
+      "id": "VC-XCH-17",
+      "title": "Independent checker in the loop",
+      "proves": ["FR-XCH-18", "TR-XCH-17"],
+      "expected": "every llull-written AP242 file of VC-XCH-01..04 analysed by NIST SFA: 0 syntax errors, GVP report lists each solid; semantic PMI report (VC-XCH-08) without errors",
+      "source": "NIST SFA README [R10]"
+    },
+    {
+      "id": "VC-XCH-18",
+      "title": "Layers, material name and density survive AP242 round trip",
+      "proves": ["FR-XCH-19"],
+      "input": "plans/xch-plate-offset-hole.json + create_material/assign_material (density 0.00785 g/mm^3, layer 'STRUCTURE')",
+      "expected": { "materialName": "preserved", "density_g_per_mm3": 0.00785, "mass_g": 892.6769953386402, "layer": "STRUCTURE" },
+      "tolerance": "density exact (decimal), mass analyticVsExactKernel",
+      "source": "analytic: mass = V * rho = 113716.81469282041 mm^3 * 0.00785 g/mm^3; OCC XDE exports/imports material name, description, density [R8]"
+    },
+    {
+      "id": "VC-XCH-19",
+      "title": "AP242 composites and kinematics mapping (COULD, V2)",
+      "proves": ["FR-XCH-20"],
+      "expected": "TBD — test files to be selected from CAx-IF composite / kinematics test rounds once accessible; depends on gaps 06 CMP and llull joints",
+      "source": "CAx-IF Composite Materials RP v4.4, AP242 XML Kinematics RP v1.3 [R15]"
+    },
+    {
+      "id": "VC-XCH-20",
+      "title": "Surface parity and offline operation",
+      "proves": ["FR-XCH-21", "FR-XCH-22", "TR-XCH-03"],
+      "expected": { "uiCliMcpSameData": "data of export_step_ap242 / verify_exchange_file identical (after timestamp param) whether called by store.dispatch, llull CLI --doc, or MCP", "networkCalls": 0 },
+      "source": "llull architecture L1/L5/L6, KI6"
+    }
+  ]
+}

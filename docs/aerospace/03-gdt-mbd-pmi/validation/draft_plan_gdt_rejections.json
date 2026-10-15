@@ -1,0 +1,230 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    120,
+    80,
+    12
+   ],
+   "anchor": "min"
+  },
+  "as": "plate"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 3.3,
+   "height": 30,
+   "position": [
+    20,
+    20,
+    6
+   ]
+  },
+  "as": "h0"
+ },
+ {
+  "command": "boolean",
+  "params": {
+   "op": "subtract",
+   "a": "$plate",
+   "b": "$h0"
+  },
+  "as": "p0"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 3.3,
+   "height": 30,
+   "position": [
+    100,
+    20,
+    6
+   ]
+  },
+  "as": "h1"
+ },
+ {
+  "command": "boolean",
+  "params": {
+   "op": "subtract",
+   "a": "$p0",
+   "b": "$h1"
+  },
+  "as": "p1"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 3.3,
+   "height": 30,
+   "position": [
+    20,
+    60,
+    6
+   ]
+  },
+  "as": "h2"
+ },
+ {
+  "command": "boolean",
+  "params": {
+   "op": "subtract",
+   "a": "$p1",
+   "b": "$h2"
+  },
+  "as": "p2"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 3.3,
+   "height": 30,
+   "position": [
+    100,
+    60,
+    6
+   ]
+  },
+  "as": "h3"
+ },
+ {
+  "command": "boolean",
+  "params": {
+   "op": "subtract",
+   "a": "$p2",
+   "b": "$h3"
+  },
+  "as": "p3"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 10,
+   "height": 30,
+   "position": [
+    60,
+    40,
+    6
+   ]
+  },
+  "as": "bore"
+ },
+ {
+  "command": "boolean",
+  "params": {
+   "op": "subtract",
+   "a": "$p3",
+   "b": "$bore"
+  },
+  "as": "part"
+ },
+ {
+  "command": "add_datum_feature",
+  "params": {
+   "label": "A",
+   "entityId": "$part",
+   "facesNear": [
+    [
+     30,
+     10,
+     0
+    ]
+   ]
+  }
+ },
+ {
+  "command": "add_datum_feature",
+  "params": {
+   "label": "A",
+   "entityId": "$part",
+   "facesNear": [
+    [
+     60,
+     0,
+     6
+    ]
+   ]
+  }
+ },
+ {
+  "command": "add_geometric_tolerance",
+  "params": {
+   "characteristic": "position",
+   "entityId": "$part",
+   "facesNear": [
+    [
+     16.7,
+     20,
+     6
+    ]
+   ],
+   "zone": {
+    "value": 0.3,
+    "diametral": true
+   },
+   "datums": [
+    {
+     "label": "D"
+    }
+   ]
+  }
+ },
+ {
+  "command": "add_geometric_tolerance",
+  "params": {
+   "characteristic": "flatness",
+   "entityId": "$part",
+   "facesNear": [
+    [
+     30,
+     10,
+     0
+    ]
+   ],
+   "zone": {
+    "value": 0.05
+   },
+   "materialCondition": "MMC"
+  }
+ },
+ {
+  "command": "add_geometric_tolerance",
+  "params": {
+   "characteristic": "flatness",
+   "entityId": "$part",
+   "facesNear": [
+    [
+     30,
+     10,
+     0
+    ]
+   ],
+   "zone": {
+    "value": 0
+   }
+  }
+ },
+ {
+  "command": "add_datum_feature",
+  "params": {
+   "label": "B",
+   "entityId": "$part",
+   "facesNear": [
+    [
+     60,
+     40,
+     50
+    ]
+   ]
+  }
+ }
+]

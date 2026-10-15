@@ -1,0 +1,20 @@
+{
+  "status": "DRAFT - uses commands PROPOSED in TECHNICAL_SPEC.md section 4 (sheet-metal plugin). Not runnable today.",
+  "expected": "expected_test_parts.json parts['ftr_bracket_L.step'] (volume 5279.716754 mm3) and expected_flat_pattern.json FP-02 (flat length 65.845663 mm at K=0.44)",
+  "plan": [
+    { "command": "set_units", "params": { "units": "mm" } },
+    {
+      "command": "create_sheet_metal_rule",
+      "params": { "name": "AL2024-T3 1.6", "material": "2024-T3", "thickness": 1.6, "insideRadius": 4.8, "kFactor": 0.44, "kFactorStandard": "ansi", "reliefType": "rectangular", "reliefRatio": 0.5 }
+    },
+    { "command": "draw_rectangle", "params": { "width": 33.6, "height": 50, "position": [0, 0, 0] }, "as": "base_outline" },
+    { "command": "add_sheet_metal_base", "params": { "profileId": "$base_outline", "rule": "AL2024-T3 1.6", "side": "up" }, "as": "sm" },
+    {
+      "command": "add_flange",
+      "params": { "id": "$sm", "edge": { "near": [33.6, 25, 0] }, "angle": 90, "length": 30, "lengthReference": "outside_mold_line", "position": "material_outside" }
+    },
+    { "command": "flat_pattern", "params": { "id": "$sm" } },
+    { "command": "check_sheet_metal", "params": { "id": "$sm" } },
+    { "command": "export_flat_pattern_dxf", "params": { "id": "$sm", "bendLines": true, "bendNotes": true } }
+  ]
+}

@@ -1,0 +1,132 @@
+{
+ "description": "Analytic countersink / drill-point expectations (mm). Tolerance applies to a future add_hole command measured with inspect_topology / mass_properties under OCC.",
+ "generator": "docs/aerospace/07-sheet-metal-machined-features/validation/generate_countersink.py",
+ "tolerance": {
+  "length_abs_mm": 1e-06,
+  "volume_rel": 1e-06,
+  "angle_abs_deg": 1e-06
+ },
+ "countersinks": [
+  {
+   "id": "CS-01",
+   "d": 4.8,
+   "D": 9.0,
+   "alpha_deg": 100.0,
+   "T": 10.0,
+   "csk_depth_c": 1.762109225,
+   "apex_depth_c0": 3.77594834,
+   "cone_semi_angle_deg": 50.0,
+   "removed_volume_beyond_hole": 36.038249378,
+   "cone_face_area": 59.424329697,
+   "cylindrical_land": 8.237890775,
+   "knife_edge": false
+  },
+  {
+   "id": "CS-02",
+   "d": 4.8,
+   "D": 9.0,
+   "alpha_deg": 100.0,
+   "T": 1.6,
+   "csk_depth_c": 1.762109225,
+   "apex_depth_c0": 3.77594834,
+   "cone_semi_angle_deg": 50.0,
+   "removed_volume_beyond_hole": 36.038249378,
+   "cone_face_area": 59.424329697,
+   "cylindrical_land": -0.162109225,
+   "knife_edge": true
+  },
+  {
+   "id": "CS-03",
+   "d": 4.8,
+   "D": 9.0,
+   "alpha_deg": 100.0,
+   "T": 1.2,
+   "csk_depth_c": 1.762109225,
+   "apex_depth_c0": 3.77594834,
+   "cone_semi_angle_deg": 50.0,
+   "removed_volume_beyond_hole": 36.038249378,
+   "cone_face_area": 59.424329697,
+   "cylindrical_land": -0.562109225,
+   "knife_edge": true
+  },
+  {
+   "id": "CS-04",
+   "d": 4.8,
+   "D": 9.0,
+   "alpha_deg": 90.0,
+   "T": 10.0,
+   "csk_depth_c": 2.1,
+   "apex_depth_c0": 4.5,
+   "cone_semi_angle_deg": 45.0,
+   "removed_volume_beyond_hole": 42.948713167,
+   "cone_face_area": 64.377373774,
+   "cylindrical_land": 7.9,
+   "knife_edge": false
+  },
+  {
+   "id": "CS-05",
+   "d": 4.8,
+   "D": 9.0,
+   "alpha_deg": 82.0,
+   "T": 10.0,
+   "csk_depth_c": 2.415773655,
+   "apex_depth_c0": 5.176657832,
+   "cone_semi_angle_deg": 41.0,
+   "removed_volume_beyond_hole": 49.406842758,
+   "cone_face_area": 69.386557518,
+   "cylindrical_land": 7.584226345,
+   "knife_edge": false
+  },
+  {
+   "id": "CS-06",
+   "d": 3.3,
+   "D": 6.0,
+   "alpha_deg": 100.0,
+   "T": 1.0,
+   "csk_depth_c": 1.132784502,
+   "apex_depth_c0": 2.517298894,
+   "cone_semi_angle_deg": 50.0,
+   "removed_volume_beyond_hole": 10.089049077,
+   "cone_face_area": 25.744391282,
+   "cylindrical_land": -0.132784502,
+   "knife_edge": true
+  },
+  {
+   "id": "CS-07",
+   "d": 6.4,
+   "D": 12.0,
+   "alpha_deg": 100.0,
+   "T": 3.0,
+   "csk_depth_c": 2.349478967,
+   "apex_depth_c0": 5.034597787,
+   "cone_semi_angle_deg": 50.0,
+   "removed_volume_beyond_hole": 85.423998526,
+   "cone_face_area": 105.643252795,
+   "cylindrical_land": 0.650521033,
+   "knife_edge": false
+  }
+ ],
+ "drill_points": [
+  {
+   "id": "DP-01",
+   "d": 6.0,
+   "point_angle_deg": 118.0,
+   "tip_height": 1.802581857,
+   "cone_semi_angle_deg": 59.0
+  },
+  {
+   "id": "DP-02",
+   "d": 6.0,
+   "point_angle_deg": 135.0,
+   "tip_height": 1.242640687,
+   "cone_semi_angle_deg": 67.5
+  },
+  {
+   "id": "DP-03",
+   "d": 3.3,
+   "point_angle_deg": 118.0,
+   "tip_height": 0.991420021,
+   "cone_semi_angle_deg": 59.0
+  }
+ ]
+}

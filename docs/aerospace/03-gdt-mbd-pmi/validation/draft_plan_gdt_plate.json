@@ -1,0 +1,397 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    120,
+    80,
+    12
+   ],
+   "anchor": "min"
+  },
+  "as": "plate"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 3.3,
+   "height": 30,
+   "position": [
+    20,
+    20,
+    6
+   ]
+  },
+  "as": "h0"
+ },
+ {
+  "command": "boolean",
+  "params": {
+   "op": "subtract",
+   "a": "$plate",
+   "b": "$h0"
+  },
+  "as": "p0"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 3.3,
+   "height": 30,
+   "position": [
+    100,
+    20,
+    6
+   ]
+  },
+  "as": "h1"
+ },
+ {
+  "command": "boolean",
+  "params": {
+   "op": "subtract",
+   "a": "$p0",
+   "b": "$h1"
+  },
+  "as": "p1"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 3.3,
+   "height": 30,
+   "position": [
+    20,
+    60,
+    6
+   ]
+  },
+  "as": "h2"
+ },
+ {
+  "command": "boolean",
+  "params": {
+   "op": "subtract",
+   "a": "$p1",
+   "b": "$h2"
+  },
+  "as": "p2"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 3.3,
+   "height": 30,
+   "position": [
+    100,
+    60,
+    6
+   ]
+  },
+  "as": "h3"
+ },
+ {
+  "command": "boolean",
+  "params": {
+   "op": "subtract",
+   "a": "$p2",
+   "b": "$h3"
+  },
+  "as": "p3"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 10,
+   "height": 30,
+   "position": [
+    60,
+    40,
+    6
+   ]
+  },
+  "as": "bore"
+ },
+ {
+  "command": "boolean",
+  "params": {
+   "op": "subtract",
+   "a": "$p3",
+   "b": "$bore"
+  },
+  "as": "part"
+ },
+ {
+  "command": "set_pmi_standard",
+  "params": {
+   "standard": "ASME_Y14.5_2018",
+   "generalToleranceNote": "UNLESS OTHERWISE SPECIFIED: LINEAR +-0.1"
+  }
+ },
+ {
+  "command": "add_datum_feature",
+  "params": {
+   "label": "A",
+   "entityId": "$part",
+   "facesNear": [
+    [
+     30,
+     10,
+     0
+    ]
+   ]
+  },
+  "as": "dA"
+ },
+ {
+  "command": "add_datum_feature",
+  "params": {
+   "label": "B",
+   "entityId": "$part",
+   "facesNear": [
+    [
+     60,
+     0,
+     6
+    ]
+   ]
+  },
+  "as": "dB"
+ },
+ {
+  "command": "add_datum_feature",
+  "params": {
+   "label": "C",
+   "entityId": "$part",
+   "facesNear": [
+    [
+     0,
+     40,
+     6
+    ]
+   ]
+  },
+  "as": "dC"
+ },
+ {
+  "command": "add_size_dimension",
+  "params": {
+   "entityId": "$part",
+   "facesNear": [
+    [
+     16.7,
+     20,
+     6
+    ],
+    [
+     96.7,
+     20,
+     6
+    ],
+    [
+     16.7,
+     60,
+     6
+    ],
+    [
+     96.7,
+     60,
+     6
+    ]
+   ],
+   "sizeKind": "diameter",
+   "tolerance": {
+    "type": "limits",
+    "lower": 6.6,
+    "upper": 6.9
+   }
+  },
+  "as": "holeSize"
+ },
+ {
+  "command": "add_size_dimension",
+  "params": {
+   "entityId": "$part",
+   "facesNear": [
+    [
+     50,
+     40,
+     6
+    ]
+   ],
+   "sizeKind": "diameter",
+   "tolerance": {
+    "type": "plusMinus",
+    "upper": 0.021,
+    "lower": 0
+   }
+  },
+  "as": "boreSize"
+ },
+ {
+  "command": "add_geometric_tolerance",
+  "params": {
+   "characteristic": "flatness",
+   "entityId": "$part",
+   "facesNear": [
+    [
+     30,
+     10,
+     0
+    ]
+   ],
+   "zone": {
+    "value": 0.05
+   }
+  },
+  "as": "fcfFlat"
+ },
+ {
+  "command": "add_geometric_tolerance",
+  "params": {
+   "characteristic": "perpendicularity",
+   "entityId": "$part",
+   "facesNear": [
+    [
+     60,
+     0,
+     6
+    ]
+   ],
+   "zone": {
+    "value": 0.1
+   },
+   "datums": [
+    {
+     "label": "A"
+    }
+   ]
+  },
+  "as": "fcfPerpB"
+ },
+ {
+  "command": "add_geometric_tolerance",
+  "params": {
+   "characteristic": "position",
+   "targetPmiId": "$holeSize",
+   "zone": {
+    "value": 0.3,
+    "diametral": true
+   },
+   "materialCondition": "MMC",
+   "datums": [
+    {
+     "label": "A"
+    },
+    {
+     "label": "B"
+    },
+    {
+     "label": "C"
+    }
+   ]
+  },
+  "as": "fcfPosHoles"
+ },
+ {
+  "command": "add_geometric_tolerance",
+  "params": {
+   "characteristic": "position",
+   "targetPmiId": "$boreSize",
+   "zone": {
+    "value": 0.05,
+    "diametral": true
+   },
+   "datums": [
+    {
+     "label": "A"
+    },
+    {
+     "label": "B"
+    },
+    {
+     "label": "C"
+    }
+   ]
+  },
+  "as": "fcfPosBore"
+ },
+ {
+  "command": "add_surface_texture",
+  "params": {
+   "entityId": "$part",
+   "facesNear": [
+    [
+     30,
+     10,
+     0
+    ]
+   ],
+   "parameter": "Ra",
+   "value": 1.6,
+   "unit": "um"
+  },
+  "as": "st"
+ },
+ {
+  "command": "create_saved_view",
+  "params": {
+   "name": "TOP - HOLE PATTERN",
+   "direction": "top",
+   "pmiIds": [
+    "$holeSize",
+    "$boreSize",
+    "$fcfPosHoles",
+    "$fcfPosBore"
+   ]
+  },
+  "as": "svTop"
+ },
+ {
+  "command": "check_pmi",
+  "params": {}
+ },
+ {
+  "command": "create_sheet",
+  "params": {
+   "name": "Plate",
+   "paper": "A3",
+   "views": [
+    "front",
+    "top",
+    "right"
+   ],
+   "partNumber": "GDT-PLATE-01",
+   "revision": "A"
+  },
+  "as": "sheet"
+ },
+ {
+  "command": "update_sheet",
+  "params": {
+   "sheetId": "$sheet",
+   "pmiMode": "auto"
+  }
+ },
+ {
+  "command": "export_sheet_svg",
+  "params": {
+   "sheetId": "$sheet"
+  }
+ },
+ {
+  "command": "export_step_ap242",
+  "params": {
+   "entityIds": [
+    "$part"
+   ],
+   "pmi": "semantic"
+  }
+ }
+]

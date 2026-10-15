@@ -1,0 +1,70 @@
+{
+  "algorithm": "Ed25519 (RFC 8032 PureEdDSA; FIPS 186-5 EdDSA)",
+  "rfc8032": [
+    {
+      "name": "TEST 1",
+      "secretKey": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+      "publicKey": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+      "messageHex": "",
+      "signature": "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b",
+      "verified": true
+    },
+    {
+      "name": "TEST 2",
+      "secretKey": "4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb",
+      "publicKey": "3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c",
+      "messageHex": "72",
+      "signature": "92a009a9f0d4cab8720e820b5f642540a2b27b5416503f8fb3762223ebdb69da085ac1e43e15996e458f3613d0f11d8c387b2eaeb4302aeeb00d291612bb0c00",
+      "verified": true
+    },
+    {
+      "name": "TEST 3",
+      "secretKey": "c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7",
+      "publicKey": "fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025",
+      "messageHex": "af82",
+      "signature": "6291d657deec24024827e69c3abe01a30ce548a284743a445e3680d7db5ac3ac18ff9b538d16f290ae67f760984dc6594a7c15e9716ed28dc027beceea1ec40a",
+      "verified": true
+    }
+  ],
+  "derived": [
+    {
+      "name": "release manifest signed with RFC 8032 TEST 1 key",
+      "publicKey": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+      "messageSha256": "5cf710ffa62c6501613d704f1197e445a95a3027457152edf94cbd08b4af3d81",
+      "messageLengthBytes": 1123,
+      "messageFile": "release_package_manifest.sample.json (canonical form of body)",
+      "signature": "f132e6dc8a3e2ad0e4a656a833a40eee9ab2bf7d2b98f80aefd5a11125b63edd33b883e836af024d34ebc90f1366fb77474667d90dc00747b9b39d76d6c77c0c",
+      "verified": true
+    }
+  ],
+  "negative": [
+    {
+      "name": "tampered manifest (revision A->B)",
+      "publicKey": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+      "signature": "f132e6dc8a3e2ad0e4a656a833a40eee9ab2bf7d2b98f80aefd5a11125b63edd33b883e836af024d34ebc90f1366fb77474667d90dc00747b9b39d76d6c77c0c",
+      "messageSha256": "54b23154d74496ddf1ea75b48e9ffb936075d17a8bcb5f8c23a2bac7d209a323",
+      "expectVerified": false
+    },
+    {
+      "name": "signature bit flip",
+      "publicKey": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+      "signature": "f032e6dc8a3e2ad0e4a656a833a40eee9ab2bf7d2b98f80aefd5a11125b63edd33b883e836af024d34ebc90f1366fb77474667d90dc00747b9b39d76d6c77c0c",
+      "messageSha256": "5cf710ffa62c6501613d704f1197e445a95a3027457152edf94cbd08b4af3d81",
+      "expectVerified": false
+    },
+    {
+      "name": "wrong public key (RFC TEST 2 key)",
+      "publicKey": "3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c",
+      "signature": "f132e6dc8a3e2ad0e4a656a833a40eee9ab2bf7d2b98f80aefd5a11125b63edd33b883e836af024d34ebc90f1366fb77474667d90dc00747b9b39d76d6c77c0c",
+      "messageSha256": "5cf710ffa62c6501613d704f1197e445a95a3027457152edf94cbd08b4af3d81",
+      "expectVerified": false
+    },
+    {
+      "name": "RFC TEST 2 signature over TEST 3 message",
+      "publicKey": "3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c",
+      "signature": "92a009a9f0d4cab8720e820b5f642540a2b27b5416503f8fb3762223ebdb69da085ac1e43e15996e458f3613d0f11d8c387b2eaeb4302aeeb00d291612bb0c00",
+      "messageSha256": "0598c67e908a9766b29fe74fd2d7035524a17616ce6a5d1bf3bf9db9b3a6ace7",
+      "expectVerified": false
+    }
+  ]
+}

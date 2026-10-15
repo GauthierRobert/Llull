@@ -1,0 +1,290 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "draw_ellipse",
+  "params": {
+   "center": [
+    0,
+    0
+   ],
+   "radiusX": 3250,
+   "radiusY": 2750,
+   "position": [
+    0,
+    0,
+    -300
+   ]
+  },
+  "as": "outerCurve"
+ },
+ {
+  "command": "draw_ellipse",
+  "params": {
+   "center": [
+    0,
+    0
+   ],
+   "radiusX": 2000,
+   "radiusY": 1000,
+   "position": [
+    0,
+    0,
+    -300
+   ]
+  },
+  "as": "innerCurve"
+ },
+ {
+  "command": "extrude_profile",
+  "params": {
+   "id": "$outerCurve",
+   "depth": 600
+  },
+  "as": "outer"
+ },
+ {
+  "command": "extrude_profile",
+  "params": {
+   "id": "$innerCurve",
+   "depth": 600
+  },
+  "as": "inner"
+ },
+ {
+  "command": "boolean",
+  "params": {
+   "op": "subtract",
+   "a": "$outer",
+   "b": "$inner"
+  },
+  "as": "ring"
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    3300,
+    2800,
+    600
+   ],
+   "position": [
+    0,
+    0,
+    -300
+   ],
+   "anchor": "min"
+  },
+  "as": "quadrant"
+ },
+ {
+  "command": "boolean",
+  "params": {
+   "op": "intersect",
+   "a": "$ring",
+   "b": "$quadrant"
+  },
+  "as": "part"
+ },
+ {
+  "command": "create_material",
+  "params": {
+   "name": "steel_E210",
+   "density": 0.0078,
+   "color": "#9aa0a6",
+   "metalness": 1,
+   "roughness": 0.4,
+   "elastic": {
+    "youngsModulusPa": 210000000000.0,
+    "poissonRatio": 0.3
+   }
+  }
+ },
+ {
+  "command": "assign_material",
+  "params": {
+   "materialName": "steel_E210",
+   "entityIds": [
+    "$part"
+   ]
+  }
+ },
+ {
+  "command": "create_analysis",
+  "params": {
+   "name": "nafems_le10",
+   "analysisType": "static",
+   "unitSystem": "N-mm-t-s",
+   "solver": "calculix"
+  },
+  "as": "an"
+ },
+ {
+  "command": "set_part_idealization",
+  "params": {
+   "analysisId": "$an",
+   "entityId": "$part",
+   "idealization": "solid"
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$an",
+   "name": "DCDC",
+   "kind": "displacement",
+   "dofs": {
+    "uy": 0
+   },
+   "target": {
+    "entityId": "$part",
+    "facesNear": [
+     [
+      2625,
+      0,
+      0
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$an",
+   "name": "ABAB",
+   "kind": "displacement",
+   "dofs": {
+    "ux": 0
+   },
+   "target": {
+    "entityId": "$part",
+    "facesNear": [
+     [
+      0,
+      1875,
+      0
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$an",
+   "name": "BCBC",
+   "kind": "displacement",
+   "dofs": {
+    "ux": 0,
+    "uy": 0
+   },
+   "target": {
+    "entityId": "$part",
+    "facesNear": [
+     [
+      2298.1,
+      1944.5,
+      0
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$an",
+   "name": "midplane",
+   "kind": "displacement",
+   "dofs": {
+    "uz": 0
+   },
+   "target": {
+    "entityId": "$part",
+    "facesNear": [
+     [
+      2298.1,
+      1944.5,
+      0
+     ]
+    ],
+    "intersectPlane": {
+     "point": [
+      0,
+      0,
+      0
+     ],
+     "normal": [
+      0,
+      0,
+      1
+     ]
+    }
+   }
+  }
+ },
+ {
+  "command": "add_fea_load",
+  "params": {
+   "analysisId": "$an",
+   "name": "upper_pressure",
+   "kind": "pressure",
+   "loadCase": "LC1",
+   "category": "limit",
+   "target": {
+    "entityId": "$part",
+    "facesNear": [
+     [
+      2600,
+      600,
+      300
+     ]
+    ]
+   },
+   "magnitude": 1
+  }
+ },
+ {
+  "command": "set_mesh_controls",
+  "params": {
+   "analysisId": "$an",
+   "mesher": "gmsh",
+   "elementFamily": "tet",
+   "order": 2,
+   "globalSize": 80,
+   "refinements": [
+    {
+     "target": {
+      "entityId": "$part",
+      "pointsNear": [
+       [
+        2000,
+        0,
+        300
+       ]
+      ]
+     },
+     "size": 20
+    }
+   ]
+  }
+ },
+ {
+  "command": "add_result_probe",
+  "params": {
+   "analysisId": "$an",
+   "name": "D",
+   "point": [
+    2000,
+    0,
+    300
+   ],
+   "quantity": "stress_yy"
+  }
+ }
+]

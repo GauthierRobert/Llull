@@ -1,0 +1,285 @@
+{
+ "generator": "generate_layup_rules_reference.py",
+ "defaults": {
+  "max_consecutive": 4,
+  "min_fraction": 0.1
+ },
+ "cases": [
+  {
+   "notation": "[0/\u00b145/90]s",
+   "angles_bottom_to_top": [
+    0.0,
+    45.0,
+    -45.0,
+    90.0,
+    90.0,
+    -45.0,
+    45.0,
+    0.0
+   ],
+   "rules": {
+    "plies": 8,
+    "R1_symmetric": true,
+    "R2_balanced": true,
+    "R3_ten_percent": true,
+    "fractions": {
+     "0": 0.25,
+     "pm45": 0.5,
+     "90": 0.25
+    },
+    "R4_max_consecutive": 2,
+    "R4_ok": true,
+    "R5_outer_pm45": false
+   }
+  },
+  {
+   "notation": "[45/-45/0/90]s",
+   "angles_bottom_to_top": [
+    45.0,
+    -45.0,
+    0.0,
+    90.0,
+    90.0,
+    0.0,
+    -45.0,
+    45.0
+   ],
+   "rules": {
+    "plies": 8,
+    "R1_symmetric": true,
+    "R2_balanced": true,
+    "R3_ten_percent": true,
+    "fractions": {
+     "0": 0.25,
+     "pm45": 0.5,
+     "90": 0.25
+    },
+    "R4_max_consecutive": 2,
+    "R4_ok": true,
+    "R5_outer_pm45": true
+   }
+  },
+  {
+   "notation": "[0/90]_2s",
+   "angles_bottom_to_top": [
+    0.0,
+    90.0,
+    0.0,
+    90.0,
+    90.0,
+    0.0,
+    90.0,
+    0.0
+   ],
+   "rules": {
+    "plies": 8,
+    "R1_symmetric": true,
+    "R2_balanced": true,
+    "R3_ten_percent": false,
+    "fractions": {
+     "0": 0.5,
+     "pm45": 0.0,
+     "90": 0.5
+    },
+    "R4_max_consecutive": 2,
+    "R4_ok": true,
+    "R5_outer_pm45": false
+   }
+  },
+  {
+   "notation": "[(0/90)_2/45]s",
+   "angles_bottom_to_top": [
+    0.0,
+    90.0,
+    0.0,
+    90.0,
+    45.0,
+    45.0,
+    90.0,
+    0.0,
+    90.0,
+    0.0
+   ],
+   "rules": {
+    "plies": 10,
+    "R1_symmetric": true,
+    "R2_balanced": false,
+    "R3_ten_percent": true,
+    "fractions": {
+     "0": 0.4,
+     "pm45": 0.2,
+     "90": 0.4
+    },
+    "R4_max_consecutive": 2,
+    "R4_ok": true,
+    "R5_outer_pm45": false
+   }
+  },
+  {
+   "notation": "[0_5/45/-45/90]s",
+   "angles_bottom_to_top": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    45.0,
+    -45.0,
+    90.0,
+    90.0,
+    -45.0,
+    45.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rules": {
+    "plies": 16,
+    "R1_symmetric": true,
+    "R2_balanced": true,
+    "R3_ten_percent": true,
+    "fractions": {
+     "0": 0.625,
+     "pm45": 0.25,
+     "90": 0.125
+    },
+    "R4_max_consecutive": 5,
+    "R4_ok": false,
+    "R5_outer_pm45": false
+   }
+  },
+  {
+   "notation": "[0/45/90]s",
+   "angles_bottom_to_top": [
+    0.0,
+    45.0,
+    90.0,
+    90.0,
+    45.0,
+    0.0
+   ],
+   "rules": {
+    "plies": 6,
+    "R1_symmetric": true,
+    "R2_balanced": false,
+    "R3_ten_percent": true,
+    "fractions": {
+     "0": 0.333333,
+     "pm45": 0.333333,
+     "90": 0.333333
+    },
+    "R4_max_consecutive": 2,
+    "R4_ok": true,
+    "R5_outer_pm45": false
+   }
+  },
+  {
+   "notation": "[45/-45/0_2/90~]s",
+   "angles_bottom_to_top": [
+    45.0,
+    -45.0,
+    0.0,
+    0.0,
+    90.0,
+    0.0,
+    0.0,
+    -45.0,
+    45.0
+   ],
+   "rules": {
+    "plies": 9,
+    "R1_symmetric": true,
+    "R2_balanced": true,
+    "R3_ten_percent": true,
+    "fractions": {
+     "0": 0.444444,
+     "pm45": 0.444444,
+     "90": 0.111111
+    },
+    "R4_max_consecutive": 2,
+    "R4_ok": true,
+    "R5_outer_pm45": true
+   }
+  },
+  {
+   "notation": "[0/90]T",
+   "angles_bottom_to_top": [
+    0.0,
+    90.0
+   ],
+   "rules": {
+    "plies": 2,
+    "R1_symmetric": false,
+    "R2_balanced": true,
+    "R3_ten_percent": false,
+    "fractions": {
+     "0": 0.5,
+     "pm45": 0.0,
+     "90": 0.5
+    },
+    "R4_max_consecutive": 1,
+    "R4_ok": true,
+    "R5_outer_pm45": false
+   }
+  },
+  {
+   "notation": "[\u00b145/0_4/90_2]s",
+   "angles_bottom_to_top": [
+    45.0,
+    -45.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    90.0,
+    90.0,
+    90.0,
+    90.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    -45.0,
+    45.0
+   ],
+   "rules": {
+    "plies": 16,
+    "R1_symmetric": true,
+    "R2_balanced": true,
+    "R3_ten_percent": true,
+    "fractions": {
+     "0": 0.5,
+     "pm45": 0.25,
+     "90": 0.25
+    },
+    "R4_max_consecutive": 4,
+    "R4_ok": true,
+    "R5_outer_pm45": true
+   }
+  },
+  {
+   "notation": "[0/30/-45]T",
+   "angles_bottom_to_top": [
+    0.0,
+    30.0,
+    -45.0
+   ],
+   "rules": {
+    "plies": 3,
+    "R1_symmetric": false,
+    "R2_balanced": false,
+    "R3_ten_percent": false,
+    "fractions": {
+     "0": 0.333333,
+     "pm45": 0.333333,
+     "90": 0.0
+    },
+    "R4_max_consecutive": 1,
+    "R4_ok": true,
+    "R5_outer_pm45": false
+   }
+  }
+ ]
+}

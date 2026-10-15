@@ -1,0 +1,102 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "set_parameter",
+  "params": {
+   "name": "pw",
+   "expression": "260"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    300,
+    120,
+    25
+   ],
+   "anchor": "min"
+  },
+  "as": "blank"
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    "=pw",
+    80,
+    21
+   ],
+   "anchor": "min",
+   "position": [
+    20,
+    20,
+    5
+   ]
+  },
+  "as": "pocketTool"
+ },
+ {
+  "command": "boolean",
+  "params": {
+   "op": "subtract",
+   "a": "$blank",
+   "b": "$pocketTool"
+  },
+  "as": "roughed"
+ },
+ {
+  "command": "fillet_edge",
+  "params": {
+   "id": "$roughed",
+   "edgesNear": [
+    [
+     20,
+     20,
+     15
+    ],
+    [
+     280,
+     20,
+     15
+    ],
+    [
+     280,
+     100,
+     15
+    ],
+    [
+     20,
+     100,
+     15
+    ]
+   ],
+   "radius": 10
+  },
+  "as": "rib"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$rib"
+  }
+ },
+ {
+  "command": "set_parameter",
+  "params": {
+   "name": "pw",
+   "expression": "240"
+  }
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$rib"
+  }
+ }
+]

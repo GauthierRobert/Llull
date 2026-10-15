@@ -1,0 +1,1236 @@
+{
+ "generator": "generate_drape_reference.py",
+ "units": {
+  "length": "mm",
+  "angle": "deg"
+ },
+ "hemisphere_pin_jointed_net": [
+  {
+   "d_mm": 4.0,
+   "R_mm": 100.0,
+   "nodes_quadrant": 1725,
+   "interior_nodes_on_hemisphere": 1020,
+   "interior_nodes_over_shear_limit": {
+    "30deg": 202,
+    "40deg": 71,
+    "50deg": 2
+   },
+   "max_shear_deg_on_hemisphere": 50.4392,
+   "max_shear_node": [
+    24,
+    25,
+    89.9622
+   ],
+   "diagonal": [
+    {
+     "i": 1,
+     "arc_length_along_tows_mm": 4.0,
+     "polar_angle_deg": 3.2422,
+     "shear_deg": 0.0229
+    },
+    {
+     "i": 2,
+     "arc_length_along_tows_mm": 8.0,
+     "polar_angle_deg": 6.4896,
+     "shear_deg": 0.2063
+    },
+    {
+     "i": 3,
+     "arc_length_along_tows_mm": 12.0,
+     "polar_angle_deg": 9.7474,
+     "shear_deg": 0.573
+    },
+    {
+     "i": 4,
+     "arc_length_along_tows_mm": 16.0,
+     "polar_angle_deg": 13.0206,
+     "shear_deg": 1.123
+    },
+    {
+     "i": 5,
+     "arc_length_along_tows_mm": 20.0,
+     "polar_angle_deg": 16.3142,
+     "shear_deg": 1.8563
+    },
+    {
+     "i": 6,
+     "arc_length_along_tows_mm": 24.0,
+     "polar_angle_deg": 19.6333,
+     "shear_deg": 2.7728
+    },
+    {
+     "i": 7,
+     "arc_length_along_tows_mm": 28.0,
+     "polar_angle_deg": 22.9826,
+     "shear_deg": 3.8723
+    },
+    {
+     "i": 8,
+     "arc_length_along_tows_mm": 32.0,
+     "polar_angle_deg": 26.3666,
+     "shear_deg": 5.1544
+    },
+    {
+     "i": 9,
+     "arc_length_along_tows_mm": 36.0,
+     "polar_angle_deg": 29.79,
+     "shear_deg": 6.6187
+    },
+    {
+     "i": 10,
+     "arc_length_along_tows_mm": 40.0,
+     "polar_angle_deg": 33.2567,
+     "shear_deg": 8.2643
+    },
+    {
+     "i": 11,
+     "arc_length_along_tows_mm": 44.0,
+     "polar_angle_deg": 36.7708,
+     "shear_deg": 10.09
+    },
+    {
+     "i": 12,
+     "arc_length_along_tows_mm": 48.0,
+     "polar_angle_deg": 40.3359,
+     "shear_deg": 12.0944
+    },
+    {
+     "i": 13,
+     "arc_length_along_tows_mm": 52.0,
+     "polar_angle_deg": 43.9552,
+     "shear_deg": 14.2754
+    },
+    {
+     "i": 14,
+     "arc_length_along_tows_mm": 56.0,
+     "polar_angle_deg": 47.6315,
+     "shear_deg": 16.6303
+    },
+    {
+     "i": 15,
+     "arc_length_along_tows_mm": 60.0,
+     "polar_angle_deg": 51.3673,
+     "shear_deg": 19.1557
+    },
+    {
+     "i": 16,
+     "arc_length_along_tows_mm": 64.0,
+     "polar_angle_deg": 55.1645,
+     "shear_deg": 21.8477
+    },
+    {
+     "i": 17,
+     "arc_length_along_tows_mm": 68.0,
+     "polar_angle_deg": 59.0244,
+     "shear_deg": 24.701
+    },
+    {
+     "i": 18,
+     "arc_length_along_tows_mm": 72.0,
+     "polar_angle_deg": 62.9479,
+     "shear_deg": 27.7098
+    },
+    {
+     "i": 19,
+     "arc_length_along_tows_mm": 76.0,
+     "polar_angle_deg": 66.9352,
+     "shear_deg": 30.8671
+    },
+    {
+     "i": 20,
+     "arc_length_along_tows_mm": 80.0,
+     "polar_angle_deg": 70.986,
+     "shear_deg": 34.1645
+    },
+    {
+     "i": 21,
+     "arc_length_along_tows_mm": 84.0,
+     "polar_angle_deg": 75.0991,
+     "shear_deg": 37.5929
+    },
+    {
+     "i": 22,
+     "arc_length_along_tows_mm": 88.0,
+     "polar_angle_deg": 79.2729,
+     "shear_deg": 41.1416
+    },
+    {
+     "i": 23,
+     "arc_length_along_tows_mm": 92.0,
+     "polar_angle_deg": 83.505,
+     "shear_deg": 44.7988
+    },
+    {
+     "i": 24,
+     "arc_length_along_tows_mm": 96.0,
+     "polar_angle_deg": 87.7925,
+     "shear_deg": 48.5514
+    }
+   ],
+   "gauss_bonnet_checks": [
+    {
+     "i": 9,
+     "polar_angle_deg": 29.79,
+     "shear_deg": 6.6187,
+     "K_times_area_deg": 7.4216
+    },
+    {
+     "i": 13,
+     "polar_angle_deg": 43.9552,
+     "shear_deg": 14.2754,
+     "K_times_area_deg": 15.4365
+    },
+    {
+     "i": 17,
+     "polar_angle_deg": 59.0244,
+     "shear_deg": 24.701,
+     "K_times_area_deg": 26.1943
+    }
+   ],
+   "generator_crossing_shear_deg": [
+    0.2292,
+    0.4585
+   ],
+   "diagonal_reaches_equator": false
+  },
+  {
+   "d_mm": 2.0,
+   "R_mm": 100.0,
+   "nodes_quadrant": 6389,
+   "interior_nodes_on_hemisphere": 4167,
+   "interior_nodes_over_shear_limit": {
+    "30deg": 875,
+    "40deg": 335,
+    "50deg": 15
+   },
+   "max_shear_deg_on_hemisphere": 51.4134,
+   "max_shear_node": [
+    49,
+    49,
+    89.9478
+   ],
+   "diagonal": [
+    {
+     "i": 1,
+     "arc_length_along_tows_mm": 2.0,
+     "polar_angle_deg": 1.6207,
+     "shear_deg": 0.0057
+    },
+    {
+     "i": 2,
+     "arc_length_along_tows_mm": 4.0,
+     "polar_angle_deg": 3.2421,
+     "shear_deg": 0.0516
+    },
+    {
+     "i": 3,
+     "arc_length_along_tows_mm": 6.0,
+     "polar_angle_deg": 4.8647,
+     "shear_deg": 0.1432
+    },
+    {
+     "i": 4,
+     "arc_length_along_tows_mm": 8.0,
+     "polar_angle_deg": 6.4893,
+     "shear_deg": 0.2807
+    },
+    {
+     "i": 5,
+     "arc_length_along_tows_mm": 10.0,
+     "polar_angle_deg": 8.1165,
+     "shear_deg": 0.4641
+    },
+    {
+     "i": 6,
+     "arc_length_along_tows_mm": 12.0,
+     "polar_angle_deg": 9.7469,
+     "shear_deg": 0.6933
+    },
+    {
+     "i": 7,
+     "arc_length_along_tows_mm": 14.0,
+     "polar_angle_deg": 11.3811,
+     "shear_deg": 0.9683
+    },
+    {
+     "i": 8,
+     "arc_length_along_tows_mm": 16.0,
+     "polar_angle_deg": 13.0199,
+     "shear_deg": 1.2891
+    },
+    {
+     "i": 9,
+     "arc_length_along_tows_mm": 18.0,
+     "polar_angle_deg": 14.6638,
+     "shear_deg": 1.6558
+    },
+    {
+     "i": 10,
+     "arc_length_along_tows_mm": 20.0,
+     "polar_angle_deg": 16.3134,
+     "shear_deg": 2.0682
+    },
+    {
+     "i": 11,
+     "arc_length_along_tows_mm": 22.0,
+     "polar_angle_deg": 17.9693,
+     "shear_deg": 2.5265
+    },
+    {
+     "i": 12,
+     "arc_length_along_tows_mm": 24.0,
+     "polar_angle_deg": 19.6322,
+     "shear_deg": 3.0305
+    },
+    {
+     "i": 13,
+     "arc_length_along_tows_mm": 26.0,
+     "polar_angle_deg": 21.3027,
+     "shear_deg": 3.5802
+    },
+    {
+     "i": 14,
+     "arc_length_along_tows_mm": 28.0,
+     "polar_angle_deg": 22.9813,
+     "shear_deg": 4.1757
+    },
+    {
+     "i": 15,
+     "arc_length_along_tows_mm": 30.0,
+     "polar_angle_deg": 24.6686,
+     "shear_deg": 4.8167
+    },
+    {
+     "i": 16,
+     "arc_length_along_tows_mm": 32.0,
+     "polar_angle_deg": 26.3651,
+     "shear_deg": 5.5033
+    },
+    {
+     "i": 17,
+     "arc_length_along_tows_mm": 34.0,
+     "polar_angle_deg": 28.0715,
+     "shear_deg": 6.2355
+    },
+    {
+     "i": 18,
+     "arc_length_along_tows_mm": 36.0,
+     "polar_angle_deg": 29.7882,
+     "shear_deg": 7.013
+    },
+    {
+     "i": 19,
+     "arc_length_along_tows_mm": 38.0,
+     "polar_angle_deg": 31.5158,
+     "shear_deg": 7.8357
+    },
+    {
+     "i": 20,
+     "arc_length_along_tows_mm": 40.0,
+     "polar_angle_deg": 33.2547,
+     "shear_deg": 8.7036
+    },
+    {
+     "i": 21,
+     "arc_length_along_tows_mm": 42.0,
+     "polar_angle_deg": 35.0055,
+     "shear_deg": 9.6164
+    },
+    {
+     "i": 22,
+     "arc_length_along_tows_mm": 44.0,
+     "polar_angle_deg": 36.7686,
+     "shear_deg": 10.5741
+    },
+    {
+     "i": 23,
+     "arc_length_along_tows_mm": 46.0,
+     "polar_angle_deg": 38.5444,
+     "shear_deg": 11.5762
+    },
+    {
+     "i": 24,
+     "arc_length_along_tows_mm": 48.0,
+     "polar_angle_deg": 40.3333,
+     "shear_deg": 12.6226
+    },
+    {
+     "i": 25,
+     "arc_length_along_tows_mm": 50.0,
+     "polar_angle_deg": 42.1359,
+     "shear_deg": 13.7131
+    },
+    {
+     "i": 26,
+     "arc_length_along_tows_mm": 52.0,
+     "polar_angle_deg": 43.9523,
+     "shear_deg": 14.8471
+    },
+    {
+     "i": 27,
+     "arc_length_along_tows_mm": 54.0,
+     "polar_angle_deg": 45.783,
+     "shear_deg": 16.0245
+    },
+    {
+     "i": 28,
+     "arc_length_along_tows_mm": 56.0,
+     "polar_angle_deg": 47.6283,
+     "shear_deg": 17.2448
+    },
+    {
+     "i": 29,
+     "arc_length_along_tows_mm": 58.0,
+     "polar_angle_deg": 49.4884,
+     "shear_deg": 18.5074
+    },
+    {
+     "i": 30,
+     "arc_length_along_tows_mm": 60.0,
+     "polar_angle_deg": 51.3637,
+     "shear_deg": 19.812
+    },
+    {
+     "i": 31,
+     "arc_length_along_tows_mm": 62.0,
+     "polar_angle_deg": 53.2543,
+     "shear_deg": 21.1578
+    },
+    {
+     "i": 32,
+     "arc_length_along_tows_mm": 64.0,
+     "polar_angle_deg": 55.1604,
+     "shear_deg": 22.5444
+    },
+    {
+     "i": 33,
+     "arc_length_along_tows_mm": 66.0,
+     "polar_angle_deg": 57.0823,
+     "shear_deg": 23.971
+    },
+    {
+     "i": 34,
+     "arc_length_along_tows_mm": 68.0,
+     "polar_angle_deg": 59.0199,
+     "shear_deg": 25.4368
+    },
+    {
+     "i": 35,
+     "arc_length_along_tows_mm": 70.0,
+     "polar_angle_deg": 60.9735,
+     "shear_deg": 26.9411
+    },
+    {
+     "i": 36,
+     "arc_length_along_tows_mm": 72.0,
+     "polar_angle_deg": 62.943,
+     "shear_deg": 28.483
+    },
+    {
+     "i": 37,
+     "arc_length_along_tows_mm": 74.0,
+     "polar_angle_deg": 64.9285,
+     "shear_deg": 30.0615
+    },
+    {
+     "i": 38,
+     "arc_length_along_tows_mm": 76.0,
+     "polar_angle_deg": 66.9299,
+     "shear_deg": 31.6756
+    },
+    {
+     "i": 39,
+     "arc_length_along_tows_mm": 78.0,
+     "polar_angle_deg": 68.9471,
+     "shear_deg": 33.3242
+    },
+    {
+     "i": 40,
+     "arc_length_along_tows_mm": 80.0,
+     "polar_angle_deg": 70.9801,
+     "shear_deg": 35.0062
+    },
+    {
+     "i": 41,
+     "arc_length_along_tows_mm": 82.0,
+     "polar_angle_deg": 73.0287,
+     "shear_deg": 36.7202
+    },
+    {
+     "i": 42,
+     "arc_length_along_tows_mm": 84.0,
+     "polar_angle_deg": 75.0927,
+     "shear_deg": 38.465
+    },
+    {
+     "i": 43,
+     "arc_length_along_tows_mm": 86.0,
+     "polar_angle_deg": 77.1719,
+     "shear_deg": 40.2392
+    },
+    {
+     "i": 44,
+     "arc_length_along_tows_mm": 88.0,
+     "polar_angle_deg": 79.266,
+     "shear_deg": 42.0413
+    },
+    {
+     "i": 45,
+     "arc_length_along_tows_mm": 90.0,
+     "polar_angle_deg": 81.3747,
+     "shear_deg": 43.8698
+    },
+    {
+     "i": 46,
+     "arc_length_along_tows_mm": 92.0,
+     "polar_angle_deg": 83.4976,
+     "shear_deg": 45.723
+    },
+    {
+     "i": 47,
+     "arc_length_along_tows_mm": 94.0,
+     "polar_angle_deg": 85.6344,
+     "shear_deg": 47.5991
+    },
+    {
+     "i": 48,
+     "arc_length_along_tows_mm": 96.0,
+     "polar_angle_deg": 87.7846,
+     "shear_deg": 49.4966
+    },
+    {
+     "i": 49,
+     "arc_length_along_tows_mm": 98.0,
+     "polar_angle_deg": 89.9478,
+     "shear_deg": 51.4134
+    }
+   ],
+   "gauss_bonnet_checks": [
+    {
+     "i": 18,
+     "polar_angle_deg": 29.7882,
+     "shear_deg": 7.013,
+     "K_times_area_deg": 7.4194
+    },
+    {
+     "i": 27,
+     "polar_angle_deg": 45.783,
+     "shear_deg": 16.0245,
+     "K_times_area_deg": 16.6307
+    },
+    {
+     "i": 35,
+     "polar_angle_deg": 60.9735,
+     "shear_deg": 26.9411,
+     "K_times_area_deg": 27.7095
+    }
+   ],
+   "generator_crossing_shear_deg": [
+    0.0573,
+    0.1146
+   ],
+   "diagonal_reaches_equator": true
+  },
+  {
+   "d_mm": 1.0,
+   "R_mm": 100.0,
+   "nodes_quadrant": 24770,
+   "interior_nodes_on_hemisphere": 16828,
+   "interior_nodes_over_shear_limit": {
+    "30deg": 3617,
+    "40deg": 1433,
+    "50deg": 90
+   },
+   "max_shear_deg_on_hemisphere": 51.8937,
+   "max_shear_node": [
+    98,
+    98,
+    89.9457
+   ],
+   "diagonal": [
+    {
+     "i": 1,
+     "arc_length_along_tows_mm": 1.0,
+     "polar_angle_deg": 0.8103,
+     "shear_deg": 0.0014
+    },
+    {
+     "i": 2,
+     "arc_length_along_tows_mm": 2.0,
+     "polar_angle_deg": 1.6207,
+     "shear_deg": 0.0129
+    },
+    {
+     "i": 3,
+     "arc_length_along_tows_mm": 3.0,
+     "polar_angle_deg": 2.4312,
+     "shear_deg": 0.0358
+    },
+    {
+     "i": 4,
+     "arc_length_along_tows_mm": 4.0,
+     "polar_angle_deg": 3.242,
+     "shear_deg": 0.0702
+    },
+    {
+     "i": 5,
+     "arc_length_along_tows_mm": 5.0,
+     "polar_angle_deg": 4.0531,
+     "shear_deg": 0.116
+    },
+    {
+     "i": 6,
+     "arc_length_along_tows_mm": 6.0,
+     "polar_angle_deg": 4.8646,
+     "shear_deg": 0.1733
+    },
+    {
+     "i": 7,
+     "arc_length_along_tows_mm": 7.0,
+     "polar_angle_deg": 5.6766,
+     "shear_deg": 0.2421
+    },
+    {
+     "i": 8,
+     "arc_length_along_tows_mm": 8.0,
+     "polar_angle_deg": 6.4892,
+     "shear_deg": 0.3223
+    },
+    {
+     "i": 9,
+     "arc_length_along_tows_mm": 9.0,
+     "polar_angle_deg": 7.3024,
+     "shear_deg": 0.414
+    },
+    {
+     "i": 10,
+     "arc_length_along_tows_mm": 10.0,
+     "polar_angle_deg": 8.1164,
+     "shear_deg": 0.5171
+    },
+    {
+     "i": 11,
+     "arc_length_along_tows_mm": 11.0,
+     "polar_angle_deg": 8.9311,
+     "shear_deg": 0.6317
+    },
+    {
+     "i": 12,
+     "arc_length_along_tows_mm": 12.0,
+     "polar_angle_deg": 9.7467,
+     "shear_deg": 0.7577
+    },
+    {
+     "i": 13,
+     "arc_length_along_tows_mm": 13.0,
+     "polar_angle_deg": 10.5633,
+     "shear_deg": 0.8952
+    },
+    {
+     "i": 14,
+     "arc_length_along_tows_mm": 14.0,
+     "polar_angle_deg": 11.381,
+     "shear_deg": 1.0442
+    },
+    {
+     "i": 15,
+     "arc_length_along_tows_mm": 15.0,
+     "polar_angle_deg": 12.1997,
+     "shear_deg": 1.2046
+    },
+    {
+     "i": 16,
+     "arc_length_along_tows_mm": 16.0,
+     "polar_angle_deg": 13.0197,
+     "shear_deg": 1.3765
+    },
+    {
+     "i": 17,
+     "arc_length_along_tows_mm": 17.0,
+     "polar_angle_deg": 13.841,
+     "shear_deg": 1.5598
+    },
+    {
+     "i": 18,
+     "arc_length_along_tows_mm": 18.0,
+     "polar_angle_deg": 14.6636,
+     "shear_deg": 1.7546
+    },
+    {
+     "i": 19,
+     "arc_length_along_tows_mm": 19.0,
+     "polar_angle_deg": 15.4876,
+     "shear_deg": 1.9608
+    },
+    {
+     "i": 20,
+     "arc_length_along_tows_mm": 20.0,
+     "polar_angle_deg": 16.3131,
+     "shear_deg": 2.1785
+    },
+    {
+     "i": 21,
+     "arc_length_along_tows_mm": 21.0,
+     "polar_angle_deg": 17.1403,
+     "shear_deg": 2.4076
+    },
+    {
+     "i": 22,
+     "arc_length_along_tows_mm": 22.0,
+     "polar_angle_deg": 17.9691,
+     "shear_deg": 2.6482
+    },
+    {
+     "i": 23,
+     "arc_length_along_tows_mm": 23.0,
+     "polar_angle_deg": 18.7996,
+     "shear_deg": 2.9002
+    },
+    {
+     "i": 24,
+     "arc_length_along_tows_mm": 24.0,
+     "polar_angle_deg": 19.632,
+     "shear_deg": 3.1636
+    },
+    {
+     "i": 25,
+     "arc_length_along_tows_mm": 25.0,
+     "polar_angle_deg": 20.4662,
+     "shear_deg": 3.4385
+    },
+    {
+     "i": 26,
+     "arc_length_along_tows_mm": 26.0,
+     "polar_angle_deg": 21.3024,
+     "shear_deg": 3.7248
+    },
+    {
+     "i": 27,
+     "arc_length_along_tows_mm": 27.0,
+     "polar_angle_deg": 22.1406,
+     "shear_deg": 4.0225
+    },
+    {
+     "i": 28,
+     "arc_length_along_tows_mm": 28.0,
+     "polar_angle_deg": 22.981,
+     "shear_deg": 4.3316
+    },
+    {
+     "i": 29,
+     "arc_length_along_tows_mm": 29.0,
+     "polar_angle_deg": 23.8235,
+     "shear_deg": 4.6522
+    },
+    {
+     "i": 30,
+     "arc_length_along_tows_mm": 30.0,
+     "polar_angle_deg": 24.6682,
+     "shear_deg": 4.9841
+    },
+    {
+     "i": 31,
+     "arc_length_along_tows_mm": 31.0,
+     "polar_angle_deg": 25.5153,
+     "shear_deg": 5.3274
+    },
+    {
+     "i": 32,
+     "arc_length_along_tows_mm": 32.0,
+     "polar_angle_deg": 26.3648,
+     "shear_deg": 5.6821
+    },
+    {
+     "i": 33,
+     "arc_length_along_tows_mm": 33.0,
+     "polar_angle_deg": 27.2167,
+     "shear_deg": 6.0481
+    },
+    {
+     "i": 34,
+     "arc_length_along_tows_mm": 34.0,
+     "polar_angle_deg": 28.0711,
+     "shear_deg": 6.4255
+    },
+    {
+     "i": 35,
+     "arc_length_along_tows_mm": 35.0,
+     "polar_angle_deg": 28.9281,
+     "shear_deg": 6.8143
+    },
+    {
+     "i": 36,
+     "arc_length_along_tows_mm": 36.0,
+     "polar_angle_deg": 29.7878,
+     "shear_deg": 7.2144
+    },
+    {
+     "i": 37,
+     "arc_length_along_tows_mm": 37.0,
+     "polar_angle_deg": 30.6502,
+     "shear_deg": 7.6257
+    },
+    {
+     "i": 38,
+     "arc_length_along_tows_mm": 38.0,
+     "polar_angle_deg": 31.5153,
+     "shear_deg": 8.0484
+    },
+    {
+     "i": 39,
+     "arc_length_along_tows_mm": 39.0,
+     "polar_angle_deg": 32.3833,
+     "shear_deg": 8.4823
+    },
+    {
+     "i": 40,
+     "arc_length_along_tows_mm": 40.0,
+     "polar_angle_deg": 33.2542,
+     "shear_deg": 8.9275
+    },
+    {
+     "i": 41,
+     "arc_length_along_tows_mm": 41.0,
+     "polar_angle_deg": 34.1281,
+     "shear_deg": 9.3839
+    },
+    {
+     "i": 42,
+     "arc_length_along_tows_mm": 42.0,
+     "polar_angle_deg": 35.005,
+     "shear_deg": 9.8516
+    },
+    {
+     "i": 43,
+     "arc_length_along_tows_mm": 43.0,
+     "polar_angle_deg": 35.8849,
+     "shear_deg": 10.3304
+    },
+    {
+     "i": 44,
+     "arc_length_along_tows_mm": 44.0,
+     "polar_angle_deg": 36.768,
+     "shear_deg": 10.8203
+    },
+    {
+     "i": 45,
+     "arc_length_along_tows_mm": 45.0,
+     "polar_angle_deg": 37.6543,
+     "shear_deg": 11.3214
+    },
+    {
+     "i": 46,
+     "arc_length_along_tows_mm": 46.0,
+     "polar_angle_deg": 38.5438,
+     "shear_deg": 11.8335
+    },
+    {
+     "i": 47,
+     "arc_length_along_tows_mm": 47.0,
+     "polar_angle_deg": 39.4366,
+     "shear_deg": 12.3568
+    },
+    {
+     "i": 48,
+     "arc_length_along_tows_mm": 48.0,
+     "polar_angle_deg": 40.3327,
+     "shear_deg": 12.891
+    },
+    {
+     "i": 49,
+     "arc_length_along_tows_mm": 49.0,
+     "polar_angle_deg": 41.2322,
+     "shear_deg": 13.4362
+    },
+    {
+     "i": 50,
+     "arc_length_along_tows_mm": 50.0,
+     "polar_angle_deg": 42.1352,
+     "shear_deg": 13.9923
+    },
+    {
+     "i": 51,
+     "arc_length_along_tows_mm": 51.0,
+     "polar_angle_deg": 43.0416,
+     "shear_deg": 14.5594
+    },
+    {
+     "i": 52,
+     "arc_length_along_tows_mm": 52.0,
+     "polar_angle_deg": 43.9516,
+     "shear_deg": 15.1372
+    },
+    {
+     "i": 53,
+     "arc_length_along_tows_mm": 53.0,
+     "polar_angle_deg": 44.8651,
+     "shear_deg": 15.7259
+    },
+    {
+     "i": 54,
+     "arc_length_along_tows_mm": 54.0,
+     "polar_angle_deg": 45.7822,
+     "shear_deg": 16.3253
+    },
+    {
+     "i": 55,
+     "arc_length_along_tows_mm": 55.0,
+     "polar_angle_deg": 46.703,
+     "shear_deg": 16.9355
+    },
+    {
+     "i": 56,
+     "arc_length_along_tows_mm": 56.0,
+     "polar_angle_deg": 47.6275,
+     "shear_deg": 17.5562
+    },
+    {
+     "i": 57,
+     "arc_length_along_tows_mm": 57.0,
+     "polar_angle_deg": 48.5556,
+     "shear_deg": 18.1875
+    },
+    {
+     "i": 58,
+     "arc_length_along_tows_mm": 58.0,
+     "polar_angle_deg": 49.4875,
+     "shear_deg": 18.8293
+    },
+    {
+     "i": 59,
+     "arc_length_along_tows_mm": 59.0,
+     "polar_angle_deg": 50.4233,
+     "shear_deg": 19.4816
+    },
+    {
+     "i": 60,
+     "arc_length_along_tows_mm": 60.0,
+     "polar_angle_deg": 51.3628,
+     "shear_deg": 20.1442
+    },
+    {
+     "i": 61,
+     "arc_length_along_tows_mm": 61.0,
+     "polar_angle_deg": 52.3061,
+     "shear_deg": 20.8172
+    },
+    {
+     "i": 62,
+     "arc_length_along_tows_mm": 62.0,
+     "polar_angle_deg": 53.2533,
+     "shear_deg": 21.5003
+    },
+    {
+     "i": 63,
+     "arc_length_along_tows_mm": 63.0,
+     "polar_angle_deg": 54.2044,
+     "shear_deg": 22.1936
+    },
+    {
+     "i": 64,
+     "arc_length_along_tows_mm": 64.0,
+     "polar_angle_deg": 55.1594,
+     "shear_deg": 22.8969
+    },
+    {
+     "i": 65,
+     "arc_length_along_tows_mm": 65.0,
+     "polar_angle_deg": 56.1184,
+     "shear_deg": 23.6102
+    },
+    {
+     "i": 66,
+     "arc_length_along_tows_mm": 66.0,
+     "polar_angle_deg": 57.0812,
+     "shear_deg": 24.3333
+    },
+    {
+     "i": 67,
+     "arc_length_along_tows_mm": 67.0,
+     "polar_angle_deg": 58.048,
+     "shear_deg": 25.0662
+    },
+    {
+     "i": 68,
+     "arc_length_along_tows_mm": 68.0,
+     "polar_angle_deg": 59.0188,
+     "shear_deg": 25.8088
+    },
+    {
+     "i": 69,
+     "arc_length_along_tows_mm": 69.0,
+     "polar_angle_deg": 59.9936,
+     "shear_deg": 26.5609
+    },
+    {
+     "i": 70,
+     "arc_length_along_tows_mm": 70.0,
+     "polar_angle_deg": 60.9723,
+     "shear_deg": 27.3225
+    },
+    {
+     "i": 71,
+     "arc_length_along_tows_mm": 71.0,
+     "polar_angle_deg": 61.9551,
+     "shear_deg": 28.0934
+    },
+    {
+     "i": 72,
+     "arc_length_along_tows_mm": 72.0,
+     "polar_angle_deg": 62.9418,
+     "shear_deg": 28.8736
+    },
+    {
+     "i": 73,
+     "arc_length_along_tows_mm": 73.0,
+     "polar_angle_deg": 63.9325,
+     "shear_deg": 29.6628
+    },
+    {
+     "i": 74,
+     "arc_length_along_tows_mm": 74.0,
+     "polar_angle_deg": 64.9272,
+     "shear_deg": 30.461
+    },
+    {
+     "i": 75,
+     "arc_length_along_tows_mm": 75.0,
+     "polar_angle_deg": 65.9259,
+     "shear_deg": 31.268
+    },
+    {
+     "i": 76,
+     "arc_length_along_tows_mm": 76.0,
+     "polar_angle_deg": 66.9285,
+     "shear_deg": 32.0838
+    },
+    {
+     "i": 77,
+     "arc_length_along_tows_mm": 77.0,
+     "polar_angle_deg": 67.9351,
+     "shear_deg": 32.9081
+    },
+    {
+     "i": 78,
+     "arc_length_along_tows_mm": 78.0,
+     "polar_angle_deg": 68.9457,
+     "shear_deg": 33.7408
+    },
+    {
+     "i": 79,
+     "arc_length_along_tows_mm": 79.0,
+     "polar_angle_deg": 69.9602,
+     "shear_deg": 34.5817
+    },
+    {
+     "i": 80,
+     "arc_length_along_tows_mm": 80.0,
+     "polar_angle_deg": 70.9787,
+     "shear_deg": 35.4308
+    },
+    {
+     "i": 81,
+     "arc_length_along_tows_mm": 81.0,
+     "polar_angle_deg": 72.001,
+     "shear_deg": 36.2878
+    },
+    {
+     "i": 82,
+     "arc_length_along_tows_mm": 82.0,
+     "polar_angle_deg": 73.0272,
+     "shear_deg": 37.1526
+    },
+    {
+     "i": 83,
+     "arc_length_along_tows_mm": 83.0,
+     "polar_angle_deg": 74.0572,
+     "shear_deg": 38.025
+    },
+    {
+     "i": 84,
+     "arc_length_along_tows_mm": 84.0,
+     "polar_angle_deg": 75.0911,
+     "shear_deg": 38.9048
+    },
+    {
+     "i": 85,
+     "arc_length_along_tows_mm": 85.0,
+     "polar_angle_deg": 76.1288,
+     "shear_deg": 39.7919
+    },
+    {
+     "i": 86,
+     "arc_length_along_tows_mm": 86.0,
+     "polar_angle_deg": 77.1703,
+     "shear_deg": 40.686
+    },
+    {
+     "i": 87,
+     "arc_length_along_tows_mm": 87.0,
+     "polar_angle_deg": 78.2154,
+     "shear_deg": 41.5871
+    },
+    {
+     "i": 88,
+     "arc_length_along_tows_mm": 88.0,
+     "polar_angle_deg": 79.2643,
+     "shear_deg": 42.4948
+    },
+    {
+     "i": 89,
+     "arc_length_along_tows_mm": 89.0,
+     "polar_angle_deg": 80.3168,
+     "shear_deg": 43.409
+    },
+    {
+     "i": 90,
+     "arc_length_along_tows_mm": 90.0,
+     "polar_angle_deg": 81.3729,
+     "shear_deg": 44.3295
+    },
+    {
+     "i": 91,
+     "arc_length_along_tows_mm": 91.0,
+     "polar_angle_deg": 82.4326,
+     "shear_deg": 45.2561
+    },
+    {
+     "i": 92,
+     "arc_length_along_tows_mm": 92.0,
+     "polar_angle_deg": 83.4957,
+     "shear_deg": 46.1885
+    },
+    {
+     "i": 93,
+     "arc_length_along_tows_mm": 93.0,
+     "polar_angle_deg": 84.5624,
+     "shear_deg": 47.1266
+    },
+    {
+     "i": 94,
+     "arc_length_along_tows_mm": 94.0,
+     "polar_angle_deg": 85.6325,
+     "shear_deg": 48.0701
+    },
+    {
+     "i": 95,
+     "arc_length_along_tows_mm": 95.0,
+     "polar_angle_deg": 86.7059,
+     "shear_deg": 49.0188
+    },
+    {
+     "i": 96,
+     "arc_length_along_tows_mm": 96.0,
+     "polar_angle_deg": 87.7826,
+     "shear_deg": 49.9724
+    },
+    {
+     "i": 97,
+     "arc_length_along_tows_mm": 97.0,
+     "polar_angle_deg": 88.8626,
+     "shear_deg": 50.9308
+    },
+    {
+     "i": 98,
+     "arc_length_along_tows_mm": 98.0,
+     "polar_angle_deg": 89.9457,
+     "shear_deg": 51.8937
+    }
+   ],
+   "gauss_bonnet_checks": [
+    {
+     "i": 36,
+     "polar_angle_deg": 29.7878,
+     "shear_deg": 7.2144,
+     "K_times_area_deg": 7.4188
+    },
+    {
+     "i": 53,
+     "polar_angle_deg": 44.8651,
+     "shear_deg": 15.7259,
+     "K_times_area_deg": 16.0246
+    },
+    {
+     "i": 69,
+     "polar_angle_deg": 59.9936,
+     "shear_deg": 26.5609,
+     "K_times_area_deg": 26.941
+    }
+   ],
+   "generator_crossing_shear_deg": [
+    0.0143,
+    0.0286
+   ],
+   "diagonal_reaches_equator": true
+  }
+ ],
+ "cylinder": [
+  {
+   "radius_mm": 50.0,
+   "length_mm": 200.0,
+   "fibre_angle_deg_from_axis": 0.0,
+   "flat_pattern": "rectangle",
+   "flat_width_mm": 314.159265,
+   "flat_height_mm": 200.0,
+   "area_mm2": 62831.8531,
+   "fibre_in_flat": "straight line at the same angle (cylinder is developable, isometric unrolling)",
+   "max_shear_deg": 0.0
+  },
+  {
+   "radius_mm": 50.0,
+   "length_mm": 200.0,
+   "fibre_angle_deg_from_axis": 45.0,
+   "flat_pattern": "rectangle",
+   "flat_width_mm": 314.159265,
+   "flat_height_mm": 200.0,
+   "area_mm2": 62831.8531,
+   "fibre_in_flat": "straight line at the same angle (cylinder is developable, isometric unrolling)",
+   "max_shear_deg": 0.0,
+   "helix_pitch_mm": 314.159265,
+   "fibre_length_one_turn_mm": 444.288294
+  },
+  {
+   "radius_mm": 50.0,
+   "length_mm": 200.0,
+   "fibre_angle_deg_from_axis": 30.0,
+   "flat_pattern": "rectangle",
+   "flat_width_mm": 314.159265,
+   "flat_height_mm": 200.0,
+   "area_mm2": 62831.8531,
+   "fibre_in_flat": "straight line at the same angle (cylinder is developable, isometric unrolling)",
+   "max_shear_deg": 0.0,
+   "helix_pitch_mm": 544.139809,
+   "fibre_length_one_turn_mm": 628.318531
+  }
+ ],
+ "cone_frustum": [
+  {
+   "r_large_mm": 100.0,
+   "r_small_mm": 50.0,
+   "height_mm": 150.0,
+   "slant_mm": 158.113883,
+   "flat_pattern": "annular sector",
+   "R_outer_mm": 316.227766,
+   "R_inner_mm": 158.113883,
+   "sector_angle_deg": 113.841996,
+   "area_mm2": 74509.412,
+   "lateral_area_check_mm2": 74509.412,
+   "zero_deg_fibre": "a generator (meridian) maps to a radial line of the sector; a geodesic fibre maps to a straight line",
+   "max_shear_deg": 0.0
+  },
+  {
+   "r_large_mm": 100.0,
+   "r_small_mm": 0.0,
+   "height_mm": 100.0,
+   "slant_mm": 141.421356,
+   "flat_pattern": "circular sector",
+   "R_outer_mm": 141.421356,
+   "R_inner_mm": 0.0,
+   "sector_angle_deg": 254.558441,
+   "area_mm2": 44428.8294,
+   "lateral_area_check_mm2": 44428.8294,
+   "zero_deg_fibre": "a generator (meridian) maps to a radial line of the sector; a geodesic fibre maps to a straight line",
+   "max_shear_deg": 0.0
+  }
+ ]
+}

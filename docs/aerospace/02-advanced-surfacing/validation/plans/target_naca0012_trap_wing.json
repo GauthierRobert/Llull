@@ -1,0 +1,56 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "m"
+  }
+ },
+ {
+  "command": "airfoil_from_naca",
+  "params": {
+   "designation": "0012",
+   "points": 161,
+   "spacing": "cosine",
+   "trailingEdge": "open"
+  },
+  "as": "af"
+ },
+ {
+  "command": "create_wing",
+  "params": {
+   "sections": [
+    {
+     "airfoilId": "$af",
+     "span": 0.0,
+     "chord": 2.0,
+     "twistDeg": 0.0
+    },
+    {
+     "airfoilId": "$af",
+     "span": 5.0,
+     "chord": 1.0,
+     "twistDeg": 0.0
+    }
+   ],
+   "sweepDeg": 0.0,
+   "sweepLocation": 0.0,
+   "dihedralDeg": 0.0,
+   "twistLocation": 0.25,
+   "loft": "linear",
+   "mirror": false
+  },
+  "as": "wing"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$wing"
+  }
+ },
+ {
+  "command": "wing_properties",
+  "params": {
+   "id": "$wing"
+  }
+ }
+]
