@@ -84,7 +84,7 @@ llull check_explicit analysisId=$an $D > check.json
 llull fea_mesh analysisId=$an $D --timeout 300 > mesh.json
 llull explicit_run analysisId=$an $D --progress --timeout 3600 > run.json         # or: export, run elsewhere, import
 llull explicit_report analysisId=$an $D > report.json
-python3 -I compare.py report.json expected_results.json VC-EXP-12.a --field rigidWalls.anvil.forcePlateauN --scale 1e-4
+python3 -I compare.py report.json expected_results.json VC-EXP-12.a --field probes.mid.plateauPa   # PHY-00 harness
 llull explicit_quick_check check=bar_impact 'inputs={"E_Pa":2e11,"rho_kg_m3":7850,"v_m_s":10,"L_m":0.2}' --json
 ```
 
