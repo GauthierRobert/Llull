@@ -15,6 +15,12 @@ public reference files, analytic expected results with sources) to prove a futur
 
 Authoring rules and section layout: [`TEMPLATE.md`](TEMPLATE.md).
 
+**Operator model:** llull's primary user is an **AI agent driving the `llull` CLI**, not an engineer at
+the UI; the person who asks for the work is not assumed to be an engineer either. The cross-cutting
+requirements for that — discoverable commands, machine-readable results with stable error codes,
+self-verification, built-in engineering guardrails, `reviewRequired` flags and human approval gates — are
+in [`AGENT_FIRST.md`](AGENT_FIRST.md) and override any UI-first wording in the packs.
+
 ## Gaps
 
 | # | Gap | Id | Functional | Technical | Validation |
