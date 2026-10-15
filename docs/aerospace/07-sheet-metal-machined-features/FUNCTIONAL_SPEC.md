@@ -186,6 +186,31 @@ Priority: MUST / SHOULD / COULD. Source = where the requirement or its numbers c
    type and diameter, and it highlights faces. For sheet geometry, run *Convert to sheet metal* (V1) and then *Flat
    Pattern*.
 
+### 6.1b Detailed UI journey — MRO angle repair (UC-1)
+
+1. *Sheet Metal ▸ Calculator*, units in. Enter T = 0.064, R = 0.25, θ = 135°, K-factor 0.4475 (or *FAA empirical*).
+   The panel shows K-chart 2.4142, SB 0.758, BA, BD and R/T. When a radius-table row exists for the chosen alloy/temper
+   at 0.064 in, it also shows R_min with its source line.
+2. *Create rule from calculator*. The rule stores material, T, R and K.
+3. Draw the repair angle web outline (2D) and run *Base Flange*. Select the long edge and run *Flange 135°*, length to
+   the OML.
+4. *Check*: green, or a list of violations. Each violation links to the rule and the table row.
+5. *Flat Pattern*: the developed outline appears in an ortho view with bend lines and the note
+   "UP 135° R0.25".
+6. *Export ▸ Flat DXF (in)* produces the file for the shop. *Export ▸ Drawing* (drawings gap) adds a bend table.
+
+### 6.1c Detailed UI journey — machined fitting (UC-5)
+
+1. Import or model the block. *Hole…*: pick the top face, choose *Countersink*, preset 100° (tooltip: "aerospace flush
+   convention — confirm with fastener catalogue"), d 4.8, D 9.0, *Through all*. Click 4 positions with snapping to grid
+   or construction points, or paste coordinates.
+2. *Hole…*: Counterbore 5.5 / 10.0 × 5.5, two positions.
+3. *Pocket…*: sketch a rectangle on the top face. Corner radius 3 is suggested from the tool diameter 6 entered in the
+   panel. Depth 4, floor fillet 0.
+4. *Hole…*: Simple 6.0, blind 6, drill point 118°. Thread checkbox → designation field (free text, family picker).
+5. *Check ▸ Machining*: countersink land OK (8.24 mm), pocket corner OK.
+6. *Analyse ▸ Hole table* gives the table panel and the drawing table.
+
 ### 6.2 CLI (`llull`, local agent / CI)
 
 ```bash

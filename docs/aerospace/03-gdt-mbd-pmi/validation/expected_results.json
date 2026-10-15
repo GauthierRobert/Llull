@@ -208,6 +208,121 @@
    ]
   },
   {
+   "id": "VC-GDT-05",
+   "proves": [
+    "FR-GDT-03",
+    "FR-GDT-10"
+   ],
+   "input": "plate; set_pmi_standard ISO_GPS then ASME_Y14.5_2018 with generalToleranceNote",
+   "expected": [
+    {
+     "quantity": "doc.pmi.standard",
+     "value": "ASME_Y14.5_2018",
+     "tolerance": "exact"
+    },
+    {
+     "quantity": "generalToleranceNote stored verbatim and printed in the sheet title block area",
+     "value": true
+    },
+    {
+     "quantity": "second identical call",
+     "value": "no-op"
+    }
+   ],
+   "source": "FR-GDT-03/10"
+  },
+  {
+   "id": "VC-GDT-06",
+   "proves": [
+    "FR-GDT-08",
+    "TR-GDT-04"
+   ],
+   "input": "plate; add_location_dimension from datum-B face (point [60,0,6]) to hole axis (point [16.7,20,6]), measure distance, basic: true; and from face y=0 to face y=80 ([60,80,6])",
+   "expected": [
+    {
+     "quantity": "plane to axis distance",
+     "value": 20.0,
+     "tolerance": 1e-09,
+     "unit": "mm",
+     "source": "derived: hole centre y=20"
+    },
+    {
+     "quantity": "plane to plane distance",
+     "value": 80.0,
+     "tolerance": 1e-09,
+     "unit": "mm",
+     "source": "derived: box depth 80"
+    },
+    {
+     "quantity": "basic flag rendered as boxed text",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": "VC-GDT-07",
+   "proves": [
+    "FR-GDT-22"
+   ],
+   "input": "V1: composite position FCF on the 4-hole pattern (upper Ø0.3 Ⓜ A B C, lower Ø0.1 Ⓜ A) + all-around profile on the outer faces",
+   "expected": [
+    {
+     "quantity": "compositeOf link",
+     "value": "lower segment references upper id"
+    },
+    {
+     "quantity": "check_pmi errors",
+     "value": 0
+    },
+    {
+     "quantity": "AP242 export contains ALL_AROUND_SHAPE_ASPECT",
+     "value": 1,
+     "unit": "count",
+     "source": "mapping table TECHNICAL_SPEC §6.1"
+    }
+   ]
+  },
+  {
+   "id": "VC-GDT-08",
+   "proves": [
+    "FR-GDT-23"
+   ],
+   "input": "V1: ISO_GPS document, size dimension Ø20 with sizeModifiers ['E']",
+   "expected": [
+    {
+     "quantity": "stored sizeModifiers",
+     "value": [
+      "E"
+     ]
+    },
+    {
+     "quantity": "rendered text contains the envelope symbol",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": "VC-GDT-09",
+   "proves": [
+    "FR-GDT-24"
+   ],
+   "input": "plate rebuilt in an inch document (set_units in, all lengths /25.4)",
+   "expected": [
+    {
+     "quantity": "hole measured diameter",
+     "value": 0.259842519685,
+     "tolerance": 1e-09,
+     "unit": "in",
+     "source": "6.6/25.4"
+    },
+    {
+     "quantity": "surface texture unit default",
+     "value": "uin under ASME when doc.units = in (TECH Q-7)",
+     "tolerance": "exact"
+    }
+   ]
+  },
+  {
    "id": "VC-GDT-10",
    "proves": [
     "FR-GDT-15",
@@ -715,6 +830,48 @@
    ]
   },
   {
+   "id": "VC-GDT-25",
+   "proves": [
+    "FR-GDT-25"
+   ],
+   "input": "V2 graphic PMI export",
+   "expected": [
+    {
+     "quantity": "SFA viewer shows llull annotations",
+     "value": "TBD — measure with NIST SFA viewer"
+    }
+   ]
+  },
+  {
+   "id": "VC-GDT-26",
+   "proves": [
+    "FR-GDT-26"
+   ],
+   "input": "V2 TDP bundle",
+   "expected": [
+    {
+     "quantity": "manifest lists AP242 + sheets with sha256 of each file",
+     "value": "TBD — structure to be defined against MIL-STD-31000B (licensed copy)"
+    }
+   ]
+  },
+  {
+   "id": "VC-GDT-27",
+   "proves": [
+    "FR-GDT-27"
+   ],
+   "input": "V2 zone visualisation of the flatness zone on datum A",
+   "expected": [
+    {
+     "quantity": "zone slab thickness",
+     "value": 0.05,
+     "tolerance": 1e-09,
+     "unit": "mm",
+     "source": "FCF value"
+    }
+   ]
+  },
+  {
    "id": "VC-GDT-30",
    "proves": [
     "FR-GDT-16",
@@ -1145,6 +1302,41 @@
    ],
    "tolerance": 1e-12,
    "source": "derived from clearance geometry"
+  },
+  {
+   "id": "VC-GDT-36",
+   "proves": [
+    "FR-GDT-18"
+   ],
+   "input": "plate; analyze_stackup with contributor {pmiId: boreSize} (hole 20 +0.021/0) and typed pin 20 -0.007/-0.020, sensitivities +1/-1",
+   "expected": [
+    {
+     "quantity": "worstCase.min",
+     "value": 0.007,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "worstCase.max",
+     "value": 0.041,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "rss.halfTolerance",
+     "value": 0.012349089,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "after update_pmi boreSize upper 0.025: worstCase.max",
+     "value": 0.045,
+     "tolerance": 1e-09,
+     "unit": "mm",
+     "source": "derived: 20.025-19.980"
+    }
+   ],
+   "source": "stackup_reference.json SU-03"
   },
   {
    "id": "VC-GDT-40",
