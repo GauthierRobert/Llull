@@ -283,12 +283,21 @@ def main() -> None:
     case("VC-CNT-40.h", "torque-controlled preload variation used when no test data is given (lubricated / dry)", "0.25 / 0.35", "1",
          {"exact": True}, "S5 section 6.1.d(1)A (named default, defaulted: true)", "A", ["FR-CNT-05", "FR-CNT-14"])
 
+    case("VC-CNT-40.i", "bolted_joint_check on a separation-critical joint without test-derived Gamma", "CNT_GAMMA_TEST_DATA_REQUIRED",
+         "code", {"exact": True}, "S5 section 6.1.c", "A", ["FR-CNT-05"])
+
     # ---- 7. pretension FE (pinned ccx deck) and contact contract
     case("VC-CNT-50", "pinned ccx decks pret1 / pret2 / bolt / contact1 / friction1 / hueeber1_mortar reproduce their .dat.ref",
          "TBD", "mixed", {"rel": 1e-4}, "S1 test suite (extract with the M2 reader, then freeze)", "TBD", ["FR-CNT-01", "FR-CNT-03", "TR-CNT-10"])
     case("VC-CNT-51", "bolt pretension section with 10 kN force: summed axial section force in the bolt after the preload step", 10000.0,
          "N", {"rel": 0.005}, "S1 manual *PRE-TENSION SECTION (mean force equals the applied force by MPC construction)", "A",
          ["FR-CNT-03"], note="exact by construction; checks the deck writer and the RF read-back")
+    case("VC-CNT-52", "V1 bolted flange FE: separation load and n*phi vs bolted_joint_check", "TBD", "N", {"rel": None},
+         "TBD - measure", "TBD", ["FR-CNT-04", "FR-CNT-07"])
+    case("VC-CNT-64", "V1 joint_from_fastener_stack and pin-in-hole template", "TBD", "mixed", {"rel": None}, "TBD - measure", "TBD",
+         ["FR-CNT-10", "FR-CNT-11"])
+    case("VC-CNT-65", "check_contact on wrong set-ups", "CNT_INITIAL_OVERCLOSURE, CNT_RIGID_BODY_BY_CONTACT_ONLY, "
+         "CNT_BEHAVIOUR_FORMULATION_MISMATCH", "codes", {"exact": True}, "TECHNICAL_SPEC 7.1", "A", ["FR-CNT-17", "FR-CNT-18"])
     case("VC-CNT-60", "contact pairs of different TYPE in one analysis", "CNT_MIXED_CONTACT_TYPES", "code", {"exact": True},
          "S1 manual *CONTACT PAIR (all pairs in a deck must be of the same type)", "A", ["FR-CNT-01", "FR-CNT-13"])
     case("VC-CNT-61", "add_contact_pair with friction and no stick slope", "named default lambda = E1/2 reported", "shape",

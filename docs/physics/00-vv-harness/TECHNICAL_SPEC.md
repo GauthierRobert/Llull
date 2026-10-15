@@ -34,19 +34,21 @@ packages/domain-physics/src  (@phys)  ── CadPlugin "vnv", toolset "analysis"
                   record_convergence_study (validated), accept_verification_exception (human gate)
    vnv/expected.ts      zod schema of expected_results.json (README §6.3) + harness recipe
    vnv/judge.ts         pure verdict rules (grade → verdict)
-        ▼ (public core API only, L10)                          ▼ reads @cae (05 FEA) types: AnalysisCase, ResultsSummary
+        ▼ (public core API only, L10 + dependency-cruiser rule; 05 types read from core model/analysis.ts)
 packages/core/src
    lib/convergence.ts   pure GCI arithmetic (observed order, Richardson, GCI, classification)  [lib, pure]
    lib/quantity.ts      (08 MAT) unit parse/convert, reused by the judge
 ```
 
+**Placement under the dependency rule** (aligned with PHY-03 TECHNICAL_SPEC §2.1): `.dependency-cruiser.cjs` rule `plugins-and-kernels-depend-on-core-only` forbids `packages/domain-physics` importing 05's `@cae`. The shared analysis data types (`AnalysisCase`, `FeaTarget`, `ResultsSummary`, mesh/result artifact shapes) live in core `model/analysis.ts` (05 TR-FEA-02), and this pack's additions go there too; behaviour that 05 must dispatch (staleness fields, check items) is registered through the core extension port proposed by PHY-03 (`CadPlugin.analysisExtensions`, `AnalysisTypeExtension`). **Proposal A (preferred):** `@phys` + core port, no package imports another package. **Proposal B (fallback):** the discipline lives inside the 05 FEA package (`packages/domain-cae/src/<discipline>/`). Pending README §5.1; everything below is written for A, under B only paths change.
+
 **Laws respected**
 
 - **L1/L5.** Every capability is a registry command or a host transport that applies its result through a registry
   command (`record_convergence_study`), like 05's `fea_solve` → `record_fea_results`.
-- **L2.** `lib/convergence.ts` is a pure leaf; `@phys` imports only core's public API and 05's `@cae` types (plugin to
-  plugin through a published type module, the same way PHY packs extend 05; README §6.2). File and process access
-  (`run_benchmarks`, solver runs) lives in `server/`.
+- **L2.** `lib/convergence.ts` is a pure leaf; `@phys` imports only core's public API. The 05 types it reads
+  (`AnalysisCase`, `ResultsSummary`, artifact shapes) are core types (`model/analysis.ts`, 05 TR-FEA-02); no package
+  imports another package (rule `plugins-and-kernels-depend-on-core-only`). File and process access lives in `server/`.
 - **L3/L4.** Studies live in the 05 `analysis` slice (`AnalysisCase.studies`); commands spread it.
 - **L6.** The server forwards and loops; it holds no V&V arithmetic (the judge and GCI are pure functions).
 - **L8.** `record_convergence_study` is a mutating step (replayable); study validity is computed from hashes, never
@@ -91,7 +93,7 @@ export function observedOrder(s: readonly ConvergenceSample[]): { p: number; ite
 export function gciTriplet(s: readonly [ConvergenceSample, ConvergenceSample, ConvergenceSample], fs: number): TripletReport;
 export function requiredSpacing(gciTarget: number, gci21: number, p: number, h1: number): number;
 
-// packages/domain-physics/src/vnv/types.ts — extends the 05 AnalysisCase (README §6.2)
+// packages/core/src/model/analysis.ts additions (data types in core, like 05 TR-FEA-02; README §6.2 adjusted by PHY-03 §2.1)
 export interface NamedValue { readonly value: number; readonly source: string; readonly defaulted: boolean }
 export type StudyQuantity =
   | { readonly kind: 'probe'; readonly probe: string; readonly component: string }     // 05 add_result_probe name

@@ -31,17 +31,20 @@ packages/domain-physics/src (@phys) ── CadPlugin "topology", toolset "analys
    topology/guard.ts        DerivationGuard 'topology' (edits of derived ids → TOP_DERIVED_READ_ONLY)
    topology/contours.ts     marching squares + Douglas–Peucker → closed polylines (pure)
    topology/grid.ts         voxelisation of the design domain (via kernel tessellation, pure point-in-mesh test)
-        ▼ (public core API, L10) + 05 @cae types (AnalysisCase, FeaTarget, FeaMaterialView)
+        ▼ (public core API only, L10 + dependency-cruiser rule): core model/analysis.ts (05 AnalysisCase, FeaTarget),
+          PHY-01 resolvePropertyModel for E, nu (no @cae import)
 packages/core/src/lib/topology.ts   pure SIMP/OC/filter reference (small grids, used by tests and by the
                                     separable-problem check; the production solve runs in the bridge)
 ```
+
+**Placement under the dependency rule** (aligned with PHY-03 TECHNICAL_SPEC §2.1): `.dependency-cruiser.cjs` rule `plugins-and-kernels-depend-on-core-only` forbids `packages/domain-physics` importing 05's `@cae`. The shared analysis data types (`AnalysisCase`, `FeaTarget`, `ResultsSummary`, mesh/result artifact shapes) live in core `model/analysis.ts` (05 TR-FEA-02), and this pack's additions go there too; behaviour that 05 must dispatch (staleness fields, check items) is registered through the core extension port proposed by PHY-03 (`CadPlugin.analysisExtensions`, `AnalysisTypeExtension`). **Proposal A (preferred):** `@phys` + core port, no package imports another package. **Proposal B (fallback):** the discipline lives inside the 05 FEA package (`packages/domain-cae/src/<discipline>/`). Pending README §5.1; everything below is written for A, under B only paths change.
 
 **Laws respected**
 
 - **L1/L5.** Study set-up and every query are registry commands; the solve is a transport that applies its result via
   `record_topology_result`, validated against the artifact store (05 §4.1 trust model), so an agent cannot inject a
   fabricated optimum.
-- **L2.** Process and file work in `server/`; deterministic numerics in the bridge op; geometry derivation in pure TS.
+- **L2.** `@phys` imports core only (no `@cae`); process and file work in `server/`; deterministic numerics in the bridge op; geometry derivation in pure TS.
 - **L3/L4.** Study data lives in the 05 `analysis` slice (`AnalysisCase.topology`); the density field lives in the
   content-addressed artifact store; the iso-surface is regenerated from it.
 - **L8.** The iso-surface entity id is reported by `derivedEntityIds`; `topology/guard.ts` rejects any command that
@@ -72,8 +75,8 @@ packages/core/src/lib/topology.ts   pure SIMP/OC/filter reference (small grids, 
 ## 3. Data model
 
 ```ts
-// packages/domain-physics/src/topology/types.ts — extends 05 AnalysisCase (README §6.2)
-import type { FeaTarget } from '@cae/model';      // 05 type (facesNear / edgesNear / pointsNear)
+// packages/core/src/model/analysis.ts additions (data types in core; behaviour in @phys via the PHY-03 extension port)
+import type { FeaTarget } from '@core/model/analysis';   // 05 type, core-owned (05 TR-FEA-02)
 export interface NamedValue { readonly value: number; readonly source: string; readonly defaulted: boolean }
 export type TopologyObjective =
   | { readonly kind: 'min_compliance'; readonly loadCaseWeights: Record<string, number> }          // MVP
@@ -147,7 +150,7 @@ Plugin `topology`, toolset `analysis`. ✱ = transport.
 | `suggest_rebuild` | query | `{ studyId, plane?, offset?: number (doc unit), tolerance?: number (doc unit), minLoopArea?: number (doc unit²) }` → `data { plane, placement: { position, rotation }, loops: [{ points: [x,y][], orientation: 'outer'\|'hole', areaMm2 }], widthSamples: [{ at, widthMm }], enclosedFraction }` | @failure stale / missing result → `TOP_RESULT_STALE` / `TOP_RESULT_MISSING` |
 | `compare_to_topology` | query (requiresKernel) | `{ studyId, entityId, iouTarget?: number, complianceRatioTarget?: number }` → `data { iou, volumeRatio, complianceRatio?, targets: { iou: NamedValue, complianceRatio: NamedValue }, status, codes[] }` | read-only |
 | `check_topology` | query | `{ studyId }` → `data { status, items: [{ code, severity, ids[], message, remediation }], reviewRequired }` | AF-20 readiness check |
-| ✱ `topology_solve` | transport | `{ studyId, timeoutS?: number (default 1800), resumeFromLast?: boolean }` | builds the grid, transfers 05 loads/supports and E/ν, runs the bridge op with progress per iteration, stores the artifact, dispatches `record_topology_result` |
+| ✱ `topology_solve` | transport | `{ studyId, timeoutS?: number (default 1800), resumeFromLast?: boolean }` | builds the grid, transfers 05 loads/supports and E/ν (E, ν resolved from the 08 record through core PHY-01 `resolvePropertyModel` / 08 preferred values, the same resolution 05's `FeaMaterialView` uses), runs the bridge op with progress per iteration, stores the artifact, dispatches `record_topology_result` |
 
 Example description (AF-02) for `create_topology_study`: "Creates a minimum-compliance topology optimization study
 on an existing 05 analysis case. `voxel` is the grid spacing in document length units (e.g. 1 for 1 mm voxels);

@@ -385,6 +385,20 @@
    ]
   },
   {
+   "id": "VC-CNT-40.i",
+   "quantity": "bolted_joint_check on a separation-critical joint without test-derived Gamma",
+   "value": "CNT_GAMMA_TEST_DATA_REQUIRED",
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "S5 section 6.1.c",
+   "grade": "A",
+   "proves": [
+    "FR-CNT-05"
+   ]
+  },
+  {
    "id": "VC-CNT-50",
    "quantity": "pinned ccx decks pret1 / pret2 / bolt / contact1 / friction1 / hueeber1_mortar reproduce their .dat.ref",
    "value": "TBD",
@@ -414,6 +428,51 @@
     "FR-CNT-03"
    ],
    "note": "exact by construction; checks the deck writer and the RF read-back"
+  },
+  {
+   "id": "VC-CNT-52",
+   "quantity": "V1 bolted flange FE: separation load and n*phi vs bolted_joint_check",
+   "value": "TBD",
+   "unit": "N",
+   "tolerance": {
+    "rel": null
+   },
+   "source": "TBD - measure",
+   "grade": "TBD",
+   "proves": [
+    "FR-CNT-04",
+    "FR-CNT-07"
+   ]
+  },
+  {
+   "id": "VC-CNT-64",
+   "quantity": "V1 joint_from_fastener_stack and pin-in-hole template",
+   "value": "TBD",
+   "unit": "mixed",
+   "tolerance": {
+    "rel": null
+   },
+   "source": "TBD - measure",
+   "grade": "TBD",
+   "proves": [
+    "FR-CNT-10",
+    "FR-CNT-11"
+   ]
+  },
+  {
+   "id": "VC-CNT-65",
+   "quantity": "check_contact on wrong set-ups",
+   "value": "CNT_INITIAL_OVERCLOSURE, CNT_RIGID_BODY_BY_CONTACT_ONLY, CNT_BEHAVIOUR_FORMULATION_MISMATCH",
+   "unit": "codes",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-CNT-17",
+    "FR-CNT-18"
+   ]
   },
   {
    "id": "VC-CNT-60",

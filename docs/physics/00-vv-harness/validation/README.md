@@ -60,6 +60,27 @@ Status **P** (proposed). Values: `expected_results.json` (12 significant digits)
 | VC-VNV-17 | TR-VNV-10 | run VC-VNV-10 twice | identical study JSON and report hash | exact | — | A | integration |
 | VC-VNV-18 | FR-VNV-16 | deliberately wrong inputs: 1 sample; duplicate h; h = 0; NaN value; 2 samples without `assumedOrder`; malformed expected case; unit mismatch | each returns the §7.1 code, path and remediation | exact | TECHNICAL_SPEC §7.1 | A | unit + CLI |
 
+## Requirement coverage supplement
+
+Requirements not named in the table above are proved as follows (same VC ids; the new ids VC-VNV-19…22 are behaviour
+checks without a physics value).
+
+| Requirement | Proved by |
+| ----------- | --------- |
+| FR-VNV-08 (Fs named, two-level flag) | VC-VNV-01 (`safetyFactor` = 1.25 named, AC-1); **VC-VNV-19**: two samples with `assumedOrder = 2` → Fs = 3 `defaulted: true`, `VNV_TWO_LEVEL_ONLY` |
+| FR-VNV-12 (quality:physics gate) | **VC-VNV-20**: `npm run quality:physics` exits 1 when one A-grade fixture fails (RF-02 injected), 0 otherwise |
+| FR-VNV-15 (units + provenance) | VC-VNV-01 / 06 (`data.unit`, `data.provenance.procedure = "celik2008-gci"`, inputs echoed) |
+| FR-VNV-17 (owner summary) | **VC-VNV-21**: `summary` of AC-1 states quantity, status and GCI in one sentence and "estimated" wording |
+| FR-VNV-18 (plot / render) | VC-VNV-10 (UI review only; `render_view` per level, manual) |
+| FR-VNV-19 (least squares, V1) | **VC-VNV-22**: 4 samples of f = 10 + 0.5 h² (h = 0.1, 0.2, 0.4, 0.8) → fitted p = 2, f0 = 10 (exact law, abs 1e-9) |
+| FR-VNV-20 (V&V 20, V2) | deferred; no VC until the formula is confirmed (TECHNICAL_SPEC §11 Q2) |
+| TR-VNV-01 (lib functions) | VC-VNV-01…09 |
+| TR-VNV-05 (triplets for > 3 samples) | VC-VNV-22 (three triplets reported) |
+| TR-VNV-07 (schema + adapter) | VC-VNV-12, VC-VNV-18 (`VNV_EXPECTED_INVALID`), TECHNICAL_SPEC §6.2 survey of 669 cases in 20 packs (all accepted) |
+| TR-VNV-08 (harness recipe) | VC-VNV-10 harness, AC-9 |
+| TR-VNV-11 (agent-first contract) | VC-VNV-01, 14, 15 |
+| TR-VNV-13 (quality:physics script) | VC-VNV-20 |
+
 ## CLI harness (AF-23)
 
 ```bash

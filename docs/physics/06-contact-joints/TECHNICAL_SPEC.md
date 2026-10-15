@@ -9,7 +9,7 @@ Gap id **PHY-06** · prefix **CNT** · status: specification · written 2026-10-
 | Area | What exists | Path | Limit for this gap |
 | ---- | ----------- | ---- | ------------------ |
 | Assemblies (today) | `create_component`, `insert_instance`; kinematic joints and `motion_study` without forces | `packages/core/src/commands/assembly/`, `commands/motion/` | No contact mechanics |
-| Interference check (today) | clash / interference queries (`check_model`, measure tools) | `packages/core/src/commands/inspect/` | Geometric overlap only, no pressure |
+| Interference check (today) | `motion_study` returns per-step AABB interference pairs between instances | `packages/core/src/commands/motion/motionStudy.ts` | Bounding-box overlap only, no contact mechanics |
 | Aerospace 05 FEA (baseline) | Analysis model, targets (`facesNear` …), Gmsh, INP writer, ccx, FRD/DAT readers, margins, `check_analysis`; **V2 hook only**: linear tied contact and bolted joints | `docs/aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md` §4, §10 | This pack supersedes the V2 hook |
 | Aerospace 08 MAT (baseline) | Fastener catalogue (`FastenerFamily`, `FastenerSize` dims), `FastenerStack { axis, layers, fastener, washers, nut, holeStepRef, checks }` in the `@aero` plugin; V2 `joint_capacity` | `docs/aerospace/08-materials-standards-libraries/TECHNICAL_SPEC.md` §3.3–3.4, §4.2 | No preload, separation or slip |
 | PHY-05 (baseline) | `nonlinear_static`, steps with load / displacement control, curve probes, increment parsing, `check_nonlinear` | `docs/physics/05-nonlinear-structural/TECHNICAL_SPEC.md` §3–§5 | No contact |
@@ -42,7 +42,8 @@ A grep of `packages/` for `contact pair`, `friction`, `pretension` and `preload`
 
 ```
 packages/core/src/model/analysis.ts       (05) AnalysisCase.contact?: ContactSettings     (types owned here)
-packages/<cae-host>/src/contact/           CadPlugin 'contact', toolset 'analysis'         (placement: PHY-05 §2.1)
+packages/domain-physics/src/contact/      CadPlugin 'contact', toolset 'analysis'  (@phys; PHY-05 §2.1 Proposal A)
+   extension.ts contributes contact / pretension deck sections and result summaries to 'nonlinear_static' (pure)
    commands/  add_contact_pair, update_contact_pair, delete_contact_pair, add_bolt_pretension, delete_bolt_pretension,
               contact_report, check_contact, hertz_contact, interference_fit, bolted_joint_check,
               joint_from_fastener_stack (V1), joint_stiffness_from_fe (V1)
@@ -51,8 +52,9 @@ packages/<cae-host>/src/contact/           CadPlugin 'contact', toolset 'analysi
    checks/    hertz.ts, lame.ts, nasa5020.ts   (pure; identical to validation/generate_cnt_reference.py)
 ```
 
-Placement follows PHY-05 §2.1 (option B recommended: a core deck-contributor extension point, the same mechanism as
-PHY-02's `MaterialCardWriter`; option A fallback: folder inside `packages/domain-cae`). The fastener link reads 08 stacks
+Placement follows PHY-05 §2.1 and PHY-03 §2.1, pending README §5.1: Proposal A — core analysis extension port
+(`AnalysisTypeExtension` / `CadPlugin.analysisExtensions`; contact contributes sections to the `nonlinear_static` extension);
+Proposal B fallback — the discipline lives inside the 05 FEA package (`packages/domain-cae/src/contact/`). The fastener link reads 08 stacks
 through `execute` of an 08 query (never by importing `@aero`, L10) — see §11 q3.
 
 **Laws respected:** L1 (commands only; solving through 05 transports), L2, L3, L4 (contact results in the 05 artifact

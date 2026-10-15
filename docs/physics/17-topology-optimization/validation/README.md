@@ -70,6 +70,27 @@ sympy) were stubbed; called `main(nelx=60, nely=20, volfrac=0.5, rmin=1.5, ft=0|
 read the returned objective. topoptlab's `ft=0` is the sensitivity filter and `ft=1` the density filter (its own
 numbering differs from top88's 1/2).
 
+## Requirement coverage supplement
+
+| Requirement | Proved by |
+| ----------- | --------- |
+| FR-TOP-01, TR-TOP-01 (study as document data, replay) | **VC-TOP-28**: run `plans/top_mbb_60x20.plan.json`, save, load, `replay_history` → `topology` slice deep-equal, ids `ts-<step>.<k>` identical; `is pure` per command |
+| FR-TOP-12 (check_topology) | VC-TOP-21, 23, 24, 25 (codes); **VC-TOP-29**: solved study without rebuild → `TOP_REBUILD_MISSING` warning |
+| FR-TOP-13 (symmetry) | **VC-TOP-30**: full 120×20 MBB (central load, two end supports) with a YZ symmetry plane → xPhys mirror-symmetric to 1e-12 and compliance within 1 % of 2 × VC-TOP-10.b (not exact: the filter crosses the symmetry line in the full model but is truncated at the boundary of the half model); TBD measure, grade B until then |
+| FR-TOP-17 (named defaults) | VC-TOP-10 (`settings` each `{value, source, defaulted}`) |
+| FR-TOP-19 (progress / resume / cache) | VC-TOP-27 + **VC-TOP-31**: resume from iterate 50 gives the same final field as an uninterrupted run |
+| FR-TOP-20 (codes) | VC-TOP-20, 21, 24, 25, 26 |
+| FR-TOP-21 (render) | manual review (UI) |
+| FR-TOP-22…24 (V1/V2) | deferred; VCs added with the milestone |
+| TR-TOP-02 (grid / masks) | VC-TOP-24, 28 |
+| TR-TOP-03, 04 (bridge op, solver) | VC-TOP-10, 11 (integration) |
+| TR-TOP-07 (artifact + validated record) | **VC-TOP-32**: `record_topology_result` with absent hash / edited summary / genuine → `TOP_ARTIFACT_NOT_FOUND`, `TOP_SUMMARY_MISMATCH`, accepted |
+| TR-TOP-08 (derived mesh) | VC-TOP-20, 27 |
+| TR-TOP-09 (contours) | VC-TOP-22 |
+| TR-TOP-10 (compare) | VC-TOP-23 |
+| TR-TOP-11 (agent-first contract) | VC-TOP-25, 26 |
+| TR-TOP-13 (shape optimisation, V1) | deferred |
+
 ## CLI harness (AF-23)
 
 ```bash

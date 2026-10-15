@@ -1,0 +1,71 @@
+{
+ "standard": "NASA-STD-5020 (2012)",
+ "control": "torque",
+ "separationCritical": false,
+ "torque": {
+  "nominal": {
+   "value": 10.0,
+   "unit": "N*m"
+  },
+  "tolerance": {
+   "value": 0.5,
+   "unit": "N*m"
+  },
+  "aboveRunning": true
+ },
+ "nutFactor": {
+  "value": 0.2,
+  "source": "test input of VC-CNT-40 (not a hardware value)",
+  "tested": false
+ },
+ "nominalDiameter": {
+  "value": 6.35,
+  "unit": "mm"
+ },
+ "lubricated": true,
+ "fastenerCount": 4,
+ "metallicJoint": true,
+ "stiffness": {
+  "boltStiffness": {
+   "value": 200000.0,
+   "unit": "N/mm"
+  },
+  "clampedStiffness": {
+   "value": 600000.0,
+   "unit": "N/mm"
+  }
+ },
+ "loadingPlaneFactor": {
+  "value": 0.5,
+  "source": "test input"
+ },
+ "allowableTensile": {
+  "value": 20000.0,
+  "unit": "N"
+ },
+ "limitLoads": {
+  "tensionPerFastener": {
+   "value": 2000.0,
+   "unit": "N"
+  },
+  "shearJoint": {
+   "value": 3000.0,
+   "unit": "N"
+  },
+  "tensionJoint": {
+   "value": 4000.0,
+   "unit": "N"
+  }
+ },
+ "factors": {
+  "separation": 1.2,
+  "ultimate": 1.4,
+  "slip": 1.2,
+  "fitting": 1.0,
+  "source": "test inputs (illustrative, not the standard's values)"
+ },
+ "friction": {
+  "mu": 0.2,
+  "surface": "uncoated_clean_metal"
+ }
+}

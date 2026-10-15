@@ -47,34 +47,35 @@ material colour comment (`commands/document/materials.ts`): there is no nonlinea
 ```
 packages/core/src/model/analysis.ts      (05)  AnalysisType += 'nonlinear_static'; AnalysisCase.nonlinear?: NonlinearSettings
 packages/core/src/model/materialModel.ts (PHY-02) MaterialModel / ConstitutiveSet — read only here
-packages/<cae-host>/src/nonlinear/        CadPlugin 'nonlinear', toolset 'analysis'                       (placement: §2.1)
+packages/domain-physics/src/nonlinear/   CadPlugin 'nonlinear', toolset 'analysis'  (@phys; Proposal A §2.1)
+   extension.ts AnalysisTypeExtension for 'nonlinear_static' (pure)
    commands/  set_nonlinear_controls, add_analysis_step, update_analysis_step, delete_analysis_step,
               set_part_constitutive_set, add_curve_probe, delete_curve_probe, add_imperfection, delete_imperfection,
               nonlinear_report, limit_load, check_nonlinear, nonlinear_analytic_check, beam_large_deflection
-   decks/     nonlinearInp.ts   (pure: extends the 05 INP writer with steps, controls, plasticity, imperfections)
+   decks/     nonlinearInp.ts   (pure deck sections returned through the extension: steps, controls, imperfections)
    results/   incrementReader.ts (FRD/DAT per increment), curves.ts, limitLoad.ts, permanentSet.ts
    solver/    corotationalFrame2d.ts, arcLength.ts, bandedLu.ts    (pure, deterministic)
    checks/    analytic.ts   (same formulas as validation/generate_nls_reference.py)
 server/       (05) fea_solve transport: progress per increment parsed from ccx stdout, cancel, timeout
 ```
 
-### 2.1 Placement and the plugin-to-plugin rule (decision needed)
+### 2.1 Placement decision forced by the dependency rule (pending README §5.1)
 
-The physics README §6.2 proposes a plugin package `packages/domain-physics` (`@phys`) that **extends** 05's `@cae`
-deck writers and result readers. The repository's `.dependency-cruiser.cjs` rule
-`plugins-and-kernels-depend-on-core-only` forbids `packages/domain-*` from importing any package other than core and
-itself, so `@phys` importing `@cae` would fail `npm run arch` (law L10; 07 FTR TECHNICAL_SPEC §1 states the same rule).
-Options:
+`docs/physics/README.md` §6.2 proposes a `packages/domain-physics` plugin (`@phys`) that extends 05's analysis stack. The
+enforced rule `plugins-and-kernels-depend-on-core-only` (`.dependency-cruiser.cjs`, part of `npm run check`) forbids
+`domain-physics → domain-cae` imports, and architecture L2 says never to loosen a rule. This pack therefore uses the
+shared proposal of PHY-03 (`../03-thermal-analysis/TECHNICAL_SPEC.md` §2.1), **pending decision** (README §5.1, §11 q1):
 
-| Option | What it means | Assessment |
-| ------ | ------------- | ---------- |
-| A | `nonlinear` is a second `CadPlugin` **inside** `packages/domain-cae` (folder `src/nonlinear/`), installed next to `cae` | No rule change; deck writer and FRD reader reused by relative import within one package |
-| **B (recommended, aligned with PHY-02)** | Core exposes an extension point (`model/analysis.ts` types + a deck-contributor interface in `plugins/plugin.ts`) and `domain-physics` contributes keyword blocks without importing `@cae`. PHY-02 already proposes this shape for material cards (`MaterialCardWriter` registered with the 05 deck writer, PHY-02 TECHNICAL_SPEC §2); this pack would add a `StepContributor` (steps, controls, probes, imperfections) of the same kind | Grows the core plugin contract once for all physics packs; needs one shared design pass |
-| C | Loosen the cruiser rule for `domain-physics → domain-cae` | Changes an architecture law: needs user approval (CLAUDE.md W6) |
+- **Proposal A (preferred): analysis extension port in core.** Shared analysis types live in core `model/analysis.ts`
+  (05 TR-FEA-02). Core gains `AnalysisTypeExtension` (validateCase · inputHashFields · writeDeckSections ·
+  summariseResults · checkItems) and `CadPlugin.analysisExtensions?`; `plugins/host.ts` exposes `analysisExtension(type)`.
+  05's deck writer, summariser, staleness hash and `check_analysis` dispatch on that lookup for types they do not own.
+  This pack registers the extension for `nonlinear_static` from `@phys`; PHY-02's material cards arrive through its
+  `MaterialCardWriter` in the same way. No package imports another package.
+- **Proposal B (fallback): discipline inside the 05 FEA package** (`packages/domain-cae/src/nonlinear/`, its own `CadPlugin`
+  exported from the same package; intra-package imports are allowed).
 
-This spec writes paths as `packages/<cae-host>/src/nonlinear/` so it holds under A or B. Types that core may reference
-(`NonlinearSettings`, `AnalysisType` member) live in core `model/analysis.ts`, owned by 05 and extended here (the 05 and
-06 CMP precedent: core holds data types, plugins hold behaviour).
+Paths below are written for Proposal A (`packages/domain-physics/src/nonlinear/`); under B only the package changes.
 
 **Laws respected:** L1 (every change is a command; meshing and solving are 05 transports that record results through
 05's validated `record_fea_results`), L2 (no DOM / process code in packages; `ccx` runs in `server/`), L3 (pure
@@ -87,7 +88,7 @@ targeting), L10 (plugin; core gets data types only).
 | Id | Pri | Requirement |
 | -- | --- | ----------- |
 | TR-NLS-01 | MUST | `AnalysisType` gains `'nonlinear_static'` (owned by this pack, listed in §3). `AnalysisCase.nonlinear?: NonlinearSettings` is present iff the type is `nonlinear_static`; plugin `validate` enforces it. |
-| TR-NLS-02 | MUST | The INP writer extension is pure and byte-deterministic: same `AnalysisModel` + mesh artifact + material models ⇒ same text (05 TR-FEA-40). |
+| TR-NLS-02 | MUST | The deck sections (via `AnalysisTypeExtension.writeDeckSections`) are pure and byte-deterministic: same `AnalysisModel` + mesh artifact + material models ⇒ same text (05 TR-FEA-40). |
 | TR-NLS-03 | MUST | Material cards come from the PHY-02 writer for the selected constitutive set (§5.2); no stress-strain values are stored in the analysis slice. |
 | TR-NLS-04 | MUST | `fea_solve` for a nonlinear case parses ccx stdout increment lines into progress events and stores per-increment probe values and the selected increments' fields in the artifact (§5.4). |
 | TR-NLS-05 | MUST | `limit_load` and `permanentSet` are pure functions of the stored curve / fields (`results/limitLoad.ts`, `results/permanentSet.ts`), unit-tested on synthetic curves. |
@@ -470,7 +471,7 @@ Cross-pack: PHY-06 contact and PHY-16 springback build on `nonlinear_static`, st
 
 ## 11. Open questions / decisions needed
 
-1. **Placement (§2.1).** Option B (core extension point, as PHY-02's `MaterialCardWriter`) vs A (inside `domain-cae`) vs C (rule change, needs user approval).
+1. **Placement (§2.1, README §5.1).** Proposal A (core `AnalysisTypeExtension` port, shared with PHY-03 and PHY-02's `MaterialCardWriter`) vs Proposal B (discipline inside the 05 FEA package). Loosening the dependency rule is not an option (L2).
 2. **Limit-point rule.** The "tangent < 1 % of initial over 3 increments" classifier is a llull rule with no external source;
    confirm or replace with a reviewer-agreed criterion.
 3. **Permanent-set threshold.** 25.305 gives no number; who supplies the "detrimental" threshold (company rule table)?
