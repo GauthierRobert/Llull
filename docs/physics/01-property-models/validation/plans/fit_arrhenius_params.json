@@ -1,0 +1,6 @@
+{
+ "data": {"variable": "T", "variableUnit": "K", "valueUnit": "1/s",
+  "rows": [[500, 2.1375e-19], [600, 8.7417e-17], [700, 6.4133e-15], [800, 1.6077e-13], [900, 1.9697e-12], [1000, 1.4620e-11]]},
+ "form": "arrhenius", "property": "diffusionRate", "id": "rate.fit", "basis": "unspecified",
+ "note": "SYNTHETIC rows rounded to 5 digits from VC-PROP-10 (A = 1e-3 1/s, Q = 150 kJ/mol); for workflow illustration only. VC-PROP-14 uses the unrounded values. 'diffusionRate' is a placeholder name that must be added to the property catalogue first (or use a catalogue property)."
+}

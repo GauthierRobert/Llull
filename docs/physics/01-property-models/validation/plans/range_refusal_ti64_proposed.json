@@ -1,0 +1,12 @@
+[
+ {"command": "define_material_record", "params": {"id": "ti6al4v", "name": "Ti-6Al-4V", "designation": "Ti-6Al-4V", "specs": [], "licence": "public-domain-us-gov", "exportMarking": {"regime": "none"}}},
+ {"command": "define_property_model", "params": {"material": "ti6al4v", "model": {
+   "id": "k.nist", "property": "k", "unit": "W/(m*K)",
+   "variables": [{"variable": "T", "unit": "K"}],
+   "form": {"kind": "log10Polynomial", "variable": "T", "coefficients": [-5107.8774, 19240.422, -30789.064, 27134.756, -14226.379, 4438.2154, -763.07767, 55.796592, 0.0]},
+   "validity": [{"variable": "T", "unit": "K", "data": [23, 300], "equation": [20, 300]}],
+   "basis": "typical",
+   "source": {"citation": "NIST Cryogenics, Material Properties: Ti 6Al 4V (UNS R56400)", "locator": "Thermal conductivity coefficients a-i", "url": "https://trc.nist.gov/cryogenics/materials/Ti6Al4V/Ti6Al4V_rev.htm", "accessed": "2026-10-15"}}}},
+ {"command": "evaluate_property", "params": {"material": "ti6al4v", "property": "k", "at": {"T": {"value": 21, "unit": "K"}}}, "as": "warned"},
+ {"command": "evaluate_property", "params": {"material": "ti6al4v", "property": "k", "at": {"T": {"value": 10, "unit": "K"}}}, "as": "refused"}
+]

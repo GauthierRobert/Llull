@@ -1,0 +1,138 @@
+{
+ "pack": "00-vv-harness",
+ "generatedBy": "generate_vnv_reference.py",
+ "rule": "pass iff |measured - value| <= abs, or |measured - value| <= rel * |value|; grade B, C, TBD never fail the gate",
+ "fixtures": [
+  {
+   "id": "RF-01",
+   "expected": {
+    "value": 36.6,
+    "unit": "degC",
+    "tolerance": {
+     "rel": 0.01
+    },
+    "grade": "A"
+   },
+   "measured": {
+    "value": 36.9,
+    "unit": "degC"
+   },
+   "verdict": "pass",
+   "relError": 0.00819672131148
+  },
+  {
+   "id": "RF-02",
+   "expected": {
+    "value": 36.6,
+    "unit": "degC",
+    "tolerance": {
+     "rel": 0.01
+    },
+    "grade": "A"
+   },
+   "measured": {
+    "value": 37.0,
+    "unit": "degC"
+   },
+   "verdict": "fail",
+   "relError": 0.0109289617486,
+   "code": "VNV_BENCHMARK_FAILED"
+  },
+  {
+   "id": "RF-03",
+   "expected": {
+    "value": 0.0,
+    "unit": "1",
+    "tolerance": {
+     "abs": 1e-12
+    },
+    "grade": "A"
+   },
+   "measured": {
+    "value": 3e-13,
+    "unit": "1"
+   },
+   "verdict": "pass"
+  },
+  {
+   "id": "RF-04",
+   "expected": {
+    "value": 92.7,
+    "unit": "MPa",
+    "tolerance": {
+     "rel": 0.02
+    },
+    "grade": "B"
+   },
+   "measured": {
+    "value": 85.0,
+    "unit": "MPa"
+   },
+   "verdict": "warn",
+   "code": "VNV_BENCHMARK_UNCONFIRMED",
+   "note": "grade B is reported, never gating"
+  },
+  {
+   "id": "RF-05",
+   "expected": {
+    "value": "TBD",
+    "unit": "MPa",
+    "grade": "TBD"
+   },
+   "measured": {
+    "value": -5.4,
+    "unit": "MPa"
+   },
+   "verdict": "skip",
+   "code": "VNV_EXPECTED_TBD"
+  },
+  {
+   "id": "RF-06",
+   "expected": {
+    "value": 92.7,
+    "unit": "MPa",
+    "tolerance": {
+     "rel": 0.02
+    },
+    "grade": "A"
+   },
+   "measured": {
+    "value": 92700000.0,
+    "unit": "Pa"
+   },
+   "verdict": "pass",
+   "note": "units converted with lib/quantity before comparison"
+  },
+  {
+   "id": "RF-07",
+   "expected": {
+    "value": 92.7,
+    "unit": "MPa",
+    "tolerance": {
+     "rel": 0.02
+    },
+    "grade": "A"
+   },
+   "measured": {
+    "value": 92.7,
+    "unit": "mm"
+   },
+   "verdict": "error",
+   "code": "VNV_UNIT_MISMATCH"
+  },
+  {
+   "id": "RF-08",
+   "expected": {
+    "value": 92.7,
+    "unit": "MPa",
+    "tolerance": {
+     "rel": 0.02
+    },
+    "grade": "A"
+   },
+   "measured": null,
+   "verdict": "error",
+   "code": "VNV_RESULT_MISSING"
+  }
+ ]
+}

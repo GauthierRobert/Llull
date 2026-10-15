@@ -1,0 +1,240 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 3.81,
+   "height": 25.4,
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "anchor": "base-center"
+  },
+  "as": "rod"
+ },
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "ti_jc_test",
+   "name": "ti_jc_test",
+   "designation": "test material E = 110000 MPa",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "ti_jc_test",
+   "property": "E",
+   "value": 110000.0,
+   "unit": "MPa",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "ti_jc_test",
+   "property": "nu",
+   "value": 0.31,
+   "unit": "-",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "ti_jc_test",
+   "property": "density",
+   "value": 4.43,
+   "unit": "g/cm^3",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_model",
+  "params": {
+   "material": "ti_jc_test",
+   "model": {
+    "kind": "johnson_cook",
+    "A": {
+     "value": 1098,
+     "unit": "MPa"
+    },
+    "B": {
+     "value": 1092,
+     "unit": "MPa"
+    },
+    "n": 0.93,
+    "C": 0.014,
+    "m": 1.1,
+    "referenceStrainRate": {
+     "value": 1.0,
+     "unit": "1/s"
+    },
+    "referenceTemperature": {
+     "value": 293,
+     "unit": "K"
+    },
+    "meltingTemperature": {
+     "value": 1900,
+     "unit": "K"
+    },
+    "validRange": {
+     "strainRatePerS": [
+      1,
+      100000
+     ],
+     "temperatureK": [
+      293,
+      293
+     ]
+    }
+   },
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   }
+  }
+ },
+ {
+  "command": "create_material",
+  "params": {
+   "name": "ti_jc_test",
+   "density": 0.00443,
+   "color": "#9aa0a6",
+   "metalness": 1,
+   "roughness": 0.4,
+   "recordId": "ti_jc_test"
+  }
+ },
+ {
+  "command": "assign_material",
+  "params": {
+   "materialName": "ti_jc_test",
+   "entityIds": [
+    "$rod"
+   ]
+  }
+ },
+ {
+  "command": "create_analysis",
+  "params": {
+   "name": "taylor_rod",
+   "analysisType": "explicit_dynamics",
+   "unitSystem": "N-mm-t-s",
+   "solver": "opencourant"
+  },
+  "as": "an"
+ },
+ {
+  "command": "set_explicit_controls",
+  "params": {
+   "analysisId": "$an",
+   "endTime": {
+    "value": 6e-05,
+    "unit": "s"
+   },
+   "animationInterval": {
+    "value": 5e-06,
+    "unit": "s"
+   },
+   "historyInterval": {
+    "value": 5.000000000000001e-07,
+    "unit": "s"
+   },
+   "massScaling": {
+    "mode": "none"
+   },
+   "precision": "double"
+  }
+ },
+ {
+  "command": "set_part_idealization",
+  "params": {
+   "analysisId": "$an",
+   "entityId": "$rod",
+   "idealization": "solid"
+  }
+ },
+ {
+  "command": "set_initial_velocity",
+  "params": {
+   "analysisId": "$an",
+   "entityId": "$rod",
+   "velocity": {
+    "vector": [
+     0,
+     0,
+     -200000
+    ],
+    "unit": "mm/s"
+   }
+  }
+ },
+ {
+  "command": "add_rigid_wall",
+  "params": {
+   "analysisId": "$an",
+   "name": "anvil",
+   "point": [
+    0,
+    0,
+    0
+   ],
+   "normal": [
+    0,
+    0,
+    1
+   ],
+   "friction": 0.0
+  }
+ },
+ {
+  "command": "set_mesh_controls",
+  "params": {
+   "analysisId": "$an",
+   "mesher": "gmsh",
+   "elementFamily": "hex_dominant",
+   "order": 1,
+   "globalSize": 0.5
+  }
+ },
+ {
+  "command": "add_result_probe",
+  "params": {
+   "analysisId": "$an",
+   "name": "top",
+   "point": [
+    0,
+    0,
+    25.4
+   ],
+   "quantity": "u_z",
+   "history": true
+  }
+ }
+]

@@ -1,0 +1,66 @@
+{
+ "pack": "19-explicit-impact",
+ "generatedBy": "quoted (read from pinned repositories / wheels on 2026-10-15; third-party files are not stored here)",
+ "opencourant": {
+  "repository": "https://github.com/OpenCourant/OpenCourant",
+  "commit": "b19ec63f372474aa52dbbff41bd2e5288cf5b04e",
+  "commitDate": "2026-10-15",
+  "stableTags": ["latest-20261005", "latest-20261006", "latest-20261011"],
+  "licence": "GNU AGPL-3.0-or-later (LICENSE.md, COPYRIGHT.md)",
+  "provenance": "COPYRIGHT.md: based on the final public OpenRadioss commit 1a0d691b82bd4f94a3bc2399682551e84e1d5fa4 (tag openradioss-final, snapshot 2026-09-28); the upstream repository github.com/OpenRadioss/OpenRadioss was removed by Siemens on 2026-10-01",
+  "files_sha256": {
+   "LICENSE.md": "ad858d53cae05eed9531ecd4c467440803acffe34c69de7b88e03affc5b6a1bd",
+   "COPYRIGHT.md": "f58efdc24ccfa676e7cced2c239e963b42270202afa737033ea25c7ae9f44f1f",
+   "INSTALL.md": "782f8a66d076657ed3ae5bffaa417cceab3c9b13a3cf96cecaa7234cb3b00041",
+   "RELEASES.md": "b3f58d78f9828885bbb86ee1a107d8b0f2f7ca1f905924bad6b499dbf807fb02",
+   "EXTLIB_VERSION.json": "d9eeba41bf1368b5bee0e0d3eac11d6b7dd8b215220b19fd5e609d2a130ffe6c",
+   "hm_cfg_files/config/CFG/radioss2025/MAT/matl2_plas_johns.cfg": "7e023bba1880ca9af82043d54caa0546b14bad92f2d1d78ecda9bc89a743fd8b",
+   "hm_cfg_files/config/CFG/radioss2025/FAIL/fail_johnson.cfg": "ddd5d1f1fb86436996b45dbc64befe8ba9d0dab6a6947c0b0ef7588ee2de3836"
+  },
+  "run": {
+   "starter": "starter_linux64_gf -i <Run>_0000.rad -np <P>   (Windows: starter_win64.exe)",
+   "engine_smp": "engine_linux64_gf -i <Run>_0001.rad",
+   "engine_mpi": "mpiexec -n <P> engine_linux64_gf_ompi -i <Run>_0001.rad",
+   "environment": ["OPENCOURANT_PATH", "RAD_CFG_PATH=$OPENCOURANT_PATH/hm_cfg_files", "RAD_H3D_PATH", "OMP_STACKSIZE=400m", "LD_LIBRARY_PATH += extlib/hm_reader/linux64", "OMP_NUM_THREADS"],
+   "precision": "double (default executables) or extended single precision (*_sp)",
+   "platforms": "release packages: Linux x86-64 and Windows x86-64 (README also states Linux arm64); containers ghcr.io/opencourant/opencourant (x86_64, arm64). No macOS binary is listed.",
+   "closed_binary_dependency": "extlib hm_reader (libhm_reader_linux64.so / hm_reader_win64.dll) is a binary component; EXTLIB_VERSION.json: 'official upstream extlib v82, recovered from a community-donated source checkout'"
+  },
+  "input_formats": [".rad native Radioss (Starter _0000.rad + Engine _0001.rad)", ".k / .key LS-DYNA keyword, native support in Starter (README)", ".inp via the inp2rad converter (OpenCourant/Tools)"],
+  "starter_cards_seen": {
+   "/BEGIN": "run name; input version + unit line: 'Mg mm s' (mass, length, time) twice (input and work units) in the QA deck",
+   "/MAT/PLAS_JOHNS/<id> (LAW2) radioss2025": [
+    "RHO_I [RHO_O]",
+    "E  Nu  Iflag  flagVP  Pmin",
+    "Iflag=0: a  b  n  EPS_p_max  SIG_max0   |  Iflag=1: SIG_Y  UTS  EUTS  EPS_p_max  SIG_max0",
+    "c  EPS_DOT_0  ICC  Fsmooth  F_cut  Chard",
+    "m  T_melt  rhoC_p  T_r  T_max"
+   ],
+   "/FAIL/JOHNSON/<mat_id> radioss2025": [
+    "D1  D2  D3  D4  D5",
+    "EPSILON_DOT_0  IFAIL_SH  IFAIL_SO  EPSF_MIN  DADV  (blank)  IXFEM",
+    "FAILIP"
+   ]
+  },
+  "engine_cards_seen": ["/RUN/<name>/1 then the end time", "/TFILE/<n> then dT_HIS", "/ANIM/DT  TSTART TFREQ", "/ANIM/ELEM/VONM", "/ANIM/ELEM/EPSP", "/PRINT/-100/55", "/VERS/2019"],
+  "engine_listing_columns": "CYCLE  TIME  TIME-STEP  ELEMENT  ERROR  I-ENERGY  K-ENERGY T  K-ENERGY R  EXT-WORK  MAS.ERR  TOTAL MASS  MASS ADDED ; end marker 'NORMAL TERMINATION'",
+  "qa_models_licence": "QA decks under qa-tests/ carry 'Copyright (C) 2026 SISW Siemens Industry Software Inc. ... licensed under CC BY-NC 4.0' (non-commercial): read for format only, never copied into llull"
+ },
+ "opencourant_tools": {
+  "repository": "https://github.com/OpenCourant/Tools",
+  "commit": "c58c805696f7364f0efe80b5dd1585f70670232e",
+  "licence": "MIT (Copyright.md, Siemens Industry Software Inc.)",
+  "th_to_csv": "./th_to_csv <TimeHistory_File>; time-history files contain impulses, not forces; /TH/TITLE in the engine deck lets the converter derive forces and write full titles",
+  "anim_to_vtk": "converts animation files to legacy VTK ASCII"
+ },
+ "ls_dyna_keyword": {
+  "parser_used_for_verification": "ansys-dyna-core 0.12.1 (PyDyna, MIT), wheel sha256 6210d64fad8c4a9e73bf6f9cadc64e103fd1ea6c466ba95cde1e27395395ab71",
+  "*MAT_JOHNSON_COOK (keyword MAT, subkeyword JOHNSON_COOK), 10-character fields": [
+   "card 0: MID RO G E PR DTF VP RATEOP",
+   "card 1: A B N C M TM TR EPSO",
+   "card 2: CP PC SPALL IT D1 D2 D3 D4",
+   "card 3: D5 C2/P/XNP/D EROD EFMIN NUMINT K EPS1"
+  ],
+  "status": "COULD export; LS-DYNA itself is commercial and was not run"
+ }
+}

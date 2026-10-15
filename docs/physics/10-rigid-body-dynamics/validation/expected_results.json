@@ -1,0 +1,429 @@
+{
+ "pack": "10-rigid-body-dynamics",
+ "generatedBy": "generate_rbd_reference.py (+ quoted: Andrews reference values S1/S2)",
+ "cases": [
+  {
+   "id": "VC-RBD-01",
+   "quantity": "Andrews' squeezer: the 7 angles beta, Theta, gamma, Phi, delta, Omega, epsilon at t = 0.03 s",
+   "value": [
+    15.8107711963,
+    -15.7563710598,
+    0.0408222401307,
+    -0.534730116323,
+    0.524409965881,
+    0.534730116323,
+    1.04808074104
+   ],
+   "unit": "rad",
+   "tolerance": {
+    "abs": 1e-06
+   },
+   "source": "S1/S2 (Bari IVP test set reference, PSIDE tol 1e-14) + independent reproduction in this generator (max rel. diff 1.6e-10)",
+   "grade": "A",
+   "proves": [
+    "FR-RBD-01",
+    "FR-RBD-03",
+    "FR-RBD-05",
+    "TR-RBD-20",
+    "TR-RBD-21"
+   ],
+   "reproduction": [
+    15.8107711951,
+    -15.7563710584,
+    0.040822240124,
+    -0.534730116335,
+    0.524409965879,
+    0.534730116335,
+    1.04808074105
+   ],
+   "reproductionMethod": "index-1 (acceleration-level) form, classical RK4, 12000 fixed steps",
+   "note": "Tolerance 1e-6 rad is a llull acceptance choice for an index-3 / stabilised integrator at default settings; the angles beta and Theta reach ~15.8 rad, so this is ~6e-8 relative."
+  },
+  {
+   "id": "VC-RBD-02",
+   "quantity": "Andrews' squeezer: angular velocities at t = 0.03 s (same order)",
+   "value": [
+    1139.92030215,
+    -1424.37929499,
+    11.0329122194,
+    19.2933746442,
+    0.573569928479,
+    -19.2933746442,
+    0.323179165803
+   ],
+   "unit": "rad/s",
+   "tolerance": {
+    "rel": 0.0001
+   },
+   "source": "S1/S2 reference + reproduction (max rel. diff 5.0e-08)",
+   "grade": "A",
+   "proves": [
+    "FR-RBD-03",
+    "TR-RBD-21"
+   ],
+   "reproduction": [
+    1139.92030226,
+    -1424.37929518,
+    11.0329119052,
+    19.2933740955,
+    0.573569914364,
+    -19.2933740955,
+    0.323179149701
+   ]
+  },
+  {
+   "id": "VC-RBD-03",
+   "quantity": "Andrews' squeezer at t = 0: consistent accelerations beta'', Theta'' and multipliers lambda1, lambda2 (test-set initial values)",
+   "value": [
+    14222.44392,
+    -10666.83294,
+    98.5668703962,
+    -6.12268834426
+   ],
+   "unit": "rad/s^2, N",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1/S2 initial values + this generator (index-1 solve)",
+   "grade": "A",
+   "proves": [
+    "FR-RBD-07",
+    "TR-RBD-22",
+    "TR-RBD-30"
+   ],
+   "reproduction": [
+    14222.44392,
+    -10666.83294,
+    98.5668703962,
+    -6.12268834426
+   ],
+   "initialConstraintResidualM": 1.38777878078e-17,
+   "note": "lambda here are the test set's multipliers of g(q) = 0 (sign convention M q'' = f - G^T lambda); joint reactions are derived from them (TR-RBD-30). The constraint units are m, so lambda is a force in N."
+  },
+  {
+   "id": "VC-RBD-04",
+   "quantity": "Andrews' squeezer: max |g(q)| (position-constraint residual) at t = 0.03 s of the index-1 reproduction",
+   "value": 1.63431768119e-13,
+   "unit": "m",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "this generator",
+   "grade": "A",
+   "proves": [
+    "FR-RBD-06",
+    "TR-RBD-23"
+   ],
+   "note": "The fine-step reproduction stays at ~1e-13 m, but an acceleration-level formulation drifts with coarser steps; llull must enforce position-level constraints (index-3 generalised-alpha or stabilisation) and report its own max |g(q)| in data.constraintResidualM, gated at <= 1e-9 m (TR-RBD-23)."
+  },
+  {
+   "id": "VC-RBD-10",
+   "quantity": "simple pendulum L = 1 m, g = 9.80665 m/s^2: period at amplitudes 10, 45, 90, 135, 170 deg (4 sqrt(L/g) K(sin(theta0/2)))",
+   "value": [
+    2.0102358926,
+    2.08661217983,
+    2.36824634629,
+    3.06568823962,
+    4.89436002875
+   ],
+   "unit": "s",
+   "tolerance": {
+    "rel": 1e-05
+   },
+   "source": "S4/S5 (DLMF 22.19, 19.8) + derived; AGM, quadrature and simulation agree (see crossChecks)",
+   "grade": "A",
+   "proves": [
+    "FR-RBD-01",
+    "FR-RBD-03",
+    "TR-RBD-20"
+   ],
+   "smallAnglePeriodS": 2.00640929259,
+   "crossChecks": {
+    "quadrature": [
+     2.0102358926,
+     2.08661217983,
+     2.36824634629,
+     3.06568823962,
+     4.89436002875
+    ],
+    "rk4Simulation": [
+     2.0102358926,
+     2.08661217983,
+     2.36824634629,
+     3.06568823962,
+     4.89436002875
+    ]
+   },
+   "note": "1e-5 relative on the period over >= 10 periods is the integrator acceptance (TR-RBD-21)."
+  },
+  {
+   "id": "VC-RBD-11",
+   "quantity": "point-mass pendulum m = 1 kg released from rest at 10, 90, 170 deg: pivot reaction (rod tension) at the bottom, m g (3 - 2 cos theta0)",
+   "value": [
+    10.1046200978,
+    29.41995,
+    48.7352799022
+   ],
+   "unit": "N",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "derived (energy + radial Newton law, S13)",
+   "grade": "A",
+   "proves": [
+    "FR-RBD-07",
+    "FR-RBD-12",
+    "TR-RBD-30"
+   ],
+   "note": "This is the joint reaction that dynamics_study must report and export to a 05 load case."
+  },
+  {
+   "id": "VC-RBD-12",
+   "quantity": "compound pendulum: box bar 0.5 x 0.01 x 0.01 m pivoted at the centre of one end face: small-angle period and period at 90 deg",
+   "value": [
+    1.15845886378,
+    1.36737602921
+   ],
+   "unit": "s",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "derived (parallel-axis theorem, equivalent length I/(m d); S4)",
+   "grade": "A",
+   "proves": [
+    "FR-RBD-02",
+    "TR-RBD-10"
+   ],
+   "slenderLimitS": 1.15840094518,
+   "note": "Exercises the inertia tensor from mass_properties (01 KRN TR-KRN-40): using the slender-rod formula instead of the box inertia changes the period by 5e-5 relative, which this tolerance detects."
+  },
+  {
+   "id": "VC-RBD-20",
+   "quantity": "slider-crank r = 0.05 m, l = 0.2 m, omega = 100 rad/s: piston x, a at theta = 0; x, v, a at 90 deg",
+   "value": [
+    0.25,
+    -625.0,
+    0.19364916731,
+    -5.0,
+    129.099444874
+   ],
+   "unit": "m, m/s^2, m, m/s, m/s^2",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (closed form; finite-difference check 1.6e-05)",
+   "grade": "A",
+   "proves": [
+    "FR-RBD-01",
+    "FR-RBD-04",
+    "TR-RBD-20"
+   ],
+   "note": "a(0) = -r omega^2 (1 + r/l) = -625 m/s^2 exactly. Kinematic values are checked against motion_study as well (existing command)."
+  },
+  {
+   "id": "VC-RBD-21",
+   "quantity": "slider-crank with a 0.5 kg piston, massless rod, no gravity: required crank torque at theta = 60 deg and 90 deg",
+   "value": [
+    4.5806214323,
+    -3.22748612184
+   ],
+   "unit": "N*m",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "derived (virtual power tau omega = m a v)",
+   "grade": "A",
+   "proves": [
+    "FR-RBD-08",
+    "FR-RBD-09",
+    "TR-RBD-31"
+   ],
+   "note": "Inverse-dynamics output of dynamics_study with a prescribed crank speed (actuator sizing)."
+  },
+  {
+   "id": "VC-RBD-30",
+   "quantity": "spring-mass-damper m 1 kg, k 1000 N/m, c 2 N s/m, x0 10 mm: x(0.5 s), x(1.0 s), logarithmic decrement",
+   "value": [
+    -6.05596072679,
+    3.63397076193,
+    0.19879118577
+   ],
+   "unit": "mm, mm, -",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "derived (S13 closed form)",
+   "grade": "A",
+   "proves": [
+    "FR-RBD-08",
+    "TR-RBD-11",
+    "TR-RBD-21"
+   ],
+   "inputs": {
+    "zeta": 0.0316227766017,
+    "wnRadPerS": 31.6227766017
+   }
+  },
+  {
+   "id": "VC-RBD-31",
+   "quantity": "undamped spring-mass (m 1 kg, k 1000 N/m) over 100 periods with the default integrator: relative total-energy change",
+   "value": 0.0,
+   "unit": "-",
+   "tolerance": {
+    "abs": 0.001
+   },
+   "source": "derived (exact energy conservation)",
+   "grade": "A",
+   "proves": [
+    "FR-RBD-06",
+    "TR-RBD-21"
+   ],
+   "note": "Generalised-alpha with rho_inf = 1 conserves energy for linear systems up to round-off; with the default rho_inf < 1 it dissipates high frequencies only. The 1e-3 bound is the acceptance; the integrator's actual value is reported in data.energyDrift."
+  },
+  {
+   "id": "VC-RBD-40",
+   "quantity": "spring-mass with Coulomb friction (m 1 kg, k 100 N/m, mu 0.1, x0 0.1 m): number of half cycles, stop time, rest position",
+   "value": [
+    5.0,
+    1.57079632679,
+    -0.0019335
+   ],
+   "unit": "-, s, m",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "derived (exact piecewise solution, S13)",
+   "grade": "A",
+   "proves": [
+    "FR-RBD-10",
+    "TR-RBD-40",
+    "TR-RBD-41"
+   ],
+   "turningPointsM": [
+    0.1,
+    -0.0803867,
+    0.0607734,
+    -0.0411601,
+    0.0215468,
+    -0.0019335
+   ],
+   "note": "Stick detection must happen at the 5th turning point (|x| = 1.93 mm < F/k = 9.81 mm); a smoothed friction law that creeps afterwards fails this case (TR-RBD-41)."
+  },
+  {
+   "id": "VC-RBD-41",
+   "quantity": "block on an incline with mu_s = 0.3: largest angle that still sticks (atan mu_s)",
+   "value": 16.699244234,
+   "unit": "deg",
+   "tolerance": {
+    "abs": 0.01
+   },
+   "source": "derived (statics, S13)",
+   "grade": "A",
+   "proves": [
+    "FR-RBD-10",
+    "TR-RBD-40"
+   ],
+   "note": "dynamics_study at 16.6 deg must report state \"stick\" for all t; at 16.8 deg \"slip\" from t = 0."
+  },
+  {
+   "id": "VC-RBD-50",
+   "quantity": "dynamics_study on an instance with no mass (no material density, no explicit mass)",
+   "value": {
+    "exit": 1,
+    "code": "RBD_MASS_MISSING"
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "TECHNICAL_SPEC section 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-RBD-02",
+    "FR-RBD-16"
+   ],
+   "note": "behaviour case"
+  },
+  {
+   "id": "VC-RBD-51",
+   "quantity": "same plan twice on the same kernel",
+   "value": {
+    "identicalDataHash": true
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "TECHNICAL_SPEC section 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-RBD-17",
+    "TR-RBD-24"
+   ],
+   "note": "behaviour case"
+  },
+  {
+   "id": "VC-RBD-52",
+   "quantity": "deliberately wrong set-ups",
+   "value": {
+    "codes": [
+     "RBD_JOINT_UNKNOWN",
+     "RBD_STEP_INVALID",
+     "RBD_SPRING_INVALID",
+     "RBD_FRICTION_INVALID",
+     "RBD_REDUNDANT_CONSTRAINTS",
+     "RBD_INITIAL_INCONSISTENT",
+     "RBD_GRAVITY_UNSET"
+    ]
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "TECHNICAL_SPEC section 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-RBD-16"
+   ],
+   "note": "behaviour case"
+  },
+  {
+   "id": "VC-RBD-53",
+   "quantity": "export_joint_loads into a 05 static case",
+   "value": {
+    "loadCategory": "limit",
+    "reviewRequired": true,
+    "provenance.studyHash": "present"
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "TECHNICAL_SPEC section 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-RBD-12",
+    "TR-RBD-60"
+   ],
+   "note": "behaviour case"
+  },
+  {
+   "id": "VC-RBD-54",
+   "quantity": "masses from a material with unverified density",
+   "value": {
+    "unverified": true,
+    "warning": "RBD_MASS_UNVERIFIED"
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "TECHNICAL_SPEC section 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-RBD-18"
+   ],
+   "note": "behaviour case"
+  }
+ ]
+}

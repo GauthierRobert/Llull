@@ -1,0 +1,656 @@
+{
+ "pack": "13-corrosion-compatibility",
+ "generatedBy": "generate_corrosion_reference.py",
+ "toleranceMm": 0.1,
+ "plate": [
+  [
+   0.0,
+   0.0,
+   0.0
+  ],
+  [
+   100.0,
+   50.0,
+   10.0
+  ]
+ ],
+ "contacts": {
+  "face_on_top": {
+   "kind": "face",
+   "area": 1800.0,
+   "gap": 0.0,
+   "volume": 0.0,
+   "normalAxis": "z"
+  },
+  "interference_0p5": {
+   "kind": "interference",
+   "volume": 900.0,
+   "gap": 0.0,
+   "area": null
+  },
+  "gap_0p05_within_tol": {
+   "kind": "face",
+   "area": 1800.0,
+   "gap": 0.05,
+   "volume": 0.0,
+   "normalAxis": "z"
+  },
+  "gap_0p2_outside_tol": {
+   "kind": "none",
+   "gap": 0.2,
+   "area": null,
+   "volume": 0.0
+  },
+  "edge_only": {
+   "kind": "edge",
+   "area": 0.0,
+   "gap": 0.0,
+   "volume": 0.0
+  },
+  "side_face_partial": {
+   "kind": "face",
+   "area": 100.0,
+   "gap": 0.0,
+   "volume": 0.0,
+   "normalAxis": "x"
+  }
+ },
+ "anodicScreening": {
+  "aluminium_wrought_other|cadmium_plate": {
+   "anode": "cadmium_plate",
+   "cathode": "aluminium_wrought_other",
+   "differenceV": 0.05,
+   "verdict": {
+    "controlled": "compatible",
+    "harsh": "compatible",
+    "normal": "compatible"
+   }
+  },
+  "aluminium_wrought_other|nickel_titanium_group": {
+   "anode": "aluminium_wrought_other",
+   "cathode": "nickel_titanium_group",
+   "differenceV": 0.6,
+   "verdict": {
+    "controlled": "incompatible",
+    "harsh": "incompatible",
+    "normal": "incompatible"
+   }
+  },
+  "aluminium_wrought_2000|nickel_titanium_group": {
+   "anode": "aluminium_wrought_2000",
+   "cathode": "nickel_titanium_group",
+   "differenceV": 0.45,
+   "verdict": {
+    "controlled": "compatible",
+    "harsh": "incompatible",
+    "normal": "incompatible"
+   }
+  },
+  "magnesium|aluminium_wrought_other": {
+   "anode": "magnesium",
+   "cathode": "aluminium_wrought_other",
+   "differenceV": 0.85,
+   "verdict": {
+    "controlled": "incompatible",
+    "harsh": "incompatible",
+    "normal": "incompatible"
+   }
+  },
+  "zinc|cadmium_plate": {
+   "anode": "zinc",
+   "cathode": "cadmium_plate",
+   "differenceV": 0.3,
+   "verdict": {
+    "controlled": "compatible",
+    "harsh": "incompatible",
+    "normal": "incompatible"
+   }
+  },
+  "aluminium_wrought_2000|gold": {
+   "anode": "aluminium_wrought_2000",
+   "cathode": "gold",
+   "differenceV": 0.75,
+   "verdict": {
+    "controlled": "incompatible",
+    "harsh": "incompatible",
+    "normal": "incompatible"
+   }
+  }
+ },
+ "cases": [
+  {
+   "id": "VC-COR-01.1",
+   "quantity": "find_contacts plate vs block 'face_on_top' (tol 0.1 mm)",
+   "value": {
+    "kind": "face",
+    "area": 1800.0,
+    "gap": 0.0,
+    "volume": 0.0,
+    "normalAxis": "z"
+   },
+   "unit": "mm, mm^2, mm^3",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (closed-form AABB overlap)",
+   "grade": "A",
+   "proves": [
+    "FR-COR-01",
+    "FR-COR-02",
+    "TR-COR-03"
+   ]
+  },
+  {
+   "id": "VC-COR-01.2",
+   "quantity": "find_contacts plate vs block 'interference_0p5' (tol 0.1 mm)",
+   "value": {
+    "kind": "interference",
+    "volume": 900.0,
+    "gap": 0.0,
+    "area": null
+   },
+   "unit": "mm, mm^2, mm^3",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (closed-form AABB overlap)",
+   "grade": "A",
+   "proves": [
+    "FR-COR-01",
+    "FR-COR-02",
+    "TR-COR-03"
+   ]
+  },
+  {
+   "id": "VC-COR-01.3",
+   "quantity": "find_contacts plate vs block 'gap_0p05_within_tol' (tol 0.1 mm)",
+   "value": {
+    "kind": "face",
+    "area": 1800.0,
+    "gap": 0.05,
+    "volume": 0.0,
+    "normalAxis": "z"
+   },
+   "unit": "mm, mm^2, mm^3",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (closed-form AABB overlap)",
+   "grade": "A",
+   "proves": [
+    "FR-COR-01",
+    "FR-COR-02",
+    "TR-COR-03"
+   ]
+  },
+  {
+   "id": "VC-COR-01.4",
+   "quantity": "find_contacts plate vs block 'gap_0p2_outside_tol' (tol 0.1 mm)",
+   "value": {
+    "kind": "none",
+    "gap": 0.2,
+    "area": null,
+    "volume": 0.0
+   },
+   "unit": "mm, mm^2, mm^3",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (closed-form AABB overlap)",
+   "grade": "A",
+   "proves": [
+    "FR-COR-01",
+    "FR-COR-02",
+    "TR-COR-03"
+   ]
+  },
+  {
+   "id": "VC-COR-01.5",
+   "quantity": "find_contacts plate vs block 'edge_only' (tol 0.1 mm)",
+   "value": {
+    "kind": "edge",
+    "area": 0.0,
+    "gap": 0.0,
+    "volume": 0.0
+   },
+   "unit": "mm, mm^2, mm^3",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (closed-form AABB overlap)",
+   "grade": "A",
+   "proves": [
+    "FR-COR-01",
+    "FR-COR-02",
+    "TR-COR-03"
+   ]
+  },
+  {
+   "id": "VC-COR-01.6",
+   "quantity": "find_contacts plate vs block 'side_face_partial' (tol 0.1 mm)",
+   "value": {
+    "kind": "face",
+    "area": 100.0,
+    "gap": 0.0,
+    "volume": 0.0,
+    "normalAxis": "x"
+   },
+   "unit": "mm, mm^2, mm^3",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (closed-form AABB overlap)",
+   "grade": "A",
+   "proves": [
+    "FR-COR-01",
+    "FR-COR-02",
+    "TR-COR-03"
+   ]
+  },
+  {
+   "id": "VC-COR-02.1",
+   "quantity": "anodic-index screening aluminium_wrought_other|cadmium_plate",
+   "value": {
+    "anode": "cadmium_plate",
+    "cathode": "aluminium_wrought_other",
+    "differenceV": 0.05,
+    "verdict": {
+     "controlled": "compatible",
+     "harsh": "compatible",
+     "normal": "compatible"
+    }
+   },
+   "unit": "V",
+   "tolerance": {
+    "abs": 1e-12
+   },
+   "source": "galvanic_anodic_index.csv (B) + anodic_index_limits.csv (A)",
+   "grade": "B",
+   "proves": [
+    "FR-COR-05",
+    "FR-COR-06"
+   ]
+  },
+  {
+   "id": "VC-COR-02.2",
+   "quantity": "anodic-index screening aluminium_wrought_other|nickel_titanium_group",
+   "value": {
+    "anode": "aluminium_wrought_other",
+    "cathode": "nickel_titanium_group",
+    "differenceV": 0.6,
+    "verdict": {
+     "controlled": "incompatible",
+     "harsh": "incompatible",
+     "normal": "incompatible"
+    }
+   },
+   "unit": "V",
+   "tolerance": {
+    "abs": 1e-12
+   },
+   "source": "galvanic_anodic_index.csv (B) + anodic_index_limits.csv (A)",
+   "grade": "B",
+   "proves": [
+    "FR-COR-05",
+    "FR-COR-06"
+   ]
+  },
+  {
+   "id": "VC-COR-02.3",
+   "quantity": "anodic-index screening aluminium_wrought_2000|nickel_titanium_group",
+   "value": {
+    "anode": "aluminium_wrought_2000",
+    "cathode": "nickel_titanium_group",
+    "differenceV": 0.45,
+    "verdict": {
+     "controlled": "compatible",
+     "harsh": "incompatible",
+     "normal": "incompatible"
+    }
+   },
+   "unit": "V",
+   "tolerance": {
+    "abs": 1e-12
+   },
+   "source": "galvanic_anodic_index.csv (B) + anodic_index_limits.csv (A)",
+   "grade": "B",
+   "proves": [
+    "FR-COR-05",
+    "FR-COR-06"
+   ]
+  },
+  {
+   "id": "VC-COR-02.4",
+   "quantity": "anodic-index screening magnesium|aluminium_wrought_other",
+   "value": {
+    "anode": "magnesium",
+    "cathode": "aluminium_wrought_other",
+    "differenceV": 0.85,
+    "verdict": {
+     "controlled": "incompatible",
+     "harsh": "incompatible",
+     "normal": "incompatible"
+    }
+   },
+   "unit": "V",
+   "tolerance": {
+    "abs": 1e-12
+   },
+   "source": "galvanic_anodic_index.csv (B) + anodic_index_limits.csv (A)",
+   "grade": "B",
+   "proves": [
+    "FR-COR-05",
+    "FR-COR-06"
+   ]
+  },
+  {
+   "id": "VC-COR-02.5",
+   "quantity": "anodic-index screening zinc|cadmium_plate",
+   "value": {
+    "anode": "zinc",
+    "cathode": "cadmium_plate",
+    "differenceV": 0.3,
+    "verdict": {
+     "controlled": "compatible",
+     "harsh": "incompatible",
+     "normal": "incompatible"
+    }
+   },
+   "unit": "V",
+   "tolerance": {
+    "abs": 1e-12
+   },
+   "source": "galvanic_anodic_index.csv (B) + anodic_index_limits.csv (A)",
+   "grade": "B",
+   "proves": [
+    "FR-COR-05",
+    "FR-COR-06"
+   ]
+  },
+  {
+   "id": "VC-COR-02.6",
+   "quantity": "anodic-index screening aluminium_wrought_2000|gold",
+   "value": {
+    "anode": "aluminium_wrought_2000",
+    "cathode": "gold",
+    "differenceV": 0.75,
+    "verdict": {
+     "controlled": "incompatible",
+     "harsh": "incompatible",
+     "normal": "incompatible"
+    }
+   },
+   "unit": "V",
+   "tolerance": {
+    "abs": 1e-12
+   },
+   "source": "galvanic_anodic_index.csv (B) + anodic_index_limits.csv (A)",
+   "grade": "B",
+   "proves": [
+    "FR-COR-05",
+    "FR-COR-06"
+   ]
+  },
+  {
+   "id": "VC-COR-03",
+   "quantity": "area ratio Aa/Ac: cadmium-plated block (anode) on the 7075 plate (cathode)",
+   "value": 0.346153846154,
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (box surface areas 4500 / 13000 mm^2)",
+   "grade": "A",
+   "proves": [
+    "FR-COR-07"
+   ],
+   "anodeAreaMm2": 4500.0,
+   "cathodeAreaMm2": 13000.0,
+   "code": "COR_SMALL_ANODE"
+  },
+  {
+   "id": "VC-COR-04",
+   "quantity": "889D compatible threshold converted to um/yr",
+   "value": 0.2286,
+   "unit": "um/yr",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S2 (0.009 mil/yr, secondary) x exact mil",
+   "grade": "B",
+   "proves": [
+    "FR-COR-04"
+   ]
+  },
+  {
+   "id": "VC-COR-05",
+   "quantity": "hydrogen-embrittlement default threshold 180 ksi in MPa",
+   "value": 1241.05631277,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S13 (NAS672 scope) x exact psi",
+   "grade": "B",
+   "proves": [
+    "FR-COR-10",
+    "FR-COR-14"
+   ]
+  },
+  {
+   "id": "VC-COR-06",
+   "quantity": "HE flag per test steel (threshold 180 ksi, electroplated surface)",
+   "value": {
+    "aisi4340_260ksi_cd_plated": true,
+    "aisi4130_normalized_670MPa_cd_plated": false,
+    "aisi4340_260ksi_unplated": false
+   },
+   "unit": "bool",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "derived",
+   "grade": "A",
+   "proves": [
+    "FR-COR-10"
+   ],
+   "code": "COR_HE_RISK"
+  },
+  {
+   "id": "VC-COR-07",
+   "quantity": "CFRP part face-contacting a 7075 part without declared isolation",
+   "value": "COR_CFRP_ALUMINIUM",
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "compatibility_rules.json COR-R-04 (S10)",
+   "grade": "B",
+   "proves": [
+    "FR-COR-08"
+   ]
+  },
+  {
+   "id": "VC-COR-08",
+   "quantity": "same pair after declare_isolation method=glass_isolation_ply",
+   "value": "pass (isolated)",
+   "unit": "status",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "COR-R-04/07",
+   "grade": "A",
+   "proves": [
+    "FR-COR-09",
+    "FR-COR-12"
+   ]
+  },
+  {
+   "id": "VC-COR-09",
+   "quantity": "graphite has no anodic index: anodic screening refuses, 889 or rule COR-R-04 used",
+   "value": "COR_GROUP_VALUE_MISSING",
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "galvanic_anodic_index.csv graphite = tbd",
+   "grade": "A",
+   "proves": [
+    "FR-COR-05",
+    "FR-COR-13"
+   ]
+  },
+  {
+   "id": "VC-COR-10",
+   "quantity": "889D matrix lookup while the matrix is not transcribed",
+   "value": "COR_889_TABLE_MISSING",
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "compatibility_rules.json COR-R-01 matrix tbd",
+   "grade": "A",
+   "proves": [
+    "FR-COR-04",
+    "FR-COR-13"
+   ]
+  },
+  {
+   "id": "VC-COR-11",
+   "quantity": "SCC check on a 7075-T6 part loaded in ST, table row not transcribed",
+   "value": "COR_SCC_UNCLASSIFIED",
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "scc_classes.json",
+   "grade": "A",
+   "proves": [
+    "FR-COR-11",
+    "FR-COR-13"
+   ]
+  },
+  {
+   "id": "VC-COR-12",
+   "quantity": "fastener stack contacts from 08 FastenerStack (2 plates + bolt + washer + nut)",
+   "value": {
+    "pairs": [
+     [
+      "bolt",
+      "plate1"
+     ],
+     [
+      "bolt",
+      "plate2"
+     ],
+     [
+      "nut",
+      "washer"
+     ],
+     [
+      "plate1",
+      "plate2"
+     ],
+     [
+      "plate2",
+      "washer"
+     ]
+    ],
+    "source": "stack"
+   },
+   "unit": "ids",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "08 MAT TECHNICAL_SPEC §3.4 FastenerStack (layers, washers side nut)",
+   "grade": "A",
+   "proves": [
+    "FR-COR-03"
+   ]
+  },
+  {
+   "id": "VC-COR-13",
+   "quantity": "Cd-plated steel part: galvanic group resolved from the outer plating layer, not the steel",
+   "value": "cadmium_plate",
+   "unit": "group",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC TR-COR-05",
+   "grade": "A",
+   "proves": [
+    "FR-COR-15"
+   ]
+  },
+  {
+   "id": "VC-COR-14",
+   "quantity": "material anodicIndex override 0.80 V vs cadmium plate: tie at the harsh limit is compatible (<=)",
+   "value": {
+    "anode": "cadmium_plate",
+    "cathode": "aluminium_7075_override",
+    "differenceV": 0.15,
+    "verdict": {
+     "controlled": "compatible",
+     "harsh": "compatible",
+     "normal": "compatible"
+    }
+   },
+   "unit": "V",
+   "tolerance": {
+    "abs": 1e-12
+   },
+   "source": "derived (override is a test value, not a material property)",
+   "grade": "A",
+   "proves": [
+    "FR-COR-16",
+    "TR-COR-06"
+   ]
+  },
+  {
+   "id": "VC-COR-15",
+   "quantity": "every item carries reviewRequired; agent acceptance refused",
+   "value": {
+    "reviewRequired": true,
+    "acceptCode": "COR_HUMAN_GATE",
+    "unverifiedWhenRuleGradeB": true
+   },
+   "unit": "flags",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "AGENT_FIRST AF-32/33/34",
+   "grade": "A",
+   "proves": [
+    "FR-COR-17",
+    "FR-COR-18"
+   ]
+  },
+  {
+   "id": "VC-COR-16",
+   "quantity": "compatibility report CSV header (--save)",
+   "value": [
+    "key",
+    "status",
+    "code",
+    "a",
+    "b",
+    "materials",
+    "surfaceSystems",
+    "rule",
+    "grade",
+    "delta",
+    "remedies",
+    "acceptance"
+   ],
+   "unit": "columns",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC §6",
+   "grade": "A",
+   "proves": [
+    "FR-COR-19"
+   ]
+  }
+ ]
+}

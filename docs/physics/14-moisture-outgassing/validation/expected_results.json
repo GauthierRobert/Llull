@@ -1,0 +1,467 @@
+{
+ "pack": "14-moisture-outgassing",
+ "generatedBy": "generate_environment_reference.py",
+ "fickTau": {
+  "G50": 0.0491826848809,
+  "G90": 0.212021352012,
+  "G99": 0.445321998467
+ },
+ "outgassing": {
+  "syn_low": {
+   "RML": 0.65,
+   "nasa_gsfc_screening": {
+    "pass": true,
+    "failed": []
+   },
+   "ecss_q_st_70_02": {
+    "pass": true,
+    "failed": []
+   }
+  },
+  "syn_water": {
+   "RML": 0.8,
+   "nasa_gsfc_screening": {
+    "pass": false,
+    "failed": [
+     "TML"
+    ]
+   },
+   "ecss_q_st_70_02": {
+    "pass": true,
+    "failed": []
+   }
+  },
+  "syn_cvcm": {
+   "RML": 0.5,
+   "nasa_gsfc_screening": {
+    "pass": false,
+    "failed": [
+     "CVCM"
+    ]
+   },
+   "ecss_q_st_70_02": {
+    "pass": false,
+    "failed": [
+     "CVCM"
+    ]
+   }
+  },
+  "syn_edge": {
+   "RML": 1.0,
+   "nasa_gsfc_screening": {
+    "pass": true,
+    "failed": []
+   },
+   "ecss_q_st_70_02": {
+    "pass": false,
+    "failed": [
+     "RML",
+     "CVCM"
+    ]
+   }
+  }
+ },
+ "cases": [
+  {
+   "id": "VC-ENV-01.1",
+   "quantity": "dimensionless time D t / h^2 for 50 % of saturation (plate, two faces)",
+   "value": 0.0491826848809,
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (Crank plane-sheet series, S14/S15)",
+   "grade": "A",
+   "proves": [
+    "FR-ENV-06",
+    "TR-ENV-05"
+   ]
+  },
+  {
+   "id": "VC-ENV-01.2",
+   "quantity": "dimensionless time D t / h^2 for 90 % of saturation (plate, two faces)",
+   "value": 0.212021352012,
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (Crank plane-sheet series, S14/S15)",
+   "grade": "A",
+   "proves": [
+    "FR-ENV-06",
+    "TR-ENV-05"
+   ]
+  },
+  {
+   "id": "VC-ENV-01.3",
+   "quantity": "dimensionless time D t / h^2 for 99 % of saturation (plate, two faces)",
+   "value": 0.445321998467,
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (Crank plane-sheet series, S14/S15)",
+   "grade": "A",
+   "proves": [
+    "FR-ENV-06",
+    "TR-ENV-05"
+   ]
+  },
+  {
+   "id": "VC-ENV-02",
+   "quantity": "fractional uptake G at selected tau",
+   "value": {
+    "0.001": 0.0713649646461,
+    "0.01": 0.225675833419,
+    "0.05": 0.504087820203,
+    "0.1": 0.697881906227,
+    "0.2": 0.887402874816,
+    "0.5": 0.994170478926,
+    "1.0": 0.999958074764
+   },
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (series to 1e-17 per term)",
+   "grade": "A",
+   "proves": [
+    "FR-ENV-06"
+   ]
+  },
+  {
+   "id": "VC-ENV-03",
+   "quantity": "short-time check G / ((4/sqrt(pi)) sqrt(tau)) -> 1",
+   "value": {
+    "1e-06": 1.0,
+    "0.0001": 1.0,
+    "0.001": 1.0
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 1e-06
+   },
+   "source": "derived",
+   "grade": "A",
+   "proves": [
+    "TR-ENV-05"
+   ]
+  },
+  {
+   "id": "VC-ENV-04",
+   "quantity": "synthetic plate h 2 mm, D 1e-6 mm^2/s, Mm 1.5 %: moisture after 7 days and time to 50 %",
+   "value": {
+    "tau": 0.1512,
+    "moisturePercent": 1.22660470969,
+    "t50Days": 2.27697615189
+   },
+   "unit": "-, %, d",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (synthetic inputs, not a material)",
+   "grade": "A",
+   "proves": [
+    "FR-ENV-06",
+    "FR-ENV-07"
+   ]
+  },
+  {
+   "id": "VC-ENV-05",
+   "quantity": "hygro strain and equivalent temperature (synthetic beta 0.001 /%, alpha 30e-6 /K) at the VC-ENV-04 moisture",
+   "value": {
+    "strain": 0.00122660470969,
+    "equivalentDeltaTK": 40.8868236562
+   },
+   "unit": "-, K",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (eps = beta dM; dT_eq = eps/alpha)",
+   "grade": "A",
+   "proves": [
+    "FR-ENV-08",
+    "TR-ENV-07"
+   ]
+  },
+  {
+   "id": "VC-ENV-06.1",
+   "quantity": "outgassing screening of synthetic syn_low under both profiles",
+   "value": {
+    "RML": 0.65,
+    "nasa_gsfc_screening": {
+     "pass": true,
+     "failed": []
+    },
+    "ecss_q_st_70_02": {
+     "pass": true,
+     "failed": []
+    }
+   },
+   "unit": "%",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "environment_rules.json profiles (NASA A, ECSS B)",
+   "grade": "A",
+   "proves": [
+    "FR-ENV-01",
+    "FR-ENV-02",
+    "FR-ENV-03"
+   ]
+  },
+  {
+   "id": "VC-ENV-06.2",
+   "quantity": "outgassing screening of synthetic syn_water under both profiles",
+   "value": {
+    "RML": 0.8,
+    "nasa_gsfc_screening": {
+     "pass": false,
+     "failed": [
+      "TML"
+     ]
+    },
+    "ecss_q_st_70_02": {
+     "pass": true,
+     "failed": []
+    }
+   },
+   "unit": "%",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "environment_rules.json profiles (NASA A, ECSS B)",
+   "grade": "B",
+   "proves": [
+    "FR-ENV-01",
+    "FR-ENV-02",
+    "FR-ENV-03"
+   ]
+  },
+  {
+   "id": "VC-ENV-06.3",
+   "quantity": "outgassing screening of synthetic syn_cvcm under both profiles",
+   "value": {
+    "RML": 0.5,
+    "nasa_gsfc_screening": {
+     "pass": false,
+     "failed": [
+      "CVCM"
+     ]
+    },
+    "ecss_q_st_70_02": {
+     "pass": false,
+     "failed": [
+      "CVCM"
+     ]
+    }
+   },
+   "unit": "%",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "environment_rules.json profiles (NASA A, ECSS B)",
+   "grade": "A",
+   "proves": [
+    "FR-ENV-01",
+    "FR-ENV-02",
+    "FR-ENV-03"
+   ]
+  },
+  {
+   "id": "VC-ENV-06.4",
+   "quantity": "outgassing screening of synthetic syn_edge under both profiles",
+   "value": {
+    "RML": 1.0,
+    "nasa_gsfc_screening": {
+     "pass": true,
+     "failed": []
+    },
+    "ecss_q_st_70_02": {
+     "pass": false,
+     "failed": [
+      "RML",
+      "CVCM"
+     ]
+    }
+   },
+   "unit": "%",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "environment_rules.json profiles (NASA A, ECSS B)",
+   "grade": "A",
+   "proves": [
+    "FR-ENV-01",
+    "FR-ENV-02",
+    "FR-ENV-03"
+   ]
+  },
+  {
+   "id": "VC-ENV-07",
+   "quantity": "screening mass-loss budget of a 200 g part in syn_low (TML 0.95 %, CVCM 0.05 %)",
+   "value": {
+    "maxMassLossG": 1.9,
+    "maxCondensableG": 0.1
+   },
+   "unit": "g",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (percent x mass_properties mass)",
+   "grade": "A",
+   "proves": [
+    "FR-ENV-04"
+   ]
+  },
+  {
+   "id": "VC-ENV-08",
+   "quantity": "Kapton H recession at a synthetic fluence 1e21 atoms/cm^2",
+   "value": 30.0,
+   "unit": "um",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S9 + S10 (Ey 3.0e-24 cm^3/atom) x fluence",
+   "grade": "A",
+   "proves": [
+    "FR-ENV-10"
+   ]
+  },
+  {
+   "id": "VC-ENV-09",
+   "quantity": "Kapton H recession at the MISSE 2 fluence 8.43e21 atoms/cm^2",
+   "value": 252.9,
+   "unit": "um",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "Ey (A) x fluence S12 (B)",
+   "grade": "B",
+   "proves": [
+    "FR-ENV-10"
+   ]
+  },
+  {
+   "id": "VC-ENV-10",
+   "quantity": "AO mass loss with synthetic density 1.0 g/cm^3, area 10 cm^2, fluence 1e21",
+   "value": 0.03,
+   "unit": "g",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (dM = rho A Ey F)",
+   "grade": "A",
+   "proves": [
+    "FR-ENV-10"
+   ],
+   "note": "Kapton density not sourced (tbd)"
+  },
+  {
+   "id": "VC-ENV-11",
+   "quantity": "material without TML/CVCM used on a part under an outgassing profile",
+   "value": "ENV_OUTGASSING_DATA_MISSING",
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC §7.1",
+   "grade": "A",
+   "proves": [
+    "FR-ENV-05",
+    "FR-ENV-14"
+   ]
+  },
+  {
+   "id": "VC-ENV-12",
+   "quantity": "no mission profile set",
+   "value": "ENV_PROFILE_UNSET",
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "AF-31",
+   "grade": "A",
+   "proves": [
+    "FR-ENV-09",
+    "FR-ENV-14"
+   ]
+  },
+  {
+   "id": "VC-ENV-13",
+   "quantity": "orthotropic lamina with beta1/alpha1 != beta2/alpha2: equivalent-temperature hand-off refused",
+   "value": "ENV_EQUIVALENT_TEMPERATURE_INVALID",
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-ENV-08",
+    "TR-ENV-07"
+   ]
+  },
+  {
+   "id": "VC-ENV-14",
+   "quantity": "flags: synthetic inputs => unverified; deviation approval by an agent refused",
+   "value": {
+    "unverified": true,
+    "approveCode": "ENV_HUMAN_GATE",
+    "reviewRequired": true
+   },
+   "unit": "flags",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "AGENT_FIRST AF-32/33/34",
+   "grade": "A",
+   "proves": [
+    "FR-ENV-13"
+   ]
+  },
+  {
+   "id": "VC-ENV-15",
+   "quantity": "NASA outgassing CSV import: one 08 record per sample row, provenance keeps sample id + dataset version",
+   "value": {
+    "recordsPerRow": 1,
+    "properties": [
+     "TML",
+     "CVCM",
+     "WVR"
+    ],
+    "provenanceFields": [
+     "sampleId",
+     "datasetVersion"
+    ]
+   },
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC §6",
+   "grade": "A",
+   "proves": [
+    "FR-ENV-15"
+   ]
+  },
+  {
+   "id": "VC-ENV-16",
+   "quantity": "one face exposed (other sealed), h 2 mm, 7 days == both faces of a 4 mm plate",
+   "value": {
+    "tauEquivalent": 0.0378,
+    "moisturePercent": 0.65803499174
+   },
+   "unit": "-, %",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (symmetry: sealed face = mid-plane of a 2h plate)",
+   "grade": "A",
+   "proves": [
+    "FR-ENV-06",
+    "TR-ENV-05"
+   ]
+  }
+ ]
+}

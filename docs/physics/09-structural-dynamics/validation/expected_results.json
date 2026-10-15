@@ -1,0 +1,678 @@
+{
+ "pack": "09-structural-dynamics",
+ "generatedBy": "generate_dynamics_reference.py (+ quoted: VC-DYN-15, 16)",
+ "cases": [
+  {
+   "id": "VC-DYN-01",
+   "quantity": "SDOF dynamic amplification k|H| at f = fn, zeta = 0.05 (equals Q = 1/(2 zeta))",
+   "value": 10.0,
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (S10 receptance)",
+   "grade": "A",
+   "proves": [
+    "FR-DYN-04",
+    "TR-DYN-20"
+   ],
+   "inputs": {
+    "zeta": 0.05
+   },
+   "derivation": "k|H(1)| = 1/(2 zeta)"
+  },
+  {
+   "id": "VC-DYN-02",
+   "quantity": "SDOF receptance peak: frequency ratio r_peak = sqrt(1 - 2 zeta^2) and peak k|H|max = 1/(2 zeta sqrt(1 - zeta^2))",
+   "value": [
+    0.997496867163,
+    10.0125234864
+   ],
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (S10)",
+   "grade": "A",
+   "proves": [
+    "FR-DYN-04",
+    "TR-DYN-20"
+   ],
+   "inputs": {
+    "zeta": 0.05
+   }
+  },
+  {
+   "id": "VC-DYN-03",
+   "quantity": "half-power points r1, r2 and Q estimate 1/(r2 - r1) for zeta = 0.05 (Q = 10 nominal)",
+   "value": [
+    0.946110500007,
+    1.04636271043,
+    9.97484240779
+   ],
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (S10)",
+   "grade": "A",
+   "proves": [
+    "FR-DYN-05",
+    "TR-DYN-22"
+   ],
+   "note": "The half-power estimate differs from 1/(2 zeta) by 0.0625 % at zeta = 0.05; check_dynamics reports Q both ways."
+  },
+  {
+   "id": "VC-DYN-04",
+   "quantity": "base-excitation transmissibility |T| at r = 1 (sqrt(1 + 4 zeta^2)/(2 zeta)) and at r = sqrt(2) for zeta 0.01, 0.05, 0.2 (always 1)",
+   "value": [
+    10.0498756211,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (S10)",
+   "grade": "A",
+   "proves": [
+    "FR-DYN-06",
+    "TR-DYN-20"
+   ]
+  },
+  {
+   "id": "VC-DYN-05",
+   "quantity": "Rayleigh alpha (1/s), beta (s) giving zeta = 0.02 at 10 Hz and 100 Hz; zeta at sqrt(10*100) Hz",
+   "value": [
+    2.28479465716,
+    5.78745247607e-05,
+    0.0114991914915
+   ],
+   "unit": "1/s, s, -",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived from S1 (*MODAL DAMPING, RAYLEIGH formula)",
+   "grade": "A",
+   "proves": [
+    "FR-DYN-03",
+    "TR-DYN-11"
+   ],
+   "note": "zeta dips to 0.0115 at the geometric mean of the anchors: the agent must report the damping actually applied per mode."
+  },
+  {
+   "id": "VC-DYN-06",
+   "quantity": "CalculiX beamdy8 *STEADY STATE DYNAMICS: mode-1 modal coordinate predicted by the SDOF FRF at the 9 output frequencies; value = max relative deviation from the .dat.ref",
+   "value": 3.90952891725e-07,
+   "unit": "-",
+   "tolerance": {
+    "abs": 2e-06
+   },
+   "source": "S2 (CalculiX test beamdy8.inp / beamdy8.dat.ref, pinned) + derived",
+   "grade": "A",
+   "proves": [
+    "FR-DYN-02",
+    "FR-DYN-03",
+    "TR-DYN-10",
+    "TR-DYN-30"
+   ],
+   "inputs": {
+    "w1RadPerTime": 82284.79,
+    "alpha": 5000.0,
+    "modalForceDerived": [
+     650957.853055,
+     -0.0198263931997
+    ]
+   },
+   "table": [
+    [
+     12000.0,
+     0.000534986243927,
+     -0.000185731741563,
+     1.06786108865e-07
+    ],
+    [
+     12113.0553154,
+     0.000577960665543,
+     -0.000224823780174,
+     1.66984760928e-07
+    ],
+    [
+     12548.0155288,
+     0.000779681828947,
+     -0.000553991615997,
+     1.8133925458e-07
+    ],
+    [
+     12982.9757423,
+     0.000421157126226,
+     -0.00147579659943,
+     3.90952891725e-07
+    ],
+    [
+     13096.0310577,
+     -3.66753101148e-18,
+     -0.001582207,
+     7.25612356364e-24
+    ],
+    [
+     13189.2752163,
+     -0.000347893358485,
+     -0.00148978132017,
+     2.1274531757e-07
+    ],
+    [
+     13548.0155288,
+     -0.000760052794045,
+     -0.000680433783366,
+     1.23195389942e-07
+    ],
+    [
+     13906.7558413,
+     -0.000599899814869,
+     -0.000303258252914,
+     1.88145794021e-07
+    ],
+    [
+     14000.0,
+     -0.000557789013363,
+     -0.00025370493022,
+     1.91459475978e-07
+    ]
+   ],
+   "note": "Reference values carry 7 significant digits, so agreement better than ~1e-6 is not expected. The 9 points also confirm the CalculiX point-placement rule (n m - m + n with n = 5, m = 1)."
+  },
+  {
+   "id": "VC-DYN-07",
+   "quantity": "Miles g_rms for fn = 100 Hz, Q = 10, W = 0.04 g^2/Hz; exact white-noise g_rms (factor 1 + 4 zeta^2); same by quadrature",
+   "value": [
+    7.92665459521,
+    7.96618927735,
+    7.96618927077
+   ],
+   "unit": "g",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "S5 (Miles 1954, citation) + S6 (NTRS 19900015329, abstract) + derived",
+   "grade": "A",
+   "proves": [
+    "FR-DYN-08",
+    "TR-DYN-40",
+    "TR-DYN-41"
+   ],
+   "derivation": "integral_0^inf |T(r)|^2 dr = pi (1 + 4 zeta^2) / (4 zeta); Miles drops the 4 zeta^2 term"
+  },
+  {
+   "id": "VC-DYN-08",
+   "quantity": "relative displacement rms of the same SDOF (white base acceleration 0.04 g^2/Hz)",
+   "value": 0.196902338045,
+   "unit": "mm",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (S10)",
+   "grade": "A",
+   "proves": [
+    "FR-DYN-08",
+    "TR-DYN-41"
+   ],
+   "inputs": {
+    "g0": 9.80665
+   }
+  },
+  {
+   "id": "VC-DYN-09",
+   "quantity": "probability that a zero-mean Gaussian response exceeds 3 sigma in magnitude",
+   "value": 0.00269979606326,
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (Gaussian, S10)",
+   "grade": "A",
+   "proves": [
+    "FR-DYN-09",
+    "TR-DYN-42"
+   ],
+   "note": "3-sigma peak is a named default (AF-31), not a law: the result states it."
+  },
+  {
+   "id": "VC-DYN-10",
+   "quantity": "overall grms of the GEVS component qualification ASD (20-2000 Hz, log-log segments); acceptance (-3 dB) ASD",
+   "value": [
+    14.1356137191,
+    9.99538831703
+   ],
+   "unit": "g",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "breakpoints S3 + S4 (quoted, B); integration derived",
+   "grade": "A",
+   "proves": [
+    "FR-DYN-07",
+    "TR-DYN-43"
+   ],
+   "note": "Derived 14.14 g rounds to the 14.1 grms the sources print (acceptance 9.995 g -> 10.0); the breakpoints themselves are grade B until GSFC-STD-7000B Table 2.4-3 is read directly (sources.md). Slopes come out at +/-5.97 dB/oct (not exactly 6) because the tabulated end points are rounded; llull integrates the breakpoints as given."
+  },
+  {
+   "id": "VC-DYN-11",
+   "quantity": "SDOF fn = 200 Hz, Q = 10 on GEVS qualification ASD: Miles g_rms (W(fn) = 0.16) and exact band-limited integral 20-2000 Hz",
+   "value": [
+    22.4199648656,
+    22.4035959181
+   ],
+   "unit": "g",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "derived (inputs S3/S4)",
+   "grade": "A",
+   "proves": [
+    "FR-DYN-07",
+    "FR-DYN-08",
+    "TR-DYN-40",
+    "TR-DYN-43"
+   ],
+   "note": "The exact value includes off-resonance input outside the plateau; Miles is a quick check, never the answer of record (FR-DYN-08)."
+  },
+  {
+   "id": "VC-DYN-12",
+   "quantity": "clamped-free beam: share of the tip static compliance captured by modes 1..6 (cumulative), from beta_n L roots",
+   "value": [
+    0.970688180121,
+    0.995404008926,
+    0.998556472908,
+    0.999377419452,
+    0.999677841306,
+    0.999812467945
+   ],
+   "unit": "-",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "derived (Euler-Bernoulli, same roots as aerospace 05 S20)",
+   "grade": "A",
+   "proves": [
+    "FR-DYN-10",
+    "TR-DYN-31"
+   ],
+   "inputs": {
+    "betaL": [
+     1.87510406871,
+     4.69409113297,
+     7.85475743824,
+     10.9955407349,
+     14.137168391,
+     17.2787595321
+    ]
+   },
+   "note": "Mode 1 alone gives 97.07 %; the residual-flexibility warning DYN_MODAL_TRUNCATION fires below the user threshold."
+  },
+  {
+   "id": "VC-DYN-13",
+   "quantity": "maximax absolute-acceleration SRS / A of a half-sine (T = 11 ms), Q = 10, at fn = 10, 20, 31.5, 50, 80, 100, 160, 250, 400, 630, 1000, 2000 Hz (exact piecewise solution)",
+   "value": [
+    0.405175738442,
+    0.783112255388,
+    1.15180721468,
+    1.52628592298,
+    1.64827469856,
+    1.59139561988,
+    1.30837091315,
+    1.07344219226,
+    1.03528899695,
+    1.02094262803,
+    1.00756429213,
+    1.00093416228
+   ],
+   "unit": "-",
+   "tolerance": {
+    "rel": 0.005
+   },
+   "source": "derived (method A); method B = S7/S8 Smallwood filter",
+   "grade": "A",
+   "proves": [
+    "FR-DYN-11",
+    "TR-DYN-50",
+    "TR-DYN-51"
+   ],
+   "crossCheckMaxRelDiff": 1.72558754767e-06,
+   "note": "Tolerance 0.5 % applies to the llull implementation (Smallwood at >= 10 samples per period of the highest fn is the TR); methods A and B agree to crossCheckMaxRelDiff here."
+  },
+  {
+   "id": "VC-DYN-14",
+   "quantity": "SRS low-frequency asymptote: SRS(1 Hz)/(wn dV), dV = 2 A T / pi (velocity change of the pulse)",
+   "value": 0.931239519772,
+   "unit": "-",
+   "tolerance": {
+    "rel": 0.02
+   },
+   "source": "derived (impulse limit, S10)",
+   "grade": "A",
+   "proves": [
+    "FR-DYN-11",
+    "TR-DYN-51"
+   ],
+   "note": "Ratio tends to 1 as fn T -> 0 (impulse); at fn T = 0.011 with zeta = 0.05 it is slightly below 1."
+  },
+  {
+   "id": "VC-DYN-15",
+   "quantity": "NAFEMS FV32 cantilevered tapered membrane, modes 1-6",
+   "value": [
+    44.623,
+    130.03,
+    162.7,
+    246.05,
+    379.9,
+    391.44
+   ],
+   "unit": "Hz",
+   "tolerance": {
+    "rel": 0.01
+   },
+   "source": "S13 (Abaqus Benchmarks FV32) + S14 (Altair OS-V:0440, 2021/2022 releases), both citing NAFEMS TNSB Rev. 3",
+   "grade": "A",
+   "proves": [
+    "FR-DYN-01",
+    "FR-DYN-16"
+   ],
+   "note": "Altair 2023.1 prints a different closed-form set (44.61, 131.12, ...): do not mix. Geometry vertex coordinates are TBD (read from the Abaqus input nfv32f4f.inp before the plan is frozen)."
+  },
+  {
+   "id": "VC-DYN-16",
+   "quantity": "NAFEMS FV52 mode 7",
+   "value": "excluded",
+   "unit": "-",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "S14 (two Altair releases disagree: 167.89 vs 265.81 Hz)",
+   "grade": "C",
+   "proves": [
+    "FR-DYN-16"
+   ],
+   "note": "Not a threshold. Listed so nobody adds it back without a primary source."
+  },
+  {
+   "id": "VC-DYN-20",
+   "quantity": "beamdy8 tip node 100 |u_x| at the 9 output frequencies (12000 ... 14000 cycles/time), 100 N tip force, Rayleigh alpha 5000",
+   "value": [
+    3.70537411543,
+    4.05559736703,
+    6.24252169975,
+    9.99590908233,
+    10.2995496411,
+    9.95422996852,
+    6.62565244629,
+    4.35771490318,
+    3.97055961044
+   ],
+   "unit": "mm",
+   "tolerance": {
+    "rel": 0.0001
+   },
+   "source": "S2 (beamdy8.dat.ref, pinned sha256 in calculix_dynamics_cases.json)",
+   "grade": "B",
+   "proves": [
+    "FR-DYN-02",
+    "FR-DYN-03",
+    "TR-DYN-30",
+    "TR-DYN-60"
+   ],
+   "frequenciesHz": [
+    12000.0,
+    12113.0553154,
+    12548.0155288,
+    12982.9757423,
+    13096.0310577,
+    13189.2752163,
+    13548.0155288,
+    13906.7558413,
+    14000.0
+   ],
+   "note": "Gate 1e-4 applies to re-running the pinned deck with the bundled ccx and parsing it with the llull reader; the native llull model of the same beam (plan dyn_beamdy8_ssd) is held to 2 % (different mesh)."
+  },
+  {
+   "id": "VC-DYN-22",
+   "quantity": "beamdy8 frequency step: fraction of total effective mass captured by 10 modes, X / Y / Z translation",
+   "value": [
+    0.9374014,
+    0.9087642,
+    0.8287773
+   ],
+   "unit": "-",
+   "tolerance": {
+    "rel": 0.0001
+   },
+   "source": "S2 (beamdy8.dat.ref, FRACTION OF TOTALS)",
+   "grade": "B",
+   "proves": [
+    "FR-DYN-10",
+    "TR-DYN-31"
+   ]
+  },
+  {
+   "id": "VC-DYN-21",
+   "quantity": "EB cantilever 100 x 20 x 3 mm (E 210000 MPa, rho 7.8e-9 t/mm^3, zeta 0.02 all modes) on GEVS qual ASD in its thickness direction: tip absolute acceleration rms (g), tip relative displacement rms (mm), root bending stress rms (MPa); 6 modes",
+   "value": [
+    76.4330589827,
+    0.244136808267,
+    27.2299399808
+   ],
+   "unit": "g, mm, MPa",
+   "tolerance": {
+    "rel": 0.05
+   },
+   "source": "derived (Euler-Bernoulli modal superposition; spectrum S3/S4)",
+   "grade": "A",
+   "proves": [
+    "FR-DYN-06",
+    "FR-DYN-08",
+    "FR-DYN-10",
+    "TR-DYN-40",
+    "TR-DYN-41"
+   ],
+   "modesHz": [
+    251.457076314,
+    1575.85459783,
+    4412.4385045,
+    8646.61840454,
+    14293.4797715,
+    21351.9837661
+   ],
+   "rmsWith3Modes": [
+    76.4292615783,
+    0.244136807688,
+    27.2239972776
+   ],
+   "effectiveMassFraction": [
+    0.613076090026,
+    0.188300361066,
+    0.0647322316854,
+    0.0330868902756,
+    0.0200139988229,
+    0.0133978442872
+   ],
+   "note": "5 % covers shear deformation and rotary inertia that a solid FE model has and Euler-Bernoulli does not (L/h = 33), and the FE mesh; the spectrum is grade B, so the case is a solver check, not a qualification value."
+  },
+  {
+   "id": "VC-DYN-17",
+   "quantity": "number of frequency points written by *STEADY STATE DYNAMICS for n = 5 and m = 1 eigenfrequency in range",
+   "value": 9.0,
+   "unit": "points",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "S1 (manual formula nm - m + n) + S2 (beamdy8.dat.ref has 9 points)",
+   "grade": "A",
+   "proves": [
+    "TR-DYN-30"
+   ]
+  },
+  {
+   "id": "VC-DYN-30",
+   "quantity": "modal transient tip u_y history, undamped and Rayleigh alpha 5000 (beamdy1 / beamdy3)",
+   "value": "TBD",
+   "unit": "mm",
+   "tolerance": {
+    "rel": 0.0001
+   },
+   "source": "S2 (pinned deck; extract with the M2/M5 parser and freeze)",
+   "grade": "TBD",
+   "proves": [
+    "FR-DYN-06",
+    "FR-DYN-12",
+    "TR-DYN-60",
+    "TR-DYN-61"
+   ],
+   "note": "TBD - measure with the bundled ccx and the llull DAT reader."
+  },
+  {
+   "id": "VC-DYN-31",
+   "quantity": "SSD with acceleration base motion: tip u_x real/imag at the output points (beamdy10bm)",
+   "value": "TBD",
+   "unit": "mm",
+   "tolerance": {
+    "rel": 0.0001
+   },
+   "source": "S2 (pinned deck; extract with the M2/M5 parser and freeze)",
+   "grade": "TBD",
+   "proves": [
+    "FR-DYN-06",
+    "FR-DYN-12",
+    "TR-DYN-60",
+    "TR-DYN-61"
+   ],
+   "note": "TBD - measure with the bundled ccx and the llull DAT reader."
+  },
+  {
+   "id": "VC-DYN-32",
+   "quantity": "direct *DYNAMIC after NLGEOM static: tip u_y history (beamdynamic)",
+   "value": "TBD",
+   "unit": "mm",
+   "tolerance": {
+    "rel": 0.0001
+   },
+   "source": "S2 (pinned deck; extract with the M2/M5 parser and freeze)",
+   "grade": "TBD",
+   "proves": [
+    "FR-DYN-06",
+    "FR-DYN-12",
+    "TR-DYN-60",
+    "TR-DYN-61"
+   ],
+   "note": "TBD - measure with the bundled ccx and the llull DAT reader."
+  },
+  {
+   "id": "VC-DYN-40",
+   "quantity": "fea_solve on a random_response case with no damping",
+   "value": {
+    "exit": 1,
+    "code": "DYN_DAMPING_UNSET"
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "TECHNICAL_SPEC section 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-DYN-03",
+    "FR-DYN-18"
+   ],
+   "note": "behaviour case (exact match of codes / flags)"
+  },
+  {
+   "id": "VC-DYN-41",
+   "quantity": "equivalent_static_load_case without peakFactor",
+   "value": {
+    "peakFactor": {
+     "value": 3,
+     "source": "llull named default",
+     "defaulted": true,
+     "rationale": "Gaussian 3-sigma (P(|x| > 3 sigma) = 0.27 %)"
+    }
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "TECHNICAL_SPEC section 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-DYN-09",
+    "FR-DYN-14",
+    "TR-DYN-42"
+   ],
+   "note": "behaviour case (exact match of codes / flags)"
+  },
+  {
+   "id": "VC-DYN-42",
+   "quantity": "deliberately wrong set-ups",
+   "value": {
+    "codes": [
+     "DYN_BASIS_MISSING",
+     "DYN_SWEEP_INVALID",
+     "DYN_SPECTRUM_INVALID",
+     "DYN_BASE_ACCEL_TRANSIENT",
+     "DYN_DAMPING_INVALID",
+     "DYN_SAMPLING_TOO_COARSE",
+     "DYN_MILES_NOT_ANSWER"
+    ]
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "TECHNICAL_SPEC section 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-DYN-18",
+    "TR-DYN-80"
+   ],
+   "note": "behaviour case (exact match of codes / flags)"
+  },
+  {
+   "id": "VC-DYN-43",
+   "quantity": "random case driven by the GEVS library spectrum (grade B)",
+   "value": {
+    "unverified": true,
+    "warning": "DYN_SPECTRUM_UNVERIFIED"
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "TECHNICAL_SPEC section 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-DYN-07",
+    "FR-DYN-20"
+   ],
+   "note": "behaviour case (exact match of codes / flags)"
+  },
+  {
+   "id": "VC-DYN-44",
+   "quantity": "agent calls dispose_margin on a row created from an equivalent static load case",
+   "value": {
+    "exit": 1,
+    "code": "DYN_HUMAN_GATE",
+    "documentUnchanged": true
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "TECHNICAL_SPEC section 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-DYN-21"
+   ],
+   "note": "behaviour case (exact match of codes / flags)"
+  }
+ ]
+}

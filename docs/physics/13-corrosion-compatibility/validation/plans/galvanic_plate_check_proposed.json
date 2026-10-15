@@ -1,0 +1,16 @@
+[
+ {"command": "set_units", "params": {"units": "mm"}},
+ {"command": "create_material", "params": {"name": "aa7075_t6", "density": 0.00281, "color": "#b8bcc2", "metalness": 1, "roughness": 0.35}},
+ {"command": "create_material", "params": {"name": "ti6al4v_annealed", "density": 0.00443, "color": "#8a8f96", "metalness": 1, "roughness": 0.4}},
+ {"command": "add_box", "params": {"size": [100, 50, 10], "anchor": "min"}, "as": "plate"},
+ {"command": "add_box", "params": {"size": [60, 30, 5], "anchor": "min", "position": [20, 10, 10]}, "as": "block"},
+ {"command": "assign_material", "params": {"materialName": "aa7075_t6", "entityIds": ["$plate"]}},
+ {"command": "assign_material", "params": {"materialName": "ti6al4v_annealed", "entityIds": ["$block"]}},
+ {"command": "set_material_property", "params": {"material": "aa7075_t6", "property": "galvanicGroup", "value": "aluminium_wrought_other", "unit": "-", "basis": "company", "source": {"citation": "llull PHY-13 galvanic_anodic_index.csv (B)"}}},
+ {"command": "set_material_property", "params": {"material": "ti6al4v_annealed", "property": "galvanicGroup", "value": "nickel_titanium_group", "unit": "-", "basis": "company", "source": {"citation": "llull PHY-13 galvanic_anodic_index.csv (B)"}}},
+ {"command": "set_service_environment", "params": {"scheme": "anodic_index", "environment": "normal"}},
+ {"command": "find_contacts", "params": {"entityIds": ["$plate", "$block"], "tolerance": {"value": 0.1, "unit": "mm"}}},
+ {"command": "check_material_compatibility", "params": {"entityIds": ["$plate", "$block"], "tolerance": {"value": 0.1, "unit": "mm"}}},
+ {"command": "declare_isolation", "params": {"pair": ["$plate", "$block"], "method": "sealant_faying", "spec": "MIL-PRF-81733 Type IV"}},
+ {"command": "check_material_compatibility", "params": {"entityIds": ["$plate", "$block"], "tolerance": {"value": 0.1, "unit": "mm"}}}
+]
