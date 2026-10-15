@@ -1,0 +1,594 @@
+{
+ "pack": "07-fatigue",
+ "generatedBy": "generate_fatigue_reference.py",
+ "cases": [
+  {
+   "id": "VC-FAT-01",
+   "quantity": "rainflow counts of the ASTM E1049-85 Fig. 6 history (range: cycles)",
+   "value": [
+    [
+     3.0,
+     0.5
+    ],
+    [
+     4.0,
+     1.5
+    ],
+    [
+     6.0,
+     0.5
+    ],
+    [
+     8.0,
+     1.0
+    ],
+    [
+     9.0,
+     0.5
+    ]
+   ],
+   "unit": "unit, cycles",
+   "tolerance": {
+    "abs": 0.0
+   },
+   "source": "S1 (standard, catalogue) + S2 TEST_CASE_1 + S3 Fig.6(a) test",
+   "grade": "A",
+   "proves": [
+    "FR-FAT-05",
+    "TR-FAT-20"
+   ],
+   "inputs": {
+    "history": [
+     -2.0,
+     1.0,
+     -3.0,
+     5.0,
+     -1.0,
+     3.0,
+     -4.0,
+     4.0,
+     -2.0
+    ]
+   },
+   "derivation": "E1049 5.4.4 three-point rule, residue as half cycles (generator reproduces the quoted list)"
+  },
+  {
+   "id": "VC-FAT-02",
+   "quantity": "four-point full cycles of the negated E1049 history, and full+residue totals",
+   "value": {
+    "fullCycles": [
+     [
+      1.0,
+      -3.0,
+      4.0
+     ]
+    ],
+    "residue": [
+     2.0,
+     -1.0,
+     3.0,
+     -5.0,
+     4.0,
+     -4.0,
+     2.0
+    ],
+    "totals": [
+     [
+      3.0,
+      0.5
+     ],
+     [
+      4.0,
+      1.5
+     ],
+     [
+      6.0,
+      0.5
+     ],
+     [
+      8.0,
+      1.0
+     ],
+     [
+      9.0,
+      0.5
+     ]
+    ]
+   },
+   "unit": "unit, cycles",
+   "tolerance": {
+    "abs": 0.0
+   },
+   "source": "S3 four-point test + generator",
+   "grade": "B",
+   "proves": [
+    "FR-FAT-05",
+    "TR-FAT-21"
+   ],
+   "inputs": {
+    "history": [
+     2.0,
+     -1.0,
+     3.0,
+     -5.0,
+     1.0,
+     -3.0,
+     4.0,
+     -4.0,
+     2.0
+    ]
+   }
+  },
+  {
+   "id": "VC-FAT-03",
+   "quantity": "repeating-history rainflow (E1049 5.4.5 / Fig. 7)",
+   "value": [
+    [
+     3.0,
+     1.0
+    ],
+    [
+     4.0,
+     1.0
+    ],
+    [
+     7.0,
+     1.0
+    ],
+    [
+     9.0,
+     1.0
+    ]
+   ],
+   "unit": "unit, cycles",
+   "tolerance": {
+    "abs": 0.0
+   },
+   "source": "S3 Fig.7 test (single source) + generator",
+   "grade": "B",
+   "proves": [
+    "FR-FAT-05",
+    "TR-FAT-20"
+   ],
+   "inputs": {
+    "history": [
+     -2.0,
+     1.0,
+     -3.0,
+     5.0,
+     -1.0,
+     3.0,
+     -4.0,
+     4.0,
+     -2.0
+    ]
+   }
+  },
+  {
+   "id": "VC-FAT-04",
+   "quantity": "rainflow counts of the S2 TEST_CASE_2 history (regression, not from E1049)",
+   "value": [
+    [
+     1.0,
+     1.0
+    ],
+    [
+     2.5,
+     1.0
+    ],
+    [
+     4.0,
+     1.5
+    ],
+    [
+     6.0,
+     1.5
+    ],
+    [
+     6.5,
+     0.5
+    ],
+    [
+     7.0,
+     1.0
+    ],
+    [
+     10.5,
+     0.5
+    ],
+    [
+     13.0,
+     0.5
+    ],
+    [
+     14.0,
+     1.0
+    ],
+    [
+     18.0,
+     0.5
+    ]
+   ],
+   "unit": "unit, cycles",
+   "tolerance": {
+    "abs": 0.0
+   },
+   "source": "S2 TEST_CASE_2 + generator",
+   "grade": "B",
+   "proves": [
+    "FR-FAT-05"
+   ],
+   "inputs": {
+    "history": [
+     -1.5,
+     1.0,
+     -3.0,
+     10.0,
+     -1.0,
+     3.0,
+     -8.0,
+     4.0,
+     -2.0,
+     6.0,
+     -1.0,
+     -4.0,
+     -8.0,
+     2.0,
+     1.0,
+     -5.0,
+     0.0,
+     2.5,
+     -4.0,
+     1.0,
+     0.0,
+     2.0,
+     -0.5
+    ]
+   }
+  },
+  {
+   "id": "VC-FAT-10",
+   "quantity": "Basquin reversals to failure 2Nf at sigma_a = 400 MPa (sigma'f 1160 MPa, b -0.081)",
+   "value": 511231.091036,
+   "unit": "reversals",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S6, S7 (formula) + generator",
+   "grade": "A",
+   "proves": [
+    "FR-FAT-01",
+    "TR-FAT-10"
+   ],
+   "derivation": "2Nf = (sigma_a / sigma'_f)^(1/b)"
+  },
+  {
+   "id": "VC-FAT-11",
+   "quantity": "S-N power law N at S = 300 MPa (k 5, N_D 1e6, S_D 200 MPa)",
+   "value": 131687.242798,
+   "unit": "cycles",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S8 (parametrisation) + generator",
+   "grade": "A",
+   "proves": [
+    "FR-FAT-01",
+    "TR-FAT-10"
+   ],
+   "derivation": "N = N_D (S/S_D)^-k"
+  },
+  {
+   "id": "VC-FAT-15",
+   "quantity": "Basquin 2Nf at 400 MPa with an explicit surface modifier 0.8 on sigma'f",
+   "value": 32523.5051309,
+   "unit": "reversals",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator (TR-FAT-10 modifier rule)",
+   "grade": "A",
+   "proves": [
+    "FR-FAT-20",
+    "TR-FAT-10"
+   ]
+  },
+  {
+   "id": "VC-FAT-61",
+   "quantity": "Basquin 2Nf at 100 MPa (beyond testedLifeRange max 1e7 cycles -> extrapolated)",
+   "value": 13850219529200.0,
+   "unit": "reversals",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-FAT-14",
+    "FR-FAT-15"
+   ],
+   "expect": {
+    "extrapolated": true,
+    "code": "FAT_CURVE_EXTRAPOLATED",
+    "staticCase": {
+     "amplitudeMPa": 1500,
+     "FtuMPa": 1400,
+     "code": "FAT_STATIC_FAILURE"
+    }
+   }
+  },
+  {
+   "id": "VC-FAT-12",
+   "quantity": "Coffin-Manson-Basquin 2Nf at eps_a = 0.0075 (Newton on log10 2N)",
+   "value": 4414.93208801,
+   "unit": "reversals",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "S6, S7 (formula) + generator",
+   "grade": "A",
+   "proves": [
+    "FR-FAT-02",
+    "TR-FAT-11"
+   ],
+   "derivation": "eps_a = sigma'f/E (2N)^b + eps'f (2N)^c; table in strain_life_table.csv"
+  },
+  {
+   "id": "VC-FAT-13",
+   "quantity": "transition life 2Nt (elastic = plastic strain)",
+   "value": 10982.2778343,
+   "unit": "reversals",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator (closed form)",
+   "grade": "A",
+   "proves": [
+    "FR-FAT-02"
+   ],
+   "derivation": "2Nt = (eps'f E / sigma'f)^(1/(b-c))"
+  },
+  {
+   "id": "VC-FAT-14",
+   "quantity": "Morrow-corrected 2Nf at eps_a = 0.005, sigma_m = 100 MPa",
+   "value": 10840.857018,
+   "unit": "reversals",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "S6, S7 + generator",
+   "grade": "A",
+   "proves": [
+    "FR-FAT-04",
+    "TR-FAT-11"
+   ]
+  },
+  {
+   "id": "VC-FAT-20",
+   "quantity": "Kf = 1 + q (Kt - 1), Kt 2.41, q 0.9857",
+   "value": 2.389837,
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "S5, S9 (formula) + generator",
+   "grade": "A",
+   "proves": [
+    "FR-FAT-03",
+    "TR-FAT-12"
+   ]
+  },
+  {
+   "id": "VC-FAT-21",
+   "quantity": "Neuber local stress sigma_max for Kf S = 896.189 MPa on the cyclic RO curve",
+   "value": 506.729085988,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "generator + S5 Example 1 (prints 506.7291 MPa)",
+   "grade": "A",
+   "proves": [
+    "FR-FAT-03",
+    "TR-FAT-12"
+   ],
+   "cross_check": {
+    "S5_sigma_max_MPa": 506.7291,
+    "S5_eps_max": 0.0075
+   },
+   "derivation": "sigma eps = (Kf S)^2 / E, eps = sigma/E + (sigma/K')^(1/n')"
+  },
+  {
+   "id": "VC-FAT-22",
+   "quantity": "SWT life of the S5 Example 1 notch (cycles)",
+   "value": 2919.91137196,
+   "unit": "cycles",
+   "tolerance": {
+    "rel": 0.0001
+   },
+   "source": "generator + S5 Example 1 (prints 2919.91 cycles)",
+   "grade": "A",
+   "proves": [
+    "FR-FAT-02",
+    "FR-FAT-04",
+    "TR-FAT-11"
+   ],
+   "cross_check": {
+    "S5_cycles": 2919.91
+   },
+   "note": "the generator and the independent S5 implementation agree to 6 digits"
+  },
+  {
+   "id": "VC-FAT-23",
+   "quantity": "notch sensitivity q, Peterson a = 0.25 mm and Neuber rho' = 0.25 mm at r = 1 mm",
+   "value": {
+    "peterson": 0.8,
+    "neuber": 0.666666666667
+   },
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "S5, S9 (formula) + generator",
+   "grade": "A",
+   "proves": [
+    "FR-FAT-03"
+   ],
+   "note": "a and rho' are test inputs; llull ships no material notch constants (TECHNICAL_SPEC OQ-FAT-04)"
+  },
+  {
+   "id": "VC-FAT-24",
+   "quantity": "Masing hysteresis strain range for d_sigma = 800 MPa",
+   "value": 0.0057055537097,
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "S8 (Masing/RO), generator",
+   "grade": "A",
+   "proves": [
+    "FR-FAT-03",
+    "TR-FAT-12"
+   ]
+  },
+  {
+   "id": "VC-FAT-30",
+   "quantity": "equivalent fully reversed amplitude sigma_ar per mean-stress model",
+   "value": {
+    "goodman": 250.0,
+    "gerber": 208.333333333,
+    "soderberg": 266.666666667,
+    "morrow": 218.867924528,
+    "swt": 244.948974278,
+    "walker": 225.869387091
+   },
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "S6, S7, S10 (formulas) + generator",
+   "grade": "A",
+   "proves": [
+    "FR-FAT-04",
+    "TR-FAT-13"
+   ],
+   "inputs": {
+    "sigma_a_MPa": 200.0,
+    "sigma_m_MPa": 100.0,
+    "Su_MPa": 500.0,
+    "Sy_MPa": 400.0,
+    "sigma_f_MPa": 1160.0,
+    "walker_gamma": 0.7
+   },
+   "note": "identity checked by the generator: Walker with gamma = 0.5 equals SWT"
+  },
+  {
+   "id": "VC-FAT-40",
+   "quantity": "Palmgren-Miner damage of one E1049 block (1 unit = 100 MPa, Basquin, no mean correction)",
+   "value": 1.23426341718e-05,
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S11 (Miner rule) + generator",
+   "grade": "A",
+   "proves": [
+    "FR-FAT-06",
+    "TR-FAT-14"
+   ]
+  },
+  {
+   "id": "VC-FAT-41",
+   "quantity": "blocks to D = 1 for the same history",
+   "value": 81019.9821273,
+   "unit": "blocks",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-FAT-06"
+   ]
+  },
+  {
+   "id": "VC-FAT-42",
+   "quantity": "local max-principal history at the hole edge: 05 Kirsch peak (300 MPa per 100 MPa) x scale 0.1 x load factors",
+   "value": [
+    -60.0,
+    30.0,
+    -90.0,
+    150.0,
+    -30.0,
+    90.0,
+    -120.0,
+    120.0,
+    -60.0
+   ],
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "aerospace 05 VC-FEA-14 + generator",
+   "grade": "A",
+   "proves": [
+    "FR-FAT-07",
+    "TR-FAT-15"
+   ]
+  },
+  {
+   "id": "VC-FAT-50",
+   "quantity": "fatigue life margin = N / (SF x N_required) - 1 (N_required 1000 blocks, SF 3 explicit)",
+   "value": 26.0066607091,
+   "unit": "-",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "generator; SF is a test input (no verified default, OQ-FAT-01)",
+   "grade": "A",
+   "proves": [
+    "FR-FAT-08",
+    "FR-FAT-09",
+    "TR-FAT-16"
+   ]
+  },
+  {
+   "id": "VC-FAT-60",
+   "quantity": "agent-first result contract",
+   "value": {
+    "scatterFactorUnset": {
+     "code": "FAT_SCATTER_FACTOR_UNSET",
+     "severity": "error",
+     "exit": 1
+    },
+    "reviewRequired": true,
+    "summaryContains": "not approved",
+    "disposeByAgent": {
+     "code": "FAT_HUMAN_GATE",
+     "exit": 1,
+     "documentUnchanged": true
+    },
+    "unverifiedCurve": {
+     "flag": "unverified",
+     "check": "FAT_CURVE_UNVERIFIED"
+    },
+    "staleResults": {
+     "code": "FAT_RESULTS_STALE"
+    }
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0.0
+   },
+   "source": "AGENT_FIRST AF-11/31/32/33/34",
+   "grade": "A",
+   "proves": [
+    "FR-FAT-09",
+    "FR-FAT-10",
+    "FR-FAT-11",
+    "FR-FAT-12",
+    "TR-FAT-30"
+   ]
+  }
+ ]
+}
