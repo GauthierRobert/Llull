@@ -71,7 +71,7 @@ amp_at_fn = receptance_norm(1.0, ZETA)
 r_peak = math.sqrt(1.0 - 2.0 * ZETA * ZETA)
 amp_peak = 1.0 / (2.0 * ZETA * math.sqrt(1.0 - ZETA * ZETA))
 case('VC-DYN-01', 'SDOF dynamic amplification k|H| at f = fn, zeta = 0.05 (equals Q = 1/(2 zeta))', amp_at_fn, '-',
-     {'rel': 1e-9}, 'derived (S10 receptance)', 'A', ['FR-DYN-04', 'TR-DYN-20'],
+     {'rel': 1e-9}, 'derived (S10 receptance)', 'A', ['FR-DYN-04', 'TR-DYN-20', 'FR-DYN-17', 'FR-DYN-19'],
      inputs={'zeta': ZETA}, derivation='k|H(1)| = 1/(2 zeta)')
 case('VC-DYN-02', 'SDOF receptance peak: frequency ratio r_peak = sqrt(1 - 2 zeta^2) and peak k|H|max = 1/(2 zeta sqrt(1 - zeta^2))',
      [r_peak, amp_peak], '-', {'rel': 1e-9}, 'derived (S10)', 'A', ['FR-DYN-04', 'TR-DYN-20'],
@@ -184,7 +184,7 @@ wn_m = 2 * math.pi * fn_m
 z_rms = math.sqrt(w_m * G0 * G0 / (8.0 * zeta_m * wn_m ** 3))
 case('VC-DYN-07', "Miles g_rms for fn = 100 Hz, Q = 10, W = 0.04 g^2/Hz; exact white-noise g_rms (factor 1 + 4 zeta^2); same by quadrature",
      [miles, exact_white, num_white], 'g', {'rel': 1e-6}, 'S5 (Miles 1954, citation) + S6 (NTRS 19900015329, abstract) + derived', 'A',
-     ['FR-DYN-08', 'TR-DYN-40', 'TR-DYN-41'],
+     ['FR-DYN-08', 'TR-DYN-40', 'TR-DYN-41', 'FR-DYN-17', 'FR-DYN-19'],
      derivation='integral_0^inf |T(r)|^2 dr = pi (1 + 4 zeta^2) / (4 zeta); Miles drops the 4 zeta^2 term')
 case('VC-DYN-08', 'relative displacement rms of the same SDOF (white base acceleration 0.04 g^2/Hz)', z_rms * 1000.0, 'mm',
      {'rel': 1e-9}, 'derived (S10)', 'A', ['FR-DYN-08', 'TR-DYN-41'], inputs={'g0': G0})
@@ -380,7 +380,7 @@ with open('srs_half_sine.csv', 'w', newline='') as fh:
 case('VC-DYN-13', 'maximax absolute-acceleration SRS / A of a half-sine (T = 11 ms), Q = 10, at fn = '
      + ', '.join('%g' % f for f in SRS_FREQS) + ' Hz (exact piecewise solution)',
      [row[2] for row in srs_rows], '-', {'rel': 0.005}, 'derived (method A); method B = S7/S8 Smallwood filter', 'A',
-     ['FR-DYN-11', 'TR-DYN-50', 'TR-DYN-51'],
+     ['FR-DYN-11', 'TR-DYN-50', 'TR-DYN-51', 'FR-DYN-17', 'FR-DYN-19'],
      crossCheckMaxRelDiff=r12(worst),
      note='Tolerance 0.5 % applies to the llull implementation (Smallwood at >= 10 samples per period of the highest fn is the TR); '
           'methods A and B agree to crossCheckMaxRelDiff here.')
@@ -507,6 +507,17 @@ AGENT_CASES = [
     ('VC-DYN-44', 'agent calls dispose_margin on a row created from an equivalent static load case', {'exit': 1, 'code': 'DYN_HUMAN_GATE',
                                                                                                     'documentUnchanged': True},
      ['FR-DYN-21']),
+]
+AGENT_CASES += [
+    ('VC-DYN-45', 'plugin contract: create_analysis accepts the three dynamic types only with the plugin installed; toolSchemas snapshot; '
+     'validate/restore round trip; any change of damping, sweep, base or spectrum marks results stale; same data from CLI, MCP, UI',
+     {'staleAfterDampingChange': True, 'roundTripDeepEqual': True, 'identicalAcrossSurfaces': True},
+     ['FR-DYN-01', 'FR-DYN-22', 'TR-DYN-01', 'TR-DYN-02', 'TR-DYN-03', 'TR-DYN-70']),
+    ('VC-DYN-46', 'V1: PHY-10 reaction history assigned to a transient case; stress ASD export CSV for PHY-07 (TBD values)',
+     {'historySource': 'fromPhy10', 'csvColumns': ['f_Hz', 'asd', 'unit']}, ['FR-DYN-13', 'FR-DYN-15', 'TR-DYN-61']),
+    ('VC-DYN-47', 'structural_material damping: record without structuralLossFactor -> refusal; record with eta = 0.02 -> deck card and '
+     'reported equivalent zeta at resonance', {'missing': 'DYN_MATERIAL_NO_DAMPING', 'deckLine': '*DAMPING,STRUCTURAL=0.02', 'zetaEq': 0.01},
+     ['FR-DYN-03', 'TR-DYN-11', 'TR-DYN-12']),
 ]
 for cid, what, expect, proves in AGENT_CASES:
     case(cid, what, expect, '-', {'abs': 0}, 'TECHNICAL_SPEC section 7.1', 'A', proves, note='behaviour case (exact match of codes / flags)')

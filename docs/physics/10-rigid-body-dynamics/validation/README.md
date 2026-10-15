@@ -11,7 +11,7 @@ library, `python3 -I generate_rbd_reference.py`, ~5 s, byte-identical on re-run,
 | File | Kind | Content |
 | ---- | ---- | ------- |
 | `generate_rbd_reference.py` | generator | Writes every file below |
-| `expected_results.json` | (a)+(b)+(c) | 20 cases VC-RBD-01…54 (PHY README §6.3 schema) |
+| `expected_results.json` | (a)+(b)+(c) | 22 cases VC-RBD-01…58 (PHY README §6.3 schema) |
 | `andrews_reference.json` | (a)+(b) | Andrews' squeezer: 42 parameters, q₀, reference q and q̇ at t = 0.03 s, initial q̈₁,₂ and λ₁,₂, and this generator's independent reproduction (max relative difference 1.6e-10 on q, 5.0e-8 on q̇) |
 | `pendulum_period.csv` | (b) | T/T₀ vs amplitude 5…175°, K(k) by AGM and by quadrature |
 | `slider_crank.csv` | (b) | x, v, a and crank torque every 15° (r 0.05 m, l 0.2 m, ω 100 rad/s, piston 0.5 kg) |
@@ -62,6 +62,10 @@ All status **P**. Gate `unit` = pure TS engine (no host, no kernel unless noted)
 | VC-RBD-52 | FR-RBD-16 | seven wrong set-ups | codes listed in the JSON | exact | A | unit + CLI |
 | VC-RBD-53 | FR-RBD-12; TR-RBD-60 | export pendulum pivot load to a 05 static case | `limit`, `reviewRequired`, provenance.studyHash | exact | A | unit |
 | VC-RBD-54 | FR-RBD-18 | unverified density | `unverified: true`, `RBD_MASS_UNVERIFIED` | exact | A | unit |
+| VC-RBD-55 | FR-RBD-20; TR-RBD-01/02 | kinematic commands unchanged; pivot defaulted | identical `evaluate_motion` data; `RBD_PIVOT_DEFAULTED` | exact | A | unit |
+| VC-RBD-56 | FR-RBD-04, 14; TR-RBD-50 | `check_mechanism` on the slider-crank, spatial vs planar | spatial DOF 1, redundant 3 (18 coordinates, 20 equations, rank 17); planar DOF 1, redundant 0 | exact | A (derived count) | unit |
+| VC-RBD-57 | FR-RBD-19, 21, 22; TR-RBD-70 | budgets, paging | `RBD_BUDGET_EXCEEDED`; page fields | exact | A | unit |
+| VC-RBD-58 | FR-RBD-13; TR-RBD-60 | V1 history export to PHY-09 | `source.fromPhy10` (values TBD) | exact | A | V1 |
 
 Notes:
 

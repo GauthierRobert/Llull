@@ -37,36 +37,52 @@
   }
  },
  {
-  "command": "set_material_property",
+  "command": "define_property_model",
   "params": {
    "material": "white_paint_test",
-   "property": "absorptivity_solar",
-   "value": 0.2,
-   "unit": "-",
-   "basis": "company",
-   "source": {
-    "citation": "test input of this validation case (not a property claim)"
-   },
-   "preferred": true,
-   "condition": {
-    "state": "BOL"
+   "model": {
+    "id": "abs_bol",
+    "property": "absorptivitySolar",
+    "unit": "1",
+    "variables": [],
+    "form": {
+     "kind": "constant",
+     "value": 0.2
+    },
+    "validity": [],
+    "basis": "company",
+    "condition": {
+     "lifeState": "BOL"
+    },
+    "source": {
+     "citation": "test input of this validation case (not a property claim)"
+    },
+    "preferred": true
    }
   }
  },
  {
-  "command": "set_material_property",
+  "command": "define_property_model",
   "params": {
    "material": "white_paint_test",
-   "property": "emissivity_ir",
-   "value": 0.9,
-   "unit": "-",
-   "basis": "company",
-   "source": {
-    "citation": "test input of this validation case (not a property claim)"
-   },
-   "preferred": true,
-   "condition": {
-    "kind": "hemispherical_total"
+   "model": {
+    "id": "eps_ht",
+    "property": "emissivityIr",
+    "unit": "1",
+    "variables": [],
+    "form": {
+     "kind": "constant",
+     "value": 0.9
+    },
+    "validity": [],
+    "basis": "company",
+    "condition": {
+     "opticalKind": "hemispherical_total"
+    },
+    "source": {
+     "citation": "test input of this validation case (not a property claim)"
+    },
+    "preferred": true
    }
   }
  },

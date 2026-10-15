@@ -14,7 +14,9 @@
    "grade": "A",
    "proves": [
     "FR-DYN-04",
-    "TR-DYN-20"
+    "TR-DYN-20",
+    "FR-DYN-17",
+    "FR-DYN-19"
    ],
    "inputs": {
     "zeta": 0.05
@@ -201,7 +203,9 @@
    "proves": [
     "FR-DYN-08",
     "TR-DYN-40",
-    "TR-DYN-41"
+    "TR-DYN-41",
+    "FR-DYN-17",
+    "FR-DYN-19"
    ],
    "derivation": "integral_0^inf |T(r)|^2 dr = pi (1 + 4 zeta^2) / (4 zeta); Miles drops the 4 zeta^2 term"
   },
@@ -338,7 +342,9 @@
    "proves": [
     "FR-DYN-11",
     "TR-DYN-50",
-    "TR-DYN-51"
+    "TR-DYN-51",
+    "FR-DYN-17",
+    "FR-DYN-19"
    ],
    "crossCheckMaxRelDiff": 1.72558754767e-06,
    "note": "Tolerance 0.5 % applies to the llull implementation (Smallwood at >= 10 samples per period of the highest fn is the TR); methods A and B agree to crossCheckMaxRelDiff here."
@@ -671,6 +677,75 @@
    "grade": "A",
    "proves": [
     "FR-DYN-21"
+   ],
+   "note": "behaviour case (exact match of codes / flags)"
+  },
+  {
+   "id": "VC-DYN-45",
+   "quantity": "plugin contract: create_analysis accepts the three dynamic types only with the plugin installed; toolSchemas snapshot; validate/restore round trip; any change of damping, sweep, base or spectrum marks results stale; same data from CLI, MCP, UI",
+   "value": {
+    "staleAfterDampingChange": true,
+    "roundTripDeepEqual": true,
+    "identicalAcrossSurfaces": true
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "TECHNICAL_SPEC section 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-DYN-01",
+    "FR-DYN-22",
+    "TR-DYN-01",
+    "TR-DYN-02",
+    "TR-DYN-03",
+    "TR-DYN-70"
+   ],
+   "note": "behaviour case (exact match of codes / flags)"
+  },
+  {
+   "id": "VC-DYN-46",
+   "quantity": "V1: PHY-10 reaction history assigned to a transient case; stress ASD export CSV for PHY-07 (TBD values)",
+   "value": {
+    "historySource": "fromPhy10",
+    "csvColumns": [
+     "f_Hz",
+     "asd",
+     "unit"
+    ]
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "TECHNICAL_SPEC section 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-DYN-13",
+    "FR-DYN-15",
+    "TR-DYN-61"
+   ],
+   "note": "behaviour case (exact match of codes / flags)"
+  },
+  {
+   "id": "VC-DYN-47",
+   "quantity": "structural_material damping: record without structuralLossFactor -> refusal; record with eta = 0.02 -> deck card and reported equivalent zeta at resonance",
+   "value": {
+    "missing": "DYN_MATERIAL_NO_DAMPING",
+    "deckLine": "*DAMPING,STRUCTURAL=0.02",
+    "zetaEq": 0.01
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "TECHNICAL_SPEC section 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-DYN-03",
+    "TR-DYN-11",
+    "TR-DYN-12"
    ],
    "note": "behaviour case (exact match of codes / flags)"
   }

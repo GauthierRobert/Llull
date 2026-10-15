@@ -15,7 +15,7 @@ Tolerances are llull acceptance choices, explained per case.
 | File | Kind | Content |
 | ---- | ---- | ------- |
 | `generate_dynamics_reference.py` | generator | Writes the four files below |
-| `expected_results.json` | (a)+(b)+(c) | 28 cases VC-DYN-01…44 in the PHY README §6.3 schema |
+| `expected_results.json` | (a)+(b)+(c) | 31 cases VC-DYN-01…47 in the PHY README §6.3 schema |
 | `sdof_frf.csv` | (b) | SDOF k\|H\|, phase, \|T\| for ζ = 0.05, r = 0…3 |
 | `gevs_profile.csv` | (b) from (a) breakpoints | GEVS component qual / acceptance ASD segments: slope n, dB/oct, area |
 | `srs_half_sine.csv` | (b) | half-sine SRS / A at 12 frequencies, Q = 10, exact solution and Smallwood filter |
@@ -70,6 +70,9 @@ Status **P** (proposed) for all. Gate: `unit` = pure TS, no solver; `integration
 | VC-DYN-42 | FR-DYN-18 | seven wrong set-ups | the seven codes listed in the JSON | exact | A | unit + CLI |
 | VC-DYN-43 | FR-DYN-07, 20 | GEVS library spectrum | `unverified: true`, `DYN_SPECTRUM_UNVERIFIED` | exact | A | unit |
 | VC-DYN-44 | FR-DYN-21 | agent `dispose_margin` | exit 1, `DYN_HUMAN_GATE`, document unchanged | exact | A | unit + CLI |
+| VC-DYN-45 | FR-DYN-01, 22; TR-DYN-01/02/03/70 | plugin contract, staleness, surface equality | flags in the JSON | exact | A | contract + golden |
+| VC-DYN-46 | FR-DYN-13, 15; TR-DYN-61 | V1 joint history in a transient; stress ASD CSV for PHY-07 | shape only (values TBD) | exact | A | V1 |
+| VC-DYN-47 | FR-DYN-03; TR-DYN-11/12 | `structural_material` damping via the PHY-01 property API | missing → `DYN_MATERIAL_NO_DAMPING`; η 0.02 → `*DAMPING,STRUCTURAL=0.02`, ζ_eq 0.01 | exact | A | unit |
 
 Notes on specific cases:
 

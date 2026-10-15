@@ -48,7 +48,7 @@ by hash), L9 (`fit_at_temperature` reads PMI data only — no kernel; distortion
 | TR-TMC-12 | MUST | Field source `expression`: evaluated at each mesh node with x, y, z in the declared `coordinatesUnit`, result in the declared `temperatureUnit`; grammar = llull's parametric expression grammar (TR-TMC-12 needs `evaluateExpression` in `lib/`, §11 Q3); non-finite at any node → `TMC_FIELD_INVALID` with the node count. |
 | TR-TMC-13 | SHOULD (V1) | Layered parts (bimetal, bonded inserts) when 05 supports bonded multi-part conformal meshes; until then `thermal_stress_check check=bimetal` only. |
 | TR-TMC-14 | MUST | Field source `uniform` and `table` (CSV `x,y,z,T` with units; nearest-node match within 1e-6 × model size, otherwise `TMC_FIELD_TABLE_UNMATCHED`). |
-| TR-TMC-15 | MUST | CTE handling (§5.2): basis required (§3.3); instantaneous tables integrated to secant at the case reference temperature by Simpson's rule on the table (piecewise linear ⇒ exact trapezoid of a linear function); re-referencing exact; PHY-01 fitted models sampled (step ≤ 10 K) then integrated; conversions listed in `data.provenance`. |
+| TR-TMC-15 | MUST | CTE handling (§5.2): source order and basis per §3.3 (`thermalStrain` model first); instantaneous tables integrated to secant at the case reference temperature by Simpson's rule on the table (piecewise linear ⇒ exact trapezoid of a linear function); re-referencing exact; PHY-01 fitted models sampled (step ≤ 10 K) then integrated; conversions listed in `data.provenance`. |
 | TR-TMC-16 | MUST | `thermal_distortion_report` (§5.4): best-fit plane (least squares, SVD-free closed form on the 3 × 3 covariance via Jacobi rotation) of a face's nodes before/after displacement; out-of-plane deviation = max − min signed distance; relative displacement of named points; comparison with a 03 flatness/profile tolerance found on that face (`pmiId`), `reviewRequired: true`. |
 | TR-TMC-20 | MUST | `fit_at_temperature` (§5.3) pure: diameters scaled with each part's secant CTE from its spec temperature; status rules; derived fit intent; per-part temperatures; outputs with units (mm or in per document); `provenance { formula, inputs, cteSources }`; no kernel and no solver. |
 | TR-TMC-21 | SHOULD (V1) | Lamé interference pressure (solid or hollow shaft, hub outer diameter given) and hub bore hoop stress per temperature, both elastic; materials' E, ν from 08. |
@@ -106,11 +106,22 @@ export interface FitResult {
 }
 ```
 
-### 3.3 CTE basis (request to PHY-01 / 08)
+### 3.3 CTE source and basis (PHY-01 / PHY-02 alignment)
 
-`cte` values need `cteBasis?: { kind: 'secant'; referenceTemperature: Q } | { kind: 'instantaneous' }` on the
-`PropertyValue` (or the PHY-01 `PropertyModel` metadata). Until PHY-01/08 add it, `set_temperature_field` /
-`fit_at_temperature` accept a per-material override `cteBasis` param, recorded in provenance. Absent both ⇒ `TMC_CTE_BASIS_UNKNOWN`.
+Order of preference, all read through PHY-01's consumer API (`resolvePropertyModel` / `evaluatePropertyModel` /
+`tabulatePropertyModel`, `docs/physics/01-property-models/TECHNICAL_SPEC.md` §3.3):
+
+1. A **`thermalStrain`** model (PHY-01 catalogue, dimensionless s(T) = (L − L_ref)/L_ref): the secant CTE for CalculiX is
+   derived exactly with PHY-01's formula ᾱ(T_ref→T) = (s(T) − s(T_ref)) / ((T − T_ref)(1 + s(T_ref))) — no basis ambiguity.
+2. A **`cte`** model or 08 scalar whose basis is stated. PHY-01 has no CTE-basis field, so this pack requests one
+   (`PropertyCondition.cteBasis?: { kind: 'secant'; referenceTemperature: Q } | { kind: 'instantaneous' }`); until PHY-01
+   adds it, `set_temperature_field` / `fit_at_temperature` accept a per-material `cteBasis` override recorded in provenance.
+3. Neither ⇒ `TMC_CTE_BASIS_UNKNOWN`.
+
+The secant table written to `*EXPANSION, ZERO=<T_ref>` is produced by `tabulatePropertyModel` (deck header: model ids,
+`coefficientsSha256`, `maxRelError`, as PHY-01 requires of PHY-04). Elastic constants come from the part's PHY-02
+`ConstitutiveSet` (elastic kind `elastic_isotropic`; `model/materialModel.ts`) or, absent one, the 05 `FeaMaterialView`
+(E, ν), with E(T) tables again from `tabulatePropertyModel`. Out-of-range requests are PHY-01 `PROP_OUT_OF_RANGE`.
 
 No document version bump: optional fields in the aerospace v3 envelope (README §6.2).
 
@@ -229,7 +240,7 @@ thick cylinder integral form, gradient beam, Lamé, CTE conversion), returned wi
 | `TMC_MESH_MISMATCH` | error | thermal and mechanical meshes differ (MVP) | both mesh hashes | same mesh controls, or `mapping: interpolate` (V1) |
 | `TMC_MATERIAL_NO_CTE` | error | analysed part / fit part without `cte` | material | `set_material_property property=cte …` |
 | `TMC_CTE_BASIS_UNKNOWN` | error | CTE basis not stated | material | add `cteBasis` (secant + reference, or instantaneous) |
-| `TMC_PROPERTY_OUT_OF_RANGE` | error (fit) / warning (FE) | temperature outside the CTE/E/ν table range | material, range, T | extend data (PHY-01) |
+| `TMC_PROPERTY_OUT_OF_RANGE` | error (fit) / warning (FE) | temperature outside the CTE/E/ν model's equation range (wraps PHY-01 `PROP_OUT_OF_RANGE`, which is passed through in `data.cause`) | material, range, T | define a model sourced for that range (PHY-01) |
 | `TMC_MATERIAL_UNVERIFIED` | warning (not suppressible) | a used CTE/E/ν is `unverified` | material, property | verified sourced value |
 | `TMC_THERMAL_CATEGORY_UNSET` | error | margins on a thermal load case without `limit`/`ultimate` category | load case | set the category with the programme rule |
 | `TMC_FIT_LIMITS_MISSING` | error | PMI size dimension has no limits (basic or untoleranced) | pmi id | add limits (03) |
@@ -282,7 +293,7 @@ thick cylinder integral form, gradient beam, Lamé, CTE conversion), returned wi
 ## 11. Open questions / decisions needed
 
 1. **Placement** — as PHY-03 §2.1 (extension port in core vs inside `domain-cae`).
-2. **CTE basis field**: should PHY-01 or 08 own `cteBasis` (secant + reference temperature / instantaneous)? Many datasheets
+2. **CTE basis field**: PHY-01 is final without one; accept the requested `PropertyCondition.cteBasis` (§3.3), or require `thermalStrain` models for every CTE used in analysis? Many datasheets
    do not say; who decides when a value's basis is unknown?
 3. **Expression evaluator in plugins**: move `commands/parametric/expression.ts` to `lib/` (pure leaf) or expose it in the
    plugin public API? Both are core changes.

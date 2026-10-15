@@ -57,7 +57,7 @@
   "command": "set_material_property",
   "params": {
    "material": "strap_61iacs",
-   "property": "resistivity_el",
+   "property": "electricalResistivity",
    "value": 2.82639344262e-08,
    "unit": "ohm*m",
    "basis": "company",

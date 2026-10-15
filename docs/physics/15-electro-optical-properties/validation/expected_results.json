@@ -445,31 +445,31 @@
    ],
    "expected": [
     {
-     "set": "emissivity_ir = 1.05",
+     "set": "emissivityIr = 1.05",
      "code": "EOP_PROPERTY_RANGE"
     },
     {
-     "set": "absorptivity_solar = -0.1",
+     "set": "absorptivitySolar = -0.1",
      "code": "EOP_PROPERTY_RANGE"
     },
     {
-     "set": "resistivity_el = 0",
+     "set": "electricalResistivity = 0",
      "code": "EOP_PROPERTY_RANGE"
     },
     {
-     "set": "permeability_rel = 0.5 without diamagnetic flag",
+     "set": "relativePermeability = 0.5 without diamagnetic flag",
      "code": "EOP_PROPERTY_RANGE"
     },
     {
-     "set": "refractive_index without wavelength",
+     "set": "refractiveIndex without wavelength",
      "code": "EOP_CONDITION_MISSING"
     },
     {
-     "set": "emissivity_ir without temperature or 'hemispherical/normal' kind",
+     "set": "emissivityIr without temperature or 'hemispherical/normal' kind",
      "code": "EOP_CONDITION_MISSING"
     },
     {
-     "set": "resistivity_el given in S/m",
+     "set": "electricalResistivity given in S/m",
      "code": "EOP_UNITS_MISMATCH"
     }
    ]
@@ -489,7 +489,7 @@
     "TR-EOP-32"
    ],
    "expected": {
-    "deck *RADIATE eps": "coating emissivity_ir at the BC temperature range",
+    "deck *RADIATE eps": "coating emissivityIr at the BC temperature range",
     "thermal_report.unverified": "true when the coating value is basis 'typical'",
     "missingCoating.code": "EOP_SURFACE_PROPERTY_MISSING"
    }

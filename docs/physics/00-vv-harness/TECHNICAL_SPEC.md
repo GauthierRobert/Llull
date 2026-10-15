@@ -64,8 +64,8 @@ packages/core/src
 | TR-VNV-04 | MUST | Classification by R = e32/e21 (e21 = f2 − f1, e32 = f3 − f2, index 1 = finest): R < 0 oscillatory; 0 < \|R\| < 1 divergent; e21 = 0 or e32 = 0 converged_exactly; else monotone. Only monotone yields p. |
 | TR-VNV-05 | MUST | With more than three samples, the GCI uses the three finest; every consecutive triplet is also reported (`triplets[]`), as the `convergence` package does [R8]. |
 | TR-VNV-06 | MUST | Code-verification corpus: each solver pack that can manufacture a solution ships an MMS case in its `expected_results.json` with `formalOrder` and an observed-order case (abs tolerance 0.01 between the two finest levels). PHY-00 ships the 1D Poisson P1 reference (`validation/mms_poisson_1d.csv`). |
-| TR-VNV-07 | MUST | `expected_results.json` schema (README §6.3) is validated by zod in `@phys/vnv/expected.ts`; the 05 FEA file (`tolerance_rel` / `tolerance_abs`, `sources`) is read through an adapter (§6) rather than rewritten. |
-| TR-VNV-08 | MUST | Harness recipe per case (optional `harness` field, §6.2): plan path, CLI calls, and a JSON pointer to the measured value; cases without a recipe are run by the owning pack's test suite and reported by id. |
+| TR-VNV-07 | MUST | `expected_results.json` schema (README §6.3, with the tolerated variations of §6.2) is validated by zod (`looseObject`) in `@phys/vnv/expected.ts`; the 05 FEA file (`tolerance_rel` / `tolerance_abs`, `sources`) is read through an adapter (§6) rather than rewritten. |
+| TR-VNV-08 | MUST | Harness recipe per case (optional `harness` field, §6.3): plan path, CLI calls, and a JSON pointer to the measured value; cases without a recipe are run by the owning pack's test suite and reported by id. |
 | TR-VNV-09 | MUST | `run_convergence_study` writes one 05 mesh + result artifact per level into `FeArtifactStore` (content-addressed, so re-runs hit the cache, AF-40), then dispatches `record_convergence_study` with level hashes; the record command validates them against the store exactly as 05 TR-FEA-33. |
 | TR-VNV-10 | MUST | Determinism: same plan, levels and toolchain ⇒ identical `ConvergenceStudy` (values to the bit, order of levels fixed finest-first). |
 | TR-VNV-11 | MUST | Agent-first result contract (AF-10/11/31–35): every `data` carries units, `safetyFactor { value, source, defaulted }`, `provenance`, `codes[]`, `unverified`, `reviewRequired` where relevant. |
@@ -122,16 +122,20 @@ export interface ConvergenceStudy {
 //   studies?: Record<string, ConvergenceStudy>; studyOrder?: string[];
 
 // packages/domain-physics/src/vnv/expected.ts — README §6.3, plus optional harness recipe
-export interface ExpectedCase {
+export type JsonValue = number | string | boolean | null | readonly JsonValue[] | { readonly [k: string]: JsonValue };
+export interface ExpectedCase {           // zod: z.looseObject — extra per-case keys (inputs, derivation, note, crossCheck…) kept, ignored
   readonly id: string; readonly quantity: string;
-  readonly value: number | string;        // string only for 'TBD' or a classification label
-  readonly unit: string;
+  readonly value: JsonValue;              // number | 'TBD' | code / label string | boolean | list | record | null (contract case, see `expected`)
+  readonly unit: string;                  // physical unit, or a non-physical tag: '-', '1', 'code', 'bool', 'ids', 'count', 'columns'
   readonly tolerance: { readonly rel?: number | null; readonly abs?: number | null; readonly exact?: boolean };
-  readonly source: string; readonly grade: 'A' | 'B' | 'C' | 'TBD';
+  readonly source: string; readonly grade: string;   // normalised: leading 'A' | 'B' | 'C' | 'TBD' (e.g. "A (given the table)" -> A, note kept)
   readonly proves: readonly string[];
+  readonly expected?: JsonValue;          // behaviour contract when value is null (codes, flags, named defaults)
   readonly harness?: { readonly plan?: string; readonly calls: readonly string[]; readonly pointer: string; readonly kernel?: 'occt' | 'manifold' };
 }
-export interface ExpectedResultsFile { readonly pack: string; readonly generatedBy: string; readonly cases: readonly ExpectedCase[] }
+export interface ExpectedResultsFile {    // z.looseObject: extra top-level keys (constants, units, units_note, workedExample…) allowed
+  readonly pack: string; readonly generatedBy: string; readonly cases: readonly ExpectedCase[];
+}
 export type Verdict = 'pass' | 'fail' | 'warn' | 'skip' | 'error';
 export interface BenchmarkRow {
   readonly pack: string; readonly caseId: string; readonly verdict: Verdict; readonly code?: string;
@@ -201,14 +205,22 @@ A zero f1 (relative error undefined) switches to absolute GCI (`gciAbs` in the q
 ### 5.3 Judge (FR-VNV-10)
 
 ```
-if expected.grade in {C, TBD} or expected.value == 'TBD'         -> skip (VNV_EXPECTED_TBD)
-if measured missing                                               -> error (VNV_RESULT_MISSING)
-convert measured to expected.unit (lib/quantity); dimension mismatch -> error (VNV_UNIT_MISMATCH)
-if tolerance.exact: ok = (measured == value)   (strings: classification labels)
-else ok = |m − v| <= abs  or  |m − v| <= rel · |v|        (either bound passes when both are given)
+grade = normalise(expected.grade)                                  ('A (given the table)' -> 'A'; unknown -> VNV_EXPECTED_INVALID)
+if grade in {C, TBD} or value == 'TBD' or tolerance has only null bounds  -> skip (VNV_EXPECTED_TBD)
+if value is null: judge `expected` (contract) with exact deep equality on the listed fields; no `expected` -> VNV_EXPECTED_INVALID
+if measured missing                                                -> error (VNV_RESULT_MISSING)
+if unit is physical: convert measured to expected.unit (lib/quantity); dimension mismatch -> error (VNV_UNIT_MISMATCH)
+compare(value, measured) recursively:
+   number leaf  : exact ? m == v : (|m − v| <= abs) or (|m − v| <= rel · |v|)    (abs: 0 means exact; either bound passes)
+   string/bool  : equality (codes, labels, ids)
+   list         : same length, element-wise (order significant)
+   record       : same key set, key-wise
 grade A: ok ? pass : fail (VNV_BENCHMARK_FAILED)
 grade B: ok ? pass : warn (VNV_BENCHMARK_UNCONFIRMED)
 ```
+
+The leaf-wise rule applies one tolerance to every numeric leaf of a list or record (e.g. 07 FAT rainflow tables,
+10 RBD state vectors, 14 ENV curves).
 
 Fixtures RF-01…RF-08 in `validation/runner_fixtures.json` pin every branch.
 
@@ -279,7 +291,28 @@ inferred: `A` when derived by the generator (`derivation` present), else `B`; `p
 (hand-maintained map in `quality/physics-benchmarks.json`). Proposal to 05: emit the §6.3 fields natively when its
 generator is next touched (no rewrite here, specs only).
 
-### 6.2 Harness recipe example
+### 6.2 Compatibility with the packs written so far (survey 2026-10-15)
+
+All `docs/physics/*/validation/expected_results.json` files present on 2026-10-15 (01–20 except 16) were read. They
+share the required keys `id, quantity, value, unit, tolerance, source, grade, proves`. Variations the zod schema and
+judge must accept (and do, per §3 and §5.3):
+
+| Variation | Packs (examples) | Handling |
+| --------- | ---------------- | -------- |
+| `value` is a list or record of numbers | 01, 02, 04, 07, 08, 09, 10, 12, 13, 14, 20 | leaf-wise tolerance |
+| `value` is a code / label string, list of ids, boolean | 01, 02, 06, 12, 13, 14 | exact equality |
+| `value: null` + `expected` contract object/list | 03, 04, 15 | contract judging |
+| `value` is a record `{exit, code}` | 09, 10, 20 | exact equality (exit code + `data.code`) |
+| `tolerance: { rel: null }` or `{ abs: 0 }` on TBD/C cases | 05, 09, 20 | skip (TBD/C) / exact |
+| `tolerance: { abs: 0 }` on A cases | 07, 09, 10, 20 | exact |
+| grade `"A (given the table)"` | 02 | normalised to A, suffix shown in the report |
+| extra top-level keys (`constants`, `units`, `units_note`, `workedExample`, `toleranceMm`, …) | 01, 02, 05, 12, 13, 14, 15 | ignored by the runner |
+| extra per-case keys (`inputs`, `derivation`, `crossCheck`, `cross_check`, `note`, …) | all | kept in the report, not judged |
+
+No pack needs a schema change. Proposal (not a requirement): new packs prefer `{ exit, code }` records or
+`expected` contracts over bare code strings, so the runner can also assert the exit code.
+
+### 6.3 Harness recipe example
 
 ```json
 { "id": "VC-FEA-10.a", "harness": { "plan": "plans/fea_cantilever_static_beamp.plan.json",

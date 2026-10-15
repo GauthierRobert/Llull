@@ -161,18 +161,18 @@ def main() -> None:
 
     # VC-EOP-10 property validation (codes)
     cases.append(case("VC-EOP-10", "property validation rejects impossible values", None, "-", {"exact": True}, "TECHNICAL_SPEC 7.1", "A", ["FR-EOP-10", "TR-EOP-02"],
-                      expected=[{"set": "emissivity_ir = 1.05", "code": "EOP_PROPERTY_RANGE"},
-                                {"set": "absorptivity_solar = -0.1", "code": "EOP_PROPERTY_RANGE"},
-                                {"set": "resistivity_el = 0", "code": "EOP_PROPERTY_RANGE"},
-                                {"set": "permeability_rel = 0.5 without diamagnetic flag", "code": "EOP_PROPERTY_RANGE"},
-                                {"set": "refractive_index without wavelength", "code": "EOP_CONDITION_MISSING"},
-                                {"set": "emissivity_ir without temperature or 'hemispherical/normal' kind", "code": "EOP_CONDITION_MISSING"},
-                                {"set": "resistivity_el given in S/m", "code": "EOP_UNITS_MISMATCH"}]))
+                      expected=[{"set": "emissivityIr = 1.05", "code": "EOP_PROPERTY_RANGE"},
+                                {"set": "absorptivitySolar = -0.1", "code": "EOP_PROPERTY_RANGE"},
+                                {"set": "electricalResistivity = 0", "code": "EOP_PROPERTY_RANGE"},
+                                {"set": "relativePermeability = 0.5 without diamagnetic flag", "code": "EOP_PROPERTY_RANGE"},
+                                {"set": "refractiveIndex without wavelength", "code": "EOP_CONDITION_MISSING"},
+                                {"set": "emissivityIr without temperature or 'hemispherical/normal' kind", "code": "EOP_CONDITION_MISSING"},
+                                {"set": "electricalResistivity given in S/m", "code": "EOP_UNITS_MISMATCH"}]))
 
     # VC-EOP-11 PHY-03 link and propagation
     cases.append(case("VC-EOP-11", "radiation BC with emissivity 'material' takes the coating value and its flags", None, "-", {"exact": True}, "PHY-03 TR-THM-50", "A",
                       ["FR-EOP-11", "TR-EOP-32"],
-                      expected={"deck *RADIATE eps": "coating emissivity_ir at the BC temperature range", "thermal_report.unverified": "true when the coating value is basis 'typical'",
+                      expected={"deck *RADIATE eps": "coating emissivityIr at the BC temperature range", "thermal_report.unverified": "true when the coating value is basis 'typical'",
                                 "missingCoating.code": "EOP_SURFACE_PROPERTY_MISSING"}))
     cases.append(case("VC-EOP-12", "human gate on accepting a failed bond path", None, "-", {"exact": True}, "AF-34", "A", ["FR-EOP-07", "TR-EOP-22"],
                       expected={"dispose_bond_check(agent).code": "EOP_HUMAN_GATE", "documentHashUnchanged": True}))

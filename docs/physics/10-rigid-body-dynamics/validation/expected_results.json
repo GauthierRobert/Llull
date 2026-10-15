@@ -25,7 +25,8 @@
     "FR-RBD-03",
     "FR-RBD-05",
     "TR-RBD-20",
-    "TR-RBD-21"
+    "TR-RBD-21",
+    "FR-RBD-23"
    ],
    "reproduction": [
     15.8107711951,
@@ -135,7 +136,8 @@
    "proves": [
     "FR-RBD-01",
     "FR-RBD-03",
-    "TR-RBD-20"
+    "TR-RBD-20",
+    "FR-RBD-15"
    ],
    "smallAnglePeriodS": 2.00640929259,
    "crossChecks": {
@@ -192,7 +194,8 @@
    "grade": "A",
    "proves": [
     "FR-RBD-02",
-    "TR-RBD-10"
+    "TR-RBD-10",
+    "FR-RBD-19"
    ],
    "slenderLimitS": 1.15840094518,
    "note": "Exercises the inertia tensor from mass_properties (01 KRN TR-KRN-40): using the slender-rod formula instead of the box inertia changes the period by 5e-5 relative, which this tolerance detects."
@@ -216,7 +219,8 @@
    "proves": [
     "FR-RBD-01",
     "FR-RBD-04",
-    "TR-RBD-20"
+    "TR-RBD-20",
+    "FR-RBD-15"
    ],
    "note": "a(0) = -r omega^2 (1 + r/l) = -625 m/s^2 exactly. Kinematic values are checked against motion_study as well (existing command)."
   },
@@ -257,7 +261,8 @@
    "proves": [
     "FR-RBD-08",
     "TR-RBD-11",
-    "TR-RBD-21"
+    "TR-RBD-21",
+    "FR-RBD-15"
    ],
    "inputs": {
     "zeta": 0.0316227766017,
@@ -297,7 +302,8 @@
    "proves": [
     "FR-RBD-10",
     "TR-RBD-40",
-    "TR-RBD-41"
+    "TR-RBD-41",
+    "FR-RBD-15"
    ],
    "turningPointsM": [
     0.1,
@@ -383,7 +389,9 @@
    "source": "TECHNICAL_SPEC section 7.1",
    "grade": "A",
    "proves": [
-    "FR-RBD-16"
+    "FR-RBD-11",
+    "FR-RBD-16",
+    "TR-RBD-80"
    ],
    "note": "behaviour case"
   },
@@ -422,6 +430,96 @@
    "grade": "A",
    "proves": [
     "FR-RBD-18"
+   ],
+   "note": "behaviour case"
+  },
+  {
+   "id": "VC-RBD-55",
+   "quantity": "plugin contract + kinematics unchanged: evaluate_motion / motion_study data identical before and after all mechanism commands; joint without set_joint_geometry -> warning",
+   "value": {
+    "kinematicDataUnchanged": true,
+    "warning": "RBD_PIVOT_DEFAULTED"
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "TECHNICAL_SPEC section 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-RBD-20",
+    "TR-RBD-01",
+    "TR-RBD-02"
+   ],
+   "note": "behaviour case"
+  },
+  {
+   "id": "VC-RBD-56",
+   "quantity": "check_mechanism on plans/rbd_slider_crank without set_mechanism_mode (spatial: 3 moving bodies, 3 revolute + 1 prismatic, 18 coordinates, 20 equations) and with planar mode (9 coordinates, 8 equations); actuator not counted",
+   "value": {
+    "spatial": {
+     "dof": 1,
+     "redundant": 3,
+     "warning": "RBD_REDUNDANT_CONSTRAINTS"
+    },
+    "planar": {
+     "dof": 1,
+     "redundant": 0
+    }
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "TECHNICAL_SPEC section 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-RBD-04",
+    "FR-RBD-14",
+    "TR-RBD-50"
+   ],
+   "note": "behaviour case"
+  },
+  {
+   "id": "VC-RBD-57",
+   "quantity": "budgets and paging: 51 bodies or 2e6+1 steps refused; series paged with offset/limit; unit-suffixed fields",
+   "value": {
+    "code": "RBD_BUDGET_EXCEEDED",
+    "pageFields": [
+     "offset",
+     "limit",
+     "total"
+    ]
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "TECHNICAL_SPEC section 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-RBD-19",
+    "FR-RBD-21",
+    "FR-RBD-22",
+    "TR-RBD-70"
+   ],
+   "note": "behaviour case"
+  },
+  {
+   "id": "VC-RBD-58",
+   "quantity": "V1: export_joint_load_history writes a PHY-09 history with source.fromPhy10 (values TBD)",
+   "value": {
+    "source": "fromPhy10"
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "TECHNICAL_SPEC section 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-RBD-13",
+    "TR-RBD-60"
    ],
    "note": "behaviour case"
   }

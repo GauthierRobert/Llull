@@ -12,7 +12,7 @@ Gap id **THM** · status: specification · written 2026-10-15 · functional spec
 | Toolsets | `TOOLSET_NAMES = core, 2d, 3d, measure, parametric, assembly, exchange, building, civil` | `packages/mcp/src/toolsets.ts` | `analysis` is added by 05 |
 | Plugin dependency rule | `plugins-and-kernels-depend-on-core-only`: a `packages/domain-*` module may import only `packages/core` (and itself) | `.dependency-cruiser.cjs` | **A `domain-physics` package cannot import `@cae`** (see §2.1) |
 | After 08 MAT (spec) | `PropertyValue` with `property: 'k' \| 'cp' \| 'cte' \| 'density' …`, `TemperatureDependence { mode, points, temperatureUnit }`, linear interpolation, no extrapolation (`MAT_TEMPERATURE_OUT_OF_RANGE`) | `docs/aerospace/08-materials-standards-libraries/TECHNICAL_SPEC.md` §3.1, §5.5 | Data only; nothing consumes k / cp |
-| After PHY-01 (spec, pending) | `PropertyModel = table \| fit(form, coeffs, validRange)` in `packages/core/src/model/propertyModel.ts`, refuses outside the valid range | `docs/physics/README.md` §2, §6.2 | Owned by PHY-01; this pack only evaluates it |
+| After PHY-01 (spec) | `PropertyModel` on `MaterialRecord.propertyModels?` (`model/propertyModel.ts`); consumer API `resolvePropertyModel` / `evaluatePropertyModel` / `tabulatePropertyModel` (`model/propertyModelEval.ts`); refuses outside the equation range (`PROP_OUT_OF_RANGE`), never extrapolates; PHY-01 names PHY-03 as the builder of `*CONDUCTIVITY` / `*SPECIFIC HEAT` tables through `tabulatePropertyModel` | `docs/physics/01-property-models/TECHNICAL_SPEC.md` §3 | This pack only consumes it |
 | After 05 FEA (spec) | `AnalysisModel` / `AnalysisCase` in core `model/analysis.ts`; `AnalysisType = 'static' \| 'modal' \| 'buckling'`; `FeaTarget` with `facesNear` / `edgesNear` / `pointsNear`; Gmsh `mesh` bridge op; `FeArtifactStore`; INP writer; FRD/DAT readers; `record_fe_mesh` / `record_fea_results` validated against the artifact store; staleness by input hash; transports `fea_mesh`, `fea_solve`, `fea_import_results`, `fea_export` | `docs/aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md` §2–§5 | Mechanical only; "thermal analysis possible later through CalculiX `*HEAT TRANSFER`" |
 | Bundled solver | CalculiX (05) — its source already contains `*HEAT TRANSFER`, `*FILM`, `*RADIATE`, `*DFLUX`, `*CFLUX`, `*GAP CONDUCTANCE`, `*VIEWFACTOR`, `*PHYSICAL CONSTANTS`, `*CONDUCTIVITY`, `*SPECIFIC HEAT`; **no `*LATENT HEAT`** | `src/calinput.f`, `doc/CalculiX.tex` at commit fd588701 [R7] | Nothing to add to the installer |
 
@@ -36,7 +36,7 @@ packages/domain-physics/src (@phys)   CadPlugin "thermal", toolset "analysis"
 packages/core/src
    model/analysis.ts   (05) + thermal data types of §3 (ThermalBc, Amplitude, ThermalStep, …) and AnalysisType members
    plugins/plugin.ts   + optional `analysisExtensions?: readonly AnalysisTypeExtension[]` on CadPlugin (proposal, §2.1)
-   model/propertyModel.ts (PHY-01, read)   model/types.ts materialRecords (08, read)
+   model/propertyModel.ts + propertyModelEval.ts (PHY-01, read via resolve/evaluate/tabulatePropertyModel)   model/types.ts materialRecords (08, read)
 ```
 
 ### 2.1 Placement decision forced by the dependency rule
@@ -72,7 +72,7 @@ plugin, installed in `src/app/plugins.ts`).
 | -- | --- | ----------- |
 | TR-THM-01 | MUST | `AnalysisType` (core `model/analysis.ts`) gains `'heat_steady' \| 'heat_transient'`, owned by this pack and listed here (README §6.2). 05's mechanical code paths ignore unknown types through the extension lookup. |
 | TR-THM-02 | MUST | `CadPlugin "thermal"` in `@phys` (toolset `analysis`) with the commands of §4, `guards` (none beyond 05's), `document.validate` for the thermal fields of §3, and `analysisExtensions: [heatSteady, heatTransient]` (Proposal A). |
-| TR-THM-03 | MUST | Thermal material view `ThermalMaterialView` (§3.3) is built from the 08 record / PHY-01 model per part; no thermal property is stored in the analysis slice. |
+| TR-THM-03 | MUST | Thermal material view `ThermalMaterialView` (§3.3) is built per part from the 08 record through PHY-01 `resolvePropertyModel` (property `k`, `cp`, `density`) and `tabulatePropertyModel(model, 'T', range, relTol)` for temperature tables; no thermal property is stored in the analysis slice. |
 | TR-THM-04 | MUST | Thermal units (§5.3): conversions into the 05 unit system follow the CalculiX units table [R7] and round-trip to 1e-12. |
 | TR-THM-10 | MUST | Deck sections for `heat_steady` (§5.1): `*HEAT TRANSFER, STEADY STATE` step, prescribed temperature as `*BOUNDARY` DOF 11, `*FILM` `Fx`, `*DFLUX` `Sx` / `BF`, `*CFLUX` DOF 11, `*NODE FILE NT, RFL`, `*EL FILE HFL`. Byte-identical for identical inputs. |
 | TR-THM-11 | MUST | Face labels per element type follow the CalculiX face numbering tables (tet: 1 = 1-2-3, 2 = 1-4-2, 3 = 2-4-3, 4 = 3-4-1; hex 1–6; quadratic elements use the corner-node faces) [R7]; unit-tested on a hand-built mesh. |
@@ -117,14 +117,14 @@ export type ThermalBc =                                                // id 'tb
   | { kind: 'heat_generation'; value: Q /* W/m³ or total W */; mode: 'density' | 'total'; entityId: EntityId }
   | { kind: 'concentrated_flux'; value: Q /* W */; target: FeaTarget /* pointsNear */ }
   | { kind: 'film'; filmCoefficient: Q | { table: TableRef }; sinkTemperature: Q; target: FeaTarget }
-  | { kind: 'radiation'; emissivity: number | { fromProperty: 'emissivity_ir' }; sinkTemperature: Q; target: FeaTarget };
+  | { kind: 'radiation'; emissivity: number | { fromProperty: 'emissivityIr' }; sinkTemperature: Q; target: FeaTarget };
 export interface ThermalBcRecord { readonly id: string; name: string; bc: ThermalBc; amplitude?: string /* Amplitude.id */;
   source?: { citation: string; locator?: string } /* mandatory for film h and emissivity values given as numbers (FR-THM-20) */ }
 
 export interface CavityRadiation {                                     // V1, id 'cv-<step>.<k>'
   readonly id: string; name: string /* ≤ 3 chars, CalculiX CAVITY */;
   environment: { kind: 'open'; temperature: Q } | { kind: 'closed' };
-  faces: ReadonlyArray<{ target: FeaTarget; emissivity: number | { fromProperty: 'emissivity_ir' } }>;
+  faces: ReadonlyArray<{ target: FeaTarget; emissivity: number | { fromProperty: 'emissivityIr' } }>;
 }
 export interface ThermalContact {                                      // V1
   readonly id: string; name: string; master: FeaTarget; slave: FeaTarget;
@@ -211,8 +211,11 @@ export type PropertyEval =
   | { kind: 'table'; points: ReadonlyArray<readonly [T: number, v: number]>; validRange: [number, number]; provenance: string };
 ```
 
-PHY-01 fitted models are sampled into tables at deck time (TR-THM-03): sample step = min(10 K, range/50), sample
-points included in `inputHash`. Extrapolation never happens in llull; CalculiX holds the end values constant outside a
+Every k / cp / ρ model is turned into a CalculiX table at deck time by PHY-01 `tabulatePropertyModel(model, 'T', range,
+relTol)` over the case's expected temperature range (initial / BC temperatures ± a margin, inside the model's equation range;
+`relTol` named default 1e-3, `source: "llull deck rule"`), and the deck header carries the model ids, `coefficientsSha256` and
+`maxRelError` (PHY-01 §3.3 consumer rule); the table points enter `inputHash`. A range outside the equation range is refused
+with PHY-01's `PROP_OUT_OF_RANGE` before solving. Extrapolation never happens in llull; CalculiX holds the end values constant outside a
 table, so `propertyRangeExceeded` is computed from the solved field and reported (FR-THM-10).
 
 ## 4. Commands
@@ -381,7 +384,7 @@ number finite; every limit has a source; quantities parse with the right dimensi
 | `THM_MATERIAL_NO_K` | error | analysed part's record has no `k` | material, record | `set_material_property property=k …` |
 | `THM_MATERIAL_NO_CP` | error | transient and no `cp` (or no density) | material | `set_material_property property=cp …` |
 | `THM_MATERIAL_UNVERIFIED` | warning (not suppressible) | a used k / cp / ρ / ε is `unverified` | material, property | replace with a verified sourced value |
-| `THM_PROPERTY_OUT_OF_RANGE` | warning | solved T leaves a table / model valid range | material, property, range, reached | extend the data or the model range (PHY-01) |
+| `THM_PROPERTY_OUT_OF_RANGE` | warning | solved T leaves the tabulated range (CalculiX then holds end values) — pre-solve range errors use PHY-01 `PROP_OUT_OF_RANGE` | material, property, range, reached | widen the tabulation range inside the model's equation range, or define a model sourced for it (PHY-01 `define_property_model`) |
 | `THM_NO_HEAT_PATH` | error | steady case without any temperature, film or radiation BC | analysis id | add a sink (temperature, film or radiation) |
 | `THM_RADIATION_SCALE` | error | radiation on a case whose absolute zero cannot be written (corrupt scale) | analysis id | set `temperatureScale` |
 | `THM_CAVITY_INVALID` | error | cavity name > 3 chars, duplicate, or < 2 faces | cavity | rename / add faces |

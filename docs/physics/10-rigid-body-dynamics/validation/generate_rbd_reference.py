@@ -184,7 +184,7 @@ drift = max(abs(c) for c in andrews_constraints(q_rk))
 
 case('VC-RBD-01', "Andrews' squeezer: the 7 angles beta, Theta, gamma, Phi, delta, Omega, epsilon at t = 0.03 s", REF_Q, 'rad',
      {'abs': 1e-6}, 'S1/S2 (Bari IVP test set reference, PSIDE tol 1e-14) + independent reproduction in this generator (max rel. diff '
-     + '%.1e' % max(rel_q) + ')', 'A', ['FR-RBD-01', 'FR-RBD-03', 'FR-RBD-05', 'TR-RBD-20', 'TR-RBD-21'],
+     + '%.1e' % max(rel_q) + ')', 'A', ['FR-RBD-01', 'FR-RBD-03', 'FR-RBD-05', 'TR-RBD-20', 'TR-RBD-21', 'FR-RBD-23'],
      reproduction=r12(q_rk), reproductionMethod='index-1 (acceleration-level) form, classical RK4, 12000 fixed steps',
      note='Tolerance 1e-6 rad is a llull acceptance choice for an index-3 / stabilised integrator at default settings; '
           'the angles beta and Theta reach ~15.8 rad, so this is ~6e-8 relative.')
@@ -268,7 +268,7 @@ for a_deg in amps:
     sims.append(4 * pendulum_quarter_period_sim(math.radians(a_deg), L_P, G0))
 case('VC-RBD-10', 'simple pendulum L = 1 m, g = 9.80665 m/s^2: period at amplitudes 10, 45, 90, 135, 170 deg (4 sqrt(L/g) K(sin(theta0/2)))',
      periods, 's', {'rel': 1e-5}, 'S4/S5 (DLMF 22.19, 19.8) + derived; AGM, quadrature and simulation agree (see crossChecks)', 'A',
-     ['FR-RBD-01', 'FR-RBD-03', 'TR-RBD-20'],
+     ['FR-RBD-01', 'FR-RBD-03', 'TR-RBD-20', 'FR-RBD-15'],
      smallAnglePeriodS=r12(T0), crossChecks={'quadrature': r12(quads), 'rk4Simulation': r12(sims)},
      note='1e-5 relative on the period over >= 10 periods is the integrator acceptance (TR-RBD-21).')
 with open('pendulum_period.csv', 'w', newline='') as fh:
@@ -294,7 +294,7 @@ t_bar = 2 * math.pi * math.sqrt(l_eq / G0)
 t_bar_90 = 4 * math.sqrt(l_eq / G0) * k_agm(math.sin(math.radians(90.0) / 2))
 t_slender = 2 * math.pi * math.sqrt(2 * L_bar / (3 * G0))
 case('VC-RBD-12', 'compound pendulum: box bar 0.5 x 0.01 x 0.01 m pivoted at the centre of one end face: small-angle period and period at 90 deg',
-     [t_bar, t_bar_90], 's', {'rel': 1e-6}, 'derived (parallel-axis theorem, equivalent length I/(m d); S4)', 'A', ['FR-RBD-02', 'TR-RBD-10'],
+     [t_bar, t_bar_90], 's', {'rel': 1e-6}, 'derived (parallel-axis theorem, equivalent length I/(m d); S4)', 'A', ['FR-RBD-02', 'TR-RBD-10', 'FR-RBD-19'],
      slenderLimitS=r12(t_slender),
      note='Exercises the inertia tensor from mass_properties (01 KRN TR-KRN-40): using the slender-rod formula instead of the box '
           'inertia changes the period by 5e-5 relative, which this tolerance detects.')
@@ -341,7 +341,7 @@ x90, v90, a90, tau90 = slider(math.pi / 2)
 tau60 = slider(math.radians(60.0))[3]
 case('VC-RBD-20', 'slider-crank r = 0.05 m, l = 0.2 m, omega = 100 rad/s: piston x, a at theta = 0; x, v, a at 90 deg',
      [x0_, a0_, x90, v90, a90], 'm, m/s^2, m, m/s, m/s^2', {'rel': 1e-9}, 'derived (closed form; finite-difference check ' + '%.1e' % fd_err + ')',
-     'A', ['FR-RBD-01', 'FR-RBD-04', 'TR-RBD-20'],
+     'A', ['FR-RBD-01', 'FR-RBD-04', 'TR-RBD-20', 'FR-RBD-15'],
      note='a(0) = -r omega^2 (1 + r/l) = -625 m/s^2 exactly. Kinematic values are checked against motion_study as well (existing command).')
 case('VC-RBD-21', 'slider-crank with a 0.5 kg piston, massless rod, no gravity: required crank torque at theta = 60 deg and 90 deg',
      [tau60, tau90], 'N*m', {'rel': 1e-6}, 'derived (virtual power tau omega = m a v)', 'A', ['FR-RBD-08', 'FR-RBD-09', 'TR-RBD-31'],
@@ -363,7 +363,7 @@ def smd_x(t):
 log_dec = 2 * math.pi * zeta_s / math.sqrt(1 - zeta_s ** 2)
 case('VC-RBD-30', 'spring-mass-damper m 1 kg, k 1000 N/m, c 2 N s/m, x0 10 mm: x(0.5 s), x(1.0 s), logarithmic decrement',
      [smd_x(0.5) * 1000, smd_x(1.0) * 1000, log_dec], 'mm, mm, -', {'rel': 1e-6}, 'derived (S13 closed form)', 'A',
-     ['FR-RBD-08', 'TR-RBD-11', 'TR-RBD-21'], inputs={'zeta': r12(zeta_s), 'wnRadPerS': r12(wn_s)})
+     ['FR-RBD-08', 'TR-RBD-11', 'TR-RBD-21', 'FR-RBD-15'], inputs={'zeta': r12(zeta_s), 'wnRadPerS': r12(wn_s)})
 
 # energy conservation: undamped spring-mass over 100 periods, energy drift bound of the integrator
 case('VC-RBD-31', 'undamped spring-mass (m 1 kg, k 1000 N/m) over 100 periods with the default integrator: relative total-energy change',
@@ -394,7 +394,7 @@ with open('coulomb_decay.csv', 'w', newline='') as fh:
         w.writerow([i, '%.12g' % (i * math.pi * math.sqrt(M_F / K_F)), '%.12g' % x])
 case('VC-RBD-40', 'spring-mass with Coulomb friction (m 1 kg, k 100 N/m, mu 0.1, x0 0.1 m): number of half cycles, stop time, rest position',
      [half_cycles, t_stop, xs[-1]], '-, s, m', {'rel': 1e-6}, 'derived (exact piecewise solution, S13)', 'A',
-     ['FR-RBD-10', 'TR-RBD-40', 'TR-RBD-41'], turningPointsM=r12(xs),
+     ['FR-RBD-10', 'TR-RBD-40', 'TR-RBD-41', 'FR-RBD-15'], turningPointsM=r12(xs),
      note='Stick detection must happen at the 5th turning point (|x| = 1.93 mm < F/k = 9.81 mm); a smoothed friction law that '
           'creeps afterwards fails this case (TR-RBD-41).')
 
@@ -412,11 +412,22 @@ for cid, what, expect, proves in (
         ('VC-RBD-51', 'same plan twice on the same kernel', {'identicalDataHash': True}, ['FR-RBD-17', 'TR-RBD-24']),
         ('VC-RBD-52', 'deliberately wrong set-ups', {'codes': ['RBD_JOINT_UNKNOWN', 'RBD_STEP_INVALID', 'RBD_SPRING_INVALID',
                                                               'RBD_FRICTION_INVALID', 'RBD_CONSTRAINTS_INCONSISTENT', 'RBD_INITIAL_INCONSISTENT',
-                                                              'RBD_GRAVITY_UNSET']}, ['FR-RBD-16']),
+                                                              'RBD_GRAVITY_UNSET']}, ['FR-RBD-11', 'FR-RBD-16', 'TR-RBD-80']),
         ('VC-RBD-53', 'export_joint_loads into a 05 static case', {'loadCategory': 'limit', 'reviewRequired': True,
                                                                   'provenance.studyHash': 'present'}, ['FR-RBD-12', 'TR-RBD-60']),
         ('VC-RBD-54', 'masses from a material with unverified density', {'unverified': True, 'warning': 'RBD_MASS_UNVERIFIED'},
-         ['FR-RBD-18'])):
+         ['FR-RBD-18']),
+        ('VC-RBD-55', 'plugin contract + kinematics unchanged: evaluate_motion / motion_study data identical before and after all mechanism '
+         'commands; joint without set_joint_geometry -> warning', {'kinematicDataUnchanged': True, 'warning': 'RBD_PIVOT_DEFAULTED'},
+         ['FR-RBD-20', 'TR-RBD-01', 'TR-RBD-02']),
+        ('VC-RBD-56', 'check_mechanism on plans/rbd_slider_crank without set_mechanism_mode (spatial: 3 moving bodies, 3 revolute + 1 prismatic, '
+         '18 coordinates, 20 equations) and with planar mode (9 coordinates, 8 equations); actuator not counted',
+         {'spatial': {'dof': 1, 'redundant': 3, 'warning': 'RBD_REDUNDANT_CONSTRAINTS'}, 'planar': {'dof': 1, 'redundant': 0}},
+         ['FR-RBD-04', 'FR-RBD-14', 'TR-RBD-50']),
+        ('VC-RBD-57', 'budgets and paging: 51 bodies or 2e6+1 steps refused; series paged with offset/limit; unit-suffixed fields',
+         {'code': 'RBD_BUDGET_EXCEEDED', 'pageFields': ['offset', 'limit', 'total']}, ['FR-RBD-19', 'FR-RBD-21', 'FR-RBD-22', 'TR-RBD-70']),
+        ('VC-RBD-58', 'V1: export_joint_load_history writes a PHY-09 history with source.fromPhy10 (values TBD)', {'source': 'fromPhy10'},
+         ['FR-RBD-13', 'TR-RBD-60'])):
     case(cid, what, expect, '-', {'abs': 0}, 'TECHNICAL_SPEC section 7.1', 'A', proves, note='behaviour case')
 
 with open('expected_results.json', 'w') as fh:

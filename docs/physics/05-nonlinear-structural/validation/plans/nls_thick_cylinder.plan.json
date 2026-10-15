@@ -111,33 +111,59 @@
   "command": "add_material_model",
   "params": {
    "material": "ep_cyl",
-   "id": "j2_perfect",
-   "behaviour": "plastic",
-   "law": "j2_perfect",
-   "parameters": {
-    "sigmaY": {
-     "value": 207.9,
+   "id": "el",
+   "model": {
+    "kind": "elastic_isotropic",
+    "E": {
+     "value": 207000.0,
      "unit": "MPa"
+    },
+    "nu": {
+     "value": 0.49,
+     "unit": "1"
     }
    },
    "basis": "company",
    "source": {
     "citation": "test input of this validation case (not a material claim)"
    }
-  },
-  "_note": "PHY-02 proposed command; param names to align with the PHY-02 TECHNICAL_SPEC"
+  }
+ },
+ {
+  "command": "add_material_model",
+  "params": {
+   "material": "ep_cyl",
+   "id": "j2_perfect",
+   "model": {
+    "kind": "j2_plasticity",
+    "isotropic": {
+     "kind": "perfect",
+     "yieldStress": {
+      "value": 207.9,
+      "unit": "MPa"
+     }
+    },
+    "kinematic": {
+     "kind": "none"
+    }
+   },
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   }
+  }
  },
  {
   "command": "define_constitutive_set",
   "params": {
    "material": "ep_cyl",
-   "name": "ep",
-   "models": [
-    "elastic",
-    "j2_perfect"
-   ]
-  },
-  "_note": "PHY-02 proposed; 'elastic' = the PHY-02 elastic model built from the 08 E/nu"
+   "set": {
+    "id": "ep",
+    "elastic": "el",
+    "plastic": "j2_perfect"
+   },
+   "makeDefault": true
+  }
  },
  {
   "command": "assign_material",

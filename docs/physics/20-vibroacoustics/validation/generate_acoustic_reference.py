@@ -100,7 +100,7 @@ case('VC-VAC-05', 'exact mid-band frequency of the 1/3-octave bands labelled 25 
 flat = [130.0] * len(NOMINAL_THIRD)
 oaspl_flat = db_sum(flat)
 case('VC-VAC-06', 'OASPL of a synthetic flat spectrum: 27 one-third-octave bands (25 Hz - 10 kHz) at 130 dB each (test input)',
-     oaspl_flat, 'dB re 20 uPa', {'abs': 1e-9}, 'derived (energy sum, 130 + 10 log10 27)', 'A', ['FR-VAC-04', 'TR-VAC-12'])
+     oaspl_flat, 'dB re 20 uPa', {'abs': 1e-9}, 'derived (energy sum, 130 + 10 log10 27)', 'A', ['FR-VAC-04', 'TR-VAC-12', 'FR-VAC-01'])
 case('VC-VAC-07', 'three equal 1/3-octave bands combined into their octave: level increase; two equal sources: increase',
      [db_sum([0.0, 0.0, 0.0]), db_sum([0.0, 0.0])], 'dB', {'abs': 1e-12}, 'derived (10 log10 3, 10 log10 2)', 'A', ['FR-VAC-04', 'TR-VAC-12'])
 uneven = [120.0, 126.0, 131.0, 128.0, 122.0]
@@ -141,7 +141,10 @@ for cid, what, expect, proves in (
         ('VC-VAC-30', 'define_acoustic_spectrum with a non-standard band centre', {'exit': 1, 'code': 'VAC_BAND_UNKNOWN'}, ['FR-VAC-03', 'FR-VAC-10']),
         ('VC-VAC-31', 'spectrum without a reference statement', {'exit': 1, 'code': 'VAC_REFERENCE_UNSET'}, ['FR-VAC-02', 'FR-VAC-10']),
         ('VC-VAC-32', 'export_acoustic_load of a grade-B / user spectrum', {'unverified': True, 'reviewRequired': True,
-                                                                            'warning': 'VAC_SPECTRUM_UNVERIFIED'}, ['FR-VAC-08', 'FR-VAC-09']),
+                                                                            'warning': 'VAC_SPECTRUM_UNVERIFIED'}, ['FR-VAC-08', 'FR-VAC-09', 'TR-VAC-20', 'TR-VAC-30']),
+        ('VC-VAC-34', 'V1: exposure as a PHY-09 random-pressure load with the correlation assumption named (TBD)', {'assumption': 'fully correlated'},
+         ['FR-VAC-12']),
+        ('VC-VAC-35', 'plugin contract: validate/restore round trip, toolSchemas snapshot', {'roundTripDeepEqual': True}, ['TR-VAC-01']),
         ('VC-VAC-33', 'request for an SEA / acoustic-FE response', {'exit': 1, 'code': 'VAC_OUT_OF_SCOPE'}, ['FR-VAC-11'])):
     case(cid, what, expect, '-', {'abs': 0}, 'TECHNICAL_SPEC section 7.1', 'A', proves, note='behaviour case')
 

@@ -27,8 +27,8 @@ Tolerances are llull acceptance choices, justified per case. No source claims th
 | `plans/nls_lee_frame.query.json` | draft query | `beam_large_deflection` input for NAFEMS NL7 |
 
 Plans use today's commands for geometry (`set_units`, `add_box`, `add_cylinder`, `boolean {op,a,b}`), aerospace 08
-material commands, the PHY-02 commands `add_material_model` / `define_constitutive_set` (param names to align with the
-PHY-02 TECHNICAL_SPEC), aerospace 05 analysis commands and this pack's proposed commands. They are drafts until those
+material commands, the PHY-02 commands `add_material_model` (`elastic_isotropic`, `j2_plasticity`) / `define_constitutive_set`
+(PHY-02 TECHNICAL_SPEC §4), aerospace 05 analysis commands and this pack's proposed commands. They are drafts until those
 commands exist. No third-party file is stored here; CalculiX decks are pinned by commit and sha256 (`sources.md` S2).
 
 ## Real use cases

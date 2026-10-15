@@ -108,7 +108,8 @@
    "grade": "A",
    "proves": [
     "FR-VAC-04",
-    "TR-VAC-12"
+    "TR-VAC-12",
+    "FR-VAC-01"
    ]
   },
   {
@@ -281,7 +282,43 @@
    "grade": "A",
    "proves": [
     "FR-VAC-08",
-    "FR-VAC-09"
+    "FR-VAC-09",
+    "TR-VAC-20",
+    "TR-VAC-30"
+   ],
+   "note": "behaviour case"
+  },
+  {
+   "id": "VC-VAC-34",
+   "quantity": "V1: exposure as a PHY-09 random-pressure load with the correlation assumption named (TBD)",
+   "value": {
+    "assumption": "fully correlated"
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "TECHNICAL_SPEC section 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-VAC-12"
+   ],
+   "note": "behaviour case"
+  },
+  {
+   "id": "VC-VAC-35",
+   "quantity": "plugin contract: validate/restore round trip, toolSchemas snapshot",
+   "value": {
+    "roundTripDeepEqual": true
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "TECHNICAL_SPEC section 7.1",
+   "grade": "A",
+   "proves": [
+    "TR-VAC-01"
    ],
    "note": "behaviour case"
   },

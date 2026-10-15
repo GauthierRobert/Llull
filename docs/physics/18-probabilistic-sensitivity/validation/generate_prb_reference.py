@@ -337,6 +337,15 @@ def main() -> None:
     ]
     for cid, q, v, proves in contracts:
         cases.append(case(cid, q, v, "-", {"exact": True}, "TECHNICAL_SPEC 7.1", "A", proves))
+    # VC-PRB-17: scatter from a PHY-01 PropertyModel.uncertainty band (statistical, two-sided coverage)
+    y, rel, cov = 70000.0, 0.05, 0.95
+    sd17 = rel * y / Phi_inv(0.5 * (1.0 + cov))
+    cases.append(case("VC-PRB-17.a", "normal sd from PropertyModel.uncertainty {kind: statistical, relative: 0.05, coverage: 0.95} "
+                                     "on E = 70000 MPa", sd17, "MPa", {"rel": 1e-10},
+                      "generator: half-band / Phi^-1((1 + coverage)/2) (PHY-01 TECHNICAL_SPEC 5.5 band definition)", "A",
+                      ["FR-PRB-01a"]))
+    cases.append(case("VC-PRB-17.b", "binding a PropertyModel whose uncertainty kind is fitErrorVsData",
+                      "PRB_SCATTER_KIND_UNSUITABLE", "code", {"exact": True}, "FUNCTIONAL_SPEC FR-PRB-01a", "A", ["FR-PRB-01a"]))
     cases.append(case("VC-PRB-16", "05 bracket: Pf of the min margin with E, load and thickness scatter (FE responses)",
                       "TBD", "1", {"rel": None}, "TBD - measure with run_reliability_study once 05 FEA exists", "TBD",
                       ["FR-PRB-11"]))

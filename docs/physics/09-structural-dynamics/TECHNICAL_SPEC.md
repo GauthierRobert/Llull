@@ -11,7 +11,7 @@ Gap id **DYN** · status: specification · written 2026-10-15 · functional spec
 | Kinematic motion | `motion_study`, joints, drive relations: kinematic sweeps without time, mass or force | `packages/core/src/commands/motion/*` | Not dynamics; PHY-10 adds forces |
 | Animation | `animate` clips: declarative spin / oscillate, "No physics" (file header) | `packages/core/src/commands/motion/animation.ts` | Presentation only |
 | FE analysis (aerospace 05, specified) | `AnalysisType = 'static' \| 'modal' \| 'buckling'`, `AnalysisCase`, `ResultsSummary.frequenciesHz`, INP writer (`*FREQUENCY`), FRD/DAT readers (EIGENVALUE OUTPUT table), artifact store, trust model for `record_fea_results`, `compute_margins`, `check_analysis`, stale hashing | `../../aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md` §3–§5 (`packages/domain-cae`, `@cae`) | Modal only; no damping, sweep, base motion, histories |
-| Materials (08 MAT + PHY-01/02, specified) | `MaterialRecord` with `PropertyValue`s; PHY-01 `propertyModel.ts`, PHY-02 `materialModel.ts` own material data | `packages/core/src/model/*` (proposed) | No damping property is defined yet; PHY-09 reads one **by name** (§3) |
+| Materials (08 MAT + PHY-01/02, specified) | `MaterialRecord` with `PropertyValue`s; PHY-01 `model/propertyModel.ts` (`PropertyModel`), `model/propertyCatalog.ts` (`PROPERTY_CATALOG`), `model/propertyModelEval.ts` (`resolvePropertyModel` / `evaluatePropertyModel` / `tabulatePropertyModel`); PHY-02 `model/materialModel.ts` (`MaterialModel`, `ConstitutiveSet`) | `packages/core/src/model/*` (proposed) | No damping property in the catalogue yet; PHY-09 adds one row and reads it through the PHY-01 API (TR-DYN-12) |
 | V&V harness (PHY-00, specified) | `run_benchmarks`, `check_convergence`, time-step refinement in V1 | `../00-vv-harness/` | PHY-09 cases plug into it |
 | Solver | Bundled CalculiX (05). The pinned manual documents `*STEADY STATE DYNAMICS`, `*MODAL DYNAMIC`, `*DYNAMIC`, `*MODAL DAMPING`, `*DAMPING`, `*BASE MOTION`, `*AMPLITUDE` [R1]. A search of the manual finds **no** PSD / random-response or response-spectrum procedure (the only "random" hits are `*ROBUST DESIGN` random fields) | `doc/CalculiX.tex` at commit fd58870 | Random response and SRS must be computed by llull |
 
@@ -59,7 +59,7 @@ packages/domain-physics/src/dynamics   (@phys/dynamics)   CadPlugin "physics-dyn
    library/:  spectra.ts             (sourced ASD library, each entry with source + grade)
         ▼ (public APIs only: core model/lib/commands/schema; @cae public types)
 packages/domain-cae/src (@cae, aerospace 05)   AnalysisModel, AnalysisCase, writers, readers, artifacts, margins
-packages/core/src/model  materialModel.ts (PHY-02) — damping read by property name, never defined here
+packages/core/src/model  propertyCatalog.ts (+1 row structuralLossFactor) · propertyModelEval.ts (PHY-01 API, read only) · materialModel.ts (PHY-02, unused here)
 ```
 
 Laws respected:
@@ -86,7 +86,7 @@ Laws respected:
 | TR-DYN-03 | MUST | A dynamic case always carries a modal basis `{ modes?: number; fMaxHz?: number }`; the INP writer emits a `*FREQUENCY,STORAGE=YES` step before the dynamic step in the same deck (initial conditions are not supported in MVP, so the single-deck form is valid [R1]). |
 | TR-DYN-10 | MUST | Damping union (§3) with exactly one active model per case; `rayleigh_from_ratios` is resolved to α, β at command time (§5.2) and both the inputs and the result are stored. |
 | TR-DYN-11 | MUST | The applied ζ per kept mode is computed after the solve (Rayleigh: ζ_j = α/(2ω_j) + βω_j/2; structural: ζ_eq = η/2 at resonance) and stored in `DynamicSummary.dampingPerMode`. |
-| TR-DYN-12 | MUST | Structural damping reads the material property named `structuralLossFactor` from the PHY-02 / 08 record through the 05 `FeaMaterialView` extension; absent property ⇒ `DYN_MATERIAL_NO_DAMPING`. PHY-09 defines no material field. |
+| TR-DYN-12 | MUST | Structural damping reads the material property `structuralLossFactor` (η, dimensionless) through the PHY-01 consumer API: `resolvePropertyModel(record, { property: 'structuralLossFactor' })` then `evaluatePropertyModel(record, model, { T: caseTemperature })` (`model/propertyModelEval.ts`); the scalar goes to `*DAMPING,STRUCTURAL=η` (CalculiX takes one value per material). PHY-09 adds the row `{ name: 'structuralLossFactor', dimension: '1', canonicalUnit: '1', positive: false, ownerPack: 'PHY-09' }` to `model/propertyCatalog.ts` (value checked ≥ 0 by `set_dynamic_damping`); it defines no other material field. A refusal from the API (absent property, out of range) ⇒ `DYN_MATERIAL_NO_DAMPING` carrying the PHY-01 code; the evaluation's `unverified` propagates. |
 | TR-DYN-20 | MUST | `math/sdof.ts`: receptance, mobility, accelerance, transmissibility, relative-motion FRFs (§5.1); exact peak and half-power points. |
 | TR-DYN-22 | SHOULD | Half-power Q from any computed FRF magnitude (linear interpolation on the dense grid of §5.4). |
 | TR-DYN-30 | MUST | INP dynamic steps (§5.6) match the manual keyword syntax; byte-identical output for identical input (05 TR-FEA-40). |
@@ -118,7 +118,7 @@ export type DampingModel =
   | { readonly model: 'rayleigh'; readonly alpha: number /* 1/s */; readonly beta: number /* s */; readonly source: SourceNote }
   | { readonly model: 'rayleigh_from_ratios'; readonly f1Hz: number; readonly f2Hz: number; readonly zeta1: number; readonly zeta2: number;
       readonly alpha: number; readonly beta: number /* resolved at command time */; readonly source: SourceNote }
-  | { readonly model: 'structural_material'; readonly propertyName: 'structuralLossFactor' };  // read from the material record
+  | { readonly model: 'structural_material'; readonly propertyName: 'structuralLossFactor' };  // PHY-01 catalogue row, read via resolvePropertyModel / evaluatePropertyModel
 
 export interface FrequencySweep { readonly fMinHz: number; readonly fMaxHz: number; readonly pointsPerInterval: number; readonly bias: number }
 
@@ -370,7 +370,7 @@ record and the SSD output is the cross-check.
 | `DYN_BASIS_MISSING` | error | dynamic case without `modes` or `fMaxHz` | analysis id | set `modes` (e.g. enough to pass 1.5 × fMax) |
 | `DYN_DAMPING_UNSET` | error | solve or quick check without damping | analysis id / param `zeta` | `set_dynamic_damping` with a cited value, or pass `zeta`/`Q` |
 | `DYN_DAMPING_INVALID` | error | ζ ∉ [0, 1), α or β < 0, f1 ≥ f2, empty citation | param path | correct the value; cite its source |
-| `DYN_MATERIAL_NO_DAMPING` | error | `structural_material` but the record lacks `structuralLossFactor` | material id | add the property (PHY-02 / 08) or use modal damping |
+| `DYN_MATERIAL_NO_DAMPING` | error | `structural_material` but `resolvePropertyModel` refuses `structuralLossFactor` (absent, out of range) | material id, PHY-01 code | add a `structuralLossFactor` property model (PHY-01 / 08 commands) or use modal damping |
 | `DYN_SWEEP_INVALID` | error | fMin ≥ fMax, points < 2, bias < 1 | param path | correct the sweep |
 | `DYN_SWEEP_UNSET` | error | frequency/random case without sweep | analysis id | `set_frequency_sweep` |
 | `DYN_BASE_ACCEL_TRANSIENT` | error | acceleration base motion in a transient | analysis id | give a displacement history (CalculiX limit [R1]) |
@@ -456,8 +456,8 @@ Total MVP ≈ 9 weeks of one engineer-equivalent agent lane (Lane 1 core/plugin 
 1. **AnalysisType extension point.** 05 declares a closed union; this pack needs plugins to add members. Proposal:
    05 keeps `AnalysisType` as a string union in `@cae` plus a plugin-contributed registry of extra types (and
    validation of `create_analysis` against it). Needs the 05 owner's agreement.
-2. **Damping property name** on the material record (`structuralLossFactor`, dimensionless η): to be fixed with
-   PHY-02 / 08 (they own material data). Also whether a frequency-dependent η belongs in PHY-01 property models.
+2. **Frequency-dependent loss factor.** PHY-01 property models can carry η(T); a dependence on frequency would need a
+   `frequency` variable in PHY-01's `PropertyVariable` set (owner PHY-01). MVP evaluates η at the case temperature only.
 3. **GEVS / NASA-STD-7001 values** must be read from the primary documents by a human before the library entries
    lose their B grade (fetch was blocked from this session).
 4. **Equivalent von Mises rms** definition for random stress: coordinate with PHY-07 (fatigue owns the stress
