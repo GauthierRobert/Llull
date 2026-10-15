@@ -23,6 +23,7 @@ import { assemblyCommands } from './assembly/catalog';
 import { motionCommands } from './motion/catalog';
 import { exchangeCommands } from './exchange/catalog';
 import { persistenceCommands } from './persistence/catalog';
+import { drawingsCommands } from './drawings/catalog';
 
 registerCommands('core', [
   ...documentCommands,
@@ -40,6 +41,7 @@ registerCommands('core', [
   ...motionCommands,
   ...exchangeCommands,
   ...persistenceCommands,
+  ...drawingsCommands,
 ]);
 onPluginInstalled((plugin) => registerCommands(`plugin '${plugin.name}'`, plugin.commands));
 

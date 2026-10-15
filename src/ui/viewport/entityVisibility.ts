@@ -13,3 +13,8 @@ export function isEntityVisible(
   if (layers[entity.layerId]?.visible === false) return false;
   return !hiddenLayerIds.has(entity.layerId) && !hiddenEntityIds.has(entity.id);
 }
+
+/** Its document layer is locked: visible but not pickable, not box-selectable and untouched by selection actions. */
+export function isEntityOnLockedLayer(entity: Entity, layers: CadDocument['layers']): boolean {
+  return layers[entity.layerId]?.locked === true;
+}

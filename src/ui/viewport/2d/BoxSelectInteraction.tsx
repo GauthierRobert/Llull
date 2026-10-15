@@ -8,7 +8,7 @@ import { useCallback, useState } from 'react';
 import * as THREE from 'three';
 import type { Entity, Vec2 } from '@core/model/types';
 import { useStore, useViewportStore } from '@ui/store';
-import { isEntityVisible } from '../entityVisibility';
+import { isEntityOnLockedLayer, isEntityVisible } from '../entityVisibility';
 import { useAnchoredGeometry, useDisposable } from '../useDisposable';
 import { useOverlayMaterial } from '../useOverlayMaterial';
 import { OVERLAY_ACCENT } from '../viewportPalette';
@@ -95,8 +95,11 @@ export function BoxSelectInteraction({ zoom }: BoxSelectInteractionProps): React
           const state = useStore.getState();
           const { hiddenLayerIds, hiddenEntityIds } = useViewportStore.getState();
           const { layers } = state.document;
-          const ids = entitiesInBox(state.document, drag.start, end, (entity: Entity) =>
-            isEntityVisible(entity, layers, hiddenLayerIds, hiddenEntityIds),
+          const ids = entitiesInBox(
+            state.document,
+            drag.start,
+            end,
+            (entity: Entity) => isEntityVisible(entity, layers, hiddenLayerIds, hiddenEntityIds) && !isEntityOnLockedLayer(entity, layers),
           );
           state.select([...new Set([...state.document.selection, ...ids])]);
         }}

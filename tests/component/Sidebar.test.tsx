@@ -66,7 +66,7 @@ describe('Sidebar — keyboard', () => {
     const layers = screen.getByRole('tab', { name: /^Layers/ });
     layers.focus();
     fireEvent.keyDown(layers, { key: 'ArrowDown' });
-    expect(document.activeElement).toBe(screen.getByRole('tab', { name: /^Assembly/ }));
+    expect(document.activeElement).toBe(screen.getByRole('tab', { name: /^Drawing sheets/ }));
     fireEvent.keyDown(document.activeElement as Element, { key: 'End' });
     expect(document.activeElement).toBe(screen.getByRole('tab', { name: /^Materials/ }));
     const building = screen.getByRole('tab', { name: /^Building/ });

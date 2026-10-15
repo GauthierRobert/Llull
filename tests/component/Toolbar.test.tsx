@@ -20,12 +20,14 @@ describe('Toolbar (command bar)', () => {
     usePaletteStore.setState({ open: false });
     useToolStore.setState({ viewMode: '3d', drawTool: 'none', gizmoMode: 'rotate', shortcutsOpen: false });
   });
-  it('is one line when idle: Tools and the command palette trigger only', () => {
+  it('is one line when idle: Tools, the command palette trigger and a disabled Undo/Redo pair', () => {
     render(<Toolbar />);
     const bar = screen.getByRole('toolbar', { name: 'Main toolbar' });
     expect(Array.from(bar.querySelectorAll('button')).map((b) => b.getAttribute('aria-label'))).toEqual([
       'Tools',
       expect.stringMatching(/^Search or run a command/),
+      'Undo',
+      'Redo',
     ]);
     expect(screen.queryByRole('group', { name: 'Tools' })).toBeNull();
   });
@@ -94,13 +96,17 @@ describe('Toolbar (command bar)', () => {
     fireEvent.click(button('Delete'));
     expect(useStore.getState().document.order).toHaveLength(1);
   });
-  it('Undo shows once there is something to undo; Redo lives in the Tools panel', () => {
+  it('Undo and Redo are always in the bar, disabled until applicable', () => {
     render(<Toolbar />);
-    expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull();
+    expect(button('Undo')).toBeDisabled();
+    expect(button('Redo')).toBeDisabled();
     pick('Box');
+    expect(button('Undo')).toBeEnabled();
+    expect(button('Redo')).toBeDisabled();
     fireEvent.click(button('Undo'));
     expect(useStore.getState().document.order).toHaveLength(0);
-    fireEvent.click(button('Tools'));
+    expect(button('Undo')).toBeDisabled();
+    expect(button('Redo')).toBeEnabled();
     fireEvent.click(button('Redo'));
     expect(useStore.getState().document.order).toHaveLength(1);
   });

@@ -19,7 +19,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'search_tools enable_toolset describe_scene find_entities build_project check_model render_view set_units load_document clear_document move_entities rotate_entity scale_entity mirror_entity duplicate_entities delete_entities array_linear array_polar group_entities ungroup_entities set_entity_name align distribute stack_on set_parameter delete_parameter add_layer update_layer set_entity_layer delete_layer set_camera fit_view',
   ),
   '2d': words(
-    'draw_polyline draw_arc draw_rectangle draw_point draw_ellipse draw_spline draw_involute draw_belt_around explode_polyline offset_2d trim extend fillet_2d chamfer_2d add_text add_dimension add_image_underlay calibrate_underlay set_underlay image_to_world',
+    'draw_polyline draw_arc draw_rectangle draw_point draw_ellipse draw_spline draw_involute draw_belt_around explode_polyline offset_2d trim extend fillet_2d chamfer_2d add_text add_dimension add_image_underlay calibrate_underlay set_underlay image_to_world create_sheet create_drawing_view add_section_view add_detail_view update_drawing_view delete_drawing_view update_sheet delete_sheet export_sheet_svg',
   ),
   '3d': words(
     'add_box add_cylinder add_sphere add_cone add_torus add_helix_spring add_bearing add_wedge add_pyramid extrude_profile revolve_profile sweep_profile loft_sections boolean blend_union fillet_edge chamfer_edge shell_solid inspect_topology add_spur_gear add_internal_gear add_planetary_gearset add_bevel_gear add_bevel_gear_pair add_spline_shaft add_keyed_shaft pattern_along_path create_material assign_material add_decal remove_decal add_subdivision_solid edit_subdivision_cage surface_from_curves',

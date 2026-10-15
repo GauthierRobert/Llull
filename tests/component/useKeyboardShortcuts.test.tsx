@@ -86,6 +86,17 @@ describe('useKeyboardShortcuts', () => {
     expect(undo).not.toHaveBeenCalled();
     expect(dispatch).not.toHaveBeenCalled();
   });
+  it('Cmd+Z undoes and Cmd+Shift+Z redoes (macOS), but redo is ignored while typing in a field', () => {
+    const { getByLabelText } = render(<Harness />);
+    fireEvent.keyDown(window, { key: 'z', metaKey: true });
+    fireEvent.keyDown(window, { key: 'Z', metaKey: true, shiftKey: true });
+    expect(undo).toHaveBeenCalledTimes(1);
+    expect(redo).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(getByLabelText('field'), { key: 'y', ctrlKey: true });
+    fireEvent.keyDown(getByLabelText('field'), { key: '?' });
+    expect(redo).toHaveBeenCalledTimes(1);
+    expect(useToolStore.getState().shortcutsOpen).toBe(false);
+  });
   it('Escape leaves the selection alone when an armed tool already consumed it', () => {
     render(<Harness />);
     const event = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true });

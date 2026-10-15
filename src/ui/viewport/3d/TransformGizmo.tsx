@@ -50,6 +50,7 @@ export function TransformGizmo({
   const dispatch = useStore((s) => s.dispatch);
   const renderOrigin = useStore((s) => s.renderOrigin);
   const snap3dEnabled = useViewportStore((s) => s.snap3dEnabled);
+  const onLockedLayer = useStore((s) => entity !== undefined && s.document.layers[entity.layerId]?.locked === true);
 
   const targetRef = useRef<THREE.Group | null>(null);
 
@@ -178,7 +179,7 @@ export function TransformGizmo({
   }, [handleDraggingChanged]);
 
   // Generated building geometry is edited through its element (Building panel), not the gizmo.
-  if (!entity || entity.tags?.includes('bim') === true) return null;
+  if (!entity || onLockedLayer || entity.tags?.includes('bim') === true) return null;
 
   const [x, y, z] = toRenderPosition(entity.position, renderOrigin);
 

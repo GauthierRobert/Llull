@@ -2,6 +2,7 @@
 // dimensions edited via edit_step_params (the entity stays selected after the replay).
 
 import React, { useState } from 'react';
+import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import { rotatedEntityBounds } from '@core/geometry/rotatedBounds';
 import { useLayoutStore, useStore, useToolStore } from '@ui/store';
@@ -19,9 +20,15 @@ export function DimensionLens(): React.ReactElement | null {
   const inspectorOpen = useLayoutStore((s) => s.inspectorOpen);
   const toggleInspector = useLayoutStore((s) => s.toggleInspector);
   const dispatchThen = useDispatchThen();
+  // drei's Html attaches to the canvas parent when it mounts: a lens mounting together with the canvas (a view switch
+  // with a selection) would stay detached, so it waits for the first rendered frame.
+  const [sceneReady, setSceneReady] = useState(false);
+  useFrame(() => {
+    if (!sceneReady) setSceneReady(true);
+  });
   const [refusal, setRefusal] = useState<{ entityId: string; summary: string } | null>(null);
 
-  if (entity === undefined || drawTool !== 'none') return null;
+  if (!sceneReady || entity === undefined || drawTool !== 'none') return null;
   const target = lensTarget(history, entity.id);
 
   const bounds = rotatedEntityBounds(entity);
