@@ -182,7 +182,7 @@ export interface SheetMetalRule {
                { readonly standard: 'ansi' | 'din'; readonly table: readonly { readonly rOverT: number; readonly k: number }[];
                  readonly source: string; readonly verification: 'verified' | 'unverified' };   // AF-32
   readonly thresholds?: Readonly<Record<'holeToBend' | 'holeToEdge' | 'minFlange' | 'minLand' | 'maxDepthRatio', { readonly value: number; readonly source: string; readonly verification: 'verified' | 'unverified' }>>; // AF-30/31: no built-in defaults
-  readonly relief?: { readonly type: 'rectangular' | 'obround' | 'none'; readonly widthRatio: number; readonly depthExtra: number };
+  readonly relief?: { readonly type: 'rectangular' | 'obround' | 'none'; readonly widthRatio: number; readonly depthExtra?: number };  // depthExtra omitted → 0, returned as a Named default (AF-31)
   readonly allowSharpBends?: boolean;     // default false -> R = 0 rejected by check
 }
 

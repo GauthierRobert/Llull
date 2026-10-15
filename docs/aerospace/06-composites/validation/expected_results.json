@@ -61,6 +61,165 @@
   {"vc": "VC-CMP-30", "what": "per-ply solids of the flat panel: volume of a continuous base ply (600 x 400 x 0.125); interference; STEP solid count", "value": {"base_ply_volume_mm3": 30000.0, "interference": 0, "step_solids": "one MANIFOLD_SOLID_BREP per ply piece"}, "tolerance_rel": 0.005, "unit": "mm^3", "provenance": "b", "source": "area x ply thickness", "proves": ["FR-CMP-54"]},
   {"vc": "VC-CMP-31", "what": "material validation nu12^2 < E1/E2: E1 = E2 = 10000 rejects nu12 = 1.1, accepts 0.9; T300/5208 bound sqrt(E1/E2)", "value": {"reject_nu_1p1": true, "accept_nu_0p9": true, "t300_nu12_bound": 4.191994}, "tolerance_rel": 1e-06, "unit": "-", "provenance": "b", "source": "positive-definite compliance 1 - nu12 nu21 > 0 (S32)", "proves": ["FR-CMP-02", "FR-CMP-03"]},
   {"vc": "VC-CMP-32", "what": "parametric ramp: set_parameter ramp 20 -> 30 changes the 8-ply ramp width; undo restores it; ids unchanged", "value": {"ramp_width_before": 20.0, "ramp_width_after": 30.0, "ids_stable": true}, "tolerance_abs": 1e-09, "unit": "mm", "provenance": "b", "source": "width = n t ratio = 8 x 0.125 x 30", "proves": ["FR-CMP-61", "FR-CMP-12"]},
-  {"vc": "VC-CMP-33", "what": "dart re-drape: hemisphere ply split by 4 darts along the generators (azimuth 0/90/180/270 deg) into quadrant pieces, each re-draped from the pole with its warp along its own bisector (azimuth 45 + 90k deg)", "value": {"pieces": 4, "shear_on_piece_bisector_deg": 0.0, "shear_at_piece_edge_node_nearest_polar_45_deg": 15.7259, "max_shear_deg": 51.8937}, "tolerance_abs": {"pieces": 0, "shear_on_piece_bisector_deg": 0.05, "shear_at_piece_edge_node_nearest_polar_45_deg": 0.6, "max_shear_deg": 1.0}, "unit": "deg", "provenance": "b", "source": "rotation symmetry of drape_reference.json: rotating the seed by 45 deg rotates the shear field, so the old diagonal becomes a generator (shear 0) and the old generator gets the old diagonal values", "proves": ["FR-CMP-42", "FR-CMP-40", "TR-CMP-40"]}
- ]
+  {"vc": "VC-CMP-33", "what": "dart re-drape: hemisphere ply split by 4 darts along the generators (azimuth 0/90/180/270 deg) into quadrant pieces, each re-draped from the pole with its warp along its own bisector (azimuth 45 + 90k deg)", "value": {"pieces": 4, "shear_on_piece_bisector_deg": 0.0, "shear_at_piece_edge_node_nearest_polar_45_deg": 15.7259, "max_shear_deg": 51.8937}, "tolerance_abs": {"pieces": 0, "shear_on_piece_bisector_deg": 0.05, "shear_at_piece_edge_node_nearest_polar_45_deg": 0.6, "max_shear_deg": 1.0}, "unit": "deg", "provenance": "b", "source": "rotation symmetry of drape_reference.json: rotating the seed by 45 deg rotates the shear field, so the old diagonal becomes a generator (shear 0) and the old generator gets the old diagonal values", "proves": ["FR-CMP-42", "FR-CMP-40", "TR-CMP-40"]},
+  {"vc": "VC-CMP-34", "what": "stable error codes for a wrong plan (bad notation, non-positive-definite material, unblendable zones)", "value": {"exitCode": 1, "codes": ["CMP_NOTATION_PARSE", "CMP_MATERIAL_NOT_POSITIVE_DEFINITE", "CMP_ZONES_NOT_BLENDABLE"], "each_error_has": ["code", "path", "remediation"]}, "tolerance_abs": 0, "unit": "-", "provenance": "b", "source": "TECHNICAL_SPEC §7.1", "proves": ["FR-CMP-65", "TR-CMP-81"]},
+  {"vc": "VC-CMP-35", "what": "unverified propagation from a basis=mean material (AS4/3501-6 typical values)", "value": {"analyze_laminate.unverified": true, "laminate_mass.unverified": true, "check_layup.unverified": true, "warning": "CMP_MATERIAL_UNVERIFIED", "suppressible": false, "provenance_present": true}, "tolerance_abs": 0, "unit": "-", "provenance": "b", "source": "FR-CMP-68 rule (TECHNICAL_SPEC §3)", "proves": ["FR-CMP-68", "FR-CMP-72", "TR-CMP-83"]},
+  {"vc": "VC-CMP-36", "what": "named defaults and reviewRequired with no F12* / thresholds given; drape without lockingAngle refused", "value": {"defaults.tsaiWuF12Star": {"value": -0.5, "unit": "-", "defaulted": true, "source": "S36"}, "defaults.minFraction": {"value": 0.1, "unit": "-", "defaulted": true}, "defaults.maxConsecutive": {"value": 4, "unit": "plies", "defaulted": true}, "defaults.rampRatio": {"value": 20, "unit": "-", "defaulted": true}, "warning": "CMP_DEFAULT_USED", "reviewRequired": true, "drape_without_lock_code": "CMP_DRAPE_LIMIT_MISSING"}, "tolerance_abs": 0, "unit": "-", "provenance": "b", "source": "FR-CMP-67, FR-CMP-69; default values S15-S17, S36", "proves": ["FR-CMP-67", "FR-CMP-69", "TR-CMP-82"]},
+  {"vc": "VC-CMP-37", "what": "human gate: Z-base T300/5208 under Nx = 400 N/mm (Tsai-Wu R = 276.119/400), waiver requested by the agent, approval attempted by the agent", "value": {"tsai_wu_R": 0.690298, "finding": "CMP_FPF_RATIO_BELOW_ONE", "request_layup_waiver.ok": true, "record_approval_as_agent.ok": false, "check_after.waiverStatus": "pending"}, "tolerance_rel": 0.0001, "unit": "-", "provenance": "b", "source": "VC-CMP-07 value scaled linearly (CLT is linear); 09 PLM TR-PLM-16", "proves": ["FR-CMP-71", "FR-CMP-66", "TR-CMP-82"]},
+  {"vc": "VC-CMP-38", "what": "discovery and units audit for the composites toolset", "value": {"search_finds": ["create_lamina_material", "define_zone", "generate_plies_from_zones", "analyze_laminate", "check_layup", "drape_ply"], "numeric_params_without_unit": 0, "query_numbers_without_unit": 0}, "tolerance_abs": 0, "unit": "-", "provenance": "b", "source": "AF-01..04, AF-10", "proves": ["FR-CMP-60", "FR-CMP-63", "FR-CMP-64", "TR-CMP-84"]}
+ ],
+ "cli_by_vc": {
+  "VC-CMP-01": {
+   "run": "llull run plans/cmp-flat-panel-zones.json --doc t.llull.json --kernel occt --json; llull analyze_laminate '{\"angles\":[0,0,0,0,0,0,0,0],\"material\":\"T300_5208\"}' --doc t.llull.json --kernel occt --json",
+   "assert": "data.Q.Q11, data.Q.Q22, data.Q.Q12"
+  },
+  "VC-CMP-02": {
+   "run": "llull analyze_laminate '{\"angles\":[0,0,0,0,0,0,0,0],\"material\":\"T300_5208\"}' --doc t.llull.json --kernel occt --json",
+   "assert": "data.constantsMembrane.Ex, data.D[0][0]"
+  },
+  "VC-CMP-03": {
+   "run": "llull analyze_laminate angles=[0,45,-45,90,90,-45,45,0] material=T300_5208 --doc t.llull.json --kernel occt --json (and [0,60,-60,-60,60,0])",
+   "assert": "data.A[0][0], data.constantsMembrane.Ex/Gxy"
+  },
+  "VC-CMP-04": {
+   "run": "llull analyze_laminate for every symmetric / balanced case of clt_reference.json --doc t.llull.json --kernel occt --json",
+   "assert": "max|data.B|, data.A[0][2], data.A[1][2]"
+  },
+  "VC-CMP-05": {
+   "run": "llull analyze_laminate angles=[0,90] material=T300_5208 --doc t.llull.json --kernel occt --json",
+   "assert": "data.B[0][0], data.B[1][1], data.constantsFreeBending.Ex"
+  },
+  "VC-CMP-06": {
+   "run": "llull analyze_laminate angles=[0,0,0,0,0,0,0,0] material=T300_5208 'loads={\"Nx\":1}' --doc t.llull.json --kernel occt --json",
+   "assert": "data.firstPlyFailure.*.R"
+  },
+  "VC-CMP-07": {
+   "run": "llull analyze_laminate angles=<case> material=<m> 'loads={\"Nx\":1}' criteria=[max_stress,tsai_hill,tsai_wu] --doc t.llull.json --kernel occt --json",
+   "assert": "data.firstPlyFailure.{max_stress,tsai_hill,tsai_wu}.R, .ply"
+  },
+  "VC-CMP-08": {
+   "run": "llull define_zone laminate=<string> ... --doc t.llull.json --kernel occt --json; llull check_laminate_rules part=$part --doc t.llull.json --kernel occt --json",
+   "assert": "zone angles; data.findings[*].code"
+  },
+  "VC-CMP-09": {
+   "run": "llull check_laminate_rules part=$part 'thresholds={\"maxConsecutive\":3}' --doc t.llull.json --kernel occt --json (then minFraction 0.3)",
+   "assert": "findings contains CMP_RULE_R4_MAX_CONSECUTIVE / CMP_RULE_R3_MIN_FRACTION"
+  },
+  "VC-CMP-10": {
+   "run": "llull run plans/cmp-flat-panel-zones.json --doc t.llull.json --kernel occt --json",
+   "assert": "core_sample steps: data.plies.length, data.thickness"
+  },
+  "VC-CMP-11": {
+   "run": "llull run plans/cmp-flat-panel-zones.json --doc t.llull.json --kernel occt --json; llull core_sample along a polyline across the pad boundary --doc t.llull.json --kernel occt --json",
+   "assert": "ramp offsets per dropped ply"
+  },
+  "VC-CMP-12": {
+   "run": "llull run plans/cmp-hemisphere-drape.json --doc t.llull.json --kernel occt --json; llull drape_ply ply=$p1 output=nodes --save net.json --doc t.llull.json --kernel occt --json",
+   "assert": "net node (53,53) shear; data.maxShearDeg"
+  },
+  "VC-CMP-13": {
+   "run": "llull check_producibility part=$part --doc t.llull.json --kernel occt --json",
+   "assert": "data.plies[0].nodesOverLock / interior nodes"
+  },
+  "VC-CMP-14": {
+   "run": "llull export_flat_patterns_dxf part=$cyl --doc t.llull.json --kernel occt --json",
+   "assert": "data pieces width, helix pitch, turn length"
+  },
+  "VC-CMP-15": {
+   "run": "llull run plans/cmp-cone-flat-pattern.json --doc t.llull.json --kernel occt --json",
+   "assert": "flat piece outer radius, sector angle, area"
+  },
+  "VC-CMP-16": {
+   "run": "llull export_flat_patterns_dxf part=$part plies=[$c1] --save cone.dxf --doc t.llull.json --kernel occt --json; llull import_dxf file=cone.dxf --doc t.llull.json --kernel occt --json; llull measure_area --doc t.llull.json --kernel occt --json",
+   "assert": "data.area; DXF header $INSUNITS"
+  },
+  "VC-CMP-17": {
+   "run": "llull export_laser_projection part=$part --save laser.txt --doc t.llull.json --kernel occt --json",
+   "assert": "parsed file: max point gap, corners, winding"
+  },
+  "VC-CMP-18": {
+   "run": "llull laminate_mass part=$part --doc t.llull.json --kernel occt --json",
+   "assert": "data.mass (Z-base region)"
+  },
+  "VC-CMP-19": {
+   "run": "llull export_composite_step part=$part representation=ap242_composite --save out.step --doc t.llull.json --kernel occt --json",
+   "assert": "TBD checker"
+  },
+  "VC-CMP-20": {
+   "run": "golden replay of every plan; edit of a derived ply entity",
+   "assert": "replay equal; edit refused"
+  },
+  "VC-CMP-21": {
+   "run": "same plan via CLI, MCP build_project, UI dispatch",
+   "assert": "documents and core_sample/analyze_laminate data equal"
+  },
+  "VC-CMP-22": {
+   "run": "npm run quality (timings) / llull run --json durationMs",
+   "assert": "durationMs"
+  },
+  "VC-CMP-23": {
+   "run": "sha256sum class40.cdb",
+   "assert": "sha256, bytes"
+  },
+  "VC-CMP-24": {
+   "run": "llull add_core part=$part ... --doc t.llull.json --kernel occt --json; llull core_sample --doc t.llull.json --kernel occt --json",
+   "assert": "data.plies, data.core, data.thickness"
+  },
+  "VC-CMP-25": {
+   "run": "llull check_laminate_rules 'thresholds={\"maxAngleChange\":45}' --doc t.llull.json --kernel occt --json",
+   "assert": "findings[code=CMP_RULE_DISORIENTATION].plies"
+  },
+  "VC-CMP-26": {
+   "run": "llull export_laminate_sections part=$part format=json --doc t.llull.json --kernel occt --json",
+   "assert": "data.sections.length, sum t per section"
+  },
+  "VC-CMP-27": {
+   "run": "llull drape_ply / flat pattern with fibre deviation output --doc t.llull.json --kernel occt --json",
+   "assert": "deviation on generators / developable faces"
+  },
+  "VC-CMP-28": {
+   "run": "llull ply_book_data part=$part --doc t.llull.json --kernel occt --json; llull export_ply_book part=$part format=svg --save out/plybook/ --doc t.llull.json --kernel occt --json",
+   "assert": "data.sequences.length; table areas vs DXF areas"
+  },
+  "VC-CMP-29": {
+   "run": "llull export_ply_table part=$part --save a.csv --doc t.llull.json --kernel occt --json; llull import_ply_table file=a.csv ... --doc t.llull.json --kernel occt --json; llull export_ply_table --save b.csv --doc t.llull.json --kernel occt --json",
+   "assert": "a.csv == b.csv"
+  },
+  "VC-CMP-30": {
+   "run": "llull export_composite_step part=$part representation=explicit --save plies.step --doc t.llull.json --kernel occt --json; llull check_model --doc t.llull.json --kernel occt --json",
+   "assert": "ply solid volumes; interference; solid count"
+  },
+  "VC-CMP-31": {
+   "run": "llull create_lamina_material ... nu12=1.1 (E1=E2=10000) --doc t.llull.json --kernel occt --json",
+   "assert": "exit 1, CMP_MATERIAL_NOT_POSITIVE_DEFINITE; nu12=0.9 accepted"
+  },
+  "VC-CMP-32": {
+   "run": "llull set_parameter name=ramp expression=30 --doc t.llull.json --kernel occt --json; llull core_sample along the pad boundary --doc t.llull.json --kernel occt --json; llull undo --doc t.llull.json",
+   "assert": "ramp width 30 then 20; ids unchanged"
+  },
+  "VC-CMP-33": {
+   "run": "llull split_ply ply=$p1 curveId=<generator curve> kind=dart --doc t.llull.json --kernel occt --json (x4); llull drape_ply per piece --doc t.llull.json --kernel occt --json",
+   "assert": "pieces, bisector shear, edge shear, max shear"
+  },
+  "VC-CMP-34": {
+   "run": "llull run bad.plan.json --validate --doc t.llull.json --kernel occt --json; llull run bad.plan.json --doc t.llull.json --kernel occt --json",
+   "assert": "exit 1; data.errors[*].code set"
+  },
+  "VC-CMP-35": {
+   "run": "llull create_lamina_material ... basis=mean --doc t.llull.json --kernel occt --json; llull analyze_laminate --doc t.llull.json --kernel occt --json; llull laminate_mass --doc t.llull.json --kernel occt --json; llull check_layup part=$part --doc t.llull.json --kernel occt --json",
+   "assert": "data.unverified; findings[code=CMP_MATERIAL_UNVERIFIED]"
+  },
+  "VC-CMP-36": {
+   "run": "llull analyze_laminate part=$part 'point=[50,50,0]' --doc t.llull.json --kernel occt --json; llull check_layup part=$part purpose=release --doc t.llull.json --kernel occt --json; llull drape_ply (material without lockingAngle) --doc t.llull.json --kernel occt --json",
+   "assert": "data.defaults.*; data.reviewRequired; errors[0].code"
+  },
+  "VC-CMP-37": {
+   "run": "llull check_layup part=$part 'loads=[{\"Nx\":400}]' --doc t.llull.json --kernel occt --json; llull request_layup_waiver part=$part code=CMP_FPF_RATIO_BELOW_ONE ... --doc t.llull.json --kernel occt --json; llull record_approval ... --server URL (agent); llull check_layup --doc t.llull.json --kernel occt --json",
+   "assert": "findings[code=CMP_FPF_RATIO_BELOW_ONE].waiverStatus == pending"
+  },
+  "VC-CMP-38": {
+   "run": "llull search laminate ply drape --json; llull list composites; llull describe <cmd> --json",
+   "assert": "units audit counts"
+  }
+ }
 }

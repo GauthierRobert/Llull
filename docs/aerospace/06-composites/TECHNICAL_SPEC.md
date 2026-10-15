@@ -234,6 +234,10 @@ and query commands return `data` without changing the document. Each command fil
 
 Notes:
 
+- **Units in params (FR-CMP-63).** Each schema description states the unit: E1, E2, G12, G13, G23, Xt, Xc, Yt, Yc, S in MPa
+  (mm documents; `stressUnit` otherwise), `plyThickness`, `stepLength`, `thickness`, `overlap`, `allowance`, `arcTolerance`,
+  `spacing` in document length units, `density` in mass per unit³, angles (`orientation`, `lockingAngle`, `warningShear`,
+  `chamferAngle`, `cornerAngle`) in degrees, loads Nx/Ny/Nxy in N/mm and Mx/My/Mxy in N·mm/mm.
 - **Read-only queries** declare `annotations: { readOnly: true }` (`commands/types.ts` `CommandAnnotations`),
   emitted as the MCP `readOnlyHint`, so agents may call them freely (FR-CMP-62).
 - **Composition.** `generate_plies_from_zones` and `import_ply_table` compose `add_ply` through
@@ -568,7 +572,7 @@ shape in `data.findings[]` with `severity` pass / warn / fail (exit 0).
 | `CMP_FLAT_OVER_LOCK` | `export_flat_patterns_dxf` | ply has over-lock nodes and `allowOverLock` is not set | ply id, node count | add darts (`split_ply`) and re-drape; or `allowOverLock` (result `reviewRequired`) |
 | `CMP_SPLIT_CURVE_INVALID` | `split_ply` | cut curve does not cross the ply boundary twice | `params.curveId` | extend the curve across the ply |
 | `CMP_WAIVER_NO_FINDING` | `request_layup_waiver` | no current finding with that code on those ids | `params.code` | run `check_layup` and copy the code |
-| `CMP_RULE_R1_SYMMETRY` … `CMP_RULE_R5_OUTER_PM45` | `check_laminate_rules`, `check_layup` (fail) | rule R1..R5 violated | zone / point, plies, value, limit | edit the stack (e.g. mirror it, add the missing −θ, split a run) or request a waiver |
+| `CMP_RULE_R1_SYMMETRY`, `CMP_RULE_R2_BALANCE`, `CMP_RULE_R3_MIN_FRACTION`, `CMP_RULE_R4_MAX_CONSECUTIVE`, `CMP_RULE_R5_OUTER_PM45` | `check_laminate_rules`, `check_layup` (fail) | rule R1..R5 violated | zone / point, plies, value, limit | edit the stack (e.g. mirror it, add the missing −θ, split a run) or request a waiver |
 | `CMP_RULE_DISORIENTATION` · `CMP_RULE_DROP_SYMMETRY` | same (fail, V1 rules) | optional rules violated | interface plies | reorder plies |
 | `CMP_FPF_RATIO_BELOW_ONE` | `check_layup` (fail) | strength ratio R < 1 for a stored load case | ply, criterion, R | add plies or change angles; acceptance is a human gate |
 | `CMP_DRAPE_OVER_LOCK` · `CMP_DRAPE_OVER_WARNING` | `check_producibility`, `check_layup` (fail / warn) | nodes beyond lock / warning shear | ply, counts, regions | add darts or splices, change seed or orientation |

@@ -25,7 +25,7 @@ confirmed.
 
 The plans use **proposed** command names from TECHNICAL_SPEC §4 (`create_lamina_material`,
 `define_rosette`, `create_composite_part`, `define_zone`, `add_ply`, `generate_plies_from_zones`,
-`core_sample`, `analyze_laminate`, `check_laminate_rules`, `check_producibility`, `export_flat_patterns_dxf`,
+`core_sample`, `analyze_laminate`, `check_laminate_rules`, `check_layup`, `check_producibility`, `export_flat_patterns_dxf`,
 `export_ply_book`). Only `set_units`, `add_box`, `add_sphere` and `add_cone` exist today. The plans become
 golden-corpus entries once the commands land.
 
@@ -47,6 +47,11 @@ for g in generate_*.py; do python3 "$g" && python3 "$g" --check; done
 | Doubly curved woven preforms (domes, radomes, nacelle lips) | A hemisphere is the standard forming benchmark (S19); fabrics lock at a characteristic shear angle (S22) | Drape simulation with locking-angle warnings before cutting cloth | VC-CMP-12, 13 |
 
 ## 3. Validation cases
+
+Every case runs unattended from the CLI (AF-23): `expected_results.json` → `cli_by_vc[<VC>]` gives the call
+sequence (`--doc t.llull.json --kernel occt --json`) and the JSON path compared with the case value and
+tolerance. Exit codes are asserted (0, or 1 for expected refusals); no UI is involved. The production-gate agent
+driver runs them in order.
 
 Tolerance notation: `rel` = relative, `abs` = absolute. Unless stated otherwise, units are N, mm, MPa and
 degrees.
@@ -295,6 +300,39 @@ generator (now the piece edge) becomes the diagonal. Expected (derived from `dra
 This case checks the cut / per-piece re-drape mechanism. The rotated seed alone does not reduce the peak
 shear; producibility gains come from flattening the pieces separately and from boundary edits.
 
+### 3.8 Agent-first cases
+
+**VC-CMP-34: stable error codes.** Proves FR-CMP-65 and TR-CMP-81.
+A plan with the stacking string `[45/-45/0/9O]s` (letter O), a material with E1 = E2 = 10 000 and ν12 = 1.1,
+and two zones whose stacks do not embed (`[0/90]s` and `[45/-45]s`) must be refused by `llull run bad.plan.json
+--validate` and by the run, exit 1, with codes `CMP_NOTATION_PARSE`, `CMP_MATERIAL_NOT_POSITIVE_DEFINITE` and
+`CMP_ZONES_NOT_BLENDABLE`, each with the step path, the param and a remediation.
+
+**VC-CMP-35: unverified propagation.** Proves FR-CMP-68, FR-CMP-72 and TR-CMP-83.
+AS4/3501-6 entered with `basis: "mean"` (the S14 values are typical lamina data, not allowables).
+`analyze_laminate`, `laminate_mass` and `check_layup` all report `unverified: true`; `check_layup` lists the
+warning `CMP_MATERIAL_UNVERIFIED`, which a threshold or rule config cannot remove; `provenance` names the
+material record.
+
+**VC-CMP-36: named defaults and review flag.** Proves FR-CMP-67, FR-CMP-69 and TR-CMP-82.
+On the flat panel with no F12* and no rule thresholds given: `analyze_laminate` reports
+`defaults.tsaiWuF12Star = {value: -0.5, unit: "-", defaulted: true, source: "S36"}`; `check_layup
+purpose=release` reports the R3 / R4 thresholds (0.10, 4) and the ramp ratio (20) as `NamedDefault` with
+`defaulted: true`, a `CMP_DEFAULT_USED` warning, and `reviewRequired: true` with a reason. A drape on a material
+without `lockingAngle` is refused with `CMP_DRAPE_LIMIT_MISSING` (no default allowed).
+
+**VC-CMP-37: human gate on a negative margin.** Proves FR-CMP-71 and TR-CMP-82.
+Z-base [45/-45/0/90]s T300/5208 under Nx = 400 N/mm: the Tsai-Wu strength ratio is 276.119 / 400 = 0.690 < 1
+(from VC-CMP-07, linear scaling), so `check_layup` fails with `CMP_FPF_RATIO_BELOW_ONE`. The agent calls
+`request_layup_waiver` (accepted, pending). An agent-caller `record_approval` through 09 PLM is refused
+(TR-PLM-16, enforceable on an authenticated server). `check_layup` still fails with `waiverStatus: "pending"` and
+`CMP_WAIVER_PENDING`.
+
+**VC-CMP-38: units, discovery and data shapes.** Proves FR-CMP-60, FR-CMP-63, FR-CMP-64 and TR-CMP-84.
+`llull search laminate ply drape` returns `create_lamina_material`, `define_zone`, `generate_plies_from_zones`,
+`analyze_laminate`, `check_layup`, `drape_ply`; for every composites command `llull describe <cmd> --json` has a
+unit in every numeric param description, and every number in query `data` has a unit field or suffix.
+
 ## 4. Traceability matrix (FR → VC)
 
 | FR | VC |
@@ -328,6 +366,14 @@ shear; producibility gains come from flattening the pieces separately and from b
 | FR-CMP-54 | VC-CMP-30, 19 |
 | FR-CMP-55 | VC-CMP-19 |
 | FR-CMP-56 | VC-CMP-23 |
-| FR-CMP-60, 62 | VC-CMP-21 |
+| FR-CMP-60, 62 | VC-CMP-21, 38 |
 | FR-CMP-61 | VC-CMP-32, 20 |
 | FR-CMP-70 | VC-CMP-22 |
+| FR-CMP-63, 64 | VC-CMP-38 |
+| FR-CMP-65 | VC-CMP-34 |
+| FR-CMP-66 | VC-CMP-36, 37 (and every plan ends with `check_layup`) |
+| FR-CMP-67 | VC-CMP-36 |
+| FR-CMP-68 | VC-CMP-35 |
+| FR-CMP-69 | VC-CMP-36 |
+| FR-CMP-71 | VC-CMP-37 |
+| FR-CMP-72 | VC-CMP-35 |

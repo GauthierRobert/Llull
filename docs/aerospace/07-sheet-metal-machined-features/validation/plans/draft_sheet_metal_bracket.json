@@ -5,7 +5,7 @@
     { "command": "set_units", "params": { "units": "mm" } },
     {
       "command": "create_sheet_metal_rule",
-      "params": { "name": "AL2024-T3 1.6", "material": "2024-T3", "thickness": 1.6, "insideRadius": 4.8, "kFactor": 0.44, "kFactorStandard": "ansi", "reliefType": "rectangular", "reliefRatio": 0.5 }
+      "params": { "name": "AL2024-T3 1.6", "material": "2024-T3", "thickness": 1.6, "insideRadius": 4.8, "kFactor": 0.44, "kFactorStandard": "ansi", "relief": { "type": "rectangular", "widthRatio": 0.5 } }
     },
     { "command": "draw_rectangle", "params": { "width": 33.6, "height": 50, "position": [0, 0, 0] }, "as": "base_outline" },
     { "command": "add_sheet_metal_base", "params": { "profileId": "$base_outline", "rule": "AL2024-T3 1.6", "side": "up" }, "as": "sm" },
