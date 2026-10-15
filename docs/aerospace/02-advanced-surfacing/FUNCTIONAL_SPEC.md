@@ -70,18 +70,33 @@ NACA 23012 root and check the leading edge is G2". This gap closes that.
 
 ## 3. Personas & user stories
 
-| Persona | Story | FR |
+Operator model per [`../AGENT_FIRST.md`](../AGENT_FIRST.md): the **operator** is an AI agent driving the `llull`
+CLI; the **owner** asks for a result in plain language and is not assumed to be an aerodynamicist or loftsman;
+a **qualified reviewer** appears only when a surface is accepted for design release (OML release, tooling
+release) or a quality waiver is decided.
+
+| Role | Who | Uses | In this gap |
+| --- | --- | --- | --- |
+| Operator (primary) | AI agent (Claude Code or similar) | `llull` CLI (`--doc` headless or `--app`), MCP for cloud agents | Writes plans with `airfoil_from_naca`, `create_wing`, `loft_fuselage`, runs `check_surface_quality`, reads numeric `data`, renders PNGs, exports STEP |
+| Owner | Person asking for "a swept wing with a NACA 23012 root" or "a smooth fairing" | Natural language; may watch the desktop app | States the intent, receives a plain-language summary and the files |
+| Qualified reviewer (only for release) | OML / surface-quality authority, tooling engineer | Desktop app review overlays (zebra, curvature map), check report, 09 PLM approval | Accepts the OML for release, approves continuity waivers (human gate) |
+
+User stories. The domain roles of the previous revision (aerodynamicist, loftsman, class-A, tooling,
+structures, UAV designer) are now the owners or reviewers on whose behalf the agent works:
+
+| # | Story | FR |
 | --- | --- | --- |
-| P1 Aerodynamicist (conceptual) | As an aerodynamicist I generate a NACA 23012 or import a UIUC `.dat` and get an exact section curve with sharp TE, so the CAD section equals my analysis section. | FR-SRF-10..13 |
-| P1 | I define a wing by span, root/tip chord, sweep at c/4, dihedral and twist and get the planform metrics (area, AR, MAC, y_MAC) back, matching OpenVSP. | FR-SRF-14..16 |
-| P2 Loftsman / OML surface designer | I define the fuselage by stations in FS/BL/WL with conic (rho) upper and lower halves and longitudinal control curves, and get a G1/G2 skin. | FR-SRF-17..19 |
-| P2 | I loft through sections **with guide curves** (leading-edge line, crown line) so the surface follows the master lines exactly. | FR-SRF-05 |
-| P3 Class-A / quality engineer | I see curvature combs on curves, zebra and Gaussian/mean curvature maps on faces and a G0–G3 table per edge, before releasing the OML. | FR-SRF-20..24 |
-| P3 | I measure the deviation of my surface from a scanned point cloud or a reference STEP surface and get max/RMS deviation and a colour map. | FR-SRF-25 |
-| P4 Tooling / manufacturing engineer | I check draft angle against a pull direction on a fairing mould and see undercut regions. | FR-SRF-24 |
-| P5 Structures engineer | I trim the wing skin between spar planes, sew skins and close-outs into a solid and offset the OML inward by skin thickness. | FR-SRF-07..09 |
-| P6 AI agent (CLI / MCP) | I call `airfoil_from_naca`, `create_wing`, `check_continuity` in one `build_project` plan and read numeric results (no screenshots needed). | FR-SRF-26..28 |
-| P7 UAV / GA designer | I fill an N-sided hole (wing-fuselage fairing corner) with a G1 patch. | FR-SRF-06 |
+| US-1 | As the operator, asked for "a wing with a NACA 23012 root", I call `airfoil_from_naca` (or `import_airfoil` on a `.dat` the owner supplied) and read `airfoil_properties` `data` (thickness, camber, LE radius, TE gap, with units) to confirm the section before building. | FR-SRF-10..13 |
+| US-2 | As the operator, I build the wing from span, chords, sweep, dihedral and twist in one plan, then read `wing_properties` (area, AR, MAC with units) and report them to the owner in plain words. | FR-SRF-14..16 |
+| US-3 | As the operator, I define a fuselage by FS/BL/WL stations with conic halves, loft it, and prove smoothness with numbers: `check_continuity` G0–G3 values per internal edge, not a zebra picture. | FR-SRF-17..19, 22 |
+| US-4 | As the operator, I loft through sections with guide curves and read the per-section deviation in `data` to show the surface passes through the master lines. | FR-SRF-05 |
+| US-5 | As the operator, I end every surface job with `check_surface_quality`; it returns pass/warn/fail with stable codes, the tolerances it used (named defaults), any `unverified` inputs, and `reviewRequired` when the result is meant for release. | FR-SRF-20..22, 39..43 |
+| US-6 | As the operator, I measure the deviation of the rebuilt surface from a reference STEP or point CSV and report max/RMS with units. | FR-SRF-25 |
+| US-7 | As the operator, I check draft against a pull direction for a mould and list the samples below the minimum draft. | FR-SRF-24 |
+| US-8 | As the operator, I trim, sew and thicken skins into a solid and read free-edge counts and volumes. | FR-SRF-07..09 |
+| US-9 | As the operator, I fill an N-sided hole with a G1 patch and read the achieved G0/G1 per boundary. | FR-SRF-06 |
+| US-10 | As the owner, I get one sentence: what was built, what passed, what needs a qualified person. | FR-SRF-42, 44 |
+| US-11 | As the qualified reviewer, I open the desktop app, look at the zebra / curvature overlays built on the same `data`, and approve or reject the release or a continuity waiver; the agent cannot do this for me. | FR-SRF-23, 43 |
 
 ## 4. Scope / out of scope
 
@@ -138,18 +153,18 @@ Priority: MUST = MVP, SHOULD = V1, COULD = V2. Every FR maps to ≥ 1 VC in `val
 
 | Id | Pri | Requirement | Rationale | Source |
 | --- | --- | --- | --- | --- |
-| FR-SRF-20 | MUST | **Curve curvature**: curvature (and radius), curvature derivative, torsion at parameters/arc length, and **curvature-comb** data (sample points + comb vectors, scale) for any curve or edge. | Fairness check of sections/master lines. | [R1] [R22] |
-| FR-SRF-21 | MUST | **Surface curvature** at (u,v) samples or a grid on a face: normal, k1, k2, principal directions, Gaussian K, mean H (sign convention documented), with min/max over the face. | Curvature maps; analytic checks. | [R12] GeomLProp_SLProps (max, min, mean, Gaussian) |
-| FR-SRF-22 | MUST | **Continuity check** between two curves at a joint or two faces along a shared edge: G0 gap, G1 angle, G2 curvature gap (relative and absolute), G3 curvature-derivative gap; verdict per order against user tolerances; worst sample location. | Release criterion for OMLs. | [R12] LocalAnalysis_*Continuity (C0/G1/G2 values); [R23] (G3 definition) |
-| FR-SRF-23 | SHOULD | **Visual analysis** in the viewport: curvature comb, zebra stripes (direction, spacing), environment/isophote shading, Gaussian/mean/min/max curvature colour maps with legend & clamping; toggled per entity, never modifying the document. | Visual G1/G2 judgement as in Rhino/NX. | [R22] |
-| FR-SRF-24 | SHOULD | **Draft analysis** against a pull direction: per-sample draft angle, regions below a minimum draft, undercuts; data + colour map. | Mould/tooling for composite fairings. | [R12] (draft angle tools) |
-| FR-SRF-25 | SHOULD | **Deviation**: distance from points (CSV/pinned scan) or another surface/solid to a face set: max, mean, RMS, signed (along normal), histogram, colour map; with a pass/fail tolerance. | Validate a rebuilt OML against reference (CRM STEP, scan). | [R12] BRepExtrema_DistShapeShape / ProjectPointOnSurf |
+| FR-SRF-20 | MUST | **Curve curvature** (numeric equivalent of the curvature comb, AF-21): curvature (and radius), curvature derivative, torsion at parameters/arc length, inflection count, plus comb vectors as data (sample points + comb vectors, scale) for any curve or edge; all in `data` with units (1/length unit, length unit). | Fairness check of sections/master lines without a picture. | [R1] [R22] |
+| FR-SRF-21 | MUST | **Surface curvature** (numeric equivalent of curvature colour maps, AF-21) at (u,v) samples or a grid on a face: normal, k1, k2, principal directions, Gaussian K, mean H (sign convention documented), with min/max and their locations over the face; units in `data`. | Curvature maps as numbers; analytic checks. | [R12] GeomLProp_SLProps (max, min, mean, Gaussian) |
+| FR-SRF-22 | MUST | **Continuity check** (numeric equivalent of zebra stripes and isophotes, AF-21) between two curves at a joint or two faces along a shared edge: G0 gap, G1 angle, G2 curvature gap (relative and absolute), G3 curvature-derivative gap; verdict per order against tolerances (given, or named defaults per FR-SRF-40); worst sample location. | Release criterion for OMLs. | [R12] LocalAnalysis_*Continuity (C0/G1/G2 values); [R23] (G3 definition) |
+| FR-SRF-23 | COULD | **Visual review overlays** in the desktop app for the qualified reviewer: curvature comb, zebra stripes, isophote shading, curvature colour maps with legend & clamping. Built only from the `data` of FR-SRF-20..22 and 24 (the numeric equivalents are the requirement, AF-21); toggled per entity, never modifying the document. Agents see the same objects with `render_view … --save view.png` (AF-22). | The reviewer judges G1/G2 visually as in Rhino/NX. | [R22] |
+| FR-SRF-24 | SHOULD | **Draft analysis** against a pull direction: per-sample draft angle (deg), area below a minimum draft, undercut samples, all in `data`; colour map only as a review overlay. | Mould/tooling for composite fairings. | [R12] (draft angle tools) |
+| FR-SRF-25 | SHOULD | **Deviation**: distance from points (CSV/pinned scan) or another surface/solid to a face set: max, mean, RMS, signed (along normal), histogram and worst locations in `data` with units; pass/fail against a tolerance; colour map only as a review overlay. | Validate a rebuilt OML against reference (CRM STEP, scan). | [R12] BRepExtrema_DistShapeShape / ProjectPointOnSurf |
 
-### 5.4 Surfaces of the product (UI / CLI / MCP)
+### 5.4 Surfaces of the product (CLI / MCP / UI)
 
 | Id | Pri | Requirement | Rationale | Source |
 | --- | --- | --- | --- | --- |
-| FR-SRF-26 | MUST | Every capability above is a registered command reachable from UI, `llull` CLI (`--app`/`--doc`) and MCP (toolsets `surface`, `aero`), with numeric `data` results usable by agents. | Laws L1, L5, KI6. | `.claude/rules/architecture.md` |
+| FR-SRF-26 | MUST | Every capability above is a registered command reachable from the `llull` CLI (`--doc` / `--app`, found by `llull search` / `describe`), MCP (toolsets `surface`, `aero`) and the UI, with agent-written descriptions (what, when, units, refusals, next command) and numeric `data` results. | Laws L1, L5, KI6; AF-01, AF-02. | `.claude/rules/architecture.md` |
 | FR-SRF-27 | MUST | Surfaces and wings persist in the llull document with full recipe (degree/knots/weights/sections) and export to STEP as `B_SPLINE_SURFACE_WITH_KNOTS` / rational forms (via OCC) without tessellation. | Exchange fidelity. | KI5 decision |
 | FR-SRF-28 | SHOULD | Code export (`export_code`) emits CadQuery equivalents (e.g. spline/loft) for the new commands where CadQuery has them, else the exact B-spline data. | Existing codegen parity (KI5). | — |
 | FR-SRF-29 | SHOULD | Without the OCC kernel (Manifold/web), NURBS entities still display (core tessellation) and query commands that need only core math (curve curvature, airfoil, wing metrics) work; kernel-only operations no-op with the standard refusal. | Offline web mode stays usable (L6, L9). | KI5 |
@@ -161,77 +176,106 @@ Priority: MUST = MVP, SHOULD = V1, COULD = V2. Every FR maps to ≥ 1 VC in `val
 | --- | --- | --- | --- |
 | FR-SRF-31 | MUST | Determinism: the same plan produces bit-identical document JSON (ids, poles, knots) on replay. | Golden replay equality (VC-SRF-19) |
 | FR-SRF-32 | MUST | Units: airfoils are chord-normalised data; wings/bodies use document units; FS/BL/WL frame declares its unit and datum; no silent unit conversion. | Unit tests on `set_units` mm/in/m |
-| FR-SRF-33 | MUST | Every refusal names the reason and the offending input (e.g. "section 3: TE gap 0.02 c exceeds closed-TE tolerance"). | Failure tests per command |
+| FR-SRF-33 | MUST | Every refusal and check failure carries a stable code (TECHNICAL_SPEC §7.1, e.g. `AERO_AIRFOIL_TE_GAP`), the offending ids or param path, and a one-line remediation (e.g. "section 3: TE gap 0.02 c exceeds closed-TE tolerance — use `trailingEdge: open` or `normalize: chord`") (AF-11). | Failure tests per command; VC-SRF-31 |
 | FR-SRF-34 | SHOULD | Analysis on large models stays interactive: see TECHNICAL_SPEC §8 budgets. | Perf tests |
-| FR-SRF-35 | SHOULD | Results are agent-readable: every query returns compact numeric `data` (no image needed), with sample counts and worst locations. | Schema snapshot |
+| FR-SRF-35 | MUST | Results are agent-readable: every query returns compact, bounded numeric `data` with a documented shape, a unit on every number (`unit` field or name suffix), sample counts and worst locations; large grids are narrowed by ids / `grid` or written with `--save` (AF-10, AF-12). | Schema snapshot; VC-SRF-35 |
+| FR-SRF-36 | MUST | Every physical param states its unit in its schema description: lengths in document units, angles in the unit named by the param (`sweepDeg`, `g1AngleRad`), airfoil data chord-normalised (AF-04). | `llull describe` audit; VC-SRF-35 |
+| FR-SRF-37 | MUST | A whole gap job fits one `build_project` plan checked by `llull run plan.json --validate` before kernel work; validation errors name the step path and the param (AF-05). | VC-SRF-31 |
+| FR-SRF-38 | SHOULD | `llull guide` and the MCP prompt gain an aero/surface section: FS/BL/WL axes and units, chord-normalised airfoils, the minimal wing plan, how to read continuity results (AF-03). | Guide snapshot |
+| FR-SRF-39 | MUST | Read-only check command `check_surface_quality`: for given entities (or all surfaces) it returns pass / warn / fail findings with stable codes: continuity per internal edge (G0..G3 against tolerances), loft section deviation, free edges, degenerate samples, optional draft. An agent ends every surface job with it (AF-20, AF-30). | VC-SRF-33 |
+| FR-SRF-40 | MUST | No silent tolerance: continuity, sewing and fidelity tolerances are given explicitly or taken from a named default that the result reports with its source, e.g. `{"value": 0.01, "unit": "rad", "source": "OCCT BRepOffsetAPI_MakeFilling TolAng default", "defaulted": true}` (AF-31). | VC-SRF-33 |
+| FR-SRF-41 | MUST | Inputs without verified provenance (an imported `.dat` with no pinned source, a point cloud with no recorded origin) are flagged `unverified`. The flag propagates to every derived curve, wing, body and query result, and `check_surface_quality` reports it as a warning that cannot be suppressed (AF-32). Sections generated from the published NACA equations are not flagged. | VC-SRF-32 |
+| FR-SRF-42 | MUST | A `check_surface_quality` run for release (`purpose: "release"`) and any OML acceptance result carry `reviewRequired: true` with the reason ("OML surface acceptance is a design-release decision: needs a qualified engineer"); the summary says so in plain words (AF-33, AF-36). | VC-SRF-33 |
+| FR-SRF-43 | MUST | Waiving a failed continuity or deviation finding is a human gate. The agent may `request_surface_waiver` (pending record: code, edge, reason). Only an approval recorded through 09 PLM `record_approval` by a human caller (TR-PLM-16) turns it into an accepted waiver; until then the finding stays `fail` with `waiverStatus: "pending"` (AF-34). | VC-SRF-34 |
+| FR-SRF-44 | MUST | Every computed value can be explained: `data.provenance` gives the method (e.g. "NACA 4-digit, Report 460 equations", "Piegl & Tiller A9.1", "OCC BRepLProp_SLProps"), the formula or standard id, and the inputs (ids, params, tolerances) (AF-35). | Schema snapshot; VC-SRF-32 |
 
 ## 6. Workflows
 
-### 6.0 Fuselage by stations (loftsman, V1) — step by step
+### 6.1 CLI (primary: the operator agent)
 
-1. `set_aircraft_frame` — datum at FS 0 / BL 0 / WL 0 at the nose reference point, +FS aft, +BL right, +WL up, unit in.
-2. Enter the station table (FS, section type). Typical: nose apex `point`; forward stations `conic` (upper rho,
-   lower rho, crown WL, keel WL, max-breadth WL and half-breadth); constant section in the cabin (`circle` or
-   `superellipse`); tail cone `conic` closing to a `point`.
-3. Optionally pick control curves (crown line, keel line, max-breadth line, shoulder lines) drawn as NURBS curves
-   in the BL 0 and WL planes; stations are then re-fitted so their extreme points lie on these curves.
-4. `loft_fuselage` with `continuity: G2` → solid; `check_continuity` on the internal edges; curvature map to check
-   for flat spots or bumps between stations; `fuselage_section_at` at any FS for frames and bulkheads.
-5. Change a station or a rho in the history → the body re-derives (L8); downstream trims (window belt, wing
-   root fairing) follow through `edgesNear` references (KI5) until persistent naming (gap 01).
-
-### 6.1 UI (desktop, OCC)
-
-1. **Surface ▸ Airfoil ▸ NACA…**: type `23012`, points 161, cosine spacing, open TE → a section curve
-   appears in a chosen plane; the side panel shows metrics (FR-SRF-13).
-2. **Surface ▸ Airfoil ▸ Import .dat…** → file dialog → format detected, report shown, optional
-   *Normalise chord* checkbox (FR-SRF-12).
-3. **Aero ▸ Wing…**: section table (airfoil, span, chord, twist), planform fields (sweep @ fraction, dihedral),
-   mirror, loft type → OK creates `wing-…`; **Inspect ▸ Wing properties** shows area/AR/MAC (FR-SRF-15).
-4. **Analysis ▸ Curvature map / Zebra / Comb** toggles a display overlay for selected faces/edges;
-   **Analysis ▸ Continuity…** pick an edge (or all internal edges) → table G0/G1/G2/G3 with worst values and
-   pass/fail colouring (FR-SRF-22/23).
-5. **Surface ▸ Fill / Trim / Sew / Thicken** operate on picked faces/edges (V1).
-
-### 6.2 CLI (`llull`, local agent path)
+The complete job "wing from a NACA section, checked, rendered, exported", headless on a file:
 
 ```bash
-llull run plan.json --app --progress                    # plan below; the desktop window updates live
-llull exec wing_properties id=wing-1 --doc wing.llull.json --kernel occt --json
-llull exec check_continuity '{"id":"wing-1","edges":"internal","g1AngleRad":0.0087,"g2Rel":0.05}' --doc wing.llull.json --kernel occt
-llull exec import_airfoil file=naca23012.dat normalize=none --doc wing.llull.json   # exchange-style file read (KI6)
-llull exec export_step_exact entityIds='["wing-1"]' --doc wing.llull.json --kernel occt --save out/wing.step
+llull search airfoil wing                      # finds airfoil_from_naca, import_airfoil, create_wing, wing_properties
+llull describe create_wing                     # params with units (sweepDeg, chords in document units, ...)
+llull guide                                    # aero section: axes, chord-normalised airfoils, minimal wing plan
+# 1. plan file (validation/plans/target_naca0012_trap_wing.json):
+#    set_units -> airfoil_from_naca -> create_wing -> mass_properties -> wing_properties
+llull run wing.plan.json --validate --doc wing.llull.json --kernel occt          # names step path + param on error
+llull run wing.plan.json --doc wing.llull.json --kernel occt --progress --json  # ids, data, durationMs per step
+# 2. numbers, not pictures
+llull wing_properties id=wing-3.1 --doc wing.llull.json --kernel occt --json    # data.areaRef, data.mac, data.unit
+llull check_continuity '{"id":"wing-3.1","edges":"internal"}' --doc wing.llull.json --kernel occt --json
+# 3. closing check: pass/warn/fail with codes, named default tolerances, unverified, reviewRequired
+llull check_surface_quality '{"ids":["wing-3.1"]}' --doc wing.llull.json --kernel occt --json
+# 4. look at it (multimodal agents)
+llull render_view view=iso isolate=wing-3.1 --doc wing.llull.json --kernel occt --save out/wing.png
+# 5. deliver
+llull export_step_exact --doc wing.llull.json --kernel occt --save out/wing.step
+llull export_code language=cadquery --doc wing.llull.json --save out/
 ```
 
-`plan.json` (target, see `validation/plans/target_naca0012_trap_wing.json`):
-`airfoil_from_naca` → `create_wing` → `mass_properties` → `wing_properties`.
+An imported section: `llull import_airfoil file=naca23012.dat normalize=none --doc wing.llull.json` (file read
+through the exchange path, KI6). A design change: `llull set_parameter name=sweep expression=35 --doc …`, then
+steps 2–4 again. `--dry-run` tries a mutating command without writing the file (AF-42). Any refusal exits 1 with
+a stable code (TECHNICAL_SPEC §7.1); the agent fixes the named param and re-validates.
 
-### 6.3 MCP agent (cloud)
+Fuselage by stations (V1), same loop:
 
-1. `enable_toolset aero` (and `surface`).
-2. `build_project` with the same plan; read `data` of `wing_properties` (area, MAC) and `check_continuity`.
-3. Iterate: `set_parameter sweep 35` → history re-evaluates → re-query metrics (L8).
+1. Plan: `set_units`, `set_aircraft_frame` (datum FS 0 / BL 0 / WL 0, +FS aft, +BL right, +WL up, unit stated),
+   `loft_fuselage` with a station table (nose `point`, `conic` stations with upper/lower rho, `circle` or
+   `superellipse` in the cabin, tail `point`) and optional control curves (`interpolate_curve` crown, keel and
+   max-breadth lines), `continuity: "G2"` (see `validation/plans/target_sears_haack_conic_fuselage.json`).
+2. `--validate`, run, `mass_properties`, `check_continuity edges=internal`, `analyze_surface_curvature grid=[50,50]`
+   (flat spots and bumps as min/max K and H with locations), `fuselage_section_at fs=…` for frames.
+3. `check_surface_quality purpose=release` returns `reviewRequired: true`; the agent reports the findings and
+   hands the release to the qualified reviewer (FR-SRF-42, 43).
+4. Edits in the history re-derive the body (L8); downstream trims follow `edgesNear` references (KI5) until
+   persistent naming (gap 01).
+
+### 6.2 MCP agent (cloud)
+
+1. `search_tools airfoil wing continuity`, then `enable_toolset aero` and `enable_toolset surface`.
+2. `build_project` with the same plan; read `data` of `wing_properties`, `check_continuity` and
+   `check_surface_quality`.
+3. Iterate: `set_parameter`, the history re-evaluates, re-query (L8).
+
+### 6.3 UI (review and approval surface)
+
+The desktop app shows what the agent built, live with `--app`. The qualified reviewer uses it to look at zebra
+stripes, curvature maps and combs (FR-SRF-23, drawn from the same `data`), read the `check_surface_quality`
+report, and approve a release or a waiver through 09 PLM (FR-SRF-43). Menus and dialogs exist for every command
+because the UI iterates `listCommands()`, but no capability depends on them.
 
 ## 7. Acceptance criteria
 
-| # | Given | When | Then | VC |
+Every criterion runs unattended as a CLI call with `--json` and an assertion against
+`validation/expected_results.json` (value, tolerance, unit; field `cli` of each case gives the call and the JSON
+path). `D` = `--doc t.llull.json --kernel occt --json`. Exit code 0 unless the case expects a refusal (exit 1).
+
+| # | Given | When (CLI) | Then (JSON assertion) | VC |
 | --- | --- | --- | --- | --- |
-| AC-01 | the NACA generator | `airfoil_from_naca 0012` (open TE) | every point of pinned UIUC `naca0012.dat` lies within **1e-6 c** of the generated curve | VC-SRF-01 |
-| AC-02 | the NACA generator | `airfoil_from_naca 23012` | pinned `naca23012.dat` within **2e-5 c** (5-decimal file rounding) | VC-SRF-02 |
-| AC-03 | pinned `naca2412.dat` (Lednicer naca.exe) | imported with `normalize: chord` and compared to `airfoil_from_naca 2412` | max deviation ≤ **2e-4 c**; without normalisation the report shows ≈ 1.29e-3 c (documented convention difference) | VC-SRF-03 |
-| AC-04 | Selig and Lednicer sample files | `import_airfoil` | format detected correctly; point counts and LE index match the file; TE gap reported | VC-SRF-04 |
-| AC-05 | a sphere R = 10, cylinder R = 5, torus R = 5 / r = 2 | `analyze_surface_curvature` at the listed (u,v) | K and |H| equal the closed-form values within 1e-6 relative (torus K abs 1e-6) | VC-SRF-05 |
-| AC-06 | the analytic curve joints (corner, line–arc, line–x³, line–x⁴, arc–arc) | `check_continuity` | reported order is exactly G0, G1, G2, G3, G3/G1 as tabulated | VC-SRF-06 |
-| AC-07 | a NURBS curve with rho = √2−1 conic | evaluate 9 samples | radius error vs unit circle ≤ **1e-12** | VC-SRF-07 |
-| AC-08 | the TR-1208 planform | `create_wing` + `wing_properties` | area 2024.35 in² ± 0.01, MAC 16.670 ± 0.005 in, AR 8.000 ± 0.03 | VC-SRF-10 |
-| AC-09 | trapezoidal wing cr 2, ct 1, b/2 5 m, NACA 0012 open TE, linear loft | `mass_properties` | volume 0.959117 m³ ± 1e-4 relative | VC-SRF-11 |
-| AC-10 | the NASA CRM STEP | import + `check_continuity` on wing upper skin + `analyze_surface_curvature` | run completes within the performance budget; values recorded as golden (TBD on first run) | VC-SRF-12 |
-| AC-11 | 19 Sears–Haack stations + nose/tail points | `loft_fuselage` (G2) + `mass_properties` | volume within 0.5 % of 3π²R²L/16 = 4.626377 (L = 10, R = 0.5) | VC-SRF-13 |
-| AC-12 | a closed loop of 3, 4 and 5 boundary edges around a hole at a box-with-fillet corner | `fill_surface` with G1 | max G0 gap ≤ 1e-4 and G1 angle ≤ 0.01 rad on every boundary (OCC defaults) | VC-SRF-15 |
-| AC-13 | two lofted wing segments | `sew_surfaces` → solid | 0 free edges, a valid solid, `mass_properties` equals sum of segment volumes ± 1e-6 rel | VC-SRF-16 |
-| AC-14 | a plane-normal draft test body | `analyze_draft` with pull +Z | draft angles equal analytic values ± 0.01° | VC-SRF-17 |
-| AC-15 | a known offset surface (sphere R = 10 vs R = 10.5) | `measure_deviation` | max = mean = 0.5 ± 1e-6 | VC-SRF-18 |
-| AC-16 | any SRF command | called through UI, CLI and MCP | identical document results (command log replay equality) | VC-SRF-19 |
+| AC-01 | pinned UIUC `naca0012.dat` | `llull airfoil_from_naca designation=0012 trailingEdge=open D`, then `measure_deviation` of the file points | `data.maxDeviation` ≤ **1e-6** (chord units) | VC-SRF-01 |
+| AC-02 | pinned `naca23012.dat` | same with `designation=23012` | `data.maxDeviation` ≤ **2e-5** (5-decimal file rounding) | VC-SRF-02 |
+| AC-03 | pinned `naca2412.dat` (Lednicer naca.exe) | `llull import_airfoil file=naca2412.dat normalize=chord D` vs `airfoil_from_naca 2412` | normalised `data.maxDeviation` ≤ **2e-4**; raw ≈ 1.29e-3 reported, not a failure | VC-SRF-03 |
+| AC-04 | Selig and Lednicer sample files | `llull import_airfoil file=… D` | `data.format`, `data.pointCount`, `data.leIndex` match the file; `data.teGap` reported with unit | VC-SRF-04 |
+| AC-05 | sphere R 10, cylinder R 5, torus 5/2 | `llull run plans/target_torus_surface_analysis.json D` | `data.samples[*].K`, `abs(H)` within 1e-6 rel of `data/curvature_analytic.json` (torus K abs 1e-6) | VC-SRF-05 |
+| AC-06 | analytic joints (corner, line–arc, line–x³, line–x⁴, arc–arc) | `llull check_continuity pairs=[…] D` | `data.joints[*].order` = G0, G1, G2, G3, G3, G1 | VC-SRF-06 |
+| AC-07 | conic rho = √2−1 | `llull create_conic … D` then `inspect_nurbs` | weight 0.70710678; radius error at 9 samples ≤ **1e-12** | VC-SRF-07 |
+| AC-08 | TR-1208 planform | `llull run plans/target_tr1208_wing.json D` | `wing_properties` `data.areaRef` 2024.35 ± 0.01 in², `data.mac` 16.670 ± 0.005 in, `data.aspectRatio` 8.000 ± 0.03, `data.unit = "in"` | VC-SRF-10 |
+| AC-09 | trapezoidal wing cr 2, ct 1, b/2 5 m, NACA 0012 open TE, linear loft | `llull run plans/target_naca0012_trap_wing.json D` | `mass_properties` `data.volume` 0.959117 m³ ± 1e-4 rel | VC-SRF-11 |
+| AC-10 | NASA CRM STEP | import + `check_continuity edges=internal` + `analyze_surface_curvature` with `--timeout 60` | completes within budget; values recorded as golden (TBD on first run) | VC-SRF-12 |
+| AC-11 | 19 Sears–Haack stations + nose/tail points | `llull run plans/target_sears_haack_conic_fuselage.json D` | `data.volume` within 0.5 % of 4.626377 | VC-SRF-13 |
+| AC-12 | closed loop of 3, 4 and 5 boundary edges around a hole at a filleted box corner | `llull fill_surface … D` | `data.boundaries[*].g0Gap` ≤ 1e-4, `g1AngleRad` ≤ 0.01 | VC-SRF-15 |
+| AC-13 | two lofted wing segments | `llull sew_surfaces makeSolid=true … D` | `data.freeEdges` = 0; volume = Σ segments ± 1e-6 rel | VC-SRF-16 |
+| AC-14 | cone r1 5, r2 3, h 10 | `llull analyze_draft pullDirection=[0,0,1] … D` | lateral `data.samples[*].draftDeg` = 11.309932 ± 0.01 | VC-SRF-17 |
+| AC-15 | sphere R 10 vs points on R 10.5 | `llull measure_deviation … D` | `data.max` = `data.mean` = 0.5 ± 1e-6 | VC-SRF-18 |
+| AC-16 | any SRF plan | run through CLI, MCP `build_project` and UI dispatch | identical documents and `data` (replay equality) | VC-SRF-19 |
+| AC-17 | a plan with a NACA designation `9999x` and a non-increasing span | `llull run bad.plan.json --validate D` / run | exit 1; `data.errors[*].code` ∈ {`AERO_NACA_DESIGNATION_UNKNOWN`, `AERO_SPAN_NOT_INCREASING`} with `path` and `remediation` | VC-SRF-31 |
+| AC-18 | a wing built from an imported `.dat` with no pinned source | `wing_properties`, `mass_properties`, `check_surface_quality` | `data.unverified = true` on each; check has a non-suppressible warn `SRF_CHECK_INPUT_UNVERIFIED` | VC-SRF-32 |
+| AC-19 | the NACA wing | `llull check_surface_quality '{"ids":["$wing"],"purpose":"release"}' D` | `data.status` pass/warn/fail with codes; `data.tolerances.g1AngleRad.defaulted = true` with `source`; `data.reviewRequired = true` with `reason` | VC-SRF-33 |
+| AC-20 | a failing G2 finding and an agent-requested waiver | `request_surface_waiver`, then 09 `record_approval` as agent caller | approval refused (TR-PLM-16); check still `fail` with `waiverStatus: "pending"` | VC-SRF-34 |
+| AC-21 | every SRF command | `llull describe <command> --json` | every numeric param has a unit in its description; every query result field has a unit or suffix | VC-SRF-35 |
 
 ## 8. Standards & regulatory alignment
 
@@ -255,7 +299,8 @@ llull exec export_step_exact entityIds='["wing-1"]' --doc wing.llull.json --kern
 | Wing metric parity with OpenVSP tutorial | area/MAC within 0.01 % |
 | Continuity classification accuracy on analytic suite | 6/6 correct |
 | Performance | NACA wing (2 sections, 161 pts) build ≤ 1 s; curvature grid 100×100 on one face ≤ 500 ms; CRM wing continuity check ≤ 10 s (desktop, OCC) |
-| Agent success | `build_project` plans in `validation/plans/target_*.json` run unchanged |
+| Agent success | `build_project` plans in `validation/plans/target_*.json` run unchanged; an agent driver runs every VC from the CLI with `--json` and exit codes only, no UI (AF-23) |
+| Self-check coverage | every agent surface job ends with `check_surface_quality`; 100 % of refusals carry a code from TECHNICAL_SPEC §7.1 |
 
 ## 10. Risks & assumptions
 
@@ -266,7 +311,8 @@ llull exec export_step_exact entityIds='["wing-1"]' --doc wing.llull.json --kern
 | UIUC licence not stated on the pages reachable during research | Cannot redistribute `.dat` files | Pin URL + sha256 only; tests download on demand or use generated data |
 | Lednicer files with differing normalisation (VC-SRF-03) | False failures | Explicit `normalize` option and tolerance per file |
 | G2/G3 measured numerically is noise-sensitive near degenerate points (LE, poles) | Spurious failures | Relative + absolute thresholds, skip degenerate samples, report sample counts |
-| No authoritative aerospace continuity standard was found | Tolerance defaults may be contested | Defaults from OCC filling defaults (TolAng 0.01 rad, TolCurv 0.1) and user-configurable |
+| No authoritative aerospace continuity standard was found | Tolerance defaults may be contested | Defaults from OCC filling defaults (TolAng 0.01 rad, TolCurv 0.1), configurable, and always named in results with `defaulted: true` (FR-SRF-40) |
+| The operator is an agent and the owner is not a surface specialist | A marginal surface is reported as "done" | `check_surface_quality` ends every job; failures and unverified inputs cannot be hidden; release results carry `reviewRequired`; waivers need a human approval (FR-SRF-39..43) |
 | CRM geometry host not reachable from the research sandbox | sha256 not recorded | Pin page URLs; record sha256 on first CI download (TBD) |
 
 ## 11. References

@@ -283,6 +283,194 @@
    "sources": [
     "S30"
    ]
+  },
+  {
+   "id": "VC-FEA-60",
+   "quantity": "named safety factors when none are given (AF-31)",
+   "value": {
+    "factors": {
+     "ultimate": {
+      "value": 1.5,
+      "source": "14 CFR 25.303",
+      "defaulted": true
+     },
+     "yield": {
+      "value": 1.0,
+      "source": "derived from 14 CFR 25.305(a) (limit load, no detrimental permanent deformation)",
+      "defaulted": true
+     },
+     "extra": []
+    }
+   },
+   "unit": "1",
+   "assert": "data.factors deep-equals value; no factor without source",
+   "derivation": "TECHNICAL_SPEC 5.8 / FR-FEA-31",
+   "sources": [
+    "S1",
+    "S1a"
+   ]
+  },
+  {
+   "id": "VC-FEA-61",
+   "quantity": "every margin row flagged for review (AF-33)",
+   "value": [
+    {
+     "rowId": "r1",
+     "appliedMPa": 300.0,
+     "allowableMPa": 450.0,
+     "ms": 0.0,
+     "status": "PASS",
+     "code": null,
+     "reviewRequired": true,
+     "reviewReason": "margin of safety supports a structural substantiation decision",
+     "disposition": "none"
+    },
+    {
+     "rowId": "r2",
+     "appliedMPa": 200.0,
+     "allowableMPa": 450.0,
+     "ms": 0.5,
+     "status": "PASS",
+     "code": null,
+     "reviewRequired": true,
+     "reviewReason": "margin of safety supports a structural substantiation decision",
+     "disposition": "none"
+    },
+    {
+     "rowId": "r3",
+     "appliedMPa": 200.0,
+     "allowableMPa": 300.0,
+     "ms": 0.0,
+     "status": "PASS",
+     "code": null,
+     "reviewRequired": true,
+     "reviewReason": "margin of safety supports a structural substantiation decision",
+     "disposition": "none"
+    },
+    {
+     "rowId": "r4",
+     "appliedMPa": 200.0,
+     "allowableMPa": 280.0,
+     "ms": -0.0666666666667,
+     "status": "FAIL",
+     "code": "FEA_MS_NEGATIVE",
+     "reviewRequired": true,
+     "reviewReason": "margin of safety supports a structural substantiation decision",
+     "disposition": "pending_human"
+    }
+   ],
+   "unit": "1",
+   "assert": "for every row: reviewRequired == true and reviewReason non-empty; data.reviewRequired == true; summary contains 'not approved'",
+   "derivation": "rows of VC-FEA-20 with FR-FEA-32/33 fields; marginalBand unset -> no MARGINAL rows and warning FEA_MARGINAL_BAND_UNSET",
+   "sources": [
+    "S1",
+    "S2"
+   ]
+  },
+  {
+   "id": "VC-FEA-62",
+   "quantity": "check_analysis after VC-FEA-61 (AF-20)",
+   "value": {
+    "status": "fail",
+    "codes": [
+     "FEA_DISPOSITION_PENDING",
+     "FEA_MARGINAL_BAND_UNSET",
+     "FEA_MS_NEGATIVE"
+    ]
+   },
+   "unit": "1",
+   "assert": "data.status == value.status and sorted(set(item.code)) == value.codes",
+   "derivation": "FR-FEA-33/35",
+   "sources": []
+  },
+  {
+   "id": "VC-FEA-63",
+   "quantity": "agent attempts dispose_margin on r4 (AF-34)",
+   "value": {
+    "exitCode": 1,
+    "code": "FEA_HUMAN_GATE",
+    "documentChanged": false,
+    "rowDisposition": "pending_human"
+   },
+   "unit": "1",
+   "assert": "CLI exit code, data.code, document hash unchanged, compute_margins row r4 disposition",
+   "derivation": "FR-FEA-33, TR-FEA-91",
+   "sources": []
+  },
+  {
+   "id": "VC-FEA-64",
+   "quantity": "unverified gap 08 input propagates (AF-32)",
+   "value": {
+    "input": {
+     "property": "E",
+     "basis": "typical",
+     "unverified": true
+    },
+    "expect": {
+     "rows[*].unverified": true,
+     "rows[*].unverifiedReasons contains": "E basis typical",
+     "meshSummary.unverified": false,
+     "resultsSummary.unverified": true,
+     "check_analysis.items contains": {
+      "code": "FEA_MATERIAL_UNVERIFIED",
+      "severity": "warning"
+     }
+    }
+   },
+   "unit": "1",
+   "assert": "as listed",
+   "derivation": "FR-FEA-34 (the mesh does not depend on material, results and margins do)",
+   "sources": []
+  },
+  {
+   "id": "VC-FEA-65",
+   "quantity": "stable error codes for deliberately wrong set-ups (AF-11)",
+   "value": [
+    {
+     "setup": "add_fea_constraint facesNear on a point 5 mm off the part",
+     "code": "FEA_TARGET_UNRESOLVED"
+    },
+    {
+     "setup": "facesNear exactly on the edge shared by two faces",
+     "code": "FEA_TARGET_AMBIGUOUS"
+    },
+    {
+     "setup": "material record without E",
+     "command": "fea_export",
+     "code": "FEA_MATERIAL_NO_ELASTIC"
+    },
+    {
+     "setup": "set_material_property property=nu value=0.5",
+     "code": "FEA_PROPERTY_INVALID"
+    },
+    {
+     "setup": "mesh artifact with one inverted tet",
+     "command": "fea_export",
+     "code": "FEA_MESH_INVERTED"
+    },
+    {
+     "setup": "set_parameter after solve",
+     "command": "compute_margins",
+     "code": "FEA_RESULTS_STALE"
+    },
+    {
+     "setup": "record_fe_mesh with a hash absent from the store",
+     "code": "FEA_ARTIFACT_NOT_FOUND"
+    },
+    {
+     "setup": "LLULL_CCX pointing to a missing file",
+     "command": "fea_solve",
+     "code": "FEA_TOOL_MISSING"
+    },
+    {
+     "setup": "set_analysis_factors ultimate=0.9",
+     "code": "FEA_FACTOR_INVALID"
+    }
+   ],
+   "unit": "1",
+   "assert": "exit code 1; data.code == code; data.remediation non-empty; data.ids or data.path set",
+   "derivation": "TECHNICAL_SPEC 7.1",
+   "sources": []
   }
  ]
 }

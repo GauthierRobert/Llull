@@ -34,7 +34,10 @@ Regenerate everything: `cd docs/aerospace/02-advanced-surfacing/validation && py
 
 ## 3. Validation cases
 
-Tolerances and values are in `expected_results.json` (authoritative); summary here.
+Tolerances and values are in `expected_results.json` (authoritative); summary here. Every case runs as a CLI
+script (AF-23): the `cli.run` field of each case is the call sequence (`--doc t.llull.json --kernel occt --json`),
+`cli.assert` the JSON path compared with the case value and tolerance; exit codes are checked, no UI is used.
+The production-gate agent driver runs them in order.
 
 | VC | Proves | Setup | Expected | Tol | Source / derivation | Gate |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -68,12 +71,17 @@ Tolerances and values are in `expected_results.json` (authoritative); summary he
 | VC-SRF-28 | FR-14, FR-16 | edit sweep 0 → 30° on a constant-chord wing (taper 1; with taper ≠ 1 give the sweep at `sweepLocation` 0) | area unchanged; LE sweep 30° | 1e-9 | shear | golden |
 | VC-SRF-29 | FR-19 | conic master-line loft | TBD (needs public loftsman example) | TBD | [S18] [S19] paywalled | — |
 | VC-SRF-30 | FR-28 | `plans/target_naca0012_trap_wing.json`, then `export_code language=cadquery`; run the script with bundled CadQuery/OCP | script runs; V = 0.959117 m³ | 1e-4 rel | same derivation as VC-SRF-11 | server (Python oracle) |
+| VC-SRF-31 | FR-33, FR-37 | wrong plan (bad NACA designation, non-increasing span, closed TE on an open file) | exit 1; codes `AERO_NACA_DESIGNATION_UNKNOWN`, `AERO_SPAN_NOT_INCREASING`, `AERO_AIRFOIL_TE_GAP` with path + remediation | exact | TECHNICAL_SPEC §7.1 | unit + CLI |
+| VC-SRF-32 | FR-41, FR-44 | wing from an imported `.dat` with no pinned source | `unverified: true` on every derived result; warn `SRF_CHECK_INPUT_UNVERIFIED` (not suppressible); `provenance` present | exact | FR-SRF-41 rule | unit + CLI |
+| VC-SRF-33 | FR-39, FR-40, FR-42 | `check_surface_quality purpose=release` on the NACA wing, no tolerances given | named defaults (0.01 rad, 0.1 rel, `defaulted: true`, source), `reviewRequired: true` + reason | exact | TECHNICAL_SPEC §5.6, §7.2 | unit + CLI |
+| VC-SRF-34 | FR-43 | G2 failure, agent `request_surface_waiver`, agent `record_approval` | approval refused; finding stays `fail`, `waiverStatus: "pending"` | exact | 09 PLM TR-PLM-16 | server (authenticated) |
+| VC-SRF-35 | FR-26, FR-35, FR-36 | `llull search` / `describe` / result audit over the aero + surface toolsets | 0 numeric params or result numbers without unit | exact | AF-01..04, AF-10 | contract |
 
 FR ↔ VC coverage: FR-01 (07, 08) · FR-02 (08) · FR-03 (08) · FR-04 (25) · FR-05 (11, 22) · FR-06 (15) · FR-07 (23)
 · FR-08 (16) · FR-09 (24) · FR-10 (01, 03, 04) · FR-11 (01, 02) · FR-12 (03) · FR-13 (09) · FR-14 (10, 11, 28) ·
 FR-15 (10, 11) · FR-16 (19, 28) · FR-17 (13, 14) · FR-18 (07, 14) · FR-19 (29) · FR-20 (06) · FR-21 (05, 12) ·
 FR-22 (06, 12) · FR-23 (27) · FR-24 (17) · FR-25 (12, 18) · FR-26 (19) · FR-27 (12, 21) · FR-28 (21, 30) · FR-29 (26) ·
-FR-30 (20) · FR-31 (19) · FR-32 (11, `set_units` unit tests) · FR-33 (19, failure tests) · FR-34 (12, perf budgets TECHNICAL §8) · FR-35 (19, schema snapshot).
+FR-30 (20) · FR-31 (19) · FR-36 (35) · FR-37 (31) · FR-38 (guide snapshot) · FR-39 (33) · FR-40 (33) · FR-41 (32) · FR-42 (33) · FR-43 (34) · FR-44 (32) · FR-32 (11, `set_units` unit tests) · FR-33 (19, 31, failure tests) · FR-34 (12, perf budgets TECHNICAL §8) · FR-35 (19, 35, schema snapshot).
 
 TR ↔ VC coverage: see TECHNICAL_SPEC §9.1 (TR-SRF-01..11); `expected_results.json` lists the TR ids per case in `proves`.
 

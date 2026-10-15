@@ -202,12 +202,12 @@ export interface CadDocument {
 | Name | Kind | Toolset | Params (zod sketch) | data |
 | ---- | ---- | ------- | ------------------- | ---- |
 | `geometric_validation_properties` | query, `requiresKernel` | measure | `{ entityIds?: string[], includeAssemblies?: boolean }` | `{ unit, items: [{ id, name, volume, area, centroid, bbox, method:'brep'|'mesh' }], assemblies?: [...] }` |
-| `export_step_ap242` | query, `requiresKernel` | exchange | `{ entityIds?: string[], schema?: 'ap242'|'ap214'|'ap203' (default 'ap242'), includeValidationProperties?: boolean (true), assembly?: 'structured'|'flat' ('structured'), tessellation?: 'off'|'alongside'|'only' ('off'), includePmi?: boolean (true), fileName?: string, timestamp?: string }` | `{ format:'step', schema, step, products, occurrences, gvp:[…], selfCheck: GvpCheck, skipped }` |
+| `export_step_ap242` | query, `requiresKernel` | exchange | `{ entityIds?: string[], schema?: 'ap242'|'ap214'|'ap203' (default 'ap242'), includeValidationProperties?: boolean (true), assembly?: 'structured'|'flat' ('structured'), tessellation?: 'off'|'alongside'|'only' ('off'), includePmi?: boolean (true), fileName?: string, timestamp?: string, acceptUnverified?: boolean (human gate) }` | `{ format:'step', schema, step, products, occurrences, gvp:[…], selfCheck: GvpCheck, skipped, policy, provenance, reviewRequired }` |
 | `import_step_exact` (owned by 01 KRN; this row = XCH extension) | mutating, `requiresKernel` | exchange | 01's params (`stepBase64` \| `text` \| `blobId`, `fileName`, `heal`, `sew`, `precisionMode`, `keepOriginal`, `name`) **+** `sha256?: string`, `mode?: 'append'|'replace'`, `tessellated?: boolean (true)`, `verify?: boolean (true)`, `gvpPolicy?: Partial<GvpPolicy>` | 01's `report` **+** `{ products, components, gvpCheck, messages }` |
-| `verify_exchange_file` | query (kernel optional) | exchange | `{ text: string, format?: 'step'|'iges', gvpPolicy?: … }` | `{ schemaName, unit, census, embeddedGvp, recomputed?: { volume, area, centroid, bbox }[] (01 `massProperties`), comparisons, band, messages }` — without a kernel: census + embedded GVP only |
+| `verify_exchange_file` | query (kernel optional) | exchange | `{ text: string, format?: 'step'|'iges', gvpPolicy?: … }` | `{ schemaName, unit, census, embeddedGvp, recomputed?: { volume, area, centroid, bbox }[] (01 `massProperties`), comparisons, band, issues, unverified, reviewRequired, policy }` — without a kernel: census + embedded GVP only |
 | `export_iges` | query, `requiresKernel` | exchange | `{ entityIds?: string[], mode?: 'brep'|'faces' ('brep'), fileName?, timestamp? }` | `{ format:'iges', iges, solidCount, selfCheck }` |
 | `import_iges` | mutating, `requiresKernel` | exchange | `{ text, fileName?, sha256?, sew?: boolean (true), mode? }` | `{ entities, openShells, untranslated: Record<type,count> }` |
-| `create_archive_package` | query, `requiresKernel` | aero (plugin) | `{ entityIds?: string[], partNumber: string, revision: string, timestamp: string }` | `{ files: [{ name, text, sha256 }], manifest }` (host writes them) |
+| `create_archive_package` | query, `requiresKernel` | aero (plugin) | `{ entityIds?: string[], partNumber: string, revision: string, timestamp: string }` | `{ files: [{ name, text, sha256 }], manifest, reviewRequired: { value: true, reasons: ['archive_record'] } }` (host writes them) |
 | `verify_archive_package` | query, `requiresKernel` | aero (plugin) | `{ manifest: Manifest, files: [{ name, text }] }` | `{ band, checks: [...] }` |
 | `export_qif` (V2) | query | aero (plugin) | `{ entityIds?, qifVersion: '3.0' }` | `{ format:'qif', xml }` |
 | `import_jt` (V2) | host tool → `import_mesh` | exchange | `{ jtBase64 | path }` via converter port | as `import_mesh` |
@@ -388,14 +388,76 @@ archive process itself (EN 9300-002 requirements) is the organisation's.
   sha256), `Characteristics` from gap-03 PMI; validates against the QIF 3.0 XSD in tests (schema files are distributed
   by qifstandards.org [R6]; pin them in the test fixture once downloaded, Q7).
 
-## 7. UI / CLI / MCP surfaces
+## 7. CLI / MCP / UI surfaces
 
 | Surface | Change |
 | ------- | ------ |
-| UI (`src/ui`, Lane 2) | File › Import STEP/IGES dialog (append/replace, sew, verify); Export dialog (schema, GVP, PMI, tessellation, assembly); Validation badge per product in the Assembly panel; report table component (sender / llull / delta / band); Archive package dialogs (V1). Param-gathering only — dispatches the commands. |
-| CLI (`server/src/cli`) | `file=<path>` → `text` for `import_step_exact`, `import_iges`, `verify_exchange_file`; `--save` for exports; `--save <dir>` for `create_archive_package` (the existing `--save` already writes a directory for multi-file results such as sheets / `export_nc_files`; it writes `data.files`); `verify_archive_package` gets its `{ manifest, files }` from a new CLI `dir=<path>` mapping that reads `manifest.json` and the listed files (host-side, like `file=`); non-zero exit code (1, as for a failed command; 2 stays "bad usage") when `data.band === 'red'` (US-4). |
+| CLI (`server/src/cli`) — **primary** | Commands found by `llull search step ap242` / `llull search iges` and documented by `llull describe` (agent-written: what, when, units, refusals, next command — AF-02). `file=<path>` → `stepBase64` / `text` for `import_step_exact`, `import_iges`, `verify_exchange_file`; `--save` for exports; `--save <dir>` for `create_archive_package` (the existing `--save` already writes a directory for multi-file results such as sheets / `export_nc_files`; it writes `data.files`); `verify_archive_package` gets its `{ manifest, files }` from a new CLI `dir=<path>` mapping that reads `manifest.json` and the listed files (host-side, like `file=`); exit code 1 (as for a failed command; 2 stays "bad usage") when `data.band === 'red'` or on a refusal (US-4). `llull guide` gains an XCH section (AF-03): file units vs document units, GVP bands and what to do on each, the minimal receive → verify → deliver sequence (FUNCTIONAL_SPEC §6.1). |
 | MCP (`packages/mcp`, Lane 4) | New tools appear automatically from the registry (exchange toolset). Host tools `import_step` / `export_step` keep their Python paths; add `path`/`stepBase64` plumbing for the new commands as for `import_dwg`. Toolset entry in `packages/mcp/src/toolsets.ts` (exchange, measure) + a new `aero` name in `TOOLSET_NAMES` for the plugin commands (as `building` / `civil`). |
+| UI (`src/ui`, Lane 2) — review / approval | Validation badge per product, report table (sender / llull / delta / band), assembly tree; reviewer acts for the human gates (TR-XCH-26). Import / Export / Archive dialogs are COULD conveniences that dispatch the same commands. |
 | Desktop | File menu entries; bundled Python gets the interim `op_*_xde` operations; `LLULL_JT_CONVERTER` documented (V2). |
+
+### 7.1 Agent-first technical requirements (TR-XCH-20 .. 27)
+
+| Id | Prio | Requirement | FR | VC |
+| -- | ---- | ----------- | -- | -- |
+| TR-XCH-20 | MUST | Refusals return `data.error`, check findings `data.issues[]`, as `{ code, severity: 'fail'|'warn'|'info', file?, productKey?, entityIds?, property?, paramPath?, remediation }` with the codes of §7.2; exit 1 on refusal or red | FR-XCH-23 | VC-XCH-21 |
+| TR-XCH-21 | MUST | `verify_exchange_file` returns `data.band` + `data.issues[]` (pass / warn / fail) and is runnable without a kernel (census + sender GVP) | FR-XCH-24 | VC-XCH-05, -21 |
+| TR-XCH-22 | MUST | Units: param descriptions state units; GVP values in `data` as `{ volume, volumeUnit, area, areaUnit, centroid, lengthUnit, bbox }`; `data.fileUnit` and `data.unitFactor` (exact 25.4 / 304.8 / 10 / 1000) on import | FR-XCH-25 | VC-XCH-12, -25 |
+| TR-XCH-23 | MUST | Named defaults `{ value, unit, source, defaulted }` for `policy` (green / yellow from §5.3 with their sources), `schema`, `tessellation`, IGES sewing tolerance; `data.provenance` = `ImportProvenance` (import) or `{ llullVersion, kernel, schemaName, timestamp }` (export) | FR-XCH-26 | VC-XCH-25 |
+| TR-XCH-24 | MUST | `ImportProvenance` gains `unverified: { value, reasons[] }` (`import_gvp_red`, `import_gvp_not_checkable`, `verify_skipped`); 01 `mass_properties` reads it (TR-KRN-103); export GVP and archive manifest entries copy it | FR-XCH-27 | VC-XCH-22 |
+| TR-XCH-25 | MUST | `reviewRequired: { value, reasons[] }` on import reports (band yellow / red / not-checkable), exports with unverified bodies, every archive package (`archive_record`); AF-36 summary order | FR-XCH-28 | VC-XCH-23 |
+| TR-XCH-26 | MUST (V1) | `export_step_ap242 { acceptUnverified: true }` (needed when any exported body is unverified or red) and archive acceptance (09 `release_item`) require `ctx.caller.kind === 'human'` (09 TR-PLM-16; advisory in local CLI runs, enforced on an authenticated server); agent → `XCH_HUMAN_GATE` | FR-XCH-29 | VC-XCH-24 |
+| TR-XCH-27 | SHOULD | Import stages (read, heal, tree, GVP, PMI) on `--progress`; `--timeout` honoured (01 worker recycle); `--dry-run` works (pure commands); missing JT converter → `XCH_CONVERTER_MISSING` with install hint | FR-XCH-30 | VC-XCH-26 |
+
+### 7.2 Stable error codes (AF-11)
+
+The import core (`KRN_STEP_UNREADABLE`, `KRN_STEP_TESSELLATED_ONLY`, `KRN_STEP_NO_SOLID`, `KRN_IMPORT_TOLERANCE_HIGH`,
+`KRN_NO_EXACT_KERNEL`, …) is owned by 01 KRN (its TECHNICAL_SPEC §7.2). XCH adds:
+
+| Code | Severity | Raised by | When | Offending ids / paths | Remediation |
+| ---- | -------- | --------- | ---- | --------------------- | ----------- |
+| `XCH_FILE_TOO_LARGE` | fail | host before parse (all readers) | bytes > `LLULL_EXCHANGE_MAX_BYTES` (default 200 MB) | file name, size | split the assembly or raise the limit on the desktop host |
+| `XCH_SCHEMA_UNKNOWN` | warn | `verify_exchange_file`, `import_step_exact` | FILE_SCHEMA not AP203 / AP214 / AP242 ed. 1–4 | schema string | import is attempted; check the result with `verify_exchange_file` |
+| `XCH_UNIT_UNKNOWN` | fail (comparison) | `verify_exchange_file`, import verify | no recognisable length unit in the file | file | GVP not compared (band `not-checkable`); ask the sender for the unit |
+| `XCH_GVP_YELLOW` | warn | import verify, `verify_exchange_file` | delta between green and yellow limits (§5.3) | product, property, sender / receiver values, delta | report the numbers to the owner; continue only if the owner accepts the deviation |
+| `XCH_GVP_RED` | fail (import still completes) | import verify, `verify_exchange_file` | delta beyond yellow | product, property, values | do not deliver; qualified reviewer decides (human gate for delivery) |
+| `XCH_GVP_NOT_CHECKABLE` | warn | import verify, `verify_exchange_file` | sender GVP absent, all-zero placeholder, or `verify: false` | product | geometry marked `unverified`; ask the sender for GVP or proceed with review |
+| `XCH_SELFCHECK_RED` | fail | `export_step_ap242`, `export_iges` | re-read of the written file disagrees with the model (same-kernel policy) | product, property | report a defect; do not deliver the file |
+| `XCH_NO_SOLIDS` | fail | exports | nothing exportable in `entityIds` | entity ids | pass 3D solid ids (`find_entities`) |
+| `XCH_WRITER_UNAVAILABLE` | fail | exports | kernel without `writeExchange` (Manifold) | — | run on the desktop backend / `--kernel occt` |
+| `XCH_IGES_OPEN_SHELL` | warn | `import_iges` | shells that did not close after sewing | entity ids, open-shell count | retry with a larger sewing tolerance within limits; keep as surfaces |
+| `XCH_IGES_UNTRANSLATED` | warn | `import_iges`, `verify_exchange_file` | IGES entity types OCC does not translate | type → count | expected for non-geometric types; review the list |
+| `XCH_PMI_UNMAPPED` | warn (V1) | import with PMI | census record not mapped to the 03 model | record id, type | listed for the reviewer; no silent drop |
+| `XCH_PMI_ZERO_MAGNITUDE` | fail (V1) | import with PMI | OCC tolerance value 0 where the text census shows a non-zero `LENGTH_MEASURE` [R25] | record id | use the text-level magnitude; report the reader defect |
+| `XCH_ARCHIVE_HASH_MISMATCH` | fail (V1) | `verify_archive_package` | a file's sha256 differs from the manifest | file name | the package is corrupt; restore from another copy |
+| `XCH_ARCHIVE_GVP_DRIFT` | fail (V1) | `verify_archive_package` | recomputed GVP outside the same-kernel policy | product, property | check the kernel version note; reviewer decides |
+| `XCH_ARCHIVE_KERNEL_VERSION` | warn (V1) | `verify_archive_package` | manifest `occVersion` ≠ running kernel | both versions | cross-version comparison applies; see 01 `KRN_KERNEL_MISMATCH` |
+| `XCH_CONVERTER_MISSING` | fail (V2) | `import_jt` host tool | `LLULL_JT_CONVERTER` not set / not executable | — | install the converter and set `LLULL_JT_CONVERTER` |
+| `XCH_SFA_UNAVAILABLE` | warn | `xch-sfa` gate scenario | NIST SFA not installed on the gate machine | — | run the scenario on the gate machine (Q10) |
+| `XCH_HUMAN_GATE` | fail | `export_step_ap242 { acceptUnverified }`, archive acceptance | agent caller on a human-gated act | act, entity ids | hand the prepared request to a qualified reviewer in the desktop app |
+
+### 7.3 Agent-first compliance (AGENT_FIRST.md)
+
+| AF | Where satisfied |
+| -- | --------------- |
+| AF-01 | every capability is a registry command (§4); FR-XCH-21; VC-XCH-20 |
+| AF-02, AF-03 | §7 CLI row (descriptions, `llull guide` XCH section) |
+| AF-04, AF-10 | TR-XCH-22; FR-XCH-25; VC-XCH-12, VC-XCH-25 |
+| AF-05 | `validation/plans/*.json` validate with `llull run … --validate` (checked in review against the real zod schemas) |
+| AF-11 | TR-XCH-20, §7.2; FR-XCH-23; VC-XCH-14, VC-XCH-21 |
+| AF-12 | files only via `--save` (STEP, IGES, archive directory); reports bounded per product |
+| AF-13 | TR-XCH-05 byte-identical export for the same `timestamp`; VC-XCH-03 |
+| AF-20 | `verify_exchange_file`, `geometric_validation_properties`; FR-XCH-24; VC-XCH-05, VC-XCH-21 |
+| AF-21 | GVP deltas and bands, census counts, untranslated-type counts instead of visual inspection |
+| AF-22 | `render_view … --save part.png` in FUNCTIONAL_SPEC §6.1 |
+| AF-23 | FUNCTIONAL_SPEC §7 (CLI + JSON assertions), `validation/README.md` §4.1 |
+| AF-30 | GVP band policy as data with sources (§5.3) applied by the check commands |
+| AF-31, AF-35 | TR-XCH-23; FR-XCH-26; VC-XCH-25 |
+| AF-32 | TR-XCH-24; FR-XCH-27; VC-XCH-22 |
+| AF-33, AF-36 | TR-XCH-25; FR-XCH-28; VC-XCH-23 |
+| AF-34 | TR-XCH-26; FR-XCH-29; VC-XCH-24 |
+| AF-40, AF-41, AF-42 | TR-XCH-27; FR-XCH-30, FR-XCH-22; VC-XCH-26, VC-XCH-20 |
 
 ## 8. Performance & robustness budgets
 
@@ -425,6 +487,7 @@ archive process itself (EN 9300-002 requirements) is the organisation's.
 | Layers / materials round trip | `tests/unit/exchange/stepAp242RoundTrip.test.ts` | VC-XCH-18 |
 | Composites / kinematics (V2) | TBD with 06 CMP | VC-XCH-19 |
 | Same `data` from `store.dispatch`, CLI `--doc`, MCP; no network (sandboxed test) | `tests/integration/exchangeParity.test.ts`, `server/tests/` | VC-XCH-20 |
+| Agent-first CLI scripts (`--json` + exit codes): wrong calls → codes; STC-06 placeholder GVP → `unverified` propagated to `mass_properties`; CTC-02 e2 / archive → `reviewRequired`; agent `acceptUnverified` → `XCH_HUMAN_GATE`; named defaults + provenance; `--dry-run` / `--progress` on CTC-02 | `tests/unit/exchange/agentFirst.test.ts`, `server/tests/cli*.test.ts` | VC-XCH-21 .. 26 |
 | Each command | happy + failure + `is pure` tests (non-negotiables) | all |
 
 Coverage gate 90/85/90/90 applies to `packages/core/src/commands/exchange/**` and the plugin.

@@ -77,38 +77,49 @@ to a concrete capability (§8).
 
 ## 3. Personas & user stories
 
-| Persona | Role |
-| ------- | ---- |
-| **DE** Design engineer | Models parts, implements ECOs |
-| **CK** Checker / stress | Independent review, approves for release |
-| **CM** Configuration manager | Owns part numbering, baselines, status accounting |
-| **QA** Quality engineer | AS9102 FAI, audits (AS9100D) |
-| **MF** Manufacturing engineer | Consumes released data, MBOM, as-built records |
-| **EC** Export-control officer | Classifies technical data (ITAR/EAR/EU) |
-| **AG** AI agent (CLI local / MCP cloud) | Drafts changes, runs checks, prepares packages |
+Operating model: [`../AGENT_FIRST.md`](../AGENT_FIRST.md) (authoritative). PLM is where the human-gate model (AF-34) lives
+for every other gap.
+
+| Persona | Who | Surface | Role in this gap |
+| ------- | --- | ------- | ---------------- |
+| **OP** Operator (primary) | AI agent on the `llull` CLI (`--app` / `--doc`), MCP for cloud agents | plan files, `exec`, `--json`, `plm_status`, `check_release_readiness`, `verify_release`, `plm_diff`, `fai_report_skeleton` | **Prepares** everything: identity, iterations, ECR/ECO drafts, `revise_item`, the model change, `submit_for_review`, release-package preview, FAI skeleton, verification. **Never** approves, signs or releases. |
+| **OW** Owner | Person who asked for the work; not assumed to be an engineer | talks to the agent; may watch the desktop app | States the goal ("make rev B with the thicker flange"), receives plain-language status ("ready for review; a checker and the design authority must sign") |
+| **QR** Qualified reviewers (humans, the gates) | Checker / stress, design authority (DOA signatory), configuration manager, quality engineer (AS9102), export-control officer | desktop app review/approval surfaces, host keystore | Record approvals, choose the change classification, sign with a human-held key, release, decide export marking, accept FAI results |
+| **MF** Consumer | Manufacturing / MRO / supplier (human or agent) | CLI read-only queries, release packages | Resolves effectivity, reads released data, verifies packages |
+
+**Human-gate rule (AF-34, central).** An agent caller (`ctx.caller.kind = 'agent'`) can run every PLM command that
+*prepares* a decision. The approval acts — `record_approval`, `record_signature` with an approval/release meaning,
+`release_item`, `set_change_state` to accepted/rejected for a classification decision, `set_export_marking` decision,
+`attach_release_package` of a signed package, disposition of a non-conformance — require a human caller **and** (for
+release) a signature from a registered human key that the agent never holds (`policy.humanSignatureRequired`, default
+true). Refusals carry `PLM_HUMAN_GATE` and tell the agent what to ask the owner.
 
 User stories:
 
-- **US-01 (DE)** — I assign a part number and get revision A, iteration 1, so the title block and exports carry managed
-  identity.
-- **US-02 (DE)** — I checkpoint iterations while working, so I can return to any work-in-progress state.
-- **US-03 (CK)** — I review a frozen iteration and approve or reject it. While it is in review nobody can edit it.
-- **US-04 (CM)** — Once released, the model cannot be changed except through a change order and a new revision.
-- **US-05 (DE)** — I raise an ECR with a reason, get an ECO with classification (minor/major) and effectivity, revise to B,
-  and see a diff A→B.
-- **US-06 (MF)** — Given a serial number, MSN or build date, I get the revision that applies.
-- **US-07 (CM)** — I freeze a product baseline of an assembly and compare it later with the working state.
-- **US-08 (QA)** — I get an AS9102 FAI skeleton with every characteristic numbered (balloons) consistently with the drawing.
-  For a partial FAI, I get only the characteristics changed by the ECO.
-- **US-09 (QA/CM)** — Years later I verify that an archived release package is unchanged and was signed by the stated
-  approver.
-- **US-10 (EC)** — I record the export-control decision for an item. Every sheet and package carries the marking, and
-  release is blocked until a decision exists (when policy demands it).
-- **US-11 (DE, desktop)** — Two engineers sharing a folder cannot overwrite each other: check-out locks the item.
-- **US-12 (AG)** — Through `llull` CLI or MCP I can run the full ECO workflow up to "in_review". Releasing requires a human
-  approval signature.
-- **US-13 (MF)** — I record the as-built configuration of serial SN-0007, including a part installed under a variance, and
-  compare it with the as-designed baseline.
+- **US-01 (OP)** — I assign a part number (`set_item_identity`) and get revision A, iteration 1, so title blocks and
+  exports carry managed identity.
+- **US-02 (OP)** — I checkpoint iterations while working, so any work-in-progress state can be returned to.
+- **US-03 (OP → QR)** — I submit a frozen iteration for review and get `check_release_readiness` all green; a human
+  checker approves or rejects it. While in review nobody can edit it.
+- **US-04 (OP)** — Once released, any edit I attempt is refused with `PLM_LOCKED` and the remediation "open an ECO and
+  revise_item".
+- **US-05 (OP → QR)** — I draft the ECR with a reason and the ECO with proposed effectivity and disposition; a human
+  records the minor/major classification; I then revise to B and show the diff A→B.
+- **US-06 (MF)** — Given a serial number, MSN or build date, I get the applicable revision as JSON.
+- **US-07 (OP → QR)** — I propose a product baseline; the configuration manager freezes it; later I compare it with the
+  working state.
+- **US-08 (OP → QR)** — I generate the AS9102 FAI skeleton with every characteristic numbered; a quality engineer fills and
+  accepts results. For a partial FAI only the ECO-changed characteristics are listed.
+- **US-09 (MF/QR)** — Years later I verify that an archived release package is unchanged and was signed by the stated human
+  approver (works without llull: sha256sum + any RFC 8032 verifier).
+- **US-10 (OP → QR)** — I report that an item has no export-control decision; release is blocked until the export-control
+  officer records one (when policy demands it).
+- **US-11 (OP, desktop)** — Check-out locks an item so two operators (agents or people) sharing a folder cannot overwrite
+  each other.
+- **US-12 (OW)** — I get one plain sentence after each step: what the agent did, what passed, and which named human must
+  act next.
+- **US-13 (OP)** — I record the as-built configuration of serial SN-0007 including a part installed under a variance
+  (the variance itself is a human disposition) and compare it with the as-designed baseline.
 
 ## 4. Scope / out of scope
 
@@ -139,7 +150,7 @@ User stories:
 | FR-PLM-14 | MUST | Drawing title blocks of a managed item show the managed part number and revision automatically, and inconsistencies are flagged by `check_model`/`verify_release`. | One source of truth | [R6] | VC-PLM-03 |
 | FR-PLM-15 | MUST | Loading a document whose release-scope content no longer matches the recorded hash of a released revision reports an **integrity mismatch** and keeps the revision locked. | Tamper evidence (AMC 21.A.5) | [R9] | VC-PLM-13 |
 | FR-PLM-16 | MUST | `verify_release` recomputes the content hash from the release snapshot (and optionally regenerates geometry) and reports match/mismatch plus signature validity. | Configuration verification & audit | [R1] | VC-PLM-13 |
-| FR-PLM-17 | MUST | An agent (MCP/CLI) can run every PLM command except producing an approval **signature**, which needs a human-held key through the host. Agent-initiated releases are refused when `policy.humanSignatureRequired` is set (default true). | Accountability | [R19] (signature meaning, compared) | VC-PLM-22 |
+| FR-PLM-17 | MUST | **Human gate (AF-34).** An agent caller can run every PLM command that *prepares* a decision (identity, iterations, ECR/ECO drafts, revise, submit, readiness check, package preview, FAI skeleton, verification). It can **never** complete an approval act: `record_approval`, `record_signature` (approval/release meaning), `release_item`, the classification decision on an ECO, the export-marking decision, accepting a deviation/variance. These refuse agent callers with `PLM_HUMAN_GATE` and a remediation naming the human role to ask. Release additionally needs a signature from a registered human key (`policy.humanSignatureRequired`, default true, named in `plm_status` as a default). | Accountability; non-engineer loop | [R19] (signature meaning, compared); AF-34 | VC-PLM-22, VC-PLM-26 |
 | FR-PLM-18 | MUST | Every PLM command is a registry command, so it is reachable from UI, `llull` CLI and MCP with identical behaviour (L1/L5). | llull law | AR1 | VC-PLM-22 |
 | FR-PLM-19 | MUST | Every PLM mutation appears in the audit trail with actor, command, params hash, timestamp, and (V1) a hash chain linking entries. | Audit trail | [R9][R19] | VC-PLM-21 |
 | FR-PLM-20 | SHOULD | Signatures: record an Ed25519 signature (public key, signer, meaning: authorship/review/approval, timestamp) over a canonical manifest. Invalid signatures are refused. Valid ones are verifiable offline. | Data integrity, non-repudiation | [R15][R18][R19] | VC-PLM-17 |
@@ -152,77 +163,90 @@ User stories:
 | FR-PLM-27 | SHOULD | `fai_report_skeleton` produces AS9102 Forms 1–3 data (JSON/CSV) prefilled from PLM, EBOM, materials and characteristics, full or partial (characteristics changed since a baseline revision). Measured results are left empty. | AS9102 FAI | [R5] | VC-PLM-15 |
 | FR-PLM-28 | COULD | As-built records per serial with deviations (part revision installed + authority such as a variance id) and a comparison against the as-designed baseline. | As-designed vs as-built | [R34][R2] | VC-PLM-14 |
 | FR-PLM-29 | COULD | Export configuration data to STEP AP242 PDM (XML) per PDM-IF recommended practices, and an ECSS TDP manifest. | Interop | [R29][R30] | VC-PLM-24 |
-| FR-PLM-30 | COULD | Each release records the tool provenance: llull version, kernel (OCC version), document schema version, plugin versions. This supports a tool assessment argument (§8.5). | Tool assessment, A380 lesson | [R20][R21][R32] | VC-PLM-18 |
+| FR-PLM-30 | MUST | Each release records the tool provenance (AF-35): llull version, kernel (OCC version), document schema version, plugin versions. This supports a tool assessment argument (§8.5). | Tool assessment, A380 lesson | [R20][R21][R32] | VC-PLM-18 |
 | FR-PLM-31 | MUST | All PLM timestamps are supplied by the caller (host clock), never read inside commands. Re-executing a plan reproduces identical state. | Determinism (L3/L8) | llull law | VC-PLM-01 |
+| FR-PLM-33 | MUST | **Stable codes (AF-11).** Every refusal and every readiness/verification finding has a stable `PLM_*` code, the offending item/revision/ECO ids or param paths, and a one-line remediation (TECHNICAL_SPEC §7.2); exit code 1 on refusal. | operator fixes its own mistakes | AF-11 | VC-PLM-25 |
+| FR-PLM-34 | MUST | **Read-only check (AF-20).** `check_release_readiness { revision? }` returns `status` pass/warn/fail and coded findings: approvals missing, checker = author, ECO missing/closed, marking undetermined, parameter errors, title block ≠ managed identity, children unreleased, and every `reviewRequired` / `unverified` flag found in the document (other gaps' PMI, materials, analyses). The operator runs it before `submit_for_review` and reports it to the owner. `verify_release` remains the post-release check. | self-verification | AF-20 | VC-PLM-27 |
+| FR-PLM-35 | MUST | **Review and unverified propagation (AF-32/33).** `release_item` refuses while any `reviewRequired` item in the release scope is unresolved (`PLM_REVIEW_PENDING`, lists the ids, e.g. gap 03 PMI not accepted). `unverified` flags present at release are copied into the manifest (`unverified[]`) and into `plm_status`, and cannot be cleared by PLM. Every `plm_status` / readiness result says in plain words which human must act. | non-engineer loop | AF-32, AF-33, AF-36 | VC-PLM-27 |
+| FR-PLM-36 | MUST | **Named defaults and units (AF-04/10/31).** Policy defaults appear in `plm_status.data.policy` as `{value, source:'llull default', defaulted:true}`; timestamps are ISO-8601 UTC strings (`at`), sizes are `bytes`, durations `ms`, serial/MSN are integers; hashes are lowercase hex with the algorithm named. | explicit for agents | AF-04, AF-10, AF-31 | VC-PLM-01, VC-PLM-27 |
 | FR-PLM-32 | MUST | Performance: lock checks add ≤ 1 ms per command. Release of a 10 MB document takes ≤ 1 s (hash + snapshot). Verifying a 50 MB release package takes ≤ 2 s on the reference desktop. | Usability | budget | VC-PLM-19 |
 
 ## 6. Workflows
 
-### 6.1 UI (desktop, offline)
+### 6.1 CLI — the operator's workflow (primary, complete; AF-05/20/23)
 
-1. **Identify.** Item panel → "Make managed item" → enter PN, name, type. Revision A.1 appears in the status bar and the
-   title block updates.
-2. **Work.** Edit normally. "Checkpoint" (Ctrl+Shift+S) creates A.2 with a comment. The history panel shows iterations.
-3. **Submit.** "Submit for review" freezes the model (lock icon, edit tools greyed with tooltip "LL-1001 A is in review").
-4. **Review.** The checker opens the review view: diff vs the previous release, `check_model`, mass properties. "Approve
-   & sign" uses the host keystore and needs a password/OS prompt. "Reject" requires a comment.
-5. **Release.** Once approvals are complete, the CM clicks "Release". The dialog shows ECO, effectivity, marking and the
-   package contents. On confirm, the package is written to the vault and the state becomes released.
-6. **Change.** "New ECR" → "Create ECO" (classification with the 21.93 / 21.A.91 definition shown as help text, effectivity
-   cut-in, disposition) → "Revise" makes B.1 in_work → edit → submit → release. A superseded with its range closed.
-7. **Look up.** The effectivity bar takes "SN 0005" and highlights the revision B content.
-8. **Desktop vault.** File > Check out (lock) / Check in (new iteration). The vault browser lists items, revisions, states,
-   locks and the holder.
-
-### 6.2 CLI (`llull`, local agent or CI)
+`D="--doc part.llull.json"` (or `--app` on the open desktop window). Timestamps/actor (`at`, `by`) are filled by the host
+(new `--at`/`--by` defaults: host clock and configured user), so agents never invent them.
 
 ```bash
-llull --app plm_status                                   # item, revision.iteration, state, locks, open ECOs
-llull --app exec create_change_request '{"id":"ECR-0002","title":"…","reason":"…","affectedItems":["LL-1001"],"at":"…","by":"u-21"}'
-llull --app exec create_change_order  '{"id":"ECO-0002","fromRequests":["ECR-0002"],"classification":"minor","effectivity":[{"kind":"serial","from":5}],"at":"…","by":"u-7"}'
-llull --app exec revise_item '{"changeOrder":"ECO-0002","at":"…","by":"u-7"}'
-llull --app exec set_parameter '{"name":"t","expression":"5"}'
-llull --app exec plm_diff '{"from":"A","to":"B"}'
-llull --app exec submit_for_review '{"comment":"ECO-0002 implemented","at":"…","by":"u-7"}'
-llull release verify ./vault/LL-1001/B/manifest.json      # NEW host-level sub-command: hashes + signatures, no document needed
-llull --doc part.llull.json exec fai_report_skeleton '{"partNumber":"LL-1001","revision":"B","faiType":"partial","format":"csv"}' > fai.csv
+llull search release revision change order                       # discover the plm toolset (AF-01)
+llull describe release_item                                      # params, refusals, human gate (AF-02)
+llull guide                                                      # PLM section: ids, states, minimal ECO plan (AF-03)
+llull $D run validation/plans/plm_release_eco_revB.plan.json --validate --json   # whole flow checked first (step paths on error)
+# Change on a released item, prepared end to end by the agent:
+llull $D exec create_change_request '{"id":"ECR-0002","title":"Increase flange 4 -> 5 mm","reason":"SN-118 negative margin","affectedItems":["LL-1001"]}' --json
+llull $D exec create_change_order '{"id":"ECO-0002","fromRequests":["ECR-0002"],"effectivity":[{"kind":"serial","from":5}]}' --json
+#   -> no classification: an agent caller passing `classification` is refused (PLM_HUMAN_GATE); it proposes one in the ECR
+#      (`proposedClassification`) and a human records the decision with create_change_order/update in the desktop app
+llull $D exec revise_item '{"changeOrder":"ECO-0002"}' --json
+llull $D exec set_parameter '{"name":"t","expression":"5"}' --json
+llull $D plm_diff from=A to=B --json                             # what changed, per category
+llull $D check_release_readiness --json                          # pass/warn/fail with PLM_* codes (AF-20)
+llull $D render_view view=iso --save revB.png                    # look at the change (AF-22)
+llull $D export_sheet_svg sheetId=<id> --save LL-1001_B.svg      # title block shows LL-1001 rev B automatically
+llull $D exec submit_for_review '{"comment":"ECO-0002 implemented"}' --json   # last step an agent can do
+#   human gate: checker + design authority approve and sign in the desktop app; the CM releases
+llull $D verify_release revision=B --json                        # after release: hashes + signatures
+llull release verify ./vault/LL-1001/B/manifest.json             # NEW host sub-command, no document needed
+llull $D exec fai_report_skeleton '{"partNumber":"LL-1001","revision":"B","faiType":"partial","reason":"ECO-0002","format":"json"}' --json
 ```
 
-`exec <command> '<json>'` is the existing one-command form (`run` takes a plan file). `release verify` and the `--at`/`--by` /
-`--sign-with` flags are new CLI surface (TECHNICAL_SPEC §7). `--at`/`--by` default to the host clock and the configured user, so agents do not invent timestamps. Release from CLI
-prompts for the signing key unless `--sign-with <keyref>` is given. It is refused in non-interactive agent mode when
-`humanSignatureRequired`.
+`exec <command> '<json>'` is the existing one-command form (`run` takes a plan file). `release verify`, `vault …`,
+`audit verify` and the `--at`/`--by`/`--sign-with` flags are new CLI surface (TECHNICAL_SPEC §7). An agent call to
+`release_item`, `record_approval` or an approval `record_signature` is refused with `PLM_HUMAN_GATE`; the agent then tells
+the owner which human role must act.
 
-### 6.3 MCP agent (cloud)
+### 6.2 MCP agent (cloud)
 
-1. The agent reads `plm_status`, then `resolve_effectivity`, then `plm_diff`.
-2. It drafts ECR/ECO and implements the change (`revise_item` + model commands), and runs `check_model` and
-   `mass_properties`.
-3. It calls `submit_for_review`. The tool result says "awaiting human approval (signature required)".
-4. A human approves in the UI. The agent can then call `verify_release` and `fai_report_skeleton`.
+Same commands as tools of the `plm` toolset (a view, `@mcp/toolsets`): `plm_status` → `resolve_effectivity` →
+`plm_diff`; draft ECR/ECO; `revise_item` + model commands; `check_model`, `mass_properties`, `check_release_readiness`;
+`submit_for_review` returns "awaiting human approval (signature required)". After a human releases, the agent can call
+`verify_release` and `fai_report_skeleton`. `release_item` and `record_signature` are annotated `destructiveHint`.
 
-The `plm` toolset is exposed as a view (`@mcp/toolsets`). `release_item` and `record_signature` are annotated
-`destructiveHint` (irreversible business event).
+### 6.3 UI — review and approval surface (the human gates)
+
+1. **Status.** Item panel shows PN, rev.iteration, state, lock icon and the readiness findings the agent produced.
+2. **Review.** The checker opens the review view: diff vs the previous release, `check_release_readiness`, mass
+   properties, the agent's summary. "Approve & sign" uses the host keystore (password/OS prompt). "Reject" requires a
+   comment.
+3. **Classify.** On an ECO, a human picks minor/major (21.93 / 21.A.91 definition shown as help text) with justification.
+4. **Release.** The CM confirms ECO, effectivity, marking and package contents; the package is written to the vault.
+5. **Desktop vault.** File > Check out / Check in; vault browser lists items, revisions, states, locks and holders.
+Authoring through the UI is possible (same commands) but is not the primary path.
 
 ## 7. Acceptance criteria
 
-| # | Given | When | Then | VC |
-| - | ----- | ---- | ---- | -- |
-| AC-01 | a document without PLM data | `set_item_identity {partNumber:"LL-1001"}` | item LL-1001 rev A.1 in_work; featureHistory length unchanged | VC-PLM-01 |
-| AC-02 | rev A in_review | `add_box` | refused, document unchanged, summary names item, revision and state | VC-PLM-02 |
-| AC-03 | rev A in_review with checker approval by another user | `release_item` | released; contentHash = SHA-256(JCS(release scope)); title block revision "A" | VC-PLM-03 |
-| AC-04 | sample_document.json as rev A content | release | contentHash = `7e3943fb…f3c24f` (vectors/hash_vectors.json) | VC-PLM-16 |
-| AC-05 | rev A released | `set_parameter t=5` | refused | VC-PLM-03 |
-| AC-06 | rev A released, ECO-0002 open listing LL-1001 | `revise_item` | rev B.1 in_work, basedOn A; A still released with an unchanged hash | VC-PLM-05 |
-| AC-07 | B released under ECO-0002 effectivity serial ≥ 5 | `resolve_effectivity serial 4` / `5` | A / B | VC-PLM-06, VC-PLM-07 |
-| AC-08 | rev A superseded | `set_lifecycle_state in_work` | refused (not an allowed transition) | VC-PLM-08 |
-| AC-09 | released file edited outside llull | `load_document` | loads, reports "content hash mismatch", revision stays locked | VC-PLM-13 |
-| AC-10 | manifest signed with RFC 8032 TEST 1 key | verify | true. Tampered revision A→B: false | VC-PLM-17 |
-| AC-11 | baseline BL-PBL-0003 with LL-1003 C; LL-1003 revised to D | `compare_baselines` | one changed member LL-1003 C→D (in_work) | VC-PLM-11 |
-| AC-12 | sheet with ballooned characteristics, ECO-0002 changed t | `fai_report_skeleton partial` | Form 3 lists only changed characteristics; results null | VC-PLM-15 |
-| AC-13 | an MCP agent session | `release_item` with `humanSignatureRequired` | refused with "human approval signature required" | VC-PLM-22 |
-| AC-14 | item marked `undetermined`, `policy.requireMarking` | `submit_for_review` | refused until marking is decided | VC-PLM-20 |
-| AC-15 | two desktop instances on the same vault | B checks out an item that A holds | refused with the holder's name; A's check-in releases the lock | VC-PLM-23 |
+All criteria run as CLI scripts with `--json` and compare against `validation/expected_results.json` (AF-23). `D` as in §6.1.
+
+| # | Invocation | JSON assertion | VC |
+| - | ---------- | -------------- | -- |
+| AC-01 | `llull $D exec set_item_identity '{"partNumber":"LL-1001","name":"Bracket","itemType":"part"}' --json` on a document without PLM data | `plm_status.data.item` = LL-1001 rev A, `iterations` 1, state in_work; featureHistory length unchanged | VC-PLM-01 |
+| AC-02 | rev A in_review: `llull $D exec add_box '{"size":[10,10,10]}' --json` | exit 1, `data.error.code` `PLM_LOCKED`, document unchanged, summary names item, revision, state | VC-PLM-02 |
+| AC-03 | rev A in_review, human approvals recorded: `release_item` from the UI (human caller) | released; `contentHash` = SHA-256(JCS(release scope)); title block revision "A" | VC-PLM-03 |
+| AC-04 | `sample_document.json` as rev A content, released | `contentHash` = `7e3943fb…f3c24f` (vectors/hash_vectors.json) | VC-PLM-16 |
+| AC-05 | rev A released: `llull $D exec set_parameter '{"name":"t","expression":"5"}' --json` | `PLM_LOCKED`, remediation contains "revise_item" | VC-PLM-03 |
+| AC-06 | ECO-0002 open listing LL-1001: `llull $D exec revise_item '{"changeOrder":"ECO-0002"}' --json` | rev B.1 in_work, basedOn A; A released with unchanged hash | VC-PLM-05 |
+| AC-07 | B released under ECO-0002 (serial ≥ 5): `llull $D resolve_effectivity kind=serial unit=4 --json` / `unit=5` | `data.revision` A / B | VC-PLM-06, VC-PLM-07 |
+| AC-08 | rev A superseded: `exec set_lifecycle_state '{"revision":"A","state":"obsolete",…}'` allowed; `state:"in_work"` | the latter: `invalid params — state` | VC-PLM-08 |
+| AC-09 | released file edited outside llull: `llull $D exec load_document json=@tampered.json --json` (or open the file) | loads; summary contains "content hash mismatch"; next edit `PLM_LOCKED` | VC-PLM-13 |
+| AC-10 | `node validation/verify_vectors.mjs` | 22 PASS, exit 0; tampered manifest false | VC-PLM-17 |
+| AC-11 | baseline BL-PBL-0003 with LL-1003 C; LL-1003 revised to D: `compare_baselines from=BL-PBL-0003 to=WORKING --json` | `data.changed` = [LL-1003 C→D (in_work)] | VC-PLM-11 |
+| AC-12 | `exec fai_report_skeleton '{…"faiType":"partial"…}' --json` | Form 3 lists only changed characteristics; `results` null | VC-PLM-15 |
+| AC-13 | agent caller: `exec release_item '{…}' --json` with `humanSignatureRequired` | exit 1, `PLM_HUMAN_GATE`, remediation names the roles to ask; document unchanged | VC-PLM-22, VC-PLM-26 |
+| AC-14 | item `undetermined`, `policy.requireMarking`: `exec submit_for_review` | `PLM_MARKING_UNDECIDED` | VC-PLM-20 |
+| AC-15 | two desktop instances on one vault: B checks out an item A holds | `PLM_VAULT_LOCKED` naming the holder; A's check-in frees it | VC-PLM-23 |
+| AC-16 | `check_release_readiness --json` on a document with an unaccepted gap-03 PMI item and an `unverified` material | `status` fail; findings `PLM_REVIEW_PENDING` (PMI id) and warning `PLM_UNVERIFIED_INPUT`; human release then refused with `PLM_REVIEW_PENDING` | VC-PLM-27 |
+| AC-17 | deliberately wrong calls (unknown ECO, bad PN, revise without ECO) | codes `PLM_ECO_UNKNOWN`, `PLM_PN_INVALID`, `PLM_ECO_REQUIRED`, each with remediation | VC-PLM-25 |
 
 ## 8. Standards & regulatory alignment
 
@@ -303,10 +327,12 @@ llull records a human classification and prints the user's notice. It never dete
 | R-4 | Key management (lost keys, shared keys) | Keys live in the OS keystore or a smart card via the host. Public keys are registered per user in the vault. Revocation list in the vault (V1) |
 | R-5 | File-share locking is unreliable (SMB/NFS) | Lock file with atomic create plus a lease and holder id. "Steal lock" needs CM role and is audited. Git-LFS-style server lock API in V2 [R23] |
 | R-6 | Undo/redo vs irreversible release | Release is undoable only until persisted to the vault; after that the store refuses undo of the release step (S2-09) |
+| R-7 | An agent operator completes an approval act, or a non-engineer owner believes the agent's preparation is an approval | Human gate on every approval act (`PLM_HUMAN_GATE`, FR-PLM-17), release signatures only from registered human keys, `nextHumanAction` in every status, release blocked by `PLM_REVIEW_PENDING`; local CLI caller kind is self-declared, so the signature requirement is the hard barrier (TR-PLM-16) |
 | A-1 | One llull document = one managed top item. Components may become sub-items (V1) | Revisit for multi-part documents |
 | A-2 | AS9102 field names come from public supplier guides; numbering not verified | Verify with the purchased AS9102C before a production gate |
 | A-3 | CAD tools do not need DO-330 qualification when outputs are independently verified (inference, §8.5) | Confirm with a DER/CVE on the first certification project |
 | A-4 | Revision letter exclusions (I,O,Q,S,X,Z) come from secondary sources | Scheme configurable; default can change without data migration |
+| A-5 | The primary operator is an AI agent on the CLI; the owner is not an engineer; qualified humans hold every approval act (`../AGENT_FIRST.md`) | — |
 
 ## 11. References
 

@@ -238,6 +238,8 @@ def main() -> int:
         "members": members,
         "documentContentHash": sd["release_scope_canonical_sha256"],
         "tool": {"name": "llull", "version": "TBD", "kernel": "occt", "schemaVersion": 2},
+        "reviewRequired": [],
+        "unverified": [],
     }
     body_canon = canonical(manifest_body)
     manifest_hash = sha256_hex(body_canon.encode())

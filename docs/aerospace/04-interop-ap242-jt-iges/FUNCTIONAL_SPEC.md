@@ -64,18 +64,28 @@ carry IGES data, visualization and digital-mock-up chains still use JT (ISO 1430
 
 ## 3. Personas & user stories
 
+Operator model: [`../AGENT_FIRST.md`](../AGENT_FIRST.md) (authoritative).
+
+| Id | Persona | Surface | In this gap |
+| -- | ------- | ------- | ----------- |
+| P1 | **Operator (primary)** — AI agent (Claude Code or similar) | `llull` CLI (`--doc` headless / `--app` on the desktop window); MCP for cloud agents | imports, verifies, exports and archives exchange files; ends every job with `verify_exchange_file` |
+| P2 | **Owner** — the person who asked (supplier owner, MRO planner, small design office); **not assumed to be an engineer** | natural language to the agent | wants "read the OEM file, add my part, send it back in the format they asked for"; reads a plain-language result: what was done, what passed, what needs a human |
+| P3 | **Qualified reviewer** — only where a delivery, archive or certification record is involved (design engineer of the supplier, quality / archive authority, OEM interface) | desktop review surfaces, the agent's JSON report | decides on red / unverified GVP, accepts a delivery or archive package, signs releases (09 PLM) |
+
 | Id | Persona | Story |
 | -- | ------- | ----- |
-| US-1 | Supplier design engineer (Alice) | As a supplier, I open the OEM's AP242 file and get exact solids, the assembly tree, names, colours and the 3D PMI, so I can design my bracket against the real interface. |
-| US-2 | Alice | When I import, llull tells me in green/yellow/red whether the volume, area and centroid it recomputes match what the sender wrote, so I know the model was not corrupted. |
-| US-3 | Alice | I deliver my part as AP242 with validation properties and PMI, and the OEM's CATIA/NX reads it without a remark. |
-| US-4 | Quality engineer (Bruno) | I run one CLI command on a folder of received files and get a JSON verification report per file (schema, GVP deltas, PMI counts, unsupported items). |
-| US-5 | Archivist (Chen) | I create a LOTAR-style archive package (AP242 + manifest + checksums + GVP + verification report), and years later I re-verify it with the same command. |
-| US-6 | MRO engineer (Dana) | I import a 1990s IGES surface model of a fairing, sew it into a solid when possible, and see which faces did not close. |
-| US-7 | Legacy-data owner | I export a llull part as IGES 5.3 for a machine shop whose CAM only reads IGES. |
-| US-8 | DMU reviewer | I load a JT visualization file next to my llull part to check clearances (COULD). |
-| US-9 | Metrology engineer | I export my toleranced part's characteristics to QIF for the CMM (COULD, V2). |
-| US-10 | AI agent (Claude via CLI/MCP) | I call `verify_exchange_file` and `geometric_validation_properties` and decide whether a supplier delivery is acceptable, with numbers I can cite. |
+| US-1 | P1 | I run `import_step_exact` on the OEM AP242 file and get exact solids, the assembly tree, names, colours (and PMI in V1) as entities and components I can address by id. |
+| US-2 | P1 | The import returns, per solid, sender GVP vs recomputed GVP with deltas, units and a green / yellow / red band in `data`, so I can decide without engineering judgement whether to continue or stop and ask. |
+| US-3 | P1 | I export AP242 with validation properties (`export_step_ap242 … --save`) and immediately run `verify_exchange_file` on my own file; a red self-check stops the export with a code. |
+| US-4 | P1 | I run one `verify_exchange_file --json` per received file in a loop and get a machine-readable report (schema, units, GVP deltas, PMI census, unsupported items, codes); exit code 1 on red. |
+| US-5 | P1 → P3 | I prepare a LOTAR-style archive package (AP242 + manifest + checksums + GVP + report) and re-verify it years later with the same command; **accepting** it into an archive or release is the reviewer's act, not mine. |
+| US-6 | P1 | I import a 1990s IGES surface model, sew it into a solid when possible, and get the open shells and untranslated entity types as counts and codes. |
+| US-7 | P1 | I export a part as IGES 5.3 for a shop whose CAM only reads IGES, with a round-trip GVP self-check. |
+| US-8 | P1 | I load a JT file (via a converter port) next to the part to check clearances numerically (COULD, V2). |
+| US-9 | P1 | I export toleranced characteristics to QIF for the CMM (COULD, V2). |
+| US-10 | P2 | I get one sentence per delivery: "imported 3 solids, GVP green; exported AP242 with validation properties; nothing needs a human" — or the exact item that needs a qualified engineer. |
+| US-11 | P1 | When the sender's GVP is missing, zero or disagrees, every result computed from that geometry says `unverified` and `reviewRequired`, so I never present it as checked. |
+| US-12 | P3 | Only I can accept a delivery that contains red / unverified bodies or accept an archive package as the record; the agent prepares and I decide. |
 
 ## 4. Scope / out of scope
 
@@ -112,63 +122,91 @@ carry IGES data, visualization and digital-mock-up chains still use JT (ISO 1430
 | FR-XCH-20 | COULD (V2) | Map AP242 composite ply data (gap 06) and kinematic joints (llull joints) on import/export. | AP242 ed. 2+ domains; CAx-IF composites RP v4.4 | [R15] |
 | FR-XCH-21 | MUST | All capabilities are commands reachable identically from UI, `llull` CLI and MCP; read-only checks are query commands. | llull L1/L5 | `.claude/rules/architecture.md` |
 | FR-XCH-22 | MUST | Works offline on the desktop app (bundled OCC/CPython); no network call. | KI6 product direction | KI6 |
+| FR-XCH-23 | MUST | Every refusal and check finding of an XCH command carries a stable code (`XCH_*`, and `KRN_*` for the import core owned by 01), the offending ids / file / product / property and a one-line remediation naming the next command; exit code 1 on refusal or red. | AF-11 | AGENT_FIRST AF-11 |
+| FR-XCH-24 | MUST | `verify_exchange_file` (file-level) and `geometric_validation_properties` (document-level) are the read-only check commands of this gap and return pass / warn / fail lists with codes; every XCH workflow ends with `verify_exchange_file` on the file just read or written. | AF-20 | AGENT_FIRST AF-20 |
+| FR-XCH-25 | MUST | Units: every numeric param states its unit; every GVP number in `data` carries its unit (`volumeUnit`, `areaUnit`, `lengthUnit`, or suffix); the file's length unit and the conversion factor applied are reported. | AF-04, AF-10 | AGENT_FIRST AF-04/AF-10 |
+| FR-XCH-26 | MUST | Named defaults and provenance: the GVP band policy (green 1e-3, yellow 1e-2 / 1 mm), schema (AP242), tessellation (off) and IGES sewing tolerance are returned as `{ value, unit, source, defaulted }`; import provenance (file sha256, schema, originating system, sender GVP) and export provenance (llull version, kernel, timestamp param) are in `data`. | AF-31, AF-35 | AGENT_FIRST AF-31/AF-35 |
+| FR-XCH-27 | MUST | Geometry whose GVP check is red or not checkable (no / placeholder sender GVP, `verify: false`) is marked `unverified` in `doc.exchange.provenance`; the flag propagates into 01 `mass_properties` (`import_gvp_red`, `import_gvp_not_checkable`), into `export_step_ap242` / archive manifests, and `verify_exchange_file` reports it as a warning that cannot be hidden. | AF-32 | AGENT_FIRST AF-32 |
+| FR-XCH-28 | MUST | Import reports with a yellow / red / not-checkable band, exports that contain unverified bodies, and every archive package carry `reviewRequired: { value: true, reasons }`, and the summary says "computed by llull, not approved — needs a qualified engineer". | AF-33, AF-36 | AGENT_FIRST AF-33/AF-36 |
+| FR-XCH-29 | MUST (V1) | Human gates: delivering a file that contains red / unverified bodies (`export_step_ap242 { acceptUnverified: true }`) and accepting an archive package as the record (09 PLM `release_item`, `humanSignatureRequired`) cannot be completed by an agent caller (`XCH_HUMAN_GATE`). | AF-34 | AGENT_FIRST AF-34; 09 PLM |
+| FR-XCH-30 | SHOULD | Large imports report progress (`--progress`), respect `--timeout`, re-use content-hash caches; `import_step_exact` / `import_iges` work under `--dry-run`; a missing external converter (JT) is reported with `XCH_CONVERTER_MISSING` and an install hint. | AF-40, AF-41, AF-42 | AGENT_FIRST AF-40/41/42 |
 
 ## 6. Workflows
 
-### 6.1 UI (desktop)
+The CLI is the product surface (AGENT_FIRST §1): one plan file, validated, run, checked, rendered and exported with
+real `llull` syntax. MCP calls the same commands. The desktop UI is where the owner watches and the qualified
+reviewer approves.
 
-1. **Receive** — File › Import › STEP/IGES… → file picker. Import dialog: target (new document / append), "sew
-   surfaces" (IGES), "verify validation properties" (on by default).
-2. llull shows the assembly tree (Assembly panel), the solids, and a **Validation** badge per product:
-   green / yellow / red. Clicking it opens the report table: property, sender value, llull value, delta, band.
-3. PMI (V1) appears in the PMI panel of gap 03; unmapped items listed under "Not imported".
-4. **Deliver** — File › Export › STEP AP242… dialog: schema (AP242 default, AP214, AP203), include validation
-   properties (on), include PMI (on when present), tessellation (off / alongside / only), assembly (structured / flat).
-5. After export llull re-reads its own file (self-check) and shows the same green/yellow/red report.
-6. **Archive** (V1) — File › Archive package… → choose folder → package written with manifest and report;
-   File › Verify archive… re-checks it.
-
-### 6.2 CLI (`llull`, local agent and CI)
+### 6.1 CLI — receive, modify, deliver (operator, complete)
 
 ```bash
-llull import_step_exact file=supplier_ap242.stp verify=true --app            # exact B-rep + GVP check (live in the app)
-llull verify_exchange_file file=supplier_ap242.stp --json                    # read-only report, no document change
-llull geometric_validation_properties --doc part.llull --json                # volume / area / centroid / bbox per solid
-llull export_step_ap242 includeValidationProperties=true --save part.stp --doc part.llull
-llull export_iges --save part.igs --doc part.llull
-llull import_iges file=fairing_1994.igs sew=true --doc legacy.llull
-llull create_archive_package --save archive/PN-12345-A --doc part.llull       # V1 (multi-file result → directory)
-llull verify_archive_package dir=archive/PN-12345-A --json                     # V1 (dir= read by the CLI host, TECHNICAL_SPEC §7)
+llull status                                                        # --app if the desktop app is open, else --doc
+llull verify_exchange_file file=in/oem_ap242.stp --json             # read-only: schema, unit, census, sender GVP; no document change
+llull import_step_exact file=in/oem_ap242.stp verify=true --dry-run --json --doc part.llull   # try first (AF-42)
+llull import_step_exact file=in/oem_ap242.stp verify=true --progress --json --doc part.llull
+# → data.gvpCheck.band "green" | "yellow" | "red" | "not-checkable", per-product comparisons with units,
+#   data.reviewRequired, codes XCH_GVP_* ; red/unverified → stop and tell the owner (US-10)
+llull run plans/my-bracket.json --validate --doc part.llull          # the supplier's own part as a plan (aliases, =expr)
+llull run plans/my-bracket.json --progress --doc part.llull
+llull geometric_validation_properties --json --doc part.llull        # volume / area / centroid / bbox per solid, with units
+llull render_view view=iso --save out/part.png --doc part.llull      # look at the result (AF-22)
+llull export_step_ap242 '{"includeValidationProperties":true}' --save out/part_ap242.stp --doc part.llull
+llull verify_exchange_file file=out/part_ap242.stp --json            # self-check of the delivered file: band green, exit 0
+llull export_iges --save out/part.igs --doc part.llull               # legacy CAM, optional
 ```
 
-Exit code is non-zero when a verification report contains a red item, so CI can gate deliveries.
+Legacy IGES: `llull import_iges file=fairing_1994.igs sew=true --json --doc legacy.llull` → `data.openShells`,
+`data.untranslated` counts, codes `XCH_IGES_OPEN_SHELL` / `XCH_IGES_UNTRANSLATED`.
 
-### 6.3 MCP agent
+Archive (V1): `llull create_archive_package '{"partNumber":"PN-12345","revision":"A","timestamp":"2026-10-15T00:00:00Z"}'
+--save archive/PN-12345-A --doc part.llull` (multi-file result → directory), later
+`llull verify_archive_package dir=archive/PN-12345-A --json` → pass / fail with codes. Accepting the package as the
+record is a human gate (FR-XCH-29, 09 PLM).
 
-1. `verify_exchange_file { stepBase64 | path }` → structured report (schema, units, products, GVP comparisons, PMI
-   census, unsupported entities).
-2. Agent decides: on green, `import_step_exact` (undoable) and continues the design; on yellow, explains the deltas
-   to the user with the numbers; on red, stops and asks.
-3. Delivery: `export_step_ap242` → `verify_exchange_file` on the result (self-check) → returns the file.
+Exit code 1 when a verification report contains a red item or a refusal, so CI and agent loops can gate on it.
+
+### 6.2 MCP agent (cloud)
+
+1. `verify_exchange_file { stepBase64 | text }` → structured report (schema, units, products, GVP comparisons, PMI
+   census, unsupported entities, codes).
+2. On green: `import_step_exact` (undoable) and continue; on yellow: explain the deltas to the owner with the numbers;
+   on red / not-checkable: stop and ask for a qualified reviewer (`reviewRequired`).
+3. Delivery: `export_step_ap242` → `verify_exchange_file` on the result (self-check) → return the file.
+
+### 6.3 UI — review and approval surface
+
+The desktop app shows the assembly tree, a Validation badge per product (green / yellow / red) and the report table
+(property, sender value, llull value, delta, band) computed by the same commands. Reviewer acts: accept a delivery that
+contains red / unverified bodies, accept an archive package as the record (human gates, FR-XCH-29). File › Import /
+Export / Archive dialogs are conveniences that dispatch the same commands; none is required for any XCH capability.
 
 ## 7. Acceptance criteria
 
-| Id | Given | When | Then | VC |
-| -- | ----- | ---- | ---- | -- |
-| AC-1 | the nine analytic parts of `validation/analytic_gvp_reference.json` built from their plans | `export_step_ap242` then `import_step_exact` | every solid's volume, area, centroid, bbox equal the analytic values within 1e-9 relative and the pre-export values within 1e-9 relative | VC-XCH-01 |
-| AC-2 | the drilled plate with an offset hole | exported to AP242 | the file holds a 'geometric validation property' with volume 113716.81469282041, area 19028.31853071796, centroid x −1.3813228334244487 (mm), read back by an OCC-independent parser | VC-XCH-02 |
-| AC-3 | any llull-written AP242 file | analysed by NIST SFA | 0 syntax errors; FILE_SCHEMA starts with `AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF` | VC-XCH-03, VC-XCH-17 |
-| AC-4 | a component instanced twice | exported and re-imported | 1 product, 2 occurrences, assembly volume 2000 mm³, centroid (50, 0, 0) | VC-XCH-04 |
-| AC-5 | the pinned NIST AP242 parts with GVP | imported | each recomputed GVP is green (≤ 1e-3 relative / ≤ 1e-3 bbox diagonal) against the embedded value; STC-06's zero placeholders are reported "not checkable" and the import succeeds; CTC-02 e2 and STC-08 e3, whose embedded GVP disagree with their geometry (measured by 01 KRN), are reported red with both values and still imported | VC-XCH-05 |
-| AC-6 | NIST CTC-02 in AP203 and AP242 | both analysed | llull reproduces the cross-CAD spread (1.12e-4 volume, −4.93e-4 area, 0.0181 mm centroid) and classifies both green | VC-XCH-06 |
-| AC-7 | NIST CTC-01 AP242 | imported with PMI (V1) | every census record is mapped or explicitly listed as unsupported: 3 DATUM, 2 DATUM_SYSTEM, 9 DIMENSIONAL_SIZE, 2 DIMENSIONAL_LOCATION, 1 ANGULAR_LOCATION, tolerance records 1 FLATNESS, 1 PERPENDICULARITY, 2 POSITION, 2 SURFACE_PROFILE | VC-XCH-07 |
-| AC-8 | a toleranced llull part (gap 03) | exported to AP242 and re-imported (V1) | the PMI is identical and SFA's semantic PMI report has no error | VC-XCH-08 |
-| AC-9 | NIST FTC-08 tessellated file | imported | one non-empty mesh body is created (never "zero geometry") | VC-XCH-09 |
-| AC-10 | OCCT `bearing.iges` / `hammer.iges` | imported | ≥ 213 / ≥ 45 faces; untranslated entity types reported | VC-XCH-10 |
-| AC-11 | the drilled plate and L-bracket | IGES export → import | GVP within 1e-6 relative of analytic | VC-XCH-11 |
-| AC-12 | an inch document / inch file | exported / imported into mm | values scale by 25.4^k exactly within tolerance | VC-XCH-12 |
-| AC-13 | an archive package of the L-bracket | re-verified | checksums match; GVP 56000 mm³ / 14800 mm² / (25, 20, 20) within 1e-9 relative; report "pass" | VC-XCH-13 |
-| AC-14 | a truncated STEP file | imported | document unchanged, `affected: []`, summary naming the cause (e.g. `import_step_exact: unreadable STEP …`; the `… rejected: invalid params` form is only for schema failures) | VC-XCH-14 |
+Phrased as CLI invocations with JSON assertions (AF-23). `ER(VC)` = the case in `validation/expected_results.json`;
+`≈` = within its tolerance; `$K` = `--kernel occt` for local `--doc` runs.
+
+| Id | Given | When (CLI) | Then (JSON assertion) | VC |
+| -- | ----- | ---------- | --------------------- | -- |
+| AC-1 | the nine analytic plans | `llull run validation/plans/<p>.json $K --doc t.llull`; `llull geometric_validation_properties --json`; `llull export_step_ap242 --save t.stp`; `llull import_step_exact file=t.stp --json --doc r.llull`; GVP again | `.data.items[*]` ≈ `analytic_gvp_reference.json` (1e-9 rel) and re-import ≈ pre-export (1e-9 rel) | VC-XCH-01 |
+| AC-2 | the drilled plate with an offset hole | `llull export_step_ap242 '{"includeValidationProperties":true}' --save p.stp`; `python3 -I extract_validation_properties.py p.stp` | one 'geometric validation property' set with volume 113716.81469282041, area 19028.31853071796, centroid x −1.3813228334244487 (mm) ≈ `ER(VC-XCH-02)` | VC-XCH-02 |
+| AC-3 | any llull-written AP242 file | `llull verify_exchange_file file=p.stp --json`; NIST SFA | `.data.schemaName` starts with `AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF`; SFA 0 syntax errors | VC-XCH-03, VC-XCH-17 |
+| AC-4 | `plans/xch-assembly-2x.json` | export → `import_step_exact … --json` | `.data.products` length 1, occurrences 2; assembly volume 2000 mm³, centroid (50, 0, 0) | VC-XCH-04 |
+| AC-5 | pinned NIST AP242 parts with GVP | `llull import_step_exact file=<f> verify=true --json $K` | `.data.gvpCheck.band == "green"` except the knownIssue entries of `ER(VC-XCH-05)` (CTC-02 e2, STC-08 e3 → `"red"`, code `XCH_GVP_RED`, exit 0, geometry imported); STC-06 → `"not-checkable"` | VC-XCH-05 |
+| AC-6 | NIST CTC-02 AP203 + AP242 | `verify_exchange_file --json` on both (no kernel) | sender-to-sender spread reproduces 1.12e-4 / −4.93e-4 / 0.0181 mm (1e-12 rel) | VC-XCH-06 |
+| AC-7 | NIST CTC-01 AP242 (V1) | `import_step_exact … --json` with PMI | every census record of `ER(VC-XCH-07)` mapped or listed with `XCH_PMI_UNMAPPED` | VC-XCH-07 |
+| AC-8 | toleranced llull part (V1) | export → import | PMI identical; SFA semantic PMI report clean | VC-XCH-08 |
+| AC-9 | NIST FTC-08 tessellated file (V1) | `import_step_exact … tessellated=true --json` | one non-empty mesh body; never "zero geometry" | VC-XCH-09 |
+| AC-10 | OCCT `bearing.iges` / `hammer.iges` | `llull import_iges file=<f> --json $K` | ≥ 213 / ≥ 45 faces; `.data.untranslated` counts | VC-XCH-10 |
+| AC-11 | plate and L-bracket | `export_iges --save` → `import_iges --json` | GVP ≈ analytic (`igesRoundTrip`, 1e-6) | VC-XCH-11 |
+| AC-12 | inch box; FTC-09 AP203 (inch) | export / `import_step_exact` into a mm document | values scale by 25.4^k: inch box ≈ `ER(VC-XCH-12)` (1e-9), FTC-09 band `green`; CTC-05 band `red` | VC-XCH-12 |
+| AC-13 | archive package of the L-bracket (V1) | `create_archive_package … --save dir`; `verify_archive_package dir=… --json` | `.data.band == "pass"`; checksums match; GVP 56000 mm³ / 14800 mm² / (25, 20, 20) (1e-9) | VC-XCH-13 |
+| AC-14 | truncated / garbage / oversize file | `llull import_step_exact file=<bad> --json` | exit 1, `affected: []`, document unchanged; code `KRN_STEP_UNREADABLE` / `XCH_FILE_TOO_LARGE` with remediation | VC-XCH-14 |
+| AC-15 | deliberately wrong calls | each in `ER(VC-XCH-21)` | exit 1; `.data` code and remediation as listed | VC-XCH-21 |
+| AC-16 | STC-06 (placeholder GVP) imported, then measured | `import_step_exact … --json`; `llull mass_properties entityId=<id> --json` | provenance `unverified: true` (`import_gvp_not_checkable`); `mass_properties` `.data.unverified.reasons` contains `import_gvp_not_checkable`; `verify_exchange_file` warning `XCH_GVP_NOT_CHECKABLE` | VC-XCH-22 |
+| AC-17 | CTC-02 e2 import; any archive package | `import_step_exact … --json`; `create_archive_package … --json` | `.data.reviewRequired.value == true` (reasons `import_gvp_red`, `archive_record`); summary contains "needs a qualified engineer" | VC-XCH-23 |
+| AC-18 | a document with a red-band body, agent caller | `llull export_step_ap242 '{"acceptUnverified":true}' --save x.stp --json` | exit 1, `XCH_HUMAN_GATE`, `x.stp` not written | VC-XCH-24 |
+| AC-19 | any export / import | `--json` | `.data.policy.greenRel == {value: 1e-3, source: …, defaulted: true}`; `.data.schema == {value: "ap242", defaulted: true}`; `.data.provenance` (sha256, originating system, kernel version) present | VC-XCH-25 |
+| AC-20 | NIST CTC-02 AP242 (largest, 637 faces) | `import_step_exact … --dry-run --json`; `--progress` | dry run `.changed == false`, document untouched; progress lines per stage | VC-XCH-26 |
 
 ## 8. Standards & regulatory alignment
 
@@ -192,6 +230,7 @@ Exit code is non-zero when a verification report contains a red item, so CI can 
 | Semantic PMI mapped (NIST CTC/FTC/STC, V1) | ≥ 90 % of census records mapped, 100 % accounted for | VC-XCH-07 |
 | IGES sample import | 100 % of root faces translated | VC-XCH-10 |
 | Import time, 2 MB AP242 part on desktop | ≤ 5 s (TECHNICAL_SPEC §8) | perf test |
+| Agent operability | 100 % of XCH VCs run unattended as CLI scripts (`--json`, exit codes, no UI); every refusal / finding carries an `XCH_*` / `KRN_*` code | VC-XCH-20, VC-XCH-21, production-gate agent driver |
 
 ## 10. Risks & assumptions
 
@@ -203,6 +242,7 @@ Exit code is non-zero when a verification report contains a red item, so CI can 
 | Thresholds: CAx-IF does not publish one pass threshold in what we could verify; the 1 % / 1 mm figures are a CATIA default [R14] | Over/under-strict checks | Configurable bands; defaults justified by measured cross-CAD spread (VC-XCH-06) |
 | JT has no open-source OCC reader (OCC's open DE wrapper lists STEP, IGES, OBJ, STL, PLY, glTF, VRML only) [R9] | JT stays COULD | External converter port, like DWG |
 | CAx-IF/MBx-IF, ISO, NIST web pages could not be fetched from this session (DNS/proxy) | Some facts rest on search-engine extracts | Marked in `validation/sources.md`; re-verify before implementation |
+| Operator and owner have no engineering judgement (AGENT_FIRST §1) | a red / unverified exchange could be delivered or archived as if checked | bands, `unverified`, `reviewRequired` in `data` (FR-XCH-26..28); human gates for delivery of unverified bodies and archive acceptance (FR-XCH-29); `verify_exchange_file` at the end of every workflow (FR-XCH-24) |
 | Topological naming (KI5) | PMI links to faces lost after edit | PMI attaches through gap-03 references; re-import resolves by geometry |
 
 ## 11. References

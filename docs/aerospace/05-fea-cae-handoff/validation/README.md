@@ -16,7 +16,7 @@ Tolerances are **llull acceptance choices**, explained per case. No source claim
 | File | Kind | Content |
 | ---- | ---- | ------- |
 | `generate_fea_analytic.py` | generator | Writes the four analytic files below. |
-| `fea_analytic_expected.json` | (b) | VC-FEA-10…14 and 20…22: cantilever deflection/stress/moment, natural frequencies, Euler buckling, SS-plate buckling, Kirsch Kt, margin-of-safety table, von Mises tensors, unit conversion. Each case has value, unit, tolerance, derivation, source ids and cross-checks against CalculiX. |
+| `fea_analytic_expected.json` | (b) | VC-FEA-10…14, 20…22 and 60…65: cantilever deflection/stress/moment, natural frequencies, Euler buckling, SS-plate buckling, Kirsch Kt, margin-of-safety table, von Mises tensors, unit conversion, and the agent-first result contract (named factors, `reviewRequired`, human gate, unverified propagation, error codes). Each case has value, unit, tolerance, derivation, source ids and cross-checks against CalculiX. |
 | `cantilever_modes.csv` | (b) | Clamped-free roots βnL (n = 1…6) and frequency ratios. |
 | `kirsch_hole_profile.csv` | (b) | σxx/S along the transverse axis (y/a = 1…10), and the hoop stress on the hole edge versus θ. |
 | `plate_buckling_k.csv` | (b) | k_min(a/b) and the number of half-waves for a simply supported plate in uniaxial compression, a/b = 0.2…5.0. |
@@ -63,7 +63,7 @@ bundled CPython (Gmsh) and CalculiX, unless the Gate column says otherwise.
 | VC-FEA-14 | FR-FEA-17, 21 | `plans/fea_plate_hole_kirsch.plan.json`: quarter plate, W/d = 10, 100 MPa remote tension. | σxx(0, a) = 3 × 100 = **300 MPa** (gross Kt = 3). The profile along y follows `kirsch_hole_profile.csv` for y/a ≤ 3. | 5 % at the hole edge, 3 % on the profile | (b) [S21] | integration |
 | VC-FEA-15 | FR-FEA-11, 12; TR-FEA-40, 41 | Export the beamp model as `.inp` and `.bdf`. | `.inp`: CalculiX 2.2x exits 0 and the result matches VC-FEA-10. `.bdf`: pyNastran `read_bdf(xref=True)` passes. Card counts: GRID = nodes, CTETRA = elements, MAT1 = 1, PSOLID = 1, SPC1 ≥ 1, FORCE = loaded nodes. Σ FORCE = (0, 9, 0) N. | exact / 1e-9 | [S14, S30] | integration (CI Python) |
 | VC-FEA-16 | FR-FEA-13 | Parse the pinned `beamp.frd.ref`, `beamf.frd.ref` and `simplebeam.frd.ref` [S30]. | beamp: 261 nodes, mean tip U2 = 0.0876111. beamf: 10 PMODE blocks. simplebeam: node 1 U1 = 9.22015e-2. | exact (string → float) | (c) | unit (fixture download) |
-| VC-FEA-17 | FR-FEA-17 | VC-FEA-14 result rendered with field = von Mises and deformation ×100. | Legend max equals the max nodal von Mises (data). Screenshot diff against the golden image is ≤ 1 % of pixels. | — | — | e2e (Playwright) |
+| VC-FEA-17 | FR-FEA-17, 17b | VC-FEA-14 result rendered with field = von Mises and deformation ×100. | Legend max equals the max nodal von Mises (data). Screenshot diff against the golden image is ≤ 1 % of pixels. | — | — | e2e (Playwright) |
 | VC-FEA-18 | FR-FEA-14 | Read an OP2 written by a Nastran-compatible solver from the VC-FEA-15 BDF. | TBD: measure with pyNastran on an OP2 produced by MYSTRAN or a licensed Nastran (fixture to be produced and pinned). | — | TBD | integration (optional) |
 | VC-FEA-19 | FR-FEA-15 | Export VTU of the VC-FEA-10 results. Read it back with meshio. | Same node count, and point data `displacement` and `von_mises` present. | exact | [S13] | integration |
 | VC-FEA-20 | FR-FEA-18 | `compute_margins` with allowable/limit pairs from `fea_analytic_expected.json` and FoS 1.5. | MS = 0.0, 0.5, 0.0, −0.0666667. A negative MS is flagged `FAIL`. | 1e-9 | (b) [S1, S2] | unit |
@@ -82,10 +82,35 @@ bundled CPython (Gmsh) and CalculiX, unless the Gate column says otherwise.
 | VC-FEA-43 | FR-FEA-09 | Run the pinned `simplebeam.inp`. | Tip ux = 0.0922015 (1-element result, not analytic). | 1e-4 rel | (c) | integration |
 | VC-FEA-44 | FR-FEA-04 | Run the pinned `shell1.inp` and `shellf.inp`, then parse. | TBD: values extracted by the M3 parser and frozen. | 1e-4 rel | (c) | integration |
 | VC-FEA-28 | FR-FEA-22; TR-FEA-33 | Call `record_fe_mesh` / `record_fea_results` through `execute` with (i) a hash absent from the artifact store, (ii) a real hash but an edited summary (node count + 1), (iii) the genuine summary. | (i) and (ii) no-op with "artifact not found" / "summary mismatch". (iii) accepted. | exact | — | unit (fake artifact port) |
+| VC-FEA-60 | FR-FEA-31, 37; TR-FEA-90 | `llull compute_margins analysisId=$an --json` on the VC-FEA-20 rows with no factors given. | `data.factors` deep-equals `fea_analytic_expected.json` VC-FEA-60 (`ultimate` 1.5 from 14 CFR 25.303, `defaulted: true`; `yield` 1.0). | exact | (b) [S1, S1a] | unit + CLI |
+| VC-FEA-61 | FR-FEA-18, 32, 37 | Same call. | Every row matches VC-FEA-61 (unit-suffixed `appliedMPa`/`allowableMPa`, `ms`, `status`, `reviewRequired: true` with `reviewReason`, `disposition`). `data.reviewRequired` is true and `summary` contains "not approved". | ms 1e-9 abs; rest exact | (b) | unit + CLI |
+| VC-FEA-62 | FR-FEA-33, 35 | `llull check_analysis analysisId=$an --json` after VC-FEA-61. | `data.status: "fail"`; codes `FEA_MS_NEGATIVE`, `FEA_DISPOSITION_PENDING`, `FEA_MARGINAL_BAND_UNSET`. | exact | — | unit + CLI |
+| VC-FEA-63 | FR-FEA-33; TR-FEA-91 | Agent runs `llull dispose_margin analysisId=$an rowId=r4 decision=accepted justification="…" --json` (no human signature). | Exit 1, `data.code: "FEA_HUMAN_GATE"`, document hash unchanged, row r4 still `pending_human`. | exact | — | unit + CLI |
+| VC-FEA-64 | FR-FEA-34 | VC-FEA-61 set-up with E taken from a gap 08 record at basis `typical` (`unverified`). | Margin rows and results summary carry `unverified: true` with the reason; `check_analysis` has warning `FEA_MATERIAL_UNVERIFIED`. The mesh summary stays unflagged (it does not use the material). | exact | — | unit |
+| VC-FEA-65 | FR-FEA-36 | The nine deliberately wrong set-ups listed in VC-FEA-65 of the JSON. | Each: exit 1, the listed `data.code`, non-empty `data.remediation`, `data.ids` or `data.path`. | exact | TECHNICAL_SPEC §7.1 | unit + CLI |
 | VC-FEA-50 | FR-FEA-22 | VC-FEA-10, then `set_parameter` length = 10. | Results marked `stale`. `compute_margins` refuses stale results with a summary naming the changed recipe. | exact | — | golden |
 | VC-FEA-51 | FR-FEA-23 | Run the same plan through UI dispatch, `llull --doc plan.json`, and MCP `build_project`. | Identical document hash and identical deck sha256. | exact | — | integration (server tests) |
 | VC-FEA-52 | FR-FEA-28 | Desktop package. | `ccx` and the gmsh module are present. `resources/licenses/{CalculiX,Gmsh}` contain the GPL text, plus a source offer or source archive. The About box lists them. | exact | [S10, S30] | desktop tests |
 | VC-FEA-53 | FR-FEA-09, 16; TR-FEA-80 | LE10, tet10, about 50k nodes, on the reference machine. | Mesh plus solve plus import in under 60 s. TBD: measure on the CI desktop runner and freeze. | — | TBD | production gate |
+
+## CLI harness (AF-23)
+
+Every VC runs unattended as a script; no UI is involved except VC-FEA-17 (screenshot) and the human-gate check of VC-FEA-63
+(which asserts that the agent path is refused). Pattern, with `D="--doc case.llull.json --kernel occt --json"`:
+
+```bash
+an=$(llull run plans/fea_cantilever_static_beamp.plan.json $D | jq -r '.data.steps[] | select(.command=="create_analysis") | .affected[0]')
+llull fea_mesh analysisId=$an $D --timeout 300 > mesh.json
+llull check_analysis analysisId=$an $D > check.json            # must not contain severity "error"
+llull fea_solve analysisId=$an $D --timeout 900 > solve.json
+llull fea_report analysisId=$an $D > report.json               # probe "tip" u_y vs VC-FEA-10.a (2 %)
+llull compute_margins analysisId=$an $D > margins.json         # VC-FEA-60/61 shape
+python3 -I compare.py report.json fea_analytic_expected.json VC-FEA-10.a   # value, tolerance, unit
+```
+
+The comparison script (M4, `server/tests`) reads `value`, `tolerance_rel`/`tolerance_abs` and `unit` from
+`fea_analytic_expected.json`, and the reference numbers of `calculix_reference_cases.json` / `nafems_benchmarks.json`. Exit codes
+are asserted too (0 on success, 1 with `data.code` on the refusal cases).
 
 ## How the gates run (proposal)
 

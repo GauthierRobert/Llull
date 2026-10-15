@@ -36,7 +36,7 @@ Regenerate and re-check:
 
 ```bash
 cd docs/aerospace/09-plm-configuration-traceability/validation
-python3 -I generate_vectors.py      # prints: ok: 5a70caa2…0696 (manifest hash)
+python3 -I generate_vectors.py      # prints: ok: 444ca1de…f43a (manifest hash)
 node verify_vectors.mjs             # 22 x PASS, exit 0
 ```
 
@@ -51,6 +51,11 @@ node verify_vectors.mjs             # 22 x PASS, exit 0
 | EASA AMC 21.A.5: records protected against alteration and tampering, kept for operational life | [R9] | Tamper detection on load (S2-10), signed immutable package verifiable without llull (VC-PLM-17/18), hash-chained audit (VC-PLM-21) |
 
 ## 3. Validation cases
+
+Every case runs unattended as a CLI script (AF-23): `llull $D run <plan> --json` or `llull $D exec <command> '<json>' --json`
+(`D="--doc v.llull.json"`; scenario steps are the same calls), then a comparison of `data` / `data.error.code` / exit code with
+`expected_results.json`. Scenario steps run as a human caller unless stated; agent-caller cases say so. Only VC-PLM-18/23
+(desktop host) and VC-PLM-24 (external checker) need more than the CLI.
 
 Tolerances are exact unless stated. "Source" is (a) a cited standard/source, (b) a derivation, or (c) TBD with the measuring tool.
 
@@ -72,14 +77,17 @@ Tolerances are exact unless stated. "Source" is (a) a cited standard/source, (b)
 | VC-PLM-14 | As-built vs as-designed | S3 4 | one difference LL-1003 C (designed) vs B (built) with authority RFV-0012 | (b) | FR-28 |
 | VC-PLM-15 | Characteristic accountability & FAI skeleton | S3 5–6 + `as9102_field_mapping.csv` | balloons stable across regenerate; partial FAI lists only ECO-changed characteristics; results null; Form 1 PN/rev filled | [R5] (secondary for field names) | FR-26, 27 |
 | VC-PLM-16 | Canonical hash | `vectors/hash_vectors.json` in Python and JS | SHA-256("abc") = `ba7816bf…f20015ad`; sample scope `7e3943fb…f3c24f` (1551 B); after camera/selection/key-order change: same; after t = 5: `c913cadc…91017e` | [R17] (a); (b) | FR-06; TR-06, 17 |
-| VC-PLM-17 | Ed25519 signatures | `vectors/ed25519_vectors.json`; S2-12 | RFC 8032 TEST 1–3 verify; manifest signature `6cabcd28…cbde0f01` verifies; 4 negatives fail; `record_signature` with bit-flipped signature refused; test keys refused by the production trust store | [R15] (a), [R18] | FR-20; TR-07, 19 |
+| VC-PLM-17 | Ed25519 signatures | `vectors/ed25519_vectors.json`; S2-12 | RFC 8032 TEST 1–3 verify; manifest signature `78343a41…1b5f460c` verifies; 4 negatives fail; `record_signature` with bit-flipped signature refused; test keys refused by the production trust store | [R15] (a), [R18] | FR-20; TR-07, 19 |
 | VC-PLM-18 | Release package | write package for S1 rev A; verify with `sha256sum` + `verify_vectors.mjs`-style verifier; flip one byte | all members match the manifest; flipped byte → member mismatch; manifest `documentContentHash` = revision contentHash; tool provenance present | (b); [R22] intent | FR-21, 30 |
 | VC-PLM-19 | Performance | `tests/perf/plm.bench.ts` | guard ≤ 1 ms p95; release 10 MB ≤ 1 s; package verify 50 MB ≤ 2 s | (c) TBD, measure with vitest bench on the reference desktop | FR-32 |
 | VC-PLM-20 | Export marking | S1 step 2 variant with `regime:'undetermined'` + `requireMarking` | submit refused; with a regime set, the statement appears in sheet SVG and manifest `marking` | [R12][R14] (data types); decision is human | FR-25 |
 | VC-PLM-21 | Audit chain | run S1 through the server; edit one audit line | `llull audit verify` passes on the original, fails at the edited line; rotation keeps the chain | [R9] | FR-19 |
-| VC-PLM-22 | Surface parity & agent gate | run S1 via CLI (`--doc`) and via MCP; compare final `plm` (id-normalized); agent `release_item` | identical state; agent release refused with "human approval signature required"; `toToolSchemas()` snapshot lists plm tools | llull L1/L5 | FR-17, 18; TR-15, 16 |
+| VC-PLM-22 | Surface parity & agent gate | run S1 via CLI (`llull --doc v.llull.json run plans/plm_release_eco_revB.plan.json --json`, human caller) and via MCP; compare final `plm` (id-normalized); agent `release_item` | identical state; agent release refused with "human approval signature required"; `toToolSchemas()` snapshot lists plm tools | llull L1/L5 | FR-17, 18; TR-15, 16 |
 | VC-PLM-23 | Vault locks | two desktop sessions on one vault folder | second check-out refused naming the holder; lease expiry + audited break | [R23] (lock semantics reference) | FR-22 |
 | VC-PLM-24 | Neutral PDM export (V2) | AP242 XML configuration export of S3 baseline | passes PDM-IF recommended-practice checks | (c) TBD, measure with the PDM-IF/CAx-IF validation tools [R29] | FR-29 |
+| VC-PLM-25 | Stable codes + remediation | `llull $D exec create_change_order '{"id":"ECO-9","fromRequests":["ECR-404"]}' --json`; `exec set_item_identity '{"partNumber":"bad pn!","name":"x","itemType":"part"}'`; `exec revise_item '{}'` on a released rev without ECO; S2-01/02/04/06/12 | codes `PLM_ECO_UNKNOWN`, `PLM_PN_INVALID`, `PLM_ECO_REQUIRED`, `PLM_STATE_TRANSITION`, `PLM_CHECKER_IS_AUTHOR`, `PLM_LOCKED`, `PLM_SIGNATURE_INVALID`; each with ids/paths and remediation; exit 1 | TECHNICAL_SPEC §7.2 | FR-33; TR-14 (AF-11) |
+| VC-PLM-26 | Human gate (agent caller) | S1 replayed with caller = agent; S2-13 | identity → `submit_for_review` succeed; `record_approval`, approval `record_signature`, classification on `create_change_order`, `release_item` refused with `PLM_HUMAN_GATE`, document unchanged; `plm_status.data.nextHumanAction` names the roles | AF-34 | FR-17; TR-16 (AF-34) |
+| VC-PLM-27 | Readiness check, review & unverified propagation | `check_release_readiness --json` on rev A in_review with one unaccepted gap-03 PMI item and an `unverified` material; then human `release_item` (S2-14) | `status` "fail"; findings `PLM_REVIEW_PENDING` (PMI id) + warning `PLM_UNVERIFIED_INPUT`; release refused `PLM_REVIEW_PENDING`; after review accepted, release succeeds and manifest `unverified[]` lists the material; `plm_status.data.policy.humanSignatureRequired.defaulted` true | AF-20, AF-31, AF-32, AF-33 | FR-34, 35, 36 |
 
 ## 4. Scenario runner contract (for the implementer)
 

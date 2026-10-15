@@ -106,18 +106,35 @@ seeded Monte Carlo of 200 000 samples).
 
 ## 3. Personas & user stories
 
-| Persona | Story id | As a … I want … so that … |
-| --- | --- | --- |
-| Design engineer (P1) | US-GDT-01 | define datums A/B/C on faces of my part and add FCFs (flatness, position, profile …) with material condition modifiers, so that the model carries the requirement, not just the shape |
-| P1 | US-GDT-02 | set size tolerances (± / limits / fit code text) on holes and shafts measured from the B-rep, so that nominal values are never typed twice |
-| P1 | US-GDT-03 | see PMI in 3D on annotation planes and switch between saved views, so that reviewers read the requirement in context |
-| P1 | US-GDT-04 | have the drawing sheet show the PMI whose annotation plane faces each view, so that MBD and the drawing never diverge (model + drawing method of Y14.41 / ISO 16792 [R2][R4]) |
-| Tolerance analyst (P2) | US-GDT-05 | build a 1D stack from PMI or typed contributors and get worst-case, RSS and seeded Monte Carlo results with % out of spec, so that I can justify tolerances |
-| Supplier quality / inspector (P3) | US-GDT-06 | open a customer's AP242 file offline and list every semantic PMI item with the face it controls, so that I can plan CMM inspection (D6-51991 §7.5 duty [R23]) |
-| P3 | US-GDT-07 | run a PMI check that flags malformed or incomplete callouts (undefined datum, modifier on a non-size feature, unreferenced feature), so that I can query the customer early |
-| Data/PLM engineer (P4) | US-GDT-08 | export semantic PMI in STEP AP242 and verify it with NIST SFA, so that downstream CAx tools receive the same requirements |
-| AI agent (P5, MCP/CLI) | US-GDT-09 | call the same commands (`add_geometric_tolerance`, `analyze_stackup`, `list_pmi` …) through MCP or `llull`, so that an agent can tolerance a part or audit a supplier model |
-| Programme manager (P6) | US-GDT-10 | export a TDP-style package (AP242 + SVG/PDF sheets + manifest) with revision data, so that deliveries follow the MIL-STD-31000B structure (V2) [R22] |
+Operating model: [`../AGENT_FIRST.md`](../AGENT_FIRST.md) (authoritative). The **operator** is an AI agent driving the
+`llull` CLI (`--doc` headless or `--app` on the open desktop window; MCP for cloud agents). The **owner** asks the agent for
+a result and is not assumed to be an engineer. A **qualified reviewer** (design engineer with GD&T competence, checker,
+supplier-quality authority) is involved only where tolerances become a release or inspection contract.
+
+| Persona | Who | Surface | Responsibility in this gap |
+| --- | --- | --- | --- |
+| **OP** Operator (primary) | CLI / MCP agent | `llull search/describe`, plan files, `run --validate`, `check_pmi`, `list_pmi`, `analyze_stackup`, `render_view --save` | Builds the part and its PMI from the owner's intent or a supplier file, checks it, explains it |
+| **OW** Owner | Non-engineer requester (startup founder, buyer, programme assistant) | Talks to the agent; may watch the desktop app | States the goal ("make this bracket inspectable", "will these spacers fit?"), accepts plain-language results |
+| **QR** Qualified reviewer | GD&T-competent engineer / checker / supplier quality | Desktop review surface (3D PMI, sheets), `check_pmi` report, release (gap 09) | Approves every tolerance an agent proposed before it becomes a contract (AF-33/AF-34) |
+
+**Key risk.** An AI operator choosing tolerances is plausible-looking but unqualified engineering. Therefore every PMI item
+created by an agent caller carries `reviewRequired: true` with a reason until a qualified reviewer accepts it
+(`accept_pmi_review`, human gate), and `check_pmi` refuses nothing silently: every malformed or doubtful frame is a coded
+finding (TECHNICAL_SPEC §7.2).
+
+| Story id | As … I want … so that … |
+| --- | --- |
+| US-GDT-01 (OP) | define datums A/B/C on faces addressed by points (`facesNear`) and add FCFs with material modifiers through one plan file, so that the model carries the requirement, not just the shape |
+| US-GDT-02 (OP) | set size tolerances on holes and shafts whose nominal llull measures from the B-rep, so that I never type a nominal that disagrees with the model |
+| US-GDT-03 (OP) | read every PMI item as JSON (`list_pmi --json`: text, faces, plane, units) and look at it in a PNG (`render_view --save`), so that I can verify placement without a UI |
+| US-GDT-04 (OP) | export a drawing sheet whose views show the PMI and get `data.pmi.placed/skipped`, so that MBD and drawing never diverge |
+| US-GDT-05 (OP for OW) | run `analyze_stackup` (worst case, RSS, seeded Monte Carlo) and get numbers with units, method and probability of interference, so that I can answer "will it fit?" in one sentence the owner understands |
+| US-GDT-06 (OP) | import a customer AP242 file offline and list every semantic PMI item with the face it controls, so that a supplier's inspection plan can be drafted (D6-51991 §7.5 duty [R23]) |
+| US-GDT-07 (OP) | run `check_pmi` and get coded errors/warnings with remediation, so that I can fix malformed callouts myself before anyone sees them |
+| US-GDT-08 (OP) | export STEP AP242 with semantic PMI and have it checked by NIST SFA in CI, so that downstream CAx tools receive the same requirements |
+| US-GDT-09 (OW) | get a plain-language summary ("4 tolerances proposed by the agent, not yet approved by an engineer"), so that I know what still needs a qualified person |
+| US-GDT-10 (QR) | review the agent's proposed PMI on the desktop (3D, sheet, `check_pmi` report) and accept or reject each item, so that only reviewed tolerances become a contract |
+| US-GDT-11 (OP) | export a TDP-style package (AP242 + sheets + manifest) with revision data (V2) [R22] |
 
 ## 4. Scope / out of scope
 
@@ -155,8 +172,8 @@ seeded Monte Carlo of 200 000 samples).
 | FR-GDT-10 | MUST | General tolerance / title-block note stored in the PMI model (free text, e.g. a class reference); llull never computes values from a paywalled general-tolerance table | ISO 2768-1 is paywalled [R7] | [R7] |
 | FR-GDT-11 | MUST | `check_pmi` read-only query: reports errors (undefined datum referenced, duplicate datum label, feature not resolvable after replay, modifier invalid for feature, datum reference frame repeats a datum, size tolerance with lower > upper, form tolerance with datum reference) and warnings (feature with no PMI on a fully-dimensioned-required part, dangling saved view refs); returns structured `data` | US-GDT-07; NIST found PMI errors in commercial CAD [R17] | [R17] |
 | FR-GDT-12 | MUST | `list_pmi` read-only query: every PMI item with id, kind, text rendering ("⌖ Ø0.3 Ⓜ A B C"), feature faces (indices + surface types), datum refs, status | inspection planning, AI agents | US-GDT-06/09 |
-| FR-GDT-13 | MUST | 3D presentation: each PMI item has an annotation plane (auto-chosen from the feature normal/axis, overridable) and a position; the viewport renders FCF frames, datum symbols, leaders on that plane | Y14.41 / ISO 16792 annotation planes [R2][R4] | [R2][R4] |
-| FR-GDT-14 | MUST | Saved views: named camera + set of visible PMI (+ optional section and entity filter); `create_saved_view`, `update_saved_view`, `delete_saved_view`, `activate_saved_view` | Y14.41 / ISO 16792 saved views; NIST files carry `CAMERA_MODEL_D3` views | census, [R2][R4] |
+| FR-GDT-13 | SHOULD | 3D presentation for the qualified reviewer: each PMI item has an annotation plane (auto-chosen from the feature normal/axis, overridable) and a position; the viewport renders FCF frames, datum symbols, leaders on that plane. **CLI equivalent (MUST, AF-21/22):** `list_pmi` returns plane origin/normal/xDir (model units) and position per item; `render_view … --save view.png` draws the PMI so a multimodal agent can see it | Y14.41 / ISO 16792 annotation planes [R2][R4] | [R2][R4] |
+| FR-GDT-14 | MUST | Saved views: named camera + set of visible PMI (+ optional section and entity filter); `create_saved_view`, `update_saved_view`, `delete_saved_view`, `activate_saved_view`; all CLI-callable (needed for AP242 exchange and for the reviewer's review views) | Y14.41 / ISO 16792 saved views; NIST files carry `CAMERA_MODEL_D3` views | census, [R2][R4] |
 | FR-GDT-15 | MUST | Drawing integration: a sheet view shows PMI whose annotation plane is parallel to the view plane (`pmiMode: auto`), or an explicit list; `export_sheet_svg` renders FCFs, datum feature symbols, size/location callouts and surface texture symbols in paper mm at the view scale; `data` reports which PMI were placed and which were skipped (and why) | model + drawing method; existing drawings feature | `packages/core/src/commands/drawings` |
 | FR-GDT-16 | MUST | Tolerance stack-up query `analyze_stackup`: 1D linear (sensitivities ±1 or any real coefficient) and non-linear expression of named contributors; methods worst-case (arithmetic), RSS, Monte Carlo (normal or uniform per contributor, seed, sample count); outputs nominal, mean, min/max, half-tolerance, σ, probability outside spec limits, per-contributor % contribution | US-GDT-05 | validation `stackup_reference.json` |
 | FR-GDT-17 | MUST | Monte Carlo is deterministic for a given seed and sample count (document-independent PRNG), and bounded (max samples) | replay/purity L3, testability | arch L3 |
@@ -166,73 +183,82 @@ seeded Monte Carlo of 200 000 samples).
 | FR-GDT-21 | SHOULD (V1) | Export STEP AP242 with semantic PMI (desktop, OCP XCAF writer); the result is accepted by NIST SFA with its semantic PMI report listing every llull PMI item | US-GDT-08 | [R18][R11] |
 | FR-GDT-22 | SHOULD (V1) | Composite FCF (pattern-locating / feature-relating segments), multiple single-segment FCFs, datum targets (point/line/area), all-around / all-over / between indicators | present in NIST FTC files (all-around, placed datum targets) | census |
 | FR-GDT-23 | SHOULD (V1) | ISO 14405-1 size specification modifiers (envelope Ⓔ, two-point LP, Gaussian GG …) stored as data and rendered | ISO GPS default independency | [R6] (catalogue) |
-| FR-GDT-24 | SHOULD | Units: PMI values in document units (mm/inch), surface texture in µm (or µin under ASME); conversions exact | aerospace mixed units | — |
+| FR-GDT-24 | MUST | Units (AF-04/AF-10): every numeric param states its unit in the schema description (document length unit, `deg` for angles, `um`/`uin` for surface texture); every `data` number carries its unit (field suffix or `unit` field); conversions exact | aerospace mixed units; operator cannot see the UI's unit display | AF-04, AF-10 |
 | FR-GDT-25 | COULD (V2) | Graphical PMI (AP242 presentation: annotation planes, tessellated annotation occurrences) exported alongside semantic PMI | SFA viewer shows graphic PMI; OCC writer writes semantic only (forum report) [R27] | [R27] |
 | FR-GDT-26 | COULD (V2) | TDP bundle export: AP242 + sheets (SVG/PDF) + JSON manifest (part number, revision, PMI standard, file hashes) | MIL-STD-31000B TDP structure [R22] | [R22] |
 | FR-GDT-27 | COULD (V2) | Tolerance-zone visualisation in 3D (envelope of the zone around the feature) | review aid | — |
-| FR-GDT-28 | MUST | Every PMI capability is a registered command reachable from UI, MCP and CLI (`llull --app` / `--doc`); read-only queries are side-effect-free MCP tools | L1, L5, KI6 | arch L1, KI6 |
+| FR-GDT-28 | MUST | Every PMI capability is a registered command reachable from CLI (`llull --app` / `--doc`, `search`, `describe`), MCP and UI; descriptions are written for an agent (units, refusals, next command); everything fits in one `build_project` plan checkable with `run --validate`; read-only queries are side-effect-free | L1, L5, KI6 | arch L1, KI6; AF-01, AF-02, AF-05 |
 | FR-GDT-29 | MUST | PMI is preserved by save/load (document JSON), undo/redo, live sync, `build_project` plans, and is dropped with a clear summary when its solid is deleted (dependents) | persistence/history contracts | arch L8 |
-| FR-GDT-30 | SHOULD | PMI requires an exact-topology kernel (OCC) for feature resolution; under Manifold the commands no-op with an explicit summary ("requires the OCC kernel") | KI5: Manifold has no topology | KI5 |
+| FR-GDT-30 | SHOULD | PMI requires an exact-topology kernel (OCC) for feature resolution; under Manifold the commands no-op with code `GDT_KERNEL_NO_TOPOLOGY` and remediation "rerun with --kernel occt" | KI5: Manifold has no topology | KI5 |
+| FR-GDT-31 | MUST | **Review flag (AF-33).** Every PMI item carries `review: { required, reason, acceptedBy?, acceptedAt? }`. Items created or edited by an agent caller, and items imported from AP242, start with `required: true` ("tolerance proposed by an AI operator — not approved by a qualified engineer" / "imported — not verified against the customer drawing"). `list_pmi`, `check_pmi` (warning `GDT_REVIEW_REQUIRED`), `export_sheet_svg` (sheet note) and `analyze_stackup` (when a contributor is linked to such an item) report it; the summary says it in plain words | an AI operator is not a qualified GD&T author | AF-33 |
+| FR-GDT-32 | MUST | **Human gate (AF-34).** `accept_pmi_review { pmiIds, decision: 'accept'\|'reject', comment }` clears or keeps the flag; it is refused for agent callers (`GDT_REVIEW_HUMAN_ONLY`). A gap-09 release refuses a document with unreviewed PMI | approval of tolerances is an engineering act | AF-34; gap 09 FR-PLM-17 |
+| FR-GDT-33 | MUST | **Stable codes (AF-11).** Every refusal and every `check_pmi` finding has a stable code (`GDT_*`), the offending PMI ids / param paths and a one-line remediation naming the command to call; exit code 1 on refusal | operator must fix its own mistakes | AF-11, AF-20 |
+| FR-GDT-34 | MUST | **Unverified propagation (AF-32).** `unverified: true` (+ reason) marks: imported items whose feature did not resolve (`unresolved_mesh`) or whose enum was unmapped; checks run without a customer rule table (built-in logic only); stack-up contributors typed by hand with `verified: false`. The flag propagates into `analyze_stackup` results and `check_pmi` warnings (`GDT_UNVERIFIED_INPUT`), never hidden | non-engineer loop | AF-32 |
+| FR-GDT-35 | MUST | **Provenance and named defaults (AF-31/AF-35).** Computed values carry `provenance` (measured faces + kernel for sizes; method, formula id, inputs, PRNG and seed for stack-ups); defaults are named in the result (`sigmaPerHalfTolerance: {value: 3, source: 'llull default: ±3σ per half tolerance', defaulted: true}`, `samples`, `tolFace`); no general tolerance is ever defaulted | explainability to owner and reviewer | AF-31, AF-35 |
+| FR-GDT-36 | SHOULD | `llull guide` gains a GD&T section (units, `facesNear` contract, minimal plate plan) and query results carry a one-sentence owner summary: done / passed / needs a human (AF-03, AF-36) | agent onboarding | AF-03, AF-36 |
 
 ## 6. Workflows
 
-### 6.1 UI (desktop, OCC kernel)
+### 6.1 CLI — the operator's workflow (primary, complete; KI6, AF-05/20/22/23)
 
-1. Model the part (existing commands). Open the **PMI** panel (new; lists `listCommands()` entries of the `pmi` toolset).
-2. Choose the standard (ASME Y14.5-2018 / ISO GPS) and type the general tolerance note → `set_pmi_standard`.
-3. Pick a face → **Datum** → letter (next free proposed) → `add_datum_feature`.
-4. Pick one or more cylindrical faces → **Size** → tolerance type → `add_size_dimension` (nominal shown from the B-rep, read-only).
-5. Pick a face or a size dimension → **Tolerance** → characteristic, value, Ø, modifier, datums (dropdown of defined datums, ordered) → `add_geometric_tolerance`. Invalid combinations are greyed out client-side and rejected server-side.
-6. Drag the annotation on its plane (→ `update_pmi` with a new position) or change its plane.
-7. Save a view (camera + visible PMI) → `create_saved_view`; switch views from the panel → `activate_saved_view`.
-8. Run **Check PMI** → `check_pmi`; errors list clickable PMI ids.
-9. Sheet: `create_sheet` with views, toggle "show PMI" → `update_sheet { pmiMode: 'auto' }`; export SVG.
-10. File > Export > STEP AP242 with PMI (V1) → `export_step_ap242 { includePmi: true }` (command specified by gap 04 XCH; GDT supplies the PMI stage).
-
-### 6.2 CLI (`llull`, local agent — KI6)
+`D="--doc plate.llull.json --kernel occt"` (or `--app` to work in the open desktop window, OCC kernel on desktop).
 
 ```bash
-llull search tolerance datum                                     # discover the new pmi toolset
-llull describe add_geometric_tolerance                           # params schema (zod-derived)
-llull --app run validation/draft_plan_gdt_plate.json --validate  # dry-run the plan
-llull --app run validation/draft_plan_gdt_plate.json             # build part + PMI live in the window
-llull --app check_pmi --json                                     # structured errors/warnings
-llull --app list_pmi --json > pmi.json
-llull --doc part.llull.json --kernel occt analyze_stackup @su01.json   # WC / RSS / MC numbers
-llull --doc part.llull.json --kernel occt export_step_ap242 includePmi=true --save part_ap242.stp   # gap 04 command
+llull search tolerance datum                                  # discover the pmi toolset (AF-01)
+llull describe add_geometric_tolerance                        # params + units + refusals (AF-02/04)
+llull guide                                                   # GD&T section: units, facesNear contract, minimal plan (AF-03)
+llull $D run validation/draft_plan_gdt_plate.json --validate --json   # dry check of the whole plan, step paths on error
+llull $D run validation/draft_plan_gdt_plate.json --json --progress   # part + datums + sizes + FCFs + texture + view + sheet
+llull $D check_pmi --json                                     # pass/warn/fail, codes GDT_*, remediation (AF-11/20)
+llull $D list_pmi --json > pmi.json                           # text, faces, plane, units, review/unverified flags
+llull $D render_view view=top --save top.png                  # look at the PMI (AF-22)
+llull $D export_sheet_svg sheetId=<aliases.sheet from the run report> --save plate_sheet.svg
+llull $D run validation/draft_plan_stackup_su01.json --json   # WC / RSS / MC with units + provenance
+llull $D export_step_ap242 includePmi=true --save plate_ap242.stp      # V1, command of gap 04 (GDT supplies the PMI stage)
 ```
-(Sub-commands and flags are the existing ones of `server/src/cli/usage.ts`: `search`, `describe`,
-`run <plan> [--validate]`, `<command> [params]`, `--app`, `--doc`, `--kernel`, `--save`, `--json`.
-Only the command names are new.)
 
-### 6.3 MCP agent (cloud)
+The operator ends every job with `check_pmi` and reports to the owner in plain words: what was built, what passed, and
+that agent-proposed tolerances still need a qualified reviewer (`reviewRequired`, FR-GDT-31). Exit code 1 means a step
+was refused; the JSON names the code, the PMI id / param path and the remediation. Supplier intake (V1):
+`llull $D import_step_exact file=customer.stp --json` (gap 01 command; AP242 PMI transport gap 04; GDT PMI stage) →
+`list_pmi --json` (inspection-plan rows) → `check_pmi --json` (questions to the customer; imported items are
+`reviewRequired` and, when unresolved, `unverified`).
 
-1. `describe_scene` → find the solid. 2. `inspect_topology` → faces with surface type, centroid/axis (from the gap 01 face-query port, TR-GDT-03).
-3. `add_datum_feature` ×3 → `add_size_dimension` → `add_geometric_tolerance` … 4. `check_pmi` until no errors.
-5. `analyze_stackup` for the critical clearance. 6. `create_sheet` + `update_sheet {pmiMode:'auto'}` → `export_sheet_svg`.
-All tools are views of the same registry (L5); hidden tools remain callable via `execute`.
+### 6.2 MCP agent (cloud)
 
-### 6.4 Supplier import (V1)
+Same commands as tools of the `pmi` toolset (`search_tools` / `enable_toolset`): `describe_scene` → `inspect_topology`
+→ `build_project` with the plate plan → `check_pmi` until no errors → `analyze_stackup` → `create_sheet` +
+`update_sheet {pmiMode:'auto'}` → `export_sheet_svg`. Hidden tools remain callable via `execute` (L5).
 
-`import_step_exact` (gap 01; AP242 PMI transport by gap 04; GDT's PMI stage) → solids + PMI in one transaction → `list_pmi` → inspection plan table;
-`check_pmi` → questions to the customer.
+### 6.3 UI — review and approval surface (qualified reviewer)
+
+The desktop app shows the operator's work live (`--app`): PMI panel listing items with their `check_pmi` codes and
+review state, 3D annotation planes and saved views, sheets with PMI. The reviewer accepts or rejects each agent-proposed
+item (`accept_pmi_review`, human gate) and may adjust placement (`update_pmi`). Authoring in the UI is possible (same
+commands) but is not the primary path.
 
 ## 7. Acceptance criteria
 
-| AC | Given | When | Then | VC |
-| --- | --- | --- | --- | --- |
-| AC-GDT-01 | the plate of `draft_plan_gdt_plate.json` on OCC | the plan is applied | 3 datums A/B/C, 2 size dimensions (4X Ø6.6–6.9 measured nominal 6.6 ±1e-6; Ø20 +0.021/0), 4 FCFs, 1 surface texture, 1 saved view exist; `check_pmi` returns 0 errors | VC-GDT-01 |
-| AC-GDT-02 | the same document | the plate thickness parameter is changed and history replays | all PMI items still resolve to the same logical faces (bottom face, hole walls) and `check_pmi` returns 0 errors | VC-GDT-02 |
-| AC-GDT-03 | `draft_plan_gdt_rejections.json` | each action executes | each invalid PMI action is a no-op whose summary names the reason (duplicate label, undefined datum D, MMC on plane, zero tolerance, point not on any face) | VC-GDT-03 |
-| AC-GDT-04 | any PMI command | run twice from the same input | input document deep-equal before/after (is pure); same output | VC-GDT-04 |
-| AC-GDT-05 | the plate sheet with `pmiMode:'auto'` | `export_sheet_svg` | the TOP view contains the hole-pattern FCF ("⌖ Ø0.3 Ⓜ A B C" rendered as frame + glyph paths) and the FRONT view contains the flatness FCF; `data.pmi.placed` lists them per view; nothing overflows | VC-GDT-10/11 |
-| AC-GDT-06 | NIST CTC/FTC/STC AP242 files (pinned) | `import_step_exact` with PMI stage (V1) | per file, counts of geometric tolerances by characteristic, dimensional size/location, datums and datum systems equal `nist_pmi_census.json` | VC-GDT-20 |
-| AC-GDT-07 | the plate | `export_step_ap242 { includePmi: true }` then NIST SFA (CLI) | SFA semantic PMI report lists 4 geometric tolerances, 2 size dimensions, 3 datums with the same values and modifiers; zero "missing reference" errors | VC-GDT-22 |
-| AC-GDT-08 | SU-01..SU-05 contributors | `analyze_stackup` | WC / RSS / σ / exact-corner values equal `stackup_reference.json` within 1e-9 mm; MC mean/std/p within the stated acceptance tolerances | VC-GDT-30..34 |
-| AC-GDT-09 | FF-01..03 | fastener helper | T = H − F (floating), (H − F)/2 (fixed, equal split), bonus/virtual condition values as in the reference | VC-GDT-35 |
-| AC-GDT-10 | PMI on a document | save/load, undo/redo, live-sync, `build_project` replay | PMI identical (id-normalised) | VC-GDT-50 |
-| AC-GDT-11 | Manifold kernel | any feature-attaching PMI command | no-op, summary contains "requires the OCC kernel" | VC-GDT-51 |
-| AC-GDT-12 | ideal sine/triangle/square profiles | surface-texture evaluator (V2, optional) | Ra, Rq, Rsk, Rku, Rz equal `surface_texture_reference.json` within 1e-4 | VC-GDT-40 |
+All criteria run as CLI scripts with `--json` and compare against `validation/expected_results.json` (AF-23).
+`D` as in §6.1.
+
+| AC | Invocation | JSON assertion | VC |
+| --- | --- | --- | --- |
+| AC-GDT-01 | `llull $D run draft_plan_gdt_plate.json --json` then `llull $D list_pmi --json`, `check_pmi --json` | 3 `datum_feature`, 2 `size_dimension` (hole `measuredMm` 6.6 ±1e-6, `count` 4; bore 20.0), 4 `geometric_tolerance`, 1 `surface_texture`, 1 saved view; `check_pmi.data.errors` = [] | VC-GDT-01 |
+| AC-GDT-02 | same plan with thickness parameter, then `exec set_parameter '{"name":"t","expression":"16"}'`, `check_pmi --json` | all 10 items resolve (no `GDT_FEATURE_UNRESOLVED`), hole 6.6 ±1e-6, 0 errors | VC-GDT-02 |
+| AC-GDT-03 | `llull $D run draft_plan_gdt_rejections.json --continue --json` | 1 accepted, 5 refused with codes `GDT_DATUM_DUPLICATE`, `GDT_DATUM_UNDEFINED`, `GDT_MC_ON_NON_FOS`, `GDT_ZONE_NON_POSITIVE`, `GDT_POINT_NOT_ON_FACE`, each with a remediation; exit code 1 | VC-GDT-03, VC-GDT-54 |
+| AC-GDT-04 | unit test: any PMI command twice from the same input | input deep-equal before/after; same output | VC-GDT-04 |
+| AC-GDT-05 | `llull $D export_sheet_svg sheetId=… --save s.svg --json` | `data.pmi.placed` per view = expected sets; `data.fits` true | VC-GDT-10/11 |
+| AC-GDT-06 | V1: `llull $D import_step_exact file=<NIST file> --json`, `list_pmi --json` | per-category counts = `nist_pmi_census.json` | VC-GDT-20 |
+| AC-GDT-07 | V1: `llull $D export_step_ap242 includePmi=true --save p.stp` then NIST `sfa-cl` | 4 GT, 2 dims, 3 datums; 0 errors | VC-GDT-22 |
+| AC-GDT-08 | `llull $D run <SU-0n plan> --json` | `data.worstCase`, `rss`, `sigma`, exact corners within 1e-9 mm; MC within stated bounds; `data.provenance.method` present; `sigmaPerHalfTolerance.defaulted` true when omitted | VC-GDT-30..34, VC-GDT-58 |
+| AC-GDT-09 | `llull exec fastener_tolerance '{…FF-0n…}' --json` | values of FF-01..03 within 1e-12 mm | VC-GDT-35 |
+| AC-GDT-10 | save/load, undo/redo, live-sync, `build_project` replay | PMI identical (id-normalised) | VC-GDT-50 |
+| AC-GDT-11 | `llull --doc p.llull.json --kernel manifold exec add_datum_feature …` | refused, code `GDT_KERNEL_NO_TOPOLOGY`, remediation mentions `--kernel occt` | VC-GDT-51 |
+| AC-GDT-12 | V2 evaluator on ideal profiles | Ra, Rq, Rsk, Rku, Rz = `surface_texture_reference.json` ±1e-4 | VC-GDT-40 |
+| AC-GDT-13 | plate plan run by an agent caller, then `list_pmi --json` and `check_pmi --json` | every item `review.required` = true with reason; `check_pmi.data.warnings` contains `GDT_REVIEW_REQUIRED` × 10; summary contains "not approved" | VC-GDT-56 |
+| AC-GDT-14 | agent caller: `exec accept_pmi_review '{"pmiIds":["…"],"decision":"accept","comment":"ok"}'` | refused, code `GDT_REVIEW_HUMAN_ONLY`; human caller (UI) succeeds and the flag clears | VC-GDT-57 |
+| AC-GDT-15 | stack-up with one contributor `verified: false` | `data.unverified` = true with the contributor name; `check_pmi`/result warnings include `GDT_UNVERIFIED_INPUT` | VC-GDT-55 |
 
 ## 8. Standards & regulatory alignment
 
@@ -283,8 +309,10 @@ customer quality systems (D6-51991 [R23]) and contract data requirements (MIL-ST
 | R-5 NIST test files contain known syntax errors ("NOT reference STEP files without any errors") [R13] | false failures on import | tolerant reader; census is the expected value, not a perfect file |
 | R-6 NIST files change (Feb 2026 update replaced 5 files) [R13] | pinned hashes break | manifest pins zip + per-member sha256 and keeps the superseded hashes |
 | R-7 Over-scoping (graphical PMI, 3D PDF, CMM) | delay | phase plan §4.1 |
+| R-8 AI operator proposes plausible but wrong tolerances (the owner cannot judge them) | non-conforming parts, false confidence | `reviewRequired` on every agent-created item (FR-GDT-31), human-only `accept_pmi_review` (FR-GDT-32), release blocked by gap 09 while unreviewed; `check_pmi` codes for every malformed frame (FR-GDT-33); stack-up results show `provenance` and named defaults (FR-GDT-35) |
 | A-1 Desktop (Electron + bundled CPython/CadQuery/OCP) is the primary product (KI6) | — | — |
 | A-2 OCC is the desktop kernel; PMI attaches to OCC topology (KI5) | — | — |
+| A-3 The primary operator is an AI agent on the CLI; the owner is not an engineer; a qualified reviewer approves tolerances before release (`../AGENT_FIRST.md`) | — | — |
 
 ## 11. References
 

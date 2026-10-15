@@ -24,7 +24,7 @@ The gap closes in three steps:
    loads and BCs on exact B-rep faces, load cases, and mesh controls are all pure llull commands, so they replay,
    get parametrised and stay traceable.
 2. **An offline open toolchain on the desktop.** Gmsh in the bundled CPython meshes the part [R10] and a bundled
-   CalculiX process solves it [R30]. Results come back as contours, deformed shapes and mode shapes, and margins of safety are computed.
+   CalculiX process solves it [R30]. Results come back as numbers first (max values, probes, frequencies, margins of safety with named factors), with contours, deformed shapes and mode shapes as an optional view.
 3. **Standard hand-off.** The same model exports to a Nastran BDF and a CalculiX/Abaqus INP for an analysis
    department's own solver, and comes back as FRD/OP2/VTU results.
 
@@ -51,38 +51,44 @@ The gap closes in three steps:
 
 ## 3. Personas & user stories
 
-| Persona | Role | Main need |
-| ------- | ---- | --------- |
-| P1 Design engineer (tier-1/2 supplier) | Designs machined fittings and sheet-metal brackets in llull | A quick check that a part has positive margins before release, and a clean deck for the customer's stress office |
-| P2 Stress engineer (OEM or supplier) | Owns the certified analysis in Nastran | A BDF that is correct, with traceable materials, loads and BCs and stable ids, and results that can come back for review |
-| P3 University / CubeSat team | Small budget, no commercial licences | A fully offline, open loop: model, mesh, solve, margins |
-| P4 MRO repair engineer | Designs doublers and repairs | Fast linear static checks of local reinforcements, and modal checks of panels |
-| P5 AI agent (Claude Code through the CLI, MCP in the cloud) | Automates trade studies | A deterministic command vocabulary: set up, mesh, solve and report margins as JSON |
+Roles follow [`../AGENT_FIRST.md`](../AGENT_FIRST.md) §1. Nobody in the loop is assumed to have stress-analysis
+judgement until the qualified reviewer signs. This gap is the **highest-risk area** of the aerospace set: a
+non-engineer owner and an AI operator can produce a margin of safety. llull therefore names every factor and allowable it
+uses (AF-31), marks every margin `reviewRequired` (AF-33), and leaves negative or marginal results to a human
+disposition (AF-34). The numeric margin table and probes come first; plots are an optional view of the same data (AF-21).
+
+| Role | Who | Uses | Main need |
+| ---- | --- | ---- | --------- |
+| **Operator (primary)** | AI agent (Claude Code via the `llull` CLI; a cloud agent via MCP) | `llull run`, `llull fea_mesh`, `llull fea_solve`, `llull check_analysis`, `llull compute_margins --json` | A deterministic command vocabulary with units in every param, stable error codes, and JSON results it can compare and explain |
+| **Owner** | The person who asks for the result (supplier designer, student, MRO planner). **Not assumed to be an engineer** | Natural language to the agent; may watch the desktop app | A plain answer: what was checked, what passed, what needs a qualified engineer |
+| **Qualified reviewer** | Stress engineer or design-organisation signatory (Part 21 DOA, DER/CVE, company authority) | Desktop app review surfaces (margins table, contours, disposition dialog), exported BDF/INP decks | Audits inputs and method, dispositions negative or marginal margins, signs. Owns the engineering judgement |
 
 User stories:
 
-- **US-1 (P1).** As a design engineer, I assign "Al 7075-T7351 (allowables from MAT)" to a bracket, fix its bolt holes,
-  apply a 2 kN limit load on the lug face, and get an MS table at FoS 1.5. When the MS is negative, it shows which
-  region fails.
-- **US-2 (P2).** As a stress engineer, I receive a BDF with one PSOLID/PSHELL per part, MAT1 cards that carry the material name in
-  comments, SPC1 sets named after the llull constraint names, and FORCE/PLOAD4 cards per load case. It loads in my
-  pre-processor without edits.
-- **US-3 (P1/P4).** As a designer of a thin sheet-metal clip, I idealize it as a shell on its midsurface with its
-  thickness, so the mesh has a few hundred quads instead of a 3D tet mesh through a 1 mm thickness.
-- **US-4 (P3).** As a student, I run modal and buckling analyses of a panel offline and compare them with the analytic plate
-  buckling formula shown next to the result.
-- **US-5 (P5).** As an AI agent, I run `llull --app plan.json`, then `llull fea mesh`, `llull fea solve` and `llull fea margins --json`,
-  and get back min MS, its location and the load case. When I change a parameter, I see the results marked stale.
-- **US-6 (P2).** As a stress engineer, I import an OP2 or FRD from my own run and review von Mises and displacement contours
-  on the llull model, with the design revision recorded.
-- **US-7 (all).** As a user, I want defeaturing (small holes, fillets, chamfers) to apply only to the analysis
-  geometry, never to the design.
+- **US-1 (owner → operator).** "Check whether this bracket is strong enough for a 2 kN limit load on the lug." The agent assigns a
+  gap 08 material record, fixes the bolt holes, adds the load as `limit`, runs mesh, `check_analysis` and `compute_margins`,
+  and reports min MS with its location, the factors and allowables used (each with its source and `defaulted` flag), and
+  "computed by llull, not approved — needs a qualified engineer".
+- **US-2 (operator).** When the MS is negative or below the configured marginal band, the agent cannot accept it. It reports the
+  failing region and the code `FEA_MS_NEGATIVE` / `FEA_MS_MARGINAL`, proposes design changes, and re-runs. Only the qualified
+  reviewer can record an acceptance (`dispose_margin`, human gate).
+- **US-3 (operator → reviewer).** The agent exports a BDF/INP with `--save` (one PSOLID/PSHELL per part, MAT1 with the material
+  name in comments, SPC1 sets named after the llull constraints, FORCE/PLOAD4 per load case) for the stress office.
+- **US-4 (operator).** For a thin sheet-metal clip the agent idealizes it as a shell on its midsurface, checks the coverage number
+  returned by `extract_midsurface`, and refuses shell export below 98 % coverage unless a human accepts it.
+- **US-5 (operator).** The agent runs modal and buckling analyses and compares them with `analytic_check` in the same JSON report
+  (FE value, analytic value, ratio).
+- **US-6 (operator).** After a parameter change the agent sees `state: "stale"` in `fea_report` and `FEA_RESULTS_STALE` from
+  `compute_margins`, and loops back to `fea_mesh`.
+- **US-7 (reviewer).** The reviewer imports an OP2 or FRD from the stress office's own run and reviews it in the desktop app as
+  review-only results, with the design revision recorded.
+- **US-8 (all).** Defeaturing applies only to the analysis geometry, never to the design.
 
 ## 4. Scope / out of scope
 
 | Phase | In scope |
 | ----- | -------- |
-| **MVP (M1–M4)** | Elastic material data and allowables links. Analysis cases (linear static, modal, linear buckling). Solid and plane-stress idealization. Constraints and loads on exact faces/edges/points with `*Near` targeting. Gmsh tet4/tet10 and tri/quad (2D) meshing with size controls. Verdict quality report and gate. CalculiX INP export and bundled solve on desktop. FRD import. Contours of von Mises, displacement and components, deformed shape, mode shapes. MS table at FoS 1.5. Stale-result tracking. Validation: NAFEMS LE1/LE10, analytic beams, CalculiX test decks. |
+| **MVP (M1–M4)** | Elastic material data and allowables links. Analysis cases (linear static, modal, linear buckling). Solid and plane-stress idealization. Constraints and loads on exact faces/edges/points with `*Near` targeting. Gmsh tet4/tet10 and tri/quad (2D) meshing with size controls. Verdict quality report and gate. CalculiX INP export and bundled solve on desktop. FRD import. Results as data (max values with location, probes, frequencies); UI contours, deformed shape and mode shapes for review. MS table at FoS 1.5 (named default), `reviewRequired`, human disposition of negative/marginal rows, `check_analysis`. Stale-result tracking. Validation: NAFEMS LE1/LE10, analytic beams, CalculiX test decks. |
 | **V1 (M5–M6)** | Nastran BDF export (SOL 101/103/105). OP2 import through pyNastran. VTU export through meshio. Shell idealization with automatic midsurface for constant-thickness parts (face-pairs: planar plus coaxial cylindrical). Defeaturing of holes, fillets and chamfers by size. Distributed couplings (RBE3-style) for remote loads and moments. Analytic quick checks (beam, SS plate buckling, Kt). Netgen as an alternative mesher. |
 | **V2** | Beam idealization of stringers and frames (CBAR/CBEAM, B31/B32). Composite shells (PCOMP from gap 06 CMP). Contact and bolted joints (linear, tied). Variable-thickness midsurface. Submodelling. Fatigue and damage tolerance hooks (stress spectra export). Running a user-installed Nastran or MYSTRAN. |
 | **Out of scope** | Writing a new FE solver in TypeScript (llull hosts and drives solvers). Nonlinear plasticity or explicit dynamics workflows. CFD and aeroelasticity. Certification sign-off (llull computes, and humans approve). Thermal analysis (possible later through CalculiX `*HEAT TRANSFER`). |
@@ -107,8 +113,9 @@ User stories:
 | FR-FEA-14 | SHOULD | Import **Nastran OP2** results (displacement, stress, eigenvectors) through pyNastran in the bundled Python. | Review of results from the stress office | [R14] |
 | FR-FEA-15 | SHOULD | Export the mesh and results to **VTU** (ParaView) through meshio. | An open post-processing hand-off | [R13] |
 | FR-FEA-16 | MUST | **Solve locally** on desktop with the bundled CalculiX as a separate process. Fully offline, with cancel, a timeout, a log and the exit status. On the server or cloud it is disabled unless configured. | KI6: offline desktop first | [R30], L1 (KI6) |
-| FR-FEA-17 | MUST | **Results visualization**: contours of von Mises, displacement magnitude and components, and principal stress (V1). Deformed shape with a scale factor, animated mode shapes, a legend with min/max and units, probes at points, and the location of the maximum. | Core of result review | — |
-| FR-FEA-18 | MUST | A **margin-of-safety table**: MS = allowable / (applied_limit × FoS) − 1. FoS is 1.5 by default and configurable, with an optional extra-factor list and justifications. The table is per part, per region and per load case. MS < 0 is flagged FAIL, and the table exports as JSON, CSV or a sheet table. | 14 CFR 25.303 and NASA-STD-5001B | [R1], [R3] |
+| FR-FEA-17 | MUST | **Results as data first** (AF-21): `fea_report` and `fea_result_field` return max von Mises, displacement magnitude and components with their location and unit, probe values at named points, mode frequencies and buckling factors in `data`. `render_view … --save` can draw the field for multimodal agents (AF-22). | The operator and owner read numbers, not plots | AF-21, AF-22 |
+| FR-FEA-17b | SHOULD | **UI result overlays** for the qualified reviewer: contours, deformed shape with a scale factor, animated mode shapes, legend with min/max and units, built on the FR-FEA-17 data. | Review surface only | — |
+| FR-FEA-18 | MUST | A **margin-of-safety table** returned in `data`: MS = allowable / (applied_limit × FoS) − 1. Each row gives part, region, load case, criterion, applied value and allowable with units, the factors used, MS, status (`PASS`, `MARGINAL`, `FAIL`), location, provenance (formula, inputs, sources), `unverified`, `reviewRequired` and `disposition`. Exports as JSON, CSV or a sheet table. | 14 CFR 25.303 and NASA-STD-5001B | [R1], [R3], AF-10, AF-35 |
 | FR-FEA-19 | MUST | **Modal analysis**: the n lowest frequencies, mode shapes, and mass participation where the solver gives it. | Panel and equipment-bracket frequencies | [R30] |
 | FR-FEA-20 | MUST | **Linear buckling**: eigenvalue buckling load factors and mode shapes. | Thin panels in compression | [R30], [R22] |
 | FR-FEA-21 | SHOULD | **Analytic quick checks** as read-only commands: cantilever and simply supported beams, the SS plate buckling coefficient k(a/b), and Kirsch Kt. The result view shows them next to the FE result for sanity. | Engineering practice is to check FE against hand calculations | [R20]–[R22] |
@@ -121,60 +128,91 @@ User stories:
 | FR-FEA-28 | SHOULD | **Licence compliance** for the GPL tools (Gmsh, CalculiX). They are shipped as separate programs, with their licence texts and the corresponding source or a written offer, and listed in the About box. llull code does not link them. | GPL obligations | [R10], [R30] |
 | FR-FEA-29 | COULD | Run a **user-installed Nastran or MYSTRAN** through a configured external command, then OP2 import. | Lets the stress office's solver close the loop | [R14] |
 | FR-FEA-30 | COULD (V2) | **Composite shell properties** (PCOMP / `*SHELL SECTION, COMPOSITE`) from gap 06 laminates. | Composite airframe structure | — |
+| FR-FEA-31 | MUST | **Named safety defaults** (AF-31): every factor of safety, allowable and threshold used by `compute_margins` is either given explicitly or taken from a sourced default that the result names, e.g. `"factors": {"ultimate": {"value": 1.5, "source": "14 CFR 25.303", "defaulted": true}}`. There is no default marginal band: if `marginalBand` is unset, `check_analysis` warns `FEA_MARGINAL_BAND_UNSET`. | No silent safety value | AF-31, [R1] |
+| FR-FEA-32 | MUST | **Review flag** (AF-33): every margin row and every `compute_margins` / `check_analysis` result carries `reviewRequired: true` with a reason, and the summary says "computed by llull, not approved — needs a qualified engineer". It is never cleared by an agent. | Margins feed certification decisions | AF-33 |
+| FR-FEA-33 | MUST | **Human disposition** (AF-34): a `FAIL` row (MS < 0) or a `MARGINAL` row (0 ≤ MS < `marginalBand`) stays `disposition: "pending_human"`. Only `dispose_margin` with a human-held signature (gap 09 `humanSignatureRequired`) records an acceptance or rejection; an agent caller gets `FEA_HUMAN_GATE` and the document is unchanged. | Accepting a negative or marginal result is an approval act | AF-34 |
+| FR-FEA-34 | MUST | **Unverified propagation** (AF-32): if any gap 08 property used (E, ν, G, density, allowable) is `unverified`, every mesh summary, result summary and margin row computed from it carries `unverified: true` and `unverifiedReasons[]`; `check_analysis` reports `FEA_MATERIAL_UNVERIFIED` as a warning that cannot be suppressed. | Typical values are not allowables | AF-32 |
+| FR-FEA-35 | MUST | **Readiness check** (AF-20): read-only `check_analysis` returns pass / warn / fail items with stable codes for set-up (targets, materials, constraints, units), mesh (inverted, adequacy, stale), results (stale, missing, foreign) and margins (negative, marginal, pending disposition, unverified). | The agent proves its own work | AF-20 |
+| FR-FEA-36 | MUST | **Stable error codes** (AF-11): every refusal and check item has a code from TECHNICAL_SPEC §7.1, the offending ids or paths, and a one-line remediation. | Agents act on codes, not prose | AF-11 |
+| FR-FEA-37 | MUST | **Units in params and results** (AF-04, AF-10): every physical param states its unit in the schema (analysis unit system, or `{ value, unit }`), and every number in `data` carries a unit suffix or `unit` field. | No inferred units | AF-04, AF-10 |
 
 ## 6. Workflows
 
-### 6.1 UI (desktop)
+### 6.1 CLI (`llull`, the operator's primary path; KI6)
 
-1. Model or open the part. **Analysis ▸ New analysis** (type, solver, units) runs `create_analysis`.
-2. Pick or create a material record with E, ν, density and allowables (gap 08 commands `define_material_record` / `set_material_property` or a gap 08 library). Assign it.
-3. **Idealize**: solid by default. Choose shell to get `extract_midsurface` with a thickness preview and coverage
-   heatmap, or plane stress to pick the source face.
-4. **Constraints / Loads** panels: pick faces in the viewport. The panel records click points as `facesNear`
-   and dispatches `add_fea_constraint` or `add_fea_load` with a load case and its limit/ultimate tag.
-5. **Mesh**: set the size, order and local refinements (`set_mesh_controls`), then press **Mesh**. The desktop runs Gmsh in the bundled
-   Python. A progress bar is shown, the result is stored through `record_fe_mesh`, and the quality panel shows histograms and
-   offending elements, highlighted.
-6. **Solve**: CalculiX runs as a child process with a live log, then the results are imported (`record_fea_results`).
-7. **Results**: choose the field, deformation scale and mode number (`set_result_view`). Probes and max markers are shown. Analytic check
-   cards appear when the model matches a template.
-8. **Margins**: a table per part and load case with FoS 1.5, and FAIL rows highlighted. Export to CSV/JSON or place on a sheet.
-9. **Export deck**: INP or BDF (the `fea_export` transport) for the stress office.
-
-### 6.2 CLI (`llull`, local agent: KI6)
+Proposed commands are those of TECHNICAL_SPEC §4. FEA transports (`fea_mesh`, `fea_solve`, `fea_import_results`,
+`fea_export`) are called like the existing exchange tools (`llull import_step file=…`): no CLI special case (AF-01).
+The analysis id comes from the `run --json` report (`affected`), or from `fea_report`.
 
 ```bash
-llull --app build plan.json                 # geometry + analysis set-up (build_project)
-llull --app fea mesh --analysis an-1        # Gmsh in bundled Python -> record_fe_mesh
-llull --app fea quality --analysis an-1 --json
-llull --app fea solve --analysis an-1       # bundled ccx -> record_fea_results
-llull --app fea margins --analysis an-1 --json   # {minMS, part, region, loadCase, rows[]}
-llull --app fea export --analysis an-1 --format bdf --out bracket.bdf
-llull --doc part.llull fea import --analysis an-1 --frd run.frd
+llull search fea margin                                  # discover (AF-01)
+llull describe create_analysis add_fea_load compute_margins
+llull guide                                              # aerospace section: units, FoS, minimal FEA plan (AF-03)
+
+# 1. one plan: geometry + gap 08 material record + analysis set-up (build_project, aliases $name)
+llull run bracket.plan.json --validate --doc bracket.llull.json            # errors name step path + param (AF-05)
+llull run bracket.plan.json --doc bracket.llull.json --kernel occt --json  # data.steps[*].affected -> analysis id
+
+# 2. mesh, check, solve (long ops: --progress, --timeout; cached by content hash, AF-40)
+llull fea_mesh analysisId=an-5.1 --doc bracket.llull.json --kernel occt --progress --timeout 300 --json
+llull check_analysis analysisId=an-5.1 --doc bracket.llull.json --json     # pass/warn/fail with codes (AF-20)
+llull fea_solve analysisId=an-5.1 --doc bracket.llull.json --progress --timeout 900 --json
+
+# 3. numbers first (AF-21): margins, probes, analytic sanity check
+llull compute_margins analysisId=an-5.1 --doc bracket.llull.json --json    # rows[] with units, factors, provenance,
+                                                                           # reviewRequired, disposition
+llull fea_report analysisId=an-5.1 --doc bracket.llull.json --json         # state, max values + locations, probes
+llull analytic_check check=cantilever 'inputs={"P_N":9,"L_mm":8,"E_MPa":210000,"b_mm":1,"h_mm":1}' --json
+
+# 4. look (multimodal agents, AF-22) and hand off (AF-12: heavy artefacts only via --save)
+llull render_view view=iso analysisId=an-5.1 field=von_mises --save out/vm.png --doc bracket.llull.json
+llull fea_export analysisId=an-5.1 format=nastran_bdf --save out/bracket.bdf --doc bracket.llull.json
+llull fea_export analysisId=an-5.1 format=calculix_inp --save out/bracket.inp --doc bracket.llull.json
+
+# 5. external results for review (review-only, never used for margins)
+llull fea_import_results analysisId=an-5.1 format=frd file=run.frd --doc bracket.llull.json --json
 ```
 
-### 6.3 MCP agent (cloud)
+`--app` replaces `--doc FILE` to act on the open desktop window (the owner sees each step). `--dry-run` works for every
+mutating set-up command (AF-42). Exit code 1 plus `data.code` on any refusal (AF-11).
 
-1. `build_project` with the plan (geometry plus `create_analysis` … `set_mesh_controls`).
-2. `fea_mesh` and `fea_solve` are transport tools on the server, available only when the deployment provides Gmsh/ccx
-   (otherwise they answer how to enable them, as `import_step` does today).
-3. `compute_margins` (read-only) returns JSON, and the `fea_export` transport returns the deck text or writes it into the exchange
-   directory.
-4. The agent edits a parameter (`set_parameter`). The results become `stale`, and the agent loops back to `fea_mesh`.
+The agent ends every job with `check_analysis` and reports in this order (AF-36): what was analysed, min MS per load case,
+every `unverified` input, every row that needs a human, and the sentence "computed by llull, not approved — needs a qualified engineer".
+
+### 6.2 MCP agent (cloud)
+
+1. `build_project` with the same plan.
+2. `fea_mesh` and `fea_solve` are transport tools, available only when the deployment provides Gmsh/ccx. Otherwise they return
+   `FEA_TOOL_MISSING` with an install hint (AF-41).
+3. `check_analysis` and `compute_margins` (read-only) return the same JSON as the CLI. `fea_export` returns the deck text or writes it
+   into the exchange directory.
+4. After `set_parameter`, results are `stale`, and the agent loops back to `fea_mesh`.
+
+### 6.3 Desktop UI (review and approval surface only)
+
+The UI shows what the commands produced; it adds no capability of its own.
+
+1. **Analysis tree and glyphs**: cases, parts, constraints and loads drawn on the model, so the owner or reviewer can see what the
+   agent set up.
+2. **Margins table** with the factor and allowable provenance, `unverified` and `reviewRequired` badges, and FAIL/marginal rows highlighted.
+3. **Contours, deformed shape, mode shapes** over the same `fea_result_field` data (optional view, AF-21).
+4. **Disposition dialog** (human gate, AF-34): the qualified reviewer accepts a negative or marginal margin with a justification and a
+   human-held signature (gap 09 `humanSignatureRequired`), or rejects it. Agents can prepare the request, never complete it.
 
 ### 6.4 Surface matrix (FR-FEA-23)
 
-| Capability | UI | CLI | MCP (cloud) | Notes |
-| ---------- | -- | --- | ----------- | ----- |
-| Analysis set-up (cases, materials, idealization, BCs, loads, mesh controls) | panels | `build` plans / `llull cmd` | registry tools (toolset `analysis`) | pure commands, replayable |
-| Midsurface preview / defeature | yes | yes | yes | OCC kernel needed. Manifold gives an explanatory no-op |
-| Mesh (Gmsh) | Mesh button | `fea mesh` | `fea_mesh` when the host has Python + gmsh | external process |
-| Quality report | histogram panel | `fea quality --json` | `fea_report` | read-only |
-| Solve (CalculiX) | Solve button | `fea solve` | `fea_solve` when the host has `ccx` | desktop default. Server needs opt-in |
-| Results field / probes | overlay | `fea report`, `fea field` | `fea_result_field`, `fea_report` | display state through `set_result_view` |
-| Margins | table plus sheet placement | `fea margins --json` | `compute_margins` | refuses stale results |
-| Deck export INP / BDF / VTU | Export menu | `fea export` | `fea_export` (exchange dir) | byte-identical across surfaces |
-| External results import FRD / OP2 | File ▸ Import results | `fea import` | `fea_import_results` | needs a mesh match, otherwise review-only |
+| Capability | CLI (primary) | MCP (cloud) | UI (review) | Notes |
+| ---------- | ------------- | ----------- | ----------- | ----- |
+| Analysis set-up | `llull run plan.json`, `llull <command> …` | registry tools (toolset `analysis`) | tree + glyphs | pure commands, replayable |
+| Midsurface preview / defeature | `llull extract_midsurface … --json` | same | translucent overlay | OCC kernel needed, else `FEA_KERNEL_OCC_REQUIRED` |
+| Mesh (Gmsh) | `llull fea_mesh` | `fea_mesh` when the host has Python + gmsh | progress | external process |
+| Quality / readiness check | `llull check_analysis --json`, `llull fea_report --json` | same | histogram panel | read-only, codes |
+| Solve (CalculiX) | `llull fea_solve` | `fea_solve` when the host has `ccx` | progress, log | desktop default. Server needs opt-in |
+| Results | `llull fea_report`, `llull fea_result_field`, probes | same | contours (optional) | numbers first |
+| Margins | `llull compute_margins --json` | same | table | refuses stale results; every row `reviewRequired` |
+| Disposition of negative / marginal MS | prepare only (`FEA_HUMAN_GATE` on completion) | prepare only | **complete** (signature) | human gate |
+| Deck export INP / BDF / VTU | `llull fea_export … --save` | `fea_export` (exchange dir) | Export menu | byte-identical across surfaces |
+| External results import FRD / OP2 | `llull fea_import_results file=…` | same | File ▸ Import results | review-only |
 
 ### 6.5 Error and edge behaviour
 
@@ -206,20 +244,27 @@ llull --doc part.llull fea import --analysis an-1 --frd run.frd
 
 ## 7. Acceptance criteria
 
-| # | Given | When | Then | VC |
-| - | ----- | ---- | ---- | -- |
-| AC-1 | the beamp plan (1×1×8 mm steel cantilever, 9 N tip load) | it is meshed with tet10 and solved | the tip deflection is within 2 % of PL³/3EI = 0.0877714 mm | VC-FEA-10, 40 |
-| AC-2 | the beamf plan | a 4-mode modal analysis runs | f1 is within 1 % of 13096.7 Hz (Euler-Bernoulli) and of the CalculiX reference 13096.03 Hz | VC-FEA-11, 41 |
-| AC-3 | NAFEMS LE1 set up in llull | it is solved with quadratic plane-stress elements | σyy(D) is within 2 % of 92.7 MPa | VC-FEA-30 |
-| AC-4 | NAFEMS LE10 set up in llull | it is solved with tet10 refined at D | σyy(D) is within 3 % of −5.38 MPa | VC-FEA-31 |
-| AC-5 | allowable/limit pairs (450/300, 450/200, 300/200, 280/200 MPa) at FoS 1.5 | `compute_margins` runs | MS = 0, 0.5, 0, −0.0667, and the last row is FAIL | VC-FEA-20 |
-| AC-6 | a mesh containing an inverted element | the user exports a deck | the export is refused with a reason | VC-FEA-08 |
-| AC-7 | an exported BDF | pyNastran reads it with cross-referencing | no error, the card counts match the mesh, and the loads sum to the applied total | VC-FEA-15 |
-| AC-8 | solved results | the user changes a driving parameter | the results show stale and margins refuse to compute | VC-FEA-50 |
-| AC-9 | a thin 100×60×40 box shelled to 2 mm | `extract_midsurface` runs | the midsurface area is 23 224 mm² ±0.1 % and coverage is 100 % | VC-FEA-03 |
-| AC-10 | the same plan | it runs from the UI, the CLI and MCP | the decks are byte-identical | VC-FEA-51 |
-| AC-11 | the quarter plate with a hole (W/d = 10) | it is solved | the peak σxx at the hole is within 5 % of 3 × the remote stress | VC-FEA-14 |
-| AC-12 | the desktop installer | it is inspected | the GPL texts and source offers for Gmsh and CalculiX are present | VC-FEA-52 |
+Each criterion is a CLI invocation with a JSON assertion against `validation/fea_analytic_expected.json` (VC id in the last
+column; tolerances there). `D` = `--doc case.llull.json --kernel occt --json`.
+
+| # | Given | When (CLI) | Then (JSON) | VC |
+| - | ----- | ---------- | ----------- | -- |
+| AC-1 | `plans/fea_cantilever_static_beamp.plan.json` | `llull run <plan> D` (`$an` = analysis id from `affected`); `llull fea_mesh analysisId=$an D`; `llull fea_solve analysisId=$an D`; `llull fea_report analysisId=$an D` | probe `tip` `u_y` (mm) within 2 % of VC-FEA-10.a = 0.0877714 mm | VC-FEA-10, 40 |
+| AC-2 | `plans/fea_cantilever_modal_beamf.plan.json` | same with `modes=4`, then `llull fea_report D` | `data.results.frequenciesHz[0]` within 1 % of VC-FEA-11.a = 13096.7 and of the CalculiX ref 13096.03 | VC-FEA-11, 41 |
+| AC-3 | `plans/fea_nafems_le1.plan.json` | run, mesh, solve, `fea_report` | probe `D` `stress_yy` (MPa) within 2 % of 92.7 | VC-FEA-30 |
+| AC-4 | `plans/fea_nafems_le10.plan.json` | run, mesh, solve, `fea_report` | probe `D` `stress_yy` (MPa) within 3 % of −5.38 | VC-FEA-31 |
+| AC-5 | the four allowable/limit pairs of VC-FEA-20, no factors given | `llull compute_margins analysisId=$an D` | `rows[*].ms` = 0, 0.5, 0, −0.0666667; row 4 `status: "FAIL"`, `code: "FEA_MS_NEGATIVE"`; `data.factors.ultimate` = `{value: 1.5, source: "14 CFR 25.303", defaulted: true}` | VC-FEA-20, 60 |
+| AC-6 | a mesh artifact with one inverted element | `llull fea_export analysisId=$an format=calculix_inp --save x.inp D` | exit 1, `data.code: "FEA_MESH_INVERTED"`, `data.elementIds` non-empty, no file written | VC-FEA-08, 65 |
+| AC-7 | an exported BDF | `fea_export … --save` then pyNastran `read_bdf(xref=True)` | no error, card counts match the mesh, Σ FORCE = applied total | VC-FEA-15 |
+| AC-8 | solved results | `llull set_parameter name=L expression=10 D`; `llull compute_margins analysisId=$an D` | exit 1, `data.code: "FEA_RESULTS_STALE"` | VC-FEA-50 |
+| AC-9 | a 100×60×40 box shelled to 2 mm | `llull extract_midsurface entityId=$box maxThickness=3 D` | `data.areaMm2` = 23 224 ±0.1 %, `data.coverage` = 1 | VC-FEA-03 |
+| AC-10 | the same plan | run from CLI, MCP `build_project` and UI dispatch | same document hash and deck sha256 | VC-FEA-51 |
+| AC-11 | `plans/fea_plate_hole_kirsch.plan.json` | run, mesh, solve, `fea_report` | peak `stress_xx` at the hole within 5 % of 300 MPa | VC-FEA-14 |
+| AC-12 | the desktop installer | `npm --prefix desktop test` | GPL texts and source offers for Gmsh and CalculiX present | VC-FEA-52 |
+| AC-13 | any solved analysis | `llull compute_margins … D` | every row has `reviewRequired: true` and a `reviewReason`; `summary` contains "not approved" | VC-FEA-61 |
+| AC-14 | a negative-MS row | agent calls `llull dispose_margin analysisId=$an rowId=r4 decision=accepted justification="…" D` | exit 1, `data.code: "FEA_HUMAN_GATE"`, document unchanged; `check_analysis` still `fail` | VC-FEA-62, 63 |
+| AC-15 | a material whose E or allowable is gap 08 `unverified` (basis `typical`) | `compute_margins` and `check_analysis` | every affected row `unverified: true` with `unverifiedReasons[]`; `check_analysis` warning `FEA_MATERIAL_UNVERIFIED` | VC-FEA-64 |
+| AC-16 | the deliberately wrong plans of VC-FEA-65 | `llull run <plan> --validate`, then the failing command | each returns the documented code and remediation of TECHNICAL_SPEC §7.1 | VC-FEA-65 |
 
 ## 8. Standards & regulatory alignment
 
@@ -242,10 +287,12 @@ report" until a customer qualifies the toolchain, and that includes tool qualifi
 | KPI | Target | How measured |
 | --- | ------ | ------------ |
 | Benchmarks passing | 100 % of VC-FEA-10…14, 30, 31, 40–43 within tolerance on the desktop OCC build | `npm run quality:fea` |
-| Time from a finished part to the first MS table (bracket, about 20k-node tet10) | ≤ 5 min of user time, ≤ 60 s of compute | Usability test script plus the VC-FEA-53 timer |
+| Time from a finished part to the first MS table (bracket, about 20k-node tet10) | ≤ 5 min of agent wall time from plan to `compute_margins --json`, ≤ 60 s of compute | Agent driver script plus the VC-FEA-53 timer |
 | Deck acceptance | 0 manual edits needed to load the BDF/INP in pyNastran / CalculiX | VC-FEA-15 |
 | Reproducibility | Same plan gives the same mesh hash and the same deck sha256 on the same platform and versions | VC-FEA-06, 51 |
-| Agent usability | An MCP/CLI agent finishes US-5 with no human input in ≥ 9 of 10 scripted runs | Agent eval harness (`server/tests`) |
+| Agent usability | A CLI/MCP agent finishes US-1 and US-6 with no human input except the human gates in ≥ 9 of 10 scripted runs | Agent driver (`docs/PRODUCTION_GATE.md`, AF-23) |
+| Silent safety values | 0 factors, allowables or thresholds used without a named source or explicit value | VC-FEA-60 |
+| Unflagged margins | 0 margin rows without `reviewRequired`; 0 agent-completed dispositions | VC-FEA-61, 63 |
 | Stale-result leaks | 0 margins computed on stale results | VC-FEA-50 plus a production-gate scenario |
 
 ## 10. Risks & assumptions

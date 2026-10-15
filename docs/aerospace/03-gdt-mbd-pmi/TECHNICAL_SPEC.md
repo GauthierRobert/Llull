@@ -107,7 +107,18 @@ export interface AnnotationPlacement {
 
 export interface DatumReference { readonly label: string; readonly boundary?: 'MMB' | 'LMB'; readonly modifiers?: readonly string[] }
 
-interface PmiBase { readonly id: string; readonly placement: AnnotationPlacement; readonly name?: string }
+/** AF-33 / AF-34: agent-created, agent-edited and imported items need a qualified reviewer. */
+export interface PmiReview {
+  readonly required: boolean;
+  readonly reason?: string;                        // e.g. 'tolerance proposed by an AI operator — not approved by a qualified engineer'
+  readonly acceptedBy?: string; readonly acceptedAt?: string;   // set only by accept_pmi_review from a human caller
+}
+interface PmiBase {
+  readonly id: string; readonly placement: AnnotationPlacement; readonly name?: string;
+  readonly review: PmiReview;
+  readonly unverified?: { readonly reason: string };             // AF-32: unresolved/unmapped import, no rule table …
+  readonly createdBy: { readonly caller: 'human' | 'agent'; readonly userId?: string };  // from ctx.caller (gap 09 TR-PLM-16)
+}
 
 export interface DatumFeaturePmi extends PmiBase { readonly kind: 'datum_feature'; readonly label: string; readonly feature: PmiFeature }
 export interface SizeDimensionPmi extends PmiBase {
@@ -205,9 +216,10 @@ Params are one inline `z.object` each (C3); entity references accept `$alias` in
 | `create_saved_view` / `update_saved_view` / `delete_saved_view` | mutating | `{ name, direction? \| camera?, pmiIds?, entityIds?, section? }` | +1/±1 SavedView | ids exist | unknown PMI/entity id | TR-GDT-08 |
 | `activate_saved_view` | mutating (camera + visibility only) | `{ savedViewId }` | sets `doc.camera`, PMI visibility (visibility survives replay via the carry hook, §3.1 / gap 09 TR-PLM-32) | — | unknown id | TR-GDT-08 |
 | `list_pmi` | query (readOnly) | `{ entityId?, kind? }` | none; `data.items[]` with text rendering and face info | — | — | TR-GDT-09 |
-| `check_pmi` | query (readOnly) | `{ entityId?, rules?: 'builtin' \| 'builtin+table' }` | none; `data { errors[], warnings[], stats }` | deterministic order | no PMI → `data` with zero counts | TR-GDT-10 |
-| `analyze_stackup` | query (readOnly) | `{ name?, contributors: [{name, nominal, upper, lower, sensitivity?, distribution?, pmiId?}], expression?, methods[], lowerSpecLimit?, upperSpecLimit?, samples? (≤ 2e6), seed?, sigmaPerHalfTolerance? (default 3) }` | none; `data { nominal, mean, worstCase, worstCaseExactCorners, rss, sigma, pBelow, pAbove, contributions[], monteCarlo? }` | MC deterministic for (seed, samples); exactly one of `expression` or per-contributor `sensitivity` (linear stack) is given; with `expression`, sensitivities by forward-mode automatic differentiation (dual numbers) over the `parametric/expression` grammar, exact to rounding | expression parse error (reuses `parametric/expression`); samples > cap; contributor `pmiId` unknown or untoleranced | TR-GDT-11 |
+| `check_pmi` | query (readOnly) | `{ entityId?, rules?: 'builtin' \| 'builtin+table' }` | none; `data { status: 'pass'\|'warn'\|'fail', errors[{code, pmiIds, message, remediation}], warnings[…same], stats{items, reviewRequired, unverified}, ruleTable: 'none'\|<file hash> }` | deterministic order | no PMI → `data` with zero counts | TR-GDT-10 |
+| `analyze_stackup` | query (readOnly) | `{ name?, contributors: [{name, nominal, upper, lower (document length unit; `unit:'deg'` for angles), sensitivity?, distribution?, pmiId?, verified? (default true when pmiId-linked, false when typed)}], expression?, methods[], lowerSpecLimit?, upperSpecLimit?, samples? (≤ 2e6), seed?, sigmaPerHalfTolerance? (default 3) }` | none; `data { unit, nominal, mean, worstCase{min,max,halfTolerance}, worstCaseExactCorners, rss, sigma, pBelow, pAbove, contributions[{name, wcPercent, rssPercent}], monteCarlo?{seed, samples, prng, mean, std, pBelow, acceptance}, sigmaPerHalfTolerance{value, source, defaulted}, provenance{method, formulas, sensitivitySource:'given'\|'autodiff'}, unverified?{contributors[]}, reviewRequired, reviewReason? }` | MC deterministic for (seed, samples); exactly one of `expression` or per-contributor `sensitivity` (linear stack) is given; with `expression`, sensitivities by forward-mode automatic differentiation (dual numbers) over the `parametric/expression` grammar, exact to rounding | expression parse error (reuses `parametric/expression`); samples > cap; contributor `pmiId` unknown or untoleranced | TR-GDT-11 |
 | `fastener_tolerance` | query (readOnly) | `{ holeMmc, fastenerMmc, type: 'floating' \| 'fixed', split?, holeLmc?, statedPosition?, actualSize? }` | none; `data { positionTolerance (per part; fixed: T1, T2 from split, default equal), bonus?, allowedPosition?, virtualCondition? }` — bonus = actualSize − holeMmc, allowedPosition = statedPosition + bonus, virtualCondition = holeMmc − statedPosition (FF-03) | — | hole ≤ fastener; `actualSize` outside [holeMmc, holeLmc]; bonus fields requested without `statedPosition` | TR-GDT-12 |
+| `accept_pmi_review` | mutating, human gate | `{ pmiIds: string[] (≥1), decision: 'accept' \| 'reject', comment, at, by }` | sets `review` on each item (`accept`: `required:false`, `acceptedBy/At`; `reject`: stays required, reason += comment) | refused for `ctx.caller.kind === 'agent'` (AF-34; same caller model as gap 09 TR-PLM-16, including its local-CLI limit); `at`/`by` host-supplied | `GDT_REVIEW_HUMAN_ONLY`; `GDT_PMI_UNKNOWN`; empty comment on reject | TR-GDT-19 |
 | `apply_pmi_set` | mutating | `{ entityId, items: PmiItemInput[], savedViews?, source }` | + many items in one step (import path) | all-or-nothing; unresolved features kept with `faceIndices: []` and counted in `doc.pmi.import.unresolved` | schema-invalid item | TR-GDT-13 |
 | `update_sheet` (extended) | mutating | `+ pmiMode?: 'off' \| 'auto'` | sheet patch | — | as today | TR-GDT-14 |
 | `update_drawing_view` (extended) | mutating | `+ pmiIds?: string[]`, `pmiAuto?: true` | view patch | ids exist | unknown PMI id | TR-GDT-14 |
@@ -229,7 +241,7 @@ pollute the recipe. Toolset `pmi` lists all of the above; `analyze_stackup`, `fa
 | TR-GDT-03 | MUST | Face addressing data come from the **gap 01 face-query port** (single optional kernel port, specified in gap 01 TECHNICAL_SPEC; GDT does not extend `ShapeFace` itself). GDT requires per face: `centroid: Vec3`, `normal?: Vec3` (plane), `axis?: {origin, dir}`, `radius?` (cylinder/cone/sphere/torus minor), `samples: Vec3[]` (≤ 64 points on the face, inside the face boundary), and a point-in-face test (§5.1 `faceContains`). Absent port (Manifold) ⇒ feature-attaching PMI commands no-op with "requires the OCC kernel" |
 | TR-GDT-04 | MUST | Size/location measurement from the resolved faces (§5.2) with relative agreement 1e-9 vs analytic for primitives |
 | TR-GDT-05 | MUST | FCF validation rules §5.5 implemented as pure functions over `PmiItem` + resolved feature types |
-| TR-GDT-06 | MUST | Post-replay refresh: after `replayHistory`, PMI items re-resolve `facesNear` → `faceIndices` / `measured`; failures surface in `check_pmi` (`UNRESOLVED_FEATURE`, `SURFACE_TYPE_CHANGED`) — never throw |
+| TR-GDT-06 | MUST | Post-replay refresh: after `replayHistory`, PMI items re-resolve `facesNear` → `faceIndices` / `measured`; failures surface in `check_pmi` (`GDT_FEATURE_UNRESOLVED`, `GDT_SURFACE_TYPE_CHANGED`) — never throw |
 | TR-GDT-07 | MUST | Surface texture item + symbol glyph |
 | TR-GDT-08 | MUST | Saved views; `activate_saved_view` sets camera through the same code path as `set_camera` |
 | TR-GDT-09 | MUST | `list_pmi` text rendering grammar §5.4 (Unicode symbols for display; ASCII fallback `--ascii`) |
@@ -241,6 +253,9 @@ pollute the recipe. Toolset `pmi` lists all of the above; `analyze_stackup`, `fa
 | TR-GDT-15 | SHOULD (V1) | PMI read stage (§5.9) plugged into gap 04's `import_step_exact` (XCAF document from opencascade.js-XDE or OCP), producing the §6.2 JSON → `apply_pmi_set`; exact face attachment needs exact import (D-1, `import_step_exact`, gap 01) |
 | TR-GDT-16 | SHOULD (V1) | PMI write stage (§5.10) plugged into gap 04's `export_step_ap242 { includePmi }` (`STEPCAFControl_Writer` GD&T mode) |
 | TR-GDT-17 | MUST | All PMI params schemas snapshot-tested in `toToolSchemas()` contract test |
+| TR-GDT-19 | MUST | Review flag + human gate (FR-GDT-31/32): `review` set from `ctx.caller` on create/edit/import; `accept_pmi_review` refuses agents; `check_pmi` warns `GDT_REVIEW_REQUIRED` per item; gap 09 `release_item` refuses while any PMI item is unreviewed (`PLM_PMI_UNREVIEWED`) |
+| TR-GDT-20 | MUST | Error contract (FR-GDT-33): every refusal returns `data.error = { code, ids?, paths?, remediation }` and the summary starts `<command> rejected: <code>`; codes = §7.2; zone/projected/UZ value checks are done in `run` (not zod `.positive()`), so they get `GDT_ZONE_NON_POSITIVE` instead of the generic invalid-params text |
+| TR-GDT-21 | MUST | Unverified propagation + provenance + named defaults (FR-GDT-34/35): `unverified` on items and stack-up contributors propagates to `analyze_stackup.data.unverified` and `check_pmi` warnings `GDT_UNVERIFIED_INPUT`; `provenance` and `{value, source, defaulted}` on every defaulted numeric |
 | TR-GDT-18 | MUST | Coverage gate 90/85/90/90 for `commands/pmi/**`, `geometry/pmi*.ts`; `lib/stackup.ts` 100 % lines (pure math) |
 
 ## 5. Kernel / algorithms
@@ -260,7 +275,7 @@ Input: solid entity, points `p_k`. Steps:
 4. Return indices (deduplicated, sorted) + surface type (or `mixed`).
 
 Replay: identical algorithm on the regenerated B-rep (KI5 edgesNear precedent). A face whose surface type
-changed is an error (`SURFACE_TYPE_CHANGED`), not a silent re-attachment.
+changed is an error (`GDT_SURFACE_TYPE_CHANGED`), not a silent re-attachment.
 
 ### 5.2 Measurement
 
@@ -308,22 +323,22 @@ Built-in rules are **logical consistency** rules that follow from the data model
 
 | Code | Severity | Rule |
 | --- | --- | --- |
-| `UNDEFINED_DATUM` | error | an FCF references a label with no `datum_feature` on the same solid |
-| `DUPLICATE_DATUM` | error | two datum features share a label |
-| `REPEATED_DATUM_REF` | error | the same label appears twice in one datum reference frame |
-| `TOO_MANY_DATUMS` | error | > 3 datum references |
-| `NON_POSITIVE_ZONE` | error | zone value ≤ 0, projected length ≤ 0, UZ value outside [0, zone] |
-| `MC_ON_NON_FOS` | error | MMC/LMC on a target that is not a feature of size |
-| `DIAMETRAL_ON_PLANE` | error | Ø zone on a planar target |
-| `FORM_WITH_DATUM` | error | straightness / flatness / roundness / cylindricity with datum references |
-| `INVALID_LIMITS` | error | size limits with lower > upper |
-| `UNRESOLVED_FEATURE` | error | `facesNear` resolves to no face after replay |
-| `SURFACE_TYPE_CHANGED` | error | resolved surface type differs from the stored one |
-| `DANGLING_TARGET` | error | `target.pmiId` missing |
-| `NOMINAL_OUTSIDE_LIMITS` | warning | measured nominal outside limits tolerance |
-| `UNTOLERANCED_FEATURE` | warning (opt-in) | a face of a solid with ≥ 1 PMI item is not covered by any PMI and no general note exists |
-| `DATUM_NOT_USED` | warning | datum feature never referenced |
-| `TABLE_RULE` | error/warning | a customer rule-table entry fails (§5.6) |
+| `GDT_DATUM_UNDEFINED` | error | an FCF references a label with no `datum_feature` on the same solid |
+| `GDT_DATUM_DUPLICATE` | error | two datum features share a label |
+| `GDT_DATUM_REPEATED` | error | the same label appears twice in one datum reference frame |
+| `GDT_DATUM_TOO_MANY` | error | > 3 datum references |
+| `GDT_ZONE_NON_POSITIVE` | error | zone value ≤ 0, projected length ≤ 0, UZ value outside [0, zone] |
+| `GDT_MC_ON_NON_FOS` | error | MMC/LMC on a target that is not a feature of size |
+| `GDT_DIAMETRAL_ON_PLANE` | error | Ø zone on a planar target |
+| `GDT_FORM_WITH_DATUM` | error | straightness / flatness / roundness / cylindricity with datum references |
+| `GDT_LIMITS_INVERTED` | error | size limits with lower > upper |
+| `GDT_FEATURE_UNRESOLVED` | error | `facesNear` resolves to no face after replay |
+| `GDT_SURFACE_TYPE_CHANGED` | error | resolved surface type differs from the stored one |
+| `GDT_TARGET_DANGLING` | error | `target.pmiId` missing |
+| `GDT_NOMINAL_OUTSIDE_LIMITS` | warning | measured nominal outside limits tolerance |
+| `GDT_FEATURE_UNTOLERANCED` | warning (opt-in) | a face of a solid with ≥ 1 PMI item is not covered by any PMI and no general note exists |
+| `GDT_DATUM_UNUSED` | warning | datum feature never referenced |
+| `GDT_TABLE_RULE` | error/warning | a customer rule-table entry fails (§5.6) |
 
 ### 5.6 Standard-specific rule tables (customer data)
 
@@ -377,8 +392,8 @@ sample); the command is synchronous and capped.
 4. Clip: items whose frame falls outside the view's paper bounds + margin are moved by the same greedy
    rule as §5.3 in paper space; still colliding ⇒ placed and reported in `warnings`.
 5. Section views: datum/feature symbols of cut faces are drawn on the cut outline (V1).
-6. Output `data.pmi.placed/skipped`; skipped reasons: `PLANE_NOT_PARALLEL`, `SOLID_NOT_IN_VIEW`,
-   `UNRESOLVED_FEATURE`, `VIEW_KIND_UNSUPPORTED`.
+6. Output `data.pmi.placed/skipped`; skipped reasons: `GDT_SHEET_PLANE_NOT_PARALLEL`, `GDT_SHEET_SOLID_NOT_IN_VIEW`,
+   `GDT_FEATURE_UNRESOLVED`, `GDT_SHEET_VIEW_KIND_UNSUPPORTED`.
 
 ### 5.9 AP242 semantic PMI import (PMI read stage of `import_step_exact`, V1)
 
@@ -403,7 +418,7 @@ class names in an opencascade.js XDE build):
 Dependency D-1: STEP import is tessellated today (`import_step` → `import_mesh`). Exact import is the single command
 `import_step_exact`, owned by gap 01 KRN and extended by gap 04 XCH (verification, AP242 assembly/PMI transport). Until it exists, imported PMI features keep their `facesNear` and `surface` but `faceIndices: []`,
 status `unresolved_mesh`; `list_pmi` still lists them (inspection planning works), `check_pmi` reports
-`UNRESOLVED_FEATURE` as info, not error, for imported items.
+`GDT_FEATURE_UNRESOLVED` as info, not error, for imported items.
 
 ### 5.10 AP242 semantic PMI export (PMI write stage of gap 04 `export_step_ap242`, V1)
 
@@ -465,15 +480,89 @@ id-normalisation (`tests/golden/normalize.ts` must normalise `pmi-<step>.<k>` li
 
 ## 7. UI / CLI / MCP surfaces
 
-- **UI** (`src/ui/panels/PmiPanel.tsx`, viewport `src/ui/viewport/3d/PmiLayer.tsx`): face picking yields
-  `facesNear` = picked world point (never indices); forms are generated from the command's
-  `paramsSchema` where possible; the viewport renders frames as camera-facing-on-plane billboards with
-  drei `<Text>`/lines; saved-view buttons call `activate_saved_view`. Presentation only (rules/react.md).
-- **CLI**: no new sub-command; `llull <command> [params]`, `run <plan>`, `--save` for `export_step_ap242`
-  (gap 04) and `export_sheet_svg`; `--kernel occt` required for feature-attaching commands in `--doc` mode.
-- **MCP**: toolset `pmi` (discoverable via `search_tools` / `enable_toolset`); query commands carry
-  `readOnlyHint`; descriptions state units, the `facesNear` contract and the OCC requirement; a prompt
-  `tolerance_part` (V1) in `packages/mcp/src/prompts.ts` walks datum → size → FCF → check.
+### 7.1 Surfaces (CLI first, `../AGENT_FIRST.md`)
+
+- **CLI (primary)**: no new sub-command; every PMI command via `llull <command> [params]` / `exec`, plans via
+  `run <plan> [--validate] [--continue]`, `--json` for `data`, `--save` for `export_sheet_svg`, `render_view` (PNG) and
+  `export_step_ap242` (gap 04); `--kernel occt` for feature-attaching commands in `--doc` mode; `--dry-run` works for every
+  mutating PMI command (AF-42). `llull guide` gains a GD&T section (units, `facesNear`, minimal plate plan; AF-03).
+  `render_view` draws PMI frames/datum symbols on their annotation planes so a multimodal agent can check placement (AF-22).
+- **MCP**: toolset `pmi` (discoverable via `search_tools` / `enable_toolset`); query commands carry `readOnlyHint`;
+  descriptions state units, the `facesNear` contract, the OCC requirement, the refusal codes and the next command (AF-02);
+  a prompt `tolerance_part` (V1) in `packages/mcp/src/prompts.ts` walks datum → size → FCF → `check_pmi`.
+- **UI (review/approval)** (`src/ui/panels/PmiPanel.tsx`, viewport `src/ui/viewport/3d/PmiLayer.tsx`): lists items with
+  their codes and review state; accept/reject buttons dispatch `accept_pmi_review` as a human caller; face picking yields
+  `facesNear` = picked world point (never indices); frames drawn as on-plane billboards with drei `<Text>`/lines;
+  saved-view buttons call `activate_saved_view`. Presentation only (rules/react.md).
+
+### 7.2 Stable error / finding codes (AF-11)
+
+Every refusal returns `data.error = { code, ids, paths, remediation }`, exit code 1; every `check_pmi` finding has the
+same shape inside `errors[]` / `warnings[]`. Codes are part of the public contract (snapshot-tested with the tool schemas).
+
+| Code | Sev | When (command) | Offending ids / paths | Remediation (text returned) |
+| --- | --- | --- | --- | --- |
+| `GDT_KERNEL_NO_TOPOLOGY` | refuse | any feature-attaching command without exact topology | `entityId` | "rerun with --kernel occt (desktop) — PMI needs exact faces" |
+| `GDT_ENTITY_NOT_SOLID` | refuse | `entityId` is not a 3D solid | `entityId` | "pass the id of a solid (llull describe_scene)" |
+| `GDT_POINT_NOT_ON_FACE` | refuse / error | a `facesNear` point is farther than `tolFace` from every face | `facesNear[i]` | "pick a point on the face (inspect_topology lists face centroids)" |
+| `GDT_FACE_AMBIGUOUS` | refuse | two different surfaces within `tolFace` | `facesNear[i]`, face indices | "move the point to the face interior" |
+| `GDT_DATUM_LABEL_INVALID` | refuse | label not `^[A-Z]{1,2}$` or excluded by the rule table | `label` | "use the next free letter (omit label)" |
+| `GDT_DATUM_DUPLICATE` | refuse / error | label already used on the solid | `label`, existing pmi id | "choose another letter or update_pmi the existing datum" |
+| `GDT_DATUM_UNDEFINED` | refuse / error | FCF references a label with no datum feature | `datums[i].label` | "add_datum_feature with that label first" |
+| `GDT_DATUM_REPEATED` | refuse / error | same label twice in one DRF | `datums` | "list each datum once, primary → tertiary" |
+| `GDT_DATUM_TOO_MANY` | refuse / error | > 3 datum references | `datums` | "keep at most 3 references" |
+| `GDT_DATUM_REFERENCED` | refuse | `delete_pmi` of a datum still referenced | pmi ids of FCFs | "delete or edit those FCFs, or pass cascade: true" |
+| `GDT_ZONE_NON_POSITIVE` | refuse / error | zone, projected length ≤ 0, UZ outside [0, zone] | `zone.*` | "tolerance values are > 0 in document units" |
+| `GDT_MC_ON_NON_FOS` | refuse / error | MMC/LMC on a target that is not a feature of size | pmi id / `materialCondition` | "target a size dimension (targetPmiId) or drop the modifier" |
+| `GDT_DIAMETRAL_ON_PLANE` | refuse / error | Ø zone on a planar target | `zone.diametral` | "remove diametral for planar features" |
+| `GDT_FORM_WITH_DATUM` | refuse / error | form characteristic with datum refs | `datums` | "form tolerances take no datums" |
+| `GDT_CHARACTERISTIC_NOT_PERMITTED` | refuse / error | rule table forbids it for the standard | `characteristic` | "see pmi-rules.<standard>.json" |
+| `GDT_NOT_FOS` | refuse | size dimension on a non feature of size | `facesNear` | "use add_location_dimension for planes" |
+| `GDT_SIZE_MIXED` | refuse | pattern faces of different size | face indices | "split into one size dimension per size" |
+| `GDT_LIMITS_INVERTED` | refuse / error | lower > upper | `tolerance` | "swap the limits" |
+| `GDT_NOMINAL_OUTSIDE_LIMITS` | warn | measured nominal outside limits | pmi id | "check the model or the limits" |
+| `GDT_PMI_UNKNOWN` | refuse | unknown `pmiId` / `targetPmiId` | id | "list_pmi for valid ids" |
+| `GDT_FIELD_INVALID_FOR_KIND` | refuse | `update_pmi` field not valid for the item kind | path | "llull describe update_pmi" |
+| `GDT_VIEW_REF_UNKNOWN` | refuse | saved view references unknown PMI/entity | ids | "remove the id or create the item" |
+| `GDT_SURFACE_PARAMETER_UNKNOWN` | refuse | surface-texture parameter not in the rule-table list | `parameter` | "use Ra/Rz or fill the rule table" |
+| `GDT_FEATURE_UNRESOLVED` | error | `facesNear` resolves to no face after replay | pmi id | "update_pmi with a point on the new face" |
+| `GDT_SURFACE_TYPE_CHANGED` | error | resolved surface type differs | pmi id | "re-attach the item" |
+| `GDT_TARGET_DANGLING` | error | `target.pmiId` missing | pmi id | "delete or retarget the FCF" |
+| `GDT_FEATURE_UNTOLERANCED` | warn (opt-in) | face of a toleranced solid not covered, no general note | face index | "add PMI or set_pmi_standard generalToleranceNote" |
+| `GDT_DATUM_UNUSED` | warn | datum never referenced | pmi id | "reference it or delete it" |
+| `GDT_TABLE_RULE` | error/warn | customer rule-table entry fails | pmi id, rule id | rule's own text |
+| `GDT_REVIEW_REQUIRED` | warn (never hidden) | item `review.required` (agent-created/edited or imported) | pmi ids | "a qualified engineer must accept_pmi_review in the desktop app" |
+| `GDT_REVIEW_HUMAN_ONLY` | refuse | `accept_pmi_review` from an agent caller | pmi ids | "ask the owner to have a qualified engineer review in the app" |
+| `GDT_UNVERIFIED_INPUT` | warn (never hidden) | unresolved/unmapped import, no rule table, typed stack-up contributor | ids / contributor names | "link the contributor to a PMI item or confirm the value with its source" |
+| `GDT_IMPORT_UNMAPPED` | warn | AP242 item with unknown enum kept as note | raw text | "report to llull; check the item manually" |
+| `GDT_STACKUP_EXPRESSION` | refuse | expression parse error / unknown name | `expression` | "use + - * / ( ) and contributor names" |
+| `GDT_STACKUP_SAMPLES_CAP` | refuse | samples > 2e6 | `samples` | "use ≤ 2000000" |
+| `GDT_STACKUP_CONTRIBUTOR_UNTOLERANCED` | refuse | `pmiId` contributor without tolerance | contributor | "add a tolerance to the PMI item" |
+| `GDT_STACKUP_SENSITIVITY_CONFLICT` | refuse | both `expression` and `sensitivity` given | contributors | "give either expression or sensitivities" |
+| `GDT_FASTENER_HOLE_LE_FASTENER` | refuse | hole MMC ≤ fastener MMC | `holeMmc` | "no clearance: no positional tolerance is possible" |
+| `GDT_SHEET_PLANE_NOT_PARALLEL` / `GDT_SHEET_SOLID_NOT_IN_VIEW` / `GDT_SHEET_VIEW_KIND_UNSUPPORTED` | info (`data.pmi.skipped`) | sheet placement | pmi id, view id | "add a view facing the plane / list pmiIds explicitly" |
+
+### 7.3 Agent-first compliance (`../AGENT_FIRST.md`)
+
+| AF | Where satisfied |
+| --- | --- |
+| AF-01, AF-02 | FR-GDT-28; all PMI commands are registry commands in toolset `pmi`; descriptions per §7.1 |
+| AF-03 | FR-GDT-36; `llull guide` GD&T section |
+| AF-04, AF-10 | FR-GDT-24; params state units; `data` shapes in §4 (`measuredMm`/`unit`, stack-up `unit`) |
+| AF-05 | FR-GDT-28; `validation/draft_plan_gdt_plate.json` runs with `run --validate` |
+| AF-11 | FR-GDT-33, TR-GDT-20, §7.2 |
+| AF-12, AF-13 | `list_pmi` filters by entity/kind; sheets/STEP via `--save`; deterministic ids `pmi-<step>.<k>`, seeded MC |
+| AF-20 | FR-GDT-11 `check_pmi` (pass/warn/fail) |
+| AF-21, AF-22 | FR-GDT-13 CLI equivalent (plane data in `list_pmi`), `render_view --save` with PMI |
+| AF-23 | VC-GDT-* phrased as CLI scripts (validation/README §4) |
+| AF-30 | built-in logical rules §5.5 + customer rule tables §5.6 (sourced data, never paywalled content) |
+| AF-31, AF-35 | FR-GDT-35, TR-GDT-21 (`sigmaPerHalfTolerance`, `samples`, `tolFace` named; provenance) |
+| AF-32 | FR-GDT-34, TR-GDT-21 |
+| AF-33, AF-34 | FR-GDT-31/32, TR-GDT-19 (`accept_pmi_review` human-only; gap 09 release blocked while unreviewed) |
+| AF-36 | FR-GDT-36 owner summary |
+| AF-40 | AP242 import (V1) reports `--progress`, respects `--timeout` |
+| AF-41 | OCP/CadQuery bundled on desktop; NIST SFA only in CI (not needed by the operator) |
+| AF-42 | `--dry-run` on all mutating PMI commands |
 
 ## 8. Performance & robustness budgets
 
@@ -504,6 +593,7 @@ id-normalisation (`tests/golden/normalize.ts` must normalise `pmi-<step>.<k>` li
 | quality gate | `quality/corpus.json` new entries `gate: "step-pmi"` pinned by `validation/nist_pmi_files.json` | per-category census equality, `knownIssues` ratchet | VC-GDT-20 |
 | production gate | scenario "supplier MBD intake": import NIST FTC 06 → list_pmi → check_pmi → sheet with PMI → export SVG | end-to-end | VC-GDT-24 |
 | external | NIST SFA `sfa-cl` on Windows CI | semantic PMI report of exports | VC-GDT-22 |
+| agent-first (CLI) | `server/tests/cli-pmi.test.ts`: runs the plate plan, rejection plan and SU plans through `node server/bin/llull.cjs … --json`, compares with `validation/expected_results.json` | error codes + remediation, `reviewRequired`, human gate, unverified propagation, provenance/defaults | VC-GDT-54..58 |
 
 ## 10. Delivery plan
 

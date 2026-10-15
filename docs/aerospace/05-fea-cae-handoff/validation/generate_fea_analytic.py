@@ -269,6 +269,68 @@ def main() -> None:
         "tolerance_rel": 1e-12, "derivation": "1 g = 1e-6 t; CalculiX manual quotes 7.8e-9 N s^2/mm^4 for steel", "sources": ["S30"],
     })
 
+    # --- VC-FEA-60..65: agent-first result contract (AGENT_FIRST.md AF-11, AF-31..35) ----------------------------
+    # Same four rows as VC-FEA-20; adds the fields an agent asserts on. Statuses follow TECHNICAL_SPEC 5.8.
+    factors = {
+        "ultimate": {"value": 1.5, "source": "14 CFR 25.303", "defaulted": True},
+        "yield": {"value": 1.0, "source": "derived from 14 CFR 25.305(a) (limit load, no detrimental permanent deformation)", "defaulted": True},
+        "extra": [],
+    }
+    af_rows = []
+    for i, row in enumerate(ms_rows, 1):
+        ms = row["MS"]
+        status = "FAIL" if ms < 0 else "PASS"
+        af_rows.append({
+            "rowId": f"r{i}", "appliedMPa": row["limit_MPa"], "allowableMPa": row["allowable_MPa"], "ms": ms, "status": status,
+            "code": "FEA_MS_NEGATIVE" if status == "FAIL" else None,
+            "reviewRequired": True, "reviewReason": "margin of safety supports a structural substantiation decision",
+            "disposition": "pending_human" if status == "FAIL" else "none",
+        })
+    cases.append({
+        "id": "VC-FEA-60", "quantity": "named safety factors when none are given (AF-31)", "value": {"factors": factors}, "unit": "1",
+        "assert": "data.factors deep-equals value; no factor without source", "derivation": "TECHNICAL_SPEC 5.8 / FR-FEA-31", "sources": ["S1", "S1a"],
+    })
+    cases.append({
+        "id": "VC-FEA-61", "quantity": "every margin row flagged for review (AF-33)", "value": af_rows, "unit": "1",
+        "assert": "for every row: reviewRequired == true and reviewReason non-empty; data.reviewRequired == true; summary contains 'not approved'",
+        "derivation": "rows of VC-FEA-20 with FR-FEA-32/33 fields; marginalBand unset -> no MARGINAL rows and warning FEA_MARGINAL_BAND_UNSET",
+        "sources": ["S1", "S2"],
+    })
+    cases.append({
+        "id": "VC-FEA-62", "quantity": "check_analysis after VC-FEA-61 (AF-20)",
+        "value": {"status": "fail", "codes": ["FEA_DISPOSITION_PENDING", "FEA_MARGINAL_BAND_UNSET", "FEA_MS_NEGATIVE"]}, "unit": "1",
+        "assert": "data.status == value.status and sorted(set(item.code)) == value.codes", "derivation": "FR-FEA-33/35", "sources": [],
+    })
+    cases.append({
+        "id": "VC-FEA-63", "quantity": "agent attempts dispose_margin on r4 (AF-34)",
+        "value": {"exitCode": 1, "code": "FEA_HUMAN_GATE", "documentChanged": False, "rowDisposition": "pending_human"}, "unit": "1",
+        "assert": "CLI exit code, data.code, document hash unchanged, compute_margins row r4 disposition", "derivation": "FR-FEA-33, TR-FEA-91", "sources": [],
+    })
+    cases.append({
+        "id": "VC-FEA-64", "quantity": "unverified gap 08 input propagates (AF-32)",
+        "value": {"input": {"property": "E", "basis": "typical", "unverified": True},
+                  "expect": {"rows[*].unverified": True, "rows[*].unverifiedReasons contains": "E basis typical",
+                             "meshSummary.unverified": False, "resultsSummary.unverified": True,
+                             "check_analysis.items contains": {"code": "FEA_MATERIAL_UNVERIFIED", "severity": "warning"}}},
+        "unit": "1", "assert": "as listed", "derivation": "FR-FEA-34 (the mesh does not depend on material, results and margins do)", "sources": [],
+    })
+    cases.append({
+        "id": "VC-FEA-65", "quantity": "stable error codes for deliberately wrong set-ups (AF-11)",
+        "value": [
+            {"setup": "add_fea_constraint facesNear on a point 5 mm off the part", "code": "FEA_TARGET_UNRESOLVED"},
+            {"setup": "facesNear exactly on the edge shared by two faces", "code": "FEA_TARGET_AMBIGUOUS"},
+            {"setup": "material record without E", "command": "fea_export", "code": "FEA_MATERIAL_NO_ELASTIC"},
+            {"setup": "set_material_property property=nu value=0.5", "code": "FEA_PROPERTY_INVALID"},
+            {"setup": "mesh artifact with one inverted tet", "command": "fea_export", "code": "FEA_MESH_INVERTED"},
+            {"setup": "set_parameter after solve", "command": "compute_margins", "code": "FEA_RESULTS_STALE"},
+            {"setup": "record_fe_mesh with a hash absent from the store", "code": "FEA_ARTIFACT_NOT_FOUND"},
+            {"setup": "LLULL_CCX pointing to a missing file", "command": "fea_solve", "code": "FEA_TOOL_MISSING"},
+            {"setup": "set_analysis_factors ultimate=0.9", "code": "FEA_FACTOR_INVALID"},
+        ],
+        "unit": "1", "assert": "exit code 1; data.code == code; data.remediation non-empty; data.ids or data.path set",
+        "derivation": "TECHNICAL_SPEC 7.1", "sources": [],
+    })
+
     doc = {
         "generator": "generate_fea_analytic.py", "gap": "05-fea-cae-handoff",
         "beta_n_L_clamped_free": [r(x, 11) for x in BETA],

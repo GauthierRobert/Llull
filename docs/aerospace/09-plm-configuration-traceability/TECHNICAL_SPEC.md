@@ -240,9 +240,9 @@ happy and failure unit tests (non-negotiable 2).
 | `submit_for_review` | mut | `{ comment?, at, by }` | checkpoint if dirty; state → in_review | scope frozen from here | state ≠ in_work; marking undetermined with `requireMarking`; unresolved parameter errors (`doc.parameters[*].error`) | 04,25 |
 | `reject_review` | mut | `{ comment, at, by }` | → in_work | — | empty comment; state ≠ in_review | 04 |
 | `record_approval` | mut | `{ role, userId, comment?, at }` | appends Approval to the current revision | one approval per (role,user) | state ≠ in_review; role not in policy | 07 |
-| `release_item` | mut, destructiveHint | `{ changeOrder?, effectivity?: Effectivity[], approvals?: Approval[], at, by }` | state → released; contentHash, snapshot, releasedAt/By; previous released → superseded with closed effectivity; ECO → implemented + ECN when all its items released | `contentHash == sha256(canonical(scope(doc)))` at that instant | not in_review; approvals missing/insufficient; checker == author (policy); ECO missing/closed/does not list item; effectivity overlaps another released revision; unreleased children (assembly); `humanSignatureRequired` and caller source is agent without signature (adapter flag) | 06,07,11,17 |
+| `release_item` | mut, destructiveHint | `{ changeOrder?, effectivity?: Effectivity[], approvals?: Approval[], at, by }` | state → released; contentHash, snapshot, releasedAt/By; previous released → superseded with closed effectivity; ECO → implemented + ECN when all its items released | `contentHash == sha256(canonical(scope(doc)))` at that instant | not in_review; approvals missing/insufficient; checker == author (policy); ECO missing/closed/does not list item; effectivity overlaps another released revision; unreleased children (assembly); agent caller (`PLM_HUMAN_GATE`); `humanSignatureRequired` without a valid human approval signature (`PLM_SIGNATURE_REQUIRED`); unresolved `reviewRequired` items in scope (`PLM_REVIEW_PENDING`) | 06,07,11,17,35 |
 | `create_change_request` | mut | `{ id?, title, reason, affectedItems, proposedClassification?, at, by }` | adds ECR open | id unique | empty title; unknown item | 08 |
-| `create_change_order` | mut | `{ id?, purpose?: 'initial-release'\|'change' (default 'change'), fromRequests?, affectedItems?, classification?, classificationTags?, classificationJustification?, effectivity?, disposition?, at, by }` | adds ECO open; listed ECRs → accepted | classification never inferred; required when `purpose='change'`, absent for `initial-release` (nothing to classify against a previous approved design) | `purpose='change'` without classification; `initial-release` for an item that already has a released revision; unknown ECR; ECR not open | 08,09 |
+| `create_change_order` | mut (classification part human-gated) | `{ id?, purpose?: 'initial-release'\|'change' (default 'change'), fromRequests?, affectedItems?, classification?, classificationTags?, classificationJustification?, effectivity?, disposition?, at, by }` | adds ECO open; listed ECRs → accepted | classification never inferred; required when `purpose='change'`, absent for `initial-release` (nothing to classify against a previous approved design) | `purpose='change'` without classification; `initial-release` for an item that already has a released revision; unknown ECR; ECR not open | 08,09 |
 | `set_change_state` | mut | `{ id, state: 'rejected'\|'cancelled', reason, at, by }` | closes ECR/ECO | implemented is terminal | illegal transition | 08 |
 | `revise_item` | mut | `{ changeOrder?, at, by }` | adds revision next(scheme) in_work basedOn current, iteration 1 | previous revision object unchanged (deep-equal) | current not released; no open ECO listing item (policy); scheme exhausted | 10 |
 | `set_lifecycle_state` | mut | `{ revision, state: 'obsolete'\|'cancelled', reason, changeOrder?, at, by }` | → obsolete/cancelled; open effectivity closed | per transition table | illegal transition; empty reason | 04 |
@@ -253,7 +253,8 @@ happy and failure unit tests (non-negotiable 2).
 | `assign_characteristic_ids` | mut | `{ sheetId?, scheme:'sequential', includeNotes? }` | `plm.characteristics` | existing numbers never change; retired numbers never reused | gap 03 PMI absent → summary explains | 26 |
 | `as_built_vs_as_designed` | query (V2) | `{ serial }` | data `{ differences: [{partNumber, asDesigned, asBuilt, authority}] }` | compares the as-built record with its baseline members | unknown serial | 28 |
 | `record_as_built` | mut (V2) | `{ serial, partNumber, asDesignedBaseline, deviations, at, by }` | adds AsBuiltRecord | — | unknown baseline | 28 |
-| `plm_status` | query | `{}` | — | — | — | 18 |
+| `plm_status` | query | `{}` | data `{ item, revisions[{label, state, iterations, contentHash, effectivity}], openChanges[], locks?, dirty, integrity{<rev>: 'ok'\|'mismatch'}, policy{<key>: {value, source, defaulted}}, reviewRequired[], unverified[], nextHumanAction? }` | — | — | 18, 35, 36 |
+| `check_release_readiness` | query | `{ revision? }` | data `{ status: 'pass'\|'warn'\|'fail', findings[{code, severity, ids, message, remediation}], humanActionsNeeded[{role, act}] }` | never mutates; lists every `reviewRequired` / `unverified` flag in scope | unknown revision | 34, 35 |
 | `resolve_effectivity` | query | `{ partNumber?, kind, unit }` | data `{revision\|null, state}` | first range containing unit among released/superseded | unit type mismatch | 12 |
 | `plm_diff` | query | `{ from, to, geometry?: boolean }` | data per category (§5.4) | — | unknown labels | 13 |
 | `verify_release` | query | `{ revision, regenerate?: boolean }` | data `{contentHashMatches, signaturesValid, titleBlockConsistent, geometryFingerprintMatches?, reconstructedFrom}` | released, superseded and obsolete revisions all verify | revision never released (in_work / in_review / cancelled) | 15,16 |
@@ -265,9 +266,9 @@ happy and failure unit tests (non-negotiable 2).
 
 | TR | Requirement | Serves |
 | -- | ----------- | ------ |
-| TR-PLM-14 | Summaries of refused edits follow the llull convention `<command> rejected: <PN> rev <R> is <state>; …` and name the remedy (`open an ECO and revise_item`). | FR-PLM-05 |
+| TR-PLM-14 | Summaries of refused edits follow the llull convention `<command> rejected: <PN> rev <R> is <state>; …` and name the remedy (`open an ECO and revise_item`); `data.error` carries the stable code (§7.2), ids and remediation. | FR-PLM-05, FR-PLM-33 |
 | TR-PLM-15 | MCP annotations: `release_item`, `record_signature`, `set_lifecycle_state` → `destructiveHint: true`; queries → `readOnlyHint`. The `toToolSchemas()` snapshot gains the `plm` tools (contract test). | FR-PLM-17 |
-| TR-PLM-16 | Agent gate: the MCP/CLI adapter passes `ctx.caller = { kind: 'human' \| 'agent', userId }`, a new optional ctx field set only by hosts. `release_item` and `record_approval` refuse `agent` callers when `humanSignatureRequired`. The UI dispatch sets `human`. **Limit:** in local CLI runs (`--doc`, `--app` without named-user auth) the caller kind is self-declared by the process, so the gate is advisory there. It is enforceable only on a server with named-user authentication (where `by` and `caller` come from the authenticated session) and through the signature requirement itself: the release needs a signature from a registered human key, which an agent cannot produce (FR-PLM-17). | FR-PLM-17 |
+| TR-PLM-16 | Agent gate (AF-34, the central human-gate mechanism for all gaps): the MCP/CLI adapter passes `ctx.caller = { kind: 'human' \| 'agent', userId }`, a new optional ctx field set only by hosts (CLI/MCP default `agent`; the desktop UI dispatch `human`). Gated commands — `record_approval`, `record_signature` (meaning approval/release), `release_item`, `create_change_order`/`set_change_state` when they carry a classification or accept/reject decision, `set_export_marking`, `attach_release_package`, `record_as_built` deviations (disposition), gap 03 `accept_pmi_review` — refuse `agent` callers with `PLM_HUMAN_GATE` (or the gap's own `*_HUMAN_ONLY` code). With `humanSignatureRequired` (default true) `release_item` also needs a valid approval signature from a registered, non-test human key; the agent never holds signing keys (signing is host code behind an OS prompt). Everything else is open to agents, so an agent can prepare a release end to end. The UI dispatch sets `human`. **Limit:** in local CLI runs (`--doc`, `--app` without named-user auth) the caller kind is self-declared by the process, so the gate is advisory there. It is enforceable only on a server with named-user authentication (where `by` and `caller` come from the authenticated session) and through the signature requirement itself: the release needs a signature from a registered human key, which an agent cannot produce (FR-PLM-17). | FR-PLM-17 |
 
 ## 5. Algorithms
 
@@ -382,7 +383,7 @@ Vectors: `vectors/effectivity_resolution.json`.
 - Signed bytes: `UTF-8(canonical(manifestBody))`, where `manifestBody` is the manifest without `manifestSha256` and
   `signatures`.
 - Deterministic: the same key and bytes always give the same signature, which makes golden tests possible (the sample
-  manifest is signed with the public RFC 8032 TEST 1 key: `6cabcd28…cbde0f01`).
+  manifest is signed with the public RFC 8032 TEST 1 key: `78343a41…1b5f460c`).
 - Key custody (host): private keys stay in the OS keystore or a hardware token. The desktop uses Electron's OS-backed
   secret storage to protect a locally generated key (candidate API, to verify), or PKCS#11 tokens in V2.
 - Public keys are registered in `vault/keys/<userId>.json` with validity dates. Revocation is a signed vault entry.
@@ -420,6 +421,7 @@ Manifest fields:
 - `releasedAt/By`;
 - `members[{path,role,mediaType,canonical,sha256,bytes}]`, `documentContentHash`;
 - `tool{name,version,kernel,schemaVersion}` (FR-PLM-30);
+- `reviewRequired[]`, `unverified[]` (ids + reason of flags present at release, FR-PLM-35; empty in the sample);
 - `manifestSha256`, `signatures[]`.
 
 Verification needs no llull: `sha256sum` per member plus any RFC 8032 verifier on the canonical body
@@ -461,15 +463,78 @@ deferred to the V2 design.
 
 ## 7. UI / CLI / MCP surfaces
 
+### 7.1 Surfaces (CLI first, `../AGENT_FIRST.md`)
+
 | Surface | Element | Notes |
 | ------- | ------- | ----- |
-| UI `src/ui/panels/PlmPanel.tsx` | Item card (PN, rev.iter, state badge, marking), revisions list, changes list, baselines, effectivity resolver | Param-gathering only; dispatches commands |
-| UI viewport | Lock overlay + disabled edit tools. Tooltips quote the guard summary | Reads `doc.plm` state |
-| UI release dialog | Checklist: approvals, ECO, effectivity, marking, `check_model` result, package preview | Host signs, then `record_signature` → `release_item` (or release then sign, policy) |
-| UI drawings | Title block PN/revision auto-filled from `plm.item` when managed. Marking statement in the frame. Balloons rendered from `plm.characteristics` | Render-time projection: no sheet data duplication |
+| CLI (primary) | `llull plm_status`, `llull <plm command> [params]` (existing `exec` form; `run` is for plan files), `--json`, `--dry-run` on every mutating PLM command; new host sub-commands `llull release verify <manifest>`, `llull vault init\|checkout\|checkin\|log\|verify`, `llull audit verify`; new flags `--at/--by` (auto-filled from host clock/user), `--sign-with <keyref>` (human, interactive only) | Agent default caller kind = `agent`; gated acts refused (TR-PLM-16) |
+| MCP | toolset `plm` (view). Prompts: `prepare_engineering_change`, `prepare_fai` (both end at `submit_for_review` / skeleton and tell the agent which human must act) | Hidden tools still callable via `execute` |
+| UI review/approval `src/ui/panels/PlmPanel.tsx` | Item card (PN, rev.iter, state badge, marking), readiness findings, revisions, changes, baselines, effectivity resolver | Param-gathering only; the place where humans approve, classify, sign, release |
+| UI viewport | Lock overlay + disabled edit tools; tooltips quote the guard code and summary | Reads `doc.plm` state |
+| UI release dialog | Checklist from `check_release_readiness`: approvals, ECO, effectivity, marking, review/unverified flags, package preview | Host signs (OS prompt), then `record_signature` → `release_item` |
+| UI drawings | Title block PN/revision auto-filled from `plm.item`; marking statement in the frame; balloons from `plm.characteristics` | Render-time projection: no sheet data duplication |
 | Desktop menu | File > Vault > Open vault…, Check out, Check in…, Release package…, Verify package… | Host code (`desktop/src/vault/*`) |
-| CLI | `llull plm_status`, `llull <plm command> [params]` (existing `exec` form; `run` is for plan files), new host sub-commands `llull release verify <manifest>`, `llull vault init\|checkout\|checkin\|log\|verify`, `llull audit verify` | `--at/--by` auto-filled from host clock/user |
-| MCP | toolset `plm` (view). Prompts: `prepare_engineering_change`, `prepare_fai` | Hidden tools still callable via `execute` |
+
+### 7.2 Stable error / finding codes (AF-11)
+
+Refusals return `data.error = { code, ids, paths, remediation }`, exit code 1; readiness/verification findings use the
+same shape. Codes are a public contract (snapshot-tested).
+
+| Code | Sev | When (command) | Offending ids / paths | Remediation (text returned) |
+| ---- | --- | -------------- | --------------------- | --------------------------- |
+| `PLM_LOCKED` | refuse | any scope-changing command while the current revision is in_review/released/superseded/obsolete (guard §5.2) | PN, revision, state | "open an ECO and revise_item" (in_review: "reject_review first") |
+| `PLM_HISTORY_IMMUTABLE` | refuse | a result changes a released revision's state/hash/snapshot outside the transition table | revision label | "released history cannot change" |
+| `PLM_RECORD_REMOVED` | refuse | a command other than load/clear removes `doc.plm` | — | "PLM data can only be replaced by load_document" |
+| `PLM_HUMAN_GATE` | refuse | agent caller on a gated act (TR-PLM-16) | command, revision/ECO id | "ask the owner to have <role> do this in the desktop app" |
+| `PLM_SIGNATURE_REQUIRED` | refuse | `release_item` without a valid approval signature (`humanSignatureRequired`) | revision | "a human signs with the host keystore (Approve & sign)" |
+| `PLM_SIGNATURE_INVALID` | refuse | `record_signature` does not verify | `signature`, `publicKey` | "re-sign the release_manifest bytes" |
+| `PLM_SIGNATURE_PORT_MISSING` | refuse | no verifier port (pure browser) | — | "run on desktop or server" |
+| `PLM_KEY_UNTRUSTED` | refuse | key not registered, revoked, or an RFC 8032 test key outside test mode | `keyId` | "register the signer's public key in the vault" |
+| `PLM_PN_INVALID` | refuse | part number fails the regex / not unique | `partNumber` | "use A–Z, 0–9, . _ - /, ≤ 64 chars" |
+| `PLM_IDENTITY_FROZEN` | refuse | `set_item_identity` after first release | PN | "identity is immutable after release" |
+| `PLM_SCHEME_INVALID` | refuse | unknown scheme, empty/duplicate custom list, scheme exhausted | `scheme` | "use asme-alpha, numeric-2 or a custom list" |
+| `PLM_STATE_TRANSITION` | refuse | transition not allowed by `lifecycle_transitions.csv` | from, to | the table's refusal text (e.g. "submit_for_review first") |
+| `PLM_APPROVALS_MISSING` | refuse / finding | required roles not approved | missing roles | "record_approval by <role> (human)" |
+| `PLM_CHECKER_IS_AUTHOR` | refuse / finding | checker = author with `requireIndependentChecker` | user id | "a different user must approve as checker" |
+| `PLM_ECO_REQUIRED` | refuse / finding | release/revise without an open ECO listing the item | PN | "create_change_order listing the item" |
+| `PLM_ECO_UNKNOWN` / `PLM_ECO_CLOSED` | refuse | unknown or not-open ECO / ECR | id | "list changes with plm_status" |
+| `PLM_CLASSIFICATION_MISSING` | refuse / finding | `purpose='change'` ECO without a classification at release | ECO id | "a human records minor/major with justification" |
+| `PLM_EFFECTIVITY_OVERLAP` | refuse | overlap with another released revision of the same kind | ranges | "start the new range after the previous one" |
+| `PLM_EFFECTIVITY_UNIT_TYPE` | refuse | unit type mismatch (date vs integer) | `unit` | "serial/msn: integer; date: YYYY-MM-DD" |
+| `PLM_CHILDREN_UNRELEASED` | refuse / finding | assembly with unreleased children | child PNs | "release the children first" |
+| `PLM_MARKING_UNDECIDED` | refuse / finding | `requireMarking` and regime `undetermined` | PN | "the export-control officer records a decision (human)" |
+| `PLM_PARAMETER_ERRORS` | refuse / finding | unresolved parameter errors at submit | parameter names | "fix the expressions (set_parameter)" |
+| `PLM_TITLEBLOCK_MISMATCH` | finding | sheet title block ≠ managed PN/revision | sheet ids | "let the title block follow plm (clear the free text)" |
+| `PLM_REVIEW_PENDING` | refuse / finding | `reviewRequired` items in scope not accepted (e.g. gap 03 PMI) | item ids | "a qualified engineer reviews them (e.g. accept_pmi_review)" |
+| `PLM_UNVERIFIED_INPUT` | finding (warn, never hidden) | `unverified` data in scope (materials, analyses, imports) | ids + reason | "replace with verified data or accept the flag into the manifest" |
+| `PLM_INTEGRITY_MISMATCH` | finding | recomputed hash ≠ recorded (afterLoad, verify_release) | revision | "restore_revision_snapshot or open an ECO" |
+| `PLM_BASELINE_MEMBER_UNRELEASED` | refuse | baseline member not released/superseded | PN, revision | "release it or leave it out" |
+| `PLM_REVISION_UNKNOWN` / `PLM_NOT_RELEASED` | refuse | unknown label / query needs a released revision | label | "plm_status lists revisions" |
+| `PLM_VAULT_LOCKED` | host refusal | check-out of an item another holder locks | holder | "wait, or CM breaks a stale lock (audited)" |
+| `PLM_AUDIT_CHAIN_BROKEN` | finding | `llull audit verify` finds a broken hash chain | file, line | "investigate tampering; do not rotate" |
+
+### 7.3 Agent-first compliance (`../AGENT_FIRST.md`)
+
+| AF | Where satisfied |
+| -- | --------------- |
+| AF-01, AF-02 | FR-PLM-18; `plm` toolset, every PLM capability a registry command; descriptions name refusals and the next command |
+| AF-03 | `llull guide` PLM section (ids, states, minimal ECO plan); MCP prompts §7.1 |
+| AF-04, AF-10 | FR-PLM-36; data shapes in §4 (`plm_status`, `check_release_readiness`, `verify_release`) |
+| AF-05 | `validation/plans/plm_release_eco_revB.plan.json` with `run --validate` |
+| AF-11 | FR-PLM-33, §7.2 |
+| AF-12, AF-13 | packages written with `--save`/vault, never to stdout; canonical hashes and deterministic ids (PLM ids are business ids) |
+| AF-20 | FR-PLM-34 `check_release_readiness` (before) and FR-PLM-16 `verify_release` (after) |
+| AF-21, AF-22 | `plm_diff` numeric per-category diff instead of a visual compare; `render_view --save` of each revision |
+| AF-23 | VC-PLM-* phrased as CLI scripts (validation/README §3) |
+| AF-30 | `lifecycle_transitions.csv` and `PlmPolicy` are data applied by the guard and the readiness check |
+| AF-31 | FR-PLM-36: policy defaults named `{value, source, defaulted}` |
+| AF-32, AF-33 | FR-PLM-35: `PLM_REVIEW_PENDING` blocks release; `unverified` copied into manifest and status |
+| AF-34 | FR-PLM-17, TR-PLM-16 (central human-gate mechanism; `PLM_HUMAN_GATE`); signatures with human-held keys (§5.7) |
+| AF-35 | FR-PLM-30 tool provenance in the manifest; audit trail with actor/caller kind (FR-PLM-19) |
+| AF-36 | `plm_status.nextHumanAction` and readiness `humanActionsNeeded` give the plain-language next step |
+| AF-40 | package verify streams with `--progress`, respects `--timeout` |
+| AF-41 | offline: vault, signatures (`node:crypto`), audit all local |
+| AF-42 | `--dry-run` on every mutating PLM command |
 
 ## 8. Performance & robustness budgets
 
@@ -502,6 +567,7 @@ deferred to the V2 design.
 | VC-PLM-22 | `tests/unit/contract/toolSchemas` snapshot includes plm; `server/tests/cli-plm.test.ts` runs S1 via CLI; agent release refused | contract + server |
 | VC-PLM-23 | `desktop/tests/vaultLocks.test.ts`: two sessions, O_EXCL lock, lease expiry, audited break | desktop |
 | VC-PLM-24 | V2 with gap 04: AP242 export of PDM data validated by the CAx-IF/PDM-IF checker (TBD) | quality |
+| VC-PLM-25, 26, 27 | `server/tests/cli-plm.test.ts`: drives `node server/bin/llull.cjs … --json` as agent and as human caller; asserts `data.error.code`, exit codes, `check_release_readiness` findings against `validation/expected_results.json` | server (CLI) |
 | Golden | `tests/golden/plans.ts` gains `plm_release_eco` (from `validation/plans/plm_release_eco_revB.plan.json`); id-normalized snapshot + replay equality (PLM state is metaHistory; replay leaves it intact through the carry hook, TR-PLM-32) | golden |
 | Production gate | `npm run production` scenario: release → ECO → B → package → verify → reopen in a fresh profile → verify | gate |
 

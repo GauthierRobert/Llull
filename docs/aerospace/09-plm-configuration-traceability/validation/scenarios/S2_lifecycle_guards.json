@@ -6,7 +6,10 @@
     "VC-PLM-03",
     "VC-PLM-08",
     "VC-PLM-09",
-    "VC-PLM-13"
+    "VC-PLM-13",
+    "VC-PLM-25",
+    "VC-PLM-26",
+    "VC-PLM-27"
   ],
   "transitionTable": "validation/lifecycle_transitions.csv",
   "cases": [
@@ -22,7 +25,8 @@
       "expect": {
         "refused": true,
         "summaryMatches": "release_item rejected: LL-2001 rev A is in_work; submit_for_review first",
-        "documentUnchanged": true
+        "documentUnchanged": true,
+        "data.error.code": "PLM_STATE_TRANSITION"
       }
     },
     {
@@ -47,7 +51,8 @@
       "expect": {
         "refused": true,
         "summaryMatches": "checker must differ from the author",
-        "documentUnchanged": true
+        "documentUnchanged": true,
+        "data.error.code": "PLM_CHECKER_IS_AUTHOR"
       }
     },
     {
@@ -80,7 +85,8 @@
       "expect": {
         "refused": true,
         "summaryMatches": "rejected: LL-2001 rev A is released; open an ECO and revise_item",
-        "documentUnchanged": true
+        "documentUnchanged": true,
+        "data.error.code": "PLM_LOCKED"
       }
     },
     {
@@ -109,7 +115,8 @@
       },
       "expect": {
         "refused": true,
-        "summaryMatches": "revise_item rejected: a released revision can only be revised under an open change order (policy.requireChangeOrder)"
+        "summaryMatches": "revise_item rejected: a released revision can only be revised under an open change order (policy.requireChangeOrder)",
+        "data.error.code": "PLM_ECO_REQUIRED"
       }
     },
     {
@@ -208,6 +215,52 @@
       "expect": {
         "refused": true,
         "summaryMatches": "record_signature rejected: signature does not verify",
+        "documentUnchanged": true,
+        "data.error.code": "PLM_SIGNATURE_INVALID"
+      }
+    },
+    {
+      "id": "S2-13",
+      "given": "LL-2001 rev A in_review with both approvals recorded by humans; caller = agent (CLI default)",
+      "command": "release_item",
+      "params": {
+        "changeOrder": "ECO-0100",
+        "at": "2026-11-02T09:00:00Z",
+        "by": "u-agent"
+      },
+      "expect": {
+        "refused": true,
+        "data.error.code": "PLM_HUMAN_GATE",
+        "summaryContains": "human",
+        "documentUnchanged": true,
+        "note": "same refusal for record_approval, approval record_signature, classification on create_change_order, set_export_marking (AF-34)"
+      }
+    },
+    {
+      "id": "S2-14",
+      "given": "LL-2001 rev A in_review; one gap-03 PMI item with review.required = true; caller = human",
+      "command": "release_item",
+      "params": {
+        "changeOrder": "ECO-0100",
+        "at": "2026-11-02T09:00:00Z",
+        "by": "u-cm",
+        "approvals": [
+          {
+            "role": "design-authority",
+            "userId": "u-1"
+          },
+          {
+            "role": "checker",
+            "userId": "u-2"
+          }
+        ]
+      },
+      "expect": {
+        "refused": true,
+        "data.error.code": "PLM_REVIEW_PENDING",
+        "data.error.ids": [
+          "<pmi id>"
+        ],
         "documentUnchanged": true
       }
     }

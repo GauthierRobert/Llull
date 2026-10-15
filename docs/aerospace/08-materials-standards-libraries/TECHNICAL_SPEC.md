@@ -63,6 +63,8 @@ rule clone of `domain-aec`, knip workspace entry.
 | TR-MAT-32 | MUST | MCP responses redact private-licensed values for non-local clients; `exportGate()` enforced in server for share/cloud | FR-MAT-09 |
 | TR-MAT-40 | MUST | Seed library = public-domain values only, each with primary locator | FR-MAT-10 |
 | TR-MAT-41 | MUST | `sources.lock.json` pins primary PDFs by sha256; CI check that every seed value's `sourceId` is locked | FR-MAT-04, FR-MAT-10 |
+| TR-MAT-50 | MUST | `unverified` = basis ∈ {typical, supplier_unstated, unspecified} or provenance `legacy` or source status not verified; it is carried as `unverified` + `unverifiedReasons[]` by every derived result (mass, BOM material rows, allowables, gap 05 `FeaMaterialView` and margins, joint capacity); `check_materials` reports `MAT_VALUE_UNVERIFIED` | FR-MAT-25 |
+| TR-MAT-51 | MUST | Human-gated acts (export of marked content, lowering a marking, certification acceptance) need a human confirmation token from the desktop app (gap 09 signing port); CLI/MCP agent callers get `MAT_HUMAN_GATE`; `reviewRequired: true` on every allowable | FR-MAT-29, FR-MAT-30 |
 
 ### 2.3 Kernel needs
 
@@ -238,9 +240,12 @@ All pure (`(doc, params, ctx) → CommandResult`), zod `params`, `snake_case`. Q
 | `resolve_material_libraries` | mutating, session (not in `featureHistory`, never serialized) | `{}` (uses `ctx.libraries`) | `@affects materialRecords of private libraries` `@invariant fills only on exact sha256 match; never changes a value of an embedded record` `@failure provider/library missing or hash mismatch ⇒ records stay unresolved with reason` (§3.2, TR-MAT-16) |
 | `assign_material` (extended) | mutating | existing; `materialName` may be a record id (auto-creates render view) | unchanged invariants |
 | `get_material` | query | `{ material }` | returns record + resolved preferred values + markings |
-| `get_material_allowable` | query | `{ material, property, direction?, basis, thickness?, thicknessUnit?, temperature?, temperatureUnit?, edOverD?, forCertification?: boolean }` | `@invariant never returns a different basis than requested; forCertification refuses superseded/typical` `@failure none matching ⇒ data.available=false + candidates[]` |
+| `get_material_allowable` | query | `{ material, property, direction?, basis, thickness?: { value, unit }, temperature?: { value, unit }, edOverD?, forCertification?: boolean }` | `@invariant never returns a different basis than requested; forCertification refuses superseded/typical` `@failure none matching ⇒ data.available=false + candidates[]` · every returned value carries `basis`, `provenance`, `unverified`, `reviewRequired: true` (TR-MAT-50/51) |
 | `diff_material_libraries` | query | `{ a: {libraryId, version}, b: {...} }` | returns changed/added/removed PropertyValues |
-| `mass_properties` (fixed) | query | unchanged + `massUnit?: 'g'\|'kg'\|'lb'` | `@invariant mass unit correct for doc units & density unit`; data adds `densitySource`, `densityQuantity` |
+| `mass_properties` (fixed) | query | unchanged + `massUnit?: 'g'\|'kg'\|'lb'` | `@invariant mass unit correct for doc units & density unit`; data adds `massG`, `massKg`, `massLb`, `densitySource` (record, property id, basis, provenance), `densityQuantity`, `unverified`, `unverifiedReasons[]` (TR-MAT-50) |
+| `convert_quantity` | query | `{ value, from, to }` (unit strings of `lib/quantity.ts`) | returns `{ value, unit, factor }`; `@failure MAT_UNIT_INVALID / MAT_UNIT_DIMENSION` |
+| `check_materials` | query | `{ entityIds? }` | read-only readiness check (AF-20): `data { status, items: [{ code, severity, ids[], message, remediation }] }` over unverified values in use, superseded sources, unresolved libraries, preferred conflicts, representative fastener geometry, regrip needed, markings and pending human gates |
+| ✱ `register_material_library` | transport (host, like `import_step`) | `{ file, storage: 'private'\|'embedded' }` | copies a library file into the workstation store read by `ctx.libraries` (`~/.llull/libraries/`); returns `{ libraryId, version, sha256, licence, exportMarking }`; no document change |
 
 ### 4.2 Plugin `@aero` — fasteners (toolset `fasteners`)
 
@@ -249,7 +254,7 @@ All pure (`(doc, params, ctx) → CommandResult`), zod `params`, `snake_case`. Q
 | `import_fastener_catalog` | mutating | `{ catalog: FastenerCatalogFile } \| { libraryId, version, sha256 }` | `@failure grammar invalid / unit errors / missing provenance ⇒ no-op` |
 | `list_fastener_families` | query | `{ kind? }` | families, sizes, licence |
 | `decode_part_number` | query | `{ partNumber }` | fields (family, diameter, grip, material code); `@failure no grammar matches ⇒ data.matches=[]` |
-| `select_fastener` | query | `{ family, diameterDash, stack?: number, stackUnit?, stackIds?: string[], axisPoint?, axis?, nut?, washer?, washerSide?: 'nut'\|'head', maxWasherTotal?: Quantity }` | `@invariant algorithm §5.2`; `@failure out of range / protrusion short / washer total > max ⇒ data.ok=false, reasons[]` |
+| `select_fastener` | query | `{ family, diameterDash, stack?: { value, unit }, stackIds?: string[], axisPoint?, axis?, nut?, washer?, washerSide?: 'nut'\|'head', maxWasherTotal?: Quantity }` | `@invariant algorithm §5.2`; `@failure out of range / protrusion short / washer total > max ⇒ data.ok=false, reasons[]` |
 | `insert_fastener_stack` | mutating, `requiresKernel` | `{ selection \| (select_fastener params), holeMode: 'cut_close_tolerance'\|'cut_clearance'\|'none', holeDiameter? }` | `@affects plates (boolean cut), components (one per part number, created once), instances (fastener, washers, nut), aero.stacks` `@invariant one step; undo restores exactly; ids step-scoped` `@failure selection not ok ⇒ no-op (reasons)`; kernel missing ⇒ no-op |
 | `insert_fastener_row` | mutating, `requiresKernel` | `{ from: Vec3, to: Vec3 \| path, pitch \| count, edgeDistance?, ...select params, allowViolations?: boolean }` | `@failure pitch < 3D or edge < 2D (rivets; bolts: catalogue/company rule) ⇒ no-op unless allowViolations (then warnings)` |
 | `check_fastener_layout` | query | `{ stackIds? }` | edge distance / pitch / grip consistency after upstream edits (stack thickness changed ⇒ flag "regrip") |
@@ -363,13 +368,13 @@ component export path). No allowables in STEP.
 
 ## 7. UI / CLI / MCP surfaces
 
-- **UI** (`src/ui/panels/MaterialsPanel`, `FastenersPanel`; param-gathering only): library list with licence and
+- **UI** (review and approval surface only; `src/ui/panels/MaterialsPanel`, `FastenersPanel`): library list with licence and
   marking badges; record inspector with property table (filter by basis/direction/thickness), provenance popover;
   fastener insert dialog with live `select_fastener` preview (read-only dispatch) and a confirm that dispatches
   `insert_fastener_stack`; BOM panel sections.
-- **CLI**: no new verbs — `llull exec <command> <json>` and `llull run <plan.json>` (`build_project`) cover everything; add
-  `llull libraries list|add|remove` as thin wrappers over `ctx.libraries` provider in `server/src/cli` (host-only
-  file management, not document mutation).
+- **CLI** (primary operator surface): no new verbs — `llull <command> …` and `llull run <plan.json>` (`build_project`) cover
+  everything. Library files are registered with the `register_material_library file=…` transport (host file management, like
+  `import_step file=…`), not a CLI subcommand (AF-01). `llull guide` gains a materials/fasteners section (AF-03).
 - **MCP**: new toolset `materials` (`get_material get_material_allowable diff_material_libraries define_material_record set_material_property import_material_library remove_material_library resolve_material_libraries create_material assign_material`).
   `create_material` and `assign_material` **move** out of `3d` (one toolset per command, the `toolsets.ts` invariant);
   `search_tools` still finds them from any toolset. `TOOLSET_NAMES` gains `materials` and `fasteners`; toolset `fasteners` comes from
@@ -377,7 +382,71 @@ component export path). No allowables in STEP.
   (`licensed-no-redistribution` ⇒ values returned to local desktop CLI only; cloud MCP gets
   `redacted:true` + basis/locator) — TR-MAT-32.
 - **Export gate**: `export_step*`, `export_gltf`, `save/share`, live-sync to a non-loopback server consult
-  `exportGate(doc, target)`; ITAR/EAR-marked content ⇒ desktop: confirmation summary; cloud: refusal with reason.
+  `exportGate(doc, target)`; ITAR/EAR-marked content ⇒ `MAT_EXPORT_CONTROLLED`; the export proceeds only after a human confirmation in the desktop app
+  (TR-MAT-51; an agent passing `confirmExportControlled` gets `MAT_HUMAN_GATE`); cloud: refusal with reason.
+
+### 7.1 Stable error and check codes (AF-11)
+
+Exit code 1 on every refusal; `data.code`, `data.ids` (or `data.path`) and `data.remediation` are always set. `check_materials`
+items use the same codes with a severity.
+
+| Code | Severity | When | Offending ids / path | Remediation |
+| ---- | -------- | ---- | -------------------- | ----------- |
+| `MAT_UNIT_INVALID` | error | a unit string does not parse | param path | use a unit listed by `llull describe convert_quantity` |
+| `MAT_UNIT_DIMENSION` | error | wrong dimension (e.g. MPa for density) | param path, expected dimension | give a unit of the right dimension |
+| `MAT_BASIS_MISSING` | error | a strength property without `basis` | material, property | add `basis` (A, B, S, typical, …) |
+| `MAT_PROVENANCE_MISSING` | error | a value without `source` | material, property | add `source.citation` (and locator) |
+| `MAT_PREFERRED_CONFLICT` | error | a second `preferred` value for the same key | material, property ids | clear `preferred` on the other value |
+| `MAT_RECORD_NOT_FOUND` | error | unknown material / record id | id | `get_material` / `list` to find the id |
+| `MAT_RECORD_IN_USE` | error | removing a library whose records are assigned | entity ids | reassign those entities first |
+| `MAT_ALLOWABLE_NOT_AVAILABLE` | error | no value for the exact (property, direction, basis, thickness, temperature) key | key, `candidates[]` | pick a candidate explicitly or supply a sourced value; never substitute a basis |
+| `MAT_SOURCE_SUPERSEDED` | error (with `forCertification`) / warning | the value comes from a superseded source (MIL-HDBK-5J) | material, property | use the current MMPDS value (licensed library) |
+| `MAT_VALUE_UNVERIFIED` | warning (not suppressible) | a result uses an `unverified` value (typical, supplier_unstated, unspecified, legacy) | material, property ids | replace with a verified, sourced value |
+| `MAT_TEMPERATURE_OUT_OF_RANGE` | error | temperature outside the tabulated range | material, property, temperature | stay inside the table; no extrapolation |
+| `MAT_LIBRARY_HASH_MISMATCH` | error | imported file / provider sha256 ≠ the requested one | library id | import the new version explicitly |
+| `MAT_LIBRARY_UNRESOLVED` | warning | private library not available on this machine | library id, record ids | register the library file (`register_material_library`) |
+| `MAT_LICENCE_EMBED_FORBIDDEN` | error | `licensed-no-redistribution` with `storage: embedded` | library id | use `storage: private` |
+| `MAT_EXPORT_CONTROLLED` | error | export / share / cloud sync of marked content | marked record and library ids | hand over to a human (export-control officer) |
+| `MAT_HUMAN_GATE` | error | an agent attempts a human-gated act (export confirmation, lowering a marking, certification acceptance) | act, ids | ask the owner to do it in the desktop app |
+| `FAST_PART_NUMBER_UNKNOWN` | error | no grammar matches | part number | `list_fastener_families` |
+| `FAST_STACK_OUT_OF_RANGE` | error | stack beyond the catalogue grip range | stack, family, size | another diameter/family, or check the stack |
+| `FAST_WASHER_GAP` | error | gap cannot be shimmed within `maxWasherTotal` | gap, washer set | next grip dash or a different washer set |
+| `FAST_PROTRUSION_SHORT` | error | protrusion < 1 thread pitch | protrusion, pitch | next grip dash |
+| `FAST_PROTRUSION_UNKNOWN` | warning | nut height unknown | nut part number | import the nut dimensions |
+| `FAST_LAYER_GAP` | error | gap between stacked solids > contact tolerance | entity ids, gap | close the gap or select the right solids |
+| `FAST_AXIS_ANGLE` | warning | axis > 2° from the face normal | stack id | angled/countersunk fasteners are out of MVP |
+| `FAST_EDGE_DISTANCE` | error / warning with `allowViolations` | edge distance < rule (2 D rivets) | stack ids | move the row |
+| `FAST_PITCH` | error / warning with `allowViolations` | pitch < rule (3 D rivets) | stack ids | increase pitch or reduce count |
+| `FAST_GEOMETRY_REPRESENTATIVE` | warning | fastener solid built from placeholder proportions; excluded from mass | part number | import catalogue dimensions |
+| `FAST_REGRIP_NEEDED` | warning | stack thickness changed after an upstream edit | stack ids | re-run `select_fastener` / re-insert |
+| `FAST_KERNEL_REQUIRED` | error | hole cut needs a kernel | command | install a kernel (`--kernel occt` on desktop) |
+
+### 7.2 Agent-first compliance (`../AGENT_FIRST.md`)
+
+| AF | Where satisfied |
+| -- | --------------- |
+| AF-01 | every capability is a registry command (§4); library files go through the `register_material_library` transport, no CLI subcommand (§7) |
+| AF-02, AF-03 | descriptions state units, refusal codes and next command; `llull guide` materials/fasteners section: unit grammar, basis meanings, minimal fastener plan |
+| AF-04 | FR-MAT-31; `{ value, unit }` params (`stack`, `thickness`, `densityQuantity`) |
+| AF-05 | `validation/plans/*` as single plans, `llull run --validate` |
+| AF-10 | `mass_properties` (`massG`, `massKg`, `massLb`, `densitySource`), `get_material_allowable`, `select_fastener` (`…In` fields), BOM |
+| AF-11 | §7.1 (FR-MAT-27; VC-MAT-24) |
+| AF-12 | BOM CSV and library files only via `--save` / `file=` |
+| AF-13 | integer sixteenths arithmetic; deterministic selection order (§5.2) |
+| AF-20 | `check_materials` (FR-MAT-26) |
+| AF-21 | no visual-only analysis; the stack preview has `select_fastener` data |
+| AF-22 | `render_view --save` shows inserted stacks |
+| AF-23 | validation README "CLI harness" |
+| AF-30 | AC 43.13-1B rules and catalogue rules held as data with sources (`installationRules`, §5.2) |
+| AF-31 | FR-MAT-28 (VC-MAT-26) |
+| AF-32 | FR-MAT-25, TR-MAT-50 (VC-MAT-22, 23) |
+| AF-33 | FR-MAT-29 (VC-MAT-23) |
+| AF-34 | FR-MAT-30, TR-MAT-51 (VC-MAT-25) |
+| AF-35 | `provenance` on every value; `densitySource` in mass results |
+| AF-36 | result summaries: computed, verified/unverified, needs a human |
+| AF-40 | library import and row insertion report progress; cheap to re-run (hash-keyed) |
+| AF-41 | no network on desktop; libraries are local files |
+| AF-42 | `--dry-run` on every mutating material/fastener command (pure) |
 
 ## 8. Performance & robustness budgets
 
@@ -407,6 +476,7 @@ degrades with explicit warnings; replay with changed library hash ⇒ step warni
 | Server (OCC) | `server/tests/aeroFasteners.occt.test.ts` | exact hole cut volume = plate − πr²t (rel 1e-6), stack measurement on exact solids, mass rel 1e-6 |
 | Integration | `tests/integration/` | dispatch insert → undo → redo; export gate on ITAR marking (VC-MAT-15) |
 | Quality gate | `npm run quality` | `validation/generate_mat_reference.py --check` (expected JSON fresh) |
+| Agent-first | `tests/unit/materials/agentFirst.test.ts` + CLI harness | unverified propagation, `reviewRequired`, human gate, named defaults, error codes (VC-MAT-22…26) from `expected_results.json` |
 | Production gate | `docs/PRODUCTION_GATE.md` scenario | "bracket splice": 2 plates, 8 NAS6204 stacks, BOM matches expected rows, mass in lb & kg |
 
 ## 10. Delivery plan

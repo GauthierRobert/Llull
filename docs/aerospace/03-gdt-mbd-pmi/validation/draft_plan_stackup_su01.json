@@ -47,7 +47,6 @@
     "rss",
     "monteCarlo"
    ],
-   "sigmaPerHalfTolerance": 3,
    "samples": 200000,
    "seed": 20261015
   }

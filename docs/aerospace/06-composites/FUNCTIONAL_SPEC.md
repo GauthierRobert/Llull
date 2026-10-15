@@ -88,34 +88,45 @@ AP242 composite export                                -> OEM / supplier exchange
 
 ## 3. Personas and user stories
 
-| Persona | Description |
-| ------- | ----------- |
-| P1 Composite design engineer | Defines plies, zones, ramps; owns the layup definition and ply book |
-| P2 Stress engineer | Needs ABD, engineering constants and first-ply failure margins; exports laminates to FEA |
-| P3 Manufacturing / process engineer | Checks drapability, adds darts and splices, generates flat patterns, nesting and laser data |
-| P4 Quality / inspection | Uses the ply book, laser projection and core samples to verify layup |
-| P5 AI agent (MCP or CLI) | Builds layups from requirements, runs checks, iterates; never bypasses commands |
+Operator model per [`../AGENT_FIRST.md`](../AGENT_FIRST.md). Laminate sizing and allowables feed structural
+substantiation, so a qualified reviewer is part of this gap whenever a result supports release or a margin is
+accepted.
+
+| Role | Who | Uses | In this gap |
+| ---- | --- | ---- | ----------- |
+| **Operator (primary)** | AI agent (Claude Code or similar) | `llull` CLI (`--doc` or `--app`), MCP for cloud agents | Enters materials, rosettes, zones and plies as plans; runs `check_layup`, `analyze_laminate`, `drape_ply`; reads numeric `data`; exports DXF, laser and ply-book files with `--save` |
+| **Owner** | Person asking for "a 600 × 400 skin panel with a pad for a fitting" | Natural language; may watch the desktop app | States the goal, receives a plain-language summary, the files, and the list of items that need a qualified engineer |
+| **Qualified reviewer** (stress / composites authority, DOA signatory) | Engineer who owns allowables, margins and the release | Desktop app review surfaces (ply tree, core samples, shear map), check report, 09 PLM approval | Accepts margins, approves rule waivers and over-lock flat patterns, releases the ply book (human gates) |
+
+The domain roles of the previous revision (composite design engineer, stress engineer, manufacturing engineer,
+inspector) are now owners or reviewers on whose behalf the agent works.
 
 User stories:
 
-- **US-1 (P1).** As a design engineer, I define a skin as zones with stacking strings
-  (`[45/-45/0/90]s`, …), and llull generates continuous plies with ramps between zones, so I avoid
-  hand-drawing hundreds of ply boundaries.
-- **US-2 (P1/P4).** I click anywhere on the part and see the core sample: the ordered plies, materials,
-  orientations and total thickness.
-- **US-3 (P2).** I get the A, B, D matrices, Ex, Ey, Gxy, νxy and first-ply failure under a load set for any
-  core sample, with the same numbers in the UI, the CLI and MCP.
-- **US-4 (P3).** I simulate drape from a seed point and see the shear angle map with warning and lock
-  colouring. Then I add a dart and re-check.
-- **US-5 (P3).** I export DXF flat patterns (one closed outline per ply piece, labelled, with an orientation
-  arrow) that a ply cutter can nest, and laser-projection outlines for the layup tool.
-- **US-6 (P1/P4).** I publish a ply book: one sheet per sequence with the ply outline on the part, the flat
-  pattern, the material and the orientation.
-- **US-7 (P5).** As an agent, I receive "a 600 × 400 panel, Nx = 300 N/mm, quasi-isotropic base, pad at the
-  centre". I write a plan, run `check_laminate_rules` and `analyze_laminate`, adjust the stacks until the
-  margins are positive, and export the flat patterns.
-- **US-8 (P2).** I hand the layup to 05 FEA as shell sections (ply table per zone) so that the stress model
-  and the CAD layup cannot diverge.
+- **US-1 (operator).** Asked for a skin with a pad, I write zones with stacking strings (`[45/-45/0/90]s`, …),
+  run `generate_plies_from_zones` and read the generated plies and ramp widths in `data`, without drawing ply
+  boundaries.
+- **US-2 (operator).** I call `core_sample` at any point and read the ordered plies, materials, orientations
+  and thickness (with units) to confirm the stack before analysis.
+- **US-3 (operator).** I run `analyze_laminate` and read A, B, D, Ex, Ey, Gxy, νxy and first-ply-failure
+  strength ratios with units and provenance. Results built on unverified or mean-basis material values carry
+  `unverified`, and any margin result carries `reviewRequired`.
+- **US-4 (operator).** For a woven ply on a dome I run `drape_ply` and read the shear angle per node, the
+  counts over the warning and lock limits and the named over-lock regions, not a colour map; I add a dart
+  (`split_ply`) and re-run until the counts are acceptable.
+- **US-5 (operator).** I end every job with `check_layup`: pass / warn / fail findings with stable codes
+  (rules R1-R5, ramp conflicts, over-lock plies, FPF margin ≤ 0, unverified materials, defaulted thresholds).
+- **US-6 (operator).** I export DXF flat patterns and laser-projection outlines with `--save`, and a ply book
+  whose numeric content (`ply_book_data`) I can check before the SVG/PDF sheets are written.
+- **US-7 (operator).** Given "a 600 × 400 panel, Nx = 300 N/mm, quasi-isotropic base, pad at the centre", I write
+  a plan, run `check_layup` and `analyze_laminate`, adjust the stacks until the margins are positive, and export
+  the flat patterns; I report the margins to the owner as "computed by llull, not approved".
+- **US-8 (operator).** I hand the layup to 05 FEA as shell sections (ply table per zone) so the stress model and
+  the CAD layup cannot diverge.
+- **US-9 (owner).** I get one paragraph: what was built, what passed, what needs a qualified engineer.
+- **US-10 (qualified reviewer).** I review the layup in the desktop app (ply tree, core samples, shear map from
+  the same data), and I alone can accept a negative or marginal margin, approve a rule waiver or an over-lock
+  flat pattern, and release the ply book through 09 PLM.
 
 ## 4. Scope and phases
 
@@ -148,8 +159,8 @@ User stories:
 | FR-CMP-11 | MUST | Core sample: at a point (or along a polyline section), return ordered plies with material, orientation in rosette and in global axes, thickness, cumulative z, and laminate total thickness | Inspection and design checks | [R10], [R14] |
 | FR-CMP-12 | MUST | Ply drop-offs and ramps. Configurable ramp ratio (default 20:1), minimum stagger (in dropped thicknesses), drop order (inner first / outer first), and number of continuous cover plies. Report conflicts where the ramp does not fit between boundaries | Interlaminar stress risers at drops; 1:20 commonly used | [R20], [R21] |
 | FR-CMP-13 | SHOULD | Cores: honeycomb or foam core regions with edge chamfer angle; plies above and below; core sample reports the core | Sandwich panels are common in fairings and interiors | [R7] |
-| FR-CMP-20 | MUST | Design-rule check on every core sample / zone stack, with these rules: R1 symmetric; R2 balanced; R3 minimum fraction per 0/±45/90 family (default 10 %); R4 maximum consecutive same-angle plies (default 4); R5 outer plies ±45. Each finding names the zone or point, the rule and the offending plies | The commonly published laminate guidelines (CMH-17 / industry) | [R20], [R21], [R22] |
-| FR-CMP-21 | MUST | All rule thresholds are configurable per part. Rules can be disabled with a recorded justification | Rules vary between programmes; the sources disagree (e.g. 4 vs 5 contiguous) | [R20], [R21] |
+| FR-CMP-20 | MUST | Design-rule check through a read-only check command (`check_laminate_rules`, aggregated by `check_layup`, FR-CMP-66) on every core sample / zone stack: R1 symmetric; R2 balanced; R3 minimum fraction per 0/±45/90 family (default 10 %); R4 maximum consecutive same-angle plies (default 4); R5 outer plies ±45. Each finding has a stable code (`CMP_RULE_R1_SYMMETRY` … `CMP_RULE_R5_OUTER_PM45`), the zone or point, the offending plies and a remediation | The commonly published laminate guidelines (CMH-17 / industry), applied by llull so the agent never has to know them (AF-20, AF-30) | [R20], [R21], [R22] |
+| FR-CMP-21 | MUST | All rule thresholds are configurable per part; defaults are named in the results with their source (FR-CMP-67). Disabling a rule records a justification; for release the disable is a waiver that only a human approval through 09 PLM makes effective (FR-CMP-71) | Rules vary between programmes; the sources disagree (e.g. 4 vs 5 contiguous) | [R20], [R21] |
 | FR-CMP-22 | SHOULD | Additional rules: ply-drop symmetry, maximum angle change between adjacent plies (disorientation, e.g. ≤ 45°), no dropped outer plies, minimum ply width at drops | Common company rules | [R22] |
 | FR-CMP-30 | MUST | Lamina stiffness: compute Q and Q̄(θ) for every ply | CLT foundation | [R19] |
 | FR-CMP-31 | MUST | Laminate stiffness: compute A, B, D (and the 6×6 inverse) at any core sample or zone. Report engineering constants Ex, Ey, Gxy, νxy for both the membrane (A⁻¹) and the free-bending (ABD⁻¹) definitions, labelled | Stress engineer's daily tool; NASA RP-1351 covers ABD and constants | [R19] |
@@ -157,20 +168,29 @@ User stories:
 | FR-CMP-33 | MUST | Laminate mass and thickness: per ply piece, per part, with centre of gravity; integrates with `mass_properties` | Weight is a top driver | — |
 | FR-CMP-34 | SHOULD | Laminate hand-off to 05 FEA: per-zone shell section definition (ply table with material, thickness, angle, offset) exported in a solver-neutral JSON and, via 05 FEA, as Nastran PCOMP / CalculiX shell section | Single source of truth between CAD and analysis | 05 FEA |
 | FR-CMP-40 | MUST (V1) | Kinematic drape simulation on any exact face. Pin-jointed net from a seed point and a seed direction, constant step, geodesic or user-curve generators; outputs fibre directions and shear angle per node | Mack & Taylor fishnet algorithm, used by Fibersim, CPD, Altair and Creo | [R13], [R14], [R24] |
-| FR-CMP-41 | MUST (V1) | Producibility: shear map against the material warning shear and locking angle; regions over the limit are flagged and named per ply | Fabrics lock beyond a characteristic shear angle | [R13] |
+| FR-CMP-41 | MUST (V1) | Producibility as numbers (AF-21): shear angle per node (deg), counts and area over the material warning shear and locking angle, named over-lock regions per ply, in `data` of `drape_ply` / `check_producibility`; findings `CMP_DRAPE_OVER_LOCK` / `CMP_DRAPE_OVER_WARNING` in `check_layup`. The colour map is a review overlay built on the same data | Fabrics lock beyond a characteristic shear angle | [R13] |
 | FR-CMP-42 | SHOULD (V1) | Darts and splices: user-placed cut curves split a ply into pieces (with overlap or butt), and drape is recomputed per piece | Standard remedy for over-shear | [R7] |
 | FR-CMP-43 | MUST | Flat patterns. Exact developable unrolling for planes, cylinders and cones (MVP); drape-based flattening for doubly curved faces (V1). Each pattern carries the 0° direction, ply name, sequence and material, and optional excess/trim allowance | Cutter input | [R9] |
 | FR-CMP-44 | COULD | Fibre-deviation map: angle between the draped fibre and the design orientation (rosette projection) | Stress knock-down awareness | [R12] |
 | FR-CMP-50 | MUST | DXF flat-pattern export: one closed outline per ply piece, layer per ply, text labels, orientation arrow, mm units; optional nesting is V2 | Universal cutter input (ASTM D6673 shows DXF pattern exchange practice) | [R25] |
-| FR-CMP-51 | SHOULD (V1) | Ply book export: one sheet per sequence with 3D view of the ply on the part, flat pattern, table (ply, material, orientation, sequence, area), through the existing drawings module | Shop-floor layup documentation | [R7], [R8] |
+| FR-CMP-51 | SHOULD (V1) | Ply book: numeric content first (`ply_book_data`: per sequence the ply, material, orientation, area with unit, flat-pattern piece ids, boundary length), then sheets (one per sequence: 3D view of the ply on the part, flat pattern, table) through the existing drawings module, written with `--save`. A ply book for production is released through 09 PLM (human gate) | Shop-floor layup documentation; checkable by an agent before sheets exist | [R7], [R8] |
 | FR-CMP-52 | SHOULD (V1) | Laser projection export: per ply, ordered 3D boundary points in tool coordinates with a configurable spacing (default 75 mm) plus every corner, consistent winding, plain-text format | Projector-guided layup | [R26], [R27] |
 | FR-CMP-53 | SHOULD | Ply table export/import (CSV): ply, sequence, material, orientation, rosette, zone, area, mass | Excel-driven workflows in CPD | [R8] |
 | FR-CMP-54 | SHOULD (V1) | Explicit per-ply solids (offset by cumulative thickness) for visualisation, interference checks and STEP AP214/AP242 export as ordinary solids | Visual verification; explicit AP242 representation | [R28] |
 | FR-CMP-55 | COULD (V2) | STEP AP242 composite export following the CAx-IF composite recommended practices (laminate table, ply, orientation, ply boundaries, cores, validation properties) | Supply-chain exchange | [R28], [R29], [R30] |
 | FR-CMP-56 | COULD (V2) | Cross-check drape and CLT results against external tools (Ansys ACP via PyACP sample data) | Confidence | [R31] |
-| FR-CMP-60 | MUST | Every capability is a registered command with a zod schema, so it is available in the UI, CLI and MCP with identical results | Architecture L1/L5 | CLAUDE.md |
+| FR-CMP-60 | MUST | Every capability is a registered command with a zod schema and an agent-written description (what, when, units, refusals, next command), so it is available in the CLI (`llull search` / `describe`), MCP and the UI with identical results | Architecture L1/L5; AF-01, AF-02 | CLAUDE.md |
 | FR-CMP-61 | MUST | The layup is parametric: stacking strings, zone boundaries, ramp ratios and orientations can reference document parameters; editing one regenerates plies, flat patterns and analyses | L8 recipe | CLAUDE.md |
-| FR-CMP-62 | SHOULD | MCP toolset `composites` with discovery prompts ("design a laminate for …") and read-only query tools flagged safe | AI-first product | — |
+| FR-CMP-62 | SHOULD | MCP toolset `composites` with discovery prompts ("design a laminate for …") and read-only query tools flagged safe; `llull guide` gains a composites section (units N-mm-MPa, stacking bottom-to-top from the tool, rosette convention, minimal zone plan ending with `check_layup`) (AF-03) | AI-first product | — |
+| FR-CMP-63 | MUST | Every physical param states its unit in its schema description (lengths in document units, moduli and strengths in MPa for mm documents, angles in degrees, density in mass per unit³, loads `Nx` in N/mm, `Mx` in N·mm/mm) (AF-04) | No unit inferred silently | AGENT_FIRST |
+| FR-CMP-64 | MUST | Every query returns `data` with a documented shape and a unit on every number (`unit` fields or suffixes such as `thicknessMm`, `shearDeg`); large outputs (drape nets, per-node arrays) are paged or written with `--save` (AF-10, AF-12) | Agent-readable results | AGENT_FIRST |
+| FR-CMP-65 | MUST | Every refusal and finding has a stable code from TECHNICAL_SPEC §7.1 (e.g. `CMP_NOTATION_PARSE`, `CMP_MATERIAL_NOT_POSITIVE_DEFINITE`, `CMP_ZONES_NOT_BLENDABLE`), the offending ids or param path, and a one-line remediation (AF-11) | Self-correcting agent loop | AGENT_FIRST |
+| FR-CMP-66 | MUST | Closing read-only check `check_layup`: aggregates rule findings (FR-CMP-20), ramp conflicts, blending feasibility, over-lock plies (V1), FPF strength ratio < 1 under the stored load cases, missing or unverified material data and defaulted thresholds into one pass / warn / fail list with codes (AF-20, AF-30) | An agent ends every job with it | AGENT_FIRST |
+| FR-CMP-67 | MUST | No safety-relevant default is silent: Tsai-Wu F12* (−0.5), rule thresholds (10 %, 4 plies), ramp ratio (20) and drape step are either given or reported as `{value, unit, source, defaulted: true}`. Material allowables and locking angle have **no** default: missing values refuse the dependent analysis with a code (AF-31) | Non-engineer operator | AGENT_FIRST |
+| FR-CMP-68 | MUST | Lamina data whose `basis` is `mean` or `unknown`, or whose `source` is not a cited verified reference, is `unverified`; the flag propagates to ABD, constants, FPF ratios, mass and `check_layup` (warning `CMP_MATERIAL_UNVERIFIED`, not suppressible) (AF-32) | Typical textbook values must not pass as allowables | AGENT_FIRST |
+| FR-CMP-69 | MUST | `analyze_laminate` FPF results, `check_layup` with `purpose: "release"`, `allowOverLock` flat patterns and the ply book carry `reviewRequired: true` with the reason; summaries say "computed by llull, not approved: needs a qualified engineer" (AF-33, AF-36) | Margins and producibility feed substantiation | AGENT_FIRST |
+| FR-CMP-71 | MUST | Human gates: accepting a strength ratio < 1 or a marginal margin, disabling a rule for release, exporting an over-lock flat pattern for production and releasing the ply book need an approval recorded through 09 PLM `record_approval` by a human caller; an agent can prepare the request (`request_layup_waiver`) but the finding stays `fail` with `waiverStatus: "pending"` until approved (AF-34) | Approval acts belong to qualified people | AGENT_FIRST, 09 PLM TR-PLM-16 |
+| FR-CMP-72 | MUST | Every computed value carries `provenance` (method: CLT per NASA RP-1351, criterion name and F12*, drape algorithm and step, flat-pattern method; inputs: material record, stack, loads) (AF-35) | Explainable to the owner, auditable by the reviewer | AGENT_FIRST |
 | FR-CMP-70 | MUST | Performance: a 200-ply, 3-zone panel regenerates in ≤ 2 s; drape at 17 k nodes ≤ 500 ms on the desktop reference machine | Interactive use | — |
 
 ## 6. Workflows

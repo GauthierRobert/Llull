@@ -172,6 +172,23 @@ export interface BodyDef { readonly id: string; readonly stations: ReadonlyArray
   readonly continuity: 'G1' | 'G2'; readonly entityIds: ReadonlyArray<string> }
 ```
 
+```ts
+// Agent-first fields (AGENT_FIRST.md AF-31..35), core model/surfaceQuality.ts
+export interface InputProvenance {                       // on AirfoilSource 'points', imported point sets, reference shapes
+  readonly verified: boolean;                            // true only with a pinned source (URL + sha256) or a generator formula
+  readonly source?: string;                              // e.g. "UIUC naca23012.dat via AeroSandbox edad83dd, sha256 …"
+}
+export interface NamedTolerance { readonly value: number; readonly unit: string; readonly source: string; readonly defaulted: boolean }
+export interface SurfaceWaiver {                         // FR-SRF-43; CadDocument.surfaceQuality?.waivers
+  readonly id: string; readonly code: string;            // finding code being waived, e.g. SRF_CHECK_G2_CURVATURE
+  readonly target: { readonly entityId: string; readonly edgeIndex?: number; readonly edgesNear?: Vec3 };
+  readonly reason: string; readonly requestedBy: 'agent' | 'human';
+  readonly approvalRef?: string;                         // 09 PLM approval id; set only when record_approval succeeded for a human caller
+}
+// Propagation rule: a derived entity or query result is `unverified` iff any input in its recipe / definition chain has
+// provenance.verified = false. Computed on read from the recipe (not stored), so it cannot be lost or cleared.
+```
+
 Document version / migration:
 
 - `CadDocument.aero?` is optional (absent until the first aero command) — no migration for existing files.
@@ -210,6 +227,8 @@ All names snake_case; all params one inline `z.object`. Tags follow `rules/comma
 | `check_continuity` | Q | K for B-rep | `pairs: {a:{id,edge?|end?}, b:{…}}[]` **or** `id` + `edges: 'internal'\|number[]`, `samples` (default 21), tolerances `g0`, `g1AngleRad`, `g2Rel`, `g2Abs`, `g3Rel` | — | `data.joints[] {g0Gap, g1Angle, g2Gap, g2Rel, g3Gap, order:'G0'..'G3', pass, worst:{t,point}}` | |
 | `analyze_draft` | Q | K | `id`, `pullDirection`, `minDraftDeg`, `grid` | — | `data {samples[] {point, draftDeg}, areaBelowMin, undercut}` | |
 | `measure_deviation` | Q | K | `id` (target) + one of `points: vec3[]`, `pointsCsv` (exchange), `referenceId` ; `tolerance?` | — | `data {max, mean, rms, signed, histogram, pass}` | |
+| `check_surface_quality` | Q | K for B-rep | `ids?` (default all surfaces / lofts / wings / bodies), `purpose: 'design' \| 'release'` (default design), tolerances `g0`, `g1AngleRad`, `g2Rel`, `g3Rel`, `sectionDeviation`, `sewing` (each optional; omitted ⇒ named default), `pullDirection?` + `minDraftDeg?` | — | `data {status: 'pass'\|'warn'\|'fail', findings[] {code, severity, entityId, edgeIndex?, value, limit, unit, worst {point}, remediation, waiverStatus?}, tolerances: Record<string, NamedTolerance>, unverified, reviewRequired, reviewReason?, provenance}` (FR-SRF-39..44) | invalid ids → `SRF_ENTITY_NOT_FOUND` |
+| `request_surface_waiver` | M | – | `code`, `entityId`, `edgeIndex?` / `edgesNear?`, `reason` (text) | 1 pending `SurfaceWaiver` | `approvalRef` never settable by params; only the 09 PLM approval link sets it | unknown code / no matching finding → `SRF_WAIVER_NO_FINDING` |
 
 ### 4.2 Plugin `@aero` — `packages/domain-aero/src/<topic>/{catalog,plugin}.ts` (toolset `aero`)
 
@@ -379,18 +398,104 @@ and leaves for `nurbs_surface`/`nurbs_curve`/`loft` v3 entities. `recipeKey` get
 | Code export | CadQuery: `Workplane.spline(...)`, `.loft(ruled=...)`, `cq.Solid.makeLoft`; raw `Geom_BSplineSurface` via OCP for others (`codegen/recipeLowering.ts` pattern) | FR-SRF-28 |
 | Document | `CadDocument.aero`, entity kinds `nurbs_curve`, `nurbs_surface`, `loft` v3 fields | §3 |
 
-## 7. UI / CLI / MCP surfaces
+## 7. CLI / MCP / UI surfaces
 
-- **UI** (`src/ui`): menus generated from `listCommands()`; param forms from zod. New overlays in
-  `src/ui/viewport/3d/analysis/`: `CurvatureCombOverlay` (lines from `analyze_curve_curvature.data.samples[].comb`),
-  `ZebraMaterial` (view-space normal → stripe function, direction & spacing uniforms; pure shading of the existing
-  tessellation, no command needed — exact normals come from `tessellate`), `CurvatureMapMaterial` (per-vertex scalar
-  from `analyze_surface_curvature` grid, legend + clamping), `DraftMapMaterial`. Continuity results table in an
-  inspector panel. Airfoil/wing/fuselage dialogs with tables (sections, stations).
-- **CLI**: `llull run plan.json --app`, `llull exec <command> '<json>'` (queries print `data` with `--json`); `import_airfoil` accepts `path` through
-  `/exchange` (KI6).
+- **CLI (primary, AF-01..05)**: nothing gap-specific in the CLI; the registry makes every command callable:
+  `llull search airfoil wing curvature continuity` · `llull describe create_wing` · `llull list aero` ·
+  `llull run plan.json --validate` then `llull run plan.json --json --progress` · `llull <query> … --json` ·
+  `llull check_surface_quality … --json` · `llull render_view isolate=<id> --save view.png` ·
+  `llull export_step_exact --save out.step` / `export_code language=cadquery --save out/`. `import_airfoil` and
+  `measure_deviation pointsCsv` read files with `file=PATH` through the exchange path (`/exchange`, KI6); in core
+  they take `text`. Long kernel steps (`create_wing` with many sections, CRM analysis) honour `--progress` and
+  `--timeout` (AF-40); every mutating SRF command works with `--dry-run` (AF-42). `llull guide` gains the aero /
+  surface section of FR-SRF-38.
 - **MCP**: toolsets `surface` and `aero` appended to `TOOLSET_NAMES`; `search_tools` finds them by keywords
-  (airfoil, NACA, wing, curvature, zebra, G2). Prompts: an `aero_wing` prompt describing the canonical plan.
+  (airfoil, NACA, wing, curvature, continuity, zebra, G2). Prompt `aero_wing` describes the canonical plan and
+  ends with `check_surface_quality`. Query commands declare `annotations: { readOnly: true }`.
+- **UI (review surface)**: menus and forms generated from `listCommands()` and zod. Review overlays in
+  `src/ui/viewport/3d/analysis/` built only from query `data`: `CurvatureCombOverlay`
+  (`analyze_curve_curvature.data.samples[].comb`), `ZebraMaterial` (view-space normal stripes on the existing
+  tessellation), `CurvatureMapMaterial` (`analyze_surface_curvature` grid, legend + clamping), `DraftMapMaterial`;
+  a `check_surface_quality` report panel; waiver approval through 09 PLM. Nothing here is required by an agent.
+
+### 7.1 Stable error and finding codes (AF-11)
+
+Every refusal returns the unchanged document, exit code 1 on the CLI, and `data.errors[] {code, path, ids,
+remediation}`; `--validate` reports the same codes with the plan step path. Check findings use the same shape
+inside `check_surface_quality` `data.findings[]` (exit 0; the agent reads `status`).
+
+| Code | Raised by | When | Offending ids / path | Remediation |
+| --- | --- | --- | --- | --- |
+| `SRF_NURBS_INVALID` | `create_nurbs_curve`, `create_nurbs_surface`, `edit_nurbs` | degree ∉ 1..25, Σ multiplicities ≠ poles + degree + 1, knots not increasing, weight ≤ 0 | `params.degree` / `params.knots` / `params.weights[i]` | fix the named array; omit `knots` for clamped uniform |
+| `SRF_POINTS_INSUFFICIENT` | `interpolate_curve`, `approximate_curve`, `surface_from_points` | fewer than degree + 1 points, or a ragged grid | `params.points` / `params.grid[i]` | add points or lower `degree`; make every grid row the same length |
+| `SRF_POINTS_COINCIDENT` | `interpolate_curve` | two consecutive points closer than 1e-9 × size | `params.points[i]` | remove the duplicate point |
+| `SRF_TOLERANCE_UNREACHABLE` | `approximate_curve`, `surface_from_points` | tolerance not met with ≤ 10 000 poles | `params.tolerance` | raise the tolerance or use `interpolate_curve` |
+| `SRF_CONIC_RHO_RANGE` | `create_conic`, `loft_fuselage` | rho ∉ (0, 1) | `params.rho` / `stations[i].section.upper.rho` | use 0 < rho < 1 (0.4142 = circle, 0.5 = parabola) |
+| `SRF_CONIC_COLLINEAR` | `create_conic` | start, apex and end collinear | `params.start/apex/end` | move the apex off the chord |
+| `SRF_LOFT_SECTIONS_TOO_FEW` | `loft_surface`, `create_wing`, `loft_fuselage` | fewer than 2 sections / stations | `params.sectionIds` | give at least 2 sections |
+| `SRF_LOFT_GUIDE_MISSES_SECTION` | `loft_surface` | a guide does not meet every section within tolerance | `params.guideIds[i]`, section index | snap the guide to the section curves (`interpolate_curve` through section points) |
+| `SRF_LOFT_SECTION_DEVIATION` | `loft_surface`, `create_wing` | post-loft fidelity check > pres3d × 10 | entity id, section index, `deviation` | reduce sections' complexity or raise `maxDegree`; report to the owner |
+| `SRF_FILL_LOOP_OPEN` | `fill_surface` | boundary edges do not form a closed loop | `params.boundary[i]` | add the missing edge or fix `edgesNear` points |
+| `SRF_TRIM_MISS` | `trim_surface` | trimming curve/plane does not cut the surface | `params.by` | project the curve onto the face (`projectAlong`) or move the plane |
+| `SRF_SEW_FREE_EDGES` | `sew_surfaces` (`makeSolid`) | free edges remain after sewing | edge list with points | raise `tolerance` within the model accuracy, or fill the gap first |
+| `SRF_THICKEN_SELF_INTERSECT` | `thicken_surface` | offset self-intersects (thickness > min radius of curvature) | entity id, min radius | reduce `thickness` below the reported min radius |
+| `SRF_FACE_NOT_FOUND` / `SRF_EDGE_AMBIGUOUS` | face/edge-referencing commands | `faceIndex` / `edgesNear` resolves to none or to two candidates | `params.faceIndex` / `params.edgesNear` | pick a point closer to the intended face/edge |
+| `SRF_ENTITY_NOT_FOUND` | all | unknown id | `params.id` | `llull describe_scene` to list ids |
+| `SRF_KERNEL_REQUIRED` | kernel commands under Manifold | `requiresKernel` and no OCC | — | re-run with `--kernel occt` (desktop default) |
+| `SRF_WAIVER_NO_FINDING` | `request_surface_waiver` | no current finding with that code on that target | `params.code`, `params.entityId` | run `check_surface_quality` and copy the finding code |
+| `AERO_NACA_DESIGNATION_UNKNOWN` | `airfoil_from_naca` | not 4 digits / not a supported 5-digit mean line (210..250) / t = 0 | `params.designation` | use e.g. `0012`, `2412`, `23012`; import other series as `.dat` |
+| `AERO_AIRFOIL_PARSE` | `import_airfoil` | non-numeric line, < 5 points, Lednicer counts inconsistent | `line n` | check the file is Selig or Lednicer; pass `format` explicitly |
+| `AERO_AIRFOIL_TE_GAP` | `import_airfoil`, `create_wing` | closed TE requested but gap > tolerance | section index, gap (chord units) | use `trailingEdge: open` or normalise |
+| `AERO_AIRFOIL_SELF_INTERSECT` | `import_airfoil` | upper and lower surfaces cross | point indices | fix the file or pass `normalize: chord` if it is a rotation artefact |
+| `AERO_PLANFORM_UNDERDETERMINED` / `AERO_PLANFORM_OVERDETERMINED` | `create_wing` | not exactly 3 independent planform values | `params.planform` | give exactly 3 of span, area, AR, taper, root/tip chord |
+| `AERO_SPAN_NOT_INCREASING` | `create_wing` | section spans not strictly increasing | `params.sections[i].span` | sort sections by span |
+| `AERO_FS_NOT_INCREASING` | `loft_fuselage` | station FS not strictly increasing (apex allowed first/last) | `params.stations[i].fs` | sort stations by FS |
+| `AERO_FRAME_NOT_ORTHONORMAL` | `set_aircraft_frame` | axes not orthonormal right-handed | `params.fsAxis/blAxis/wlAxis` | use unit, mutually perpendicular axes (default +X aft, +Y right, +Z up) |
+| `SRF_CHECK_G0_GAP` · `SRF_CHECK_G1_ANGLE` · `SRF_CHECK_G2_CURVATURE` · `SRF_CHECK_G3` | `check_surface_quality` (fail) | continuity gap above the tolerance at some sample of an internal edge | entity id, edge index, worst point, value, limit, unit | refit sections, add a guide curve, raise loft continuity, or request a waiver (human gate) |
+| `SRF_CHECK_SECTION_DEVIATION` | `check_surface_quality` (fail) | loft departs from an input section beyond tolerance | entity id, section index | as `SRF_LOFT_SECTION_DEVIATION` |
+| `SRF_CHECK_FREE_EDGES` | `check_surface_quality` (fail when a solid is expected) | open shell | edge list | `sew_surfaces` or `fill_surface` |
+| `SRF_CHECK_DRAFT_BELOW_MIN` | `check_surface_quality` (fail, only with `pullDirection`) | draft < `minDraftDeg` or undercut | sample points, area | change the pull direction or the surface |
+| `SRF_CHECK_DEGENERATE_SAMPLES` | `check_surface_quality` (warn) | samples skipped (zero derivative, poles, LE apex) | count, locations | none; reported so the result is not over-read |
+| `SRF_CHECK_TOLERANCE_DEFAULTED` | `check_surface_quality` (warn) | a tolerance was taken from a named default | tolerance name, value, source | give the programme's tolerance explicitly when known |
+| `SRF_CHECK_INPUT_UNVERIFIED` | `check_surface_quality` (warn, not suppressible) | an input has `provenance.verified = false` | input ids, sources | pin the source (URL + sha256) or confirm with the owner |
+| `SRF_CHECK_WAIVER_PENDING` | `check_surface_quality` (attached to a fail) | a waiver exists without a human approval | waiver id | ask the qualified reviewer to approve in 09 PLM |
+
+### 7.2 Result conventions (AF-10, AF-31..35)
+
+- Lengths in `data` are in document units and every query result has a top-level `unit` (length unit) and
+  `angleUnit`; curvature fields are `1/<unit>`; field names carry the unit when it differs (`g1AngleRad`,
+  `draftDeg`, `areaRef` + `areaUnit`). Airfoil results are chord-normalised and say so (`unit: "chord"`).
+- Every query result carries `unverified: boolean` (propagation rule, §3) and `provenance {method, reference,
+  inputs}` (e.g. `{method: "Gaussian curvature from fundamental forms", reference: "OCC BRepLProp_SLProps",
+  inputs: {id, faceIndex, grid}}`).
+- Defaulted tolerances are reported as `NamedTolerance` with `defaulted: true` and their source (OCC filling
+  defaults, TECHNICAL_SPEC §5.9).
+- `reviewRequired: true` + `reviewReason` on `check_surface_quality` with `purpose: "release"` (FR-SRF-42); the
+  summary ends with "computed by llull, not approved: needs a qualified engineer".
+- Bounded output: grids ≤ 200×200, sample arrays summarised (min/max/worst + counts) unless `output: "samples"`.
+
+### 7.3 Agent-first compliance
+
+| AF | Where satisfied |
+| --- | --- |
+| AF-01, AF-02 | FR-SRF-26; every command is a registry command with an agent-written description (§4) |
+| AF-03 | FR-SRF-38 (`llull guide` aero/surface section, MCP prompt `aero_wing`) |
+| AF-04 | FR-SRF-36; param names carry units (`sweepDeg`, `g1AngleRad`), lengths in document units |
+| AF-05 | FR-SRF-37; plans in `validation/plans/` validate with `--validate` |
+| AF-10, AF-12 | FR-SRF-35, §7.2 |
+| AF-11 | FR-SRF-33, §7.1 |
+| AF-13 | FR-SRF-31, TR-SRF-10 |
+| AF-20, AF-30 | FR-SRF-39 `check_surface_quality` |
+| AF-21 | FR-SRF-20..22, 24, 25 numeric `data`; overlays FR-SRF-23 are COULD |
+| AF-22 | `render_view isolate=<id> --save view.png` in the CLI workflow (FUNCTIONAL §6.1) |
+| AF-23 | `expected_results.json` `cli` field per case; VC-SRF-35 audit |
+| AF-31 | FR-SRF-40, `NamedTolerance` |
+| AF-32 | FR-SRF-41, `InputProvenance`, propagation rule (§3) |
+| AF-33, AF-36 | FR-SRF-42 |
+| AF-34 | FR-SRF-43, `request_surface_waiver` + 09 PLM `record_approval` (TR-PLM-16) |
+| AF-35 | FR-SRF-44, `provenance` in every result |
+| AF-40, AF-42 | §7 CLI bullet (`--progress`, `--timeout`, `--dry-run`), §8 budgets |
+| AF-41 | all SRF computation is core or bundled OCC; no network |
 
 ## 8. Performance & robustness budgets (desktop, OCC worker)
 
@@ -412,6 +517,8 @@ and leaves for `nurbs_surface`/`nurbs_curve`/`loft` v3 entities. `recipeKey` get
 | --- | --- | --- | --- |
 | Unit (core math) | `tests/unit/surface/nurbs*.test.ts` | basis partition of unity, knot insertion/degree elevation shape invariance, interpolation passes through points, conic weights/shoulder, curvature formulas vs analytic | VC-SRF-05, 06, 07 |
 | Unit (commands) | `tests/unit/surface/*.test.ts`, `tests/unit/aero/*.test.ts` | happy + failure per command; `is pure`; schema snapshot (`toToolSchemas()`) | VC-SRF-19 |
+| Agent-first | `tests/unit/surface/agentFirst.test.ts`, `tests/unit/contract/` | error codes per §7.1 (one failing plan per code family), `unverified` propagation, named defaults + `reviewRequired` in `check_surface_quality`, waiver human gate (with 09 PLM), units audit of `describe` and results | VC-SRF-31..35 |
+| Agent driver | production-gate agent driver (`docs/PRODUCTION_GATE.md`) | runs every case's `cli.run` from `expected_results.json` with `--json` and exit codes only | all |
 | Unit (aero data) | `tests/unit/aero/naca.test.ts` | generated sections vs `validation/data/naca_*_selig_81.csv` (exact to 1e-8) and vs pinned UIUC files (downloaded by a fixture script when network allows; skipped offline with a notice) | VC-SRF-01..04 |
 | Golden | `tests/golden/plans.ts` add `aero_naca_trap_wing`, `aero_tr1208`, `surface_torus_analysis`, `aero_sears_haack_body` (plans in `validation/plans/target_*.json`) | id-normalised snapshot + replay equality | VC-SRF-10, 11, 13, 19 |
 | Kernel integration | `server/tests/occtSurfacing.test.ts`, `occtAnalysis.test.ts` | every bound OCC class used (§1.2); cross-check curvature/continuity vs `LocalAnalysis_*`; sewing/fill tolerances | VC-SRF-05, 12, 15, 16, 17, 18 |
@@ -437,6 +544,10 @@ Each TR points to the section that specifies it; `validation/expected_results.js
 | TR-SRF-09 | Interop: `.dat` import (`text` in core, files via `/exchange`), exact STEP B-spline export, `export_code` lowering | §4.3, §6 | 03, 04, 12, 20, 21, 30 |
 | TR-SRF-10 | Purity, deterministic replay, numerical tolerances and performance budgets | §2.3, §5.9, §8 | 12, 19 |
 | TR-SRF-11 | Every OCC class used (§1.2) has a `server/tests/` integration test ("bound" ≠ "works") | §1.2, §9 | 15, 16, 23, 24 |
+| TR-SRF-12 | Stable error and finding codes with path, ids and remediation for every SRF command | §7.1 | 31 |
+| TR-SRF-13 | `check_surface_quality` read-only check: findings, named tolerances, `unverified`, `reviewRequired`, waivers | §4.1, §7.2 | 33, 34 |
+| TR-SRF-14 | `InputProvenance` + recipe-walk propagation of `unverified`; `provenance` block in every query result | §3, §7.2 | 32 |
+| TR-SRF-15 | Units in every param description and every result field; bounded output | §7.2 | 35 |
 
 ## 10. Delivery plan
 

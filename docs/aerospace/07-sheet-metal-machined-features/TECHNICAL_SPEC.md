@@ -1,6 +1,7 @@
 # Gap FTR — Sheet-metal and machined manufacturing features — Technical specification
 
-Gap id: **FTR** · Companion: `FUNCTIONAL_SPEC.md` (FR-FTR-nn) · Validation: `validation/README.md` (VC-FTR-nn).
+Gap id: **FTR** · Companion: `FUNCTIONAL_SPEC.md` (FR-FTR-nn) · Validation: `validation/README.md` (VC-FTR-nn),
+`validation/expected_results.json` · Operator model: [`AGENT_FIRST.md`](../AGENT_FIRST.md) (compliance table §7.4).
 Laws respected: L1 (one command layer), L3 (purity), L4 (document = single source of truth), L5 (registry), L8
 (feature history), L9 (kernel via `ctx.kernel`, shape boundary per KI5), L10 (domain = plugin). The product direction is
 desktop-first, with OCC as the desktop kernel (KI6).
@@ -173,11 +174,14 @@ export interface FaceGraph {
 ```ts
 export interface SheetMetalRule {
   readonly name: string;
-  readonly material: string;              // free label, e.g. "2024-T3" (links to a radius-table row by material+temper)
+  readonly material: string;              // free label, e.g. "2024" (links to a radius-table row by material + temper)
+  readonly temper?: string;               // e.g. "T3"; absent → no row can match → FTR_BEND_RADIUS_NO_TABLE_ROW
   readonly thickness: number;
   readonly insideRadius: number;
   readonly k: { readonly standard: 'ansi' | 'din'; readonly value: number } |
-               { readonly standard: 'ansi' | 'din'; readonly table: readonly { readonly rOverT: number; readonly k: number }[] };
+               { readonly standard: 'ansi' | 'din'; readonly table: readonly { readonly rOverT: number; readonly k: number }[];
+                 readonly source: string; readonly verification: 'verified' | 'unverified' };   // AF-32
+  readonly thresholds?: Readonly<Record<'holeToBend' | 'holeToEdge' | 'minFlange' | 'minLand' | 'maxDepthRatio', { readonly value: number; readonly source: string; readonly verification: 'verified' | 'unverified' }>>; // AF-30/31: no built-in defaults
   readonly relief?: { readonly type: 'rectangular' | 'obround' | 'none'; readonly widthRatio: number; readonly depthExtra: number };
   readonly allowSharpBends?: boolean;     // default false -> R = 0 rejected by check
 }
@@ -206,6 +210,7 @@ export interface BendRadiusRow {
   readonly material: string; readonly temper: string; readonly thickness: number; readonly minInsideRadius: number;
   readonly units: 'mm' | 'in'; readonly bendAngle: number; /* deg the row applies to, AC Table 4-6 = 90 */
   readonly source: string;                // mandatory provenance, e.g. "AC 43.13-1B Table 4-6 (verified 2026-xx)"
+  readonly verification: 'verified' | 'unverified';   // AF-32: 'verified' only after dual-review transcription from the cited source
 }
 // CadDocument += sheetMetal?: SheetMetalModel   (absent until the first sheet-metal command)
 ```
@@ -217,7 +222,8 @@ in `derivedEntityIds` and protected by derivation guards. Only sheet-metal comma
 ## 4. Commands
 
 All are `defineCommand({ name, description, params: z.object(...), run })`, pure and snake_case. M = mutating (a feature
-step is appended), Q = query (returns `data`, document unchanged). K = `requiresKernel`.
+step is appended), Q = query (returns `data`, document unchanged). K = `requiresKernel`. Units, `data` shapes, refusal codes,
+waivers and provenance follow §4.3; the codes are listed in §7.2.
 
 ### 4.1 Core `commands/features/` (toolset `manufacturing`)
 
@@ -228,15 +234,15 @@ step is appended), Q = query (returns `data`, document unchanged). K = `requires
 | `add_rib` | M, K (SHOULD) | `target`, `plane: {origin, normal}`, `path: Profile2D (open)`, `thickness`, `height \| upToFace`, `symmetric` | same | rib fused (Fuse = 1) | path not on a supporting face |
 | `set_thread` | M | `id`, `featureIndex` or `face`, `thread: ThreadSpec \| null` | entity `features[].thread` only | geometry and `recipeKey` unchanged | designation fails family grammar; face not cylindrical |
 | `recognize_features` | Q, K | `id`, `kinds?`, `mergeSplitFaces = true`, `angularTolerance = 1e-6`, `lengthTolerance = 1e-6` | — | read-only; deterministic order (by type, then axis point lexicographic) | no B-rep (`faceGraph` null) → summary "needs an exact kernel (OCC)" |
-| `check_machining` | Q, K | `id`, `rules?: { minLand, maxDepthRatio, toolDiameter, … }`, `thickness?` (local material thickness override) | — | read-only; T_local from a kernel ray cast (§5.3) unless `thickness` is given | no exact B-rep and no `thickness` → summary "needs an exact kernel (OCC) or `thickness`" |
+| `check_machining` | Q, K | `id`, `rules?: { minLand, maxDepthRatio, toolDiameter, … }` (each `{ value, source }`), `thickness?` (local material thickness override, document length unit), `waivers?` | — | read-only; T_local from a kernel ray cast (§5.3) unless `thickness` is given | no exact B-rep and no `thickness` → summary "needs an exact kernel (OCC) or `thickness`" |
 | `hole_table` | Q (SHOULD) | `id`, `origin?` | — | read-only | — |
 
 ### 4.2 Plugin `sheetmetal` (toolset `manufacturing`)
 
 | Command | Type | Params sketch | Notes |
 | ------- | ---- | ------------- | ----- |
-| `sheet_metal_calc` | Q | `thickness`, `insideRadius`, `angle` (deg), `kFactor?`, `kStandard = 'ansi'`, `mode: 'k_factor' \| 'faa_empirical'`, `units?`, `material?`, `temper?` | returns `{ BA, OSSB, ISSB, BD, kChart, rOverT, minRadius?, minRadiusSource? }`; needs no part (FR-FTR-14) |
-| `create_sheet_metal_rule` | M | `name`, `material`, `thickness`, `insideRadius`, `kFactor \| kTable`, `kFactorStandard`, `relief?`, `allowSharpBends?` | `sheetMetal.rules[name]` |
+| `sheet_metal_calc` | Q | `units: 'mm' \| 'in'` (required), `thickness`, `insideRadius` (in `units`), `angle` (deg), `kFactor` (required in mode `k_factor`, else `FTR_K_FACTOR_MISSING`), `kStandard = 'ansi'`, `mode: 'k_factor' \| 'faa_empirical'`, `material?`, `temper?` | returns `SheetMetalCalcData` (§4.3): `ba, ossb, issb, bd, kChart, rOverT, minRadius?` + meta; needs no part (FR-FTR-14) |
+| `create_sheet_metal_rule` | M | `name`, `material`, `temper?`, `thickness`, `insideRadius`, `kFactor \| kTable`, `kFactorStandard`, `relief?`, `allowSharpBends?` | `sheetMetal.rules[name]` |
 | `import_bend_radius_table` | M | `rows: BendRadiusRow[]` (or CSV text) | each row needs `source`; replaces rows with the same key |
 | `add_sheet_metal_base` | M, K | `profileId` (closed 2D entity), `rule`, `side: 'up' \| 'down' \| 'mid'` | creates part + folded solid |
 | `add_flange` | M, K | `id`, `edge: {near}`, `angle`, `length`, `lengthReference: 'outside_mold_line' \| 'inside_mold_line' \| 'tangent'`, `position: 'material_inside' \| 'material_outside' \| 'bend_outside'`, `insideRadius?`, `widthStart?`, `widthEnd?` | relief auto per rule (V1) |
@@ -247,12 +253,107 @@ step is appended), Q = query (returns `data`, document unchanged). K = `requires
 | `add_relief` / `add_corner_relief` | M, K (V1) | `id`, `bend` or `corner`, `type`, `size` | |
 | `convert_to_sheet_metal` | M, K (V1) | `id`, `stationaryFace: {near}`, `rule?` (inferred T, R) | builds `SheetMetalPart` from `faceGraph`; fails with reason (non-constant thickness, non-cylindrical bend) |
 | `flat_pattern` | Q (+ M with `materialize: true`) | `id`, `materialize?`, `layer?` | `data: { outline, cutouts, bendLines, bends[], extents, area }`; with `materialize` adds derived 2D entities |
-| `check_sheet_metal` | Q | `id` | violations list `{ code, nodeId, value, limit, source }` |
-| `export_flat_pattern_dxf` | Q (file content) | `id`, `units?`, `bendLines = true`, `bendNotes = true`, `splineTolerance = 0.01` | returns DXF text (CLI `--save`) |
+| `check_sheet_metal` | Q | `id`, `waivers?` | `CheckData` (§4.3): findings with codes of §7.2, `rulesApplied`, `rulesSkipped` |
+| `export_flat_pattern_dxf` | Q (file content) | `id`, `units?` (default: document unit, echoed), `bendLines = true`, `bendNotes = true`, `splineTolerance = 0.01` (document length unit, reported as defaulted) | returns DXF text (CLI `--save`); `NOTES` layer carries the review note and the unverified inputs |
 
 Feature-step semantics: every M command records its params, including the `near` points. Replay re-resolves faces and
 edges by nearest face or edge midpoint on the regenerated B-rep (KI5). Plugin commands compose core ones through
 `ctx.registry`/`execute` where needed (L10).
+
+### 4.3 Result and refusal conventions (agent-first, `../AGENT_FIRST.md`)
+
+Units (AF-04): every length param is in the document's length unit (`set_units`) and its zod `.describe()` says so;
+every angle param is in degrees and says so. `sheet_metal_calc` needs no document and takes a **required**
+`units: 'mm' | 'in'`. Command descriptions follow AF-02: what it does, units, refusals with their codes, next command.
+
+```ts
+/** Carried by every FTR query result (AF-10, AF-32, AF-33, AF-35). */
+interface FtrResultMeta {
+  readonly lengthUnit: 'mm' | 'in' | 'cm' | 'm' | 'ft';   // document unit, or `units` for sheet_metal_calc
+  readonly angleUnit: 'deg';
+  readonly unverified: boolean;                            // true if any input row/preset is unverified
+  readonly unverifiedInputs: readonly { readonly kind: 'radius_row' | 'k_table' | 'preset' | 'catalogue'; readonly id: string; readonly source: string }[];
+  readonly reviewRequired: true;                           // FR-FTR-37: always for the queries listed there
+  readonly reviewReason: string;                           // "computed by llull, not approved — a qualified person must review …"
+  readonly provenance: {
+    readonly formulas: Readonly<Record<string, string>>;   // e.g. { ba: 'theta*(R+K*T)', ossb: 'tan(theta/2)*(R+T)' }
+    readonly inputs: Readonly<Record<string, { readonly value: number | string; readonly unit?: string; readonly source: string; readonly defaulted?: boolean }>>;
+    readonly sources: readonly string[];                   // reference ids (R2, R7 …), rule names, table row ids
+  };
+}
+/** A named value that may have been defaulted (AF-31). */
+interface Named<T> { readonly value: T; readonly source: string; readonly defaulted: boolean; readonly verification: 'verified' | 'unverified' }
+
+interface SheetMetalCalcData extends FtrResultMeta {
+  readonly mode: 'k_factor' | 'faa_empirical';
+  readonly kFactor?: Named<number> & { readonly standard: 'ansi' };          // DIN input converted, original kept in provenance
+  readonly ba: number; readonly ossb: number; readonly issb: number; readonly bd: number; readonly kChart: number; readonly rOverT: number;
+  readonly minRadius?: Named<number> & { readonly rowId: string };          // only when a table row matches
+}
+interface FlatPatternData extends FtrResultMeta {
+  readonly partId: string;
+  readonly extents: readonly [number, number]; readonly area: number;
+  readonly outline: readonly Vec2[]; readonly outlineTruncated: boolean;    // bounded (AF-12); full outline via materialize / DXF
+  readonly bends: readonly { readonly id: string; readonly angleDeg: number; readonly insideRadius: number; readonly direction: 'up' | 'down';
+                             readonly ba: number; readonly bd: number; readonly ossb: number; readonly kFactor: Named<number> }[];
+  readonly joggles: readonly { readonly id: string; readonly allowance: number; readonly run: number; readonly inclinedStraight: number }[];
+}
+interface Finding {
+  readonly code: FtrCode; readonly severity: 'fail' | 'warn' | 'info';
+  readonly ids: readonly string[];                       // part / node / entity / feature ids
+  readonly value?: number; readonly limit?: number; readonly unit?: string;
+  readonly source?: string;                              // rule / table row that produced the limit
+  readonly remediation: string;
+}
+interface CheckData extends FtrResultMeta {
+  readonly status: 'pass' | 'warn' | 'fail';             // fail if any fail finding not covered by an approved waiver
+  readonly findings: readonly Finding[];                 // deterministic order: severity, code, ids
+  readonly rulesApplied: readonly string[]; readonly rulesSkipped: readonly { readonly rule: string; readonly code: 'FTR_RULE_THRESHOLD_MISSING' | 'FTR_BEND_RADIUS_NO_TABLE_ROW' }[];
+}
+interface HoleTableData extends FtrResultMeta {
+  readonly origin: Vec2;                                 // datum: top-left corner of the face bbox unless `origin` given
+  readonly rows: readonly { readonly label: string; readonly x: number; readonly y: number; readonly subtype: HoleKind; readonly diameter: number;
+                            readonly cskDiameter?: number; readonly cskAngleDeg?: number; readonly cskDepth?: number;
+                            readonly cboreDiameter?: number; readonly cboreDepth?: number; readonly depth?: number; readonly through: boolean;
+                            readonly drillPointAngle?: Named<number>; readonly tipHeight?: number }[];   // sorted by y then x
+}
+interface RecognizeData extends FtrResultMeta {
+  readonly counts: { readonly holes: number; readonly countersink: number; readonly counterbore: number; readonly blind: number; readonly pockets: number; readonly bends: number };
+  readonly holes: readonly { readonly subtype: HoleKind; readonly axisPoint: Vec3; readonly axis: Vec3; readonly diameter: number;
+                             readonly cskDiameter?: number; readonly cskAngleDeg?: number; readonly cskDepth?: number;
+                             readonly cboreDiameter?: number; readonly cboreDepth?: number; readonly depth?: number; readonly through: boolean;
+                             readonly drillPointAngleDeg?: number; readonly faceIndices: readonly number[]; readonly confidence: 'exact' | 'ambiguous' }[];
+  readonly pockets: readonly { readonly floorZ: number; readonly depth: number; readonly cornerRadius: number; readonly floorFillet: number; readonly open: boolean; readonly faceIndices: readonly number[] }[];
+  readonly unclassified: readonly number[];              // face indices
+}
+```
+
+Refusals (AF-11): a refused call returns the document unchanged, `rejected: true`, exit code 1, and
+`data.error = { code: FtrCode, ids, paths, remediation }` (`paths` = param paths, e.g. `hole.cskAngle`; inside a plan
+the CLI prefixes the step path). Check commands are queries: they exit 0 and report problems as findings.
+
+Waivers (AF-34): `check_sheet_metal` and `check_machining` take `waivers?: { code, ids, approvalRef }[]`. A waiver turns a
+`fail` finding into `info` only when `approvalRef` resolves to a gap 09 approval record signed by a human
+(`record_approval`, `humanSignatureRequired`). Otherwise the finding stays `fail` and `FTR_WAIVER_NOT_APPROVED` is
+added. Check commands never write: they cannot create the approval.
+
+Rule data (AF-30/31/32): radius rows, K tables, DFM thresholds and presets are document data with `source` and
+`verification` (§3.3). No DFM threshold has a built-in default: a missing one is reported, not assumed.
+
+### 4.4 Agent-first technical requirements
+
+| Id | Requirement | FR | AF |
+| -- | ----------- | -- | -- |
+| TR-FTR-01 | Every FTR command's zod schema states the unit of each numeric param in `.describe()`; a contract test scans `toToolSchemas()` for FTR tools and fails on a numeric param without a unit word (`document length unit`, `degrees`, `mm`/`in` for `sheet_metal_calc`). | FR-FTR-31 | AF-02, AF-04 |
+| TR-FTR-02 | Query results implement `FtrResultMeta` and the shapes of §4.3; the shapes are documented in the command descriptions and snapshot-tested. | FR-FTR-32 | AF-10, AF-13 |
+| TR-FTR-03 | `FtrCode` is a closed string-literal union (§7.2); refusals use `data.error`; findings use `Finding`. The union is exported once and snapshot-tested so codes stay stable. | FR-FTR-33 | AF-11 |
+| TR-FTR-04 | `check_sheet_metal` / `check_machining` run every rule of §7.2 marked "check" for which data exists, report `rulesSkipped` with a code otherwise, and are `readOnly`. | FR-FTR-34 | AF-20, AF-30 |
+| TR-FTR-05 | No safety-relevant param has a schema default (`kFactor`, `insideRadius`, thresholds). Defaults that do exist (drill point 118°, `splineTolerance` 0.01) are reported as `Named` with `defaulted: true`. | FR-FTR-35 | AF-31 |
+| TR-FTR-06 | `verification` is carried by `BendRadiusRow`, K tables and presets; `unverified` is OR-ed through every computation (rule → part → flat pattern → DXF note → check), never dropped. | FR-FTR-36 | AF-32 |
+| TR-FTR-07 | `reviewRequired: true` + `reviewReason` on the queries of FR-FTR-37; the DXF writer adds the note on layer `NOTES`. | FR-FTR-37 | AF-33, AF-36 |
+| TR-FTR-08 | Waiver resolution reads gap 09 approval records through the document only (no network, no keys in core); unresolved or agent-signed → `FTR_WAIVER_NOT_APPROVED`. | FR-FTR-38 | AF-34 |
+| TR-FTR-09 | `provenance` built by `lib/sheetMath.ts` / `lib/holeMath.ts` helpers that return the formula id with the value, so a value cannot be emitted without its formula. | FR-FTR-39 | AF-35 |
+| TR-FTR-10 | `llull guide` section text and an MCP prompt `design_sheet_bracket`; every mutating FTR command is pure, so `--dry-run` works with no extra code; plans in `validation/plans/` pass `run --validate`. | FR-FTR-41 | AF-03, AF-05, AF-42 |
 
 ## 5. Kernel / algorithms
 
@@ -383,7 +484,9 @@ approach of comparing adjacent planes, cylinders, cones and tori [R7].
 | CSV | R | Bend-radius table import and K tables (`rOverT,k`) similar to FreeCAD MDS CSV [R7]. |
 | JSON `data` | W | `recognize_features`, `flat_pattern`, `hole_table`, check reports. These are the agent and drawing contract, described by a zod output schema in docs. |
 
-## 7. UI / CLI / MCP surfaces
+## 7. CLI / MCP / UI surfaces and error codes
+
+### 7.1 CLI and MCP
 
 - **Toolset `manufacturing`** (MCP view): `add_hole add_pocket add_rib set_thread recognize_features check_machining
   hole_table` + plugin `sheet_metal_calc create_sheet_metal_rule import_bend_radius_table add_sheet_metal_base add_flange
@@ -393,13 +496,87 @@ approach of comparing adjacent planes, cylinders, cones and tori [R7].
   `TOOLSET_NAMES` tuple, a core word list for the `commands/features` names, and a getter that appends
   `pluginToolNames('manufacturing')` for the sheet-metal plugin (keeping the "each tool in exactly one toolset"
   invariant). The `toToolSchemas()`/toolset contract snapshots change accordingly (VC-FTR-31).
-- **CLI**: no new verbs. `llull <command> …`, `llull run plan.json`, and `--save` for `export_flat_pattern_dxf`. Add one
-  `guide` paragraph: the K-factor is explicit, and lengths reference mold lines.
-- **UI**: a Hole panel (type picker with section preview, presets 82/90/100°, fastener picker after gap 08), a Pocket
-  panel, a Sheet-metal panel (rule, flange, joggle), a Flat-pattern toggle (2D ortho view of the derived flat entities),
-  and a Feature table panel (sortable; selecting a row highlights its face indices). All of them gather params and
-  `dispatch`. They never build entities (L4).
-- **MCP prompt** (optional): `design_sheet_bracket`, a short workflow that ends with check, flat pattern and DXF.
+- **CLI** (primary surface, `server/src/cli/`): no new verbs. Discovery with `llull search sheet metal` /
+  `llull describe add_flange` / `llull list manufacturing`; jobs with `llull run plan.json --validate` then `llull run
+  plan.json --json`; checks with `llull check_sheet_metal …` / `llull check_machining …`; picture with `llull render_view
+  view=top --save flat.png`; files with `llull export_flat_pattern_dxf … --save blank.dxf` and `export_step_exact --save`.
+  `--kernel occt` for exact work, `--progress` / `--timeout` for recognition of large parts, `--dry-run` for trials.
+  `llull guide` gains an FTR section (bend angle = angle bent through, lengths to mold lines, K explicit, units, the
+  minimal bracket plan).
+- **MCP prompt**: `design_sheet_bracket`, a short workflow that ends with check, flat pattern and DXF.
+
+### 7.2 Stable error and finding codes (AF-11)
+
+Refusals: `data.error = { code, ids, paths, remediation }`, exit 1. Findings: `Finding` inside `check_*` `data.findings`
+(exit 0). The codes are a public contract (TR-FTR-03).
+
+| Code | Kind | When (command) | Offending ids / paths | Remediation (text returned) |
+| ---- | ---- | -------------- | --------------------- | --------------------------- |
+| `FTR_K_FACTOR_MISSING` | refuse | `sheet_metal_calc` (mode `k_factor`), `create_sheet_metal_rule` without `kFactor`/`kTable` | `kFactor` | "give kFactor (ANSI 0–0.5) or kTable, or use mode=faa_empirical" |
+| `FTR_K_FACTOR_OUT_OF_RANGE` | refuse | ANSI K ∉ (0, 0.5] or DIN K ∉ (0, 1] | `kFactor`, `kTable[i]` | "ANSI K is neutral-axis offset / T, 0 < K ≤ 0.5 (DIN = 2·ANSI)" |
+| `FTR_BEND_ANGLE_OUT_OF_RANGE` | refuse | θ ∉ (0, 180] deg (`add_flange`, `sheet_metal_calc`) | `angle` | "bend angle is the angle bent through, 0 < θ ≤ 180 degrees" |
+| `FTR_SHARP_BEND_FORBIDDEN` | refuse / fail | R = 0 with `allowSharpBends` false (`add_flange`; check on imported rules) | bend id, `insideRadius` | "use an inside radius ≥ the table minimum, or a rule with allowSharpBends" |
+| `FTR_BEND_RADIUS_BELOW_MIN` | fail | check: R < R_min of the matching radius row | part, bend ids; value R, limit R_min, row source | "increase insideRadius to ≥ limit or choose a softer temper / thinner sheet" |
+| `FTR_BEND_RADIUS_NO_TABLE_ROW` | warn | check: no row for material/temper/thickness | part id, rule name | "import a sourced row with import_bend_radius_table" |
+| `FTR_TABLE_ROW_NO_SOURCE` | refuse | `import_bend_radius_table` row without `source` | `rows[i].source` | "every row needs its source and edition" |
+| `FTR_RULE_NOT_FOUND` / `FTR_PART_NOT_FOUND` | refuse | unknown rule / sheet-metal part id | `rule`, `id` | "list rules/parts with describe_scene" |
+| `FTR_PROFILE_NOT_CLOSED` | refuse | `add_sheet_metal_base`, `add_pocket` outline open or self-intersecting | `profileId`, `outline` | "pass a closed, simple 2D profile" |
+| `FTR_EDGE_NOT_STRAIGHT` | refuse | `add_flange` edge not a straight edge of a flat | `edge.near` | "pick a point on a straight edge of a flat face" |
+| `FTR_JOGGLE_OFFSET_TOO_SMALL` | refuse | `add_joggle` with s < 0 (JG-04) | `offset`, `angle`, `insideRadius` | "increase offset to ≥ 2·(R+T/2)·(1−cos φ), or reduce R or φ" |
+| `FTR_HOLE_TO_BEND_TOO_CLOSE` | fail | check: hole edge to bend tangent < threshold | hole, bend ids; value, limit | "move the hole away from the bend or add a relief" |
+| `FTR_HOLE_TO_EDGE_TOO_CLOSE` | fail | check: hole edge to part edge < threshold | hole id; value, limit | "move the hole inward or reduce its diameter" |
+| `FTR_FLANGE_TOO_SHORT` | fail | check: flange length < threshold | flange id; value, limit | "lengthen the flange" |
+| `FTR_RELIEF_MISSING` | warn | check: bend ends at a free edge without relief where the rule asks for one | bend id | "add_relief on that bend" |
+| `FTR_NOT_SHEET_METAL` | refuse | `convert_to_sheet_metal`: non-constant thickness or non-cylindrical bend | face indices | "the part is not sheet metal; model it as a machined part" |
+| `FTR_NON_DEVELOPABLE` | refuse / warn | `flat_pattern` / convert on B-spline or non-corner torus faces | face indices | "flat pattern not possible; use the area estimate (V2)" |
+| `FTR_FACE_NOT_FOUND` / `FTR_FACE_NOT_PLANAR` | refuse | `add_hole`, `add_pocket`, `add_rib` face `near` | `face.near` | "pick a point on a planar face (inspect_topology lists faces)" |
+| `FTR_HOLE_POINT_OUTSIDE_FACE` | refuse | a position outside the face | `points[i]` | "keep hole centres inside the face outline" |
+| `FTR_HOLE_DIAMETERS_INCONSISTENT` | refuse | D ≤ d, cbore ≤ d, cbore depth ≤ 0 | `hole.*` | "countersink / counterbore diameter must exceed the hole diameter" |
+| `FTR_CSK_ANGLE_OUT_OF_RANGE` | refuse | α ∉ (0, 180) deg | `hole.cskAngle` | "included angle in degrees, e.g. 82, 90, 100" |
+| `FTR_BLIND_DEPTH_INVALID` | refuse | blind depth ≤ 0 or ≥ stock along the axis | `extent.depth` | "use through_all, or a depth inside the material" |
+| `FTR_FASTENER_CATALOG_UNAVAILABLE` | refuse | `hole.fastener` before gap 08 | `hole.fastener` | "give explicit diameters until the fastener catalogue is installed" |
+| `FTR_THREAD_DESIGNATION_INVALID` | refuse | `set_thread` designation fails the family grammar | `thread.designation` | "use the family's designation form, e.g. MJ6x1-4H5H" |
+| `FTR_POCKET_FILLET_GT_CORNER` | refuse / fail | rf > rc (PK-03) | `floorFillet`, `cornerRadius` | "floor fillet must be ≤ corner radius" |
+| `FTR_POCKET_DEPTH_EXCEEDS_STOCK` | refuse | depth ≥ thickness without `'through'` | `depth` | "reduce depth or use 'through'" |
+| `FTR_CSK_KNIFE_EDGE` | fail | check: countersink depth c ≥ local thickness (land ≤ 0) | hole id; value land, unit | "use thicker material, a smaller head, or a dimpled (formed) countersink" |
+| `FTR_CSK_LAND_BELOW_MIN` | warn | check: 0 < land < `minLand` | hole id; value, limit | "increase thickness or reduce countersink diameter" |
+| `FTR_POCKET_CORNER_BELOW_TOOL_RADIUS` | fail | check: corner radius < tool diameter / 2 | pocket id; value, limit | "increase cornerRadius to ≥ tool radius or use a smaller cutter" |
+| `FTR_HOLE_DEPTH_RATIO_HIGH` | warn | check: depth / diameter > `maxDepthRatio` | hole id; value, limit | "reduce depth or increase diameter" |
+| `FTR_RULE_THRESHOLD_MISSING` | warn | check: a rule needs a threshold that the document does not hold | rule name | "set the threshold in the rule (with its source) to enable this check" |
+| `FTR_UNVERIFIED_DATA` | warn (never hidden) | any result built from an unverified row / table / preset | row / preset ids | "confirm the value against its source, or have a qualified person accept it" |
+| `FTR_WAIVER_NOT_APPROVED` | fail | a waiver without a human-signed gap 09 approval | waiver index, finding code | "a qualified person must record the approval (gap 09); the agent cannot" |
+| `FTR_NEEDS_EXACT_KERNEL` | refuse | `recognize_features`, `check_machining` without `thickness`, `convert_to_sheet_metal` with no exact B-rep | `id` | "rerun with --kernel occt; for imported parts use import_step_exact (gap 01)" |
+| `FTR_RECOGNITION_AMBIGUOUS` | info | recognition could not decide (chamfer vs countersink, fillet vs partial hole) | face indices | "inspect the faces or give the intended feature explicitly" |
+
+### 7.3 UI — review and approval surface
+
+A Flat-pattern toggle (derived flat entities), a Findings panel (codes, values, limits, sources, `unverified` inputs
+highlighted, `reviewRequired` banner), a Feature table panel (sortable; a row highlights its face indices) and a
+provenance popover. Parameter-gathering panels (Hole with presets 82/90/100°, Pocket, Sheet-metal) are SHOULD. All of
+them `dispatch` the same commands and never build entities (L4). The reviewer's waiver approval goes through gap 09.
+
+### 7.4 Agent-first compliance (`../AGENT_FIRST.md`)
+
+| AF | Where satisfied |
+| -- | --------------- |
+| AF-01, AF-02 | FR-FTR-28; all FTR capabilities are registry commands in toolset `manufacturing` (§7.1); descriptions per §4.3 |
+| AF-03 | FR-FTR-41, TR-FTR-10 (`llull guide` FTR section, MCP prompt) |
+| AF-04 | FR-FTR-31, TR-FTR-01 |
+| AF-05 | FR-FTR-41; `validation/plans/*.json` with `run --validate` (VC-FTR-45) |
+| AF-10, AF-13 | FR-FTR-32, TR-FTR-02 (§4.3 shapes; deterministic order §4.1) |
+| AF-11 | FR-FTR-33, TR-FTR-03, §7.2 (VC-FTR-37) |
+| AF-12 | `flat_pattern` outline bounded (`outlineTruncated`), DXF / STEP only via `--save` |
+| AF-20, AF-30 | FR-FTR-34, TR-FTR-04: `check_sheet_metal`, `check_machining` (VC-FTR-10, 16, 23, 27, 38) |
+| AF-21, AF-22 | FR-FTR-40 (numeric `data` for every view; `render_view --save`) |
+| AF-23 | `validation/expected_results.json` + CLI scripts (validation/README §2b) |
+| AF-31 | FR-FTR-35, TR-FTR-05 (VC-FTR-39) |
+| AF-32 | FR-FTR-36, TR-FTR-06 (VC-FTR-40) |
+| AF-33, AF-36 | FR-FTR-37, TR-FTR-07 (VC-FTR-41) |
+| AF-34 | FR-FTR-38, TR-FTR-08 (VC-FTR-42) |
+| AF-35 | FR-FTR-39, TR-FTR-09 (VC-FTR-43) |
+| AF-40 | FR-FTR-42 (`--progress`, `--timeout`, `faceGraph` cache; VC-FTR-46) |
+| AF-41 | pure TS + bundled OCC / CPython; no network (§2.1) |
+| AF-42 | FR-FTR-41 (`--dry-run`, VC-FTR-45) |
 
 ## 8. Performance & robustness budgets
 
@@ -429,6 +606,8 @@ to `unclassified[]`. `add_hole` validates all positions first, so it is all-or-n
 | DXF | parse output with a strict reader (ezdxf in the Python test env, or the existing core `import_dxf`); only allowed entity types; extents | VC-FTR-09 |
 | Quality gate (`npm run quality`) | add the NIST CTC set to `quality/corpus.json` for recognition timing and crash-free runs | VC-FTR-21 |
 | Production gate scenario | "MRO angle repair": calc → rule → part → check → DXF, all via CLI on desktop | VC-FTR-02, 09, 10 |
+| Agent-first contract (`tests/unit/contract/ftrAgentFirst.test.ts`) | units in every FTR schema; `FtrCode` snapshot; refusal `data.error` shape; `unverified` OR-propagation; `reviewRequired`; waiver without human approval stays fail; provenance present on every computed value | VC-FTR-37…44 |
+| CLI scripts (`validation/` + production-gate agent driver) | each VC as `llull … --json` compared with `validation/expected_results.json`; `run --validate`, `--dry-run`, `render_view --save`, `--progress`/`--timeout` | VC-FTR-45, 46, all CLI-phrased VCs |
 
 ## 10. Delivery plan
 
@@ -436,6 +615,7 @@ to `unclassified[]`. `add_hole` validates all positions first, so it is all-or-n
 | --------- | ------- | ---------- | ----------------- |
 | M0 Exact STEP import (prerequisite) | Consume gap 01 `import_step_exact` (`docs/aerospace/01-exact-brep-kernel/`): imported STEP solids keep a `brep`. Not designed here | gap 01 | 0 here (effort owned by gap 01); ~1 day integration tests in M4 |
 | M1 Math + calc | `lib/sheetMath.ts`, `lib/holeMath.ts`, `sheet_metal_calc` (plugin skeleton, toolset) | D1 decided | 4 |
+| M1b Agent-first plumbing | `FtrResultMeta`, `FtrCode` union + `data.error`, waivers (gap 09 lookup), `verification` on rows/tables/presets, provenance helpers, `llull guide` section, contract tests | M1 | 4 |
 | M2 Holes & pockets (lowered) | `feature` recipe node, `featureLowering.ts`, `add_hole`, `add_pocket`, `set_thread`, `check_machining`, codegen `cskHole`/`cboreHole` | M1 | 8 |
 | M3 Native sheet metal | model, rule, base, flange, fold, analytic unfold, `flat_pattern`, `check_sheet_metal`, radius table import; DXF writer moved to core + `export_flat_pattern_dxf` | M1, D4 | 12 |
 | M4 Face graph + recognition | `faceGraph` (OCC), recognition holes/pockets/fillets/chamfers, split-face merge, NIST tests | M2, M0 | 10 |

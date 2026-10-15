@@ -5,7 +5,7 @@ functional counterpart: [FUNCTIONAL_SPEC.md](FUNCTIONAL_SPEC.md) · validation: 
 
 Requirement ids `TR-KRN-nn` are grouped by decade: 0x kernel selection & build, 1x tolerance policy & booleans,
 2x STEP → exact B-rep & healing, 3x persistent naming, 4x mass properties, 5x validity, 6x determinism,
-7x large assemblies & display, 8x export, 9x face-query port.
+7x large assemblies & display, 8x export, 9x face-query port, 10x agent-first (codes, units, defaults, unverified, review, human gates, loop).
 
 ## 1. Current state in llull
 
@@ -195,16 +195,16 @@ exchange, …); existing commands keep their current toolset.
 | Command | Kind | Params (sketch) | Data / effect | Toolset |
 | ------- | ---- | --------------- | ------------- | ------- |
 | `kernel_info` | query | `{}` | TR-KRN-04 payload | core |
-| `set_modeling_tolerance` | mutating | `{ linear?: number, angular?: number, maxImportTolerance?: number }` | updates `kernelSettings.modelingTolerance` (validated range) | core |
+| `set_modeling_tolerance` | mutating | `{ linear?: number (mm), angular?: number (rad), maxImportTolerance?: number (mm) }` | updates `kernelSettings.modelingTolerance` (validated range) | core |
 | `import_step_exact` (owned by 01; extended by 04) | mutating, kernel | exactly one of `stepBase64?: string`, `text?: string` (Part 21, ASCII), `blobId?: string`; `fileName?: string`, `heal?: boolean = true`, `sew?: boolean = true`, `precisionMode?: 'file'|'document' = 'file'`, `keepOriginal?: boolean = false`, `name?: string`; **04 extension**: `verify?: boolean = true`, `gvpPolicy?: Partial<GvpPolicy>`, `mode?: 'append'|'replace'`, `tessellated?: boolean` | MVP (01): one `mesh` entity per solid with `brep: { op:'heal'?, source: { op:'brep', blob } }`, world placement, names, colours; `data.report` (§5.2). 04 extension: XDE product tree → components / instances, `doc.exchange.provenance`, `data.gvpCheck` (04 TECHNICAL_SPEC §3–§5) | exchange |
-| `heal_shape` | mutating, kernel | `{ id: string, precision?: number, maxTolerance?: number, sew?: boolean, fixSmallEdges?: boolean }` | wraps the entity recipe in a `heal` node; `data.report` | 3d |
+| `heal_shape` | mutating, kernel | `{ id: string, precision?: number (mm), maxTolerance?: number (mm), sew?: boolean, fixSmallEdges?: boolean }` | wraps the entity recipe in a `heal` node; `data.report` | 3d |
 | `validate_shape` | query, kernel | `{ entityIds?: string[], selfIntersection?: boolean = false, exact?: boolean = false }` | `data: { results: [{ id, valid, issues: [{ code, subShape: TopoName, detail }], maxTolerance }] }` | measure |
 | `boolean` (extended) | mutating, kernel | `+ fuzzy?: number` (mm, ≥ 0, ≤ 0.1) | recipe `boolean.fuzzy`; on failure `data.argumentCheck` | 3d |
 | `fillet_edge` / `chamfer_edge` (extended) | mutating, kernel | `+ edgeNames?: TopoName[]` | names resolved first, then `edgeIndices`, then `edgesNear`; history stores names | 3d |
 | `inspect_topology` (extended) | query, kernel | `+ withNames?: boolean = true` | each face/edge gains `name: TopoName` and `history: 'primitive'|'modified'|'generated'|'imported'` | 3d |
-| `mass_properties` (extended) | query | `+ frame?: 'document'|'entity' = 'document', eps?: number = 1e-9, about?: Vec3` | §5.4 payload | measure |
+| `mass_properties` (extended) | query | `+ frame?: 'document'|'entity' = 'document', eps?: number = 1e-9 (relative), about?: Vec3 (document unit), purpose?: 'general'|'weight-and-balance' = 'general'` | §5.4 payload + `unverified`, `reviewRequired`, `provenance`, named defaults (TR-KRN-102..104) | measure |
 | `export_step_exact` (unchanged) / `export_step_ap242` (04 XCH) | query, kernel | — / see 04 TECHNICAL_SPEC §4 | `export_step_exact` stays AP214, flat, no GVP; exact AP242 export with assembly structure and GVP is 04's `export_step_ap242` (TR-KRN-80) | exchange |
-| `check_model` (extended) | query | — | adds `faceted_result`, `kernel_mismatch`, `invalid_brep` (when kernel present) issue codes | core |
+| `check_model` (extended) | query | — | adds `KRN_FACETED_RESULT`, `KRN_KERNEL_MISMATCH`, `KRN_INVALID_BREP` (when kernel present), `KRN_MASS_INPUT_UNVERIFIED`, `KRN_BROKEN_REFERENCE`, `KRN_KERNEL_FALLBACK` issues (§7.2) | core |
 
 Structured tags (example):
 
@@ -328,7 +328,9 @@ forwarding to `import_step_exact`; the mesh path remains for Manifold. CLI: `llu
   k = √(I/m). Payload of `mass_properties` (extended):
   `{ volume, volumeUnit, area, areaUnit, centroid, inertia: { atCentroid: Mat3, atOrigin: Mat3, principal:
   { moments: Vec3, axes: [Vec3,Vec3,Vec3] }, unit: 'g·mm²' | 'mm⁵ (per unit density)' }, density?, mass?,
-  method: 'exact'|'closed-form'|'mesh', relErrorEstimate? }`.
+  method: 'exact'|'closed-form'|'mesh', relErrorEstimate?, eps: Named<number>, densitySource?, provenance,
+  unverified: { value, reasons[] }, reviewRequired: { value, reasons[] } }` (`Named<T> = { value: T, unit, source,
+  defaulted }`, TR-KRN-102..104).
 - **TR-KRN-41 (MUST, MVP) — part-frame evaluation.** Before integration, the shape is **copied** (geometry, not
   only location) to a local frame centred on its bounding-box centre `c`, rounded to 1 mm
   (`BRepBuilderAPI_Transform(shape, T(−c), copy=true)`); results are shifted back: centroid += c; inertia at the
@@ -496,19 +498,108 @@ OCC classes (union of the consumer packs' lists, to be added to the M2 binding l
 Desktop files larger than the 512 MB body limit (`backendEnv.ts`) must use a sidecar blob directory next to the
 document instead of inline base64 (V2).
 
-## 7. UI / CLI / MCP surfaces
+## 7. CLI / MCP / UI surfaces
 
-- **UI**: kernel badge in the status bar (`OCC 7.9.x` / `Manifold (fallback: <reason>)`); Import dialog option
-  "Exact B-rep (editable)" default on desktop, with the healing report panel (per body: valid, actions, max
-  tolerance, GVP deltas); Tools → Validate shape; Measure → Mass properties panel with tensor, principal axes
-  gizmo and CSV copy; Document settings → Modelling tolerance; broken-reference badges in the feature tree
-  with "re-pick" action (re-pick = `edit_step_params` with new names).
-- **CLI**: `llull kernel_info`, `llull import_step_exact file=<path>`, `llull validate_shape`,
-  `llull mass_properties '{"entityId":…}'` — compact JSON output (llull-cli skill); `--kernel occt` becomes the
-  CLI default for `--doc` runs on desktop installs.
-- **MCP**: tools from the registry (`toToolSchemas`); `import_step` exchange tool `mode` param; toolsets:
-  core (kernel_info, set_modeling_tolerance), measure (validate_shape, mass_properties), exchange (import/export),
-  3d (heal_shape).
+- **CLI (primary, AGENT_FIRST §1)**: every KRN capability is a registry command, found by `llull search exact
+  kernel` / `llull search step import` and documented by `llull describe <cmd>` (agent-written descriptions: what,
+  when, units, refusals, next command — AF-02). Typical calls: `llull kernel_info --json`,
+  `llull import_step_exact file=<path> --progress --json`, `llull validate_shape '{"entityIds":[…]}' --json`,
+  `llull mass_properties entityId=<id> --json`, `llull check_model --json`. Heavy artefacts go to files with
+  `--save` (STEP via 04's `export_step_ap242`, PNG via `render_view`). `--kernel occt` becomes the CLI default for
+  `--doc` runs on desktop installs. `llull guide` gains a KRN section (AF-03): units (mm internal, document unit for
+  params), aircraft axes / precision envelope (|x|,|y|,|z| ≤ 1e5 mm), id conventions for imported bodies, and the
+  minimal correct plans (`validation/plans/krn-rib-pocket.json`, the W2 import sequence).
+- **MCP**: same tools from the registry (`toToolSchemas`); `import_step` exchange tool `mode` param; toolsets:
+  core (kernel_info, set_modeling_tolerance, check_model), measure (validate_shape, mass_properties),
+  exchange (import/export), 3d (heal_shape).
+- **UI (review / approval surface)**: kernel badge (`OCC 7.9.x` / `Manifold (fallback: <reason>)`), import report
+  table, validation results, mass-property table with principal-axes gizmo, broken-reference badges; reviewer-only
+  acts: accept a faceted body into an exact delivery and accept a kernel baseline (human gates, TR-KRN-105). The
+  UI renders the same `data` the CLI returns; no KRN capability is UI-only.
+
+### 7.1 Agent-first technical requirements (TR-KRN-100 .. 106)
+
+- **TR-KRN-100 (MUST, MVP) — stable codes.** Every KRN refusal / finding returns `data.issues[]` (check commands) or
+  `data.error` (refusals) as `{ code, severity: 'fail'|'warn'|'info', entityIds?, subShape?, paramPath?,
+  remediation }` with the codes of §7.2; the CLI exits 1 on a refusal (AF-11).
+- **TR-KRN-101 (MUST, MVP) — units.** Param descriptions state units (lengths in the document length unit; `fuzzy`,
+  `precision`, `maxTolerance`, `linear`, `maxImportTolerance` in mm; `angular` in rad; `eps` dimensionless relative);
+  `data` numbers carry a unit suffix (`maxToleranceMm`, `centroidMm`) or a sibling `…Unit` field (`volumeUnit`,
+  `inertia.unit`), as `mass_properties` already does for `volumeUnit` (AF-04, AF-10).
+- **TR-KRN-102 (MUST, MVP) — named defaults + provenance.** `{ value, unit, source, defaulted }` for
+  `modelingTolerance.linear` (1e-4 mm, source "OCCT STEP reader `read.precision.val` default [R5]"),
+  `modelingTolerance.angular`, `maxImportTolerance` (0.01 mm, "llull policy TR-KRN-11"), `eps` (1e-9, "llull policy
+  TR-KRN-40; BRepGProp adaptive Gauss [R8]"), boolean `fuzzy` (Precision::Confusion 1e-7 mm [R1] when omitted) and
+  density (`densitySource`: material record id / legacy material / param). `data.provenance = { method, occtClass,
+  kernel: { name, occtVersion, build }, inputs: { entityIds, recipeKey, density } }` (AF-31, AF-35).
+- **TR-KRN-103 (MUST, MVP) — `unverified` propagation.** `mass_properties` returns `unverified: { value, reasons[] }`
+  with reasons `density_unverified` (no verified 08 MAT record, or record basis `typical` / `supplier_unstated` /
+  `unspecified`), `method_mesh`, `faceted_body`, `import_gvp_red`, `import_gvp_not_checkable`; assembly totals OR
+  the flags of their parts. `check_model` emits `KRN_MASS_INPUT_UNVERIFIED` (warn, cannot be filtered out) (AF-32).
+- **TR-KRN-104 (MUST, MVP) — `reviewRequired`.** `mass_properties` and the `import_step_exact` report return
+  `reviewRequired: { value, reasons[] }`: true for `purpose: 'weight-and-balance'` (new optional param), any
+  `unverified` reason, `outside_precision_envelope`, `import_gvp_mismatch`, `tolerance_growth`. The summary appends
+  "computed by llull, not approved — needs a qualified engineer" when true; summaries follow AF-36 order (done /
+  passed / needs a human) (AF-33, AF-36).
+- **TR-KRN-105 (MUST, V1) — human gates.** Accepting a faceted body into an exact delivery (`acceptFaceted` on 04's
+  `export_step_ap242`) and accepting a kernel-regression baseline (`quality:kernel --accept`) require
+  `ctx.caller.kind === 'human'` (09 TR-PLM-16; advisory in local CLI runs, enforced on an authenticated server);
+  an agent gets `KRN_HUMAN_GATE` with the prepared request (AF-34).
+- **TR-KRN-106 (SHOULD, MVP) — loop behaviour.** `import_step_exact` reports progress per stage (read, heal, sew,
+  validate, blob) to the CLI `--progress` stream, respects `--timeout` (worker recycled on timeout, existing
+  `LLULL_OCC_TIMEOUT_MS`), re-uses blobs by sha256 on re-run; `import_step_exact`, `heal_shape`,
+  `set_modeling_tolerance` are pure commands, so `--dry-run` works unchanged (AF-40, AF-42).
+
+### 7.2 Stable error codes (AF-11)
+
+| Code | Severity | Raised by | When | Offending ids / paths | Remediation |
+| ---- | -------- | --------- | ---- | --------------------- | ----------- |
+| `KRN_NO_EXACT_KERNEL` | fail | every `requiresKernel` KRN command | no kernel, or a kernel without the needed port (`importShapes`, `massProperties`, `validate`, `faceQuery`) | command name | run on the desktop backend or with `--kernel occt`; `kernel_info` shows the active kernel |
+| `KRN_KERNEL_FALLBACK` | warn | `kernel_info`, `check_model` | OCC failed to start; Manifold active | `fallbackReason` | restart the app; report the reason; exact results are unavailable until fixed |
+| `KRN_KERNEL_MISMATCH` | warn | load, `kernel_info`, `check_model` | document written by another kernel / OCCT version | `kernelSettings.occtVersion` both values | re-run the KRN plans and compare (`quality:kernel`) before relying on stored measures |
+| `KRN_STEP_UNREADABLE` | fail | `import_step_exact` | Part 21 parse / transfer failure, truncated file | `fileName` | check the file (sha256, size); try `verify_exchange_file` (04) for a census |
+| `KRN_STEP_TESSELLATED_ONLY` | fail | `import_step_exact` | file holds only `TESSELLATED_*` geometry | `fileName` | import as mesh with `import_step` (`mode: 'mesh'`) or 04's tessellated import |
+| `KRN_STEP_NO_SOLID` | fail | `import_step_exact` | no solid and no closable shell after sewing | `fileName`, open-shell count | retry with `sew: true` and a larger `precision` (mm) within `maxImportTolerance`; else import as surfaces (02 SRF) |
+| `KRN_IMPORT_TOLERANCE_HIGH` | warn | `import_step_exact`, `heal_shape`, `validate_shape` | a sub-shape tolerance > `maxImportTolerance` | entity id, sub-shape | `heal_shape` with a smaller `maxTolerance`; check the result with `validate_shape`; reviewer if it remains |
+| `KRN_GVP_MISMATCH` | warn | `import_step_exact` (04 `verify`) | recomputed GVP outside the green band (04 §5.3) | entity id, property, sender / recomputed values | do not deliver as-is; report both values; qualified reviewer decides |
+| `KRN_HEAL_FAILED` | fail | `heal_shape`, `import_step_exact` | shape still invalid after the healing pipeline | entity id, BRepCheck statuses | try `sew: false` / other `precision`; else keep the original and report |
+| `KRN_BLOB_MISSING` / `KRN_BLOB_HASH_MISMATCH` | fail | load, `brep` leaf evaluation | `brep` leaf references an absent blob or bytes whose sha256 differ | blob sha256, entity id | re-import the STEP file (`import_step_exact`); never edit the document by hand |
+| `KRN_BOOLEAN_FAILED` | fail | `boolean` | BOP returned no valid result | `a`, `b`, `data.argumentCheck` issues | retry with `fuzzy` (mm, ≤ 0.1) or `heal_shape` the operands |
+| `KRN_INVALID_RESULT` | fail | any kernel node (commit gate) | a result fails BRepCheck | entity id, node op | change the parameters (smaller fillet radius, …); see `validate_shape` |
+| `KRN_BROKEN_REFERENCE` | fail | replay of `fillet_edge` / `chamfer_edge` / later naming users | a stored `TopoName` resolves to no entity | step path, `TopoName` | re-pick with `edit_step_params` (new `edgeNames` / `edgesNear`) |
+| `KRN_REFERENCE_RERESOLVED` | info | replay | a reference was re-resolved by history trace | step path, old / new name | none; listed for audit |
+| `KRN_TOLERANCE_OUT_OF_RANGE` | fail | `set_modeling_tolerance`, `boolean` (`fuzzy`) | value outside policy (`linear` ∉ [1e-7, 1e-2] mm, `fuzzy` > 0.1 mm) | param path | pass a value inside the range |
+| `KRN_PRECISION_ENVELOPE` | warn | build, import, `mass_properties` | geometry beyond \|x\|,\|y\|,\|z\| ≤ 1e5 mm | entity ids, bbox | move the part frame near the origin and place it by instance |
+| `KRN_FACETED_RESULT` | warn (fail for exact export) | `check_model`, exports | an exact recipe fell back to triangles | entity id | run on OCC; or a qualified reviewer accepts it (human gate) |
+| `KRN_INVALID_BREP`, `KRN_SELF_INTERSECTION`, `KRN_SMALL_EDGE`, `KRN_SLIVER_FACE`, `KRN_OPEN_SHELL`, `KRN_NEGATIVE_VOLUME` | fail / warn | `validate_shape`, `check_model` | the TR-KRN-51 checks | entity id, sub-shape (index MVP, `TopoName` V1) | `heal_shape`; rebuild the feature; reviewer if it is imported data |
+| `KRN_MASS_INPUT_UNVERIFIED` | warn | `mass_properties`, `check_model` | TR-KRN-103 reasons | entity ids, reasons | assign a verified material record (08 MAT `assign_material` with a record), use the exact kernel |
+| `KRN_HUMAN_GATE` | fail | `export_step_ap242 { acceptFaceted }`, baseline accept | agent caller on a human-gated act | act, entity ids | hand the prepared request to a qualified reviewer in the desktop app |
+| `KRN_DRIFT_TOPOLOGY` / `KRN_DRIFT_MEASURE` | fail / warn | `quality:kernel` | cross-build drift beyond tolerance | model id, measure | review the drift report; baseline change is a human gate |
+
+Existing lowercase `check_model` codes (`degenerate_size`, …) stay unchanged; new KRN findings use the `KRN_*` codes.
+
+### 7.3 Agent-first compliance (AGENT_FIRST.md)
+
+| AF | Where satisfied |
+| -- | --------------- |
+| AF-01 | §4: every capability is a registry command; FR-KRN-17; VC-KRN-17 |
+| AF-02, AF-03 | §7 CLI bullet (descriptions, `llull guide` KRN section) |
+| AF-04, AF-10 | TR-KRN-101; FR-KRN-21; VC-KRN-17, VC-KRN-23 |
+| AF-05 | `validation/plans/*.json` validate with `llull run … --validate` (checked in review: all valid against the real zod schemas) |
+| AF-11 | TR-KRN-100, §7.2; FR-KRN-19; VC-KRN-19 |
+| AF-12 | heavy outputs via `--save` (STEP, PNG); import report bounded per body |
+| AF-13 | TR-KRN-60 determinism; FR-KRN-10; VC-KRN-10 |
+| AF-20 | `validate_shape` + `check_model`; FR-KRN-20; VC-KRN-09, VC-KRN-19 |
+| AF-21 | numeric equivalents: validity issues, tolerance values, inertia tensor and principal axes, `data.instancing` instead of viewport inspection (FR-KRN-11) |
+| AF-22 | `render_view … --save view.png` in W1 / W2 |
+| AF-23 | FUNCTIONAL_SPEC §7 (CLI + JSON assertions), `validation/README.md` §3.1 |
+| AF-30 | tolerance policy and validity rules as data (TR-KRN-10/11/51) applied by the check commands |
+| AF-31, AF-35 | TR-KRN-102; FR-KRN-22; VC-KRN-23 |
+| AF-32 | TR-KRN-103; FR-KRN-23; VC-KRN-20 |
+| AF-33, AF-36 | TR-KRN-104; FR-KRN-24; VC-KRN-21 |
+| AF-34 | TR-KRN-105; FR-KRN-25; VC-KRN-22 |
+| AF-40, AF-42 | TR-KRN-106; FR-KRN-26; VC-KRN-24 |
+| AF-41 | desktop OCC + bundled CPython, no network (KI6); `KRN_NO_EXACT_KERNEL` when unavailable |
 
 ## 8. Performance & robustness budgets
 
@@ -539,6 +630,7 @@ once in M2 and then ratcheted.
 | Kernel regression (new `quality:kernel`) | signatures + measures vs baseline; cross-version tolerance mode | VC-KRN-10 |
 | Display gate | 10 000-instance scene, 70 m station z-fighting screenshot | VC-KRN-12, TR-KRN-73 |
 | Desktop (`npm --prefix desktop test`) | backend env contains `LLULL_KERNEL=occt`; `kernel_info.active === 'occt'`; forced failure → fallback warning | VC-KRN-11 |
+| Agent-first (CLI scripts, `--json` + exit codes) | wrong calls → codes; legacy-material rib → `unverified`; weight-and-balance purpose → `reviewRequired`; agent `acceptFaceted` → `KRN_HUMAN_GATE`; named defaults + provenance; `--dry-run` / `--timeout` on import | VC-KRN-19 .. 24 |
 | Production-gate scenario | "Supplier STEP round trip": import NIST CTC 01 AP242 → drill + pocket + fillet → validate → mass → `export_step_ap242` with GVP (04) → re-import → GVP within 1e-6 of the exported values | VC-KRN-04, 09, TR-KRN-80 |
 
 Coverage gate (90/85/90/90) applies to new code in `packages/core/src/{commands,geometry}`.

@@ -67,9 +67,38 @@ Tolerances are relative (`rel`) or absolute (`abs`). "Gate" names the automated 
 | VC-KRN-13 | FR-KRN-02, TR-KRN-03 | web app without backend, `?kernel=occt`, rib plan | no main-thread long task > 50 ms during kernel work; results identical to the server run | TBD — measure with Playwright Long Tasks API | quality:display |
 | VC-KRN-14 | FR-KRN-13, TR-KRN-80 | rib (VC-KRN-03) and NIST CTC 01 modified part | `export_step_ap242` (04 XCH) writes GVP; re-import GVP delta ≤ 1e-6 relative (volume, area), ≤ 1e-6 mm centroid | as stated | production scenario |
 | VC-KRN-15 | FR-KRN-14, FR-KRN-15, TR-KRN-61 | save/load a document; `set_modeling_tolerance` | saved file carries `kernelSettings.occtVersion` + build; load under another version → provenance warning; `linear: 1` (mm) rejected (range [1e-7, 1e-2]); import uses the document precision when the file has none | exact | unit + server |
-| VC-KRN-16 | FR-KRN-16 | fillet recipe loaded under Manifold (capability gap) | entity flagged `faceted`; `check_model` reports `faceted_result`; `export_step_exact` / `export_step_ap242` refuse without explicit acceptance | exact | unit |
+| VC-KRN-16 | FR-KRN-16 | fillet recipe loaded under Manifold (capability gap) | entity flagged `faceted`; `check_model` reports `KRN_FACETED_RESULT`; `export_step_exact` / `export_step_ap242` refuse unless a qualified reviewer accepts (human gate) | exact | unit |
 | VC-KRN-18 | FR-KRN-18, TR-KRN-90..92 | analytic face fixtures: box 100×50×20 (min corner at origin), cylinder r 10 h 40, sphere r 25 at origin | box +Z face: normal (0,0,1), centroid (50,25,20); cylinder side: radius 10, \|k\| = 1/r = 0.1 and 0; sphere: \|k1\| = \|k2\| = 1/r = 0.04, K = 1/r² = 0.0016, \|H\| = 0.04; `projectOnFace`((0,0,50)) on the sphere → distance 25, point (0,0,25); Manifold: `faceQuery` absent | abs 1e-9 (rel 1e-9 curvature) | server OCC unit (`occtFaceQuery.test.ts`) |
 | VC-KRN-17 | FR-KRN-17 | registry | every KRN command in `toToolSchemas()` snapshot, CLI help, happy + failure unit tests, `is pure` test | exact | contract tests |
+| VC-KRN-19 | FR-KRN-19, FR-KRN-20, TR-KRN-100 | deliberately wrong calls (table in `expected_results.json`) | each exits 1 with the listed `KRN_*` code, offending id / path and remediation; document unchanged | exact (code strings) | CLI script (`--json`, exit codes) |
+| VC-KRN-20 | FR-KRN-23, TR-KRN-103 | rib plan with the legacy `create_material` aluminium (no verified record) | `mass_properties` `.data.unverified == {value: true, reasons: ["density_unverified"]}`; volume still 485 716.8147 mm³; `check_model` warning `KRN_MASS_INPUT_UNVERIFIED` naming the rib | exact | CLI script |
+| VC-KRN-21 | FR-KRN-24, TR-KRN-104 | rib with `purpose: "weight-and-balance"`; NIST ctc_02 e2 import (GVP mismatch) | `.data.reviewRequired.value == true` with reasons `weight-and-balance` (+ `density_unverified`) / `import_gvp_mismatch`; summary contains "needs a qualified engineer"; plain rib with default purpose and a verified density: `value == false` | exact | CLI script |
+| VC-KRN-22 | FR-KRN-25, TR-KRN-105 | faceted rib (fillet recipe under Manifold), agent caller | `export_step_ap242 {acceptFaceted: true}` → exit 1, `KRN_HUMAN_GATE`, nothing saved; same act from the desktop UI (human caller) proceeds | exact | server unit + desktop test |
+| VC-KRN-23 | FR-KRN-21, FR-KRN-22, TR-KRN-101, TR-KRN-102 | rib; `kernel_info` | `mass_properties` `.data.volumeUnit == "mm³"`, `.data.eps == {value: 1e-9, unit: "relative", source: …, defaulted: true}`, `.data.densitySource` present, `.data.provenance.method == "BRepGProp"`; `kernel_info` `.data.modelingTolerance.linear == {value: 1e-4, unit: "mm", source: "OCCT read.precision.val default", defaulted: true}` | exact | CLI script |
+| VC-KRN-24 | FR-KRN-26, TR-KRN-106 | `nist_ctc_02_asme1_rc.stp` (largest measured read, 0.84 s native) | `import_step_exact … --dry-run --json` → `.changed == false`, document file byte-identical; `--progress` prints the import stages; with `LLULL_OCC_TIMEOUT_MS=1` (or a `--timeout` shorter than the import) → exit 1, nothing saved | exact | CLI script |
+
+### 3.1 CLI form of the validation cases (AF-23)
+
+Every VC runs unattended as a script: build with a plan, query with `--json`, compare with `expected_results.json`
+(value, tolerance, unit) using exit codes only. Pattern (VC-KRN-03):
+
+```bash
+llull run docs/aerospace/01-exact-brep-kernel/validation/plans/krn-rib-pocket.json --validate --doc t.llull
+llull run docs/aerospace/01-exact-brep-kernel/validation/plans/krn-rib-pocket.json --kernel occt --json --doc t.llull > run.json
+RIB=$(jq -r '.data.steps[] | select(.command=="fillet_edge") | .affected[0]' run.json)
+llull mass_properties entityId=$RIB --kernel occt --json --doc t.llull \
+  | jq -e --slurpfile er docs/aerospace/01-exact-brep-kernel/validation/expected_results.json \
+      '($er[0].cases[] | select(.vc=="VC-KRN-03") | .value.volume) as $v | ((.data.volume - $v) | fabs) <= 1e-9 * $v'
+llull validate_shape "{\"entityIds\":[\"$RIB\"]}" --kernel occt --json --doc t.llull | jq -e '.data.results[0].valid'
+llull check_model --json --doc t.llull | jq -e '[.data.issues[] | select(.severity=="fail")] | length == 0'
+```
+
+The other VCs follow the same shape: VC-KRN-01/02/03b (`mass_properties` per alias), VC-KRN-04..06
+(`import_step_exact file=… --json`, assertions on `.data.report`), VC-KRN-07 (`run` renaming plan, then volume or
+`KRN_BROKEN_REFERENCE`), VC-KRN-08 (`boolean … fuzzy`), VC-KRN-09/19 (`validate_shape`, `check_model`, codes),
+VC-KRN-10 (`npm run quality:kernel`), VC-KRN-11 (`kernel_info --app`), VC-KRN-15/23 (`kernel_info`,
+`set_modeling_tolerance`), VC-KRN-20..22/24 (rows above). VC-KRN-12/13 are display gates (Playwright), VC-KRN-18 a
+server unit test of the kernel port.
 
 Also reused, not duplicated: **the existing quality corpus** (`quality/corpus.json`, R27). In exact mode
 (`import_step_exact`) every `step-import` entry must additionally pass: `validAfterHeal`, exact volume vs

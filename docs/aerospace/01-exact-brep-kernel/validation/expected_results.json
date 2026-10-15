@@ -925,7 +925,7 @@
    ],
    "value": {
     "facetedFlag": true,
-    "checkModelCode": "faceted_result",
+    "checkModelCode": "KRN_FACETED_RESULT",
     "exactExportRefused": true
    },
    "tolerance": null,
@@ -999,6 +999,204 @@
    },
    "unit": "mm, 1/mm, 1/mm^2",
    "source": "analytic (b): plane normal and face centroid of box-100x50x20 (min corner at origin); cylinder principal curvatures 1/r and 0; sphere k1 = k2 = 1/r, K = 1/r^2, H = 1/r (signs depend on the face orientation convention, so magnitudes are compared); closest point of an external point on a sphere is along the radius"
+  },
+  {
+   "vc": "VC-KRN-19",
+   "title": "stable error codes and remediation on wrong calls",
+   "proves": [
+    "FR-KRN-19",
+    "FR-KRN-20",
+    "TR-KRN-100"
+   ],
+   "value": {
+    "calls": [
+     {
+      "cli": "llull import_step_exact text=garbage --kernel occt --json",
+      "exit": 1,
+      "code": "KRN_STEP_UNREADABLE"
+     },
+     {
+      "cli": "llull import_step_exact file=nist_ftc_08_asme1_ap242-e4-tg.stp --kernel occt --json",
+      "exit": 1,
+      "code": "KRN_STEP_TESSELLATED_ONLY"
+     },
+     {
+      "cli": "llull set_modeling_tolerance linear=1 --json",
+      "exit": 1,
+      "code": "KRN_TOLERANCE_OUT_OF_RANGE",
+      "paramPath": "linear"
+     },
+     {
+      "cli": "llull boolean '{\"op\":\"union\",\"a\":\"<box>\",\"b\":\"<box2>\",\"fuzzy\":0.5}' --kernel occt --json",
+      "exit": 1,
+      "code": "KRN_TOLERANCE_OUT_OF_RANGE",
+      "paramPath": "fuzzy"
+     },
+     {
+      "cli": "llull validate_shape '{\"entityIds\":[\"<box>\"]}' --json (Manifold kernel)",
+      "exit": 1,
+      "code": "KRN_NO_EXACT_KERNEL"
+     }
+    ],
+    "everyErrorHas": [
+     "code",
+     "remediation"
+    ],
+    "documentUnchanged": true
+   },
+   "tolerance": null,
+   "unit": "-",
+   "source": "requirement (AGENT_FIRST.md); policy values, not measured"
+  },
+  {
+   "vc": "VC-KRN-20",
+   "title": "unverified density propagates into mass results and check_model",
+   "proves": [
+    "FR-KRN-23",
+    "TR-KRN-103"
+   ],
+   "value": {
+    "volume": 485716.8146928204,
+    "unverified": {
+     "value": true,
+     "reasons": [
+      "density_unverified"
+     ]
+    },
+    "checkModelWarning": "KRN_MASS_INPUT_UNVERIFIED"
+   },
+   "tolerance": {
+    "volumeRel": 1e-09
+   },
+   "unit": "mm^3",
+   "plan": "plans/krn-rib-pocket.json",
+   "source": "volume analytic (b) as VC-KRN-03; the plan's create_material is a legacy material without an 08 MAT verified record, so the flag is expected by requirement (AGENT_FIRST AF-32)"
+  },
+  {
+   "vc": "VC-KRN-21",
+   "title": "reviewRequired on weight-and-balance results and GVP-mismatch imports",
+   "proves": [
+    "FR-KRN-24",
+    "TR-KRN-104"
+   ],
+   "value": {
+    "ribWeightAndBalance": {
+     "reviewRequired": {
+      "value": true,
+      "reasonsInclude": [
+       "weight-and-balance"
+      ]
+     },
+     "summaryContains": "needs a qualified engineer"
+    },
+    "nist_ctc_02_asme1_ap242-e2.stp": {
+     "reviewRequired": {
+      "value": true,
+      "reasonsInclude": [
+       "import_gvp_mismatch"
+      ]
+     }
+    },
+    "ribGeneralVerifiedDensity": {
+     "reviewRequired": {
+      "value": false
+     }
+    }
+   },
+   "tolerance": null,
+   "unit": "-",
+   "source": "requirement (AGENT_FIRST AF-33); GVP mismatch of ctc_02 e2 measured (nist_gvp_vs_occt.json)"
+  },
+  {
+   "vc": "VC-KRN-22",
+   "title": "human gate: agent cannot accept a faceted body into an exact delivery",
+   "proves": [
+    "FR-KRN-25",
+    "TR-KRN-105"
+   ],
+   "value": {
+    "agentCaller": {
+     "exit": 1,
+     "code": "KRN_HUMAN_GATE",
+     "fileWritten": false
+    },
+    "humanCaller": {
+     "proceeds": true
+    }
+   },
+   "tolerance": null,
+   "unit": "-",
+   "source": "requirement (AGENT_FIRST.md); policy values, not measured; caller model from 09 PLM TR-PLM-16 (advisory in local CLI runs)"
+  },
+  {
+   "vc": "VC-KRN-23",
+   "title": "named defaults, units and provenance in data",
+   "proves": [
+    "FR-KRN-21",
+    "FR-KRN-22",
+    "TR-KRN-101",
+    "TR-KRN-102"
+   ],
+   "value": {
+    "mass_properties": {
+     "volumeUnit": "mm³",
+     "eps": {
+      "value": 1e-09,
+      "unit": "relative",
+      "defaulted": true
+     },
+     "densitySourcePresent": true,
+     "provenance.method": "BRepGProp"
+    },
+    "kernel_info": {
+     "modelingTolerance.linear": {
+      "value": 0.0001,
+      "unit": "mm",
+      "defaulted": true,
+      "source": "OCCT STEP reader read.precision.val default (R5)"
+     },
+     "maxImportTolerance": {
+      "value": 0.01,
+      "unit": "mm",
+      "defaulted": true,
+      "source": "llull policy TR-KRN-11"
+     }
+    }
+   },
+   "tolerance": null,
+   "unit": "-",
+   "source": "defaults quoted from R5 (read.precision.val 0.0001) and llull policy (TECHNICAL_SPEC TR-KRN-11/40)"
+  },
+  {
+   "vc": "VC-KRN-24",
+   "title": "dry run, progress and timeout on a large STEP import",
+   "proves": [
+    "FR-KRN-26",
+    "TR-KRN-106"
+   ],
+   "value": {
+    "dryRun": {
+     "changed": false,
+     "documentByteIdentical": true
+    },
+    "progressStages": [
+     "read",
+     "heal",
+     "sew",
+     "validate",
+     "blob"
+    ],
+    "timeout": {
+     "env": "LLULL_OCC_TIMEOUT_MS=1",
+     "exit": 1,
+     "saved": false,
+     "note": "deterministic cut of the single OCC call; the CLI --timeout SEC bounds the whole run the same way"
+    }
+   },
+   "tolerance": null,
+   "unit": "-",
+   "input": "nist_ctc_02_asme1_rc.stp",
+   "source": "requirement (AGENT_FIRST.md); policy values, not measured"
   }
  ]
 }

@@ -32,7 +32,8 @@ src/app  installDefaultPlugins() + caePlugin       packages/mcp: exchangeTools-s
         ▼
 packages/domain-cae/src  (@cae)  ── CadPlugin "cae", toolset "analysis"
    commands/: create_analysis, set_part_idealization, add_fea_constraint, add_fea_load, set_mesh_controls,
-              record_fe_mesh, record_fea_results, set_result_view, add_result_probe, compute_margins, …
+              record_fe_mesh, record_fea_results, set_result_view, add_result_probe, compute_margins,
+              check_analysis, dispose_margin (human gate), …
    decks/:    inpWriter.ts, bdfWriter.ts   (pure: AnalysisModel + FeMesh → text)
    results/:  frdReader.ts, datReader.ts, derivedFields.ts (von Mises, principal), margins.ts
    checks/:   analytic.ts (beam, plate k, Kirsch)
@@ -89,6 +90,8 @@ packages/kernel-occt/src  occtMidsurface.ts, occtDefeature.ts (KernelOps), face 
 | TR-FEA-60 | MUST | `@cae/results/margins.ts` implements §5.8. There is no averaging across parts, and singular zones are reported separately. |
 | TR-FEA-70 | MUST | `server/src/feaSolve.ts` spawns `ccx` with `trackChild`, a timeout, cancel, and log capture (§5.9). |
 | TR-FEA-80 | SHOULD | Performance budgets in §8 are enforced by the production-gate scenario VC-FEA-53. |
+| TR-FEA-90 | MUST | Agent-first result contract (AF-10/11/31–35): `compute_margins`, `check_analysis` and `fea_report` follow §5.8/§7.1; factors carry `source`/`defaulted`; `unverified` is the OR of all gap 08 inputs' flags; `reviewRequired` is always true on margins. |
+| TR-FEA-91 | MUST | `dispose_margin` verifies a human-held signature through the gap 09 signing port; the CLI/MCP agent path cannot supply one (AF-34). |
 
 ## 3. Data model
 
@@ -223,8 +226,10 @@ pure commands in the table.
 | `record_fea_results` | mutating (registry; validated, §4.1) | `{ analysisId, summary: ResultsSummary }` | @invariant as `record_fe_mesh` for `resultsHash` · @failure no mesh, meshHash mismatch, artifact missing, hash or summary mismatch → no-op |
 | `set_result_view` | mutating (presentation, like `set_camera`) | `{ analysisId, field, loadCase?, mode?, deformationScale? }` | — |
 | `add_result_probe` / `delete_result_probe` | mutating | `{ analysisId, name, point, quantity }` | — |
-| `fea_report` | query | `{ analysisId }` → `data { state: 'unmeshed'\|'meshed'\|'solved'\|'stale'\|'missing', mesh, quality, results, probes }` | read-only |
-| `compute_margins` | query | `{ analysisId, criterion?='von_mises', allowable?: 'ftu'\|'fty'\|number, groupBy?: 'part'\|'target', loadCases? }` → `data { rows[], minMS }` | @failure stale results, material without allowables (unless a number is given) |
+| `fea_report` | query | `{ analysisId }` (all values with units, AF-10) → `data { state: 'unmeshed'\|'meshed'\|'solved'\|'stale'\|'missing', mesh, quality, results, probes }` | read-only |
+| `compute_margins` | query | `{ analysisId, criterion?='von_mises', allowable?: 'ftu'\|'fty'\|{ value, unit }, groupBy?: 'part'\|'target', loadCases?, marginalBand?: number (MS units, no default) }` → `data` shape §5.8 | @invariant every factor named with `source` + `defaulted` (AF-31); every row `reviewRequired: true` (AF-33); `unverified` propagated from gap 08 inputs (AF-32) · @failure `FEA_RESULTS_STALE`, `FEA_RESULTS_MISSING`, `FEA_MATERIAL_NO_ALLOWABLE` (unless an explicit allowable is given) |
+| `check_analysis` | query | `{ analysisId }` → `data { status: 'pass'\|'warn'\|'fail', items: [{ code, severity, ids[], path?, message, remediation }], reviewRequired: true }` | read-only readiness check (AF-20) over set-up, mesh, results and margins; codes §7.1. The agent ends every FEA job with it |
+| `dispose_margin` | mutating, **human gate** | `{ analysisId, rowId, decision: 'accepted'\|'rejected'\|'redesign', justification, signature }` | @affects case.dispositions · @invariant `signature` must verify against a human-held key through the gap 09 signing port (`humanSignatureRequired`); the disposition records rowId, the results hash and the signer · @failure agent caller or no valid human signature → `FEA_HUMAN_GATE`, doc unchanged; stale results → `FEA_RESULTS_STALE` |
 | `analytic_check` | query | `{ check: 'cantilever'\|'ss_beam'\|'ss_plate_buckling'\|'kirsch_kt', inputs }` → value + formula | pure. Matches `generate_fea_analytic.py` |
 | ✱ `fea_mesh` | transport | `{ analysisId }` | runs the Gmsh op, stores the artifact, dispatches `record_fe_mesh` |
 | ✱ `fea_solve` | transport | `{ analysisId, timeoutS?=600, threads? }` | writes the INP, runs `ccx`, parses FRD/DAT, stores the artifact, dispatches `record_fea_results` |
@@ -400,6 +405,36 @@ Averaging is never done across material or part boundaries. Nodes within `singul
 sharp edge are reported separately as `singular: true` and do not set the MS by default (open question 8).
 Expected values: `fea_analytic_expected.json` VC-FEA-20.
 
+Status: `FAIL` if MS < 0; `MARGINAL` if 0 ≤ MS < `marginalBand` (only when the caller set one; there is no default band, AF-31);
+otherwise `PASS`. `FAIL` and `MARGINAL` rows get `disposition: "pending_human"` until `dispose_margin` (human gate, AF-34).
+
+`compute_margins` `data` shape (AF-10, AF-31…35):
+
+```json
+{
+  "analysisId": "an-5.1", "unitSystem": "N-mm-t-s", "resultsHash": "…", "minMs": -0.0666667,
+  "factors": {
+    "ultimate": { "value": 1.5, "source": "14 CFR 25.303", "defaulted": true },
+    "yield":    { "value": 1.0, "source": "derived from 14 CFR 25.305(a) (limit load, no detrimental permanent deformation)", "defaulted": true },
+    "extra": []
+  },
+  "rows": [{
+    "rowId": "r4", "part": "box-3.1", "region": "part", "loadCase": "LC1", "category": "limit", "criterion": "von_mises",
+    "appliedMPa": 200, "allowableMPa": 280, "allowable": { "property": "Ftu", "basis": "B", "provenance": "MAT:<id> Table …" },
+    "ms": -0.0666667, "status": "FAIL", "code": "FEA_MS_NEGATIVE", "atMm": [0, 10, 0], "singular": false,
+    "provenance": { "formula": "MS = allowable / (applied × FoS × Π extra) − 1", "standard": ["NASA-STD-5001B", "14 CFR 25.303"] },
+    "unverified": false, "unverifiedReasons": [],
+    "reviewRequired": true, "reviewReason": "margin of safety supports a structural substantiation decision",
+    "disposition": "pending_human"
+  }],
+  "reviewRequired": true,
+  "summary": "4 rows, min MS −0.067 (FAIL, LC1). Computed by llull, not approved — needs a qualified engineer."
+}
+```
+
+Field names carry units for the analysis unit system (`…MPa`, `…Mm` for N-mm-t-s; `…Psi`, `…In` for lbf-in). Expected values of
+this shape: `fea_analytic_expected.json` VC-FEA-60…64.
+
 ### 5.9 Solve (FR-FEA-16)
 
 `server/src/feaSolve.ts` writes `job.inp` into a temp dir and spawns `ccx -i job` (`LLULL_CCX`, default: the bundled path on desktop),
@@ -435,16 +470,85 @@ summaries well formed. Recipes inside `midsurface`/`defeature` nodes are checked
 
 ## 7. UI / CLI / MCP surfaces
 
-- **UI** (`src/ui/panels/analysis/*`, a viewport branch `src/ui/viewport/3d/AnalysisOverlay.tsx`). Panels: Analysis tree (cases,
+- **UI** (review and approval surface only; `src/ui/panels/analysis/*`, a viewport branch `src/ui/viewport/3d/AnalysisOverlay.tsx`). Panels: Analysis tree (cases,
   parts, constraints, loads, mesh, results), Target picker (records click points as `*Near`), Mesh quality histogram, Result legend,
-  Margins table. The overlay draws the midsurface (translucent), constraint and load glyphs, the skin mesh with scalars, and probes.
+  Margins table, **disposition dialog** (human gate: the reviewer's signature, gap 09). The overlay draws the midsurface (translucent), constraint and load glyphs, the skin mesh with scalars, and probes.
   The 2D view shows plane-stress parts. UI work goes through the `viewport-feature` skill and is verified with Playwright (VC-FEA-17).
-- **CLI** (`server/src/cli`). A new `fea` subcommand group (`mesh | quality | solve | margins | export | import | report`) is a thin client
-  of the transports, in-process for `--doc` and over REST (`POST /fea/<op>`) for `--app`/`--server`, mirroring `cli/exchange.ts`.
-  Output is compact JSON with `--json`.
+- **CLI** (primary operator surface, AF-01). **No `fea` subcommand group**: registry commands run as `llull <command> …` and the ✱
+  transports run like the existing exchange tools (`llull fea_mesh analysisId=… --progress --timeout 300`, `llull fea_import_results
+  file=run.frd …`, `llull fea_export … --save out/x.bdf`), in-process for `--doc` and over REST (`POST /fea/<op>`) for
+  `--app`/`--server`, mirroring `cli/exchange.ts`. Long transports stream progress and respect `--timeout` (AF-40). `llull guide` gains an
+  FEA section: analysis unit systems, FoS defaults and their sources, the minimal static plan, the end-of-job `check_analysis` (AF-03).
+- **render_view.** Proposed optional params `analysisId`, `field`, `loadCase`, `mode` so `llull render_view … --save vm.png` draws the
+  skin mesh with scalars for multimodal agents (AF-22); the host supplies the field from the artifact store, nothing is stored.
 - **MCP.** The `analysis` toolset holds the registry commands plus the ✱ transports. Hosts without Gmsh/ccx return a
   how-to-enable message, as `import_step` does when Python is off. There is a prompt `fea_quick_check` (set up, mesh, solve, margins).
 - **REST.** `POST /fea/mesh|solve|import|export` live in `server/src/feaRoutes.ts` and reuse the token and security model (KI6).
+
+### 7.1 Stable error and check codes (AF-11)
+
+Exit code 1 on every refusal; `data.code`, `data.ids` (or `data.path` for plan validation) and `data.remediation` are always set.
+Check items from `check_analysis` use the same codes with a severity.
+
+| Code | Severity | When | Offending ids / path | Remediation |
+| ---- | -------- | ---- | -------------------- | ----------- |
+| `FEA_TARGET_UNRESOLVED` | error | a `facesNear`/`edgesNear`/`pointsNear` point matches no face/edge/vertex (also after a parametric edit) | constraint/load id, point | move the point onto the intended face, then re-run |
+| `FEA_TARGET_AMBIGUOUS` | error | two candidates within 1e-6 × model size | constraint/load id, candidate face indices | pick a point farther from the shared edge |
+| `FEA_MATERIAL_MISSING` | error | an analysed part has no material | entity id | `assign_material` with a gap 08 record |
+| `FEA_MATERIAL_NO_ELASTIC` | error | the record has no E or ν | material name, record id | `set_material_property property=E …` / `nu` |
+| `FEA_MATERIAL_NO_ALLOWABLE` | error | margins need Ftu/Fty and none is given | material name | `set_material_property property=Ftu …` or pass `allowable={value,unit}` |
+| `FEA_MATERIAL_UNVERIFIED` | warning (not suppressible) | a used property is gap 08 `unverified` | material, property ids | replace with a verified, sourced value (gap 08) |
+| `FEA_PROPERTY_INVALID` | error | E ≤ 0, G ≤ 0, ν ∉ (−1, 0.5) | material, property | correct the value |
+| `FEA_UNITS_MISMATCH` | error | explicit `unitSystem` disagrees with the document unit, or a `{value, unit}` has the wrong dimension | param path | drop `unitSystem` or fix the unit |
+| `FEA_UNDERCONSTRAINED` | warning | < 6 independent restrained DOFs per connected part | part id | add constraints |
+| `FEA_POINT_LOAD_SINGULAR` | warning | force on a single node / re-entrant sharp edge | load id | distribute over a face; singular zone excluded from MS |
+| `FEA_KERNEL_OCC_REQUIRED` | error | midsurface, defeature or face targeting on Manifold | command | `--kernel occt` (desktop default) |
+| `FEA_MIDSURFACE_COVERAGE` | error | shell export with coverage < 0.98 | entity id, unpaired face indices | fix geometry or use solid idealization |
+| `FEA_TOOL_MISSING` | error | Gmsh or ccx not found | tool name | install hint (desktop bundle / `LLULL_CCX`) (AF-41) |
+| `FEA_FACE_MAP_AMBIGUOUS` | error | llull face → Gmsh surface not unique | face indices | heal geometry and re-mesh |
+| `FEA_MESH_INVERTED` | error | any element with scaled Jacobian ≤ 0 | element ids | refine, or change `order`/`optimize` |
+| `FEA_MESH_ADEQUACY` | warning | < 2 elements through a thickness or span | part id | reduce `globalSize` or add a refinement |
+| `FEA_MESH_STALE` | error | mesh `inputHash` ≠ current | analysis id | `fea_mesh` |
+| `FEA_RESULTS_MISSING` | error | no results, or artifact absent on this machine | analysis id | `fea_solve` |
+| `FEA_RESULTS_STALE` | error | results `inputHash` ≠ current | analysis id, changed inputs | `fea_mesh` then `fea_solve` |
+| `FEA_ARTIFACT_NOT_FOUND` | error | `record_*` hash not in the store | hash | run the transport; never hand-write summaries |
+| `FEA_SUMMARY_MISMATCH` | error | `record_*` summary ≠ recomputed | hash, differing fields | same |
+| `FEA_FOREIGN_RESULTS` | warning | imported results do not match the mesh | analysis id | review-only; not used for margins |
+| `FEA_SOLVER_FAILED` | error | ccx exit ≠ 0 or `*ERROR` | `data.logTail` | read the log tail; usually constraints or material |
+| `FEA_SOLVER_TIMEOUT` | error | `--timeout` / `timeoutS` reached | analysis id | coarser mesh or longer timeout |
+| `FEA_FACTOR_INVALID` | error | a factor < 1, or an extra factor without justification | param path | correct the factor |
+| `FEA_MS_NEGATIVE` | fail | a margin row with MS < 0 | row id, part, load case | redesign; only a qualified reviewer can disposition it |
+| `FEA_MS_MARGINAL` | warning | 0 ≤ MS < `marginalBand` | row id | same |
+| `FEA_MARGINAL_BAND_UNSET` | warning | `marginalBand` not given | analysis id | ask the owner / company rule for a band |
+| `FEA_DISPOSITION_PENDING` | warning | FAIL/MARGINAL row without a human disposition | row ids | qualified reviewer: `dispose_margin` in the desktop app |
+| `FEA_HUMAN_GATE` | error | `dispose_margin` by an agent or without a valid human signature | row id | hand over to the qualified reviewer |
+
+### 7.2 Agent-first compliance (`../AGENT_FIRST.md`)
+
+| AF | Where satisfied |
+| -- | --------------- |
+| AF-01 | set-up and query capabilities are registry commands (§4); transports run like exchange tools, no CLI subcommand group (§7) |
+| AF-02, AF-03 | command descriptions state units and the next command; `llull guide` FEA section (§7) |
+| AF-04 | FR-FEA-37; analysis unit system fixed at `create_analysis` (TR-FEA-07); `{value, unit}` for explicit allowables |
+| AF-05 | all set-up in one plan (`validation/plans/*`), `llull run --validate` |
+| AF-10 | `fea_report`, `compute_margins` (§5.8 shape), `check_analysis`: unit-suffixed fields |
+| AF-11 | §7.1 codes (FR-FEA-36; VC-FEA-65) |
+| AF-12 | decks and meshes only via `fea_export --save` / the artifact store |
+| AF-13 | TR-FEA-30/40 determinism (VC-FEA-06, 51) |
+| AF-20 | `check_analysis` (FR-FEA-35) |
+| AF-21 | FR-FEA-17 numbers first; overlays FR-FEA-17b SHOULD |
+| AF-22 | `render_view` with `analysisId` / `field` (§7) |
+| AF-23 | validation README "CLI harness" |
+| AF-30 | Verdict ranges, FoS rule, adequacy rule held as data with sources (§5.5, §5.8) |
+| AF-31 | FR-FEA-31; named factors in §5.8 (VC-FEA-60) |
+| AF-32 | FR-FEA-34 (VC-FEA-64) |
+| AF-33 | FR-FEA-32 (VC-FEA-61) |
+| AF-34 | FR-FEA-33, `dispose_margin`, TR-FEA-91 (VC-FEA-62, 63) |
+| AF-35 | `provenance` in every margin row (§5.8); method and inputs in `analytic_check` |
+| AF-36 | `compute_margins.summary`: done, passed, needs a human |
+| AF-40 | `fea_mesh` / `fea_solve` progress, `--timeout`, content-hash cache (TR-FEA-05) |
+| AF-41 | bundled ccx/gmsh; `FEA_TOOL_MISSING` |
+| AF-42 | `--dry-run` on every set-up command (pure) |
 
 ## 8. Performance & robustness budgets
 
@@ -470,7 +574,8 @@ summaries well formed. Recipes inside `midsurface`/`defeature` nodes are checked
 | Quality gate (`npm run quality:fea`) | NAFEMS LE1/LE10, analytic table, report markdown | 30, 31 |
 | E2E (Playwright) | result overlay screenshot, margins table | 17 |
 | Desktop (`npm --prefix desktop test`) | bundled `ccx --version`, `python -c "import gmsh"`, licence files | 52 |
-| Production gate | LE10 timing scenario | 53 |
+| Agent-first (`tests/unit/cae/agentFirst.test.ts` + CLI harness) | named factors, `reviewRequired`, human gate, unverified propagation, error codes, driven by `fea_analytic_expected.json` | 28, 60–65 |
+| Production gate | LE10 timing scenario; the agent driver runs the whole CLI scenario unattended except the human gate (AF-23) | 53 |
 
 Coverage 90/85/90/90 extends to `packages/domain-cae/src/**` (CLAUDE.md non-negotiable 3).
 

@@ -19,7 +19,11 @@
     "FR-SRF-10",
     "FR-SRF-11",
     "TR-SRF-04"
-   ]
+   ],
+   "cli": {
+    "run": "llull airfoil_from_naca designation=0012 trailingEdge=open points=161 --doc t.llull.json --kernel occt --json; llull measure_deviation id=$af file=fixtures/srf/naca0012.dat --doc t.llull.json --kernel occt --json",
+    "assert": "data.max"
+   }
   },
   {
    "vc": "VC-SRF-02",
@@ -35,7 +39,11 @@
    "proves": [
     "FR-SRF-11",
     "TR-SRF-04"
-   ]
+   ],
+   "cli": {
+    "run": "llull airfoil_from_naca designation=23012 --doc t.llull.json --kernel occt --json; llull measure_deviation id=$af file=fixtures/srf/naca23012.dat --doc t.llull.json --kernel occt --json",
+    "assert": "data.max"
+   }
   },
   {
    "vc": "VC-SRF-03",
@@ -52,7 +60,11 @@
     "FR-SRF-12",
     "TR-SRF-04",
     "TR-SRF-09"
-   ]
+   ],
+   "cli": {
+    "run": "llull import_airfoil file=fixtures/srf/naca2412.dat normalize=chord --doc t.llull.json --kernel occt --json; llull measure_deviation (vs airfoil_from_naca 2412) --doc t.llull.json --kernel occt --json",
+    "assert": "data.max"
+   }
   },
   {
    "vc": "VC-SRF-04",
@@ -104,7 +116,11 @@
     "FR-SRF-10",
     "TR-SRF-04",
     "TR-SRF-09"
-   ]
+   ],
+   "cli": {
+    "run": "llull import_airfoil file=<file> format=auto --doc t.llull.json --kernel occt --json",
+    "assert": "data.format, data.pointCount, data.leIndex, data.teGap"
+   }
   },
   {
    "vc": "VC-SRF-05",
@@ -144,7 +160,11 @@
     "FR-SRF-21",
     "TR-SRF-06",
     "TR-SRF-07"
-   ]
+   ],
+   "cli": {
+    "run": "llull run plans/target_torus_surface_analysis.json --doc t.llull.json --kernel occt --json (+ sphere / cylinder variants)",
+    "assert": "steps[1].data.samples[*].K, abs(steps[1].data.samples[*].H)"
+   }
   },
   {
    "vc": "VC-SRF-06",
@@ -170,7 +190,11 @@
     "FR-SRF-22",
     "TR-SRF-01",
     "TR-SRF-06"
-   ]
+   ],
+   "cli": {
+    "run": "llull check_continuity pairs=@continuity_pairs.json --doc t.llull.json --kernel occt --json",
+    "assert": "data.joints[*].order"
+   }
   },
   {
    "vc": "VC-SRF-07",
@@ -196,7 +220,11 @@
     "FR-SRF-01",
     "FR-SRF-18",
     "TR-SRF-01"
-   ]
+   ],
+   "cli": {
+    "run": "llull create_conic start=[1,0,0] apex=[1,1,0] end=[0,1,0] rho=0.41421356 --doc t.llull.json --kernel occt --json; llull inspect_nurbs id=$c --doc t.llull.json --kernel occt --json",
+    "assert": "data.weights[1]; radius error from 9 evaluated samples"
+   }
   },
   {
    "vc": "VC-SRF-08",
@@ -215,7 +243,11 @@
     "FR-SRF-02",
     "FR-SRF-03",
     "TR-SRF-01"
-   ]
+   ],
+   "cli": {
+    "run": "llull exec unit tests (core NURBS lib: knot insertion, degree elevation, interpolation)",
+    "assert": "n/a (unit test)"
+   }
   },
   {
    "vc": "VC-SRF-09",
@@ -239,7 +271,11 @@
    "proves": [
     "FR-SRF-13",
     "TR-SRF-04"
-   ]
+   ],
+   "cli": {
+    "run": "llull airfoil_properties airfoilId=$af --doc t.llull.json --kernel occt --json",
+    "assert": "data.tMax, data.xTMax, data.teThickness, data.leRadius, data.area"
+   }
   },
   {
    "vc": "VC-SRF-10",
@@ -272,7 +308,11 @@
     "FR-SRF-14",
     "FR-SRF-15",
     "TR-SRF-05"
-   ]
+   ],
+   "cli": {
+    "run": "llull run plans/target_tr1208_wing.json --doc t.llull.json --kernel occt --json",
+    "assert": "steps[-1].data.areaRef, data.mac, data.yMac, data.aspectRatio, data.unit == \"in\""
+   }
   },
   {
    "vc": "VC-SRF-11",
@@ -297,7 +337,11 @@
     "FR-SRF-32",
     "TR-SRF-03",
     "TR-SRF-05"
-   ]
+   ],
+   "cli": {
+    "run": "llull run plans/target_naca0012_trap_wing.json --doc t.llull.json --kernel occt --json",
+    "assert": "steps[3].data.volume (mass_properties), steps[4].data.areaPerSide"
+   }
   },
   {
    "vc": "VC-SRF-12",
@@ -322,7 +366,11 @@
     "TR-SRF-07",
     "TR-SRF-09",
     "TR-SRF-10"
-   ]
+   ],
+   "cli": {
+    "run": "llull import_step file=crm.step --doc t.llull.json --kernel occt --json --timeout 120; llull check_continuity id=$crm edges=internal --doc t.llull.json --kernel occt --json; llull analyze_surface_curvature id=$crm faceIndex=<upper skin> grid=[50,50] --doc t.llull.json --kernel occt --json",
+    "assert": "golden recorded on first run"
+   }
   },
   {
    "vc": "VC-SRF-13",
@@ -340,7 +388,11 @@
    "proves": [
     "FR-SRF-17",
     "TR-SRF-05"
-   ]
+   ],
+   "cli": {
+    "run": "llull run plans/target_sears_haack_conic_fuselage.json --doc t.llull.json --kernel occt --json",
+    "assert": "steps[-1].data.volume"
+   }
   },
   {
    "vc": "VC-SRF-14",
@@ -356,7 +408,11 @@
     "FR-SRF-18",
     "TR-SRF-01",
     "TR-SRF-05"
-   ]
+   ],
+   "cli": {
+    "run": "llull fuselage_section_at bodyId=$fus fs=5 --doc t.llull.json --kernel occt --json (conic rho 0.41421356 vs circle body)",
+    "assert": "data.halfBreadth, data.area"
+   }
   },
   {
    "vc": "VC-SRF-15",
@@ -371,7 +427,11 @@
     "FR-SRF-06",
     "TR-SRF-08",
     "TR-SRF-11"
-   ]
+   ],
+   "cli": {
+    "run": "llull fill_surface boundary=@fill_boundary.json --doc t.llull.json --kernel occt --json",
+    "assert": "data.boundaries[*].g0Gap, data.boundaries[*].g1AngleRad"
+   }
   },
   {
    "vc": "VC-SRF-16",
@@ -387,7 +447,11 @@
     "FR-SRF-08",
     "TR-SRF-08",
     "TR-SRF-11"
-   ]
+   ],
+   "cli": {
+    "run": "llull sew_surfaces ids=[$s1,$s2] makeSolid=true --doc t.llull.json --kernel occt --json; llull mass_properties entityId=$solid --doc t.llull.json --kernel occt --json",
+    "assert": "data.freeEdges; data.volume"
+   }
   },
   {
    "vc": "VC-SRF-17",
@@ -401,7 +465,11 @@
    "proves": [
     "FR-SRF-24",
     "TR-SRF-08"
-   ]
+   ],
+   "cli": {
+    "run": "llull add_cone ...; llull analyze_draft id=$c pullDirection=[0,0,1] minDraftDeg=1 --doc t.llull.json --kernel occt --json",
+    "assert": "data.samples[lateral].draftDeg"
+   }
   },
   {
    "vc": "VC-SRF-18",
@@ -417,7 +485,11 @@
    "proves": [
     "FR-SRF-25",
     "TR-SRF-08"
-   ]
+   ],
+   "cli": {
+    "run": "llull measure_deviation id=$sphere points=@points_r10p5.json --doc t.llull.json --kernel occt --json",
+    "assert": "data.max, data.mean, data.rms"
+   }
   },
   {
    "vc": "VC-SRF-19",
@@ -435,7 +507,11 @@
     "FR-SRF-33",
     "FR-SRF-35",
     "TR-SRF-10"
-   ]
+   ],
+   "cli": {
+    "run": "same plan via CLI, MCP build_project and UI dispatch; diff the documents and data",
+    "assert": "documents and data equal"
+   }
   },
   {
    "vc": "VC-SRF-20",
@@ -454,7 +530,11 @@
    "proves": [
     "FR-SRF-30",
     "TR-SRF-09"
-   ]
+   ],
+   "cli": {
+    "run": "llull import_openvsp_wing file=fixtures/srf/TR1208.vsp3 --doc t.llull.json --kernel occt --json; llull wing_properties id=$w --doc t.llull.json --kernel occt --json",
+    "assert": "data.areaPerSide, data.areaRef"
+   }
   },
   {
    "vc": "VC-SRF-21",
@@ -469,7 +549,11 @@
     "FR-SRF-27",
     "FR-SRF-28",
     "TR-SRF-09"
-   ]
+   ],
+   "cli": {
+    "run": "llull run conceptual_wing.plan.json --doc t.llull.json --kernel occt --json; llull export_step_exact --save out/w.step --doc t.llull.json --kernel occt --json; llull import_step file=out/w.step --doc t.llull.json --kernel occt --json; llull mass_properties --doc t.llull.json --kernel occt --json",
+    "assert": "data.volume relative change"
+   }
   },
   {
    "vc": "VC-SRF-22",
@@ -486,7 +570,11 @@
    "proves": [
     "FR-SRF-05",
     "TR-SRF-03"
-   ]
+   ],
+   "cli": {
+    "run": "llull loft_surface sectionIds=[...] --doc t.llull.json --kernel occt --json",
+    "assert": "data.sectionDeviation[*]"
+   }
   },
   {
    "vc": "VC-SRF-23",
@@ -501,7 +589,11 @@
     "FR-SRF-07",
     "TR-SRF-08",
     "TR-SRF-11"
-   ]
+   ],
+   "cli": {
+    "run": "llull trim_surface id=$sheet by={\"curveIds\":[\"$circle\"]} keep=inside --doc t.llull.json --kernel occt --json; llull measure_area --doc t.llull.json --kernel occt --json",
+    "assert": "data.area"
+   }
   },
   {
    "vc": "VC-SRF-24",
@@ -515,7 +607,11 @@
     "FR-SRF-09",
     "TR-SRF-08",
     "TR-SRF-11"
-   ]
+   ],
+   "cli": {
+    "run": "llull thicken_surface id=$hemi thickness=1 side=normal --doc t.llull.json --kernel occt --json; llull mass_properties --doc t.llull.json --kernel occt --json",
+    "assert": "data.volume"
+   }
   },
   {
    "vc": "VC-SRF-25",
@@ -529,7 +625,11 @@
    "proves": [
     "FR-SRF-04",
     "TR-SRF-01"
-   ]
+   ],
+   "cli": {
+    "run": "llull surface_from_points grid=@torus_21x21.json mode=interpolate --doc t.llull.json --kernel occt --json",
+    "assert": "data.maxGridDeviation"
+   }
   },
   {
    "vc": "VC-SRF-26",
@@ -544,7 +644,11 @@
    "proves": [
     "FR-SRF-29",
     "TR-SRF-07"
-   ]
+   ],
+   "cli": {
+    "run": "llull run plans/target_naca0012_trap_wing.json --doc t.llull.json --kernel manifold --json",
+    "assert": "airfoil/wing_properties ok; kernel ops errors[*].code == SRF_KERNEL_REQUIRED"
+   }
   },
   {
    "vc": "VC-SRF-27",
@@ -557,7 +661,11 @@
    "proves": [
     "FR-SRF-23",
     "TR-SRF-02"
-   ]
+   ],
+   "cli": {
+    "run": "component test (overlay on/off)",
+    "assert": "document unchanged"
+   }
   },
   {
    "vc": "VC-SRF-28",
@@ -572,7 +680,11 @@
     "FR-SRF-16",
     "FR-SRF-14",
     "TR-SRF-05"
-   ]
+   ],
+   "cli": {
+    "run": "llull set_parameter name=sweep expression=30 --doc t.llull.json --kernel occt --json; llull wing_properties id=$wing --doc t.llull.json --kernel occt --json",
+    "assert": "data.areaRef unchanged, data.sweepLeDeg == 30"
+   }
   },
   {
    "vc": "VC-SRF-29",
@@ -581,7 +693,11 @@
    "proves": [
     "FR-SRF-19",
     "TR-SRF-05"
-   ]
+   ],
+   "cli": {
+    "run": "TBD",
+    "assert": "TBD"
+   }
   },
   {
    "vc": "VC-SRF-30",
@@ -599,7 +715,150 @@
    "proves": [
     "FR-SRF-28",
     "TR-SRF-09"
-   ]
+   ],
+   "cli": {
+    "run": "llull run plans/target_naca0012_trap_wing.json --doc t.llull.json --kernel occt --json; llull export_code language=cadquery --save out/ --doc t.llull.json --kernel occt --json; python out/model.py (bundled CadQuery)",
+    "assert": "volume of the emitted solid"
+   }
+  },
+  {
+   "vc": "VC-SRF-31",
+   "what": "stable error codes: plan with designation '9999x', a non-increasing span and a closed-TE request on an open-TE file",
+   "expected": {
+    "exitCode": 1,
+    "codes": [
+     "AERO_NACA_DESIGNATION_UNKNOWN",
+     "AERO_SPAN_NOT_INCREASING",
+     "AERO_AIRFOIL_TE_GAP"
+    ],
+    "each_error_has": [
+     "code",
+     "path",
+     "remediation"
+    ]
+   },
+   "tolerance": "exact",
+   "source": "(b) TECHNICAL_SPEC \u00a77.1",
+   "proves": [
+    "FR-SRF-33",
+    "FR-SRF-37",
+    "TR-SRF-12"
+   ],
+   "cli": {
+    "run": "llull run bad_wing.plan.json --validate --doc t.llull.json --kernel occt --json; llull run bad_wing.plan.json --doc t.llull.json --kernel occt --json",
+    "assert": "exit code 1; data.errors[*].code set equals expected.codes; every error has path and remediation"
+   }
+  },
+  {
+   "vc": "VC-SRF-32",
+   "what": "unverified propagation: wing from an imported .dat with no pinned source",
+   "expected": {
+    "airfoil_properties.unverified": true,
+    "wing_properties.unverified": true,
+    "mass_properties.unverified": true,
+    "check_surface_quality.findings_contains": "SRF_CHECK_INPUT_UNVERIFIED",
+    "check_surface_quality.severity": "warn",
+    "suppressible": false,
+    "provenance_present": true
+   },
+   "tolerance": "exact",
+   "source": "(b) FR-SRF-41 propagation rule (TECHNICAL_SPEC \u00a73)",
+   "proves": [
+    "FR-SRF-41",
+    "FR-SRF-44",
+    "TR-SRF-14"
+   ],
+   "cli": {
+    "run": "llull import_airfoil file=unpinned.dat --doc t.llull.json --kernel occt --json; llull run wing_from_af.plan.json --doc t.llull.json --kernel occt --json; llull check_surface_quality --doc t.llull.json --kernel occt --json",
+    "assert": "data.unverified == true on each query; findings[code=SRF_CHECK_INPUT_UNVERIFIED].severity == warn; data.provenance present"
+   }
+  },
+  {
+   "vc": "VC-SRF-33",
+   "what": "check_surface_quality on the NACA 0012 wing with purpose=release and no tolerances given",
+   "expected": {
+    "status_in": [
+     "pass",
+     "warn",
+     "fail"
+    ],
+    "tolerances.g1AngleRad": {
+     "value": 0.01,
+     "unit": "rad",
+     "defaulted": true,
+     "source": "OCCT BRepOffsetAPI_MakeFilling TolAng default"
+    },
+    "tolerances.g2Rel": {
+     "value": 0.1,
+     "unit": "-",
+     "defaulted": true,
+     "source": "OCCT BRepOffsetAPI_MakeFilling TolCurv default"
+    },
+    "findings_contains": "SRF_CHECK_TOLERANCE_DEFAULTED",
+    "reviewRequired": true,
+    "reviewReason_present": true,
+    "unverified": false
+   },
+   "tolerance": "exact",
+   "source": "(b) FR-SRF-39, FR-SRF-40, FR-SRF-42; default values from TECHNICAL_SPEC \u00a75.6/\u00a75.9 (S12 headers)",
+   "proves": [
+    "FR-SRF-39",
+    "FR-SRF-40",
+    "FR-SRF-42",
+    "TR-SRF-13"
+   ],
+   "cli": {
+    "run": "llull run plans/target_naca0012_trap_wing.json --doc t.llull.json --kernel occt --json; llull check_surface_quality '{\"purpose\":\"release\"}' --doc t.llull.json --kernel occt --json",
+    "assert": "data.tolerances.*.defaulted/source; data.reviewRequired == true; summary contains 'needs a qualified engineer'"
+   }
+  },
+  {
+   "vc": "VC-SRF-34",
+   "what": "human gate: G2 failure on a two-segment ruled wing (kink between segments), agent requests a waiver and tries to approve it",
+   "expected": {
+    "finding": "SRF_CHECK_G2_CURVATURE",
+    "request_surface_waiver.ok": true,
+    "record_approval_as_agent.ok": false,
+    "check_after.status": "fail",
+    "check_after.waiverStatus": "pending",
+    "check_after.findings_contains": "SRF_CHECK_WAIVER_PENDING"
+   },
+   "tolerance": "exact",
+   "source": "(b) FR-SRF-43; agent refusal of record_approval per 09 PLM TR-PLM-16 (enforceable on an authenticated server; advisory on local CLI)",
+   "proves": [
+    "FR-SRF-43",
+    "TR-SRF-13"
+   ],
+   "cli": {
+    "run": "llull request_surface_waiver code=SRF_CHECK_G2_CURVATURE entityId=$wing edgesNear=[...] reason='aero accepts' --doc t.llull.json --kernel occt --json; llull record_approval ... --server URL (agent caller); llull check_surface_quality --doc t.llull.json --kernel occt --json",
+    "assert": "record_approval exit 1; findings[code=SRF_CHECK_G2_CURVATURE].waiverStatus == pending"
+   }
+  },
+  {
+   "vc": "VC-SRF-35",
+   "what": "units and data shapes: describe audit and result audit for every SRF / aero command",
+   "expected": {
+    "numeric_params_without_unit": 0,
+    "query_numbers_without_unit": 0,
+    "search_finds": [
+     "airfoil_from_naca",
+     "create_wing",
+     "check_continuity",
+     "check_surface_quality"
+    ]
+   },
+   "tolerance": "exact",
+   "source": "(b) AF-01..04, AF-10; FR-SRF-35, FR-SRF-36",
+   "proves": [
+    "FR-SRF-26",
+    "FR-SRF-35",
+    "FR-SRF-36",
+    "TR-SRF-15"
+   ],
+   "cli": {
+    "run": "llull search airfoil wing continuity --json; for c in $(llull list aero) $(llull list surface): llull describe $c --json",
+    "assert": "every number-typed param description names a unit; every query data number has a unit field or suffix"
+   }
   }
  ]
 }

@@ -1,7 +1,8 @@
 # Gap FTR — Sheet-metal and machined manufacturing features — Functional specification
 
 Gap id: **FTR** · Folder: `docs/aerospace/07-sheet-metal-machined-features/` · Status: draft spec (2026-10-15) ·
-Related gaps: **08 (fastener catalogue)**, drawings / hole tables, STEP exchange, parametric history.
+Related gaps: **08 (fastener catalogue)**, drawings / hole tables, STEP exchange, parametric history. Operator model:
+[`AGENT_FIRST.md`](../AGENT_FIRST.md) (AI agent via the `llull` CLI; owner not assumed to be an engineer).
 
 ---
 
@@ -70,15 +71,27 @@ volumes.
 
 ## 3. Personas & user stories
 
-| Persona | Story |
-| ------- | ----- |
-| **P1 Sheet-metal detail designer** (OEM/Tier-1) | As P1, I create an angle or clip from a sketch, add flanges, reliefs and a joggle, then get the flat pattern with bend lines and notes as DXF, so that the shop can cut the blank. |
-| **P2 MRO repair engineer / A&P mechanic** | As P2, I enter alloy, temper, thickness and bend angle and get the minimum radius, setback, bend allowance and developed length, matching AC 43.13-1B, in inches. |
-| **P3 Machined-part designer** | As P3, I place counterbored and 100° countersunk holes on a fitting from a fastener part number, pocket the web with a corner radius my cutter can reach, and see a DFM report. |
-| **P4 Manufacturing / NC engineer** | As P4, I import a supplier STEP and get a list of holes (type, diameter, depth, countersink), pockets and bends, so I can plan operations and check drill sizes. |
-| **P5 Stress / weight engineer** | As P5, I resize a pocket floor or flange via a parameter and get mass at once; lightening holes update the mass. |
-| **P6 AI agent (MCP/CLI)** | As P6, I build, check, unfold and export a part from one `build_project` plan, and read a structured feature table (`data`) back. |
-| **P7 Quality / inspection** | As P7, I get a hole table (position, diameter, countersink diameter and angle) and a bend table for the drawing. |
+Roles follow [`AGENT_FIRST.md`](../AGENT_FIRST.md) §1. The operator is an AI agent driving the `llull` CLI. The owner is
+the person who asks for the part and is **not assumed to be an engineer**. A qualified reviewer appears only where a
+result feeds an aircraft repair, a part release or a safety decision.
+
+| Role | Who (examples) | What they need from this gap |
+| ---- | -------------- | ---------------------------- |
+| **O1 Operator: CLI agent** (primary) | Claude Code or a similar agent with a shell, `--doc` headless or `--app` on the desktop window | Commands it can find (`llull search sheet metal`, `llull describe add_flange`), units stated in every schema, one plan per job, `--validate`, read-only checks with stable codes, numeric results in `data`, files written with `--save` |
+| **O2 Operator: MCP agent** | Cloud agent on `/mcp`, toolset `manufacturing` | The same commands and the same `data` shapes |
+| **W1 Owner** | Small repair-station manager, homebuilder, start-up founder, buyer who needs a bracket or a fitting | A plain-language answer: what was made, what passed, what needs a qualified person; the DXF / STEP files |
+| **R1 Qualified reviewer** (only for certification / release / safety) | Engineer or certificated person with the authority the applicable rules require for the repair or part (the AC itself says it applies only when no manufacturer data exist [R1]) | A review surface showing the computed numbers, their provenance, every check finding and every `unverified` input; the only role that can approve a waiver or release |
+
+| # | Story |
+| - | ----- |
+| US-1 (O1) | As the operator, asked "make the repair angle from 0.064 in 2024-T3, 135° bend", I find `sheet_metal_calc` with `llull search bend allowance`, call it with explicit `units=in`, and read setback, bend allowance and bend deduction from `data` with their formulas and inputs, without reading a K-chart. |
+| US-2 (O1) | As the operator, I write the bracket as one plan file, run `llull run plan.json --validate`, then run it, then `check_sheet_metal` and `flat_pattern`, look at `render_view view=top --save flat.png`, and export the blank with `export_flat_pattern_dxf --save blank.dxf`. |
+| US-3 (O1) | As the operator, I do not know the minimum bend radius of 2024-T3 or the safe distance from a hole to a bend. The check commands apply the rule tables for me and return codes (`FTR_BEND_RADIUS_BELOW_MIN`, `FTR_HOLE_TO_BEND_TOO_CLOSE`) with a remediation I can act on. |
+| US-4 (O1) | As the operator, I place countersunk and counterbored holes and a pocket on a fitting with `add_hole` / `add_pocket`, then `check_machining` tells me about knife edges and cutter-radius problems with codes and values in mm. |
+| US-5 (O1) | As the operator, I import a supplier STEP and get a feature list (holes, countersinks, pockets, bends) as `data` with face indices, so I can answer the owner's "what holes are in this part?" and build a hole table. |
+| US-6 (O1) | As the operator, I change one parameter (`set_parameter t=12`) and re-run the checks and `mass_properties`; nothing else in the plan changes. |
+| US-7 (W1) | As the owner, I get one paragraph: "built the angle; flat blank 65.846 mm × 50 mm; all checks pass; the radius table row it used is unverified; computed by llull, not approved — a qualified person must review it before it is used on an aircraft". |
+| US-8 (R1) | As the qualified reviewer, I open the part in the desktop app, see every number with its formula and source, every `unverified` flag and every finding, and I alone can record the approval that waives a finding or releases the part (gap 09). |
 
 ## 4. Scope / out of scope
 
@@ -170,82 +183,121 @@ Priority: MUST / SHOULD / COULD. Source = where the requirement or its numbers c
 | FR-FTR-29 | SHOULD | **Hole table and bend table** as structured `data`, and as drawing-sheet tables (with the drawings work). | Inspection (P7). | — |
 | FR-FTR-30 | MUST | **Units**: mm and inch documents; inch inputs reproduce the AC 43.13-1B examples to 0.0005 in. | US repair data is in inches. | [R2] |
 
+### 5.4 Agent-first requirements ([`AGENT_FIRST.md`](../AGENT_FIRST.md))
+
+No requirement in §5.1–5.3 exists only in the UI: every one is a registry command with `data`. The UI panels of
+TECHNICAL_SPEC §7.3 are review surfaces (SHOULD), built on the same commands.
+
+| Id | Pri | Requirement | AF | Source |
+| -- | --- | ----------- | -- | ------ |
+| FR-FTR-31 | MUST | **Units in every schema.** Every length param is in the document's length unit and its description says so; every angle param is in degrees and says so. `sheet_metal_calc` (no document needed) takes a **required** `units: 'mm' \| 'in'`; nothing is inferred from context the agent cannot see. Every result echoes `lengthUnit` and `angleUnit`. | AF-04, AF-02 | llull |
+| FR-FTR-32 | MUST | **Documented `data` shapes.** Every query (`sheet_metal_calc`, `flat_pattern`, `recognize_features`, `hole_table`, `check_*`) returns the shape of TECHNICAL_SPEC §4.3, with units, in a deterministic order, bounded in size (outline vertices paged or narrowed by part id). Files (DXF) only via `--save`. | AF-10, AF-12, AF-13 | llull |
+| FR-FTR-33 | MUST | **Stable error codes.** Every refusal and every check finding has a stable `FTR_*` code, the offending ids or plan paths, and a one-line remediation (TECHNICAL_SPEC §7.2). | AF-11 | llull |
+| FR-FTR-34 | MUST | **Rules enforced by the checks, not by the operator.** `check_sheet_metal` and `check_machining` are read-only and return `pass` / `warn` / `fail` findings. They apply automatically every rule for which the document holds data: minimum bend radius and sharp bends (FR-FTR-07), hole-to-bend and hole-to-edge distance, minimum flange length, relief presence (FR-FTR-16), countersink knife edge and cylindrical land, pocket corner radius versus tool radius, depth/diameter ratio, floor fillet versus corner radius (FR-FTR-26). A rule whose threshold has no value is reported as `FTR_RULE_THRESHOLD_MISSING` (warn), never skipped silently. An agent ends every FTR job with the relevant check. | AF-20, AF-30 | llull |
+| FR-FTR-35 | MUST | **No silent safety-relevant defaults.** K-factor, inside radius, minimum radius and DFM thresholds are given explicitly or come from a sourced row that the result names as `{ value, source, defaulted }`. A missing K-factor is a refusal (`FTR_K_FACTOR_MISSING`), not a default. Geometric conveniences (drill point 118° [R8]) are allowed but named with `defaulted: true` and their source. | AF-31 | llull |
+| FR-FTR-36 | MUST | **`unverified` propagation.** Radius-table rows, K tables and presets carry `verification: 'verified' \| 'unverified'` and a source. A result computed from any unverified row or preset (for example a K table copied from a secondary source, the 100° countersink preset until gap 08 confirms it, a radius row without dual-review transcription) carries `unverified: true` and the list of unverified inputs; every check reports `FTR_UNVERIFIED_DATA` (warn) that no param can hide. | AF-32 | llull |
+| FR-FTR-37 | MUST | **`reviewRequired`.** `sheet_metal_calc`, `flat_pattern`, `check_sheet_metal`, `check_machining`, `recognize_features` and `export_flat_pattern_dxf` results carry `reviewRequired: true` with a reason, and the summary says in plain words "computed by llull, not approved — a qualified person must review it before it is used for an aircraft part or repair". The flat DXF carries the same note on layer `NOTES`. | AF-33, AF-36 | §8 regulatory note |
+| FR-FTR-38 | MUST | **Human gate on waivers.** A `fail` finding can only be waived by a waiver that references a human approval record of gap 09 (`record_approval`, `humanSignatureRequired`). The check commands ignore any other waiver and report `FTR_WAIVER_NOT_APPROVED`; the finding stays `fail`. The agent can prepare the waiver request; it cannot complete it. | AF-34 | gap 09 |
+| FR-FTR-39 | MUST | **Provenance.** Every computed engineering value in `data` comes with `provenance`: method or formula id, the inputs with units, and the source ids (rule, table row, preset, reference). | AF-35 | llull |
+| FR-FTR-40 | SHOULD | **Numeric equivalents of visual reviews, and a picture.** Flat-pattern view → `flat_pattern` outline, bend lines and extents; feature-table highlighting → face indices in `recognize_features`; DFM colouring → check findings. With `flat_pattern materialize=true`, `render_view view=top --save flat.png` shows the blank to a multimodal agent. | AF-21, AF-22 | llull |
+| FR-FTR-41 | MUST | **One plan, validated; guide; dry run.** Every FTR job (bracket, joggle, machined plate, recognition) fits one `build_project` plan, checked with `llull run plan.json --validate` before kernel work (errors name the step path and param). `llull guide` gains an FTR section: bend angle = angle bent through, lengths to mold lines, K-factor always explicit, the minimal bracket plan. Every mutating FTR command works with `--dry-run`. | AF-03, AF-05, AF-42 | llull |
+| FR-FTR-42 | SHOULD | **Long runs.** Recognition and imports of large parts honour `--progress` and `--timeout`; face graphs are cached by `recipeKey`, so a re-run is cheap. Everything runs offline on the desktop (pure TS + bundled OCC / CPython). | AF-40, AF-41 | llull |
+
 ## 6. Workflows
 
-### 6.1 UI (desktop, offline)
+### 6.1 CLI (`llull`) — the primary workflow
 
-1. **Sheet part.** Choose *Sheet Metal ▸ Rule…* and pick a material row; T, R and K are prefilled from the rule library.
-   Draw a rectangle and run *Base Flange*. Select an edge and run *Flange* (angle, length, reference, position). A live
-   flat length shows in the panel. Add *Relief* and *Joggle* (V1). Choose *Flat Pattern* to toggle the folded and flat
-   views: the same document, a derived display. *Check* lists warnings, for example "R 1.0 < R_min 2.4 for 2024-T3 1.6"
-   when such a row exists. *Export ▸ Flat DXF*.
-2. **Machined part.** Select a face and run *Hole…* (type, size or fastener, extent, positions picked on the face with
-   snapping). Run *Pocket…* (sketch on the face, depth, corner radius = tool radius, floor fillet). *Thread* is a checkbox
-   in the Hole panel. Run *Check ▸ Machining*.
-3. **Imported part.** Run *File ▸ Import STEP*, then *Analyse ▸ Recognise features*. The table panel can be sorted by
-   type and diameter, and it highlights faces. For sheet geometry, run *Convert to sheet metal* (V1) and then *Flat
-   Pattern*.
+Shown with `--doc` (headless). Use `--app` instead to act on the open desktop window, so the owner can watch. Commands
+marked *(proposed)* are this gap's; the rest exist today. Exit code 0 = ok, 1 = a step or check refused, 2 = usage.
 
-### 6.1b Detailed UI journey — MRO angle repair (UC-1)
-
-1. *Sheet Metal ▸ Calculator*, units in. Enter T = 0.064, R = 0.25, θ = 135°, K-factor 0.4475 (or *FAA empirical*).
-   The panel shows K-chart 2.4142, SB 0.758, BA, BD and R/T. When a radius-table row exists for the chosen alloy/temper
-   at 0.064 in, it also shows R_min with its source line.
-2. *Create rule from calculator*. The rule stores material, T, R and K.
-3. Draw the repair angle web outline (2D) and run *Base Flange*. Select the long edge and run *Flange 135°*, length to
-   the OML.
-4. *Check*: green, or a list of violations. Each violation links to the rule and the table row.
-5. *Flat Pattern*: the developed outline appears in an ortho view with bend lines and the note
-   "UP 135° R0.25".
-6. *Export ▸ Flat DXF (in)* produces the file for the shop. *Export ▸ Drawing* (drawings gap) adds a bend table.
-
-### 6.1c Detailed UI journey — machined fitting (UC-5)
-
-1. Import or model the block. *Hole…*: pick the top face, choose *Countersink*, preset 100° (tooltip: "aerospace flush
-   convention — confirm with fastener catalogue"), d 4.8, D 9.0, *Through all*. Click 4 positions with snapping to grid
-   or construction points, or paste coordinates.
-2. *Hole…*: Counterbore 5.5 / 10.0 × 5.5, two positions.
-3. *Pocket…*: sketch a rectangle on the top face. Corner radius 3 is suggested from the tool diameter 6 entered in the
-   panel. Depth 4, floor fillet 0.
-4. *Hole…*: Simple 6.0, blind 6, drill point 118°. Thread checkbox → designation field (free text, family picker).
-5. *Check ▸ Machining*: countersink land OK (8.24 mm), pocket corner OK.
-6. *Analyse ▸ Hole table* gives the table panel and the drawing table.
-
-### 6.2 CLI (`llull`, local agent / CI)
+**Job A — MRO repair angle (UC-1), inch document.**
 
 ```bash
-llull sheet_metal_calc thickness=0.064 insideRadius=0.25 angle=135 kFactor=0.4475 units=in --json   # SB 0.758 in (AC 43.13-1B)
-llull run validation/plans/draft_sheet_metal_bracket.json --doc bracket.llull.json --json          # build + check + unfold
-llull export_flat_pattern_dxf id=<sm> --doc bracket.llull.json --save bracket_flat.dxf
-llull import_step file=supplier.stp --doc part.llull.json && llull recognize_features id=<id> --doc part.llull.json --json   # recognition needs gap 01 import_step_exact (TECHNICAL_SPEC M0)
+llull search bend allowance                                   # -> sheet_metal_calc (proposed)
+llull describe sheet_metal_calc                               # units, modes, refusals
+llull sheet_metal_calc units=in thickness=0.064 insideRadius=0.25 angle=135 kFactor=0.4475 --json
+#   data.ossb 0.758063 (AC 43.13-1B: 0.758), data.kChart 2.414214, data.provenance, data.reviewRequired true
+llull run plans/draft_sheet_metal_bracket.json --validate --doc angle.llull.json   # names step path + param on error
+llull run plans/draft_sheet_metal_bracket.json --doc angle.llull.json --kernel occt --json
+llull check_sheet_metal id=<part> --doc angle.llull.json --json                     # pass/warn/fail + FTR_* codes
+llull flat_pattern id=<part> materialize=true --doc angle.llull.json --json         # extents, bends[], provenance
+llull render_view view=top --save flat.png --doc angle.llull.json                   # look at the blank
+llull export_flat_pattern_dxf id=<part> units=in --save blank.dxf --doc angle.llull.json
 ```
 
-### 6.3 MCP agent (cloud)
+The agent reports to the owner in the order of AF-36: what was built, what passed, what needs a human (every
+`unverified` input and the `reviewRequired` reason).
 
-1. `describe` the toolset `manufacturing` (names in TECHNICAL_SPEC §7).
-2. Run `build_project` with the plan: create rule, then base flange, flanges, joggle, `check_sheet_metal`, `flat_pattern`.
-3. Read the `data` of `flat_pattern` (bend table, extents) and of `check_sheet_metal` (violations). Adjust parameters
-   with `set_parameter` and re-run the checks.
-4. `export_flat_pattern_dxf`, which returns the file content in the result.
+**Job B — machined fitting (UC-5), mm document.**
 
-## 7. Acceptance criteria (Given / When / Then)
+```bash
+llull run plans/draft_machined_plate.json --validate --doc plate.llull.json
+llull run plans/draft_machined_plate.json --doc plate.llull.json --kernel occt --json
+llull check_machining id=<part> --doc plate.llull.json --kernel occt --json        # FTR_CSK_KNIFE_EDGE, FTR_POCKET_CORNER_BELOW_TOOL_RADIUS …
+llull mass_properties entityId=<part> --doc plate.llull.json --kernel occt --json  # data.volume 55978.529153, volumeUnit mm³
+llull hole_table id=<part> --doc plate.llull.json --json
+llull render_view view=iso --save plate.png --doc plate.llull.json
+llull export_step_exact --save plate.step --doc plate.llull.json --kernel occt
+```
 
-| AC | Given | When | Then | VC |
-| -- | ----- | ---- | ---- | -- |
-| AC-01 | T = 0.064 in, R = 0.25 in | `sheet_metal_calc` for θ = 45° and θ = 135° | OSSB = 0.130 in and 0.758 in (±0.0005 in), K-chart values 0.41421 and 2.4142 | VC-FTR-02 |
-| AC-02 | T = 0.040 in, R = 0.250 in, θ = 60°, FAA empirical mode | `sheet_metal_calc` | BA = 0.2802 in (exact arithmetic; the EAA text rounds intermediates to 0.2796) within 0.0007 in of the EAA value | VC-FTR-03 |
-| AC-03 | Rule T = 1.6, R = 4.8, K = 0.44; base 33.6 × 50 + 90° flange to 30 OML | `flat_pattern` | developed length 65.845663 mm ±0.01 mm, width 50, one bend (BA 8.645663) | VC-FTR-07 |
-| AC-04 | Same part with K = 0.5 | volume of folded vs flat × T | equal within 1e-6 relative (5279.716754 mm³) | VC-FTR-06, VC-FTR-08 |
-| AC-05 | Flat pattern of AC-03 | `export_flat_pattern_dxf` | DXF contains only LINE/ARC/CIRCLE (and TEXT when notes are on), one bend line on layer BEND_UP, extents 65.8457 × 50 | VC-FTR-09 |
-| AC-06 | Rule with R = 0 and a table row for the material | `check_sheet_metal` | one violation `min_bend_radius`, with the table row cited | VC-FTR-10 |
-| AC-07 | Joggle φ = 20°, R = 1.6, T = 1.6, h = 1.6, K = 0.44 | `flat_pattern` | joggle allowance 0.197880 mm ±0.001; JG-04 rejected with reason | VC-FTR-11 |
-| AC-08 | 100 × 60 × 10 plate | one `add_hole` countersink call with four positions (d 4.8, D 9.0, 100°) + 2 counterbores + pocket + blind 118° | volume 55978.529153 mm³ (rel 1e-6); each countersink depth 1.762109 mm | VC-FTR-22, VC-FTR-25 |
-| AC-09 | Countersink d 4.8 / D 9.0 / 100° in 1.6 mm sheet | `check_machining` | knife-edge violation (land −0.162 mm); in 3.0 mm sheet with D 12/d 6.4 no violation | VC-FTR-23 |
-| AC-10 | `ftr_machined_plate.step` imported | `recognize_features` | 7 holes (4 csk 100°, 2 cbore, 1 blind 118°) + 1 pocket rc 3, positions ±1e-4 mm, no false positives | VC-FTR-17 |
-| AC-11 | NIST CTC-01 imported | `recognize_features` | exactly 2 blind holes ∅20 with 118° point, each built from 2 half-cone faces | VC-FTR-20 |
-| AC-12 | Hole with thread `MJ6x1-4H5H` (example designation string) | save, reload, `mass_properties` | designation persisted; volume equals the unthreaded hole | VC-FTR-28 |
-| AC-13 | Plate thickness bound to parameter `t` | `set_parameter t=12` | holes stay through, countersinks keep D and angle; volume matches the analytic value at t = 12 | VC-FTR-30 |
-| AC-14 | Any new command | registry snapshot / CLI `describe` | present with zod-derived schema; happy and failure unit tests | VC-FTR-31 |
+**Job C — supplier STEP intake (UC-4).** Needs gap 01 `import_step_exact` (TECHNICAL_SPEC M0).
+
+```bash
+llull import_step_exact file=supplier.stp --doc part.llull.json --kernel occt --progress --timeout 120
+llull find_entities kind=mesh --doc part.llull.json --json
+llull recognize_features id=<id> --doc part.llull.json --kernel occt --json        # holes[], pockets[], bends[], counts
+llull convert_to_sheet_metal id=<id> stationaryFace='{"near":[0,0,0]}' --doc part.llull.json --json   # V1, sheet parts only
+```
+
+**Parametric change (US-6).** `llull set_parameter name=t expression=12 --doc plate.llull.json`, then re-run the check
+and `mass_properties`.
+
+### 6.2 MCP agent (cloud)
+
+1. Enable toolset `manufacturing`; `describe` the commands (names in TECHNICAL_SPEC §7.1).
+2. Call `build_project` with the same plan JSON as the CLI (`validate: true` first).
+3. Call `check_sheet_metal` / `check_machining`, then `flat_pattern` or `recognize_features`; read `data`.
+4. Call `export_flat_pattern_dxf`, which returns the file content in the result.
+
+### 6.3 Desktop UI — review and approval surface
+
+The UI does not add capability. It shows what the operator built, for the owner watching `--app` and for the qualified
+reviewer:
+
+- folded / flat toggle of the derived flat pattern (same data as `flat_pattern`);
+- a findings panel listing `check_*` findings with codes, values, limits and sources, `unverified` inputs highlighted;
+- a feature table (`recognize_features`, `hole_table`) that highlights face indices;
+- the provenance of each number (formula, inputs, source row);
+- the reviewer's approval action for a waiver or release, which is a gap 09 human gate (FR-FTR-38).
+
+Parameter-gathering panels (Hole, Pocket, Sheet-metal) are SHOULD and only call the same commands.
+
+## 7. Acceptance criteria (CLI + JSON assertions)
+
+Each criterion is one or more CLI calls with `--json` and assertions on the result, compared with
+`validation/expected_results.json` (key = VC id; value, tolerance, unit). Paths are into the `--json` object.
+
+| AC | Given | When (CLI) | Then (JSON) | VC |
+| -- | ----- | ---------- | ----------- | -- |
+| AC-01 | T 0.064 in, R 0.25 in | `llull sheet_metal_calc units=in thickness=0.064 insideRadius=0.25 angle=45 kFactor=0.4475 --json`, same with `angle=135` | `data.ossb` = 0.130 / 0.758 in ±0.0005; `data.kChart` = 0.41421 / 2.4142; `data.lengthUnit` = "in" | VC-FTR-02 |
+| AC-02 | T 0.040 in, R 0.250 in, 60° | `… mode=faa_empirical units=in thickness=0.04 insideRadius=0.25 angle=60 --json` | `data.ba` = 0.28017 ±1e-7 (EAA text 0.2796, within 0.0007) | VC-FTR-03 |
+| AC-03 | Bracket plan (T 1.6, R 4.8, K 0.44, base 33.6 × 50, 90° flange 30 to OML) | `llull run plans/draft_sheet_metal_bracket.json --doc b.llull.json --json` then `llull flat_pattern id=<part> --json` | `data.extents[0]` = 65.845663 ±0.01 mm, `data.extents[1]` = 50, `data.bends.length` = 1, `data.bends[0].ba` = 8.645663 | VC-FTR-07 |
+| AC-04 | Same part, K 0.5 | `flat_pattern` + `mass_properties` | `data.area` × 1.6 = `data.volume` = 5279.716754 mm³ (rel 1e-6) | VC-FTR-06, 08 |
+| AC-05 | Flat pattern of AC-03 | `llull export_flat_pattern_dxf id=<part> --save b.dxf --json` | `saved` lists `b.dxf`; parsed DXF has only LINE/ARC/CIRCLE/TEXT, 1 entity on `BEND_UP`, extents 65.8457 × 50, `$INSUNITS` 4, NOTES text contains "not approved" | VC-FTR-09, 41 |
+| AC-06 | Rule R = 0, `allowSharpBends` false, synthetic row | `llull check_sheet_metal id=<part> --json` | `data.status` = "fail" (check queries exit 0; refusals exit 1), one finding `code` = "FTR_SHARP_BEND_FORBIDDEN"; with R 1.0 vs row 2.0: `FTR_BEND_RADIUS_BELOW_MIN`, `limit` 2.0, `source` = row source | VC-FTR-10, 37 |
+| AC-07 | Joggle φ 20°, R 1.6, T 1.6, h 1.6, K 0.44 | `flat_pattern` on the joggle part; `add_joggle` with JG-04 values | `data.joggles[0].allowance` = 0.197880 ±0.001; JG-04: exit 1, `code` = "FTR_JOGGLE_OFFSET_TOO_SMALL" | VC-FTR-11, 11b |
+| AC-08 | 100 × 60 × 10 plate | `llull run plans/draft_machined_plate.json --doc p.llull.json --kernel occt` then `llull mass_properties entityId=<part> --kernel occt --json` | `data.volume` = 55978.529153 (rel 1e-6), `data.volumeUnit` = "mm³"; `hole_table` rows' `cskDepth` = 1.762109 | VC-FTR-22, 25 |
+| AC-09 | Countersink d 4.8 / D 9.0 / 100° in 1.6 mm sheet | `llull check_machining id=<part> --json` | finding `FTR_CSK_KNIFE_EDGE`, `value` −0.162 mm (land); for D 12 / d 6.4 in 3.0 mm: no such finding | VC-FTR-23 |
+| AC-10 | `ftr_machined_plate.step` imported with `import_step_exact` | `llull recognize_features id=<id> --kernel occt --json` | `data.counts` = {holes 7, countersink 4, counterbore 2, blind 1, pockets 1}; positions ±1e-4 mm; `data.unclassified` = [] | VC-FTR-17 |
+| AC-11 | NIST CTC-01 imported | `recognize_features --json` | 2 holes with `drillPointAngleDeg` 118, `diameter` 20, each with 2 cone face indices | VC-FTR-20 |
+| AC-12 | Hole with thread `MJ6x1-4H5H` | `set_thread`, save, reload, `mass_properties --json` | designation persisted; `data.volume` equal to the unthreaded hole | VC-FTR-28 |
+| AC-13 | Plate thickness = parameter `t` | `llull set_parameter name=t expression=12`, then `mass_properties --json` | holes still through; volume = analytic value at t = 12 | VC-FTR-30 |
+| AC-14 | Any new command | `llull describe <command>`; `llull search sheet metal` | listed; every numeric param description states its unit; toolset `manufacturing` | VC-FTR-31, 44 |
+| AC-15 | Deliberately wrong inputs (PK-03 rf > rc, missing K, table row without source) | `add_pocket …`, `sheet_metal_calc units=mm thickness=1.6 insideRadius=4.8 angle=90`, `import_bend_radius_table …` | exit 1; `code` = `FTR_POCKET_FILLET_GT_CORNER` / `FTR_K_FACTOR_MISSING` / `FTR_TABLE_ROW_NO_SOURCE`; `remediation` non-empty; offending path given | VC-FTR-37, 39 |
+| AC-16 | Radius row marked `unverified` | `sheet_metal_calc … material=TEST-ALLOY temper=T0 --json`; `check_sheet_metal --json` | `data.unverified` = true, `data.unverifiedInputs` names the row; check has warn `FTR_UNVERIFIED_DATA` | VC-FTR-40 |
+| AC-17 | Any FTR query result | `flat_pattern --json` | `data.reviewRequired` = true, `data.reviewReason` non-empty; `summary` contains "not approved" | VC-FTR-41 |
+| AC-18 | A `fail` finding and a waiver with no human approval | `check_sheet_metal id=<part> waivers='[…]' --json` | finding still `fail`; extra finding `FTR_WAIVER_NOT_APPROVED` | VC-FTR-42 |
+| AC-19 | `sheet_metal_calc` of AC-01 | `--json` | `data.provenance.formulas.ossb` = "tan(theta/2)*(R+T)", `data.provenance.inputs.thickness` = {value 0.064, unit "in"}, `data.provenance.sources` contains "R2" | VC-FTR-43 |
 
 ## 8. Standards & regulatory alignment
 
@@ -274,6 +326,9 @@ data holder. Every table row carries its source and edition, so the user can sho
 | Flat DXF accepted by LibreCAD/ezdxf audit | 0 errors |
 | Time to build + unfold + export the bracket plan via CLI | < 3 s warm (desktop) |
 | Commands with happy + failure tests and coverage gate | 100 % / 90-85-90-90 |
+| Agent driver completes UC-1 and UC-5 from plan files with `--json` and exit codes only (no UI), stopping only at the human gate | 2/2 scenarios |
+| Refusals and check findings with a stable `FTR_*` code and a remediation | 100 % (VC-FTR-37) |
+| Results built from an `unverified` row that fail to show the flag | 0 (VC-FTR-40) |
 
 ## 10. Risks & assumptions
 
@@ -286,6 +341,8 @@ data holder. Every table row carries its source and edition, so the user can sho
 | K-factor is process-dependent | Flat length error | K is always explicit or from a user table. The "engineering mode" idea from FreeCAD [R7] makes K mandatory |
 | Feature recognition ambiguity (chamfer vs countersink, fillet vs partial hole) | Wrong classification | Adjacency rules plus angular-span tests. Report confidence and ambiguous items instead of guessing |
 | Fastener data licence (NAS/NASM/AS) | Cannot ship tables | Gap 08 supplies catalogues; this gap stores references only |
+| The operator (agent) and the owner are not engineers | A part that violates a bend-radius, edge-distance, knife-edge or cutter rule is built and shipped | Rules live as sourced data and are applied by `check_sheet_metal` / `check_machining` with codes (FR-FTR-34); missing thresholds are reported, never skipped; `reviewRequired` and the waiver human gate keep approval with a qualified person (FR-FTR-37/38) |
+| Rule tables ship empty or unverified (Table 4-6 not yet transcribed) | Checks have nothing to enforce | `FTR_BEND_RADIUS_NO_TABLE_ROW` / `FTR_RULE_THRESHOLD_MISSING` warnings and `FTR_UNVERIFIED_DATA` make the gap visible in every result |
 
 ## 11. References
 

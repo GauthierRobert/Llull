@@ -81,6 +81,11 @@ Observations used by the specs:
 
 ## 4. Validation cases
 
+Every case runs unattended as a CLI script (AF-23): a plan (`llull $D run <plan> --json`, `D="--doc v.llull.json --kernel occt"`)
+or a single command (`llull $D <command> … --json`), then a comparison of the JSON `data` with `expected_results.json`
+(value, tolerance, unit). Refusals are asserted on `data.error.code` and exit code 1. Only VC-GDT-22/25 need an external
+tool (NIST SFA) and VC-GDT-53 is a component test.
+
 Tolerances: lengths 1e-9 mm for analytic quantities, 1e-6 mm for B-rep measurements (OCC tessellation-free
 analytic surfaces), counts exact; Monte Carlo per the 5σ statistical bounds listed in `stackup_reference.json`.
 
@@ -88,7 +93,7 @@ analytic surfaces), counts exact; Monte Carlo per the 5σ statistical bounds lis
 | --- | --- | --- | --- | --- | --- |
 | VC-GDT-01 | FR-01/02/04/05/06/07/09/14, TR-02/04/05 | `draft_plan_gdt_plate.json` (OCC) | 3 datums, 2 sizes (4X Ø6.6, Ø20), 4 FCFs, 1 texture, 1 saved view, `check_pmi` 0 errors; hole Ø 6.6 | counts exact; Ø 1e-6 mm | derived from plan geometry |
 | VC-GDT-02 | FR-02, TR-06 | plate with thickness parameter t: 12 → 16 | all 10 PMI items + saved view resolve; Ø 6.6; 0 errors | exact / 1e-6 | derived |
-| VC-GDT-03 | FR-04/06/11, TR-05/10 | `draft_plan_gdt_rejections.json` | 1 accepted, 5 rejected with codes DUPLICATE_DATUM, UNDEFINED_DATUM, MC_ON_NON_FOS, NON_POSITIVE_ZONE, point not on face | exact | TECHNICAL_SPEC §5.5 |
+| VC-GDT-03 | FR-04/06/11, TR-05/10 | `llull $D run draft_plan_gdt_rejections.json --continue --json` | 1 accepted, 5 rejected with codes GDT_DATUM_DUPLICATE, GDT_DATUM_UNDEFINED, GDT_MC_ON_NON_FOS, GDT_ZONE_NON_POSITIVE, GDT_POINT_NOT_ON_FACE | exact | TECHNICAL_SPEC §5.5 |
 | VC-GDT-04 | FR-01/28 | each PMI command | input deep-equal before/after | exact | arch L3 |
 | VC-GDT-05 | FR-03/10 | standard switch + note | stored, printed, idempotent | exact | — |
 | VC-GDT-06 | FR-08, TR-04 | location dims on plate | 20.0 (plane→hole axis), 80.0 (plane→plane) | 1e-9 mm | derived |
@@ -117,6 +122,11 @@ analytic surfaces), counts exact; Monte Carlo per the 5σ statistical bounds lis
 | VC-GDT-51 | FR-30 | Manifold kernel | no-op "requires the OCC kernel" | exact | KI5 |
 | VC-GDT-52 | FR-28, TR-17 | tool schemas, MCP toolset `pmi`, CLI `describe` | all PMI commands present on all surfaces | exact | arch L5 |
 | VC-GDT-53 | FR-13/14 | `PmiPanel` component test | dispatch with `facesNear` from picked point | exact | rules/react.md |
+| VC-GDT-54 | FR-33, TR-20 (AF-11) | `llull $D run draft_plan_gdt_rejections.json --continue --json` | 5 refusals with `data.error.code` ∈ {GDT_DATUM_DUPLICATE, GDT_DATUM_UNDEFINED, GDT_MC_ON_NON_FOS, GDT_ZONE_NON_POSITIVE, GDT_POINT_NOT_ON_FACE}, each with non-empty `remediation` and offending path; exit 1 | exact | §7.2 |
+| VC-GDT-55 | FR-34, TR-21 (AF-32) | `llull $D run draft_plan_stackup_su01.json --json` with contributor C typed `verified:false` | `data.unverified.contributors` = ["C"]; warning `GDT_UNVERIFIED_INPUT`; numbers unchanged vs SU-01 | exact | AF-32 |
+| VC-GDT-56 | FR-31, TR-19 (AF-33) | plate plan run with `ctx.caller = agent` (CLI default for agents), then `list_pmi --json`, `check_pmi --json` | 10/10 items `review.required` true with reason; `check_pmi.data.stats.reviewRequired` 10; `status` "warn"; summary contains "not approved" | exact | AF-33 |
+| VC-GDT-57 | FR-32, TR-19 (AF-34) | agent: `llull $D exec accept_pmi_review '{"pmiIds":["$fcfPosHoles"],"decision":"accept","comment":"ok","at":"…","by":"…"}' --json`; then same as human caller | agent → `GDT_REVIEW_HUMAN_ONLY`, exit 1, document unchanged; human → `review.required` false, `acceptedBy` set | exact | AF-34 |
+| VC-GDT-58 | FR-35, TR-21 (AF-31/35) | SU-01 plan without `sigmaPerHalfTolerance` | `data.sigmaPerHalfTolerance` = {value 3, defaulted true, source non-empty}; `data.provenance.method` and `sensitivitySource` "autodiff"; values = VC-GDT-30 | exact | AF-31, AF-35 |
 
 ## 5. FR → VC traceability
 
@@ -132,6 +142,8 @@ analytic surfaces), counts exact; Monte Carlo per the 5σ statistical bounds lis
 | FR-GDT-08 | 06 | FR-GDT-18 | 36 | FR-GDT-28 | 04, 52 |
 | FR-GDT-09 | 01, 40 | FR-GDT-19 | 35 | FR-GDT-29 | 50 |
 | FR-GDT-10 | 05 | FR-GDT-20 | 20, 23, 24 | FR-GDT-30 | 51 |
+| FR-GDT-31 | 56 | FR-GDT-32 | 57 | FR-GDT-33 | 03, 54 |
+| FR-GDT-34 | 55 | FR-GDT-35 | 58 | FR-GDT-36 | 52 (guide section listed by `llull guide`) |
 
 ## 6. Verification tools
 

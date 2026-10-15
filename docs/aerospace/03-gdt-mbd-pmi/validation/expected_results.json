@@ -151,7 +151,7 @@
     "TR-GDT-05",
     "TR-GDT-10"
    ],
-   "input": "draft_plan_gdt_rejections.json (run with onError=continue / --continue)",
+   "input": "llull --doc v.llull.json --kernel occt run draft_plan_gdt_rejections.json --continue --json",
    "expected": [
     {
      "action": "add_datum_feature A (first)",
@@ -161,31 +161,36 @@
      "action": "add_datum_feature A (second)",
      "result": "rejected",
      "summaryContains": "label 'A' is already used",
-     "code": "DUPLICATE_DATUM"
+     "code": "GDT_DATUM_DUPLICATE",
+     "remediationContains": "choose another letter or update_pmi the existing datum"
     },
     {
      "action": "position with datum D",
      "result": "rejected",
      "summaryContains": "datum 'D' is not defined",
-     "code": "UNDEFINED_DATUM"
+     "code": "GDT_DATUM_UNDEFINED",
+     "remediationContains": "add_datum_feature with that label first"
     },
     {
      "action": "flatness with MMC",
      "result": "rejected",
      "summaryContains": "MMC",
-     "code": "MC_ON_NON_FOS"
+     "code": "GDT_MC_ON_NON_FOS",
+     "remediationContains": "target a size dimension"
     },
     {
      "action": "flatness zone 0",
      "result": "rejected",
-     "summaryContains": "invalid params",
-     "code": "NON_POSITIVE_ZONE (zod positive())"
+     "summaryContains": "GDT_ZONE_NON_POSITIVE",
+     "code": "GDT_ZONE_NON_POSITIVE",
+     "remediationContains": "tolerance values are > 0 in document units"
     },
     {
      "action": "datum B at [60,40,50]",
      "result": "rejected",
-     "summaryContains": "not on any face",
-     "code": "point farther than tolFace"
+     "summaryContains": "GDT_POINT_NOT_ON_FACE",
+     "code": "GDT_POINT_NOT_ON_FACE",
+     "remediationContains": "pick a point on the face"
     }
    ],
    "source": "logical consistency rules, TECHNICAL_SPEC §5.5"
@@ -1472,6 +1477,207 @@
      "value": true
     }
    ]
+  },
+  {
+   "id": "VC-GDT-54",
+   "proves": [
+    "FR-GDT-33",
+    "TR-GDT-20"
+   ],
+   "af": [
+    "AF-11"
+   ],
+   "input": "llull --doc v.llull.json --kernel occt run draft_plan_gdt_rejections.json --continue --json",
+   "expected": [
+    {
+     "quantity": "refused steps",
+     "value": 5,
+     "tolerance": 0,
+     "unit": "count"
+    },
+    {
+     "quantity": "data.error.code set",
+     "value": [
+      "GDT_DATUM_DUPLICATE",
+      "GDT_DATUM_UNDEFINED",
+      "GDT_MC_ON_NON_FOS",
+      "GDT_POINT_NOT_ON_FACE",
+      "GDT_ZONE_NON_POSITIVE"
+     ],
+     "tolerance": "set equality",
+     "unit": "codes"
+    },
+    {
+     "quantity": "every refusal has non-empty data.error.remediation and data.error.paths",
+     "value": true,
+     "tolerance": "exact",
+     "unit": "bool"
+    },
+    {
+     "quantity": "process exit code",
+     "value": 1,
+     "tolerance": "exact",
+     "unit": "exit code"
+    }
+   ],
+   "source": "TECHNICAL_SPEC §7.2"
+  },
+  {
+   "id": "VC-GDT-55",
+   "proves": [
+    "FR-GDT-34",
+    "TR-GDT-21"
+   ],
+   "af": [
+    "AF-32"
+   ],
+   "input": "llull --doc v.llull.json --kernel occt run draft_plan_stackup_su01.json --json, with contributor C given \"verified\": false",
+   "expected": [
+    {
+     "quantity": "data.unverified.contributors",
+     "value": [
+      "C"
+     ],
+     "tolerance": "exact",
+     "unit": "names"
+    },
+    {
+     "quantity": "warning code",
+     "value": "GDT_UNVERIFIED_INPUT",
+     "tolerance": "present",
+     "unit": "code"
+    },
+    {
+     "quantity": "rss.halfTolerance",
+     "value": 0.124096736,
+     "tolerance": 1e-09,
+     "unit": "mm",
+     "source": "unchanged vs VC-GDT-30"
+    }
+   ],
+   "source": "AF-32"
+  },
+  {
+   "id": "VC-GDT-56",
+   "proves": [
+    "FR-GDT-31",
+    "TR-GDT-19"
+   ],
+   "af": [
+    "AF-33"
+   ],
+   "input": "llull --doc v.llull.json --kernel occt run draft_plan_gdt_plate.json --json (agent caller), then list_pmi --json and check_pmi --json",
+   "expected": [
+    {
+     "quantity": "items with review.required = true",
+     "value": 10,
+     "tolerance": 0,
+     "unit": "count"
+    },
+    {
+     "quantity": "check_pmi.data.stats.reviewRequired",
+     "value": 10,
+     "tolerance": 0,
+     "unit": "count"
+    },
+    {
+     "quantity": "check_pmi.data.status",
+     "value": "warn",
+     "tolerance": "exact",
+     "unit": "enum"
+    },
+    {
+     "quantity": "check_pmi.data.errors",
+     "value": [],
+     "tolerance": "exact",
+     "unit": "list"
+    },
+    {
+     "quantity": "summary contains",
+     "value": "not approved",
+     "tolerance": "substring",
+     "unit": "text"
+    }
+   ],
+   "source": "AF-33"
+  },
+  {
+   "id": "VC-GDT-57",
+   "proves": [
+    "FR-GDT-32",
+    "TR-GDT-19"
+   ],
+   "af": [
+    "AF-34"
+   ],
+   "input": "llull --doc v.llull.json --kernel occt exec accept_pmi_review '{\"pmiIds\":[\"<fcfPosHoles id>\"],\"decision\":\"accept\",\"comment\":\"ok\",\"at\":\"2026-11-02T09:00:00Z\",\"by\":\"u-qr\"}' --json as agent, then as human (UI)",
+   "expected": [
+    {
+     "quantity": "agent: data.error.code",
+     "value": "GDT_REVIEW_HUMAN_ONLY",
+     "tolerance": "exact",
+     "unit": "code"
+    },
+    {
+     "quantity": "agent: document unchanged",
+     "value": true,
+     "tolerance": "exact",
+     "unit": "bool"
+    },
+    {
+     "quantity": "human: item review.required",
+     "value": false,
+     "tolerance": "exact",
+     "unit": "bool"
+    },
+    {
+     "quantity": "human: item review.acceptedBy",
+     "value": "u-qr",
+     "tolerance": "exact",
+     "unit": "user id"
+    }
+   ],
+   "source": "AF-34"
+  },
+  {
+   "id": "VC-GDT-58",
+   "proves": [
+    "FR-GDT-35",
+    "TR-GDT-21"
+   ],
+   "af": [
+    "AF-31",
+    "AF-35"
+   ],
+   "input": "llull --doc v.llull.json --kernel occt run draft_plan_stackup_su01.json --json (no sigmaPerHalfTolerance given)",
+   "expected": [
+    {
+     "quantity": "data.sigmaPerHalfTolerance.value",
+     "value": 3,
+     "tolerance": "exact",
+     "unit": "sigma per half tolerance"
+    },
+    {
+     "quantity": "data.sigmaPerHalfTolerance.defaulted",
+     "value": true,
+     "tolerance": "exact",
+     "unit": "bool"
+    },
+    {
+     "quantity": "data.provenance.sensitivitySource",
+     "value": "autodiff",
+     "tolerance": "exact",
+     "unit": "enum"
+    },
+    {
+     "quantity": "data.sigma",
+     "value": 0.041365579,
+     "tolerance": 1e-09,
+     "unit": "mm",
+     "source": "= VC-GDT-30"
+    }
+   ],
+   "source": "AF-31, AF-35"
   }
  ]
 }

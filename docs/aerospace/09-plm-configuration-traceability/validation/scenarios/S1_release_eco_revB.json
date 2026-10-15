@@ -16,7 +16,8 @@
     "Timestamps are caller-supplied (commands never read a clock, architecture L3/L8); the host (UI/CLI) fills `at`.",
     "contentHash values marked `$hash:<label>` are computed at run time; the test asserts equality/inequality relations, not literals,",
     "except step 1 which starts from validation/sample_document.json so its hash is the literal in vectors/hash_vectors.json.",
-    "Step numbering: ECO-0001 (initial release) is created at step 6; steps after it are shifted by one relative to earlier drafts."
+    "Step numbering: ECO-0001 (initial release) is created at step 6; steps after it are shifted by one relative to earlier drafts.",
+    "Caller: every step runs as a human caller (UI/desktop) unless stated; VC-PLM-22/26 replay the same flow as an agent caller and expect PLM_HUMAN_GATE on approvals, classification and release_item."
   ],
   "start": {
     "document": "validation/sample_document.json"
@@ -93,7 +94,8 @@
       "expect": {
         "refused": true,
         "summaryMatches": "^add_box rejected: LL-1001 rev A is in_review",
-        "documentUnchanged": true
+        "documentUnchanged": true,
+        "data.error.code": "PLM_LOCKED"
       }
     },
     {
@@ -169,7 +171,8 @@
       "expect": {
         "refused": true,
         "summaryMatches": "^set_parameter rejected: LL-1001 rev A is released",
-        "documentUnchanged": true
+        "documentUnchanged": true,
+        "data.error.code": "PLM_LOCKED"
       }
     },
     {

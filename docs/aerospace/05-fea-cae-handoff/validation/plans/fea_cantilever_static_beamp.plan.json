@@ -168,5 +168,18 @@
    "order": 2,
    "globalSize": 0.25
   }
+ },
+ {
+  "command": "add_result_probe",
+  "params": {
+   "analysisId": "$an",
+   "name": "tip",
+   "point": [
+    0.5,
+    0.5,
+    8
+   ],
+   "quantity": "u_y"
+  }
  }
 ]

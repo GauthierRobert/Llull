@@ -92,15 +92,35 @@ every choice with citations. No licensed data is redistributed: the user imports
 
 ## 3. Personas & user stories
 
-| Persona | Story |
-| ------- | ----- |
-| P1 Design engineer (tier-2 supplier) | As a designer I assign "7075-T7351 plate, AMS xxxx" to a fitting and see its mass in lb and kg, with the density source shown, so the weight report is defensible. |
-| P2 Stress engineer | As a stress engineer I see Ftu/Fty/Fbru with **basis (A/B/S), thickness range, grain direction, temperature and source edition**, so I know which value I may use for single-load-path structure. |
-| P3 Materials & processes (M&P) engineer | As the M&P owner I import our licensed MMPDS / company allowables into a **private library** that never leaves the machine and is never committed into shared documents unless I allow it. |
-| P4 Structures designer (joints) | As a joint designer I select two plates and a hole axis, ask for "NAS6204 + MS21042 + NAS1149", and get the correct grip dash, washer shim and length. Failures are explained (too thick, protrusion short). |
-| P5 Production / MRO planner | As a planner I get a BOM listing each standard part number with quantity, plus raw-material lines (alloy, spec, form, mass). |
-| P6 AI agent (CLI/MCP) | As an agent I query `get_material_allowable` and `select_fastener` as read-only tools and get structured data with citations, so I can justify a design to a human reviewer. |
-| P7 Export-control officer | As the ECO I mark a library or material record as ITAR/EAR-controlled. llull then warns before export, sharing or cloud sync (links gap 09 PLM). |
+Roles follow [`../AGENT_FIRST.md`](../AGENT_FIRST.md) §1. The owner is not assumed to know what an A-basis value, a grip
+dash or an ITAR marking is, so llull carries those rules itself: units are explicit, every value carries its basis and
+source, **unverified or typical data is flagged and the flag follows every result computed from it** (mass, FEA, allowable
+queries; AF-32), and certification-relevant results say they need a qualified engineer (AF-33).
+
+| Role | Who | Uses | Main need |
+| ---- | --- | ---- | --------- |
+| **Operator (primary)** | AI agent driving the `llull` CLI (cloud agents: MCP) | `llull run`, `llull get_material_allowable`, `llull select_fastener`, `llull mass_properties`, `llull check_materials`, `llull bill_of_materials --json` | Commands with units in every param, results with units, basis, provenance and `unverified` flags, stable error codes |
+| **Owner** | The person asking for the part, weight or BOM. **Not assumed to be an engineer** | Natural language to the agent; may watch the desktop app | A defensible answer: which numbers are verified, which are typical/unverified, what needs a human |
+| **Qualified reviewer** | Stress engineer or M&P engineer (allowables for certification), export-control officer (markings) | Desktop app review surfaces; library and marking dialogs | Approves allowables used for certification, imports licensed libraries, sets or lowers export-control markings (human gates) |
+
+User stories:
+
+- **US-1 (owner → operator).** "What does this 7075 fitting weigh?" The agent assigns the material record and runs
+  `mass_properties --json`. It reports mass in g, kg and lb, the density used with its source and basis, and, if the density is a
+  typical or legacy value, `unverified: true` with the reason, in plain words.
+- **US-2 (operator).** The agent asks `get_material_allowable` for Ftu, L, A-basis at a thickness. If only S-basis or typical exists it
+  gets `available: false` with candidates and the code `MAT_ALLOWABLE_NOT_AVAILABLE`, never a silent fallback. Every returned allowable
+  carries `reviewRequired: true` because it can feed a certification decision.
+- **US-3 (reviewer).** The M&P engineer registers a licensed MMPDS/company library as **private** in the desktop app; it never leaves the
+  machine and is never embedded in shared documents.
+- **US-4 (operator).** "Bolt these two plates with NAS6204, MS21042 nut, NAS1149 washer." The agent runs `select_fastener` and gets the
+  grip dash, washer shim, length and protrusion check, each rule with its source and every default named (max washer stack 1/8 in from
+  AC 43.13-1B). Failures come with codes (`FAST_STACK_OUT_OF_RANGE`, `FAST_PROTRUSION_SHORT`). Then `insert_fastener_stack`.
+- **US-5 (operator).** The agent exports a BOM with standard-part rows and raw-material rows (`bill_of_materials --json`, CSV with `--save`).
+- **US-6 (operator).** The agent sees a record marked ITAR; an export attempt returns `MAT_EXPORT_CONTROLLED` and the agent hands over to
+  the owner. Only a human confirmation in the desktop app (export-control officer) releases the export (AF-34).
+- **US-7 (operator).** The agent ends every job with `check_materials`, which lists unverified values, superseded sources, unresolved
+  private libraries, representative fastener geometry and pending human gates.
 
 ## 4. Scope / out of scope
 
@@ -143,59 +163,89 @@ substantiation.
 | FR-MAT-22 | SHOULD | Composite material records (lamina/laminate allowables, CMH-17 basis) reuse FR-MAT-03/04/08/09 and are specified in gap 06. This gap provides the shared envelope. | Avoid two provenance systems. | R8 |
 | FR-MAT-23 | MUST | Backward compatibility: existing documents with `{name, density, color, metalness, roughness}` load unchanged. Their density is interpreted as g/(document unit)³, marked basis `unspecified`, provenance `legacy`. | No data loss. | VC-MAT-01 |
 | FR-MAT-24 | SHOULD | A "library diff" query compares two library versions (edition change) and lists changed values with old/new and source. | Re-checks after MMPDS edition updates. | R10; VC-MAT-13 |
+| FR-MAT-25 | MUST | **Unverified propagation** (AF-32): a property value is `unverified` unless it traces to a cited, verified source with a statistical basis where one applies (basis `typical`, `supplier_unstated`, `unspecified`, provenance `legacy`, or status not verified ⇒ `unverified`). The flag and its reasons propagate into every result computed from it: `mass_properties`, BOM material rows, `get_material_allowable`, gap 05 FEA results and margins, and joint capacity. | Typical values are not allowables; the owner cannot tell them apart | AF-32; VC-MAT-22, VC-MAT-23 |
+| FR-MAT-26 | MUST | **Readiness check** (AF-20): read-only `check_materials` returns pass / warn / fail items with codes for unverified values in use, superseded sources, unresolved private libraries, preferred conflicts, representative fastener geometry, regrip needed after edits, export-control markings and pending human gates. | The agent proves its own work | AF-20; VC-MAT-24 |
+| FR-MAT-27 | MUST | **Stable error codes** (AF-11) from TECHNICAL_SPEC §7.1 on every refusal and check item, with offending ids/paths and a remediation. | Agents act on codes | AF-11; VC-MAT-24 |
+| FR-MAT-28 | MUST | **Named defaults** (AF-31): every rule threshold used without an explicit param is named in the result with its source and `defaulted: true` (max washer stack 1/8 in — AC 43.13-1B 7-37; protrusion ≥ 1 thread pitch — AC 43.13-1B, llull reading; rivet length rounding `up` — llull choice OQ-MAT-04; edge 2 D / pitch 3 D — AC 43.13-1B 4-57(c)). | No silent safety value | AF-31, R17, R18; VC-MAT-26 |
+| FR-MAT-29 | MUST | **Review flag** (AF-33): every allowable returned by `get_material_allowable`, every `forCertification` query and every joint capacity carries `reviewRequired: true` with a reason. | Allowables feed certification decisions | AF-33; VC-MAT-23 |
+| FR-MAT-30 | MUST | **Human gates** (AF-34): releasing an export of export-controlled content, lowering or removing an export-control marking, and accepting a value for certification use require a human confirmation in the desktop app (export-control officer / qualified reviewer, gap 09 signing). An agent caller gets `MAT_HUMAN_GATE`; it may raise a marking, never lower it. | Approval acts are human | AF-34; VC-MAT-25 |
+| FR-MAT-31 | MUST | **Units in params and results** (AF-04, AF-10): quantities are `{ value, unit }` or carry the unit in the field name (`massKg`, `gripIn`); no unit is inferred from the document unit without being stated in the result. | Today mass is labelled "g" whatever the density unit | AF-04, AF-10; VC-MAT-03, VC-MAT-04 |
 
 ## 6. Workflows
 
-### 6.1 UI (desktop)
+### 6.1 CLI (`llull`, the operator's primary path; KI6)
 
-1. **Materials panel → Libraries → Import…** picks `company-mmpds-2024.json`. The dialog shows licence =
-   licensed-no-redistribution, storage = workstation-private, export control = none. Import runs
-   `import_material_library`.
-2. Select a part, then **Assign material**. The picker filters by alloy/temper/form/spec and shows basis badges
-   (A/B/S/typ) and source edition. Runs `assign_material`.
-3. The **Properties inspector** shows mass "139.8 g (0.308 lb), density 0.101 lb/in³, source: …". Clicking
-   the source opens its provenance.
-4. Select two plates and pick a hole point, then **Fasteners → Insert stack…**. Choose family NAS6203,
-   nut MS21042 and washer NAS1149. The preview shows `NAS6203-9 · 1× NAS1149 .063 · MS21042L3 · protrusion
-   0.124 in ✓`. Confirm runs `insert_fastener_stack`.
-5. **BOM** shows the standard-parts and raw-material sections, exportable as CSV.
-
-### 6.2 CLI (`llull`, local agent path, KI6)
+Proposed commands are those of TECHNICAL_SPEC §4. Library files are registered with a transport called like the
+existing exchange tools (`file=PATH`), not a CLI special case (AF-01).
 
 ```bash
-llull libraries add ~/libs/company-mmpds.llull-matlib.json --private      # host-side file registration (TECHNICAL_SPEC §7)
-llull --app exec import_material_library '{"libraryId":"company-mmpds","version":"2024.1","sha256":"…"}'
-llull --app exec get_material_allowable '{"material":"aa7075_t7351","property":"Ftu","direction":"L","basis":"A","thickness":1.5,"thicknessUnit":"in"}' --json
-llull --app exec select_fastener '{"family":"NAS6203-6220","diameterDash":"3","stack":0.51,"stackUnit":"in","nut":"MS21042","washer":"NAS1149"}' --json
-llull --doc bracket.llull.json run validation/plans/fastener_stack_nas6203_proposed.json --validate
+llull search material allowable ; llull search fastener grip      # discover (AF-01)
+llull describe get_material_allowable select_fastener              # units of every param (AF-02, AF-04)
+
+# 1. libraries: public seed or a user file (private storage stays on this machine)
+llull register_material_library file=libs/company-mmpds.llull-matlib.json storage=private --doc part.llull.json --json
+llull import_material_library 'libraryId=company-mmpds' version=2024.1 sha256=… --doc part.llull.json --json
+
+# 2. one plan: geometry, material assignment, fastener stacks (build_project)
+llull run plans/fastener_stack_nas6203_proposed.json --validate --doc part.llull.json
+llull run plans/fastener_stack_nas6203_proposed.json --doc part.llull.json --kernel occt --json
+
+# 3. numbers (AF-10): every value with unit, basis, source, unverified
+llull mass_properties entityId=box-3.1 massUnit=kg --doc part.llull.json --json
+llull get_material_allowable '{"material":"aa7075_t7351","property":"Ftu","direction":"L","basis":"A","thickness":{"value":1.5,"unit":"in"}}' --doc part.llull.json --json
+llull select_fastener '{"family":"NAS6203-6220","diameterDash":"3","stack":{"value":0.51,"unit":"in"},"nut":"MS21042","washer":"NAS1149"}' --json
+
+# 4. check, look, hand off
+llull check_materials --doc part.llull.json --json                 # pass/warn/fail with codes (AF-20)
+llull render_view view=iso --save out/stack.png --doc part.llull.json
+llull bill_of_materials includeStandardParts=true --doc part.llull.json --json
+llull export_bom_csv --save out/bom.csv --doc part.llull.json      # V1
 ```
 
-### 6.3 MCP agent (cloud)
+`--dry-run` works for every mutating material and fastener command (AF-42). Refusals exit 1 with `data.code` and a remediation
+(TECHNICAL_SPEC §7.1). The agent's report to the owner lists, in order: what was computed, which inputs are verified, which are
+`unverified` (and why), and what needs a qualified reviewer.
+
+### 6.2 MCP agent (cloud)
 
 The `materials` toolset exposes `get_material` and `get_material_allowable` (read-only, safe) and the mutating
 `create_material` / `assign_material`. The `@aero` plugin's `fasteners` toolset exposes `list_fastener_families` and
-`select_fastener` (read-only) and the mutating `insert_fastener_stack` / `insert_fastener_row` (TECHNICAL_SPEC §4.2, §7). An agent asked to "fasten the doubler to the skin with NAS6204 at 4D pitch" calls
-`select_fastener` on the stack and then `insert_fastener_row`. It reports each part number with the
-AC 43.13-1B rule that justified it.
+`select_fastener` (read-only) and the mutating `insert_fastener_stack` / `insert_fastener_row` (TECHNICAL_SPEC §4.2, §7).
+An agent asked to "fasten the doubler to the skin with NAS6204 at 4D pitch" calls `select_fastener` on the stack and then
+`insert_fastener_row`. It reports each part number with the AC 43.13-1B rule that justified it. Private-library values are
+redacted for cloud clients (TR-MAT-32) and export-controlled content is refused (`MAT_EXPORT_CONTROLLED`).
+
+### 6.3 Desktop UI (review and approval surface only)
+
+1. **Libraries panel**: licence, storage and marking badges; the M&P engineer registers private libraries here.
+2. **Material inspector**: property table with basis, direction, thickness, source and `unverified` badges (same data as `get_material`).
+3. **Fastener preview**: shows the stack the agent selected (`NAS6203-9 · 1× NAS1149 .063 · MS21042L3 · protrusion 0.124 in ✓`).
+4. **Human gates** (AF-34): export-control confirmation, setting or lowering a marking, marking an allowable as accepted for certification.
+5. **BOM panel**: standard-part and raw-material sections.
 
 ## 7. Acceptance criteria
 
-| # | Given | When | Then | VC |
-| - | ----- | ---- | ---- | -- |
-| AC-1 | a v2 document with a legacy material `{density: 0.00785}` | it is loaded | the material still gives the same mass and shows basis `unspecified`, provenance `legacy` | VC-MAT-01 |
-| AC-2 | a material with two density values from two sources | the user marks one preferred | `mass_properties` uses it and names it; the other is still listed | VC-MAT-02 |
-| AC-3 | density 0.101 lb/in³ | queried in g/cm³ | 2.795670376 g/cm³ (= 0.101 × 453.59237 / 16.387064, rel. 1e-9) | VC-MAT-03 |
-| AC-4 | a 100×50×10 mm box in 7075-T6 (2.81 g/cm³) | `mass_properties` | 140.5 g, rel. 1e-6 (OCC) | VC-MAT-04 |
-| AC-5 | an allowable requested at basis A that only exists at basis S | `get_material_allowable` | structured not-available result listing the S value as a candidate; no value returned as A | VC-MAT-05 |
-| AC-6 | catalogue NAS6204, dash 10 | the length rule is evaluated | grip 0.625 in, length 0.995 in (published) | VC-MAT-06 |
-| AC-7 | a 0.510 in stack, NAS6203 + MS21042L3 + NAS1149 | `select_fastener` | NAS6203-9, one 0.063 in washer, protrusion 0.124 in ≥ 1/32 in | VC-MAT-07 |
-| AC-8 | a 0.600 in stack, HL19 1/4 in | `select_fastener` | HL19-8-10 (grip .5625–.625) | VC-MAT-08 |
-| AC-9 | a 0.125 in stack, MS20470AD4 | `select_fastener` | MS20470AD4-5; edge ≥ 0.25 in, pitch ≥ 0.375 in | VC-MAT-09 |
-| AC-10 | two plates and a hole point | `insert_fastener_stack`, then undo | the hole, 1 bolt, 1 washer and 1 nut appear as instances; undo restores the original exactly | VC-MAT-10 |
-| AC-11 | a model with 2 stacks | `bill_of_materials` | rows NAS6203-9 ×2, MS21042L3 ×2, NAS1149… ×2, plus raw-material rows | VC-MAT-11 |
-| AC-12 | a row at 2.5 D pitch | `insert_fastener_row` | refused (or warned in `allowViolations` mode) citing min pitch 3 D | VC-MAT-12 |
-| AC-13 | a library flagged licensed-no-redistribution, storage private | the document is saved or exported | the file contains only the library id, version and hash, with no values | VC-MAT-14 |
-| AC-14 | a record flagged ITAR | `export_step` / share | the export warns and requires explicit confirmation (desktop) or is refused (cloud MCP) | VC-MAT-15 |
+Each criterion is a CLI invocation with a JSON assertion against `validation/expected_results.json` (VC id in the last
+column). `D` = `--doc case.llull.json --json`.
+
+| # | Given | When (CLI) | Then (JSON) | VC |
+| - | ----- | ---------- | ----------- | -- |
+| AC-1 | a v2 document with a legacy material `{density: 0.00785}` on a 10 mm cube | `llull mass_properties entityId=… D` | `data.mass` = 7.85 (g) as today; `data.densitySource.provenance: "legacy"`, `data.unverified: true` (reason `legacy`) | VC-MAT-01, 22 |
+| AC-2 | a material with two density values from two sources | `llull set_material_property … preferred=true D`; `mass_properties D` | `data.densitySource` names the preferred entry; `get_material` lists both | VC-MAT-02 |
+| AC-3 | density 0.101 lb/in³ | `llull convert_quantity value=0.101 from=lb/in^3 to=g/cm^3 --json` (or `get_material`) | 2.795670376 g/cm³ (= 0.101 × 453.59237 / 16.387064, rel. 1e-9) | VC-MAT-03 |
+| AC-4 | `plans/mass_7075_block_current.json` (runs on today's llull) | `llull run <plan> D` | last step `data.mass` = 140.5, `data.unit: "g"` (rel. 1e-6) — verified on the current registry | VC-MAT-04 |
+| AC-5 | an allowable requested at basis A that only exists at basis S | `llull get_material_allowable … basis=A D` | exit 1, `data.code: "MAT_ALLOWABLE_NOT_AVAILABLE"`, `data.candidates[0].basis: "S"`; no value returned as A | VC-MAT-05 |
+| AC-6 | catalogue NAS6204, dash 10 | `llull decode_part_number partNumber=NAS6204-10 --json` | `gripIn` 0.625, `lengthIn` 0.995 (published) | VC-MAT-06 |
+| AC-7 | a 0.510 in stack, NAS6203 + MS21042L3 + NAS1149 | `llull select_fastener … --json` | `partNumber: "NAS6203-9"`, `washersIn: [0.063]`, `protrusionIn: 0.124`, `maxWasherTotal.source: "AC 43.13-1B 7-37"`, `defaulted: true` | VC-MAT-07, 26 |
+| AC-8 | a 0.600 in stack, HL19 1/4 in | `llull select_fastener family=HL19 … --json` | `partNumber: "HL19-8-10"`, `gripRangeIn: [0.5625, 0.625]` | VC-MAT-08 |
+| AC-9 | a 0.125 in stack, MS20470AD4 | `llull select_fastener family=MS20470 … --json` | `MS20470AD4-5`; `minEdgeDistanceIn` 0.25, `minPitchIn` 0.375; rounding `{value: "up", defaulted: true}` | VC-MAT-09, 26 |
+| AC-10 | two plates and a hole point | `llull run plans/fastener_stack_nas6203_proposed.json D --kernel occt`; `llull undo` | hole + 1 bolt + 1 washer + 1 nut instances; undo restores the document hash | VC-MAT-10 |
+| AC-11 | a model with 2 stacks | `llull bill_of_materials D` | `standardParts`: NAS6203-9 ×2, MS21042L3 ×2, NAS1149(.063) ×2; raw-material rows | VC-MAT-11 |
+| AC-12 | a row at 2.5 D pitch | `llull insert_fastener_row … D` | exit 1, `data.code: "FAST_PITCH"` citing min pitch 3 D (or warnings with `allowViolations`) | VC-MAT-12 |
+| AC-13 | a library flagged licensed-no-redistribution, storage private | save, snapshot, `export_code`, live-sync log | outputs contain only library id, version and hash | VC-MAT-14 |
+| AC-14 | a record flagged ITAR | agent runs `llull export_step_exact --save x.step D` | exit 1, `data.code: "MAT_EXPORT_CONTROLLED"`; with `confirmExportControlled=true` from the agent: `MAT_HUMAN_GATE`; nothing written | VC-MAT-15, 25 |
+| AC-15 | the 7075 block with the **typical** MatWeb density (basis `typical`) | `mass_properties D`; FEA `compute_margins` on a typical E; `get_material_allowable` on a typical Ftu | each result `unverified: true` with reasons; `check_materials` warning `MAT_VALUE_UNVERIFIED` | VC-MAT-22, 23 |
+| AC-16 | the deliberately wrong inputs of VC-MAT-24 | the failing command | each returns the documented code and remediation (TECHNICAL_SPEC §7.1) | VC-MAT-24 |
 
 ## 8. Standards & regulatory alignment
 
@@ -241,6 +291,9 @@ AC 43.13-1B rule that justified it.
 | Values with basis and provenance (seed library) | 100 % |
 | Time to insert 100 fastener stacks (desktop OCC) | ≤ 10 s (TECHNICAL_SPEC §8) |
 | Licensed values leaking into a saved shared document (fuzz test) | 0 |
+| Results computed from unverified data without the `unverified` flag (mass, FEA, allowables) | 0 (VC-MAT-22, 23) |
+| Human-gated acts completed by an agent | 0 (VC-MAT-25) |
+| Agent driver completes the bracket-splice scenario unattended except the human gates | ≥ 9 of 10 runs (AF-23) |
 
 ## 10. Risks & assumptions
 
