@@ -422,6 +422,14 @@ export const plans: Record<string, GoldenAction[]> = {
       },
     },
   ],
+  drawing_sheet_part: [
+    { command: 'add_box', params: { size: [100, 60, 40] } },
+    { command: 'create_sheet', params: { name: 'Part', paper: 'A3', title: 'Block', partNumber: 'P-1', date: '2026-01-01' }, as: 'sheet' },
+    { command: 'create_drawing_view', params: { sheetId: '$sheet', direction: 'front' }, as: 'front' },
+    { command: 'create_drawing_view', params: { sheetId: '$sheet', direction: 'top' } },
+    { command: 'add_section_view', params: { sheetId: '$sheet', direction: 'right', offset: 0, parentViewId: '$front' } },
+    { command: 'add_detail_view', params: { sheetId: '$sheet', parentViewId: '$front', center: [50, 20], radius: 10 } },
+  ],
 };
 
 /** Plans needing the Manifold geometry kernel (booleans). */

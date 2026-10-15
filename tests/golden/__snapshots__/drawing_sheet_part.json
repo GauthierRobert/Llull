@@ -1,0 +1,110 @@
+{
+  "format": "llull-document",
+  "version": 2,
+  "document": {
+    "entities": {
+      "#1": {
+        "id": "#1",
+        "kind": "box",
+        "size": [100,60,40],
+        "position": [0,0,0],
+        "rotation": [0,0,0],
+        "layerId": "#2",
+        "color": "#6b8f9c"
+      }
+    },
+    "order": [
+      "#1"
+    ],
+    "layers": {
+      "#2": {
+        "id": "#2",
+        "name": "Layer 0",
+        "visible": true,
+        "locked": false
+      }
+    },
+    "layerOrder": [
+      "#2"
+    ],
+    "selection": [],
+    "camera": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "azimuth": 2.35619449,
+      "polar": 1.04719755,
+      "distance": 12
+    },
+    "groups": {},
+    "units": "mm",
+    "displayPrecision": 3,
+    "parameters": {},
+    "animations": {},
+    "featureHistory": [
+      {
+        "id": "#3",
+        "name": "add_box",
+        "params": {"size":[100,60,40]},
+        "suppressed": false,
+        "affected": ["#1"]
+      },
+      {
+        "id": "#4",
+        "name": "create_sheet",
+        "params": {"name":"Part","paper":"A3","title":"Block","partNumber":"P-1","date":"2026-01-01"},
+        "suppressed": false,
+        "affected": ["#5"]
+      },
+      {
+        "id": "#6",
+        "name": "create_drawing_view",
+        "params": {"sheetId":"#5","direction":"front"},
+        "suppressed": false,
+        "affected": ["#7"]
+      },
+      {
+        "id": "#8",
+        "name": "create_drawing_view",
+        "params": {"sheetId":"#5","direction":"top"},
+        "suppressed": false,
+        "affected": ["#9"]
+      },
+      {
+        "id": "#10",
+        "name": "add_section_view",
+        "params": {"sheetId":"#5","direction":"right","offset":0,"parentViewId":"#7"},
+        "suppressed": false,
+        "affected": ["#11"]
+      },
+      {
+        "id": "#12",
+        "name": "add_detail_view",
+        "params": {"sheetId":"#5","parentViewId":"#7","center":[50,20],"radius":10},
+        "suppressed": false,
+        "affected": ["#13"]
+      }
+    ],
+    "configurations": {},
+    "materials": {},
+    "recipes": {},
+    "components": {},
+    "constraints": {},
+    "constraintOrder": [],
+    "joints": {},
+    "jointOrder": [],
+    "driveRelations": {},
+    "driveRelationOrder": [],
+    "nextStepNumber": 7,
+    "drawings": {
+      "sheets": {
+        "#5": {"id":"#5","name":"Part","paper":"A3","titleBlock":{"title":"Block","partNumber":"P-1","date":"2026-01-01"},"projectionAngle":"first","views":[{"id":"#7","label":"FRONT","kind":"projection","direction":"front"},{"id":"#9","label":"TOP","kind":"projection","direction":"top"},{"id":"#11","label":"SECTION A-A","kind":"section","direction":"right","mark":"A","section":{"offset":0,"parentViewId":"#7"}},{"id":"#13","label":"DETAIL B","kind":"detail","mark":"B","detail":{"parentViewId":"#7","center":[50,20],"radius":10}}]}
+      },
+      "order": [
+        "#5"
+      ]
+    }
+  }
+}

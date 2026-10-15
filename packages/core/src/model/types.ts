@@ -3,6 +3,7 @@
 import type { Vec2, Vec3 } from './vectors';
 import type { BuildingModel } from './building';
 import type { CivilModel } from './civil';
+import type { DrawingsModel } from './sheet';
 import type { CurveSegment } from './curve';
 
 /** Re-exported: every model consumer reads its vectors from here. */
@@ -626,6 +627,8 @@ export interface CadDocument {
   building?: BuildingModel;
   /** Absent until the first civil (site / terrain / road / drainage) command. */
   civil?: CivilModel;
+  /** Absent until the first sheet command (`create_sheet`). */
+  drawings?: DrawingsModel;
 }
 
 /**
