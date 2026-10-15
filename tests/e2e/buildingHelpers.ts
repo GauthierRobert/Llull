@@ -70,6 +70,8 @@ export async function scheduleCsv(page: Page, kind: string): Promise<{ name: str
 }
 
 export async function openProjectFile(page: Page, text: string): Promise<void> {
+  const more = page.getByRole('button', { name: 'More', exact: true });
+  if ((await more.getAttribute('aria-expanded')) !== 'true') await more.click();
   await page
     .getByRole('group', { name: 'Project file' })
     .locator('input[type="file"]')
