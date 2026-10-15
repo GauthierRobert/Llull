@@ -55,7 +55,44 @@ PMI on desktop via the bundled CPython + OCP/XCAF, KI6).
   same public test cases is a credible differentiator, and llull's command log (L8) makes every PMI
   edit auditable and replayable.
 
-### 2.3 Why it blocks aerospace use
+### 2.3 Key concepts (product vocabulary used in this spec)
+
+| Concept | Meaning in llull | Notes / source |
+| --- | --- | --- |
+| Semantic PMI (representation) | machine-readable requirement linked to B-rep faces: characteristic, value, modifiers, datum reference frame | SFA docs: semantic PMI is the computer-interpretable representation of tolerances and datums [R18][R19] |
+| Graphical PMI (presentation) | the drawn annotation (lines, text, tessellated glyphs) on an annotation plane; not computer-interpretable | SFA docs: graphic PMI "is not intended to be computer-interpretable" [R19] |
+| Annotation plane | 3D plane on which an annotation is laid out and read | AP242 `ANNOTATION_PLANE` (present in all 17 NIST files, census) |
+| Saved view | named camera + subset of PMI (and optionally section/entities) | AP242 `CAMERA_MODEL_D3` (1–23 per NIST file, census) |
+| Datum feature / datum / DRF | a real face designated by a letter / its ideal simulated geometry / ordered set of ≤ 3 datums fixing a coordinate frame | ISO 5459 scope [R5]; AP242 `DATUM_FEATURE`, `DATUM`, `DATUM_SYSTEM` |
+| Feature control frame (FCF) | characteristic + tolerance zone + modifiers + DRF | AP242 `*_TOLERANCE` entities |
+| Feature of size (FOS) | cylinder, sphere, pair of opposed parallel planes: has a measurable size; can take MMC/LMC | AP242 `DIMENSIONAL_SIZE` |
+| Material condition modifiers | MMC (max material: smallest hole / largest shaft), LMC, RFS; on datums MMB/LMB | AP242 `.MAXIMUM_MATERIAL_REQUIREMENT.` etc. occur in 12 of the 17 NIST files |
+| Stack-up | the variation of a dependent dimension (gap, clearance) from its contributors' tolerances: worst case (arithmetic), RSS (statistical, independent normal), Monte Carlo (sampled, any distribution, non-linear) | derivations in `validation/generate_stackup_reference.py` |
+| Model-only vs model + drawing | the two application methods of Y14.41 / ISO 16792 | [R2][R4] |
+
+### 2.4 Comparison with existing tools (what users will expect)
+
+| Tool | Semantic PMI authoring | AP242 PMI | Drawing link | Stack-up | Source / verification status |
+| --- | --- | --- | --- | --- | --- |
+| PTC Creo (GD&T Advisor) | yes, with an ASME Y14.5 rule set | yes (vendor) | yes | separate tools | PTC help page "ASME Y14.5 Rule Set" seen in search [R33]; feature detail not verified |
+| Dassault CATIA (3D Master / FT&A) | yes | yes (vendor) | yes | separate tools | vendor blog [R35]; detail not verified |
+| Four major CAD systems tested by NIST (CATIA, NX, Creo, SolidWorks; 2012/2015 versions) | yes | STEP/JT/3D PDF derived files tested | — | — | NIST found 411 PMI errors (98 unique) [R17] |
+| OpenCascade (OCCT) | data model (XCAF `XCAFDimTolObjects`) | import per CAx-IF practices; export semantic only (forum report) | — | — | [R26][R27][R28][R29] |
+| NIST SFA | — (analysis/viewing) | reads and checks semantic + graphic PMI; viewer for graphic PMI | — | — | [R18] |
+| llull today | none | none | sheets without PMI | none | §1 |
+| llull after this gap | commands (UI/MCP/CLI) with replay-stable face links | semantic import/export via OCP (V1) | PMI rendered on live sheets | WC/RSS/MC query | this spec |
+
+### 2.5 Worked example of the value (from the reference data)
+
+A housing depth H = 100 ± 0.10 mm receives four spacers (24.95 ± 0.05, 25.00 ± 0.03, 24.90 ± 0.04,
+25.00 ± 0.02). Nominal gap 0.15 mm. Worst case says the gap ranges −0.09 … +0.39 mm (interference
+possible); RSS (±3σ normal) says 0.026 … 0.274 mm, with a predicted interference probability of
+1.44 × 10⁻⁴; if the parts are uniformly distributed instead of normal, the exact probability rises to
+1.21 × 10⁻² (≈ 84× higher) — a decision that changes the tolerance allocation. llull must produce
+exactly these numbers (`validation/stackup_reference.json`, SU-01/SU-02, derived analytically and by a
+seeded Monte Carlo of 200 000 samples).
+
+### 2.6 Why it blocks aerospace use
 
 1. No releasable part definition: an aerospace part without tolerances cannot be quoted, made or
    inspected (Boeing D6-51991 §7.5 assumes the dataset carries manufacturing/inspection information [R23]).
@@ -264,12 +301,16 @@ customer quality systems (D6-51991 [R23]) and contract data requirements (MIL-ST
 - [R16] Cheney D., Fischer B., Measuring the PMI Modeling Capability in CAD Systems: Report 1 — Combined Test Case Verification, NIST GCR 15-997 (2015) — https://nvlpubs.nist.gov/nistpubs/gcr/2015/NIST.GCR.15-997.pdf (accessed 2026-10)
 - [R17] Lipman R., Filliben J., Testing Implementations of Geometric Dimensioning and Tolerancing in CAD Software, Computer-Aided Design & Applications 17(6) 2020 1241–1265 — https://tsapps.nist.gov/publication/get_pdf.cfm?pub_id=926080 ; results page https://pages.nist.gov/CAD-PMI-Testing/results.html (accessed 2026-10)
 - [R18] NIST STEP File Analyzer and Viewer (SFA) — NIST — https://github.com/usnistgov/SFA (accessed 2026-10)
+- [R19] NIST STEP File Analyzer documentation (semantic vs graphic PMI definitions) — NIST IR 7999 https://nvlpubs.nist.gov/nistpubs/ir/2014/NIST.IR.7999.pdf ; SFA user guide NIST AMS 200-12 https://nvlpubs.nist.gov/nistpubs/ams/NIST.AMS.200-12.pdf (accessed 2026-10)
 - [R20] NIST AMS 100-26 The Model Based Enterprise — NIST — https://nvlpubs.nist.gov/nistpubs/ams/NIST.AMS.100-26.pdf (accessed 2026-10)
 - [R21] NIST GCR 18-015 (minimum information model for a 3D model replacing a drawing) — NIST — https://nvlpubs.nist.gov/nistpubs/gcr/2018/NIST.GCR.18-015.pdf (accessed 2026-10)
 - [R22] MIL-STD-31000B Technical Data Packages — ANSI listing https://webstore.ansi.org/Standards/DOD/MILSTD31000B ; J. Windham (US Army), MIL-STD-31000 update, NIST MBE Summit — https://www.nist.gov/document/16amil-std-31000updateand3dipdftdpjeffwindhampdf (accessed 2026-10)
 - [R23] Boeing D6-51991 Rev P Quality Assurance Standard for Digital Product Definition at Boeing Suppliers — Boeing — https://www.boeingsuppliers.com/content/dam/boeing/boeingsuppliers/boeing-suppliers/becoming/quality/D6-51991_Rev_P.pdf ; https://www.boeingsuppliers.com/dpd.html (accessed 2026-10)
 - [R24] The Digital Thread — Key to F-35 Joint Strike Fighter Affordability — Aerospace Manufacturing and Design — https://www.aerospacemanufacturinganddesign.com/article/amd-080910-f-35-joint-strike-fighter-digital-thread/ ; D. Kinard, F-35 digital thread production process — https://sldinfo.com/2018/11/the-f-35-digital-thread-production-process-donald-kinard-provides-an-overview/ (accessed 2026-10)
 - [R25] Airbus FAST magazine #57 (Jan 2016) — Airbus — https://www.aircraft.airbus.com/sites/g/files/jlcbta126/files/2022-04/Airbus-FAST57.pdf (accessed 2026-10)
+- [R28] OCCT STEP translator user guide, GD&T section (via OCCT commit page) — https://git.rbts.co/OpenCascade/occt/commit/a8a3b37c0d5dd416a0f98a031be7a4fc05075e52 (accessed 2026-10)
+- [R29] OpenCascade aerospace use cases — https://opencascade.com/use_cases_industry/aerospace (accessed 2026-10)
+- [R33] PTC Creo help, "ASME Y14.5 Rule Set" (GD&T Advisor) — https://support.ptc.com/help/creo/creo_pma/r7.0/usascii/model-based_definition/asme/rule_set.html (accessed 2026-10)
 - [R26] OCCT `XCAFDimTolObjects_*` headers (GeomToleranceType, GeomToleranceModif, DatumSingleModif, DimensionType, GeomToleranceObject) — Open Cascade SAS — https://github.com/Open-Cascade-SAS/OCCT/tree/master/src/DataExchange/TKXCAF/XCAFDimTolObjects (accessed 2026-10)
 - [R27] OCCT forum: Missing presentation PMI in STEP export with STEPCAFControl_Writer — https://dev.opencascade.org/content/missing-presentation-pmi-step-export-stepcafcontrolwriter (accessed 2026-10)
 - [R31] opencascade.js — https://github.com/donalffons/opencascade.js (accessed 2026-10)

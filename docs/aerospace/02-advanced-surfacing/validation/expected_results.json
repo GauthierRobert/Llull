@@ -3,46 +3,545 @@
  "generated": "2026-10-15",
  "notes": "Values are (a) quoted from a cited source, (b) derived analytically (derivation given), or (c) TBD with the tool to measure. Source ids refer to validation/sources.md. Data files referenced live in validation/data/.",
  "cases": [
-  {"vc": "VC-SRF-01", "what": "NACA 0012 generator vs UIUC naca0012.dat (Lednicer naca.exe, Selig order) and n0012.dat", "metric": "max point-to-curve distance", "value": 0.0, "tolerance": 1e-6, "unit": "chord", "measured_by_reference_script": {"naca0012.dat": 1e-7, "n0012.dat": 0.0}, "source": "(b) generate_naca.py vs S7 pinned files; equations S2/S4", "proves": ["FR-SRF-10", "FR-SRF-11", "TR §5.3"]},
-  {"vc": "VC-SRF-02", "what": "NACA 23012 generator (230 mean line r=0.2025, k1=15.957) vs UIUC naca23012.dat", "metric": "max point-to-curve distance", "value": 0.0, "tolerance": 2e-5, "unit": "chord", "measured_by_reference_script": {"naca23012.dat": 9.2e-6}, "source": "(b) generate_naca.py; constants S5; file has 5 decimals", "proves": ["FR-SRF-11"]},
-  {"vc": "VC-SRF-03", "what": "NACA 2412: pinned UIUC naca2412.dat (Lednicer naca.exe) differs in normalisation", "metric": "max point-to-curve distance", "value_raw": 0.0012909, "value_after_chord_normalisation": 0.000158, "value_after_best_fit_rotation_0p0014rad": 8.21e-5, "tolerance_normalised": 2e-4, "unit": "chord", "source": "(b) measured by generate_naca.py (data/naca_uiuc_comparison.json); the file is consistent with the analytic section rotated about the TE by about 0.0014 rad; residual after best-fit rotation 8.2e-5 c is unexplained (TBD - check against TM 4741 program output)", "proves": ["FR-SRF-10", "FR-SRF-12"]},
-  {"vc": "VC-SRF-04", "what": "airfoil format detection and parsing", "expected": [
-    {"file": "OpenVSP examples/airfoil/e205_Selig.dat", "format": "selig", "header": "E205  (10.48%)", "first_point": [1.0, 0.0]},
-    {"file": "OpenVSP examples/airfoil/clarky_Lednicer.dat", "format": "lednicer", "counts": [61, 61], "first_point": [0.0, 0.0]},
-    {"file": "OpenVSP examples/airfoil/n0012.dat", "format": "lednicer", "counts": [66, 66]},
-    {"file": "UIUC naca23012.dat (AeroSandbox mirror)", "format": "selig", "points": 61},
-    {"file": "UIUC naca0012.dat (AeroSandbox mirror)", "format": "selig", "points": 69}
-   ], "tolerance": "exact", "source": "(a) file contents, S8/S7", "proves": ["FR-SRF-10"]},
-  {"vc": "VC-SRF-05", "what": "surface curvature analytic cases", "data_file": "data/curvature_analytic.json", "examples": [
-    {"surface": "sphere R=10", "K": 0.01, "abs_H": 0.1},
-    {"surface": "cylinder R=5", "K": 0.0, "abs_H": 0.1},
-    {"surface": "torus R=5 r=2, v=0", "K": 0.07142857142857142, "abs_H": 0.32142857142857145},
-    {"surface": "torus R=5 r=2, v=pi/2", "K": 0.0, "abs_H": 0.25},
-    {"surface": "torus R=5 r=2, v=pi", "K": -0.16666666666666666, "abs_H": 0.08333333333333333}
-   ], "tolerance": "1e-6 relative (K absolute 1e-6 where K = 0)", "unit": "1/length, 1/length^2", "source": "(b) closed forms S26 + finite-difference self-check in generate_analytic_refs.py", "proves": ["FR-SRF-21"]},
-  {"vc": "VC-SRF-06", "what": "continuity classification of analytic curve joints", "data_file": "data/continuity_cases.json", "expected": {"corner": "G0", "line_arc": "G1", "line_cubic": "G2", "line_quartic": "G3", "arc_arc_equal": "G3", "arc_arc_ratio2": "G1"}, "expected_gaps": {"line_arc.curvature_jump": 0.2, "line_cubic.dkappa_ds_jump": 6.0, "arc_arc_ratio2.curvature_jump": 0.1}, "tolerance": "classification exact; gaps 1e-6 relative", "source": "(b) analytic", "proves": ["FR-SRF-20", "FR-SRF-22"]},
-  {"vc": "VC-SRF-07", "what": "Liming rho-conic as rational quadratic", "data_file": "data/conic_cases.json", "expected": {"rho_sqrt2m1_weight": 0.7071067811865476, "rho_sqrt2m1_max_radius_error": 0.0, "rho_0.5_weight": 1.0, "shoulder_rho_0.3": [0.65, 0.65], "shoulder_rho_0.7": [0.85, 0.85]}, "tolerance": 1e-12, "unit": "length", "source": "(b) w = rho/(1-rho), S1/S19", "proves": ["FR-SRF-01", "FR-SRF-18"]},
-  {"vc": "VC-SRF-08", "what": "NURBS invariants", "expected": {"knot_insertion_shape_change": 0.0, "degree_elevation_shape_change": 0.0, "interpolation_residual": 0.0, "partition_of_unity": 1.0}, "tolerance": 1e-12, "unit": "length", "source": "(b) properties of B-splines, S1", "proves": ["FR-SRF-01", "FR-SRF-02", "FR-SRF-03"]},
-  {"vc": "VC-SRF-09", "what": "NACA 0012 section metrics (open TE)", "expected": {"max_thickness": 0.120035, "max_thickness_x": 0.2998, "te_thickness": 0.00252, "le_radius": 0.015867, "area": 0.08221}, "tolerance": {"max_thickness": 1e-5, "max_thickness_x": 1e-3, "te_thickness": 1e-6, "le_radius": "5e-4 (fit)", "area": 1e-5}, "unit": "chord / chord^2", "source": "(b) generate_naca.py from S2 equation; LE radius 1.1019 t^2 derived", "proves": ["FR-SRF-13"]},
-  {"vc": "VC-SRF-10", "what": "TR-1208 wing planform (OpenVSP Swept_Wing_API table)", "inputs": {"root_chord_in": 21.941, "semi_span_in": 63.63, "taper": 0.45, "sweep_c4_deg": 45.0}, "expected": {"tip_chord_in": 9.87345, "area_full_in2": 2024.3535, "mac_in": 16.6701, "y_mac_in": 27.7924, "aspect_ratio": 8.0001}, "published": {"area_full_in2": 2024.35, "mac_in": 16.672, "aspect_ratio": 8.02}, "tolerance": {"area_full_in2": 0.01, "mac_in": 0.005, "aspect_ratio": 0.03}, "source": "(b) trapezoid formulas in data/wing_planforms.json; (a) published values S9 (published AR 8.02 vs derived 8.000 from the same table)", "proves": ["FR-SRF-14", "FR-SRF-15"]},
-  {"vc": "VC-SRF-11", "what": "trapezoidal wing cr=2 m, ct=1 m, b/2=5 m, NACA 0012, linear loft", "expected": {"volume_half_open_te_m3": 0.959117, "volume_half_closed_te_m3": 0.953237, "planform_area_half_m2": 7.5, "mac_m": 1.555556}, "tolerance": {"volume": "1e-4 relative", "area": 1e-9, "mac": 1e-6}, "baseline_today": "TBD - run plans/baseline_trap_wing_loft_sections.json with llull --doc on OCC and on Manifold; indicative linear 24-gon section area error -2.0 %", "source": "(b) V = A_unit * b (cr^2 + cr ct + ct^2)/3, exact for homothetic sections", "proves": ["FR-SRF-05", "FR-SRF-14", "FR-SRF-15"]},
-  {"vc": "VC-SRF-12", "what": "NASA CRM wing-body STEP: import, curvature, continuity", "reference": {"Sref_full_scale_m2": 383.65, "span_m": 58.76, "cref_m": 7.0, "aspect_ratio": 9, "sweep_c4_deg": 35, "wind_tunnel_Sref_ft2": 3.011, "wind_tunnel_span_in": 62.47, "wind_tunnel_mac_in": 7.447}, "expected": "TBD - first run records golden: face count, B-spline face count, wing upper-skin G1 max angle, curvature min/max; geometric span within 0.1 % of 58.76 m (full-scale file)", "source": "(a) S16, S17, S15; files S14", "proves": ["FR-SRF-21", "FR-SRF-22", "FR-SRF-25", "FR-SRF-27"]},
-  {"vc": "VC-SRF-13", "what": "Sears-Haack body by stations (L=10, Rmax=0.5)", "data_file": "data/sears_haack.json", "expected": {"volume": 4.626377, "r_quarter_over_Rmax": 0.805927}, "tolerance": {"volume": "0.5 % relative (target; confirm on first OCC run)", "station_radius": 1e-6}, "source": "(b) V = 3 pi^2 R^2 L / 16 (Beta function), r(0.25L)/R = 0.75^0.75; S27", "proves": ["FR-SRF-17"]},
-  {"vc": "VC-SRF-14", "what": "conic body halves with rho = sqrt(2)-1 and equal half-breadth/crown/keel reproduce a circle", "expected": {"section_max_radius_error": 0.0, "body_volume_equals_circular_body": true}, "tolerance": 1e-9, "source": "(b) VC-SRF-07 identity", "proves": ["FR-SRF-17", "FR-SRF-18"]},
-  {"vc": "VC-SRF-15", "what": "N-sided fill (3, 4, 5 sides) on a filleted box corner with G1", "expected": {"max_g0_gap": 1e-4, "max_g1_angle_rad": 0.01}, "tolerance": "upper bounds (OCC MakeFilling defaults Tol3d 1e-4, TolAng 0.01)", "source": "(a) S12 BRepOffsetAPI_MakeFilling header defaults", "proves": ["FR-SRF-06"]},
-  {"vc": "VC-SRF-16", "what": "sew two wing segments into a solid", "expected": {"free_edges": 0, "solids": 1, "volume": "sum of segment volumes"}, "tolerance": "1e-6 relative", "source": "(b)", "proves": ["FR-SRF-08"]},
-  {"vc": "VC-SRF-17", "what": "draft on a cone r1=5, r2=3, h=10, pull +Z", "expected": {"lateral_draft_deg": 11.309932}, "tolerance": 0.01, "unit": "deg", "source": "(b) atan((r1-r2)/h)", "proves": ["FR-SRF-24"]},
-  {"vc": "VC-SRF-18", "what": "deviation between sphere R=10 and R=10.5 (concentric)", "expected": {"max": 0.5, "mean": 0.5, "rms": 0.5}, "tolerance": 1e-6, "unit": "length", "source": "(b)", "proves": ["FR-SRF-25"]},
-  {"vc": "VC-SRF-19", "what": "UI/CLI/MCP equivalence, purity, schema snapshot", "expected": {"replay_equal": true, "is_pure": true}, "tolerance": "exact", "source": "llull W3 contract tests", "proves": ["FR-SRF-16", "FR-SRF-26"]},
-  {"vc": "VC-SRF-20", "what": "OpenVSP TR1208.vsp3 import (file values, not README values)", "expected": {"semi_span_in": 63.63, "root_chord_in": 16.672, "tip_chord_in": 7.5024, "area_per_side_in2": 769.1085, "total_area_in2": 1538.2171, "sweep_deg": 45.0, "sweep_location": 0.25}, "tolerance": 1e-4, "source": "(a) parameter values stored in TR1208.vsp3 (S8, sha256 in reference_files.json)", "proves": ["FR-SRF-30"]},
-  {"vc": "VC-SRF-21", "what": "STEP round trip of the conceptual wing", "expected": {"bspline_faces_preserved": true, "volume_relative_change": 0.0}, "tolerance": 1e-6, "source": "(b)", "proves": ["FR-SRF-27", "FR-SRF-28"]},
-  {"vc": "VC-SRF-22", "what": "loft section fidelity", "expected": {"max_section_deviation_over_chord": 0.0}, "tolerance": 1e-5, "baseline_today_indicative": {"linear_24gon_max_deviation_over_chord": 0.0109, "linear_24gon_area_error": -0.0202}, "source": "(b) README section 4 estimate; target from TR §5.5", "proves": ["FR-SRF-05"]},
-  {"vc": "VC-SRF-23", "what": "trim a planar 10x10 NURBS sheet by a circle r=3, keep inside", "expected": {"area": 28.274334}, "tolerance": 1e-6, "unit": "length^2", "source": "(b) pi r^2", "proves": ["FR-SRF-07"]},
-  {"vc": "VC-SRF-24", "what": "thicken a hemisphere sheet R=10 outward by 1", "expected": {"volume": 693.244779}, "tolerance": "1e-5 relative", "source": "(b) 2/3 pi (11^3 - 10^3)", "proves": ["FR-SRF-09"]},
-  {"vc": "VC-SRF-25", "what": "surface_from_points on a 21x21 torus grid (R=5, r=2)", "expected": {"max_deviation_at_grid": 0.0, "max_deviation_midcells": "TBD - record; must be <= tolerance param"}, "tolerance": 1e-9, "source": "(b) interpolation property", "proves": ["FR-SRF-04"]},
-  {"vc": "VC-SRF-26", "what": "Manifold / web fallback", "expected": {"airfoil_from_naca": "works", "wing_properties_planform": "works", "fill_surface": "no-op with kernel refusal"}, "tolerance": "exact", "source": "KI5 behaviour", "proves": ["FR-SRF-29"]},
-  {"vc": "VC-SRF-27", "what": "analysis overlays never mutate the document; legend range equals data min/max", "expected": {"document_unchanged": true}, "tolerance": "exact", "source": "component test", "proves": ["FR-SRF-23"]},
-  {"vc": "VC-SRF-28", "what": "edit wing sweep 0 -> 30 deg at constant chords", "expected": {"planform_area_unchanged": true, "le_sweep_deg_reported": 30.0}, "tolerance": 1e-9, "source": "(b) shear preserves area", "proves": ["FR-SRF-16", "FR-SRF-14"]},
-  {"vc": "VC-SRF-29", "what": "conic master-line loft", "expected": "TBD - define with a loftsman reference case (Liming S18/S19 examples are paywalled)", "proves": ["FR-SRF-19"]}
+  {
+   "vc": "VC-SRF-01",
+   "what": "NACA 0012 generator vs UIUC naca0012.dat (Lednicer naca.exe, Selig order) and n0012.dat",
+   "metric": "max point-to-curve distance",
+   "value": 0.0,
+   "tolerance": 1e-06,
+   "unit": "chord",
+   "measured_by_reference_script": {
+    "naca0012.dat": 1e-07,
+    "n0012.dat": 0.0
+   },
+   "source": "(b) generate_naca.py vs S7 pinned files; equations S2/S4",
+   "proves": [
+    "FR-SRF-10",
+    "FR-SRF-11",
+    "TR \u00a75.3"
+   ]
+  },
+  {
+   "vc": "VC-SRF-02",
+   "what": "NACA 23012 generator (230 mean line r=0.2025, k1=15.957) vs UIUC naca23012.dat",
+   "metric": "max point-to-curve distance",
+   "value": 0.0,
+   "tolerance": 2e-05,
+   "unit": "chord",
+   "measured_by_reference_script": {
+    "naca23012.dat": 9.2e-06
+   },
+   "source": "(b) generate_naca.py; constants S5; file has 5 decimals",
+   "proves": [
+    "FR-SRF-11"
+   ]
+  },
+  {
+   "vc": "VC-SRF-03",
+   "what": "NACA 2412: pinned UIUC naca2412.dat (Lednicer naca.exe) differs in normalisation",
+   "metric": "max point-to-curve distance",
+   "value_raw": 0.0012909,
+   "value_after_chord_normalisation": 0.000158,
+   "value_after_best_fit_rotation_0p0014rad": 8.21e-05,
+   "tolerance_normalised": 0.0002,
+   "unit": "chord",
+   "source": "(b) measured by generate_naca.py (data/naca_uiuc_comparison.json); the file is consistent with the analytic section rotated about the TE by about 0.0014 rad; residual after best-fit rotation 8.2e-5 c is unexplained (TBD - check against TM 4741 program output)",
+   "proves": [
+    "FR-SRF-10",
+    "FR-SRF-12"
+   ]
+  },
+  {
+   "vc": "VC-SRF-04",
+   "what": "airfoil format detection and parsing",
+   "expected": [
+    {
+     "file": "OpenVSP examples/airfoil/e205_Selig.dat",
+     "format": "selig",
+     "header": "E205  (10.48%)",
+     "first_point": [
+      1.0,
+      0.0
+     ]
+    },
+    {
+     "file": "OpenVSP examples/airfoil/clarky_Lednicer.dat",
+     "format": "lednicer",
+     "counts": [
+      61,
+      61
+     ],
+     "first_point": [
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "file": "OpenVSP examples/airfoil/n0012.dat",
+     "format": "lednicer",
+     "counts": [
+      66,
+      66
+     ]
+    },
+    {
+     "file": "UIUC naca23012.dat (AeroSandbox mirror)",
+     "format": "selig",
+     "points": 61
+    },
+    {
+     "file": "UIUC naca0012.dat (AeroSandbox mirror)",
+     "format": "selig",
+     "points": 69
+    }
+   ],
+   "tolerance": "exact",
+   "source": "(a) file contents, S8/S7",
+   "proves": [
+    "FR-SRF-10"
+   ]
+  },
+  {
+   "vc": "VC-SRF-05",
+   "what": "surface curvature analytic cases",
+   "data_file": "data/curvature_analytic.json",
+   "examples": [
+    {
+     "surface": "sphere R=10",
+     "K": 0.01,
+     "abs_H": 0.1
+    },
+    {
+     "surface": "cylinder R=5",
+     "K": 0.0,
+     "abs_H": 0.1
+    },
+    {
+     "surface": "torus R=5 r=2, v=0",
+     "K": 0.07142857142857142,
+     "abs_H": 0.32142857142857145
+    },
+    {
+     "surface": "torus R=5 r=2, v=pi/2",
+     "K": 0.0,
+     "abs_H": 0.25
+    },
+    {
+     "surface": "torus R=5 r=2, v=pi",
+     "K": -0.16666666666666666,
+     "abs_H": 0.08333333333333333
+    }
+   ],
+   "tolerance": "1e-6 relative (K absolute 1e-6 where K = 0)",
+   "unit": "1/length, 1/length^2",
+   "source": "(b) closed forms S26 + finite-difference self-check in generate_analytic_refs.py",
+   "proves": [
+    "FR-SRF-21"
+   ]
+  },
+  {
+   "vc": "VC-SRF-06",
+   "what": "continuity classification of analytic curve joints",
+   "data_file": "data/continuity_cases.json",
+   "expected": {
+    "corner": "G0",
+    "line_arc": "G1",
+    "line_cubic": "G2",
+    "line_quartic": "G3",
+    "arc_arc_equal": "G3",
+    "arc_arc_ratio2": "G1"
+   },
+   "expected_gaps": {
+    "line_arc.curvature_jump": 0.2,
+    "line_cubic.dkappa_ds_jump": 6.0,
+    "arc_arc_ratio2.curvature_jump": 0.1
+   },
+   "tolerance": "classification exact; gaps 1e-6 relative",
+   "source": "(b) analytic",
+   "proves": [
+    "FR-SRF-20",
+    "FR-SRF-22"
+   ]
+  },
+  {
+   "vc": "VC-SRF-07",
+   "what": "Liming rho-conic as rational quadratic",
+   "data_file": "data/conic_cases.json",
+   "expected": {
+    "rho_sqrt2m1_weight": 0.7071067811865476,
+    "rho_sqrt2m1_max_radius_error": 0.0,
+    "rho_0.5_weight": 1.0,
+    "shoulder_rho_0.3": [
+     0.65,
+     0.65
+    ],
+    "shoulder_rho_0.7": [
+     0.85,
+     0.85
+    ]
+   },
+   "tolerance": 1e-12,
+   "unit": "length",
+   "source": "(b) w = rho/(1-rho), S1/S19",
+   "proves": [
+    "FR-SRF-01",
+    "FR-SRF-18"
+   ]
+  },
+  {
+   "vc": "VC-SRF-08",
+   "what": "NURBS invariants",
+   "expected": {
+    "knot_insertion_shape_change": 0.0,
+    "degree_elevation_shape_change": 0.0,
+    "interpolation_residual": 0.0,
+    "partition_of_unity": 1.0
+   },
+   "tolerance": 1e-12,
+   "unit": "length",
+   "source": "(b) properties of B-splines, S1",
+   "proves": [
+    "FR-SRF-01",
+    "FR-SRF-02",
+    "FR-SRF-03"
+   ]
+  },
+  {
+   "vc": "VC-SRF-09",
+   "what": "NACA 0012 section metrics (open TE)",
+   "expected": {
+    "max_thickness": 0.120035,
+    "max_thickness_x": 0.2998,
+    "te_thickness": 0.00252,
+    "le_radius": 0.015867,
+    "area": 0.08221
+   },
+   "tolerance": {
+    "max_thickness": 1e-05,
+    "max_thickness_x": 0.001,
+    "te_thickness": 1e-06,
+    "le_radius": "5e-4 (fit)",
+    "area": 1e-05
+   },
+   "unit": "chord / chord^2",
+   "source": "(b) generate_naca.py from S2 equation; LE radius 1.1019 t^2 derived",
+   "proves": [
+    "FR-SRF-13"
+   ]
+  },
+  {
+   "vc": "VC-SRF-10",
+   "what": "TR-1208 wing planform (OpenVSP Swept_Wing_API table)",
+   "inputs": {
+    "root_chord_in": 21.941,
+    "semi_span_in": 63.63,
+    "taper": 0.45,
+    "sweep_c4_deg": 45.0
+   },
+   "expected": {
+    "tip_chord_in": 9.87345,
+    "area_full_in2": 2024.3535,
+    "mac_in": 16.6701,
+    "y_mac_in": 27.7924,
+    "aspect_ratio": 8.0001
+   },
+   "published": {
+    "area_full_in2": 2024.35,
+    "mac_in": 16.672,
+    "aspect_ratio": 8.02
+   },
+   "tolerance": {
+    "area_full_in2": 0.01,
+    "mac_in": 0.005,
+    "aspect_ratio": 0.03
+   },
+   "source": "(b) trapezoid formulas in data/wing_planforms.json; (a) published values S9 (published AR 8.02 vs derived 8.000 from the same table)",
+   "proves": [
+    "FR-SRF-14",
+    "FR-SRF-15"
+   ]
+  },
+  {
+   "vc": "VC-SRF-11",
+   "what": "trapezoidal wing cr=2 m, ct=1 m, b/2=5 m, NACA 0012, linear loft",
+   "expected": {
+    "volume_half_open_te_m3": 0.959117,
+    "volume_half_closed_te_m3": 0.953237,
+    "planform_area_half_m2": 7.5,
+    "mac_m": 1.555556
+   },
+   "tolerance": {
+    "volume": "1e-4 relative",
+    "area": 1e-09,
+    "mac": 1e-06
+   },
+   "baseline_today": "TBD - run plans/baseline_trap_wing_loft_sections.json with llull --doc on OCC and on Manifold; indicative linear 24-gon section area error -2.0 %",
+   "source": "(b) V = A_unit * b (cr^2 + cr ct + ct^2)/3, exact for homothetic sections",
+   "proves": [
+    "FR-SRF-05",
+    "FR-SRF-14",
+    "FR-SRF-15",
+    "FR-SRF-32"
+   ]
+  },
+  {
+   "vc": "VC-SRF-12",
+   "what": "NASA CRM wing-body STEP: import, curvature, continuity",
+   "reference": {
+    "Sref_full_scale_m2": 383.65,
+    "span_m": 58.76,
+    "cref_m": 7.0,
+    "aspect_ratio": 9,
+    "sweep_c4_deg": 35,
+    "wind_tunnel_Sref_ft2": 3.011,
+    "wind_tunnel_span_in": 62.47,
+    "wind_tunnel_mac_in": 7.447
+   },
+   "expected": "TBD - first run records golden: face count, B-spline face count, wing upper-skin G1 max angle, curvature min/max; geometric span within 0.1 % of 58.76 m (full-scale file)",
+   "source": "(a) S16, S17, S15; files S14",
+   "proves": [
+    "FR-SRF-21",
+    "FR-SRF-22",
+    "FR-SRF-25",
+    "FR-SRF-27"
+   ]
+  },
+  {
+   "vc": "VC-SRF-13",
+   "what": "Sears-Haack body by stations (L=10, Rmax=0.5)",
+   "data_file": "data/sears_haack.json",
+   "expected": {
+    "volume": 4.626377,
+    "r_quarter_over_Rmax": 0.805927
+   },
+   "tolerance": {
+    "volume": "0.5 % relative (target; confirm on first OCC run)",
+    "station_radius": 1e-06
+   },
+   "source": "(b) V = 3 pi^2 R^2 L / 16 (Beta function), r(0.25L)/R = 0.75^0.75; S27",
+   "proves": [
+    "FR-SRF-17"
+   ]
+  },
+  {
+   "vc": "VC-SRF-14",
+   "what": "conic body halves with rho = sqrt(2)-1 and equal half-breadth/crown/keel reproduce a circle",
+   "expected": {
+    "section_max_radius_error": 0.0,
+    "body_volume_equals_circular_body": true
+   },
+   "tolerance": 1e-09,
+   "source": "(b) VC-SRF-07 identity",
+   "proves": [
+    "FR-SRF-17",
+    "FR-SRF-18"
+   ]
+  },
+  {
+   "vc": "VC-SRF-15",
+   "what": "N-sided fill (3, 4, 5 sides) on a filleted box corner with G1",
+   "expected": {
+    "max_g0_gap": 0.0001,
+    "max_g1_angle_rad": 0.01
+   },
+   "tolerance": "upper bounds (OCC MakeFilling defaults Tol3d 1e-4, TolAng 0.01)",
+   "source": "(a) S12 BRepOffsetAPI_MakeFilling header defaults",
+   "proves": [
+    "FR-SRF-06"
+   ]
+  },
+  {
+   "vc": "VC-SRF-16",
+   "what": "sew two wing segments into a solid",
+   "expected": {
+    "free_edges": 0,
+    "solids": 1,
+    "volume": "sum of segment volumes"
+   },
+   "tolerance": "1e-6 relative",
+   "source": "(b)",
+   "proves": [
+    "FR-SRF-08"
+   ]
+  },
+  {
+   "vc": "VC-SRF-17",
+   "what": "draft on a cone r1=5, r2=3, h=10, pull +Z",
+   "expected": {
+    "lateral_draft_deg": 11.309932
+   },
+   "tolerance": 0.01,
+   "unit": "deg",
+   "source": "(b) atan((r1-r2)/h)",
+   "proves": [
+    "FR-SRF-24"
+   ]
+  },
+  {
+   "vc": "VC-SRF-18",
+   "what": "deviation between sphere R=10 and R=10.5 (concentric)",
+   "expected": {
+    "max": 0.5,
+    "mean": 0.5,
+    "rms": 0.5
+   },
+   "tolerance": 1e-06,
+   "unit": "length",
+   "source": "(b)",
+   "proves": [
+    "FR-SRF-25"
+   ]
+  },
+  {
+   "vc": "VC-SRF-19",
+   "what": "UI/CLI/MCP equivalence, purity, schema snapshot",
+   "expected": {
+    "replay_equal": true,
+    "is_pure": true
+   },
+   "tolerance": "exact",
+   "source": "llull W3 contract tests",
+   "proves": [
+    "FR-SRF-16",
+    "FR-SRF-26",
+    "FR-SRF-31",
+    "FR-SRF-33",
+    "FR-SRF-35"
+   ]
+  },
+  {
+   "vc": "VC-SRF-20",
+   "what": "OpenVSP TR1208.vsp3 import (file values, not README values)",
+   "expected": {
+    "semi_span_in": 63.63,
+    "root_chord_in": 16.672,
+    "tip_chord_in": 7.5024,
+    "area_per_side_in2": 769.1085,
+    "total_area_in2": 1538.2171,
+    "sweep_deg": 45.0,
+    "sweep_location": 0.25
+   },
+   "tolerance": 0.0001,
+   "source": "(a) parameter values stored in TR1208.vsp3 (S8, sha256 in reference_files.json)",
+   "proves": [
+    "FR-SRF-30"
+   ]
+  },
+  {
+   "vc": "VC-SRF-21",
+   "what": "STEP round trip of the conceptual wing",
+   "expected": {
+    "bspline_faces_preserved": true,
+    "volume_relative_change": 0.0
+   },
+   "tolerance": 1e-06,
+   "source": "(b)",
+   "proves": [
+    "FR-SRF-27",
+    "FR-SRF-28"
+   ]
+  },
+  {
+   "vc": "VC-SRF-22",
+   "what": "loft section fidelity",
+   "expected": {
+    "max_section_deviation_over_chord": 0.0
+   },
+   "tolerance": 1e-05,
+   "baseline_today_indicative": {
+    "linear_24gon_max_deviation_over_chord": 0.0109,
+    "linear_24gon_area_error": -0.0202
+   },
+   "source": "(b) README section 4 estimate; target from TR \u00a75.5",
+   "proves": [
+    "FR-SRF-05"
+   ]
+  },
+  {
+   "vc": "VC-SRF-23",
+   "what": "trim a planar 10x10 NURBS sheet by a circle r=3, keep inside",
+   "expected": {
+    "area": 28.274334
+   },
+   "tolerance": 1e-06,
+   "unit": "length^2",
+   "source": "(b) pi r^2",
+   "proves": [
+    "FR-SRF-07"
+   ]
+  },
+  {
+   "vc": "VC-SRF-24",
+   "what": "thicken a hemisphere sheet R=10 outward by 1",
+   "expected": {
+    "volume": 693.244779
+   },
+   "tolerance": "1e-5 relative",
+   "source": "(b) 2/3 pi (11^3 - 10^3)",
+   "proves": [
+    "FR-SRF-09"
+   ]
+  },
+  {
+   "vc": "VC-SRF-25",
+   "what": "surface_from_points on a 21x21 torus grid (R=5, r=2)",
+   "expected": {
+    "max_deviation_at_grid": 0.0,
+    "max_deviation_midcells": "TBD - record; must be <= tolerance param"
+   },
+   "tolerance": 1e-09,
+   "source": "(b) interpolation property",
+   "proves": [
+    "FR-SRF-04"
+   ]
+  },
+  {
+   "vc": "VC-SRF-26",
+   "what": "Manifold / web fallback",
+   "expected": {
+    "airfoil_from_naca": "works",
+    "wing_properties_planform": "works",
+    "fill_surface": "no-op with kernel refusal"
+   },
+   "tolerance": "exact",
+   "source": "KI5 behaviour",
+   "proves": [
+    "FR-SRF-29"
+   ]
+  },
+  {
+   "vc": "VC-SRF-27",
+   "what": "analysis overlays never mutate the document; legend range equals data min/max",
+   "expected": {
+    "document_unchanged": true
+   },
+   "tolerance": "exact",
+   "source": "component test",
+   "proves": [
+    "FR-SRF-23"
+   ]
+  },
+  {
+   "vc": "VC-SRF-28",
+   "what": "edit wing sweep 0 -> 30 deg at constant chords",
+   "expected": {
+    "planform_area_unchanged": true,
+    "le_sweep_deg_reported": 30.0
+   },
+   "tolerance": 1e-09,
+   "source": "(b) shear preserves area",
+   "proves": [
+    "FR-SRF-16",
+    "FR-SRF-14"
+   ]
+  },
+  {
+   "vc": "VC-SRF-29",
+   "what": "conic master-line loft",
+   "expected": "TBD - define with a loftsman reference case (Liming S18/S19 examples are paywalled)",
+   "proves": [
+    "FR-SRF-19"
+   ]
+  }
  ]
 }

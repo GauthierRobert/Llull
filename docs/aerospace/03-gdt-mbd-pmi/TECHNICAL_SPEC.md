@@ -286,7 +286,8 @@ internal), needed for MMC = minimum hole size / maximum shaft size in §5.7.6.
 Size: `[nX ] Ø nominal +u/-l` or `[nX ] Ø lower–upper`. Unicode symbols: ⏤ straightness, ⏥ flatness,
 ○ roundness, ⌭ cylindricity, ⌒ profile of a line, ⌓ profile of a surface, ∠ angularity,
 ⟂ perpendicularity, ∥ parallelism, ⌖ position, ◎ concentricity/coaxiality, ⌯ symmetry, ↗ circular
-runout, ⌰ total runout (Unicode "Miscellaneous Technical" block characters); SVG export draws them as
+runout, ⌰ total runout (candidate code points, mostly in the Unicode "Miscellaneous Technical" block;
+to be checked against the Unicode charts before use); SVG export draws them as
 paths (`geometry/pmiSymbols.ts`), never relying on fonts. Glyph geometry is llull's own drawing; the
 exact proportions prescribed by the standards are not reproduced (paywalled) and are configurable.
 
@@ -398,8 +399,10 @@ status `unresolved_mesh`; `list_pmi` still lists them (inspection planning works
   differences between opencascade.js and OCP builds (KI5 precedent for edges).
 - Create XCAF labels: shape (`XCAFDoc_ShapeTool`), datums (`SetDatum`), dimensions (`SetDimension`),
   geometric tolerances (`SetGeomTolerance` + `SetDatumToGeomTol`), populate objects with the mapping
-  tables; `STEPCAFControl_Writer` with `SetGDTMode(True)`, schema AP242 (`write.step.schema` = 5 for
-  AP242DIS in OCCT's interface static; exact value to confirm in the OCP version shipped — Q-3).
+  tables; `STEPCAFControl_Writer` with `SetGDTMode(True)`, schema switched to AP242 through OCCT's
+  `write.step.schema` interface static (accepted value for AP242 to confirm in the shipped OCP version — Q-3).
+  XCAF method names in §5.9/§5.10 beyond those fetched from the headers [R26] (e.g. `SetDatumToGeomTol`,
+  `GetRefShapeLabel`) are taken from the OCCT reference manual index [R28] and must be confirmed in the M6 spike.
 - Known limitation: OCC writer reportedly writes semantic PMI without presentation [R27] → FR-GDT-25 (V2).
 - Verification: NIST SFA CLI (`sfa-cl`, Windows build of the Tcl tool [R18]) semantic PMI report on the
   exported file in CI on a Windows runner (VC-GDT-22); the census script (stdlib) as a cross-platform

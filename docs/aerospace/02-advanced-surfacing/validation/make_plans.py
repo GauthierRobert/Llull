@@ -14,6 +14,7 @@ import os
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.dont_write_bytecode = True
 sys.path.insert(0, HERE)
 import generate_naca as naca  # noqa: E402
 

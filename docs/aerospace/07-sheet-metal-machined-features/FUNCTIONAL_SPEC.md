@@ -100,6 +100,27 @@ volumes.
 - Distributing standard documents. AS8879, ISO 5855 and NAS/NASM content stays with the licensed catalogue (gap 08). llull
   stores designations and user-entered or catalogue-provided numbers only.
 
+### 4.3 Conventions & terminology (binding for all FTR commands)
+
+| Term | Definition used by llull | Source |
+| ---- | ------------------------ | ------ |
+| Bend angle θ | The angle the flange is bent **through**: 0° = flat, 90° = right angle. A closed 45° angle is a 135° bend. | AC 43.13-1B K-chart example [R2] |
+| Inside radius R | Radius of the bend's inner surface | [R2] |
+| Thickness T (MT) | Nominal sheet thickness | [R2] |
+| Mold line / mold point | Extension of the flat outer (or inner) surfaces; their intersection is the mold point | [R2] |
+| Setback SB (OSSB) | Distance from the mold point to the bend tangent line on the outside: SB = K'(R + T), K' = tan(θ/2) (K-chart) | [R2] |
+| K-factor (ANSI) | Neutral-axis position / T, 0 < K ≤ 0.5. **Distinct from the AC K-chart value K'** | [R7][R14] |
+| K-factor (DIN) | 2 × ANSI K (FreeCAD convention); converted on input | [R7] |
+| Bend allowance BA | Neutral-surface arc length: θ·(R + K·T) | [R7] |
+| Bend deduction BD | 2·OSSB − BA; flat = sum of OML legs − BD | geometry |
+| Joggle | Two opposite bends offsetting a flat by h so it nests over another part | geometry (§5.4 TECH) |
+| Countersink angle α | Included cone angle (82°, 90°, 100°…); countersink depth c = (D − d)/(2·tan(α/2)) | geometry |
+| Drill point angle β | Included angle of the drill tip (118° default in FreeCAD) | [R8] |
+| Cosmetic thread | Thread specified as an attribute (designation, class, depth) without helical geometry | [R8] |
+
+The K-factor and the K-chart value share a letter in the sources. llull names them `kFactor` and `kChart`
+in every schema and output, so the two are never confused.
+
 ## 5. Functional requirements
 
 Priority: MUST / SHOULD / COULD. Source = where the requirement or its numbers come from (R-ids in §11).

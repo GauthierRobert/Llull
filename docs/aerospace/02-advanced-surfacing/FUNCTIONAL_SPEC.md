@@ -155,7 +155,30 @@ Priority: MUST = MVP, SHOULD = V1, COULD = V2. Every FR maps to ≥ 1 VC in `val
 | FR-SRF-29 | SHOULD | Without the OCC kernel (Manifold/web), NURBS entities still display (core tessellation) and query commands that need only core math (curve curvature, airfoil, wing metrics) work; kernel-only operations no-op with the standard refusal. | Offline web mode stays usable (L6, L9). | KI5 |
 | FR-SRF-30 | COULD | Import an OpenVSP `.vsp3` WingGeom (planform + XSec airfoil types NACA 4-series / AF file) into a llull wing. | Aero-tool interoperability. | [R8] |
 
+### 5.5 Non-functional requirements
+
+| Id | Pri | Requirement | Measure |
+| --- | --- | --- | --- |
+| FR-SRF-31 | MUST | Determinism: the same plan produces bit-identical document JSON (ids, poles, knots) on replay. | Golden replay equality (VC-SRF-19) |
+| FR-SRF-32 | MUST | Units: airfoils are chord-normalised data; wings/bodies use document units; FS/BL/WL frame declares its unit and datum; no silent unit conversion. | Unit tests on `set_units` mm/in/m |
+| FR-SRF-33 | MUST | Every refusal names the reason and the offending input (e.g. "section 3: TE gap 0.02 c exceeds closed-TE tolerance"). | Failure tests per command |
+| FR-SRF-34 | SHOULD | Analysis on large models stays interactive: see TECHNICAL_SPEC §8 budgets. | Perf tests |
+| FR-SRF-35 | SHOULD | Results are agent-readable: every query returns compact numeric `data` (no image needed), with sample counts and worst locations. | Schema snapshot |
+
 ## 6. Workflows
+
+### 6.0 Fuselage by stations (loftsman, V1) — step by step
+
+1. `set_aircraft_frame` — datum at FS 0 / BL 0 / WL 0 at the nose reference point, +FS aft, +BL right, +WL up, unit in.
+2. Enter the station table (FS, section type). Typical: nose apex `point`; forward stations `conic` (upper rho,
+   lower rho, crown WL, keel WL, max-breadth WL and half-breadth); constant section in the cabin (`circle` or
+   `superellipse`); tail cone `conic` closing to a `point`.
+3. Optionally pick control curves (crown line, keel line, max-breadth line, shoulder lines) drawn as NURBS curves
+   in the BL 0 and WL planes; stations are then re-fitted so their extreme points lie on these curves.
+4. `loft_fuselage` with `continuity: G2` → solid; `check_continuity` on the internal edges; curvature map to check
+   for flat spots or bumps between stations; `fuselage_section_at` at any FS for frames and bulkheads.
+5. Change a station or a rho in the history → the body re-derives (L8); downstream trims (window belt, wing
+   root fairing) follow through `edgesNear` references (KI5) until persistent naming (gap 01).
 
 ### 6.1 UI (desktop, OCC)
 
@@ -173,10 +196,11 @@ Priority: MUST = MVP, SHOULD = V1, COULD = V2. Every FR maps to ≥ 1 VC in `val
 ### 6.2 CLI (`llull`, local agent path)
 
 ```bash
-llull --app run plan.json          # plan below; the desktop window updates live
-llull --doc wing.llull query wing_properties '{"id":"wing-1"}'
-llull --doc wing.llull query check_continuity '{"id":"wing-1","edges":"internal","g1AngleTol":0.0087,"g2RelTol":0.05}'
-llull --doc wing.llull export step out/wing.step
+llull run plan.json --app --progress                    # plan below; the desktop window updates live
+llull exec wing_properties id=wing-1 --doc wing.llull.json --kernel occt --json
+llull exec check_continuity '{"id":"wing-1","edges":"internal","g1AngleRad":0.0087,"g2Rel":0.05}' --doc wing.llull.json --kernel occt
+llull exec import_airfoil file=naca23012.dat normalize=none --doc wing.llull.json   # exchange-style file read (KI6)
+llull exec export_step_exact entityIds='["wing-1"]' --doc wing.llull.json --kernel occt --save out/wing.step
 ```
 
 `plan.json` (target, see `validation/plans/target_naca0012_trap_wing.json`):
