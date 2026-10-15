@@ -1,6 +1,7 @@
 # Gap FTR — Validation plan
 
-Validates `FUNCTIONAL_SPEC.md` (FR-FTR-01…30) and `TECHNICAL_SPEC.md` (TR sections). Every expected value below falls
+Validates `FUNCTIONAL_SPEC.md` (FR-FTR-01…42) and `TECHNICAL_SPEC.md` (TR sections, TR-FTR-01…10). Every case is also
+expressed as CLI calls with JSON assertions in `expected_results.json` (§2b, AGENT_FIRST AF-23). Every expected value below falls
 into one of three categories (TEMPLATE.md):
 
 - **(a)** quoted from a cited source;
@@ -37,7 +38,7 @@ Tolerance column: abs = absolute, rel = relative. FR/TR = what the case proves.
 | VC-FTR-07 | FR-04 | Same bracket, K 0.33 / 0.44 / 0.50 | flat length 65.569203 / 65.845663 / 65.996459 mm, width 50 | 1e-6 (native) | b | `expected_test_parts.json` |
 | VC-FTR-08 | FR-05 | Bracket, K = 0.5 | flat area × T = folded volume; refold recipe key equal to original | 1e-6 rel | b | same |
 | VC-FTR-09 | FR-06 | DXF of the bracket flat pattern | only LINE/ARC/CIRCLE/TEXT; 1 entity on BEND_UP; extents 65.8457 × 50 mm; `$INSUNITS` = 4 (mm) | 1e-4 mm | b | — |
-| VC-FTR-10 | FR-07 | Rule R = 0 (FP-12); synthetic table row `TEST-ALLOY/T0, 0.8 mm → 2.0 mm` | violation `min_bend_radius` citing the row; R = 2.4 → none | exact | b (synthetic row; real rows TBD after D6) | inline |
+| VC-FTR-10 | FR-07, FR-34 | Rule R = 0 (FP-12); synthetic table row `TEST-ALLOY/T0, 0.8 mm → 2.0 mm`; R = 1.0 | R = 0: refusal `FTR_SHARP_BEND_FORBIDDEN`; R = 1.0: finding `FTR_BEND_RADIUS_BELOW_MIN` citing the row (limit 2.0); R = 2.4 → none | exact | b (synthetic row; real rows TBD after D6) | inline |
 | VC-FTR-11 | FR-09 | JG-01…03 | allowance 0.197880 / 0.098095 / 0.287239 mm; run 5.242333 / 5.136723 / 6.143594 | 1e-6 | b | `expected_flat_pattern.json` |
 | VC-FTR-11b | FR-09 | JG-04 (R 6, φ 45°, h 0.5) | rejected: s < 0 | — | b | same |
 | VC-FTR-12 | FR-08 | Flange with rectangular relief, width ratio 0.5 | relief width = 0.5·T, depth = R + T + extra; flat cut matches | TBD — measure with OCC `mass_properties` after M5 | TBD | — |
@@ -51,7 +52,7 @@ Tolerance column: abs = absolute, rel = relative. FR/TR = what the case proves.
 | VC-FTR-20 | FR-24 | NIST CTC-01 (vendored, sha below) | 2 blind holes ∅20 with 118° point (4 half-cone faces → 2 apexes); further features TBD vs PMI | exact count | c | same + `data/step_feature_survey.json` |
 | VC-FTR-21 | FR-24 | NIST CTC-02…05 (pinned) | per-file drill-point apex counts 74 / 0 / 22 / 10 (59° semi-angle), 45° cone seeds 0 / 0 / 42 / 3; no crash, < 5 s each | exact counts (seeds) | c | same |
 | VC-FTR-22 | FR-17, FR-18 | CS-01…07 | countersink depth c, removed volume beyond bore (full cone and `removed_volume_in_sheet`, truncated at T for knife-edge cases), cone area | 1e-6 abs / 1e-6 rel | b | `data/expected_countersink.json` |
-| VC-FTR-23 | FR-26 | CS-02/03/06 (thin sheet) vs CS-01/07 | knife edge true for 02/03/06 (land −0.162 / −0.562 / −0.133 mm), false for 01/07 (land 8.238 / 0.651 mm) | exact flag | b | same |
+| VC-FTR-23 | FR-26, FR-34 | CS-02/03/06 (thin sheet) vs CS-01/07 | knife edge true for 02/03/06 (land −0.162 / −0.562 / −0.133 mm), false for 01/07 (land 8.238 / 0.651 mm) | exact flag | b | same |
 | VC-FTR-24 | FR-17 | DP-01…03 | tip height 1.802582 / 1.242641 / 0.991420 mm | 1e-6 | b | same |
 | VC-FTR-25 | FR-17, FR-21, TR §5.3 | `plans/draft_machined_plate.json` | volume 55978.529153 mm³ (OCC reference build rel err 1.2e-15); native vs lowered equal | 1e-6 rel | b + c | `expected_test_parts.json` |
 | VC-FTR-26 | FR-17 (parity baseline) | `plans/baseline_countersunk_plate_today.json` (existing commands only; run in review under OCC: 59783.006 mm³) | `mass_properties` volume 59783.006014 mm³ | 1e-6 rel | b | inline (60000 − π·2.4²·10 − 36.038249) |
@@ -65,13 +66,32 @@ Tolerance column: abs = absolute, rel = relative. FR/TR = what the case proves.
 | VC-FTR-34 | FR-29 | `hole_table` on the machined plate | 7 rows, coordinates from the top-left corner datum, sorted | exact | b | `expected_feature_recognition.json` |
 | VC-FTR-35 | FR-30 | FP-08…11 entered in an inch document | same values in inch; mm document gives ×25.4 exactly | 1e-9 rel | b | `flat_pattern_cases.csv` |
 | VC-FTR-36 | FR-20 | Modelled thread (V2) | TBD | TBD | TBD | — |
+| VC-FTR-37 | FR-33 (AF-11) | Wrong inputs: PK-03, missing K, θ = 0, radius row without `source`, D ≤ d, JG-04 | exit 1; `data.error.code` = `FTR_POCKET_FILLET_GT_CORNER` / `FTR_K_FACTOR_MISSING` / `FTR_BEND_ANGLE_OUT_OF_RANGE` / `FTR_TABLE_ROW_NO_SOURCE` / `FTR_HOLE_DIAMETERS_INCONSISTENT` / `FTR_JOGGLE_OFFSET_TOO_SMALL`; offending path + remediation present | exact | b | `expected_results.json` |
+| VC-FTR-38 | FR-34 (AF-20, AF-30, AF-31) | `check_machining` on a countersunk plate with no `minLand` threshold | warn `FTR_RULE_THRESHOLD_MISSING`; `rulesSkipped` lists `minLand` | exact | b | same |
+| VC-FTR-39 | FR-35 (AF-31) | `sheet_metal_calc` without K; blind hole without drill angle | refusal `FTR_K_FACTOR_MISSING`; `hole_table` row `drillPointAngle` = {118, defaulted true, source R8} | exact | b | same |
+| VC-FTR-40 | FR-36 (AF-32) | Synthetic radius row marked `unverified` → calc, part, check, flat pattern | `data.unverified` true in calc and flat pattern; check warn `FTR_UNVERIFIED_DATA` | exact | b | same |
+| VC-FTR-41 | FR-37 (AF-33, AF-36) | `flat_pattern` of the bracket; DXF of VC-FTR-09 | `data.reviewRequired` true + reason; summary contains "not approved"; DXF `NOTES` carries the note | exact | b | same |
+| VC-FTR-42 | FR-38 (AF-34) | R 1.0 vs row 2.0 with a waiver whose `approvalRef` is not a human gap 09 approval | `status` fail; findings `FTR_BEND_RADIUS_BELOW_MIN` + `FTR_WAIVER_NOT_APPROVED` | exact | b | same |
+| VC-FTR-43 | FR-39 (AF-35) | `sheet_metal_calc` FP-10 | `provenance.formulas.ossb` = "tan(theta/2)*(R+T)", inputs with units, sources contain R2 | exact | b | same |
+| VC-FTR-44 | FR-31, FR-32 (AF-01/02/04/10) | `llull search`, `llull describe` of the FTR commands, calc result | commands found; every numeric param states a unit; `lengthUnit` / `angleUnit` echoed | exact | b | same |
+| VC-FTR-45 | FR-40, FR-41 (AF-05/22/42) | bracket plan `--validate`; broken plan; `--dry-run`; `render_view --save` | validate ok; broken plan names `step 0` and `thickness`; doc file unchanged after dry run; PNG written | exact | b | same |
+| VC-FTR-46 | FR-42 (AF-40/41) | CTC-02 import + recognition with `--progress --timeout` | exit 0; recognition < 5 s | exact / budget | c | same |
 
 ### FR → VC coverage
 
 FR-01→05 · FR-02→06 · FR-03→06 · FR-04→01,04,07 · FR-05→08 · FR-06→09 · FR-07→10 · FR-08→12 · FR-09→11,11b ·
 FR-10→13 · FR-11→14 · FR-12→15 · FR-13→15 · FR-14→01,02,03 · FR-15→18,19 · FR-16→16 · FR-17→22,24,25,26 ·
 FR-18→22 · FR-19→28 · FR-20→36 · FR-21→25,27 · FR-22→33 · FR-23→29 · FR-24→17,18,20,21 · FR-25→32 · FR-26→23,27 ·
-FR-27→30 · FR-28→31 · FR-29→34 · FR-30→01,02,35.
+FR-27→30 · FR-28→31 · FR-29→34 · FR-30→01,02,35 · FR-31→44 · FR-32→44 · FR-33→37 · FR-34→10,16,23,27,38 · FR-35→39 ·
+FR-36→40 · FR-37→41 · FR-38→42 · FR-39→43 · FR-40→45 · FR-41→45 · FR-42→46.
+
+### 2b. CLI form of every case (AF-23)
+
+`expected_results.json` (generated by `build_expected_results.py` from `data/*.json`, never edited by hand) lists each VC
+as an optional inline plan or plan file, CLI calls with `--json`, and assertions (`path`, `op`, `value`, `tol`, `unit`).
+The consumer is a small script used by the production-gate agent driver: fresh `--doc` per case, `llull run … --json`,
+then the calls, then the assertions; exit codes only, no UI. Cases on proposed commands stay red until those commands
+land; VC-FTR-26 runs today (review run 2026-10-15). Recognition cases need gap 01 `import_step_exact`.
 
 ## 3. Generators and how to run them
 
@@ -80,11 +100,12 @@ FR-27→30 · FR-28→31 · FR-29→34 · FR-30→01,02,35.
 | `generate_flat_pattern.py` | Python ≥ 3.9 standard library | `data/flat_pattern_cases.csv`, `data/expected_flat_pattern.json` |
 | `generate_countersink.py` | standard library | `data/expected_countersink.json` |
 | `generate_test_parts.py` | `pip install cadquery-ocp` (used: 8.0.1.1.0, OCCT 8.0) | `data/ftr_*.step`, `data/expected_test_parts.json` (analytic vs OCC volume) |
+| `build_expected_results.py` | standard library; run after the two generators above | `expected_results.json` (CLI cases + assertions, AF-23) |
 | `survey_step_features.py` | `cadquery-ocp` | `data/step_feature_survey.json` (face types, radii, cone semi-angles, cone adjacency, distinct apexes) |
 
 ```bash
 cd docs/aerospace/07-sheet-metal-machined-features/validation
-python3 -I generate_flat_pattern.py && python3 -I generate_countersink.py
+python3 -I generate_flat_pattern.py && python3 -I generate_countersink.py && python3 -I build_expected_results.py
 python3 -I generate_test_parts.py
 python3 -I survey_step_features.py <ctc-dir>/nist_ctc_0*_asme1_ap242.stp data/ftr_*.step > data/step_feature_survey.json
 ```
@@ -125,7 +146,8 @@ the geometry, so tests must assert on geometry, never on hashes, for these files
 
 ## 5. Gates
 
-- **Unit / contract** (`npm run check`): VC-FTR-01…05, 07, 10, 11, 16, 22–24, 27, 28, 31, 35.
+- **Unit / contract** (`npm run check`): VC-FTR-01…05, 07, 10, 11, 16, 22–24, 27, 28, 31, 35, 37–44.
+- **CLI scripts** (`expected_results.json`, production-gate agent driver): all cases listed there, plus VC-FTR-45, 46.
 - **Server OCC** (`npm --prefix server test`): VC-FTR-06, 08, 17–21, 25, 26, 30, 32.
 - **Golden**: bracket and machined-plate plans (id-normalised snapshot + replay equality).
 - **Quality gate** (`npm run quality`): NIST CTC set in `quality/corpus.json` (timing, no crash).
