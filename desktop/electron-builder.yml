@@ -14,8 +14,10 @@ extraResources:
   - from: ../dist
     to: web
   # Server bundle + CLI (dist/cli.js) + production node_modules + Python bridge script.
-  - from: build/server
-    to: server
+  # Copied from build/ (not build/server): electron-builder always drops a node_modules at the root of `from`.
+  - from: build
+    to: .
+    filter: ['server/**/*']
   # Relocatable CPython with CadQuery (npm run prepare:python).
   - from: build/python
     to: python
