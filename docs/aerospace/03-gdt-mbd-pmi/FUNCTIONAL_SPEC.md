@@ -1,6 +1,9 @@
 # GDT — GD&T, Model-Based Definition (MBD) and semantic PMI — Functional specification
 
 Gap id: **GDT** · Folder: `docs/aerospace/03-gdt-mbd-pmi/` · Status: specification (no implementation) · Date: 2026-10-15
+Related gaps: 01 KRN (exact B-rep, `import_step_brep`) · 04 XCH (AP242 transport: `import_step_exact`, `export_step_ap242`,
+validation properties, QIF) — GDT owns the semantic PMI **model, commands, checks, drawing integration, stack-up**
+and the PMI stage of the AP242 translation.
 
 ## 1. Summary
 
@@ -184,7 +187,7 @@ seeded Monte Carlo of 200 000 samples).
 7. Save a view (camera + visible PMI) → `create_saved_view`; switch views from the panel → `activate_saved_view`.
 8. Run **Check PMI** → `check_pmi`; errors list clickable PMI ids.
 9. Sheet: `create_sheet` with views, toggle "show PMI" → `update_sheet { pmiMode: 'auto' }`; export SVG.
-10. File > Export > STEP AP242 with PMI (V1) → `export_step_ap242`.
+10. File > Export > STEP AP242 with PMI (V1) → `export_step_ap242 { includePmi: true }` (command specified by gap 04 XCH; GDT supplies the PMI stage).
 
 ### 6.2 CLI (`llull`, local agent — KI6)
 
@@ -196,7 +199,7 @@ llull --app run validation/draft_plan_gdt_plate.json             # build part + 
 llull --app check_pmi --json                                     # structured errors/warnings
 llull --app list_pmi --json > pmi.json
 llull --doc part.llull.json --kernel occt analyze_stackup @su01.json   # WC / RSS / MC numbers
-llull --doc part.llull.json --kernel occt export_step_ap242 pmi=semantic --save part_ap242.stp
+llull --doc part.llull.json --kernel occt export_step_ap242 includePmi=true --save part_ap242.stp   # gap 04 command
 ```
 (Sub-commands and flags are the existing ones of `server/src/cli/usage.ts`: `search`, `describe`,
 `run <plan> [--validate]`, `<command> [params]`, `--app`, `--doc`, `--kernel`, `--save`, `--json`.
@@ -211,7 +214,7 @@ All tools are views of the same registry (L5); hidden tools remain callable via 
 
 ### 6.4 Supplier import (V1)
 
-`import_step_pmi` (desktop) → solids + PMI in one transaction → `list_pmi` → inspection plan table;
+`import_step_exact` (gap 04 XCH; GDT's PMI stage) → solids + PMI in one transaction → `list_pmi` → inspection plan table;
 `check_pmi` → questions to the customer.
 
 ## 7. Acceptance criteria
@@ -223,8 +226,8 @@ All tools are views of the same registry (L5); hidden tools remain callable via 
 | AC-GDT-03 | `draft_plan_gdt_rejections.json` | each action executes | each invalid PMI action is a no-op whose summary names the reason (duplicate label, undefined datum D, MMC on plane, zero tolerance, point not on any face) | VC-GDT-03 |
 | AC-GDT-04 | any PMI command | run twice from the same input | input document deep-equal before/after (is pure); same output | VC-GDT-04 |
 | AC-GDT-05 | the plate sheet with `pmiMode:'auto'` | `export_sheet_svg` | the TOP view contains the hole-pattern FCF ("⌖ Ø0.3 Ⓜ A B C" rendered as frame + glyph paths) and the FRONT view contains the flatness FCF; `data.pmi.placed` lists them per view; nothing overflows | VC-GDT-10/11 |
-| AC-GDT-06 | NIST CTC/FTC/STC AP242 files (pinned) | `import_step_pmi` (V1) | per file, counts of geometric tolerances by characteristic, dimensional size/location, datums and datum systems equal `nist_pmi_census.json` | VC-GDT-20 |
-| AC-GDT-07 | the plate | `export_step_ap242` then NIST SFA (CLI) | SFA semantic PMI report lists 4 geometric tolerances, 2 size dimensions, 3 datums with the same values and modifiers; zero "missing reference" errors | VC-GDT-22 |
+| AC-GDT-06 | NIST CTC/FTC/STC AP242 files (pinned) | `import_step_exact` with PMI stage (V1) | per file, counts of geometric tolerances by characteristic, dimensional size/location, datums and datum systems equal `nist_pmi_census.json` | VC-GDT-20 |
+| AC-GDT-07 | the plate | `export_step_ap242 { includePmi: true }` then NIST SFA (CLI) | SFA semantic PMI report lists 4 geometric tolerances, 2 size dimensions, 3 datums with the same values and modifiers; zero "missing reference" errors | VC-GDT-22 |
 | AC-GDT-08 | SU-01..SU-05 contributors | `analyze_stackup` | WC / RSS / σ / exact-corner values equal `stackup_reference.json` within 1e-9 mm; MC mean/std/p within the stated acceptance tolerances | VC-GDT-30..34 |
 | AC-GDT-09 | FF-01..03 | fastener helper | T = H − F (floating), (H − F)/2 (fixed, equal split), bonus/virtual condition values as in the reference | VC-GDT-35 |
 | AC-GDT-10 | PMI on a document | save/load, undo/redo, live-sync, `build_project` replay | PMI identical (id-normalised) | VC-GDT-50 |

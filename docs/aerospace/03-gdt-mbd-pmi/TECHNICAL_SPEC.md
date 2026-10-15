@@ -43,8 +43,10 @@ packages/core/src/
   commands/drawings/pmiPainter.ts      PMI on sheet views (used by exportSheet.ts renderSheet)
 packages/kernel-occt/src/occtTopology.ts   ShapeFace += centroid / normal / axis / radius / samples
 packages/mcp/src/toolsets.ts           new toolset `pmi`
-packages/mcp/src/exchangeTools.ts      + import_step_pmi, export_step_ap242 (CadExchangePort.importStepPmi / exportStepAp242)
-server/python/llull_bridge.py          + ops import_step_pmi / export_step_ap242 (OCP XCAF)
+(AP242 transport — owned by gap 04 XCH: `import_step_exact`, `export_step_ap242 { includePmi }` over an XCAF
+ document, opencascade.js custom build with XDE or the desktop OCP bridge; GDT supplies the PMI stage:)
+packages/core/src/commands/pmi/xcafMapping.ts   PmiItem ⇄ bridge JSON (§6.2), enum tables (§6.1)        [commands, pure]
+server/python/llull_bridge.py          PMI read/write helpers used by XCH's ops when the OCP path is used (fallback)
 src/ui/panels/PmiPanel.tsx             param gathering only (L1)
 src/ui/viewport/3d/PmiLayer.tsx        render PMI on annotation planes (presentation only)
 ```
@@ -204,8 +206,8 @@ Params are one inline `z.object` each (C3); entity references accept `$alias` in
 | `update_sheet` (extended) | mutating | `+ pmiMode?: 'off' \| 'auto'` | sheet patch | — | as today | TR-GDT-14 |
 | `update_drawing_view` (extended) | mutating | `+ pmiIds?: string[]`, `pmiAuto?: true` | view patch | ids exist | unknown PMI id | TR-GDT-14 |
 | `export_sheet_svg` (extended) | query | unchanged params | `data.pmi: { placed: [{viewId, pmiIds}], skipped: [{pmiId, reason}] }` | PMI geometry derived at export | — | TR-GDT-14 |
-| `import_step_pmi` (exchange tool, V1) | exchange → commands | `{ file \| stepBase64 }` | `import_step` (bodies) + `apply_pmi_set` per body | one undo group | Python missing; no XCAF GD&T in file | TR-GDT-15 |
-| `export_step_ap242` (exchange tool, V1) | exchange (read-only on doc) | `{ entityIds?, pmi: 'none' \| 'semantic' }` | writes file / returns base64 | B-rep from `export_code` path (as `export_step`), PMI attached by face reference | solid not exact; PMI unresolved → listed, not written | TR-GDT-16 |
+| PMI stage of XCH `import_step_exact` (V1; gap 04) | exchange → commands | XCH params | exact bodies (XCH) + `apply_pmi_set` per body | one undo group | no XCAF GD&T in file → 0 items, not an error | TR-GDT-15 |
+| PMI stage of XCH `export_step_ap242 { includePmi: true }` (V1; gap 04) | query | XCH params | PMI attached by face reference in the XCAF document | read-only | PMI unresolved → listed in `skipped`, not written | TR-GDT-16 |
 
 Feature steps: every mutating command above appends a `FeatureStep` through `execute` (L8);
 `activate_saved_view` is a view-state command (`metaHistory`, like camera commands) so it does not
@@ -230,8 +232,8 @@ pollute the recipe. Toolset `pmi` lists all of the above; `analyze_stackup`, `fa
 | TR-GDT-12 | SHOULD | fastener formulas §5.7.6 |
 | TR-GDT-13 | MUST | `apply_pmi_set` input schema = the Python bridge JSON (§6.2) |
 | TR-GDT-14 | MUST | Sheet PMI rendering §5.8 |
-| TR-GDT-15 | SHOULD (V1) | Python `import_step_pmi` with OCP XCAF (§5.9), JSON out; exact-B-rep attachment depends on exact STEP import (see §10 dependency D-1) |
-| TR-GDT-16 | SHOULD (V1) | Python `export_step_ap242` with `STEPCAFControl_Writer` GD&T mode (§5.10) |
+| TR-GDT-15 | SHOULD (V1) | PMI read stage (§5.9) plugged into gap 04's `import_step_exact` (XCAF document from opencascade.js-XDE or OCP), producing the §6.2 JSON → `apply_pmi_set`; exact face attachment needs exact import (D-1, gap 01 `import_step_brep` / gap 04 `import_step_exact`) |
+| TR-GDT-16 | SHOULD (V1) | PMI write stage (§5.10) plugged into gap 04's `export_step_ap242 { includePmi }` (`STEPCAFControl_Writer` GD&T mode) |
 | TR-GDT-17 | MUST | All PMI params schemas snapshot-tested in `toToolSchemas()` contract test |
 | TR-GDT-18 | MUST | Coverage gate 90/85/90/90 for `commands/pmi/**`, `geometry/pmi*.ts`; `lib/stackup.ts` 100 % lines (pure math) |
 
@@ -367,9 +369,10 @@ sample); the command is synchronous and capped.
 6. Output `data.pmi.placed/skipped`; skipped reasons: `PLANE_NOT_PARALLEL`, `SOLID_NOT_IN_VIEW`,
    `UNRESOLVED_FEATURE`, `VIEW_KIND_UNSUPPORTED`.
 
-### 5.9 AP242 semantic PMI import (desktop, Python OCP, V1)
+### 5.9 AP242 semantic PMI import (PMI read stage of gap 04 `import_step_exact`, V1)
 
-`llull_bridge.py` op `import_step_pmi`:
+PMI read stage (runs inside gap 04's `import_step_exact`; shown here with the OCP/Python API, identical
+class names in an opencascade.js XDE build):
 - `STEPCAFControl_Reader` with `SetGDTMode(True)`, `SetNameMode(True)`, `SetViewMode(True)`; transfer to
   an XCAF document; `XCAFDoc_DocumentTool.DimTolTool_s(doc.Main())`.
 - Enumerate dimension labels (`GetDimensionLabels`), geometric tolerance labels (`GetGeomToleranceLabels`),
@@ -386,12 +389,12 @@ sample); the command is synchronous and capped.
   attached to shapes or shape groups [R28]; NIST files may hold items on constructive geometry → counted
   as `unattached` (expected, compared against the census per category).
 
-Dependency D-1: STEP import is tessellated today (`import_step` → `import_mesh`). Until an exact STEP import
-exists (separate gap), imported PMI features keep their `facesNear` and `surface` but `faceIndices: []`,
+Dependency D-1: STEP import is tessellated today (`import_step` → `import_mesh`). Exact import is specified by
+gap 01 KRN (`import_step_brep`) and gap 04 XCH (`import_step_exact`). Until it exists, imported PMI features keep their `facesNear` and `surface` but `faceIndices: []`,
 status `unresolved_mesh`; `list_pmi` still lists them (inspection planning works), `check_pmi` reports
 `UNRESOLVED_FEATURE` as info, not error, for imported items.
 
-### 5.10 AP242 semantic PMI export (desktop, V1)
+### 5.10 AP242 semantic PMI export (PMI write stage of gap 04 `export_step_ap242`, V1)
 
 - Build the exact shapes exactly as `export_step` does today (`export_code` → CadQuery → OCP shape), keep a
   map llull solid id → OCP solid; resolve each PMI `facesNear` again on the OCP B-rep (same algorithm as
@@ -456,7 +459,7 @@ id-normalisation (`tests/golden/normalize.ts` must normalise `pmi-<step>.<k>` li
   `paramsSchema` where possible; the viewport renders frames as camera-facing-on-plane billboards with
   drei `<Text>`/lines; saved-view buttons call `activate_saved_view`. Presentation only (rules/react.md).
 - **CLI**: no new sub-command; `llull <command> [params]`, `run <plan>`, `--save` for `export_step_ap242`
-  and `export_sheet_svg`; `--kernel occt` required for feature-attaching commands in `--doc` mode.
+  (gap 04) and `export_sheet_svg`; `--kernel occt` required for feature-attaching commands in `--doc` mode.
 - **MCP**: toolset `pmi` (discoverable via `search_tools` / `enable_toolset`); query commands carry
   `readOnlyHint`; descriptions state units, the `facesNear` contract and the OCC requirement; a prompt
   `tolerance_part` (V1) in `packages/mcp/src/prompts.ts` walks datum → size → FCF → check.
@@ -500,7 +503,7 @@ id-normalisation (`tests/golden/normalize.ts` must normalise `pmi-<step>.<k>` li
 | M3 | Viewport PMI layer + panel + saved views | M2 | 2.5 |
 | M4 | Sheets: pmiPainter, `pmiMode`, symbols | M2, drawings feature (exists) | 2 |
 | M5 | `lib/stackup.ts`, `lib/prng.ts`, `analyze_stackup`, `fastener_tolerance` | — (parallel) | 1.5 |
-| M6 (V1) | Python import/export AP242 PMI, exchange tools, quality gate on NIST files, SFA CI | M2; D-1 exact STEP import for attachment (gap "STEP AP242 exact import/assemblies") | 4 |
+| M6 (V1) | PMI read/write stages + `xcafMapping.ts` + `apply_pmi_set`, quality gate on NIST files, SFA CI | M2; gap 04 XCH (`import_step_exact`, `export_step_ap242`, XCAF document); gap 01 KRN (`import_step_brep`) for exact attachment | 4 |
 | M7 (V1) | composite FCF, datum targets, all-around, ISO 14405 modifiers, PMI-linked stacks | M2, M5 | 2.5 |
 | V2 | graphic PMI, PDF sheets, zone visualisation, TDP bundle, 2D/3D vector loops | M6 | 6+ |
 
@@ -510,8 +513,8 @@ Total MVP (M1–M5) ≈ 11 eng-weeks; V1 ≈ +6.5.
 
 | Id | Question | Proposed answer |
 | --- | --- | --- |
-| Q-1 | Does the opencascade.js build used in the browser/worker expose XCAF GD&T classes? | Not needed for MVP (PMI model is llull data); AP242 I/O stays desktop-Python (KI6) |
-| Q-2 | Exact STEP B-rep import (D-1) owner? | Separate aerospace gap; PMI import degrades to `unresolved_mesh` until then |
+| Q-1 | Does the opencascade.js build expose XCAF GD&T classes? | Not needed for MVP (PMI model is llull data). Gap 04 plans a custom opencascade.js build with XDE toolkits; the OCP bridge on desktop is the fallback (KI6) |
+| Q-2 | Exact STEP B-rep import (D-1) owner? | Gap 01 KRN `import_step_brep` / gap 04 XCH `import_step_exact`; PMI import degrades to `unresolved_mesh` until then |
 | Q-3 | AP242 schema switch value in the shipped OCP/OCCT (`write.step.schema`) and whether "e2/e3/e4" editions are writable | Spike in M6 against SFA |
 | Q-4 | Ship any rule-table content? | No (paywalled); empty template + customer fill; optionally partner-supplied |
 | Q-5 | Should PMI be entities (`kind: 'pmi'`) for selection/layers? | No: separate model like drawings; selection via panel; revisit if layer control is required |

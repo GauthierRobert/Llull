@@ -140,7 +140,7 @@ analytic surfaces), counts exact; Monte Carlo per the 5σ statistical bounds lis
   Windows CI job on llull's AP242 exports (VC-GDT-22) and manually on imports. Not redistributed by llull.
 - **Census script** (this folder): cross-platform, stdlib-only pre-check; run it on llull's own AP242
   exports too (the counts of the plate are then 4 GT, 2 DIMENSIONAL_SIZE, 3 DATUM).
-- **OCC XCAF via OCP** (desktop Python): reader used by `import_step_pmi`; the same reader re-imports
+- **OCC XCAF via OCP** (desktop Python): reader behind the PMI stage of gap 04's `import_step_exact`; the same reader re-imports
   exports for VC-GDT-21.
 
 ## 7. How to regenerate
