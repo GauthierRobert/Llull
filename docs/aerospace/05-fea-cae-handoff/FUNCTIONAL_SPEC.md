@@ -264,11 +264,11 @@ report" until a customer qualifies the toolchain, and that includes tool qualifi
 ## 11. References
 
 - [R1] 14 CFR §25.303 Factor of safety — US eCFR / FAA — https://www.ecfr.gov/current/title-14/chapter-I/subchapter-C/part-25/subpart-C/subject-group-ECFR6dd5e5c4b86d1bc/section-25.303 (accessed 2026-10; text via search, fetch blocked)
-- [R2] 14 CFR §25.301 Loads; §25.305 Strength and deformation — GPO CFR 2010 — https://www.gpo.gov/fdsys/pkg/CFR-2010-title14-vol1/pdf/CFR-2010-title14-vol1-sec25-301.pdf ; https://www.govinfo.gov/content/pkg/CFR-2010-title14-vol1/pdf/CFR-2010-title14-vol1-sec25-305.pdf (accessed 2026-10)
-- [R3] NASA-STD-5001B Structural Design and Test Factors of Safety for Spaceflight Hardware — NASA — https://standards.nasa.gov/sites/default/files/standards/NASA/B-w/CHANGE-3/3/2022-10-24-NASA-STD-5001B-w-Change-3-Approved.pdf (accessed 2026-10)
+- [R2] 14 CFR §25.301 Loads; §25.305 Strength and deformation — GPO CFR 2010 — https://www.gpo.gov/fdsys/pkg/CFR-2010-title14-vol1/pdf/CFR-2010-title14-vol1-sec25-301.pdf ; https://www.govinfo.gov/content/pkg/CFR-2010-title14-vol1/pdf/CFR-2010-title14-vol1-sec25-305.pdf (accessed 2026-10, search)
+- [R3] NASA-STD-5001B Structural Design and Test Factors of Safety for Spaceflight Hardware — NASA — https://standards.nasa.gov/sites/default/files/standards/NASA/B-w/CHANGE-3/3/2022-10-24-NASA-STD-5001B-w-Change-3-Approved.pdf (accessed 2026-10, search)
 - [R4] EASA Easy Access Rules for Large Aeroplanes (CS-25) — EASA — https://www.easa.europa.eu/en/document-library/easy-access-rules/online-publications/easy-access-rules-large-aeroplanes-cs-25 (accessed 2026-10; catalogue only)
-- [R5] NASA NTRS 20150003482 (history of the 1.5 factor of safety) — NASA — https://ntrs.nasa.gov/api/citations/20150003482/downloads/20150003482.pdf (accessed 2026-10)
-- [R6] NASA-HDBK-5026 — NASA — https://standards.nasa.gov/sites/default/files/standards/NASA/Baseline/0/NASA-HDBK-5026-Final-8-12-2024.pdf (accessed 2026-10)
+- [R5] NASA NTRS 20150003482 (history of the 1.5 factor of safety) — NASA — https://ntrs.nasa.gov/api/citations/20150003482/downloads/20150003482.pdf (accessed 2026-10, search)
+- [R6] NASA-HDBK-5026 — NASA — https://standards.nasa.gov/sites/default/files/standards/NASA/Baseline/0/NASA-HDBK-5026-Final-8-12-2024.pdf (accessed 2026-10, search)
 - [R10] Gmsh 4.15.2 (PyPI wheel, LICENSE, API) — Geuzaine & Remacle — https://pypi.org/project/gmsh/4.15.2/ (accessed 2026-10)
 - [R11] Netgen — NGSolve — https://github.com/NGSolve/netgen (accessed 2026-10)
 - [R12] The Verdict Library Reference Manual SAND2007-2853 — Sandia — https://github.com/sandialabs/verdict (accessed 2026-10)

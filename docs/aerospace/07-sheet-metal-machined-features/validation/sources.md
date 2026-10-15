@@ -26,8 +26,8 @@ Verification level, as achieved from this authoring sandbox:
 | R12 | `cadquery-ocp` 8.0.1.1.0 (PyPI) | https://pypi.org/project/cadquery-ocp/ | V-fetch (pip install) | Python binding of OCCT 8.0 used to generate the synthetic STEP parts and to measure the NIST files. |
 | R13 | Web3D Consortium, X3D example archive — NIST STEP conformance (CTC 02, CTC 04, FTC 08) | https://www.web3d.org/x3d/content/ConformanceNist/STEP/CTC02/index.html | V-search | X3D conversions of individual CTC/FTC cases exist (alternative visual reference). |
 | R14 | The Fabricator, *Analyzing the k-factor in sheet metal bending* | https://www.thefabricator.com/thefabricator/article/bending/analyzing-the-k-factor-in-sheet-metal-bending | V-search | K-factor = neutral-axis shift divided by material thickness (definition only). |
-| R16 | CadQuery `cadquery/cq.py` @ `5f5bc62b255f62e3512105740025361b6c31eddd` | https://github.com/CadQuery/cadquery/blob/master/cadquery/cq.py | V-fetch (git clone) | `hole(diameter, depth)`, `cboreHole(diameter, cboreDiameter, cboreDepth, depth)`, `cskHole(diameter, cskDiameter, cskAngle, depth)` signatures (code-export target). |
 | R15 | NIST AMS 100-10 *Guide to the NIST PMI CAD Models and CAD System PMI Modeling Capability Verification Testing Results* (ResearchGate listing) | https://www.researchgate.net/publication/320255032 | V-search | Existence and title of the companion report. |
+| R16 | CadQuery `cadquery/cq.py` @ `5f5bc62b255f62e3512105740025361b6c31eddd` | https://github.com/CadQuery/cadquery/blob/master/cadquery/cq.py | V-fetch (git clone) | `hole(diameter, depth)`, `cboreHole(diameter, cboreDiameter, cboreDepth, depth)`, `cskHole(diameter, cskDiameter, cskAngle, depth)` signatures (code-export target). |
 
 ## Internal llull sources (read in the repository)
 

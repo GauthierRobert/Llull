@@ -207,7 +207,7 @@
   "params": {
    "analysisId": "$an",
    "mesher": "gmsh",
-   "elementFamily": "shell_quad",
+   "elementFamily": "quad",
    "order": 2,
    "globalSize": 50
   }

@@ -244,7 +244,7 @@ def main() -> None:
     # --- VC-FEA-20: margins of safety --------------------------------------------------------------------------
     ms_rows = []
     for allow, limit in [(450.0, 300.0), (450.0, 200.0), (300.0, 200.0), (280.0, 200.0)]:
-        ms_rows.append({"allowable_MPa": allow, "limit_MPa": limit, "FoS": 1.5, "MS": r(margin(allow, limit, 1.5), 6)})
+        ms_rows.append({"allowable_MPa": allow, "limit_MPa": limit, "FoS": 1.5, "MS": r(margin(allow, limit, 1.5), 12)})
     cases.append({
         "id": "VC-FEA-20", "quantity": "margin of safety table", "value": ms_rows, "unit": "1", "tolerance_abs": 1e-9,
         "derivation": "MS = allowable / (limit x FoS) - 1, FoS = 1.5 (14 CFR 25.303); MS < 0 => FAIL", "sources": ["S1", "S2"],
@@ -252,10 +252,10 @@ def main() -> None:
 
     # --- VC-FEA-21: von Mises -----------------------------------------------------------------------------------
     vm = [
-        {"tensor": [100, 0, 0, 0, 0, 0], "vm": r(von_mises(100, 0, 0, 0, 0, 0)), "note": "uniaxial -> sigma"},
-        {"tensor": [0, 0, 0, 50, 0, 0], "vm": r(von_mises(0, 0, 0, 50, 0, 0)), "note": "pure shear -> sqrt(3) tau"},
-        {"tensor": [80, 80, 80, 0, 0, 0], "vm": r(von_mises(80, 80, 80, 0, 0, 0)), "note": "hydrostatic -> 0"},
-        {"tensor": [120, -40, 10, 30, -20, 15], "vm": r(von_mises(120, -40, 10, 30, -20, 15)), "note": "general"},
+        {"tensor": [100, 0, 0, 0, 0, 0], "vm": r(von_mises(100, 0, 0, 0, 0, 0), 12), "note": "uniaxial -> sigma"},
+        {"tensor": [0, 0, 0, 50, 0, 0], "vm": r(von_mises(0, 0, 0, 50, 0, 0), 12), "note": "pure shear -> sqrt(3) tau"},
+        {"tensor": [80, 80, 80, 0, 0, 0], "vm": r(von_mises(80, 80, 80, 0, 0, 0), 12), "note": "hydrostatic -> 0"},
+        {"tensor": [120, -40, 10, 30, -20, 15], "vm": r(von_mises(120, -40, 10, 30, -20, 15), 12), "note": "general"},
     ]
     cases.append({
         "id": "VC-FEA-21", "quantity": "von Mises from Cauchy tensor (sxx, syy, szz, sxy, syz, szx)", "value": vm, "unit": "MPa",

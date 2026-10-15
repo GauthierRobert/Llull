@@ -16,7 +16,7 @@ Requirement ids `TR-KRN-nn` are grouped by decade: 0x kernel selection & build, 
 | Kernel choice | `packages/core/src/geometry/kernelChoice.ts`; `src/main.tsx`; `server/src/geometryKernel.ts` | `parseKernelChoice` → `'manifold'` unless `occt`; browser `?kernel=occt`; server `LLULL_KERNEL=occt` (falls back to Manifold) | Manifold is the default everywhere |
 | Desktop | `desktop/src/backendEnv.ts` | passes `LLULL_PYTHON`, token, body limit …; strips inherited `LLULL_*`; sets **no** `LLULL_KERNEL` | desktop runs Manifold |
 | OCC implementation | `packages/kernel-occt/src/occtKernel.ts` (+ `occtShapes`, `occtTopology`, `occtMesh`, `occtStep`, `occtCurves`, `occtPatches`, `tangentGuard`) | opencascade.js **1.1.1 = OCCT 7.4.0p1** [R11][R12]; no C++ exception support (`___cxa_*` ReferenceError classification); BRepCheck only after fillets (`validOrNull`); `ShapeUpgrade_UnifySameDomain` after booleans; display deflection 0.1 mm / 0.5 rad; tessellation in world space; STEP writer to fixed `/out.step` path | 6-year-old OCCT; no fuzzy/glue; no history; world-space meshes |
-| Isolation | `server/src/isolatedKernel.ts`, `occtWorker.ts` | OCC in a Node worker thread behind a synchronous call (`Atomics.wait`), timeout `LLULL_OCC_TIMEOUT_MS` (30 s), recycle on degrading failure | browser OCC (`src/ui/geometry/occtKernelBrowser.ts`) runs on the UI thread |
+| Isolation | `server/src/isolatedKernel.ts`, `occtWorker.ts`, `geometryKernel.ts` (timeout) | OCC in a Node worker thread behind a synchronous call (`Atomics.wait`), timeout `LLULL_OCC_TIMEOUT_MS` (30 s), recycle on degrading failure | browser OCC (`src/ui/geometry/occtKernelBrowser.ts`) runs on the UI thread |
 | STEP import | `packages/mcp/src/exchangeTools.ts` (`import_step`), `server/python/llull_bridge.py` (`op_import_step`) | CadQuery reads STEP (assembly walk, names, colours) and **tessellates** (tolerance 0.05) → `import_mesh` | imported parts are meshes: not editable as B-rep, faceted mass properties |
 | Topology / naming | `packages/core/src/commands/brep/topology.ts` (`inspect_topology`), `brep/modify3d.ts` (`fillet_edge`, `chamfer_edge`) | edges by kernel index or `edgesNear` points re-resolved on replay to the nearest roundable edge mid point (KI5; `server/tests/occtParametricEdges.test.ts`) | heuristic: wrong edge possible after large moves; faces have no names |
 | Mass properties | `packages/core/src/commands/inspect/measureSolid.ts`, `solidVolume.ts` | volume (`exact` via `topology().volume` under OCC, else closed form or display-mesh sum) and mass; instances summed | no area, centroid, inertia; no accuracy statement |
@@ -174,8 +174,9 @@ export const importStepBrep = defineCommand({ name: 'import_step_brep', annotati
 ```
 
 MCP: `import_step` (exchange tool) gains `mode: 'brep' | 'mesh'` (default `brep` when the OCC kernel is active),
-forwarding to `import_step_brep`; the mesh path remains for Manifold. CLI: `llull import_step_brep …`
-(in-process for `--doc`, via `POST /exchange` for `--app`, KI6).
+forwarding to `import_step_brep`; the mesh path remains for Manifold. CLI: `llull import_step_brep file=<path>` —
+`import_step_brep` is a registry command (in-process for `--doc`, `POST /command` for `--app`); the CLI's
+`file=` → `stepBase64` mapping (`server/src/cli/exchange.ts` `FILE_PARAMS`, today exchange tools only) is extended to it.
 
 ## 5. Kernel / algorithms
 
@@ -361,7 +362,7 @@ document instead of inline base64 (V2).
   tolerance, GVP deltas); Tools → Validate shape; Measure → Mass properties panel with tensor, principal axes
   gizmo and CSV copy; Document settings → Modelling tolerance; broken-reference badges in the feature tree
   with "re-pick" action (re-pick = `edit_step_params` with new names).
-- **CLI**: `llull kernel_info`, `llull import_step_brep '{"path":…}'`, `llull validate_shape`,
+- **CLI**: `llull kernel_info`, `llull import_step_brep file=<path>`, `llull validate_shape`,
   `llull mass_properties '{"entityId":…}'` — compact JSON output (llull-cli skill); `--kernel occt` becomes the
   CLI default for `--doc` runs on desktop installs.
 - **MCP**: tools from the registry (`toToolSchemas`); `import_step` exchange tool `mode` param; toolsets:

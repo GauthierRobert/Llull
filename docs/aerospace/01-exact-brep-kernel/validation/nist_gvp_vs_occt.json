@@ -427,7 +427,21 @@
    "volumeRelDiff": 16559.13460046679,
    "areaRelDiff": 645.3682506333703,
    "centroidAbsDiffMm": 95.27289759519991,
-   "verdict": "DISAGREE - investigate (file GVP may be stale or scoped to a shape aspect)"
+   "verdict": "DISAGREE - investigate (file GVP may be stale or scoped to a shape aspect)",
+   "gvpUnitInferred": "inch (file length unit is inch; GVP values are in file units)",
+   "gvpMm": {
+    "volume": 12694914.68692222,
+    "area": 861242.9165391091,
+    "centroid": [
+     -0.00444232975083708,
+     -1.0106082709285138,
+     99.72360139103179
+    ]
+   },
+   "volumeRelDiffAfterUnitConversion": 0.01056141603320725,
+   "areaRelDiffAfterUnitConversion": 0.0018727922273084853,
+   "centroidAbsDiffMmAfterUnitConversion": 2.167041818112764,
+   "reviewNote": "volumeRelDiff / areaRelDiff / centroidAbsDiffMm above compare inch GVP with mm OCCT values (unit artefact); after inch->mm conversion the file still disagrees (~1.1e-2 volume, ~1.9e-3 area, ~2.2 mm centroid)"
   },
   {
    "file": "nist_ftc_06_asme1_rd.stp",

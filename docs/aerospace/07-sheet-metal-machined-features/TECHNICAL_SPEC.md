@@ -18,9 +18,9 @@ desktop-first, with OCC as the desktop kernel (KI6).
 | Profile solids | `commands/solids/profile.ts` (`extrude_profile`, `revolve_profile`), `sweep.ts`, `loft.ts` | 2D → 3D bridge (L7) | No thickness-side semantics, no bends |
 | Patterns | `commands/edit/` `array_linear`, `array_polar`, `pattern_along_path` | Entity copies | Not feature patterns (no hole pattern on a face) |
 | Queries | `commands/inspect/` `mass_properties`, `measure_*`, `find_entities`, `check_model` | Volume and mass from kernel or mesh | — |
-| OCC kernel | `packages/kernel-occt/src/` (`occtKernel.ts`, `occtShapes.ts`, `occtTopology.ts`, `occtStep.ts`); `opencascade.js@^1.1.1` | Booleans, fillet, chamfer, offset (shell), pipe, thru-sections, prism, revol, STEP write | `BRepFeat_*` and `LocOpe_*` bindings are **unverified** in the opencascade.js 1.1.1 build (only the classes listed in `occt*.ts` are exercised); see D3 |
-| Python bridge | `server/python/llull_bridge.py`, `packages/mcp/src/exchangeTools.ts` | `import_step` / `export_step` via CadQuery (bundled CPython on desktop, KI6) | `import_step` is an exchange tool, not a registry command; imported parts arrive as `mesh` entities with `brep` |
-| DXF | `packages/domain-aec/src/building/exchange/dxfWriter.ts`, `dxfExport.ts` (`export_dxf`), core `import_dxf` | R12-style writer inside the AEC plugin | A plugin cannot import another plugin (L10), so a generic writer must move to core `lib` (D4) |
+| OCC kernel | `packages/kernel-occt/src/` (`occtKernel.ts`, `occtShapes.ts`, `occtTopology.ts`, `occtStep.ts`); `opencascade.js@^1.1.1` | Booleans, fillet, chamfer, offset (shell), pipe, thru-sections, prism, revol, STEP write | The package ships no `.d.ts` (llull declares its own ambient module, `opencascade.d.ts`). Review probe of the installed 1.1.1 wasm (2026-10-15, Node): `BRepFeat_MakePrism`, `MakeRevol`, `MakePipe`, `MakeRevolutionForm`, `Gluer`, `SplitShape`, `LocOpe_Prism`, `BRepAdaptor_Surface` construct; `BRepFeat_MakeCylindricalHole` is exported but **cannot be constructed** ("unbound types: BOPAlgo_BOP"); `BRepFeat_MakeLinearForm` is **not exported** (listed in the package's `Supported APIs.md`, absent from the binary); `TopTools_IndexedDataMapOfShapeListOfShape` is not exported, so `TopExp.MapShapesAndAncestors` is unusable (adjacency must be built like `occtTopology.ts` does, by `HashCode`/`IsSame`). `Perform*` calls were not exercised; see D3 |
+| Python bridge | `server/python/llull_bridge.py`, `packages/mcp/src/exchangeTools.ts` | `import_step` / `export_step` via CadQuery (bundled CPython on desktop, KI6) | `import_step` is an exchange tool, not a registry command. It tessellates in Python (`op_import_step` → `_bodies_from` triangles) and replays `import_mesh`: imported parts arrive as `mesh` entities **without** `brep`, so no exact face graph exists for them today (see §2.2, D9) |
+| DXF | `packages/domain-aec/src/building/exchange/dxfWriter.ts`, `dxfExport.ts` (`export_dxf`), core `import_dxf` | R12 (`$ACADVER` AC1009) writer inside the AEC plugin; entities LINE, CIRCLE, ARC, TEXT, POLYLINE/VERTEX, 3DFACE (no LWPOLYLINE) | A plugin cannot import another plugin (L10), so a generic writer must move to core (D4). The current file also imports `@core/model/types`, `@core/geometry/*`, `@core/model/drawing` and AEC-only `planModel`/`shared/numeric`, so it cannot move to `lib` as is (`lib-is-a-leaf` rule in `.dependency-cruiser.cjs`) |
 | Code export | `packages/core/src/codegen/` (`python.ts`, `recipeLowering.ts`, `freecad.ts`, `openscad.ts`) | CadQuery / build123d / FreeCAD / OpenSCAD emitters | No hole or sheet-metal lowering; CadQuery has `hole`, `cboreHole`, `cskHole` (`cadquery/cq.py` @5f5bc62 [R16]) |
 | Toolsets | `packages/mcp/src/toolsets.ts` | `core, 2d, 3d, measure, parametric, assembly, exchange`, plugin toolsets `building`, `civil` | No `manufacturing` toolset |
 
@@ -33,7 +33,7 @@ There is no sheet-metal, hole, thread, pocket or recognition code anywhere in `p
 
 ```
 packages/core/src/
-  lib/dxfWriter.ts                    (moved from domain-aec, generic R12 LINE/ARC/CIRCLE/TEXT/LWPOLYLINE writer)       D4
+  lib/dxfWriter.ts                    (generic R12 LINE/ARC/CIRCLE/TEXT/POLYLINE writer split out of domain-aec)        D4
   lib/sheetMath.ts                    pure bend math: bendAllowance, outsideSetback, bendDeduction, kChart, joggle, kTable
   lib/holeMath.ts                     countersink depth/diameter, drill tip, frustum volumes
   model/types.ts                      + ShapeRecipe ops 'feature' (hole | pocket | rib); + FaceInfo surface params
@@ -72,7 +72,7 @@ Rationale:
 | --- | ---- |
 | 08 Fastener catalogue | `FastenerRef` → hole spec (clearance/fit, countersink D and angle, thread designation). Until 08 lands, `add_hole` takes explicit dimensions and `fastener` is rejected with a clear summary. |
 | Drawings (hole/bend tables, thread callouts) | `data` tables of `recognize_features`, `flat_pattern` and hole features; drawing views of flat patterns |
-| STEP exchange / PMI | `import_step` already gives exact `brep`; AP242 PMI association is out of scope here |
+| STEP exchange / PMI | **Prerequisite (not true today):** an exact STEP import that keeps a `brep` on the imported entity (e.g. an OCC `STEPControl_Reader` path in the kernel, or a CadQuery path that hands back STEP to the kernel). Today `import_step` returns triangles only (§1). Needed by `recognize_features` on imported parts, `convert_to_sheet_metal` and VC-FTR-18…21, 32 (D9). AP242 PMI association is out of scope here |
 | Parametric / persistent naming | Face `near` references (KI5 approach) now; BRepTools_History naming later |
 
 ## 3. Data model
@@ -375,8 +375,8 @@ approach of comparing adjacent planes, cylinders, cones and tori [R7].
 | Format | Direction | Content |
 | ------ | --------- | ------- |
 | `.llull.json` | R/W | `sheetMetal` extension, `feature` recipe nodes, `features` meta (thread designations). Validation rejects unknown hole kinds, rf > rc, rows without `source`. |
-| DXF (R12/AC1009 subset) | W | Flat pattern: layers `OUTLINE`, `CUTOUT`, `BEND_UP`, `BEND_DOWN`, `NOTES`; LINE/ARC/CIRCLE/TEXT; `$INSUNITS` from document units. Writer moved to core `lib` (D4). |
-| STEP AP214 / AP242 | W | `export_step_exact` writes feature results as plain B-rep (feature semantics not encoded). STEP is read via `import_step` (CadQuery), and recognition runs on the exact result. |
+| DXF (R12/AC1009 subset) | W | Flat pattern: layers `OUTLINE`, `CUTOUT`, `BEND_UP`, `BEND_DOWN`, `NOTES`; LINE/ARC/CIRCLE/TEXT; `$INSUNITS` from document units. Generic writer split into core `lib` (D4). |
+| STEP AP214 / AP242 | W | `export_step_exact` writes feature results as plain B-rep (feature semantics not encoded). STEP is read via `import_step` (CadQuery), which today yields a tessellated `mesh` without `brep`; recognition on imported parts needs the exact import path of §2.2 (D9). |
 | CadQuery / build123d code | W | `feature(hole)` lowered to `.hole()`, `.cboreHole()`, `.cskHole()` [R16]. The 100° angle passes through `cskAngle`. Drill points are emitted as an extra cone cut. Thread designations are emitted as comments. The sheet-metal fold is emitted as its union recipe. |
 | CSV | R | Bend-radius table import and K tables (`rOverT,k`) similar to FreeCAD MDS CSV [R7]. |
 | JSON `data` | W | `recognize_features`, `flat_pattern`, `hole_table`, check reports. These are the agent and drawing contract, described by a zod output schema in docs. |
@@ -444,8 +444,9 @@ to `unclassified[]`. `add_hole` validates all positions first, so it is all-or-n
 | -- | -------- | -------- |
 | D1 | New package `packages/domain-mfg` (sheet-metal plugin) vs adding sheet metal to core | New plugin package (L10: a domain with its own model and tables). Needs user approval because it changes the layer map in CLAUDE.md. |
 | D2 | Should `feature` be a recipe node, or should commands emit lowered boolean trees directly? | A recipe node: it keeps semantics for code export, drawings, recognition round trip and native OCC. Lowering stays the fallback. |
-| D3 | Does opencascade.js@1.1.1 expose `BRepFeat_MakePrism` / `MakeCylindricalHole` / `MakeLinearForm`? | 1-day spike (as KI4). If not, stay with lowering. On desktop, OCP/CadQuery could be used, but the in-process OCC worker is preferred. |
-| D4 | Move `dxfWriter.ts` from domain-aec to core `lib` | Yes. domain-aec then imports it from core (direction allowed by L2). |
+| D3 | Does opencascade.js@1.1.1 expose `BRepFeat_MakePrism` / `MakeCylindricalHole` / `MakeLinearForm`? | Partly answered by the review probe (§1): `MakePrism`/`MakeRevol` construct; `MakeCylindricalHole` is not constructible and `MakeLinearForm` is absent. Remaining 1-day spike (as KI4): exercise `MakePrism`/`MakeRevol` `Perform*` end to end. Holes and ribs stay on lowering in the in-process kernel. On desktop, OCP/CadQuery could be used, but the in-process OCC worker is preferred. |
+| D4 | Move `dxfWriter.ts` from domain-aec to core `lib` | Yes for the generic part only: the low-level R12 writer (`DxfWriter` entity methods, `INSUNITS`, `dxfLayerName`, `dxfText`) moves to `lib` with only `model/vectors` types; `writePrimitive`, layer colours, hatch and dimension handling stay in domain-aec (they import `geometry`/AEC modules, which `lib-is-a-leaf` forbids). domain-aec then imports the writer from core (direction allowed by L2). |
+| D9 | Exact STEP import (keep `brep` on imported parts) | Required before V1 recognition / convert-to-sheet-metal. Options: OCC `STEPControl_Reader` inside the kernel behind a new optional `GeometryKernel` member (not yet probed in opencascade.js 1.1.1), or the CadQuery bridge returning the STEP text to the kernel. Needs a decision and its own spike. |
 | D5 | Default countersink preset for aerospace (100°) | Confirm from gap 08 catalogue data / NASM documents before it becomes a default. Until then it is a named preset with the "unverified" note in the UI tooltip. |
 | D6 | Minimum bend radius seed data | Transcribe AC 43.13-1B Table 4-6 from the FAA PDF with dual review. Store `source` and edition per row. |
 | D7 | Thread designation grammar (UNJ, MJ) | Accept free text with a light per-family regex. Full validation only with licensed AS8879 / ISO 5855 data via gap 08. |

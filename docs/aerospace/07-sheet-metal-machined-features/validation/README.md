@@ -54,7 +54,7 @@ Tolerance column: abs = absolute, rel = relative. FR/TR = what the case proves.
 | VC-FTR-23 | FR-26 | CS-02/03/06 (thin sheet) vs CS-01/07 | knife edge true for 02/03/06 (land −0.162 / −0.562 / −0.133 mm), false for 01/07 (land 8.238 / 0.651 mm) | exact flag | b | same |
 | VC-FTR-24 | FR-17 | DP-01…03 | tip height 1.802582 / 1.242641 / 0.991420 mm | 1e-6 | b | same |
 | VC-FTR-25 | FR-17, FR-21, TR §5.3 | `plans/draft_machined_plate.json` | volume 55978.529153 mm³ (OCC reference build rel err 1.2e-15); native vs lowered equal | 1e-6 rel | b + c | `expected_test_parts.json` |
-| VC-FTR-26 | FR-17 (parity baseline) | `plans/baseline_countersunk_plate_today.json` (existing commands only; first run is part of M2) | `mass_properties` volume 59783.006014 mm³ | 1e-6 rel | b | inline (60000 − π·2.4²·10 − 36.038249) |
+| VC-FTR-26 | FR-17 (parity baseline) | `plans/baseline_countersunk_plate_today.json` (existing commands only; run in review under OCC: 59783.006 mm³) | `mass_properties` volume 59783.006014 mm³ | 1e-6 rel | b | inline (60000 − π·2.4²·10 − 36.038249) |
 | VC-FTR-27 | FR-21, FR-26 | PK-01/02/03 | removed volume 3931.327412 / 3877.717302 mm³; PK-03 rejected (rf > rc); tool Ø > 2·rc → DFM violation | 1e-6 rel | b (OCC cross-check 6.8e-12) | `data/expected_pocket.json` |
 | VC-FTR-28 | FR-19 | Hole + `set_thread` "MJ6x1-4H5H" (example string) | volume and `recipeKey` unchanged; designation persists through save/load and code export comment | exact | b | — |
 | VC-FTR-29 | FR-23 | Mock catalogue entry (gap 08 test double) → hole; edit entry D | hole regenerates with new D; summary names the fastener | exact | b | — |
@@ -118,7 +118,7 @@ the geometry, so tests must assert on geometry, never on hashes, for these files
 
 | Plan | Runs today? | Purpose |
 | ---- | ----------- | ------- |
-| `baseline_countersunk_plate_today.json` | uses only existing commands (OCC kernel); not executed while authoring, because the sandbox has no `node_modules` | What a countersunk hole costs today: 2 primitives, 2 booleans, no semantics. Volume reference VC-FTR-26 |
+| `baseline_countersunk_plate_today.json` | yes, existing commands only. Run in review (2026-10-15, `build_project`, opencascade.js 1.1.1 kernel): 7/7 steps ok, `mass_properties` 59783.006 mm³ (exact B-rep, display precision); Manifold gives 59787.578 mm³ (mesh) | What a countersunk hole costs today: 2 primitives, 2 booleans, no semantics. Volume reference VC-FTR-26 |
 | `draft_machined_plate.json` | no (proposed `add_hole`, `add_pocket`, `recognize_features`) | Target authoring of the machined plate; must match `ftr_machined_plate.step` |
 | `draft_sheet_metal_bracket.json` | no (proposed sheet-metal plugin) | Target authoring of the bracket; must match `ftr_bracket_L.step` and FP-02 |
 | `draft_recognize_ctc01.json` | no (proposed `recognize_features`) | CLI import of CTC-01, then recognition |

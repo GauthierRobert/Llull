@@ -15,8 +15,8 @@ no product form, temper, specification, statistical basis, temperature dependenc
 are no standard parts: no fasteners, no grip-length logic, no hole/fastener/nut stacks. The bill of
 materials (`bill_of_materials`) counts component instances only.
 
-Aerospace structures are designed against **design allowables**. These are statistically based minimum
-strengths (A-, B- or S-basis) tied to an alloy, temper, product form, thickness range, grain direction,
+Aerospace structures are designed against **design allowables**. These are minimum strengths, statistically
+based (A- or B-basis) or specification minima (S-basis), tied to an alloy, temper, product form, thickness range, grain direction,
 temperature and source edition. Airframes are joined by **standard fasteners** whose part numbers encode
 diameter and grip. An aerospace user cannot use llull for a fitting, bracket or skin splice until it can:
 (1) record a material the way a stress engineer and a certification authority expect, with provenance;
@@ -172,9 +172,9 @@ llull --doc bracket.llull.json run validation/plans/fastener_stack_nas6203_propo
 
 ### 6.3 MCP agent (cloud)
 
-The `materials` toolset exposes `get_material`, `get_material_allowable`, `list_fastener_families`,
-`select_fastener` (all read-only, safe) and the mutating `create_material` / `assign_material` /
-`insert_fastener_stack`. An agent asked to "fasten the doubler to the skin with NAS6204 at 4D pitch" calls
+The `materials` toolset exposes `get_material` and `get_material_allowable` (read-only, safe) and the mutating
+`create_material` / `assign_material`. The `@aero` plugin's `fasteners` toolset exposes `list_fastener_families` and
+`select_fastener` (read-only) and the mutating `insert_fastener_stack` / `insert_fastener_row` (TECHNICAL_SPEC §4.2, §7). An agent asked to "fasten the doubler to the skin with NAS6204 at 4D pitch" calls
 `select_fastener` on the stack and then `insert_fastener_row`. It reports each part number with the
 AC 43.13-1B rule that justified it.
 
@@ -184,7 +184,7 @@ AC 43.13-1B rule that justified it.
 | - | ----- | ---- | ---- | -- |
 | AC-1 | a v2 document with a legacy material `{density: 0.00785}` | it is loaded | the material still gives the same mass and shows basis `unspecified`, provenance `legacy` | VC-MAT-01 |
 | AC-2 | a material with two density values from two sources | the user marks one preferred | `mass_properties` uses it and names it; the other is still listed | VC-MAT-02 |
-| AC-3 | density 0.101 lb/in³ | queried in g/cm³ | 2.79567 g/cm³ (rel. 1e-9) | VC-MAT-03 |
+| AC-3 | density 0.101 lb/in³ | queried in g/cm³ | 2.795670376 g/cm³ (= 0.101 × 453.59237 / 16.387064, rel. 1e-9) | VC-MAT-03 |
 | AC-4 | a 100×50×10 mm box in 7075-T6 (2.81 g/cm³) | `mass_properties` | 140.5 g, rel. 1e-6 (OCC) | VC-MAT-04 |
 | AC-5 | an allowable requested at basis A that only exists at basis S | `get_material_allowable` | structured not-available result listing the S value as a candidate; no value returned as A | VC-MAT-05 |
 | AC-6 | catalogue NAS6204, dash 10 | the length rule is evaluated | grip 0.625 in, length 0.995 in (published) | VC-MAT-06 |
@@ -225,8 +225,8 @@ AC 43.13-1B rule that justified it.
 ### 8.4 Export control (ITAR / EAR)
 - ITAR 22 CFR 120.34: public domain = information that is published and generally accessible to the public
   [R26]. EAR 15 CFR 734.7: "published" = available to the public without restrictions on further
-  dissemination, including public internet posting [R27]. The regimes differ: internet posting can count as
-  publication under the EAR but not under the ITAR [R26][R27].
+  dissemination, including public internet posting [R27]. The two regimes define these terms differently, so a
+  record that is "published" under one is not automatically public domain under the other [R26][R27].
 - llull therefore does not decide classification. It records the marking the user's ECO assigns, propagates
   it (document marking = most restrictive of its libraries and records) and gates export, share and cloud
   paths (FR-MAT-09). Marking semantics are shared with gap 09 PLM.
@@ -255,6 +255,10 @@ AC 43.13-1B rule that justified it.
 | Assumption | OCC is the desktop kernel (hole cuts exact); gap 07 provides hole features later; gap 09 provides markings UI. |
 
 ## 11. References
+
+All entries below were read through web-search index content only (direct fetches were blocked); the grade of
+each one (primary index, supplier, secondary) is in [validation/sources.md](validation/sources.md).
+
 
 - [R1] 14 CFR § 25.613 — eCFR / Cornell LII / govinfo — https://www.ecfr.gov/current/title-14/chapter-I/subchapter-C/part-25/subpart-D/subject-group-ECFRff93ea3edba9270/section-25.613 (accessed 2026-10)
 - [R2] FAA AC 25.613-1 — FAA — https://www.faa.gov/documentLibrary/media/Advisory_Circular/AC25.613-1.pdf (accessed 2026-10)

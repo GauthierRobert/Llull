@@ -221,7 +221,7 @@ entities, as golden id-normalised snapshots. Derived ply geometry is read-only: 
 boundary entity is refused by the derivation guard.
 
 **VC-CMP-21: surface parity.** Proves FR-CMP-60 and TR-CMP-70.
-The same plan run through the UI dispatch, `llull --doc plan.json` and the MCP `build_project` gives
+The same plan run through the UI dispatch, `llull run plan.json --doc <file>` and the MCP `build_project` gives
 identical documents and identical query `data` for `core_sample` and `analyze_laminate`.
 
 **VC-CMP-22: performance budget.** Proves TR-CMP-80.

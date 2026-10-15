@@ -227,7 +227,7 @@ llull exec export_step_exact entityIds='["wing-1"]' --doc wing.llull.json --kern
 | AC-09 | trapezoidal wing cr 2, ct 1, b/2 5 m, NACA 0012 open TE, linear loft | `mass_properties` | volume 0.959117 m³ ± 1e-4 relative | VC-SRF-11 |
 | AC-10 | the NASA CRM STEP | import + `check_continuity` on wing upper skin + `analyze_surface_curvature` | run completes within the performance budget; values recorded as golden (TBD on first run) | VC-SRF-12 |
 | AC-11 | 19 Sears–Haack stations + nose/tail points | `loft_fuselage` (G2) + `mass_properties` | volume within 0.5 % of 3π²R²L/16 = 4.626377 (L = 10, R = 0.5) | VC-SRF-13 |
-| AC-12 | an open loop of 3, 4 and 5 edges on a box-with-fillet corner | `fill_surface` with G1 | max G0 gap ≤ 1e-4 and G1 angle ≤ 0.01 rad on every boundary (OCC defaults) | VC-SRF-15 |
+| AC-12 | a closed loop of 3, 4 and 5 boundary edges around a hole at a box-with-fillet corner | `fill_surface` with G1 | max G0 gap ≤ 1e-4 and G1 angle ≤ 0.01 rad on every boundary (OCC defaults) | VC-SRF-15 |
 | AC-13 | two lofted wing segments | `sew_surfaces` → solid | 0 free edges, a valid solid, `mass_properties` equals sum of segment volumes ± 1e-6 rel | VC-SRF-16 |
 | AC-14 | a plane-normal draft test body | `analyze_draft` with pull +Z | draft angles equal analytic values ± 0.01° | VC-SRF-17 |
 | AC-15 | a known offset surface (sphere R = 10 vs R = 10.5) | `measure_deviation` | max = mean = 0.5 ± 1e-6 | VC-SRF-18 |

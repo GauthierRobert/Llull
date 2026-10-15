@@ -65,9 +65,9 @@ rule clone of `domain-aec`, knip workspace entry.
 
 ### 2.3 Kernel needs
 
-- Hole cut: `boolean` recipe node `difference(plate, cylinder)` already exists (KI5). OCC exact; Manifold
+- Hole cut: `boolean` recipe node `{ op: 'boolean', boolean: 'subtract', a: plate, b: cylinder }` already exists (KI5). OCC exact; Manifold
   mesh fallback acceptable for preview (`supports('boolean')` true on both).
-- Fastener solids: revolve of a 2D half-profile (`revolve_profile` recipe leaf) or primitive composition
+- Fastener solids: revolve of a 2D half-profile (a `revolve_profile` solid, entering recipes as a `solid` leaf) or primitive composition
   (cylinder shank + head). Generated once per part number into a `Component`; instances reuse it (KI5 cache
   keys by `recipeKey`, so N instances cost one evaluation).
 - Stack thickness measurement along an axis: ray–solid intersection. MVP: analytic for boxes/cylinders and

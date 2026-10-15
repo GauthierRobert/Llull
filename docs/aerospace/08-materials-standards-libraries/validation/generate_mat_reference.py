@@ -47,7 +47,7 @@ def unit_cases() -> list[dict]:
         cases.append({
             "id": f"VC-MAT-03/{rho}lb_in3",
             "input": {"density": rho, "unit": "lb/in^3"},
-            "expected": {"g/cm^3": r(g_cm3), "g/mm^3": r(g_cm3 / 1000.0), "kg/m^3": r(g_cm3 * 1000.0)},
+            "expected": {"g/cm^3": r(g_cm3, 12), "g/mm^3": r(g_cm3 / 1000.0, 12), "kg/m^3": r(g_cm3 * 1000.0, 12)},
             "tolerance": {"relative": 1e-9},
             "derivation": "rho[g/cm^3] = rho[lb/in^3] * 453.59237 / 16.387064 (exact constants)",
         })

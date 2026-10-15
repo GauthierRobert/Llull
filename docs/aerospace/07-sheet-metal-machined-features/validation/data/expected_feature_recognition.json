@@ -47,7 +47,7 @@
         "blind_drilled_holes_with_118deg_point": { "count": 2, "diameter": 20.0, "category": "c - two apexes of semi-angle 59 deg, each split into two half-cone faces adjacent to an r=10 cylinder" },
         "other_holes_pockets_fillets": "TBD - confirm against the CTC-01 PMI (CTC-FTC-Test-Cases.csv lists dia 20, 25, 35 dimensions and a 60 deg angle) before freezing counts"
       },
-      "notes": "Split periodic faces: every cone/cylinder of a hole may arrive as 2 faces; recognition must merge faces on the same analytic surface (FR-FTR-23)."
+      "notes": "Split periodic faces: every cone/cylinder of a hole may arrive as 2 faces; recognition must merge faces on the same analytic surface (FR-FTR-24)."
     },
     {
       "vc": "VC-FTR-21",

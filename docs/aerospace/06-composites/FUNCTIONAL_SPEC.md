@@ -252,7 +252,7 @@ The verbs (`run`, `exec`/shorthand, `--validate`, `--save`, `--json`) are the ex
 
 | KPI | Target |
 | --- | ------ |
-| Validation cases passing on desktop OCC | 100 % of MVP VCs (01-11, 14-16, 18, 20, 21) before MVP release; V1 VCs before V1 |
+| Validation cases passing on desktop OCC | 100 % of MVP VCs (01-11, 14-16, 18, 20, 21, 31, 32) before MVP release; V1 VCs before V1 |
 | CLT agreement with the reference generator | rel ≤ 1e-4 on all 14 cases |
 | Time to define a 3-zone, 24-ply panel and export flats (expert user) | ≤ 15 min (baseline: hand-drawn plies in a generic CAD, TBD measure) |
 | Agent success rate (US-7 benchmark prompt, 10 runs) | ≥ 8/10 produce a rule-clean laminate with positive FPF margin |

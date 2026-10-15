@@ -18,7 +18,9 @@ ti = (hi_i - lo_i)/2 (symmetric half tolerance). For a linear stack y = sum(ai *
   P(y < L) all-uniform:     exact generalised Irwin-Hall CDF (inclusion-exclusion over the 2^n width subsets);
                             the normal approximation is also reported to show its tail error.
 
-For a non-linear stack the first-order (linearised) sensitivities ai = df/dxi at the means are used
+Every case carries its exact coefficients ai ('sensitivities'; analytic partials at the means for the
+non-linear SU-05); the central difference below is only a fallback. For a non-linear stack these
+first-order (linearised) sensitivities ai = df/dxi at the means are used
 for WC/RSS, and the exact corner-search WC (all 2^n limit combinations) is reported alongside, which
 shows why a Monte Carlo is needed.
 
@@ -106,8 +108,10 @@ def evaluate(case: dict) -> dict:
     y_nominal = f(nominal_values)
     y_mean_lin = f(list(centres))
     eps = 1e-6
-    sens = []
-    for i in range(len(contribs)):
+    sens = list(case['sensitivities']) if 'sensitivities' in case else []
+    # exact coefficients: a central difference at |c| = 100 carries ~3e-9 relative error, which moves the
+    # probabilities by > 1e-12 and the SU-05 RSS by > 1e-9 (the stated tolerances)
+    for i in range(len(sens), len(contribs)):
         up = list(centres)
         dn = list(centres)
         up[i] += eps
@@ -192,6 +196,7 @@ CASES = [
         'title': 'Linear 1D gap: housing bore depth minus four stacked spacers (all symmetric, normal)',
         'expression': 'gap = H - (A + B + C + D)',
         'function': lambda x: x[0] - (x[1] + x[2] + x[3] + x[4]),
+        'sensitivities': [1.0, -1.0, -1.0, -1.0, -1.0],
         'contributors': [
             {'name': 'H', 'nominal': 100.00, 'lower': -0.10, 'upper': 0.10},
             {'name': 'A', 'nominal': 24.95, 'lower': -0.05, 'upper': 0.05},
@@ -206,6 +211,7 @@ CASES = [
         'title': 'Same stack, all contributors uniform (sigma = t / sqrt(3)) - RSS-normal is optimistic',
         'expression': 'gap = H - (A + B + C + D)',
         'function': lambda x: x[0] - (x[1] + x[2] + x[3] + x[4]),
+        'sensitivities': [1.0, -1.0, -1.0, -1.0, -1.0],
         'contributors': [
             {'name': 'H', 'nominal': 100.00, 'lower': -0.10, 'upper': 0.10, 'distribution': 'uniform'},
             {'name': 'A', 'nominal': 24.95, 'lower': -0.05, 'upper': 0.05, 'distribution': 'uniform'},
@@ -220,6 +226,7 @@ CASES = [
         'title': 'Unequal bilateral limits: pin in hole diametral clearance (re-centred to mean +- t)',
         'expression': 'clearance = Dhole - Dpin',
         'function': lambda x: x[0] - x[1],
+        'sensitivities': [1.0, -1.0],
         'contributors': [
             {'name': 'Dhole', 'nominal': 20.000, 'lower': 0.000, 'upper': 0.021},
             {'name': 'Dpin', 'nominal': 20.000, 'lower': -0.020, 'upper': -0.007},
@@ -231,6 +238,7 @@ CASES = [
         'title': 'Non-unit sensitivities: radial clearance of a pin in a located hole (diameters enter with 1/2)',
         'expression': 'radialClearance = Dhole/2 - Dpin/2 - e1 - e2   (e = radial locating error of hole and pin axes)',
         'function': lambda x: x[0] / 2 - x[1] / 2 - x[2] - x[3],
+        'sensitivities': [0.5, -0.5, -1.0, -1.0],
         'contributors': [
             {'name': 'Dhole', 'nominal': 10.20, 'lower': -0.05, 'upper': 0.05},
             {'name': 'Dpin', 'nominal': 10.00, 'lower': -0.02, 'upper': 0.02},
@@ -244,6 +252,8 @@ CASES = [
         'title': 'Non-linear: tip height of an arm h = L sin(theta), theta in degrees - linearised WC vs exact corners vs MC',
         'expression': 'h = L * sin(theta_deg * pi / 180)',
         'function': lambda x: x[0] * math.sin(math.radians(x[1])),
+        # analytic partials at the means (L = 100, theta = 30 deg): dh/dL = sin(theta), dh/dtheta = L cos(theta) pi/180
+        'sensitivities': [math.sin(math.radians(30.0)), 100.0 * math.cos(math.radians(30.0)) * math.pi / 180.0],
         'contributors': [
             {'name': 'L', 'nominal': 100.0, 'lower': -0.1, 'upper': 0.1},
             {'name': 'theta_deg', 'nominal': 30.0, 'lower': -0.5, 'upper': 0.5, 'unit': 'deg'},

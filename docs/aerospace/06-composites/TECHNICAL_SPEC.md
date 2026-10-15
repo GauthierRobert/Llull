@@ -26,7 +26,7 @@ Grep result (2026-10-15): no `ply`, `laminate`, `drape`, `rosette` or `fiber` co
 
 ```
 packages/domain-aero/src/composites/          NEW plugin "composites" (toolset "composites")
-  model.ts            CompositesModel types + validation (DocumentExtension)
+  model.ts            CompositesModel validation (DocumentExtension); the types live in core model/composites.ts (§3)
   notation.ts         stacking-notation parser / printer (pure)
   clt.ts              Q, Qbar, ABD, inverse, constants, ply stresses (pure)
   failure.ts          max stress, Tsai-Hill, Tsai-Wu (pure; LaRC03 in V2)
@@ -74,7 +74,9 @@ All lengths are in document units (mm in tests), angles in degrees, stresses in 
 final versions follow C1: no `any`, unions over comments, `readonly`.
 
 ```ts
-// packages/domain-aero/src/composites/model.ts
+// packages/core/src/model/composites.ts — the type lives in core next to building.ts / civil.ts, because
+// `CadDocument` (core) references it and core never imports a plugin (L2, L10). Validation, derivation and
+// commands stay in the plugin (packages/domain-aero/src/composites/model.ts implements the DocumentExtension).
 export type LaminaForm = 'ud_tape' | 'woven' | 'core_honeycomb' | 'core_foam';
 export type AllowableBasis = 'mean' | 'b_basis' | 'a_basis' | 'unknown';
 
@@ -217,8 +219,8 @@ and query commands return `data` without changing the document. Each command fil
 
 Notes:
 
-- **Read-only queries** carry MCP annotations `readOnlyHint: true`, so agents may call them freely
-  (FR-CMP-62).
+- **Read-only queries** declare `annotations: { readOnly: true }` (`commands/types.ts` `CommandAnnotations`),
+  emitted as the MCP `readOnlyHint`, so agents may call them freely (FR-CMP-62).
 - **Composition.** `generate_plies_from_zones` and `import_ply_table` compose `add_ply` through
   `ctx.registry` / `execute` (L10). They do not build plies inline.
 - **Retirement.** None.
@@ -555,6 +557,20 @@ separator. Numbers use `.` as the decimal mark.
 | `server/tests/` + `desktop/tests/` | CLI `run` of the plans with `--kernel occt`; MCP `build_project` parity | VC-CMP-21 |
 | `npm run quality` | timing of VC-CMP-22 on the reference machine | VC-CMP-22 |
 | Validation scripts | `python3 generate_*.py --check` in CI (stdlib only) | all derived values |
+
+Technical requirement ids cited by the validation pack (each points to the section that specifies it):
+
+| Id | Requirement | Spec |
+| -- | ----------- | ---- |
+| TR-CMP-01 | Every mutating command is pure (returns a new document; `is pure` test) | §2 L3 |
+| TR-CMP-02 | Step-scoped deterministic ids; plans replay to identical documents | §2 L8, §8 Determinism |
+| TR-CMP-03 | Derived ply geometry is listed by `derivedEntityIds`, read-only via derivation guards, regenerated on load | §3, §6.1 |
+| TR-CMP-30..36 | CLT and first-ply failure as specified: Q/Q̄/ABD/inverse/constants (30), bottom-to-top stacking and B sign convention (31), ply stresses (32), failure criteria (33), singular-laminate rejection (34), tolerances (35), units (36) | §5.2, §5.3, §5.9 |
+| TR-CMP-40 | Kinematic drape on exact faces through optional `GeometryKernel` face queries read from `ctx.kernel` (`requiresKernel`) | §5.4, §5.5 |
+| TR-CMP-41 | Drape self-checks: sphere closed-form oracle, generator symmetry, Gauss-Bonnet residual | §5.4 |
+| TR-CMP-60 | Generic DXF writer in `@lib/dxfWrite.ts`, flat-pattern DXF layout | §6.2 |
+| TR-CMP-70 | UI, CLI and MCP reach the same registry commands with identical results | §7 |
+| TR-CMP-80 | Performance budgets | §8 |
 
 Coverage: `packages/domain-aero/src/**` is added to the 90/85/90/90 gate (NON-NEGOTIABLE 3, which today
 names domain-aec; extend the gate config).

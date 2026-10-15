@@ -71,9 +71,9 @@
     },
     "sigma": 0.041365579,
     "lowerSpecLimit": 0.0,
-    "pBelowLowerLimit": 0.000143809448,
+    "pBelowLowerLimit": 0.000143809451,
     "pMethod": "normal CDF (exact: linear sum of independent normals)",
-    "pBelowLowerLimitNormalApprox": 0.000143809448
+    "pBelowLowerLimitNormalApprox": 0.000143809451
    },
    "unit": "mm",
    "monteCarlo": {
@@ -167,9 +167,9 @@
     },
     "sigma": 0.071647284,
     "lowerSpecLimit": 0.0,
-    "pBelowLowerLimit": 0.012083445811,
+    "pBelowLowerLimit": 0.012083333333,
     "pMethod": "exact CDF of a sum of independent uniforms (inclusion-exclusion, generalised Irwin-Hall)",
-    "pBelowLowerLimitNormalApprox": 0.018148282877
+    "pBelowLowerLimitNormalApprox": 0.018148283044
    },
    "unit": "mm",
    "monteCarlo": {
@@ -183,7 +183,7 @@
     "acceptance": {
      "meanTolerance": 0.000801041,
      "stdTolerance": 0.000566422,
-     "pTolerance": 0.001221548
+     "pTolerance": 0.001221542
     },
     "pBelowLowerLimit": 0.01212
    }
@@ -313,9 +313,9 @@
     },
     "sigma": 0.014813657,
     "lowerSpecLimit": 0.0,
-    "pBelowLowerLimit": 0.000368724954,
+    "pBelowLowerLimit": 0.000368724955,
     "pMethod": "normal CDF (exact: linear sum of independent normals)",
-    "pBelowLowerLimitNormalApprox": 0.000368724954
+    "pBelowLowerLimitNormalApprox": 0.000368724955
    },
    "unit": "mm",
    "monteCarlo": {
@@ -363,20 +363,20 @@
     "yNominal": 50.0,
     "yMean": 50.0,
     "worstCase": {
-     "halfTolerance": 0.805749736,
-     "min": 49.194250264,
-     "max": 50.805749736
+     "halfTolerance": 0.805749735,
+     "min": 49.194250265,
+     "max": 50.805749735
     },
     "worstCaseExactCorners": {
      "min": 49.193113654,
      "max": 50.804590132
     },
     "rss": {
-     "halfTolerance": 0.757401917,
-     "min": 49.242598083,
-     "max": 50.757401917
+     "halfTolerance": 0.757401916,
+     "min": 49.242598084,
+     "max": 50.757401916
     },
-    "sigma": 0.252467306
+    "sigma": 0.252467305
    },
    "unit": "mm",
    "monteCarlo": {

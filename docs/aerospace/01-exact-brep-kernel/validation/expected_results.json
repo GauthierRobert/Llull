@@ -30,7 +30,13 @@
    },
    "unit": "mm, mm^2, mm, mm^5",
    "source": "analytic (b): analytic_solids.json, formulas in README Derivations; OCCT 7.9.3 cross-check worst rel err 1.1e-14 (occt_crosscheck.json)",
-   "plan": "plans/krn-analytic-primitives.json"
+   "plan": "plans/krn-analytic-primitives.json",
+   "centroidInPlan": [
+    50.0,
+    25.0,
+    10.0
+   ],
+   "centroidNote": "value.centroid is in the solid local frame of analytic_solids.json; the plan places the solid elsewhere (add_* position/anchor), so compare the plan result with centroidInPlan"
   },
   {
    "vc": "VC-KRN-01",
@@ -61,7 +67,13 @@
    },
    "unit": "mm, mm^2, mm, mm^5",
    "source": "analytic (b): analytic_solids.json, formulas in README Derivations; OCCT 7.9.3 cross-check worst rel err 1.1e-14 (occt_crosscheck.json)",
-   "plan": "plans/krn-analytic-primitives.json"
+   "plan": "plans/krn-analytic-primitives.json",
+   "centroidInPlan": [
+    200.0,
+    0.0,
+    20.0
+   ],
+   "centroidNote": "value.centroid is in the solid local frame of analytic_solids.json; the plan places the solid elsewhere (add_* position/anchor), so compare the plan result with centroidInPlan"
   },
   {
    "vc": "VC-KRN-01",
@@ -122,7 +134,13 @@
    },
    "unit": "mm, mm^2, mm, mm^5",
    "source": "analytic (b): analytic_solids.json, formulas in README Derivations; OCCT 7.9.3 cross-check worst rel err 1.1e-14 (occt_crosscheck.json)",
-   "plan": "plans/krn-analytic-primitives.json"
+   "plan": "plans/krn-analytic-primitives.json",
+   "centroidInPlan": [
+    300.0,
+    0.0,
+    0.0
+   ],
+   "centroidNote": "value.centroid is in the solid local frame of analytic_solids.json; the plan places the solid elsewhere (add_* position/anchor), so compare the plan result with centroidInPlan"
   },
   {
    "vc": "VC-KRN-01",
@@ -153,7 +171,13 @@
    },
    "unit": "mm, mm^2, mm, mm^5",
    "source": "analytic (b): analytic_solids.json, formulas in README Derivations; OCCT 7.9.3 cross-check worst rel err 1.1e-14 (occt_crosscheck.json)",
-   "plan": "plans/krn-analytic-primitives.json"
+   "plan": "plans/krn-analytic-primitives.json",
+   "centroidInPlan": [
+    400.0,
+    0.0,
+    15.0
+   ],
+   "centroidNote": "value.centroid is in the solid local frame of analytic_solids.json; the plan places the solid elsewhere (add_* position/anchor), so compare the plan result with centroidInPlan"
   },
   {
    "vc": "VC-KRN-01",
@@ -184,7 +208,13 @@
    },
    "unit": "mm, mm^2, mm, mm^5",
    "source": "analytic (b): analytic_solids.json, formulas in README Derivations; OCCT 7.9.3 cross-check worst rel err 1.1e-14 (occt_crosscheck.json)",
-   "plan": "plans/krn-analytic-primitives.json"
+   "plan": "plans/krn-analytic-primitives.json",
+   "centroidInPlan": [
+    550.0,
+    0.0,
+    0.0
+   ],
+   "centroidNote": "value.centroid is in the solid local frame of analytic_solids.json; the plan places the solid elsewhere (add_* position/anchor), so compare the plan result with centroidInPlan"
   },
   {
    "vc": "VC-KRN-01",
@@ -215,7 +245,13 @@
    },
    "unit": "mm, mm^2, mm, mm^5",
    "source": "analytic (b): analytic_solids.json, formulas in README Derivations; OCCT 7.9.3 cross-check worst rel err 1.1e-14 (occt_crosscheck.json)",
-   "plan": "plans/krn-analytic-primitives.json"
+   "plan": "plans/krn-analytic-primitives.json",
+   "centroidInPlan": [
+    40.0,
+    230.0,
+    5.0
+   ],
+   "centroidNote": "value.centroid is in the solid local frame of analytic_solids.json; the plan places the solid elsewhere (add_* position/anchor), so compare the plan result with centroidInPlan"
   },
   {
    "vc": "VC-KRN-02",
@@ -681,11 +717,20 @@
       -0.9958026936300081,
       99.19902363421691
      ]
+    },
+    "gvpMm": {
+     "volume": 12694914.68692222,
+     "area": 861242.9165391091,
+     "centroid": [
+      -0.00444232975083708,
+      -1.0106082709285138,
+      99.72360139103179
+     ]
     }
    },
    "tolerance": null,
    "unit": "mm",
-   "source": "file GVP and OCCT 7.9.3 disagree beyond tolerance; treat as knownIssue until triaged (GVP may be scoped to a SHAPE_ASPECT or stale)",
+   "source": "file GVP and OCCT 7.9.3 disagree beyond tolerance; treat as knownIssue until triaged (GVP may be scoped to a SHAPE_ASPECT or stale); NOTE the file length unit is inch and value.gvp is in inches (file units): compare value.gvpMm (converted x25.4) with occt — still ~1.1e-2 volume / ~1.9e-3 area / ~2.2 mm centroid apart",
    "knownIssueToday": true
   },
   {

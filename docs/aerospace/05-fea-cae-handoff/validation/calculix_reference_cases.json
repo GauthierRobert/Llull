@@ -35,7 +35,7 @@
    ],
    "reference_values": {"frequencies_Hz": [13096.03, 19319.52, 76839.71, 86955.23, 105963.6, 162998.5, 197645.0, 256161.0, 261139.5, 351862.3]},
    "analytic_comparison": "VC-FEA-11.a: Euler-Bernoulli f1 (weak axis) = 13096.7 Hz (+0.005 %); 11.b strong axis 19645.1 Hz (+1.7 %, shear/rotary inertia); 11.c second weak-axis bending 82075.8 Hz (+6.8 %)",
-   "used_for": ["FR-FEA-20 (modal)", "FR-FEA-13 (FRD eigenmode blocks)"]
+   "used_for": ["FR-FEA-19 (modal)", "FR-FEA-13 (FRD eigenmode blocks)"]
   },
   {
    "id": "VC-FEA-42",
@@ -47,7 +47,7 @@
    ],
    "reference_values": {"buckling_factors": [48.15456, 106.3175, 393.4026, 780.7062, 927.9968, 1490.897, 1595.536, 1986.459, 1991.373, 2177.302]},
    "analytic_comparison": "NOT an analytic oracle: Euler fixed-free P_cr = pi^2 E I_min / (4 L^2) = 1012 N total (factor 506 per 1 N node load) differs from 48.15 because the load is applied to two corner nodes of a quadratic element. Use only as a solver regression oracle (llull must parse the BUCKLING FACTOR block exactly).",
-   "used_for": ["FR-FEA-21 (buckling result parsing)"]
+   "used_for": ["FR-FEA-20 (buckling result parsing)"]
   },
   {
    "id": "VC-FEA-43",

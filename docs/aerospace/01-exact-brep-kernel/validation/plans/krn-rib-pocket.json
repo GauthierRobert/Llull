@@ -9,7 +9,10 @@
   "command": "create_material",
   "params": {
    "name": "aluminium",
-   "density": 0.0027
+   "density": 0.0027,
+   "color": "#b0b0b0",
+   "metalness": 1,
+   "roughness": 0.3
   }
  },
  {

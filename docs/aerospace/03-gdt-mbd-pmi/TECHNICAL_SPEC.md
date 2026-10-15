@@ -481,11 +481,11 @@ id-normalisation (`tests/golden/normalize.ts` must normalise `pmi-<step>.<k>` li
 | Layer | File(s) | Covers | VC |
 | --- | --- | --- | --- |
 | unit | `tests/unit/pmi/datum.test.ts`, `tolerance.test.ts`, `dimension.test.ts`, `surface.test.ts`, `views.test.ts` | happy + every failure code, `is pure` | VC-GDT-01, 03, 04 |
-| unit (OCC) | `tests/unit/pmi/featureResolution.occt.test.ts` (server/ OCC worker, like `server/tests/occtParametricEdges.test.ts`) | facesNear resolution, ambiguity, replay after resize | VC-GDT-02 |
+| unit (OCC) | `server/tests/occtPmiFeatures.test.ts` (OCC worker, like `server/tests/occtParametricEdges.test.ts`) | facesNear resolution, ambiguity, replay after resize | VC-GDT-02 |
 | unit | `tests/unit/lib/stackup.test.ts` | `stackup_reference.json` SU-01..05, FF-01..03; uniform CDF; erfc accuracy | VC-GDT-30..35 |
 | unit | `tests/unit/lib/prng.test.ts` | determinism per seed, uniformity (χ² on 1e5 draws, p > 1e-3) | VC-GDT-33 |
-| contract | `tests/unit/contract/toolSchemas.test.ts` snapshot | new schemas | VC-GDT-52 |
-| contract | `tests/unit/contract/persistence.test.ts` | `pmiValidation` round trip and rejections | VC-GDT-50 |
+| contract | `tests/unit/contract/toolSchemaSnapshot.test.ts` snapshot (`__snapshots__/toolSchemas.json`) | new schemas | VC-GDT-52 |
+| contract | `tests/unit/persistence.test.ts` + `tests/unit/contract/persistenceV2.test.ts` | `pmiValidation` round trip and rejections | VC-GDT-50 |
 | golden | `tests/golden/plans.ts` `kernelPlans.gdt_plate` (from `validation/draft_plan_gdt_plate.json`) | id-normalised snapshot + replay equality | VC-GDT-01, 50 |
 | component | `tests/component/PmiPanel.test.tsx` | param gathering, no geometry math | VC-GDT-53 |
 | drawings | `tests/unit/drawings/pmiPainter.test.ts` | auto selection, placed/skipped, SVG contains frame/glyph groups | VC-GDT-10, 11 |

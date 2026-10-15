@@ -153,13 +153,13 @@ User stories (each maps to FRs):
 ### 6.2 W2 — Supplier modifies an OEM STEP part (CLI, local agent)
 
 ```bash
-llull --app import_step_brep '{"path":"in/nist_ctc_01_asme1_ap242-e1.stp","heal":true}'
+llull --app import_step_brep file=in/nist_ctc_01_asme1_ap242-e1.stp heal=true   # file= → stepBase64 (CLI FILE_PARAMS)
 # → data: { bodies:[{id, name, valid:true, healed:[...], maxTolerance:0.00335, gvp:{volumeRelDiff:4.6e-8, ...}}] }
-llull --app validate_shape '{"ids":["$imported"]}'
+llull --app validate_shape '{"ids":["<imported id>"]}'
 llull --app add_cylinder '{"radius":5,"height":200,"position":[0,0,-150]}'
 llull --app boolean '{"op":"subtract","a":"<imported id>","b":"<cylinder id>"}'
 llull --app mass_properties '{"entityId":"<result id>"}'
-llull --app export_step_exact '{"ids":["<result id>"],"validationProperties":true}'
+llull --app export_step_exact '{"entityIds":["<result id>"],"validationProperties":true}' --save out/part.step
 ```
 
 Each line is one command (same registry as the UI); the user sees each change live in the window and can undo.

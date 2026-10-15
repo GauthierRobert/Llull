@@ -217,7 +217,7 @@ Priority: MUST / SHOULD / COULD. Source = where the requirement or its numbers c
 llull sheet_metal_calc thickness=0.064 insideRadius=0.25 angle=135 kFactor=0.4475 units=in --json   # SB 0.758 in (AC 43.13-1B)
 llull run validation/plans/draft_sheet_metal_bracket.json --doc bracket.llull.json --json          # build + check + unfold
 llull export_flat_pattern_dxf id=<sm> --doc bracket.llull.json --save bracket_flat.dxf
-llull import_step file=supplier.stp --doc part.llull.json && llull recognize_features id=<id> --doc part.llull.json --json
+llull import_step file=supplier.stp --doc part.llull.json && llull recognize_features id=<id> --doc part.llull.json --json   # needs exact STEP import (TECHNICAL_SPEC §2.2, D9)
 ```
 
 ### 6.3 MCP agent (cloud)
@@ -239,7 +239,7 @@ llull import_step file=supplier.stp --doc part.llull.json && llull recognize_fea
 | AC-05 | Flat pattern of AC-03 | `export_flat_pattern_dxf` | DXF contains only LINE/ARC/CIRCLE (and TEXT when notes are on), one bend line on layer BEND_UP, extents 65.8457 × 50 | VC-FTR-09 |
 | AC-06 | Rule with R = 0 and a table row for the material | `check_sheet_metal` | one violation `min_bend_radius`, with the table row cited | VC-FTR-10 |
 | AC-07 | Joggle φ = 20°, R = 1.6, T = 1.6, h = 1.6, K = 0.44 | `flat_pattern` | joggle allowance 0.197880 mm ±0.001; JG-04 rejected with reason | VC-FTR-11 |
-| AC-08 | 100 × 60 × 10 plate | four `add_hole` countersink calls (d 4.8, D 9.0, 100°) + 2 counterbores + pocket + blind 118° | volume 55978.529153 mm³ (rel 1e-6); each countersink depth 1.762109 mm | VC-FTR-22, VC-FTR-25 |
+| AC-08 | 100 × 60 × 10 plate | one `add_hole` countersink call with four positions (d 4.8, D 9.0, 100°) + 2 counterbores + pocket + blind 118° | volume 55978.529153 mm³ (rel 1e-6); each countersink depth 1.762109 mm | VC-FTR-22, VC-FTR-25 |
 | AC-09 | Countersink d 4.8 / D 9.0 / 100° in 1.6 mm sheet | `check_machining` | knife-edge violation (land −0.162 mm); in 3.0 mm sheet with D 12/d 6.4 no violation | VC-FTR-23 |
 | AC-10 | `ftr_machined_plate.step` imported | `recognize_features` | 7 holes (4 csk 100°, 2 cbore, 1 blind 118°) + 1 pocket rc 3, positions ±1e-4 mm, no false positives | VC-FTR-17 |
 | AC-11 | NIST CTC-01 imported | `recognize_features` | exactly 2 blind holes ∅20 with 118° point, each built from 2 half-cone faces | VC-FTR-20 |
@@ -281,7 +281,7 @@ data holder. Every table row carries its source and edition, so the user can sho
 | ----------------- | ------ | ---------- |
 | Primary FAA/NIST pages could not be fetched while writing this spec; some numbers are V-search | A wrong reference value could pass into a test | `validation/README.md` §6 lists the re-checks; V-search values are tagged, and a CI gate is frozen only after re-check |
 | Table 4-6 radii unverified | Wrong minimum radius advice | Ship an empty table with schema and source fields; users import company or AC values |
-| opencascade.js@1.1.1 may lack bindings for `BRepFeat_*` | Native features unavailable in the browser kernel | Build holes and pockets as recipe sub-trees of existing primitives and booleans (works today, see baseline plan). `BRepFeat` is an optimisation; desktop OCC via CadQuery/OCP has it |
+| opencascade.js@1.1.1 lacks usable bindings for part of `BRepFeat_*` (review probe: `MakeCylindricalHole` not constructible, `MakeLinearForm` absent; `MakePrism`/`MakeRevol` construct — TECHNICAL_SPEC §1) | Native holes and ribs unavailable in the in-process kernel | Build holes and pockets as recipe sub-trees of existing primitives and booleans (works today, see baseline plan). `BRepFeat` is an optimisation; desktop OCC via CadQuery/OCP has it |
 | Topological naming after upstream edits | Holes land on the wrong face | Face `near` points re-resolved on replay (KI5 pattern), plus a test that a hole stays on its face after a resize (VC-FTR-30) |
 | K-factor is process-dependent | Flat length error | K is always explicit or from a user table. The "engineering mode" idea from FreeCAD [R7] makes K mandatory |
 | Feature recognition ambiguity (chamfer vs countersink, fillet vs partial hole) | Wrong classification | Adjacency rules plus angular-span tests. Report confidence and ambiguous items instead of guessing |
@@ -301,5 +301,6 @@ data holder. Every table row carries its source and edition, so the user can sho
 - [R10] OCCT TKFeat / TKOffset headers @3d097a0 — Open Cascade SAS / GitHub — https://github.com/Open-Cascade-SAS/OCCT (accessed 2026-10, fetched)
 - [R11] NIST CTC AP242 mirror @12fa031 — pzfreo/dw-examples / GitHub — https://github.com/pzfreo/dw-examples (accessed 2026-10, fetched)
 - [R12] cadquery-ocp 8.0.1.1.0 — PyPI — https://pypi.org/project/cadquery-ocp/ (accessed 2026-10, installed)
+- [R14] Analyzing the k-factor in sheet metal bending — The Fabricator — https://www.thefabricator.com/thefabricator/article/bending/analyzing-the-k-factor-in-sheet-metal-bending (accessed 2026-10, V-search; definition only)
 
 Full verification log: `validation/sources.md`.

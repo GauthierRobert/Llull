@@ -20,7 +20,7 @@ Laws: `.claude/rules/architecture.md` L1–L10 · Decisions: KI5 (shape boundary
 | Topology query | `inspect_topology` | `commands/brep/topology.ts`, OCC `occtTopology.ts` | Faces/edges with `FaceSurface` (`plane`…`bspline`) and `EdgeCurve` types, areas, lengths | No curvature, normals, continuity, poles/knots |
 | Measurement | `measure_*`, `mass_properties`, `check_model` | `commands/inspect/*` | Volume/area/bbox | No surface analysis |
 | Kernel port | `GeometryKernel` | `packages/core/src/geometry/kernel.ts` | `supports`, `evaluate(recipe)`, `tessellate`, `topology`, `exportStep` (sync, no async) | No surface/curve evaluation or analysis methods |
-| Recipe | `ShapeRecipe` | `geometry/shapeRecipe.ts` | Leaves `solid` (entity) + `boolean`, `fillet`, `chamfer`, `blend`, `shell`, `place`, `scale` | No `sew`, `trim`, `fill`, `thicken`, `offset`; leaves must be closed solids |
+| Recipe | `ShapeRecipe` | `model/types.ts` (type), `geometry/shapeRecipe.ts` (`recipeKey`, validation) | Leaves `solid` (entity) + `boolean`, `fillet`, `chamfer`, `blend`, `shell`, `place`, `scale` | No `sew`, `trim`, `fill`, `thicken`, `offset`; leaves must be closed solids |
 
 Toolsets (`packages/mcp/src/toolsets.ts`): the 3D toolset lists `sweep_profile loft_sections … add_subdivision_solid
 edit_subdivision_cage surface_from_curves`; `TOOLSET_NAMES` = `core, 2d, 3d, measure, parametric, assembly, exchange,
@@ -42,7 +42,7 @@ From `dist/Supported APIs.md` of the pinned tag (green = bound):
 | `BRepBuilderAPI_Sewing`, `BRepOffsetAPI_MakeOffsetShape`, `BRepOffsetAPI_DraftAngle`, `BRepExtrema_DistShapeShape`, `GeomAPI_ProjectPointOnSurf`, `BRepAlgoAPI_Section`, `ShapeFix_Shape`, `BRepCheck_Analyzer`, `BRepGProp` | yes | sew, thicken, draft, deviation, trim, validity |
 | `TColgp_Array2OfPnt` | not listed (typedef) | llull already works around 2D pole arrays (`occtPatches.ts`) — keep that technique or custom build |
 
-"Bound" ≠ "works": every class used must get an integration test in `server/tests/` (TR-SRF-40).
+"Bound" ≠ "works": every class used must get an integration test in `server/tests/` (§9 "Kernel integration").
 
 ## 2. Target architecture
 
@@ -385,7 +385,7 @@ and leaves for `nurbs_surface`/`nurbs_curve`/`loft` v3 entities. `recipeKey` get
   tessellation, no command needed — exact normals come from `tessellate`), `CurvatureMapMaterial` (per-vertex scalar
   from `analyze_surface_curvature` grid, legend + clamping), `DraftMapMaterial`. Continuity results table in an
   inspector panel. Airfoil/wing/fuselage dialogs with tables (sections, stations).
-- **CLI**: `llull --app run plan.json`, `llull query <command> '<json>'`; `import_airfoil` accepts `path` through
+- **CLI**: `llull run plan.json --app`, `llull exec <command> '<json>'` (queries print `data` with `--json`); `import_airfoil` accepts `path` through
   `/exchange` (KI6).
 - **MCP**: toolsets `surface` and `aero` appended to `TOOLSET_NAMES`; `search_tools` finds them by keywords
   (airfoil, NACA, wing, curvature, zebra, G2). Prompts: an `aero_wing` prompt describing the canonical plan.

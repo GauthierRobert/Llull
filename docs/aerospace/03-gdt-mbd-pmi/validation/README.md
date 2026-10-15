@@ -105,11 +105,11 @@ analytic surfaces), counts exact; Monte Carlo per the 5σ statistical bounds lis
 | VC-GDT-25 | FR-25 (V2) | graphic PMI export | visible in SFA viewer | TBD — measure with NIST SFA viewer | [R18] |
 | VC-GDT-26 | FR-26 (V2) | TDP bundle | manifest with hashes | TBD | [R22] |
 | VC-GDT-27 | FR-27 (V2) | zone visualisation | slab 0.05 mm | 1e-9 mm | FCF value |
-| VC-GDT-30 | FR-16, TR-11 | SU-01 (normal, linear) | mean 0.15; WC [−0.09, 0.39]; RSS ±0.124096736; σ 0.041365579; P(gap<0) 1.43809448e-4 | 1e-9 mm; p 1e-12 | derived |
-| VC-GDT-31 | FR-16 | SU-02 (uniform) | WC/RSS as SU-01; σ 0.071647284; exact P(gap<0) 1.2083445811e-2 (normal approx would say 1.8148e-2) | 1e-9; p 1e-12 | derived (Irwin–Hall) |
+| VC-GDT-30 | FR-16, TR-11 | SU-01 (normal, linear) | mean 0.15; WC [−0.09, 0.39]; RSS ±0.124096736; σ 0.041365579; P(gap<0) 1.43809451e-4 | 1e-9 mm; p 1e-12 | derived |
+| VC-GDT-31 | FR-16 | SU-02 (uniform) | WC/RSS as SU-01; σ 0.071647284; exact P(gap<0) 1.2083333333e-2 (= 29/2400) (normal approx would say 1.8148e-2) | 1e-9; p 1e-12 | derived (Irwin–Hall) |
 | VC-GDT-32 | FR-16 | SU-03 (unequal limits) | mean 0.024; WC [0.007, 0.041]; RSS ±0.012349089; P ≈ 2.765e-9 | 1e-9 | derived |
-| VC-GDT-33 | FR-16/17 | SU-04 (sensitivity ½) | mean 0.05; WC [−0.035, 0.135]; RSS ±0.044440972; P 3.68724954e-4; MC deterministic per seed | 1e-9; MC 5σ | derived |
-| VC-GDT-34 | FR-16 | SU-05 (non-linear h = L sinθ) | linear WC [49.194250264, 50.805749736]; exact corners [49.193113654, 50.804590132]; RSS ±0.757401917; σ 0.252467306 | 1e-9 | derived |
+| VC-GDT-33 | FR-16/17 | SU-04 (sensitivity ½) | mean 0.05; WC [−0.035, 0.135]; RSS ±0.044440972; P 3.68724955e-4; MC deterministic per seed | 1e-9; MC 5σ | derived |
+| VC-GDT-34 | FR-16 | SU-05 (non-linear h = L sinθ) | linear WC [49.194250265, 50.805749735]; exact corners [49.193113654, 50.804590132]; RSS ±0.757401916; σ 0.252467305 | 1e-9 | derived |
 | VC-GDT-35 | FR-19, TR-12 | FF-01..03 | floating T = 0.6; fixed T = 0.3; hole 6.6–6.9 pos Ø0.3 Ⓜ: 0.3 @MMC, 0.6 @LMC, 0.45 @6.75, VC 6.3 | 1e-12 | derived |
 | VC-GDT-36 | FR-18 | stack with contributor `pmiId: boreSize` | = SU-03; after bore upper 0.025: WC max 0.045 | 1e-9 | derived |
 | VC-GDT-40 | FR-09 | ideal profiles | e.g. sine A=0.8 µm: Ra 0.509295818, Rq 0.565685425, Rku 1.5, Rz 1.6 | 1e-4 µm | closed forms |
