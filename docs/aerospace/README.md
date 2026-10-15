@@ -106,6 +106,9 @@ output (`python3 -I <script>` from its `validation/` folder). Four scripts need 
    owns `export_step_ap242` and the single GVP band policy.
 5. **Licensing**: shipping GPL Gmsh and CalculiX with the desktop installer (05); licensed MMPDS / NAS /
    CMH-17 data must stay in private libraries that never land in saved files (08).
+5b. **Agent-first plumbing (shared prerequisite, do first)**: plan reports with per-step error codes,
+   query `data` and an alias→ids map (AGENT_FIRST AF-14); human gates bound to a human-held signing key
+   (AF-34a). Every pack's CLI validation cases assume these.
 6. **Open surfaces** as 3D entities that are not closed solids (02 D1); `DerivationGuard.check` receiving the
    command name (09); the DXF writer moving from domain-aec to core `lib` (07 D4).
 
