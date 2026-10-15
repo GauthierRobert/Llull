@@ -44,7 +44,7 @@ Agents are isolated; coordination is structural, run by the orchestrator:
 ## Open tasks (DONE/REMOVED pruned 2026-10-13; full history in git)
 
 ## Lane 2 — 3D viewport + UI shell (`viewport-engineer`)
-- `[TODO]` **E3** Layers panel (visibility/lock) + undo/redo buttons + shortcuts. _deps: W0-2_
+- `[WIP]` **E3** Layers panel (visibility/lock) + undo/redo buttons + shortcuts. _deps: W0-2_
 
 ## Lane 5 — Tests & review (`test-verifier`, `cad-reviewer`) — continuous, non-blocking
 - `[TODO]` **I1** Hold the `core/commands/**` 90/85/90/90 gate; happy + failure test per new command. _runs with every Lane-1 task_
@@ -64,7 +64,7 @@ Agents are isolated; coordination is structural, run by the orchestrator:
 - `[TODO]` **KI7** Typed command/tool client bindings (DX): generate typed params/return bindings from the registry so callers (UI param forms, the example agent, tests) get compile-time safety instead of `unknown`. _Lane 1/4. deps: —. Acceptance: a generated typed surface used by ≥1 caller; no `any`; gate held. (Lower priority.)_
 
 ## Group 2 — NEW WANTED FEATURES (net-new product capability)
-- `[TODO]` **NF3** Drawings & sheets (2D documentation from 3D): `create_drawing_view` (orthographic projection of a solid onto a sheet), `add_section_view`, `add_detail_view`; a `sheet`/paper-space concept with title block. _Lane 1 cmd + Lane 3 render. deps: M1; hidden-line ideally KI4 (mesh silhouette acceptable v1). PAIR(NF3↔VNF3). Acceptance: a box yields front/top/right views on a sheet; views update when the model changes._
+- `[WIP]` **NF3** Drawings & sheets (2D documentation from 3D): `create_drawing_view` (orthographic projection of a solid onto a sheet), `add_section_view`, `add_detail_view`; a `sheet`/paper-space concept with title block. _Lane 1 cmd + Lane 3 render. deps: M1; hidden-line ideally KI4 (mesh silhouette acceptable v1). PAIR(NF3↔VNF3). Acceptance: a box yields front/top/right views on a sheet; views update when the model changes._
 - `[TODO]` **VNF3** Sheet/paper-space mode: render projected views + title block + sheet-placed dimensions. _Lane 3. deps: NF3._
 - `[TODO]` **NF7** Direct face editing / push-pull: select a planar face → push/pull to add/remove material. _Lane 1 cmd + Lane 2 interaction. deps: KI4 (face topology). **STRETCH** — needs B-rep faces; defer if OCC deferred._
 
