@@ -40,6 +40,8 @@ export const updateDrawingView = defineCommand({
     const { direction, offset, center, radius } = params;
     if (direction !== undefined && view.kind === 'detail') return fail('a detail view has no direction');
     if (direction === 'iso' && view.kind === 'section') return fail('a section view cannot be iso');
+    if (direction === 'iso' && sheet.views.some((other) => other.detail?.parentViewId === view.id))
+      return fail('a view with detail views cannot become iso');
     if (offset !== undefined && view.kind !== 'section') return fail('offset only applies to section views');
     if ((center !== undefined || radius !== undefined) && view.kind !== 'detail') return fail('center / radius only apply to detail views');
     const problem = params.entityIds === undefined ? null : entityProblem(doc, params.entityIds);
@@ -137,6 +139,8 @@ export const updateSheet = defineCommand({
         }),
       },
     };
+    if (JSON.stringify(next) === JSON.stringify(sheet))
+      return noop(doc, `update_sheet: sheet ${sheet.id} already has these values; no-op.`);
     return changed(withSheet(doc, next), `Updated sheet ${sheet.id} ("${next.name}", ${next.paper}).`, [sheet.id]);
   },
 });

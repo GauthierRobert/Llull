@@ -54,7 +54,7 @@ export interface DrawingView {
   readonly mark?: string;
   /** Section: world coordinate of the cutting plane on the axis the view looks along (x for left/right, y for front/back, z for top/bottom). */
   readonly section?: { readonly offset: number; readonly parentViewId?: string };
-  /** Detail: circle on the parent view, in the parent's projected model coordinates. */
+  /** Detail: circle on the parent view, in the parent's projected model coordinates (front: X,Z; back: -X,Z; right: Y,Z; left: -Y,Z; top: X,Y; bottom: X,-Y). */
   readonly detail?: { readonly parentViewId: string; readonly center: Vec2; readonly radius: number };
 }
 

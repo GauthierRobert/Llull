@@ -740,3 +740,164 @@ const nextMarkAt = (index: number): string => {
   const letters = 'ABCDEFGHJKLMNPRSTUVWXYZ';
   return index < letters.length ? (letters[index] as string) : `${letters[index - letters.length]}1`;
 };
+
+describe('review fixes', () => {
+  const textY = (svg: string, content: string): number =>
+    Number(new RegExp(`<text x="[-\\d.]+" y="([-\\d.]+)"[^>]*>${content}</text>`).exec(svg)?.[1]);
+
+  it('rejects unsafe ids on load and escapes every user string in the SVG', () => {
+    const { doc, sheetId, viewIds } = sheetWithViews();
+    const evil = 'v"/><script>alert(1)</script><g x="';
+    const tamper = (mutate: (sheet: Record<string, unknown>, views: Array<Record<string, unknown>>) => void): string => {
+      const raw = JSON.parse(serializeDocument(doc)) as { document: { drawings: { sheets: Record<string, Record<string, unknown>> } } };
+      const sheet = raw.document.drawings.sheets[sheetId] as Record<string, unknown>;
+      mutate(sheet, sheet['views'] as Array<Record<string, unknown>>);
+      return JSON.stringify(raw);
+    };
+    expect(() =>
+      deserializeDocument(
+        tamper((_, views) => {
+          (views[0] as Record<string, unknown>)['id'] = evil;
+        }),
+      ),
+    ).toThrow('id must match');
+    expect(() =>
+      deserializeDocument(
+        tamper((sheet) => {
+          sheet['id'] = evil;
+        }),
+      ),
+    ).toThrow('does not match');
+    const raw = JSON.parse(serializeDocument(doc)) as { document: { drawings: { sheets: Record<string, unknown>; order: string[] } } };
+    raw.document.drawings.sheets = { [evil]: { ...(raw.document.drawings.sheets[sheetId] as object), id: evil } };
+    raw.document.drawings.order = [evil];
+    expect(() => deserializeDocument(JSON.stringify(raw))).toThrow('must match');
+
+    const direct: CadDocument = {
+      ...doc,
+      drawings: {
+        ...doc.drawings!,
+        sheets: {
+          [sheetId]: {
+            ...doc.drawings!.sheets[sheetId]!,
+            name: '<b>',
+            titleBlock: { title: '<script>t</script>', drawnBy: '"><x>' },
+            views: [{ ...doc.drawings!.sheets[sheetId]!.views[0]!, id: evil, label: '<script>l</script>', mark: '<m>' }],
+          },
+        },
+      },
+    };
+    const svg = exportSheet(direct, sheetId).svg;
+    expect(svg).not.toContain('<script');
+    expect(svg).not.toContain('<b>');
+    expect(svg).not.toContain('"><x>');
+    expect(svg).toContain('&lt;script&gt;');
+    expect(viewIds).toHaveLength(3);
+  });
+
+  it('reports the sheet scale, not the first view scale', () => {
+    const { doc, sheetId, viewIds } = sheetWithViews();
+    const own = run(doc, 'update_drawing_view', { sheetId, viewId: viewIds[0], scale: 100 });
+    const result = execute(run(own, 'update_sheet', { sheetId, scale: 5 }), 'export_sheet_svg', { sheetId });
+    expect((result.data as { scaleText: string }).scaleText).toBe('1:5');
+    expect(result.summary).toContain('at 1:5');
+  });
+
+  it('keeps stepping the fallback scale until the views fit', () => {
+    for (const side of [1e7, 3.3e7, 9e9]) {
+      const { doc, sheetId } = sheetWithViews(boxDoc([side, side, side]), ['front', 'top', 'right']);
+      expect(exportSheet(doc, sheetId).fits).toBe(true);
+    }
+  });
+
+  it('documents detail axes, rejects iso parents, and defaults to a standard magnification', () => {
+    const { doc, sheetId, viewIds } = sheetWithViews(boxDoc(), ['front', 'iso']);
+    expectNoOp(execute(doc, 'add_detail_view', { sheetId, parentViewId: viewIds[1], center: [0, 0], radius: 5 }), doc, 'iso view');
+    const withDetail = run(doc, 'add_detail_view', { sheetId, parentViewId: viewIds[0], center: [50, 20], radius: 10 });
+    expectNoOp(
+      execute(withDetail, 'update_drawing_view', { sheetId, viewId: viewIds[0], direction: 'iso' }),
+      withDetail,
+      'cannot become iso',
+    );
+    for (const [sheetScale, expected] of [
+      [5, 2],
+      [1, 0.5],
+      [100, 50],
+      [50, 25],
+      [0.2, 0.1],
+    ] as const) {
+      const data = exportSheet(run(withDetail, 'update_sheet', { sheetId, scale: sheetScale }), sheetId);
+      expect(data.views.find((v) => v.kind === 'detail')?.scale).toBe(expected);
+    }
+  });
+
+  it('warns about an empty detail circle and uses 1:1 for a sheet without views', () => {
+    const { doc, sheetId, viewIds } = sheetWithViews(boxDoc(), ['front']);
+    const empty = run(doc, 'add_detail_view', { sheetId, parentViewId: viewIds[0], center: [0, 0], radius: 5 });
+    const result = execute(empty, 'export_sheet_svg', { sheetId });
+    expect((result.data as Exported & { warnings: string[] }).warnings[0]).toContain('detail circle contains no geometry');
+    expect(result.summary).toContain('detail circle contains no geometry');
+    const none = execute(boxDoc(), 'create_sheet', {});
+    expect(exportSheet(none.document, none.affected[0] as string).scale).toBe(1);
+  });
+
+  it('keeps the section letter clear of the width dimension', () => {
+    const { doc, sheetId, viewIds } = sheetWithViews(boxDoc(), ['front']);
+    const sectioned = run(doc, 'add_section_view', { sheetId, direction: 'right', offset: 0, parentViewId: viewIds[0] });
+    const svg = exportSheet(sectioned, sheetId, true).svg;
+    expect(textY(svg, 'A')).toBeGreaterThan(textY(svg, '100') + 5);
+  });
+
+  it('update_sheet is a no-op when nothing changes', () => {
+    const { doc, sheetId } = sheetWithViews();
+    expectNoOp(execute(doc, 'update_sheet', { sheetId, name: 'Part', paper: 'A3' }), doc, 'already has');
+  });
+
+  it('rejects iso sections, self-parented sections and duplicate marks on load', () => {
+    const { doc, sheetId, viewIds } = sheetWithViews();
+    const sectioned = run(doc, 'add_section_view', { sheetId, direction: 'right', offset: 0, parentViewId: viewIds[0] });
+    const withMarks = run(sectioned, 'add_detail_view', { sheetId, parentViewId: viewIds[0], center: [50, 20], radius: 10 });
+    const tamper = (mutate: (views: Array<Record<string, unknown>>) => void): string => {
+      const raw = JSON.parse(serializeDocument(withMarks)) as {
+        document: { drawings: { sheets: Record<string, { views: Array<Record<string, unknown>> }> } };
+      };
+      mutate(raw.document.drawings.sheets[sheetId]!.views);
+      return JSON.stringify(raw);
+    };
+    expect(() =>
+      deserializeDocument(
+        tamper((v) => {
+          v[3]!['direction'] = 'iso';
+        }),
+      ),
+    ).toThrow('cannot be iso');
+    expect(() =>
+      deserializeDocument(
+        tamper((v) => {
+          v[3]!['section'] = { offset: 0, parentViewId: v[3]!['id'] };
+        }),
+      ),
+    ).toThrow('the view itself');
+    expect(() =>
+      deserializeDocument(
+        tamper((v) => {
+          v[4]!['mark'] = v[3]!['mark'];
+        }),
+      ),
+    ).toThrow('duplicate view marks');
+  });
+
+  it('a stale nextStepNumber cannot re-mint an existing sheet id', () => {
+    let doc = run(createEmptyDocument(), 'add_layer', { name: 'L' });
+    const created = execute(doc, 'create_sheet', { name: 'Keep' });
+    doc = created.document;
+    const raw = JSON.parse(serializeDocument(doc)) as { document: Record<string, unknown> };
+    raw.document['nextStepNumber'] = 1;
+    raw.document['featureHistory'] = [];
+    const loaded = deserializeDocument(JSON.stringify(raw));
+    expect(loaded.nextStepNumber).toBeGreaterThan(2);
+    const second = execute(loaded, 'create_sheet', { name: 'New' });
+    expect(second.affected[0]).not.toBe(created.affected[0]);
+    expect(Object.keys(second.document.drawings!.sheets)).toHaveLength(2);
+  });
+});

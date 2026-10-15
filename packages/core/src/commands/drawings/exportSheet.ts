@@ -28,6 +28,8 @@ export interface RenderedSheet {
   readonly views: SheetViewInfo[];
   /** Views that could not be drawn (no solids, unknown parent), with the reason. */
   readonly skipped: Array<{ readonly id: string; readonly reason: string }>;
+  /** Drawn views that look wrong (e.g. a detail circle with no geometry in it). */
+  readonly warnings: string[];
   /** Whether every view lies inside the drawing area at this scale. */
   readonly fits: boolean;
 }
@@ -42,7 +44,13 @@ const round2 = (value: number): number => Number(value.toFixed(2));
 const center = (bounds: Bounds): Vec2 => [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2];
 
 /** Cutting-plane line (with sight arrows and letters) of every section drawn from `parent`. */
-function cuttingMarks(parent: Drawn, placed: PlacedView, map: (p: Vec2) => Vec2, sections: ReadonlyArray<DrawingView>): string[] {
+function cuttingMarks(
+  parent: Drawn,
+  placed: PlacedView,
+  map: (p: Vec2) => Vec2,
+  sections: ReadonlyArray<DrawingView>,
+  clearance: number,
+): string[] {
   return sections.flatMap((section) => {
     const line = cuttingLine(parent.view, section);
     if (!line) return [];
@@ -54,7 +62,7 @@ function cuttingMarks(parent: Drawn, placed: PlacedView, map: (p: Vec2) => Vec2,
       [bounds[2], bounds[3]],
     ];
     const along = corners.map((corner) => (corner[0] - line.point[0]) * line.along[0] + (corner[1] - line.point[1]) * line.along[1]);
-    const reach = 6 / placed.perUnit;
+    const reach = clearance / placed.perUnit;
     const ends = [Math.min(...along) - reach, Math.max(...along) + reach].map(
       (t): Vec2 => map([line.point[0] + line.along[0] * t, line.point[1] + line.along[1] * t]),
     );
@@ -107,18 +115,22 @@ function overallDimensions(doc: CadDocument, drawn: Drawn, map: (p: Vec2) => Vec
  */
 export function renderSheet(doc: CadDocument, sheet: DrawingSheet, options: { readonly showDimensions: boolean }): RenderedSheet {
   const skipped: Array<{ id: string; reason: string }> = [];
+  const warnings: string[] = [];
   const drawn: Drawn[] = [];
   for (const view of sheet.views) {
     const derived = deriveView(doc, sheet, view);
     if (derived === null) skipped.push({ id: view.id, reason: 'parent view is missing or cannot be a detail parent' });
     else if (derived.primitives.length === 0 && view.kind !== 'detail')
       skipped.push({ id: view.id, reason: 'no 3D solids project into this view' });
-    else drawn.push({ view, derived });
+    else {
+      if (view.kind === 'detail' && derived.primitives.length === 0) warnings.push(`${view.id}: detail circle contains no geometry`);
+      drawn.push({ view, derived });
+    }
   }
   const area = sheetArea(sheet.paper);
   const layout = layoutViews(
     drawn.map(({ view, derived }) => ({ view, size: [derived.bounds[2] - derived.bounds[0], derived.bounds[3] - derived.bounds[1]] })),
-    { angle: sheet.projectionAngle, area, mmPerUnit: MM_PER_UNIT[doc.units], scale: sheet.scale, margin: options.showDimensions ? 14 : 4 },
+    { angle: sheet.projectionAngle, area, mmPerUnit: MM_PER_UNIT[doc.units], scale: sheet.scale, margin: options.showDimensions ? 18 : 4 },
   );
   const defs: string[] = [];
   const groups: string[] = [];
@@ -137,15 +149,16 @@ export function renderSheet(doc: CadDocument, sheet: DrawingSheet, options: { re
     const caption = own ? `${view.label} (${scaleText(placed.denominator)})` : view.label;
     const [x, y] = placed.center;
     const parts = painter.parts;
-    const body = [`<g id="view-${view.id}" data-kind="${view.kind}" data-label="${escapeXml(view.label)}">`];
+    const viewKey = escapeXml(view.id);
+    const body = [`<g id="view-${viewKey}" data-kind="${view.kind}" data-label="${escapeXml(view.label)}">`];
     if (view.kind === 'detail') {
       const r = n(placed.width / 2);
-      defs.push(`<clipPath id="clip-${view.id}"><circle cx="${n(x)}" cy="${n(y)}" r="${r}"/></clipPath>`);
-      body.push(`<g clip-path="url(#clip-${view.id})">${parts.join('')}</g>`, `<circle cx="${n(x)}" cy="${n(y)}" r="${r}" class="thin"/>`);
+      defs.push(`<clipPath id="clip-${viewKey}"><circle cx="${n(x)}" cy="${n(y)}" r="${r}"/></clipPath>`);
+      body.push(`<g clip-path="url(#clip-${viewKey})">${parts.join('')}</g>`, `<circle cx="${n(x)}" cy="${n(y)}" r="${r}" class="thin"/>`);
     } else {
       body.push(...parts);
       const hosted = sheet.views.filter((other) => other.section?.parentViewId === view.id);
-      body.push(...cuttingMarks(entry, placed, map, hosted));
+      body.push(...cuttingMarks(entry, placed, map, hosted, options.showDimensions ? 14 : 6));
       body.push(
         ...detailMarks(
           placed,
@@ -156,7 +169,7 @@ export function renderSheet(doc: CadDocument, sheet: DrawingSheet, options: { re
       if (options.showDimensions && view.kind === 'projection' && view.direction !== 'iso')
         body.push(...overallDimensions(doc, entry, map));
     }
-    const labelY = y + placed.height / 2 + (options.showDimensions ? 18 : 8);
+    const labelY = y + placed.height / 2 + (options.showDimensions ? 22 : 8);
     body.push(svgText(x, labelY, 3.5, 'middle', caption), '</g>');
     groups.push(body.join(''));
     views.push({
@@ -175,5 +188,5 @@ export function renderSheet(doc: CadDocument, sheet: DrawingSheet, options: { re
       bounds[2] <= area.x + area.width + 0.01 &&
       bounds[3] <= area.y + area.height + 0.01,
   );
-  return { svg: composeSheet(sheet, layout.scale, groups.join('\n'), defs.join('')), scale: layout.scale, views, skipped, fits };
+  return { svg: composeSheet(sheet, layout.scale, groups.join('\n'), defs.join('')), scale: layout.scale, views, skipped, warnings, fits };
 }

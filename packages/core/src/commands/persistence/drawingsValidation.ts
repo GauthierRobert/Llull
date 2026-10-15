@@ -7,12 +7,16 @@ import { isReservedKey } from '../../lib/reservedKey';
 const isOneOf = (list: ReadonlyArray<string>, value: unknown): boolean => typeof value === 'string' && list.includes(value);
 const isPair = (value: unknown): boolean => Array.isArray(value) && value.length === 2 && value.every(isFiniteNumber);
 const isOptional = (value: unknown, check: (v: unknown) => boolean): boolean => value === undefined || check(value);
+/** Ids end up in SVG attributes and element ids: restrict them to a safe alphabet. */
+const SAFE_ID = /^[A-Za-z0-9._-]+$/;
+const isSafeId = (value: unknown): boolean => typeof value === 'string' && SAFE_ID.test(value);
 const isPositive = (value: unknown): boolean => isFiniteNumber(value) && value > 0;
 
 function viewProblem(sheetId: string, index: number, view: unknown, viewIds: ReadonlySet<string>): string | null {
   const where = `sheet '${sheetId}': views[${index}]`;
   if (!isRecord(view)) return `${where} is not an object`;
-  if (typeof view['id'] !== 'string' || typeof view['label'] !== 'string') return `${where}: id and label must be strings`;
+  if (!isSafeId(view['id'])) return `${where}: id must match [A-Za-z0-9._-]+`;
+  if (typeof view['label'] !== 'string') return `${where}: id and label must be strings`;
   const kind = view['kind'];
   if (!isOneOf(VIEW_KINDS, kind)) return `${where}: kind must be one of ${VIEW_KINDS.join(', ')}`;
   if (kind !== 'detail' && !isOneOf(VIEW_DIRECTIONS, view['direction']))
@@ -23,10 +27,12 @@ function viewProblem(sheetId: string, index: number, view: unknown, viewIds: Rea
   if (!isOptional(view['mark'], (v) => typeof v === 'string')) return `${where}: mark must be a string`;
   const section = view['section'];
   if (kind === 'section') {
+    if (view['direction'] === 'iso') return `${where}: a section view cannot be iso`;
     if (!isRecord(section) || !isFiniteNumber(section['offset'])) return `${where}: a section view needs section.offset (finite number)`;
     const parent = section['parentViewId'];
     if (parent !== undefined && (typeof parent !== 'string' || !viewIds.has(parent)))
       return `${where}: section.parentViewId is not a view of this sheet`;
+    if (parent === view['id']) return `${where}: section.parentViewId is the view itself`;
   }
   const detail = view['detail'];
   if (kind === 'detail') {
@@ -41,6 +47,7 @@ function viewProblem(sheetId: string, index: number, view: unknown, viewIds: Rea
 /** First problem of a saved drawing sheet, or null. */
 function sheetProblem(key: string, sheet: unknown): string | null {
   if (!isRecord(sheet)) return `sheet '${key}' is not an object`;
+  if (!isSafeId(key)) return `sheet '${key}': id must match [A-Za-z0-9._-]+`;
   if (sheet['id'] !== key) return `sheet record key '${key}' does not match sheet.id '${String(sheet['id'])}'`;
   if (typeof sheet['name'] !== 'string') return `sheet '${key}': name must be a string`;
   if (!isOneOf(PAPER_SIZES, sheet['paper'])) return `sheet '${key}': paper must be one of ${PAPER_SIZES.join(', ')}`;
@@ -54,6 +61,8 @@ function sheetProblem(key: string, sheet: unknown): string | null {
   if (!Array.isArray(views)) return `sheet '${key}': views must be an array`;
   const ids = views.map((view) => (isRecord(view) ? view['id'] : undefined));
   if (new Set(ids).size !== ids.length) return `sheet '${key}': duplicate view ids`;
+  const marks = views.flatMap((view) => (isRecord(view) && typeof view['mark'] === 'string' ? [view['mark']] : []));
+  if (new Set(marks).size !== marks.length) return `sheet '${key}': duplicate view marks`;
   const known = new Set(ids.filter((id): id is string => typeof id === 'string'));
   for (let index = 0; index < views.length; index++) {
     const problem = viewProblem(key, index, views[index], known);

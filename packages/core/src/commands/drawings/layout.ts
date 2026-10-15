@@ -75,7 +75,12 @@ function cellOf(direction: ViewDirection, angle: ProjectionAngle): readonly [num
 }
 
 /** Own scale of a view at sheet scale `scale`: explicit, else a detail is a 2x magnification, else the sheet scale. */
-export const viewDenominator = (view: DrawingView, scale: number): number => view.scale ?? (view.kind === 'detail' ? scale / 2 : scale);
+export const viewDenominator = (view: DrawingView, scale: number): number =>
+  view.scale ?? (view.kind === 'detail' ? magnified(scale) : scale);
+
+/** The standard scale at least 2x larger than `scale` (the largest standard denominator <= scale / 2). */
+const magnified = (scale: number): number =>
+  [...STANDARD_SCALES].reverse().find((candidate) => candidate <= scale / 2) ?? (STANDARD_SCALES[0] as number);
 
 interface Sized {
   readonly item: LayoutItem;
@@ -157,13 +162,23 @@ const isAuto = (item: LayoutItem): boolean => item.view.position === undefined;
 /** Largest standard scale at which every auto-placed view fits `area`. */
 function fitDenominator(items: ReadonlyArray<LayoutItem>, options: LayoutOptions): number {
   const auto = items.filter(isAuto);
+  if (auto.length === 0) return 1;
+  const fits = (candidate: number): { ok: boolean; ratio: number } => {
+    const { width, height } = arrange(sizeViews(auto, candidate, options), options.angle);
+    return {
+      ok: width <= options.area.width && height <= options.area.height,
+      ratio: Math.max(width / options.area.width, height / options.area.height),
+    };
+  };
   let last = 1;
   for (const candidate of STANDARD_SCALES) {
-    const { width, height } = arrange(sizeViews(auto, candidate, options), options.angle);
-    if (width <= options.area.width && height <= options.area.height) return candidate;
-    last = candidate * Math.max(width / options.area.width, height / options.area.height);
+    const { ok, ratio } = fits(candidate);
+    if (ok) return candidate;
+    last = candidate * ratio;
   }
-  return niceStep(last);
+  let candidate = niceStep(last);
+  for (let attempt = 0; attempt < 60 && !fits(candidate).ok; attempt++) candidate = niceStep(candidate * 1.01);
+  return candidate;
 }
 
 /** Places `items` on the paper `area` (centred); views with a `position` keep it. @pure */

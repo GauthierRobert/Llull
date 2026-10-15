@@ -102,8 +102,8 @@ export const addSectionView = defineCommand({
 
 /**
  * @affects adds 1 detail DrawingView (circle on the parent, magnified, clipped to the circle); affected = [viewId]
- * @invariant default scale is twice the sheet scale (2x magnification)
- * @failure unknown sheet / parent view, parent is itself a detail -> no-op, affected:[]
+ * @invariant default scale is the standard scale at least 2x the sheet scale
+ * @failure unknown sheet / parent view, parent is a detail or an iso view -> no-op, affected:[]
  */
 export const addDetailView = defineCommand({
   name: 'add_detail_view',
@@ -111,13 +111,15 @@ export const addDetailView = defineCommand({
     'Add a detail view to a drawing sheet: a circle on a parent (projection or section) view is drawn magnified and clipped to the ' +
     'circle, labelled "DETAIL B (2:1)" with the next free letter; the circle and letter are drawn on the parent. `center` and ' +
     "`radius` are in the parent view's projected model coordinates (document units; for a front view x = world X, y = world Z). " +
-    'Default magnification is 2x the sheet scale. Returns the view id.',
+    'Default scale is the standard scale at least 2x the sheet scale (1:10 sheet -> 1:5, 1:5 -> 1:2). Returns the view id.',
   params: z.object({
     sheetId: z.string().describe('Id of the sheet.'),
     parentViewId: z.string().describe('View (projection or section) the circle is on.'),
     center: vec2("Circle centre in the parent view's projected model coordinates (document units)."),
     radius: z.number().positive().describe('Circle radius in document units.'),
-    scale: scaleField.optional().describe('Scale denominator N of the detail, e.g. 0.5 = 2:1. Omit for 2x the sheet scale.'),
+    scale: scaleField
+      .optional()
+      .describe('Scale denominator N of the detail, e.g. 0.5 = 2:1. Omit for the standard scale at least 2x the sheet scale.'),
     paperPosition: vec2('Centre of the detail on the paper in millimetres. Omit for automatic layout.').optional(),
   }),
   run: (doc, { sheetId, parentViewId, center, radius, scale, paperPosition }): CommandResult => {
@@ -126,6 +128,8 @@ export const addDetailView = defineCommand({
     const parent = findView(sheet, parentViewId);
     if (!parent || parent.kind === 'detail')
       return noop(doc, `add_detail_view rejected: '${parentViewId}' is not a projection or section view on sheet ${sheetId}.`);
+    if (parent.direction === 'iso')
+      return noop(doc, `add_detail_view rejected: '${parentViewId}' is an iso view; its axes are not model axes.`);
     const mark = nextMark(sheet);
     const view: DrawingView = {
       id: nextId('view'),

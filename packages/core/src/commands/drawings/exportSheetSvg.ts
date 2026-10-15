@@ -3,7 +3,7 @@ import { defineCommand, z } from '../schema';
 import { report } from '../noop';
 import { PAPER_MM } from '../../model/sheet';
 import { renderSheet } from './exportSheet';
-import { isRejection, requireSheet } from './sheetOps';
+import { isRejection, requireSheet, scaleText } from './sheetOps';
 
 /**
  * @affects nothing — read-only; document returned unchanged, affected:[]
@@ -17,7 +17,7 @@ export const exportSheetSvg = defineCommand({
     'Export a drawing sheet as a self-contained SVG string (paper frame, title block, every view with ISO line weights, hatched ' +
     'sections, clipped details). Geometry is derived from the CURRENT model, so edits to the model show without touching the sheet. ' +
     'Returns `data`: { svg, sheetId, paper, scale (denominator N), scaleText ("1:2"), widthMm, heightMm, fits, ' +
-    'views: [{ id, label, kind, scale, scaleText, bounds: [minX, minY, maxX, maxY] in paper mm }], skipped: [{ id, reason }] }. ' +
+    'views: [{ id, label, kind, scale, scaleText, bounds: [minX, minY, maxX, maxY] in paper mm }], skipped: [{ id, reason }], warnings: string[] }. ' +
     '`fits` is false when views overflow the drawing area (choose a smaller scale or larger paper).',
   params: z.object({
     sheetId: z.string().describe('Id of the sheet to export.'),
@@ -35,21 +35,23 @@ export const exportSheetSvg = defineCommand({
       rendered.skipped.length > 0
         ? ` Skipped ${rendered.skipped.length} view(s): ${rendered.skipped.map((s) => `${s.id} (${s.reason})`).join('; ')}.`
         : '';
+    const warned = rendered.warnings.length > 0 ? ` WARNING: ${rendered.warnings.join('; ')}.` : '';
     const overflow = rendered.fits ? '' : ' WARNING: views overflow the drawing area; use a smaller scale or larger paper.';
     return report(
       doc,
-      `Exported sheet ${sheet.id} ("${sheet.name}"): ${rendered.views.length} view(s) at ${rendered.views[0]?.scaleText ?? 'n/a'}, ${sheet.paper}, ${rendered.svg.length} chars.${notes}${overflow}`,
+      `Exported sheet ${sheet.id} ("${sheet.name}"): ${rendered.views.length} view(s) at ${scaleText(rendered.scale)}, ${sheet.paper}, ${rendered.svg.length} chars.${notes}${overflow}${warned}`,
       {
         svg: rendered.svg,
         sheetId: sheet.id,
         paper: sheet.paper,
         scale: rendered.scale,
-        scaleText: rendered.views[0]?.scaleText ?? null,
+        scaleText: scaleText(rendered.scale),
         widthMm,
         heightMm,
         fits: rendered.fits,
         views: rendered.views,
         skipped: rendered.skipped,
+        warnings: rendered.warnings,
       },
     );
   },
