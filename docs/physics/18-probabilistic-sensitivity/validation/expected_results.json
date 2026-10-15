@@ -1,0 +1,809 @@
+{
+ "pack": "18-probabilistic-sensitivity",
+ "generatedBy": "generate_prb_reference.py",
+ "units": "dimensionless unless stated",
+ "cases": [
+  {
+   "id": "VC-PRB-01.a",
+   "quantity": "reliability index, g = R - S, normal R, S",
+   "value": 2.0,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator: (muR - muS)/sqrt(sR^2 + sS^2) [S1, S2]",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-04",
+    "TR-PRB-05"
+   ],
+   "inputs": {
+    "R": {
+     "dist": "normal",
+     "mean": 300.0,
+     "sd": 30.0,
+     "unit": "MPa"
+    },
+    "S": {
+     "dist": "normal",
+     "mean": 200.0,
+     "sd": 40.0,
+     "unit": "MPa"
+    },
+    "g": "R - S"
+   }
+  },
+  {
+   "id": "VC-PRB-01.b",
+   "quantity": "probability of failure Phi(-beta)",
+   "value": 0.0227501319482,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator (erfc)",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-04",
+    "FR-PRB-05"
+   ],
+   "inputs": {
+    "R": {
+     "dist": "normal",
+     "mean": 300.0,
+     "sd": 30.0,
+     "unit": "MPa"
+    },
+    "S": {
+     "dist": "normal",
+     "mean": 200.0,
+     "sd": 40.0,
+     "unit": "MPa"
+    },
+    "g": "R - S"
+   }
+  },
+  {
+   "id": "VC-PRB-01.c",
+   "quantity": "FORM importance factors alpha^2 (R, S)",
+   "value": [
+    0.359999999563,
+    0.640000000437
+   ],
+   "unit": "1",
+   "tolerance": {
+    "abs": 1e-06
+   },
+   "source": "generator: alpha_R^2 = sR^2/(sR^2+sS^2) = 0.36, alpha_S^2 = 0.64",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-06"
+   ],
+   "inputs": {
+    "R": {
+     "dist": "normal",
+     "mean": 300.0,
+     "sd": 30.0,
+     "unit": "MPa"
+    },
+    "S": {
+     "dist": "normal",
+     "mean": 200.0,
+     "sd": 40.0,
+     "unit": "MPa"
+    },
+    "g": "R - S"
+   }
+  },
+  {
+   "id": "VC-PRB-01.d",
+   "quantity": "Monte Carlo Pf, N = 200 000, any seed",
+   "value": 0.0227501319482,
+   "unit": "1",
+   "tolerance": {
+    "abs": 0.0016670544174
+   },
+   "source": "generator: exact Pf, 5-sigma binomial acceptance (as 03 GDT)",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-02",
+    "TR-PRB-03"
+   ],
+   "inputs": {
+    "R": {
+     "dist": "normal",
+     "mean": 300.0,
+     "sd": 30.0,
+     "unit": "MPa"
+    },
+    "S": {
+     "dist": "normal",
+     "mean": 200.0,
+     "sd": 40.0,
+     "unit": "MPa"
+    },
+    "g": "R - S"
+   },
+   "referenceRun": {
+    "prng": "Python random.Random(20261015).gauss",
+    "samples": 200000,
+    "pf": 0.022835
+   }
+  },
+  {
+   "id": "VC-PRB-02.a",
+   "quantity": "exact beta, lognormal R and S (g = ln R - ln S)",
+   "value": 1.89451599469,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator: (lambdaR - lambdaS)/sqrt(zetaR^2 + zetaS^2)",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-04"
+   ],
+   "inputs": {
+    "R": {
+     "dist": "lognormal",
+     "mean": 300.0,
+     "sd": 30.0,
+     "unit": "MPa"
+    },
+    "S": {
+     "dist": "lognormal",
+     "mean": 200.0,
+     "sd": 40.0,
+     "unit": "MPa"
+    },
+    "g": "R - S"
+   }
+  },
+  {
+   "id": "VC-PRB-02.b",
+   "quantity": "FORM (HL-RF) beta on g = R - S, same variables",
+   "value": 1.89451599469,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "generator HL-RF; equals 02.a because the failure surface R = S is linear in u",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-04",
+    "TR-PRB-05"
+   ],
+   "inputs": {
+    "R": {
+     "dist": "lognormal",
+     "mean": 300.0,
+     "sd": 30.0,
+     "unit": "MPa"
+    },
+    "S": {
+     "dist": "lognormal",
+     "mean": 200.0,
+     "sd": 40.0,
+     "unit": "MPa"
+    },
+    "g": "R - S"
+   },
+   "iterations": 8
+  },
+  {
+   "id": "VC-PRB-03.a",
+   "quantity": "exact Pf, OpenTURNS axial stressed beam use case",
+   "value": 0.0291981946248,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "generator: 1D integration of P(R < F/A) over F [S5 model]",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-02",
+    "FR-PRB-05"
+   ],
+   "inputs": {
+    "R": {
+     "dist": "lognormal",
+     "mean": 3000000.0,
+     "sd": 300000.0,
+     "unit": "Pa"
+    },
+    "F": {
+     "dist": "normal",
+     "mean": 750.0,
+     "sd": 50.0,
+     "unit": "N"
+    },
+    "g": "R - F / (pi / 1e4)"
+   }
+  },
+  {
+   "id": "VC-PRB-03.b",
+   "quantity": "FORM beta, same problem",
+   "value": 1.88104651853,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "generator HL-RF",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-04"
+   ],
+   "inputs": {
+    "R": {
+     "dist": "lognormal",
+     "mean": 3000000.0,
+     "sd": 300000.0,
+     "unit": "Pa"
+    },
+    "F": {
+     "dist": "normal",
+     "mean": 750.0,
+     "sd": 50.0,
+     "unit": "N"
+    },
+    "g": "R - F / (pi / 1e4)"
+   }
+  },
+  {
+   "id": "VC-PRB-03.c",
+   "quantity": "FORM Pf = Phi(-beta), same problem",
+   "value": 0.0299827955769,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-04"
+   ],
+   "inputs": {
+    "R": {
+     "dist": "lognormal",
+     "mean": 3000000.0,
+     "sd": 300000.0,
+     "unit": "Pa"
+    },
+    "F": {
+     "dist": "normal",
+     "mean": 750.0,
+     "sd": 50.0,
+     "unit": "N"
+    },
+    "g": "R - F / (pi / 1e4)"
+   },
+   "note": "FORM vs exact: relative difference reported, not gated"
+  },
+  {
+   "id": "VC-PRB-03.d",
+   "quantity": "FORM design point (R*, F*)",
+   "value": [
+    2546286.83181,
+    799.939600476
+   ],
+   "unit": "Pa, N",
+   "tolerance": {
+    "rel": 1e-05
+   },
+   "source": "generator HL-RF",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-06"
+   ],
+   "inputs": {
+    "R": {
+     "dist": "lognormal",
+     "mean": 3000000.0,
+     "sd": 300000.0,
+     "unit": "Pa"
+    },
+    "F": {
+     "dist": "normal",
+     "mean": 750.0,
+     "sd": 50.0,
+     "unit": "N"
+    },
+    "g": "R - F / (pi / 1e4)"
+   }
+  },
+  {
+   "id": "VC-PRB-04.a",
+   "quantity": "FORM beta for g = 3 - u1 + 0.1 u2^2",
+   "value": 3.0,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator (design point (3, 0))",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-04"
+   ],
+   "inputs": {
+    "u1": "standard normal",
+    "u2": "standard normal",
+    "g": "3 - u1 + 0.1 u2^2"
+   }
+  },
+  {
+   "id": "VC-PRB-04.b",
+   "quantity": "exact Pf",
+   "value": 0.00104359875879,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-08
+   },
+   "source": "generator: integral of phi(u2) Phi(-(3 + 0.1 u2^2))",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-07"
+   ],
+   "inputs": {
+    "u1": "standard normal",
+    "u2": "standard normal",
+    "g": "3 - u1 + 0.1 u2^2"
+   }
+  },
+  {
+   "id": "VC-PRB-04.c",
+   "quantity": "Breitung SORM Pf, curvature 2k = 0.2",
+   "value": 0.00106718809723,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "generator: Phi(-beta) prod (1 + beta kappa_i)^-1/2 [S3, formula form via search]",
+   "grade": "B",
+   "proves": [
+    "FR-PRB-07"
+   ],
+   "inputs": {
+    "u1": "standard normal",
+    "u2": "standard normal",
+    "g": "3 - u1 + 0.1 u2^2"
+   },
+   "exactRatio": 1.02260383911,
+   "formPfRatio": 1.29350291025
+  },
+  {
+   "id": "VC-PRB-05.mean",
+   "quantity": "Ishigami mean (a = 7, b = 0.1, X ~ U(-pi, pi))",
+   "value": 3.5,
+   "unit": "1",
+   "tolerance": {
+    "abs": 1e-12
+   },
+   "source": "generator closed form; same formula in OpenTURNS usecase [S7]",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-08"
+   ]
+  },
+  {
+   "id": "VC-PRB-05.variance",
+   "quantity": "Ishigami variance (a = 7, b = 0.1, X ~ U(-pi, pi))",
+   "value": 13.8445879407,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "generator closed form; same formula in OpenTURNS usecase [S7]",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-08"
+   ]
+  },
+  {
+   "id": "VC-PRB-05.S1",
+   "quantity": "Ishigami Sobol index S1",
+   "value": 0.313905191148,
+   "unit": "1",
+   "tolerance": {
+    "abs": 0.03
+   },
+   "source": "generator closed form; OpenTURNS formula [S7]; SALib quotes S1..S3 [S6]",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-08",
+    "TR-PRB-07"
+   ],
+   "estimatorTolerance": "abs 0.03 for N = 8192 base samples (Saltelli 2010 first order, Jansen total); exact implementation of the closed form: abs 1e-12",
+   "quotedBySource": 0.3139,
+   "referenceRun": {
+    "prng": "Python random.Random(12345)",
+    "N": 8192,
+    "estimate": 0.299540698559
+   }
+  },
+  {
+   "id": "VC-PRB-05.S2",
+   "quantity": "Ishigami Sobol index S2",
+   "value": 0.44241114479,
+   "unit": "1",
+   "tolerance": {
+    "abs": 0.03
+   },
+   "source": "generator closed form; OpenTURNS formula [S7]; SALib quotes S1..S3 [S6]",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-08",
+    "TR-PRB-07"
+   ],
+   "estimatorTolerance": "abs 0.03 for N = 8192 base samples (Saltelli 2010 first order, Jansen total); exact implementation of the closed form: abs 1e-12",
+   "quotedBySource": 0.4424,
+   "referenceRun": {
+    "prng": "Python random.Random(12345)",
+    "N": 8192,
+    "estimate": 0.437722322245
+   }
+  },
+  {
+   "id": "VC-PRB-05.S3",
+   "quantity": "Ishigami Sobol index S3",
+   "value": 0.0,
+   "unit": "1",
+   "tolerance": {
+    "abs": 0.03
+   },
+   "source": "generator closed form; OpenTURNS formula [S7]; SALib quotes S1..S3 [S6]",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-08",
+    "TR-PRB-07"
+   ],
+   "estimatorTolerance": "abs 0.03 for N = 8192 base samples (Saltelli 2010 first order, Jansen total); exact implementation of the closed form: abs 1e-12",
+   "quotedBySource": 0.0,
+   "referenceRun": {
+    "prng": "Python random.Random(12345)",
+    "N": 8192,
+    "estimate": -0.0151377627008
+   }
+  },
+  {
+   "id": "VC-PRB-05.ST1",
+   "quantity": "Ishigami Sobol index ST1",
+   "value": 0.55758885521,
+   "unit": "1",
+   "tolerance": {
+    "abs": 0.03
+   },
+   "source": "generator closed form; OpenTURNS formula [S7]; SALib quotes S1..S3 [S6]",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-08",
+    "TR-PRB-07"
+   ],
+   "estimatorTolerance": "abs 0.03 for N = 8192 base samples (Saltelli 2010 first order, Jansen total); exact implementation of the closed form: abs 1e-12",
+   "quotedBySource": null,
+   "referenceRun": {
+    "prng": "Python random.Random(12345)",
+    "N": 8192,
+    "estimate": 0.566426805758
+   }
+  },
+  {
+   "id": "VC-PRB-05.ST2",
+   "quantity": "Ishigami Sobol index ST2",
+   "value": 0.44241114479,
+   "unit": "1",
+   "tolerance": {
+    "abs": 0.03
+   },
+   "source": "generator closed form; OpenTURNS formula [S7]; SALib quotes S1..S3 [S6]",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-08",
+    "TR-PRB-07"
+   ],
+   "estimatorTolerance": "abs 0.03 for N = 8192 base samples (Saltelli 2010 first order, Jansen total); exact implementation of the closed form: abs 1e-12",
+   "quotedBySource": null,
+   "referenceRun": {
+    "prng": "Python random.Random(12345)",
+    "N": 8192,
+    "estimate": 0.447081695834
+   }
+  },
+  {
+   "id": "VC-PRB-05.ST3",
+   "quantity": "Ishigami Sobol index ST3",
+   "value": 0.243683664062,
+   "unit": "1",
+   "tolerance": {
+    "abs": 0.03
+   },
+   "source": "generator closed form; OpenTURNS formula [S7]; SALib quotes S1..S3 [S6]",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-08",
+    "TR-PRB-07"
+   ],
+   "estimatorTolerance": "abs 0.03 for N = 8192 base samples (Saltelli 2010 first order, Jansen total); exact implementation of the closed form: abs 1e-12",
+   "quotedBySource": null,
+   "referenceRun": {
+    "prng": "Python random.Random(12345)",
+    "N": 8192,
+    "estimate": 0.239889167425
+   }
+  },
+  {
+   "id": "VC-PRB-06.a",
+   "quantity": "box mass rho w h d (w 40, h 20, d 10 mm; rho 0.0027 g/mm^3)",
+   "value": 21.6,
+   "unit": "g",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-10"
+   ]
+  },
+  {
+   "id": "VC-PRB-06.b",
+   "quantity": "dm/dw, dm/dh, dm/dd",
+   "value": [
+    0.54,
+    1.08,
+    2.16
+   ],
+   "unit": "g/mm",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "generator: central differences are exact for a trilinear response (rounding only)",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-10",
+    "TR-PRB-09"
+   ]
+  },
+  {
+   "id": "VC-PRB-06.c",
+   "quantity": "elasticities (x/m) dm/dx for w, h, d",
+   "value": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "unit": "1",
+   "tolerance": {
+    "abs": 1e-06
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-10"
+   ]
+  },
+  {
+   "id": "VC-PRB-06.d",
+   "quantity": "E[m] with independent normal w, h, d (sd 0.1, 0.1, 0.05 mm)",
+   "value": 21.6,
+   "unit": "g",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "generator (independence)",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-02",
+    "FR-PRB-03"
+   ]
+  },
+  {
+   "id": "VC-PRB-06.e",
+   "quantity": "sd[m], same",
+   "value": 0.16200135,
+   "unit": "g",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator: Var = rho^2 (prod(mu^2 + s^2) - prod mu^2)",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-02",
+    "FR-PRB-03"
+   ],
+   "mcAcceptance": "MC N = 10 000: mean +- 5 sd/sqrt(N), sd +- 5 sd/sqrt(2N)"
+  },
+  {
+   "id": "VC-PRB-07",
+   "quantity": "centred LHS, n = 10, 2 variables U(0,1): each of the 10 strata holds exactly one point per variable and each marginal mean is exactly 0.5",
+   "value": 0.5,
+   "unit": "1",
+   "tolerance": {
+    "abs": 1e-15
+   },
+   "source": "generator (stratum midpoints (i + 0.5)/n)",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-02",
+    "TR-PRB-04"
+   ]
+  },
+  {
+   "id": "VC-PRB-08.a",
+   "quantity": "one-sided normal tolerance factor, n = 10, 90 % coverage, 95 % confidence (B-basis form)",
+   "value": 2.35464013183,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "generator: non-central t quantile [S8 definition]",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-12"
+   ],
+   "note": "published tables quote 2.355 (to confirm against CMH-17 / MMPDS, open question)"
+  },
+  {
+   "id": "VC-PRB-08.b",
+   "quantity": "same, 99 % coverage (A-basis form)",
+   "value": 3.98111784527,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "generator: non-central t quantile [S8 definition]",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-12"
+   ],
+   "note": "published tables quote 3.981 (to confirm)"
+  },
+  {
+   "id": "VC-PRB-08.c",
+   "quantity": "limits n -> infinity: z_0.90, z_0.99",
+   "value": [
+    1.28155156554,
+    2.32634787404
+   ],
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-10
+   },
+   "source": "generator (Phi^-1)",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-12"
+   ]
+  },
+  {
+   "id": "VC-PRB-09.a",
+   "quantity": "Phi(-3)",
+   "value": 0.00134989803163,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-10
+   },
+   "source": "generator (erfc)",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-05"
+   ]
+  },
+  {
+   "id": "VC-PRB-09.b",
+   "quantity": "beta for Pf = 1e-6",
+   "value": 4.75342430882,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-10
+   },
+   "source": "generator (Phi^-1)",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-05"
+   ]
+  },
+  {
+   "id": "VC-PRB-10",
+   "quantity": "propagate_uncertainty twice with the same seed and samples",
+   "value": "identical data (bit-equal)",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-13"
+   ]
+  },
+  {
+   "id": "VC-PRB-11",
+   "quantity": "random variable bound to an 08 property with basis typical",
+   "value": "PRB_INPUT_UNVERIFIED",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-15"
+   ]
+  },
+  {
+   "id": "VC-PRB-12",
+   "quantity": "distribution sd <= 0 / lognormal mean <= 0 / correlation matrix not positive definite",
+   "value": [
+    "PRB_DISTRIBUTION_INVALID",
+    "PRB_DISTRIBUTION_INVALID",
+    "PRB_CORRELATION_INVALID"
+   ],
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-17"
+   ]
+  },
+  {
+   "id": "VC-PRB-13",
+   "quantity": "FORM on g with zero gradient at the start point",
+   "value": "PRB_FORM_NOT_CONVERGED",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-04"
+   ]
+  },
+  {
+   "id": "VC-PRB-14",
+   "quantity": "Pf result without a target",
+   "value": "PRB_TARGET_UNSET (warning) and reviewRequired true",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-14",
+    "FR-PRB-16"
+   ]
+  },
+  {
+   "id": "VC-PRB-15",
+   "quantity": "agent calls accept_reliability_result without signature",
+   "value": "PRB_HUMAN_GATE",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-PRB-16"
+   ]
+  },
+  {
+   "id": "VC-PRB-16",
+   "quantity": "05 bracket: Pf of the min margin with E, load and thickness scatter (FE responses)",
+   "value": "TBD",
+   "unit": "1",
+   "tolerance": {
+    "rel": null
+   },
+   "source": "TBD - measure with run_reliability_study once 05 FEA exists",
+   "grade": "TBD",
+   "proves": [
+    "FR-PRB-11"
+   ]
+  }
+ ]
+}

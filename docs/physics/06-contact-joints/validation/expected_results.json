@@ -1,0 +1,477 @@
+{
+ "pack": "06-contact-joints",
+ "generatedBy": "generate_cnt_reference.py",
+ "units": "N, mm, MPa unless stated",
+ "cases": [
+  {
+   "id": "VC-CNT-10.a",
+   "quantity": "Hertz line contact half-width b, cylinder R = 50 mm on block, 35 000 N/mm",
+   "value": 6.21462786687,
+   "unit": "mm",
+   "tolerance": {
+    "rel": 0.02
+   },
+   "source": "generator + S2 (code_aster SSNP154 analytic a = 6.21) ",
+   "grade": "A",
+   "proves": [
+    "FR-CNT-01",
+    "FR-CNT-08",
+    "TR-CNT-20"
+   ],
+   "inputs": {
+    "E_cylinder_MPa": 210000.0,
+    "E_block_MPa": 70000.0,
+    "nu": 0.3,
+    "R_mm": 50.0,
+    "P_per_length_N_per_mm": 35000.0
+   },
+   "quotedBySource": 6.21,
+   "R_inferred_from_reference_mm": 49.9255604062,
+   "note": "load is per unit length (plane strain): resolves '35 kN vs 35 kN/mm' as 35 kN per mm of roller length"
+  },
+  {
+   "id": "VC-CNT-10.b",
+   "quantity": "Hertz line contact peak pressure p0",
+   "value": 3585.36223088,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.02
+   },
+   "source": "generator + S2 (SSNP154 p0 = 3585.37; code_aster's own FE check tolerance 0.4 %)",
+   "grade": "A",
+   "proves": [
+    "FR-CNT-01",
+    "FR-CNT-08",
+    "TR-CNT-20"
+   ],
+   "inputs": {
+    "E_cylinder_MPa": 210000.0,
+    "E_block_MPa": 70000.0,
+    "nu": 0.3,
+    "R_mm": 50.0,
+    "P_per_length_N_per_mm": 35000.0
+   },
+   "quotedBySource": 3585.37,
+   "relDiffToQuoted": -2.16689365362e-06
+  },
+  {
+   "id": "VC-CNT-11.a",
+   "quantity": "Hertz sphere-sphere peak pressure p0 (SSNV104)",
+   "value": 2798.32866975,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.02
+   },
+   "source": "generator + S3 (code_aster SSNV104 VALE_REFE -2798.3)",
+   "grade": "A",
+   "proves": [
+    "FR-CNT-01",
+    "FR-CNT-08"
+   ],
+   "inputs": {
+    "E_MPa": 20000.0,
+    "nu": 0.3,
+    "R1_mm": 50.0,
+    "R2_mm": 50.0,
+    "approach_mm": 4.0
+   },
+   "quotedBySource": 2798.3,
+   "relDiffToQuoted": 1.02454160062e-05,
+   "note": "FE gate: sigma_yy at the contact centre; code_aster's own linear-element run is 13.5 % off (PRECISION 0.14), so the FE gate uses quadratic elements and 5 %"
+  },
+  {
+   "id": "VC-CNT-11.b",
+   "quantity": "Hertz sphere-sphere contact radius a (SSNV104)",
+   "value": 10.0,
+   "unit": "mm",
+   "tolerance": {
+    "rel": 0.05
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-CNT-01",
+    "FR-CNT-08"
+   ],
+   "inputs": {
+    "E_MPa": 20000.0,
+    "nu": 0.3,
+    "R1_mm": 50.0,
+    "R2_mm": 50.0,
+    "approach_mm": 4.0
+   }
+  },
+  {
+   "id": "VC-CNT-11.c",
+   "quantity": "Hertz sphere-sphere total force for 4 mm approach (SSNV104 geometry)",
+   "value": 586080.586081,
+   "unit": "N",
+   "tolerance": {
+    "rel": 0.03
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-CNT-01",
+    "FR-CNT-08"
+   ],
+   "inputs": {
+    "E_MPa": 20000.0,
+    "nu": 0.3,
+    "R1_mm": 50.0,
+    "R2_mm": 50.0,
+    "approach_mm": 4.0
+   },
+   "derivation": "P = (4/3) E* sqrt(R*) delta^1.5"
+  },
+  {
+   "id": "VC-CNT-12",
+   "quantity": "Hertz steel ball R = 10 mm on a steel flat, P = 1000 N: contact radius",
+   "value": 0.402072575859,
+   "unit": "mm",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator (formula check for hertz_contact)",
+   "grade": "A",
+   "proves": [
+    "FR-CNT-08"
+   ],
+   "inputs": {
+    "E_MPa": 210000.0,
+    "nu": 0.3,
+    "R_mm": 10.0,
+    "P_N": 1000.0
+   },
+   "extra": {
+    "p0_MPa": 2953.46944291,
+    "approach_mm": 0.0161662356258
+   }
+  },
+  {
+   "id": "VC-CNT-13.a",
+   "quantity": "sphere contact: max shear stress on axis / p0 (nu = 0.3)",
+   "value": 0.310020501955,
+   "unit": "1",
+   "tolerance": {
+    "rel": 0.01
+   },
+   "source": "generator from Johnson 1985 eq. 3.45 (formula not fetched)",
+   "grade": "B",
+   "proves": [
+    "FR-CNT-08"
+   ],
+   "depthOverA": 0.480864487525
+  },
+  {
+   "id": "VC-CNT-13.b",
+   "quantity": "line contact: max shear stress on axis / p0",
+   "value": 0.300283106001,
+   "unit": "1",
+   "tolerance": {
+    "rel": 0.01
+   },
+   "source": "generator from the plane-strain axis stresses (formula not fetched)",
+   "grade": "B",
+   "proves": [
+    "FR-CNT-08"
+   ],
+   "depthOverB": 0.786151371039
+  },
+  {
+   "id": "VC-CNT-20.a",
+   "quantity": "interference-fit contact pressure, solid steel shaft r = 20 mm in steel hub r_o = 40 mm, radial interference 0.01 mm",
+   "value": 39.375,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.02
+   },
+   "source": "generator (Lame compatibility)",
+   "grade": "A",
+   "proves": [
+    "FR-CNT-01",
+    "FR-CNT-09"
+   ],
+   "inputs": {
+    "shaft_radius_mm": 20.0,
+    "hub_outer_radius_mm": 40.0,
+    "radial_interference_mm": 0.01,
+    "E_MPa": 210000.0,
+    "nu": 0.3,
+    "plane": "stress"
+   }
+  },
+  {
+   "id": "VC-CNT-20.b",
+   "quantity": "hub hoop stress at the bore",
+   "value": 65.625,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.03
+   },
+   "source": "generator (Lame)",
+   "grade": "A",
+   "proves": [
+    "FR-CNT-09"
+   ],
+   "inputs": {
+    "shaft_radius_mm": 20.0,
+    "hub_outer_radius_mm": 40.0,
+    "radial_interference_mm": 0.01,
+    "E_MPa": 210000.0,
+    "nu": 0.3,
+    "plane": "stress"
+   },
+   "derivation": "sigma_theta = p (c^2 + b^2)/(c^2 - b^2)"
+  },
+  {
+   "id": "VC-CNT-30.a",
+   "quantity": "Coulomb slip threshold of a block pressed with 1000 N, mu = 0.2",
+   "value": 200.0,
+   "unit": "N",
+   "tolerance": {
+    "rel": 0.02
+   },
+   "source": "generator (Coulomb)",
+   "grade": "A",
+   "proves": [
+    "FR-CNT-02"
+   ],
+   "inputs": {
+    "N_N": 1000.0,
+    "mu": 0.2
+   },
+   "note": "FE: tangential reaction plateau under tangential displacement control; ccx stick slope makes the pre-slip branch elastic"
+  },
+  {
+   "id": "VC-CNT-40.a",
+   "quantity": "minimum preload for separation of a separation-critical joint, Pp-min",
+   "value": 5329.72440945,
+   "unit": "N",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S5 NASA-STD-5020 (2012 baseline, fetched) equations; generator arithmetic",
+   "grade": "A",
+   "proves": [
+    "FR-CNT-05",
+    "FR-CNT-06"
+   ],
+   "inputs": {
+    "T_nom_Nm": 10.0,
+    "T_tol_Nm": 0.5,
+    "K_nom": 0.2,
+    "D_mm": 6.35,
+    "Gamma_lubricated": 0.25,
+    "n_f": 4,
+    "relaxation_fraction": 0.05,
+    "creep_N": 0.0,
+    "dT_max_N": 0.0,
+    "dT_min_N": 0.0,
+    "k_b_N_per_mm": 200000.0,
+    "k_c_N_per_mm": 600000.0,
+    "n_loading_plane": 0.5,
+    "P_tu_allow_N": 20000.0,
+    "PtL_N": 2000.0,
+    "PsL_joint_N": 3000.0,
+    "PtL_joint_N": 4000.0,
+    "FS_sep": 1.2,
+    "FS_u": 1.4,
+    "FS_slip": 1.2,
+    "FF": 1.0,
+    "mu": 0.2
+   }
+  },
+  {
+   "id": "VC-CNT-40.b",
+   "quantity": "minimum preload for joint slip, Pp-min (Gamma / n_f)",
+   "value": 6662.15551181,
+   "unit": "N",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S5 NASA-STD-5020 (2012 baseline, fetched) equations; generator arithmetic",
+   "grade": "A",
+   "proves": [
+    "FR-CNT-05",
+    "FR-CNT-06"
+   ]
+  },
+  {
+   "id": "VC-CNT-40.c",
+   "quantity": "maximum preload Pp-max",
+   "value": 10334.6456693,
+   "unit": "N",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S5 NASA-STD-5020 (2012 baseline, fetched) equations; generator arithmetic",
+   "grade": "A",
+   "proves": [
+    "FR-CNT-05"
+   ]
+  },
+  {
+   "id": "VC-CNT-40.d",
+   "quantity": "margin of safety for separation MS_sep (eq. 6-23)",
+   "value": 1.22071850394,
+   "unit": "1",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "S5 NASA-STD-5020 (2012 baseline, fetched) equations; generator arithmetic",
+   "grade": "A",
+   "proves": [
+    "FR-CNT-06",
+    "FR-CNT-12"
+   ]
+  },
+  {
+   "id": "VC-CNT-40.e",
+   "quantity": "margin of safety for joint slip MS_slip (eq. A.10-4)",
+   "value": 0.168799212598,
+   "unit": "1",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "S5 NASA-STD-5020 (2012 baseline, fetched) equations; generator arithmetic",
+   "grade": "A",
+   "proves": [
+    "FR-CNT-06"
+   ]
+  },
+  {
+   "id": "VC-CNT-40.f",
+   "quantity": "linear-theory separation load at max preload P'sep (eq. 6-10)",
+   "value": 11811.023622,
+   "unit": "N",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S5 NASA-STD-5020 (2012 baseline, fetched) equations; generator arithmetic",
+   "grade": "A",
+   "proves": [
+    "FR-CNT-06"
+   ]
+  },
+  {
+   "id": "VC-CNT-40.g",
+   "quantity": "bolt_joint_check with mu = 0.3 on uncoated metal and no test substantiation",
+   "value": "CNT_FRICTION_ABOVE_CAP",
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "S5 section 6.4 (mu <= 0.2 uncoated clean metal, 0.1 otherwise, unless test-substantiated)",
+   "grade": "A",
+   "proves": [
+    "FR-CNT-06",
+    "FR-CNT-14"
+   ]
+  },
+  {
+   "id": "VC-CNT-40.h",
+   "quantity": "torque-controlled preload variation used when no test data is given (lubricated / dry)",
+   "value": "0.25 / 0.35",
+   "unit": "1",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "S5 section 6.1.d(1)A (named default, defaulted: true)",
+   "grade": "A",
+   "proves": [
+    "FR-CNT-05",
+    "FR-CNT-14"
+   ]
+  },
+  {
+   "id": "VC-CNT-50",
+   "quantity": "pinned ccx decks pret1 / pret2 / bolt / contact1 / friction1 / hueeber1_mortar reproduce their .dat.ref",
+   "value": "TBD",
+   "unit": "mixed",
+   "tolerance": {
+    "rel": 0.0001
+   },
+   "source": "S1 test suite (extract with the M2 reader, then freeze)",
+   "grade": "TBD",
+   "proves": [
+    "FR-CNT-01",
+    "FR-CNT-03",
+    "TR-CNT-10"
+   ]
+  },
+  {
+   "id": "VC-CNT-51",
+   "quantity": "bolt pretension section with 10 kN force: summed axial section force in the bolt after the preload step",
+   "value": 10000.0,
+   "unit": "N",
+   "tolerance": {
+    "rel": 0.005
+   },
+   "source": "S1 manual *PRE-TENSION SECTION (mean force equals the applied force by MPC construction)",
+   "grade": "A",
+   "proves": [
+    "FR-CNT-03"
+   ],
+   "note": "exact by construction; checks the deck writer and the RF read-back"
+  },
+  {
+   "id": "VC-CNT-60",
+   "quantity": "contact pairs of different TYPE in one analysis",
+   "value": "CNT_MIXED_CONTACT_TYPES",
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "S1 manual *CONTACT PAIR (all pairs in a deck must be of the same type)",
+   "grade": "A",
+   "proves": [
+    "FR-CNT-01",
+    "FR-CNT-13"
+   ]
+  },
+  {
+   "id": "VC-CNT-61",
+   "quantity": "add_contact_pair with friction and no stick slope",
+   "value": "named default lambda = E1/2 reported",
+   "unit": "shape",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "S1 manual *FRICTION default (first elastic constant / 2)",
+   "grade": "A",
+   "proves": [
+    "FR-CNT-02",
+    "FR-CNT-14"
+   ]
+  },
+  {
+   "id": "VC-CNT-62",
+   "quantity": "contact_report / check_contact / bolted_joint_check result",
+   "value": "reviewRequired=true",
+   "unit": "flag",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "AF-33",
+   "grade": "A",
+   "proves": [
+    "FR-CNT-15"
+   ]
+  },
+  {
+   "id": "VC-CNT-63",
+   "quantity": "bolted_joint_check from a nut factor flagged unverified",
+   "value": "unverified=true",
+   "unit": "flag",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "AF-32",
+   "grade": "A",
+   "proves": [
+    "FR-CNT-16"
+   ]
+  }
+ ]
+}
