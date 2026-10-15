@@ -1,0 +1,629 @@
+{
+ "generator": "generate_mat_reference.py",
+ "constants": {
+  "mm_per_in": 25.4,
+  "g_per_lb": 453.59237
+ },
+ "unitConversion": [
+  {
+   "id": "VC-MAT-03/0.1lb_in3",
+   "input": {
+    "density": 0.1,
+    "unit": "lb/in^3"
+   },
+   "expected": {
+    "g/cm^3": 2.76799,
+    "g/mm^3": 0.00276799,
+    "kg/m^3": 2767.99
+   },
+   "tolerance": {
+    "relative": 1e-09
+   },
+   "derivation": "rho[g/cm^3] = rho[lb/in^3] * 453.59237 / 16.387064 (exact constants)"
+  },
+  {
+   "id": "VC-MAT-03/0.101lb_in3",
+   "input": {
+    "density": 0.101,
+    "unit": "lb/in^3"
+   },
+   "expected": {
+    "g/cm^3": 2.79567,
+    "g/mm^3": 0.00279567,
+    "kg/m^3": 2795.67
+   },
+   "tolerance": {
+    "relative": 1e-09
+   },
+   "derivation": "rho[g/cm^3] = rho[lb/in^3] * 453.59237 / 16.387064 (exact constants)"
+  },
+  {
+   "id": "VC-MAT-03/0.16lb_in3",
+   "input": {
+    "density": 0.16,
+    "unit": "lb/in^3"
+   },
+   "expected": {
+    "g/cm^3": 4.42878,
+    "g/mm^3": 0.00442878,
+    "kg/m^3": 4428.78
+   },
+   "tolerance": {
+    "relative": 1e-09
+   },
+   "derivation": "rho[g/cm^3] = rho[lb/in^3] * 453.59237 / 16.387064 (exact constants)"
+  }
+ ],
+ "massProperties": [
+  {
+   "id": "VC-MAT-04/box_100x50x10_mm/aa7075_t6/density_typical_matweb",
+   "geometry": "box_100x50x10_mm",
+   "documentUnits": "mm",
+   "material": "aa7075_t6",
+   "expected": {
+    "volume_mm3": 50000.0,
+    "density_g_mm3": 0.00281,
+    "mass_g": 140.5
+   },
+   "tolerance": {
+    "relative_exact_kernel": 1e-06,
+    "relative_mesh_kernel": 0.005
+   },
+   "derivation": "V = 100*50*10 mm^3; aa7075_t6.physical.density_typical_matweb = 2.81 g/cm^3; mass = V * rho",
+   "densitySource": "S12"
+  },
+  {
+   "id": "VC-MAT-04/box_100x50x10_mm/aa7075_t6/density_ams4045_supplier",
+   "geometry": "box_100x50x10_mm",
+   "documentUnits": "mm",
+   "material": "aa7075_t6",
+   "expected": {
+    "volume_mm3": 50000.0,
+    "density_g_mm3": 0.00279567038,
+    "mass_g": 139.7835
+   },
+   "tolerance": {
+    "relative_exact_kernel": 1e-06,
+    "relative_mesh_kernel": 0.005
+   },
+   "derivation": "V = 100*50*10 mm^3; aa7075_t6.physical.density_ams4045_supplier = 0.101 lb/in^3; mass = V * rho",
+   "densitySource": "S13"
+  },
+  {
+   "id": "VC-MAT-04/cylinder_r10_h50_mm/ti6al4v_annealed/density_supplier",
+   "geometry": "cylinder_r10_h50_mm",
+   "documentUnits": "mm",
+   "material": "ti6al4v_annealed",
+   "expected": {
+    "volume_mm3": 15707.9633,
+    "density_g_mm3": 0.00442878475,
+    "mass_g": 69.56719
+   },
+   "tolerance": {
+    "relative_exact_kernel": 1e-06,
+    "relative_mesh_kernel": 0.005
+   },
+   "derivation": "V = pi*10^2*50 mm^3; ti6al4v_annealed.physical.density_supplier = 0.16 lb/in^3; mass = V * rho",
+   "densitySource": "S15"
+  },
+  {
+   "id": "VC-MAT-04/plate_100x100x5_hole_d10_mm/aa2024_t3/density_typical_matweb",
+   "geometry": "plate_100x100x5_hole_d10_mm",
+   "documentUnits": "mm",
+   "material": "aa2024_t3",
+   "expected": {
+    "volume_mm3": 49607.3009,
+    "density_g_mm3": 0.00278,
+    "mass_g": 137.9083
+   },
+   "tolerance": {
+    "relative_exact_kernel": 1e-06,
+    "relative_mesh_kernel": 0.005
+   },
+   "derivation": "V = 100*100*5 - pi*5^2*5 mm^3 (through hole); aa2024_t3.physical.density_typical_matweb = 2.78 g/cm^3; mass = V * rho",
+   "densitySource": "S10"
+  },
+  {
+   "id": "VC-MAT-04/box_2x1x0.25_in/aa7075_t6/density_ams4045_supplier",
+   "geometry": "box_2x1x0.25_in",
+   "documentUnits": "in",
+   "material": "aa7075_t6",
+   "expected": {
+    "volume_in3": 0.5,
+    "mass_lb": 0.0505,
+    "mass_g": 22.90641
+   },
+   "tolerance": {
+    "relative_exact_kernel": 1e-06,
+    "relative_mesh_kernel": 1e-06
+   },
+   "derivation": "V = 2*1*0.25 in^3; aa7075_t6.physical.density_ams4045_supplier = 0.101 lb/in^3; mass_lb = V*rho; mass_g = mass_lb*453.59237",
+   "densitySource": "S13"
+  }
+ ],
+ "catalogCheckpoints": [
+  {
+   "id": "VC-MAT-06/NAS6203-33",
+   "expected": {
+    "grip_in": 2.0625,
+    "length_in": 2.385
+   },
+   "published": {
+    "grip_in": 2.062,
+    "length_in": 2.385
+   },
+   "tolerance": {
+    "absolute_in": 0.001
+   },
+   "consistent": true,
+   "derivation": "grip = dash*0.0625; length = grip + threadLength (distributor rule S22)"
+  },
+  {
+   "id": "VC-MAT-06/NAS6204-33",
+   "expected": {
+    "grip_in": 2.0625,
+    "length_in": 2.433
+   },
+   "published": {
+    "grip_in": 2.062,
+    "length_in": 2.432
+   },
+   "tolerance": {
+    "absolute_in": 0.001
+   },
+   "consistent": true,
+   "derivation": "grip = dash*0.0625; length = grip + threadLength (distributor rule S22)"
+  },
+  {
+   "id": "VC-MAT-06/NAS6204-10",
+   "expected": {
+    "grip_in": 0.625,
+    "length_in": 0.995
+   },
+   "published": {
+    "grip_in": 0.625,
+    "length_in": 0.995
+   },
+   "tolerance": {
+    "absolute_in": 0.001
+   },
+   "consistent": true,
+   "derivation": "grip = dash*0.0625; length = grip + threadLength (distributor rule S22)"
+  },
+  {
+   "id": "VC-MAT-06/NAS6205-33",
+   "expected": {
+    "grip_in": 2.0625,
+    "length_in": 2.501
+   },
+   "published": {
+    "grip_in": 2.062,
+    "length_in": 2.5
+   },
+   "tolerance": {
+    "absolute_in": 0.001
+   },
+   "consistent": true,
+   "derivation": "grip = dash*0.0625; length = grip + threadLength (distributor rule S22)"
+  },
+  {
+   "id": "VC-MAT-06/NAS6205-10",
+   "expected": {
+    "grip_in": 0.625,
+    "length_in": 1.063
+   },
+   "published": {
+    "grip_in": 0.625,
+    "length_in": 1.063
+   },
+   "tolerance": {
+    "absolute_in": 0.001
+   },
+   "consistent": true,
+   "derivation": "grip = dash*0.0625; length = grip + threadLength (distributor rule S22)"
+  },
+  {
+   "id": "VC-MAT-06/NAS6206-33",
+   "expected": {
+    "grip_in": 2.0625,
+    "length_in": 2.517
+   },
+   "published": {
+    "grip_in": 2.062,
+    "length_in": 2.516
+   },
+   "tolerance": {
+    "absolute_in": 0.001
+   },
+   "consistent": true,
+   "derivation": "grip = dash*0.0625; length = grip + threadLength (distributor rule S22)"
+  }
+ ],
+ "boltGripSelection": [
+  {
+   "id": "VC-MAT-07/NAS6203/t=0.5",
+   "input": {
+    "family": "NAS6203-6220",
+    "diameterDash": "3",
+    "stack_in": 0.5
+   },
+   "expected": {
+    "ok": true,
+    "partNumber": "NAS6203-8",
+    "grip_in": 0.5,
+    "length_in": 0.823,
+    "gap_in": 0.0,
+    "washersUnderNut_in": [],
+    "nut": "MS21042L3",
+    "protrusionBeyondNutMaxHeight_in": 0.135,
+    "atLeastOneThreadProtrudes": true
+   },
+   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37)"
+  },
+  {
+   "id": "VC-MAT-07/NAS6203/t=0.51",
+   "input": {
+    "family": "NAS6203-6220",
+    "diameterDash": "3",
+    "stack_in": 0.51
+   },
+   "expected": {
+    "ok": true,
+    "partNumber": "NAS6203-9",
+    "grip_in": 0.5625,
+    "length_in": 0.885,
+    "gap_in": 0.0525,
+    "washersUnderNut_in": [
+     0.063
+    ],
+    "nut": "MS21042L3",
+    "protrusionBeyondNutMaxHeight_in": 0.124,
+    "atLeastOneThreadProtrudes": true
+   },
+   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37)"
+  },
+  {
+   "id": "VC-MAT-07/NAS6203/t=0.5625",
+   "input": {
+    "family": "NAS6203-6220",
+    "diameterDash": "3",
+    "stack_in": 0.5625
+   },
+   "expected": {
+    "ok": true,
+    "partNumber": "NAS6203-9",
+    "grip_in": 0.5625,
+    "length_in": 0.885,
+    "gap_in": 0.0,
+    "washersUnderNut_in": [],
+    "nut": "MS21042L3",
+    "protrusionBeyondNutMaxHeight_in": 0.1345,
+    "atLeastOneThreadProtrudes": true
+   },
+   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37)"
+  },
+  {
+   "id": "VC-MAT-07/NAS6204/t=0.25",
+   "input": {
+    "family": "NAS6203-6220",
+    "diameterDash": "4",
+    "stack_in": 0.25
+   },
+   "expected": {
+    "ok": true,
+    "partNumber": "NAS6204-4",
+    "grip_in": 0.25,
+    "length_in": 0.62,
+    "gap_in": 0.0,
+    "washersUnderNut_in": []
+   },
+   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37)"
+  },
+  {
+   "id": "VC-MAT-07/NAS6204/t=0.3",
+   "input": {
+    "family": "NAS6203-6220",
+    "diameterDash": "4",
+    "stack_in": 0.3
+   },
+   "expected": {
+    "ok": true,
+    "partNumber": "NAS6204-5",
+    "grip_in": 0.3125,
+    "length_in": 0.682,
+    "gap_in": 0.0125,
+    "washersUnderNut_in": [
+     0.016
+    ]
+   },
+   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37)"
+  },
+  {
+   "id": "VC-MAT-07/NAS6205/t=0.625",
+   "input": {
+    "family": "NAS6203-6220",
+    "diameterDash": "5",
+    "stack_in": 0.625
+   },
+   "expected": {
+    "ok": true,
+    "partNumber": "NAS6205-10",
+    "grip_in": 0.625,
+    "length_in": 1.063,
+    "gap_in": 0.0,
+    "washersUnderNut_in": []
+   },
+   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37)"
+  },
+  {
+   "id": "VC-MAT-07/NAS6205/t=0.7",
+   "input": {
+    "family": "NAS6203-6220",
+    "diameterDash": "5",
+    "stack_in": 0.7
+   },
+   "expected": {
+    "ok": true,
+    "partNumber": "NAS6205-12",
+    "grip_in": 0.75,
+    "length_in": 1.188,
+    "gap_in": 0.05,
+    "washersUnderNut_in": [
+     0.063
+    ]
+   },
+   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37)"
+  },
+  {
+   "id": "VC-MAT-07/NAS6206/t=1.0",
+   "input": {
+    "family": "NAS6203-6220",
+    "diameterDash": "6",
+    "stack_in": 1.0
+   },
+   "expected": {
+    "ok": true,
+    "partNumber": "NAS6206-16",
+    "grip_in": 1.0,
+    "length_in": 1.454,
+    "gap_in": 0.0,
+    "washersUnderNut_in": []
+   },
+   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37)"
+  },
+  {
+   "id": "VC-MAT-07/NAS6206/t=0.02",
+   "input": {
+    "family": "NAS6203-6220",
+    "diameterDash": "6",
+    "stack_in": 0.02
+   },
+   "expected": {
+    "ok": true,
+    "partNumber": "NAS6206-1",
+    "grip_in": 0.0625,
+    "length_in": 0.516,
+    "gap_in": 0.0425,
+    "washersUnderNut_in": [
+     0.063
+    ]
+   },
+   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37)"
+  },
+  {
+   "id": "VC-MAT-07/NAS6204/t=3.0",
+   "input": {
+    "family": "NAS6203-6220",
+    "diameterDash": "4",
+    "stack_in": 3.0
+   },
+   "expected": {
+    "ok": false,
+    "reason": "stack exceeds largest grip in catalogue fixture"
+   }
+  }
+ ],
+ "hiLokGripSelection": [
+  {
+   "id": "VC-MAT-08/HL19-8/t=0.6",
+   "input": {
+    "family": "HL19",
+    "diameterDash32nds": 8,
+    "stack_in": 0.6
+   },
+   "expected": {
+    "partNumber": "HL19-8-10",
+    "gripRange_in": [
+     0.5625,
+     0.625
+    ],
+    "diameter_in": 0.25
+   },
+   "derivation": "gripDash n = ceil(16*stack); pin covers ((n-1)/16, n/16] in (HL19-8-10 -> .5625-.625 in)"
+  },
+  {
+   "id": "VC-MAT-08/HL19-8/t=0.5625",
+   "input": {
+    "family": "HL19",
+    "diameterDash32nds": 8,
+    "stack_in": 0.5625
+   },
+   "expected": {
+    "partNumber": "HL19-8-9",
+    "gripRange_in": [
+     0.5,
+     0.5625
+    ],
+    "diameter_in": 0.25
+   },
+   "derivation": "gripDash n = ceil(16*stack); pin covers ((n-1)/16, n/16] in (HL19-8-10 -> .5625-.625 in)"
+  },
+  {
+   "id": "VC-MAT-08/HL19-8/t=0.5626",
+   "input": {
+    "family": "HL19",
+    "diameterDash32nds": 8,
+    "stack_in": 0.5626
+   },
+   "expected": {
+    "partNumber": "HL19-8-10",
+    "gripRange_in": [
+     0.5625,
+     0.625
+    ],
+    "diameter_in": 0.25
+   },
+   "derivation": "gripDash n = ceil(16*stack); pin covers ((n-1)/16, n/16] in (HL19-8-10 -> .5625-.625 in)"
+  },
+  {
+   "id": "VC-MAT-08/HL19-6/t=0.25",
+   "input": {
+    "family": "HL19",
+    "diameterDash32nds": 6,
+    "stack_in": 0.25
+   },
+   "expected": {
+    "partNumber": "HL19-6-4",
+    "gripRange_in": [
+     0.1875,
+     0.25
+    ],
+    "diameter_in": 0.1875
+   },
+   "derivation": "gripDash n = ceil(16*stack); pin covers ((n-1)/16, n/16] in (HL19-8-10 -> .5625-.625 in)"
+  },
+  {
+   "id": "VC-MAT-08/HL19-6/t=0.251",
+   "input": {
+    "family": "HL19",
+    "diameterDash32nds": 6,
+    "stack_in": 0.251
+   },
+   "expected": {
+    "partNumber": "HL19-6-5",
+    "gripRange_in": [
+     0.25,
+     0.3125
+    ],
+    "diameter_in": 0.1875
+   },
+   "derivation": "gripDash n = ceil(16*stack); pin covers ((n-1)/16, n/16] in (HL19-8-10 -> .5625-.625 in)"
+  }
+ ],
+ "rivetSelection": [
+  {
+   "id": "VC-MAT-09/MS20470AD4/t=0.125",
+   "input": {
+    "family": "MS20470",
+    "material": "AD",
+    "diameterDash": "4",
+    "stack_in": 0.125
+   },
+   "expected": {
+    "partNumber": "MS20470AD4-5",
+    "rawLength_in": 0.3125,
+    "length_in": 0.3125,
+    "shopHeadMinDiameter_in": 0.1875,
+    "shopHeadMinHeight_in": 0.0625,
+    "minEdgeDistance_in": 0.25,
+    "minPitch_in": 0.375
+   },
+   "derivation": "L = stack + 1.5D rounded UP to 1/16 in (open question OQ-MAT-04: nearest vs up); shop head >= 1.5D x 0.5D; edge >= 2D, pitch >= 3D (AC 43.13-1B 4-57c)"
+  },
+  {
+   "id": "VC-MAT-09/MS20470AD4/t=0.08",
+   "input": {
+    "family": "MS20470",
+    "material": "AD",
+    "diameterDash": "4",
+    "stack_in": 0.08
+   },
+   "expected": {
+    "partNumber": "MS20470AD4-5",
+    "rawLength_in": 0.2675,
+    "length_in": 0.3125,
+    "shopHeadMinDiameter_in": 0.1875,
+    "shopHeadMinHeight_in": 0.0625,
+    "minEdgeDistance_in": 0.25,
+    "minPitch_in": 0.375
+   },
+   "derivation": "L = stack + 1.5D rounded UP to 1/16 in (open question OQ-MAT-04: nearest vs up); shop head >= 1.5D x 0.5D; edge >= 2D, pitch >= 3D (AC 43.13-1B 4-57c)"
+  },
+  {
+   "id": "VC-MAT-09/MS20470AD3/t=0.064",
+   "input": {
+    "family": "MS20470",
+    "material": "AD",
+    "diameterDash": "3",
+    "stack_in": 0.064
+   },
+   "expected": {
+    "partNumber": "MS20470AD3-4",
+    "rawLength_in": 0.20463,
+    "length_in": 0.25,
+    "shopHeadMinDiameter_in": 0.14062,
+    "shopHeadMinHeight_in": 0.04688,
+    "minEdgeDistance_in": 0.1875,
+    "minPitch_in": 0.28125
+   },
+   "derivation": "L = stack + 1.5D rounded UP to 1/16 in (open question OQ-MAT-04: nearest vs up); shop head >= 1.5D x 0.5D; edge >= 2D, pitch >= 3D (AC 43.13-1B 4-57c)"
+  },
+  {
+   "id": "VC-MAT-09/MS20470AD5/t=0.16",
+   "input": {
+    "family": "MS20470",
+    "material": "AD",
+    "diameterDash": "5",
+    "stack_in": 0.16
+   },
+   "expected": {
+    "partNumber": "MS20470AD5-7",
+    "rawLength_in": 0.39438,
+    "length_in": 0.4375,
+    "shopHeadMinDiameter_in": 0.23438,
+    "shopHeadMinHeight_in": 0.07812,
+    "minEdgeDistance_in": 0.3125,
+    "minPitch_in": 0.46875
+   },
+   "derivation": "L = stack + 1.5D rounded UP to 1/16 in (open question OQ-MAT-04: nearest vs up); shop head >= 1.5D x 0.5D; edge >= 2D, pitch >= 3D (AC 43.13-1B 4-57c)"
+  },
+  {
+   "id": "VC-MAT-09/MS20470AD6/t=0.25",
+   "input": {
+    "family": "MS20470",
+    "material": "AD",
+    "diameterDash": "6",
+    "stack_in": 0.25
+   },
+   "expected": {
+    "partNumber": "MS20470AD6-9",
+    "rawLength_in": 0.53125,
+    "length_in": 0.5625,
+    "shopHeadMinDiameter_in": 0.28125,
+    "shopHeadMinHeight_in": 0.09375,
+    "minEdgeDistance_in": 0.375,
+    "minPitch_in": 0.5625
+   },
+   "derivation": "L = stack + 1.5D rounded UP to 1/16 in (open question OQ-MAT-04: nearest vs up); shop head >= 1.5D x 0.5D; edge >= 2D, pitch >= 3D (AC 43.13-1B 4-57c)"
+  },
+  {
+   "id": "VC-MAT-09/MS20470AD6/t=0.188",
+   "input": {
+    "family": "MS20470",
+    "material": "AD",
+    "diameterDash": "6",
+    "stack_in": 0.188
+   },
+   "expected": {
+    "partNumber": "MS20470AD6-8",
+    "rawLength_in": 0.46925,
+    "length_in": 0.5,
+    "shopHeadMinDiameter_in": 0.28125,
+    "shopHeadMinHeight_in": 0.09375,
+    "minEdgeDistance_in": 0.375,
+    "minPitch_in": 0.5625
+   },
+   "derivation": "L = stack + 1.5D rounded UP to 1/16 in (open question OQ-MAT-04: nearest vs up); shop head >= 1.5D x 0.5D; edge >= 2D, pitch >= 3D (AC 43.13-1B 4-57c)"
+  }
+ ]
+}
