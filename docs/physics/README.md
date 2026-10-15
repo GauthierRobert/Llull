@@ -146,3 +146,76 @@ licence and binaries, Elmer test-suite layout, ASTM E1049 example values, IFToMM
    private-library storage and ship no tables.
 4. **Scope of this list.** Confirm the P1/P2/P3 split and whether PHY-12 to PHY-20 should get full packs or
    stay as backlog items.
+
+## 6. Pack conventions (shared by every `NN-*` folder)
+
+Layout, sections and authoring rules: [`../aerospace/TEMPLATE.md`](../aerospace/TEMPLATE.md) and
+[`../aerospace/AGENT_FIRST.md`](../aerospace/AGENT_FIRST.md) apply unchanged (specs only, verified sources, no
+fabricated numbers, FR → VC mapping, AF-nn mapping). The additions below keep 21 packs consistent.
+
+### 6.1 Folders and requirement ids
+
+| Gap | Folder | Req. prefix / error-code prefix |
+| --- | ------ | -------------------------------- |
+| PHY-00 | `00-vv-harness` | `VNV` |
+| PHY-01 | `01-property-models` | `PROP` |
+| PHY-02 | `02-constitutive-models` | `MATL` |
+| PHY-03 | `03-thermal-analysis` | `THM` |
+| PHY-04 | `04-thermo-mechanical` | `TMC` |
+| PHY-05 | `05-nonlinear-structural` | `NLS` |
+| PHY-06 | `06-contact-joints` | `CNT` |
+| PHY-07 | `07-fatigue` | `FAT` |
+| PHY-08 | `08-fracture-damage-tolerance` | `FRC` |
+| PHY-09 | `09-structural-dynamics` | `DYN` |
+| PHY-10 | `10-rigid-body-dynamics` | `RBD` |
+| PHY-11 | `11-creep-viscoelasticity` | `CRP` |
+| PHY-12 | `12-material-selection` | `SEL` |
+| PHY-13 | `13-corrosion-compatibility` | `COR` |
+| PHY-14 | `14-moisture-outgassing` | `ENV` |
+| PHY-15 | `15-electro-optical-properties` | `EOP` |
+| PHY-16 | `16-process-physics` | `PRC` |
+| PHY-17 | `17-topology-optimization` | `TOP` |
+| PHY-18 | `18-probabilistic-sensitivity` | `PRB` |
+| PHY-19 | `19-explicit-impact` | `EXP` |
+| PHY-20 | `20-vibroacoustics` | `VAC` |
+
+Ids: `FR-THM-nn`, `TR-THM-nn`, `VC-THM-nn`; error codes `THM_<UPPER_SNAKE>` (AF-11).
+
+### 6.2 Proposed placement (pending decision §5.1, every pack states it as a proposal)
+
+- **Core model** (types core may reference): `packages/core/src/model/propertyModel.ts` (owned by PHY-01),
+  `model/materialModel.ts` (owned by PHY-02). Both hang off the 08 MAT `MaterialRecord` as
+  `propertyModels?` / `materialModels?`; no other pack defines material data.
+- **Plugin** `packages/domain-physics` (alias `@phys`), one `CadPlugin` per discipline (`thermal`, `nonlinear`,
+  `fatigue`, …). It **extends** 05 FEA's `AnalysisModel` / `AnalysisCase` / deck writers / result readers
+  (`@cae`) instead of creating a parallel analysis stack. Each pack owns the `AnalysisType` members it adds
+  (e.g. PHY-03 `heat_steady`, `heat_transient`; PHY-05 `nonlinear_static`; PHY-09 `frequency_response`,
+  `random_response`, `transient_dynamic`; PHY-11 `creep`) and lists them in its TECHNICAL_SPEC §3.
+- **Solver:** bundled CalculiX (05) first; any other tool (MFront, external explicit solver, Python libs in
+  the bundled CPython) is justified in the pack with its licence.
+- **Document version:** slices ride the aerospace v3 envelope (01 KRN TECHNICAL_SPEC §3.1); a pack that needs
+  a new slice lists it as an addition to `migrate2to3` or a v4 item, never its own migration.
+
+### 6.3 `expected_results.json` schema (consumed by PHY-00's harness)
+
+```json
+{
+  "pack": "03-thermal-analysis",
+  "generatedBy": "generate_thermal_reference.py | quoted",
+  "cases": [
+    {
+      "id": "VC-THM-03",
+      "quantity": "temperature at x = 0.08 m, t = 32 s",
+      "value": 36.6, "unit": "degC",
+      "tolerance": { "rel": 0.01 },
+      "source": "S1 (Abaqus T3) + S6 (MOOSE)", "grade": "A",
+      "proves": ["FR-THM-02", "TR-THM-05"]
+    }
+  ]
+}
+```
+
+`grade`: `A` (≥ 2 independent sources or exact analytic derivation in a generator), `B` (1 secondary source,
+reported but not a pass/fail gate until confirmed), `C` / `TBD` (not used as a threshold). Generators are
+**Python 3 standard library only**, run as `python3 -I <script>` from their `validation/` folder, and
+re-run to byte-identical output; values are stored with 12 significant digits.
