@@ -574,6 +574,63 @@
    ]
   },
   {
+   "id": "VC-NLS-67",
+   "quantity": "agent calls dispose_margin on a FAIL row with criterion limit_load",
+   "value": "FEA_HUMAN_GATE",
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "aerospace 05 FR-FEA-33 (AF-34)",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-14"
+   ]
+  },
+  {
+   "id": "VC-NLS-68",
+   "quantity": "limit-load margin row without a PHY-00 convergence study",
+   "value": "VNV_NO_CONVERGENCE_STUDY",
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "PHY-00 TECHNICAL_SPEC 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-19"
+   ]
+  },
+  {
+   "id": "VC-NLS-69",
+   "quantity": "Code_Aster export of the cantilever case re-run in a user-installed code_aster (V2)",
+   "value": "TBD",
+   "unit": "N",
+   "tolerance": {
+    "rel": null
+   },
+   "source": "TBD \u2014 needs a code_aster install",
+   "grade": "TBD",
+   "proves": [
+    "FR-NLS-20"
+   ]
+  },
+  {
+   "id": "VC-NLS-71",
+   "quantity": "check_nonlinear guardrails on deliberately wrong set-ups",
+   "value": "NLS_IMPERFECTION_MISSING, NLS_NLGEOM_RECOMMENDED, NLS_STRAIN_BEYOND_CURVE, NLS_MESH_PLASTIC_ADEQUACY, NLS_PERMANENT_SET_THRESHOLD_UNSET",
+   "unit": "codes",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-10",
+    "FR-NLS-07"
+   ]
+  },
+  {
    "id": "VC-NLS-41",
    "quantity": "pinned CalculiX decks beampiso / beampkin / beampd: displacements per increment equal the .dat.ref files",
    "value": "TBD",

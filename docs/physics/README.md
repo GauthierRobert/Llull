@@ -1,10 +1,9 @@
 # Physics & material behaviour: gap list
 
-Status: **gap list only** (no specs, no implementation). Written 2026-10-15.
-Next step: once this list is approved, write one pack per gap (`FUNCTIONAL_SPEC.md`, `TECHNICAL_SPEC.md`,
-`validation/`) following [`../aerospace/TEMPLATE.md`](../aerospace/TEMPLATE.md) and
+Status: **specifications written for all 21 gaps** (no implementation). Written 2026-10-15.
+Each pack follows [`../aerospace/TEMPLATE.md`](../aerospace/TEMPLATE.md) and
 [`../aerospace/AGENT_FIRST.md`](../aerospace/AGENT_FIRST.md) (the agent drives the `llull` CLI, the owner is
-not assumed to be an engineer, and qualified reviewers sign off).
+not assumed to be an engineer, and qualified reviewers sign off). Index: §7. Cross-pack findings: §8.
 
 ## 1. Baseline: what llull has once the aerospace packs are built
 
@@ -135,7 +134,7 @@ reproduce the value analytically.
 Treloar table, open aerospace S-N / ε-N datasets, NASA outgassing database, NIST AM-Bench, OpenRadioss
 licence and binaries, Elmer test-suite layout, ASTM E1049 example values, IFToMM multibody benchmark library.
 
-## 5. Decisions needed before writing the packs
+## 5. Decisions needed before writing the packs (superseded by §8.3)
 
 1. **Package.** One `domain-physics` plugin (or `cae` disciplines inside the proposed `packages/domain-aero`)
    that extends 05 FEA instead of a parallel stack. Material models live in **core model** next to the 08
@@ -186,7 +185,7 @@ Ids: `FR-THM-nn`, `TR-THM-nn`, `VC-THM-nn`; error codes `THM_<UPPER_SNAKE>` (AF-
 - **Core model** (types core may reference): `packages/core/src/model/propertyModel.ts` (owned by PHY-01),
   `model/materialModel.ts` (owned by PHY-02). Both hang off the 08 MAT `MaterialRecord` as
   `propertyModels?` / `materialModels?`; no other pack defines material data.
-- **Plugin** `packages/domain-physics` (alias `@phys`), one `CadPlugin` per discipline (`thermal`, `nonlinear`,
+- **Plugin** `packages/domain-physics` (alias `@phys`; see §8.1: it cannot import `@cae`), one `CadPlugin` per discipline (`thermal`, `nonlinear`,
   `fatigue`, …). It **extends** 05 FEA's `AnalysisModel` / `AnalysisCase` / deck writers / result readers
   (`@cae`) instead of creating a parallel analysis stack. Each pack owns the `AnalysisType` members it adds
   (e.g. PHY-03 `heat_steady`, `heat_transient`; PHY-05 `nonlinear_static`; PHY-09 `frequency_response`,
@@ -219,3 +218,96 @@ Ids: `FR-THM-nn`, `TR-THM-nn`, `VC-THM-nn`; error codes `THM_<UPPER_SNAKE>` (AF-
 reported but not a pass/fail gate until confirmed), `C` / `TBD` (not used as a threshold). Generators are
 **Python 3 standard library only**, run as `python3 -I <script>` from their `validation/` folder, and
 re-run to byte-identical output; values are stored with 12 significant digits.
+
+## 7. Packs
+
+| Id | Gap | Functional | Technical | Validation | VC cases (A / B / C·TBD) |
+| -- | --- | ---------- | --------- | ---------- | ------------------------ |
+| PHY-00 | V&V harness | [spec](00-vv-harness/FUNCTIONAL_SPEC.md) | [spec](00-vv-harness/TECHNICAL_SPEC.md) | [pack](00-vv-harness/validation/README.md) | 33 (31 / 0 / 2) |
+| PHY-01 | Property models | [spec](01-property-models/FUNCTIONAL_SPEC.md) | [spec](01-property-models/TECHNICAL_SPEC.md) | [pack](01-property-models/validation/README.md) | 81 (75 / 6 / 0) |
+| PHY-02 | Constitutive models + material-point driver | [spec](02-constitutive-models/FUNCTIONAL_SPEC.md) | [spec](02-constitutive-models/TECHNICAL_SPEC.md) | [pack](02-constitutive-models/validation/README.md) | 107 (103 / 4 / 0) |
+| PHY-03 | Thermal analysis | [spec](03-thermal-analysis/FUNCTIONAL_SPEC.md) | [spec](03-thermal-analysis/TECHNICAL_SPEC.md) | [pack](03-thermal-analysis/validation/README.md) | 30 (29 / 0 / 1) |
+| PHY-04 | Thermo-mechanical & fits at temperature | [spec](04-thermo-mechanical/FUNCTIONAL_SPEC.md) | [spec](04-thermo-mechanical/TECHNICAL_SPEC.md) | [pack](04-thermo-mechanical/validation/README.md) | 31 (30 / 1 / 0) |
+| PHY-05 | Nonlinear structural | [spec](05-nonlinear-structural/FUNCTIONAL_SPEC.md) | [spec](05-nonlinear-structural/TECHNICAL_SPEC.md) | [pack](05-nonlinear-structural/validation/README.md) | 35 (30 / 1 / 4) |
+| PHY-06 | Contact, friction, bolted joints | [spec](06-contact-joints/FUNCTIONAL_SPEC.md) | [spec](06-contact-joints/TECHNICAL_SPEC.md) | [pack](06-contact-joints/validation/README.md) | 29 (24 / 2 / 3) |
+| PHY-07 | Fatigue | [spec](07-fatigue/FUNCTIONAL_SPEC.md) | [spec](07-fatigue/TECHNICAL_SPEC.md) | [pack](07-fatigue/validation/README.md) | 22 (19 / 3 / 0) |
+| PHY-08 | Fracture & damage tolerance | [spec](08-fracture-damage-tolerance/FUNCTIONAL_SPEC.md) | [spec](08-fracture-damage-tolerance/TECHNICAL_SPEC.md) | [pack](08-fracture-damage-tolerance/validation/README.md) | 18 (13 / 3 / 2) |
+| PHY-09 | Structural dynamics | [spec](09-structural-dynamics/FUNCTIONAL_SPEC.md) | [spec](09-structural-dynamics/TECHNICAL_SPEC.md) | [pack](09-structural-dynamics/validation/README.md) | 31 (25 / 2 / 4) |
+| PHY-10 | Rigid-body dynamics | [spec](10-rigid-body-dynamics/FUNCTIONAL_SPEC.md) | [spec](10-rigid-body-dynamics/TECHNICAL_SPEC.md) | [pack](10-rigid-body-dynamics/validation/README.md) | 22 (22 / 0 / 0) |
+| PHY-11 | Creep & viscoelasticity | [spec](11-creep-viscoelasticity/FUNCTIONAL_SPEC.md) | [spec](11-creep-viscoelasticity/TECHNICAL_SPEC.md) | [pack](11-creep-viscoelasticity/validation/README.md) | 26 (22 / 4 / 0) |
+| PHY-12 | Material selection | [spec](12-material-selection/FUNCTIONAL_SPEC.md) | [spec](12-material-selection/TECHNICAL_SPEC.md) | [pack](12-material-selection/validation/README.md) | 39 (34 / 5 / 0) |
+| PHY-13 | Corrosion compatibility | [spec](13-corrosion-compatibility/FUNCTIONAL_SPEC.md) | [spec](13-corrosion-compatibility/TECHNICAL_SPEC.md) | [pack](13-corrosion-compatibility/validation/README.md) | 26 (17 / 9 / 0) |
+| PHY-14 | Moisture, outgassing, space environment | [spec](14-moisture-outgassing/FUNCTIONAL_SPEC.md) | [spec](14-moisture-outgassing/TECHNICAL_SPEC.md) | [pack](14-moisture-outgassing/validation/README.md) | 21 (19 / 2 / 0) |
+| PHY-15 | Electrical, magnetic, optical, radiative properties | [spec](15-electro-optical-properties/FUNCTIONAL_SPEC.md) | [spec](15-electro-optical-properties/TECHNICAL_SPEC.md) | [pack](15-electro-optical-properties/validation/README.md) | 22 (20 / 2 / 0) |
+| PHY-16 | Process physics (springback, AM, distortion) | [spec](16-process-physics/FUNCTIONAL_SPEC.md) | [spec](16-process-physics/TECHNICAL_SPEC.md) | [pack](16-process-physics/validation/README.md) | 21 (17 / 1 / 3) |
+| PHY-17 | Topology optimization | [spec](17-topology-optimization/FUNCTIONAL_SPEC.md) | [spec](17-topology-optimization/TECHNICAL_SPEC.md) | [pack](17-topology-optimization/validation/README.md) | 30 (21 / 7 / 2) |
+| PHY-18 | Probabilistic & sensitivity | [spec](18-probabilistic-sensitivity/FUNCTIONAL_SPEC.md) | [spec](18-probabilistic-sensitivity/TECHNICAL_SPEC.md) | [pack](18-probabilistic-sensitivity/validation/README.md) | 41 (39 / 1 / 1) |
+| PHY-19 | Explicit impact (hand-off) | [spec](19-explicit-impact/FUNCTIONAL_SPEC.md) | [spec](19-explicit-impact/TECHNICAL_SPEC.md) | [pack](19-explicit-impact/validation/README.md) | 25 (21 / 4 / 0) |
+| PHY-20 | Vibro-acoustics (hand-off) | [spec](20-vibroacoustics/FUNCTIONAL_SPEC.md) | [spec](20-vibroacoustics/TECHNICAL_SPEC.md) | [pack](20-vibroacoustics/validation/README.md) | 19 (18 / 0 / 1) |
+
+Total: 709 validation cases (629 A, 57 B, 23 C / TBD). Every generator is Python standard library
+only and re-runs byte-identical (`python3 -I <script>` from its `validation/` folder; re-checked by the coordinator).
+PHY-00's harness schema accepts every pack's `expected_results.json` (survey in PHY-00 TECHNICAL_SPEC §6.2).
+
+## 8. Cross-pack findings and decisions (2026-10-15)
+
+### 8.1 Findings that change §5 / §6.2
+
+- **Placement (blocking).** `.dependency-cruiser.cjs` rule `plugins-and-kernels-depend-on-core-only` forbids
+  `packages/domain-physics` importing 05's `@cae`, so §6.2's "extends `@cae`" is not buildable. Proposal: a **core
+  analysis extension port** (plugins register `AnalysisType` members, deck fragments, result readers; PHY-03
+  TECHNICAL_SPEC §2, Proposal A). Fallback: physics disciplines live inside the 05 FEA package. Packs 07, 08, 09, 11
+  and 19 carry an erratum note pointing here.
+- **CalculiX limits** found while writing the packs (all workarounds specified):
+  no Riks / arc-length (PHY-05 refuses it on CalculiX and adds a native corotational beam solver for frames); no
+  Prony viscoelastic material (`*VISCO` is a step; PHY-02 refuses export with `MATL_EXPORT_UNSUPPORTED`, MFront
+  user material in V2); no `*LATENT HEAT` (equivalent cp table); `*EXPANSION` is a secant CTE from a reference
+  temperature (PHY-01 needs a `cteBasis` condition); no random-vibration or shock-spectrum procedure (PHY-09 computes
+  them in llull); `*STATIC` switches creep off (PHY-11 deck rules).
+- **Explicit solver.** The PHY-19 author reports the OpenRadioss repository was deleted on 2026-10-01 and targets the
+  AGPL-3.0 fork OpenCourant, which depends on a closed `hm_reader` binary and has no macOS build. Not confirmed by the
+  coordinator; re-check before deciding.
+- **Today's code.** The motion evaluator pivots every joint on the anchor instance origin, ignores the joint `frame`,
+  adds Euler angles and does not close loops (PHY-10 §1) — a real defect independent of these specs. There is no
+  general contact query (only building `check_clashes` and `motion_study` box overlaps); PHY-13 proposes
+  `find_contacts` plus a kernel `proximity` port.
+- **Corrections to §2/§4.** NAFEMS T1 / T2 were found (FeenoX repository). T4 = 18.2538 °C (settles 18.3 vs 18.25).
+  The cylinder-roller load is 35 kN per mm (plane strain), confirmed via code_aster SSNP154. 14 CFR 25.631 is the
+  **8 lb** bird; the 4 lb bird is 25.571(e)(1). The Treloar table is pinned from Steinmann et al. 2012.
+
+### 8.2 Requests between packs (to apply when implementing)
+
+| From | To | Request |
+| ---- | -- | ------- |
+| 04, 15 | PHY-01 | Variables `wavelength`, `frequency`; condition fields `cteBasis`, `opticalKind`, `lifeState` |
+| 11 | PHY-01 | `larson_miller` property form |
+| 19 | PHY-02 | Equation-of-state law kind |
+| 12, 13, 14, 15, 09 | 08 MAT / PHY-01 `propertyCatalog.ts` | New property names (price, embodied carbon, galvanic group, anodic index, SCC class, TML, CVCM, WVR, RML, moisture diffusivity / saturation, CME, AO erosion yield, resistivity, emissivity, absorptivity, structural loss factor) |
+| PHY-02 | 08 MAT | Unit grammar accepting scale factors (`1e-5`) |
+| 14 | 06 CMP | Lamina β1 / β2 (moisture swelling) |
+| 13 | 01 KRN | `proximity` kernel port; core `find_contacts` |
+| 06 | 08 MAT | Query listing fastener stacks |
+| 04 | core `lib/` | Expression evaluator usable by plugins (spatial temperature fields) |
+| 09 | 05 FEA | `AnalysisType` extensible by plugins (same as the placement port) |
+| 10 | core motion | `pivot` field, `fixed` / `spherical` joints, fix the evaluator defects above |
+
+### 8.3 Decisions needed (supersedes §5)
+
+1. **Placement**: core analysis extension port (recommended) or disciplines inside the 05 package.
+2. **Licences**: MFront (GPL-3 with linking exception / CeCILL-A), OpenCourant (AGPL + closed binary), mmapy (GPL)
+   for MMA, shipping numpy / scipy in the desktop bundle, bundling the NASA outgassing dataset (public-domain tag seen
+   only on a mirror), ICE embodied-carbon data (licence required ⇒ user-imported only).
+3. **Named safety defaults with no verified source yet**: fatigue / damage-tolerance scatter factors (AC 25.571-1D,
+   NASA-STD-5019 not read), hydrogen-embrittlement threshold (180 vs 220 ksi), explicit damage and hourglass limits,
+   GCI / reliability targets, limit-point and permanent-set thresholds, imperfection amplitude. Until decided, the
+   packs require these values explicitly (AF-31).
+4. **Paid references to buy** (would upgrade B/C cases to A): NAFEMS TNSB Rev. 3, NNB, R0020, R0027, R0030, Konter
+   2006; ASTM E1049, E595; MIL-STD-889D matrix and MSFC-STD-3029A tables transcription (public but not yet read).
+5. **Release policy**: whether a pack whose remaining cases are only B-grade can gate a release.
+
+### 8.4 Verification limits
+
+Most standards and agency hosts (nist.gov, nasa.gov, faa.gov, ecfr.gov, nafems.org, astm.org…) were blocked or
+DNS-refused from this session; GitHub, PyPI and search extracts were the main channels. Each pack's
+`validation/sources.md` grades every source and lists what was not verified. Values not confirmed are `B`, `C` or
+`TBD` and are not pass/fail thresholds.

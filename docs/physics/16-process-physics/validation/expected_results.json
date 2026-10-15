@@ -193,7 +193,7 @@
     "E_layer_MPa": 200000.0,
     "inherent_strain": -0.002,
     "nu_FE": 0.0,
-    "note": "test inputs; uniform isotropic inherent strain along the beam axis only"
+    "note": "test inputs; uniform uniaxial inherent strain along the beam axis (exx only)"
    },
    "crossCheck": {
     "timoshenko1925": -0.00012957563978
@@ -222,7 +222,7 @@
     "E_layer_MPa": 200000.0,
     "inherent_strain": -0.002,
     "nu_FE": 0.0,
-    "note": "test inputs; uniform isotropic inherent strain along the beam axis only"
+    "note": "test inputs; uniform uniaxial inherent strain along the beam axis (exx only)"
    },
    "note": "FE: CalculiX *MODEL CHANGE ADD=STRAIN FREE per layer + *EXPANSION (alpha = inherent strain) with unit temperature step; beam 100 mm long, nu = 0"
   },
@@ -247,7 +247,7 @@
     "E_layer_MPa": 200000.0,
     "inherent_strain": -0.002,
     "nu_FE": 0.0,
-    "note": "test inputs; uniform isotropic inherent strain along the beam axis only"
+    "note": "test inputs; uniform uniaxial inherent strain along the beam axis (exx only)"
    }
   },
   {
@@ -272,7 +272,7 @@
     "E_layer_MPa": 200000.0,
     "inherent_strain": -0.002,
     "nu_FE": 0.0,
-    "note": "test inputs; uniform isotropic inherent strain along the beam axis only"
+    "note": "test inputs; uniform uniaxial inherent strain along the beam axis (exx only)"
    },
    "note": "same mechanics as machining distortion by layer removal (FR-PRC-12)"
   },
@@ -297,10 +297,40 @@
     "E_layer_MPa": 200000.0,
     "inherent_strain": -0.002,
     "nu_FE": 0.0,
-    "note": "test inputs; uniform isotropic inherent strain along the beam axis only"
+    "note": "test inputs; uniform uniaxial inherent strain along the beam axis (exx only)"
    },
    "note": "differs from 30.b: shows why stress-free layer activation matters",
    "ratioLayeredToOnce": 2.07024633705
+  },
+  {
+   "id": "VC-PRC-31",
+   "quantity": "inherent-strain carrier decision deck (nodal temperature vs element initial strain)",
+   "value": "TBD",
+   "unit": "1/mm",
+   "tolerance": {
+    "rel": null
+   },
+   "source": "TBD - integration test decides",
+   "grade": "TBD",
+   "proves": [
+    "TR-PRC-20",
+    "TR-PRC-21"
+   ]
+  },
+  {
+   "id": "VC-PRC-55",
+   "quantity": "COULD items (weld shrinkage export) and CLI / MCP / UI result parity",
+   "value": "TBD / identical hash",
+   "unit": "mixed",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TBD / L1",
+   "grade": "TBD",
+   "proves": [
+    "FR-PRC-13",
+    "FR-PRC-18"
+   ]
   },
   {
    "id": "VC-PRC-40",

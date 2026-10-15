@@ -33,6 +33,9 @@ A case-insensitive grep of `packages/`, `server/src` and `src/` (`*.ts`) for the
 
 ## 2. Target architecture
 
+> **Placement erratum (coordinator, 2026-10-15).** `.dependency-cruiser.cjs` rule `plugins-and-kernels-depend-on-core-only` forbids `packages/domain-physics` importing `@cae` (or any other package). Wherever this spec says `@phys` imports or extends `@cae`, read: the plugin registers its analysis type, deck fragments and result readers through the **core analysis extension port** proposed in [`../03-thermal-analysis/TECHNICAL_SPEC.md`](../03-thermal-analysis/TECHNICAL_SPEC.md) §2; fallback: the discipline lives inside the 05 FEA package. Decision pending in [`../README.md`](../README.md) §5.
+
+
 ```
 src/ui (creep step panel, history chart)       server/ (05 transports: fea_solve writes *VISCO decks, reads PEEQ histories)
         │ dispatch                                     │ bundled ccx
@@ -312,7 +315,7 @@ time period = hold duration (no creep law, so `*VISCO` is not needed — to conf
 | ---- | -------- | ---- | ---------- | ----------- |
 | `CRP_CASE_TYPE` | error | creep command on a case that is not `creep` | analysis id | `create_analysis analysisType=creep` |
 | `CRP_SOLVER_UNSUPPORTED` | error | `creep` with a solver other than CalculiX | analysis id | use `solver: calculix` |
-| `CRP_LAW_MISSING` | error | an analysed part's material has no PHY-02 creep model | entity id, record id | `set_material_model` with a Norton law (PHY-02) |
+| `CRP_LAW_MISSING` | error | an analysed part's material has no PHY-02 creep model | entity id, record id | `add_material_model` with a Norton law (PHY-02) |
 | `CRP_LAW_OUT_OF_RANGE` | error (query) / fail (check) | σ, T or LMP outside the law / curve range | element ids or param path, extreme value, range | change load / temperature, or supply a law valid there |
 | `CRP_LAW_UNVERIFIED` | warning (not suppressible) | law, curve or shift with basis typical / supplier_unstated / unspecified | record id | replace with a sourced, verified law |
 | `CRP_DURATION_INVALID` | error | duration ≤ 0 or not a time unit | param path | give `{value > 0, unit: s\|min\|h\|d\|yr}` |

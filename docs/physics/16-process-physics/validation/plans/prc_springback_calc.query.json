@@ -1,0 +1,18 @@
+{
+ "inputs": {
+  "thickness_mm": 1.6,
+  "insideRadius_mm": 4.8,
+  "angle_deg": 90,
+  "E": {
+   "value": 72000,
+   "unit": "MPa",
+   "source": "test input of this validation case (not a material claim)"
+  },
+  "yield": {
+   "value": 300,
+   "unit": "MPa",
+   "source": "test input of this validation case (not a material claim)"
+  },
+  "stressState": "uniaxial"
+ }
+}

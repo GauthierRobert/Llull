@@ -210,7 +210,7 @@ def main() -> None:
             w.writerow([i, repr(r12(dk)), repr(r12(kt))])
         w.writerow(["release_substrate", repr(r12(k_release)), repr(r12(hist[-1][2] + k_release))])
     linp = {"substrate_mm": ts, "E_substrate_MPa": Es, "layers": nl, "layer_mm": tl, "E_layer_MPa": El, "inherent_strain": es,
-            "nu_FE": 0.0, "note": "test inputs; uniform isotropic inherent strain along the beam axis only"}
+            "nu_FE": 0.0, "note": "test inputs; uniform uniaxial inherent strain along the beam axis (exx only)"}
     k_one = timoshenko_bimetal(-es, tl, El, ts, Es)
     _, dk1 = eigen_increment([(-ts, 0.0, Es), (0.0, tl, El)], 1, es)
     case("VC-PRC-30.a", "curvature after the first deposited layer (two-layer check)", dk1, "1/mm", {"rel": 1e-9},
@@ -232,6 +232,11 @@ def main() -> None:
     case("VC-PRC-30.e", "curvature if the 2 mm deposit received its inherent strain at once (no layering)", k_once, "1/mm",
          {"rel": 1e-9}, "generator", "A", ["FR-PRC-08"], inputs=linp,
          note="differs from 30.b: shows why stress-free layer activation matters", ratioLayeredToOnce=r12(k_tot / k_once))
+
+    case("VC-PRC-31", "inherent-strain carrier decision deck (nodal temperature vs element initial strain)", "TBD", "1/mm",
+         {"rel": None}, "TBD - integration test decides", "TBD", ["TR-PRC-20", "TR-PRC-21"])
+    case("VC-PRC-55", "COULD items (weld shrinkage export) and CLI / MCP / UI result parity", "TBD / identical hash", "mixed",
+         {"exact": True}, "TBD / L1", "TBD", ["FR-PRC-13", "FR-PRC-18"])
 
     # ---- quoted AM-Bench (grade B) and contract cases
     case("VC-PRC-40", "NIST AM-Bench 2018 AMB2018-01 IN625 bridge, deflection at ridge 1 after EDM separation of the legs", 1.276, "mm",

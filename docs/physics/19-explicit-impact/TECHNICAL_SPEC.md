@@ -35,6 +35,9 @@ finds no capability.
 
 ## 2. Target architecture
 
+> **Placement erratum (coordinator, 2026-10-15).** `.dependency-cruiser.cjs` rule `plugins-and-kernels-depend-on-core-only` forbids `packages/domain-physics` importing `@cae` (or any other package). Wherever this spec says `@phys` imports or extends `@cae`, read: the plugin registers its analysis type, deck fragments and result readers through the **core analysis extension port** proposed in [`../03-thermal-analysis/TECHNICAL_SPEC.md`](../03-thermal-analysis/TECHNICAL_SPEC.md) §2; fallback: the discipline lives inside the 05 FEA package. Decision pending in [`../README.md`](../README.md) §5.
+
+
 ```
 src/ui (explicit panel, energy chart, eps_p overlay)      server/ (transports: export_explicit_deck, explicit_run, explicit_import_results)
         │ dispatch                                           │ spawns: user-installed OpenCourant starter + engine, th_to_csv, anim_to_vtk

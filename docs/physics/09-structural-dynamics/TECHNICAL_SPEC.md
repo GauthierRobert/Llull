@@ -42,6 +42,9 @@ Facts read in the CalculiX manual [R1] that this design depends on:
 
 ## 2. Target architecture
 
+> **Placement erratum (coordinator, 2026-10-15).** `.dependency-cruiser.cjs` rule `plugins-and-kernels-depend-on-core-only` forbids `packages/domain-physics` importing `@cae` (or any other package). Wherever this spec says `@phys` imports or extends `@cae`, read: the plugin registers its analysis type, deck fragments and result readers through the **core analysis extension port** proposed in [`../03-thermal-analysis/TECHNICAL_SPEC.md`](../03-thermal-analysis/TECHNICAL_SPEC.md) §2; fallback: the discipline lives inside the 05 FEA package. Decision pending in [`../README.md`](../README.md) §5.
+
+
 ```
 src/ui (FRF / ASD / SRS plots, damping badges)       server/ (05 transports fea_mesh / fea_solve learn the new types)
         │ dispatch                                            │ spawns bundled ccx; runs pure @phys post-processing

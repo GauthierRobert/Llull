@@ -68,7 +68,7 @@ imprint uses the 05 `intersectPlane` mechanism through Gmsh `occ.fragment`, not 
 | TR-CNT-01 | MUST | `AnalysisCase.contact?: ContactSettings` only on `nonlinear_static` cases (PHY-05); plugin `validate` enforces one `formulation` per case. |
 | TR-CNT-02 | MUST | Contact surfaces are element-face sets built from 05 `FeaTarget`s (physical groups); a nodal slave is used only for `node_to_surface` with linear elements. |
 | TR-CNT-03 | MUST | Pretension section: plane (point, normal) intersected with the bolt part in Gmsh (`occ.fragment`, as 05 `intersectPlane`), element faces on one side collected; the deck writer refuses a section adjacent to quadratic contact faces (ccx rule) with `CNT_PRETENSION_SECTION_INVALID`. |
-| TR-CNT-04 | MUST | Preload step order: (1) pretension force applied, external loads at 0; (2) reference DOF locked at its step-1 value (`*BOUNDARY, FIXED` on the reference node — exact keyword spelling verified in a ccx run, VC-CNT-50); (3) PHY-05 load steps. |
+| TR-CNT-04 | MUST | Preload step order: (1) pretension force applied, external loads at 0; (2) reference DOF locked at its step-1 value (`*BOUNDARY, FIXED` on the reference node; the FIXED parameter is in the manual, its effect on a pretension node is verified in VC-CNT-50); (3) PHY-05 load steps. |
 | TR-CNT-10 | MUST | `contactReader.ts` parses `*CONTACT PRINT` tables and `*CONTACT FILE` frd blocks per increment; bolt force = reaction on the pretension reference node (`*NODE PRINT … RF`). Formats are taken from pinned `.dat.ref` fixtures, not prose. |
 | TR-CNT-20 | MUST | `checks/hertz.ts`, `lame.ts`, `nasa5020.ts` match the generator at 1e-9 relative. |
 | TR-CNT-30 | MUST | `bolted_joint_check` carries the standard edition (`"NASA-STD-5020 (2012)"`) in every result; a later edition is a new rule-table version, never a silent change. |
@@ -356,8 +356,8 @@ Reused: `NLS_*` (PHY-05), `FEA_*` (05), `VNV_NO_CONVERGENCE_STUDY` (PHY-00), `MA
 
 1. **Edition**: equations and defaults come from the 2012 baseline of NASA-STD-5020 (fetched). 5020B (2021, revalidated
    2026 per search) could not be opened; a human must diff the two before the rule table is frozen.
-2. **Lock keyword**: confirm the ccx way to hold the pretension reference DOF after the preload step (`*BOUNDARY, FIXED`
-   is the expected form; verify on `pret*` decks).
+2. **Lock keyword**: the manual documents `*BOUNDARY, FIXED` ("freezes the deformation from the previous step"); confirm
+   on a `pret*`-style deck that applying it to the pretension reference node holds the bolt length (VC-CNT-50).
 3. **08 stack access**: `joint_from_fastener_stack` needs an 08 query returning stack geometry (none is specified in 08
    §4.2 beyond `check_fastener_layout`); add `list_fastener_stacks` to 08 or extend `check_fastener_layout` data.
 4. **Separation factor of safety**: the standard's Figure 1 logic flow was not readable; `factors.separation` stays an

@@ -124,7 +124,7 @@
   }
  },
  {
-  "command": "set_material_model",
+  "command": "add_material_model",
   "params": {
    "material": "norton_tube",
    "model": {
