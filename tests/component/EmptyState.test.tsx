@@ -56,10 +56,12 @@ describe('EmptyState — quick starts', () => {
     expect(useToolStore.getState().viewMode).toBe('2d');
     expect(useStore.getState().document.order).toHaveLength(0);
   });
-  it('explains how to move things and how to connect an agent', () => {
+  it('points to letting an agent build it, with the hand-made starts as one row of chips', () => {
     render(<EmptyState />);
-    expect(screen.getByText(/move things:/i)).toBeDefined();
     expect(screen.getByText(/let ai build it/i)).toBeDefined();
+    for (const name of [/add a 3d box/i, /draw a 2d rectangle/i, /steel structure/i, /portal-frame hall/i, /civil site starter/i]) {
+      expect(screen.getByRole('button', { name })).toBeDefined();
+    }
   });
 });
 

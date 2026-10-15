@@ -1,4 +1,5 @@
-// App shell (Lens): full-bleed viewport; header, browser rail, inspector card, tool dock and status float over it.
+// App shell (Lens, AI-first): full-bleed viewport; a slim header and the command bar float over it. The browser panel,
+// properties, tools and view options appear on demand.
 
 import React, { useEffect } from 'react';
 import { useLayoutStore, useStore, useThemeStore, useToolStore } from '@ui/store';
@@ -31,7 +32,7 @@ export function App(): React.ReactElement {
   const sidebarOpen = useLayoutStore((s) => s.sidebarOpen);
   const viewMode = useToolStore((s) => s.viewMode);
   const hasSelection = useStore((s) => s.document.selection.length > 0);
-  // Lens: properties float in only while something is selected.
+  // Properties float in on demand, and only while something is selected.
   const showInspector = inspectorOpen && hasSelection;
 
   useMcpLiveDocument();
@@ -64,7 +65,7 @@ export function App(): React.ReactElement {
       </main>
 
       <TopBar />
-      <Sidebar />
+      {sidebarOpen && <Sidebar />}
       {showInspector && <PropertiesPanel className="inspector" />}
       <Toolbar />
       <StatusBar />

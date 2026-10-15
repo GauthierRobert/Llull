@@ -1,8 +1,9 @@
-// Lens card on the model: name + kind, then one pill per dimension. Click a pill to retype it; Enter applies, Escape
-// cancels. Expression-driven dimensions (=param) are read-only and show ƒ.
+// Lens card on the model: name + kind + a Properties toggle, then one pill per dimension. Click a pill to retype it;
+// Enter applies, Escape cancels. Expression-driven dimensions (=param) are read-only and show ƒ.
 
 import React, { useState } from 'react';
 import { classNames } from '@ui/classNames';
+import { Icon } from '@ui/components/Icon';
 import { parseNumber } from '@ui/numberText';
 import type { LensDimension } from './lensDimensions';
 
@@ -83,21 +84,45 @@ interface LensPillsProps {
   dimensions: readonly LensDimension[];
   /** Last refusal summary of an edit, shown under the pills. */
   refusal: string | null;
+  propertiesOpen: boolean;
+  onToggleProperties: () => void;
   onCommit: (dimension: LensDimension, value: number) => void;
 }
 
-export function LensPills({ name, kind, unit, dimensions, refusal, onCommit }: LensPillsProps): React.ReactElement {
+export function LensPills({
+  name,
+  kind,
+  unit,
+  dimensions,
+  refusal,
+  propertiesOpen,
+  onToggleProperties,
+  onCommit,
+}: LensPillsProps): React.ReactElement {
+  const propertiesLabel = propertiesOpen ? 'Hide properties' : 'Show properties';
   return (
     <div className="lens" role="group" aria-label={`Dimensions of ${name}`}>
       <div className="lens__tag">
         <span className="lens__name">{name}</span>
         <span className="lens__kind">{kind}</span>
+        <button
+          type="button"
+          className="lens__properties"
+          aria-label={propertiesLabel}
+          aria-pressed={propertiesOpen}
+          title={propertiesLabel}
+          onClick={onToggleProperties}
+        >
+          <Icon name="panelRight" size={13} />
+        </button>
       </div>
-      <div className="lens__pills">
-        {dimensions.map((dimension) => (
-          <LensPill key={dimension.id} dimension={dimension} unit={unit} onCommit={onCommit} />
-        ))}
-      </div>
+      {dimensions.length > 0 && (
+        <div className="lens__pills">
+          {dimensions.map((dimension) => (
+            <LensPill key={dimension.id} dimension={dimension} unit={unit} onCommit={onCommit} />
+          ))}
+        </div>
+      )}
       {refusal !== null && (
         <p className="lens__refusal" role="alert">
           {refusal}

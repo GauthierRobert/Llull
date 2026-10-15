@@ -39,7 +39,7 @@ describe('layoutStore — persisted layout parsing', () => {
     localStorage.setItem('llull-layout', '{not json');
     vi.resetModules();
     const again = await import('@ui/store/layoutStore');
-    expect(again.useLayoutStore.getState().inspectorOpen).toBe(true);
+    expect(again.useLayoutStore.getState().inspectorOpen).toBe(false);
   });
   it('restores a valid stored layout', async () => {
     localStorage.setItem('llull-layout', JSON.stringify({ sidebarTab: 'history', sidebarOpen: false, inspectorOpen: false }));

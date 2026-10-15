@@ -137,6 +137,7 @@ export function Viewport2D(): React.ReactElement {
     setPendingValue,
     commitValue,
   } = useModifyTool();
+  const hasSelection = useStore((s) => s.document.selection.length > 0);
 
   // Set by ZoomReader inside the canvas, read by ScaleBar outside; starts at the camera's zoom prop.
   const [cameraZoom, setCameraZoom] = useState<number>(50);
@@ -161,7 +162,8 @@ export function Viewport2D(): React.ReactElement {
 
       <ScaleBar zoom={cameraZoom} />
 
-      <div className="vp-tool-dock">
+      {/* On demand: the modify palette shows once there is something to modify. */}
+      <div className="vp-tool-dock" hidden={!hasSelection && activeModifyTool === 'none'}>
         <ModifyTools
           activeTool={activeModifyTool}
           phase={modifyPhase}

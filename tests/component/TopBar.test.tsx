@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { useLayoutStore, usePaletteStore, useStore, useThemeStore } from '@ui/store';
+import { useLayoutStore, useStore, useThemeStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { TopBar } from '@ui/components/TopBar';
 
@@ -58,17 +58,22 @@ describe('TopBar — agent pill', () => {
 
 // TopBar — command palette trigger
 
-describe('TopBar — search trigger', () => {
+describe('TopBar — More menu', () => {
   beforeEach(() => {
     resetStore();
-    usePaletteStore.setState({ open: false });
   });
-  it('opens the command palette and advertises the shortcut', () => {
+  it('keeps file, export and view actions out of sight until More is opened, and closes on Escape', () => {
     render(<TopBar />);
-    const trigger = screen.getByRole('button', { name: /^Search or run a command/ });
-    expect(trigger.getAttribute('aria-keyshortcuts')).toContain('Control+K');
-    fireEvent.click(trigger);
-    expect(usePaletteStore.getState().open).toBe(true);
+    expect(screen.queryByRole('button', { name: /open project/i })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'More' }));
+    expect(screen.getByRole('button', { name: 'More' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('group', { name: 'More actions' })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('button', { name: /open project/i })).toBeNull();
+  });
+  it('has no command palette trigger (it lives in the command bar)', () => {
+    render(<TopBar />);
+    expect(screen.queryByRole('button', { name: /^Search or run a command/ })).toBeNull();
   });
 });
 
@@ -81,12 +86,14 @@ describe('TopBar — theme toggle', () => {
   it('flips the theme from dark to light', () => {
     useThemeStore.setState({ theme: 'dark' });
     render(<TopBar />);
+    fireEvent.click(screen.getByRole('button', { name: 'More' }));
     fireEvent.click(screen.getByRole('button', { name: /switch to light theme/i }));
     expect(useThemeStore.getState().theme).toBe('light');
   });
   it('flips the theme from light to dark', () => {
     useThemeStore.setState({ theme: 'light' });
     render(<TopBar />);
+    fireEvent.click(screen.getByRole('button', { name: 'More' }));
     fireEvent.click(screen.getByRole('button', { name: /switch to dark theme/i }));
     expect(useThemeStore.getState().theme).toBe('dark');
   });
@@ -108,13 +115,16 @@ describe('TopBar — dock toggles and actions', () => {
   });
   it('hides and shows the properties panel', () => {
     render(<TopBar />);
+    fireEvent.click(screen.getByRole('button', { name: 'More' }));
     fireEvent.click(screen.getByRole('button', { name: 'Hide properties panel' }));
     expect(useLayoutStore.getState().inspectorOpen).toBe(false);
     fireEvent.click(screen.getByRole('button', { name: 'Show properties panel' }));
     expect(useLayoutStore.getState().inspectorOpen).toBe(true);
   });
-  it('exposes Open, Save and Connect agent actions', () => {
+  it('exposes Connect agent directly, and Open / Save in the More menu', () => {
     render(<TopBar />);
+    expect(screen.getByRole('button', { name: /^connect agent/i })).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'More' }));
     expect(screen.getByRole('button', { name: /open project/i })).toBeDefined();
     expect(screen.getByRole('button', { name: /save project/i })).toBeDefined();
     expect(screen.getByRole('button', { name: /^connect agent/i })).toBeDefined();

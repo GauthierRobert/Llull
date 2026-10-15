@@ -1,4 +1,5 @@
-// Tray that opens above the dock: a row of labelled tools with their key, and a one-line hint for the focused one.
+// One section of the Tools panel: a titled row of labelled tools with their key, and a one-line hint for the hovered
+// (or armed) one.
 
 import React, { useState } from 'react';
 import { classNames } from '@ui/classNames';
@@ -22,9 +23,12 @@ interface DockTrayProps {
 
 export function DockTray({ id, label, items }: DockTrayProps): React.ReactElement {
   const [focusedId, setFocusedId] = useState<string | null>(null);
-  const described = items.find((item) => item.id === focusedId) ?? items.find((item) => item.active === true) ?? items[0];
+  const described = items.find((item) => item.id === focusedId) ?? items.find((item) => item.active === true);
   return (
     <div className="dock-tray" id={id} role="group" aria-label={label}>
+      <span className="dock-tray__title" aria-hidden="true">
+        {label}
+      </span>
       <div className="dock-tray__items">
         {items.map((item) => (
           <button

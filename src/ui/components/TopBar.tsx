@@ -1,18 +1,14 @@
-// Header: sidebar toggle, brand, breadcrumbs, palette trigger (Ctrl/Cmd+K), agent pill (liveStatus), project / export /
-// connect actions, theme and inspector toggles.
+// Header: browser-panel toggle, brand, breadcrumbs (project › selection); agent status, Connect agent and the More menu
+// (file, export, theme, properties). The command palette trigger lives in the command bar.
 
 import React from 'react';
 import { classNames } from '@ui/classNames';
-import { type LiveStatus, useLayoutStore, usePaletteStore, useStore } from '@ui/store';
+import { type LiveStatus, useLayoutStore, useStore } from '@ui/store';
 import { useSessionStore } from '@ui/store/sessionStore';
 import { projectNameOf } from '@ui/components/projectName';
 import { Icon } from '@ui/components/Icon';
-import { ThemeToggle } from '@ui/components/ThemeToggle';
-import { ProjectIO } from '@ui/components/ProjectIO';
-import { ModelExport } from '@ui/components/ModelExport';
-import { ImageUnderlayImport } from '@ui/components/ImageUnderlayImport';
 import { McpConnectButton } from '@ui/components/McpConnect';
-import { PALETTE_SHORTCUT_LABEL } from '@ui/hooks/shortcuts';
+import { MoreMenu } from '@ui/components/MoreMenu';
 
 function AgentPill({ status }: { status: LiveStatus }): React.ReactElement {
   const isConnected = status === 'connected';
@@ -61,42 +57,6 @@ function SidebarToggle(): React.ReactElement {
   );
 }
 
-function InspectorToggle(): React.ReactElement {
-  const inspectorOpen = useLayoutStore((s) => s.inspectorOpen);
-  const toggleInspector = useLayoutStore((s) => s.toggleInspector);
-  const label = inspectorOpen ? 'Hide properties panel' : 'Show properties panel';
-  return (
-    <button
-      type="button"
-      className={`icon-btn${inspectorOpen ? ' icon-btn--active' : ''}`}
-      onClick={toggleInspector}
-      aria-label={label}
-      title={label}
-    >
-      <Icon name="panelRight" size={16} />
-    </button>
-  );
-}
-
-function SearchTrigger(): React.ReactElement {
-  const setOpen = usePaletteStore((s) => s.setOpen);
-  const shortcut = PALETTE_SHORTCUT_LABEL;
-  return (
-    <button
-      type="button"
-      className="search-trigger"
-      onClick={() => setOpen(true)}
-      aria-label={`Search or run a command… ${shortcut}`}
-      aria-keyshortcuts="Control+K Meta+K"
-      title={`Search every action and command (${shortcut})`}
-    >
-      <Icon name="search" size={14} />
-      <span className="search-trigger__text">Search or run a command…</span>
-      <kbd className="kbd search-trigger__kbd">{shortcut}</kbd>
-    </button>
-  );
-}
-
 export function TopBar(): React.ReactElement {
   const liveStatus = useStore((s) => s.liveStatus);
   const projectName = useStore((s) => projectNameOf(s.document));
@@ -140,18 +100,10 @@ export function TopBar(): React.ReactElement {
         </nav>
       </div>
 
-      <SearchTrigger />
-
       <div className="topbar__right">
         <AgentPill status={liveStatus} />
-        <span className="topbar__sep" aria-hidden="true" />
-        <ProjectIO />
-        <ImageUnderlayImport />
-        <ModelExport />
         <McpConnectButton />
-        <span className="topbar__sep" aria-hidden="true" />
-        <ThemeToggle />
-        <InspectorToggle />
+        <MoreMenu />
       </div>
     </header>
   );

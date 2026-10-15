@@ -61,8 +61,38 @@ describe('lensTarget', () => {
 });
 
 describe('LensPills', () => {
+  it('toggles the properties panel from the tag, even with no editable dimension', () => {
+    const onToggleProperties = vi.fn();
+    render(
+      <LensPills
+        name="Merged"
+        kind="mesh"
+        unit="mm"
+        dimensions={[]}
+        refusal={null}
+        propertiesOpen
+        onToggleProperties={onToggleProperties}
+        onCommit={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Hide properties' }));
+    expect(onToggleProperties).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: /Edit/ })).toBeNull();
+  });
+
   const renderPills = (dimensions: LensDimension[], onCommit = vi.fn()): ReturnType<typeof vi.fn> => {
-    render(<LensPills name="Boss" kind="cylinder" unit="mm" dimensions={dimensions} refusal={null} onCommit={onCommit} />);
+    render(
+      <LensPills
+        name="Boss"
+        kind="cylinder"
+        unit="mm"
+        dimensions={dimensions}
+        refusal={null}
+        propertiesOpen={false}
+        onToggleProperties={vi.fn()}
+        onCommit={onCommit}
+      />,
+    );
     return onCommit;
   };
 
@@ -99,6 +129,8 @@ describe('LensPills', () => {
         unit="mm"
         dimensions={[dimension({ value: null, expression: '=boss_r' })]}
         refusal="edit_step_params: refused"
+        propertiesOpen={false}
+        onToggleProperties={vi.fn()}
         onCommit={vi.fn()}
       />,
     );

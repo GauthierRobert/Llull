@@ -1,10 +1,10 @@
-// Floats the lens card above the sole selected entity: its creating step's dimensions, edited via edit_step_params
-// (the entity stays selected after the replay).
+// Floats the lens card above the sole selected entity: name, kind, a Properties toggle, and its creating step's
+// dimensions edited via edit_step_params (the entity stays selected after the replay).
 
 import React, { useState } from 'react';
 import { Html } from '@react-three/drei';
 import { rotatedEntityBounds } from '@core/geometry/rotatedBounds';
-import { useStore, useToolStore } from '@ui/store';
+import { useLayoutStore, useStore, useToolStore } from '@ui/store';
 import { useSoleSelectedEntity } from '@ui/store/selectionHooks';
 import { useDispatchThen } from '@ui/hooks/useDispatchThen';
 import { type LensDimension, lensTarget, withDimension } from './lensDimensions';
@@ -16,16 +16,18 @@ export function DimensionLens(): React.ReactElement | null {
   const units = useStore((s) => s.document.units);
   const drawTool = useToolStore((s) => s.drawTool);
   const select = useStore((s) => s.select);
+  const inspectorOpen = useLayoutStore((s) => s.inspectorOpen);
+  const toggleInspector = useLayoutStore((s) => s.toggleInspector);
   const dispatchThen = useDispatchThen();
   const [refusal, setRefusal] = useState<{ entityId: string; summary: string } | null>(null);
 
   if (entity === undefined || drawTool !== 'none') return null;
   const target = lensTarget(history, entity.id);
-  if (target === null) return null;
 
   const bounds = rotatedEntityBounds(entity);
   const anchor: [number, number, number] = [(bounds.min[0] + bounds.max[0]) / 2, (bounds.min[1] + bounds.max[1]) / 2, bounds.max[2]];
   const commit = (dimension: LensDimension, value: number): void => {
+    if (target === null) return;
     setRefusal(null);
     dispatchThen(
       'edit_step_params',
@@ -44,7 +46,9 @@ export function DimensionLens(): React.ReactElement | null {
         name={entity.name ?? entity.id}
         kind={entity.kind}
         unit={units}
-        dimensions={target.dimensions}
+        dimensions={target?.dimensions ?? []}
+        propertiesOpen={inspectorOpen}
+        onToggleProperties={toggleInspector}
         refusal={refusal?.entityId === entity.id ? refusal.summary : null}
         onCommit={commit}
       />
