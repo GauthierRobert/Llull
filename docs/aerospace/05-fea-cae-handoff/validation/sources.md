@@ -43,6 +43,25 @@ never happened. They are listed at the end.
 | S50 | Sandia JAS toolbox, mechanical specification (MS = 1/R − 1) | Sandia | https://jastoolbox.sandia.gov/?p=539 | search | MS = 1/R − 1, where R = factored applied / allowable. This is equivalent to S2. |
 | L1 | llull architecture and kernel decisions | this repo | `.claude/rules/architecture.md`, `docs/decisions/KI5-shape-kernel-boundary.md`, `docs/decisions/KI6-desktop-app-cli-first.md` | local | The laws L1–L10, the shape-not-mesh kernel boundary, and the bundled CPython on desktop. |
 
+## Citation id mapping (specs [Rn] ↔ this register [Sn])
+
+The specs cite `[Rn]`; this register and the validation files use `Sn`. The numbers differ for the first six
+entries (for example R3 is NASA-STD-5001B but S3 is EASA CS-25), so always map through this table.
+
+| Spec id | Register id | Source |
+| ------- | ----------- | ------ |
+| R1 | S1 | 14 CFR §25.303 |
+| R2 | S1a | 14 CFR §25.301 / §25.305 |
+| R3 | S2 | NASA-STD-5001B |
+| R4 | S3 | EASA CS-25 |
+| R5 | S5 | NTRS 20150003482 (history of 1.5) |
+| R6 | S4 | NASA-HDBK-5026 |
+| R10, R11, R12, R13, R14, R14a, R15 | S10, S11, S12, S13, S14, S14a, S15 | Gmsh, Netgen, Verdict, meshio, pyNastran, Altair CQUAD4, FreeCAD FEM |
+| R20, R21, R22 | S20, S21, S22 | clamped-free beam roots, Kirsch, NACA TN 3781 |
+| R30, R31 | S30, S31 | CalculiX, NASTRAN-95 |
+| R40–R45 | S40–S45 | NAFEMS LE1/LE10 reproductions (Abaqus, COMSOL, Altair, FeenoX) |
+| — | S6, S16, S50 | register only (further reading, ccx2paraview, Sandia JAS); not cited by the specs |
+
 ## Not verified (follow-up needed)
 
 - The text of **NAFEMS TNSB Rev. 3 (1990)** and the NAFEMS catalogue page. These are paid, and the search budget ran

@@ -50,6 +50,7 @@ rule clone of `domain-aec`, knip workspace entry.
 | TR-MAT-13 | SHOULD | Temperature tables: linear interpolation, no extrapolation, `percentOfRT` mode | FR-MAT-07 |
 | TR-MAT-14 | MUST | Persistence v3 + migration 2→3; legacy materials unchanged | FR-MAT-23 |
 | TR-MAT-15 | SHOULD | `diff_material_libraries` keyed by `(material.id, PropertyValue.id)` | FR-MAT-24 |
+| TR-MAT-16 | MUST | Private-library resolution is the host-dispatched session command `resolve_material_libraries` after `load_document` (§3.2); exact sha256 match only; otherwise records stay `unresolved` with the last snapshot hash and value queries return `available:false` | FR-MAT-08, FR-MAT-21 |
 | TR-MAT-20 | MUST | `FastenerFamily` model with part-number grammar; integer sixteenths/32nds arithmetic | FR-MAT-11 |
 | TR-MAT-21 | MUST | `select_fastener` algorithm §5.2 (grip modes, washer shim ≤ 1/8 in, protrusion ≥ 1 pitch) | FR-MAT-12/13/14 |
 | TR-MAT-22 | MUST | `insert_fastener_stack`: one FeatureStep; boolean cut via `ctx.kernel`; component per part number; derivation guard | FR-MAT-15 |
@@ -142,9 +143,28 @@ export interface MaterialLibrary {
 ```
 
 Document stores `materialLibraries: Record<libraryId, { version, sha256, storage, licence, exportMarking, title }>`.
-`storage: 'private'` ⇒ `materialRecords` entries from it are **not serialized**; on load they are re-resolved
-through `ctx.libraries.get(id, version, sha256)`; if missing, the record is a stub `{ id, libraryRef, unresolved: true }`
-and mass falls back per TR-MAT-10 with a warning (never a silent number).
+`storage: 'private'` ⇒ `materialRecords` entries from it are **not serialized**. The saved document keeps, per
+private library, `{ libraryId, version, sha256 }` (the hash of the library snapshot last resolved) and per record only
+`{ id, libraryRef }`.
+
+**Resolution step (TR-MAT-16).** Persistence stays pure and port-free (`load_document` and `DocumentExtension.restore` get no
+`ctx`). Private values are filled by a separate mutating command `resolve_material_libraries {}` that reads the injected port
+`ctx.libraries.get(libraryId, version, sha256)`:
+
+1. The host (`server/` for CLI and desktop, `src/ui` for the browser) dispatches it right after every `load_document`, and the
+   UI offers it again after the user registers a library (`llull libraries add`).
+2. For each `libraryRef` whose provider snapshot has the **same sha256**, it fills the records. It is a session command: it is
+   not appended to `featureHistory` and it is never serialized (TR-MAT-31), so undo/redo and replay never carry private values.
+3. Provider missing, library missing, or **different sha256** ⇒ the record stays a stub `{ id, libraryRef, unresolved: true,
+   reason: 'provider missing' | 'library missing' | 'hash mismatch' }`. It keeps the last snapshot hash; values are **never**
+   silently replaced by another version or by the legacy density.
+
+**Replay without the provider.** `replay_history` re-runs steps against the stubs: mutating steps that need a private value
+(for example `assign_material` of an unresolved record) still apply their structural effect, while every query that needs the
+value (`mass_properties`, `get_material_allowable`, `select_fastener` material checks) returns `available: false` with the
+reason, never a number. Once the provider appears with the recorded hash, `resolve_material_libraries` restores the same values,
+so a replay is value-identical; with a new hash the user must run `import_material_library` for the new version explicitly
+(a recorded, diffable step, TR-MAT-15).
 
 ### 3.3 Fastener catalogue (plugin `@aero`, `fasteners/catalogModel.ts`)
 
@@ -214,6 +234,7 @@ All pure (`(doc, params, ctx) → CommandResult`), zod `params`, `snake_case`. Q
 | `set_material_property` | mutating | `{ material, property, value, unit, basis, direction?, thickness?, edOverD?, temperature?, source: {citation, locator?, accessed?, url?}, preferred? }` | `@affects materialRecords[m].properties` `@invariant one preferred per key` `@failure unit dimension mismatch (e.g. MPa for density) / basis missing ⇒ no-op` |
 | `import_material_library` | mutating | `{ library: MaterialLibrary } \| { libraryId, version, sha256 }` (private: resolved via `ctx.libraries`) | `@affects materialLibraries, materialRecords (embedded only)` `@failure hash mismatch / schema error / licence=licensed-no-redistribution with storage=embedded and no override ⇒ no-op` |
 | `remove_material_library` | mutating | `{ libraryId }` | `@failure records still assigned ⇒ no-op listing entities` |
+| `resolve_material_libraries` | mutating, session (not in `featureHistory`, never serialized) | `{}` (uses `ctx.libraries`) | `@affects materialRecords of private libraries` `@invariant fills only on exact sha256 match; never changes a value of an embedded record` `@failure provider/library missing or hash mismatch ⇒ records stay unresolved with reason` (§3.2, TR-MAT-16) |
 | `assign_material` (extended) | mutating | existing; `materialName` may be a record id (auto-creates render view) | unchanged invariants |
 | `get_material` | query | `{ material }` | returns record + resolved preferred values + markings |
 | `get_material_allowable` | query | `{ material, property, direction?, basis, thickness?, thicknessUnit?, temperature?, temperatureUnit?, edOverD?, forCertification?: boolean }` | `@invariant never returns a different basis than requested; forCertification refuses superseded/typical` `@failure none matching ⇒ data.available=false + candidates[]` |
@@ -268,7 +289,11 @@ Inputs: stack `t` (document units → catalogue unit), family F, size S, washer 
    and may force g−1: out of MVP.)
 4. Length `L = G + threadLength(S)` (grip_plus_thread) — checked against catalogue checkpoints (VC-MAT-06).
 5. Protrusion `p = L − t − Σ − h_n,max`; require `p ≥ 1/TPI` (≥ one full thread, AC 43.13-1B) when `h_n` known;
-   else report `protrusion: unknown` (not a pass).
+   else report `protrusion: unknown` (not a pass). **llull choices, not source text:** (a) AC 43.13-1B says "at least one
+   thread" protrudes; llull reads that as one thread pitch beyond the nut's *maximum* height (conservative: a short nut only
+   adds protrusion). (b) `L` is the catalogue length rounded to 0.001 in as distributors list it (0.5625 + 0.323 = 0.8855 →
+   0.885), and `p` is computed from that rounded `L`, so it can be up to 0.0005 in below the unrounded value (0.124 vs 0.1245
+   for NAS6203-9 on 0.510 in).
 6. Rivets (stack_plus_k_d): `L_raw = t + 1.5·D`; `L = ceil(L_raw/step − ε)·step` (`round:'up'` default; `'nearest'`
    selectable, OQ-MAT-04); report shop head ≥ 1.5D × 0.5D, edge ≥ 2D, pitch ≥ 3D.
 
@@ -344,8 +369,9 @@ component export path). No allowables in STEP.
 - **CLI**: no new verbs — `llull exec <command> <json>` and `llull run <plan.json>` (`build_project`) cover everything; add
   `llull libraries list|add|remove` as thin wrappers over `ctx.libraries` provider in `server/src/cli` (host-only
   file management, not document mutation).
-- **MCP**: new toolset `materials` (`get_material get_material_allowable diff_material_libraries define_material_record set_material_property import_material_library`)
-  — move `create_material assign_material` there with aliases kept in `3d` for discovery; toolset `fasteners` from
+- **MCP**: new toolset `materials` (`get_material get_material_allowable diff_material_libraries define_material_record set_material_property import_material_library remove_material_library resolve_material_libraries create_material assign_material`).
+  `create_material` and `assign_material` **move** out of `3d` (one toolset per command, the `toolsets.ts` invariant);
+  `search_tools` still finds them from any toolset. `TOOLSET_NAMES` gains `materials` and `fasteners`; toolset `fasteners` comes from
   the plugin. Private library values are returned to MCP clients only if the library's licence allows
   (`licensed-no-redistribution` ⇒ values returned to local desktop CLI only; cloud MCP gets
   `redacted:true` + basis/locator) — TR-MAT-32.

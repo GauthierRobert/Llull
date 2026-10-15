@@ -123,7 +123,8 @@
     "S30"
    ],
    "cross_check": {
-    "calculix_beamf_mode3_Hz": 76839.71
+    "calculix_beamf_mode3_Hz": 76839.71,
+    "mode_identification": "TBD - confirm from the beamf.frd.ref mode shape that CalculiX mode 3 is the 2nd weak-axis bending mode (torsion estimate ~85 kHz is close); not a gate until confirmed"
    }
   },
   {

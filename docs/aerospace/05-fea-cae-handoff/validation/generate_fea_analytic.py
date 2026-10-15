@@ -212,7 +212,8 @@ def main() -> None:
     cases.append({
         "id": "VC-FEA-11.c", "quantity": "2nd bending frequency, weak axis", "value": r(f_w[1]), "unit": "Hz", "tolerance_rel": 0.08,
         "derivation": "beta2 L = %.10f; Timoshenko effects grow with mode number - use only as an upper bound" % BETA[1],
-        "sources": ["S20", "S30"], "cross_check": {"calculix_beamf_mode3_Hz": ccx["mode3_Hz"]},
+        "sources": ["S20", "S30"], "cross_check": {"calculix_beamf_mode3_Hz": ccx["mode3_Hz"],
+            "mode_identification": "TBD - confirm from the beamf.frd.ref mode shape that CalculiX mode 3 is the 2nd weak-axis bending mode (torsion estimate ~85 kHz is close); not a gate until confirmed"},
     })
 
     # --- VC-FEA-12: Euler buckling of a cantilever (fixed-free), slender case for llull-native test ----------

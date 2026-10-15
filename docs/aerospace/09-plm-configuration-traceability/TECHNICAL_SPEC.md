@@ -280,9 +280,9 @@ happy and failure unit tests (non-negotiable 2).
    - `undefined` properties omitted, as in JSON.
 3. `contentHash = hex(SHA-256(UTF-8(canonical(scope(doc)))))` (FIPS 180-4 [R17]).
 4. Golden vectors: `validation/vectors/hash_vectors.json`:
-   - sample document scope hash `d3f3a4fa…80703f` over 966 bytes;
+   - sample document scope hash `7e3943fb…f3c24f` over 1551 bytes;
    - invariance under camera/selection change and key reordering;
-   - sensitivity to a parameter edit `3fe51bfa…ecbc1`;
+   - sensitivity to a parameter edit `c913cadc…91017e`;
    - cross-checked in Python and Node.
 5. Unicode: no NFC normalization (bytes as authored). Part numbers are restricted to ASCII by regex, which avoids the
    main normalization trap.
@@ -337,7 +337,7 @@ as drift, not as a change.
 - the snapshot hash of every released revision.
 
 A mismatch sets the transient `plm.integrity` (excluded from scope and serialization) and the load summary says
-`release A content hash mismatch (expected d3f3…, got …)`. The revision stays locked. The fix is to revert to the snapshot
+`release A content hash mismatch (expected 7e39…, got …)`. The revision stays locked. The fix is to revert to the snapshot
 (`restore_revision_snapshot`, a mutating command allowed only in that mismatch state) or to open an ECO.
 
 ### 5.6 Effectivity (FR-PLM-11/12)
@@ -357,7 +357,7 @@ Vectors: `vectors/effectivity_resolution.json`.
 - Signed bytes: `UTF-8(canonical(manifestBody))`, where `manifestBody` is the manifest without `manifestSha256` and
   `signatures`.
 - Deterministic: the same key and bytes always give the same signature, which makes golden tests possible (the sample
-  manifest is signed with the public RFC 8032 TEST 1 key: `f132e6dc…c77c0c`).
+  manifest is signed with the public RFC 8032 TEST 1 key: `df1953d3…20beb0f`).
 - Key custody (host): private keys stay in the OS keystore or a hardware token. The desktop uses Electron's OS-backed
   secret storage to protect a locally generated key (candidate API, to verify), or PKCS#11 tokens in V2.
 - Public keys are registered in `vault/keys/<userId>.json` with validity dates. Revocation is a signed vault entry.

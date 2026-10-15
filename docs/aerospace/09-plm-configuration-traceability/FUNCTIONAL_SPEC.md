@@ -210,7 +210,7 @@ The `plm` toolset is exposed as a view (`@mcp/toolsets`). `release_item` and `re
 | AC-01 | a document without PLM data | `set_item_identity {partNumber:"LL-1001"}` | item LL-1001 rev A.1 in_work; featureHistory length unchanged | VC-PLM-01 |
 | AC-02 | rev A in_review | `add_box` | refused, document unchanged, summary names item, revision and state | VC-PLM-02 |
 | AC-03 | rev A in_review with checker approval by another user | `release_item` | released; contentHash = SHA-256(JCS(release scope)); title block revision "A" | VC-PLM-03 |
-| AC-04 | sample_document.json as rev A content | release | contentHash = `d3f3a4fa…0703f` (vectors/hash_vectors.json) | VC-PLM-16 |
+| AC-04 | sample_document.json as rev A content | release | contentHash = `7e3943fb…f3c24f` (vectors/hash_vectors.json) | VC-PLM-16 |
 | AC-05 | rev A released | `set_parameter t=5` | refused | VC-PLM-03 |
 | AC-06 | rev A released, ECO-0002 open listing LL-1001 | `revise_item` | rev B.1 in_work, basedOn A; A still released with an unchanged hash | VC-PLM-05 |
 | AC-07 | B released under ECO-0002 effectivity serial ≥ 5 | `resolve_effectivity serial 4` / `5` | A / B | VC-PLM-06, VC-PLM-07 |

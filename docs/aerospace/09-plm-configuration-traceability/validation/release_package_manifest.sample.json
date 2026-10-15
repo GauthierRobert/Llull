@@ -38,8 +38,8 @@
       "role": "native-definition",
       "mediaType": "application/json",
       "canonical": true,
-      "sha256": "d3f3a4fa201f96bc92d660646b40a19af92ee7b8eb211957a24e65a02880703f",
-      "bytes": 966
+      "sha256": "7e3943fb2961d30684cc53e19aa1f6486463e667890f34cecc45ceea78f3c24f",
+      "bytes": 1551
     },
     {
       "path": "drawings/LL-1001_A_sheet1.svg",
@@ -50,14 +50,14 @@
       "bytes": 140
     }
   ],
-  "documentContentHash": "d3f3a4fa201f96bc92d660646b40a19af92ee7b8eb211957a24e65a02880703f",
+  "documentContentHash": "7e3943fb2961d30684cc53e19aa1f6486463e667890f34cecc45ceea78f3c24f",
   "tool": {
     "name": "llull",
     "version": "TBD",
     "kernel": "occt",
     "schemaVersion": 2
   },
-  "manifestSha256": "5cf710ffa62c6501613d704f1197e445a95a3027457152edf94cbd08b4af3d81",
+  "manifestSha256": "5c829b08363031c720e7518cb0b44119e828a255110607ddb8e35cce729d9d9c",
   "signatures": [
     {
       "alg": "Ed25519",
@@ -70,7 +70,7 @@
         "name": "J. Example"
       },
       "signedContent": "UTF-8 canonical JSON of the manifest without manifestSha256 and signatures",
-      "signature": "f132e6dc8a3e2ad0e4a656a833a40eee9ab2bf7d2b98f80aefd5a11125b63edd33b883e836af024d34ebc90f1366fb77474667d90dc00747b9b39d76d6c77c0c",
+      "signature": "df1953d356160aab5b4aceeeb630be7aa33fef0661ccf16d5986a4a73955742fff8193358e65215698be9e95c79311ffe8449c5890a7fe0db914a470a20beb0f",
       "WARNING": "RFC 8032 public TEST 1 key - test only, never trust in production"
     }
   ]

@@ -45,6 +45,61 @@
   "as": "plate"
  },
  {
+  "command": "define_material_record",
+  "params": {
+   "id": "al_E70",
+   "name": "al_E70",
+   "designation": "test material E = 70000 MPa",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "al_E70",
+   "property": "E",
+   "value": 70000.0,
+   "unit": "MPa",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "al_E70",
+   "property": "nu",
+   "value": 0.33,
+   "unit": "-",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "al_E70",
+   "property": "density",
+   "value": 2.7,
+   "unit": "g/cm^3",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
   "command": "create_material",
   "params": {
    "name": "al_E70",
@@ -52,10 +107,7 @@
    "color": "#c0c4c8",
    "metalness": 1,
    "roughness": 0.35,
-   "elastic": {
-    "youngsModulusPa": 70000000000.0,
-    "poissonRatio": 0.33
-   }
+   "recordId": "al_E70"
   }
  },
  {

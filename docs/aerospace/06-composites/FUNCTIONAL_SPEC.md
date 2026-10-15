@@ -233,6 +233,7 @@ The verbs (`run`, `exec`/shorthand, `--validate`, `--save`, `--json`) are the ex
 | AC-6 | The 3-zone flat panel plan | Plies generated; core sample at two points | 8 plies / 1.0 mm and 24 plies / 3.0 mm; ramp widths n·t·20 | VC-CMP-10, 11 |
 | AC-7 | Hemisphere R = 100, seed at the pole, step 1 mm | Drape | Shear at polar 45° on the diagonal = 15.7 ± 0.6°; Gauss-Bonnet residual ≤ 0.5°; max shear 51.9 ± 1.0° | VC-CMP-12 |
 | AC-8 | Locking angle 40° | Producibility check | About 8.5 % of the quadrant is flagged; no flat pattern without `allowOverLock` | VC-CMP-13 |
+| AC-8b | The hemisphere ply split by 4 darts along the generators | Each piece re-draped from the pole along its bisector | 4 pieces; shear 0 ± 0.05° on each bisector, 15.7 ± 0.6° at the piece-edge node near polar 45° | VC-CMP-33 |
 | AC-9 | Cylinder and cone plies | Flat pattern | Width 2πr; cone sector angle 254.558°, area 44 428.8 mm² | VC-CMP-14, 15 |
 | AC-10 | Cone flat pattern | Exported to DXF and re-imported | Area within 0.2 %; layer per ply; INSUNITS = 4 | VC-CMP-16 |
 | AC-11 | Any ply | Laser projection exported | Point spacing ≤ 75 mm, corners present, consistent winding | VC-CMP-17 |

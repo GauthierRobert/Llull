@@ -280,6 +280,21 @@ Bind `rampRatio` to parameter `ramp = 20`, then run `set_parameter ramp 30`. The
 step becomes 30 mm, the flats are regenerated, and undo restores 20 mm. Ids stay identical across the edit
 (L8).
 
+**VC-CMP-33: dart and re-drape.** Proves FR-CMP-42, FR-CMP-40 and TR-CMP-40.
+Split the hemisphere ply of VC-CMP-12 with 4 darts along the old generators (azimuth 0°, 90°, 180°, 270°,
+from the pole to the equator) using `split_ply`. Each of the 4 quadrant pieces is re-draped from the pole with
+its warp along its own bisector (azimuth 45° + k·90°). The sphere is rotationally symmetric, so the shear
+field of each piece is the VC-CMP-12 field rotated by 45°: the old diagonal becomes a generator and the old
+generator (now the piece edge) becomes the diagonal. Expected (derived from `drape_reference.json`):
+
+- 4 pieces with deterministic ids; drape and flats are computed per piece;
+- shear on each piece bisector 0°, abs 0.05°;
+- shear at the piece-edge node nearest a polar angle of 45°: 15.726°, abs 0.6°;
+- maximum shear 51.894° at the equator on the piece edges, abs 1.0°.
+
+This case checks the cut / per-piece re-drape mechanism. The rotated seed alone does not reduce the peak
+shear; producibility gains come from flattening the pieces separately and from boundary edits.
+
 ## 4. Traceability matrix (FR → VC)
 
 | FR | VC |
@@ -302,7 +317,8 @@ step becomes 30 mm, the flats are regenerated, and undo restores 20 mm. Ids stay
 | FR-CMP-33 | VC-CMP-18 |
 | FR-CMP-34 | VC-CMP-26 |
 | FR-CMP-40 | VC-CMP-12 |
-| FR-CMP-41, 42 | VC-CMP-13 |
+| FR-CMP-41 | VC-CMP-13 |
+| FR-CMP-42 | VC-CMP-13, 33 |
 | FR-CMP-43 | VC-CMP-14, 15 |
 | FR-CMP-44 | VC-CMP-27 |
 | FR-CMP-50 | VC-CMP-16 |

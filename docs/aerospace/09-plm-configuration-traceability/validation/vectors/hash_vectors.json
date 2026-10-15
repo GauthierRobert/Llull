@@ -47,18 +47,18 @@
   ],
   "sample_document": {
     "file": "sample_document.json",
-    "full_canonical_sha256": "9142ccdedfdd1d40c24a14753e14942603c251621979682158aaf58935bbaff8",
-    "full_canonical_length_bytes": 1071,
+    "full_canonical_sha256": "f092b7dfcad8e1cf49de0d09086d167b6cb69b66cdc90131dbd6ef128e063cdc",
+    "full_canonical_length_bytes": 1672,
     "release_scope_excluded_fields": [
       "selection",
       "camera",
       "plm"
     ],
-    "release_scope_canonical_sha256": "d3f3a4fa201f96bc92d660646b40a19af92ee7b8eb211957a24e65a02880703f",
-    "release_scope_canonical_length_bytes": 966,
-    "release_scope_after_camera_and_selection_change_sha256": "d3f3a4fa201f96bc92d660646b40a19af92ee7b8eb211957a24e65a02880703f",
-    "release_scope_after_key_reordering_sha256": "d3f3a4fa201f96bc92d660646b40a19af92ee7b8eb211957a24e65a02880703f",
-    "release_scope_after_parameter_t_edit_sha256": "3fe51bfaefd6362caa0f9d505c273d9e4e695df0fc7e8373dfc47608b6fecbc1",
+    "release_scope_canonical_sha256": "7e3943fb2961d30684cc53e19aa1f6486463e667890f34cecc45ceea78f3c24f",
+    "release_scope_canonical_length_bytes": 1551,
+    "release_scope_after_camera_and_selection_change_sha256": "7e3943fb2961d30684cc53e19aa1f6486463e667890f34cecc45ceea78f3c24f",
+    "release_scope_after_key_reordering_sha256": "7e3943fb2961d30684cc53e19aa1f6486463e667890f34cecc45ceea78f3c24f",
+    "release_scope_after_parameter_t_edit_sha256": "c913cadc86e8348f02b43d5f73432eb93929c745eff11fe62b57f747c691017e",
     "expect": {
       "camera_selection_change_keeps_hash": true,
       "key_reordering_keeps_hash": true,

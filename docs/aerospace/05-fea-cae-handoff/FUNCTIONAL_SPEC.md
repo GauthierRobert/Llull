@@ -92,8 +92,8 @@ User stories:
 | Id | Pri | Requirement | Rationale | Source |
 | -- | --- | ----------- | --------- | ------ |
 | FR-FEA-01 | MUST | A document holds one or more **analysis cases**. Each has a type (`static`, `modal`, `buckling`), a solver (`calculix`, `nastran`), a unit system, a factor set, load cases, and mesh controls. All of it is created and edited by commands, replays, and saves with the document. | L1/L4/L8: analysis set-up is design data and must be traceable to the revision | L1 |
-| FR-FEA-02 | MUST | Materials carry **elastic constants**: E and ν, with G derived or explicit. Density is reused, and ν ∈ (−1, 0.5) and E > 0 are validated. | MAT1 needs E, G, ν and ρ, and CalculiX `*ELASTIC` needs E and ν | [R14], [R30] |
-| FR-FEA-03 | MUST | Materials can reference **allowables** (Ftu, Fty, Fsu, Fcy, plus a basis label such as A, B or S) from gap 08 MAT or entered explicitly with a source note. MS uses them. | MS needs allowables, and their provenance must be visible | [R3] |
+| FR-FEA-02 | MUST | Analysed parts use a **gap 08 MAT material record** carrying elastic constants as properties: E and ν, with G explicit or derived as E / (2(1 + ν)), and density. FEA reads these values and never stores its own copy. E > 0, G > 0 and ν ∈ (−1, 0.5) are validated when the property is set. | MAT1 needs E, G, ν and ρ, and CalculiX `*ELASTIC` needs E and ν. One material model for the whole document (gap 08 FR-MAT-01…04) | [R14], [R30], gap 08 |
+| FR-FEA-03 | MUST | MS uses **allowables** (Ftu, Fty, optionally Fsu, Fcy) read from the gap 08 record, with their basis (A, B, S, …) and provenance carried unchanged into the MS report. No basis substitution (gap 08 FR-MAT-06). | MS needs allowables, and their provenance must be visible | [R3], gap 08 |
 | FR-FEA-04 | MUST | **Part idealization** per part: `solid` (3D), `plane_stress` (2D region plus thickness), and `shell` (surface plus thickness and offset). `beam` is V2. | Thin parts are analysed as shells, and LE1 is plane stress | [R40], [R30] |
 | FR-FEA-05 | SHOULD | **Midsurface extraction** for constant-thickness thin-walled solids. It reports coverage (the share of face area that was paired) and lists unpaired faces, and it is derived geometry that never edits the design. | Airframe sheet-metal and machined thin walls are meshed as shells | — |
 | FR-FEA-06 | SHOULD | **Defeaturing** of the analysis geometry: remove holes, fillets and chamfers below a size or picked by point, using derived geometry only. | Small features drive the mesh size without changing the global stiffness | [R10] (`occ.defeature`) |
@@ -127,7 +127,7 @@ User stories:
 ### 6.1 UI (desktop)
 
 1. Model or open the part. **Analysis ▸ New analysis** (type, solver, units) runs `create_analysis`.
-2. Pick or create a material with elastic constants and allowables (`create_material` with `elastic`; gap 08 libraries). Assign it.
+2. Pick or create a material record with E, ν, density and allowables (gap 08 commands `define_material_record` / `set_material_property` or a gap 08 library). Assign it.
 3. **Idealize**: solid by default. Choose shell to get `extract_midsurface` with a thickness preview and coverage
    heatmap, or plane stress to pick the source face.
 4. **Constraints / Loads** panels: pick faces in the viewport. The panel records click points as `facesNear`
@@ -139,7 +139,7 @@ User stories:
 7. **Results**: choose the field, deformation scale and mode number (`set_result_view`). Probes and max markers are shown. Analytic check
    cards appear when the model matches a template.
 8. **Margins**: a table per part and load case with FoS 1.5, and FAIL rows highlighted. Export to CSV/JSON or place on a sheet.
-9. **Export deck**: INP or BDF (`export_solver_deck`) for the stress office.
+9. **Export deck**: INP or BDF (the `fea_export` transport) for the stress office.
 
 ### 6.2 CLI (`llull`, local agent: KI6)
 
@@ -158,7 +158,7 @@ llull --doc part.llull fea import --analysis an-1 --frd run.frd
 1. `build_project` with the plan (geometry plus `create_analysis` … `set_mesh_controls`).
 2. `fea_mesh` and `fea_solve` are transport tools on the server, available only when the deployment provides Gmsh/ccx
    (otherwise they answer how to enable them, as `import_step` does today).
-3. `compute_margins` (read-only) returns JSON, and `export_solver_deck` returns the deck text or writes it into the exchange
+3. `compute_margins` (read-only) returns JSON, and the `fea_export` transport returns the deck text or writes it into the exchange
    directory.
 4. The agent edits a parameter (`set_parameter`). The results become `stale`, and the agent loops back to `fea_mesh`.
 
@@ -182,7 +182,7 @@ llull --doc part.llull fea import --analysis an-1 --frd run.frd
 | --------- | --------- | -- |
 | A target point matches no face or two faces equally | The command is rejected (no-op) with a summary naming the target and the candidate faces | FR-FEA-07 |
 | A target face disappears after a parametric edit | The constraint or load is kept but flagged `unresolved`. Mesh and solve are refused until the user fixes it | FR-FEA-07, 22 |
-| Material has no `elastic` | Mesh is allowed. Solve and export are refused, naming the part and material | FR-FEA-02 |
+| Material record has no E or ν | Mesh is allowed. Solve and export are refused, naming the part and material | FR-FEA-02 |
 | A part is not constrained enough (rigid-body modes) | Pre-solve check: fewer than 6 independent restrained DOFs per connected part gives a warning, and a singular solver matrix gives a readable error from the log | FR-FEA-16 |
 | A point force on a single node | Warning about the stress singularity. Margins exclude the singular zone by default and list it separately | FR-FEA-18 |
 | Mixed units (document in inches) | The deck is written in the lbf-in system. The header says so and the report shows the units | FR-FEA-25 |

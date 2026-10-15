@@ -34,7 +34,7 @@
     {"path": "test/beamf.frd.ref", "sha256": "87ab67f902cd4be850f36f61656b182fed602eb3e67bfb3db3c4da83a9397232", "bytes": 158849}
    ],
    "reference_values": {"frequencies_Hz": [13096.03, 19319.52, 76839.71, 86955.23, 105963.6, 162998.5, 197645.0, 256161.0, 261139.5, 351862.3]},
-   "analytic_comparison": "VC-FEA-11.a: Euler-Bernoulli f1 (weak axis) = 13096.7 Hz (+0.005 %); 11.b strong axis 19645.1 Hz (+1.7 %, shear/rotary inertia); 11.c second weak-axis bending 82075.8 Hz (+6.8 %)",
+   "analytic_comparison": "VC-FEA-11.a: Euler-Bernoulli f1 (weak axis) = 13096.7 Hz (+0.005 %); 11.b strong axis 19645.1 Hz (+1.7 %, shear/rotary inertia); 11.c second weak-axis bending 82075.8 Hz (+6.8 %; pairing with CalculiX mode 3 is TBD until the mode shape in beamf.frd.ref is checked, a torsion mode is estimated near 85 kHz)",
    "used_for": ["FR-FEA-19 (modal)", "FR-FEA-13 (FRD eigenmode blocks)"]
   },
   {

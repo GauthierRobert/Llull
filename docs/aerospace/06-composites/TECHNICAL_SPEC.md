@@ -547,7 +547,7 @@ separator. Numbers use `.` as the decimal mark.
 | `tests/unit/composites/failure.test.ts` | closed forms + table values | VC-CMP-06, 07 |
 | `tests/unit/composites/notation.test.ts`, `rules.test.ts` | the 10 reference cases + config variants + parse errors | VC-CMP-08, 09 |
 | `tests/unit/composites/zones.test.ts` | blending feasibility, ramp offsets, conflicts | VC-CMP-10, 11 |
-| `tests/unit/composites/drape.sphere.test.ts` | sphere closed-form oracle (no kernel) vs `drape_reference.json`; Gauss-Bonnet residual | VC-CMP-12, 13 |
+| `tests/unit/composites/drape.sphere.test.ts` | sphere closed-form oracle (no kernel) vs `drape_reference.json`; Gauss-Bonnet residual; dart split + per-piece re-drape (rotated field) | VC-CMP-12, 13, 33 |
 | `server/tests/occtDrape.test.ts` | same hemisphere through the OCC `projectOnFace` path; tolerance per VC | VC-CMP-12, 13 |
 | `tests/unit/composites/flatten.test.ts` | cylinder / cone / frustum analytic | VC-CMP-14, 15 |
 | `tests/unit/composites/exports.test.ts` | DXF → `import_dxf` → `measure_area`; laser spacing and winding | VC-CMP-16, 17 |
@@ -566,7 +566,7 @@ Technical requirement ids cited by the validation pack (each points to the secti
 | TR-CMP-02 | Step-scoped deterministic ids; plans replay to identical documents | §2 L8, §8 Determinism |
 | TR-CMP-03 | Derived ply geometry is listed by `derivedEntityIds`, read-only via derivation guards, regenerated on load | §3, §6.1 |
 | TR-CMP-30..36 | CLT and first-ply failure as specified: Q/Q̄/ABD/inverse/constants (30), bottom-to-top stacking and B sign convention (31), ply stresses (32), failure criteria (33), singular-laminate rejection (34), tolerances (35), units (36) | §5.2, §5.3, §5.9 |
-| TR-CMP-40 | Kinematic drape on exact faces through optional `GeometryKernel` face queries read from `ctx.kernel` (`requiresKernel`) | §5.4, §5.5 |
+| TR-CMP-40 | Kinematic drape on exact faces through optional `GeometryKernel` face queries read from `ctx.kernel` (`requiresKernel`); per-piece re-drape after darts/splices | §5.4, §5.5, §5.7 |
 | TR-CMP-41 | Drape self-checks: sphere closed-form oracle, generator symmetry, Gauss-Bonnet residual | §5.4 |
 | TR-CMP-60 | Generic DXF writer in `@lib/dxfWrite.ts`, flat-pattern DXF layout | §6.2 |
 | TR-CMP-70 | UI, CLI and MCP reach the same registry commands with identical results | §7 |

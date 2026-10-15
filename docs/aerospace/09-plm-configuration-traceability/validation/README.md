@@ -17,7 +17,7 @@ The proposed commands do not exist yet. Files that use them are **contracts** fo
 | ---- | ---- | ------- | ------ |
 | `generate_vectors.py` | generator (Python 3.9+, `cryptography`) | Rebuilds every file in `vectors/` and the sample manifest, deterministically. It asserts its own invariants (RFC 8032 re-derivation, hash invariance, negative signatures). | VC-PLM-04, 07, 16, 17 |
 | `verify_vectors.mjs` | cross-check (Node ≥ 20, only `node:crypto`) | Recomputes canonical JSON, SHA-256 and Ed25519 verification in the JS runtime llull ships on (server/desktop). 18/18 PASS on Node v22.22.0. | VC-PLM-16, 17 |
-| `sample_document.json` | input | Small llull v2 document envelope (parameters, 3 feature steps, a configuration, a material). Used as release content of LL-1001 rev A. Values are illustrative and not engineering data. | VC-PLM-16 |
+| `sample_document.json` | input | Small llull v2 document envelope produced by llull itself (`build_project`: parameters w/t, `set_units`, `add_box` 60×40×t, `add_cylinder`, a configuration, a material → 4 feature steps, 2 entities) and serialized with `serializeDocument`; it loads with `load_document`. Used as release content of LL-1001 rev A. Values are illustrative and not engineering data. | VC-PLM-16 |
 | `vectors/hash_vectors.json` | generated | SHA-256 known answers, canonicalization cases, release-scope hash of the sample, invariance and sensitivity cases | VC-PLM-16 |
 | `vectors/ed25519_vectors.json` | generated | RFC 8032 §7.1 TEST 1–3 (re-verified), manifest signature (deterministic, TEST 1 key), 4 negative cases | VC-PLM-17 |
 | `vectors/revision_sequence.json` | generated | `asme-alpha` and `numeric-2` sequences, iteration examples | VC-PLM-04 |
@@ -36,7 +36,7 @@ Regenerate and re-check:
 
 ```bash
 cd docs/aerospace/09-plm-configuration-traceability/validation
-python3 -I generate_vectors.py      # prints: ok: 5cf710ff…3d81 (manifest hash)
+python3 -I generate_vectors.py      # prints: ok: 5c829b08…9d9c (manifest hash)
 node verify_vectors.mjs             # 18 x PASS, exit 0
 ```
 
@@ -71,8 +71,8 @@ Tolerances are exact unless stated. "Source" is (a) a cited standard/source, (b)
 | VC-PLM-13 | Integrity & verification | S2-09/10/11, S1 17 | tampered file → mismatch reported, still locked; `verify_release` true on an untouched revision; undo blocked after persistence | [R9] tamper protection | FR-15, 16 |
 | VC-PLM-14 | As-built vs as-designed | S3 4 | one difference LL-1003 C (designed) vs B (built) with authority RFV-0012 | (b) | FR-28 |
 | VC-PLM-15 | Characteristic accountability & FAI skeleton | S3 5–6 + `as9102_field_mapping.csv` | balloons stable across regenerate; partial FAI lists only ECO-changed characteristics; results null; Form 1 PN/rev filled | [R5] (secondary for field names) | FR-26, 27 |
-| VC-PLM-16 | Canonical hash | `vectors/hash_vectors.json` in Python and JS | SHA-256("abc") = `ba7816bf…f20015ad`; sample scope `d3f3a4fa…80703f` (966 B); after camera/selection/key-order change: same; after t = 5: `3fe51bfa…ecbc1` | [R17] (a); (b) | FR-06; TR-06, 17 |
-| VC-PLM-17 | Ed25519 signatures | `vectors/ed25519_vectors.json`; S2-12 | RFC 8032 TEST 1–3 verify; manifest signature `f132e6dc…c77c0c` verifies; 4 negatives fail; `record_signature` with bit-flipped signature refused; test keys refused by the production trust store | [R15] (a), [R18] | FR-20; TR-07, 19 |
+| VC-PLM-16 | Canonical hash | `vectors/hash_vectors.json` in Python and JS | SHA-256("abc") = `ba7816bf…f20015ad`; sample scope `7e3943fb…f3c24f` (1551 B); after camera/selection/key-order change: same; after t = 5: `c913cadc…91017e` | [R17] (a); (b) | FR-06; TR-06, 17 |
+| VC-PLM-17 | Ed25519 signatures | `vectors/ed25519_vectors.json`; S2-12 | RFC 8032 TEST 1–3 verify; manifest signature `df1953d3…20beb0f` verifies; 4 negatives fail; `record_signature` with bit-flipped signature refused; test keys refused by the production trust store | [R15] (a), [R18] | FR-20; TR-07, 19 |
 | VC-PLM-18 | Release package | write package for S1 rev A; verify with `sha256sum` + `verify_vectors.mjs`-style verifier; flip one byte | all members match the manifest; flipped byte → member mismatch; manifest `documentContentHash` = revision contentHash; tool provenance present | (b); [R22] intent | FR-21, 30 |
 | VC-PLM-19 | Performance | `tests/perf/plm.bench.ts` | guard ≤ 1 ms p95; release 10 MB ≤ 1 s; package verify 50 MB ≤ 2 s | (c) TBD, measure with vitest bench on the reference desktop | FR-32 |
 | VC-PLM-20 | Export marking | S1 step 2 variant with `regime:'undetermined'` + `requireMarking` | submit refused; with a regime set, the statement appears in sheet SVG and manifest `marking` | [R12][R14] (data types); decision is human | FR-25 |

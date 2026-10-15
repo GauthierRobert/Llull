@@ -13,15 +13,15 @@
     {
       "vc": "VC-PLM-16",
       "name": "Release-scope content hash of validation/sample_document.json",
-      "value": "d3f3a4fa201f96bc92d660646b40a19af92ee7b8eb211957a24e65a02880703f",
+      "value": "7e3943fb2961d30684cc53e19aa1f6486463e667890f34cecc45ceea78f3c24f",
       "tolerance": "exact",
       "unit": "hex digest",
-      "source": "derived: SHA-256(RFC 8785-style canonical JSON of envelope minus selection/camera/plm), 966 bytes; generate_vectors.py"
+      "source": "derived: SHA-256(RFC 8785-style canonical JSON of envelope minus selection/camera/plm), 1551 bytes; generate_vectors.py"
     },
     {
       "vc": "VC-PLM-16",
       "name": "Release-scope hash invariant to camera/selection change and key order",
-      "value": "d3f3a4fa201f96bc92d660646b40a19af92ee7b8eb211957a24e65a02880703f",
+      "value": "7e3943fb2961d30684cc53e19aa1f6486463e667890f34cecc45ceea78f3c24f",
       "tolerance": "exact (must equal the previous row)",
       "unit": "hex digest",
       "source": "derived; generate_vectors.py asserts equality"
@@ -29,7 +29,7 @@
     {
       "vc": "VC-PLM-16",
       "name": "Release-scope hash after editing parameter t 4 -> 5",
-      "value": "3fe51bfaefd6362caa0f9d505c273d9e4e695df0fc7e8373dfc47608b6fecbc1",
+      "value": "c913cadc86e8348f02b43d5f73432eb93929c745eff11fe62b57f747c691017e",
       "tolerance": "exact (must differ from the unedited hash)",
       "unit": "hex digest",
       "source": "derived; generate_vectors.py"
@@ -45,7 +45,7 @@
     {
       "vc": "VC-PLM-17",
       "name": "Sample release manifest hash",
-      "value": "5cf710ffa62c6501613d704f1197e445a95a3027457152edf94cbd08b4af3d81",
+      "value": "5c829b08363031c720e7518cb0b44119e828a255110607ddb8e35cce729d9d9c",
       "tolerance": "exact",
       "unit": "hex digest",
       "source": "derived: SHA-256 of canonical manifest body (without manifestSha256, signatures)"
@@ -53,7 +53,7 @@
     {
       "vc": "VC-PLM-17",
       "name": "Sample release manifest Ed25519 signature (RFC 8032 TEST 1 key, deterministic)",
-      "value": "f132e6dc8a3e2ad0e4a656a833a40eee9ab2bf7d2b98f80aefd5a11125b63edd33b883e836af024d34ebc90f1366fb77474667d90dc00747b9b39d76d6c77c0c",
+      "value": "df1953d356160aab5b4aceeeb630be7aa33fef0661ccf16d5986a4a73955742fff8193358e65215698be9e95c79311ffe8449c5890a7fe0db914a470a20beb0f",
       "tolerance": "exact (Ed25519 is deterministic, RFC 8032 section 5.1.6)",
       "unit": "hex signature (64 bytes)",
       "source": "derived; generate_vectors.py"
