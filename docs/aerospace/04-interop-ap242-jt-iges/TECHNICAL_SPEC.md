@@ -16,7 +16,7 @@ Gap id: **XCH** · Companion of [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md) · Va
 | Mass properties | `packages/core/src/commands/inspect/measureSolid.ts` `mass_properties`; `ShapeTopology.volume` | Volume (exact with OCC for mesh results) and mass | **No surface area, no centroid** → cannot compute CAx-IF GVP today |
 | Independent STEP reference | `quality/step_reference.py` (OCP: `STEPCAFControl_Reader`, `BRepGProp`, `BRepBndLib.AddOptimal_s`) | Quality-gate ground truth: solids, faces, area, volume, boxes, colours, names | Reads only; already the right shape for GVP recompute (reuse its algorithm) |
 | Quality corpus | `quality/corpus.json` (AP214 assemblies, OCCT/FreeCAD/pythonocc samples, synthetic files) | Step-import gate | No AP242/PMI/GVP files, no IGES |
-| Kernels | `packages/kernel-occt` uses `opencascade.js` **^1.1.1** (package-lock) in browser + server worker; desktop also bundles CPython + CadQuery/OCP (KI6) | Two OCC runtimes | Unknown whether the 1.1.1 build binds `STEPCAFControl_*`, `XCAFDoc_*`, `IGESControl_*`; must be verified (Q1) |
+| Kernels | `packages/kernel-occt` uses `opencascade.js` **^1.1.1** (`package.json`; 1.1.1 in `package-lock.json`) in browser + server worker; desktop also bundles CPython + CadQuery/OCP (KI6) | Two OCC runtimes | Unknown whether the 1.1.1 build binds `STEPCAFControl_*`, `XCAFDoc_*`, `IGESControl_*`; must be verified (Q1) |
 
 ## 2. Target architecture
 
@@ -34,7 +34,7 @@ packages/<aero plugin>/src/exchange/   (domain: LOTAR, QIF)  create_archive_pack
         ▼
 GeometryKernel (core interface)  ── + exchange port methods (§2.3)
         ▼
-packages/kernel-occt (opencascade.js custom build: TKDESTEP/TKXDESTEP/TKDEIGES/TKXCAF)    [target]
+packages/kernel-occt (opencascade.js custom build: TKDESTEP/TKDEIGES/TKXCAF)    [target]
 server/python/llull_bridge.py (OCP STEPCAFControl / IGESCAFControl)                       [interim, desktop-only]
 ```
 
@@ -434,7 +434,7 @@ Coverage gate 90/85/90/90 applies to `packages/core/src/commands/exchange/**` an
 
 | Milestone | Content | Depends on | Effort (eng-weeks) |
 | --------- | ------- | ---------- | ------------------ |
-| M0 Spike | Verify opencascade.js 1.1.1 bindings; build custom ocjs with TKXDESTEP/TKDEIGES/TKXCAF; size/perf report | 01 KRN spike | 1.5 |
+| M0 Spike | Verify opencascade.js 1.1.1 bindings; build custom ocjs with TKDESTEP/TKDEIGES/TKXCAF (OCCT ≥ 7.8 names; 7.4 splits them into TKSTEP*/TKXDESTEP/TKIGES/TKXDEIGES); size/perf report | 01 KRN spike | 1.5 |
 | M1 GVP | `massProperties` kernel member + `geometric_validation_properties` query; TS Part 21 verifier (`lib/step21`) | — | 1.5 |
 | M2 AP242 export | `writeExchange` (XDE), `export_step_ap242`, assembly structure, GVP write, self-check; alias `export_step_exact` | M0, M1 | 3 |
 | M3 Exact import + verify | `readExchange`, `import_step_exact`, provenance, bands, `verify_exchange_file`; NIST gate | M0, 01 KRN imported recipe leaf | 3 |

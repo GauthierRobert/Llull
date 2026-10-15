@@ -339,7 +339,7 @@ means with h = 1e-6 × max(1, |c_i|)).
 5. Probabilities: all-normal linear ⇒ P(y < L) = Φ((L − y_mean)/σ_y) (Φ via erf, Abramowitz–Stegun
    7.1.26-class approximation is **not** acceptable: use a double-precision erfc implementation with
    relative error < 1e-12 in the tested range); all-uniform linear ⇒ exact generalised Irwin–Hall CDF
-   P(Σ U_i ≤ x) = (1/(n! Π w_i)) Σ_{S ⊆ {1..n}} (−1)^{|S|} (x − Σ lo_i − Σ_{i∈S} w_i)_+^n (n ≤ 12); otherwise MC only.
+   P(Σ U_i ≤ x) = (1/(n! Π w_i)) Σ_{S ⊆ {1..n}} (−1)^{|S|} (x − Σ lo_i − Σ_{i∈S} w_i)_+^n (n ≤ 12); otherwise MC only. Evaluate it on centred terms (lo_i = −|a_i| t_i, x = L − y_mean) and with exact coefficients for linear stacks: a central-difference a_i at |c_i| = 100 carries ~1e-9 relative error, which moves P by ≫ 1e-12 (review finding; the reference generator now takes explicit `sensitivities`).
 6. Contribution % = (a_i σ_i)² / σ_y² × 100 (RSS) and |a_i| t_i / T_wc × 100 (WC).
 7. Monte Carlo: N samples (default 100 000, cap 2 000 000), xoshiro128** seeded by SplitMix32(seed),
    uniform u ∈ (0,1) from the top 24 bits / 2^24 offset by 2^-25; normal via Box–Muller; reports mean,
