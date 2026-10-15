@@ -1,6 +1,6 @@
 # XCH — Aerospace data exchange: STEP AP242 (PMI, assemblies, validation properties), IGES, JT, QIF, LOTAR — Functional specification
 
-Gap id: **XCH** · Status: specification (no implementation) · Written 2026-10-15 · Depends on: 01 KRN (STEP → exact
+Gap id: **XCH** · Status: specification (no implementation) · Written 2026-10-15 · Depends on: 01 KRN (owner of `import_step_exact`, STEP → exact
 B-rep import), 03 GDT (semantic PMI model) · Feeds: 09 PLM (LOTAR archive, release packages).
 
 ## 1. Summary
@@ -137,8 +137,8 @@ llull geometric_validation_properties --doc part.llull --json                # v
 llull export_step_ap242 includeValidationProperties=true --save part.stp --doc part.llull
 llull export_iges --save part.igs --doc part.llull
 llull import_iges file=fairing_1994.igs sew=true --doc legacy.llull
-llull create_archive_package --save-dir archive/PN-12345-A --doc part.llull   # V1
-llull verify_archive_package dir=archive/PN-12345-A --json                     # V1
+llull create_archive_package --save archive/PN-12345-A --doc part.llull       # V1 (multi-file result → directory)
+llull verify_archive_package dir=archive/PN-12345-A --json                     # V1 (dir= read by the CLI host, TECHNICAL_SPEC §7)
 ```
 
 Exit code is non-zero when a verification report contains a red item, so CI can gate deliveries.
@@ -155,7 +155,7 @@ Exit code is non-zero when a verification report contains a red item, so CI can 
 
 | Id | Given | When | Then | VC |
 | -- | ----- | ---- | ---- | -- |
-| AC-1 | the nine analytic parts of `validation/analytic_gvp_reference.json` built from their plans | `export_step_ap242` then `import_step_exact` | every solid's volume, area, centroid, bbox equal the analytic values within 1e-6 relative and the pre-export values within 1e-9 relative | VC-XCH-01 |
+| AC-1 | the nine analytic parts of `validation/analytic_gvp_reference.json` built from their plans | `export_step_ap242` then `import_step_exact` | every solid's volume, area, centroid, bbox equal the analytic values within 1e-9 relative and the pre-export values within 1e-9 relative | VC-XCH-01 |
 | AC-2 | the drilled plate with an offset hole | exported to AP242 | the file holds a 'geometric validation property' with volume 113716.81469282041, area 19028.31853071796, centroid x −1.3813228334244487 (mm), read back by an OCC-independent parser | VC-XCH-02 |
 | AC-3 | any llull-written AP242 file | analysed by NIST SFA | 0 syntax errors; FILE_SCHEMA starts with `AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF` | VC-XCH-03, VC-XCH-17 |
 | AC-4 | a component instanced twice | exported and re-imported | 1 product, 2 occurrences, assembly volume 2000 mm³, centroid (50, 0, 0) | VC-XCH-04 |
@@ -168,7 +168,7 @@ Exit code is non-zero when a verification report contains a red item, so CI can 
 | AC-11 | the drilled plate and L-bracket | IGES export → import | GVP within 1e-6 relative of analytic | VC-XCH-11 |
 | AC-12 | an inch document / inch file | exported / imported into mm | values scale by 25.4^k exactly within tolerance | VC-XCH-12 |
 | AC-13 | an archive package of the L-bracket | re-verified | checksums match; GVP 56000 mm³ / 14800 mm² / (25, 20, 20) within 1e-9 relative; report "pass" | VC-XCH-13 |
-| AC-14 | a truncated STEP file | imported | document unchanged, summary `import_step_exact rejected: …` | VC-XCH-14 |
+| AC-14 | a truncated STEP file | imported | document unchanged, `affected: []`, summary naming the cause (e.g. `import_step_exact: unreadable STEP …`; the `… rejected: invalid params` form is only for schema failures) | VC-XCH-14 |
 
 ## 8. Standards & regulatory alignment
 

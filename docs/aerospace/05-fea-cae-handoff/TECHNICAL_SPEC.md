@@ -41,7 +41,7 @@ packages/core/src
    model/analysis.ts      AnalysisModel types (like model/building.ts, model/civil.ts)
    model/types.ts         CadDocument.analysis?   (materials: gap 08 MaterialRecord, read only — TR-FEA-04)
    geometry/shapeRecipe   + recipe ops 'midsurface', 'defeature' (kernel boundary stays a SHAPE, KI5)
-   geometry/kernel.ts     ShapeFace gains centroid + normal (planar) for face matching / facesNear
+   geometry/kernel.ts     (gap 01) GeometryKernel.faceQuery?.faceDetails → centroid + normal for face matching / facesNear
    lib/meshQuality.ts     Verdict metric port (pure)
    lib/vonMises.ts        tensor helpers (pure)
 packages/kernel-occt/src  occtMidsurface.ts, occtDefeature.ts (KernelOps), face centroid/normal in occtTopology.ts
@@ -254,7 +254,8 @@ machine without the artifact leaves the step recorded and the state `missing` (T
 
 ### 5.1 Face data and targeting (TR-FEA-03, TR-FEA-32)
 
-- `ShapeFace` gains `centroid: Vec3` and `normal?: Vec3` (planar faces only) from `BRepGProp::SurfaceProperties`. OCC already uses
+- Face centroid and normal come from the gap 01 face-query port (`GeometryKernel.faceQuery?.faceDetails`, TR-KRN-90..92,
+  docs/aerospace/01-exact-brep-kernel/TECHNICAL_SPEC.md §5.9); FEA requires `centroid: Vec3` and `normal?: Vec3` (planar faces) from `BRepGProp::SurfaceProperties`. OCC already uses
   `BRepGProp`/`GProp_GProps` (`occtTopology.ts`), and the plane comes from `BRepAdaptor_Surface`.
 - `facesNear` resolution measures the distance from the point to each face's sampled tessellation triangles (reusing `tessellate`) and takes the
   argmin. Ambiguity means a second-best face within `1e-6 × diag(AABB)`.

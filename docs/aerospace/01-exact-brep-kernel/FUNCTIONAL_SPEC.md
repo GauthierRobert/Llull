@@ -101,7 +101,8 @@ User stories (each maps to FRs):
 | Phase | Content |
 | ----- | ------- |
 | **MVP** | OCC default on desktop (server worker) with visible fallback; current OCCT build (7.9.x line) in the server/worker; tolerance policy + document `modelingTolerance`; `import_step_exact` (exact solids, ShapeFix, sewing of shells, import report, tessellated-only detection); `validate_shape`; result validity gating; exact `mass_properties` with centroid + inertia + part-frame evaluation; kernel provenance in documents; determinism golden set; boolean `fuzzy` option |
-| **V1** | Persistent topological naming (history-based element names) for fillet / chamfer / shell / hole selections and for imported faces; GVP comparison on import and GVP writing on export; assembly mass properties with instances; browser OCC in a Web Worker (web-only use); instancing of arbitrary exact parts in the viewport; cross-version regression gate |
+| **V1** | Persistent topological naming (history-based element names) for fillet / chamfer / shell / hole selections and for imported faces; GVP attributes returned by the importer (comparison bands and GVP writing on export are 04 XCH);
+face-query kernel port for 02/03/05/06/07 (FR-KRN-18); assembly mass properties with instances; browser OCC in a Web Worker (web-only use); instancing of arbitrary exact parts in the viewport; cross-version regression gate |
 | **V2** | LOD tessellation ladder and lightweight proxies; streaming / lazy loading of large assemblies; ABC-sample stress tier; JT/glTF lightweight hand-off (with gap XCH); kernel-level parallelism (BOP parallel mode) |
 
 ### 4.2 Out of scope (owned elsewhere)
@@ -129,7 +130,8 @@ User stories (each maps to FRs):
 | FR-KRN-10 | MUST (MVP) | Regeneration SHALL be deterministic for a given kernel build (same plan → same topology signature); a regression gate SHALL re-run a reference corpus on every kernel change and report topology/measure drift with tolerance-based comparison across versions. | Upgrade safety; OCCT moves quarterly [R14] | R11, R12, R14 |
 | FR-KRN-11 | SHOULD (V1/V2) | Large assemblies: repeated parts SHALL share one exact definition and one display mesh (instancing); the viewport SHALL support levels of detail and lightweight proxies so that assemblies of 10⁴-10⁵ instances stay interactive (budgets in TECHNICAL_SPEC §8). | 747 ≈ 6 M parts [R25]; three.js InstancedMesh/BatchedMesh/LOD [R26] | R25, R26 |
 | FR-KRN-12 | MUST (MVP) | The machined-part feature chain (blank, pocket by boolean, corner/floor fillets, through holes, chamfers) SHALL produce exact, valid solids whose mass matches analytic values. | Use case U1 | validation VC-KRN-03 |
-| FR-KRN-13 | SHOULD (V1) | Exact STEP export SHALL carry product structure, names, colours and geometric validation properties (volume, area, centroid). | CAx-IF GVP practice | R21 |
+| FR-KRN-13 | SHOULD (V1) | Exact STEP export SHALL carry product structure, names, colours and geometric validation properties (volume, area, centroid). Delivered by 04 XCH `export_step_ap242` (FR-XCH-01/03/04) using KRN's `massProperties`; KRN keeps only the round-trip check VC-KRN-14. | CAx-IF GVP practice | R21; 04 XCH |
+| FR-KRN-18 | SHOULD (V1) | The exact kernel SHALL expose one optional face-query port (located faces, containment, face graph, surface parameters, projection / evaluation, curvature and distance analysis) that every other gap uses instead of its own kernel extension; Manifold reports it unavailable. | 02 / 03 / 05 / 06 / 07 each need face-level queries; one port avoids five divergent kernel APIs | TECHNICAL_SPEC §5.9 |
 | FR-KRN-14 | MUST (MVP) | Each document SHALL record the kernel and version that produced it (and per-step kernel when mixed), shown in document info and checked on load (warning on mismatch). | Traceability (feeds gap 09 PLM) | R11, R13 |
 | FR-KRN-15 | SHOULD (MVP) | Users SHALL be able to read and set the document modelling tolerance (linear, angular) within policy limits; import SHALL map STEP uncertainty to it. | STEP `read.precision.mode` / uncertainty | R5 |
 | FR-KRN-16 | MUST (MVP) | No silent faceting: when an exact operation falls back to triangles (capability gap) the result SHALL be flagged `faceted`, listed by `check_model`, and blocked from exact export unless the user accepts. | KI5 fallback exists today | KI5 |
@@ -159,7 +161,7 @@ llull --app validate_shape '{"ids":["<imported id>"]}'
 llull --app add_cylinder '{"radius":5,"height":200,"position":[0,0,-150]}'
 llull --app boolean '{"op":"subtract","a":"<imported id>","b":"<cylinder id>"}'
 llull --app mass_properties '{"entityId":"<result id>"}'
-llull --app export_step_exact '{"entityIds":["<result id>"],"validationProperties":true}' --save out/part.step
+llull --app export_step_ap242 '{"entityIds":["<result id>"],"includeValidationProperties":true}' --save out/part.step   # 04 XCH
 ```
 
 Each line is one command (same registry as the UI); the user sees each change live in the window and can undo.
@@ -207,6 +209,7 @@ Each line is one command (same registry as the UI); the user sees each change li
 | AC-16 | a saved document | it is reopened with a different OCCT build | a provenance warning names both versions; tolerance settings are kept and validated | VC-KRN-15 |
 | AC-17 | an exact recipe the active kernel cannot rebuild | it is loaded | the entity is flagged faceted, listed by `check_model`, blocked from exact export | VC-KRN-16 |
 | AC-18 | the command registry | the contract tests run | every KRN command is an MCP tool and CLI verb with happy/failure tests | VC-KRN-17 |
+| AC-19 | the analytic face fixtures (plane, cylinder r 10, sphere r 25) under OCC | `faceQuery` methods run | plane normal / centroid exact; cylinder radius 10 and k = 0.1 / 0; sphere k1 = k2 = 0.04, K = 0.0016; projection of (0,0,50) on the sphere at distance 25; Manifold: port absent | VC-KRN-18 |
 
 ### 7.1 Traceability (FR → VC → TR)
 
@@ -229,6 +232,7 @@ Each line is one command (same registry as the UI); the user sees each change li
 | FR-KRN-15 | VC-KRN-15 | TR-KRN-11 |
 | FR-KRN-16 | VC-KRN-16 | (KI5 fallback rule; `faceted` flag, §3 of TECHNICAL_SPEC) |
 | FR-KRN-17 | VC-KRN-17 | all commands of TECHNICAL_SPEC §4 |
+| FR-KRN-18 | VC-KRN-18 | TR-KRN-90, TR-KRN-91, TR-KRN-92 |
 
 Known-failing today (ratcheted like `quality/corpus.json` knownIssues): VC-KRN-07 (heuristic `edgesNear`),
 VC-KRN-04x (GVP disagreements in the source files), every VC that needs the OCC kernel while the desktop default

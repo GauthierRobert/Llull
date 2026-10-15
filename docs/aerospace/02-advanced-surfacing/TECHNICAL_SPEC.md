@@ -338,14 +338,16 @@ export interface EdgeContinuitySample { readonly t: number; readonly point: Vec3
   readonly normalCurvature: readonly [number, number]; readonly g3?: number }
 export interface EdgeCurveSample { readonly t: number; readonly s: number; readonly point: Vec3; readonly tangent: Vec3;
   readonly curvature: number; readonly dCurvatureDs: number; readonly torsion: number; readonly normal: Vec3 }
-export interface SurfaceAnalysisPort {
+// Merged into the single optional kernel face-query port owned by gap 01 (`FaceQueryPort`, `GeometryKernel.faceQuery?`,
+// TR-KRN-90..92, docs/aerospace/01-exact-brep-kernel/TECHNICAL_SPEC.md §5.9). The methods below keep these names there; this block states what SRF needs from it.
+export interface SurfaceAnalysisPort /* = subset of FaceQueryPort */ {
   faceSamples(shape: ShapeHandle, face: number, uv: ReadonlyArray<readonly [number, number]> | { nu: number; nv: number }): SurfaceSample[] | null;
   edgeSamples(shape: ShapeHandle, edge: number, count: number): EdgeCurveSample[] | null;       // κ, τ, comb
   edgeContinuity(shape: ShapeHandle, edge: number, count: number): EdgeContinuitySample[] | null;
   distance(shape: ShapeHandle, points: ReadonlyArray<Vec3>): Array<{ distance: number; signed: number; face: number }> | null;
   bspline(shape: ShapeHandle, face: number): NurbsSurfaceData | null;                            // inspect_nurbs
 }
-export interface GeometryKernel { /* … existing … */ readonly analysis?: SurfaceAnalysisPort }  // optional: Manifold omits it
+export interface GeometryKernel { /* … existing … */ readonly faceQuery?: FaceQueryPort }  // gap 01; optional: Manifold omits it
 ```
 
 `ShapeRecipe` additions (`model/types.ts`): `{ op: 'sew'; sources; tolerance; solid }`, `{ op: 'fill'; boundary:

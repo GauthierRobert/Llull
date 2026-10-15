@@ -945,6 +945,60 @@
    "tolerance": null,
    "unit": "-",
    "source": "requirement (TECHNICAL_SPEC); thresholds are policy values, not measured"
+  },
+  {
+   "vc": "VC-KRN-18",
+   "title": "face-query port on analytic faces",
+   "proves": [
+    "FR-KRN-18",
+    "TR-KRN-90",
+    "TR-KRN-91",
+    "TR-KRN-92"
+   ],
+   "value": {
+    "boxTopFace": {
+     "normal": [
+      0,
+      0,
+      1
+     ],
+     "centroid": [
+      50.0,
+      25.0,
+      20.0
+     ]
+    },
+    "cylinderSide": {
+     "radius": 10,
+     "absPrincipalCurvatures": [
+      0.1,
+      0.0
+     ]
+    },
+    "sphere": {
+     "absPrincipalCurvatures": [
+      0.04,
+      0.04
+     ],
+     "gaussianK": 0.0016,
+     "absMeanH": 0.04,
+     "projectionOf_0_0_50": {
+      "point": [
+       0.0,
+       0.0,
+       25.0
+      ],
+      "distance": 25.0
+     }
+    },
+    "manifold": "faceQuery absent"
+   },
+   "tolerance": {
+    "abs": 1e-09,
+    "curvatureRel": 1e-09
+   },
+   "unit": "mm, 1/mm, 1/mm^2",
+   "source": "analytic (b): plane normal and face centroid of box-100x50x20 (min corner at origin); cylinder principal curvatures 1/r and 0; sphere k1 = k2 = 1/r, K = 1/r^2, H = 1/r (signs depend on the face orientation convention, so magnitudes are compared); closest point of an external point on a sphere is along the radius"
   }
  ]
 }

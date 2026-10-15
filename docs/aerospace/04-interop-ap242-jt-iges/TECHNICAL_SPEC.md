@@ -27,7 +27,7 @@ src/ui (Import/Export dialogs, Validation badge, report table)      server/ + de
         │ dispatch(name, params)                                           │ read file → params; write data → file
         ▼                                                                  ▼
 packages/core/src/commands/exchange/   (Lane 1)                    packages/mcp/src/exchangeTools.ts (host tools: path/base64 plumbing only)
-   export_step_ap242   import_step_exact   export_iges   import_iges
+   export_step_ap242   import_step_exact (owned by 01 KRN; extended here)   export_iges   import_iges
    verify_exchange_file (query)   geometric_validation_properties (query)
 packages/<aero plugin>/src/exchange/   (domain: LOTAR, QIF)  create_archive_package / verify_archive_package / export_qif
         │ ctx.kernel (requiresKernel)
@@ -56,7 +56,7 @@ server/python/llull_bridge.py (OCP STEPCAFControl / IGESCAFControl)             
 | Runtime | Where | Status | Use |
 | ------- | ----- | ------ | --- |
 | opencascade.js custom build with XDE toolkits | browser, server worker, desktop | target | All XCH commands as registry commands; offline in the browser too. Custom builds are a supported opencascade.js workflow (YAML list of bindings, e.g. `STEPCAFControl_Reader`, `XCAFDoc_ShapeTool`, `TDocStd_Document`) [R24]; an OCCT 8.0.1 WASM STEPCAF reader with `XCAFDoc_DimTolTool` exists (LGPL-2.1) [R26] |
-| OCP (CadQuery) in bundled CPython | desktop app, server with `LLULL_PYTHON` | interim (MVP fallback) | Same operations implemented in `llull_bridge.py` (`op_export_xde`, `op_import_xde`, `op_gvp`); exposed through the host exchange tools while the WASM build lands. Same JSON contract as §2.3 so the swap is invisible to callers |
+| OCP (CadQuery) in bundled CPython | desktop app, server with `LLULL_PYTHON` | interim (MVP fallback) | Write side implemented in `llull_bridge.py` (`op_export_xde`, `op_gvp`); exposed through the host exchange tools while the WASM build lands, same JSON contract as §2.3. The read side follows 01 KRN's `importShapes` (01 TECHNICAL_SPEC Q1 / TR-KRN-05) |
 
 Decision needed (Q1): keep both (WASM primary, Python fallback) or Python-only on desktop. Recommendation: WASM
 primary because it keeps XCH commands pure registry commands reachable from every caller (L1), with the Python path
@@ -64,19 +64,20 @@ as the escape hatch for features OCC-WASM cannot do in time (e.g. GD&T export).
 
 ### 2.3 Kernel interface extension (core, `packages/core/src/geometry/kernel.ts`)
 
-`exportStep(shapes)` stays for backwards compatibility. Add an **exchange port** (optional members; Manifold returns
-`null`, as it does for `exportStep`):
+Ownership (decided 2026-10-15, see 01 KRN TECHNICAL_SPEC §2.0): **01 KRN** owns the read side and the mass properties —
+`GeometryKernel.importShapes(format: 'step' | 'iges', bytes, options)` (healed definitions as BRep blobs, the XDE
+product tree, names, colours, embedded GVP attributes in file units, file length unit; 01 TR-KRN-20/23), the `brep` blob
+recipe leaf + `heal` node (01 §3), and the single `massProperties(handle, { eps, reference })` method returning volume,
+area, centroid, inertia **and the optimal bbox** this pack needs (01 TR-KRN-40). XCH defines **no** `readExchange`, no
+`MassProps` of its own and no `imported` recipe leaf: an `imported` leaf keyed only by the file sha256 would hold no
+payload and could not re-evaluate after reload. Imported solids (STEP and IGES) carry 01's `brep` blob leaf.
+
+`exportStep(shapes)` stays for backwards compatibility. XCH adds only the **write** side (optional member; Manifold
+returns `null`, as it does for `exportStep`):
 
 ```ts
 export type StepSchema = 'ap242' | 'ap214' | 'ap203';
 export type TessellationMode = 'off' | 'alongside' | 'only';
-
-export interface MassProps {
-  readonly volume: number;                 // document units^3; 0 for open shells
-  readonly area: number;                   // sum of face areas, document units^2
-  readonly centroid: Vec3;                 // volume centroid (solids) or area centroid (shells)
-  readonly bbox: readonly [number, number, number, number, number, number]; // optimal box (BRepBndLib::AddOptimal)
-}
 
 /** XDE-like tree handed to the writer: products own shapes, occurrences place products. */
 export interface ExchangeProduct {
@@ -105,54 +106,38 @@ export interface ExchangeWriteRequest {
   readonly pmi?: readonly ExchangePmi[];   // gap 03 objects, V1
   readonly header: { readonly fileName: string; readonly originatingSystem: string; readonly author?: string; readonly timestamp: string };
 }
-export interface ExchangeReadResult {
-  readonly unit: DocumentUnit | 'unknown';
-  readonly schemaName: string | null;
-  readonly products: readonly (Omit<ExchangeProduct, 'shapes' | 'writeValidationProperties'> & {
-    readonly shapes: readonly ShapeHandle[];
-    readonly embeddedGvp?: readonly EmbeddedGvp[];
-  })[];
-  readonly occurrences: readonly ExchangeOccurrence[];
-  readonly tessellated: readonly { readonly product: string; readonly mesh: MeshData }[];
-  readonly pmi: readonly ExchangePmi[];    // V1
-  readonly messages: readonly string[];    // untranslated entity types, healing notes
-}
 
 export interface GeometryKernel {
-  // … existing members …
-  massProperties?(shape: ShapeHandle): MassProps | null;
+  // … existing members; importShapes / massProperties / faceQuery from 01 KRN …
   writeExchange?(request: ExchangeWriteRequest): string | null;   // Part 21 / IGES text
-  readExchange?(format: 'step' | 'iges', text: string, options: { sew: boolean; tessellated: boolean }): ExchangeReadResult | null;
 }
 ```
 
-Handles minted by `readExchange` carry an `import` recipe leaf (`ShapeRecipe` op `imported`, keyed by the file
-sha256 + product key) so they re-evaluate after eviction (KI5 rule: a handle stays valid). This recipe leaf is
-shared with gap 01 KRN (Q3) — XCH must not define a competing one.
+GVP values written by `writeExchange` come from 01's `massProperties` (volume, area, centroid, bbox).
 
 ### 2.4 Technical requirements
 
 | Id | Prio | Requirement | FR | VC |
 | -- | ---- | ----------- | -- | -- |
 | TR-XCH-01 | MUST | `GeometryKernel.writeExchange` writes STEP with a selectable schema (AP242DIS / AP214IS / AP203 OCC values) through an XDE document; OCC kernel implements it, Manifold returns null | FR-XCH-01 | VC-XCH-01, -03 |
-| TR-XCH-02 | MUST | `GeometryKernel.massProperties` returns volume, area, centroid, optimal bbox from the exact B-rep; mesh fallback (signed tetrahedra) flagged `method:'mesh'` | FR-XCH-02, -03 | VC-XCH-01 |
+| TR-XCH-02 | MUST | `geometric_validation_properties` reads volume, area, centroid, optimal bbox from 01 KRN's `GeometryKernel.massProperties` (TR-KRN-40, owned by 01); mesh fallback (signed tetrahedra) flagged `method:'mesh'` | FR-XCH-02, -03 | VC-XCH-01 |
 | TR-XCH-03 | MUST | No file I/O, network or clock in core commands: content in/out via params/`data`; host passes `sha256`, `timestamp` | FR-XCH-21, -22 | all |
 | TR-XCH-04 | MUST | Output profile §6.1 (header, FILE_SCHEMA, one PRODUCT per component/free solid) | FR-XCH-01 | VC-XCH-03 |
 | TR-XCH-05 | MUST | REAL values written with ≥ 15 significant digits; same document + timestamp ⇒ byte-identical file | FR-XCH-02 | VC-XCH-01, -03 |
 | TR-XCH-06 | MUST | GVP (volume, surface area, centre point; bbox SHOULD; assembly GVP) written per CAx-IF GVP RP using XCAF validation attributes | FR-XCH-03 | VC-XCH-02 |
 | TR-XCH-07 | MUST | Components ↔ PRODUCT, instances ↔ NEXT_ASSEMBLY_USAGE_OCCURRENCE with rigid placement; names, colours via XCAF (retire `stepLabels.ts` regex) | FR-XCH-04 | VC-XCH-04 |
-| TR-XCH-08 | MUST | `readExchange` + `import_step_exact`: exact solids, assembly tree, provenance with embedded GVP, comparison bands §5.3, never blocking | FR-XCH-05, -06 | VC-XCH-05, -06 |
+| TR-XCH-08 | MUST | Extension of 01 KRN's `import_step_exact` (command, reader `importShapes`, `brep` blob leaf, healing and report owned by 01): XDE product tree → components / instances, provenance with embedded GVP, comparison bands §5.3, never blocking | FR-XCH-05, -06 | VC-XCH-05, -06 |
 | TR-XCH-09 | SHOULD | Semantic PMI import mapping §5.4 with text-level magnitude cross-check; every census record mapped or reported | FR-XCH-07 | VC-XCH-07 |
 | TR-XCH-10 | SHOULD | Semantic PMI export (schema forced to AP242) with graphic presentation | FR-XCH-08 | VC-XCH-08 |
 | TR-XCH-11 | SHOULD | Tessellated read (`read.step.tessellated`=1/2) → mesh entities; write modes 'alongside'/'only' | FR-XCH-09 | VC-XCH-09 |
-| TR-XCH-12 | MUST | IGES read with sewing at max(file resolution, 1e-6·diag) and untranslated-type census; IGES calls serialised | FR-XCH-10 | VC-XCH-10 |
+| TR-XCH-12 | MUST | IGES read through 01 KRN's `importShapes(format: 'iges', …)`, healed solids stored in the same `brep` blob leaf; sewing at max(file resolution, 1e-6·diag) and untranslated-type census; IGES calls serialised | FR-XCH-10 | VC-XCH-10 |
 | TR-XCH-13 | SHOULD | IGES 5.3 write, B-rep mode default, faces mode optional | FR-XCH-11 | VC-XCH-11 |
 | TR-XCH-14 | MUST | Exact unit factors on import/export and on embedded GVP before comparison | FR-XCH-12 | VC-XCH-12 |
 | TR-XCH-15 | SHOULD | Archive package layout §6.3; verify recomputes sha256 + GVP vs manifest | FR-XCH-13, -14 | VC-XCH-13 |
 | TR-XCH-16 | MUST | Robustness budgets §8: size limit before parse, guarded OCC calls, WASM memory released, no throw out of a command | FR-XCH-15 | VC-XCH-14 |
 | TR-XCH-17 | SHOULD | NIST SFA analysis of every llull-written AP242 gate file (0 syntax errors) | FR-XCH-18 | VC-XCH-17 |
 | TR-XCH-18 | MUST | Independent pure-TS Part 21 reader (`packages/core/src/lib/step21/`): tokenizer, record map, GVP extraction, entity census — port of `validation/extract_validation_properties.py`, tested against its JSON output | FR-XCH-06, -18 | VC-XCH-02, -05, -07 |
-| TR-XCH-19 | MUST | `export_step_exact` kept as an alias (AP214, flat, no GVP) so existing plans and tools are unchanged | FR-XCH-21 | VC-XCH-03 |
+| TR-XCH-19 | MUST | `export_step_exact` stays a registered command delegating to the `export_step_ap242` implementation (AP214, flat, no GVP) so existing plans and tools are unchanged | FR-XCH-21 | VC-XCH-03 |
 
 ## 3. Data model
 
@@ -204,12 +189,13 @@ export interface CadDocument {
 ```
 
 - Products → `Component` (existing `doc.components`), occurrences → `InstanceEntity` (existing
-  `insert_instance`), leaf solids → `mesh` entities with `brep` = imported recipe leaf (KI5).
+  `insert_instance`), leaf solids → `mesh` entities with `brep` = 01 KRN's `brep` blob leaf (+ `heal` node) (KI5).
 - PMI → gap-03 model (`doc.pmi`, owned by 03). XCH defines only the mapping (§5.4).
 - Ids: `stp-<step>.<k>` for imported entities, `comp-stp-<step>.<k>` for components (step-scoped, replay-stable, L8).
 - Timestamp: commands never call `Date.now()`; hosts pass `timestamp` for export headers (deterministic tests).
-- Document version: bump the persistence minor version; loading an older file needs no migration (fields optional).
-  Snapshot/recipe validation (KI5) extends to the `imported` leaf: sha256 hex, product key string.
+- Document version: `exchange` is one slice of the single `llull-document` v3 envelope owned by 01 KRN
+  (01 TECHNICAL_SPEC §3.1, one v2 → v3 migration; the slice itself is optional and needs no data migration).
+  Recipe validation of the `brep` leaf is 01's (blob exists, sha256 matches).
 
 ## 4. Commands
 
@@ -217,8 +203,8 @@ export interface CadDocument {
 | ---- | ---- | ------- | ------------------- | ---- |
 | `geometric_validation_properties` | query, `requiresKernel` | measure | `{ entityIds?: string[], includeAssemblies?: boolean }` | `{ unit, items: [{ id, name, volume, area, centroid, bbox, method:'brep'|'mesh' }], assemblies?: [...] }` |
 | `export_step_ap242` | query, `requiresKernel` | exchange | `{ entityIds?: string[], schema?: 'ap242'|'ap214'|'ap203' (default 'ap242'), includeValidationProperties?: boolean (true), assembly?: 'structured'|'flat' ('structured'), tessellation?: 'off'|'alongside'|'only' ('off'), includePmi?: boolean (true), fileName?: string, timestamp?: string }` | `{ format:'step', schema, step, products, occurrences, gvp:[…], selfCheck: GvpCheck, skipped }` |
-| `import_step_exact` | mutating, `requiresKernel` | exchange | `{ text: string, fileName?: string, sha256?: string, mode?: 'append'|'replace', sew?: boolean, tessellated?: boolean (true), verify?: boolean (true), gvpPolicy?: Partial<GvpPolicy> }` | `{ products, entities, components, gvpCheck, messages }` |
-| `verify_exchange_file` | query (kernel optional) | exchange | `{ text: string, format?: 'step'|'iges', gvpPolicy?: … }` | `{ schemaName, unit, census, embeddedGvp, recomputed?: MassProps[], comparisons, band, messages }` — without a kernel: census + embedded GVP only |
+| `import_step_exact` (owned by 01 KRN; this row = XCH extension) | mutating, `requiresKernel` | exchange | 01's params (`stepBase64` \| `text` \| `blobId`, `fileName`, `heal`, `sew`, `precisionMode`, `keepOriginal`, `name`) **+** `sha256?: string`, `mode?: 'append'|'replace'`, `tessellated?: boolean (true)`, `verify?: boolean (true)`, `gvpPolicy?: Partial<GvpPolicy>` | 01's `report` **+** `{ products, components, gvpCheck, messages }` |
+| `verify_exchange_file` | query (kernel optional) | exchange | `{ text: string, format?: 'step'|'iges', gvpPolicy?: … }` | `{ schemaName, unit, census, embeddedGvp, recomputed?: { volume, area, centroid, bbox }[] (01 `massProperties`), comparisons, band, messages }` — without a kernel: census + embedded GVP only |
 | `export_iges` | query, `requiresKernel` | exchange | `{ entityIds?: string[], mode?: 'brep'|'faces' ('brep'), fileName?, timestamp? }` | `{ format:'iges', iges, solidCount, selfCheck }` |
 | `import_iges` | mutating, `requiresKernel` | exchange | `{ text, fileName?, sha256?, sew?: boolean (true), mode? }` | `{ entities, openShells, untranslated: Record<type,count> }` |
 | `create_archive_package` | query, `requiresKernel` | aero (plugin) | `{ entityIds?: string[], partNumber: string, revision: string, timestamp: string }` | `{ files: [{ name, text, sha256 }], manifest }` (host writes them) |
@@ -246,7 +232,8 @@ Tags (C2) for the two central commands:
 export const exportStepAp242 = defineCommand({ name: 'export_step_ap242', annotations: { readOnly: true, requiresKernel: true }, … });
 
 /**
- * @affects creates 1 mesh entity per imported solid (brep = imported recipe leaf), 1 component per product with
+ * (owned by 01 KRN; tags below describe the XCH extension)
+ * @affects creates 1 mesh entity per imported solid (brep = 01 KRN `brep` blob leaf), 1 component per product with
  *   children, 1 instance per occurrence; sets doc.exchange.provenance for each product
  * @invariant ids are step-scoped (stp-<step>.<k>); units converted to doc.units; a yellow/red GVP never blocks
  * @failure empty/garbage/truncated text, no kernel, reader returned nothing translatable -> no-op, summary names the cause
@@ -254,9 +241,10 @@ export const exportStepAp242 = defineCommand({ name: 'export_step_ap242', annota
 export const importStepExact = defineCommand({ name: 'import_step_exact', annotations: { requiresKernel: true }, … });
 ```
 
-Host plumbing (`packages/mcp/src/exchangeTools.ts`, CLI): `path` / `stepBase64` → `text` (Latin-1 decode; Part 21
-is 7-bit ASCII with `\X2\` escapes), host computes `sha256` and passes it; `--save` writes `data.step`. The existing
-`import_step` (mesh) stays as the fallback when no exact kernel is installed.
+Host plumbing (`packages/mcp/src/exchangeTools.ts`, CLI): `path` / `file=` → `stepBase64` or `text` (Latin-1 decode;
+Part 21 is 7-bit ASCII with `\X2\` escapes), host computes `sha256` and passes it; `--save` writes `data.step`. The
+existing `import_step` host tool gains `mode: 'exact' | 'mesh'` (01 KRN §4) and keeps the mesh path as the fallback
+when no exact kernel is installed.
 
 ## 5. Kernel / algorithms
 
@@ -305,11 +293,21 @@ red    : otherwise
 not-checkable : sender GVP all zero (placeholder, NIST STC-06) or absent
 ```
 
-Bands are configurable per command call (`gvpPolicy`) and per document setting (V1). Justification: the CAx-IF uses
-a three-tier result system [R13]; the only numeric default we could verify is CATIA's (1 % volume/area, 1 mm
-centroid) [R14]; the measured spread between two different CAD systems exporting NIST CTC-02 is 1.12e-4 (volume),
-4.93e-4 (solid area) and 0.018 mm (centroid) (`validation/expected_results.json` VC-XCH-06), so green at 1e-3 accepts
-genuine inter-CAD differences while flagging anything an order of magnitude worse.
+This is llull's **single** GVP band policy (01 KRN's import defers to it; KRN's VC-KRN-04 tolerances are test
+tolerances only). Bands are configurable per command call (`gvpPolicy`) and per document setting (V1).
+
+Justification:
+- the CAx-IF uses a three-tier result system [R13]; the only numeric default we could verify is CATIA's (1 %
+  volume/area, 1 mm centroid) [R14] → **yellow**;
+- **green** (one order tighter) is checked against measured data: OCCT 7.9.3 recomputation vs the GVP written by the
+  originating CAD systems in the pinned NIST files (01 KRN `validation/nist_gvp_vs_occt.json`, reproduced in review).
+  The 6 files whose GVP describe their geometry (CTC-01 e1, CTC-03 e2, CTC-04 e2, FTC-06 e2, STC-10 e2, FTC-09 rd)
+  differ by at most 7.5e-5 (volume), 9.4e-4 (area, CTC-04 e2) and 0.0064 mm (centroid): all green. The 4 gross
+  disagreements (CTC-02 rc and e2, STC-08 e3, CTC-05 rd after inch conversion: ≥ 1.06e-2 volume) are red;
+- CTC-04's area delta sits 6 % under the green limit, so green must not be tightened without new evidence. FTC-07 e2
+  (2.1e-4 volume, 3.9e-5 area, 0.021 mm) is green under these bands although 01's stricter test tolerance flags it;
+- VC-XCH-06 (CTC-02 AP203 vs AP242, 1.12e-4 / 4.93e-4 / 0.018 mm) compares two senders' GVP with each other; the two
+  files' geometries differ by 5.2 % in OCCT volume, so it is **not** used as justification.
 
 ### 5.4 Semantic PMI mapping (V1, with gap 03)
 
@@ -342,7 +340,8 @@ with a text re-read workaround) [R25]. TR-XCH-09 therefore requires a text-level
 | Quantity | Tolerance | Why |
 | -------- | --------- | --- |
 | Same-kernel round trip (export → import, OCC → OCC) | 1e-9 relative (V, A), 1e-9 · diag (centroid) | Only REAL serialization intervenes; TR-XCH-05 requires ≥ 15 significant digits (Q5 if OCC writes fewer) |
-| Model vs analytic | 1e-6 relative | Gauss integration error of `BRepGProp` on analytic surfaces |
+| Model vs analytic | 1e-9 relative | Gauss integration error of `BRepGProp` on analytic surfaces: ≤ 1.1e-14 measured with OCCT 7.9.3 (01 KRN `occt_crosscheck.json`); same as VC-KRN-01 |
+| IGES export → import | 1e-6 relative (provisional) | solids rebuilt by sewing; replace with a measured bound after VC-XCH-11 |
 | Import vs embedded GVP | bands §5.3 | Different CAD kernels/tessellations |
 | Tessellated vs exact | 5e-3 relative (provisional) | Facet chord error; replace with measured bound after VC-XCH-09 |
 | Sewing | max(file resolution, 1e-6 · diag) | IGES files carry their own resolution |
@@ -394,7 +393,7 @@ archive process itself (EN 9300-002 requirements) is the organisation's.
 | Surface | Change |
 | ------- | ------ |
 | UI (`src/ui`, Lane 2) | File › Import STEP/IGES dialog (append/replace, sew, verify); Export dialog (schema, GVP, PMI, tessellation, assembly); Validation badge per product in the Assembly panel; report table component (sender / llull / delta / band); Archive package dialogs (V1). Param-gathering only — dispatches the commands. |
-| CLI (`server/src/cli`) | `file=<path>` → `text` for `import_step_exact`, `import_iges`, `verify_exchange_file`; `--save` for exports; `--save-dir` for `create_archive_package` (writes `data.files`); non-zero exit code (1, as for a failed command; 2 stays "bad usage") when `data.band === 'red'` (US-4). |
+| CLI (`server/src/cli`) | `file=<path>` → `text` for `import_step_exact`, `import_iges`, `verify_exchange_file`; `--save` for exports; `--save <dir>` for `create_archive_package` (the existing `--save` already writes a directory for multi-file results such as sheets / `export_nc_files`; it writes `data.files`); `verify_archive_package` gets its `{ manifest, files }` from a new CLI `dir=<path>` mapping that reads `manifest.json` and the listed files (host-side, like `file=`); non-zero exit code (1, as for a failed command; 2 stays "bad usage") when `data.band === 'red'` (US-4). |
 | MCP (`packages/mcp`, Lane 4) | New tools appear automatically from the registry (exchange toolset). Host tools `import_step` / `export_step` keep their Python paths; add `path`/`stepBase64` plumbing for the new commands as for `import_dwg`. Toolset entry in `packages/mcp/src/toolsets.ts` (exchange, measure) + a new `aero` name in `TOOLSET_NAMES` for the plugin commands (as `building` / `civil`). |
 | Desktop | File menu entries; bundled Python gets the interim `op_*_xde` operations; `LLULL_JT_CONVERTER` documented (V2). |
 
@@ -434,13 +433,13 @@ Coverage gate 90/85/90/90 applies to `packages/core/src/commands/exchange/**` an
 
 | Milestone | Content | Depends on | Effort (eng-weeks) |
 | --------- | ------- | ---------- | ------------------ |
-| M0 Spike | Verify opencascade.js 1.1.1 bindings; build custom ocjs with TKDESTEP/TKDEIGES/TKXCAF (OCCT ≥ 7.8 names; 7.4 splits them into TKSTEP*/TKXDESTEP/TKIGES/TKXDEIGES); size/perf report | 01 KRN spike | 1.5 |
-| M1 GVP | `massProperties` kernel member + `geometric_validation_properties` query; TS Part 21 verifier (`lib/step21`) | — | 1.5 |
-| M2 AP242 export | `writeExchange` (XDE), `export_step_ap242`, assembly structure, GVP write, self-check; alias `export_step_exact` | M0, M1 | 3 |
-| M3 Exact import + verify | `readExchange`, `import_step_exact`, provenance, bands, `verify_exchange_file`; NIST gate | M0, 01 KRN imported recipe leaf | 3 |
-| M4 IGES | `import_iges` (sewing, census), `export_iges` | M0 | 2 |
+| M0 Binding list | XCH's class list (XCAF writer, IGES, GD&T) handed to 01 KRN M2, which owns the single custom OCCT 7.9.x build (TKDESTEP/TKDEIGES/TKXCAF; OCCT ≥ 7.8 names, 7.4 splits them into TKSTEP*/TKXDESTEP/TKIGES/TKXDEIGES); verify the bindings in that build | 01 KRN M2 | 0.5 |
+| M1 GVP (merged with 01 KRN M3, owner of `massProperties`) | `geometric_validation_properties` query over 01's `massProperties`; TS Part 21 verifier (`lib/step21`) | 01 KRN M3 | 1 |
+| M2 AP242 export | `writeExchange` (XDE), `export_step_ap242`, assembly structure, GVP write, self-check; `export_step_exact` delegating; also delivers 01 KRN FR-KRN-13 / TR-KRN-80 | M0, M1 | 3 |
+| M3 Import verify (merged with 01 KRN M4, owner of `import_step_exact`, `importShapes`, `brep` leaf) | extension of `import_step_exact`: XDE product tree → components / instances, provenance, bands, `verify_exchange_file`; NIST gate | 01 KRN M4 | 2.5 |
+| M4 IGES | `import_iges` (through 01's `importShapes`, `brep` leaf; sewing, census), `export_iges` | M0, 01 KRN M4 | 2 |
 | M5 UI/CLI/MCP | dialogs, badge, report table, CLI exit codes, toolsets | M2–M4 | 2 |
-| MVP total | | | **13** |
+| MVP total | | | **11** (was 13: the custom build, `massProperties` and the reader moved to 01 KRN M2 / M3 / M4) |
 | V1 | PMI import/export (with 03), tessellated, layers/materials, archive package + verify, SFA gate | 03 GDT | 8 |
 | V2 | QIF export, JT converter port, composites/kinematics mapping, AP242 XML read | 06 CMP | 6 |
 
@@ -450,7 +449,7 @@ Coverage gate 90/85/90/90 applies to `packages/core/src/commands/exchange/**` an
 | -- | -------- | -------------- |
 | Q1 | XCH on opencascade.js custom build (all callers) vs OCP Python bridge (desktop only)? | Custom build primary; Python interim |
 | Q2 | JT: external converter only, or license a JT toolkit? | Converter port; no in-house parser |
-| Q3 | Who owns the `imported` `ShapeRecipe` leaf and STEP → B-rep import? | Gap 01 KRN owns; XCH consumes |
+| Q3 | Who owns STEP → B-rep import and its recipe leaf? | **Decided**: 01 KRN owns `import_step_exact`, `importShapes` and the `brep` blob leaf; XCH extends the command (verify, provenance, product tree) and defines no leaf of its own |
 | Q4 | Plugin name for LOTAR/QIF (`packages/domain-aero`?) shared with 03/09 | Align with 09 PLM before M5 |
 | Q5 | Digits of REAL values written by OCC (does it guarantee round-trip precision)? | Measure in M0; if < 15 digits relax same-kernel tolerance to 1e-7 |
 | Q6 | Exact AP242 object identifier written by the OCC version we ship | Record in golden; document in CAD_EXCHANGE.md |

@@ -34,9 +34,10 @@ copied (sizes 0.2–6 MB, and NIST states they are *not* error-free reference fi
 
 | Comparison | Volume / area | Centroid | Basis |
 | ---------- | ------------- | -------- | ----- |
-| llull model vs analytic closed form | 1e-6 relative | 1e-6 × bbox diagonal | `BRepGProp` integration on exact analytic surfaces |
+| llull model vs analytic closed form | 1e-9 relative | 1e-9 × bbox diagonal | `BRepGProp` integration on exact analytic surfaces (≤ 1.1e-14 measured, 01 KRN `occt_crosscheck.json`; same as VC-KRN-01) |
+| IGES export → import (sewing) | 1e-6 relative (provisional) | 1e-6 × diagonal | solids rebuilt by sewing (TR-XCH-12); replace by a measured bound after VC-XCH-11 |
 | llull export → llull import (same OCC) | 1e-9 relative | 1e-9 × diagonal | only REAL serialization (≥ 15 digits, TR-XCH-05) |
-| llull import vs GVP embedded by another CAD | green ≤ 1e-3; yellow ≤ 1e-2; red beyond | green ≤ 1e-3 × diagonal; yellow ≤ 1 mm | yellow = CATIA default (1 %, 1 mm) [R14]; CAx-IF three-tier results [R13]; green checked against measured cross-CAD spread (VC-XCH-06) |
+| llull import vs GVP embedded by another CAD | green ≤ 1e-3; yellow ≤ 1e-2; red beyond | green ≤ 1e-3 × diagonal; yellow ≤ 1 mm | yellow = CATIA default (1 %, 1 mm) [R14]; CAx-IF three-tier results [R13]; green checked against the measured sender-vs-OCCT agreement of the 6 NIST files whose GVP match their geometry (≤ 7.5e-5 volume, ≤ 9.4e-4 area, ≤ 0.0064 mm — 01 KRN `nist_gvp_vs_occt.json`); the 4 gross disagreements (≥ 1.06e-2 volume) are red. Single band policy of llull (01 KRN defers to it) |
 | Tessellated vs exact | 5e-3 relative (provisional) | — | to be replaced by a measured bound (VC-XCH-09) |
 
 Measured cross-CAD spread on NIST CTC-02 (two different CAD systems, AP203 `_rc` vs AP242 `-e2`), computed from the
@@ -49,8 +50,8 @@ geometric one.
 
 | VC | Proves | Input | Expected (abridged) | Tol. | Source | Gate |
 | -- | ------ | ----- | ------------------- | ---- | ------ | ---- |
-| VC-XCH-01 | FR-01, FR-02, TR-01, TR-05 | 9 analytic plans | per `analytic_gvp_reference.json`, e.g. box 120000 mm³ / 18400 mm²; torus 14804.406601634037 / 5921.762640653615 | 1e-6 vs analytic; 1e-9 round trip | analytic | unit (OCC) |
-| VC-XCH-02 | FR-03, TR-06, TR-18 | plate, offset hole | GVP in file: V 113716.81469282041, A 19028.31853071796, c (−1.3813228334244487, 0, 0) | 1e-6 | analytic | unit |
+| VC-XCH-01 | FR-01, FR-02, TR-01, TR-02, TR-05 | 9 analytic plans | per `analytic_gvp_reference.json`, e.g. box 120000 mm³ / 18400 mm²; torus 14804.406601634037 / 5921.762640653615 | 1e-9 vs analytic; 1e-9 round trip | analytic | unit (OCC) |
+| VC-XCH-02 | FR-03, TR-06, TR-18 | plate, offset hole | GVP in file: V 113716.81469282041, A 19028.31853071796, c (−1.3813228334244487, 0, 0) | 1e-9 | analytic | unit |
 | VC-XCH-03 | FR-01, TR-04, TR-19 | any export | FILE_SCHEMA `AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF…`; implementation level `2;1`; byte-identical for same timestamp | exact | NIST file headers [R4] | golden |
 | VC-XCH-04 | FR-04, TR-07 | `xch-assembly-2x`, `as1-oc-214`, `red-cube-blue-cylinder` | 1 product / 2 occurrences, V 2000, c (50,0,0); 18 placed parts; names+colours kept | exact / 1e-9 | analytic; quality corpus | unit + quality |
 | VC-XCH-05 | FR-05, FR-06, TR-08 | 7 NIST AP242 files with GVP + STC-06 | embedded GVP e.g. CTC-01 V 14644822.6361138 mm³, A 807080.802199914 mm², c (−2.2926, −1.3635, −32.2974); STC-06 → not-checkable; CTC-02 e2 and STC-08 e3 embedded GVP disagree with the OCCT-recomputed geometry (01 KRN, measured) → expected red, reported, import succeeds | green band (except knownIssue entries) | NIST files | quality `step-ap242` |
@@ -58,15 +59,15 @@ geometric one.
 | VC-XCH-07 | FR-07, TR-09 | CTC-01..05, FTC-06, STC-06/08 | census, e.g. CTC-01: 3 DATUM, 9 DIMENSIONAL_SIZE, 2 DIMENSIONAL_LOCATION, 1 ANGULAR_LOCATION, tolerances 1 flatness, 1 perpendicularity, 2 position, 2 surface profile | all accounted | NIST census; SFA report | quality (V1) |
 | VC-XCH-08 | FR-08, TR-10 | toleranced llull part (gap 03) | identical PMI after round trip; SFA semantic PMI clean | exact | PMI RP v4.1 [R12] | unit + SFA (V1) |
 | VC-XCH-09 | FR-09, TR-11 | FTC-08 `-e4-tg` | 1 tessellated solid → 1 non-empty mesh; triangle count TBD — measure with OCC | provisional | NIST census/README | quality (V1) |
-| VC-XCH-10 | FR-10, TR-12 | OCCT `bearing.iges`, `hammer.iges` | ≥ 213 / ≥ 45 faces (type-144 roots); area TBD — measure with OCC | — | file census; OCC guide [R7] | quality `iges-import` |
-| VC-XCH-11 | FR-11, TR-13 | plate + L-bracket | analytic GVP after IGES round trip | 1e-6 | analytic | unit |
-| VC-XCH-12 | FR-12, TR-14 | inch box; CTC-05 AP203 (inch) | 131096.512 mm³ / 18064.48 mm² / z 12.7 mm; CTC-05: 12694914.68692222 mm³, 861242.9165391091 mm² | 1e-6; band | analytic; NIST × 25.4^k | unit + quality |
+| VC-XCH-10 | FR-10, TR-12 | OCCT `bearing.iges`, `hammer.iges` | ≥ 213 / ≥ 45 faces (type-144 roots; a review run with OCP 7.9.3 `IGESControl_Reader` read exactly 213 / 45 — to be recorded by a script in this folder before it becomes `=`); area TBD — measure with OCC (unit setting to pin) | — | file census; OCC guide [R7] | quality `iges-import` |
+| VC-XCH-11 | FR-11, TR-13 | plate + L-bracket | analytic GVP after IGES round trip | 1e-6 (provisional, `igesRoundTrip`) | analytic | unit |
+| VC-XCH-12 | FR-12, TR-14 | inch box; FTC-09 AP203 (inch); CTC-05 AP203 (inch, secondary) | 131096.512 mm³ / 18064.48 mm² / z 12.7 mm; FTC-09: 136445.10481135413 mm³, 96614.23380695238 mm², c (2.1859, 1.5150, 4.5543) mm → green (OCCT agrees to 1e-10 after × 25.4^k); CTC-05: converted GVP 12694914.68692222 mm³ still 1.06e-2 from the geometry → red | 1e-9; band | analytic; NIST × 25.4^k; 01 KRN measurement | unit + quality |
 | VC-XCH-13 | FR-13, FR-14, TR-15 | L-bracket package | sha256 match; V 56000, A 14800, c (25,20,20) on retrieval | 1e-9 | analytic | unit (V1) |
 | VC-XCH-14 | FR-15, TR-16 | truncated / garbage / oversize / zero-GVP | no-op + summary; never throws | — | llull L1 | unit fuzz |
 | VC-XCH-15 | FR-16 | JT sample | TBD — no openly licensed sample pinned | — | ISO 14306 [R5] | V2 |
 | VC-XCH-16 | FR-17 | toleranced part | QIF XML validates vs QIF 3.0 XSD; characteristic count = PMI count | — | ISO 23952 [R6] | V2 |
 | VC-XCH-17 | FR-18, TR-17 | VC-01..04 outputs | SFA: 0 syntax errors, GVP listed | exact | SFA [R10] | production (gate machine) |
-| VC-XCH-18 | FR-19 | plate + steel material + layer | density 0.00785 g/mm³ kept; mass 892.6769953386402 g; layer kept | 1e-6 | analytic | unit |
+| VC-XCH-18 | FR-19 | plate + steel material + layer | density 0.00785 g/mm³ kept; mass 892.6769953386402 g; layer kept | 1e-9 | analytic | unit |
 | VC-XCH-19 | FR-20 | CAx-IF composite / kinematic files | TBD | — | RPs [R15] | V2 |
 | VC-XCH-20 | FR-21, FR-22, TR-03 | any | identical `data` from UI dispatch, CLI, MCP; 0 network calls | exact | L1/L5/L6, KI6 | integration |
 
@@ -86,7 +87,7 @@ llull verify_exchange_file file=/tmp/p.stp --json
 ```
 
 Expected for step 3: `geometric_validation_properties` and `verify_exchange_file` both report V 113716.81469282041,
-A 19028.31853071796, c (−1.3813228334244487, 0, 0) within 1e-6, band green.
+A 19028.31853071796, c (−1.3813228334244487, 0, 0) within 1e-9, band green.
 
 ## 6. Known caveats of the reference data
 

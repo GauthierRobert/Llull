@@ -343,7 +343,10 @@ export type FaceGeometry =
   | { kind: 'sphere'; center: Vec3; radius: number }
   | { kind: 'freeform' };
 export interface FaceProjection { point: Vec3; normal: Vec3; uv: Vec2; distance: number }
-interface GeometryKernel {
+// These four methods belong to the single optional face-query port owned by gap 01 (`FaceQueryPort`, exposed as
+// `GeometryKernel.faceQuery?`, TR-KRN-90..92, docs/aerospace/01-exact-brep-kernel/TECHNICAL_SPEC.md §5.9), where `FaceGeometry` is the shared `SurfaceParams`
+// type (`halfAngle` is named `semiAngle`, `freeform` is named `other`). Signatures here state what CMP needs.
+interface FaceQueryPort /* subset */ {
   /** Analytic description + UV bounds of face `index` (null: unsupported). */
   faceGeometry?(shape: ShapeHandle, index: number): { geometry: FaceGeometry; uvBounds: [Vec2, Vec2] } | null;
   /** Closest points on face `index` (batched). */

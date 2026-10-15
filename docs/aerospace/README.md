@@ -58,10 +58,10 @@ output (`python3 -I <script>` from its `validation/` folder). Four scripts need 
 
 | Gap | Effort (from its TECHNICAL_SPEC § Delivery plan) | Key validation assets |
 | --- | --- | --- |
-| 01 KRN | ≈ 34–45 eng-weeks | 10 closed-form solids (incl. at 70 m), OCCT 7.9.3 cross-check, all 27 NIST B-rep files measured |
+| 01 KRN | ≈ 35.5–46.5 eng-weeks | 10 closed-form solids (incl. at 70 m), OCCT 7.9.3 cross-check, all 27 NIST B-rep files measured |
 | 02 SRF | ≈ 33 eng-weeks | NACA 4/5-digit generator vs pinned UIUC files (≤ 1e-7 c), analytic curvature, OpenVSP TR-1208 wing, Sears–Haack |
 | 03 GDT | MVP ≈ 11 eng-weeks, V1 + 6.5 | NIST PMI census (17 AP242 files), stack-ups (WC / RSS / seeded Monte Carlo), surface texture |
-| 04 XCH | MVP ≈ 13 eng-weeks | NIST PMI zip pinned (sha256), validation properties of 28 files (17 AP242 + 11 AP203), OCCT IGES samples |
+| 04 XCH | MVP ≈ 11 eng-weeks (shares 01 M3/M4) | NIST PMI zip pinned (sha256), validation properties of 28 files (17 AP242 + 11 AP203), OCCT IGES samples |
 | 05 FEA | see spec (M1–M6) | Cantilever / modal / Kirsch / plate buckling closed forms, NAFEMS LE1 & LE10, CalculiX reference decks |
 | 06 CMP | ≈ 18 eng-weeks to V1 | CLT ABD + first-ply failure (T300/5208, AS4/3501-6), hemisphere fishnet drape, layup rules |
 | 07 FTR | see spec | Flat pattern / setback (FAA AC 43.13-1B example), countersink, 3 synthetic STEP parts, NIST CTC-01 |
@@ -88,10 +88,16 @@ output (`python3 -I <script>` from its `validation/` folder). Four scripts need 
    approval (CLAUDE.md layer map, `.dependency-cruiser.cjs`, `tsconfig.base.json` aliases).
 2. **OCC build.** A custom OCCT 7.9.x WASM build with C++ exceptions, aligned with the bundled OCP, exposing
    every class the packs list (01 TR-KRN-01/02 owns the list).
-3. **One `GeometryKernel` extension**, owned by 01 KRN, merging the requests from the other packs: face
-   centroid / normal / axis / radius (03, 05), `faceGraph()` adjacency (07), surface `analysis` (02),
-   history-based persistent names (01).
-4. **Document v3**: B-rep blobs as recipe leaves (01), PLM metadata (09), PMI (03), analysis set-ups (05).
+3. **One kernel face-query port** — *settled in review*: `FaceQueryPort`, exposed as the optional
+   `GeometryKernel.faceQuery?` (01 TECHNICAL_SPEC §5.9, TR-KRN-90..92; Manifold omits it). It merges the
+   requests of 02 (curvature, continuity, distance, B-spline), 03 / 05 (face centroid, normal, axis, radius),
+   06 (face geometry, projection, evaluation) and 07 (face graph); the other packs reference it.
+4. **Document v3** — *settled in review*: one envelope and one `migrate2to3` owned by 01 (TECHNICAL_SPEC §3.1),
+   listing every pack's slice; plugin slices survive replay through a new `DocumentExtension.carry?` hook and
+   report load problems through `afterLoad` (09 TR-PLM-32/33, core changes to review with `cad-reviewer`).
+4b. **Exact STEP import** — *settled in review*: one command, `import_step_exact`, owned by 01 (B-rep blob
+   leaf, healing, import report); 04 extends it with validation properties, assembly tree and AP242 PMI, and
+   owns `export_step_ap242` and the single GVP band policy.
 5. **Licensing**: shipping GPL Gmsh and CalculiX with the desktop installer (05); licensed MMPDS / NAS /
    CMH-17 data must stay in private libraries that never land in saved files (08).
 6. **Open surfaces** as 3D entities that are not closed solids (02 D1); `DerivationGuard.check` receiving the
@@ -107,6 +113,31 @@ named official page. Each `validation/sources.md` grades every source (fetched /
 extract) and lists what could not be verified; values not confirmed are marked `TBD` or
 `secondary_unconfirmed` and are not used as pass/fail thresholds. Re-run the open checks once those hosts
 are allowed. The largest open item: no MIL-HDBK-5J / MMPDS design allowable is verified yet (08 MAT).
+
+### Review (2026-10-15)
+
+All nine packs were reviewed by independent agents that recomputed every headline number with their own
+scripts, re-ran every generator (pure-Python ones byte-identical; OCP ones with `cadquery-ocp`), validated
+the draft plans against the real zod schemas / `build_project validate`, and checked every repo claim
+(paths, commands, constants, toolsets, CLI syntax). Defects found and fixed include:
+
+- 09: the sample document was not a loadable llull document (replaced by one llull produced; hashes and
+  signatures recomputed); replay silently dropped the PLM slice (new carry hook); negative signature vectors
+  are now really verified in Node (22/22 pass).
+- 03: one stack-up probability was off by 1.1e-7 against a 1e-12 tolerance (exact sensitivities now).
+- 05 / 08: stored values rounded to 6 digits failed their own 1e-9 tolerances (now 12 significant digits);
+  FEA now consumes 08's material record instead of defining its own fields.
+- 06: the composites model type was placed in a plugin while core referenced it (moved to core model, L2/L10).
+- 04: the `imported` recipe leaf stored no file bytes, so imports could not be rebuilt after reload (replaced
+  by 01's blob leaf); 2 of the NIST files' embedded validation properties disagree with their own geometry
+  (now expected red, still imported).
+- 01: the persistent-naming test would have passed with today's heuristic (geometry changed so it fails).
+- 07: the BRepFeat bindings were probed in opencascade.js 1.1.1 (`MakeCylindricalHole` cannot be
+  constructed, `MakeLinearForm` is absent); native feature path narrowed to prism / revolve.
+- 02 / 06: missing technical-requirement index and expected values added; plans aligned with type sketches.
+
+Verdicts after the fixes: all packs **ready with notes** — the notes are the open questions in each
+TECHNICAL_SPEC and the unverified sources listed in each `validation/sources.md`.
 
 ## What "validated" means here
 

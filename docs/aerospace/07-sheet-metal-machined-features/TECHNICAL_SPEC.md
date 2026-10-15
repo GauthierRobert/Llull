@@ -37,7 +37,7 @@ packages/core/src/
   lib/sheetMath.ts                    pure bend math: bendAllowance, outsideSetback, bendDeduction, kChart, joggle, kTable
   lib/holeMath.ts                     countersink depth/diameter, drill tip, frustum volumes
   model/types.ts                      + ShapeRecipe ops 'feature' (hole | pocket | rib); + FaceInfo surface params
-  geometry/kernel.ts                  + GeometryKernel.faceGraph(shape) (optional; null on Manifold)
+  geometry/kernel.ts                  (gap 01) GeometryKernel.faceQuery?.faceGraph(shape) (optional; absent on Manifold)
   geometry/featureLowering.ts         'feature' node -> boolean/primitive sub-tree (fallback for kernels without BRepFeat)
   geometry/recognition/               pure recognition over FaceGraph (holes, pockets, fillets, chamfers, bends)
   commands/features/catalog.ts        add_hole, add_pocket, add_rib, set_thread, recognize_features, check_machining
@@ -164,7 +164,8 @@ export interface FaceGraph {
   readonly edgeFaces: readonly (readonly number[])[];           // edge index -> adjacent face indices
   readonly edgeConvexity: readonly ('convex' | 'concave' | 'smooth' | 'unknown')[];
 }
-// GeometryKernel += faceGraph?(shape: ShapeHandle): FaceGraph | null   (optional member: Manifold omits it)
+// gap 01 FaceQueryPort (GeometryKernel.faceQuery?, TR-KRN-90..92) provides faceGraph(shape): FaceGraph | null;
+// FaceGraph / SurfaceParams are the shared types defined there (Manifold omits the port).
 ```
 
 ### 3.3 Plugin `sheetmetal`: document extension

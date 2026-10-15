@@ -2,11 +2,12 @@
   "$comment": "XCH validation cases: expected value, tolerance, unit, source/derivation. Values are (a) quoted from a pinned file (nist_pmi_gvp_reference.json, xch_corpus.json), (b) analytic (analytic_gvp_reference.json, generate_analytic_gvp.py), or (c) TBD with the tool that measures them. Tolerance policy: validation/README.md section 3.",
   "tolerancePolicy": {
     "sameKernelRoundTrip": { "volumeRel": 1e-9, "areaRel": 1e-9, "centroidAbsPerBboxDiag": 1e-9, "derivation": "OCC writes and reads back the same B-rep; only decimal serialization of REAL values intervenes (llull TR-XCH-05 requires >= 15 significant digits)" },
-    "analyticVsExactKernel": { "volumeRel": 1e-6, "areaRel": 1e-6, "centroidAbsPerBboxDiag": 1e-6, "derivation": "exact analytic surfaces; residual is BRepGProp numerical integration error" },
+    "analyticVsExactKernel": { "volumeRel": 1e-9, "areaRel": 1e-9, "centroidAbsPerBboxDiag": 1e-9, "derivation": "exact analytic surfaces; residual is BRepGProp numerical integration error, measured <= 1.1e-14 relative at the origin with OCCT 7.9.3 (01 KRN occt_crosscheck.json); aligned with VC-KRN-01 (1e-9)" },
+    "igesRoundTrip": { "volumeRel": 1e-6, "areaRel": 1e-6, "centroidAbsPerBboxDiag": 1e-6, "derivation": "provisional: IGES re-import rebuilds solids by sewing at max(file resolution, 1e-6 diag) (TR-XCH-12); replace with a measured bound after VC-XCH-11 runs" },
     "importVsEmbeddedGvp": {
       "green": { "volumeRel": 1e-3, "areaRel": 1e-3, "centroidAbsPerBboxDiag": 1e-3 },
       "yellow": { "volumeRel": 1e-2, "areaRel": 1e-2, "centroidAbsMm": 1.0 },
-      "derivation": "yellow bound = Dassault Systemes CATIA STEP import default (volume and area ratio < 1 %, centroid deviation < 1 mm), [R14]; green bound chosen one order tighter and checked against the observed cross-CAD spread of NIST CTC-02 (VC-XCH-06: 1.12e-4 volume, 4.93e-4 area). CAx-IF three-tier green/yellow/red reporting [R13]."
+      "derivation": "yellow bound = Dassault Systemes CATIA STEP import default (volume and area ratio < 1 %, centroid deviation < 1 mm), [R14]. Green bound one order tighter, checked against measured sender-vs-OCCT 7.9.3 agreement on the NIST files whose GVP describe their geometry (01 KRN ../../01-exact-brep-kernel/validation/nist_gvp_vs_occt.json): 6 files (ctc_01 e1, ctc_03 e2, ctc_04 e2, ftc_06 e2, stc_10 e2, ftc_09 rd) differ by at most 7.5e-5 volume and 9.4e-4 area (ctc_04 e2) and 0.0064 mm centroid, all green; the 4 gross disagreements (ctc_02 rc / e2, stc_08 e3, ctc_05 rd: >= 1.06e-2 volume) are red. ctc_04 area sits 6 % under the green limit, so 1e-3 must not be tightened without new evidence; ftc_07 e2 (2.1e-4 volume, 3.9e-5 area, 0.021 mm) is green here although 01 KRN VC-KRN-04 (stricter test tolerance 1e-4) flags it. VC-XCH-06 (CTC-02 AP203 vs AP242) is a GVP-to-GVP figure and is not used as justification. CAx-IF three-tier green/yellow/red reporting [R13]. This is the single GVP band policy of llull (01 KRN defers to it)."
     },
     "tessellatedVsExact": { "volumeRel": 5e-3, "areaRel": 5e-3, "derivation": "COULD-level heuristic; a faceted body under-estimates curved volume; replace with a chord-tolerance-derived bound once VC-XCH-09 is measured" }
   },
@@ -14,7 +15,7 @@
     {
       "id": "VC-XCH-01",
       "title": "AP242 exact export -> re-import (same kernel) preserves volume, area, centroid, bbox of 9 analytic parts",
-      "proves": ["FR-XCH-01", "FR-XCH-02", "TR-XCH-01", "TR-XCH-05"],
+      "proves": ["FR-XCH-01", "FR-XCH-02", "TR-XCH-01", "TR-XCH-02", "TR-XCH-05"],
       "input": "analytic_gvp_reference.json (all cases) built from plans/*.json",
       "expected": "per case in analytic_gvp_reference.json",
       "tolerance": "analyticVsExactKernel for model vs analytic; sameKernelRoundTrip for exported vs re-imported",
@@ -132,7 +133,7 @@
       "proves": ["FR-XCH-11", "TR-XCH-13"],
       "input": "plans/xch-plate-offset-hole.json, plans/xch-l-bracket.json",
       "expected": "analytic_gvp_reference.json values for those cases",
-      "tolerance": "analyticVsExactKernel (IGES carries exact NURBS/analytic surfaces; solids rebuilt by sewing on re-import)",
+      "tolerance": "igesRoundTrip (IGES carries exact NURBS/analytic surfaces; solids rebuilt by sewing on re-import)",
       "source": "analytic; OCC IGES writer conforms to IGES 5.3 [R7]"
     },
     {
@@ -141,10 +142,11 @@
       "proves": ["FR-XCH-12", "TR-XCH-14"],
       "expected": {
         "xch-inch-box exported then imported into a mm document": { "volume_mm3": 131096.512, "area_mm2": 18064.48, "centroid_mm": [0.0, 0.0, 12.7] },
-        "nist_ctc_05_asme1_rd.stp imported into a mm document": { "volume_mm3": 12694914.68692222, "area_mm2": 861242.9165391091, "centroid_mm": [-0.00444232975083708, -1.0106082709285138, 99.72360139103179] }
+        "nist_ftc_09_asme1_rd.stp imported into a mm document": { "volume_mm3": 136445.10481135413, "area_mm2": 96614.23380695238, "centroid_mm": [2.185934719329844, 1.5150352387139119, 4.554269753453959], "band": "green" },
+        "nist_ctc_05_asme1_rd.stp (secondary: converted GVP still disagrees)": { "volume_mm3": 12694914.68692222, "area_mm2": 861242.9165391091, "centroid_mm": [-0.00444232975083708, -1.0106082709285138, 99.72360139103179], "band": "red" }
       },
-      "tolerance": "analyticVsExactKernel for xch-inch-box; importVsEmbeddedGvp for CTC-05",
-      "caveat": "CTC-05 AP203: after exact inch->mm conversion the OCCT 7.9.3 recomputation (V 12828990.96 mm^3, A 862855.85 mm^2) still differs from the converted GVP by 1.06e-2 volume, 1.9e-3 area, 2.2 mm centroid (red band) - 01 KRN nist_gvp_vs_occt.json; nist_ftc_09_asme1_rd.stp (inch, GVP agree to 1e-10 after conversion) is the cleaner unit-conversion check",
+      "tolerance": "analyticVsExactKernel for xch-inch-box; importVsEmbeddedGvp for the NIST files (FTC-09 green, CTC-05 red)",
+      "caveat": "FTC-09 AP203 (inch): embedded GVP V 8.326391158987 in^3, A 149.7523619055 in^2, c (0.08606042202086, 0.05964705664228, 0.1793019587974) in, x 25.4^k exactly; OCCT 7.9.3 recomputation agrees to 9.8e-11 volume / 6.5e-11 area / 9.1e-7 mm (01 KRN nist_gvp_vs_occt.json), so a wrong unit factor turns it red. CTC-05 AP203: after exact inch->mm conversion the OCCT 7.9.3 recomputation (V 12828990.96 mm^3, A 862855.85 mm^2) still differs from the converted GVP by 1.06e-2 volume, 1.9e-3 area, 2.2 mm centroid (red band) - kept as a check that a converted-but-wrong GVP is reported red",
       "source": "25.4 mm per inch exactly; xch-inch-box: V = 8 in^3 * 25.4^3, A = 28 in^2 * 25.4^2; CTC-05 embedded GVP (V 774.6912251592 in^3, solid area 1334.929190494 in^2, centroid [-0.0001748948720802, -0.03978772720191, 3.926126039017] in) * 25.4^k"
     },
     {
@@ -160,7 +162,7 @@
       "id": "VC-XCH-14",
       "title": "Robustness: hostile or truncated inputs",
       "proves": ["FR-XCH-15", "TR-XCH-16"],
-      "expected": { "truncatedStep": "no-op + summary '<cmd> rejected: ...', no crash", "binaryGarbage": "no-op", "oversize": "rejected before parse", "zeroGvp": "import succeeds, GVP reported 'not checkable'" },
+      "expected": { "truncatedStep": "no-op, affected [], summary naming the cause (e.g. 'import_step_exact: unreadable STEP ...'), no crash", "binaryGarbage": "no-op", "oversize": "rejected before parse", "zeroGvp": "import succeeds, GVP reported 'not checkable'" },
       "source": "llull L1 contract (invalid input => unchanged document + summary)"
     },
     {
