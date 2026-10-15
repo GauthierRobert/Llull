@@ -42,6 +42,11 @@ python3 -I measure_step_brep.py nist_occt_reference.json <dir>/NIST-PMI-STEP-Fil
 | U2 | Supplier receives OEM STEP (AP203/AP242) and must modify it (add a hole, cut a pocket, fillet) | import must give editable exact B-rep, healed, with names stable across edits | VC-KRN-04..07 on NIST files (R20) |
 | U3 | Parts positioned in aircraft coordinates (body station / waterline / buttline) on a > 70 m airframe (A380 72.6 m per ICAO WP, R24) | no precision loss far from origin; centroid/inertia in aircraft axes for weight & balance | VC-KRN-02, VC-KRN-03b |
 | U4 | Large assembly review: a 747 has ~6 million parts (NASA, R25) | instancing (one exact definition, many placements), LOD, lightweight display | VC-KRN-12 |
+| VC-KRN-13 | FR-KRN-02, TR-KRN-03 | web app without backend, `?kernel=occt`, rib plan | no main-thread long task > 50 ms during kernel work; results identical to the server run | TBD — measure with Playwright Long Tasks API | quality:display |
+| VC-KRN-14 | FR-KRN-13, TR-KRN-80 | rib (VC-KRN-03) and NIST CTC 01 modified part | `export_step_exact` writes GVP; re-import GVP delta ≤ 1e-6 relative (volume, area), ≤ 1e-6 mm centroid | as stated | production scenario |
+| VC-KRN-15 | FR-KRN-14, FR-KRN-15, TR-KRN-61 | save/load a document; `set_modeling_tolerance` | saved file carries `kernelSettings.occtVersion` + build; load under another version → provenance warning; `linear: 1` (mm) rejected (range [1e-7, 1e-2]); import uses the document precision when the file has none | exact | unit + server |
+| VC-KRN-16 | FR-KRN-16 | fillet recipe loaded under Manifold (capability gap) | entity flagged `faceted`; `check_model` reports `faceted_result`; `export_step_exact` refuses without explicit acceptance | exact | unit |
+| VC-KRN-17 | FR-KRN-17 | registry | every KRN command in `toToolSchemas()` snapshot, CLI help, happy + failure unit tests, `is pure` test | exact | contract tests |
 | U5 | Regression of the kernel across OCCT upgrades (OCCT moved 7.4 → 7.9 → 8.0, R11, R14) | determinism, golden signatures, tolerance-based cross-version comparison | VC-KRN-10 |
 
 ## 3. Validation cases

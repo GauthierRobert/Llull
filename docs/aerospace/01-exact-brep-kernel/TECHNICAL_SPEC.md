@@ -72,12 +72,12 @@ Laws respected:
 - **TR-KRN-02 (MUST, MVP)** Replace `opencascade.js@1.1.1` (OCCT 7.4.0p1, 2020) by a **pinned OCCT 7.9.x build**:
   Emscripten build with WebAssembly exception handling (`-fwasm-exceptions`) so OCC `Standard_Failure` is
   catchable (removes the `___cxa_*` degraded-module class in `occtKernel.ts`), including the toolkits
-  TKBO/TKBool/TKFillet/TKOffset/TKShHealing/TKXSBase/TKDESTEP (STEP)/TKXCAF/TKMesh/TKGProp-equivalents
-  (`BRepGProp` lives in TKTopAlgo). The binding layer keeps `KernelOps<OccShape>`; `occtTypes.ts` is
+  TKBO/TKBool/TKFillet/TKOffset/TKShHealing/TKXSBase/TKDESTEP (STEP)/TKXCAF/TKMesh and TKTopAlgo
+  (which holds `BRepCheck` and `BRepGProp` [R33]). The binding layer keeps `KernelOps<OccShape>`; `occtTypes.ts` is
   regenerated. Size / init time / op latency are measured against KI4's baseline (63 MB, 0.8-1 s, 150-180 ms) and
   recorded in a new decision record (KI7).
 - **TR-KRN-03 (SHOULD, V1)** Browser-only (web app without backend): OCC in a dedicated Web Worker. Because the
-  `GeometryKernel` contract is synchronous and `Atomics.wait` is not allowed on the browser main thread, the
+  `GeometryKernel` contract is synchronous and `Atomics.wait` cannot be used on the browser main thread [R32], the
   browser path executes **whole commands** in the worker (worker hosts `execute` + kernel; the main thread
   receives `CommandResult`) — the same split the desktop already has between renderer and backend (L6).
 - **TR-KRN-04 (MUST, MVP)** `kernel_info` read-only command: `{ active: 'occt'|'manifold', occtVersion?, build?,
@@ -221,7 +221,7 @@ forwarding to `import_step_brep`; the mesh path remains for Manifold. CLI: `llul
   FTC 08 `-tg`, measured: plain reader returns a void shape) → no-op with diagnostic and suggestion to use mesh
   import; mixed → import B-rep, list skipped items.
 - **TR-KRN-23 (SHOULD, V1) — GVP comparison.** Read STEP geometric validation properties (volume, area,
-  centroid; CAx-IF practice [R21]) with the XDE validation-property API; recompute with §5.4 on the healed
+  centroid; CAx-IF practice [R21]) with `STEPCAFControl_Reader::SetPropsMode(true)` and the `XCAFDoc_Volume` / `XCAFDoc_Area` / `XCAFDoc_Centroid` attributes [R33]; recompute with §5.4 on the healed
   shape; report `volumeRelDiff`, `areaRelDiff`, `centroidAbsDiff`, in file units converted to mm (two NIST
   AP203 files and one AP242 file carry GVP in inches — measured). Thresholds: info ≤ 1e-6, warning > 1e-4
   (volume) / > 1e-3 (area) / > 0.05 mm (centroid).
@@ -326,7 +326,7 @@ forwarding to `import_step_brep`; the mesh path remains for Manifold. CLI: `llul
   `(recipeKey, deflection)`.
 - **TR-KRN-72 (MUST, MVP) — local-frame tessellation.** `tessellate` returns vertices in the definition's local
   frame (`occtMesh.ts` currently emits world space), with the placement carried by the entity/instance matrix;
-  three.js composes model-view matrices on the CPU in float64 before uploading float32, so vertex precision is
+  three.js composes model-view matrices on the CPU in float64 before uploading float32 [R31], so vertex precision is
   bounded by part size, not by station (float32 ulp at 70 000 = 0.0078 mm [R29], at 300 mm part size 3e-5 mm).
 - **TR-KRN-73 (SHOULD, MVP) — depth precision.** Replace near 0.01 / far 1e8 (`Viewport3D.tsx`) by near/far
   fitted to the scene bounds each frame, plus `logarithmicDepthBuffer` or reversed-Z; acceptance: no z-fighting
@@ -455,5 +455,8 @@ M7, GVP M8), 05 FEA (exact faces M4, names M7), 02 SRF (NURBS ops need M2), 09 P
 - [R24] ICAO APANPIRG/15 WP12 (A380 dimensions) — https://www.icao.int/sites/default/files/Meetings/AMC/MA/2004/APANPIRG15/wp12.pdf (search summary only, accessed 2026-10)
 - [R26] three.js docs r170 (InstancedMesh, BatchedMesh, LOD) — https://raw.githubusercontent.com/mrdoob/three.js/r170/docs/api/en/objects/BatchedMesh.html (accessed 2026-10)
 - [R29] IEEE-754 spacing — computed with Python `math.ulp` (validation/sources.md)
+- [R31] three.js WebGLRenderer.js r170 — https://raw.githubusercontent.com/mrdoob/three.js/r170/src/renderers/WebGLRenderer.js (accessed 2026-10)
+- [R32] MDN Atomics.wait() — https://raw.githubusercontent.com/mdn/content/main/files/en-us/web/javascript/reference/global_objects/atomics/wait/index.md (accessed 2026-10)
+- [R33] OCCT V7_8_0 toolkit PACKAGES and XCAFDoc / STEPCAFControl / BOPAlgo headers — https://raw.githubusercontent.com/Open-Cascade-SAS/OCCT/V7_8_0/src/TKTopAlgo/PACKAGES (accessed 2026-10)
 - llull code and decisions cited by path in §1 (KI4, KI5, KI6); measured data: `validation/occt_behaviour_probe.json`,
   `validation/occt_crosscheck.json`, `validation/nist_occt_reference.json`, `validation/nist_gvp_vs_occt.json`

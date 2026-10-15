@@ -162,6 +162,48 @@ llull --doc part.llull fea import --analysis an-1 --frd run.frd
    directory.
 4. The agent edits a parameter (`set_parameter`). The results become `stale`, and the agent loops back to `fea_mesh`.
 
+### 6.4 Surface matrix (FR-FEA-23)
+
+| Capability | UI | CLI | MCP (cloud) | Notes |
+| ---------- | -- | --- | ----------- | ----- |
+| Analysis set-up (cases, materials, idealization, BCs, loads, mesh controls) | panels | `build` plans / `llull cmd` | registry tools (toolset `analysis`) | pure commands, replayable |
+| Midsurface preview / defeature | yes | yes | yes | OCC kernel needed. Manifold gives an explanatory no-op |
+| Mesh (Gmsh) | Mesh button | `fea mesh` | `fea_mesh` when the host has Python + gmsh | external process |
+| Quality report | histogram panel | `fea quality --json` | `fea_report` | read-only |
+| Solve (CalculiX) | Solve button | `fea solve` | `fea_solve` when the host has `ccx` | desktop default. Server needs opt-in |
+| Results field / probes | overlay | `fea report`, `fea field` | `fea_result_field`, `fea_report` | display state through `set_result_view` |
+| Margins | table plus sheet placement | `fea margins --json` | `compute_margins` | refuses stale results |
+| Deck export INP / BDF / VTU | Export menu | `fea export` | `fea_export` (exchange dir) | byte-identical across surfaces |
+| External results import FRD / OP2 | File ▸ Import results | `fea import` | `fea_import_results` | needs a mesh match, otherwise review-only |
+
+### 6.5 Error and edge behaviour
+
+| Situation | Behaviour | FR |
+| --------- | --------- | -- |
+| A target point matches no face or two faces equally | The command is rejected (no-op) with a summary naming the target and the candidate faces | FR-FEA-07 |
+| A target face disappears after a parametric edit | The constraint or load is kept but flagged `unresolved`. Mesh and solve are refused until the user fixes it | FR-FEA-07, 22 |
+| Material has no `elastic` | Mesh is allowed. Solve and export are refused, naming the part and material | FR-FEA-02 |
+| A part is not constrained enough (rigid-body modes) | Pre-solve check: fewer than 6 independent restrained DOFs per connected part gives a warning, and a singular solver matrix gives a readable error from the log | FR-FEA-16 |
+| A point force on a single node | Warning about the stress singularity. Margins exclude the singular zone by default and list it separately | FR-FEA-18 |
+| Mixed units (document in inches) | The deck is written in the lbf-in system. The header says so and the report shows the units | FR-FEA-25 |
+| Gmsh or CalculiX is missing (web, cloud, or misconfigured desktop) | The tool explains how to enable it. The document is never left half-updated | FR-FEA-16 |
+| The solver times out or is cancelled | The child process is killed and no results are recorded. The log tail is shown | FR-FEA-16 |
+| The results artifact is missing on another machine | State `missing`. The UI offers a re-solve. Margins are refused | FR-FEA-22 |
+| Midsurface coverage < 98 % | Shell export is blocked unless the user accepts. Unpaired faces are highlighted | FR-FEA-05 |
+
+### 6.6 Glossary
+
+| Term | Meaning in this spec |
+| ---- | -------------------- |
+| Limit load | Maximum load expected in service. Loads prescribed by Part 25 are limit loads unless stated otherwise [R2] |
+| Ultimate load | Limit load × factor of safety (1.5 unless otherwise specified) [R1][R2] |
+| MS (margin of safety) | allowable / (limit × FoS) − 1. Must be ≥ 0 [R3] |
+| Idealization | Choice of FE representation for a part (solid, plane stress, shell, beam) |
+| Midsurface | Surface halfway through a thin wall, carrying thickness as a property |
+| Deck | Solver input file (CalculiX/Abaqus `.inp`, Nastran `.bdf`) |
+| FRD / OP2 | CalculiX ASCII results file / Nastran binary results file |
+| Scaled Jacobian, aspect ratio | Element shape metrics as defined by Verdict [R12] |
+
 ## 7. Acceptance criteria
 
 | # | Given | When | Then | VC |

@@ -824,6 +824,82 @@
    "tolerance": null,
    "unit": "count",
    "source": "requirement; budgets in TECHNICAL_SPEC section 8 are TBD-measure"
+  },
+  {
+   "vc": "VC-KRN-13",
+   "title": "browser OCC off the main thread",
+   "proves": [
+    "FR-KRN-02",
+    "TR-KRN-03"
+   ],
+   "value": {
+    "maxMainThreadLongTaskMs": 50
+   },
+   "tolerance": null,
+   "unit": "-",
+   "source": "requirement (TECHNICAL_SPEC); thresholds are policy values, not measured"
+  },
+  {
+   "vc": "VC-KRN-14",
+   "title": "exact export carries GVP; round trip",
+   "proves": [
+    "FR-KRN-13",
+    "TR-KRN-80"
+   ],
+   "value": {
+    "gvpRoundTripRel": 1e-06
+   },
+   "tolerance": null,
+   "unit": "-",
+   "source": "requirement (TECHNICAL_SPEC); thresholds are policy values, not measured"
+  },
+  {
+   "vc": "VC-KRN-15",
+   "title": "kernel provenance and modelling tolerance",
+   "proves": [
+    "FR-KRN-14",
+    "FR-KRN-15",
+    "TR-KRN-61"
+   ],
+   "value": {
+    "provenanceWarningOnMismatch": true,
+    "linearToleranceRangeMm": [
+     1e-07,
+     0.01
+    ]
+   },
+   "tolerance": null,
+   "unit": "-",
+   "source": "requirement (TECHNICAL_SPEC); thresholds are policy values, not measured"
+  },
+  {
+   "vc": "VC-KRN-16",
+   "title": "no silent faceting",
+   "proves": [
+    "FR-KRN-16"
+   ],
+   "value": {
+    "facetedFlag": true,
+    "checkModelCode": "faceted_result",
+    "exactExportRefused": true
+   },
+   "tolerance": null,
+   "unit": "-",
+   "source": "requirement (TECHNICAL_SPEC); thresholds are policy values, not measured"
+  },
+  {
+   "vc": "VC-KRN-17",
+   "title": "registry contract",
+   "proves": [
+    "FR-KRN-17"
+   ],
+   "value": {
+    "inToolSchemas": true,
+    "happyAndFailureTests": true
+   },
+   "tolerance": null,
+   "unit": "-",
+   "source": "requirement (TECHNICAL_SPEC); thresholds are policy values, not measured"
   }
  ]
 }

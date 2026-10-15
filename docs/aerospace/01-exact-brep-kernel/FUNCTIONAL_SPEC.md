@@ -202,6 +202,38 @@ Each line is one command (same registry as the UI); the user sees each change li
 | AC-11 | any golden / quality model | it is built | no committed shape fails `validate_shape` | VC-KRN-09 |
 | AC-12 | the KRN reference set | it is rebuilt twice with the same build | identical topology signatures; across builds, equal counts and measures within tolerance | VC-KRN-10 |
 | AC-13 | 10 000 instances of the rib | the assembly is displayed | one kernel evaluation and one tessellation per LOD; frame-time budget met | VC-KRN-12 |
+| AC-14 | the web app without backend on OCC | a kernel-heavy command runs | the UI thread shows no long task > 50 ms | VC-KRN-13 |
+| AC-15 | a modified part | it is exported exact and re-imported | GVP written on export agree with the re-import within 1e-6 | VC-KRN-14 |
+| AC-16 | a saved document | it is reopened with a different OCCT build | a provenance warning names both versions; tolerance settings are kept and validated | VC-KRN-15 |
+| AC-17 | an exact recipe the active kernel cannot rebuild | it is loaded | the entity is flagged faceted, listed by `check_model`, blocked from exact export | VC-KRN-16 |
+| AC-18 | the command registry | the contract tests run | every KRN command is an MCP tool and CLI verb with happy/failure tests | VC-KRN-17 |
+
+### 7.1 Traceability (FR → VC → TR)
+
+| FR | Validation cases | Technical requirements |
+| -- | ---------------- | ---------------------- |
+| FR-KRN-01 | VC-KRN-11, VC-KRN-03 | TR-KRN-01, TR-KRN-04 |
+| FR-KRN-02 | VC-KRN-13 | TR-KRN-03 |
+| FR-KRN-03 | VC-KRN-02, VC-KRN-03b | TR-KRN-10, TR-KRN-41, TR-KRN-72, TR-KRN-73 |
+| FR-KRN-04 | VC-KRN-04 | TR-KRN-20, TR-KRN-21 |
+| FR-KRN-05 | VC-KRN-04, VC-KRN-04x, VC-KRN-05, VC-KRN-06 | TR-KRN-22, TR-KRN-23, TR-KRN-24 |
+| FR-KRN-06 | VC-KRN-07 | TR-KRN-30, TR-KRN-31, TR-KRN-32 |
+| FR-KRN-07 | VC-KRN-08 | TR-KRN-12, TR-KRN-13 |
+| FR-KRN-08 | VC-KRN-01, VC-KRN-02, VC-KRN-03 | TR-KRN-40, TR-KRN-41, TR-KRN-42 |
+| FR-KRN-09 | VC-KRN-09 | TR-KRN-50, TR-KRN-51 |
+| FR-KRN-10 | VC-KRN-10 | TR-KRN-60, TR-KRN-61, TR-KRN-62 |
+| FR-KRN-11 | VC-KRN-12 | TR-KRN-70, TR-KRN-71, TR-KRN-74 |
+| FR-KRN-12 | VC-KRN-03 | TR-KRN-02, TR-KRN-50 |
+| FR-KRN-13 | VC-KRN-14 | TR-KRN-80 |
+| FR-KRN-14 | VC-KRN-15 | TR-KRN-61 |
+| FR-KRN-15 | VC-KRN-15 | TR-KRN-11 |
+| FR-KRN-16 | VC-KRN-16 | (KI5 fallback rule; `faceted` flag, §3 of TECHNICAL_SPEC) |
+| FR-KRN-17 | VC-KRN-17 | all commands of TECHNICAL_SPEC §4 |
+
+Known-failing today (ratcheted like `quality/corpus.json` knownIssues): VC-KRN-07 (heuristic `edgesNear`),
+VC-KRN-04x (GVP disagreements in the source files), every VC that needs the OCC kernel while the desktop default
+is Manifold (VC-KRN-01..03 can only pass with `LLULL_KERNEL=occt` — not yet run; VC-KRN-02's inertia tolerance needs
+TR-KRN-41; inertia is not reported at all today).
 
 ## 8. Standards & regulatory alignment
 
