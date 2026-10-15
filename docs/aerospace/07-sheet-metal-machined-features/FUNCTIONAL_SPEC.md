@@ -217,7 +217,7 @@ Priority: MUST / SHOULD / COULD. Source = where the requirement or its numbers c
 llull sheet_metal_calc thickness=0.064 insideRadius=0.25 angle=135 kFactor=0.4475 units=in --json   # SB 0.758 in (AC 43.13-1B)
 llull run validation/plans/draft_sheet_metal_bracket.json --doc bracket.llull.json --json          # build + check + unfold
 llull export_flat_pattern_dxf id=<sm> --doc bracket.llull.json --save bracket_flat.dxf
-llull import_step file=supplier.stp --doc part.llull.json && llull recognize_features id=<id> --doc part.llull.json --json   # recognition needs gap 01 import_step_brep (TECHNICAL_SPEC M0)
+llull import_step file=supplier.stp --doc part.llull.json && llull recognize_features id=<id> --doc part.llull.json --json   # recognition needs gap 01 import_step_exact (TECHNICAL_SPEC M0)
 ```
 
 ### 6.3 MCP agent (cloud)

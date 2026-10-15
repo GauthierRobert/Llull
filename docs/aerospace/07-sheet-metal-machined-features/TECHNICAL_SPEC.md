@@ -72,7 +72,7 @@ Rationale:
 | --- | ---- |
 | 08 Fastener catalogue | `FastenerRef` → hole spec (clearance/fit, countersink D and angle, thread designation). Until 08 lands, `add_hole` takes explicit dimensions and `fastener` is rejected with a clear summary. |
 | Drawings (hole/bend tables, thread callouts) | `data` tables of `recognize_features`, `flat_pattern` and hole features; drawing views of flat patterns |
-| STEP exchange / PMI | **Prerequisite (not true today):** an exact STEP import that keeps a `brep` on the imported entity, i.e. gap 01 `import_step_brep` (`docs/aerospace/01-exact-brep-kernel/`). Gap 01 owns its design; this gap only consumes the resulting exact solid. Today `import_step` returns triangles only (§1). Needed by `recognize_features` on imported parts, `convert_to_sheet_metal` and VC-FTR-18…21, 32 (milestone M0, D9). AP242 PMI association is out of scope here |
+| STEP exchange / PMI | **Prerequisite (not true today):** an exact STEP import that keeps a `brep` on the imported entity, i.e. gap 01 `import_step_exact` (`docs/aerospace/01-exact-brep-kernel/`). Gap 01 owns its design; this gap only consumes the resulting exact solid. Today `import_step` returns triangles only (§1). Needed by `recognize_features` on imported parts, `convert_to_sheet_metal` and VC-FTR-18…21, 32 (milestone M0, D9). AP242 PMI association is out of scope here |
 | Parametric / persistent naming | Face `near` references (KI5 approach) now; BRepTools_History naming later |
 
 ## 3. Data model
@@ -433,7 +433,7 @@ to `unclassified[]`. `add_hole` validates all positions first, so it is all-or-n
 
 | Milestone | Content | Depends on | Effort (eng-days) |
 | --------- | ------- | ---------- | ----------------- |
-| M0 Exact STEP import (prerequisite) | Consume gap 01 `import_step_brep` (`docs/aerospace/01-exact-brep-kernel/`): imported STEP solids keep a `brep`. Not designed here | gap 01 | 0 here (effort owned by gap 01); ~1 day integration tests in M4 |
+| M0 Exact STEP import (prerequisite) | Consume gap 01 `import_step_exact` (`docs/aerospace/01-exact-brep-kernel/`): imported STEP solids keep a `brep`. Not designed here | gap 01 | 0 here (effort owned by gap 01); ~1 day integration tests in M4 |
 | M1 Math + calc | `lib/sheetMath.ts`, `lib/holeMath.ts`, `sheet_metal_calc` (plugin skeleton, toolset) | D1 decided | 4 |
 | M2 Holes & pockets (lowered) | `feature` recipe node, `featureLowering.ts`, `add_hole`, `add_pocket`, `set_thread`, `check_machining`, codegen `cskHole`/`cboreHole` | M1 | 8 |
 | M3 Native sheet metal | model, rule, base, flange, fold, analytic unfold, `flat_pattern`, `check_sheet_metal`, radius table import; DXF writer moved to core + `export_flat_pattern_dxf` | M1, D4 | 12 |
@@ -451,7 +451,7 @@ to `unclassified[]`. `add_hole` validates all positions first, so it is all-or-n
 | D2 | Should `feature` be a recipe node, or should commands emit lowered boolean trees directly? | A recipe node: it keeps semantics for code export, drawings, recognition round trip and native OCC. Lowering stays the fallback. |
 | D3 | Does opencascade.js@1.1.1 expose `BRepFeat_MakePrism` / `MakeCylindricalHole` / `MakeLinearForm`? | Partly answered by the review probe (§1): `MakePrism`/`MakeRevol` construct; `MakeCylindricalHole` is not constructible and `MakeLinearForm` is absent. Remaining 1-day spike (as KI4): exercise `MakePrism`/`MakeRevol` `Perform*` end to end. Holes and ribs stay on lowering in the in-process kernel. On desktop, OCP/CadQuery could be used, but the in-process OCC worker is preferred. |
 | D4 | Move `dxfWriter.ts` from domain-aec to core `lib` | Yes for the generic part only: the low-level R12 writer (`DxfWriter` entity methods, `INSUNITS`, `dxfLayerName`, `dxfText`) moves to `lib` with only `model/vectors` types; `writePrimitive`, layer colours, hatch and dimension handling stay in domain-aec (they import `geometry`/AEC modules, which `lib-is-a-leaf` forbids). domain-aec then imports the writer from core (direction allowed by L2). |
-| D9 | Exact STEP import (keep `brep` on imported parts) | Use gap 01 `import_step_brep` (`docs/aerospace/01-exact-brep-kernel/`) (milestone M0). Its internals are owned by gap 01; this gap only requires that the imported entity carries a `brep` the kernel can evaluate for `faceGraph`. |
+| D9 | Exact STEP import (keep `brep` on imported parts) | Use gap 01 `import_step_exact` (`docs/aerospace/01-exact-brep-kernel/`) (milestone M0). Its internals are owned by gap 01; this gap only requires that the imported entity carries a `brep` the kernel can evaluate for `faceGraph`. |
 | D5 | Default countersink preset for aerospace (100°) | Confirm from gap 08 catalogue data / NASM documents before it becomes a default. Until then it is a named preset with the "unverified" note in the UI tooltip. |
 | D6 | Minimum bend radius seed data | Transcribe AC 43.13-1B Table 4-6 from the FAA PDF with dual review. Store `source` and edition per row. |
 | D7 | Thread designation grammar (UNJ, MJ) | Accept free text with a light per-family regex. Full validation only with licensed AS8879 / ISO 5855 data via gap 08. |

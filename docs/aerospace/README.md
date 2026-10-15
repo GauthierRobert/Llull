@@ -61,7 +61,7 @@ output (`python3 -I <script>` from its `validation/` folder). Four scripts need 
 | 01 KRN | ≈ 34–45 eng-weeks | 10 closed-form solids (incl. at 70 m), OCCT 7.9.3 cross-check, all 27 NIST B-rep files measured |
 | 02 SRF | ≈ 33 eng-weeks | NACA 4/5-digit generator vs pinned UIUC files (≤ 1e-7 c), analytic curvature, OpenVSP TR-1208 wing, Sears–Haack |
 | 03 GDT | MVP ≈ 11 eng-weeks, V1 + 6.5 | NIST PMI census (17 AP242 files), stack-ups (WC / RSS / seeded Monte Carlo), surface texture |
-| 04 XCH | MVP ≈ 13 eng-weeks | NIST PMI zip pinned (sha256), validation properties of 30 files, OCCT IGES samples |
+| 04 XCH | MVP ≈ 13 eng-weeks | NIST PMI zip pinned (sha256), validation properties of 28 files (17 AP242 + 11 AP203), OCCT IGES samples |
 | 05 FEA | see spec (M1–M6) | Cantilever / modal / Kirsch / plate buckling closed forms, NAFEMS LE1 & LE10, CalculiX reference decks |
 | 06 CMP | ≈ 18 eng-weeks to V1 | CLT ABD + first-ply failure (T300/5208, AS4/3501-6), hemisphere fishnet drape, layup rules |
 | 07 FTR | see spec | Flat pattern / setback (FAA AC 43.13-1B example), countersink, 3 synthetic STEP parts, NIST CTC-01 |
