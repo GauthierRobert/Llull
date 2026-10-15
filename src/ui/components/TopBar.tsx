@@ -50,7 +50,7 @@ function SidebarToggle(): React.ReactElement {
       className={`icon-btn${sidebarOpen ? ' icon-btn--active' : ''}`}
       onClick={toggleSidebar}
       aria-label={label}
-      title={label}
+      title={`${label} — layers, parameters, history, materials…`}
     >
       <Icon name="panelLeft" size={16} />
     </button>

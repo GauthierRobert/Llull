@@ -38,3 +38,12 @@
 .layer-visibility-btn--hidden {
   color: var(--fg-faint);
 }
+
+/* One name field + the add button (the shared 3-column parameter grid would squeeze the name to 76px). */
+.layers-panel .param-add-fields {
+  grid-template-columns: minmax(0, 1fr) var(--control-h);
+}
+
+.layers-panel .param-add-fields input {
+  font-family: inherit;
+}

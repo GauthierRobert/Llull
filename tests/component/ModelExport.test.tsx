@@ -22,8 +22,15 @@ describe('ModelExport', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
-  it('downloads CadQuery code by default', () => {
+  it('downloads a binary STL mesh by default', () => {
     render(<ModelExport />);
+    fireEvent.click(screen.getByRole('button', { name: /export the model/i }));
+    expect(downloads).toEqual(['model.stl']);
+    expect(screen.getByRole('status').textContent).toMatch(/export_stl/);
+  });
+  it('downloads CadQuery code when that format is chosen', () => {
+    render(<ModelExport />);
+    fireEvent.change(screen.getByLabelText('Export format'), { target: { value: 'cadquery' } });
     fireEvent.click(screen.getByRole('button', { name: /export the model/i }));
     expect(downloads).toEqual(['model.py']);
   });

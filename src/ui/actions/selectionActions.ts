@@ -4,6 +4,16 @@ import type { Vec3 } from '@core/model/types';
 import { buildingElementOf } from '@aec/index';
 import { rotatedEntityBounds } from '@core/geometry/rotatedBounds';
 import { useStore } from '@ui/store';
+import { isEntityOnLockedLayer } from '@ui/viewport/entityVisibility';
+
+/** Selected ids whose layer is not locked (a locked layer can still hold a stale selection). */
+function editableSelection(): string[] {
+  const { selection, entities, layers } = useStore.getState().document;
+  return selection.filter((id) => {
+    const entity = entities[id];
+    return entity === undefined || !isEntityOnLockedLayer(entity, layers);
+  });
+}
 
 /** Fewest commands; generated building geometry is deleted through its element (walls take their openings). */
 export function deleteSelection(): void {
@@ -27,10 +37,11 @@ const DUPLICATE_GAP = 1.5; // document units
 /** Selection split into building elements (owning generated geometry) and plain entities; null when empty. */
 function partitionSelection(): { elementIds: string[]; entityIds: string[] } | null {
   const { document } = useStore.getState();
-  if (document.selection.length === 0) return null;
+  const editable = editableSelection();
+  if (editable.length === 0) return null;
   const elementIds = new Set<string>();
   const entityIds: string[] = [];
-  for (const id of document.selection) {
+  for (const id of editable) {
     const elementId = buildingElementOf(document, id);
     if (elementId === null) entityIds.push(id);
     else elementIds.add(elementId);
@@ -39,11 +50,11 @@ function partitionSelection(): { elementIds: string[]; entityIds: string[] } | n
 }
 
 /** X offset that places copies of the selection clear of the originals. */
-function duplicateOffset(): Vec3 {
+function duplicateOffset(ids: readonly string[]): Vec3 {
   const { document } = useStore.getState();
   let minX = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
-  for (const id of document.selection) {
+  for (const id of ids) {
     const entity = document.entities[id];
     if (entity === undefined) continue;
     const bounds = rotatedEntityBounds(entity);
@@ -57,9 +68,9 @@ function duplicateOffset(): Vec3 {
 /** Copies beside the originals in one undo step; a single copy becomes the selection. */
 export function duplicateSelection(): void {
   const state = useStore.getState();
-  const selection = state.document.selection;
+  const selection = editableSelection();
   if (selection.length === 0) return;
-  state.dispatch('duplicate_entities', { ids: [...selection], offset: duplicateOffset() }, { selectAffected: selection.length === 1 });
+  state.dispatch('duplicate_entities', { ids: selection, offset: duplicateOffset(selection) }, { selectAffected: selection.length === 1 });
 }
 
 /** One undo step per kind; building geometry moves through its element (plan move, skipped when delta has Z). */

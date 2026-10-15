@@ -59,6 +59,10 @@ export function isNcFilesData(value: unknown): value is { files: ReadonlyArray<{
   );
 }
 
+export function isStlExportData(value: unknown): value is { stlBase64: string } {
+  return isRecord(value) && typeof value['stlBase64'] === 'string';
+}
+
 export function isCodeExportData(value: unknown): value is { text: string; fileName: string } {
   return isRecord(value) && typeof value['text'] === 'string' && typeof value['fileName'] === 'string';
 }

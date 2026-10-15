@@ -73,17 +73,26 @@ function selectedIdFor(name: string, selection: readonly EntityId[]): EntityId |
   return numbered === null ? undefined : selection[Number(numbered[1]) - 1];
 }
 
+/** An optional `id` next to an optional `ids` are alternative sources ("pass only one"), e.g. extrude_profile. */
+function hasAlternativeSources(fields: readonly FormField[]): boolean {
+  const optional = (name: string): boolean => fields.some((field) => field.name === name && !field.required);
+  return optional('id') && optional('ids');
+}
+
 /**
  * Pre-fill entity-id fields from the current selection so "select, then run" just works; required
- * enums / booleans start on the value their select shows (first option / `true`).
+ * enums / booleans start on the value their select shows (first option / `true`). Alternative sources get one
+ * field: `id` for a single selected entity, `ids` for several.
  */
 export function initialValues(fields: readonly FormField[], selection: readonly EntityId[]): FormValues {
   const values: Record<string, string> = {};
+  const alternatives = hasAlternativeSources(fields);
   for (const field of fields) {
-    const selectedId = field.kind === 'text' ? selectedIdFor(field.name, selection) : undefined;
+    const selectedId = field.kind === 'text' && !(alternatives && selection.length > 1) ? selectedIdFor(field.name, selection) : undefined;
+    const fillsList = field.kind === 'textList' && MULTI_ID_FIELD.test(field.name) && !(alternatives && selection.length === 1);
     values[field.name] =
       selectedId ??
-      (field.kind === 'textList' && MULTI_ID_FIELD.test(field.name)
+      (fillsList
         ? selection.join(', ')
         : field.kind === 'enum' && field.required
           ? (field.options[0] ?? '')

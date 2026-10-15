@@ -7,7 +7,7 @@ import type { CadDocument, Entity, EntityId, InstanceEntity, SolidKind } from '@
 import { useStore, useViewportStore } from '@ui/store';
 import { useSelectionSet } from '@ui/store/selectionHooks';
 import { animatedEntityIds, findClickAnimationsForEntity } from './animationClickHelpers';
-import { isEntityVisible } from '../entityVisibility';
+import { isEntityOnLockedLayer, isEntityVisible } from '../entityVisibility';
 import { DecalOverlay } from './entities/DecalOverlay';
 import { TextMesh } from './entities/TextMesh';
 import { SOLID_MESHES, type SolidMeshBranch } from './entities/solidMeshes';
@@ -121,6 +121,9 @@ export function Entities(): React.ReactElement {
 
   const handleSelect = useCallback(
     (id: EntityId, additive: boolean): void => {
+      const { entities, layers } = useStore.getState().document;
+      const picked = entities[id];
+      if (picked !== undefined && isEntityOnLockedLayer(picked, layers)) return;
       if (additive) toggleSelection(id);
       else select([id]);
 

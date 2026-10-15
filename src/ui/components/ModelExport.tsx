@@ -1,15 +1,16 @@
-// Download the model as code (CadQuery, build123d, OpenSCAD, FreeCAD; read-only `export_code`) or exact STEP from the
+// Download the model as a mesh (STL, read-only `export_stl`), as code (CadQuery, build123d, OpenSCAD, FreeCAD; read-only `export_code`) or exact STEP from the
 // server's `/export/step` (Python bridge).
 
 import React, { useState } from 'react';
 import { runQuery } from '@ui/services/localQuery';
 import { downloadBlob as download, downloadText } from '@ui/download';
-import { isCodeExportData } from '@ui/resultData';
+import { isCodeExportData, isStlExportData } from '@ui/resultData';
 import { fetchStepExport } from '@ui/services/serverFiles';
 
-type ExportFormat = 'cadquery' | 'build123d' | 'openscad' | 'freecad' | 'step';
+type ExportFormat = 'stl' | 'cadquery' | 'build123d' | 'openscad' | 'freecad' | 'step';
 
 const FORMATS: ReadonlyArray<{ value: ExportFormat; label: string }> = [
+  { value: 'stl', label: 'STL mesh (.stl)' },
   { value: 'cadquery', label: 'CadQuery (.py)' },
   { value: 'build123d', label: 'build123d (.py)' },
   { value: 'openscad', label: 'OpenSCAD (.scad)' },
@@ -18,10 +19,10 @@ const FORMATS: ReadonlyArray<{ value: ExportFormat; label: string }> = [
 ];
 
 export function ModelExport(): React.ReactElement {
-  const [format, setFormat] = useState<ExportFormat>('cadquery');
+  const [format, setFormat] = useState<ExportFormat>('stl');
   const [status, setStatus] = useState('');
 
-  const exportCode = (language: Exclude<ExportFormat, 'step'>): void => {
+  const exportCode = (language: Exclude<ExportFormat, 'step' | 'stl'>): void => {
     const result = runQuery('export_code', { language, name: 'model' });
     if (!isCodeExportData(result.data)) {
       setStatus(result.summary);
@@ -29,6 +30,15 @@ export function ModelExport(): React.ReactElement {
     }
     const { text, fileName } = result.data;
     downloadText(text, fileName, 'text/plain');
+    setStatus(result.summary);
+  };
+
+  const exportStl = (): void => {
+    const result = runQuery('export_stl', { format: 'binary', name: 'model' });
+    if (isStlExportData(result.data)) {
+      const bytes = Uint8Array.from(atob(result.data.stlBase64), (char) => char.charCodeAt(0));
+      download(new Blob([bytes], { type: 'model/stl' }), 'model.stl');
+    }
     setStatus(result.summary);
   };
 
@@ -41,6 +51,7 @@ export function ModelExport(): React.ReactElement {
 
   const handleExport = (): void => {
     if (format === 'step') void exportStep();
+    else if (format === 'stl') exportStl();
     else exportCode(format);
   };
 
@@ -68,7 +79,7 @@ export function ModelExport(): React.ReactElement {
       >
         Export
       </button>
-      <span className="visually-hidden" role="status" aria-live="polite">
+      <span className="project-io__status" role="status" aria-live="polite">
         {status}
       </span>
     </span>

@@ -2,14 +2,14 @@
 
 import type { CadDocument, Entity } from '@core/model/types';
 import { useStore, useViewportStore } from '@ui/store';
-import { isEntityVisible } from '../entityVisibility';
+import { isEntityOnLockedLayer, isEntityVisible } from '../entityVisibility';
 import { PICK_RADIUS_PX } from './modifyHelpers';
 
 interface PickContext {
   document: CadDocument;
   /** Document units. */
   tolerance: number;
-  /** Visible, narrowed by `extraFilter`. */
+  /** Visible and on an unlocked layer, narrowed by `extraFilter`. */
   accepts: (entity: Entity) => boolean;
 }
 
@@ -20,6 +20,9 @@ export function pickContext(zoom: number, extraFilter?: (entity: Entity) => bool
   return {
     document,
     tolerance: PICK_RADIUS_PX / (zoom > 0 ? zoom : 1),
-    accepts: (entity) => (extraFilter?.(entity) ?? true) && isEntityVisible(entity, layers, hiddenLayerIds, hiddenEntityIds),
+    accepts: (entity) =>
+      (extraFilter?.(entity) ?? true) &&
+      isEntityVisible(entity, layers, hiddenLayerIds, hiddenEntityIds) &&
+      !isEntityOnLockedLayer(entity, layers),
   };
 }

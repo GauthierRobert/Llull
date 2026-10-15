@@ -1,6 +1,6 @@
 // Command bar (bottom-center). Idle it is one line: a Tools button and "Ask or run a command" (opens the palette).
-// Everything else is on demand: the Tools panel (sketch tools, solids, view mode, select, redo, shortcuts), the armed
-// tool chip, Undo once there is something to undo, and the selection's actions while something is selected.
+// Everything else is on demand: the Tools panel (sketch tools, solids, view mode, select, shortcuts), the armed
+// tool chip, an Undo/Redo pair (disabled when idle), and the selection's actions while something is selected.
 
 import React, { useCallback, useRef, useState } from 'react';
 import { classNames } from '@ui/classNames';
@@ -137,8 +137,6 @@ function ToolsPanel({ close }: { close: () => void }): React.ReactElement {
   const viewMode = useToolStore((s) => s.viewMode);
   const setDrawTool = useToolStore((s) => s.setDrawTool);
   const setShortcutsOpen = useToolStore((s) => s.setShortcutsOpen);
-  const canRedo = useStore((s) => s.canRedo);
-  const redo = useStore((s) => s.redo);
   const sketchItems = useSketchItems(close);
   const is2d = viewMode === '2d';
   return (
@@ -160,7 +158,6 @@ function ToolsPanel({ close }: { close: () => void }): React.ReactElement {
           }}
         />
         <span className="dock-panel__spacer" />
-        <DockButton label="Redo" icon="redo" tip="step forward" shortcut="Ctrl Y" disabled={!canRedo} onClick={redo} />
         <DockButton
           label="Shortcuts"
           icon="keyboard"
@@ -262,6 +259,20 @@ function AskButton(): React.ReactElement {
   );
 }
 
+/** Always present (disabled when there is nothing to step through) so the bar never shifts. */
+function UndoRedo(): React.ReactElement {
+  const canUndo = useStore((s) => s.canUndo);
+  const canRedo = useStore((s) => s.canRedo);
+  const undo = useStore((s) => s.undo);
+  const redo = useStore((s) => s.redo);
+  return (
+    <>
+      <DockButton label="Undo" icon="undo" tip="step back" shortcut="Ctrl Z" disabled={!canUndo} onClick={undo} />
+      <DockButton label="Redo" icon="redo" tip="step forward" shortcut="Ctrl Y" disabled={!canRedo} onClick={redo} />
+    </>
+  );
+}
+
 export function Toolbar(): React.ReactElement {
   const [toolsOpen, setToolsOpen] = useState(false);
   const dockRef = useRef<HTMLDivElement>(null);
@@ -269,9 +280,6 @@ export function Toolbar(): React.ReactElement {
   useDismiss(dockRef, toolsOpen, close);
 
   const hasSelection = useStore((s) => s.document.selection.length > 0);
-  const canUndo = useStore((s) => s.canUndo);
-  const undo = useStore((s) => s.undo);
-
   return (
     <div className="dock" ref={dockRef}>
       {toolsOpen && <ToolsPanel close={close} />}
@@ -289,7 +297,7 @@ export function Toolbar(): React.ReactElement {
         </button>
         <ArmedToolChip />
         <AskButton />
-        {canUndo && <DockButton label="Undo" icon="undo" tip="step back" shortcut="Ctrl Z" onClick={undo} />}
+        <UndoRedo />
         {hasSelection && <SelectionActions />}
       </div>
     </div>

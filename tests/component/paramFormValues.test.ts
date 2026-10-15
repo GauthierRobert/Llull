@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { getCommand } from '@core/commands/registry';
-import { fieldsFromSchema, matchTypeahead, parseFormValues, valuesFromParams } from '@ui/components/commandPalette/paramForm';
+import {
+  fieldsFromSchema,
+  initialValues,
+  matchTypeahead,
+  parseFormValues,
+  valuesFromParams,
+} from '@ui/components/commandPalette/paramForm';
 
 describe('matchTypeahead', () => {
   const units = ['mm', 'cm', 'm', 'km'];
@@ -28,5 +34,19 @@ describe('valuesFromParams', () => {
   it('leaves unknown or mistyped params blank instead of throwing', () => {
     const fields = fieldsFromSchema(getCommand('array_linear')!.paramsSchema);
     expect(valuesFromParams(fields, { count: 'many', offset: 'x' })).toMatchObject({ count: '', offset: '' });
+  });
+});
+
+describe('initialValues', () => {
+  const extrudeFields = (): ReturnType<typeof fieldsFromSchema> => fieldsFromSchema(getCommand('extrude_profile')!.paramsSchema);
+  it('fills only `id` for one selected shape (id and ids are alternative sources)', () => {
+    expect(initialValues(extrudeFields(), ['rect-1.1'])).toMatchObject({ id: 'rect-1.1', ids: '' });
+  });
+  it('fills only `ids` for several selected pieces', () => {
+    expect(initialValues(extrudeFields(), ['line-1.1', 'line-2.1'])).toMatchObject({ id: '', ids: 'line-1.1, line-2.1' });
+  });
+  it('fills both a single and a list field when they are not alternatives', () => {
+    const fields = fieldsFromSchema(getCommand('align')!.paramsSchema);
+    expect(initialValues(fields, ['a', 'b'])).toMatchObject({ referenceId: 'a', targetIds: 'a, b' });
   });
 });
