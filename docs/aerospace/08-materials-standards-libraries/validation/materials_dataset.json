@@ -9,7 +9,7 @@
  "basisLegend": {
   "A": "MMPDS / MIL-HDBK-5: >= 99% of population equals or exceeds, 95% confidence (S3, S5)",
   "B": "MMPDS / MIL-HDBK-5: >= 90% of population equals or exceeds, 95% confidence (S3, S5)",
-  "S": "MMPDS: specification minimum; statistical assurance not established (S5; see TECHNICAL_SPEC OQ-MAT-02)",
+  "S": "MMPDS: specification minimum; statistical assurance not established (S3; see TECHNICAL_SPEC OQ-MAT-02)",
   "typical": "average/typical value (e.g. Aluminum Association typical via MatWeb); never a design allowable",
   "supplier_unstated": "supplier datasheet; basis not stated"
  },

@@ -258,7 +258,7 @@
     "protrusionBeyondNutMaxHeight_in": 0.135,
     "atLeastOneThreadProtrudes": true
    },
-   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37)"
+   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37: 'at least one thread'; one pitch beyond the MAX nut height is a llull choice); length rounded to 0.001 in as distributors list it, protrusion computed from the rounded length"
   },
   {
    "id": "VC-MAT-07/NAS6203/t=0.51",
@@ -280,7 +280,7 @@
     "protrusionBeyondNutMaxHeight_in": 0.124,
     "atLeastOneThreadProtrudes": true
    },
-   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37)"
+   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37: 'at least one thread'; one pitch beyond the MAX nut height is a llull choice); length rounded to 0.001 in as distributors list it, protrusion computed from the rounded length"
   },
   {
    "id": "VC-MAT-07/NAS6203/t=0.5625",
@@ -300,7 +300,7 @@
     "protrusionBeyondNutMaxHeight_in": 0.1345,
     "atLeastOneThreadProtrudes": true
    },
-   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37)"
+   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37: 'at least one thread'; one pitch beyond the MAX nut height is a llull choice); length rounded to 0.001 in as distributors list it, protrusion computed from the rounded length"
   },
   {
    "id": "VC-MAT-07/NAS6204/t=0.25",
@@ -317,7 +317,7 @@
     "gap_in": 0.0,
     "washersUnderNut_in": []
    },
-   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37)"
+   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37: 'at least one thread'; one pitch beyond the MAX nut height is a llull choice); length rounded to 0.001 in as distributors list it, protrusion computed from the rounded length"
   },
   {
    "id": "VC-MAT-07/NAS6204/t=0.3",
@@ -336,7 +336,7 @@
      0.016
     ]
    },
-   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37)"
+   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37: 'at least one thread'; one pitch beyond the MAX nut height is a llull choice); length rounded to 0.001 in as distributors list it, protrusion computed from the rounded length"
   },
   {
    "id": "VC-MAT-07/NAS6205/t=0.625",
@@ -353,7 +353,7 @@
     "gap_in": 0.0,
     "washersUnderNut_in": []
    },
-   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37)"
+   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37: 'at least one thread'; one pitch beyond the MAX nut height is a llull choice); length rounded to 0.001 in as distributors list it, protrusion computed from the rounded length"
   },
   {
    "id": "VC-MAT-07/NAS6205/t=0.7",
@@ -372,7 +372,7 @@
      0.063
     ]
    },
-   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37)"
+   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37: 'at least one thread'; one pitch beyond the MAX nut height is a llull choice); length rounded to 0.001 in as distributors list it, protrusion computed from the rounded length"
   },
   {
    "id": "VC-MAT-07/NAS6206/t=1.0",
@@ -389,7 +389,7 @@
     "gap_in": 0.0,
     "washersUnderNut_in": []
    },
-   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37)"
+   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37: 'at least one thread'; one pitch beyond the MAX nut height is a llull choice); length rounded to 0.001 in as distributors list it, protrusion computed from the rounded length"
   },
   {
    "id": "VC-MAT-07/NAS6206/t=0.02",
@@ -406,9 +406,10 @@
     "gap_in": 0.0425,
     "washersUnderNut_in": [
      0.063
-    ]
+    ],
+    "fixtureOnly": "grip dash 1 is the lower end of the test-fixture range [1, 40]; real availability TBD from the NAS sheet"
    },
-   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37)"
+   "derivation": "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37: 'at least one thread'; one pitch beyond the MAX nut height is a llull choice); length rounded to 0.001 in as distributors list it, protrusion computed from the rounded length"
   },
   {
    "id": "VC-MAT-07/NAS6204/t=3.0",

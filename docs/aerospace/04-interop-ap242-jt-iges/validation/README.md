@@ -11,7 +11,7 @@ Proves the requirements of [`../FUNCTIONAL_SPEC.md`](../FUNCTIONAL_SPEC.md) (FR-
 | `expected_results.json` | All VC cases: expected value, tolerance, unit, source/derivation, FR/TR proven | hand-written from the files below |
 | `analytic_gvp_reference.json` / `.csv` | Volume, area, centroid, bbox of 9 reference parts (box, cylinder, offset sphere, torus, plate with centred / offset hole, L-bracket, inch box, 2-instance assembly) with tolerance | `python3 -I generate_analytic_gvp.py <this folder>` |
 | `plans/*.json` | Draft llull `build_project` plans building each analytic part (same format as `quality/drawings/plans/*.json`) | written by the generator |
-| `nist_pmi_gvp_reference.json` | For each of the 30 STEP files of the official NIST archive: sha256, bytes, FILE_SCHEMA, length unit, validation-property counts, embedded GVP values, entity census (PMI / tessellation / B-rep / assembly types) | `python3 -I extract_validation_properties.py <files>` on the extracted archive, post-filtered (all-zero placeholder GVP dropped and counted) |
+| `nist_pmi_gvp_reference.json` | For each of the 28 STEP files of the official NIST archive (17 AP242 + 11 AP203): sha256, bytes, FILE_SCHEMA, length unit, validation-property counts, embedded GVP values, entity census (PMI / tessellation / B-rep / assembly types) | `python3 -I extract_validation_properties.py <files>` on the extracted archive, post-filtered (all-zero placeholder GVP dropped and counted) |
 | `xch_corpus.json` | Pinned corpus for the quality gate: NIST archive (URL + sha256) and members, OCCT IGES samples with entity census, reused `quality/corpus.json` STEP entries | hand-assembled from downloads of 2026-10-15 |
 | `extract_validation_properties.py` | Stdlib-only, OCC-independent Part 21 reader for CAx-IF GVP + census (reference for TR-XCH-18) | — |
 | `generate_analytic_gvp.py` | Analytic generator | — |
@@ -75,9 +75,9 @@ green band, which is the point of VC-XCH-06.
 #    download archives[nist-pmi-step-files].url, check sha256 1fb91bb8…4f90, unzip, check each member sha256
 # 2. Reference data (already generated; re-run to check reproducibility)
 python3 -I docs/aerospace/04-interop-ap242-jt-iges/validation/generate_analytic_gvp.py docs/aerospace/04-interop-ap242-jt-iges/validation
-python3 -I docs/aerospace/04-interop-ap242-jt-iges/validation/extract_validation_properties.py <unzipped>/NIST-PMI-STEP-Files/*.stp
+python3 -I docs/aerospace/04-interop-ap242-jt-iges/validation/extract_validation_properties.py <unzipped>/NIST-PMI-STEP-Files/*.stp <unzipped>/NIST-PMI-STEP-Files/"AP203 geometry only"/*.stp
 # 3. llull side (after implementation)
-llull build_project file=docs/aerospace/04-interop-ap242-jt-iges/validation/plans/xch-plate-offset-hole.json --doc /tmp/p.llull
+llull run docs/aerospace/04-interop-ap242-jt-iges/validation/plans/xch-plate-offset-hole.json --doc /tmp/p.llull
 llull geometric_validation_properties --doc /tmp/p.llull --json
 llull export_step_ap242 --save /tmp/p.stp --doc /tmp/p.llull
 llull verify_exchange_file file=/tmp/p.stp --json

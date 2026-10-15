@@ -78,7 +78,7 @@ def release_scope(envelope: dict) -> dict:
 # Revision schemes
 # --------------------------------------------------------------------------------------------------------------------
 
-ASME_EXCLUDED = set("IOQSXZ")  # per secondary sources quoting ASME Y14.35M-1997 (see sources.md S-ASME); configurable
+ASME_EXCLUDED = set("IOQSXZ")  # per secondary sources quoting ASME Y14.35M-1997 (see sources.md R26); configurable
 ASME_LETTERS = [c for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" if c not in ASME_EXCLUDED]
 
 

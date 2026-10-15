@@ -215,7 +215,7 @@ export interface CadDocument {
 
 | Name | Kind | Toolset | Params (zod sketch) | data |
 | ---- | ---- | ------- | ------------------- | ---- |
-| `geometric_validation_properties` | query, `requiresKernel` | inspect | `{ entityIds?: string[], includeAssemblies?: boolean }` | `{ unit, items: [{ id, name, volume, area, centroid, bbox, method:'brep'|'mesh' }], assemblies?: [...] }` |
+| `geometric_validation_properties` | query, `requiresKernel` | measure | `{ entityIds?: string[], includeAssemblies?: boolean }` | `{ unit, items: [{ id, name, volume, area, centroid, bbox, method:'brep'|'mesh' }], assemblies?: [...] }` |
 | `export_step_ap242` | query, `requiresKernel` | exchange | `{ entityIds?: string[], schema?: 'ap242'|'ap214'|'ap203' (default 'ap242'), includeValidationProperties?: boolean (true), assembly?: 'structured'|'flat' ('structured'), tessellation?: 'off'|'alongside'|'only' ('off'), includePmi?: boolean (true), fileName?: string, timestamp?: string }` | `{ format:'step', schema, step, products, occurrences, gvp:[…], selfCheck: GvpCheck, skipped }` |
 | `import_step_exact` | mutating, `requiresKernel` | exchange | `{ text: string, fileName?: string, sha256?: string, mode?: 'append'|'replace', sew?: boolean, tessellated?: boolean (true), verify?: boolean (true), gvpPolicy?: Partial<GvpPolicy> }` | `{ products, entities, components, gvpCheck, messages }` |
 | `verify_exchange_file` | query (kernel optional) | exchange | `{ text: string, format?: 'step'|'iges', gvpPolicy?: … }` | `{ schemaName, unit, census, embeddedGvp, recomputed?: MassProps[], comparisons, band, messages }` — without a kernel: census + embedded GVP only |
@@ -226,8 +226,11 @@ export interface CadDocument {
 | `export_qif` (V2) | query | aero (plugin) | `{ entityIds?, qifVersion: '3.0' }` | `{ format:'qif', xml }` |
 | `import_jt` (V2) | host tool → `import_mesh` | exchange | `{ jtBase64 | path }` via converter port | as `import_mesh` |
 
-`export_step_exact` becomes an alias of `export_step_ap242 { schema:'ap214', assembly:'flat', includeValidationProperties:false }`
-(retired-command map pattern of `persistence/retiredEditCommands.ts`), so existing plans keep working.
+`export_step_exact` stays a registered command that delegates to the `export_step_ap242` implementation with
+`{ schema:'ap214', assembly:'flat', includeValidationProperties:false }`, so existing plans, CLI scripts and MCP agents keep
+working. (The retired-command map of `persistence/retiredCommands.ts` / `retiredEditCommands.ts` is not usable here: it only
+rewrites steps of saved documents in `migrate()`, and a read-only export never enters the feature history, so retiring
+`export_step_exact` would make live calls fail as unknown commands.)
 
 Tags (C2) for the two central commands:
 
@@ -391,8 +394,8 @@ archive process itself (EN 9300-002 requirements) is the organisation's.
 | Surface | Change |
 | ------- | ------ |
 | UI (`src/ui`, Lane 2) | File › Import STEP/IGES dialog (append/replace, sew, verify); Export dialog (schema, GVP, PMI, tessellation, assembly); Validation badge per product in the Assembly panel; report table component (sender / llull / delta / band); Archive package dialogs (V1). Param-gathering only — dispatches the commands. |
-| CLI (`server/src/cli`) | `file=<path>` → `text` for `import_step_exact`, `import_iges`, `verify_exchange_file`; `--save` for exports; `--save-dir` for `create_archive_package` (writes `data.files`); exit code 2 when `data.band === 'red'` (US-4). |
-| MCP (`packages/mcp`, Lane 4) | New tools appear automatically from the registry (exchange toolset). Host tools `import_step` / `export_step` keep their Python paths; add `path`/`stepBase64` plumbing for the new commands as for `import_dwg`. Toolset entry in `packages/mcp/src/toolsets.ts` (exchange) + `aero`. |
+| CLI (`server/src/cli`) | `file=<path>` → `text` for `import_step_exact`, `import_iges`, `verify_exchange_file`; `--save` for exports; `--save-dir` for `create_archive_package` (writes `data.files`); non-zero exit code (1, as for a failed command; 2 stays "bad usage") when `data.band === 'red'` (US-4). |
+| MCP (`packages/mcp`, Lane 4) | New tools appear automatically from the registry (exchange toolset). Host tools `import_step` / `export_step` keep their Python paths; add `path`/`stepBase64` plumbing for the new commands as for `import_dwg`. Toolset entry in `packages/mcp/src/toolsets.ts` (exchange, measure) + a new `aero` name in `TOOLSET_NAMES` for the plugin commands (as `building` / `civil`). |
 | Desktop | File menu entries; bundled Python gets the interim `op_*_xde` operations; `LLULL_JT_CONVERTER` documented (V2). |
 
 ## 8. Performance & robustness budgets

@@ -149,11 +149,13 @@ def bolt_grip_cases(catalog: dict) -> list[dict]:
             expected["nut"] = "MS21042L3"
             expected["protrusionBeyondNutMaxHeight_in"] = protrusion
             expected["atLeastOneThreadProtrudes"] = protrusion >= pitch
+        if grip_dash == lo:
+            expected["fixtureOnly"] = "grip dash %d is the lower end of the test-fixture range %s; real availability TBD from the NAS sheet" % (grip_dash, [lo, hi])
         case["expected"] = expected
         case["derivation"] = (
             "gripDash = ceil(stack / 0.0625); grip = gripDash*0.0625; length = grip + threadLength(dia); "
             "gap = grip - stack filled by NAS1149 washers (sum >= gap, <= 0.125 in); "
-            "protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37)"
+            "protrusion = length - stack - washers - nutHeightMax >= 1 thread pitch (AC 43.13-1B 7-37: 'at least one thread'; one pitch beyond the MAX nut height is a llull choice); length rounded to 0.001 in as distributors list it, protrusion computed from the rounded length"
         )
         cases.append(case)
     return cases
