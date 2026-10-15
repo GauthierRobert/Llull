@@ -630,7 +630,7 @@ once in M2 and then ratcheted.
 | Kernel regression (new `quality:kernel`) | signatures + measures vs baseline; cross-version tolerance mode | VC-KRN-10 |
 | Display gate | 10 000-instance scene, 70 m station z-fighting screenshot | VC-KRN-12, TR-KRN-73 |
 | Desktop (`npm --prefix desktop test`) | backend env contains `LLULL_KERNEL=occt`; `kernel_info.active === 'occt'`; forced failure → fallback warning | VC-KRN-11 |
-| Agent-first (CLI scripts, `--json` + exit codes) | wrong calls → codes; legacy-material rib → `unverified`; weight-and-balance purpose → `reviewRequired`; agent `acceptUnverified` → `KRN_HUMAN_GATE`; named defaults + provenance; `--dry-run` / `--timeout` on import | VC-KRN-19 .. 24 |
+| Agent-first (CLI scripts, `--json` + exit codes) | wrong calls → codes; legacy-material rib → `unverified`; weight-and-balance purpose → `reviewRequired`; agent `acceptUnverified` → `XCH_HUMAN_GATE`, agent baseline accept → `KRN_HUMAN_GATE`; named defaults + provenance; `--dry-run` / `--timeout` on import | VC-KRN-19 .. 24 |
 | Production-gate scenario | "Supplier STEP round trip": import NIST CTC 01 AP242 → drill + pocket + fillet → validate → mass → `export_step_ap242` with GVP (04) → re-import → GVP within 1e-6 of the exported values | VC-KRN-04, 09, TR-KRN-80 |
 
 Coverage gate (90/85/90/90) applies to new code in `packages/core/src/{commands,geometry}`.

@@ -63,13 +63,41 @@ geometric one.
 | VC-XCH-11 | FR-11, TR-13 | plate + L-bracket | analytic GVP after IGES round trip | 1e-6 (provisional, `igesRoundTrip`) | analytic | unit |
 | VC-XCH-12 | FR-12, TR-14 | inch box; FTC-09 AP203 (inch); CTC-05 AP203 (inch, secondary) | 131096.512 mm³ / 18064.48 mm² / z 12.7 mm; FTC-09: 136445.10481135413 mm³, 96614.23380695238 mm², c (2.1859, 1.5150, 4.5543) mm → green (OCCT agrees to 1e-10 after × 25.4^k); CTC-05: converted GVP 12694914.68692222 mm³ still 1.06e-2 from the geometry → red | 1e-9; band | analytic; NIST × 25.4^k; 01 KRN measurement | unit + quality |
 | VC-XCH-13 | FR-13, FR-14, TR-15 | L-bracket package | sha256 match; V 56000, A 14800, c (25,20,20) on retrieval | 1e-9 | analytic | unit (V1) |
-| VC-XCH-14 | FR-15, TR-16 | truncated / garbage / oversize / zero-GVP | no-op + summary; never throws | — | llull L1 | unit fuzz |
+| VC-XCH-14 | FR-15, TR-16 | truncated / garbage / oversize / zero-GVP | exit 1, `affected: []`, code `KRN_STEP_UNREADABLE` / `XCH_FILE_TOO_LARGE` + remediation; never throws | — | llull L1 | unit fuzz |
 | VC-XCH-15 | FR-16 | JT sample | TBD — no openly licensed sample pinned | — | ISO 14306 [R5] | V2 |
 | VC-XCH-16 | FR-17 | toleranced part | QIF XML validates vs QIF 3.0 XSD; characteristic count = PMI count | — | ISO 23952 [R6] | V2 |
 | VC-XCH-17 | FR-18, TR-17 | VC-01..04 outputs | SFA: 0 syntax errors, GVP listed | exact | SFA [R10] | production (gate machine) |
 | VC-XCH-18 | FR-19 | plate + steel material + layer | density 0.00785 g/mm³ kept; mass 892.6769953386402 g; layer kept | 1e-9 | analytic | unit |
 | VC-XCH-19 | FR-20 | CAx-IF composite / kinematic files | TBD | — | RPs [R15] | V2 |
 | VC-XCH-20 | FR-21, FR-22, TR-03 | any | identical `data` from UI dispatch, CLI, MCP; 0 network calls | exact | L1/L5/L6, KI6 | integration |
+| VC-XCH-21 | FR-23, FR-24, TR-20, TR-21 | deliberately wrong calls (`expected_results.json`) | each exits 1 with the listed `XCH_*` / `KRN_*` code and a remediation; document unchanged | exact (codes) | requirement; CTC-02 e2 red measured | CLI script |
+| VC-XCH-22 | FR-27, TR-24 | STC-06 (placeholder solid GVP) | provenance `unverified` (`import_gvp_not_checkable`); `mass_properties` `.data.unverified.reasons` contains it; `XCH_GVP_NOT_CHECKABLE` warning | exact | pinned file | CLI script |
+| VC-XCH-23 | FR-28, TR-25 | CTC-02 e2 import; L-bracket archive; CTC-01 e1 (green) | `reviewRequired.value` true / true / false with reasons; summary wording | exact | requirement + measured bands | CLI script |
+| VC-XCH-24 | FR-29, TR-26 | agent `export_step_ap242 {acceptUnverified}` with a red body | exit 1, `XCH_HUMAN_GATE`, no file; human caller proceeds | exact | requirement | unit + desktop test |
+| VC-XCH-25 | FR-25, FR-26, TR-22, TR-23 | any import / export | named `policy` / `schema` defaults with sources; GVP unit fields; FTC-09 `fileUnit` inch, `unitFactor` 25.4; provenance fields | exact | §5.3, [R14] | CLI script |
+| VC-XCH-26 | FR-30, TR-27 | CTC-02 AP242 | `--dry-run` → `.changed == false`; progress stages; JT without converter → `XCH_CONVERTER_MISSING` | exact | requirement | CLI script |
+
+### 4.1 CLI form of the validation cases (AF-23)
+
+Each VC runs unattended: a plan (`llull run … --validate`, then `llull run …`), a `--json` query, and a `jq -e`
+comparison with `expected_results.json`; exit codes only, no UI. Pattern (VC-XCH-02):
+
+```bash
+P=docs/aerospace/04-interop-ap242-jt-iges/validation
+llull run $P/plans/xch-plate-offset-hole.json --validate --doc t.llull
+llull run $P/plans/xch-plate-offset-hole.json --kernel occt --doc t.llull
+llull export_step_ap242 '{"includeValidationProperties":true,"timestamp":"2026-10-15T00:00:00Z"}' --save t.stp --kernel occt --doc t.llull
+python3 -I $P/extract_validation_properties.py t.stp \
+  | jq -e --slurpfile er $P/expected_results.json \
+      '($er[0].cases[] | select(.id=="VC-XCH-02") | .expected.volume) as $v
+       | [.[0].geometricValidationProperties[].values[] | select(.item=="volume measure") | .value][0] as $got
+       | (($got - $v) | fabs) <= 1e-9 * $v'
+llull verify_exchange_file file=t.stp --kernel occt --json | jq -e '.data.band == "green"'
+```
+
+VC-XCH-05/-12/-22/-23 use `llull import_step_exact file=<pinned NIST member> verify=true --json` and assert on
+`.data.gvpCheck`, `.data.reviewRequired`, then `llull mass_properties … --json` for `.data.unverified`; VC-XCH-21
+iterates the `calls` list of its expected entry and checks exit code + `.data.error.code`.
 
 ## 5. How to run (future implementation)
 

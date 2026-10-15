@@ -401,7 +401,7 @@ items use the same codes with a severity.
 | `MAT_RECORD_IN_USE` | error | removing a library whose records are assigned | entity ids | reassign those entities first |
 | `MAT_ALLOWABLE_NOT_AVAILABLE` | error | no value for the exact (property, direction, basis, thickness, temperature) key | key, `candidates[]` | pick a candidate explicitly or supply a sourced value; never substitute a basis |
 | `MAT_SOURCE_SUPERSEDED` | error (with `forCertification`) / warning | the value comes from a superseded source (MIL-HDBK-5J) | material, property | use the current MMPDS value (licensed library) |
-| `MAT_VALUE_UNVERIFIED` | warning (not suppressible) | a result uses an `unverified` value (typical, supplier_unstated, unspecified, legacy) | material, property ids | replace with a verified, sourced value |
+| `MAT_VALUE_UNVERIFIED` | warning (not suppressible); error with `forCertification` | a result uses an `unverified` value (typical, supplier_unstated, unspecified, legacy) | material, property ids | replace with a verified, sourced value |
 | `MAT_TEMPERATURE_OUT_OF_RANGE` | error | temperature outside the tabulated range | material, property, temperature | stay inside the table; no extrapolation |
 | `MAT_LIBRARY_HASH_MISMATCH` | error | imported file / provider sha256 ≠ the requested one | library id | import the new version explicitly |
 | `MAT_LIBRARY_UNRESOLVED` | warning | private library not available on this machine | library id, record ids | register the library file (`register_material_library`) |

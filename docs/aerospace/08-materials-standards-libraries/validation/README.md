@@ -13,7 +13,7 @@ facts come from [sources.md](sources.md) (S-ids). All derived numbers come from
 | `materials_dataset.json` | 10 material entries in the draft library schema. Each value carries `source`, `basis` and `status` (`verified` / `secondary_unconfirmed` / `tbd`). Verified values exist for 2024-T3, 7075-T6 and Ti-6Al-4V (densities, moduli, ν, typical strengths). 7075-T7351, 6061-T6, 7050-T7451, 4130, 15-5PH, 718 and A-286 are identification-only stubs with `tbd` values (see "Known gaps"). It also holds fastener material minima (NAS6203 160/95 ksi, Hi-Lok 95 ksi). | partial |
 | `fastener_catalog_sample.json` | Draft catalogue: NAS6203-6220 (grip/length rule plus 6 published checkpoints), MS20470 (AD3–AD6 shank, head min/max for AD4–AD6), Hi-Lok HL10/11/18/19 grammar plus the HL19-8-10 checkpoint, AN grammar (length code unresolved), MS21042L3, NAS1149 thickness set, and AC 43.13-1B installation rules. Licence notes are included. | draft |
 | `generate_mat_reference.py` | Pure-stdlib generator. `python3 generate_mat_reference.py` writes the expected JSON; `--check` fails if the JSON is stale. It uses only `verified` inputs (it asserts this). | complete |
-| `expected_results.json` | Derived expectations: unit conversions, mass properties, catalogue checkpoints, bolt grip selection, Hi-Lok grip, rivet selection. Each has value, tolerance and derivation. | generated |
+| `expected_results.json` | Derived expectations: unit conversions, mass properties, catalogue checkpoints, bolt grip selection, Hi-Lok grip, rivet selection, and the agent-first contract (`agentFirst`: unverified propagation, reviewRequired, human gates, named defaults, error codes). Each has value, tolerance and derivation. | generated |
 | `plans/mass_7075_block_current.json` | `build_project` plan that runs on **today's** llull (create_material → add_box → assign_material → mass_properties). Expected mass 140.5 g. | runnable now |
 | `plans/mass_ti_cylinder_proposed.json` | Draft plan using the proposed `load_material_library` / `set_material_property` with a lb/in³ density in a mm document. Expected mass 69.56719 g. | proposed commands |
 | `plans/fastener_stack_nas6203_proposed.json` | Draft plan: two plates (0.25 + 0.26 in) → `select_fastener` → `insert_fastener_stack` → `bill_of_materials`. | proposed commands |
@@ -57,13 +57,18 @@ VC id prefix.
 | VC-MAT-12 | FR-MAT-18, TR-MAT-25 | `insert_fastener_row` MS20470AD4 at pitch 0.30 in (< 3 D = 0.375) and edge 0.20 in (< 2 D = 0.25) | No-op with 2 reasons citing 3 D / 2 D. With `allowViolations:true`: inserted with 2 warnings. | exact | S7 |
 | VC-MAT-13 | FR-MAT-24, TR-MAT-15 | Library v1 (Fbru 156 ksi) vs v2 (146 ksi) for a synthetic 7075-T6 key | diff lists 1 changed value old 156 → new 146 with both provenances | exact | Synthetic fixture modelled on S14 (not real data) |
 | VC-MAT-14 | FR-MAT-08, FR-MAT-21, TR-MAT-31, TR-MAT-16 | Import a `licensed-no-redistribution`, `storage:'private'` library with a unique sentinel value (e.g. 123.456789). Assign it, save, snapshot, export_code, live-sync log. | The sentinel appears in none of the outputs. The document carries only `{libraryId, version, sha256}`. Reload with the provider gives the same mass; without the provider, the record stays `unresolved` with the saved sha256 and `mass_properties` returns `available:false` (no number). A provider with a different sha256 also leaves it unresolved (`hash mismatch`). | exact (string search) | fuzz test |
-| VC-MAT-15 | FR-MAT-09, TR-MAT-30, TR-MAT-32 | Record marked ITAR; call `export_step_exact` via (a) desktop CLI and (b) cloud MCP | (a) result requires `confirmExportControlled:true`, summary names the marking. (b) refused. Unmarked document: unaffected. | exact | 22 CFR 120.34 [S28], 15 CFR 734.7 [S29] (policy, not legal advice) |
+| VC-MAT-15 | FR-MAT-09, FR-MAT-30, TR-MAT-30, TR-MAT-32, TR-MAT-51 | Record marked ITAR; call `llull export_step_exact --save x.step --json` via (a) desktop CLI agent and (b) cloud MCP | (a) exit 1 `MAT_EXPORT_CONTROLLED`; with `confirmExportControlled=true` from the agent: `MAT_HUMAN_GATE`; the export proceeds only after a human confirmation in the desktop app. (b) refused. Unmarked document: unaffected. Nothing saved on refusal. | exact | 22 CFR 120.34 [S28], 15 CFR 734.7 [S29] (policy, not legal advice) |
 | VC-MAT-16 | FR-MAT-07, TR-MAT-13 | Synthetic temperature table (percentOfRT: 70 °F 100 %, 300 °F 80 %, 500 °F 50 %) on an RT value of 60 ksi | 400 °F → 65 % → 39 ksi; 600 °F → `available:false` (no extrapolation) | rel 1e-12 | linear interpolation (synthetic; real MIL-HDBK-5 curve points TBD, Fig. 3.2.3.1.1(a) [S9]) |
 | VC-MAT-17 | FR-MAT-15/16 performance | 10⁴ instances of 3 part numbers | BOM ≤ 1 s, mass ≤ 1 s, file growth ≤ 1 KB per instance | budget | TECHNICAL_SPEC §8 |
 | VC-MAT-18 | FR-MAT-10, TR-MAT-40/41 | CI check over the seed library | Every value has `basis`, a `sourceId` present in `sources.lock.json` with sha256, and a locator. `superseded` is set. | exact | policy |
 | VC-MAT-19 | FR-MAT-17, TR-MAT-24 | Generate MS20470AD4 geometry | Head Ø within [0.238, 0.262] in, head h within [0.054, 0.064] in. NAS620x head (dims unknown) is `representative` and excluded from mass. | range | S24 |
-| VC-MAT-21 | FR-MAT-20 (V2) | `joint_capacity` on one NAS6204 stack in two sheets, with fastener Fsu and sheet Fbru records at (i) basis A + A, (ii) A + B, (iii) B + S | (i) basis A, (ii) basis B, (iii) basis `mixed` with the per-input list (TECHNICAL_SPEC §5.6). Capacity values **TBD** — needs verified Fsu/Fbru allowables (seed library, M4); until then only the basis propagation is asserted. | exact (basis); TBD (values) | TECHNICAL_SPEC §5.6 |
 | VC-MAT-20 | FR-MAT-19, FR-MAT-22, TR-MAT-26 | Import a user catalogue for a new family (synthetic "ACME-100") without code change. Gap 06 imports a composite record through the same envelope. | Decode, select and BOM work. The composite record validates with basis B and CMH-17 provenance. | exact | — |
+| VC-MAT-21 | FR-MAT-20 (V2) | `joint_capacity` on one NAS6204 stack in two sheets, with fastener Fsu and sheet Fbru records at (i) basis A + A, (ii) A + B, (iii) B + S | (i) basis A, (ii) basis B, (iii) basis `mixed` with the per-input list (TECHNICAL_SPEC §5.6). Capacity values **TBD** — needs verified Fsu/Fbru allowables (seed library, M4); until then only the basis propagation is asserted. | exact (basis); TBD (values) | TECHNICAL_SPEC §5.6 |
+| VC-MAT-22 | FR-MAT-25, FR-MAT-31, TR-MAT-50 | `llull mass_properties entityId=$block --json` on the 7075 block with (a) the typical MatWeb density, (b) the supplier density, (c) a legacy material | `expected_results.json` `agentFirst` VC-MAT-22: `massG`/`massKg`/`massLb`, `densitySource`, `unverified: true` with reasons in all three; `check_materials` warning `MAT_VALUE_UNVERIFIED` | rel 1e-6 | derivation (as VC-MAT-04) |
+| VC-MAT-23 | FR-MAT-25, FR-MAT-29, TR-MAT-50, TR-MAT-51 | `get_material_allowable` on a typical Ftu, then with `forCertification=true`; gap 05 `compute_margins` with E/Ftu from the same record | VC-MAT-23: value returned with `unverified` + `reviewRequired`; forCertification refused (`MAT_VALUE_UNVERIFIED`); FEA rows flagged | exact | S12; gap 05 VC-FEA-64 |
+| VC-MAT-24 | FR-MAT-26, FR-MAT-27 | The nine wrong inputs listed in VC-MAT-24 | each: exit 1, listed `data.code`, non-empty `data.remediation` | exact | TECHNICAL_SPEC §7.1 |
+| VC-MAT-25 | FR-MAT-30, TR-MAT-51 | Agent attempts the gated acts of VC-MAT-25 | refused with `MAT_EXPORT_CONTROLLED` / `MAT_HUMAN_GATE`, document unchanged, nothing saved; raising a marking is allowed | exact | policy |
+| VC-MAT-26 | FR-MAT-28 | `llull select_fastener … --json` (NAS6203, t = 0.510) and (MS20470AD4, t = 0.125) with no rule params | `data.rules` contains each VC-MAT-26 default with `source` and `defaulted: true` | exact | S6, S7, OQ-MAT-04 |
 
 ### FR → VC coverage
 
@@ -77,7 +82,7 @@ VC id prefix.
 | FR-MAT-06 | VC-MAT-05 |
 | FR-MAT-07 | VC-MAT-16 |
 | FR-MAT-08 | VC-MAT-14 |
-| FR-MAT-09 | VC-MAT-15 |
+| FR-MAT-09 | VC-MAT-15, VC-MAT-25 |
 | FR-MAT-10 | VC-MAT-18 |
 | FR-MAT-11 | VC-MAT-06 |
 | FR-MAT-12 | VC-MAT-07, VC-MAT-08 |
@@ -93,6 +98,29 @@ VC id prefix.
 | FR-MAT-22 | VC-MAT-20 |
 | FR-MAT-23 | VC-MAT-01 |
 | FR-MAT-24 | VC-MAT-13 |
+| FR-MAT-25 | VC-MAT-22, VC-MAT-23 |
+| FR-MAT-26 | VC-MAT-24 |
+| FR-MAT-27 | VC-MAT-24 |
+| FR-MAT-28 | VC-MAT-26 |
+| FR-MAT-29 | VC-MAT-23 |
+| FR-MAT-30 | VC-MAT-15, VC-MAT-25 |
+| FR-MAT-31 | VC-MAT-03, VC-MAT-04, VC-MAT-22 |
+
+## CLI harness (AF-23)
+
+Every VC runs unattended as a script, `--json` and exit codes only. With `D="--doc case.llull.json --json"`:
+
+```bash
+llull run plans/mass_7075_block_current.json $D | jq '.data.steps[-1].data'       # runs today: mass 140.5, unit "g"
+llull mass_properties entityId=$block massUnit=kg $D > mass.json                 # VC-MAT-22 (proposed fields)
+llull get_material_allowable material=aa7075_t6 property=Ftu basis=A $D; echo "exit $?"   # VC-MAT-05: exit 1, MAT_ALLOWABLE_NOT_AVAILABLE
+llull select_fastener '{"family":"NAS6203-6220","diameterDash":"3","stack":{"value":0.51,"unit":"in"},"nut":"MS21042","washer":"NAS1149"}' --json > sel.json
+llull check_materials $D > check.json                                            # warnings listed, no error
+python3 -I compare.py sel.json expected_results.json "VC-MAT-07/NAS6203/t=0.51"   # value + tolerance
+```
+
+The comparison script (M5, `tests/unit/aero` and `server/tests`) reads the case by id from `expected_results.json` and asserts
+values within tolerance, codes, and exit codes.
 
 ## Running
 

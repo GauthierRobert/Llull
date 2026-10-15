@@ -168,6 +168,18 @@ export interface CompositesModel {               // CadDocument.composites (abse
 }
 ```
 
+```ts
+// Agent-first records (AGENT_FIRST.md AF-31..34), same core model file
+export interface NamedDefault { readonly value: number; readonly unit: string; readonly source: string; readonly defaulted: boolean }
+export interface LayupWaiver {                    // CompositesModel.waivers (FR-CMP-71)
+  readonly id: string; readonly partId: string; readonly code: string; readonly ids: readonly string[];
+  readonly reason: string; readonly requestedBy: 'agent' | 'human';
+  readonly approvalRef?: string;                  // 09 PLM approval id; set only after record_approval by a human caller
+}
+// LaminaMaterial is `unverified` when basis ∈ {'mean','unknown'} or `source` is empty / not a cited reference;
+// every result computed from it reports unverified: true (computed on read, cannot be cleared).
+```
+
 **Document extension.** `CadDocument` gains an optional `composites?: CompositesModel`. This mirrors
 `building?` and `civil?`, and the plugin declares it through `DocumentExtension`:
 
@@ -205,14 +217,17 @@ and query commands return `data` without changing the document. Each command fil
 | `split_ply` | mutating | `{ ply, curveId, kind: 'dart'\|'splice', overlap? }` | ply gains a cut, flats re-derived / curve crosses the ply boundary twice / → no-op | V1 |
 | `add_core` | mutating | `{ part, boundary, material, thickness, chamferAngle }` | 1 core region / thickness > 0, 0 < chamfer ≤ 90 / — | V1 |
 | `core_sample` | query | `{ part, point: vec3 } \| { part, polyline: vec3[], samples? }` | data `{ plies: [{ id, name, material, angleRosette, angleGlobal, z0, z1 }], thickness, core? }` / point projects onto a tool face / off-part → rejected | MVP |
-| `check_laminate_rules` | query | `{ part, zones?: string[] }` | data `{ findings: [{ rule, zoneId?, point?, plies, message }] }` | MVP |
-| `analyze_laminate` | query | `{ part, point } \| { angles, material }` + `{ loads?: { Nx?, Ny?, Nxy?, Mx?, My?, Mxy? }, criteria?: ('max_stress'\|'tsai_hill'\|'tsai_wu')[] }` | data `{ A, B, D, abdInverse, constantsMembrane, constantsFreeBending, plies: [{ stresses12Bottom, stresses12Top, ratios }], firstPlyFailure: { criterion: { R, ply, position } } }` | MVP |
+| `check_laminate_rules` | query | `{ part, zones?: string[], thresholds? }` | data `{ status, findings: [{ code, severity, rule, zoneId?, point?, plies, value, limit, unit, remediation, waiverStatus? }], thresholds: Record<string, NamedDefault> }` (codes `CMP_RULE_*`, §7.1) | MVP |
+| `analyze_laminate` | query | `{ part, point } \| { angles, material }` + `{ loads?: { Nx?, Ny?, Nxy? (N/mm), Mx?, My?, Mxy? (N·mm/mm) }, criteria?: ('max_stress'\|'tsai_hill'\|'tsai_wu')[] }` | data `{ unit: 'N-mm-MPa', Q, A, B, D, abdInverse, constantsMembrane, constantsFreeBending, plies: [{ stresses12Bottom, stresses12Top, ratios }], firstPlyFailure: { criterion: { R, ply, position } }, defaults: { tsaiWuF12Star: NamedDefault }, unverified, reviewRequired, reviewReason, provenance }` | MVP |
 | `laminate_mass` | query | `{ part }` | data `{ mass, area, volume, cg, perMaterial }`; `mass_properties` delegates here when an entity is a composite part | MVP |
-| `drape_ply` | query | `{ ply, stepLength?, output?: 'summary'\|'nodes' }` | data `{ maxShear, nodesOverWarning, nodesOverLock, net? }` / requiresKernel / no OCC → no-op summary | V1 |
-| `check_producibility` | query | `{ part, plies? }` | data `{ plies: [{ id, maxShear, overLockArea, suggestions }] }` | V1 |
+| `check_layup` | query | `{ part, purpose?: 'design'\|'release', loads?: LoadCase[], thresholds? }` | data `{ status: 'pass'\|'warn'\|'fail', findings: [{ code, severity, ids, value?, limit?, unit?, remediation, waiverStatus? }], defaults: Record<string, NamedDefault>, unverified, reviewRequired, reviewReason?, provenance }`; aggregates rules, ramps, blending, producibility (V1), FPF R < 1, material completeness and verification (AF-20) | MVP |
+| `request_layup_waiver` | mutating | `{ part, code, ids, reason }` | creates 1 pending `LayupWaiver` / `approvalRef` not settable by params (only the 09 PLM approval link sets it) / no matching current finding → `CMP_WAIVER_NO_FINDING` | MVP |
+| `drape_ply` | query | `{ ply, stepLength? (mm), output?: 'summary'\|'nodes' }` | data `{ maxShearDeg, nodesOverWarning, nodesOverLock, areaOverLockMm2, overLockRegions: [{ id, nodeCount, centroid }], stepLength: NamedDefault, net? }` (`net` only with `output: 'nodes'`, paged or `--save`) / requiresKernel / no OCC → `CMP_KERNEL_REQUIRED`; missing `lockingAngle` → `CMP_DRAPE_LIMIT_MISSING` | V1 |
+| `check_producibility` | query | `{ part, plies? }` | data `{ plies: [{ id, maxShearDeg, nodesOverLock, areaOverLockMm2, findings: [{ code, severity, remediation }], suggestions }] }` | V1 |
 | `export_flat_patterns_dxf` | query (export) | `{ part, plies?, labels?, nest?, allowance?, arcTolerance? }` | data `{ files: [{ name, mime: 'image/vnd.dxf', content }] }` / plies with over-lock nodes refused unless `allowOverLock` | MVP (developable), V1 (draped) |
 | `export_laser_projection` | query (export) | `{ part, plies?, spacing?: number, cornerAngle?: number, frame?: 'tool'\|'world' }` | text file per part, §6.3 | V1 |
-| `export_ply_book` | query (export) | `{ part, format: 'svg'\|'pdf', sheetSize? }` | builds sheets through the drawings renderer **without** mutating the document (in-memory sheet model) | V1 |
+| `ply_book_data` | query | `{ part }` | data `{ sequences: [{ sequence, plies: [{ id, name, material, orientationDeg, areaMm2, flatPieceIds, boundaryLengthMm }] }], reviewRequired: true, unverified }` (numeric content of the ply book, AF-21) | V1 |
+| `export_ply_book` | query (export) | `{ part, format: 'svg'\|'pdf', sheetSize? }` | sheets from `ply_book_data` through the drawings renderer **without** mutating the document (in-memory sheet model), written with `--save`; `reviewRequired: true` | V1 |
 | `export_ply_table` / `import_ply_table` | query / mutating | CSV text | round-trip of plies (`import_ply_table` creates plies through `add_ply` via `execute`) | V1 |
 | `export_laminate_sections` | query | `{ part, format: 'json'\|'nastran_pcomp'\|'calculix' }` | per zone section definitions (05 FEA consumes JSON) | V1 |
 | `export_composite_step` | query | `{ part, representation: 'explicit'\|'ap242_composite' }` | explicit = per-ply solids via `exportStep`; ap242_composite = V2 (§6.4) | V1 / V2 |
@@ -508,27 +523,94 @@ separator. Numbers use `.` as the decimal mark.
 
 05 FEA maps the sections to PCOMP / CalculiX `*SHELL SECTION, COMPOSITE`.
 
-## 7. UI, CLI and MCP surfaces
+## 7. CLI, MCP and UI surfaces
 
-- **UI (`src/ui/panels/composites/`):**
-  - Composites ribbon: Material, Rosette, Part, Zone, Ply, Generate, Core sample, Check, Analyze, Drape,
-    Export.
-  - Ply tree grouped by sequence, with drag to reorder (`reorder_plies`).
-  - Zone table showing notation, plies, thickness and a rule badge.
-  - Core-sample hover tooltip, showing the stack with angles and colours per material.
-  - Shear-map overlay with legend: green below warning, amber up to the lock, red above.
-  - Flat-pattern preview on a 2D "flats" layer. It uses the same ortho 2D view (L7), so no second model.
-  - All actions dispatch commands (L1). The panels compute nothing.
-- **Viewport.** Ply outlines are rendered as 3D polylines offset by cumulative thickness along the normal
-  (visual), with optional ply solids. The rosette glyph is an arrow triad. The drape net is a line mesh
-  coloured by shear.
-- **CLI.** No new verbs. The commands are reachable as `llull <command> …`, `llull run plan.json` and
-  `--save` for exports (KI6).
+- **CLI (primary).** No new verbs: every command is `llull <command> …` / `llull exec`, plans run with
+  `llull run plan.json --validate` then `llull run plan.json --json --progress`, exports land with `--save`
+  (DXF, laser text, CSV, ply-book SVG/PDF, net JSON). `llull search laminate ply drape` and `llull describe`
+  expose the toolset; `llull guide` gains the composites section (FR-CMP-62). Drape and regeneration honour
+  `--progress` / `--timeout` (AF-40); mutating commands work with `--dry-run` (AF-42). `render_view
+  isolate=<part> --save view.png` shows plies and nets to multimodal agents (AF-22).
 - **MCP.**
   - Toolset `composites`, exposed in discovery.
-  - Prompts `design_laminate` (requirements → plan) and `check_layup` (rules + FPF loop).
-  - Read-only queries carry `readOnlyHint`.
+  - Prompts `design_laminate` (requirements → plan) and `layup_loop` (`check_layup` + FPF loop).
+  - Read-only queries declare `annotations: { readOnly: true }` (MCP `readOnlyHint`).
   - Export tools return resources (DXF text, laser text, SVG).
+- **UI (`src/ui/panels/composites/`, review surface).** Ply tree grouped by sequence (drag to reorder dispatches
+  `reorder_plies`), zone table with rule badge, core-sample tooltip, shear-map overlay (green / amber / red from
+  `drape_ply` data), flat-pattern preview on a 2D "flats" layer (L7), `check_layup` report, waiver and ply-book
+  approval through 09 PLM. Ply outlines render as 3D polylines offset by cumulative thickness; the rosette glyph
+  is an arrow triad. All actions dispatch commands (L1); panels compute nothing; no capability depends on them.
+
+### 7.1 Stable error and finding codes (AF-11)
+
+Refusals return the unchanged document, exit 1, and `data.errors[] {code, path, ids, remediation}` (`--validate`
+adds the plan step path). Findings of `check_layup` / `check_laminate_rules` / `check_producibility` use the same
+shape in `data.findings[]` with `severity` pass / warn / fail (exit 0).
+
+| Code | Raised by | When | Offending ids / path | Remediation |
+| ---- | --------- | ---- | -------------------- | ----------- |
+| `CMP_NOTATION_PARSE` | `define_zone`, `edit_zone`, `analyze_laminate` | stacking string does not parse | `params.laminate`, token index | use `[a/b/…]`, `_n`, `( )_n`, `s`, `T`, `~` (TECHNICAL §5.1) |
+| `CMP_MATERIAL_NOT_POSITIVE_DEFINITE` | `create_lamina_material` | ν12² ≥ E1/E2 | `params.nu12` | check ν12 and the E1/E2 order |
+| `CMP_MATERIAL_NOT_POSITIVE` | `create_lamina_material` | a modulus, strength, thickness or density ≤ 0 | `params.<field>` | enter positive values in MPa / mm |
+| `CMP_MATERIAL_ALLOWABLE_MISSING` | `analyze_laminate`, `check_layup` | a strength needed by the criterion is absent | material name, field | add Xt, Xc, Yt, Yc, S from a cited source (no default exists) |
+| `CMP_F12_RANGE` | `create_lamina_material` | F12* ∉ [−1, 0] | `params.tsaiWuF12Star` | use −0.5 or a value from biaxial data |
+| `CMP_ROSETTE_DEGENERATE` | `define_rosette` | 0° axis parallel to the normal, zero vector | `params.axis0` / `params.normal` | give a 0° axis not parallel to the normal |
+| `CMP_FACE_NOT_FOUND` / `CMP_FACE_AMBIGUOUS` | `create_composite_part` | `faceNear` resolves to none / two faces within tolerance | `params.toolSurface.faceNear` | pick a point on the intended face interior |
+| `CMP_REF_MISSING` | ply / zone commands | material, rosette, part or ply id unknown | `params.<ref>` | create it first or fix the id (`llull describe_scene`) |
+| `CMP_ZONE_BOUNDARY_INVALID` | `define_zone` | polygon self-intersects or leaves the face | `params.boundary[i]` | give a simple polygon inside the face |
+| `CMP_ZONES_NOT_BLENDABLE` | `generate_plies_from_zones` | a zone stack is not a subsequence of the master stack | the two zone ids | edit the thinner zone so its stack embeds in the thicker one |
+| `CMP_ZONES_EQUAL_THICKNESS_CONFLICT` | `generate_plies_from_zones` | equally thick zones with different stacks | zone ids | make their stacks identical or change a ply count |
+| `CMP_RAMP_CONFLICT` | `generate_plies_from_zones` (refusal) / `check_layup` (fail) | a ramp does not fit before another boundary or the face edge | location, needed vs available length (mm) | move the zone boundary, lower the ramp ratio (with a reviewer) or reduce the step |
+| `CMP_LAMINATE_SINGULAR` | `analyze_laminate` | ABD condition number > 1e12 | stack | add plies in other directions |
+| `CMP_KERNEL_REQUIRED` | drape, curved flats | no OCC kernel | — | re-run with `--kernel occt` |
+| `CMP_DRAPE_LIMIT_MISSING` | `drape_ply`, `check_producibility` | material has no `lockingAngle` / `warningShear` | material name | enter the fabric's locking angle from a cited source (no default) |
+| `CMP_FLAT_OVER_LOCK` | `export_flat_patterns_dxf` | ply has over-lock nodes and `allowOverLock` is not set | ply id, node count | add darts (`split_ply`) and re-drape; or `allowOverLock` (result `reviewRequired`) |
+| `CMP_SPLIT_CURVE_INVALID` | `split_ply` | cut curve does not cross the ply boundary twice | `params.curveId` | extend the curve across the ply |
+| `CMP_WAIVER_NO_FINDING` | `request_layup_waiver` | no current finding with that code on those ids | `params.code` | run `check_layup` and copy the code |
+| `CMP_RULE_R1_SYMMETRY` … `CMP_RULE_R5_OUTER_PM45` | `check_laminate_rules`, `check_layup` (fail) | rule R1..R5 violated | zone / point, plies, value, limit | edit the stack (e.g. mirror it, add the missing −θ, split a run) or request a waiver |
+| `CMP_RULE_DISORIENTATION` · `CMP_RULE_DROP_SYMMETRY` | same (fail, V1 rules) | optional rules violated | interface plies | reorder plies |
+| `CMP_FPF_RATIO_BELOW_ONE` | `check_layup` (fail) | strength ratio R < 1 for a stored load case | ply, criterion, R | add plies or change angles; acceptance is a human gate |
+| `CMP_DRAPE_OVER_LOCK` · `CMP_DRAPE_OVER_WARNING` | `check_producibility`, `check_layup` (fail / warn) | nodes beyond lock / warning shear | ply, counts, regions | add darts or splices, change seed or orientation |
+| `CMP_MATERIAL_UNVERIFIED` | `check_layup` (warn, not suppressible) | material basis mean/unknown or uncited source | material name | use a sourced A/B-basis record (08 MAT, NCAMP) |
+| `CMP_DEFAULT_USED` | `check_layup` (warn) | a safety-relevant default was applied (F12*, thresholds, ramp ratio) | default name, value, source | give the programme value explicitly |
+| `CMP_WAIVER_PENDING` | `check_layup` (attached to a fail) | waiver without a human approval | waiver id | ask the qualified reviewer to approve in 09 PLM |
+
+### 7.2 Result conventions (AF-10, AF-31..35)
+
+- Units: `analyze_laminate` reports `unit: "N-mm-MPa"` (A in N/mm, B in N, D in N·mm, stresses MPa); geometric
+  results carry `unit` (document length unit) and angle fields end in `Deg`; masses carry `massUnit`.
+- `defaults` lists every `NamedDefault` used (F12* −0.5 source pyfem/Tsai-Wu convention S36; rule thresholds
+  "common published guidelines" S15-S17; ramp ratio 20 S16; drape step = bbox/200).
+- `unverified` follows the material rule above; `reviewRequired` + `reviewReason` on FPF results, `check_layup`
+  with `purpose: "release"`, `allowOverLock` flat patterns and ply-book outputs; `provenance {method,
+  reference, inputs}` on every query (e.g. `{method: "CLT", reference: "NASA RP-1351", inputs: {material,
+  angles, plyThickness}}`).
+- Bounded output: drape nets only with `output: "nodes"` (paged or `--save`); per-ply arrays summarised unless
+  requested.
+
+### 7.3 Agent-first compliance
+
+| AF | Where satisfied |
+| -- | --------------- |
+| AF-01, AF-02 | FR-CMP-60; registry commands with agent-written descriptions (§4) |
+| AF-03 | FR-CMP-62 (`llull guide` composites section, prompts) |
+| AF-04 | FR-CMP-63; units in every param description (§4 param sketches) |
+| AF-05 | plans in `validation/plans/` validate with `--validate` (VC-CMP-34) |
+| AF-10, AF-12 | FR-CMP-64, §7.2 |
+| AF-11 | FR-CMP-65, §7.1 |
+| AF-13 | §8 determinism, TR-CMP-02 |
+| AF-20, AF-30 | FR-CMP-20, FR-CMP-66 (`check_layup`, `check_laminate_rules` with `CMP_RULE_*`) |
+| AF-21 | FR-CMP-41 (shear per node, counts), FR-CMP-51 (`ply_book_data`), FPF ratios instead of plots |
+| AF-22 | `render_view isolate=<part> --save` in FUNCTIONAL §6.1 |
+| AF-23 | `expected_results.json` `cli_by_vc`; agent driver |
+| AF-31 | FR-CMP-67, `NamedDefault`; no allowable / locking-angle defaults |
+| AF-32 | FR-CMP-68 material verification rule |
+| AF-33, AF-36 | FR-CMP-69 |
+| AF-34 | FR-CMP-71, `request_layup_waiver` + 09 PLM `record_approval` (TR-PLM-16) |
+| AF-35 | FR-CMP-72, `provenance` |
+| AF-40, AF-42 | §7 CLI bullet, §8 budgets |
+| AF-41 | all composites computation is core / bundled OCC; no network |
 
 ## 8. Performance and robustness budgets
 
@@ -557,6 +639,8 @@ separator. Numbers use `.` as the decimal mark.
 | `tests/unit/composites/*.purity.test.ts` | `is pure` for every mutating command; failure paths (happy + failure per NON-NEGOTIABLE 2) | VC-CMP-20 |
 | `tests/golden/plans.ts` | add the 3 plans from `validation/plans/` (id-normalised snapshots + replay equality) | VC-CMP-10, 15, 20 |
 | `tests/unit/contract/` | `toToolSchemas()` snapshot includes the toolset; plugin document validate/restore; guards reject edits to derived ply entities | VC-CMP-20, 21 |
+| `tests/unit/composites/agentFirst.test.ts`, `tests/unit/contract/` | error codes (one failing plan per family), `unverified` propagation, named defaults, `reviewRequired`, waiver human gate with 09 PLM, units audit | VC-CMP-34..38 |
+| production-gate agent driver | runs `cli_by_vc` from `expected_results.json` with `--json` and exit codes only | all |
 | `server/tests/` + `desktop/tests/` | CLI `run` of the plans with `--kernel occt`; MCP `build_project` parity | VC-CMP-21 |
 | `npm run quality` | timing of VC-CMP-22 on the reference machine | VC-CMP-22 |
 | Validation scripts | `python3 generate_*.py --check` in CI (stdlib only) | all derived values |
@@ -574,6 +658,10 @@ Technical requirement ids cited by the validation pack (each points to the secti
 | TR-CMP-60 | Generic DXF writer in `@lib/dxfWrite.ts`, flat-pattern DXF layout | §6.2 |
 | TR-CMP-70 | UI, CLI and MCP reach the same registry commands with identical results | §7 |
 | TR-CMP-80 | Performance budgets | §8 |
+| TR-CMP-81 | Stable error and finding codes with path, ids and remediation | §7.1 |
+| TR-CMP-82 | `check_layup` aggregate check, `NamedDefault` reporting, `reviewRequired`, waivers linked to 09 PLM approvals | §4, §7.2 |
+| TR-CMP-83 | Material verification rule and `unverified` propagation; `provenance` on every query | §3, §7.2 |
+| TR-CMP-84 | Units in every param description and result field; bounded output | §7.2 |
 
 Coverage: `packages/domain-aero/src/**` is added to the 90/85/90/90 gate (NON-NEGOTIABLE 3, which today
 names domain-aec; extend the gate config).
