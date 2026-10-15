@@ -1,0 +1,153 @@
+{
+ "units": "1/length (document units)",
+ "cases": [
+  {
+   "surface": "sphere",
+   "R": 10.0,
+   "u": 0.3,
+   "v": 0.0,
+   "k1": 0.1,
+   "k2": 0.1,
+   "K": 0.01,
+   "abs_H": 0.1,
+   "fd_check": {
+    "K": 0.01000000018945979,
+    "H_signed": -0.10000000094729894
+   },
+   "tolerance_rel": 1e-06,
+   "derivation": "umbilic surface: k1 = k2 = 1/R, K = 1/R^2, |H| = 1/R; integral of K dA = 4*pi (Gauss-Bonnet, chi = 2)"
+  },
+  {
+   "surface": "sphere",
+   "R": 10.0,
+   "u": 0.3,
+   "v": 0.5,
+   "k1": 0.1,
+   "k2": 0.1,
+   "K": 0.01,
+   "abs_H": 0.1,
+   "fd_check": {
+    "K": 0.010000000161770377,
+    "H_signed": -0.10000000080885188
+   },
+   "tolerance_rel": 1e-06,
+   "derivation": "umbilic surface: k1 = k2 = 1/R, K = 1/R^2, |H| = 1/R; integral of K dA = 4*pi (Gauss-Bonnet, chi = 2)"
+  },
+  {
+   "surface": "sphere",
+   "R": 10.0,
+   "u": 0.3,
+   "v": 1.2,
+   "k1": 0.1,
+   "k2": 0.1,
+   "K": 0.01,
+   "abs_H": 0.1,
+   "fd_check": {
+    "K": 0.009999999680902507,
+    "H_signed": -0.09999999840451253
+   },
+   "tolerance_rel": 1e-06,
+   "derivation": "umbilic surface: k1 = k2 = 1/R, K = 1/R^2, |H| = 1/R; integral of K dA = 4*pi (Gauss-Bonnet, chi = 2)"
+  },
+  {
+   "surface": "cylinder",
+   "R": 5.0,
+   "k1": 0.2,
+   "k2": 0.0,
+   "K": 0.0,
+   "abs_H": 0.1,
+   "fd_check": {
+    "K": -0.0,
+    "H_signed": -0.1000000009568896
+   },
+   "tolerance_abs_K": 1e-09,
+   "tolerance_rel_H": 1e-06,
+   "derivation": "developable: k1 = 1/R around, k2 = 0 along the axis; K = 0, |H| = 1/(2R)"
+  },
+  {
+   "surface": "torus",
+   "R_centre": 5.0,
+   "r_tube": 2.0,
+   "u": 0.4,
+   "v": 0.0,
+   "k_tube": 0.5,
+   "k_ring": 0.14285714285714285,
+   "K": 0.07142857142857142,
+   "abs_H": 0.32142857142857145,
+   "fd_check": {
+    "K": 0.07142857424990892,
+    "H_signed": -0.32142857821775483
+   },
+   "tolerance_abs_K": 1e-06,
+   "tolerance_rel_H": 1e-05,
+   "derivation": "K = cos v / (r (R + r cos v)); outer equator v=0: K = 1/(r(R+r)) > 0; inner equator v=pi: K = -1/(r(R-r)) < 0; top v=pi/2: K = 0; integral of K dA = 0 (chi = 0)"
+  },
+  {
+   "surface": "torus",
+   "R_centre": 5.0,
+   "r_tube": 2.0,
+   "u": 0.4,
+   "v": 1.5707963267948966,
+   "k_tube": 0.5,
+   "k_ring": 1.2246467991473533e-17,
+   "K": 6.123233995736766e-18,
+   "abs_H": 0.25,
+   "fd_check": {
+    "K": -0.0,
+    "H_signed": -0.24999999931440064
+   },
+   "tolerance_abs_K": 1e-06,
+   "tolerance_rel_H": 1e-05,
+   "derivation": "K = cos v / (r (R + r cos v)); outer equator v=0: K = 1/(r(R+r)) > 0; inner equator v=pi: K = -1/(r(R-r)) < 0; top v=pi/2: K = 0; integral of K dA = 0 (chi = 0)"
+  },
+  {
+   "surface": "torus",
+   "R_centre": 5.0,
+   "r_tube": 2.0,
+   "u": 0.4,
+   "v": 2.0,
+   "k_tube": 0.5,
+   "k_ring": -0.09985032627193476,
+   "K": -0.04992516313596738,
+   "abs_H": 0.20007483686403266,
+   "fd_check": {
+    "K": -0.04992516466686233,
+    "H_signed": -0.20007483906148021
+   },
+   "tolerance_abs_K": 1e-06,
+   "tolerance_rel_H": 1e-05,
+   "derivation": "K = cos v / (r (R + r cos v)); outer equator v=0: K = 1/(r(R+r)) > 0; inner equator v=pi: K = -1/(r(R-r)) < 0; top v=pi/2: K = 0; integral of K dA = 0 (chi = 0)"
+  },
+  {
+   "surface": "torus",
+   "R_centre": 5.0,
+   "r_tube": 2.0,
+   "u": 0.4,
+   "v": 3.141592653589793,
+   "k_tube": 0.5,
+   "k_ring": -0.3333333333333333,
+   "K": -0.16666666666666666,
+   "abs_H": 0.08333333333333333,
+   "fd_check": {
+    "K": -0.16666667119034267,
+    "H_signed": -0.08333333446336265
+   },
+   "tolerance_abs_K": 1e-06,
+   "tolerance_rel_H": 1e-05,
+   "derivation": "K = cos v / (r (R + r cos v)); outer equator v=0: K = 1/(r(R+r)) > 0; inner equator v=pi: K = -1/(r(R-r)) < 0; top v=pi/2: K = 0; integral of K dA = 0 (chi = 0)"
+  }
+ ],
+ "integrals": [
+  {
+   "surface": "sphere",
+   "integral_K_dA": 12.566370614359172,
+   "area": 1256.6370614359173
+  },
+  {
+   "surface": "torus",
+   "integral_K_dA": 0.0,
+   "area": 394.78417604357435,
+   "volume": 394.78417604357435
+  }
+ ]
+}

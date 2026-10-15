@@ -1,0 +1,101 @@
+{
+ "schema": "llull-material-library/0.1-draft (TECHNICAL_SPEC §3.1)",
+ "accessed": "2026-10-15",
+ "statusLegend": {
+  "verified": "value read in the cited source's indexed content during authoring (see sources.md for how it was seen); usable as a test expectation",
+  "secondary_unconfirmed": "value seen only in a secondary transcription / forum / summary; recorded for traceability, NOT usable as a test expectation",
+  "tbd": "value not verified in this session; read it from the named primary location before use (MIL-HDBK-5J PDF on DTIC/EverySpec was blocked from the authoring sandbox)"
+ },
+ "basisLegend": {
+  "A": "MMPDS / MIL-HDBK-5: >= 99% of population equals or exceeds, 95% confidence (S3, S5)",
+  "B": "MMPDS / MIL-HDBK-5: >= 90% of population equals or exceeds, 95% confidence (S3, S5)",
+  "S": "MMPDS: specification minimum; statistical assurance not established (S3; see TECHNICAL_SPEC OQ-MAT-02)",
+  "typical": "average/typical value (e.g. Aluminum Association typical via MatWeb); never a design allowable",
+  "supplier_unstated": "supplier datasheet; basis not stated"
+ },
+ "licensingNote": "No MMPDS (licensed, Battelle) values are included. MIL-HDBK-5J (cancelled 2003, public DoD handbook) is the only allowables source allowed for redistribution in llull's seed library (TECHNICAL_SPEC §6.3).",
+ "materials": [
+  {
+   "id": "aa2024_t3",
+   "designation": "Aluminium alloy 2024", "temper": "T3", "productForm": "sheet",
+   "specs": [{"body": "SAE", "id": "AMS 4037", "title": "Aluminum Alloy, Sheet & Plate, Solution Heat Treated (2024-T3 sheet / T351 plate) — title as listed by suppliers", "status": "verified", "source": "S20"}],
+   "primaryAllowablesLocation": {"doc": "MIL-HDBK-5J", "table": "Table 3.2.3.0(b1) Design Mechanical and Physical Properties of 2024 Aluminum Alloy Sheet and Plate", "status": "verified (table title, via MIL-HDBK-5H CN1 excerpt S9)"},
+   "physical": {
+    "density_typical_matweb": {"value": 2.78, "unit": "g/cm^3", "alt": {"value": 0.100, "unit": "lb/in^3"}, "basis": "typical", "status": "verified", "source": "S10"},
+    "poisson_typical": {"value": 0.33, "unit": "-", "basis": "typical", "status": "verified", "source": "S10"},
+    "shearModulus_typical": {"value": 28, "unit": "GPa", "basis": "typical", "status": "verified", "source": "S10"},
+    "tensileModulus_typical": {"value": 73.1, "unit": "GPa", "alt": {"value": 10.6, "unit": "Msi"}, "basis": "typical", "status": "verified", "source": "S10",
+      "note": "compression modulus ~2% greater than tension (S10 Aerospace Metals datasheet)"}
+   },
+   "mechanical": {
+    "Ftu_supplier": {"value": 70, "unit": "ksi", "basis": "supplier_unstated", "status": "secondary_unconfirmed", "source": "S11"},
+    "Fty_supplier": {"value": 50, "unit": "ksi", "basis": "supplier_unstated", "status": "secondary_unconfirmed", "source": "S11"},
+    "elongation_supplier": {"value": 18, "unit": "%", "basis": "supplier_unstated", "status": "secondary_unconfirmed", "source": "S11"},
+    "Ftu_L_A_mil5_transcription": {"value": 65, "unit": "ksi", "basis": "A", "thickness_in": [0.020, 0.128], "status": "secondary_unconfirmed", "source": "S8",
+      "note": "third-party transcription of MIL-HDBK-5 seen only as a search summary; confirm against MIL-HDBK-5J Table 3.2.3.0(b1)"},
+    "Ftu_LT_A_mil5_transcription": {"value": 63, "unit": "ksi", "basis": "A", "thickness_in": [0.020, 0.128], "status": "secondary_unconfirmed", "source": "S8"},
+    "Fty_L_A_mil5_transcription": {"value": 49, "unit": "ksi", "basis": "A", "thickness_in": [0.020, 0.128], "status": "secondary_unconfirmed", "source": "S8"},
+    "Fty_LT_A_mil5_transcription": {"value": 42, "unit": "ksi", "basis": "A", "thickness_in": [0.020, 0.128], "status": "secondary_unconfirmed", "source": "S8"}
+   },
+   "temperature": {
+    "Ftu_vs_T": {"location": "MIL-HDBK-5 Figure 3.2.3.1.1(a) Effect of temperature on the tensile ultimate strength of 2024-T3, T351 ...", "points": "tbd — digitize", "status": "tbd", "source": "S9"},
+    "Ftu_RT_after_exposure": {"location": "MIL-HDBK-5 Figure 3.2.3.1.1(e) (exposure up to 10,000 h)", "points": "tbd — digitize", "status": "tbd", "source": "S9"}
+   }
+  },
+  {
+   "id": "aa7075_t6",
+   "designation": "Aluminium alloy 7075", "temper": "T6", "productForm": "sheet",
+   "specs": [{"body": "SAE", "id": "AMS 4045", "title": "Aluminum Alloy Sheet & Plate, Solution & Precipitation Heat Treated (7075-T6 sheet / T651 plate) — title as listed by suppliers", "status": "verified", "source": "S20"}],
+   "primaryAllowablesLocation": {"doc": "MIL-HDBK-5J", "table": "§3.7.x 7075 tables", "status": "tbd"},
+   "physical": {
+    "density_typical_matweb": {"value": 2.81, "unit": "g/cm^3", "alt": {"value": 0.102, "unit": "lb/in^3"}, "basis": "typical", "status": "verified", "source": "S12"},
+    "density_ams4045_supplier": {"value": 0.101, "unit": "lb/in^3", "basis": "supplier_unstated", "status": "verified", "source": "S13"},
+    "tensileModulus_typical": {"value": 71.7, "unit": "GPa", "basis": "typical", "status": "verified", "source": "S12", "note": "average of tension and compression; compression ~2% higher"},
+    "poisson_typical": {"value": 0.33, "unit": "-", "basis": "typical", "status": "verified", "source": "S12"}
+   },
+   "mechanical": {
+    "Ftu_typical": {"value": 572, "unit": "MPa", "alt": {"value": 83, "unit": "ksi"}, "basis": "typical", "status": "verified", "source": "S12"},
+    "Fty_typical": {"value": 503, "unit": "MPa", "alt": {"value": 73, "unit": "ksi"}, "basis": "typical", "status": "verified", "source": "S12"},
+    "Fbru_bare_sheet_edition_change": {"value": {"MMPDS-04_and_earlier": 156, "MMPDS-05_and_later": 146}, "unit": "ksi", "basis": "unknown", "status": "secondary_unconfirmed", "source": "S14",
+      "note": "forum report; recorded as the motivating example for per-value edition traceability (FR-MAT-04), not as data"}
+   },
+   "temperature": {"status": "tbd"}
+  },
+  {
+   "id": "aa7075_t7351",
+   "designation": "Aluminium alloy 7075", "temper": "T7351", "productForm": "plate",
+   "specs": [{"body": "SAE", "id": "tbd", "status": "tbd"}],
+   "physical": {}, "mechanical": {}, "status": "tbd — MIL-HDBK-5J chapter 3 (7075) tables"
+  },
+  {
+   "id": "ti6al4v_annealed",
+   "designation": "Titanium Ti-6Al-4V (UNS R56400)", "temper": "annealed", "productForm": "sheet",
+   "specs": [{"body": "SAE", "id": "AMS 4911", "title": "6-4 Titanium Sheet, Strip and Plate (as indexed by suppliers); annealed condition not confirmed from SAE page", "status": "verified", "source": "S20"}],
+   "primaryAllowablesLocation": {"doc": "MIL-HDBK-5J", "table": "chapter 5 Ti-6Al-4V tables", "status": "tbd"},
+   "physical": {
+    "density_supplier": {"value": 0.160, "unit": "lb/in^3", "basis": "supplier_unstated", "status": "verified", "source": "S15"},
+    "density_supplier_alt": {"value": 0.163, "unit": "lb/in^3", "basis": "supplier_unstated", "status": "verified", "source": "S15", "note": "sources disagree by ~2%: the library must keep both with provenance (FR-MAT-04)"}
+   },
+   "mechanical": {
+    "Ftu_typical": {"value": 134, "unit": "ksi", "thickness_in": [0.063, 0.1875], "basis": "typical", "status": "verified", "source": "S16"},
+    "Fty_typical": {"value": 126, "unit": "ksi", "thickness_in": [0.063, 0.1875], "basis": "typical", "status": "verified", "source": "S16"},
+    "elongation_typical": {"value": 10, "unit": "%", "thickness_in": [0.063, 0.1875], "basis": "typical", "status": "verified", "source": "S16"}
+   },
+   "temperature": {"status": "tbd"}
+  },
+  {"id": "aa6061_t6", "designation": "Aluminium alloy 6061", "temper": "T6", "productForm": "tbd", "specs": [], "physical": {}, "mechanical": {}, "status": "tbd — MIL-HDBK-5J chapter 3"},
+  {"id": "aa7050_t7451", "designation": "Aluminium alloy 7050", "temper": "T7451", "productForm": "plate", "specs": [], "physical": {}, "mechanical": {}, "status": "tbd — MIL-HDBK-5J chapter 3"},
+  {"id": "aisi4130_normalized", "designation": "Steel AISI 4130", "temper": "normalized", "productForm": "tbd", "specs": [], "physical": {}, "mechanical": {},
+   "primaryAllowablesLocation": {"doc": "MIL-HDBK-5J", "table": "chapter 2 (low-alloy steels; 4130 pages around p. 2-17)", "status": "verified (page header seen in excerpt S17); values tbd"}, "status": "tbd"},
+  {"id": "ph15_5_h1025", "designation": "Stainless 15-5PH", "temper": "H1025", "productForm": "tbd", "specs": [], "physical": {}, "mechanical": {}, "status": "tbd — MIL-HDBK-5J chapter 2"},
+  {"id": "in718", "designation": "Nickel alloy 718", "temper": "solution treated and aged", "productForm": "tbd", "specs": [], "physical": {}, "mechanical": {}, "status": "tbd — MIL-HDBK-5J chapter 6"},
+  {"id": "a286", "designation": "Iron-base heat-resistant alloy A-286", "temper": "tbd", "productForm": "bolt stock", "specs": [], "physical": {}, "mechanical": {},
+   "note": "NAS6303-6320 bolts are A286 CRES per distributor index (S22)", "status": "tbd — MIL-HDBK-5J chapter 6"}
+ ],
+ "fastenerMaterialAllowables": [
+  {"id": "nas6203_bolt_alloy_steel", "appliesTo": "NAS6203-6220", "Ftu_min": {"value": 160, "unit": "ksi", "status": "verified", "source": "S21"},
+   "Fsu_min": {"value": 95, "unit": "ksi", "status": "verified", "source": "S22"}},
+  {"id": "hilok_hl10_ti", "appliesTo": "HL10 (Ti-6Al-4V)", "Fsu_min": {"value": 95, "unit": "ksi", "status": "verified", "source": "S26"}},
+  {"id": "hilok_hl18_steel", "appliesTo": "HL18 (alloy steel)", "Fsu_min": {"value": 95, "unit": "ksi", "status": "verified", "source": "S26"}}
+ ]
+}

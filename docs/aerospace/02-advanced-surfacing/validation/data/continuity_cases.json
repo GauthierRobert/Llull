@@ -1,0 +1,54 @@
+{
+ "convention": "joint at the origin; left branch for x <= 0, right branch for x >= 0; curvature signed in the plane",
+ "cases": [
+  {
+   "id": "corner",
+   "left": "y = 0",
+   "right": "y = x",
+   "expected_order": "G0",
+   "tangent_angle_jump_rad": 0.7853981633974483
+  },
+  {
+   "id": "line_arc",
+   "left": "y = 0",
+   "right": "circle radius 5.0 tangent at origin (y = R - sqrt(R^2 - x^2))",
+   "expected_order": "G1",
+   "tangent_angle_jump_rad": 0.0,
+   "curvature_jump": 0.2
+  },
+  {
+   "id": "line_cubic",
+   "left": "y = 0",
+   "right": "y = x^3",
+   "expected_order": "G2",
+   "curvature_jump": 0.0,
+   "dkappa_ds_jump": 6.0,
+   "derivation": "kappa = 6x/(1+9x^4)^1.5 -> 0 at x=0; dkappa/ds at 0 = 6 vs 0 on the line"
+  },
+  {
+   "id": "line_quartic",
+   "left": "y = 0",
+   "right": "y = x^4",
+   "expected_order": "G3",
+   "curvature_jump": 0.0,
+   "dkappa_ds_jump": 0.0,
+   "d2kappa_ds2_jump": 24.0,
+   "derivation": "kappa = 12x^2/(...)^1.5; kappa(0) = 0, kappa'(0) = 0, kappa''(0) = 24"
+  },
+  {
+   "id": "arc_arc_equal",
+   "left": "circle radius 5.0",
+   "right": "same circle radius 5.0",
+   "expected_order": "G3 (constant curvature; any order)",
+   "curvature_jump": 0.0
+  },
+  {
+   "id": "arc_arc_ratio2",
+   "left": "circle radius 5.0",
+   "right": "tangent circle radius 10.0",
+   "expected_order": "G1",
+   "curvature_jump": 0.1
+  }
+ ],
+ "bezier_g2_rule": "cubic Beziers P0..P3 | Q0..Q3 with P3 = Q0: G1 iff P2, P3, Q1 collinear with P3 between; curvature at an end = (n-1)/n * |d1 x d2| / |d1|^3 with d1 = P3-P2, d2 = P2-P1 (n = 3): kappa_end = 2/3 * |(P3-P2) x (P1-P2)| / |P3-P2|^3  (Piegl & Tiller / Farin)"
+}

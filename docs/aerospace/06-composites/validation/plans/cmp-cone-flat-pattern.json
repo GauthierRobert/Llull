@@ -1,0 +1,11 @@
+[
+ { "command": "set_units", "params": { "units": "mm" } },
+ { "command": "add_cone", "params": { "radius": 100, "height": 100, "position": [0, 0, 0] }, "as": "tool" },
+ { "command": "create_lamina_material", "params": { "name": "AS4_3501_6", "form": "ud_tape", "E1": 126000, "E2": 11000, "G12": 6600, "nu12": 0.28,
+   "Xt": 1950, "Xc": 1480, "Yt": 48, "Yc": 200, "S": 79, "plyThickness": 0.125, "source": "Soden, Hinton & Kaddour 1998" } },
+ { "command": "define_rosette", "params": { "name": "Rax", "origin": [0, 0, 0], "axis0": [0, 0, 1], "normal": [1, 0, 0], "method": "cylindrical", "axis": [0, 0, 1] } },
+ { "command": "create_composite_part", "params": { "name": "Cone skin", "toolSurface": { "entityId": "$tool", "faceNear": [50, 0, 50] }, "rosette": "Rax" }, "as": "part" },
+ { "command": "add_ply", "params": { "part": "$part", "name": "C1", "material": "AS4_3501_6", "orientation": 0, "sequence": "S1",
+   "boundary": { "kind": "whole_face" }, "drape": { "method": "developable" } }, "as": "c1" },
+ { "command": "export_flat_patterns_dxf", "params": { "part": "$part", "plies": ["$c1"] } }
+]

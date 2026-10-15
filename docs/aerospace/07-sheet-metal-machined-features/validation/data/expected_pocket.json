@@ -1,0 +1,46 @@
+{
+ "description": "Rounded-rectangle closed pocket with vertical corner radius rc and floor fillet rf (rf <= rc), mm. Category (b): analytic; cross-checked once against OCCT 8.0 (cadquery-ocp 8.0.1.1.0) BRepFilletAPI_MakeFillet on the pocket floor edges, relative error 6.8e-12.",
+ "formula": {
+  "area": "A = W*L - (4 - pi)*rc^2",
+  "removed_no_fillet": "V0 = D*A",
+  "spandrel_area": "a = rf^2*(1 - pi/4)",
+  "spandrel_centroid_from_corner": "xbar = rf*(10 - 3*pi)/(3*(4 - pi))",
+  "removed_with_floor_fillet": "V = V0 - a*(2*(W+L) - 8*rc + 2*pi*(rc - xbar))  (straight walls + Pappus around the 4 corners)"
+ },
+ "tolerance": {
+  "volume_rel": 1e-06
+ },
+ "cases": [
+  {
+   "id": "PK-01",
+   "W": 40.0,
+   "L": 20.0,
+   "D": 5.0,
+   "rc": 4.0,
+   "rf": 0.0,
+   "removed_volume": 3931.327412287,
+   "max_tool_diameter": 8.0
+  },
+  {
+   "id": "PK-02",
+   "W": 40.0,
+   "L": 20.0,
+   "D": 5.0,
+   "rc": 4.0,
+   "rf": 1.5,
+   "removed_volume": 3877.71730193,
+   "max_tool_diameter": 8.0,
+   "ball_or_bull_nose_corner_radius": 1.5
+  },
+  {
+   "id": "PK-03",
+   "W": 40.0,
+   "L": 20.0,
+   "D": 5.0,
+   "rc": 1.0,
+   "rf": 1.5,
+   "valid": false,
+   "reason": "floor fillet larger than corner radius: formula domain rf <= rc; add_pocket must reject or clamp with a summary"
+  }
+ ]
+}

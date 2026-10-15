@@ -1,0 +1,66 @@
+[
+ {
+  "designation": "0012",
+  "file": "naca0012.dat",
+  "sha256": "e930c9a52ec3affa528d607d55de591687f90bb17c39bd758d15f521552fb3e2",
+  "bytes": 1517,
+  "format": "selig",
+  "points": 69,
+  "max_deviation_chord": 1e-07,
+  "rms_deviation_chord": 0.0,
+  "worst_point": [
+   0.0748914,
+   0.0419751
+  ],
+  "max_deviation_chord_after_chord_normalisation": 1e-07,
+  "rms_deviation_chord_after_chord_normalisation": 0.0
+ },
+ {
+  "designation": "2412",
+  "file": "naca2412.dat",
+  "sha256": "d1ab3c211815041c249d799a861588f7f3f7a79394956f5e7d7c50004ff91d86",
+  "bytes": 1516,
+  "format": "selig",
+  "points": 69,
+  "max_deviation_chord": 0.0012909,
+  "rms_deviation_chord": 0.0007798,
+  "worst_point": [
+   0.0524184,
+   -0.0318994
+  ],
+  "max_deviation_chord_after_chord_normalisation": 0.000158,
+  "rms_deviation_chord_after_chord_normalisation": 9.56e-05
+ },
+ {
+  "designation": "23012",
+  "file": "naca23012.dat",
+  "sha256": "23fe31b5f8728ffe2c18394a7b44b64b17337e5c7010d8370975109af1a3efa7",
+  "bytes": 1238,
+  "format": "selig",
+  "points": 61,
+  "max_deviation_chord": 9.2e-06,
+  "rms_deviation_chord": 4.4e-06,
+  "worst_point": [
+   0.25131,
+   0.07597
+  ],
+  "max_deviation_chord_after_chord_normalisation": 0.0041062,
+  "rms_deviation_chord_after_chord_normalisation": 0.0024741
+ },
+ {
+  "designation": "0012",
+  "file": "n0012.dat",
+  "sha256": "13e296d47b272016e6c8cb04d2cbe25bc561977b1763dda9c453ea636bc65785",
+  "bytes": 2640,
+  "format": "selig",
+  "points": 131,
+  "max_deviation_chord": 0.0,
+  "rms_deviation_chord": 0.0,
+  "worst_point": [
+   0.9309849,
+   0.0105485
+  ],
+  "max_deviation_chord_after_chord_normalisation": 0.0,
+  "rms_deviation_chord_after_chord_normalisation": 0.0
+ }
+]

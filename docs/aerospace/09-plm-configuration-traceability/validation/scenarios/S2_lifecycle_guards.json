@@ -1,0 +1,268 @@
+{
+  "id": "S2",
+  "title": "Lifecycle state machine: illegal transitions, edit locks, obsolescence, undo/replay safety, tamper detection",
+  "proves": [
+    "VC-PLM-02",
+    "VC-PLM-03",
+    "VC-PLM-08",
+    "VC-PLM-09",
+    "VC-PLM-13",
+    "VC-PLM-25",
+    "VC-PLM-26",
+    "VC-PLM-27"
+  ],
+  "transitionTable": "validation/lifecycle_transitions.csv",
+  "cases": [
+    {
+      "id": "S2-01",
+      "given": "LL-2001 rev A in_work",
+      "command": "release_item",
+      "params": {
+        "changeOrder": "ECO-0100",
+        "at": "2026-11-02T09:00:00Z",
+        "by": "u-1"
+      },
+      "expect": {
+        "refused": true,
+        "summaryMatches": "release_item rejected: LL-2001 rev A is in_work; submit_for_review first",
+        "documentUnchanged": true,
+        "data.error.code": "PLM_STATE_TRANSITION"
+      }
+    },
+    {
+      "id": "S2-02",
+      "given": "LL-2001 rev A in_review; policy.requireIndependentChecker = true",
+      "command": "release_item",
+      "params": {
+        "changeOrder": "ECO-0100",
+        "at": "2026-11-02T09:00:00Z",
+        "by": "u-1",
+        "approvals": [
+          {
+            "role": "design-authority",
+            "userId": "u-1"
+          },
+          {
+            "role": "checker",
+            "userId": "u-1"
+          }
+        ]
+      },
+      "expect": {
+        "refused": true,
+        "summaryMatches": "checker must differ from the author",
+        "documentUnchanged": true,
+        "data.error.code": "PLM_CHECKER_IS_AUTHOR"
+      }
+    },
+    {
+      "id": "S2-03",
+      "given": "LL-2001 rev A in_review",
+      "command": "reject_review",
+      "params": {
+        "comment": "missing edge break note",
+        "at": "2026-11-02T09:05:00Z",
+        "by": "u-2"
+      },
+      "expect": {
+        "plm.item.revisions.A.state": "in_work"
+      }
+    },
+    {
+      "id": "S2-04",
+      "given": "LL-2001 rev A released",
+      "command": "move_entities",
+      "params": {
+        "ids": [
+          "box-2.1"
+        ],
+        "delta": [
+          1,
+          0,
+          0
+        ]
+      },
+      "expect": {
+        "refused": true,
+        "summaryMatches": "rejected: LL-2001 rev A is released; open an ECO and revise_item",
+        "documentUnchanged": true,
+        "data.error.code": "PLM_LOCKED"
+      }
+    },
+    {
+      "id": "S2-05",
+      "given": "LL-2001 rev A released",
+      "command": "set_camera",
+      "params": {
+        "target": [
+          0,
+          0,
+          0
+        ]
+      },
+      "expect": {
+        "refused": false,
+        "note": "view state is outside the release scope (selection, camera) and stays editable"
+      }
+    },
+    {
+      "id": "S2-06",
+      "given": "LL-2001 rev A released",
+      "command": "revise_item",
+      "params": {
+        "at": "2026-11-03T09:00:00Z",
+        "by": "u-1"
+      },
+      "expect": {
+        "refused": true,
+        "summaryMatches": "revise_item rejected: a released revision can only be revised under an open change order (policy.requireChangeOrder)",
+        "data.error.code": "PLM_ECO_REQUIRED"
+      }
+    },
+    {
+      "id": "S2-07",
+      "given": "LL-2001 rev A released, rev B released (A superseded)",
+      "command": "set_lifecycle_state",
+      "params": {
+        "revision": "A",
+        "state": "in_work",
+        "at": "2027-01-01T00:00:00Z",
+        "by": "u-1"
+      },
+      "expect": {
+        "refused": true,
+        "summaryMatches": "^set_lifecycle_state rejected: invalid params — state",
+        "documentUnchanged": true,
+        "note": "the zod enum of set_lifecycle_state only admits 'obsolete' | 'cancelled', so 'in_work' never reaches the transition table; transitions between admitted states are checked against lifecycle_transitions.csv (e.g. in_review -> cancelled refused: 'reject_review first')"
+      }
+    },
+    {
+      "id": "S2-08",
+      "given": "LL-2001 rev B released",
+      "command": "set_lifecycle_state",
+      "params": {
+        "revision": "B",
+        "state": "obsolete",
+        "reason": "part replaced by LL-2002",
+        "changeOrder": "ECO-0140",
+        "at": "2028-01-01T00:00:00Z",
+        "by": "u-1"
+      },
+      "expect": {
+        "plm.item.revisions.B.state": "obsolete",
+        "plm.item.revisions.B.contentHashUnchanged": true,
+        "resolve_effectivity(serial 99).data.revision": null
+      }
+    },
+    {
+      "id": "S2-09",
+      "given": "rev A released at document step k; user presses Undo in the UI",
+      "action": "store.undo()",
+      "expect": {
+        "note": "Undo of release_item is refused by the store when the release has been persisted to the vault (release is an irreversible business event); before persistence it is allowed and emits audit 'release_reverted'.",
+        "plm.item.revisions.A.state": "released"
+      }
+    },
+    {
+      "id": "S2-10",
+      "given": "rev A released with contentHash H; a file editor changes parameters.t.expression in the saved .llull.json outside llull",
+      "command": "load_document",
+      "params": {
+        "json": "<tampered file>"
+      },
+      "expect": {
+        "loaded": true,
+        "summaryContains": "release A content hash mismatch",
+        "plm_status.data.integrity.A": "mismatch",
+        "editsStillLocked": true,
+        "note": "reported by DocumentExtension.afterLoad (TECHNICAL_SPEC TR-PLM-33); nothing is stored, plm_status / verify_release recompute it"
+      }
+    },
+    {
+      "id": "S2-11",
+      "given": "rev A released; replay of featureHistory (regenerate) after kernel upgrade",
+      "command": "verify_release",
+      "params": {
+        "revision": "A",
+        "regenerate": true
+      },
+      "expect": {
+        "readOnly": true,
+        "data.contentHashMatches": true,
+        "data.geometryFingerprintMatches": "true or reported drift with per-entity volume/bbox deltas (tolerance 1e-6 relative)"
+      }
+    },
+    {
+      "id": "S2-12",
+      "given": "rev A released and signed (Ed25519)",
+      "command": "record_signature",
+      "params": {
+        "target": {
+          "kind": "release",
+          "ref": "A"
+        },
+        "alg": "Ed25519",
+        "keyId": "rfc8032-test-1",
+        "publicKey": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+        "signature": "<bit-flipped signature from vectors/ed25519_vectors.json negative[1]>",
+        "meaning": "approval",
+        "signer": {
+          "userId": "u-1",
+          "name": "J. Example"
+        },
+        "at": "2026-11-02T09:31:00Z"
+      },
+      "expect": {
+        "refused": true,
+        "summaryMatches": "record_signature rejected: signature does not verify",
+        "documentUnchanged": true,
+        "data.error.code": "PLM_SIGNATURE_INVALID"
+      }
+    },
+    {
+      "id": "S2-13",
+      "given": "LL-2001 rev A in_review with both approvals recorded by humans; caller = agent (CLI default)",
+      "command": "release_item",
+      "params": {
+        "changeOrder": "ECO-0100",
+        "at": "2026-11-02T09:00:00Z",
+        "by": "u-agent"
+      },
+      "expect": {
+        "refused": true,
+        "data.error.code": "PLM_HUMAN_GATE",
+        "summaryContains": "human",
+        "documentUnchanged": true,
+        "note": "same refusal for record_approval, approval record_signature, classification on create_change_order, set_export_marking (AF-34)"
+      }
+    },
+    {
+      "id": "S2-14",
+      "given": "LL-2001 rev A in_review; one gap-03 PMI item with review.required = true; caller = human",
+      "command": "release_item",
+      "params": {
+        "changeOrder": "ECO-0100",
+        "at": "2026-11-02T09:00:00Z",
+        "by": "u-cm",
+        "approvals": [
+          {
+            "role": "design-authority",
+            "userId": "u-1"
+          },
+          {
+            "role": "checker",
+            "userId": "u-2"
+          }
+        ]
+      },
+      "expect": {
+        "refused": true,
+        "data.error.code": "PLM_REVIEW_PENDING",
+        "data.error.ids": [
+          "<pmi id>"
+        ],
+        "documentUnchanged": true
+      }
+    }
+  ]
+}

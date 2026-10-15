@@ -1,0 +1,104 @@
+{
+  "item": "LL-1001",
+  "ranges": {
+    "serial": [
+      {
+        "revision": "A",
+        "from": 1,
+        "to": 4
+      },
+      {
+        "revision": "B",
+        "from": 5,
+        "to": null
+      }
+    ],
+    "msn": [
+      {
+        "revision": "A",
+        "from": 1,
+        "to": 11
+      },
+      {
+        "revision": "B",
+        "from": 12,
+        "to": null
+      }
+    ],
+    "date": [
+      {
+        "revision": "A",
+        "from": "2026-11-02",
+        "to": "2027-02-28"
+      },
+      {
+        "revision": "B",
+        "from": "2027-03-01",
+        "to": null
+      }
+    ]
+  },
+  "cases": [
+    {
+      "kind": "serial",
+      "unit": 1,
+      "expectRevision": "A"
+    },
+    {
+      "kind": "serial",
+      "unit": 4,
+      "expectRevision": "A"
+    },
+    {
+      "kind": "serial",
+      "unit": 5,
+      "expectRevision": "B"
+    },
+    {
+      "kind": "serial",
+      "unit": 37,
+      "expectRevision": "B"
+    },
+    {
+      "kind": "msn",
+      "unit": 1,
+      "expectRevision": "A"
+    },
+    {
+      "kind": "msn",
+      "unit": 11,
+      "expectRevision": "A"
+    },
+    {
+      "kind": "msn",
+      "unit": 12,
+      "expectRevision": "B"
+    },
+    {
+      "kind": "msn",
+      "unit": 250,
+      "expectRevision": "B"
+    },
+    {
+      "kind": "date",
+      "unit": "2026-11-01",
+      "expectRevision": null
+    },
+    {
+      "kind": "date",
+      "unit": "2026-11-02",
+      "expectRevision": "A"
+    },
+    {
+      "kind": "date",
+      "unit": "2027-02-28",
+      "expectRevision": "A"
+    },
+    {
+      "kind": "date",
+      "unit": "2027-03-01",
+      "expectRevision": "B"
+    }
+  ],
+  "note": "null = no released revision effective (e.g. date before first release)"
+}

@@ -1,0 +1,173 @@
+{
+  "format": "llull-document",
+  "version": 2,
+  "document": {
+    "entities": {
+      "box-2.1": {
+        "id": "box-2.1",
+        "kind": "box",
+        "size": [
+          60,
+          40,
+          4
+        ],
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "layer-default",
+        "color": "#6b8f9c"
+      },
+      "cyl-3.1": {
+        "id": "cyl-3.1",
+        "kind": "cylinder",
+        "radius": 3.3,
+        "height": 10,
+        "position": [
+          20,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "layerId": "layer-default",
+        "color": "#6b8f9c"
+      }
+    },
+    "order": [
+      "box-2.1",
+      "cyl-3.1"
+    ],
+    "layers": {
+      "layer-default": {
+        "id": "layer-default",
+        "name": "Layer 0",
+        "visible": true,
+        "locked": false
+      }
+    },
+    "layerOrder": [
+      "layer-default"
+    ],
+    "selection": [
+      "box-2.1"
+    ],
+    "camera": {
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "azimuth": 2.356194490192345,
+      "polar": 1.0471975511965976,
+      "distance": 12
+    },
+    "groups": {},
+    "units": "mm",
+    "displayPrecision": 3,
+    "parameters": {
+      "w": {
+        "name": "w",
+        "expression": "60",
+        "value": 60
+      },
+      "t": {
+        "name": "t",
+        "expression": "4",
+        "value": 4
+      }
+    },
+    "animations": {},
+    "featureHistory": [
+      {
+        "id": "step-1",
+        "name": "set_units",
+        "params": {
+          "units": "mm"
+        },
+        "suppressed": false,
+        "affected": []
+      },
+      {
+        "id": "step-2",
+        "name": "add_box",
+        "params": {
+          "size": [
+            "=w",
+            40,
+            "=t"
+          ]
+        },
+        "suppressed": false,
+        "affected": [
+          "box-2.1"
+        ]
+      },
+      {
+        "id": "step-3",
+        "name": "add_cylinder",
+        "params": {
+          "radius": 3.3,
+          "height": 10,
+          "position": [
+            20,
+            0,
+            0
+          ]
+        },
+        "suppressed": false,
+        "affected": [
+          "cyl-3.1"
+        ]
+      },
+      {
+        "id": "step-4",
+        "name": "create_material",
+        "params": {
+          "name": "Al 2024-T3",
+          "density": 0.00278,
+          "color": "#c0c0c0",
+          "metalness": 1,
+          "roughness": 0.4
+        },
+        "suppressed": false,
+        "affected": []
+      }
+    ],
+    "configurations": {
+      "thin": {
+        "name": "thin",
+        "parameterValues": {
+          "t": "3"
+        }
+      }
+    },
+    "materials": {
+      "Al 2024-T3": {
+        "name": "Al 2024-T3",
+        "density": 0.00278,
+        "color": "#c0c0c0",
+        "metalness": 1,
+        "roughness": 0.4
+      }
+    },
+    "recipes": {},
+    "components": {},
+    "constraints": {},
+    "constraintOrder": [],
+    "joints": {},
+    "jointOrder": [],
+    "driveRelations": {},
+    "driveRelationOrder": [],
+    "nextStepNumber": 5
+  }
+}

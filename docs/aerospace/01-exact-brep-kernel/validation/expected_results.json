@@ -1,0 +1,1206 @@
+{
+ "$comment": "KRN expected results. value/tolerance/unit/source per case; (a) quoted, (b) analytic, measured = produced by the scripts in this folder.",
+ "cases": [
+  {
+   "vc": "VC-KRN-01",
+   "title": "exact mass properties: box-100x50x20",
+   "proves": [
+    "FR-KRN-08",
+    "TR-KRN-40"
+   ],
+   "value": {
+    "volume": 100000,
+    "area": 16000,
+    "centroid": [
+     50.0,
+     25.0,
+     10.0
+    ],
+    "inertiaRho1": [
+     24166666.666666668,
+     86666666.66666667,
+     104166666.66666667
+    ]
+   },
+   "tolerance": {
+    "volumeRel": 1e-09,
+    "areaRel": 1e-09,
+    "centroidAbs": 1e-06,
+    "inertiaRel": 1e-09
+   },
+   "unit": "mm, mm^2, mm, mm^5",
+   "source": "analytic (b): analytic_solids.json, formulas in README Derivations; OCCT 7.9.3 cross-check worst rel err 1.1e-14 (occt_crosscheck.json)",
+   "plan": "plans/krn-analytic-primitives.json",
+   "centroidInPlan": [
+    50.0,
+    25.0,
+    10.0
+   ],
+   "centroidNote": "value.centroid is in the solid local frame of analytic_solids.json; the plan places the solid elsewhere (add_* position/anchor), so compare the plan result with centroidInPlan"
+  },
+  {
+   "vc": "VC-KRN-01",
+   "title": "exact mass properties: cyl-r10-h40",
+   "proves": [
+    "FR-KRN-08",
+    "TR-KRN-40"
+   ],
+   "value": {
+    "volume": 12566.370614359173,
+    "area": 3141.5926535897934,
+    "centroid": [
+     0.0,
+     0.0,
+     20.0
+    ],
+    "inertiaRho1": [
+     1989675.3472735358,
+     1989675.3472735358,
+     628318.5307179587
+    ]
+   },
+   "tolerance": {
+    "volumeRel": 1e-09,
+    "areaRel": 1e-09,
+    "centroidAbs": 1e-06,
+    "inertiaRel": 1e-09
+   },
+   "unit": "mm, mm^2, mm, mm^5",
+   "source": "analytic (b): analytic_solids.json, formulas in README Derivations; OCCT 7.9.3 cross-check worst rel err 1.1e-14 (occt_crosscheck.json)",
+   "plan": "plans/krn-analytic-primitives.json",
+   "centroidInPlan": [
+    200.0,
+    0.0,
+    20.0
+   ],
+   "centroidNote": "value.centroid is in the solid local frame of analytic_solids.json; the plan places the solid elsewhere (add_* position/anchor), so compare the plan result with centroidInPlan"
+  },
+  {
+   "vc": "VC-KRN-01",
+   "title": "exact mass properties: tube-ro25-ri20-h100",
+   "proves": [
+    "FR-KRN-08",
+    "TR-KRN-40"
+   ],
+   "value": {
+    "volume": 70685.83470577035,
+    "area": 29688.050576423546,
+    "centroid": [
+     0.0,
+     0.0,
+     50.0
+    ],
+    "inertiaRho1": [
+     77018107.39816228,
+     77018107.39816228,
+     36226490.286707304
+    ]
+   },
+   "tolerance": {
+    "volumeRel": 1e-09,
+    "areaRel": 1e-09,
+    "centroidAbs": 1e-06,
+    "inertiaRel": 1e-09
+   },
+   "unit": "mm, mm^2, mm, mm^5",
+   "source": "analytic (b): analytic_solids.json, formulas in README Derivations; OCCT 7.9.3 cross-check worst rel err 1.1e-14 (occt_crosscheck.json)"
+  },
+  {
+   "vc": "VC-KRN-01",
+   "title": "exact mass properties: sphere-r25",
+   "proves": [
+    "FR-KRN-08",
+    "TR-KRN-40"
+   ],
+   "value": {
+    "volume": 65449.84694978735,
+    "area": 7853.981633974483,
+    "centroid": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "inertiaRho1": [
+     16362461.737446839,
+     16362461.737446839,
+     16362461.737446839
+    ]
+   },
+   "tolerance": {
+    "volumeRel": 1e-09,
+    "areaRel": 1e-09,
+    "centroidAbs": 1e-06,
+    "inertiaRel": 1e-09
+   },
+   "unit": "mm, mm^2, mm, mm^5",
+   "source": "analytic (b): analytic_solids.json, formulas in README Derivations; OCCT 7.9.3 cross-check worst rel err 1.1e-14 (occt_crosscheck.json)",
+   "plan": "plans/krn-analytic-primitives.json",
+   "centroidInPlan": [
+    300.0,
+    0.0,
+    0.0
+   ],
+   "centroidNote": "value.centroid is in the solid local frame of analytic_solids.json; the plan places the solid elsewhere (add_* position/anchor), so compare the plan result with centroidInPlan"
+  },
+  {
+   "vc": "VC-KRN-01",
+   "title": "exact mass properties: cone-r20-h60",
+   "proves": [
+    "FR-KRN-08",
+    "TR-KRN-40"
+   ],
+   "value": {
+    "volume": 25132.741228718343,
+    "area": 5230.472367754358,
+    "centroid": [
+     0.0,
+     0.0,
+     15.0
+    ],
+    "inertiaRho1": [
+     4900884.539600077,
+     4900884.539600077,
+     3015928.947446201
+    ]
+   },
+   "tolerance": {
+    "volumeRel": 1e-09,
+    "areaRel": 1e-09,
+    "centroidAbs": 1e-06,
+    "inertiaRel": 1e-09
+   },
+   "unit": "mm, mm^2, mm, mm^5",
+   "source": "analytic (b): analytic_solids.json, formulas in README Derivations; OCCT 7.9.3 cross-check worst rel err 1.1e-14 (occt_crosscheck.json)",
+   "plan": "plans/krn-analytic-primitives.json",
+   "centroidInPlan": [
+    400.0,
+    0.0,
+    15.0
+   ],
+   "centroidNote": "value.centroid is in the solid local frame of analytic_solids.json; the plan places the solid elsewhere (add_* position/anchor), so compare the plan result with centroidInPlan"
+  },
+  {
+   "vc": "VC-KRN-01",
+   "title": "exact mass properties: torus-R40-r8",
+   "proves": [
+    "FR-KRN-08",
+    "TR-KRN-40"
+   ],
+   "value": {
+    "volume": 50532.37453357752,
+    "area": 12633.09363339438,
+    "centroid": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "inertiaRho1": [
+     42447194.60820512,
+     42447194.60820512,
+     83277353.23133574
+    ]
+   },
+   "tolerance": {
+    "volumeRel": 1e-09,
+    "areaRel": 1e-09,
+    "centroidAbs": 1e-06,
+    "inertiaRel": 1e-09
+   },
+   "unit": "mm, mm^2, mm, mm^5",
+   "source": "analytic (b): analytic_solids.json, formulas in README Derivations; OCCT 7.9.3 cross-check worst rel err 1.1e-14 (occt_crosscheck.json)",
+   "plan": "plans/krn-analytic-primitives.json",
+   "centroidInPlan": [
+    550.0,
+    0.0,
+    0.0
+   ],
+   "centroidNote": "value.centroid is in the solid local frame of analytic_solids.json; the plan places the solid elsewhere (add_* position/anchor), so compare the plan result with centroidInPlan"
+  },
+  {
+   "vc": "VC-KRN-01",
+   "title": "exact mass properties: plate-hole-80x60x10-r12",
+   "proves": [
+    "FR-KRN-08",
+    "TR-KRN-40"
+   ],
+   "value": {
+    "volume": 43476.106578830695,
+    "area": 12249.203552627689,
+    "centroid": [
+     40.0,
+     30.0,
+     5.0
+    ],
+    "inertiaRho1": [
+     14599440.724994827,
+     25799440.724994827,
+     39674279.67367581
+    ]
+   },
+   "tolerance": {
+    "volumeRel": 1e-09,
+    "areaRel": 1e-09,
+    "centroidAbs": 1e-06,
+    "inertiaRel": 1e-09
+   },
+   "unit": "mm, mm^2, mm, mm^5",
+   "source": "analytic (b): analytic_solids.json, formulas in README Derivations; OCCT 7.9.3 cross-check worst rel err 1.1e-14 (occt_crosscheck.json)",
+   "plan": "plans/krn-analytic-primitives.json",
+   "centroidInPlan": [
+    40.0,
+    230.0,
+    5.0
+   ],
+   "centroidNote": "value.centroid is in the solid local frame of analytic_solids.json; the plan places the solid elsewhere (add_* position/anchor), so compare the plan result with centroidInPlan"
+  },
+  {
+   "vc": "VC-KRN-02",
+   "title": "large-coordinate mass properties: box-station-70m",
+   "proves": [
+    "FR-KRN-03",
+    "FR-KRN-08",
+    "TR-KRN-10",
+    "TR-KRN-41"
+   ],
+   "value": {
+    "volume": 100000,
+    "centroid": [
+     70050.0,
+     25.0,
+     10.0
+    ],
+    "inertiaRho1": [
+     24166666.666666668,
+     86666666.66666667,
+     104166666.66666667
+    ]
+   },
+   "tolerance": {
+    "volumeRel": 1e-09,
+    "centroidAbs": 1e-06,
+    "inertiaRel": 1e-12
+   },
+   "unit": "mm",
+   "source": "analytic (b); NOTE raw BRepGProp at x=70 m gives inertia rel err 1.2e-9 (occt_behaviour_probe.json) - the 1e-12 tolerance REQUIRES the part-frame evaluation of TR-KRN-41"
+  },
+  {
+   "vc": "VC-KRN-02",
+   "title": "large-coordinate mass properties: plate-hole-station-70m",
+   "proves": [
+    "FR-KRN-03",
+    "FR-KRN-08",
+    "TR-KRN-10",
+    "TR-KRN-41"
+   ],
+   "value": {
+    "volume": 43476.106578830695,
+    "centroid": [
+     70040.0,
+     30.0,
+     5.0
+    ],
+    "inertiaRho1": [
+     14599440.724994827,
+     25799440.724994827,
+     39674279.67367581
+    ]
+   },
+   "tolerance": {
+    "volumeRel": 1e-09,
+    "centroidAbs": 1e-06,
+    "inertiaRel": 1e-12
+   },
+   "unit": "mm",
+   "source": "analytic (b); NOTE raw BRepGProp at x=70 m gives inertia rel err 1.2e-9 (occt_behaviour_probe.json) - the 1e-12 tolerance REQUIRES the part-frame evaluation of TR-KRN-41"
+  },
+  {
+   "vc": "VC-KRN-03",
+   "title": "machined rib from billet: volume, buy-to-fly",
+   "proves": [
+    "FR-KRN-01",
+    "FR-KRN-08",
+    "FR-KRN-12"
+   ],
+   "value": {
+    "volume": 485716.8146928204,
+    "mass_g_at_0.0027": 1311.4353996706152,
+    "buyToFly": 1.852931528773989,
+    "topology": {
+     "solids": 1,
+     "validBRepCheck": true
+    }
+   },
+   "tolerance": {
+    "volumeRel": 1e-09,
+    "massRel": 1e-09
+   },
+   "unit": "mm^3, g",
+   "source": "analytic (b): blank 300x120x25 minus pocket (260x80 - (4-pi)*10^2)*20; density 0.0027 g/mm^3 = llull's own aluminium example (mass_properties description)",
+   "plan": "plans/krn-rib-pocket.json"
+  },
+  {
+   "vc": "VC-KRN-03b",
+   "title": "same rib at body station x = 70 000 mm",
+   "proves": [
+    "FR-KRN-03",
+    "TR-KRN-10"
+   ],
+   "value": {
+    "volume": 485716.8146928204,
+    "centroid": [
+     70150.0,
+     60.0,
+     10.367671178065027
+    ]
+   },
+   "tolerance": {
+    "volumeRel": 1e-09,
+    "centroidAbs": 1e-06
+   },
+   "unit": "mm",
+   "source": "analytic (b), translation of VC-KRN-03; filleting edges selected far from origin must pick the same 4 edges",
+   "plan": "plans/krn-rib-pocket-station-70m.json"
+  },
+  {
+   "vc": "VC-KRN-07",
+   "title": "persistent naming: fillet follows pocket edges after pw 260 -> 200",
+   "proves": [
+    "FR-KRN-06",
+    "TR-KRN-30",
+    "TR-KRN-31"
+   ],
+   "value": {
+    "volumeBefore": 485716.8146928204,
+    "volumeAfter": 581716.8146928204,
+    "filletFacesAfter": 4,
+    "brokenReferences": 0
+   },
+   "tolerance": {
+    "volumeRel": 1e-09
+   },
+   "unit": "mm^3",
+   "source": "analytic (b). V = 300*120*25 - (200*80 - (4-pi)*10^2)*20. With today's edgesNear heuristic, the 2 points at x=280 are 60 mm from the moved corner edges (x=220) but 22.36 mm from the blank's outer top edges, so they silently re-target: expected to FAIL (known issue) until TR-KRN-30 lands",
+   "plan": "plans/krn-rib-parametric-renaming.json",
+   "knownIssueToday": true
+  },
+  {
+   "vc": "VC-KRN-04",
+   "title": "STEP -> exact B-rep, GVP agreement: nist_ctc_01_asme1_ap242-e1.stp",
+   "proves": [
+    "FR-KRN-04",
+    "FR-KRN-05",
+    "TR-KRN-20",
+    "TR-KRN-23"
+   ],
+   "value": {
+    "gvp": {
+     "volume": 14644822.6361138,
+     "area": 807080.802199914,
+     "centroid": [
+      -2.29264395139875,
+      -1.36345168588643,
+      -32.2974419857648
+     ]
+    },
+    "solids": 1,
+    "faces": 117,
+    "validAfterShapeFix": true
+   },
+   "tolerance": {
+    "volumeRel": 0.0001,
+    "areaRel": 0.001,
+    "centroidAbs": 0.05
+   },
+   "unit": "mm",
+   "source": "(a) GVP written by the originating CAD system in the NIST file (CAx-IF GVP practice); OCCT 7.9.3 reference diff vol 4.57e-08, area 2.45e-08 (nist_gvp_vs_occt.json)"
+  },
+  {
+   "vc": "VC-KRN-04",
+   "title": "STEP -> exact B-rep, GVP agreement: nist_ctc_03_asme1_ap242-e2.stp",
+   "proves": [
+    "FR-KRN-04",
+    "FR-KRN-05",
+    "TR-KRN-20",
+    "TR-KRN-23"
+   ],
+   "value": {
+    "gvp": {
+     "volume": 332122.9076263,
+     "area": 354787.650175344,
+     "centroid": [
+      -118.329746932968,
+      242.86422820302,
+      69.31685776493
+     ]
+    },
+    "solids": 1,
+    "faces": 120,
+    "validAfterShapeFix": true
+   },
+   "tolerance": {
+    "volumeRel": 0.0001,
+    "areaRel": 0.001,
+    "centroidAbs": 0.05
+   },
+   "unit": "mm",
+   "source": "(a) GVP written by the originating CAD system in the NIST file (CAx-IF GVP practice); OCCT 7.9.3 reference diff vol 9.20e-13, area 1.64e-16 (nist_gvp_vs_occt.json)"
+  },
+  {
+   "vc": "VC-KRN-04",
+   "title": "STEP -> exact B-rep, GVP agreement: nist_ctc_04_asme1_ap242-e2.stp",
+   "proves": [
+    "FR-KRN-04",
+    "FR-KRN-05",
+    "TR-KRN-20",
+    "TR-KRN-23"
+   ],
+   "value": {
+    "gvp": {
+     "centroid": [
+      -0.0079803627,
+      360.9458561866,
+      -7.8767441293
+     ],
+     "area": 1022497.095954,
+     "volume": 17519780.220394
+    },
+    "solids": 1,
+    "faces": 484,
+    "validAfterShapeFix": true
+   },
+   "tolerance": {
+    "volumeRel": 0.0001,
+    "areaRel": 0.001,
+    "centroidAbs": 0.05
+   },
+   "unit": "mm",
+   "source": "(a) GVP written by the originating CAD system in the NIST file (CAx-IF GVP practice); OCCT 7.9.3 reference diff vol 7.47e-05, area 9.41e-04 (nist_gvp_vs_occt.json)"
+  },
+  {
+   "vc": "VC-KRN-04",
+   "title": "STEP -> exact B-rep, GVP agreement: nist_ftc_06_asme1_ap242-e2.stp",
+   "proves": [
+    "FR-KRN-04",
+    "FR-KRN-05",
+    "TR-KRN-20",
+    "TR-KRN-23"
+   ],
+   "value": {
+    "gvp": {
+     "volume": 3323556.50526143,
+     "area": 283413.011089723,
+     "centroid": [
+      8.44667839028049e-05,
+      29.008906494,
+      -109.600480952032
+     ]
+    },
+    "solids": 1,
+    "faces": 187,
+    "validAfterShapeFix": true
+   },
+   "tolerance": {
+    "volumeRel": 0.0001,
+    "areaRel": 0.001,
+    "centroidAbs": 0.05
+   },
+   "unit": "mm",
+   "source": "(a) GVP written by the originating CAD system in the NIST file (CAx-IF GVP practice); OCCT 7.9.3 reference diff vol 2.15e-07, area 1.63e-07 (nist_gvp_vs_occt.json)"
+  },
+  {
+   "vc": "VC-KRN-04",
+   "title": "STEP -> exact B-rep, GVP agreement: nist_stc_10_asme1_ap242-e2.stp",
+   "proves": [
+    "FR-KRN-04",
+    "FR-KRN-05",
+    "TR-KRN-20",
+    "TR-KRN-23"
+   ],
+   "value": {
+    "gvp": {
+     "volume": 188312.244641244,
+     "area": 48486.2744665371,
+     "centroid": [
+      84.0076805122325,
+      14.6087293037364,
+      37.4990364132354
+     ]
+    },
+    "solids": 1,
+    "faces": 256,
+    "validAfterShapeFix": true
+   },
+   "tolerance": {
+    "volumeRel": 0.0001,
+    "areaRel": 0.001,
+    "centroidAbs": 0.05
+   },
+   "unit": "mm",
+   "source": "(a) GVP written by the originating CAD system in the NIST file (CAx-IF GVP practice); OCCT 7.9.3 reference diff vol 3.03e-06, area 3.88e-06 (nist_gvp_vs_occt.json)"
+  },
+  {
+   "vc": "VC-KRN-04",
+   "title": "STEP -> exact B-rep, GVP agreement: nist_ftc_09_asme1_rd.stp",
+   "proves": [
+    "FR-KRN-04",
+    "FR-KRN-05",
+    "TR-KRN-20",
+    "TR-KRN-23"
+   ],
+   "value": {
+    "gvp": {
+     "volume": 136445.10481135413,
+     "area": 96614.23380695238,
+     "centroid": [
+      2.185934719329844,
+      1.5150352387139119,
+      4.554269753453959
+     ]
+    },
+    "solids": 1,
+    "faces": 158,
+    "validAfterShapeFix": true
+   },
+   "tolerance": {
+    "volumeRel": 0.0001,
+    "areaRel": 0.001,
+    "centroidAbs": 0.05
+   },
+   "unit": "mm",
+   "source": "(a) GVP written by the originating CAD system in the NIST file (CAx-IF GVP practice); OCCT 7.9.3 reference diff vol 9.75e-11, area 6.55e-11 (nist_gvp_vs_occt.json)"
+  },
+  {
+   "vc": "VC-KRN-04x",
+   "title": "GVP disagreement to triage: nist_ctc_02_asme1_ap242-e2.stp",
+   "proves": [
+    "FR-KRN-05"
+   ],
+   "value": {
+    "gvp": {
+     "volume": 47106788.0321802,
+     "area": 2480624.4791306,
+     "centroid": [
+      -0.00415567842900755,
+      358.620787544608,
+      -178.169662485763
+     ]
+    },
+    "occt": {
+     "volume": 45468679.56513147,
+     "area": 2490716.559184648,
+     "centroid": [
+      0.003274642132905713,
+      346.67269057114714,
+      -179.41098118937828
+     ]
+    }
+   },
+   "tolerance": null,
+   "unit": "mm",
+   "source": "file GVP and OCCT 7.9.3 disagree beyond tolerance; treat as knownIssue until triaged (GVP may be scoped to a SHAPE_ASPECT or stale)",
+   "knownIssueToday": true
+  },
+  {
+   "vc": "VC-KRN-04x",
+   "title": "GVP disagreement to triage: nist_ftc_07_asme1_ap242-e2.stp",
+   "proves": [
+    "FR-KRN-05"
+   ],
+   "value": {
+    "gvp": {
+     "volume": 1726247.5707237597,
+     "area": 391371.39402984,
+     "centroid": [
+      0.76753038264,
+      -64.55628822524,
+      0.035132517999999995
+     ]
+    },
+    "occt": {
+     "volume": 1726618.4094427053,
+     "area": 391386.8304113767,
+     "centroid": [
+      0.74998945112339,
+      -64.54377603007887,
+      0.056629945796231956
+     ]
+    }
+   },
+   "tolerance": null,
+   "unit": "mm",
+   "source": "file GVP and OCCT 7.9.3 disagree beyond tolerance; treat as knownIssue until triaged (GVP may be scoped to a SHAPE_ASPECT or stale)",
+   "knownIssueToday": true
+  },
+  {
+   "vc": "VC-KRN-04x",
+   "title": "GVP disagreement to triage: nist_stc_08_asme1_ap242-e3.stp",
+   "proves": [
+    "FR-KRN-05"
+   ],
+   "value": {
+    "gvp": {
+     "volume": 503592.175239539,
+     "area": 191687.873141661,
+     "centroid": [
+      2.53109307374693,
+      -0.0591847313749045,
+      25.3789167065934
+     ]
+    },
+    "occt": {
+     "volume": 388154.8232067842,
+     "area": 195094.3172328976,
+     "centroid": [
+      1.9803390075732792,
+      22.83531953216217,
+      23.861368159839426
+     ]
+    }
+   },
+   "tolerance": null,
+   "unit": "mm",
+   "source": "file GVP and OCCT 7.9.3 disagree beyond tolerance; treat as knownIssue until triaged (GVP may be scoped to a SHAPE_ASPECT or stale)",
+   "knownIssueToday": true
+  },
+  {
+   "vc": "VC-KRN-04x",
+   "title": "GVP disagreement to triage: nist_ctc_02_asme1_rc.stp",
+   "proves": [
+    "FR-KRN-05"
+   ],
+   "value": {
+    "gvp": {
+     "area": 2481847.636045,
+     "volume": 47101527.47498,
+     "centroid": [
+      -0.000876966143434,
+      358.6349444541,
+      -178.1588021156
+     ]
+    },
+    "occt": {
+     "volume": 47847994.41949637,
+     "area": 2486260.0067519336,
+     "centroid": [
+      -0.040657234313908185,
+      363.73711522527685,
+      -177.60300306158047
+     ]
+    }
+   },
+   "tolerance": null,
+   "unit": "mm",
+   "source": "file GVP and OCCT 7.9.3 disagree beyond tolerance; treat as knownIssue until triaged (GVP may be scoped to a SHAPE_ASPECT or stale)",
+   "knownIssueToday": true
+  },
+  {
+   "vc": "VC-KRN-04x",
+   "title": "GVP disagreement to triage: nist_ctc_05_asme1_rd.stp",
+   "proves": [
+    "FR-KRN-05"
+   ],
+   "value": {
+    "gvp": {
+     "area": 1334.929190494,
+     "volume": 774.6912251592,
+     "centroid": [
+      -0.0001748948720802,
+      -0.03978772720191,
+      3.926126039017
+     ]
+    },
+    "occt": {
+     "volume": 12828990.962436879,
+     "area": 862855.845579028,
+     "centroid": [
+      2.098096424561531,
+      -0.9958026936300081,
+      99.19902363421691
+     ]
+    },
+    "gvpMm": {
+     "volume": 12694914.68692222,
+     "area": 861242.9165391091,
+     "centroid": [
+      -0.00444232975083708,
+      -1.0106082709285138,
+      99.72360139103179
+     ]
+    }
+   },
+   "tolerance": null,
+   "unit": "mm",
+   "source": "file GVP and OCCT 7.9.3 disagree beyond tolerance; treat as knownIssue until triaged (GVP may be scoped to a SHAPE_ASPECT or stale); NOTE the file length unit is inch and value.gvp is in inches (file units): compare value.gvpMm (converted x25.4) with occt — still ~1.1e-2 volume / ~1.9e-3 area / ~2.2 mm centroid apart",
+   "knownIssueToday": true
+  },
+  {
+   "vc": "VC-KRN-05",
+   "title": "tessellated-only AP242 (nist_ftc_08_asme1_ap242-e4-tg.stp) is reported, not silently empty",
+   "proves": [
+    "FR-KRN-05",
+    "TR-KRN-22"
+   ],
+   "value": {
+    "exactSolids": 0,
+    "diagnostic": "no exact B-rep geometry (tessellated only)"
+   },
+   "tolerance": null,
+   "unit": "-",
+   "source": "measured: plain STEPControl_Reader returns a void shape (nist_occt_reference.json)"
+  },
+  {
+   "vc": "VC-KRN-06",
+   "title": "healing reported: max sub-shape tolerance after import",
+   "proves": [
+    "FR-KRN-05",
+    "TR-KRN-24"
+   ],
+   "value": {
+    "nist_ctc_01_asme1_rd.stp": 0.006537944602632954,
+    "nist_ctc_02_asme1_rc.stp": 0.10767118545457749,
+    "nist_ctc_03_asme1_rc.stp": 1e-05,
+    "nist_ctc_04_asme1_rd.stp": 0.0001432519319592788,
+    "nist_ctc_05_asme1_rd.stp": 0.08604595277731558,
+    "nist_ftc_06_asme1_rd.stp": 1e-05,
+    "nist_ftc_07_asme1_rd.stp": 0.005878867285610049,
+    "nist_ftc_08_asme1_rc.stp": 3.004213404303088e-05,
+    "nist_ftc_09_asme1_rd.stp": 1.0002118056576789e-07,
+    "nist_ftc_10_asme1_rb.stp": 0.0021720080539951326,
+    "nist_ftc_11_asme1_rb.stp": 1e-05,
+    "nist_ctc_01_asme1_ap242-e1.stp": 0.0033547822177017743,
+    "nist_ctc_02_asme1_ap242-e2.stp": 0.009621834295462154,
+    "nist_ctc_03_asme1_ap242-e2.stp": 1e-07,
+    "nist_ctc_04_asme1_ap242-e2.stp": 0.04933242575770948,
+    "nist_ctc_05_asme1_ap242-e1.stp": 0.017396486940336978,
+    "nist_ftc_06_asme1_ap242-e2.stp": 0.004323077202531944,
+    "nist_ftc_07_asme1_ap242-e2.stp": 0.10426621631172882,
+    "nist_ftc_08_asme1_ap242-e2.stp": 1e-05,
+    "nist_ftc_09_asme1_ap242-e1.stp": 1e-07,
+    "nist_ftc_10_asme1_ap242-e2.stp": 0.003779199844556154,
+    "nist_ftc_11_asme1_ap242-e3.stp": 0.013980271153617402,
+    "nist_stc_06_asme1_ap242-e3.stp": 1e-05,
+    "nist_stc_07_asme1_ap242-e3.stp": 0.00519201685180793,
+    "nist_stc_08_asme1_ap242-e3.stp": 3.0042124443588922e-05,
+    "nist_stc_09_asme1_ap242-e4.stp": 1.9259312425956447e-07,
+    "nist_stc_10_asme1_ap242-e2.stp": 0.005984022850067364
+   },
+   "tolerance": {
+    "policy": "warn when > 0.01 mm (TR-KRN-11)"
+   },
+   "unit": "mm",
+   "source": "measured with OCCT 7.9.3 (nist_occt_reference.json): 0.1 mm on nist_ctc_02_asme1_rc.stp"
+  },
+  {
+   "vc": "VC-KRN-08",
+   "title": "fuzzy boolean on a 1e-5 mm gap",
+   "proves": [
+    "FR-KRN-07",
+    "TR-KRN-12"
+   ],
+   "value": {
+    "withoutFuzzy": {
+     "solids": 2
+    },
+    "withFuzzy2e-5": {
+     "solids": 1,
+     "valid": true
+    }
+   },
+   "tolerance": null,
+   "unit": "count",
+   "source": "measured (occt_behaviour_probe.json)"
+  },
+  {
+   "vc": "VC-KRN-09",
+   "title": "validity gate: every kernel result passes BRepCheck_Analyzer",
+   "proves": [
+    "FR-KRN-09",
+    "TR-KRN-50"
+   ],
+   "value": {
+    "invalidResultsCommitted": 0
+   },
+   "tolerance": null,
+   "unit": "count",
+   "source": "requirement; OCCT already used in occtKernel.ts validOrNull for fillets"
+  },
+  {
+   "vc": "VC-KRN-10",
+   "title": "determinism: same plan twice -> identical topology signature; cross-version drift reported",
+   "proves": [
+    "FR-KRN-10",
+    "TR-KRN-60"
+   ],
+   "value": {
+    "plateHoleCutSignatureOcct793": "1125f7464525c4f6",
+    "faces": 7
+   },
+   "tolerance": null,
+   "unit": "hash",
+   "source": "measured, same process (occt_behaviour_probe.json); cross-process / cross-OCCT-version golden to be recorded by the regression gate"
+  },
+  {
+   "vc": "VC-KRN-11",
+   "title": "OCC is the default desktop kernel",
+   "proves": [
+    "FR-KRN-01",
+    "TR-KRN-01"
+   ],
+   "value": {
+    "activeKernel": "occt",
+    "fallbackOnFailure": "manifold with visible warning"
+   },
+   "tolerance": null,
+   "unit": "-",
+   "source": "requirement"
+  },
+  {
+   "vc": "VC-KRN-12",
+   "title": "large assembly: 10 000 instances of one exact part",
+   "proves": [
+    "FR-KRN-11",
+    "TR-KRN-70",
+    "TR-KRN-71"
+   ],
+   "value": {
+    "kernelEvaluations": 1,
+    "drawCallsMax": "TBD - measure with Playwright display gate"
+   },
+   "tolerance": null,
+   "unit": "count",
+   "source": "requirement; budgets in TECHNICAL_SPEC section 8 are TBD-measure"
+  },
+  {
+   "vc": "VC-KRN-13",
+   "title": "browser OCC off the main thread",
+   "proves": [
+    "FR-KRN-02",
+    "TR-KRN-03"
+   ],
+   "value": {
+    "maxMainThreadLongTaskMs": 50
+   },
+   "tolerance": null,
+   "unit": "-",
+   "source": "requirement (TECHNICAL_SPEC); thresholds are policy values, not measured"
+  },
+  {
+   "vc": "VC-KRN-14",
+   "title": "exact export carries GVP; round trip",
+   "proves": [
+    "FR-KRN-13",
+    "TR-KRN-80"
+   ],
+   "value": {
+    "gvpRoundTripRel": 1e-06
+   },
+   "tolerance": null,
+   "unit": "-",
+   "source": "requirement (TECHNICAL_SPEC); thresholds are policy values, not measured"
+  },
+  {
+   "vc": "VC-KRN-15",
+   "title": "kernel provenance and modelling tolerance",
+   "proves": [
+    "FR-KRN-14",
+    "FR-KRN-15",
+    "TR-KRN-61"
+   ],
+   "value": {
+    "provenanceWarningOnMismatch": true,
+    "linearToleranceRangeMm": [
+     1e-07,
+     0.01
+    ]
+   },
+   "tolerance": null,
+   "unit": "-",
+   "source": "requirement (TECHNICAL_SPEC); thresholds are policy values, not measured"
+  },
+  {
+   "vc": "VC-KRN-16",
+   "title": "no silent faceting",
+   "proves": [
+    "FR-KRN-16"
+   ],
+   "value": {
+    "facetedFlag": true,
+    "checkModelCode": "KRN_FACETED_RESULT",
+    "exactExportRefused": true
+   },
+   "tolerance": null,
+   "unit": "-",
+   "source": "requirement (TECHNICAL_SPEC); thresholds are policy values, not measured"
+  },
+  {
+   "vc": "VC-KRN-17",
+   "title": "registry contract",
+   "proves": [
+    "FR-KRN-17"
+   ],
+   "value": {
+    "inToolSchemas": true,
+    "happyAndFailureTests": true
+   },
+   "tolerance": null,
+   "unit": "-",
+   "source": "requirement (TECHNICAL_SPEC); thresholds are policy values, not measured"
+  },
+  {
+   "vc": "VC-KRN-18",
+   "title": "face-query port on analytic faces",
+   "proves": [
+    "FR-KRN-18",
+    "TR-KRN-90",
+    "TR-KRN-91",
+    "TR-KRN-92"
+   ],
+   "value": {
+    "boxTopFace": {
+     "normal": [
+      0,
+      0,
+      1
+     ],
+     "centroid": [
+      50.0,
+      25.0,
+      20.0
+     ]
+    },
+    "cylinderSide": {
+     "radius": 10,
+     "absPrincipalCurvatures": [
+      0.1,
+      0.0
+     ]
+    },
+    "sphere": {
+     "absPrincipalCurvatures": [
+      0.04,
+      0.04
+     ],
+     "gaussianK": 0.0016,
+     "absMeanH": 0.04,
+     "projectionOf_0_0_50": {
+      "point": [
+       0.0,
+       0.0,
+       25.0
+      ],
+      "distance": 25.0
+     }
+    },
+    "manifold": "faceQuery absent"
+   },
+   "tolerance": {
+    "abs": 1e-09,
+    "curvatureRel": 1e-09
+   },
+   "unit": "mm, 1/mm, 1/mm^2",
+   "source": "analytic (b): plane normal and face centroid of box-100x50x20 (min corner at origin); cylinder principal curvatures 1/r and 0; sphere k1 = k2 = 1/r, K = 1/r^2, H = 1/r (signs depend on the face orientation convention, so magnitudes are compared); closest point of an external point on a sphere is along the radius"
+  },
+  {
+   "vc": "VC-KRN-19",
+   "title": "stable error codes and remediation on wrong calls",
+   "proves": [
+    "FR-KRN-19",
+    "FR-KRN-20",
+    "TR-KRN-100"
+   ],
+   "value": {
+    "calls": [
+     {
+      "cli": "llull import_step_exact text=garbage --kernel occt --json",
+      "exit": 1,
+      "code": "KRN_STEP_UNREADABLE"
+     },
+     {
+      "cli": "llull import_step_exact file=nist_ftc_08_asme1_ap242-e4-tg.stp --kernel occt --json",
+      "exit": 1,
+      "code": "KRN_STEP_TESSELLATED_ONLY"
+     },
+     {
+      "cli": "llull set_modeling_tolerance linear=1 --json",
+      "exit": 1,
+      "code": "KRN_TOLERANCE_OUT_OF_RANGE",
+      "paramPath": "linear"
+     },
+     {
+      "cli": "llull boolean '{\"op\":\"union\",\"a\":\"<box>\",\"b\":\"<box2>\",\"fuzzy\":0.5}' --kernel occt --json",
+      "exit": 1,
+      "code": "KRN_TOLERANCE_OUT_OF_RANGE",
+      "paramPath": "fuzzy"
+     },
+     {
+      "cli": "llull validate_shape '{\"entityIds\":[\"<box>\"]}' --json (Manifold kernel)",
+      "exit": 1,
+      "code": "KRN_NO_EXACT_KERNEL"
+     }
+    ],
+    "everyErrorHas": [
+     "code",
+     "remediation"
+    ],
+    "documentUnchanged": true
+   },
+   "tolerance": null,
+   "unit": "-",
+   "source": "requirement (AGENT_FIRST.md); policy values, not measured"
+  },
+  {
+   "vc": "VC-KRN-20",
+   "title": "unverified density propagates into mass results and check_model",
+   "proves": [
+    "FR-KRN-23",
+    "TR-KRN-103"
+   ],
+   "value": {
+    "volume": 485716.8146928204,
+    "unverified": {
+     "value": true,
+     "reasons": [
+      "density_unverified"
+     ]
+    },
+    "checkModelWarning": "KRN_MASS_INPUT_UNVERIFIED"
+   },
+   "tolerance": {
+    "volumeRel": 1e-09
+   },
+   "unit": "mm^3",
+   "plan": "plans/krn-rib-pocket.json",
+   "source": "volume analytic (b) as VC-KRN-03; the plan's create_material is a legacy material without an 08 MAT verified record, so the flag is expected by requirement (AGENT_FIRST AF-32)"
+  },
+  {
+   "vc": "VC-KRN-21",
+   "title": "reviewRequired on weight-and-balance results and GVP-mismatch imports",
+   "proves": [
+    "FR-KRN-24",
+    "TR-KRN-104"
+   ],
+   "value": {
+    "ribWeightAndBalance": {
+     "reviewRequired": {
+      "value": true,
+      "reasonsInclude": [
+       "weight-and-balance"
+      ]
+     },
+     "summaryContains": "needs a qualified engineer"
+    },
+    "nist_ctc_02_asme1_ap242-e2.stp": {
+     "reviewRequired": {
+      "value": true,
+      "reasonsInclude": [
+       "import_gvp_mismatch"
+      ]
+     }
+    },
+    "ribGeneralVerifiedDensity": {
+     "reviewRequired": {
+      "value": false
+     }
+    }
+   },
+   "tolerance": null,
+   "unit": "-",
+   "source": "requirement (AGENT_FIRST AF-33); GVP mismatch of ctc_02 e2 measured (nist_gvp_vs_occt.json)"
+  },
+  {
+   "vc": "VC-KRN-22",
+   "title": "human gate: agent cannot accept a faceted body into an exact delivery",
+   "proves": [
+    "FR-KRN-25",
+    "TR-KRN-105"
+   ],
+   "value": {
+    "agentCaller": {
+     "exit": 1,
+     "code": "XCH_HUMAN_GATE",
+     "fileWritten": false
+    },
+    "humanCaller": {
+     "proceeds": true
+    },
+    "baselineAcceptByAgent": {
+     "exit": 1,
+     "code": "KRN_HUMAN_GATE"
+    }
+   },
+   "tolerance": null,
+   "unit": "-",
+   "source": "requirement (AGENT_FIRST.md); policy values, not measured; caller model from 09 PLM TR-PLM-16 (advisory in local CLI runs)"
+  },
+  {
+   "vc": "VC-KRN-23",
+   "title": "named defaults, units and provenance in data",
+   "proves": [
+    "FR-KRN-21",
+    "FR-KRN-22",
+    "TR-KRN-101",
+    "TR-KRN-102"
+   ],
+   "value": {
+    "mass_properties": {
+     "volumeUnit": "mm³",
+     "eps": {
+      "value": 1e-09,
+      "unit": "relative",
+      "defaulted": true
+     },
+     "densitySourcePresent": true,
+     "provenance.method": "BRepGProp"
+    },
+    "kernel_info": {
+     "modelingTolerance.linear": {
+      "value": 0.0001,
+      "unit": "mm",
+      "defaulted": true,
+      "source": "OCCT STEP reader read.precision.val default (R5)"
+     },
+     "maxImportTolerance": {
+      "value": 0.01,
+      "unit": "mm",
+      "defaulted": true,
+      "source": "llull policy TR-KRN-11"
+     }
+    }
+   },
+   "tolerance": null,
+   "unit": "-",
+   "source": "defaults quoted from R5 (read.precision.val 0.0001) and llull policy (TECHNICAL_SPEC TR-KRN-11/40)"
+  },
+  {
+   "vc": "VC-KRN-24",
+   "title": "dry run, progress and timeout on a large STEP import",
+   "proves": [
+    "FR-KRN-26",
+    "TR-KRN-106"
+   ],
+   "value": {
+    "dryRun": {
+     "changed": false,
+     "documentByteIdentical": true
+    },
+    "progressStages": [
+     "read",
+     "heal",
+     "sew",
+     "validate",
+     "blob"
+    ],
+    "timeout": {
+     "env": "LLULL_OCC_TIMEOUT_MS=1",
+     "exit": 1,
+     "saved": false,
+     "note": "deterministic cut of the single OCC call; the CLI --timeout SEC bounds the whole run the same way"
+    }
+   },
+   "tolerance": null,
+   "unit": "-",
+   "input": "nist_ctc_02_asme1_rc.stp",
+   "source": "requirement (AGENT_FIRST.md); policy values, not measured"
+  }
+ ]
+}

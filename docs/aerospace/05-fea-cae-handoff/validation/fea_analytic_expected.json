@@ -1,0 +1,476 @@
+{
+ "generator": "generate_fea_analytic.py",
+ "gap": "05-fea-cae-handoff",
+ "beta_n_L_clamped_free": [
+  1.8751040687,
+  4.694091133,
+  7.8547574382,
+  10.995540735,
+  14.137168391,
+  17.278759532
+ ],
+ "cases": [
+  {
+   "id": "VC-FEA-10.a",
+   "quantity": "cantilever tip deflection (Euler-Bernoulli)",
+   "value": 0.0877714,
+   "unit": "mm",
+   "tolerance_rel": 0.02,
+   "inputs": {
+    "E_MPa": 210000.0,
+    "nu": 0.3,
+    "b_mm": 1.0,
+    "h_mm": 1.0,
+    "L_mm": 8.0,
+    "P_N": 9.0
+   },
+   "derivation": "delta = P L^3 / (3 E I), I = b h^3 / 12",
+   "sources": [
+    "S20",
+    "S30"
+   ],
+   "cross_check": {
+    "calculix_beamp_frd_mean_tip_uy_mm": 0.0876111,
+    "note": "mean U2 over the 21 nodes at z = 8 of test/beamp.frd.ref"
+   }
+  },
+  {
+   "id": "VC-FEA-10.b",
+   "quantity": "cantilever tip deflection incl. Timoshenko shear term",
+   "value": 0.0888411,
+   "unit": "mm",
+   "tolerance_rel": 0.02,
+   "derivation": "delta = P L^3/(3 E I) + P L / (k G A), k = 5/6, G = E / (2 (1 + nu))",
+   "sources": [
+    "S20"
+   ]
+  },
+  {
+   "id": "VC-FEA-10.c",
+   "quantity": "cantilever root bending stress (outer fibre)",
+   "value": 432.0,
+   "unit": "MPa",
+   "tolerance_rel": 0.05,
+   "derivation": "sigma = M c / I, M = P L, c = h / 2 (FE value extrapolated to the root surface; St-Venant zone excluded)",
+   "sources": [
+    "S20"
+   ]
+  },
+  {
+   "id": "VC-FEA-10.d",
+   "quantity": "section moment at z = 6 (beamp SECTION PRINT S1)",
+   "value": 18.0,
+   "unit": "N.mm",
+   "tolerance_rel": 0.001,
+   "derivation": "M(z) = P (L - z)",
+   "sources": [
+    "S20",
+    "S30"
+   ],
+   "cross_check": {
+    "calculix_beamp_dat_bending_moment": 17.99943,
+    "calculix_beamp_dat_shear": 8.99964
+   }
+  },
+  {
+   "id": "VC-FEA-11.a",
+   "quantity": "1st bending frequency, weak axis",
+   "value": 13096.7,
+   "unit": "Hz",
+   "tolerance_rel": 0.01,
+   "inputs": {
+    "E_MPa": 210000.0,
+    "rho_t_per_mm3": 7.8e-09,
+    "section_mm": [
+     1.0,
+     1.5
+    ],
+    "L_mm": 8.0
+   },
+   "derivation": "f1 = (beta1 L)^2/(2 pi L^2) sqrt(E I/(rho A)), beta1 L = 1.8751040687",
+   "sources": [
+    "S20",
+    "S30"
+   ],
+   "cross_check": {
+    "calculix_beamf_mode1_Hz": 13096.03
+   }
+  },
+  {
+   "id": "VC-FEA-11.b",
+   "quantity": "1st bending frequency, strong axis",
+   "value": 19645.1,
+   "unit": "Hz",
+   "tolerance_rel": 0.03,
+   "derivation": "as 11.a with I = b h^3/12, h = 1.5; Euler-Bernoulli over-predicts (no shear / rotary inertia), L/h = 5.3",
+   "sources": [
+    "S20",
+    "S30"
+   ],
+   "cross_check": {
+    "calculix_beamf_mode2_Hz": 19319.52
+   }
+  },
+  {
+   "id": "VC-FEA-11.c",
+   "quantity": "2nd bending frequency, weak axis",
+   "value": 82075.8,
+   "unit": "Hz",
+   "tolerance_rel": 0.08,
+   "derivation": "beta2 L = 4.6940911330; Timoshenko effects grow with mode number - use only as an upper bound",
+   "sources": [
+    "S20",
+    "S30"
+   ],
+   "cross_check": {
+    "calculix_beamf_mode3_Hz": 76839.71,
+    "mode_identification": "TBD - confirm from the beamf.frd.ref mode shape that CalculiX mode 3 is the 2nd weak-axis bending mode (torsion estimate ~85 kHz is close); not a gate until confirmed"
+   }
+  },
+  {
+   "id": "VC-FEA-12",
+   "quantity": "Euler critical load, fixed-free column",
+   "value": 1151.45,
+   "unit": "N",
+   "tolerance_rel": 0.02,
+   "inputs": {
+    "E_MPa": 70000.0,
+    "b_mm": 20.0,
+    "h_mm": 10.0,
+    "L_mm": 500.0,
+    "note": "E is a test input, not a material claim"
+   },
+   "derivation": "P_cr = pi^2 E I / (2 L)^2 (effective length 2L), I_min = b h^3/12",
+   "sources": [
+    "S20"
+   ]
+  },
+  {
+   "id": "VC-FEA-13",
+   "quantity": "SS plate uniaxial compressive buckling stress",
+   "value": 25.8434,
+   "unit": "MPa",
+   "tolerance_rel": 0.03,
+   "inputs": {
+    "E_MPa": 70000.0,
+    "nu": 0.33,
+    "t_mm": 2.0,
+    "a_mm": 600.0,
+    "b_mm": 200.0,
+    "k": 4.0,
+    "half_waves_m": 3
+   },
+   "derivation": "sigma_cr = k pi^2 E/(12(1-nu^2)) (t/b)^2, k = min_m (m b/a + a/(m b))^2 = 4 at a/b = 3",
+   "sources": [
+    "S22"
+   ]
+  },
+  {
+   "id": "VC-FEA-14",
+   "quantity": "Kt (gross) circular hole, infinite plate, uniaxial",
+   "value": 3.0,
+   "unit": "1",
+   "tolerance_rel": 0.05,
+   "derivation": "sigma_tt(a, 90 deg) = S (1 - 2 cos 180 deg) = 3 S; FE model W/d >= 10 so finite-width effect stays inside tolerance (llull choice)",
+   "sources": [
+    "S21"
+   ]
+  },
+  {
+   "id": "VC-FEA-20",
+   "quantity": "margin of safety table",
+   "value": [
+    {
+     "allowable_MPa": 450.0,
+     "limit_MPa": 300.0,
+     "FoS": 1.5,
+     "MS": 0.0
+    },
+    {
+     "allowable_MPa": 450.0,
+     "limit_MPa": 200.0,
+     "FoS": 1.5,
+     "MS": 0.5
+    },
+    {
+     "allowable_MPa": 300.0,
+     "limit_MPa": 200.0,
+     "FoS": 1.5,
+     "MS": 0.0
+    },
+    {
+     "allowable_MPa": 280.0,
+     "limit_MPa": 200.0,
+     "FoS": 1.5,
+     "MS": -0.0666666666667
+    }
+   ],
+   "unit": "1",
+   "tolerance_abs": 1e-09,
+   "derivation": "MS = allowable / (limit x FoS) - 1, FoS = 1.5 (14 CFR 25.303); MS < 0 => FAIL",
+   "sources": [
+    "S1",
+    "S2"
+   ]
+  },
+  {
+   "id": "VC-FEA-21",
+   "quantity": "von Mises from Cauchy tensor (sxx, syy, szz, sxy, syz, szx)",
+   "value": [
+    {
+     "tensor": [
+      100,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "vm": 100.0,
+     "note": "uniaxial -> sigma"
+    },
+    {
+     "tensor": [
+      0,
+      0,
+      0,
+      50,
+      0,
+      0
+     ],
+     "vm": 86.6025403784,
+     "note": "pure shear -> sqrt(3) tau"
+    },
+    {
+     "tensor": [
+      80,
+      80,
+      80,
+      0,
+      0,
+      0
+     ],
+     "vm": 0.0,
+     "note": "hydrostatic -> 0"
+    },
+    {
+     "tensor": [
+      120,
+      -40,
+      10,
+      30,
+      -20,
+      15
+     ],
+     "vm": 157.082780724,
+     "note": "general"
+    }
+   ],
+   "unit": "MPa",
+   "tolerance_rel": 1e-09,
+   "derivation": "sqrt(((sxx-syy)^2+(syy-szz)^2+(szz-sxx)^2)/2 + 3(sxy^2+syz^2+szx^2))",
+   "sources": [
+    "S20"
+   ]
+  },
+  {
+   "id": "VC-FEA-22",
+   "quantity": "density conversion steel g/mm3 -> t/mm3 (N, mm, s)",
+   "value": 7.8e-09,
+   "unit": "t/mm3",
+   "tolerance_rel": 1e-12,
+   "derivation": "1 g = 1e-6 t; CalculiX manual quotes 7.8e-9 N s^2/mm^4 for steel",
+   "sources": [
+    "S30"
+   ]
+  },
+  {
+   "id": "VC-FEA-60",
+   "quantity": "named safety factors when none are given (AF-31)",
+   "value": {
+    "factors": {
+     "ultimate": {
+      "value": 1.5,
+      "source": "14 CFR 25.303",
+      "defaulted": true
+     },
+     "yield": {
+      "value": 1.0,
+      "source": "derived from 14 CFR 25.305(a) (limit load, no detrimental permanent deformation)",
+      "defaulted": true
+     },
+     "extra": []
+    }
+   },
+   "unit": "1",
+   "assert": "data.factors deep-equals value; no factor without source",
+   "derivation": "TECHNICAL_SPEC 5.8 / FR-FEA-31",
+   "sources": [
+    "S1",
+    "S1a"
+   ]
+  },
+  {
+   "id": "VC-FEA-61",
+   "quantity": "every margin row flagged for review (AF-33)",
+   "value": [
+    {
+     "rowId": "r1",
+     "appliedMPa": 300.0,
+     "allowableMPa": 450.0,
+     "ms": 0.0,
+     "status": "PASS",
+     "code": null,
+     "reviewRequired": true,
+     "reviewReason": "margin of safety supports a structural substantiation decision",
+     "disposition": "none"
+    },
+    {
+     "rowId": "r2",
+     "appliedMPa": 200.0,
+     "allowableMPa": 450.0,
+     "ms": 0.5,
+     "status": "PASS",
+     "code": null,
+     "reviewRequired": true,
+     "reviewReason": "margin of safety supports a structural substantiation decision",
+     "disposition": "none"
+    },
+    {
+     "rowId": "r3",
+     "appliedMPa": 200.0,
+     "allowableMPa": 300.0,
+     "ms": 0.0,
+     "status": "PASS",
+     "code": null,
+     "reviewRequired": true,
+     "reviewReason": "margin of safety supports a structural substantiation decision",
+     "disposition": "none"
+    },
+    {
+     "rowId": "r4",
+     "appliedMPa": 200.0,
+     "allowableMPa": 280.0,
+     "ms": -0.0666666666667,
+     "status": "FAIL",
+     "code": "FEA_MS_NEGATIVE",
+     "reviewRequired": true,
+     "reviewReason": "margin of safety supports a structural substantiation decision",
+     "disposition": "pending_human"
+    }
+   ],
+   "unit": "1",
+   "assert": "for every row: reviewRequired == true and reviewReason non-empty; data.reviewRequired == true; summary contains 'not approved'",
+   "derivation": "rows of VC-FEA-20 with FR-FEA-32/33 fields; marginalBand unset -> no MARGINAL rows and warning FEA_MARGINAL_BAND_UNSET",
+   "sources": [
+    "S1",
+    "S2"
+   ]
+  },
+  {
+   "id": "VC-FEA-62",
+   "quantity": "check_analysis after VC-FEA-61 (AF-20)",
+   "value": {
+    "status": "fail",
+    "codes": [
+     "FEA_DISPOSITION_PENDING",
+     "FEA_MARGINAL_BAND_UNSET",
+     "FEA_MS_NEGATIVE"
+    ]
+   },
+   "unit": "1",
+   "assert": "data.status == value.status and sorted(set(item.code)) == value.codes",
+   "derivation": "FR-FEA-33/35",
+   "sources": []
+  },
+  {
+   "id": "VC-FEA-63",
+   "quantity": "agent attempts dispose_margin on r4 (AF-34)",
+   "value": {
+    "exitCode": 1,
+    "code": "FEA_HUMAN_GATE",
+    "documentChanged": false,
+    "rowDisposition": "pending_human"
+   },
+   "unit": "1",
+   "assert": "CLI exit code, data.code, document hash unchanged, compute_margins row r4 disposition",
+   "derivation": "FR-FEA-33, TR-FEA-91",
+   "sources": []
+  },
+  {
+   "id": "VC-FEA-64",
+   "quantity": "unverified gap 08 input propagates (AF-32)",
+   "value": {
+    "input": {
+     "property": "E",
+     "basis": "typical",
+     "unverified": true
+    },
+    "expect": {
+     "rows[*].unverified": true,
+     "rows[*].unverifiedReasons contains": "E basis typical",
+     "meshSummary.unverified": false,
+     "resultsSummary.unverified": true,
+     "check_analysis.items contains": {
+      "code": "FEA_MATERIAL_UNVERIFIED",
+      "severity": "warning"
+     }
+    }
+   },
+   "unit": "1",
+   "assert": "as listed",
+   "derivation": "FR-FEA-34 (the mesh does not depend on material, results and margins do)",
+   "sources": []
+  },
+  {
+   "id": "VC-FEA-65",
+   "quantity": "stable error codes for deliberately wrong set-ups (AF-11)",
+   "value": [
+    {
+     "setup": "add_fea_constraint facesNear on a point 5 mm off the part",
+     "code": "FEA_TARGET_UNRESOLVED"
+    },
+    {
+     "setup": "facesNear exactly on the edge shared by two faces",
+     "code": "FEA_TARGET_AMBIGUOUS"
+    },
+    {
+     "setup": "material record without E",
+     "command": "fea_export",
+     "code": "FEA_MATERIAL_NO_ELASTIC"
+    },
+    {
+     "setup": "set_material_property property=nu value=0.5",
+     "code": "FEA_PROPERTY_INVALID"
+    },
+    {
+     "setup": "mesh artifact with one inverted tet",
+     "command": "fea_export",
+     "code": "FEA_MESH_INVERTED"
+    },
+    {
+     "setup": "set_parameter after solve",
+     "command": "compute_margins",
+     "code": "FEA_RESULTS_STALE"
+    },
+    {
+     "setup": "record_fe_mesh with a hash absent from the store",
+     "code": "FEA_ARTIFACT_NOT_FOUND"
+    },
+    {
+     "setup": "LLULL_CCX pointing to a missing file",
+     "command": "fea_solve",
+     "code": "FEA_TOOL_MISSING"
+    },
+    {
+     "setup": "set_analysis_factors ultimate=0.9",
+     "code": "FEA_FACTOR_INVALID"
+    }
+   ],
+   "unit": "1",
+   "assert": "exit code 1; data.code == code; data.remediation non-empty; data.ids or data.path set",
+   "derivation": "TECHNICAL_SPEC 7.1",
+   "sources": []
+  }
+ ]
+}

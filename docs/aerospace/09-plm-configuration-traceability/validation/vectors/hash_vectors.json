@@ -1,0 +1,68 @@
+{
+  "algorithm": "SHA-256 (FIPS 180-4) over UTF-8 bytes of canonical JSON (RFC 8785 JCS; numbers restricted, see generator)",
+  "fips_known_answer": [
+    {
+      "input_utf8": "abc",
+      "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+      "source": "NIST example for FIPS 180-x SHA-256 ('abc')"
+    },
+    {
+      "input_utf8": "",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "SHA-256 of the empty string (derived; widely published)"
+    }
+  ],
+  "canonicalization_cases": [
+    {
+      "name": "key order",
+      "input": {
+        "b": 1,
+        "a": [
+          2,
+          {
+            "d": true,
+            "c": null
+          }
+        ]
+      },
+      "canonical": "{\"a\":[2,{\"c\":null,\"d\":true}],\"b\":1}"
+    },
+    {
+      "name": "unicode passthrough",
+      "input": {
+        "title": "Ferrure éclisse",
+        "é": 1,
+        "z": 2
+      },
+      "canonical": "{\"title\":\"Ferrure éclisse\",\"z\":2,\"é\":1}"
+    },
+    {
+      "name": "decimal",
+      "input": {
+        "density": 0.00278,
+        "r": 3.3
+      },
+      "canonical": "{\"density\":0.00278,\"r\":3.3}"
+    }
+  ],
+  "sample_document": {
+    "file": "sample_document.json",
+    "full_canonical_sha256": "f092b7dfcad8e1cf49de0d09086d167b6cb69b66cdc90131dbd6ef128e063cdc",
+    "full_canonical_length_bytes": 1672,
+    "release_scope_excluded_fields": [
+      "selection",
+      "camera",
+      "plm"
+    ],
+    "release_scope_canonical_sha256": "7e3943fb2961d30684cc53e19aa1f6486463e667890f34cecc45ceea78f3c24f",
+    "release_scope_canonical_length_bytes": 1551,
+    "release_scope_after_camera_and_selection_change_sha256": "7e3943fb2961d30684cc53e19aa1f6486463e667890f34cecc45ceea78f3c24f",
+    "release_scope_after_key_reordering_sha256": "7e3943fb2961d30684cc53e19aa1f6486463e667890f34cecc45ceea78f3c24f",
+    "release_scope_after_parameter_t_edit_sha256": "c913cadc86e8348f02b43d5f73432eb93929c745eff11fe62b57f747c691017e",
+    "expect": {
+      "camera_selection_change_keeps_hash": true,
+      "key_reordering_keeps_hash": true,
+      "parameter_edit_changes_hash": true
+    }
+  }
+}

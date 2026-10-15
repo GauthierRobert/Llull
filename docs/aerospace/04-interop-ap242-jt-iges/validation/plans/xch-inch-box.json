@@ -1,0 +1,31 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "in"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    4.0,
+    2.0,
+    1.0
+   ],
+   "position": [
+    0.0,
+    0.0,
+    0.5
+   ]
+  },
+  "as": "part"
+ },
+ {
+  "command": "set_entity_name",
+  "params": {
+   "id": "$part",
+   "name": "xch-inch-box"
+  }
+ }
+]

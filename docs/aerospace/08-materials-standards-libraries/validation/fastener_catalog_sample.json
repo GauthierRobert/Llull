@@ -1,0 +1,87 @@
+{
+ "schema": "llull-fastener-catalog/0.1-draft (TECHNICAL_SPEC §3.3)",
+ "accessed": "2026-10-15",
+ "licensing": {
+  "note": "NAS standards are AIA intellectual property and are sold under licence (S23). This sample holds only part-number ENCODING rules and individual dimensions published openly by distributors (S22, S24, S25, S26). It must not be extended by copying NAS/MS sheet tables. See FUNCTIONAL_SPEC §8.3.",
+  "redistributable": "facts (dimensions, coding rules) restated with attribution; no reproduction of standard sheets"
+ },
+ "families": [
+  {
+   "id": "NAS6203-6220",
+   "kind": "bolt",
+   "title": "Bolt, tension, hex head, close tolerance, alloy steel, short thread, reduced major thread dia., self-locking and nonlocking, 160 ksi Ftu (catalogue title, S21)",
+   "standard": {"body": "AIA/NAS", "id": "NAS6203-6220", "revision": "13 (December 2024) per Accuris listing", "source": "S21"},
+   "material": {"value": "alloy steel", "note": "a distributor page calls NAS6203-9 A286 — conflicts with the series title and with the NAS6303-6320 (A286) index; treat as distributor error", "source": "S22"},
+   "partNumberPattern": "NAS62{dd}[-]{grip}  where dd = diameter dash (03..20), grip = dash in 1/16 in",
+   "gripIncrement_in": {"value": 0.0625, "source": "S22"},
+   "lengthRule": "length = grip + threadLength(diameter)  (all grips of one diameter share one thread length)",
+   "fixtureGripDashRange": [1, 40],
+   "fixtureGripDashRangeNote": "TEST FIXTURE ONLY — the real available grip range per diameter is TBD from the NAS sheet / distributor tables",
+   "sizes": [
+    {"dash": "3", "nominalDiameter_in": 0.1875, "thread": ".1900-32 UNJF-3A", "threadsPerInch": 32, "threadLength_in": {"value": 0.323, "source": "S22"},
+     "checkpoints": [{"pn": "NAS6203-33", "grip_in": 2.062, "length_in": 2.385, "source": "S22"}]},
+    {"dash": "4", "nominalDiameter_in": 0.25, "thread": ".2500-28", "threadsPerInch": 28, "threadLength_in": {"value": 0.370, "source": "S22"},
+     "checkpoints": [{"pn": "NAS6204-33", "grip_in": 2.062, "length_in": 2.432, "source": "S22"}, {"pn": "NAS6204-10", "grip_in": 0.625, "length_in": 0.995, "source": "S22"}]},
+    {"dash": "5", "nominalDiameter_in": 0.3125, "thread": "tbd", "threadsPerInch": null, "threadLength_in": {"value": 0.438, "source": "S22"},
+     "checkpoints": [{"pn": "NAS6205-33", "grip_in": 2.062, "length_in": 2.500, "source": "S22"}, {"pn": "NAS6205-10", "grip_in": 0.625, "length_in": 1.063, "source": "S22"}]},
+    {"dash": "6", "nominalDiameter_in": 0.375, "thread": "tbd", "threadsPerInch": null, "threadLength_in": {"value": 0.454, "source": "S22"},
+     "checkpoints": [{"pn": "NAS6206-33", "grip_in": 2.062, "length_in": 2.516, "source": "S22"}]}
+   ],
+   "headGeometry": {"status": "tbd — hex head height / across flats not verified; render with parametric placeholder ratios flagged 'representative'"}
+  },
+  {
+   "id": "MS20470",
+   "kind": "solid_rivet",
+   "title": "Rivet, solid, universal head",
+   "partNumberPattern": "MS20470{mat}{d}-{L}  where d = shank diameter in 1/32 in, L = length in 1/16 in (S24)",
+   "materialCodes": {"AD": "aluminium alloy (2117-T4 per general knowledge — verify)", "DD": "aluminium alloy 2024 (verify for rivets; S18 confirms DD = 2024 for AN bolts)"},
+   "sizes": [
+    {"dash": "3", "shankDiameter_in": {"value": 0.09375, "source": "S24"}, "head": {"status": "tbd"}},
+    {"dash": "4", "shankDiameter_in": {"value": 0.125, "source": "S24"}, "head": {"diameter_in": {"min": 0.238, "max": 0.262}, "height_in": {"min": 0.054, "max": 0.064}, "source": "S24"}},
+    {"dash": "5", "shankDiameter_in": {"value": 0.15625, "source": "S24"}, "head": {"diameter_in": {"min": 0.296, "max": 0.328}, "height_in": {"min": 0.067, "max": 0.077}, "source": "S24"}},
+    {"dash": "6", "shankDiameter_in": {"value": 0.1875, "source": "S24"}, "head": {"diameter_in": {"min": 0.356, "max": 0.394}, "height_in": {"min": 0.080, "max": 0.090}, "source": "S24"}}
+   ],
+   "selectionRule": {"length": "L = grip + 1.5 D, rounded to 1/16 in (S19 secondary; Cherry guidance)", "shopHead": ">= 1.5 D diameter, >= 0.5 D height (attributed to AC 43.13-1B by S19; not confirmed in primary)",
+     "edgeDistanceMin": "2 D", "pitchMin": "3 D", "edgePitchSource": "AC 43.13-1B par. 4-57(c) as excerpted (S7)"}
+  },
+  {
+   "id": "HL10/HL11/HL18/HL19",
+   "kind": "hi_lok_pin",
+   "standard": {"body": "Hi-Shear (proprietary product specification)", "id": "Hi-Lok Product Specification 342", "source": "S26"},
+   "variants": {"HL10": "protruding shear head, Ti-6Al-4V, Fsu 95 ksi", "HL18": "protruding shear head, alloy steel, Fsu 95 ksi", "HL11": "100 deg flush shear, Ti", "HL19": "100 deg flush shear, alloy steel"},
+   "partNumberPattern": "HLnn-{d}-{g}  d = nominal diameter in 1/32 in, g = MAXIMUM grip in 1/16 in; pin covers ((g-1)/16, g/16]",
+   "checkpoints": [{"pn": "HL19-8-10", "diameter_in": 0.25, "gripRange_in": [0.5625, 0.625], "source": "S26"}],
+   "collars": {"HL70": "aluminium collar (distributor table)", "others": ["HL79", "HL82", "HL94", "HL97"], "source": "S26"}
+  },
+  {
+   "id": "AN3-AN20",
+   "kind": "bolt",
+   "partNumberPattern": "AN{d}[DD][H]{L}[A]  d = diameter in 1/16 in; DD = 2024 aluminium; A = undrilled shank (S18)",
+   "lengthCodeStatus": "sources disagree whether the dash encodes total length (1/8 in) or grip; resolve from NASM/AN sheet before implementing (OQ-MAT-05)",
+   "checkpoints": [{"pn": "AN3DD5A", "thread": "10-32", "shank_in": 0.1875, "length_in_reported": [0.641, 0.656], "grip_in_reported": 0.25, "source": "S18"}]
+  }
+ ],
+ "families_nuts": {
+  "MS21042": {
+   "kind": "nut", "title": "Nut, self-locking, reduced hexagon, extended washer, 450 F (all-metal prevailing torque)",
+   "sizes": [
+    {"pn": "MS21042L3", "thread": "0.190-32 UNJF-3B (10-32)", "height_in": {"min": 0.154, "max": 0.188}, "acrossFlats_in": {"min": 0.243, "max": 0.252},
+     "washerFace": {"od_in": 0.33, "thickness_in": 0.015}, "maxTemperature_F": 450, "source": "S25"}
+   ]
+  }
+ },
+ "families_washers": {
+  "NAS1149": {
+   "kind": "washer", "partNumberPattern": "NAS1149{mat}{size}{thickness code}{finish}; e.g. NAS1149F0332P = #10, 1/32 in, carbon steel, cadmium plated (S27)",
+   "thicknessOptions_in": [{"value": 0.016}, {"value": 0.032}, {"value": 0.063}, {"value": 0.090}],
+   "thicknessOptionsAlsoListed_in": [0.042, 0.049, 0.065],
+   "idOd": {"status": "tbd per size"}, "source": "S27"
+  }
+ },
+ "installationRules": {
+  "gripEqualsMaterialThickness": {"text": "bolt grip length = thickness of material held", "source": "S6"},
+  "maxCombinedWasherHeight_in": {"value": 0.125, "text": "slightly longer grip allowed with washers under nut or head; max combined washer height 1/8 in", "source": "S6"},
+  "minThreadProtrusion": {"text": "at least one thread of the bolt protruding through the nut (self-locking or plain nuts)", "source": "S6"},
+  "plateNutShim": {"text": "if proper grip not available with plate nuts, add shims under the plate", "source": "S6"}
+ }
+}

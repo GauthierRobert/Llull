@@ -1,0 +1,58 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    80.0,
+    40.0,
+    10.0
+   ],
+   "anchor": "min",
+   "position": [
+    0,
+    0,
+    0
+   ]
+  },
+  "as": "base"
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    10.0,
+    40.0,
+    60.0
+   ],
+   "anchor": "min",
+   "position": [
+    0,
+    0,
+    10
+   ]
+  },
+  "as": "up"
+ },
+ {
+  "command": "boolean",
+  "params": {
+   "op": "union",
+   "a": "$base",
+   "b": "$up"
+  },
+  "as": "part"
+ },
+ {
+  "command": "set_entity_name",
+  "params": {
+   "id": "$part",
+   "name": "xch-l-bracket"
+  }
+ }
+]

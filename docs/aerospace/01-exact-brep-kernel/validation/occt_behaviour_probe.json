@@ -1,0 +1,70 @@
+{
+  "$comment": "Measured by probe_occt_behaviour.py; see TECHNICAL_SPEC sections 5 and 9.",
+  "ocp": "7.9.3.1",
+  "inertia_vs_offset": [
+    {
+      "x_mm": 0.0,
+      "iyy_rel_err": 5.158094259408804e-16
+    },
+    {
+      "x_mm": 1000.0,
+      "iyy_rel_err": 2.9349556336036096e-13
+    },
+    {
+      "x_mm": 10000.0,
+      "iyy_rel_err": 3.756003884168771e-11
+    },
+    {
+      "x_mm": 70000.0,
+      "iyy_rel_err": 1.2019231342352353e-09
+    },
+    {
+      "x_mm": 100000.0,
+      "iyy_rel_err": 1.9230769803890815e-09
+    },
+    {
+      "x_mm": 1000000.0,
+      "iyy_rel_err": 1.2307692313423524e-07
+    }
+  ],
+  "part_frame_at_70m": {
+    "as_is": 1.2019231342352353e-09,
+    "moved_back_by_location_only": 1.2019231342352353e-09,
+    "geometry_copied_back_to_origin": 5.158094259408804e-16,
+    "authored_at_origin_placed_by_location": 3.318373973552997e-14
+  },
+  "fuzzy_fuse": {
+    "gap_mm": 1e-05,
+    "runs": [
+      {
+        "fuzzy": 0.0,
+        "solids": 2,
+        "faces": 12,
+        "valid": true
+      },
+      {
+        "fuzzy": 2e-05,
+        "solids": 1,
+        "faces": 10,
+        "valid": true
+      }
+    ]
+  },
+  "determinism_same_process": {
+    "run1": {
+      "faces": 7,
+      "sha256_16": "1125f7464525c4f6"
+    },
+    "run2": {
+      "faces": 7,
+      "sha256_16": "1125f7464525c4f6"
+    },
+    "identical": true
+  },
+  "fillet_history": {
+    "faces_generated_from_edge": 1,
+    "input_faces_modified": 4,
+    "input_faces": 6,
+    "result_valid": true
+  }
+}

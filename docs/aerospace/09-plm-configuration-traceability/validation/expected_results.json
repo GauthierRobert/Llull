@@ -1,0 +1,179 @@
+{
+  "gap": "PLM",
+  "generated_by": "hand-written; hash/signature literals produced by generate_vectors.py and cross-checked by verify_vectors.mjs (Node 22, node:crypto)",
+  "results": [
+    {
+      "vc": "VC-PLM-16",
+      "name": "SHA-256 known answer 'abc'",
+      "value": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+      "tolerance": "exact",
+      "unit": "hex digest",
+      "source": "NIST SHA-256 example ('abc'), FIPS 180-x [R17]"
+    },
+    {
+      "vc": "VC-PLM-16",
+      "name": "Release-scope content hash of validation/sample_document.json",
+      "value": "7e3943fb2961d30684cc53e19aa1f6486463e667890f34cecc45ceea78f3c24f",
+      "tolerance": "exact",
+      "unit": "hex digest",
+      "source": "derived: SHA-256(RFC 8785-style canonical JSON of envelope minus selection/camera/plm), 1551 bytes; generate_vectors.py"
+    },
+    {
+      "vc": "VC-PLM-16",
+      "name": "Release-scope hash invariant to camera/selection change and key order",
+      "value": "7e3943fb2961d30684cc53e19aa1f6486463e667890f34cecc45ceea78f3c24f",
+      "tolerance": "exact (must equal the previous row)",
+      "unit": "hex digest",
+      "source": "derived; generate_vectors.py asserts equality"
+    },
+    {
+      "vc": "VC-PLM-16",
+      "name": "Release-scope hash after editing parameter t 4 -> 5",
+      "value": "c913cadc86e8348f02b43d5f73432eb93929c745eff11fe62b57f747c691017e",
+      "tolerance": "exact (must differ from the unedited hash)",
+      "unit": "hex digest",
+      "source": "derived; generate_vectors.py"
+    },
+    {
+      "vc": "VC-PLM-17",
+      "name": "Ed25519 RFC 8032 TEST 1/2/3 verify",
+      "value": true,
+      "tolerance": "exact",
+      "unit": "boolean",
+      "source": "RFC 8032 section 7.1 [R15]; vectors re-verified with Python cryptography 50.0.1 and Node 22 node:crypto"
+    },
+    {
+      "vc": "VC-PLM-17",
+      "name": "Sample release manifest hash",
+      "value": "444ca1de7b6dda3d597533ba0c22b5de864edc3782d9c40c13cd6ed39b4df43a",
+      "tolerance": "exact",
+      "unit": "hex digest",
+      "source": "derived: SHA-256 of canonical manifest body (without manifestSha256, signatures)"
+    },
+    {
+      "vc": "VC-PLM-17",
+      "name": "Sample release manifest Ed25519 signature (RFC 8032 TEST 1 key, deterministic)",
+      "value": "78343a41b4ada2bc2148bdef1e8821ae05a8a19dbc3e826424c8393ca1d8fe90c52025118eae961eda0dde6baf569a12e80cef5682126f5d179b6b281b5f460c",
+      "tolerance": "exact (Ed25519 is deterministic, RFC 8032 section 5.1.6)",
+      "unit": "hex signature (64 bytes)",
+      "source": "derived; generate_vectors.py"
+    },
+    {
+      "vc": "VC-PLM-17",
+      "name": "Negative signature cases (tampered manifest, bit flip, wrong key, mismatched RFC vectors)",
+      "value": false,
+      "tolerance": "exact",
+      "unit": "boolean (verify result)",
+      "source": "derived; vectors/ed25519_vectors.json#negative"
+    },
+    {
+      "vc": "VC-PLM-04",
+      "name": "Revision sequence 'asme-alpha': 9th, 14th, 20th, 21st, 420th revision",
+      "value": {
+        "9": "J",
+        "14": "P",
+        "20": "Y",
+        "21": "AA",
+        "420": "YY"
+      },
+      "tolerance": "exact",
+      "unit": "revision label",
+      "source": "derived from the letter-exclusion rule I,O,Q,S,X,Z (secondary sources quoting ASME Y14.35M-1997 [R26]); configurable"
+    },
+    {
+      "vc": "VC-PLM-07",
+      "name": "Effectivity resolution after ECO-0002",
+      "value": {
+        "serial 4": "A",
+        "serial 5": "B",
+        "msn 11": "A",
+        "msn 12": "B",
+        "date 2026-11-01": null,
+        "date 2027-03-01": "B"
+      },
+      "tolerance": "exact",
+      "unit": "revision label",
+      "source": "derived; vectors/effectivity_resolution.json"
+    },
+    {
+      "vc": "VC-PLM-06",
+      "name": "S1 final lifecycle states",
+      "value": {
+        "A": "superseded",
+        "B": "released",
+        "ECO-0002": "implemented"
+      },
+      "tolerance": "exact",
+      "unit": "state",
+      "source": "scenarios/S1_release_eco_revB.json#finalState (state machine of lifecycle_transitions.csv)"
+    },
+    {
+      "vc": "VC-PLM-10",
+      "name": "S3 EBOM total quantity",
+      "value": 5,
+      "tolerance": "exact",
+      "unit": "count",
+      "source": "derived from the S3 given assembly (2 + 1 + 2)"
+    },
+    {
+      "vc": "VC-PLM-19",
+      "name": "Release package open/verify time for 50 MB package",
+      "value": "TBD - measure with verify_release on a 50 MB package on the reference desktop",
+      "tolerance": "budget <= 2 s (TECHNICAL_SPEC section 8)",
+      "unit": "s",
+      "source": "budget, not a measurement"
+    },
+    {
+      "vc": "VC-PLM-25",
+      "name": "Stable refusal codes with remediation",
+      "value": [
+        "PLM_ECO_UNKNOWN",
+        "PLM_PN_INVALID",
+        "PLM_ECO_REQUIRED",
+        "PLM_STATE_TRANSITION",
+        "PLM_CHECKER_IS_AUTHOR",
+        "PLM_LOCKED",
+        "PLM_SIGNATURE_INVALID"
+      ],
+      "tolerance": "exact set; every refusal has non-empty data.error.remediation; exit code 1",
+      "unit": "codes",
+      "source": "TECHNICAL_SPEC §7.2; scenarios/S2"
+    },
+    {
+      "vc": "VC-PLM-26",
+      "name": "Agent caller cannot complete approval acts",
+      "value": {
+        "release_item": "PLM_HUMAN_GATE",
+        "record_approval": "PLM_HUMAN_GATE",
+        "record_signature (approval)": "PLM_HUMAN_GATE",
+        "create_change_order with classification": "PLM_HUMAN_GATE",
+        "submit_for_review": "allowed"
+      },
+      "tolerance": "exact",
+      "unit": "code per command",
+      "source": "FUNCTIONAL_SPEC FR-PLM-17; TECHNICAL_SPEC TR-PLM-16; scenarios/S2 S2-13"
+    },
+    {
+      "vc": "VC-PLM-27",
+      "name": "Readiness check and review/unverified propagation",
+      "value": {
+        "check_release_readiness.status": "fail",
+        "findings": [
+          "PLM_REVIEW_PENDING",
+          "PLM_UNVERIFIED_INPUT"
+        ],
+        "release_item (human)": "PLM_REVIEW_PENDING",
+        "manifest.unverified after acceptance": [
+          "<material id>"
+        ],
+        "plm_status.policy.humanSignatureRequired": {
+          "value": true,
+          "defaulted": true
+        }
+      },
+      "tolerance": "exact",
+      "unit": "status / codes",
+      "source": "FR-PLM-34/35/36; scenarios/S2 S2-14"
+    }
+  ]
+}

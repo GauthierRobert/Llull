@@ -1,0 +1,8 @@
+[
+ {"command": "set_units", "params": {"units": "mm"}},
+ {"command": "load_material_library", "params": {"library": "llull-seed-mil5j", "materials": ["ti6al4v_annealed"]}},
+ {"command": "set_material_property", "params": {"material": "ti6al4v_annealed", "property": "density", "value": 0.160, "unit": "lb/in^3", "basis": "supplier_unstated", "source": {"citation": "Rolled Alloys 6Al-4V data sheet", "accessed": "2026-10-15"}}},
+ {"command": "add_cylinder", "params": {"radius": 10, "height": 50}, "as": "pin"},
+ {"command": "assign_material", "params": {"materialName": "ti6al4v_annealed", "entityIds": ["$pin"]}},
+ {"command": "mass_properties", "params": {"entityId": "$pin"}}
+]

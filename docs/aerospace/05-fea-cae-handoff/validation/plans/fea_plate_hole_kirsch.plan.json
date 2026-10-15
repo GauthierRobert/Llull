@@ -1,0 +1,230 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    200,
+    100,
+    2
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "anchor": "min"
+  },
+  "as": "quarter"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 10,
+   "height": 4,
+   "position": [
+    0,
+    0,
+    1
+   ]
+  },
+  "as": "hole"
+ },
+ {
+  "command": "boolean",
+  "params": {
+   "op": "subtract",
+   "a": "$quarter",
+   "b": "$hole"
+  },
+  "as": "plate"
+ },
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "al_E70",
+   "name": "al_E70",
+   "designation": "test material E = 70000 MPa",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "al_E70",
+   "property": "E",
+   "value": 70000.0,
+   "unit": "MPa",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "al_E70",
+   "property": "nu",
+   "value": 0.33,
+   "unit": "-",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "al_E70",
+   "property": "density",
+   "value": 2.7,
+   "unit": "g/cm^3",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "create_material",
+  "params": {
+   "name": "al_E70",
+   "density": 0.0027,
+   "color": "#c0c4c8",
+   "metalness": 1,
+   "roughness": 0.35,
+   "recordId": "al_E70"
+  }
+ },
+ {
+  "command": "assign_material",
+  "params": {
+   "materialName": "al_E70",
+   "entityIds": [
+    "$plate"
+   ]
+  }
+ },
+ {
+  "command": "create_analysis",
+  "params": {
+   "name": "kirsch_quarter",
+   "analysisType": "static",
+   "unitSystem": "N-mm-t-s",
+   "solver": "calculix"
+  },
+  "as": "an"
+ },
+ {
+  "command": "set_part_idealization",
+  "params": {
+   "analysisId": "$an",
+   "entityId": "$plate",
+   "idealization": "plane_stress",
+   "thickness": 2,
+   "sourceFacesNear": [
+    [
+     150,
+     50,
+     2
+    ]
+   ]
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$an",
+   "name": "sym_x",
+   "kind": "symmetry",
+   "target": {
+    "entityId": "$plate",
+    "facesNear": [
+     [
+      0,
+      50,
+      1
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$an",
+   "name": "sym_y",
+   "kind": "symmetry",
+   "target": {
+    "entityId": "$plate",
+    "facesNear": [
+     [
+      100,
+      0,
+      1
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "add_fea_load",
+  "params": {
+   "analysisId": "$an",
+   "name": "remote_tension",
+   "kind": "pressure",
+   "loadCase": "LC1",
+   "category": "limit",
+   "target": {
+    "entityId": "$plate",
+    "facesNear": [
+     [
+      200,
+      50,
+      1
+     ]
+    ]
+   },
+   "magnitude": -100
+  }
+ },
+ {
+  "command": "set_mesh_controls",
+  "params": {
+   "analysisId": "$an",
+   "mesher": "gmsh",
+   "elementFamily": "quad",
+   "order": 2,
+   "globalSize": 5,
+   "refinements": [
+    {
+     "target": {
+      "entityId": "$plate",
+      "edgesNear": [
+       [
+        7.0711,
+        7.0711,
+        2
+       ]
+      ]
+     },
+     "size": 0.5
+    }
+   ]
+  }
+ }
+]

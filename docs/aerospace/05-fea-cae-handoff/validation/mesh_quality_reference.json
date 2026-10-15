@@ -1,0 +1,65 @@
+{
+ "definitions": "Verdict manual (Stimpson et al., SAND2007-2853) [S12]; acceptable ranges quoted from the same manual",
+ "acceptable_ranges": {
+  "tet_aspect_ratio": [
+   1,
+   3
+  ],
+  "tet_scaled_jacobian": [
+   0.5,
+   1
+  ],
+  "quad_aspect_ratio": [
+   1,
+   1.3
+  ],
+  "quad_scaled_jacobian": [
+   0.3,
+   1
+  ],
+  "quad_skew": [
+   0,
+   0.5
+  ],
+  "quad_warpage": [
+   0.3,
+   1
+  ],
+  "tri_minimum_angle_deg": [
+   30,
+   60
+  ]
+ },
+ "elements": {
+  "tet_regular_unit": {
+   "scaled_jacobian": 1.0,
+   "aspect_ratio": 1.0,
+   "volume": 0.117851
+  },
+  "tet_trirectangular_corner": {
+   "scaled_jacobian": 0.707107,
+   "aspect_ratio": 1.36603,
+   "volume": 0.166667
+  },
+  "tet_sliver_h0.05": {
+   "scaled_jacobian": 0.10567,
+   "aspect_ratio": 8.22575,
+   "volume": 0.00721688
+  },
+  "tet_inverted_regular": {
+   "scaled_jacobian": -1.0,
+   "aspect_ratio": 1.0,
+   "volume": 0.117851
+  },
+  "quad_unit_square": {
+   "aspect_ratio": 1.0
+  },
+  "quad_rect_2x1": {
+   "aspect_ratio": 1.5
+  },
+  "quad_rect_10x1": {
+   "aspect_ratio": 5.5
+  }
+ },
+ "tolerance_abs": 1e-06
+}

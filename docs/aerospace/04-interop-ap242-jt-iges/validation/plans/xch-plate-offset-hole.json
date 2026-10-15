@@ -1,0 +1,48 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    100.0,
+    60.0,
+    20.0
+   ]
+  },
+  "as": "plate"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 10.0,
+   "height": 40.0,
+   "position": [
+    25.0,
+    0,
+    0
+   ]
+  },
+  "as": "tool"
+ },
+ {
+  "command": "boolean",
+  "params": {
+   "op": "subtract",
+   "a": "$plate",
+   "b": "$tool"
+  },
+  "as": "part"
+ },
+ {
+  "command": "set_entity_name",
+  "params": {
+   "id": "$part",
+   "name": "xch-plate-offset-hole"
+  }
+ }
+]

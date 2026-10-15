@@ -1,0 +1,54 @@
+{
+ "about": "NAFEMS linear-elastic benchmarks used by gap 05. The original NAFEMS publication (The Standard NAFEMS Benchmarks, TNSB Rev. 3, Oct 1990) is a paid NAFEMS document; its target values are reproduced publicly by solver vendors' verification manuals and by open-source projects (sources listed per case). Geometry/BCs below are taken from the public FeenoX example files (GPL-3.0, pinned commit) and agree with the vendor manuals' descriptions. Files are pinned by URL + sha256, not redistributed (GPL).",
+ "accessed": "2026-10-15",
+ "cases": [
+  {
+   "id": "VC-FEA-30",
+   "benchmark": "NAFEMS LE1 elliptic membrane (plane stress)",
+   "units": "mm, N, MPa",
+   "geometry": {
+    "description": "quarter of an elliptic ring; inner ellipse x^2/2000^2 + y^2/1000^2 = 1, outer ellipse x^2/3250^2 + y^2/2750^2 = 1, first quadrant",
+    "points": {"A": [0, 1000], "B": [0, 2750], "C": [3250, 0], "D": [2000, 0]},
+    "thickness_mm": 100
+   },
+   "material": {"E_MPa": 210000, "nu": 0.3},
+   "boundary_conditions": {"AB (x = 0)": "ux = 0", "CD (y = 0)": "uy = 0"},
+   "load": "uniform outward normal pressure (tension) 10 MPa on outer elliptic edge BC",
+   "target": {"quantity": "sigma_yy at D (2000, 0)", "value": 92.7, "unit": "MPa"},
+   "acceptance": {"tolerance_rel": 0.02, "mesh": "quadratic elements (CPS8/quad8/tri6 or S8 with membrane only), >= the 'fine' NAFEMS density", "note": "tolerance is llull's choice; Abaqus CPS8 fine mesh gives 92.81 MPa (0.12 %)"},
+   "sources": ["S40 Abaqus Benchmarks Manual 4.2.1 LE1 (search-verified)", "S41 COMSOL elliptic membrane model (search-verified)", "S42 Altair OptiStruct OS-V:0010 (search-verified)", "S43 FeenoX examples/nafems-le1.{geo,fee,yaml} (fetched via git)"],
+   "pinned_files": [
+    {"url": "https://github.com/seamplex/feenox/blob/3759eb2426a9e9a77ab8a9ce97db93071a389776/examples/nafems-le1.geo", "sha256": "03131a67a1afc83c7499cc913c226a96f9e73bb23beb31a9051555cde434cb46", "bytes": 1359, "license": "GPL-3.0-or-later"},
+    {"url": "https://github.com/seamplex/feenox/blob/3759eb2426a9e9a77ab8a9ce97db93071a389776/examples/nafems-le1.fee", "sha256": "229a061c7518a5ea30f3e66176e0c0c8dbecdc47fb8546440df4e0c9ca439a1c", "bytes": 264, "license": "GPL-3.0-or-later"}
+   ],
+   "published_open_source_result": {"solver": "FeenoX + Gmsh quad9 structured", "sigma_yy_D_MPa": 92.7011, "source": "S43 nafems-le1.yaml"}
+  },
+  {
+   "id": "VC-FEA-31",
+   "benchmark": "NAFEMS LE10 thick plate under pressure (3D)",
+   "units": "mm, N, MPa",
+   "geometry": {
+    "description": "quarter elliptic annular plate, same planform as LE1 (inner 2000 x 1000, outer 3250 x 2750), thickness 600 mm, mid-plane at z = 0",
+    "thickness_mm": 600
+   },
+   "material": {"E_MPa": 210000, "nu": 0.3},
+   "boundary_conditions": {
+    "face DCD'C' (y = 0)": "uy = 0",
+    "face ABA'B' (x = 0)": "ux = 0",
+    "outer face BCB'C'": "ux = uy = 0",
+    "outer edge on mid-plane": "uz = 0"
+   },
+   "load": "uniform normal pressure 1 MPa on the upper face (z = +300)",
+   "target": {"quantity": "sigma_yy at D (2000, 0, 300)", "value": -5.38, "unit": "MPa", "sign_note": "compressive; some manuals print the magnitude 5.38"},
+   "acceptance": {"tolerance_rel": 0.03, "mesh": "quadratic tetrahedra (C3D10/CTETRA10) locally refined at D", "note": "tolerance is llull's choice; Abaqus fine meshes report -5.51 to -5.89 MPa depending on element (search-verified), FeenoX + Gmsh tet10 reports -5.37968"},
+   "sources": ["S44 Abaqus Benchmarks Manual 4.2.10 LE10 (search-verified)", "S45 Altair OptiStruct OS-V:0060 (search-verified)", "S43 FeenoX examples/nafems-le10.{geo,fee,yaml,step} (fetched via git)"],
+   "pinned_files": [
+    {"url": "https://github.com/seamplex/feenox/blob/3759eb2426a9e9a77ab8a9ce97db93071a389776/examples/nafems-le10.step", "sha256": "1ebf08d9982ee89df40f4e1913aae56e7beb6cb622ce37b0b1e9bffa592eb764", "bytes": 23076, "license": "GPL-3.0-or-later (repository licence)", "tests": "STEP import -> face tagging -> tet10 mesh -> CalculiX deck"},
+    {"url": "https://github.com/seamplex/feenox/blob/3759eb2426a9e9a77ab8a9ce97db93071a389776/examples/nafems-le10-cad.geo", "sha256": "2050f59146f81bf6c7311575cf102fa01bb7f94690dc24ac29b0603832770644", "bytes": 780, "license": "GPL-3.0-or-later"},
+    {"url": "https://github.com/seamplex/feenox/blob/3759eb2426a9e9a77ab8a9ce97db93071a389776/examples/nafems-le10.geo", "sha256": "e8e375bb75668844a0f8a0826b5d4ef2db7f7b24f37afbc110afc31be9cfffc7", "bytes": 1180, "license": "GPL-3.0-or-later"},
+    {"url": "https://github.com/seamplex/feenox/blob/3759eb2426a9e9a77ab8a9ce97db93071a389776/examples/nafems-le10.fee", "sha256": "a75f6fb3dbe7ccf8dce332ff798ea98a8852d38df61cdbe28415b99d9e351461", "bytes": 733, "license": "GPL-3.0-or-later"}
+   ],
+   "published_open_source_result": {"solver": "FeenoX + Gmsh tet10 (HXT, refined at D)", "sigma_yy_D_MPa": -5.37968, "source": "S43 nafems-le10.yaml"}
+  }
+ ]
+}

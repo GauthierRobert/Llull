@@ -1,0 +1,8 @@
+[
+ {"command": "set_units", "params": {"units": "in"}},
+ {"command": "add_box", "params": {"size": [2, 1, 0.25], "anchor": "min"}, "as": "plateA"},
+ {"command": "add_box", "params": {"size": [2, 1, 0.26], "position": [0, 0, 0.25], "anchor": "min"}, "as": "plateB"},
+ {"command": "select_fastener", "params": {"family": "NAS6203-6220", "diameterDash": "3", "stackIds": ["$plateA", "$plateB"], "axisPoint": [1, 0.5, 0], "axis": [0, 0, 1], "nut": "MS21042", "washer": "NAS1149"}},
+ {"command": "insert_fastener_stack", "params": {"family": "NAS6203-6220", "diameterDash": "3", "stackIds": ["$plateA", "$plateB"], "axisPoint": [1, 0.5, 0], "axis": [0, 0, 1], "nut": "MS21042", "washer": "NAS1149", "holeMode": "cut_close_tolerance"}, "as": "stack"},
+ {"command": "bill_of_materials", "params": {"includeStandardParts": true}}
+]

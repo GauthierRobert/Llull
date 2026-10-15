@@ -1,0 +1,25 @@
+form,field_name_as_publicly_described,llull_source,proposed_data_path,auto_fill,notes,public_source
+1,Part Number,PLM item identity,plm.item.partNumber,yes,"Field numbering of the official form is NOT reproduced (paywalled); verify against purchased AS9102C",R5
+1,Part Name,PLM item identity,plm.item.name,yes,,R5
+1,Serial Number,FAI context (user),fai.serialNumber,no,"Unit inspected; ties to record_as_built serial",R5
+1,FAI Report Number,FAI context,fai.reportId,generated,"Deterministic id e.g. FAI-<PN>-<rev>-<n>",R5
+1,Drawing Number,Drawing sheet title block,drawings.sheets[*].titleBlock.partNumber,yes,"llull title block already has partNumber",R5
+1,Drawing Revision Level,PLM revision (title block revision must equal),plm.item.currentRevision,yes,"Consistency check: titleBlock.revision == released revision",R5
+1,Additional Changes (e.g. ECO not yet incorporated in drawing),PLM change records,plm.changes[*] (state=open & affects item),yes,"Lists open/implemented ECOs affecting the revision",R5
+1,Manufacturing Process Reference,MBOM / routing (V2),mbom.routingRef,no,"Out of MVP; user entry",R5
+1,Organization Name / Supplier Code / PO Number,Organisation settings (user),fai.organization,no,"Not CAD data",R5
+1,Detail / Assembly FAI,PLM item type,plm.item.itemType,yes,"part -> detail; assembly -> assembly",R5
+1,Full FAI / Partial FAI + reason (baseline part number incl. revision for partial),PLM change history,fai.faiType; fai.reason; fai.baselineRevision,yes (proposed),"Partial FAI = characteristics affected by ECO since baseline revision (plm_diff)",R5
+1,Index of part numbers / sub-assembly numbers required to make the assembly,EBOM,engineering_bom.rows[*].{partNumber;revision},yes,"From engineering_bom (levels=1)",R5
+1,FAI complete / not complete + signatures (prepared by / approved by / date),PLM signatures,fai.signatures[*],no (signed by humans),"Rev C: reviewer must not be approver (vendor-reported); llull enforces distinct userIds if policy set",R5
+2,Material or Process Name,Material + process callouts,materials[*].name; notes tagged 'process',partial,"Material from llull Material; special processes from drawing notes (gap 03 PMI notes)",R5
+2,Specification Number,Material/process spec (new field),materials[*].specification,partial,"Proposed Material.specification (e.g. AMS/ASTM number) - user entered",R5
+2,Code / Special Process Supplier Code / Customer Approval Verification / Certificate of Conformance Number,Supply chain (user),fai.form2Rows[*],no,"Not CAD data",R5
+2,Functional Test Procedure Number / acceptance report,Test refs (user),fai.functionalTests[*],no,,R5
+3,Characteristic Number (balloon),Characteristic register (gap 03),plm.characteristics[*].charNo,yes,"Stable across regenerations; assign_characteristic_ids",R5
+3,Reference Location (drawing zone / sheet / view),Drawing sheet + view placement,characteristics[*].sheetId+zone,yes,"Needs sheet grid zones (frame) -> zone letter/number computed from paper position",R5
+3,Characteristic Designator (key / critical),PMI attribute (gap 03),characteristics[*].designator,partial,"User flag; customer-specific symbols",R5
+3,Requirement (nominal + tolerance / spec / note text),PMI dimension + tolerance (gap 03),characteristics[*].requirementText,yes,"Rendered text identical to the drawing callout",R5
+3,Results (measured value),Inspection (CMM / manual),fai.form3Rows[*].results,no,"Import from CMM report (QIF, gap 03/V2); null in skeleton",R5
+3,Designed / Qualified Tooling,User,fai.form3Rows[*].tooling,no,,R5
+3,Nonconformance Number,QMS (user),fai.form3Rows[*].ncr,no,,R5
