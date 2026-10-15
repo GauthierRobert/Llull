@@ -1,7 +1,8 @@
-// App shell: top bar, toolbar, sidebar | viewport + hint bar | inspector, status bar.
+// App shell (Lens, AI-first): full-bleed viewport; a slim header and the command bar float over it. The browser panel,
+// properties, tools and view options appear on demand.
 
 import React, { useEffect } from 'react';
-import { useLayoutStore, useThemeStore, useToolStore } from '@ui/store';
+import { useLayoutStore, useStore, useThemeStore, useToolStore } from '@ui/store';
 import { ViewportErrorBoundary } from '@ui/viewport/3d/ViewportErrorBoundary';
 import { Viewport3D } from '@ui/viewport/3d/Viewport3D';
 import { Viewport2D } from '@ui/viewport/2d/Viewport2D';
@@ -16,7 +17,6 @@ import { HintBar } from '@ui/components/HintBar';
 import { ShortcutsDialog } from '@ui/components/ShortcutsDialog';
 import { CommandPalette } from '@ui/components/commandPalette/CommandPalette';
 import { PaletteResultToast } from '@ui/components/commandPalette/PaletteResultToast';
-import { Icon } from '@ui/components/Icon';
 import { useMcpLiveDocument } from '@ui/hooks/useMcpLiveDocument';
 import { useKeyboardShortcuts } from '@ui/hooks/useKeyboardShortcuts';
 import { useAutoFrame } from '@ui/hooks/useAutoFrame';
@@ -29,8 +29,11 @@ import { UpdateBanner } from '@ui/components/UpdateBanner';
 export function App(): React.ReactElement {
   const theme = useThemeStore((s) => s.theme);
   const inspectorOpen = useLayoutStore((s) => s.inspectorOpen);
+  const sidebarOpen = useLayoutStore((s) => s.sidebarOpen);
   const viewMode = useToolStore((s) => s.viewMode);
-  const setViewMode = useToolStore((s) => s.setViewMode);
+  const hasSelection = useStore((s) => s.document.selection.length > 0);
+  // Properties float in on demand, and only while something is selected.
+  const showInspector = inspectorOpen && hasSelection;
 
   useMcpLiveDocument();
   useKeyboardShortcuts();
@@ -44,51 +47,27 @@ export function App(): React.ReactElement {
   }, [theme]);
 
   return (
-    <div className="app-layout" data-theme={theme}>
+    <div
+      className="app-layout"
+      data-theme={theme}
+      data-sidebar={sidebarOpen ? 'open' : 'closed'}
+      data-inspector={showInspector ? 'open' : 'closed'}
+    >
+      <main className="app-viewport" aria-label="Viewport">
+        <MeasurementHUD />
+        <EmptyState />
+        <RestoredBanner />
+        <UpdateBanner />
+        <ViewportErrorBoundary key={viewMode}>{viewMode === '3d' ? <Viewport3D /> : <Viewport2D />}</ViewportErrorBoundary>
+        <LiveActivityFeed />
+        <HintBar />
+        <PaletteResultToast />
+      </main>
+
       <TopBar />
+      {sidebarOpen && <Sidebar />}
+      {showInspector && <PropertiesPanel className="inspector" />}
       <Toolbar />
-
-      <div className="app-content">
-        <Sidebar />
-
-        <main className="app-viewport" aria-label="Viewport">
-          <MeasurementHUD />
-          <EmptyState />
-          <RestoredBanner />
-          <UpdateBanner />
-
-          <div className="view-mode-toggle" role="group" aria-label="View mode">
-            <button
-              type="button"
-              className={`view-mode-btn${viewMode === '3d' ? ' view-mode-btn--active' : ''}`}
-              onClick={() => setViewMode('3d')}
-              aria-pressed={viewMode === '3d'}
-              title="3D view (3)"
-            >
-              <Icon name="cube" size={14} />
-              3D
-            </button>
-            <button
-              type="button"
-              className={`view-mode-btn${viewMode === '2d' ? ' view-mode-btn--active' : ''}`}
-              onClick={() => setViewMode('2d')}
-              aria-pressed={viewMode === '2d'}
-              title="2D drafting view (2)"
-            >
-              <Icon name="square" size={14} />
-              2D
-            </button>
-          </div>
-
-          <ViewportErrorBoundary key={viewMode}>{viewMode === '3d' ? <Viewport3D /> : <Viewport2D />}</ViewportErrorBoundary>
-          <LiveActivityFeed />
-          <HintBar />
-          <PaletteResultToast />
-        </main>
-
-        {inspectorOpen && <PropertiesPanel className="inspector" />}
-      </div>
-
       <StatusBar />
       <ShortcutsDialog />
       <CommandPalette />

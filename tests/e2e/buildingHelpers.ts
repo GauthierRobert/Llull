@@ -19,6 +19,7 @@ export async function openBuilding(page: Page): Promise<void> {
     .catch(() => undefined);
   await page.goto('about:blank');
   await page.goto('/?fresh=1');
+  await page.getByRole('button', { name: 'Show browser panel' }).click();
   await page.getByRole('tab', { name: 'Building' }).click();
   await expect(page.getByTestId('building-panel')).toBeVisible();
 }
@@ -69,6 +70,8 @@ export async function scheduleCsv(page: Page, kind: string): Promise<{ name: str
 }
 
 export async function openProjectFile(page: Page, text: string): Promise<void> {
+  const more = page.getByRole('button', { name: 'More', exact: true });
+  if ((await more.getAttribute('aria-expanded')) !== 'true') await more.click();
   await page
     .getByRole('group', { name: 'Project file' })
     .locator('input[type="file"]')

@@ -34,11 +34,12 @@ describe('layoutStore — persisted layout parsing', () => {
     vi.resetModules();
     const fresh = await import('@ui/store/layoutStore');
     expect(fresh.useLayoutStore.getState().sidebarTab).toBe('layers');
-    expect(fresh.useLayoutStore.getState().sidebarOpen).toBe(true);
+    // Lens: the browser panel starts closed (rail only); properties float in with a selection.
+    expect(fresh.useLayoutStore.getState().sidebarOpen).toBe(false);
     localStorage.setItem('llull-layout', '{not json');
     vi.resetModules();
     const again = await import('@ui/store/layoutStore');
-    expect(again.useLayoutStore.getState().inspectorOpen).toBe(true);
+    expect(again.useLayoutStore.getState().inspectorOpen).toBe(false);
   });
   it('restores a valid stored layout', async () => {
     localStorage.setItem('llull-layout', JSON.stringify({ sidebarTab: 'history', sidebarOpen: false, inspectorOpen: false }));

@@ -18,6 +18,7 @@ test('survey -> terrain -> LandXML in the Civil / Site panel', async ({ page }) 
   await captureDownloads(page);
   await page.addInitScript(() => window.localStorage.clear());
   await page.goto('/');
+  await page.getByRole('button', { name: 'Show browser panel' }).click();
   await page.getByRole('tab', { name: /site/i }).click();
   await page.getByLabel('Survey unit').selectOption('m');
   await page.getByLabel('Survey points text').fill(survey());

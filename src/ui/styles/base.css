@@ -32,6 +32,11 @@ textarea {
   color: inherit;
 }
 
+/* `hidden` wins over component display rules (on-demand chrome stays mounted but out of sight). */
+[hidden] {
+  display: none !important;
+}
+
 button {
   cursor: pointer;
   background: none;

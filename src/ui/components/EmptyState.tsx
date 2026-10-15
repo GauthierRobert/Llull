@@ -1,5 +1,5 @@
-// Centered "start here" card while the document is empty: one-click starts, how to move things, how to let an MCP agent
-// build. Dismissal is local state.
+// Small "start here" card while the document is empty: let an agent build it, or one of a few one-click starts.
+// Dismissal is local state.
 
 import React, { useState } from 'react';
 import { useLayoutStore, useStore, useToolStore } from '@ui/store';
@@ -10,14 +10,29 @@ import { SOLID_PRESETS } from '@ui/components/toolbar/solidPresets';
 import { createSolid } from '@ui/actions/createSolid';
 import { startCivilSite } from '@ui/actions/civilStarter';
 
-function Tip({ icon, children }: { icon: IconName; children: React.ReactNode }): React.ReactElement {
+interface StartChipProps {
+  icon: IconName;
+  /** Accessible name (what the start does). */
+  label: string;
+  caption: string;
+  busy?: boolean;
+  onClick: () => void;
+}
+
+function StartChip({ icon, label, caption, busy = false, onClick }: StartChipProps): React.ReactElement {
   return (
-    <li className="empty-state__tip">
-      <span className="empty-state__tip-icon" aria-hidden="true">
-        <Icon name={icon} size={14} />
-      </span>
-      <span className="empty-state__tip-text">{children}</span>
-    </li>
+    <button
+      type="button"
+      className="empty-state__start"
+      aria-label={label}
+      title={label}
+      disabled={busy}
+      aria-busy={busy}
+      onClick={onClick}
+    >
+      <Icon name={icon} size={15} />
+      {caption}
+    </button>
   );
 }
 
@@ -56,81 +71,46 @@ export function EmptyState(): React.ReactElement | null {
           onClick={() => setDismissed(true)}
         />
 
-        <div className="empty-state__mark" aria-hidden="true">
-          <Icon name="cube" size={22} />
-        </div>
-
         <h2 className="empty-state__heading">Start your model</h2>
-        <p className="empty-state__subheading">Everything you can create is in the toolbar above. Try one:</p>
+        <p className="empty-state__subheading">
+          <strong>Let AI build it:</strong> use <em>Connect agent</em> and describe the part to Claude. Or start by hand:
+        </p>
 
-        <div className="empty-state__actions">
+        <div className="empty-state__starts">
           {boxPreset !== undefined && (
-            <button type="button" className="empty-state__action" onClick={() => createSolid(boxPreset)}>
-              <Icon name="cube" size={18} />
-              <span className="empty-state__action-title">Add a 3D box</span>
-              <span className="empty-state__action-sub">then drag its arrows to move it</span>
-            </button>
+            <StartChip icon="cube" label="Add a 3D box" caption="3D box" onClick={() => createSolid(boxPreset)} />
           )}
-          <button type="button" className="empty-state__action" onClick={() => setDrawTool('rectangle')}>
-            <Icon name="drawRectangle" size={18} />
-            <span className="empty-state__action-title">Draw a 2D rectangle</span>
-            <span className="empty-state__action-sub">click two corners on the grid</span>
-          </button>
-        </div>
-
-        <div className="empty-state__actions empty-state__actions--structure">
-          <button
-            type="button"
-            className="empty-state__action"
+          <StartChip icon="drawRectangle" label="Draw a 2D rectangle" caption="2D sketch" onClick={() => setDrawTool('rectangle')} />
+          <StartChip
+            icon="building"
+            label="Start a steel structure"
+            caption="Steel structure"
             onClick={() => {
               showBuildingTab();
               setDismissed(true);
             }}
-          >
-            <Icon name="building" size={18} />
-            <span className="empty-state__action-title">Start a steel structure</span>
-            <span className="empty-state__action-sub">step by step: levels, grid, members</span>
-          </button>
-          <button
-            type="button"
-            className="empty-state__action"
+          />
+          <StartChip
+            icon="building"
+            label="Portal-frame hall template"
+            caption="Portal-frame hall"
             onClick={() => {
               showBuildingTab();
               dispatch('add_portal_frame_building', {});
             }}
-          >
-            <Icon name="building" size={18} />
-            <span className="empty-state__action-title">Portal-frame hall template</span>
-            <span className="empty-state__action-sub">a ready-made frame set in one click</span>
-          </button>
-          <button
-            type="button"
-            className="empty-state__action empty-state__action--wide"
+          />
+          <StartChip
+            icon="terrain"
+            label={civilLoading ? 'Civil site starter — loading the sample survey…' : 'Civil site starter'}
+            caption={civilLoading ? 'Loading survey…' : 'Civil site'}
+            busy={civilLoading}
             onClick={startCivil}
-            disabled={civilLoading}
-            aria-busy={civilLoading}
-          >
-            <Icon name="terrain" size={18} />
-            <span className="empty-state__action-title">Civil site starter</span>
-            <span className="empty-state__action-sub">
-              {civilLoading ? 'loading the sample survey…' : 'survey, terrain, pad, road, drainage'}
-            </span>
-          </button>
+          />
         </div>
 
-        <ul className="empty-state__tips" aria-label="Tips">
-          <Tip icon="transformMove">
-            <strong>Move things:</strong> click an object, then drag the gizmo arrows (3D) or press <kbd className="kbd">M</kbd> (2D). Arrow
-            keys nudge, the Properties panel takes exact coordinates.
-          </Tip>
-          <Tip icon="plug">
-            <strong>Or let AI build it:</strong> use <em>Connect agent</em> (top right) and ask Claude to model something.
-          </Tip>
-          <Tip icon="search">
-            Press <kbd className="kbd">{PALETTE_SHORTCUT_LABEL}</kbd> to search and run any of llull’s commands, or{' '}
-            <kbd className="kbd">?</kbd> for keyboard shortcuts.
-          </Tip>
-        </ul>
+        <p className="empty-state__foot">
+          <kbd className="kbd">{PALETTE_SHORTCUT_LABEL}</kbd> runs any command · <kbd className="kbd">?</kbd> shortcuts
+        </p>
       </div>
     </div>
   );

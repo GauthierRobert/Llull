@@ -34,7 +34,7 @@ interface PersistedLayout {
   inspectorOpen: boolean;
 }
 
-const DEFAULT_LAYOUT: PersistedLayout = { sidebarTab: 'layers', sidebarOpen: true, inspectorOpen: true };
+const DEFAULT_LAYOUT: PersistedLayout = { sidebarTab: 'layers', sidebarOpen: false, inspectorOpen: false };
 
 function isSidebarTab(value: unknown): value is SidebarTab {
   return SIDEBAR_TABS.some((tab) => tab === value);

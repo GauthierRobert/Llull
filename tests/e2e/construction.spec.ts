@@ -8,6 +8,7 @@ import { applyTool, downloadText, elementRows, openBuilding, openProjectFile, st
 
 /** Switches to 2D, arms the Wall tool and returns the canvas with its bounding box. */
 async function armWallTool(page: Page): Promise<{ canvas: ReturnType<Page['locator']>; box: { width: number; height: number } }> {
+  await page.getByRole('button', { name: 'Tools', exact: true }).click();
   await page.getByRole('button', { name: '2D', exact: true }).click();
   await page.getByRole('button', { name: 'Wall', exact: true }).click();
   const canvas = page.locator('.viewport-2d-wrapper canvas');
@@ -67,6 +68,7 @@ test.describe('construction workflow', () => {
     await canvas.click({ position: { x: box.width * 0.45, y: box.height * 0.5 } });
     await canvas.click({ position: { x: box.width * 0.55, y: box.height * 0.5 } });
     await page.keyboard.press('Enter');
+    await page.getByRole('button', { name: 'More', exact: true }).click();
     const saved = await downloadText(page, () => page.getByRole('button', { name: 'Save project to a JSON file' }).click());
     const document = JSON.parse(saved.text) as {
       document: { building: { elements: Record<string, { category: string; start?: number[] }> } };
@@ -172,6 +174,7 @@ test.describe('construction workflow', () => {
   test('a building survives Save and Open', async ({ page }) => {
     await openBuilding(page);
     await page.getByRole('button', { name: 'Starter house' }).click();
+    await page.getByRole('button', { name: 'More', exact: true }).click();
     const saved = await downloadText(page, () => page.getByRole('button', { name: 'Save project to a JSON file' }).click());
     expect(saved.text).toContain('"building"');
     await openBuilding(page);

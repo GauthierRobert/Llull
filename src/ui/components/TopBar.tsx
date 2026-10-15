@@ -1,18 +1,14 @@
-// Header: sidebar toggle, brand, breadcrumbs, palette trigger (Ctrl/Cmd+K), agent pill (liveStatus), project / export /
-// connect actions, theme and inspector toggles.
+// Header: browser-panel toggle, brand, breadcrumbs (project › selection); agent status, Connect agent and the More menu
+// (file, export, theme, properties). The command palette trigger lives in the command bar.
 
 import React from 'react';
 import { classNames } from '@ui/classNames';
-import { type LiveStatus, useLayoutStore, usePaletteStore, useStore } from '@ui/store';
+import { type LiveStatus, useLayoutStore, useStore } from '@ui/store';
 import { useSessionStore } from '@ui/store/sessionStore';
 import { projectNameOf } from '@ui/components/projectName';
 import { Icon } from '@ui/components/Icon';
-import { ThemeToggle } from '@ui/components/ThemeToggle';
-import { ProjectIO } from '@ui/components/ProjectIO';
-import { ModelExport } from '@ui/components/ModelExport';
-import { ImageUnderlayImport } from '@ui/components/ImageUnderlayImport';
 import { McpConnectButton } from '@ui/components/McpConnect';
-import { PALETTE_SHORTCUT_LABEL } from '@ui/hooks/shortcuts';
+import { MoreMenu } from '@ui/components/MoreMenu';
 
 function AgentPill({ status }: { status: LiveStatus }): React.ReactElement {
   const isConnected = status === 'connected';
@@ -32,6 +28,18 @@ function AgentPill({ status }: { status: LiveStatus }): React.ReactElement {
   );
 }
 
+/** Breadcrumb tail: the sole selected entity's name (or id), "<n> selected" for several, null for none. */
+function useSelectionCrumb(): string | null {
+  return useStore((s) => {
+    const ids = s.document.selection.filter((id) => id in s.document.entities);
+    if (ids.length === 0) return null;
+    if (ids.length > 1) return `${ids.length} selected`;
+    const [id] = ids;
+    const entity = id === undefined ? undefined : s.document.entities[id];
+    return entity === undefined ? null : (entity.name ?? entity.id);
+  });
+}
+
 function SidebarToggle(): React.ReactElement {
   const sidebarOpen = useLayoutStore((s) => s.sidebarOpen);
   const toggleSidebar = useLayoutStore((s) => s.toggleSidebar);
@@ -49,46 +57,11 @@ function SidebarToggle(): React.ReactElement {
   );
 }
 
-function InspectorToggle(): React.ReactElement {
-  const inspectorOpen = useLayoutStore((s) => s.inspectorOpen);
-  const toggleInspector = useLayoutStore((s) => s.toggleInspector);
-  const label = inspectorOpen ? 'Hide properties panel' : 'Show properties panel';
-  return (
-    <button
-      type="button"
-      className={`icon-btn${inspectorOpen ? ' icon-btn--active' : ''}`}
-      onClick={toggleInspector}
-      aria-label={label}
-      title={label}
-    >
-      <Icon name="panelRight" size={16} />
-    </button>
-  );
-}
-
-function SearchTrigger(): React.ReactElement {
-  const setOpen = usePaletteStore((s) => s.setOpen);
-  const shortcut = PALETTE_SHORTCUT_LABEL;
-  return (
-    <button
-      type="button"
-      className="search-trigger"
-      onClick={() => setOpen(true)}
-      aria-label={`Search or run a command… ${shortcut}`}
-      aria-keyshortcuts="Control+K Meta+K"
-      title={`Search every action and command (${shortcut})`}
-    >
-      <Icon name="search" size={14} />
-      <span className="search-trigger__text">Search or run a command…</span>
-      <kbd className="kbd search-trigger__kbd">{shortcut}</kbd>
-    </button>
-  );
-}
-
 export function TopBar(): React.ReactElement {
   const liveStatus = useStore((s) => s.liveStatus);
   const projectName = useStore((s) => projectNameOf(s.document));
   const isDirty = useSessionStore((s) => s.dirty);
+  const selectionName = useSelectionCrumb();
 
   return (
     <header className="topbar" role="banner">
@@ -97,9 +70,9 @@ export function TopBar(): React.ReactElement {
 
         <div className="brand" aria-label="Llull CAD">
           <div className="brand-mark" aria-hidden="true">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2.5 3.5 7v10L12 21.5 20.5 17V7L12 2.5Z" fill="currentColor" />
-              <path d="M3.5 7 12 11.5 20.5 7M12 11.5v10" stroke="var(--surface-1)" strokeWidth="1.6" strokeLinejoin="round" />
+            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+              <circle cx="11" cy="11" r="9.5" stroke="currentColor" strokeWidth="1.6" />
+              <circle cx="11" cy="11" r="4.5" fill="var(--accent)" />
             </svg>
           </div>
           <h1 className="brand-wordmark">Llull</h1>
@@ -108,7 +81,17 @@ export function TopBar(): React.ReactElement {
         <span className="topbar__sep" aria-hidden="true" />
 
         <nav className="file-crumbs" aria-label="File location">
-          <span className="file-crumb file-crumb--active">{projectName ?? 'Untitled'}</span>
+          <span className={classNames('file-crumb', selectionName === null && 'file-crumb--active')}>{projectName ?? 'Untitled'}</span>
+          {selectionName !== null && (
+            <>
+              <span className="file-crumb-sep" aria-hidden="true">
+                ›
+              </span>
+              <span className="file-crumb file-crumb--active" title={selectionName}>
+                {selectionName}
+              </span>
+            </>
+          )}
           {isDirty && (
             <span className="unsaved-dot" role="status" aria-label="Unsaved changes" title="Unsaved changes">
               ●<span className="unsaved-dot__label"> unsaved</span>
@@ -117,18 +100,10 @@ export function TopBar(): React.ReactElement {
         </nav>
       </div>
 
-      <SearchTrigger />
-
       <div className="topbar__right">
         <AgentPill status={liveStatus} />
-        <span className="topbar__sep" aria-hidden="true" />
-        <ProjectIO />
-        <ImageUnderlayImport />
-        <ModelExport />
         <McpConnectButton />
-        <span className="topbar__sep" aria-hidden="true" />
-        <ThemeToggle />
-        <InspectorToggle />
+        <MoreMenu />
       </div>
     </header>
   );

@@ -13,8 +13,8 @@
 
 .empty-state__card {
   position: relative;
-  width: min(420px, 100%);
-  padding: var(--space-6);
+  width: min(440px, 100%);
+  padding: var(--space-6) var(--space-5) var(--space-5);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -34,74 +34,63 @@
   right: var(--space-2);
 }
 
-.empty-state__mark {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 48px;
-  margin-bottom: var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--accent-soft);
-  color: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--accent-border);
-}
-
 .empty-state__heading {
+  margin: 0 0 6px;
   font-size: var(--text-lg);
   font-weight: var(--weight-semibold);
-  color: var(--fg);
   letter-spacing: -0.01em;
+  color: var(--fg);
 }
 
 .empty-state__subheading {
-  margin-top: var(--space-1);
+  max-width: 34ch;
+  margin: 0 0 var(--space-4);
   font-size: var(--text-base);
   color: var(--fg-muted);
 }
 
-.empty-state__tips {
-  width: 100%;
-  margin-top: var(--space-5);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--divider);
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  text-align: left;
+.empty-state__subheading strong {
+  color: var(--fg);
+  font-weight: var(--weight-semibold);
 }
 
-.empty-state__tip {
+.empty-state__starts {
   display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
-  font-size: var(--text-sm);
-  line-height: 1.5;
-  color: var(--fg-muted);
-}
-
-.empty-state__tip-icon {
-  display: flex;
-  align-items: center;
+  flex-wrap: wrap;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  color: var(--fg-subtle);
-  flex-shrink: 0;
+  gap: 6px;
 }
 
-.empty-state__tip-text {
-  flex: 1;
-  min-width: 0;
-  padding-top: 2px;
-}
-
-.empty-state__tip-text strong {
+.empty-state__start {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-1);
+  font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   color: var(--fg);
+  transition: var(--transition-colors);
+}
+
+.empty-state__start:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent-text);
+}
+
+.empty-state__start:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.empty-state__foot {
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
 }
 
 @keyframes empty-state-in {
@@ -109,56 +98,4 @@
     opacity: 0;
     transform: translateY(4px);
   }
-}
-
-/* ---- Quick-start actions ---------------------------------------------------- */
-
-.empty-state__actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-2);
-  width: 100%;
-  margin-top: var(--space-4);
-}
-
-.empty-state__action {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: var(--space-3) var(--space-2);
-  border-radius: var(--radius);
-  background: var(--accent-softer);
-  border: 1px solid var(--accent-border);
-  color: var(--accent-text);
-  transition: background var(--dur-fast) var(--ease);
-}
-
-.empty-state__action:hover {
-  background: var(--accent-soft);
-}
-
-.empty-state__action-title {
-  font-size: var(--text-base);
-  font-weight: var(--weight-semibold);
-  color: var(--fg);
-}
-
-.empty-state__action-sub {
-  font-size: var(--text-xs);
-  color: var(--fg-subtle);
-}
-
-.empty-state__actions--structure {
-  margin-top: var(--space-2);
-}
-
-/* The civil site starter spans the row under the two structure starters. */
-.empty-state__action--wide {
-  grid-column: 1 / -1;
-}
-
-.empty-state__action:disabled {
-  opacity: 0.7;
-  cursor: progress;
 }

@@ -62,6 +62,7 @@ describe('layoutStore — narrow windows', () => {
     expect(JSON.parse(localStorage.getItem('llull-layout') ?? '{}')).toMatchObject({ sidebarOpen: true });
   });
   it('keeps the stored docks on a wide window', async () => {
+    localStorage.setItem('llull-layout', JSON.stringify({ sidebarTab: 'layers', sidebarOpen: true, inspectorOpen: true }));
     stubMatchMedia(() => false);
     const { useLayoutStore } = await import('@ui/store/layoutStore');
     expect(useLayoutStore.getState().sidebarOpen).toBe(true);

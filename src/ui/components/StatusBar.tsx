@@ -109,7 +109,13 @@ export function StatusBar(): React.ReactElement {
         <LiveIndicator />
         <KernelIndicator />
         {lastSummary !== null && (
-          <span className="status-summary" aria-live="polite" aria-label={`Last command: ${lastSummary}`} title={lastSummary}>
+          <span
+            key={lastSummary}
+            className="status-summary"
+            aria-live="polite"
+            aria-label={`Last command: ${lastSummary}`}
+            title={lastSummary}
+          >
             {lastSummary}
           </span>
         )}

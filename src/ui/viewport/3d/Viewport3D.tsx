@@ -11,6 +11,9 @@ import * as THREE from 'three';
 import { type GizmoMode, useStore, useToolStore } from '@ui/store';
 import { Entities } from './Entities';
 import { TransformGizmo } from './TransformGizmo';
+import { DimensionLens } from './DimensionLens';
+import { ViewOptionsToggle } from './ViewOptionsToggle';
+import { useChromeStore } from '@ui/store/chromeStore';
 import { RenderOriginSyncer } from '../RenderOriginSyncer';
 import { ViewPresetsOverlay } from './ViewPresets';
 import { CameraBridge } from './cameraBridge';
@@ -112,6 +115,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         <TransformGizmo mode={gizmoMode} onDraggingChanged={onDraggingChanged} />
         <MeasureBBoxWireframe />
         <MechanismOverlay />
+        <DimensionLens />
       </group>
 
       <GizmoHelper alignment="bottom-right" margin={[72, 72]}>
@@ -124,6 +128,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
 export function Viewport3D(): React.ReactElement {
   const clearSelection = useStore((s) => s.clearSelection);
   const gizmoMode = useToolStore((s) => s.gizmoMode);
+  const viewOptionsOpen = useChromeStore((s) => s.viewOptionsOpen);
 
   const [orbitEnabled, setOrbitEnabled] = useState(true);
 
@@ -150,9 +155,13 @@ export function Viewport3D(): React.ReactElement {
         </Suspense>
       </Canvas>
 
-      <ViewPresetsOverlay />
-
-      <ViewportControls />
+      <ViewOptionsToggle />
+      {viewOptionsOpen && (
+        <>
+          <ViewPresetsOverlay />
+          <ViewportControls />
+        </>
+      )}
     </div>
   );
 }
