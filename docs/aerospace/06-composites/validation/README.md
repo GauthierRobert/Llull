@@ -234,17 +234,84 @@ measurements, recorded with `npm run quality`.
 tutorials. If llull gains an Ansys CDB or mesh import, draping a 0° ply on the hull and comparing shear
 against PyACP output is a V2 cross-check. The file is pinned only.
 
+### 3.7 Remaining functional coverage
+
+**VC-CMP-24: cores.** Proves FR-CMP-13.
+Add a 10 mm honeycomb core (chamfer 30°) inside Z-base. A core sample through the core lists 4 plies, then
+the core, then 4 plies, with total thickness 1.0 + 10.0 = 11.0 mm (derived). At the chamfer mid-run, the
+core thickness is 5.0 mm (linear chamfer).
+
+**VC-CMP-25: extra rules.** Proves FR-CMP-22.
+With `maxAngleChange: 45`, `[0/90/45/-45]s` is flagged at the 0→90 interface (change of 90°) and at the
+45→-45 interface (90°). `[45/0/-45/90]s` passes. Derived by inspection, with angle differences taken modulo
+180°.
+
+**VC-CMP-26: FEA laminate sections.** Proves FR-CMP-34.
+`export_laminate_sections` on the flat panel gives 3 sections. Their ply lists equal the core samples of
+VC-CMP-10, and the sum of t equals the zone thickness: 1.0, 2.0 and 3.0 mm.
+
+**VC-CMP-27: fibre deviation.** Proves FR-CMP-44.
+On the cylinder and cone (developable, geodesic generators), the deviation is 0 within 0.01°. On the
+hemisphere, the deviation along the generators is 0 within 0.05°. It is non-zero elsewhere and equals the
+local warp rotation; this value is reported, not gated.
+
+**VC-CMP-28: ply book.** Proves FR-CMP-51.
+For the flat panel, the book has one sheet per sequence label (24 sequences for 24 master plies). Each sheet
+holds a 3D view, the flat pattern and a table row whose area equals the DXF piece area within 0.2 %. The
+check is structural: the SVG is parsed by the existing sheet tests.
+
+**VC-CMP-29: ply table round trip.** Proves FR-CMP-53.
+`export_ply_table`, then `import_ply_table` into an empty part on the same tool, then `export_ply_table`
+again: the two CSVs are byte-identical.
+
+**VC-CMP-30: per-ply solids.** Proves FR-CMP-54.
+For the flat panel, each ply solid's volume equals area × 0.125 within 0.5 %, solids stack without
+interference (`check_model` interference = 0), and `export_step_exact` contains one MANIFOLD_SOLID_BREP per
+ply piece.
+
+**VC-CMP-31: material provenance.** Proves FR-CMP-02 and FR-CMP-03.
+The in-plane compliance is positive definite only if 1 − ν12ν21 > 0, that is ν12² < E1/E2. With
+E1 = E2 = 10 000, `create_lamina_material` must reject ν12 = 1.1 (1.21 ≥ 1) and accept ν12 = 0.9. With the
+T300/5208 moduli, the bound is ν12 < √(181/10.3) = 4.19. The `source` and `basis` strings survive save and
+load unchanged.
+
+**VC-CMP-32: parametric regeneration.** Proves FR-CMP-61.
+Bind `rampRatio` to parameter `ramp = 20`, then run `set_parameter ramp 30`. The ramp width of the 8-ply
+step becomes 30 mm, the flats are regenerated, and undo restores 20 mm. Ids stay identical across the edit
+(L8).
+
 ## 4. Traceability matrix (FR → VC)
 
 | FR | VC |
 | -- | -- |
-| FR-CMP-01..03 (materials) | VC-CMP-01, 06 |
-| FR-CMP-04 (notation) | VC-CMP-08 |
-| FR-CMP-05..07 (rosettes, part, plies) | VC-CMP-10, 12, 14, 20 |
-| FR-CMP-10..13 (zones, core sample, ramps, cores) | VC-CMP-10, 11 |
-| FR-CMP-20..22 (rules) | VC-CMP-04, 08, 09 |
-| FR-CMP-30..34 (CLT, failure, mass, hand-off) | VC-CMP-01..07, 18 |
-| FR-CMP-40..44 (drape, producibility, flat) | VC-CMP-12..15 |
-| FR-CMP-50..56 (exports) | VC-CMP-16, 17, 19, 23 |
-| FR-CMP-60..62 (surfaces, agents) | VC-CMP-20, 21 |
-| FR-CMP-70 (performance) | VC-CMP-22 |
+| FR-CMP-01 | VC-CMP-01, 06 |
+| FR-CMP-02, 03 | VC-CMP-31 |
+| FR-CMP-04 | VC-CMP-08 |
+| FR-CMP-05 (rosettes) | VC-CMP-12, 14, 15 (orientation from rosette) |
+| FR-CMP-06 (part on face) | VC-CMP-10, 12, 15, 20 |
+| FR-CMP-07 (plies) | VC-CMP-12, 14, 20 |
+| FR-CMP-10, 11 | VC-CMP-10 |
+| FR-CMP-12 | VC-CMP-11, 32 |
+| FR-CMP-13 | VC-CMP-24 |
+| FR-CMP-20 | VC-CMP-04, 08 |
+| FR-CMP-21 | VC-CMP-08, 09 |
+| FR-CMP-22 | VC-CMP-25 |
+| FR-CMP-30 | VC-CMP-01 |
+| FR-CMP-31 | VC-CMP-02..05 |
+| FR-CMP-32 | VC-CMP-06, 07 |
+| FR-CMP-33 | VC-CMP-18 |
+| FR-CMP-34 | VC-CMP-26 |
+| FR-CMP-40 | VC-CMP-12 |
+| FR-CMP-41, 42 | VC-CMP-13 |
+| FR-CMP-43 | VC-CMP-14, 15 |
+| FR-CMP-44 | VC-CMP-27 |
+| FR-CMP-50 | VC-CMP-16 |
+| FR-CMP-51 | VC-CMP-28 |
+| FR-CMP-52 | VC-CMP-17 |
+| FR-CMP-53 | VC-CMP-29 |
+| FR-CMP-54 | VC-CMP-30, 19 |
+| FR-CMP-55 | VC-CMP-19 |
+| FR-CMP-56 | VC-CMP-23 |
+| FR-CMP-60, 62 | VC-CMP-21 |
+| FR-CMP-61 | VC-CMP-32, 20 |
+| FR-CMP-70 | VC-CMP-22 |
