@@ -32,12 +32,17 @@
      "twistDeg": 0.0
     }
    ],
-   "sweepDeg": 0.0,
-   "sweepLocation": 0.0,
-   "dihedralDeg": 0.0,
+   "segments": [
+    {
+     "sweepDeg": 0.0,
+     "sweepLocation": 0.0,
+     "dihedralDeg": 0.0
+    }
+   ],
    "twistLocation": 0.25,
    "loft": "linear",
-   "mirror": false
+   "mirror": false,
+   "tip": "flat"
   },
   "as": "wing"
  },

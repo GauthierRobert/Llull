@@ -6,298 +6,354 @@
   }
  },
  {
+  "command": "set_aircraft_frame",
+  "params": {
+   "datum": [
+    0,
+    0,
+    0
+   ],
+   "fsAxis": [
+    1,
+    0,
+    0
+   ],
+   "blAxis": [
+    0,
+    1,
+    0
+   ],
+   "wlAxis": [
+    0,
+    0,
+    1
+   ],
+   "units": "m"
+  }
+ },
+ {
   "command": "loft_fuselage",
   "params": {
    "stations": [
     {
+     "fs": 0.0,
+     "section": {
+      "type": "point",
+      "wl": 0.0
+     }
+    },
+    {
      "fs": 0.5,
-     "upper": {
+     "section": {
       "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.143892,
-      "crown": 0.143892
-     },
-     "lower": {
-      "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.143892,
-      "keel": 0.143892
+      "upper": {
+       "wlExtreme": 0.143892,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.143892,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.143892
      }
     },
     {
      "fs": 1.0,
-     "upper": {
+     "section": {
       "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.232379,
-      "crown": 0.232379
-     },
-     "lower": {
-      "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.232379,
-      "keel": 0.232379
+      "upper": {
+       "wlExtreme": 0.232379,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.232379,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.232379
      }
     },
     {
      "fs": 1.5,
-     "upper": {
+     "section": {
       "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.30175,
-      "crown": 0.30175
-     },
-     "lower": {
-      "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.30175,
-      "keel": 0.30175
+      "upper": {
+       "wlExtreme": 0.30175,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.30175,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.30175
      }
     },
     {
      "fs": 2.0,
-     "upper": {
+     "section": {
       "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.357771,
-      "crown": 0.357771
-     },
-     "lower": {
-      "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.357771,
-      "keel": 0.357771
+      "upper": {
+       "wlExtreme": 0.357771,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.357771,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.357771
      }
     },
     {
      "fs": 2.5,
-     "upper": {
+     "section": {
       "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.402964,
-      "crown": 0.402964
-     },
-     "lower": {
-      "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.402964,
-      "keel": 0.402964
+      "upper": {
+       "wlExtreme": 0.402964,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.402964,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.402964
      }
     },
     {
      "fs": 3.0,
-     "upper": {
+     "section": {
       "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.438712,
-      "crown": 0.438712
-     },
-     "lower": {
-      "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.438712,
-      "keel": 0.438712
+      "upper": {
+       "wlExtreme": 0.438712,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.438712,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.438712
      }
     },
     {
      "fs": 3.5,
-     "upper": {
+     "section": {
       "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.465855,
-      "crown": 0.465855
-     },
-     "lower": {
-      "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.465855,
-      "keel": 0.465855
+      "upper": {
+       "wlExtreme": 0.465855,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.465855,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.465855
      }
     },
     {
      "fs": 4.0,
-     "upper": {
+     "section": {
       "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.484924,
-      "crown": 0.484924
-     },
-     "lower": {
-      "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.484924,
-      "keel": 0.484924
+      "upper": {
+       "wlExtreme": 0.484924,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.484924,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.484924
      }
     },
     {
      "fs": 4.5,
-     "upper": {
+     "section": {
       "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.496245,
-      "crown": 0.496245
-     },
-     "lower": {
-      "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.496245,
-      "keel": 0.496245
+      "upper": {
+       "wlExtreme": 0.496245,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.496245,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.496245
      }
     },
     {
      "fs": 5.0,
-     "upper": {
+     "section": {
       "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.5,
-      "crown": 0.5
-     },
-     "lower": {
-      "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.5,
-      "keel": 0.5
+      "upper": {
+       "wlExtreme": 0.5,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.5,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.5
      }
     },
     {
      "fs": 5.5,
-     "upper": {
+     "section": {
       "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.496245,
-      "crown": 0.496245
-     },
-     "lower": {
-      "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.496245,
-      "keel": 0.496245
+      "upper": {
+       "wlExtreme": 0.496245,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.496245,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.496245
      }
     },
     {
      "fs": 6.0,
-     "upper": {
+     "section": {
       "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.484924,
-      "crown": 0.484924
-     },
-     "lower": {
-      "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.484924,
-      "keel": 0.484924
+      "upper": {
+       "wlExtreme": 0.484924,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.484924,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.484924
      }
     },
     {
      "fs": 6.5,
-     "upper": {
+     "section": {
       "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.465855,
-      "crown": 0.465855
-     },
-     "lower": {
-      "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.465855,
-      "keel": 0.465855
+      "upper": {
+       "wlExtreme": 0.465855,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.465855,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.465855
      }
     },
     {
      "fs": 7.0,
-     "upper": {
+     "section": {
       "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.438712,
-      "crown": 0.438712
-     },
-     "lower": {
-      "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.438712,
-      "keel": 0.438712
+      "upper": {
+       "wlExtreme": 0.438712,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.438712,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.438712
      }
     },
     {
      "fs": 7.5,
-     "upper": {
+     "section": {
       "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.402964,
-      "crown": 0.402964
-     },
-     "lower": {
-      "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.402964,
-      "keel": 0.402964
+      "upper": {
+       "wlExtreme": 0.402964,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.402964,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.402964
      }
     },
     {
      "fs": 8.0,
-     "upper": {
+     "section": {
       "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.357771,
-      "crown": 0.357771
-     },
-     "lower": {
-      "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.357771,
-      "keel": 0.357771
+      "upper": {
+       "wlExtreme": 0.357771,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.357771,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.357771
      }
     },
     {
      "fs": 8.5,
-     "upper": {
+     "section": {
       "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.30175,
-      "crown": 0.30175
-     },
-     "lower": {
-      "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.30175,
-      "keel": 0.30175
+      "upper": {
+       "wlExtreme": 0.30175,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.30175,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.30175
      }
     },
     {
      "fs": 9.0,
-     "upper": {
+     "section": {
       "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.232379,
-      "crown": 0.232379
-     },
-     "lower": {
-      "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.232379,
-      "keel": 0.232379
+      "upper": {
+       "wlExtreme": 0.232379,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.232379,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.232379
      }
     },
     {
      "fs": 9.5,
-     "upper": {
+     "section": {
       "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.143892,
-      "crown": 0.143892
-     },
-     "lower": {
-      "type": "conic",
-      "rho": 0.41421356,
-      "halfBreadth": 0.143892,
-      "keel": 0.143892
+      "upper": {
+       "wlExtreme": 0.143892,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.143892,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.143892
+     }
+    },
+    {
+     "fs": 10.0,
+     "section": {
+      "type": "point",
+      "wl": 0.0
      }
     }
    ],
-   "noseFs": 0.0,
-   "tailFs": 10.0,
-   "frame": "FS_BL_WL",
    "continuity": "G2"
   },
   "as": "fus"

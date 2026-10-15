@@ -57,7 +57,8 @@ def target_naca_wing():
                     {"airfoilId": "$af", "span": 0.0, "chord": 2.0, "twistDeg": 0.0},
                     {"airfoilId": "$af", "span": 5.0, "chord": 1.0, "twistDeg": 0.0},
                 ],
-                "sweepDeg": 0.0, "sweepLocation": 0.0, "dihedralDeg": 0.0, "twistLocation": 0.25, "loft": "linear", "mirror": False,
+                "segments": [{"sweepDeg": 0.0, "sweepLocation": 0.0, "dihedralDeg": 0.0}],
+                "twistLocation": 0.25, "loft": "linear", "mirror": False, "tip": "flat",
             },
             "as": "wing",
         },
@@ -73,9 +74,10 @@ def target_tr1208():
         {
             "command": "create_wing",
             "params": {
-                "planform": {"semiSpan": 63.63, "rootChord": 21.941, "taper": 0.45, "sweepDeg": 45.0, "sweepLocation": 0.25},
-                "sections": [{"airfoilId": "$af", "span": 0.0}, {"airfoilId": "$af", "span": 63.63}],
-                "mirror": True,
+                # planform resolves chords (TECHNICAL_SPEC 4.2: any 3 independent planform values); sections give airfoil + twist only
+                "planform": {"semiSpan": 63.63, "rootChord": 21.941, "taper": 0.45, "sweepDeg": 45.0, "sweepLocation": 0.25, "dihedralDeg": 0.0},
+                "sections": [{"airfoilId": "$af", "span": 0.0, "twistDeg": 0.0}, {"airfoilId": "$af", "span": 63.63, "twistDeg": 0.0}],
+                "twistLocation": 0.25, "loft": "linear", "mirror": True, "tip": "flat",
             },
             "as": "wing",
         },
@@ -92,15 +94,20 @@ def target_surface_analysis():
 
 
 def target_conic_fuselage():
-    stations = []
+    # BodyStation / BodySection shapes of TECHNICAL_SPEC 3: { fs, section: { type: 'conic', upper, lower, wlMaxBreadth, halfBreadth } },
+    # apexes as { type: 'point', wl }. rho = sqrt(2) - 1 makes each conic half an exact semicircle (VC-SRF-14).
+    rho = round(math.sqrt(2) - 1, 8)
+    stations = [{"fs": 0.0, "section": {"type": "point", "wl": 0.0}}]
     for k in range(1, 20):
         x = k / 20
-        r = 0.5 * (4 * x * (1 - x)) ** 0.75
-        stations.append({"fs": round(10 * x, 4), "upper": {"type": "conic", "rho": 0.41421356, "halfBreadth": round(r, 6), "crown": round(r, 6)},
-                         "lower": {"type": "conic", "rho": 0.41421356, "halfBreadth": round(r, 6), "keel": round(r, 6)}})
+        r = round(0.5 * (4 * x * (1 - x)) ** 0.75, 6)
+        stations.append({"fs": round(10 * x, 4), "section": {"type": "conic", "upper": {"wlExtreme": r, "rho": rho},
+                         "lower": {"wlExtreme": -r, "rho": rho}, "wlMaxBreadth": 0.0, "halfBreadth": r}})
+    stations.append({"fs": 10.0, "section": {"type": "point", "wl": 0.0}})
     return [
         {"command": "set_units", "params": {"units": "m"}},
-        {"command": "loft_fuselage", "params": {"stations": stations, "noseFs": 0.0, "tailFs": 10.0, "frame": "FS_BL_WL", "continuity": "G2"}, "as": "fus"},
+        {"command": "set_aircraft_frame", "params": {"datum": [0, 0, 0], "fsAxis": [1, 0, 0], "blAxis": [0, 1, 0], "wlAxis": [0, 0, 1], "units": "m"}},
+        {"command": "loft_fuselage", "params": {"stations": stations, "continuity": "G2"}, "as": "fus"},
         {"command": "mass_properties", "params": {"entityId": "$fus"}},
     ]
 
