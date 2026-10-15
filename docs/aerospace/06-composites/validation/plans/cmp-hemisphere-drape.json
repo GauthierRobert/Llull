@@ -10,5 +10,6 @@
    "boundary": { "kind": "surface_region", "maxPolarAngleDeg": 90 },
    "drape": { "method": "kinematic", "seedPoint": [0, 0, 100], "seedDirection": [1, 0, 0], "stepLength": 1.0, "generators": "geodesic" } }, "as": "p1" },
  { "command": "check_producibility", "params": { "part": "$part", "plies": ["$p1"] } },
+ { "command": "check_layup", "params": { "part": "$part" } },
  { "command": "export_flat_patterns_dxf", "params": { "part": "$part", "plies": ["$p1"] } }
 ]
