@@ -235,7 +235,7 @@ CASES = [
     },
     {
         'id': 'SU-04',
-        'title': 'Non-unit sensitivities: radial clearance of a pin in a located hole (diameters enter with 1/2)',
+        'title': 'Non-unit sensitivities: radial clearance of a pin in a located hole (diameters enter with 1/2). TEST VECTOR: radial locating errors e1, e2 are modelled as symmetric normals about 0.025 for arithmetic coverage; a real radial position error is non-negative (Rayleigh-like) and needs a 2D/MC model',
         'expression': 'radialClearance = Dhole/2 - Dpin/2 - e1 - e2   (e = radial locating error of hole and pin axes)',
         'function': lambda x: x[0] / 2 - x[1] / 2 - x[2] - x[3],
         'sensitivities': [0.5, -0.5, -1.0, -1.0],

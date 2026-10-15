@@ -7,7 +7,7 @@ For each STEP file: read with STEPControl_Reader (default ShapeFix shape process
   (inertia: density 1, about the centroid, world axes), optimal bounding box, read time, and a topology
   signature hash (per-face area + centroid in kernel order) of two independent reads (same-process determinism).
 
-This is the ORACLE a llull `import_step_brep` must reproduce (TECHNICAL_SPEC TR-KRN-20..24, VC-KRN-04..06):
+This is the ORACLE a llull `import_step_exact` must reproduce (TECHNICAL_SPEC TR-KRN-20..24, VC-KRN-04..06):
 volume / area / centroid are compared with the CAD-system-written geometric validation properties (GVP) where
 the file has them (NIST AP242 files; values in ../../04-interop-ap242-jt-iges/validation/nist_pmi_gvp_reference.json).
 

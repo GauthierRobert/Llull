@@ -21,7 +21,7 @@ assemblies. Every expected value is (a) quoted from a cited source, (b) analytic
 | `plans/krn-analytic-primitives.json` | draft `build_project` plan | primitives + plate-hole + far box, then `mass_properties` |
 | `plans/krn-rib-pocket.json` | draft plan | machined rib from a billet (blank − pocket, 4 corner fillets via `edgesNear`), material, topology, check, mass |
 | `plans/krn-rib-pocket-station-70m.json` | draft plan | the same rib at body station x = 70 000 mm |
-| `plans/krn-rib-parametric-renaming.json` | draft plan | pocket width parameter 260 → 240: the fillet must follow its edges (persistent naming) |
+| `plans/krn-rib-parametric-renaming.json` | draft plan | pocket width parameter 260 → 200: the fillet must follow its edges (persistent naming) |
 
 Regenerate (desktop CPython or any env with `pip install cadquery`):
 
@@ -58,7 +58,7 @@ Tolerances are relative (`rel`) or absolute (`abs`). "Gate" names the automated 
 | VC-KRN-04x | FR-KRN-05 | 5 NIST files whose GVP disagree (ctc_02 e2 & rc, ftc_07 e2, stc_08 e3, ctc_05 rd — inch file: GVP in file units, still ≈ 1.1e-2 volume apart after ×25.4) | reported as GVP mismatch with both numbers (converted to mm) | — (knownIssue until triaged) | quality:step |
 | VC-KRN-05 | FR-KRN-05, TR-KRN-22 | `nist_ftc_08_asme1_ap242-e4-tg.stp` (tessellated only) | import reports "no exact B-rep (tessellated)"; offers mesh import; never a silent empty result | exact | quality:step |
 | VC-KRN-06 | FR-KRN-05, TR-KRN-24 | all NIST files | per-file max sub-shape tolerance reported (0.1 mm on ctc_02 rc, measured); warning when > 0.01 mm | exact | quality:step |
-| VC-KRN-07 | FR-KRN-06, TR-KRN-30, TR-KRN-31 | `plans/krn-rib-parametric-renaming.json` | after pw 260 → 240: still 4 fillet faces, V = 517 716.8147 mm³, 0 broken references | rel 1e-9 | golden (expected to FAIL with today's `edgesNear`) |
+| VC-KRN-07 | FR-KRN-06, TR-KRN-30, TR-KRN-31 | `plans/krn-rib-parametric-renaming.json` | after pw 260 → 200: still 4 fillet faces on the pocket corners, V = 581 716.8147 mm³, 0 broken references | rel 1e-9 | golden (expected to FAIL with today's `edgesNear`: the two stored points at x = 280 are 60 mm from the moved corner edges at x = 220 but 22.4 mm from the blank's outer top edges, so the nearest-edge rule re-targets them silently) |
 | VC-KRN-08 | FR-KRN-07, TR-KRN-12 | two 10 mm cubes, 1e-5 mm gap | `fuzzy` 0 → 2 solids; `fuzzy` 2e-5 → 1 valid solid (measured) | exact counts | unit |
 | VC-KRN-09 | FR-KRN-09, TR-KRN-50 | every golden/quality result | no committed shape fails `validate_shape` | 0 | golden + quality |
 | VC-KRN-10 | FR-KRN-10, TR-KRN-60, TR-KRN-61 | plate-minus-cylinder, rib, NIST set | identical topology signature on re-run (measured `1125f7464525c4f6`, 7 faces, OCCT 7.9.3); cross-version: counts equal, measures within VC-KRN-01 tolerances | hash equality same build; tolerance across builds | quality:kernel |
@@ -71,7 +71,7 @@ Tolerances are relative (`rel`) or absolute (`abs`). "Gate" names the automated 
 | VC-KRN-17 | FR-KRN-17 | registry | every KRN command in `toToolSchemas()` snapshot, CLI help, happy + failure unit tests, `is pure` test | exact | contract tests |
 
 Also reused, not duplicated: **the existing quality corpus** (`quality/corpus.json`, R27). In exact mode
-(`import_step_brep`) every `step-import` entry must additionally pass: `validAfterHeal`, exact volume vs
+(`import_step_exact`) every `step-import` entry must additionally pass: `validAfterHeal`, exact volume vs
 `quality/step_reference.py` (rel 1e-6), and save/load round trip of the B-rep. Of special value to KRN:
 `as1-pe-203` (large coordinates), `syn-far-from-origin` (1000 km offset — beyond the TR-KRN-10 envelope:
 must import with a warning, not silently lose precision), `syn-inch-units`, `syn-hollow-cavity`,
@@ -100,7 +100,10 @@ All formulas are standard closed forms for homogeneous solids.
   P = 2(p_w+p_l) − 8r_c + 2πr_c; V = abt − S·d; A = A_blank + P·d; centroid z = (V_blank t/2 − S d (t − d/2))/V;
   buy-to-fly = V_blank / V (definition: blank volume over finished volume).
   Numbers: 300×120×25 blank, 260×80 pocket, d = 20, r_c = 10 → S = 20 714.159265 mm², V = 485 716.814693 mm³,
-  buy-to-fly = 1.852932; with p_w = 240 → V = 517 716.814693 mm³.
+  buy-to-fly = 1.852932; with p_w = 200 (pocket min corner fixed at x = 20) → S = 15 914.159265 mm², V = 581 716.814693 mm³.
+  Renaming discriminator: stored point (280, 20, 15) → moved corner edge x = 220: 60 mm; outer top edges (y = 0 or x = 300,
+  z = 25): √(20² + 10²) = 22.36 mm; so `edgesNear` picks a wrong edge (a pw 260 → 240 change would not discriminate:
+  20 mm to the moved corner vs 22.36 mm).
 - Large-coordinate cases: translation leaves V, A and centroidal inertia unchanged and shifts the centroid.
 
 ## 5. Measured findings that drive requirements

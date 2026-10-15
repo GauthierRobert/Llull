@@ -10,6 +10,7 @@
     { "command": "set_item_identity", "params": { "partNumber": "LL-1001", "name": "Bracket, hinge fitting", "itemType": "part", "revisionScheme": "asme-alpha" } },
     { "command": "set_export_marking", "params": { "regime": "none", "statement": "NLR-EXAMPLE", "decidedBy": "u-0003" } },
     { "command": "submit_for_review", "params": { "comment": "ready for release", "at": "2026-11-01T10:00:00Z", "by": "u-0007" } },
+    { "command": "create_change_order", "params": { "id": "ECO-0001", "purpose": "initial-release", "affectedItems": ["LL-1001"], "effectivity": [{ "kind": "serial", "from": 1 }], "at": "2026-11-01T12:00:00Z", "by": "u-0005" } },
     { "command": "release_item", "params": { "changeOrder": "ECO-0001", "effectivity": [{ "kind": "serial", "from": 1 }], "at": "2026-11-02T09:30:00Z", "by": "u-0007", "approvals": [{ "role": "design-authority", "userId": "u-0007" }, { "role": "checker", "userId": "u-0011" }] } },
     { "command": "create_change_request", "params": { "id": "ECR-0002", "title": "Increase flange thickness 4 -> 5 mm", "reason": "SN-118 negative margin", "affectedItems": ["LL-1001"], "proposedClassification": "minor", "at": "2026-12-01T08:00:00Z", "by": "u-0021" } },
     { "command": "create_change_order", "params": { "id": "ECO-0002", "fromRequests": ["ECR-0002"], "classification": "minor", "effectivity": [{ "kind": "serial", "from": 5 }], "at": "2026-12-03T08:00:00Z", "by": "u-0007" } },

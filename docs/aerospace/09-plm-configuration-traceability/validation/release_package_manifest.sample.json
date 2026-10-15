@@ -9,13 +9,12 @@
   "lifecycleState": "released",
   "change": {
     "eco": "ECO-0001",
-    "classification": "initial-release"
+    "purpose": "initial-release"
   },
   "effectivity": [
     {
       "kind": "serial",
-      "from": 1,
-      "to": null
+      "from": 1
     }
   ],
   "baseline": {
@@ -23,8 +22,9 @@
     "kind": "product"
   },
   "marking": {
-    "exportControl": "NLR-EXAMPLE",
-    "notice": "Example marking only; classification is a user/legal decision"
+    "regime": "none",
+    "statement": "NLR-EXAMPLE - example marking only; classification is a user/legal decision",
+    "decidedBy": "u-0003"
   },
   "releasedAt": "2026-11-02T09:30:00Z",
   "releasedBy": {
@@ -57,7 +57,7 @@
     "kernel": "occt",
     "schemaVersion": 2
   },
-  "manifestSha256": "5c829b08363031c720e7518cb0b44119e828a255110607ddb8e35cce729d9d9c",
+  "manifestSha256": "5a70caa20bd2a8ac1f511fbd9552297f92cc89f0a0e03f603134c6a620210696",
   "signatures": [
     {
       "alg": "Ed25519",
@@ -70,7 +70,7 @@
         "name": "J. Example"
       },
       "signedContent": "UTF-8 canonical JSON of the manifest without manifestSha256 and signatures",
-      "signature": "df1953d356160aab5b4aceeeb630be7aa33fef0661ccf16d5986a4a73955742fff8193358e65215698be9e95c79311ffe8449c5890a7fe0db914a470a20beb0f",
+      "signature": "6cabcd285cd8dddfafe00f4d64999cf0bbb8caea19f2149876910ad6a9f7df0d536b58edce8f89dca893d5bc8f19a2f00412ecf766eaa7de65839b6cfbde0f01",
       "WARNING": "RFC 8032 public TEST 1 key - test only, never trust in production"
     }
   ]

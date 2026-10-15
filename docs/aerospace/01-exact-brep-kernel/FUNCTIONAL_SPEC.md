@@ -100,7 +100,7 @@ User stories (each maps to FRs):
 
 | Phase | Content |
 | ----- | ------- |
-| **MVP** | OCC default on desktop (server worker) with visible fallback; current OCCT build (7.9.x line) in the server/worker; tolerance policy + document `modelingTolerance`; `import_step_brep` (exact solids, ShapeFix, sewing of shells, import report, tessellated-only detection); `validate_shape`; result validity gating; exact `mass_properties` with centroid + inertia + part-frame evaluation; kernel provenance in documents; determinism golden set; boolean `fuzzy` option |
+| **MVP** | OCC default on desktop (server worker) with visible fallback; current OCCT build (7.9.x line) in the server/worker; tolerance policy + document `modelingTolerance`; `import_step_exact` (exact solids, ShapeFix, sewing of shells, import report, tessellated-only detection); `validate_shape`; result validity gating; exact `mass_properties` with centroid + inertia + part-frame evaluation; kernel provenance in documents; determinism golden set; boolean `fuzzy` option |
 | **V1** | Persistent topological naming (history-based element names) for fillet / chamfer / shell / hole selections and for imported faces; GVP comparison on import and GVP writing on export; assembly mass properties with instances; browser OCC in a Web Worker (web-only use); instancing of arbitrary exact parts in the viewport; cross-version regression gate |
 | **V2** | LOD tessellation ladder and lightweight proxies; streaming / lazy loading of large assemblies; ABC-sample stress tier; JT/glTF lightweight hand-off (with gap XCH); kernel-level parallelism (BOP parallel mode) |
 
@@ -146,14 +146,14 @@ User stories (each maps to FRs):
    fillet (`fillet_edge`); the history stores persistent edge names (FR-KRN-06).
 5. Assigns aluminium; runs Measure → Mass properties: volume 485 716.8147 mm³, centroid, inertia tensor
    (FR-KRN-08); buy-to-fly shown by the FTR gap from blank/part volume.
-6. Changes the pocket width parameter 260 → 240: the fillets stay on the pocket corners; volume becomes
-   517 716.8147 mm³ (FR-KRN-06).
+6. Changes the pocket width parameter 260 → 200: the fillets stay on the pocket corners; volume becomes
+   581 716.8147 mm³ (FR-KRN-06).
 7. `validate_shape` reports valid (FR-KRN-09); exports exact STEP with GVP (FR-KRN-13).
 
 ### 6.2 W2 — Supplier modifies an OEM STEP part (CLI, local agent)
 
 ```bash
-llull --app import_step_brep file=in/nist_ctc_01_asme1_ap242-e1.stp heal=true   # file= → stepBase64 (CLI FILE_PARAMS)
+llull --app import_step_exact file=in/nist_ctc_01_asme1_ap242-e1.stp heal=true   # file= → stepBase64 (CLI FILE_PARAMS)
 # → data: { bodies:[{id, name, valid:true, healed:[...], maxTolerance:0.00335, gvp:{volumeRelDiff:4.6e-8, ...}}] }
 llull --app validate_shape '{"ids":["<imported id>"]}'
 llull --app add_cylinder '{"radius":5,"height":200,"position":[0,0,-150]}'
@@ -173,7 +173,7 @@ Each line is one command (same registry as the UI); the user sees each change li
 
 ### 6.4 W4 — MCP agent heals and checks a received file (cloud)
 
-1. Agent calls `import_step_brep` with `stepBase64`.
+1. Agent calls `import_step_exact` with `stepBase64`.
 2. Reads the import report; if `maxTolerance > policy`, calls `heal_shape` with stricter options, then
    `validate_shape`.
 3. Calls `inspect_topology` to list named faces; reports GVP deltas to the user.
@@ -193,11 +193,11 @@ Each line is one command (same registry as the UI); the user sees each change li
 | AC-02 | the analytic solids of `analytic_solids.json` | `mass_properties` runs on each | volume, area, inertia within 1e-9 relative and centroid within 1e-6 mm of the closed form | VC-KRN-01 |
 | AC-03 | the same solids translated to x = 70 000 mm | `mass_properties` runs | volume and centroidal inertia equal the origin values within 1e-9 / 1e-12 relative; centroid shifted by exactly 70 000 mm (± 1e-6) | VC-KRN-02, VC-KRN-03b |
 | AC-04 | the rib plan | it is built | one valid solid, V = 485 716.8147 mm³ (1e-9 rel) | VC-KRN-03 |
-| AC-05 | a NIST STEP file whose GVP agree with OCCT | `import_step_brep` runs | exact solid(s), valid after healing, GVP deltas within 1e-4 (vol) / 1e-3 (area) / 0.05 mm (centroid) | VC-KRN-04 |
+| AC-05 | a NIST STEP file whose GVP agree with OCCT | `import_step_exact` runs | exact solid(s), valid after healing, GVP deltas within 1e-4 (vol) / 1e-3 (area) / 0.05 mm (centroid) | VC-KRN-04 |
 | AC-06 | a NIST file whose GVP disagree | it is imported | the report lists the GVP mismatch with both values and imports the geometry | VC-KRN-04x |
 | AC-07 | the tessellated-only FTC 08 file | it is imported in exact mode | the command reports "no exact B-rep (tessellated)" and suggests mesh import; nothing is silently empty | VC-KRN-05 |
 | AC-08 | any imported file | it is imported | the report gives the max sub-shape tolerance and warns above the policy threshold | VC-KRN-06 |
-| AC-09 | the parametric rib with 4 corner fillets | pocket width changes 260 → 240 | 4 fillet faces remain on the pocket corners, V = 517 716.8147 mm³; or a named broken-reference error, never a wrong edge | VC-KRN-07 |
+| AC-09 | the parametric rib with 4 corner fillets | pocket width changes 260 → 200 | 4 fillet faces remain on the pocket corners, V = 581 716.8147 mm³; or a named broken-reference error, never a wrong edge | VC-KRN-07 |
 | AC-10 | two cubes with a 1e-5 mm gap | `boolean union` with `fuzzy: 2e-5` | one valid solid; without fuzzy, two solids | VC-KRN-08 |
 | AC-11 | any golden / quality model | it is built | no committed shape fails `validate_shape` | VC-KRN-09 |
 | AC-12 | the KRN reference set | it is rebuilt twice with the same build | identical topology signatures; across builds, equal counts and measures within tolerance | VC-KRN-10 |

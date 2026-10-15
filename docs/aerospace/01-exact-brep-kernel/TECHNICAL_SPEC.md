@@ -5,7 +5,7 @@ functional counterpart: [FUNCTIONAL_SPEC.md](FUNCTIONAL_SPEC.md) · validation: 
 
 Requirement ids `TR-KRN-nn` are grouped by decade: 0x kernel selection & build, 1x tolerance policy & booleans,
 2x STEP → exact B-rep & healing, 3x persistent naming, 4x mass properties, 5x validity, 6x determinism,
-7x large assemblies & display, 8x export.
+7x large assemblies & display, 8x export, 9x face-query port.
 
 ## 1. Current state in llull
 
@@ -32,15 +32,17 @@ Requirement ids `TR-KRN-nn` are grouped by decade: 0x kernel selection & build, 
                                    │ dispatch                                         │
                                    ▼                                                  ▼
             ┌──────────────── packages/core/src/commands ─────────────────────────────────────┐
-            │ brep/: import_step_brep · heal_shape · validate_shape · boolean(+fuzzy) ·        │
+            │ brep/: heal_shape · validate_shape · boolean(+fuzzy) ·                            │
             │        fillet_edge/chamfer_edge(+edgeNames) · inspect_topology(+names)           │
             │ inspect/: mass_properties(+centroid, inertia, principal) · kernel_info           │
-            │ document/: set_modeling_tolerance        exchange/: export_step_exact(+GVP)       │
+            │ document/: set_modeling_tolerance                                                 │
+            │ exchange/: import_step_exact (owned here; 04 XCH extends it) · export_step_ap242 (04) │
             └───────────────┬───────────────────────────────────────────────────────────────────┘
                             │ ctx.kernel (GeometryKernel, synchronous; requiresKernel)
             ┌───────────────▼───────────────────────────┐
             │ core/geometry: ShapeRecipe (+brep leaf,   │   shapeKernel.ts: recipe cache, naming map,
-            │ +heal node, boolean.fuzzy), kernel.ts     │   provenance
+            │ +heal node, boolean.fuzzy), kernel.ts     │   provenance; optional ports: importShapes,
+            │ (+faceQuery port §5.9)                    │   massProperties, validate, faceQuery
             └───────────────┬───────────────────────────┘
                             │ KernelOps<S>
     ┌───────────────────────┴───────────────────────┐
@@ -53,7 +55,7 @@ Laws respected:
 
 - **L1/L5** — every capability is a `defineCommand` in a core feature catalog (`commands/brep`, `commands/inspect`,
   `commands/document`, `commands/exchange`) → UI button + MCP tool + CLI verb from one registration.
-- **L2** — no DOM / fetch in `packages/*`: file bytes reach `import_step_brep` as a parameter (base64) or as a
+- **L2** — no DOM / fetch in `packages/*`: file bytes reach `import_step_exact` as a parameter (base64) or as a
   content-addressed blob id already in the document; reading the file from disk stays in `server/`
   (exchange directory) and in `src/ui` (file picker), as today for `import_step`.
 - **L3/L8** — commands stay pure; an imported shape becomes a recipe leaf holding the **healed B-rep bytes**
@@ -63,10 +65,23 @@ Laws respected:
 - **L10** — nothing aerospace-specific in core: KRN is generic exact-modelling infrastructure; aerospace
   conventions (body-station axes, weights reports) belong to later plugins.
 
+### 2.0 Ownership split with 04 XCH (decided 2026-10-15)
+
+| Item | Owner | Other pack |
+| ---- | ----- | ---------- |
+| `import_step_exact` command (one STEP → exact B-rep import; the name `import_step_brep` is retired) | **01 KRN** (§4, TR-KRN-20..24) | 04 XCH extends it: `verify` / `gvpPolicy`, `ImportProvenance`, XDE product tree → components / instances |
+| `brep` recipe leaf + `heal` node + document blobs; `GeometryKernel.importShapes` | **01 KRN** (§3, TR-KRN-20/21) | 04 `import_iges` reuses the same leaf; 04 defines no other leaf and no `readExchange` |
+| Healing, import report, tessellated-only detection, kernel provenance, llull-document v3 envelope + migration | **01 KRN** (TR-KRN-22/24/61, §3.1) | every pack adds its slice to §3.1 |
+| `GeometryKernel.massProperties` (one superset method) | **01 KRN** (TR-KRN-40) | 04 `geometric_validation_properties` consumes it |
+| `GeometryKernel.faceQuery` port | **01 KRN** (§5.9) | 02 / 03 / 05 / 06 / 07 consume it |
+| GVP band policy, `verify_exchange_file`, `geometric_validation_properties`, `export_step_ap242` (AP242 + assembly + GVP), IGES | **04 XCH** | KRN FR-KRN-13 / TR-KRN-23 / TR-KRN-80 point there |
+
 ### 2.1 Kernel selection & build
 
-- **TR-KRN-01 (MUST, MVP)** `desktop/src/backendEnv.ts` sets `LLULL_KERNEL: 'occt'` (overridable by an explicit
-  user setting `LLULL_KERNEL=manifold` for diagnostics). `server/src/geometryKernel.ts` already falls back to
+- **TR-KRN-01 (MUST, MVP)** `desktop/src/backendEnv.ts` sets `LLULL_KERNEL: 'occt'`. `backendEnv` strips every
+  inherited `LLULL_*` variable today, so a diagnostic override needs an explicit exception: an inherited
+  `LLULL_KERNEL=manifold` is passed through (same pattern as the `LLULL_ALLOW_CODE_EXECUTION === '1'` pass-through),
+  any other inherited value is ignored and `occt` is used; `desktop/tests` covers both. `server/src/geometryKernel.ts` already falls back to
   Manifold with a warning; the fallback reason is exposed through `kernel_info` and a UI status badge
   (`useKernelStatusStore`). `desktop/tests` asserts the active kernel.
 - **TR-KRN-02 (MUST, MVP)** Replace `opencascade.js@1.1.1` (OCCT 7.4.0p1, 2020) by a **pinned OCCT 7.9.x build**:
@@ -134,12 +149,42 @@ export type ShapeRecipe =
 // MeshSolidEntity gains: readonly faceted?: true
 ```
 
-- **Document version / migration**: serialization `version: 2` (`commands/persistence/serialization.ts`) →
-  `version: 3`. Loading v2: `kernelSettings` absent → `{ kernel: <active>, modelingTolerance: defaults }` and a
-  provenance warning; `blobs` absent → `{}`. Recipes stay valid (new node kinds are additive). The loader's
+- **Document version / migration**: see §3.1 — 01 KRN owns the single `llull-document` v3 envelope. The loader's
   recipe validation (`MAX_RECIPE_DEPTH`, leaf validation) is extended: `brep` leaves must reference an existing
   blob whose sha256 matches its bytes.
 - `recipeKey('brep') = brep(<sha256>)`; `heal` and `boolean.fuzzy` enter the key text.
+
+### 3.1 The `llull-document` v3 envelope (one version, one migration, owned by 01 KRN)
+
+Today `commands/persistence/serialization.ts` writes `{ format: 'llull-document', version: 2, document }`
+(`CURRENT_SCHEMA_VERSION = 2`) and refuses any other version ("unsupported version … expected 1 or 2"). Several packs
+add document data; instead of each bumping the version on its own, they share **one** step to `version: 3`:
+
+| Slice | Added by | Kind | Declared through | Notes |
+| ----- | -------- | ---- | ---------------- | ----- |
+| `kernelSettings`, `blobs` | 01 KRN (§3) | core root fields | core persistence guards | provenance + content-addressed B-rep / STEP payloads |
+| `exchange.provenance` (`ImportProvenance`) | 04 XCH (TECHNICAL_SPEC §3.1) | core root field | core persistence guards | embedded GVP and band of each import |
+| `aero` (`AeroModel`) + entity kinds `nurbs_curve`, `nurbs_surface`, `loft` v3 fields | 02 SRF (§3; resolves its D3) | core model types, plugin data | plugin `DocumentExtension` (`aero`); kinds in core guards | old readers must refuse new kinds — the version bump does that |
+| `pmi` | 03 GDT (§3) | core root field | core `pmiValidation.ts` | |
+| `analysis` (`AnalysisModel`) | 05 FEA (TR-FEA-02) | plugin data | plugin `DocumentExtension` | |
+| `composites` (`CompositesModel`) | 06 CMP (§3) | plugin data | plugin `DocumentExtension` | |
+| `sheetMetal` | 07 FTR (§3) | plugin data | plugin `DocumentExtension` | |
+| `materialRecords`, `materialLibraries`; `Material.recordId?` | 08 MAT (§3.5, TR-MAT-14) | core root fields | core guards (`validateMaterialRecord`) | private-library values never serialized (TR-MAT-31) |
+| `plm` (`PlmModel`) | 09 PLM (TR-PLM-10) | plugin data | plugin `DocumentExtension` (+ carried through `replayHistory`, TR-PLM-02) | |
+
+Rules:
+
+- **Writer**: always writes `version: 3` once this lands (`CURRENT_SCHEMA_VERSION = 3`), whichever slices are present;
+  absent slices are omitted, never written empty.
+- **Reader**: accepts 1, 2, 3. One migration function `migrate2to3` (after the existing 1 → 2 and retired-command
+  rewrites): `kernelSettings` absent → `{ kernel: <active kernel>, modelingTolerance: defaults }` plus a provenance
+  warning (FR-KRN-14); `blobs` absent → `{}`; legacy `Material`s unchanged (no `recordId`, 08); every other slice
+  stays absent. No slice needs data rewriting, so the migration is total and idempotent.
+- **Plugin slices** go through `DocumentExtension.validate` / `restore`; a plugin slice whose plugin is not installed is
+  kept verbatim (today's behaviour of `migrate()`), but the file is still v3, so pre-v3 builds refuse it (09's
+  release-lock concern).
+- **Tests**: one contract test per slice (round trip v3), one v2 → v3 migration golden, one "v3 refused by a v2 reader"
+  fixture; packs add their slice rows here rather than bumping the version themselves.
 
 ## 4. Commands
 
@@ -151,14 +196,14 @@ exchange, …); existing commands keep their current toolset.
 | ------- | ---- | --------------- | ------------- | ------- |
 | `kernel_info` | query | `{}` | TR-KRN-04 payload | core |
 | `set_modeling_tolerance` | mutating | `{ linear?: number, angular?: number, maxImportTolerance?: number }` | updates `kernelSettings.modelingTolerance` (validated range) | core |
-| `import_step_brep` | mutating, kernel | `{ stepBase64?: string, blobId?: string, heal?: boolean = true, sew?: boolean = true, precisionMode?: 'file'|'document' = 'file', keepOriginal?: boolean = false, name?: string }` | one `mesh` entity per solid with `brep: { op:'heal'?, source: { op:'brep', blob } }`, placements/names/colours from XDE; components for repeated parts; `data.report` (§5.2) | exchange |
+| `import_step_exact` (owned by 01; extended by 04) | mutating, kernel | exactly one of `stepBase64?: string`, `text?: string` (Part 21, ASCII), `blobId?: string`; `fileName?: string`, `heal?: boolean = true`, `sew?: boolean = true`, `precisionMode?: 'file'|'document' = 'file'`, `keepOriginal?: boolean = false`, `name?: string`; **04 extension**: `verify?: boolean = true`, `gvpPolicy?: Partial<GvpPolicy>`, `mode?: 'append'|'replace'`, `tessellated?: boolean` | MVP (01): one `mesh` entity per solid with `brep: { op:'heal'?, source: { op:'brep', blob } }`, world placement, names, colours; `data.report` (§5.2). 04 extension: XDE product tree → components / instances, `doc.exchange.provenance`, `data.gvpCheck` (04 TECHNICAL_SPEC §3–§5) | exchange |
 | `heal_shape` | mutating, kernel | `{ id: string, precision?: number, maxTolerance?: number, sew?: boolean, fixSmallEdges?: boolean }` | wraps the entity recipe in a `heal` node; `data.report` | 3d |
-| `validate_shape` | query, kernel | `{ ids?: string[], selfIntersection?: boolean = false, exact?: boolean = false }` | `data: { results: [{ id, valid, issues: [{ code, subShape: TopoName, detail }], maxTolerance }] }` | measure |
+| `validate_shape` | query, kernel | `{ entityIds?: string[], selfIntersection?: boolean = false, exact?: boolean = false }` | `data: { results: [{ id, valid, issues: [{ code, subShape: TopoName, detail }], maxTolerance }] }` | measure |
 | `boolean` (extended) | mutating, kernel | `+ fuzzy?: number` (mm, ≥ 0, ≤ 0.1) | recipe `boolean.fuzzy`; on failure `data.argumentCheck` | 3d |
 | `fillet_edge` / `chamfer_edge` (extended) | mutating, kernel | `+ edgeNames?: TopoName[]` | names resolved first, then `edgeIndices`, then `edgesNear`; history stores names | 3d |
 | `inspect_topology` (extended) | query, kernel | `+ withNames?: boolean = true` | each face/edge gains `name: TopoName` and `history: 'primitive'|'modified'|'generated'|'imported'` | 3d |
 | `mass_properties` (extended) | query | `+ frame?: 'document'|'entity' = 'document', eps?: number = 1e-9, about?: Vec3` | §5.4 payload | measure |
-| `export_step_exact` (extended) | query, kernel | `+ validationProperties?: boolean = true, assembly?: boolean = true` | AP214/AP242 text with GVP (TR-KRN-80) | exchange |
+| `export_step_exact` (unchanged) / `export_step_ap242` (04 XCH) | query, kernel | — / see 04 TECHNICAL_SPEC §4 | `export_step_exact` stays AP214, flat, no GVP; exact AP242 export with assembly structure and GVP is 04's `export_step_ap242` (TR-KRN-80) | exchange |
 | `check_model` (extended) | query | — | adds `faceted_result`, `kernel_mismatch`, `invalid_brep` (when kernel present) issue codes | core |
 
 Structured tags (example):
@@ -172,12 +217,12 @@ Structured tags (example):
  * @failure no kernel / kernel without importShapes, unreadable STEP, no solid and no closable shell,
  *   tessellated-only content (report says so) -> no-op, affected:[]
  */
-export const importStepBrep = defineCommand({ name: 'import_step_brep', annotations: { requiresKernel: true }, ... });
+export const importStepExact = defineCommand({ name: 'import_step_exact', annotations: { requiresKernel: true }, ... });
 ```
 
-MCP: `import_step` (exchange tool) gains `mode: 'brep' | 'mesh'` (default `brep` when the OCC kernel is active),
-forwarding to `import_step_brep`; the mesh path remains for Manifold. CLI: `llull import_step_brep file=<path>` —
-`import_step_brep` is a registry command (in-process for `--doc`, `POST /command` for `--app`); the CLI's
+MCP: `import_step` (exchange tool) gains `mode: 'exact' | 'mesh'` (default `exact` when the OCC kernel is active),
+forwarding to `import_step_exact`; the mesh path remains for Manifold. CLI: `llull import_step_exact file=<path>` —
+`import_step_exact` is a registry command (in-process for `--doc`, `POST /command` for `--app`); the CLI's
 `file=` → `stepBase64` mapping (`server/src/cli/exchange.ts` `FILE_PARAMS`, today exchange tools only) is extended to it.
 
 ## 5. Kernel / algorithms
@@ -212,9 +257,12 @@ forwarding to `import_step_brep`; the mesh path remains for Manifold. CLI: `llul
 - **TR-KRN-20 (MUST, MVP) — reader.** New optional kernel method
   `importShapes(format: 'step', bytes: Uint8Array, options): ImportedShapes | null` implemented with
   `STEPCAFControl_Reader` → XDE document (names, colours, assembly structure, instances [R6]);
-  `xstep.cascade.unit = MM`, `read.precision.mode` = file (uncertainty) or document [R5]. Each free shape
-  becomes a definition; each XDE instance a placement (`TopLoc_Location`) → llull `components` +
-  `insert_instance` for repeated definitions, plain entities for singletons.
+  `xstep.cascade.unit = MM`, `read.precision.mode` = file (uncertainty) or document [R5]. `ImportedShapes` returns
+  the healed definitions (BRep bytes for the blob leaf) **and** the XDE product tree (definitions, occurrences with
+  `TopLoc_Location`, names, colours, embedded GVP attributes) so no second reader exists. MVP (01): one llull solid per
+  placed STEP solid (world placement, names, colours). The mapping of the product tree onto `components` +
+  `insert_instance`, and the embedded-GVP check, are 04 XCH's extension of the same command (04 TR-XCH-07/-08).
+  04's `import_iges` calls `importShapes(format: 'iges', …)` and stores the same `brep` blob leaf.
 - **TR-KRN-21 (MUST, MVP) — persistence of imported geometry.** After healing, each definition is serialized
   with `BRepTools::Write` (text, versioned format) into a document blob keyed by sha256; the recipe leaf
   `{ op: 'brep', blob }` is what `evaluate` reads (`BRepTools::Read`). Optionally (`keepOriginal`) the STEP bytes
@@ -223,11 +271,13 @@ forwarding to `import_step_brep`; the mesh path remains for Manifold. CLI: `llul
   shells, open shells, faces, wires, tessellated items (`TESSELLATED_*`, AP242). Tessellated-only files (NIST
   FTC 08 `-tg`, measured: plain reader returns a void shape) → no-op with diagnostic and suggestion to use mesh
   import; mixed → import B-rep, list skipped items.
-- **TR-KRN-23 (SHOULD, V1) — GVP comparison.** Read STEP geometric validation properties (volume, area,
-  centroid; CAx-IF practice [R21]) with `STEPCAFControl_Reader::SetPropsMode(true)` and the `XCAFDoc_Volume` / `XCAFDoc_Area` / `XCAFDoc_Centroid` attributes [R33]; recompute with §5.4 on the healed
-  shape; report `volumeRelDiff`, `areaRelDiff`, `centroidAbsDiff`, in file units converted to mm (two NIST
-  AP203 files and one AP242 file carry GVP in inches — measured). Thresholds: info ≤ 1e-6, warning > 1e-4
-  (volume) / > 1e-3 (area) / > 0.05 mm (centroid).
+- **TR-KRN-23 (SHOULD, V1) — GVP attributes for 04.** `importShapes` reads STEP geometric validation properties
+  (volume, area, centroid; CAx-IF practice [R21]) with `STEPCAFControl_Reader::SetPropsMode(true)` and the
+  `XCAFDoc_Volume` / `XCAFDoc_Area` / `XCAFDoc_Centroid` attributes [R33] and returns them, in file units, with the
+  file length unit (two NIST AP203 files and one AP242 file carry GVP in inches — measured). The comparison, the unit
+  conversion before comparison and the **single green / yellow / red band policy** are owned by 04 XCH
+  (04 TECHNICAL_SPEC §5.3, `verify` of `import_step_exact`). KRN's VC-KRN-04 tolerances (1e-4 volume, 1e-3 area,
+  0.05 mm centroid) are test tolerances for the pinned NIST files, not user-facing bands.
 - **TR-KRN-24 (MUST, MVP) — healing pipeline.** Per definition: `BRepCheck_Analyzer` (as read) →
   `ShapeFix_Shape` (`SetPrecision(linear)`, `SetMaxTolerance(maxprecision)`, `SetMinTolerance(linear/10)` [R4])
   → if shells are open and `sew`: `BRepBuilderAPI_Sewing(linear·10)` [R3] + `ShapeFix_Solid` /
@@ -268,9 +318,10 @@ forwarding to `import_step_brep`; the mesh path remains for Manifold. CLI: `llul
 
 ### 5.4 Mass properties (TR-KRN-40 .. 42)
 
-- **TR-KRN-40 (MUST, MVP) — exact properties.** New optional kernel method
+- **TR-KRN-40 (MUST, MVP) — exact properties.** New optional kernel method — the **one** mass-property method of
+  `GeometryKernel` (superset of 04 XCH's GVP needs, which no longer defines its own):
   `massProperties(handle, { eps, reference }) → { volume, area, centroid, inertiaAtCentroid: Mat3,
-  relError }` with `BRepGProp::VolumeProperties(shape, props, eps, onlyClosed=true)` (adaptive Gauss; `eps`
+  bbox: [xmin, ymin, zmin, xmax, ymax, zmax] (optimal, `BRepBndLib::AddOptimal`), relError }` with `BRepGProp::VolumeProperties(shape, props, eps, onlyClosed=true)` (adaptive Gauss; `eps`
   default 1e-9 relative per face; the returned error estimate is reported) and
   `BRepGProp::SurfaceProperties` [R8]. `GProp_GProps::MatrixOfInertia()` is about the centre of mass;
   principal moments/axes by symmetric 3×3 Jacobi eigen-decomposition in `@lib`; radii of gyration
@@ -320,8 +371,8 @@ forwarding to `import_step_brep`; the mesh path remains for Manifold. CLI: `llul
 
 - **TR-KRN-70 (SHOULD, V1) — shared definitions.** A component definition evaluates to one kernel shape;
   instances are `TopLoc_Location`-placed references (XDE model [R6]) — never copied geometry — so 10 000
-  fasteners cost 1 evaluation and 1 tessellation. Exact-mode `import_step_brep` creates components for repeated
-  STEP definitions (quality case `syn-bolt-grid`: 400 instances).
+  fasteners cost 1 evaluation and 1 tessellation. `import_step_exact` with 04's product-tree extension creates
+  components for repeated STEP definitions (quality case `syn-bolt-grid`: 400 instances).
 - **TR-KRN-71 (SHOULD, V1/V2) — display.** Extend `InstancedRenderer.tsx` from box/cylinder/sphere to any
   `mesh` result: one `InstancedMesh` per (definition, material, LOD) [R26]; `BatchedMesh` for many distinct small
   parts sharing a material [R26]; `LOD` with a tessellation ladder per definition (deflection 0.01 / 0.1 / 1 mm
@@ -339,9 +390,97 @@ forwarding to `import_step_brep`; the mesh path remains for Manifold. CLI: `llul
 
 ### 5.8 Export (TR-KRN-80)
 
-- **TR-KRN-80 (SHOULD, V1)** `export_step_exact` via `STEPCAFControl_Writer` (assembly structure, names,
-  colours) and GVP (volume, area, centroid of each solid, §5.4) [R21]; replace the fixed `/out.step` scratch path
-  workaround once the new build is verified (KI5 gotcha).
+- **TR-KRN-80 (SHOULD, V1)** Exact export with assembly structure, names, colours and GVP is **04 XCH's
+  `export_step_ap242`** (`STEPCAFControl_Writer`, 04 TR-XCH-01/-06/-07), computing GVP with TR-KRN-40. KRN only
+  requires that it exists for the VC-KRN-14 round trip, and that the fixed `/out.step` scratch-path workaround
+  (KI5 gotcha) is removed once the M2 build is verified. `export_step_exact` stays AP214 / flat / no GVP.
+
+### 5.9 Face-query port (TR-KRN-90 .. 92) — one optional kernel port for every pack
+
+Five packs asked for face-level kernel queries independently. They merge into **one** optional port owned here;
+the other packs consume it and define no `GeometryKernel` member of their own.
+
+| Request (source pack, section) | Merged into |
+| ------------------------------ | ----------- |
+| 03 GDT TR-GDT-03: `ShapeFace` + centroid / normal / axis / radius / samples; §5.1 `faceContains?` | `faceDetails`, `faceContains` |
+| 05 FEA §5.1: `ShapeFace` + centroid / normal (planar) for `facesNear` | `faceDetails` (same record) |
+| 07 FTR §3.2: `faceGraph?(shape): FaceGraph` (surface params, loops, edge→faces, convexity) | `faceGraph` |
+| 06 CMP §5.5: `faceGeometry?`, `projectOnFace?`, `evaluateFace?`, `tessellateFace?` | same names |
+| 02 SRF §5.8: `analysis?: SurfaceAnalysisPort` (`faceSamples`, `edgeSamples`, `edgeContinuity`, `distance`, `bspline`) | same names, folded into the port |
+
+- **TR-KRN-90 (MUST, V1)** `GeometryKernel` gains one optional member `readonly faceQuery?: FaceQueryPort`. Manifold
+  omits it (every consumer then reports "requires the OCC kernel"); the OCC kernel implements it in
+  `packages/kernel-occt/src/occtFaceQuery.ts`. Face and edge indices are those of `ShapeTopology` (same `recipeKey`,
+  same explorer order); persistent names (§5.3) resolve to these indices before a call. Every method returns null on
+  an unsupported request and never throws (guarded like `topology`). Results are cached by `(recipeKey, method, args)`
+  in the existing recipe cache.
+- **TR-KRN-91 (MUST, V1)** One surface-parameter type for the whole port (merges 06 `FaceGeometry` and 07
+  `SurfaceParams`; 06's `halfAngle` = `semiAngle`, 06's `'freeform'` = `'other'`).
+- **TR-KRN-92 (SHOULD, V1)** Contract tests: one analytic fixture per surface type (plane, cylinder, cone, sphere,
+  torus, B-spline) checked against closed forms (centroid, normal, curvature k = 1/r, projection distance) in
+  `server/tests/occtFaceQuery.test.ts`; the consumer packs' VCs reuse it.
+
+```ts
+// packages/core/src/geometry/kernel.ts (sketch)
+export type SurfaceParams =
+  | { readonly type: 'plane'; readonly origin: Vec3; readonly normal: Vec3; readonly xDir: Vec3 }
+  | { readonly type: 'cylinder'; readonly origin: Vec3; readonly axis: Vec3; readonly xDir: Vec3; readonly radius: number }
+  | { readonly type: 'cone'; readonly apex: Vec3; readonly axis: Vec3; readonly xDir: Vec3; readonly semiAngle: number }
+  | { readonly type: 'sphere'; readonly center: Vec3; readonly radius: number }
+  | { readonly type: 'torus'; readonly center: Vec3; readonly axis: Vec3; readonly major: number; readonly minor: number }
+  | { readonly type: 'other'; readonly kind: FaceSurface };
+
+/** 03 TR-GDT-03 + 05 §5.1: located face record (index = ShapeTopology.faces index). */
+export interface FaceDetail {
+  readonly index: number;
+  readonly surface: FaceSurface;
+  readonly area: number;
+  readonly centroid: Vec3;                                  // BRepGProp::SurfaceProperties
+  readonly normal?: Vec3;                                   // planes (outward, material side)
+  readonly axis?: { readonly origin: Vec3; readonly dir: Vec3 }; // cylinder / cone / sphere / torus
+  readonly radius?: number;                                 // cylinder, sphere; torus minor; cone at the face centroid
+  readonly samples: readonly Vec3[];                        // <= options.samples (default 64) points inside the trimmed face
+}
+
+/** 07 §3.2. */
+export interface FaceGraphFace {
+  readonly index: number; readonly surface: SurfaceParams; readonly reversed: boolean; readonly area: number;
+  readonly loops: readonly (readonly number[])[];           // edge indices, outer loop first
+  readonly uvBounds: readonly [number, number, number, number];
+}
+export interface FaceGraph {
+  readonly faces: readonly FaceGraphFace[];
+  readonly edgeFaces: readonly (readonly number[])[];
+  readonly edgeConvexity: readonly ('convex' | 'concave' | 'smooth' | 'unknown')[];
+}
+
+/** 06 §5.5. */
+export interface FaceProjection { readonly point: Vec3; readonly normal: Vec3; readonly uv: Vec2; readonly distance: number }
+
+/** 02 §5.8 (types SurfaceSample, EdgeCurveSample, EdgeContinuitySample, NurbsSurfaceData as defined in 02 §5.8). */
+export interface FaceQueryPort {
+  faceDetails(shape: ShapeHandle, options?: { readonly samples?: number }): readonly FaceDetail[] | null;
+  faceContains(shape: ShapeHandle, face: number, point: Vec3, tolerance?: number): boolean | null;
+  faceGraph(shape: ShapeHandle): FaceGraph | null;
+  faceGeometry(shape: ShapeHandle, face: number): { readonly surface: SurfaceParams; readonly uvBounds: readonly [Vec2, Vec2] } | null;
+  projectOnFace(shape: ShapeHandle, face: number, points: readonly Vec3[]): readonly (FaceProjection | null)[] | null;
+  evaluateFace(shape: ShapeHandle, face: number, uv: readonly Vec2[]): readonly { readonly point: Vec3; readonly normal: Vec3 }[] | null;
+  tessellateFace(shape: ShapeHandle, face: number, deflection: number): (MeshData & { readonly uv: readonly number[] }) | null;
+  faceSamples(shape: ShapeHandle, face: number, uv: ReadonlyArray<readonly [number, number]> | { readonly nu: number; readonly nv: number }): readonly SurfaceSample[] | null; // k1, k2, gaussian K, mean H
+  edgeSamples(shape: ShapeHandle, edge: number, count: number): readonly EdgeCurveSample[] | null;
+  edgeContinuity(shape: ShapeHandle, edge: number, count: number): readonly EdgeContinuitySample[] | null;
+  distance(shape: ShapeHandle, points: readonly Vec3[]): readonly { readonly distance: number; readonly signed: number; readonly face: number }[] | null;
+  bspline(shape: ShapeHandle, face: number): NurbsSurfaceData | null;
+}
+
+export interface GeometryKernel { /* … existing … */ readonly faceQuery?: FaceQueryPort }
+```
+
+OCC classes (union of the consumer packs' lists, to be added to the M2 binding list, TR-KRN-02):
+`BRepGProp::SurfaceProperties`, `BRepAdaptor_Surface` (`GetType`, `Plane`/`Cylinder`/`Cone`/`Sphere`/`Torus`),
+`BRepTools::UVBounds`, `BRepClass_FaceClassifier` / `BRepTopAdaptor_FClass2d`, `GeomAPI_ProjectPointOnSurf`,
+`BRepLProp_SLProps` (normals, principal curvatures), `BRepExtrema_DistShapeShape`, `TopExp::MapShapesAndAncestors`
+(edge → faces), `BRepMesh_IncrementalMesh` + `Poly_Triangulation` UV nodes, `GeomConvert` / `Geom_BSplineSurface`.
 
 ## 6. Interop & persistence
 
@@ -349,8 +488,8 @@ forwarding to `import_step_brep`; the mesh path remains for Manifold. CLI: `llul
 | ---- | ------ | ----- |
 | Imported definition | OCCT BRep text (`BRepTools::Write`, versioned) in `document.blobs` | content-addressed; base64 in JSON; gzip in the desktop file container when > 1 MB (Q4) |
 | Original STEP (optional) | `model/step` blob | audit / re-import; not used on replay |
-| Document | `llull-document` v3 | `kernelSettings`, `blobs`; v2 migration (§3) |
-| Exact export | STEP AP214 (today) → AP242 geometry + GVP (V1) | full AP242 PMI is gap XCH |
+| Document | `llull-document` v3 | single envelope for every pack's slice; v2 → v3 migration (§3.1) |
+| Exact export | STEP AP214 (`export_step_exact`, today) → AP242 geometry + assembly + GVP (`export_step_ap242`, 04 XCH) | full AP242 PMI is gap XCH |
 | Lightweight | glTF (existing `export_gltf`), JT (gap XCH, ISO 14306 [R23]) | LOD ladder reused |
 | Code | CadQuery / build123d via `export_code` | `brep` leaves lowered to `cq.importers.importBrep`-style loading of the blob (Q5) |
 
@@ -364,7 +503,7 @@ document instead of inline base64 (V2).
   tolerance, GVP deltas); Tools → Validate shape; Measure → Mass properties panel with tensor, principal axes
   gizmo and CSV copy; Document settings → Modelling tolerance; broken-reference badges in the feature tree
   with "re-pick" action (re-pick = `edit_step_params` with new names).
-- **CLI**: `llull kernel_info`, `llull import_step_brep file=<path>`, `llull validate_shape`,
+- **CLI**: `llull kernel_info`, `llull import_step_exact file=<path>`, `llull validate_shape`,
   `llull mass_properties '{"entityId":…}'` — compact JSON output (llull-cli skill); `--kernel occt` becomes the
   CLI default for `--doc` runs on desktop installs.
 - **MCP**: tools from the registry (`toToolSchemas`); `import_step` exchange tool `mode` param; toolsets:
@@ -394,13 +533,13 @@ once in M2 and then ratcheted.
 | Layer | Test | VC |
 | ----- | ---- | -- |
 | Unit (core, no kernel) | `kernel_info` / `set_modeling_tolerance` schema + purity + failure; recipe `brep`/`heal`/`fuzzy` key & validation; v2→v3 migration; parallel-axis / principal-axes helpers in `@lib` against `analytic_solids.json` | VC-KRN-01 (math), VC-KRN-11 |
-| Unit (server, real OCC: `server/tests/occt*.test.ts` pattern) | analytic solids and far-box mass properties; fuzzy boolean; commit validity gate; `import_step_brep` on a small committed synthetic STEP; naming grammar on box/fillet/boolean | VC-KRN-01, 02, 08, 09 |
+| Unit (server, real OCC: `server/tests/occt*.test.ts` pattern) | analytic solids and far-box mass properties; fuzzy boolean; commit validity gate; `import_step_exact` on a small committed synthetic STEP; naming grammar on box/fillet/boolean | VC-KRN-01, 02, 08, 09 |
 | Golden (`tests/golden/plans.ts`) | KRN plans from `validation/plans/` (aliases, id-normalised snapshots, replay equality); renaming plan expected to fail until V1 (registered as known issue) | VC-KRN-03, 03b, 07 |
 | Quality gate | `quality:step` gains `--mode brep` (validity after heal, exact volume vs `quality/step_reference.py`, save/load of blobs) over `quality/corpus.json`; NIST set pinned as a new `aerospace` group (archive URL + sha256, see `validation/README.md`); GVP comparison | VC-KRN-04, 04x, 05, 06 |
 | Kernel regression (new `quality:kernel`) | signatures + measures vs baseline; cross-version tolerance mode | VC-KRN-10 |
 | Display gate | 10 000-instance scene, 70 m station z-fighting screenshot | VC-KRN-12, TR-KRN-73 |
 | Desktop (`npm --prefix desktop test`) | backend env contains `LLULL_KERNEL=occt`; `kernel_info.active === 'occt'`; forced failure → fallback warning | VC-KRN-11 |
-| Production-gate scenario | "Supplier STEP round trip": import NIST CTC 01 AP242 → drill + pocket + fillet → validate → mass → export STEP with GVP → re-import → GVP within 1e-6 of the exported values | VC-KRN-04, 09, TR-KRN-80 |
+| Production-gate scenario | "Supplier STEP round trip": import NIST CTC 01 AP242 → drill + pocket + fillet → validate → mass → `export_step_ap242` with GVP (04) → re-import → GVP within 1e-6 of the exported values | VC-KRN-04, 09, TR-KRN-80 |
 
 Coverage gate (90/85/90/90) applies to new code in `packages/core/src/{commands,geometry}`.
 
@@ -410,16 +549,18 @@ Coverage gate (90/85/90/90) applies to new code in `packages/core/src/{commands,
 | --------- | ------- | --- | ------------------ | ---------- |
 | M1 OCC default | desktop env, `kernel_info`, status badge, provenance fields + migration, faceted flag | 01, 04, 61 (fields), FR-KRN-16 | 1.5 | — |
 | M2 Kernel build | OCCT 7.9.x WASM with exceptions, regenerated bindings, KI7 decision with measurements, version alignment with OCP | 02, 61 | 4-6 | M1 |
-| M3 Precision & mass | tolerance policy + command, part-frame mass properties, inertia/principal, local-frame tessellation, depth precision | 10, 11, 40, 41, 72, 73 | 3 | M1 (M2 for exception-safe GProp) |
-| M4 Exact import | `importShapes`, blobs, `import_step_brep`, healing, classification, report, MCP/CLI wiring, quality `--mode brep` | 20, 21, 22, 24 | 5-7 | M2 |
+| M3 Precision & mass (merged with 04 XCH M1: KRN owns `massProperties`; XCH M1 adds only `geometric_validation_properties` + `lib/step21`) | tolerance policy + command, part-frame mass properties (incl. area, bbox for GVP), inertia/principal, local-frame tessellation, depth precision | 10, 11, 40, 41, 72, 73 | 3 | M1 (M2 for exception-safe GProp) |
+| M4 Exact import (merged with 04 XCH M3: KRN owns the command, reader, blob leaf; XCH M3 adds verify / provenance / product tree on top) | `importShapes` (STEP; IGES entry point for 04), blobs, `import_step_exact`, healing, classification, report, MCP/CLI wiring, quality `--mode brep`, v3 envelope + migration (§3.1) | 20, 21, 22, 23 (GVP attributes), 24 | 5-7 | M2 |
 | M5 Robustness | commit validity gate, `validate_shape`, fuzzy booleans, argument analysis | 12, 13, 50, 51 | 2 | M2 |
 | M6 Regression | signatures, `quality:kernel`, baselines | 60, 62 | 2 | M4 |
 | M7 Persistent naming | element maps, naming grammar, resolution, UI repair, golden renaming plan green | 30, 31, 32 | 8-12 | M2, M6 |
-| M8 Assemblies & export | shared definitions, assembly mass properties, instancing of results, LOD, GVP import/export | 23, 42, 70, 71, 80 | 5-7 | M4, M7 (names for PMI later) |
+| M8 Assemblies | shared definitions, assembly mass properties, instancing of results, LOD (GVP comparison and `export_step_ap242` moved to 04 XCH M2/M3) | 42, 70, 71 | 4-6 | M4, M7 (names for PMI later), 04 XCH M3 (product tree) |
 | M9 Browser worker / native evaluation | Web Worker command execution; native OCP kernel spike | 03, 05 | 3-4 | M2 |
+| M10 Face-query port | `GeometryKernel.faceQuery` (§5.9): faceDetails, faceContains, faceGraph, faceGeometry, projectOnFace, evaluateFace, tessellateFace, faceSamples, edgeSamples, edgeContinuity, distance, bspline (OCC); contract tests | 90, 91, 92 | 3 | M2 |
 
-Total ≈ 34-45 engineer-weeks. Downstream gaps: 07 FTR (holes/pockets need M4, M7), 03 GDT and 04 XCH (face names
-M7, GVP M8), 05 FEA (exact faces M4, names M7), 02 SRF (NURBS ops need M2), 09 PLM (provenance M1/M6).
+Total ≈ 35.5-46.5 engineer-weeks (M8 −1 after moving GVP/export to 04; +3 for the face-query port M10, which removes the
+per-pack kernel work from 02/03/05/06/07). Downstream gaps: 07 FTR (holes/pockets need M4, M7), 03 GDT and 04 XCH (face names
+M7; `massProperties` M3 and `import_step_exact` M4 for XCH M1/M3), 02 / 03 / 05 / 06 / 07 (face-query port M10), 05 FEA (exact faces M4, names M7), 02 SRF (NURBS ops need M2), 09 PLM (provenance M1/M6).
 
 ## 11. Open questions / decisions needed
 

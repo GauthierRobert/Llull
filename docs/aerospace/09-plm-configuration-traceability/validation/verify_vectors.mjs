@@ -62,6 +62,10 @@ for (const s of signatures)
   expect(`manifest signature ${s.keyId}`, ed25519Verify(s.publicKey, s.signature, Buffer.from(bodyCanon, 'utf8')));
 const tampered = canonical({ ...body, item: { ...body.item, revision: 'B' } });
 expect('tampered manifest rejected', !ed25519Verify(signatures[0].publicKey, signatures[0].signature, Buffer.from(tampered, 'utf8')));
-for (const n of ev.negative) expect(`negative vector listed: ${n.name}`, n.expectVerified === false);
+for (const n of ev.negative) {
+  const msg = Buffer.from(n.messageHex, 'hex');
+  expect(`negative message sha256: ${n.name}`, sha256(msg) === n.messageSha256);
+  expect(`negative rejected: ${n.name}`, n.expectVerified === false && !ed25519Verify(n.publicKey, n.signature, msg));
+}
 
 process.exit(failures === 0 ? 0 : 1);

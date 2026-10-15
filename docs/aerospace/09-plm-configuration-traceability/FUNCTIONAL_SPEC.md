@@ -264,10 +264,10 @@ Part 11 compliance (no identity-proofing, password-policy or validation package)
 ### 8.5 Tool qualification (DO-330 / DO-254)
 
 DO-330 and the DO-178C §12.2 criteria cover tools used in an **airborne software** life cycle, as recognized by
-AC 20-115D [R20]. A mechanical CAD tool whose output (geometry, drawings) is independently verified by analysis,
-inspection (FAI) and test does not fall under DO-330 qualification. DO-254 practice: every tool is assessed, but a tool
+AC 20-115D [R20]. In the sources reviewed, a mechanical CAD tool whose output (geometry, drawings) is independently verified by
+analysis, inspection (FAI) and test does not appear to fall under DO-330 qualification (our inference, not a quoted rule). DO-254 practice: every tool is assessed, but a tool
 whose output is independently assessed needs no qualification [R21]. No source found requires mechanical CAD/PDM
-qualification. That is an inference, recorded as an assumption (A-3) in §10.
+qualification; the conclusion remains an assumption (A-3, §10) to confirm with a DER/CVE.
 
 llull therefore supports a **tool assessment** argument: provenance in each release (FR-PLM-30), deterministic replay,
 and `verify_release` regeneration. If llull's codegen ever produced airborne software, DO-330 criteria would apply to

@@ -95,7 +95,7 @@ analytic surfaces), counts exact; Monte Carlo per the 5σ statistical bounds lis
 | VC-GDT-07 | FR-22 (V1) | composite FCF + all-around | link stored, 0 errors, 1 ALL_AROUND_SHAPE_ASPECT on export | exact | §6.1 mapping |
 | VC-GDT-08 | FR-23 (V1) | ISO 14405 Ⓔ | stored + rendered | exact | — |
 | VC-GDT-09 | FR-24 | inch plate | Ø 0.259842519685 in | 1e-9 in | 6.6/25.4 |
-| VC-GDT-10 | FR-15, TR-14 | plate sheet `pmiMode:'auto'` | TOP view holds the 4 hole/bore PMI; FRONT holds flatness, datum A, texture; fits | set equality | §5.3/5.8 |
+| VC-GDT-10 | FR-15, TR-14 | plate sheet `pmiMode:'auto'` | TOP view holds the 4 hole/bore PMI; FRONT holds flatness, datum A, texture, datum C; RIGHT holds datum B + perpendicularity; fits | set equality | §5.3/5.8 |
 | VC-GDT-11 | FR-15 | same | placed + skipped covers every PMI of shown solids | exact | KPI |
 | VC-GDT-20 | FR-20/22, TR-15 (V1) | import of the 16 semantic NIST files | per category: imported + unattached + unmapped = census; CTC: unattached = 0 for tolerances | exact | `nist_pmi_census.json` |
 | VC-GDT-21 | FR-21, TR-16 (V1) | export → re-import plate (+ a coaxiality part) | identical semantics | 1e-9 rel / exact | self-consistency |
@@ -108,7 +108,7 @@ analytic surfaces), counts exact; Monte Carlo per the 5σ statistical bounds lis
 | VC-GDT-30 | FR-16, TR-11 | SU-01 (normal, linear) | mean 0.15; WC [−0.09, 0.39]; RSS ±0.124096736; σ 0.041365579; P(gap<0) 1.43809451e-4 | 1e-9 mm; p 1e-12 | derived |
 | VC-GDT-31 | FR-16 | SU-02 (uniform) | WC/RSS as SU-01; σ 0.071647284; exact P(gap<0) 1.2083333333e-2 (= 29/2400) (normal approx would say 1.8148e-2) | 1e-9; p 1e-12 | derived (Irwin–Hall) |
 | VC-GDT-32 | FR-16 | SU-03 (unequal limits) | mean 0.024; WC [0.007, 0.041]; RSS ±0.012349089; P ≈ 2.765e-9 | 1e-9 | derived |
-| VC-GDT-33 | FR-16/17 | SU-04 (sensitivity ½) | mean 0.05; WC [−0.035, 0.135]; RSS ±0.044440972; P 3.68724955e-4; MC deterministic per seed | 1e-9; MC 5σ | derived |
+| VC-GDT-33 | FR-16/17 | SU-04 (sensitivity ½; test vector — radial errors modelled as symmetric normals, not a physical radial-error model) | mean 0.05; WC [−0.035, 0.135]; RSS ±0.044440972; P 3.68724955e-4; MC deterministic per seed | 1e-9; MC 5σ | derived |
 | VC-GDT-34 | FR-16 | SU-05 (non-linear h = L sinθ) | linear WC [49.194250265, 50.805749735]; exact corners [49.193113654, 50.804590132]; RSS ±0.757401916; σ 0.252467305 | 1e-9 | derived |
 | VC-GDT-35 | FR-19, TR-12 | FF-01..03 | floating T = 0.6; fixed T = 0.3; hole 6.6–6.9 pos Ø0.3 Ⓜ: 0.3 @MMC, 0.6 @LMC, 0.45 @6.75, VC 6.3 | 1e-12 | derived |
 | VC-GDT-36 | FR-18 | stack with contributor `pmiId: boreSize` | = SU-03; after bore upper 0.025: WC max 0.045 | 1e-9 | derived |
@@ -140,7 +140,7 @@ analytic surfaces), counts exact; Monte Carlo per the 5σ statistical bounds lis
   Windows CI job on llull's AP242 exports (VC-GDT-22) and manually on imports. Not redistributed by llull.
 - **Census script** (this folder): cross-platform, stdlib-only pre-check; run it on llull's own AP242
   exports too (the counts of the plate are then 4 GT, 2 DIMENSIONAL_SIZE, 3 DATUM).
-- **OCC XCAF via OCP** (desktop Python): reader behind the PMI stage of gap 04's `import_step_exact`; the same reader re-imports
+- **OCC XCAF via OCP** (desktop Python): reader behind the PMI stage of `import_step_exact` (gap 01 command, AP242 PMI transport by gap 04); the same reader re-imports
   exports for VC-GDT-21.
 
 ## 7. How to regenerate

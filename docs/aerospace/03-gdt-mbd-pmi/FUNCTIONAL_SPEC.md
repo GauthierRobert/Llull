@@ -1,7 +1,7 @@
 # GDT — GD&T, Model-Based Definition (MBD) and semantic PMI — Functional specification
 
 Gap id: **GDT** · Folder: `docs/aerospace/03-gdt-mbd-pmi/` · Status: specification (no implementation) · Date: 2026-10-15
-Related gaps: 01 KRN (exact B-rep, `import_step_brep`) · 04 XCH (AP242 transport: `import_step_exact`, `export_step_ap242`,
+Related gaps: 01 KRN (exact B-rep; owns `import_step_exact` and the face-query port) · 04 XCH (extends `import_step_exact` with verification and AP242 assembly/PMI transport; `export_step_ap242`,
 validation properties, QIF) — GDT owns the semantic PMI **model, commands, checks, drawing integration, stack-up**
 and the PMI stage of the AP242 translation.
 
@@ -207,14 +207,14 @@ Only the command names are new.)
 
 ### 6.3 MCP agent (cloud)
 
-1. `describe_scene` → find the solid. 2. `inspect_topology` → faces with surface type, centroid/axis (TR-GDT-03 extension).
+1. `describe_scene` → find the solid. 2. `inspect_topology` → faces with surface type, centroid/axis (from the gap 01 face-query port, TR-GDT-03).
 3. `add_datum_feature` ×3 → `add_size_dimension` → `add_geometric_tolerance` … 4. `check_pmi` until no errors.
 5. `analyze_stackup` for the critical clearance. 6. `create_sheet` + `update_sheet {pmiMode:'auto'}` → `export_sheet_svg`.
 All tools are views of the same registry (L5); hidden tools remain callable via `execute`.
 
 ### 6.4 Supplier import (V1)
 
-`import_step_exact` (gap 04 XCH; GDT's PMI stage) → solids + PMI in one transaction → `list_pmi` → inspection plan table;
+`import_step_exact` (gap 01; AP242 PMI transport by gap 04; GDT's PMI stage) → solids + PMI in one transaction → `list_pmi` → inspection plan table;
 `check_pmi` → questions to the customer.
 
 ## 7. Acceptance criteria

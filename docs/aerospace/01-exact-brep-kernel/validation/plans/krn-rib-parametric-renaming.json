@@ -90,7 +90,7 @@
   "command": "set_parameter",
   "params": {
    "name": "pw",
-   "expression": "240"
+   "expression": "200"
   }
  },
  {

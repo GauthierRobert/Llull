@@ -363,7 +363,7 @@
   },
   {
    "vc": "VC-KRN-07",
-   "title": "persistent naming: fillet follows pocket edges after pw 260 -> 240",
+   "title": "persistent naming: fillet follows pocket edges after pw 260 -> 200",
    "proves": [
     "FR-KRN-06",
     "TR-KRN-30",
@@ -371,7 +371,7 @@
    ],
    "value": {
     "volumeBefore": 485716.8146928204,
-    "volumeAfter": 517716.8146928204,
+    "volumeAfter": 581716.8146928204,
     "filletFacesAfter": 4,
     "brokenReferences": 0
    },
@@ -379,7 +379,7 @@
     "volumeRel": 1e-09
    },
    "unit": "mm^3",
-   "source": "analytic (b). With today's edgesNear heuristic, the 2 points at x=280 are 20 mm from the moved edges: expected to FAIL (known issue) until TR-KRN-30 lands",
+   "source": "analytic (b). V = 300*120*25 - (200*80 - (4-pi)*10^2)*20. With today's edgesNear heuristic, the 2 points at x=280 are 60 mm from the moved corner edges (x=220) but 22.36 mm from the blank's outer top edges, so they silently re-target: expected to FAIL (known issue) until TR-KRN-30 lands",
    "plan": "plans/krn-rib-parametric-renaming.json",
    "knownIssueToday": true
   },

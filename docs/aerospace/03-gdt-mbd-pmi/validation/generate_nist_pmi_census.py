@@ -3,7 +3,7 @@
 
 Reads the 17 NIST AP242 STEP files of the NIST zip (CTC 01-05, FTC 06-11 incl. the tessellated FTC 08
 variant, STC 06-10), verifies the zip and each member's sha256 against nist_pmi_files.json, parses the ISO 10303-21 DATA section with the standard library only, and
-counts the AP242 PMI entity instances the PMI stage of a future llull `import_step_exact` (gap 04) must recover. Output:
+counts the AP242 PMI entity instances the PMI stage of a future llull `import_step_exact` (gap 01, AP242 PMI transport by gap 04) must recover. Output:
 nist_pmi_census.json (committed). The STEP files themselves are NOT committed (sizes 0.4-6.1 MB).
 
 Usage:

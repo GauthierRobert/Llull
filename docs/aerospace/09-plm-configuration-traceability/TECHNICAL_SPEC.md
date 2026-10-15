@@ -44,14 +44,16 @@ packages/core: lib/canonicalJson.ts, lib/sha256.ts (pure) · commands/{schema,ty
 
 | TR | Requirement | Serves |
 | -- | ----------- | ------ |
-| TR-PLM-01 | PLM is a **plugin package** `packages/plm` (alias `@plm`, added once in `tsconfig.base.json`), installed by default in `src/app/plugins.ts`. Rationale: domain-neutral but optional data management. L10 keeps core free of PLM policy. Core changes: two pure `@lib` helpers, the guard signature (TR-PLM-04), the `ctx.caller` / `ctx.signatures` ports (TR-PLM-07/16, M0), carrying `plm` through history replay (TR-PLM-02), a post-load integrity hook (§5.5) and the schema-version bump (TR-PLM-10). None of these exists in the public plugin API today. | FR-PLM-18 |
-| TR-PLM-02 | All PLM commands are `metaHistory: true`. They edit document *input state* (`doc.plm`) like `create_configuration` and are never replayed by `replayHistory`. Regenerating geometry therefore never re-releases or re-signs anything. **Core change required:** `replayHistory` (`packages/core/src/commands/history/replay.ts`) seeds the replayed document from `createEmptyDocument()` plus a fixed carry list (camera, units, parameters, configurations, recipes, … see `history/carry.ts`); `plm` is not on it, so today any replay (`set_parameter` with dependents, `activate_configuration`, `replay_history`, `edit_step_params`) would drop `doc.plm`. `plm` must be added to the carried state (or a generic “carried plugin slice” hook added to `DocumentExtension`). | FR-PLM-31 |
+| TR-PLM-01 | PLM is a **plugin package** `packages/plm` (alias `@plm`, added once in `tsconfig.base.json`), installed by default in `src/app/plugins.ts`. Rationale: domain-neutral but optional data management. L10 keeps core free of PLM policy. Core changes: two pure `@lib` helpers, the guard signature (TR-PLM-04), the `ctx.caller` / `ctx.signatures` ports (TR-PLM-07/16, M0), the `DocumentExtension.carry` replay hook (TR-PLM-32), the `DocumentExtension.afterLoad` hook (TR-PLM-33) and the schema-version bump (TR-PLM-10). None of these exists in the public plugin API today; the M0 core diff needs a `cad-reviewer` pass (workflow W5). | FR-PLM-18 |
+| TR-PLM-02 | All PLM commands are `metaHistory: true`. They edit document *input state* (`doc.plm`) like `create_configuration` and are never replayed by `replayHistory`. Regenerating geometry therefore never re-releases or re-signs anything. **Core change required:** `replayHistory` (`packages/core/src/commands/history/replay.ts`) seeds the replayed document from `createEmptyDocument()` plus a fixed carry list (camera, units, parameters, configurations, recipes, … see `history/carry.ts`); `plm` is not on it, so today any replay (`set_parameter` with dependents, `activate_configuration`, `replay_history`, `edit_step_params`) would drop `doc.plm`. Resolution: the generic carried-slice hook TR-PLM-32; the PLM extension carries `plm` unchanged. | FR-PLM-31 |
 | TR-PLM-03 | `doc.plm` is **outside the release scope**. Release scope = the serialized envelope minus `selection`, `camera`, `plm` (§5.1). PLM commands therefore never trip the release lock, and the lock blocks every other change to the definition. | FR-PLM-05 |
 | TR-PLM-04 | Release lock = a `DerivationGuard` (`domain: 'plm'`) in the plugin. Core change: `check(previous, next, commandName)` gets the command name (backward-compatible extra argument; `derivationViolation` in `commands/derivation.ts` already receives `commandName`, so it is a pass-through), so `load_document`/`clear_document` (document replacement) are exempt. Building/civil guards ignore it. | FR-PLM-05 |
 | TR-PLM-05 | Commands never read a clock, a key or the filesystem. Timestamps (`at`), actor (`by`) and signatures come from params, filled by the host (UI/CLI/MCP adapter injects host time and authenticated user. Agents cannot override `by` when the server has named-user auth). | FR-PLM-31, FR-PLM-17 |
 | TR-PLM-06 | Hashing is pure and synchronous in core: `@lib/canonicalJson` (RFC 8785 profile [R16]) + `@lib/sha256` (FIPS 180-4, pure TS, about 120 lines, no dependency). The browser, Node and the CLI produce identical digests. | FR-PLM-06 |
 | TR-PLM-07 | Signature **verification** goes through an injected port `ctx.signatures?: SignatureVerifier` (sync). Server/desktop provide it with `node:crypto` Ed25519 (`verify(null, …)`, verified in `validation/verify_vectors.mjs`). When the port is absent (pure browser), `record_signature` refuses with "signature verification requires the desktop or server host" (open question Q2: vendoring a pure-TS verifier). **Signing** never happens in a command. | FR-PLM-20 |
 | TR-PLM-08 | Vault, package writing, file locks and the keystore are **host** code (`desktop/src/vault/*`, `server/src/vault/*` in V2), per L6. They call read-only query commands (`release_manifest`, `plm_status`) and write files. The document changes only through commands (`attach_release_package` records the package hash). | FR-PLM-21, FR-PLM-22 |
+| TR-PLM-32 | **Core change (needs `cad-reviewer`).** `DocumentExtension` gains an optional `carry?(prev: CadDocument, next: CadDocument): CadDocument`. `replayHistory` (`commands/history/replay.ts`) calls every installed extension's `carry(base, seeded)` after building the seed document (empty geometry + today's carried fields + `orphanState`) and before running the first step; `carry` returns `next` plus the slices that replay must not lose and must not regenerate. It is pure, and returns `next` unchanged when the plugin has no data. PLM: `carry = (prev, next) => prev.plm === undefined ? next : { ...next, plm: prev.plm }`. The same hook serves gap 03 (`doc.pmi` orphan items and saved-view visibility state, GDT TECHNICAL_SPEC §3.1). `history/carry.ts` documents the new class “CARRIED by extension”. Contract test: for every installed extension, `replay_history` on a document with the slice leaves the slice deep-equal. | FR-PLM-31, FR-PLM-15 |
+| TR-PLM-33 | **Core change (needs `cad-reviewer`).** `DocumentExtension` gains an optional `afterLoad?(doc: CadDocument): readonly string[]`, called by `load_document` on the validated, restored document. Each returned string is appended to the load summary. It is a pure query and cannot modify the document. PLM uses it for the integrity check (§5.5). | FR-PLM-15 |
 | TR-PLM-09 | The kernel is used only by optional geometry fingerprints (`verify_release {regenerate:true}`, `plm_diff` mass delta), through `ctx.kernel` with `requiresKernel` on those query variants. OCC is the desktop kernel. No kernel is needed for the MVP lock/hash logic. | FR-PLM-13, FR-PLM-16 |
 
 Laws check:
@@ -98,8 +100,9 @@ export interface SignatureRecord {
   readonly signature: string;          // 128 hex chars (64 bytes)
 }
 
+/** A revision is dirty when the current release-scope hash differs from its last iteration's contentHash (derived, never stored). */
 export interface Iteration {
-  readonly n: number;                  // 1-based
+  readonly n: number;                  // 1-based; current iteration = iterations.length
   readonly contentHash: string;        // release-scope SHA-256 at checkpoint
   readonly at: string;
   readonly by: string;
@@ -159,7 +162,8 @@ export interface ChangeRecord {
   readonly title: string;
   readonly reason?: string;
   readonly affectedItems: string[];    // part numbers
-  readonly classification?: 'minor' | 'major';
+  readonly purpose: 'initial-release' | 'change';
+  readonly classification?: 'minor' | 'major';   // required when purpose = 'change'
   readonly classificationTags?: ('acoustical' | 'emissions')[];   // 14 CFR 21.93(b)(c) [R7]
   readonly classificationJustification?: string;
   readonly effectivity?: Effectivity[];
@@ -238,7 +242,7 @@ happy and failure unit tests (non-negotiable 2).
 | `record_approval` | mut | `{ role, userId, comment?, at }` | appends Approval to the current revision | one approval per (role,user) | state ≠ in_review; role not in policy | 07 |
 | `release_item` | mut, destructiveHint | `{ changeOrder?, effectivity?: Effectivity[], approvals?: Approval[], at, by }` | state → released; contentHash, snapshot, releasedAt/By; previous released → superseded with closed effectivity; ECO → implemented + ECN when all its items released | `contentHash == sha256(canonical(scope(doc)))` at that instant | not in_review; approvals missing/insufficient; checker == author (policy); ECO missing/closed/does not list item; effectivity overlaps another released revision; unreleased children (assembly); `humanSignatureRequired` and caller source is agent without signature (adapter flag) | 06,07,11,17 |
 | `create_change_request` | mut | `{ id?, title, reason, affectedItems, proposedClassification?, at, by }` | adds ECR open | id unique | empty title; unknown item | 08 |
-| `create_change_order` | mut | `{ id?, fromRequests?, affectedItems?, classification, classificationTags?, classificationJustification?, effectivity?, disposition?, at, by }` | adds ECO open; listed ECRs → accepted | classification never inferred | missing classification; unknown ECR; ECR not open | 08,09 |
+| `create_change_order` | mut | `{ id?, purpose?: 'initial-release'\|'change' (default 'change'), fromRequests?, affectedItems?, classification?, classificationTags?, classificationJustification?, effectivity?, disposition?, at, by }` | adds ECO open; listed ECRs → accepted | classification never inferred; required when `purpose='change'`, absent for `initial-release` (nothing to classify against a previous approved design) | `purpose='change'` without classification; `initial-release` for an item that already has a released revision; unknown ECR; ECR not open | 08,09 |
 | `set_change_state` | mut | `{ id, state: 'rejected'\|'cancelled', reason, at, by }` | closes ECR/ECO | implemented is terminal | illegal transition | 08 |
 | `revise_item` | mut | `{ changeOrder?, at, by }` | adds revision next(scheme) in_work basedOn current, iteration 1 | previous revision object unchanged (deep-equal) | current not released; no open ECO listing item (policy); scheme exhausted | 10 |
 | `set_lifecycle_state` | mut | `{ revision, state: 'obsolete'\|'cancelled', reason, changeOrder?, at, by }` | → obsolete/cancelled; open effectivity closed | per transition table | illegal transition; empty reason | 04 |
@@ -247,11 +251,12 @@ happy and failure unit tests (non-negotiable 2).
 | `attach_release_package` | mut | `{ revision, manifestSha256, location? }` | `packageSha256` | manifest's documentContentHash == revision.contentHash | mismatch | 21 |
 | `create_baseline` | mut | `{ id?, name, kind, root?, at, by }` | adds Baseline | members sorted; hash = sha256(JCS(members)) | any member not released/superseded | 23 |
 | `assign_characteristic_ids` | mut | `{ sheetId?, scheme:'sequential', includeNotes? }` | `plm.characteristics` | existing numbers never change; retired numbers never reused | gap 03 PMI absent → summary explains | 26 |
+| `as_built_vs_as_designed` | query (V2) | `{ serial }` | data `{ differences: [{partNumber, asDesigned, asBuilt, authority}] }` | compares the as-built record with its baseline members | unknown serial | 28 |
 | `record_as_built` | mut (V2) | `{ serial, partNumber, asDesignedBaseline, deviations, at, by }` | adds AsBuiltRecord | — | unknown baseline | 28 |
 | `plm_status` | query | `{}` | — | — | — | 18 |
 | `resolve_effectivity` | query | `{ partNumber?, kind, unit }` | data `{revision\|null, state}` | first range containing unit among released/superseded | unit type mismatch | 12 |
 | `plm_diff` | query | `{ from, to, geometry?: boolean }` | data per category (§5.4) | — | unknown labels | 13 |
-| `verify_release` | query | `{ revision, regenerate?: boolean }` | data `{contentHashMatches, signaturesValid, titleBlockConsistent, geometryFingerprintMatches?}` | — | revision not released | 15,16 |
+| `verify_release` | query | `{ revision, regenerate?: boolean }` | data `{contentHashMatches, signaturesValid, titleBlockConsistent, geometryFingerprintMatches?, reconstructedFrom}` | released, superseded and obsolete revisions all verify | revision never released (in_work / in_review / cancelled) | 15,16 |
 | `release_manifest` | query | `{ revision }` | data = canonical manifest body + bytes to sign | deterministic | not released | 21 |
 | `view_revision` | query | `{ revision }` | data = snapshot document (read-only) for UI rendering | — | no snapshot | 13 |
 | `engineering_bom` | query | `{ levels?: number\|'all' }` | data rows `{level, partNumber, revision, state, quantity}` | extends `bill_of_materials`, which is left unchanged | — | 24 |
@@ -262,14 +267,17 @@ happy and failure unit tests (non-negotiable 2).
 | -- | ----------- | ------ |
 | TR-PLM-14 | Summaries of refused edits follow the llull convention `<command> rejected: <PN> rev <R> is <state>; …` and name the remedy (`open an ECO and revise_item`). | FR-PLM-05 |
 | TR-PLM-15 | MCP annotations: `release_item`, `record_signature`, `set_lifecycle_state` → `destructiveHint: true`; queries → `readOnlyHint`. The `toToolSchemas()` snapshot gains the `plm` tools (contract test). | FR-PLM-17 |
-| TR-PLM-16 | Agent gate: the MCP/CLI adapter passes `ctx.caller = { kind: 'human' \| 'agent', userId }`, a new optional ctx field set only by hosts. `release_item` and `record_approval` refuse `agent` callers when `humanSignatureRequired`. The UI dispatch sets `human`. | FR-PLM-17 |
+| TR-PLM-16 | Agent gate: the MCP/CLI adapter passes `ctx.caller = { kind: 'human' \| 'agent', userId }`, a new optional ctx field set only by hosts. `release_item` and `record_approval` refuse `agent` callers when `humanSignatureRequired`. The UI dispatch sets `human`. **Limit:** in local CLI runs (`--doc`, `--app` without named-user auth) the caller kind is self-declared by the process, so the gate is advisory there. It is enforceable only on a server with named-user authentication (where `by` and `caller` come from the authenticated session) and through the signature requirement itself: the release needs a signature from a registered human key, which an agent cannot produce (FR-PLM-17). | FR-PLM-17 |
 
 ## 5. Algorithms
 
 ### 5.1 Release scope & content hash (TR-PLM-17, FR-PLM-06/15/16)
 
 1. `scope(doc) = { format:'llull-document', version, document: omit(doc, ['selection','camera','plm']) }`, with derived
-   entities included (`includeDerived: true` semantics, as the serializer comment already prescribes for hashing).
+   entities **omitted** (`includeDerived: false`, i.e. exactly what a saved file stores). Plugin-derived geometry (L8) is
+   regenerated from the definition by plugin code; hashing it would make the release hash change on a llull/plugin upgrade
+   and raise false integrity mismatches. Derived geometry is covered instead by `geometryFingerprint` (volume, area, bbox per
+   entity, derived entities included), whose drift is reported, never treated as tampering (R-2).
 2. `canonical(x)`: RFC 8785 profile [R16]:
    - objects get keys sorted by UTF-16 code units;
    - no whitespace;
@@ -289,20 +297,34 @@ happy and failure unit tests (non-negotiable 2).
 
 ### 5.2 Release lock guard (TR-PLM-18, FR-PLM-05)
 
+The decision uses **both** documents, so that one transaction (`build_project`, which the guard also sees as a whole) may
+`revise_item` and then edit the new revision, while nothing can edit a locked revision:
+
 ```
 check(prev, next, commandName):
-  if commandName in {'load_document','clear_document'} → null          // replacement; integrity handled on load (5.5)
-  item = prev.plm?.item; if !item → null
-  rev = item.revisions[item.currentRevision]; if rev.state == 'in_work' or 'cancelled' → null
-  for key in RELEASE_SCOPE_KEYS (every CadDocument key except selection, camera, plm, plus plugin slices):
-      if prev[key] !== next[key] → return `${item.partNumber} rev ${rev.label} is ${rev.state}; open an ECO and revise_item`
-  return null
+  if commandName in {'load_document','clear_document'} → null          // replacement; integrity handled on load (5.5, TR-PLM-33)
+  if prev.plm?.item is absent → null                                   // unmanaged before the change
+  if next.plm?.item is absent → 'the PLM record cannot be removed'      // only load/clear may drop it
+  if !scopeChanged(prev, next) → null                                  // PLM-only or view-state change
+  for every revision label L in prev.plm.item.revisions:               // released history is immutable
+      if next.plm.item.revisions[L] differs from prev in state (other than the transitions of
+         lifecycle_transitions.csv), contentHash or snapshot → return `… rev ${L} history cannot change`
+  cur = next.plm.item.revisions[next.plm.item.currentRevision]
+  if cur.state in {'in_work','cancelled'} and (cur.label === prev current label or cur.basedOn === prev current label
+         and prev current revision is released)                       // edit of the open revision, or revise-then-edit
+      → null
+  return `${item.partNumber} rev ${cur.label} is ${cur.state}; open an ECO and revise_item`
+scopeChanged(prev, next) = some key K of RELEASE_SCOPE_KEYS (every CadDocument key except selection, camera, plm, plus
+                            plugin slices) with prev[K] !== next[K]
 ```
 
-The check costs O(number of top-level keys), about 30 reference comparisons, so it stays well under the 1 ms budget,
-thanks to structural sharing (L3). False positives would come from a command that re-creates an unchanged top-level
+A non-PLM command cannot create a new in_work revision (only PLM commands write `plm`, and `plm` changes inside the same
+result are themselves checked by the history loop above), so "next is in_work" cannot be forged by an ordinary command.
+The check costs O(number of top-level keys + revisions), about 30 reference comparisons, so it stays well under the 1 ms
+budget, thanks to structural sharing (L3). False positives would come from a command that re-creates an unchanged top-level
 object. Mitigation: the contract test runs every registered mutating command on a released document and asserts either
-refusal or `next[key] === prev[key]` for all scope keys (TR-PLM-30).
+refusal or `next[key] === prev[key]` for all scope keys (TR-PLM-30). A second contract case runs a `build_project` with
+`revise_item` + `set_parameter` on a released document and expects success.
 
 ### 5.3 Revision schemes (FR-PLM-02)
 
@@ -331,14 +353,17 @@ as drift, not as a change.
 
 ### 5.5 Integrity on load (FR-PLM-15)
 
-`plmExtension.validate` cannot hash (validation is structural). Instead, a post-load hook in the plugin's `restore` path
-(or a dedicated `verify_on_load` invoked by `load_document` via the extension) recomputes:
+`plmExtension.validate` cannot hash (validation is structural) and `restore` sees the raw, unvalidated document and cannot
+report anything. The check therefore runs in the new `afterLoad(doc)` hook (TR-PLM-33), on the validated document, and
+recomputes:
 - `contentHash` of the **current** scope when the current revision is released;
 - the snapshot hash of every released revision.
 
-A mismatch sets the transient `plm.integrity` (excluded from scope and serialization) and the load summary says
-`release A content hash mismatch (expected 7e39…, got …)`. The revision stays locked. The fix is to revert to the snapshot
-(`restore_revision_snapshot`, a mutating command allowed only in that mismatch state) or to open an ECO.
+A mismatch is returned as a warning string that `load_document` appends to its summary:
+`release A content hash mismatch (expected 7e39…, got …)`. Because `afterLoad` cannot modify the document, the mismatch
+state is not stored: `plm_status` and `verify_release` recompute it on demand (`data.integrity`), and the revision stays
+locked (the guard never unlocks a released revision). The fix is to revert to the snapshot (`restore_revision_snapshot`, a
+mutating command allowed only while the recomputed hash mismatches) or to open an ECO.
 
 ### 5.6 Effectivity (FR-PLM-11/12)
 
@@ -357,7 +382,7 @@ Vectors: `vectors/effectivity_resolution.json`.
 - Signed bytes: `UTF-8(canonical(manifestBody))`, where `manifestBody` is the manifest without `manifestSha256` and
   `signatures`.
 - Deterministic: the same key and bytes always give the same signature, which makes golden tests possible (the sample
-  manifest is signed with the public RFC 8032 TEST 1 key: `df1953d3…20beb0f`).
+  manifest is signed with the public RFC 8032 TEST 1 key: `6cabcd28…cbde0f01`).
 - Key custody (host): private keys stay in the OS keystore or a hardware token. The desktop uses Electron's OS-backed
   secret storage to protect a locally generated key (candidate API, to verify), or PKCS#11 tokens in V2.
 - Public keys are registered in `vault/keys/<userId>.json` with validity dates. Revocation is a signed vault entry.
@@ -389,8 +414,9 @@ LL-1001_A/                                  (folder or .zip with STORE; files re
 ```
 
 Manifest fields:
-- `item{partNumber,name,revision,iteration}`, `lifecycleState`, `change{eco,classification}`, `effectivity[]`,
-  `baseline`, `marking`;
+- `item{partNumber,name,revision,iteration}`, `lifecycleState`, `change{eco, purpose, classification?}` (`ChangeRecord`),
+  `effectivity[]` (`Effectivity`, open range = `to` absent), `baseline`, `marking` (`ExportMarking`: regime, classification?,
+  statement?, decidedBy?);
 - `releasedAt/By`;
 - `members[{path,role,mediaType,canonical,sha256,bytes}]`, `documentContentHash`;
 - `tool{name,version,kernel,schemaVersion}` (FR-PLM-30);
@@ -476,20 +502,20 @@ deferred to the V2 design.
 | VC-PLM-22 | `tests/unit/contract/toolSchemas` snapshot includes plm; `server/tests/cli-plm.test.ts` runs S1 via CLI; agent release refused | contract + server |
 | VC-PLM-23 | `desktop/tests/vaultLocks.test.ts`: two sessions, O_EXCL lock, lease expiry, audited break | desktop |
 | VC-PLM-24 | V2 with gap 04: AP242 export of PDM data validated by the CAx-IF/PDM-IF checker (TBD) | quality |
-| Golden | `tests/golden/plans.ts` gains `plm_release_eco` (from `validation/plans/plm_release_eco_revB.plan.json`); id-normalized snapshot + replay equality (PLM state is metaHistory; replay leaves it intact only once `plm` is carried by `replayHistory`, TR-PLM-02) | golden |
+| Golden | `tests/golden/plans.ts` gains `plm_release_eco` (from `validation/plans/plm_release_eco_revB.plan.json`); id-normalized snapshot + replay equality (PLM state is metaHistory; replay leaves it intact through the carry hook, TR-PLM-32) | golden |
 | Production gate | `npm run production` scenario: release → ECO → B → package → verify → reopen in a fresh profile → verify | gate |
 
 | TR | Requirement | Serves |
 | -- | ----------- | ------ |
 | TR-PLM-19 | Test-key rejection: the production trust store refuses RFC 8032 test public keys; tests run with `LLULL_PLM_TEST_KEYS=1`. | FR-PLM-20 |
-| TR-PLM-30 | Release-lock contract test over `listCommands()`. Adding a new mutating command without passing it fails CI. | FR-PLM-05 |
+| TR-PLM-30 | Release-lock contract test over `listCommands()`, plus the revise-then-edit `build_project` case of §5.2. Adding a new mutating command without passing it fails CI. | FR-PLM-05 |
 | TR-PLM-31 | Coverage gate 90/85/90/90 extends to `packages/plm/src/**` (same as domain-aec). | NN-3 |
 
 ## 10. Delivery plan
 
 | Milestone | Content | Depends on | Effort (1 dev) |
 | --------- | ------- | ---------- | -------------- |
-| M0 | Core: `@lib/canonicalJson`, `@lib/sha256` + vectors; `DerivationGuard.check(…, commandName)`; `ctx.caller`, `ctx.signatures` ports | — | 3 d |
+| M0 | Core: `@lib/canonicalJson`, `@lib/sha256` + vectors; `DerivationGuard.check(…, commandName)`; `ctx.caller`, `ctx.signatures` ports; `DocumentExtension.carry` (TR-PLM-32) and `afterLoad` (TR-PLM-33) hooks; `cad-reviewer` pass | — | 4–5 d |
 | M1 MVP | `packages/plm`: model, extension, guard, identity/scheme/iteration/review/release/ECR/ECO/revise/lifecycle/effectivity/diff/status/verify; title-block projection; CLI parity; S1/S2 green; golden plan | M0 | 12–15 d |
 | M2 V1-integrity | Audit chain (server); signatures (record/verify, node port); release manifest + package writer (desktop); trust store; package verify CLI | M1 | 8–10 d |
 | M3 V1-vault | Desktop vault (CAS, refs, locks, check-in/out, menu); snapshots externalized | M2 | 8–10 d |

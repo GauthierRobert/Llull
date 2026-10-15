@@ -228,10 +228,11 @@ def main() -> int:
         "schema": "llull-release-manifest/0.1",
         "item": {"partNumber": "LL-1001", "name": "Bracket, hinge fitting", "revision": "A", "iteration": 2},
         "lifecycleState": "released",
-        "change": {"eco": "ECO-0001", "classification": "initial-release"},
-        "effectivity": [{"kind": "serial", "from": 1, "to": None}],
+        "change": {"eco": "ECO-0001", "purpose": "initial-release"},
+        "effectivity": [{"kind": "serial", "from": 1}],
         "baseline": {"id": "BL-PBL-0001", "kind": "product"},
-        "marking": {"exportControl": "NLR-EXAMPLE", "notice": "Example marking only; classification is a user/legal decision"},
+        "marking": {"regime": "none", "statement": "NLR-EXAMPLE - example marking only; classification is a user/legal decision",
+                    "decidedBy": "u-0003"},
         "releasedAt": "2026-11-02T09:30:00Z",
         "releasedBy": {"userId": "u-0007", "name": "J. Example", "role": "design-authority"},
         "members": members,
@@ -281,7 +282,8 @@ def main() -> int:
     for name, pk, sig, msg in neg:
         ok = verifies(pk, sig, msg)
         assert ok is False, name
-        ed_vectors["negative"].append({"name": name, "publicKey": pk, "signature": sig, "messageSha256": sha256_hex(msg), "expectVerified": False})
+        ed_vectors["negative"].append({"name": name, "publicKey": pk, "signature": sig, "messageHex": msg.hex(),
+                                       "messageSha256": sha256_hex(msg), "expectVerified": False})
     write("vectors/ed25519_vectors.json", ed_vectors)
 
     # ---------------- revision sequences ----------------
