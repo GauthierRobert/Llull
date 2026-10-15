@@ -27,7 +27,7 @@
       "n": 2,
       "command": "set_export_marking",
       "params": { "regime": "none", "statement": "NLR-EXAMPLE - classification decided by the export-control officer", "decidedBy": "u-0003" },
-      "expect": { "plm.marking.regime": "none" }
+      "expect": { "plm.item.marking.regime": "none" }
     },
     {
       "n": 3,

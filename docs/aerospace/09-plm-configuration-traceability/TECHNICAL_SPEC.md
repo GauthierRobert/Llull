@@ -44,8 +44,8 @@ packages/core: lib/canonicalJson.ts, lib/sha256.ts (pure) · commands/{schema,ty
 
 | TR | Requirement | Serves |
 | -- | ----------- | ------ |
-| TR-PLM-01 | PLM is a **plugin package** `packages/plm` (alias `@plm`, added once in `tsconfig.base.json`), installed by default in `src/app/plugins.ts`. Rationale: domain-neutral but optional data management. L10 keeps core free of PLM policy. Core changes are limited to two pure `@lib` helpers and the guard signature (TR-PLM-04). | FR-PLM-18 |
-| TR-PLM-02 | All PLM commands are `metaHistory: true`. They edit document *input state* (`doc.plm`) like `create_configuration` and are never replayed by `replayHistory`. Regenerating geometry therefore never re-releases or re-signs anything. | FR-PLM-31 |
+| TR-PLM-01 | PLM is a **plugin package** `packages/plm` (alias `@plm`, added once in `tsconfig.base.json`), installed by default in `src/app/plugins.ts`. Rationale: domain-neutral but optional data management. L10 keeps core free of PLM policy. Core changes: two pure `@lib` helpers, the guard signature (TR-PLM-04), the `ctx.caller` / `ctx.signatures` ports (TR-PLM-07/16, M0), carrying `plm` through history replay (TR-PLM-02), a post-load integrity hook (§5.5) and the schema-version bump (TR-PLM-10). None of these exists in the public plugin API today. | FR-PLM-18 |
+| TR-PLM-02 | All PLM commands are `metaHistory: true`. They edit document *input state* (`doc.plm`) like `create_configuration` and are never replayed by `replayHistory`. Regenerating geometry therefore never re-releases or re-signs anything. **Core change required:** `replayHistory` (`packages/core/src/commands/history/replay.ts`) seeds the replayed document from `createEmptyDocument()` plus a fixed carry list (camera, units, parameters, configurations, recipes, … see `history/carry.ts`); `plm` is not on it, so today any replay (`set_parameter` with dependents, `activate_configuration`, `replay_history`, `edit_step_params`) would drop `doc.plm`. `plm` must be added to the carried state (or a generic “carried plugin slice” hook added to `DocumentExtension`). | FR-PLM-31 |
 | TR-PLM-03 | `doc.plm` is **outside the release scope**. Release scope = the serialized envelope minus `selection`, `camera`, `plm` (§5.1). PLM commands therefore never trip the release lock, and the lock blocks every other change to the definition. | FR-PLM-05 |
 | TR-PLM-04 | Release lock = a `DerivationGuard` (`domain: 'plm'`) in the plugin. Core change: `check(previous, next, commandName)` gets the command name (backward-compatible extra argument), so `load_document`/`clear_document` (document replacement) are exempt. Building/civil guards ignore it. | FR-PLM-05 |
 | TR-PLM-05 | Commands never read a clock, a key or the filesystem. Timestamps (`at`), actor (`by`) and signatures come from params, filled by the host (UI/CLI/MCP adapter injects host time and authenticated user. Agents cannot override `by` when the server has named-user auth). | FR-PLM-31, FR-PLM-17 |
@@ -442,7 +442,7 @@ deferred to the V2 design.
 | UI release dialog | Checklist: approvals, ECO, effectivity, marking, `check_model` result, package preview | Host signs, then `record_signature` → `release_item` (or release then sign, policy) |
 | UI drawings | Title block PN/revision auto-filled from `plm.item` when managed. Marking statement in the frame. Balloons rendered from `plm.characteristics` | Render-time projection: no sheet data duplication |
 | Desktop menu | File > Vault > Open vault…, Check out, Check in…, Release package…, Verify package… | Host code (`desktop/src/vault/*`) |
-| CLI | `llull plm status`, `llull run <plm command>`, `llull release verify <manifest>`, `llull vault init\|checkout\|checkin\|log\|verify`, `llull audit verify` | `--at/--by` auto-filled from host clock/user |
+| CLI | `llull plm_status`, `llull <plm command> [params]` (existing `exec` form; `run` is for plan files), new host sub-commands `llull release verify <manifest>`, `llull vault init\|checkout\|checkin\|log\|verify`, `llull audit verify` | `--at/--by` auto-filled from host clock/user |
 | MCP | toolset `plm` (view). Prompts: `prepare_engineering_change`, `prepare_fai` | Hidden tools still callable via `execute` |
 
 ## 8. Performance & robustness budgets
@@ -476,7 +476,7 @@ deferred to the V2 design.
 | VC-PLM-22 | `tests/unit/contract/toolSchemas` snapshot includes plm; `server/tests/cli-plm.test.ts` runs S1 via CLI; agent release refused | contract + server |
 | VC-PLM-23 | `desktop/tests/vaultLocks.test.ts`: two sessions, O_EXCL lock, lease expiry, audited break | desktop |
 | VC-PLM-24 | V2 with gap 04: AP242 export of PDM data validated by the CAx-IF/PDM-IF checker (TBD) | quality |
-| Golden | `tests/golden/plans.ts` gains `plm_release_eco` (from `validation/plans/plm_release_eco_revB.plan.json`); id-normalized snapshot + replay equality (PLM state is metaHistory so replay leaves it intact) | golden |
+| Golden | `tests/golden/plans.ts` gains `plm_release_eco` (from `validation/plans/plm_release_eco_revB.plan.json`); id-normalized snapshot + replay equality (PLM state is metaHistory; replay leaves it intact only once `plm` is carried by `replayHistory`, TR-PLM-02) | golden |
 | Production gate | `npm run production` scenario: release → ECO → B → package → verify → reopen in a fresh profile → verify | gate |
 
 | TR | Requirement | Serves |

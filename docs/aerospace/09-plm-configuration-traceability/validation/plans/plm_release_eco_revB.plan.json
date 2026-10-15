@@ -1,5 +1,5 @@
 {
-  "description": "DRAFT build_project plan (proposed PLM commands do not exist yet). Mirrors scenarios/S1 end-to-end from an empty document. Run later with: llull plan validate plm_release_eco_revB.plan.json && llull plan apply ... (llull-cli skill).",
+  "description": "DRAFT build_project plan (proposed PLM commands do not exist yet). Mirrors scenarios/S1 end-to-end from an empty document. Run later with: llull run plm_release_eco_revB.plan.json --validate, then llull run plm_release_eco_revB.plan.json (llull-cli skill).",
   "onError": "abort",
   "actions": [
     { "command": "set_units", "params": { "units": "mm" } },

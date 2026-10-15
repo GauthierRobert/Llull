@@ -177,18 +177,19 @@ User stories:
 ### 6.2 CLI (`llull`, local agent or CI)
 
 ```bash
-llull --app plm status                                   # item, revision.iteration, state, locks, open ECOs
-llull --app run create_change_request '{"id":"ECR-0002","title":"…","reason":"…","affectedItems":["LL-1001"],"at":"…","by":"u-21"}'
-llull --app run create_change_order  '{"id":"ECO-0002","fromRequests":["ECR-0002"],"classification":"minor","effectivity":[{"kind":"serial","from":5}],"at":"…","by":"u-7"}'
-llull --app run revise_item '{"changeOrder":"ECO-0002","at":"…","by":"u-7"}'
-llull --app run set_parameter '{"name":"t","expression":"5"}'
-llull --app run plm_diff '{"from":"A","to":"B"}'
-llull --app run submit_for_review '{"comment":"ECO-0002 implemented","at":"…","by":"u-7"}'
-llull release verify ./vault/LL-1001/B/manifest.json      # host-level: hashes + signatures, no document needed
-llull --doc part.llull.json run fai_report_skeleton '{"partNumber":"LL-1001","revision":"B","faiType":"partial","format":"csv"}' > fai.csv
+llull --app plm_status                                   # item, revision.iteration, state, locks, open ECOs
+llull --app exec create_change_request '{"id":"ECR-0002","title":"…","reason":"…","affectedItems":["LL-1001"],"at":"…","by":"u-21"}'
+llull --app exec create_change_order  '{"id":"ECO-0002","fromRequests":["ECR-0002"],"classification":"minor","effectivity":[{"kind":"serial","from":5}],"at":"…","by":"u-7"}'
+llull --app exec revise_item '{"changeOrder":"ECO-0002","at":"…","by":"u-7"}'
+llull --app exec set_parameter '{"name":"t","expression":"5"}'
+llull --app exec plm_diff '{"from":"A","to":"B"}'
+llull --app exec submit_for_review '{"comment":"ECO-0002 implemented","at":"…","by":"u-7"}'
+llull release verify ./vault/LL-1001/B/manifest.json      # NEW host-level sub-command: hashes + signatures, no document needed
+llull --doc part.llull.json exec fai_report_skeleton '{"partNumber":"LL-1001","revision":"B","faiType":"partial","format":"csv"}' > fai.csv
 ```
 
-`--at`/`--by` default to the host clock and the configured user, so agents do not invent timestamps. Release from CLI
+`exec <command> '<json>'` is the existing one-command form (`run` takes a plan file). `release verify` and the `--at`/`--by` /
+`--sign-with` flags are new CLI surface (TECHNICAL_SPEC §7). `--at`/`--by` default to the host clock and the configured user, so agents do not invent timestamps. Release from CLI
 prompts for the signing key unless `--sign-with <keyref>` is given. It is refused in non-interactive agent mode when
 `humanSignatureRequired`.
 
@@ -196,7 +197,7 @@ prompts for the signing key unless `--sign-with <keyref>` is given. It is refuse
 
 1. The agent reads `plm_status`, then `resolve_effectivity`, then `plm_diff`.
 2. It drafts ECR/ECO and implements the change (`revise_item` + model commands), and runs `check_model` and
-   `measure_solid`.
+   `mass_properties`.
 3. It calls `submit_for_review`. The tool result says "awaiting human approval (signature required)".
 4. A human approves in the UI. The agent can then call `verify_release` and `fai_report_skeleton`.
 

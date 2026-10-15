@@ -44,7 +44,7 @@ rule clone of `domain-aec`, knip workspace entry.
 | -- | --- | ----------- | -- |
 | TR-MAT-01 | MUST | `lib/quantity.ts`: parse/convert units with exact factors; dimension check; rel error ≤ 1e-12 | FR-MAT-02 |
 | TR-MAT-02 | MUST | `mass_properties` returns `mass`, `massUnit`, `densityQuantity`, `densitySource`; legacy `unit:'g'` field kept when massUnit = g | FR-MAT-05 |
-| TR-MAT-10 | MUST | Density resolution order: record preferred density → legacy `Material.density` (g/(doc unit)³) → `density` param; the source used is reported | FR-MAT-05, FR-MAT-23 |
+| TR-MAT-10 | MUST | Density resolution order: record preferred density → legacy `Material.density` (g/(doc unit)³) → `density` param; the source used is reported. An `unresolved` private record stops the chain (mass `available:false`, TR-MAT-16), never a fallback | FR-MAT-05, FR-MAT-23 |
 | TR-MAT-11 | MUST | `MaterialRecord` / `PropertyValue` / `Provenance` types (§3.1) with zod schemas; one `preferred` per key | FR-MAT-01/03/04 |
 | TR-MAT-12 | MUST | `get_material_allowable` exact-key match; no basis substitution; `forCertification` refuses `superseded`, `typical`, `supplier_unstated` | FR-MAT-06 |
 | TR-MAT-13 | SHOULD | Temperature tables: linear interpolation, no extrapolation, `percentOfRT` mode | FR-MAT-07 |
@@ -154,7 +154,8 @@ private library, `{ libraryId, version, sha256 }` (the hash of the library snaps
 1. The host (`server/` for CLI and desktop, `src/ui` for the browser) dispatches it right after every `load_document`, and the
    UI offers it again after the user registers a library (`llull libraries add`).
 2. For each `libraryRef` whose provider snapshot has the **same sha256**, it fills the records. It is a session command: it is
-   not appended to `featureHistory` and it is never serialized (TR-MAT-31), so undo/redo and replay never carry private values.
+   not appended to `featureHistory` (today `execute` exempts only `readOnly` and `metaHistory` commands from the
+   step append, so this needs a new `session` annotation, OQ-MAT-09) and it is never serialized (TR-MAT-31), so undo/redo and replay never carry private values.
 3. Provider missing, library missing, or **different sha256** ⇒ the record stays a stub `{ id, libraryRef, unresolved: true,
    reason: 'provider missing' | 'library missing' | 'hash mismatch' }`. It keeps the last snapshot hash; values are **never**
    silently replaced by another version or by the legacy density.
@@ -435,6 +436,7 @@ Total MVP (M1–M5) ≈ 28 d; V1 (M6–M8) ≈ 16 d.
 | OQ-MAT-05 | AN bolt dash: total length (1/8 in) or grip code? Sources disagree. | Do not ship AN rules until read from the NASM/AN sheet |
 | OQ-MAT-06 | Can MatWeb typical values be bundled (terms of use)? | No; validation folder only |
 | OQ-MAT-07 | Private library values to cloud MCP: redact always, or per-library opt-in? | Redact by default; opt-in flag per library |
+| OQ-MAT-09 | `resolve_material_libraries` must change the in-memory document without a FeatureStep. Add a `session` command annotation next to `readOnly` / `metaHistory`, or resolve outside the registry? | `session` annotation: still validated, broadcast locally, never logged or synced (TR-MAT-31) |
 | OQ-MAT-08 | Bearing washers under bolt head (always required by some company standards) — model as mandatory washer counted in grip? | V1 option `headWasher: partNumber` included in Σ before gap |
 
 ## 12. References
