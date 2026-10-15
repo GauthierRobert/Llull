@@ -14,7 +14,7 @@ Today's code (verified by reading the repository on 2026-10-15) and the baseline
 | Plastic section data (today) | `plasticModulus` of steel profiles, used by EN 1993 checks | `packages/domain-aec/src/steel/profiles.ts` | AEC section property only; no FE plasticity |
 | Materials (today) | `Material { name, density, color, metalness, roughness, finish? }` | `packages/core/src/model/types.ts` | No constitutive data |
 | Aerospace 08 MAT (baseline) | `MaterialRecord` with `PropertyValue`s, basis, provenance, `unverified` | `docs/aerospace/08-materials-standards-libraries/TECHNICAL_SPEC.md` §3.1 | Scalars and temperature tables only |
-| PHY-02 (baseline, being specified in parallel) | `MaterialModel` (plasticity variants: bilinear / multilinear J2 isotropic / kinematic / combined, Ramberg-Osgood; hyperelastic …) on `MaterialRecord.materialModels?`, in `packages/core/src/model/materialModel.ts` | `docs/physics/02-constitutive-models/` | Owns all stress-strain data; this pack only references it by id |
+| PHY-02 (baseline, being specified in parallel) | `MaterialModel`s (J2 plasticity: perfect, linear with explicit modulus kind, multilinear, Voce, linear kinematic in MVP; combined / Chaboche in V1; Ramberg-Osgood deformation theory) grouped into named **constitutive sets** on the 08 record (`packages/core/src/model/materialModel.ts`); analyses reference a set, never loose parameters (FR-MATL-01); CalculiX writers produce the material cards from a set (FR-MATL-15, `MATL_EXPORT_UNSUPPORTED`) | `docs/physics/02-constitutive-models/FUNCTIONAL_SPEC.md` | Owns all stress-strain data and the material cards; this pack references a set by id |
 | Aerospace 05 FEA (baseline) | `AnalysisModel` / `AnalysisCase` (`type: 'static' \| 'modal' \| 'buckling'`), Gmsh meshing, INP writer, bundled `ccx`, FRD/DAT readers, artifact store, staleness, margins, `check_analysis`, transports `fea_mesh` / `fea_solve` / `fea_import_results` / `fea_export` | `docs/aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md` §2–§5; core types in `packages/core/src/model/analysis.ts` (proposed there) | Linear only. FRD reader reads one step |
 | PHY-00 (baseline) | `check_convergence`, `compare_to_expected`, `run_benchmarks`, `ExpectedCase` schema | `docs/physics/00-vv-harness/TECHNICAL_SPEC.md` §3–§4 | — |
 | MCP toolsets (today) | `TOOLSET_NAMES = core, 2d, 3d, measure, parametric, assembly, exchange, building, civil` | `packages/mcp/src/toolsets.ts` | 05 adds `analysis`; this pack adds no toolset |
@@ -49,7 +49,7 @@ packages/core/src/model/analysis.ts      (05)  AnalysisType += 'nonlinear_static
 packages/core/src/model/materialModel.ts (PHY-02) MaterialModel — read only here
 packages/<cae-host>/src/nonlinear/        CadPlugin 'nonlinear', toolset 'analysis'                       (placement: §2.1)
    commands/  set_nonlinear_controls, add_analysis_step, update_analysis_step, delete_analysis_step,
-              set_part_material_model, add_curve_probe, delete_curve_probe, add_imperfection, delete_imperfection,
+              set_part_constitutive_set, add_curve_probe, delete_curve_probe, add_imperfection, delete_imperfection,
               nonlinear_report, limit_load, check_nonlinear, nonlinear_analytic_check, beam_large_deflection
    decks/     nonlinearInp.ts   (pure: extends the 05 INP writer with steps, controls, plasticity, imperfections)
    results/   incrementReader.ts (FRD/DAT per increment), curves.ts, limitLoad.ts, permanentSet.ts
@@ -88,7 +88,7 @@ targeting), L10 (plugin; core gets data types only).
 | -- | --- | ----------- |
 | TR-NLS-01 | MUST | `AnalysisType` gains `'nonlinear_static'` (owned by this pack, listed in §3). `AnalysisCase.nonlinear?: NonlinearSettings` is present iff the type is `nonlinear_static`; plugin `validate` enforces it. |
 | TR-NLS-02 | MUST | The INP writer extension is pure and byte-deterministic: same `AnalysisModel` + mesh artifact + material models ⇒ same text (05 TR-FEA-40). |
-| TR-NLS-03 | MUST | Material mapping (§5.2) reads PHY-02 `MaterialModel` through a read-only view (like 05 `FeaMaterialView`); no stress-strain values are stored in the analysis slice. |
+| TR-NLS-03 | MUST | Material cards come from the PHY-02 writer for the selected constitutive set (§5.2); no stress-strain values are stored in the analysis slice. |
 | TR-NLS-04 | MUST | `fea_solve` for a nonlinear case parses ccx stdout increment lines into progress events and stores per-increment probe values and the selected increments' fields in the artifact (§5.4). |
 | TR-NLS-05 | MUST | `limit_load` and `permanentSet` are pure functions of the stored curve / fields (`results/limitLoad.ts`, `results/permanentSet.ts`), unit-tested on synthetic curves. |
 | TR-NLS-06 | MUST | Staleness: the 05 `analysisInputHash` additionally covers `nonlinear` settings and the referenced `MaterialModel` content hashes; a change marks curves `stale`. |
@@ -151,7 +151,7 @@ export interface NonlinearSettings {
   nlgeom: boolean;
   steps: Record<string, AnalysisStep>; stepOrder: string[];
   convergence: ConvergencePreset;
-  materialModels: Record<EntityId, string>;      // part -> PHY-02 MaterialModel id on its 08 record
+  constitutiveSets: Record<EntityId, string>;   // part -> PHY-02 constitutive set id on its 08 record
   probes: Record<string, CurveProbe>; probeOrder: string[];
   imperfections: Record<string, Imperfection>; imperfectionOrder: string[];
   outputIncrements: 'all' | 'last_per_step' | { readonly every: number };
@@ -205,7 +205,7 @@ its unit (analysis unit system of the case, fractions of step time, or radians) 
 | ---- | ---- | ------------- | ---- |
 | `set_nonlinear_controls` | M | `{ analysisId, nlgeom: boolean (required), convergence?: { name: 'ccx_default' \| 'custom', field?, timeIncrementation? }, outputIncrements?, thresholds? }` | @affects case.nonlinear (created on first call; case.type must be `nonlinear_static`) · @invariant nlgeom always explicit; thresholds carry `source` · @failure case not nonlinear → `NLS_CASE_NOT_NONLINEAR`; custom values ≤ 0 → `NLS_CONTROL_INVALID` |
 | `add_analysis_step` / `update_analysis_step` / `delete_analysis_step` | M | `{ analysisId, name, multipliers: Record<loadCase, number>, amplitude?: 'ramp' (default named), control: SolutionControl }` | @affects nonlinear.steps · @invariant ≥ 1 step; `min ≤ initial ≤ max ≤ 1`; displacement target resolves (05 TR-FEA-03) · @failure arc_length on `calculix` → `NLS_ARC_LENGTH_UNSUPPORTED`; unknown load case → `NLS_LOAD_CASE_UNKNOWN`; target unresolved → `FEA_TARGET_UNRESOLVED` |
-| `set_part_material_model` | M | `{ analysisId, entityId, materialModelId }` | @affects nonlinear.materialModels · @invariant model exists on the part's 08 record (PHY-02) and is a plasticity or elastic variant this pack maps (§5.2) · @failure missing → `NLS_MATERIAL_MODEL_MISSING`; unmapped variant → `NLS_MATERIAL_MODEL_UNSUPPORTED` |
+| `set_part_constitutive_set` | M | `{ analysisId, entityId, constitutiveSetId }` | @affects nonlinear.constitutiveSets · @invariant the set exists on the part's 08 record (PHY-02) and contains only behaviours a static nonlinear step accepts (§5.2) · @failure missing → `NLS_MATERIAL_MODEL_MISSING`; creep / viscoelastic / rate laws in the set → `NLS_MATERIAL_MODEL_UNSUPPORTED` |
 | `add_curve_probe` / `delete_curve_probe` | M | `{ analysisId, name, load: {kind:'load', loadId} \| {kind:'reaction', constraintId, component}, displacement: { point (length unit), dof } }` | @affects nonlinear.probes · @failure unknown load/constraint → `NLS_PROBE_REFERENCE_UNKNOWN` |
 | `add_imperfection` / `delete_imperfection` | M (V1) | `{ analysisId, fromAnalysisId, modes: [{ mode, amplitude (length unit, signed) }], amplitudeSource: string }` | @affects nonlinear.imperfections · @invariant `amplitude` and `amplitudeSource` required, no default (AF-31) · @failure missing amplitude → `NLS_IMPERFECTION_AMPLITUDE_UNSET`; source case not buckling / not solved / different meshHash → `NLS_IMPERFECTION_SOURCE_INVALID` |
 | `nonlinear_report` | Q | `{ analysisId, probe?, increments?: 'summary' \| 'all' (paged, AF-12) }` | → `data` §5.5 · @failure no results → `FEA_RESULTS_MISSING`; stale → `NLS_CURVE_STALE` |
@@ -247,20 +247,26 @@ The probe uses `*NODE PRINT … TOTALS=ONLY` to get the summed reaction per incr
 displacement of the probe node (the mesh node nearest to `point`, distance reported). Keyword spellings are tested
 against a real ccx run (VC-NLS-41) rather than prose.
 
-### 5.2 Material model mapping (PHY-02 → CalculiX)
+### 5.2 Material cards (PHY-02 writers) and the checks this pack adds
 
-| PHY-02 variant (by name) | CalculiX | Rule |
+The material cards are written by the PHY-02 CalculiX writer from the selected constitutive set (FR-MATL-15); this
+pack embeds that text in its deck and does not map laws itself. The table states what a nonlinear static step needs
+from the writer and which extra checks `check_nonlinear` runs.
+
+
+| PHY-02 law (by name) | CalculiX card (PHY-02 writer) | Check added by this pack |
 | ------------------------ | -------- | ---- |
 | elastic isotropic | `*ELASTIC` | — |
 | J2 bilinear / multilinear, isotropic hardening | `*PLASTIC, HARDENING=ISOTROPIC` | rows as true stress vs equivalent plastic strain; first row at 0 plastic strain (manual rule) else `NLS_MATERIAL_MODEL_UNSUPPORTED` |
 | J2 kinematic (linear Prager) | `*PLASTIC, HARDENING=KINEMATIC` | — |
-| J2 combined | `*PLASTIC, HARDENING=COMBINED` + `*CYCLIC HARDENING` | Chaboche multi-backstress: V2 (ccx accepts one backstress curve) |
+| J2 combined (PHY-02 V1) | `*PLASTIC, HARDENING=COMBINED` + `*CYCLIC HARDENING` | available once PHY-02 V1 ships; multi-backstress forms the writer refuses surface as `MATL_EXPORT_UNSUPPORTED` |
 | Ramberg-Osgood | `*DEFORMATION PLASTICITY` (E, ν, σ0, n, α) | monotonic loading only: unload steps with this model raise `NLS_DEFORMATION_PLASTICITY_UNLOAD` (deformation theory is path-independent) |
 | temperature tables | rows per temperature | ccx interpolates hardening curves at the `*ELASTIC` temperatures (manual) — writer emits identical temperature sets |
-| anything else (hyperelastic, viscoelastic, creep) | — | `NLS_MATERIAL_MODEL_UNSUPPORTED` (owned by PHY-02 / PHY-11) |
+| hyperelastic | `*HYPERELASTIC` (PHY-02 writer) | accepted with NLGEOM on only (else `NLS_NLGEOM_RECOMMENDED` as error) |
+| viscoelastic, creep, rate laws | — | `NLS_MATERIAL_MODEL_UNSUPPORTED` in a static step (PHY-11 / PHY-19) |
 
-Engineering-to-true conversion is PHY-02's job; this pack requires models already in true stress / logarithmic plastic
-strain and checks the flag PHY-02 carries.
+Engineering-to-true conversion is PHY-02's job (FR-MATL-05); this pack only reads the conversion record PHY-02 keeps
+and reports it in `provenance`.
 
 ### 5.3 Convergence presets (named values, AF-31)
 
@@ -381,7 +387,7 @@ study it adds `VNV_NO_CONVERGENCE_STUDY` (FR-NLS-19).
 | `NLS_CONTROL_INVALID` | error | increment values ≤ 0 or out of order, custom control ≤ 0 | param path | fix the values (min ≤ initial ≤ max ≤ 1) |
 | `NLS_ARC_LENGTH_UNSUPPORTED` | error | `control.kind = arc_length` with solver `calculix` | step id | use displacement control, `beam_large_deflection` (frames) or the Code_Aster export (V2) |
 | `NLS_LOAD_CASE_UNKNOWN` | error | step multiplier names an absent load case | step id, name | add the load case or fix the name |
-| `NLS_MATERIAL_MODEL_MISSING` | error | analysed part has no PHY-02 model selected / record has none | entity id, record id | `set_part_material_model` (create the model with PHY-02 `fit_material_model`) |
+| `NLS_MATERIAL_MODEL_MISSING` | error | analysed part has no PHY-02 constitutive set selected, or the record has none | entity id, record id | PHY-02 `add_material_model` + `define_constitutive_set`, then `set_part_constitutive_set` |
 | `NLS_MATERIAL_MODEL_UNSUPPORTED` | error | model variant not mappable (§5.2), or first hardening row not at zero plastic strain | model id | choose a J2 or Ramberg-Osgood model |
 | `NLS_MATERIAL_MODEL_UNVERIFIED` | warning (not suppressible) | model or its source data `unverified` | model id, reasons | use a verified, sourced model (PHY-02 / 08) |
 | `NLS_DEFORMATION_PLASTICITY_UNLOAD` | error | Ramberg-Osgood deformation plasticity with an unloading step | step id | use an incremental J2 model for load-unload |
@@ -451,7 +457,7 @@ Coverage 90/85/90/90 extends to the plugin folder.
 
 | M | Content | Depends on | Effort |
 | - | ------- | ---------- | ------ |
-| M1 | Types, `set_nonlinear_controls`, steps, probes, `set_part_material_model`, analytic checks, `limit_load`/`permanentSet` pure functions, codes | 05 M1–M3, PHY-02 M1 (MaterialModel), placement decision §2.1 | 2 w |
+| M1 | Types, `set_nonlinear_controls`, steps, probes, `set_part_constitutive_set`, analytic checks, `limit_load`/`permanentSet` pure functions, codes | 05 M1–M3, PHY-02 MVP (MaterialModel, constitutive sets, CalculiX writers), placement decision §2.1 | 2 w |
 | M2 | INP extension, material mapping, increment reader, `fea_solve` progress, `nonlinear_report`, `check_nonlinear`, VC-NLS-30/40/41/60–66 | M1, 05 M3 | 3 w |
 | M3 (V1) | `beam_large_deflection` (native solver), imperfections, limit-load margins, VC-NLS-10/20/50 | M2, 05 buckling | 2 w |
 | M4 (V1) | Guide, MCP prompt, UI curve panel, production-gate scenario | M3 | 1.5 w |

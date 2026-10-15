@@ -180,15 +180,15 @@ Density view (iso-surface, threshold slider, iteration slider), rebuild overlay 
 
 | # | Given | When (CLI) | Then (JSON) | VC |
 | - | ----- | ---------- | ----------- | -- |
-| AC-1 | `plans/top_mbb_60x20.plan.json` (2D, 60×20 voxels, volfrac 0.5, p 3, rmin 1.5 voxel, sensitivity filter) | `topology_solve`, `topology_report` | iterations = 94, last-iteration compliance 203.192457639 (rel 1e-6), volume 0.49997 (abs 1e-3) | VC-TOP-10 |
-| AC-2 | same with density filter | same | iterations = 127, compliance 218.803221064 (rel 1e-6) | VC-TOP-11 |
+| AC-1 | `plans/top_mbb_60x20.plan.json` (2D, 60×20 voxels, volfrac 0.5, p 3, rmin 1.5 voxel, sensitivity filter, `protectLoadSupport: false`) | `topology_solve`, `topology_report` | last-iteration compliance 203.192457639 (rel 1e-6), volume 0.49997 (abs 1e-3), iterations 94 (±2, grade B) | VC-TOP-10 |
+| AC-2 | `plans/top_mbb_60x20_density.plan.json` | same | compliance 218.803221064 (rel 1e-6), iterations 127 (±2, grade B) | VC-TOP-11 |
 | AC-3 | separable problem a = [1, 4, 9, 16], V = 2, p = 1 | optimizer unit test | x = [0.2, 0.4, 0.6, 0.8] (abs 1e-6), objective 50 | VC-TOP-03 |
 | AC-4 | uniform x = 0.5 on 30×10 | one analysis | c(0.5)/c(1) = 7.99999994398 | VC-TOP-04 |
 | AC-5 | the derived mesh of AC-1 | `llull move_entities 'ids=["$topoMesh"]' delta=[1,0,0] D` | exit 1, `TOP_DERIVED_READ_ONLY`, doc unchanged | VC-TOP-20 |
 | AC-6 | AC-1 result, then `set_parameter` on the domain | `check_topology` | `TOP_RESULT_STALE`; `suggest_rebuild` refuses with the same code | VC-TOP-21 |
 | AC-7 | AC-1 result | `suggest_rebuild plane=XY` | contours closed, total enclosed area / domain area within 0.02 of the thresholded volume fraction | VC-TOP-22 |
 | AC-8 | a rebuild plan from AC-7 contours | `compare_to_topology` | IoU ≥ 0.85 (llull target, TBD measure), volume ratio within 0.05 | VC-TOP-23 |
-| AC-9 | keep-in volume 0.6 of the domain, volfrac 0.5 | `topology_solve` | exit 1, `TOP_KEEPIN_EXCEEDS_BUDGET` | VC-TOP-24 |
+| AC-9 | `plans/top_rejection_keepin_budget.plan.json` (keep-in box 40×20 = 0.667 of the domain, volfrac 0.5) | `llull run <plan> D` | step `set_topology_regions` fails, `error.code` = `TOP_KEEPIN_EXCEEDS_BUDGET` (AF-14), doc unchanged by that step | VC-TOP-24 |
 | AC-10 | material E from an 08 `typical` value | `topology_report` | `unverified: true`; `check_topology` warning `TOP_INPUT_UNVERIFIED` | VC-TOP-25 |
 | AC-11 | 09 release of a configuration that includes the density mesh | release command | refused, `TOP_RESULT_NOT_RELEASABLE` | VC-TOP-26 |
 | AC-12 | AC-1 run twice | compare report hashes | identical | VC-TOP-27 |
@@ -222,7 +222,7 @@ No standard governs topology optimization itself. Relevant alignment:
 | Rebuild from contours needs judgement | Poor parts | Numeric aids, `compare_to_topology` targets, reviewer gate for release |
 | 3D voxel SIMP in Python is slow | Long agent loops | Voxel cap, PCG with multigrid preconditioning (scipy), resumable iterates; V1 unstructured mesh |
 | Only one implementation (the generator) pins the MBB values | Formula slip undetected | Cross-check against topoptlab (GPL, run outside llull) or the DTU MATLAB code; values B-grade until then |
-| GPL implementations (topoptlab, mmapy) cannot be bundled into llull's bridge process | Licence | Own implementation on numpy/scipy (BSD); GPL codes only as external cross-checks |
+| GPL implementations (topoptlab, mmapy) cannot be bundled into llull's bridge process | Licence | Own implementation on numpy/scipy (permissive licences); GPL codes only as external cross-checks |
 
 ## 11. References
 

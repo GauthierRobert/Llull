@@ -329,6 +329,22 @@ def main() -> None:
                       {"rel": None}, "TBD - measure with the bundled optimizer (too large for the stdlib generator)", "TBD",
                       ["FR-TOP-02", "NFR budget"]))
 
+    # VC-TOP-20..27: behaviour contracts (exact, no physics value)
+    contracts = [
+        ("VC-TOP-20", "edit of the derived iso-surface (move_entities)", "TOP_DERIVED_READ_ONLY", ["FR-TOP-07"]),
+        ("VC-TOP-21", "check_topology / suggest_rebuild after set_parameter on the domain", "TOP_RESULT_STALE", ["FR-TOP-14"]),
+        ("VC-TOP-22", "suggest_rebuild loops: closed, enclosed fraction within 0.02 of the thresholded volume fraction",
+         "closed loops; |enclosedFraction - thresholded fraction| <= 0.02", ["FR-TOP-10"]),
+        ("VC-TOP-23", "compare_to_topology on a rebuild from VC-TOP-22 contours", "TBD - measure IoU and volume ratio", ["FR-TOP-11"]),
+        ("VC-TOP-24", "keep-in box 40x20 on a 60x20 domain with volumeFraction 0.5", "TOP_KEEPIN_EXCEEDS_BUDGET", ["FR-TOP-06"]),
+        ("VC-TOP-25", "E from an 08 value with basis typical", "TOP_INPUT_UNVERIFIED", ["FR-TOP-16"]),
+        ("VC-TOP-26", "09 release including the derived mesh", "TOP_RESULT_NOT_RELEASABLE", ["FR-TOP-15"]),
+        ("VC-TOP-27", "two identical topology_solve runs", "identical fieldHash and report", ["FR-TOP-18"]),
+    ]
+    for cid, q, v, proves in contracts:
+        grade = "TBD" if v.startswith("TBD") else "A"
+        cases.append(case(cid, q, v, "-", {"exact": True}, "TECHNICAL_SPEC 7.1 / FUNCTIONAL_SPEC 7", grade, proves))
+
     doc = {"pack": "17-topology-optimization", "generatedBy": "generate_top_reference.py",
            "units": "consistent: E0 = 1, unit element edge, unit load (dimensionless top88 units) unless stated", "cases": cases}
     with open(os.path.join(HERE, "expected_results.json"), "w", encoding="utf-8") as fh:

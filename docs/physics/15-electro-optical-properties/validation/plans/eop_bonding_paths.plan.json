@@ -1,0 +1,204 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    200,
+    150,
+    80
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "anchor": "min"
+  },
+  "as": "box"
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    300,
+    200,
+    5
+   ],
+   "position": [
+    -50,
+    -25,
+    -5
+   ],
+   "anchor": "min"
+  },
+  "as": "structure"
+ },
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "strap_61iacs",
+   "name": "strap_61iacs",
+   "designation": "validation test record",
+   "productForm": "strap",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "strap_61iacs",
+   "property": "resistivity_el",
+   "value": 2.82639344262e-08,
+   "unit": "ohm*m",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a property claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "define_bond_path",
+  "params": {
+   "name": "box_to_structure",
+   "from": {
+    "entityId": "$box",
+    "pointNear": [
+     200,
+     75,
+     0
+    ]
+   },
+   "to": {
+    "entityId": "$structure",
+    "pointNear": [
+     250,
+     75,
+     0
+    ]
+   },
+   "elements": [
+    {
+     "kind": "joint",
+     "resistance": {
+      "value": 0.5,
+      "unit": "mohm"
+     },
+     "source": {
+      "citation": "test input of this validation case (not a property claim)"
+     }
+    },
+    {
+     "kind": "strap",
+     "material": "strap_61iacs",
+     "length": {
+      "value": 150,
+      "unit": "mm"
+     },
+     "crossSection": {
+      "value": 10,
+      "unit": "mm^2"
+     }
+    },
+    {
+     "kind": "joint",
+     "resistance": {
+      "value": 0.8,
+      "unit": "mohm"
+     },
+     "source": {
+      "citation": "test input of this validation case (not a property claim)"
+     }
+    }
+   ],
+   "limit": {
+    "value": 2.5,
+    "unit": "mohm",
+    "ruleId": "bond_class_R_test",
+    "source": {
+     "citation": "rule table entry for this test; MIL-STD-464C rationale value as quoted by secondary sources (unverified)"
+    }
+   }
+  },
+  "as": "p1"
+ },
+ {
+  "command": "define_bond_path",
+  "params": {
+   "name": "box_to_structure_degraded",
+   "from": {
+    "entityId": "$box",
+    "pointNear": [
+     0,
+     75,
+     0
+    ]
+   },
+   "to": {
+    "entityId": "$structure",
+    "pointNear": [
+     -40,
+     75,
+     0
+    ]
+   },
+   "elements": [
+    {
+     "kind": "joint",
+     "resistance": {
+      "value": 1.2,
+      "unit": "mohm"
+     },
+     "source": {
+      "citation": "test input of this validation case (not a property claim)"
+     }
+    },
+    {
+     "kind": "strap",
+     "material": "strap_61iacs",
+     "length": {
+      "value": 150,
+      "unit": "mm"
+     },
+     "crossSection": {
+      "value": 10,
+      "unit": "mm^2"
+     }
+    },
+    {
+     "kind": "joint",
+     "resistance": {
+      "value": 1.5,
+      "unit": "mohm"
+     },
+     "source": {
+      "citation": "test input of this validation case (not a property claim)"
+     }
+    }
+   ],
+   "limit": {
+    "value": 2.5,
+    "unit": "mohm",
+    "ruleId": "bond_class_R_test",
+    "source": {
+     "citation": "rule table entry for this test; MIL-STD-464C rationale value as quoted by secondary sources (unverified)"
+    }
+   }
+  },
+  "as": "p2"
+ },
+ {
+  "command": "check_bonding",
+  "params": {}
+ }
+]

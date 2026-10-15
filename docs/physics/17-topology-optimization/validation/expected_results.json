@@ -470,6 +470,118 @@
     "FR-TOP-02",
     "NFR budget"
    ]
+  },
+  {
+   "id": "VC-TOP-20",
+   "quantity": "edit of the derived iso-surface (move_entities)",
+   "value": "TOP_DERIVED_READ_ONLY",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1 / FUNCTIONAL_SPEC 7",
+   "grade": "A",
+   "proves": [
+    "FR-TOP-07"
+   ]
+  },
+  {
+   "id": "VC-TOP-21",
+   "quantity": "check_topology / suggest_rebuild after set_parameter on the domain",
+   "value": "TOP_RESULT_STALE",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1 / FUNCTIONAL_SPEC 7",
+   "grade": "A",
+   "proves": [
+    "FR-TOP-14"
+   ]
+  },
+  {
+   "id": "VC-TOP-22",
+   "quantity": "suggest_rebuild loops: closed, enclosed fraction within 0.02 of the thresholded volume fraction",
+   "value": "closed loops; |enclosedFraction - thresholded fraction| <= 0.02",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1 / FUNCTIONAL_SPEC 7",
+   "grade": "A",
+   "proves": [
+    "FR-TOP-10"
+   ]
+  },
+  {
+   "id": "VC-TOP-23",
+   "quantity": "compare_to_topology on a rebuild from VC-TOP-22 contours",
+   "value": "TBD - measure IoU and volume ratio",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1 / FUNCTIONAL_SPEC 7",
+   "grade": "TBD",
+   "proves": [
+    "FR-TOP-11"
+   ]
+  },
+  {
+   "id": "VC-TOP-24",
+   "quantity": "keep-in box 40x20 on a 60x20 domain with volumeFraction 0.5",
+   "value": "TOP_KEEPIN_EXCEEDS_BUDGET",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1 / FUNCTIONAL_SPEC 7",
+   "grade": "A",
+   "proves": [
+    "FR-TOP-06"
+   ]
+  },
+  {
+   "id": "VC-TOP-25",
+   "quantity": "E from an 08 value with basis typical",
+   "value": "TOP_INPUT_UNVERIFIED",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1 / FUNCTIONAL_SPEC 7",
+   "grade": "A",
+   "proves": [
+    "FR-TOP-16"
+   ]
+  },
+  {
+   "id": "VC-TOP-26",
+   "quantity": "09 release including the derived mesh",
+   "value": "TOP_RESULT_NOT_RELEASABLE",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1 / FUNCTIONAL_SPEC 7",
+   "grade": "A",
+   "proves": [
+    "FR-TOP-15"
+   ]
+  },
+  {
+   "id": "VC-TOP-27",
+   "quantity": "two identical topology_solve runs",
+   "value": "identical fieldHash and report",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1 / FUNCTIONAL_SPEC 7",
+   "grade": "A",
+   "proves": [
+    "FR-TOP-18"
+   ]
   }
  ]
 }

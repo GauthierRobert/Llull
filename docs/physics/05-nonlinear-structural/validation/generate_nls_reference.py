@@ -493,6 +493,15 @@ def main() -> None:
          {"exact": True}, "AGENT_FIRST AF-31", "A", ["FR-NLS-03", "FR-NLS-15"])
     case("VC-NLS-66", "limit_load on a PHY-02 model marked unverified", "unverified=true + NLS_MATERIAL_MODEL_UNVERIFIED", "flag",
          {"exact": True}, "AGENT_FIRST AF-32", "A", ["FR-NLS-16"])
+    case("VC-NLS-67", "agent calls dispose_margin on a FAIL row with criterion limit_load", "FEA_HUMAN_GATE", "code", {"exact": True},
+         "aerospace 05 FR-FEA-33 (AF-34)", "A", ["FR-NLS-14"])
+    case("VC-NLS-68", "limit-load margin row without a PHY-00 convergence study", "VNV_NO_CONVERGENCE_STUDY", "code", {"exact": True},
+         "PHY-00 TECHNICAL_SPEC 7.1", "A", ["FR-NLS-19"])
+    case("VC-NLS-69", "Code_Aster export of the cantilever case re-run in a user-installed code_aster (V2)", "TBD", "N",
+         {"rel": None}, "TBD — needs a code_aster install", "TBD", ["FR-NLS-20"])
+    case("VC-NLS-71", "check_nonlinear guardrails on deliberately wrong set-ups", "NLS_IMPERFECTION_MISSING, NLS_NLGEOM_RECOMMENDED, "
+         "NLS_STRAIN_BEYOND_CURVE, NLS_MESH_PLASTIC_ADEQUACY, NLS_PERMANENT_SET_THRESHOLD_UNSET", "codes", {"exact": True},
+         "TECHNICAL_SPEC 7.1", "A", ["FR-NLS-10", "FR-NLS-07"])
     case("VC-NLS-41", "pinned CalculiX decks beampiso / beampkin / beampd: displacements per increment equal the .dat.ref files",
          "TBD", "mm", {"rel": 1e-4}, "S2 test suite (values to be extracted by the M2 reader and frozen)", "TBD",
          ["FR-NLS-02", "FR-NLS-06", "TR-NLS-04"])

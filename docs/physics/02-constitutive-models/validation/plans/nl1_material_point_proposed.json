@@ -1,0 +1,382 @@
+[
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "nl1_steel",
+   "name": "NAFEMS NL1 test material",
+   "designation": "NL1",
+   "specs": [],
+   "licence": "public-domain-us-gov",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "add_material_model",
+  "params": {
+   "material": "nl1_steel",
+   "id": "elastic",
+   "model": {
+    "kind": "elastic_isotropic",
+    "E": {
+     "value": 250,
+     "unit": "GPa"
+    },
+    "nu": {
+     "value": 0.25,
+     "unit": "1"
+    }
+   },
+   "validity": [
+    {
+     "variable": "T",
+     "unit": "K",
+     "data": [
+      293,
+      293
+     ]
+    }
+   ],
+   "basis": "unspecified",
+   "source": {
+    "citation": "NAFEMS NL1 material data as quoted by the Abaqus Benchmarks Guide 4.6.1 (search extract)",
+    "accessed": "2026-10-15"
+   }
+  }
+ },
+ {
+  "command": "add_material_model",
+  "params": {
+   "material": "nl1_steel",
+   "id": "perfect",
+   "model": {
+    "kind": "j2_plasticity",
+    "isotropic": {
+     "kind": "perfect",
+     "yieldStress": {
+      "value": 5,
+      "unit": "MPa"
+     }
+    },
+    "kinematic": {
+     "kind": "none"
+    }
+   },
+   "validity": [
+    {
+     "variable": "T",
+     "unit": "K",
+     "data": [
+      293,
+      293
+     ]
+    },
+    {
+     "variable": "equivalentPlasticStrain",
+     "unit": "1",
+     "data": [
+      0,
+      0.001
+     ]
+    }
+   ],
+   "basis": "unspecified",
+   "source": {
+    "citation": "NAFEMS NL1 material data as quoted by the Abaqus Benchmarks Guide 4.6.1 (search extract)",
+    "accessed": "2026-10-15"
+   }
+  }
+ },
+ {
+  "command": "add_material_model",
+  "params": {
+   "material": "nl1_steel",
+   "id": "iso_h",
+   "model": {
+    "kind": "j2_plasticity",
+    "isotropic": {
+     "kind": "linear",
+     "yieldStress": {
+      "value": 5,
+      "unit": "MPa"
+     },
+     "modulus": {
+      "value": 62.5,
+      "unit": "GPa"
+     },
+     "modulusKind": "plastic"
+    },
+    "kinematic": {
+     "kind": "none"
+    }
+   },
+   "validity": [
+    {
+     "variable": "T",
+     "unit": "K",
+     "data": [
+      293,
+      293
+     ]
+    },
+    {
+     "variable": "equivalentPlasticStrain",
+     "unit": "1",
+     "data": [
+      0,
+      0.001
+     ]
+    }
+   ],
+   "basis": "unspecified",
+   "source": {
+    "citation": "NAFEMS NL1 material data as quoted by the Abaqus Benchmarks Guide 4.6.1 (search extract)",
+    "accessed": "2026-10-15"
+   }
+  }
+ },
+ {
+  "command": "define_constitutive_set",
+  "params": {
+   "material": "nl1_steel",
+   "set": {
+    "id": "perfect",
+    "elastic": "elastic",
+    "plastic": "perfect"
+   }
+  }
+ },
+ {
+  "command": "define_constitutive_set",
+  "params": {
+   "material": "nl1_steel",
+   "set": {
+    "id": "iso_hardening",
+    "elastic": "elastic",
+    "plastic": "iso_h"
+   },
+   "makeDefault": true
+  }
+ },
+ {
+  "command": "material_point_response",
+  "params": {
+   "material": "nl1_steel",
+   "set": "perfect",
+   "kinematics": "small",
+   "preset": "plane_strain",
+   "steps": [
+    {
+     "increments": 10,
+     "control": {
+      "xx": {
+       "strain": 2.5e-05
+      },
+      "yy": {
+       "strain": 0.0
+      }
+     }
+    },
+    {
+     "increments": 10,
+     "control": {
+      "xx": {
+       "strain": 5e-05
+      },
+      "yy": {
+       "strain": 0.0
+      }
+     }
+    },
+    {
+     "increments": 10,
+     "control": {
+      "xx": {
+       "strain": 5e-05
+      },
+      "yy": {
+       "strain": 2.5e-05
+      }
+     }
+    },
+    {
+     "increments": 10,
+     "control": {
+      "xx": {
+       "strain": 5e-05
+      },
+      "yy": {
+       "strain": 5e-05
+      }
+     }
+    },
+    {
+     "increments": 10,
+     "control": {
+      "xx": {
+       "strain": 2.5e-05
+      },
+      "yy": {
+       "strain": 5e-05
+      }
+     }
+    },
+    {
+     "increments": 10,
+     "control": {
+      "xx": {
+       "strain": 0.0
+      },
+      "yy": {
+       "strain": 5e-05
+      }
+     }
+    },
+    {
+     "increments": 10,
+     "control": {
+      "xx": {
+       "strain": 0.0
+      },
+      "yy": {
+       "strain": 2.5e-05
+      }
+     }
+    },
+    {
+     "increments": 10,
+     "control": {
+      "xx": {
+       "strain": 0.0
+      },
+      "yy": {
+       "strain": 0.0
+      }
+     }
+    }
+   ],
+   "output": "steps"
+  },
+  "as": "nl1_perfect"
+ },
+ {
+  "command": "material_point_response",
+  "params": {
+   "material": "nl1_steel",
+   "set": "iso_hardening",
+   "kinematics": "small",
+   "preset": "plane_strain",
+   "steps": [
+    {
+     "increments": 10,
+     "control": {
+      "xx": {
+       "strain": 2.5e-05
+      },
+      "yy": {
+       "strain": 0.0
+      }
+     }
+    },
+    {
+     "increments": 10,
+     "control": {
+      "xx": {
+       "strain": 5e-05
+      },
+      "yy": {
+       "strain": 0.0
+      }
+     }
+    },
+    {
+     "increments": 10,
+     "control": {
+      "xx": {
+       "strain": 5e-05
+      },
+      "yy": {
+       "strain": 2.5e-05
+      }
+     }
+    },
+    {
+     "increments": 10,
+     "control": {
+      "xx": {
+       "strain": 5e-05
+      },
+      "yy": {
+       "strain": 5e-05
+      }
+     }
+    },
+    {
+     "increments": 10,
+     "control": {
+      "xx": {
+       "strain": 2.5e-05
+      },
+      "yy": {
+       "strain": 5e-05
+      }
+     }
+    },
+    {
+     "increments": 10,
+     "control": {
+      "xx": {
+       "strain": 0.0
+      },
+      "yy": {
+       "strain": 5e-05
+      }
+     }
+    },
+    {
+     "increments": 10,
+     "control": {
+      "xx": {
+       "strain": 0.0
+      },
+      "yy": {
+       "strain": 2.5e-05
+      }
+     }
+    },
+    {
+     "increments": 10,
+     "control": {
+      "xx": {
+       "strain": 0.0
+      },
+      "yy": {
+       "strain": 0.0
+      }
+     }
+    }
+   ],
+   "output": "steps"
+  },
+  "as": "nl1_hard"
+ },
+ {
+  "command": "check_material_models",
+  "params": {
+   "material": [
+    "nl1_steel"
+   ],
+   "target": "calculix"
+  }
+ },
+ {
+  "command": "export_material_cards",
+  "params": {
+   "material": "nl1_steel",
+   "set": "iso_hardening",
+   "target": "calculix",
+   "name": "NL1_ISO"
+  }
+ }
+]

@@ -50,7 +50,7 @@ src/app installDefaultPlugins() + caePlugin + physicsDynamicsPlugin
         ▼
 packages/domain-physics/src/dynamics   (@phys/dynamics)   CadPlugin "physics-dynamics", toolset "analysis"
    commands/: set_dynamic_damping, set_frequency_sweep, set_base_excitation, define_vibration_spectrum,
-              define_load_history, set_transient_controls, import_joint_load_history (V1),
+              define_load_history, set_transient_controls, assign_load_history (V1),
               equivalent_static_load_case, dynamic_report, check_dynamics,
               sdof_response, psd_rms, shock_response_spectrum, damping_coefficients
    decks/:    inpDynamics.ts         (extends @cae inpWriter: STORAGE=YES, SSD / MODAL DYNAMIC / DYNAMIC steps)
@@ -209,7 +209,7 @@ Plugin `physics-dynamics`, toolset `analysis`. All are pure `defineCommand`s; �
 | `define_load_history` | mutating | `{ name, unit, timeS: number[], values: number[], source }` | @invariant equal lengths, strictly increasing time, finite · @failure `DYN_HISTORY_INVALID` |
 | `set_transient_controls` | mutating (V1) | `{ analysisId, method, durationS, dtS, hhtAlpha? }` | @invariant hhtAlpha ∈ [−1/3, 0]; dtS ≤ 1/(20 f_highestKept) warned otherwise · @failure `DYN_TRANSIENT_INVALID` |
 | `assign_load_history` | mutating (V1) | `{ analysisId, loadId, history }` | @affects case.dynamics.loadHistories · @failure unknown load / history |
-| `import_joint_load_history` | mutating (V1) | `{ studyResultHash, jointId, component: 'Fx'\|…\|'Mz', name }` | @affects physics.dynamics.histories · @invariant hash must match a PHY-10 `dynamics_study` result in the artifact store (PHY-10 TR-RBD-60) · @failure `DYN_JOINT_HISTORY_NOT_FOUND` |
+| (PHY-10) `export_joint_load_history` | mutating (V1), owned by PHY-10 | `{ study, jointId, component: 'Fx'\|…\|'Mz', name }` | @affects physics.dynamics.histories · @invariant the PHY-10 study is re-computed and its `studyHash` matches (PHY-10 TR-RBD-60); the history keeps `source.fromPhy10` and the `unverified` flag · @failure `RBD_STUDY_STALE` (PHY-10 code) |
 | `equivalent_static_load_case` | mutating | `{ analysisId, probe? \| nodalMax?: true, peakFactor?: number, targetAnalysisId, direction?, loadCase }` | @affects target static case loads (05 `FeaLoad` gravity kind, category `limit`) · @invariant source results not stale; provenance records case, spectrum, damping, peak factor (named, AF-31) · @failure `DYN_RESULTS_STALE`, `DYN_MILES_NOT_ANSWER`, `DYN_TARGET_NOT_STATIC` |
 | `dynamic_report` | query | `{ analysisId, probes?: string[] }` → `data: DynamicSummary` + state (05 states) | read-only |
 | `export_response_psd` | ✱ transport-read (V1) | `{ analysisId, probe, quantity, path? }` → CSV (Hz, ASD, unit) | heavy output only via `--save` (AF-12); input to PHY-07 |
@@ -388,7 +388,7 @@ record and the SSD output is the cross-check.
 | `DYN_MILES_NOT_ANSWER` | error | Miles result used as an equivalent load | param path | run a random_response case |
 | `DYN_TARGET_NOT_STATIC` | error | equivalent load target is not a static case | target id | create a static case |
 | `DYN_TRANSIENT_INVALID` | error | hhtAlpha ∉ [−1/3, 0], dt ≤ 0, duration ≤ dt | param path | correct |
-| `DYN_JOINT_HISTORY_NOT_FOUND` | error | PHY-10 result hash not in the store | hash | re-run `dynamics_study` |
+| `DYN_HISTORY_UNKNOWN` | error | `assign_load_history` names a history that does not exist (e.g. a PHY-10 export not yet made) | name | `define_load_history` or PHY-10 `export_joint_load_history` |
 | `DYN_REVIEW_PENDING` | warning | result used for a qualification decision without disposition | case id | qualified reviewer disposition (05 `dispose_margin`) |
 | `DYN_HUMAN_GATE` | error | agent tries to complete a qualification disposition | row id | hand over to the qualified reviewer |
 

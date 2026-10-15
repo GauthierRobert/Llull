@@ -126,7 +126,7 @@ llull search dynamics joint reaction                    # AF-01
 llull describe set_body_properties add_joint_actuator dynamics_study export_joint_loads
 llull guide                                             # mechanism section: units, gravity explicit, planar mode, minimal plan
 
-llull pendulum_period lengthM=1 amplitudeDeg=90 $D       # quick check: 2.36824634629 s
+llull mechanism_quick_check kind=pendulum 'inputs={"lengthM":1,"amplitudeDeg":90}' $D   # 2.36824634629 s
 
 llull run gear_retract.plan.json --validate $D           # assembly + joints + masses + gravity + actuator (AF-05)
 llull run gear_retract.plan.json $D

@@ -1,0 +1,113 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "m"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    0.5,
+    0.5,
+    0.002
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "anchor": "min"
+  },
+  "as": "panel"
+ },
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "white_paint_test",
+   "name": "white_paint_test",
+   "designation": "validation test record",
+   "productForm": "coating",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "white_paint_test",
+   "property": "absorptivity_solar",
+   "value": 0.2,
+   "unit": "-",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a property claim)"
+   },
+   "preferred": true,
+   "condition": {
+    "state": "BOL"
+   }
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "white_paint_test",
+   "property": "emissivity_ir",
+   "value": 0.9,
+   "unit": "-",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a property claim)"
+   },
+   "preferred": true,
+   "condition": {
+    "kind": "hemispherical_total"
+   }
+  }
+ },
+ {
+  "command": "assign_surface_coating",
+  "params": {
+   "entityId": "$panel",
+   "facesNear": [
+    [
+     0.25,
+     0.25,
+     0.002
+    ]
+   ],
+   "coating": "white_paint_test"
+  }
+ },
+ {
+  "command": "optical_balance",
+  "params": {
+   "entityId": "$panel",
+   "facesNear": [
+    [
+     0.25,
+     0.25,
+     0.002
+    ]
+   ],
+   "solarFlux": {
+    "value": 1361.0,
+    "unit": "W/m^2"
+   },
+   "radiatingFaces": 1
+  }
+ },
+ {
+  "command": "check_surface_properties",
+  "params": {
+   "entityIds": [
+    "$panel"
+   ]
+  }
+ }
+]

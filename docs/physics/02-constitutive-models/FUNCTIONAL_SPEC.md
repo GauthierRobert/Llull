@@ -58,7 +58,7 @@ PHY-11 and PHY-19.
 
 **llull's value.** The law lives with the material record, has units and provenance, is checked for stability,
 can be fitted and exercised from the CLI in milliseconds, and is written to the solver deck the same way every
-time. A non-engineer owner can be told "this rubber model is stable up to 886 % biaxial stretch and fits the
+time. A non-engineer owner can be told "this rubber model is stable up to a biaxial stretch of 8.86 and fits the
 test within 0.18 MPa RMS" instead of "here are some Mooney constants".
 
 ## 3. Personas & user stories

@@ -97,6 +97,7 @@ export interface TopologySettings {
   readonly filter: { readonly kind: 'sensitivity' | 'density'; readonly radius: NamedValue };   // radius in doc units, default 1.5 voxel
   readonly threshold: NamedValue;        // 0.5 (llull choice) for derived geometry
   readonly greyLimit: NamedValue;        // 0.1 (llull choice)
+  readonly protectLoadSupport: { readonly value: boolean; readonly source: string; readonly defaulted: boolean };   // true (llull choice); false reproduces top88
   readonly optimizer: 'oc' | 'mma';
 }
 export interface TopologyStudy {
@@ -139,7 +140,7 @@ Plugin `topology`, toolset `analysis`. ✱ = transport.
 | ---- | ---- | ------------- | ---- |
 | `create_topology_study` | mutating (requiresKernel) | `{ analysisId, name, designDomain: string[], dimension: 2\|3, plane?, voxel: number (doc length unit), volumeFraction: number (0–1), objective?: { kind:'min_compliance', loadCaseWeights? } }` | @affects `analysis.cases[a].topology` · @invariant settings filled with named defaults; load/support faces added as keep-in (named default) · @failure analysis missing, domain not a solid, voxel count > cap (`TOP_GRID_TOO_LARGE`), volumeFraction ∉ (0,1) → no-op |
 | `set_topology_regions` | mutating | `{ studyId, keepIn?: TopologyRegion[], keepOut?: TopologyRegion[] }` | @failure region outside domain (`TOP_REGION_OUTSIDE_DOMAIN`), keep-in ≥ budget (`TOP_KEEPIN_EXCEEDS_BUDGET`) |
-| `set_topology_settings` | mutating | `{ studyId, penal?, eminRatio?, move?, changeTol?, maxIterations?, filter?: { kind, radius? }, threshold?, greyLimit?, optimizer?, manufacturing? }` | @invariant p ∈ [1, 5], 0 < move ≤ 1, radius > 0 · each given value stored `defaulted: false` |
+| `set_topology_settings` | mutating | `{ studyId, penal?, eminRatio?, move?, changeTol?, maxIterations?, filter?: { kind, radius? (doc length unit) }, threshold?, greyLimit?, protectLoadSupport?: boolean, optimizer?, manufacturing? }` | @invariant p ∈ [1, 5], 0 < move ≤ 1, radius > 0 · each given value stored `defaulted: false` |
 | `delete_topology_study` | mutating | `{ studyId }` | removes study and its derived entity |
 | `record_topology_result` | mutating (validated) | `{ studyId, fieldHash }` | @affects `study.result`, regenerates `derivedEntityId` · @invariant artifact exists, sha256 = hash, summary recomputed from the artifact, inputHash current · @failure `TOP_ARTIFACT_NOT_FOUND`, `TOP_SUMMARY_MISMATCH`, `TOP_RESULT_STALE` → no-op |
 | `topology_report` | query | `{ studyId, historyRows?: integer }` → `data { state: 'unsolved'\|'solved'\|'stale'\|'missing', result, settings, manufacturing, provenance, concept: true, unverified }` | read-only |

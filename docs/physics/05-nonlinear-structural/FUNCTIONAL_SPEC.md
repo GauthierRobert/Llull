@@ -64,7 +64,7 @@ could support a strength claim is marked `reviewRequired` (AF-33).
 User stories:
 
 - **US-1 (owner → operator).** "What is the collapse load of this bracket?" The agent copies the 05 static case into a
-  `nonlinear_static` case, picks the PHY-02 plasticity model of the part's 08 material, switches to displacement control
+  `nonlinear_static` case, picks the PHY-02 constitutive set (elastic + plastic) of the part's 08 record, switches to displacement control
   on the load face, adds a load-displacement probe, solves, and calls `limit_load`. It reports the limit load, the method
   (peak or plateau), the strain at the peak and "computed by llull, not approved".
 - **US-2 (operator).** A load-controlled run stops with `NLS_LIMIT_POINT_REACHED`. The agent reads the remediation,
@@ -95,7 +95,7 @@ User stories:
 | Id | Pri | Requirement | Rationale | Source |
 | -- | --- | ----------- | --------- | ------ |
 | FR-NLS-01 | MUST | A 05 analysis case can have type **`nonlinear_static`**, with `nlgeom: boolean` set explicitly (no default: the description says when it matters). All set-up is command data, replays and is versioned (05 FR-FEA-01, 22). | One analysis model, traceable | [R2], 05 |
-| FR-NLS-02 | MUST | Each analysed part uses a **PHY-02 `MaterialModel`** (plasticity variants: bilinear / multilinear J2 with isotropic, kinematic or combined hardening; Ramberg-Osgood) attached to its 08 material record, chosen by id. llull stores no stress-strain data of its own. The deck writer maps them to `*PLASTIC, HARDENING=…` or `*DEFORMATION PLASTICITY`. | PHY-02 owns material data (README §6.2) | [R2], PHY-02 |
+| FR-NLS-02 | MUST | Each analysed part uses a **PHY-02 constitutive set** (elastic + plastic `MaterialModel`s: J2 perfect / linear / multilinear / Voce isotropic or linear kinematic in PHY-02 MVP, combined in V1; Ramberg-Osgood deformation theory) on its 08 record, chosen by id. llull's analysis slice stores no stress-strain data; the PHY-02 CalculiX writer produces `*PLASTIC, HARDENING=…` or `*DEFORMATION PLASTICITY`. | PHY-02 owns material data and cards (README §6.2, FR-MATL-01/15) | [R2], PHY-02 |
 | FR-NLS-03 | MUST | **Load control** with automatic incrementation: initial, minimum and maximum increment and maximum increment count, plus a named convergence preset (`ccx_default`, quoted from the CalculiX manual) or explicit `*CONTROLS` values. Every value used is returned named (`{ value, source, defaulted }`). | Increment control decides whether a run finishes | [R2], AF-31 |
 | FR-NLS-04 | MUST | **Displacement control** on a 05 target (face, edge, point) and DOF: the run prescribes a displacement history, and the reaction on that target is the load measure. **Arc-length control** is refused on CalculiX with `NLS_ARC_LENGTH_UNSUPPORTED` (CalculiX documents no RIKS / arc-length parameter [R2]) and offered by `beam_large_deflection` (frames) and, V2, the Code_Aster export. | Passing a limit point needs displacement or arc-length control | [R2], [R6] |
 | FR-NLS-05 | MUST | **Limit load** (`limit_load`, read-only) from a load-displacement curve: `peak` (first maximum of load with increasing displacement), `plateau` (slope below a stated fraction of the initial slope over a stated displacement window, both explicit), or `not_reached` (curve still rising at the end). The method, inputs and curve hash are returned (AF-35). A load-controlled run that stops at a limit point reports `NLS_LIMIT_POINT_REACHED` and its last load as a **lower bound**, never as the limit load. | A collapse load must say how it was found | AF-35 |
@@ -124,7 +124,7 @@ llull search nonlinear limit load                           # AF-01
 llull describe set_nonlinear_controls add_curve_probe limit_load
 llull guide                                                 # nonlinear section: NLGEOM, controls, limit point (AF-03)
 
-# 1. one plan: geometry, 08 record + PHY-02 plasticity model, nonlinear case, displacement control, probe
+# 1. one plan: geometry, 08 record + PHY-02 constitutive set, nonlinear case, displacement control, probe
 llull run plans/nls_cantilever_plastic_collapse.plan.json --validate --doc c.llull.json
 llull run plans/nls_cantilever_plastic_collapse.plan.json --doc c.llull.json --kernel occt --json
 
@@ -166,7 +166,7 @@ dialog (human gate). The UI adds no capability.
 | Path turns back in the controlled displacement (snap-back) | `NLS_SNAP_BACK_DETECTED`; remediation "use beam_large_deflection (frames) or a Code_Aster arc-length export" | FR-NLS-04 |
 | Arc-length requested on CalculiX | Refused, `NLS_ARC_LENGTH_UNSUPPORTED` | FR-NLS-04 |
 | PEEQ exceeds the last tabulated hardening point | Warning `NLS_STRAIN_BEYOND_CURVE` (CalculiX holds the curve flat beyond the last point; llull does not extrapolate) | FR-NLS-10 |
-| Material record has no plasticity model | Solve refused, `NLS_MATERIAL_MODEL_MISSING` naming part and record | FR-NLS-02 |
+| Part has no PHY-02 constitutive set | Solve refused, `NLS_MATERIAL_MODEL_MISSING` naming part and record | FR-NLS-02 |
 | Results from an earlier input hash | `NLS_CURVE_STALE` / 05 `FEA_RESULTS_STALE`; `limit_load` refuses | FR-NLS-08 |
 
 ## 7. Acceptance criteria
@@ -217,7 +217,7 @@ stress report".
 | NAFEMS values come second-hand (Abaqus pages, search only) | A quoted target could be mis-transcribed | NL7 cross-checked by the generator; NL2 kept grade C until the tables are obtained |
 | NL7B (a variant) target reported mesh dependent and about 17 % high in the gap list | Wrong gate | NL7B is not used (README gap list caution) |
 | Plastic reserve used for ultimate strength without review | Unsafe sign-off | `reviewRequired`, human disposition (05) |
-| Assumption: PHY-02 delivers `MaterialModel` with J2 multilinear and Ramberg-Osgood variants | Dependency | Interface named in TECHNICAL_SPEC §3; this pack defines no material data |
+| Assumption: PHY-02 delivers constitutive sets with J2 and Ramberg-Osgood laws and their CalculiX writer | Dependency | Interface named in TECHNICAL_SPEC §3; this pack defines no material data |
 | Assumption: 05 artifact store holds per-increment results | Size | Store only probe curves and selected increments by default (`outputIncrements`) |
 
 ## 11. References
