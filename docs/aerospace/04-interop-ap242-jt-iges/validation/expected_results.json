@@ -64,15 +64,15 @@
       "input": "xch_corpus.json NIST entries with GVP",
       "expected": {
         "nist_ctc_01_asme1_ap242-e1.stp": { "volume": 14644822.6361138, "area": 807080.802199914, "centroid": [-2.29264395139875, -1.36345168588643, -32.2974419857648], "unit": "mm" },
-        "nist_ctc_02_asme1_ap242-e2.stp": { "volume": 47106788.0321802, "area": 2480624.4791306, "centroid": [-0.00415567842900755, 358.620787544608, -178.169662485763], "unit": "mm" },
+        "nist_ctc_02_asme1_ap242-e2.stp": { "volume": 47106788.0321802, "area": 2480624.4791306, "centroid": [-0.00415567842900755, 358.620787544608, -178.169662485763], "unit": "mm", "knownIssue": "OCCT 7.9.3 recomputation disagrees with this embedded GVP: volume 3.5e-2, area 4.1e-3, centroid 11.9 mm (red) - 01 KRN ../../01-exact-brep-kernel/validation/nist_gvp_vs_occt.json; GVP may be stale or scoped to a shape aspect" },
         "nist_ctc_03_asme1_ap242-e2.stp": { "volume": 332122.9076263, "area": 354787.650175344, "centroid": [-118.329746932968, 242.86422820302, 69.31685776493], "unit": "mm" },
         "nist_ctc_04_asme1_ap242-e2.stp": { "volume": 17519780.220394, "area": 1022497.095954, "centroid": [-0.0079803627, 360.9458561866, -7.8767441293], "bbox": [-250.0, 0.0, -100.5734088324, 250.0, 780.0, 30.0], "unit": "mm" },
         "nist_ftc_06_asme1_ap242-e2.stp": { "volume": 3323556.50526143, "area": 283413.011089723, "centroid": [8.44667839028049e-05, 29.008906494, -109.600480952032], "unit": "mm" },
-        "nist_stc_08_asme1_ap242-e3.stp": { "volume": 503592.175239539, "area": 191687.873141661, "centroid": [2.53109307374693, -0.0591847313749045, 25.3789167065934], "unit": "mm" },
+        "nist_stc_08_asme1_ap242-e3.stp": { "volume": 503592.175239539, "area": 191687.873141661, "centroid": [2.53109307374693, -0.0591847313749045, 25.3789167065934], "unit": "mm", "knownIssue": "OCCT 7.9.3 recomputation disagrees with this embedded GVP: volume 2.3e-1, area 1.8e-2, centroid 22.9 mm (red) - 01 KRN ../../01-exact-brep-kernel/validation/nist_gvp_vs_occt.json" },
         "nist_stc_10_asme1_ap242-e2.stp": { "volume": 188312.244641244, "area": 48486.2744665371, "centroid": [84.0076805122325, 14.6087293037364, 37.4990364132354], "unit": "mm" },
         "nist_stc_06_asme1_ap242-e3.stp": { "gvp": "all-zero placeholder: reported as 'not checkable', import must succeed" }
       },
-      "tolerance": "importVsEmbeddedGvp (green expected; yellow = warning, red = failure)",
+      "tolerance": "importVsEmbeddedGvp (green expected except entries marked knownIssue, which must be reported red with both values and still import; yellow = warning, red = failure)",
       "source": "values written by the originating CAD systems in the pinned NIST files (nist_pmi_gvp_reference.json). 'area' = 'wetted area measure' or 'surface area measure' of the solid; independent-surface areas are compared separately."
     },
     {
@@ -85,6 +85,7 @@
         "centroidDistanceMm": 0.018141545708500635
       },
       "tolerance": "exact reproduction of these numbers from the pinned files (1e-12 rel); all three must sit inside the green band of importVsEmbeddedGvp",
+      "caveat": "GVP-to-GVP spread only: OCCT 7.9.3 volumes of the two files differ by 5.2e-2 (47847994.4 vs 45468679.6 mm^3) and each file GVP disagrees with its own geometry (1.6e-2 / 3.5e-2), see 01 KRN nist_occt_reference.json and nist_gvp_vs_occt.json - do not read it as a geometric cross-CAD spread",
       "source": "computed from nist_ctc_02_asme1_rc.stp (AP203: V 47101527.47498, solid area 2481847.636045, centroid [-0.000876966143434, 358.6349444541, -178.1588021156]) and nist_ctc_02_asme1_ap242-e2.stp (values in VC-XCH-05)"
     },
     {
@@ -143,6 +144,7 @@
         "nist_ctc_05_asme1_rd.stp imported into a mm document": { "volume_mm3": 12694914.68692222, "area_mm2": 861242.9165391091, "centroid_mm": [-0.00444232975083708, -1.0106082709285138, 99.72360139103179] }
       },
       "tolerance": "analyticVsExactKernel for xch-inch-box; importVsEmbeddedGvp for CTC-05",
+      "caveat": "CTC-05 AP203: after exact inch->mm conversion the OCCT 7.9.3 recomputation (V 12828990.96 mm^3, A 862855.85 mm^2) still differs from the converted GVP by 1.06e-2 volume, 1.9e-3 area, 2.2 mm centroid (red band) - 01 KRN nist_gvp_vs_occt.json; nist_ftc_09_asme1_rd.stp (inch, GVP agree to 1e-10 after conversion) is the cleaner unit-conversion check",
       "source": "25.4 mm per inch exactly; xch-inch-box: V = 8 in^3 * 25.4^3, A = 28 in^2 * 25.4^2; CTC-05 embedded GVP (V 774.6912251592 in^3, solid area 1334.929190494 in^2, centroid [-0.0001748948720802, -0.03978772720191, 3.926126039017] in) * 25.4^k"
     },
     {

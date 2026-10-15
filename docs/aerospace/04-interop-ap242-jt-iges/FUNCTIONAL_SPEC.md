@@ -159,7 +159,7 @@ Exit code is non-zero when a verification report contains a red item, so CI can 
 | AC-2 | the drilled plate with an offset hole | exported to AP242 | the file holds a 'geometric validation property' with volume 113716.81469282041, area 19028.31853071796, centroid x −1.3813228334244487 (mm), read back by an OCC-independent parser | VC-XCH-02 |
 | AC-3 | any llull-written AP242 file | analysed by NIST SFA | 0 syntax errors; FILE_SCHEMA starts with `AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF` | VC-XCH-03, VC-XCH-17 |
 | AC-4 | a component instanced twice | exported and re-imported | 1 product, 2 occurrences, assembly volume 2000 mm³, centroid (50, 0, 0) | VC-XCH-04 |
-| AC-5 | the pinned NIST AP242 parts with GVP | imported | each recomputed GVP is green (≤ 1e-3 relative / ≤ 1e-3 bbox diagonal) against the embedded value; STC-06's zero placeholders are reported "not checkable" and the import succeeds | VC-XCH-05 |
+| AC-5 | the pinned NIST AP242 parts with GVP | imported | each recomputed GVP is green (≤ 1e-3 relative / ≤ 1e-3 bbox diagonal) against the embedded value; STC-06's zero placeholders are reported "not checkable" and the import succeeds; CTC-02 e2 and STC-08 e3, whose embedded GVP disagree with their geometry (measured by 01 KRN), are reported red with both values and still imported | VC-XCH-05 |
 | AC-6 | NIST CTC-02 in AP203 and AP242 | both analysed | llull reproduces the cross-CAD spread (1.12e-4 volume, −4.93e-4 area, 0.0181 mm centroid) and classifies both green | VC-XCH-06 |
 | AC-7 | NIST CTC-01 AP242 | imported with PMI (V1) | every census record is mapped or explicitly listed as unsupported: 3 DATUM, 2 DATUM_SYSTEM, 9 DIMENSIONAL_SIZE, 2 DIMENSIONAL_LOCATION, 1 ANGULAR_LOCATION, tolerance records 1 FLATNESS, 1 PERPENDICULARITY, 2 POSITION, 2 SURFACE_PROFILE | VC-XCH-07 |
 | AC-8 | a toleranced llull part (gap 03) | exported to AP242 and re-imported (V1) | the PMI is identical and SFA's semantic PMI report has no error | VC-XCH-08 |
@@ -186,7 +186,7 @@ Exit code is non-zero when a verification report contains a red item, so CI can 
 | KPI | Target | Measured by |
 | --- | ------ | ----------- |
 | NIST AP242 parts imported as exact solids | 100 % of the pinned AP242 B-rep files | VC-XCH-05 gate |
-| GVP agreement on import (NIST, files with GVP) | 100 % green | VC-XCH-05 |
+| GVP agreement on import (NIST, files with GVP) | 100 % green except the known GVP/geometry disagreements (CTC-02 e2, STC-08 e3), which are reported red | VC-XCH-05 |
 | Self round-trip GVP agreement | 100 % within 1e-9 relative | VC-XCH-01 |
 | SFA syntax errors on llull-written AP242 | 0 | VC-XCH-17 |
 | Semantic PMI mapped (NIST CTC/FTC/STC, V1) | ≥ 90 % of census records mapped, 100 % accounted for | VC-XCH-07 |

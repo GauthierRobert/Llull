@@ -41,7 +41,9 @@ copied (sizes 0.2–6 MB, and NIST states they are *not* error-free reference fi
 
 Measured cross-CAD spread on NIST CTC-02 (two different CAD systems, AP203 `_rc` vs AP242 `-e2`), computed from the
 pinned files: volume +1.117e-4 relative, solid surface area −4.928e-4 relative, centroid 0.0181 mm. Both are inside the
-green band, which is the point of VC-XCH-06.
+green band, which is the point of VC-XCH-06. Caveat (01 KRN measurement, OCCT 7.9.3): the two files' geometries
+differ by 5.2 % in volume and each file's GVP disagrees with its own geometry, so this is a GVP-to-GVP spread, not a
+geometric one.
 
 ## 4. Validation cases
 
@@ -51,7 +53,7 @@ green band, which is the point of VC-XCH-06.
 | VC-XCH-02 | FR-03, TR-06, TR-18 | plate, offset hole | GVP in file: V 113716.81469282041, A 19028.31853071796, c (−1.3813228334244487, 0, 0) | 1e-6 | analytic | unit |
 | VC-XCH-03 | FR-01, TR-04, TR-19 | any export | FILE_SCHEMA `AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF…`; implementation level `2;1`; byte-identical for same timestamp | exact | NIST file headers [R4] | golden |
 | VC-XCH-04 | FR-04, TR-07 | `xch-assembly-2x`, `as1-oc-214`, `red-cube-blue-cylinder` | 1 product / 2 occurrences, V 2000, c (50,0,0); 18 placed parts; names+colours kept | exact / 1e-9 | analytic; quality corpus | unit + quality |
-| VC-XCH-05 | FR-05, FR-06, TR-08 | 7 NIST AP242 files with GVP + STC-06 | embedded GVP e.g. CTC-01 V 14644822.6361138 mm³, A 807080.802199914 mm², c (−2.2926, −1.3635, −32.2974); STC-06 → not-checkable | green band | NIST files | quality `step-ap242` |
+| VC-XCH-05 | FR-05, FR-06, TR-08 | 7 NIST AP242 files with GVP + STC-06 | embedded GVP e.g. CTC-01 V 14644822.6361138 mm³, A 807080.802199914 mm², c (−2.2926, −1.3635, −32.2974); STC-06 → not-checkable; CTC-02 e2 and STC-08 e3 embedded GVP disagree with the OCCT-recomputed geometry (01 KRN, measured) → expected red, reported, import succeeds | green band (except knownIssue entries) | NIST files | quality `step-ap242` |
 | VC-XCH-06 | FR-06 | CTC-02 AP203 + AP242 | Δ 1.1168549051822634e-4 / −4.928412593244942e-4 / 0.018141545708500635 mm | 1e-12 rel on reproduction | NIST files | unit (pure TS) |
 | VC-XCH-07 | FR-07, TR-09 | CTC-01..05, FTC-06, STC-06/08 | census, e.g. CTC-01: 3 DATUM, 9 DIMENSIONAL_SIZE, 2 DIMENSIONAL_LOCATION, 1 ANGULAR_LOCATION, tolerances 1 flatness, 1 perpendicularity, 2 position, 2 surface profile | all accounted | NIST census; SFA report | quality (V1) |
 | VC-XCH-08 | FR-08, TR-10 | toleranced llull part (gap 03) | identical PMI after round trip; SFA semantic PMI clean | exact | PMI RP v4.1 [R12] | unit + SFA (V1) |
