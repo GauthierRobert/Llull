@@ -48,6 +48,66 @@ Authoring rules and section layout: [`TEMPLATE.md`](TEMPLATE.md).
 
 Each gap's `TECHNICAL_SPEC.md` § Delivery plan gives milestones and effort.
 
+## Status (2026-10-15)
+
+All nine packs are written: 18 specs (≈ 7 000 lines), 9 validation plans, 87 JSON reference files,
+generator scripts and draft `build_project` plans. Every pure-Python generator re-runs to byte-identical
+output (`python3 -I <script>` from its `validation/` folder). Four scripts need OCC's Python binding
+(`pip install cadquery-ocp`) and are optional: `01/…/measure_step_brep.py`, `01/…/probe_occt_behaviour.py`,
+`07/…/generate_test_parts.py`, `07/…/survey_step_features.py`.
+
+| Gap | Effort (from its TECHNICAL_SPEC § Delivery plan) | Key validation assets |
+| --- | --- | --- |
+| 01 KRN | ≈ 34–45 eng-weeks | 10 closed-form solids (incl. at 70 m), OCCT 7.9.3 cross-check, all 27 NIST B-rep files measured |
+| 02 SRF | ≈ 33 eng-weeks | NACA 4/5-digit generator vs pinned UIUC files (≤ 1e-7 c), analytic curvature, OpenVSP TR-1208 wing, Sears–Haack |
+| 03 GDT | MVP ≈ 11 eng-weeks, V1 + 6.5 | NIST PMI census (17 AP242 files), stack-ups (WC / RSS / seeded Monte Carlo), surface texture |
+| 04 XCH | MVP ≈ 13 eng-weeks | NIST PMI zip pinned (sha256), validation properties of 30 files, OCCT IGES samples |
+| 05 FEA | see spec (M1–M6) | Cantilever / modal / Kirsch / plate buckling closed forms, NAFEMS LE1 & LE10, CalculiX reference decks |
+| 06 CMP | ≈ 18 eng-weeks to V1 | CLT ABD + first-ply failure (T300/5208, AS4/3501-6), hemisphere fishnet drape, layup rules |
+| 07 FTR | see spec | Flat pattern / setback (FAA AC 43.13-1B example), countersink, 3 synthetic STEP parts, NIST CTC-01 |
+| 08 MAT | MVP ≈ 28 d, V1 + 16 d | Sourced material dataset (partial), NAS6203–6206 / MS20470 / Hi-Lok / MS21042 catalogue sample, grip selection |
+| 09 PLM | see spec | RFC 8032 Ed25519 vectors (verified locally, Python + Node), canonical-JSON hashes, release → ECO → rev B scenarios |
+
+### Defects in today's llull found while writing the packs
+
+- `loft_sections` / `sweep_profile` resample every section to 24 points (`SECTION_RING_POINTS`): an airfoil
+  loses ≈ 2 % section area and its sharp trailing edge (02 SRF).
+- `mass_properties` always labels mass in grams, whatever the document units and density unit (08 MAT);
+  it returns no surface area or centroid, so STEP validation properties cannot be checked (04 XCH).
+- The bundled `opencascade.js@1.1.1` is OCCT 7.4.0p1 (2020) while the bundled CadQuery uses OCP 7.9.3; it
+  does not bind `GeomAPI_Interpolate` / `GeomFill_NSections`, and `STEPCAFControl` / `XCAFDoc` / `BRepFeat_*`
+  availability is unconfirmed (01, 02, 04, 07).
+- Inertia computed far from the origin loses precision (1.2e-9 relative at 70 m, 1.2e-7 at 1 km); a local
+  part frame fixes it (01 KRN).
+
+### Cross-gap decisions needed before implementation
+
+1. **Package layout.** The packs propose new plugin packages independently: `@aero` / `packages/domain-aero`
+   (02, 06, 08), `packages/domain-mfg` (07), `domain-cae` (05), `packages/plm` (09). Recommendation: one
+   `packages/domain-aero` workspace with one `CadPlugin` per discipline, plus PLM as its own package. Needs
+   approval (CLAUDE.md layer map, `.dependency-cruiser.cjs`, `tsconfig.base.json` aliases).
+2. **OCC build.** A custom OCCT 7.9.x WASM build with C++ exceptions, aligned with the bundled OCP, exposing
+   every class the packs list (01 TR-KRN-01/02 owns the list).
+3. **One `GeometryKernel` extension**, owned by 01 KRN, merging the requests from the other packs: face
+   centroid / normal / axis / radius (03, 05), `faceGraph()` adjacency (07), surface `analysis` (02),
+   history-based persistent names (01).
+4. **Document v3**: B-rep blobs as recipe leaves (01), PLM metadata (09), PMI (03), analysis set-ups (05).
+5. **Licensing**: shipping GPL Gmsh and CalculiX with the desktop installer (05); licensed MMPDS / NAS /
+   CMH-17 data must stay in private libraries that never land in saved files (08).
+6. **Open surfaces** as 3D entities that are not closed solids (02 D1); `DerivationGuard.check` receiving the
+   command name (09); the DXF writer moving from domain-aec to core `lib` (07 D4).
+
+### Verification limits
+
+The session's network policy refused direct fetches from most standards and agency hosts (nist.gov, iso.org,
+faa.gov, nasa.gov, cax-if / mbx-if, opencascade.org, UIUC, wikipedia…). GitHub, PyPI and npm were reachable,
+so OCCT, FreeCAD, OpenVSP, CalculiX, Verdict, pyNastran, Gmsh and the NIST files (from `usnistgov/SFA`) were
+read or downloaded and hashed directly. Everything else was checked through search-engine extracts of the
+named official page. Each `validation/sources.md` grades every source (fetched / downloaded / search
+extract) and lists what could not be verified; values not confirmed are marked `TBD` or
+`secondary_unconfirmed` and are not used as pass/fail thresholds. Re-run the open checks once those hosts
+are allowed. The largest open item: no MIL-HDBK-5J / MMPDS design allowable is verified yet (08 MAT).
+
 ## What "validated" means here
 
 A gap is done only when every `VC-*` case in its `validation/README.md` passes in an automated gate
