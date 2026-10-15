@@ -411,7 +411,7 @@ for cid, what, expect, proves in (
          {'exit': 1, 'code': 'RBD_MASS_MISSING'}, ['FR-RBD-02', 'FR-RBD-16']),
         ('VC-RBD-51', 'same plan twice on the same kernel', {'identicalDataHash': True}, ['FR-RBD-17', 'TR-RBD-24']),
         ('VC-RBD-52', 'deliberately wrong set-ups', {'codes': ['RBD_JOINT_UNKNOWN', 'RBD_STEP_INVALID', 'RBD_SPRING_INVALID',
-                                                              'RBD_FRICTION_INVALID', 'RBD_REDUNDANT_CONSTRAINTS', 'RBD_INITIAL_INCONSISTENT',
+                                                              'RBD_FRICTION_INVALID', 'RBD_CONSTRAINTS_INCONSISTENT', 'RBD_INITIAL_INCONSISTENT',
                                                               'RBD_GRAVITY_UNSET']}, ['FR-RBD-16']),
         ('VC-RBD-53', 'export_joint_loads into a 05 static case', {'loadCategory': 'limit', 'reviewRequired': True,
                                                                   'provenance.studyHash': 'present'}, ['FR-RBD-12', 'TR-RBD-60']),

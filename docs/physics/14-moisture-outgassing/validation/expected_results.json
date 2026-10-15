@@ -126,7 +126,8 @@
    "source": "derived (series to 1e-17 per term)",
    "grade": "A",
    "proves": [
-    "FR-ENV-06"
+    "FR-ENV-06",
+    "FR-ENV-16"
    ]
   },
   {
@@ -144,7 +145,8 @@
    "source": "derived",
    "grade": "A",
    "proves": [
-    "TR-ENV-05"
+    "TR-ENV-05",
+    "FR-ENV-16"
    ]
   },
   {
@@ -207,7 +209,8 @@
    "proves": [
     "FR-ENV-01",
     "FR-ENV-02",
-    "FR-ENV-03"
+    "FR-ENV-03",
+    "FR-ENV-12"
    ]
   },
   {
@@ -235,7 +238,8 @@
    "proves": [
     "FR-ENV-01",
     "FR-ENV-02",
-    "FR-ENV-03"
+    "FR-ENV-03",
+    "FR-ENV-12"
    ]
   },
   {
@@ -265,7 +269,8 @@
    "proves": [
     "FR-ENV-01",
     "FR-ENV-02",
-    "FR-ENV-03"
+    "FR-ENV-03",
+    "FR-ENV-12"
    ]
   },
   {
@@ -294,7 +299,8 @@
    "proves": [
     "FR-ENV-01",
     "FR-ENV-02",
-    "FR-ENV-03"
+    "FR-ENV-03",
+    "FR-ENV-12"
    ]
   },
   {
@@ -369,6 +375,7 @@
    "grade": "A",
    "proves": [
     "FR-ENV-05",
+    "FR-ENV-12",
     "FR-ENV-14"
    ]
   },

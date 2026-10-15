@@ -327,7 +327,7 @@ def build() -> dict:
     cases.append(case("VC-SEL-19", "user-defined index without derivationNote is refused", "SEL_DERIVATION_NOTE_MISSING", "code",
                       {"exact": True}, "TECHNICAL_SPEC TR-SEL-15", "A", ["FR-SEL-06"]))
     cases.append(case("VC-SEL-20", "temperature outside a PHY-01 model range: material excluded with the PHY-01 code forwarded unchanged",
-                      {"excludedCodePrefix": "PROP_", "imputed": False}, "code", {"exact": True}, "TECHNICAL_SPEC TR-SEL-11", "A",
+                      {"excludedCode": "PROP_OUT_OF_RANGE", "imputed": False}, "code", {"exact": True}, "TECHNICAL_SPEC TR-SEL-11", "A",
                       ["FR-SEL-13"]))
     cases.append(case("VC-SEL-21", "material differs from the released revision without an open ECO (check)", "SEL_SUBSTITUTION_RELEASED",
                       "code", {"exact": True}, "TECHNICAL_SPEC §7.1; 09 PLM release lock", "A", ["FR-SEL-16", "FR-SEL-17"]))

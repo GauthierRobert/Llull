@@ -833,7 +833,7 @@
    "id": "VC-SEL-20",
    "quantity": "temperature outside a PHY-01 model range: material excluded with the PHY-01 code forwarded unchanged",
    "value": {
-    "excludedCodePrefix": "PROP_",
+    "excludedCode": "PROP_OUT_OF_RANGE",
     "imputed": false
    },
    "unit": "code",

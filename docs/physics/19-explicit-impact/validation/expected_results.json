@@ -477,6 +477,27 @@
     "TR-EXP-40"
    ],
    "derivation": "Econ / Eint"
+  },
+  {
+   "id": "VC-EXP-42",
+   "quantity": "energy error read from the last cycle line of engine_listing_sample.txt",
+   "value": -0.2,
+   "unit": "%",
+   "tolerance": {
+    "abs": 0.05
+   },
+   "source": "fixture",
+   "grade": "A",
+   "proves": [
+    "FR-EXP-09",
+    "TR-EXP-41"
+   ],
+   "derivation": "ERROR column of the last CYCLE line; NORMAL TERMINATION present",
+   "expect": {
+    "normalTermination": true,
+    "cycles": 21,
+    "maxAddedMassKg": 0.0
+   }
   }
  ]
 }

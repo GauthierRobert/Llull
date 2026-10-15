@@ -115,10 +115,10 @@ def build() -> dict:
                           {"rel": 1e-9}, "derived (Crank plane-sheet series, S14/S15)", "A", ["FR-ENV-06", "TR-ENV-05"]))
     g_values = {str(t): r12(fick_g(t)) for t in (0.001, 0.01, 0.05, 0.1, 0.2, 0.5, 1.0)}
     cases.append(case("VC-ENV-02", "fractional uptake G at selected tau", g_values, "-", {"rel": 1e-9},
-                      "derived (series to 1e-17 per term)", "A", ["FR-ENV-06"]))
+                      "derived (series to 1e-17 per term)", "A", ["FR-ENV-06", "FR-ENV-16"]))
     st = {str(t): r12(short_time_ratio(t)) for t in (1e-6, 1e-4, 1e-3)}
     cases.append(case("VC-ENV-03", "short-time check G / ((4/sqrt(pi)) sqrt(tau)) -> 1", st, "-", {"abs": 1e-6},
-                      "derived", "A", ["TR-ENV-05"]))
+                      "derived", "A", ["TR-ENV-05", "FR-ENV-16"]))
     # synthetic worked case: h = 2 mm, D = 1e-6 mm^2/s, Mm = 1.5 %, Mi = 0, 7 days
     h_mm, d_mm2s, mm_pct, days = 2.0, 1.0e-6, 1.5, 7.0
     t_s = days * 86400.0
@@ -141,7 +141,7 @@ def build() -> dict:
     for k, (mid, res) in enumerate(outg.items(), start=1):
         cases.append(case(f"VC-ENV-06.{k}", f"outgassing screening of synthetic {mid} under both profiles", res, "%",
                           {"exact": True}, "environment_rules.json profiles (NASA A, ECSS B)", "A" if mid != "syn_water" else "B",
-                          ["FR-ENV-01", "FR-ENV-02", "FR-ENV-03"]))
+                          ["FR-ENV-01", "FR-ENV-02", "FR-ENV-03", "FR-ENV-12"]))
     part_mass_g = 200.0
     budget = {"maxMassLossG": r12(part_mass_g * 0.95 / 100.0), "maxCondensableG": r12(part_mass_g * 0.05 / 100.0)}
     cases.append(case("VC-ENV-07", "screening mass-loss budget of a 200 g part in syn_low (TML 0.95 %, CVCM 0.05 %)", budget, "g", exact,
@@ -157,7 +157,7 @@ def build() -> dict:
     cases.append(case("VC-ENV-10", "AO mass loss with synthetic density 1.0 g/cm^3, area 10 cm^2, fluence 1e21", r12(rho_syn * area_cm2 * ey * f_syn), "g",
                       exact, "derived (dM = rho A Ey F)", "A", ["FR-ENV-10"], note="Kapton density not sourced (tbd)"))
     cases.append(case("VC-ENV-11", "material without TML/CVCM used on a part under an outgassing profile", "ENV_OUTGASSING_DATA_MISSING", "code",
-                      {"exact": True}, "TECHNICAL_SPEC §7.1", "A", ["FR-ENV-05", "FR-ENV-14"]))
+                      {"exact": True}, "TECHNICAL_SPEC §7.1", "A", ["FR-ENV-05", "FR-ENV-12", "FR-ENV-14"]))
     cases.append(case("VC-ENV-12", "no mission profile set", "ENV_PROFILE_UNSET", "code", {"exact": True}, "AF-31", "A", ["FR-ENV-09", "FR-ENV-14"]))
     cases.append(case("VC-ENV-13", "orthotropic lamina with beta1/alpha1 != beta2/alpha2: equivalent-temperature hand-off refused",
                       "ENV_EQUIVALENT_TEMPERATURE_INVALID", "code", {"exact": True}, "TECHNICAL_SPEC §5.3", "A", ["FR-ENV-08", "TR-ENV-07"]))

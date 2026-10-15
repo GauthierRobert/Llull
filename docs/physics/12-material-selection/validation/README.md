@@ -39,7 +39,7 @@ How to prove that a future implementation of material selection and substitution
 | VC-SEL-17 | CFRP via layup Ex 69.6757 GPa | `SEL_ANISOTROPIC` | exact | A | FR-SEL-15 |
 | VC-SEL-18 | Chart guide slopes 1, 2, 3, 2 (E-based cases) | — | abs 1e-12 | A | FR-SEL-18 |
 | VC-SEL-19 | User index without derivation note | `SEL_DERIVATION_NOTE_MISSING` | exact | A | FR-SEL-06 |
-| VC-SEL-20 | Temperature outside a PHY-01 model range | excluded, PHY-01 `PROP_*` code forwarded, nothing imputed | exact | A | FR-SEL-13 |
+| VC-SEL-20 | Temperature outside a PHY-01 model range | excluded with PHY-01 `PROP_OUT_OF_RANGE`, nothing imputed | exact | A | FR-SEL-13 |
 | VC-SEL-21 | Material changed on a released item without ECO | `SEL_SUBSTITUTION_RELEASED` | exact | A | FR-SEL-16, 17 |
 | VC-SEL-22 | Named defaults (weights, ν tolerance, yield factor) | `defaulted: true` with source | exact | A | FR-SEL-20 |
 

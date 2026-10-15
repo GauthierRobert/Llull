@@ -267,6 +267,18 @@ write_csv("johnson_cook_curves.csv", ["eps_p", "sigma_MPa_rate_1", "sigma_MPa_ra
 
 write_csv("energy_balance_sample.csv", ["t_s", "E_kin_J", "E_int_J", "E_hourglass_J", "E_contact_J", "W_ext_J", "M_added_kg"], rows)
 
+# Synthetic Engine listing (column layout as in [S1] engine_listing_columns; values = the fixture above, NOT a solver run)
+with open(out("engine_listing_sample.txt"), "w", encoding="utf-8", newline="\n") as f:
+    f.write("SYNTHETIC FIXTURE written by generate_explicit_reference.py (not solver output)\n")
+    f.write("   CYCLE    TIME      TIME-STEP  ELEMENT          ERROR  I-ENERGY    K-ENERGY T  K-ENERGY R  EXT-WORK     MAS.ERR     TOTAL MASS  MASS ADDED\n")
+    for k, r in enumerate(rows):
+        e_err = (r[1] + r[2] + r[3] + r[4] - E0 - r[5]) / E0 * 100.0
+        f.write(f"{k * 100:8d}  {r[0]:.4E}  {1.0e-6:.4E} BRICK          1 {e_err:5.1f}%  {r[2]:.4E}  {r[1]:.4E}  {0.0:.4E}  {r[5]:.4E}  {0.0:.4E}  {1.814:.4E}  {0.0:.4E}\n")
+    f.write("     NORMAL TERMINATION\n")
+case("VC-EXP-42", "energy error read from the last cycle line of engine_listing_sample.txt", -0.2, "%", {"abs": 0.05},
+     "fixture", "A", ["FR-EXP-09", "TR-EXP-41"], "ERROR column of the last CYCLE line; NORMAL TERMINATION present",
+     None, {"expect": {"normalTermination": True, "cycles": 21, "maxAddedMassKg": 0.0}})
+
 doc = {"pack": PACK, "generatedBy": "generate_explicit_reference.py",
        "units_note": "SI unless the unit field says otherwise; '-' = dimensionless", "cases": CASES}
 with open(out("expected_results.json"), "w", encoding="utf-8", newline="\n") as f:

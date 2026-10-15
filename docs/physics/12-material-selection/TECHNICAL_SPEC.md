@@ -55,7 +55,7 @@ read through `execute` results; a shared type import from `@cae` would need an a
 | TR-SEL-08 | MUST | `substitute_material` design-rule ratios exactly as §5.3; mass before/after by `mass_properties` on the real and the virtual document | FR-SEL-07 |
 | TR-SEL-09 | MUST | Margin re-scaling only when every condition of §5.4 holds; otherwise `SEL_MARGINS_NEED_RESOLVE` + `resolvePlan` | FR-SEL-08, 09 |
 | TR-SEL-10 | MUST | Basis set of each comparison is collected; >1 basis ⇒ `SEL_BASIS_MIXED` warning | FR-SEL-12 |
-| TR-SEL-11 | SHOULD | Temperature: when `temperature` is given, properties are evaluated with PHY-01 `PropertyModel`; out-of-range codes from PHY-01 are forwarded unchanged in `excluded[]` | FR-SEL-13 |
+| TR-SEL-11 | SHOULD | Temperature: when `temperature` is given, properties are evaluated with PHY-01 `PropertyModel`; `PROP_OUT_OF_RANGE` (PHY-01) is forwarded unchanged in `excluded[]` | FR-SEL-13 |
 | TR-SEL-12 | MUST | Composite candidates name a 06 layup (`layup: { part, zone? }` or laminate id); E and ν come from 06 effective in-plane constants; `SEL_ANISOTROPIC` warning always set | FR-SEL-15 |
 | TR-SEL-13 | MUST | All SEL commands `annotations: { readOnly: true, idempotent: true }`; same document reference back; `affected: []` | FR-SEL-16, L3 |
 | TR-SEL-14 | SHOULD | `material_chart_data` returns points in base units and guide lines (slope 1/n on log P vs log ρ) | FR-SEL-18 |

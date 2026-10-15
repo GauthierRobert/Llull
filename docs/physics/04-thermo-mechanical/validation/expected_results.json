@@ -811,6 +811,47 @@
     "rows[*].unverified": "OR of the cte inputs' flags",
     "status of VC-TMC-06.a": "interference_possible"
    }
+  },
+  {
+   "id": "VC-TMC-50",
+   "quantity": "staleness chain thermal -> thermo_static",
+   "value": null,
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "05 TR-FEA-06 + PHY-03 TR-THM-32 + TR-TMC-10",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-14",
+    "TR-TMC-10"
+   ],
+   "expected": {
+    "fea_report(ms).state": "stale",
+    "compute_margins(ms).code": "FEA_RESULTS_STALE",
+    "check_thermo_mechanical(ms).items": [
+     "TMC_THERMAL_RESULT_STALE"
+    ]
+   }
+  },
+  {
+   "id": "VC-TMC-63",
+   "quantity": "binding fit needs a human disposition",
+   "value": null,
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "AF-34",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-13",
+    "TR-TMC-32"
+   ],
+   "expected": {
+    "dispose_fit_result(agent).code": "TMC_HUMAN_GATE",
+    "documentHashUnchanged": true
+   }
   }
  ]
 }

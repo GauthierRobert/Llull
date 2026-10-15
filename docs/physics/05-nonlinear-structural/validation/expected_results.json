@@ -529,6 +529,79 @@
     "FR-NLS-04",
     "FR-NLS-13"
    ]
+  },
+  {
+   "id": "VC-NLS-64",
+   "quantity": "every nonlinear_report / limit_load / check_nonlinear result",
+   "value": "reviewRequired=true",
+   "unit": "flag",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "AGENT_FIRST AF-33",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-17"
+   ]
+  },
+  {
+   "id": "VC-NLS-65",
+   "quantity": "every control value, threshold and amplitude in data is {value, source, defaulted}",
+   "value": "named",
+   "unit": "shape",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "AGENT_FIRST AF-31",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-03",
+    "FR-NLS-15"
+   ]
+  },
+  {
+   "id": "VC-NLS-66",
+   "quantity": "limit_load on a PHY-02 model marked unverified",
+   "value": "unverified=true + NLS_MATERIAL_MODEL_UNVERIFIED",
+   "unit": "flag",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "AGENT_FIRST AF-32",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-16"
+   ]
+  },
+  {
+   "id": "VC-NLS-41",
+   "quantity": "pinned CalculiX decks beampiso / beampkin / beampd: displacements per increment equal the .dat.ref files",
+   "value": "TBD",
+   "unit": "mm",
+   "tolerance": {
+    "rel": 0.0001
+   },
+   "source": "S2 test suite (values to be extracted by the M2 reader and frozen)",
+   "grade": "TBD",
+   "proves": [
+    "FR-NLS-02",
+    "FR-NLS-06",
+    "TR-NLS-04"
+   ]
+  },
+  {
+   "id": "VC-NLS-70",
+   "quantity": "wall time, 20k-node C3D20R cantilever collapse, 50 increments",
+   "value": "TBD",
+   "unit": "s",
+   "tolerance": {
+    "rel": null
+   },
+   "source": "TBD \u2014 measure on the reference desktop",
+   "grade": "TBD",
+   "proves": [
+    "FR-NLS-18"
+   ]
   }
  ]
 }
