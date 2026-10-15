@@ -1,9 +1,16 @@
 /* Drawing sheets: sidebar panel + paper-space viewer. The paper stays white in both themes. */
 
 .sheet-viewer {
+  /* Inside the area the floating chrome leaves clear (header, browser panel, inspector, dock). */
   position: absolute;
-  inset: 0;
+  top: var(--vp-inset-top);
+  right: var(--vp-inset-right);
+  bottom: calc(var(--chrome-gap) * 2 + 56px);
+  left: var(--vp-inset-left);
   z-index: 20;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   background: color-mix(in oklch, var(--surface-app) 82%, var(--fg) 18%);

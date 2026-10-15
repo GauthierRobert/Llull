@@ -12,6 +12,7 @@ import { ParametersPanel } from '@ui/panels/ParametersPanel';
 import { FeatureHistoryPanel } from '@ui/panels/FeatureHistoryPanel';
 import { ConfigurationsPanel } from '@ui/panels/ConfigurationsPanel';
 import { MaterialsPanel } from '@ui/panels/MaterialsPanel';
+import { SheetsPanel } from '@ui/panels/SheetsPanel';
 import { BuildingPanel } from '@ui/panels/building/BuildingPanel';
 import { CivilPanel } from '@ui/panels/civil/CivilPanel';
 import { type SidebarTabSpec, SIDEBAR_TAB_SPECS } from './sidebarTabs';
@@ -20,6 +21,7 @@ const TAB_PANELS: Readonly<Record<SidebarTab, React.ComponentType<{ className?: 
   building: BuildingPanel,
   civil: CivilPanel,
   layers: LayersPanel,
+  sheets: SheetsPanel,
   assembly: AssemblyPanel,
   mechanisms: MechanismsPanel,
   parameters: ParametersPanel,
@@ -33,6 +35,7 @@ const TAB_COUNTS: Readonly<Record<SidebarTab, (doc: CadDocument) => number>> = {
   building: (doc) => doc.building?.elementOrder.length ?? 0,
   civil: (doc) => doc.civil?.order.length ?? 0,
   layers: (doc) => doc.layerOrder.length,
+  sheets: (doc) => doc.drawings?.order.length ?? 0,
   assembly: (doc) => Object.keys(doc.components).length,
   mechanisms: (doc) => doc.constraintOrder.length + doc.jointOrder.length + doc.driveRelationOrder.length,
   parameters: (doc) => Object.keys(doc.parameters).length,

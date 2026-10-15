@@ -9,6 +9,7 @@ const SIDEBAR_TABS = [
   'building',
   'civil',
   'layers',
+  'sheets',
   'assembly',
   'mechanisms',
   'parameters',

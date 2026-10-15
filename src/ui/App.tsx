@@ -22,6 +22,8 @@ import { useKeyboardShortcuts } from '@ui/hooks/useKeyboardShortcuts';
 import { useAutoFrame } from '@ui/hooks/useAutoFrame';
 import { useAutosave } from '@ui/hooks/useAutosave';
 import { useLiveFx } from '@ui/hooks/useLiveFx';
+import { SheetViewer } from '@ui/viewport/sheet/SheetViewer';
+import { useSheetViewStore } from '@ui/viewport/sheet/sheetViewStore';
 import { LiveActivityFeed } from '@ui/components/LiveActivityFeed';
 import { RestoredBanner } from '@ui/components/RestoredBanner';
 import { UpdateBanner } from '@ui/components/UpdateBanner';
@@ -31,6 +33,8 @@ export function App(): React.ReactElement {
   const inspectorOpen = useLayoutStore((s) => s.inspectorOpen);
   const sidebarOpen = useLayoutStore((s) => s.sidebarOpen);
   const viewMode = useToolStore((s) => s.viewMode);
+  const openSheetId = useSheetViewStore((s) => s.openSheetId);
+  const sheetOpen = useStore((s) => openSheetId !== null && s.document.drawings?.sheets[openSheetId] !== undefined);
   const hasSelection = useStore((s) => s.document.selection.length > 0);
   // Properties float in on demand, and only while something is selected.
   const showInspector = inspectorOpen && hasSelection;
@@ -58,7 +62,8 @@ export function App(): React.ReactElement {
         <EmptyState />
         <RestoredBanner />
         <UpdateBanner />
-        <ViewportErrorBoundary key={viewMode}>{viewMode === '3d' ? <Viewport3D /> : <Viewport2D />}</ViewportErrorBoundary>
+        {!sheetOpen && <ViewportErrorBoundary key={viewMode}>{viewMode === '3d' ? <Viewport3D /> : <Viewport2D />}</ViewportErrorBoundary>}
+        <SheetViewer />
         <LiveActivityFeed />
         <HintBar />
         <PaletteResultToast />
