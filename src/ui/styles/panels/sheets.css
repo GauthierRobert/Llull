@@ -1,0 +1,90 @@
+/* Drawing sheets: sidebar panel + paper-space viewer. The paper stays white in both themes. */
+
+.sheet-viewer {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in oklch, var(--surface-app) 82%, var(--fg) 18%);
+}
+
+.sheet-viewer__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: var(--surface-popover);
+  border-bottom: 1px solid var(--border-strong);
+  color: var(--fg);
+}
+
+.sheet-viewer__name {
+  font-weight: 600;
+  max-width: 28ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet-viewer__spacer {
+  flex: 1;
+}
+
+.sheet-viewer__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.sheet-viewer__stage {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.sheet-viewer__stage:active {
+  cursor: grabbing;
+}
+
+.sheet-viewer__paper {
+  position: absolute;
+  background: #fff;
+  box-shadow:
+    0 1px 2px oklch(0 0 0 / 0.25),
+    0 12px 40px -8px oklch(0 0 0 / 0.45);
+}
+
+.sheet-viewer__paper img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.sheet-viewer__selection {
+  position: absolute;
+  pointer-events: none;
+  border: 1.5px dashed var(--accent);
+  background: var(--accent-softer);
+}
+
+.sheet-viewer__empty,
+.sheet-viewer__status {
+  margin: 0;
+  padding: 8px 12px;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.sheet-viewer__status {
+  background: var(--surface-popover);
+  border-top: 1px solid var(--border);
+}
