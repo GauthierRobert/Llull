@@ -28,7 +28,7 @@ export type ToolsetName = (typeof TOOLSET_NAMES)[number];
 const words = (list: string): readonly string[] => list.split(' ');
 
 const ANALYSIS_CORE_TOOLS = words(
-  'check_assembly engine_quick_check check_convergence compare_to_expected thermal_analytic_check compute_view_factors fit_at_temperature thermal_stress_check',
+  'check_assembly engine_quick_check check_convergence compare_to_expected thermal_analytic_check compute_view_factors fit_at_temperature thermal_stress_check fea_mesh fea_solve fea_export',
 );
 
 /** Tool names per toolset; `building` / `civil` / the FE part of `analysis` come from their plugins. */

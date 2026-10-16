@@ -1,6 +1,6 @@
 /** Input hash of an analysis (05 TR-FEA-06): equal hashes <=> the same set-up on the same geometry and materials. */
 
-import type { AnalysisCase } from '@core/model/analysis';
+import type { AnalysisCase, ThermalSetup } from '@core/model/analysis';
 import type { CadDocument, Entity, Material } from '@core/model/types';
 import { geometryKey } from '@core/geometry/shapeRecipe';
 import { canonicalJson } from '@lib/canonicalJson';
@@ -41,11 +41,24 @@ function materialsUsed(doc: CadDocument, analysisCase: AnalysisCase): Record<str
   return used;
 }
 
-/** Results hash of the thermal case a thermo-mechanical field reads, so a re-solved thermal case makes this one stale. */
+/**
+ * Results hash and current input hash of the thermal case a thermo-mechanical field reads: a re-solved OR an edited thermal case makes
+ * this one stale (PHY-04 VC-TMC-50). The source is a heat case (no field of its own), so this never recurses; a self-reference is ignored.
+ */
 function sourceResultsHash(doc: CadDocument, analysisCase: AnalysisCase): string | null {
   const field = analysisCase.thermomech?.field;
-  if (field?.kind !== 'thermal_result') return null;
-  return caseOf(doc, field.analysisId)?.results?.resultsHash ?? null;
+  if (field?.kind !== 'thermal_result' || field.analysisId === analysisCase.id) return null;
+  const source = caseOf(doc, field.analysisId);
+  if (source === undefined) return null;
+  return `${source.results?.resultsHash ?? ''}:${source.thermomech === undefined ? analysisInputHash(doc, source.id, 'full') : ''}`;
+}
+
+/** A recorded human disposition does not change the solution: it must not make the results stale. */
+function withoutDispositions(thermal: ThermalSetup | undefined): Omit<ThermalSetup, 'dispositions'> | null {
+  if (thermal === undefined) return null;
+  const { dispositions, ...rest } = thermal;
+  void dispositions;
+  return rest;
 }
 
 const fullInputs = (doc: CadDocument, analysisCase: AnalysisCase): Record<string, unknown> => ({
@@ -58,8 +71,11 @@ const fullInputs = (doc: CadDocument, analysisCase: AnalysisCase): Record<string
   constraints: analysisCase.constraintOrder.map((id) => analysisCase.constraints[id]),
   loads: analysisCase.loadOrder.map((id) => analysisCase.loads[id]),
   probes: analysisCase.probes,
-  thermal: analysisCase.thermal ?? null,
-  thermomech: analysisCase.thermomech ?? null,
+  thermal: withoutDispositions(analysisCase.thermal),
+  thermomech:
+    analysisCase.thermomech === undefined
+      ? null
+      : { ...analysisCase.thermomech, thermal: withoutDispositions(analysisCase.thermomech.thermal) },
   sourceResultsHash: sourceResultsHash(doc, analysisCase),
 });
 

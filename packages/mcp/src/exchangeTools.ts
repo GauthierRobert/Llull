@@ -14,6 +14,7 @@ import { isRecord } from '@lib/isRecord';
 import { nonEmptyString } from '@lib/nonEmptyString';
 import { safeFileName } from '@lib/safeFileName';
 import type { McpToolDefinition } from './tools';
+import { applyFeaToolCall, type FeaToolsPort } from './feaTools';
 import { shapeToolCallContent, type McpShapedResult } from './dispatch';
 import type { CommandOutcome } from './restProtocol';
 
@@ -45,6 +46,7 @@ export type ExchangeCommandResult = Omit<CommandOutcome, 'changed'>;
 export interface ExchangeDeps {
   readonly port: CadExchangePort | null;
   readonly dwg?: DwgConverterPort | null;
+  readonly fea?: FeaToolsPort | null; // fea_mesh / fea_solve / fea_export transports
   readonly getDoc: () => CadDocument;
   readonly applyCommand: (name: string, params: unknown) => ExchangeCommandResult; // the command bus (undo + broadcast)
   readonly allowCodeExecution: boolean; // import_code runs arbitrary Python
@@ -326,6 +328,8 @@ const EXCHANGE_HANDLERS = new Map([
  * @failure missing Python, disabled execution, script/bridge errors → isError result, document unchanged
  */
 export async function applyExchangeToolCall(toolName: string, rawArgs: unknown, deps: ExchangeDeps): Promise<McpShapedResult | null> {
+  const fea = await applyFeaToolCall(toolName, rawArgs, deps);
+  if (fea !== null) return fea;
   if (toolName === 'import_dwg') {
     if (deps.dwg === undefined || deps.dwg === null) return failure(`import_dwg ${NO_DWG}`);
     try {

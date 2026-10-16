@@ -1,6 +1,6 @@
 /** Thermal quantity kinds, dimension-checked conversion to SI and to the 05 FEA unit systems (PHY-03 TR-THM-04, TECHNICAL_SPEC 5.3). */
 
-import { convertValue, isUnitFailure, parseUnit } from '../../lib/quantity';
+import { convertValue, isUnitFailure, parseUnit } from './quantity';
 
 /** SI unit of every thermal quantity kind. */
 const SI_UNITS = {
@@ -11,6 +11,7 @@ const SI_UNITS = {
   film: 'W/(m^2*K)',
   flux: 'W/m^2',
   generation: 'W/m^3',
+  power: 'W',
   stefanBoltzmann: 'W/(m^2*K^4)',
   diffusivity: 'm^2/s',
   time: 's',

@@ -10,7 +10,7 @@ import {
   shrinkFitPressure,
   thickCylinder,
 } from './analytic';
-import { linearLaw, reReferenceSecant, secantFromInstantaneous, tableLaw, type InstantaneousLaw } from './cteConversion';
+import { linearLaw, reReferenceSecant, secantFromInstantaneous, tableLaw, type InstantaneousLaw } from '../../model/cteConversion';
 
 export const CHECKS = ['restrained', 'inclusion', 'bimetal', 'thick_cylinder', 'gradient_beam', 'shrink_fit', 'cte_secant'] as const;
 export type CheckName = (typeof CHECKS)[number];

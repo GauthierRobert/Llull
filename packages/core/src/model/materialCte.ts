@@ -3,7 +3,7 @@
  * property models (`thermalStrain` first, else `cte` with a stated basis) or (b) an explicit secant CTE. Pure; never extrapolates.
  */
 
-import { convertValue, isUnitFailure } from '../../lib/quantity';
+import { convertValue, isUnitFailure } from '../lib/quantity';
 import { sampledIntegral, tableLaw, type Alpha } from './cteConversion';
 import {
   evaluatePropertyModel,
@@ -12,9 +12,9 @@ import {
   type PropertyEvaluation,
   type PropertyEvaluationRefused,
   type PropertyRecord,
-} from '../../model/propertyModelEval';
-import type { PropertyModel } from '../../model/propertyModel';
-import type { Material } from '../../model/types';
+} from './propertyModelEval';
+import type { PropertyModel } from './propertyModel';
+import type { Material } from './types';
 
 export interface CteRefusal {
   readonly code: string;

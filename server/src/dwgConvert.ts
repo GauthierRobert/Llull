@@ -21,6 +21,7 @@ import {
   type ExchangeOptions,
 } from './pythonExchange';
 import { exchangeDirOf, positiveInteger } from './env';
+import { createFeaToolsPort } from './fea/transports';
 import { trackChild } from './childProcesses';
 
 const DEFAULT_MAX_BYTES = 50 * 1024 * 1024;
@@ -168,5 +169,5 @@ function createDwgConverterPort(env: NodeJS.ProcessEnv = process.env): DwgConver
 }
 
 export function exchangeOptionsWithDwg(env: NodeJS.ProcessEnv = process.env): ExchangeOptions {
-  return { ...exchangeOptionsFromEnv(env), dwg: createDwgConverterPort(env) };
+  return { ...exchangeOptionsFromEnv(env), dwg: createDwgConverterPort(env), fea: createFeaToolsPort(env) };
 }

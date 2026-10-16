@@ -77,7 +77,7 @@ export interface SampledIntegral {
   readonly intervals: number;
 }
 
-export const MAX_SAMPLING_STEP_KELVIN = 10;
+const MAX_SAMPLING_STEP_KELVIN = 10;
 
 function simpson(f: Alpha, a: number, b: number, intervals: number): number {
   const h = (b - a) / intervals;

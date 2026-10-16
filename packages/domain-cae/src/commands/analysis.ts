@@ -7,6 +7,7 @@ import { changed, report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { nextId } from '@lib/id';
 import { analysisInputHash } from '../hash/inputHash';
+import { stateOf } from '../shared/state';
 import { analysisOf, caseOf, withCase, withoutCase } from '../shared/access';
 import { refuseCode } from '../shared/codes';
 import { DEFAULT_FACTORS, defaultMeshControls, emptyThermalSetup, unitSystemOf } from '../shared/defaults';
@@ -192,15 +193,6 @@ export const deleteAnalysis = defineCommand({
     return changed(withoutCase(doc, analysisId), `delete_analysis: removed '${analysisId}' (${analysisCase.name}).`, [analysisId]);
   },
 });
-
-type AnalysisState = 'unmeshed' | 'meshed' | 'solved' | 'stale';
-
-function stateOf(doc: CadDocument, analysisCase: AnalysisCase): AnalysisState {
-  if (analysisCase.meshSummary === undefined) return 'unmeshed';
-  if (analysisCase.meshSummary.inputHash !== analysisInputHash(doc, analysisCase.id, 'mesh')) return 'stale';
-  if (analysisCase.results === undefined) return 'meshed';
-  return analysisCase.results.inputHash === analysisInputHash(doc, analysisCase.id, 'full') ? 'solved' : 'stale';
-}
 
 /**
  * @invariant read-only; data.state is unmeshed | meshed | solved | stale (recorded artifact input hash != the current one)

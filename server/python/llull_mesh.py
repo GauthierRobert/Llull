@@ -1,0 +1,381 @@
+"""
+llull FE mesher (bridge op `mesh`): Gmsh tetrahedral meshing of the analysed solids + target resolution.
+
+Request (all lengths in DOCUMENT units; `lengthScale` converts to the analysis unit, the output is in the analysis unit):
+  {"op": "mesh", "lengthScale": 1.0,
+   "parts": [{"entityId": "box-1", "geometry": {"kind": "step", "stepBase64": "..."} | {"kind": "stl", "stlBase64": "..."}}],
+   "targets": [{"key": "C_c1", "entityId": "box-1" | null, "facesNear": [[x,y,z]], "edgesNear": [...], "pointsNear": [...]}],
+   "controls": {"order": 1 | 2, "globalSize": 5.0, "minSize": 1.0, "refinements": [{"key": "R_0", "size": 1.0}]}}
+  (`geometry` + `entityId` at the top level is accepted for a single part; `stlBase64` is a binary STL.)
+Response: {"ok": true, "mesher", "mesherVersion", "nodes": [[id,x,y,z]], "blocks": [{"type","entityId","elements":[[id,n1..]]}],
+  "nodeSets": {key: [ids]}, "faceSets": {key: [[elementId, ccxFaceLabel]]}, "targets": {key: {"residual"}}}
+Errors: {"ok": false, "code": "FEA_*", "error": "..."} (see MeshError).
+
+Every entity is meshed in its own Gmsh model (separate volumes, no shared nodes); ids are global and contiguous (1..n).
+Faces: STEP -> OCC faces. STL -> regions grown from the facets with the classification angle (flat / smooth faces stay ONE face
+even when Gmsh splits them into patches for reparametrisation). Gmsh tet10 is reordered to CalculiX C3D10 (last two mid-edge nodes swap).
+"""
+
+import base64
+import math
+import os
+import tempfile
+
+TET4, TET10, TRI3, TRI6 = 4, 11, 2, 9
+CLASSIFY_ANGLE = math.radians(40.0)
+AMBIGUOUS_REL = 1e-6
+UNRESOLVED_REL = 1e-3
+# CalculiX tet face labels over 0-based corner indices: 1 = 1-2-3, 2 = 1-4-2, 3 = 2-4-3, 4 = 3-4-1
+CCX_FACES = ((1, (0, 1, 2)), (2, (0, 3, 1)), (3, (1, 3, 2)), (4, (2, 3, 0)))
+
+
+class MeshError(Exception):
+    def __init__(self, code, message):
+        super().__init__(message)
+        self.code = code
+
+
+def _gmsh():
+    try:
+        import gmsh  # noqa: PLC0415
+    except ImportError as error:
+        raise MeshError("FEA_TOOL_MISSING", "the gmsh Python module is missing (pip install gmsh): %s" % error)
+    return gmsh
+
+
+def _dist(a, b):
+    return math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b)))
+
+
+def _scaled_stl(data, scale, path):
+    import numpy as np  # noqa: PLC0415
+
+    count = int(np.frombuffer(data, dtype="<u4", count=1, offset=80)[0])
+    record = np.dtype([("n", "<f4", 3), ("v", "<f4", (3, 3)), ("a", "<u2")])
+    triangles = np.frombuffer(data, dtype=record, count=count, offset=84).copy()
+    triangles["v"] = triangles["v"] * scale
+    with open(path, "wb") as handle:
+        handle.write(b"\0" * 80 + np.uint32(count).tobytes() + triangles.tobytes())
+
+
+def _centroid_key(gmsh, element_nodes, coords):
+    pts = [coords[n] for n in element_nodes[:3]]
+    return tuple(round(sum(p[i] for p in pts) / 3.0, 7) for i in range(3))
+
+
+def _node_coords(gmsh):
+    tags, xyz, _ = gmsh.model.mesh.getNodes()
+    return {int(t): (float(xyz[3 * i]), float(xyz[3 * i + 1]), float(xyz[3 * i + 2])) for i, t in enumerate(tags)}
+
+
+def _surface_triangles(gmsh, surface):
+    types, _, nodes = gmsh.model.mesh.getElements(2, surface)
+    out = []
+    for etype, enodes in zip(types, nodes):
+        width = 3 if etype == TRI3 else 6
+        out += [[int(n) for n in enodes[i : i + width]] for i in range(0, len(enodes), width)]
+    return out
+
+
+def _stl_face_regions(gmsh, path):
+    """Facet-centroid -> face region id, from a classification without reparametrisation patches."""
+    gmsh.merge(path)
+    gmsh.model.mesh.classifySurfaces(CLASSIFY_ANGLE, True, False, math.pi)
+    coords = _node_coords(gmsh)
+    regions = {}
+    for _, surface in gmsh.model.getEntities(2):
+        for tri in _surface_triangles(gmsh, surface):
+            regions[_centroid_key(gmsh, tri, coords)] = surface
+    gmsh.clear()
+    return regions
+
+
+def _load_stl(gmsh, path):
+    """Discrete geometry from an STL; returns {patch surface tag: face region id}."""
+    regions = _stl_face_regions(gmsh, path)
+    gmsh.merge(path)
+    gmsh.model.mesh.classifySurfaces(CLASSIFY_ANGLE, True, True, math.pi)
+    coords = _node_coords(gmsh)
+    region_of = {}
+    for _, surface in gmsh.model.getEntities(2):
+        tris = _surface_triangles(gmsh, surface)
+        key = _centroid_key(gmsh, tris[0], coords) if tris else None
+        region_of[surface] = regions.get(key, surface)
+    gmsh.model.mesh.createGeometry()
+    surfaces = [tag for _, tag in gmsh.model.getEntities(2)]
+    loop = gmsh.model.geo.addSurfaceLoop(surfaces)
+    gmsh.model.geo.addVolume([loop])
+    gmsh.model.geo.synchronize()
+    return region_of
+
+
+def _load_step(gmsh, path, scale):
+    gmsh.option.setString("Geometry.OCCTargetUnit", "")
+    gmsh.model.occ.importShapes(path)
+    gmsh.model.occ.synchronize()
+    if scale != 1.0:
+        gmsh.model.occ.dilate(gmsh.model.occ.getEntities(), 0, 0, 0, scale, scale, scale)
+        gmsh.model.occ.synchronize()
+    if not gmsh.model.getEntities(3):
+        raise MeshError("FEA_MESH_FAILED", "the STEP geometry has no solid")
+    return {tag: tag for _, tag in gmsh.model.getEntities(2)}
+
+
+def _faces_of(gmsh, region_of, points, key, entity_id):
+    """Face regions nearest to each point; residual = the largest point-to-face distance."""
+    diag = _dist(gmsh.model.getBoundingBox(-1, -1)[:3], gmsh.model.getBoundingBox(-1, -1)[3:]) or 1.0
+    resolved, residual = set(), 0.0
+    for point in points:
+        per_region = {}
+        for surface, region in region_of.items():
+            closest, _ = gmsh.model.getClosestPoint(2, surface, list(point))
+            d = _dist(point, [float(c) for c in closest])
+            per_region[region] = min(d, per_region.get(region, math.inf))
+        ranked = sorted(per_region.items(), key=lambda item: (item[1], item[0]))
+        best_region, best = ranked[0]
+        if best > UNRESOLVED_REL * diag:
+            raise MeshError(
+                "FEA_TARGET_UNRESOLVED",
+                "target %s: no face of '%s' within %.3g of point %s (nearest is %.3g away)" % (key, entity_id, UNRESOLVED_REL * diag, list(point), best),
+            )
+        if len(ranked) > 1 and ranked[1][1] - best <= AMBIGUOUS_REL * diag:
+            raise MeshError(
+                "FEA_TARGET_AMBIGUOUS",
+                "target %s: point %s lies on the boundary between two faces of '%s'; move it into the face interior" % (key, list(point), entity_id),
+            )
+        resolved.add(best_region)
+        residual = max(residual, best)
+    return resolved, residual
+
+
+def _edges_of(gmsh, points, key, entity_id):
+    diag = _dist(gmsh.model.getBoundingBox(-1, -1)[:3], gmsh.model.getBoundingBox(-1, -1)[3:]) or 1.0
+    resolved, residual = set(), 0.0
+    for point in points:
+        ranked = sorted(
+            (_dist(point, [float(c) for c in gmsh.model.getClosestPoint(1, tag, list(point))[0]]), tag) for _, tag in gmsh.model.getEntities(1)
+        )
+        if not ranked or ranked[0][0] > UNRESOLVED_REL * diag:
+            raise MeshError("FEA_TARGET_UNRESOLVED", "target %s: no edge of '%s' near point %s" % (key, entity_id, list(point)))
+        if len(ranked) > 1 and ranked[1][0] - ranked[0][0] <= AMBIGUOUS_REL * diag:
+            raise MeshError("FEA_TARGET_AMBIGUOUS", "target %s: point %s lies on two edges of '%s'" % (key, list(point), entity_id))
+        resolved.add(ranked[0][1])
+        residual = max(residual, ranked[0][0])
+    return resolved, residual
+
+
+def _size_fields(gmsh, controls, refinements, scale):
+    """Background field: global size, locally reduced near the refinement faces / points."""
+    field = gmsh.model.mesh.field
+    global_size = float(controls["globalSize"]) * scale
+    fields = []
+    base = field.add("MathEval")
+    field.setString(base, "F", repr(global_size))
+    fields.append(base)
+    for item in refinements:
+        size = float(item["size"]) * scale
+        if item["surfaces"]:
+            distance = field.add("Distance")
+            field.setNumbers(distance, "SurfacesList", item["surfaces"])
+            field.setNumber(distance, "Sampling", 24)
+            threshold = field.add("Threshold")
+            field.setNumber(threshold, "InField", distance)
+            field.setNumber(threshold, "SizeMin", size)
+            field.setNumber(threshold, "SizeMax", global_size)
+            field.setNumber(threshold, "DistMin", size)
+            field.setNumber(threshold, "DistMax", max(2.0 * global_size, 2.0 * size))
+            fields.append(threshold)
+        for x, y, z in item["points"]:
+            ball = field.add("Ball")
+            field.setNumber(ball, "Radius", 1.5 * global_size)
+            field.setNumber(ball, "VIn", size)
+            field.setNumber(ball, "VOut", global_size)
+            field.setNumber(ball, "XCenter", x)
+            field.setNumber(ball, "YCenter", y)
+            field.setNumber(ball, "ZCenter", z)
+            field.setNumber(ball, "Thickness", global_size)
+            fields.append(ball)
+    low = field.add("Min")
+    field.setNumbers(low, "FieldsList", fields)
+    field.setAsBackgroundMesh(low)
+    gmsh.option.setNumber("Mesh.MeshSizeMax", global_size)
+    if controls.get("minSize") is not None:
+        gmsh.option.setNumber("Mesh.MeshSizeMin", float(controls["minSize"]) * scale)
+
+
+def _mesh_part(gmsh, part, targets, controls, scale, workdir):
+    """Mesh one entity in a fresh model; returns its raw mesh + target sets keyed by tags of this model."""
+    entity_id = part["entityId"]
+    geometry = part["geometry"]
+    gmsh.model.add("part_" + str(entity_id))
+    path = os.path.join(workdir, "part_%d" % len(os.listdir(workdir)))
+    if geometry["kind"] == "step":
+        with open(path + ".step", "wb") as handle:
+            handle.write(base64.b64decode(geometry["stepBase64"]))
+        region_of = _load_step(gmsh, path + ".step", scale)
+    elif geometry["kind"] == "stl":
+        _scaled_stl(base64.b64decode(geometry["stlBase64"]), scale, path + ".stl")
+        region_of = _load_stl(gmsh, path + ".stl")
+    else:
+        raise MeshError("FEA_MESH_FAILED", "unknown geometry kind %r" % geometry.get("kind"))
+
+    resolved = {}
+    for target in targets:
+        key = target["key"]
+        faces, residual, edges = set(), 0.0, set()
+        if target.get("facesNear"):
+            faces, residual = _faces_of(gmsh, region_of, [[c * scale for c in p] for p in target["facesNear"]], key, entity_id)
+        if target.get("edgesNear"):
+            if geometry["kind"] != "step":
+                raise MeshError("FEA_TARGET_UNRESOLVED", "target %s: edgesNear needs exact STEP geometry (use the OCC kernel)" % key)
+            edges, edge_residual = _edges_of(gmsh, [[c * scale for c in p] for p in target["edgesNear"]], key, entity_id)
+            residual = max(residual, edge_residual)
+        resolved[key] = {"faces": faces, "edges": edges, "residual": residual, "points": [[c * scale for c in p] for p in target.get("pointsNear") or []]}
+
+    refinements = [
+        {
+            "size": r["size"],
+            "surfaces": [s for s, region in region_of.items() if region in resolved.get(r["key"], {}).get("faces", ())],
+            "points": resolved.get(r["key"], {}).get("points", []),
+        }
+        for r in controls.get("refinements", [])
+        if r["key"] in resolved
+    ]
+    _size_fields(gmsh, controls, refinements, scale)
+    for option, value in (
+        ("Mesh.MeshSizeExtendFromBoundary", 0),
+        ("Mesh.MeshSizeFromPoints", 0),
+        ("Mesh.MeshSizeFromCurvature", 0),
+        ("Mesh.ElementOrder", int(controls["order"])),
+        ("Mesh.SecondOrderLinear", 1),
+        ("Mesh.Algorithm3D", 1),
+        ("Mesh.RandomFactor", 1e-9),
+    ):
+        gmsh.option.setNumber(option, value)
+    try:
+        gmsh.model.mesh.generate(3)
+    except Exception as error:  # noqa: BLE001 - Gmsh raises a bare Exception on meshing failure
+        raise MeshError("FEA_MESH_FAILED", "Gmsh could not mesh '%s': %s" % (entity_id, error))
+
+    coords = _node_coords(gmsh)
+    tets, wanted = [], TET10 if int(controls["order"]) == 2 else TET4
+    for _, volume in gmsh.model.getEntities(3):
+        types, _, nodes = gmsh.model.mesh.getElements(3, volume)
+        for etype, enodes in zip(types, nodes):
+            if etype != wanted:
+                raise MeshError("FEA_MESH_FAILED", "unexpected Gmsh element type %d in '%s'" % (etype, entity_id))
+            width = 10 if etype == TET10 else 4
+            for i in range(0, len(enodes), width):
+                row = [int(n) for n in enodes[i : i + width]]
+                if width == 10:
+                    row[8], row[9] = row[9], row[8]
+                tets.append(row)
+    if not tets:
+        raise MeshError("FEA_MESH_FAILED", "Gmsh produced no tetrahedra for '%s'" % entity_id)
+
+    face_index = {}
+    for position, tet in enumerate(tets):
+        for label, corners in CCX_FACES:
+            face_index.setdefault(tuple(sorted(tet[c] for c in corners)), []).append((position, label))
+    region_nodes, region_faces = {}, {}
+    for surface, region in region_of.items():
+        for tri in _surface_triangles(gmsh, surface):
+            region_nodes.setdefault(region, set()).update(tri)
+            hit = face_index.get(tuple(sorted(tri[:3])))
+            if hit:
+                region_faces.setdefault(region, []).append(hit[0])
+    curve_nodes = {}
+    for _, curve in gmsh.model.getEntities(1):
+        curve_nodes[curve] = {int(n) for n in gmsh.model.mesh.getNodes(1, curve, True)[0]}
+    return {"coords": coords, "tets": tets, "resolved": resolved, "region_nodes": region_nodes, "region_faces": region_faces, "curve_nodes": curve_nodes}
+
+
+def _nearest_node(nodes, coords, point):
+    best = min(nodes, key=lambda n: (_dist(coords[n], point), n))
+    return best, _dist(coords[best], point)
+
+
+def op_mesh(request):
+    gmsh = _gmsh()
+    parts = request.get("parts")
+    if parts is None:
+        parts = [{"entityId": request.get("entityId", "part"), "geometry": request["geometry"]}]
+    scale = float(request.get("lengthScale", 1.0))
+    controls = request["controls"]
+    targets = request.get("targets", [])
+    gmsh.initialize()
+    try:
+        gmsh.option.setNumber("General.Terminal", 0)
+        gmsh.option.setNumber("General.NumThreads", 1)
+        gmsh.option.setNumber("Mesh.MaxNumThreads1D", 1)
+        gmsh.option.setNumber("Mesh.MaxNumThreads2D", 1)
+        gmsh.option.setNumber("Mesh.MaxNumThreads3D", 1)
+        version = gmsh.__version__
+        element_type = "C3D10" if int(controls["order"]) == 2 else "C3D4"
+        nodes_out, blocks, node_sets, face_sets, residuals = [], [], {}, {}, {}
+        node_counter = element_counter = 0
+        part_nodes = {}
+        with tempfile.TemporaryDirectory(prefix="llull-mesh-") as workdir:
+            for part in parts:
+                own = [t for t in targets if t.get("entityId") == part["entityId"]]
+                gmsh.clear()
+                raw = _mesh_part(gmsh, part, own, controls, scale, workdir)
+                used = sorted({n for tet in raw["tets"] for n in tet})
+                renumber = {}
+                for tag in used:
+                    node_counter += 1
+                    renumber[tag] = node_counter
+                    nodes_out.append([node_counter, *raw["coords"][tag]])
+                part_nodes[part["entityId"]] = (used, renumber, raw["coords"])
+                elements, element_ids = [], []
+                for tet in raw["tets"]:
+                    element_counter += 1
+                    element_ids.append(element_counter)
+                    elements.append([element_counter, *(renumber[n] for n in tet)])
+                blocks.append({"type": element_type, "entityId": part["entityId"], "elements": elements})
+                for key, item in raw["resolved"].items():
+                    nodes = set()
+                    faces = []
+                    for region in item["faces"]:
+                        nodes |= raw["region_nodes"].get(region, set())
+                        faces += [[element_ids[position], label] for position, label in raw["region_faces"].get(region, [])]
+                    for curve in item["edges"]:
+                        nodes |= raw["curve_nodes"].get(curve, set())
+                    residual = item["residual"]
+                    for point in item["points"]:
+                        node, d = _nearest_node(used, raw["coords"], point)
+                        nodes.add(node)
+                        residual = max(residual, d)
+                    node_sets[key] = sorted(renumber[n] for n in nodes if n in renumber)
+                    if item["faces"]:
+                        face_sets[key] = sorted(faces)
+                    residuals[key] = {"residual": residual}
+        for target in targets:
+            key = target["key"]
+            if target.get("entityId") is None:
+                best, residual = None, math.inf
+                for entity_id, (used, renumber, coords) in part_nodes.items():
+                    for point in target.get("pointsNear") or []:
+                        node, d = _nearest_node(used, coords, [c * scale for c in point])
+                        if d < residual:
+                            best, residual = renumber[node], d
+                if best is None:
+                    raise MeshError("FEA_TARGET_UNRESOLVED", "target %s: no mesh node found" % key)
+                node_sets[key] = [best]
+                residuals[key] = {"residual": residual}
+            elif key not in residuals:
+                raise MeshError("FEA_TARGET_UNRESOLVED", "target %s: entity '%s' is not a meshed part" % (key, target.get("entityId")))
+            elif not node_sets.get(key):
+                raise MeshError("FEA_TARGET_UNRESOLVED", "target %s resolved to no mesh node" % key)
+        return {
+            "ok": True,
+            "mesher": "gmsh",
+            "mesherVersion": version,
+            "nodes": nodes_out,
+            "blocks": blocks,
+            "nodeSets": node_sets,
+            "faceSets": face_sets,
+            "targets": residuals,
+        }
+    finally:
+        gmsh.finalize()

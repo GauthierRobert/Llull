@@ -14,6 +14,9 @@ export { SERVER_INSTRUCTIONS } from './instructions';
 export type { CadExchangePort, DwgConverterPort, ProgramRun } from './exchangeTools';
 export { buildExchangeToolDefinitions, applyExchangeToolCall, exportStepFile } from './exchangeTools';
 
+export type { FeaToolsPort, FeaHost, FeaToolResult } from './feaTools';
+export { buildFeaToolDefinitions } from './feaTools';
+
 export type { ToolSearchResult } from './discovery';
 export {
   buildAllMcpTools,

@@ -1,7 +1,14 @@
 /** fit_at_temperature (PHY-04, TR-TMC-20/21): hole/shaft clearance of a mixed-material fit at operating temperatures. */
 
 import { codeOf, clearanceAt, intentOf, lameAt, statusOf, type FitIntent, type LameInput } from './fitMath';
-import { explicitCteProvider, isCteRefusal, materialCteProvider, type CteBasis, type CteProvider, type CteRefusal } from './materialCte';
+import {
+  explicitCteProvider,
+  isCteRefusal,
+  materialCteProvider,
+  type CteBasis,
+  type CteProvider,
+  type CteRefusal,
+} from '../../model/materialCte';
 import { convertTo, failed, toKelvin, type Quantity } from './thermoUnits';
 import type { CadDocument } from '../../model/types';
 import type { CommandResult } from '../types';

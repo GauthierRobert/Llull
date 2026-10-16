@@ -6,7 +6,7 @@ import { defineCommand, z } from '../schema';
 import { commandError, rejection, report } from '../noop';
 import { CHECK_SPECS, type CheckSpec, type Domain, type InputSpec } from './analyticChecks';
 import { physicalConstants } from './constants';
-import { fromSi, siToSystem, siUnitOf, toSi, UNIT_SYSTEMS, type ThermalKind } from './units';
+import { fromSi, siToSystem, siUnitOf, toSi, UNIT_SYSTEMS, type ThermalKind } from '../../lib/thermalUnits';
 
 const CHECKS = [
   'plane_wall',

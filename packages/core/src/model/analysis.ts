@@ -271,11 +271,16 @@ export type TemperatureFieldSource =
       readonly temperatureUnit: string;
     };
 
+/** Stated basis of a material's `cte` model (PHY-04 §3.3 override until PHY-01 carries one). */
+export type CteBasisSpec = { readonly kind: 'secant'; readonly referenceTemperature: Q } | { readonly kind: 'instantaneous' };
+
 export interface ThermoMechSetup {
   readonly referenceTemperature: Q;
   /** Scale the temperature field and results are reported in (recorded, never implied). */
   readonly temperatureScale: TemperatureScale;
   readonly field?: TemperatureFieldSource;
+  /** Per material id: how its `cte` property model is to be read (secant at a reference, or instantaneous). */
+  readonly cteBasis?: Readonly<Record<string, CteBasisSpec>>;
   readonly thermal?: ThermalSetup;
   readonly loadCaseName: string;
 }

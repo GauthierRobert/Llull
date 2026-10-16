@@ -1,13 +1,6 @@
 /** Pure CTE conversions (PHY-04 5.2, TR-TMC-15). */
 import { describe, expect, it } from 'vitest';
-import {
-  linearLaw,
-  reReferenceSecant,
-  sampledIntegral,
-  secantFromInstantaneous,
-  secantStrain,
-  tableLaw,
-} from '@core/commands/thermomech/cteConversion';
+import { linearLaw, reReferenceSecant, sampledIntegral, secantFromInstantaneous, secantStrain, tableLaw } from '@core/model/cteConversion';
 
 describe('cteConversion', () => {
   const law = linearLaw(2.2e-5, 1e-8, 20);

@@ -1,12 +1,15 @@
 /** The 05 FEA set-up commands (lane 1). */
 
 import { commandCatalog } from '@core/commands/schema';
+import { checkAnalysis } from './check';
 import { createAnalysis, deleteAnalysis, describeAnalysis } from './analysis';
 import { addFeaConstraint, deleteFeaConstraint, updateFeaConstraint } from './constraints';
 import { addFeaLoad, deleteFeaLoad, updateFeaLoad } from './loads';
 import { setMeshControls } from './mesh';
 import { setPartIdealization } from './parts';
 import { addResultProbe, deleteResultProbe } from './probes';
+import { recordFeMesh, recordFeaResults } from './record';
+import { feaReport } from './report';
 
 export const feaCommands = commandCatalog(
   createAnalysis,
@@ -22,4 +25,8 @@ export const feaCommands = commandCatalog(
   setMeshControls,
   addResultProbe,
   deleteResultProbe,
+  recordFeMesh,
+  recordFeaResults,
+  feaReport,
+  checkAnalysis,
 );

@@ -1,5 +1,15 @@
-/** PHY-04 thermo-mechanical FE commands (lane 3 fills this list). */
+/** PHY-04 thermo-mechanical FE commands. */
 
 import { commandCatalog } from '@core/commands/schema';
+import { checkThermoMechanical } from './check';
+import { setReferenceTemperature, setTemperatureField } from './commands';
+import { disposeFitResult } from './dispose';
+import { thermalDistortionReport } from './distortion';
 
-export const thermomechCommands = commandCatalog();
+export const thermomechCommands = commandCatalog(
+  setReferenceTemperature,
+  setTemperatureField,
+  checkThermoMechanical,
+  thermalDistortionReport,
+  disposeFitResult,
+);

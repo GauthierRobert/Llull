@@ -14,7 +14,7 @@ import {
   viewFactorParallel,
   viewFactorPerpendicular,
 } from '../../lib/thermalClosedForms';
-import type { ThermalKind } from './units';
+import type { ThermalKind } from '../../lib/thermalUnits';
 
 /** positive: > 0 · nonnegative: >= 0 · any · absolute: absolute temperature > 0 K · emissivity: 0 < eps <= 1 */
 export type Domain = 'positive' | 'nonnegative' | 'any' | 'absolute' | 'emissivity';

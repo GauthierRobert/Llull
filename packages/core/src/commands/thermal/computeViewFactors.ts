@@ -9,7 +9,7 @@ import type { CadDocument } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
 import { commandError, rejection, report } from '../noop';
-import { toSi } from './units';
+import { toSi } from '../../lib/thermalUnits';
 
 const RECIPROCITY_WARNING = 1e-3;
 const ROW_SUM_TOLERANCE = 1e-3;

@@ -1,6 +1,6 @@
 /** PHY-03 TR-THM-04: thermal unit conversions into the 05 unit systems (TECHNICAL_SPEC 5.3), 1e-12 round trip. */
 import { describe, expect, it } from 'vitest';
-import { fromSi, siToSystem, siUnitOf, systemToSi, toSi, UNIT_SYSTEMS, type ThermalKind } from '@core/commands/thermal/units';
+import { fromSi, siToSystem, siUnitOf, systemToSi, toSi, UNIT_SYSTEMS, type ThermalKind } from '@lib/thermalUnits';
 
 const SIGMA = 5.670374419e-8;
 
@@ -13,6 +13,7 @@ describe('thermal units', () => {
       ['film', 1e-3],
       ['flux', 1e-3],
       ['generation', 1e-6],
+      ['power', 1e3],
       ['stefanBoltzmann', 1e-3],
       ['temperature', 1],
       ['ratio', 1],
@@ -38,6 +39,7 @@ describe('thermal units', () => {
       'film',
       'flux',
       'generation',
+      'power',
       'stefanBoltzmann',
       'diffusivity',
       'time',
