@@ -11,7 +11,10 @@ import { entityMassProperties } from '../geometry/entityMassProperties';
 import { combineMassProperties, type InertiaTensor, type MassProperties } from '../geometry/massProperties';
 import { RAD_PER_S_PER_RPM, appliedLoadsFor, speedServoGains } from './forceLaws';
 import type { SimulationBody, SimulationJoint, SimulationLoop, SimulationModel, SimulationServo } from './physicsEngine';
+import { prepareCylinders, withCylinderForces, type CylinderRuntime } from './cylinderLoads';
 import { consistentSpeeds } from './mobility';
+import { announcedSpeed } from './timestep';
+import type { CurveCode } from './pressureCurve';
 import { buildTopology, isRefusal, type Topology, type TopologyRefusal } from './topology';
 
 /** kg/m³ of a body entity without a material: steel. */
@@ -71,22 +74,23 @@ function initialVelocities(dynamics: DynamicsModel): Record<string, number> {
   return speeds;
 }
 
+/** Moment of inertia (kg·m²) of a body about the line through `anchor` along unit `axis` (parallel-axis theorem). */
+export function inertiaAboutAxis(body: BodyMassProperties, anchor: Vec3, axis: Vec3): number {
+  const [ax, ay, az] = axis;
+  const [ixx, iyy, izz, ixy, ixz, iyz] = body.inertia;
+  const own = ixx * ax * ax + iyy * ay * ay + izz * az * az + 2 * (ixy * ax * ay + ixz * ax * az + iyz * ay * az);
+  const d = [0, 1, 2].map((i) => (body.centerOfMass[i] ?? 0) - (anchor[i] ?? 0));
+  const along = (d[0] ?? 0) * ax + (d[1] ?? 0) * ay + (d[2] ?? 0) * az;
+  const offsetSquared = d.reduce((sum, value) => sum + value * value, 0) - along * along;
+  return own + body.mass * Math.max(0, offsetSquared);
+}
+
 /** Moment of inertia (kg·m²) about `joint`'s axis of every body carried by it (its child and that child's descendants). */
 function inertiaAboutJoint(bodies: readonly SimulationBody[], joint: SimulationJoint): number {
   const carried = new Set<string>();
   for (const body of bodies)
     if (body.joint?.id === joint.id || (body.parentId !== null && carried.has(body.parentId))) carried.add(body.id);
-  const [ax, ay, az] = joint.axis;
-  return bodies
-    .filter((body) => carried.has(body.id))
-    .reduce((total, body) => {
-      const [ixx, iyy, izz, ixy, ixz, iyz] = body.inertia;
-      const own = ixx * ax * ax + iyy * ay * ay + izz * az * az + 2 * (ixy * ax * ay + ixz * ax * az + iyz * ay * az);
-      const d = [0, 1, 2].map((i) => (body.centerOfMass[i] ?? 0) - (joint.anchor[i] ?? 0));
-      const along = (d[0] ?? 0) * ax + (d[1] ?? 0) * ay + (d[2] ?? 0) * az;
-      const offsetSquared = d.reduce((sum, value) => sum + value * value, 0) - along * along;
-      return total + own + body.mass * Math.max(0, offsetSquared);
-    }, 0);
+  return bodies.filter((body) => carried.has(body.id)).reduce((total, body) => total + inertiaAboutAxis(body, joint.anchor, joint.axis), 0);
 }
 
 /** First reference from a gear / motor / propeller to a joint that cannot move (missing, or on a fixed body). */
@@ -106,6 +110,7 @@ const MIN_HALF_SPAN = 0.005;
 
 export interface BuiltSimulation {
   readonly model: SimulationModel;
+  readonly cylinders: readonly CylinderRuntime[];
   readonly mass: Record<string, BodyMassProperties>;
   readonly topology: Topology;
   readonly settings: DynamicsSolverSettings;
@@ -114,7 +119,7 @@ export interface BuiltSimulation {
 export interface BuildRefusal {
   readonly error: string;
   /** FPR_* code when the refusal has one. */
-  readonly code?: TopologyRefusal['code'];
+  readonly code?: TopologyRefusal['code'] | CurveCode;
   readonly ids?: readonly string[];
 }
 
@@ -206,13 +211,18 @@ export function buildSimulationModel(doc: CadDocument, timestep: number): BuiltS
     ];
   });
   const bodyOfJoint = Object.fromEntries(Object.values(dynamics.joints).map((joint) => [joint.id, joint.child]));
-  const loads = appliedLoadsFor(Object.values(dynamics.motors), Object.values(dynamics.propellers), bodyOfJoint);
+  const baseLoads = appliedLoadsFor(Object.values(dynamics.motors), Object.values(dynamics.propellers), bodyOfJoint);
+  const announcedRpm = announcedSpeed(dynamics) / RAD_PER_S_PER_RPM;
+  const cylinders = prepareCylinders(dynamics, topology, metres, announcedRpm > 0 ? announcedRpm : undefined);
+  if ('error' in cylinders) return cylinders;
+  const loads = cylinders.length > 0 ? withCylinderForces(baseLoads, cylinders) : baseLoads;
   const solver = {
     integrator: settings.integrator,
     loopTimeConstant: settings.loopTimeConstantSteps * timestep,
     loopImpedance: settings.loopImpedance,
   };
   return {
+    cylinders,
     model: { gravity: dynamics.gravity, bodies, gears: Object.values(dynamics.gears), loops, solver, servos, loads },
     mass,
     topology,

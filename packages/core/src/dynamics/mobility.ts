@@ -11,7 +11,7 @@ import type { Topology } from './topology';
 /** Central-difference step in tree coordinates (rad or m). */
 const DIFFERENCE_STEP = 1e-7;
 /** A pivot below this fraction of the largest one is numerically zero. */
-export const RANK_TOLERANCE = 1e-9;
+const RANK_TOLERANCE = 1e-9;
 /** Largest start-pose distance (m) between the two pins of a loop that still counts as closed (FR-FPR-12). */
 export const LOOP_OPEN_TOLERANCE_M = 1e-6;
 
@@ -166,7 +166,7 @@ function pivotedColumns(columns: readonly number[][]): Pivot[] {
   return pivots;
 }
 
-export interface RedundantRow {
+interface RedundantRow {
   readonly loop: string;
   readonly component: string;
   readonly message: string;

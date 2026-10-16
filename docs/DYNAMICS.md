@@ -7,15 +7,18 @@ The same commands run in the browser (WASM loaded on the first Simulate), in the
 
 ## The model (document data, `doc.dynamics`)
 
-| Command                                                   | What it adds                                                                                                                                                                                                              |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `add_rigid_body`                                          | entities that move as one part; mass / centre of mass / full inertia tensor from their geometry (material density, else `density` kg/m³, default steel); `massKg` rescales; `fixed` welds to ground                       |
-| `add_body_joint`                                          | revolute (shaft, hinge, crank pin) or prismatic (piston) joint to `ground` or a parent body, anchor in document units, damping, dry friction, initial speed                                                               |
-| `add_gear_coupling`                                       | rigid ratio between two joints (spur, belt, planetary), enforced as a near-rigid constraint                                                                                                                               |
-| `add_motor`                                               | `torque_curve` engine (N·m vs rpm × throttle) or `speed` governor (holds rpm, max torque)                                                                                                                                 |
-| `add_propeller`                                           | static-thrust propeller: T = Ct·ρ·n²·D⁴, P = Cp·ρ·n³·D⁵, Q = P/(2πn)                                                                                                                                                      |
-| `set_gravity`, `delete_dynamics_item`, `inspect_dynamics` | gravity vector; removal with cascade; read-only listing (mass, inertia about the joint axis, problems)                                                                                                                    |
-| `simulate_motion`                                         | read-only run: final rpm per joint, settle time, engine torque/power, propeller thrust/torque/power/tip Mach, measured gear ratios, warnings; `detail: "series"` adds time series, `"poses"` adds body poses for playback |
+| Command                                                   | What it adds                                                                                                                                                                                                                                                                                                                            |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `add_rigid_body`                                          | entities that move as one part; mass / centre of mass / full inertia tensor from their geometry (material density, else `density` kg/m³, default steel); `massKg` rescales; `fixed` welds to ground                                                                                                                                     |
+| `add_body_joint`                                          | revolute (shaft, hinge, crank pin), prismatic (piston) or spherical (ball pin, loop closure only) joint to `ground` or a parent body, anchor in document units, damping, dry friction, initial speed. A body may be the child of several joints: closed loops (see below)                                                               |
+| `add_gear_coupling`                                       | rigid ratio between two joints (spur, belt, planetary), enforced as a near-rigid constraint                                                                                                                                                                                                                                             |
+| `add_motor`                                               | `torque_curve` engine (N·m vs rpm × throttle) or `speed` governor (holds rpm, max torque)                                                                                                                                                                                                                                               |
+| `add_propeller`                                           | static-thrust propeller: T = Ct·ρ·n²·D⁴, P = Cp·ρ·n³·D⁵, Q = P/(2πn)                                                                                                                                                                                                                                                                    |
+| `add_cylinder_pressure`                                   | gas pressure on a piston (prismatic joint) driven by a crank: `table`, `wiebe` (exact IMEP calibration) or `single_zone` (Woschni heat loss) model, four- or two-stroke; crank radius, rod length and TDC read from the joints                                                                                                          |
+| `set_dynamics_solver`                                     | timestep (`auto` = 0.5 deg of crank), integrator, loop constraint stiffness and the residual tiers                                                                                                                                                                                                                                      |
+| `set_gravity`, `delete_dynamics_item`, `inspect_dynamics` | gravity vector; removal with cascade; read-only listing (mass, inertia about the joint axis, problems) plus topology, mobility, redundancy and loop gaps                                                                                                                                                                                |
+| `engine_quick_check`                                      | analytic slider-crank kinematics, torque, rod force, side thrust and MEP / torque / power without simulating                                                                                                                                                                                                                            |
+| `simulate_motion`                                         | read-only run: final rpm per joint, settle time, engine torque/power, propeller thrust/torque/power/tip Mach, measured gear ratios, warnings; `detail: "series"` adds time series, `"poses"` adds body poses for playback. With loops or cylinders also `data.loops` (residual, tier, solver), `data.reactions` and `data.engineReport` |
 
 UI: **Mechanisms › Physics** lists the bodies, runs _Simulate_, shows the operating point and an rpm chart, and replays
 the motion in the 3D view (play / scrub / slow motion down to 1/100).
@@ -83,9 +86,37 @@ body + revolute joint per planet with `parent` = the carrier body, coupled to th
 Self-checks in every result: gear-ratio deviation (with when it happened), unsettled runs, propeller tip Mach > 0.85,
 propeller figure of merit > 0.8 (no real propeller exceeds ~0.75).
 
+## Closed loops, engines and reactions (PHY-21)
+
+A joint graph may contain loops (slider-crank, four-bar, multi-cylinder engine). `dynamics/topology.ts` picks a spanning tree rooted at
+the ground (prismatic joints first, then revolute, in creation order; the last-declared joint of a loop closes it) and
+`inspect_dynamics` reports it with the mobility (Gruebler count, Jacobian rank, true degrees of freedom, redundant constraint rows and the
+suggestion to make one planar loop joint `spherical`). Tree joints are MuJoCo coordinates; a loop closure is a `connect` equality (two
+pins on the axis for a revolute joint, one for a spherical joint) with a stiff reference (`loopTimeConstantSteps` timesteps,
+`loopImpedance` 0.9999). A prismatic joint cannot close a loop (`FPR_LOOP_PRISMATIC`); a loop open at the start pose is refused before
+integrating (`FPR_LOOP_OPEN`, limit 1 µm). Loop joints have no coordinate: motors, gears, propellers and cylinder pressure sit on tree joints.
+
+`simulate_motion` reports the largest loop-constraint violation (`data.loops.residualM`) against the physical pin clearance: pass up to
+1 µm, warn up to 10 µm (`FPR_LOOP_DRIFT`, reactions approximate), fail above (reactions unreliable). The error scales with the
+acceleration of the lightest body at the pin times the square of the constraint time constant: lower the timestep for light bodies under
+large gas forces. `reactions` (`peaks` by default with loops) gives force and moment on the child of every joint and loop, in world axes
+at the joint anchor, with peak, time and crank angle. For a driven joint the component along its axis includes the drive force itself.
+
+`add_cylinder_pressure` applies the gas force as the generalised force of the piston joint; `data.engineReport` gives, over the last full
+cycle, the torque against crank angle (1 deg), mean torque, indicated power, IMEP, the cycle-energy closure (gate 0.5 %), speed ripple
+against the analytic ΔE/(I·ω²) and the peak wrist-pin, rod, side-thrust, crank-pin and main-bearing loads.
+
+| Check (`tests/unit/{mujocoLoops,mujocoEngine,mujocoEngineStatic,engineAnalytic}.test.ts`) | Source of truth                      | Result       |
+| ----------------------------------------------------------------------------------------- | ------------------------------------ | ------------ |
+| Slider-crank r 49.2125 mm, l 150 mm at 2700 rpm: piston travel against crank angle        | exact kinematics x(θ)                | < 1e-6 m     |
+| Crank held at 30..150 deg under 1000 N: crank torque, rod force, side thrust              | F·dx/dθ, F/cos β, F·tan β            | < 0.5 %      |
+| Governed engine, pressure curve from a Wiebe model: cycle energy                          | ∮T dθ against Σ∮p dV                 | < 0.5 % gate |
+| Flywheel engine: speed ripple                                                             | ΔE/(I·ω₀²) from the run torque curve | < 5 %        |
+| Gear 51/21 behind the loop mechanism                                                      | tooth counts                         | < 0.1 %      |
+
 ## Limits (by design, for now)
 
 - Propeller: static (no forward speed), coefficients supplied by the user (published data or a test); no blade-element model yet.
-- Engine: mean torque curve — no individual cylinder firing pulses, no slider-crank pistons yet.
-- No contacts / collisions (pure multibody dynamics); each body is the child of one joint (no closed loops yet).
+- Engine: a mean torque curve (`add_motor`) or, with `add_cylinder_pressure`, individual cylinder gas pulses on a slider-crank. No engine friction (FMEP), gear efficiency, tabulated propeller coefficients or calibration to a brake torque yet: indicated, not brake, values. The crank must turn in the positive sense of its joint axis.
+- No contacts / collisions (pure multibody dynamics). Loop closures are soft constraints, gated against the pin clearance (see above); a spherical joint cannot carry a body on its own.
 - Spin-up time depends on rotating inertia that is modelled: parts absent from the CAD (a crankshaft) are absent from it.

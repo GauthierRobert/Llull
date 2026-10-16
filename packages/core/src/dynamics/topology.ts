@@ -6,7 +6,7 @@
 import { GROUND, type DynamicJoint, type DynamicsModel } from '../model/dynamics';
 
 /** A joint of the spanning tree, seen in the direction the tree is rooted (ground outwards). */
-export interface TreeJoint {
+interface TreeJoint {
   readonly joint: DynamicJoint;
   /** Body (or GROUND) nearer the root. */
   readonly parent: string;
@@ -28,7 +28,7 @@ export interface Topology {
   readonly jointOfBody: ReadonlyMap<string, TreeJoint>;
 }
 
-export type TopologyCode = 'FPR_LOOP_PRISMATIC' | 'FPR_SPHERICAL_TREE' | 'FPR_JOINT_DANGLING';
+type TopologyCode = 'FPR_LOOP_PRISMATIC' | 'FPR_SPHERICAL_TREE' | 'FPR_JOINT_DANGLING';
 
 export interface TopologyRefusal {
   readonly error: string;

@@ -20,6 +20,8 @@ export interface SliderCrankOptions {
   crankInertia?: number;
   /** Shift of the wrist pin on the piston along Y, mm: makes the loop open by this much. */
   wristGapMm?: number;
+  /** Offset of the cylinder axis from the crank axis along Y, mm. Default 0. */
+  offsetMm?: number;
   /** Crank speed at t = 0, rpm (avoids the start-up transient of a governed run). */
   crankRpm?: number;
   /** Declare the joints in this order (default crank, rod, wrist, slide). */
@@ -45,13 +47,14 @@ export function sliderCrank(options: SliderCrankOptions = {}): SliderCrank {
   const { rMm = 49.2125, lMm = 150, startDeg = 0, wrist = 'spherical', pistonKg = 0.4, rodKg = 0.001 } = options;
   const angle = (startDeg * Math.PI) / 180;
   const pin = [rMm * Math.cos(angle), rMm * Math.sin(angle), 0] as const;
-  const wristX = pin[0] + Math.sqrt(lMm * lMm - pin[1] * pin[1]);
+  const offset = options.offsetMm ?? 0;
+  const wristX = pin[0] + Math.sqrt(lMm * lMm - (pin[1] - offset) ** 2);
   const crankRadius = 80;
   const crankMass = (2 * (options.crankInertia ?? 0.05)) / (crankRadius / 1000) ** 2;
   let doc = createEmptyDocument();
   const crankSolid = step(doc, 'add_cylinder', { radius: crankRadius, height: 20, axis: [0, 0, 1], position: [0, 0, 0] });
-  const rodSolid = step(crankSolid.doc, 'add_box', { size: [lMm, 10, 10], position: [(pin[0] + wristX) / 2, pin[1] / 2, 0] });
-  const pistonSolid = step(rodSolid.doc, 'add_box', { size: [30, 30, 30], position: [wristX, 0, 0] });
+  const rodSolid = step(crankSolid.doc, 'add_box', { size: [lMm, 10, 10], position: [(pin[0] + wristX) / 2, (pin[1] + offset) / 2, 0] });
+  const pistonSolid = step(rodSolid.doc, 'add_box', { size: [30, 30, 30], position: [wristX, offset, 0] });
   const crank = step(pistonSolid.doc, 'add_rigid_body', { entityIds: [crankSolid.id], massKg: crankMass, id: 'crank' });
   const rod = step(crank.doc, 'add_rigid_body', { entityIds: [rodSolid.id], massKg: rodKg, id: 'rod' });
   const piston = step(rod.doc, 'add_rigid_body', { entityIds: [pistonSolid.id], massKg: pistonKg, id: 'piston' });
@@ -63,11 +66,11 @@ export function sliderCrank(options: SliderCrankOptions = {}): SliderCrank {
       kind: wrist,
       child: 'piston',
       parent: 'rod',
-      anchor: [wristX, 0, 0],
+      anchor: [wristX, offset, 0],
       axis: [0, 0, 1],
-      ...(options.wristGapMm !== undefined ? { anchorOnChild: [wristX, options.wristGapMm, 0] } : {}),
+      ...(options.wristGapMm !== undefined ? { anchorOnChild: [wristX, offset + options.wristGapMm, 0] } : {}),
     },
-    slide_j: { kind: 'prismatic', child: 'piston', anchor: [wristX, 0, 0], axis: [1, 0, 0] },
+    slide_j: { kind: 'prismatic', child: 'piston', anchor: [wristX, offset, 0], axis: [1, 0, 0] },
   } as const;
   for (const id of options.order ?? (['crank_j', 'rod_j', 'wrist_j', 'slide_j'] as const))
     doc = step(doc, 'add_body_joint', { ...joints[id], id }).doc;

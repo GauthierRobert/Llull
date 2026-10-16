@@ -96,7 +96,7 @@ export interface SimulationLoop {
 }
 
 /** Engine-neutral solver settings. */
-export interface SimulationSolver {
+interface SimulationSolver {
   readonly integrator: 'rk4' | 'implicitfast';
   /** s: reference time constant of the loop constraints. */
   readonly loopTimeConstant: number;

@@ -11,6 +11,7 @@ import { PILOT_DURATION, PILOT_TIMESTEP, resolveTimestep } from '../../dynamics/
 import { buildTopology, isRefusal } from '../../dynamics/topology';
 import { analyseMobility } from '../../dynamics/mobility';
 import { reactionsData, residualTier, type ReactionMode } from '../../dynamics/reactions';
+import { cycleAngleSeries, engineData } from '../../dynamics/engineReport';
 import { errorMessage } from '../../lib/errorMessage';
 import { dynamicsOf } from './bodies';
 import { openLoopGaps } from './inspect';
@@ -21,7 +22,7 @@ const MAX_STEPS = 1_000_000;
 const MAX_SAMPLES = 6001;
 
 /**
- * @affects nothing — read-only; returns { ...SimulationData, loops?, reactions? } in data
+ * @affects nothing — read-only; returns { ...SimulationData, loops?, reactions?, engineReport? } in data
  * @invariant deterministic: same document + params → same data; a model without loops or cylinders returns exactly the legacy data
  * @failure no bodies, invalid model, no physics engine installed, engine error or divergence -> no-op with the reason;
  *          FPR_LOOP_PRISMATIC / FPR_SPHERICAL_TREE (topology), FPR_LOOP_OPEN (a loop is open at the start pose) -> rejected, nothing run
@@ -42,8 +43,13 @@ export const simulateMotion = defineCommand({
     '(metres), its tier (pass <= 1 µm, warn <= 10 µm = FPR_LOOP_DRIFT warn, reactions approximate; fail above, reactions unreliable) ' +
     'and the solver settings used. `reactions`: "off", "peaks" (default when the mechanism has loops) or "series": data.reactions ' +
     'gives, per joint and per loop closure, the force (N) and moment (N·m) on the child body at the joint anchor in world axes, with ' +
-    'peak magnitude, time and crank angle. The crank angle axis is the joint named by `crankAxis`. Next: read data.loops.tier first, ' +
-    'then data.reactions.',
+    'peak magnitude, time and crank angle (the crank angle axis is the cycle angle of the first cylinder, or the joint named by ' +
+    '`crankAxis`); along the axis of a driven joint the reported component includes the drive force itself. With cylinder pressures ' +
+    '(add_cylinder_pressure) the sampling defaults to one sample per crank degree and data.engineReport gives, over the last full ' +
+    'cycle: torque against crank angle per cylinder and total (detail series), mean torque (N·m), indicated power (kW), IMEP and peak ' +
+    'pressure per cylinder, cycle-energy closure (gate 0.5 %, FPR_ENERGY_CLOSURE), speed ripple against the analytic ΔE/(I·ω²), and ' +
+    'the peak wrist-pin, rod, side-thrust, crank-pin and main-bearing forces. Simulate at least one full cycle (two crank turns for a ' +
+    'four-stroke) after the speed has settled. Next: read data.loops.tier first, then data.engineReport and data.reactions.',
   params: z.object({
     duration: z.number().positive().max(600).optional().describe('Simulated seconds. Default 5.'),
     timestep: z
@@ -77,11 +83,12 @@ export const simulateMotion = defineCommand({
         commandError(topology.code, topology.error, topology.ids),
       );
     }
-    const structured = topology.loops.length > 0;
+    const hasCylinders = Object.keys(dynamics.cylinders ?? {}).length > 0;
+    const structured = topology.loops.length > 0 || hasCylinders;
     const crankAxis = params.crankAxis;
     if (crankAxis !== undefined && !topology.tree.some((entry) => entry.joint.id === crankAxis && entry.joint.kind === 'revolute'))
       return fail(`crankAxis '${crankAxis}' is not a revolute tree joint`);
-    if (structured) {
+    if (topology.loops.length > 0) {
       const open = Object.entries(openLoopGaps(analyseMobility(dynamics, topology, metres)));
       if (open.length > 0) {
         const detail = open.map(([id, gap]) => `loop joint '${id}' is open by ${(gap * 1000).toPrecision(4)} mm`).join('; ');
@@ -112,7 +119,14 @@ export const simulateMotion = defineCommand({
     const timestep = resolved.timestep;
     if (duration / timestep > MAX_STEPS)
       return fail(`duration / timestep is over ${MAX_STEPS.toLocaleString('en-US')} steps; raise the timestep`);
-    const sampleInterval = Math.max(timestep, 1 / (params.sampleRate ?? 50), duration / (MAX_SAMPLES - 1));
+    // engines: one sample per degree of crank at the top speed unless the call sets a rate
+    const degreeInterval = resolved.maxSpeed > 0 ? Math.PI / 180 / resolved.maxSpeed : 1 / 50;
+    const defaultInterval = hasCylinders ? degreeInterval : 1 / 50;
+    const sampleInterval = Math.max(
+      timestep,
+      params.sampleRate !== undefined ? 1 / params.sampleRate : defaultInterval,
+      duration / (MAX_SAMPLES - 1),
+    );
     const built = buildSimulationModel(doc, timestep);
     if ('error' in built) return fail(built.error);
     const mode: ReactionMode = params.reactions ?? (structured ? 'peaks' : 'off');
@@ -133,9 +147,24 @@ export const simulateMotion = defineCommand({
           `FPR_LOOP_DRIFT (${tier}): loop residual ${(residual * 1e6).toPrecision(3)} µm; ` +
             `${tier === 'warn' ? 'reactions are approximate' : 'reactions are unreliable'}: use a smaller timestep or set_dynamics_solver`,
         );
+      const lead = built.cylinders[0];
       const angleDeg =
-        crankAxis === undefined ? null : (trace.jointPosition[crankAxis] ?? []).map((rad) => ((((rad * 180) / Math.PI) % 360) + 360) % 360);
+        crankAxis !== undefined
+          ? (trace.jointPosition[crankAxis] ?? []).map((rad) => ((((rad * 180) / Math.PI) % 360) + 360) % 360)
+          : lead !== undefined
+            ? cycleAngleSeries(lead, trace)
+            : null;
       const reactions = mode === 'off' ? null : reactionsData({ topology, trace, mode, angleDeg, tier });
+      const engineReport = engineData({
+        dynamics,
+        topology,
+        runtimes: built.cylinders,
+        trace,
+        mass: built.mass,
+        metresPerUnit: metres,
+        series: (params.detail ?? 'summary') !== 'summary' || mode === 'series',
+      });
+      if (engineReport !== null) warnings.push(...engineReport.warnings);
       const data = {
         ...base,
         warnings,
@@ -162,9 +191,14 @@ export const simulateMotion = defineCommand({
             }
           : {}),
         ...(reactions !== null ? { reactions } : {}),
+        ...(engineReport !== null ? { engineReport } : {}),
       };
       const loopText = structured ? ` Loops: residual ${(residual * 1e6).toPrecision(3)} µm (${tier}), timestep ${timestep} s.` : '';
-      return report(doc, simulationSummary(data) + loopText, data);
+      const engineText =
+        engineReport?.meanTorqueNm != null
+          ? ` Engine ${engineReport.crankJoint}: mean torque ${engineReport.meanTorqueNm.toFixed(2)} N·m, indicated ${(engineReport.indicatedPowerKW ?? 0).toFixed(2)} kW at ${(engineReport.lastCycle?.meanRpm ?? 0).toFixed(0)} rpm, energy closure ${engineReport.energyClosure?.ratio == null ? 'not evaluated' : `${(engineReport.energyClosure.ratio * 100).toFixed(3)} %`}, speed ripple ${((engineReport.speedRipple?.measured ?? 0) * 100).toFixed(3)} %.`
+          : '';
+      return report(doc, simulationSummary(data) + loopText + engineText, data);
     } catch (error) {
       return fail(`the physics engine rejected the model: ${errorMessage(error)}`);
     }

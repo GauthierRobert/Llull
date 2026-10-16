@@ -19,7 +19,7 @@ export const PILOT_DURATION = 0.2;
 export const PILOT_TIMESTEP = 1e-4;
 
 /** Highest shaft speed (rad/s) the drives and initial speeds of `dynamics` announce; 0 when none does. */
-function announcedSpeed(dynamics: DynamicsModel): number {
+export function announcedSpeed(dynamics: DynamicsModel): number {
   const rpms = Object.values(dynamics.motors).map((motor) =>
     motor.kind === 'speed' ? motor.rpm : Math.max(...motor.curve.map((p) => p[0])),
   );

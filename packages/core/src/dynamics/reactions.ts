@@ -19,7 +19,7 @@ export interface Peak {
   readonly angleDeg: number | null;
 }
 
-export interface JointReactionPeaks {
+interface JointReactionPeaks {
   readonly forceN: Peak;
   readonly momentNm: Peak;
 }
@@ -63,7 +63,7 @@ export function childForceSeries(topology: Topology, trace: SimulationTrace, joi
 }
 
 /** Moment about the anchor on the declared child of tree joint `jointId` at each sample, or null. */
-export function childMomentSeries(topology: Topology, trace: SimulationTrace, jointId: string): Vec3[] | null {
+function childMomentSeries(topology: Topology, trace: SimulationTrace, jointId: string): Vec3[] | null {
   const tree = topology.tree.find((entry) => entry.joint.id === jointId);
   const reaction = trace.jointReaction?.[jointId];
   if (tree === undefined || reaction === undefined) return null;

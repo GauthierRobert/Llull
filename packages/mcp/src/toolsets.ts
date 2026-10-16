@@ -30,7 +30,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   ),
   assembly: words(
     'create_component insert_instance explode_instance bill_of_materials add_joint delete_joint set_joint_value add_drive_relation delete_drive_relation evaluate_motion bake_motion motion_study animate stop_animation ' +
-      'add_rigid_body add_body_joint add_gear_coupling add_motor add_propeller set_gravity delete_dynamics_item set_dynamics_solver inspect_dynamics simulate_motion',
+      'add_rigid_body add_body_joint add_gear_coupling add_motor add_propeller add_cylinder_pressure set_gravity delete_dynamics_item set_dynamics_solver inspect_dynamics engine_quick_check simulate_motion',
   ),
   exchange: words(
     'export_stl export_obj export_gltf export_step_exact export_code apply_code_trace import_mesh import_dxf export_step import_step import_dwg import_code',

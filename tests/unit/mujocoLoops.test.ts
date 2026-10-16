@@ -17,7 +17,10 @@ afterAll(() => setPhysicsEngine(null));
 
 type LoopData = SimulationData & {
   loops?: { residualM: number; tier: string; solver: { timestepS: number } };
-  reactions?: { joints: Record<string, { forceN: { value: number } }>; loops: Record<string, { forceN: { value: number } }> };
+  reactions?: {
+    joints: Record<string, { forceN: { value: number; angleDeg: number | null } }>;
+    loops: Record<string, { forceN: { value: number } }>;
+  };
 };
 
 function simulate(doc: CadDocument, params: Record<string, unknown>): LoopData {

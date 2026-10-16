@@ -439,6 +439,43 @@ export const kernelPlans: Record<string, GoldenAction[]> = {
     { command: 'sweep_profile', params: { path: xyz(2, 0, 2, 7, 0, 2, 7, 0, 8), radius: 0.5, bendRadius: 2 }, as: 'pipe' },
     { command: 'boolean', params: { op: 'union', a: '$drum', b: '$pipe' } },
   ],
+  // PHY-21: slider-crank with a spherical wrist (loop closure), gas pressure and solver settings; ids are step-scoped (cyl-<step>.<k>)
+  dynamics_slider_crank_engine: [
+    { command: 'add_cylinder', params: { radius: 80, height: 20, axis: [0, 0, 1], position: [0, 0, 0] }, as: 'crankSolid' },
+    { command: 'add_box', params: { size: [130, 10, 10], position: [48.4, 0, 0] }, as: 'rodSolid' },
+    { command: 'add_box', params: { size: [30, 30, 30], position: [145.5, 0, 0] }, as: 'pistonSolid' },
+    { command: 'add_rigid_body', params: { entityIds: ['$crankSolid'], massKg: 4, id: 'crank' } },
+    { command: 'add_rigid_body', params: { entityIds: ['$rodSolid'], massKg: 0.4, id: 'rod' } },
+    { command: 'add_rigid_body', params: { entityIds: ['$pistonSolid'], massKg: 0.4, id: 'piston' } },
+    { command: 'add_body_joint', params: { id: 'crank_j', kind: 'revolute', child: 'crank', anchor: [0, 0, 0], axis: [0, 0, 1] } },
+    {
+      command: 'add_body_joint',
+      params: { id: 'rod_j', kind: 'revolute', child: 'rod', parent: 'crank', anchor: [30.5, 0, 0], axis: [0, 0, 1] },
+    },
+    { command: 'add_body_joint', params: { id: 'wrist_j', kind: 'spherical', child: 'piston', parent: 'rod', anchor: [160.5, 0, 0] } },
+    { command: 'add_body_joint', params: { id: 'slide_j', kind: 'prismatic', child: 'piston', anchor: [160.5, 0, 0], axis: [1, 0, 0] } },
+    { command: 'set_dynamics_solver', params: { loopTimeConstantSteps: 2, loopImpedance: 0.9999 } },
+    {
+      command: 'add_cylinder_pressure',
+      params: {
+        piston: 'slide_j',
+        crank: 'crank_j',
+        boreMm: 84,
+        compressionRatio: 10.8,
+        model: {
+          kind: 'wiebe',
+          startDeg: -15,
+          durationDeg: 50,
+          a: 5,
+          m: 2,
+          compressionIndex: 1.32,
+          expansionIndex: 1.28,
+          intakePressurePa: 95000,
+          heat: { kind: 'target_imep_Pa', value: 1000000 },
+        },
+      },
+    },
+  ],
   kernel_boolean_union: [
     { command: 'add_box', params: { size: [2, 2, 2] }, as: 'a' },
     { command: 'add_box', params: { size: [2, 2, 2], position: [1, 1, 1] }, as: 'b' },
