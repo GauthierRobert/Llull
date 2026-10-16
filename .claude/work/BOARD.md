@@ -79,6 +79,13 @@ Agents are isolated; coordination is structural, run by the orchestrator:
 ## Pillar 2 — Camera control (Lane 1 command + Lane 2 viewport, PAIR)
 - `[TODO]` **W5B** Camera-control command(s): `set_camera` / `look_at` / `fit_view(direction, padding)` writing `document.camera`, and make the viewport **react to `document.camera` changes** (today `ViewPresetsInner` reads `cam` only at initial mount, so an MCP camera change is ignored live). _Lane 1 cmd + Lane 2 viewport (PAIR). deps: —. Acceptance: an MCP agent frames the model deterministically (front/iso/top + fit-all with padding) with no UI click or wheel hack; camera changes broadcast over SSE move the live camera; flagged `readOnly`/meta as appropriate so it doesn't pollute feature history._
 
+## PHY-21 — Functional digital prototype (`docs/physics/21-functional-prototype/`)
+- `[WIP]` **FPR-A** Buildability gate (FUNCTIONAL_SPEC §5.1, TECHNICAL_SPEC M1 + joint realisation): kernel `analyze`/`distance` (both kernels) + face axes, `meshBvh`, `check_assembly` (validity, pairs, connectivity, ray thickness, process table, joint realisation), `doc.prototype` intents/grounding, `allow_interference` / `remove_interference_intent` / `set_part_grounded`; VC-FPR-01…09. _Lane 1+4. branch `feat/phy21-assembly-check`._
+- `[WIP]` **FPR-B** Physically connected mechanism (FUNCTIONAL_SPEC §5.2, TECHNICAL_SPEC M2 + M3): closed loops + `spherical`, MJCF `connect`, solver settings, reactions + residual, mobility in `inspect_dynamics`, `FPR_LOOP_OPEN`; `add_cylinder_pressure` (table, Wiebe, single-zone), engine report, `engine_quick_check`; VC-FPR-10…17, 20, 21. Brake calibration (`calibrate_brake`) waits on FPR-E losses. _Lane 1 + physics. branch `feat/phy21-loops` (worktree `../Llull-phy21b`)._
+- `[TODO]` **FPR-C** `check_motion_clearance`. _deps: FPR-A, FPR-B._
+- `[TODO]` **FPR-E** Realism (M3b): accuracy envelope, sourced materials, losses, brake calibration, gear efficiency, propeller table, references. _deps: FPR-B._
+- `[TODO]` **FPR-D** Review tab + `check_prototype` + dispositions/sign-off. _deps: FPR-A…E._
+
 ## Pillar A — Procedural / computed geometry (Lane 1 cmd + Lane 2 render) — HIGHEST LEVERAGE
 - `[TODO]` **VPG2/VPG3** Render branches / draw affordances for involute + chain-path entities. _Lane 2/3. deps: PG2 (involute renders today as a `polyline` — VPG2 = tangent/normal overlay polish) / PG3._
 
