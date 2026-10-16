@@ -40,7 +40,7 @@ const burnSchema = z.object({
     .positive()
     .describe('Burn duration in crank degrees at 3000 rpm (about 35 for 0-90 % burn at medium speed); scaled by (rpm / 3000)^rpmExponent.'),
   a: z.number().positive().describe('Wiebe efficiency parameter (5 is typical for gasoline).'),
-  m: z.number().describe('Wiebe form factor (2 is typical for gasoline).'),
+  m: z.number().gt(-1).describe('Wiebe form factor, > -1 (2 is typical for gasoline).'),
   rpmExponent: z.number().optional().describe(`Exponent of the burn-duration speed scaling. Default ${DEFAULT_RPM_EXPONENT}.`),
 });
 
@@ -69,7 +69,7 @@ const modelSchema = z.object({
   startDeg: z.number().optional().describe('wiebe: start of combustion, deg (negative = before firing TDC, e.g. -15).'),
   durationDeg: z.number().positive().optional().describe('wiebe: burn duration, crank deg (e.g. 50).'),
   a: z.number().positive().optional().describe('wiebe: Wiebe a (5 is typical for gasoline).'),
-  m: z.number().optional().describe('wiebe: Wiebe m (2 is typical for gasoline).'),
+  m: z.number().gt(-1).optional().describe('wiebe: Wiebe m, > -1 (2 is typical for gasoline).'),
   compressionIndex: z
     .number()
     .optional()
@@ -173,10 +173,10 @@ export const addCylinderPressure = defineCommand({
     'polytropic compression (n_c) and expansion (n_e) with a Wiebe heat release (startDeg, durationDeg, a, m; gasoline a 5, m 2), heat ' +
     'per cycle OR calibrated exactly to a net `target_imep_Pa` (FPR_IMEP_UNREACHABLE when it is below the unfired loop). n_c, n_e and ' +
     'intakePressurePa are required, no defaults. "single_zone" = first law with Wiebe burn (ca50Deg 8-10 for MBT, or fixed startDeg; ' +
-    'durationDeg about 35 at 3000 rpm), Woschni wall heat loss (constants default to 3.26 / 2.28 / 6.18 / 0.00324, exponent -0.53, wall ' +
-    '450 K and are stored), charge at intake closing (intakePressurePa, intakeTempK), heat per cycle or per rpm (calibration to a ' +
+    'durationDeg about 35 at 3000 rpm), Woschni wall heat loss (give all six `woschni` constants, or omit the object for 3.26 / 2.28 / 6.18 / ' +
+    '0.00324, exponent -0.53, wall 450 K, which are then stored), charge at intake closing (intakePressurePa, intakeTempK), heat per cycle or per rpm (calibration to a ' +
     'brake torque needs engine losses and is not available yet). Returns the cylinder id (cyl-<step>.<k>) in affected[0]; the summary ' +
-    'gives geometry, peak pressure and IMEP. Next: simulate_motion (reactions peaks, data.engine), or engine_quick_check for a ' +
+    'gives geometry, peak pressure and IMEP. Next: simulate_motion (reactions peaks, data.engineReport), or engine_quick_check for a ' +
     'sanity check without simulation.',
   params: z.object({
     piston: z.string().describe('Id of the prismatic joint of the piston (add_body_joint kind prismatic).'),

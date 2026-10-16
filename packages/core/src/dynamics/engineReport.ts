@@ -61,17 +61,32 @@ export interface EngineData {
   readonly cylinders: CylinderReport[];
   /** Last full cycle used for the curves and means; null when the run is shorter than one cycle. */
   readonly lastCycle: { fromS: number; toS: number; meanRpm: number; resolutionDeg: number } | null;
+  /** SIMULATED mean gas torque (N·m) and indicated power (kW) over the last cycle: the gas force against the piston speed of the run. */
   readonly meanTorqueNm: number | null;
   readonly indicatedPowerKW: number | null;
+  /** The same from the pressure model and exact kinematics, independent of the simulation (what engine_quick_check gives). */
+  readonly analyticMeanTorqueNm: number | null;
+  readonly analyticIndicatedPowerKW: number | null;
+  /**
+   * Cycle-energy closure (gate 0.5 %): gas work integrated on the simulated piston speed against the loop integral of the pressure model
+   * (ratio), and, with a speed governor as the only other load, against the governor work plus the crank-body kinetic energy change.
+   */
   readonly energyClosure: {
     ratio: number | null;
     gate: number;
     status: 'pass' | 'fail' | 'not_evaluated';
-    integralJ: number;
+    simulatedWorkJ: number;
     expectedJ: number;
+    crankSide: { governorWorkJ: number; kineticChangeJ: number; ratio: number } | null;
   } | null;
-  readonly speedRipple: { measured: number; analytic: number | null; crankInertiaKgM2: number; relativeDifference: number | null } | null;
-  readonly governor: { meanTorqueNm: number; balanceError: number } | null;
+  /** measured = (w_max - w_min) / w_mean; analytic = dE / (I w^2) with I = crank body + reflected gear-coupled inertia (kg·m²). */
+  readonly speedRipple: {
+    measured: number;
+    analytic: number | null;
+    inertiaKgM2: number;
+    reflectedInertiaKgM2: number;
+    relativeDifference: number | null;
+  } | null;
   readonly torqueCurve?: { angleDeg: number[]; totalNm: number[]; perCylinderNm: Record<string, number[]> };
   readonly warnings: string[];
 }
@@ -179,10 +194,14 @@ export function engineData(input: EngineInput): EngineData | null {
   const first = input.runtimes[0];
   if (first === undefined) return null;
   const crank = first.layout.crankJoint;
-  const runtimes = input.runtimes.filter((runtime) => runtime.layout.crankJoint === crank);
+  const runtimes = input.runtimes;
   const { trace } = input;
   const warnings: string[] = [];
-  if (runtimes.length < input.runtimes.length) warnings.push(`cylinders on other cranks than '${crank}' are not reported here`);
+  for (const runtime of runtimes)
+    if (runtime.tdcMismatchDeg !== null)
+      warnings.push(
+        `cylinder '${runtime.cylinder.id}': tdcCrankAngleDeg differs from the geometric top by ${runtime.tdcMismatchDeg.toFixed(2)} deg; the kinematics follow the geometry, so the cycle angle and the piston are out of phase`,
+      );
   if (runtimes.some((runtime) => runtime.cylinder.model.kind === 'table' && runtime.cylinder.model.source === undefined))
     warnings.push('unverified: a pressure table has no source');
   const theta = trace.jointPosition[crank] ?? [];
@@ -228,7 +247,16 @@ export function engineData(input: EngineInput): EngineData | null {
     warnings.push(
       `the run covers ${(swept / RADIANS_PER_DEG).toFixed(0)} deg of crank, less than one ${first.cylinder.cycle} cycle (${cycleDeg}): simulate longer for curves, closure and ripple`,
     );
-    return { ...base, lastCycle: null, meanTorqueNm: null, indicatedPowerKW: null, energyClosure: null, speedRipple: null, governor: null };
+    return {
+      ...base,
+      lastCycle: null,
+      meanTorqueNm: null,
+      indicatedPowerKW: null,
+      analyticMeanTorqueNm: null,
+      analyticIndicatedPowerKW: null,
+      energyClosure: null,
+      speedRipple: null,
+    };
   }
   const end = elementAt(theta, theta.length - 1);
   const grid = Array.from(
@@ -237,71 +265,116 @@ export function engineData(input: EngineInput): EngineData | null {
   );
   const times = grid.map((angle) => lerpAt(theta, trace.times, angle));
   const speeds = grid.map((angle) => lerpAt(theta, omega, angle));
-  const perCylinder: Record<string, number[]> = {};
+  const simulated = new Map<string, number[]>();
+  const analytic = new Map<string, number[]>();
   for (const runtime of runtimes) {
-    perCylinder[runtime.cylinder.id] = grid.map((angle, k) => {
-      const state = cylinderState(runtime, angle, elementAt(speeds, k));
-      return state.forceN * sliderRate(runtime.layout.slider, angle - runtime.topAngleRad);
-    });
+    const pistonSpeed = trace.jointVelocity[runtime.layout.pistonJoint] ?? [];
+    const force = grid.map((angle) => cylinderState(runtime, angle).forceN);
+    // gas force Q = -headSign F on the piston joint coordinate, piston speed from the run: T = Q v / w
+    simulated.set(
+      runtime.cylinder.id,
+      grid.map((angle, k) => (-runtime.layout.headSign * elementAt(force, k) * lerpAt(theta, pistonSpeed, angle)) / elementAt(speeds, k)),
+    );
+    analytic.set(
+      runtime.cylinder.id,
+      grid.map((angle, k) => elementAt(force, k) * sliderRate(runtime.layout.slider, angle - runtime.topAngleRad)),
+    );
   }
-  const total = grid.map((_, k) => runtimes.reduce((sum, runtime) => sum + (perCylinder[runtime.cylinder.id]?.[k] ?? 0), 0));
+  const sum = (curves: ReadonlyMap<string, number[]>): number[] =>
+    grid.map((_, k) => [...curves.values()].reduce((total, curve) => total + elementAt(curve, k), 0));
+  const [total, analyticTotal] = [sum(simulated), sum(analytic)];
   const step = RESAMPLE_DEG * RADIANS_PER_DEG;
-  const integral = integrate(total, step);
+  const [simulatedWork, analyticWork] = [integrate(total, step), integrate(analyticTotal, step)];
   const duration = elementAt(times, times.length - 1) - elementAt(times, 0);
   const meanOmega = duration > 0 ? cycleRad / duration : 0;
   const meanRpm = (meanOmega * 60) / (2 * Math.PI);
-  const meanTorque = integral / cycleRad;
-  const curves = runtimes.map((runtime) => ({ curve: runtime.curveAt(meanRpm), displacement: runtime.layout.displacementM3 }));
-  const expected = curves.reduce((sum, { curve }) => sum + curve.workJ, 0);
-  const gross = curves.reduce((sum, { curve, displacement }) => sum + curve.peakPa * displacement, 0);
-  const ratio = Math.abs(expected) > MIN_NET_WORK_FRACTION * gross ? Math.abs(integral - expected) / Math.abs(expected) : null;
-  const status = ratio === null ? 'not_evaluated' : ratio <= ENERGY_CLOSURE_GATE ? 'pass' : 'fail';
-  if (status === 'fail')
-    warnings.push(
-      `FPR_ENERGY_CLOSURE (fail): the torque curve integrates to ${integral.toPrecision(5)} J but the cylinders do ${expected.toPrecision(5)} J ` +
-        `(${((ratio ?? 0) * 100).toFixed(2)} %, gate ${ENERGY_CLOSURE_GATE * 100} %): use a smaller timestep or set_dynamics_solver`,
-    );
+  const cycleIndex = cylinderState(first, end).cycleIndex;
+  const curves = runtimes.map((runtime) => ({
+    curve: runtime.curveAt(runtime.heldRpm(cycleIndex)),
+    displacement: runtime.layout.displacementM3,
+  }));
+  const expected = curves.reduce((sumWork, { curve }) => sumWork + curve.workJ, 0);
+  const gross = curves.reduce((sumGross, { curve, displacement }) => sumGross + curve.peakPa * displacement, 0);
+  const evaluated = Math.abs(expected) > MIN_NET_WORK_FRACTION * gross;
+  const ratio = evaluated ? Math.abs(simulatedWork - expected) / Math.abs(expected) : null;
   const crankJoint = input.dynamics.joints[crank];
   const crankBody = crankJoint === undefined ? undefined : input.mass[crankJoint.child];
-  const inertia =
-    crankJoint === undefined || crankBody === undefined
-      ? 0
-      : inertiaAboutAxis(crankBody, crankJoint.anchor.map((c) => c * input.metresPerUnit) as unknown as Vec3, crankJoint.axis);
+  const anchor = (crankJoint?.anchor ?? [0, 0, 0]).map((c) => c * input.metresPerUnit) as unknown as Vec3;
+  const bodyInertia = crankJoint === undefined || crankBody === undefined ? 0 : inertiaAboutAxis(crankBody, anchor, crankJoint.axis);
+  const reflected = reflectedInertia(input, crank, 1);
+  const inertia = bodyInertia + reflected;
+  const governor = Object.values(input.dynamics.motors).find((motor) => motor.kind === 'speed' && motor.joint === crank);
+  const governorSeries = governor === undefined ? undefined : trace.servoForce[governor.id];
+  let crankSide: { governorWorkJ: number; kineticChangeJ: number; ratio: number } | null = null;
+  if (evaluated && governorSeries !== undefined && onlyGovernorLoads(input.dynamics, governor?.id)) {
+    const governorWork = -integrate(
+      grid.map((angle) => lerpAt(theta, governorSeries, angle)),
+      step,
+    );
+    const kinetic = 0.5 * inertia * (elementAt(speeds, speeds.length - 1) ** 2 - elementAt(speeds, 0) ** 2);
+    crankSide = {
+      governorWorkJ: governorWork,
+      kineticChangeJ: kinetic,
+      ratio: Math.abs(simulatedWork - (governorWork + kinetic)) / Math.abs(simulatedWork),
+    };
+  }
+  const worst = Math.max(ratio ?? 0, crankSide?.ratio ?? 0);
+  const status = ratio === null ? 'not_evaluated' : worst <= ENERGY_CLOSURE_GATE ? 'pass' : 'fail';
+  if (status === 'fail')
+    warnings.push(
+      `FPR_ENERGY_CLOSURE (fail): simulated gas work ${simulatedWork.toPrecision(5)} J against the pressure model: ${expected.toPrecision(5)} J (${((ratio ?? 0) * 100).toFixed(2)} %)` +
+        `${crankSide === null ? '' : ` and the governor side (${(crankSide.ratio * 100).toFixed(2)} %)`}, gate ${ENERGY_CLOSURE_GATE * 100} %: use a smaller timestep or set_dynamics_solver`,
+    );
   const inLastCycle = trace.times.flatMap((t, i) => (t >= elementAt(times, 0) - 1e-12 ? [elementAt(omega, i)] : []));
   const measured = meanOmega > 0 ? (Math.max(...inLastCycle) - Math.min(...inLastCycle)) / meanOmega : 0;
+  const meanTorque = simulatedWork / cycleRad;
   let [cumulative, high, low] = [0, 0, 0];
   total.forEach((value, k) => {
     if (k > 0) cumulative += 0.5 * (value + elementAt(total, k - 1) - 2 * meanTorque) * step;
     [high, low] = [Math.max(high, cumulative), Math.min(low, cumulative)];
   });
-  const analytic = inertia > 0 && meanOmega > 0 ? (high - low) / (inertia * meanOmega ** 2) : null;
-  const governor = Object.values(input.dynamics.motors).find((motor) => motor.kind === 'speed' && motor.joint === crank);
-  const governed =
-    governor === undefined
-      ? undefined
-      : trace.servoForce[governor.id]?.filter((_, i) => elementAt(trace.times, i) >= elementAt(times, 0) - 1e-12);
-  const governorMean = governed === undefined || governed.length === 0 ? null : governed.reduce((sum, v) => sum + v, 0) / governed.length;
+  const rippleAnalytic = inertia > 0 && meanOmega > 0 ? (high - low) / (inertia * meanOmega ** 2) : null;
   return {
     ...base,
     lastCycle: { fromS: elementAt(times, 0), toS: elementAt(times, times.length - 1), meanRpm, resolutionDeg: RESAMPLE_DEG },
     meanTorqueNm: meanTorque,
     indicatedPowerKW: (meanTorque * meanOmega) / 1000,
-    energyClosure: { ratio, gate: ENERGY_CLOSURE_GATE, status, integralJ: integral, expectedJ: expected },
+    analyticMeanTorqueNm: analyticWork / cycleRad,
+    analyticIndicatedPowerKW: ((analyticWork / cycleRad) * meanOmega) / 1000,
+    energyClosure: { ratio, gate: ENERGY_CLOSURE_GATE, status, simulatedWorkJ: simulatedWork, expectedJ: expected, crankSide },
     speedRipple: {
       measured,
-      analytic,
-      crankInertiaKgM2: inertia,
-      relativeDifference: analytic !== null && analytic > 0 ? Math.abs(measured - analytic) / analytic : null,
+      analytic: rippleAnalytic,
+      inertiaKgM2: inertia,
+      reflectedInertiaKgM2: reflected,
+      relativeDifference: rippleAnalytic !== null && rippleAnalytic > 0 ? Math.abs(measured - rippleAnalytic) / rippleAnalytic : null,
     },
-    governor:
-      governorMean === null
-        ? null
-        : {
-            meanTorqueNm: governorMean,
-            balanceError: meanTorque !== 0 ? Math.abs(governorMean + meanTorque) / Math.abs(meanTorque) : Math.abs(governorMean),
-          },
     ...(input.series
-      ? { torqueCurve: { angleDeg: grid.map((_, k) => k * RESAMPLE_DEG), totalNm: total, perCylinderNm: perCylinder } }
+      ? { torqueCurve: { angleDeg: grid.map((_, k) => k * RESAMPLE_DEG), totalNm: total, perCylinderNm: Object.fromEntries(simulated) } }
       : {}),
   };
+}
+
+/** True when nothing but the speed governor loads the crank (no other motor, propeller, gear, damping or friction): the energy balance is closed. */
+function onlyGovernorLoads(dynamics: DynamicsModel, governorId: string | undefined): boolean {
+  return (
+    Object.values(dynamics.motors).every((motor) => motor.id === governorId) &&
+    Object.keys(dynamics.propellers).length === 0 &&
+    Object.keys(dynamics.gears).length === 0 &&
+    Object.values(dynamics.joints).every((joint) => joint.damping === 0 && joint.friction === 0)
+  );
+}
+
+/** Inertia (kg·m²) the gear-coupled joints driven by `jointId` add at that joint speed: the sum of I * (ratio chain)^2. */
+function reflectedInertia(input: EngineInput, jointId: string, factor: number): number {
+  return Object.values(input.dynamics.gears)
+    .filter((gear) => gear.driver === jointId)
+    .reduce((total, gear) => {
+      const driven = input.dynamics.joints[gear.driven];
+      const props = driven === undefined ? undefined : input.mass[driven.child];
+      if (driven === undefined || props === undefined) return total;
+      const anchor = driven.anchor.map((c) => c * input.metresPerUnit) as unknown as Vec3;
+      const ratio = factor * gear.ratio;
+      return total + inertiaAboutAxis(props, anchor, driven.axis) * ratio * ratio + reflectedInertia(input, gear.driven, ratio);
+    }, 0);
 }

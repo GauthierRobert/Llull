@@ -213,3 +213,64 @@ describe('cylinder pressures as document data', () => {
     expect(problems({ model: { kind: 'plasma' } })[0]).toMatch(/model.kind/);
   });
 });
+
+describe('load bounds mirror the command bounds', () => {
+  const { doc } = sliderCrank();
+  const dynamics = JSON.parse(JSON.stringify(doc.dynamics)) as Record<string, unknown>;
+  const solverWith = (patch: Record<string, unknown>): string[] =>
+    dynamicsProblems({ ...dynamics, solver: { ...DEFAULT_SOLVER_SETTINGS, ...patch } });
+
+  it('solver: timestep 1e-5..0.01, time constant 2..1000, pass limit not above fail limit', () => {
+    expect(solverWith({ timestepS: 1e-6 })[0]).toMatch(/1e-5\.\.0\.01/);
+    expect(solverWith({ timestepS: 0.5 })[0]).toMatch(/1e-5\.\.0\.01/);
+    expect(solverWith({ timestepS: 0.002 })).toEqual([]);
+    expect(solverWith({ loopTimeConstantSteps: 5000 })[0]).toMatch(/2\.\.1000/);
+    expect(solverWith({ loopResidualPassM: 1e-3, loopResidualFailM: 1e-5 })[0]).toMatch(/must not exceed/);
+  });
+
+  it('wiebe and burn m > -1, Woschni constants positive', () => {
+    const cylinder = (model: Record<string, unknown>): string[] =>
+      dynamicsProblems({
+        ...dynamics,
+        cylinders: {
+          c: {
+            id: 'c',
+            piston: 'slide_j',
+            crank: 'crank_j',
+            boreMm: 84,
+            compressionRatio: 10,
+            cycle: 'four_stroke',
+            firingOffsetDeg: 0,
+            tdcCrankAngleRad: null,
+            ambientPressurePa: 101325,
+            model,
+          },
+        },
+      });
+    const wiebe = {
+      kind: 'wiebe',
+      startDeg: -15,
+      durationDeg: 50,
+      a: 5,
+      m: 2,
+      compressionIndex: 1.3,
+      expansionIndex: 1.3,
+      intakePressurePa: 95000,
+      heat: { kind: 'per_cycle_J', value: 300 },
+    };
+    expect(cylinder(wiebe)).toEqual([]);
+    expect(cylinder({ ...wiebe, m: -1 })[0]).toMatch(/m > -1/);
+    const single = {
+      kind: 'single_zone',
+      burn: { ca50Deg: 9, durationDeg: 35, a: 5, m: 2, rpmExponent: 0.2 },
+      woschni: { c1: 3.26, c2Closed: 2.28, c2Exchange: 6.18, c3: 0.00324, tempExponent: -0.53, wallTempK: 450 },
+      intakePressurePa: 95000,
+      intakeTempK: 330,
+      heat: { kind: 'per_cycle_J', value: 300 },
+    };
+    expect(cylinder(single)).toEqual([]);
+    expect(cylinder({ ...single, burn: { ...single.burn, m: -2 } })[0]).toMatch(/m > -1/);
+    expect(cylinder({ ...single, woschni: { ...single.woschni, c1: 0 } })[0]).toMatch(/woschni needs/);
+    expect(cylinder({ ...single, woschni: { ...single.woschni, wallTempK: -1 } })[0]).toMatch(/woschni needs/);
+  });
+});

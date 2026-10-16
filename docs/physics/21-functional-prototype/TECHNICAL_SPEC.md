@@ -81,7 +81,7 @@ Laws respected:
 | TR-FPR-06 | MUST | `SimulationModel` gains `loops: SimulationLoop[]` and `solver: SimulationSolver`. `SimulationTrace` gains `loopForce` (per loop, world N, per sample), `jointReaction` (per tree joint: force N and moment N·m at the anchor, world axes), and `loopResidual` (max over samples, m). All three are optional on the interface so another engine may omit them; the report then marks the items `not_run`. |
 | TR-FPR-07 | MUST | MuJoCo adapter: revolute loop = two `connect` equalities at the anchor ± `axis · s` (s = half the shorter body's bounding-box extent along the axis, ≥ 5 mm, named); spherical loop = one `connect`. Each equality gets the loop `solref`/`solimp` from `solver` (§5.3). `<flag diagexact="enable"/>` when available. Reactions: `mj_rnePostConstraint` after each recorded step, `cfrc_int` moved from the subtree-COM frame to the joint anchor; loop forces from `efc_force` rows with `efc_type == mjCNSTR_EQUALITY` and matching `efc_id`, sign fixed by a static unit test; residual from `efc_pos`. |
 | TR-FPR-08 | MUST | Cylinder pressure law (§5.4) is pure core code, evaluated in `loads(state)` as a generalised force on the piston's prismatic joint, so MuJoCo applies the reaction to the cylinder's body (the joint parent) automatically. The pressure–angle table is precomputed once per run on a 0.1° grid. |
-| TR-FPR-09 | MUST | Mobility (§5.5) in core from the same topology: Gruebler count and numerical rank of the loop-constraint Jacobian at the initial pose (finite differences in tree coordinates, column-pivoted QR, rank tolerance 1e-9 relative, named). |
+| TR-FPR-09 | MUST | Mobility (§5.5) in core from the same topology: Gruebler count and numerical rank of the loop-constraint Jacobian at the initial pose (finite differences in tree coordinates, column-pivoted QR, rank tolerance 1e-6 relative = sqrt(eps), the noise floor of the differences; named). |
 | TR-FPR-10 | MUST | `check_motion_clearance` (§5.6) rebuilds part poses from `SimulationTrace.bodyPosition/bodyOrientation` (or from `motion_study` steps) and uses `meshBvh` on the kernel tessellation (tessellation tolerance reported). The worst colliding pose is re-evaluated exactly through placed recipes for volume. |
 | TR-FPR-11 | MUST | Determinism: fixed iteration orders (entity order, body order, joint creation order, pair `(i < j)` order), no `Math.random`, numbers in `data` rounded to 12 significant digits (PHY-10 TR-RBD-24 convention). |
 | TR-FPR-12 | MUST | `inputsHash` per check = sha256 of the canonical JSON of everything the check reads: recipes' `recipeKey`, transforms, dynamics slice, intents, params, kernel and engine names. Uses `@lib/hash` over canonical JSON (keys sorted). Deviation: `@lib/hash` is a 64-bit FNV-style hash, not sha256 (core has no sha256 and may not use Node crypto); it identifies inputs but is not collision-resistant against an adversary. |
@@ -446,7 +446,7 @@ with φ = 0 at firing TDC:
   force.
 - **Engine report**: per cylinder and total torque vs crank angle (resampled at 1° over the last full cycle); mean
   torque; indicated power P = T_mean·ω; IMEP = W/V_d per cylinder; cycle-energy closure
-  ε = |∮T_gas dθ − Σ W_k| / Σ W_k (named gate 0.5 %); speed ripple δ = (ω_max − ω_min)/ω_mean and the analytic
+  ε = |∮T_gas dθ − Σ W_k| / Σ W_k (named gate 0.5 %), with T_gas the SIMULATED torque (gas force against the simulated piston speed) and, when a speed governor is the only other load, also against the governor work plus the crank kinetic energy change; the analytic torque is reported separately (`analyticMeanTorqueNm`); speed ripple δ = (ω_max − ω_min)/ω_mean and the analytic
   ΔE/(I·ω₀²) [C-R25]; peak pressure and its crank angle; peaks of the derived loads.
 
 ### 5.5 Mobility (TR-FPR-09)
@@ -532,7 +532,7 @@ what needs a human, and how far to trust the numbers (calibrated vs predicted, t
 | calibration tolerance | 0.1 % on the brake target, ≤ 30 secant iterations |
 | reference band (default) | ±5 % per point [E-R20] |
 | friction smoothing ω_s | 1 rad/s |
-| mobility rank tolerance | 1e-9 × max |pivot| |
+| mobility rank tolerance | 1e-6 × max |pivot| (central-difference noise floor) |
 | thickness ray start offset | 1e-6 × part diagonal |
 | corner exclusion | 0.5 × threshold |
 | tessellation tolerance | kernel default, reported |

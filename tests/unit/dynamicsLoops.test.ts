@@ -188,3 +188,46 @@ describe('add_body_joint with loops', () => {
     expect(run({ kind: 'revolute', child: 'piston', parent: 'ghost', axis: [0, 0, 1] })).toMatch(/not found/);
   });
 });
+
+describe('mobility is frame independent', () => {
+  /** Rotate 30 deg about (1, 1, 0) / sqrt 2 and translate by [1000, 500, 1000] mm. */
+  function moved(doc: CadDocument): CadDocument {
+    const u = [Math.SQRT1_2, Math.SQRT1_2, 0] as const;
+    const [c, s] = [Math.cos(Math.PI / 6), Math.sin(Math.PI / 6)];
+    const rotate = (v: readonly number[]): [number, number, number] => {
+      const [x, y, z] = [v[0] ?? 0, v[1] ?? 0, v[2] ?? 0];
+      const dot = u[0] * x + u[1] * y;
+      const cross = [u[1] * z, -u[0] * z, u[0] * y - u[1] * x];
+      return [
+        x * c + (cross[0] ?? 0) * s + u[0] * dot * (1 - c),
+        y * c + (cross[1] ?? 0) * s + u[1] * dot * (1 - c),
+        z * c + (cross[2] ?? 0) * s,
+      ];
+    };
+    const shift = [1000, 500, 1000];
+    const joints = Object.fromEntries(
+      Object.entries(doc.dynamics!.joints).map(([id, j]) => {
+        const anchor = rotate(j.anchor);
+        return [
+          id,
+          {
+            ...j,
+            anchor: [anchor[0] + (shift[0] ?? 0), anchor[1] + (shift[1] ?? 0), anchor[2] + (shift[2] ?? 0)] as [number, number, number],
+            axis: rotate(j.axis),
+          },
+        ];
+      }),
+    );
+    return { ...doc, dynamics: { ...doc.dynamics!, joints } };
+  }
+
+  it.each([
+    ['revolute', 3],
+    ['spherical', 1],
+  ] as const)('slider-crank with a %s wrist keeps DOF 1 and %i redundant rows after a rotation and translation', (wrist, redundant) => {
+    const { mobility } = inspect(moved(sliderCrank({ wrist, startDeg: 40 }).doc));
+    expect(mobility.dof).toBe(1);
+    expect(mobility.rank).toBe(2);
+    expect(mobility.redundant).toHaveLength(redundant);
+  });
+});

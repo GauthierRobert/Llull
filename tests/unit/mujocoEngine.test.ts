@@ -17,7 +17,7 @@ beforeAll(async () => {
 afterAll(() => setPhysicsEngine(null));
 
 type EngineRun = SimulationData & {
-  reactions?: { quality: string };
+  reactions?: { quality: string; joints: Record<string, { forceN: { value: number } }> };
   engineReport?: EngineData;
   loops?: { tier: string; residualM: number; solver: { timestepS: number } };
 };
@@ -47,6 +47,8 @@ function engine(options: {
   rodKg?: number;
   imepBar?: number;
   model?: Record<string, unknown>;
+  wrist?: 'revolute' | 'spherical';
+  order?: ('crank_j' | 'rod_j' | 'wrist_j' | 'slide_j')[];
 }): { doc: CadDocument; cylinder: string } {
   const { doc } = sliderCrank({
     rMm: R * 1000,
@@ -56,6 +58,8 @@ function engine(options: {
     pistonKg: options.pistonKg ?? 0.4,
     rodKg: options.rodKg ?? 0.4,
     startDeg: 25,
+    ...(options.wrist !== undefined ? { wrist: options.wrist } : {}),
+    ...(options.order !== undefined ? { order: options.order } : {}),
   });
   const added = execute(doc, 'add_cylinder_pressure', {
     piston: 'slide_j',
@@ -102,8 +106,8 @@ describe('engine run at a governed speed', () => {
     expect(report?.torqueCurve?.angleDeg).toHaveLength(721);
   });
 
-  it('the governor supplies the opposite of the gas torque: mean torque balance within 1 %', () => {
-    expect(report?.governor?.balanceError ?? 1).toBeLessThan(0.01);
+  it('the governor work plus the crank kinetic energy change balances the simulated gas work within the 0.5 % gate', () => {
+    expect(report?.energyClosure?.crankSide?.ratio ?? 1).toBeLessThan(0.005);
   });
 
   it('keeps the loop residual in the pass tier and samples every crank degree', () => {
@@ -232,5 +236,78 @@ describe('engine run diagnostics', () => {
     const result = execute(stripped, 'simulate_motion', { duration: 0.01 });
     expect(result.data).toBeUndefined();
     expect(result.summary).toMatch(/cylinder .*no connecting rod/);
+  });
+});
+
+describe('energy closure measures the simulation', () => {
+  it('a converged run passes both the gas-work and the governor side; analytic and simulated means agree', () => {
+    const { doc } = engine({ rpm: 300, crankInertia: 2, pistonKg: 0.05, rodKg: 0.05 });
+    const data = run(governed(doc, 300), { duration: 0.45, timestep: 2e-5 });
+    const closure = data.engineReport?.energyClosure;
+    expect(closure?.status).toBe('pass');
+    expect(closure?.crankSide?.ratio ?? 1).toBeLessThan(0.005);
+    const report = data.engineReport;
+    expect(Math.abs((report?.meanTorqueNm ?? 0) - (report?.analyticMeanTorqueNm ?? 1)) / (report?.analyticMeanTorqueNm ?? 1)).toBeLessThan(
+      0.005,
+    );
+  });
+
+  it('a loose solver at a 1 ms step drifts: the simulated gas work no longer matches and FPR_ENERGY_CLOSURE fails', () => {
+    const { doc } = engine({ rpm: 300, crankInertia: 2, pistonKg: 0.05, rodKg: 0.05 });
+    const loose = execute(governed(doc, 300), 'set_dynamics_solver', { loopImpedance: 0.99, loopTimeConstantSteps: 5 }).document;
+    const data = run(loose, { duration: 0.45, timestep: 1e-3 });
+    expect(data.engineReport?.energyClosure?.status).toBe('fail');
+    expect(data.engineReport?.warnings.some((w) => w.startsWith('FPR_ENERGY_CLOSURE (fail)'))).toBe(true);
+    expect(data.loops?.tier).not.toBe('pass');
+  });
+});
+
+describe('invariances', () => {
+  it('a wrist joint walked against its declared sense gives the same torque and reactions', () => {
+    const base = engine({ rpm: 300, crankInertia: 2, pistonKg: 0.05, rodKg: 0.05, wrist: 'revolute' });
+    const flipped = engine({
+      rpm: 300,
+      crankInertia: 2,
+      pistonKg: 0.05,
+      rodKg: 0.05,
+      wrist: 'revolute',
+      order: ['slide_j', 'wrist_j', 'crank_j', 'rod_j'],
+    });
+    const [a, b] = [base, flipped].map((e) => run(governed(e.doc, 300), { duration: 0.45, timestep: 2e-5, crankAxis: 'crank_j' }));
+    expect((b as unknown as { loops: { flipped: string[] } }).loops.flipped).toContain('wrist_j');
+    const [ra, rb] = [a?.engineReport, b?.engineReport];
+    expect(Math.abs((rb?.meanTorqueNm ?? 0) - (ra?.meanTorqueNm ?? 1)) / (ra?.meanTorqueNm ?? 1)).toBeLessThan(0.005);
+    const [wa, wb] = [ra?.cylinders[0]?.derived?.wristPinN.value ?? 0, rb?.cylinders[0]?.derived?.wristPinN.value ?? 1];
+    expect(Math.abs(wa - wb) / wa).toBeLessThan(0.02);
+    const [ma, mb] = [a?.reactions?.joints['crank_j']?.forceN.value ?? 0, b?.reactions?.joints['crank_j']?.forceN.value ?? 1];
+    expect(Math.abs(ma - mb) / ma).toBeLessThan(0.02);
+  });
+
+  it('recording reactions does not change the trajectory', () => {
+    const { doc } = engine({ rpm: 1000, crankInertia: 0.3 });
+    const governedDoc = governed(doc, 1000);
+    const [off, peaks] = ['off', 'peaks'].map((reactions) => run(governedDoc, { duration: 0.1, detail: 'series', reactions }));
+    expect(peaks?.series?.jointPosition).toEqual(off?.series?.jointPosition);
+    expect(peaks?.series?.jointVelocity).toEqual(off?.series?.jointVelocity);
+  });
+
+  it('the ripple inertia includes the reflected inertia of a gear-coupled propeller', () => {
+    const { doc } = engine({ rpm: 1500, crankInertia: 0.3, pistonKg: 0.05, rodKg: 0.05 });
+    const disc = execute(doc, 'add_cylinder', { radius: 150, height: 15, axis: [0, 0, 1], position: [0, 200, 0] });
+    const body = execute(disc.document, 'add_rigid_body', { entityIds: [disc.affected[0]], id: 'prop', density: 600 });
+    const joint = execute(body.document, 'add_body_joint', {
+      kind: 'revolute',
+      child: 'prop',
+      anchor: [0, 200, 0],
+      axis: [0, 0, 1],
+      id: 'prop_j',
+    });
+    const gear = execute(joint.document, 'add_gear_coupling', { driver: 'crank_j', driven: 'prop_j', ratio: 21 / 51 });
+    const data = run(governed(gear.document, 1500), { duration: 0.2 });
+    const ripple = data.engineReport?.speedRipple;
+    const propInertia = 0.5 * (600 * Math.PI * 0.15 ** 2 * 0.015) * 0.15 ** 2;
+    expect(ripple?.reflectedInertiaKgM2 ?? 0).toBeCloseTo(propInertia * (21 / 51) ** 2, 6);
+    expect(ripple?.inertiaKgM2 ?? 0).toBeCloseTo(0.3 + (ripple?.reflectedInertiaKgM2 ?? 0), 6);
+    expect(data.engineReport?.energyClosure?.crankSide).toBeNull();
   });
 });
