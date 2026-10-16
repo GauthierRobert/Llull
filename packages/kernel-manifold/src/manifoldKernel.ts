@@ -9,8 +9,10 @@
  * @failure unsupported kind / degenerate size / non-closed mesh / Manifold error -> null
  */
 
-import type { MeshData } from '@core/model/types';
+import type { MeshData, Vec3 } from '@core/model/types';
 import type { BooleanOp } from '@core/model/types';
+import type { ShapeAnalysis, ShapeDistance } from '@core/geometry/kernel';
+import { buildMeshBvh, bvhMinDistance } from '@core/geometry/meshBvh';
 import { kernelFromOps, type CachingKernel, type KernelOps } from '@core/geometry/shapeKernel';
 import { type Entity, createEmptyDocument, is2D } from '@core/model/types';
 import { orientOutward, soupIndices } from '@core/geometry/meshVolume';
@@ -37,7 +39,12 @@ interface ManifoldShape {
   getMesh(): ManifoldMesh;
   delete(): void;
   isEmpty(): boolean;
-  status(): number;
+  status(): string;
+  volume(): number;
+  surfaceArea(): number;
+  boundingBox(): { readonly min: readonly number[]; readonly max: readonly number[] };
+  decompose(): ManifoldShape[];
+  minGap(other: ManifoldShape, searchLength: number): number;
 }
 
 interface CrossSectionShape {
@@ -202,6 +209,67 @@ function manifoldToMeshData(solid: ManifoldShape): MeshData | null {
   return { positions, indices: Array.from(mesh.triVerts) };
 }
 
+const triple = (values: readonly number[]): Vec3 => [values[0] ?? 0, values[1] ?? 0, values[2] ?? 0];
+
+/** Validity, volume and connected pieces of a Manifold (a Manifold cannot hold sheets or open shells, so `freeFaces` is 0). */
+function analyzeManifold(shape: ManifoldShape): ShapeAnalysis {
+  const status = shape.status();
+  const valid = status === 'NoError';
+  const pieces = valid && !shape.isEmpty() ? shape.decompose() : [];
+  const lumps = pieces.map((piece) => {
+    const box = piece.boundingBox();
+    return { volume: piece.volume(), area: piece.surfaceArea(), bounds: { min: triple(box.min), max: triple(box.max) } };
+  });
+  pieces.forEach(release);
+  return {
+    valid,
+    status,
+    closed: valid && !shape.isEmpty(),
+    volume: valid ? shape.volume() : 0,
+    area: valid ? shape.surfaceArea() : 0,
+    lumps,
+    freeFaces: 0,
+  };
+}
+
+/** Relative slack of the nesting test (`ShapeDistance.inside`): the overlap must reach the smaller volume within this fraction. */
+const INSIDE_TOLERANCE = 1e-6;
+
+const contains = (outer: ManifoldShape, inner: ManifoldShape): boolean => {
+  const [o, i] = [outer.boundingBox(), inner.boundingBox()];
+  const slack = 1e-9 * (1 + Math.max(...o.max.map(Math.abs), ...o.min.map(Math.abs)));
+  return [0, 1, 2].every((k) => (i.min[k] ?? 0) >= (o.min[k] ?? 0) - slack && (i.max[k] ?? 0) <= (o.max[k] ?? 0) + slack);
+};
+
+/** One shape lies inside the other: bounds nest and the intersection fills the smaller volume. */
+function nested(a: ManifoldShape, b: ManifoldShape): boolean {
+  const [volumeA, volumeB] = [a.volume(), b.volume()];
+  const [smaller, larger] = volumeA <= volumeB ? [a, b] : [b, a];
+  if (!contains(larger, smaller)) return false;
+  const common = a.intersect(b);
+  try {
+    return common.volume() >= Math.min(volumeA, volumeB) * (1 - INSIDE_TOLERANCE);
+  } finally {
+    release(common);
+  }
+}
+
+const center = (shape: ManifoldShape): Vec3 => {
+  const box = shape.boundingBox();
+  return [0, 1, 2].map((k) => ((box.min[k] ?? 0) + (box.max[k] ?? 0)) / 2) as unknown as Vec3;
+};
+
+/** `minGap` for the distance, the core BVH on the tessellations for the witness points (bounds centres when out of range). */
+function distanceManifolds(a: ManifoldShape, b: ManifoldShape, maxDistance: number): ShapeDistance | null {
+  if (a.isEmpty() || b.isEmpty() || a.status() !== 'NoError' || b.status() !== 'NoError') return null;
+  const gap = a.minGap(b, Math.max(maxDistance, 0));
+  const inside = nested(a, b);
+  const [meshA, meshB] = [manifoldToMeshData(a), manifoldToMeshData(b)];
+  const witness =
+    meshA !== null && meshB !== null ? bvhMinDistance(buildMeshBvh(meshA), buildMeshBvh(meshB), Math.max(gap, 0) + 1e-9) : null;
+  return { distance: inside ? 0 : gap, pointA: witness?.pointA ?? center(a), pointB: witness?.pointB ?? center(b), inside };
+}
+
 const COMBINE = { union: 'add', subtract: 'subtract', intersect: 'intersect' } as const;
 
 /** Manifold is a mesh kernel: no B-rep, so fillet / chamfer / shell / blend, `topology` and `exportStep` are null. */
@@ -219,6 +287,8 @@ function manifoldOps(mod: ManifoldModule): KernelOps<ManifoldShape> {
     tessellate: (shape) => withOwned(() => manifoldToMeshData(shape)),
     topology: () => null,
     exportStep: () => null,
+    analyze: analyzeManifold,
+    distance: distanceManifolds,
     release,
   };
 }

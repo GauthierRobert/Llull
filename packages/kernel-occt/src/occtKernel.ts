@@ -11,6 +11,7 @@ import { clearTangentContact } from './tangentGuard';
 import { entityToOccShape, placementTransform, transformedCopy } from './occtShapes';
 import { extractMeshData } from './occtMesh';
 import { shapeTopology, uniqueSubShapes } from './occtTopology';
+import { analyzeShape, shapeDistance } from './occtAnalysis';
 import { writeStep } from './occtStep';
 import { release, withOwned } from '@core/geometry/nativeObject';
 import {
@@ -262,6 +263,8 @@ export function occtOps(api: OccApi): KernelOps<OccShape> {
     tessellate: (shape) => guarded('fragile', () => extractMeshData(api, shape)),
     topology: (shape) => guarded('fragile', () => shapeTopology(api, shape)),
     exportStep: (shapes) => guarded('fragile', () => writeStep(api, shapes)),
+    analyze: (shape) => guarded('fragile', () => analyzeShape(api, shape)),
+    distance: (a, b) => guarded('fragile', () => shapeDistance(api, a, b)),
     release,
   };
 }

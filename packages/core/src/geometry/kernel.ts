@@ -42,6 +42,12 @@ export interface ShapeFace {
   readonly index: number;
   readonly surface: FaceSurface;
   readonly area: number;
+  /** Cylinder, cone and revolution faces (OCC): the axis line and, for a cylinder, its radius (document units). */
+  readonly axis?: { readonly origin: Vec3; readonly direction: Vec3; readonly radius?: number };
+  /** Planes (OCC): the outward unit normal of the face on its solid. */
+  readonly normal?: Vec3;
+  /** Cylinders (OCC): the solid lies inside the surface (a pin), false = outside it (a bore). */
+  readonly convex?: boolean;
 }
 
 /** Exact topology of a kernel shape (B-rep faces and edges, deduplicated, kernel order). */
@@ -51,6 +57,36 @@ export interface ShapeTopology {
   readonly edges: readonly ShapeEdge[];
   readonly vertices: number;
   readonly volume: number;
+}
+
+/** Health and lump structure of one shape (`GeometryKernel.analyze`). Lengths in document units. */
+export interface ShapeAnalysis {
+  /** The kernel accepts the shape as a valid solid. */
+  readonly valid: boolean;
+  /** Kernel status text: Manifold `ErrorStatus`, OCC `BRepCheck` summary. */
+  readonly status: string;
+  /** Watertight solid(s). */
+  readonly closed: boolean;
+  readonly volume: number;
+  readonly area: number;
+  /** Disconnected pieces (one entry for a connected shape). */
+  readonly lumps: readonly {
+    readonly volume: number;
+    readonly area: number;
+    readonly bounds: { readonly min: Vec3; readonly max: Vec3 };
+  }[];
+  /** OCC: faces outside any closed shell; Manifold cannot hold sheets, so 0. */
+  readonly freeFaces: number;
+}
+
+/** Minimum distance between two shapes (`GeometryKernel.distance`). */
+export interface ShapeDistance {
+  /** 0 when the shapes touch or intersect. */
+  readonly distance: number;
+  readonly pointA: Vec3;
+  readonly pointB: Vec3;
+  /** One shape lies inside the other (surfaces may not touch). */
+  readonly inside: boolean;
 }
 
 /**
@@ -73,6 +109,12 @@ export interface GeometryKernel {
 
   /** ISO 10303-21 (STEP AP214) text of the shapes as exact B-rep solids; null when unsupported. */
   exportStep(shapes: readonly ShapeHandle[]): string | null;
+
+  /** Validity, volume and lumps of a shape; absent or null when the kernel cannot tell (dependent checks report `not_run`). */
+  analyze?(shape: ShapeHandle): ShapeAnalysis | null;
+
+  /** Minimum distance between two shapes, searched up to `maxDistance` (document units; farther pairs may report a larger value). */
+  distance?(a: ShapeHandle, b: ShapeHandle, maxDistance: number): ShapeDistance | null;
 }
 
 let _kernel: GeometryKernel | null = null;

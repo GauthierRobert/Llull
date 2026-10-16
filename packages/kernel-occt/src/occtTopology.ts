@@ -138,12 +138,73 @@ function edgeInfo(api: OccApi, shape: OccShape, index: number, faceCount: number
   return info;
 }
 
+interface AxisHandle extends OccHandle {
+  Location(): OccPoint;
+  Direction(): OccPoint;
+}
+
+interface AnalyticSurface extends OccHandle {
+  Axis(): AxisHandle;
+  Radius?(): number;
+  Direct?(): boolean;
+}
+
+interface SurfaceAdaptor extends OccHandle {
+  GetType(): unknown;
+  Plane(): AnalyticSurface;
+  Cylinder(): AnalyticSurface;
+  Cone(): AnalyticSurface;
+  AxeOfRevolution(): AxisHandle;
+}
+
+type FaceGeometry = Pick<Mutable<ShapeFace>, 'axis' | 'normal' | 'convex'>;
+type Mutable<T> = { -readonly [K in keyof T]?: T[K] };
+
+const FORWARD = 0;
+
+function vectorOf(handle: OccPoint): Vec3 {
+  const out: Vec3 = [handle.X(), handle.Y(), handle.Z()];
+  release(handle);
+  return out;
+}
+
+/** Axis (cylinder / cone / revolution), outward plane normal and convexity of an analytic face (TR-FPR-02); {} for other surfaces. */
+function faceGeometry(face: OccShape, adaptor: SurfaceAdaptor, surface: FaceSurface): FaceGeometry {
+  const forward = (face.Orientation_1().value as number) === FORWARD;
+  if (surface === 'plane') {
+    const plane = adaptor.Plane();
+    const axis = plane.Axis();
+    const [x, y, z] = vectorOf(axis.Direction());
+    [axis, plane].forEach(release);
+    const sign = forward ? 1 : -1;
+    return { normal: [x * sign, y * sign, z * sign] };
+  }
+  if (surface === 'cylinder' || surface === 'cone') {
+    const analytic = surface === 'cylinder' ? adaptor.Cylinder() : adaptor.Cone();
+    const axis = analytic.Axis();
+    const origin = vectorOf(axis.Location());
+    const direction = vectorOf(axis.Direction());
+    const radius = surface === 'cylinder' ? analytic.Radius?.() : undefined;
+    const direct = analytic.Direct?.() ?? true;
+    [axis, analytic].forEach(release);
+    return { axis: { origin, direction, ...(radius === undefined ? {} : { radius }) }, convex: forward === direct };
+  }
+  if (surface === 'revolution') {
+    const axis = adaptor.AxeOfRevolution();
+    const info = { origin: vectorOf(axis.Location()), direction: vectorOf(axis.Direction()) };
+    release(axis);
+    return { axis: info };
+  }
+  return {};
+}
+
 function faceInfo(api: OccApi, shape: OccShape, index: number): ShapeFace {
   const face = api.TopoDS.Face_1(shape) as OccShape;
-  const adaptor = new api.BRepAdaptor_Surface_2(face, true) as OccHandle & { GetType(): unknown };
+  const adaptor = new api.BRepAdaptor_Surface_2(face, true) as SurfaceAdaptor;
   const props = new api.GProp_GProps_1() as GProps;
   api.BRepGProp.SurfaceProperties_1(face, props, false, false);
-  const info: ShapeFace = { index, surface: classify(api.GeomAbs_SurfaceType, SURFACES, adaptor.GetType(), 'other'), area: props.Mass() };
+  const surface = classify(api.GeomAbs_SurfaceType, SURFACES, adaptor.GetType(), 'other');
+  const info: ShapeFace = { index, surface, area: props.Mass(), ...faceGeometry(face, adaptor, surface) };
   [props, adaptor, face].forEach(release);
   return info;
 }
