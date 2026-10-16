@@ -7,7 +7,15 @@ import tseslint from 'typescript-eslint';
 export default tseslint.config(
   {
     // Isolated agent worktrees hold full repo copies; never lint them twice.
-    ignores: ['**/dist/**', '**/coverage/**', '**/node_modules/**', '**/*.cjs', '.claude/worktrees/**', 'desktop/build/**', 'desktop/release/**'],
+    ignores: [
+      '**/dist/**',
+      '**/coverage/**',
+      '**/node_modules/**',
+      '**/*.cjs',
+      '.claude/worktrees/**',
+      'desktop/build/**',
+      'desktop/release/**',
+    ],
   },
   js.configs.recommended,
   tseslint.configs.recommended,
