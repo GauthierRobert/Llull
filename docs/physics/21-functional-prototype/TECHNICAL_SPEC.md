@@ -16,6 +16,8 @@ Gap id **PHY-21** · prefix **FPR** · status: specification · written 2026-10-
 | Model check | `check_model`: degenerate sizes, open profiles, dangling references, far from origin, parameter errors | `packages/core/src/commands/inspect/checkModel.ts` | Nothing physical |
 | Kernel | `GeometryKernel { supports, evaluate(ShapeRecipe), tessellate, topology, exportStep }`. Recipes include `boolean` (union / subtract / intersect) and `place`. `ShapeTopology { solids, faces: { index, surface, area }[], edges, vertices, volume }` (OCC only) | `packages/core/src/geometry/kernel.ts`, `model/types.ts` ≈ l. 717 | No distance query, no validity status, no lump count on Manifold, no face axis or radius (joint realisation needs them) |
 | Mass properties | Mesh-based mass, centre of mass and inertia per body | `packages/core/src/geometry/massProperties.ts`, `dynamics/simulationModel.ts` | — |
+| Materials | `doc.materials` (`Material { name, density, color, metalness, roughness, finish? }`), `assign_material`, `BaseEntity.materialId`. `RigidBody.density` falls back to steel 7850 kg/m³ | `packages/core/src/model/types.ts` ≈ l. 644, `commands/document/materials.ts`, `model/dynamics.ts` | No source or grade on a material; the steel fallback is silent (an aluminium piston without a material weighs 2.9 × too much) |
+| Losses | Joint `damping` and `friction` per dynamic joint; no engine friction, no gear efficiency | `model/dynamics.ts` | No FMEP, no brake values |
 | UI | Mechanisms tab: Constraints, Joints, Drive relations, Physics (simulate, rpm chart `SpeedChart`, playback `DynamicsPlayer` + `dynamicsPlaybackStore` with speeds 1…1/100). Loads & forces review list + `DynamicsLoadsOverlay` (uncommitted work in progress) | `src/ui/panels/{MechanismsPanel,PhysicsSection,PhysicsLoadsSection,SpeedChart}.tsx`, `src/ui/viewport/3d/{DynamicsPlayer,DynamicsLoadsOverlay,MechanismOverlay,ClippingPlane}.tsx` | No checklist, findings, mechanism graph, crank-angle axis or Explain |
 | Mesh acceleration | `three-mesh-bvh` in the UI (`bvhSetup.ts`) | `src/ui/viewport/3d/bvhSetup.ts` | Core may not import three (`.dependency-cruiser.cjs` L2 rule) |
 | Human gate | None: no `ctx.caller`, no signature (09 PLM not built) | — | FR-FPR-31/33 need an interim gate (§11 Q5) |
@@ -39,6 +41,10 @@ packages/core/src/geometry/
 packages/core/src/dynamics/
    topology.ts (spanning tree + loop closures) · mobility.ts (Gruebler + Jacobian rank) · cylinderPressure.ts ·
    engineReport.ts (crank-angle series, MEP, energy closure, ripple) · reactions.ts (frames, derived engine loads)
+   engineLosses.ts (PNH / Chen–Flynn / table FMEP) · singleZone.ts (Wiebe + Woschni) · gearLoss.ts ·
+   propellerTable.ts (C_T(J), C_P(J)) · accuracy.ts (Accuracy envelope, validation level) · referenceCompare.ts
+packages/core/src/model/   materials catalogue with sources (al_4032, steel_4340) · reference data sets (Rotax, Lycoming)
+   commands/dynamics/  set_engine_losses · add_reference_data · compare_to_reference (query)
 packages/core/src/geometry/kernel.ts   + analyze · distance  (optional methods; null = unsupported)
 packages/kernel-manifold · packages/kernel-occt        implement them
 packages/physics-mujoco                                  connect equalities, solver settings, reactions in the trace
@@ -80,6 +86,11 @@ Laws respected:
 | TR-FPR-11 | MUST | Determinism: fixed iteration orders (entity order, body order, joint creation order, pair `(i < j)` order), no `Math.random`, numbers in `data` rounded to 12 significant digits (PHY-10 TR-RBD-24 convention). |
 | TR-FPR-12 | MUST | `inputsHash` per check = sha256 of the canonical JSON of everything the check reads: recipes' `recipeKey`, transforms, dynamics slice, intents, params, kernel and engine names. Uses `@lib/hash`. |
 | TR-FPR-13 | MUST | Agent-first result envelope on every query: `{ status, items[], provenance, unverified, reviewRequired, inputsHash }`, unit-suffixed fields, `FPR_*` codes (§7.1). |
+| TR-FPR-14 | MUST | `Accuracy` envelope (§3.4) attached to every scalar output of the engine report, the reactions and the comparison. It is built in `dynamics/accuracy.ts` from the model's inputs: each law declares its own band and basis (friction ±15 % [E-R9], combustion as calibrated, reactions inheriting the worst input band). Bands combine by root-sum-square of independent relative bands, named. A missing band propagates as `null` ("± ?"), never as 0. |
+| TR-FPR-15 | MUST | Engine losses (§5.8) are a pure core law evaluated in `loads(state)`: a torque on the crank joint, T_f = −FMEP(n, p_max)·V_d/(4π)·s(ω), with s(ω) = tanh(ω/ω_s), ω_s = 1 rad/s (named), so the cycle-average loss equals FMEP·V_d exactly at steady speed. p_max is taken from the previous cycle (first cycle: the calibration value). |
+| TR-FPR-16 | MUST | `singleZone.ts`: first-law single-zone ODE with Wiebe heat release and Woschni heat loss, RK4 on a 0.1° grid, precomputed per operating point (rpm enters through Woschni and burn scaling). The model is no longer linear in Q, so calibration uses a secant iteration on Q_total until \|brake target error\| ≤ 0.1 % (named), at most 30 iterations, else `FPR_CALIBRATION_FAILED`. |
+| TR-FPR-17 | MUST | Gear loss: on each gear equality the transmitted torque is read from the equality force (`efc_force`, as for the loop reactions). The loss (1 − η)·\|T_in\| is applied as a load on the driven joint, against its velocity. Power flow direction comes from sign(T·ω) on the driving side. |
+| TR-FPR-18 | MUST | `compare_to_reference`: per operating point, a governed run (full throttle, the point's rpm, settle + 2 cycles) or a free-equilibrium run with the propeller. It reports S from the last cycle, D, E, U_val and `origin` from the calibration set. U_num comes from the timestep-halving difference at the calibration point (FR-FPR-79); U_input comes from the input bands; U_D comes from the reference record. |
 
 ## 3. Data model
 
@@ -115,7 +126,31 @@ export interface CylinderPressure {
     | { kind: 'wiebe'; startDeg: number; durationDeg: number; a: number; m: number;
         compressionIndex: number; expansionIndex: number; intakePressurePa: number;
         heat: { kind: 'per_cycle_J'; value: number } | { kind: 'target_imep_Pa'; value: number };
+        source?: string }
+    | { kind: 'single_zone';                         // FR-FPR-72, realistic default
+        burn: { ca50Deg: number; durationDeg: number; a: number; m: number; rpmExponent: number }  // 0.2 [E-R12]
+            | { startDeg: number; durationDeg: number; a: number; m: number; rpmExponent: number };  // fixed spark
+        woschni: { c1: number; c2Closed: number; c2Exchange: number; c3: number; tempExponent: number; wallTempK: number };
+        intakePressurePa: number; intakeTempK: number;
+        heat: { kind: 'per_cycle_J'; value: number }
+            | { kind: 'calibrate_brake'; points: readonly { rpm: number; brakeTorqueNm: number }[] }
+            | { kind: 'table_vs_rpm'; points: readonly (readonly [rpm: number, joulesPerCycle: number])[]; source?: string };
         source?: string };
+}
+
+/** FR-FPR-71: mechanical losses on a crank, reported as FMEP. */
+export interface EngineLosses {
+  readonly id: string;
+  crank: string;                     // revolute joint id
+  cylinders: string[];               // CylinderPressure ids (V_d, bore, stroke, p_max come from them)
+  model:
+    | { kind: 'component'; mainBearing: { diameterMm: number; lengthMm: number; count: number };
+        rodBearing: { diameterMm: number; lengthMm: number };
+        valvetrain: 'ohv_rocker' | 'sohc_finger' | 'sohc_rocker' | 'dohc_direct'; valvesPerCylinder: number;
+        variant: 'pnh' | 'sandoval_heywood' }                    // [E-R9]
+    | { kind: 'chen_flynn'; aPa: number; bRatio: number; cPaPerRpm: number; dPaPerRpm2: number; source: string }  // [E-R10]
+    | { kind: 'fmep_table'; points: readonly (readonly [rpm: number, fmepPa: number])[]; source: string };
+  oilTempFactor: number;             // 1 = hot; cold ≈ 2.1 [E-R9]
 }
 
 export interface DynamicsSolverSettings {
@@ -123,15 +158,24 @@ export interface DynamicsSolverSettings {
   integrator: 'rk4' | 'implicitfast';
   loopTimeConstantSteps: number;     // solref timeconst = k · timestep, k ≥ 2 (MuJoCo refsafe), default 2
   loopImpedance: number;             // solimp d0 = dwidth, default 0.9999 (mjMAXIMP)
-  loopResidualGateM: number;         // default 1e-6
+  loopResidualPassM: number;         // default 1e-6 (5 % of 0.020 mm diametral pin clearance [F-R19])
+  loopResidualFailM: number;         // default 1e-5
+  timestepSensitivityGate: number;   // default 0.01 (FR-FPR-79)
 }
 
 export interface DynamicsModel {
-  gravity: Vec3; bodies; joints; gears; motors; propellers;
+  gravity: Vec3; bodies; joints; motors;
+  gears;                                         // GearPair gains efficiency (default 0.99 [E-R21]) and optional teeth: [number, number]
+  propellers;                                    // Propeller gains table?: { points: [J, ct, cp][]; source; grade } and inertiaKgM2?
   cylinders: Record<string, CylinderPressure>;   // new, default {}
+  losses: Record<string, EngineLosses>;          // new, default {}
   solver?: DynamicsSolverSettings;               // new, absent = defaults
 }
 ```
+
+`Material` (`model/types.ts`) gains optional `source?: string` and `grade?: 'A' | 'B' | 'C'`. A catalogue of sourced
+materials (`al_4032` 2680 kg/m³ [E-R32], `steel_4340` 7850 kg/m³ [E-R31]) is offered by `assign_material` by name.
+Bodies whose mass falls back to `RigidBody.density` or the 7850 default are reported (`FPR_MASS_DEFAULTED`).
 
 Load validation (`commands/persistence/dynamicsValidation.ts`) accepts both new fields, and an old document without
 them loads unchanged. The relaxed joint invariant is validated as: every body reachable from `ground` through joints
@@ -183,7 +227,19 @@ export interface ReviewSignature {
   readonly id: string; reviewer: string; at: string;
   verdict: 'approved' | 'rejected'; checkHashes: Record<string, string>; comment: string;
 }
+/** FR-FPR-77: measured or datasheet data to validate against. */
+export interface ReferenceData {
+  readonly id: string;               // e.g. 'rotax_912uls_full_throttle'
+  quantity: 'brake_torque_Nm' | 'brake_power_kW' | 'bmep_bar' | 'static_rpm' | 'propeller_rpm' | 'bsfc_g_per_kWh';
+  condition: { throttle: 'full' | 'propeller_curve'; altitudeM: number; note?: string };
+  points: readonly { rpm?: number; value: number; min?: number; max?: number; uncertainty?: number }[];  // window: min/max
+  source: string; grade: 'A' | 'B' | 'C';
+  digitised: boolean;                // read off a graph (uncertainty = reading error)
+  calibrationRpm: number[];          // points used for calibration → origin 'calibrated'
+  bandRel: number;                   // default 0.05 [E-R20]
+}
 export interface PrototypeModel {
+  references: Record<string, ReferenceData>;          // new
   intents: Record<string, InterferenceIntent>;
   grounded: string[];                                 // entity / instance ids treated as attached to the world
   dispositions: Record<string, Disposition>;
@@ -196,12 +252,22 @@ export interface PrototypeModel {
 
 ```ts
 type CheckStatus = 'pass' | 'warn' | 'fail' | 'not_run';
+/** FR-FPR-70 / TR-FPR-14 — attached to every scalar output (values[key] ↔ accuracy[key]). */
+interface Accuracy {
+  band: { rel: number } | { abs: number; unit: string } | null;   // null = "no quantitative estimate available"
+  basis: string;                                                   // source ref or method
+  origin: 'input' | 'calibrated' | 'predicted' | 'verification';
+  validationLevel: 0 | 1 | 2 | 3 | 4;                              // NASA-STD-7009 validation scale [F-R32]
+  comparison?: { referenceId: string; s: number; d: number; e: number; uVal: number | null };
+  warnings: string[];                                              // e.g. "rigid bodies: no torsional resonance"
+}
 interface CheckItem {
   code: string;                  // FPR_* (§7.1)
   status: CheckStatus;
   ids: string[];                 // entities / instances / joints / bodies
   findingKey: string;
   values: Record<string, number>;        // unit-suffixed keys: overlapVolumeMm3, minDistanceMm, thicknessMm, …
+  accuracy?: Record<string, Accuracy>;   // same keys as values (physics outputs; geometry checks use tolerances)
   threshold?: { value: number; unit: string; source: string; grade: 'A' | 'B' | 'C'; defaulted: boolean };
   witness?: { pointsMm: Vec3[]; timeS?: number; crankDeg?: number };
   remediation: string;
@@ -229,6 +295,9 @@ interface CheckResult {
 | `set_part_grounded` | mutating | `{ ids, grounded: boolean }` | `@affects doc.prototype.grounded` |
 | `add_body_joint` (extended) | mutating | `+ kind: 'spherical'`; child may already have a joint | `@invariant parent ≠ child`; `@failure loop needs a prismatic closure ⇒ FPR_LOOP_PRISMATIC` |
 | `add_cylinder_pressure` | mutating | `{ piston, crank, boreMm, compressionRatio, cycle?, firingOffsetDeg?, tdcCrankAngleDeg?, ambientPressurePa?, model }` | `@affects doc.dynamics.cylinders` · `@failure piston not prismatic, crank not revolute, bore ≤ 0, CR ≤ 1, table not covering the cycle, Wiebe a ≤ 0 or duration ≤ 0` |
+| `set_engine_losses` | mutating | `{ crank, cylinders?, model, oilTempFactor? }` | `@affects doc.dynamics.losses` · `@failure crank not revolute; component model without bearing sizes; table without source` |
+| `add_reference_data` | mutating | `ReferenceData` minus id + `{ id? }`; `preset?: 'rotax_912uls_full_throttle' \| 'rotax_912is_power_table' \| 'o320a_full_throttle' \| 'o320b_full_throttle' \| 'rotax_912_static_rpm_window'` | `@affects doc.prototype.references` · `@failure empty points, no source, band ≤ 0` |
+| `compare_to_reference` | query, physics | `{ reference: id \| 'all', points?: rpm[], detail? }` | per point S, D, E, U_val, band, origin, status; `@failure no losses on a brake quantity ⇒ FPR_NO_LOSSES (brake vs indicated would mislead)` |
 | `set_dynamics_solver` | mutating | `Partial<DynamicsSolverSettings>` | `@affects doc.dynamics.solver` · `@failure loopTimeConstantSteps < 2, impedance ∉ (0, 0.9999]` |
 | `inspect_dynamics` (extended) | query | `+ mobility: boolean (default true)` | adds `data.topology { tree, loops }`, `data.mobility { gruebler, rank, dof, redundant[] }`, `data.loopGapsM` at the start pose |
 | `engine_quick_check` | query | `{ cylinder?: id, crankRadiusMm?, rodLengthMm?, forceN?, anglesDeg?, rpm?, mepBar?, displacementCm3?, cycle? }`. Taken from the model when a cylinder id is given | analytic only (§5.4), no kernel or physics |
@@ -408,21 +477,60 @@ above the gate gives `FPR_LOOP_OPEN`.
 ### 5.7 `check_prototype`
 
 Order: `check_assembly` → `inspect_dynamics` (mobility) → `simulate_motion` (duration = settle + cycles·(720°/ω), with
-`reactions: 'peaks'`) → `check_motion_clearance` (same run). It stops at the first `fail` that makes later checks
+`reactions: 'peaks'`) → `check_motion_clearance` (same run) → realism checks (materials, plausibility, timestep
+halving) → `compare_to_reference` (when `doc.prototype.references` is non-empty). It stops at the first `fail` that makes later checks
 meaningless: an invalid part, a floating moving body, or an open loop. Each skipped check is reported as `not_run`
 with the reason. Verdict: `ready_for_review` when no `fail` remains after intents and human-accepted dispositions;
 otherwise `blocked`. `ownerSummary` (AF-36) is one sentence each: what was done, what passed (with the key numbers),
-what needs a human. It ends with "Computed by llull, not approved — needs a qualified engineer."
+what needs a human, and how far to trust the numbers (calibrated vs predicted, the largest band). It ends with
+"Computed by llull, not approved — needs a qualified engineer."
 
-### 5.8 Numerical tolerances (named, in provenance)
+### 5.8 Realism laws (FR-FPR-70…79)
+
+- **Losses** (`engineLosses.ts`). FMEP is evaluated per cycle at the mean rpm of the previous cycle.
+  - `component`: the sum of crankshaft, reciprocating (with gas-load term), valvetrain, auxiliary and pumping terms
+    [E-R9]. It is implemented **only after** the equations are checked against the primary source (§11 Q8). Until
+    then, VC-FPR-29 is the reference for the reconstructed form.
+  - `chen_flynn`: A + B·p_max + C·n + D·n² [E-R10].
+  - `fmep_table`: linear interpolation, clamped, with `FPR_OUTSIDE_VALIDATED_RANGE` outside the table.
+  - The torque is applied as in TR-FPR-15.
+  - Report: FMEP and its components, BMEP = IMEP − FMEP, brake torque = BMEP·V_d/(4π) (cross-checked against the
+    simulated mean crank torque), and η_m = BMEP/IMEP [E-R11].
+- **Single zone** (`singleZone.ts`):
+  - The ODE is dp/dθ = −k·(p/V)·dV/dθ + ((k−1)/V)·(dQ_in/dθ − dQ_loss/dθ) [E-R8], with k = 1.35 (named), and
+    dQ_loss/dθ = h·A_w·(T − T_w)/ω.
+  - h follows Woschni [E-R17][E-R18]. T comes from the ideal gas with the trapped mass, set at intake closing (BDC,
+    `intakePressurePa`, `intakeTempK`).
+  - Burn: given CA50, θ₀ = CA50 − Δθ·(ln 2/a)^{1/(m+1)} [E §2.1]. Δθ(n) = Δθ_ref·(n/n_ref)^0.2 [E-R12].
+  - Gas exchange (360–540°, 180–360°) at intake and ambient pressure, as before.
+- **Calibration**: secant iteration on Q_total (TR-FPR-16) against the brake target at each calibration point,
+  including the FMEP at that point. With several points, Q is interpolated linearly in rpm, and the result is
+  `heat: table_vs_rpm` with `origin: calibrated` at those points only.
+- **Gear loss** (`gearLoss.ts`): see TR-FPR-17. With teeth, the ratio is z₂/z₁, exact (51/21 [E-R4]).
+- **Propeller table** (`propellerTable.ts`):
+  - J = V/(nD), with n in rev/s.
+  - C_T and C_P come from the table by monotone cubic (PCHIP) interpolation. J = 0 uses the static coefficients.
+  - Thrust T = C_T·ρn²D⁴, power P = C_P·ρn³D⁵, torque Q = P/(2πn), applied against rotation [C §5].
+- **Timestep halving** (FR-FPR-79): the same calibration point at dt/2. The change in mean brake torque and in peak
+  wrist-pin force gives U_num, which is reported.
+- **Reference comparison** (TR-FPR-18): E = S − D. U_val = √(U_num² + U_input² + U_D²); missing terms are left
+  out and listed. The status uses the band: |E/D| ≤ band → pass. A miss is a fail (`FPR_REFERENCE_MISMATCH`) when
+  the reference is grade A/B and the point is a hold-out; otherwise it is a warn. Calibration points have status
+  `info`.
+
+### 5.9 Numerical tolerances (named, in provenance)
 
 | Name | Default |
 | ---- | ------- |
 | ε_touch | max(1e-3 doc units, kernel tolerance) |
 | ε_vol (relative) | 1e-6 × smaller part volume |
 | containment ratio | 0.99 |
-| loop residual gate | 1e-6 m |
+| loop residual tiers | pass ≤ 1e-6 m, warn ≤ 1e-5 m, fail above (FR-FPR-15) |
 | energy-closure gate | 0.5 % |
+| timestep-halving gate | 1 % |
+| calibration tolerance | 0.1 % on the brake target, ≤ 30 secant iterations |
+| reference band (default) | ±5 % per point [E-R20] |
+| friction smoothing ω_s | 1 rad/s |
 | mobility rank tolerance | 1e-9 × max |pivot| |
 | thickness ray start offset | 1e-6 × part diagonal |
 | corner exclusion | 0.5 × threshold |
@@ -482,7 +590,14 @@ use distinct shapes (✔ ▲ ✖ ○ ◌) with text [D-R43][D-R44].
 | `FPR_LOOP_PRISMATIC` | refusal | loop would close through a prismatic joint → re-order or make that joint a tree joint |
 | `FPR_LOOP_OPEN` | fail | loop gap at the start pose → fix the anchors or geometry |
 | `FPR_REDUNDANT_CONSTRAINT` | warn | redundant direction at a loop → use `spherical` for that joint |
-| `FPR_LOOP_DRIFT` | fail | residual above the gate → smaller timestep, `set_dynamics_solver` |
+| `FPR_LOOP_DRIFT` | warn / fail | residual 1–10 µm (warn) or > 10 µm (fail) → smaller timestep, `set_dynamics_solver` |
+| `FPR_MASS_DEFAULTED` | warn | body mass from the default density → `assign_material` with a sourced material |
+| `FPR_UNREALISTIC` | warn | value outside its plausibility band (value, band, source) → check the input named in the item |
+| `FPR_OUTSIDE_VALIDATED_RANGE` | warn | operating point outside the propeller table / reference / friction data |
+| `FPR_REFERENCE_MISMATCH` | fail / warn | hold-out point outside its band (S, D, E, U_val) → review the model input with the largest band |
+| `FPR_TIMESTEP_SENSITIVE` | warn | halving dt changes results by > 1 % → smaller timestep |
+| `FPR_CALIBRATION_FAILED` | refusal | brake target not reached (target, best, iterations) |
+| `FPR_NO_LOSSES` | refusal | brake comparison without `set_engine_losses` |
 | `FPR_ENERGY_CLOSURE` | fail | ∮T dθ ≠ Σ∮p dV beyond the gate → timestep or loop settings |
 | `FPR_PRESSURE_TABLE_GAP` | refusal | table does not cover the cycle |
 | `FPR_IMEP_UNREACHABLE` | refusal | target IMEP below the motored work |
@@ -501,6 +616,7 @@ use distinct shapes (✔ ▲ ✖ ○ ◌) with text [D-R43][D-R44].
 | Thickness rays | 2000 per part by default, 200 000 total |
 | `check_motion_clearance` | 4000 samples × 200 pairs; reference engine < 5 s on the desktop |
 | Simulation | 2 × 10⁶ steps (reference engine: 2 cycles at 5800 rpm, dt 14.4 µs ≈ 2900 steps) |
+| `compare_to_reference` | ≤ 12 operating points × (settle + 2 cycles); Rotax curve (9 points) < 30 s on the desktop; the timestep-halving run is counted once |
 | Review tab | open a saved result < 300 ms; playback ≥ 30 fps with overlays |
 
 ## 9. Test strategy (VC mapping)
@@ -512,6 +628,9 @@ use distinct shapes (✔ ▲ ✖ ○ ◌) with text [D-R43][D-R44].
 | Unit, dynamics | topology (BFS order, prismatic preference, flips), mobility rank on slider-crank and four-bar, Wiebe calibration linearity, exact slider-crank formulas vs `engine_quick_check` | VC-FPR-15, 20 |
 | MuJoCo integration (`tests/unit/mujocoPhysics*.test.ts`) | kinematics, static torque, reactions, residual, energy closure, gear ratio, flywheel ripple | VC-FPR-10…17, 21 |
 | Motion clearance | rotating bar vs block: analytic clearance and contact interval | VC-FPR-18, 19 |
+| Unit, realism laws | PNH terms (VC-29), material mass (VC-30), gear loss (VC-27), single-zone calibration convergence, PCHIP propeller table, accuracy band propagation (RSS, `null` stays `null`), E/U_val with synthetic S (VC-31), loop tiers (VC-35) | VC-FPR-27, 29…31, 34…36 |
+| MuJoCo integration, realism | motored inertia torque (VC-28), brake calibration (VC-15), timestep halving (VC-33), friction torque cycle average = FMEP·V_d (TR-FPR-15) | VC-FPR-15, 28, 33 |
+| Validation (V1, production gate) | four-cylinder Rotax-class reference against the full-throttle curve and the static rpm window; result recorded, misses listed (KPI, not a CI gate) | VC-FPR-31, 32 |
 | Contract | `toToolSchemas()` snapshot gains the new commands; load validation of the new slices; `is pure` on every command | VC-FPR-23 |
 | Golden | `build_project` plan of the reference engine → id-normalised snapshot + replay equality | VC-FPR-24 |
 | Component (Testing Library) | checklist row (icon + word + value + source), findings filter and disposition dispatch, sign-off disabled reason, Explain content, mechanism graph rendering | VC-FPR-22, 25 |
@@ -525,18 +644,22 @@ use distinct shapes (✔ ▲ ✖ ○ ◌) with text [D-R43][D-R44].
 | M1 | Kernel `analyze` + `distance` (both kernels), `meshBvh`, `check_assembly` (validity, pairs, connectivity, ray thickness, process table), intents and grounding commands, codes, unit tests VC-01…08 | 1 (core + kernels) | — | 2 w |
 | M2 | Dynamics topology, loops in MJCF, solver settings, reactions + residual in the trace, mobility in `inspect_dynamics`, VC-10…13, 20, 21 | 1 + physics | — (parallel with M1) | 2 w |
 | M3 | `add_cylinder_pressure` (table, Wiebe, calibration), engine report, `engine_quick_check`, VC-14…17 | 1 | M2 | 1.5 w |
-| M4 | `check_motion_clearance`, `check_prototype`, joint realisation (OCC topology axes), VC-09, 18, 19, 24; reference engine plan | 1 | M1, M3 | 1.5 w |
+| M3b | Realism: `Accuracy` envelope, materials with sources + `FPR_MASS_DEFAULTED`, `set_engine_losses` (after Q8), single-zone Woschni + brake calibration, gear efficiency, propeller C_T(J)/C_P(J) + inertia check, plausibility checks, `add_reference_data` presets, `compare_to_reference`, timestep halving; VC-15, 27…36 | 1 | M3 | 2.5 w |
+| M4 | `check_motion_clearance`, `check_prototype`, joint realisation (OCC topology axes), VC-09, 18, 19, 24; reference engine plan | 1 | M1, M3b | 1.5 w |
 | M5 | Review tab: checklist, findings + overlay, mechanism graph, timeline dock with crank axis + `SeriesChart`, reaction arrows, thickness map, Explain, dispositions + interim sign-off; component + e2e tests VC-22, 25, 26 | 2 (+3 for overlays) | M1 data shapes (can start on fixtures after M1), M4 | 2.5 w |
-| V1 | Fits on joints, inscribed-sphere thickness, C_T(J)/C_P(J) propeller, swept volume, Rotax-class 4-cylinder reference with gearbox, reaction export to 05 / PHY-10 | 1, 2 | MVP | 3 w |
+| V1 | Fits on joints, inscribed-sphere thickness, swept volume, Rotax-class 4-cylinder reference with gearbox validated against the full-throttle curve and static rpm window, load-dependent joint friction, cycle-to-cycle variation, bsfc, reaction export to 05 / PHY-10 | 1, 2 | MVP | 3.5 w |
 
-MVP is about 9.5 weeks of agent lane time. M1 and M2 run in parallel; M5 starts on fixtures after M1.
+M5 also covers the accuracy badges, the "Matches reality" row and the reference overlays on charts (FR-FPR-62/63),
+within its 2.5 w. MVP is about 12 weeks of agent lane time. M1 and M2 run in parallel; M5 starts on fixtures after M1.
 
 ## 11. Open questions / decisions needed
 
-1. **PHY-10 vs MuJoCo.** PHY-10 specifies its own index-3 solver because MuJoCo's soft constraints are "not for
-   reactions of record". The code merged MuJoCo. Proposal: PHY-21 delivers on MuJoCo with the residual gate and
-   analytic cross-checks, and reactions stay `reviewRequired`. PHY-10's solver, if ever built, becomes the
-   load-of-record path for exports to FEA. Needs a user decision.
+1. **PHY-10 vs MuJoCo. Decided 2026-10-16 (owner): "reflect reality, not 100 % exact but accurate".**
+   - PHY-21 delivers on MuJoCo. Its constraint error is gated against the physical pin clearance (FR-FPR-15) and
+     its convergence is checked by timestep halving (FR-FPR-79).
+   - The effort goes into realism (§5.8) and validation against real data.
+   - PHY-10's exact solver is not a prerequisite. It is reconsidered only if an FEA load export needs reactions of
+     record.
 2. **Two mechanism models.** `doc.joints` (kinematic, instances) and `doc.dynamics` (bodies). PHY-21 reads both.
    Should a later change derive one from the other (mature tools reuse assembly mates as joints [A-R18][A-R43])?
    Proposal: a separate core task after PHY-21.
@@ -551,6 +674,17 @@ MVP is about 9.5 weeks of agent lane time. M1 and M2 run in parallel; M5 starts 
    that is not public (rod length, masses, pressure trace) stays stated test input, `unverified`.
 7. **MuJoCo version.** Stay on 3.14.0 (weld-torque fix included [C-R7]) or move to 3.16.0? Proposal: stay, and
    re-run VC-10…17 on any upgrade.
+8. **Friction equations.** The PNH / Sandoval–Heywood forms in note E were reconstructed from an OCR scan [E-R9].
+   - Someone must check them against SAE 890836 / 2003-01-0725 or Heywood ch. 13 before `component` is coded.
+     These sources are paywalled or in print; they were not fetched.
+   - Until then MVP ships `fmep_table` and `chen_flynn` only.
+   - Can the owner provide access to one of these sources?
+9. **Real data for the target design.** The strongest validation would be the owner's own data:
+   - the engine or propeller actually intended, with its datasheet;
+   - any dyno curve, propeller static-rpm test or measured part masses.
+
+   Without these, validation is limited to the public Rotax and Lycoming curves (FR-FPR-77) and the rpm windows. The
+   piston and rod masses stay test values.
 
 ## 12. References
 

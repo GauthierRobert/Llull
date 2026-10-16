@@ -1,6 +1,6 @@
 """PHY-21 (FPR) reference values. Python 3 standard library only.
 
-Run from this folder:  python3 -I generate_fpr_reference.py
+Run from this folder:  python3 -I generate_fpr_reference.py  (python on Windows)
 Writes expected_results.json (12 significant digits, byte-identical on re-run).
 Every value is an exact analytic derivation (grade A) or quoted from a cited datasheet; see README.md for derivations.
 """
