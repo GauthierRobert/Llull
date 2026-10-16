@@ -3,6 +3,7 @@
 import type { Server } from 'http';
 import type { Express } from 'express';
 import { installGeometryKernel } from './geometryKernel';
+import { installPhysicsEngine } from './physicsEngine';
 import { flushAutosave, stopAutosave, closeAllSubscribers } from './liveDocument';
 import { closeAllSessions } from './mcp/sessions';
 import { killAllChildren } from './childProcesses';
@@ -31,7 +32,7 @@ async function shutdown(server: Server): Promise<void> {
 
 /**
  * Listen on host:port and install SIGTERM/SIGINT/uncaughtException handlers.
- * Resolves once the geometry kernel is installed and the port is bound.
+ * Resolves once the geometry kernel and physics engine are installed and the port is bound.
  * @failure unsafe bind (see `checkBindSafety`) -> rejects
  */
 export async function startServer(app: Express, port: number, host: string): Promise<Server> {
@@ -40,7 +41,7 @@ export async function startServer(app: Express, port: number, host: string): Pro
   if (!isLoopbackAddress(host) && !process.env['MCP_AUTH_TOKEN'] && !process.env['LLULL_USERS_FILE']) {
     console.warn('[llull-server] WARNING: network-exposed without MCP_AUTH_TOKEN (LLULL_ALLOW_UNAUTHENTICATED=true).');
   }
-  await installGeometryKernel();
+  await Promise.all([installGeometryKernel(), installPhysicsEngine()]);
   const server = app.listen(port, host);
   await new Promise<void>((resolve, reject) => {
     server.once('listening', () => {

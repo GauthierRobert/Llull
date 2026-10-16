@@ -7,6 +7,7 @@
  */
 
 import { getGeometryKernel } from '../geometry/kernel';
+import { getPhysicsEngine } from '../dynamics/physicsEngine';
 import { type ReplayCache, createReplayCache } from './history/replayCache';
 import { counterIdSource, withIdSource } from '../lib/id';
 import type { ExecutionContext } from './types';
@@ -35,6 +36,7 @@ export function defaultContext(): ExecutionContext {
   const kernel = getGeometryKernel();
   return {
     kernel,
+    physics: getPhysicsEngine(),
     ids: counterIdSource,
     registry: getCommand,
     projectDepth: 0,

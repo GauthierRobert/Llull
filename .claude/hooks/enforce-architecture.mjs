@@ -35,7 +35,7 @@ async function main() {
     if (/\blocalStorage\b/.test(newText)) violations.push('localStorage in a library package (architecture L2)');
     if (/\bdocument\.(getElementById|querySelector|createElement|body|cookie|addEventListener)\b/.test(newText))
       violations.push('document.* DOM global in a library package (architecture L2)');
-    if (inCore && /from\s+['"]@(aec|mcp|kernel-manifold|kernel-occt)\//.test(newText))
+    if (inCore && /from\s+['"]@(aec|mcp|kernel-manifold|kernel-occt|physics-mujoco)\//.test(newText))
       violations.push('packages/core importing another package — core must not depend on plugins/kernels/mcp (architecture L2/L10)');
   }
 

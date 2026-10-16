@@ -4,6 +4,7 @@ import type { Vec2, Vec3 } from './vectors';
 import type { BuildingModel } from './building';
 import type { CivilModel } from './civil';
 import type { DrawingsModel } from './sheet';
+import type { DynamicsModel } from './dynamics';
 import type { CurveSegment } from './curve';
 
 /** Re-exported: every model consumer reads its vectors from here. */
@@ -629,6 +630,8 @@ export interface CadDocument {
   civil?: CivilModel;
   /** Absent until the first sheet command (`create_sheet`). */
   drawings?: DrawingsModel;
+  /** Absent until the first rigid-body dynamics command (`add_rigid_body`). */
+  dynamics?: DynamicsModel;
 }
 
 /**

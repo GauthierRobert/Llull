@@ -21,14 +21,16 @@ agents: local = `llull` CLI (`--app` drives desktop), cloud = MCP `/mcp`.
 packages/core/src/        @core  framework-agnostic: NO react/DOM/window/fetch
   lib/                    @lib   pure leaf helpers (id, hash, polygon, triangulate, lruCache)
   model/                         types.ts (CadDocument, Entity, MeshData, ShapeRecipe) · vectors · units · building · civil
-  geometry/                      kernel.ts (GeometryKernel) · shapeRecipe · shapeKernel · tessellation, bounds, instanceExpansion
+  geometry/                      kernel.ts (GeometryKernel) · shapeRecipe · shapeKernel · tessellation, bounds, instanceExpansion, massProperties
+  dynamics/                      physicsEngine.ts (PhysicsEngine) · simulationModel · forceLaws · simulationReport
   commands/                      engine: types · schema (defineCommand, commandCatalog) · context · commandTable · execute · guard · registry
-    <feature>/catalog.ts         solids draw2d modify2d edit brep inspect render exchange persistence history parametric project assembly motion document entity
+    <feature>/catalog.ts         solids draw2d modify2d edit brep inspect render exchange persistence history parametric project assembly motion dynamics document entity
   plugins/                       plugin.ts (CadPlugin) · host.ts (installPlugin, derivedEntityIds)
   codegen/                       CadQuery / build123d / OpenSCAD / FreeCAD emitters
 packages/mcp/src/         @mcp   tools/resources/prompts/toolsets/discovery/liveSync over the registry
 packages/domain-aec/src/  @aec   plugins `<domain>/{catalog,plugin}.ts`: building/ industrial/<discipline>/ civil/<topic>/ steel/ shared/
 packages/kernel-{manifold,occt}/src/   GeometryKernel impls
+packages/physics-mujoco/src/           PhysicsEngine impl (MuJoCo WASM) — rigid-body dynamics, docs/DYNAMICS.md
 src/app/                  @app   composition root: installDefaultPlugins()
 src/ui/                   @ui    React: presentation + param-gathering ONLY
 src/main.tsx                     installs kernel (`?kernel=occt`) + plugins, mounts <App>

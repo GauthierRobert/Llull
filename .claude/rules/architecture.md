@@ -73,7 +73,8 @@ three.js renders; it is NOT a CAD kernel. `GeometryKernel` (`@core/geometry/kern
 implemented by `packages/kernel-manifold` (default) and `packages/kernel-occt`. Commands read it
 ONLY from `ctx.kernel` and declare `annotations: { requiresKernel: true }`. The boundary is a SHAPE,
 not a mesh: commands pass a `ShapeRecipe` and get an opaque `ShapeHandle`; meshes only come OUT.
-Installing a kernel is the composition root's job, never a command's.
+Installing a kernel is the composition root's job, never a command's. Rigid-body physics follows the same pattern:
+`PhysicsEngine` (`@core/dynamics/physicsEngine`), read from `ctx.physics`, implemented by `packages/physics-mujoco`.
 
 ## L10 — Domains are plugins
 

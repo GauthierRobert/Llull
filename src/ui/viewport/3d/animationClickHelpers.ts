@@ -1,6 +1,7 @@
 // Pure click-to-trigger animation helpers.
 
 import type { Animation, EntityGroup, EntityId } from '@core/model/types';
+import type { DynamicsModel } from '@core/model/dynamics';
 
 /** `trigger:'click'` animations targeting `entityId` directly or through a group containing it. */
 export function findClickAnimationsForEntity(
@@ -32,4 +33,9 @@ export function animatedEntityIds(animations: Record<string, Animation>, groups:
     else for (const memberId of groups[anim.targetId]?.memberIds ?? []) result.add(memberId);
   }
   return result;
+}
+
+/** Entities of moving rigid bodies: replayed by DynamicsPlayer through their scene objects, so never instanced either. */
+export function dynamicEntityIds(dynamics: DynamicsModel | undefined): Set<EntityId> {
+  return new Set(Object.values(dynamics?.bodies ?? {}).flatMap((body) => (body.fixed ? [] : body.entityIds)));
 }
