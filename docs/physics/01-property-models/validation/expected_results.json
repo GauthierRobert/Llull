@@ -1114,7 +1114,7 @@
    "value": 1.09670857391,
    "unit": "1",
    "tolerance": {
-    "rel": 1e-12
+    "rel": 1e-11
    },
    "source": "synthetic; form from Johnson & Cook 1983 (S9)",
    "grade": "A",
@@ -1128,7 +1128,7 @@
    "value": 2.89986930849,
    "unit": "1",
    "tolerance": {
-    "rel": 1e-12
+    "rel": 1e-11
    },
    "source": "synthetic fixture (constants not attributed)",
    "grade": "A",

@@ -1,3 +1,5 @@
+import { storedModelsProblem } from '../document/propertyModelSchema';
+import { formHash } from '../document/propertyModels';
 import {
   type Layer,
   type CameraState,
@@ -324,6 +326,10 @@ export function validateMaterialValue(name: string, v: unknown): string | null {
   const isUnit = (x: unknown): boolean => isFiniteNumber(x) && x >= 0 && x <= 1;
   if (!isUnit(metalness)) return `material '${name}': metalness must be a finite number in [0, 1], got ${String(metalness)}`;
   if (!isUnit(roughness)) return `material '${name}': roughness must be a finite number in [0, 1], got ${String(roughness)}`;
+  if (v['propertyModels'] !== undefined) {
+    const models = storedModelsProblem(name, v['propertyModels'], formHash);
+    if (models !== null) return models;
+  }
   const finish = v['finish'];
   if (finish === undefined) return null;
   if (!isRecord(finish) || !(FINISH_PATTERNS as readonly unknown[]).includes(finish['pattern']))

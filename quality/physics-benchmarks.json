@@ -1,0 +1,11 @@
+{
+  "note": "Aerospace expected-results files that do not follow docs/physics/README.md §6.3 natively; run_benchmarks reads them through an adapter (PHY-00 TECHNICAL_SPEC §6.1). `proves` is the hand-maintained case -> requirement map.",
+  "files": [
+    {
+      "pack": "05-fea-cae-handoff",
+      "file": "docs/aerospace/05-fea-cae-handoff/validation/fea_analytic_expected.json",
+      "adapter": "fea-legacy",
+      "proves": {}
+    }
+  ]
+}

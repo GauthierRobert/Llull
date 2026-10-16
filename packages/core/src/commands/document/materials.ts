@@ -39,7 +39,7 @@ export const createMaterial = defineCommand({
     'Define or replace a named material in the document material library. ' +
     'A material carries a physical density (used by mass_properties for mass = volume × density) ' +
     'and PBR visual properties (color, metalness, roughness) used by the 3D viewport renderer. ' +
-    'If a material with the same name already exists it is fully replaced. ' +
+    'If a material with the same name already exists it is replaced (its property models are kept). ' +
     'Density units match the document unit system: for a mm document, density is in g/mm³ ' +
     '(steel ≈ 0.00785, aluminium ≈ 0.0027, PLA ≈ 0.00124). Assign the material to entities with assign_material.',
   params: z.object({
@@ -127,7 +127,16 @@ export const createMaterial = defineCommand({
             ...(normalStrength !== undefined ? { normalStrength } : {}),
             ...(clearcoat !== undefined ? { clearcoat } : {}),
           };
-    const material: Material = { name, density, color, metalness, roughness, ...(finish !== undefined ? { finish } : {}) };
+    const models = Object.hasOwn(doc.materials, name) ? doc.materials[name]?.propertyModels : undefined;
+    const material: Material = {
+      name,
+      density,
+      color,
+      metalness,
+      roughness,
+      ...(finish !== undefined ? { finish } : {}),
+      ...(models !== undefined ? { propertyModels: models } : {}),
+    };
     const newDoc: CadDocument = { ...doc, materials: { ...doc.materials, [name]: material } };
     const action = Object.hasOwn(doc.materials, name) ? 'replaced' : 'created';
     return report(
