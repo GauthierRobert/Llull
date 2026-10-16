@@ -54,6 +54,58 @@ in [`AGENT_FIRST.md`](AGENT_FIRST.md) and override any UI-first wording in the p
 
 Each gap's `TECHNICAL_SPEC.md` § Delivery plan gives milestones and effort.
 
+## Alignment with in-flight work: rigid-body dynamics (2026-10-16)
+
+The motion / rigid-body dynamics work (merged to `main` 2026-10-16, PR #73, plus `dbb0e491` for mesh placement;
+[`docs/DYNAMICS.md`](../DYNAMICS.md)) built pieces several packs had planned to build themselves. The packs **reuse**
+them; nothing below is built twice.
+
+| Delivered by dynamics | Where | Pack that planned it | Decision |
+| --------------------- | ----- | -------------------- | -------- |
+| Polyhedral mass properties (Eberly divergence integrals): mass, volume, centre of mass, full inertia tensor `[Ixx,Iyy,Izz,Ixy,Ixz,Iyz]` about the CoM; `combineMassProperties` (parallel-axis) | `packages/core/src/geometry/massProperties.ts` | 01 TR-KRN-40/42 (inertia, assemblies), 04 TR-XCH-02 mesh fallback, 08 VC-MAT-04 | **The one non-kernel mass engine.** 01 M3 adds only the exact kernel path, area, bbox, principal axes and the part frame on top of it; `mass_properties` and `simulate_motion` read the same resolver (01 §5.4). |
+| Per-entity mass properties in world pose: closed forms for box / cylinder / sphere, triangles otherwise, instances combined, density per solid through a `densityOf` callback | `packages/core/src/geometry/entityMassProperties.ts` | 01 TR-KRN-42; today's `inspect/solidVolume.ts` (sweep / loft / revolution closed forms, exact OCC volume) | **Merge, don't fork**: one `resolveMassProperties(doc, entity, densityOf, ctx)` with the order exact kernel → closed form (all of `solidVolume.ts`'s cases) → mesh. Both callers switch to it (01 M3). |
+| Density per entity: material `density` (g/(doc unit)³) else `add_rigid_body.density` (kg/m³) else steel 7850 kg/m³ | `packages/core/src/dynamics/simulationModel.ts` | 08 TR-MAT-10 (resolution order), AF-31 (named defaults), AF-32 (`unverified`) | A second copy of the resolution order with a different param unit and a silent default. 08 M1 owns **one** resolver; dynamics consumes it after merge (08 TR-MAT-10). |
+| `doc.dynamics` core root field + `persistence/dynamicsValidation.ts` | `model/dynamics.ts` | 01 §3.1 (v3 envelope) | Added as a row of the v3 table. It lands on v2 (absent until used, no bump); v3 carries it unchanged. |
+| Injected engine pattern: `PhysicsEngine` contract in core, `ctx.physics` (optional, `null` when absent), impl package `packages/physics-mujoco`, composition-root install, dep-cruiser rules `physics-*`, core sub-layer `dynamics/` | `.dependency-cruiser.cjs`, `architecture.md` L9 | 05 `ctx.feaArtifacts`, 08 `ctx.libraries`, 09 `ctx.caller`, 03 `ctx.pmiRules` | **The template for every new port** (below). |
+| Mesh entities honour `position` / `rotation` (viewport, kernel, triangles, bounds, mass) | `geometry/{bounds,tessellation,solidTriangles}.ts`, `model/types.ts` | 01 TR-KRN-41 (part authored at origin, placed by location: 3.3e-14), 04 import world placement | Imports place bodies by `position` / `rotation` instead of baking world coordinates; the `brep` invariant stays "before position/rotation". |
+
+Rules this sets for every pack:
+
+1. **Ports follow the `ctx.physics` shape**: a narrow interface in core (`commands/types.ts` or the owning core
+   sub-layer), an optional `ExecutionContext` field that is `null`/absent when not installed, installed only by the
+   composition root (`src/app/`, `server/`, `desktop/`), a contract test, and a command that refuses with a stable
+   code when it is missing (AF-11, AF-41). Engines that run a third-party solver live in `packages/<role>-<impl>`
+   (`physics-mujoco`; a future in-process FE solver would be `packages/solver-*`), never in a domain plugin.
+   External processes (Gmsh, CalculiX, CadQuery) stay host transports (05 §4).
+2. **L9 text is generalised once** — "injected engines: `ctx.kernel`, `ctx.physics`, …" — not one sentence per
+   port; packs that add a port add one list item.
+3. **Mass properties are computed in one place** (01 §5.4); anything needing mass, CoG or inertia (08 BOM / weight
+   and balance, 05 modal mass checks, 06 `laminate_mass` when it delegates, dynamics bodies) calls it.
+4. **Density is resolved in one place** (08 TR-MAT-10); any safety-relevant default is reported as named
+   (`densitySource`, `defaulted: true`), never silent.
+5. **Dynamics follows AGENT_FIRST**: now that AF-14 exists, `simulate_motion` / `inspect_dynamics` warnings and
+   refusals get stable `DYN_*` codes (`CommandResult.error`) and `provenance` (engine, timestep, densities).
+   Tracked as a dynamics follow-up.
+
+### Start order (updated 2026-10-16, after the dynamics merge)
+
+| Task | Pack / milestone | State |
+| ---- | ---------------- | ----- |
+| Plan reports with per-step error codes, query `data`, alias map | AGENT_FIRST AF-14 (shared prerequisite) | **implemented** (see AGENT_FIRST §2.2 status) |
+| OCC default on desktop, `kernel_info`, provenance fields | 01 M1 | ready |
+| Custom OCCT 7.9.x WASM build with exceptions | 01 M2 (long pole, 4–6 eng-weeks) | ready; unblocks 01 M3–M10, 02, 04, 07 native |
+| `lib/quantity.ts`, `resolveDensity` (wired into `mass_properties` **and** dynamics), unit-correct mass | 08 M1 | ready |
+| Pure maths: NURBS / NACA generator / `SECTION_RING_POINTS` loft fix | 02 core maths | ready |
+| CLT (ABD, first-ply failure) | 06 pure core | ready |
+| Flat pattern / setback / countersink maths, hole table | 07 pure parts | ready; native BRepFeat waits for 01 M2 |
+| Canonical JSON + Ed25519 verify helpers | 09 pure parts | ready; `packages/plm` waits for decision 1 |
+| `doc.pmi` data model + note commands (no face resolution yet) | 03 MVP data | ready |
+| `resolveMassProperties` over the dynamics mass engine (merge `solidVolume.ts` closed forms; part-frame shift on the mesh path) | 01 M3, non-kernel half | ready; the exact-kernel half waits for 01 M1 (M2 for exception-safe GProp) |
+| New `ExecutionContext` ports (`ctx.caller`, `ctx.libraries`, `ctx.feaArtifacts`) | 09 / 08 / 05 | ready; copy the `ctx.physics` shape |
+| New packages + dep-cruiser / alias entries (`domain-aero`, `plm`) | 02 / 06 / 07 / 08 / 09 | blocked on decision 1 (package layout) |
+| v3 envelope + `migrate2to3`, import placement by `position` / `rotation` | 01 M4, 04 M3 | waits for 01 M2 |
+| Deck writers, closed-form checks | 05 `@cae` pure | blocked on decision 1; materials need 08 M2 |
+
 ## Status (2026-10-15)
 
 All nine packs are written: 18 specs (≈ 7 000 lines), 9 validation plans, 87 JSON reference files,
@@ -84,14 +136,20 @@ output (`python3 -I <script>` from its `validation/` folder). Four scripts need 
   does not bind `GeomAPI_Interpolate` / `GeomFill_NSections`, and `STEPCAFControl` / `XCAFDoc` / `BRepFeat_*`
   availability is unconfirmed (01, 02, 04, 07).
 - Inertia computed far from the origin loses precision (1.2e-9 relative at 70 m, 1.2e-7 at 1 km); a local
-  part frame fixes it (01 KRN).
+  part frame fixes it (01 KRN). The dynamics branch's triangle integration also runs in world coordinates, so
+  the same part-frame shift applies to it (01 TR-KRN-41).
+- Two mass paths with two density conventions once dynamics merges: `mass_properties` (g/(doc unit)³ param,
+  exact OCC volume, sweep/loft closed forms, no inertia) and `add_rigid_body` (kg/m³ param, silent steel default,
+  inertia from display triangles for every non-primitive). Unified by 01 §5.4 and 08 TR-MAT-10.
 
 ### Cross-gap decisions needed before implementation
 
 1. **Package layout.** The packs propose new plugin packages independently: `@aero` / `packages/domain-aero`
    (02, 06, 08), `packages/domain-mfg` (07), `domain-cae` (05), `packages/plm` (09). Recommendation: one
    `packages/domain-aero` workspace with one `CadPlugin` per discipline, plus PLM as its own package. Needs
-   approval (CLAUDE.md layer map, `.dependency-cruiser.cjs`, `tsconfig.base.json` aliases).
+   approval (CLAUDE.md layer map, `.dependency-cruiser.cjs`, `tsconfig.base.json` aliases). Precedent from
+   dynamics: solver/engine adapters are `packages/<role>-<impl>` (`physics-mujoco`), not domain plugins, so `domain-cae`
+   holds only commands + pure `@cae` writers; edit the dep-cruiser/alias files after the dynamics merge.
 2. **OCC build.** A custom OCCT 7.9.x WASM build with C++ exceptions, aligned with the bundled OCP, exposing
    every class the packs list (01 TR-KRN-01/02 owns the list).
 3. **One kernel face-query port** — *settled in review*: `FaceQueryPort`, exposed as the optional
@@ -99,7 +157,7 @@ output (`python3 -I <script>` from its `validation/` folder). Four scripts need 
    requests of 02 (curvature, continuity, distance, B-spline), 03 / 05 (face centroid, normal, axis, radius),
    06 (face geometry, projection, evaluation) and 07 (face graph); the other packs reference it.
 4. **Document v3** — *settled in review*: one envelope and one `migrate2to3` owned by 01 (TECHNICAL_SPEC §3.1),
-   listing every pack's slice; plugin slices survive replay through a new `DocumentExtension.carry?` hook and
+   listing every pack's slice (plus the core `dynamics` slice from the motion work); plugin slices survive replay through a new `DocumentExtension.carry?` hook and
    report load problems through `afterLoad` (09 TR-PLM-32/33, core changes to review with `cad-reviewer`).
 4b. **Exact STEP import** — *settled in review*: one command, `import_step_exact`, owned by 01 (B-rep blob
    leaf, healing, import report); 04 extends it with validation properties, assembly tree and AP242 PMI, and

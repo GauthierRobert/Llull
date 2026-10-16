@@ -19,7 +19,7 @@ Requirement ids `TR-KRN-nn` are grouped by decade: 0x kernel selection & build, 
 | Isolation | `server/src/isolatedKernel.ts`, `occtWorker.ts`, `geometryKernel.ts` (timeout) | OCC in a Node worker thread behind a synchronous call (`Atomics.wait`), timeout `LLULL_OCC_TIMEOUT_MS` (30 s), recycle on degrading failure | browser OCC (`src/ui/geometry/occtKernelBrowser.ts`) runs on the UI thread |
 | STEP import | `packages/mcp/src/exchangeTools.ts` (`import_step`), `server/python/llull_bridge.py` (`op_import_step`) | CadQuery reads STEP (assembly walk, names, colours) and **tessellates** (tolerance 0.05) → `import_mesh` | imported parts are meshes: not editable as B-rep, faceted mass properties |
 | Topology / naming | `packages/core/src/commands/brep/topology.ts` (`inspect_topology`), `brep/modify3d.ts` (`fillet_edge`, `chamfer_edge`) | edges by kernel index or `edgesNear` points re-resolved on replay to the nearest roundable edge mid point (KI5; `server/tests/occtParametricEdges.test.ts`) | heuristic: wrong edge possible after large moves; faces have no names |
-| Mass properties | `packages/core/src/commands/inspect/measureSolid.ts`, `solidVolume.ts` | volume (`exact` via `topology().volume` under OCC, else closed form or display-mesh sum) and mass; instances summed | no area, centroid, inertia; no accuracy statement |
+| Mass properties | `packages/core/src/commands/inspect/measureSolid.ts`, `solidVolume.ts` | volume (`exact` via `topology().volume` under OCC, else closed form or display-mesh sum) and mass; instances summed | no area, centroid, inertia; no accuracy statement. *In flight* (`feat/motion-dynamics`): `geometry/massProperties.ts` (polyhedral mass / CoM / inertia tensor, `combineMassProperties`) and `geometry/entityMassProperties.ts` (box / cylinder / sphere closed forms, instances) for `add_rigid_body`; still display triangles for every other kind, world coordinates, no exact path |
 | Validity | `packages/core/src/commands/inspect/checkModel.ts` | parameter / structural lint (degenerate sizes, …) | no B-rep check |
 | Viewport | `src/ui/viewport/3d/Viewport3D.tsx`, `InstancedRenderer.tsx` | perspective camera near 0.01 / far 1e8; InstancedMesh batches for box / cylinder / sphere only | depth range 1e10; no instancing of kernel results; no LOD |
 | Python | `server/python/requirements.txt` (`cadquery>=2.4`), desktop bundles CadQuery (KI6) | CadQuery 2.8.0 pins `cadquery-ocp >=7.9.3.1,<8.0` [R13] | two OCCT versions in one product (7.4 WASM vs 7.9 native) |
@@ -171,6 +171,7 @@ add document data; instead of each bumping the version on its own, they share **
 | `sheetMetal` | 07 FTR (§3) | plugin data | plugin `DocumentExtension` | |
 | `materialRecords`, `materialLibraries`; `Material.recordId?` | 08 MAT (§3.5, TR-MAT-14) | core root fields | core guards (`validateMaterialRecord`) | private-library values never serialized (TR-MAT-31) |
 | `plm` (`PlmModel`) | 09 PLM (TR-PLM-10) | plugin data | plugin `DocumentExtension` (+ carried through `replayHistory`, TR-PLM-02) | |
+| `dynamics` (`DynamicsModel`) | motion / rigid-body dynamics (`feat/motion-dynamics`, not an aerospace pack) | core root field | core `persistence/dynamicsValidation.ts` | lands on v2 before this envelope (optional field, no bump); v3 carries it unchanged |
 
 Rules:
 
@@ -331,6 +332,15 @@ forwarding to `import_step_exact`; the mesh path remains for Manifold. CLI: `llu
   method: 'exact'|'closed-form'|'mesh', relErrorEstimate?, eps: Named<number>, densitySource?, provenance,
   unverified: { value, reasons[] }, reviewRequired: { value, reasons[] } }` (`Named<T> = { value: T, unit, source,
   defaulted }`, TR-KRN-102..104).
+- **TR-KRN-40a (MUST, MVP) — one resolver, two callers.** The non-kernel path is the dynamics work's
+  `geometry/massProperties.ts` (`MassProperties`, `InertiaTensor` `[Ixx,Iyy,Izz,Ixy,Ixz,Iyz]` with Ixy = −∫xy dm,
+  `combineMassProperties`) and `geometry/entityMassProperties.ts`; this pack does not write another. M3 merges
+  today's `inspect/solidVolume.ts` closed forms (sweep, loft, revolution/Pappus) into it and adds one
+  `resolveMassProperties(doc, entity, densityOf, ctx)` in `geometry/` with the order exact kernel
+  (`GeometryKernel.massProperties`, when a `brep` exists) → closed form → mesh, returning `method`. `mass_properties`
+  (`commands/inspect/measureSolid.ts`) and dynamics (`dynamics/simulationModel.ts` `bodyMassProperties`) both call it,
+  so a rigid body made of an OCC part gets exact inertia. `MassProperties` gains optional `area`, `bbox`, `relError`;
+  `Mat3` / `atOrigin` / principal axes in the payload are derived from `InertiaTensor` (Jacobi in `@lib`).
 - **TR-KRN-41 (MUST, MVP) — part-frame evaluation.** Before integration, the shape is **copied** (geometry, not
   only location) to a local frame centred on its bounding-box centre `c`, rounded to 1 mm
   (`BRepBuilderAPI_Transform(shape, T(−c), copy=true)`); results are shifted back: centroid += c; inertia at the
@@ -338,11 +348,14 @@ forwarding to `import_step_exact`; the mesh path remains for Manifold. CLI: `llu
   I_O = I_G + m(|r|²E − r rᵀ), r = centroid. Measured on OCCT 7.9.3 for a 100×50×20 box: raw Iyy relative error
   5e-16 at the origin, 3.8e-11 at 10 m, **1.2e-9 at 70 m**, 1.2e-7 at 1 km; moving back by `TopLoc_Location` only
   does not help (1.2e-9); geometry copied to the origin: 5e-16; part authored at origin and placed by location:
-  3.3e-14 (`occt_behaviour_probe.json`). Target: ≤ 1e-12 relative at 70 m (VC-KRN-02).
+  3.3e-14 (`occt_behaviour_probe.json`). Target: ≤ 1e-12 relative at 70 m (VC-KRN-02). The mesh path
+  (`meshMassProperties`) applies the same shift: triangles are translated by −c before integration and the result
+  is moved back with `combineMassProperties`' parallel-axis term.
 - **TR-KRN-42 (SHOULD, V1) — assemblies.** Instance properties are computed once per component definition in
   its own frame and combined: m = Σmᵢ; c = Σmᵢcᵢ/m with cᵢ = Rᵢĉᵢ + tᵢ; I_G = Σ[RᵢÎᵢRᵢᵀ + mᵢ(|dᵢ|²E − dᵢdᵢᵀ)],
-  dᵢ = cᵢ − c. Densities from materials (existing resolution order in `measureSolid.ts`). Display-mesh volume is
-  never used when an exact handle exists.
+  dᵢ = cᵢ − c — already implemented as `combineMassProperties` (dynamics work); this TR adds the per-definition
+  cache (by `recipeKey`). Densities from 08's single `resolveDensity` (TR-MAT-10), passed as `densityOf`.
+  Display-mesh volume is never used when an exact handle exists.
 
 ### 5.5 Validity (TR-KRN-50 .. 51)
 
@@ -641,7 +654,7 @@ Coverage gate (90/85/90/90) applies to new code in `packages/core/src/{commands,
 | --------- | ------- | --- | ------------------ | ---------- |
 | M1 OCC default | desktop env, `kernel_info`, status badge, provenance fields + migration, faceted flag | 01, 04, 61 (fields), FR-KRN-16 | 1.5 | — |
 | M2 Kernel build | OCCT 7.9.x WASM with exceptions, regenerated bindings, KI7 decision with measurements, version alignment with OCP | 02, 61 | 4-6 | M1 |
-| M3 Precision & mass (merged with 04 XCH M1: KRN owns `massProperties`; XCH M1 adds only `geometric_validation_properties` + `lib/step21`) | tolerance policy + command, part-frame mass properties (incl. area, bbox for GVP), inertia/principal, local-frame tessellation, depth precision | 10, 11, 40, 41, 72, 73 | 3 | M1 (M2 for exception-safe GProp) |
+| M3 Precision & mass (merged with 04 XCH M1: KRN owns `massProperties`; XCH M1 adds only `geometric_validation_properties` + `lib/step21`) | tolerance policy + command, part-frame mass properties (incl. area, bbox for GVP), inertia/principal, local-frame tessellation, depth precision; one resolver over the dynamics mass engine (TR-KRN-40a) | 10, 11, 40, 40a, 41, 72, 73 | 3 | M1 (M2 for exception-safe GProp); **`feat/motion-dynamics` merged** |
 | M4 Exact import (merged with 04 XCH M3: KRN owns the command, reader, blob leaf; XCH M3 adds verify / provenance / product tree on top) | `importShapes` (STEP; IGES entry point for 04), blobs, `import_step_exact`, healing, classification, report, MCP/CLI wiring, quality `--mode brep`, v3 envelope + migration (§3.1) | 20, 21, 22, 23 (GVP attributes), 24 | 5-7 | M2 |
 | M5 Robustness | commit validity gate, `validate_shape`, fuzzy booleans, argument analysis | 12, 13, 50, 51 | 2 | M2 |
 | M6 Regression | signatures, `quality:kernel`, baselines | 60, 62 | 2 | M4 |

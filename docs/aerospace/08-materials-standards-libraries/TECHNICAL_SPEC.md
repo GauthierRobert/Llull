@@ -44,7 +44,7 @@ rule clone of `domain-aec`, knip workspace entry.
 | -- | --- | ----------- | -- |
 | TR-MAT-01 | MUST | `lib/quantity.ts`: parse/convert units with exact factors; dimension check; rel error ≤ 1e-12 | FR-MAT-02 |
 | TR-MAT-02 | MUST | `mass_properties` returns `mass`, `massUnit`, `densityQuantity`, `densitySource`; legacy `unit:'g'` field kept when massUnit = g | FR-MAT-05 |
-| TR-MAT-10 | MUST | Density resolution order: record preferred density → legacy `Material.density` (g/(doc unit)³) → `density` param; the source used is reported. An `unresolved` private record stops the chain (mass `available:false`, TR-MAT-16), never a fallback | FR-MAT-05, FR-MAT-23 |
+| TR-MAT-10 | MUST | Density resolution order: record preferred density → legacy `Material.density` (g/(doc unit)³) → `density` param; the source used is reported. An `unresolved` private record stops the chain (mass `available:false`, TR-MAT-16), never a fallback. Implemented **once** as `resolveDensity(doc, entity, fallback)` in core `geometry/` returning `{ kgPerM3, perDocUnit³, source, defaulted, unverified }`; it replaces the inline copies in `inspect/measureSolid.ts` and (after the dynamics merge) `dynamics/simulationModel.ts`, whose `add_rigid_body.density` (kg/m³) and steel 7850 kg/m³ default become an explicit `fallback` reported as `densitySource: 'default:steel'`, `defaulted: true` (AF-31) | FR-MAT-05, FR-MAT-23 |
 | TR-MAT-11 | MUST | `MaterialRecord` / `PropertyValue` / `Provenance` types (§3.1) with zod schemas; one `preferred` per key | FR-MAT-01/03/04 |
 | TR-MAT-12 | MUST | `get_material_allowable` exact-key match; no basis substitution; `forCertification` refuses `superseded`, `typical`, `supplier_unstated` | FR-MAT-06 |
 | TR-MAT-13 | SHOULD | Temperature tables: linear interpolation, no extrapolation, `percentOfRT` mode | FR-MAT-07 |
@@ -483,7 +483,7 @@ degrades with explicit warnings; replay with changed library hash ⇒ step warni
 
 | Milestone | Content | Depends on | Effort |
 | --------- | ------- | ---------- | ------ |
-| M1 Units + mass fix | `lib/quantity.ts`, `mass_properties` unit-correct output, `create_material` density quantity | — | 3 d |
+| M1 Units + mass fix | `lib/quantity.ts`, `resolveDensity` (TR-MAT-10), `mass_properties` unit-correct output, `create_material` density quantity; after the dynamics merge, `add_rigid_body` / `simulate_motion` read `resolveDensity` (+0.5 d) | — (dynamics merge for the last step only) | 3.5 d |
 | M2 Material records | model, commands, persistence v3, allowable query, provenance, legacy migration | M1 | 8 d |
 | M3 Libraries & IP | import/export, `ctx.libraries` provider (server fs + browser IndexedDB), licence/marking flags, export gate | M2; gap 09 marking semantics | 6 d |
 | M4 Seed library | re-verify MIL-HDBK-5J values from primary PDF, `sources.lock.json`, ~10 materials | M2; human access to PDF | 4 d |

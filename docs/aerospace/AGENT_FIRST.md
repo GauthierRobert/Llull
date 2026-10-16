@@ -73,6 +73,38 @@ Ids `AF-nn`. Each pack maps its own FR/TR to these where relevant and adds a VC 
 | AF-41 | MUST | Offline first: nothing in a gap needs network access on the desktop (L6, KI6). External tools (CalculiX, Gmsh, CadQuery) are bundled or reported as missing with an install hint and a stable code. |
 | AF-42 | SHOULD | `--dry-run` works for every mutating command of the gap, so an agent can try a change and read the result without writing the document. |
 
+### 2.6 Status: AF-11 / AF-14 plumbing (implemented 2026-10-16)
+
+- `CommandResult.error?: CommandError` = `{ code, ids, paths, remediation }` (`packages/core/src/commands/types.ts`).
+  Every registry refusal (`rejected: true`) carries one; a command may also set it on its own graceful no-op — packs
+  add their codes there (`KRN_*`, `GDT_*`, …). It reaches MCP (an `Error <code> at <paths>: <remediation>` line plus
+  `structuredContent.error`), the command bus / REST body and `llull … --json` (`error`).
+- `build_project` (`commands/project/`): each failed step has `error` (the command's own, else a plan code), each
+  read-only step has `data` (its answer), and a completed run has `data.aliases` (every `as`, loop-interpolated ones
+  included, → the ids it bound; legacy `for_each` element variables are not aliases and are left out). An aborted run
+  also sets `CommandResult.error` to the failing step's error, so an outer plan or an MCP caller sees the real code.
+  `llull run` derives its `aliases` / `consumedAliases` from that map. **Behaviour change:** a legacy
+  `{ repeat: { count, as }, step }` alias now lists what `$alias` resolves to — the last iteration's ids — where the
+  CLI used to print the union of all iterations; use a nestable loop with `as: "name{i}"` to address every iteration.
+- Core codes:
+
+| Code | Raised by | Meaning |
+| ---- | --------- | ------- |
+| `CMD_UNKNOWN` | `execute`, plan step | no command with that name |
+| `CMD_INVALID_PARAMS` | guard | params fail the zod schema; `paths` = param paths (`size.1`) |
+| `CMD_RESERVED_ID` | guard | an id param is a JavaScript property name |
+| `CMD_KERNEL_UNAVAILABLE` | `execute` | `requiresKernel` command with no kernel |
+| `CMD_STEP_COUNTER_INVALID` | `execute` | corrupt `nextStepNumber` |
+| `CMD_THREW` | guard | the command threw (internal error) |
+| `CMD_DERIVED_GEOMETRY` | guard | edit of plugin-derived geometry refused |
+| `CMD_CORRUPT_RESULT` | guard | NaN / malformed position in a result; `ids` = the entity |
+| `CMD_NO_EFFECT` | plan step | the command changed nothing and set no code of its own |
+| `PLAN_INVALID_ACTION`, `PLAN_LOOP_HEADER`, `PLAN_LOOP_LIMIT`, `PLAN_STEP_BUDGET`, `PLAN_PARAM_UNRESOLVED` | plan step | `paths` = plan location (`step 4 › iter 2 › step 1`) |
+| `PLAN_EMPTY`, `PLAN_TOO_LARGE`, `PLAN_TOO_DEEP` | `build_project` result | the whole plan was refused; `paths` = `actions` |
+
+Not yet done: `--validate` issues are still strings (no codes), and individual commands' own no-ops do not set codes
+yet (they surface as `CMD_NO_EFFECT` until each pack adds its codes).
+
 ## 3. How the packs apply this
 
 Each pack's FUNCTIONAL_SPEC and TECHNICAL_SPEC is revised so that:
