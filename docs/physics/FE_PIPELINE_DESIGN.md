@@ -92,3 +92,44 @@ midsurface, defeature, Nastran BDF, OP2, margins (`compute_margins`, `dispose_ma
 UI panels, cavity radiation deck and contact conductance (PHY-03 V1, unless time allows), coupled procedure (PHY-04 V1).
 Human gates (`dispose_thermal_limit`, `dispose_fit_result`) verify through `ctx.humanSignature`; no implementation is installed
 (09 PLM is not built), so every call is refused with the `*_HUMAN_GATE` code, which is the specified agent-path behaviour.
+
+## 5. Deck and summary contract between the 05 core and the disciplines (Phase 2)
+
+Owned by the 05 lane (`packages/domain-cae/src/decks/`, `src/results/`); the thermal and thermo-mechanical lanes implement the
+discipline functions against exactly these types.
+
+```ts
+// @cae/decks/context.ts
+export interface DeckContext {
+  readonly doc: CadDocument; readonly analysisId: string; readonly analysis: AnalysisCase; readonly mesh: FeMeshArtifact;
+  readonly unitSystem: UnitSystem;
+  readonly lengthToAnalysis: number;                       // document length unit -> analysis length unit
+  readonly nset: (targetKey: string) => string;           // NSET name already written by the model block for that key
+  readonly faces: (targetKey: string) => readonly (readonly [elementId: number, face: number])[];   // mesh.faceSets[key] ?? []
+  readonly elset: (entityId: string) => string;           // ELSET of a part, e.g. P_box_1_1
+  readonly materialName: (entityId: string) => string;    // *MATERIAL name used by the part's *SOLID SECTION
+  readonly materialOf: (entityId: string) => Material | null;
+}
+export type DeckSections = { readonly text: string } | { readonly code: string; readonly message: string; readonly ids?: readonly string[] };
+```
+
+`writeInp` order: header comment → `*NODE` → `*ELEMENT` per part block → `*NSET` for every keyed target (nodeSets) →
+material cards (one `*MATERIAL` per used material: static → 05 mechanical cards; `heat_*` → `thermalMaterialCards(ctx)`;
+`thermo_static` → 05 mechanical cards **and** `thermomechMaterialCards(ctx)` appended inside each material) → `*SOLID SECTION`
+per part → step sections (static → 05 `staticStep(ctx)`; `heat_*` → `thermalSections(ctx)`; `thermo_static` →
+`thermomechSections(ctx)`, which calls the exported 05 helper `mechanicalStepLines(ctx)` for `*BOUNDARY` / `*CLOAD` / `*DLOAD`).
+
+| Module | Exports (exact names) |
+| ------ | --------------------- |
+| `@cae/decks/inpWriter.ts` (05) | `writeInp(doc, analysisId, mesh): { text } \| { code, message }` |
+| `@cae/decks/mechanical.ts` (05) | `mechanicalMaterialLines(ctx, entityId): DeckSections`, `mechanicalStepLines(ctx): DeckSections`, `staticStep(ctx): DeckSections` |
+| `@cae/thermal/deck.ts` (thermal) | `thermalMaterialCards(ctx, entityId): DeckSections` (k, cp, density lines under the open `*MATERIAL`), `thermalSections(ctx): DeckSections` (initial conditions, amplitudes, physical constants, step) |
+| `@cae/thermomech/deck.ts` (thermomech) | `thermomechMaterialCards(ctx, entityId): DeckSections` (`*EXPANSION, ZERO=`), `thermomechSections(ctx): DeckSections` (initial conditions, step with `*TEMPERATURE`) |
+| `@cae/results/frdReader.ts`, `datReader.ts` (05) | `parseFrd(text)`, `parseDat(text)` |
+| `@cae/results/summary.ts` (05) | `meshSummary(mesh, meshHash)`, `resultsSummary(doc, analysisId, mesh, results, resultsHash)` — dispatches `heat_*` to `thermalResultsSummary` |
+| `@cae/thermal/summary.ts` (thermal) | `thermalResultsSummary(doc, analysisId, mesh, results): ThermalResultsSummary` (§5.5 balance, probes, extremes) |
+
+Field names in `FeResultsArtifact.steps[].fields`: the FRD block names (`DISP`, `STRESS`, `TOSTRAIN`, `NDTEMP`, `FLUX`, `RFL`), components as
+written by CalculiX. Element faces use the CalculiX labels (tet: 1 = 1-2-3, 2 = 1-4-2, 3 = 2-4-3, 4 = 3-4-1). Gmsh tet10 node order
+differs from CalculiX C3D10: the mesher swaps the last two mid-edge nodes (Gmsh 3-4 / 2-4 edges → CalculiX 2-4 / 3-4) so the artifact
+is already in CalculiX order.
