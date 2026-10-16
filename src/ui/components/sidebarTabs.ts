@@ -1,5 +1,6 @@
 /** Document-browser tabs (rail order): tab id, label, icon. Read by the Sidebar and the palette. */
 
+import { getCommand } from '@core/commands/registry';
 import type { SidebarTab } from '@ui/store';
 import type { IconName } from '@ui/components/Icon';
 
@@ -23,4 +24,10 @@ export const SIDEBAR_TAB_SPECS: readonly SidebarTabSpec[] = [
   { tab: 'history', label: 'History', shortLabel: 'History', icon: 'history' },
   { tab: 'configurations', label: 'Configurations', shortLabel: 'Variants', icon: 'configurations' },
   { tab: 'materials', label: 'Materials', shortLabel: 'Materials', icon: 'materials' },
+  { tab: 'review', label: 'Review', shortLabel: 'Review', icon: 'review' },
 ];
+
+/** The Review tab appears once prototype checks can run (check_prototype registered) or a result is loaded. */
+export function isSidebarTabAvailable(tab: SidebarTab, reviewLoaded: boolean): boolean {
+  return tab !== 'review' || reviewLoaded || getCommand('check_prototype') !== undefined;
+}
