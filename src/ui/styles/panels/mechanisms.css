@@ -39,7 +39,7 @@
 /* Physics section — rigid-body simulation results, speed chart, playback */
 
 .physics-run,
-.physics-playback__row {
+.timeline-dock__row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -53,7 +53,7 @@
   text-align: right;
 }
 
-.physics-playback__scrub {
+.timeline-dock__scrub {
   flex: 1;
   min-width: 0;
 }
@@ -81,55 +81,102 @@
   color: var(--fg-muted);
 }
 
-.speed-chart {
+.series-chart {
   margin: var(--space-1) var(--space-2);
 }
 
-.speed-chart svg {
+.series-chart svg {
   width: 100%;
   height: auto;
   display: block;
 }
 
-.speed-chart__axis {
+.series-chart__axis {
   stroke: var(--border-strong);
   stroke-width: 1;
 }
 
-.speed-chart__tick {
+.series-chart__tick {
   fill: var(--fg-muted);
   font-size: 9px;
   font-family: var(--font-mono);
 }
 
-.speed-chart__line {
+.series-chart__line {
   fill: none;
   stroke-width: 1.5;
 }
 
-.speed-chart__cursor {
+.series-chart__cursor {
   stroke: var(--fg-muted);
   stroke-dasharray: 2 2;
 }
 
-.speed-chart__line--1 {
-  stroke: var(--accent);
-  background: var(--accent);
+.series-chart__line--1 {
+  stroke: var(--cat-1);
 }
-.speed-chart__line--2 {
-  stroke: var(--success);
-  background: var(--success);
+.series-chart__line--2 {
+  stroke: var(--cat-2);
 }
-.speed-chart__line--3 {
-  stroke: var(--warning);
-  background: var(--warning);
+.series-chart__line--3 {
+  stroke: var(--cat-3);
 }
-.speed-chart__line--4 {
-  stroke: var(--danger);
-  background: var(--danger);
+.series-chart__line--4 {
+  stroke: var(--cat-4);
+}
+.series-chart__line--5 {
+  stroke: var(--cat-5);
+}
+.series-chart__line--6 {
+  stroke: var(--cat-6);
+}
+.series-chart__line--7 {
+  stroke: var(--cat-7);
+}
+.series-chart__line--8 {
+  stroke: var(--cat-8);
 }
 
-.speed-chart__legend {
+.series-chart svg {
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.series-chart__legend .series-chart__swatch {
+  width: 14px;
+  height: 4px;
+  stroke-width: 2;
+  cursor: default;
+}
+
+.timeline-dock__markers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  list-style: none;
+}
+
+.timeline-dock__marker {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm, 4px);
+  background: var(--surface-2);
+  color: var(--fg);
+  font-size: var(--text-xs);
+  padding: 1px 6px;
+  cursor: pointer;
+}
+
+.timeline-dock__marker:hover {
+  background: var(--surface-3);
+}
+
+.timeline-dock__marker--collision {
+  border-color: var(--danger);
+}
+
+.series-chart__legend {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
@@ -138,10 +185,8 @@
   font-family: var(--font-mono);
 }
 
-.speed-chart__swatch {
+.series-chart__swatch {
   display: inline-block;
-  width: 10px;
-  height: 2px;
   margin-right: 4px;
   vertical-align: middle;
 }
