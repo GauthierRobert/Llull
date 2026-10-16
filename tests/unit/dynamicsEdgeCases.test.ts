@@ -290,3 +290,76 @@ describe('cylinder run edge cases', () => {
     expect(data.cylinders).toEqual({});
   });
 });
+
+describe('further dynamics edge cases', () => {
+  it('buildSimulationModel names a body whose entity is missing, flat or has no mass', () => {
+    const { doc } = sliderCrank();
+    const dynamics = doc.dynamics!;
+    const withEntities = (entityIds: string[]): CadDocument => ({
+      ...doc,
+      dynamics: { ...dynamics, bodies: { ...dynamics.bodies, piston: { ...dynamics.bodies['piston']!, entityIds } } },
+    });
+    expect(buildSimulationModel(withEntities(['ghost']), 0.001)).toMatchObject({ error: expect.stringMatching(/missing entity 'ghost'/) });
+    const arc = execute(doc, 'draw_arc', { center: [0, 0], radius: 1 });
+    const flat = withEntities([arc.affected[0] ?? '']);
+    expect(buildSimulationModel({ ...flat, entities: { ...flat.entities, ...arc.document.entities } }, 0.001)).toMatchObject({
+      error: expect.stringMatching(/no solid volume/),
+    });
+  });
+
+  it('cycleAngleSeries is null without a crank series and wraps into the cycle otherwise', async () => {
+    const { cycleAngleSeries } = await import('@core/dynamics/engineReport');
+    const { doc } = sliderCrank({ rMm: 30.5, lMm: 130 });
+    const added = execute(doc, 'add_cylinder_pressure', {
+      piston: 'slide_j',
+      crank: 'crank_j',
+      boreMm: 84,
+      compressionRatio: 10,
+      model: {
+        kind: 'table',
+        points: [
+          [0, 0],
+          [720, 0],
+        ],
+      },
+    });
+    const dynamics = added.document.dynamics!;
+    const runtimes = prepareCylinders(dynamics, topologyOf(dynamics), 0.001);
+    if ('error' in runtimes) throw new Error(runtimes.error);
+    const base = { times: [0, 1], jointVelocity: {}, bodyPosition: {}, bodyOrientation: {}, servoForce: {} };
+    const runtime = runtimes[0]!;
+    expect(cycleAngleSeries(runtime, { ...base, jointPosition: {} })).toBeNull();
+    const angles = cycleAngleSeries(runtime, { ...base, jointPosition: { crank_j: [0, 2 * Math.PI * 3] } });
+    expect(angles?.every((a) => a >= 0 && a < 720)).toBe(true);
+    expect(angles?.[1]).toBeCloseTo(((angles?.[0] ?? 0) + 360 * 3) % 720, 6);
+  });
+
+  it('single zone with a fixed spark angle and a heat table clamped at its ends', () => {
+    const { doc } = sliderCrank({ rMm: 30.5, lMm: 130 });
+    const make = (burn: object, heat: object): ReturnType<typeof execute> =>
+      execute(doc, 'add_cylinder_pressure', {
+        piston: 'slide_j',
+        crank: 'crank_j',
+        boreMm: 84,
+        compressionRatio: 10,
+        model: { kind: 'single_zone', burn, intakePressurePa: 95000, intakeTempK: 330, heat },
+      });
+    const fixed = make(
+      { startDeg: -20, durationDeg: 40, a: 5, m: 2 },
+      {
+        kind: 'table_vs_rpm',
+        points: [
+          [1000, 300],
+          [3000, 500],
+        ],
+      },
+    );
+    expect(fixed.affected).toHaveLength(1);
+    const dynamics = fixed.document.dynamics!;
+    const runtimes = prepareCylinders(dynamics, topologyOf(dynamics), 0.001, 500);
+    if ('error' in runtimes) throw new Error(runtimes.error);
+    expect(runtimes[0]?.curveAt(500).heatJ).toBe(300);
+    expect(runtimes[0]?.curveAt(9000).heatJ).toBe(500);
+    expect(runtimes[0]?.curveAt(2000).heatJ).toBe(400);
+  });
+});
