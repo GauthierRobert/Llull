@@ -120,6 +120,19 @@ export function SheetViewer(): React.ReactElement | null {
             Views overflow the sheet
           </span>
         )}
+        {exported !== null && exported.warnings.length > 0 && (
+          <details className="sheet-viewer__warnings" data-testid="sheet-warnings">
+            <summary className="chip chip--warning">
+              <Icon name="info" size={12} />
+              {exported.warnings.length === 1 ? '1 warning' : `${exported.warnings.length} warnings`}
+            </summary>
+            <ul role="status" aria-label="Sheet warnings">
+              {exported.warnings.map((warning) => (
+                <li key={warning}>Warning: {warning}</li>
+              ))}
+            </ul>
+          </details>
+        )}
         <span className="sheet-viewer__spacer" />
         <label className="sheet-viewer__toggle" title="Overall width and height on each projection view">
           <input type="checkbox" checked={showDimensions} onChange={(event) => setShowDimensions(event.target.checked)} />

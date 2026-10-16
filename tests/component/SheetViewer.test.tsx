@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import * as localQuery from '@ui/services/localQuery';
 import { act, render, screen, fireEvent } from '@testing-library/react';
 import { useStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
@@ -42,6 +43,21 @@ describe('SheetViewer', () => {
     openSheet({ scale: 0.01 });
     render(<SheetViewer />);
     expect(screen.getByTestId('sheet-fits-warning')).toBeTruthy();
+  });
+
+  it('lists export warnings as text when present and nothing when absent', () => {
+    const sheetId = openSheet();
+    const real = runQuery('export_sheet_svg', { sheetId });
+    const spy = vi.spyOn(localQuery, 'runQuery');
+    spy.mockReturnValue({ ...real, data: { ...(real.data as object), warnings: ['front: detail circle contains no geometry'] } });
+    const { unmount } = render(<SheetViewer />);
+    expect(screen.getByTestId('sheet-warnings').textContent).toContain('1 warning');
+    expect(screen.getByLabelText('Sheet warnings').textContent).toContain('Warning: front: detail circle contains no geometry');
+    unmount();
+    spy.mockReturnValue({ ...real, data: { ...(real.data as object), warnings: [] } });
+    render(<SheetViewer />);
+    expect(screen.queryByTestId('sheet-warnings')).toBeNull();
+    spy.mockRestore();
   });
 
   it('the Dimensions toggle re-exports with showDimensions', () => {

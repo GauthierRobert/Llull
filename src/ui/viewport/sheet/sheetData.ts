@@ -20,6 +20,7 @@ export interface SheetExport {
   fits: boolean;
   views: SheetViewInfo[];
   skipped: Array<{ id: string; reason: string }>;
+  warnings: string[];
 }
 
 function readView(value: unknown): SheetViewInfo | null {
@@ -34,7 +35,7 @@ function readView(value: unknown): SheetViewInfo | null {
 /** null when `data` is not an `export_sheet_svg` payload (unknown sheet). */
 export function readSheetExport(data: unknown): SheetExport | null {
   if (!isRecord(data)) return null;
-  const { svg, paper, scaleText, widthMm, heightMm, fits, views, skipped } = data;
+  const { svg, paper, scaleText, widthMm, heightMm, fits, views, skipped, warnings } = data;
   if (typeof svg !== 'string' || typeof widthMm !== 'number' || typeof heightMm !== 'number') return null;
   return {
     svg,
@@ -49,6 +50,7 @@ export function readSheetExport(data: unknown): SheetExport | null {
           isRecord(entry) && typeof entry['id'] === 'string' ? [{ id: entry['id'], reason: String(entry['reason'] ?? '') }] : [],
         )
       : [],
+    warnings: Array.isArray(warnings) ? warnings.filter((warning): warning is string => typeof warning === 'string' && warning !== '') : [],
   };
 }
 

@@ -27,6 +27,23 @@
   color: var(--fg);
 }
 
+.sheet-viewer__warnings summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.sheet-viewer__warnings ul {
+  position: absolute;
+  z-index: 2;
+  margin: 4px 0 0;
+  padding: 8px 12px 8px 24px;
+  max-width: 420px;
+  font-size: 12px;
+  background: var(--surface-popover);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+}
+
 .sheet-viewer__name {
   font-weight: 600;
   max-width: 28ch;
