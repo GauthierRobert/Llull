@@ -113,13 +113,14 @@ describe('simulation model', () => {
     expect(built.model.bodies.find((body) => body.id === 'B')?.joint?.initialVelocity).toBe(-20);
   });
 
-  it('reports joint loops, references to immovable joints, and entities without volume', () => {
+  it('builds joint loops, reports references to immovable joints, and entities without volume', () => {
     const loop = rawDocument(({ a, b }) => ({
       ...createDynamicsModel(),
       bodies: { A: { id: 'A', entityIds: [a], fixed: false }, B: { id: 'B', entityIds: [b], fixed: false } },
       joints: { ja: joint('ja', 'A', 'B'), jb: joint('jb', 'B', 'A') },
     }));
-    expect(buildSimulationModel(loop, 0.001)).toEqual({ error: expect.stringMatching(/joint loop/) });
+    const built = buildSimulationModel(loop, 0.001);
+    expect('model' in built ? built.model.loops.map((l) => l.id) : built).toEqual(['jb']);
     const fixedDriven = rawDocument(({ a }) => ({
       ...createDynamicsModel(),
       bodies: { A: { id: 'A', entityIds: [a], fixed: true } },

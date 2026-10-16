@@ -1,44 +1,54 @@
 /** Joints between rigid bodies and gear couplings between joints. */
 
-import { GROUND, type DynamicJoint, type DynamicsModel } from '../../model/dynamics';
+import { GROUND, type DynamicJoint } from '../../model/dynamics';
+import type { Vec3 } from '../../model/vectors';
+import { buildTopology, isRefusal } from '../../dynamics/topology';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
 import { idOrNext } from '../entity/explicitId';
-import { changed, failer } from '../noop';
+import { changed, commandError, failer, rejection } from '../noop';
 import { dynamicsIdTaken, dynamicsOf, withDynamics } from './bodies';
 
 const RAD_PER_S_PER_RPM = (2 * Math.PI) / 60;
 
-/** True when `ancestor` is `body` or above it in the joint tree. */
-function isAncestor(dynamics: DynamicsModel, ancestor: string, body: string): boolean {
-  const parentOf = new Map(Object.values(dynamics.joints).map((joint) => [joint.child, joint.parent]));
-  for (let current: string | undefined = body, guard = 0; current !== undefined && guard <= parentOf.size; guard++) {
-    if (current === ancestor) return true;
-    current = parentOf.get(current);
-  }
-  return false;
-}
-
 /**
  * @affects adds 1 joint to doc.dynamics (affected: [jointId])
- * @invariant child is an existing non-fixed body with no joint yet; parent is GROUND or another body; no loop; axis non-zero
- * @failure unknown / fixed / already-jointed child, unknown parent, loop, zero axis, taken id -> no-op
+ * @invariant child is an existing non-fixed body (it may already have other joints: closed loops); parent is GROUND or another body;
+ *            axis non-zero (revolute, prismatic); spherical joints carry no damping, friction or initial speed; the joint graph keeps a
+ *            valid spanning tree (dynamics/topology.ts)
+ * @failure unknown / fixed child, unknown parent, zero axis, taken id, spherical with damping / friction / speed, FPR_LOOP_PRISMATIC
+ *          (a prismatic joint would have to close a loop) -> no-op; a spherical joint alone on its body is accepted but FPR_SPHERICAL_TREE
+ *          blocks simulate_motion until the body has a revolute or prismatic joint
  */
 export const addBodyJoint = defineCommand({
   name: 'add_body_joint',
   description:
-    'Connect a rigid body (child) to the ground or to another body (parent) with ONE degree of freedom, for simulate_motion. ' +
-    '"revolute": the child spins about `axis` through `anchor` (a shaft in its bearings, a propeller hub, a crank pin, a hinge). ' +
-    '"prismatic": the child slides along `axis` (a piston in its bore). `anchor` is a world point on the axis in DOCUMENT units ' +
-    '(e.g. the shaft centre); `axis` a world direction (need not be unit). Each body can be the child of only one joint; parents may ' +
-    'chain (ground → crank → connecting rod). Optional: damping (bearing viscous loss, N·m·s/rad), friction (dry friction torque, N·m), ' +
+    'Connect a rigid body (child) to the ground or to another body (parent), for simulate_motion. "revolute": the child spins about ' +
+    '`axis` through `anchor` (a shaft in its bearings, a propeller hub, a crank pin, a hinge). "prismatic": the child slides along ' +
+    '`axis` (a piston in its bore). "spherical": a ball pin at `anchor` (three rotations); it can only CLOSE A LOOP, never be the only ' +
+    'connection of a body. `anchor` is a world point on the axis in DOCUMENT units (e.g. the shaft centre); `axis` a world direction ' +
+    '(need not be unit; not used by spherical). A body may be the child of SEVERAL joints: that makes a closed loop (slider-crank, ' +
+    'four-bar, multi-cylinder engine). llull then picks the spanning tree itself (prismatic joints first, then revolute, in creation ' +
+    'order, so the last-declared joint of a loop becomes the closing constraint) and reports it in inspect_dynamics (data.topology, ' +
+    'data.mobility: degrees of freedom, redundant constraints). Loop joints have no coordinate of their own: motors, gears, propellers ' +
+    'and cylinder pressure must sit on tree joints. In a planar loop make one revolute loop joint "spherical" to avoid redundant ' +
+    'constraints. Refusals: FPR_LOOP_PRISMATIC (a prismatic joint would close a loop: re-order, or use a revolute joint there), ' +
+    'FPR_SPHERICAL_TREE (reported by inspect_dynamics / simulate_motion while a spherical joint is the only connection of its body: declare the revolute or prismatic joint too, in any order). The loop must be closed at the start pose: every joint has one anchor, so the pose of the bodies is the pose ' +
+    'you modelled; give `anchorOnChild` only to state where the pin sits on the child body when it differs (the distance is the loop ' +
+    'gap; above 1 µm simulate_motion refuses with FPR_LOOP_OPEN). Optional: damping (viscous, N·m·s/rad), friction (dry, N·m), ' +
     'initialRpm / initialVelocity (speed at t = 0). Returns the joint id in affected[0].',
   params: z.object({
-    kind: z.enum(['revolute', 'prismatic']).describe('"revolute" = rotation about the axis; "prismatic" = translation along it.'),
+    kind: z
+      .enum(['revolute', 'prismatic', 'spherical'])
+      .describe('"revolute" = rotation about the axis; "prismatic" = translation along it; "spherical" = ball pin, loop closure only.'),
     child: z.string().describe('Id of the moving body.'),
     parent: z.string().optional().describe(`Body the child is mounted on, or "${GROUND}" (default) for the fixed world.`),
-    anchor: vec3('World point on the joint axis, document units (e.g. the shaft centre [0, 200, 800]).'),
-    axis: vec3('World direction of the axis, e.g. [0, 1, 0] for a shaft along Y.'),
+    anchor: vec3('World point on the joint axis (the pin centre for spherical), document units, e.g. the shaft centre [0, 200, 800].'),
+    axis: vec3('World direction of the axis, e.g. [0, 1, 0] for a shaft along Y. Required for revolute and prismatic.').optional(),
+    anchorOnChild: vec3(
+      'Where the pin sits on the child body, document units, when it differs from anchor. Only used when the joint closes a loop: the ' +
+        'distance to anchor is the loop gap (refused above 1 µm). Default = anchor.',
+    ).optional(),
     damping: z.number().min(0).optional().describe('Viscous damping: N·m·s/rad (revolute) or N·s/m (prismatic). Default 0.'),
     friction: z.number().min(0).optional().describe('Dry friction: N·m (revolute) or N (prismatic). Default 0.'),
     initialRpm: z.number().optional().describe('Revolute only: speed at t = 0 in rpm (overrides initialVelocity).'),
@@ -52,12 +62,14 @@ export const addBodyJoint = defineCommand({
     const child = dynamics.bodies[params.child];
     if (child === undefined) return fail(`child body '${params.child}' not found (add_rigid_body first)`);
     if (child.fixed) return fail(`body '${child.id}' is fixed to the ground and cannot move`);
-    const existing = Object.values(dynamics.joints).find((joint) => joint.child === child.id);
-    if (existing !== undefined) return fail(`body '${child.id}' already hangs on joint '${existing.id}' (one joint per child body)`);
     if (parent !== GROUND && dynamics.bodies[parent] === undefined) return fail(`parent body '${parent}' not found`);
-    if (parent === child.id || isAncestor(dynamics, child.id, parent))
-      return fail(`joining '${child.id}' to '${parent}' would close a loop`);
-    if (Math.hypot(...params.axis) < 1e-12) return fail('axis must be a non-zero vector');
+    if (parent === child.id) return fail(`a body cannot be jointed to itself ('${parent}')`);
+    const spherical = params.kind === 'spherical';
+    const axis: Vec3 = params.axis ?? [0, 0, 1];
+    if (!spherical && (params.axis === undefined || Math.hypot(...axis) < 1e-12)) return fail('axis must be a non-zero vector');
+    const requestedSpeed = params.initialRpm !== undefined || (params.initialVelocity ?? 0) !== 0;
+    if (spherical && ((params.damping ?? 0) !== 0 || (params.friction ?? 0) !== 0 || requestedSpeed))
+      return fail('a spherical joint has no damping, friction or initial speed (put them on the tree joints)');
     const jointId = idOrNext(params.id, 'bjoint');
     if (dynamicsIdTaken(dynamics, jointId)) return fail(`id '${jointId}' is already used`);
     const initialVelocity =
@@ -68,14 +80,33 @@ export const addBodyJoint = defineCommand({
       parent,
       child: child.id,
       anchor: params.anchor,
-      axis: params.axis,
+      axis,
+      ...(params.anchorOnChild !== undefined ? { anchorOnChild: params.anchorOnChild } : {}),
       damping: params.damping ?? 0,
       friction: params.friction ?? 0,
       initialVelocity,
     };
+    const next = { ...dynamics, joints: { ...dynamics.joints, [jointId]: joint } };
+    const topology = buildTopology(next);
+    // a spherical joint may be declared before the joint that carries its body: only simulate_motion / inspect_dynamics complain then
+    if (isRefusal(topology) && topology.code !== 'FPR_SPHERICAL_TREE')
+      return rejection(
+        doc,
+        `add_body_joint: ${topology.code} — ${topology.error}; no-op.`,
+        commandError(topology.code, topology.error, topology.ids),
+      );
+    const closes = !isRefusal(topology) && topology.loops.some((loop) => loop.id === jointId);
+    const role = isRefusal(topology)
+      ? `waiting: it can only close a loop, so '${child.id}' still needs a revolute or prismatic joint (FPR_SPHERICAL_TREE until then)`
+      : closes
+        ? `closes a loop (${topology.loops.length} loop(s), ${topology.tree.length} tree joint(s))`
+        : 'tree joint';
+    const sense = spherical
+      ? `ball pin at [${params.anchor.join(', ')}]`
+      : `axis [${axis.join(', ')}] through [${params.anchor.join(', ')}]`;
     return changed(
-      withDynamics(doc, { ...dynamics, joints: { ...dynamics.joints, [jointId]: joint } }),
-      `add_body_joint: ${params.kind} '${jointId}' — '${child.id}' on '${parent}', axis [${params.axis.join(', ')}] through [${params.anchor.join(', ')}].`,
+      withDynamics(doc, next),
+      `add_body_joint: ${params.kind} '${jointId}' — '${child.id}' on '${parent}', ${sense}; ${role}.`,
       [jointId],
     );
   },

@@ -4,12 +4,15 @@
  */
 
 import type { CadDocument, Entity, Vec3 } from '../model/types';
-import { GROUND, type DynamicJoint, type DynamicsModel, type RigidBody } from '../model/dynamics';
+import { DEFAULT_SOLVER_SETTINGS, GROUND, type DynamicsModel, type DynamicsSolverSettings, type RigidBody } from '../model/dynamics';
 import { toMetres } from '../model/units';
+import { entityBoundsInDoc } from '../geometry/bounds';
 import { entityMassProperties } from '../geometry/entityMassProperties';
 import { combineMassProperties, type InertiaTensor, type MassProperties } from '../geometry/massProperties';
 import { RAD_PER_S_PER_RPM, appliedLoadsFor, speedServoGains } from './forceLaws';
-import type { SimulationBody, SimulationJoint, SimulationModel, SimulationServo } from './physicsEngine';
+import type { SimulationBody, SimulationJoint, SimulationLoop, SimulationModel, SimulationServo } from './physicsEngine';
+import { consistentSpeeds } from './mobility';
+import { buildTopology, isRefusal, type Topology, type TopologyRefusal } from './topology';
 
 /** kg/m³ of a body entity without a material: steel. */
 const DEFAULT_DENSITY = 7850;
@@ -68,24 +71,6 @@ function initialVelocities(dynamics: DynamicsModel): Record<string, number> {
   return speeds;
 }
 
-/** Bodies ordered parent before child; error on a joint cycle. */
-function treeOrder(bodies: readonly RigidBody[], jointOfChild: ReadonlyMap<string, DynamicJoint>): RigidBody[] | { error: string } {
-  const ordered: RigidBody[] = [];
-  const placed = new Set<string>();
-  let remaining = [...bodies];
-  while (remaining.length > 0) {
-    const ready = remaining.filter((body) => {
-      const parent = jointOfChild.get(body.id)?.parent;
-      return parent === undefined || parent === GROUND || placed.has(parent);
-    });
-    if (ready.length === 0) return { error: `joint loop through bodies ${remaining.map((b) => `'${b.id}'`).join(', ')}` };
-    for (const body of ready) placed.add(body.id);
-    ordered.push(...ready);
-    remaining = remaining.filter((body) => !placed.has(body.id));
-  }
-  return ordered;
-}
-
 /** Moment of inertia (kg·m²) about `joint`'s axis of every body carried by it (its child and that child's descendants). */
 function inertiaAboutJoint(bodies: readonly SimulationBody[], joint: SimulationJoint): number {
   const carried = new Set<string>();
@@ -105,50 +90,89 @@ function inertiaAboutJoint(bodies: readonly SimulationBody[], joint: SimulationJ
 }
 
 /** First reference from a gear / motor / propeller to a joint that cannot move (missing, or on a fixed body). */
-function danglingReference(dynamics: DynamicsModel, movable: ReadonlySet<string>): string | null {
+function danglingReference(dynamics: DynamicsModel, movable: ReadonlySet<string>, closing: ReadonlySet<string>): string | null {
+  const why = (joint: string): string =>
+    closing.has(joint) ? 'which closes a loop and has no coordinate of its own (use a tree joint of the loop)' : 'which cannot move';
   for (const gear of Object.values(dynamics.gears))
     for (const joint of [gear.driver, gear.driven])
-      if (!movable.has(joint)) return `gear '${gear.id}' uses joint '${joint}', which cannot move`;
+      if (!movable.has(joint)) return `gear '${gear.id}' uses joint '${joint}', ${why(joint)}`;
   for (const load of [...Object.values(dynamics.motors), ...Object.values(dynamics.propellers)])
-    if (!movable.has(load.joint)) return `'${load.id}' acts on joint '${load.joint}', which cannot move`;
+    if (!movable.has(load.joint)) return `'${load.id}' acts on joint '${load.joint}', ${why(load.joint)}`;
   return null;
 }
 
+/** Smallest half-distance between the two pins of a revolute loop, m. */
+const MIN_HALF_SPAN = 0.005;
+
+export interface BuiltSimulation {
+  readonly model: SimulationModel;
+  readonly mass: Record<string, BodyMassProperties>;
+  readonly topology: Topology;
+  readonly settings: DynamicsSolverSettings;
+}
+
+export interface BuildRefusal {
+  readonly error: string;
+  /** FPR_* code when the refusal has one. */
+  readonly code?: TopologyRefusal['code'];
+  readonly ids?: readonly string[];
+}
+
+/** Solver settings of the document: stored overrides on top of the defaults. */
+export function solverSettingsOf(dynamics: DynamicsModel): DynamicsSolverSettings {
+  return { ...DEFAULT_SOLVER_SETTINGS, ...dynamics.solver };
+}
+
+/** Half the shorter of the two bodies' extents along `axis` (m), at least MIN_HALF_SPAN; ground has no extent. */
+function loopHalfSpan(doc: CadDocument, bodies: readonly (RigidBody | undefined)[], axis: Vec3, metres: number): number {
+  const extents = bodies.flatMap((body) => {
+    if (body === undefined) return [];
+    const boxes = body.entityIds.flatMap((id) => {
+      const entity = doc.entities[id];
+      return entity === undefined ? [] : [entityBoundsInDoc(doc, entity)];
+    });
+    if (boxes.length === 0) return [];
+    const min = [0, 1, 2].map((i) => Math.min(...boxes.map((box) => box.min[i] ?? 0)));
+    const max = [0, 1, 2].map((i) => Math.max(...boxes.map((box) => box.max[i] ?? 0)));
+    return [[0, 1, 2].reduce((sum, i) => sum + Math.abs(axis[i] ?? 0) * ((max[i] ?? 0) - (min[i] ?? 0)), 0) * metres];
+  });
+  return Math.max(MIN_HALF_SPAN, extents.length === 0 ? 0 : Math.min(...extents) / 2);
+}
+
 /** The simulation model of the document's dynamics at integration step `timestep` (s), or the first problem that prevents simulating it. */
-export function buildSimulationModel(
-  doc: CadDocument,
-  timestep: number,
-): { model: SimulationModel; mass: Record<string, BodyMassProperties> } | { error: string } {
+export function buildSimulationModel(doc: CadDocument, timestep: number): BuiltSimulation | BuildRefusal {
   const dynamics = doc.dynamics;
   if (dynamics === undefined || Object.keys(dynamics.bodies).length === 0) return { error: 'no rigid bodies (add_rigid_body first)' };
   const metres = toMetres(doc, 1);
-  const jointOfChild = new Map(Object.values(dynamics.joints).map((joint) => [joint.child, joint]));
-  const order = treeOrder(Object.values(dynamics.bodies), jointOfChild);
-  if ('error' in order) return order;
-  const speeds = initialVelocities(dynamics);
+  const topology = buildTopology(dynamics);
+  if (isRefusal(topology)) return topology;
+  const settings = solverSettingsOf(dynamics);
+  const speeds = { ...initialVelocities(dynamics), ...consistentSpeeds(topology, initialVelocities(dynamics), metres) };
   const mass: Record<string, BodyMassProperties> = {};
   const bodies: SimulationBody[] = [];
-  for (const body of order) {
+  for (const id of topology.bodyOrder) {
+    const body = dynamics.bodies[id];
+    if (body === undefined) continue;
     const props = bodyMassProperties(doc, body);
     if ('error' in props) return props;
     mass[body.id] = props;
-    const joint = body.fixed ? undefined : jointOfChild.get(body.id);
-    const simulationJoint: SimulationJoint | null =
-      joint === undefined
-        ? null
-        : {
-            id: joint.id,
-            kind: joint.kind,
-            anchor: joint.anchor.map((c) => c * metres) as unknown as Vec3,
-            axis: unitAxis(joint.axis),
-            damping: joint.damping,
-            friction: joint.friction,
-            initialVelocity: speeds[joint.id] ?? 0,
-          };
-    const parent = joint?.parent;
+    const entry = body.fixed ? undefined : topology.jointOfBody.get(body.id);
+    let simulationJoint: SimulationJoint | null = null;
+    if (entry !== undefined && entry.joint.kind !== 'spherical') {
+      const axis = unitAxis(entry.joint.axis);
+      simulationJoint = {
+        id: entry.joint.id,
+        kind: entry.joint.kind,
+        anchor: entry.joint.anchor.map((c) => c * metres) as unknown as Vec3,
+        axis: entry.flipped ? [-axis[0], -axis[1], -axis[2]] : axis,
+        damping: entry.joint.damping,
+        friction: entry.joint.friction,
+        initialVelocity: speeds[entry.joint.id] ?? 0,
+      };
+    }
     bodies.push({
       id: body.id,
-      parentId: parent === undefined || parent === GROUND ? null : parent,
+      parentId: entry === undefined || entry.parent === GROUND ? null : entry.parent,
       mass: props.mass,
       centerOfMass: props.centerOfMass,
       inertia: props.inertia,
@@ -157,7 +181,8 @@ export function buildSimulationModel(
     });
   }
   const simulated = new Map(bodies.flatMap((body) => (body.joint === null ? [] : [[body.joint.id, body.joint] as const])));
-  const dangling = danglingReference(dynamics, new Set(simulated.keys()));
+  const closing = new Set(topology.loops.map((loop) => loop.id));
+  const dangling = danglingReference(dynamics, new Set(simulated.keys()), closing);
   if (dangling !== null) return { error: dangling };
   const servos: SimulationServo[] = Object.values(dynamics.motors).flatMap((motor) => {
     const joint = simulated.get(motor.joint);
@@ -165,7 +190,32 @@ export function buildSimulationModel(
     const gains = speedServoGains(inertiaAboutJoint(bodies, joint), timestep);
     return [{ id: motor.id, joint: motor.joint, targetVelocity: motor.rpm * RAD_PER_S_PER_RPM, ...gains, maxForce: motor.maxTorque }];
   });
+  const loops: SimulationLoop[] = topology.loops.flatMap((loop) => {
+    if (loop.kind === 'prismatic') return [];
+    const axis = unitAxis(loop.axis);
+    return [
+      {
+        id: loop.id,
+        kind: loop.kind,
+        bodyA: loop.parent === GROUND ? 'world' : loop.parent,
+        bodyB: loop.child,
+        anchor: loop.anchor.map((c) => c * metres) as unknown as Vec3,
+        axis,
+        halfSpan: loopHalfSpan(doc, [dynamics.bodies[loop.parent], dynamics.bodies[loop.child]], axis, metres),
+      },
+    ];
+  });
   const bodyOfJoint = Object.fromEntries(Object.values(dynamics.joints).map((joint) => [joint.id, joint.child]));
   const loads = appliedLoadsFor(Object.values(dynamics.motors), Object.values(dynamics.propellers), bodyOfJoint);
-  return { model: { gravity: dynamics.gravity, bodies, gears: Object.values(dynamics.gears), servos, loads }, mass };
+  const solver = {
+    integrator: settings.integrator,
+    loopTimeConstant: settings.loopTimeConstantSteps * timestep,
+    loopImpedance: settings.loopImpedance,
+  };
+  return {
+    model: { gravity: dynamics.gravity, bodies, gears: Object.values(dynamics.gears), loops, solver, servos, loads },
+    mass,
+    topology,
+    settings,
+  };
 }

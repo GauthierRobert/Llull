@@ -26,18 +26,24 @@ export interface RigidBody {
 }
 
 /**
- * A one-degree-of-freedom connection: `child` rotates (revolute) about / slides (prismatic) along `axis` through `anchor`, relative to
- * `parent` (a body id or GROUND).
- * @invariant parent !== child; each body is the child of at most one joint; axis non-zero; damping, friction >= 0
+ * A connection: `child` rotates (revolute) about / slides (prismatic) along `axis` through `anchor`, relative to `parent` (a body id or
+ * GROUND); a spherical joint is a ball pin (three rotations) that can only close a loop.
+ * @invariant parent !== child; a body may be the child of several joints (closed loops: dynamics/topology.ts picks the tree);
+ *            axis non-zero (ignored for spherical); damping, friction >= 0; spherical joints have damping = friction = initialVelocity = 0
  */
 export interface DynamicJoint {
   readonly id: string;
-  kind: 'revolute' | 'prismatic';
+  kind: 'revolute' | 'prismatic' | 'spherical';
   parent: string;
   child: string;
   /** World point on the axis, document units. */
   anchor: Vec3;
   axis: Vec3;
+  /**
+   * Where the pin sits on the child body when it differs from `anchor` (document units). Read only when the joint closes a loop: the
+   * distance between the two points is the loop gap (FPR_LOOP_OPEN). Absent = `anchor`.
+   */
+  anchorOnChild?: Vec3;
   /** Viscous damping: N·m·s/rad (revolute) or N·s/m (prismatic). */
   damping: number;
   /** Dry (Coulomb) friction: N·m (revolute) or N (prismatic). */
@@ -86,6 +92,78 @@ export interface PropellerLoad {
   thrustDirection: Vec3;
 }
 
+/**
+ * Gas pressure on a piston (prismatic joint `piston`) whose travel is tied to a crank (revolute joint `crank`) through the connecting rod.
+ * Pressure models are functions of the cycle angle φ (0 = firing TDC; 720 deg four-stroke, 360 deg two-stroke).
+ * @invariant boreMm > 0; compressionRatio > 1; piston prismatic, crank revolute (both tree joints of the mechanism)
+ */
+export interface CylinderPressure {
+  readonly id: string;
+  piston: string;
+  crank: string;
+  boreMm: number;
+  compressionRatio: number;
+  cycle: 'four_stroke' | 'two_stroke';
+  /** Cycle angle φ when the crank is at this piston's TDC position. */
+  firingOffsetDeg: number;
+  /** Crank joint angle (rad from its t = 0 pose) at this piston's TDC; null = computed from the geometry. */
+  tdcCrankAngleRad: number | null;
+  /** Pa, default 101 325 (ISA sea level). */
+  ambientPressurePa: number;
+  model:
+    | { kind: 'table'; points: (readonly [cycleDeg: number, gaugePa: number])[]; source?: string }
+    | {
+        kind: 'wiebe';
+        startDeg: number;
+        durationDeg: number;
+        a: number;
+        m: number;
+        compressionIndex: number;
+        expansionIndex: number;
+        intakePressurePa: number;
+        heat: { kind: 'per_cycle_J'; value: number } | { kind: 'target_imep_Pa'; value: number };
+        source?: string;
+      }
+    | {
+        kind: 'single_zone';
+        burn:
+          | { ca50Deg: number; durationDeg: number; a: number; m: number; rpmExponent: number }
+          | { startDeg: number; durationDeg: number; a: number; m: number; rpmExponent: number };
+        woschni: { c1: number; c2Closed: number; c2Exchange: number; c3: number; tempExponent: number; wallTempK: number };
+        intakePressurePa: number;
+        intakeTempK: number;
+        heat: { kind: 'per_cycle_J'; value: number } | { kind: 'table_vs_rpm'; points: (readonly [rpm: number, joulesPerCycle: number])[] };
+        source?: string;
+      };
+}
+
+/** Engine-neutral solver settings of loop-closed mechanisms (absent in the document = these defaults). */
+export interface DynamicsSolverSettings {
+  /** s, or 'auto' = min(1 ms, 0.5 deg of crank at the highest expected speed). */
+  timestepS: number | 'auto';
+  integrator: 'rk4' | 'implicitfast';
+  /** Loop constraint reference time constant in timesteps (>= 2, MuJoCo refsafe). */
+  loopTimeConstantSteps: number;
+  /** Loop constraint impedance in (0, 0.9999]. */
+  loopImpedance: number;
+  /** m: a residual up to this passes (5 % of a 0.020 mm pin clearance). */
+  loopResidualPassM: number;
+  /** m: a residual above this fails. */
+  loopResidualFailM: number;
+  /** Relative change between a run and its half-step run above which results are flagged (reserved for the realism slice). */
+  timestepSensitivityGate: number;
+}
+
+export const DEFAULT_SOLVER_SETTINGS: DynamicsSolverSettings = {
+  timestepS: 'auto',
+  integrator: 'rk4',
+  loopTimeConstantSteps: 2,
+  loopImpedance: 0.9999,
+  loopResidualPassM: 1e-6,
+  loopResidualFailM: 1e-5,
+  timestepSensitivityGate: 0.01,
+};
+
 export interface DynamicsModel {
   /** m/s², world axes (Z up: [0, 0, -9.81]). */
   gravity: Vec3;
@@ -94,6 +172,9 @@ export interface DynamicsModel {
   gears: Record<string, GearCoupling>;
   motors: Record<string, Motor>;
   propellers: Record<string, PropellerLoad>;
+  /** Absent in documents saved before PHY-21. */
+  cylinders?: Record<string, CylinderPressure>;
+  solver?: DynamicsSolverSettings;
 }
 
 export function createDynamicsModel(): DynamicsModel {

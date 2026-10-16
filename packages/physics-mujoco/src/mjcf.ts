@@ -1,10 +1,10 @@
 /**
  * Engine-neutral `SimulationModel` → MuJoCo MJCF XML. Every body frame sits at its centre of mass with world-aligned axes (so a child's
  * `pos` is the difference of centres of mass) and carries its full inertia tensor; joints are placed at their anchors in that frame. The
- * model has no geoms: no contacts, pure multibody dynamics.
+ * model has no geoms: no contacts, pure multibody dynamics. Loop-closing joints are `connect` equalities (a hinge outside the tree).
  */
 
-import type { SimulationBody, SimulationModel } from '@core/dynamics/physicsEngine';
+import type { SimulationBody, SimulationLoop, SimulationModel } from '@core/dynamics/physicsEngine';
 import type { Vec3 } from '@core/model/vectors';
 
 const ZERO: Vec3 = [0, 0, 0];
@@ -15,12 +15,45 @@ const ZERO: Vec3 = [0, 0, 0];
  */
 const GEAR_IMPEDANCE = '0.9999 0.9999 0.001';
 
+/** Name of the `connect` equality number `index` of a loop (a revolute loop has two pins, a spherical loop one). */
+export const loopEqualityName = (loopId: string, index: number): string => `loop:${loopId}:${index}`;
+
+/** Number of `connect` equalities of a loop. */
+export const loopPinCount = (loop: SimulationLoop): number => (loop.kind === 'spherical' ? 1 : 2);
+
 const numbers = (values: readonly number[]): string => values.map((value) => String(value)).join(' ');
 
 const minus = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 
 /** Names are ids, escaped for an XML attribute. */
 const attribute = (value: string): string => value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
+/** Pin points of a loop, world: the anchor, or for a revolute loop anchor ± axis · halfSpan. */
+function loopPins(loop: SimulationLoop): Vec3[] {
+  if (loop.kind === 'spherical') return [loop.anchor];
+  const at = (sign: number): Vec3 => [
+    loop.anchor[0] + sign * loop.halfSpan * loop.axis[0],
+    loop.anchor[1] + sign * loop.halfSpan * loop.axis[1],
+    loop.anchor[2] + sign * loop.halfSpan * loop.axis[2],
+  ];
+  return [at(-1), at(1)];
+}
+
+/**
+ * `connect` equalities of a loop (anchor in bodyA's frame, world for 'world'). Stiffness: reference time constant `loopTimeConstant`,
+ * impedance d (solimp = d d 0.001 0.5 2): the steady violation under acceleration a is a (1 - d) tau^2 (zeta = 1).
+ */
+function loopXml(loop: SimulationLoop, centers: ReadonlyMap<string, Vec3>, model: SimulationModel): string {
+  const reference = loop.bodyA === 'world' ? ZERO : (centers.get(loop.bodyA) ?? ZERO);
+  const impedance = model.solver.loopImpedance;
+  return loopPins(loop)
+    .map(
+      (pin, index) =>
+        `<connect name="${attribute(loopEqualityName(loop.id, index))}" body1="${attribute(loop.bodyA)}" body2="${attribute(loop.bodyB)}" ` +
+        `anchor="${numbers(minus(pin, reference))}" solref="${model.solver.loopTimeConstant} 1" solimp="${impedance} ${impedance} 0.001 0.5 2"/>`,
+    )
+    .join('');
+}
 
 function bodyXml(body: SimulationBody, parentCenter: Vec3, childrenOf: ReadonlyMap<string | null, SimulationBody[]>): string {
   const { joint } = body;
@@ -38,20 +71,24 @@ function bodyXml(body: SimulationBody, parentCenter: Vec3, childrenOf: ReadonlyM
 }
 
 /**
- * MJCF for `model`, integrated with RK4 at `timestep`. Gear couplings are joint equality constraints q_driven = ratio · q_driver (from the
- * initial pose), near-rigid (GEAR_IMPEDANCE) with the stiffest stable reference (time constant 2 · timestep). Servos are `intvelocity` actuators (ctrl = target velocity integrated
- * into a position set-point), evaluated by MuJoCo at every integrator stage.
+ * MJCF for `model`, integrated with RK4 (or implicitfast, per `solver.integrator`) at `timestep`. Gear couplings are joint equality
+ * constraints q_driven = ratio · q_driver (from the initial pose), near-rigid (GEAR_IMPEDANCE) with the stiffest stable reference (time
+ * constant 2 · timestep). Loop joints are `connect` equalities with the loop solref / solimp, and `diagexact` is enabled when loops exist.
+ * Servos are `intvelocity` actuators (ctrl = target velocity integrated into a position set-point), evaluated by MuJoCo at every
+ * integrator stage.
  */
 export function toMjcf(model: SimulationModel, timestep: number): string {
   const childrenOf = new Map<string | null, SimulationBody[]>();
   for (const body of model.bodies) childrenOf.set(body.parentId, [...(childrenOf.get(body.parentId) ?? []), body]);
   const roots = (childrenOf.get(null) ?? []).map((body) => bodyXml(body, ZERO, childrenOf)).join('');
+  const centers = new Map(model.bodies.map((body) => [body.id, body.centerOfMass] as const));
   const gears = model.gears
     .map(
       (gear) =>
         `<joint name="${attribute(gear.id)}" joint1="${attribute(gear.driven)}" joint2="${attribute(gear.driver)}" polycoef="0 ${gear.ratio} 0 0 0" solref="${2 * timestep} 1" solimp="${GEAR_IMPEDANCE}"/>`,
     )
     .join('');
+  const loops = model.loops.map((loop) => loopXml(loop, centers, model)).join('');
   const servos = model.servos
     .map(
       (servo) =>
@@ -59,10 +96,12 @@ export function toMjcf(model: SimulationModel, timestep: number): string {
         `actrange="-1e12 1e12" forcelimited="true" forcerange="${-servo.maxForce} ${servo.maxForce}"/>`,
     )
     .join('');
+  const integrator = model.solver.integrator === 'implicitfast' ? 'implicitfast' : 'RK4';
+  const flags = model.loops.length > 0 ? '<flag diagexact="enable"/>' : '';
   return (
     '<mujoco model="llull"><compiler angle="radian" inertiafromgeom="false" balanceinertia="true"/>' +
-    `<option timestep="${timestep}" integrator="RK4" gravity="${numbers(model.gravity)}"/>` +
-    `<worldbody>${roots}</worldbody>${gears === '' ? '' : `<equality>${gears}</equality>`}` +
+    `<option timestep="${timestep}" integrator="${integrator}" gravity="${numbers(model.gravity)}">${flags}</option>` +
+    `<worldbody>${roots}</worldbody>${gears === '' && loops === '' ? '' : `<equality>${gears}${loops}</equality>`}` +
     `${servos === '' ? '' : `<actuator>${servos}</actuator>`}</mujoco>`
   );
 }

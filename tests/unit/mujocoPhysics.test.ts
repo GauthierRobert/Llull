@@ -11,6 +11,9 @@ beforeAll(async () => {
   engine = await createMujocoPhysics();
 });
 
+/** No loop closures, default solver. */
+const tree = { loops: [], solver: { integrator: 'rk4', loopTimeConstant: 0.002, loopImpedance: 0.9999 } } as const;
+
 const noLoads = (): { jointForces: Record<string, number>; bodyForces: Record<string, [number, number, number]> } => ({
   jointForces: {},
   bodyForces: {},
@@ -41,6 +44,8 @@ describe('MuJoCo physics engine', () => {
       gravity: [0, 0, -9.81],
       bodies: [rotor('wheel', [0, 0, 1], 10, 0.5)],
       gears: [],
+      ...tree,
+      ...tree,
       servos: [],
       loads: () => ({ jointForces: { 'wheel-hinge': 2 }, bodyForces: {} }),
     };
@@ -61,6 +66,7 @@ describe('MuJoCo physics engine', () => {
       gravity: [0, 0, 0],
       bodies: [rotor('pinion', [0, 0, 0], 1, 0.02), rotor('wheel', [0.4, 0, 0], 5, 0.9)],
       gears: [{ id: 'mesh', driver: 'pinion-hinge', driven: 'wheel-hinge', ratio }],
+      ...tree,
       servos: [],
       loads: () => ({ jointForces: { 'pinion-hinge': 1 }, bodyForces: {} }),
     };
@@ -83,7 +89,7 @@ describe('MuJoCo physics engine', () => {
       joint: { id: 'pivot', kind: 'revolute', anchor: [0, 0, 0], axis: [0, 1, 0], damping: 0, friction: 0, initialVelocity: 0.05 },
     };
     const trace = engine.simulate(
-      { gravity: [0, 0, -9.81], bodies: [pendulum], gears: [], servos: [], loads: noLoads },
+      { gravity: [0, 0, -9.81], bodies: [pendulum], gears: [], ...tree, servos: [], loads: noLoads },
       { duration: 4, timestep: 0.0005, sampleInterval: 0.0005 },
     );
     const velocity = trace.jointVelocity['pivot'] ?? [];
@@ -110,7 +116,14 @@ describe('MuJoCo physics engine', () => {
       joint: null,
     };
     const trace = engine.simulate(
-      { gravity: [0, 0, 0], bodies: [block], gears: [], servos: [], loads: () => ({ jointForces: {}, bodyForces: { block: [8, 0, 0] } }) },
+      {
+        gravity: [0, 0, 0],
+        bodies: [block],
+        gears: [],
+        ...tree,
+        servos: [],
+        loads: () => ({ jointForces: {}, bodyForces: { block: [8, 0, 0] } }),
+      },
       { duration: 1, timestep: 0.001, sampleInterval: 1 },
     );
     expect(trace.bodyPosition['block']?.[1]?.[0]).toBeCloseTo(1, 6);
@@ -120,7 +133,7 @@ describe('MuJoCo physics engine', () => {
     const broken: SimulationBody = { ...rotor('bad', [0, 0, 0], -1, 0.1) };
     expect(() =>
       engine.simulate(
-        { gravity: [0, 0, 0], bodies: [broken], gears: [], servos: [], loads: noLoads },
+        { gravity: [0, 0, 0], bodies: [broken], gears: [], ...tree, servos: [], loads: noLoads },
         { duration: 0.1, timestep: 0.001, sampleInterval: 0.1 },
       ),
     ).toThrow();

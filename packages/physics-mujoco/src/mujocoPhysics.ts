@@ -5,42 +5,9 @@
 
 import type { PhysicsEngine, Quaternion, SimulationModel, SimulationOptions, SimulationTrace } from '@core/dynamics/physicsEngine';
 import type { Vec3 } from '@core/model/vectors';
+import { OBJECT_BODY, OBJECT_JOINT, type MjData, type MjModel, type MujocoModule } from './bindings';
+import { jointReaction, loopReader, loopSlots, type ReactionSlot } from './constraintForces';
 import { toMjcf } from './mjcf';
-
-/** The slice of the MuJoCo WASM bindings this adapter uses (the generated typings are `any`). */
-interface MjModel {
-  readonly njnt: number;
-  readonly jnt_qposadr: Int32Array;
-  readonly jnt_dofadr: Int32Array;
-  delete(): void;
-}
-
-interface MjData {
-  readonly time: number;
-  readonly qpos: Float64Array;
-  readonly qvel: Float64Array;
-  readonly qfrc_applied: Float64Array;
-  readonly ctrl: Float64Array;
-  readonly act: Float64Array;
-  readonly actuator_force: Float64Array;
-  readonly xfrc_applied: Float64Array;
-  readonly xpos: Float64Array;
-  readonly xquat: Float64Array;
-  delete(): void;
-}
-
-interface MujocoModule {
-  readonly MjModel: { from_xml_string(xml: string): MjModel };
-  readonly MjData: new (model: MjModel) => MjData;
-  mj_name2id(model: MjModel, type: number, name: string): number;
-  mj_step(model: MjModel, data: MjData): void;
-  mj_forward(model: MjModel, data: MjData): void;
-  mj_versionString(): string;
-}
-
-/** mjtObj values (mjOBJ_BODY, mjOBJ_JOINT). */
-const OBJECT_BODY = 1;
-const OBJECT_JOINT = 3;
 
 interface JointSlot {
   readonly id: string;
@@ -79,6 +46,27 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
     for (const body of model.bodies) if (body.joint !== null) data.qvel[jointDof(joints, body.joint.id)] = body.joint.initialVelocity;
     mujoco.mj_forward(mjModel, data);
     const initialOrientation = new Map(bodies.map(({ id, index }) => [id, readQuaternion(data, index)]));
+    const wantReactions = options.reactions === true;
+    const slots = loopSlots(mujoco, mjModel, model.loops);
+    const reader = loopReader(slots);
+    const reactionSlots: ReactionSlot[] = wantReactions
+      ? model.bodies.flatMap((body, i) =>
+          body.joint === null
+            ? []
+            : [
+                {
+                  jointId: body.joint.id,
+                  bodyIndex: bodies[i]?.index ?? 0,
+                  jointIndex: lookup(mujoco, mjModel, OBJECT_JOINT, body.joint.id),
+                },
+              ],
+        )
+      : [];
+    const loopForce: Record<string, Vec3[]> = Object.fromEntries(model.loops.map((loop) => [loop.id, []]));
+    const reaction: Record<string, { force: Vec3[]; moment: Vec3[] }> = Object.fromEntries(
+      reactionSlots.map((slot) => [slot.jointId, { force: [], moment: [] }]),
+    );
+    let residual = 0;
     const trace: SimulationTrace = {
       times: [],
       jointPosition: Object.fromEntries(joints.map((joint) => [joint.id, []])),
@@ -107,6 +95,17 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
         const start = initialOrientation.get(id) ?? [1, 0, 0, 0];
         trace.bodyOrientation[id]?.push(relativeQuaternion(readQuaternion(data, index), start));
       }
+      if (wantReactions) {
+        // constraint forces of the current state: forward pass, then the inverse dynamics that fills cfrc_int
+        mujoco.mj_forward(mjModel, data);
+        mujoco.mj_rnePostConstraint(mjModel, data);
+        reader.forces(data).forEach((force, i) => loopForce[model.loops[i]?.id ?? '']?.push(force));
+        for (const slot of reactionSlots) {
+          const { force, moment } = jointReaction(mjModel, data, slot);
+          reaction[slot.jointId]?.force.push(force);
+          reaction[slot.jointId]?.moment.push(moment);
+        }
+      }
     };
     const steps = Math.round(options.duration / options.timestep);
     const stride = Math.max(1, Math.round(options.sampleInterval / options.timestep));
@@ -116,9 +115,14 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
       previousVelocity = applyLoads(model, data, { joints, bodies, initialPosition, previousVelocity, timestep: options.timestep });
       mujoco.mj_step(mjModel, data);
       if (!data.qvel.every(Number.isFinite)) throw new Error(`simulation diverged at t = ${data.time.toFixed(4)} s.`);
+      if (slots.length > 0) residual = Math.max(residual, reader.residual(data));
       if (step % stride === 0 || step === steps) record();
     }
-    return trace;
+    return {
+      ...trace,
+      ...(wantReactions ? { jointReaction: reaction, ...(slots.length > 0 ? { loopForce } : {}) } : {}),
+      ...(slots.length > 0 ? { loopResidual: residual } : {}),
+    };
   } finally {
     data.delete();
     mjModel.delete();

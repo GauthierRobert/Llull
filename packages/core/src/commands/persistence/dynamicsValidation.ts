@@ -22,15 +22,17 @@ const bodyProblem: Check = (body) =>
         : null;
 
 const jointProblem: Check = (joint) =>
-  joint['kind'] !== 'revolute' && joint['kind'] !== 'prismatic'
-    ? "kind must be 'revolute' or 'prismatic'"
+  joint['kind'] !== 'revolute' && joint['kind'] !== 'prismatic' && joint['kind'] !== 'spherical'
+    ? "kind must be 'revolute', 'prismatic' or 'spherical'"
     : typeof joint['parent'] !== 'string' || typeof joint['child'] !== 'string'
       ? 'parent and child must be strings'
-      : !isVec3(joint['anchor']) || !isVec3(joint['axis'])
-        ? 'anchor and axis must be [x, y, z] finite numbers'
+      : !isVec3(joint['anchor']) || !isVec3(joint['axis']) || !isOptional(joint['anchorOnChild'], isVec3)
+        ? 'anchor, axis and anchorOnChild must be [x, y, z] finite numbers'
         : !isNonNegative(joint['damping']) || !isNonNegative(joint['friction']) || !isFiniteNumber(joint['initialVelocity'])
           ? 'damping, friction must be >= 0 and initialVelocity finite'
-          : null;
+          : joint['kind'] === 'spherical' && (joint['damping'] !== 0 || joint['friction'] !== 0 || joint['initialVelocity'] !== 0)
+            ? 'a spherical joint has damping = friction = initialVelocity = 0'
+            : null;
 
 const gearProblem: Check = (gear) =>
   typeof gear['driver'] !== 'string' || typeof gear['driven'] !== 'string'
@@ -64,6 +66,69 @@ const propellerProblem: Check = (propeller) =>
           ? 'thrustDirection must be [x, y, z]'
           : null;
 
+const isPoints = (value: unknown, minimum: number): boolean =>
+  Array.isArray(value) &&
+  value.length >= minimum &&
+  value.every((point) => Array.isArray(point) && point.length === 2 && point.every(isFiniteNumber));
+
+const allFinite = (record: Record<string, unknown>, keys: readonly string[]): boolean => keys.every((key) => isFiniteNumber(record[key]));
+
+const wiebeProblem = (model: Record<string, unknown>): string | null => {
+  const heat = model['heat'];
+  if (!isRecord(heat) || (heat['kind'] !== 'per_cycle_J' && heat['kind'] !== 'target_imep_Pa') || !isFiniteNumber(heat['value']))
+    return 'wiebe needs heat { kind: per_cycle_J | target_imep_Pa, value }';
+  const keys = ['startDeg', 'durationDeg', 'a', 'm', 'compressionIndex', 'expansionIndex', 'intakePressurePa'];
+  return allFinite(model, keys) && isPositive(model['durationDeg']) && isPositive(model['a'])
+    ? null
+    : 'wiebe needs finite startDeg, durationDeg > 0, a > 0, m, compressionIndex, expansionIndex, intakePressurePa';
+};
+
+const singleZoneProblem = (model: Record<string, unknown>): string | null => {
+  const [burn, woschni, heat] = [model['burn'], model['woschni'], model['heat']];
+  if (!isRecord(burn) || !isPositive(burn['durationDeg']) || !isPositive(burn['a']) || !allFinite(burn, ['m', 'rpmExponent']))
+    return 'single_zone burn needs durationDeg > 0, a > 0, m, rpmExponent and ca50Deg or startDeg';
+  if (!isFiniteNumber(burn['ca50Deg']) && !isFiniteNumber(burn['startDeg'])) return 'single_zone burn needs ca50Deg or startDeg';
+  if (!isRecord(woschni) || !allFinite(woschni, ['c1', 'c2Closed', 'c2Exchange', 'c3', 'tempExponent', 'wallTempK']))
+    return 'single_zone woschni needs c1, c2Closed, c2Exchange, c3, tempExponent, wallTempK';
+  if (!isPositive(model['intakePressurePa']) || !isPositive(model['intakeTempK']))
+    return 'single_zone needs intakePressurePa and intakeTempK > 0';
+  const heatOk =
+    isRecord(heat) &&
+    (heat['kind'] === 'per_cycle_J' ? isPositive(heat['value']) : heat['kind'] === 'table_vs_rpm' && isPoints(heat['points'], 1));
+  return heatOk ? null : 'single_zone heat must be per_cycle_J { value > 0 } or table_vs_rpm { points }';
+};
+
+const cylinderProblem: Check = (cylinder) => {
+  if (typeof cylinder['piston'] !== 'string' || typeof cylinder['crank'] !== 'string') return 'piston and crank must be joint ids';
+  const ratio = cylinder['compressionRatio'];
+  if (!isPositive(cylinder['boreMm']) || !isFiniteNumber(ratio) || ratio <= 1) return 'boreMm must be > 0 and compressionRatio > 1';
+  if (cylinder['cycle'] !== 'four_stroke' && cylinder['cycle'] !== 'two_stroke') return "cycle must be 'four_stroke' or 'two_stroke'";
+  if (!isFiniteNumber(cylinder['firingOffsetDeg']) || !isPositive(cylinder['ambientPressurePa']))
+    return 'firingOffsetDeg finite, ambientPressurePa > 0';
+  if (cylinder['tdcCrankAngleRad'] !== null && !isFiniteNumber(cylinder['tdcCrankAngleRad']))
+    return 'tdcCrankAngleRad must be a number or null';
+  const model = cylinder['model'];
+  if (!isRecord(model)) return 'model must be an object';
+  if (model['kind'] === 'table') return isPoints(model['points'], 2) ? null : 'table needs points [[cycleDeg, gaugePa], ...] (at least 2)';
+  if (model['kind'] === 'wiebe') return wiebeProblem(model);
+  if (model['kind'] === 'single_zone') return singleZoneProblem(model);
+  return "model.kind must be 'table', 'wiebe' or 'single_zone'";
+};
+
+const solverProblem = (solver: unknown): string | null => {
+  if (solver === undefined) return null;
+  if (!isRecord(solver)) return 'solver must be an object';
+  const stepOk = solver['timestepS'] === 'auto' || isPositive(solver['timestepS']);
+  if (!stepOk || (solver['integrator'] !== 'rk4' && solver['integrator'] !== 'implicitfast'))
+    return "timestepS must be 'auto' or > 0; integrator 'rk4' | 'implicitfast'";
+  const [steps, impedance] = [solver['loopTimeConstantSteps'], solver['loopImpedance']];
+  if (!isFiniteNumber(steps) || steps < 2) return 'loopTimeConstantSteps must be >= 2';
+  if (!isFiniteNumber(impedance) || impedance <= 0 || impedance > 0.9999) return 'loopImpedance must be in (0, 0.9999]';
+  return isPositive(solver['loopResidualPassM']) && isPositive(solver['loopResidualFailM']) && isPositive(solver['timestepSensitivityGate'])
+    ? null
+    : 'loopResidualPassM, loopResidualFailM, timestepSensitivityGate must be > 0';
+};
+
 const TABLES: ReadonlyArray<readonly [string, Check]> = [
   ['bodies', bodyProblem],
   ['joints', jointProblem],
@@ -78,7 +143,10 @@ export function dynamicsProblems(value: unknown): string[] {
   if (!isRecord(value) || !isVec3(value['gravity']))
     return ['dynamics must be { gravity: [x, y, z], bodies, joints, gears, motors, propellers }'];
   const errors: string[] = [];
-  for (const [table, check] of TABLES) {
+  const solverError = solverProblem(value['solver']);
+  if (solverError !== null) errors.push(`dynamics.solver: ${solverError}`);
+  const tables = value['cylinders'] === undefined ? TABLES : [...TABLES, ['cylinders', cylinderProblem] as const];
+  for (const [table, check] of tables) {
     const records = value[table];
     if (!isRecord(records)) {
       errors.push(`dynamics.${table} must be an object`);
@@ -93,10 +161,5 @@ export function dynamicsProblems(value: unknown): string[] {
       }
     }
   }
-  const children = Object.values(isRecord(value['joints']) ? value['joints'] : {}).flatMap((joint) =>
-    isRecord(joint) && typeof joint['child'] === 'string' ? [joint['child']] : [],
-  );
-  for (const child of new Set(children.filter((id, i) => children.indexOf(id) !== i)))
-    errors.push(`dynamics.joints: body '${child}' is the child of more than one joint`);
   return errors;
 }

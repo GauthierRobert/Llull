@@ -88,10 +88,10 @@ describe('dynamics persistence', () => {
     );
   });
 
-  it('refuses a body hanging on two joints', () => {
+  it('accepts a body hanging on two joints (closed loops), and the new slices', () => {
     const dynamics = structuredClone(rotorDocument().dynamics) as unknown as Record<string, Record<string, Record<string, unknown>>>;
     const twice = { ...dynamics, joints: { ...dynamics['joints'], extra: { ...dynamics['joints']?.['shaft'], id: 'extra' } } };
-    expect(dynamicsProblems(twice)).toEqual(["dynamics.joints: body 'rotor' is the child of more than one joint"]);
+    expect(dynamicsProblems(twice)).toEqual([]);
   });
 
   it('a document with broken dynamics is refused on load', () => {

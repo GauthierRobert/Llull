@@ -174,11 +174,11 @@ describe('dynamics commands — validation and bookkeeping', () => {
     expect(execute(ok.document, 'add_rigid_body', { entityIds: [disc.id], id: ok.affected[0] }).affected).toEqual([]);
   });
 
-  it('add_body_joint rejects unknown / fixed / doubly-jointed children, loops and zero axes', () => {
+  it('add_body_joint rejects unknown / fixed children, self-joints and zero axes; a second joint on a child closes a loop', () => {
     const { doc, body, joint } = discOnShaft();
     const anchor = [0, 0, 0];
     expect(execute(doc, 'add_body_joint', { kind: 'revolute', child: 'x', anchor, axis: [0, 1, 0] }).summary).toMatch(/not found/);
-    expect(execute(doc, 'add_body_joint', { kind: 'revolute', child: body, anchor, axis: [0, 1, 0] }).summary).toMatch(/already hangs/);
+    expect(execute(doc, 'add_body_joint', { kind: 'revolute', child: body, anchor, axis: [0, 1, 0] }).summary).toMatch(/closes a loop/);
     const other = run(doc, 'add_box', { size: [10, 10, 10] });
     const fixed = run(other.doc, 'add_rigid_body', { entityIds: [other.id], fixed: true });
     expect(execute(fixed.doc, 'add_body_joint', { kind: 'revolute', child: fixed.id, anchor, axis: [0, 1, 0] }).summary).toMatch(/fixed/);
@@ -197,7 +197,7 @@ describe('dynamics commands — validation and bookkeeping', () => {
     });
     expect(chained.doc.dynamics?.joints[chained.id]?.initialVelocity).toBe(1);
     expect(execute(doc, 'add_body_joint', { kind: 'revolute', child: body, parent: body, anchor, axis: [0, 0, 1] }).summary).toMatch(
-      /already hangs/,
+      /itself/,
     );
     expect(joint).toMatch(/^bjoint/);
   });
