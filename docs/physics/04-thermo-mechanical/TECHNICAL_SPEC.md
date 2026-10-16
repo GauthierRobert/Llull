@@ -309,3 +309,43 @@ thick cylinder integral form, gradient beam, Lamé, CTE conversion), returned wi
 - llull: `.claude/rules/architecture.md`, `.dependency-cruiser.cjs`, `packages/core/src/commands/parametric/expression.ts`,
   `docs/aerospace/03-gdt-mbd-pmi/TECHNICAL_SPEC.md`, `docs/aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md`,
   `docs/aerospace/08-materials-standards-libraries/TECHNICAL_SPEC.md`, `docs/physics/03-thermal-analysis/TECHNICAL_SPEC.md`.
+
+## 13. Implementation status (2026-10-16)
+
+**Built: M1** — `fit_at_temperature` (TR-TMC-20, with the V1 Lamé pressure / hub hoop stress of TR-TMC-21), `thermal_stress_check`
+(§5.5) and the CTE conversion module (TR-TMC-15). VC-TMC-01.a–c, 03.a–c, 04.a/b, 05.a–c, 06.a–d, 07.a–c, 08.a–d, 09.a–c and 62 are
+judged by `tests/unit/physics/thermomech/` (all pass); every row of `fit_at_temperature.csv` (12), `thick_cylinder_profile.csv` (11) and
+`cte_conversion.csv` (6) is reproduced. VC-TMC-60 / 61 are asserted for the fit-side codes.
+
+| Item | Where |
+| ---- | ----- |
+| `fit_at_temperature` | `packages/core/src/commands/thermomech/{fitAtTemperature,fitMath,materialCte}.ts` |
+| `thermal_stress_check` | `commands/thermomech/{thermalStressCheck,thermalChecks,analytic}.ts` |
+| CTE conversions §5.2 | `commands/thermomech/cteConversion.ts` (exact for linear laws / piecewise-linear tables; Simpson ≤ 10 K with a Richardson error estimate otherwise) |
+
+Toolset `analysis`.
+
+**Deviations (recorded, not silent):**
+
+- **Placement.** Core feature catalog `commands/thermomech/` (no `packages/domain-physics`), as PHY-00/01.
+- **No PMI.** 03 GDT size dimensions do not exist: limits are explicit `hole` / `shaft` `{ nominal, upper, lower }` in document units;
+  `provenance.limits[]` carries `part` instead of `pmiId` / `code`; `unit` is the document length unit.
+- **CTE sources.** A PHY-01 `thermalStrain` model is preferred (exact §3.3 secant); a `cte` model needs the per-material `cteBasis`
+  override (`secant` + reference, or `instantaneous`) because PHY-01 has no basis field (§11 Q2); explicit `holeCte` / `shaftCte`
+  need a `referenceTemperature` and are always `unverified`. E, ν for Lamé are explicit inputs (`lame`), flagged `unverified`.
+- **Temperatures.** No silent spec-temperature row: no temperature given ⇒ `TMC_FIT_TEMPERATURES_MISSING`.
+- **Formula string** is the VC-TMC-62 text `D(T) = D_spec (1 + a_sec (T - T_spec))`.
+- **`thermal_stress_check` inputs** are a `Record<string, { value, unit }>` per check (keys in the description), unknown / missing keys
+  refused; defaults (`inclusion r = a`, thick-cylinder radii) listed in `data.defaults`.
+- **Extra codes:** `TMC_FIT_TEMPERATURES_MISSING`, `TMC_CTE_SOURCE_CONFLICT`, `TMC_CHECK_INPUT_MISSING`, `TMC_CHECK_INPUT_UNKNOWN`,
+  `TMC_CHECK_INPUT_INVALID`.
+- **Rows** carry `disposition: 'pending_human'` when a code is raised (no signing port), `'none'` otherwise.
+
+**Validation pack finding (open):** the generator derives VC-TMC-09.b/c with the nominal-diameter linearisation
+`i(T) = i(20) − D (α_hub − α_shaft) ΔT`, whereas §5.3 (and VC-TMC-06) scale every limit diameter. The two differ by 1.6e-5 mm on 09.c
+against an `abs 1e-7` tolerance. 09.b/c are therefore measured through `thermal_stress_check check=shrink_fit` (the generator formula);
+`fit_at_temperature` keeps §5.3. The pack should either re-derive 09.b/c limit by limit or state the linearisation.
+
+**Not built (blocked):** M2–M4 — `thermo_static` / coupled cases, `set_reference_temperature`, `set_temperature_field`, deck sections,
+`thermal_distortion_report`, `check_thermo_mechanical`, the staleness chain and the `lib/expression` move need the 05 FEA analysis slice
+and CalculiX, PHY-03 M2 and the extension port; `dispose_fit_result` needs the 09 PLM signing port. VC-TMC-02 (LE11), 50, 63 stay open.

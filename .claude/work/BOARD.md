@@ -90,6 +90,19 @@ Agents are isolated; coordination is structural, run by the orchestrator:
 - `[BLOCKED]` **PROP-M6** seed NIST library. _deps: access to trc.nist.gov (OQ-PROP-03); 08 MAT library files._
 - `[BLOCKED]` **PROP-08** move models onto the 08 `MaterialRecord`, TR-PROP-07 adapter, private libraries (VC-PROP-22). _deps: 08 MAT._
 
+## PHY-02 — Constitutive models + material-point driver (`docs/physics/02-constitutive-models/`)
+- `[DONE]` **MATL-M1…M6** `MaterialModel` union + durability variants + law catalogue (`model/materialModel*.ts`, `model/materialLaws/**`), `add/remove_material_model`, `define_constitutive_set`, `check_material_models` (toolset `materials`), `fit_material_model` (linear), `material_point_response` (J2 / Chaboche / RO / hyperelastic / Prony / creep), `export_material_cards` (CalculiX; Nastran MAT1+MATS1) in core `commands/materiallab/` (toolset `material-lab`). Done 2026-10-16 (branch `ccr-5fde98b7-32ge5q`): 107/107 VC-MATL pass; deviations in TECHNICAL_SPEC §13.
+- `[BLOCKED]` **MATL-M4b** 05 deck-writer `MaterialCardWriter` hook, `FeaConstitutiveView`, ccx / pyNastran read tests. _deps: 05 FEA, server Python test infra._
+- `[TODO]` **MATL-M7** (V2) LM fits, compressible hyperelastic driver, Hill-48, MFront (licence review OQ-MATL-05).
+
+## PHY-03 — Thermal analysis (`docs/physics/03-thermal-analysis/`)
+- `[DONE]` **THM-A** `thermal_analytic_check`, thermal units, `compute_view_factors` (V1-a + V1-b obstruction, explicit polygons) in core `commands/thermal/` (toolset `analysis`). Done 2026-10-16: VC-THM-01, 02, 06–13, 60 pass; deviations in TECHNICAL_SPEC §13.
+- `[BLOCKED]` **THM-M0…M3, M4 decks** thermal slice + set-up commands, deck sections, summariser, `thermal_report`, `check_thermal`, `check_temperature_limits`, `dispose_thermal_limit`. _deps: 05 FEA (analysis slice, Gmsh, ccx, artifact store), extension-port decision (README §8.3-1), 09 PLM signing._
+
+## PHY-04 — Thermo-mechanical & fits (`docs/physics/04-thermo-mechanical/`)
+- `[DONE]` **TMC-M1** `fit_at_temperature` (+ Lamé), `thermal_stress_check`, CTE conversions in core `commands/thermomech/` (toolset `analysis`). Done 2026-10-16: VC-TMC-01, 03–09, 62 pass. Open pack finding: VC-TMC-09.b/c generator linearisation vs §5.3 (TECHNICAL_SPEC §13).
+- `[BLOCKED]` **TMC-M2…M4** `thermo_static`, temperature fields, decks, distortion, `check_thermo_mechanical`, `dispose_fit_result`. _deps: PHY-03 M2, 05 FEA, 03 GDT PMI, 09 PLM signing, `lib/expression` move._
+
 ## PHY-21 — Functional digital prototype (`docs/physics/21-functional-prototype/`)
 - `[DONE]` **FPR-A** Buildability gate (FUNCTIONAL_SPEC §5.1, TECHNICAL_SPEC M1 + joint realisation): kernel `analyze`/`distance` (both kernels) + face axes, `meshBvh`, `check_assembly` (validity, pairs, connectivity, ray thickness, process table, joint realisation), `doc.prototype` intents/grounding, `allow_interference` / `remove_interference_intent` / `set_part_grounded`; VC-FPR-01…09. _Lane 1+4. Done 2026-10-16 (merged 930fca4c): adds status `info`, codes `FPR_NO_PARTS`, `FPR_STALE_REFERENCE`, `FPR_JOINT_REALISED`, `FPR_WALL_MEASURED`; joint realisation OCC + dynamics revolute joints only; inputsHash = FNV-64 of canonical JSON (no sha256 in core)._
 - `[DONE]` **FPR-B** Physically connected mechanism (FUNCTIONAL_SPEC §5.2, TECHNICAL_SPEC M2 + M3): closed loops + `spherical`, MJCF `connect`, solver settings, reactions + residual, mobility in `inspect_dynamics`, `FPR_LOOP_OPEN`; `add_cylinder_pressure` (table, Wiebe, single-zone), engine report, `engine_quick_check`; VC-FPR-10…17, 20, 21. Brake calibration (`calibrate_brake`) waits on FPR-E losses. _Done 2026-10-16 (merged 430ae1e1, review fixes afd185a3): energy closure from the simulated side; `data.engineReport`; `anchorOnChild`; firingOffsetDeg 0|360; codes FPR_SPHERICAL_TREE / FPR_JOINT_DANGLING / FPR_PRESSURE_MODEL_INVALID. Open: auto timestep vs light parts at low rpm (loop tier fails, owner to decide)._

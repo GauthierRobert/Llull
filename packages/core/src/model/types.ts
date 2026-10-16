@@ -1,6 +1,7 @@
 /** Domain model — the single source of truth for a CAD document; changed only by commands. */
 
 import type { PropertyModel } from './propertyModel';
+import type { ConstitutiveSet, MaterialModel } from './materialModel';
 import type { Vec2, Vec3 } from './vectors';
 import type { BuildingModel } from './building';
 import type { CivilModel } from './civil';
@@ -655,6 +656,12 @@ export interface Material {
   finish?: MaterialFinish;
   /** Property models (PHY-01: k(T), cp(T), E(T), …) defined with define_property_model; read through `propertyModelEval`. */
   readonly propertyModels?: readonly PropertyModel[];
+  /** Constitutive / durability laws (PHY-02: add_material_model); read through `materialLaws/*`. */
+  readonly materialModels?: readonly MaterialModel[];
+  /** Named combinations of material models an analysis picks (PHY-02: define_constitutive_set). */
+  readonly constitutiveSets?: readonly ConstitutiveSet[];
+  /** Id of the set used when a query names none. */
+  readonly defaultConstitutiveSet?: string;
 }
 
 export const FINISH_PATTERNS = ['carbon_twill', 'carbon_plain', 'brushed', 'knurl', 'checker'] as const;

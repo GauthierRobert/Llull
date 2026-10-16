@@ -3,6 +3,7 @@
 import { canonicalJson } from '../../lib/canonicalJson';
 import { sha256Hex } from '../../lib/sha256';
 import { preferenceKey, type FitRecord, type PropertyForm, type PropertyModel, type Provenance } from '../../model/propertyModel';
+import { materialModelsReading } from '../../model/materialLaws/references';
 import { modelProblem } from '../../model/propertyModelValidate';
 import type { CadDocument, Material } from '../../model/types';
 import type { CommandResult } from '../types';
@@ -159,6 +160,18 @@ export const definePropertyModel = defineCommand({
         'model.preferred',
       );
     const models = index >= 0 ? existing.map((m) => (m.id === model.id ? model : m)) : [...existing, model];
+    if (index >= 0) {
+      const { broken } = materialModelsReading(materialId, model.id, material.materialModels ?? [], models);
+      if (broken !== null)
+        return refuseWith(
+          doc,
+          name,
+          'PROP_MODEL_IN_USE',
+          `material model '${broken.modelId}' reads '${model.id}' and would break (${broken.message})`,
+          [broken.modelId],
+          'model.id',
+        );
+    }
     return changed(
       withModels(doc, materialId, material, models),
       `define_property_model '${materialId}/${model.id}': ${model.property} [${model.unit}] as ${model.form.kind} over ${model.validity
@@ -178,7 +191,7 @@ export const removePropertyModel = defineCommand({
   name: 'remove_property_model',
   annotations: { destructive: true },
   description:
-    'Remove one property model from a material. Refused while another model of the material is a ratioOf of it (PROP_MODEL_IN_USE).',
+    'Remove one property model from a material. Refused while another model of the material is a ratioOf of it, or a material law reads it (PROP_MODEL_IN_USE).',
   params: z.object({
     material: z.string().describe('Material id (create_material name).'),
     modelId: z.string().describe('Id of the model to remove.'),
@@ -194,6 +207,9 @@ export const removePropertyModel = defineCommand({
     const dependants = models.filter((m) => JSON.stringify(m.form).includes(`"baseModelId":${JSON.stringify(modelId)}`)).map((m) => m.id);
     if (dependants.length > 0)
       return refuseWith(doc, name, 'PROP_MODEL_IN_USE', `${dependants.join(', ')} build on '${modelId}'`, dependants, 'modelId');
+    const { readers } = materialModelsReading(materialId, modelId, material.materialModels ?? [], models);
+    if (readers.length > 0)
+      return refuseWith(doc, name, 'PROP_MODEL_IN_USE', `material model(s) ${readers.join(', ')} read '${modelId}'`, readers, 'modelId');
     return changed(
       withModels(
         doc,

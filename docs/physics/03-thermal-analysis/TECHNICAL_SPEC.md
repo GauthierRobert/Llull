@@ -469,3 +469,37 @@ Cross-gap: **05 FEA** (pipeline), **08 MAT** / **PHY-01** (k, cp, ρ data), **PH
 - llull: `.claude/rules/architecture.md` (L1–L10), `.dependency-cruiser.cjs` (rule `plugins-and-kernels-depend-on-core-only`),
   `packages/core/src/model/types.ts`, `packages/mcp/src/toolsets.ts`, `docs/aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md`,
   `docs/aerospace/08-materials-standards-libraries/TECHNICAL_SPEC.md`, `docs/physics/README.md`.
+
+## 13. Implementation status (2026-10-16)
+
+**Built: the parts that need no FE pipeline** — `thermal_analytic_check` (TR-THM-40), thermal unit conversions (TR-THM-04) and
+`compute_view_factors` V1-a + V1-b (TR-THM-20). VC-THM-01.a–d, 02, 06, 07.a/b, 08, 09.a–d, 10, 11.a/b, 12.a/b, 13 and 60 are judged
+by `tests/unit/physics/thermal/` through the PHY-00 judge (all pass); all 16 rows of `view_factors.csv` pass. VC-THM-61 is asserted for
+the two set-ups that apply to these commands (`THM_EMISSIVITY_INVALID`, `THM_UNITS_MISMATCH`).
+
+| Item | Where |
+| ---- | ----- |
+| `thermal_analytic_check` | `packages/core/src/commands/thermal/{analyticCheck,analyticChecks,constants}.ts`, closed forms in `lib/thermalClosedForms.ts` |
+| `compute_view_factors` | `commands/thermal/computeViewFactors.ts`, `lib/{viewFactorContour,planarFacets,segmentTriangle}.ts` |
+| Units table §5.3 | `commands/thermal/units.ts` (derived from dimension vectors; round-trip 1e-12) |
+
+Toolset `analysis`.
+
+**Deviations (recorded, not silent):**
+
+- **Placement.** Core feature catalog `commands/thermal/` (no `packages/domain-physics`; README §8.3 decision 1 still open), as PHY-00/01.
+- **Check names.** `stefan` is the Neumann one-phase melting problem (VC-THM-12); σ (VC-THM-13) is `stefan_boltzmann`. `view_factor`
+  takes `configuration: parallel_rectangles | perpendicular_rectangles | coaxial_discs | cube_summation`. Inputs are `{ value, unit }`
+  maps (dimensionless unit `"1"`); temperature differences must be in K. `lumped` warns (not refuses) when Bi ≥ 0.1.
+- **View factors.** Inputs are explicit planar polygons (`surfaces[{ name, vertices, flip? }]` + `lengthUnit`), not 05 `FeaTarget`
+  faces, so the command is not `requiresKernel`. Quadrature: closed-form inner integral of ln r along one edge, adaptive 8-point
+  Gauss–Legendre on the other (exact for collinear / touching edges). Obstruction uses the centroid-segment test per facet pair
+  (refine with `maxFacetSize`). VC-THM-09.d (discs) uses 64-gons and passes within the case tolerance (≈ 1e-3).
+- **Extra codes:** `THM_INPUT_INVALID`, `THM_SURFACE_INVALID`, `THM_FACET_LIMIT` (400 facets, surfaces + blockers; at most 16 blockers and 256 vertices per polygon), `THM_VIEW_FACTOR_ROWSUM` (closed cavity
+  row sum off by > 1e-3).
+
+**Not built (blocked):** M0–M3 and the M4 deck parts — the thermal analysis slice and every set-up command (`add_thermal_bc`,
+`set_initial_temperature`, `define_amplitude`, `set_thermal_step`, `add_temperature_limit`, cavity, contact), deck sections,
+summariser / heat balance, `thermal_report`, `check_thermal`, `check_temperature_limits` need the 05 FEA analysis slice, Gmsh,
+CalculiX (`ccx`), artifact store and readers, none of which exist; `dispose_thermal_limit` needs the 09 PLM signing port. VC-THM-03,
+04, 05, 14, 30, 50, 62, 63 and the full VC-THM-61 contract stay open with them. The `llull guide` thermal section is not written.

@@ -15,6 +15,7 @@ export const TOOLSET_NAMES = [
   'parametric',
   'assembly',
   'materials',
+  'material-lab',
   'analysis',
   'review',
   'exchange',
@@ -46,9 +47,12 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
       'add_rigid_body add_body_joint add_gear_coupling add_motor add_propeller add_cylinder_pressure set_gravity delete_dynamics_item set_dynamics_solver inspect_dynamics simulate_motion',
   ),
   materials: words(
-    'define_property_model remove_property_model evaluate_property sample_property fit_property_model check_property_models',
+    'define_property_model remove_property_model evaluate_property sample_property fit_property_model check_property_models add_material_model remove_material_model define_constitutive_set check_material_models',
   ),
-  analysis: words('check_assembly engine_quick_check check_convergence compare_to_expected'),
+  'material-lab': words('fit_material_model material_point_response export_material_cards'),
+  analysis: words(
+    'check_assembly engine_quick_check check_convergence compare_to_expected thermal_analytic_check compute_view_factors fit_at_temperature thermal_stress_check',
+  ),
   review: words('allow_interference remove_interference_intent set_part_grounded'),
   exchange: words(
     'export_stl export_obj export_gltf export_step_exact export_code apply_code_trace import_mesh import_dxf export_step import_step import_dwg import_code',

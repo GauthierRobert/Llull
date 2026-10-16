@@ -1,3 +1,4 @@
+import { storedMaterialModelsProblem } from '../document/materialModelStored';
 import { storedModelsProblem } from '../document/propertyModelSchema';
 import { formHash } from '../document/propertyModels';
 import {
@@ -329,6 +330,16 @@ export function validateMaterialValue(name: string, v: unknown): string | null {
   if (v['propertyModels'] !== undefined) {
     const models = storedModelsProblem(name, v['propertyModels'], formHash);
     if (models !== null) return models;
+  }
+  if (v['materialModels'] !== undefined || v['constitutiveSets'] !== undefined || v['defaultConstitutiveSet'] !== undefined) {
+    const laws = storedMaterialModelsProblem(
+      name,
+      v['materialModels'],
+      v['constitutiveSets'],
+      v['defaultConstitutiveSet'],
+      v['propertyModels'],
+    );
+    if (laws !== null) return laws;
   }
   const finish = v['finish'];
   if (finish === undefined) return null;
