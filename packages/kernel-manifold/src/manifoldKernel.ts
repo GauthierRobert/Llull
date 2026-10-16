@@ -275,6 +275,7 @@ const COMBINE = { union: 'add', subtract: 'subtract', intersect: 'intersect' } a
 /** Manifold is a mesh kernel: no B-rep, so fillet / chamfer / shell / blend, `topology` and `exportStep` are null. */
 function manifoldOps(mod: ManifoldModule): KernelOps<ManifoldShape> {
   return {
+    name: 'manifold',
     unsupported: new Set(['fillet', 'chamfer', 'shell', 'blend']),
     solid: (entity) => withOwned(() => entityToManifold(mod, entity)),
     boolean: (op: BooleanOp, a, b) => withOwned(() => a[COMBINE[op]](b)),

@@ -3,7 +3,7 @@ import { expect, it } from 'vitest';
 import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle } from '@core/geometry/kernel';
 import type { Entity, ShapeRecipe, Vec3 } from '@core/model/types';
 
-const common = { layerId: 'layer-default', color: '#888888', rotation: [0, 0, 0] };
+const common = { layerId: 'layer-default', color: '#888888', rotation: [0, 0, 0] as Vec3 };
 
 export const cube = (id: string, position: Vec3, side: number): Entity =>
   ({ id, kind: 'box', position, size: [side, side, side], ...common }) as Entity;

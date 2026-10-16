@@ -43,7 +43,13 @@ export interface ShapeFace {
   readonly surface: FaceSurface;
   readonly area: number;
   /** Cylinder, cone and revolution faces (OCC): the axis line and, for a cylinder, its radius (document units). */
-  readonly axis?: { readonly origin: Vec3; readonly direction: Vec3; readonly radius?: number };
+  readonly axis?: {
+    readonly origin: Vec3;
+    readonly direction: Vec3;
+    readonly radius?: number;
+    /** Cylinders: axial extent of the face as signed offsets from `origin` along `direction`. */
+    readonly span?: readonly [number, number];
+  };
   /** Planes (OCC): the outward unit normal of the face on its solid. */
   readonly normal?: Vec3;
   /** Cylinders (OCC): the solid lies inside the surface (a pin), false = outside it (a bore). */
@@ -95,6 +101,9 @@ export interface ShapeDistance {
  * -> null, and fillet / chamfer / shell recipes evaluate to null).
  */
 export interface GeometryKernel {
+  /** Short kernel name ('manifold', 'occt') recorded in check provenance; absent for anonymous kernels. */
+  readonly name?: string;
+
   /** Whether this kernel can perform recipe nodes of `op` at all (Manifold: no fillet/chamfer/shell). */
   supports(op: ShapeRecipe['op']): boolean;
 

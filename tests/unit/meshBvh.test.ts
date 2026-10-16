@@ -52,7 +52,7 @@ const trianglesOf = (mesh: MeshData): Triangle[] => {
 
 const rotationAbout = (axis: Vec3, angle: number): RigidTransform['rotation'] => {
   const length = Math.hypot(...axis);
-  const [x, y, z] = axis.map((c) => c / length) as Vec3;
+  const [x, y, z] = axis.map((c) => c / length) as [number, number, number];
   const c = Math.cos(angle);
   const s = Math.sin(angle);
   const k = 1 - c;

@@ -20,6 +20,8 @@ import { errorMessage } from '../lib/errorMessage';
  * returned native exactly once).
  */
 export interface KernelOps<S> {
+  /** Kernel name exposed as `GeometryKernel.name`. */
+  readonly name?: string;
   /** Recipe ops this kernel cannot perform at all (a capability gap, not a refusal of one input). */
   readonly unsupported?: ReadonlySet<ShapeRecipe['op']>;
   /** Grows whenever the native module may have been left degraded (cached failures are then retried). */
@@ -198,6 +200,7 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
   const analyzeOps = ops.analyze?.bind(ops);
   const distanceOps = ops.distance?.bind(ops);
   return {
+    ...(ops.name === undefined ? {} : { name: ops.name }),
     ...(analyzeOps === undefined
       ? {}
       : {

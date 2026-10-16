@@ -229,6 +229,7 @@ function untangle(a: ShapeRecipe, b: ShapeRecipe): [ShapeRecipe, ShapeRecipe] {
 
 export function occtOps(api: OccApi): KernelOps<OccShape> {
   return {
+    name: 'occt',
     failureEpoch: nativeFailureCount,
     solid: (entity) => guarded('refusal', () => entityToOccShape(api, entity)),
     prepareBoolean: untangle,

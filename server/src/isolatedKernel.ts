@@ -191,6 +191,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
   };
 
   return {
+    name: 'occt',
     supports: () => true,
     evaluate: (recipe) => (call('evaluate', [recipe]) === null ? null : handleOf(recipe)),
     tessellate: (shape) => shapeCall('tessellate', [shape], false) as ReturnType<GeometryKernel['tessellate']>,

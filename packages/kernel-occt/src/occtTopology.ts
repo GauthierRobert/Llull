@@ -151,6 +151,8 @@ interface AnalyticSurface extends OccHandle {
 
 interface SurfaceAdaptor extends OccHandle {
   GetType(): unknown;
+  FirstVParameter(): number;
+  LastVParameter(): number;
   Plane(): AnalyticSurface;
   Cylinder(): AnalyticSurface;
   Cone(): AnalyticSurface;
@@ -187,7 +189,12 @@ function faceGeometry(face: OccShape, adaptor: SurfaceAdaptor, surface: FaceSurf
     const radius = surface === 'cylinder' ? analytic.Radius?.() : undefined;
     const direct = analytic.Direct?.() ?? true;
     [axis, analytic].forEach(release);
-    return { axis: { origin, direction, ...(radius === undefined ? {} : { radius }) }, convex: forward === direct };
+    const span: readonly [number, number] | undefined =
+      surface === 'cylinder' ? [adaptor.FirstVParameter(), adaptor.LastVParameter()] : undefined;
+    return {
+      axis: { origin, direction, ...(radius === undefined ? {} : { radius }), ...(span === undefined ? {} : { span }) },
+      convex: forward === direct,
+    };
   }
   if (surface === 'revolution') {
     const axis = adaptor.AxeOfRevolution();
