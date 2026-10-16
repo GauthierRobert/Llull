@@ -341,10 +341,10 @@ Toolset `analysis`.
   `TMC_CHECK_INPUT_INVALID`.
 - **Rows** carry `disposition: 'pending_human'` when a code is raised (no signing port), `'none'` otherwise.
 
-**Validation pack finding (open):** the generator derives VC-TMC-09.b/c with the nominal-diameter linearisation
-`i(T) = i(20) − D (α_hub − α_shaft) ΔT`, whereas §5.3 (and VC-TMC-06) scale every limit diameter. The two differ by 1.6e-5 mm on 09.c
-against an `abs 1e-7` tolerance. 09.b/c are therefore measured through `thermal_stress_check check=shrink_fit` (the generator formula);
-`fit_at_temperature` keeps §5.3. The pack should either re-derive 09.b/c limit by limit or state the linearisation.
+**Validation pack fix (2026-10-16, owner-approved):** the generator derived VC-TMC-09.b/c with the nominal-diameter linearisation
+`i(T) = i(20) − D (α_hub − α_shaft) ΔT`, contradicting §5.3 (every limit diameter scales; 1.6e-5 mm against `abs 1e-7`). It now
+derives them limit by limit (values 0.0200761625 / −0.01396495 mm; no other case changed) and `fit_at_temperature` measures them.
+`thermal_stress_check check=shrink_fit` keeps its stated nominal-diameter linearisation (a quick check, not judged on 09.b/c).
 
 **Not built (blocked):** M2–M4 — `thermo_static` / coupled cases, `set_reference_temperature`, `set_temperature_field`, deck sections,
 `thermal_distortion_report`, `check_thermo_mechanical`, the staleness chain and the `lib/expression` move need the 05 FEA analysis slice

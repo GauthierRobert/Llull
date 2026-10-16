@@ -656,7 +656,7 @@
   {
    "id": "VC-TMC-09.b",
    "quantity": "same fit at +85 degC: maximum diametral interference",
-   "value": 0.02005,
+   "value": 0.0200761625,
    "unit": "mm",
    "tolerance": {
     "abs": 1e-07
@@ -687,12 +687,12 @@
     "alpha_shaft_per_K": 1.15e-05,
     "specTemperature_degC": 20.0
    },
-   "derivation": "i(T) = i(20) - D (a_hub - a_shaft)(T - 20)"
+   "derivation": "limit by limit (TECHNICAL_SPEC §5.3): i_max = D_s,max(T) - D_h,min(T), each D(T) = D_spec (1 + a (T - 20))"
   },
   {
    "id": "VC-TMC-09.c",
    "quantity": "same fit at +85 degC: minimum diametral interference (negative = clearance, joint loose)",
-   "value": -0.01395,
+   "value": -0.01396495,
    "unit": "mm",
    "tolerance": {
     "abs": 1e-07

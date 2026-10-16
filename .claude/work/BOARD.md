@@ -100,7 +100,7 @@ Agents are isolated; coordination is structural, run by the orchestrator:
 - `[BLOCKED]` **THM-M0…M3, M4 decks** thermal slice + set-up commands, deck sections, summariser, `thermal_report`, `check_thermal`, `check_temperature_limits`, `dispose_thermal_limit`. _deps: 05 FEA (analysis slice, Gmsh, ccx, artifact store), extension-port decision (README §8.3-1), 09 PLM signing._
 
 ## PHY-04 — Thermo-mechanical & fits (`docs/physics/04-thermo-mechanical/`)
-- `[DONE]` **TMC-M1** `fit_at_temperature` (+ Lamé), `thermal_stress_check`, CTE conversions in core `commands/thermomech/` (toolset `analysis`). Done 2026-10-16: VC-TMC-01, 03–09, 62 pass. Open pack finding: VC-TMC-09.b/c generator linearisation vs §5.3 (TECHNICAL_SPEC §13).
+- `[DONE]` **TMC-M1** `fit_at_temperature` (+ Lamé), `thermal_stress_check`, CTE conversions in core `commands/thermomech/` (toolset `analysis`). Done 2026-10-16: VC-TMC-01, 03–09, 62 pass. VC-TMC-09.b/c generator aligned with §5.3 (owner-approved).
 - `[BLOCKED]` **TMC-M2…M4** `thermo_static`, temperature fields, decks, distortion, `check_thermo_mechanical`, `dispose_fit_result`. _deps: PHY-03 M2, 05 FEA, 03 GDT PMI, 09 PLM signing, `lib/expression` move._
 
 ## PHY-21 — Functional digital prototype (`docs/physics/21-functional-prototype/`)

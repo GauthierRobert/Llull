@@ -109,6 +109,8 @@ describe('fit_at_temperature: fit_at_temperature.csv and VC-TMC-06', () => {
     const pressure = data.rows[0]?.interferencePressureMPa?.max ?? 0;
     expect(data.rows[0]?.hubHoopStressMPa?.max).toBeCloseTo((pressure * (400 + 100)) / (400 - 100), 9);
     expect(data.intent).toBe('interference');
+    expectCase(PACK, 'VC-TMC-09.b', -(data.rows[1]?.clearance.min ?? Number.NaN));
+    expectCase(PACK, 'VC-TMC-09.c', -(data.rows[1]?.clearance.max ?? Number.NaN));
     expect(data.rows[1]?.code).toBe('TMC_FIT_LOOSE');
     expect(data.rows[1]?.status).toBe('clearance_possible');
     expect(data.rows[1]?.interferencePressureMPa?.min).toBe(0);

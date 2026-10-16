@@ -245,13 +245,17 @@ def main() -> None:
     max_int_20 = sf["shaft_limits_mm"][1] - sf["hole_limits_mm"][0]
     p20 = shrink_pressure(max_int_20 / 2, sf["b_mm"], sf["c_mm"], sf["E_hub_MPa"], sf["nu_hub"], sf["E_shaft_MPa"], sf["nu_shaft"])
     dT = 85.0 - 20.0
-    max_int_85 = max_int_20 - 2 * sf["b_mm"] * (sf["alpha_hub_per_K"] - sf["alpha_shaft_per_K"]) * dT
-    min_int_85 = (sf["shaft_limits_mm"][0] - sf["hole_limits_mm"][1]) - 2 * sf["b_mm"] * (sf["alpha_hub_per_K"] - sf["alpha_shaft_per_K"]) * dT
+    # TECHNICAL_SPEC §5.3: every limit diameter scales with its part's secant CTE (not the nominal only)
+    d_nom = 2 * sf["b_mm"]
+    hole_85 = [(d_nom + lim) * (1 + sf["alpha_hub_per_K"] * dT) for lim in sf["hole_limits_mm"]]
+    shaft_85 = [(d_nom + lim) * (1 + sf["alpha_shaft_per_K"] * dT) for lim in sf["shaft_limits_mm"]]
+    max_int_85 = shaft_85[1] - hole_85[0]
+    min_int_85 = shaft_85[0] - hole_85[1]
     cases.append(case("VC-TMC-09.a", "Al hub on steel shaft, 20 H7/p6, contact pressure at maximum interference, 20 degC", sig(p20), "MPa", {"rel": 0.01},
                       "generator (Lame, S9) with S5 limits", "A", ["FR-TMC-10", "TR-TMC-21"], inputs=sf,
                       derivation="p = d_r / (b [((c^2+b^2)/(c^2-b^2) + nu_h)/E_h + (1 - nu_s)/E_s]), d_r = 0.035/2 mm"))
     cases.append(case("VC-TMC-09.b", "same fit at +85 degC: maximum diametral interference", sig(max_int_85), "mm", {"abs": 1e-7}, "generator", "A",
-                      ["FR-TMC-07", "FR-TMC-10", "TR-TMC-20"], inputs=sf, derivation="i(T) = i(20) - D (a_hub - a_shaft)(T - 20)"))
+                      ["FR-TMC-07", "FR-TMC-10", "TR-TMC-20"], inputs=sf, derivation="limit by limit (TECHNICAL_SPEC §5.3): i_max = D_s,max(T) - D_h,min(T), each D(T) = D_spec (1 + a (T - 20))"))
     cases.append(case("VC-TMC-09.c", "same fit at +85 degC: minimum diametral interference (negative = clearance, joint loose)", sig(min_int_85), "mm", {"abs": 1e-7}, "generator", "A",
                       ["FR-TMC-07", "FR-TMC-10", "TR-TMC-20"], inputs=sf, expectedStatus="clearance_possible", code="TMC_FIT_LOOSE"))
 
