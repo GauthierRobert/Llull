@@ -20,9 +20,11 @@ export function withDynamics(doc: CadDocument, dynamics: DynamicsModel): CadDocu
   return { ...doc, dynamics };
 }
 
-/** Every id used by any dynamics record (bodies, joints, gears, motors, propellers share one id space). */
+/** Every id used by any dynamics record (bodies, joints, gears, motors, propellers, cylinders share one id space). */
 export function dynamicsIdTaken(dynamics: DynamicsModel, id: string): boolean {
-  return [dynamics.bodies, dynamics.joints, dynamics.gears, dynamics.motors, dynamics.propellers].some((table) => idTaken(table, id));
+  return [dynamics.bodies, dynamics.joints, dynamics.gears, dynamics.motors, dynamics.propellers, dynamics.cylinders ?? {}].some((table) =>
+    idTaken(table, id),
+  );
 }
 
 /**
@@ -107,8 +109,8 @@ export const deleteDynamicsItem = defineCommand({
   name: 'delete_dynamics_item',
   annotations: { destructive: true },
   description:
-    'Remove a rigid body, joint, gear coupling, motor or propeller from the physics model by id. Cascades: a body takes its joints with ' +
-    'it; a joint takes the gears, motors and propellers on it. Entities (geometry) are never deleted.',
+    'Remove a rigid body, joint, gear coupling, motor, propeller or cylinder pressure from the physics model by id. Cascades: a body ' +
+    'takes its joints with it; a joint takes the gears, motors, propellers and cylinder pressures on it. Entities (geometry) are never deleted.',
   params: z.object({ id: z.string().describe('Id of the body / joint / gear / motor / propeller to remove.') }),
   run: (doc, { id }): CommandResult => {
     const dynamics = dynamicsOf(doc);
@@ -124,9 +126,12 @@ export const deleteDynamicsItem = defineCommand({
       gears: keep(dynamics.gears, (key, gear) => key === id || goneJoint(gear.driver) || goneJoint(gear.driven)),
       motors: keep(dynamics.motors, (key, motor) => key === id || goneJoint(motor.joint)),
       propellers: keep(dynamics.propellers, (key, propeller) => key === id || goneJoint(propeller.joint)),
+      ...(dynamics.cylinders === undefined
+        ? {}
+        : { cylinders: keep(dynamics.cylinders, (key, cyl) => key === id || goneJoint(cyl.piston) || goneJoint(cyl.crank)) }),
     };
-    const removed = (['bodies', 'joints', 'gears', 'motors', 'propellers'] as const)
-      .map((table) => Object.keys(dynamics[table]).length - Object.keys(next[table]).length)
+    const removed = (['bodies', 'joints', 'gears', 'motors', 'propellers', 'cylinders'] as const)
+      .map((table) => Object.keys(dynamics[table] ?? {}).length - Object.keys(next[table] ?? {}).length)
       .reduce((a, b) => a + b, 0);
     return report(
       withDynamics(doc, next),

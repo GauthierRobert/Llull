@@ -77,7 +77,7 @@ Laws respected:
 | TR-FPR-02 | MUST | `ShapeTopology.faces[i]` gains optional `axis?: { origin: Vec3; direction: Vec3; radius?: number }` for cylinder, cone and revolution faces and `normal?: Vec3` for planes (OCC: `BRepAdaptor_Surface`). Used by joint realisation. Backward compatible. |
 | TR-FPR-03 | MUST | Interference volume through the existing recipe path: `evaluate({ op: 'boolean', boolean: 'intersect', a, b })` then `analyze(...).volume`. No new boolean API. |
 | TR-FPR-04 | MUST | `geometry/meshBvh.ts`: AABB tree over a `MeshData` in its local frame, median split on the longest axis, leaf size 8, deterministic tie rule (lower triangle index). Queries take a rigid transform (rotation matrix + translation) for the other mesh: `intersects`, `minDistance(maxDistance)` with witness points, `rayCast(origin, direction, maxT)`. |
-| TR-FPR-05 | MUST | Dynamics topology (§5.3): spanning tree by BFS from `ground` over the body–joint graph. Order: joints sorted by `(isRevolute ? 1 : 0, creation order)` so prismatic joints enter the tree first. Ties broken by joint id. Non-tree joints become `SimulationLoop`s. A prismatic joint that would have to be a loop closure is refused: `FPR_LOOP_PRISMATIC` (MuJoCo has no slide equality between bodies). |
+| TR-FPR-05 | MUST | Dynamics topology (§5.3): spanning tree by BFS from `ground` over the body–joint graph. Order: joints sorted by `(isRevolute ? 1 : 0, creation order)` so prismatic joints enter the tree first. The tree is chosen Kruskal-style in that order (the last-declared joint of a loop closes it), then rooted by BFS from `ground`. Non-tree joints become `SimulationLoop`s. A prismatic joint that would have to be a loop closure is refused: `FPR_LOOP_PRISMATIC` (MuJoCo has no slide equality between bodies). |
 | TR-FPR-06 | MUST | `SimulationModel` gains `loops: SimulationLoop[]` and `solver: SimulationSolver`. `SimulationTrace` gains `loopForce` (per loop, world N, per sample), `jointReaction` (per tree joint: force N and moment N·m at the anchor, world axes), and `loopResidual` (max over samples, m). All three are optional on the interface so another engine may omit them; the report then marks the items `not_run`. |
 | TR-FPR-07 | MUST | MuJoCo adapter: revolute loop = two `connect` equalities at the anchor ± `axis · s` (s = half the shorter body's bounding-box extent along the axis, ≥ 5 mm, named); spherical loop = one `connect`. Each equality gets the loop `solref`/`solimp` from `solver` (§5.3). `<flag diagexact="enable"/>` when available. Reactions: `mj_rnePostConstraint` after each recorded step, `cfrc_int` moved from the subtree-COM frame to the joint anchor; loop forces from `efc_force` rows with `efc_type == mjCNSTR_EQUALITY` and matching `efc_id`, sign fixed by a static unit test; residual from `efc_pos`. |
 | TR-FPR-08 | MUST | Cylinder pressure law (§5.4) is pure core code, evaluated in `loads(state)` as a generalised force on the piston's prismatic joint, so MuJoCo applies the reaction to the cylinder's body (the joint parent) automatically. The pressure–angle table is precomputed once per run on a 0.1° grid. |
@@ -103,6 +103,7 @@ export interface DynamicJoint {
   parent: string;                                       // body id or GROUND
   child: string;
   anchor: Vec3;                                         // document units
+  anchorOnChild?: Vec3;                                 // pin position on the child when it differs; the distance to `anchor` is the loop gap (FPR_LOOP_OPEN). Implemented: with one anchor per joint a loop is otherwise always closed at the start pose
   axis: Vec3;                                           // ignored for spherical
   damping: number; friction: number; initialVelocity: number;
 }
@@ -117,7 +118,7 @@ export interface CylinderPressure {
   boreMm: number;                    // > 0
   compressionRatio: number;          // > 1
   cycle: 'four_stroke' | 'two_stroke';
-  firingOffsetDeg: number;           // cycle angle of this cylinder's firing TDC relative to the crank's TDC reference
+  firingOffsetDeg: number;           // which TDC crossing of this piston fires: 0 or 360 (implemented restriction; other values put the firing TDC off a TDC). Phasing between cylinders comes from the crank-pin geometry
   /** Crank joint angle (rad, from its t = 0 pose) at which this piston is at TDC; null = computed from geometry. */
   tdcCrankAngleRad: number | null;
   ambientPressurePa: number;         // default 101 325 (ISA sea level), named
@@ -301,7 +302,7 @@ interface CheckResult {
 | `set_dynamics_solver` | mutating | `Partial<DynamicsSolverSettings>` | `@affects doc.dynamics.solver` · `@failure loopTimeConstantSteps < 2, impedance ∉ (0, 0.9999]` |
 | `inspect_dynamics` (extended) | query | `+ mobility: boolean (default true)` | adds `data.topology { tree, loops }`, `data.mobility { gruebler, rank, dof, redundant[] }`, `data.loopGapsM` at the start pose |
 | `engine_quick_check` | query | `{ cylinder?: id, crankRadiusMm?, rodLengthMm?, forceN?, anglesDeg?, rpm?, mepBar?, displacementCm3?, cycle? }`. Taken from the model when a cylinder id is given | analytic only (§5.4), no kernel or physics |
-| `simulate_motion` (extended) | query, physics | `+ reactions?: 'off' \| 'peaks' \| 'series'` (default `peaks` when loops or cylinders exist), `+ crankAxis?: joint id` | adds `data.reactions`, `data.engine`, `data.loops`; unchanged output for models without loops or cylinders (FR-FPR-19) |
+| `simulate_motion` (extended) | query, physics | `+ reactions?: 'off' \| 'peaks' \| 'series'` (default `peaks` when loops or cylinders exist), `+ crankAxis?: joint id` | adds `data.reactions`, `data.engineReport` (not `data.engine`: that key already holds the engine name string), `data.loops`; the reaction component along the axis of a driven joint includes the applied drive force (`cfrc_int` excludes `qfrc_applied`); unchanged output for models without loops or cylinders (FR-FPR-19) |
 | `check_motion_clearance` | query, `requiresKernel` + physics | `{ source: 'simulation' \| { joint, startDeg, endDeg }, durationS? \| cycles?, clearanceMm?, pairs?: 'moving' \| 'all', maxSamples? (default 4000) }` | `@failure no poses ⇒ FPR_NO_MOTION` |
 | `check_prototype` | query, `requiresKernel` + physics | `{ process?, minWallMm?, clearanceMm?, cycles? (default 1), settleS? }` | runs the four checks in order; `verdict`, `ownerSummary`, `checks[]` |
 | `set_review_disposition` | mutating | `{ findingKey, status, comment }` | `@failure accepted on a fail by an agent ⇒ FPR_HUMAN_GATE` |
@@ -591,6 +592,9 @@ use distinct shapes (✔ ▲ ✖ ○ ◌) with text [D-R43][D-R44].
 | `FPR_NO_PARTS` | not_run | the document or scope has no 3D parts → add solids or instances (an empty check is never a pass) |
 | `FPR_STALE_REFERENCE` | info | `doc.prototype` refers to deleted entities; they were ignored → remove the intent or release the part |
 | `FPR_WALL_MEASURED` | info | wall thickness measured without a threshold → give `process` or `minWallMm` — added by slice A |
+| `FPR_SPHERICAL_TREE` | refusal | a spherical joint would carry a body alone (it can only close a loop; accepted at declaration, reported by inspect/simulate) → add a revolute or prismatic joint |
+| `FPR_JOINT_DANGLING` | refusal | a joint references a body that does not exist → delete the joint or restore the body |
+| `FPR_PRESSURE_MODEL_INVALID` | refusal | pressure model leaves its valid range (burn outside the stroke, integration left the physical range) → change phasing or constants |
 | `FPR_LOOP_PRISMATIC` | refusal | loop would close through a prismatic joint → re-order or make that joint a tree joint |
 | `FPR_LOOP_OPEN` | fail | loop gap at the start pose → fix the anchors or geometry |
 | `FPR_REDUNDANT_CONSTRAINT` | warn | redundant direction at a loop → use `spherical` for that joint |

@@ -77,10 +77,39 @@ export interface AppliedLoads {
   readonly bodyForces: Readonly<Record<string, Vec3>>;
 }
 
+/**
+ * A joint that closes a kinematic loop: a constraint between two bodies, not a coordinate. A revolute loop pins two points on its axis;
+ * a spherical loop pins one point. `bodyA` is the joint parent ('world' allowed), `bodyB` the child.
+ */
+export interface SimulationLoop {
+  /** The DynamicJoint id that closes the loop. */
+  readonly id: string;
+  readonly kind: 'revolute' | 'spherical';
+  readonly bodyA: string;
+  readonly bodyB: string;
+  /** World, m. */
+  readonly anchor: Vec3;
+  /** Unit vector, world. */
+  readonly axis: Vec3;
+  /** m: the two pins of a revolute loop sit at anchor ± axis · halfSpan (half the shorter body's extent along the axis, >= 5 mm). */
+  readonly halfSpan: number;
+}
+
+/** Engine-neutral solver settings. */
+interface SimulationSolver {
+  readonly integrator: 'rk4' | 'implicitfast';
+  /** s: reference time constant of the loop constraints. */
+  readonly loopTimeConstant: number;
+  /** Loop constraint impedance in (0, 0.9999]. */
+  readonly loopImpedance: number;
+}
+
 export interface SimulationModel {
   readonly gravity: Vec3;
   readonly bodies: readonly SimulationBody[];
   readonly gears: readonly SimulationGear[];
+  readonly loops: readonly SimulationLoop[];
+  readonly solver: SimulationSolver;
   readonly servos: readonly SimulationServo[];
   /** Force laws, evaluated by the engine at every step (at the step midpoint) from the state. Must be pure. */
   readonly loads: (state: SimulationState) => AppliedLoads;
@@ -93,6 +122,8 @@ export interface SimulationOptions {
   readonly timestep: number;
   /** Interval between recorded samples, s (>= timestep). */
   readonly sampleInterval: number;
+  /** Record joint reactions and loop forces at every sample (costs one extra pass per sample). Default false. */
+  readonly reactions?: boolean;
 }
 
 /** Unit quaternion [w, x, y, z]. */
@@ -109,6 +140,15 @@ export interface SimulationTrace {
   readonly bodyOrientation: Record<string, Quaternion[]>;
   /** Force each servo applied: N·m or N. */
   readonly servoForce: Record<string, number[]>;
+  /** Force the constraint of each loop exerts on its `bodyB`, world axes, N, per sample (needs `options.reactions`). */
+  readonly loopForce?: Record<string, Vec3[]>;
+  /**
+   * Per tree joint (keyed by joint id): force and moment the tree parent exerts on the body carried by the joint, at the joint anchor,
+   * world axes, N and N·m, per sample (needs `options.reactions`). Omitted by engines that cannot report reactions.
+   */
+  readonly jointReaction?: Record<string, { force: Vec3[]; moment: Vec3[] }>;
+  /** m: largest loop-constraint violation over every integration step (present when the model has loops). */
+  readonly loopResidual?: number;
 }
 
 export interface PhysicsEngine {

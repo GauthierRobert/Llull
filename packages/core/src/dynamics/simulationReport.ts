@@ -114,9 +114,11 @@ export function simulationData(
   const velocityOf = (joint: string): number[] => seriesOf(trace.jointVelocity, joint);
   const warnings: string[] = [];
   const joints = Object.fromEntries(
-    Object.values(dynamics.joints)
-      .filter((joint) => trace.jointVelocity[joint.id] !== undefined)
-      .map((joint) => [joint.id, jointResult(joint.kind, trace.times, velocityOf(joint.id), seriesOf(trace.jointPosition, joint.id))]),
+    Object.values(dynamics.joints).flatMap((joint) =>
+      joint.kind === 'spherical' || trace.jointVelocity[joint.id] === undefined
+        ? []
+        : [[joint.id, jointResult(joint.kind, trace.times, velocityOf(joint.id), seriesOf(trace.jointPosition, joint.id))] as const],
+    ),
   );
   for (const [id, result] of Object.entries(joints))
     if (!result.steady && result.peakVelocity > 1e-6)
