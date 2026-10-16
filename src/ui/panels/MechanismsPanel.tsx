@@ -1,4 +1,4 @@
-// Constraints (solve/delete), joints (set value/delete) and drive relations (delete); a highlighted constraint/joint
+// Constraints (solve/delete), joints (set value/delete), drive relations (delete) and rigid-body physics (PhysicsSection); a highlighted constraint/joint
 // row sets `mechanismSelection` for MechanismOverlay.
 
 import { toDegrees, toRadians } from '@lib/angle';
@@ -10,6 +10,7 @@ import { PanelEmpty, PanelHeader, PanelSection, IconButton, DeleteButton } from 
 import { CommitInput } from '@ui/panels/propertyFields';
 import { orderedValues } from '@ui/panels/orderedValues';
 import { parseNumber } from '@ui/numberText';
+import { PhysicsSection } from '@ui/panels/PhysicsSection';
 
 type ChipTone = 'accent' | 'success' | 'warning' | 'danger' | 'agent';
 
@@ -305,6 +306,7 @@ export function MechanismsPanel({ className }: { className?: string }): React.Re
           <DriveRelationRow key={relation.id} relation={relation} />
         ))}
       />
+      <PhysicsSection />
     </aside>
   );
 }

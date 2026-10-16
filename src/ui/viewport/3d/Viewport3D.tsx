@@ -21,6 +21,7 @@ import { MeasureBBoxWireframe } from './MeasureBBoxWireframe';
 import { ClippingPlane } from './ClippingPlane';
 import { ViewportControls } from './ViewportControls';
 import { AnimationPlayer } from './AnimationPlayer';
+import { DynamicsPlayer } from './DynamicsPlayer';
 import { useRenderQuality } from './useRenderQuality';
 import { AdaptiveClipping, CameraReactor, OrbitSettle, sphericalToCartesian } from './CameraRig';
 import { GROUND_PLANE_ROTATION, SceneLighting } from './SceneLighting';
@@ -92,6 +93,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
       <ClippingPlane />
 
       <AnimationPlayer />
+      <DynamicsPlayer />
 
       <SceneLighting quality={quality} contactShadowOpacity={palette.contactShadowOpacity} />
 

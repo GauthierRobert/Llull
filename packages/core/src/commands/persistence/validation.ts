@@ -10,6 +10,7 @@ import { corruptionReason } from '../guard';
 import { getCommand, listCommands } from '../commandTable';
 import { validateAnimationValue, validateComponentValue, validateConfigurationValue, validateGroupValue } from './collections';
 import { drawingsProblems } from './drawingsValidation';
+import { dynamicsProblems } from './dynamicsValidation';
 import { validateCamera, validateLayer, validateEntityValue, validateMaterialValue, validateParameterValue } from './guards';
 
 const VALID_CONSTRAINT_KINDS: ReadonlySet<string> = new Set(CONSTRAINT_KINDS);
@@ -227,6 +228,7 @@ export function validateDocumentValues(v: Record<string, unknown>): string[] {
   validateSection(v['constraints'], validateConstraintValue);
   validateSection(v['joints'], validateJointValue);
   errors.push(...drawingsProblems(v['drawings']));
+  errors.push(...dynamicsProblems(v['dynamics']));
   for (const extension of documentExtensions()) errors.push(...extension.validate(v));
   validateSection(v['driveRelations'], validateDriveRelationValue);
   return errors;

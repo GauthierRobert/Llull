@@ -35,3 +35,118 @@
 .mechanisms-row.panel__row--selected .panel__row-actions {
   background: var(--surface-1);
 }
+
+/* Physics section — rigid-body simulation results, speed chart, playback */
+
+.physics-run,
+.physics-playback__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+}
+
+.physics-run__duration {
+  width: 64px;
+  font-family: var(--font-mono);
+  text-align: right;
+}
+
+.physics-playback__scrub {
+  flex: 1;
+  min-width: 0;
+}
+
+.physics-results {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.physics-results th,
+.physics-results td {
+  padding: 2px var(--space-2);
+  text-align: left;
+  font-weight: var(--weight-medium);
+}
+
+.physics-results th {
+  font-family: var(--font-mono);
+  color: var(--fg-muted);
+}
+
+.physics-results__meta {
+  color: var(--fg-muted);
+}
+
+.speed-chart {
+  margin: var(--space-1) var(--space-2);
+}
+
+.speed-chart svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.speed-chart__axis {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+}
+
+.speed-chart__tick {
+  fill: var(--fg-muted);
+  font-size: 9px;
+  font-family: var(--font-mono);
+}
+
+.speed-chart__line {
+  fill: none;
+  stroke-width: 1.5;
+}
+
+.speed-chart__cursor {
+  stroke: var(--fg-muted);
+  stroke-dasharray: 2 2;
+}
+
+.speed-chart__line--1 {
+  stroke: var(--accent);
+  background: var(--accent);
+}
+.speed-chart__line--2 {
+  stroke: var(--success);
+  background: var(--success);
+}
+.speed-chart__line--3 {
+  stroke: var(--warning);
+  background: var(--warning);
+}
+.speed-chart__line--4 {
+  stroke: var(--danger);
+  background: var(--danger);
+}
+
+.speed-chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+}
+
+.speed-chart__swatch {
+  display: inline-block;
+  width: 10px;
+  height: 2px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.physics-engine-note {
+  margin: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+}

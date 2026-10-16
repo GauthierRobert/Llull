@@ -24,6 +24,7 @@ import { motionCommands } from './motion/catalog';
 import { exchangeCommands } from './exchange/catalog';
 import { persistenceCommands } from './persistence/catalog';
 import { drawingsCommands } from './drawings/catalog';
+import { dynamicsCommands } from './dynamics/catalog';
 
 registerCommands('core', [
   ...documentCommands,
@@ -42,6 +43,7 @@ registerCommands('core', [
   ...exchangeCommands,
   ...persistenceCommands,
   ...drawingsCommands,
+  ...dynamicsCommands,
 ]);
 onPluginInstalled((plugin) => registerCommands(`plugin '${plugin.name}'`, plugin.commands));
 

@@ -52,12 +52,12 @@ export function earClipTriangulate(pts: ReadonlyArray<readonly [number, number]>
  * Triangles of a mesh entity's data. Kernel output is indexed (shared vertices); an empty `indices` means `positions` is a triangle soup (9
  * numbers per triangle).
  */
-export function meshTriangles(mesh: {
-  readonly positions: readonly number[];
-  readonly indices: readonly number[];
-}): Array<[Vec3, Vec3, Vec3]> {
+export function meshTriangles(
+  mesh: { readonly positions: readonly number[]; readonly indices: readonly number[] },
+  offset: Vec3 = [0, 0, 0],
+): Array<[Vec3, Vec3, Vec3]> {
   const p = mesh.positions;
-  const vertex = (i: number): Vec3 => [p[i * 3] ?? 0, p[i * 3 + 1] ?? 0, p[i * 3 + 2] ?? 0];
+  const vertex = (i: number): Vec3 => [(p[i * 3] ?? 0) + offset[0], (p[i * 3 + 1] ?? 0) + offset[1], (p[i * 3 + 2] ?? 0) + offset[2]];
   const indexed = mesh.indices.length > 0;
   const cornerCount = indexed ? mesh.indices.length : Math.floor(p.length / 3);
   const corner = (n: number): number => (indexed ? (mesh.indices[n] ?? 0) : n);

@@ -1,25 +1,37 @@
 import { entityOfKind } from '../entity/entityOfKind';
-import type { CadDocument, InstanceEntity, JointMateRef, DriveRelation, Vec3 } from '../../model/types';
+import type { CadDocument, InstanceEntity, Joint, JointMateRef, DriveRelation, Vec3 } from '../../model/types';
 import { resolveNumeric } from '../parametric/expression';
 import { axisVector } from '../../lib/axis';
 import { topologicalSort } from '../../lib/topologicalSort';
 import { add3, scale3, sub3 } from '../../lib/vec3';
+import { applyMat3, eulerFromMat, matFromAxisAngle, matFromEulerXYZ, mulMat3, type Mat3 } from '../../lib/axisRotation';
 
-/** Rotate a Vec3 about an axis by an angle (Rodrigues' rotation formula). */
-function rotateAboutAxis(v: Vec3, axis: Vec3, angle: number): Vec3 {
-  const [ux, uy, uz] = axis;
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
-  const dot = v[0] * ux + v[1] * uy + v[2] * uz;
-  // Rodrigues: v*cos + (axis×v)*sin + axis*(axis·v)*(1-cos)
-  const crossX = uy * v[2] - uz * v[1];
-  const crossY = uz * v[0] - ux * v[2];
-  const crossZ = ux * v[1] - uy * v[0];
-  return [
-    v[0] * cos + crossX * sin + ux * dot * (1 - cos),
-    v[1] * cos + crossY * sin + uy * dot * (1 - cos),
-    v[2] * cos + crossZ * sin + uz * dot * (1 - cos),
-  ];
+/** A rigid motion p ↦ rotation·p + translation (world frame). */
+interface RigidMotion {
+  readonly rotation: Mat3;
+  readonly translation: Vec3;
+}
+
+const REST: RigidMotion = { rotation: [1, 0, 0, 0, 1, 0, 0, 0, 1], translation: [0, 0, 0] };
+
+const moveBy = (motion: RigidMotion, p: Vec3): Vec3 => add3(applyMat3(motion.rotation, p), motion.translation);
+
+function unit(v: Vec3): Vec3 {
+  const length = Math.hypot(v[0], v[1], v[2]);
+  return length > 0 ? scale3(v, 1 / length) : v;
+}
+
+/** Joints ordered so that a joint whose `a` instance is moved by another joint comes after that joint (cycles keep input order). */
+function parentFirst(joints: readonly Joint[]): Joint[] {
+  const ordered: Joint[] = [];
+  let pending = [...joints];
+  while (pending.length > 0) {
+    const ready = pending.filter((joint) => !pending.some((other) => other !== joint && other.b.instanceId === joint.a.instanceId));
+    const next = ready.length > 0 ? ready : pending.slice(0, 1);
+    ordered.push(...next);
+    pending = pending.filter((joint) => !next.includes(joint));
+  }
+  return ordered;
 }
 
 /** Resolve a JointMateRef to the InstanceEntity, returning null on missing/wrong kind. */
@@ -89,7 +101,7 @@ interface EvaluatedMotion {
  * 1. Collect base joint values (resolving expression strings via doc.parameters); a joint named in `overrides` takes the override value
  *   instead (used by motion_study sweeps).
  * 2. Topo-sort drive relations and propagate: driven = driver * ratio + offset (never into an overridden joint).
- * 3. Apply each joint to instance b's position/rotation relative to instance a.
+ * 3. Apply each joint (parent joints first) to instance b: b moves rigidly with a, then by the joint about / along the axis through a.
  *
  * Returns EvaluatedMotion. Never mutates doc.
  */
@@ -117,28 +129,31 @@ export function evaluateMotionInternal(doc: CadDocument, overrides: Readonly<Rec
     if (driverValue === undefined || overrides[jid] !== undefined) continue;
     resolvedJoints[jid] = driverValue * dr.ratio + (dr.offset ?? 0);
   }
-  // Step 3: apply joints to instance transforms
+  // Step 3: apply joints parent-first. Each instance carries the rigid motion of the joint chain above it: b moves with a (axis
+  // included), then turns about the axis through a's moved origin (revolute) or sits at a's moved origin + axis·value (prismatic).
   const instancePositions: Record<string, Vec3> = {};
   const instanceRotations: Record<string, Vec3> = {};
-  for (const joint of Object.values(doc.joints)) {
+  const motions = new Map<string, RigidMotion>();
+  for (const joint of parentFirst(Object.values(doc.joints))) {
     const instanceA = resolveInstance(joint.a, doc);
     const instanceB = resolveInstance(joint.b, doc);
     if (!instanceA || !instanceB) continue;
     const value = resolvedJoints[joint.id] ?? 0;
-    const axisVec = axisVector(joint.axis);
-    const bId = joint.b.instanceId;
-    const bRot: Vec3 = instanceRotations[bId] ?? instanceB.rotation;
+    const carried = motions.get(joint.a.instanceId) ?? REST;
+    const base = motions.get(joint.b.instanceId) ?? carried;
+    const pivot = moveBy(carried, instanceA.position);
+    const axis = unit(applyMat3(carried.rotation, axisVector(joint.axis)));
+    let motion: RigidMotion;
     if (joint.kind === 'revolute') {
-      // Rotate b about the axis through a's position; b's Euler angles gain value * axis.
-      const pivot = instanceA.position;
-      const offset = sub3(instancePositions[bId] ?? instanceB.position, pivot);
-      instancePositions[bId] = add3(pivot, rotateAboutAxis(offset, axisVec, value));
-      instanceRotations[bId] = add3(bRot, scale3(axisVec, value));
+      const turn = matFromAxisAngle(axis, value);
+      motion = { rotation: mulMat3(turn, base.rotation), translation: add3(applyMat3(turn, sub3(base.translation, pivot)), pivot) };
     } else {
-      // Prismatic: b slides along the axis from a's position; rotation unchanged.
-      instancePositions[bId] = add3(instanceA.position, scale3(axisVec, value));
-      instanceRotations[bId] = bRot;
+      const target = add3(pivot, scale3(axis, value));
+      motion = { rotation: base.rotation, translation: sub3(target, applyMat3(base.rotation, instanceB.position)) };
     }
+    motions.set(joint.b.instanceId, motion);
+    instancePositions[joint.b.instanceId] = moveBy(motion, instanceB.position);
+    instanceRotations[joint.b.instanceId] = eulerFromMat(mulMat3(motion.rotation, matFromEulerXYZ(instanceB.rotation)));
   }
   return { resolvedJoints, instancePositions, instanceRotations };
 }
