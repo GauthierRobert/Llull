@@ -201,6 +201,30 @@ describe('engine run diagnostics', () => {
     expect(data.warnings.some((w) => w.startsWith('FPR_SAMPLING_COARSE'))).toBe(true);
   });
 
+  it('a crank turning against the positive sense of its axis is reported', () => {
+    const { doc } = engine({ rpm: -1000, crankInertia: 0.2 });
+    const data = run(governed(doc, -1000), { duration: 0.15 });
+    expect(data.engineReport?.warnings.some((w) => /positive sense/.test(w))).toBe(true);
+    expect(data.engineReport?.lastCycle).toBeNull();
+  });
+
+  it('a pressure table without a source marks the engine report unverified', () => {
+    const table = {
+      kind: 'table',
+      points: [
+        [0, 0],
+        [15, 3e6],
+        [180, 5e5],
+        [720, 0],
+      ],
+    };
+    const { doc } = engine({ rpm: 1500, crankInertia: 0.3, model: table });
+    const data = run(governed(doc, 1500), { duration: 0.15 });
+    expect(data.engineReport?.warnings).toContain('unverified: a pressure table has no source');
+    expect(data.engineReport?.cylinders[0]?.unverified).toBe(true);
+    expect(data.engineReport?.energyClosure?.status).toBe('pass');
+  });
+
   it('a cylinder on a piston that lost its rod refuses to simulate with the reason', () => {
     const { doc } = engine({ rpm: 1000, crankInertia: 0.2 });
     const broken = execute(doc, 'delete_dynamics_item', { id: 'wrist_j' });

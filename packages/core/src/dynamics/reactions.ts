@@ -7,6 +7,7 @@
 import type { Vec3 } from '../model/vectors';
 import type { SimulationTrace } from './physicsEngine';
 import type { Topology } from './topology';
+import { elementAt } from '../lib/elementAt';
 
 export type ReactionMode = 'off' | 'peaks' | 'series';
 export type ResidualTier = 'pass' | 'warn' | 'fail';
@@ -49,7 +50,7 @@ export function peakOf(values: readonly Vec3[], times: readonly number[], angleD
     const m = magnitude(v);
     if (m > best) [best, at] = [m, i];
   });
-  return { value: best, timeS: times[at] ?? 0, angleDeg: angleDeg?.[at] ?? null };
+  return { value: best, timeS: elementAt(times, at), angleDeg: angleDeg?.[at] ?? null };
 }
 
 /** Force on the declared child of `jointId` at each sample (tree or loop joint), or null when the engine did not report it. */

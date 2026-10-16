@@ -4,6 +4,7 @@
  */
 
 import { sliderTravel, type Slider } from './slider';
+import { elementAt } from '../lib/elementAt';
 
 /** Grid step of every curve, deg (named, TR-FPR-08). */
 export const STEP_DEG = 0.1;
@@ -61,9 +62,9 @@ export function finishCurve(
   let previousVolume = volumeAt(geometry, 0);
   for (let k = 0; k < cells; k++) {
     const volume = volumeAt(geometry, (k + 1) * STEP_DEG);
-    work += 0.5 * ((gaugePa[k] ?? 0) + (gaugePa[k + 1] ?? 0)) * (volume - previousVolume);
+    work += 0.5 * (elementAt(gaugePa, k) + elementAt(gaugePa, k + 1)) * (volume - previousVolume);
     previousVolume = volume;
-    if ((gaugePa[k] ?? 0) > peak) [peak, peakAt] = [gaugePa[k] ?? 0, k];
+    if (elementAt(gaugePa, k) > peak) [peak, peakAt] = [elementAt(gaugePa, k), k];
   }
   return {
     cycleDeg,
@@ -83,7 +84,7 @@ export function gaugeAt(curve: PressureCurve, phiDeg: number): number {
   const position = wrapped / STEP_DEG;
   const index = Math.min(Math.floor(position), curve.gaugePa.length - 2);
   const fraction = position - index;
-  return (curve.gaugePa[index] ?? 0) * (1 - fraction) + (curve.gaugePa[index + 1] ?? 0) * fraction;
+  return elementAt(curve.gaugePa, index) * (1 - fraction) + elementAt(curve.gaugePa, index + 1) * fraction;
 }
 
 /** Cumulative Wiebe burn fraction x_b = 1 - exp(-a ((psi - start) / duration)^(m + 1)) and its derivative per degree. */

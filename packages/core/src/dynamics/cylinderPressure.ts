@@ -17,6 +17,7 @@ import {
 } from './pressureCurve';
 import { singleZoneCurve } from './singleZone';
 import { sliderRate } from './slider';
+import { elementAt } from '../lib/elementAt';
 
 const RADIANS_PER_DEG = Math.PI / 180;
 
@@ -117,7 +118,7 @@ function wiebeGrids(
 /** Subtract `offset` from every element and close the periodic grid. */
 function closeGrid(values: Float64Array, offset: number): Float64Array {
   const out = values.map((v) => v - offset);
-  out[out.length - 1] = out[0] ?? 0;
+  out[out.length - 1] = elementAt(out, 0);
   return out;
 }
 
@@ -138,7 +139,7 @@ function wiebeCurve(cylinder: CylinderPressure, geometry: CylinderGeometry, mode
         `target IMEP ${(heat.value / 1e5).toPrecision(4)} bar is below the motored loop of this cylinder ` +
         `(${(motoredWork / geometry.displacementM3 / 1e5).toPrecision(4)} bar with these indices and intake pressure): raise the target or change the indices`,
     };
-  const gauge = motoredGauge.map((p, k) => p + joules * (heatGauge[k] ?? 0));
+  const gauge = motoredGauge.map((p, k) => p + joules * elementAt(heatGauge, k));
   return finishCurve(gauge, geometry, ambient, cycleDeg, joules);
 }
 

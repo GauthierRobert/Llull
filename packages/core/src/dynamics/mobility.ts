@@ -7,6 +7,7 @@
 import { GROUND, type DynamicJoint, type DynamicsModel } from '../model/dynamics';
 import type { Vec3 } from '../model/vectors';
 import type { Topology } from './topology';
+import { elementAt } from '../lib/elementAt';
 
 /** Central-difference step in tree coordinates (rad or m). */
 const DIFFERENCE_STEP = 1e-7;
@@ -86,7 +87,6 @@ function jointMotion(joint: DynamicJoint, q: number, metresPerUnit: number): Pos
 /** World pose of every body for tree coordinates `q` (one per tree joint, declared sense). */
 function bodyPoses(topology: Topology, q: readonly number[], metresPerUnit: number): Map<string, Pose> {
   const poses = new Map<string, Pose>();
-  const coordinate = new Map(topology.tree.map((entry, i) => [entry.joint.id, q[i] ?? 0]));
   for (const id of topology.bodyOrder) {
     const entry = topology.jointOfBody.get(id);
     if (entry === undefined) {
@@ -94,7 +94,7 @@ function bodyPoses(topology: Topology, q: readonly number[], metresPerUnit: numb
       continue;
     }
     const parent = entry.parent === GROUND ? IDENTITY : (poses.get(entry.parent) ?? IDENTITY);
-    const value = (coordinate.get(entry.joint.id) ?? 0) * (entry.flipped ? -1 : 1);
+    const value = elementAt(q, topology.tree.indexOf(entry)) * (entry.flipped ? -1 : 1);
     const motion = jointMotion(entry.joint, value, metresPerUnit);
     const rotated = apply(parent.rotation, motion.translation);
     poses.set(id, {
@@ -150,17 +150,17 @@ function pivotedColumns(columns: readonly number[][]): Pivot[] {
     let best = -1;
     let bestNorm = -1;
     for (const i of remaining) {
-      const n = norm(residual[i] ?? []);
+      const n = norm(elementAt(residual, i));
       if (n > bestNorm) [best, bestNorm] = [i, n];
     }
     remaining.delete(best);
     pivots.push({ index: best, size: bestNorm });
-    const direction = residual[best] ?? [];
+    const direction = elementAt(residual, best);
     if (bestNorm > 0)
       for (const i of remaining) {
-        const target = residual[i] ?? [];
-        const projection = target.reduce((sum, x, k) => sum + x * (direction[k] ?? 0), 0) / (bestNorm * bestNorm);
-        residual[i] = target.map((x, k) => x - projection * (direction[k] ?? 0));
+        const target = elementAt(residual, i);
+        const projection = target.reduce((sum, x, k) => sum + x * elementAt(direction, k), 0) / (bestNorm * bestNorm);
+        residual[i] = target.map((x, k) => x - projection * elementAt(direction, k));
       }
   }
   return pivots;
@@ -215,32 +215,29 @@ function loopJacobian(topology: Topology, rows: number, metresPerUnit: number): 
     plus[j] = DIFFERENCE_STEP;
     minus[j] = -DIFFERENCE_STEP;
     const [fp, fm] = [loopResidual(topology, plus, metresPerUnit), loopResidual(topology, minus, metresPerUnit)];
-    jacobian.forEach((row, i) => row.push(((fp[i] ?? 0) - (fm[i] ?? 0)) / (2 * DIFFERENCE_STEP)));
+    jacobian.forEach((row, i) => row.push((elementAt(fp, i) - elementAt(fm, i)) / (2 * DIFFERENCE_STEP)));
   }
   return jacobian;
 }
 
-/** Solve the symmetric positive semi-definite system `a x = b` (Gaussian elimination with partial pivoting). */
+/** Solve the symmetric positive definite system `a x = b` (Gaussian elimination; no row exchange is needed for such a system). */
 function solveSystem(a: number[][], b: number[]): number[] {
   const n = b.length;
-  const m = a.map((row, i) => [...row, b[i] ?? 0]);
+  const m = a.map((row, i) => [...row, elementAt(b, i)]);
   for (let col = 0; col < n; col++) {
-    let pivot = col;
-    for (let r = col + 1; r < n; r++) if (Math.abs(m[r]?.[col] ?? 0) > Math.abs(m[pivot]?.[col] ?? 0)) pivot = r;
-    [m[col], m[pivot]] = [m[pivot] ?? [], m[col] ?? []];
-    const lead = m[col]?.[col] ?? 0;
-    if (Math.abs(lead) < 1e-300) continue;
+    const pivotRow = elementAt(m, col);
     for (let r = col + 1; r < n; r++) {
-      const factor = (m[r]?.[col] ?? 0) / lead;
-      for (let c = col; c <= n; c++) (m[r] as number[])[c] = (m[r]?.[c] ?? 0) - factor * (m[col]?.[c] ?? 0);
+      const row = elementAt(m, r);
+      const factor = elementAt(row, col) / elementAt(pivotRow, col);
+      for (let c = col; c <= n; c++) row[c] = elementAt(row, c) - factor * elementAt(pivotRow, c);
     }
   }
   const x = new Array<number>(n).fill(0);
   for (let row = n - 1; row >= 0; row--) {
-    const lead = m[row]?.[row] ?? 0;
-    let sum = m[row]?.[n] ?? 0;
-    for (let c = row + 1; c < n; c++) sum -= (m[row]?.[c] ?? 0) * (x[c] ?? 0);
-    x[row] = Math.abs(lead) < 1e-300 ? 0 : sum / lead;
+    const r = elementAt(m, row);
+    let sum = elementAt(r, n);
+    for (let c = row + 1; c < n; c++) sum -= elementAt(r, c) * elementAt(x, c);
+    x[row] = sum / elementAt(r, row);
   }
   return x;
 }
@@ -254,22 +251,23 @@ export function consistentSpeeds(
   prescribed: Readonly<Record<string, number>>,
   metresPerUnit: number,
 ): Record<string, number> {
-  const speeds = Object.fromEntries(topology.tree.map((entry) => [entry.joint.id, prescribed[entry.joint.id] ?? 0]));
+  const prescribedSpeed = (id: string): number => prescribed[id] ?? 0;
+  const speeds = Object.fromEntries(topology.tree.map((entry) => [entry.joint.id, prescribedSpeed(entry.joint.id)]));
   if (topology.loops.length === 0) return speeds;
   const rows = topology.loops.reduce((sum, loop) => sum + (loop.kind === 'revolute' ? 5 : 3), 0);
   const jacobian = loopJacobian(topology, rows, metresPerUnit);
-  const free = topology.tree.flatMap((entry, i) => ((prescribed[entry.joint.id] ?? 0) === 0 ? [i] : []));
+  const free = topology.tree.flatMap((entry, i) => (prescribedSpeed(entry.joint.id) === 0 ? [i] : []));
   if (free.length === 0 || free.length === topology.tree.length) return speeds;
-  const driven = topology.tree.map((entry, i) => (free.includes(i) ? 0 : (prescribed[entry.joint.id] ?? 0)));
-  const rhs = jacobian.map((row) => -row.reduce((sum, value, i) => sum + value * (driven[i] ?? 0), 0));
-  const a = free.map((i) => free.map((j) => jacobian.reduce((sum, row) => sum + (row[i] ?? 0) * (row[j] ?? 0), 0)));
-  const scale = Math.max(1e-300, ...a.map((row, i) => row[i] ?? 0));
+  const driven = topology.tree.map((entry, i) => (free.includes(i) ? 0 : prescribedSpeed(entry.joint.id)));
+  const rhs = jacobian.map((row) => -row.reduce((sum, value, i) => sum + value * elementAt(driven, i), 0));
+  const a = free.map((i) => free.map((j) => jacobian.reduce((sum, row) => sum + elementAt(row, i) * elementAt(row, j), 0)));
+  const scale = Math.max(1e-300, ...a.map((row, i) => elementAt(row, i)));
   const regular = a.map((row, i) => row.map((value, j) => value + (i === j ? 1e-12 * scale : 0)));
-  const b = free.map((i) => jacobian.reduce((sum, row, r) => sum + (row[i] ?? 0) * (rhs[r] ?? 0), 0));
+  const b = free.map((i) => jacobian.reduce((sum, row, r) => sum + elementAt(row, i) * elementAt(rhs, r), 0));
   const solution = solveSystem(regular, b);
   free.forEach((i, k) => {
     const entry = topology.tree[i];
-    if (entry !== undefined) speeds[entry.joint.id] = solution[k] ?? 0;
+    if (entry !== undefined) speeds[entry.joint.id] = elementAt(solution, k);
   });
   return speeds;
 }
@@ -286,7 +284,7 @@ export function analyseMobility(dynamics: DynamicsModel, topology: Topology, met
   const labels: { loop: DynamicJoint; component: string; rotation: boolean }[] = [];
   let cursor = 0;
   for (const loop of topology.loops) {
-    loopGapsM[loop.id] = Math.hypot(rows0[cursor] ?? 0, rows0[cursor + 1] ?? 0, rows0[cursor + 2] ?? 0);
+    loopGapsM[loop.id] = Math.hypot(elementAt(rows0, cursor), elementAt(rows0, cursor + 1), elementAt(rows0, cursor + 2));
     for (let k = 0; k < 3; k++) labels.push({ loop, component: `position ${AXIS_NAMES[k]}`, rotation: false });
     cursor += 3;
     if (loop.kind === 'revolute') {

@@ -21,6 +21,7 @@ import {
   type PressureCurve,
 } from './pressureCurve';
 import { sliderRate } from './slider';
+import { elementAt } from '../lib/elementAt';
 
 /** Heat-capacity ratio of the trapped charge (named, FR-FPR-72). */
 const SPECIFIC_HEAT_RATIO = 1.35;
@@ -115,9 +116,9 @@ export function singleZoneCurve(
     } else {
       absolute[i] = psi <= 360 + 1e-9 ? ambient : pIn;
     }
-    gauge[gridIndex(psi, cycleDeg)] = (absolute[i] ?? 0) - ambient;
+    gauge[gridIndex(psi, cycleDeg)] = elementAt(absolute, i) - ambient;
   }
-  gauge[cells] = gauge[0] ?? 0;
+  gauge[cells] = elementAt(gauge, 0);
   return finishCurve(gauge, geometry, ambient, cycleDeg, heat);
 }
 

@@ -13,6 +13,7 @@ import { childForceSeries, peakOf, type Peak } from './reactions';
 import { inertiaAboutAxis, type BodyMassProperties } from './simulationModel';
 import { sliderRate } from './slider';
 import type { Topology } from './topology';
+import { elementAt } from '../lib/elementAt';
 
 /** Cycle-energy closure gate, 0.5 % (named, FR-FPR-16). */
 const ENERGY_CLOSURE_GATE = 0.005;
@@ -78,16 +79,16 @@ export interface EngineData {
 /** Linear interpolation of `ys` at `x` over increasing `xs`; clamps outside. */
 function lerpAt(xs: readonly number[], ys: readonly number[], x: number): number {
   let [lo, hi] = [0, xs.length - 1];
-  if (x <= (xs[0] ?? 0)) return ys[0] ?? 0;
-  if (x >= (xs[hi] ?? 0)) return ys[hi] ?? 0;
+  if (x <= elementAt(xs, 0)) return elementAt(ys, 0);
+  if (x >= elementAt(xs, hi)) return elementAt(ys, hi);
   while (hi - lo > 1) {
     const mid = (lo + hi) >> 1;
-    if ((xs[mid] ?? 0) <= x) lo = mid;
+    if (elementAt(xs, mid) <= x) lo = mid;
     else hi = mid;
   }
-  const span = (xs[hi] ?? 0) - (xs[lo] ?? 0);
-  const fraction = span > 0 ? (x - (xs[lo] ?? 0)) / span : 0;
-  return (ys[lo] ?? 0) * (1 - fraction) + (ys[hi] ?? 0) * fraction;
+  const span = elementAt(xs, hi) - elementAt(xs, lo);
+  const fraction = span > 0 ? (x - elementAt(xs, lo)) / span : 0;
+  return elementAt(ys, lo) * (1 - fraction) + elementAt(ys, hi) * fraction;
 }
 
 function rotate(q: Quaternion, v: Vec3): Vec3 {
@@ -171,7 +172,7 @@ export interface EngineInput {
 
 /** Trapezoid integral of `values` over a uniform grid of `step`. */
 const integrate = (values: readonly number[], step: number): number =>
-  values.reduce((sum, v, i) => (i === 0 ? 0 : sum + 0.5 * (v + (values[i - 1] ?? 0)) * step), 0);
+  values.reduce((sum, v, i) => (i === 0 ? 0 : sum + 0.5 * (v + elementAt(values, i - 1)) * step), 0);
 
 /** The engine report of the first crank that has cylinder pressures; null when the model has none. */
 export function engineData(input: EngineInput): EngineData | null {
@@ -188,7 +189,7 @@ export function engineData(input: EngineInput): EngineData | null {
   const omega = trace.jointVelocity[crank] ?? [];
   const cycleDeg = cycleLength(first.cylinder.cycle);
   const angleDeg = cycleAngleSeries(first, trace);
-  const lastRpm = Math.max(0, ((omega[omega.length - 1] ?? 0) * 60) / (2 * Math.PI));
+  const lastRpm = Math.max(0, (elementAt(omega, omega.length - 1) * 60) / (2 * Math.PI));
   const cylinders: CylinderReport[] = runtimes.map((runtime) => {
     const curve = runtime.curveAt(lastRpm);
     const { layout } = runtime;
@@ -212,14 +213,14 @@ export function engineData(input: EngineInput): EngineData | null {
       derived: derivedLoads(runtime, input, angleDeg),
     };
   });
-  const swept = (theta[theta.length - 1] ?? 0) - (theta[0] ?? 0);
+  const swept = elementAt(theta, theta.length - 1) - elementAt(theta, 0);
   const cycleRad = cycleDeg * RADIANS_PER_DEG;
   const spacing = theta.length > 1 ? Math.abs(swept) / (theta.length - 1) / RADIANS_PER_DEG : Infinity;
   if (spacing > COARSE_SAMPLING_DEG)
     warnings.push(
       `FPR_SAMPLING_COARSE: samples are ${spacing.toFixed(1)} deg of crank apart (> ${COARSE_SAMPLING_DEG}); set sampleRate higher for peaks and curves`,
     );
-  const increasing = theta.every((t, i) => i === 0 || t >= (theta[i - 1] ?? 0));
+  const increasing = theta.every((t, i) => i === 0 || t >= elementAt(theta, i - 1));
   if (swept < 0 || !increasing)
     warnings.push(`the crank '${crank}' does not turn steadily in its positive sense: cycle angles run backwards; flip the joint axis`);
   const base = { crankJoint: crank, cycle: first.cylinder.cycle, cylinders, warnings };
@@ -229,7 +230,7 @@ export function engineData(input: EngineInput): EngineData | null {
     );
     return { ...base, lastCycle: null, meanTorqueNm: null, indicatedPowerKW: null, energyClosure: null, speedRipple: null, governor: null };
   }
-  const end = theta[theta.length - 1] ?? 0;
+  const end = elementAt(theta, theta.length - 1);
   const grid = Array.from(
     { length: Math.round(cycleDeg / RESAMPLE_DEG) + 1 },
     (_, k) => end - cycleRad + k * RESAMPLE_DEG * RADIANS_PER_DEG,
@@ -239,14 +240,14 @@ export function engineData(input: EngineInput): EngineData | null {
   const perCylinder: Record<string, number[]> = {};
   for (const runtime of runtimes) {
     perCylinder[runtime.cylinder.id] = grid.map((angle, k) => {
-      const state = cylinderState(runtime, angle, speeds[k] ?? 0);
+      const state = cylinderState(runtime, angle, elementAt(speeds, k));
       return state.forceN * sliderRate(runtime.layout.slider, angle - runtime.topAngleRad);
     });
   }
   const total = grid.map((_, k) => runtimes.reduce((sum, runtime) => sum + (perCylinder[runtime.cylinder.id]?.[k] ?? 0), 0));
   const step = RESAMPLE_DEG * RADIANS_PER_DEG;
   const integral = integrate(total, step);
-  const duration = (times[times.length - 1] ?? 0) - (times[0] ?? 0);
+  const duration = elementAt(times, times.length - 1) - elementAt(times, 0);
   const meanOmega = duration > 0 ? cycleRad / duration : 0;
   const meanRpm = (meanOmega * 60) / (2 * Math.PI);
   const meanTorque = integral / cycleRad;
@@ -266,21 +267,23 @@ export function engineData(input: EngineInput): EngineData | null {
     crankJoint === undefined || crankBody === undefined
       ? 0
       : inertiaAboutAxis(crankBody, crankJoint.anchor.map((c) => c * input.metresPerUnit) as unknown as Vec3, crankJoint.axis);
-  const inLastCycle = trace.times.flatMap((t, i) => (t >= (times[0] ?? 0) - 1e-12 ? [omega[i] ?? 0] : []));
+  const inLastCycle = trace.times.flatMap((t, i) => (t >= elementAt(times, 0) - 1e-12 ? [elementAt(omega, i)] : []));
   const measured = meanOmega > 0 ? (Math.max(...inLastCycle) - Math.min(...inLastCycle)) / meanOmega : 0;
   let [cumulative, high, low] = [0, 0, 0];
   total.forEach((value, k) => {
-    if (k > 0) cumulative += 0.5 * (value + (total[k - 1] ?? 0) - 2 * meanTorque) * step;
+    if (k > 0) cumulative += 0.5 * (value + elementAt(total, k - 1) - 2 * meanTorque) * step;
     [high, low] = [Math.max(high, cumulative), Math.min(low, cumulative)];
   });
   const analytic = inertia > 0 && meanOmega > 0 ? (high - low) / (inertia * meanOmega ** 2) : null;
   const governor = Object.values(input.dynamics.motors).find((motor) => motor.kind === 'speed' && motor.joint === crank);
   const governed =
-    governor === undefined ? undefined : trace.servoForce[governor.id]?.filter((_, i) => (trace.times[i] ?? 0) >= (times[0] ?? 0) - 1e-12);
+    governor === undefined
+      ? undefined
+      : trace.servoForce[governor.id]?.filter((_, i) => elementAt(trace.times, i) >= elementAt(times, 0) - 1e-12);
   const governorMean = governed === undefined || governed.length === 0 ? null : governed.reduce((sum, v) => sum + v, 0) / governed.length;
   return {
     ...base,
-    lastCycle: { fromS: times[0] ?? 0, toS: times[times.length - 1] ?? 0, meanRpm, resolutionDeg: RESAMPLE_DEG },
+    lastCycle: { fromS: elementAt(times, 0), toS: elementAt(times, times.length - 1), meanRpm, resolutionDeg: RESAMPLE_DEG },
     meanTorqueNm: meanTorque,
     indicatedPowerKW: (meanTorque * meanOmega) / 1000,
     energyClosure: { ratio, gate: ENERGY_CLOSURE_GATE, status, integralJ: integral, expectedJ: expected },

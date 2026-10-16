@@ -40,7 +40,7 @@ export interface TopologyRefusal {
 const KIND_RANK: Readonly<Record<DynamicJoint['kind'], number>> = { prismatic: 0, revolute: 1, spherical: 2 };
 
 /**
- * Tree and loop closures of `dynamics`. Joints are taken in the order (kind rank, creation order, id); a joint joins the tree unless its
+ * Tree and loop closures of `dynamics`. Joints are taken in the order (kind rank, creation order); a joint joins the tree unless its
  * ends are already connected (fixed bodies count as ground), then it closes a loop. The tree is rooted by breadth-first search from
  * ground and the fixed bodies; bodies unreachable from them root at their first declared parent-most body (free bodies).
  */
@@ -64,13 +64,10 @@ export function buildTopology(dynamics: DynamicsModel): Topology | TopologyRefus
       root = next;
     }
   };
-  const creation = new Map(joints.map((joint, i) => [joint.id, i]));
-  const ranked = [...joints].sort(
-    (a, b) =>
-      KIND_RANK[a.kind] - KIND_RANK[b.kind] ||
-      (creation.get(a.id) ?? 0) - (creation.get(b.id) ?? 0) ||
-      (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
-  );
+  const ranked = joints
+    .map((joint, creation) => ({ joint, creation }))
+    .sort((a, b) => KIND_RANK[a.joint.kind] - KIND_RANK[b.joint.kind] || a.creation - b.creation)
+    .map(({ joint }) => joint);
   const treeSet = new Set<string>();
   for (const joint of ranked) {
     const [a, b] = [find(nodeOf(joint.parent)), find(nodeOf(joint.child))];
@@ -135,8 +132,9 @@ export function buildTopology(dynamics: DynamicsModel): Topology | TopologyRefus
       ids: [spherical.joint.id],
     };
   const bodyOrder = bodies
-    .map((body) => body.id)
-    .sort((a, b) => (level.get(a) ?? 0) - (level.get(b) ?? 0) || (index.get(a) ?? 0) - (index.get(b) ?? 0));
+    .map((body, declaration) => ({ id: body.id, declaration, depth: level.get(body.id) ?? 0 }))
+    .sort((a, b) => a.depth - b.depth || a.declaration - b.declaration)
+    .map(({ id }) => id);
   return {
     tree,
     loops,
