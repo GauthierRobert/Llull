@@ -5,6 +5,7 @@ import type { ConstitutiveSet, MaterialModel } from './materialModel';
 import type { Vec2, Vec3 } from './vectors';
 import type { BuildingModel } from './building';
 import type { CivilModel } from './civil';
+import type { AnalysisModel } from './analysis';
 import type { DrawingsModel } from './sheet';
 import type { DynamicsModel } from './dynamics';
 import type { PrototypeModel } from './prototype';
@@ -639,6 +640,8 @@ export interface CadDocument {
   dynamics?: DynamicsModel;
   /** Absent until the first prototype-review command (`allow_interference`, `set_part_grounded`). */
   prototype?: PrototypeModel;
+  /** Absent until the first analysis command (`create_analysis`, plugin `cae`). */
+  analysis?: AnalysisModel;
 }
 
 /**

@@ -2,10 +2,12 @@
 
 import { installPlugin } from '@core/plugins/host';
 import { buildingPlugin, civilPlugin, industrialPlugin } from '@aec/index';
+import { caePlugin } from '@cae/index';
 
 /** Install every default domain plugin (idempotent). */
 export function installDefaultPlugins(): void {
   installPlugin(buildingPlugin);
   installPlugin(industrialPlugin);
   installPlugin(civilPlugin);
+  installPlugin(caePlugin);
 }

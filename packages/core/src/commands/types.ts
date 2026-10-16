@@ -6,6 +6,7 @@
 import type { CadDocument } from '../model/types';
 import type { GeometryKernel } from '../geometry/kernel';
 import type { PhysicsEngine } from '../dynamics/physicsEngine';
+import type { FeArtifactPort, HumanSignaturePort } from '../model/analysis';
 import type { IdSource } from '../lib/id';
 import type { ReplayCache } from './history/replayCache';
 import type { ZodType } from 'zod';
@@ -149,6 +150,10 @@ export interface ExecutionContext {
   readonly kernel: GeometryKernel | null;
   /** Rigid-body physics engine for `simulate_motion`; null/absent while none is installed. */
   readonly physics?: PhysicsEngine | null;
+  /** Read-only FE mesh/results artifact store (host-provided); null/absent = `record_fe_*` commands no-op with FEA_ARTIFACT_NOT_FOUND. */
+  readonly feaArtifacts?: FeArtifactPort | null;
+  /** Human-signature verifier (09 PLM); null/absent = human-gate commands refuse. */
+  readonly humanSignature?: HumanSignaturePort | null;
   /** Mints every id the command creates. */
   readonly ids: IdSource;
   /** Resolves command names for commands that run other commands. */
