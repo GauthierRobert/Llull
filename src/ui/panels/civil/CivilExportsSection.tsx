@@ -8,7 +8,7 @@ import { OptionSelect } from '@ui/panels/OptionSelect';
 import { NumberTextField } from './CivilParts';
 import { optionalNumber } from '@ui/numberText';
 
-export function CivilExportsSection(): React.ReactElement {
+export function CivilExportsSection({ defaultOpen = true }: { defaultOpen?: boolean }): React.ReactElement {
   const [status, setStatus] = useState('');
   const [paper, setPaper] = useState<PaperSize>('A3');
   const [scale, setScale] = useState('');
@@ -18,6 +18,7 @@ export function CivilExportsSection(): React.ReactElement {
       step={6}
       hint="LandXML for Civil 3D / 12d / Trimble, DXF with the TIN as 3D faces and contours at their elevation."
       collapsible
+      defaultOpen={defaultOpen}
       testId="civil-exports"
     >
       <div className="building-actions">

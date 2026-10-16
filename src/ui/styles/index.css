@@ -12,6 +12,7 @@
 @import './panels/common.css';
 @import './panels/properties.css';
 @import './panels/layers.css';
+@import './panels/objects.css';
 @import './panels/assembly.css';
 @import './panels/parameters.css';
 @import './panels/history.css';
@@ -19,3 +20,4 @@
 @import './panels/materials.css';
 @import './panels/mechanisms.css';
 @import './panels/building.css';
+@import './panels/civil.css';

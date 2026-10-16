@@ -41,6 +41,7 @@
 .physics-run,
 .physics-playback__row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-1) var(--space-2);
@@ -149,4 +150,153 @@
   margin: var(--space-1) var(--space-2);
   font-size: var(--text-xs);
   color: var(--fg-muted);
+}
+
+/* Loads & forces — review list of what acts on the rigid-body model + the viewport overlay switches */
+
+.loads-switches {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: 0 var(--space-3) var(--space-2);
+}
+
+.loads-switches__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+}
+
+.loads-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.loads-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  transition:
+    background var(--dur-fast) var(--ease),
+    opacity var(--dur-fast) var(--ease);
+}
+
+.loads-chip:hover {
+  background: var(--surface-2);
+}
+
+.loads-chip[aria-pressed='false'] {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+.loads-chip:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.loads-chip__count {
+  font-family: var(--font-mono);
+  color: var(--fg-subtle);
+}
+
+.loads-swatch {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+}
+
+.loads-group__title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3) 0;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--fg-faint);
+}
+
+.loads-group__total {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-weight: var(--weight-medium);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.loads-row {
+  align-items: flex-start;
+  padding-right: var(--space-2);
+}
+
+.loads-row .icon-btn {
+  margin-top: 4px;
+}
+
+.loads-row__main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 5px 0;
+  text-align: left;
+}
+
+.loads-row__line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.loads-row__value {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+  white-space: nowrap;
+}
+
+.loads-row__detail {
+  padding-left: 14px;
+  font-size: var(--text-2xs);
+  line-height: 1.4;
+  color: var(--fg-subtle);
+}
+
+.loads-row--hidden .loads-row__main {
+  opacity: 0.5;
+}
+
+/* Value pill next to a load glyph in the 3D view (DynamicsLoadsOverlay) */
+.load-label {
+  display: inline-block;
+  transform: translate(6px, -50%);
+  padding: 1px 6px;
+  border: 1px solid;
+  border-left-width: 3px;
+  border-radius: var(--radius-xs);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+  color: var(--fg);
+  white-space: nowrap;
 }

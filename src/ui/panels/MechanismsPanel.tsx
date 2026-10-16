@@ -11,6 +11,7 @@ import { CommitInput } from '@ui/panels/propertyFields';
 import { orderedValues } from '@ui/panels/orderedValues';
 import { parseNumber } from '@ui/numberText';
 import { PhysicsSection } from '@ui/panels/PhysicsSection';
+import { PhysicsLoadsSection } from '@ui/panels/PhysicsLoadsSection';
 
 type ChipTone = 'accent' | 'success' | 'warning' | 'danger' | 'agent';
 
@@ -239,12 +240,21 @@ interface MechanismSectionProps {
   testId: string;
   listLabel: string;
   rows: ReadonlyArray<React.ReactElement>;
+  /** Start collapsed while empty (a physics model has no kinematic constraints to show). */
+  collapseEmpty: boolean;
 }
 
-function MechanismSection({ title, testId, listLabel, rows }: MechanismSectionProps): React.ReactElement {
+function MechanismSection({ title, testId, listLabel, rows, collapseEmpty }: MechanismSectionProps): React.ReactElement {
   const noun = title.toLowerCase();
   return (
-    <PanelSection collapsible title={title} count={rows.length} countLabel={`${rows.length} ${noun}`} testId={testId}>
+    <PanelSection
+      collapsible
+      defaultOpen={!collapseEmpty || rows.length > 0}
+      title={title}
+      count={rows.length}
+      countLabel={`${rows.length} ${noun}`}
+      testId={testId}
+    >
       {rows.length === 0 ? (
         <PanelEmpty compact icon="mechanism" message={`No ${noun} defined.`} />
       ) : (
@@ -264,6 +274,7 @@ export function MechanismsPanel({ className }: { className?: string }): React.Re
   const driveRelations = useStore((s) => s.document.driveRelations);
   const driveRelationOrder = useStore((s) => s.document.driveRelationOrder);
 
+  const hasBodies = useStore((s) => Object.keys(s.document.dynamics?.bodies ?? {}).length > 0);
   const mechanismSelection = useViewportStore((s) => s.mechanismSelection);
   const setMechanismSelection = useViewportStore((s) => s.setMechanismSelection);
 
@@ -277,9 +288,12 @@ export function MechanismsPanel({ className }: { className?: string }): React.Re
   return (
     <aside className={classNames('panel mechanisms-panel', className)} aria-label="Mechanisms">
       <PanelHeader title="Mechanisms" />
+      {hasBodies && <PhysicsLoadsSection />}
+      {hasBodies && <PhysicsSection />}
       <MechanismSection
         title="Constraints"
         testId="mechanisms-section-constraints"
+        collapseEmpty={hasBodies}
         listLabel="Constraint list"
         rows={orderedValues(constraintOrder, constraints).map((constraint) => (
           <ConstraintRow
@@ -293,6 +307,7 @@ export function MechanismsPanel({ className }: { className?: string }): React.Re
       <MechanismSection
         title="Joints"
         testId="mechanisms-section-joints"
+        collapseEmpty={hasBodies}
         listLabel="Joint list"
         rows={orderedValues(jointOrder, joints).map((joint) => (
           <JointRow key={joint.id} joint={joint} highlighted={isHighlighted('joint', joint.id)} onHighlight={highlight('joint')} />
@@ -301,12 +316,13 @@ export function MechanismsPanel({ className }: { className?: string }): React.Re
       <MechanismSection
         title="Drive Relations"
         testId="mechanisms-section-drive relations"
+        collapseEmpty={hasBodies}
         listLabel="Drive relation list"
         rows={orderedValues(driveRelationOrder, driveRelations).map((relation) => (
           <DriveRelationRow key={relation.id} relation={relation} />
         ))}
       />
-      <PhysicsSection />
+      {!hasBodies && <PhysicsSection />}
     </aside>
   );
 }

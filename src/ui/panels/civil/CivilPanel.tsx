@@ -1,4 +1,5 @@
-// Civil / site workspace in workflow order: 1 survey, 2 terrain, 3 earthworks, 4 roads, 5 drainage, 6 exports.
+// Civil / site workspace in workflow order: 1 survey, 2 terrain, 3 earthworks, 4 roads, 5 drainage, then exports. A step with objects is
+// ticked and starts expanded (its list is what an engineer reviews); so does the next step to do. The rest start collapsed.
 
 import React from 'react';
 import { classNames } from '@ui/classNames';
@@ -12,9 +13,12 @@ import { RoadsSection } from './RoadsSection';
 import { DrainageSection } from './DrainageSection';
 import { CivilExportsSection } from './CivilExportsSection';
 import { CivilFeedback } from './CivilFeedback';
+import { civilStepStates } from './civilSteps';
 
 export function CivilPanel({ className }: { className?: string }): React.ReactElement {
-  const objectCount = useStore((s) => s.document.civil?.order.length ?? 0);
+  const civil = useStore((s) => s.document.civil);
+  const objectCount = civil?.order.length ?? 0;
+  const steps = civilStepStates(civil);
   return (
     <div className={classNames('panel civil-panel', className)} data-testid="civil-panel">
       <PanelHeader title="Civil / Site" count={objectCount} countLabel={`${objectCount} civil objects`}>
@@ -28,13 +32,13 @@ export function CivilPanel({ className }: { className?: string }): React.ReactEl
           compact
         />
       )}
-      <SurveySection />
-      <CivilCrsSection />
-      <TerrainSection />
-      <EarthworksSection />
-      <RoadsSection />
-      <DrainageSection />
-      <CivilExportsSection />
+      <SurveySection {...steps.survey} />
+      <CivilCrsSection defaultOpen={civil?.crs !== undefined} />
+      <TerrainSection {...steps.terrain} />
+      <EarthworksSection {...steps.earthworks} />
+      <RoadsSection {...steps.roads} />
+      <DrainageSection {...steps.drainage} />
+      <CivilExportsSection defaultOpen={steps.terrain.done} />
     </div>
   );
 }

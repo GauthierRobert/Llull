@@ -1,0 +1,76 @@
+/* Objects panel (model tree) */
+
+.objects-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 12px 4px;
+  padding: 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  color: var(--fg-faint);
+}
+
+.objects-filter input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: var(--control-h);
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  outline: none;
+}
+
+.object-row {
+  gap: 6px;
+}
+
+.object-row--nested {
+  padding-left: 28px;
+}
+
+.object-row__main {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.object-row__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.object-name-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.object-swatch {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px var(--border-strong);
+}
+
+.object-row--hidden .object-row__main,
+.object-row--hidden .object-swatch {
+  opacity: 0.45;
+}
+
+.object-visibility-btn--hidden {
+  color: var(--fg-faint);
+}

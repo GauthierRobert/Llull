@@ -52,6 +52,10 @@ interface PanelSectionProps {
   /** One line under the header: what the section is for. */
   hint?: string;
   testId?: string;
+  /** Collapsible only: expanded until the user toggles it (default true); follows later changes until then. */
+  defaultOpen?: boolean;
+  /** Workflow step completed: the step badge shows a tick. */
+  done?: boolean;
   children: React.ReactNode;
 }
 
@@ -63,15 +67,18 @@ export function PanelSection({
   step,
   hint,
   testId,
+  defaultOpen = true,
+  done = false,
   children,
 }: PanelSectionProps): React.ReactElement {
-  const [open, setOpen] = useState(true);
+  const [toggled, setToggled] = useState<boolean | null>(null);
+  const open = !collapsible || (toggled ?? defaultOpen);
   const label = (
     <>
       {collapsible && <Icon name={open ? 'chevronDown' : 'chevronRight'} size={12} />}
       {step !== undefined && (
-        <span className="panel__step" aria-label={`Step ${step}:`}>
-          {step}
+        <span className={classNames('panel__step', done && 'panel__step--done')} aria-label={`Step ${step}${done ? ' (done)' : ''}:`}>
+          {done ? <Icon name="check" size={10} strokeWidth={3} /> : step}
         </span>
       )}
       <span className="panel__section-title">{title}</span>
@@ -88,7 +95,7 @@ export function PanelSection({
         <button
           type="button"
           className="panel__section-header panel__section-header--button"
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => setToggled(!open)}
           aria-expanded={open}
         >
           {label}

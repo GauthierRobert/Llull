@@ -1,0 +1,553 @@
+{
+ "pack": "21-functional-prototype",
+ "generatedBy": "generate_fpr_reference.py",
+ "cases": [
+  {
+   "id": "VC-FPR-01",
+   "quantity": "overlap volume, two 20 mm cubes offset 10 mm along x",
+   "value": 4000.0,
+   "unit": "mm3",
+   "tolerance": {
+    "rel": 0.001
+   },
+   "source": "exact analytic derivation in this generator (README §3)",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-03",
+    "TR-FPR-01",
+    "TR-FPR-03"
+   ]
+  },
+  {
+   "id": "VC-FPR-02",
+   "quantity": "two 20 mm cubes sharing a face: class touch, overlap volume",
+   "value": 0.0,
+   "unit": "mm3",
+   "tolerance": {
+    "abs": 1e-06
+   },
+   "source": "exact analytic derivation in this generator (README §3)",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-03",
+    "FR-FPR-04"
+   ]
+  },
+  {
+   "id": "VC-FPR-03",
+   "quantity": "min distance, cubes 0.5 mm apart (required clearance 1 mm)",
+   "value": 0.5,
+   "unit": "mm",
+   "tolerance": {
+    "abs": 1e-06
+   },
+   "source": "exact analytic derivation in this generator (README §3)",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-03",
+    "FR-FPR-04"
+   ]
+  },
+  {
+   "id": "VC-FPR-04",
+   "quantity": "containment volume, 10 mm cube centred in a 30 mm cube",
+   "value": 1000.0,
+   "unit": "mm3",
+   "tolerance": {
+    "rel": 0.001
+   },
+   "source": "exact analytic derivation in this generator (README §3)",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-03"
+   ]
+  },
+  {
+   "id": "VC-FPR-05",
+   "quantity": "lump count of one part made of two disjoint 10 mm boxes",
+   "value": 2,
+   "unit": "count",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "exact analytic derivation in this generator (README §3)",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-02",
+    "TR-FPR-01"
+   ]
+  },
+  {
+   "id": "VC-FPR-06",
+   "quantity": "floating components: one free box beside a grounded jointed pair",
+   "value": 1,
+   "unit": "count",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "exact analytic derivation in this generator (README §3)",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-06"
+   ]
+  },
+  {
+   "id": "VC-FPR-07",
+   "quantity": "min wall thickness of a 100 x 100 x 2 mm plate (ray method)",
+   "value": 2.0,
+   "unit": "mm",
+   "tolerance": {
+    "abs": 0.02
+   },
+   "source": "exact analytic derivation in this generator (README §3); threshold cnc_metal 0.794 mm quoted from [B-R14]",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-07",
+    "TR-FPR-04"
+   ]
+  },
+  {
+   "id": "VC-FPR-08",
+   "quantity": "min wall thickness of a 100 x 100 x 0.5 mm plate -> FPR_WALL_THIN",
+   "value": 0.5,
+   "unit": "mm",
+   "tolerance": {
+    "abs": 0.01
+   },
+   "source": "exact analytic derivation in this generator (README §3)",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-07"
+   ]
+  },
+  {
+   "id": "VC-FPR-09",
+   "quantity": "diametral clearance, pin D10.00 in bore D10.02 coaxial with a revolute joint",
+   "value": 0.02,
+   "unit": "mm",
+   "tolerance": {
+    "abs": 1e-06
+   },
+   "source": "exact analytic derivation in this generator (README §3)",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-08",
+    "TR-FPR-02"
+   ]
+  },
+  {
+   "id": "VC-FPR-10",
+   "quantity": "piston travel from TDC at crank 30/60/90/120/150 deg (r 49.2125 mm, l 150 mm)",
+   "value": [
+    0.00862521320247,
+    0.0307883186326,
+    0.0575151822987,
+    0.0800008186326,
+    0.09386376357
+   ],
+   "unit": "m",
+   "tolerance": {
+    "abs": 1e-06
+   },
+   "source": "exact analytic derivation in this generator (README §3); formula [C-R12]",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-10",
+    "FR-FPR-12",
+    "TR-FPR-05",
+    "TR-FPR-07"
+   ]
+  },
+  {
+   "id": "VC-FPR-11",
+   "quantity": "crank torque from a constant 1000 N gas force at 30/60/90/120/150 deg",
+   "value": [
+    31.6935963024,
+    49.9111374016,
+    49.2125,
+    35.3274129659,
+    17.5189036976
+   ],
+   "unit": "N*m",
+   "tolerance": {
+    "rel": 0.005
+   },
+   "source": "exact analytic derivation in this generator (README §3); T = F dx/dtheta = F r sin(theta+beta)/cos(beta) [C-R12][C-R14]",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-13",
+    "TR-FPR-08"
+   ]
+  },
+  {
+   "id": "VC-FPR-12a",
+   "quantity": "rod force F/cos(beta), static, 1000 N, at 30/60/90/120/150 deg",
+   "value": [
+    1013.7326194,
+    1042.9853814,
+    1058.59449165,
+    1042.9853814,
+    1013.7326194
+   ],
+   "unit": "N",
+   "tolerance": {
+    "rel": 0.005
+   },
+   "source": "exact analytic derivation in this generator (README §3) [C-R12]",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-14",
+    "TR-FPR-07"
+   ]
+  },
+  {
+   "id": "VC-FPR-12b",
+   "quantity": "cylinder side thrust F tan(beta), static, 1000 N, at 30/60/90/120/150 deg",
+   "value": [
+    166.29438844,
+    296.341873218,
+    347.307209468,
+    296.341873218,
+    166.29438844
+   ],
+   "unit": "N",
+   "tolerance": {
+    "rel": 0.005
+   },
+   "source": "exact analytic derivation in this generator (README §3) [C-R12]",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-14",
+    "TR-FPR-07"
+   ]
+  },
+  {
+   "id": "VC-FPR-13",
+   "quantity": "max loop-closure residual in the verification runs of this pack (pass tier)",
+   "value": 1e-06,
+   "unit": "m",
+   "tolerance": {
+    "max": 1e-06
+   },
+   "source": "pass tier of VC-FPR-35; derived estimate 1e-8 m with the stiff settings [C sec. 1.2][C-R3]",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-15",
+    "TR-FPR-07"
+   ]
+  },
+  {
+   "id": "VC-FPR-14",
+   "quantity": "cycle-energy closure |oint T dtheta - sum oint p dV| / sum oint p dV (gate)",
+   "value": 0.005,
+   "unit": "ratio",
+   "tolerance": {
+    "max": 0.005
+   },
+   "source": "identity T = F dx/dtheta (virtual work) [C-R12]; gate named",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-16"
+   ]
+  },
+  {
+   "id": "VC-FPR-15a",
+   "quantity": "MEP for 73.5 kW at 5800 rpm, 1352 cm3, four-stroke",
+   "value": 11.2477045501,
+   "unit": "bar",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived from datasheet [C-R23] with P = MEP Vd N / 2 [C-R18]",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-17"
+   ]
+  },
+  {
+   "id": "VC-FPR-15b",
+   "quantity": "mean BRAKE torque with the heat release calibrated so BMEP = VC-FPR-15a (origin: calibrated, not validation evidence)",
+   "value": 121.012637765,
+   "unit": "N*m",
+   "tolerance": {
+    "rel": 0.005
+   },
+   "source": "derived [C-R18]; datasheet quotes 121 N*m at 5800 rpm [C-R23]",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-16",
+    "FR-FPR-17",
+    "FR-FPR-72",
+    "FR-FPR-78"
+   ]
+  },
+  {
+   "id": "VC-FPR-16",
+   "quantity": "propeller speed through the 51/21 reduction (i = 2.4286) at 5800 rpm crank",
+   "value": 2388.23529412,
+   "unit": "rpm",
+   "tolerance": {
+    "rel": 0.001
+   },
+   "source": "tooth counts 51/21 quoted from [E-R4] (datasheet rounds to 2.43 [C-R23])",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-14",
+    "FR-FPR-74"
+   ]
+  },
+  {
+   "id": "VC-FPR-17",
+   "quantity": "speed-ripple coefficient vs Delta E / (I omega0^2) from the simulated torque curve",
+   "value": 0.05,
+   "unit": "relative difference",
+   "tolerance": {
+    "max": 0.05
+   },
+   "source": "formula [C-R25]; value computed at test time from the run's own torque curve (method b)",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-16"
+   ]
+  },
+  {
+   "id": "VC-FPR-18",
+   "quantity": "min clearance, bar (100 x 10 mm) rotating about z vs block face at x = 105 mm",
+   "value": 4.8750780275,
+   "unit": "mm",
+   "tolerance": {
+    "abs": 0.001
+   },
+   "source": "exact analytic derivation in this generator (README §3)",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-20",
+    "FR-FPR-21",
+    "TR-FPR-10"
+   ]
+  },
+  {
+   "id": "VC-FPR-18b",
+   "quantity": "rotation angle of closest approach (+-)",
+   "value": 2.86240522611,
+   "unit": "deg",
+   "tolerance": {
+    "abs": 0.05
+   },
+   "source": "exact analytic derivation in this generator (README §3)",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-20"
+   ]
+  },
+  {
+   "id": "VC-FPR-19",
+   "quantity": "contact half-interval, same bar vs block face at x = 95 mm (contact on [-a, a])",
+   "value": 21.2735271276,
+   "unit": "deg",
+   "tolerance": {
+    "abs": 0.05
+   },
+   "source": "exact analytic derivation in this generator (README §3) (bisection to 1e-15)",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-20",
+    "FR-FPR-21"
+   ]
+  },
+  {
+   "id": "VC-FPR-20a",
+   "quantity": "slider-crank, wrist revolute: [Gruebler DOF, rank DOF, redundant rows]",
+   "value": [
+    -2,
+    1,
+    3
+   ],
+   "unit": "count",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "Gruebler [A-R59]; rank: 3 tree coords, 5 loop rows of rank 2 (planar)",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-11",
+    "TR-FPR-09"
+   ]
+  },
+  {
+   "id": "VC-FPR-20b",
+   "quantity": "slider-crank, wrist spherical: [Gruebler DOF, rank DOF, redundant rows]",
+   "value": [
+    0,
+    1,
+    1
+   ],
+   "unit": "count",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "Gruebler [A-R59] (0 although the mechanism moves: Gruebler cannot prove redundancy [A-R60])",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-11",
+    "TR-FPR-09"
+   ]
+  },
+  {
+   "id": "VC-FPR-21",
+   "quantity": "start-pose loop gap reported by FPR_LOOP_OPEN, wrist pin moved 1 mm",
+   "value": 0.001,
+   "unit": "m",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "exact analytic derivation in this generator (README §3)",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-12"
+   ]
+  },
+  {
+   "id": "VC-FPR-27",
+   "quantity": "propeller-shaft torque from 121 N*m crank torque through 51/21 at mesh efficiency 0.99",
+   "value": 290.918571429,
+   "unit": "N*m",
+   "tolerance": {
+    "rel": 0.001
+   },
+   "source": "teeth [E-R4]; efficiency default 0.99 per mesh [E-R21]",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-74"
+   ]
+  },
+  {
+   "id": "VC-FPR-28",
+   "quantity": "motored inertia torque at 30/60/90/120/150 deg: 0.40 kg piston (test value), r 30.5 mm, l 130 mm, governed 5800 rpm, no gas force, no friction",
+   "value": [
+    81.5707508685,
+    50.9550937851,
+    -33.1301707083,
+    -64.5842549997,
+    -40.6946891149
+   ],
+   "unit": "N*m",
+   "tolerance": {
+    "rel": 0.01
+   },
+   "source": "exact analytic derivation in this generator (README §3); T = m w^2 x'(theta) x''(theta); r, l from [E-R8] (low confidence)",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-73",
+    "FR-FPR-79"
+   ]
+  },
+  {
+   "id": "VC-FPR-29",
+   "quantity": "PNH friction terms, Rotax 912 geometry at 5800 rpm WOT: [piston skirt, rings, ring gas load, auxiliaries]",
+   "value": [
+    41.2766666667,
+    6.74603174603,
+    21.7776087837,
+    30.48444
+   ],
+   "unit": "kPa",
+   "tolerance": {
+    "rel": 0.001
+   },
+   "source": "equations of [E-R9] as reconstructed in note E sec. 1.3; bore/stroke [C-R23], CR [E-R2]. Grade C until checked against SAE 890836 / 2003-01-0725",
+   "grade": "C",
+   "proves": [
+    "FR-FPR-71"
+   ]
+  },
+  {
+   "id": "VC-FPR-30",
+   "quantity": "mass of a 50 mm cube of aluminium 4032 (SG 2.68)",
+   "value": 0.335,
+   "unit": "kg",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "density [E-R32]",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-73"
+   ]
+  },
+  {
+   "id": "VC-FPR-31",
+   "quantity": "reference BMEP of the Rotax 912 ULS full-throttle torque curve at 2500/3000/3500/4000/4500/5000/5100/5500/5800 rpm (BMEP = 4 pi T / Vd)",
+   "value": [
+    9.20170629306,
+    9.94527851876,
+    10.6423774804,
+    11.0606368573,
+    11.5253694984,
+    11.8506823471,
+    11.8971556112,
+    11.5718427625,
+    11.2465299137
+   ],
+   "unit": "bar",
+   "tolerance": {
+    "abs": 0.1
+   },
+   "source": "torque digitised from OM-912 Fig. 4 [E-R2] (+-1 N*m reading); peak 128 N*m at 5100 rpm quoted [E-R1]",
+   "grade": "B",
+   "proves": [
+    "FR-FPR-77",
+    "FR-FPR-78"
+   ]
+  },
+  {
+   "id": "VC-FPR-32",
+   "quantity": "fixed-pitch static full-throttle rpm window, Rotax 912 + 1.70-1.80 m propeller (V1, four-cylinder reference)",
+   "value": [
+    5100,
+    5800
+   ],
+   "unit": "rpm",
+   "tolerance": {
+    "window": true
+   },
+   "source": "propeller maker's setting rule [F-R22]; >= 5200 rpm WOT [E-R5]",
+   "grade": "B",
+   "proves": [
+    "FR-FPR-75",
+    "FR-FPR-77"
+   ]
+  },
+  {
+   "id": "VC-FPR-33",
+   "quantity": "timestep-halving change of mean brake torque and peak wrist-pin force (gate)",
+   "value": 0.01,
+   "unit": "ratio",
+   "tolerance": {
+    "max": 0.01
+   },
+   "source": "named gate (solution verification)",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-79"
+   ]
+  },
+  {
+   "id": "VC-FPR-35",
+   "quantity": "loop-residual tiers: pass <= 1e-6 m, warn <= 1e-5 m, fail above",
+   "value": [
+    1e-06,
+    1e-05
+   ],
+   "unit": "m",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "5 % of the 0.020 mm minimum rod-pin diametral clearance [F-R19]; named",
+   "grade": "A",
+   "proves": [
+    "FR-FPR-15"
+   ]
+  }
+ ]
+}

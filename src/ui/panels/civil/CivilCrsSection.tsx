@@ -10,7 +10,7 @@ import { useFormValues } from '@ui/panels/useFormValues';
 
 const CRS_FORM = { name: '', epsg: '', datum: '', localOrigin: '', gridOrigin: '', rotation: '', scale: '' };
 
-export function CivilCrsSection(): React.ReactElement {
+export function CivilCrsSection({ defaultOpen = true }: { defaultOpen?: boolean }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const crs = useStore((s) => s.document.civil?.crs);
   const { values, field } = useFormValues(() => CRS_FORM);
@@ -49,13 +49,14 @@ export function CivilCrsSection(): React.ReactElement {
       title="Coordinate system"
       hint="Projected CRS and local-to-grid calibration; exports and sheets then use grid coordinates."
       collapsible
+      defaultOpen={defaultOpen}
       testId="civil-crs"
     >
       <form className="civil-form" onSubmit={applyCrs} aria-label="Coordinate system">
         <div className="building-inline-form">
-          <TextField {...field('name')} hint="CRS name" label="CRS name" />
-          <NumberTextField {...field('epsg')} hint="EPSG" label="EPSG code" />
-          <TextField {...field('datum')} hint="Vertical datum" label="Vertical datum" />
+          <TextField {...field('name')} hint="e.g. Belgian Lambert 2008" label="CRS name" />
+          <NumberTextField {...field('epsg')} hint="e.g. 3812" label="EPSG code" />
+          <TextField {...field('datum')} hint="e.g. TAW-DNG" label="Vertical datum" />
           <button type="submit" className="btn btn--primary btn--sm" disabled={values.name.trim() === ''}>
             Set CRS
           </button>
@@ -63,10 +64,10 @@ export function CivilCrsSection(): React.ReactElement {
       </form>
       <form className="civil-form" onSubmit={applyCalibration} aria-label="Site calibration">
         <div className="building-inline-form">
-          <TextField {...field('localOrigin')} hint="Local x, y" label="Local origin" />
-          <TextField {...field('gridOrigin')} hint="Grid E, N" label="Grid origin" />
-          <NumberTextField {...field('rotation')} hint="Rotation deg" label="Rotation" />
-          <NumberTextField {...field('scale')} hint="Scale factor" label="Scale factor" />
+          <TextField {...field('localOrigin')} hint="x, y (site)" label="Local origin" />
+          <TextField {...field('gridOrigin')} hint="E, N (grid)" label="Grid origin" />
+          <NumberTextField {...field('rotation')} hint="0" label="Rotation (°)" />
+          <NumberTextField {...field('scale')} hint="1" label="Scale factor" />
           <button type="submit" className="btn btn--primary btn--sm">
             Calibrate
           </button>

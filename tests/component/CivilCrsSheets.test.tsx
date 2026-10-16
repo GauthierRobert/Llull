@@ -11,6 +11,7 @@ describe('CivilCrsSection', () => {
   it('dispatches set_coordinate_system and set_site_calibration', () => {
     const dispatch = spyDispatch();
     render(<CivilPanel />);
+    fireEvent.click(screen.getByRole('button', { name: /Coordinate system/ }));
     fireEvent.change(screen.getByLabelText('CRS name'), { target: { value: 'Lambert-93' } });
     fireEvent.change(screen.getByLabelText('EPSG code'), { target: { value: '2154' } });
     fireEvent.change(screen.getByLabelText('Vertical datum'), { target: { value: 'IGN69' } });
@@ -18,13 +19,14 @@ describe('CivilCrsSection', () => {
     expect(dispatch).toHaveBeenCalledWith('set_coordinate_system', { name: 'Lambert-93', epsg: 2154, verticalDatum: 'IGN69' });
     fireEvent.change(screen.getByLabelText('Local origin'), { target: { value: '0,0' } });
     fireEvent.change(screen.getByLabelText('Grid origin'), { target: { value: '1000, 2000' } });
-    fireEvent.change(screen.getByLabelText('Rotation'), { target: { value: '15' } });
+    fireEvent.change(screen.getByLabelText('Rotation (°)'), { target: { value: '15' } });
     fireEvent.click(screen.getByRole('button', { name: 'Calibrate' }));
     expect(dispatch).toHaveBeenCalledWith('set_site_calibration', { localOrigin: [0, 0], gridOrigin: [1000, 2000], rotationDeg: 15 });
   });
   it('rejects a malformed origin locally and shows the current CRS', () => {
     const dispatch = spyDispatch();
     render(<CivilPanel />);
+    fireEvent.click(screen.getByRole('button', { name: /Coordinate system/ }));
     fireEvent.change(screen.getByLabelText('Local origin'), { target: { value: 'abc' } });
     fireEvent.click(screen.getByRole('button', { name: 'Calibrate' }));
     expect(dispatch).not.toHaveBeenCalled();

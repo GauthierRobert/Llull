@@ -1,10 +1,11 @@
-// Icon rail + the one browser panel it selects (building, civil, layers, assembly, mechanisms, parameters, history,
+// Icon rail + the one browser panel it selects (objects, building, civil, layers, assembly, mechanisms, parameters, history,
 // configurations, materials); tab state in useLayoutStore.
 
 import React from 'react';
 import type { CadDocument } from '@core/model/types';
 import { type SidebarTab, useLayoutStore, useStore } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
+import { ObjectsPanel } from '@ui/panels/ObjectsPanel';
 import { LayersPanel } from '@ui/panels/LayersPanel';
 import { AssemblyPanel } from '@ui/panels/AssemblyPanel';
 import { MechanismsPanel } from '@ui/panels/MechanismsPanel';
@@ -18,6 +19,7 @@ import { CivilPanel } from '@ui/panels/civil/CivilPanel';
 import { type SidebarTabSpec, SIDEBAR_TAB_SPECS } from './sidebarTabs';
 
 const TAB_PANELS: Readonly<Record<SidebarTab, React.ComponentType<{ className?: string }>>> = {
+  objects: ObjectsPanel,
   building: BuildingPanel,
   civil: CivilPanel,
   layers: LayersPanel,
@@ -32,6 +34,7 @@ const TAB_PANELS: Readonly<Record<SidebarTab, React.ComponentType<{ className?: 
 
 /** Rail badge counts. */
 const TAB_COUNTS: Readonly<Record<SidebarTab, (doc: CadDocument) => number>> = {
+  objects: (doc) => doc.order.length,
   building: (doc) => doc.building?.elementOrder.length ?? 0,
   civil: (doc) => doc.civil?.order.length ?? 0,
   layers: (doc) => doc.layerOrder.length,

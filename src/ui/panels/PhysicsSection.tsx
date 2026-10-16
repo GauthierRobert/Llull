@@ -3,9 +3,8 @@
 
 import React, { useMemo, useState } from 'react';
 import { useStore } from '@ui/store';
-import { runQuery } from '@ui/services/localQuery';
+import { runSimulation } from '@ui/services/simulationRun';
 import { execute } from '@core/commands/registry';
-import { ensurePhysicsEngine } from '@app/physics';
 import type { SimulationData } from '@core/dynamics/simulationReport';
 import { PLAYBACK_SPEEDS, useDynamicsPlaybackStore } from '@ui/store/dynamicsPlaybackStore';
 import { PanelEmpty, PanelSection, StatusLine } from '@ui/panels/PanelParts';
@@ -121,17 +120,11 @@ export function PhysicsSection(): React.ReactElement {
   const simulate = async (): Promise<void> => {
     const seconds = parseNumber(duration) ?? 5;
     setBusy(true);
-    setStatus('Loading the MuJoCo physics engine…');
-    const ready = await ensurePhysicsEngine();
-    if (!ready) {
-      setBusy(false);
-      setStatus('The physics engine could not be loaded (see the console).');
-      return;
-    }
     setStatus(`Simulating ${format(seconds, 2)} s…`);
-    // let the status paint before the synchronous run
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    const run = runQuery('simulate_motion', { duration: seconds, detail: 'poses', sampleRate: Math.min(1000, PLAYBACK_SAMPLES / seconds) });
+    const run = await runSimulation(
+      { duration: seconds, detail: 'poses', sampleRate: Math.min(1000, PLAYBACK_SAMPLES / seconds) },
+      setStatus,
+    );
     setBusy(false);
     setStatus(run.summary);
     const source = { dynamics: useStore.getState().document.dynamics, entities: useStore.getState().document.entities };

@@ -21,30 +21,35 @@ export function DxfImports({ unit }: { unit: DocumentUnit }): React.ReactElement
     });
   };
   return (
-    <div className="building-inline-form" aria-label="DXF import">
+    <div className="civil-imports" role="group" aria-label="DXF import">
+      <p className="civil-field__label civil-imports__title">Other survey and drawing files</p>
       <FileField
-        label="Import survey DXF"
+        label="Survey DXF"
         accept=".dxf"
         ariaLabel="Survey DXF file"
+        title="Survey points from a DXF: POINTs, point blocks and 3D polyline vertices (import_survey_dxf)"
         onText={(text, fileName) => dispatch('import_survey_dxf', { text, name: fileStem(fileName), sourceUnit: unit })}
       />
       <FileField
-        label="Import DXF drawing"
+        label="Survey DWG"
+        accept=".dwg"
+        ariaLabel="Survey DWG file"
+        title="Survey points from a DWG, converted on the server"
+        onFile={(file) => importDwg(file, 'survey')}
+      />
+      <FileField
+        label="Drawing DXF"
         accept=".dxf"
         ariaLabel="Drawing DXF file"
+        title="Linework of a DXF drawing as 2D entities (import_dxf)"
         onText={(text) => dispatch('import_dxf', { text, sourceUnit: unit })}
       />
       <FileField
-        label="Import DWG drawing (via server)"
+        label="Drawing DWG"
         accept=".dwg"
         ariaLabel="Drawing DWG file"
+        title="Linework of a DWG drawing, converted on the server"
         onFile={(file) => importDwg(file, 'drawing')}
-      />
-      <FileField
-        label="Import survey DWG (via server)"
-        accept=".dwg"
-        ariaLabel="Survey DWG file"
-        onFile={(file) => importDwg(file, 'survey')}
       />
       <StatusLine text={dwgStatus} />
     </div>

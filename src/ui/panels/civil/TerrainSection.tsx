@@ -4,7 +4,7 @@ import React from 'react';
 import type { SurfaceObject } from '@core/model/civil';
 import { useStore } from '@ui/store';
 import { PanelSection } from '@ui/panels/PanelParts';
-import { useCivilObjects, NumberTextField, TextField } from './CivilParts';
+import { useCivilObjects, NumberTextField, TextField, type CivilStepState } from './CivilParts';
 import { CivilReportRow } from './CivilReportRow';
 import { useFormValues } from '@ui/panels/useFormValues';
 
@@ -31,7 +31,7 @@ function SurfaceRow({ surface }: { surface: SurfaceObject }): React.ReactElement
   );
 }
 
-export function TerrainSection(): React.ReactElement {
+export function TerrainSection({ defaultOpen = true, done = false }: Partial<CivilStepState>): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const units = useStore((s) => s.document.units);
   const groups = useCivilObjects('pointGroup');
@@ -57,17 +57,10 @@ export function TerrainSection(): React.ReactElement {
       count={surfaces.length}
       countLabel={`${surfaces.length} surfaces`}
       collapsible
+      defaultOpen={defaultOpen}
+      done={done}
       testId="civil-terrain"
     >
-      <form className="building-inline-form" onSubmit={handleSubmit} aria-label="Create surface">
-        <TextField {...field('name')} hint="Surface name" label="Surface name" />
-        <NumberTextField {...field('interval')} hint="Contour interval" label="Contour interval" />
-        <NumberTextField {...field('majorEvery')} hint="Major every" label="Major contour every" />
-        <NumberTextField {...field('maxEdge')} hint="Max edge (optional)" label="Maximum triangle edge" />
-        <button type="submit" className="btn btn--primary btn--sm" disabled={groups.length === 0}>
-          Create surface
-        </button>
-      </form>
       {surfaces.length > 0 && (
         <ul className="civil-list" aria-label="Surfaces">
           {surfaces.map((surface) => (
@@ -75,6 +68,15 @@ export function TerrainSection(): React.ReactElement {
           ))}
         </ul>
       )}
+      <form className="building-inline-form" onSubmit={handleSubmit} aria-label="Create surface">
+        <TextField {...field('name')} hint="e.g. Existing ground" label="Surface name" />
+        <NumberTextField {...field('interval')} hint="e.g. 0.5" label="Contour interval" />
+        <NumberTextField {...field('majorEvery')} hint="e.g. 5" label="Major contour every" />
+        <NumberTextField {...field('maxEdge')} hint="optional" label="Maximum triangle edge" />
+        <button type="submit" className="btn btn--primary btn--sm" disabled={groups.length === 0}>
+          Create surface
+        </button>
+      </form>
     </PanelSection>
   );
 }

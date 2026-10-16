@@ -1,9 +1,11 @@
 import { resetStore } from '../helpers/componentEntities';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { PhysicsSection } from '@ui/panels/PhysicsSection';
+import { useStore } from '@ui/store';
 import { useDynamicsPlaybackStore } from '@ui/store/dynamicsPlaybackStore';
-import { setPhysicsEngine } from '@core/dynamics/physicsEngine';
+import { execute } from '@core/commands/registry';
+import { getPhysicsEngine, setPhysicsEngine } from '@core/dynamics/physicsEngine';
 import { createMujocoPhysics } from '@physics-mujoco/mujocoPhysics';
 import { localDispatch } from '../helpers/storeTestHelpers';
 
@@ -59,6 +61,49 @@ describe('PhysicsSection', () => {
     expect(useDynamicsPlaybackStore.getState().speed).toBe(0.01);
     fireEvent.click(screen.getByTestId('physics-clear'));
     expect(useDynamicsPlaybackStore.getState().result).toBeNull();
+  });
+
+  it('online, runs simulate_motion on the server (the served CSP blocks in-page MuJoCo) and plays its result', async () => {
+    const { jointId } = buildRotor();
+    const serverRun = execute(useStore.getState().document, 'simulate_motion', { duration: 1, detail: 'poses' });
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({ summary: 'server run', affected: [], isError: false, data: serverRun.data, canUndo: true, canRedo: false }),
+        ),
+      );
+    setPhysicsEngine(null);
+    useStore.setState({ liveStatus: 'connected' });
+    try {
+      render(<PhysicsSection />);
+      fireEvent.click(screen.getByTestId('physics-simulate'));
+      await waitFor(() => expect(screen.getByTestId('physics-results')).toHaveTextContent(new RegExp(`${jointId}.*rpm`)));
+      const [url, init] = fetchSpy.mock.calls[0]!;
+      expect(String(url)).toMatch(/\/command$/);
+      expect(JSON.parse(String(init?.body))).toMatchObject({ name: 'simulate_motion', params: { detail: 'poses' } });
+      expect(getPhysicsEngine()).toBeNull();
+      expect(useDynamicsPlaybackStore.getState().result?.poses?.times.length).toBeGreaterThan(10);
+    } finally {
+      fetchSpy.mockRestore();
+      useStore.setState({ liveStatus: 'disconnected' });
+      setPhysicsEngine(await createMujocoPhysics());
+    }
+  });
+
+  it('online, reports a server failure instead of a result', async () => {
+    buildRotor();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 500 }));
+    useStore.setState({ liveStatus: 'connected' });
+    try {
+      render(<PhysicsSection />);
+      fireEvent.click(screen.getByTestId('physics-simulate'));
+      await waitFor(() => expect(screen.getByText(/simulate_motion failed on the server: .*HTTP 500/)).toBeInTheDocument());
+      expect(useDynamicsPlaybackStore.getState().result).toBeNull();
+    } finally {
+      fetchSpy.mockRestore();
+      useStore.setState({ liveStatus: 'disconnected' });
+    }
   });
 
   it('disables Simulate and shows the problem when the model cannot run', () => {

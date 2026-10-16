@@ -5,7 +5,7 @@ import { DOCUMENT_UNITS, type DocumentUnit } from '@core/model/types';
 import { useStore } from '@ui/store';
 import { PanelSection } from '@ui/panels/PanelParts';
 import { OptionSelect } from '@ui/panels/OptionSelect';
-import { CivilObjectRow, useCivilObjects, TextField } from './CivilParts';
+import { CivilObjectRow, useCivilObjects, TextField, type CivilStepState } from './CivilParts';
 import { DxfImports } from './DxfImports';
 import { fileStem } from '@ui/chosenFile';
 import { FileField } from '@ui/panels/FileField';
@@ -22,7 +22,13 @@ const FORMAT_HINT: Readonly<Record<(typeof FORMATS)[number], string>> = {
   NEZ: 'Northing, Easting, Z',
 };
 
-export function SurveySection(): React.ReactElement {
+/** "Import 120 lines": non-empty lines of the pasted / loaded text (a header line counts: a preview, not the parse). */
+function importLabel(text: string): string {
+  const lines = text.split(/\r?\n/).filter((line) => line.trim() !== '').length;
+  return lines === 0 ? 'Import points' : `Import ${lines} line${lines === 1 ? '' : 's'}`;
+}
+
+export function SurveySection({ defaultOpen = true, done = false }: Partial<CivilStepState>): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const groups = useCivilObjects('pointGroup');
   const documentUnit = useStore((s) => s.document.units);
@@ -52,6 +58,8 @@ export function SurveySection(): React.ReactElement {
       count={groups.length}
       countLabel={`${groups.length} point groups`}
       collapsible
+      defaultOpen={defaultOpen}
+      done={done}
       testId="civil-survey"
     >
       {documentUnit !== 'm' && (
@@ -62,31 +70,6 @@ export function SurveySection(): React.ReactElement {
           </button>
         </div>
       )}
-      <form className="civil-form" onSubmit={handleSubmit} aria-label="Import survey points">
-        <FileField accept=".csv,.txt,.xyz" ariaLabel="Survey file" onText={loadFile} />
-        <textarea
-          value={text}
-          rows={3}
-          placeholder="1001,1000.0,2000.0,52.31,TOPO"
-          aria-label="Survey points text"
-          onChange={(event) => setText(event.target.value)}
-        />
-        <div className="building-inline-form">
-          <OptionSelect
-            value={format}
-            options={FORMATS}
-            label="Survey format"
-            optionLabel={(option) => `${option} — ${FORMAT_HINT[option]}`}
-            onChange={setFormat}
-          />
-          <OptionSelect value={unit} options={DOCUMENT_UNITS} label="Survey unit" onChange={setUnit} />
-          <TextField value={name} set={setName} hint="Group name" label="Point group name" />
-          <button type="submit" className="btn btn--primary btn--sm" disabled={text.trim() === ''}>
-            Import points
-          </button>
-        </div>
-      </form>
-      <DxfImports unit={unit} />
       {groups.length > 0 && (
         <ul className="civil-list" aria-label="Point groups">
           {groups.map((group) => (
@@ -94,6 +77,33 @@ export function SurveySection(): React.ReactElement {
           ))}
         </ul>
       )}
+      <form className="civil-form" onSubmit={handleSubmit} aria-label="Import survey points">
+        <FileField label="Points file" accept=".csv,.txt,.xyz" ariaLabel="Survey file" onText={loadFile} />
+        <textarea
+          className="civil-points-text"
+          value={text}
+          rows={3}
+          placeholder={'…or paste points, one per line:\n1001,1000.0,2000.0,52.31,TOPO'}
+          aria-label="Survey points text"
+          onChange={(event) => setText(event.target.value)}
+        />
+        <div className="building-inline-form">
+          <label className="civil-field">
+            <span className="civil-field__label">Columns</span>
+            <OptionSelect value={format} options={FORMATS} label="Survey format" title={FORMAT_HINT[format]} onChange={setFormat} />
+          </label>
+          <label className="civil-field">
+            <span className="civil-field__label">Unit</span>
+            <OptionSelect value={unit} options={DOCUMENT_UNITS} label="Survey unit" onChange={setUnit} />
+          </label>
+          <p className="civil-field__hint">{FORMAT_HINT[format]}</p>
+          <TextField value={name} set={setName} hint="from the file name" label="Point group name" />
+          <button type="submit" className="btn btn--primary btn--sm" disabled={text.trim() === ''}>
+            {importLabel(text)}
+          </button>
+        </div>
+      </form>
+      <DxfImports unit={unit} />
     </PanelSection>
   );
 }

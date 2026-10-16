@@ -4,7 +4,15 @@ import React, { useState } from 'react';
 import type { PlatformObject } from '@core/model/civil';
 import { useStore } from '@ui/store';
 import { PanelSection, FormError, StatusLine } from '@ui/panels/PanelParts';
-import { CivilObjectSelect, useCivilObjects, NumberTextField, PointsFromSelectionRow, TextField, useChosenId } from './CivilParts';
+import {
+  CivilObjectSelect,
+  useCivilObjects,
+  NumberTextField,
+  PointsFromSelectionRow,
+  TextField,
+  useChosenId,
+  type CivilStepState,
+} from './CivilParts';
 import { optionalNumber, parseNumber, optionalText } from '@ui/numberText';
 import { parsePoints } from './civilInput';
 import { useFormValues } from '@ui/panels/useFormValues';
@@ -54,7 +62,7 @@ function CompareSurfaces(): React.ReactElement {
   );
 }
 
-export function EarthworksSection(): React.ReactElement {
+export function EarthworksSection({ defaultOpen = true, done = false }: Partial<CivilStepState>): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
   const surfaces = useCivilObjects('surface');
   const platforms = useCivilObjects('platform');
@@ -92,8 +100,17 @@ export function EarthworksSection(): React.ReactElement {
       count={platforms.length}
       countLabel={`${platforms.length} platforms`}
       collapsible
+      defaultOpen={defaultOpen}
+      done={done}
       testId="civil-earthworks"
     >
+      {platforms.length > 0 && (
+        <ul className="civil-list" aria-label="Platforms">
+          {platforms.map((platform) => (
+            <PlatformRow key={platform.id} platform={platform} />
+          ))}
+        </ul>
+      )}
       <form className="civil-form" onSubmit={handleSubmit} aria-label="Add platform">
         <PointsFromSelectionRow
           {...field('outline')}
@@ -104,23 +121,16 @@ export function EarthworksSection(): React.ReactElement {
           <CivilObjectSelect objects={surfaces} value={surfaceId} label="Platform surface" onChange={setSurface} />
         </PointsFromSelectionRow>
         <div className="building-inline-form">
-          <NumberTextField {...field('elevation')} hint="Pad elevation" label="Platform elevation" />
-          <NumberTextField {...field('cutSlope')} hint="Cut H:1V (1.5)" label="Cut slope" />
-          <NumberTextField {...field('fillSlope')} hint="Fill H:1V (2)" label="Fill slope" />
-          <TextField {...field('name')} hint="Name" label="Platform name" />
+          <NumberTextField {...field('elevation')} hint="e.g. 52.40" label="Platform elevation" />
+          <NumberTextField {...field('cutSlope')} hint="H:1V, default 1.5" label="Cut slope" />
+          <NumberTextField {...field('fillSlope')} hint="H:1V, default 2" label="Fill slope" />
+          <TextField {...field('name')} hint="optional" label="Platform name" />
           <button type="submit" className="btn btn--primary btn--sm" disabled={surfaceId === ''}>
             Add platform
           </button>
         </div>
         <FormError text={error} />
       </form>
-      {platforms.length > 0 && (
-        <ul className="civil-list" aria-label="Platforms">
-          {platforms.map((platform) => (
-            <PlatformRow key={platform.id} platform={platform} />
-          ))}
-        </ul>
-      )}
       {surfaces.length > 1 && <CompareSurfaces />}
     </PanelSection>
   );

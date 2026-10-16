@@ -26,6 +26,7 @@ import { useRenderQuality } from './useRenderQuality';
 import { AdaptiveClipping, CameraReactor, OrbitSettle, sphericalToCartesian } from './CameraRig';
 import { GROUND_PLANE_ROTATION, SceneLighting } from './SceneLighting';
 import { MechanismOverlay } from './MechanismOverlay';
+import { DynamicsLoadsOverlay } from './DynamicsLoadsOverlay';
 import { useViewportPalette } from '@ui/viewport/viewportPalette';
 import { StoreInvalidator, ViewportStoreInvalidator } from '../StoreInvalidator';
 import { LiveFxCamera } from '../liveFx/LiveFxCamera';
@@ -117,6 +118,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         <TransformGizmo mode={gizmoMode} onDraggingChanged={onDraggingChanged} />
         <MeasureBBoxWireframe />
         <MechanismOverlay />
+        <DynamicsLoadsOverlay />
         <DimensionLens />
       </group>
 

@@ -17,8 +17,19 @@ describe('CivilPanel', () => {
     fireEvent.change(screen.getByLabelText('Survey format'), { target: { value: 'PNEZD' } });
     fireEvent.change(screen.getByLabelText('Survey unit'), { target: { value: 'mm' } });
     fireEvent.change(screen.getByLabelText('Point group name'), { target: { value: 'Topo' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Import points' }));
+    fireEvent.click(screen.getByRole('button', { name: `Import ${SURVEY.trim().split('\n').length} lines` }));
     expect(dispatch).toHaveBeenCalledWith('import_survey_points', { text: SURVEY, format: 'PNEZD', sourceUnit: 'mm', name: 'Topo' });
+  });
+  it('opens the steps that hold objects and the next step to do, ticks the done ones, and collapses the rest', () => {
+    surveyed();
+    render(<CivilPanel />);
+    const expanded = (testId: string): string | null =>
+      screen.getByTestId(testId).querySelector('.panel__section-header')?.getAttribute('aria-expanded') ?? null;
+    expect(['civil-survey', 'civil-terrain', 'civil-earthworks'].map(expanded)).toEqual(['true', 'true', 'true']);
+    expect(['civil-crs', 'civil-roads', 'civil-drainage'].map(expanded)).toEqual(['false', 'false', 'false']);
+    expect(screen.getByLabelText('Step 1 (done):')).toBeInTheDocument();
+    expect(screen.getByLabelText('Step 2 (done):')).toBeInTheDocument();
+    expect(screen.getByLabelText('Step 3:')).toBeInTheDocument();
   });
   it('lists the imported point group and the surface report', () => {
     localDispatch('import_survey_points', { text: SURVEY, name: 'Topo' });
@@ -76,6 +87,8 @@ describe('CivilPanel', () => {
     surveyed();
     const dispatch = spyDispatch();
     render(<CivilPanel />);
+    fireEvent.click(screen.getByRole('button', { name: /Roads/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Drainage/ }));
     fireEvent.change(screen.getByLabelText('Alignment points'), { target: { value: '0,0; 10,5; 20,0' } });
     fireEvent.change(screen.getByLabelText('Curve radii'), { target: { value: '15' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add alignment' }));

@@ -20,7 +20,7 @@ describe('layoutStore', () => {
     useLayoutStore.getState().toggleInspector();
     expect(useLayoutStore.getState().inspectorOpen).toBe(false);
     const stored: unknown = JSON.parse(localStorage.getItem('llull-layout') ?? '{}');
-    expect(stored).toMatchObject({ inspectorOpen: false, sidebarTab: 'layers' });
+    expect(stored).toMatchObject({ inspectorOpen: false, sidebarTab: 'objects' });
   });
   it('toggles the sidebar', () => {
     useLayoutStore.getState().toggleSidebar();
@@ -33,7 +33,7 @@ describe('layoutStore — persisted layout parsing', () => {
     localStorage.setItem('llull-layout', JSON.stringify({ sidebarTab: 'nope', sidebarOpen: 3 }));
     vi.resetModules();
     const fresh = await import('@ui/store/layoutStore');
-    expect(fresh.useLayoutStore.getState().sidebarTab).toBe('layers');
+    expect(fresh.useLayoutStore.getState().sidebarTab).toBe('objects');
     // Lens: the browser panel starts closed (rail only); properties float in with a selection.
     expect(fresh.useLayoutStore.getState().sidebarOpen).toBe(false);
     localStorage.setItem('llull-layout', '{not json');

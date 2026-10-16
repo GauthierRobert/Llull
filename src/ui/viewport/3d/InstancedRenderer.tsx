@@ -80,10 +80,12 @@ function InstanceBatchMesh({ batch, selectionSet, displayMode, onSelect }: Insta
     [displayMode, batch.pbrMaterial],
   );
 
+  // `args` changing (display mode → material, geometry, count) makes r3f construct a NEW InstancedMesh with identity
+  // matrices and no colors: rewrite whenever any of them changes, not just the batch.
   useEffect(() => {
     const mesh = meshRef.current;
     if (mesh) writeBatchInstances(mesh, batch, selectionSet);
-  }, [batch, selectionSet]);
+  }, [batch, selectionSet, geometry, material, count]);
 
   // InstancedMesh has no per-instance opacity: in x-ray, any selected entity raises the whole batch's opacity.
   useEffect(() => {

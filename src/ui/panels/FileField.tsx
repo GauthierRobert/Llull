@@ -1,20 +1,32 @@
-// File input (optionally labelled) handing the file over as text or `File`; clears itself so re-picks fire.
+// File picker as one compact button (label + accepted extensions, then the picked file's name) handing the file over as text or `File`;
+// the native input is visually hidden inside the label and clears itself so re-picks fire.
 
-import React from 'react';
+import React, { useState } from 'react';
 import { readChosenFile, takeChosenFile } from '@ui/chosenFile';
+import { Icon } from '@ui/components/Icon';
 
 interface FileFieldBase {
-  /** Visible label; omitted = the bare input. */
+  /** Button text; omitted = "Choose file". */
   label?: string;
   accept: string;
   ariaLabel: string;
+  /** Tooltip, e.g. what the import does with the file. */
+  title?: string;
 }
 
 type FileFieldProps = FileFieldBase &
   ({ onText: (text: string, fileName: string) => void; onFile?: never } | { onFile: (file: File) => void; onText?: never });
 
-export function FileField({ label, accept, ariaLabel, ...handlers }: FileFieldProps): React.ReactElement {
+/** "Survey DXF" already says what `.dxf` would. */
+function namesFormat(label: string | undefined, accept: string): boolean {
+  const text = (label ?? '').toLowerCase();
+  return accept.split(',').every((extension) => text.includes(extension.replace('.', '').toLowerCase()));
+}
+
+export function FileField({ label, accept, ariaLabel, title, ...handlers }: FileFieldProps): React.ReactElement {
+  const [picked, setPicked] = useState('');
   const onChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
+    setPicked(event.target.files?.[0]?.name ?? '');
     if (handlers.onText !== undefined) {
       readChosenFile(event, handlers.onText);
       return;
@@ -22,12 +34,14 @@ export function FileField({ label, accept, ariaLabel, ...handlers }: FileFieldPr
     const file = takeChosenFile(event);
     if (file) handlers.onFile(file);
   };
-  const input = <input type="file" accept={accept} aria-label={ariaLabel} onChange={onChange} />;
-  if (label === undefined) return input;
   return (
-    <label className="field">
-      <span>{label}</span>
-      {input}
+    <label className="file-btn" title={title ?? `${label ?? 'Choose file'} (${accept})`}>
+      <input className="file-btn__input" type="file" accept={accept} aria-label={ariaLabel} onChange={onChange} />
+      <Icon name="open" size={13} />
+      <span className="file-btn__label">{label ?? 'Choose file'}</span>
+      {(picked !== '' || !namesFormat(label, accept)) && (
+        <span className="file-btn__meta">{picked !== '' ? picked : accept.split(',').join(' ')}</span>
+      )}
     </label>
   );
 }

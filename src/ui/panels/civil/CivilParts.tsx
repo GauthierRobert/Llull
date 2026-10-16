@@ -20,6 +20,12 @@ export function useCivilObjects<C extends CivilCategory>(category: C): Array<Ext
   );
 }
 
+/** A workflow-step section's start state, from CivilPanel: expanded (has content or is the next step) and done (has content). */
+export interface CivilStepState {
+  defaultOpen: boolean;
+  done: boolean;
+}
+
 interface CivilObjectRowProps {
   object: CivilObject;
   detail?: string;
@@ -99,8 +105,16 @@ interface CivilFieldProps {
   label: string;
 }
 
+/** Labelled field: the label stays visible above the input (the placeholder only hints the format or default). */
 function CivilInput({ value, set, hint, label, type }: CivilFieldProps & { type?: 'number' }): React.ReactElement {
-  return <input type={type} value={value} placeholder={hint} aria-label={label} onChange={(event) => set(event.target.value)} />;
+  return (
+    <label className="civil-field">
+      <span className="civil-field__label" title={label}>
+        {label}
+      </span>
+      <input type={type} value={value} placeholder={hint} aria-label={label} onChange={(event) => set(event.target.value)} />
+    </label>
+  );
 }
 
 export function TextField(props: CivilFieldProps): React.ReactElement {

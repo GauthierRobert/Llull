@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { useStore } from '@ui/store';
 import { PanelSection, StatusLine } from '@ui/panels/PanelParts';
 import { QueryDownloadButton } from '@ui/panels/QueryDownloadButton';
-import { CivilObjectRow, useCivilObjects, NumberTextField } from './CivilParts';
+import { CivilObjectRow, useCivilObjects, NumberTextField, type CivilStepState } from './CivilParts';
 import { ManholeForm, PipeForm } from './DrainageForms';
 import { optionalNumber } from '@ui/numberText';
 import { IDF_FIELDS, failuresOf, stormParams } from './civilRules';
@@ -92,7 +92,7 @@ function NetworkChecks(): React.ReactElement {
   );
 }
 
-export function DrainageSection(): React.ReactElement {
+export function DrainageSection({ defaultOpen = true, done = false }: Partial<CivilStepState>): React.ReactElement {
   const manholes = useCivilObjects('manhole');
   const pipes = useCivilObjects('pipe');
   const civil = useStore((s) => s.document.civil);
@@ -105,6 +105,8 @@ export function DrainageSection(): React.ReactElement {
       count={manholes.length + pipes.length}
       countLabel={`${manholes.length} manholes, ${pipes.length} pipes`}
       collapsible
+      defaultOpen={defaultOpen}
+      done={done}
       testId="civil-drainage"
     >
       <ManholeForm />

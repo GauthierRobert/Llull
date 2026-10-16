@@ -1,0 +1,153 @@
+/* Civil / Site panel — labelled two-column forms, file pickers, object cards */
+
+.civil-panel {
+  overflow-y: auto;
+}
+
+.civil-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0 var(--space-3) var(--space-2);
+}
+
+/* Fields sit on a two-column grid with their label above; actions take a full row. */
+.civil-panel .building-inline-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: var(--space-2);
+  padding: 0 var(--space-3) var(--space-2);
+}
+
+.civil-form .building-inline-form {
+  padding: 0;
+}
+
+.civil-panel .building-inline-form > .btn,
+.civil-panel .building-inline-form > .panel__error,
+.civil-panel .building-inline-form > .building-summary {
+  grid-column: 1 / -1;
+  justify-self: end;
+}
+
+.civil-panel .building-inline-form select,
+.civil-panel .building-inline-form input {
+  flex: none;
+  width: 100%;
+}
+
+.civil-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.civil-field__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
+  color: var(--fg-subtle);
+}
+
+.civil-field__hint {
+  grid-column: 1 / -1;
+  margin: -4px 0 0;
+  font-size: var(--text-2xs);
+  color: var(--fg-faint);
+}
+
+.civil-form textarea {
+  width: 100%;
+  height: auto;
+  min-height: 56px;
+  padding: 6px var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.civil-form > .file-btn {
+  align-self: flex-start;
+}
+
+/* Secondary imports: four compact pickers, two per row. */
+.civil-imports {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: var(--space-1) var(--space-3) var(--space-2);
+}
+
+.civil-imports .file-btn {
+  width: 100%;
+}
+
+.civil-imports__title {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.civil-imports > .building-summary {
+  grid-column: 1 / -1;
+  padding: 0;
+}
+
+/* Object list: one card per civil object (name, id, facts, its own editor). */
+.civil-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-1) var(--space-3) var(--space-2);
+  list-style: none;
+}
+
+.civil-row {
+  padding: 6px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.civil-row > .building-actions {
+  padding: 0;
+}
+
+.civil-row .panel__empty-hint {
+  max-width: none;
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--fg-subtle);
+}
+
+.civil-row__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--weight-medium);
+}
+
+.civil-row__name small {
+  font-family: var(--font-mono);
+  font-weight: var(--weight-regular, 400);
+  color: var(--fg-faint);
+}
+
+.civil-row .building-inline-form,
+.civil-row .civil-form {
+  padding: var(--space-2) 0 0;
+}
+
+.civil-status {
+  padding: 0 var(--space-3) var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+  overflow-wrap: anywhere;
+}

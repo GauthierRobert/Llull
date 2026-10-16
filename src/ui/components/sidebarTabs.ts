@@ -12,6 +12,7 @@ export interface SidebarTabSpec {
 }
 
 export const SIDEBAR_TAB_SPECS: readonly SidebarTabSpec[] = [
+  { tab: 'objects', label: 'Objects', shortLabel: 'Objects', icon: 'cube' },
   { tab: 'building', label: 'Building', shortLabel: 'Building', icon: 'building' },
   { tab: 'civil', label: 'Civil / Site', shortLabel: 'Site', icon: 'terrain' },
   { tab: 'layers', label: 'Layers', shortLabel: 'Layers', icon: 'layers' },

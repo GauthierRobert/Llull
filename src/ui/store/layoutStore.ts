@@ -6,6 +6,7 @@ import { isRecord } from '@lib/isRecord';
 import { readStored, writeStored } from './persistence';
 
 const SIDEBAR_TABS = [
+  'objects',
   'building',
   'civil',
   'layers',
@@ -35,7 +36,7 @@ interface PersistedLayout {
   inspectorOpen: boolean;
 }
 
-const DEFAULT_LAYOUT: PersistedLayout = { sidebarTab: 'layers', sidebarOpen: false, inspectorOpen: false };
+const DEFAULT_LAYOUT: PersistedLayout = { sidebarTab: 'objects', sidebarOpen: false, inspectorOpen: false };
 
 function isSidebarTab(value: unknown): value is SidebarTab {
   return SIDEBAR_TABS.some((tab) => tab === value);

@@ -99,6 +99,11 @@
   letter-spacing: 0;
 }
 
+.panel__step--done {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
 .panel__section-hint {
   margin: 0 0 var(--space-2);
   padding: 0 var(--space-3);
@@ -335,6 +340,62 @@
 
 .btn--block {
   width: 100%;
+}
+
+/* ---- File picker (FileField): a button-looking label over a visually hidden input ---- */
+
+.file-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  height: var(--control-h-sm);
+  padding: 0 var(--space-2);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.file-btn:hover {
+  background: var(--surface-2);
+  border-color: var(--accent-border);
+  color: var(--fg);
+}
+
+.file-btn:focus-within {
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 3px var(--accent-softer);
+}
+
+.file-btn__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.file-btn__label {
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.file-btn__meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--fg-faint);
 }
 
 /* ---- Forms -------------------------------------------------------------- */

@@ -4,7 +4,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { useLayoutStore } from '@ui/store';
 import { Sidebar } from '@ui/components/Sidebar';
 
-const TAB_LABELS = ['Building', 'Layers', 'Assembly', 'Mechanisms', 'Parameters', 'History', 'Configurations', 'Materials'];
+const TAB_LABELS = ['Objects', 'Building', 'Layers', 'Assembly', 'Mechanisms', 'Parameters', 'History', 'Configurations', 'Materials'];
 
 describe('Sidebar', () => {
   beforeEach(() => {
@@ -69,12 +69,12 @@ describe('Sidebar — keyboard', () => {
     expect(document.activeElement).toBe(screen.getByRole('tab', { name: /^Drawing sheets/ }));
     fireEvent.keyDown(document.activeElement as Element, { key: 'End' });
     expect(document.activeElement).toBe(screen.getByRole('tab', { name: /^Materials/ }));
-    const building = screen.getByRole('tab', { name: /^Building/ });
+    const objects = screen.getByRole('tab', { name: /^Objects/ });
     fireEvent.keyDown(document.activeElement as Element, { key: 'ArrowDown' });
-    expect(document.activeElement).toBe(building);
-    fireEvent.keyDown(building, { key: 'ArrowUp' });
+    expect(document.activeElement).toBe(objects);
+    fireEvent.keyDown(objects, { key: 'ArrowUp' });
     expect(document.activeElement).toBe(screen.getByRole('tab', { name: /^Materials/ }));
     fireEvent.keyDown(document.activeElement as Element, { key: 'Home' });
-    expect(document.activeElement).toBe(building);
+    expect(document.activeElement).toBe(objects);
   });
 });

@@ -14,7 +14,7 @@ import { pathToFileURL } from 'node:url';
 export function lintClaude(root = process.cwd()) {
   const errors = [];
   const claudeDir = join(root, '.claude');
-  const read = (path) => readFileSync(path, 'utf8');
+  const read = (path) => readFileSync(path, 'utf8').replace(/\r\n/g, '\n'); // CRLF checkouts (Windows autocrlf)
 
   const skills = readdirSync(join(claudeDir, 'skills')).filter((d) => statSync(join(claudeDir, 'skills', d)).isDirectory());
   for (const skill of skills) {

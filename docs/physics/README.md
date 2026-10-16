@@ -177,6 +177,7 @@ fabricated numbers, FR → VC mapping, AF-nn mapping). The additions below keep 
 | PHY-18 | `18-probabilistic-sensitivity` | `PRB` |
 | PHY-19 | `19-explicit-impact` | `EXP` |
 | PHY-20 | `20-vibroacoustics` | `VAC` |
+| PHY-21 | `21-functional-prototype` | `FPR` |
 
 Ids: `FR-THM-nn`, `TR-THM-nn`, `VC-THM-nn`; error codes `THM_<UPPER_SNAKE>` (AF-11).
 
@@ -244,6 +245,7 @@ re-run to byte-identical output; values are stored with 12 significant digits.
 | PHY-18 | Probabilistic & sensitivity | [spec](18-probabilistic-sensitivity/FUNCTIONAL_SPEC.md) | [spec](18-probabilistic-sensitivity/TECHNICAL_SPEC.md) | [pack](18-probabilistic-sensitivity/validation/README.md) | 41 (39 / 1 / 1) |
 | PHY-19 | Explicit impact (hand-off) | [spec](19-explicit-impact/FUNCTIONAL_SPEC.md) | [spec](19-explicit-impact/TECHNICAL_SPEC.md) | [pack](19-explicit-impact/validation/README.md) | 25 (21 / 4 / 0) |
 | PHY-20 | Vibro-acoustics (hand-off) | [spec](20-vibroacoustics/FUNCTIONAL_SPEC.md) | [spec](20-vibroacoustics/TECHNICAL_SPEC.md) | [pack](20-vibroacoustics/validation/README.md) | 19 (18 / 0 / 1) |
+| PHY-21 | Functional digital prototype (buildability gate, closed-loop piston engine, motion clearance, review UX; on the merged MuJoCo engine) | [spec](21-functional-prototype/FUNCTIONAL_SPEC.md) | [spec](21-functional-prototype/TECHNICAL_SPEC.md) | [pack](21-functional-prototype/validation/README.md) | 25 (25 / 0 / 0) + 4 behaviour cases |
 
 Total: 709 validation cases (629 A, 57 B, 23 C / TBD). Every generator is Python standard library
 only and re-runs byte-identical (`python3 -I <script>` from its `validation/` folder; re-checked by the coordinator).
