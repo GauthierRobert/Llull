@@ -11,7 +11,7 @@
  */
 
 import type { BooleanOp, Entity, MeshData, ShapeRecipe, Vec3 } from '../model/types';
-import type { GeometryKernel, ShapeHandle, ShapeTopology } from './kernel';
+import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, ShapeTopology } from './kernel';
 import { recipeKey } from './shapeRecipe';
 import { errorMessage } from '../lib/errorMessage';
 
@@ -20,6 +20,8 @@ import { errorMessage } from '../lib/errorMessage';
  * returned native exactly once).
  */
 export interface KernelOps<S> {
+  /** Kernel name exposed as `GeometryKernel.name`. */
+  readonly name?: string;
   /** Recipe ops this kernel cannot perform at all (a capability gap, not a refusal of one input). */
   readonly unsupported?: ReadonlySet<ShapeRecipe['op']>;
   /** Grows whenever the native module may have been left degraded (cached failures are then retried). */
@@ -39,6 +41,10 @@ export interface KernelOps<S> {
   tessellate(shape: S): MeshData | null;
   topology(shape: S): ShapeTopology | null;
   exportStep(shapes: readonly S[]): string | null;
+  /** Optional validity / lump report; a kernel without it leaves `GeometryKernel.analyze` undefined. */
+  analyze?(shape: S): ShapeAnalysis | null;
+  /** Optional minimum distance (searched up to `maxDistance`); a kernel without it leaves `GeometryKernel.distance` undefined. */
+  distance?(a: S, b: S, maxDistance: number): ShapeDistance | null;
   release(shape: S): void;
 }
 
@@ -191,7 +197,28 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
     if (!shapes.has(key)) throw new Error(`${SHAPE_NOT_CACHED}: ${key}`);
     return shapes.get(key) ?? null;
   };
+  const analyzeOps = ops.analyze?.bind(ops);
+  const distanceOps = ops.distance?.bind(ops);
   return {
+    ...(ops.name === undefined ? {} : { name: ops.name }),
+    ...(analyzeOps === undefined
+      ? {}
+      : {
+          analyze: (handle: ShapeHandle): ShapeAnalysis | null =>
+            call(() => {
+              const shape = nativeOf(handle);
+              return shape === null ? null : analyzeOps(shape);
+            }),
+        }),
+    ...(distanceOps === undefined
+      ? {}
+      : {
+          distance: (a: ShapeHandle, b: ShapeHandle, maxDistance: number): ShapeDistance | null =>
+            call(() => {
+              const [first, second] = [nativeOf(a), nativeOf(b)];
+              return first === null || second === null ? null : distanceOps(first, second, maxDistance);
+            }),
+        }),
     supports: (op) => !(ops.unsupported?.has(op) ?? false),
     evaluate: (recipe) => call(() => (evaluateNative(recipe) === null ? null : handleOf(recipe))),
     tessellate: (handle) =>

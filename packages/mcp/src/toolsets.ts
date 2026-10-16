@@ -7,7 +7,19 @@
 
 import { pluginToolNames } from '@core/plugins/host';
 
-export const TOOLSET_NAMES = ['core', '2d', '3d', 'measure', 'parametric', 'assembly', 'exchange', 'building', 'civil'] as const;
+export const TOOLSET_NAMES = [
+  'core',
+  '2d',
+  '3d',
+  'measure',
+  'parametric',
+  'assembly',
+  'analysis',
+  'review',
+  'exchange',
+  'building',
+  'civil',
+] as const;
 
 export type ToolsetName = (typeof TOOLSET_NAMES)[number];
 
@@ -32,6 +44,8 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
     'create_component insert_instance explode_instance bill_of_materials add_joint delete_joint set_joint_value add_drive_relation delete_drive_relation evaluate_motion bake_motion motion_study animate stop_animation ' +
       'add_rigid_body add_body_joint add_gear_coupling add_motor add_propeller set_gravity delete_dynamics_item inspect_dynamics simulate_motion',
   ),
+  analysis: words('check_assembly'),
+  review: words('allow_interference remove_interference_intent set_part_grounded'),
   exchange: words(
     'export_stl export_obj export_gltf export_step_exact export_code apply_code_trace import_mesh import_dxf export_step import_step import_dwg import_code',
   ),
