@@ -671,7 +671,9 @@ within its 2.5 w. MVP is about 12 weeks of agent lane time. M1 and M2 run in par
      these laws run in `loads(state)`. Extract to a plugin package when a second engine domain appears or a plugin
      force-law extension point exists; with the folder boundary that is a move.
    - `add_propeller` stays where it is; it moves with the engine folder if that is extracted.
-4. **Kernel interface growth** (`analyze`, `distance`, face axes): core-owner approval for the L9 contract change.
+4. **Kernel interface growth. Decided 2026-10-16 (owner): approved.** Optional `analyze` and `distance` plus face
+   axes on `GeometryKernel` (§5.1, TR-FPR-01/02), as built in FPR-A. A kernel returning null makes the dependent
+   items `not_run`.
 5. **Human gate before 09 PLM. Decided 2026-10-16 (owner): no sign-off in the MVP.**
    - `sign_prototype_review`, `SignOffBar` (FR-FPR-33, the sign button of FR-FPR-58) and `FPR_SIGNOFF_BLOCKED` are
      deferred until 09's signature path exists.
@@ -681,8 +683,8 @@ within its 2.5 w. MVP is about 12 weeks of agent lane time. M1 and M2 run in par
 6. **Reference engine geometry.** The user's existing propeller model was not found in the repo. Use the
    single-cylinder demonstrator (validation/README §4) for MVP and a Rotax-912-class 4-cylinder for V1? Engine data
    that is not public (rod length, masses, pressure trace) stays stated test input, `unverified`.
-7. **MuJoCo version.** Stay on 3.14.0 (weld-torque fix included [C-R7]) or move to 3.16.0? Proposal: stay, and
-   re-run VC-10…17 on any upgrade.
+7. **MuJoCo version. Decided 2026-10-16 (owner): migrate to the latest (3.16.0).** Done after FPR-B merges, as its
+   own change (`packages/physics-mujoco` and `server` pins together), re-running VC-FPR-10…17 and the dynamics suite.
 8. **Friction equations. Decided 2026-10-16 (owner): skipped for now, no source available.**
    - The PNH / Sandoval–Heywood forms in note E were reconstructed from an OCR scan [E-R9] and are unchecked
      against SAE 890836 / 2003-01-0725 or Heywood ch. 13.

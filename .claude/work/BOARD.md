@@ -84,10 +84,13 @@ Agents are isolated; coordination is structural, run by the orchestrator:
 - `[WIP]` **FPR-B** Physically connected mechanism (FUNCTIONAL_SPEC §5.2, TECHNICAL_SPEC M2 + M3): closed loops + `spherical`, MJCF `connect`, solver settings, reactions + residual, mobility in `inspect_dynamics`, `FPR_LOOP_OPEN`; `add_cylinder_pressure` (table, Wiebe, single-zone), engine report, `engine_quick_check`; VC-FPR-10…17, 20, 21. Brake calibration (`calibrate_brake`) waits on FPR-E losses. _Lane 1 + physics. branch `feat/phy21-loops` (worktree `../Llull-phy21b`)._
 - `[TODO]` **FPR-C** `check_motion_clearance`. _deps: FPR-A, FPR-B._
 - `[TODO]` **FPR-E** Realism (M3b): accuracy envelope, sourced materials, losses, brake calibration, gear efficiency, propeller table, references. _deps: FPR-B._
-- `[TODO]` **FPR-D** Review tab + `check_prototype` + dispositions/sign-off. _deps: FPR-A…E._
+- `[TODO]` **FPR-D** Review tab wiring + `check_prototype` + dispositions (no sign-off in the MVP, §11 Q5). _deps: FPR-A…E, FPR-UI2._
+- `[WIP]` **FPR-UI1** `SeriesChart` (generalises `SpeedChart`), `TimelineDock` (cursor, time/crank axis in `dynamicsPlaybackStore`), Okabe-Ito tokens. _Lane 2, `src/ui` only. deps: —._
+- `[WIP]` **FPR-UI2** Review tab on fixtures: `ReviewPanel`, `ReadinessChecklist`, `FindingsList`, `ExplainDrawer` against the §3.4 envelope; "fail (accepted)", no sign-off bar. _Lane 2, `src/ui` only. deps: FPR-UI1._
+- `[TODO]` **FPR-MJ** MuJoCo 3.14.0 → 3.16.0 (§11 Q7), re-run VC-FPR-10…17. _deps: FPR-B._
 
 ## Pillar A — Procedural / computed geometry (Lane 1 cmd + Lane 2 render) — HIGHEST LEVERAGE
-- `[TODO]` **VPG2/VPG3** Render branches / draw affordances for involute + chain-path entities. _Lane 2/3. deps: PG2 (involute renders today as a `polyline` — VPG2 = tangent/normal overlay polish) / PG3._
+- `[WIP]` **VPG2/VPG3** Render branches / draw affordances for involute + chain-path entities. _Lane 2/3. deps: PG2 (involute renders today as a `polyline` — VPG2 = tangent/normal overlay polish) / PG3._
 
 ## Done / removed task ids
 W0-1 · W0-2 · A1 · A2 · A3 · A6 · A4-core · A4-ui · R1 · A5 · B1 · B2 · B3 · H1 · H2 · C1 · C2 · C3 · E1 · E2 · D1 · D2 · D3 · F1 · F2 · F3 · G1 · G2 · G3 · I2 · I3 · W1 · N0 · N1 · VN1 · N2 · VN2 · K1 · K2 · K3 · U1 · U2 · U3 · U4 · S1 · VS1 · S2 · VS2 · S4 · T1 · VT1 · T2 · VT2-nits · VT2 · M1 · M2 · L1 · L2 · Q1 · Q2 · Q4 · Q3 · VQ · X1 · X2 · JX · P1 · P2 · P3 · P4 · V1 · V2 · V3 · V4 · J1 · J2 · J3 · AI1 · AI2 · AI3 · AI4 · AI5 · AI6 · KI1-followup · KI1 · KI2 · KI3 · KI4 · KI5 · KI6 · NF1 · VNF1 · NF2 · NF4 · VNF4 · NF5 · NF6 · VNF6 · EN1 · EN2 · EN3 · EN4 · EN8 · EN9 · EN10 · W4A · W4B · W4C · W4D · W4E · W4H · W4F · W4G · W5A · W5B-cmd · W5B-viewport + VN2 · W5C+W5G · W5G-coast · W5D · W5E · W5F · W5H · PG1 · PG2 · PG3 · VPG1 · KN1 · KN2 · MG0.1 · MG0.2 · MG0.3 · MG0.4 · MG1.1 · MG1.2 · MG1.3 · MG1.4 · MG1.5 · MG2.1 · MG2.2 · MG2.3 · MG2.4 · MG3.1 · MG3.2 · MG3.3 · MG4.1 · MG4.2 · MG4.3 · MG4.4 · MG4.5 · MG5.1 · MG5.2 · MG5.3 · MG5.4 · MG6.1 · MG6.2 · MG6.3 · MG6.4 · MG6.5
