@@ -1,0 +1,27 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_sphere",
+  "params": {
+   "radius": 25.0,
+   "position": [
+    10.0,
+    20.0,
+    30.0
+   ]
+  },
+  "as": "part"
+ },
+ {
+  "command": "set_entity_name",
+  "params": {
+   "id": "$part",
+   "name": "xch-sphere-offset"
+  }
+ }
+]

@@ -1,0 +1,43 @@
+[
+ {
+  "command": "add_torus",
+  "params": {
+   "ringRadius": 5,
+   "tubeRadius": 2
+  },
+  "as": "t"
+ },
+ {
+  "command": "analyze_surface_curvature",
+  "params": {
+   "id": "$t",
+   "faceIndex": 0,
+   "samples": [
+    [
+     0.4,
+     0.0
+    ],
+    [
+     0.4,
+     1.5707963
+    ],
+    [
+     0.4,
+     3.1415927
+    ]
+   ]
+  }
+ },
+ {
+  "command": "analyze_draft",
+  "params": {
+   "id": "$t",
+   "pullDirection": [
+    0,
+    0,
+    1
+   ],
+   "minDraftDeg": 1.0
+  }
+ }
+]

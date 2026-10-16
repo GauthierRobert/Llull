@@ -1,0 +1,79 @@
+{
+  "schema": "llull-release-manifest/0.1",
+  "item": {
+    "partNumber": "LL-1001",
+    "name": "Bracket, hinge fitting",
+    "revision": "A",
+    "iteration": 2
+  },
+  "lifecycleState": "released",
+  "change": {
+    "eco": "ECO-0001",
+    "purpose": "initial-release"
+  },
+  "effectivity": [
+    {
+      "kind": "serial",
+      "from": 1
+    }
+  ],
+  "baseline": {
+    "id": "BL-PBL-0001",
+    "kind": "product"
+  },
+  "marking": {
+    "regime": "none",
+    "statement": "NLR-EXAMPLE - example marking only; classification is a user/legal decision",
+    "decidedBy": "u-0003"
+  },
+  "releasedAt": "2026-11-02T09:30:00Z",
+  "releasedBy": {
+    "userId": "u-0007",
+    "name": "J. Example",
+    "role": "design-authority"
+  },
+  "members": [
+    {
+      "path": "model/LL-1001_A.llull.json",
+      "role": "native-definition",
+      "mediaType": "application/json",
+      "canonical": true,
+      "sha256": "7e3943fb2961d30684cc53e19aa1f6486463e667890f34cecc45ceea78f3c24f",
+      "bytes": 1551
+    },
+    {
+      "path": "drawings/LL-1001_A_sheet1.svg",
+      "role": "drawing",
+      "mediaType": "image/svg+xml",
+      "canonical": false,
+      "sha256": "f087c7779e10c0328ca78eb8385c6c976d68818cc4d6a107bac47324e3db610b",
+      "bytes": 140
+    }
+  ],
+  "documentContentHash": "7e3943fb2961d30684cc53e19aa1f6486463e667890f34cecc45ceea78f3c24f",
+  "tool": {
+    "name": "llull",
+    "version": "TBD",
+    "kernel": "occt",
+    "schemaVersion": 2
+  },
+  "reviewRequired": [],
+  "unverified": [],
+  "manifestSha256": "444ca1de7b6dda3d597533ba0c22b5de864edc3782d9c40c13cd6ed39b4df43a",
+  "signatures": [
+    {
+      "alg": "Ed25519",
+      "keyId": "rfc8032-test-1",
+      "publicKey": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+      "meaning": "approval",
+      "signedAt": "2026-11-02T09:30:00Z",
+      "signer": {
+        "userId": "u-0007",
+        "name": "J. Example"
+      },
+      "signedContent": "UTF-8 canonical JSON of the manifest without manifestSha256 and signatures",
+      "signature": "78343a41b4ada2bc2148bdef1e8821ae05a8a19dbc3e826424c8393ca1d8fe90c52025118eae961eda0dde6baf569a12e80cef5682126f5d179b6b281b5f460c",
+      "WARNING": "RFC 8032 public TEST 1 key - test only, never trust in production"
+    }
+  ]
+}

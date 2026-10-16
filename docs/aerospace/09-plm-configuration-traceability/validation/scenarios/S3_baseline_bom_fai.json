@@ -1,0 +1,90 @@
+{
+  "id": "S3",
+  "title": "Assembly EBOM with part numbers/revisions, product baseline freeze + compare, as-built deviation per serial, AS9102 FAI skeleton",
+  "proves": ["VC-PLM-10", "VC-PLM-11", "VC-PLM-14", "VC-PLM-15"],
+  "given": {
+    "assembly": { "partNumber": "LL-3000", "name": "Hinge assembly", "revision": "A" },
+    "components": [
+      { "componentId": "comp-fitting", "partNumber": "LL-1001", "revision": "B", "instances": 2 },
+      { "componentId": "comp-pin", "partNumber": "LL-1002", "revision": "A", "instances": 1 },
+      { "componentId": "comp-bush", "partNumber": "LL-1003", "revision": "C", "instances": 2 }
+    ]
+  },
+  "steps": [
+    {
+      "n": 1,
+      "command": "engineering_bom",
+      "params": { "levels": "all" },
+      "expect": {
+        "readOnly": true,
+        "data.rows": [
+          { "level": 1, "partNumber": "LL-1001", "revision": "B", "quantity": 2, "state": "released" },
+          { "level": 1, "partNumber": "LL-1002", "revision": "A", "quantity": 1, "state": "released" },
+          { "level": 1, "partNumber": "LL-1003", "revision": "C", "quantity": 2, "state": "released" }
+        ],
+        "data.totalQuantity": 5,
+        "data.unreleasedChildren": 0
+      }
+    },
+    {
+      "n": 2,
+      "command": "create_baseline",
+      "params": { "id": "BL-PBL-0003", "name": "Hinge PBL", "kind": "product", "root": "LL-3000", "at": "2027-01-10T12:00:00Z", "by": "u-7" },
+      "expect": {
+        "plm.baselines.BL-PBL-0003.members.length": 4,
+        "plm.baselines.BL-PBL-0003.members[*]": "each { partNumber, revision, contentHash }",
+        "plm.baselines.BL-PBL-0003.hash": "sha256 of canonical JSON of the members array sorted by partNumber",
+        "refusedIf": "any member not released (in_work/in_review) -> 'create_baseline rejected: LL-xxxx rev Y is in_work'"
+      }
+    },
+    {
+      "n": 3,
+      "command": "compare_baselines",
+      "params": { "from": "BL-PBL-0003", "to": "WORKING" },
+      "given": "LL-1003 revised to D (in_work) after the baseline",
+      "expect": { "readOnly": true, "data.changed": [{ "partNumber": "LL-1003", "from": "C", "to": "D", "toState": "in_work" }], "data.added": [], "data.removed": [] }
+    },
+    {
+      "n": 4,
+      "command": "record_as_built",
+      "params": {
+        "serial": "SN-0007",
+        "partNumber": "LL-3000",
+        "asDesignedBaseline": "BL-PBL-0003",
+        "deviations": [{ "partNumber": "LL-1003", "installedRevision": "B", "authority": "RFV-0012 (request for variance, use-as-is)" }],
+        "at": "2027-02-01T08:00:00Z",
+        "by": "u-9"
+      },
+      "expect": {
+        "plm.asBuilt.SN-0007.deviations.length": 1,
+        "as_built_vs_as_designed(SN-0007).data.differences": [{ "partNumber": "LL-1003", "asDesigned": "C", "asBuilt": "B", "authority": "RFV-0012 (request for variance, use-as-is)" }]
+      }
+    },
+    {
+      "n": 5,
+      "command": "assign_characteristic_ids",
+      "params": { "sheetId": "sheet-LL-1001-1", "scheme": "sequential", "includeNotes": true },
+      "expect": {
+        "note": "Needs gap 03 (GD&T / PMI). Every dimension, tolerance, GD&T frame and drawing note gets a stable characteristic number (balloon).",
+        "data.characteristics[0].charNo": 1,
+        "idsStableAcrossRegenerate": true,
+        "renumberOnlyNewCharacteristics": true
+      }
+    },
+    {
+      "n": 6,
+      "command": "fai_report_skeleton",
+      "params": { "partNumber": "LL-1001", "revision": "B", "faiType": "partial", "reason": "ECO-0002 design change", "format": "json" },
+      "expect": {
+        "readOnly": true,
+        "data.form1.partNumber": "LL-1001",
+        "data.form1.drawingRevision": "B",
+        "data.form1.fullOrPartial": "partial",
+        "data.form1.reasonForPartial": "ECO-0002 design change",
+        "data.form3.rows": "only characteristics changed by ECO-0002 (partial FAI) - each { charNo, referenceLocation, characteristicDesignator, requirement, results: null }",
+        "data.form3.rows[*].results": null,
+        "mappingTable": "validation/as9102_field_mapping.csv"
+      }
+    }
+  ]
+}

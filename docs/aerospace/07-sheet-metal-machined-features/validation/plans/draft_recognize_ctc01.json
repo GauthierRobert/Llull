@@ -1,0 +1,13 @@
+{
+  "status": "DRAFT - recognize_features is PROPOSED in TECHNICAL_SPEC.md section 4. import_step exists today as an exchange tool (MCP / CLI), not a registry command, so it runs as a CLI step before the plan. It currently yields a mesh without brep; recognition needs gap 01 import_step_exact (TECHNICAL_SPEC M0), which should replace the import_step line once it exists.",
+  "expected": "expected_feature_recognition.json case VC-FTR-20 (CTC-01 baseline from step_feature_survey.json)",
+  "cli": [
+    "llull new --doc ctc01.llull.json --force",
+    "llull import_step file=docs/aerospace/07-sheet-metal-machined-features/validation/data/nist_ctc_01_asme1_ap242.stp --doc ctc01.llull.json",
+    "llull find_entities kind=mesh --doc ctc01.llull.json --json   # -> id of the imported solid, substituted for <ctc01> below",
+    "llull run draft_recognize_ctc01.plan.json --doc ctc01.llull.json --json"
+  ],
+  "plan": [
+    { "command": "recognize_features", "params": { "id": "<ctc01>", "kinds": ["hole", "pocket", "fillet", "chamfer"], "mergeSplitFaces": true } }
+  ]
+}

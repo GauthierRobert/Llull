@@ -1,0 +1,79 @@
+{
+ "about": "CalculiX CrunchiX test-suite decks and their reference outputs (.dat.ref / .frd.ref) used as round-trip and regression oracles for gap 05. Repository: https://github.com/Dhondtguido/CalculiX (GPL-2.0, test/README: 'compare' scripts diff .dat/.frd against the .ref files). Pinned to one commit; files are NOT redistributed in llull (GPL) - fetch by URL and check sha256. Values below were extracted by this gap's author from the pinned files on 2026-10-15.",
+ "repository": "https://github.com/Dhondtguido/CalculiX",
+ "commit": "fd588701edd6a92fde06e99b1bdf01f3b0f80f2c",
+ "license": "GPL-2.0 (LICENSE at the pinned commit, sha256 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643)",
+ "raw_base": "https://raw.githubusercontent.com/Dhondtguido/CalculiX/fd588701edd6a92fde06e99b1bdf01f3b0f80f2c/",
+ "units": "mm, N, s, t (E = 210000 MPa, rho = 7.8e-9 t/mm3 for steel decks)",
+ "cases": [
+  {
+   "id": "VC-FEA-40",
+   "deck": "test/beamp.inp",
+   "what": "cantilever 1 x 1 x 8 mm, C3D20R, fixed at z = 0, 9 nodal forces of 1 N in +y at z = 8 (total 9 N); *SECTION PRINT shear/moment",
+   "files": [
+    {"path": "test/beamp.inp", "sha256": "29bfbf72da8b752d9ea104ad2869e238b0a2de5d3975d10dc3e18189332b79d2", "bytes": 19312},
+    {"path": "test/beamp.dat.ref", "sha256": "8a2fcf42eeb7f7ef1661a622b48080b68341be3ca1561c128c8efdd1e0355d65", "bytes": 1302},
+    {"path": "test/beamp.frd.ref", "sha256": "df6bf671bb33567d874faa99c31142832ea4d40723039a2d2e627cc6e4c56c2c", "bytes": 34977}
+   ],
+   "reference_values": {
+    "section_S1_shear_N": 8.99964,
+    "section_S1_bending_moment_Nmm": 17.99943,
+    "tip_uy_mean_mm": 0.0876111,
+    "tip_uy_range_mm": [0.087556, 0.087688]
+   },
+   "analytic_comparison": "VC-FEA-10.a: P L^3/(3 E I) = 0.0877714 mm (-0.18 %); VC-FEA-10.d: M(z = 6) = 18 N.mm",
+   "used_for": ["FR-FEA-13 (FRD import)", "FR-FEA-16 (deck export round-trip: llull-written deck of the same model must reproduce the .ref values within 1e-4 rel)"]
+  },
+  {
+   "id": "VC-FEA-41",
+   "deck": "test/beamf.inp",
+   "what": "cantilever 1.0 (x) x 1.5 (y) x 8 mm, C3D20R, *FREQUENCY 10 modes, steel E 210000, nu 0.3, rho 7.8e-9",
+   "files": [
+    {"path": "test/beamf.inp", "sha256": "6981f48b9b6610a15786f467c01d980aae3363da934b67a675cdb8066c917a96", "bytes": 19108},
+    {"path": "test/beamf.dat.ref", "sha256": "8c1a26dc9935239306dcac007674ee67dc8136ed37ef469c5b7c6b2b39866925", "bytes": 3998},
+    {"path": "test/beamf.frd.ref", "sha256": "87ab67f902cd4be850f36f61656b182fed602eb3e67bfb3db3c4da83a9397232", "bytes": 158849}
+   ],
+   "reference_values": {"frequencies_Hz": [13096.03, 19319.52, 76839.71, 86955.23, 105963.6, 162998.5, 197645.0, 256161.0, 261139.5, 351862.3]},
+   "analytic_comparison": "VC-FEA-11.a: Euler-Bernoulli f1 (weak axis) = 13096.7 Hz (+0.005 %); 11.b strong axis 19645.1 Hz (+1.7 %, shear/rotary inertia); 11.c second weak-axis bending 82075.8 Hz (+6.8 %; pairing with CalculiX mode 3 is TBD until the mode shape in beamf.frd.ref is checked, a torsion mode is estimated near 85 kHz)",
+   "used_for": ["FR-FEA-19 (modal)", "FR-FEA-13 (FRD eigenmode blocks)"]
+  },
+  {
+   "id": "VC-FEA-42",
+   "deck": "test/beamb.inp",
+   "what": "same 1 x 1.5 x 8 mm beam, fixed at z = 0, *BUCKLE with -1 N (z) on two corner nodes (5, 6) of the free end",
+   "files": [
+    {"path": "test/beamb.inp", "sha256": "d22da5b46c0af7518a28822eb828de9887e7c9a3f24b694d6478a7ce29fc7304", "bytes": 19405},
+    {"path": "test/beamb.dat.ref", "sha256": "c4125a2b8eb2456a5cb15c7ebab62ecd3185a1db32bd72e6a334ac4f567e2360", "bytes": 381}
+   ],
+   "reference_values": {"buckling_factors": [48.15456, 106.3175, 393.4026, 780.7062, 927.9968, 1490.897, 1595.536, 1986.459, 1991.373, 2177.302]},
+   "analytic_comparison": "NOT an analytic oracle: Euler fixed-free P_cr = pi^2 E I_min / (4 L^2) = 1012 N total (factor 506 per 1 N node load) differs from 48.15 because the load is applied to two corner nodes of a quadratic element. Use only as a solver regression oracle (llull must parse the BUCKLING FACTOR block exactly).",
+   "used_for": ["FR-FEA-20 (buckling result parsing)"]
+  },
+  {
+   "id": "VC-FEA-43",
+   "deck": "test/simplebeam.inp",
+   "what": "one-element B32R cantilever, L = 10, 0.25 x 0.25 section, E = 1e7, tip load 1 in x",
+   "files": [
+    {"path": "test/simplebeam.inp", "sha256": "c936fa174b8ad3f9644ae4887bc362c8a277c2571a2998d639a264ffbff0a48b", "bytes": 467},
+    {"path": "test/simplebeam.dat.ref", "sha256": "b556d8252a8b1f091a33678550facbd076d613623243fd3ac69b308359f0fd3c", "bytes": 5298},
+    {"path": "test/simplebeam.frd.ref", "sha256": "a546256e25a2c1cd4ec25cc0d7f2fb3c66872ddb50eb6931c8b63f588a2c7d45", "bytes": 2220}
+   ],
+   "reference_values": {"tip_ux": 0.0922015},
+   "analytic_comparison": "P L^3/(3 E I) = 0.1024 (I = 0.25^4/12); the single expanded C3D20R element is ~10 % stiff. Demonstrates why FR-FEA-09 (mesh adequacy warning) exists; not an accuracy oracle.",
+   "used_for": ["FR-FEA-09 (one-element-through-span warning)", "FR-FEA-13 (2D/1D expanded FRD)"]
+  },
+  {
+   "id": "VC-FEA-44",
+   "deck": "test/shell1.inp + test/shellf.inp",
+   "what": "S8R / S8 cantilever shells with nodal thickness (static NLGEOM + thermal; modal + steady-state dynamics)",
+   "files": [
+    {"path": "test/shell1.inp", "sha256": "bf04a8e874b97edfcc45e3e8ef1e9446f19211b9d793dbb7dafec857235d5ab8", "bytes": 2218},
+    {"path": "test/shell1.dat.ref", "sha256": "473a61e34b11f8a71ff29c86d49034faa1cd271c6142ca21d0fcc699f70c111b", "bytes": 6951},
+    {"path": "test/shellf.inp", "sha256": "fba37209ba44455ee93fa5c8a59c57190030a0c7773eeec801554a89eb802590", "bytes": 2148},
+    {"path": "test/shellf.dat.ref", "sha256": "2afbc0fba143ed184a676093630b04fd682bc1207702048523b85e3e9b52bbe6", "bytes": 7037}
+   ],
+   "reference_values": "TBD - extract with the FRD/DAT parser of M3 (shell expansion to C3D20R per CalculiX manual)",
+   "used_for": ["FR-FEA-04 (shell idealization export *SHELL SECTION)"]
+  }
+ ]
+}

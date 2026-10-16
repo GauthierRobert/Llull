@@ -1,0 +1,52 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "in"
+  }
+ },
+ {
+  "command": "airfoil_from_naca",
+  "params": {
+   "designation": "0012",
+   "points": 161
+  },
+  "as": "af"
+ },
+ {
+  "command": "create_wing",
+  "params": {
+   "planform": {
+    "semiSpan": 63.63,
+    "rootChord": 21.941,
+    "taper": 0.45,
+    "sweepDeg": 45.0,
+    "sweepLocation": 0.25,
+    "dihedralDeg": 0.0
+   },
+   "sections": [
+    {
+     "airfoilId": "$af",
+     "span": 0.0,
+     "twistDeg": 0.0
+    },
+    {
+     "airfoilId": "$af",
+     "span": 63.63,
+     "twistDeg": 0.0
+    }
+   ],
+   "twistLocation": 0.25,
+   "loft": "linear",
+   "mirror": true,
+   "tip": "flat"
+  },
+  "as": "wing"
+ },
+ {
+  "command": "wing_properties",
+  "params": {
+   "id": "$wing"
+  }
+ }
+]

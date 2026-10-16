@@ -1,0 +1,367 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "m"
+  }
+ },
+ {
+  "command": "set_aircraft_frame",
+  "params": {
+   "datum": [
+    0,
+    0,
+    0
+   ],
+   "fsAxis": [
+    1,
+    0,
+    0
+   ],
+   "blAxis": [
+    0,
+    1,
+    0
+   ],
+   "wlAxis": [
+    0,
+    0,
+    1
+   ],
+   "units": "m"
+  }
+ },
+ {
+  "command": "loft_fuselage",
+  "params": {
+   "stations": [
+    {
+     "fs": 0.0,
+     "section": {
+      "type": "point",
+      "wl": 0.0
+     }
+    },
+    {
+     "fs": 0.5,
+     "section": {
+      "type": "conic",
+      "upper": {
+       "wlExtreme": 0.143892,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.143892,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.143892
+     }
+    },
+    {
+     "fs": 1.0,
+     "section": {
+      "type": "conic",
+      "upper": {
+       "wlExtreme": 0.232379,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.232379,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.232379
+     }
+    },
+    {
+     "fs": 1.5,
+     "section": {
+      "type": "conic",
+      "upper": {
+       "wlExtreme": 0.30175,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.30175,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.30175
+     }
+    },
+    {
+     "fs": 2.0,
+     "section": {
+      "type": "conic",
+      "upper": {
+       "wlExtreme": 0.357771,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.357771,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.357771
+     }
+    },
+    {
+     "fs": 2.5,
+     "section": {
+      "type": "conic",
+      "upper": {
+       "wlExtreme": 0.402964,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.402964,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.402964
+     }
+    },
+    {
+     "fs": 3.0,
+     "section": {
+      "type": "conic",
+      "upper": {
+       "wlExtreme": 0.438712,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.438712,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.438712
+     }
+    },
+    {
+     "fs": 3.5,
+     "section": {
+      "type": "conic",
+      "upper": {
+       "wlExtreme": 0.465855,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.465855,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.465855
+     }
+    },
+    {
+     "fs": 4.0,
+     "section": {
+      "type": "conic",
+      "upper": {
+       "wlExtreme": 0.484924,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.484924,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.484924
+     }
+    },
+    {
+     "fs": 4.5,
+     "section": {
+      "type": "conic",
+      "upper": {
+       "wlExtreme": 0.496245,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.496245,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.496245
+     }
+    },
+    {
+     "fs": 5.0,
+     "section": {
+      "type": "conic",
+      "upper": {
+       "wlExtreme": 0.5,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.5,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.5
+     }
+    },
+    {
+     "fs": 5.5,
+     "section": {
+      "type": "conic",
+      "upper": {
+       "wlExtreme": 0.496245,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.496245,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.496245
+     }
+    },
+    {
+     "fs": 6.0,
+     "section": {
+      "type": "conic",
+      "upper": {
+       "wlExtreme": 0.484924,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.484924,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.484924
+     }
+    },
+    {
+     "fs": 6.5,
+     "section": {
+      "type": "conic",
+      "upper": {
+       "wlExtreme": 0.465855,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.465855,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.465855
+     }
+    },
+    {
+     "fs": 7.0,
+     "section": {
+      "type": "conic",
+      "upper": {
+       "wlExtreme": 0.438712,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.438712,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.438712
+     }
+    },
+    {
+     "fs": 7.5,
+     "section": {
+      "type": "conic",
+      "upper": {
+       "wlExtreme": 0.402964,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.402964,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.402964
+     }
+    },
+    {
+     "fs": 8.0,
+     "section": {
+      "type": "conic",
+      "upper": {
+       "wlExtreme": 0.357771,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.357771,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.357771
+     }
+    },
+    {
+     "fs": 8.5,
+     "section": {
+      "type": "conic",
+      "upper": {
+       "wlExtreme": 0.30175,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.30175,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.30175
+     }
+    },
+    {
+     "fs": 9.0,
+     "section": {
+      "type": "conic",
+      "upper": {
+       "wlExtreme": 0.232379,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.232379,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.232379
+     }
+    },
+    {
+     "fs": 9.5,
+     "section": {
+      "type": "conic",
+      "upper": {
+       "wlExtreme": 0.143892,
+       "rho": 0.41421356
+      },
+      "lower": {
+       "wlExtreme": -0.143892,
+       "rho": 0.41421356
+      },
+      "wlMaxBreadth": 0.0,
+      "halfBreadth": 0.143892
+     }
+    },
+    {
+     "fs": 10.0,
+     "section": {
+      "type": "point",
+      "wl": 0.0
+     }
+    }
+   ],
+   "continuity": "G2"
+  },
+  "as": "fus"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$fus"
+  }
+ }
+]

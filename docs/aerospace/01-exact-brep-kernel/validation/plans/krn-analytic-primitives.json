@@ -1,0 +1,171 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    100,
+    50,
+    20
+   ],
+   "anchor": "min"
+  },
+  "as": "box"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 10,
+   "height": 40,
+   "anchor": "base-center",
+   "position": [
+    200,
+    0,
+    0
+   ]
+  },
+  "as": "cyl"
+ },
+ {
+  "command": "add_sphere",
+  "params": {
+   "radius": 25,
+   "position": [
+    300,
+    0,
+    0
+   ]
+  },
+  "as": "sph"
+ },
+ {
+  "command": "add_cone",
+  "params": {
+   "radius": 20,
+   "height": 60,
+   "position": [
+    400,
+    0,
+    0
+   ]
+  },
+  "as": "cone"
+ },
+ {
+  "command": "add_torus",
+  "params": {
+   "ringRadius": 40,
+   "tubeRadius": 8,
+   "position": [
+    550,
+    0,
+    0
+   ]
+  },
+  "as": "tor"
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    80,
+    60,
+    10
+   ],
+   "anchor": "min",
+   "position": [
+    0,
+    200,
+    0
+   ]
+  },
+  "as": "plate"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 12,
+   "height": 12,
+   "anchor": "base-center",
+   "position": [
+    40,
+    230,
+    -1
+   ]
+  },
+  "as": "drill"
+ },
+ {
+  "command": "boolean",
+  "params": {
+   "op": "subtract",
+   "a": "$plate",
+   "b": "$drill"
+  },
+  "as": "plateHole"
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    100,
+    50,
+    20
+   ],
+   "anchor": "min",
+   "position": [
+    70000,
+    0,
+    0
+   ]
+  },
+  "as": "boxStation"
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$box"
+  }
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$cyl"
+  }
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$sph"
+  }
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$cone"
+  }
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$tor"
+  }
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$plateHole"
+  }
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$boxStation"
+  }
+ }
+]

@@ -1,0 +1,39 @@
+[
+ {
+  "id": "tr1208",
+  "units": "in",
+  "root_chord": 21.941,
+  "semi_span": 63.63,
+  "taper": 0.45,
+  "sweep_c4_deg": 45.0,
+  "tip_chord": 9.87345,
+  "area_full": 2024.3534535000001,
+  "aspect_ratio": 8.000138301935127,
+  "mac": 16.67011609195402,
+  "y_mac": 27.79241379310345,
+  "published": {
+   "area_full": 2024.35,
+   "mac": 16.672,
+   "aspect_ratio": 8.02,
+   "source": "OpenVSP examples/vspaero_ex/Swept_Wing_API/README.md (NACA TR-1208 model)"
+  },
+  "derivation": "S = b (cr + ct) / 2 per side; MAC = 2/3 cr (1 + l + l^2) / (1 + l); y_MAC = b/3 (1 + 2 l) / (1 + l)"
+ },
+ {
+  "id": "trap_naca0012",
+  "units": "m",
+  "root_chord": 2.0,
+  "tip_chord": 1.0,
+  "semi_span": 5.0,
+  "sweep_le_deg": 0.0,
+  "section": "NACA 0012 (open TE, a4 = -0.1015)",
+  "area_planform_half": 7.5,
+  "mac": 1.5555555555555554,
+  "section_area_unit_chord_open": 0.08220999999999996,
+  "section_area_unit_chord_closed": 0.08170599999999996,
+  "volume_half_open_te": 0.9591166666666662,
+  "volume_half_closed_te": 0.9532366666666662,
+  "derivation": "V = A_unit * integral_0^b c(y)^2 dy = A_unit * b (cr^2 + cr ct + ct^2) / 3; exact for a ruled or two-section loft of homothetic sections; A_unit(NACA 00tt) = 10 t (0.2969*2/3 - 0.126/2 - 0.3516/3 + 0.2843/4 + a4/5)",
+  "tolerance_rel_volume": 0.0001
+ }
+]

@@ -1,0 +1,1683 @@
+{
+ "$comment": "Expected results for gap GDT validation cases. Values: (a) quoted, (b) derived (see the generator scripts), or TBD. Units mm unless stated. Assembled once from nist_pmi_census.json, stackup_reference.json and surface_texture_reference.json (numbers copied verbatim); if a generator output changes, update the matching case.",
+ "cases": [
+  {
+   "id": "VC-GDT-01",
+   "proves": [
+    "FR-GDT-01",
+    "FR-GDT-02",
+    "FR-GDT-04",
+    "FR-GDT-05",
+    "FR-GDT-06",
+    "FR-GDT-07",
+    "FR-GDT-09",
+    "FR-GDT-14",
+    "TR-GDT-02",
+    "TR-GDT-04",
+    "TR-GDT-05"
+   ],
+   "input": "draft_plan_gdt_plate.json (OCC kernel)",
+   "expected": [
+    {
+     "quantity": "datum features",
+     "value": 3,
+     "tolerance": 0,
+     "unit": "count",
+     "source": "plan (labels A,B,C)"
+    },
+    {
+     "quantity": "size dimensions",
+     "value": 2,
+     "tolerance": 0,
+     "unit": "count",
+     "source": "plan"
+    },
+    {
+     "quantity": "hole pattern count (nX)",
+     "value": 4,
+     "tolerance": 0,
+     "unit": "count",
+     "source": "plan: 4 facesNear on 4 distinct cylinders"
+    },
+    {
+     "quantity": "hole measured diameter",
+     "value": 6.6,
+     "tolerance": 1e-06,
+     "unit": "mm",
+     "source": "derived: add_cylinder radius 3.3 -> diameter 6.6"
+    },
+    {
+     "quantity": "bore measured diameter",
+     "value": 20.0,
+     "tolerance": 1e-06,
+     "unit": "mm",
+     "source": "derived: add_cylinder radius 10"
+    },
+    {
+     "quantity": "geometric tolerances",
+     "value": 4,
+     "tolerance": 0,
+     "unit": "count",
+     "source": "plan"
+    },
+    {
+     "quantity": "position FCF text (holes)",
+     "value": "⌖ | Ø0.3 Ⓜ | A | B | C",
+     "tolerance": "exact string",
+     "unit": "text",
+     "source": "TECHNICAL_SPEC §5.4 grammar"
+    },
+    {
+     "quantity": "surface texture items",
+     "value": 1,
+     "tolerance": 0,
+     "unit": "count",
+     "source": "plan"
+    },
+    {
+     "quantity": "saved views",
+     "value": 1,
+     "tolerance": 0,
+     "unit": "count",
+     "source": "plan"
+    },
+    {
+     "quantity": "check_pmi errors",
+     "value": 0,
+     "tolerance": 0,
+     "unit": "count",
+     "source": "plan is well-formed by construction"
+    },
+    {
+     "quantity": "datum A resolved surface",
+     "value": "plane",
+     "tolerance": "exact",
+     "unit": "enum",
+     "source": "point [30,10,0] lies on bottom face z=0 of box 120x80x12 (anchor min)"
+    },
+    {
+     "quantity": "datum B resolved surface",
+     "value": "plane",
+     "tolerance": "exact",
+     "unit": "enum",
+     "source": "point [60,0,6] lies on face y=0"
+    },
+    {
+     "quantity": "hole faces surface",
+     "value": "cylinder",
+     "tolerance": "exact",
+     "unit": "enum",
+     "source": "points at x=cx-3.3 lie on hole walls"
+    }
+   ]
+  },
+  {
+   "id": "VC-GDT-02",
+   "proves": [
+    "FR-GDT-02",
+    "TR-GDT-06"
+   ],
+   "input": "draft_plan_gdt_plate.json with the box thickness driven by parameter t (set_parameter t=12, size [120,80,'=t']), then set_parameter t=16",
+   "expected": [
+    {
+     "quantity": "PMI items resolving after t=16",
+     "value": "all 10 PMI items (3 datums, 2 sizes, 4 FCFs, 1 surface texture) and the saved view",
+     "tolerance": 0,
+     "unit": "count",
+     "source": "facesNear points remain on the same logical faces for 0<z<12 and z=0"
+    },
+    {
+     "quantity": "hole measured diameter after t=16",
+     "value": 6.6,
+     "tolerance": 1e-06,
+     "unit": "mm",
+     "source": "unchanged radius"
+    },
+    {
+     "quantity": "check_pmi errors after t=16",
+     "value": 0,
+     "tolerance": 0,
+     "unit": "count",
+     "source": "—"
+    }
+   ]
+  },
+  {
+   "id": "VC-GDT-03",
+   "proves": [
+    "FR-GDT-04",
+    "FR-GDT-06",
+    "FR-GDT-11",
+    "TR-GDT-05",
+    "TR-GDT-10"
+   ],
+   "input": "llull --doc v.llull.json --kernel occt run draft_plan_gdt_rejections.json --continue --json",
+   "expected": [
+    {
+     "action": "add_datum_feature A (first)",
+     "result": "accepted"
+    },
+    {
+     "action": "add_datum_feature A (second)",
+     "result": "rejected",
+     "summaryContains": "label 'A' is already used",
+     "code": "GDT_DATUM_DUPLICATE",
+     "remediationContains": "choose another letter or update_pmi the existing datum"
+    },
+    {
+     "action": "position with datum D",
+     "result": "rejected",
+     "summaryContains": "datum 'D' is not defined",
+     "code": "GDT_DATUM_UNDEFINED",
+     "remediationContains": "add_datum_feature with that label first"
+    },
+    {
+     "action": "flatness with MMC",
+     "result": "rejected",
+     "summaryContains": "MMC",
+     "code": "GDT_MC_ON_NON_FOS",
+     "remediationContains": "target a size dimension"
+    },
+    {
+     "action": "flatness zone 0",
+     "result": "rejected",
+     "summaryContains": "GDT_ZONE_NON_POSITIVE",
+     "code": "GDT_ZONE_NON_POSITIVE",
+     "remediationContains": "tolerance values are > 0 in document units"
+    },
+    {
+     "action": "datum B at [60,40,50]",
+     "result": "rejected",
+     "summaryContains": "GDT_POINT_NOT_ON_FACE",
+     "code": "GDT_POINT_NOT_ON_FACE",
+     "remediationContains": "pick a point on the face"
+    }
+   ],
+   "source": "logical consistency rules, TECHNICAL_SPEC §5.5"
+  },
+  {
+   "id": "VC-GDT-04",
+   "proves": [
+    "FR-GDT-01",
+    "FR-GDT-28"
+   ],
+   "input": "every PMI command, happy params",
+   "expected": [
+    {
+     "quantity": "input document deep-equal before/after",
+     "value": true,
+     "tolerance": "exact",
+     "unit": "bool",
+     "source": "architecture L3 'is pure' test"
+    }
+   ]
+  },
+  {
+   "id": "VC-GDT-05",
+   "proves": [
+    "FR-GDT-03",
+    "FR-GDT-10"
+   ],
+   "input": "plate; set_pmi_standard ISO_GPS then ASME_Y14.5_2018 with generalToleranceNote",
+   "expected": [
+    {
+     "quantity": "doc.pmi.standard",
+     "value": "ASME_Y14.5_2018",
+     "tolerance": "exact"
+    },
+    {
+     "quantity": "generalToleranceNote stored verbatim and printed in the sheet title block area",
+     "value": true
+    },
+    {
+     "quantity": "second identical call",
+     "value": "no-op"
+    }
+   ],
+   "source": "FR-GDT-03/10"
+  },
+  {
+   "id": "VC-GDT-06",
+   "proves": [
+    "FR-GDT-08",
+    "TR-GDT-04"
+   ],
+   "input": "plate; add_location_dimension from datum-B face (point [60,0,6]) to hole axis (point [16.7,20,6]), measure distance, basic: true; and from face y=0 to face y=80 ([60,80,6])",
+   "expected": [
+    {
+     "quantity": "plane to axis distance",
+     "value": 20.0,
+     "tolerance": 1e-09,
+     "unit": "mm",
+     "source": "derived: hole centre y=20"
+    },
+    {
+     "quantity": "plane to plane distance",
+     "value": 80.0,
+     "tolerance": 1e-09,
+     "unit": "mm",
+     "source": "derived: box depth 80"
+    },
+    {
+     "quantity": "basic flag rendered as boxed text",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": "VC-GDT-07",
+   "proves": [
+    "FR-GDT-22"
+   ],
+   "input": "V1: composite position FCF on the 4-hole pattern (upper Ø0.3 Ⓜ A B C, lower Ø0.1 Ⓜ A) + all-around profile on the outer faces",
+   "expected": [
+    {
+     "quantity": "compositeOf link",
+     "value": "lower segment references upper id"
+    },
+    {
+     "quantity": "check_pmi errors",
+     "value": 0
+    },
+    {
+     "quantity": "AP242 export contains ALL_AROUND_SHAPE_ASPECT",
+     "value": 1,
+     "unit": "count",
+     "source": "mapping table TECHNICAL_SPEC §6.1"
+    }
+   ]
+  },
+  {
+   "id": "VC-GDT-08",
+   "proves": [
+    "FR-GDT-23"
+   ],
+   "input": "V1: ISO_GPS document, size dimension Ø20 with sizeModifiers ['E']",
+   "expected": [
+    {
+     "quantity": "stored sizeModifiers",
+     "value": [
+      "E"
+     ]
+    },
+    {
+     "quantity": "rendered text contains the envelope symbol",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": "VC-GDT-09",
+   "proves": [
+    "FR-GDT-24"
+   ],
+   "input": "plate rebuilt in an inch document (set_units in, all lengths /25.4)",
+   "expected": [
+    {
+     "quantity": "hole measured diameter",
+     "value": 0.259842519685,
+     "tolerance": 1e-09,
+     "unit": "in",
+     "source": "6.6/25.4"
+    },
+    {
+     "quantity": "surface texture unit default",
+     "value": "uin under ASME when doc.units = in (TECH Q-7)",
+     "tolerance": "exact"
+    }
+   ]
+  },
+  {
+   "id": "VC-GDT-10",
+   "proves": [
+    "FR-GDT-15",
+    "TR-GDT-14"
+   ],
+   "input": "plate + create_sheet front/top/right + update_sheet pmiMode auto + export_sheet_svg",
+   "expected": [
+    {
+     "quantity": "TOP view placed PMI",
+     "value": [
+      "holeSize",
+      "boreSize",
+      "fcfPosHoles",
+      "fcfPosBore"
+     ],
+     "tolerance": "set equality",
+     "unit": "ids",
+     "source": "auto planes of cylinder features are perpendicular to the hole axis (+Z) -> parallel to the top view (TECHNICAL_SPEC §5.3, §5.8)"
+    },
+    {
+     "quantity": "FRONT view placed PMI",
+     "value": [
+      "fcfFlat",
+      "dA",
+      "st",
+      "dC"
+     ],
+     "tolerance": "set equality",
+     "unit": "ids",
+     "source": "normal ±Z (bottom face) and ±X (face x=0) -> auto plane with normal ±Y by the §5.3 tie-break order Z, X, Y"
+    },
+    {
+     "quantity": "RIGHT view placed PMI",
+     "value": [
+      "dB",
+      "fcfPerpB"
+     ],
+     "tolerance": "set equality",
+     "unit": "ids",
+     "source": "face y=0 (normal -Y) -> plane containing Y and Z, normal ±X (§5.3 tie-break)"
+    },
+    {
+     "quantity": "data.fits",
+     "value": true,
+     "tolerance": "exact",
+     "unit": "bool",
+     "source": "A3, auto scale"
+    }
+   ]
+  },
+  {
+   "id": "VC-GDT-11",
+   "proves": [
+    "FR-GDT-15"
+   ],
+   "input": "same sheet",
+   "expected": [
+    {
+     "quantity": "placed + skipped",
+     "value": "= number of PMI items whose solid is shown, per view (every item accounted for)",
+     "tolerance": 0,
+     "unit": "count",
+     "source": "KPI drawing completeness"
+    }
+   ]
+  },
+  {
+   "id": "VC-GDT-20",
+   "proves": [
+    "FR-GDT-20",
+    "TR-GDT-15"
+   ],
+   "input": "import_step_exact (gap 01; AP242 PMI transport gap 04) with the GDT PMI stage on each NIST file (nist_pmi_files.json)",
+   "rule": "for each category: imported + unattached + unmapped == census value (tolerance 0). geometricTolerancesTotal must match with unattached == 0 for CTC 01-05 (V1 acceptance); FTC/STC: ratchet via quality/corpus.json knownIssues",
+   "source": "nist_pmi_census.json (generated by generate_nist_pmi_census.py; ctc_01 cross-checked against an independent count: 3 datums, 9 dimensional_size, 6 tolerances [R30])",
+   "files": [
+    {
+     "id": "ctc_01",
+     "file": "nist_ctc_01_asme1_ap242-e1.stp",
+     "sha256": "036683e8358ac27d51a92c35362e175c91bc44d3b600a5c605fb496865edcd37",
+     "expected": {
+      "geometricTolerancesTotal": 6,
+      "byCharacteristic": {
+       "FLATNESS_TOLERANCE": 1,
+       "PERPENDICULARITY_TOLERANCE": 1,
+       "POSITION_TOLERANCE": 2,
+       "SURFACE_PROFILE_TOLERANCE": 2
+      },
+      "dimensionalSize": 9,
+      "dimensionalLocation": 3,
+      "datums": 3,
+      "datumFeatures": 3,
+      "datumSystems": 2,
+      "placedDatumTargets": 0,
+      "savedViews": 1
+     }
+    },
+    {
+     "id": "ctc_02",
+     "file": "nist_ctc_02_asme1_ap242-e2.stp",
+     "sha256": "99a0a2079ddeb64d05c2432cbe931fa17c89da60d8b0bcb0b11bd0ed94fa2e68",
+     "expected": {
+      "geometricTolerancesTotal": 22,
+      "byCharacteristic": {
+       "FLATNESS_TOLERANCE": 1,
+       "LINE_PROFILE_TOLERANCE": 1,
+       "PERPENDICULARITY_TOLERANCE": 3,
+       "POSITION_TOLERANCE": 4,
+       "SURFACE_PROFILE_TOLERANCE": 13
+      },
+      "dimensionalSize": 7,
+      "dimensionalLocation": 0,
+      "datums": 10,
+      "datumFeatures": 6,
+      "datumSystems": 14,
+      "placedDatumTargets": 9,
+      "savedViews": 3
+     }
+    },
+    {
+     "id": "ctc_03",
+     "file": "nist_ctc_03_asme1_ap242-e2.stp",
+     "sha256": "196b665776e759282f80fc8fb27d7bceb995df77cf78b7ce48347535a4d6cb5f",
+     "expected": {
+      "geometricTolerancesTotal": 13,
+      "byCharacteristic": {
+       "ANGULARITY_TOLERANCE": 1,
+       "FLATNESS_TOLERANCE": 1,
+       "PERPENDICULARITY_TOLERANCE": 2,
+       "POSITION_TOLERANCE": 6,
+       "SURFACE_PROFILE_TOLERANCE": 3
+      },
+      "dimensionalSize": 9,
+      "dimensionalLocation": 1,
+      "datums": 6,
+      "datumFeatures": 6,
+      "datumSystems": 6,
+      "placedDatumTargets": 0,
+      "savedViews": 1
+     }
+    },
+    {
+     "id": "ctc_04",
+     "file": "nist_ctc_04_asme1_ap242-e2.stp",
+     "sha256": "7eaea9d2cf417a73d20f8ee840a9d346b0ee5f558a4ab1bf2326a323bd423182",
+     "expected": {
+      "geometricTolerancesTotal": 7,
+      "byCharacteristic": {
+       "POSITION_TOLERANCE": 4,
+       "SURFACE_PROFILE_TOLERANCE": 3
+      },
+      "dimensionalSize": 7,
+      "dimensionalLocation": 3,
+      "datums": 8,
+      "datumFeatures": 8,
+      "datumSystems": 5,
+      "placedDatumTargets": 0,
+      "savedViews": 1
+     }
+    },
+    {
+     "id": "ctc_05",
+     "file": "nist_ctc_05_asme1_ap242-e1.stp",
+     "sha256": "7f04f14be27918d31aef5b6d9ff74d547382ad469e45495c5b710baaa772323d",
+     "expected": {
+      "geometricTolerancesTotal": 10,
+      "byCharacteristic": {
+       "CIRCULAR_RUNOUT_TOLERANCE": 3,
+       "CONCENTRICITY_TOLERANCE": 1,
+       "PERPENDICULARITY_TOLERANCE": 2,
+       "ROUNDNESS_TOLERANCE": 1,
+       "STRAIGHTNESS_TOLERANCE": 1,
+       "TOTAL_RUNOUT_TOLERANCE": 2
+      },
+      "dimensionalSize": 1,
+      "dimensionalLocation": 5,
+      "datums": 4,
+      "datumFeatures": 2,
+      "datumSystems": 5,
+      "placedDatumTargets": 2,
+      "savedViews": 2
+     }
+    },
+    {
+     "id": "ftc_06",
+     "file": "nist_ftc_06_asme1_ap242-e2.stp",
+     "sha256": "b87afb7f25adc0d44d12e182209d50f0b085b533c0742fb8ffd58f4c87403447",
+     "expected": {
+      "geometricTolerancesTotal": 28,
+      "byCharacteristic": {
+       "FLATNESS_TOLERANCE": 3,
+       "PERPENDICULARITY_TOLERANCE": 2,
+       "POSITION_TOLERANCE": 11,
+       "SURFACE_PROFILE_TOLERANCE": 12
+      },
+      "dimensionalSize": 14,
+      "dimensionalLocation": 10,
+      "datums": 10,
+      "datumFeatures": 6,
+      "datumSystems": 12,
+      "placedDatumTargets": 6,
+      "savedViews": 3
+     }
+    },
+    {
+     "id": "ftc_07",
+     "file": "nist_ftc_07_asme1_ap242-e2.stp",
+     "sha256": "aa8115c12e12a99cc439477cbfd222916f9ec629fbb3c9002b18e0c264c9a892",
+     "expected": {
+      "geometricTolerancesTotal": 27,
+      "byCharacteristic": {
+       "FLATNESS_TOLERANCE": 1,
+       "PARALLELISM_TOLERANCE": 1,
+       "PERPENDICULARITY_TOLERANCE": 1,
+       "POSITION_TOLERANCE": 12,
+       "SURFACE_PROFILE_TOLERANCE": 12
+      },
+      "dimensionalSize": 12,
+      "dimensionalLocation": 5,
+      "datums": 5,
+      "datumFeatures": 5,
+      "datumSystems": 5,
+      "placedDatumTargets": 0,
+      "savedViews": 16
+     }
+    },
+    {
+     "id": "ftc_08",
+     "file": "nist_ftc_08_asme1_ap242-e2.stp",
+     "sha256": "7b9283b4288d152fd181d76c39285d7c79fbba34fda1e14a41ac4a983f6d68b3",
+     "expected": {
+      "geometricTolerancesTotal": 33,
+      "byCharacteristic": {
+       "FLATNESS_TOLERANCE": 3,
+       "PARALLELISM_TOLERANCE": 5,
+       "PERPENDICULARITY_TOLERANCE": 1,
+       "POSITION_TOLERANCE": 13,
+       "SURFACE_PROFILE_TOLERANCE": 11
+      },
+      "dimensionalSize": 9,
+      "dimensionalLocation": 1,
+      "datums": 11,
+      "datumFeatures": 11,
+      "datumSystems": 9,
+      "placedDatumTargets": 0,
+      "savedViews": 12
+     }
+    },
+    {
+     "id": "ftc_08-tg",
+     "file": "nist_ftc_08_asme1_ap242-e4-tg.stp",
+     "sha256": "40cd4e5e2e02b5742e0884ba5b132f2e37d2215c45f57afb48962a05a060c384",
+     "expected": {
+      "geometricTolerancesTotal": 0,
+      "byCharacteristic": {},
+      "dimensionalSize": 0,
+      "dimensionalLocation": 0,
+      "datums": 0,
+      "datumFeatures": 0,
+      "datumSystems": 0,
+      "placedDatumTargets": 0,
+      "savedViews": 4
+     }
+    },
+    {
+     "id": "ftc_09",
+     "file": "nist_ftc_09_asme1_ap242-e1.stp",
+     "sha256": "f1215fe15a78085a9fa78dd81714caf774b59071be92580b04ebfdc19f52a1bd",
+     "expected": {
+      "geometricTolerancesTotal": 31,
+      "byCharacteristic": {
+       "FLATNESS_TOLERANCE": 1,
+       "PERPENDICULARITY_TOLERANCE": 4,
+       "POSITION_TOLERANCE": 23,
+       "SURFACE_PROFILE_TOLERANCE": 3
+      },
+      "dimensionalSize": 14,
+      "dimensionalLocation": 8,
+      "datums": 8,
+      "datumFeatures": 8,
+      "datumSystems": 8,
+      "placedDatumTargets": 0,
+      "savedViews": 23
+     }
+    },
+    {
+     "id": "ftc_10",
+     "file": "nist_ftc_10_asme1_ap242-e2.stp",
+     "sha256": "9d7711f48e81831c5d1838fdac5c11c0de1aa9b61f3c1d67930a7638b3b25e69",
+     "expected": {
+      "geometricTolerancesTotal": 40,
+      "byCharacteristic": {
+       "CYLINDRICITY_TOLERANCE": 2,
+       "FLATNESS_TOLERANCE": 1,
+       "PERPENDICULARITY_TOLERANCE": 6,
+       "POSITION_TOLERANCE": 19,
+       "STRAIGHTNESS_TOLERANCE": 1,
+       "SURFACE_PROFILE_TOLERANCE": 10,
+       "SYMMETRY_TOLERANCE": 1
+      },
+      "dimensionalSize": 19,
+      "dimensionalLocation": 7,
+      "datums": 11,
+      "datumFeatures": 11,
+      "datumSystems": 12,
+      "placedDatumTargets": 0,
+      "savedViews": 18
+     }
+    },
+    {
+     "id": "ftc_11",
+     "file": "nist_ftc_11_asme1_ap242-e3.stp",
+     "sha256": "2d05bd399463a9ced7b84a479872a759f170fe92f7a62f8194e83df77f86f117",
+     "expected": {
+      "geometricTolerancesTotal": 4,
+      "byCharacteristic": {
+       "CIRCULAR_RUNOUT_TOLERANCE": 1,
+       "FLATNESS_TOLERANCE": 1,
+       "ROUNDNESS_TOLERANCE": 1,
+       "SURFACE_PROFILE_TOLERANCE": 1
+      },
+      "dimensionalSize": 5,
+      "dimensionalLocation": 1,
+      "datums": 2,
+      "datumFeatures": 2,
+      "datumSystems": 1,
+      "placedDatumTargets": 0,
+      "savedViews": 9
+     }
+    },
+    {
+     "id": "stc_06",
+     "file": "nist_stc_06_asme1_ap242-e3.stp",
+     "sha256": "71777c28da76da0e8a667e4cbe792d5f72c09b5c56440c9744d3d50ca96ecc8d",
+     "expected": {
+      "geometricTolerancesTotal": 25,
+      "byCharacteristic": {
+       "FLATNESS_TOLERANCE": 3,
+       "PERPENDICULARITY_TOLERANCE": 2,
+       "POSITION_TOLERANCE": 9,
+       "SURFACE_PROFILE_TOLERANCE": 11
+      },
+      "dimensionalSize": 14,
+      "dimensionalLocation": 3,
+      "datums": 6,
+      "datumFeatures": 6,
+      "datumSystems": 9,
+      "placedDatumTargets": 0,
+      "savedViews": 12
+     }
+    },
+    {
+     "id": "stc_07",
+     "file": "nist_stc_07_asme1_ap242-e3.stp",
+     "sha256": "2dddf9b8894bc241f7ffddf3dc4502baa3d49c374e8784039d14b86473d54832",
+     "expected": {
+      "geometricTolerancesTotal": 22,
+      "byCharacteristic": {
+       "FLATNESS_TOLERANCE": 1,
+       "PARALLELISM_TOLERANCE": 1,
+       "PERPENDICULARITY_TOLERANCE": 1,
+       "POSITION_TOLERANCE": 9,
+       "SURFACE_PROFILE_TOLERANCE": 10
+      },
+      "dimensionalSize": 41,
+      "dimensionalLocation": 4,
+      "datums": 5,
+      "datumFeatures": 3,
+      "datumSystems": 5,
+      "placedDatumTargets": 0,
+      "savedViews": 4
+     }
+    },
+    {
+     "id": "stc_08",
+     "file": "nist_stc_08_asme1_ap242-e3.stp",
+     "sha256": "64f24b914910ce8e20c9e4bd59637b4fd155715c7c7b51689466534ed7db1442",
+     "expected": {
+      "geometricTolerancesTotal": 30,
+      "byCharacteristic": {
+       "FLATNESS_TOLERANCE": 3,
+       "PARALLELISM_TOLERANCE": 5,
+       "PERPENDICULARITY_TOLERANCE": 1,
+       "POSITION_TOLERANCE": 9,
+       "SURFACE_PROFILE_TOLERANCE": 12
+      },
+      "dimensionalSize": 7,
+      "dimensionalLocation": 0,
+      "datums": 8,
+      "datumFeatures": 8,
+      "datumSystems": 9,
+      "placedDatumTargets": 0,
+      "savedViews": 4
+     }
+    },
+    {
+     "id": "stc_09",
+     "file": "nist_stc_09_asme1_ap242-e4.stp",
+     "sha256": "41026b1f0d81830c6092b5147e0e084d2fa163169161c31af4ce06493d3c7d33",
+     "expected": {
+      "geometricTolerancesTotal": 27,
+      "byCharacteristic": {
+       "FLATNESS_TOLERANCE": 1,
+       "PERPENDICULARITY_TOLERANCE": 4,
+       "POSITION_TOLERANCE": 19,
+       "SURFACE_PROFILE_TOLERANCE": 3
+      },
+      "dimensionalSize": 13,
+      "dimensionalLocation": 7,
+      "datums": 8,
+      "datumFeatures": 6,
+      "datumSystems": 8,
+      "placedDatumTargets": 0,
+      "savedViews": 4
+     }
+    },
+    {
+     "id": "stc_10",
+     "file": "nist_stc_10_asme1_ap242-e2.stp",
+     "sha256": "fba4f46cab1ce1402362038036884631b4a41afe1c9efc5681d358c39db7ed5f",
+     "expected": {
+      "geometricTolerancesTotal": 37,
+      "byCharacteristic": {
+       "CYLINDRICITY_TOLERANCE": 2,
+       "FLATNESS_TOLERANCE": 1,
+       "PERPENDICULARITY_TOLERANCE": 6,
+       "POSITION_TOLERANCE": 17,
+       "STRAIGHTNESS_TOLERANCE": 1,
+       "SURFACE_PROFILE_TOLERANCE": 9,
+       "SYMMETRY_TOLERANCE": 1
+      },
+      "dimensionalSize": 25,
+      "dimensionalLocation": 2,
+      "datums": 9,
+      "datumFeatures": 9,
+      "datumSystems": 12,
+      "placedDatumTargets": 0,
+      "savedViews": 13
+     }
+    }
+   ]
+  },
+  {
+   "id": "VC-GDT-21",
+   "proves": [
+    "FR-GDT-21",
+    "TR-GDT-16"
+   ],
+   "input": "export_step_ap242 {includePmi:true} (gap 04) of the plate, then import_step_exact of the result",
+   "expected": [
+    {
+     "quantity": "round-trip PMI equality",
+     "value": "same kinds, characteristics, zone values, modifiers, datum order, size limits; facesNear re-resolve to the same surface types",
+     "tolerance": "values 1e-9 relative; counts exact",
+     "unit": "—",
+     "source": "self-consistency"
+    }
+   ]
+  },
+  {
+   "id": "VC-GDT-22",
+   "proves": [
+    "FR-GDT-21"
+   ],
+   "input": "NIST SFA sfa-cl on the exported plate",
+   "expected": [
+    {
+     "quantity": "SFA semantic PMI report",
+     "value": "TBD — measure with NIST SFA 5.51 (sfa-cl): expect 4 geometric tolerances, 2 dimensions, 3 datums, 0 errors",
+     "tolerance": "counts exact",
+     "unit": "count",
+     "source": "[R18]"
+    }
+   ]
+  },
+  {
+   "id": "VC-GDT-23",
+   "proves": [
+    "FR-GDT-14",
+    "FR-GDT-20"
+   ],
+   "input": "saved views on import",
+   "expected": [
+    {
+     "quantity": "saved views per NIST file",
+     "value": "= census savedViews (CAMERA_MODEL_D3)",
+     "tolerance": 0,
+     "unit": "count",
+     "source": "nist_pmi_census.json"
+    }
+   ]
+  },
+  {
+   "id": "VC-GDT-24",
+   "proves": [
+    "FR-GDT-12",
+    "FR-GDT-15",
+    "FR-GDT-20"
+   ],
+   "input": "production scenario: import FTC 06 -> list_pmi -> check_pmi -> sheet with pmiMode auto -> export_sheet_svg",
+   "expected": [
+    {
+     "quantity": "list_pmi geometric tolerances",
+     "value": 28,
+     "tolerance": "census rule of VC-GDT-20",
+     "unit": "count",
+     "source": "nist_pmi_census.json"
+    },
+    {
+     "quantity": "pipeline completes without throw",
+     "value": true,
+     "tolerance": "exact",
+     "unit": "bool",
+     "source": "—"
+    }
+   ]
+  },
+  {
+   "id": "VC-GDT-25",
+   "proves": [
+    "FR-GDT-25"
+   ],
+   "input": "V2 graphic PMI export",
+   "expected": [
+    {
+     "quantity": "SFA viewer shows llull annotations",
+     "value": "TBD — measure with NIST SFA viewer"
+    }
+   ]
+  },
+  {
+   "id": "VC-GDT-26",
+   "proves": [
+    "FR-GDT-26"
+   ],
+   "input": "V2 TDP bundle",
+   "expected": [
+    {
+     "quantity": "manifest lists AP242 + sheets with sha256 of each file",
+     "value": "TBD — structure to be defined against MIL-STD-31000B (licensed copy)"
+    }
+   ]
+  },
+  {
+   "id": "VC-GDT-27",
+   "proves": [
+    "FR-GDT-27"
+   ],
+   "input": "V2 zone visualisation of the flatness zone on datum A",
+   "expected": [
+    {
+     "quantity": "zone slab thickness",
+     "value": 0.05,
+     "tolerance": 1e-09,
+     "unit": "mm",
+     "source": "FCF value"
+    }
+   ]
+  },
+  {
+   "id": "VC-GDT-30",
+   "proves": [
+    "FR-GDT-16",
+    "TR-GDT-11"
+   ],
+   "input": "stackup_reference.json SU-01",
+   "expected": [
+    {
+     "quantity": "yMean",
+     "value": 0.15,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "worstCase.min",
+     "value": -0.09,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "worstCase.max",
+     "value": 0.39,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "worstCaseExactCorners.min",
+     "value": -0.09,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "worstCaseExactCorners.max",
+     "value": 0.39,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "rss.halfTolerance",
+     "value": 0.124096736,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "sigma",
+     "value": 0.041365579,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "monteCarlo.mean",
+     "value": 0.15,
+     "tolerance": 0.000462481,
+     "unit": "mm",
+     "note": "reference run seed 20261015 N 200000 gave 0.149976352"
+    },
+    {
+     "quantity": "monteCarlo.std",
+     "value": 0.041365579,
+     "tolerance": 0.000327024,
+     "unit": "mm",
+     "note": "reference run gave 0.041324357"
+    },
+    {
+     "quantity": "pBelowLowerLimit (analytic)",
+     "value": 0.000143809451,
+     "tolerance": 1e-12,
+     "unit": "probability",
+     "note": "normal CDF (exact: linear sum of independent normals)"
+    },
+    {
+     "quantity": "monteCarlo.pBelowLowerLimit",
+     "value": 0.000143809451,
+     "tolerance": 0.000134066,
+     "unit": "probability",
+     "note": "reference run gave 0.000135"
+    }
+   ],
+   "source": "derived analytically (generate_stackup_reference.py docstring)"
+  },
+  {
+   "id": "VC-GDT-31",
+   "proves": [
+    "FR-GDT-16",
+    "TR-GDT-11"
+   ],
+   "input": "stackup_reference.json SU-02",
+   "expected": [
+    {
+     "quantity": "yMean",
+     "value": 0.15,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "worstCase.min",
+     "value": -0.09,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "worstCase.max",
+     "value": 0.39,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "worstCaseExactCorners.min",
+     "value": -0.09,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "worstCaseExactCorners.max",
+     "value": 0.39,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "rss.halfTolerance",
+     "value": 0.124096736,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "sigma",
+     "value": 0.071647284,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "monteCarlo.mean",
+     "value": 0.15,
+     "tolerance": 0.000801041,
+     "unit": "mm",
+     "note": "reference run seed 20261015 N 200000 gave 0.149875325"
+    },
+    {
+     "quantity": "monteCarlo.std",
+     "value": 0.071647284,
+     "tolerance": 0.000566422,
+     "unit": "mm",
+     "note": "reference run gave 0.071557724"
+    },
+    {
+     "quantity": "pBelowLowerLimit (analytic)",
+     "value": 0.012083333333,
+     "tolerance": 1e-12,
+     "unit": "probability",
+     "note": "exact CDF of a sum of independent uniforms (inclusion-exclusion, generalised Irwin-Hall)"
+    },
+    {
+     "quantity": "monteCarlo.pBelowLowerLimit",
+     "value": 0.012083333333,
+     "tolerance": 0.001221542,
+     "unit": "probability",
+     "note": "reference run gave 0.01212"
+    }
+   ],
+   "source": "derived analytically (generate_stackup_reference.py docstring)"
+  },
+  {
+   "id": "VC-GDT-32",
+   "proves": [
+    "FR-GDT-16",
+    "TR-GDT-11"
+   ],
+   "input": "stackup_reference.json SU-03",
+   "expected": [
+    {
+     "quantity": "yMean",
+     "value": 0.024,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "worstCase.min",
+     "value": 0.007,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "worstCase.max",
+     "value": 0.041,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "worstCaseExactCorners.min",
+     "value": 0.007,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "worstCaseExactCorners.max",
+     "value": 0.041,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "rss.halfTolerance",
+     "value": 0.012349089,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "sigma",
+     "value": 0.004116363,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "monteCarlo.mean",
+     "value": 0.024,
+     "tolerance": 4.6022e-05,
+     "unit": "mm",
+     "note": "reference run seed 20261015 N 200000 gave 0.02399763"
+    },
+    {
+     "quantity": "monteCarlo.std",
+     "value": 0.004116363,
+     "tolerance": 3.2543e-05,
+     "unit": "mm",
+     "note": "reference run gave 0.004129247"
+    },
+    {
+     "quantity": "pBelowLowerLimit (analytic)",
+     "value": 2.765e-09,
+     "tolerance": 1e-12,
+     "unit": "probability",
+     "note": "normal CDF (exact: linear sum of independent normals)"
+    },
+    {
+     "quantity": "monteCarlo.pBelowLowerLimit",
+     "value": 2.765e-09,
+     "tolerance": 1e-05,
+     "unit": "probability",
+     "note": "reference run gave 0.0"
+    }
+   ],
+   "source": "derived analytically (generate_stackup_reference.py docstring)"
+  },
+  {
+   "id": "VC-GDT-33",
+   "proves": [
+    "FR-GDT-16",
+    "FR-GDT-17",
+    "TR-GDT-11"
+   ],
+   "input": "stackup_reference.json SU-04",
+   "expected": [
+    {
+     "quantity": "yMean",
+     "value": 0.05,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "worstCase.min",
+     "value": -0.035,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "worstCase.max",
+     "value": 0.135,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "worstCaseExactCorners.min",
+     "value": -0.035,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "worstCaseExactCorners.max",
+     "value": 0.135,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "rss.halfTolerance",
+     "value": 0.044440972,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "sigma",
+     "value": 0.014813657,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "monteCarlo.mean",
+     "value": 0.05,
+     "tolerance": 0.000165622,
+     "unit": "mm",
+     "note": "reference run seed 20261015 N 200000 gave 0.049964892"
+    },
+    {
+     "quantity": "monteCarlo.std",
+     "value": 0.014813657,
+     "tolerance": 0.000117112,
+     "unit": "mm",
+     "note": "reference run gave 0.014810858"
+    },
+    {
+     "quantity": "pBelowLowerLimit (analytic)",
+     "value": 0.000368724955,
+     "tolerance": 1e-12,
+     "unit": "probability",
+     "note": "normal CDF (exact: linear sum of independent normals)"
+    },
+    {
+     "quantity": "monteCarlo.pBelowLowerLimit",
+     "value": 0.000368724955,
+     "tolerance": 0.000214648,
+     "unit": "probability",
+     "note": "reference run gave 0.00031"
+    }
+   ],
+   "source": "derived analytically (generate_stackup_reference.py docstring)"
+  },
+  {
+   "id": "VC-GDT-34",
+   "proves": [
+    "FR-GDT-16",
+    "TR-GDT-11"
+   ],
+   "input": "stackup_reference.json SU-05",
+   "expected": [
+    {
+     "quantity": "yMean",
+     "value": 50.0,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "worstCase.min",
+     "value": 49.194250265,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "worstCase.max",
+     "value": 50.805749735,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "worstCaseExactCorners.min",
+     "value": 49.193113654,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "worstCaseExactCorners.max",
+     "value": 50.804590132,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "rss.halfTolerance",
+     "value": 0.757401916,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "sigma",
+     "value": 0.252467305,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "monteCarlo.mean",
+     "value": 50.0,
+     "tolerance": 0.00282267,
+     "unit": "mm",
+     "note": "reference run seed 20261015 N 200000 gave 50.000161363"
+    },
+    {
+     "quantity": "monteCarlo.std",
+     "value": 0.252467305,
+     "tolerance": 0.001995929,
+     "unit": "mm",
+     "note": "reference run gave 0.252386908"
+    }
+   ],
+   "source": "derived analytically (generate_stackup_reference.py docstring)"
+  },
+  {
+   "id": "VC-GDT-35",
+   "proves": [
+    "FR-GDT-19",
+    "TR-GDT-12"
+   ],
+   "input": "stackup_reference.json fasteners FF-01..03",
+   "expected": [
+    {
+     "id": "FF-01",
+     "title": "Floating fastener: T = H - F",
+     "H": 6.6,
+     "F": 6.0,
+     "T_each": 0.6,
+     "unit": "mm"
+    },
+    {
+     "id": "FF-02",
+     "title": "Fixed fastener, equal split: T1 = T2 = (H - F) / 2",
+     "H": 6.6,
+     "F": 6.0,
+     "T_each": 0.3,
+     "unit": "mm"
+    },
+    {
+     "id": "FF-03",
+     "title": "MMC bonus and virtual condition of a hole 6.6-6.9 with position dia 0.3 (M)",
+     "statedPosition": 0.3,
+     "sizeMMC": 6.6,
+     "sizeLMC": 6.9,
+     "allowedPositionAtMMC": 0.3,
+     "allowedPositionAtLMC": 0.6,
+     "allowedPositionAtSize6_75": 0.45,
+     "virtualCondition": 6.3,
+     "unit": "mm"
+    }
+   ],
+   "tolerance": 1e-12,
+   "source": "derived from clearance geometry"
+  },
+  {
+   "id": "VC-GDT-36",
+   "proves": [
+    "FR-GDT-18"
+   ],
+   "input": "plate; analyze_stackup with contributor {pmiId: boreSize} (hole 20 +0.021/0) and typed pin 20 -0.007/-0.020, sensitivities +1/-1",
+   "expected": [
+    {
+     "quantity": "worstCase.min",
+     "value": 0.007,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "worstCase.max",
+     "value": 0.041,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "rss.halfTolerance",
+     "value": 0.012349089,
+     "tolerance": 1e-09,
+     "unit": "mm"
+    },
+    {
+     "quantity": "after update_pmi boreSize upper 0.025: worstCase.max",
+     "value": 0.045,
+     "tolerance": 1e-09,
+     "unit": "mm",
+     "source": "derived: 20.025-19.980"
+    }
+   ],
+   "source": "stackup_reference.json SU-03"
+  },
+  {
+   "id": "VC-GDT-40",
+   "proves": [
+    "FR-GDT-09"
+   ],
+   "input": "surface_texture_reference.json",
+   "expected": [
+    {
+     "id": "ST-sine-0.8",
+     "Ra": 0.509295818,
+     "Rq": 0.565685425,
+     "Rsk": 0.0,
+     "Rku": 1.5,
+     "Rz": 1.6
+    },
+    {
+     "id": "ST-triangle-0.8",
+     "Ra": 0.4,
+     "Rq": 0.461880215,
+     "Rsk": 0.0,
+     "Rku": 1.8,
+     "Rz": 1.6
+    },
+    {
+     "id": "ST-square-0.8",
+     "Ra": 0.8,
+     "Rq": 0.8,
+     "Rsk": 0.0,
+     "Rku": 1.0,
+     "Rz": 1.6
+    },
+    {
+     "id": "ST-sine-1.6",
+     "Ra": 1.018591636,
+     "Rq": 1.13137085,
+     "Rsk": 0.0,
+     "Rku": 1.5,
+     "Rz": 3.2
+    },
+    {
+     "id": "ST-triangle-1.6",
+     "Ra": 0.8,
+     "Rq": 0.923760431,
+     "Rsk": 0.0,
+     "Rku": 1.8,
+     "Rz": 3.2
+    },
+    {
+     "id": "ST-square-1.6",
+     "Ra": 1.6,
+     "Rq": 1.6,
+     "Rsk": 0.0,
+     "Rku": 1.0,
+     "Rz": 3.2
+    }
+   ],
+   "tolerance": 0.0001,
+   "unit": "um",
+   "source": "closed forms (generate_surface_texture_reference.py)"
+  },
+  {
+   "id": "VC-GDT-50",
+   "proves": [
+    "FR-GDT-29",
+    "TR-GDT-17"
+   ],
+   "input": "plate document",
+   "expected": [
+    {
+     "quantity": "save -> load -> id-normalised equality",
+     "value": true
+    },
+    {
+     "quantity": "undo of each PMI step restores previous doc.pmi",
+     "value": true
+    },
+    {
+     "quantity": "golden replay equality",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": "VC-GDT-51",
+   "proves": [
+    "FR-GDT-30"
+   ],
+   "input": "add_datum_feature under the Manifold kernel",
+   "expected": [
+    {
+     "quantity": "result",
+     "value": "no-op",
+     "summaryContains": "requires the OCC kernel"
+    }
+   ]
+  },
+  {
+   "id": "VC-GDT-52",
+   "proves": [
+    "FR-GDT-28",
+    "TR-GDT-17"
+   ],
+   "input": "toToolSchemas() snapshot + MCP tools/list with toolset pmi + CLI describe",
+   "expected": [
+    {
+     "quantity": "every PMI command present in all three surfaces",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": "VC-GDT-53",
+   "proves": [
+    "FR-GDT-13",
+    "FR-GDT-14"
+   ],
+   "input": "PmiPanel component test",
+   "expected": [
+    {
+     "quantity": "panel dispatches add_geometric_tolerance with facesNear from the picked point (no face indices)",
+     "value": true
+    }
+   ]
+  },
+  {
+   "id": "VC-GDT-54",
+   "proves": [
+    "FR-GDT-33",
+    "TR-GDT-20"
+   ],
+   "af": [
+    "AF-11"
+   ],
+   "input": "llull --doc v.llull.json --kernel occt run draft_plan_gdt_rejections.json --continue --json",
+   "expected": [
+    {
+     "quantity": "refused steps",
+     "value": 5,
+     "tolerance": 0,
+     "unit": "count"
+    },
+    {
+     "quantity": "data.error.code set",
+     "value": [
+      "GDT_DATUM_DUPLICATE",
+      "GDT_DATUM_UNDEFINED",
+      "GDT_MC_ON_NON_FOS",
+      "GDT_POINT_NOT_ON_FACE",
+      "GDT_ZONE_NON_POSITIVE"
+     ],
+     "tolerance": "set equality",
+     "unit": "codes"
+    },
+    {
+     "quantity": "every refusal has non-empty data.error.remediation and data.error.paths",
+     "value": true,
+     "tolerance": "exact",
+     "unit": "bool"
+    },
+    {
+     "quantity": "process exit code",
+     "value": 1,
+     "tolerance": "exact",
+     "unit": "exit code"
+    }
+   ],
+   "source": "TECHNICAL_SPEC §7.2"
+  },
+  {
+   "id": "VC-GDT-55",
+   "proves": [
+    "FR-GDT-34",
+    "TR-GDT-21"
+   ],
+   "af": [
+    "AF-32"
+   ],
+   "input": "llull --doc v.llull.json --kernel occt run draft_plan_stackup_su01.json --json, with contributor C given \"verified\": false",
+   "expected": [
+    {
+     "quantity": "data.unverified.contributors",
+     "value": [
+      "C"
+     ],
+     "tolerance": "exact",
+     "unit": "names"
+    },
+    {
+     "quantity": "warning code",
+     "value": "GDT_UNVERIFIED_INPUT",
+     "tolerance": "present",
+     "unit": "code"
+    },
+    {
+     "quantity": "rss.halfTolerance",
+     "value": 0.124096736,
+     "tolerance": 1e-09,
+     "unit": "mm",
+     "source": "unchanged vs VC-GDT-30"
+    }
+   ],
+   "source": "AF-32"
+  },
+  {
+   "id": "VC-GDT-56",
+   "proves": [
+    "FR-GDT-31",
+    "TR-GDT-19"
+   ],
+   "af": [
+    "AF-33"
+   ],
+   "input": "llull --doc v.llull.json --kernel occt run draft_plan_gdt_plate.json --json (agent caller), then list_pmi --json and check_pmi --json",
+   "expected": [
+    {
+     "quantity": "items with review.required = true",
+     "value": 10,
+     "tolerance": 0,
+     "unit": "count"
+    },
+    {
+     "quantity": "check_pmi.data.stats.reviewRequired",
+     "value": 10,
+     "tolerance": 0,
+     "unit": "count"
+    },
+    {
+     "quantity": "check_pmi.data.status",
+     "value": "warn",
+     "tolerance": "exact",
+     "unit": "enum"
+    },
+    {
+     "quantity": "check_pmi.data.errors",
+     "value": [],
+     "tolerance": "exact",
+     "unit": "list"
+    },
+    {
+     "quantity": "summary contains",
+     "value": "not approved",
+     "tolerance": "substring",
+     "unit": "text"
+    }
+   ],
+   "source": "AF-33"
+  },
+  {
+   "id": "VC-GDT-57",
+   "proves": [
+    "FR-GDT-32",
+    "TR-GDT-19"
+   ],
+   "af": [
+    "AF-34"
+   ],
+   "input": "llull --doc v.llull.json --kernel occt exec accept_pmi_review '{\"pmiIds\":[\"<fcfPosHoles id>\"],\"decision\":\"accept\",\"comment\":\"ok\",\"at\":\"2026-11-02T09:00:00Z\",\"by\":\"u-qr\"}' --json as agent, then as human (UI)",
+   "expected": [
+    {
+     "quantity": "agent: data.error.code",
+     "value": "GDT_REVIEW_HUMAN_ONLY",
+     "tolerance": "exact",
+     "unit": "code"
+    },
+    {
+     "quantity": "agent: document unchanged",
+     "value": true,
+     "tolerance": "exact",
+     "unit": "bool"
+    },
+    {
+     "quantity": "human: item review.required",
+     "value": false,
+     "tolerance": "exact",
+     "unit": "bool"
+    },
+    {
+     "quantity": "human: item review.acceptedBy",
+     "value": "u-qr",
+     "tolerance": "exact",
+     "unit": "user id"
+    }
+   ],
+   "source": "AF-34"
+  },
+  {
+   "id": "VC-GDT-58",
+   "proves": [
+    "FR-GDT-35",
+    "TR-GDT-21"
+   ],
+   "af": [
+    "AF-31",
+    "AF-35"
+   ],
+   "input": "llull --doc v.llull.json --kernel occt run draft_plan_stackup_su01.json --json (no sigmaPerHalfTolerance given)",
+   "expected": [
+    {
+     "quantity": "data.sigmaPerHalfTolerance.value",
+     "value": 3,
+     "tolerance": "exact",
+     "unit": "sigma per half tolerance"
+    },
+    {
+     "quantity": "data.sigmaPerHalfTolerance.defaulted",
+     "value": true,
+     "tolerance": "exact",
+     "unit": "bool"
+    },
+    {
+     "quantity": "data.provenance.sensitivitySource",
+     "value": "autodiff",
+     "tolerance": "exact",
+     "unit": "enum"
+    },
+    {
+     "quantity": "data.sigma",
+     "value": 0.041365579,
+     "tolerance": 1e-09,
+     "unit": "mm",
+     "source": "= VC-GDT-30"
+    }
+   ],
+   "source": "AF-31, AF-35"
+  }
+ ]
+}

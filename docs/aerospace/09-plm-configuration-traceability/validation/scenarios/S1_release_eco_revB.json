@@ -1,0 +1,418 @@
+{
+  "id": "S1",
+  "title": "Initial release of LL-1001 rev A, ECR -> ECO, revision B with serial effectivity, release of B supersedes A",
+  "proves": [
+    "VC-PLM-01",
+    "VC-PLM-02",
+    "VC-PLM-03",
+    "VC-PLM-04",
+    "VC-PLM-05",
+    "VC-PLM-06",
+    "VC-PLM-07",
+    "VC-PLM-12"
+  ],
+  "notes": [
+    "Command names and params are the PROPOSED surface of TECHNICAL_SPEC section 4; they do not exist in llull yet.",
+    "Timestamps are caller-supplied (commands never read a clock, architecture L3/L8); the host (UI/CLI) fills `at`.",
+    "contentHash values marked `$hash:<label>` are computed at run time; the test asserts equality/inequality relations, not literals,",
+    "except step 1 which starts from validation/sample_document.json so its hash is the literal in vectors/hash_vectors.json.",
+    "Step numbering: ECO-0001 (initial release) is created at step 6; steps after it are shifted by one relative to earlier drafts.",
+    "Caller: every step runs as a human caller (UI/desktop) unless stated; VC-PLM-22/26 replay the same flow as an agent caller and expect PLM_HUMAN_GATE on approvals, classification and release_item."
+  ],
+  "start": {
+    "document": "validation/sample_document.json"
+  },
+  "steps": [
+    {
+      "n": 1,
+      "command": "set_item_identity",
+      "params": {
+        "partNumber": "LL-1001",
+        "name": "Bracket, hinge fitting",
+        "itemType": "part",
+        "revisionScheme": "asme-alpha"
+      },
+      "expect": {
+        "summaryContains": "LL-1001",
+        "plm.item.partNumber": "LL-1001",
+        "plm.item.currentRevision": "A",
+        "plm.item.revisions.A.state": "in_work",
+        "featureHistoryLengthUnchanged": true,
+        "plm.item.revisions.A.iterations.length": 1
+      }
+    },
+    {
+      "n": 2,
+      "command": "set_export_marking",
+      "params": {
+        "regime": "none",
+        "statement": "NLR-EXAMPLE - classification decided by the export-control officer",
+        "decidedBy": "u-0003"
+      },
+      "expect": {
+        "plm.item.marking.regime": "none"
+      }
+    },
+    {
+      "n": 3,
+      "command": "checkpoint_iteration",
+      "params": {
+        "comment": "design review actions closed",
+        "at": "2026-10-30T16:00:00Z",
+        "by": "u-0007"
+      },
+      "expect": {
+        "plm.item.revisions.A.iterations.length": 1,
+        "summaryContains": "nothing to checkpoint",
+        "note": "steps 1-2 changed only doc.plm (outside the release scope), so the definition is clean and checkpoint_iteration is a no-op (TECHNICAL_SPEC §4)"
+      }
+    },
+    {
+      "n": 4,
+      "command": "submit_for_review",
+      "params": {
+        "comment": "ready for release",
+        "at": "2026-11-01T10:00:00Z",
+        "by": "u-0007"
+      },
+      "expect": {
+        "plm.item.revisions.A.state": "in_review",
+        "plm.item.revisions.A.iterations.length": 1,
+        "note": "still clean -> no new iteration"
+      }
+    },
+    {
+      "n": 5,
+      "command": "add_box",
+      "params": {
+        "size": [
+          10,
+          10,
+          10
+        ]
+      },
+      "expect": {
+        "refused": true,
+        "summaryMatches": "^add_box rejected: LL-1001 rev A is in_review",
+        "documentUnchanged": true,
+        "data.error.code": "PLM_LOCKED"
+      }
+    },
+    {
+      "n": 6,
+      "command": "create_change_order",
+      "params": {
+        "id": "ECO-0001",
+        "purpose": "initial-release",
+        "affectedItems": [
+          "LL-1001"
+        ],
+        "effectivity": [
+          {
+            "kind": "serial",
+            "from": 1
+          }
+        ],
+        "at": "2026-11-01T12:00:00Z",
+        "by": "u-0005"
+      },
+      "expect": {
+        "plm.changes.ECO-0001.kind": "eco",
+        "plm.changes.ECO-0001.purpose": "initial-release",
+        "plm.changes.ECO-0001.state": "open",
+        "note": "no classification: an initial release has no previous approved design to classify against"
+      }
+    },
+    {
+      "n": 7,
+      "command": "release_item",
+      "params": {
+        "changeOrder": "ECO-0001",
+        "effectivity": [
+          {
+            "kind": "serial",
+            "from": 1
+          }
+        ],
+        "at": "2026-11-02T09:30:00Z",
+        "by": "u-0007",
+        "approvals": [
+          {
+            "role": "design-authority",
+            "userId": "u-0007"
+          },
+          {
+            "role": "checker",
+            "userId": "u-0011"
+          }
+        ]
+      },
+      "expect": {
+        "plm.item.revisions.A.state": "released",
+        "plm.item.revisions.A.contentHashEquals": "vectors/hash_vectors.json#sample_document.release_scope_canonical_sha256 (steps 1-5 left the definition unchanged)",
+        "plm.item.revisions.A.releasedAt": "2026-11-02T09:30:00Z",
+        "plm.item.revisions.A.effectivity": [
+          {
+            "kind": "serial",
+            "from": 1
+          }
+        ],
+        "plm.changes.ECO-0001.state": "implemented",
+        "auditEventEmitted": "release_item"
+      }
+    },
+    {
+      "n": 8,
+      "command": "set_parameter",
+      "params": {
+        "name": "t",
+        "expression": "5"
+      },
+      "expect": {
+        "refused": true,
+        "summaryMatches": "^set_parameter rejected: LL-1001 rev A is released",
+        "documentUnchanged": true,
+        "data.error.code": "PLM_LOCKED"
+      }
+    },
+    {
+      "n": 9,
+      "command": "create_change_request",
+      "params": {
+        "id": "ECR-0002",
+        "title": "Increase flange thickness 4 -> 5 mm (fatigue margin)",
+        "reason": "Stress note SN-118 negative margin at lug",
+        "affectedItems": [
+          "LL-1001"
+        ],
+        "proposedClassification": "minor",
+        "at": "2026-12-01T08:00:00Z",
+        "by": "u-0021"
+      },
+      "expect": {
+        "plm.changes.ECR-0002.kind": "ecr",
+        "plm.changes.ECR-0002.state": "open",
+        "plm.item.revisions.A.state": "released"
+      }
+    },
+    {
+      "n": 10,
+      "command": "create_change_order",
+      "params": {
+        "id": "ECO-0002",
+        "fromRequests": [
+          "ECR-0002"
+        ],
+        "classification": "minor",
+        "effectivity": [
+          {
+            "kind": "serial",
+            "from": 5
+          }
+        ],
+        "disposition": {
+          "inStock": "use-as-is",
+          "wip": "rework",
+          "fielded": "no-action"
+        },
+        "at": "2026-12-03T08:00:00Z",
+        "by": "u-0007"
+      },
+      "expect": {
+        "plm.changes.ECO-0002.state": "open",
+        "plm.changes.ECR-0002.state": "accepted"
+      }
+    },
+    {
+      "n": 11,
+      "command": "revise_item",
+      "params": {
+        "changeOrder": "ECO-0002",
+        "at": "2026-12-03T08:05:00Z",
+        "by": "u-0007"
+      },
+      "expect": {
+        "plm.item.currentRevision": "B",
+        "plm.item.revisions.B.state": "in_work",
+        "plm.item.revisions.B.basedOn": "A",
+        "plm.item.revisions.A.state": "released",
+        "plm.item.revisions.A.contentHashUnchanged": true,
+        "plm.item.revisions.B.iterations.length": 1
+      }
+    },
+    {
+      "n": 12,
+      "command": "set_parameter",
+      "params": {
+        "name": "t",
+        "expression": "5"
+      },
+      "expect": {
+        "refused": false,
+        "parameters.t.value": 5,
+        "plm_status.data.dirty": true,
+        "note": "dirty = current release-scope hash differs from the last iteration's contentHash (derived, not stored)"
+      }
+    },
+    {
+      "n": 13,
+      "command": "plm_diff",
+      "params": {
+        "from": "A",
+        "to": "B"
+      },
+      "expect": {
+        "readOnly": true,
+        "data.parameters.changed": [
+          {
+            "name": "t",
+            "from": "4",
+            "to": "5"
+          }
+        ],
+        "data.featureHistory.added": 0
+      }
+    },
+    {
+      "n": 14,
+      "command": "submit_for_review",
+      "params": {
+        "comment": "ECO-0002 implemented",
+        "at": "2026-12-04T10:00:00Z",
+        "by": "u-0007"
+      },
+      "expect": {
+        "plm.item.revisions.B.state": "in_review",
+        "note": "dirty since revise -> submit checkpoints B.2",
+        "plm.item.revisions.B.iterations.length": 2
+      }
+    },
+    {
+      "n": 15,
+      "command": "release_item",
+      "params": {
+        "changeOrder": "ECO-0002",
+        "at": "2026-12-05T09:00:00Z",
+        "by": "u-0007",
+        "approvals": [
+          {
+            "role": "design-authority",
+            "userId": "u-0007"
+          },
+          {
+            "role": "checker",
+            "userId": "u-0011"
+          }
+        ]
+      },
+      "expect": {
+        "plm.item.revisions.B.state": "released",
+        "plm.item.revisions.B.effectivity": [
+          {
+            "kind": "serial",
+            "from": 5
+          }
+        ],
+        "plm.item.revisions.A.state": "superseded",
+        "plm.item.revisions.A.effectivity": [
+          {
+            "kind": "serial",
+            "from": 1,
+            "to": 4
+          }
+        ],
+        "plm.item.revisions.B.contentHashDiffersFrom": "plm.item.revisions.A.contentHash",
+        "plm.changes.ECO-0002.state": "implemented",
+        "plm.changes.ECO-0002.notice": "ECN-0002"
+      }
+    },
+    {
+      "n": 16,
+      "command": "resolve_effectivity",
+      "params": {
+        "partNumber": "LL-1001",
+        "kind": "serial",
+        "unit": 4
+      },
+      "expect": {
+        "readOnly": true,
+        "data.revision": "A"
+      }
+    },
+    {
+      "n": 17,
+      "command": "resolve_effectivity",
+      "params": {
+        "partNumber": "LL-1001",
+        "kind": "serial",
+        "unit": 5
+      },
+      "expect": {
+        "readOnly": true,
+        "data.revision": "B"
+      }
+    },
+    {
+      "n": 18,
+      "command": "verify_release",
+      "params": {
+        "revision": "A"
+      },
+      "expect": {
+        "readOnly": true,
+        "data.contentHashMatches": true,
+        "data.reconstructedFrom": "release snapshot A",
+        "data.signaturesValid": "n/a (none attached)",
+        "note": "A is superseded; verify_release accepts released, superseded and obsolete revisions"
+      }
+    }
+  ],
+  "finalState": {
+    "plm.item": {
+      "partNumber": "LL-1001",
+      "currentRevision": "B",
+      "revisions": {
+        "A": {
+          "state": "superseded",
+          "effectivity": [
+            {
+              "kind": "serial",
+              "from": 1,
+              "to": 4
+            }
+          ],
+          "iterations.length": 1
+        },
+        "B": {
+          "state": "released",
+          "effectivity": [
+            {
+              "kind": "serial",
+              "from": 5
+            }
+          ],
+          "basedOn": "A",
+          "iterations.length": 2
+        }
+      }
+    },
+    "plm.changes": {
+      "ECO-0001": {
+        "kind": "eco",
+        "state": "implemented",
+        "purpose": "initial-release"
+      },
+      "ECR-0002": {
+        "kind": "ecr",
+        "state": "accepted"
+      },
+      "ECO-0002": {
+        "kind": "eco",
+        "state": "implemented",
+        "notice": "ECN-0002",
+        "classification": "minor"
+      }
+    },
+    "parameters.t.value": 5
+  }
+}

@@ -1,0 +1,1711 @@
+{
+ "$comment": "Geometric validation properties embedded by the originating CAD systems in the official NIST MBE PMI STEP files, plus an entity census (records instantiating each PMI / tessellation / B-rep / assembly type, simple or complex). Extracted with extract_validation_properties.py (stdlib, independent of OCC). A llull importer must recompute GVP from the imported B-rep and compare (VC-XCH-05/06), and its semantic PMI import must account for every census item (VC-XCH-07). lengthUnitDetected = first LENGTH_UNIT in the file: confirm per file. GVP entries whose values are all 0 (placeholders, e.g. STC 06) are dropped and counted in placeholderGvpDropped.",
+ "source": {
+  "archive": "https://raw.githubusercontent.com/usnistgov/SFA/72375d17c09cf7072c30d9393b5c08b7aa272285/Release/NIST-PMI-STEP-Files.zip",
+  "archiveSha256": "1fb91bb8ff0fe02032b948fda0775bc74591cd0bebc0988347d32574e5884f90",
+  "archiveBytes": 12889852,
+  "publisher": "NIST (usnistgov/SFA Release directory, commit 72375d17)",
+  "readme": "NIST-PMI-STEP-Files/README.txt (February 2026 update)",
+  "accessed": "2026-10-15"
+ },
+ "files": [
+  {
+   "file": "nist_ctc_01_asme1_ap242-e1.stp",
+   "zipMember": "NIST-PMI-STEP-Files/nist_ctc_01_asme1_ap242-e1.stp",
+   "bytes": 395283,
+   "sha256": "036683e8358ac27d51a92c35362e175c91bc44d3b600a5c605fb496865edcd37",
+   "fileSchema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 1 1 4 }",
+   "lengthUnitDetected": "mm",
+   "validationPropertyCounts": {
+    "geometric": 1,
+    "pmi": 8,
+    "attribute": 1
+   },
+   "placeholderGvpDropped": 0,
+   "geometricValidationProperties": [
+    {
+     "propertyDefinition": "#4335",
+     "description": "volume of NIST Complex Test Case 1",
+     "definitionTarget": "PRODUCT_DEFINITION_SHAPE",
+     "values": [
+      {
+       "item": "volume measure",
+       "measure": "VOLUME_MEASURE",
+       "value": 14644822.6361138
+      },
+      {
+       "item": "wetted area measure",
+       "measure": "AREA_MEASURE",
+       "value": 807080.802199914
+      },
+      {
+       "item": "centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        -2.29264395139875,
+        -1.36345168588643,
+        -32.2974419857648
+       ]
+      }
+     ]
+    }
+   ],
+   "entityCensus": {
+    "ADVANCED_FACE": 117,
+    "ANGULAR_LOCATION": 1,
+    "COMPLEX_TRIANGULATED_SURFACE_SET": 37,
+    "DATUM": 3,
+    "DATUM_FEATURE": 3,
+    "DATUM_REFERENCE_COMPARTMENT": 4,
+    "DATUM_SYSTEM": 2,
+    "DIMENSIONAL_LOCATION": 2,
+    "DIMENSIONAL_SIZE": 9,
+    "FLATNESS_TOLERANCE": 1,
+    "GEOMETRIC_TOLERANCE": 4,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PERPENDICULARITY_TOLERANCE": 1,
+    "PLUS_MINUS_TOLERANCE": 6,
+    "POSITION_TOLERANCE": 2,
+    "PRODUCT": 1,
+    "SURFACE_PROFILE_TOLERANCE": 2,
+    "TESSELLATED_ANNOTATION_OCCURRENCE": 23
+   }
+  },
+  {
+   "file": "nist_ctc_02_asme1_ap242-e2.stp",
+   "zipMember": "NIST-PMI-STEP-Files/nist_ctc_02_asme1_ap242-e2.stp",
+   "bytes": 1981342,
+   "sha256": "99a0a2079ddeb64d05c2432cbe931fa17c89da60d8b0bcb0b11bd0ed94fa2e68",
+   "fileSchema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 3 1 4 }",
+   "lengthUnitDetected": "mm",
+   "validationPropertyCounts": {
+    "geometric": 4,
+    "pmi": 85,
+    "attribute": 1
+   },
+   "placeholderGvpDropped": 0,
+   "geometricValidationProperties": [
+    {
+     "propertyDefinition": "#22133",
+     "description": "volume of PartBody",
+     "definitionTarget": "SHAPE_ASPECT",
+     "values": [
+      {
+       "item": "volume measure",
+       "measure": "VOLUME_MEASURE",
+       "value": 47106788.0321802
+      },
+      {
+       "item": "wetted area measure",
+       "measure": "AREA_MEASURE",
+       "value": 2480624.4791306
+      },
+      {
+       "item": "centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        -0.00415567842900755,
+        358.620787544608,
+        -178.169662485763
+       ]
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#22135",
+     "description": "volume of Fill.1",
+     "definitionTarget": "SHAPE_ASPECT",
+     "values": [
+      {
+       "item": "independent surface area measure",
+       "measure": "AREA_MEASURE",
+       "value": 5674.50173054656
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#22137",
+     "description": "volume of Split.1",
+     "definitionTarget": "SHAPE_ASPECT",
+     "values": [
+      {
+       "item": "independent surface area measure",
+       "measure": "AREA_MEASURE",
+       "value": 4417.86466911065
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#22139",
+     "description": "volume of Test Case 2 Baseline",
+     "definitionTarget": "PRODUCT_DEFINITION_SHAPE",
+     "values": [
+      {
+       "item": "volume measure",
+       "measure": "VOLUME_MEASURE",
+       "value": 47106788.0321802
+      },
+      {
+       "item": "wetted area measure",
+       "measure": "AREA_MEASURE",
+       "value": 2480624.4791306
+      },
+      {
+       "item": "centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        -0.00415567842900755,
+        358.620787544608,
+        -178.169662485763
+       ]
+      },
+      {
+       "item": "independent surface area measure",
+       "measure": "AREA_MEASURE",
+       "value": 10092.3663996572
+      },
+      {
+       "item": "curve length measure",
+       "measure": "LENGTH_MEASURE",
+       "value": 15444.7622486291
+      },
+      {
+       "item": "curve centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        -32.0491726164941,
+        307.791975866551,
+        -121.456657566512
+       ]
+      }
+     ]
+    }
+   ],
+   "entityCensus": {
+    "ADVANCED_FACE": 637,
+    "COMPLEX_TRIANGULATED_SURFACE_SET": 70,
+    "DATUM": 10,
+    "DATUM_FEATURE": 6,
+    "DATUM_REFERENCE_COMPARTMENT": 34,
+    "DATUM_SYSTEM": 14,
+    "DIMENSIONAL_SIZE": 7,
+    "FLATNESS_TOLERANCE": 1,
+    "GEOMETRIC_TOLERANCE": 18,
+    "LINE_PROFILE_TOLERANCE": 1,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PERPENDICULARITY_TOLERANCE": 3,
+    "PLACED_DATUM_TARGET_FEATURE": 9,
+    "PLUS_MINUS_TOLERANCE": 7,
+    "POSITION_TOLERANCE": 4,
+    "PRODUCT": 1,
+    "SURFACE_PROFILE_TOLERANCE": 13,
+    "TESSELLATED_ANNOTATION_OCCURRENCE": 46,
+    "TOLERANCE_ZONE": 7
+   }
+  },
+  {
+   "file": "nist_ctc_03_asme1_ap242-e2.stp",
+   "zipMember": "NIST-PMI-STEP-Files/nist_ctc_03_asme1_ap242-e2.stp",
+   "bytes": 673846,
+   "sha256": "196b665776e759282f80fc8fb27d7bceb995df77cf78b7ce48347535a4d6cb5f",
+   "fileSchema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 3 1 4 }",
+   "lengthUnitDetected": "mm",
+   "validationPropertyCounts": {
+    "geometric": 2,
+    "pmi": 60,
+    "attribute": 1
+   },
+   "placeholderGvpDropped": 0,
+   "geometricValidationProperties": [
+    {
+     "propertyDefinition": "#5809",
+     "description": "volume of PartBody",
+     "definitionTarget": "SHAPE_ASPECT",
+     "values": [
+      {
+       "item": "volume measure",
+       "measure": "VOLUME_MEASURE",
+       "value": 332122.9076263
+      },
+      {
+       "item": "wetted area measure",
+       "measure": "AREA_MEASURE",
+       "value": 354787.650175344
+      },
+      {
+       "item": "centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        -118.329746932968,
+        242.86422820302,
+        69.31685776493
+       ]
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#5811",
+     "description": "volume of Test Case 3 Baseline",
+     "definitionTarget": "PRODUCT_DEFINITION_SHAPE",
+     "values": [
+      {
+       "item": "volume measure",
+       "measure": "VOLUME_MEASURE",
+       "value": 332122.9076263
+      },
+      {
+       "item": "wetted area measure",
+       "measure": "AREA_MEASURE",
+       "value": 354787.650175344
+      },
+      {
+       "item": "centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        -118.329746932968,
+        242.86422820302,
+        69.31685776493
+       ]
+      },
+      {
+       "item": "curve length measure",
+       "measure": "LENGTH_MEASURE",
+       "value": 4214.2964139314
+      },
+      {
+       "item": "curve centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        -59.7821613225628,
+        256.176079771412,
+        69.7667775388778
+       ]
+      }
+     ]
+    }
+   ],
+   "entityCensus": {
+    "ADVANCED_FACE": 120,
+    "ANGULARITY_TOLERANCE": 1,
+    "COMPLEX_TRIANGULATED_SURFACE_SET": 43,
+    "DATUM": 6,
+    "DATUM_FEATURE": 6,
+    "DATUM_REFERENCE_COMPARTMENT": 13,
+    "DATUM_SYSTEM": 6,
+    "DIMENSIONAL_LOCATION": 1,
+    "DIMENSIONAL_SIZE": 9,
+    "FLATNESS_TOLERANCE": 1,
+    "GEOMETRIC_TOLERANCE": 9,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PERPENDICULARITY_TOLERANCE": 2,
+    "PLUS_MINUS_TOLERANCE": 8,
+    "POSITION_TOLERANCE": 6,
+    "PRODUCT": 1,
+    "SURFACE_PROFILE_TOLERANCE": 3,
+    "TESSELLATED_ANNOTATION_OCCURRENCE": 29,
+    "TOLERANCE_ZONE": 7
+   }
+  },
+  {
+   "file": "nist_ctc_04_asme1_ap242-e2.stp",
+   "zipMember": "NIST-PMI-STEP-Files/nist_ctc_04_asme1_ap242-e2.stp",
+   "bytes": 1287291,
+   "sha256": "7eaea9d2cf417a73d20f8ee840a9d346b0ee5f558a4ab1bf2326a323bd423182",
+   "fileSchema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 3 1 4 }",
+   "lengthUnitDetected": "mm",
+   "validationPropertyCounts": {
+    "geometric": 19,
+    "pmi": 55,
+    "attribute": 1
+   },
+   "placeholderGvpDropped": 17,
+   "geometricValidationProperties": [
+    {
+     "propertyDefinition": "#17385",
+     "description": "",
+     "definitionTarget": "SHAPE_ASPECT",
+     "values": [
+      {
+       "item": "bounding box corner point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        -250.0,
+        -0.0,
+        -100.5734088324
+       ]
+      },
+      {
+       "item": "bounding box corner point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        250.0,
+        780.0,
+        30.0
+       ]
+      },
+      {
+       "item": "centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        -0.0079803627,
+        360.9458561866,
+        -7.8767441293
+       ]
+      },
+      {
+       "item": "surface area measure",
+       "measure": "AREA_MEASURE",
+       "value": 1022497.095954
+      },
+      {
+       "item": "volume measure",
+       "measure": "VOLUME_MEASURE",
+       "value": 17519780.220394
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#18287",
+     "description": "",
+     "definitionTarget": "PRODUCT_DEFINITION_SHAPE",
+     "values": [
+      {
+       "item": "bounding box corner point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        -250.0,
+        -0.0,
+        -100.5734088324
+       ]
+      },
+      {
+       "item": "bounding box corner point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        250.0,
+        780.0,
+        30.0
+       ]
+      },
+      {
+       "item": "centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        -0.0079803627,
+        360.9458561866,
+        -7.8767441293
+       ]
+      },
+      {
+       "item": "independent points centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        5.1997209302,
+        388.9534883721,
+        -3.2558139535
+       ]
+      },
+      {
+       "item": "surface area measure",
+       "measure": "AREA_MEASURE",
+       "value": 1022497.095954
+      },
+      {
+       "item": "volume measure",
+       "measure": "VOLUME_MEASURE",
+       "value": 17519780.220394
+      }
+     ]
+    }
+   ],
+   "entityCensus": {
+    "ADVANCED_FACE": 484,
+    "ANGULAR_SIZE": 1,
+    "DATUM": 8,
+    "DATUM_FEATURE": 8,
+    "DATUM_REFERENCE_COMPARTMENT": 12,
+    "DATUM_SYSTEM": 5,
+    "DIMENSIONAL_LOCATION": 3,
+    "DIMENSIONAL_SIZE": 6,
+    "GEOMETRIC_TOLERANCE": 7,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PLUS_MINUS_TOLERANCE": 7,
+    "POSITION_TOLERANCE": 4,
+    "PRODUCT": 1,
+    "SURFACE_PROFILE_TOLERANCE": 3,
+    "TESSELLATED_ANNOTATION_OCCURRENCE": 27,
+    "TOLERANCE_ZONE": 4
+   }
+  },
+  {
+   "file": "nist_ctc_05_asme1_ap242-e1.stp",
+   "zipMember": "NIST-PMI-STEP-Files/nist_ctc_05_asme1_ap242-e1.stp",
+   "bytes": 878030,
+   "sha256": "7f04f14be27918d31aef5b6d9ff74d547382ad469e45495c5b710baaa772323d",
+   "fileSchema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF {1 0 10303 442 1 1 4 }",
+   "lengthUnitDetected": "inch",
+   "validationPropertyCounts": {
+    "geometric": 0,
+    "pmi": 44,
+    "attribute": 1
+   },
+   "placeholderGvpDropped": 0,
+   "geometricValidationProperties": [],
+   "entityCensus": {
+    "ADVANCED_FACE": 156,
+    "ANNOTATION_CURVE_OCCURRENCE": 22,
+    "CIRCULAR_RUNOUT_TOLERANCE": 3,
+    "CONCENTRICITY_TOLERANCE": 1,
+    "DATUM": 4,
+    "DATUM_FEATURE": 2,
+    "DATUM_REFERENCE_COMPARTMENT": 5,
+    "DATUM_SYSTEM": 5,
+    "DIMENSIONAL_LOCATION": 5,
+    "DIMENSIONAL_SIZE": 1,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PERPENDICULARITY_TOLERANCE": 2,
+    "PLACED_DATUM_TARGET_FEATURE": 2,
+    "PLUS_MINUS_TOLERANCE": 2,
+    "PRODUCT": 2,
+    "ROUNDNESS_TOLERANCE": 1,
+    "STRAIGHTNESS_TOLERANCE": 1,
+    "TOLERANCE_ZONE": 1,
+    "TOTAL_RUNOUT_TOLERANCE": 2
+   }
+  },
+  {
+   "file": "nist_ftc_06_asme1_ap242-e2.stp",
+   "zipMember": "NIST-PMI-STEP-Files/nist_ftc_06_asme1_ap242-e2.stp",
+   "bytes": 1971192,
+   "sha256": "b87afb7f25adc0d44d12e182209d50f0b085b533c0742fb8ffd58f4c87403447",
+   "fileSchema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 3 1 4 }",
+   "lengthUnitDetected": "mm",
+   "validationPropertyCounts": {
+    "geometric": 2,
+    "pmi": 133,
+    "attribute": 1
+   },
+   "placeholderGvpDropped": 0,
+   "geometricValidationProperties": [
+    {
+     "propertyDefinition": "#9691",
+     "description": "volume of PartBody",
+     "definitionTarget": "SHAPE_ASPECT",
+     "values": [
+      {
+       "item": "volume measure",
+       "measure": "VOLUME_MEASURE",
+       "value": 3323556.50526143
+      },
+      {
+       "item": "wetted area measure",
+       "measure": "AREA_MEASURE",
+       "value": 283413.011089723
+      },
+      {
+       "item": "centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        8.44667839028049e-05,
+        29.008906494,
+        -109.600480952032
+       ]
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#9693",
+     "description": "volume of NIST PMI FTC 06 ASME1",
+     "definitionTarget": "PRODUCT_DEFINITION_SHAPE",
+     "values": [
+      {
+       "item": "volume measure",
+       "measure": "VOLUME_MEASURE",
+       "value": 3323556.50526143
+      },
+      {
+       "item": "wetted area measure",
+       "measure": "AREA_MEASURE",
+       "value": 283413.011089723
+      },
+      {
+       "item": "centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        8.44667839028049e-05,
+        29.008906494,
+        -109.600480952032
+       ]
+      },
+      {
+       "item": "curve length measure",
+       "measure": "LENGTH_MEASURE",
+       "value": 2834.77718401667
+      },
+      {
+       "item": "curve centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        6.12593413860678,
+        53.4627714239828,
+        -103.480296395524
+       ]
+      }
+     ]
+    }
+   ],
+   "entityCensus": {
+    "ADVANCED_FACE": 187,
+    "COMPLEX_TRIANGULATED_SURFACE_SET": 98,
+    "DATUM": 10,
+    "DATUM_FEATURE": 6,
+    "DATUM_REFERENCE_COMPARTMENT": 27,
+    "DATUM_SYSTEM": 12,
+    "DIMENSIONAL_LOCATION": 10,
+    "DIMENSIONAL_SIZE": 14,
+    "FLATNESS_TOLERANCE": 3,
+    "GEOMETRIC_TOLERANCE": 23,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PERPENDICULARITY_TOLERANCE": 2,
+    "PLACED_DATUM_TARGET_FEATURE": 6,
+    "PLUS_MINUS_TOLERANCE": 19,
+    "POSITION_TOLERANCE": 11,
+    "PRODUCT": 1,
+    "SURFACE_PROFILE_TOLERANCE": 12,
+    "TESSELLATED_ANNOTATION_OCCURRENCE": 67,
+    "TOLERANCE_ZONE": 9
+   }
+  },
+  {
+   "file": "nist_ftc_07_asme1_ap242-e2.stp",
+   "zipMember": "NIST-PMI-STEP-Files/nist_ftc_07_asme1_ap242-e2.stp",
+   "bytes": 1478375,
+   "sha256": "aa8115c12e12a99cc439477cbfd222916f9ec629fbb3c9002b18e0c264c9a892",
+   "fileSchema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 3 1 4 }",
+   "lengthUnitDetected": "mm",
+   "validationPropertyCounts": {
+    "geometric": 2,
+    "pmi": 135,
+    "attribute": 1
+   },
+   "placeholderGvpDropped": 0,
+   "geometricValidationProperties": [
+    {
+     "propertyDefinition": "#13292",
+     "description": "",
+     "definitionTarget": "SHAPE_ASPECT",
+     "values": [
+      {
+       "item": "bounding box corner point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        -6.1339745962,
+        -4.85,
+        -4.3839745962
+       ]
+      },
+      {
+       "item": "bounding box corner point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        6.1339745962,
+        0.5,
+        4.3839745962
+       ]
+      },
+      {
+       "item": "centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        0.0302177316,
+        -2.5415861506,
+        0.00138317
+       ]
+      },
+      {
+       "item": "surface area measure",
+       "measure": "AREA_MEASURE",
+       "value": 606.626874
+      },
+      {
+       "item": "volume measure",
+       "measure": "VOLUME_MEASURE",
+       "value": 105.34209
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#13668",
+     "description": "",
+     "definitionTarget": "PRODUCT_DEFINITION_SHAPE",
+     "values": [
+      {
+       "item": "bounding box corner point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        -6.1339745962,
+        -4.85,
+        -4.3839745962
+       ]
+      },
+      {
+       "item": "bounding box corner point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        6.1339745962,
+        0.5,
+        4.3839745962
+       ]
+      },
+      {
+       "item": "centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        0.0302177316,
+        -2.5415861506,
+        0.00138317
+       ]
+      },
+      {
+       "item": "independent points centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        -2.8125,
+        -1.9875,
+        3.875
+       ]
+      },
+      {
+       "item": "surface area measure",
+       "measure": "AREA_MEASURE",
+       "value": 606.626874
+      },
+      {
+       "item": "volume measure",
+       "measure": "VOLUME_MEASURE",
+       "value": 105.34209
+      }
+     ]
+    }
+   ],
+   "entityCensus": {
+    "ADVANCED_FACE": 306,
+    "DATUM": 5,
+    "DATUM_FEATURE": 5,
+    "DATUM_REFERENCE_COMPARTMENT": 12,
+    "DATUM_SYSTEM": 5,
+    "DIMENSIONAL_LOCATION": 5,
+    "DIMENSIONAL_SIZE": 12,
+    "FLATNESS_TOLERANCE": 1,
+    "GEOMETRIC_TOLERANCE": 24,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PARALLELISM_TOLERANCE": 1,
+    "PERPENDICULARITY_TOLERANCE": 1,
+    "PLUS_MINUS_TOLERANCE": 16,
+    "POSITION_TOLERANCE": 12,
+    "PRODUCT": 2,
+    "SURFACE_PROFILE_TOLERANCE": 12,
+    "TESSELLATED_ANNOTATION_OCCURRENCE": 53,
+    "TOLERANCE_ZONE": 13
+   }
+  },
+  {
+   "file": "nist_ftc_08_asme1_ap242-e2.stp",
+   "zipMember": "NIST-PMI-STEP-Files/nist_ftc_08_asme1_ap242-e2.stp",
+   "bytes": 4722264,
+   "sha256": "7b9283b4288d152fd181d76c39285d7c79fbba34fda1e14a41ac4a983f6d68b3",
+   "fileSchema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 3 1 4 }",
+   "lengthUnitDetected": "inch",
+   "validationPropertyCounts": {
+    "geometric": 0,
+    "pmi": 0,
+    "attribute": 0
+   },
+   "placeholderGvpDropped": 0,
+   "geometricValidationProperties": [],
+   "entityCensus": {
+    "ADVANCED_FACE": 247,
+    "COMPLEX_TRIANGULATED_SURFACE_SET": 51,
+    "DATUM": 11,
+    "DATUM_FEATURE": 11,
+    "DATUM_REFERENCE_COMPARTMENT": 19,
+    "DATUM_SYSTEM": 9,
+    "DIMENSIONAL_LOCATION": 1,
+    "DIMENSIONAL_SIZE": 9,
+    "FLATNESS_TOLERANCE": 3,
+    "GEOMETRIC_TOLERANCE": 29,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PARALLELISM_TOLERANCE": 5,
+    "PERPENDICULARITY_TOLERANCE": 1,
+    "PLUS_MINUS_TOLERANCE": 9,
+    "POSITION_TOLERANCE": 13,
+    "PRODUCT": 1,
+    "SURFACE_PROFILE_TOLERANCE": 11,
+    "TESSELLATED_ANNOTATION_OCCURRENCE": 52,
+    "TOLERANCE_ZONE": 14
+   }
+  },
+  {
+   "file": "nist_ftc_08_asme1_ap242-e4-tg.stp",
+   "zipMember": "NIST-PMI-STEP-Files/nist_ftc_08_asme1_ap242-e4-tg.stp",
+   "bytes": 2120559,
+   "sha256": "40cd4e5e2e02b5742e0884ba5b132f2e37d2215c45f57afb48962a05a060c384",
+   "fileSchema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF {1 0 10303 442 7 1 4 }",
+   "lengthUnitDetected": "mm",
+   "validationPropertyCounts": {
+    "geometric": 0,
+    "pmi": 65,
+    "attribute": 0
+   },
+   "placeholderGvpDropped": 0,
+   "geometricValidationProperties": [],
+   "entityCensus": {
+    "PRODUCT": 1,
+    "TESSELLATED_ANNOTATION_OCCURRENCE": 60,
+    "TESSELLATED_SHELL": 1,
+    "TESSELLATED_SOLID": 1
+   }
+  },
+  {
+   "file": "nist_ftc_09_asme1_ap242-e1.stp",
+   "zipMember": "NIST-PMI-STEP-Files/nist_ftc_09_asme1_ap242-e1.stp",
+   "bytes": 6109836,
+   "sha256": "f1215fe15a78085a9fa78dd81714caf774b59071be92580b04ebfdc19f52a1bd",
+   "fileSchema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF {1 0 10303 442 1 1 4 }",
+   "lengthUnitDetected": "mm",
+   "validationPropertyCounts": {
+    "geometric": 0,
+    "pmi": 0,
+    "attribute": 0
+   },
+   "placeholderGvpDropped": 0,
+   "geometricValidationProperties": [],
+   "entityCensus": {
+    "ADVANCED_FACE": 163,
+    "COMPLEX_TRIANGULATED_SURFACE_SET": 324,
+    "DATUM": 8,
+    "DATUM_FEATURE": 8,
+    "DATUM_REFERENCE_COMPARTMENT": 20,
+    "DATUM_SYSTEM": 8,
+    "DIMENSIONAL_LOCATION": 8,
+    "DIMENSIONAL_SIZE": 14,
+    "FLATNESS_TOLERANCE": 1,
+    "GEOMETRIC_TOLERANCE": 26,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PERPENDICULARITY_TOLERANCE": 4,
+    "PLUS_MINUS_TOLERANCE": 21,
+    "POSITION_TOLERANCE": 23,
+    "PRODUCT": 4,
+    "SURFACE_PROFILE_TOLERANCE": 3,
+    "TESSELLATED_ANNOTATION_OCCURRENCE": 62,
+    "TOLERANCE_ZONE": 17
+   }
+  },
+  {
+   "file": "nist_ftc_10_asme1_ap242-e2.stp",
+   "zipMember": "NIST-PMI-STEP-Files/nist_ftc_10_asme1_ap242-e2.stp",
+   "bytes": 1879881,
+   "sha256": "9d7711f48e81831c5d1838fdac5c11c0de1aa9b61f3c1d67930a7638b3b25e69",
+   "fileSchema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 3 1 4 }",
+   "lengthUnitDetected": "mm",
+   "validationPropertyCounts": {
+    "geometric": 0,
+    "pmi": 0,
+    "attribute": 0
+   },
+   "placeholderGvpDropped": 0,
+   "geometricValidationProperties": [],
+   "entityCensus": {
+    "ADVANCED_FACE": 282,
+    "CYLINDRICITY_TOLERANCE": 2,
+    "DATUM": 11,
+    "DATUM_FEATURE": 11,
+    "DATUM_REFERENCE_COMPARTMENT": 27,
+    "DATUM_SYSTEM": 12,
+    "DIMENSIONAL_LOCATION": 7,
+    "DIMENSIONAL_SIZE": 19,
+    "FLATNESS_TOLERANCE": 1,
+    "GEOMETRIC_TOLERANCE": 30,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PERPENDICULARITY_TOLERANCE": 6,
+    "PLUS_MINUS_TOLERANCE": 23,
+    "POSITION_TOLERANCE": 19,
+    "PRODUCT": 2,
+    "STRAIGHTNESS_TOLERANCE": 1,
+    "SURFACE_PROFILE_TOLERANCE": 10,
+    "SYMMETRY_TOLERANCE": 1,
+    "TESSELLATED_ANNOTATION_OCCURRENCE": 91,
+    "TOLERANCE_ZONE": 22
+   }
+  },
+  {
+   "file": "nist_ftc_11_asme1_ap242-e3.stp",
+   "zipMember": "NIST-PMI-STEP-Files/nist_ftc_11_asme1_ap242-e3.stp",
+   "bytes": 1946454,
+   "sha256": "2d05bd399463a9ced7b84a479872a759f170fe92f7a62f8194e83df77f86f117",
+   "fileSchema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 4 1 4 }",
+   "lengthUnitDetected": "mm",
+   "validationPropertyCounts": {
+    "geometric": 0,
+    "pmi": 0,
+    "attribute": 0
+   },
+   "placeholderGvpDropped": 0,
+   "geometricValidationProperties": [],
+   "entityCensus": {
+    "ADVANCED_FACE": 42,
+    "CIRCULAR_RUNOUT_TOLERANCE": 1,
+    "COMPLEX_TRIANGULATED_SURFACE_SET": 13,
+    "DATUM": 2,
+    "DATUM_FEATURE": 2,
+    "DATUM_REFERENCE_COMPARTMENT": 2,
+    "DATUM_SYSTEM": 1,
+    "DIMENSIONAL_LOCATION": 1,
+    "DIMENSIONAL_SIZE": 5,
+    "FLATNESS_TOLERANCE": 1,
+    "GEOMETRIC_TOLERANCE": 4,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PLUS_MINUS_TOLERANCE": 4,
+    "PRODUCT": 1,
+    "ROUNDNESS_TOLERANCE": 1,
+    "SURFACE_PROFILE_TOLERANCE": 1,
+    "TESSELLATED_ANNOTATION_OCCURRENCE": 14
+   }
+  },
+  {
+   "file": "nist_stc_06_asme1_ap242-e3.stp",
+   "zipMember": "NIST-PMI-STEP-Files/nist_stc_06_asme1_ap242-e3.stp",
+   "bytes": 1006401,
+   "sha256": "71777c28da76da0e8a667e4cbe792d5f72c09b5c56440c9744d3d50ca96ecc8d",
+   "fileSchema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 4 1 4 }",
+   "lengthUnitDetected": "mm",
+   "validationPropertyCounts": {
+    "geometric": 2,
+    "pmi": 155,
+    "attribute": 1
+   },
+   "placeholderGvpDropped": 1,
+   "geometricValidationProperties": [
+    {
+     "propertyDefinition": "#8167",
+     "description": "",
+     "definitionTarget": "PRODUCT_DEFINITION_SHAPE",
+     "values": [
+      {
+       "item": "independent points centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        129.6711766783,
+        0.6180553292,
+        29.05125
+       ]
+      }
+     ]
+    }
+   ],
+   "entityCensus": {
+    "ADVANCED_FACE": 144,
+    "DATUM": 6,
+    "DATUM_FEATURE": 6,
+    "DATUM_REFERENCE_COMPARTMENT": 19,
+    "DATUM_SYSTEM": 9,
+    "DIMENSIONAL_LOCATION": 3,
+    "DIMENSIONAL_SIZE": 14,
+    "FLATNESS_TOLERANCE": 3,
+    "GEOMETRIC_TOLERANCE": 20,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PERPENDICULARITY_TOLERANCE": 2,
+    "PLUS_MINUS_TOLERANCE": 16,
+    "POSITION_TOLERANCE": 9,
+    "PRODUCT": 1,
+    "SURFACE_PROFILE_TOLERANCE": 11,
+    "TESSELLATED_ANNOTATION_OCCURRENCE": 42,
+    "TOLERANCE_ZONE": 7
+   }
+  },
+  {
+   "file": "nist_stc_07_asme1_ap242-e3.stp",
+   "zipMember": "NIST-PMI-STEP-Files/nist_stc_07_asme1_ap242-e3.stp",
+   "bytes": 1945387,
+   "sha256": "2dddf9b8894bc241f7ffddf3dc4502baa3d49c374e8784039d14b86473d54832",
+   "fileSchema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF {1 0 10303 442 4 1 4}",
+   "lengthUnitDetected": "mm",
+   "validationPropertyCounts": {
+    "geometric": 0,
+    "pmi": 116,
+    "attribute": 0
+   },
+   "placeholderGvpDropped": 0,
+   "geometricValidationProperties": [],
+   "entityCensus": {
+    "ADVANCED_FACE": 306,
+    "COMPLEX_TRIANGULATED_SURFACE_SET": 193,
+    "DATUM": 5,
+    "DATUM_FEATURE": 3,
+    "DATUM_REFERENCE_COMPARTMENT": 12,
+    "DATUM_SYSTEM": 5,
+    "DIMENSIONAL_SIZE": 39,
+    "FLATNESS_TOLERANCE": 1,
+    "GEOMETRIC_TOLERANCE": 19,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PARALLELISM_TOLERANCE": 1,
+    "PERPENDICULARITY_TOLERANCE": 1,
+    "PLUS_MINUS_TOLERANCE": 13,
+    "POSITION_TOLERANCE": 9,
+    "PRODUCT": 5,
+    "SURFACE_PROFILE_TOLERANCE": 10,
+    "TESSELLATED_ANNOTATION_OCCURRENCE": 42,
+    "TOLERANCE_ZONE": 22
+   }
+  },
+  {
+   "file": "nist_stc_08_asme1_ap242-e3.stp",
+   "zipMember": "NIST-PMI-STEP-Files/nist_stc_08_asme1_ap242-e3.stp",
+   "bytes": 2251152,
+   "sha256": "64f24b914910ce8e20c9e4bd59637b4fd155715c7c7b51689466534ed7db1442",
+   "fileSchema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 4 1 4 }",
+   "lengthUnitDetected": "mm",
+   "validationPropertyCounts": {
+    "geometric": 3,
+    "pmi": 92,
+    "attribute": 1
+   },
+   "placeholderGvpDropped": 0,
+   "geometricValidationProperties": [
+    {
+     "propertyDefinition": "#2605",
+     "description": "volume of PartBody",
+     "definitionTarget": "SHAPE_ASPECT",
+     "values": [
+      {
+       "item": "volume measure",
+       "measure": "VOLUME_MEASURE",
+       "value": 503592.175239539
+      },
+      {
+       "item": "wetted area measure",
+       "measure": "AREA_MEASURE",
+       "value": 191687.873141661
+      },
+      {
+       "item": "centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        2.53109307374693,
+        -0.0591847313749045,
+        25.3789167065934
+       ]
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#2607",
+     "description": "volume of Fill.5",
+     "definitionTarget": "SHAPE_ASPECT",
+     "values": [
+      {
+       "item": "independent surface area measure",
+       "measure": "AREA_MEASURE",
+       "value": 3406.44480002725
+      },
+      {
+       "item": "surface centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        -1.21249769820208e-14,
+        -102.45725000041,
+        28.4480000001138
+       ]
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#2609",
+     "description": "volume of NIST PMI STC 08 ASME1",
+     "definitionTarget": "PRODUCT_DEFINITION_SHAPE",
+     "values": [
+      {
+       "item": "volume measure",
+       "measure": "VOLUME_MEASURE",
+       "value": 503592.175239539
+      },
+      {
+       "item": "wetted area measure",
+       "measure": "AREA_MEASURE",
+       "value": 191687.873141661
+      },
+      {
+       "item": "centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        2.53109307374693,
+        -0.0591847313749045,
+        25.3789167065934
+       ]
+      },
+      {
+       "item": "independent surface area measure",
+       "measure": "AREA_MEASURE",
+       "value": 3406.44480002725
+      },
+      {
+       "item": "surface centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        -1.21249769820208e-14,
+        -102.45725000041,
+        28.4480000001138
+       ]
+      },
+      {
+       "item": "curve length measure",
+       "measure": "LENGTH_MEASURE",
+       "value": 4891.57136104863
+      },
+      {
+       "item": "curve centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        2.88674390746709,
+        -9.92326298887008,
+        18.8576761461164
+       ]
+      }
+     ]
+    }
+   ],
+   "entityCensus": {
+    "ADVANCED_FACE": 271,
+    "COMPLEX_TRIANGULATED_SURFACE_SET": 68,
+    "DATUM": 8,
+    "DATUM_FEATURE": 8,
+    "DATUM_REFERENCE_COMPARTMENT": 19,
+    "DATUM_SYSTEM": 9,
+    "DIMENSIONAL_SIZE": 7,
+    "FLATNESS_TOLERANCE": 3,
+    "GEOMETRIC_TOLERANCE": 26,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PARALLELISM_TOLERANCE": 5,
+    "PERPENDICULARITY_TOLERANCE": 1,
+    "PLUS_MINUS_TOLERANCE": 7,
+    "POSITION_TOLERANCE": 9,
+    "PRODUCT": 1,
+    "SURFACE_PROFILE_TOLERANCE": 12,
+    "TESSELLATED_ANNOTATION_OCCURRENCE": 44,
+    "TOLERANCE_ZONE": 10
+   }
+  },
+  {
+   "file": "nist_stc_09_asme1_ap242-e4.stp",
+   "zipMember": "NIST-PMI-STEP-Files/nist_stc_09_asme1_ap242-e4.stp",
+   "bytes": 968495,
+   "sha256": "41026b1f0d81830c6092b5147e0e084d2fa163169161c31af4ce06493d3c7d33",
+   "fileSchema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 7 1 4 }",
+   "lengthUnitDetected": "mm",
+   "validationPropertyCounts": {
+    "geometric": 0,
+    "pmi": 0,
+    "attribute": 0
+   },
+   "placeholderGvpDropped": 0,
+   "geometricValidationProperties": [],
+   "entityCensus": {
+    "ADVANCED_FACE": 163,
+    "DATUM": 8,
+    "DATUM_FEATURE": 8,
+    "DATUM_REFERENCE_COMPARTMENT": 20,
+    "DATUM_SYSTEM": 8,
+    "DIMENSIONAL_LOCATION": 7,
+    "DIMENSIONAL_SIZE": 13,
+    "FLATNESS_TOLERANCE": 1,
+    "GEOMETRIC_TOLERANCE": 22,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PERPENDICULARITY_TOLERANCE": 4,
+    "PLUS_MINUS_TOLERANCE": 20,
+    "POSITION_TOLERANCE": 19,
+    "PRODUCT": 2,
+    "SURFACE_PROFILE_TOLERANCE": 3,
+    "TESSELLATED_ANNOTATION_OCCURRENCE": 58,
+    "TOLERANCE_ZONE": 17
+   }
+  },
+  {
+   "file": "nist_stc_10_asme1_ap242-e2.stp",
+   "zipMember": "NIST-PMI-STEP-Files/nist_stc_10_asme1_ap242-e2.stp",
+   "bytes": 4875056,
+   "sha256": "fba4f46cab1ce1402362038036884631b4a41afe1c9efc5681d358c39db7ed5f",
+   "fileSchema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 3 1 4 }",
+   "lengthUnitDetected": "mm",
+   "validationPropertyCounts": {
+    "geometric": 2,
+    "pmi": 69,
+    "attribute": 0
+   },
+   "placeholderGvpDropped": 0,
+   "geometricValidationProperties": [
+    {
+     "propertyDefinition": "#2616",
+     "description": "",
+     "definitionTarget": "SHAPE_ASPECT",
+     "values": [
+      {
+       "item": "volume measure",
+       "measure": "VOLUME_MEASURE",
+       "value": 188312.244641244
+      },
+      {
+       "item": "surface area measure",
+       "measure": "AREA_MEASURE",
+       "value": 48486.2744665371
+      },
+      {
+       "item": "centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        84.0076805122325,
+        14.6087293037364,
+        37.4990364132354
+       ]
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#2617",
+     "description": "",
+     "definitionTarget": "PRODUCT_DEFINITION_SHAPE",
+     "values": [
+      {
+       "item": "volume measure",
+       "measure": "VOLUME_MEASURE",
+       "value": 188312.244641244
+      },
+      {
+       "item": "surface area measure",
+       "measure": "AREA_MEASURE",
+       "value": 48486.2744665371
+      },
+      {
+       "item": "centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        84.0076805122325,
+        14.6087293037364,
+        37.4990364132354
+       ]
+      }
+     ]
+    }
+   ],
+   "entityCensus": {
+    "ADVANCED_FACE": 256,
+    "COMPLEX_TRIANGULATED_SURFACE_SET": 68,
+    "CYLINDRICITY_TOLERANCE": 2,
+    "DATUM": 9,
+    "DATUM_FEATURE": 9,
+    "DATUM_REFERENCE_COMPARTMENT": 27,
+    "DATUM_SYSTEM": 12,
+    "DIMENSIONAL_LOCATION": 2,
+    "DIMENSIONAL_SIZE": 25,
+    "FLATNESS_TOLERANCE": 1,
+    "GEOMETRIC_TOLERANCE": 27,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PERPENDICULARITY_TOLERANCE": 6,
+    "PLUS_MINUS_TOLERANCE": 21,
+    "POSITION_TOLERANCE": 17,
+    "PRODUCT": 1,
+    "STRAIGHTNESS_TOLERANCE": 1,
+    "SURFACE_PROFILE_TOLERANCE": 9,
+    "SYMMETRY_TOLERANCE": 1,
+    "TESSELLATED_ANNOTATION_OCCURRENCE": 68,
+    "TOLERANCE_ZONE": 20
+   }
+  },
+  {
+   "file": "nist_ctc_01_asme1_rd.stp",
+   "zipMember": "NIST-PMI-STEP-Files/AP203 geometry only/nist_ctc_01_asme1_rd.stp",
+   "bytes": 235171,
+   "sha256": "e081d518484d5c708c6729353237f94a7d97da2b74a10d60d4c0d146d67a5855",
+   "fileSchema": "AP203_CONFIGURATION_CONTROLLED_3D_DESIGN_OF_MECHANICAL_PARTS_AND_ASSEMBLIES_MIM_LF { 1 0 10303 403 2 1 2}",
+   "lengthUnitDetected": "mm",
+   "validationPropertyCounts": {
+    "geometric": 0,
+    "pmi": 0,
+    "attribute": 0
+   },
+   "placeholderGvpDropped": 0,
+   "geometricValidationProperties": [],
+   "entityCensus": {
+    "ADVANCED_FACE": 139,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PRODUCT": 1
+   }
+  },
+  {
+   "file": "nist_ctc_02_asme1_rc.stp",
+   "zipMember": "NIST-PMI-STEP-Files/AP203 geometry only/nist_ctc_02_asme1_rc.stp",
+   "bytes": 1154600,
+   "sha256": "e6df6d0ed68fd8a91bd3f8360c7047f2af3d61068b89050d84423fe8ddb93bcf",
+   "fileSchema": "AP203_CONFIGURATION_CONTROLLED_3D_DESIGN_OF_MECHANICAL_PARTS_AND_ASSEMBLIES_MIM_LF { 1 0 10303 403 2 1 2 }",
+   "lengthUnitDetected": "mm",
+   "validationPropertyCounts": {
+    "geometric": 7,
+    "pmi": 0,
+    "attribute": 0
+   },
+   "placeholderGvpDropped": 0,
+   "geometricValidationProperties": [
+    {
+     "propertyDefinition": "#20778",
+     "description": "area of NIST_CTC_02_ASME1_RC",
+     "definitionTarget": "SHAPE_ASPECT",
+     "values": [
+      {
+       "item": "surface area measure",
+       "measure": "AREA_MEASURE",
+       "value": 2481847.636045
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#20785",
+     "description": "volume of NIST_CTC_02_ASME1_RC",
+     "definitionTarget": "SHAPE_ASPECT",
+     "values": [
+      {
+       "item": "volume measure",
+       "measure": "VOLUME_MEASURE",
+       "value": 47101527.47498
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#20789",
+     "description": "centroid of NIST_CTC_02_ASME1_RC",
+     "definitionTarget": "SHAPE_ASPECT",
+     "values": [
+      {
+       "item": "centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        -0.000876966143434,
+        358.6349444541,
+        -178.1588021156
+       ]
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#20800",
+     "description": "area of NIST_CTC_02_ASME1_RC",
+     "definitionTarget": "SHAPE_ASPECT",
+     "values": [
+      {
+       "item": "surface area measure",
+       "measure": "AREA_MEASURE",
+       "value": 4417.488569853
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#20807",
+     "description": "area of NIST_CTC_02_ASME1_RC",
+     "definitionTarget": "PRODUCT_DEFINITION_SHAPE",
+     "values": [
+      {
+       "item": "surface area measure",
+       "measure": "AREA_MEASURE",
+       "value": 2486265.124614
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#20814",
+     "description": "volume of NIST_CTC_02_ASME1_RC",
+     "definitionTarget": "PRODUCT_DEFINITION_SHAPE",
+     "values": [
+      {
+       "item": "volume measure",
+       "measure": "VOLUME_MEASURE",
+       "value": 47101527.47498
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#20818",
+     "description": "centroid of NIST_CTC_02_ASME1_RC",
+     "definitionTarget": "PRODUCT_DEFINITION_SHAPE",
+     "values": [
+      {
+       "item": "centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        -0.000876966143434,
+        358.6349444541,
+        -178.1588021156
+       ]
+      }
+     ]
+    }
+   ],
+   "entityCensus": {
+    "ADVANCED_FACE": 664,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PRODUCT": 1
+   }
+  },
+  {
+   "file": "nist_ctc_03_asme1_rc.stp",
+   "zipMember": "NIST-PMI-STEP-Files/AP203 geometry only/nist_ctc_03_asme1_rc.stp",
+   "bytes": 252128,
+   "sha256": "95a775b1acdbc34de11319cb83b4cf6c6fdd7de8cbfc4af2d0afe5d3565cfdf8",
+   "fileSchema": "AP203_CONFIGURATION_CONTROLLED_3D_DESIGN_OF_MECHANICAL_PARTS_AND_ASSEMBLIES_MIM_LF { 1 0 10303 403 2 1 2}",
+   "lengthUnitDetected": "inch",
+   "validationPropertyCounts": {
+    "geometric": 0,
+    "pmi": 0,
+    "attribute": 0
+   },
+   "placeholderGvpDropped": 0,
+   "geometricValidationProperties": [],
+   "entityCensus": {
+    "ADVANCED_FACE": 139,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PRODUCT": 1
+   }
+  },
+  {
+   "file": "nist_ctc_04_asme1_rd.stp",
+   "zipMember": "NIST-PMI-STEP-Files/AP203 geometry only/nist_ctc_04_asme1_rd.stp",
+   "bytes": 793048,
+   "sha256": "cdb59a085a3364941b881f96b511265a7cb5f6e94180c4426bdc3025481f405a",
+   "fileSchema": "AP203_CONFIGURATION_CONTROLLED_3D_DESIGN_OF_MECHANICAL_PARTS_AND_ASSEMBLIES_MIM_LF { 1 0 10303 403 3 1 4}",
+   "lengthUnitDetected": "mm",
+   "validationPropertyCounts": {
+    "geometric": 0,
+    "pmi": 0,
+    "attribute": 0
+   },
+   "placeholderGvpDropped": 0,
+   "geometricValidationProperties": [],
+   "entityCensus": {
+    "ADVANCED_FACE": 520,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PRODUCT": 1
+   }
+  },
+  {
+   "file": "nist_ctc_05_asme1_rd.stp",
+   "zipMember": "NIST-PMI-STEP-Files/AP203 geometry only/nist_ctc_05_asme1_rd.stp",
+   "bytes": 326817,
+   "sha256": "5140b8f41fa1d0a069ea978e28c92a597f47220d0a11e667b79ff5f7c7243b86",
+   "fileSchema": "AP203_CONFIGURATION_CONTROLLED_3D_DESIGN_OF_MECHANICAL_PARTS_AND_ASSEMBLIES_MIM_LF { 1 0 10303 403 2 1 2 }",
+   "lengthUnitDetected": "inch",
+   "validationPropertyCounts": {
+    "geometric": 7,
+    "pmi": 0,
+    "attribute": 0
+   },
+   "placeholderGvpDropped": 0,
+   "geometricValidationProperties": [
+    {
+     "propertyDefinition": "#6629",
+     "description": "area of NIST_CTC_05_ASME1_RD",
+     "definitionTarget": "SHAPE_ASPECT",
+     "values": [
+      {
+       "item": "surface area measure",
+       "measure": "AREA_MEASURE",
+       "value": 1334.929190494
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#6638",
+     "description": "volume of NIST_CTC_05_ASME1_RD",
+     "definitionTarget": "SHAPE_ASPECT",
+     "values": [
+      {
+       "item": "volume measure",
+       "measure": "VOLUME_MEASURE",
+       "value": 774.6912251592
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#6642",
+     "description": "centroid of NIST_CTC_05_ASME1_RD",
+     "definitionTarget": "SHAPE_ASPECT",
+     "values": [
+      {
+       "item": "centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        -0.0001748948720802,
+        -0.03978772720191,
+        3.926126039017
+       ]
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#6655",
+     "description": "area of NIST_CTC_05_ASME1_RD",
+     "definitionTarget": "SHAPE_ASPECT",
+     "values": [
+      {
+       "item": "surface area measure",
+       "measure": "AREA_MEASURE",
+       "value": 2.5
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#6664",
+     "description": "area of NIST_CTC_05_ASME1_RD",
+     "definitionTarget": "PRODUCT_DEFINITION_SHAPE",
+     "values": [
+      {
+       "item": "surface area measure",
+       "measure": "AREA_MEASURE",
+       "value": 1337.429190494
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#6673",
+     "description": "volume of NIST_CTC_05_ASME1_RD",
+     "definitionTarget": "PRODUCT_DEFINITION_SHAPE",
+     "values": [
+      {
+       "item": "volume measure",
+       "measure": "VOLUME_MEASURE",
+       "value": 774.6912251592
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#6677",
+     "description": "centroid of NIST_CTC_05_ASME1_RD",
+     "definitionTarget": "PRODUCT_DEFINITION_SHAPE",
+     "values": [
+      {
+       "item": "centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        -0.0001748948720802,
+        -0.03978772720191,
+        3.926126039017
+       ]
+      }
+     ]
+    }
+   ],
+   "entityCensus": {
+    "ADVANCED_FACE": 209,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PRODUCT": 1
+   }
+  },
+  {
+   "file": "nist_ftc_06_asme1_rd.stp",
+   "zipMember": "NIST-PMI-STEP-Files/AP203 geometry only/nist_ftc_06_asme1_rd.stp",
+   "bytes": 222799,
+   "sha256": "5e30f0903f9470c14a98e70395ca005fe90bcd3fb704c381a80a69958838f169",
+   "fileSchema": "AP203_CONFIGURATION_CONTROLLED_3D_DESIGN_OF_MECHANICAL_PARTS_AND_ASSEMBLIES_MIM_LF { 1 0 10303 403 2 1 2}",
+   "lengthUnitDetected": "inch",
+   "validationPropertyCounts": {
+    "geometric": 0,
+    "pmi": 0,
+    "attribute": 0
+   },
+   "placeholderGvpDropped": 0,
+   "geometricValidationProperties": [],
+   "entityCensus": {
+    "ADVANCED_FACE": 144,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PRODUCT": 1
+   }
+  },
+  {
+   "file": "nist_ftc_07_asme1_rd.stp",
+   "zipMember": "NIST-PMI-STEP-Files/AP203 geometry only/nist_ftc_07_asme1_rd.stp",
+   "bytes": 402531,
+   "sha256": "a0bc551656780b26d7a0ee1beedbc07d43f41efa092f74f3c2d8383417f04481",
+   "fileSchema": "CONFIG_CONTROL_DESIGN",
+   "lengthUnitDetected": "cm",
+   "validationPropertyCounts": {
+    "geometric": 0,
+    "pmi": 0,
+    "attribute": 0
+   },
+   "placeholderGvpDropped": 0,
+   "geometricValidationProperties": [],
+   "entityCensus": {
+    "ADVANCED_FACE": 269,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PRODUCT": 1
+   }
+  },
+  {
+   "file": "nist_ftc_08_asme1_rc.stp",
+   "zipMember": "NIST-PMI-STEP-Files/AP203 geometry only/nist_ftc_08_asme1_rc.stp",
+   "bytes": 450741,
+   "sha256": "4b7011b0b86cf6301058aa954b76a9587d23478b6dee2660f4a80caf0dfe8b73",
+   "fileSchema": "AP203_CONFIGURATION_CONTROLLED_3D_DESIGN_OF_MECHANICAL_PARTS_AND_ASSEMBLIES_MIM_LF { 1 0 10303 403 3 1 4}",
+   "lengthUnitDetected": "mm",
+   "validationPropertyCounts": {
+    "geometric": 0,
+    "pmi": 0,
+    "attribute": 0
+   },
+   "placeholderGvpDropped": 0,
+   "geometricValidationProperties": [],
+   "entityCensus": {
+    "ADVANCED_FACE": 270,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PRODUCT": 1
+   }
+  },
+  {
+   "file": "nist_ftc_09_asme1_rd.stp",
+   "zipMember": "NIST-PMI-STEP-Files/AP203 geometry only/nist_ftc_09_asme1_rd.stp",
+   "bytes": 263916,
+   "sha256": "e29c09bd2d454601ff1a0d77c4c4ffaf2ed78eee71031ce49f7b7bb5a6d1d4e8",
+   "fileSchema": "AP203_CONFIGURATION_CONTROLLED_3D_DESIGN_OF_MECHANICAL_PARTS_AND_ASSEMBLIES_MIM_LF { 1 0 10303 403 2 1 2 }",
+   "lengthUnitDetected": "inch",
+   "validationPropertyCounts": {
+    "geometric": 6,
+    "pmi": 0,
+    "attribute": 0
+   },
+   "placeholderGvpDropped": 0,
+   "geometricValidationProperties": [
+    {
+     "propertyDefinition": "#5809",
+     "description": "area of NIST_FTC_09_ASME1_RD",
+     "definitionTarget": "SHAPE_ASPECT",
+     "values": [
+      {
+       "item": "surface area measure",
+       "measure": "AREA_MEASURE",
+       "value": 149.7523619055
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#5818",
+     "description": "volume of NIST_FTC_09_ASME1_RD",
+     "definitionTarget": "SHAPE_ASPECT",
+     "values": [
+      {
+       "item": "volume measure",
+       "measure": "VOLUME_MEASURE",
+       "value": 8.326391158987
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#5822",
+     "description": "centroid of NIST_FTC_09_ASME1_RD",
+     "definitionTarget": "SHAPE_ASPECT",
+     "values": [
+      {
+       "item": "centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        0.08606042202086,
+        0.05964705664228,
+        0.1793019587974
+       ]
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#5831",
+     "description": "area of NIST_FTC_09_ASME1_RD",
+     "definitionTarget": "PRODUCT_DEFINITION_SHAPE",
+     "values": [
+      {
+       "item": "surface area measure",
+       "measure": "AREA_MEASURE",
+       "value": 149.7523619055
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#5840",
+     "description": "volume of NIST_FTC_09_ASME1_RD",
+     "definitionTarget": "PRODUCT_DEFINITION_SHAPE",
+     "values": [
+      {
+       "item": "volume measure",
+       "measure": "VOLUME_MEASURE",
+       "value": 8.326391158987
+      }
+     ]
+    },
+    {
+     "propertyDefinition": "#5844",
+     "description": "centroid of NIST_FTC_09_ASME1_RD",
+     "definitionTarget": "PRODUCT_DEFINITION_SHAPE",
+     "values": [
+      {
+       "item": "centre point",
+       "measure": "CARTESIAN_POINT",
+       "value": [
+        0.08606042202086,
+        0.05964705664228,
+        0.1793019587974
+       ]
+      }
+     ]
+    }
+   ],
+   "entityCensus": {
+    "ADVANCED_FACE": 158,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PRODUCT": 1
+   }
+  },
+  {
+   "file": "nist_ftc_10_asme1_rb.stp",
+   "zipMember": "NIST-PMI-STEP-Files/AP203 geometry only/nist_ftc_10_asme1_rb.stp",
+   "bytes": 323601,
+   "sha256": "2bd726f9fe86aeb96ab517ce876e5696e7951310df5c4fbca36276d65879067b",
+   "fileSchema": "CONFIG_CONTROL_DESIGN",
+   "lengthUnitDetected": "mm",
+   "validationPropertyCounts": {
+    "geometric": 0,
+    "pmi": 0,
+    "attribute": 0
+   },
+   "placeholderGvpDropped": 0,
+   "geometricValidationProperties": [],
+   "entityCensus": {
+    "ADVANCED_FACE": 214,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PRODUCT": 1
+   }
+  },
+  {
+   "file": "nist_ftc_11_asme1_rb.stp",
+   "zipMember": "NIST-PMI-STEP-Files/AP203 geometry only/nist_ftc_11_asme1_rb.stp",
+   "bytes": 7634,
+   "sha256": "a5abfea460499dc31bc812aca68917948a117565fea4f5a080e36eb32f39650d",
+   "fileSchema": "CONFIG_CONTROL_DESIGN",
+   "lengthUnitDetected": "mm",
+   "validationPropertyCounts": {
+    "geometric": 0,
+    "pmi": 0,
+    "attribute": 0
+   },
+   "placeholderGvpDropped": 0,
+   "geometricValidationProperties": [],
+   "entityCensus": {
+    "ADVANCED_FACE": 6,
+    "MANIFOLD_SOLID_BREP": 1,
+    "PRODUCT": 1
+   }
+  }
+ ]
+}

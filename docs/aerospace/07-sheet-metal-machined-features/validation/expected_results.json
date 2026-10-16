@@ -1,0 +1,4131 @@
+{
+ "description": "Gap FTR validation cases as CLI invocations + JSON assertions (AGENT_FIRST AF-23). Generated; do not edit by hand.",
+ "generator": "docs/aerospace/07-sheet-metal-machined-features/validation/build_expected_results.py",
+ "conventions": {
+  "doc": "each case runs on a fresh temp --doc; plan / plan_file first (llull run \u2026 --json), then cli calls with --json",
+  "alias": "<alias:NAME> = first id in affected of the plan step whose \"as\" is NAME",
+  "first": "<first:data.ids> = first id in data.ids of the previous call (find_entities)",
+  "paths": "dot paths into the --json object; [*] maps over an array; [?field==value] filters",
+  "status": "commands marked proposed in TECHNICAL_SPEC \u00a74 make these cases red until implemented; VC-FTR-26 runs today"
+ },
+ "cases": [
+  {
+   "vc": "VC-FTR-01",
+   "case": "FP-01",
+   "proves": [
+    "FR-FTR-04",
+    "FR-FTR-14",
+    "FR-FTR-30"
+   ],
+   "category": "b",
+   "cli": [
+    "llull sheet_metal_calc units=mm thickness=2.0 insideRadius=1.64 angle=90.0 kFactor=0.38 mode=k_factor"
+   ],
+   "assert": [
+    {
+     "path": "data.lengthUnit",
+     "op": "eq",
+     "value": "mm"
+    },
+    {
+     "path": "data.ba",
+     "op": "approx",
+     "value": 3.769911184,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.ossb",
+     "op": "approx",
+     "value": 3.64,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.issb",
+     "op": "approx",
+     "value": 1.64,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.bd",
+     "op": "approx",
+     "value": 3.510088816,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.kChart",
+     "op": "approx",
+     "value": 1.0,
+     "tol": 1e-09,
+     "tolKind": "abs"
+    }
+   ],
+   "source": "data/expected_flat_pattern.json bends[FP-01]"
+  },
+  {
+   "vc": "VC-FTR-01",
+   "case": "FP-02",
+   "proves": [
+    "FR-FTR-04",
+    "FR-FTR-14",
+    "FR-FTR-30"
+   ],
+   "category": "b",
+   "cli": [
+    "llull sheet_metal_calc units=mm thickness=1.6 insideRadius=4.8 angle=90.0 kFactor=0.44 mode=k_factor"
+   ],
+   "assert": [
+    {
+     "path": "data.lengthUnit",
+     "op": "eq",
+     "value": "mm"
+    },
+    {
+     "path": "data.ba",
+     "op": "approx",
+     "value": 8.645662983,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.ossb",
+     "op": "approx",
+     "value": 6.4,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.issb",
+     "op": "approx",
+     "value": 4.8,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.bd",
+     "op": "approx",
+     "value": 4.154337017,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.kChart",
+     "op": "approx",
+     "value": 1.0,
+     "tol": 1e-09,
+     "tolKind": "abs"
+    }
+   ],
+   "source": "data/expected_flat_pattern.json bends[FP-02]"
+  },
+  {
+   "vc": "VC-FTR-01",
+   "case": "FP-03",
+   "proves": [
+    "FR-FTR-04",
+    "FR-FTR-14",
+    "FR-FTR-30"
+   ],
+   "category": "b",
+   "cli": [
+    "llull sheet_metal_calc units=mm thickness=1.6 insideRadius=4.8 angle=90.0 kFactor=0.33 mode=k_factor"
+   ],
+   "assert": [
+    {
+     "path": "data.lengthUnit",
+     "op": "eq",
+     "value": "mm"
+    },
+    {
+     "path": "data.ba",
+     "op": "approx",
+     "value": 8.369202829,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.ossb",
+     "op": "approx",
+     "value": 6.4,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.issb",
+     "op": "approx",
+     "value": 4.8,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.bd",
+     "op": "approx",
+     "value": 4.430797171,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.kChart",
+     "op": "approx",
+     "value": 1.0,
+     "tol": 1e-09,
+     "tolKind": "abs"
+    }
+   ],
+   "source": "data/expected_flat_pattern.json bends[FP-03]"
+  },
+  {
+   "vc": "VC-FTR-01",
+   "case": "FP-04",
+   "proves": [
+    "FR-FTR-04",
+    "FR-FTR-14",
+    "FR-FTR-30"
+   ],
+   "category": "b",
+   "cli": [
+    "llull sheet_metal_calc units=mm thickness=1.6 insideRadius=4.8 angle=90.0 kFactor=0.5 mode=k_factor"
+   ],
+   "assert": [
+    {
+     "path": "data.lengthUnit",
+     "op": "eq",
+     "value": "mm"
+    },
+    {
+     "path": "data.ba",
+     "op": "approx",
+     "value": 8.79645943,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.ossb",
+     "op": "approx",
+     "value": 6.4,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.issb",
+     "op": "approx",
+     "value": 4.8,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.bd",
+     "op": "approx",
+     "value": 4.00354057,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.kChart",
+     "op": "approx",
+     "value": 1.0,
+     "tol": 1e-09,
+     "tolKind": "abs"
+    }
+   ],
+   "source": "data/expected_flat_pattern.json bends[FP-04]"
+  },
+  {
+   "vc": "VC-FTR-01",
+   "case": "FP-05",
+   "proves": [
+    "FR-FTR-04",
+    "FR-FTR-14",
+    "FR-FTR-30"
+   ],
+   "category": "b",
+   "cli": [
+    "llull sheet_metal_calc units=mm thickness=1.0 insideRadius=1.0 angle=45.0 kFactor=0.4 mode=k_factor"
+   ],
+   "assert": [
+    {
+     "path": "data.lengthUnit",
+     "op": "eq",
+     "value": "mm"
+    },
+    {
+     "path": "data.ba",
+     "op": "approx",
+     "value": 1.099557429,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.ossb",
+     "op": "approx",
+     "value": 0.828427125,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.issb",
+     "op": "approx",
+     "value": 0.414213562,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.bd",
+     "op": "approx",
+     "value": 0.557296821,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.kChart",
+     "op": "approx",
+     "value": 0.414213562,
+     "tol": 1e-09,
+     "tolKind": "abs"
+    }
+   ],
+   "source": "data/expected_flat_pattern.json bends[FP-05]"
+  },
+  {
+   "vc": "VC-FTR-01",
+   "case": "FP-06",
+   "proves": [
+    "FR-FTR-04",
+    "FR-FTR-14",
+    "FR-FTR-30"
+   ],
+   "category": "b",
+   "cli": [
+    "llull sheet_metal_calc units=mm thickness=1.0 insideRadius=1.0 angle=135.0 kFactor=0.4 mode=k_factor"
+   ],
+   "assert": [
+    {
+     "path": "data.lengthUnit",
+     "op": "eq",
+     "value": "mm"
+    },
+    {
+     "path": "data.ba",
+     "op": "approx",
+     "value": 3.298672286,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.ossb",
+     "op": "approx",
+     "value": 4.828427125,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.issb",
+     "op": "approx",
+     "value": 2.414213562,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.bd",
+     "op": "approx",
+     "value": 6.358181963,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.kChart",
+     "op": "approx",
+     "value": 2.414213562,
+     "tol": 1e-09,
+     "tolKind": "abs"
+    }
+   ],
+   "source": "data/expected_flat_pattern.json bends[FP-06]"
+  },
+  {
+   "vc": "VC-FTR-01",
+   "case": "FP-07",
+   "proves": [
+    "FR-FTR-04",
+    "FR-FTR-14",
+    "FR-FTR-30"
+   ],
+   "category": "b",
+   "cli": [
+    "llull sheet_metal_calc units=mm thickness=3.0 insideRadius=9.0 angle=120.0 kFactor=0.45 mode=k_factor"
+   ],
+   "assert": [
+    {
+     "path": "data.lengthUnit",
+     "op": "eq",
+     "value": "mm"
+    },
+    {
+     "path": "data.ba",
+     "op": "approx",
+     "value": 21.67698931,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.ossb",
+     "op": "approx",
+     "value": 20.784609691,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.issb",
+     "op": "approx",
+     "value": 15.588457268,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.bd",
+     "op": "approx",
+     "value": 19.892230072,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.kChart",
+     "op": "approx",
+     "value": 1.732050808,
+     "tol": 1e-09,
+     "tolKind": "abs"
+    }
+   ],
+   "source": "data/expected_flat_pattern.json bends[FP-07]"
+  },
+  {
+   "vc": "VC-FTR-01",
+   "case": "FP-08",
+   "proves": [
+    "FR-FTR-04",
+    "FR-FTR-14",
+    "FR-FTR-30"
+   ],
+   "category": "b",
+   "cli": [
+    "llull sheet_metal_calc units=in thickness=0.064 insideRadius=0.25 angle=90.0 kFactor=0.4475 mode=k_factor"
+   ],
+   "assert": [
+    {
+     "path": "data.lengthUnit",
+     "op": "eq",
+     "value": "in"
+    },
+    {
+     "path": "data.ba",
+     "op": "approx",
+     "value": 0.437686688,
+     "tol": 1e-07,
+     "tolKind": "abs",
+     "unit": "in"
+    },
+    {
+     "path": "data.ossb",
+     "op": "approx",
+     "value": 0.314,
+     "tol": 1e-07,
+     "tolKind": "abs",
+     "unit": "in"
+    },
+    {
+     "path": "data.issb",
+     "op": "approx",
+     "value": 0.25,
+     "tol": 1e-07,
+     "tolKind": "abs",
+     "unit": "in"
+    },
+    {
+     "path": "data.bd",
+     "op": "approx",
+     "value": 0.190313312,
+     "tol": 1e-07,
+     "tolKind": "abs",
+     "unit": "in"
+    },
+    {
+     "path": "data.kChart",
+     "op": "approx",
+     "value": 1.0,
+     "tol": 1e-09,
+     "tolKind": "abs"
+    }
+   ],
+   "source": "data/expected_flat_pattern.json bends[FP-08]"
+  },
+  {
+   "vc": "VC-FTR-01",
+   "case": "FP-09",
+   "proves": [
+    "FR-FTR-04",
+    "FR-FTR-14",
+    "FR-FTR-30"
+   ],
+   "category": "b",
+   "cli": [
+    "llull sheet_metal_calc units=in thickness=0.064 insideRadius=0.25 angle=45.0 kFactor=0.4475 mode=k_factor"
+   ],
+   "assert": [
+    {
+     "path": "data.lengthUnit",
+     "op": "eq",
+     "value": "in"
+    },
+    {
+     "path": "data.ba",
+     "op": "approx",
+     "value": 0.218843344,
+     "tol": 1e-07,
+     "tolKind": "abs",
+     "unit": "in"
+    },
+    {
+     "path": "data.ossb",
+     "op": "approx",
+     "value": 0.130063059,
+     "tol": 1e-07,
+     "tolKind": "abs",
+     "unit": "in"
+    },
+    {
+     "path": "data.issb",
+     "op": "approx",
+     "value": 0.103553391,
+     "tol": 1e-07,
+     "tolKind": "abs",
+     "unit": "in"
+    },
+    {
+     "path": "data.bd",
+     "op": "approx",
+     "value": 0.041282773,
+     "tol": 1e-07,
+     "tolKind": "abs",
+     "unit": "in"
+    },
+    {
+     "path": "data.kChart",
+     "op": "approx",
+     "value": 0.414213562,
+     "tol": 1e-09,
+     "tolKind": "abs"
+    }
+   ],
+   "source": "data/expected_flat_pattern.json bends[FP-09]"
+  },
+  {
+   "vc": "VC-FTR-01",
+   "case": "FP-10",
+   "proves": [
+    "FR-FTR-04",
+    "FR-FTR-14",
+    "FR-FTR-30"
+   ],
+   "category": "b",
+   "cli": [
+    "llull sheet_metal_calc units=in thickness=0.064 insideRadius=0.25 angle=135.0 kFactor=0.4475 mode=k_factor"
+   ],
+   "assert": [
+    {
+     "path": "data.lengthUnit",
+     "op": "eq",
+     "value": "in"
+    },
+    {
+     "path": "data.ba",
+     "op": "approx",
+     "value": 0.656530033,
+     "tol": 1e-07,
+     "tolKind": "abs",
+     "unit": "in"
+    },
+    {
+     "path": "data.ossb",
+     "op": "approx",
+     "value": 0.758063059,
+     "tol": 1e-07,
+     "tolKind": "abs",
+     "unit": "in"
+    },
+    {
+     "path": "data.issb",
+     "op": "approx",
+     "value": 0.603553391,
+     "tol": 1e-07,
+     "tolKind": "abs",
+     "unit": "in"
+    },
+    {
+     "path": "data.bd",
+     "op": "approx",
+     "value": 0.859596084,
+     "tol": 1e-07,
+     "tolKind": "abs",
+     "unit": "in"
+    },
+    {
+     "path": "data.kChart",
+     "op": "approx",
+     "value": 2.414213562,
+     "tol": 1e-09,
+     "tolKind": "abs"
+    }
+   ],
+   "source": "data/expected_flat_pattern.json bends[FP-10]"
+  },
+  {
+   "vc": "VC-FTR-01",
+   "case": "FP-11",
+   "proves": [
+    "FR-FTR-04",
+    "FR-FTR-14",
+    "FR-FTR-30"
+   ],
+   "category": "b",
+   "cli": [
+    "llull sheet_metal_calc units=in thickness=0.04 insideRadius=0.25 angle=60.0 kFactor=0.4475 mode=k_factor"
+   ],
+   "assert": [
+    {
+     "path": "data.lengthUnit",
+     "op": "eq",
+     "value": "in"
+    },
+    {
+     "path": "data.ba",
+     "op": "approx",
+     "value": 0.280544224,
+     "tol": 1e-07,
+     "tolKind": "abs",
+     "unit": "in"
+    },
+    {
+     "path": "data.ossb",
+     "op": "approx",
+     "value": 0.167431578,
+     "tol": 1e-07,
+     "tolKind": "abs",
+     "unit": "in"
+    },
+    {
+     "path": "data.issb",
+     "op": "approx",
+     "value": 0.144337567,
+     "tol": 1e-07,
+     "tolKind": "abs",
+     "unit": "in"
+    },
+    {
+     "path": "data.bd",
+     "op": "approx",
+     "value": 0.054318932,
+     "tol": 1e-07,
+     "tolKind": "abs",
+     "unit": "in"
+    },
+    {
+     "path": "data.kChart",
+     "op": "approx",
+     "value": 0.577350269,
+     "tol": 1e-09,
+     "tolKind": "abs"
+    }
+   ],
+   "source": "data/expected_flat_pattern.json bends[FP-11]"
+  },
+  {
+   "vc": "VC-FTR-01",
+   "case": "FP-12",
+   "proves": [
+    "FR-FTR-04",
+    "FR-FTR-14",
+    "FR-FTR-30"
+   ],
+   "category": "b",
+   "cli": [
+    "llull sheet_metal_calc units=mm thickness=0.8 insideRadius=0.0 angle=90.0 kFactor=0.33 mode=k_factor"
+   ],
+   "assert": [
+    {
+     "path": "data.lengthUnit",
+     "op": "eq",
+     "value": "mm"
+    },
+    {
+     "path": "data.ba",
+     "op": "approx",
+     "value": 0.41469023,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.ossb",
+     "op": "approx",
+     "value": 0.8,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.issb",
+     "op": "approx",
+     "value": 0.0,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.bd",
+     "op": "approx",
+     "value": 1.18530977,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.kChart",
+     "op": "approx",
+     "value": 1.0,
+     "tol": 1e-09,
+     "tolKind": "abs"
+    }
+   ],
+   "source": "data/expected_flat_pattern.json bends[FP-12]"
+  },
+  {
+   "vc": "VC-FTR-02",
+   "case": "FP-09",
+   "proves": [
+    "FR-FTR-14",
+    "FR-FTR-30"
+   ],
+   "category": "a (V-search) + b",
+   "cli": [
+    "llull sheet_metal_calc units=in thickness=0.064 insideRadius=0.25 angle=45.0 kFactor=0.4475 mode=k_factor"
+   ],
+   "assert": [
+    {
+     "path": "data.ossb",
+     "op": "approx",
+     "value": 0.13,
+     "tol": 0.0005,
+     "tolKind": "abs",
+     "unit": "in"
+    },
+    {
+     "path": "data.ossb",
+     "op": "approx",
+     "value": 0.130063059,
+     "tol": 1e-07,
+     "tolKind": "abs",
+     "unit": "in"
+    },
+    {
+     "path": "data.kChart",
+     "op": "approx",
+     "value": 0.414213562,
+     "tol": 1e-05,
+     "tolKind": "abs"
+    }
+   ],
+   "source": "AC 43.13-1B ch.4 [R2]; data/expected_flat_pattern.json FP-09"
+  },
+  {
+   "vc": "VC-FTR-02",
+   "case": "FP-10",
+   "proves": [
+    "FR-FTR-14",
+    "FR-FTR-30"
+   ],
+   "category": "a (V-search) + b",
+   "cli": [
+    "llull sheet_metal_calc units=in thickness=0.064 insideRadius=0.25 angle=135.0 kFactor=0.4475 mode=k_factor"
+   ],
+   "assert": [
+    {
+     "path": "data.ossb",
+     "op": "approx",
+     "value": 0.758,
+     "tol": 0.0005,
+     "tolKind": "abs",
+     "unit": "in"
+    },
+    {
+     "path": "data.ossb",
+     "op": "approx",
+     "value": 0.758063059,
+     "tol": 1e-07,
+     "tolKind": "abs",
+     "unit": "in"
+    },
+    {
+     "path": "data.kChart",
+     "op": "approx",
+     "value": 2.414213562,
+     "tol": 1e-05,
+     "tolKind": "abs"
+    }
+   ],
+   "source": "AC 43.13-1B ch.4 [R2]; data/expected_flat_pattern.json FP-10"
+  },
+  {
+   "vc": "VC-FTR-03",
+   "case": "FP-11",
+   "proves": [
+    "FR-FTR-14"
+   ],
+   "category": "a (V-search) + b",
+   "cli": [
+    "llull sheet_metal_calc units=in thickness=0.04 insideRadius=0.25 angle=60.0 mode=faa_empirical"
+   ],
+   "assert": [
+    {
+     "path": "data.ba",
+     "op": "approx",
+     "value": 0.28017,
+     "tol": 1e-07,
+     "tolKind": "abs",
+     "unit": "in"
+    },
+    {
+     "path": "data.ba",
+     "op": "approx",
+     "value": 0.2796,
+     "tol": 0.0007,
+     "tolKind": "abs",
+     "unit": "in"
+    },
+    {
+     "path": "data.mode",
+     "op": "eq",
+     "value": "faa_empirical"
+    }
+   ],
+   "source": "EAA [R3]; data/expected_flat_pattern.json FP-11"
+  },
+  {
+   "vc": "VC-FTR-04",
+   "case": "FP-01",
+   "proves": [
+    "FR-FTR-04"
+   ],
+   "category": "b",
+   "cli": [
+    "llull sheet_metal_calc units=mm thickness=2.0 insideRadius=1.64 angle=90.0 kFactor=0.38 mode=k_factor"
+   ],
+   "assert": [
+    {
+     "path": "data.ba",
+     "op": "approx",
+     "value": 3.769911,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.ossb",
+     "op": "approx",
+     "value": 3.64,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    }
+   ],
+   "derivation": "leg = 50 - BA/2 = 48.115044; flange = OSSB + leg = 51.755044 (FreeCAD tools/calc-unfold.py [R7])",
+   "source": "data/expected_flat_pattern.json freecad_calc_unfold_FP01"
+  },
+  {
+   "vc": "VC-FTR-05",
+   "case": "DIN 0.88",
+   "proves": [
+    "FR-FTR-01"
+   ],
+   "category": "b",
+   "cli": [
+    "llull sheet_metal_calc units=mm thickness=1.6 insideRadius=4.8 angle=90 kFactor=0.88 kStandard=din"
+   ],
+   "assert": [
+    {
+     "path": "data.kFactor.value",
+     "op": "approx",
+     "value": 0.44,
+     "tol": 1e-12,
+     "tolKind": "abs"
+    },
+    {
+     "path": "data.kFactor.standard",
+     "op": "eq",
+     "value": "ansi"
+    },
+    {
+     "path": "data.ba",
+     "op": "approx",
+     "value": 8.645662983,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    }
+   ],
+   "source": "FreeCAD _convert_to_ansi_kfactor [R7]"
+  },
+  {
+   "vc": "VC-FTR-07",
+   "case": "bracket K 0.44",
+   "proves": [
+    "FR-FTR-04"
+   ],
+   "category": "b",
+   "plan_file": "docs/aerospace/07-sheet-metal-machined-features/validation/plans/draft_sheet_metal_bracket.json",
+   "flags": [
+    "--kernel",
+    "occt"
+   ],
+   "cli": [
+    "llull flat_pattern id=<alias:sm> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.extents[0]",
+     "op": "approx",
+     "value": 65.8456629826791,
+     "tol": 0.01,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.extents[1]",
+     "op": "approx",
+     "value": 50.0,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.bends",
+     "op": "len",
+     "value": 1
+    },
+    {
+     "path": "data.bends[0].ba",
+     "op": "approx",
+     "value": 8.645662983,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    }
+   ],
+   "source": "data/expected_test_parts.json ftr_bracket_L.step; FP-02"
+  },
+  {
+   "vc": "VC-FTR-06",
+   "case": "bracket volume",
+   "proves": [
+    "FR-FTR-02",
+    "FR-FTR-03"
+   ],
+   "category": "b + c",
+   "plan_file": "docs/aerospace/07-sheet-metal-machined-features/validation/plans/draft_sheet_metal_bracket.json",
+   "flags": [
+    "--kernel",
+    "occt"
+   ],
+   "cli": [
+    "llull mass_properties entityId=<alias:sm> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.volume",
+     "op": "approx",
+     "value": 5279.716754404115,
+     "tol": 1e-06,
+     "tolKind": "rel",
+     "unit": "mm\u00b3"
+    },
+    {
+     "path": "data.volumeUnit",
+     "op": "eq",
+     "value": "mm\u00b3"
+    }
+   ],
+   "derivation": "W*T*(A+B-2*(R+T)+theta*(R+T/2))  (= W*T*flat length at K=0.5, case FP-04)",
+   "source": "data/expected_test_parts.json"
+  },
+  {
+   "vc": "VC-FTR-41",
+   "case": "reviewRequired on flat_pattern",
+   "proves": [
+    "FR-FTR-37"
+   ],
+   "af": [
+    "AF-33",
+    "AF-36"
+   ],
+   "category": "b",
+   "plan_file": "docs/aerospace/07-sheet-metal-machined-features/validation/plans/draft_sheet_metal_bracket.json",
+   "flags": [
+    "--kernel",
+    "occt"
+   ],
+   "cli": [
+    "llull flat_pattern id=<alias:sm> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.reviewRequired",
+     "op": "eq",
+     "value": true
+    },
+    {
+     "path": "data.reviewReason",
+     "op": "exists"
+    },
+    {
+     "path": "summary",
+     "op": "contains",
+     "value": "not approved"
+    }
+   ],
+   "source": "FUNCTIONAL_SPEC FR-FTR-37"
+  },
+  {
+   "vc": "VC-FTR-11",
+   "case": "JG-01",
+   "proves": [
+    "FR-FTR-09"
+   ],
+   "category": "b",
+   "plan_file": "TBD (M5): joggle strip plan matching data/ftr_joggle_strip.step",
+   "cli": [
+    "llull flat_pattern id=<alias:sm>"
+   ],
+   "assert": [
+    {
+     "path": "data.joggles[0].allowance",
+     "op": "approx",
+     "value": 0.197879593,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.joggles[0].run",
+     "op": "approx",
+     "value": 5.242333379,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.joggles[0].inclinedStraight",
+     "op": "approx",
+     "value": 3.831717533,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    }
+   ],
+   "source": "data/expected_flat_pattern.json JG-01"
+  },
+  {
+   "vc": "VC-FTR-17",
+   "case": "machined plate",
+   "proves": [
+    "FR-FTR-24"
+   ],
+   "category": "b",
+   "cli": [
+    "llull import_step_exact file=docs/aerospace/07-sheet-metal-machined-features/validation/data/ftr_machined_plate.step --kernel occt",
+    "llull find_entities kind=mesh",
+    "llull recognize_features id=<first:data.ids> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.counts.holes",
+     "op": "eq",
+     "value": 7
+    },
+    {
+     "path": "data.counts.countersink",
+     "op": "eq",
+     "value": 4
+    },
+    {
+     "path": "data.counts.counterbore",
+     "op": "eq",
+     "value": 2
+    },
+    {
+     "path": "data.counts.blind",
+     "op": "eq",
+     "value": 1
+    },
+    {
+     "path": "data.counts.pockets",
+     "op": "eq",
+     "value": 1
+    },
+    {
+     "path": "data.unclassified",
+     "op": "len",
+     "value": 0
+    }
+   ],
+   "source": "data/expected_feature_recognition.json VC-FTR-17"
+  },
+  {
+   "vc": "VC-FTR-20",
+   "case": "NIST CTC-01",
+   "proves": [
+    "FR-FTR-24"
+   ],
+   "category": "c",
+   "cli": [
+    "llull import_step_exact file=docs/aerospace/07-sheet-metal-machined-features/validation/data/nist_ctc_01_asme1_ap242.stp --kernel occt",
+    "llull find_entities kind=mesh",
+    "llull recognize_features id=<first:data.ids> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.holes[?drillPointAngleDeg==118]",
+     "op": "len",
+     "value": 2
+    },
+    {
+     "path": "data.holes[?drillPointAngleDeg==118].diameter",
+     "op": "eq",
+     "value": [
+      20.0,
+      20.0
+     ]
+    }
+   ],
+   "source": "data/expected_feature_recognition.json VC-FTR-20 (measured baseline)"
+  },
+  {
+   "vc": "VC-FTR-22",
+   "case": "CS-01",
+   "proves": [
+    "FR-FTR-17",
+    "FR-FTR-18"
+   ],
+   "category": "b",
+   "plan": [
+    {
+     "command": "set_units",
+     "params": {
+      "units": "mm"
+     }
+    },
+    {
+     "command": "add_box",
+     "params": {
+      "size": [
+       40.0,
+       40.0,
+       10.0
+      ],
+      "position": [
+       0,
+       0,
+       0
+      ],
+      "anchor": "min"
+     },
+     "as": "plate"
+    },
+    {
+     "command": "add_hole",
+     "as": "part",
+     "params": {
+      "target": "$plate",
+      "face": {
+       "near": [
+        20,
+        20,
+        10.0
+       ]
+      },
+      "points": [
+       [
+        20,
+        20
+       ]
+      ],
+      "pointsFrame": "world_xy",
+      "hole": {
+       "kind": "countersink",
+       "diameter": 4.8,
+       "cskDiameter": 9.0,
+       "cskAngle": 100.0
+      },
+      "extent": {
+       "kind": "through_all"
+      }
+     }
+    }
+   ],
+   "flags": [
+    "--kernel",
+    "occt"
+   ],
+   "cli": [
+    "llull hole_table id=<alias:part> --kernel occt",
+    "llull mass_properties entityId=<alias:part> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.rows[0].cskDepth",
+     "op": "approx",
+     "value": 1.762109225,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm",
+     "on": 0
+    },
+    {
+     "path": "data.volume",
+     "op": "approx",
+     "value": 15783.006014,
+     "tol": 1e-06,
+     "tolKind": "rel",
+     "unit": "mm\u00b3"
+    }
+   ],
+   "derivation": "40*40*T - pi*(d/2)^2*T - removed_volume_in_sheet (TECHNICAL_SPEC 5.3)",
+   "source": "data/expected_countersink.json CS-01"
+  },
+  {
+   "vc": "VC-FTR-23",
+   "case": "CS-01",
+   "proves": [
+    "FR-FTR-26",
+    "FR-FTR-34"
+   ],
+   "af": [
+    "AF-20",
+    "AF-30"
+   ],
+   "category": "b",
+   "plan": [
+    {
+     "command": "set_units",
+     "params": {
+      "units": "mm"
+     }
+    },
+    {
+     "command": "add_box",
+     "params": {
+      "size": [
+       40.0,
+       40.0,
+       10.0
+      ],
+      "position": [
+       0,
+       0,
+       0
+      ],
+      "anchor": "min"
+     },
+     "as": "plate"
+    },
+    {
+     "command": "add_hole",
+     "as": "part",
+     "params": {
+      "target": "$plate",
+      "face": {
+       "near": [
+        20,
+        20,
+        10.0
+       ]
+      },
+      "points": [
+       [
+        20,
+        20
+       ]
+      ],
+      "pointsFrame": "world_xy",
+      "hole": {
+       "kind": "countersink",
+       "diameter": 4.8,
+       "cskDiameter": 9.0,
+       "cskAngle": 100.0
+      },
+      "extent": {
+       "kind": "through_all"
+      }
+     }
+    }
+   ],
+   "flags": [
+    "--kernel",
+    "occt"
+   ],
+   "cli": [
+    "llull check_machining id=<alias:part> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.findings[*].code",
+     "op": "notContains",
+     "value": "FTR_CSK_KNIFE_EDGE"
+    }
+   ],
+   "source": "data/expected_countersink.json CS-01 (land = T - c)"
+  },
+  {
+   "vc": "VC-FTR-22",
+   "case": "CS-02",
+   "proves": [
+    "FR-FTR-17",
+    "FR-FTR-18"
+   ],
+   "category": "b",
+   "plan": [
+    {
+     "command": "set_units",
+     "params": {
+      "units": "mm"
+     }
+    },
+    {
+     "command": "add_box",
+     "params": {
+      "size": [
+       40.0,
+       40.0,
+       1.6
+      ],
+      "position": [
+       0,
+       0,
+       0
+      ],
+      "anchor": "min"
+     },
+     "as": "plate"
+    },
+    {
+     "command": "add_hole",
+     "as": "part",
+     "params": {
+      "target": "$plate",
+      "face": {
+       "near": [
+        20,
+        20,
+        1.6
+       ]
+      },
+      "points": [
+       [
+        20,
+        20
+       ]
+      ],
+      "pointsFrame": "world_xy",
+      "hole": {
+       "kind": "countersink",
+       "diameter": 4.8,
+       "cskDiameter": 9.0,
+       "cskAngle": 100.0
+      },
+      "extent": {
+       "kind": "through_all"
+      }
+     }
+    }
+   ],
+   "flags": [
+    "--kernel",
+    "occt"
+   ],
+   "cli": [
+    "llull hole_table id=<alias:part> --kernel occt",
+    "llull mass_properties entityId=<alias:part> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.rows[0].cskDepth",
+     "op": "approx",
+     "value": 1.762109225,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm",
+     "on": 0
+    },
+    {
+     "path": "data.volume",
+     "op": "approx",
+     "value": 2495.251305,
+     "tol": 1e-06,
+     "tolKind": "rel",
+     "unit": "mm\u00b3"
+    }
+   ],
+   "derivation": "40*40*T - pi*(d/2)^2*T - removed_volume_in_sheet (TECHNICAL_SPEC 5.3)",
+   "source": "data/expected_countersink.json CS-02"
+  },
+  {
+   "vc": "VC-FTR-23",
+   "case": "CS-02",
+   "proves": [
+    "FR-FTR-26",
+    "FR-FTR-34"
+   ],
+   "af": [
+    "AF-20",
+    "AF-30"
+   ],
+   "category": "b",
+   "plan": [
+    {
+     "command": "set_units",
+     "params": {
+      "units": "mm"
+     }
+    },
+    {
+     "command": "add_box",
+     "params": {
+      "size": [
+       40.0,
+       40.0,
+       1.6
+      ],
+      "position": [
+       0,
+       0,
+       0
+      ],
+      "anchor": "min"
+     },
+     "as": "plate"
+    },
+    {
+     "command": "add_hole",
+     "as": "part",
+     "params": {
+      "target": "$plate",
+      "face": {
+       "near": [
+        20,
+        20,
+        1.6
+       ]
+      },
+      "points": [
+       [
+        20,
+        20
+       ]
+      ],
+      "pointsFrame": "world_xy",
+      "hole": {
+       "kind": "countersink",
+       "diameter": 4.8,
+       "cskDiameter": 9.0,
+       "cskAngle": 100.0
+      },
+      "extent": {
+       "kind": "through_all"
+      }
+     }
+    }
+   ],
+   "flags": [
+    "--kernel",
+    "occt"
+   ],
+   "cli": [
+    "llull check_machining id=<alias:part> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.findings[*].code",
+     "op": "contains",
+     "value": "FTR_CSK_KNIFE_EDGE"
+    },
+    {
+     "path": "data.findings[?code==FTR_CSK_KNIFE_EDGE].value",
+     "op": "approx",
+     "value": -0.162109225,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    }
+   ],
+   "source": "data/expected_countersink.json CS-02 (land = T - c)"
+  },
+  {
+   "vc": "VC-FTR-22",
+   "case": "CS-03",
+   "proves": [
+    "FR-FTR-17",
+    "FR-FTR-18"
+   ],
+   "category": "b",
+   "plan": [
+    {
+     "command": "set_units",
+     "params": {
+      "units": "mm"
+     }
+    },
+    {
+     "command": "add_box",
+     "params": {
+      "size": [
+       40.0,
+       40.0,
+       1.2
+      ],
+      "position": [
+       0,
+       0,
+       0
+      ],
+      "anchor": "min"
+     },
+     "as": "plate"
+    },
+    {
+     "command": "add_hole",
+     "as": "part",
+     "params": {
+      "target": "$plate",
+      "face": {
+       "near": [
+        20,
+        20,
+        1.2
+       ]
+      },
+      "points": [
+       [
+        20,
+        20
+       ]
+      ],
+      "pointsFrame": "world_xy",
+      "hole": {
+       "kind": "countersink",
+       "diameter": 4.8,
+       "cskDiameter": 9.0,
+       "cskAngle": 100.0
+      },
+      "extent": {
+       "kind": "through_all"
+      }
+     }
+    }
+   ],
+   "flags": [
+    "--kernel",
+    "occt"
+   ],
+   "cli": [
+    "llull hole_table id=<alias:part> --kernel occt",
+    "llull mass_properties entityId=<alias:part> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.rows[0].cskDepth",
+     "op": "approx",
+     "value": 1.762109225,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm",
+     "on": 0
+    },
+    {
+     "path": "data.volume",
+     "op": "approx",
+     "value": 1865.350375,
+     "tol": 1e-06,
+     "tolKind": "rel",
+     "unit": "mm\u00b3"
+    }
+   ],
+   "derivation": "40*40*T - pi*(d/2)^2*T - removed_volume_in_sheet (TECHNICAL_SPEC 5.3)",
+   "source": "data/expected_countersink.json CS-03"
+  },
+  {
+   "vc": "VC-FTR-23",
+   "case": "CS-03",
+   "proves": [
+    "FR-FTR-26",
+    "FR-FTR-34"
+   ],
+   "af": [
+    "AF-20",
+    "AF-30"
+   ],
+   "category": "b",
+   "plan": [
+    {
+     "command": "set_units",
+     "params": {
+      "units": "mm"
+     }
+    },
+    {
+     "command": "add_box",
+     "params": {
+      "size": [
+       40.0,
+       40.0,
+       1.2
+      ],
+      "position": [
+       0,
+       0,
+       0
+      ],
+      "anchor": "min"
+     },
+     "as": "plate"
+    },
+    {
+     "command": "add_hole",
+     "as": "part",
+     "params": {
+      "target": "$plate",
+      "face": {
+       "near": [
+        20,
+        20,
+        1.2
+       ]
+      },
+      "points": [
+       [
+        20,
+        20
+       ]
+      ],
+      "pointsFrame": "world_xy",
+      "hole": {
+       "kind": "countersink",
+       "diameter": 4.8,
+       "cskDiameter": 9.0,
+       "cskAngle": 100.0
+      },
+      "extent": {
+       "kind": "through_all"
+      }
+     }
+    }
+   ],
+   "flags": [
+    "--kernel",
+    "occt"
+   ],
+   "cli": [
+    "llull check_machining id=<alias:part> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.findings[*].code",
+     "op": "contains",
+     "value": "FTR_CSK_KNIFE_EDGE"
+    },
+    {
+     "path": "data.findings[?code==FTR_CSK_KNIFE_EDGE].value",
+     "op": "approx",
+     "value": -0.562109225,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    }
+   ],
+   "source": "data/expected_countersink.json CS-03 (land = T - c)"
+  },
+  {
+   "vc": "VC-FTR-22",
+   "case": "CS-04",
+   "proves": [
+    "FR-FTR-17",
+    "FR-FTR-18"
+   ],
+   "category": "b",
+   "plan": [
+    {
+     "command": "set_units",
+     "params": {
+      "units": "mm"
+     }
+    },
+    {
+     "command": "add_box",
+     "params": {
+      "size": [
+       40.0,
+       40.0,
+       10.0
+      ],
+      "position": [
+       0,
+       0,
+       0
+      ],
+      "anchor": "min"
+     },
+     "as": "plate"
+    },
+    {
+     "command": "add_hole",
+     "as": "part",
+     "params": {
+      "target": "$plate",
+      "face": {
+       "near": [
+        20,
+        20,
+        10.0
+       ]
+      },
+      "points": [
+       [
+        20,
+        20
+       ]
+      ],
+      "pointsFrame": "world_xy",
+      "hole": {
+       "kind": "countersink",
+       "diameter": 4.8,
+       "cskDiameter": 9.0,
+       "cskAngle": 90.0
+      },
+      "extent": {
+       "kind": "through_all"
+      }
+     }
+    }
+   ],
+   "flags": [
+    "--kernel",
+    "occt"
+   ],
+   "cli": [
+    "llull hole_table id=<alias:part> --kernel occt",
+    "llull mass_properties entityId=<alias:part> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.rows[0].cskDepth",
+     "op": "approx",
+     "value": 2.1,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm",
+     "on": 0
+    },
+    {
+     "path": "data.volume",
+     "op": "approx",
+     "value": 15776.09555,
+     "tol": 1e-06,
+     "tolKind": "rel",
+     "unit": "mm\u00b3"
+    }
+   ],
+   "derivation": "40*40*T - pi*(d/2)^2*T - removed_volume_in_sheet (TECHNICAL_SPEC 5.3)",
+   "source": "data/expected_countersink.json CS-04"
+  },
+  {
+   "vc": "VC-FTR-23",
+   "case": "CS-04",
+   "proves": [
+    "FR-FTR-26",
+    "FR-FTR-34"
+   ],
+   "af": [
+    "AF-20",
+    "AF-30"
+   ],
+   "category": "b",
+   "plan": [
+    {
+     "command": "set_units",
+     "params": {
+      "units": "mm"
+     }
+    },
+    {
+     "command": "add_box",
+     "params": {
+      "size": [
+       40.0,
+       40.0,
+       10.0
+      ],
+      "position": [
+       0,
+       0,
+       0
+      ],
+      "anchor": "min"
+     },
+     "as": "plate"
+    },
+    {
+     "command": "add_hole",
+     "as": "part",
+     "params": {
+      "target": "$plate",
+      "face": {
+       "near": [
+        20,
+        20,
+        10.0
+       ]
+      },
+      "points": [
+       [
+        20,
+        20
+       ]
+      ],
+      "pointsFrame": "world_xy",
+      "hole": {
+       "kind": "countersink",
+       "diameter": 4.8,
+       "cskDiameter": 9.0,
+       "cskAngle": 90.0
+      },
+      "extent": {
+       "kind": "through_all"
+      }
+     }
+    }
+   ],
+   "flags": [
+    "--kernel",
+    "occt"
+   ],
+   "cli": [
+    "llull check_machining id=<alias:part> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.findings[*].code",
+     "op": "notContains",
+     "value": "FTR_CSK_KNIFE_EDGE"
+    }
+   ],
+   "source": "data/expected_countersink.json CS-04 (land = T - c)"
+  },
+  {
+   "vc": "VC-FTR-22",
+   "case": "CS-05",
+   "proves": [
+    "FR-FTR-17",
+    "FR-FTR-18"
+   ],
+   "category": "b",
+   "plan": [
+    {
+     "command": "set_units",
+     "params": {
+      "units": "mm"
+     }
+    },
+    {
+     "command": "add_box",
+     "params": {
+      "size": [
+       40.0,
+       40.0,
+       10.0
+      ],
+      "position": [
+       0,
+       0,
+       0
+      ],
+      "anchor": "min"
+     },
+     "as": "plate"
+    },
+    {
+     "command": "add_hole",
+     "as": "part",
+     "params": {
+      "target": "$plate",
+      "face": {
+       "near": [
+        20,
+        20,
+        10.0
+       ]
+      },
+      "points": [
+       [
+        20,
+        20
+       ]
+      ],
+      "pointsFrame": "world_xy",
+      "hole": {
+       "kind": "countersink",
+       "diameter": 4.8,
+       "cskDiameter": 9.0,
+       "cskAngle": 82.0
+      },
+      "extent": {
+       "kind": "through_all"
+      }
+     }
+    }
+   ],
+   "flags": [
+    "--kernel",
+    "occt"
+   ],
+   "cli": [
+    "llull hole_table id=<alias:part> --kernel occt",
+    "llull mass_properties entityId=<alias:part> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.rows[0].cskDepth",
+     "op": "approx",
+     "value": 2.415773655,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm",
+     "on": 0
+    },
+    {
+     "path": "data.volume",
+     "op": "approx",
+     "value": 15769.63742,
+     "tol": 1e-06,
+     "tolKind": "rel",
+     "unit": "mm\u00b3"
+    }
+   ],
+   "derivation": "40*40*T - pi*(d/2)^2*T - removed_volume_in_sheet (TECHNICAL_SPEC 5.3)",
+   "source": "data/expected_countersink.json CS-05"
+  },
+  {
+   "vc": "VC-FTR-23",
+   "case": "CS-05",
+   "proves": [
+    "FR-FTR-26",
+    "FR-FTR-34"
+   ],
+   "af": [
+    "AF-20",
+    "AF-30"
+   ],
+   "category": "b",
+   "plan": [
+    {
+     "command": "set_units",
+     "params": {
+      "units": "mm"
+     }
+    },
+    {
+     "command": "add_box",
+     "params": {
+      "size": [
+       40.0,
+       40.0,
+       10.0
+      ],
+      "position": [
+       0,
+       0,
+       0
+      ],
+      "anchor": "min"
+     },
+     "as": "plate"
+    },
+    {
+     "command": "add_hole",
+     "as": "part",
+     "params": {
+      "target": "$plate",
+      "face": {
+       "near": [
+        20,
+        20,
+        10.0
+       ]
+      },
+      "points": [
+       [
+        20,
+        20
+       ]
+      ],
+      "pointsFrame": "world_xy",
+      "hole": {
+       "kind": "countersink",
+       "diameter": 4.8,
+       "cskDiameter": 9.0,
+       "cskAngle": 82.0
+      },
+      "extent": {
+       "kind": "through_all"
+      }
+     }
+    }
+   ],
+   "flags": [
+    "--kernel",
+    "occt"
+   ],
+   "cli": [
+    "llull check_machining id=<alias:part> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.findings[*].code",
+     "op": "notContains",
+     "value": "FTR_CSK_KNIFE_EDGE"
+    }
+   ],
+   "source": "data/expected_countersink.json CS-05 (land = T - c)"
+  },
+  {
+   "vc": "VC-FTR-22",
+   "case": "CS-06",
+   "proves": [
+    "FR-FTR-17",
+    "FR-FTR-18"
+   ],
+   "category": "b",
+   "plan": [
+    {
+     "command": "set_units",
+     "params": {
+      "units": "mm"
+     }
+    },
+    {
+     "command": "add_box",
+     "params": {
+      "size": [
+       40.0,
+       40.0,
+       1.0
+      ],
+      "position": [
+       0,
+       0,
+       0
+      ],
+      "anchor": "min"
+     },
+     "as": "plate"
+    },
+    {
+     "command": "add_hole",
+     "as": "part",
+     "params": {
+      "target": "$plate",
+      "face": {
+       "near": [
+        20,
+        20,
+        1.0
+       ]
+      },
+      "points": [
+       [
+        20,
+        20
+       ]
+      ],
+      "pointsFrame": "world_xy",
+      "hole": {
+       "kind": "countersink",
+       "diameter": 3.3,
+       "cskDiameter": 6.0,
+       "cskAngle": 100.0
+      },
+      "extent": {
+       "kind": "through_all"
+      }
+     }
+    }
+   ],
+   "flags": [
+    "--kernel",
+    "occt"
+   ],
+   "cli": [
+    "llull hole_table id=<alias:part> --kernel occt",
+    "llull mass_properties entityId=<alias:part> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.rows[0].cskDepth",
+     "op": "approx",
+     "value": 1.132784502,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm",
+     "on": 0
+    },
+    {
+     "path": "data.volume",
+     "op": "approx",
+     "value": 1581.470369,
+     "tol": 1e-06,
+     "tolKind": "rel",
+     "unit": "mm\u00b3"
+    }
+   ],
+   "derivation": "40*40*T - pi*(d/2)^2*T - removed_volume_in_sheet (TECHNICAL_SPEC 5.3)",
+   "source": "data/expected_countersink.json CS-06"
+  },
+  {
+   "vc": "VC-FTR-23",
+   "case": "CS-06",
+   "proves": [
+    "FR-FTR-26",
+    "FR-FTR-34"
+   ],
+   "af": [
+    "AF-20",
+    "AF-30"
+   ],
+   "category": "b",
+   "plan": [
+    {
+     "command": "set_units",
+     "params": {
+      "units": "mm"
+     }
+    },
+    {
+     "command": "add_box",
+     "params": {
+      "size": [
+       40.0,
+       40.0,
+       1.0
+      ],
+      "position": [
+       0,
+       0,
+       0
+      ],
+      "anchor": "min"
+     },
+     "as": "plate"
+    },
+    {
+     "command": "add_hole",
+     "as": "part",
+     "params": {
+      "target": "$plate",
+      "face": {
+       "near": [
+        20,
+        20,
+        1.0
+       ]
+      },
+      "points": [
+       [
+        20,
+        20
+       ]
+      ],
+      "pointsFrame": "world_xy",
+      "hole": {
+       "kind": "countersink",
+       "diameter": 3.3,
+       "cskDiameter": 6.0,
+       "cskAngle": 100.0
+      },
+      "extent": {
+       "kind": "through_all"
+      }
+     }
+    }
+   ],
+   "flags": [
+    "--kernel",
+    "occt"
+   ],
+   "cli": [
+    "llull check_machining id=<alias:part> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.findings[*].code",
+     "op": "contains",
+     "value": "FTR_CSK_KNIFE_EDGE"
+    },
+    {
+     "path": "data.findings[?code==FTR_CSK_KNIFE_EDGE].value",
+     "op": "approx",
+     "value": -0.132784502,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    }
+   ],
+   "source": "data/expected_countersink.json CS-06 (land = T - c)"
+  },
+  {
+   "vc": "VC-FTR-22",
+   "case": "CS-07",
+   "proves": [
+    "FR-FTR-17",
+    "FR-FTR-18"
+   ],
+   "category": "b",
+   "plan": [
+    {
+     "command": "set_units",
+     "params": {
+      "units": "mm"
+     }
+    },
+    {
+     "command": "add_box",
+     "params": {
+      "size": [
+       40.0,
+       40.0,
+       3.0
+      ],
+      "position": [
+       0,
+       0,
+       0
+      ],
+      "anchor": "min"
+     },
+     "as": "plate"
+    },
+    {
+     "command": "add_hole",
+     "as": "part",
+     "params": {
+      "target": "$plate",
+      "face": {
+       "near": [
+        20,
+        20,
+        3.0
+       ]
+      },
+      "points": [
+       [
+        20,
+        20
+       ]
+      ],
+      "pointsFrame": "world_xy",
+      "hole": {
+       "kind": "countersink",
+       "diameter": 6.4,
+       "cskDiameter": 12.0,
+       "cskAngle": 100.0
+      },
+      "extent": {
+       "kind": "through_all"
+      }
+     }
+    }
+   ],
+   "flags": [
+    "--kernel",
+    "occt"
+   ],
+   "cli": [
+    "llull hole_table id=<alias:part> --kernel occt",
+    "llull mass_properties entityId=<alias:part> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.rows[0].cskDepth",
+     "op": "approx",
+     "value": 2.349478967,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm",
+     "on": 0
+    },
+    {
+     "path": "data.volume",
+     "op": "approx",
+     "value": 4618.066275,
+     "tol": 1e-06,
+     "tolKind": "rel",
+     "unit": "mm\u00b3"
+    }
+   ],
+   "derivation": "40*40*T - pi*(d/2)^2*T - removed_volume_in_sheet (TECHNICAL_SPEC 5.3)",
+   "source": "data/expected_countersink.json CS-07"
+  },
+  {
+   "vc": "VC-FTR-23",
+   "case": "CS-07",
+   "proves": [
+    "FR-FTR-26",
+    "FR-FTR-34"
+   ],
+   "af": [
+    "AF-20",
+    "AF-30"
+   ],
+   "category": "b",
+   "plan": [
+    {
+     "command": "set_units",
+     "params": {
+      "units": "mm"
+     }
+    },
+    {
+     "command": "add_box",
+     "params": {
+      "size": [
+       40.0,
+       40.0,
+       3.0
+      ],
+      "position": [
+       0,
+       0,
+       0
+      ],
+      "anchor": "min"
+     },
+     "as": "plate"
+    },
+    {
+     "command": "add_hole",
+     "as": "part",
+     "params": {
+      "target": "$plate",
+      "face": {
+       "near": [
+        20,
+        20,
+        3.0
+       ]
+      },
+      "points": [
+       [
+        20,
+        20
+       ]
+      ],
+      "pointsFrame": "world_xy",
+      "hole": {
+       "kind": "countersink",
+       "diameter": 6.4,
+       "cskDiameter": 12.0,
+       "cskAngle": 100.0
+      },
+      "extent": {
+       "kind": "through_all"
+      }
+     }
+    }
+   ],
+   "flags": [
+    "--kernel",
+    "occt"
+   ],
+   "cli": [
+    "llull check_machining id=<alias:part> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.findings[*].code",
+     "op": "notContains",
+     "value": "FTR_CSK_KNIFE_EDGE"
+    }
+   ],
+   "source": "data/expected_countersink.json CS-07 (land = T - c)"
+  },
+  {
+   "vc": "VC-FTR-24",
+   "case": "DP-01",
+   "proves": [
+    "FR-FTR-17"
+   ],
+   "category": "b",
+   "plan": [
+    {
+     "command": "set_units",
+     "params": {
+      "units": "mm"
+     }
+    },
+    {
+     "command": "add_box",
+     "params": {
+      "size": [
+       40.0,
+       40.0,
+       10.0
+      ],
+      "position": [
+       0,
+       0,
+       0
+      ],
+      "anchor": "min"
+     },
+     "as": "plate"
+    },
+    {
+     "command": "add_hole",
+     "as": "part",
+     "params": {
+      "target": "$plate",
+      "face": {
+       "near": [
+        20,
+        20,
+        10
+       ]
+      },
+      "points": [
+       [
+        20,
+        20
+       ]
+      ],
+      "pointsFrame": "world_xy",
+      "hole": {
+       "kind": "simple",
+       "diameter": 6.0
+      },
+      "extent": {
+       "kind": "blind",
+       "depth": 6.0,
+       "drillPointAngle": 118.0
+      }
+     }
+    }
+   ],
+   "flags": [
+    "--kernel",
+    "occt"
+   ],
+   "cli": [
+    "llull hole_table id=<alias:part> --kernel occt",
+    "llull mass_properties entityId=<alias:part> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.rows[0].tipHeight",
+     "op": "approx",
+     "value": 1.802581857,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm",
+     "on": 0
+    },
+    {
+     "path": "data.volume",
+     "op": "approx",
+     "value": 15813.365063,
+     "tol": 1e-06,
+     "tolKind": "rel",
+     "unit": "mm\u00b3"
+    }
+   ],
+   "derivation": "40*40*10 - pi*(d/2)^2*6 - pi*(d/2)^2*h/3 (blind depth 6 to the shoulder, tip cone below)",
+   "source": "data/expected_countersink.json DP-01"
+  },
+  {
+   "vc": "VC-FTR-24",
+   "case": "DP-02",
+   "proves": [
+    "FR-FTR-17"
+   ],
+   "category": "b",
+   "plan": [
+    {
+     "command": "set_units",
+     "params": {
+      "units": "mm"
+     }
+    },
+    {
+     "command": "add_box",
+     "params": {
+      "size": [
+       40.0,
+       40.0,
+       10.0
+      ],
+      "position": [
+       0,
+       0,
+       0
+      ],
+      "anchor": "min"
+     },
+     "as": "plate"
+    },
+    {
+     "command": "add_hole",
+     "as": "part",
+     "params": {
+      "target": "$plate",
+      "face": {
+       "near": [
+        20,
+        20,
+        10
+       ]
+      },
+      "points": [
+       [
+        20,
+        20
+       ]
+      ],
+      "pointsFrame": "world_xy",
+      "hole": {
+       "kind": "simple",
+       "diameter": 6.0
+      },
+      "extent": {
+       "kind": "blind",
+       "depth": 6.0,
+       "drillPointAngle": 135.0
+      }
+     }
+    }
+   ],
+   "flags": [
+    "--kernel",
+    "occt"
+   ],
+   "cli": [
+    "llull hole_table id=<alias:part> --kernel occt",
+    "llull mass_properties entityId=<alias:part> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.rows[0].tipHeight",
+     "op": "approx",
+     "value": 1.242640687,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm",
+     "on": 0
+    },
+    {
+     "path": "data.volume",
+     "op": "approx",
+     "value": 15818.642384,
+     "tol": 1e-06,
+     "tolKind": "rel",
+     "unit": "mm\u00b3"
+    }
+   ],
+   "derivation": "40*40*10 - pi*(d/2)^2*6 - pi*(d/2)^2*h/3 (blind depth 6 to the shoulder, tip cone below)",
+   "source": "data/expected_countersink.json DP-02"
+  },
+  {
+   "vc": "VC-FTR-24",
+   "case": "DP-03",
+   "proves": [
+    "FR-FTR-17"
+   ],
+   "category": "b",
+   "plan": [
+    {
+     "command": "set_units",
+     "params": {
+      "units": "mm"
+     }
+    },
+    {
+     "command": "add_box",
+     "params": {
+      "size": [
+       40.0,
+       40.0,
+       10.0
+      ],
+      "position": [
+       0,
+       0,
+       0
+      ],
+      "anchor": "min"
+     },
+     "as": "plate"
+    },
+    {
+     "command": "add_hole",
+     "as": "part",
+     "params": {
+      "target": "$plate",
+      "face": {
+       "near": [
+        20,
+        20,
+        10
+       ]
+      },
+      "points": [
+       [
+        20,
+        20
+       ]
+      ],
+      "pointsFrame": "world_xy",
+      "hole": {
+       "kind": "simple",
+       "diameter": 3.3
+      },
+      "extent": {
+       "kind": "blind",
+       "depth": 6.0,
+       "drillPointAngle": 118.0
+      }
+     }
+    }
+   ],
+   "flags": [
+    "--kernel",
+    "occt"
+   ],
+   "cli": [
+    "llull hole_table id=<alias:part> --kernel occt",
+    "llull mass_properties entityId=<alias:part> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.rows[0].tipHeight",
+     "op": "approx",
+     "value": 0.991420021,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm",
+     "on": 0
+    },
+    {
+     "path": "data.volume",
+     "op": "approx",
+     "value": 15945.85555,
+     "tol": 1e-06,
+     "tolKind": "rel",
+     "unit": "mm\u00b3"
+    }
+   ],
+   "derivation": "40*40*10 - pi*(d/2)^2*6 - pi*(d/2)^2*h/3 (blind depth 6 to the shoulder, tip cone below)",
+   "source": "data/expected_countersink.json DP-03"
+  },
+  {
+   "vc": "VC-FTR-25",
+   "case": "machined plate plan",
+   "proves": [
+    "FR-FTR-17",
+    "FR-FTR-21"
+   ],
+   "category": "b + c",
+   "plan_file": "docs/aerospace/07-sheet-metal-machined-features/validation/plans/draft_machined_plate.json",
+   "flags": [
+    "--kernel",
+    "occt"
+   ],
+   "cli": [
+    "llull mass_properties entityId=<alias:part> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.volume",
+     "op": "approx",
+     "value": 55978.529153,
+     "tol": 1e-06,
+     "tolKind": "rel",
+     "unit": "mm\u00b3"
+    }
+   ],
+   "source": "data/expected_test_parts.json ftr_machined_plate.step"
+  },
+  {
+   "vc": "VC-FTR-26",
+   "case": "baseline (existing commands, runs today)",
+   "proves": [
+    "FR-FTR-17"
+   ],
+   "category": "b",
+   "plan_file": "docs/aerospace/07-sheet-metal-machined-features/validation/plans/baseline_countersunk_plate_today.json",
+   "flags": [
+    "--kernel",
+    "occt"
+   ],
+   "cli": [
+    "llull mass_properties entityId=<alias:part> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.volume",
+     "op": "approx",
+     "value": 59783.006014,
+     "tol": 1e-06,
+     "tolKind": "rel",
+     "unit": "mm\u00b3"
+    }
+   ],
+   "derivation": "100*60*10 - pi*2.4^2*10 - CS-01 removed_volume_beyond_hole",
+   "source": "review run 2026-10-15: 59783.006 mm\u00b3 (display precision)"
+  },
+  {
+   "vc": "VC-FTR-27",
+   "case": "PK-01",
+   "proves": [
+    "FR-FTR-21"
+   ],
+   "category": "b",
+   "plan": [
+    {
+     "command": "set_units",
+     "params": {
+      "units": "mm"
+     }
+    },
+    {
+     "command": "add_box",
+     "params": {
+      "size": [
+       60,
+       40,
+       10
+      ],
+      "position": [
+       0,
+       0,
+       0
+      ],
+      "anchor": "min"
+     },
+     "as": "plate"
+    },
+    {
+     "command": "add_pocket",
+     "as": "part",
+     "params": {
+      "target": "$plate",
+      "face": {
+       "near": [
+        30,
+        20,
+        10
+       ]
+      },
+      "outline": {
+       "kind": "rounded_rectangle",
+       "center": [
+        30,
+        20
+       ],
+       "size": [
+        40.0,
+        20.0
+       ],
+       "cornerRadius": 4.0
+      },
+      "depth": 5.0,
+      "floorFillet": 0.0
+     }
+    }
+   ],
+   "flags": [
+    "--kernel",
+    "occt"
+   ],
+   "cli": [
+    "llull mass_properties entityId=<alias:part> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.volume",
+     "op": "approx",
+     "value": 20068.672588,
+     "tol": 1e-06,
+     "tolKind": "rel",
+     "unit": "mm\u00b3"
+    }
+   ],
+   "derivation": "60*40*10 - removed_volume (expected_pocket.json formula)",
+   "source": "data/expected_pocket.json PK-01"
+  },
+  {
+   "vc": "VC-FTR-27",
+   "case": "PK-02",
+   "proves": [
+    "FR-FTR-21"
+   ],
+   "category": "b",
+   "plan": [
+    {
+     "command": "set_units",
+     "params": {
+      "units": "mm"
+     }
+    },
+    {
+     "command": "add_box",
+     "params": {
+      "size": [
+       60,
+       40,
+       10
+      ],
+      "position": [
+       0,
+       0,
+       0
+      ],
+      "anchor": "min"
+     },
+     "as": "plate"
+    },
+    {
+     "command": "add_pocket",
+     "as": "part",
+     "params": {
+      "target": "$plate",
+      "face": {
+       "near": [
+        30,
+        20,
+        10
+       ]
+      },
+      "outline": {
+       "kind": "rounded_rectangle",
+       "center": [
+        30,
+        20
+       ],
+       "size": [
+        40.0,
+        20.0
+       ],
+       "cornerRadius": 4.0
+      },
+      "depth": 5.0,
+      "floorFillet": 1.5
+     }
+    }
+   ],
+   "flags": [
+    "--kernel",
+    "occt"
+   ],
+   "cli": [
+    "llull mass_properties entityId=<alias:part> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.volume",
+     "op": "approx",
+     "value": 20122.282698,
+     "tol": 1e-06,
+     "tolKind": "rel",
+     "unit": "mm\u00b3"
+    }
+   ],
+   "derivation": "60*40*10 - removed_volume (expected_pocket.json formula)",
+   "source": "data/expected_pocket.json PK-02"
+  },
+  {
+   "vc": "VC-FTR-37",
+   "case": "refusal codes",
+   "proves": [
+    "FR-FTR-33"
+   ],
+   "af": [
+    "AF-11"
+   ],
+   "category": "b",
+   "subcases": [
+    {
+     "id": "PK-03",
+     "plan": [
+      {
+       "command": "set_units",
+       "params": {
+        "units": "mm"
+       }
+      },
+      {
+       "command": "add_box",
+       "params": {
+        "size": [
+         60,
+         40,
+         10
+        ],
+        "anchor": "min"
+       },
+       "as": "plate"
+      },
+      {
+       "command": "add_pocket",
+       "params": {
+        "target": "$plate",
+        "face": {
+         "near": [
+          30,
+          20,
+          10
+         ]
+        },
+        "outline": {
+         "kind": "rounded_rectangle",
+         "center": [
+          30,
+          20
+         ],
+         "size": [
+          40.0,
+          20.0
+         ],
+         "cornerRadius": 1.0
+        },
+        "depth": 5.0,
+        "floorFillet": 1.5
+       }
+      }
+     ],
+     "assert": [
+      {
+       "op": "exit",
+       "value": 1
+      },
+      {
+       "path": "data.steps[2].error.code",
+       "op": "eq",
+       "value": "FTR_POCKET_FILLET_GT_CORNER"
+      },
+      {
+       "path": "data.steps[2].error.paths",
+       "op": "contains",
+       "value": "floorFillet"
+      },
+      {
+       "path": "data.steps[2].error.remediation",
+       "op": "exists"
+      }
+     ]
+    },
+    {
+     "id": "K missing",
+     "cli": [
+      "llull sheet_metal_calc units=mm thickness=1.6 insideRadius=4.8 angle=90"
+     ],
+     "assert": [
+      {
+       "op": "exit",
+       "value": 1
+      },
+      {
+       "path": "data.error.code",
+       "op": "eq",
+       "value": "FTR_K_FACTOR_MISSING"
+      },
+      {
+       "path": "data.error.paths",
+       "op": "contains",
+       "value": "kFactor"
+      }
+     ]
+    },
+    {
+     "id": "angle 0",
+     "cli": [
+      "llull sheet_metal_calc units=mm thickness=1.6 insideRadius=4.8 angle=0 kFactor=0.44"
+     ],
+     "assert": [
+      {
+       "op": "exit",
+       "value": 1
+      },
+      {
+       "path": "data.error.code",
+       "op": "eq",
+       "value": "FTR_BEND_ANGLE_OUT_OF_RANGE"
+      }
+     ]
+    },
+    {
+     "id": "row without source",
+     "cli": [
+      "llull import_bend_radius_table 'rows=[{\"material\":\"TEST-ALLOY\",\"temper\":\"T0\",\"thickness\":0.8,\"minInsideRadius\":2.0,\"units\":\"mm\",\"bendAngle\":90,\"verification\":\"unverified\"}]'"
+     ],
+     "assert": [
+      {
+       "op": "exit",
+       "value": 1
+      },
+      {
+       "path": "data.error.code",
+       "op": "eq",
+       "value": "FTR_TABLE_ROW_NO_SOURCE"
+      },
+      {
+       "path": "data.error.paths",
+       "op": "contains",
+       "value": "rows[0].source"
+      }
+     ]
+    },
+    {
+     "id": "csk D <= d",
+     "plan": [
+      {
+       "command": "set_units",
+       "params": {
+        "units": "mm"
+       }
+      },
+      {
+       "command": "add_box",
+       "params": {
+        "size": [
+         40.0,
+         40.0,
+         10.0
+        ],
+        "position": [
+         0,
+         0,
+         0
+        ],
+        "anchor": "min"
+       },
+       "as": "plate"
+      },
+      {
+       "command": "add_hole",
+       "params": {
+        "target": "$plate",
+        "face": {
+         "near": [
+          20,
+          20,
+          10
+         ]
+        },
+        "points": [
+         [
+          20,
+          20
+         ]
+        ],
+        "pointsFrame": "world_xy",
+        "hole": {
+         "kind": "countersink",
+         "diameter": 4.8,
+         "cskDiameter": 4.0,
+         "cskAngle": 100
+        },
+        "extent": {
+         "kind": "through_all"
+        }
+       }
+      }
+     ],
+     "assert": [
+      {
+       "op": "exit",
+       "value": 1
+      },
+      {
+       "path": "data.steps[2].error.code",
+       "op": "eq",
+       "value": "FTR_HOLE_DIAMETERS_INCONSISTENT"
+      }
+     ]
+    },
+    {
+     "id": "JG-04 (V1)",
+     "note": "add_joggle with JG-04 values on a T 1.6 part (plan in M5)",
+     "assert": [
+      {
+       "op": "exit",
+       "value": 1
+      },
+      {
+       "path": "data.error.code",
+       "op": "eq",
+       "value": "FTR_JOGGLE_OFFSET_TOO_SMALL"
+      }
+     ],
+     "source": "data/expected_flat_pattern.json JG-04"
+    }
+   ]
+  },
+  {
+   "vc": "VC-FTR-10",
+   "case": "min bend radius from (synthetic) table row",
+   "proves": [
+    "FR-FTR-07",
+    "FR-FTR-34"
+   ],
+   "af": [
+    "AF-30"
+   ],
+   "category": "b",
+   "subcases": [
+    {
+     "id": "R 1.0 < row 2.0",
+     "plan": [
+      {
+       "command": "set_units",
+       "params": {
+        "units": "mm"
+       }
+      },
+      {
+       "command": "import_bend_radius_table",
+       "params": {
+        "rows": [
+         {
+          "material": "TEST-ALLOY",
+          "temper": "T0",
+          "thickness": 0.8,
+          "minInsideRadius": 2.0,
+          "units": "mm",
+          "bendAngle": 90,
+          "source": "synthetic test row (not engineering data)",
+          "verification": "unverified"
+         }
+        ]
+       }
+      },
+      {
+       "command": "create_sheet_metal_rule",
+       "params": {
+        "name": "TEST",
+        "material": "TEST-ALLOY",
+        "temper": "T0",
+        "thickness": 0.8,
+        "insideRadius": 1.0,
+        "kFactor": 0.4,
+        "kFactorStandard": "ansi"
+       }
+      },
+      {
+       "command": "draw_rectangle",
+       "params": {
+        "width": 20,
+        "height": 20,
+        "position": [
+         0,
+         0,
+         0
+        ]
+       },
+       "as": "outline"
+      },
+      {
+       "command": "add_sheet_metal_base",
+       "params": {
+        "profileId": "$outline",
+        "rule": "TEST",
+        "side": "up"
+       },
+       "as": "sm"
+      },
+      {
+       "command": "add_flange",
+       "params": {
+        "id": "$sm",
+        "edge": {
+         "near": [
+          20,
+          10,
+          0
+         ]
+        },
+        "angle": 90,
+        "length": 20,
+        "lengthReference": "outside_mold_line",
+        "position": "material_outside"
+       }
+      }
+     ],
+     "cli": [
+      "llull check_sheet_metal id=<alias:sm>"
+     ],
+     "assert": [
+      {
+       "path": "data.status",
+       "op": "eq",
+       "value": "fail"
+      },
+      {
+       "path": "data.findings[*].code",
+       "op": "contains",
+       "value": "FTR_BEND_RADIUS_BELOW_MIN"
+      },
+      {
+       "path": "data.findings[?code==FTR_BEND_RADIUS_BELOW_MIN].limit",
+       "op": "approx",
+       "value": 2.0,
+       "tol": 1e-12,
+       "tolKind": "abs",
+       "unit": "mm"
+      }
+     ]
+    },
+    {
+     "id": "R 0, sharp bends forbidden",
+     "plan": [
+      {
+       "command": "set_units",
+       "params": {
+        "units": "mm"
+       }
+      },
+      {
+       "command": "import_bend_radius_table",
+       "params": {
+        "rows": [
+         {
+          "material": "TEST-ALLOY",
+          "temper": "T0",
+          "thickness": 0.8,
+          "minInsideRadius": 2.0,
+          "units": "mm",
+          "bendAngle": 90,
+          "source": "synthetic test row (not engineering data)",
+          "verification": "unverified"
+         }
+        ]
+       }
+      },
+      {
+       "command": "create_sheet_metal_rule",
+       "params": {
+        "name": "TEST",
+        "material": "TEST-ALLOY",
+        "temper": "T0",
+        "thickness": 0.8,
+        "insideRadius": 0.0,
+        "kFactor": 0.4,
+        "kFactorStandard": "ansi"
+       }
+      },
+      {
+       "command": "draw_rectangle",
+       "params": {
+        "width": 20,
+        "height": 20,
+        "position": [
+         0,
+         0,
+         0
+        ]
+       },
+       "as": "outline"
+      },
+      {
+       "command": "add_sheet_metal_base",
+       "params": {
+        "profileId": "$outline",
+        "rule": "TEST",
+        "side": "up"
+       },
+       "as": "sm"
+      },
+      {
+       "command": "add_flange",
+       "params": {
+        "id": "$sm",
+        "edge": {
+         "near": [
+          20,
+          10,
+          0
+         ]
+        },
+        "angle": 90,
+        "length": 20,
+        "lengthReference": "outside_mold_line",
+        "position": "material_outside"
+       }
+      }
+     ],
+     "assert": [
+      {
+       "op": "exit",
+       "value": 1
+      },
+      {
+       "path": "data.steps[5].error.code",
+       "op": "eq",
+       "value": "FTR_SHARP_BEND_FORBIDDEN"
+      }
+     ]
+    },
+    {
+     "id": "R 2.4 ok",
+     "plan": [
+      {
+       "command": "set_units",
+       "params": {
+        "units": "mm"
+       }
+      },
+      {
+       "command": "import_bend_radius_table",
+       "params": {
+        "rows": [
+         {
+          "material": "TEST-ALLOY",
+          "temper": "T0",
+          "thickness": 0.8,
+          "minInsideRadius": 2.0,
+          "units": "mm",
+          "bendAngle": 90,
+          "source": "synthetic test row (not engineering data)",
+          "verification": "unverified"
+         }
+        ]
+       }
+      },
+      {
+       "command": "create_sheet_metal_rule",
+       "params": {
+        "name": "TEST",
+        "material": "TEST-ALLOY",
+        "temper": "T0",
+        "thickness": 0.8,
+        "insideRadius": 2.4,
+        "kFactor": 0.4,
+        "kFactorStandard": "ansi"
+       }
+      },
+      {
+       "command": "draw_rectangle",
+       "params": {
+        "width": 20,
+        "height": 20,
+        "position": [
+         0,
+         0,
+         0
+        ]
+       },
+       "as": "outline"
+      },
+      {
+       "command": "add_sheet_metal_base",
+       "params": {
+        "profileId": "$outline",
+        "rule": "TEST",
+        "side": "up"
+       },
+       "as": "sm"
+      },
+      {
+       "command": "add_flange",
+       "params": {
+        "id": "$sm",
+        "edge": {
+         "near": [
+          20,
+          10,
+          0
+         ]
+        },
+        "angle": 90,
+        "length": 20,
+        "lengthReference": "outside_mold_line",
+        "position": "material_outside"
+       }
+      }
+     ],
+     "cli": [
+      "llull check_sheet_metal id=<alias:sm>"
+     ],
+     "assert": [
+      {
+       "path": "data.findings[*].code",
+       "op": "notContains",
+       "value": "FTR_BEND_RADIUS_BELOW_MIN"
+      }
+     ]
+    }
+   ],
+   "source": "FP-12 geometry; synthetic row (real rows TBD after D6)"
+  },
+  {
+   "vc": "VC-FTR-38",
+   "case": "rule without threshold is reported, not skipped",
+   "proves": [
+    "FR-FTR-34"
+   ],
+   "af": [
+    "AF-20",
+    "AF-30",
+    "AF-31"
+   ],
+   "category": "b",
+   "plan": [
+    {
+     "command": "set_units",
+     "params": {
+      "units": "mm"
+     }
+    },
+    {
+     "command": "add_box",
+     "params": {
+      "size": [
+       40.0,
+       40.0,
+       10.0
+      ],
+      "position": [
+       0,
+       0,
+       0
+      ],
+      "anchor": "min"
+     },
+     "as": "plate"
+    },
+    {
+     "command": "add_hole",
+     "as": "part",
+     "params": {
+      "target": "$plate",
+      "face": {
+       "near": [
+        20,
+        20,
+        10
+       ]
+      },
+      "points": [
+       [
+        20,
+        20
+       ]
+      ],
+      "pointsFrame": "world_xy",
+      "hole": {
+       "kind": "countersink",
+       "diameter": 4.8,
+       "cskDiameter": 9.0,
+       "cskAngle": 100
+      },
+      "extent": {
+       "kind": "through_all"
+      }
+     }
+    }
+   ],
+   "flags": [
+    "--kernel",
+    "occt"
+   ],
+   "cli": [
+    "llull check_machining id=<alias:part> --kernel occt"
+   ],
+   "assert": [
+    {
+     "path": "data.findings[*].code",
+     "op": "contains",
+     "value": "FTR_RULE_THRESHOLD_MISSING"
+    },
+    {
+     "path": "data.rulesSkipped[*].rule",
+     "op": "contains",
+     "value": "minLand"
+    }
+   ]
+  },
+  {
+   "vc": "VC-FTR-39",
+   "case": "named defaults",
+   "proves": [
+    "FR-FTR-35"
+   ],
+   "af": [
+    "AF-31"
+   ],
+   "category": "b",
+   "subcases": [
+    {
+     "id": "K never defaulted",
+     "cli": [
+      "llull sheet_metal_calc units=in thickness=0.064 insideRadius=0.25 angle=90"
+     ],
+     "assert": [
+      {
+       "op": "exit",
+       "value": 1
+      },
+      {
+       "path": "data.error.code",
+       "op": "eq",
+       "value": "FTR_K_FACTOR_MISSING"
+      }
+     ]
+    },
+    {
+     "id": "drill point default named",
+     "plan": [
+      {
+       "command": "set_units",
+       "params": {
+        "units": "mm"
+       }
+      },
+      {
+       "command": "add_box",
+       "params": {
+        "size": [
+         40.0,
+         40.0,
+         10.0
+        ],
+        "position": [
+         0,
+         0,
+         0
+        ],
+        "anchor": "min"
+       },
+       "as": "plate"
+      },
+      {
+       "command": "add_hole",
+       "as": "part",
+       "params": {
+        "target": "$plate",
+        "face": {
+         "near": [
+          20,
+          20,
+          10
+         ]
+        },
+        "points": [
+         [
+          20,
+          20
+         ]
+        ],
+        "pointsFrame": "world_xy",
+        "hole": {
+         "kind": "simple",
+         "diameter": 6.0
+        },
+        "extent": {
+         "kind": "blind",
+         "depth": 6.0
+        }
+       }
+      }
+     ],
+     "flags": [
+      "--kernel",
+      "occt"
+     ],
+     "cli": [
+      "llull hole_table id=<alias:part> --kernel occt"
+     ],
+     "assert": [
+      {
+       "path": "data.rows[0].drillPointAngle.value",
+       "op": "approx",
+       "value": 118.0,
+       "tol": 1e-12,
+       "tolKind": "abs",
+       "unit": "deg"
+      },
+      {
+       "path": "data.rows[0].drillPointAngle.defaulted",
+       "op": "eq",
+       "value": true
+      },
+      {
+       "path": "data.rows[0].drillPointAngle.source",
+       "op": "contains",
+       "value": "R8"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "vc": "VC-FTR-40",
+   "case": "unverified propagation",
+   "proves": [
+    "FR-FTR-36"
+   ],
+   "af": [
+    "AF-32"
+   ],
+   "category": "b",
+   "subcases": [
+    {
+     "id": "calc",
+     "plan": [
+      {
+       "command": "set_units",
+       "params": {
+        "units": "mm"
+       }
+      },
+      {
+       "command": "import_bend_radius_table",
+       "params": {
+        "rows": [
+         {
+          "material": "TEST-ALLOY",
+          "temper": "T0",
+          "thickness": 0.8,
+          "minInsideRadius": 2.0,
+          "units": "mm",
+          "bendAngle": 90,
+          "source": "synthetic test row (not engineering data)",
+          "verification": "unverified"
+         }
+        ]
+       }
+      }
+     ],
+     "cli": [
+      "llull sheet_metal_calc units=mm thickness=0.8 insideRadius=2.4 angle=90 kFactor=0.4 material=TEST-ALLOY temper=T0"
+     ],
+     "assert": [
+      {
+       "path": "data.unverified",
+       "op": "eq",
+       "value": true
+      },
+      {
+       "path": "data.unverifiedInputs[*].kind",
+       "op": "contains",
+       "value": "radius_row"
+      },
+      {
+       "path": "data.minRadius.value",
+       "op": "approx",
+       "value": 2.0,
+       "tol": 1e-12,
+       "tolKind": "abs",
+       "unit": "mm"
+      },
+      {
+       "path": "data.minRadius.verification",
+       "op": "eq",
+       "value": "unverified"
+      }
+     ]
+    },
+    {
+     "id": "check",
+     "plan": [
+      {
+       "command": "set_units",
+       "params": {
+        "units": "mm"
+       }
+      },
+      {
+       "command": "import_bend_radius_table",
+       "params": {
+        "rows": [
+         {
+          "material": "TEST-ALLOY",
+          "temper": "T0",
+          "thickness": 0.8,
+          "minInsideRadius": 2.0,
+          "units": "mm",
+          "bendAngle": 90,
+          "source": "synthetic test row (not engineering data)",
+          "verification": "unverified"
+         }
+        ]
+       }
+      },
+      {
+       "command": "create_sheet_metal_rule",
+       "params": {
+        "name": "TEST",
+        "material": "TEST-ALLOY",
+        "temper": "T0",
+        "thickness": 0.8,
+        "insideRadius": 2.4,
+        "kFactor": 0.4,
+        "kFactorStandard": "ansi"
+       }
+      },
+      {
+       "command": "draw_rectangle",
+       "params": {
+        "width": 20,
+        "height": 20,
+        "position": [
+         0,
+         0,
+         0
+        ]
+       },
+       "as": "outline"
+      },
+      {
+       "command": "add_sheet_metal_base",
+       "params": {
+        "profileId": "$outline",
+        "rule": "TEST",
+        "side": "up"
+       },
+       "as": "sm"
+      },
+      {
+       "command": "add_flange",
+       "params": {
+        "id": "$sm",
+        "edge": {
+         "near": [
+          20,
+          10,
+          0
+         ]
+        },
+        "angle": 90,
+        "length": 20,
+        "lengthReference": "outside_mold_line",
+        "position": "material_outside"
+       }
+      }
+     ],
+     "cli": [
+      "llull check_sheet_metal id=<alias:sm>",
+      "llull flat_pattern id=<alias:sm>"
+     ],
+     "assert": [
+      {
+       "path": "data.findings[*].code",
+       "op": "contains",
+       "value": "FTR_UNVERIFIED_DATA",
+       "on": 0
+      },
+      {
+       "path": "data.unverified",
+       "op": "eq",
+       "value": true
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "vc": "VC-FTR-42",
+   "case": "waiver needs a human approval (gap 09)",
+   "proves": [
+    "FR-FTR-38"
+   ],
+   "af": [
+    "AF-34"
+   ],
+   "category": "b",
+   "plan": [
+    {
+     "command": "set_units",
+     "params": {
+      "units": "mm"
+     }
+    },
+    {
+     "command": "import_bend_radius_table",
+     "params": {
+      "rows": [
+       {
+        "material": "TEST-ALLOY",
+        "temper": "T0",
+        "thickness": 0.8,
+        "minInsideRadius": 2.0,
+        "units": "mm",
+        "bendAngle": 90,
+        "source": "synthetic test row (not engineering data)",
+        "verification": "unverified"
+       }
+      ]
+     }
+    },
+    {
+     "command": "create_sheet_metal_rule",
+     "params": {
+      "name": "TEST",
+      "material": "TEST-ALLOY",
+      "temper": "T0",
+      "thickness": 0.8,
+      "insideRadius": 1.0,
+      "kFactor": 0.4,
+      "kFactorStandard": "ansi"
+     }
+    },
+    {
+     "command": "draw_rectangle",
+     "params": {
+      "width": 20,
+      "height": 20,
+      "position": [
+       0,
+       0,
+       0
+      ]
+     },
+     "as": "outline"
+    },
+    {
+     "command": "add_sheet_metal_base",
+     "params": {
+      "profileId": "$outline",
+      "rule": "TEST",
+      "side": "up"
+     },
+     "as": "sm"
+    },
+    {
+     "command": "add_flange",
+     "params": {
+      "id": "$sm",
+      "edge": {
+       "near": [
+        20,
+        10,
+        0
+       ]
+      },
+      "angle": 90,
+      "length": 20,
+      "lengthReference": "outside_mold_line",
+      "position": "material_outside"
+     }
+    }
+   ],
+   "cli": [
+    "llull check_sheet_metal id=<alias:sm> 'waivers=[{\"code\":\"FTR_BEND_RADIUS_BELOW_MIN\",\"ids\":[\"<alias:sm>\"],\"approvalRef\":\"approval-does-not-exist\"}]'"
+   ],
+   "assert": [
+    {
+     "path": "data.status",
+     "op": "eq",
+     "value": "fail"
+    },
+    {
+     "path": "data.findings[*].code",
+     "op": "contains",
+     "value": "FTR_BEND_RADIUS_BELOW_MIN"
+    },
+    {
+     "path": "data.findings[*].code",
+     "op": "contains",
+     "value": "FTR_WAIVER_NOT_APPROVED"
+    }
+   ]
+  },
+  {
+   "vc": "VC-FTR-43",
+   "case": "provenance",
+   "proves": [
+    "FR-FTR-39"
+   ],
+   "af": [
+    "AF-35"
+   ],
+   "category": "b",
+   "cli": [
+    "llull sheet_metal_calc units=in thickness=0.064 insideRadius=0.25 angle=135.0 kFactor=0.4475 mode=k_factor"
+   ],
+   "assert": [
+    {
+     "path": "data.provenance.formulas.ossb",
+     "op": "eq",
+     "value": "tan(theta/2)*(R+T)"
+    },
+    {
+     "path": "data.provenance.formulas.ba",
+     "op": "eq",
+     "value": "theta*(R+K*T)"
+    },
+    {
+     "path": "data.provenance.inputs.thickness.value",
+     "op": "approx",
+     "value": 0.064,
+     "tol": 1e-12,
+     "tolKind": "abs"
+    },
+    {
+     "path": "data.provenance.inputs.thickness.unit",
+     "op": "eq",
+     "value": "in"
+    },
+    {
+     "path": "data.provenance.sources",
+     "op": "contains",
+     "value": "R2"
+    }
+   ]
+  },
+  {
+   "vc": "VC-FTR-44",
+   "case": "discoverable, units in schemas, data units",
+   "proves": [
+    "FR-FTR-31",
+    "FR-FTR-32"
+   ],
+   "af": [
+    "AF-01",
+    "AF-02",
+    "AF-04",
+    "AF-10"
+   ],
+   "category": "b",
+   "subcases": [
+    {
+     "id": "search",
+     "cli": [
+      "llull search sheet metal flat pattern"
+     ],
+     "assert": [
+      {
+       "path": "data[*].name",
+       "op": "contains",
+       "value": "flat_pattern"
+      },
+      {
+       "path": "data[*].name",
+       "op": "contains",
+       "value": "sheet_metal_calc"
+      }
+     ]
+    },
+    {
+     "id": "describe",
+     "cli": [
+      "llull describe sheet_metal_calc add_flange add_hole add_pocket check_machining"
+     ],
+     "assert": [
+      {
+       "op": "allNumericParamsHaveUnit",
+       "unitWords": [
+        "document length unit",
+        "degrees",
+        "in `units`"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "echo",
+     "cli": [
+      "llull sheet_metal_calc units=mm thickness=1.6 insideRadius=4.8 angle=90.0 kFactor=0.44 mode=k_factor"
+     ],
+     "assert": [
+      {
+       "path": "data.lengthUnit",
+       "op": "eq",
+       "value": "mm"
+      },
+      {
+       "path": "data.angleUnit",
+       "op": "eq",
+       "value": "deg"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "vc": "VC-FTR-45",
+   "case": "validate, dry run, picture",
+   "proves": [
+    "FR-FTR-40",
+    "FR-FTR-41"
+   ],
+   "af": [
+    "AF-05",
+    "AF-22",
+    "AF-42"
+   ],
+   "category": "b",
+   "subcases": [
+    {
+     "id": "validate ok",
+     "cli": [
+      "llull run docs/aerospace/07-sheet-metal-machined-features/validation/plans/draft_sheet_metal_bracket.json --validate"
+     ],
+     "assert": [
+      {
+       "op": "exit",
+       "value": 0
+      },
+      {
+       "path": "ok",
+       "op": "eq",
+       "value": true
+      }
+     ]
+    },
+    {
+     "id": "validate names step and param",
+     "plan_validate_only": [
+      {
+       "command": "sheet_metal_calc",
+       "params": {
+        "units": "mm",
+        "thickness": "abc",
+        "insideRadius": 1,
+        "angle": 90,
+        "kFactor": 0.4
+       }
+      }
+     ],
+     "assert": [
+      {
+       "op": "exit",
+       "value": 1
+      },
+      {
+       "path": "summary",
+       "op": "contains",
+       "value": "step 0"
+      },
+      {
+       "path": "summary",
+       "op": "contains",
+       "value": "thickness"
+      }
+     ]
+    },
+    {
+     "id": "dry run leaves the file unchanged",
+     "plan_file": "docs/aerospace/07-sheet-metal-machined-features/validation/plans/draft_sheet_metal_bracket.json",
+     "flags": [
+      "--kernel",
+      "occt"
+     ],
+     "cli": [
+      "llull add_flange id=<alias:sm> 'edge={\"near\":[0,25,0]}' angle=90 length=20 lengthReference=outside_mold_line position=material_outside --dry-run"
+     ],
+     "assert": [
+      {
+       "op": "docFileUnchanged"
+      }
+     ]
+    },
+    {
+     "id": "render",
+     "plan_file": "docs/aerospace/07-sheet-metal-machined-features/validation/plans/draft_sheet_metal_bracket.json",
+     "flags": [
+      "--kernel",
+      "occt"
+     ],
+     "cli": [
+      "llull flat_pattern id=<alias:sm> materialize=true",
+      "llull render_view view=top --save flat.png"
+     ],
+     "assert": [
+      {
+       "path": "saved",
+       "op": "contains",
+       "value": "flat.png"
+      },
+      {
+       "op": "fileIsPng",
+       "value": "flat.png"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "vc": "VC-FTR-46",
+   "case": "progress and timeout on a large part",
+   "proves": [
+    "FR-FTR-42"
+   ],
+   "af": [
+    "AF-40",
+    "AF-41"
+   ],
+   "category": "c",
+   "cli": [
+    "llull import_step_exact file=<ctc-dir>/nist_ctc_02_asme1_ap242.stp --kernel occt --progress --timeout 120",
+    "llull find_entities kind=mesh",
+    "llull recognize_features id=<first:data.ids> --kernel occt --progress --timeout 30"
+   ],
+   "assert": [
+    {
+     "op": "exit",
+     "value": 0
+    },
+    {
+     "op": "durationBelowMs",
+     "value": 5000,
+     "on": 2
+    }
+   ],
+   "source": "TECHNICAL_SPEC \u00a78 budget; CTC-02 sha256 pinned in README \u00a74"
+  }
+ ]
+}

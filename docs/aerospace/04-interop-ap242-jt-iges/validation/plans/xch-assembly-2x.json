@@ -1,0 +1,53 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    20.0,
+    10.0,
+    5.0
+   ]
+  },
+  "as": "b"
+ },
+ {
+  "command": "create_component",
+  "params": {
+   "name": "Block",
+   "entityIds": [
+    "$b"
+   ],
+   "componentId": "comp-block"
+  }
+ },
+ {
+  "command": "insert_instance",
+  "params": {
+   "componentId": "comp-block",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "as": "i1"
+ },
+ {
+  "command": "insert_instance",
+  "params": {
+   "componentId": "comp-block",
+   "position": [
+    100.0,
+    0.0,
+    0.0
+   ]
+  },
+  "as": "i2"
+ }
+]

@@ -1,0 +1,13 @@
+[
+  { "command": "set_units", "params": { "units": "mm" } },
+  { "command": "add_box", "params": { "size": [100, 60, 10], "position": [0, 0, 0], "anchor": "min" }, "as": "plate" },
+  { "command": "add_cylinder", "params": { "radius": 2.4, "height": 12, "position": [10, 10, 5] }, "as": "drill" },
+  { "command": "boolean", "params": { "op": "subtract", "a": "$plate", "b": "$drill" }, "as": "drilled" },
+  {
+    "command": "add_cone",
+    "params": { "radius": 5.69175359259421, "height": 4.77594834029776, "position": [10, 10, 11], "axis": [0, 0, -1] },
+    "as": "csk"
+  },
+  { "command": "boolean", "params": { "op": "subtract", "a": "$drilled", "b": "$csk" }, "as": "part" },
+  { "command": "mass_properties", "params": { "entityId": "$part" } }
+]

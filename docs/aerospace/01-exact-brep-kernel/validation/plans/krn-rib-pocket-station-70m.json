@@ -1,0 +1,116 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "create_material",
+  "params": {
+   "name": "aluminium",
+   "density": 0.0027,
+   "color": "#b0b0b0",
+   "metalness": 1,
+   "roughness": 0.3
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    300,
+    120,
+    25
+   ],
+   "anchor": "min",
+   "position": [
+    70000,
+    0,
+    0
+   ]
+  },
+  "as": "blank"
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    260,
+    80,
+    21
+   ],
+   "anchor": "min",
+   "position": [
+    70020,
+    20,
+    5
+   ]
+  },
+  "as": "pocketTool"
+ },
+ {
+  "command": "boolean",
+  "params": {
+   "op": "subtract",
+   "a": "$blank",
+   "b": "$pocketTool"
+  },
+  "as": "roughed"
+ },
+ {
+  "command": "fillet_edge",
+  "params": {
+   "id": "$roughed",
+   "edgesNear": [
+    [
+     70020,
+     20,
+     15
+    ],
+    [
+     70280,
+     20,
+     15
+    ],
+    [
+     70280,
+     100,
+     15
+    ],
+    [
+     70020,
+     100,
+     15
+    ]
+   ],
+   "radius": 10
+  },
+  "as": "rib"
+ },
+ {
+  "command": "assign_material",
+  "params": {
+   "materialName": "aluminium",
+   "entityIds": [
+    "$rib"
+   ]
+  }
+ },
+ {
+  "command": "inspect_topology",
+  "params": {
+   "id": "$rib"
+  }
+ },
+ {
+  "command": "check_model",
+  "params": {}
+ },
+ {
+  "command": "mass_properties",
+  "params": {
+   "entityId": "$rib"
+  }
+ }
+]
