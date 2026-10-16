@@ -1,0 +1,25 @@
+[
+ {"command": "set_units", "params": {"units": "mm"}},
+ {"command": "define_material_record", "params": {"id": "aa6061_t6", "name": "6061-T6 aluminium", "designation": "6061", "temper": "T6", "specs": [], "licence": "public-domain-us-gov", "exportMarking": {"regime": "none"}}},
+ {"command": "define_property_model", "params": {"material": "aa6061_t6", "model": {
+   "id": "k.nist", "property": "k", "unit": "W/(m*K)",
+   "variables": [{"variable": "T", "unit": "K"}],
+   "form": {"kind": "log10Polynomial", "variable": "T", "coefficients": [0.07918, 1.0957, -0.07277, 0.08084, 0.02803, -0.09464, 0.04179, -0.00571, 0.0]},
+   "validity": [{"variable": "T", "unit": "K", "data": [4, 300], "equation": [1, 300]}],
+   "basis": "typical",
+   "uncertainty": {"kind": "fitErrorVsData", "relative": 0.005, "provenance": {"sourceId": "nist-6061-t6", "locator": "thermal conductivity, curve fit % error relative to data"}},
+   "source": {"citation": "NIST Cryogenics, Material Properties: 6061-T6 Aluminum (UNS A96061)", "locator": "Thermal conductivity coefficients a-i", "url": "https://trc.nist.gov/cryogenics/materials/6061%20Aluminum/6061_T6Aluminum_rev.htm", "accessed": "2026-10-15"},
+   "preferred": true}}},
+ {"command": "define_property_model", "params": {"material": "aa6061_t6", "model": {
+   "id": "thermalStrain.nist", "property": "thermalStrain", "unit": "1e-5",
+   "variables": [{"variable": "T", "unit": "K"}],
+   "form": {"kind": "piecewise", "variable": "T", "segments": [
+     {"upTo": 18, "form": {"kind": "constant", "value": -415.45}},
+     {"upTo": 300, "form": {"kind": "polynomial", "variable": "T", "coefficients": [-412.77, -0.30389, 0.0087696, -9.9821e-06, 0.0]}}]},
+   "validity": [{"variable": "T", "unit": "K", "data": [4, 300]}],
+   "basis": "typical",
+   "source": {"citation": "NIST Cryogenics, Material Properties: 6061-T6 Aluminum (UNS A96061)", "locator": "Linear expansion coefficients a-e, f below 18 K", "url": "https://trc.nist.gov/cryogenics/materials/6061%20Aluminum/6061_T6Aluminum_rev.htm", "accessed": "2026-10-15"}}}},
+ {"command": "evaluate_property", "params": {"material": "aa6061_t6", "property": "k", "at": {"T": {"value": 77, "unit": "K"}}, "band": true}, "as": "k77"},
+ {"command": "evaluate_property", "params": {"material": "aa6061_t6", "property": "thermalStrain", "at": {"T": {"value": 293, "unit": "K"}}, "derivative": "T"}, "as": "cte293"},
+ {"command": "check_property_models", "params": {"material": ["aa6061_t6"]}}
+]

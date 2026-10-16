@@ -6,7 +6,7 @@ import { memo, useCallback, useMemo } from 'react';
 import type { CadDocument, Entity, EntityId, InstanceEntity, SolidKind } from '@core/model/types';
 import { useStore, useViewportStore } from '@ui/store';
 import { useSelectionSet } from '@ui/store/selectionHooks';
-import { animatedEntityIds, findClickAnimationsForEntity } from './animationClickHelpers';
+import { animatedEntityIds, dynamicEntityIds, findClickAnimationsForEntity } from './animationClickHelpers';
 import { isEntityOnLockedLayer, isEntityVisible } from '../entityVisibility';
 import { DecalOverlay } from './entities/DecalOverlay';
 import { TextMesh } from './entities/TextMesh';
@@ -107,7 +107,7 @@ const renderGhost3D: GhostRenderer = (ghost) => (
 
 export function Entities(): React.ReactElement {
   const document = useStore((s) => s.document);
-  const { order, entities, layers, materials, animations, groups } = document;
+  const { order, entities, layers, materials, animations, groups, dynamics } = document;
   const selectionSet = useSelectionSet();
 
   const select = useStore((s) => s.select);
@@ -146,7 +146,10 @@ export function Entities(): React.ReactElement {
       entity.decals !== undefined || (entity.materialId !== undefined && materials[entity.materialId]?.finish !== undefined),
     [materials],
   );
-  const animatedIds = useMemo(() => animatedEntityIds(animations, groups), [animations, groups]);
+  const animatedIds = useMemo(
+    () => new Set([...animatedEntityIds(animations, groups), ...dynamicEntityIds(dynamics)]),
+    [animations, groups, dynamics],
+  );
   const batches = useMemo(
     () =>
       groupEntitiesForInstancing(

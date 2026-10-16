@@ -124,7 +124,7 @@ export function tessellateEntity(e: Entity): PreDepthPolygon[] {
     case 'revolution':
       return rotated(revolutionPolygons(e.profile, e.axis, e.angle, e.segments, e.position));
     case 'mesh':
-      return rotated(meshTriangles(e.mesh));
+      return rotated(meshTriangles(e.mesh, e.position));
     case 'loft':
       return rotated(loftTriangles(e, e.position).map((triangle) => [...triangle]));
     case 'subdivision':

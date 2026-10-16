@@ -1,0 +1,228 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    60,
+    20,
+    1
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "anchor": "min"
+  },
+  "as": "dom"
+ },
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "topo_unit",
+   "name": "topo_unit",
+   "designation": "benchmark material E = 1 MPa, nu = 0.3",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "topo_unit",
+   "property": "E",
+   "value": 1.0,
+   "unit": "MPa",
+   "basis": "company",
+   "source": {
+    "citation": "dimensionless top88 benchmark input (E0 = 1, nu = 0.3), not a material claim"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "topo_unit",
+   "property": "nu",
+   "value": 0.3,
+   "unit": "-",
+   "basis": "company",
+   "source": {
+    "citation": "dimensionless top88 benchmark input (E0 = 1, nu = 0.3), not a material claim"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "topo_unit",
+   "property": "density",
+   "value": 1.0,
+   "unit": "g/cm^3",
+   "basis": "company",
+   "source": {
+    "citation": "dimensionless top88 benchmark input (E0 = 1, nu = 0.3), not a material claim"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "create_material",
+  "params": {
+   "name": "topo_unit",
+   "density": 0.001,
+   "color": "#9aa0a6",
+   "metalness": 0,
+   "roughness": 0.6,
+   "recordId": "topo_unit"
+  }
+ },
+ {
+  "command": "assign_material",
+  "params": {
+   "materialName": "topo_unit",
+   "entityIds": [
+    "$dom"
+   ]
+  }
+ },
+ {
+  "command": "create_analysis",
+  "params": {
+   "name": "mbb_half",
+   "analysisType": "static",
+   "unitSystem": "N-mm-t-s",
+   "solver": "calculix"
+  },
+  "as": "an"
+ },
+ {
+  "command": "set_part_idealization",
+  "params": {
+   "analysisId": "$an",
+   "entityId": "$dom",
+   "idealization": "plane_stress",
+   "thickness": 1,
+   "sourceFacesNear": [
+    [
+     30,
+     10,
+     0
+    ]
+   ]
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$an",
+   "name": "symmetry_left",
+   "kind": "displacement",
+   "dofs": {
+    "ux": 0
+   },
+   "target": {
+    "entityId": "$dom",
+    "edgesNear": [
+     [
+      0,
+      10,
+      0
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$an",
+   "name": "roller_bottom_right",
+   "kind": "displacement",
+   "dofs": {
+    "uy": 0
+   },
+   "target": {
+    "entityId": "$dom",
+    "pointsNear": [
+     [
+      60,
+      0,
+      0
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "add_fea_load",
+  "params": {
+   "analysisId": "$an",
+   "name": "top_left_unit",
+   "kind": "force",
+   "loadCase": "LC1",
+   "category": "limit",
+   "target": {
+    "entityId": "$dom",
+    "pointsNear": [
+     [
+      0,
+      20,
+      0
+     ]
+    ]
+   },
+   "vector": [
+    0,
+    -1,
+    0
+   ],
+   "distribution": "total"
+  }
+ },
+ {
+  "command": "create_topology_study",
+  "params": {
+   "analysisId": "$an",
+   "name": "mbb_60x20",
+   "designDomain": [
+    "$dom"
+   ],
+   "dimension": 2,
+   "plane": "XY",
+   "voxel": 1,
+   "volumeFraction": 0.5,
+   "objective": {
+    "kind": "min_compliance"
+   }
+  },
+  "as": "ts"
+ },
+ {
+  "command": "set_topology_settings",
+  "params": {
+   "studyId": "$ts",
+   "penal": 3,
+   "eminRatio": 1e-09,
+   "move": 0.2,
+   "changeTol": 0.01,
+   "filter": {
+    "kind": "sensitivity",
+    "radius": 1.5
+   },
+   "protectLoadSupport": false,
+   "optimizer": "oc"
+  }
+ }
+]

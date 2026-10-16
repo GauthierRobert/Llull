@@ -1,0 +1,664 @@
+{
+ "pack": "05-nonlinear-structural",
+ "generatedBy": "generate_nls_reference.py",
+ "units": "N, mm, MPa unless stated; normalised quantities have unit 1",
+ "cases": [
+  {
+   "id": "VC-NLS-10.a",
+   "quantity": "elastica cantilever tip vertical deflection / L at PL^2/EI = 1",
+   "value": 0.3017207738,
+   "unit": "1",
+   "tolerance": {
+    "rel": 0.01
+   },
+   "source": "generator (elliptic closed form, S10) + corotational cross-check",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-01",
+    "FR-NLS-08",
+    "TR-NLS-20"
+   ],
+   "inputs": {
+    "lambda": 1.0
+   },
+   "crossCheck": {
+    "corotational20": 0.301740240309,
+    "linearTheory": 0.333333333333
+   },
+   "derivation": "alpha L = K(k) - F(phi1,k); dv/L = 1 - 2(E(k) - E(phi1,k))/(alpha L)"
+  },
+  {
+   "id": "VC-NLS-10.b",
+   "quantity": "elastica cantilever tip vertical deflection / L at PL^2/EI = 2",
+   "value": 0.493457480397,
+   "unit": "1",
+   "tolerance": {
+    "rel": 0.01
+   },
+   "source": "generator (elliptic closed form, S10) + corotational cross-check",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-01",
+    "FR-NLS-08",
+    "TR-NLS-20"
+   ],
+   "inputs": {
+    "lambda": 2.0
+   },
+   "crossCheck": {
+    "corotational20": 0.493534373662,
+    "linearTheory": 0.666666666667
+   },
+   "derivation": "alpha L = K(k) - F(phi1,k); dv/L = 1 - 2(E(k) - E(phi1,k))/(alpha L)"
+  },
+  {
+   "id": "VC-NLS-10.c",
+   "quantity": "elastica cantilever tip vertical deflection / L at PL^2/EI = 10",
+   "value": 0.81060902488,
+   "unit": "1",
+   "tolerance": {
+    "rel": 0.01
+   },
+   "source": "generator (elliptic closed form, S10) + corotational cross-check",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-01",
+    "FR-NLS-08",
+    "TR-NLS-20"
+   ],
+   "inputs": {
+    "lambda": 10.0
+   },
+   "crossCheck": {
+    "corotational20": 0.810903176059,
+    "linearTheory": 3.33333333333
+   },
+   "derivation": "alpha L = K(k) - F(phi1,k); dv/L = 1 - 2(E(k) - E(phi1,k))/(alpha L)"
+  },
+  {
+   "id": "VC-NLS-10.d",
+   "quantity": "elastica tip horizontal shortening / L at PL^2/EI = 2",
+   "value": 0.160641720825,
+   "unit": "1",
+   "tolerance": {
+    "rel": 0.02
+   },
+   "source": "generator (S10)",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-01",
+    "FR-NLS-08"
+   ],
+   "crossCheck": {
+    "corotational20": 0.160597260998
+   }
+  },
+  {
+   "id": "VC-NLS-20.a",
+   "quantity": "Lee frame first limit load P L^2/(E I)",
+   "value": 18.55,
+   "unit": "1",
+   "tolerance": {
+    "rel": 0.01
+   },
+   "source": "S1 (Abaqus NL7 quoting NAFEMS NNB 1989) + generator corotational arc-length",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-05",
+    "FR-NLS-08",
+    "TR-NLS-20"
+   ],
+   "generatorValue": 18.5631763741,
+   "meshStudy": {
+    "10": {
+     "peak": 18.658774153,
+     "vAtPeak": 0.406634061373
+    },
+    "20": {
+     "peak": 18.5824672009,
+     "vAtPeak": 0.406248088879
+    },
+    "40": {
+     "peak": 18.5631763741,
+     "vAtPeak": 0.406156829427
+    }
+   }
+  },
+  {
+   "id": "VC-NLS-20.b",
+   "quantity": "Lee frame vertical displacement / L at the first limit load",
+   "value": 0.407,
+   "unit": "1",
+   "tolerance": {
+    "abs": 0.004
+   },
+   "source": "S1 + generator",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-05",
+    "FR-NLS-08"
+   ],
+   "generatorValue": 0.406156829427
+  },
+  {
+   "id": "VC-NLS-20.c",
+   "quantity": "Lee frame vertical displacement / L where the loaded path reaches P L^2/(E I) = 31.89",
+   "value": 0.781,
+   "unit": "1",
+   "tolerance": {
+    "abs": 0.004
+   },
+   "source": "S1 (Abaqus 0.781; NAFEMS reference 0.784) + generator",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-05",
+    "FR-NLS-08"
+   ],
+   "generatorValue": 0.780854928221,
+   "note": "NAFEMS quotes 0.784; Abaqus and this generator give 0.781"
+  },
+  {
+   "id": "VC-NLS-20.d",
+   "quantity": "Lee frame minimum (most negative) load on the snap-back branch P L^2/(E I)",
+   "value": -9.42713616746,
+   "unit": "1",
+   "tolerance": {
+    "rel": 0.03
+   },
+   "source": "generator only (single method)",
+   "grade": "B",
+   "proves": [
+    "FR-NLS-05"
+   ],
+   "meshStudy": {
+    "10": -9.61808689071,
+    "20": -9.46528299673,
+    "40": -9.42713616746
+   }
+  },
+  {
+   "id": "VC-NLS-30.a",
+   "quantity": "thick cylinder first-yield pressure, von Mises, plane strain, nu = 0.3",
+   "value": 89.8736758805,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.02
+   },
+   "source": "generator (Lame + plane strain + von Mises)",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-02",
+    "FR-NLS-06",
+    "TR-NLS-21"
+   ],
+   "inputs": {
+    "a_mm": 100.0,
+    "b_mm": 200.0,
+    "sigma_y_MPa": 207.9,
+    "nu": 0.3,
+    "E_MPa": 207000.0
+   }
+  },
+  {
+   "id": "VC-NLS-30.b",
+   "quantity": "thick cylinder collapse (limit) pressure, von Mises plane strain",
+   "value": 166.398466152,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.02
+   },
+   "source": "generator (limit analysis, k = sy/sqrt3)",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-02",
+    "FR-NLS-05",
+    "FR-NLS-06"
+   ],
+   "inputs": {
+    "a_mm": 100.0,
+    "b_mm": 200.0,
+    "sigma_y_MPa": 207.9,
+    "nu": 0.3,
+    "E_MPa": 207000.0
+   },
+   "derivation": "p_c = (2/sqrt3) sy ln(b/a)"
+  },
+  {
+   "id": "VC-NLS-30.c",
+   "quantity": "thick cylinder collapse pressure, Tresca",
+   "value": 144.105298838,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-06"
+   ],
+   "inputs": {
+    "a_mm": 100.0,
+    "b_mm": 200.0,
+    "sigma_y_MPa": 207.9,
+    "nu": 0.3,
+    "E_MPa": 207000.0
+   },
+   "derivation": "p_c = sy ln(b/a)"
+  },
+  {
+   "id": "VC-NLS-30.d",
+   "quantity": "thick cylinder first-yield pressure, Tresca",
+   "value": 77.9625,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-06"
+   ],
+   "inputs": {
+    "a_mm": 100.0,
+    "b_mm": 200.0,
+    "sigma_y_MPa": 207.9,
+    "nu": 0.3,
+    "E_MPa": 207000.0
+   },
+   "derivation": "p_y = (sy/2)(1 - a^2/b^2)"
+  },
+  {
+   "id": "VC-NLS-30.e",
+   "quantity": "pressure for plastic radius c = 150 mm, von Mises incompressible",
+   "value": 149.850478298,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.03
+   },
+   "source": "generator (S11 form)",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-02",
+    "FR-NLS-06"
+   ],
+   "inputs": {
+    "a_mm": 100.0,
+    "b_mm": 200.0,
+    "sigma_y_MPa": 207.9,
+    "nu": 0.3,
+    "E_MPa": 207000.0
+   },
+   "note": "FE gate uses nu = 0.49 so the incompressible closed form applies; see README"
+  },
+  {
+   "id": "VC-NLS-31",
+   "quantity": "NAFEMS NL2 stress tables (radial and hoop stress at 8 radii, 80-160 MPa)",
+   "value": "TBD",
+   "unit": "MPa",
+   "tolerance": {
+    "rel": null
+   },
+   "source": "S1 search extract: material quoted, tables and radii not obtained",
+   "grade": "C",
+   "proves": [
+    "FR-NLS-02"
+   ],
+   "consistency": {
+    "generator_pc_mises_if_a100_b200_MPa": 166.398466152,
+    "nl2_max_pressure_MPa": 160.0,
+    "generator_py_mises_nu03_MPa": 89.8736758805
+   }
+  },
+  {
+   "id": "VC-NLS-40.a",
+   "quantity": "plastic moment M_p of a 10 x 20 mm rectangle, sy = 250 MPa",
+   "value": 250000.0,
+   "unit": "N*mm",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-07"
+   ],
+   "inputs": {
+    "b_mm": 10.0,
+    "h_mm": 20.0,
+    "sigma_y_MPa": 250.0,
+    "L_mm": 500.0
+   },
+   "derivation": "M_p = sy b h^2 / 4; shape factor 1.5"
+  },
+  {
+   "id": "VC-NLS-40.b",
+   "quantity": "collapse tip load of a cantilever (L = 500 mm)",
+   "value": 500.0,
+   "unit": "N",
+   "tolerance": {
+    "rel": 0.03
+   },
+   "source": "generator (S12 virtual work)",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-05",
+    "FR-NLS-07"
+   ],
+   "inputs": {
+    "b_mm": 10.0,
+    "h_mm": 20.0,
+    "sigma_y_MPa": 250.0,
+    "L_mm": 500.0
+   },
+   "derivation": "P_c = M_p / L",
+   "note": "FE: solid C3D20R, perfectly plastic, small strain; limit_load reads the plateau of the load-displacement curve"
+  },
+  {
+   "id": "VC-NLS-40.c",
+   "quantity": "collapse central load, propped cantilever",
+   "value": 3000.0,
+   "unit": "N",
+   "tolerance": {
+    "rel": 0.03
+   },
+   "source": "generator (S12)",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-05",
+    "FR-NLS-07"
+   ],
+   "inputs": {
+    "b_mm": 10.0,
+    "h_mm": 20.0,
+    "sigma_y_MPa": 250.0,
+    "L_mm": 500.0
+   },
+   "derivation": "P_c = 6 M_p / L"
+  },
+  {
+   "id": "VC-NLS-40.d",
+   "quantity": "collapse central load, fixed-fixed beam (small deflection)",
+   "value": 4000.0,
+   "unit": "N",
+   "tolerance": {
+    "rel": 0.03
+   },
+   "source": "generator (S12)",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-07"
+   ],
+   "inputs": {
+    "b_mm": 10.0,
+    "h_mm": 20.0,
+    "sigma_y_MPa": 250.0,
+    "L_mm": 500.0
+   },
+   "derivation": "P_c = 8 M_p / L (NLGEOM off: membrane action excluded)"
+  },
+  {
+   "id": "VC-NLS-40.e",
+   "quantity": "elastic-plastic moment at kappa = 2 kappa_y, M / M_y",
+   "value": 1.375,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-07"
+   ],
+   "derivation": "M/My = 1.5 (1 - (kappa_y/kappa)^2 / 3)"
+  },
+  {
+   "id": "VC-NLS-50.a",
+   "quantity": "pinned column Euler load (20 x 10 mm, L = 500 mm, E = 70 GPa)",
+   "value": 4605.81538718,
+   "unit": "N",
+   "tolerance": {
+    "rel": 0.02
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-09"
+   ],
+   "derivation": "P_cr = pi^2 E I / L^2 (weak axis)"
+  },
+  {
+   "id": "VC-NLS-50.b",
+   "quantity": "mid-span lateral deflection at P = 0.5 P_cr, w0 = 0.5 mm (first-mode shape)",
+   "value": 0.5,
+   "unit": "mm",
+   "tolerance": {
+    "rel": 0.05
+   },
+   "source": "generator (amplification w0/(1-P/Pcr))",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-09",
+    "FR-NLS-10"
+   ],
+   "inputs": {
+    "E_MPa": 70000.0,
+    "L_mm": 500.0,
+    "w0_mm": 0.5,
+    "PoverPcr": 0.5
+   },
+   "note": "additional deflection w - w0 = w0 (P/Pcr)/(1 - P/Pcr); FE with NLGEOM and the imperfection from the buckling mode"
+  },
+  {
+   "id": "VC-NLS-50.c",
+   "quantity": "mid-span lateral deflection at P = 0.8 P_cr, w0 = 0.5 mm (first-mode shape)",
+   "value": 2.0,
+   "unit": "mm",
+   "tolerance": {
+    "rel": 0.05
+   },
+   "source": "generator (amplification w0/(1-P/Pcr))",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-09",
+    "FR-NLS-10"
+   ],
+   "inputs": {
+    "E_MPa": 70000.0,
+    "L_mm": 500.0,
+    "w0_mm": 0.5,
+    "PoverPcr": 0.8
+   },
+   "note": "additional deflection w - w0 = w0 (P/Pcr)/(1 - P/Pcr); FE with NLGEOM and the imperfection from the buckling mode"
+  },
+  {
+   "id": "VC-NLS-60",
+   "quantity": "nonlinear_report on a load-controlled run that passes a limit point",
+   "value": "NLS_LIMIT_POINT_REACHED",
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-05",
+    "FR-NLS-13"
+   ]
+  },
+  {
+   "id": "VC-NLS-61",
+   "quantity": "snap-back detected on a displacement-controlled run",
+   "value": "NLS_SNAP_BACK_DETECTED",
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-04",
+    "FR-NLS-13"
+   ]
+  },
+  {
+   "id": "VC-NLS-62",
+   "quantity": "add_imperfection without amplitude",
+   "value": "NLS_IMPERFECTION_AMPLITUDE_UNSET",
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1 (AF-31)",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-10",
+    "FR-NLS-15"
+   ]
+  },
+  {
+   "id": "VC-NLS-63",
+   "quantity": "request arc-length control on the bundled CalculiX",
+   "value": "NLS_ARC_LENGTH_UNSUPPORTED",
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "S2 (CalculiX manual: no RIKS on *STATIC)",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-04",
+    "FR-NLS-13"
+   ]
+  },
+  {
+   "id": "VC-NLS-64",
+   "quantity": "every nonlinear_report / limit_load / check_nonlinear result",
+   "value": "reviewRequired=true",
+   "unit": "flag",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "AGENT_FIRST AF-33",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-17"
+   ]
+  },
+  {
+   "id": "VC-NLS-65",
+   "quantity": "every control value, threshold and amplitude in data is {value, source, defaulted}",
+   "value": "named",
+   "unit": "shape",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "AGENT_FIRST AF-31",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-03",
+    "FR-NLS-15"
+   ]
+  },
+  {
+   "id": "VC-NLS-66",
+   "quantity": "limit_load on a PHY-02 model marked unverified",
+   "value": "unverified=true + NLS_MATERIAL_MODEL_UNVERIFIED",
+   "unit": "flag",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "AGENT_FIRST AF-32",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-16"
+   ]
+  },
+  {
+   "id": "VC-NLS-67",
+   "quantity": "agent calls dispose_margin on a FAIL row with criterion limit_load",
+   "value": "FEA_HUMAN_GATE",
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "aerospace 05 FR-FEA-33 (AF-34)",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-14"
+   ]
+  },
+  {
+   "id": "VC-NLS-68",
+   "quantity": "limit-load margin row without a PHY-00 convergence study",
+   "value": "VNV_NO_CONVERGENCE_STUDY",
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "PHY-00 TECHNICAL_SPEC 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-19"
+   ]
+  },
+  {
+   "id": "VC-NLS-69",
+   "quantity": "Code_Aster export of the cantilever case re-run in a user-installed code_aster (V2)",
+   "value": "TBD",
+   "unit": "N",
+   "tolerance": {
+    "rel": null
+   },
+   "source": "TBD \u2014 needs a code_aster install",
+   "grade": "TBD",
+   "proves": [
+    "FR-NLS-20"
+   ]
+  },
+  {
+   "id": "VC-NLS-71",
+   "quantity": "check_nonlinear guardrails on deliberately wrong set-ups",
+   "value": "NLS_IMPERFECTION_MISSING, NLS_NLGEOM_RECOMMENDED, NLS_STRAIN_BEYOND_CURVE, NLS_MESH_PLASTIC_ADEQUACY, NLS_PERMANENT_SET_THRESHOLD_UNSET",
+   "unit": "codes",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-NLS-10",
+    "FR-NLS-07"
+   ]
+  },
+  {
+   "id": "VC-NLS-41",
+   "quantity": "pinned CalculiX decks beampiso / beampkin / beampd: displacements per increment equal the .dat.ref files",
+   "value": "TBD",
+   "unit": "mm",
+   "tolerance": {
+    "rel": 0.0001
+   },
+   "source": "S2 test suite (values to be extracted by the M2 reader and frozen)",
+   "grade": "TBD",
+   "proves": [
+    "FR-NLS-02",
+    "FR-NLS-06",
+    "TR-NLS-04"
+   ]
+  },
+  {
+   "id": "VC-NLS-70",
+   "quantity": "wall time, 20k-node C3D20R cantilever collapse, 50 increments",
+   "value": "TBD",
+   "unit": "s",
+   "tolerance": {
+    "rel": null
+   },
+   "source": "TBD \u2014 measure on the reference desktop",
+   "grade": "TBD",
+   "proves": [
+    "FR-NLS-18"
+   ]
+  }
+ ]
+}

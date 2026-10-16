@@ -1,0 +1,175 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    20,
+    20,
+    20
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "anchor": "center"
+  },
+  "as": "ground_box"
+ },
+ {
+  "command": "create_component",
+  "params": {
+   "name": "ground",
+   "entityIds": [
+    "$ground_box"
+   ],
+   "componentId": "comp_ground"
+  },
+  "as": "ground"
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    10,
+    10,
+    10
+   ],
+   "position": [
+    1000,
+    0,
+    0
+   ],
+   "anchor": "center"
+  },
+  "as": "bob_box"
+ },
+ {
+  "command": "create_component",
+  "params": {
+   "name": "bob",
+   "entityIds": [
+    "$bob_box"
+   ],
+   "componentId": "comp_bob"
+  },
+  "as": "bob"
+ },
+ {
+  "command": "add_joint",
+  "params": {
+   "kind": "revolute",
+   "a": {
+    "instanceId": "$ground"
+   },
+   "b": {
+    "instanceId": "$bob"
+   },
+   "axis": "y",
+   "id": "pivot"
+  }
+ },
+ {
+  "command": "set_joint_geometry",
+  "params": {
+   "jointId": "pivot",
+   "pivotMm": [
+    0,
+    0,
+    0
+   ]
+  }
+ },
+ {
+  "command": "set_ground",
+  "params": {
+   "instanceIds": [
+    "$ground"
+   ]
+  }
+ },
+ {
+  "command": "set_mechanism_mode",
+  "params": {
+   "mode": "planar",
+   "planeNormal": "y"
+  }
+ },
+ {
+  "command": "set_body_properties",
+  "params": {
+   "instanceId": "$bob",
+   "mass": {
+    "massKg": 1.0,
+    "centroidMm": [
+     1000,
+     0,
+     0
+    ],
+    "inertiaKgM2": [
+     [
+      0,
+      0,
+      0
+     ],
+     [
+      0,
+      0,
+      0
+     ],
+     [
+      0,
+      0,
+      0
+     ]
+    ]
+   },
+   "source": {
+    "citation": "VC-RBD-10/11 test input: 1 kg point mass"
+   }
+  }
+ },
+ {
+  "command": "set_gravity",
+  "params": {
+   "vectorMPerS2": [
+    0,
+    0,
+    -9.80665
+   ]
+  }
+ },
+ {
+  "command": "save_dynamics_study",
+  "params": {
+   "name": "release_90deg",
+   "durationS": 5.0,
+   "outputStepS": 0.001,
+   "integrator": {
+    "method": "generalized_alpha",
+    "rhoInf": 1.0,
+    "stepS": 0.0001
+   }
+  }
+ },
+ {
+  "command": "dynamics_study",
+  "params": {
+   "name": "release_90deg",
+   "outputs": {
+    "joints": [
+     "pivot"
+    ],
+    "events": [
+     "joint_value_crossing:pivot:0"
+    ]
+   }
+  }
+ }
+]

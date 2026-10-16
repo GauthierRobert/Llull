@@ -1,0 +1,720 @@
+{
+ "pack": "00-vv-harness",
+ "generatedBy": "generate_vnv_reference.py",
+ "units": "dimensionless unless stated",
+ "cases": [
+  {
+   "id": "VC-VNV-01.a",
+   "quantity": "observed order of convergence p",
+   "value": 1.78616959217,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator + S5 (quoted to 6 digits)",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-01",
+    "FR-VNV-02",
+    "TR-VNV-03"
+   ],
+   "inputs": {
+    "h": [
+     1.0,
+     2.0,
+     4.0
+    ],
+    "f": [
+     0.9705,
+     0.96854,
+     0.96178
+    ],
+    "Fs": 1.25
+   },
+   "quotedBySource": 1.78617,
+   "derivation": "p = ln((f3-f2)/(f2-f1))/ln r; GCI = 1.25 e_a/(r^p - 1)"
+  },
+  {
+   "id": "VC-VNV-01.b",
+   "quantity": "Richardson-extrapolated value f_ext",
+   "value": 0.971300333333,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator + S5 (quoted to 6 digits)",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-01",
+    "FR-VNV-02",
+    "TR-VNV-03"
+   ],
+   "inputs": {
+    "h": [
+     1.0,
+     2.0,
+     4.0
+    ],
+    "f": [
+     0.9705,
+     0.96854,
+     0.96178
+    ],
+    "Fs": 1.25
+   },
+   "quotedBySource": 0.9713,
+   "derivation": "p = ln((f3-f2)/(f2-f1))/ln r; GCI = 1.25 e_a/(r^p - 1)"
+  },
+  {
+   "id": "VC-VNV-01.c",
+   "quantity": "GCI21 (fine grid, fraction)",
+   "value": 0.00103082603469,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator + S5 (quoted to 6 digits)",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-01",
+    "FR-VNV-02",
+    "TR-VNV-03"
+   ],
+   "inputs": {
+    "h": [
+     1.0,
+     2.0,
+     4.0
+    ],
+    "f": [
+     0.9705,
+     0.96854,
+     0.96178
+    ],
+    "Fs": 1.25
+   },
+   "quotedBySource": 0.001031,
+   "derivation": "p = ln((f3-f2)/(f2-f1))/ln r; GCI = 1.25 e_a/(r^p - 1)"
+  },
+  {
+   "id": "VC-VNV-01.d",
+   "quantity": "GCI32 (fraction)",
+   "value": 0.00356249268659,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator + S5 (quoted to 6 digits)",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-01",
+    "FR-VNV-02",
+    "TR-VNV-03"
+   ],
+   "inputs": {
+    "h": [
+     1.0,
+     2.0,
+     4.0
+    ],
+    "f": [
+     0.9705,
+     0.96854,
+     0.96178
+    ],
+    "Fs": 1.25
+   },
+   "quotedBySource": 0.003562,
+   "derivation": "p = ln((f3-f2)/(f2-f1))/ln r; GCI = 1.25 e_a/(r^p - 1)"
+  },
+  {
+   "id": "VC-VNV-01.e",
+   "quantity": "asymptotic ratio r^p GCI21 / GCI32",
+   "value": 0.997980422463,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator + S5 (quoted to 6 digits)",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-01",
+    "FR-VNV-02",
+    "TR-VNV-03"
+   ],
+   "inputs": {
+    "h": [
+     1.0,
+     2.0,
+     4.0
+    ],
+    "f": [
+     0.9705,
+     0.96854,
+     0.96178
+    ],
+    "Fs": 1.25
+   },
+   "quotedBySource": 0.99798,
+   "derivation": "p = ln((f3-f2)/(f2-f1))/ln r; GCI = 1.25 e_a/(r^p - 1)"
+  },
+  {
+   "id": "VC-VNV-02.a",
+   "quantity": "observed order, f = 10 + 0.5 h^2, h = 0.1/0.2/0.4",
+   "value": 2.0,
+   "unit": "1",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "generator (exact)",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-01",
+    "TR-VNV-03"
+   ]
+  },
+  {
+   "id": "VC-VNV-02.b",
+   "quantity": "extrapolated value, same data",
+   "value": 10.0,
+   "unit": "1",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "generator (exact)",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-02",
+    "TR-VNV-03"
+   ]
+  },
+  {
+   "id": "VC-VNV-02.c",
+   "quantity": "GCI21 fine, same data",
+   "value": 0.000624687656172,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator (exact)",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-02",
+    "TR-VNV-03"
+   ]
+  },
+  {
+   "id": "VC-VNV-03.a",
+   "quantity": "observed order, h = 0.1/0.15/0.3 (r21 = 1.5, r32 = 2)",
+   "value": 2.0,
+   "unit": "1",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "generator (exact)",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-01",
+    "TR-VNV-03"
+   ]
+  },
+  {
+   "id": "VC-VNV-03.b",
+   "quantity": "extrapolated value, same data",
+   "value": 10.0,
+   "unit": "1",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "generator (exact)",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-02",
+    "TR-VNV-03"
+   ]
+  },
+  {
+   "id": "VC-VNV-04",
+   "quantity": "classification of f = 1.00 / 1.02 / 0.99 (h = 1/2/4)",
+   "value": "oscillatory",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "generator (sign of e32/e21)",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-03",
+    "TR-VNV-04"
+   ],
+   "code": "VNV_OSCILLATORY",
+   "ratio": -1.5
+  },
+  {
+   "id": "VC-VNV-05",
+   "quantity": "classification of f = 1.00 / 1.10 / 1.15 (h = 1/2/4)",
+   "value": "divergent",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "generator (|e32/e21| < 1)",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-03",
+    "TR-VNV-04"
+   ],
+   "code": "VNV_DIVERGENT",
+   "ratio": 0.5,
+   "pIfForced": -1.0
+  },
+  {
+   "id": "VC-VNV-06.a",
+   "quantity": "gcat README example: p",
+   "value": 4.14323863221,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-05
+   },
+   "source": "generator + S4 (quoted to 7 digits)",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-01",
+    "FR-VNV-02",
+    "FR-VNV-04",
+    "TR-VNV-03"
+   ],
+   "inputs": {
+    "h": [
+     8.3,
+     10.84,
+     14.14
+    ],
+    "f": [
+     1.0,
+     1.02,
+     1.08
+    ],
+    "Fs": 1.25
+   },
+   "quotedBySource": 4.143231,
+   "note": "p = 4.14 is far above a formal order of 2: check_convergence must warn VNV_ORDER_MISMATCH"
+  },
+  {
+   "id": "VC-VNV-06.b",
+   "quantity": "gcat README example: gci21_fine",
+   "value": 0.0123589345715,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-05
+   },
+   "source": "generator + S4 (quoted to 7 digits)",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-01",
+    "FR-VNV-02",
+    "FR-VNV-04",
+    "TR-VNV-03"
+   ],
+   "inputs": {
+    "h": [
+     8.3,
+     10.84,
+     14.14
+    ],
+    "f": [
+     1.0,
+     1.02,
+     1.08
+    ],
+    "Fs": 1.25
+   },
+   "quotedBySource": 0.01235897,
+   "note": "p = 4.14 is far above a formal order of 2: check_convergence must warn VNV_ORDER_MISMATCH"
+  },
+  {
+   "id": "VC-VNV-06.c",
+   "quantity": "gcat README example: gci21_coarse",
+   "value": 0.0373589345715,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-05
+   },
+   "source": "generator + S4 (quoted to 7 digits)",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-01",
+    "FR-VNV-02",
+    "FR-VNV-04",
+    "TR-VNV-03"
+   ],
+   "inputs": {
+    "h": [
+     8.3,
+     10.84,
+     14.14
+    ],
+    "f": [
+     1.0,
+     1.02,
+     1.08
+    ],
+    "Fs": 1.25
+   },
+   "quotedBySource": 0.03735897,
+   "note": "p = 4.14 is far above a formal order of 2: check_convergence must warn VNV_ORDER_MISMATCH"
+  },
+  {
+   "id": "VC-VNV-06.d",
+   "quantity": "gcat README example: gci32_fine",
+   "value": 0.0366264064427,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-05
+   },
+   "source": "generator + S4 (quoted to 7 digits)",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-01",
+    "FR-VNV-02",
+    "FR-VNV-04",
+    "TR-VNV-03"
+   ],
+   "inputs": {
+    "h": [
+     8.3,
+     10.84,
+     14.14
+    ],
+    "f": [
+     1.0,
+     1.02,
+     1.08
+    ],
+    "Fs": 1.25
+   },
+   "quotedBySource": 0.03662651,
+   "note": "p = 4.14 is far above a formal order of 2: check_convergence must warn VNV_ORDER_MISMATCH"
+  },
+  {
+   "id": "VC-VNV-06.e",
+   "quantity": "gcat README example: asymptotic_ratio",
+   "value": 1.02,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-05
+   },
+   "source": "generator + S4 (quoted to 7 digits)",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-01",
+    "FR-VNV-02",
+    "FR-VNV-04",
+    "TR-VNV-03"
+   ],
+   "inputs": {
+    "h": [
+     8.3,
+     10.84,
+     14.14
+    ],
+    "f": [
+     1.0,
+     1.02,
+     1.08
+    ],
+    "Fs": 1.25
+   },
+   "quotedBySource": 1.019998,
+   "note": "p = 4.14 is far above a formal order of 2: check_convergence must warn VNV_ORDER_MISMATCH"
+  },
+  {
+   "id": "VC-VNV-07.a",
+   "quantity": "MMS 1D P1: L2 error at n = 64",
+   "value": 0.00015552898473,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "generator (exact load, 5-point Gauss error integration)",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-05",
+    "TR-VNV-06"
+   ]
+  },
+  {
+   "id": "VC-VNV-07.b",
+   "quantity": "MMS 1D P1: observed L2 order between n = 32 and 64",
+   "value": 1.99977238071,
+   "unit": "1",
+   "tolerance": {
+    "abs": 0.01
+   },
+   "source": "generator; formal order 2",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-05",
+    "TR-VNV-06"
+   ]
+  },
+  {
+   "id": "VC-VNV-07.c",
+   "quantity": "MMS 1D P1: observed H1-seminorm order between n = 32 and 64",
+   "value": 0.999826188659,
+   "unit": "1",
+   "tolerance": {
+    "abs": 0.01
+   },
+   "source": "generator; formal order 1",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-05",
+    "TR-VNV-06"
+   ]
+  },
+  {
+   "id": "VC-VNV-07.d",
+   "quantity": "MMS 1D P1: max nodal error (nodal superconvergence)",
+   "value": 0.0,
+   "unit": "1",
+   "tolerance": {
+    "abs": 1e-12
+   },
+   "source": "generator; exact load gives exact nodal values in 1D",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-05"
+   ],
+   "measuredByGenerator": "1.921e-14"
+  },
+  {
+   "id": "VC-VNV-08",
+   "quantity": "required spacing h* for GCI* = 0.1 given GCI21 = 0.4, p = 2, h1 = 4",
+   "value": 2.0,
+   "unit": "length unit of h",
+   "tolerance": {
+    "abs": 1e-10
+   },
+   "source": "generator + S5 (test_required_resolution expects 2)",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-06"
+   ]
+  },
+  {
+   "id": "VC-VNV-09.a",
+   "quantity": "representative spacing, 3D, N = 1000 elements, V = 1",
+   "value": 0.1,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "TR-VNV-02"
+   ]
+  },
+  {
+   "id": "VC-VNV-09.b",
+   "quantity": "representative spacing, 2D, N = 2900, A = 0.2 m^2 (gcat README 'check')",
+   "value": 8.30454798537,
+   "unit": "mm",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "generator + S4 (h1 = 8.304548 mm)",
+   "grade": "A",
+   "proves": [
+    "TR-VNV-02"
+   ],
+   "quotedBySource": 8.304548
+  },
+  {
+   "id": "VC-VNV-10",
+   "quantity": "05 FEA beamp cantilever tip u_y: GCI21 with tet10 at h = 1, 0.5, 0.25 mm",
+   "value": "TBD",
+   "unit": "1",
+   "tolerance": {
+    "rel": null
+   },
+   "source": "TBD - measure with check_convergence on 05 FEA plan fea_cantilever_static_beamp",
+   "grade": "TBD",
+   "proves": [
+    "FR-VNV-07",
+    "FR-VNV-09"
+   ],
+   "note": "extrapolated u_y must fall within 2 % of 0.0888411 mm (05 VC-FEA-10.b, EB + Timoshenko) once measured"
+  },
+  {
+   "id": "VC-VNV-11",
+   "quantity": "NAFEMS LE10 sigma_yy(D): observed order and GCI with tet10 refinement",
+   "value": "TBD",
+   "unit": "1",
+   "tolerance": {
+    "rel": null
+   },
+   "source": "TBD - measure (05 VC-FEA-31 target -5.38 MPa)",
+   "grade": "TBD",
+   "proves": [
+    "FR-VNV-07",
+    "FR-VNV-09"
+   ]
+  },
+  {
+   "id": "VC-VNV-12",
+   "quantity": "judge verdicts for runner_fixtures.json RF-01..RF-08",
+   "value": [
+    "pass",
+    "fail",
+    "pass",
+    "warn",
+    "skip",
+    "pass",
+    "error",
+    "error"
+   ],
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "generator (TECHNICAL_SPEC 5.3 rules)",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-10",
+    "FR-VNV-11"
+   ]
+  },
+  {
+   "id": "VC-VNV-13",
+   "quantity": "check_verification after set_parameter on a studied case",
+   "value": "VNV_STUDY_STALE",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-13"
+   ]
+  },
+  {
+   "id": "VC-VNV-14",
+   "quantity": "accept_verification_exception by an agent without signature",
+   "value": "VNV_HUMAN_GATE",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "AGENT_FIRST AF-34",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-14",
+    "TR-VNV-12"
+   ],
+   "documentUnchanged": true
+  },
+  {
+   "id": "VC-VNV-15",
+   "quantity": "study over an unverified material result",
+   "value": "VNV_INPUT_UNVERIFIED",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "AGENT_FIRST AF-32",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-14"
+   ],
+   "expectFields": {
+    "unverified": true,
+    "reviewRequired": true
+   }
+  },
+  {
+   "id": "VC-VNV-16",
+   "quantity": "record_convergence_study: absent hash / edited value / genuine",
+   "value": [
+    "VNV_ARTIFACT_NOT_FOUND",
+    "VNV_SUMMARY_MISMATCH",
+    "accepted"
+   ],
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 4 (validated record)",
+   "grade": "A",
+   "proves": [
+    "TR-VNV-09"
+   ]
+  },
+  {
+   "id": "VC-VNV-17",
+   "quantity": "two identical study runs",
+   "value": "identical study JSON",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC TR-VNV-10",
+   "grade": "A",
+   "proves": [
+    "TR-VNV-10"
+   ]
+  },
+  {
+   "id": "VC-VNV-18",
+   "quantity": "deliberately wrong check_convergence / compare_to_expected inputs",
+   "value": [
+    {
+     "input": "1 sample",
+     "code": "VNV_SAMPLES_INVALID",
+     "path": "samples"
+    },
+    {
+     "input": "duplicate h",
+     "code": "VNV_SAMPLES_INVALID",
+     "path": "samples[1].h"
+    },
+    {
+     "input": "h = 0",
+     "code": "VNV_SAMPLES_INVALID",
+     "path": "samples[0].h"
+    },
+    {
+     "input": "value NaN",
+     "code": "VNV_SAMPLES_INVALID",
+     "path": "samples[2].value"
+    },
+    {
+     "input": "2 samples, no assumedOrder",
+     "code": "VNV_SAMPLES_INVALID",
+     "path": "assumedOrder"
+    },
+    {
+     "input": "expected case without unit",
+     "code": "VNV_EXPECTED_INVALID",
+     "path": "expected.unit"
+    },
+    {
+     "input": "MPa expected, mm measured",
+     "code": "VNV_UNIT_MISMATCH",
+     "path": "measured.unit"
+    }
+   ],
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-VNV-16"
+   ]
+  }
+ ]
+}

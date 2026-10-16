@@ -1,0 +1,424 @@
+{
+ "pack": "16-process-physics",
+ "generatedBy": "generate_prc_reference.py",
+ "units": "mm, MPa, deg unless stated",
+ "cases": [
+  {
+   "id": "VC-PRC-10.a",
+   "quantity": "formed radius after springback, R_i = 4.8 mm (3T), uniaxial E and Y",
+   "value": 4.98697250834,
+   "unit": "mm",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator (moment-curvature + elastic unloading)",
+   "grade": "A",
+   "proves": [
+    "FR-PRC-01",
+    "TR-PRC-10"
+   ],
+   "inputs": {
+    "E_MPa": 72000.0,
+    "Y_MPa": 300.0,
+    "nu": 0.33,
+    "T_mm": 1.6,
+    "note": "test inputs, not an alloy claim"
+   },
+   "crossCheck": {
+    "gardinerForm_Ri_over_Rf": 0.9625078125,
+    "direct_Ri_over_Rf": 0.9625078125,
+    "u": 0.0125
+   }
+  },
+  {
+   "id": "VC-PRC-10.b",
+   "quantity": "bend angle after springback for a 90 deg bend at R_i = 4.8 mm",
+   "value": 87.0921711264,
+   "unit": "deg",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-PRC-01"
+   ],
+   "inputs": {
+    "E_MPa": 72000.0,
+    "Y_MPa": 300.0,
+    "nu": 0.33,
+    "T_mm": 1.6,
+    "note": "test inputs, not an alloy claim"
+   },
+   "derivation": "theta_f = theta_i (R_i + T/2)/(R_f + T/2)"
+  },
+  {
+   "id": "VC-PRC-10.c",
+   "quantity": "formed radius, plane-strain option (E' = E/(1-nu^2), Y' = 2Y/sqrt3)",
+   "value": 4.99260081439,
+   "unit": "mm",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-PRC-01",
+    "FR-PRC-02"
+   ],
+   "inputs": {
+    "E_MPa": 72000.0,
+    "Y_MPa": 300.0,
+    "nu": 0.33,
+    "T_mm": 1.6,
+    "note": "test inputs, not an alloy claim"
+   }
+  },
+  {
+   "id": "VC-PRC-10.d",
+   "quantity": "largest inside radius that still yields the outer fibre (u = 1/2)",
+   "value": 192.0,
+   "unit": "mm",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-PRC-01",
+    "FR-PRC-14"
+   ],
+   "inputs": {
+    "E_MPa": 72000.0,
+    "Y_MPa": 300.0,
+    "nu": 0.33,
+    "T_mm": 1.6,
+    "note": "test inputs, not an alloy claim"
+   },
+   "note": "R_i >= this => PRC_BEND_ELASTIC (full springback)"
+  },
+  {
+   "id": "VC-PRC-11",
+   "quantity": "FE plane-strain bend-and-release of the 1.6 mm strip (CalculiX, J2 perfect, NLGEOM) at R_i = 4.8 mm",
+   "value": 4.99260081439,
+   "unit": "mm",
+   "tolerance": {
+    "rel": 0.05
+   },
+   "source": "generator (plane-strain closed form); FE TBD",
+   "grade": "A",
+   "proves": [
+    "FR-PRC-01",
+    "FR-PRC-05"
+   ],
+   "note": "FE uses pure bending by rotation of the strip ends (no tool contact) so the closed form applies; tool-contact variant is VC-PRC-12 (TBD)"
+  },
+  {
+   "id": "VC-PRC-12",
+   "quantity": "tool (punch / die) bending with contact, then tool removal",
+   "value": "TBD",
+   "unit": "mm",
+   "tolerance": {
+    "rel": null
+   },
+   "source": "TBD \u2014 measure with PHY-06 contact + *MODEL CHANGE",
+   "grade": "TBD",
+   "proves": [
+    "FR-PRC-05",
+    "FR-PRC-06"
+   ]
+  },
+  {
+   "id": "VC-PRC-20.a",
+   "quantity": "tool radius that gives a formed R_f = 4.8 mm (test material)",
+   "value": 4.62653839002,
+   "unit": "mm",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-PRC-03"
+   ],
+   "inputs": {
+    "E_MPa": 72000.0,
+    "Y_MPa": 300.0,
+    "nu": 0.33,
+    "T_mm": 1.6,
+    "note": "test inputs, not an alloy claim"
+   }
+  },
+  {
+   "id": "VC-PRC-20.b",
+   "quantity": "tool angle that gives a formed 90 deg bend at R_f = 4.8 mm",
+   "value": 92.8768883175,
+   "unit": "deg",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-PRC-03",
+    "FR-PRC-04"
+   ],
+   "inputs": {
+    "E_MPa": 72000.0,
+    "Y_MPa": 300.0,
+    "nu": 0.33,
+    "T_mm": 1.6,
+    "note": "test inputs, not an alloy claim"
+   }
+  },
+  {
+   "id": "VC-PRC-30.a",
+   "quantity": "curvature after the first deposited layer (two-layer check)",
+   "value": -0.00012957563978,
+   "unit": "1/mm",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator (equilibrium) + Timoshenko bimetal form",
+   "grade": "A",
+   "proves": [
+    "FR-PRC-07",
+    "TR-PRC-20"
+   ],
+   "inputs": {
+    "substrate_mm": 4.0,
+    "E_substrate_MPa": 200000.0,
+    "layers": 10,
+    "layer_mm": 0.2,
+    "E_layer_MPa": 200000.0,
+    "inherent_strain": -0.002,
+    "nu_FE": 0.0,
+    "note": "test inputs; uniform uniaxial inherent strain along the beam axis (exx only)"
+   },
+   "crossCheck": {
+    "timoshenko1925": -0.00012957563978
+   },
+   "note": "sign: negative curvature = concave up for z up"
+  },
+  {
+   "id": "VC-PRC-30.b",
+   "quantity": "curvature after 10 layers built on the substrate (layer-by-layer, stress-free activation)",
+   "value": -0.000920109483135,
+   "unit": "1/mm",
+   "tolerance": {
+    "rel": 0.03
+   },
+   "source": "generator (superposition)",
+   "grade": "A",
+   "proves": [
+    "FR-PRC-07",
+    "FR-PRC-08"
+   ],
+   "inputs": {
+    "substrate_mm": 4.0,
+    "E_substrate_MPa": 200000.0,
+    "layers": 10,
+    "layer_mm": 0.2,
+    "E_layer_MPa": 200000.0,
+    "inherent_strain": -0.002,
+    "nu_FE": 0.0,
+    "note": "test inputs; uniform uniaxial inherent strain along the beam axis (exx only)"
+   },
+   "note": "FE: CalculiX *MODEL CHANGE ADD=STRAIN FREE per layer + *EXPANSION (alpha = inherent strain) with unit temperature step; beam 100 mm long, nu = 0"
+  },
+  {
+   "id": "VC-PRC-30.c",
+   "quantity": "mid-span deflection of a 100 mm long beam after 10 layers (k L^2 / 8)",
+   "value": -1.15013685392,
+   "unit": "mm",
+   "tolerance": {
+    "rel": 0.03
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-PRC-08"
+   ],
+   "inputs": {
+    "substrate_mm": 4.0,
+    "E_substrate_MPa": 200000.0,
+    "layers": 10,
+    "layer_mm": 0.2,
+    "E_layer_MPa": 200000.0,
+    "inherent_strain": -0.002,
+    "nu_FE": 0.0,
+    "note": "test inputs; uniform uniaxial inherent strain along the beam axis (exx only)"
+   }
+  },
+  {
+   "id": "VC-PRC-30.d",
+   "quantity": "additional curvature when the substrate is removed after the build",
+   "value": -0.00111217022579,
+   "unit": "1/mm",
+   "tolerance": {
+    "rel": 0.03
+   },
+   "source": "generator (release of substrate resultants)",
+   "grade": "A",
+   "proves": [
+    "FR-PRC-09",
+    "FR-PRC-12"
+   ],
+   "inputs": {
+    "substrate_mm": 4.0,
+    "E_substrate_MPa": 200000.0,
+    "layers": 10,
+    "layer_mm": 0.2,
+    "E_layer_MPa": 200000.0,
+    "inherent_strain": -0.002,
+    "nu_FE": 0.0,
+    "note": "test inputs; uniform uniaxial inherent strain along the beam axis (exx only)"
+   },
+   "note": "same mechanics as machining distortion by layer removal (FR-PRC-12)"
+  },
+  {
+   "id": "VC-PRC-30.e",
+   "quantity": "curvature if the 2 mm deposit received its inherent strain at once (no layering)",
+   "value": -0.000444444444444,
+   "unit": "1/mm",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-PRC-08"
+   ],
+   "inputs": {
+    "substrate_mm": 4.0,
+    "E_substrate_MPa": 200000.0,
+    "layers": 10,
+    "layer_mm": 0.2,
+    "E_layer_MPa": 200000.0,
+    "inherent_strain": -0.002,
+    "nu_FE": 0.0,
+    "note": "test inputs; uniform uniaxial inherent strain along the beam axis (exx only)"
+   },
+   "note": "differs from 30.b: shows why stress-free layer activation matters",
+   "ratioLayeredToOnce": 2.07024633705
+  },
+  {
+   "id": "VC-PRC-31",
+   "quantity": "inherent-strain carrier decision deck (nodal temperature vs element initial strain)",
+   "value": "TBD",
+   "unit": "1/mm",
+   "tolerance": {
+    "rel": null
+   },
+   "source": "TBD - integration test decides",
+   "grade": "TBD",
+   "proves": [
+    "TR-PRC-20",
+    "TR-PRC-21"
+   ]
+  },
+  {
+   "id": "VC-PRC-55",
+   "quantity": "COULD items (weld shrinkage export) and CLI / MCP / UI result parity",
+   "value": "TBD / identical hash",
+   "unit": "mixed",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TBD / L1",
+   "grade": "TBD",
+   "proves": [
+    "FR-PRC-13",
+    "FR-PRC-18"
+   ]
+  },
+  {
+   "id": "VC-PRC-40",
+   "quantity": "NIST AM-Bench 2018 AMB2018-01 IN625 bridge, deflection at ridge 1 after EDM separation of the legs",
+   "value": 1.276,
+   "unit": "mm",
+   "tolerance": {
+    "rel": 0.1
+   },
+   "source": "S5 (NIST AM-Bench page, search extract); 15-5 PH part 1.168 mm",
+   "grade": "B",
+   "proves": [
+    "FR-PRC-10"
+   ],
+   "note": "reported, not a pass/fail gate until the data release is read (geometry, process, per-ridge values)"
+  },
+  {
+   "id": "VC-PRC-50",
+   "quantity": "check_process on a bend with R_i below the 07 minimum-bend-radius row (code relayed from 07 check_sheet_metal)",
+   "value": "FTR_BEND_RADIUS_BELOW_MIN",
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "07 FTR TECHNICAL_SPEC 7.2 (relayed)",
+   "grade": "A",
+   "proves": [
+    "FR-PRC-14"
+   ]
+  },
+  {
+   "id": "VC-PRC-51",
+   "quantity": "springback_calc without yield stress or with an unverified material record",
+   "value": "PRC_MATERIAL_INPUT_MISSING / unverified=true",
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1 (AF-31/32)",
+   "grade": "A",
+   "proves": [
+    "FR-PRC-15",
+    "FR-PRC-16"
+   ]
+  },
+  {
+   "id": "VC-PRC-52",
+   "quantity": "AM overhang check without a threshold angle",
+   "value": "PRC_OVERHANG_THRESHOLD_UNSET",
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1 (AF-31: no default)",
+   "grade": "A",
+   "proves": [
+    "FR-PRC-11",
+    "FR-PRC-15"
+   ]
+  },
+  {
+   "id": "VC-PRC-53",
+   "quantity": "every process result",
+   "value": "reviewRequired=true",
+   "unit": "flag",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "AF-33",
+   "grade": "A",
+   "proves": [
+    "FR-PRC-17"
+   ]
+  },
+  {
+   "id": "VC-PRC-54",
+   "quantity": "downskin angles of a test part's downward faces inclined 45 deg and 30 deg to the plate, and a horizontal ceiling (build +Z)",
+   "value": "45 / 30 / 0",
+   "unit": "deg",
+   "tolerance": {
+    "abs": 1e-06
+   },
+   "source": "geometry: downskin angle = 90 deg - angle(face normal, -Z)",
+   "grade": "A",
+   "proves": [
+    "FR-PRC-11"
+   ],
+   "note": "llull convention: angle between a downward-facing face and the build plate; 0 = horizontal ceiling, 90 = vertical wall"
+  }
+ ]
+}

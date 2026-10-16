@@ -1,0 +1,751 @@
+{
+ "pack": "03-thermal-analysis",
+ "generatedBy": "generate_thermal_reference.py",
+ "cases": [
+  {
+   "id": "VC-THM-01.a",
+   "quantity": "plane wall heat flux",
+   "value": 1459.45945946,
+   "unit": "W/m^2",
+   "tolerance": {
+    "rel": 0.005
+   },
+   "source": "generator (S9 formula)",
+   "grade": "A",
+   "proves": [
+    "FR-THM-01",
+    "FR-THM-03",
+    "TR-THM-10"
+   ],
+   "inputs": {
+    "L_m": 0.05,
+    "k_W_mK": 15.0,
+    "h1_W_m2K": 50.0,
+    "Tinf1_degC": 200.0,
+    "h2_W_m2K": 10.0,
+    "Tinf2_degC": 20.0
+   },
+   "derivation": "q = (Tinf1 - Tinf2)/(1/h1 + L/k + 1/h2); Ts1 = Tinf1 - q/h1; Ts2 = Tinf2 + q/h2"
+  },
+  {
+   "id": "VC-THM-01.b",
+   "quantity": "plane wall hot-side surface temperature",
+   "value": 170.810810811,
+   "unit": "degC",
+   "tolerance": {
+    "abs": 0.05
+   },
+   "source": "generator (S9 formula)",
+   "grade": "A",
+   "proves": [
+    "FR-THM-01",
+    "FR-THM-03"
+   ],
+   "inputs": {
+    "L_m": 0.05,
+    "k_W_mK": 15.0,
+    "h1_W_m2K": 50.0,
+    "Tinf1_degC": 200.0,
+    "h2_W_m2K": 10.0,
+    "Tinf2_degC": 20.0
+   },
+   "derivation": "q = (Tinf1 - Tinf2)/(1/h1 + L/k + 1/h2); Ts1 = Tinf1 - q/h1; Ts2 = Tinf2 + q/h2"
+  },
+  {
+   "id": "VC-THM-01.c",
+   "quantity": "plane wall cold-side surface temperature",
+   "value": 165.945945946,
+   "unit": "degC",
+   "tolerance": {
+    "abs": 0.05
+   },
+   "source": "generator (S9 formula)",
+   "grade": "A",
+   "proves": [
+    "FR-THM-01",
+    "FR-THM-03"
+   ],
+   "inputs": {
+    "L_m": 0.05,
+    "k_W_mK": 15.0,
+    "h1_W_m2K": 50.0,
+    "Tinf1_degC": 200.0,
+    "h2_W_m2K": 10.0,
+    "Tinf2_degC": 20.0
+   },
+   "derivation": "q = (Tinf1 - Tinf2)/(1/h1 + L/k + 1/h2); Ts1 = Tinf1 - q/h1; Ts2 = Tinf2 + q/h2"
+  },
+  {
+   "id": "VC-THM-01.d",
+   "quantity": "heat balance residual |Q_in - Q_out| / Q_in (steady state)",
+   "value": 0.0,
+   "unit": "1",
+   "tolerance": {
+    "abs": 0.001
+   },
+   "source": "definition (energy conservation)",
+   "grade": "A",
+   "proves": [
+    "FR-THM-12",
+    "TR-THM-31"
+   ],
+   "derivation": "steady state: heat entering on face 1 equals heat leaving on face 2; llull reports the residual from reaction fluxes (RFL) and film fluxes"
+  },
+  {
+   "id": "VC-THM-02",
+   "quantity": "slab with uniform generation, centre temperature",
+   "value": 75.0,
+   "unit": "degC",
+   "tolerance": {
+    "rel": 0.005
+   },
+   "source": "generator (S9 formula)",
+   "grade": "A",
+   "proves": [
+    "FR-THM-04",
+    "TR-THM-12"
+   ],
+   "inputs": {
+    "half_thickness_m": 0.01,
+    "k_W_mK": 20.0,
+    "qgen_W_m3": 10000000.0,
+    "Ts_degC": 50.0
+   },
+   "derivation": "Tmax = Ts + q''' L^2 / (2 k), L = half thickness"
+  },
+  {
+   "id": "VC-THM-03",
+   "quantity": "NAFEMS T3: temperature at x = 0.08 m, t = 32 s",
+   "value": 36.6,
+   "unit": "degC",
+   "tolerance": {
+    "rel": 0.02
+   },
+   "source": "S1 (Abaqus T3) + S2 (MOOSE, git) + S3 (FeenoX test 36.6 +/- 0.05) + S4 (FEATool T_ref 36.6)",
+   "grade": "A",
+   "proves": [
+    "FR-THM-02",
+    "FR-THM-07",
+    "TR-THM-13"
+   ],
+   "inputs": {
+    "L_m": 0.1,
+    "k_W_mK": 35.0,
+    "rho_kg_m3": 7200.0,
+    "cp_J_kgK": 440.5,
+    "x_m": 0.08,
+    "t_s": 32.0,
+    "T_left_degC": 0.0,
+    "T_right_degC": "100 sin(pi t / 40)",
+    "T_initial_degC": 0.0
+   },
+   "analytic": 36.603115959,
+   "derivation": "eigenfunction expansion (20000 terms) of u_t = a u_xx with u(0)=0, u(L)=100 sin(pi t/40), u(x,0)=0; a = k/(rho cp)",
+   "note": "the analytic series gives 36.6031 degC, so the quoted 36.60 is confirmed to 4 digits; MOOSE coarse linear meshes are 10 % high"
+  },
+  {
+   "id": "VC-THM-04",
+   "quantity": "NAFEMS T4: steady temperature at (0.6, 0.2) m",
+   "value": 18.2537565371,
+   "unit": "degC",
+   "tolerance": {
+    "rel": 0.01
+   },
+   "source": "generator (separation of variables) + S3 (FeenoX 18.3) + S4 (FEATool 18.3) + S6 (COMSOL 18.25, search)",
+   "grade": "A",
+   "proves": [
+    "FR-THM-01",
+    "FR-THM-03",
+    "TR-THM-10"
+   ],
+   "inputs": {
+    "W_m": 0.6,
+    "H_m": 1.0,
+    "k_W_mK": 52.0,
+    "h_W_m2K": 750.0,
+    "T_bottom_degC": 100.0,
+    "T_ambient_degC": 0.0,
+    "left": "adiabatic",
+    "right_and_top": "convection",
+    "point_m": [
+     0.6,
+     0.2
+    ]
+   },
+   "quotedBySource": 18.3,
+   "derivation": "T = sum C_n cos(b_n x) Y_n(y)/Y_n(0); b tan(b W) = h/k; C_n = T0 (sin(bW)/b)/(W/2 + sin(2bW)/(4b)); 400 terms",
+   "note": "settles the rounding question of the gap list: 18.2538 rounds to 18.3 (NAFEMS) and 18.25 (COMSOL)"
+  },
+  {
+   "id": "VC-THM-05",
+   "quantity": "NAFEMS T2 (FeenoX statement): temperature of the radiating face",
+   "value": 927.007606246,
+   "unit": "K",
+   "tolerance": {
+    "rel": 0.001
+   },
+   "source": "generator + S3 (FeenoX nafems-t2-1d.fee, analytic root)",
+   "grade": "A",
+   "proves": [
+    "FR-THM-05",
+    "TR-THM-14"
+   ],
+   "inputs": {
+    "l_m": 0.1,
+    "k_W_mK": 55.6,
+    "eps": 0.98,
+    "T0_K": 1000.0,
+    "Tinf_K": 300.0,
+    "sigma_W_m2K4": 5.67e-08
+   },
+   "derivation": "(T - T0) k / l + eps sigma (T^4 - Tinf^4) = 0, bisection",
+   "value_with_exact_sigma": 927.00395045,
+   "note": "sigma = 5.67e-8 as in the problem statement; the exact SI value 5.670374419e-8 shifts T by the amount shown"
+  },
+  {
+   "id": "VC-THM-06",
+   "quantity": "semi-infinite solid after a step in surface temperature",
+   "value": 106.310021994,
+   "unit": "degC",
+   "tolerance": {
+    "rel": 0.01
+   },
+   "source": "generator (S9 formula)",
+   "grade": "A",
+   "proves": [
+    "FR-THM-02",
+    "TR-THM-13"
+   ],
+   "inputs": {
+    "Ti_degC": 20.0,
+    "Ts_degC": 200.0,
+    "alpha_m2_s": 1e-05,
+    "x_m": 0.01,
+    "t_s": 10.0
+   },
+   "derivation": "T = Ts + (Ti - Ts) erf(x / (2 sqrt(alpha t)))"
+  },
+  {
+   "id": "VC-THM-07.a",
+   "quantity": "lumped-capacitance sphere temperature at t",
+   "value": 153.492976027,
+   "unit": "degC",
+   "tolerance": {
+    "rel": 0.01
+   },
+   "source": "generator (S9 formula)",
+   "grade": "A",
+   "proves": [
+    "FR-THM-02",
+    "FR-THM-14",
+    "TR-THM-40"
+   ],
+   "inputs": {
+    "d_m": 0.01,
+    "rho_kg_m3": 2700.0,
+    "c_J_kgK": 900.0,
+    "k_W_mK": 200.0,
+    "h_W_m2K": 50.0,
+    "Ti_degC": 300.0,
+    "Tinf_degC": 20.0,
+    "t_s": 60.0
+   },
+   "derivation": "T = Tinf + (Ti - Tinf) exp(-t/tau), tau = rho c (d/6) / h"
+  },
+  {
+   "id": "VC-THM-07.b",
+   "quantity": "Biot number of the lumped sphere (validity Bi < 0.1)",
+   "value": 0.000416666666667,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator (S9 formula)",
+   "grade": "A",
+   "proves": [
+    "FR-THM-14",
+    "TR-THM-40"
+   ],
+   "inputs": {
+    "d_m": 0.01,
+    "rho_kg_m3": 2700.0,
+    "c_J_kgK": 900.0,
+    "k_W_mK": 200.0,
+    "h_W_m2K": 50.0,
+    "Ti_degC": 300.0,
+    "Tinf_degC": 20.0,
+    "t_s": 60.0
+   },
+   "derivation": "Bi = h (V/A) / k, V/A = d/6",
+   "time_constant_s": 81.0
+  },
+  {
+   "id": "VC-THM-08",
+   "quantity": "pin fin efficiency, adiabatic tip",
+   "value": 0.761594155956,
+   "unit": "1",
+   "tolerance": {
+    "rel": 0.01
+   },
+   "source": "generator (S9 formula)",
+   "grade": "A",
+   "proves": [
+    "FR-THM-03",
+    "FR-THM-14",
+    "TR-THM-40"
+   ],
+   "inputs": {
+    "h_W_m2K": 100.0,
+    "k_W_mK": 200.0,
+    "d_m": 0.005,
+    "L_m": 0.05
+   },
+   "derivation": "eta = tanh(mL)/(mL), m = sqrt(4h/(k d))",
+   "m_per_m": 20.0
+  },
+  {
+   "id": "VC-THM-09.a",
+   "quantity": "view factor, identical parallel directly opposed unit squares, spacing 1",
+   "value": 0.199824895698,
+   "unit": "1",
+   "tolerance": {
+    "abs": 0.002
+   },
+   "source": "generator (closed form, S8 C-11 configuration) + Gauss-Legendre 16^4 check",
+   "grade": "A",
+   "proves": [
+    "FR-THM-06",
+    "TR-THM-20"
+   ],
+   "quadrature": 0.199824895698,
+   "derivation": "F = 2/(pi X Y) {ln sqrt((1+X^2)(1+Y^2)/(1+X^2+Y^2)) + X sqrt(1+Y^2) atan(X/sqrt(1+Y^2)) + Y sqrt(1+X^2) atan(Y/sqrt(1+X^2)) - X atan X - Y atan Y}"
+  },
+  {
+   "id": "VC-THM-09.b",
+   "quantity": "view factor, perpendicular unit squares with a common edge",
+   "value": 0.200043776075,
+   "unit": "1",
+   "tolerance": {
+    "abs": 0.002
+   },
+   "source": "generator (closed form, S8 C-14 configuration) + edge-integrated Duffy/Gauss-Legendre check",
+   "grade": "A",
+   "proves": [
+    "FR-THM-06",
+    "TR-THM-20"
+   ],
+   "quadrature": 0.200043776075,
+   "derivation": "Hottel closed form, W = H = 1 (see vf_perpendicular)",
+   "note": "the kernel is singular on the shared edge: the check integrates along the edge in closed form and uses a Duffy map for the corner"
+  },
+  {
+   "id": "VC-THM-09.c",
+   "quantity": "summation rule inside a unit cube: F(opposite) + 4 F(adjacent)",
+   "value": 1.0,
+   "unit": "1",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "generator (summation rule)",
+   "grade": "A",
+   "proves": [
+    "FR-THM-06",
+    "TR-THM-20"
+   ],
+   "derivation": "sum of view factors from one face of a closed cube = 1"
+  },
+  {
+   "id": "VC-THM-09.d",
+   "quantity": "view factor, coaxial parallel discs r1 = r2 = L",
+   "value": 0.38196601125,
+   "unit": "1",
+   "tolerance": {
+    "abs": 0.002
+   },
+   "source": "generator (closed form, S8 C-41 configuration)",
+   "grade": "A",
+   "proves": [
+    "FR-THM-06",
+    "TR-THM-20"
+   ],
+   "derivation": "F = (S - sqrt(S^2 - 4 (R2/R1)^2))/2, S = 1 + (1 + R2^2)/R1^2"
+  },
+  {
+   "id": "VC-THM-10",
+   "quantity": "net radiative flux between infinite grey parallel plates",
+   "value": 441.029121492,
+   "unit": "W/m^2",
+   "tolerance": {
+    "rel": 0.01
+   },
+   "source": "generator (S9 formula, exact SI sigma)",
+   "grade": "A",
+   "proves": [
+    "FR-THM-05",
+    "FR-THM-06",
+    "TR-THM-21"
+   ],
+   "inputs": {
+    "T1_K": 400.0,
+    "T2_K": 300.0,
+    "eps1": 0.8,
+    "eps2": 0.5
+   },
+   "derivation": "q = sigma (T1^4 - T2^4)/(1/e1 + 1/e2 - 1)",
+   "sigma_W_m2K4": 5.67037441918e-08
+  },
+  {
+   "id": "VC-THM-11.a",
+   "quantity": "flux through two slabs with an interface conductance",
+   "value": 64864.8648649,
+   "unit": "W/m^2",
+   "tolerance": {
+    "rel": 0.005
+   },
+   "source": "generator (S7 definition, S9)",
+   "grade": "A",
+   "proves": [
+    "FR-THM-08",
+    "TR-THM-15"
+   ],
+   "inputs": {
+    "L1_m": 0.01,
+    "k1_W_mK": 150.0,
+    "hc_W_m2K": 2000.0,
+    "L2_m": 0.01,
+    "k2_W_mK": 15.0,
+    "T_hot_degC": 100.0,
+    "T_cold_degC": 20.0
+   },
+   "derivation": "q = dT / (L1/k1 + 1/hc + L2/k2)"
+  },
+  {
+   "id": "VC-THM-11.b",
+   "quantity": "temperature jump across the interface",
+   "value": 32.4324324324,
+   "unit": "K",
+   "tolerance": {
+    "rel": 0.01
+   },
+   "source": "generator (S7 definition)",
+   "grade": "A",
+   "proves": [
+    "FR-THM-08",
+    "TR-THM-15"
+   ],
+   "inputs": {
+    "L1_m": 0.01,
+    "k1_W_mK": 150.0,
+    "hc_W_m2K": 2000.0,
+    "L2_m": 0.01,
+    "k2_W_mK": 15.0,
+    "T_hot_degC": 100.0,
+    "T_cold_degC": 20.0
+   },
+   "derivation": "dT_interface = q / hc"
+  },
+  {
+   "id": "VC-THM-12.a",
+   "quantity": "Neumann one-phase melting: root lambda",
+   "value": 0.24573098524,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator (S9 formula)",
+   "grade": "A",
+   "proves": [
+    "FR-THM-09",
+    "TR-THM-16"
+   ],
+   "inputs": {
+    "k_W_mK": 0.6,
+    "rho_kg_m3": 1000.0,
+    "cp_J_kgK": 4200.0,
+    "latent_J_kg": 334000.0,
+    "Twall_minus_Tmelt_K": 10.0,
+    "t_s": 3600.0
+   },
+   "stefanNumber": 0.125748502994,
+   "derivation": "lam exp(lam^2) erf(lam) = Ste/sqrt(pi)"
+  },
+  {
+   "id": "VC-THM-12.b",
+   "quantity": "Neumann one-phase melting: front position at t",
+   "value": 0.0111453098806,
+   "unit": "m",
+   "tolerance": {
+    "rel": 0.03
+   },
+   "source": "generator (S9 formula)",
+   "grade": "A",
+   "proves": [
+    "FR-THM-09",
+    "TR-THM-16"
+   ],
+   "inputs": {
+    "k_W_mK": 0.6,
+    "rho_kg_m3": 1000.0,
+    "cp_J_kgK": 4200.0,
+    "latent_J_kg": 334000.0,
+    "Twall_minus_Tmelt_K": 10.0,
+    "t_s": 3600.0
+   },
+   "derivation": "s = 2 lam sqrt(alpha t); FE uses the apparent-heat-capacity table of TR-THM-16"
+  },
+  {
+   "id": "VC-THM-13",
+   "quantity": "Stefan-Boltzmann constant written to *PHYSICAL CONSTANTS (SI)",
+   "value": 5.67037441918e-08,
+   "unit": "W/(m^2 K^4)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator (exact 2019 SI constants, S11) + S7 (keyword syntax)",
+   "grade": "A",
+   "proves": [
+    "FR-THM-05",
+    "TR-THM-14"
+   ],
+   "derivation": "sigma = 2 pi^5 kB^4 / (15 h^3 c^2)",
+   "inMmTonneSecond": 5.67037441918e-11,
+   "note": "N-mm-t-s: 1 W/(m^2 K^4) = 1000 N mm s^-1 / (1e6 mm^2 K^4), so the deck value is sigma_SI x 1e-3"
+  },
+  {
+   "id": "VC-THM-14.a",
+   "quantity": "CalculiX oneel8ra: temperature of the radiating face",
+   "value": -0.950738649222,
+   "unit": "degC",
+   "tolerance": {
+    "rel": 0.0001
+   },
+   "source": "generator (1D conduction + radiation balance) + S7 (test/oneel8ra.dat.ref: -9.507386E-01)",
+   "grade": "A",
+   "proves": [
+    "FR-THM-05",
+    "TR-THM-14",
+    "TR-THM-30"
+   ],
+   "inputs": {
+    "L_m": 1.0,
+    "k_W_mK": 50.0,
+    "eps": 1.0,
+    "T_fixed_degC": 0.0,
+    "T_sink_degC": -12.0,
+    "absoluteZero_degC": -273.15,
+    "sigma_W_m2K4": 5.669e-08
+   },
+   "calculixReference": -0.9507386,
+   "deckSha256": "3cd84490cb97f4d06dba2d8c273149c29099840db950d90530e46af4f130bc06",
+   "derivation": "k (T0 - T)/L = eps sigma ((T - Tz)^4 - (Tsink - Tz)^4); a linear C3D8 element is exact for this 1D field"
+  },
+  {
+   "id": "VC-THM-14.b",
+   "quantity": "CalculiX oneel8ra: heat flow through the cube (sum of RFL on the fixed face)",
+   "value": 47.5369324611,
+   "unit": "W",
+   "tolerance": {
+    "rel": 0.0001
+   },
+   "source": "generator + S7 (4 x 1.188423E+01 = 47.53692)",
+   "grade": "A",
+   "proves": [
+    "FR-THM-11",
+    "FR-THM-12",
+    "TR-THM-31"
+   ],
+   "inputs": {
+    "L_m": 1.0,
+    "k_W_mK": 50.0,
+    "eps": 1.0,
+    "T_fixed_degC": 0.0,
+    "T_sink_degC": -12.0,
+    "absoluteZero_degC": -273.15,
+    "sigma_W_m2K4": 5.669e-08
+   },
+   "derivation": "Q = k A (T0 - T)/L with A = 1 m^2; equals the radiated power (heat balance)"
+  },
+  {
+   "id": "VC-THM-60",
+   "quantity": "named defaults: absolute zero and sigma are reported with source and defaulted flag",
+   "value": null,
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 5.4 / AF-31",
+   "grade": "A",
+   "proves": [
+    "FR-THM-20",
+    "TR-THM-50"
+   ],
+   "expected": {
+    "physicalConstants": {
+     "stefanBoltzmann": {
+      "value": 5.67037441918e-08,
+      "unit": "W/(m^2 K^4)",
+      "source": "2019 SI exact constants",
+      "defaulted": true
+     },
+     "absoluteZero": {
+      "value": -273.15,
+      "unit": "degC",
+      "source": "SI definition of degC",
+      "defaulted": true
+     }
+    }
+   }
+  },
+  {
+   "id": "VC-THM-61",
+   "quantity": "deliberately wrong set-ups return stable codes",
+   "value": null,
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1 / AF-11",
+   "grade": "A",
+   "proves": [
+    "FR-THM-21",
+    "TR-THM-51"
+   ],
+   "expected": [
+    {
+     "setup": "heat_transient case, material record has k but no cp",
+     "code": "THM_MATERIAL_NO_CP"
+    },
+    {
+     "setup": "radiation BC with emissivity 1.2",
+     "code": "THM_EMISSIVITY_INVALID"
+    },
+    {
+     "setup": "radiation BC with sink temperature given in degC without absoluteZero handling",
+     "code": "THM_UNITS_MISMATCH"
+    },
+    {
+     "setup": "transient case without initial temperature",
+     "code": "THM_INITIAL_TEMPERATURE_MISSING"
+    },
+    {
+     "setup": "no temperature BC, film or radiation anywhere (steady)",
+     "code": "THM_NO_HEAT_PATH"
+    },
+    {
+     "setup": "k(T) table evaluated outside its valid range at a solved temperature",
+     "code": "THM_PROPERTY_OUT_OF_RANGE"
+    },
+    {
+     "setup": "heat balance residual 5 % after solve",
+     "code": "THM_HEAT_BALANCE"
+    },
+    {
+     "setup": "agent calls dispose_thermal_limit",
+     "code": "THM_HUMAN_GATE"
+    },
+    {
+     "setup": "add_temperature_limit without source",
+     "code": "THM_LIMIT_SOURCE_REQUIRED"
+    },
+    {
+     "setup": "film BC with numeric h and no source",
+     "code": "THM_SOURCE_REQUIRED"
+    }
+   ]
+  },
+  {
+   "id": "VC-THM-30",
+   "quantity": "CalculiX cavity view factor vs compute_view_factors for VC-THM-09.a geometry",
+   "value": null,
+   "unit": "1",
+   "tolerance": {
+    "abs": 0.002
+   },
+   "source": "TBD - measure with bundled ccx (*VIEWFACTOR, WRITE) and llull TS factors",
+   "grade": "TBD",
+   "proves": [
+    "FR-THM-06",
+    "TR-THM-20",
+    "TR-THM-21"
+   ],
+   "note": "not a gate until measured; the manual calls CalculiX view factors approximate (S7)"
+  },
+  {
+   "id": "VC-THM-50",
+   "quantity": "stale thermal results are refused",
+   "value": null,
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "05 TR-FEA-06 + TR-THM-32",
+   "grade": "A",
+   "proves": [
+    "FR-THM-15",
+    "FR-THM-18",
+    "TR-THM-32"
+   ],
+   "expected": {
+    "thermal_report.state": "stale",
+    "check_temperature_limits.code": "FEA_RESULTS_STALE",
+    "dependentThermoStatic.state": "stale"
+   }
+  },
+  {
+   "id": "VC-THM-62",
+   "quantity": "limit exceedance needs a human disposition",
+   "value": null,
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "AF-33, AF-34",
+   "grade": "A",
+   "proves": [
+    "FR-THM-13",
+    "FR-THM-22",
+    "FR-THM-23",
+    "TR-THM-52"
+   ],
+   "inputs": {
+    "limit_max_degC": 150.0,
+    "limit_source": "test input of this validation case",
+    "case": "VC-THM-01 wall (max T 170.81 degC)"
+   },
+   "expected": {
+    "row.status": "FAIL",
+    "row.code": "THM_LIMIT_EXCEEDED",
+    "row.marginK": -20.8108108108,
+    "row.reviewRequired": true,
+    "row.disposition": "pending_human",
+    "dispose_thermal_limit(agent).code": "THM_HUMAN_GATE",
+    "documentHashUnchanged": true
+   }
+  },
+  {
+   "id": "VC-THM-63",
+   "quantity": "unverified conductivity propagates",
+   "value": null,
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "AF-32",
+   "grade": "A",
+   "proves": [
+    "FR-THM-22",
+    "TR-THM-50"
+   ],
+   "inputs": {
+    "k": "08 record value with basis 'typical'"
+   },
+   "expected": {
+    "thermal_report.unverified": true,
+    "limitRows[*].unverified": true,
+    "check_thermal.items": [
+     "THM_MATERIAL_UNVERIFIED"
+    ]
+   }
+  }
+ ]
+}

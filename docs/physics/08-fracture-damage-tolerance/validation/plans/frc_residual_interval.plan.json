@@ -1,0 +1,210 @@
+[
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "dt_test",
+   "name": "dt_test",
+   "designation": "damage-tolerance test set (not a material claim)",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "dt_test",
+   "property": "Fty",
+   "value": 300.0,
+   "unit": "MPa",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "add_material_model",
+  "params": {
+   "material": "dt_test",
+   "id": "paris1",
+   "model": {
+    "kind": "da_dn_paris",
+    "C": 1e-11,
+    "m": 3,
+    "units": "m/cycle|MPa*m^0.5",
+    "conditions": {
+     "stressRatio": 0
+    }
+   },
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   }
+  }
+ },
+ {
+  "command": "add_material_model",
+  "params": {
+   "material": "dt_test",
+   "id": "kc1",
+   "model": {
+    "kind": "fracture_toughness",
+    "Kc": [
+     {
+      "thickness": {
+       "value": 2,
+       "unit": "mm"
+      },
+      "value": {
+       "value": 60,
+       "unit": "MPa*m^0.5"
+      }
+     }
+    ],
+    "state": "thickness_table"
+   },
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   }
+  }
+ },
+ {
+  "command": "define_load_history",
+  "params": {
+   "name": "ca_150",
+   "kind": "stress",
+   "unit": "MPa",
+   "data": {
+    "form": "blocks",
+    "rows": [
+     {
+      "max": 150,
+      "min": 0,
+      "cycles": 1
+     }
+    ]
+   },
+   "repeats": "repeating",
+   "source": {
+    "citation": "constant amplitude 0-150 MPa (test input)"
+   }
+  },
+  "as": "h"
+ },
+ {
+  "command": "define_crack",
+  "params": {
+   "name": "center_W200",
+   "geometry": {
+    "kind": "center_through",
+    "a": {
+     "value": 5,
+     "unit": "mm"
+    },
+    "W": {
+     "value": 200,
+     "unit": "mm"
+    },
+    "t": {
+     "value": 2,
+     "unit": "mm"
+    }
+   },
+   "referenceStress": {
+    "source": "history"
+   }
+  },
+  "as": "cr"
+ },
+ {
+  "command": "create_crack_growth_case",
+  "params": {
+   "name": "interval",
+   "crackId": "$cr",
+   "material": {
+    "recordId": "dt_test",
+    "growthModelId": "paris1",
+    "toughnessModelId": "kc1"
+   },
+   "histories": [
+    {
+     "historyId": "$h",
+     "scale": 1
+    }
+   ],
+   "sequence": "cycle_by_cycle",
+   "growth": {
+    "aInitial": {
+     "value": 5,
+     "unit": "mm"
+    },
+    "aDetectable": {
+     "value": 5,
+     "unit": "mm"
+    }
+   },
+   "residualStrengthStress": {
+    "value": 150,
+    "unit": "MPa"
+   }
+  },
+  "as": "cg"
+ },
+ {
+  "command": "set_damage_tolerance_factors",
+  "params": {
+   "caseId": "$cg",
+   "scatterInterval": {
+    "value": 2,
+    "source": "case input (test value, not a regulatory factor)"
+   }
+  }
+ },
+ {
+  "command": "compute_residual_strength",
+  "params": {
+   "crackId": "$cr",
+   "sizes": [
+    {
+     "value": 10,
+     "unit": "mm"
+    },
+    {
+     "value": 20,
+     "unit": "mm"
+    },
+    {
+     "value": 40,
+     "unit": "mm"
+    }
+   ],
+   "stress": {
+    "value": 150,
+    "unit": "MPa"
+   }
+  }
+ },
+ {
+  "command": "compute_crack_growth",
+  "params": {
+   "caseId": "$cg"
+  }
+ },
+ {
+  "command": "compute_inspection_interval",
+  "params": {
+   "caseId": "$cg"
+  }
+ },
+ {
+  "command": "check_damage_tolerance",
+  "params": {
+   "caseId": "$cg"
+  }
+ }
+]

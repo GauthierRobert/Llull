@@ -1,0 +1,71 @@
+[
+ {
+  "command": "define_vibration_spectrum",
+  "params": {
+   "name": "gevs_q",
+   "library": "gevs_component_qual"
+  }
+ },
+ {
+  "command": "psd_rms",
+  "params": {
+   "spectrum": "gevs_q"
+  }
+ },
+ {
+  "command": "sdof_response",
+  "params": {
+   "fnHz": 200.0,
+   "Q": 10.0,
+   "input": {
+    "kind": "random",
+    "spectrum": "gevs_q"
+   }
+  }
+ },
+ {
+  "command": "sdof_response",
+  "params": {
+   "fnHz": 100.0,
+   "zeta": 0.05,
+   "input": {
+    "kind": "harmonic"
+   }
+  }
+ },
+ {
+  "command": "shock_response_spectrum",
+  "params": {
+   "input": {
+    "kind": "half_sine",
+    "peakG": 1.0,
+    "durationS": 0.011
+   },
+   "Q": 10.0,
+   "frequenciesHz": [
+    10,
+    20,
+    31.5,
+    50,
+    80,
+    100,
+    160,
+    250,
+    400,
+    630,
+    1000,
+    2000
+   ]
+  }
+ },
+ {
+  "command": "damping_coefficients",
+  "params": {
+   "fromRatios": {
+    "f1Hz": 10.0,
+    "f2Hz": 100.0,
+    "zeta": 0.02
+   }
+  }
+ }
+]

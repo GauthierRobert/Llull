@@ -1,0 +1,17 @@
+configuration,parameter,F_closed_form
+parallel_squares_side_over_spacing,0.1,0.00316205684
+parallel_squares_side_over_spacing,0.5,0.0685895888
+parallel_squares_side_over_spacing,1.0,0.199824896
+parallel_squares_side_over_spacing,2.0,0.415253284
+parallel_squares_side_over_spacing,5.0,0.690244694
+parallel_squares_side_over_spacing,10.0,0.826994522
+perpendicular_squares_common_edge_h_over_l,0.1,0.0432513694
+perpendicular_squares_common_edge_h_over_l,0.5,0.146186679
+perpendicular_squares_common_edge_h_over_l,1.0,0.200043776
+perpendicular_squares_common_edge_h_over_l,2.0,0.232852603
+perpendicular_squares_common_edge_h_over_l,5.0,0.246899006
+coaxial_equal_discs_radius_over_spacing,0.25,0.05572809
+coaxial_equal_discs_radius_over_spacing,0.5,0.171572875
+coaxial_equal_discs_radius_over_spacing,1.0,0.381966011
+coaxial_equal_discs_radius_over_spacing,2.0,0.609611797
+coaxial_equal_discs_radius_over_spacing,4.0,0.779304445

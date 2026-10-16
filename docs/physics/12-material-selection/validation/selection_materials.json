@@ -1,0 +1,55 @@
+{
+ "schema": "PHY-12 SEL selection inputs, draft 0.1 (TECHNICAL_SPEC §3). Values are NOT a llull library: they feed the generator only.",
+ "accessed": "2026-10-15",
+ "statusLegend": {
+  "verified": "value seen in the cited source's indexed content (08 MAT validation/sources.md method); basis is typical or supplier, so results computed from it are still `unverified` in the AF-32 sense",
+  "secondary": "value seen through one secondary page only (grade B); reported, never a pass/fail gate",
+  "derived": "computed by another llull generator from sourced inputs",
+  "synthetic": "round numbers invented for algorithm tests; never a material property; labelled as such in every output",
+  "tbd": "no public source reached in this session"
+ },
+ "synthetic": [
+  {"id": "syn_a", "densityGcm3": 2.0, "eGPa": 70.0, "strengthMPa": 500.0, "costPerKg": 4.0, "co2KgPerKg": 10.0, "maxServiceTempC": 120.0},
+  {"id": "syn_b", "densityGcm3": 4.0, "eGPa": 110.0, "strengthMPa": 900.0, "costPerKg": 30.0, "co2KgPerKg": 40.0, "maxServiceTempC": 350.0},
+  {"id": "syn_c", "densityGcm3": 8.0, "eGPa": 200.0, "strengthMPa": 1000.0, "costPerKg": 1.0, "co2KgPerKg": 2.0, "maxServiceTempC": 500.0},
+  {"id": "syn_d", "densityGcm3": 1.6, "eGPa": 70.0, "strengthMPa": 600.0, "costPerKg": 60.0, "co2KgPerKg": 30.0, "maxServiceTempC": 120.0},
+  {"id": "syn_e", "densityGcm3": 2.5, "eGPa": 60.0, "strengthMPa": 400.0, "costPerKg": 5.0, "co2KgPerKg": 12.0, "maxServiceTempC": 100.0}
+ ],
+ "workedExample": [
+  {
+   "id": "aa7075_t6", "label": "Aluminium 7075-T6 sheet",
+   "density": {"value": 2.81, "unit": "g/cm^3", "basis": "typical", "status": "verified", "source": "08 MAT S12 (MatWeb/ASM 7075-T6)"},
+   "E": {"value": 71.7, "unit": "GPa", "basis": "typical", "status": "verified", "source": "08 MAT S12"},
+   "Fty": {"value": 503, "unit": "MPa", "basis": "typical", "status": "verified", "source": "08 MAT S12"},
+   "nu": {"value": 0.33, "unit": "-", "basis": "typical", "status": "verified", "source": "08 MAT S12"}
+  },
+  {
+   "id": "ti6al4v_annealed", "label": "Ti-6Al-4V annealed sheet",
+   "density": {"value": 0.160, "unit": "lb/in^3", "basis": "supplier_unstated", "status": "verified", "source": "08 MAT S15 (Rolled Alloys); 0.163 lb/in^3 also seen (FR-MAT-04 multi-source)"},
+   "E": {"value": 113.8, "unit": "GPa", "basis": "typical", "status": "secondary", "source": "S3 (MatWeb value as quoted by nTop sample-materials documentation; condition not stated)"},
+   "Fty": {"value": 126, "unit": "ksi", "basis": "typical", "status": "verified", "source": "08 MAT S16 (annealed sheet 0.063-0.1875 in)"},
+   "nu": {"value": 0.342, "unit": "-", "basis": "typical", "status": "secondary", "source": "S3"}
+  },
+  {
+   "id": "aisi4130_normalized", "label": "Steel AISI 4130 normalized",
+   "density": {"value": 7.8, "unit": "g/cm^3", "basis": "typical", "status": "secondary", "source": "S4 (MakeItFrom normalized 4130; Industeel gives 7.85 for a Q&T plate)"},
+   "E": {"value": 190, "unit": "GPa", "basis": "typical", "status": "secondary", "source": "S4 (MakeItFrom)"},
+   "Fty": {"value": 440, "unit": "MPa", "basis": "typical", "status": "secondary", "source": "S4 (MakeItFrom)"},
+   "nu": {"value": null, "unit": "-", "status": "tbd"}
+  },
+  {
+   "id": "cfrp_t300_5208_quasi_iso", "label": "CFRP T300/5208 quasi-isotropic [0/±45/90]s (in-plane)",
+   "density": {"value": null, "unit": "g/cm^3", "status": "tbd", "source": "not in 06 CMP clt_reference.json; Tsai & Hahn table not reached"},
+   "E": {"value": 69675.7, "unit": "MPa", "basis": "derived", "status": "derived", "source": "06 CMP validation/clt_reference.json analytic_checks.T300_5208.quasi_isotropic_Ex (from Tsai & Hahn lamina data)"},
+   "Fty": {"value": null, "unit": "MPa", "status": "tbd", "source": "laminate strength is a 06 CMP first-ply-failure result, not a scalar property"},
+   "nu": {"value": 0.296031, "unit": "-", "basis": "derived", "status": "derived", "source": "06 CMP clt_reference.json quasi_isotropic_nuxy"}
+  }
+ ],
+ "workedPart": {
+  "description": "08 MAT plan mass_7075_block_current.json: box 100 x 50 x 10 mm (runs on today's llull, 140.5 g)",
+  "sizeMm": [100, 50, 10],
+  "appliedVonMisesMPa": 300,
+  "appliedNote": "synthetic applied stress for the margin what-if; not from an analysis",
+  "yieldFactor": {"value": 1.0, "source": "05 FEA §5.8 default (derived from 14 CFR 25.305(a))", "defaulted": true}
+ }
+}

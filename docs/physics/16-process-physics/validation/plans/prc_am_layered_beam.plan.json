@@ -1,0 +1,271 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    100,
+    10,
+    4
+   ],
+   "position": [
+    0,
+    0,
+    -4
+   ],
+   "anchor": "min"
+  },
+  "as": "plate"
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    100,
+    10,
+    2
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "anchor": "min"
+  },
+  "as": "deposit"
+ },
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "am_test_E200_nu0",
+   "name": "am_test_E200_nu0",
+   "designation": "test material",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "am_test_E200_nu0",
+   "property": "E",
+   "value": 200000.0,
+   "unit": "MPa",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "am_test_E200_nu0",
+   "property": "nu",
+   "value": 0.0,
+   "unit": "-",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "add_material_model",
+  "params": {
+   "material": "am_test_E200_nu0",
+   "id": "el",
+   "model": {
+    "kind": "elastic_isotropic",
+    "E": {
+     "value": 200000.0,
+     "unit": "MPa"
+    },
+    "nu": {
+     "value": 0.0,
+     "unit": "1"
+    }
+   },
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   }
+  }
+ },
+ {
+  "command": "define_constitutive_set",
+  "params": {
+   "material": "am_test_E200_nu0",
+   "set": {
+    "id": "el",
+    "elastic": "el"
+   },
+   "makeDefault": true
+  }
+ },
+ {
+  "command": "create_material",
+  "params": {
+   "name": "am_test_E200_nu0",
+   "density": 0.0078,
+   "color": "#9aa0a6",
+   "metalness": 1,
+   "roughness": 0.4,
+   "recordId": "am_test_E200_nu0"
+  }
+ },
+ {
+  "command": "assign_material",
+  "params": {
+   "materialName": "am_test_E200_nu0",
+   "entityIds": [
+    "$plate",
+    "$deposit"
+   ]
+  }
+ },
+ {
+  "command": "create_analysis",
+  "params": {
+   "name": "layered_beam",
+   "analysisType": "am_build_distortion",
+   "unitSystem": "N-mm-t-s",
+   "solver": "calculix"
+  },
+  "as": "an"
+ },
+ {
+  "command": "set_part_idealization",
+  "params": {
+   "analysisId": "$an",
+   "entityId": "$plate",
+   "idealization": "solid"
+  }
+ },
+ {
+  "command": "set_part_idealization",
+  "params": {
+   "analysisId": "$an",
+   "entityId": "$deposit",
+   "idealization": "solid"
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$an",
+   "name": "clamp_321",
+   "kind": "displacement",
+   "dofs": {
+    "ux": 0,
+    "uy": 0,
+    "uz": 0
+   },
+   "target": {
+    "entityId": "$plate",
+    "pointsNear": [
+     [
+      50,
+      0,
+      -4
+     ]
+    ]
+   }
+  },
+  "_note": "statically determinate support (plus two more points, 3-2-1) so the free beam can curve; parts are tied (shared interface nodes after fragment)"
+ },
+ {
+  "command": "am_build_setup",
+  "params": {
+   "analysisId": "$an",
+   "buildDirection": [
+    0,
+    0,
+    1
+   ],
+   "plateEntityId": "$plate",
+   "supportEntityIds": [],
+   "layerHeight": 0.2,
+   "probes": [
+    {
+     "name": "end",
+     "point": [
+      100,
+      5,
+      0
+     ],
+     "dof": "uz"
+    },
+    {
+     "name": "mid",
+     "point": [
+      50,
+      5,
+      0
+     ],
+     "dof": "uz"
+    }
+   ]
+  }
+ },
+ {
+  "command": "set_inherent_strain",
+  "params": {
+   "analysisId": "$an",
+   "exx": -0.002,
+   "eyy": 0.0,
+   "ezz": 0.0,
+   "source": "VC-PRC-30 test input (not a process datum)",
+   "calibrated": false
+  }
+ },
+ {
+  "command": "add_release_step",
+  "params": {
+   "analysisId": "$an",
+   "name": "cut_plate",
+   "remove": [
+    "plate"
+   ],
+   "support321": {
+    "points": [
+     [
+      50,
+      0,
+      0
+     ],
+     [
+      50,
+      10,
+      0
+     ],
+     [
+      0,
+      0,
+      0
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "set_mesh_controls",
+  "params": {
+   "analysisId": "$an",
+   "mesher": "gmsh",
+   "elementFamily": "hex_dominant",
+   "order": 2,
+   "globalSize": 0.2
+  }
+ }
+]

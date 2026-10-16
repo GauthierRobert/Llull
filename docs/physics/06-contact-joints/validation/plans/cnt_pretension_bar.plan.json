@@ -1,0 +1,241 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 3,
+   "height": 20,
+   "position": [
+    0,
+    0,
+    10
+   ]
+  },
+  "as": "bolt"
+ },
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "bolt_E200",
+   "name": "bolt_E200",
+   "designation": "test material",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "bolt_E200",
+   "property": "E",
+   "value": 200000.0,
+   "unit": "MPa",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "bolt_E200",
+   "property": "nu",
+   "value": 0.3,
+   "unit": "-",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "add_material_model",
+  "params": {
+   "material": "bolt_E200",
+   "id": "el",
+   "model": {
+    "kind": "elastic_isotropic",
+    "E": {
+     "value": 200000.0,
+     "unit": "MPa"
+    },
+    "nu": {
+     "value": 0.3,
+     "unit": "1"
+    }
+   },
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   }
+  }
+ },
+ {
+  "command": "define_constitutive_set",
+  "params": {
+   "material": "bolt_E200",
+   "set": {
+    "id": "el",
+    "elastic": "el"
+   },
+   "makeDefault": true
+  }
+ },
+ {
+  "command": "create_material",
+  "params": {
+   "name": "bolt_E200",
+   "density": 0.0078,
+   "color": "#9aa0a6",
+   "metalness": 1,
+   "roughness": 0.4,
+   "recordId": "bolt_E200"
+  }
+ },
+ {
+  "command": "assign_material",
+  "params": {
+   "materialName": "bolt_E200",
+   "entityIds": [
+    "$bolt"
+   ]
+  }
+ },
+ {
+  "command": "create_analysis",
+  "params": {
+   "name": "pretension_bar",
+   "analysisType": "nonlinear_static",
+   "unitSystem": "N-mm-t-s",
+   "solver": "calculix"
+  },
+  "as": "an"
+ },
+ {
+  "command": "set_part_idealization",
+  "params": {
+   "analysisId": "$an",
+   "entityId": "$bolt",
+   "idealization": "solid"
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$an",
+   "name": "ends",
+   "kind": "fixed",
+   "target": {
+    "entityId": "$bolt",
+    "facesNear": [
+     [
+      0,
+      0,
+      0
+     ],
+     [
+      0,
+      0,
+      20
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "set_nonlinear_controls",
+  "params": {
+   "analysisId": "$an",
+   "nlgeom": false,
+   "convergence": {
+    "name": "ccx_default"
+   },
+   "outputIncrements": "all"
+  }
+ },
+ {
+  "command": "add_analysis_step",
+  "params": {
+   "analysisId": "$an",
+   "name": "preload",
+   "multipliers": {},
+   "amplitude": "ramp",
+   "control": {
+    "kind": "load",
+    "initialIncrement": 1.0,
+    "minIncrement": 0.0001,
+    "maxIncrement": 1.0,
+    "maxIncrements": 10
+   }
+  },
+  "as": "st1"
+ },
+ {
+  "command": "add_bolt_pretension",
+  "params": {
+   "analysisId": "$an",
+   "name": "pt",
+   "entityId": "$bolt",
+   "section": {
+    "point": [
+     0,
+     0,
+     10
+    ],
+    "normal": [
+     0,
+     0,
+     1
+    ]
+   },
+   "preload": {
+    "kind": "force",
+    "value": 10000.0
+   },
+   "preloadStepId": "$st1",
+   "lockAfter": true
+  }
+ },
+ {
+  "command": "add_curve_probe",
+  "params": {
+   "analysisId": "$an",
+   "name": "end_reaction",
+   "load": {
+    "kind": "reaction",
+    "constraintId": "ends",
+    "component": "z"
+   },
+   "displacement": {
+    "point": [
+     0,
+     0,
+     10
+    ],
+    "dof": "uz"
+   }
+  },
+  "_note": "reaction per end face = 10 000 N (sum over both faces = 0); contact_report gives the bolt force from the reference node"
+ },
+ {
+  "command": "set_mesh_controls",
+  "params": {
+   "analysisId": "$an",
+   "mesher": "gmsh",
+   "elementFamily": "tet",
+   "order": 1,
+   "globalSize": 1.0
+  }
+ }
+]

@@ -1,0 +1,163 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    20,
+    20,
+    20
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "anchor": "center"
+  },
+  "as": "ground_box"
+ },
+ {
+  "command": "create_component",
+  "params": {
+   "name": "ground",
+   "entityIds": [
+    "$ground_box"
+   ],
+   "componentId": "comp_ground"
+  },
+  "as": "ground"
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    500,
+    10,
+    10
+   ],
+   "position": [
+    250,
+    0,
+    0
+   ],
+   "anchor": "center"
+  },
+  "as": "bar_box"
+ },
+ {
+  "command": "create_component",
+  "params": {
+   "name": "bar",
+   "entityIds": [
+    "$bar_box"
+   ],
+   "componentId": "comp_bar"
+  },
+  "as": "bar"
+ },
+ {
+  "command": "create_material",
+  "params": {
+   "name": "test_density",
+   "density": 0.0078,
+   "color": "#9aa0a6",
+   "metalness": 1,
+   "roughness": 0.4
+  }
+ },
+ {
+  "command": "assign_material",
+  "params": {
+   "materialName": "test_density",
+   "entityIds": [
+    "$bar"
+   ]
+  }
+ },
+ {
+  "command": "add_joint",
+  "params": {
+   "kind": "revolute",
+   "a": {
+    "instanceId": "$ground"
+   },
+   "b": {
+    "instanceId": "$bar"
+   },
+   "axis": "y",
+   "id": "pivot"
+  }
+ },
+ {
+  "command": "set_joint_geometry",
+  "params": {
+   "jointId": "pivot",
+   "pivotMm": [
+    0,
+    0,
+    0
+   ]
+  }
+ },
+ {
+  "command": "set_ground",
+  "params": {
+   "instanceIds": [
+    "$ground"
+   ]
+  }
+ },
+ {
+  "command": "set_mechanism_mode",
+  "params": {
+   "mode": "planar",
+   "planeNormal": "y"
+  }
+ },
+ {
+  "command": "set_body_properties",
+  "params": {
+   "instanceId": "$bar",
+   "mass": "geometry"
+  }
+ },
+ {
+  "command": "set_gravity",
+  "params": {
+   "vectorMPerS2": [
+    0,
+    0,
+    -9.80665
+   ]
+  }
+ },
+ {
+  "command": "set_initial_conditions",
+  "params": {
+   "jointValues": {
+    "pivot": 0.0
+   }
+  }
+ },
+ {
+  "command": "dynamics_study",
+  "params": {
+   "durationS": 3.0,
+   "outputStepS": 0.0005,
+   "outputs": {
+    "joints": [
+     "pivot"
+    ],
+    "events": [
+     "joint_rate_crossing:pivot:0"
+    ]
+   }
+  }
+ }
+]

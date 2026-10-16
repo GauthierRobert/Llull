@@ -1,0 +1,7 @@
+[
+ {"command": "set_units", "params": {"units": "mm"}},
+ {"command": "add_box", "params": {"size": [100, 50, 10], "anchor": "min"}, "as": "plate"},
+ {"command": "add_box", "params": {"size": [60, 30, 5], "anchor": "min", "position": [20, 10, 10]}, "as": "block"},
+ {"command": "measure_bounding_box", "params": {"entityId": "$plate"}},
+ {"command": "measure_bounding_box", "params": {"entityId": "$block"}}
+]

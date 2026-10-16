@@ -1,0 +1,87 @@
+[
+ {
+  "command": "define_random_variable",
+  "params": {
+   "name": "bad_sd",
+   "unit": "MPa",
+   "binding": {
+    "kind": "free"
+   },
+   "distribution": {
+    "kind": "normal",
+    "mean": 100,
+    "sd": 0
+   }
+  }
+ },
+ {
+  "command": "define_random_variable",
+  "params": {
+   "name": "bad_ln",
+   "unit": "MPa",
+   "binding": {
+    "kind": "free"
+   },
+   "distribution": {
+    "kind": "lognormal",
+    "mean": -1,
+    "sd": 1
+   }
+  }
+ },
+ {
+  "command": "define_random_variable",
+  "params": {
+   "name": "a",
+   "unit": "1",
+   "binding": {
+    "kind": "free"
+   },
+   "distribution": {
+    "kind": "normal",
+    "mean": 0,
+    "sd": 1
+   },
+   "citation": {
+    "text": "test"
+   }
+  }
+ },
+ {
+  "command": "define_random_variable",
+  "params": {
+   "name": "b",
+   "unit": "1",
+   "binding": {
+    "kind": "free"
+   },
+   "distribution": {
+    "kind": "normal",
+    "mean": 0,
+    "sd": 1
+   },
+   "citation": {
+    "text": "test"
+   }
+  }
+ },
+ {
+  "command": "set_correlation",
+  "params": {
+   "names": [
+    "a",
+    "b"
+   ],
+   "matrix": [
+    [
+     1,
+     1.2
+    ],
+    [
+     1.2,
+     1
+    ]
+   ]
+  }
+ }
+]

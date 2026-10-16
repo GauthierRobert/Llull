@@ -1,0 +1,1821 @@
+{
+ "pack": "02-constitutive-models",
+ "generatedBy": "generate_matl_reference.py",
+ "constants": {
+  "R_J_per_mol_K": 8.31446261815324
+ },
+ "cases": [
+  {
+   "id": "VC-MATL-01/firstYield",
+   "quantity": "von Mises stress at exx = 0.25e-4 (plane strain, elastic)",
+   "value": 5.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "closed form: sigma_x - sigma_y = E/(1+nu) * exx",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-01/perfect/point1(0.25,0.0)e-4/N10",
+   "quantity": "effective stress, 10 equal increments per segment (algorithm identity)",
+   "value": 5.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-01/perfect/point1(0.25,0.0)e-4/N1000",
+   "quantity": "effective stress, 1000 increments per segment",
+   "value": 5.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-01/perfect/point1(0.25,0.0)e-4/converged",
+   "quantity": "effective stress, converged (N = 100000 per segment)",
+   "value": 5.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.0002
+   },
+   "source": "reference integrator; NAFEMS target quoted for comparison only (B)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ],
+   "convergedN100000": 5.0
+  },
+  {
+   "id": "VC-MATL-01/perfect/point2(0.5,0.0)e-4/N10",
+   "quantity": "effective stress, 10 equal increments per segment (algorithm identity)",
+   "value": 5.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-01/perfect/point2(0.5,0.0)e-4/N1000",
+   "quantity": "effective stress, 1000 increments per segment",
+   "value": 5.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-01/perfect/point2(0.5,0.0)e-4/converged",
+   "quantity": "effective stress, converged (N = 100000 per segment)",
+   "value": 5.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.0002
+   },
+   "source": "reference integrator; NAFEMS target quoted for comparison only (B)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ],
+   "convergedN100000": 5.0
+  },
+  {
+   "id": "VC-MATL-01/perfect/point3(0.5,0.25)e-4/N10",
+   "quantity": "effective stress, 10 equal increments per segment (algorithm identity)",
+   "value": 5.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-01/perfect/point3(0.5,0.25)e-4/N1000",
+   "quantity": "effective stress, 1000 increments per segment",
+   "value": 5.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-01/perfect/point3(0.5,0.25)e-4/converged",
+   "quantity": "effective stress, converged (N = 100000 per segment)",
+   "value": 4.99999999995,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.0002
+   },
+   "source": "reference integrator; NAFEMS target quoted for comparison only (B)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ],
+   "convergedN100000": 4.99999999995,
+   "nafemsTarget": 5.0,
+   "relDiffConvergedVsTarget": -9.061e-12
+  },
+  {
+   "id": "VC-MATL-01/perfect/point4(0.5,0.5)e-4/N10",
+   "quantity": "effective stress, 10 equal increments per segment (algorithm identity)",
+   "value": 5.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-01/perfect/point4(0.5,0.5)e-4/N1000",
+   "quantity": "effective stress, 1000 increments per segment",
+   "value": 5.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-01/perfect/point4(0.5,0.5)e-4/converged",
+   "quantity": "effective stress, converged (N = 100000 per segment)",
+   "value": 5.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.0002
+   },
+   "source": "reference integrator; NAFEMS target quoted for comparison only (B)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ],
+   "convergedN100000": 5.0
+  },
+  {
+   "id": "VC-MATL-01/perfect/point5(0.25,0.5)e-4/N10",
+   "quantity": "effective stress, 10 equal increments per segment (algorithm identity)",
+   "value": 5.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-01/perfect/point5(0.25,0.5)e-4/N1000",
+   "quantity": "effective stress, 1000 increments per segment",
+   "value": 5.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-01/perfect/point5(0.25,0.5)e-4/converged",
+   "quantity": "effective stress, converged (N = 100000 per segment)",
+   "value": 5.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.0002
+   },
+   "source": "reference integrator; NAFEMS target quoted for comparison only (B)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ],
+   "convergedN100000": 5.0
+  },
+  {
+   "id": "VC-MATL-01/perfect/point6(0.0,0.5)e-4/N10",
+   "quantity": "effective stress, 10 equal increments per segment (algorithm identity)",
+   "value": 5.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-01/perfect/point6(0.0,0.5)e-4/N1000",
+   "quantity": "effective stress, 1000 increments per segment",
+   "value": 5.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-01/perfect/point6(0.0,0.5)e-4/converged",
+   "quantity": "effective stress, converged (N = 100000 per segment)",
+   "value": 5.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.0002
+   },
+   "source": "reference integrator; NAFEMS target quoted for comparison only (B)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ],
+   "convergedN100000": 5.0
+  },
+  {
+   "id": "VC-MATL-01/perfect/point7(0.0,0.25)e-4/N10",
+   "quantity": "effective stress, 10 equal increments per segment (algorithm identity)",
+   "value": 3.82350455285,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-01/perfect/point7(0.0,0.25)e-4/N1000",
+   "quantity": "effective stress, 1000 increments per segment",
+   "value": 3.91511459035,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-01/perfect/point7(0.0,0.25)e-4/converged",
+   "quantity": "effective stress, converged (N = 100000 per segment)",
+   "value": 3.91606036912,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.0002
+   },
+   "source": "reference integrator; NAFEMS target quoted for comparison only (B)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ],
+   "convergedN100000": 3.91606036912,
+   "nafemsTarget": 3.917,
+   "relDiffConvergedVsTarget": -0.0002399,
+   "abaqusCPE4R": 3.824
+  },
+  {
+   "id": "VC-MATL-01/perfect/point8(0.0,0.0)e-4/N10",
+   "quantity": "effective stress, 10 equal increments per segment (algorithm identity)",
+   "value": 5.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-01/perfect/point8(0.0,0.0)e-4/N1000",
+   "quantity": "effective stress, 1000 increments per segment",
+   "value": 5.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-01/perfect/point8(0.0,0.0)e-4/converged",
+   "quantity": "effective stress, converged (N = 100000 per segment)",
+   "value": 5.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.0002
+   },
+   "source": "reference integrator; NAFEMS target quoted for comparison only (B)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ],
+   "convergedN100000": 5.0
+  },
+  {
+   "id": "VC-MATL-02/isotropicH62500/point1(0.25,0.0)e-4/N10",
+   "quantity": "effective stress, 10 equal increments per segment (algorithm identity)",
+   "value": 5.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-02/isotropicH62500/point1(0.25,0.0)e-4/N1000",
+   "quantity": "effective stress, 1000 increments per segment",
+   "value": 5.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-02/isotropicH62500/point1(0.25,0.0)e-4/converged",
+   "quantity": "effective stress, converged (N = 100000 per segment)",
+   "value": 5.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.0002
+   },
+   "source": "reference integrator; NAFEMS target quoted for comparison only (B)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ],
+   "convergedN100000": 5.0
+  },
+  {
+   "id": "VC-MATL-02/isotropicH62500/point2(0.5,0.0)e-4/N10",
+   "quantity": "effective stress, 10 equal increments per segment (algorithm identity)",
+   "value": 5.86206896552,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-02/isotropicH62500/point2(0.5,0.0)e-4/N1000",
+   "quantity": "effective stress, 1000 increments per segment",
+   "value": 5.86206896552,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-02/isotropicH62500/point2(0.5,0.0)e-4/converged",
+   "quantity": "effective stress, converged (N = 100000 per segment)",
+   "value": 5.8620689655,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.0002
+   },
+   "source": "reference integrator; NAFEMS target quoted for comparison only (B)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ],
+   "convergedN100000": 5.8620689655
+  },
+  {
+   "id": "VC-MATL-02/isotropicH62500/point3(0.5,0.25)e-4/N10",
+   "quantity": "effective stress, 10 equal increments per segment (algorithm identity)",
+   "value": 5.48210796399,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-02/isotropicH62500/point3(0.5,0.25)e-4/N1000",
+   "quantity": "effective stress, 1000 increments per segment",
+   "value": 5.48210796399,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-02/isotropicH62500/point3(0.5,0.25)e-4/converged",
+   "quantity": "effective stress, converged (N = 100000 per segment)",
+   "value": 5.48210796393,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.0002
+   },
+   "source": "reference integrator; NAFEMS target quoted for comparison only (B)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ],
+   "convergedN100000": 5.48210796393,
+   "nafemsTarget": 5.482,
+   "relDiffConvergedVsTarget": 1.969e-05,
+   "abaqusCPE4R": 5.482
+  },
+  {
+   "id": "VC-MATL-02/isotropicH62500/point4(0.5,0.5)e-4/N10",
+   "quantity": "effective stress, 10 equal increments per segment (algorithm identity)",
+   "value": 6.35943858929,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-02/isotropicH62500/point4(0.5,0.5)e-4/N1000",
+   "quantity": "effective stress, 1000 increments per segment",
+   "value": 6.36138363824,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-02/isotropicH62500/point4(0.5,0.5)e-4/converged",
+   "quantity": "effective stress, converged (N = 100000 per segment)",
+   "value": 6.36140595481,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.0002
+   },
+   "source": "reference integrator; NAFEMS target quoted for comparison only (B)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ],
+   "convergedN100000": 6.36140595481
+  },
+  {
+   "id": "VC-MATL-02/isotropicH62500/point5(0.25,0.5)e-4/N10",
+   "quantity": "effective stress, 10 equal increments per segment (algorithm identity)",
+   "value": 6.62604912636,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-02/isotropicH62500/point5(0.25,0.5)e-4/N1000",
+   "quantity": "effective stress, 1000 increments per segment",
+   "value": 6.6351561151,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-02/isotropicH62500/point5(0.25,0.5)e-4/converged",
+   "quantity": "effective stress, converged (N = 100000 per segment)",
+   "value": 6.63525584474,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.0002
+   },
+   "source": "reference integrator; NAFEMS target quoted for comparison only (B)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ],
+   "convergedN100000": 6.63525584474
+  },
+  {
+   "id": "VC-MATL-02/isotropicH62500/point6(0.0,0.5)e-4/N10",
+   "quantity": "effective stress, 10 equal increments per segment (algorithm identity)",
+   "value": 7.29728542161,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-02/isotropicH62500/point6(0.0,0.5)e-4/N1000",
+   "quantity": "effective stress, 1000 increments per segment",
+   "value": 7.31296296477,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-02/isotropicH62500/point6(0.0,0.5)e-4/converged",
+   "quantity": "effective stress, converged (N = 100000 per segment)",
+   "value": 7.31313231086,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.0002
+   },
+   "source": "reference integrator; NAFEMS target quoted for comparison only (B)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ],
+   "convergedN100000": 7.31313231086,
+   "nafemsTarget": 7.322,
+   "relDiffConvergedVsTarget": -0.001211
+  },
+  {
+   "id": "VC-MATL-02/isotropicH62500/point7(0.0,0.25)e-4/N10",
+   "quantity": "effective stress, 10 equal increments per segment (algorithm identity)",
+   "value": 4.11405326241,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-02/isotropicH62500/point7(0.0,0.25)e-4/N1000",
+   "quantity": "effective stress, 1000 increments per segment",
+   "value": 4.18884520175,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-02/isotropicH62500/point7(0.0,0.25)e-4/converged",
+   "quantity": "effective stress, converged (N = 100000 per segment)",
+   "value": 4.18963116268,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.0002
+   },
+   "source": "reference integrator; NAFEMS target quoted for comparison only (B)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ],
+   "convergedN100000": 4.18963116268,
+   "nafemsTarget": 4.23,
+   "relDiffConvergedVsTarget": -0.009543,
+   "abaqusCPE4R": 4.114
+  },
+  {
+   "id": "VC-MATL-02/isotropicH62500/point8(0.0,0.0)e-4/N10",
+   "quantity": "effective stress, 10 equal increments per segment (algorithm identity)",
+   "value": 5.53177132278,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-02/isotropicH62500/point8(0.0,0.0)e-4/N1000",
+   "quantity": "effective stress, 1000 increments per segment",
+   "value": 5.62258133995,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator §5.3",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-02/isotropicH62500/point8(0.0,0.0)e-4/converged",
+   "quantity": "effective stress, converged (N = 100000 per segment)",
+   "value": 5.62353219622,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.0002
+   },
+   "source": "reference integrator; NAFEMS target quoted for comparison only (B)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-10",
+    "TR-MATL-05"
+   ],
+   "convergedN100000": 5.62353219622
+  },
+  {
+   "id": "VC-MATL-02/hardeningKindMatters/point2",
+   "quantity": "point 2 if 62.5 GPa were read as a TANGENT modulus (H = E Et/(E - Et))",
+   "value": 6.08695652174,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "reference integrator",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-05",
+    "TR-MATL-03"
+   ],
+   "note": "differs from the plastic-modulus reading (point 2 N1000); the param must state its kind (MATL_HARDENING_MODULUS_KIND_MISSING)"
+  },
+  {
+   "id": "VC-MATL-03/orthoSynthetic/calculixORTHO",
+   "quantity": "engineering constants -> CalculiX *ELASTIC,TYPE=ORTHO D1111 D1122 D2222 D1133 D2233 D3333 D1212 D1313 D2323",
+   "value": [
+    138354.037267,
+    5590.0621118,
+    12765.0460484,
+    5590.0621118,
+    5868.49432427,
+    12765.0460484,
+    5000.0,
+    5000.0,
+    3448.0
+   ],
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "synthetic CFRP-like set; exact inversion of the compliance matrix",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-02",
+    "TR-MATL-02"
+   ],
+   "engineeringConstants": {
+    "E1": 135000,
+    "E2": 10000,
+    "E3": 10000,
+    "nu12": 0.3,
+    "nu13": 0.3,
+    "nu23": 0.45,
+    "G12": 5000,
+    "G13": 5000,
+    "G23": 3448
+   },
+   "note": "tensor shear: D1212 = G12 (S_12 = 2 G12 E_12)"
+  },
+  {
+   "id": "VC-MATL-03/orthoSynthetic/positiveDefinite",
+   "quantity": "positive definiteness of the synthetic set",
+   "value": true,
+   "unit": "bool",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "exact pivots",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-03",
+    "TR-MATL-02"
+   ]
+  },
+  {
+   "id": "VC-MATL-03/orthoInvalid/nu12=3.8",
+   "quantity": "nu12 = 3.8 > sqrt(E1/E2) = 3.674235: positive definite?",
+   "value": false,
+   "unit": "bool",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "2x2 leading minor of S: nu12^2 < E1/E2 (Lempriere 1968 bound, S6)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-03",
+    "TR-MATL-02"
+   ],
+   "expectCode": "MATL_ELASTIC_NOT_POSITIVE_DEFINITE",
+   "bound": 3.67423461417
+  },
+  {
+   "id": "VC-MATL-03/ccxManualORTHO/engineeringConstants",
+   "quantity": "CalculiX manual *ELASTIC,TYPE=ORTHO example converted to engineering constants",
+   "value": {
+    "E1": 399999.270591,
+    "E2": 304220.243126,
+    "E3": 217443.063445,
+    "nu12": 0.235581839339,
+    "nu13": 0.400555116187,
+    "nu23": 0.43011374738
+   },
+   "unit": "MPa / -",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "D values quoted from the ccx 2.23 manual (S3); exact inversion",
+   "grade": "B",
+   "proves": [
+    "FR-MATL-02",
+    "TR-MATL-02"
+   ],
+   "positiveDefinite": true
+  },
+  {
+   "id": "VC-MATL-03/isoBound/nu=0.5",
+   "quantity": "isotropic nu must satisfy -1 < nu < 0.5",
+   "value": "MATL_POISSON_BOUND",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "bulk K = E/(3(1-2nu)) > 0 and G = E/(2(1+nu)) > 0",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-03",
+    "TR-MATL-02"
+   ]
+  },
+  {
+   "id": "VC-MATL-03/isoBound/nu=-1.0",
+   "quantity": "isotropic nu must satisfy -1 < nu < 0.5",
+   "value": "MATL_POISSON_BOUND",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "bulk K = E/(3(1-2nu)) > 0 and G = E/(2(1+nu)) > 0",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-03",
+    "TR-MATL-02"
+   ]
+  },
+  {
+   "id": "VC-MATL-04/RO/alpha",
+   "quantity": "engineering form eps = s/E + 0.002 (s/s02)^n mapped to CalculiX form E eps = s + alpha (|s|/s0)^(n-1) s, s0 = s02",
+   "value": 0.36,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "algebra (S3 *DEFORMATION PLASTICITY form; NACA TN 902 three-parameter idea, S5)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-04",
+    "TR-MATL-04"
+   ]
+  },
+  {
+   "id": "VC-MATL-04/RO/strainAt_s02",
+   "quantity": "total strain at s = s02",
+   "value": 0.00755555555556,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "closed form",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-04"
+   ]
+  },
+  {
+   "id": "VC-MATL-04/RO/stressAt_eps0.01",
+   "quantity": "stress at total strain 0.01 (inverse by bisection)",
+   "value": 420.054211273,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "closed-form inverse, bisection to machine precision",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-04",
+    "TR-MATL-04"
+   ]
+  },
+  {
+   "id": "VC-MATL-05/AF/monotonic/ep=0.005",
+   "quantity": "uniaxial stress, s = sy + (C/gamma)(1 - exp(-gamma ep))",
+   "value": 278.693868057,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.001
+   },
+   "source": "closed form (Armstrong-Frederick); tolerance allows >= 1000 backward-Euler increments",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-06",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-05/AF/monotonic/ep=0.01",
+   "quantity": "uniaxial stress, s = sy + (C/gamma)(1 - exp(-gamma ep))",
+   "value": 326.424111766,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.001
+   },
+   "source": "closed form (Armstrong-Frederick); tolerance allows >= 1000 backward-Euler increments",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-06",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-05/AF/monotonic/ep=0.05",
+   "quantity": "uniaxial stress, s = sy + (C/gamma)(1 - exp(-gamma ep))",
+   "value": 398.6524106,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.001
+   },
+   "source": "closed form (Armstrong-Frederick); tolerance allows >= 1000 backward-Euler increments",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-06",
+    "TR-MATL-05"
+   ]
+  },
+  {
+   "id": "VC-MATL-05/AF/saturation",
+   "quantity": "saturated stress sy + C/gamma",
+   "value": 400.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "closed form",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-06"
+   ]
+  },
+  {
+   "id": "VC-MATL-05/Prager/reverseYield",
+   "quantity": "load to ep = 0.01 then reverse: stress at reverse yield = s_max - 2 sy",
+   "value": -100.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "closed form (elastic range 2 sy translates)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-06",
+    "TR-MATL-05"
+   ],
+   "sMax": 300.0
+  },
+  {
+   "id": "VC-MATL-06/neoHooke/UT/lambda=2",
+   "quantity": "nominal stress, synthetic neoHooke C10=0.2, UT, stretch 2",
+   "value": 0.7,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "closed form, incompressible",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-07",
+    "TR-MATL-06"
+   ]
+  },
+  {
+   "id": "VC-MATL-06/neoHooke/ET/lambda=2",
+   "quantity": "nominal stress, synthetic neoHooke C10=0.2, ET, stretch 2",
+   "value": 0.7875,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "closed form, incompressible",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-07",
+    "TR-MATL-06"
+   ]
+  },
+  {
+   "id": "VC-MATL-06/neoHooke/PS/lambda=2",
+   "quantity": "nominal stress, synthetic neoHooke C10=0.2, PS, stretch 2",
+   "value": 0.75,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "closed form, incompressible",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-07",
+    "TR-MATL-06"
+   ]
+  },
+  {
+   "id": "VC-MATL-06/mooneyRivlin/UT/lambda=2",
+   "quantity": "nominal stress, synthetic mooneyRivlin C10=0.16 C01=0.02, UT, stretch 2",
+   "value": 0.595,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "closed form, incompressible",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-07",
+    "TR-MATL-06"
+   ]
+  },
+  {
+   "id": "VC-MATL-06/mooneyRivlin/ET/lambda=2",
+   "quantity": "nominal stress, synthetic mooneyRivlin C10=0.16 C01=0.02, ET, stretch 2",
+   "value": 0.945,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "closed form, incompressible",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-07",
+    "TR-MATL-06"
+   ]
+  },
+  {
+   "id": "VC-MATL-06/mooneyRivlin/PS/lambda=2",
+   "quantity": "nominal stress, synthetic mooneyRivlin C10=0.16 C01=0.02, PS, stretch 2",
+   "value": 0.675,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "closed form, incompressible",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-07",
+    "TR-MATL-06"
+   ]
+  },
+  {
+   "id": "VC-MATL-06/yeoh/UT/lambda=2",
+   "quantity": "nominal stress, synthetic yeoh C10=0.18 C20=-0.002 C30=0.0001, UT, stretch 2",
+   "value": 0.6062,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "closed form, incompressible",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-07",
+    "TR-MATL-06"
+   ]
+  },
+  {
+   "id": "VC-MATL-06/yeoh/ET/lambda=2",
+   "quantity": "nominal stress, synthetic yeoh C10=0.18 C20=-0.002 C30=0.0001, ET, stretch 2",
+   "value": 0.659289770508,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "closed form, incompressible",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-07",
+    "TR-MATL-06"
+   ]
+  },
+  {
+   "id": "VC-MATL-06/yeoh/PS/lambda=2",
+   "quantity": "nominal stress, synthetic yeoh C10=0.18 C20=-0.002 C30=0.0001, PS, stretch 2",
+   "value": 0.6469453125,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "closed form, incompressible",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-07",
+    "TR-MATL-06"
+   ]
+  },
+  {
+   "id": "VC-MATL-06/arrudaBoyce/UT/lambda=2",
+   "quantity": "nominal stress, synthetic Arruda-Boyce mu = 0.27 MPa, lambda_m = 2.8, 5-term series",
+   "value": 0.548111303159,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "series coefficients S3 (ccx manual) + S12",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-07"
+   ]
+  },
+  {
+   "id": "VC-MATL-06/ogden1972set/UT/lambda=2",
+   "quantity": "nominal stress, Ogden 1972 convention W = sum mu_p/alpha_p (...)",
+   "value": 0.602721615587,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "closed form; parameter set S11 (B)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-07"
+   ]
+  },
+  {
+   "id": "VC-MATL-06/arrudaBoyce/ET/lambda=2",
+   "quantity": "nominal stress, synthetic Arruda-Boyce mu = 0.27 MPa, lambda_m = 2.8, 5-term series",
+   "value": 0.693361162958,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "series coefficients S3 (ccx manual) + S12",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-07"
+   ]
+  },
+  {
+   "id": "VC-MATL-06/ogden1972set/ET/lambda=2",
+   "quantity": "nominal stress, Ogden 1972 convention W = sum mu_p/alpha_p (...)",
+   "value": 0.821614770483,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "closed form; parameter set S11 (B)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-07"
+   ]
+  },
+  {
+   "id": "VC-MATL-06/arrudaBoyce/PS/lambda=2",
+   "quantity": "nominal stress, synthetic Arruda-Boyce mu = 0.27 MPa, lambda_m = 2.8, 5-term series",
+   "value": 0.592405877562,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "series coefficients S3 (ccx manual) + S12",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-07"
+   ]
+  },
+  {
+   "id": "VC-MATL-06/ogden1972set/PS/lambda=2",
+   "quantity": "nominal stress, Ogden 1972 convention W = sum mu_p/alpha_p (...)",
+   "value": 0.685622477981,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "closed form; parameter set S11 (B)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-07"
+   ]
+  },
+  {
+   "id": "VC-MATL-07/ogden1972set/initialShearModulus",
+   "quantity": "mu0 = 1/2 sum mu_p alpha_p",
+   "value": 0.4225,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "closed form",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-07",
+    "TR-MATL-06"
+   ]
+  },
+  {
+   "id": "VC-MATL-07/ogden1972set/calculixMu",
+   "quantity": "CalculiX/Abaqus convention W = sum 2 mu_i/alpha_i^2 (...): mu_i = mu_p alpha_p / 2",
+   "value": [
+    0.4095,
+    0.003,
+    0.01
+   ],
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "ccx 2.23 manual Ogden form (S3)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-07",
+    "FR-MATL-15",
+    "TR-MATL-10"
+   ]
+  },
+  {
+   "id": "VC-MATL-08/ogden1972set/rmsVsTreloar",
+   "quantity": "RMS residual of the Ogden 1972 set against the pinned Treloar table, per mode",
+   "value": {
+    "UT": 0.287921,
+    "ET": 0.0412547,
+    "PS": 0.028547
+   },
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "S10 table (B) + S11 parameters (B)",
+   "grade": "B",
+   "proves": [
+    "FR-MATL-08"
+   ],
+   "note": "reported, not a gate"
+  },
+  {
+   "id": "VC-MATL-08/treloarFit/neoHooke_UT",
+   "quantity": "linear least squares (absolute nominal-stress residual) on modes ['UT']",
+   "value": {
+    "C10": 0.283579607089
+   },
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "S10 table (B); exact rational normal equations here",
+   "grade": "A (given the table)",
+   "proves": [
+    "FR-MATL-08",
+    "TR-MATL-07"
+   ],
+   "rmsPerModeMPa": {
+    "UT": 0.786764,
+    "ET": 0.271363,
+    "PS": 0.647794
+   },
+   "stability": {
+    "UT": {
+     "tension": null,
+     "compression": null
+    },
+    "ET": {
+     "tension": null,
+     "compression": null
+    },
+    "PS": {
+     "tension": null,
+     "compression": null
+    }
+   }
+  },
+  {
+   "id": "VC-MATL-08/treloarFit/neoHooke_all",
+   "quantity": "linear least squares (absolute nominal-stress residual) on modes ['UT', 'ET', 'PS']",
+   "value": {
+    "C10": 0.262442676945
+   },
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "S10 table (B); exact rational normal equations here",
+   "grade": "A (given the table)",
+   "proves": [
+    "FR-MATL-08",
+    "TR-MATL-07"
+   ],
+   "rmsPerModeMPa": {
+    "UT": 0.814631,
+    "ET": 0.187652,
+    "PS": 0.528257
+   },
+   "stability": {
+    "UT": {
+     "tension": null,
+     "compression": null
+    },
+    "ET": {
+     "tension": null,
+     "compression": null
+    },
+    "PS": {
+     "tension": null,
+     "compression": null
+    }
+   }
+  },
+  {
+   "id": "VC-MATL-08/treloarFit/mooneyRivlin_all",
+   "quantity": "linear least squares (absolute nominal-stress residual) on modes ['UT', 'ET', 'PS']",
+   "value": {
+    "C10": 0.265829838273,
+    "C01": -0.00169590877646
+   },
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "S10 table (B); exact rational normal equations here",
+   "grade": "A (given the table)",
+   "proves": [
+    "FR-MATL-08",
+    "TR-MATL-07"
+   ],
+   "rmsPerModeMPa": {
+    "UT": 0.806479,
+    "ET": 0.180543,
+    "PS": 0.537816
+   },
+   "stability": {
+    "UT": {
+     "tension": null,
+     "compression": null
+    },
+    "ET": {
+     "tension": 8.86,
+     "compression": 0.28
+    },
+    "PS": {
+     "tension": null,
+     "compression": null
+    }
+   }
+  },
+  {
+   "id": "VC-MATL-08/treloarFit/yeoh_all",
+   "quantity": "linear least squares (absolute nominal-stress residual) on modes ['UT', 'ET', 'PS']",
+   "value": {
+    "C10": 0.183027183347,
+    "C20": -0.00141844935972,
+    "C30": 3.93471468735e-05
+   },
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "S10 table (B); exact rational normal equations here",
+   "grade": "A (given the table)",
+   "proves": [
+    "FR-MATL-08",
+    "TR-MATL-07"
+   ],
+   "rmsPerModeMPa": {
+    "UT": 0.140354,
+    "ET": 0.189842,
+    "PS": 0.0270939
+   },
+   "stability": {
+    "UT": {
+     "tension": null,
+     "compression": null
+    },
+    "ET": {
+     "tension": null,
+     "compression": null
+    },
+    "PS": {
+     "tension": null,
+     "compression": null
+    }
+   }
+  },
+  {
+   "id": "VC-MATL-09/ogden1972set/drucker",
+   "quantity": "Drucker scan of the Ogden 1972 set (all mu_p alpha_p > 0 => stable everywhere)",
+   "value": {
+    "UT": {
+     "tension": null,
+     "compression": null
+    },
+    "ET": {
+     "tension": null,
+     "compression": null
+    },
+    "PS": {
+     "tension": null,
+     "compression": null
+    }
+   },
+   "unit": "stretch",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "closed form Hessian §5.6",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-09",
+    "TR-MATL-08"
+   ]
+  },
+  {
+   "id": "VC-MATL-09/mooneyRivlinNegativeC01/drucker",
+   "quantity": "Drucker scan, synthetic C10 = 0.2, C01 = -0.15 MPa",
+   "value": {
+    "UT": {
+     "tension": 1.16,
+     "compression": 0.86
+    },
+    "ET": {
+     "tension": 1.08,
+     "compression": 0.93
+    },
+    "PS": {
+     "tension": 1.14,
+     "compression": 0.88
+    }
+   },
+   "unit": "stretch",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "closed form Hessian §5.6",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-09",
+    "TR-MATL-08"
+   ],
+   "expectCode": "MATL_HYPERELASTIC_UNSTABLE"
+  },
+  {
+   "id": "VC-MATL-10/prony/t=0s",
+   "quantity": "G(t) = G0 (1 - sum g_i (1 - exp(-t/tau_i)))",
+   "value": 1.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "synthetic; closed form",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-11",
+    "TR-MATL-09"
+   ]
+  },
+  {
+   "id": "VC-MATL-10/prony/t=0.1s",
+   "quantity": "G(t) = G0 (1 - sum g_i (1 - exp(-t/tau_i)))",
+   "value": 0.808373799101,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "synthetic; closed form",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-11",
+    "TR-MATL-09"
+   ]
+  },
+  {
+   "id": "VC-MATL-10/prony/t=1s",
+   "quantity": "G(t) = G0 (1 - sum g_i (1 - exp(-t/tau_i)))",
+   "value": 0.680981103586,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "synthetic; closed form",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-11",
+    "TR-MATL-09"
+   ]
+  },
+  {
+   "id": "VC-MATL-10/prony/t=10s",
+   "quantity": "G(t) = G0 (1 - sum g_i (1 - exp(-t/tau_i)))",
+   "value": 0.573575888234,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "synthetic; closed form",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-11",
+    "TR-MATL-09"
+   ]
+  },
+  {
+   "id": "VC-MATL-10/prony/t=100s",
+   "quantity": "G(t) = G0 (1 - sum g_i (1 - exp(-t/tau_i)))",
+   "value": 0.500009079986,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "synthetic; closed form",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-11",
+    "TR-MATL-09"
+   ]
+  },
+  {
+   "id": "VC-MATL-10/wlf/T=373K",
+   "quantity": "log10 aT = -C1 (T - Tr)/(C2 + T - Tr), C1 = 17.44, C2 = 51.6 K, Tr = Tg = 373 K (synthetic Tg)",
+   "value": 0.0,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "WLF form; 'universal' constants S13 (B)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-11"
+   ]
+  },
+  {
+   "id": "VC-MATL-10/wlf/T=383K",
+   "quantity": "log10 aT = -C1 (T - Tr)/(C2 + T - Tr), C1 = 17.44, C2 = 51.6 K, Tr = Tg = 373 K (synthetic Tg)",
+   "value": -2.83116883117,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "WLF form; 'universal' constants S13 (B)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-11"
+   ]
+  },
+  {
+   "id": "VC-MATL-10/wlf/T=423K",
+   "quantity": "log10 aT = -C1 (T - Tr)/(C2 + T - Tr), C1 = 17.44, C2 = 51.6 K, Tr = Tg = 373 K (synthetic Tg)",
+   "value": -8.58267716535,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "WLF form; 'universal' constants S13 (B)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-11"
+   ]
+  },
+  {
+   "id": "VC-MATL-10/wlf/T=360K",
+   "quantity": "below Tr = Tg: refused",
+   "value": "MATL_SHIFT_OUT_OF_RANGE",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "WLF valid at or above Tg (S13, secondary)",
+   "grade": "B",
+   "proves": [
+    "FR-MATL-11",
+    "TR-MATL-09"
+   ]
+  },
+  {
+   "id": "VC-MATL-11/norton/m=0.0/creepStrain",
+   "quantity": "Norton (CalculiX form) eps_dot = A s^n t^m, constant s = 50 MPa, t = 10 h: eps = A s^n t^(m+1)/(m+1)",
+   "value": 0.3125,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "closed form; A = 1e-10, n = 5 from the ccx manual example (S3), m synthetic",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-12",
+    "TR-MATL-09"
+   ]
+  },
+  {
+   "id": "VC-MATL-11/norton/m=-0.5/creepStrain",
+   "quantity": "Norton (CalculiX form) eps_dot = A s^n t^m, constant s = 50 MPa, t = 10 h: eps = A s^n t^(m+1)/(m+1)",
+   "value": 0.197642353761,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "closed form; A = 1e-10, n = 5 from the ccx manual example (S3), m synthetic",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-12",
+    "TR-MATL-09"
+   ]
+  },
+  {
+   "id": "VC-MATL-11/garofalo/rate",
+   "quantity": "eps_dot = A sinh(alpha s)^n exp(-Q/(R T)), synthetic, s = 100 MPa, T = 900 K",
+   "value": 7.40017838452e-12,
+   "unit": "1/s",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "synthetic; closed form",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-12"
+   ]
+  },
+  {
+   "id": "VC-MATL-12/johnsonCook/flowStress",
+   "quantity": "(A + B ep^n)(1 + C ln(rate/rate0))(1 - T*^m), ep = 0.1, rate = 100/s, T = 600 K",
+   "value": 553.641286869,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "synthetic; Johnson & Cook 1983 form (S9)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-13",
+    "TR-MATL-09"
+   ]
+  },
+  {
+   "id": "VC-MATL-13/ccx/rambergOsgood",
+   "quantity": "CalculiX deck lines for the VC-MATL-04 Ramberg-Osgood model (E and nu live on the card; no *ELASTIC)",
+   "value": [
+    "*MATERIAL,NAME=AL_RO",
+    "*DEFORMATION PLASTICITY",
+    "72000.,0.33,400.,15.,0.36"
+   ],
+   "unit": "text",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "ccx 2.23 manual *DEFORMATION PLASTICITY (S3) + parser deformationplasticitys.f (S4)",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-15",
+    "TR-MATL-10"
+   ]
+  },
+  {
+   "id": "VC-MATL-13/ccx/engineeringConstants",
+   "quantity": "CalculiX lines, engineering constants E1 E2 E3 nu12 nu13 nu23 G12 G13 / G23 T",
+   "value": [
+    "*MATERIAL,NAME=CFRP_UD",
+    "*ELASTIC,TYPE=ENGINEERING CONSTANTS",
+    "135000.,10000.,10000.,0.3,0.3,0.45,5000.,5000.",
+    "3448.,293."
+   ],
+   "unit": "text",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "S3 *ELASTIC + S4 elastics.f",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-15",
+    "TR-MATL-10"
+   ]
+  },
+  {
+   "id": "VC-MATL-13/ccx/plasticLinearIsotropic",
+   "quantity": "NL1 linear hardening (H = 62.5 GPa plastic modulus) as a 2-point *PLASTIC curve",
+   "value": [
+    "*MATERIAL,NAME=NL1_ISO",
+    "*ELASTIC",
+    "250000.,0.25",
+    "*PLASTIC,HARDENING=ISOTROPIC",
+    "5.,0.",
+    "67.5,0.001"
+   ],
+   "unit": "text",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "S3 *PLASTIC (von Mises stress, equivalent plastic strain) + S4 plastics.f",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-15",
+    "TR-MATL-10"
+   ],
+   "note": "writer extends a linear law to the model's declared strain range (here 0.001)"
+  },
+  {
+   "id": "VC-MATL-13/ccx/ogdenN3",
+   "quantity": "Ogden N=3 pair lines mu1 a1 mu2 a2 mu3 a3 D1 D2 / D3 (incompressible: D = 0, ccx substitutes a small value)",
+   "value": [
+    "*MATERIAL,NAME=TRELOAR_OGDEN",
+    "*HYPERELASTIC,OGDEN,N=3",
+    "0.4095,1.3,0.003,5.,0.01,-2.,0.,0.",
+    "0."
+   ],
+   "unit": "text",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "S3 *HYPERELASTIC + S4 hyperelastics.f",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-15",
+    "TR-MATL-10"
+   ],
+   "namedDefault": "D = 0 means incompressible; CalculiX replaces 0 by a small compressibility (S3) -> MATL_INCOMPRESSIBLE_DEFAULT warning"
+  },
+  {
+   "id": "VC-MATL-13/ccx/norton",
+   "quantity": "Norton creep lines A, n, m, T",
+   "value": [
+    "*MATERIAL,NAME=CREEP_N5",
+    "*ELASTIC",
+    "200000.,0.3,100.",
+    "*CREEP,LAW=NORTON",
+    "1e-10,5.,0.,100."
+   ],
+   "unit": "text",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "S3 *CREEP + S4 creeps.f",
+   "grade": "A",
+   "proves": [
+    "FR-MATL-15",
+    "TR-MATL-10"
+   ]
+  },
+  {
+   "id": "VC-MATL-14/nastran/NL1",
+   "quantity": "Nastran small-field MAT1 + MATS1 (TYPE PLASTIC, H, YF = 1 von Mises, HR = 1 isotropic, LIMIT1 = yield)",
+   "value": [
+    "MAT1    1       250000.         0.25",
+    "MATS1   1               PLASTIC 62500.  1       1       5."
+   ],
+   "unit": "text",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "pyNastran MAT1/MATS1 docstrings (S7); integer fields MID, YF, HR without decimal point",
+   "grade": "B",
+   "proves": [
+    "FR-MATL-15",
+    "TR-MATL-11"
+   ],
+   "note": "G left blank so Nastran derives it (05 FEA convention); field layout verified by pyNastran read_bdf in the implementation test"
+  }
+ ]
+}

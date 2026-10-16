@@ -1,0 +1,99 @@
+{
+ "source": "S2 CalculiX test suite (GPL-2.0, not stored here)",
+ "commit": "fd588701edd6a92fde06e99b1bdf01f3b0f80f2c",
+ "model": "cantilever 1 x 1.5 x 8 (mm), 261 nodes, C3D20R (beamdynamic: C3D20), E 210000, nu 0.3, density 7.8e-9; same nodes as aerospace 05 beamf",
+ "decks": [
+  {
+   "name": "beamdy1",
+   "objective": "modal dynamic, constant impact (amplitude A1), no damping, *MODAL DYNAMIC,SOLVER=ITERATIVE SCALING",
+   "inp": "https://github.com/Dhondtguido/CalculiX/blob/fd588701edd6a92fde06e99b1bdf01f3b0f80f2c/test/beamdy1.inp",
+   "inpSha256": "264f5ea21fc91dc77abf58d7ac2220954191a5345888c7f76ef06bea187ba1b3",
+   "datRef": "https://github.com/Dhondtguido/CalculiX/blob/fd588701edd6a92fde06e99b1bdf01f3b0f80f2c/test/beamdy1.dat.ref",
+   "datRefSha256": "8a4ca2a484063360837cf7123e2fccf8f0ad765d5dddab1336f030351be3eabf",
+   "usedBy": [
+    "VC-DYN-30"
+   ]
+  },
+  {
+   "name": "beamdy3",
+   "objective": "modal dynamic, constant impact, *MODAL DAMPING,RAYLEIGH alpha 5000 beta 0",
+   "inp": "https://github.com/Dhondtguido/CalculiX/blob/fd588701edd6a92fde06e99b1bdf01f3b0f80f2c/test/beamdy3.inp",
+   "inpSha256": "fdfc24ff358719617547ff221fb3c3c78464e1ef2898e29bab2b5a1f06a521ef",
+   "datRef": "https://github.com/Dhondtguido/CalculiX/blob/fd588701edd6a92fde06e99b1bdf01f3b0f80f2c/test/beamdy3.dat.ref",
+   "datRefSha256": "13ba9eec12484ef1ee8d9ca1f707813c8a62090b83846d4563d380a20d382cb8",
+   "usedBy": [
+    "VC-DYN-30"
+   ]
+  },
+  {
+   "name": "beamdy8",
+   "objective": "steady state dynamics 12000-14000, 5 points, Rayleigh alpha 5000, CLOAD node 100 dof 1 = 100",
+   "inp": "https://github.com/Dhondtguido/CalculiX/blob/fd588701edd6a92fde06e99b1bdf01f3b0f80f2c/test/beamdy8.inp",
+   "inpSha256": "e10f026d7c3d31b02f5b086a491eabbbfa8b64b4b26ad9994e17c3bc9a49af84",
+   "datRef": "https://github.com/Dhondtguido/CalculiX/blob/fd588701edd6a92fde06e99b1bdf01f3b0f80f2c/test/beamdy8.dat.ref",
+   "datRefSha256": "7524aca42f99ec33ca52f8ff8ba8e8940b7eb05163df1e5f62f19ed444e3680b",
+   "usedBy": [
+    "VC-DYN-06",
+    "VC-DYN-17",
+    "VC-DYN-20",
+    "VC-DYN-22"
+   ]
+  },
+  {
+   "name": "beamdy10bm",
+   "objective": "steady state dynamics with *BASE MOTION,DOF=1,TYPE=ACCELERATION, amplitude A1 = 1 over 11000-15000",
+   "inp": "https://github.com/Dhondtguido/CalculiX/blob/fd588701edd6a92fde06e99b1bdf01f3b0f80f2c/test/beamdy10bm.inp",
+   "inpSha256": "e5601d4554020b58651486a40e39cb0a3fbb367eb4d0626a8a16f70d52cbc3bf",
+   "datRef": "https://github.com/Dhondtguido/CalculiX/blob/fd588701edd6a92fde06e99b1bdf01f3b0f80f2c/test/beamdy10bm.dat.ref",
+   "datRefSha256": "0d467abd48f0780c99a8f97e80d2d25615943fd8ba3972ff01ff7896a7aa57be",
+   "usedBy": [
+    "VC-DYN-31"
+   ]
+  },
+  {
+   "name": "beamdynamic",
+   "objective": "NLGEOM static then *DYNAMIC (direct, HHT default alpha)",
+   "inp": "https://github.com/Dhondtguido/CalculiX/blob/fd588701edd6a92fde06e99b1bdf01f3b0f80f2c/test/beamdynamic.inp",
+   "inpSha256": "fa13b2998aa30c3e9c465a5276a48440476ca493d32887741b5e2dd8ad7b971e",
+   "datRef": "https://github.com/Dhondtguido/CalculiX/blob/fd588701edd6a92fde06e99b1bdf01f3b0f80f2c/test/beamdynamic.dat.ref",
+   "datRefSha256": "4f94514d63efd117f21acf2d12df4a671d37d8bfd8a0138dba89db79283578e0",
+   "usedBy": [
+    "VC-DYN-32"
+   ]
+  }
+ ],
+ "extracted": {
+  "beamdy8": {
+   "eigenfrequenciesHz": [
+    13096.03,
+    19319.52,
+    76839.71,
+    86955.23,
+    105963.6,
+    162998.5,
+    197645.0,
+    256161.0,
+    261139.5,
+    351862.3
+   ],
+   "w1RadPerTime": 82284.79,
+   "fractionOfTotalEffectiveMassXYZ": [
+    0.9374014,
+    0.9087642,
+    0.8287773
+   ],
+   "outputFrequenciesHz": [
+    12000.0,
+    12113.05531535,
+    12548.01552883,
+    12982.97574231,
+    13096.03105766,
+    13189.27521633,
+    13548.01552883,
+    13906.75584133,
+    14000.0
+   ]
+  }
+ },
+ "toExtract": "beamdy1/3/10bm/dynamic: node-print histories are frozen by the M3 parser on first run (VC-DYN-30..32 are TBD until then)"
+}

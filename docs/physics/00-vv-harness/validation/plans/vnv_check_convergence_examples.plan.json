@@ -1,0 +1,84 @@
+[
+ {
+  "command": "check_convergence",
+  "params": {
+   "quantity": "NPARC tutorial example",
+   "unit": "1",
+   "samples": [
+    {
+     "h": 1,
+     "value": 0.9705
+    },
+    {
+     "h": 2,
+     "value": 0.96854
+    },
+    {
+     "h": 4,
+     "value": 0.96178
+    }
+   ],
+   "gciTarget": 0.001
+  }
+ },
+ {
+  "command": "check_convergence",
+  "params": {
+   "quantity": "oscillatory example",
+   "unit": "1",
+   "samples": [
+    {
+     "h": 1,
+     "value": 1.0
+    },
+    {
+     "h": 2,
+     "value": 1.02
+    },
+    {
+     "h": 4,
+     "value": 0.99
+    }
+   ]
+  }
+ },
+ {
+  "command": "check_convergence",
+  "params": {
+   "quantity": "gcat README example",
+   "unit": "1",
+   "formalOrder": 2,
+   "samples": [
+    {
+     "h": 8.3,
+     "value": 1.0
+    },
+    {
+     "h": 10.84,
+     "value": 1.02
+    },
+    {
+     "h": 14.14,
+     "value": 1.08
+    }
+   ]
+  }
+ },
+ {
+  "command": "check_convergence",
+  "params": {
+   "quantity": "two samples without assumedOrder (must be refused: VNV_SAMPLES_INVALID)",
+   "unit": "1",
+   "samples": [
+    {
+     "h": 1,
+     "value": 1.0
+    },
+    {
+     "h": 2,
+     "value": 1.1
+    }
+   ]
+  }
+ }
+]

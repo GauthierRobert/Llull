@@ -1,0 +1,72 @@
+[
+ {
+  "command": "define_random_variable",
+  "params": {
+   "name": "x1",
+   "unit": "1",
+   "binding": {
+    "kind": "free"
+   },
+   "distribution": {
+    "kind": "uniform",
+    "min": "=-pi",
+    "max": "=pi"
+   },
+   "citation": {
+    "text": "Ishigami benchmark (Ishigami & Homma 1990)"
+   }
+  }
+ },
+ {
+  "command": "define_random_variable",
+  "params": {
+   "name": "x2",
+   "unit": "1",
+   "binding": {
+    "kind": "free"
+   },
+   "distribution": {
+    "kind": "uniform",
+    "min": "=-pi",
+    "max": "=pi"
+   },
+   "citation": {
+    "text": "Ishigami benchmark"
+   }
+  }
+ },
+ {
+  "command": "define_random_variable",
+  "params": {
+   "name": "x3",
+   "unit": "1",
+   "binding": {
+    "kind": "free"
+   },
+   "distribution": {
+    "kind": "uniform",
+    "min": "=-pi",
+    "max": "=pi"
+   },
+   "citation": {
+    "text": "Ishigami benchmark"
+   }
+  }
+ },
+ {
+  "command": "define_limit_state",
+  "params": {
+   "name": "ishigami",
+   "expression": "sin(x1) + 7 * pow(sin(x2), 2) + 0.1 * pow(x3, 4) * sin(x1)",
+   "unit": "1"
+  }
+ },
+ {
+  "command": "sensitivity_indices",
+  "params": {
+   "limitState": "ishigami",
+   "samples": 8192,
+   "seed": 12345
+  }
+ }
+]

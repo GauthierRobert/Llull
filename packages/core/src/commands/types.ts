@@ -5,6 +5,7 @@
 
 import type { CadDocument } from '../model/types';
 import type { GeometryKernel } from '../geometry/kernel';
+import type { PhysicsEngine } from '../dynamics/physicsEngine';
 import type { IdSource } from '../lib/id';
 import type { ReplayCache } from './history/replayCache';
 import type { ZodType } from 'zod';
@@ -132,6 +133,8 @@ export interface PlanStepEvent {
 export interface ExecutionContext {
   /** Geometry kernel for booleans/fillets; null while none is installed or loaded. */
   readonly kernel: GeometryKernel | null;
+  /** Rigid-body physics engine for `simulate_motion`; null/absent while none is installed. */
+  readonly physics?: PhysicsEngine | null;
   /** Mints every id the command creates. */
   readonly ids: IdSource;
   /** Resolves command names for commands that run other commands. */

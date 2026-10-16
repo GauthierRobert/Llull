@@ -1,0 +1,230 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    100,
+    20,
+    3
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "anchor": "min"
+  },
+  "as": "strip"
+ },
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "steel_E210",
+   "name": "steel_E210",
+   "designation": "test material, E = 210000 MPa",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "steel_E210",
+   "property": "E",
+   "value": 210000.0,
+   "unit": "MPa",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "steel_E210",
+   "property": "nu",
+   "value": 0.3,
+   "unit": "-",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "steel_E210",
+   "property": "density",
+   "value": 7.8,
+   "unit": "g/cm^3",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "create_material",
+  "params": {
+   "name": "steel_E210",
+   "density": 0.0078,
+   "color": "#9aa0a6",
+   "metalness": 1,
+   "roughness": 0.4,
+   "recordId": "steel_E210"
+  }
+ },
+ {
+  "command": "assign_material",
+  "params": {
+   "materialName": "steel_E210",
+   "entityIds": [
+    "$strip"
+   ]
+  }
+ },
+ {
+  "command": "define_vibration_spectrum",
+  "params": {
+   "name": "gevs_q",
+   "library": "gevs_component_qual"
+  },
+  "as": "spec"
+ },
+ {
+  "command": "create_analysis",
+  "params": {
+   "name": "strip_random",
+   "analysisType": "random_response",
+   "unitSystem": "N-mm-t-s",
+   "solver": "calculix",
+   "modes": 6
+  },
+  "as": "an"
+ },
+ {
+  "command": "set_part_idealization",
+  "params": {
+   "analysisId": "$an",
+   "entityId": "$strip",
+   "idealization": "solid"
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$an",
+   "name": "root",
+   "kind": "fixed",
+   "target": {
+    "entityId": "$strip",
+    "facesNear": [
+     [
+      0,
+      10,
+      1.5
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "set_dynamic_damping",
+  "params": {
+   "analysisId": "$an",
+   "model": "modal",
+   "ratios": [
+    {
+     "fromMode": 1,
+     "toMode": 6,
+     "zeta": 0.02
+    }
+   ],
+   "source": {
+    "citation": "test input of VC-DYN-21 (2 % critical, all modes)"
+   }
+  }
+ },
+ {
+  "command": "set_base_excitation",
+  "params": {
+   "analysisId": "$an",
+   "direction": "z",
+   "kind": "acceleration",
+   "spectrum": "gevs_q"
+  }
+ },
+ {
+  "command": "set_frequency_sweep",
+  "params": {
+   "analysisId": "$an",
+   "fMinHz": 20.0,
+   "fMaxHz": 2000.0,
+   "pointsPerInterval": 20,
+   "bias": 3.0
+  }
+ },
+ {
+  "command": "add_result_probe",
+  "params": {
+   "analysisId": "$an",
+   "name": "tip",
+   "point": [
+    100,
+    10,
+    1.5
+   ],
+   "quantity": "a_z"
+  }
+ },
+ {
+  "command": "add_result_probe",
+  "params": {
+   "analysisId": "$an",
+   "name": "tip_rel",
+   "point": [
+    100,
+    10,
+    1.5
+   ],
+   "quantity": "u_z_rel"
+  }
+ },
+ {
+  "command": "add_result_probe",
+  "params": {
+   "analysisId": "$an",
+   "name": "root_top",
+   "point": [
+    5,
+    10,
+    3
+   ],
+   "quantity": "s_xx"
+  }
+ },
+ {
+  "command": "set_mesh_controls",
+  "params": {
+   "analysisId": "$an",
+   "mesher": "gmsh",
+   "elementFamily": "tet",
+   "order": 2,
+   "globalSize": 1.0
+  }
+ }
+]

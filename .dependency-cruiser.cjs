@@ -3,8 +3,8 @@
  * checked by `npm run arch` (part of `npm run check`) for every change, human or agent.
  * The PreToolUse hook gives agents early feedback; this file is the authority.
  *
- * Layers (one-way): desktop → server; src/ui, server → src/app → packages/{mcp, domain-aec, kernel-*} → packages/core
- * Inside core:      commands, codegen, plugins → geometry → model → lib
+ * Layers (one-way): desktop → server; src/ui, server → src/app → packages/{mcp, domain-aec, kernel-*, physics-*} → packages/core
+ * Inside core:      commands, codegen, plugins → dynamics → geometry → model → lib
  */
 
 /** @type {import('dependency-cruiser').IConfiguration} */
@@ -43,9 +43,9 @@ module.exports = {
     },
     {
       name: 'plugins-and-kernels-depend-on-core-only',
-      comment: 'L9/L10: a domain plugin or a kernel reaches the app only through core contracts.',
+      comment: 'L9/L10: a domain plugin, a geometry kernel or a physics engine reaches the app only through core contracts.',
       severity: 'error',
-      from: { path: '^packages/(domain-[^/]+|kernel-[^/]+)/' },
+      from: { path: '^packages/(domain-[^/]+|kernel-[^/]+|physics-[^/]+)/' },
       to: { path: '^packages/(?!core/)', pathNot: '^packages/$1/' },
     },
     {
@@ -55,21 +55,22 @@ module.exports = {
         'the plugin contract and the command-authoring API (schema, types, noop, derivation, ' +
         'registry). Composing another command goes through `execute`, never its module.',
       severity: 'error',
-      from: { path: '^packages/(domain-[^/]+|kernel-[^/]+)/' },
+      from: { path: '^packages/(domain-[^/]+|kernel-[^/]+|physics-[^/]+)/' },
       to: {
         path: '^packages/core/src/',
         pathNot:
           '^packages/core/src/(model|lib|geometry)/|' +
+          '^packages/core/src/dynamics/physicsEngine\\.ts$|' +
           '^packages/core/src/plugins/plugin\\.ts$|' +
           '^packages/core/src/commands/(schema|types|noop|derivation|registry)\\.ts$',
       },
     },
     {
       name: 'mcp-is-a-view-of-the-registry',
-      comment: 'L5: MCP exposes the registry; it never depends on a plugin or a concrete kernel.',
+      comment: 'L5: MCP exposes the registry; it never depends on a plugin, a concrete kernel or a physics engine.',
       severity: 'error',
       from: { path: '^packages/mcp/' },
-      to: { path: '^packages/(domain-|kernel-)' },
+      to: { path: '^packages/(domain-|kernel-|physics-)' },
     },
     {
       name: 'lib-is-a-leaf',
@@ -86,11 +87,18 @@ module.exports = {
       to: { path: '^packages/core/src/(?!model/|lib/)' },
     },
     {
+      name: 'dynamics-below-commands',
+      comment: 'Dynamics (physics-engine contract, simulation model, force laws) never reaches up into commands.',
+      severity: 'error',
+      from: { path: '^packages/core/src/dynamics/' },
+      to: { path: '^packages/core/src/(commands|codegen|plugins)/' },
+    },
+    {
       name: 'geometry-below-commands',
       comment: 'Geometry (kernel contract, recipes, pure geometry) never reaches up into commands.',
       severity: 'error',
       from: { path: '^packages/core/src/geometry/' },
-      to: { path: '^packages/core/src/(commands|codegen|plugins)/' },
+      to: { path: '^packages/core/src/(commands|codegen|plugins|dynamics)/' },
     },
     {
       name: 'server-is-thin',

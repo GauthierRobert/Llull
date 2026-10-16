@@ -1,0 +1,245 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    100,
+    10,
+    10
+   ],
+   "anchor": "min"
+  },
+  "as": "bar"
+ },
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "steel_test",
+   "name": "steel_test",
+   "designation": "validation test material",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "steel_test",
+   "property": "E",
+   "value": 210000.0,
+   "unit": "MPa",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "steel_test",
+   "property": "nu",
+   "value": 0.3,
+   "unit": "-",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "steel_test",
+   "property": "cte",
+   "value": 1.2e-05,
+   "unit": "1/K",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "steel_test",
+   "property": "density",
+   "value": 7.8,
+   "unit": "g/cm^3",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "create_material",
+  "params": {
+   "name": "steel_test",
+   "density": 0.0078,
+   "color": "#9aa0a6",
+   "metalness": 1,
+   "roughness": 0.4,
+   "recordId": "steel_test"
+  }
+ },
+ {
+  "command": "assign_material",
+  "params": {
+   "materialName": "steel_test",
+   "entityIds": [
+    "$bar"
+   ]
+  }
+ },
+ {
+  "command": "create_analysis",
+  "params": {
+   "name": "restrained_bar",
+   "analysisType": "thermo_static",
+   "unitSystem": "N-mm-t-s",
+   "solver": "calculix",
+   "referenceTemperature": {
+    "value": 20.0,
+    "unit": "degC"
+   }
+  },
+  "as": "an"
+ },
+ {
+  "command": "set_part_idealization",
+  "params": {
+   "analysisId": "$an",
+   "entityId": "$bar",
+   "idealization": "solid"
+  }
+ },
+ {
+  "command": "set_temperature_field",
+  "params": {
+   "analysisId": "$an",
+   "source": {
+    "kind": "uniform",
+    "value": {
+     "value": 120.0,
+     "unit": "degC"
+    }
+   }
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$an",
+   "name": "end0",
+   "kind": "displacement",
+   "dofs": {
+    "ux": 0
+   },
+   "target": {
+    "entityId": "$bar",
+    "facesNear": [
+     [
+      0,
+      5,
+      5
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$an",
+   "name": "end1",
+   "kind": "displacement",
+   "dofs": {
+    "ux": 0
+   },
+   "target": {
+    "entityId": "$bar",
+    "facesNear": [
+     [
+      100,
+      5,
+      5
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$an",
+   "name": "sym_y",
+   "kind": "symmetry",
+   "target": {
+    "entityId": "$bar",
+    "facesNear": [
+     [
+      50,
+      0,
+      5
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$an",
+   "name": "sym_z",
+   "kind": "symmetry",
+   "target": {
+    "entityId": "$bar",
+    "facesNear": [
+     [
+      50,
+      5,
+      0
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "set_mesh_controls",
+  "params": {
+   "analysisId": "$an",
+   "mesher": "gmsh",
+   "elementFamily": "tet",
+   "order": 2,
+   "globalSize": 2.5
+  }
+ },
+ {
+  "command": "add_result_probe",
+  "params": {
+   "analysisId": "$an",
+   "name": "mid",
+   "point": [
+    50,
+    5,
+    5
+   ],
+   "quantity": "stress_xx"
+  }
+ }
+]

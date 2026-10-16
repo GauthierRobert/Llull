@@ -1,0 +1,503 @@
+{
+ "pack": "19-explicit-impact",
+ "generatedBy": "generate_explicit_reference.py",
+ "units_note": "SI unless the unit field says otherwise; '-' = dimensionless",
+ "cases": [
+  {
+   "id": "VC-EXP-10.a",
+   "quantity": "1D bar wave speed, steel-like test material",
+   "value": 5047.54465125,
+   "unit": "m/s",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derivation (1D wave equation)",
+   "grade": "A",
+   "proves": [
+    "FR-EXP-11",
+    "TR-EXP-30"
+   ],
+   "derivation": "c0 = sqrt(E / rho)",
+   "inputs": {
+    "E_Pa": 200000000000.0,
+    "rho_kg_m3": 7850.0
+   }
+  },
+  {
+   "id": "VC-EXP-10.b",
+   "quantity": "3D dilatational wave speed, steel-like test material",
+   "value": 5856.35665562,
+   "unit": "m/s",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derivation (elastodynamics)",
+   "grade": "A",
+   "proves": [
+    "FR-EXP-11",
+    "TR-EXP-30"
+   ],
+   "derivation": "cd = sqrt(E(1-nu)/((1+nu)(1-2nu)rho))",
+   "inputs": {
+    "E_Pa": 200000000000.0,
+    "nu": 0.3,
+    "rho_kg_m3": 7850.0
+   }
+  },
+  {
+   "id": "VC-EXP-11.a",
+   "quantity": "CFL critical time step, 2 mm solid element, steel-like (dilatational)",
+   "value": 3.4150925526e-07,
+   "unit": "s",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derivation (Courant condition)",
+   "grade": "A",
+   "proves": [
+    "FR-EXP-11",
+    "TR-EXP-30"
+   ],
+   "derivation": "dt = L_e / cd",
+   "inputs": {
+    "L_e_m": 0.002,
+    "E_Pa": 200000000000.0,
+    "nu": 0.3,
+    "rho_kg_m3": 7850.0
+   }
+  },
+  {
+   "id": "VC-EXP-11.b",
+   "quantity": "added-mass ratio to raise dt to 1e-6 s for the same element",
+   "value": 7.57422831945,
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derivation",
+   "grade": "A",
+   "proves": [
+    "FR-EXP-12",
+    "TR-EXP-31"
+   ],
+   "derivation": "rho' = M dt^2 / L_e^2 with M = E(1-nu)/((1+nu)(1-2nu)); ratio = rho'/rho - 1",
+   "inputs": {
+    "L_e_m": 0.002,
+    "dt_target_s": 1e-06
+   }
+  },
+  {
+   "id": "VC-EXP-12.a",
+   "quantity": "bar-on-rigid-wall impact stress, v = 10 m/s",
+   "value": 396232255.123,
+   "unit": "Pa",
+   "tolerance": {
+    "rel": 0.02
+   },
+   "source": "derivation (1D elastic waves)",
+   "grade": "A",
+   "proves": [
+    "FR-EXP-11",
+    "FR-EXP-15",
+    "TR-EXP-32"
+   ],
+   "derivation": "sigma = rho c0 v",
+   "inputs": {
+    "E_Pa": 200000000000.0,
+    "rho_kg_m3": 7850.0,
+    "v_m_s": 10.0
+   }
+  },
+  {
+   "id": "VC-EXP-12.b",
+   "quantity": "contact duration of the bar on the rigid wall",
+   "value": 7.92464510246e-05,
+   "unit": "s",
+   "tolerance": {
+    "rel": 0.03
+   },
+   "source": "derivation",
+   "grade": "A",
+   "proves": [
+    "FR-EXP-15",
+    "TR-EXP-32"
+   ],
+   "derivation": "t_c = 2 L / c0",
+   "inputs": {
+    "L_m": 0.2
+   }
+  },
+  {
+   "id": "VC-EXP-12.c",
+   "quantity": "stress for two identical bars at relative speed 10 m/s",
+   "value": 198116127.562,
+   "unit": "Pa",
+   "tolerance": {
+    "rel": 0.02
+   },
+   "source": "derivation",
+   "grade": "A",
+   "proves": [
+    "FR-EXP-11"
+   ],
+   "derivation": "sigma = rho c0 v / 2",
+   "inputs": {
+    "v_rel_m_s": 10.0
+   }
+  },
+  {
+   "id": "VC-EXP-12.d",
+   "quantity": "largest elastic impact speed for yield 500 MPa (rigid wall)",
+   "value": 12.6188616281,
+   "unit": "m/s",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derivation",
+   "grade": "A",
+   "proves": [
+    "FR-EXP-11"
+   ],
+   "derivation": "v_y = sigma_y / (rho c0)",
+   "inputs": {
+    "sigma_y_Pa": 500000000.0
+   }
+  },
+  {
+   "id": "VC-EXP-20.a",
+   "quantity": "Johnson-Cook flow stress, eps_p = 0.1, rate 1000/s (eps_dot0 = 1/s), T = Tr",
+   "value": 1344.89242239,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derivation with S9 constants",
+   "grade": "B",
+   "proves": [
+    "FR-EXP-05",
+    "TR-EXP-20"
+   ],
+   "derivation": "(A + B eps^n)(1 + C ln(rate/rate0))",
+   "inputs": {
+    "A_MPa": 1098.0,
+    "B_MPa": 1092.0,
+    "n": 0.93,
+    "C": 0.014,
+    "m": 1.1
+   },
+   "note": "constants are reported in secondary literature as Lesuer (DOT/FAA/AR-00/25) or Kay (DOT/FAA/AR-03/57); primary PDF not reached"
+  },
+  {
+   "id": "VC-EXP-20.b",
+   "quantity": "same, T = 600 K with test-input Tm = 1900 K, Tr = 293 K",
+   "value": 1127.16040566,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derivation",
+   "grade": "B",
+   "proves": [
+    "FR-EXP-05",
+    "TR-EXP-20"
+   ],
+   "derivation": "thermal term (1 - T*^m)",
+   "inputs": {
+    "A_MPa": 1098.0,
+    "B_MPa": 1092.0,
+    "n": 0.93,
+    "C": 0.014,
+    "m": 1.1,
+    "T_K": 600.0,
+    "Tm_K": 1900.0,
+    "Tr_K": 293.0
+   }
+  },
+  {
+   "id": "VC-EXP-20.c",
+   "quantity": "rate below eps_dot0 is clamped (no softening below the reference rate)",
+   "value": 1.0,
+   "unit": "-",
+   "tolerance": {
+    "abs": 1e-12
+   },
+   "source": "solver convention (TR-EXP-20)",
+   "grade": "B",
+   "proves": [
+    "TR-EXP-20"
+   ],
+   "derivation": "rate term = 1 + C ln(max(rate/rate0, 1))",
+   "inputs": {
+    "A": 1.0,
+    "B": 0.0,
+    "C": 0.014,
+    "rate_per_s": 0.001
+   }
+  },
+  {
+   "id": "VC-EXP-21.a",
+   "quantity": "Johnson-Cook failure strain, uniaxial tension (triaxiality 1/3), quasi-static, T = Tr",
+   "value": 1.74690296571,
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derivation",
+   "grade": "A",
+   "proves": [
+    "FR-EXP-06",
+    "TR-EXP-21"
+   ],
+   "derivation": "eps_f = D1 + D2 exp(D3 eta)",
+   "inputs": {
+    "D1_D5": [
+     0.05,
+     3.44,
+     -2.12,
+     0.002,
+     0.61
+    ],
+    "triaxiality": 0.3333333333333333
+   }
+  },
+  {
+   "id": "VC-EXP-21.b",
+   "quantity": "plastic strain at D = 1 under constant conditions (linear accumulation)",
+   "value": 1.74690296571,
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "derivation",
+   "grade": "A",
+   "proves": [
+    "FR-EXP-06",
+    "TR-EXP-21"
+   ],
+   "derivation": "D = sum d eps / eps_f reaches 1 at eps = eps_f",
+   "inputs": {
+    "increments": 1000
+   }
+  },
+  {
+   "id": "VC-EXP-22",
+   "quantity": "Taylor dynamic yield estimate from rod lengths",
+   "value": 559953368.271,
+   "unit": "Pa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S10 (form as quoted in secondary literature)",
+   "grade": "B",
+   "proves": [
+    "FR-EXP-15",
+    "TR-EXP-33"
+   ],
+   "derivation": "sigma_d = rho v^2 (L0 - X) / (2 (L0 - L1) ln(L0/X))",
+   "inputs": {
+    "rho_kg_m3": 4430.0,
+    "v_m_s": 200.0,
+    "L0_m": 0.0254,
+    "L1_m": 0.022,
+    "X_m": 0.018
+   }
+  },
+  {
+   "id": "VC-EXP-30.a",
+   "quantity": "bird mass for 14 CFR 25.571(e)(1) (4 lb)",
+   "value": 1.81436948,
+   "unit": "kg",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "S11 (4 lb) + exact lb definition",
+   "grade": "A",
+   "proves": [
+    "FR-EXP-16"
+   ],
+   "derivation": "m = 4 x 0.45359237"
+  },
+  {
+   "id": "VC-EXP-30.b",
+   "quantity": "bird mass for 14 CFR 25.631 (8 lb)",
+   "value": 3.62873896,
+   "unit": "kg",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "S11 (8 lb) + exact lb definition",
+   "grade": "A",
+   "proves": [
+    "FR-EXP-16"
+   ],
+   "derivation": "m = 8 x 0.45359237"
+  },
+  {
+   "id": "VC-EXP-31.a",
+   "quantity": "kinetic energy of a 4 lb bird at 150 m/s (test speed)",
+   "value": 20411.65665,
+   "unit": "J",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "derivation",
+   "grade": "A",
+   "proves": [
+    "FR-EXP-16",
+    "TR-EXP-34"
+   ],
+   "derivation": "KE = m v^2 / 2",
+   "inputs": {
+    "m_kg": 1.81436948,
+    "v_m_s": 150.0
+   }
+  },
+  {
+   "id": "VC-EXP-31.b",
+   "quantity": "impulse delivered to a rigid plate by a 4 lb soft body at 150 m/s, normal, no rebound",
+   "value": 272.155422,
+   "unit": "N s",
+   "tolerance": {
+    "rel": 0.05
+   },
+   "source": "derivation (momentum conservation)",
+   "grade": "A",
+   "proves": [
+    "FR-EXP-16",
+    "FR-EXP-09",
+    "TR-EXP-34"
+   ],
+   "derivation": "J = m v (5 % allows residual splash velocity along the normal)",
+   "inputs": {
+    "m_kg": 1.81436948,
+    "v_m_s": 150.0
+   }
+  },
+  {
+   "id": "VC-EXP-31.c",
+   "quantity": "diameter of a 4 lb cylinder with L = 2 D at the test density 1000 kg/m^3 (plan geometry)",
+   "value": 0.104922497164,
+   "unit": "m",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derivation",
+   "grade": "A",
+   "proves": [
+    "FR-EXP-16"
+   ],
+   "derivation": "D = (2 V / pi)^(1/3), V = m / rho",
+   "inputs": {
+    "m_kg": 1.81436948,
+    "rho_kg_m3": 1000.0
+   },
+   "length_m": 0.209844994328
+  },
+  {
+   "id": "VC-EXP-32.a",
+   "quantity": "impact speed after a free drop of 1.2 m",
+   "value": 4.85138743042,
+   "unit": "m/s",
+   "tolerance": {
+    "rel": 0.005
+   },
+   "source": "derivation (free fall)",
+   "grade": "A",
+   "proves": [
+    "FR-EXP-17",
+    "TR-EXP-34"
+   ],
+   "derivation": "v = sqrt(2 g h), g = 9.80665",
+   "inputs": {
+    "h_m": 1.2
+   }
+  },
+  {
+   "id": "VC-EXP-32.b",
+   "quantity": "time to impact after a free drop of 1.2 m",
+   "value": 0.494703841823,
+   "unit": "s",
+   "tolerance": {
+    "rel": 0.005
+   },
+   "source": "derivation",
+   "grade": "A",
+   "proves": [
+    "FR-EXP-17"
+   ],
+   "derivation": "t = sqrt(2 h / g)",
+   "inputs": {
+    "h_m": 1.2
+   }
+  },
+  {
+   "id": "VC-EXP-40.a",
+   "quantity": "energy error at the end of the synthetic history",
+   "value": -0.002,
+   "unit": "-",
+   "tolerance": {
+    "abs": 1e-12
+   },
+   "source": "fixture",
+   "grade": "A",
+   "proves": [
+    "FR-EXP-09",
+    "TR-EXP-40"
+   ],
+   "derivation": "(Ekin + Eint + Ehg + Econ - Ekin0 - Wext) / (Ekin0 + Wext)"
+  },
+  {
+   "id": "VC-EXP-40.b",
+   "quantity": "hourglass / internal energy ratio at the end",
+   "value": 0.05,
+   "unit": "-",
+   "tolerance": {
+    "abs": 1e-12
+   },
+   "source": "fixture",
+   "grade": "A",
+   "proves": [
+    "FR-EXP-09",
+    "TR-EXP-40"
+   ],
+   "derivation": "Ehg / Eint"
+  },
+  {
+   "id": "VC-EXP-40.c",
+   "quantity": "contact / internal energy ratio at the end",
+   "value": 0.03,
+   "unit": "-",
+   "tolerance": {
+    "abs": 1e-12
+   },
+   "source": "fixture",
+   "grade": "A",
+   "proves": [
+    "FR-EXP-09",
+    "TR-EXP-40"
+   ],
+   "derivation": "Econ / Eint"
+  },
+  {
+   "id": "VC-EXP-42",
+   "quantity": "energy error read from the last cycle line of engine_listing_sample.txt",
+   "value": -0.2,
+   "unit": "%",
+   "tolerance": {
+    "abs": 0.05
+   },
+   "source": "fixture",
+   "grade": "A",
+   "proves": [
+    "FR-EXP-09",
+    "TR-EXP-41"
+   ],
+   "derivation": "ERROR column of the last CYCLE line; NORMAL TERMINATION present",
+   "expect": {
+    "normalTermination": true,
+    "cycles": 21,
+    "maxAddedMassKg": 0.0
+   }
+  }
+ ]
+}

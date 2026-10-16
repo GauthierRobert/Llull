@@ -51,6 +51,7 @@ export const clearDocument = defineCommand({
       doc.building === undefined &&
       doc.civil === undefined &&
       doc.drawings === undefined &&
+      doc.dynamics === undefined &&
       (keepLayers || isLayersDefault);
     if (isAlreadyEmpty) return noop(doc, 'Document is already empty.');
     const nextDoc: CadDocument = {
@@ -64,6 +65,7 @@ export const clearDocument = defineCommand({
     delete nextDoc.building;
     delete nextDoc.civil;
     delete nextDoc.drawings;
+    delete nextDoc.dynamics;
     const layerPart = keepLayers ? `kept ${layerCount} layer${layerCount === 1 ? '' : 's'}` : `reset to default layer`;
     return report(
       nextDoc,

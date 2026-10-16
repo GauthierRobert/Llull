@@ -1,0 +1,9 @@
+group_id,description,anodic_index_V,status,source,note
+gold,Gold (solid or plated),0.00,secondary,S5 (Misumi table) + S6 (Pietenpol list reproduction),cathodic end of the scale
+nickel_titanium_group,Nickel (solid or plated); titanium and its alloys listed in the same group,0.30,secondary,S6,titanium placement seen in one reproduction only
+aluminium_wrought_2000,Aluminium wrought 2000 series (e.g. 2024),0.75,secondary,S6,
+aluminium_wrought_other,Aluminium wrought alloys other than 2000 series (e.g. 7075; also cast Al-Si per S6),0.90,secondary,S6,
+cadmium_plate,Cadmium plating,0.95,secondary,S6,
+zinc,Zinc (wrought / plated),1.25,secondary,S6,
+magnesium,Magnesium and magnesium alloys,1.75,secondary,S5 + S6,anodic end of the scale
+graphite,Graphite / carbon fibre,tbd,tbd,S5 lists graphite as +0.25 with a sign convention not explained,use the CFRP-aluminium rule (compatibility_rules.json COR-R-04) instead

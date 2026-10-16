@@ -1,0 +1,365 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    20,
+    10,
+    500
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "anchor": "min"
+  },
+  "as": "col"
+ },
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "el_al_E70",
+   "name": "el_al_E70",
+   "designation": "test material",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "el_al_E70",
+   "property": "E",
+   "value": 70000.0,
+   "unit": "MPa",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "el_al_E70",
+   "property": "nu",
+   "value": 0.33,
+   "unit": "-",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "el_al_E70",
+   "property": "density",
+   "value": 7.8,
+   "unit": "g/cm^3",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "create_material",
+  "params": {
+   "name": "el_al_E70",
+   "density": 0.0078,
+   "color": "#9aa0a6",
+   "metalness": 1,
+   "roughness": 0.4,
+   "recordId": "el_al_E70"
+  }
+ },
+ {
+  "command": "assign_material",
+  "params": {
+   "materialName": "el_al_E70",
+   "entityIds": [
+    "$col"
+   ]
+  }
+ },
+ {
+  "command": "create_analysis",
+  "params": {
+   "name": "col_buckle",
+   "analysisType": "buckling",
+   "unitSystem": "N-mm-t-s",
+   "solver": "calculix",
+   "modes": 2
+  },
+  "as": "bk"
+ },
+ {
+  "command": "set_part_idealization",
+  "params": {
+   "analysisId": "$bk",
+   "entityId": "$col",
+   "idealization": "solid"
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$bk",
+   "name": "base_pin",
+   "kind": "displacement",
+   "dofs": {
+    "ux": 0,
+    "uy": 0,
+    "uz": 0
+   },
+   "target": {
+    "entityId": "$col",
+    "edgesNear": [
+     [
+      10,
+      5,
+      0
+     ]
+    ]
+   }
+  },
+  "_note": "pinned line at the base centre (draft; final pin idealisation via 05 distributing coupling)"
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$bk",
+   "name": "top_guide",
+   "kind": "displacement",
+   "dofs": {
+    "ux": 0,
+    "uy": 0
+   },
+   "target": {
+    "entityId": "$col",
+    "edgesNear": [
+     [
+      10,
+      5,
+      500
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "add_fea_load",
+  "params": {
+   "analysisId": "$bk",
+   "name": "axial",
+   "kind": "force",
+   "loadCase": "LC1",
+   "category": "limit",
+   "target": {
+    "entityId": "$col",
+    "facesNear": [
+     [
+      10,
+      5,
+      500
+     ]
+    ]
+   },
+   "vector": [
+    0,
+    0,
+    -1
+   ],
+   "distribution": "total"
+  }
+ },
+ {
+  "command": "set_mesh_controls",
+  "params": {
+   "analysisId": "$bk",
+   "mesher": "gmsh",
+   "elementFamily": "hex_dominant",
+   "order": 2,
+   "globalSize": 2.5
+  }
+ },
+ {
+  "command": "create_analysis",
+  "params": {
+   "name": "col_nonlinear",
+   "analysisType": "nonlinear_static",
+   "unitSystem": "N-mm-t-s",
+   "solver": "calculix"
+  },
+  "as": "an",
+  "_note": "copy of the buckling set-up; a copy_analysis helper is out of scope"
+ },
+ {
+  "command": "set_part_idealization",
+  "params": {
+   "analysisId": "$an",
+   "entityId": "$col",
+   "idealization": "solid"
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$an",
+   "name": "base_pin",
+   "kind": "displacement",
+   "dofs": {
+    "ux": 0,
+    "uy": 0,
+    "uz": 0
+   },
+   "target": {
+    "entityId": "$col",
+    "edgesNear": [
+     [
+      10,
+      5,
+      0
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$an",
+   "name": "top_guide",
+   "kind": "displacement",
+   "dofs": {
+    "ux": 0,
+    "uy": 0
+   },
+   "target": {
+    "entityId": "$col",
+    "edgesNear": [
+     [
+      10,
+      5,
+      500
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "add_fea_load",
+  "params": {
+   "analysisId": "$an",
+   "name": "axial",
+   "kind": "force",
+   "loadCase": "LC1",
+   "category": "limit",
+   "target": {
+    "entityId": "$col",
+    "facesNear": [
+     [
+      10,
+      5,
+      500
+     ]
+    ]
+   },
+   "vector": [
+    0,
+    0,
+    -1
+   ],
+   "distribution": "total"
+  }
+ },
+ {
+  "command": "set_mesh_controls",
+  "params": {
+   "analysisId": "$an",
+   "mesher": "gmsh",
+   "elementFamily": "hex_dominant",
+   "order": 2,
+   "globalSize": 2.5
+  }
+ },
+ {
+  "command": "set_nonlinear_controls",
+  "params": {
+   "analysisId": "$an",
+   "nlgeom": true,
+   "convergence": {
+    "name": "ccx_default"
+   },
+   "outputIncrements": "all"
+  }
+ },
+ {
+  "command": "add_imperfection",
+  "params": {
+   "analysisId": "$an",
+   "fromAnalysisId": "$bk",
+   "modes": [
+    {
+     "mode": 1,
+     "amplitude": 0.5
+    }
+   ],
+   "amplitudeSource": "validation case VC-NLS-50 test input (not a design rule)"
+  },
+  "_note": "requires the buckling case to be meshed and solved first on the same mesh (transport steps between plan runs)"
+ },
+ {
+  "command": "add_analysis_step",
+  "params": {
+   "analysisId": "$an",
+   "name": "half_pcr",
+   "multipliers": {
+    "LC1": 2302.90769359
+   },
+   "amplitude": "ramp",
+   "control": {
+    "kind": "load",
+    "initialIncrement": 0.05,
+    "minIncrement": 1e-06,
+    "maxIncrement": 0.1,
+    "maxIncrements": 200
+   }
+  },
+  "_note": "0.5 x P_cr = 0.5 x 4605.81538718 N (generator VC-NLS-50.a)"
+ },
+ {
+  "command": "add_curve_probe",
+  "params": {
+   "analysisId": "$an",
+   "name": "mid",
+   "load": {
+    "kind": "load",
+    "loadId": "axial"
+   },
+   "displacement": {
+    "point": [
+     10,
+     5,
+     250
+    ],
+    "dof": "uy"
+   }
+  }
+ }
+]

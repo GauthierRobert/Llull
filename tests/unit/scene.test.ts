@@ -106,13 +106,14 @@ describe('rotatedEntityBounds', () => {
     expect(snap.entities[0]!.bounds.oriented).toBe(true);
   });
 
-  it('a rotated world-space mesh about its own centre keeps its raw AABB', () => {
+  it('a rotated, moved mesh is rotated about the origin then translated, like the viewport and the kernel place it', () => {
     const positions = [3, -1, -1, 5, -1, -1, 5, 1, -1, 3, 1, -1, 3, -1, 1, 5, -1, 1, 5, 1, 1, 3, 1, 1];
     const b = rotatedEntityBounds(
       raw({ kind: 'mesh', mesh: { positions, indices: [0, 1, 2] }, position: [4, 0, 0], rotation: [0, 0, Math.PI] }),
     );
     expect(b.oriented).toBe(true);
-    close([...b.min, ...b.max], [3, -1, -1, 5, 1, 1]);
+    // x ∈ [3, 5] turned by π about Z → [-5, -3], then +4 → [-1, 1]
+    close([...b.min, ...b.max], [-1, -1, -1, 1, 1, 1]);
   });
 });
 

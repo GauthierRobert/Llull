@@ -12,7 +12,7 @@ export default defineConfig(({ command }) => ({
   assetsInclude: ['**/*.wasm'],
   // Pre-bundling moves manifold-3d into node_modules/.vite/deps/, where emscripten's sibling
   // `manifold.wasm` lookup 404s into the SPA fallback (index.html): the kernel never initialises.
-  optimizeDeps: { exclude: ['manifold-3d'] },
+  optimizeDeps: { exclude: ['manifold-3d', '@mujoco/mujoco'] },
   build: {
     chunkSizeWarningLimit: 900, // three.js alone is ~800 kB and cannot be split further
     rolldownOptions: {
@@ -73,6 +73,7 @@ export default defineConfig(({ command }) => ({
       thresholds: {
         'packages/core/src/commands/**': { statements: 90, branches: 85, functions: 90, lines: 90 },
         'packages/core/src/geometry/**': { statements: 90, branches: 85, functions: 90, lines: 90 },
+        'packages/core/src/dynamics/**': { statements: 90, branches: 85, functions: 90, lines: 90 },
         'packages/domain-aec/src/**': { statements: 90, branches: 85, functions: 90, lines: 90 },
       },
     },

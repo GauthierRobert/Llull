@@ -1,0 +1,8 @@
+case,component,objective,constraint,free_variable,fixed,property,exponent_n,index_to_maximise,derivation,source
+tie_stiffness,tie (bar in tension),minimum mass,stiffness S = E A / L,area A,length L,E,1,E/rho,m = rho L^2 S / E,R1 R2; generator min_mass
+tie_strength,tie (bar in tension),minimum mass,load F = sigma_f A,area A,length L,sigma_f,1,sigma_f/rho,m = rho L F / sigma_f,R1 R2; generator min_mass
+beam_stiffness,beam in bending (square section),minimum mass,stiffness S = C E b^4 / (12 L^3),section side b,length L,E,1/2,E^(1/2)/rho,m = rho L b^2 with b ~ E^(-1/4),R1 R2; generator min_mass
+beam_strength,beam in bending (square section),minimum mass,moment M = sigma_f b^3 / 6,section side b,length L,sigma_f,2/3,sigma_f^(2/3)/rho,m = rho L b^2 with b ~ sigma_f^(-1/3),R1 R2; generator min_mass
+panel_stiffness,panel/plate in bending,minimum mass,stiffness S = C E w t^3 / (12 L^3),thickness t,length L and width w,E,1/3,E^(1/3)/rho,m = rho w L t with t ~ E^(-1/3),R1 R2; generator min_mass
+panel_strength,panel/plate in bending,minimum mass,moment M = sigma_f w t^2 / 6,thickness t,length L and width w,sigma_f,1/2,sigma_f^(1/2)/rho,m = rho w L t with t ~ sigma_f^(-1/2),R1 R2; generator min_mass
+column_buckling,slender column (square section),minimum mass,Euler load F = n pi^2 E b^4 / (12 L^2),section side b,length L and end condition n,E,1/2,E^(1/2)/rho,m = rho L b^2 with b ~ E^(-1/4),R1 R2; generator min_mass
