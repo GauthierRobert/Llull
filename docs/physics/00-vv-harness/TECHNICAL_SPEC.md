@@ -443,3 +443,37 @@ Coverage 90/85/90/90 extends to `packages/domain-physics/src/**`.
 - [R9] `gcat`, MIT — https://github.com/gabrielbdsantos/gcat (commit 0b4f6fd839762bca6ad756b89c900296738f2b4e, read)
 - [R10] arXiv 2103.14559 — https://arxiv.org/abs/2103.14559 (search extract)
 - llull: `.claude/rules/architecture.md`, `.claude/context/command-layer.md`, `docs/QUALITY_GATES.md`, `docs/PRODUCTION_GATE.md`, `packages/core/src/commands/project/types.ts`, 05 FEA TECHNICAL_SPEC.
+
+## 13. Implementation status (2026-10-16)
+
+**Built: M1 + M2.** `npm run quality:physics` judges 26 VC-VNV cases (VC-VNV-01…09, 12, 18, measured by `tests/unit/physics/`):
+all pass; VC-VNV-19 (two-level study) and VC-VNV-20 (gate exit code) are unit / server tests. The 7 skipped cases are TBD (10, 11) or
+wait for M3 (13–17).
+
+| Item | Where |
+| ---- | ----- |
+| GCI arithmetic (TR-VNV-01…05) | `packages/core/src/lib/convergence.ts` |
+| Unit grammar used by the judge | `packages/core/src/lib/quantity.ts` (minimal version of 08 TR-MAT-01; 08 MAT owns it once built) |
+| `check_convergence`, `compare_to_expected`, schema + 05 adapter, judge | `packages/core/src/commands/vnv/` (toolset `analysis`) |
+| `run_benchmarks` host transport (FR-VNV-11) | `server/src/cli/benchmarks.ts`, `llull run_benchmarks` |
+| `npm run quality:physics` (FR-VNV-12, TR-VNV-13) | `quality/physicsBenchmarks.mjs`, `quality/physics-benchmarks.json` (05 FEA legacy file via the §6.1 adapter) |
+
+**Deviations from this spec (recorded, not silent):**
+
+- **Placement.** README §5.1 / §8.3 is undecided and `packages/domain-physics` does not exist, so the two pure commands live in a core
+  feature catalog (`commands/vnv/`) — the answer to open question 1 "pure judge and GCI in core, transport in `server/`". Moving them to
+  a plugin later is a file move plus registration.
+- **Unit measurements.** Instead of a Vitest reporter, the packs' unit tests judge through `tests/unit/physics/benchmarkCases.ts`, which
+  appends `{ pack, caseId, measured }` lines when `LLULL_PHYSICS_MEASUREMENTS` is set; `quality:physics` sets it.
+- **Refusals** carry the code in the registry's `error { code, ids, paths, remediation }` (exit 1 on the CLI), not in `data.code`.
+  `compare_to_expected` verdict errors (`VNV_UNIT_MISMATCH`, `VNV_RESULT_MISSING`) are valid results (exit 0) with `data.code`,
+  `data.path`, `data.remediation`. `check_convergence` reports `data.codes[]` plus `data.findings[]` (severity, message, remediation).
+- **Harness recipes** run in-process without a kernel; a `$alias` in a call needs AF-14 `aliases`, not built yet, and reports
+  `VNV_HARNESS_UNSUPPORTED`. No pack ships a harness recipe yet. The report's toolchain holds the Node version only.
+- **A non-finite sample** can only reach the command from TypeScript (JSON has no NaN): NaN gives `VNV_SAMPLES_INVALID`, ±∞ the
+  schema-level `CMD_INVALID_PARAMS`.
+
+**Not built (blocked on dependencies that do not exist yet):** M3 — `run_convergence_study`, `record_convergence_study`,
+`delete_convergence_study`, `check_verification`, `accept_verification_exception` need the 05 FEA analysis slice, `FeArtifactStore`
+and solver transports, and the 09 PLM signing port. VC-VNV-10, 11, 13–17 stay open with them. M4 (V1) not started, including
+FR-VNV-19 / VC-VNV-22 (least-squares order).

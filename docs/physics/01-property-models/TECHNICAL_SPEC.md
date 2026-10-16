@@ -520,3 +520,40 @@ See FUNCTIONAL_SPEC §11 [R1]–[R15] and `validation/sources.md` [S1]–[S9]. A
 - [T1] llull command layer — `.claude/context/command-layer.md`; `packages/core/src/commands/inspect/measureSolid.ts`; `packages/core/src/commands/document/materials.ts`; `packages/core/src/model/types.ts`
 - [T2] 08 MAT TECHNICAL_SPEC §3.1 (`MaterialRecord`, `PropertyValue`, `TemperatureDependence`), §5.1 (units), §5.5 (temperature interpolation), §7.1 (MAT codes) — `docs/aerospace/08-materials-standards-libraries/TECHNICAL_SPEC.md`
 - [T3] 05 FEA TECHNICAL_SPEC TR-FEA-04/06/07 (materials view, canonical hash, unit systems) — `docs/aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md`
+
+## 13. Implementation status (2026-10-16)
+
+**Built: M1–M5** (types, catalogue, evaluator, commands, multi-variable forms, fit, tabulation + integral). `npm run quality:physics`
+judges 81 VC-PROP cases through `tests/unit/physics/` (VC-PROP-01…20 values, VC-PROP-08 statuses, VC-PROP-18/19 behaviour): all pass.
+VC-PROP-21 (solver table ≤ 60 points, `maxRelError` ≤ 1e-3) is a unit test.
+
+| Item | Where |
+| ---- | ----- |
+| Types, catalogue | `packages/core/src/model/propertyModel.ts`, `model/propertyCatalog.ts` |
+| Forms §5.1–5.2, range guard §5.3, consumer API §3.3 | `model/propertyForms.ts`, `model/propertyModelEval.ts` |
+| Sampling, integral, solver table §5.8 | `model/propertyTabulate.ts` (adaptive Gauss-Kronrod 7/15) |
+| Well-formedness §3.4 | `model/propertyModelValidate.ts`; load-time check in `commands/persistence/guards.ts` (also re-verifies `coefficientsSha256`) |
+| Least squares, SHA-256 | `lib/leastSquares.ts` (Householder QR, equilibrated columns), `lib/sha256.ts` (FIPS 180-4, pure) |
+| Six commands §4 | `commands/document/{propertyModels,propertyQueries,fitPropertyModel,checkPropertyModels}.ts`, toolset `materials` |
+
+**Deviations (08 MAT is not built, so this pack carries a minimal bridge):**
+
+- Models hang off the document **`Material`** (`Material.propertyModels`), the material id is the `create_material` name, and
+  `create_material` keeps a material's models when it replaces it. `Basis` and a minimal `Provenance` (citation or sourceId, locator,
+  url, accessed, note) live in `propertyModel.ts` until 08 provides them. The only scalar value is `Material.density`, so
+  `PROP_CONSTANT_ONLY` / `allowConstant` apply to `density`. The 08 source status is unknown, so `unverified` follows the basis,
+  range and fit rules of §5.7 only.
+- TR-PROP-07 (08 `PropertyValue` adapter) has nothing to adapt yet; an 08 percent-of-RT table is a `ratioOf` model (VC-PROP-17 proves
+  the arithmetic). TR-PROP-15 / VC-PROP-22 (private libraries) and library `schemaVersion: 2` wait for 08 libraries.
+- `cte` queries with no `cte` model derive the instantaneous CTE from the preferred `thermalStrain` model (`method` says so).
+- New codes: `PROP_PROPERTY_UNKNOWN` (property not in the catalogue) and `PROP_EQUATION_RANGE_MISSING` (info, check).
+- Parameter shapes kept flat for the MCP schema rules: `at` / `fixed` / `condition` are maps validated in `run` (condition keys
+  strictly), and `sample_property` takes `solverTable: true` + `solverTableRelTol`.
+- `fit_property_model`: `powerLaw` fits use `reference = 1` (in the variable unit); `degree` defaults to 3 (named default).
+- Refusals carry `error { code, paths, remediation }` and `data` = the refusal (`PropertyEvaluationRefused`).
+
+**Validation pack fix:** VC-PROP-12 rate-factor cases had `rel 1e-12` while their values are stored to 12 significant digits (rounding
+alone reaches 3.9e-12); the generator now writes `rel 1e-11` for those two cases (regenerated, no other change).
+
+**Not built:** M6 seed NIST library (OQ-PROP-03, needs access to trc.nist.gov); VC-PROP-23 budgets are not measured; the
+`llull guide` section.

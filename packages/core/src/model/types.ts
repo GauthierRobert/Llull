@@ -1,5 +1,6 @@
 /** Domain model — the single source of truth for a CAD document; changed only by commands. */
 
+import type { PropertyModel } from './propertyModel';
 import type { Vec2, Vec3 } from './vectors';
 import type { BuildingModel } from './building';
 import type { CivilModel } from './civil';
@@ -652,6 +653,8 @@ export interface Material {
   roughness: number;
   /** Procedural surface texture (albedo + normal + roughness maps); absent = plain PBR colour. */
   finish?: MaterialFinish;
+  /** Property models (PHY-01: k(T), cp(T), E(T), …) defined with define_property_model; read through `propertyModelEval`. */
+  readonly propertyModels?: readonly PropertyModel[];
 }
 
 export const FINISH_PATTERNS = ['carbon_twill', 'carbon_plain', 'brushed', 'knurl', 'checker'] as const;

@@ -21,6 +21,7 @@ import { outcomeIsFailure } from '@mcp/commandOutcome';
 import { exchangeOptionsWithDwg } from '../dwgConvert';
 import type { ExchangeOptions } from '../pythonExchange';
 import { USAGE } from './usage';
+import { benchmarkCli } from './benchmarks';
 
 export interface CliIo {
   readonly stdout: (text: string) => void;
@@ -337,6 +338,14 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<number
       case 'undo':
       case 'redo':
         return await runHistory(subcommand, args, io);
+      case 'run_benchmarks': {
+        const save = stringFlag(args, 'save');
+        return benchmarkCli(
+          args.positionals.slice(1),
+          { json: booleanFlag(args, 'json'), ...(save !== undefined ? { save } : {}) },
+          { stdout: io.stdout, cwd: process.cwd() },
+        );
+      }
       default:
         // `llull add_box width=10` is `llull exec add_box width=10`.
         if (getCommand(subcommand) !== undefined || exchangeTool(subcommand) !== undefined)

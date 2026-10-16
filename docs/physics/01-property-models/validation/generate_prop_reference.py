@@ -217,12 +217,13 @@ def synthetic_cases() -> list[dict]:
     v = (1 - u) * (1 - w) * vals[0][0] + (1 - u) * w * vals[0][1] + u * (1 - w) * vals[1][0] + u * w * vals[1][1]
     out.append(case("VC-PROP-12/table2d/T=383K,rate=1/s", "synthetic yield stress table, bilinear in (T, log10 rate)", sig(v), "MPa",
                     {"rel": 1e-12}, "synthetic", "A", ["FR-PROP-06", "TR-PROP-06"]))
+    # rel 1e-11 below: values are stored to 12 significant digits, so rounding alone reaches 5e-12 relative
     jc = 1.0 + 0.014 * math.log(1000.0 / 1.0)
     cs = 1.0 + (1000.0 / 40.4) ** (1.0 / 5.0)
     out.append(case("VC-PROP-12/rateFactor/johnsonCook", "synthetic J-C rate factor 1 + C ln(rate/rate0), C = 0.014, rate0 = 1/s, rate = 1000/s",
-                    sig(jc), "1", {"rel": 1e-12}, "synthetic; form from Johnson & Cook 1983 (S9)", "A", ["FR-PROP-06"]))
+                    sig(jc), "1", {"rel": 1e-11}, "synthetic; form from Johnson & Cook 1983 (S9)", "A", ["FR-PROP-06"]))
     out.append(case("VC-PROP-12/rateFactor/cowperSymonds", "synthetic Cowper-Symonds 1 + (rate/D)^(1/q), D = 40.4/s, q = 5, rate = 1000/s",
-                    sig(cs), "1", {"rel": 1e-12}, "synthetic fixture (constants not attributed)", "A", ["FR-PROP-06"]))
+                    sig(cs), "1", {"rel": 1e-11}, "synthetic fixture (constants not attributed)", "A", ["FR-PROP-06"]))
     return out
 
 

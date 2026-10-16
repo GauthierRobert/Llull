@@ -23,6 +23,9 @@ Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first cha
                               [--validate] dry-run check  [--continue] onError=continue
   new [--force]               write an empty document
   undo | redo                 local: swap with FILE.bak (one level); server: shared history
+  run_benchmarks [packs=a,b]  judge every docs/physics/*/validation/expected_results.json case
+                              (harness recipes + unit-test measurements); exit 1 on an A-grade
+                              fail/error  [grades=A,B caseIds=… measurements=FILE root=DIR]
 
 Flags
   --app                       act on the running llull desktop app (what the user sees;
