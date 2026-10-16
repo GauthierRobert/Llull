@@ -1,0 +1,214 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "m"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    0.1,
+    0.01,
+    0.01
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "anchor": "min"
+  },
+  "as": "bar"
+ },
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "nafems_t3",
+   "name": "nafems_t3",
+   "designation": "validation test material",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "nafems_t3",
+   "property": "k",
+   "value": 35.0,
+   "unit": "W/(m*K)",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "nafems_t3",
+   "property": "cp",
+   "value": 440.5,
+   "unit": "J/(kg*K)",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "nafems_t3",
+   "property": "density",
+   "value": 7200.0,
+   "unit": "kg/m^3",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "create_material",
+  "params": {
+   "name": "nafems_t3",
+   "density": 7200000.0,
+   "color": "#9aa0a6",
+   "metalness": 1,
+   "roughness": 0.4,
+   "recordId": "nafems_t3"
+  }
+ },
+ {
+  "command": "assign_material",
+  "params": {
+   "materialName": "nafems_t3",
+   "entityIds": [
+    "$bar"
+   ]
+  }
+ },
+ {
+  "command": "create_analysis",
+  "params": {
+   "name": "nafems_t3",
+   "analysisType": "heat_transient",
+   "unitSystem": "N-m-kg-s",
+   "solver": "calculix",
+   "temperatureScale": "degC"
+  },
+  "as": "an"
+ },
+ {
+  "command": "set_part_idealization",
+  "params": {
+   "analysisId": "$an",
+   "entityId": "$bar",
+   "idealization": "solid"
+  }
+ },
+ {
+  "command": "set_initial_temperature",
+  "params": {
+   "analysisId": "$an",
+   "value": 0.0,
+   "unit": "degC"
+  }
+ },
+ {
+  "command": "define_amplitude",
+  "params": {
+   "analysisId": "$an",
+   "name": "sine40",
+   "kind": "sine",
+   "amplitude": 1.0,
+   "periodS": 80.0,
+   "sampleStepS": 0.5,
+   "durationS": 32.0
+  }
+ },
+ {
+  "command": "add_thermal_bc",
+  "params": {
+   "analysisId": "$an",
+   "name": "A_cold",
+   "kind": "temperature",
+   "value": 0.0,
+   "unit": "degC",
+   "target": {
+    "entityId": "$bar",
+    "facesNear": [
+     [
+      0,
+      0.005,
+      0.005
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "add_thermal_bc",
+  "params": {
+   "analysisId": "$an",
+   "name": "B_sine",
+   "kind": "temperature",
+   "value": 100.0,
+   "unit": "degC",
+   "amplitude": "sine40",
+   "target": {
+    "entityId": "$bar",
+    "facesNear": [
+     [
+      0.1,
+      0.005,
+      0.005
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "set_thermal_step",
+  "params": {
+   "analysisId": "$an",
+   "endTimeS": 32.0,
+   "initialIncrementS": 0.5,
+   "maxIncrementS": 0.5,
+   "fixedIncrements": true,
+   "outputEveryS": 2.0
+  }
+ },
+ {
+  "command": "set_mesh_controls",
+  "params": {
+   "analysisId": "$an",
+   "mesher": "gmsh",
+   "elementFamily": "hex_dominant",
+   "order": 2,
+   "globalSize": 0.005
+  }
+ },
+ {
+  "command": "add_result_probe",
+  "params": {
+   "analysisId": "$an",
+   "name": "x080",
+   "point": [
+    0.08,
+    0.005,
+    0.005
+   ],
+   "quantity": "temperature"
+  }
+ }
+]

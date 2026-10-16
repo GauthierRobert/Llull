@@ -1,0 +1,163 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "set_parameter",
+  "params": {
+   "name": "w",
+   "expression": "40"
+  }
+ },
+ {
+  "command": "set_parameter",
+  "params": {
+   "name": "h",
+   "expression": "20"
+  }
+ },
+ {
+  "command": "set_parameter",
+  "params": {
+   "name": "d",
+   "expression": "10"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    "=w",
+    "=h",
+    "=d"
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "anchor": "min"
+  },
+  "as": "box"
+ },
+ {
+  "command": "create_material",
+  "params": {
+   "name": "test_al",
+   "density": 0.0027,
+   "color": "#b8bcc2",
+   "metalness": 1,
+   "roughness": 0.4
+  }
+ },
+ {
+  "command": "assign_material",
+  "params": {
+   "materialName": "test_al",
+   "entityIds": [
+    "$box"
+   ]
+  }
+ },
+ {
+  "command": "define_response",
+  "params": {
+   "name": "mass",
+   "unit": "g",
+   "query": {
+    "command": "mass_properties",
+    "params": {
+     "entityId": "$box"
+    },
+    "pointer": "/data/mass"
+   }
+  }
+ },
+ {
+  "command": "define_random_variable",
+  "params": {
+   "name": "w",
+   "unit": "mm",
+   "binding": {
+    "kind": "parameter",
+    "parameter": "w"
+   },
+   "distribution": {
+    "kind": "normal",
+    "mean": 40,
+    "sd": 0.1
+   },
+   "citation": {
+    "text": "test input: machining tolerance +-0.3 mm read as 3 sigma (validation case, not a process claim)"
+   }
+  }
+ },
+ {
+  "command": "define_random_variable",
+  "params": {
+   "name": "h",
+   "unit": "mm",
+   "binding": {
+    "kind": "parameter",
+    "parameter": "h"
+   },
+   "distribution": {
+    "kind": "normal",
+    "mean": 20,
+    "sd": 0.1
+   },
+   "citation": {
+    "text": "test input (validation case)"
+   }
+  }
+ },
+ {
+  "command": "define_random_variable",
+  "params": {
+   "name": "d",
+   "unit": "mm",
+   "binding": {
+    "kind": "parameter",
+    "parameter": "d"
+   },
+   "distribution": {
+    "kind": "normal",
+    "mean": 10,
+    "sd": 0.05
+   },
+   "citation": {
+    "text": "test input (validation case)"
+   }
+  }
+ },
+ {
+  "command": "define_limit_state",
+  "params": {
+   "name": "mass_budget",
+   "expression": "22 - mass",
+   "unit": "g"
+  }
+ },
+ {
+  "command": "parameter_sensitivity",
+  "params": {
+   "parameters": [
+    "w",
+    "h",
+    "d"
+   ],
+   "response": "mass"
+  }
+ },
+ {
+  "command": "propagate_uncertainty",
+  "params": {
+   "method": "lhs",
+   "samples": 10000,
+   "seed": 7
+  }
+ }
+]

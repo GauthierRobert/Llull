@@ -1,0 +1,89 @@
+{
+ "units": {
+  "length": "mm",
+  "force": "N"
+ },
+ "nodes": [
+  {
+   "id": "A",
+   "x": 0,
+   "y": 0
+  },
+  {
+   "id": "B",
+   "x": 0,
+   "y": 120
+  },
+  {
+   "id": "P",
+   "x": 24,
+   "y": 120
+  },
+  {
+   "id": "C",
+   "x": 120,
+   "y": 120
+  }
+ ],
+ "members": [
+  {
+   "from": "A",
+   "to": "B",
+   "E": 720,
+   "A": 6,
+   "I": 2,
+   "elements": 20
+  },
+  {
+   "from": "B",
+   "to": "P",
+   "E": 720,
+   "A": 6,
+   "I": 2,
+   "elements": 4
+  },
+  {
+   "from": "P",
+   "to": "C",
+   "E": 720,
+   "A": 6,
+   "I": 2,
+   "elements": 16
+  }
+ ],
+ "supports": [
+  {
+   "node": "A",
+   "ux": true,
+   "uy": true
+  },
+  {
+   "node": "C",
+   "ux": true,
+   "uy": true
+  }
+ ],
+ "referenceLoad": [
+  {
+   "node": "P",
+   "fy": -1
+  }
+ ],
+ "control": {
+  "kind": "arc_length",
+  "arcLength": 1.0,
+  "maxSteps": 5000
+ },
+ "stop": {
+  "maxLoadFactor": 3.5
+ },
+ "report": {
+  "node": "P",
+  "dofs": [
+   "ux",
+   "uy"
+  ],
+  "every": 5
+ },
+ "_note": "NAFEMS NL7 as quoted by S1 (consistent units, unit-free in the source); 20 elements per leg as the generator; normalised load = loadFactor x 120^2 / (720 x 2)"
+}

@@ -1,0 +1,11 @@
+[
+ {"command": "set_units", "params": {"units": "mm"}},
+ {"command": "create_material", "params": {"name": "aa7075_t6", "density": 0.00281, "color": "#b8bcc2", "metalness": 1, "roughness": 0.35}},
+ {"command": "add_box", "params": {"size": [100, 50, 10], "anchor": "min"}, "as": "block"},
+ {"command": "assign_material", "params": {"materialName": "aa7075_t6", "entityIds": ["$block"]}},
+ {"command": "mass_properties", "params": {"entityId": "$block"}},
+ {"command": "substitute_material", "params": {
+   "entityIds": ["$block"], "from": "aa7075_t6", "to": "ti6al4v_annealed",
+   "designRule": "same_geometry", "include": ["mass", "stiffness", "margins"]
+ }}
+]

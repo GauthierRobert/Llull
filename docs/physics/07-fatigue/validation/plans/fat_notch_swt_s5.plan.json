@@ -1,0 +1,178 @@
+[
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "mat_test",
+   "name": "mat_test",
+   "designation": "fatigue test parameter set (not a material claim)",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "mat_test",
+   "property": "E",
+   "value": 210000.0,
+   "unit": "MPa",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim); same set as reliability Example 1 (S5)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "mat_test",
+   "property": "Ftu",
+   "value": 1400.0,
+   "unit": "MPa",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim); same set as reliability Example 1 (S5)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "add_material_model",
+  "params": {
+   "material": "mat_test",
+   "id": "sn1",
+   "model": {
+    "kind": "sn_basquin",
+    "sigmaF": {
+     "value": 1160,
+     "unit": "MPa"
+    },
+    "b": -0.081,
+    "conditions": {
+     "stressRatio": -1,
+     "specimenKt": 1,
+     "probability": "mean",
+     "control": "load",
+     "testedLifeRange": {
+      "minCycles": 100,
+      "maxCycles": 10000000
+     }
+    }
+   },
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim); same set as reliability Example 1 (S5)"
+   }
+  }
+ },
+ {
+  "command": "add_material_model",
+  "params": {
+   "material": "mat_test",
+   "id": "en1",
+   "model": {
+    "kind": "en_coffin_manson",
+    "sigmaF": {
+     "value": 1160,
+     "unit": "MPa"
+    },
+    "b": -0.081,
+    "epsF": 1.1,
+    "c": -0.65,
+    "E": {
+     "value": 210000,
+     "unit": "MPa"
+    },
+    "conditions": {
+     "stressRatio": -1,
+     "specimenKt": 1,
+     "probability": "mean",
+     "control": "strain"
+    }
+   },
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim); same set as reliability Example 1 (S5)"
+   }
+  }
+ },
+ {
+  "command": "add_material_model",
+  "params": {
+   "material": "mat_test",
+   "id": "ro1",
+   "model": {
+    "kind": "cyclic_ramberg_osgood",
+    "Kprime": {
+     "value": 1060,
+     "unit": "MPa"
+    },
+    "nPrime": 0.14,
+    "E": {
+     "value": 210000,
+     "unit": "MPa"
+    }
+   },
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim); same set as reliability Example 1 (S5)"
+   }
+  }
+ },
+ {
+  "command": "fatigue_life",
+  "params": {
+   "method": "strain_life",
+   "material": "mat_test",
+   "modelId": "en1",
+   "cyclicModelId": "ro1",
+   "nominal": {
+    "amplitude": {
+     "value": 375,
+     "unit": "MPa"
+    },
+    "mean": {
+     "value": 0,
+     "unit": "MPa"
+    }
+   },
+   "notch": {
+    "kt": 2.41,
+    "q": 0.9857,
+    "feIncludesKt": false
+   },
+   "meanStress": "swt"
+  }
+ },
+ {
+  "command": "fatigue_life",
+  "params": {
+   "method": "strain_life",
+   "material": "mat_test",
+   "modelId": "en1",
+   "strainAmplitude": 0.0075,
+   "meanStress": "none"
+  }
+ },
+ {
+  "command": "fatigue_life",
+  "params": {
+   "method": "stress_life",
+   "material": "mat_test",
+   "modelId": "sn1",
+   "amplitude": {
+    "value": 400,
+    "unit": "MPa"
+   },
+   "mean": {
+    "value": 0,
+    "unit": "MPa"
+   },
+   "meanStress": "none"
+  }
+ }
+]

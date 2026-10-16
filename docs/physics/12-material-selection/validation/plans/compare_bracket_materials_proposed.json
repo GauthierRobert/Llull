@@ -1,0 +1,11 @@
+[
+ {"command": "set_units", "params": {"units": "mm"}},
+ {"command": "import_material_library", "params": {"libraryId": "company-materials", "version": "2026.1", "sha256": "<sha256 of the registered library>"}},
+ {"command": "compare_materials", "params": {
+   "materials": ["aa7075_t6", "ti6al4v_annealed", "aisi4130_normalized", "cfrp_t300_5208_quasi_iso"],
+   "objectives": [{"index": "beam_stiffness", "weight": 0.7}, {"index": "beam_strength", "strengthProperty": "Fty", "weight": 0.3}],
+   "constraints": [{"property": "Fty", "min": {"value": 400, "unit": "MPa"}}],
+   "missing": "report"
+ }},
+ {"command": "check_material_selection", "params": {}}
+]

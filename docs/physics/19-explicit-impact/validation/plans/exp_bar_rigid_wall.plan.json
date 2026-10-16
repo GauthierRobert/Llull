@@ -1,0 +1,210 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    10,
+    10,
+    200
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "anchor": "min"
+  },
+  "as": "bar"
+ },
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "steel_like",
+   "name": "steel_like",
+   "designation": "test material E = 200000 MPa",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "steel_like",
+   "property": "E",
+   "value": 200000.0,
+   "unit": "MPa",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "steel_like",
+   "property": "nu",
+   "value": 0.3,
+   "unit": "-",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "steel_like",
+   "property": "density",
+   "value": 7.85,
+   "unit": "g/cm^3",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "create_material",
+  "params": {
+   "name": "steel_like",
+   "density": 0.00785,
+   "color": "#9aa0a6",
+   "metalness": 1,
+   "roughness": 0.4,
+   "recordId": "steel_like"
+  }
+ },
+ {
+  "command": "assign_material",
+  "params": {
+   "materialName": "steel_like",
+   "entityIds": [
+    "$bar"
+   ]
+  }
+ },
+ {
+  "command": "create_analysis",
+  "params": {
+   "name": "bar_rigid_wall",
+   "analysisType": "explicit_dynamics",
+   "unitSystem": "N-mm-t-s",
+   "solver": "opencourant"
+  },
+  "as": "an"
+ },
+ {
+  "command": "set_explicit_controls",
+  "params": {
+   "analysisId": "$an",
+   "endTime": {
+    "value": 0.00016,
+    "unit": "s"
+   },
+   "animationInterval": {
+    "value": 1e-05,
+    "unit": "s"
+   },
+   "historyInterval": {
+    "value": 1.0000000000000002e-06,
+    "unit": "s"
+   },
+   "massScaling": {
+    "mode": "none"
+   },
+   "precision": "double"
+  }
+ },
+ {
+  "command": "set_part_idealization",
+  "params": {
+   "analysisId": "$an",
+   "entityId": "$bar",
+   "idealization": "solid"
+  }
+ },
+ {
+  "command": "set_initial_velocity",
+  "params": {
+   "analysisId": "$an",
+   "entityId": "$bar",
+   "velocity": {
+    "vector": [
+     0,
+     0,
+     -10000
+    ],
+    "unit": "mm/s"
+   }
+  }
+ },
+ {
+  "command": "add_rigid_wall",
+  "params": {
+   "analysisId": "$an",
+   "name": "anvil",
+   "point": [
+    5,
+    5,
+    0
+   ],
+   "normal": [
+    0,
+    0,
+    1
+   ],
+   "friction": 0.0
+  }
+ },
+ {
+  "command": "set_mesh_controls",
+  "params": {
+   "analysisId": "$an",
+   "mesher": "gmsh",
+   "elementFamily": "hex_dominant",
+   "order": 1,
+   "globalSize": 2.5
+  }
+ },
+ {
+  "command": "add_time_history",
+  "params": {
+   "analysisId": "$an",
+   "name": "wall_impulse",
+   "kind": "rigid_wall",
+   "target": "anvil",
+   "quantities": [
+    "impulse_z",
+    "force_z"
+   ]
+  }
+ },
+ {
+  "command": "add_result_probe",
+  "params": {
+   "analysisId": "$an",
+   "name": "mid",
+   "point": [
+    5,
+    5,
+    100
+   ],
+   "quantity": "s_zz",
+   "history": true
+  }
+ }
+]

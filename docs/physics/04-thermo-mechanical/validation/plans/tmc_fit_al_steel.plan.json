@@ -1,0 +1,250 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    40,
+    40,
+    20
+   ],
+   "anchor": "min"
+  },
+  "as": "blk"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 10.0,
+   "height": 30,
+   "position": [
+    20,
+    20,
+    10
+   ]
+  },
+  "as": "hole"
+ },
+ {
+  "command": "boolean",
+  "params": {
+   "op": "subtract",
+   "a": "$blk",
+   "b": "$hole"
+  },
+  "as": "housing"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 10.0,
+   "height": 40,
+   "position": [
+    20,
+    20,
+    10
+   ]
+  },
+  "as": "shaft"
+ },
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "al_test",
+   "name": "al_test",
+   "designation": "validation test material",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "al_test",
+   "property": "cte",
+   "value": 2.3e-05,
+   "unit": "1/K",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "al_test",
+   "property": "density",
+   "value": 2.7,
+   "unit": "g/cm^3",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "steel_test",
+   "name": "steel_test",
+   "designation": "validation test material",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "steel_test",
+   "property": "cte",
+   "value": 1.15e-05,
+   "unit": "1/K",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "steel_test",
+   "property": "density",
+   "value": 7.8,
+   "unit": "g/cm^3",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "create_material",
+  "params": {
+   "name": "al_test",
+   "density": 0.0027,
+   "color": "#9aa0a6",
+   "metalness": 1,
+   "roughness": 0.4,
+   "recordId": "al_test"
+  }
+ },
+ {
+  "command": "assign_material",
+  "params": {
+   "materialName": "al_test",
+   "entityIds": [
+    "$housing"
+   ]
+  }
+ },
+ {
+  "command": "create_material",
+  "params": {
+   "name": "steel_test",
+   "density": 0.0078,
+   "color": "#9aa0a6",
+   "metalness": 1,
+   "roughness": 0.4,
+   "recordId": "steel_test"
+  }
+ },
+ {
+  "command": "assign_material",
+  "params": {
+   "materialName": "steel_test",
+   "entityIds": [
+    "$shaft"
+   ]
+  }
+ },
+ {
+  "command": "set_pmi_standard",
+  "params": {
+   "standard": "ISO_GPS"
+  }
+ },
+ {
+  "command": "add_size_dimension",
+  "params": {
+   "entityId": "$housing",
+   "facesNear": [
+    [
+     30,
+     20,
+     10
+    ]
+   ],
+   "sizeKind": "diameter",
+   "tolerance": {
+    "type": "fit",
+    "code": "H7",
+    "upper": 0.021,
+    "lower": 0.0
+   }
+  },
+  "as": "bore"
+ },
+ {
+  "command": "add_size_dimension",
+  "params": {
+   "entityId": "$shaft",
+   "facesNear": [
+    [
+     30,
+     20,
+     10
+    ]
+   ],
+   "sizeKind": "diameter",
+   "tolerance": {
+    "type": "fit",
+    "code": "g6",
+    "upper": -0.007,
+    "lower": -0.02
+   }
+  },
+  "as": "pin"
+ },
+ {
+  "command": "fit_at_temperature",
+  "params": {
+   "holePmiId": "$bore",
+   "shaftPmiId": "$pin",
+   "specTemperature": {
+    "value": 20.0,
+    "unit": "degC"
+   },
+   "temperatures": [
+    {
+     "value": -55.0,
+     "unit": "degC"
+    },
+    {
+     "value": 20.0,
+     "unit": "degC"
+    },
+    {
+     "value": 85.0,
+     "unit": "degC"
+    }
+   ]
+  }
+ }
+]

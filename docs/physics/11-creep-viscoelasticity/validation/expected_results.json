@@ -1,0 +1,596 @@
+{
+ "pack": "11-creep-viscoelasticity",
+ "generatedBy": "generate_creep_reference.py",
+ "units_note": "every value carries its unit; '-' = dimensionless",
+ "cases": [
+  {
+   "id": "VC-CRP-10",
+   "quantity": "equivalent creep strain, uniaxial Norton, constant stress, t = 1000 s",
+   "value": 0.32,
+   "unit": "-",
+   "tolerance": {
+    "rel": 0.005
+   },
+   "source": "S1 (CalculiX manual *CREEP) + S2 (beamcr3.frd.ref)",
+   "grade": "A",
+   "proves": [
+    "FR-CRP-02",
+    "FR-CRP-05",
+    "TR-CRP-20"
+   ],
+   "derivation": "eps = A sigma^n t, A = 1e-10 MPa^-5 s^-1, n = 5, m = 0, sigma = 20 MPa",
+   "inputs": {
+    "A_per_MPa5_s": 1e-10,
+    "n": 5.0,
+    "m": 0.0,
+    "sigma_MPa": 20.0,
+    "t_s": 1000.0
+   },
+   "cross_check": {
+    "calculix_beamcr3_frd_PE_min": 0.319987,
+    "calculix_beamcr3_frd_PE_max": 0.320016,
+    "calculix_beamcr3_frd_Szz_MPa": 19.9992,
+    "note": "block PE (requested as CEEQ) at step time 1000 of test/beamcr3.frd.ref"
+   }
+  },
+  {
+   "id": "VC-CRP-11",
+   "quantity": "equivalent creep strain, Norton time hardening m = -0.5, t = 1000 s",
+   "value": 0.0202385770251,
+   "unit": "-",
+   "tolerance": {
+    "rel": 0.01
+   },
+   "source": "S1 (law form) + derivation",
+   "grade": "A",
+   "proves": [
+    "FR-CRP-02",
+    "TR-CRP-20"
+   ],
+   "derivation": "eps = A sigma^n t^(m+1) / (m+1)",
+   "inputs": {
+    "A_per_MPa5_s": 1e-10,
+    "n": 5.0,
+    "m": -0.5,
+    "sigma_MPa": 20.0,
+    "t_s": 1000.0
+   }
+  },
+  {
+   "id": "VC-CRP-12.a",
+   "quantity": "relaxed stress of a bar at fixed strain after 3600 s",
+   "value": 93.8687499151,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.005
+   },
+   "source": "derivation (closed form)",
+   "grade": "A",
+   "proves": [
+    "FR-CRP-03",
+    "TR-CRP-21"
+   ],
+   "derivation": "sigma = [sigma0^(1-n) + (n-1) E A t]^(1/(1-n))",
+   "inputs": {
+    "E_MPa": 200000.0,
+    "A_per_MPa5_s": 1e-18,
+    "n": 5.0,
+    "sigma0_MPa": 100.0,
+    "t_s": 3600.0
+   }
+  },
+  {
+   "id": "VC-CRP-12.b",
+   "quantity": "time for the bar stress to relax to 50 % of sigma0",
+   "value": 187500.0,
+   "unit": "s",
+   "tolerance": {
+    "rel": 0.01
+   },
+   "source": "derivation (closed form)",
+   "grade": "A",
+   "proves": [
+    "FR-CRP-03",
+    "TR-CRP-21"
+   ],
+   "derivation": "t_f = sigma0^(1-n) (f^(1-n) - 1) / ((n-1) E A), f = 0.5",
+   "inputs": {
+    "E_MPa": 200000.0,
+    "A_per_MPa5_s": 1e-18,
+    "n": 5.0,
+    "sigma0_MPa": 100.0
+   }
+  },
+  {
+   "id": "VC-CRP-13.a",
+   "quantity": "bolt preload remaining after 1e6 s (k_b/k_m = 1/3)",
+   "value": 0.357822413961,
+   "unit": "-",
+   "tolerance": {
+    "rel": 0.005
+   },
+   "source": "derivation (closed form, series springs)",
+   "grade": "A",
+   "proves": [
+    "FR-CRP-04",
+    "TR-CRP-21"
+   ],
+   "derivation": "F/F0 = sigma/sigma0 with E' = E k_m / (k_m + k_b)",
+   "inputs": {
+    "E_MPa": 200000.0,
+    "A_per_MPa5_s": 1e-18,
+    "n": 5.0,
+    "sigma0_MPa": 100.0,
+    "kb_over_km": 0.3333333333333333,
+    "t_s": 1000000.0
+   }
+  },
+  {
+   "id": "VC-CRP-13.b",
+   "quantity": "same bolt, rigid members (k_m -> infinity), preload remaining after 1e6 s",
+   "value": 0.333333333333,
+   "unit": "-",
+   "tolerance": {
+    "rel": 0.005
+   },
+   "source": "derivation (closed form)",
+   "grade": "A",
+   "proves": [
+    "FR-CRP-04"
+   ],
+   "derivation": "F/F0 with E' = E (rigid members relax fastest)",
+   "inputs": {
+    "E_MPa": 200000.0,
+    "A_per_MPa5_s": 1e-18,
+    "n": 5.0,
+    "sigma0_MPa": 100.0,
+    "t_s": 1000000.0
+   }
+  },
+  {
+   "id": "VC-CRP-14.a",
+   "quantity": "stationary creep hoop stress at the bore r = a (n = 5)",
+   "value": 14.466573955,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.03
+   },
+   "source": "derivation (closed form)",
+   "grade": "A",
+   "proves": [
+    "FR-CRP-06",
+    "TR-CRP-22"
+   ],
+   "derivation": "sigma_t(a), see generator section 3",
+   "inputs": {
+    "p_MPa": 10.0,
+    "a_m": 0.16,
+    "b_m": 0.25,
+    "n": 5.0
+   }
+  },
+  {
+   "id": "VC-CRP-14.b",
+   "quantity": "stationary creep hoop stress at the outer surface r = b (n = 5)",
+   "value": 20.466573955,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.03
+   },
+   "source": "derivation (closed form)",
+   "grade": "A",
+   "proves": [
+    "FR-CRP-06",
+    "TR-CRP-22"
+   ],
+   "derivation": "sigma_t(b)",
+   "inputs": {
+    "p_MPa": 10.0,
+    "a_m": 0.16,
+    "b_m": 0.25,
+    "n": 5.0
+   }
+  },
+  {
+   "id": "VC-CRP-14.c",
+   "quantity": "stationary creep von Mises stress at the bore r = a (n = 5)",
+   "value": 21.1886745886,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.03
+   },
+   "source": "derivation (closed form)",
+   "grade": "A",
+   "proves": [
+    "FR-CRP-06",
+    "TR-CRP-22"
+   ],
+   "derivation": "sigma_eq = (sqrt 3 / n) p (b/r)^(2/n) / ((b/a)^(2/n) - 1)",
+   "inputs": {
+    "p_MPa": 10.0,
+    "a_m": 0.16,
+    "b_m": 0.25,
+    "n": 5.0
+   }
+  },
+  {
+   "id": "VC-CRP-14.d",
+   "quantity": "n = 1 limit: Lame elastic hoop stress at the bore",
+   "value": 23.8753387534,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "derivation (Lame)",
+   "grade": "A",
+   "proves": [
+    "TR-CRP-22"
+   ],
+   "derivation": "p (b^2 + a^2) / (b^2 - a^2)",
+   "inputs": {
+    "p_MPa": 10.0,
+    "a_m": 0.16,
+    "b_m": 0.25,
+    "n": 1.0
+   },
+   "cross_check": {
+    "lame_closed_form_MPa": 23.8753387534
+   }
+  },
+  {
+   "id": "VC-CRP-15.a",
+   "quantity": "stationary creep outer-fibre bending stress (n = 5)",
+   "value": 110.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.03
+   },
+   "source": "derivation (closed form)",
+   "grade": "A",
+   "proves": [
+    "FR-CRP-06",
+    "TR-CRP-22"
+   ],
+   "derivation": "sigma_max = (2n+1)/(3n) 6M/(bh^2)",
+   "inputs": {
+    "M_Nmm": 100000.0,
+    "b_mm": 10.0,
+    "h_mm": 20.0,
+    "n": 5.0
+   },
+   "cross_check": {
+    "elastic_outer_fibre_MPa": 150.0
+   }
+  },
+  {
+   "id": "VC-CRP-15.b",
+   "quantity": "stationary creep bending stress at y = h/4 (n = 5)",
+   "value": 95.7605619626,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.03
+   },
+   "source": "derivation (closed form)",
+   "grade": "A",
+   "proves": [
+    "FR-CRP-06"
+   ],
+   "derivation": "sigma(y) = M y^(1/n) / I_n",
+   "inputs": {
+    "M_Nmm": 100000.0,
+    "b_mm": 10.0,
+    "h_mm": 20.0,
+    "n": 5.0
+   }
+  },
+  {
+   "id": "VC-CRP-20.a",
+   "quantity": "Larson-Miller parameter, T = 800 K, t_r = 1000 h, C = 20",
+   "value": 18400.0,
+   "unit": "K",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "S7 (definition) + S8 (C = 20 convention)",
+   "grade": "A",
+   "proves": [
+    "FR-CRP-08",
+    "TR-CRP-30"
+   ],
+   "derivation": "LMP = T (C + log10 t_r)",
+   "inputs": {
+    "T_K": 800.0,
+    "tr_h": 1000.0,
+    "C": 20.0
+   }
+  },
+  {
+   "id": "VC-CRP-20.b",
+   "quantity": "iso-LMP rupture time at 850 K (same stress)",
+   "value": 44.3668733098,
+   "unit": "h",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S7 + S8",
+   "grade": "A",
+   "proves": [
+    "FR-CRP-08",
+    "TR-CRP-30"
+   ],
+   "derivation": "t_r2 = 10^(LMP / T2 - C)",
+   "inputs": {
+    "T1_K": 800.0,
+    "tr1_h": 1000.0,
+    "T2_K": 850.0,
+    "C": 20.0
+   },
+   "cross_check": {
+    "reliability_0_9_0_creep_failure_time": "same formula in degF/Rankine (temp_low=980.33 F, temp_high=1070.33 F, time_low=1000); Rankine = 1.8 K so the ratio, and t_r2, are unchanged"
+   }
+  },
+  {
+   "id": "VC-CRP-21",
+   "quantity": "time-fraction creep damage sum (linear summation)",
+   "value": 1.0,
+   "unit": "-",
+   "tolerance": {
+    "abs": 1e-12
+   },
+   "source": "S9 (ASME III-5 linear damage summation, scope only)",
+   "grade": "B",
+   "proves": [
+    "FR-CRP-09"
+   ],
+   "derivation": "D = sum t_i / t_r,i",
+   "inputs": {
+    "blocks_hours_and_rupture_hours": [
+     [
+      500.0,
+      1000.0
+     ],
+     [
+      200.0,
+      400.0
+     ]
+    ]
+   }
+  },
+  {
+   "id": "VC-CRP-30.a",
+   "quantity": "SLS relaxation modulus at t = tau",
+   "value": 1735.75888234,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derivation",
+   "grade": "A",
+   "proves": [
+    "FR-CRP-10",
+    "TR-CRP-40"
+   ],
+   "derivation": "E(t) = E_inf + E1 exp(-t/tau)",
+   "inputs": {
+    "Einf_MPa": 1000.0,
+    "E1_MPa": 2000.0,
+    "tau_s": 10.0
+   }
+  },
+  {
+   "id": "VC-CRP-30.b",
+   "quantity": "SLS creep compliance at t = 10 tau",
+   "value": 0.000976217337768,
+   "unit": "1/MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derivation",
+   "grade": "A",
+   "proves": [
+    "FR-CRP-10",
+    "TR-CRP-40"
+   ],
+   "derivation": "J(t) = 1/E_inf - E1/(E0 E_inf) exp(-t E_inf/(tau E0))",
+   "inputs": {
+    "Einf_MPa": 1000.0,
+    "E1_MPa": 2000.0,
+    "tau_s": 10.0,
+    "t_s": 100.0
+   }
+  },
+  {
+   "id": "VC-CRP-30.c",
+   "quantity": "SLS interconversion identity residual at t = 25 s",
+   "value": 0.0,
+   "unit": "-",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "derivation",
+   "grade": "A",
+   "proves": [
+    "TR-CRP-40"
+   ],
+   "derivation": "1 - [E(t) J(0) + int E(t-s) dJ(s)]; generator value below",
+   "cross_check": {
+    "generator_residual": -1.332e-14
+   }
+  },
+  {
+   "id": "VC-CRP-31",
+   "quantity": "Kelvin-Voigt creep compliance at t = tau",
+   "value": 0.000632120558829,
+   "unit": "1/MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derivation",
+   "grade": "A",
+   "proves": [
+    "FR-CRP-10"
+   ],
+   "derivation": "J = (1 - exp(-t/tau)) / E",
+   "inputs": {
+    "E_MPa": 1000.0,
+    "tau_s": 10.0,
+    "t_s": 10.0
+   }
+  },
+  {
+   "id": "VC-CRP-32",
+   "quantity": "two-term Prony relaxation modulus at t = 10 s",
+   "value": 1452.48680891,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derivation",
+   "grade": "A",
+   "proves": [
+    "FR-CRP-10",
+    "TR-CRP-40"
+   ],
+   "derivation": "E(t) = E_inf + sum E_i exp(-t/tau_i)",
+   "inputs": {
+    "Einf_MPa": 1000.0,
+    "terms_MPa_s": [
+     [
+      1500.0,
+      1.0
+     ],
+     [
+      500.0,
+      100.0
+     ]
+    ],
+    "t_s": 10.0
+   }
+  },
+  {
+   "id": "VC-CRP-33.a",
+   "quantity": "WLF log10 aT at T - Tg = 10 K, universal constants",
+   "value": -2.83116883117,
+   "unit": "-",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "S11 (constants, search-verified)",
+   "grade": "B",
+   "proves": [
+    "FR-CRP-11",
+    "TR-CRP-41"
+   ],
+   "derivation": "log10 aT = -C1 dT / (C2 + dT)",
+   "inputs": {
+    "C1": 17.44,
+    "C2_K": 51.6,
+    "T_minus_Tr_K": 10.0
+   }
+  },
+  {
+   "id": "VC-CRP-33.b",
+   "quantity": "WLF log10 aT at T - Tg = 50 K, universal constants",
+   "value": -8.58267716535,
+   "unit": "-",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "S11 (constants, search-verified)",
+   "grade": "B",
+   "proves": [
+    "FR-CRP-11",
+    "TR-CRP-41"
+   ],
+   "derivation": "log10 aT = -C1 dT / (C2 + dT)",
+   "inputs": {
+    "C1": 17.44,
+    "C2_K": 51.6,
+    "T_minus_Tr_K": 50.0
+   }
+  },
+  {
+   "id": "VC-CRP-34",
+   "quantity": "SLS modulus at T = Tg + 10 K, t = 0.01 s (shifted)",
+   "value": 2015.35894449,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derivation + S11",
+   "grade": "B",
+   "proves": [
+    "FR-CRP-11",
+    "TR-CRP-41"
+   ],
+   "derivation": "E(t, T) = E_ref(t / aT)",
+   "inputs": {
+    "Einf_MPa": 1000.0,
+    "E1_MPa": 2000.0,
+    "tau_s": 10.0,
+    "t_s": 0.01,
+    "T_minus_Tr_K": 10.0
+   }
+  },
+  {
+   "id": "VC-CRP-16.a",
+   "quantity": "Norton A converted from MPa^-5 s^-1 to Pa^-5 s^-1",
+   "value": 1e-40,
+   "unit": "Pa^-5 s^-1",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "derivation",
+   "grade": "A",
+   "proves": [
+    "FR-CRP-23",
+    "TR-CRP-12"
+   ],
+   "derivation": "A_Pa = A_MPa (1e6)^-n",
+   "inputs": {
+    "A_per_MPa5_s": 1e-10,
+    "n": 5.0
+   }
+  },
+  {
+   "id": "VC-CRP-16.b",
+   "quantity": "Norton A converted from MPa^-5 s^-1 to MPa^-5 h^-1 (m = 0)",
+   "value": 3.6e-07,
+   "unit": "MPa^-5 h^-1",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "derivation",
+   "grade": "A",
+   "proves": [
+    "FR-CRP-23",
+    "TR-CRP-12"
+   ],
+   "derivation": "A_h = A_s 3600^(m+1)",
+   "inputs": {
+    "A_per_MPa5_s": 1e-10,
+    "m": 0.0
+   }
+  },
+  {
+   "id": "VC-CRP-16.c",
+   "quantity": "Norton A converted from MPa^-5 s^-1.5 (m = -0.5) to MPa^-5 h^-0.5",
+   "value": 6e-09,
+   "unit": "MPa^-5 h^-(m+1)",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "derivation",
+   "grade": "A",
+   "proves": [
+    "FR-CRP-23",
+    "TR-CRP-12"
+   ],
+   "derivation": "A_h = A_s 3600^(m+1)",
+   "inputs": {
+    "A": 1e-10,
+    "m": -0.5
+   }
+  }
+ ]
+}

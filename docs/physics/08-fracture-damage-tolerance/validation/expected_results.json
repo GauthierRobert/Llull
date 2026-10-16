@@ -1,0 +1,381 @@
+{
+ "pack": "08-fracture-damage-tolerance",
+ "generatedBy": "generate_fracture_reference.py",
+ "cases": [
+  {
+   "id": "VC-FRC-01",
+   "quantity": "K_I center crack, sigma 100 MPa, a 10 mm (half-length), W 100 mm, secant correction",
+   "value": 18.1748892684,
+   "unit": "MPa*m^0.5",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "S1 (secant form), S3 + generator",
+   "grade": "A",
+   "proves": [
+    "FR-FRC-01",
+    "TR-FRC-10"
+   ],
+   "derivation": "K = sigma sqrt(pi a) sqrt(sec(pi a / W))"
+  },
+  {
+   "id": "VC-FRC-02",
+   "quantity": "edge crack beta at a/b = 0.5: Tada form and polynomial",
+   "value": {
+    "tada": 2.82658060837,
+    "polynomial": 2.829125
+   },
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "S2 (both forms) + generator",
+   "grade": "A",
+   "proves": [
+    "FR-FRC-01",
+    "TR-FRC-10"
+   ],
+   "note": "long-plate solutions; table k_solutions_table.csv"
+  },
+  {
+   "id": "VC-FRC-03",
+   "quantity": "NAFEMS R0020 test 2.1 single-edge-cracked plate (a/b 0.5, h/b 0.5): K_I / (sigma sqrt(pi a))",
+   "value": 3.0,
+   "unit": "-",
+   "tolerance": {
+    "rel": 0.03
+   },
+   "source": "S4 Ansys VM-R020-t2a target (ref. Rooke & Cartwright 1976); Ansys 2.966 (interaction integral), 2.965 (J)",
+   "grade": "B",
+   "proves": [
+    "FR-FRC-03",
+    "TR-FRC-20"
+   ],
+   "cross_check": {
+    "ansys_interaction": 2.966,
+    "ansys_J": 2.965
+   },
+   "inputs": {
+    "E_MPa": 207000,
+    "nu": 0.3,
+    "sigma_MPa": 100,
+    "b_mm": 20,
+    "a_over_b": 0.5,
+    "h_over_b": 0.5,
+    "state": "plane strain"
+   },
+   "note": "short plate (h/b 0.5): differs from the long-plate Tada value of VC-FRC-02 by design"
+  },
+  {
+   "id": "VC-FRC-04",
+   "quantity": "Newman-Raju surface crack F (a/t 0.5, c/b 0.1) at deepest (90 deg) and surface (0 deg) points",
+   "value": {
+    "a_c=0.2": {
+     "Q": 1.10285859069,
+     "F_deepest": 1.49973059209,
+     "F_surface": 0.796456143566
+    },
+    "a_c=0.4": {
+     "Q": 1.32280485835,
+     "F_deepest": 1.30559252347,
+     "F_surface": 0.980553441688
+    },
+    "a_c=1.0": {
+     "Q": 2.464,
+     "F_deepest": 1.08714263029,
+     "F_surface": 1.29098187347
+    }
+   },
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S5 (Q, M1, M2 seen in search extracts; M3, g, f_phi, f_w transcription unconfirmed)",
+   "grade": "C",
+   "proves": [
+    "FR-FRC-02",
+    "TR-FRC-11"
+   ],
+   "note": "not a gate until TM-83200 equations are checked by a human (OQ-FRC-01)"
+  },
+  {
+   "id": "VC-FRC-05",
+   "quantity": "Paris life, center crack Y = 1, 1 -> 10 mm, d_sigma 100 MPa, C 1e-11, m 3 (closed form)",
+   "value": 776634.44445,
+   "unit": "cycles",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S6 (Paris law) + generator closed form",
+   "grade": "A",
+   "proves": [
+    "FR-FRC-05",
+    "FR-FRC-06",
+    "TR-FRC-30"
+   ],
+   "derivation": "N = (a0^(1-m/2) - af^(1-m/2)) / (C (m/2-1) (ds sqrt(pi))^m)"
+  },
+  {
+   "id": "VC-FRC-06",
+   "quantity": "same, explicit cycle-by-cycle summation (cycles to exceed 10 mm)",
+   "value": 776637,
+   "unit": "cycles",
+   "tolerance": {
+    "rel": 0.001
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-FRC-06",
+    "TR-FRC-31"
+   ],
+   "note": "integrator acceptance: block / adaptive integration within 0.1 % of VC-FRC-05"
+  },
+  {
+   "id": "VC-FRC-07",
+   "quantity": "Paris life with secant width correction, W 200 mm, 5 -> 40 mm, d_sigma 150 MPa (Simpson, 20000 intervals in ln a)",
+   "value": 92454.9203271,
+   "unit": "cycles",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "generator (converged quadrature)",
+   "grade": "A",
+   "proves": [
+    "FR-FRC-06",
+    "TR-FRC-31"
+   ]
+  },
+  {
+   "id": "VC-FRC-08",
+   "quantity": "crack-growth rates at dK = 10 MPa sqrt m (test constants)",
+   "value": {
+    "paris": 1e-08,
+    "walker_R0.5_g0.5": 2.82842712475e-08,
+    "forman_R0.1": 2.27272727273e-10,
+    "nasgro_R0.1_f0.1_dKth2_p0.25_q0.25": 9.95423220853e-09
+   },
+   "unit": "m/cycle",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "S6 (Paris), S7 (NASGRO form, 2 search sources), S8 (Walker / Forman forms)",
+   "grade": "B",
+   "proves": [
+    "FR-FRC-04",
+    "TR-FRC-32"
+   ],
+   "note": "grade B until the Walker / Forman forms are confirmed in a primary source"
+  },
+  {
+   "id": "VC-FRC-09",
+   "quantity": "Newman crack-opening function f(R), alpha 2, Smax/sigma0 0.3",
+   "value": {
+    "R=-1.0": 0.24375633963,
+    "R=0.0": 0.32565633963,
+    "R=0.1": 0.342171862121,
+    "R=0.5": 0.548065669815,
+    "R=0.8": 0.804489059322
+   },
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "S7 (structure only)",
+   "grade": "C",
+   "proves": [
+    "FR-FRC-04"
+   ],
+   "note": "coefficient expressions not confirmed (OQ-FRC-02)"
+  },
+  {
+   "id": "VC-FRC-10",
+   "quantity": "critical half-length at sigma 150 MPa (Kc 60, W 200 mm, secant)",
+   "value": 0.0408158761182,
+   "unit": "m",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-FRC-07",
+    "TR-FRC-40"
+   ]
+  },
+  {
+   "id": "VC-FRC-11",
+   "quantity": "net-section-yield half-length at sigma 150 MPa (Fty 300 MPa)",
+   "value": 0.05,
+   "unit": "m",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-FRC-07",
+    "TR-FRC-40"
+   ],
+   "derivation": "sigma W / (W - 2a) = Fty"
+  },
+  {
+   "id": "VC-FRC-12",
+   "quantity": "residual strength min(Kc criterion, net-section yield) at a = 10, 20, 40 mm",
+   "value": {
+    "a=0.01": {
+     "sigma_K_MPa": 336.423463481,
+     "sigma_netyield_MPa": 270.0,
+     "residualStrength_MPa": 270.0,
+     "governing": "net_section_yield"
+    },
+    "a=0.02": {
+     "sigma_K_MPa": 233.434197285,
+     "sigma_netyield_MPa": 240.0,
+     "residualStrength_MPa": 233.434197285,
+     "governing": "fracture"
+    },
+    "a=0.04": {
+     "sigma_K_MPa": 152.238725908,
+     "sigma_netyield_MPa": 180.0,
+     "residualStrength_MPa": 152.238725908,
+     "governing": "fracture"
+    }
+   },
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-FRC-07",
+    "TR-FRC-40"
+   ]
+  },
+  {
+   "id": "VC-FRC-13",
+   "quantity": "crack-growth life from detectable 5 mm to critical (VC-FRC-10), d_sigma = sigma (R 0)",
+   "value": 92841.1526827,
+   "unit": "cycles",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-FRC-08",
+    "TR-FRC-41"
+   ]
+  },
+  {
+   "id": "VC-FRC-14",
+   "quantity": "inspection interval = life / scatter factor 2 (explicit test value)",
+   "value": 46420.5763414,
+   "unit": "cycles",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "generator; factor is a test input (no verified default, OQ-FRC-03)",
+   "grade": "A",
+   "proves": [
+    "FR-FRC-08",
+    "FR-FRC-09",
+    "TR-FRC-41"
+   ]
+  },
+  {
+   "id": "VC-FRC-15",
+   "quantity": "CalculiX *CRACK PROPAGATION shape factors and Richard K_eq (manual definitions)",
+   "value": {
+    "edge_s0": 1.12,
+    "edge_s1": 1.0976,
+    "subsurface": 0.636619772368,
+    "surface_pi_s0": 0.662084563262,
+    "surface_pi_s1": 1.36236631287,
+    "Keq_10_5_0": 12.6387580797
+   },
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "S9 CalculiX manual (git) + generator",
+   "grade": "B",
+   "proves": [
+    "FR-FRC-10",
+    "TR-FRC-21"
+   ]
+  },
+  {
+   "id": "VC-FRC-16",
+   "quantity": "CalculiX Paris-constant mapping: C = (da/dN)_ref / dK_ref^m -> dK_ref for (da/dN)_ref 1e-8 m",
+   "value": 10.0,
+   "unit": "MPa*m^0.5",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "S9 + generator",
+   "grade": "A",
+   "proves": [
+    "FR-FRC-10",
+    "TR-FRC-21"
+   ]
+  },
+  {
+   "id": "VC-FRC-17",
+   "quantity": "interaction-integral K_I on a centre-crack plate model (a 20 mm, W 200 mm, 100 MPa; plan drafted in M4)",
+   "value": 25.703174898,
+   "unit": "MPa*m^0.5",
+   "tolerance": {
+    "rel": 0.02
+   },
+   "source": "secant closed form (VC-FRC-01 formula)",
+   "grade": "A",
+   "proves": [
+    "FR-FRC-03",
+    "TR-FRC-20"
+   ],
+   "note": "FE value TBD — measure with the M3 interaction-integral post-processor"
+  },
+  {
+   "id": "VC-FRC-20",
+   "quantity": "agent-first result contract",
+   "value": {
+    "scatterUnset": {
+     "code": "FRC_SCATTER_FACTOR_UNSET",
+     "exit": 1
+    },
+    "kcUnverified": {
+     "flag": "unverified",
+     "check": "FRC_DATA_UNVERIFIED"
+    },
+    "reviewRequired": true,
+    "summaryContains": "not approved",
+    "acceptIntervalByAgent": {
+     "code": "FRC_HUMAN_GATE",
+     "exit": 1,
+     "documentUnchanged": true
+    },
+    "outsideValidity": {
+     "code": "FRC_K_SOLUTION_OUT_OF_RANGE"
+    },
+    "stale": {
+     "code": "FRC_RESULTS_STALE"
+    }
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0.0
+   },
+   "source": "AGENT_FIRST AF-11/31/32/33/34",
+   "grade": "A",
+   "proves": [
+    "FR-FRC-09",
+    "FR-FRC-11",
+    "FR-FRC-12",
+    "FR-FRC-13",
+    "TR-FRC-50"
+   ]
+  }
+ ]
+}

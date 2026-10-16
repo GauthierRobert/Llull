@@ -1,0 +1,62 @@
+[
+ {
+  "command": "define_load_history",
+  "params": {
+   "name": "e1049_fig6",
+   "kind": "stress",
+   "unit": "MPa",
+   "data": {
+    "form": "series",
+    "values": [
+     -2,
+     1,
+     -3,
+     5,
+     -1,
+     3,
+     -4,
+     4,
+     -2
+    ]
+   },
+   "repeats": "once",
+   "source": {
+    "citation": "ASTM E1049-85 Fig. 6 history as quoted by S2/S3 (unit values used as MPa)"
+   }
+  },
+  "as": "h"
+ },
+ {
+  "command": "count_cycles",
+  "params": {
+   "historyId": "$h",
+   "method": "rainflow_3pt",
+   "residue": "half_cycles"
+  }
+ },
+ {
+  "command": "count_cycles",
+  "params": {
+   "historyId": "$h",
+   "method": "rainflow_4pt",
+   "residue": "half_cycles"
+  }
+ },
+ {
+  "command": "count_cycles",
+  "params": {
+   "history": [
+    -2,
+    1,
+    -3,
+    5,
+    -1,
+    3,
+    -4,
+    4,
+    -2
+   ],
+   "method": "rainflow_repeating"
+  }
+ }
+]

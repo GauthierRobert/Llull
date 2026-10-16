@@ -1,0 +1,159 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    20,
+    20,
+    20
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "anchor": "center"
+  },
+  "as": "ground_box"
+ },
+ {
+  "command": "create_component",
+  "params": {
+   "name": "ground",
+   "entityIds": [
+    "$ground_box"
+   ],
+   "componentId": "comp_ground"
+  },
+  "as": "ground"
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    20,
+    20,
+    20
+   ],
+   "position": [
+    100,
+    0,
+    0
+   ],
+   "anchor": "center"
+  },
+  "as": "mass_box"
+ },
+ {
+  "command": "create_component",
+  "params": {
+   "name": "mass",
+   "entityIds": [
+    "$mass_box"
+   ],
+   "componentId": "comp_mass"
+  },
+  "as": "mass"
+ },
+ {
+  "command": "add_joint",
+  "params": {
+   "kind": "prismatic",
+   "a": {
+    "instanceId": "$ground"
+   },
+   "b": {
+    "instanceId": "$mass"
+   },
+   "axis": "x",
+   "id": "slide"
+  }
+ },
+ {
+  "command": "set_ground",
+  "params": {
+   "instanceIds": [
+    "$ground"
+   ]
+  }
+ },
+ {
+  "command": "set_body_properties",
+  "params": {
+   "instanceId": "$mass",
+   "mass": {
+    "massKg": 1.0,
+    "centroidMm": [
+     100,
+     0,
+     0
+    ],
+    "inertiaKgM2": [
+     [
+      0.0001,
+      0,
+      0
+     ],
+     [
+      0,
+      0.0001,
+      0
+     ],
+     [
+      0,
+      0,
+      0.0001
+     ]
+    ]
+   },
+   "source": {
+    "citation": "VC-RBD-30 test input"
+   }
+  }
+ },
+ {
+  "command": "add_spring_damper",
+  "params": {
+   "kind": "joint",
+   "jointId": "slide",
+   "stiffnessNPerM": 1000.0,
+   "dampingNsPerM": 2.0,
+   "freeValueMm": 0.0
+  }
+ },
+ {
+  "command": "set_gravity",
+  "params": {
+   "vectorMPerS2": "none"
+  }
+ },
+ {
+  "command": "set_initial_conditions",
+  "params": {
+   "jointValues": {
+    "slide": 10.0
+   },
+   "jointRates": {
+    "slide": 0.0
+   }
+  }
+ },
+ {
+  "command": "dynamics_study",
+  "params": {
+   "durationS": 1.0,
+   "outputStepS": 0.0005,
+   "outputs": {
+    "joints": [
+     "slide"
+    ]
+   }
+  }
+ }
+]

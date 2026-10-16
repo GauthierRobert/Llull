@@ -1,0 +1,896 @@
+{
+ "pack": "12-material-selection",
+ "generatedBy": "generate_selection_reference.py",
+ "indexDerivation": [
+  {
+   "case": "tie_stiffness",
+   "property": "E",
+   "exponent": 1.0,
+   "exponentMeasured": 1.00000000068,
+   "index": "E/rho"
+  },
+  {
+   "case": "tie_strength",
+   "property": "strength",
+   "exponent": 1.0,
+   "exponentMeasured": 0.999999999956,
+   "index": "sigma_f/rho"
+  },
+  {
+   "case": "beam_stiffness",
+   "property": "E",
+   "exponent": 0.5,
+   "exponentMeasured": 0.5,
+   "index": "E^(1/2)/rho"
+  },
+  {
+   "case": "beam_strength",
+   "property": "strength",
+   "exponent": 0.666666666667,
+   "exponentMeasured": 0.666666666667,
+   "index": "sigma_f^(2/3)/rho"
+  },
+  {
+   "case": "panel_stiffness",
+   "property": "E",
+   "exponent": 0.333333333333,
+   "exponentMeasured": 0.333333333333,
+   "index": "E^(1/3)/rho"
+  },
+  {
+   "case": "panel_strength",
+   "property": "strength",
+   "exponent": 0.5,
+   "exponentMeasured": 0.5,
+   "index": "sigma_f^(1/2)/rho"
+  },
+  {
+   "case": "column_buckling",
+   "property": "E",
+   "exponent": 0.5,
+   "exponentMeasured": 0.5,
+   "index": "E^(1/2)/rho"
+  }
+ ],
+ "synthetic": {
+  "beamStiffnessIndex": {
+   "syn_a": 4.18330013267,
+   "syn_b": 2.62202212043,
+   "syn_c": 1.76776695297,
+   "syn_d": 5.22912516584,
+   "syn_e": 3.09838667697
+  },
+  "beamStiffnessOrder": [
+   "syn_d",
+   "syn_a",
+   "syn_e",
+   "syn_b",
+   "syn_c"
+  ],
+  "constraintPassing": [
+   "syn_b",
+   "syn_c",
+   "syn_d"
+  ],
+  "relMassPerStiffness": {
+   "syn_a": 0.239045721867,
+   "syn_b": 0.381385035698,
+   "syn_c": 0.565685424949,
+   "syn_d": 0.191236577494,
+   "syn_e": 0.322748612184
+  },
+  "relCostPerStiffness": {
+   "syn_a": 0.956182887468,
+   "syn_b": 11.4415510709,
+   "syn_c": 0.565685424949,
+   "syn_d": 11.4741946496,
+   "syn_e": 1.61374306092
+  },
+  "paretoMassCost": [
+   "syn_a",
+   "syn_c",
+   "syn_d"
+  ],
+  "weightedScore": {
+   "syn_a": 0.772531713837,
+   "syn_b": 0.508243059148,
+   "syn_c": 0.320986457854,
+   "syn_d": 1.0,
+   "syn_e": 0.561290827745
+  },
+  "weightedOrder": [
+   "syn_d",
+   "syn_a",
+   "syn_e",
+   "syn_b",
+   "syn_c"
+  ]
+ },
+ "substitution": {
+  "syn_a_to_syn_b": {
+   "sameGeometryMassRatio": 2.0,
+   "sameGeometryStiffnessRatio": 1.57142857143,
+   "sameGeometryDeflectionRatio": 0.636363636364,
+   "equalStiffnessBeamMassRatio": 1.59544807043,
+   "equalStiffnessPanelMassRatio": 1.72027725507,
+   "equalStrengthTieMassRatio": 1.11111111111,
+   "marginFrom0p25": 1.25,
+   "modalFrequencyRatio": 0.886405260428,
+   "bucklingFactorRatio": 1.57142857143
+  },
+  "twoBar": {
+   "bothAluminiumN": [
+    666.666666667,
+    333.333333333
+   ],
+   "bothSteelN": [
+    666.666666667,
+    333.333333333
+   ],
+   "mixedN": [
+    857.142857143,
+    142.857142857
+   ]
+  }
+ },
+ "workedExample": {
+  "volumeCm3": 50.0,
+  "appliedMPa": 300,
+  "rows": {
+   "aa7075_t6": {
+    "inputStatus": [
+     "verified",
+     "verified",
+     "verified"
+    ],
+    "densityGcm3": 2.81,
+    "eGPa": 71.7,
+    "ftyMPa": 503.0,
+    "massG": 140.5,
+    "beamStiffnessIndex": 3.01337553452,
+    "panelStiffnessIndex": 1.47842761275,
+    "tieStrengthIndex": 179.003558719,
+    "msYield": 0.676666666667,
+    "unverified": true
+   },
+   "ti6al4v_annealed": {
+    "inputStatus": [
+     "verified",
+     "secondary",
+     "verified"
+    ],
+    "densityGcm3": 4.42878475363,
+    "eGPa": 113.8,
+    "ftyMPa": 868.739418939,
+    "massG": 221.439237682,
+    "beamStiffnessIndex": 2.40872132558,
+    "panelStiffnessIndex": 1.09419866523,
+    "tieStrengthIndex": 196.157516625,
+    "msYield": 1.89579806313,
+    "unverified": true,
+    "vs7075EqualStiffnessBeamMassRatio": 1.25102705013,
+    "vs7075SameGeometryMassRatio": 1.5760799835
+   },
+   "aisi4130_normalized": {
+    "inputStatus": [
+     "secondary",
+     "secondary",
+     "secondary"
+    ],
+    "densityGcm3": 7.8,
+    "eGPa": 190.0,
+    "ftyMPa": 440.0,
+    "massG": 390.0,
+    "beamStiffnessIndex": 1.76718573745,
+    "panelStiffnessIndex": 0.737038087044,
+    "tieStrengthIndex": 56.4102564103,
+    "msYield": 0.466666666667,
+    "unverified": true,
+    "vs7075EqualStiffnessBeamMassRatio": 1.70518325871,
+    "vs7075SameGeometryMassRatio": 2.77580071174
+   },
+   "cfrp_t300_5208_quasi_iso": {
+    "inputStatus": [
+     "tbd",
+     "derived",
+     "tbd"
+    ],
+    "densityGcm3": null,
+    "eGPa": 69.6757,
+    "ftyMPa": null,
+    "code": "SEL_PROPERTY_MISSING",
+    "missing": [
+     "density"
+    ],
+    "unverified": true
+   }
+  }
+ },
+ "cases": [
+  {
+   "id": "VC-SEL-01.1",
+   "quantity": "mass exponent n in m ~ rho/P^n, tie_stiffness (E/rho)",
+   "value": 1.0,
+   "unit": "-",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "derived (numerical min-mass, closed form per Ashby R1/R2)",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-01",
+    "TR-SEL-03"
+   ],
+   "measured": 1.00000000068
+  },
+  {
+   "id": "VC-SEL-01.2",
+   "quantity": "mass exponent n in m ~ rho/P^n, tie_strength (sigma_f/rho)",
+   "value": 1.0,
+   "unit": "-",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "derived (numerical min-mass, closed form per Ashby R1/R2)",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-01",
+    "TR-SEL-03"
+   ],
+   "measured": 0.999999999956
+  },
+  {
+   "id": "VC-SEL-01.3",
+   "quantity": "mass exponent n in m ~ rho/P^n, beam_stiffness (E^(1/2)/rho)",
+   "value": 0.5,
+   "unit": "-",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "derived (numerical min-mass, closed form per Ashby R1/R2)",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-01",
+    "TR-SEL-03"
+   ],
+   "measured": 0.5
+  },
+  {
+   "id": "VC-SEL-01.4",
+   "quantity": "mass exponent n in m ~ rho/P^n, beam_strength (sigma_f^(2/3)/rho)",
+   "value": 0.666666666667,
+   "unit": "-",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "derived (numerical min-mass, closed form per Ashby R1/R2)",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-01",
+    "TR-SEL-03"
+   ],
+   "measured": 0.666666666667
+  },
+  {
+   "id": "VC-SEL-01.5",
+   "quantity": "mass exponent n in m ~ rho/P^n, panel_stiffness (E^(1/3)/rho)",
+   "value": 0.333333333333,
+   "unit": "-",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "derived (numerical min-mass, closed form per Ashby R1/R2)",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-01",
+    "TR-SEL-03"
+   ],
+   "measured": 0.333333333333
+  },
+  {
+   "id": "VC-SEL-01.6",
+   "quantity": "mass exponent n in m ~ rho/P^n, panel_strength (sigma_f^(1/2)/rho)",
+   "value": 0.5,
+   "unit": "-",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "derived (numerical min-mass, closed form per Ashby R1/R2)",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-01",
+    "TR-SEL-03"
+   ],
+   "measured": 0.5
+  },
+  {
+   "id": "VC-SEL-01.7",
+   "quantity": "mass exponent n in m ~ rho/P^n, column_buckling (E^(1/2)/rho)",
+   "value": 0.5,
+   "unit": "-",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "derived (numerical min-mass, closed form per Ashby R1/R2)",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-01",
+    "TR-SEL-03"
+   ],
+   "measured": 0.5
+  },
+  {
+   "id": "VC-SEL-02.syn_a",
+   "quantity": "beam stiffness index E^(1/2)/rho of synthetic syn_a",
+   "value": 4.18330013267,
+   "unit": "GPa^(1/2)/(Mg/m^3)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (synthetic inputs)",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-01",
+    "FR-SEL-02"
+   ]
+  },
+  {
+   "id": "VC-SEL-02.syn_b",
+   "quantity": "beam stiffness index E^(1/2)/rho of synthetic syn_b",
+   "value": 2.62202212043,
+   "unit": "GPa^(1/2)/(Mg/m^3)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (synthetic inputs)",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-01",
+    "FR-SEL-02"
+   ]
+  },
+  {
+   "id": "VC-SEL-02.syn_c",
+   "quantity": "beam stiffness index E^(1/2)/rho of synthetic syn_c",
+   "value": 1.76776695297,
+   "unit": "GPa^(1/2)/(Mg/m^3)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (synthetic inputs)",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-01",
+    "FR-SEL-02"
+   ]
+  },
+  {
+   "id": "VC-SEL-02.syn_d",
+   "quantity": "beam stiffness index E^(1/2)/rho of synthetic syn_d",
+   "value": 5.22912516584,
+   "unit": "GPa^(1/2)/(Mg/m^3)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (synthetic inputs)",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-01",
+    "FR-SEL-02"
+   ]
+  },
+  {
+   "id": "VC-SEL-02.syn_e",
+   "quantity": "beam stiffness index E^(1/2)/rho of synthetic syn_e",
+   "value": 3.09838667697,
+   "unit": "GPa^(1/2)/(Mg/m^3)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (synthetic inputs)",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-01",
+    "FR-SEL-02"
+   ]
+  },
+  {
+   "id": "VC-SEL-03",
+   "quantity": "compare_materials order by beam stiffness index (synthetic)",
+   "value": [
+    "syn_d",
+    "syn_a",
+    "syn_e",
+    "syn_b",
+    "syn_c"
+   ],
+   "unit": "ids",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "derived",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-03",
+    "TR-SEL-05"
+   ]
+  },
+  {
+   "id": "VC-SEL-04",
+   "quantity": "ids passing strength >= 550 MPa and maxServiceTemp >= 110 C (synthetic)",
+   "value": [
+    "syn_b",
+    "syn_c",
+    "syn_d"
+   ],
+   "unit": "ids",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "derived",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-04"
+   ]
+  },
+  {
+   "id": "VC-SEL-05",
+   "quantity": "Pareto set, minimise (relative beam mass, relative beam cost) (synthetic)",
+   "value": [
+    "syn_a",
+    "syn_c",
+    "syn_d"
+   ],
+   "unit": "ids",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "derived",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-05",
+    "FR-SEL-14"
+   ],
+   "relMass": {
+    "syn_a": 0.239045721867,
+    "syn_b": 0.381385035698,
+    "syn_c": 0.565685424949,
+    "syn_d": 0.191236577494,
+    "syn_e": 0.322748612184
+   },
+   "relCost": {
+    "syn_a": 0.956182887468,
+    "syn_b": 11.4415510709,
+    "syn_c": 0.565685424949,
+    "syn_d": 11.4741946496,
+    "syn_e": 1.61374306092
+   }
+  },
+  {
+   "id": "VC-SEL-06",
+   "quantity": "weighted order 0.7 beam stiffness + 0.3 beam strength (synthetic)",
+   "value": [
+    "syn_d",
+    "syn_a",
+    "syn_e",
+    "syn_b",
+    "syn_c"
+   ],
+   "unit": "ids",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "derived",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-05"
+   ],
+   "scores": {
+    "syn_a": 0.772531713837,
+    "syn_b": 0.508243059148,
+    "syn_c": 0.320986457854,
+    "syn_d": 1.0,
+    "syn_e": 0.561290827745
+   }
+  },
+  {
+   "id": "VC-SEL-07.sameGeometryMassRatio",
+   "quantity": "syn_a -> syn_b sameGeometryMassRatio",
+   "value": 2.0,
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-07",
+    "TR-SEL-08"
+   ]
+  },
+  {
+   "id": "VC-SEL-07.sameGeometryStiffnessRatio",
+   "quantity": "syn_a -> syn_b sameGeometryStiffnessRatio",
+   "value": 1.57142857143,
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-07",
+    "TR-SEL-08"
+   ]
+  },
+  {
+   "id": "VC-SEL-07.sameGeometryDeflectionRatio",
+   "quantity": "syn_a -> syn_b sameGeometryDeflectionRatio",
+   "value": 0.636363636364,
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-07",
+    "TR-SEL-08"
+   ]
+  },
+  {
+   "id": "VC-SEL-07.equalStiffnessBeamMassRatio",
+   "quantity": "syn_a -> syn_b equalStiffnessBeamMassRatio",
+   "value": 1.59544807043,
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-07",
+    "TR-SEL-08"
+   ]
+  },
+  {
+   "id": "VC-SEL-07.equalStiffnessPanelMassRatio",
+   "quantity": "syn_a -> syn_b equalStiffnessPanelMassRatio",
+   "value": 1.72027725507,
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-07",
+    "TR-SEL-08"
+   ]
+  },
+  {
+   "id": "VC-SEL-07.equalStrengthTieMassRatio",
+   "quantity": "syn_a -> syn_b equalStrengthTieMassRatio",
+   "value": 1.11111111111,
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-07",
+    "TR-SEL-08"
+   ]
+  },
+  {
+   "id": "VC-SEL-07.modalFrequencyRatio",
+   "quantity": "syn_a -> syn_b modalFrequencyRatio",
+   "value": 0.886405260428,
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-07",
+    "TR-SEL-08"
+   ]
+  },
+  {
+   "id": "VC-SEL-07.bucklingFactorRatio",
+   "quantity": "syn_a -> syn_b bucklingFactorRatio",
+   "value": 1.57142857143,
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-07",
+    "TR-SEL-08"
+   ]
+  },
+  {
+   "id": "VC-SEL-08",
+   "quantity": "re-scaled yield margin syn_a (MS 0.25) -> syn_b, applied stress unchanged",
+   "value": 1.25,
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-08",
+    "TR-SEL-09"
+   ]
+  },
+  {
+   "id": "VC-SEL-09",
+   "quantity": "two-bar indeterminate forces (N): single material Al vs steel equal; mixed differs",
+   "value": {
+    "bothAluminium": [
+     666.666666667,
+     333.333333333
+    ],
+    "bothSteel": [
+     666.666666667,
+     333.333333333
+    ],
+    "mixed": [
+     857.142857143,
+     142.857142857
+    ]
+   },
+   "unit": "N",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived (k = E A / L load sharing)",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-09",
+    "TR-SEL-09"
+   ]
+  },
+  {
+   "id": "VC-SEL-10",
+   "quantity": "7075-T6 block mass from the substitution what-if (typical density 2.81)",
+   "value": 140.5,
+   "unit": "g",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "08 MAT S12 (typical) x analytic volume",
+   "grade": "B",
+   "proves": [
+    "FR-SEL-07",
+    "FR-SEL-11"
+   ],
+   "note": "typical density: result unverified (AF-32); 140.5 g in 08 VC-MAT-04 uses the same value"
+  },
+  {
+   "id": "VC-SEL-11",
+   "quantity": "Ti-6Al-4V block mass (supplier density 0.160 lb/in^3)",
+   "value": 221.439237682,
+   "unit": "g",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "08 MAT S15 + exact lb/in^3 conversion",
+   "grade": "B",
+   "proves": [
+    "FR-SEL-07",
+    "FR-SEL-11"
+   ]
+  },
+  {
+   "id": "VC-SEL-12",
+   "quantity": "Ti-6Al-4V vs 7075-T6 equal-stiffness beam mass ratio",
+   "value": 1.25102705013,
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "08 S12/S15 + S3 (E Ti secondary)",
+   "grade": "B",
+   "proves": [
+    "FR-SEL-07"
+   ]
+  },
+  {
+   "id": "VC-SEL-13",
+   "quantity": "4130 vs 7075-T6 equal-stiffness beam mass ratio",
+   "value": 1.70518325871,
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "08 S12 + S4 (secondary)",
+   "grade": "B",
+   "proves": [
+    "FR-SEL-07"
+   ]
+  },
+  {
+   "id": "VC-SEL-14",
+   "quantity": "CFRP quasi-iso row refused: density not sourced",
+   "value": "SEL_PROPERTY_MISSING",
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "selection_materials.json (density tbd)",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-10",
+    "TR-SEL-20"
+   ]
+  },
+  {
+   "id": "VC-SEL-15",
+   "quantity": "yield margins at 300 MPa applied (typical / secondary data)",
+   "value": {
+    "aa7075_t6": 0.676666666667,
+    "aisi4130_normalized": 0.466666666667,
+    "cfrp_t300_5208_quasi_iso": null,
+    "ti6al4v_annealed": 1.89579806313
+   },
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived from graded inputs",
+   "grade": "B",
+   "proves": [
+    "FR-SEL-08",
+    "FR-SEL-11"
+   ]
+  },
+  {
+   "id": "VC-SEL-16",
+   "quantity": "check_material_selection warning when a comparison mixes bases (worked example bases)",
+   "value": "SEL_BASIS_MIXED",
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "selection_materials.json basis fields",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-12",
+    "FR-SEL-17",
+    "FR-SEL-19"
+   ],
+   "bases": {
+    "aa7075_t6": [
+     "typical"
+    ],
+    "ti6al4v_annealed": [
+     "supplier_unstated",
+     "typical"
+    ],
+    "aisi4130_normalized": [
+     "typical"
+    ],
+    "cfrp_t300_5208_quasi_iso": [
+     "derived"
+    ]
+   }
+  },
+  {
+   "id": "VC-SEL-17",
+   "quantity": "CFRP compared through layup effective Ex: warning code and E used (GPa)",
+   "value": "SEL_ANISOTROPIC",
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "06 CMP clt_reference.json",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-15"
+   ],
+   "eUsedGPa": 69.6757
+  },
+  {
+   "id": "VC-SEL-18",
+   "quantity": "material_chart_data guide-line slope on log(E) vs log(rho) axes (= 1/n)",
+   "value": {
+    "tie_stiffness": 1.0,
+    "beam_stiffness": 2.0,
+    "panel_stiffness": 3.0,
+    "column_buckling": 2.0
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 1e-12
+   },
+   "source": "derived: P^n/rho = C  =>  log P = (1/n) log rho + const",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-18"
+   ]
+  },
+  {
+   "id": "VC-SEL-19",
+   "quantity": "user-defined index without derivationNote is refused",
+   "value": "SEL_DERIVATION_NOTE_MISSING",
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC TR-SEL-15",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-06"
+   ]
+  },
+  {
+   "id": "VC-SEL-20",
+   "quantity": "temperature outside a PHY-01 model range: material excluded with the PHY-01 code forwarded unchanged",
+   "value": {
+    "excludedCode": "PROP_OUT_OF_RANGE",
+    "imputed": false
+   },
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC TR-SEL-11",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-13"
+   ]
+  },
+  {
+   "id": "VC-SEL-21",
+   "quantity": "material differs from the released revision without an open ECO (check)",
+   "value": "SEL_SUBSTITUTION_RELEASED",
+   "unit": "code",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC §7.1; 09 PLM release lock",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-16",
+    "FR-SEL-17"
+   ]
+  },
+  {
+   "id": "VC-SEL-22",
+   "quantity": "named defaults in compare/substitute results",
+   "value": {
+    "weights": {
+     "value": [
+      0.5,
+      0.5
+     ],
+     "defaulted": true
+    },
+    "nuTolerance": {
+     "value": 0,
+     "defaulted": true
+    },
+    "yieldFactor": {
+     "value": 1.0,
+     "source": "05 FEA §5.8 default (derived from 14 CFR 25.305(a))",
+     "defaulted": true
+    }
+   },
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "AF-31; 05 FEA §5.8",
+   "grade": "A",
+   "proves": [
+    "FR-SEL-20"
+   ]
+  }
+ ]
+}

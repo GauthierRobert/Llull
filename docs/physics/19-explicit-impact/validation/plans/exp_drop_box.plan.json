@@ -1,0 +1,203 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    50,
+    50,
+    50
+   ],
+   "position": [
+    0,
+    0,
+    1200
+   ],
+   "anchor": "min"
+  },
+  "as": "box"
+ },
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "aluminium_like",
+   "name": "aluminium_like",
+   "designation": "test material E = 70000 MPa",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "aluminium_like",
+   "property": "E",
+   "value": 70000.0,
+   "unit": "MPa",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "aluminium_like",
+   "property": "nu",
+   "value": 0.33,
+   "unit": "-",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "aluminium_like",
+   "property": "density",
+   "value": 2.7,
+   "unit": "g/cm^3",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "create_material",
+  "params": {
+   "name": "aluminium_like",
+   "density": 0.0027,
+   "color": "#9aa0a6",
+   "metalness": 1,
+   "roughness": 0.4,
+   "recordId": "aluminium_like"
+  }
+ },
+ {
+  "command": "assign_material",
+  "params": {
+   "materialName": "aluminium_like",
+   "entityIds": [
+    "$box"
+   ]
+  }
+ },
+ {
+  "command": "create_analysis",
+  "params": {
+   "name": "box_drop",
+   "analysisType": "explicit_dynamics",
+   "unitSystem": "N-mm-t-s",
+   "solver": "opencourant"
+  },
+  "as": "an"
+ },
+ {
+  "command": "set_explicit_controls",
+  "params": {
+   "analysisId": "$an",
+   "endTime": {
+    "value": 0.5,
+    "unit": "s"
+   },
+   "animationInterval": {
+    "value": 0.01,
+    "unit": "s"
+   },
+   "historyInterval": {
+    "value": 0.001,
+    "unit": "s"
+   },
+   "massScaling": {
+    "mode": "none"
+   },
+   "precision": "double",
+   "gravity": {
+    "vector": [
+     0,
+     0,
+     -9806.65
+    ],
+    "unit": "mm/s^2"
+   }
+  }
+ },
+ {
+  "command": "set_part_idealization",
+  "params": {
+   "analysisId": "$an",
+   "entityId": "$box",
+   "idealization": "solid"
+  }
+ },
+ {
+  "command": "add_rigid_wall",
+  "params": {
+   "analysisId": "$an",
+   "name": "floor",
+   "point": [
+    0,
+    0,
+    0
+   ],
+   "normal": [
+    0,
+    0,
+    1
+   ],
+   "friction": 0.0
+  }
+ },
+ {
+  "command": "set_mesh_controls",
+  "params": {
+   "analysisId": "$an",
+   "mesher": "gmsh",
+   "elementFamily": "hex_dominant",
+   "order": 1,
+   "globalSize": 12.5
+  }
+ },
+ {
+  "command": "add_time_history",
+  "params": {
+   "analysisId": "$an",
+   "name": "floor_impulse",
+   "kind": "rigid_wall",
+   "target": "floor",
+   "quantities": [
+    "impulse_z",
+    "force_z"
+   ]
+  }
+ },
+ {
+  "command": "add_result_probe",
+  "params": {
+   "analysisId": "$an",
+   "name": "centre",
+   "point": [
+    25,
+    25,
+    1225
+   ],
+   "quantity": "v_z",
+   "history": true
+  }
+ }
+]

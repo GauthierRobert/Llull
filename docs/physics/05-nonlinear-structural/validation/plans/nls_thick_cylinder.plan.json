@@ -1,0 +1,328 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 200,
+   "height": 10,
+   "position": [
+    0,
+    0,
+    5
+   ]
+  },
+  "as": "outer"
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 100,
+   "height": 10,
+   "position": [
+    0,
+    0,
+    5
+   ]
+  },
+  "as": "inner"
+ },
+ {
+  "command": "boolean",
+  "params": {
+   "op": "subtract",
+   "a": "$outer",
+   "b": "$inner"
+  },
+  "as": "tube",
+  "_note": "today's boolean; the result id is bound by 'as' (AF-14 aliases)"
+ },
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "ep_cyl",
+   "name": "ep_cyl",
+   "designation": "test material",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "ep_cyl",
+   "property": "E",
+   "value": 207000.0,
+   "unit": "MPa",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "ep_cyl",
+   "property": "nu",
+   "value": 0.49,
+   "unit": "-",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "ep_cyl",
+   "property": "density",
+   "value": 7.8,
+   "unit": "g/cm^3",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "create_material",
+  "params": {
+   "name": "ep_cyl",
+   "density": 0.0078,
+   "color": "#9aa0a6",
+   "metalness": 1,
+   "roughness": 0.4,
+   "recordId": "ep_cyl"
+  }
+ },
+ {
+  "command": "add_material_model",
+  "params": {
+   "material": "ep_cyl",
+   "id": "el",
+   "model": {
+    "kind": "elastic_isotropic",
+    "E": {
+     "value": 207000.0,
+     "unit": "MPa"
+    },
+    "nu": {
+     "value": 0.49,
+     "unit": "1"
+    }
+   },
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   }
+  }
+ },
+ {
+  "command": "add_material_model",
+  "params": {
+   "material": "ep_cyl",
+   "id": "j2_perfect",
+   "model": {
+    "kind": "j2_plasticity",
+    "isotropic": {
+     "kind": "perfect",
+     "yieldStress": {
+      "value": 207.9,
+      "unit": "MPa"
+     }
+    },
+    "kinematic": {
+     "kind": "none"
+    }
+   },
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   }
+  }
+ },
+ {
+  "command": "define_constitutive_set",
+  "params": {
+   "material": "ep_cyl",
+   "set": {
+    "id": "ep",
+    "elastic": "el",
+    "plastic": "j2_perfect"
+   },
+   "makeDefault": true
+  }
+ },
+ {
+  "command": "assign_material",
+  "params": {
+   "materialName": "ep_cyl",
+   "entityIds": [
+    "$tube"
+   ]
+  }
+ },
+ {
+  "command": "create_analysis",
+  "params": {
+   "name": "thick_cylinder",
+   "analysisType": "nonlinear_static",
+   "unitSystem": "N-mm-t-s",
+   "solver": "calculix"
+  },
+  "as": "an"
+ },
+ {
+  "command": "set_part_idealization",
+  "params": {
+   "analysisId": "$an",
+   "entityId": "$tube",
+   "idealization": "solid"
+  }
+ },
+ {
+  "command": "set_part_constitutive_set",
+  "params": {
+   "analysisId": "$an",
+   "entityId": "$tube",
+   "constitutiveSetId": "ep"
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$an",
+   "name": "ends",
+   "kind": "symmetry",
+   "target": {
+    "entityId": "$tube",
+    "facesNear": [
+     [
+      150,
+      0,
+      0
+     ],
+     [
+      150,
+      0,
+      10
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$an",
+   "name": "rigid_body",
+   "kind": "displacement",
+   "dofs": {
+    "ux": 0
+   },
+   "target": {
+    "entityId": "$tube",
+    "pointsNear": [
+     [
+      0,
+      150,
+      5
+     ]
+    ]
+   }
+  },
+  "_note": "plus uy=0 at (150,0,5); rigid-body removal only"
+ },
+ {
+  "command": "add_fea_load",
+  "params": {
+   "analysisId": "$an",
+   "name": "p_in",
+   "kind": "pressure",
+   "loadCase": "LC1",
+   "category": "limit",
+   "target": {
+    "entityId": "$tube",
+    "facesNear": [
+     [
+      100,
+      0,
+      5
+     ]
+    ]
+   },
+   "magnitude": 1.0
+  }
+ },
+ {
+  "command": "set_nonlinear_controls",
+  "params": {
+   "analysisId": "$an",
+   "nlgeom": false,
+   "convergence": {
+    "name": "ccx_default"
+   },
+   "outputIncrements": "all"
+  }
+ },
+ {
+  "command": "add_analysis_step",
+  "params": {
+   "analysisId": "$an",
+   "name": "pressurise",
+   "multipliers": {
+    "LC1": 166.0
+   },
+   "amplitude": "ramp",
+   "control": {
+    "kind": "load",
+    "initialIncrement": 0.05,
+    "minIncrement": 1e-06,
+    "maxIncrement": 0.05,
+    "maxIncrements": 400
+   }
+  },
+  "_note": "load control to 166 MPa (just below p_c = 166.398); displacement-controlled variant reaches the plateau"
+ },
+ {
+  "command": "add_curve_probe",
+  "params": {
+   "analysisId": "$an",
+   "name": "bore",
+   "load": {
+    "kind": "load",
+    "loadId": "p_in"
+   },
+   "displacement": {
+    "point": [
+     100,
+     0,
+     5
+    ],
+    "dof": "ux"
+   }
+  }
+ },
+ {
+  "command": "set_mesh_controls",
+  "params": {
+   "analysisId": "$an",
+   "mesher": "gmsh",
+   "elementFamily": "tet",
+   "order": 2,
+   "globalSize": 5.0
+  }
+ }
+]

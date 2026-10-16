@@ -1,0 +1,133 @@
+{
+ "format": "llull-physics-reference-data",
+ "pack": "01-property-models",
+ "title": "NIST cryogenic material property curve fits (subset) as transcribed by independent open-source projects",
+ "accessed": "2026-10-15",
+ "primary": "NIST Cryogenics Technologies Group, Material Properties index — https://trc.nist.gov/cryogenics/materials/materialproperties.htm (NOT fetched: host blocked from the authoring sandbox; see sources.md S1)",
+ "licence": "NIST data: US Government work (public domain in the US). Transcriptions are only used to cross-check coefficient digits; no code is copied.",
+ "transcriptions": {
+  "T1": "circuitqed/cryocalc — cryocalc/data/materials.json — https://raw.githubusercontent.com/circuitqed/cryocalc/HEAD/cryocalc/data/materials.json",
+  "T2": "Krataios14/spacemat — src/spacemat/data/nist_fits.json — https://raw.githubusercontent.com/Krataios14/spacemat/HEAD/src/spacemat/data/nist_fits.json",
+  "T3": "amccaugh/cryoheatflow — cryoheatflow/conductivity.py — https://raw.githubusercontent.com/amccaugh/cryoheatflow/HEAD/cryoheatflow/conductivity.py",
+  "T4": "ipmu-lab/ipmucmblab_genlib — lib_materialproperties/data/*_NIST_*.txt — https://raw.githubusercontent.com/ipmu-lab/ipmucmblab_genlib/HEAD/lib_materialproperties/data/"
+ },
+ "forms": {
+  "log10Polynomial": "log10(y) = sum_{k=0..8} c_k * (log10 T)^k, c = [a, b, c, d, e, f, g, h, i], T in K",
+  "nistRational": "log10(y) = (a + c*T^0.5 + e*T + g*T^1.5 + i*T^2) / (1 + b*T^0.5 + d*T + f*T^1.5 + h*T^2), T in K",
+  "polynomial": "y = sum_{k=0..4} c_k * T^k, T in K",
+  "thermalStrainNist": "y = (L - L293)/L293 * 1e5 = a + b*T + c*T^2 + d*T^3 + e*T^4 for T >= tLow, y = belowValue for T < tLow"
+ },
+ "fits": [
+  {
+   "id": "aa6061_t6.k", "material": "6061-T6 aluminium (UNS A96061)", "property": "k", "unit": "W/(m*K)",
+   "form": "log10Polynomial",
+   "coefficients": [0.07918, 1.0957, -0.07277, 0.08084, 0.02803, -0.09464, 0.04179, -0.00571, 0.0],
+   "dataRangeK": [4, 300], "equationRangeK": [1, 300], "fitErrorPercent": 0.5,
+   "page": "https://trc.nist.gov/cryogenics/materials/6061%20Aluminum/6061_T6Aluminum_rev.htm",
+   "agreeIn": ["T1", "T2", "T3", "T4"], "rangeSource": "search extract of the NIST page (data 4-300, equation 1-300, error 0.5 %)", "grade": "A"
+  },
+  {
+   "id": "aa6061_t6.cp", "material": "6061-T6 aluminium (UNS A96061)", "property": "cp", "unit": "J/(kg*K)",
+   "form": "log10Polynomial",
+   "coefficients": [46.6467, -314.292, 866.662, -1298.3, 1162.27, -637.795, 210.351, -38.3094, 2.96344],
+   "dataRangeK": [4, 300], "equationRangeK": [4, 300], "fitErrorPercent": 5,
+   "page": "https://trc.nist.gov/cryogenics/materials/6061%20Aluminum/6061_T6Aluminum_rev.htm",
+   "agreeIn": ["T1", "T2", "T4"], "rangeSource": "search extract (data 4-300, error 5 %); equation range taken equal to data range (T1, T2)", "grade": "A"
+  },
+  {
+   "id": "aa6061_t6.E", "material": "6061-T6 aluminium (UNS A96061)", "property": "E", "unit": "GPa",
+   "form": "polynomial",
+   "coefficients": [77.71221, 0.01030646, -0.00029241, 8.9936e-07, -1.0709e-09],
+   "dataRangeK": null, "equationRangeK": null, "fitErrorPercent": 1,
+   "rangeConflict": "T1 gives [0, 299]; T2 gives equation [2, 295] and data [0, 299]. Range TBD until the NIST page is read; VCs only evaluate inside [4, 295].",
+   "page": "https://trc.nist.gov/cryogenics/materials/6061%20Aluminum/6061_T6Aluminum_rev.htm",
+   "agreeIn": ["T1", "T2"], "rangeSource": "error 1 % from search extract", "grade": "A (coefficients) / TBD (range)"
+  },
+  {
+   "id": "aa6061_t6.thermalStrain", "material": "6061-T6 aluminium (UNS A96061)", "property": "thermalStrain", "unit": "1e-5",
+   "form": "thermalStrainNist",
+   "coefficients": [-412.77, -0.30389, 0.0087696, -9.9821e-06, 0.0], "tLowK": 18, "belowValue": -415.45,
+   "dataRangeK": [4, 300], "equationRangeK": [4, 300], "fitErrorPercent": 4,
+   "page": "https://trc.nist.gov/cryogenics/materials/6061%20Aluminum/6061_T6Aluminum_rev.htm",
+   "agreeIn": ["T1", "T2"], "rangeSource": "tLow/belowValue from T2 only (T1 omits them); error 4 % from search extract", "grade": "A (coefficients) / B (tLow, belowValue)"
+  },
+  {
+   "id": "ss304.k", "material": "304 stainless steel (UNS S30400)", "property": "k", "unit": "W/(m*K)",
+   "form": "log10Polynomial",
+   "coefficients": [-1.4087, 1.3982, 0.2543, -0.626, 0.2334, 0.4256, -0.4658, 0.165, -0.0199],
+   "dataRangeK": [4, 300], "equationRangeK": [1, 300], "fitErrorPercent": 2,
+   "page": "https://trc.nist.gov/cryogenics/materials/304Stainless/304Stainless_rev.htm",
+   "agreeIn": ["T1", "T2", "T3"], "rangeSource": "search extract (data 4-300, equation 1-300, error 2 %)", "grade": "A"
+  },
+  {
+   "id": "ss304.cp", "material": "304 stainless steel (UNS S30400)", "property": "cp", "unit": "J/(kg*K)",
+   "form": "log10Polynomial",
+   "coefficients": [22.0061, -127.5528, 303.647, -381.0098, 274.0328, -112.9212, 24.7593, -2.239153, 0.0],
+   "dataRangeK": [4, 300], "equationRangeK": [4, 300], "fitErrorPercent": 5,
+   "page": "https://trc.nist.gov/cryogenics/materials/304Stainless/304Stainless_rev.htm",
+   "agreeIn": ["T1", "T2"], "rangeSource": "search extract (data 4-300, error 5 %)", "grade": "A"
+  },
+  {
+   "id": "ss304.E", "material": "304 stainless steel (UNS S30400)", "property": "E", "unit": "GPa",
+   "form": "piecewise",
+   "segments": [
+    {"rangeK": [5, 57], "form": "polynomial", "coefficients": [209.8145, 0.1217019, -0.01146999, 0.000360543, -3.0179e-06], "agreeIn": ["T1"]},
+    {"rangeK": [57, 293], "form": "polynomial", "coefficients": [210.0593, 0.1534883, -0.00161739, 5.11706e-06, -6.1546e-09], "agreeIn": ["T1", "T2"]}
+   ],
+   "dataRangeK": [5, 293], "equationRangeK": [5, 293], "fitErrorPercent": null,
+   "page": "https://trc.nist.gov/cryogenics/materials/304Stainless/304Stainless_rev.htm",
+   "rangeSource": "T1 (segment split at 57 K); T2 gives the high segment with equation range [57, 293]", "grade": "B (low segment, one transcription) / A (high segment coefficients)"
+  },
+  {
+   "id": "ti6al4v.k", "material": "Ti-6Al-4V (UNS R56400)", "property": "k", "unit": "W/(m*K)",
+   "form": "log10Polynomial",
+   "coefficients": [-5107.8774, 19240.422, -30789.064, 27134.756, -14226.379, 4438.2154, -763.07767, 55.796592, 0.0],
+   "dataRangeK": [23, 300], "equationRangeK": [20, 300], "fitErrorPercent": 2,
+   "page": "https://trc.nist.gov/cryogenics/materials/Ti6Al4V/Ti6Al4V_rev.htm",
+   "agreeIn": ["T1", "T2"], "rangeSource": "search extract (data 23-300, equation 20-300, error 2 %)", "grade": "A"
+  },
+  {
+   "id": "g10cr.k.normal", "material": "G-10CR fiberglass epoxy, normal direction", "property": "k", "unit": "W/(m*K)",
+   "form": "log10Polynomial",
+   "coefficients": [-4.1236, 13.788, -26.068, 26.272, -14.663, 4.4954, -0.6905, 0.0397, 0.0],
+   "dataRangeK": [4, 300], "equationRangeK": null, "fitErrorPercent": null,
+   "rangeConflict": "T1 gives [4, 300]; T2 gives equation [10, 300]. Error TBD. VCs only evaluate inside [10, 300].",
+   "page": "https://trc.nist.gov/cryogenics/materials/G-10%20CR%20Fiberglass%20Epoxy/G10CRFiberglassEpoxy_rev.htm",
+   "agreeIn": ["T1", "T2", "T3"], "rangeSource": "transcriptions only", "grade": "A (coefficients) / TBD (range, error)"
+  },
+  {
+   "id": "cu_ofhc.k.rrr50", "material": "OFHC copper, RRR = 50", "property": "k", "unit": "W/(m*K)",
+   "form": "nistRational",
+   "coefficients": [1.8743, -0.41538, -0.6018, 0.13294, 0.26426, -0.0219, -0.051276, 0.0014871, 0.003723],
+   "dataRangeK": [4, 300], "equationRangeK": [4, 300], "fitErrorPercent": null,
+   "condition": {"rrr": 50},
+   "page": "https://trc.nist.gov/cryogenics/materials/OFHC%20Copper/OFHC_Copper_rev1.htm",
+   "agreeIn": ["T1", "T3", "T4"], "rangeSource": "transcriptions (T1, T3: 4-300 K); error TBD", "grade": "A (coefficients) / B (range) / TBD (error)"
+  },
+  {
+   "id": "cu_ofhc.k.rrr100", "material": "OFHC copper, RRR = 100", "property": "k", "unit": "W/(m*K)",
+   "form": "nistRational",
+   "coefficients": [2.2154, -0.47461, -0.88068, 0.13871, 0.29505, -0.02043, -0.04831, 0.001281, 0.003207],
+   "dataRangeK": [4, 300], "equationRangeK": [4, 300], "fitErrorPercent": null,
+   "condition": {"rrr": 100},
+   "page": "https://trc.nist.gov/cryogenics/materials/OFHC%20Copper/OFHC_Copper_rev1.htm",
+   "agreeIn": ["T1", "T3", "T4"], "rangeSource": "transcriptions (T1, T3: 4-300 K); error TBD", "grade": "A (coefficients) / B (range) / TBD (error)"
+  },
+  {
+   "id": "invar36.thermalStrain.T1", "material": "Invar 36", "property": "thermalStrain", "unit": "1e-5",
+   "form": "thermalStrainNist",
+   "coefficients": [-52.65, 0.1009, 0.0008395, -1.973e-06, 9.794e-11], "tLowK": null, "belowValue": null,
+   "dataRangeK": [80, 300], "equationRangeK": [80, 300], "fitErrorPercent": null,
+   "page": "https://trc.nist.gov/cryogenics/materials/Invar%20(Fe-36Ni)/Invar_rev.htm",
+   "agreeIn": ["T1"], "conflictWith": "invar36.thermalStrain.T2", "rangeSource": "T1", "grade": "C (transcriptions disagree on e)"
+  },
+  {
+   "id": "invar36.thermalStrain.T2", "material": "Invar 36", "property": "thermalStrain", "unit": "1e-5",
+   "form": "thermalStrainNist",
+   "coefficients": [-52.65, 0.1009, 0.0008395, -1.973e-06, 8.794e-11], "tLowK": 80, "belowValue": -40.0,
+   "dataRangeK": [80, 300], "equationRangeK": [80, 300], "fitErrorPercent": null,
+   "page": "https://trc.nist.gov/cryogenics/materials/Invar%20(Fe-36Ni)/Invar_rev.htm",
+   "agreeIn": ["T2"], "conflictWith": "invar36.thermalStrain.T1", "rangeSource": "T2", "grade": "C (transcriptions disagree on e)"
+  }
+ ]
+}

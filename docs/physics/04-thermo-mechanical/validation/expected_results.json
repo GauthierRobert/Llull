@@ -1,0 +1,857 @@
+{
+ "pack": "04-thermo-mechanical",
+ "generatedBy": "generate_thermomech_reference.py",
+ "cases": [
+  {
+   "id": "VC-TMC-01.a",
+   "quantity": "fully restrained bar (uniaxial), axial stress",
+   "value": -252.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.005
+   },
+   "source": "generator (S9 formula)",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-01",
+    "FR-TMC-03",
+    "TR-TMC-11"
+   ],
+   "inputs": {
+    "E_MPa": 210000.0,
+    "nu": 0.3,
+    "alpha_per_K": 1.2e-05,
+    "dT_K": 100.0
+   },
+   "derivation": "s = -E alpha dT"
+  },
+  {
+   "id": "VC-TMC-01.b",
+   "quantity": "edge-restrained plate (biaxial), in-plane stress",
+   "value": -360.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.005
+   },
+   "source": "generator (S9 formula)",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-01",
+    "TR-TMC-11"
+   ],
+   "inputs": {
+    "E_MPa": 210000.0,
+    "nu": 0.3,
+    "alpha_per_K": 1.2e-05,
+    "dT_K": 100.0
+   },
+   "derivation": "s = -E alpha dT / (1 - nu)"
+  },
+  {
+   "id": "VC-TMC-01.c",
+   "quantity": "fully restrained block (triaxial), hydrostatic stress",
+   "value": -630.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.005
+   },
+   "source": "generator (S9 formula)",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-01",
+    "TR-TMC-11"
+   ],
+   "inputs": {
+    "E_MPa": 210000.0,
+    "nu": 0.3,
+    "alpha_per_K": 1.2e-05,
+    "dT_K": 100.0
+   },
+   "derivation": "s = -E alpha dT / (1 - 2 nu)"
+  },
+  {
+   "id": "VC-TMC-02",
+   "quantity": "NAFEMS LE11: sigma_zz at point A",
+   "value": -105.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.03
+   },
+   "source": "S1 (Abaqus LE11) + S2 (Altair OS-V:0070) + S3 (FeenoX -105.041, git)",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-01",
+    "FR-TMC-02",
+    "TR-TMC-10",
+    "TR-TMC-12"
+   ],
+   "inputs": {
+    "E_MPa": 210000.0,
+    "nu": 0.3,
+    "alpha_per_degC": 0.00023,
+    "temperature": "T(x, y, z) = sqrt(x^2 + y^2) + z  [degC, x y z in m]",
+    "pointA_m": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "geometry": "FeenoX examples/nafems-le11.geo (pinned in sources.md)",
+    "referenceTemperature_degC": 0.0
+   },
+   "quotedBySource": {
+    "FeenoX_hex27": -104.8,
+    "FeenoX_tet10": -105.9,
+    "FeenoX_doc": -105.041,
+    "Abaqus_C3D20_fine": -103.3
+   },
+   "note": "the temperature field is prescribed analytically (thermo_static with a field expression or a PHY-03 result); stress-free reference 0 degC"
+  },
+  {
+   "id": "VC-TMC-03.a",
+   "quantity": "NAFEMS T1: hoop stress just outside the hot disc (r -> a+)",
+   "value": 50.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.02
+   },
+   "source": "generator (inclusion closed form, S9) + S3 (FeenoX test answer 50)",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-01",
+    "FR-TMC-04",
+    "TR-TMC-11"
+   ],
+   "inputs": {
+    "E_MPa": 100000.0,
+    "nu": 0.3,
+    "alpha_hot_per_K": 0.001,
+    "alpha_bulk_per_K": 0.0,
+    "dT_K": 1.0,
+    "a_mm": 1.0,
+    "plate_halfwidth_mm": 10.0,
+    "probe_mm": [
+     1.005,
+     0.0
+    ]
+   },
+   "derivation": "st(a+) = E alpha dT / 2 (same E and nu inside and outside; infinite plate)"
+  },
+  {
+   "id": "VC-TMC-03.b",
+   "quantity": "NAFEMS T1: sigma_y at the FeenoX probe (1.005, 0) mm",
+   "value": 49.5037251553,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.02
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-04"
+   ],
+   "inputs": {
+    "E_MPa": 100000.0,
+    "nu": 0.3,
+    "alpha_hot_per_K": 0.001,
+    "alpha_bulk_per_K": 0.0,
+    "dT_K": 1.0,
+    "a_mm": 1.0,
+    "plate_halfwidth_mm": 10.0,
+    "probe_mm": [
+     1.005,
+     0.0
+    ]
+   },
+   "derivation": "st(r) = E alpha dT a^2 / (2 r^2)",
+   "note": "finite 20 x 20 mm plate: the (a/W)^2 correction is below 1 %; FeenoX accepts 50 +/- 0.1"
+  },
+  {
+   "id": "VC-TMC-03.c",
+   "quantity": "NAFEMS T1: stress inside the hot disc",
+   "value": -50.0,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.02
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-04"
+   ],
+   "inputs": {
+    "E_MPa": 100000.0,
+    "nu": 0.3,
+    "alpha_hot_per_K": 0.001,
+    "alpha_bulk_per_K": 0.0,
+    "dT_K": 1.0,
+    "a_mm": 1.0,
+    "plate_halfwidth_mm": 10.0,
+    "probe_mm": [
+     1.005,
+     0.0
+    ]
+   },
+   "derivation": "sr = st = -E alpha dT / 2"
+  },
+  {
+   "id": "VC-TMC-04.a",
+   "quantity": "bimetal strip curvature (Timoshenko 1925)",
+   "value": 0.00101818181818,
+   "unit": "1/mm",
+   "tolerance": {
+    "rel": 0.02
+   },
+   "source": "generator (S4 closed form) + independent equilibrium solve",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-05",
+    "TR-TMC-13"
+   ],
+   "inputs": {
+    "t1_mm": 0.5,
+    "t2_mm": 0.5,
+    "E1_MPa": 200000.0,
+    "E2_MPa": 100000.0,
+    "alpha1_per_K": 1.2e-05,
+    "alpha2_per_K": 1.9e-05,
+    "dT_K": 100.0,
+    "L_mm": 50.0
+   },
+   "equilibriumSolve": 0.00101818181818,
+   "derivation": "1/rho = 6 (a2 - a1) dT (1+m)^2 / (h [3 (1+m)^2 + (1+mn)(m^2 + 1/(mn))])"
+  },
+  {
+   "id": "VC-TMC-04.b",
+   "quantity": "bimetal cantilever tip deflection",
+   "value": 1.27272727273,
+   "unit": "mm",
+   "tolerance": {
+    "rel": 0.03
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-05",
+    "FR-TMC-08"
+   ],
+   "inputs": {
+    "t1_mm": 0.5,
+    "t2_mm": 0.5,
+    "E1_MPa": 200000.0,
+    "E2_MPa": 100000.0,
+    "alpha1_per_K": 1.2e-05,
+    "alpha2_per_K": 1.9e-05,
+    "dT_K": 100.0,
+    "L_mm": 50.0
+   },
+   "derivation": "w = kappa L^2 / 2 (small deflection)"
+  },
+  {
+   "id": "VC-TMC-05.a",
+   "quantity": "thick cylinder, radial gradient: hoop stress at the bore",
+   "value": -209.823707276,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.02
+   },
+   "source": "generator (integral form + T&G log form + Simpson quadrature, S9)",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-06",
+    "TR-TMC-14"
+   ],
+   "inputs": {
+    "a_mm": 10.0,
+    "b_mm": 20.0,
+    "Ta_minus_Tb_K": 100.0,
+    "E_MPa": 200000.0,
+    "nu": 0.3,
+    "alpha_per_K": 1.2e-05,
+    "ends": "free (generalised plane strain)"
+   },
+   "crossChecks": {
+    "classicLogForm": -209.823707276,
+    "quadrature": -209.823707276
+   }
+  },
+  {
+   "id": "VC-TMC-05.b",
+   "quantity": "thick cylinder, radial gradient: hoop stress at the outer surface",
+   "value": 133.033435581,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.02
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-06",
+    "TR-TMC-14"
+   ],
+   "inputs": {
+    "a_mm": 10.0,
+    "b_mm": 20.0,
+    "Ta_minus_Tb_K": 100.0,
+    "E_MPa": 200000.0,
+    "nu": 0.3,
+    "alpha_per_K": 1.2e-05,
+    "ends": "free (generalised plane strain)"
+   },
+   "crossChecks": {
+    "classicLogForm": 133.033435581,
+    "quadrature": 133.033435581
+   }
+  },
+  {
+   "id": "VC-TMC-05.c",
+   "quantity": "thick cylinder, radial gradient: axial stress at the bore (free ends)",
+   "value": -209.823707276,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.02
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-06",
+    "TR-TMC-14"
+   ],
+   "inputs": {
+    "a_mm": 10.0,
+    "b_mm": 20.0,
+    "Ta_minus_Tb_K": 100.0,
+    "E_MPa": 200000.0,
+    "nu": 0.3,
+    "alpha_per_K": 1.2e-05,
+    "ends": "free (generalised plane strain)"
+   },
+   "crossChecks": {
+    "classicLogForm": -209.823707276
+   },
+   "note": "sz = sr + st holds for this field; the FE model uses free ends with a uniform axial strain (generalised plane strain) or a long solid with the mid-length section probed"
+  },
+  {
+   "id": "VC-TMC-06.a",
+   "quantity": "Al housing / steel shaft, H7/g6 20 mm, minimum clearance at -55 degC",
+   "value": -0.0102560375,
+   "unit": "mm",
+   "tolerance": {
+    "abs": 1e-07
+   },
+   "source": "generator (S9 linear expansion) with S5 limits",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-07",
+    "TR-TMC-20"
+   ],
+   "inputs": {
+    "nominal_mm": 20.0,
+    "hole_limits_mm": [
+     0.0,
+     0.021
+    ],
+    "shaft_limits_mm": [
+     -0.02,
+     -0.007
+    ],
+    "fitCode": "H7/g6 (code text only)",
+    "specTemperature_degC": 20.0,
+    "alpha_note": "secant CTEs relative to 20 degC are test inputs (Al 23e-6, steel 11.5e-6, Ti 8.6e-6, CFRP 2e-6 /K), not material claims",
+    "pair": "aluminium_housing_steel_shaft",
+    "T_degC": -55.0
+   },
+   "expectedStatus": "interference_possible",
+   "code": "TMC_FIT_INTERFERENCE"
+  },
+  {
+   "id": "VC-TMC-06.b",
+   "quantity": "Al housing / steel shaft, H7/g6 20 mm, maximum clearance at +85 degC",
+   "value": 0.055996345,
+   "unit": "mm",
+   "tolerance": {
+    "abs": 1e-07
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-07",
+    "TR-TMC-20"
+   ],
+   "inputs": {
+    "nominal_mm": 20.0,
+    "hole_limits_mm": [
+     0.0,
+     0.021
+    ],
+    "shaft_limits_mm": [
+     -0.02,
+     -0.007
+    ],
+    "fitCode": "H7/g6 (code text only)",
+    "specTemperature_degC": 20.0,
+    "alpha_note": "secant CTEs relative to 20 degC are test inputs (Al 23e-6, steel 11.5e-6, Ti 8.6e-6, CFRP 2e-6 /K), not material claims",
+    "pair": "aluminium_housing_steel_shaft",
+    "T_degC": 85.0
+   },
+   "expectedStatus": "clearance"
+  },
+  {
+   "id": "VC-TMC-06.c",
+   "quantity": "steel housing / Al shaft, H7/g6 20 mm, minimum clearance at +85 degC",
+   "value": -0.007939535,
+   "unit": "mm",
+   "tolerance": {
+    "abs": 1e-07
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-07",
+    "TR-TMC-20"
+   ],
+   "inputs": {
+    "nominal_mm": 20.0,
+    "hole_limits_mm": [
+     0.0,
+     0.021
+    ],
+    "shaft_limits_mm": [
+     -0.02,
+     -0.007
+    ],
+    "fitCode": "H7/g6 (code text only)",
+    "specTemperature_degC": 20.0,
+    "alpha_note": "secant CTEs relative to 20 degC are test inputs (Al 23e-6, steel 11.5e-6, Ti 8.6e-6, CFRP 2e-6 /K), not material claims",
+    "pair": "steel_housing_aluminium_shaft",
+    "T_degC": 85.0
+   },
+   "expectedStatus": "interference_possible",
+   "code": "TMC_FIT_INTERFERENCE"
+  },
+  {
+   "id": "VC-TMC-06.d",
+   "quantity": "20 degC limits reproduce the ISO 286 H7/g6 clearance range 7-41 um",
+   "value": [
+    0.007,
+    0.041
+   ],
+   "unit": "mm",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "S5 (H7 +21/0 and the 7-41 um range quoted; g6 -7/-20 um consistent)",
+   "grade": "B",
+   "proves": [
+    "FR-TMC-07",
+    "TR-TMC-20"
+   ],
+   "inputs": {
+    "nominal_mm": 20.0,
+    "hole_limits_mm": [
+     0.0,
+     0.021
+    ],
+    "shaft_limits_mm": [
+     -0.02,
+     -0.007
+    ],
+    "fitCode": "H7/g6 (code text only)",
+    "specTemperature_degC": 20.0,
+    "alpha_note": "secant CTEs relative to 20 degC are test inputs (Al 23e-6, steel 11.5e-6, Ti 8.6e-6, CFRP 2e-6 /K), not material claims"
+   },
+   "note": "grade B: g6 deviations for 18-30 mm were not quoted directly by any reached source; they are test inputs here"
+  },
+  {
+   "id": "VC-TMC-07.a",
+   "quantity": "secant CTE at 120 degC, reference 20 degC (CalculiX ZERO=20)",
+   "value": 2.25e-05,
+   "unit": "1/K",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator (S7 definition)",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-09",
+    "TR-TMC-15"
+   ],
+   "inputs": {
+    "alpha0_per_K": 2.2e-05,
+    "alpha1_per_K2": 1e-08,
+    "law": "alpha_inst(T) = alpha0 + alpha1 (T - 20)",
+    "Tref_degC": 20.0,
+    "T_degC": 120.0
+   },
+   "derivation": "a_sec = (1/(T - Tref)) int_Tref^T a_inst; closed form a0 + a1 (T - 20)/2"
+  },
+  {
+   "id": "VC-TMC-07.b",
+   "quantity": "secant CTE at 120 degC re-referenced to 0 degC (CalculiX ZERO=0)",
+   "value": 2.24e-05,
+   "unit": "1/K",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator (S7 definition)",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-09",
+    "TR-TMC-15"
+   ],
+   "inputs": {
+    "alpha0_per_K": 2.2e-05,
+    "alpha1_per_K2": 1e-08,
+    "law": "alpha_inst(T) = alpha0 + alpha1 (T - 20)",
+    "Tref_degC": 20.0,
+    "T_degC": 120.0
+   },
+   "derivation": "a_sec(T; 0) = (1/T) int_0^T a_inst"
+  },
+  {
+   "id": "VC-TMC-07.c",
+   "quantity": "thermal strain from 20 to 120 degC (identical for both references)",
+   "value": 0.00225,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator (S7 strain formula)",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-09",
+    "TR-TMC-15"
+   ],
+   "inputs": {
+    "alpha0_per_K": 2.2e-05,
+    "alpha1_per_K2": 1e-08,
+    "law": "alpha_inst(T) = alpha0 + alpha1 (T - 20)",
+    "Tref_degC": 20.0,
+    "T_degC": 120.0
+   },
+   "derivation": "e_th = a(T)(T - Tref) - a(T0)(T0 - Tref) with T0 = 20; with ZERO=0: a_sec(120;0) 120 - a_sec(20;0) 20",
+   "check_ref0": 0.00225
+  },
+  {
+   "id": "VC-TMC-08.a",
+   "quantity": "beam with a linear through-thickness gradient: curvature",
+   "value": 9.2e-05,
+   "unit": "1/mm",
+   "tolerance": {
+    "rel": 0.01
+   },
+   "source": "generator (S9)",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-08",
+    "TR-TMC-16"
+   ],
+   "inputs": {
+    "alpha_per_K": 2.3e-05,
+    "dT_through_thickness_K": 20.0,
+    "h_mm": 5.0,
+    "L_mm": 500.0
+   },
+   "derivation": "kappa = alpha dT / h"
+  },
+  {
+   "id": "VC-TMC-08.b",
+   "quantity": "simply supported span: mid-span thermal bow",
+   "value": 2.875,
+   "unit": "mm",
+   "tolerance": {
+    "rel": 0.02
+   },
+   "source": "generator (S9)",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-08",
+    "TR-TMC-16"
+   ],
+   "inputs": {
+    "alpha_per_K": 2.3e-05,
+    "dT_through_thickness_K": 20.0,
+    "h_mm": 5.0,
+    "L_mm": 500.0
+   },
+   "derivation": "w = kappa L^2 / 8"
+  },
+  {
+   "id": "VC-TMC-08.c",
+   "quantity": "cantilever: tip thermal deflection",
+   "value": 11.5,
+   "unit": "mm",
+   "tolerance": {
+    "rel": 0.02
+   },
+   "source": "generator (S9)",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-08",
+    "TR-TMC-16"
+   ],
+   "inputs": {
+    "alpha_per_K": 2.3e-05,
+    "dT_through_thickness_K": 20.0,
+    "h_mm": 5.0,
+    "L_mm": 500.0
+   },
+   "derivation": "w = kappa L^2 / 2"
+  },
+  {
+   "id": "VC-TMC-08.d",
+   "quantity": "statically determinate beam with a linear gradient: thermal stress",
+   "value": 0.0,
+   "unit": "MPa",
+   "tolerance": {
+    "abs": 0.5
+   },
+   "source": "generator (S9)",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-08"
+   ],
+   "inputs": {
+    "alpha_per_K": 2.3e-05,
+    "dT_through_thickness_K": 20.0,
+    "h_mm": 5.0,
+    "L_mm": 500.0
+   },
+   "derivation": "a linear temperature through the depth of an unrestrained beam produces curvature and no stress"
+  },
+  {
+   "id": "VC-TMC-09.a",
+   "quantity": "Al hub on steel shaft, 20 H7/p6, contact pressure at maximum interference, 20 degC",
+   "value": 54.6468401487,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 0.01
+   },
+   "source": "generator (Lame, S9) with S5 limits",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-10",
+    "TR-TMC-21"
+   ],
+   "inputs": {
+    "b_mm": 10.0,
+    "c_mm": 20.0,
+    "hole_limits_mm": [
+     0.0,
+     0.021
+    ],
+    "shaft_limits_mm": [
+     0.022,
+     0.035
+    ],
+    "E_hub_MPa": 70000.0,
+    "nu_hub": 0.33,
+    "E_shaft_MPa": 200000.0,
+    "nu_shaft": 0.3,
+    "alpha_hub_per_K": 2.3e-05,
+    "alpha_shaft_per_K": 1.15e-05,
+    "specTemperature_degC": 20.0
+   },
+   "derivation": "p = d_r / (b [((c^2+b^2)/(c^2-b^2) + nu_h)/E_h + (1 - nu_s)/E_s]), d_r = 0.035/2 mm"
+  },
+  {
+   "id": "VC-TMC-09.b",
+   "quantity": "same fit at +85 degC: maximum diametral interference",
+   "value": 0.02005,
+   "unit": "mm",
+   "tolerance": {
+    "abs": 1e-07
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-07",
+    "FR-TMC-10",
+    "TR-TMC-20"
+   ],
+   "inputs": {
+    "b_mm": 10.0,
+    "c_mm": 20.0,
+    "hole_limits_mm": [
+     0.0,
+     0.021
+    ],
+    "shaft_limits_mm": [
+     0.022,
+     0.035
+    ],
+    "E_hub_MPa": 70000.0,
+    "nu_hub": 0.33,
+    "E_shaft_MPa": 200000.0,
+    "nu_shaft": 0.3,
+    "alpha_hub_per_K": 2.3e-05,
+    "alpha_shaft_per_K": 1.15e-05,
+    "specTemperature_degC": 20.0
+   },
+   "derivation": "i(T) = i(20) - D (a_hub - a_shaft)(T - 20)"
+  },
+  {
+   "id": "VC-TMC-09.c",
+   "quantity": "same fit at +85 degC: minimum diametral interference (negative = clearance, joint loose)",
+   "value": -0.01395,
+   "unit": "mm",
+   "tolerance": {
+    "abs": 1e-07
+   },
+   "source": "generator",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-07",
+    "FR-TMC-10",
+    "TR-TMC-20"
+   ],
+   "inputs": {
+    "b_mm": 10.0,
+    "c_mm": 20.0,
+    "hole_limits_mm": [
+     0.0,
+     0.021
+    ],
+    "shaft_limits_mm": [
+     0.022,
+     0.035
+    ],
+    "E_hub_MPa": 70000.0,
+    "nu_hub": 0.33,
+    "E_shaft_MPa": 200000.0,
+    "nu_shaft": 0.3,
+    "alpha_hub_per_K": 2.3e-05,
+    "alpha_shaft_per_K": 1.15e-05,
+    "specTemperature_degC": 20.0
+   },
+   "expectedStatus": "clearance_possible",
+   "code": "TMC_FIT_LOOSE"
+  },
+  {
+   "id": "VC-TMC-60",
+   "quantity": "no silent reference temperature",
+   "value": null,
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "AF-31",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-11",
+    "TR-TMC-30"
+   ],
+   "expected": {
+    "thermo_static without referenceTemperature": "TMC_REFERENCE_TEMPERATURE_MISSING",
+    "fit_at_temperature without specTemperature": "TMC_SPEC_TEMPERATURE_MISSING"
+   }
+  },
+  {
+   "id": "VC-TMC-61",
+   "quantity": "deliberately wrong set-ups return stable codes",
+   "value": null,
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-12",
+    "TR-TMC-31"
+   ],
+   "expected": [
+    {
+     "setup": "thermo_static referencing a stale heat_steady result",
+     "code": "TMC_THERMAL_RESULT_STALE"
+    },
+    {
+     "setup": "thermo_static referencing a result whose mesh differs and no mapping allowed",
+     "code": "TMC_MESH_MISMATCH"
+    },
+    {
+     "setup": "part material has no cte",
+     "code": "TMC_MATERIAL_NO_CTE"
+    },
+    {
+     "setup": "cte table given as instantaneous but no reference temperature",
+     "code": "TMC_CTE_BASIS_UNKNOWN"
+    },
+    {
+     "setup": "fit_at_temperature on a size dimension without limits",
+     "code": "TMC_FIT_LIMITS_MISSING"
+    },
+    {
+     "setup": "fit_at_temperature temperature outside the cte table range",
+     "code": "TMC_PROPERTY_OUT_OF_RANGE"
+    },
+    {
+     "setup": "agent calls dispose_fit_result",
+     "code": "TMC_HUMAN_GATE"
+    }
+   ]
+  },
+  {
+   "id": "VC-TMC-62",
+   "quantity": "fit result flags",
+   "value": null,
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "AF-32, AF-33, AF-35",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-07",
+    "FR-TMC-13",
+    "TR-TMC-20"
+   ],
+   "expected": {
+    "rows[*].reviewRequired": true,
+    "rows[*].provenance.formula": "D(T) = D_spec (1 + a_sec (T - T_spec))",
+    "rows[*].unverified": "OR of the cte inputs' flags",
+    "status of VC-TMC-06.a": "interference_possible"
+   }
+  },
+  {
+   "id": "VC-TMC-50",
+   "quantity": "staleness chain thermal -> thermo_static",
+   "value": null,
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "05 TR-FEA-06 + PHY-03 TR-THM-32 + TR-TMC-10",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-14",
+    "TR-TMC-10"
+   ],
+   "expected": {
+    "fea_report(ms).state": "stale",
+    "compute_margins(ms).code": "FEA_RESULTS_STALE",
+    "check_thermo_mechanical(ms).items": [
+     "TMC_THERMAL_RESULT_STALE"
+    ]
+   }
+  },
+  {
+   "id": "VC-TMC-63",
+   "quantity": "binding fit needs a human disposition",
+   "value": null,
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "AF-34",
+   "grade": "A",
+   "proves": [
+    "FR-TMC-13",
+    "TR-TMC-32"
+   ],
+   "expected": {
+    "dispose_fit_result(agent).code": "TMC_HUMAN_GATE",
+    "documentHashUnchanged": true
+   }
+  }
+ ]
+}

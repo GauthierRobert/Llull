@@ -1,0 +1,54 @@
+{
+ "pack": "11-creep-viscoelasticity",
+ "generatedBy": "quoted (extracted by hand from the pinned CalculiX test suite; GPL-2.0 files are not stored here)",
+ "repository": "https://github.com/Dhondtguido/CalculiX",
+ "commit": "fd588701edd6a92fde06e99b1bdf01f3b0f80f2c",
+ "commitDate": "2026-10-14",
+ "decks": [
+  {
+   "id": "beamcr3",
+   "files": {
+    "test/beamcr3.inp": "fee19a21832998df80c5726f4a0c92c4ab0b11e265bc57075bb8d96db7c37b05",
+    "test/beamcr3.frd.ref": "6d884c0e483bfd5f28fa1e81f481686d561c44858a5f14cef139724287d84d15"
+   },
+   "deck_header": "1 element under tension; elastically anisotropic material with isotropic viscoplastic behavior; creep constants in input deck; NLGEOM",
+   "model": {
+    "element": "one C3D20, unit cube 1 x 1 x 1",
+    "elastic": "*ELASTIC,TYPE=ORTHO 500000.,157200.,500000.,157200.,157200.,500000.,126200.,126200.,126200.",
+    "creep": "*CREEP 1.E-10,5,0.  (LAW=NORTON default: eps_dot = A sigma^n t^m)",
+    "load": "*DLOAD 1,P2,-20. with amplitude constant 1",
+    "step": "*STEP,INC=100  *VISCO,CETOL=1.,NLGEOM  0.1,1000."
+   },
+   "reference_values": [
+    { "quantity": "S zz (all 20 nodes)", "min": 19.9992, "max": 20.0010, "unit": "MPa", "frd_block": "STRESS, step 2" },
+    { "quantity": "equivalent creep strain, FRD label PE (requested as CEEQ)", "min": 0.319987, "max": 0.320016, "unit": "-", "frd_block": "PE, step 3, time 1000.000000" }
+   ],
+   "used_by": ["VC-CRP-10", "VC-CRP-40"],
+   "note": "The analytic small-strain value A sigma^n t = 1e-10 * 20^5 * 1000 = 0.32 (generator VC-CRP-10). The deck uses NLGEOM and an orthotropic elastic law, so the reference is a cross-check of the Norton integration, not of the elastic part."
+  },
+  {
+   "id": "beamcr",
+   "files": {
+    "test/beamcr.inp": "5c60de466a64db78c0f784c0db4be18d414248bc1842c83c37f56803c8ad3105",
+    "test/beamcr.dat.ref": "30812e2a7dd51ca73e10f6fc2de1f577cd424b13a9775d1cdf561518a57d98d8"
+   },
+   "deck_header": "Cantilever beam under tensile forces; material card *CREEP",
+   "model": {
+    "element": "C3D20R beam 1 x 1 x 8",
+    "elastic": "*ELASTIC 210000.,.3",
+    "plastic": "*PLASTIC 0.,0. (zero yield surface)",
+    "creep": "*CREEP 1.e-10,5.,0.",
+    "step": "*STEP,INC=1000,NLGEOM  *VISCO,CETOL=8.e-4  0.001,0.001"
+   },
+   "reference_values": "TBD: extract the U and S,PE tables of beamcr.dat.ref with the M2 DAT reader and freeze",
+   "used_by": ["VC-CRP-44"]
+  },
+  {
+   "id": "beamcr4",
+   "files": { "test/beamcr4.inp": "d485a0f1fa023a57c58e43718f0016ec13cbbcdcf7686e6f326dfb5da886cde8", "test/beamcr4.frd.ref": "f1ccc789640d16d0aed4a60447fd7cf3eaddbaf90363c39b849b4a2044ff2fb4" },
+   "deck_header": "1 element under tension; elastically anisotropic material with isotropic viscous behavior: routine umat_aniso_creep.f; *CREEP,LAW=USER",
+   "reference_values": "not used: LAW=USER needs a recompiled creep.f / umat (V2 path only)",
+   "used_by": []
+  }
+ ]
+}

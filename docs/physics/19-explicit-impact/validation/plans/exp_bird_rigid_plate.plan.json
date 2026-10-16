@@ -1,0 +1,203 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_cylinder",
+  "params": {
+   "radius": 52.461248582,
+   "height": 209.844994328,
+   "position": [
+    0,
+    0,
+    1
+   ],
+   "anchor": "base-center"
+  },
+  "as": "bird"
+ },
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "bird_substitute_test",
+   "name": "bird_substitute_test",
+   "designation": "test material E = 1 MPa",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "bird_substitute_test",
+   "property": "E",
+   "value": 1.0,
+   "unit": "MPa",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "bird_substitute_test",
+   "property": "nu",
+   "value": 0.0,
+   "unit": "-",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "bird_substitute_test",
+   "property": "density",
+   "value": 1.0,
+   "unit": "g/cm^3",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "add_material_model",
+  "params": {
+   "material": "bird_substitute_test",
+   "model": {
+    "kind": "hydrodynamic_eos",
+    "eos": "linear_polynomial",
+    "bulkModulus": "TBD (PHY-02 EOS model, open question)",
+    "deviatoric": "none"
+   },
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   }
+  }
+ },
+ {
+  "command": "create_material",
+  "params": {
+   "name": "bird_substitute_test",
+   "density": 0.001,
+   "color": "#9aa0a6",
+   "metalness": 1,
+   "roughness": 0.4,
+   "recordId": "bird_substitute_test"
+  }
+ },
+ {
+  "command": "assign_material",
+  "params": {
+   "materialName": "bird_substitute_test",
+   "entityIds": [
+    "$bird"
+   ]
+  }
+ },
+ {
+  "command": "create_analysis",
+  "params": {
+   "name": "bird_rigid_plate",
+   "analysisType": "explicit_dynamics",
+   "unitSystem": "N-mm-t-s",
+   "solver": "opencourant"
+  },
+  "as": "an"
+ },
+ {
+  "command": "set_explicit_controls",
+  "params": {
+   "analysisId": "$an",
+   "endTime": {
+    "value": 0.0025,
+    "unit": "s"
+   },
+   "animationInterval": {
+    "value": 0.0001,
+    "unit": "s"
+   },
+   "historyInterval": {
+    "value": 1e-05,
+    "unit": "s"
+   },
+   "massScaling": {
+    "mode": "none"
+   },
+   "precision": "double"
+  }
+ },
+ {
+  "command": "set_part_idealization",
+  "params": {
+   "analysisId": "$an",
+   "entityId": "$bird",
+   "idealization": "sph",
+   "particleSpacing": {
+    "value": 5,
+    "unit": "mm"
+   }
+  }
+ },
+ {
+  "command": "set_initial_velocity",
+  "params": {
+   "analysisId": "$an",
+   "entityId": "$bird",
+   "velocity": {
+    "vector": [
+     0,
+     0,
+     -150000
+    ],
+    "unit": "mm/s"
+   }
+  }
+ },
+ {
+  "command": "add_rigid_wall",
+  "params": {
+   "analysisId": "$an",
+   "name": "plate",
+   "point": [
+    0,
+    0,
+    0
+   ],
+   "normal": [
+    0,
+    0,
+    1
+   ],
+   "friction": 0.0
+  }
+ },
+ {
+  "command": "add_time_history",
+  "params": {
+   "analysisId": "$an",
+   "name": "plate_impulse",
+   "kind": "rigid_wall",
+   "target": "plate",
+   "quantities": [
+    "impulse_z",
+    "force_z"
+   ]
+  }
+ }
+]

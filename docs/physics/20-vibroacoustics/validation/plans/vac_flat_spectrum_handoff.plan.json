@@ -1,0 +1,189 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    300,
+    200,
+    100
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "anchor": "min"
+  },
+  "as": "panel_box"
+ },
+ {
+  "command": "define_acoustic_spectrum",
+  "params": {
+   "name": "flat130",
+   "bandwidth": "third_octave",
+   "reference": "20uPa",
+   "bands": [
+    {
+     "nominalHz": 25,
+     "splDb": 130.0
+    },
+    {
+     "nominalHz": 31.5,
+     "splDb": 130.0
+    },
+    {
+     "nominalHz": 40,
+     "splDb": 130.0
+    },
+    {
+     "nominalHz": 50,
+     "splDb": 130.0
+    },
+    {
+     "nominalHz": 63,
+     "splDb": 130.0
+    },
+    {
+     "nominalHz": 80,
+     "splDb": 130.0
+    },
+    {
+     "nominalHz": 100,
+     "splDb": 130.0
+    },
+    {
+     "nominalHz": 125,
+     "splDb": 130.0
+    },
+    {
+     "nominalHz": 160,
+     "splDb": 130.0
+    },
+    {
+     "nominalHz": 200,
+     "splDb": 130.0
+    },
+    {
+     "nominalHz": 250,
+     "splDb": 130.0
+    },
+    {
+     "nominalHz": 315,
+     "splDb": 130.0
+    },
+    {
+     "nominalHz": 400,
+     "splDb": 130.0
+    },
+    {
+     "nominalHz": 500,
+     "splDb": 130.0
+    },
+    {
+     "nominalHz": 630,
+     "splDb": 130.0
+    },
+    {
+     "nominalHz": 800,
+     "splDb": 130.0
+    },
+    {
+     "nominalHz": 1000,
+     "splDb": 130.0
+    },
+    {
+     "nominalHz": 1250,
+     "splDb": 130.0
+    },
+    {
+     "nominalHz": 1600,
+     "splDb": 130.0
+    },
+    {
+     "nominalHz": 2000,
+     "splDb": 130.0
+    },
+    {
+     "nominalHz": 2500,
+     "splDb": 130.0
+    },
+    {
+     "nominalHz": 3150,
+     "splDb": 130.0
+    },
+    {
+     "nominalHz": 4000,
+     "splDb": 130.0
+    },
+    {
+     "nominalHz": 5000,
+     "splDb": 130.0
+    },
+    {
+     "nominalHz": 6300,
+     "splDb": 130.0
+    },
+    {
+     "nominalHz": 8000,
+     "splDb": 130.0
+    },
+    {
+     "nominalHz": 10000,
+     "splDb": 130.0
+    }
+   ],
+   "source": {
+    "citation": "synthetic test input of VC-VAC-06 (not a test level)",
+    "grade": "A"
+   }
+  }
+ },
+ {
+  "command": "acoustic_spectrum_report",
+  "params": {
+   "spectrum": "flat130"
+  }
+ },
+ {
+  "command": "convert_acoustic_spectrum",
+  "params": {
+   "spectrum": "flat130",
+   "to": "octave",
+   "name": "flat130_oct"
+  }
+ },
+ {
+  "command": "acoustic_spectrum_report",
+  "params": {
+   "spectrum": "flat130_oct"
+  }
+ },
+ {
+  "command": "define_acoustic_exposure",
+  "params": {
+   "name": "enclosure_skin",
+   "spectrum": "flat130",
+   "target": {
+    "entityId": "$panel_box",
+    "facesNear": [
+     [
+      150,
+      100,
+      100
+     ]
+    ]
+   },
+   "field": "diffuse"
+  }
+ },
+ {
+  "command": "check_acoustic_handoff",
+  "params": {}
+ }
+]

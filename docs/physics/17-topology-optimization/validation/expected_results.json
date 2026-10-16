@@ -1,0 +1,587 @@
+{
+ "pack": "17-topology-optimization",
+ "generatedBy": "generate_top_reference.py",
+ "units": "consistent: E0 = 1, unit element edge, unit load (dimensionless top88 units) unless stated",
+ "cases": [
+  {
+   "id": "VC-TOP-01.a",
+   "quantity": "KE[0][0], nu = 0.3, E = 1, unit square, plane stress",
+   "value": 0.494505494505,
+   "unit": "N/m (E=1, t=1)",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "generator: (12 - 4 nu) / (24 (1 - nu^2)) [S1]",
+   "grade": "A",
+   "proves": [
+    "TR-TOP-05"
+   ],
+   "closedForm": 0.494505494505
+  },
+  {
+   "id": "VC-TOP-01.b",
+   "quantity": "KE[0][1]",
+   "value": 0.178571428571,
+   "unit": "N/m (E=1, t=1)",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "generator: (3 + 3 nu) / (24 (1 - nu^2)) [S1]",
+   "grade": "A",
+   "proves": [
+    "TR-TOP-05"
+   ],
+   "closedForm": 0.178571428571
+  },
+  {
+   "id": "VC-TOP-01.c",
+   "quantity": "max |row sum| of KE (rigid translation has zero energy)",
+   "value": 0.0,
+   "unit": "N/m",
+   "tolerance": {
+    "abs": 1e-14
+   },
+   "source": "generator (equilibrium)",
+   "grade": "A",
+   "proves": [
+    "TR-TOP-05"
+   ],
+   "measuredByGenerator": "2.1e-17"
+  },
+  {
+   "id": "VC-TOP-02.a",
+   "quantity": "filter weight, centre element, rmin = 1.5",
+   "value": 1.5,
+   "unit": "1",
+   "tolerance": {
+    "abs": 1e-15
+   },
+   "source": "generator: max(0, rmin - 0)",
+   "grade": "A",
+   "proves": [
+    "FR-TOP-04"
+   ]
+  },
+  {
+   "id": "VC-TOP-02.b",
+   "quantity": "filter weight, edge neighbour",
+   "value": 0.5,
+   "unit": "1",
+   "tolerance": {
+    "abs": 1e-15
+   },
+   "source": "generator: rmin - 1",
+   "grade": "A",
+   "proves": [
+    "FR-TOP-04"
+   ]
+  },
+  {
+   "id": "VC-TOP-02.c",
+   "quantity": "filter weight, diagonal neighbour",
+   "value": 0.0857864376269,
+   "unit": "1",
+   "tolerance": {
+    "abs": 1e-15
+   },
+   "source": "generator: rmin - sqrt(2)",
+   "grade": "A",
+   "proves": [
+    "FR-TOP-04"
+   ]
+  },
+  {
+   "id": "VC-TOP-02.d",
+   "quantity": "Hs of an interior element (sum of 9 weights)",
+   "value": 3.84314575051,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-15
+   },
+   "source": "generator: 1.5 + 4 (0.5) + 4 (1.5 - sqrt 2)",
+   "grade": "A",
+   "proves": [
+    "FR-TOP-04"
+   ]
+  },
+  {
+   "id": "VC-TOP-03.a",
+   "quantity": "optimal x for a = [1, 4, 9, 16], V = 2 (x_i = V sqrt(a_i) / sum sqrt(a_j))",
+   "value": [
+    0.2,
+    0.4,
+    0.6,
+    0.8
+   ],
+   "unit": "1",
+   "tolerance": {
+    "abs": 1e-06
+   },
+   "source": "generator (Lagrange multiplier, exact)",
+   "grade": "A",
+   "proves": [
+    "FR-TOP-05",
+    "TR-TOP-06"
+   ]
+  },
+  {
+   "id": "VC-TOP-03.b",
+   "quantity": "optimal objective sum a_i / x_i",
+   "value": 50.0,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "generator: (sum sqrt a)^2 / V = 50",
+   "grade": "A",
+   "proves": [
+    "FR-TOP-05",
+    "TR-TOP-06"
+   ]
+  },
+  {
+   "id": "VC-TOP-04.a",
+   "quantity": "compliance of the solid 30x10 MBB half-beam (x = 1)",
+   "value": 123.069351174,
+   "unit": "N*m (E=1, F=1)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "generator (exact linear solve)",
+   "grade": "A",
+   "proves": [
+    "FR-TOP-03",
+    "TR-TOP-05"
+   ]
+  },
+  {
+   "id": "VC-TOP-04.b",
+   "quantity": "ratio c(x = 0.5) / c(x = 1) (SIMP p = 3)",
+   "value": 7.99999994398,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-08
+   },
+   "source": "generator: 1 / (Emin + 0.5^3 (1 - Emin)) = 7.99999994",
+   "grade": "A",
+   "proves": [
+    "FR-TOP-03"
+   ],
+   "closedForm": 7.999999944
+  },
+  {
+   "id": "VC-TOP-10.a",
+   "quantity": "MBB 60x20 (sensitivity filter): iterations to max|dx| <= 0.01",
+   "value": 94,
+   "unit": "count",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "generator reproduction of top88 [S1]",
+   "grade": "B",
+   "proves": [
+    "FR-TOP-02",
+    "FR-TOP-03",
+    "TR-TOP-06"
+   ],
+   "inputs": {
+    "nelx": 60,
+    "nely": 20,
+    "volfrac": 0.5,
+    "penal": 3.0,
+    "rmin": 1.5,
+    "ft": 1,
+    "E0": 1.0,
+    "Emin": 1e-09,
+    "nu": 0.3,
+    "move": 0.2,
+    "stop": "max|dx| <= 0.01"
+   }
+  },
+  {
+   "id": "VC-TOP-10.b",
+   "quantity": "MBB 60x20 (sensitivity): compliance printed at the last iteration",
+   "value": 203.192457639,
+   "unit": "N*m (E=1, F=1)",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "generator reproduction of top88 [S1] + topoptlab 1.0.0 run [S3]",
+   "grade": "A",
+   "proves": [
+    "FR-TOP-02",
+    "FR-TOP-03"
+   ],
+   "crossCheck": {
+    "tool": "topoptlab 1.0.0 (GPL-3.0), optimizer oc, ft=0",
+    "compliance": 203.19245763914194,
+    "xPhysMean": 0.49997009027820527
+   },
+   "inputs": {
+    "nelx": 60,
+    "nely": 20,
+    "volfrac": 0.5,
+    "penal": 3.0,
+    "rmin": 1.5,
+    "ft": 1,
+    "E0": 1.0,
+    "Emin": 1e-09,
+    "nu": 0.3,
+    "move": 0.2,
+    "stop": "max|dx| <= 0.01"
+   }
+  },
+  {
+   "id": "VC-TOP-10.c",
+   "quantity": "MBB 60x20 (sensitivity): compliance of the final xPhys",
+   "value": 203.182593258,
+   "unit": "N*m (E=1, F=1)",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "generator reproduction of top88 [S1]",
+   "grade": "B",
+   "proves": [
+    "FR-TOP-03",
+    "FR-TOP-08"
+   ],
+   "inputs": {
+    "nelx": 60,
+    "nely": 20,
+    "volfrac": 0.5,
+    "penal": 3.0,
+    "rmin": 1.5,
+    "ft": 1,
+    "E0": 1.0,
+    "Emin": 1e-09,
+    "nu": 0.3,
+    "move": 0.2,
+    "stop": "max|dx| <= 0.01"
+   }
+  },
+  {
+   "id": "VC-TOP-10.d",
+   "quantity": "MBB 60x20 (sensitivity): final volume fraction of xPhys",
+   "value": 0.499970090278,
+   "unit": "1",
+   "tolerance": {
+    "abs": 0.001
+   },
+   "source": "generator; OC bisection tolerance 1e-3 + topoptlab [S3]",
+   "grade": "A",
+   "proves": [
+    "FR-TOP-02"
+   ],
+   "inputs": {
+    "nelx": 60,
+    "nely": 20,
+    "volfrac": 0.5,
+    "penal": 3.0,
+    "rmin": 1.5,
+    "ft": 1,
+    "E0": 1.0,
+    "Emin": 1e-09,
+    "nu": 0.3,
+    "move": 0.2,
+    "stop": "max|dx| <= 0.01"
+   }
+  },
+  {
+   "id": "VC-TOP-10.e",
+   "quantity": "MBB 60x20 (sensitivity): grey-level measure mean 4x(1-x)",
+   "value": 0.174175545817,
+   "unit": "1",
+   "tolerance": {
+    "abs": 0.0001
+   },
+   "source": "generator",
+   "grade": "B",
+   "proves": [
+    "FR-TOP-09"
+   ],
+   "inputs": {
+    "nelx": 60,
+    "nely": 20,
+    "volfrac": 0.5,
+    "penal": 3.0,
+    "rmin": 1.5,
+    "ft": 1,
+    "E0": 1.0,
+    "Emin": 1e-09,
+    "nu": 0.3,
+    "move": 0.2,
+    "stop": "max|dx| <= 0.01"
+   }
+  },
+  {
+   "id": "VC-TOP-11.a",
+   "quantity": "MBB 60x20 (density filter): iterations to max|dx| <= 0.01",
+   "value": 127,
+   "unit": "count",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "generator reproduction of top88 [S1]",
+   "grade": "B",
+   "proves": [
+    "FR-TOP-02",
+    "FR-TOP-03",
+    "TR-TOP-06"
+   ],
+   "inputs": {
+    "nelx": 60,
+    "nely": 20,
+    "volfrac": 0.5,
+    "penal": 3.0,
+    "rmin": 1.5,
+    "ft": 2,
+    "E0": 1.0,
+    "Emin": 1e-09,
+    "nu": 0.3,
+    "move": 0.2,
+    "stop": "max|dx| <= 0.01"
+   }
+  },
+  {
+   "id": "VC-TOP-11.b",
+   "quantity": "MBB 60x20 (density): compliance printed at the last iteration",
+   "value": 218.803221064,
+   "unit": "N*m (E=1, F=1)",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "generator reproduction of top88 [S1] + topoptlab 1.0.0 run [S3]",
+   "grade": "A",
+   "proves": [
+    "FR-TOP-02",
+    "FR-TOP-03"
+   ],
+   "crossCheck": {
+    "tool": "topoptlab 1.0.0 (GPL-3.0), optimizer oc, ft=1",
+    "compliance": 218.80322107077228
+   },
+   "inputs": {
+    "nelx": 60,
+    "nely": 20,
+    "volfrac": 0.5,
+    "penal": 3.0,
+    "rmin": 1.5,
+    "ft": 2,
+    "E0": 1.0,
+    "Emin": 1e-09,
+    "nu": 0.3,
+    "move": 0.2,
+    "stop": "max|dx| <= 0.01"
+   }
+  },
+  {
+   "id": "VC-TOP-11.c",
+   "quantity": "MBB 60x20 (density): compliance of the final xPhys",
+   "value": 218.815227557,
+   "unit": "N*m (E=1, F=1)",
+   "tolerance": {
+    "rel": 1e-06
+   },
+   "source": "generator reproduction of top88 [S1]",
+   "grade": "B",
+   "proves": [
+    "FR-TOP-03",
+    "FR-TOP-08"
+   ],
+   "inputs": {
+    "nelx": 60,
+    "nely": 20,
+    "volfrac": 0.5,
+    "penal": 3.0,
+    "rmin": 1.5,
+    "ft": 2,
+    "E0": 1.0,
+    "Emin": 1e-09,
+    "nu": 0.3,
+    "move": 0.2,
+    "stop": "max|dx| <= 0.01"
+   }
+  },
+  {
+   "id": "VC-TOP-11.d",
+   "quantity": "MBB 60x20 (density): final volume fraction of xPhys",
+   "value": 0.499980636009,
+   "unit": "1",
+   "tolerance": {
+    "abs": 0.001
+   },
+   "source": "generator; OC bisection tolerance 1e-3",
+   "grade": "B",
+   "proves": [
+    "FR-TOP-02"
+   ],
+   "inputs": {
+    "nelx": 60,
+    "nely": 20,
+    "volfrac": 0.5,
+    "penal": 3.0,
+    "rmin": 1.5,
+    "ft": 2,
+    "E0": 1.0,
+    "Emin": 1e-09,
+    "nu": 0.3,
+    "move": 0.2,
+    "stop": "max|dx| <= 0.01"
+   }
+  },
+  {
+   "id": "VC-TOP-11.e",
+   "quantity": "MBB 60x20 (density): grey-level measure mean 4x(1-x)",
+   "value": 0.268323476248,
+   "unit": "1",
+   "tolerance": {
+    "abs": 0.0001
+   },
+   "source": "generator",
+   "grade": "B",
+   "proves": [
+    "FR-TOP-09"
+   ],
+   "inputs": {
+    "nelx": 60,
+    "nely": 20,
+    "volfrac": 0.5,
+    "penal": 3.0,
+    "rmin": 1.5,
+    "ft": 2,
+    "E0": 1.0,
+    "Emin": 1e-09,
+    "nu": 0.3,
+    "move": 0.2,
+    "stop": "max|dx| <= 0.01"
+   }
+  },
+  {
+   "id": "VC-TOP-12",
+   "quantity": "MBB 300x100 (paper figure scale), compliance and topology",
+   "value": "TBD",
+   "unit": "N*m (E=1, F=1)",
+   "tolerance": {
+    "rel": null
+   },
+   "source": "TBD - measure with the bundled optimizer (too large for the stdlib generator)",
+   "grade": "TBD",
+   "proves": [
+    "FR-TOP-02",
+    "NFR budget"
+   ]
+  },
+  {
+   "id": "VC-TOP-20",
+   "quantity": "edit of the derived iso-surface (move_entities)",
+   "value": "TOP_DERIVED_READ_ONLY",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1 / FUNCTIONAL_SPEC 7",
+   "grade": "A",
+   "proves": [
+    "FR-TOP-07"
+   ]
+  },
+  {
+   "id": "VC-TOP-21",
+   "quantity": "check_topology / suggest_rebuild after set_parameter on the domain",
+   "value": "TOP_RESULT_STALE",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1 / FUNCTIONAL_SPEC 7",
+   "grade": "A",
+   "proves": [
+    "FR-TOP-14"
+   ]
+  },
+  {
+   "id": "VC-TOP-22",
+   "quantity": "suggest_rebuild loops: closed, enclosed fraction within 0.02 of the thresholded volume fraction",
+   "value": "closed loops; |enclosedFraction - thresholded fraction| <= 0.02",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1 / FUNCTIONAL_SPEC 7",
+   "grade": "A",
+   "proves": [
+    "FR-TOP-10"
+   ]
+  },
+  {
+   "id": "VC-TOP-23",
+   "quantity": "compare_to_topology on a rebuild from VC-TOP-22 contours",
+   "value": "TBD - measure IoU and volume ratio",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1 / FUNCTIONAL_SPEC 7",
+   "grade": "TBD",
+   "proves": [
+    "FR-TOP-11"
+   ]
+  },
+  {
+   "id": "VC-TOP-24",
+   "quantity": "keep-in box 40x20 on a 60x20 domain with volumeFraction 0.5",
+   "value": "TOP_KEEPIN_EXCEEDS_BUDGET",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1 / FUNCTIONAL_SPEC 7",
+   "grade": "A",
+   "proves": [
+    "FR-TOP-06"
+   ]
+  },
+  {
+   "id": "VC-TOP-25",
+   "quantity": "E from an 08 value with basis typical",
+   "value": "TOP_INPUT_UNVERIFIED",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1 / FUNCTIONAL_SPEC 7",
+   "grade": "A",
+   "proves": [
+    "FR-TOP-16"
+   ]
+  },
+  {
+   "id": "VC-TOP-26",
+   "quantity": "09 release including the derived mesh",
+   "value": "TOP_RESULT_NOT_RELEASABLE",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1 / FUNCTIONAL_SPEC 7",
+   "grade": "A",
+   "proves": [
+    "FR-TOP-15"
+   ]
+  },
+  {
+   "id": "VC-TOP-27",
+   "quantity": "two identical topology_solve runs",
+   "value": "identical fieldHash and report",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC 7.1 / FUNCTIONAL_SPEC 7",
+   "grade": "A",
+   "proves": [
+    "FR-TOP-18"
+   ]
+  }
+ ]
+}

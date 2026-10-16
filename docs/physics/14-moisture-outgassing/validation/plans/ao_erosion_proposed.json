@@ -1,0 +1,8 @@
+[
+ {"command": "ao_erosion", "params": {
+   "erosionYield": {"value": 3.0e-24, "unit": "cm^3/atom", "source": "Kapton H reference value (S9, S10)"},
+   "fluence": {"value": 1e21, "unit": "atoms/cm^2", "source": "synthetic"},
+   "area": {"value": 10, "unit": "cm^2"},
+   "density": {"value": 1.0, "unit": "g/cm^3", "source": "synthetic"}
+ }}
+]

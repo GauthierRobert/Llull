@@ -1,0 +1,333 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "revolve_profile",
+  "params": {
+   "profile": [
+    [
+     10,
+     0
+    ],
+    [
+     20,
+     0
+    ],
+    [
+     20,
+     100
+    ],
+    [
+     10,
+     100
+    ]
+   ],
+   "axis": "z",
+   "angle": 1.5707963267948966
+  },
+  "as": "tube"
+ },
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "steel_cyl",
+   "name": "steel_cyl",
+   "designation": "validation test material",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "steel_cyl",
+   "property": "E",
+   "value": 200000.0,
+   "unit": "MPa",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "steel_cyl",
+   "property": "nu",
+   "value": 0.3,
+   "unit": "-",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "steel_cyl",
+   "property": "cte",
+   "value": 1.2e-05,
+   "unit": "1/K",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "steel_cyl",
+   "property": "k",
+   "value": 50.0,
+   "unit": "W/(m*K)",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "steel_cyl",
+   "property": "density",
+   "value": 7.8,
+   "unit": "g/cm^3",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "create_material",
+  "params": {
+   "name": "steel_cyl",
+   "density": 0.0078,
+   "color": "#9aa0a6",
+   "metalness": 1,
+   "roughness": 0.4,
+   "recordId": "steel_cyl"
+  }
+ },
+ {
+  "command": "assign_material",
+  "params": {
+   "materialName": "steel_cyl",
+   "entityIds": [
+    "$tube"
+   ]
+  }
+ },
+ {
+  "command": "create_analysis",
+  "params": {
+   "name": "tube_thermal",
+   "analysisType": "heat_steady",
+   "unitSystem": "N-mm-t-s",
+   "solver": "calculix",
+   "temperatureScale": "degC"
+  },
+  "as": "th"
+ },
+ {
+  "command": "set_part_idealization",
+  "params": {
+   "analysisId": "$th",
+   "entityId": "$tube",
+   "idealization": "solid"
+  }
+ },
+ {
+  "command": "add_thermal_bc",
+  "params": {
+   "analysisId": "$th",
+   "name": "bore",
+   "kind": "temperature",
+   "value": 120.0,
+   "unit": "degC",
+   "target": {
+    "entityId": "$tube",
+    "facesNear": [
+     [
+      7.0711,
+      7.0711,
+      50
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "add_thermal_bc",
+  "params": {
+   "analysisId": "$th",
+   "name": "outer",
+   "kind": "temperature",
+   "value": 20.0,
+   "unit": "degC",
+   "target": {
+    "entityId": "$tube",
+    "facesNear": [
+     [
+      14.1421,
+      14.1421,
+      50
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "set_mesh_controls",
+  "params": {
+   "analysisId": "$th",
+   "mesher": "gmsh",
+   "elementFamily": "tet",
+   "order": 2,
+   "globalSize": 1.0
+  }
+ },
+ {
+  "command": "create_analysis",
+  "params": {
+   "name": "tube_stress",
+   "analysisType": "thermo_static",
+   "unitSystem": "N-mm-t-s",
+   "solver": "calculix",
+   "referenceTemperature": {
+    "value": 20.0,
+    "unit": "degC"
+   }
+  },
+  "as": "ms"
+ },
+ {
+  "command": "set_part_idealization",
+  "params": {
+   "analysisId": "$ms",
+   "entityId": "$tube",
+   "idealization": "solid"
+  }
+ },
+ {
+  "command": "set_temperature_field",
+  "params": {
+   "analysisId": "$ms",
+   "source": {
+    "kind": "thermal_result",
+    "analysisId": "$th",
+    "time": "last",
+    "mapping": "same_mesh"
+   }
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$ms",
+   "name": "sym_xz",
+   "kind": "symmetry",
+   "target": {
+    "entityId": "$tube",
+    "facesNear": [
+     [
+      15,
+      0,
+      50
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$ms",
+   "name": "sym_yz",
+   "kind": "symmetry",
+   "target": {
+    "entityId": "$tube",
+    "facesNear": [
+     [
+      0,
+      15,
+      50
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$ms",
+   "name": "end_z",
+   "kind": "displacement",
+   "dofs": {
+    "uz": 0
+   },
+   "target": {
+    "entityId": "$tube",
+    "facesNear": [
+     [
+      10.6066,
+      10.6066,
+      0
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "set_mesh_controls",
+  "params": {
+   "analysisId": "$ms",
+   "mesher": "gmsh",
+   "elementFamily": "tet",
+   "order": 2,
+   "globalSize": 1.0
+  }
+ },
+ {
+  "command": "add_result_probe",
+  "params": {
+   "analysisId": "$ms",
+   "name": "bore_mid",
+   "point": [
+    10,
+    0,
+    50
+   ],
+   "quantity": "stress_hoop"
+  }
+ },
+ {
+  "command": "add_result_probe",
+  "params": {
+   "analysisId": "$ms",
+   "name": "outer_mid",
+   "point": [
+    20,
+    0,
+    50
+   ],
+   "quantity": "stress_hoop"
+  }
+ }
+]

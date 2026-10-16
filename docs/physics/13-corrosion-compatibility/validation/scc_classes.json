@@ -1,0 +1,47 @@
+{
+ "schema": "PHY-13 SCC classification table, draft 0.1",
+ "source": "MSFC-STD-3029 Revision A (24 Feb 2005), NASA, public: Table I high resistance, Table II moderate, Table III low resistance to SCC in sodium chloride environments (alternate immersion, salt fog, seacoast, slow strain rate in salt solution)",
+ "status": "table structure verified (S11 index); per-alloy rows must be transcribed from the primary PDF before shipping",
+ "entries": [
+  {
+   "alloy": "300-series austenitic stainless (unsensitized)",
+   "table": "I",
+   "status": "secondary",
+   "source": "S11 (Revision A note: moved to Table I)"
+  },
+  {
+   "alloy": "7075",
+   "temper": "T73",
+   "direction": "ST",
+   "class": "resistant",
+   "table": "tbd",
+   "status": "secondary",
+   "source": "S12 (NASA MTP-P&VE-M-63-8, 1963: all tested Al alloys highly susceptible in ST except 7075-T73 and 2219-T87)"
+  },
+  {
+   "alloy": "2219",
+   "temper": "T87",
+   "direction": "ST",
+   "class": "resistant",
+   "table": "tbd",
+   "status": "secondary",
+   "source": "S12"
+  },
+  {
+   "alloy": "7075",
+   "temper": "T6",
+   "class": "service-failure history",
+   "table": "tbd",
+   "status": "secondary",
+   "source": "S18 (7079-T6, 7075-T6 and 2024-T3 > 90 % of high-strength Al service SCC failures)"
+  },
+  {
+   "alloy": "2024",
+   "temper": "T3",
+   "class": "service-failure history",
+   "table": "tbd",
+   "status": "secondary",
+   "source": "S18"
+  }
+ ]
+}

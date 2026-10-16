@@ -1,0 +1,13 @@
+pair,alpha_hole_per_K,alpha_shaft_per_K,T_degC,min_clearance_mm,max_clearance_mm,status
+aluminium_housing_steel_shaft,2.3e-05,1.15e-05,-55.0,-0.0102560375,0.023696525,interference_possible
+aluminium_housing_steel_shaft,2.3e-05,1.15e-05,20.0,0.007,0.041,clearance
+aluminium_housing_steel_shaft,2.3e-05,1.15e-05,85.0,0.0219552325,0.055996345,clearance
+titanium_housing_steel_shaft,8.6e-06,1.15e-05,-55.0,0.0113439625,0.045319205,clearance
+titanium_housing_steel_shaft,8.6e-06,1.15e-05,20.0,0.007,0.041,clearance
+titanium_housing_steel_shaft,8.6e-06,1.15e-05,85.0,0.0032352325,0.037256689,clearance
+steel_housing_aluminium_shaft,1.15e-05,2.3e-05,-55.0,0.024237925,0.0581973875,clearance
+steel_housing_aluminium_shaft,1.15e-05,2.3e-05,20.0,0.007,0.041,clearance
+steel_housing_aluminium_shaft,1.15e-05,2.3e-05,85.0,-0.007939535,0.0260955975,interference_possible
+cfrp_housing_steel_shaft,2e-06,1.15e-05,-55.0,0.0212439625,0.0552296,clearance
+cfrp_housing_steel_shaft,2e-06,1.15e-05,20.0,0.007,0.041,clearance
+cfrp_housing_steel_shaft,2e-06,1.15e-05,85.0,-0.0053447675,0.02866768,interference_possible

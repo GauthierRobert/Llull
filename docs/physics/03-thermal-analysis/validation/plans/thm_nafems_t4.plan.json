@@ -1,0 +1,214 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "m"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    0.6,
+    1.0,
+    0.01
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "anchor": "min"
+  },
+  "as": "plate"
+ },
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "nafems_t4",
+   "name": "nafems_t4",
+   "designation": "validation test material",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "nafems_t4",
+   "property": "k",
+   "value": 52.0,
+   "unit": "W/(m*K)",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "nafems_t4",
+   "property": "density",
+   "value": 7850.0,
+   "unit": "kg/m^3",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "nafems_t4",
+   "property": "cp",
+   "value": 460.0,
+   "unit": "J/(kg*K)",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "create_material",
+  "params": {
+   "name": "nafems_t4",
+   "density": 7850000.0,
+   "color": "#9aa0a6",
+   "metalness": 1,
+   "roughness": 0.4,
+   "recordId": "nafems_t4"
+  }
+ },
+ {
+  "command": "assign_material",
+  "params": {
+   "materialName": "nafems_t4",
+   "entityIds": [
+    "$plate"
+   ]
+  }
+ },
+ {
+  "command": "create_analysis",
+  "params": {
+   "name": "nafems_t4",
+   "analysisType": "heat_steady",
+   "unitSystem": "N-m-kg-s",
+   "solver": "calculix",
+   "temperatureScale": "degC"
+  },
+  "as": "an"
+ },
+ {
+  "command": "set_part_idealization",
+  "params": {
+   "analysisId": "$an",
+   "entityId": "$plate",
+   "idealization": "solid"
+  }
+ },
+ {
+  "command": "add_thermal_bc",
+  "params": {
+   "analysisId": "$an",
+   "name": "AB_hot",
+   "kind": "temperature",
+   "value": 100.0,
+   "unit": "degC",
+   "target": {
+    "entityId": "$plate",
+    "facesNear": [
+     [
+      0.3,
+      0,
+      0.005
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "add_thermal_bc",
+  "params": {
+   "analysisId": "$an",
+   "name": "BC_film",
+   "kind": "film",
+   "filmCoefficient": {
+    "value": 750.0,
+    "unit": "W/(m^2*K)"
+   },
+   "sinkTemperature": {
+    "value": 0.0,
+    "unit": "degC"
+   },
+   "target": {
+    "entityId": "$plate",
+    "facesNear": [
+     [
+      0.6,
+      0.5,
+      0.005
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "add_thermal_bc",
+  "params": {
+   "analysisId": "$an",
+   "name": "CD_film",
+   "kind": "film",
+   "filmCoefficient": {
+    "value": 750.0,
+    "unit": "W/(m^2*K)"
+   },
+   "sinkTemperature": {
+    "value": 0.0,
+    "unit": "degC"
+   },
+   "target": {
+    "entityId": "$plate",
+    "facesNear": [
+     [
+      0.3,
+      1.0,
+      0.005
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "set_mesh_controls",
+  "params": {
+   "analysisId": "$an",
+   "mesher": "gmsh",
+   "elementFamily": "hex_dominant",
+   "order": 2,
+   "globalSize": 0.02
+  }
+ },
+ {
+  "command": "add_result_probe",
+  "params": {
+   "analysisId": "$an",
+   "name": "E",
+   "point": [
+    0.6,
+    0.2,
+    0.005
+   ],
+   "quantity": "temperature"
+  }
+ }
+]

@@ -1,0 +1,1393 @@
+{
+ "pack": "01-property-models",
+ "generatedBy": "generate_prop_reference.py",
+ "constants": {
+  "R_J_per_mol_K": 8.31446261815324
+ },
+ "cases": [
+  {
+   "id": "VC-PROP-01/aa6061_t6.k/T=4K",
+   "quantity": "k of 6061-T6 aluminium (UNS A96061) at 4 K",
+   "value": 5.34742389854,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2+T3+T4; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-01/aa6061_t6.k/T=10K",
+   "quantity": "k of 6061-T6 aluminium (UNS A96061) at 10 K",
+   "value": 14.2043053579,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2+T3+T4; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-01/aa6061_t6.k/T=20K",
+   "quantity": "k of 6061-T6 aluminium (UNS A96061) at 20 K",
+   "value": 28.4275476264,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2+T3+T4; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-01/aa6061_t6.k/T=77K",
+   "quantity": "k of 6061-T6 aluminium (UNS A96061) at 77 K",
+   "value": 83.5314419471,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2+T3+T4; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-01/aa6061_t6.k/T=100K",
+   "quantity": "k of 6061-T6 aluminium (UNS A96061) at 100 K",
+   "value": 97.7012229674,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2+T3+T4; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-01/aa6061_t6.k/T=200K",
+   "quantity": "k of 6061-T6 aluminium (UNS A96061) at 200 K",
+   "value": 136.025244261,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2+T3+T4; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-01/aa6061_t6.k/T=300K",
+   "quantity": "k of 6061-T6 aluminium (UNS A96061) at 300 K",
+   "value": 155.318789794,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2+T3+T4; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-02/aa6061_t6.cp/T=4K",
+   "quantity": "cp of 6061-T6 aluminium (UNS A96061) at 4 K",
+   "value": 0.291976487945,
+   "unit": "J/(kg*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2+T4; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-02/aa6061_t6.cp/T=10K",
+   "quantity": "cp of 6061-T6 aluminium (UNS A96061) at 10 K",
+   "value": 1.57304084681,
+   "unit": "J/(kg*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2+T4; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-02/aa6061_t6.cp/T=20K",
+   "quantity": "cp of 6061-T6 aluminium (UNS A96061) at 20 K",
+   "value": 8.85427028859,
+   "unit": "J/(kg*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2+T4; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-02/aa6061_t6.cp/T=77K",
+   "quantity": "cp of 6061-T6 aluminium (UNS A96061) at 77 K",
+   "value": 348.127924912,
+   "unit": "J/(kg*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2+T4; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-02/aa6061_t6.cp/T=100K",
+   "quantity": "cp of 6061-T6 aluminium (UNS A96061) at 100 K",
+   "value": 492.198176058,
+   "unit": "J/(kg*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2+T4; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-02/aa6061_t6.cp/T=200K",
+   "quantity": "cp of 6061-T6 aluminium (UNS A96061) at 200 K",
+   "value": 835.239019741,
+   "unit": "J/(kg*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2+T4; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-02/aa6061_t6.cp/T=300K",
+   "quantity": "cp of 6061-T6 aluminium (UNS A96061) at 300 K",
+   "value": 953.864360101,
+   "unit": "J/(kg*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2+T4; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-03/ss304.k/T=4K",
+   "quantity": "k of 304 stainless steel (UNS S30400) at 4 K",
+   "value": 0.272396188966,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2+T3; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-03/ss304.k/T=20K",
+   "quantity": "k of 304 stainless steel (UNS S30400) at 20 K",
+   "value": 2.16862240629,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2+T3; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-03/ss304.k/T=77K",
+   "quantity": "k of 304 stainless steel (UNS S30400) at 77 K",
+   "value": 7.92065160226,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2+T3; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-03/ss304.k/T=300K",
+   "quantity": "k of 304 stainless steel (UNS S30400) at 300 K",
+   "value": 15.3086538243,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2+T3; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-03/ss304.cp/T=4K",
+   "quantity": "cp of 304 stainless steel (UNS S30400) at 4 K",
+   "value": 2.06598568482,
+   "unit": "J/(kg*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-03/ss304.cp/T=20K",
+   "quantity": "cp of 304 stainless steel (UNS S30400) at 20 K",
+   "value": 13.4524780613,
+   "unit": "J/(kg*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-03/ss304.cp/T=77K",
+   "quantity": "cp of 304 stainless steel (UNS S30400) at 77 K",
+   "value": 204.493027449,
+   "unit": "J/(kg*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-03/ss304.cp/T=300K",
+   "quantity": "cp of 304 stainless steel (UNS S30400) at 300 K",
+   "value": 469.448840674,
+   "unit": "J/(kg*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-04/ti6al4v.k/T=23K",
+   "quantity": "k of Ti-6Al-4V (UNS R56400) at 23 K",
+   "value": 1.42129996445,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-04/ti6al4v.k/T=77K",
+   "quantity": "k of Ti-6Al-4V (UNS R56400) at 77 K",
+   "value": 3.47051408408,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-04/ti6al4v.k/T=300K",
+   "quantity": "k of Ti-6Al-4V (UNS R56400) at 300 K",
+   "value": 7.55457237646,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-05/g10cr.k.normal/T=20K",
+   "quantity": "k of G-10CR fiberglass epoxy, normal direction at 20 K",
+   "value": 0.156421869666,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2+T3; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-05/g10cr.k.normal/T=77K",
+   "quantity": "k of G-10CR fiberglass epoxy, normal direction at 77 K",
+   "value": 0.279965413171,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2+T3; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-05/g10cr.k.normal/T=300K",
+   "quantity": "k of G-10CR fiberglass epoxy, normal direction at 300 K",
+   "value": 0.607982754731,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2+T3; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "log10Polynomial",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-06/cu_ofhc.k.rrr50/T=4K",
+   "quantity": "k of OFHC copper, RRR = 50 at 4 K",
+   "value": 320.383132925,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T3+T4; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "nistRational",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-06/cu_ofhc.k.rrr50/T=20K",
+   "quantity": "k of OFHC copper, RRR = 50 at 20 K",
+   "value": 1367.85481145,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T3+T4; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "nistRational",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-06/cu_ofhc.k.rrr50/T=77K",
+   "quantity": "k of OFHC copper, RRR = 50 at 77 K",
+   "value": 515.074322619,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T3+T4; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "nistRational",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-06/cu_ofhc.k.rrr50/T=300K",
+   "quantity": "k of OFHC copper, RRR = 50 at 300 K",
+   "value": 392.368244868,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T3+T4; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "nistRational",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-06/cu_ofhc.k.rrr100/T=4K",
+   "quantity": "k of OFHC copper, RRR = 100 at 4 K",
+   "value": 642.296960743,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T3+T4; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "nistRational",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-06/cu_ofhc.k.rrr100/T=20K",
+   "quantity": "k of OFHC copper, RRR = 100 at 20 K",
+   "value": 2422.51026454,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T3+T4; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "nistRational",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-06/cu_ofhc.k.rrr100/T=77K",
+   "quantity": "k of OFHC copper, RRR = 100 at 77 K",
+   "value": 547.199698079,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T3+T4; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "nistRational",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-06/cu_ofhc.k.rrr100/T=300K",
+   "quantity": "k of OFHC copper, RRR = 100 at 300 K",
+   "value": 396.323959015,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T3+T4; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "nistRational",
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-07/aa6061_t6.E/T=4K",
+   "quantity": "E of 6061-T6 aluminium (UNS A96061) at 4 K",
+   "value": 77.7488145649,
+   "unit": "GPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "polynomial",
+   "rangeStatus": "range_tbd"
+  },
+  {
+   "id": "VC-PROP-07/aa6061_t6.E/T=77K",
+   "quantity": "E of 6061-T6 aluminium (UNS A96061) at 77 K",
+   "value": 77.1450506573,
+   "unit": "GPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "polynomial",
+   "rangeStatus": "range_tbd"
+  },
+  {
+   "id": "VC-PROP-07/aa6061_t6.E/T=295K",
+   "quantity": "E of 6061-T6 aluminium (UNS A96061) at 295 K",
+   "value": 70.2840414457,
+   "unit": "GPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2; evaluated here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-03",
+    "TR-PROP-03"
+   ],
+   "form": "polynomial",
+   "rangeStatus": "range_tbd"
+  },
+  {
+   "id": "VC-PROP-07/aa6061_t6.thermalStrain/T=4K",
+   "quantity": "(L - L293)/L293 of 6061-T6",
+   "value": -0.0041545,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2 (tLow from T2)",
+   "grade": "B",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-07"
+   ],
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-07/aa6061_t6.thermalStrain/T=20K",
+   "quantity": "(L - L293)/L293 of 6061-T6",
+   "value": -0.004154198168,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2 (tLow from T2)",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-07"
+   ],
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-07/aa6061_t6.thermalStrain/T=77K",
+   "quantity": "(L - L293)/L293 of 6061-T6",
+   "value": -0.00388731729659,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2 (tLow from T2)",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-07"
+   ],
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-07/aa6061_t6.thermalStrain/T=293K",
+   "quantity": "(L - L293)/L293 of 6061-T6",
+   "value": -3.56973497e-07,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST fit via T1+T2 (tLow from T2)",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "FR-PROP-07"
+   ],
+   "rangeStatus": "in_data_range"
+  },
+  {
+   "id": "VC-PROP-07/aa6061_t6.cte/T=77K",
+   "quantity": "instantaneous CTE alpha = (ds/dT)/(1 + s), llull derivation",
+   "value": 8.72468348602e-06,
+   "unit": "1/K",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived analytically from the S1 thermal-strain fit",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-07",
+    "TR-PROP-05"
+   ],
+   "note": "llull derivation, not a NIST-published CTE fit"
+  },
+  {
+   "id": "VC-PROP-07/aa6061_t6.cte/T=200K",
+   "quantity": "instantaneous CTE alpha = (ds/dT)/(1 + s), llull derivation",
+   "value": 2.01017102461e-05,
+   "unit": "1/K",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived analytically from the S1 thermal-strain fit",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-07",
+    "TR-PROP-05"
+   ],
+   "note": "llull derivation, not a NIST-published CTE fit"
+  },
+  {
+   "id": "VC-PROP-07/aa6061_t6.cte/T=293K",
+   "quantity": "instantaneous CTE alpha = (ds/dT)/(1 + s), llull derivation",
+   "value": 2.26423649957e-05,
+   "unit": "1/K",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "derived analytically from the S1 thermal-strain fit",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-07",
+    "TR-PROP-05"
+   ],
+   "note": "llull derivation, not a NIST-published CTE fit"
+  },
+  {
+   "id": "VC-PROP-08/aa6061_t6.k/T=0.5K",
+   "quantity": "range status of aa6061_t6.k at 0.5 K",
+   "value": "PROP_OUT_OF_RANGE",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "ranges in nist_cryogenic_fits.json (S1 search extracts)",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-04",
+    "TR-PROP-04"
+   ]
+  },
+  {
+   "id": "VC-PROP-08/aa6061_t6.k/T=400K",
+   "quantity": "range status of aa6061_t6.k at 400 K",
+   "value": "PROP_OUT_OF_RANGE",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "ranges in nist_cryogenic_fits.json (S1 search extracts)",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-04",
+    "TR-PROP-04"
+   ]
+  },
+  {
+   "id": "VC-PROP-08/aa6061_t6.k/T=2K",
+   "quantity": "range status of aa6061_t6.k at 2 K",
+   "value": "in_equation_range_only",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "ranges in nist_cryogenic_fits.json (S1 search extracts)",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-04",
+    "TR-PROP-04"
+   ],
+   "valueIfWarned": 2.53895791268,
+   "unverifiedReason": "outside data range"
+  },
+  {
+   "id": "VC-PROP-08/ti6al4v.k/T=10K",
+   "quantity": "range status of ti6al4v.k at 10 K",
+   "value": "PROP_OUT_OF_RANGE",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "ranges in nist_cryogenic_fits.json (S1 search extracts)",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-04",
+    "TR-PROP-04"
+   ]
+  },
+  {
+   "id": "VC-PROP-08/ti6al4v.k/T=21K",
+   "quantity": "range status of ti6al4v.k at 21 K",
+   "value": "in_equation_range_only",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "ranges in nist_cryogenic_fits.json (S1 search extracts)",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-04",
+    "TR-PROP-04"
+   ],
+   "valueIfWarned": 1.08526425753,
+   "unverifiedReason": "outside data range"
+  },
+  {
+   "id": "VC-PROP-08/aa6061_t6.cp/T=3K",
+   "quantity": "range status of aa6061_t6.cp at 3 K",
+   "value": "PROP_OUT_OF_RANGE",
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "ranges in nist_cryogenic_fits.json (S1 search extracts)",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-04",
+    "TR-PROP-04"
+   ]
+  },
+  {
+   "id": "VC-PROP-09/ss304.E/jump@57K",
+   "quantity": "discontinuity at the 57 K breakpoint (high - low segment)",
+   "value": 0.0373135477254,
+   "unit": "GPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 NIST 304 E segments via T1",
+   "grade": "B",
+   "proves": [
+    "FR-PROP-05",
+    "TR-PROP-06"
+   ],
+   "expectCheck": "PROP_DISCONTINUITY warning when |jump|/value > 1e-3 (named default)",
+   "relativeJump": 0.000174038209978
+  },
+  {
+   "id": "VC-PROP-09/ss304.E/T=20K",
+   "quantity": "304 E, piecewise (left segment wins at 57 K)",
+   "value": 210.062022,
+   "unit": "GPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 via T1/T2",
+   "grade": "B",
+   "proves": [
+    "FR-PROP-05"
+   ]
+  },
+  {
+   "id": "VC-PROP-09/ss304.E/T=57K",
+   "quantity": "304 E, piecewise (left segment wins at 57 K)",
+   "value": 214.398595171,
+   "unit": "GPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 via T1/T2",
+   "grade": "B",
+   "proves": [
+    "FR-PROP-05"
+   ]
+  },
+  {
+   "id": "VC-PROP-09/ss304.E/T=100K",
+   "quantity": "304 E, piecewise (left segment wins at 57 K)",
+   "value": 213.73583,
+   "unit": "GPa",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 via T1/T2",
+   "grade": "B",
+   "proves": [
+    "FR-PROP-05"
+   ]
+  },
+  {
+   "id": "VC-PROP-09/invar36/transcriptionConflict@300K",
+   "quantity": "difference between two transcriptions of one NIST fit at 300 K",
+   "value": 8.1e-07,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "T1 vs T2 (e = 9.794e-11 vs 8.794e-11)",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-08",
+    "TR-PROP-09"
+   ],
+   "expectCheck": "PROP_SOURCE_CONFLICT warning: same sourceId + locator, different coefficients"
+  },
+  {
+   "id": "VC-PROP-10/arrhenius/T=600K",
+   "quantity": "synthetic Arrhenius y = 1e-3 * exp(-150000/(R*T))",
+   "value": 8.7416813144e-17,
+   "unit": "1/s",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "synthetic; R = N_A*k_B exact (SI 2019)",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "TR-PROP-03"
+   ]
+  },
+  {
+   "id": "VC-PROP-10/arrhenius/T=800K",
+   "quantity": "synthetic Arrhenius y = 1e-3 * exp(-150000/(R*T))",
+   "value": 1.60766748177e-13,
+   "unit": "1/s",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "synthetic; R = N_A*k_B exact (SI 2019)",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "TR-PROP-03"
+   ]
+  },
+  {
+   "id": "VC-PROP-10/arrhenius/T=1000K",
+   "quantity": "synthetic Arrhenius y = 1e-3 * exp(-150000/(R*T))",
+   "value": 1.46203234889e-11,
+   "unit": "1/s",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "synthetic; R = N_A*k_B exact (SI 2019)",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-02",
+    "TR-PROP-03"
+   ]
+  },
+  {
+   "id": "VC-PROP-11/table1d/linear/T=300K",
+   "quantity": "synthetic table (100,10),(200,40),(400,160) at 300 K, mode linear",
+   "value": 100.0,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "synthetic; interpolation rules TECHNICAL_SPEC §5.2",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-05",
+    "TR-PROP-06"
+   ]
+  },
+  {
+   "id": "VC-PROP-11/table1d/loglog/T=300K",
+   "quantity": "synthetic table (100,10),(200,40),(400,160) at 300 K, mode loglog",
+   "value": 90.0,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "synthetic; interpolation rules TECHNICAL_SPEC §5.2",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-05",
+    "TR-PROP-06"
+   ]
+  },
+  {
+   "id": "VC-PROP-11/table1d/loglinear/T=300K",
+   "quantity": "synthetic table (100,10),(200,40),(400,160) at 300 K, mode loglinear",
+   "value": 80.0,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "synthetic; interpolation rules TECHNICAL_SPEC §5.2",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-05",
+    "TR-PROP-06"
+   ]
+  },
+  {
+   "id": "VC-PROP-11/table1d/step/T=300K",
+   "quantity": "synthetic table (100,10),(200,40),(400,160) at 300 K, mode step",
+   "value": 40.0,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "synthetic; interpolation rules TECHNICAL_SPEC §5.2",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-05",
+    "TR-PROP-06"
+   ]
+  },
+  {
+   "id": "VC-PROP-12/table2d/T=383K,rate=1/s",
+   "quantity": "synthetic yield stress table, bilinear in (T, log10 rate)",
+   "value": 307.5,
+   "unit": "MPa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "synthetic",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-06",
+    "TR-PROP-06"
+   ]
+  },
+  {
+   "id": "VC-PROP-12/rateFactor/johnsonCook",
+   "quantity": "synthetic J-C rate factor 1 + C ln(rate/rate0), C = 0.014, rate0 = 1/s, rate = 1000/s",
+   "value": 1.09670857391,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "synthetic; form from Johnson & Cook 1983 (S9)",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-06"
+   ]
+  },
+  {
+   "id": "VC-PROP-12/rateFactor/cowperSymonds",
+   "quantity": "synthetic Cowper-Symonds 1 + (rate/D)^(1/q), D = 40.4/s, q = 5, rate = 1000/s",
+   "value": 2.89986930849,
+   "unit": "1",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "synthetic fixture (constants not attributed)",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-06"
+   ]
+  },
+  {
+   "id": "VC-PROP-13/refit6061k/maxRelError",
+   "quantity": "max relative error of a degree-7 log10-polynomial refit of 27 samples of the 6061-T6 k fit",
+   "value": 0.0,
+   "unit": "1",
+   "tolerance": {
+    "abs": 1e-08
+   },
+   "source": "S1 fit sampled at 27 temperatures 4-300 K; exact rational least squares here",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-09",
+    "TR-PROP-08"
+   ],
+   "generatorObserved": 5.11e-15
+  },
+  {
+   "id": "VC-PROP-13/refit6061k/coefficients",
+   "quantity": "refit coefficients a..h (should reproduce the NIST coefficients)",
+   "value": [
+    0.0791799999999,
+    1.0957,
+    -0.0727700000011,
+    0.0808400000014,
+    0.0280299999989,
+    -0.0946399999995,
+    0.0417899999999,
+    -0.00570999999999
+   ],
+   "unit": "-",
+   "tolerance": {
+    "abs": 1e-05
+   },
+   "source": "same",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-09",
+    "TR-PROP-08"
+   ],
+   "reference": [
+    0.07918,
+    1.0957,
+    -0.07277,
+    0.08084,
+    0.02803,
+    -0.09464,
+    0.04179,
+    -0.00571
+   ],
+   "generatorMaxAbsDiff": 1.44e-12
+  },
+  {
+   "id": "VC-PROP-14/arrheniusFit/Q",
+   "quantity": "Arrhenius fit (ln y vs 1/T) of the synthetic VC-PROP-10 data: activation energy",
+   "value": 150000.0,
+   "unit": "J/mol",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "synthetic; exact rational least squares",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-09",
+    "TR-PROP-08"
+   ]
+  },
+  {
+   "id": "VC-PROP-14/arrheniusFit/A",
+   "quantity": "same: pre-exponential factor",
+   "value": 0.001,
+   "unit": "1/s",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "synthetic",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-09"
+   ]
+  },
+  {
+   "id": "VC-PROP-15/aa6061_t6.k/band@77K",
+   "quantity": "fit-error band k(77 K) * (1 -/+ 0.005), kind fitErrorVsData (not a confidence bound)",
+   "value": [
+    83.1137847373,
+    83.9490991568
+   ],
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 coefficients (A) + 0.5 % fit error (search extract)",
+   "grade": "B",
+   "proves": [
+    "FR-PROP-10",
+    "TR-PROP-10"
+   ]
+  },
+  {
+   "id": "VC-PROP-16/aa6061_t6.k/T=-196degC",
+   "quantity": "k at -196 degC (= 77.15 K) requested in degC",
+   "value": 83.6343787049,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 + affine conversion K = degC + 273.15",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-11",
+    "TR-PROP-02"
+   ]
+  },
+  {
+   "id": "VC-PROP-16/aa6061_t6.k/T=-320degF",
+   "quantity": "k at -320 degF (= 77.594444 K)",
+   "value": 83.9384687781,
+   "unit": "W/(m*K)",
+   "tolerance": {
+    "rel": 1e-09
+   },
+   "source": "S1 + K = (degF + 459.67) * 5/9",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-11",
+    "TR-PROP-02"
+   ]
+  },
+  {
+   "id": "VC-PROP-16/aa6061_t6.k/T=77K/in_W_per_mm_K",
+   "quantity": "k at 77 K in W/(mm*K)",
+   "value": 0.0835314419471,
+   "unit": "W/(mm*K)",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "S1; 1 m = 1000 mm",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-11"
+   ]
+  },
+  {
+   "id": "VC-PROP-17/legacy08PercentOfRT/T=400degF",
+   "quantity": "08 MAT percentOfRT table evaluated through evaluate_property",
+   "value": 39.0,
+   "unit": "ksi",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "08 VC-MAT-16 synthetic table",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-12",
+    "TR-PROP-07"
+   ],
+   "sameAs": "08 VC-MAT-16 (39 ksi)"
+  },
+  {
+   "id": "VC-PROP-20/ss304.k/integral4to300K",
+   "quantity": "thermal conductivity integral from 4 K to 300 K (heat per unit A/L)",
+   "value": 3030.84358308,
+   "unit": "W/m",
+   "tolerance": {
+    "rel": 1e-08
+   },
+   "source": "S1 fit; composite Simpson, 40000 intervals (converged to < 1e-11)",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-18",
+    "TR-PROP-13"
+   ]
+  },
+  {
+   "id": "VC-PROP-20/aa6061_t6.k/integral4to300K",
+   "quantity": "thermal conductivity integral from 4 K to 300 K (heat per unit A/L)",
+   "value": 32325.1862914,
+   "unit": "W/m",
+   "tolerance": {
+    "rel": 1e-08
+   },
+   "source": "S1 fit; composite Simpson, 40000 intervals (converged to < 1e-11)",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-18",
+    "TR-PROP-13"
+   ]
+  },
+  {
+   "id": "VC-PROP-18/unverified",
+   "quantity": "evaluate_property on a model with basis 'typical'",
+   "value": true,
+   "unit": "bool",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "AF-32",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-13",
+    "TR-PROP-11"
+   ],
+   "expect": {
+    "data.unverified": true,
+    "data.unverifiedReasons": [
+     "basis typical"
+    ]
+   }
+  },
+  {
+   "id": "VC-PROP-18/outsideDataRange",
+   "quantity": "evaluate_property ti6al4v.k at 21 K",
+   "value": true,
+   "unit": "bool",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "AF-31/32",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-04",
+    "FR-PROP-13"
+   ],
+   "expect": {
+    "data.rangeStatus": "in_equation_range_only",
+    "data.unverified": true,
+    "warnings[0].code": "PROP_OUTSIDE_DATA_RANGE"
+   }
+  },
+  {
+   "id": "VC-PROP-19/errorCodes",
+   "quantity": "deliberately wrong inputs return stable codes",
+   "value": [
+    "PROP_OUT_OF_RANGE",
+    "PROP_VARIABLE_MISSING",
+    "MAT_UNIT_DIMENSION",
+    "PROP_FORM_INVALID",
+    "PROP_TABLE_NOT_MONOTONIC",
+    "PROP_NO_MODEL_FOR_PROPERTY",
+    "PROP_CONSTANT_ONLY",
+    "PROP_FIT_INSUFFICIENT_DATA"
+   ],
+   "unit": "-",
+   "tolerance": {
+    "exact": true
+   },
+   "source": "TECHNICAL_SPEC §7.1",
+   "grade": "A",
+   "proves": [
+    "FR-PROP-14",
+    "TR-PROP-12"
+   ]
+  }
+ ]
+}

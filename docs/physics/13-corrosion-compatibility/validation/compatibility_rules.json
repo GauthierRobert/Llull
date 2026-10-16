@@ -1,0 +1,109 @@
+{
+ "schema": "PHY-13 COR compatibility rule table, draft 0.1 (TECHNICAL_SPEC §3.2). AF-30: rules as data with sources.",
+ "accessed": "2026-10-15",
+ "rules": [
+  {
+   "id": "COR-R-01",
+   "name": "MIL-STD-889D galvanic corrosion rate matrix",
+   "method": "Anodic-member corrosion rate (mil/year) of a 1:1 area couple under artificial seawater, from joint polarization curves (mixed potential). Rows = anodic member, columns = cathodic member; an empty cell means the members are swapped.",
+   "compatibleBelow": {
+    "value": 0.009,
+    "unit": "mil/yr",
+    "status": "secondary",
+    "source": "S2 (NAWCAD slides, category 0 < 0.009 mil/yr) + S1 summary"
+   },
+   "scopeLimit": "The table shall not be used to indicate the level of risk of a couple nor the level of protection required (S2, S3). llull reports the cell; it never derives a protection level from it.",
+   "matrix": "tbd: transcribe from MIL-STD-889D (DoD ASSIST, public) into galvanic_889d_matrix.json; no cell is shipped until read from the standard",
+   "status": "structure verified, values tbd",
+   "grade": "B"
+  },
+  {
+   "id": "COR-R-02",
+   "name": "Anodic index difference (non-889 screening)",
+   "method": "|AI(anode) - AI(cathode)| <= limit(environment); the member with the larger index is the anode",
+   "table": "galvanic_anodic_index.csv",
+   "limits": "anodic_index_limits.csv",
+   "label": "industrial rule of thumb, NOT MIL-STD-889; S8 says not for critical applications such as aerospace flying parts",
+   "status": "limits verified (A), indices secondary (B)",
+   "grade": "B"
+  },
+  {
+   "id": "COR-R-03",
+   "name": "Small anode / large cathode",
+   "method": "report Aa/Ac (wetted anode area / cathode area); warn when the anode is the smaller member (Aa/Ac < 1)",
+   "basis": "corrosion concentrates on a small anode coupled to a large cathode (S9); 889D values assume a 1:1 ratio (S2, S3)",
+   "threshold": "directional only (no numeric limit found); a company limit can be supplied and is then named",
+   "status": "secondary",
+   "grade": "B"
+  },
+  {
+   "id": "COR-R-04",
+   "name": "Carbon fibre composite in contact with aluminium",
+   "method": "CFRP (carbon) is noble to aluminium; direct contact is flagged unless an isolation is declared (glass ply, sealant, primer/adhesive layer)",
+   "status": "secondary",
+   "source": "S10 (Composite Envisions note; forum practice of a glass barrier ply, wet installation)",
+   "grade": "B"
+  },
+  {
+   "id": "COR-R-05",
+   "name": "Stress-corrosion cracking susceptibility (sodium chloride environments)",
+   "method": "classify alloy + temper (+ product form, grain direction) into MSFC-STD-3029A Table I (high resistance), II (moderate), III (low); Table II/III require an approved materials usage agreement",
+   "tables": "scc_classes.json (entries tbd except the listed secondary facts)",
+   "status": "structure verified",
+   "source": "S11, S12",
+   "grade": "B"
+  },
+  {
+   "id": "COR-R-06",
+   "name": "Hydrogen embrittlement flag",
+   "method": "steel with Ftu >= threshold and an electroplated or acid-processed surface system => warn (bake / plating process control required)",
+   "threshold": {
+    "value": 180,
+    "unit": "ksi",
+    "defaulted": true,
+    "source": "S13 (NAS672 scope: cadmium plating of steel heat-treated to 180 ksi and higher)",
+    "status": "secondary"
+   },
+   "note": "S14 reports a historical restriction of cadmium electroplating on steels above 220 ksi; S15 ASTM F519 baseline 4340 at 260-280 ksi",
+   "grade": "B"
+  },
+  {
+   "id": "COR-R-07",
+   "name": "Remedy vocabulary (not requirements)",
+   "remedies": [
+    {
+     "id": "sealant_faying",
+     "spec": "MIL-PRF-81733 Type IV (faying surface)",
+     "source": "S16"
+    },
+    {
+     "id": "sealant_wet_install",
+     "spec": "MIL-PRF-81733 Type II (extrusion) / wet installation of fasteners",
+     "source": "S16"
+    },
+    {
+     "id": "primer",
+     "spec": "MIL-PRF-23377 epoxy primer",
+     "source": "S17"
+    },
+    {
+     "id": "conversion_coating",
+     "spec": "MIL-DTL-81706",
+     "source": "S17"
+    },
+    {
+     "id": "glass_isolation_ply",
+     "spec": "company practice",
+     "source": "S10"
+    },
+    {
+     "id": "isolating_washer_or_tape",
+     "spec": "company practice",
+     "source": "S9"
+    }
+   ],
+   "note": "llull proposes remedies as options with sources; selecting one is a design decision (reviewRequired)",
+   "grade": "B"
+  }
+ ]
+}

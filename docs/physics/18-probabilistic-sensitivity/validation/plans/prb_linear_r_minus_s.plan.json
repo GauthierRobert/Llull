@@ -1,0 +1,61 @@
+[
+ {
+  "command": "define_random_variable",
+  "params": {
+   "name": "R",
+   "unit": "MPa",
+   "binding": {
+    "kind": "free"
+   },
+   "distribution": {
+    "kind": "normal",
+    "mean": 300,
+    "sd": 30
+   },
+   "citation": {
+    "text": "VC-PRB-01 test input"
+   }
+  }
+ },
+ {
+  "command": "define_random_variable",
+  "params": {
+   "name": "S",
+   "unit": "MPa",
+   "binding": {
+    "kind": "free"
+   },
+   "distribution": {
+    "kind": "normal",
+    "mean": 200,
+    "sd": 40
+   },
+   "citation": {
+    "text": "VC-PRB-01 test input"
+   }
+  }
+ },
+ {
+  "command": "define_limit_state",
+  "params": {
+   "name": "g",
+   "expression": "R - S",
+   "unit": "MPa"
+  }
+ },
+ {
+  "command": "reliability_form",
+  "params": {
+   "limitState": "g",
+   "sorm": true
+  }
+ },
+ {
+  "command": "propagate_uncertainty",
+  "params": {
+   "method": "mc",
+   "samples": 200000,
+   "seed": 20261015
+  }
+ }
+]

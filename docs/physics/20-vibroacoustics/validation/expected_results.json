@@ -1,0 +1,344 @@
+{
+ "pack": "20-vibroacoustics",
+ "generatedBy": "generate_acoustic_reference.py",
+ "cases": [
+  {
+   "id": "VC-VAC-01",
+   "quantity": "rms pressure for SPL 94, 120, 140, 150 dB re 20 uPa (p = p0 10^(L/20))",
+   "value": [
+    1.00237446725,
+    20.0,
+    200.0,
+    632.455532034
+   ],
+   "unit": "Pa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "derived (definition L = 20 log10(p/p0), p0 S3/S4)",
+   "grade": "A",
+   "proves": [
+    "FR-VAC-02",
+    "TR-VAC-10"
+   ]
+  },
+  {
+   "id": "VC-VAC-02",
+   "quantity": "SPL of 1 Pa and 1 kPa rms",
+   "value": [
+    93.9794000867,
+    153.979400087
+   ],
+   "unit": "dB re 20 uPa",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "derived",
+   "grade": "A",
+   "proves": [
+    "FR-VAC-02",
+    "TR-VAC-10"
+   ]
+  },
+  {
+   "id": "VC-VAC-03",
+   "quantity": "1/3-octave band at 1 kHz (x = 0, b = 3): exact mid, lower edge, upper edge, bandwidth",
+   "value": [
+    1000.0,
+    891.250938134,
+    1122.0184543,
+    230.767516168
+   ],
+   "unit": "Hz",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "derived (S2 formulas via S4 implementation)",
+   "grade": "A",
+   "proves": [
+    "FR-VAC-03",
+    "TR-VAC-11"
+   ]
+  },
+  {
+   "id": "VC-VAC-04",
+   "quantity": "relative bandwidth (f2 - f1)/fm for 1/3-octave and octave bands (base 10)",
+   "value": [
+    0.230767516168,
+    0.704591760239
+   ],
+   "unit": "-",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "derived",
+   "grade": "A",
+   "proves": [
+    "FR-VAC-03",
+    "TR-VAC-11"
+   ]
+  },
+  {
+   "id": "VC-VAC-05",
+   "quantity": "exact mid-band frequency of the 1/3-octave bands labelled 25 Hz and 10 kHz (labels are nominal, S4)",
+   "value": [
+    25.1188643151,
+    10000.0
+   ],
+   "unit": "Hz",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "derived; nominal labels S4",
+   "grade": "A",
+   "proves": [
+    "FR-VAC-03"
+   ],
+   "note": "Spectra are stored against exact mid-band frequencies; nominal labels are display only (25 Hz band is 25.1189 Hz)."
+  },
+  {
+   "id": "VC-VAC-06",
+   "quantity": "OASPL of a synthetic flat spectrum: 27 one-third-octave bands (25 Hz - 10 kHz) at 130 dB each (test input)",
+   "value": 144.313637642,
+   "unit": "dB re 20 uPa",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "derived (energy sum, 130 + 10 log10 27)",
+   "grade": "A",
+   "proves": [
+    "FR-VAC-04",
+    "TR-VAC-12",
+    "FR-VAC-01"
+   ]
+  },
+  {
+   "id": "VC-VAC-07",
+   "quantity": "three equal 1/3-octave bands combined into their octave: level increase; two equal sources: increase",
+   "value": [
+    4.7712125472,
+    3.01029995664
+   ],
+   "unit": "dB",
+   "tolerance": {
+    "abs": 1e-12
+   },
+   "source": "derived (10 log10 3, 10 log10 2)",
+   "grade": "A",
+   "proves": [
+    "FR-VAC-04",
+    "TR-VAC-12"
+   ]
+  },
+  {
+   "id": "VC-VAC-08",
+   "quantity": "OASPL of five unequal bands 120, 126, 131, 128, 122 dB (test input)",
+   "value": 134.05940141,
+   "unit": "dB re 20 uPa",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "derived",
+   "grade": "A",
+   "proves": [
+    "FR-VAC-04"
+   ]
+  },
+  {
+   "id": "VC-VAC-09",
+   "quantity": "overall rms pressure of VC-VAC-06 spectrum, and the same from the root-sum-square of band pressures",
+   "value": [
+    328.633534503,
+    328.633534503
+   ],
+   "unit": "Pa",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "derived",
+   "grade": "A",
+   "proves": [
+    "FR-VAC-04",
+    "TR-VAC-12"
+   ]
+  },
+  {
+   "id": "VC-VAC-10",
+   "quantity": "band-averaged pressure PSD of a 130 dB 1/3-octave band at 1 kHz and at 100 Hz (G = p^2 / bandwidth)",
+   "value": [
+    17.3334621199,
+    173.334621199
+   ],
+   "unit": "Pa^2/Hz",
+   "tolerance": {
+    "rel": 1e-12
+   },
+   "source": "derived",
+   "grade": "A",
+   "proves": [
+    "FR-VAC-05",
+    "TR-VAC-13"
+   ],
+   "note": "Round trip PSD -> SPL must give 130 dB back (TR-VAC-13); the PSD is band-averaged, not a narrow-band level."
+  },
+  {
+   "id": "VC-VAC-11",
+   "quantity": "round trip SPL -> PSD -> SPL at 1 kHz",
+   "value": 130.0,
+   "unit": "dB re 20 uPa",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "derived",
+   "grade": "A",
+   "proves": [
+    "FR-VAC-05",
+    "TR-VAC-13"
+   ]
+  },
+  {
+   "id": "VC-VAC-12",
+   "quantity": "octave band 1 kHz from its thirds 800 / 1000 / 1250 Hz at 128 / 131 / 127 dB (test input)",
+   "value": 133.785922887,
+   "unit": "dB re 20 uPa",
+   "tolerance": {
+    "abs": 1e-09
+   },
+   "source": "derived",
+   "grade": "A",
+   "proves": [
+    "FR-VAC-06",
+    "TR-VAC-14"
+   ],
+   "octaveMidHz": 1000.0,
+   "note": "Octave edges coincide with the outer third edges (G^(+-1/2) = G^(+-1/6 +- 1/3))."
+  },
+  {
+   "id": "VC-VAC-20",
+   "quantity": "NASA-STD-7001 / GEVS acoustic test levels (any band value)",
+   "value": "TBD",
+   "unit": "dB re 20 uPa",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "S5 (NASA-STD-7001B supersedes A, 2017: scope only, values not seen); S6 GSFC-STD-7000B (catalogue)",
+   "grade": "TBD",
+   "proves": [
+    "FR-VAC-07"
+   ],
+   "note": "No level is shipped until a human reads the standard; library entries stay empty (TECHNICAL_SPEC open question 1)."
+  },
+  {
+   "id": "VC-VAC-30",
+   "quantity": "define_acoustic_spectrum with a non-standard band centre",
+   "value": {
+    "exit": 1,
+    "code": "VAC_BAND_UNKNOWN"
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "TECHNICAL_SPEC section 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-VAC-03",
+    "FR-VAC-10"
+   ],
+   "note": "behaviour case"
+  },
+  {
+   "id": "VC-VAC-31",
+   "quantity": "spectrum without a reference statement",
+   "value": {
+    "exit": 1,
+    "code": "VAC_REFERENCE_UNSET"
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "TECHNICAL_SPEC section 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-VAC-02",
+    "FR-VAC-10"
+   ],
+   "note": "behaviour case"
+  },
+  {
+   "id": "VC-VAC-32",
+   "quantity": "export_acoustic_load of a grade-B / user spectrum",
+   "value": {
+    "unverified": true,
+    "reviewRequired": true,
+    "warning": "VAC_SPECTRUM_UNVERIFIED"
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "TECHNICAL_SPEC section 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-VAC-08",
+    "FR-VAC-09",
+    "TR-VAC-20",
+    "TR-VAC-30"
+   ],
+   "note": "behaviour case"
+  },
+  {
+   "id": "VC-VAC-34",
+   "quantity": "V1: exposure as a PHY-09 random-pressure load with the correlation assumption named (TBD)",
+   "value": {
+    "assumption": "fully correlated"
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "TECHNICAL_SPEC section 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-VAC-12"
+   ],
+   "note": "behaviour case"
+  },
+  {
+   "id": "VC-VAC-35",
+   "quantity": "plugin contract: validate/restore round trip, toolSchemas snapshot",
+   "value": {
+    "roundTripDeepEqual": true
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "TECHNICAL_SPEC section 7.1",
+   "grade": "A",
+   "proves": [
+    "TR-VAC-01"
+   ],
+   "note": "behaviour case"
+  },
+  {
+   "id": "VC-VAC-33",
+   "quantity": "request for an SEA / acoustic-FE response",
+   "value": {
+    "exit": 1,
+    "code": "VAC_OUT_OF_SCOPE"
+   },
+   "unit": "-",
+   "tolerance": {
+    "abs": 0
+   },
+   "source": "TECHNICAL_SPEC section 7.1",
+   "grade": "A",
+   "proves": [
+    "FR-VAC-11"
+   ],
+   "note": "behaviour case"
+  }
+ ]
+}

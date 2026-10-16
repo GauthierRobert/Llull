@@ -1,0 +1,11 @@
+[
+ {"command": "set_units", "params": {"units": "mm"}},
+ {"command": "create_material", "params": {"name": "syn_low", "density": 0.0012, "color": "#d9a441", "metalness": 0, "roughness": 0.6}},
+ {"command": "set_material_property", "params": {"material": "syn_low", "property": "TML", "value": 0.95, "unit": "%", "basis": "company", "source": {"citation": "synthetic test value (PHY-14 VC-ENV-06.1)"}}},
+ {"command": "set_material_property", "params": {"material": "syn_low", "property": "CVCM", "value": 0.05, "unit": "%", "basis": "company", "source": {"citation": "synthetic test value"}}},
+ {"command": "set_material_property", "params": {"material": "syn_low", "property": "WVR", "value": 0.30, "unit": "%", "basis": "company", "source": {"citation": "synthetic test value"}}},
+ {"command": "add_box", "params": {"size": [100, 100, 16.6666666667], "anchor": "min"}, "as": "panel"},
+ {"command": "assign_material", "params": {"materialName": "syn_low", "entityIds": ["$panel"]}},
+ {"command": "set_mission_environment", "params": {"outgassingProfile": "nasa_gsfc_screening"}},
+ {"command": "check_space_environment", "params": {"entityIds": ["$panel"]}}
+]

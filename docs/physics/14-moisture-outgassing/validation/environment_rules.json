@@ -1,0 +1,92 @@
+{
+ "schema": "PHY-14 ENV limit profiles and rule data, draft 0.1 (TECHNICAL_SPEC §3.2). AF-30.",
+ "accessed": "2026-10-15",
+ "testMethods": {
+  "ASTM_E595": {
+   "conditions": "125 degC, 24 h, < 7e-3 Pa (5e-5 torr); condensables collected at 25 degC; outputs TML, CVCM, optional WVR",
+   "status": "verified",
+   "source": "S1 (ANSI/ASTM catalogue abstract) + S2 (Element)"
+  },
+  "ECSS_Q_ST_70_02C": {
+   "conditions": "24 h preconditioning at 22 degC / 55 % RH, then 125 degC, 24 h, high vacuum; outputs TML, RML, CVCM (and WVR)",
+   "status": "verified",
+   "source": "S5 (ECSS catalogue) + S6 (DLR / test labs)"
+  }
+ },
+ "profiles": [
+  {
+   "id": "nasa_gsfc_screening",
+   "label": "NASA GSFC outgassing screening (database background, ASTM E595)",
+   "limits": [
+    {
+     "quantity": "TML",
+     "op": "<=",
+     "value": 1.0,
+     "unit": "%"
+    },
+    {
+     "quantity": "CVCM",
+     "op": "<=",
+     "value": 0.1,
+     "unit": "%"
+    }
+   ],
+   "status": "verified",
+   "source": "S3 (outgassing.nasa.gov background: maximum TML 1.0 %, maximum CVCM 0.10 %) + S4 (data.nasa.gov listing)",
+   "note": "GSFC preferred practice PD-1410 (S7) words it as TML < 1.0 % and CVCM < 0.10 %; the operator differs between sources (OQ-ENV-01). Programs may tailor."
+  },
+  {
+   "id": "ecss_q_st_70_02",
+   "label": "ECSS-Q-ST-70-02C general acceptance",
+   "limits": [
+    {
+     "quantity": "RML",
+     "op": "<",
+     "value": 1.0,
+     "unit": "%"
+    },
+    {
+     "quantity": "CVCM",
+     "op": "<",
+     "value": 0.1,
+     "unit": "%"
+    }
+   ],
+   "status": "secondary",
+   "source": "S6 (test-lab report quoting ECSS-Q-ST-70-02C: RML < 1,00 %, CVCM < 0,10 %)",
+   "note": "the standard notes acceptance depends on application and location and can be more severe"
+  }
+ ],
+ "derived": {
+  "RML": "RML = TML - WVR (recovered mass loss: mass loss without the regained water); S6, S8"
+ },
+ "atomicOxygen": {
+  "kaptonH": {
+   "erosionYield": {
+    "value": 3e-24,
+    "unit": "cm^3/atom"
+   },
+   "status": "verified",
+   "source": "S9 (JAXA repository paper: first measured on STS-8/EOIM-1) + S10 (SPENVIS/ECSS erosion background); used as the fluence reference in flight experiments",
+   "caveat": "S9/S11: Ey depends on exposure conditions; ground-facility values differ"
+  },
+  "misse2Fluence": {
+   "value": 8.43e+21,
+   "unit": "atoms/cm^2",
+   "status": "secondary",
+   "source": "S12 (computational study quoting MISSE 2 fluence)"
+  },
+  "kaptonDensity": {
+   "value": null,
+   "unit": "g/cm^3",
+   "status": "tbd",
+   "source": "NASA TM-2008-215490 (S13) not read"
+  }
+ },
+ "moisture": {
+  "model": "Fickian 1D diffusion through a plate of thickness h exposed on both faces (Crank plane sheet; Shen & Springer 1976 for composites)",
+  "status": "analytic",
+  "source": "S14 (Shen & Springer, J. Compos. Mater. 10 (1976) 2-20) + S15 (Crank, The Mathematics of Diffusion, catalogue)",
+  "materialData": "D(T), Mm(RH) and beta are material data: none sourced in this session (tbd); synthetic values in the generator only"
+ }
+}

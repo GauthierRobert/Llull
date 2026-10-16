@@ -1,0 +1,4 @@
+environment,max_anodic_index_difference_V,description,status,source
+harsh,0.15,outdoor / high humidity / salt,verified,S7 (Engineers Edge) + S8 (Carr Lane)
+normal,0.25,warehouse / indoor without temperature and humidity control,verified,S7 + S8
+controlled,0.50,temperature- and humidity-controlled,verified,S7 + S8

@@ -1,0 +1,268 @@
+[
+ {
+  "command": "set_units",
+  "params": {
+   "units": "mm"
+  }
+ },
+ {
+  "command": "add_box",
+  "params": {
+   "size": [
+    1,
+    1,
+    1
+   ],
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "anchor": "min"
+  },
+  "as": "cube"
+ },
+ {
+  "command": "define_material_record",
+  "params": {
+   "id": "relax_cube",
+   "name": "relax_cube",
+   "designation": "test material E = 200000 MPa",
+   "specs": [],
+   "licence": "company-proprietary",
+   "exportMarking": {
+    "regime": "none"
+   }
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "relax_cube",
+   "property": "E",
+   "value": 200000.0,
+   "unit": "MPa",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "relax_cube",
+   "property": "nu",
+   "value": 0.3,
+   "unit": "-",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "set_material_property",
+  "params": {
+   "material": "relax_cube",
+   "property": "density",
+   "value": 7.8,
+   "unit": "g/cm^3",
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   },
+   "preferred": true
+  }
+ },
+ {
+  "command": "add_material_model",
+  "params": {
+   "material": "relax_cube",
+   "model": {
+    "kind": "norton",
+    "A": {
+     "value": 1e-18,
+     "unit": "MPa^-5 s^-1"
+    },
+    "n": 5.0,
+    "m": 0.0,
+    "validRange": {
+     "stressMPa": [
+      1,
+      400
+     ],
+     "temperatureK": [
+      293,
+      293
+     ]
+    }
+   },
+   "basis": "company",
+   "source": {
+    "citation": "test input of this validation case (not a material claim)"
+   }
+  }
+ },
+ {
+  "command": "create_material",
+  "params": {
+   "name": "relax_cube",
+   "density": 0.0078,
+   "color": "#9aa0a6",
+   "metalness": 1,
+   "roughness": 0.4,
+   "recordId": "relax_cube"
+  }
+ },
+ {
+  "command": "assign_material",
+  "params": {
+   "materialName": "relax_cube",
+   "entityIds": [
+    "$cube"
+   ]
+  }
+ },
+ {
+  "command": "create_analysis",
+  "params": {
+   "name": "bar_relaxation",
+   "analysisType": "creep",
+   "unitSystem": "N-mm-t-s",
+   "solver": "calculix"
+  },
+  "as": "an"
+ },
+ {
+  "command": "set_part_idealization",
+  "params": {
+   "analysisId": "$an",
+   "entityId": "$cube",
+   "idealization": "solid"
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$an",
+   "name": "x0",
+   "kind": "symmetry",
+   "target": {
+    "entityId": "$cube",
+    "facesNear": [
+     [
+      0,
+      0.5,
+      0.5
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$an",
+   "name": "y0",
+   "kind": "symmetry",
+   "target": {
+    "entityId": "$cube",
+    "facesNear": [
+     [
+      0.5,
+      0,
+      0.5
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$an",
+   "name": "z0",
+   "kind": "symmetry",
+   "target": {
+    "entityId": "$cube",
+    "facesNear": [
+     [
+      0.5,
+      0.5,
+      0
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "add_fea_constraint",
+  "params": {
+   "analysisId": "$an",
+   "name": "hold",
+   "kind": "displacement",
+   "dofs": {
+    "uz": 0.0005
+   },
+   "target": {
+    "entityId": "$cube",
+    "facesNear": [
+     [
+      0.5,
+      0.5,
+      1
+     ]
+    ]
+   }
+  }
+ },
+ {
+  "command": "set_creep_step",
+  "params": {
+   "analysisId": "$an",
+   "duration": {
+    "value": 3600,
+    "unit": "s"
+   },
+   "initialIncrement": {
+    "value": 1,
+    "unit": "s"
+   },
+   "cetol": 1e-05,
+   "maxIncrements": 1000,
+   "preloadStep": true,
+   "nlgeom": false,
+   "temperature": {
+    "value": 293,
+    "unit": "K"
+   }
+  }
+ },
+ {
+  "command": "set_mesh_controls",
+  "params": {
+   "analysisId": "$an",
+   "mesher": "gmsh",
+   "elementFamily": "tet",
+   "order": 2,
+   "globalSize": 0.5
+  }
+ },
+ {
+  "command": "add_result_probe",
+  "params": {
+   "analysisId": "$an",
+   "name": "centre",
+   "point": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "quantity": "s_zz",
+   "history": true
+  }
+ }
+]
