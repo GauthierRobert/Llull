@@ -481,7 +481,7 @@ the two set-ups that apply to these commands (`THM_EMISSIVITY_INVALID`, `THM_UNI
 | ---- | ----- |
 | `thermal_analytic_check` | `packages/core/src/commands/thermal/{analyticCheck,analyticChecks,constants}.ts`, closed forms in `lib/thermalClosedForms.ts` |
 | `compute_view_factors` | `commands/thermal/computeViewFactors.ts`, `lib/{viewFactorContour,planarFacets,segmentTriangle}.ts` |
-| Units table §5.3 | `commands/thermal/units.ts` (derived from dimension vectors; round-trip 1e-12) |
+| Units table §5.3 | `lib/thermalUnits.ts` (derived from dimension vectors; round-trip 1e-12; moved from `commands/thermal/` so the FE plugin can use it) |
 
 Toolset `analysis`.
 
@@ -498,8 +498,46 @@ Toolset `analysis`.
 - **Extra codes:** `THM_INPUT_INVALID`, `THM_SURFACE_INVALID`, `THM_FACET_LIMIT` (400 facets, surfaces + blockers; at most 16 blockers and 256 vertices per polygon), `THM_VIEW_FACTOR_ROWSUM` (closed cavity
   row sum off by > 1e-3).
 
-**Not built (blocked):** M0–M3 and the M4 deck parts — the thermal analysis slice and every set-up command (`add_thermal_bc`,
-`set_initial_temperature`, `define_amplitude`, `set_thermal_step`, `add_temperature_limit`, cavity, contact), deck sections,
-summariser / heat balance, `thermal_report`, `check_thermal`, `check_temperature_limits` need the 05 FEA analysis slice, Gmsh,
-CalculiX (`ccx`), artifact store and readers, none of which exist; `dispose_thermal_limit` needs the 09 PLM signing port. VC-THM-03,
-04, 05, 14, 30, 50, 62, 63 and the full VC-THM-61 contract stay open with them. The `llull guide` thermal section is not written.
+**FE milestones M0–M3 and the M4 decks: built (2026-10-16, owner decision).** The minimal 05 FEA slice was built first
+(`docs/physics/FE_PIPELINE_DESIGN.md`) and the thermal discipline sits inside it — **Proposal B** of §2.1 (`packages/domain-cae/src/thermal/`),
+so no core extension port was needed.
+
+| Item | Where |
+| ---- | ----- |
+| Set-up commands `add/update/delete_thermal_bc`, `set_initial_temperature`, `define/delete_amplitude`, `set_thermal_step`, `add/delete_temperature_limit`, `add_cavity_radiation`, `add_thermal_contact`, `set_thermal_physical_constants` | `packages/domain-cae/src/thermal/{bcCommands,stepCommands,amplitude,limitCommands,radiationCommands,constantsCommand}.ts` (toolset `analysis`) |
+| Deck sections §5.1 (materials tabulated from PHY-01 models, `*HEAT TRANSFER`, BCs, `*FILM`, `*RADIATE` incl. `CAVITY=`, output) | `thermal/{deck,deckMaterial,deckLoads,deckStep,deckNames}.ts`, assembled by the 05 `writeInp` |
+| Summary + heat balance §5.5 | `thermal/{summary,heatBalance,bcFlows,storedEnergy,meshGeometry}.ts` |
+| `thermal_report`, `check_thermal`, `check_temperature_limits`, `dispose_thermal_limit` (human gate) | `thermal/{report,check,limitsCheck,limitRows,dispose}.ts` |
+| Solve path | server `fea_mesh` (Gmsh 4.15.2) → `fea_solve` (CalculiX `ccx`) → `record_*` validated against the artifact store |
+
+FE benchmarks, real Gmsh + ccx 2.21, judged by the PHY-00 judge (`server/tests/feaThermal*.test.ts`, adapted plans in
+`server/tests/fixtures/thermal/`, run by `npm run quality:physics`): VC-THM-01.a–d (wall), 03 (T3 36.48 °C vs 36.60, 0.33 %), 04 (T4
+18.2542 vs 18.2538), 05 (T2 927.004 K, exact σ), 14.a/b (oneel8ra), plus 61 (all ten set-ups, CLI), 50 (incl. the dependent thermo_static going stale), 62, 63 at unit level and an
+open-cavity case against the exact view-factor network (0.5 %).
+
+**FE deviations:**
+
+- **Output times (§11 Q2), decided on ccx 2.21:** `DIRECT` cannot be combined with `*TIME POINTS`, so fixed increments write every
+  `outputEveryS / increment` increments (`FREQUENCY`) and `set_thermal_step` refuses `fixedIncrements` with `outputTimesS`; automatic
+  increments use a `*TIME POINTS` set (requested times + end time).
+- **Material tables** cover the case temperatures (initial, prescribed, film sinks, amplitude extremes) ± 50 K inside the model's equation
+  range; radiation sinks are excluded (a 3 K sink would demand k at 3 K); fields leaving the tables report `THM_PROPERTY_OUT_OF_RANGE`.
+- **Heat balance:** CalculiX's RFL omits loads applied at prescribed nodes and their capacity; the summary corrects both. Steady cases
+  balance to ≤ 1e-3; an amplitude-driven transient (T3) keeps ≈ 1.7 % (0.25 s increments) and reports `THM_HEAT_BALANCE`. Cavity cases
+  report "heat balance not evaluated" (the cavity exchange is not integrated).
+- **σ override:** `set_thermal_physical_constants` records an explicit σ (`defaulted: false`, source required); the oneel8ra case uses
+  CalculiX's 5.669e-8 (the exact SI σ misses its 1e-4 tolerance by 2.2e-4 — kept visible by a test). The default stays the exact SI value.
+- **Probes:** temperature probes are interpolated with the containing C3D4 / C3D10 element's shape functions (nearest node was 3 % low
+  on T3); other quantities use the nearest node.
+- **Targets** are resolved by the mesher (closest Gmsh surface / node to the given points), not by the 05 face map (TR-FEA-32, needs the
+  01 face-query port); with the Manifold kernel faces are the 40° crease regions of the tessellation.
+- **Contact conductance:** data and validation only; the deck refuses it with `THM_CONTACT_UNSUPPORTED` (TR-THM-15 card set not yet
+  confirmed on `contact7–9`). Steady cavity cases without an initial temperature warn (ccx starts from 0 K).
+- **Human gate:** `dispose_thermal_limit` verifies through `ctx.humanSignature`; no implementation is installed (09 PLM not built), so
+  every call is refused with `THM_HUMAN_GATE` — the specified agent-path behaviour. Payload:
+  `sha256(canonicalJson({ kind, analysisId, rowId, decision, justification, resultsHash }))`.
+- **Extra codes:** `THM_BC_NOT_FOUND`, `THM_AMPLITUDE_NOT_FOUND`, `THM_AMPLITUDE_IN_USE`, `THM_LIMIT_INVALID`, `THM_LIMIT_NOT_FOUND`,
+  `THM_CONTACT_INVALID`, `THM_CONTACT_UNSUPPORTED`, `THM_TABLE_POINTS`, `THM_CONSTANT_INVALID`.
+
+**Still open:** VC-THM-30 (TBD grade, CalculiX cavity factors vs llull's); contact conductance deck; phase change (V2); orthotropic k,
+h(T) / ε(T) tables and `render_view field=temperature` (M4 V1); a signing implementation (09 PLM); the `llull guide` thermal section.

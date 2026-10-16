@@ -1,7 +1,7 @@
 /** Heat flow through each thermal BC from a solved temperature field (PHY-03 §5.5), in W, positive INTO the part. */
 
 import type { FeMeshArtifact, ThermalBcRecord, ThermalSetup, UnitSystem } from '@core/model/analysis';
-import { STEFAN_BOLTZMANN } from '@lib/thermalClosedForms';
+import { stefanBoltzmannOf } from './constants';
 import { systemToSi } from '@lib/thermalUnits';
 import { analysisLengthMetres } from '../shared/defaults';
 import { amplitudeAt } from './amplitude';
@@ -86,7 +86,7 @@ export function bcFlowW(inputs: FlowInputs, record: ThermalBcRecord, step: StepF
     case 'radiation': {
       const sink = inScale(bc.sinkTemperature, scale) * factor - zero;
       const emissivity = typeof bc.emissivity === 'number' ? bc.emissivity : 0;
-      return faceSum((temperature) => emissivity * STEFAN_BOLTZMANN * (fourth(sink) - fourth(temperature - zero)));
+      return faceSum((temperature) => emissivity * stefanBoltzmannOf(thermal) * (fourth(sink) - fourth(temperature - zero)));
     }
     case 'surface_flux':
       return siOf('flux', bc.value) * factor * faceSum(() => 1);
@@ -141,7 +141,7 @@ export function nodalLoadsW(inputs: FlowInputs, record: ThermalBcRecord, step: S
     case 'radiation': {
       const sink = inScale(bc.sinkTemperature, scale) * factor - zero;
       const emissivity = typeof bc.emissivity === 'number' ? bc.emissivity : 0;
-      faceLoads((temperature) => emissivity * STEFAN_BOLTZMANN * (fourth(sink) - fourth(temperature - zero)));
+      faceLoads((temperature) => emissivity * stefanBoltzmannOf(thermal) * (fourth(sink) - fourth(temperature - zero)));
       break;
     }
     case 'surface_flux':

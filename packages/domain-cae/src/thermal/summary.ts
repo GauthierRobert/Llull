@@ -138,6 +138,6 @@ export function thermalResultsSummary(
     probes,
     propertyRangeExceeded: rangeExceeded(doc, found, minT.value, maxT.value),
     fieldRefs: steps.map((step) => ({ resultsHash, step: step.step, timeS: timeOf(step) })),
-    ...(hasRadiation(thermal) ? { physicalConstants: physicalConstantsOf(scale) } : {}),
+    ...(hasRadiation(thermal) ? { physicalConstants: physicalConstantsOf(thermal) } : {}),
   };
 }

@@ -1,9 +1,10 @@
-/** Result probes evaluated from a results artifact (MVP: the value at the NEAREST MESH NODE, no interpolation). */
+/** Result probes evaluated from a results artifact (the value at the NEAREST MESH NODE; temperature between nodes is interpolated in its element). */
 
 import type { AnalysisCase, FeMeshArtifact, FeResultsArtifact, ProbeQuantity } from '@core/model/analysis';
 import { loadCasesOf } from '../decks/context';
 import { lengthUnitName, stressUnitName } from '../decks/units';
 import { magnitude, nodeCoordinates, stepOfLoadCase, vonMises, type ResultStep } from './fields';
+import { locatePoint, type PointWeights } from './probeInterpolation';
 
 interface ProbeValue {
   /** Load case name (static / thermo_static) or null for a time series (heat_*). */
@@ -66,10 +67,20 @@ function nearestNode(
   return [best, best === null ? null : distanceTo(best)];
 }
 
+function interpolated(at: PointWeights, field: ResultStep['fields'][string] | undefined): number {
+  let sum = 0;
+  for (const [node, weight] of at.nodes) {
+    const value = field?.values[String(node)]?.[0];
+    if (value === undefined) return Number.NaN;
+    sum += weight * value;
+  }
+  return sum;
+}
+
 /**
  * Value of every probe of `analysis` at its node: the node the mesher resolved for the probe (`nodeSets.P_<id>`), else the nearest mesh node
  * to the probe point. Static and thermo_static give one value per load case (last increment); heat_* one per written result set.
- * @invariant nearest-node values (no interpolation inside elements); nodal stresses are CalculiX's extrapolated and averaged values
+ * @invariant nearest-node values, except a temperature probe between nodes, which is interpolated with the shape functions of the C3D4 / C3D10 element containing the point; nodal stresses are CalculiX's extrapolated and averaged values
  */
 export function evaluateProbes(
   analysis: AnalysisCase,
@@ -87,6 +98,10 @@ export function evaluateProbes(
   return Object.entries(analysis.probes).map(([probeId, probe]) => {
     const [nodeId, nodeDistance] = nearestNode(mesh, probeId, probe.point, lengthToAnalysis);
     const { field, scalar } = FIELD[probe.quantity];
+    const inside =
+      probe.quantity === 'temperature' && nodeDistance !== null && nodeDistance > 0
+        ? locatePoint(mesh, [probe.point[0] * lengthToAnalysis, probe.point[1] * lengthToAnalysis, probe.point[2] * lengthToAnalysis])
+        : null;
     return {
       probeId,
       name: probe.name,
@@ -96,7 +111,7 @@ export function evaluateProbes(
       nodeDistance,
       values: sets.map(({ loadCase, step }) => {
         const values = nodeId === null ? undefined : step.fields[field]?.values[String(nodeId)];
-        const value = values === undefined ? Number.NaN : scalar(values);
+        const value = inside !== null ? interpolated(inside, step.fields[field]) : values === undefined ? Number.NaN : scalar(values);
         return { loadCase, step: step.step, time: step.time, value: Number.isFinite(value) ? value : null };
       }),
     };

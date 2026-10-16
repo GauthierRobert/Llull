@@ -627,3 +627,28 @@ exact faces and STEP. **06 CMP** supplies laminates. **09 PLM** stamps results w
 - [R43] FeenoX NAFEMS examples — https://github.com/seamplex/feenox/tree/3759eb2426a9e9a77ab8a9ce97db93071a389776/examples (accessed 2026-10)
 - Other references (R4–R6, R20–R22, R31, R40–R45): see [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md) §11 and [`validation/sources.md`](validation/sources.md).
 - L1 llull: `.claude/rules/architecture.md`, `docs/decisions/KI5-shape-kernel-boundary.md`, `docs/decisions/KI6-desktop-app-cli-first.md`, `packages/core/src/geometry/kernel.ts`, `server/src/pythonExchange.ts`.
+
+## 13. Implementation status (2026-10-16)
+
+**Built: a minimal slice**, driven by physics packs PHY-03 / PHY-04 (owner decision; design `docs/physics/FE_PIPELINE_DESIGN.md`).
+
+| Item | Where |
+| ---- | ----- |
+| Analysis types, artifacts, ports (`feaArtifacts`, `humanSignature` on `ExecutionContext`) | `packages/core/src/model/analysis.ts`, `commands/types.ts` |
+| Plugin `cae` (toolset `analysis`): `create_analysis` (static, heat_*, thermo_static), `delete_analysis`, `describe_analysis`, `set_part_idealization` (solid), constraints, loads (force, pressure, gravity), `set_mesh_controls` (tet 1/2), probes, `record_fe_mesh` / `record_fea_results` (§4.1 trust model), `fea_report`, `check_analysis` | `packages/domain-cae/src/commands/` |
+| INP writer §5.6 (model block, mechanical cards, `*STATIC` per load case), FRD / DAT readers §5.7, summaries, staleness TR-FEA-06 | `packages/domain-cae/src/{decks,results,hash}/` |
+| Transports `fea_mesh` (bridge op `mesh`, Gmsh 4.15.2), `fea_solve` (ccx), `fea_export`; content-addressed `FeArtifactStore` | `server/src/fea/`, `server/python/llull_mesh.py`, `packages/mcp/src/feaTools.ts` |
+
+Verified end to end with real Gmsh + ccx 2.21 (axial bar σ = F/A within 1 %, pressure sign, load-case reset) and by the PHY-03 / PHY-04
+benchmarks.
+
+**Deviations:** targets are resolved by the mesher (closest Gmsh surface / node to the given points), not by the TR-FEA-32 face map,
+because the 01 face-query port (`faceDetails`) does not exist; without STEP (Manifold) the mesher rebuilds the geometry from the
+tessellation (`classifySurfaces` 40°), so faces are crease regions; `edgesNear` works with STEP only; `intersectPlane` is ignored.
+Forces are split equally over the target nodes (not area-consistent). Probes use the nearest node (temperature: element interpolation).
+Mesh quality reports Gmsh-independent tet scaled Jacobian and edge ratio only. Case lengths are in document units, loads in the case unit
+system. The FE tools run synchronously in the server process (no ticket cancel yet).
+
+**Not built (05 backlog):** modal, buckling, shells / plane stress / beams, midsurface, defeature, moment loads, Nastran BDF, OP2,
+`compute_margins` / `dispose_margin`, `analytic_check`, `set_result_view`, `fea_import_results`, `fea_result_field`, the full Verdict
+quality port, UI panels, `.llullz` result bundling.

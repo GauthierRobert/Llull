@@ -1,0 +1,73 @@
+[
+  { "command": "set_units", "params": { "units": "mm" } },
+  {
+    "command": "create_material",
+    "params": { "name": "al_test", "density": 0.0078, "color": "#9aa0a6", "metalness": 1, "roughness": 0.4 }
+  },
+  {
+    "command": "define_property_model",
+    "params": {
+      "material": "al_test",
+      "model": {
+        "id": "strain",
+        "property": "thermalStrain",
+        "unit": "1",
+        "variables": [{ "variable": "T", "unit": "K" }],
+        "form": { "kind": "polynomial", "variable": "T", "coefficients": [0, 2.3e-5], "origin": 293.15 },
+        "validity": [{ "variable": "T", "unit": "K", "data": [100, 1000] }],
+        "basis": "company",
+        "source": { "citation": "test input of this validation case (not a material claim)" }
+      }
+    }
+  },
+  {
+    "command": "create_material",
+    "params": { "name": "steel_test", "density": 0.0078, "color": "#9aa0a6", "metalness": 1, "roughness": 0.4 }
+  },
+  {
+    "command": "define_property_model",
+    "params": {
+      "material": "steel_test",
+      "model": {
+        "id": "strain",
+        "property": "thermalStrain",
+        "unit": "1",
+        "variables": [{ "variable": "T", "unit": "K" }],
+        "form": { "kind": "polynomial", "variable": "T", "coefficients": [0, 1.15e-5], "origin": 293.15 },
+        "validity": [{ "variable": "T", "unit": "K", "data": [100, 1000] }],
+        "basis": "company",
+        "source": { "citation": "test input of this validation case (not a material claim)" }
+      }
+    }
+  },
+  {
+    "command": "fit_at_temperature",
+    "params": {
+      "hole": { "nominal": 20.0, "upper": 0.021, "lower": 0.0 },
+      "shaft": { "nominal": 20.0, "upper": -0.007, "lower": -0.02 },
+      "specTemperature": { "value": 20.0, "unit": "degC" },
+      "holeMaterial": "al_test",
+      "shaftMaterial": "steel_test",
+      "temperatures": [
+        { "value": -55.0, "unit": "degC" },
+        { "value": 20.0, "unit": "degC" },
+        { "value": 85.0, "unit": "degC" }
+      ]
+    }
+  },
+  {
+    "command": "fit_at_temperature",
+    "params": {
+      "hole": { "nominal": 20.0, "upper": 0.021, "lower": 0.0 },
+      "shaft": { "nominal": 20.0, "upper": -0.007, "lower": -0.02 },
+      "specTemperature": { "value": 20.0, "unit": "degC" },
+      "holeMaterial": "steel_test",
+      "shaftMaterial": "al_test",
+      "temperatures": [
+        { "value": -55.0, "unit": "degC" },
+        { "value": 20.0, "unit": "degC" },
+        { "value": 85.0, "unit": "degC" }
+      ]
+    }
+  }
+]

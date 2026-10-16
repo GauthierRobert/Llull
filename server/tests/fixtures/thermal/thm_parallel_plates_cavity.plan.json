@@ -1,0 +1,94 @@
+[
+  { "command": "set_units", "params": { "units": "m" } },
+  { "command": "add_box", "params": { "size": [1.0, 1.0, 0.01], "position": [0, 0, -0.01], "anchor": "min" }, "as": "hot" },
+  { "command": "add_box", "params": { "size": [1.0, 1.0, 0.01], "position": [0, 0, 1.0], "anchor": "min" }, "as": "cold" },
+  {
+    "command": "create_material",
+    "params": { "name": "plate_cu", "density": 8900000.0, "color": "#b87333", "metalness": 1, "roughness": 0.4 }
+  },
+  {
+    "command": "define_property_model",
+    "params": {
+      "material": "plate_cu",
+      "model": {
+        "id": "k_const",
+        "property": "k",
+        "unit": "W/(m*K)",
+        "variables": [],
+        "validity": [],
+        "form": { "kind": "constant", "value": 400.0 },
+        "basis": "company",
+        "source": { "citation": "test input of this validation case (not a material claim)" }
+      }
+    }
+  },
+  {
+    "command": "define_property_model",
+    "params": {
+      "material": "plate_cu",
+      "model": {
+        "id": "cp_const",
+        "property": "cp",
+        "unit": "J/(kg*K)",
+        "variables": [],
+        "validity": [],
+        "form": { "kind": "constant", "value": 385.0 },
+        "basis": "company",
+        "source": { "citation": "test input of this validation case (not a material claim)" }
+      }
+    }
+  },
+  { "command": "assign_material", "params": { "materialName": "plate_cu", "entityIds": ["$hot", "$cold"] } },
+  {
+    "command": "create_analysis",
+    "params": {
+      "name": "two_plates",
+      "analysisType": "heat_steady",
+      "unitSystem": "N-m-kg-s",
+      "solver": "calculix",
+      "temperatureScale": "K"
+    },
+    "as": "an"
+  },
+  { "command": "set_part_idealization", "params": { "analysisId": "$an", "entityId": "$hot", "idealization": "solid" } },
+  { "command": "set_part_idealization", "params": { "analysisId": "$an", "entityId": "$cold", "idealization": "solid" } },
+  {
+    "command": "add_thermal_bc",
+    "params": {
+      "analysisId": "$an",
+      "name": "hot_T",
+      "kind": "temperature",
+      "value": 400.0,
+      "unit": "K",
+      "target": { "entityId": "$hot", "facesNear": [[0.5, 0.5, -0.01]] }
+    }
+  },
+  {
+    "command": "add_thermal_bc",
+    "params": {
+      "analysisId": "$an",
+      "name": "cold_T",
+      "kind": "temperature",
+      "value": 300.0,
+      "unit": "K",
+      "target": { "entityId": "$cold", "facesNear": [[0.5, 0.5, 1.01]] }
+    }
+  },
+  { "command": "set_initial_temperature", "params": { "analysisId": "$an", "value": 350.0, "unit": "K" } },
+  {
+    "command": "add_cavity_radiation",
+    "params": {
+      "analysisId": "$an",
+      "name": "C01",
+      "environmentTemperature": { "value": 1.0, "unit": "K" },
+      "faces": [
+        { "target": { "entityId": "$hot", "facesNear": [[0.5, 0.5, 0]] }, "emissivity": 1.0 },
+        { "target": { "entityId": "$cold", "facesNear": [[0.5, 0.5, 1.0]] }, "emissivity": 1.0 }
+      ]
+    }
+  },
+  {
+    "command": "set_mesh_controls",
+    "params": { "analysisId": "$an", "mesher": "gmsh", "elementFamily": "tet", "order": 1, "globalSize": 0.05 }
+  }
+]

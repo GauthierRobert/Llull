@@ -4,6 +4,7 @@ import { commandCatalog } from '@core/commands/schema';
 import { defineAmplitude, deleteAmplitude } from './amplitude';
 import { addThermalBc, deleteThermalBc, updateThermalBc } from './bcCommands';
 import { checkThermal } from './check';
+import { setThermalPhysicalConstants } from './constantsCommand';
 import { disposeThermalLimit } from './dispose';
 import { checkTemperatureLimits } from './limitsCheck';
 import { thermalReport } from './report';
@@ -19,6 +20,7 @@ export const thermalCommands = commandCatalog(
   defineAmplitude,
   deleteAmplitude,
   setThermalStep,
+  setThermalPhysicalConstants,
   addTemperatureLimit,
   deleteTemperatureLimit,
   addCavityRadiation,

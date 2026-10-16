@@ -94,6 +94,22 @@ describe('resolveTemperatureField', () => {
     expect(resolveTemperatureField(unsolved, analysisId, mesh, source.artifacts)).toMatchObject({ code: 'FEA_RESULTS_MISSING' });
   });
 
+  it('accepts a thermal mesh that differs only in node / face sets and targets, and refuses another discretisation', () => {
+    const base = thermoFixture();
+    const sibling = { ...base.mesh, nodeSets: { B_1: [1, 2] }, targets: { B_1: { residual: 0 } } };
+    expect(hashOf(sibling)).not.toBe(hashOf(base.mesh));
+    const same = withThermalSource(base, { meshHash: hashOf(sibling) });
+    const withMesh = portOf({ [hashOf(sibling)]: sibling, [same.resultsHash]: same.results });
+    const { doc, analysisId, mesh } = same.fixture;
+    expect(resolveTemperatureField(doc, analysisId, mesh, withMesh)).toMatchObject({ ok: true, values: [101, 102, 103, 104, 105] });
+    expect(resolveTemperatureField(doc, analysisId, mesh, same.artifacts)).toMatchObject({ code: 'TMC_MESH_MISMATCH' });
+
+    const moved = { ...sibling, nodes: sibling.nodes.map((node) => (node[0] === 5 ? ([5, 11, 10, 10] as const) : node)) };
+    const other = withThermalSource(base, { meshHash: hashOf(moved) });
+    const withMoved = portOf({ [hashOf(moved)]: moved, [other.resultsHash]: other.results });
+    expect(resolveTemperatureField(other.fixture.doc, analysisId, mesh, withMoved)).toMatchObject({ code: 'TMC_MESH_MISMATCH' });
+  });
+
   it('refuses an output time the results do not have and a results step without NDTEMP', () => {
     const source = withThermalSource(thermoFixture());
     const { doc, analysisId, mesh, boxId } = source.fixture;

@@ -39,7 +39,7 @@ export async function runFeaSolve(
   const doc = host.getDoc();
   const current = currentMesh('fea_solve', doc, analysisId, deps.store, deps.hooks);
   if (isFailure(current)) return current;
-  const deck = deps.hooks.writeInp(doc, analysisId, current.mesh);
+  const deck = deps.hooks.writeInp(doc, analysisId, current.mesh, deps.store);
   if ('code' in deck) return feaFailure('fea_solve', deck.code, deck.message, [analysisId]);
 
   const directory = await mkdtemp(path.join(tmpdir(), 'llull-ccx-'));

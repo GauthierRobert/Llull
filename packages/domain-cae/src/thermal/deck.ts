@@ -14,7 +14,7 @@ import { propertyCards } from './deckMaterial';
 import { cavityLines, bcLines } from './deckLoads';
 import { amplitudeName } from './deckNames';
 import { planStep } from './deckStep';
-import { hasRadiation, physicalConstantsOf } from './constants';
+import { hasRadiation, stefanBoltzmannOf } from './constants';
 import { partVolumes, indexMesh } from './meshGeometry';
 
 const refusal = (code: string, message: string, ids: readonly string[] = []): DeckRefusal => ({ code, message, ids });
@@ -72,7 +72,7 @@ export function thermalSections(ctx: DeckContext): DeckSections {
   ];
   if (hasRadiation(thermal))
     lines.push(
-      `*PHYSICAL CONSTANTS, ABSOLUTE ZERO=${num(absoluteZeroOf(scale))}, STEFAN BOLTZMANN=${num(siToSystem('stefanBoltzmann', physicalConstantsOf(scale).stefanBoltzmann.value, ctx.unitSystem))}`,
+      `*PHYSICAL CONSTANTS, ABSOLUTE ZERO=${num(absoluteZeroOf(scale))}, STEFAN BOLTZMANN=${num(siToSystem('stefanBoltzmann', stefanBoltzmannOf(thermal), ctx.unitSystem))}`,
     );
   lines.push(...plan.timePoints);
   if (thermal.initialTemperature !== undefined)

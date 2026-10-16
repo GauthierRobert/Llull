@@ -1,0 +1,133 @@
+[
+  { "command": "set_units", "params": { "units": "m" } },
+  { "command": "draw_arc", "params": { "center": [0, 0], "radius": 1.0, "startAngle": 0, "endAngle": 0.7853981633974483 }, "as": "arcIn" },
+  { "command": "draw_arc", "params": { "center": [0, 0], "radius": 1.4, "startAngle": 0, "endAngle": 0.5294703357755082 }, "as": "arcOut" },
+  {
+    "command": "draw_polyline",
+    "params": {
+      "points": [
+        [0.7071067811865476, 0.7071067811865476],
+        [0.7071067811865476, 1.3971067811865474],
+        [0.7071067811865476, 1.7971067811865473],
+        [1.0, 1.7971067811865473],
+        [1.0, 1.3971067811865474],
+        [1.2083045973594573, 0.7071067811865476]
+      ]
+    },
+    "as": "side"
+  },
+  {
+    "command": "draw_polyline",
+    "params": {
+      "points": [
+        [1.4, 0],
+        [1.0, 0]
+      ]
+    },
+    "as": "base"
+  },
+  {
+    "command": "revolve_profile",
+    "params": { "profileIds": ["$arcIn", "$arcOut", "$side", "$base"], "axis": "z", "angle": 1.5707963267948966 },
+    "as": "bar"
+  },
+  {
+    "command": "create_material",
+    "params": { "name": "nafems_le11", "density": 7800000.0, "color": "#9aa0a6", "metalness": 1, "roughness": 0.4 }
+  },
+  {
+    "command": "add_material_model",
+    "params": {
+      "material": "nafems_le11",
+      "id": "elastic",
+      "model": { "kind": "elastic_isotropic", "E": { "value": 210, "unit": "GPa" }, "nu": { "value": 0.3, "unit": "1" } },
+      "basis": "company",
+      "source": { "citation": "test input of this validation case (not a material claim)" }
+    }
+  },
+  {
+    "command": "define_constitutive_set",
+    "params": { "material": "nafems_le11", "set": { "id": "set", "elastic": "elastic" }, "makeDefault": true }
+  },
+  {
+    "command": "define_property_model",
+    "params": {
+      "material": "nafems_le11",
+      "model": {
+        "id": "strain",
+        "property": "thermalStrain",
+        "unit": "1",
+        "variables": [{ "variable": "T", "unit": "K" }],
+        "form": { "kind": "polynomial", "variable": "T", "coefficients": [0, 0.00023], "origin": 273.15 },
+        "validity": [{ "variable": "T", "unit": "K", "data": [100, 1000] }],
+        "basis": "company",
+        "source": { "citation": "test input of this validation case (not a material claim)" }
+      }
+    }
+  },
+  { "command": "assign_material", "params": { "materialName": "nafems_le11", "entityIds": ["$bar"] } },
+  {
+    "command": "create_analysis",
+    "params": {
+      "name": "nafems_le11",
+      "analysisType": "thermo_static",
+      "unitSystem": "N-m-kg-s",
+      "solver": "calculix",
+      "referenceTemperature": { "value": 0.0, "unit": "degC" }
+    },
+    "as": "an"
+  },
+  { "command": "set_part_idealization", "params": { "analysisId": "$an", "entityId": "$bar", "idealization": "solid" } },
+  {
+    "command": "set_temperature_field",
+    "params": {
+      "analysisId": "$an",
+      "source": { "kind": "expression", "expression": "hypot(x, y) + z", "coordinatesUnit": "m", "temperatureUnit": "degC" }
+    }
+  },
+  {
+    "command": "add_fea_constraint",
+    "params": {
+      "analysisId": "$an",
+      "name": "sym_xz",
+      "kind": "displacement",
+      "dofs": { "uy": 0 },
+      "target": { "entityId": "$bar", "facesNear": [[1.2, 0, 0.3]] }
+    }
+  },
+  {
+    "command": "add_fea_constraint",
+    "params": {
+      "analysisId": "$an",
+      "name": "sym_yz",
+      "kind": "displacement",
+      "dofs": { "ux": 0 },
+      "target": { "entityId": "$bar", "facesNear": [[0, 1.2, 0.3]] }
+    }
+  },
+  {
+    "command": "add_fea_constraint",
+    "params": {
+      "analysisId": "$an",
+      "name": "base_w0",
+      "kind": "displacement",
+      "dofs": { "uz": 0 },
+      "target": { "entityId": "$bar", "facesNear": [[0.85, 0.85, 0]] }
+    }
+  },
+  {
+    "command": "add_fea_constraint",
+    "params": {
+      "analysisId": "$an",
+      "name": "top_w0",
+      "kind": "displacement",
+      "dofs": { "uz": 0 },
+      "target": { "entityId": "$bar", "facesNear": [[0.6, 0.6, 1.7971067811865473]] }
+    }
+  },
+  {
+    "command": "set_mesh_controls",
+    "params": { "analysisId": "$an", "mesher": "gmsh", "elementFamily": "tet", "order": 2, "globalSize": 0.1 }
+  },
+  { "command": "add_result_probe", "params": { "analysisId": "$an", "name": "A", "point": [1.0, 0, 0], "quantity": "s_zz" } }
+]

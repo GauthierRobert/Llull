@@ -8,6 +8,7 @@ import { checkThermalItems } from '@cae/thermal/check';
 import { thermalSections } from '@cae/thermal/deck';
 import { buildDeckContext } from '@cae/decks/context';
 import { sha256Hex } from '@lib/sha256';
+import { analysisInputHash } from '@cae/index';
 import { canonicalJson } from '@lib/canonicalJson';
 import { expectCase, packCase } from '../../physics/benchmarkCases';
 import { addBc, must, thermalFixture, twoTetMesh } from './fixtures';
@@ -22,6 +23,47 @@ const hash = (doc: CadDocument): string => sha256Hex(canonicalJson(doc));
 const codeOf = (result: CommandResult): string => result.error?.code ?? 'none';
 const firstCode = (items: readonly { code: string }[], wanted: string): string =>
   items.find((item) => item.code === wanted)?.code ?? 'none';
+
+/** A thermo_static case solved against the wall's thermal results, then the thermal case is edited: the dependent state (VC-THM-50). */
+function dependentStateAfterEdit(wall: ReturnType<typeof solvedWall>): string {
+  const created = must(wall.solved, 'create_analysis', {
+    name: 'dependent',
+    analysisType: 'thermo_static',
+    referenceTemperature: { value: 20, unit: 'degC' },
+  });
+  const dependentId = created.affected[0] ?? '';
+  const linked = must(
+    must(created.document, 'set_part_idealization', { analysisId: dependentId, entityId: wall.boxId, idealization: 'solid' }).document,
+    'set_temperature_field',
+    { analysisId: dependentId, source: { kind: 'thermal_result', analysisId: wall.analysisId, time: 'last' } },
+  ).document;
+  const dependent = linked.analysis?.cases[dependentId];
+  const thermal = linked.analysis?.cases[wall.analysisId];
+  if (dependent === undefined || thermal?.meshSummary === undefined || thermal.results === undefined) return 'missing';
+  const solved: CadDocument = {
+    ...linked,
+    analysis: {
+      ...linked.analysis!,
+      cases: {
+        ...linked.analysis!.cases,
+        [dependentId]: {
+          ...dependent,
+          meshSummary: { ...thermal.meshSummary, inputHash: analysisInputHash(linked, dependentId, 'mesh') },
+          results: { ...thermal.results, inputHash: analysisInputHash(linked, dependentId, 'full') },
+        },
+      },
+    },
+  };
+  const withStore = { ...defaultContext(), feaArtifacts: wall.port };
+  const before = (run(solved, 'fea_report', { analysisId: dependentId }, withStore).data as { state: string }).state;
+  expect(before).toBe('solved');
+  const edited = must(solved, 'update_thermal_bc', {
+    analysisId: wall.analysisId,
+    bcId: wall.hotId,
+    filmCoefficient: { value: 60, unit: 'W/(m^2*K)' },
+  }).document;
+  return (run(edited, 'fea_report', { analysisId: dependentId }, withStore).data as { state: string }).state;
+}
 
 interface Row {
   status: string;
@@ -74,13 +116,11 @@ describe('PHY-03 agent-first contract', () => {
       { analysisId: wall.analysisId },
       { ...defaultContext(), feaArtifacts: wall.port },
     );
-    const expected = packCase(PACK, 'VC-THM-50')['expected'] as Record<string, string>;
-    expect({ 'thermal_report.state': report.state, 'check_temperature_limits.code': codeOf(limits) }).toEqual({
-      'thermal_report.state': expected['thermal_report.state'],
-      'check_temperature_limits.code': expected['check_temperature_limits.code'],
+    expectCase(PACK, 'VC-THM-50', {
+      'thermal_report.state': report.state,
+      'check_temperature_limits.code': codeOf(limits),
+      'dependentThermoStatic.state': dependentStateAfterEdit(wall),
     });
-    // dependentThermoStatic.state: judged with the PHY-04 pack (tests/unit/cae/thermomech/contract.test.ts, VC-TMC-50)
-    expect(expected['dependentThermoStatic.state']).toBe('stale');
   });
 
   it('VC-THM-62: the exceeded limit FAILs pending a human; an agent disposition is refused and the document hash is unchanged', () => {

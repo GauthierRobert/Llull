@@ -346,6 +346,35 @@ Toolset `analysis`.
 derives them limit by limit (values 0.0200761625 / −0.01396495 mm; no other case changed) and `fit_at_temperature` measures them.
 `thermal_stress_check check=shrink_fit` keeps its stated nominal-diameter linearisation (a quick check, not judged on 09.b/c).
 
-**Not built (blocked):** M2–M4 — `thermo_static` / coupled cases, `set_reference_temperature`, `set_temperature_field`, deck sections,
-`thermal_distortion_report`, `check_thermo_mechanical`, the staleness chain and the `lib/expression` move need the 05 FEA analysis slice
-and CalculiX, PHY-03 M2 and the extension port; `dispose_fit_result` needs the 09 PLM signing port. VC-TMC-02 (LE11), 50, 63 stay open.
+**M2 + M3: built (2026-10-16, owner decision)** on the minimal 05 slice (`docs/physics/FE_PIPELINE_DESIGN.md`), discipline inside
+`packages/domain-cae/src/thermomech/` (PHY-03 §2.1 Proposal B). The CTE derivation modules moved to core `model/{cteConversion,materialCte}.ts`
+and the expression evaluator to `lib/expression.ts` (§11 Q3) so the plugin can use them.
+
+| Item | Where |
+| ---- | ----- |
+| `create_analysis analysisType=thermo_static` (reference temperature required) | `packages/domain-cae/src/commands/analysis.ts` (05 slice) |
+| `set_reference_temperature`, `set_temperature_field` (uniform / expression / thermal_result same mesh / table) | `thermomech/commands.ts`, `field.ts` |
+| Deck §5.1 (`*EXPANSION, ZERO=` secant table, initial conditions = T_ref, `*TEMPERATURE` per node, `*NODE FILE U, NT`, `*EL FILE S, E, THE`) | `thermomech/{deck,cte,units}.ts` + the 05 `mechanicalStepLines` |
+| `check_thermo_mechanical`, `thermal_distortion_report` (Jacobi plane fit), `dispose_fit_result` (human gate) | `thermomech/{check,distortion,plane,dispose}.ts` |
+| Staleness chain thermal → thermo_static (TR-TMC-10) | `hash/inputHash.ts`: the dependent case hashes the source case's results hash **and** its current input hash |
+
+FE benchmarks, real Gmsh + ccx 2.21 (`server/tests/feaThermomech*.test.ts`, adapted plans in `server/tests/fixtures/thermomech/`, run by
+`npm run quality:physics`): VC-TMC-01.a/b/c (−251.997 / −359.996 / −629.994 MPa), 02 LE11 (−103.43 MPa vs −105, −1.5 %, OCC kernel, full
+FeenoX section revolved), 05.a/b/c sequential thick cylinder (−206.93 / 133.69 / −208.40 MPa, ≤ 1.4 %), 08.b/c/d thermal bow
+(`thermal_distortion_report` agrees with the probe), 60, 61, 63, and the fit plan (06.a–d). VC-TMC-50 is verified on its
+`fea_report` (stale) and `check_thermo_mechanical` (`TMC_THERMAL_RESULT_STALE`) sides and by the refused mechanical solve; its contract also
+lists `compute_margins`, a 05 command not built in the minimal slice, so the case is not recorded as a whole.
+
+**FE deviations:**
+
+- **Same-mesh test:** two cases with different BCs never share a mesh hash (their node sets differ), so `thermal_result` compares nodes
+  and element blocks when the hashes differ; a missing mesh or a different discretisation is still `TMC_MESH_MISMATCH`.
+- **Table fields** read `{ kind: 'fe_table', rows }` from the artifact store under the CSV hash; the `fea_import_field` transport that
+  writes it is not built.
+- **LE11 needs the OCC kernel:** with Manifold the sphere tessellation gives overlapping facets in Gmsh. Initial temperatures are written
+  per node (no set-name dependency). `TMC_THERMAL_CATEGORY_UNSET` is a warning (`add_fea_load` always sets a category).
+- **Human gate:** `dispose_fit_result` verifies through `ctx.humanSignature`; none is installed (09 PLM), so agents get `TMC_HUMAN_GATE`.
+
+**Still open:** VC-TMC-50's `compute_margins` key (05 margins); VC-TMC-03.b NAFEMS T1 FE (needs plane stress or bonded multi-part meshes — 05 V1; the analytic VC-TMC-03.a–c pass);
+M4 (coupled procedure, mesh mapping, orthotropic CTE, fit stack-ups, bimetal FE); `fea_import_field`; a signing implementation (09 PLM);
+the `llull guide` section.

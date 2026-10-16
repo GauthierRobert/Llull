@@ -16,13 +16,16 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'give strictly increasing finite times with finite factors (table), or positive periodS / sampleStepS / durationS (sine, ramp)',
   THM_AMPLITUDE_IN_USE: 'update or delete the thermal BCs that reference the amplitude first',
   THM_STEP_INVALID: 'set_thermal_step: endTimeS > 0 for a transient, increments > 0 (min <= initial <= max <= end), one output option',
-  THM_INITIAL_TEMPERATURE_MISSING: 'set_initial_temperature { analysisId, value, unit } (a transient case has no default)',
+  THM_INITIAL_TEMPERATURE_MISSING:
+    'set_initial_temperature { analysisId, value, unit } (a transient case has no default; a steady cavity-radiation case should start near its expected temperatures)',
   THM_MATERIAL_NO_K: 'define_property_model on the part material with property k (W/(m*K)), a valid T range and a source',
   THM_MATERIAL_NO_CP:
     'define_property_model with property cp (J/(kg*K)); a transient also needs density (model or create_material density)',
   THM_MATERIAL_UNVERIFIED: 'replace the typical / unstated value by a verified, sourced model; results stay flagged until then',
   THM_PROPERTY_OUT_OF_RANGE: 'widen the tabulation inside the model equation range, or define a model sourced for the temperatures reached',
   THM_NO_HEAT_PATH: 'add a sink: add_thermal_bc kind temperature, film or radiation (the steady problem has no unique solution)',
+  THM_CONSTANT_INVALID:
+    'give a finite positive Stefan-Boltzmann constant in W/(m^2*K^4) and source: { citation } naming where the value comes from',
   THM_RADIATION_SCALE: 'recreate the case with temperatureScale degC or K (radiation is evaluated on absolute temperature)',
   THM_CAVITY_INVALID: 'give a unique cavity name of at most 3 characters and at least 2 faces',
   THM_CONTACT_INVALID: 'give master and slave targets on different parts and a positive conductance in W/(m^2*K)',

@@ -10,7 +10,7 @@ export function runFeaExport(analysisId: string, host: FeaHost, deps: { store: F
   const doc = host.getDoc();
   const current = currentMesh('fea_export', doc, analysisId, deps.store, deps.hooks);
   if (isFailure(current)) return current;
-  const deck = deps.hooks.writeInp(doc, analysisId, current.mesh);
+  const deck = deps.hooks.writeInp(doc, analysisId, current.mesh, deps.store);
   if ('code' in deck) return feaFailure('fea_export', deck.code, deck.message, [analysisId]);
   const sha256 = sha256Hex(deck.text);
   return {

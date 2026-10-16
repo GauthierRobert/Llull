@@ -125,7 +125,7 @@ export const checkAnalysis = defineCommand({
       analysis.type === 'heat_steady' || analysis.type === 'heat_transient'
         ? checkThermalItems(doc, analysisId)
         : analysis.type === 'thermo_static'
-          ? checkThermomechItems(doc, analysisId)
+          ? checkThermomechItems(doc, analysisId, port)
           : [];
     const items: CheckItem[] = [
       ...partItems(doc, analysis),

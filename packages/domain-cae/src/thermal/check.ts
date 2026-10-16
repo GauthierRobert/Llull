@@ -100,6 +100,15 @@ function setupItems(doc: CadDocument, found: ThermalCase): ThermalCheckItem[] {
       items.push(
         item('THM_NO_HEAT_PATH', 'error', 'a steady case without a temperature, film or radiation BC has no unique solution', [id]),
       );
+    if (Object.keys(thermal.cavities).length > 0 && thermal.initialTemperature === undefined)
+      items.push(
+        item(
+          'THM_INITIAL_TEMPERATURE_MISSING',
+          'warning',
+          'a steady cavity-radiation case starts from 0 K: CalculiX can declare convergence at the first iteration with no radiative exchange',
+          [id],
+        ),
+      );
   }
   for (const bcId of thermal.bcOrder) {
     const record = thermal.bcs[bcId];
@@ -139,7 +148,16 @@ function resultItems(analysisCase: AnalysisCase, doc: CadDocument): ThermalCheck
   if (summary === undefined || analysisCase.results?.inputHash !== analysisInputHash(doc, analysisCase.id, 'full')) return [];
   const items: ThermalCheckItem[] = [];
   const balance = summary.heatBalance;
-  if (balance.residualRel > HEAT_BALANCE_TOLERANCE.value)
+  if (Object.keys(analysisCase.thermal?.cavities ?? {}).length > 0)
+    items.push(
+      item(
+        'THM_HEAT_BALANCE',
+        'warning',
+        `heat balance not evaluated: the net cavity-radiation exchange is not integrated, so the BC flows alone (in ${balance.inW} W, out ${balance.outW} W) cannot close`,
+        [analysisCase.id],
+      ),
+    );
+  else if (balance.residualRel > HEAT_BALANCE_TOLERANCE.value)
     items.push(
       item(
         'THM_HEAT_BALANCE',

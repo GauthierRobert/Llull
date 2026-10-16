@@ -71,7 +71,7 @@ export const thermalReport = defineCommand({
       bcHeatFlows: summary.bcHeatFlowsW.filter((flow) => flow.timeS === wanted),
       heatBalance: { ...balance, tolerance: HEAT_BALANCE_TOLERANCE, withinTolerance: balance.residualRel <= HEAT_BALANCE_TOLERANCE.value },
       probes: summary.probes.filter((probe) => probes === undefined || probes.includes(probe.probeId)),
-      physicalConstants: summary.physicalConstants ?? (hasRadiation(thermal) ? physicalConstantsOf(thermal.temperatureScale) : null),
+      physicalConstants: summary.physicalConstants ?? (hasRadiation(thermal) ? physicalConstantsOf(thermal) : null),
       propertyRangeExceeded: summary.propertyRangeExceeded,
       fieldRefs: summary.fieldRefs,
       reviewRequired: true,

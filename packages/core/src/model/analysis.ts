@@ -237,6 +237,8 @@ export interface Disposition {
 export interface ThermalSetup {
   readonly temperatureScale: TemperatureScale;
   readonly initialTemperature?: Q;
+  /** Explicit Stefan-Boltzmann constant (SI value, `defaulted: false`, with source); absent = the 2019 SI exact value. */
+  readonly stefanBoltzmann?: Named;
   readonly bcs: Readonly<Record<string, ThermalBcRecord>>;
   readonly bcOrder: readonly string[];
   readonly amplitudes: Readonly<Record<string, Amplitude>>;

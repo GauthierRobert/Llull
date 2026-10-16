@@ -1,6 +1,6 @@
 /** Named physical constants of radiation cases (PHY-03 FR-THM-20, VC-THM-60): value, unit, source, defaulted. */
 
-import type { Named, TemperatureScale, ThermalSetup } from '@core/model/analysis';
+import type { Named, ThermalSetup } from '@core/model/analysis';
 import { STEFAN_BOLTZMANN } from '@lib/thermalClosedForms';
 import { absoluteZeroOf } from './quantities';
 
@@ -11,7 +11,20 @@ export const HEAT_BALANCE_TOLERANCE: Named = { value: 1e-2, unit: '1', source: '
 export const hasRadiation = (thermal: ThermalSetup): boolean =>
   Object.keys(thermal.cavities).length > 0 || Object.values(thermal.bcs).some((record) => record.bc.kind === 'radiation');
 
-export const physicalConstantsOf = (scale: TemperatureScale): { stefanBoltzmann: Named; absoluteZero: Named } => ({
-  stefanBoltzmann: { value: STEFAN_BOLTZMANN, unit: 'W/(m^2 K^4)', source: '2019 SI exact constants', defaulted: true },
-  absoluteZero: { value: absoluteZeroOf(scale), unit: scale, source: 'SI definition of degC', defaulted: true },
+/** Stefan-Boltzmann constant of the case (W/(m^2 K^4)): the explicit `set_thermal_physical_constants` value, else the SI exact one. */
+export const stefanBoltzmannOf = (thermal: ThermalSetup): number => thermal.stefanBoltzmann?.value ?? STEFAN_BOLTZMANN;
+
+export const physicalConstantsOf = (thermal: ThermalSetup): { stefanBoltzmann: Named; absoluteZero: Named } => ({
+  stefanBoltzmann: thermal.stefanBoltzmann ?? {
+    value: STEFAN_BOLTZMANN,
+    unit: 'W/(m^2 K^4)',
+    source: '2019 SI exact constants',
+    defaulted: true,
+  },
+  absoluteZero: {
+    value: absoluteZeroOf(thermal.temperatureScale),
+    unit: thermal.temperatureScale,
+    source: 'SI definition of degC',
+    defaulted: true,
+  },
 });

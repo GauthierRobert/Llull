@@ -192,11 +192,25 @@ function sourceStep(results: FeResultsArtifact, time: number | 'last'): FeResult
   return results.steps.find((step) => Math.abs(step.time - time) <= 1e-9 * Math.max(1, Math.abs(time)));
 }
 
-/** Status of the thermal case a `thermal_result` field reads, without reading any artifact. */
+/**
+ * True when two mesh artifacts cannot be shown to be one discretisation: different hash and (a mesh is not in the store or the nodes /
+ * elements differ). The node sets, face sets and targets belong to each case's own boundary conditions and may differ.
+ */
+function meshesDiffer(artifacts: FeArtifactPort | null, a: string, b: string, current?: FeMeshArtifact): boolean {
+  if (a === b) return false;
+  const first = artifacts?.get(a);
+  const second = current ?? artifacts?.get(b);
+  if (first?.kind !== 'fe_mesh' || second?.kind !== 'fe_mesh') return true;
+  const geometry = (mesh: FeMeshArtifact): string => sha256Hex(canonicalJson({ nodes: mesh.nodes, blocks: mesh.blocks }));
+  return geometry(first) !== geometry(second);
+}
+
+/** Status of the thermal case a `thermal_result` field reads; reads the meshes (not the results) from `artifacts` when the hashes differ. */
 export function thermalSourceProblem(
   doc: CadDocument,
   analysisCase: AnalysisCase,
   field: Extract<TemperatureFieldSource, { kind: 'thermal_result' }>,
+  artifacts: FeArtifactPort | null = null,
 ): FieldRefusal | null {
   const source = caseOf(doc, field.analysisId);
   const ids = [analysisCase.id, field.analysisId];
@@ -211,7 +225,7 @@ export function thermalSourceProblem(
     );
   const hash = source.meshSummary?.meshHash;
   const own = analysisCase.meshSummary?.meshHash;
-  if (hash !== undefined && own !== undefined && hash !== own)
+  if (hash !== undefined && own !== undefined && meshesDiffer(artifacts, hash, own))
     return refusal('TMC_MESH_MISMATCH', `thermal mesh ${hash} differs from this analysis' mesh ${own}`, ids);
   return null;
 }
@@ -224,7 +238,7 @@ function thermalResultField(
   scale: TemperatureScale,
   artifacts: FeArtifactPort | null,
 ): ResolvedField | FieldRefusal {
-  const problem = thermalSourceProblem(doc, analysisCase, field);
+  const problem = thermalSourceProblem(doc, analysisCase, field, artifacts);
   if (problem !== null) return problem;
   const source = caseOf(doc, field.analysisId);
   const resultsHash = source?.results?.resultsHash ?? '';
@@ -238,7 +252,7 @@ function thermalResultField(
     );
   const artifact = results as FeResultsArtifact;
   const meshHash = sha256Hex(canonicalJson(mesh));
-  if (artifact.meshHash !== meshHash)
+  if (meshesDiffer(artifacts, artifact.meshHash, meshHash, mesh))
     return refusal(
       'TMC_MESH_MISMATCH',
       `thermal results were computed on mesh ${artifact.meshHash}, this analysis uses mesh ${meshHash}`,

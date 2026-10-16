@@ -78,7 +78,7 @@ export function thermomechSections(ctx: DeckContext): DeckSections {
     '*TEMPERATURE',
     ...ctx.mesh.nodes.map(([id], i) => `${id}, ${num(field.values[i] ?? Number.NaN)}`),
     '*NODE FILE',
-    'U',
+    'U, NT',
     '*EL FILE',
     'S, E, THE',
     '*END STEP',

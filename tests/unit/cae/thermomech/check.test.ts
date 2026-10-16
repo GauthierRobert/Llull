@@ -3,7 +3,7 @@ import { execute } from '@core/commands/registry';
 import { checkThermomechItems } from '@cae/thermomech/check';
 import { cteModel } from '../../physics/thermomech/thermomechFixtures';
 import { expectNoOp, expectPure } from '../../../helpers/expectNoOp';
-import { thermoFixture, withThermalSource, type Fixture } from './fixtures';
+import { portOf, thermoFixture, withThermalSource, type Fixture } from './fixtures';
 
 const withThermalLoad = (fixture: Fixture): Fixture => ({
   ...fixture,
@@ -124,6 +124,9 @@ describe('check_thermo_mechanical', () => {
       },
     };
     expect(codes({ ...source.fixture, doc: mismatched })).toEqual(['TMC_MESH_MISMATCH']);
+    const sameGeometry = portOf({ aaa: source.fixture.mesh, bbb: { ...source.fixture.mesh, nodeSets: { B_1: [1] } } });
+    const fromStore = checkThermomechItems(mismatched, source.fixture.analysisId, sameGeometry).map((i) => i.code);
+    expect(fromStore).not.toContain('TMC_MESH_MISMATCH');
   });
 
   it('refuses unknown and non thermo_static analyses', () => {

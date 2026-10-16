@@ -1,6 +1,6 @@
 /** The only server module that imports the pure @cae functions the FE transports call (deck writing, result parsing, summaries). */
 
-import type { FeMeshArtifact, FeResultsArtifact, MeshSummary, ResultsSummary } from '@core/model/analysis';
+import type { FeArtifactPort, FeMeshArtifact, FeResultsArtifact, MeshSummary, ResultsSummary } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 import { analysisInputHash, meshRequest, type MeshRequest } from '@cae/index';
 import { writeInp } from '@cae/decks/inpWriter';
@@ -16,7 +16,12 @@ export interface CaeCode {
 export interface CaeHooks {
   meshRequest(doc: CadDocument, analysisId: string): MeshRequest | CaeCode;
   analysisInputHash(doc: CadDocument, analysisId: string, scope: 'mesh' | 'full'): string;
-  writeInp(doc: CadDocument, analysisId: string, mesh: FeMeshArtifact): { readonly text: string } | CaeCode;
+  writeInp(
+    doc: CadDocument,
+    analysisId: string,
+    mesh: FeMeshArtifact,
+    artifacts: FeArtifactPort | null,
+  ): { readonly text: string } | CaeCode;
   parseFrd(text: string): FeResultsArtifact['steps'];
   parseDat(text: string): NonNullable<FeResultsArtifact['dat']>;
   meshSummary(mesh: FeMeshArtifact, meshHash: string): MeshSummary;

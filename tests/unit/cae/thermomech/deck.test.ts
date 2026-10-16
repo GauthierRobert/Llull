@@ -38,7 +38,7 @@ describe('thermomech deck', () => {
         '4, 120',
         '5, 120',
         '*NODE FILE',
-        'U',
+        'U, NT',
         '*EL FILE',
         'S, E, THE',
         '*END STEP',

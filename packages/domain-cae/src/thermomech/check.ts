@@ -1,6 +1,6 @@
 /** check_thermo_mechanical (PHY-04 §7.1): set-up completeness and staleness of a thermo_static case; every answer needs human review. */
 
-import type { AnalysisCase, ThermoMechSetup } from '@core/model/analysis';
+import type { AnalysisCase, FeArtifactPort, ThermoMechSetup } from '@core/model/analysis';
 import { isCteRefusal } from '@core/model/materialCte';
 import type { CadDocument } from '@core/model/types';
 import { defineCommand, z } from '@core/commands/schema';
@@ -29,7 +29,12 @@ const item = (code: string, severity: 'error' | 'warning', message: string, ids:
   remediation: remediationOf(code),
 });
 
-function fieldItems(doc: CadDocument, analysisCase: AnalysisCase, setup: ThermoMechSetup): ThermomechCheckItem[] {
+function fieldItems(
+  doc: CadDocument,
+  analysisCase: AnalysisCase,
+  setup: ThermoMechSetup,
+  artifacts: FeArtifactPort | null,
+): ThermomechCheckItem[] {
   const { field } = setup;
   const id = analysisCase.id;
   if (field === undefined) return [item('TMC_FIELD_SOURCE_INVALID', 'error', 'no temperature field is set (set_temperature_field)', [id])];
@@ -38,7 +43,7 @@ function fieldItems(doc: CadDocument, analysisCase: AnalysisCase, setup: ThermoM
     return problem === null ? [] : [item('TMC_FIELD_INVALID', 'error', `expression '${field.expression}': ${problem}`, [id])];
   }
   if (field.kind !== 'thermal_result') return [];
-  const problem = thermalSourceProblem(doc, analysisCase, field);
+  const problem = thermalSourceProblem(doc, analysisCase, field, artifacts);
   if (problem !== null) return [item(problem.code, 'error', problem.message, problem.ids)];
   const times = caseOf(doc, field.analysisId)?.results?.thermal?.times ?? [];
   const wanted = field.time;
@@ -90,9 +95,10 @@ function partItems(doc: CadDocument, analysisCase: AnalysisCase, setup: ThermoMe
 /**
  * Problems of a thermo_static case: reference temperature, field, thermal source (unsolved / stale / other mesh), CTE per part and its
  * basis, unverified E / nu / CTE, thermal load category.
+ * With `artifacts`, a thermal mesh that differs only in node / face sets and targets counts as the same mesh.
  * @failure unknown case -> FEA_ANALYSIS_NOT_FOUND item; other analysis type -> THM_CASE_TYPE item
  */
-export function checkThermomechItems(doc: CadDocument, analysisId: string): ThermomechCheckItem[] {
+export function checkThermomechItems(doc: CadDocument, analysisId: string, artifacts: FeArtifactPort | null = null): ThermomechCheckItem[] {
   const analysisCase = caseOf(doc, analysisId);
   if (analysisCase === undefined) return [item('FEA_ANALYSIS_NOT_FOUND', 'error', `no analysis '${analysisId}'`, [analysisId])];
   const setup = thermomechOf(analysisCase);
@@ -105,7 +111,7 @@ export function checkThermomechItems(doc: CadDocument, analysisId: string): Ther
       item('TMC_REFERENCE_TEMPERATURE_MISSING', 'error', 'the reference temperature is missing or has an invalid unit', [analysisId]),
     );
   }
-  items.push(...fieldItems(doc, analysisCase, setup));
+  items.push(...fieldItems(doc, analysisCase, setup, artifacts));
   if (reference !== null && Number.isFinite(reference))
     items.push(...partItems(doc, analysisCase, setup, kelvinOf(reference, setup.temperatureScale)));
   if (!analysisCase.loadOrder.some((id) => analysisCase.loads[id]?.loadCase === setup.loadCaseName))
@@ -135,7 +141,7 @@ export const checkThermoMechanical = defineCommand({
     'warnings, else pass. reviewRequired is always true: a qualified person must review thermal stress results.',
   annotations: { readOnly: true },
   params: z.object({ analysisId: analysisIdSchema }),
-  run: (doc, { analysisId }): CommandResult => {
+  run: (doc, { analysisId }, ctx): CommandResult => {
     const analysisCase = caseOf(doc, analysisId);
     if (analysisCase === undefined)
       return refuseTmc(
@@ -154,7 +160,7 @@ export const checkThermoMechanical = defineCommand({
         `analysis '${analysisId}' is ${analysisCase.type}, not thermo_static`,
         [analysisId],
       );
-    const items = checkThermomechItems(doc, analysisId);
+    const items = checkThermomechItems(doc, analysisId, ctx?.feaArtifacts ?? null);
     const errors = items.filter((entry) => entry.severity === 'error').length;
     const verdict = errors > 0 ? 'fail' : items.length > 0 ? 'warn' : 'pass';
     const codes = items.map((entry) => entry.code).join(', ');

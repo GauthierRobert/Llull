@@ -39,7 +39,7 @@ describe('thermalResultsSummary: steady case', () => {
     const probe = must(film.doc, 'add_result_probe', {
       analysisId: fixture.analysisId,
       name: 'p',
-      point: [0.9, 0.9, 0.9],
+      point: [1, 1, 1],
       quantity: 'temperature',
     });
     fixture = withDoc(fixture, probe.document);
