@@ -1,7 +1,7 @@
 import type { CadDocument, DimensionEntity, Entity, InstanceEntity, TextEntity, Vec3 } from '../model/types';
 import { instanceToWorld } from './instanceTransform';
 import { pointsExtent, tupleExtent } from '../lib/extent';
-import { ORIGIN, add3, sub3, vec3At } from '../lib/vec3';
+import { ORIGIN, add3, vec3At } from '../lib/vec3';
 import { sweepTriangles } from './sweep';
 import { loftTriangles } from './loft';
 import { subdivisionTriangles } from './subdivision';
@@ -47,12 +47,12 @@ export function textLocalBounds(e: TextEntity): Bounds {
   return bounds([left, -blockHeight / 2, 0], [left + width, blockHeight / 2, 0]);
 }
 
-/** Local-space AABB of a `mesh`: its world-space positions re-expressed relative to `position`. */
+/** Local-space AABB of a `mesh`: its vertices, which `position` / `rotation` place like any other entity's local geometry. */
 function meshLocalBounds(e: Extract<Entity, { kind: 'mesh' }>): Bounds {
   const p = e.mesh.positions;
   if (p.length < 3) return bounds(ORIGIN, ORIGIN);
   const { min, max } = positionsExtent(p);
-  return bounds(sub3(min, e.position), sub3(max, e.position));
+  return bounds(min, max);
 }
 
 /** Local-space AABB of a sweep or loft: its tessellated surface around the local origin. */
@@ -145,11 +145,6 @@ export function localBounds(e: Entity): Bounds {
 
 /** World-space AABB of one entity, matching how the viewport places each kind. */
 export function entityBounds(e: Entity): Bounds {
-  if (e.kind === 'mesh') {
-    // Mesh positions are already world-space.
-    const p = e.mesh.positions;
-    return p.length < 3 ? bounds(e.position, e.position) : positionsExtent(p);
-  }
   const { min, max } = localBounds(e);
   return bounds(add3(e.position, min), add3(e.position, max));
 }

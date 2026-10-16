@@ -125,7 +125,9 @@ export interface ExtrusionEntity extends BaseEntity {
 }
 
 /**
- * Triangle mesh in world space (`position` is [0,0,0]): boolean/fillet/chamfer results, imports, plugin geometry.
+ * Triangle mesh: boolean/fillet/chamfer results, imports, plugin geometry. Created in world space with `position` / `rotation` at zero;
+ * like every entity, a later `position` / `rotation` moves it (vertices rotated about the origin, then translated) — in the viewport,
+ * the kernel, triangles, bounds and mass properties alike.
  * @invariant `brep`, when present, is the exact construction tree the kernel tessellated into `mesh` (before `position`/`rotation`); a
  *   command that rewrites `mesh` must rewrite or drop `brep`
  */

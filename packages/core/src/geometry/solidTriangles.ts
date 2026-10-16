@@ -81,7 +81,7 @@ function unrotatedTriangles(e: Entity): Triangle[] {
     case 'extrusion':
       return triangulateExtrusion(e);
     case 'mesh':
-      return meshTriangles(e.mesh);
+      return meshTriangles(e.mesh, e.position);
     case 'revolution':
       return revolutionTriangles(e.profile, e.axis, e.angle, e.segments, e.position);
     case 'sweep':
