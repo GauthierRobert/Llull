@@ -663,28 +663,34 @@ within its 2.5 w. MVP is about 12 weeks of agent lane time. M1 and M2 run in par
 2. **Two mechanism models.** `doc.joints` (kinematic, instances) and `doc.dynamics` (bodies). PHY-21 reads both.
    Should a later change derive one from the other (mature tools reuse assembly mates as joints [A-R18][A-R43])?
    Proposal: a separate core task after PHY-21.
-3. **Placement.** Core (proposed, next to `add_propeller`) or a plugin `@phys/mechanism` for the engine-specific
-   parts (`add_cylinder_pressure`, `engine_quick_check`, propeller)?
+3. **Placement. Decided 2026-10-16 (owner): core for now, in its own folder.**
+   - The engine-specific parts (`add_cylinder_pressure`, `engine_quick_check`, `set_engine_losses`, reference data,
+     the cylinder-pressure, loss and engine-report laws) live in `packages/core/src/dynamics/engine/` and
+     `packages/core/src/commands/dynamics/engine/`. Generic dynamics code never imports from them.
+   - A plugin cannot contribute force laws today (`CadPlugin` has commands, guards and document data only), and
+     these laws run in `loads(state)`. Extract to a plugin package when a second engine domain appears or a plugin
+     force-law extension point exists; with the folder boundary that is a move.
+   - `add_propeller` stays where it is; it moves with the engine folder if that is extracted.
 4. **Kernel interface growth** (`analyze`, `distance`, face axes): core-owner approval for the L9 contract change.
-5. **Human gate before 09 PLM.** No `ctx.caller` or signature path exists. Interim proposal: `sign_prototype_review`
-   and `accepted` dispositions are hidden from MCP and the CLI agent toolsets and dispatched only by the desktop UI.
-   This is advisory under AF-34a and is stated as such in the result until 09's signature lands.
+5. **Human gate before 09 PLM. Decided 2026-10-16 (owner): no sign-off in the MVP.**
+   - `sign_prototype_review`, `SignOffBar` (FR-FPR-33, the sign button of FR-FPR-58) and `FPR_SIGNOFF_BLOCKED` are
+     deferred until 09's signature path exists.
+   - `set_review_disposition` stays. Without `ctx.caller` the agent check of FR-FPR-31 cannot be enforced, so
+     `FPR_HUMAN_GATE` is deferred too. An `accepted` disposition is recorded but never turns a fail into a pass:
+     the verdict reports it as "fail (accepted)". VC-FPR-22 is reduced to that rule.
 6. **Reference engine geometry.** The user's existing propeller model was not found in the repo. Use the
    single-cylinder demonstrator (validation/README §4) for MVP and a Rotax-912-class 4-cylinder for V1? Engine data
    that is not public (rod length, masses, pressure trace) stays stated test input, `unverified`.
 7. **MuJoCo version.** Stay on 3.14.0 (weld-torque fix included [C-R7]) or move to 3.16.0? Proposal: stay, and
    re-run VC-10…17 on any upgrade.
-8. **Friction equations.** The PNH / Sandoval–Heywood forms in note E were reconstructed from an OCR scan [E-R9].
-   - Someone must check them against SAE 890836 / 2003-01-0725 or Heywood ch. 13 before `component` is coded.
-     These sources are paywalled or in print; they were not fetched.
-   - Until then MVP ships `fmep_table` and `chen_flynn` only.
-   - Can the owner provide access to one of these sources?
-9. **Real data for the target design.** The strongest validation would be the owner's own data:
-   - the engine or propeller actually intended, with its datasheet;
-   - any dyno curve, propeller static-rpm test or measured part masses.
-
-   Without these, validation is limited to the public Rotax and Lycoming curves (FR-FPR-77) and the rpm windows. The
-   piston and rod masses stay test values.
+8. **Friction equations. Decided 2026-10-16 (owner): skipped for now, no source available.**
+   - The PNH / Sandoval–Heywood forms in note E were reconstructed from an OCR scan [E-R9] and are unchecked
+     against SAE 890836 / 2003-01-0725 or Heywood ch. 13.
+   - MVP ships `fmep_table` and `chen_flynn` only. `component` is refused as unsupported, never approximated.
+   - Revisit when someone can check the equations against one of those sources.
+9. **Real data for the target design. Decided 2026-10-16 (owner): none available.**
+   - Validation is limited to the public Rotax and Lycoming curves (FR-FPR-77) and the rpm windows.
+   - The MVP demonstrator is the single-cylinder engine (Q6). Piston and rod masses stay test values, `unverified`.
 
 ## 12. References
 
