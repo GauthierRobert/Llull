@@ -5,6 +5,7 @@ import type { BuildingModel } from './building';
 import type { CivilModel } from './civil';
 import type { DrawingsModel } from './sheet';
 import type { DynamicsModel } from './dynamics';
+import type { PrototypeModel } from './prototype';
 import type { CurveSegment } from './curve';
 
 /** Re-exported: every model consumer reads its vectors from here. */
@@ -634,6 +635,8 @@ export interface CadDocument {
   drawings?: DrawingsModel;
   /** Absent until the first rigid-body dynamics command (`add_rigid_body`). */
   dynamics?: DynamicsModel;
+  /** Absent until the first prototype-review command (`allow_interference`, `set_part_grounded`). */
+  prototype?: PrototypeModel;
 }
 
 /**

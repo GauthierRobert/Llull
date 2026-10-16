@@ -44,6 +44,16 @@
   --agent: oklch(0.74 0.13 50); /* Claude / MCP agent activity (warm) */
   --agent-soft: oklch(0.74 0.13 50 / 0.14);
 
+  /* ---- Categories: Okabe-Ito colour-blind-safe palette (charts, series, finding types). Order = series order. ---- */
+  --cat-1: #e69f00; /* orange */
+  --cat-2: #56b4e9; /* sky blue */
+  --cat-3: #009e73; /* bluish green */
+  --cat-4: #d55e00; /* vermillion */
+  --cat-5: #0072b2; /* blue (lifted on dark for contrast) */
+  --cat-6: #cc79a7; /* reddish purple */
+  --cat-7: #f0e442; /* yellow */
+  --cat-8: #e8e8e8; /* "black" of the palette, inverted on dark */
+
   /* ---- Dock (bottom tool bar) + floating chrome ---- */
   --dock-bg: oklch(0.255 0.009 265);
   --dock-fg: oklch(0.97 0.003 265);
@@ -157,6 +167,15 @@
 
   --dock-bg: oklch(0.19 0.01 265);
   --dock-fg: oklch(1 0 0);
+  --cat-1: #e69f00;
+  --cat-2: #3a9bd5;
+  --cat-3: #009e73;
+  --cat-4: #d55e00;
+  --cat-5: #0072b2;
+  --cat-6: #cc79a7;
+  --cat-7: #b8a800; /* yellow darkened to read on white */
+  --cat-8: #000000;
+
   --dock-fg-muted: oklch(0.83 0.01 265);
   --dock-hover: oklch(1 0 0 / 0.09);
   --dock-active-bg: oklch(1 0 0);

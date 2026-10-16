@@ -6,10 +6,11 @@ import { useStore } from '@ui/store';
 import { runSimulation } from '@ui/services/simulationRun';
 import { execute } from '@core/commands/registry';
 import type { SimulationData } from '@core/dynamics/simulationReport';
-import { PLAYBACK_SPEEDS, useDynamicsPlaybackStore } from '@ui/store/dynamicsPlaybackStore';
+import { useDynamicsPlaybackStore } from '@ui/store/dynamicsPlaybackStore';
 import { PanelEmpty, PanelSection, StatusLine } from '@ui/panels/PanelParts';
 import { parseNumber } from '@ui/numberText';
-import { SpeedChart } from './SpeedChart';
+import { SeriesChart } from './SeriesChart';
+import { TimelineDock } from '@ui/components/TimelineDock';
 
 const RPM_PER_RAD_S = 60 / (2 * Math.PI);
 /** Samples per simulated second for playback: ≥ 4 per turn up to 15 000 rpm on short runs; capped by the command's 6001 samples. */
@@ -64,52 +65,25 @@ function ResultTable({ result }: { result: SimulationData }): React.ReactElement
   );
 }
 
-function PlaybackControls({ result }: { result: SimulationData }): React.ReactElement {
-  const { time, playing, speed, setTime, setPlaying, setSpeed, setResult } = useDynamicsPlaybackStore();
-  return (
-    <div className="physics-playback" data-testid="physics-playback">
-      <div className="physics-playback__row">
-        <button type="button" className="btn btn--sm" onClick={() => setPlaying(!playing)} data-testid="physics-play">
-          {playing ? 'Pause' : 'Play'}
-        </button>
-        <input
-          type="range"
-          className="physics-playback__scrub"
-          min={0}
-          max={result.duration}
-          step={result.duration / 1000}
-          value={time}
-          onChange={(e) => setTime(parseFloat(e.target.value))}
-          aria-label="Simulation time"
-          data-testid="physics-scrub"
-        />
-        <span className="panel__row-meta">{format(time, 3)} s</span>
-      </div>
-      <div className="physics-playback__row">
-        <label className="panel__row-meta" htmlFor="physics-speed">
-          Speed
-        </label>
-        <select id="physics-speed" value={speed} onChange={(e) => setSpeed(parseFloat(e.target.value))} data-testid="physics-speed">
-          {PLAYBACK_SPEEDS.map((factor) => (
-            <option key={factor} value={factor}>
-              {factor === 1 ? 'real time' : `${factor}× (slow motion)`}
-            </option>
-          ))}
-        </select>
-        <button type="button" className="btn btn--sm btn--ghost" onClick={() => setResult(null)} data-testid="physics-clear">
-          Back to design pose
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export function PhysicsSection(): React.ReactElement {
   const document = useStore((s) => s.document);
   const dynamics = document.dynamics;
   const result = useDynamicsPlaybackStore((s) => s.result);
   const setResult = useDynamicsPlaybackStore((s) => s.setResult);
-  const time = useDynamicsPlaybackStore((s) => s.time);
+  const speedSeries = useMemo(
+    () =>
+      result?.series === undefined
+        ? []
+        : Object.entries(result.series.jointVelocity)
+            .filter(([id]) => result.joints[id]?.kind === 'revolute')
+            .map(([id, values]) => ({ id, values: values.map((v) => v * RPM_PER_RAD_S) })),
+    [result],
+  );
+  const priority = useMemo(
+    () =>
+      result === null ? [] : [...Object.values(result.motors).map((m) => m.joint), ...Object.values(result.propellers).map((p) => p.joint)],
+    [result],
+  );
   const [duration, setDuration] = useState('5');
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
@@ -187,20 +161,24 @@ export function PhysicsSection(): React.ReactElement {
       {result !== null && (
         <>
           <ResultTable result={result} />
-          {result.series !== undefined && (
-            <SpeedChart
-              times={result.series.times}
-              priority={[...Object.values(result.motors).map((m) => m.joint), ...Object.values(result.propellers).map((p) => p.joint)]}
-              series={Object.fromEntries(
-                Object.entries(result.series.jointVelocity)
-                  .filter(([id]) => result.joints[id]?.kind === 'revolute')
-                  .map(([id, values]) => [id, values.map((v) => v * RPM_PER_RAD_S)]),
-              )}
-              cursor={time}
-            />
-          )}
           {result.warnings.length > 0 && <StatusLine text={`⚠ ${result.warnings.join('; ')}`} testId="physics-warnings" />}
-          <PlaybackControls result={result} />
+          <TimelineDock times={result.series?.times ?? []} idPrefix="physics">
+            {(view) =>
+              speedSeries.length > 0 && (
+                <SeriesChart
+                  xs={view.xs}
+                  xUnit={view.xUnit}
+                  cursor={view.cursor}
+                  onSeek={view.seek}
+                  unit="rpm"
+                  title="Joint speed over simulated time"
+                  testId="physics-chart"
+                  priority={priority}
+                  series={speedSeries}
+                />
+              )
+            }
+          </TimelineDock>
           <p className="physics-engine-note">{result.engine} · rigid-body dynamics, static propeller model</p>
         </>
       )}

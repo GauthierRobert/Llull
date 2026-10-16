@@ -7,7 +7,7 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { MessageChannel, Worker, receiveMessageOnPort, type MessagePort } from 'node:worker_threads';
-import type { GeometryKernel, ShapeHandle } from '@core/geometry/kernel';
+import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle } from '@core/geometry/kernel';
 import { errorMessage } from '@lib/errorMessage';
 import { handleOf, keyOnlyHandle, SHAPE_NOT_CACHED } from '@core/geometry/shapeKernel';
 import { STATUS_DIED, STATUS_READY, STATUS_REPLY, type KernelOperation, type KernelReply, type TestHook } from './occtWorkerProtocol';
@@ -183,19 +183,22 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
   const call = (op: KernelOperation | TestHook, args: readonly unknown[]): unknown => exchange(op, args)?.result ?? null;
 
   /** Output call with key-only handles first; on SHAPE_NOT_CACHED (evicted/recycled) retry with full recipes. */
-  const shapeCall = (op: KernelOperation, handles: readonly ShapeHandle[], wrap: boolean): unknown => {
-    const pack = (list: readonly ShapeHandle[]): unknown[] => (wrap ? [list] : [...list]);
+  const shapeCall = (op: KernelOperation, handles: readonly ShapeHandle[], wrap: boolean, extra: readonly unknown[] = []): unknown => {
+    const pack = (list: readonly ShapeHandle[]): unknown[] => (wrap ? [list] : [...list, ...extra]);
     const reply = exchange(op, pack(handles.map(keyOnlyHandle)));
     if (reply?.error?.startsWith(SHAPE_NOT_CACHED) !== true) return reply?.result ?? null;
     return call(op, pack(handles));
   };
 
   return {
+    name: 'occt',
     supports: () => true,
     evaluate: (recipe) => (call('evaluate', [recipe]) === null ? null : handleOf(recipe)),
     tessellate: (shape) => shapeCall('tessellate', [shape], false) as ReturnType<GeometryKernel['tessellate']>,
     topology: (shape) => shapeCall('topology', [shape], false) as ReturnType<GeometryKernel['topology']>,
     exportStep: (shapes) => shapeCall('exportStep', shapes, true) as ReturnType<GeometryKernel['exportStep']>,
+    analyze: (shape) => shapeCall('analyze', [shape], false) as ShapeAnalysis | null,
+    distance: (a, b, maxDistance) => shapeCall('distance', [a, b], false, [maxDistance]) as ShapeDistance | null,
     crashCount: () => crashes,
     recycleCount: () => recycles,
     forceFailure: (hook) => void call(hook, []),

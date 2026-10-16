@@ -17,6 +17,7 @@ const SIDEBAR_TABS = [
   'history',
   'configurations',
   'materials',
+  'review',
 ] as const;
 
 export type SidebarTab = (typeof SIDEBAR_TABS)[number];

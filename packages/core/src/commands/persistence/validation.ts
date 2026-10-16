@@ -11,6 +11,7 @@ import { getCommand, listCommands } from '../commandTable';
 import { validateAnimationValue, validateComponentValue, validateConfigurationValue, validateGroupValue } from './collections';
 import { drawingsProblems } from './drawingsValidation';
 import { dynamicsProblems } from './dynamicsValidation';
+import { prototypeProblems } from './prototypeValidation';
 import { validateCamera, validateLayer, validateEntityValue, validateMaterialValue, validateParameterValue } from './guards';
 
 const VALID_CONSTRAINT_KINDS: ReadonlySet<string> = new Set(CONSTRAINT_KINDS);
@@ -229,6 +230,7 @@ export function validateDocumentValues(v: Record<string, unknown>): string[] {
   validateSection(v['joints'], validateJointValue);
   errors.push(...drawingsProblems(v['drawings']));
   errors.push(...dynamicsProblems(v['dynamics']));
+  errors.push(...prototypeProblems(v['prototype']));
   for (const extension of documentExtensions()) errors.push(...extension.validate(v));
   validateSection(v['driveRelations'], validateDriveRelationValue);
   return errors;

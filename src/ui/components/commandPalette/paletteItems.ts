@@ -9,7 +9,8 @@ import { createSolid } from '@ui/actions/createSolid';
 import { DRAW_TOOL_KEYS, GIZMO_KEYS } from '@ui/hooks/shortcuts';
 import { SOLID_PRESETS } from '@ui/components/toolbar/solidPresets';
 import { DRAW_TOOLS } from '@ui/components/toolbar/drawTools';
-import { SIDEBAR_TAB_SPECS } from '@ui/components/sidebarTabs';
+import { SIDEBAR_TAB_SPECS, isSidebarTabAvailable } from '@ui/components/sidebarTabs';
+import { useReviewStore } from '@ui/panels/review/reviewStore';
 import { fuzzyScore } from './fuzzyMatch';
 import { humanizeName } from './paramForm';
 
@@ -134,7 +135,7 @@ function appActions(): PaletteAction[] {
       ),
     ),
     ...STATIC_ACTIONS.map((row) => action(...row)),
-    ...SIDEBAR_TAB_SPECS.map((spec) =>
+    ...SIDEBAR_TAB_SPECS.filter((spec) => isSidebarTabAvailable(spec.tab, useReviewStore.getState().result !== null)).map((spec) =>
       action(`panel-${spec.tab}`, 'Panels', `Open ${spec.label}`, `Show the ${spec.label} panel`, spec.icon, () => {
         if (!(layout().sidebarOpen && layout().sidebarTab === spec.tab)) layout().selectSidebarTab(spec.tab);
       }),
