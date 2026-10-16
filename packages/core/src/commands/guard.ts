@@ -2,10 +2,10 @@
 
 import type { CommandDefinition, CommandResult, ParamsSchema } from './types';
 import { isReservedKey } from '../lib/reservedKey';
-import { formatIssues } from './schema';
+import { formatIssues, issuePaths } from './schema';
 import { derivationViolation } from './derivation';
 import { pluginGuards } from '../plugins/host';
-import { rejection } from './noop';
+import { commandError, rejection } from './noop';
 import { errorMessage } from '../lib/errorMessage';
 
 function containsNonFinite(value: unknown, depth = 0): boolean {
@@ -42,6 +42,8 @@ function hasPrototypeIdKey(value: unknown, keyHint = '', depth = 0): boolean {
   if (Array.isArray(value)) return value.some((v) => hasPrototypeIdKey(v, keyHint, depth + 1));
   return Object.entries(value).some(([k, v]) => hasPrototypeIdKey(v, k, depth + 1));
 }
+
+const INVALID_PARAMS_FIX = 'Fix the params at `paths`; `llull describe <command>` shows the schema.';
 
 const POSITION_CONTRACT = ' Format [x, y, z]; [x, y] is accepted and placed at z=0.';
 
@@ -85,6 +87,7 @@ export function guardCommand(def: CommandDefinition<unknown>): CommandDefinition
         return rejection(
           doc,
           `${def.name} rejected: an id param is a reserved JavaScript property name (e.g. constructor, __proto__, toString). Use a different id.`,
+          commandError('CMD_RESERVED_ID', 'Use an id that is not a JavaScript property name (constructor, __proto__, toString, …).'),
         );
       if (def.paramsValidator) {
         let checked: ReturnType<typeof def.paramsValidator.safeParse>;
@@ -92,24 +95,42 @@ export function guardCommand(def: CommandDefinition<unknown>): CommandDefinition
           checked = def.paramsValidator.safeParse(safeParams, { reportInput: true });
         } catch (error) {
           const reason = warnAndDescribe(`command '${def.name}' params validation threw:`, error);
-          return rejection(doc, `${def.name} rejected: invalid params — ${reason}`);
+          return rejection(doc, `${def.name} rejected: invalid params — ${reason}`, commandError('CMD_INVALID_PARAMS', INVALID_PARAMS_FIX));
         }
         if (!checked.success)
-          return rejection(doc, `${def.name} rejected: invalid params — ${formatIssues(checked.error)}. Document unchanged.`);
+          return rejection(
+            doc,
+            `${def.name} rejected: invalid params — ${formatIssues(checked.error)}. Document unchanged.`,
+            commandError('CMD_INVALID_PARAMS', INVALID_PARAMS_FIX, [], issuePaths(checked.error)),
+          );
       }
       let result: CommandResult;
       try {
         result = def.run(doc, safeParams, ctx);
       } catch (error) {
         const reason = warnAndDescribe(`command '${def.name}' threw:`, error);
-        return rejection(doc, `${def.name} failed: ${reason}; document unchanged.`);
+        return rejection(
+          doc,
+          `${def.name} failed: ${reason}; document unchanged.`,
+          commandError('CMD_THREW', 'An internal error; simplify the input or report the summary as a bug.'),
+        );
       }
       const violation = derivationViolation(pluginGuards(), def.name, doc, result.document);
-      if (violation !== null) return rejection(doc, violation);
+      if (violation !== null)
+        return rejection(
+          doc,
+          violation,
+          commandError('CMD_DERIVED_GEOMETRY', 'Edit the domain object that derives this geometry instead of the derived entities.'),
+        );
       if (result.document !== doc) {
         for (const id of result.affected) {
           const reason = corruptionReason(result.document.entities[id]);
-          if (reason !== null) return rejection(doc, `${def.name} rejected: result for ${id} contains ${reason}. Document unchanged.`);
+          if (reason !== null)
+            return rejection(
+              doc,
+              `${def.name} rejected: result for ${id} contains ${reason}. Document unchanged.`,
+              commandError('CMD_CORRUPT_RESULT', 'Check the numeric params (sizes, positions) for extreme or degenerate values.', [id]),
+            );
         }
       }
       return result;

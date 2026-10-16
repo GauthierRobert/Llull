@@ -31,6 +31,12 @@ describe('parseCommandResponse', () => {
     });
   });
 
+  it('keeps a well-formed refusal code and drops a malformed one', () => {
+    const error = { code: 'CMD_UNKNOWN', ids: [], paths: [], remediation: 'Search.' };
+    expect(parseCommandResponse({ summary: 's', affected: [], isError: true, error }, 200).error).toEqual(error);
+    expect(parseCommandResponse({ summary: 's', affected: [], error: { code: 'X', ids: [1] } }, 200).error).toBeUndefined();
+  });
+
   it('turns an error body or a non-2xx status into an error outcome', () => {
     expect(parseCommandResponse({ error: 'nope' }, 401)).toMatchObject({ isError: true, summary: 'Server answered HTTP 401: nope.' });
     expect(parseCommandResponse({ summary: 's', affected: [] }, 500).isError).toBe(true);

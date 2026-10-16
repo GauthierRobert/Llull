@@ -224,6 +224,29 @@ describe('llull CLI — local document', () => {
     expect(report.consumedAliases).toEqual(['body', 'hole']);
   });
 
+  it('reports loop aliases and per-step refusal codes in --json', async () => {
+    const plan = [
+      { repeat: { count: 2 }, actions: [{ command: 'add_sphere', params: { radius: 1 }, as: 'ball{i}' }] },
+      { command: 'add_box', params: { size: 'big' } },
+    ];
+    const c = capture({ stdin: JSON.stringify(plan) });
+    expect(await runCli(['run', '-', '--continue', '--json', ...docFlag()], c.io)).toBe(EXIT_COMMAND_ERROR);
+    const report = JSON.parse(c.out[0] ?? '') as {
+      aliases: Record<string, string[]>;
+      data: { steps: { ok: boolean; error?: { code: string; paths: string[] } }[] };
+    };
+    expect(Object.keys(report.aliases)).toEqual(['ball0', 'ball1']);
+    expect(report.data.steps.at(-1)?.error).toMatchObject({ code: 'CMD_INVALID_PARAMS', paths: ['size'] });
+
+    const single = capture();
+    expect(await runCli(['add_box', 'size=7', '--json', ...docFlag()], single.io)).toBe(EXIT_COMMAND_ERROR);
+    expect((JSON.parse(single.out[0] ?? '') as { error: { code: string } }).error.code).toBe('CMD_INVALID_PARAMS');
+
+    const text = capture();
+    expect(await runCli(['add_box', 'size=7', ...docFlag()], text.io)).toBe(EXIT_COMMAND_ERROR);
+    expect(text.out.join('\n')).toMatch(/Error CMD_INVALID_PARAMS at size: /);
+  });
+
   it('prints the per-step report with issues for an invalid plan', async () => {
     const c = capture({ stdin: '[{"command":"no_such_command"}]' });
     expect(await runCli(['run', '-', '--validate', ...docFlag()], c.io)).toBe(EXIT_COMMAND_ERROR);

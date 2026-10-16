@@ -30,6 +30,7 @@ export function resultJson(result: PrintableResult): string {
     affected: result.affected,
     changed: result.changed,
     ...(result.data !== undefined ? { data: result.data } : {}),
+    ...(result.error !== undefined ? { error: result.error } : {}),
     ...(result.saved !== undefined ? { saved: result.saved } : {}),
     ...(result.planAliases !== undefined ? { aliases: result.planAliases.aliases, consumedAliases: result.planAliases.consumed } : {}),
   });
@@ -46,6 +47,7 @@ export function resultText(result: PrintableResult): string {
     affected: [...result.affected],
     isError: result.isError,
     data: result.data,
+    ...(result.error !== undefined ? { error: result.error } : {}),
   });
   return [...shaped.content.map((block) => block.text), ...savedLines(result.saved)].join('\n');
 }

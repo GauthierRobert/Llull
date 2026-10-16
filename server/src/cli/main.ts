@@ -224,7 +224,7 @@ async function runPlan(args: ParsedArgv, io: CliIo): Promise<number> {
   const observer = observerOf(args, io);
   const backend = await backendOf(args, io, observer);
   const result = withTimeout(observer, withOutcome('build_project', await backend.run('build_project', params)));
-  const found = planAliases(base['actions'], result.data);
+  const found = planAliases(result.data);
   return finish(found === null ? result : { ...result, planAliases: found }, args, io, planText);
 }
 

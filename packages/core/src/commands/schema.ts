@@ -142,6 +142,11 @@ export function toParamsSchema(schema: ParamsObject): ParamsSchema {
   return { type: 'object', properties, required };
 }
 
+/** Dotted param path of every issue (`size.0`; `(params)` for the root). */
+export function issuePaths(error: z.ZodError): string[] {
+  return [...new Set(error.issues.map((issue) => (issue.path.length > 0 ? issue.path.join('.') : '(params)')))];
+}
+
 /** "path: message (got …)" for the first few issues — fed back to the agent as the summary. */
 export function formatIssues(error: z.ZodError): string {
   return error.issues

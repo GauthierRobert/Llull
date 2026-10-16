@@ -32,6 +32,20 @@ export interface CommandResult {
    * to an error.
    */
   rejected?: true;
+  /** Machine-readable reason of a refusal (always set with `rejected`; a command may also set it on its own no-op). */
+  error?: CommandError;
+}
+
+/**
+ * A refusal an agent can script on (AGENT_FIRST AF-11): a stable `code` (`CMD_*` registry, `PLAN_*` build_project, pack prefixes such
+ * as `KRN_*`), the offending entity ids, the offending locations (param paths such as `size.0`, or plan paths such as
+ * `step 4 › iter 2 › step 1`) and a one-line fix.
+ */
+export interface CommandError {
+  readonly code: string;
+  readonly ids: readonly string[];
+  readonly paths: readonly string[];
+  readonly remediation: string;
 }
 
 /** Safety annotations; emitted as MCP tool annotations (readOnlyHint, destructiveHint, idempotentHint). */

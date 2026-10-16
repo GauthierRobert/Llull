@@ -1,4 +1,5 @@
 import type { SceneSnapshot } from '../inspect/sceneTypes';
+import type { CommandError } from '../types';
 
 export interface PlanAction {
   command: string;
@@ -45,6 +46,10 @@ export interface StepReport {
   ok: boolean;
   summary: string;
   affected: string[];
+  /** Why a failed step failed (`ok: false` only): the command's own `CommandError`, else a `PLAN_*` / `CMD_NO_EFFECT` code. */
+  error?: CommandError;
+  /** A read-only step's answer (its `CommandResult.data`), so a script reads query results without re-running them. */
+  data?: unknown;
 }
 
 export interface BuildProjectData {
@@ -54,6 +59,11 @@ export interface BuildProjectData {
   steps: StepReport[];
   /** Index of the step that aborted the run, or null (completed / continue mode). */
   failedAt: number | null;
+  /**
+   * Every `as` alias the run bound (loop-interpolated ones included, e.g. `piston0`) → the ids bound at that moment (later steps may have
+   * consumed them). Present when the run completed; absent in validate mode and on an aborted (rolled-back) run.
+   */
+  aliases?: Record<string, string[]>;
   /** Validation issues (validate mode only). */
   issues?: string[];
   /** Final document snapshot (omitted in validate mode — nothing changed). */

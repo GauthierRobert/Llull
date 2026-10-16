@@ -1,6 +1,7 @@
 import type { CadDocument } from '../../model/types';
 import { report } from '../noop';
-import type { CommandResult } from '../types';
+import { PLAN_FIX, planError } from './planErrors';
+import type { CommandError, CommandResult } from '../types';
 import { type EvalResult, evaluateExpression, extractReferences, isBuiltinConstant, parameterValues } from '../parametric/expression';
 import { MAX_PROJECT_STEPS } from '../limits';
 import { mapStringLeaves } from '../history/regenerate';
@@ -61,12 +62,13 @@ export function budgetFailure(index: number): StepReport {
     ok: false,
     summary: `step budget exceeded: MAX_PROJECT_STEPS (${MAX_PROJECT_STEPS}).`,
     affected: [],
+    error: planError(PLAN_FIX.stepBudget, `step ${index}`),
   };
 }
 
 /** A rejected `build_project` run: unchanged doc plus the plan report. */
-export function rejectPlan(doc: CadDocument, data: BuildProjectData, summary: string): CommandResult {
-  return report(doc, summary, data);
+export function rejectPlan(doc: CadDocument, data: BuildProjectData, summary: string, error: CommandError): CommandResult {
+  return { ...report(doc, summary, data), error };
 }
 
 /** Expression env: every parameter value plus the loop variables (`$i`, `$<as>`). */

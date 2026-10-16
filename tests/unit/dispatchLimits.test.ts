@@ -47,6 +47,14 @@ describe('shapeToolCallContent size limits', () => {
     expect(text.endsWith('```')).toBe(true);
     expect((shaped.structuredContent as typeof data).entities).toHaveLength(20_000);
   });
+  it('adds a refusal code line and keeps the error in structuredContent', () => {
+    const error = { code: 'CMD_INVALID_PARAMS', ids: [], paths: ['size.0'], remediation: 'Fix the params.' };
+    const bare = shapeToolCallContent({ summary: 's', affected: [], isError: true, error });
+    expect(bare.content[1]?.text).toBe('Error CMD_INVALID_PARAMS at size.0: Fix the params.');
+    expect(bare.structuredContent).toEqual({ error });
+    const withData = shapeToolCallContent({ summary: 's', affected: [], isError: true, data: { ok: false }, error });
+    expect(withData.structuredContent).toEqual({ ok: false, error });
+  });
   it('bounds a 3000-entity-scale result to a small multiple of the caps', () => {
     const shaped = shapeToolCallContent({ summary: 's', affected: ids(3000), isError: false, data: { stl: 'x'.repeat(11_000_000) } });
     expect(totalChars(shaped.content)).toBeLessThan(MAX_JSON_TEXT_CHARS + 12_000);

@@ -4,6 +4,7 @@
  * (the one reader of a command-bus body, used by every non-browser client).
  */
 
+import type { CommandError } from '@core/commands/types';
 import { isRecord } from '@lib/isRecord';
 
 /**
@@ -17,6 +18,11 @@ export interface CommandOutcome {
   /** The document was replaced (and saved, for a local CLI backend not in dry-run). */
   changed: boolean;
   data?: unknown;
+  /**
+   * Machine-readable reason (`code`, `ids`, `paths`, `remediation`): on every rejection (`isError`), and also with `isError: false` on a
+   * failure the command reported itself (an aborted or refused `build_project`, a command's own coded no-op).
+   */
+  error?: CommandError;
 }
 
 /**
@@ -82,5 +88,20 @@ export function parseCommandResponse(body: unknown, status: number): CommandOutc
     isError: body['isError'] === true || status >= 400,
     changed: body['changed'] === true,
     ...(body['data'] !== undefined ? { data: body['data'] } : {}),
+    ...(isCommandError(body['error']) ? { error: body['error'] } : {}),
   };
+}
+
+function isStringList(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
+function isCommandError(value: unknown): value is CommandError {
+  return (
+    isRecord(value) &&
+    typeof value['code'] === 'string' &&
+    typeof value['remediation'] === 'string' &&
+    isStringList(value['ids']) &&
+    isStringList(value['paths'])
+  );
 }

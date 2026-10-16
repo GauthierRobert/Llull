@@ -3,6 +3,7 @@
  * assembled (the server calls it after `commandBus.applyCommand`).
  */
 
+import type { CommandError } from '@core/commands/types';
 import { isRecord } from '@lib/isRecord';
 
 interface McpTextContent {
@@ -64,9 +65,20 @@ function jsonText(value: unknown): string {
  * `MAX_JSON_TEXT_CHARS` (a `format:'code'` record's `text` moves to its own verbatim block,
  * clipped past `MAX_CODE_TEXT_CHARS`).
  */
-export function shapeToolCallContent(result: { summary: string; affected: string[]; isError: boolean; data?: unknown }): McpShapedResult {
-  const { summary, affected, isError, data } = result;
+export function shapeToolCallContent(result: {
+  summary: string;
+  affected: string[];
+  isError: boolean;
+  data?: unknown;
+  error?: CommandError;
+}): McpShapedResult {
+  const { summary, affected, isError, data, error } = result;
   const content: McpTextContent[] = [{ type: 'text', text: summary }];
+  const errorPart = error === undefined ? {} : { error };
+  if (error !== undefined) {
+    const where = error.paths.length > 0 ? ` at ${error.paths.join(', ')}` : '';
+    content.push({ type: 'text', text: `Error ${error.code}${where}: ${error.remediation}` });
+  }
   if (affected.length > 0) {
     const shown = affected.slice(0, MAX_AFFECTED_IDS_SHOWN).join(', ');
     const more = affected.length - MAX_AFFECTED_IDS_SHOWN;
@@ -80,7 +92,8 @@ export function shapeToolCallContent(result: { summary: string; affected: string
   }
   if (data === undefined) {
     // Ids past the text cap would otherwise be in no channel at all.
-    return affected.length > MAX_AFFECTED_IDS_SHOWN ? { content, isError, structuredContent: { affected } } : { content, isError };
+    const structured = { ...errorPart, ...(affected.length > MAX_AFFECTED_IDS_SHOWN ? { affected } : {}) };
+    return Object.keys(structured).length > 0 ? { content, isError, structuredContent: structured } : { content, isError };
   }
 
   // Source code (export_code) is shown verbatim so agents read it as code, not as a JSON string.
@@ -90,5 +103,5 @@ export function shapeToolCallContent(result: { summary: string; affected: string
   if (code !== null) {
     content.push({ type: 'text', text: clip(code, MAX_CODE_TEXT_CHARS, 'the full source is in structuredContent.text') });
   }
-  return { content, isError, structuredContent: structuredOf(data, affected) };
+  return { content, isError, structuredContent: { ...structuredOf(data, affected), ...errorPart } };
 }

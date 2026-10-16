@@ -31,6 +31,7 @@ export function runCommandOutcome(doc: CadDocument, name: string, params: unknow
         isError: result.rejected === true,
         changed: result.document !== doc,
         ...(result.data !== undefined ? { data: result.data } : {}),
+        ...(result.error !== undefined ? { error: result.error } : {}),
       },
     };
   } catch (error) {

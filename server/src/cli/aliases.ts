@@ -12,38 +12,27 @@ export interface PlanAliases {
   readonly consumed: string[];
 }
 
-function aliasOf(action: unknown): string | undefined {
-  if (!isRecord(action)) return undefined;
-  if (typeof action['as'] === 'string') return action['as'];
-  const repeat = action['repeat'];
-  return isRecord(repeat) && typeof repeat['as'] === 'string' ? repeat['as'] : undefined;
-}
-
 function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.map(String) : [];
 }
 
-/** Null when the report has no final scene (validation, failed plan): nothing to resolve against. */
-export function planAliases(actions: unknown, data: unknown): PlanAliases | null {
-  if (!Array.isArray(actions) || !isRecord(data) || data['failedAt'] != null) return null;
+/**
+ * The run report's alias map (`data.aliases`, loop aliases included) narrowed to ids still in the final scene. Null when the report has
+ * no final scene or no alias map (validation, failed plan): nothing to resolve against.
+ */
+export function planAliases(data: unknown): PlanAliases | null {
+  if (!isRecord(data) || data['failedAt'] != null || !isRecord(data['aliases'])) return null;
   const scene = data['scene'];
-  const steps = data['steps'];
-  if (!isRecord(scene) || !Array.isArray(scene['entities']) || !Array.isArray(steps)) return null;
+  if (!isRecord(scene) || !Array.isArray(scene['entities'])) return null;
   const present = new Set(scene['entities'].map((entity) => (isRecord(entity) ? String(entity['id']) : '')));
   const aliases: Record<string, string[]> = {};
   const consumed: string[] = [];
-  actions.forEach((action, index) => {
-    const alias = aliasOf(action);
-    if (alias === undefined) return;
-    const ids = steps
-      .filter((step) => isRecord(step) && step['index'] === index && step['ok'] === true)
-      .flatMap((step) => (isRecord(step) ? stringList(step['affected']) : []));
-    const alive = [...new Set(ids)].filter((id) => present.has(id));
-    delete aliases[alias];
+  for (const [alias, ids] of Object.entries(data['aliases'])) {
+    const alive = [...new Set(stringList(ids))].filter((id) => present.has(id));
     if (alive.length > 0) aliases[alias] = alive;
-    else if (!consumed.includes(alias)) consumed.push(alias);
-  });
-  return { aliases, consumed: consumed.filter((alias) => !(alias in aliases)) };
+    else consumed.push(alias);
+  }
+  return { aliases, consumed };
 }
 
 export function aliasLine(found: PlanAliases): string | null {

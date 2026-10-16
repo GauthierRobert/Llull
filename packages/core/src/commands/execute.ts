@@ -5,7 +5,7 @@ import type { CommandResult, ExecutionContext } from './types';
 import { currentContext, runInContext } from './context';
 import { getCommand } from './commandTable';
 import { kernelUnavailable } from './kernelRefusal';
-import { rejection } from './noop';
+import { commandError, rejection, unknownCommandError } from './noop';
 import { stepIdSource } from '../lib/id';
 
 /**
@@ -16,9 +16,14 @@ import { stepIdSource } from '../lib/id';
  */
 export function execute(doc: CadDocument, commandName: string, params: unknown, ctx: ExecutionContext = currentContext()): CommandResult {
   const def = getCommand(commandName);
-  if (!def) return rejection(doc, `Unknown command: ${commandName}`);
+  if (!def) return rejection(doc, `Unknown command: ${commandName}`, unknownCommandError());
   const annotations = def.annotations;
-  if (annotations?.requiresKernel === true && ctx.kernel === null) return rejection(doc, kernelUnavailable(commandName));
+  if (annotations?.requiresKernel === true && ctx.kernel === null)
+    return rejection(
+      doc,
+      kernelUnavailable(commandName),
+      commandError('CMD_KERNEL_UNAVAILABLE', 'Retry once the geometry kernel has loaded, or run with `--kernel occt`.'),
+    );
   const recordsStep = annotations?.readOnly !== true && annotations?.metaHistory !== true;
   if (!recordsStep || ctx.stepKey !== undefined) {
     // Queries, history meta-commands, and executes nested inside a running step append nothing.
@@ -29,6 +34,12 @@ export function execute(doc: CadDocument, commandName: string, params: unknown, 
     return rejection(
       doc,
       `${commandName} rejected: document nextStepNumber ${String(stepNumber)} is not a safe integer >= 1 (ids would collide).`,
+      commandError(
+        'CMD_STEP_COUNTER_INVALID',
+        'Reload the document from a valid file; its step counter is corrupt.',
+        [],
+        ['nextStepNumber'],
+      ),
     );
   const stepKey = String(stepNumber);
   const stepContext: ExecutionContext = { ...ctx, ids: stepIdSource(stepKey), stepKey };

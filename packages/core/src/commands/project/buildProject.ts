@@ -11,6 +11,7 @@ import { MAX_PROJECT_DEPTH } from '../limits';
 import { type BuildProjectParams } from './types';
 import { rejectPlan } from './resolve';
 import { runProject } from './run';
+import { PLAN_FIX, planError } from './planErrors';
 
 /**
  * @affects runs an ordered list of commands; affected = union of created/changed ids
@@ -63,6 +64,7 @@ export const buildProject = defineCommand({
         doc,
         { ok: false, validated: params.validate === true, stepCount: 0, steps: [], failedAt: null },
         `build_project: nesting depth exceeds MAX_PROJECT_DEPTH (${MAX_PROJECT_DEPTH}).`,
+        planError(PLAN_FIX.tooDeep, 'actions'),
       );
     return runInContext({ ...context, projectDepth: context.projectDepth + 1 }, () =>
       runProject(doc, params as unknown as BuildProjectParams),

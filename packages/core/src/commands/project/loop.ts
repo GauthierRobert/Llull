@@ -10,6 +10,7 @@ import type { FeatureStep } from '../../model/types';
 import { currentContext, runInContext } from '../context';
 import { MAX_LOOP_ITERATIONS, MAX_PROJECT_STEPS } from '../limits';
 import { execStep, failStep, type PlanRun } from './exec';
+import { PLAN_FIX } from './planErrors';
 import { isLoopNode, resolveLoopHeader } from './loopHeader';
 import { buildEnv, budgetFailure, interpolate, isPlanAction, REF, resolveRef } from './resolve';
 import { type ActionItem, type LoopNode } from './types';
@@ -38,13 +39,13 @@ function runItem(run: PlanRun, index: number, item: ActionItem, path: string, va
     const why = legacy
       ? 'a repeat/for_each with "step" cannot be nested; write { repeat, actions: [...] }'
       : 'not a valid action (needs a string "command")';
-    return failStep(run, index, '(invalid)', `${path}: ${why}`, path);
+    return failStep(run, index, '(invalid)', `${path}: ${why}`, PLAN_FIX.invalidAction, path);
   }
   const env = buildEnv(run.current, vars);
   let alias: string | undefined;
   if (item.as !== undefined) {
     const filled = interpolate(item.as, env);
-    if (filled.error !== null) return failStep(run, index, item.command, `${path}: ${filled.error}`, path);
+    if (filled.error !== null) return failStep(run, index, item.command, `${path}: ${filled.error}`, PLAN_FIX.unresolvedParam, path);
     alias = filled.text;
   }
   const r = execStep(run, index, item.command, item.params ?? {}, run.bindings, env, path, path);
@@ -58,9 +59,16 @@ function runItem(run: PlanRun, index: number, item: ActionItem, path: string, va
 /** Expands one loop (header evaluated now, over the current document); true when the run must abort. */
 function runLoopNode(run: PlanRun, index: number, node: LoopNode, path: string, vars: Vars): boolean {
   const header = resolveLoopHeader(node, buildEnv(run.current, vars));
-  if (header.error !== null) return failStep(run, index, 'loop', `${path}: ${header.error}`, path);
+  if (header.error !== null) return failStep(run, index, 'loop', `${path}: ${header.error}`, PLAN_FIX.loopHeader, path);
   if (run.loopIterations + header.values.length > MAX_LOOP_ITERATIONS)
-    return failStep(run, index, 'loop', `${path}: loops expand to more than MAX_LOOP_ITERATIONS (${MAX_LOOP_ITERATIONS}) iterations`, path);
+    return failStep(
+      run,
+      index,
+      'loop',
+      `${path}: loops expand to more than MAX_LOOP_ITERATIONS (${MAX_LOOP_ITERATIONS}) iterations`,
+      PLAN_FIX.loopLimit,
+      path,
+    );
   run.loopIterations += header.values.length;
   for (let k = 0; k < header.values.length; k++) {
     const scope = { ...vars, [header.variable]: header.values[k] as number };
