@@ -42,8 +42,8 @@ export const simulateMotion = defineCommand({
     'top speed) unless set_dynamics_solver or `timestep` says otherwise, and data.loops reports the largest constraint violation ' +
     '(metres), its tier (pass <= 1 µm, warn <= 10 µm = FPR_LOOP_DRIFT warn, reactions approximate; fail above, reactions unreliable) ' +
     'and the solver settings used. `reactions`: "off", "peaks" (default when the mechanism has loops) or "series": data.reactions ' +
-    'gives, per joint and per loop closure, the force (N) and moment (N·m) on the child body at the joint anchor in world axes, with ' +
-    'peak magnitude, time and crank angle (the crank angle axis is the cycle angle of the first cylinder, or the joint named by ' +
+    'gives, per tree joint, the force (N) and moment (N·m) on the child body at the joint anchor in world axes, and per loop closure ' +
+    'the resultant force (N) on the child (no moment), each with peak magnitude, time and crank angle (the crank angle axis is the cycle angle of the first cylinder, or the joint named by ' +
     '`crankAxis`); along the axis of a driven joint the reported component includes the drive force itself. With cylinder pressures ' +
     '(add_cylinder_pressure) the sampling defaults to one sample per crank degree and data.engineReport gives, over the last full ' +
     'cycle: torque against crank angle per cylinder and total (detail series), mean torque (N·m), indicated power (kW), IMEP and peak ' +

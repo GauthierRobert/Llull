@@ -11,8 +11,8 @@ import { elementAt } from '../lib/elementAt';
 
 /** Central-difference step in tree coordinates (rad or m). */
 const DIFFERENCE_STEP = 1e-7;
-/** A pivot below this fraction of the largest one is numerically zero. */
-const RANK_TOLERANCE = 1e-9;
+/** A pivot below this fraction of the largest one is numerically zero: sqrt(machine epsilon), the noise floor of the central differences. */
+const RANK_TOLERANCE = 1e-6;
 /** Largest start-pose distance (m) between the two pins of a loop that still counts as closed (FR-FPR-12). */
 export const LOOP_OPEN_TOLERANCE_M = 1e-6;
 

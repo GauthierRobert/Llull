@@ -174,9 +174,6 @@ describe('engine geometry from the joints', () => {
 
   it('refuses a piston or crank that is not a tree joint of the right kind, and a missing rod', () => {
     expect(geometryOf({ ...wiebeCylinder(), crank: 'rod_j' })).toMatchObject({ error: expect.stringMatching(/no connecting rod/) });
-    expect(geometryOf({ ...wiebeCylinder(), crank: 'wrist_j' }, { wrist: 'revolute' })).toMatchObject({
-      error: expect.stringMatching(/'wrist_j' closes a loop/),
-    });
     expect(geometryOf({ ...wiebeCylinder(), piston: 'crank_j' })).toMatchObject({ error: expect.stringMatching(/not a prismatic/) });
     expect(geometryOf({ ...wiebeCylinder(), crank: 'slide_j' })).toMatchObject({ error: expect.stringMatching(/not a revolute/) });
   });
@@ -487,5 +484,69 @@ describe('add_cylinder_pressure', () => {
     const result = execute({ ...noRod, dynamics }, 'add_cylinder_pressure', params);
     expect(result.affected).toHaveLength(1);
     expect(result.summary).toMatch(/geometry not usable yet \(no connecting rod/);
+  });
+});
+
+describe('pressure model cross-checks', () => {
+  const layout = geometryOf(wiebeCylinder());
+  if ('error' in layout) throw new Error(layout.error);
+  const V = (phi: number): number => layout.clearanceVolumeM3 + layout.pistonAreaM2 * sliderTravel(layout.slider, phi * DEG);
+
+  it('the offset-cylinder top angle follows the closed form asin(e / (l + r))', () => {
+    for (const e of [0.005, 0.02, -0.03]) {
+      const slider = createSlider(R, L, e);
+      expect(slider.top).toBeCloseTo(Math.asin(e / (L + R)), 8);
+    }
+  });
+
+  it('wiebe with no heat is the polytropic compression then expansion, point by point', () => {
+    const curve = pressureCurve(wiebeCylinder({ heat: { kind: 'per_cycle_J', value: 0 } }), layout, 1000);
+    if ('error' in curve) throw new Error(curve.error);
+    const bdc = V(180);
+    const end = V(35);
+    for (const psi of [-180, -150, -90, -30, 0, 20, 35]) {
+      const expected = 95000 * (bdc / V(psi)) ** 1.32;
+      expect(Math.abs(gaugeAt(curve, psi + 720) + 101325 - expected) / expected).toBeLessThan(1e-9);
+    }
+    const atEnd = 95000 * (bdc / end) ** 1.32;
+    for (const psi of [60, 120, 180]) {
+      const expected = atEnd * (end / V(psi)) ** 1.28;
+      expect(Math.abs(gaugeAt(curve, psi) + 101325 - expected) / expected).toBeLessThan(1e-9);
+    }
+  });
+
+  it('single zone with no wall heat transfer reproduces the Wiebe model at n_c = n_e = k = 1.35 and the same burn', () => {
+    const wiebe = pressureCurve(
+      wiebeCylinder({
+        compressionIndex: 1.35,
+        expansionIndex: 1.35,
+        startDeg: -15,
+        durationDeg: 50,
+        a: 12,
+        heat: { kind: 'per_cycle_J', value: 400 },
+      }),
+      layout,
+      1000,
+    );
+    const single = pressureCurve(
+      {
+        ...wiebeCylinder(),
+        model: {
+          kind: 'single_zone',
+          burn: { startDeg: -15, durationDeg: 50, a: 12, m: 2, rpmExponent: 0 },
+          woschni: { c1: 1e-12, c2Closed: 2.28, c2Exchange: 6.18, c3: 0.00324, tempExponent: -0.53, wallTempK: 450 },
+          intakePressurePa: 95000,
+          intakeTempK: 330,
+          heat: { kind: 'per_cycle_J', value: 400 },
+        },
+      },
+      layout,
+      1000,
+    );
+    if ('error' in wiebe || 'error' in single) throw new Error('curve refused');
+    let worst = 0;
+    wiebe.gaugePa.forEach((p, k) => (worst = Math.max(worst, Math.abs(p - (single.gaugePa[k] ?? 0)))));
+    expect(worst / wiebe.peakPa).toBeLessThan(1e-3);
+    expect(Math.abs(single.imepPa - wiebe.imepPa) / wiebe.imepPa).toBeLessThan(2e-3);
   });
 });

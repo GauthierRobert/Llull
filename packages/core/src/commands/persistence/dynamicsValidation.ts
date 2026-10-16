@@ -73,23 +73,36 @@ const isPoints = (value: unknown, minimum: number): boolean =>
 
 const allFinite = (record: Record<string, unknown>, keys: readonly string[]): boolean => keys.every((key) => isFiniteNumber(record[key]));
 
+const isGreaterThanMinusOne = (value: unknown): boolean => isFiniteNumber(value) && value > -1;
+
 const wiebeProblem = (model: Record<string, unknown>): string | null => {
   const heat = model['heat'];
   if (!isRecord(heat) || (heat['kind'] !== 'per_cycle_J' && heat['kind'] !== 'target_imep_Pa') || !isFiniteNumber(heat['value']))
     return 'wiebe needs heat { kind: per_cycle_J | target_imep_Pa, value }';
   const keys = ['startDeg', 'durationDeg', 'a', 'm', 'compressionIndex', 'expansionIndex', 'intakePressurePa'];
-  return allFinite(model, keys) && isPositive(model['durationDeg']) && isPositive(model['a'])
+  return allFinite(model, keys) && isPositive(model['durationDeg']) && isPositive(model['a']) && isGreaterThanMinusOne(model['m'])
     ? null
-    : 'wiebe needs finite startDeg, durationDeg > 0, a > 0, m, compressionIndex, expansionIndex, intakePressurePa';
+    : 'wiebe needs finite startDeg, durationDeg > 0, a > 0, m > -1, compressionIndex, expansionIndex, intakePressurePa';
 };
 
 const singleZoneProblem = (model: Record<string, unknown>): string | null => {
   const [burn, woschni, heat] = [model['burn'], model['woschni'], model['heat']];
-  if (!isRecord(burn) || !isPositive(burn['durationDeg']) || !isPositive(burn['a']) || !allFinite(burn, ['m', 'rpmExponent']))
-    return 'single_zone burn needs durationDeg > 0, a > 0, m, rpmExponent and ca50Deg or startDeg';
+  if (
+    !isRecord(burn) ||
+    !isPositive(burn['durationDeg']) ||
+    !isPositive(burn['a']) ||
+    !allFinite(burn, ['rpmExponent']) ||
+    !isGreaterThanMinusOne(burn['m'])
+  )
+    return 'single_zone burn needs durationDeg > 0, a > 0, m > -1, rpmExponent and ca50Deg or startDeg';
   if (!isFiniteNumber(burn['ca50Deg']) && !isFiniteNumber(burn['startDeg'])) return 'single_zone burn needs ca50Deg or startDeg';
-  if (!isRecord(woschni) || !allFinite(woschni, ['c1', 'c2Closed', 'c2Exchange', 'c3', 'tempExponent', 'wallTempK']))
-    return 'single_zone woschni needs c1, c2Closed, c2Exchange, c3, tempExponent, wallTempK';
+  if (
+    !isRecord(woschni) ||
+    !allFinite(woschni, ['c3', 'tempExponent']) ||
+    !['c1', 'c2Closed', 'c2Exchange', 'wallTempK'].every((key) => isPositive(woschni[key])) ||
+    !isNonNegative(woschni['c3'])
+  )
+    return 'single_zone woschni needs c1, c2Closed, c2Exchange, wallTempK > 0 and c3 >= 0, tempExponent';
   if (!isPositive(model['intakePressurePa']) || !isPositive(model['intakeTempK']))
     return 'single_zone needs intakePressurePa and intakeTempK > 0';
   const heatOk =
@@ -118,15 +131,17 @@ const cylinderProblem: Check = (cylinder) => {
 const solverProblem = (solver: unknown): string | null => {
   if (solver === undefined) return null;
   if (!isRecord(solver)) return 'solver must be an object';
-  const stepOk = solver['timestepS'] === 'auto' || isPositive(solver['timestepS']);
+  const step = solver['timestepS'];
+  const stepOk = step === 'auto' || (isFiniteNumber(step) && step >= 1e-5 && step <= 0.01);
   if (!stepOk || (solver['integrator'] !== 'rk4' && solver['integrator'] !== 'implicitfast'))
-    return "timestepS must be 'auto' or > 0; integrator 'rk4' | 'implicitfast'";
+    return "timestepS must be 'auto' or in 1e-5..0.01 s; integrator 'rk4' | 'implicitfast'";
   const [steps, impedance] = [solver['loopTimeConstantSteps'], solver['loopImpedance']];
-  if (!isFiniteNumber(steps) || steps < 2) return 'loopTimeConstantSteps must be >= 2';
+  if (!isFiniteNumber(steps) || steps < 2 || steps > 1000) return 'loopTimeConstantSteps must be in 2..1000';
   if (!isFiniteNumber(impedance) || impedance <= 0 || impedance > 0.9999) return 'loopImpedance must be in (0, 0.9999]';
-  return isPositive(solver['loopResidualPassM']) && isPositive(solver['loopResidualFailM']) && isPositive(solver['timestepSensitivityGate'])
-    ? null
-    : 'loopResidualPassM, loopResidualFailM, timestepSensitivityGate must be > 0';
+  const [pass, fail] = [solver['loopResidualPassM'], solver['loopResidualFailM']];
+  if (!isPositive(pass) || !isPositive(fail) || !isPositive(solver['timestepSensitivityGate']))
+    return 'loopResidualPassM, loopResidualFailM, timestepSensitivityGate must be > 0';
+  return (pass as number) <= (fail as number) ? null : 'loopResidualPassM must not exceed loopResidualFailM';
 };
 
 const TABLES: ReadonlyArray<readonly [string, Check]> = [

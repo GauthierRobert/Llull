@@ -37,7 +37,9 @@ export interface TopologyRefusal {
 }
 
 /** Tree preference: prismatic joints first (a loop cannot close through one), then revolute, spherical last. */
-const KIND_RANK: Readonly<Record<DynamicJoint['kind'], number>> = { prismatic: 0, revolute: 1, spherical: 2 };
+const KIND_RANK: Readonly<Record<DynamicJoint['kind'], number>> = { prismatic: 0, revolute: 2, spherical: 3 };
+/** Rank of the crank joint of a cylinder pressure: after prismatic joints, ahead of other revolute joints (it must be a tree joint). */
+const CRANK_RANK = 1;
 
 /**
  * Tree and loop closures of `dynamics`. Joints are taken in the order (kind rank, creation order); a joint joins the tree unless its
@@ -52,9 +54,12 @@ export function buildTopology(dynamics: DynamicsModel): Topology | TopologyRefus
     for (const end of [joint.parent, joint.child])
       if (end !== GROUND && !index.has(end))
         return { error: `joint '${joint.id}' references missing body '${end}'`, code: 'FPR_JOINT_DANGLING', ids: [joint.id, end] };
-  // a joint whose child is welded to the ground never moves: it is inert (neither tree nor loop)
-  const joints = declared.filter((joint) => dynamics.bodies[joint.child]?.fixed !== true);
   const nodeOf = (id: string): string => (id === GROUND || dynamics.bodies[id]?.fixed === true ? GROUND : id);
+  // a joint between two grounded things never moves: it is inert (neither tree nor loop). A fixed child with a moving parent joins the
+  // tree from the fixed side (flipped), so the parent is held by it.
+  const joints = declared.filter((joint) => nodeOf(joint.parent) !== GROUND || nodeOf(joint.child) !== GROUND);
+  const cranks = new Set(Object.values(dynamics.cylinders ?? {}).map((cylinder) => cylinder.crank));
+  const rankOf = (joint: DynamicJoint): number => (cranks.has(joint.id) && joint.kind === 'revolute' ? CRANK_RANK : KIND_RANK[joint.kind]);
   const unionParent = new Map<string, string>();
   const find = (id: string): string => {
     let root = id;
@@ -66,7 +71,7 @@ export function buildTopology(dynamics: DynamicsModel): Topology | TopologyRefus
   };
   const ranked = joints
     .map((joint, creation) => ({ joint, creation }))
-    .sort((a, b) => KIND_RANK[a.joint.kind] - KIND_RANK[b.joint.kind] || a.creation - b.creation)
+    .sort((a, b) => rankOf(a.joint) - rankOf(b.joint) || a.creation - b.creation)
     .map(({ joint }) => joint);
   const treeSet = new Set<string>();
   for (const joint of ranked) {
@@ -75,7 +80,7 @@ export function buildTopology(dynamics: DynamicsModel): Topology | TopologyRefus
       if (joint.kind === 'prismatic')
         return {
           error:
-            `joint '${joint.id}' (prismatic) would close a loop, and MuJoCo has no sliding constraint between two bodies: make a ` +
+            `joint '${joint.id}' (prismatic) would close a loop, and a loop cannot close through a sliding constraint between two bodies: make a ` +
             `different joint of the loop the closing one (re-order or replace it by a revolute joint)`,
           code: 'FPR_LOOP_PRISMATIC',
           ids: [joint.id],

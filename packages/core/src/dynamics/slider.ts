@@ -22,6 +22,12 @@ function height(r: number, l: number, offset: number, alpha: number): number {
   return r * Math.cos(alpha) + Math.sqrt(l * l - (r * Math.sin(alpha) - offset) ** 2);
 }
 
+/** d(height)/d(alpha). */
+function heightRate(r: number, l: number, offset: number, alpha: number): number {
+  const lateral = r * Math.sin(alpha) - offset;
+  return -r * Math.sin(alpha) - (lateral * r * Math.cos(alpha)) / Math.sqrt(l * l - lateral * lateral);
+}
+
 /** Angle of the highest piston position, rad: exact 0 for a centred cylinder, a search with golden-section refinement otherwise. */
 function topAngle(r: number, l: number, offset: number): number {
   if (Math.abs(offset) < 1e-12 * l) return 0;
@@ -33,13 +39,13 @@ function topAngle(r: number, l: number, offset: number): number {
     const h = height(r, l, offset, alpha);
     if (h > bestHeight) [best, bestHeight] = [alpha, h];
   }
+  // the height peaks where its derivative changes sign: bisect inside one sample step
   const step = (2 * Math.PI) / samples;
   let [lo, hi] = [best - step, best + step];
-  const ratio = (Math.sqrt(5) - 1) / 2;
   for (let i = 0; i < 80; i++) {
-    const [a, b] = [hi - ratio * (hi - lo), lo + ratio * (hi - lo)];
-    if (height(r, l, offset, a) > height(r, l, offset, b)) hi = b;
-    else lo = a;
+    const mid = (lo + hi) / 2;
+    if (heightRate(r, l, offset, mid) > 0) lo = mid;
+    else hi = mid;
   }
   return (lo + hi) / 2;
 }

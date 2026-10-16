@@ -363,3 +363,92 @@ describe('further dynamics edge cases', () => {
     expect(runtimes[0]?.curveAt(2000).heatJ).toBe(400);
   });
 });
+
+describe('crank rank, fixed children, tdc override (review fixes)', () => {
+  const stub = (patch: Partial<CylinderPressure> = {}): CylinderPressure => ({
+    id: 'c',
+    piston: 'slide_j',
+    crank: 'crank_j',
+    boreMm: 84,
+    compressionRatio: 10,
+    cycle: 'four_stroke',
+    firingOffsetDeg: 0,
+    tdcCrankAngleRad: null,
+    ambientPressurePa: 101325,
+    model: {
+      kind: 'table',
+      points: [
+        [0, 0],
+        [720, 0],
+      ],
+    },
+    ...patch,
+  });
+
+  it('a crank declared last is still a tree joint when a cylinder uses it; without the cylinder it closes the loop', () => {
+    const order: ('slide_j' | 'wrist_j' | 'rod_j' | 'crank_j')[] = ['slide_j', 'wrist_j', 'rod_j', 'crank_j'];
+    const dynamics = sliderCrank({ wrist: 'revolute', order }).doc.dynamics!;
+    expect(topologyOf(dynamics).loops.map((loop) => loop.id)).toEqual(['crank_j']);
+    const withCylinder = { ...dynamics, cylinders: { c: stub() } };
+    expect(topologyOf(withCylinder).loops.map((loop) => loop.id)).not.toContain('crank_j');
+    expect(engineLayout(dynamics, topologyOf(dynamics), stub(), 0.001)).toMatchObject({
+      error: expect.stringMatching(/'crank_j' closes a loop/),
+    });
+    expect(engineLayout(withCylinder, topologyOf(withCylinder), stub(), 0.001)).not.toHaveProperty('error');
+  });
+
+  it('a fixed child with a moving parent holds the parent from the ground instead of being dropped', () => {
+    const topology = topologyOf(model(['f', 'a'], { j: joint('j', 'a', 'f') }, ['f']));
+    expect(topology.tree).toHaveLength(1);
+    expect(topology.tree[0]).toMatchObject({ parent: 'f', child: 'a', flipped: true });
+    expect(topology.jointOfBody.get('a')?.joint.id).toBe('j');
+  });
+
+  it('reports a user TDC angle that disagrees with the geometry, and accepts one that agrees', () => {
+    const dynamics = sliderCrank({ rMm: 30.5, lMm: 130, startDeg: 60 }).doc.dynamics!;
+    const topology = topologyOf(dynamics);
+    const geometric = (300 * Math.PI) / 180;
+    const run = (override: number): ReturnType<typeof prepareCylinders> =>
+      prepareCylinders({ ...dynamics, cylinders: { c: stub({ tdcCrankAngleRad: override }) } }, topology, 0.001);
+    const off = run(geometric + (5 * Math.PI) / 180);
+    if ('error' in off) throw new Error(off.error);
+    expect(off[0]?.tdcMismatchDeg).toBeCloseTo(5, 9);
+    const same = run(geometric - 2 * Math.PI);
+    if ('error' in same) throw new Error(same.error);
+    expect(same[0]?.tdcMismatchDeg).toBeNull();
+  });
+
+  it('refuses cylinders on two different cranks', () => {
+    const dynamics = sliderCrank().doc.dynamics!;
+    const result = prepareCylinders(
+      { ...dynamics, cylinders: { a: stub({ id: 'a' }), b: stub({ id: 'b', crank: 'rod_j', piston: 'slide_j' }) } },
+      topologyOf(dynamics),
+      0.001,
+    );
+    expect(result).toMatchObject({ error: expect.stringMatching(/share one crank/) });
+  });
+
+  it('holds a single-zone curve for a whole cycle at the previous cycle mean speed', () => {
+    const dynamics = sliderCrank({ rMm: 30.5, lMm: 130 }).doc.dynamics!;
+    const single: CylinderPressure['model'] = {
+      kind: 'single_zone',
+      burn: { ca50Deg: 9, durationDeg: 35, a: 5, m: 2, rpmExponent: 0.2 },
+      woschni: { c1: 3.26, c2Closed: 2.28, c2Exchange: 6.18, c3: 0.00324, tempExponent: -0.53, wallTempK: 450 },
+      intakePressurePa: 95000,
+      intakeTempK: 330,
+      heat: { kind: 'per_cycle_J', value: 300 },
+    };
+    const runtimes = prepareCylinders({ ...dynamics, cylinders: { c: stub({ model: single }) } }, topologyOf(dynamics), 0.001, 1200);
+    if ('error' in runtimes) throw new Error(runtimes.error);
+    const runtime = runtimes[0]!;
+    // cycles 0 (partial), 1, 2 start at t = 0, 0.1, 0.2: two revolutions in 0.1 s = 1200 rpm
+    runtime.observe(0, 0);
+    expect(runtime.heldRpm(0)).toBe(1200);
+    runtime.observe(1, 0.1);
+    expect(runtime.heldRpm(1)).toBe(1200);
+    runtime.observe(2, 0.15);
+    expect(runtime.heldRpm(2)).toBeCloseTo((2 * 60) / 0.05, 9);
+    runtime.observe(2, 99);
+    expect(runtime.heldRpm(2)).toBeCloseTo(2400, 9);
+  });
+});
