@@ -25,7 +25,7 @@ export interface PairClass {
   readonly pointB: Vec3;
 }
 
-/** Index pairs (i < j) of parts whose bounds, grown by `margin` per side, overlap. */
+/** Index pairs (i < j) of parts whose bounds, grown by `margin` once (gap between boxes), overlap. */
 export function candidatePairs(parts: readonly AssemblyPart[], margin: number): Array<[number, number]> {
   const order = parts.map((_, index) => index).sort((p, q) => (parts[p]?.min[0] ?? 0) - (parts[q]?.min[0] ?? 0) || p - q);
   const pairs: Array<[number, number]> = [];
@@ -53,9 +53,9 @@ function overlapOf(kernel: GeometryKernel, a: AssemblyPart, b: AssemblyPart): { 
   const analyze = kernel.analyze?.bind(kernel);
   if (analyze === undefined) return null;
   const shape = kernel.evaluate({ op: 'boolean', boolean: 'intersect', a: a.recipe, b: b.recipe });
-  if (shape === null) return { volume: 0, depth: 0 };
+  if (shape === null) return null;
   const analysis = analyze(shape);
-  if (analysis === null) return null;
+  if (analysis === null || !analysis.valid) return null;
   const mins = analysis.lumps.reduce<Vec3>(
     (acc, lump) => [Math.min(acc[0], lump.bounds.min[0]), Math.min(acc[1], lump.bounds.min[1]), Math.min(acc[2], lump.bounds.min[2])],
     [Infinity, Infinity, Infinity],

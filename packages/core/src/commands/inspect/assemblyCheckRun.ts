@@ -1,15 +1,17 @@
 /**
  * The `check_assembly` pipeline (TECHNICAL_SPEC 5.2): collect parts, validity, pairs, connectivity, thickness, joint realisation.
  * @invariant deterministic: fixed iteration orders (document order, pairs i < j), no random, numbers rounded to 12 significant digits
+ * @invariant a scoped run builds the connectivity graph over ALL parts and reports only items that touch the scope
  */
 
-import type { CadDocument } from '../../model/types';
-import type { GeometryKernel } from '../../geometry/kernel';
+import type { CadDocument, Vec3 } from '../../model/types';
+import type { GeometryKernel, ShapeAnalysis } from '../../geometry/kernel';
 import { MM_PER_UNIT } from '../../model/units';
 import { type CheckItem, type CheckResult, type CheckThreshold, worstStatus } from '../../model/checkResult';
 import { PROCESS_RULES, type ProcessId } from '../../model/processRules';
 import { GROUND } from '../../model/dynamics';
 import { hashText } from '../../lib/hash';
+import { canonicalJson } from '../../lib/canonicalJson';
 import { roundDeep } from '../../lib/significant';
 import { recipeKey } from '../../geometry/shapeRecipe';
 import type { AssemblyPart, CheckTolerances } from '../../geometry/assemblyCheck/partTypes';
@@ -18,7 +20,7 @@ import { candidatePairs, classifyPair, pairItem } from '../../geometry/assemblyC
 import { connectivityItems } from '../../geometry/assemblyCheck/connectivity';
 import { measureThickness } from '../../geometry/assemblyCheck/thickness';
 import { realiseJoint } from '../../geometry/assemblyCheck/jointRealisation';
-import { type PartScope, collectParts } from './assemblyParts';
+import { type PartScope, candidateIds, collectParts, scopedIds } from './assemblyParts';
 import { assemblyLinks, intentOf } from './assemblyGraph';
 
 export interface AssemblyCheckParams extends PartScope {
@@ -61,18 +63,28 @@ function thresholdOf(params: AssemblyCheckParams): CheckThreshold | null {
 
 function thicknessItems(
   parts: readonly AssemblyPart[],
-  excluded: ReadonlySet<string>,
+  skip: (part: AssemblyPart) => boolean,
   threshold: CheckThreshold | null,
   rays: number,
   tolerances: CheckTolerances,
 ): CheckItem[] {
   const { mmPerUnit } = tolerances;
   const items: CheckItem[] = [];
+  const code = threshold === null ? 'FPR_WALL_MEASURED' : 'FPR_WALL_THIN';
   for (const part of parts) {
-    if (excluded.has(part.id) || part.mesh === null) continue;
+    if (skip(part)) continue;
     const thresholdUnits = threshold === null ? 0 : threshold.value / mmPerUnit;
-    const report = measureThickness(part.mesh, rays, CORNER_EXCLUSION_FACTOR * thresholdUnits, 2 * thresholdUnits);
-    if (report === null) continue;
+    const report =
+      part.mesh === null ? null : measureThickness(part.mesh, rays, CORNER_EXCLUSION_FACTOR * thresholdUnits, 2 * thresholdUnits);
+    if (report === null) {
+      items.push(
+        makeItem(code, 'not_run', [part.id], 'Check that the part is a closed solid (check_assembly part validity) and retry.', {
+          unverified: true,
+          note: 'thickness could not be measured: no mesh, or no sample ray hit the opposite wall',
+        }),
+      );
+      continue;
+    }
     const values = {
       thicknessMm: report.min * mmPerUnit,
       thicknessP1Mm: report.p1 * mmPerUnit,
@@ -84,14 +96,12 @@ function thicknessItems(
     };
     const note = 'method: ray (inward normal, first hit); overestimates on non-parallel walls; witness lists the thinnest clusters';
     if (threshold === null)
-      items.push(
-        makeItem('FPR_WALL_MEASURED', 'info', [part.id], 'Give process or minWallMm to judge these walls.', { values, witness, note }),
-      );
+      items.push(makeItem(code, 'info', [part.id], 'Give process or minWallMm to judge these walls.', { values, witness, note }));
     else {
       const thin = report.min * mmPerUnit < threshold.value;
       items.push(
         makeItem(
-          'FPR_WALL_THIN',
+          code,
           thin ? 'fail' : 'pass',
           [part.id],
           thin
@@ -109,6 +119,7 @@ function jointItems(
   doc: CadDocument,
   kernel: GeometryKernel,
   partsById: ReadonlyMap<string, AssemblyPart>,
+  inScope: (bodyId: string) => boolean,
   mmPerUnit: number,
 ): CheckItem[] {
   const shapesOf = (bodyId: string): AssemblyPart['shape'][] =>
@@ -117,7 +128,7 @@ function jointItems(
       return part === undefined ? [] : [part.shape];
     });
   return Object.values(doc.dynamics?.joints ?? {})
-    .filter((joint) => joint.kind === 'revolute')
+    .filter((joint) => joint.kind === 'revolute' && (inScope(joint.child) || inScope(joint.parent)))
     .map((joint) =>
       realiseJoint(kernel, {
         id: joint.id,
@@ -130,6 +141,37 @@ function jointItems(
     );
 }
 
+/** Part bounds from the kernel's exact lumps when known (the tessellation is short by its chord error on curved parts). */
+function withExactBounds(parts: readonly AssemblyPart[], analyses: ReadonlyMap<string, ShapeAnalysis>): AssemblyPart[] {
+  return parts.map((part) => {
+    const lumps = analyses.get(part.id)?.lumps ?? [];
+    if (lumps.length === 0) return part;
+    const min = [0, 1, 2].map((k) => Math.min(...lumps.map((lump) => lump.bounds.min[k] ?? Infinity), part.min[k] ?? Infinity));
+    const max = [0, 1, 2].map((k) => Math.max(...lumps.map((lump) => lump.bounds.max[k] ?? -Infinity), part.max[k] ?? -Infinity));
+    return { ...part, min: min as unknown as Vec3, max: max as unknown as Vec3 };
+  });
+}
+
+function staleReferenceItem(doc: CadDocument): CheckItem[] {
+  const prototype = doc.prototype;
+  if (prototype === undefined) return [];
+  const referenced = [...prototype.grounded, ...Object.values(prototype.intents).flatMap((intent) => [intent.a, intent.b])];
+  const stale = [...new Set(referenced.filter((id) => doc.entities[id] === undefined))];
+  return stale.length === 0
+    ? []
+    : [
+        makeItem(
+          'FPR_STALE_REFERENCE',
+          'info',
+          stale,
+          'These ids no longer exist: remove their intents with remove_interference_intent or release them with set_part_grounded.',
+          { note: 'prototype intents / grounded parts refer to deleted entities; they were ignored' },
+        ),
+      ];
+}
+
+const refusal = (limit: string, remediation: string): BudgetRefusal => ({ refused: true, limit, remediation });
+
 export function runAssemblyCheck(doc: CadDocument, kernel: GeometryKernel, params: AssemblyCheckParams): AssemblyCheckOutcome {
   const mmPerUnit = MM_PER_UNIT[doc.units];
   const tolerances: CheckTolerances = {
@@ -139,56 +181,73 @@ export function runAssemblyCheck(doc: CadDocument, kernel: GeometryKernel, param
     volumeRelative: VOLUME_RELATIVE,
     mmPerUnit,
   };
-  const collected = collectParts(doc, kernel, params);
-  const { parts } = collected;
-  if (parts.length + collected.refused.length > MAX_PARTS)
-    return {
-      refused: true,
-      limit: `${parts.length + collected.refused.length} parts, limit ${MAX_PARTS}`,
-      remediation: 'Narrow the request with ids, body or component.',
-    };
+  const { ids: allIds, skipped2D } = candidateIds(doc);
+  const selected = scopedIds(doc, params);
+  const subjectIds = selected === null ? allIds : allIds.filter((id) => selected.has(id));
+  const narrow = 'Narrow the request with ids, body or component.';
+  if (subjectIds.length > MAX_PARTS) return refusal(`${subjectIds.length} parts, limit ${MAX_PARTS}`, narrow);
   const threshold = thresholdOf(params);
   const rays = params.raysPerPart ?? DEFAULT_RAYS;
   const thicknessOn = (params.thickness ?? (threshold === null ? 'off' : 'ray')) === 'ray';
-  if (thicknessOn && parts.length * rays > MAX_RAYS_TOTAL)
-    return {
-      refused: true,
-      limit: `${parts.length * rays} thickness rays, limit ${MAX_RAYS_TOTAL}`,
-      remediation: 'Lower raysPerPart, narrow the scope, or set thickness to "off".',
-    };
+  if (thicknessOn && subjectIds.length * rays > MAX_RAYS_TOTAL)
+    return refusal(
+      `${subjectIds.length * rays} thickness rays, limit ${MAX_RAYS_TOTAL}`,
+      'Lower raysPerPart, narrow the scope, or set thickness to "off".',
+    );
 
-  const items: CheckItem[] = collected.refused.map((id) =>
-    makeItem(
-      'FPR_PART_INVALID',
-      'fail',
-      [id],
-      'The kernel refused to build this part (degenerate size, open mesh, unsupported feature); rebuild it.',
-      { note: 'kernel evaluation returned null' },
-    ),
+  const subjects = new Set(subjectIds);
+  // Context parts (outside the scope) are built so that contact with them counts as a connection; skipped when the document is too big.
+  const buildIds = allIds.length <= MAX_PARTS ? new Set(allIds) : subjects;
+  const collected = collectParts(doc, kernel, buildIds);
+  const items: CheckItem[] = collected.refused.map(({ id, reason }) =>
+    reason === 'kernel'
+      ? makeItem(
+          'FPR_PART_INVALID',
+          'fail',
+          [id],
+          'The kernel refused to build this part (degenerate size, open mesh, unsupported feature); rebuild it.',
+          { note: 'kernel evaluation returned null' },
+        )
+      : makeItem(
+          'FPR_PART_EMPTY',
+          'fail',
+          [id],
+          'The instance has no buildable solid: fix its component (missing, empty or nested too deep).',
+          { note: 'instance expansion produced no solid' },
+        ),
   );
-  const validity = validateParts(kernel, parts, tolerances);
+  if (subjectIds.length === 0)
+    items.push(
+      makeItem(
+        'FPR_NO_PARTS',
+        'not_run',
+        [],
+        'Add 3D solids or component instances (2D entities are ignored), or pick a scope that has some.',
+        { unverified: true, note: 'nothing to check: the document or scope has no 3D parts' },
+      ),
+    );
+  const validity = validateParts(kernel, collected.parts, tolerances);
   items.push(...validity.items);
+  const parts = withExactBounds(collected.parts, validity.analyses);
 
-  const partIds = new Set(parts.map((part) => part.id));
-  const links = assemblyLinks(doc, partIds);
+  const links = assemblyLinks(doc, new Set(allIds));
   const strongLinks = [...links.strongLinks];
   const touchLinks: Array<readonly [string, string]> = [];
   const candidates = candidatePairs(parts, tolerances.clearance + tolerances.epsTouch).filter(([i, j]) => {
     const [a, b] = [parts[i], parts[j]];
-    if (a === undefined || b === undefined || validity.excluded.has(a.id) || validity.excluded.has(b.id)) return false;
+    if (a === undefined || b === undefined || (!subjects.has(a.id) && !subjects.has(b.id))) return false;
+    if (validity.excluded.has(a.id) || validity.excluded.has(b.id)) return false;
     return params.body !== undefined || links.bodyOf.get(a.id) === undefined || links.bodyOf.get(a.id) !== links.bodyOf.get(b.id);
   });
-  if (candidates.length > MAX_PAIRS)
-    return {
-      refused: true,
-      limit: `${candidates.length} candidate pairs, limit ${MAX_PAIRS}`,
-      remediation: 'Narrow the request with ids, body or component.',
-    };
+  if (candidates.length > MAX_PAIRS) return refusal(`${candidates.length} candidate pairs, limit ${MAX_PAIRS}`, narrow);
   let pairsNotRun = false;
   for (const [i, j] of candidates) {
     const [a, b] = [parts[i] as AssemblyPart, parts[j] as AssemblyPart];
-    const volumeOf = (part: AssemblyPart): number => validity.analyses.get(part.id)?.volume ?? 0;
-    const pair = classifyPair(kernel, a, b, volumeOf(a), volumeOf(b), tolerances);
+    const [analysisA, analysisB] = [validity.analyses.get(a.id), validity.analyses.get(b.id)];
+    const pair =
+      analysisA === undefined || analysisB === undefined
+        ? null
+        : classifyPair(kernel, a, b, analysisA.volume, analysisB.volume, tolerances);
     if (pair === null) {
       pairsNotRun = true;
       continue;
@@ -206,24 +265,27 @@ export function runAssemblyCheck(doc: CadDocument, kernel: GeometryKernel, param
     if (pair.kind === 'touch') touchLinks.push([a.id, b.id]);
     else if (pair.kind !== 'clearance') strongLinks.push([a.id, b.id]);
   }
-  if (pairsNotRun)
-    items.push(
-      kernelUnsupportedItem(
-        parts.map((part) => part.id),
-        'pair classification (distance / analyze)',
-      ),
+  if (pairsNotRun) items.push(kernelUnsupportedItem(subjectIds, 'pair classification (distance / analyze)'));
+
+  items.push(...connectivityItems({ parts: allIds, strongLinks, touchLinks, grounded: links.grounded }));
+  const reported = items.filter((entry) => entry.ids.length === 0 || entry.ids.some((id) => subjects.has(id)));
+  if (thicknessOn)
+    reported.push(
+      ...thicknessItems(parts, (part) => !subjects.has(part.id) || validity.excluded.has(part.id), threshold, rays, tolerances),
     );
+  if (params.includeJoints !== false) {
+    const bodyInScope = (bodyId: string): boolean =>
+      selected === null || (doc.dynamics?.bodies[bodyId]?.entityIds ?? []).some((id) => subjects.has(id));
+    reported.push(...jointItems(doc, kernel, new Map(parts.map((part) => [part.id, part])), bodyInScope, mmPerUnit));
+  }
+  reported.push(...staleReferenceItem(doc));
 
-  items.push(...connectivityItems({ parts: parts.map((part) => part.id), strongLinks, touchLinks, grounded: links.grounded }));
-  if (thicknessOn) items.push(...thicknessItems(parts, validity.excluded, threshold, rays, tolerances));
-  if (params.includeJoints !== false) items.push(...jointItems(doc, kernel, new Map(parts.map((part) => [part.id, part])), mmPerUnit));
-
-  const unverified = items.some((entry) => entry.status === 'not_run');
   const provenanceParams = { ...params };
   const inputsHash = hashText(
-    JSON.stringify({
+    canonicalJson({
       parts: parts.map((part) => [part.id, recipeKey(part.recipe)]),
       refused: collected.refused,
+      subjects: subjectIds,
       dynamics: doc.dynamics ?? null,
       joints: doc.joints,
       prototype: doc.prototype ?? null,
@@ -234,8 +296,8 @@ export function runAssemblyCheck(doc: CadDocument, kernel: GeometryKernel, param
   );
   const result: CheckResult = {
     check: 'assembly',
-    status: worstStatus(items.map((entry) => entry.status)),
-    items,
+    status: reported.length === 0 ? 'pass' : worstStatus(reported.map((entry) => entry.status)),
+    items: reported,
     provenance: {
       method: 'kernel distance + recipe intersect; ray thickness; union-find connectivity',
       ...(kernel.name === undefined ? {} : { kernel: kernel.name }),
@@ -250,12 +312,14 @@ export function runAssemblyCheck(doc: CadDocument, kernel: GeometryKernel, param
       params: provenanceParams,
     },
     inputsHash,
-    unverified,
+    unverified: reported.some((entry) => entry.status === 'not_run'),
     reviewRequired: true,
   };
   const extras = {
-    parts: parts.map((part) => ({ id: part.id, volumeMm3: (validity.analyses.get(part.id)?.volume ?? 0) * mmPerUnit ** 3 })),
-    skipped2D: collected.skipped2D,
+    parts: parts
+      .filter((part) => subjects.has(part.id))
+      .map((part) => ({ id: part.id, volumeMm3: (validity.analyses.get(part.id)?.volume ?? 0) * mmPerUnit ** 3 })),
+    skipped2D,
     pairsChecked: candidates.length,
   };
   return { refused: false, result: roundDeep(result), extras: roundDeep(extras) };

@@ -88,6 +88,50 @@ export function analyzeShape(api: OccApi, shape: OccShape): ShapeAnalysis {
   };
 }
 
+interface SolidClassifier extends OccHandle {
+  Load(shape: OccShape): void;
+  Perform(point: OccHandle, tolerance: number): void;
+  State(): unknown;
+}
+
+/**
+ * Every solid of `inner` has its first vertex strictly inside some solid of `outer`. With disjoint surfaces (distance > 0) that means
+ * containment, also for compounds (boolean results, unions) where BRepExtrema's InnerSolution is not reported.
+ */
+function containedIn(api: OccApi, outer: OccShape, inner: OccShape): boolean {
+  const outerSolids = uniqueSubShapes(api, outer, 'TopAbs_SOLID');
+  const innerSolids = uniqueSubShapes(api, inner, 'TopAbs_SOLID');
+  try {
+    if (outerSolids.length === 0 || innerSolids.length === 0) return false;
+    return innerSolids.every((solid) => {
+      const vertices = uniqueSubShapes(api, solid, 'TopAbs_VERTEX');
+      try {
+        const first = vertices[0];
+        if (first === undefined) return false;
+        const point = api.BRep_Tool.Pnt(api.TopoDS.Vertex_1(first) as OccShape) as OccPoint;
+        try {
+          return outerSolids.some((candidate) => {
+            const classifier = new api.BRepClass3d_SolidClassifier_1() as SolidClassifier;
+            try {
+              classifier.Load(candidate);
+              classifier.Perform(point, 1e-6);
+              return classifier.State() === api.TopAbs_State.TopAbs_IN;
+            } finally {
+              release(classifier);
+            }
+          });
+        } finally {
+          release(point);
+        }
+      } finally {
+        vertices.forEach(release);
+      }
+    });
+  } finally {
+    [...outerSolids, ...innerSolids].forEach(release);
+  }
+}
+
 /** Exact minimum distance (BRepExtrema_DistShapeShape); `inside` when a solid contains the other (inner solution). */
 export function shapeDistance(api: OccApi, a: OccShape, b: OccShape): ShapeDistance | null {
   const extrema = new api.BRepExtrema_DistShapeShape_1() as Extrema;
@@ -95,11 +139,12 @@ export function shapeDistance(api: OccApi, a: OccShape, b: OccShape): ShapeDista
     extrema.LoadS1(a);
     extrema.LoadS2(b);
     if (!extrema.Perform() || !extrema.IsDone()) return null;
+    const distance = extrema.Value();
     return {
-      distance: extrema.Value(),
+      distance,
       pointA: xyz(extrema.PointOnShape1(1)),
       pointB: xyz(extrema.PointOnShape2(1)),
-      inside: extrema.InnerSolution(),
+      inside: extrema.InnerSolution() || (distance > 0 && (containedIn(api, a, b) || containedIn(api, b, a))),
     };
   } finally {
     release(extrema);

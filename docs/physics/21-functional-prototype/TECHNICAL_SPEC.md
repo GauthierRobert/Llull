@@ -84,7 +84,7 @@ Laws respected:
 | TR-FPR-09 | MUST | Mobility (§5.5) in core from the same topology: Gruebler count and numerical rank of the loop-constraint Jacobian at the initial pose (finite differences in tree coordinates, column-pivoted QR, rank tolerance 1e-9 relative, named). |
 | TR-FPR-10 | MUST | `check_motion_clearance` (§5.6) rebuilds part poses from `SimulationTrace.bodyPosition/bodyOrientation` (or from `motion_study` steps) and uses `meshBvh` on the kernel tessellation (tessellation tolerance reported). The worst colliding pose is re-evaluated exactly through placed recipes for volume. |
 | TR-FPR-11 | MUST | Determinism: fixed iteration orders (entity order, body order, joint creation order, pair `(i < j)` order), no `Math.random`, numbers in `data` rounded to 12 significant digits (PHY-10 TR-RBD-24 convention). |
-| TR-FPR-12 | MUST | `inputsHash` per check = sha256 of the canonical JSON of everything the check reads: recipes' `recipeKey`, transforms, dynamics slice, intents, params, kernel and engine names. Uses `@lib/hash`. |
+| TR-FPR-12 | MUST | `inputsHash` per check = sha256 of the canonical JSON of everything the check reads: recipes' `recipeKey`, transforms, dynamics slice, intents, params, kernel and engine names. Uses `@lib/hash` over canonical JSON (keys sorted). Deviation: `@lib/hash` is a 64-bit FNV-style hash, not sha256 (core has no sha256 and may not use Node crypto); it identifies inputs but is not collision-resistant against an adversary. |
 | TR-FPR-13 | MUST | Agent-first result envelope on every query: `{ status, items[], provenance, unverified, reviewRequired, inputsHash }`, unit-suffixed fields, `FPR_*` codes (§7.1). |
 | TR-FPR-14 | MUST | `Accuracy` envelope (§3.4) attached to every scalar output of the engine report, the reactions and the comparison. It is built in `dynamics/accuracy.ts` from the model's inputs: each law declares its own band and basis (friction ±15 % [E-R9], combustion as calibrated, reactions inheriting the worst input band). Bands combine by root-sum-square of independent relative bands, named. A missing band propagates as `null` ("± ?"), never as 0. |
 | TR-FPR-15 | MUST | Engine losses (§5.8) are a pure core law evaluated in `loads(state)`: a torque on the crank joint, T_f = −FMEP(n, p_max)·V_d/(4π)·s(ω), with s(ω) = tanh(ω/ω_s), ω_s = 1 rad/s (named), so the cycle-average loss equals FMEP·V_d exactly at steady speed. p_max is taken from the previous cycle (first cycle: the calibration value). |
@@ -588,6 +588,8 @@ use distinct shapes (✔ ▲ ✖ ○ ◌) with text [D-R43][D-R44].
 | `FPR_WALL_THIN` | fail | min wall below the threshold (value, threshold, source) |
 | `FPR_JOINT_NOT_REALISED` | warn (MVP) | no pin/bore coaxial with the joint → model the journal and the bore |
 | `FPR_JOINT_REALISED` | pass | pin and bore found (diametral clearance, engagement) — added by slice A |
+| `FPR_NO_PARTS` | not_run | the document or scope has no 3D parts → add solids or instances (an empty check is never a pass) |
+| `FPR_STALE_REFERENCE` | info | `doc.prototype` refers to deleted entities; they were ignored → remove the intent or release the part |
 | `FPR_WALL_MEASURED` | info | wall thickness measured without a threshold → give `process` or `minWallMm` — added by slice A |
 | `FPR_LOOP_PRISMATIC` | refusal | loop would close through a prismatic joint → re-order or make that joint a tree joint |
 | `FPR_LOOP_OPEN` | fail | loop gap at the start pose → fix the anchors or geometry |

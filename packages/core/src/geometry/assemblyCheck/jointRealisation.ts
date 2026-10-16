@@ -27,6 +27,8 @@ const ANGLE_DEGREES = 0.5;
 /** Axis offset tolerance: absolute (mm) plus relative to the radius. */
 const OFFSET_ABSOLUTE_MM = 0.01;
 const OFFSET_RELATIVE = 1e-4;
+/** Largest radial clearance (as a fraction of the pin radius) still counted as a fit; a 2 mm pin in a 40 mm bore is not a joint. */
+const MAX_RELATIVE_CLEARANCE = 0.1;
 
 interface Candidate {
   readonly convex: boolean;
@@ -64,27 +66,39 @@ export function realiseJoint(kernel: GeometryKernel, input: RevoluteJointInput):
   const parent = candidatesOf(kernel, input.parentShapes, input);
   const child = candidatesOf(kernel, input.childShapes, input);
   if (parent === null || child === null) return kernelUnsupportedItem(ids, 'joint realisation (exact cylinder faces)');
-  let best: { pin: Candidate; bore: Candidate } | null = null;
+  let best: { pin: Candidate; bore: Candidate; engagement: number } | null = null;
+  const rejected = new Set<'disjoint' | 'interference' | 'loose'>();
   for (const [sideA, sideB] of [
     [parent, child],
     [child, parent],
   ] as const) {
     for (const pin of sideA.filter((face) => face.convex)) {
       for (const bore of sideB.filter((face) => !face.convex)) {
-        if (best === null || Math.abs(bore.radius - pin.radius) < Math.abs(best.bore.radius - best.pin.radius)) best = { pin, bore };
+        const engagement = Math.min(pin.range[1], bore.range[1]) - Math.max(pin.range[0], bore.range[0]);
+        if (engagement <= 0) rejected.add('disjoint');
+        else if (bore.radius < pin.radius) rejected.add('interference');
+        else if (bore.radius - pin.radius > MAX_RELATIVE_CLEARANCE * pin.radius) rejected.add('loose');
+        else if (best === null || bore.radius - pin.radius < best.bore.radius - best.pin.radius) best = { pin, bore, engagement };
       }
     }
   }
-  if (best === null)
+  if (best === null) {
+    const reason = rejected.has('interference')
+      ? 'a pin is larger than its bore (interference; declared fits are V1)'
+      : rejected.has('loose')
+        ? `the bore is more than ${MAX_RELATIVE_CLEARANCE * 100} % of the pin radius larger than the pin`
+        : rejected.has('disjoint')
+          ? 'the pin and bore do not overlap along the joint axis'
+          : 'no coaxial pin / bore cylinder pair found on the two sides of the joint';
     return makeItem(
       'FPR_JOINT_NOT_REALISED',
       'warn',
       ids,
-      'Model the journal (pin) on one part and the bore on the other, coaxial with the joint axis.',
-      { note: 'no coaxial pin / bore cylinder pair found on the two sides of the joint' },
+      'Model the journal (pin) on one part and the bore on the other, coaxial with the joint axis, overlapping along it.',
+      { note: reason },
     );
-  const { pin, bore } = best;
-  const engagement = Math.max(0, Math.min(pin.range[1], bore.range[1]) - Math.max(pin.range[0], bore.range[0]));
+  }
+  const { pin, bore, engagement } = best;
   return makeItem('FPR_JOINT_REALISED', 'pass', ids, 'Pin and bore found.', {
     values: {
       pinDiameterMm: 2 * pin.radius * input.mmPerUnit,
