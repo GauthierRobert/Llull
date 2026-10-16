@@ -430,6 +430,12 @@ export const plans: Record<string, GoldenAction[]> = {
     { command: 'add_section_view', params: { sheetId: '$sheet', direction: 'right', offset: 0, parentViewId: '$front' } },
     { command: 'add_detail_view', params: { sheetId: '$sheet', parentViewId: '$front', center: [50, 20], radius: 10 } },
   ],
+  prototype_review: [
+    { command: 'add_box', params: { size: [20, 20, 20] }, as: 'base' },
+    { command: 'add_cylinder', params: { radius: 5, height: 30 }, as: 'pin' },
+    { command: 'set_part_grounded', params: { ids: ['$base'], grounded: true } },
+    { command: 'allow_interference', params: { a: '$pin', b: '$base', kind: 'press_fit', reason: 'pin pressed into the frame boss' } },
+  ],
 };
 
 /** Plans needing the Manifold geometry kernel (booleans). */

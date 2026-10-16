@@ -133,7 +133,8 @@ export const insertInstance = defineCommand({
     'Place a new InstanceEntity referencing an existing Component definition. ' +
     'The instance carries its own world-space transform (position, rotation, scale). ' +
     'Editing the component later automatically updates all its instances. ' +
-    'componentId must exist in doc.components. Returns the new instance id in affected.',
+    'componentId must exist in doc.components. Returns the new instance id in affected. ' +
+    'Next: check_assembly finds overlapping, floating and too-thin parts.',
   params: z.object({
     componentId: z.string().describe('Id of an existing Component in doc.components. Obtain via create_component.'),
     position: vec3('World-space origin [x, y, z] for the instance. Default: [0, 0, 0].').optional(),

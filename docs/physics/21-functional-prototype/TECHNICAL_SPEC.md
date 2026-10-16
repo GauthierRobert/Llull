@@ -587,6 +587,8 @@ use distinct shapes (✔ ▲ ✖ ○ ◌) with text [D-R43][D-R44].
 | `FPR_PART_RESTING_ONLY` | warn | held only by contact → add a joint or fastener |
 | `FPR_WALL_THIN` | fail | min wall below the threshold (value, threshold, source) |
 | `FPR_JOINT_NOT_REALISED` | warn (MVP) | no pin/bore coaxial with the joint → model the journal and the bore |
+| `FPR_JOINT_REALISED` | pass | pin and bore found (diametral clearance, engagement) — added by slice A |
+| `FPR_WALL_MEASURED` | info | wall thickness measured without a threshold → give `process` or `minWallMm` — added by slice A |
 | `FPR_LOOP_PRISMATIC` | refusal | loop would close through a prismatic joint → re-order or make that joint a tree joint |
 | `FPR_LOOP_OPEN` | fail | loop gap at the start pose → fix the anchors or geometry |
 | `FPR_REDUNDANT_CONSTRAINT` | warn | redundant direction at a loop → use `spherical` for that joint |
