@@ -185,7 +185,7 @@ export function FindingsList({ checks, dispositionAvailable, onDisposition, onEx
         {shown.length} of {all.length} findings
       </p>
       {!dispositionAvailable && shown.length > 0 && (
-        <p className="panel__row-meta" data-testid="findings-disposition-unavailable">
+        <p className="findings__note" data-testid="findings-disposition-unavailable">
           Reviewer status and comments are not available yet.
         </p>
       )}

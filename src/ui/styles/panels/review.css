@@ -202,6 +202,12 @@
   color: var(--fg-subtle);
 }
 
+.findings__note {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+
 .finding__remediation {
   margin: 2px 0 var(--space-1);
   font-size: var(--text-xs);
