@@ -36,6 +36,22 @@ export const codedRejection = (
   paths: readonly string[] = [],
 ): CommandResult => rejection(doc, `${command}: ${code} — ${message}; no-op.`, commandError(code, remediation, ids, paths));
 
+/** A coded rejection whose remediation comes from a lookup table. */
+type TableRejection = (
+  doc: CadDocument,
+  command: string,
+  code: string,
+  message: string,
+  ids?: readonly string[],
+  paths?: readonly string[],
+) => CommandResult;
+
+/** `codedRejection` with the remediation registered for the code in `table`, else `fallback`. */
+export const tableRejection =
+  (table: Readonly<Record<string, string>>, fallback = 'see the command description'): TableRejection =>
+  (doc, command, code, message, ids = [], paths = []) =>
+    codedRejection(doc, command, code, message, table[code] ?? fallback, ids, paths);
+
 /** Reporter for a command's rejections: `fail(why)` -> no-op "<command>: <why>; no-op.". */
 export const failer =
   (doc: CadDocument, command: string) =>
