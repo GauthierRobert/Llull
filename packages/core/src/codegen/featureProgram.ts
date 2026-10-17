@@ -298,6 +298,7 @@ function modificationStep(
   if (removed[0] !== sourceId || variable === undefined || result?.kind !== 'mesh') return null;
   const brep = result.brep;
   if (brep === undefined || (brep.op !== 'fillet' && brep.op !== 'chamfer' && brep.op !== 'shell')) return null;
+  if (brep.op === 'shell' && brep.openNear !== undefined && brep.openNear.length > 0) return null;
   variables.delete(sourceId);
   variables.set(result.id, variable);
   const sizeParam = { fillet: 'radius', chamfer: 'distance', shell: 'thickness' }[brep.op];

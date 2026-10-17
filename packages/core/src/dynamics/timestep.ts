@@ -31,7 +31,7 @@ export interface ResolvedTimestep {
   readonly timestep: number;
   /** Where the value came from, reported in provenance. */
   readonly basis: string;
-  /** Highest crank speed the auto rule used (rad/s), 0 when not applicable. */
+  /** Highest crank speed the auto rule used (rad/s), 0 when not applicable (models without loops or cylinders). */
   readonly maxSpeed: number;
 }
 

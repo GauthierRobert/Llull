@@ -113,7 +113,7 @@ export function crossSectionAt(
   };
 }
 
-function designAtOffset(design: ReadonlyArray<SectionNode>, offset: number): number {
+export function designAtOffset(design: ReadonlyArray<SectionNode>, offset: number): number {
   for (let i = 1; i < design.length; i++) {
     const a = design[i - 1] as SectionNode;
     const b = design[i] as SectionNode;

@@ -203,7 +203,7 @@ describe.skipIf(!hasCcx)('CalculiX single-element read of the constitutive deck'
       dofs: { ux: 0.002 },
       target: { entityId: bar.boxId, facesNear: [[2, 0.5, 0.5]] },
     });
-    const doc = mustRun(pull.document, 'add_fea_load', { analysisId: bar.analysisId, name: 'g', kind: 'gravity', vector: [0, 0, 0] });
+    const doc = mustRun(pull.document, 'add_fea_load', { analysisId: bar.analysisId, name: 'g', kind: 'gravity', vector: [0, 0, -1e-12] });
     const sets = { ...supportSets(bar.constraints), [`C_${pull.affected[0]}`]: X2_NODES };
     const written = writeInp(doc, bar.analysisId, barMesh(doc, bar.analysisId, bar.boxId, sets));
     if (!('text' in written)) throw new Error(`${written.code}: ${written.message}`);

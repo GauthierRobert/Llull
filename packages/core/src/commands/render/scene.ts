@@ -8,8 +8,14 @@ import { tessellateEntity } from './polygons';
 import { DEFAULT_BACKGROUND, buildSvg } from './svg';
 import { MAX_POLYGONS, applyBudget, type EntityPolygons } from './budget';
 import { cutEntityPolygons, unitPlanes } from './clip';
+import { splitForDepth } from './depthSplit';
 import { expandInstance } from '../../geometry/instanceExpansion';
 import { orderedEntities } from '../entity/entityOps';
+
+/** Faces longer than this fraction of the scene radius are split before the painter's sort (see depthSplit.ts). */
+const DEPTH_SPLIT_FRACTION = 0.12;
+/** Face budget of a raster render (each face costs its pixels, so far more fit than in vector SVG). */
+const RASTER_BUDGET = 400000;
 
 /** Component instances nested deeper than this are not drawn (guards against reference cycles). */
 const MAX_INSTANCE_DEPTH = 4;
@@ -20,6 +26,12 @@ function drawableEntities(doc: CadDocument, e: Entity, depth = 0): Entity[] {
   const component = doc.components[e.componentId];
   if (!component || depth >= MAX_INSTANCE_DEPTH) return [];
   return expandInstance(e, component).flatMap((child) => drawableEntities(doc, child, depth + 1));
+}
+
+/** `e` in its assigned material's colour, as the 3D viewport shows it (the entity colour when no material is assigned). */
+function withMaterialColor(doc: CadDocument, e: Entity): Entity {
+  const material = e.materialId === undefined ? undefined : doc.materials[e.materialId];
+  return material === undefined || material.color === e.color ? e : { ...e, color: material.color };
 }
 
 /** Z-up orthographic SVG render of every entity in `doc.order`. @pure */
@@ -46,16 +58,24 @@ export function renderDocument(
   const items: EntityPolygons[] = [];
   for (const e of orderedEntities(doc)) {
     const id = e.id;
-    let polygons: PreDepthPolygon[] = drawableEntities(doc, e).flatMap(tessellateEntity);
+    let polygons: PreDepthPolygon[] = drawableEntities(doc, e).flatMap((drawable) => tessellateEntity(withMaterialColor(doc, drawable)));
     if (cut && (cutIds === null || cutIds.has(id))) {
       const result = cutEntityPolygons(polygons, cut, planes, tolerance);
       polygons = result.polygons;
       if (result.cut) cutEntityIds.push(id);
     }
-    items.push({ id, polygons });
+    items.push({ id, polygons: polygons.map((polygon) => ({ ...polygon, owner: id })) });
   }
-  const fitted = applyBudget(items, budget);
-  const polygons: Polygon3D[] = fitted.polygons.map((p) => {
+  const raster = options.mode !== 'vector';
+  // Rasterising costs per pixel, not per face: the budget only guards against pathological meshes there.
+  const fitted = applyBudget(items, raster ? Math.max(budget, RASTER_BUDGET) : budget);
+  const split = raster
+    ? fitted.polygons
+    : splitForDepth(fitted.polygons, radius * DEPTH_SPLIT_FRACTION, budget, (p) => {
+        const [u, v] = projectPoint(p, cam, basis);
+        return [u, v];
+      });
+  const polygons: Polygon3D[] = split.map((p) => {
     // Caps sit on the nearest face of their outline; everything else sorts by centroid.
     const depth = p.loops
       ? p.verts.reduce((nearest, v) => Math.min(nearest, projectPoint(v, cam, basis)[2]), Infinity)
@@ -74,10 +94,10 @@ export function renderDocument(
     camera: cam,
     orthoHalf,
     polygonCount: polygons.filter((p) => !p.stroke).length,
-    polygonBudget: budget,
+    polygonBudget: raster ? Math.max(budget, RASTER_BUDGET) : budget,
     simplifiedEntityIds: fitted.simplifiedEntityIds,
     skippedEntityIds: fitted.skippedEntityIds,
     cutEntityIds,
-    svg: buildSvg(polygons, underlays, cam, orthoHalf, width, height, view, snapshot.entityCount, background),
+    svg: buildSvg(polygons, underlays, cam, orthoHalf, width, height, view, snapshot.entityCount, background, raster ? radius : null),
   };
 }

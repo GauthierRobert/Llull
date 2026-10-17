@@ -1,4 +1,4 @@
-/** check_pipe_supports: support spacing of every pipe against the water-filled steel pipe span table. */
+/** check_pipe_supports: support spacing of every pipe against the steel pipe span tables (water-filled; gas / air / steam). */
 
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
@@ -14,7 +14,7 @@ import { collectSteelBars, modelUnits, type ModelUnits } from '../steelDesign/st
 import { spanCoordinate } from './routeSupport';
 import { createBeamLoads, type BeamLoads } from '../steelDesign/steelBeamLoads';
 import { restingArcs } from '../steelDesign/steelLineLoads';
-import { pipeSpanLimit } from './pipeSpans';
+import { isGasService, pipeSpanLimit } from './pipeSpans';
 import {
   endCarriers,
   pipeRunsOf,
@@ -54,11 +54,11 @@ export interface PipeSupportRow {
 }
 
 const ASSUMPTIONS: ReadonlyArray<string> = [
-  'Span limits: MSS SP-69 Table 3 / ASME B31.1 Table 121.5 suggested spacing of horizontal, water-filled, standard-wall steel pipe by nominal size (DN25 2.1 m, DN50 3.0 m, DN80 3.7 m, DN100 4.3 m, DN150 5.2 m, DN200 5.8 m, DN250 6.7 m, DN300 7.0 m, DN400 8.2 m, DN600 9.8 m …), multiplied by spanFactor. A pipe without `dn` takes the size of its outside diameter (an untabulated diameter the next smaller size).',
+  'Span limits: MSS SP-69 Table 3 / ASME B31.1 Table 121.5 suggested spacing of horizontal, standard-wall steel pipe by nominal size; water-filled lines (and any service not named gas, air, steam, vapour, nitrogen, oxygen, hydrogen or methane) use the water column (DN25 2.1 m, DN50 3.0 m, DN80 3.7 m, DN100 4.3 m, DN150 5.2 m, DN200 5.8 m, DN250 6.7 m, DN300 7.0 m, DN400 8.2 m, DN600 9.8 m …), gas / air / steam lines the longer typical gas column (DN25 2.7 m, DN50 4.0 m, DN80 4.6 m, DN100 5.2 m, DN150 6.4 m, DN200 7.3 m, DN300 9.1 m, DN600 12.8 m …), multiplied by spanFactor. A pipe without `dn` takes the size of its outside diameter (an untabulated diameter the next smaller size).',
   'Spans are measured along the centreline between consecutive attached supports; vertical risers (slope > 0.7) are not counted — a vertical pipe does not sag, its weight goes to the supports at its ends. A pipe end inside equipment (nozzle) or on another pipe (branch) is carried: it is a support for the span. A free end must have a support within overhangRatio × allowed span (default 0.5: the cantilever moment stays below the simple-span moment).',
   'Supports count when they bear on a steel member (add_pipe_support memberId set); unattached supports carry nothing and fail the pipe. A pipe without supports counts the beams it rests on (underside at top of steel ±10 mm, as check_steel_members) and is marked basis "resting"; a pipe with supports is carried by them only.',
   'Risers (runs of at least 0.5 m steeper than 44° from horizontal, |dz| / length > 0.7) are checked by a design-aid rule, not a quoted code clause: lateral restraints — attached guides and anchors on the riser (add_pipe_support type guide / anchor at a point on it), an end carried by equipment or a header — at most the table span of the DN × spanFactor apart (the MSS SP-69 spacing applied to the vertical length); a free end (elbow) at most overhangRatio × that span from the nearest restraint (a riser between two elbows with no guide may be that long at most); the riser weight (water-filled, standard wall) carried by an end in equipment / on a header (nozzle), a shoe or anchor clamp on the riser, or an attached support of the pipe within overhangRatio × that span along the pipe of one of its elbows (the riser hangs on the elbow like a free end). A guide on a riser carries no weight on the horizontal spans; a shoe or anchor clamp counts as a support at its elbow.',
-  'Not covered: pipes with concentrated loads (valves, flanged instruments), insulation, non-water content, sloped lines (use a smaller spanFactor), thermal loops and seismic restraint.',
+  'Not covered: pipes with concentrated loads (valves, flanged instruments), insulation, valves in gas lines, sloped lines (use a smaller spanFactor), thermal loops and seismic restraint.',
 ];
 
 function rowOf(
@@ -84,7 +84,7 @@ function rowOf(
       : carriers[0] !== null && carriers[1] !== null
         ? 'nozzles'
         : 'none';
-  const limit = pipeSpanLimit(element.dn, run.diameterMm);
+  const limit = pipeSpanLimit(element.dn, run.diameterMm, element.service);
   const allowed = limit.spanM * spanFactor;
   const length = spanCoordinate(run.points, run.lengthMm);
   const spans = arcs.map((arc) => spanCoordinate(run.points, arc));
@@ -113,6 +113,11 @@ function rowOf(
   }
   for (const station of unattached) {
     issues.push(`support ${station.mark} (${station.type}) is attached to no steel member`);
+  }
+  if (isGasService(element.service)) {
+    notes.push(
+      `service "${element.service}" is gas / air / steam: the gas span column (ASME B31.1 Table 121.5, typical values) was applied`,
+    );
   }
   if (limit.approximated) notes.push(`DN not tabulated: span of DN${limit.dn} used (next smaller size)`);
   if (run.lengthMm - length > 1) notes.push(`risers (${shown(run.lengthMm - length)} m) are not counted in the spans`);

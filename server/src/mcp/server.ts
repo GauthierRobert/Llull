@@ -115,7 +115,7 @@ export function buildMcpServer(
     const applied = applyCommand(name, args ?? {}, undefined, caller.actor);
     const busResult = caller.remote === true ? redactLicensedOutcome(getLiveDoc(), name, args, applied) : applied;
     // Vision loop: the PNG replaces the multi-KB SVG in the text/structured content.
-    const imageBlock = buildImageBlock(busResult.data);
+    const imageBlock = await buildImageBlock(busResult.data);
     const shaped = shapeToolCallContent(imageBlock !== null ? { ...busResult, data: stripSvgFromData(busResult.data) } : busResult);
     return imageBlock !== null ? { ...shaped, content: [...shaped.content, imageBlock] } : shaped;
   };

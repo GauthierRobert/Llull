@@ -23,13 +23,13 @@ export interface ThermomechCheckItem {
   readonly remediation: string;
 }
 
-const item = (code: string, severity: 'error' | 'warning', message: string, ids: readonly string[]): ThermomechCheckItem => ({
-  code,
-  severity,
-  message,
-  ids,
-  remediation: remediationOf(code),
-});
+const item = (
+  code: string,
+  severity: 'error' | 'warning',
+  message: string,
+  ids: readonly string[],
+  remediation: string = remediationOf(code),
+): ThermomechCheckItem => ({ code, severity, message, ids, remediation });
 
 /** Warning when interpolation had to project nodes outside the thermal mesh; an error when the mapping itself fails. Needs the artifacts. */
 function mappingItems(
@@ -103,12 +103,12 @@ function partItems(doc: CadDocument, analysisCase: AnalysisCase, setup: ThermoMe
     }
     const provider = providerFor(doc, setup, materialId, 'material');
     if (isCteRefusal(provider)) {
-      items.push(item(provider.code, 'error', provider.reason, [materialId, entityId]));
+      items.push(item(provider.code, 'error', provider.reason, [materialId, entityId], provider.remediation));
       continue;
     }
     const probe = provider.strainAt(referenceKelvin + REFERENCE_PROBE_KELVIN, referenceKelvin);
     if (isCteRefusal(probe)) {
-      items.push(item(probe.code, 'error', `at the reference temperature: ${probe.reason}`, [materialId, entityId]));
+      items.push(item(probe.code, 'error', `at the reference temperature: ${probe.reason}`, [materialId, entityId], probe.remediation));
       continue;
     }
     const reasons = [...probe.unverifiedReasons, ...elasticUnverifiedReasons(doc, materialId)];
@@ -161,7 +161,7 @@ export function checkThermomechItems(doc: CadDocument, analysisId: string, artif
       item(
         'TMC_THERMAL_CATEGORY_UNSET',
         'warning',
-        `load case '${setup.loadCaseName}' has no load carrying a limit / ultimate category: margins on it are refused until one is set (add_fea_load with loadCase and category)`,
+        `load case '${setup.loadCaseName}' has no load carrying a limit / ultimate category: compute_margins treats it as a LIMIT case (yield and ultimate factors both apply); set the category with add_fea_load if the programme rule says ultimate`,
         [analysisId],
       ),
     );

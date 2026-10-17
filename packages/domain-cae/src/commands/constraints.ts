@@ -9,7 +9,7 @@ import { nextId } from '@lib/id';
 import { caseOf, withCase } from '../shared/access';
 import { refuseCode } from '../shared/codes';
 import { analysisIdSchema } from '../shared/schemas';
-import { feaTargetSchema, targetProblem, toTarget } from '../shared/target';
+import { feaTargetSchema, targetDistanceWarning, targetProblem, toTarget } from '../shared/target';
 
 const DOFS = ['ux', 'uy', 'uz', 'rx', 'ry', 'rz'] as const;
 
@@ -89,7 +89,7 @@ export const addFeaConstraint = defineCommand({
     };
     return changed(
       withCase(doc, next),
-      `add_fea_constraint: '${constraint.id}' (${name}) ${describeConstraint(constraint)} on '${target.entityId}' in '${analysisId}'.`,
+      `add_fea_constraint: '${constraint.id}' (${name}) ${describeConstraint(constraint)} on '${target.entityId}' in '${analysisId}'.${targetDistanceWarning(doc, target)}`,
       [constraint.id],
     );
   },

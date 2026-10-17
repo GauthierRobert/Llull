@@ -9,7 +9,8 @@ import { disposeThermalLimit } from './dispose';
 import { checkTemperatureLimits } from './limitsCheck';
 import { thermalReport } from './report';
 import { addTemperatureLimit, deleteTemperatureLimit } from './limitCommands';
-import { addCavityRadiation, addThermalContact } from './radiationCommands';
+import { addThermalContact, deleteThermalContact, updateThermalContact } from './contactCommands';
+import { addCavityRadiation } from './radiationCommands';
 import { setInitialTemperature, setThermalStep } from './stepCommands';
 
 export const thermalCommands = commandCatalog(
@@ -25,6 +26,8 @@ export const thermalCommands = commandCatalog(
   deleteTemperatureLimit,
   addCavityRadiation,
   addThermalContact,
+  updateThermalContact,
+  deleteThermalContact,
   thermalReport,
   checkThermal,
   checkTemperatureLimits,

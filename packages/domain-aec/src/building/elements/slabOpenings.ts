@@ -17,7 +17,7 @@ import { pointsDiagonal } from '@lib/extent';
 /** Plan footprint of a stair run, grown by `margin` on every side. */
 function stairFootprint(stair: StairElement, margin: number): Vec2[] {
   const half = stair.width / 2 + margin;
-  const run = stair.riserCount * stair.treadDepth + margin;
+  const run = (stair.riserCount - 1) * stair.treadDepth + margin;
   return [stairPoint(stair, -margin, -half), stairPoint(stair, run, -half), stairPoint(stair, run, half), stairPoint(stair, -margin, half)];
 }
 

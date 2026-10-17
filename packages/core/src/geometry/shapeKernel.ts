@@ -51,7 +51,8 @@ export interface KernelOps<S> {
   /** Union of `shapes` with the new intersection (joint) edges filleted by `radius`. */
   blend(shapes: readonly S[], radius: number): S | null;
   chamfer(shape: S, edges: readonly number[], distance: number): S | null;
-  shell(shape: S, thickness: number): S | null;
+  /** `openNear`: points, each removing the face of `shape` nearest to it (an open pocket); absent/empty = a sealed cavity. */
+  shell(shape: S, thickness: number, openNear?: readonly Vec3[]): S | null;
   place(shape: S, position: Vec3, rotation: Vec3): S | null;
   scale(shape: S, factor: number): S | null;
   tessellate(shape: S): MeshData | null;
@@ -139,7 +140,7 @@ function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe
     }
     case 'shell': {
       const source = child(recipe.source);
-      return source === null ? null : ops.shell(source, recipe.thickness);
+      return source === null ? null : ops.shell(source, recipe.thickness, recipe.openNear);
     }
     case 'place': {
       const source = child(recipe.source);

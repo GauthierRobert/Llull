@@ -35,7 +35,7 @@ import { curvedBandBetween } from '../geometry/curvedWallGeometry';
 import { gridBubbleCenters } from '../geometry/gridGeometry';
 import { doorSwing, openingsOf, pointAlong, wallExtent, wallFrame, wallPieces } from '../geometry/wallGeometry';
 import type { WallExtent } from '../geometry/wallExtent';
-import { stairPoint } from '../geometry/stairGeometry';
+import { stairPoint, stairTreads } from '../geometry/stairGeometry';
 
 export type EvaluationContext = { readonly doc: CadDocument; readonly building: BuildingModel };
 
@@ -163,22 +163,16 @@ export function evaluateBeam(beam: BeamElement, level: BuildingLevel): Entity[] 
 
 export function evaluateStair(stair: StairElement, level: BuildingLevel): Entity[] {
   const color = colorForMaterial(stair.material, '#b4b2aa');
-  const steps: Entity[] = [];
-  for (let index = 0; index < stair.riserCount; index++) {
-    const along = (index + 0.5) * stair.treadDepth;
-    const stepHeight = (index + 1) * stair.riserHeight;
-    steps.push(
-      orientedBox(
-        stair,
-        { part: `step-${index}`, label: `Stair ${stair.mark} step ${index + 1}` },
-        [...stairPoint(stair, along, 0), level.elevation + stepHeight / 2],
-        stair.angle,
-        [stair.treadDepth, stair.width, stepHeight],
-        color,
-      ),
-    );
-  }
-  return steps;
+  return stairTreads(stair).map((tread, index) =>
+    orientedBox(
+      stair,
+      { part: `step-${index}`, label: `Stair ${stair.mark} step ${index + 1}` },
+      [...stairPoint(stair, (tread.alongStart + tread.alongEnd) / 2, 0), level.elevation + (tread.zBottom + tread.zTop) / 2],
+      stair.angle,
+      [stair.treadDepth, stair.width, tread.zTop - tread.zBottom],
+      color,
+    ),
+  );
 }
 
 export function evaluateRoom(context: EvaluationContext, room: RoomElement, level: BuildingLevel): Entity[] {

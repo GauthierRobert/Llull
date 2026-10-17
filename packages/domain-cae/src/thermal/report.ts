@@ -1,5 +1,6 @@
 /** thermal_report: temperatures, heat flows and heat balance of a solved heat_* analysis, as data (PHY-03 FR-THM-11, FR-THM-12, AF-10). */
 
+import { significantNumber } from '@lib/compactNumber';
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
@@ -21,12 +22,12 @@ export const thermalReport = defineCommand({
   name: 'thermal_report',
   description:
     'Read the thermal results of a heat_steady / heat_transient analysis: data { state: unmeshed | meshed | solved | stale | missing | untrusted, ' +
-    'temperatureScale, maxT / minT {value, at (document units), entityId, timeS}, maxHeatFlux, bcHeatFlows [{ bcId, timeS, valueW }] (W, ' +
+    'temperatureScale, maxT / minT {value, at (document units), entityId, timeS}, maxHeatFlux {value, unit W/m^2, at, timeS}, bcHeatFlows [{ bcId, timeS, valueW }] (W, ' +
     'positive INTO the part), heatBalance {inW, outW, storedW, residualRel, timeS, tolerance}, probes [{ probeId, series [[timeS, T]] }], ' +
     'physicalConstants (radiation cases: Stefan-Boltzmann and absolute zero with source and defaulted), propertyRangeExceeded, unverified, ' +
     'unverifiedReasons }. Numbers are returned only for state "solved" and are recomputed from the artifact store: a stale result must be re-solved (fea_mesh, ' +
     'fea_solve); "missing" (no artifact store or artifact on this machine) and "untrusted" (FEA_SUMMARY_MISMATCH) withhold them. ' +
-    'Check heatBalance.residualRel against the tolerance before reporting a result as final; end with check_thermal.',
+    "Check heatBalance.residualRel against the tolerance before reporting a result as final (samplingRel = spread between the end-value and interval-mean quadratures of a transient's last output interval; above the tolerance, write results at every increment); end with check_thermal.",
   annotations: { readOnly: true },
   params: z.object({
     analysisId: analysisIdSchema,
@@ -71,11 +72,13 @@ export const thermalReport = defineCommand({
       times,
       maxT: summary.maxT,
       minT: summary.minT,
-      maxHeatFlux: summary.maxHeatFluxW_m2,
+      maxHeatFlux: { ...summary.maxHeatFluxW_m2, unit: 'W/m^2' },
       reportedTimeS: wanted,
       bcHeatFlows: summary.bcHeatFlowsW.filter((flow) => flow.timeS === wanted),
       heatBalance: { ...balance, tolerance: HEAT_BALANCE_TOLERANCE, withinTolerance: balance.residualRel <= HEAT_BALANCE_TOLERANCE.value },
-      probes: summary.probes.filter((probe) => probes === undefined || probes.includes(probe.probeId)),
+      probes: summary.probes
+        .filter((probe) => probes === undefined || probes.includes(probe.probeId))
+        .map((probe) => ({ ...probe, name: analysisCase.probes[probe.probeId]?.name ?? probe.probeId })),
       physicalConstants: summary.physicalConstants ?? (hasRadiation(thermal) ? physicalConstantsOf(thermal) : null),
       propertyRangeExceeded: summary.propertyRangeExceeded,
       fieldRefs: summary.fieldRefs,
@@ -83,11 +86,12 @@ export const thermalReport = defineCommand({
       reviewReason: REVIEW_REASON,
     };
     const unit = thermal.temperatureScale;
+    const sig = (value: number): string => significantNumber(value, 5);
     const text = [
       `thermal_report: '${analysisId}' ${state}`,
-      `max ${summary.maxT.value} ${unit} at [${summary.maxT.at.join(', ')}] t=${summary.maxT.timeS} s`,
-      `min ${summary.minT.value} ${unit}`,
-      `heat balance residual ${balance.residualRel} (in ${balance.inW} W, out ${balance.outW} W, stored ${balance.storedW} W)${data.heatBalance.withinTolerance ? '' : ' EXCEEDS the tolerance: do not report as final'}`,
+      `max ${sig(summary.maxT.value)} ${unit} at [${summary.maxT.at.map(sig).join(', ')}] t=${sig(summary.maxT.timeS)} s`,
+      `min ${sig(summary.minT.value)} ${unit}`,
+      `heat balance residual ${sig(balance.residualRel)}${balance.samplingRel === undefined ? '' : ` (± ${sig(balance.samplingRel)} output-interval sampling)`} (in ${sig(balance.inW)} W, out ${sig(balance.outW)} W, stored ${sig(balance.storedW)} W)${data.heatBalance.withinTolerance ? '' : ' EXCEEDS the tolerance: do not report as final'}`,
       inputs.unverified ? `unverified inputs: ${inputs.reasons.join('; ')}` : 'no unverified input',
     ];
     return report(doc, `${text.join('; ')}.`, data);

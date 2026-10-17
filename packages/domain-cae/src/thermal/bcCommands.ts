@@ -6,6 +6,7 @@ import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { nextId } from '@lib/id';
 import { analysisIdSchema } from '../shared/schemas';
+import { targetDistanceWarning } from '../shared/target';
 import { isProblem, problem, thermalCaseOf, withThermal, type Problem, type ThermalCase } from './access';
 import { amplitudeIdOf, assembleBc, BC_KINDS, bcFieldsSchema, plainSource, recordProblem, unusedFields, type BcFields } from './bcModel';
 import { refuseThermal } from './codes';
@@ -97,7 +98,7 @@ export const addThermalBc = defineCommand({
     };
     return changed(
       withThermal(doc, found, thermal),
-      `add_thermal_bc: '${record.id}' (${params.name}) ${describeBc(bc)}${amplitude !== undefined ? `, amplitude '${amplitude}'` : ''} in '${params.analysisId}'.`,
+      `add_thermal_bc: '${record.id}' (${params.name}) ${describeBc(bc)}${amplitude !== undefined ? `, amplitude '${amplitude}'` : ''} in '${params.analysisId}'.${params.target !== undefined ? targetDistanceWarning(doc, params.target) : ''}`,
       [record.id],
     );
   },

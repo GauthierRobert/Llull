@@ -151,6 +151,8 @@ export interface StairElement extends LevelElementBase {
   riserCount: number;
   riserHeight: number;
   treadDepth: number;
+  /** Thickness of the sloping waist slab under the steps, perpendicular to the flight. Absent = the riser height. */
+  waistThickness?: number;
   material: string;
 }
 

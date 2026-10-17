@@ -21,6 +21,28 @@ export interface SizingResult {
   readonly unsized: string[];
   readonly iterations: number;
   readonly converged: boolean;
+  /** Manholes where a larger outgoing pipe has its crown above the incoming crown (invert-matched step-up; backwater). */
+  readonly crownWarnings: string[];
+}
+
+/** Crown (soffit) mismatches where the outgoing pipe is larger than an incoming one and its crown sits more than 1 mm higher. */
+function crownMismatches(doc: CadDocument, civil: CivilModel): string[] {
+  const tolerance = fromMm(doc, 1);
+  const pipes = civilObjectsOf(civil, 'pipe');
+  const warnings: string[] = [];
+  for (const outgoing of pipes) {
+    for (const incoming of pipes.filter((pipe) => pipe.toId === outgoing.fromId)) {
+      const rise = outgoing.invertFrom + outgoing.diameter - (incoming.invertTo + incoming.diameter);
+      if (outgoing.diameter <= incoming.diameter || rise <= tolerance) continue;
+      const lower = Math.round((rise / fromMm(doc, 1)) * 10) / 10;
+      warnings.push(
+        `${outgoing.id} (Ø${Math.round(outgoing.diameter / fromMm(doc, 1))}) leaves ${outgoing.fromId} with its crown ${lower} mm above ` +
+          `the crown of ${incoming.id} (Ø${Math.round(incoming.diameter / fromMm(doc, 1))}) - inverts were kept, not soffits; ` +
+          `lower ${outgoing.id} invertFrom by ${lower} mm (update_pipe) to match soffits`,
+      );
+    }
+  }
+  return warnings;
 }
 
 export function sizeNetwork(
@@ -66,5 +88,5 @@ export function sizeNetwork(
       ? [`${pipe.id} -> Ø${Math.round((pipe.diameter / fromMm(doc, 1)) * 10) / 10}`]
       : [];
   });
-  return { civil, changed, unsized, iterations, converged };
+  return { civil, changed, unsized, iterations, converged, crownWarnings: crownMismatches(doc, civil) };
 }

@@ -4,6 +4,7 @@ import { polygonArea } from '@lib/polygon';
 import { toMetres } from '@core/model/units';
 import { round } from '../../shared/numeric';
 import { builtExtent, openingsOf } from '../geometry/wallGeometry';
+import { stairTreads } from '../geometry/stairGeometry';
 
 type TakeoffUnit = 'm' | 'm2' | 'm3' | 'ea' | 'kg';
 
@@ -55,8 +56,7 @@ export function columnSectionArea(column: Extract<BuildingElement, { category: '
 }
 
 export function stairVolume(stair: Extract<BuildingElement, { category: 'stair' }>): number {
-  const stepCountSum = (stair.riserCount * (stair.riserCount + 1)) / 2;
-  return stair.treadDepth * stair.width * stair.riserHeight * stepCountSum;
+  return stairTreads(stair).reduce((sum, tread) => sum + stair.treadDepth * stair.width * (tread.zTop - tread.zBottom), 0);
 }
 
 const REBAR_KG_PER_M3 = 7850;

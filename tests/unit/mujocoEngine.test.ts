@@ -124,6 +124,18 @@ describe('engine run at a governed speed', () => {
 });
 
 describe('derived loads against the analytic peaks at low speed (VC-FPR-12 dynamic)', () => {
+  it('joint-force peaks do not depend on the sample rate: a coarse run reports the every-step peak', () => {
+    const { doc, cylinder } = engine({ rpm: 300, crankInertia: 2, pistonKg: 0.05, rodKg: 0.05 });
+    const peaksAt = (sampleRate: number): { wrist: number; pin: number; bearing: number } => {
+      const data = run(governed(doc, 300), { duration: 0.45, timestep: 2e-5, reactions: 'peaks', sampleRate });
+      const derived = data.engineReport?.cylinders.find((c) => c.id === cylinder)?.derived;
+      return { wrist: derived?.wristPinN.value ?? 0, pin: derived?.crankPinN.value ?? 0, bearing: derived?.mainBearingN.value ?? 0 };
+    };
+    const coarse = peaksAt(40);
+    const fine = peaksAt(5000);
+    for (const key of ['wrist', 'pin', 'bearing'] as const) expect(Math.abs(coarse[key] - fine[key]) / fine[key]).toBeLessThan(0.01);
+  });
+
   it('wrist-pin, rod, side-thrust, crank-pin and main-bearing peaks follow F/cos(beta) and F tan(beta) of the gas force', () => {
     const { doc, cylinder } = engine({ rpm: 300, crankInertia: 2, pistonKg: 0.05, rodKg: 0.05 });
     const data = run(governed(doc, 300), { duration: 0.45, timestep: 2e-5, reactions: 'peaks' });
@@ -146,7 +158,7 @@ describe('derived loads against the analytic peaks at low speed (VC-FPR-12 dynam
 
   it('light bodies under a 27 kN gas force at a 1 ms step drift past the fail tier: flagged, reactions unreliable (VC-FPR-35)', () => {
     const { doc } = engine({ rpm: 60, crankInertia: 2, pistonKg: 0.001, rodKg: 0.001 });
-    const data = run(governed(doc, 60), { duration: 2.2, reactions: 'peaks' });
+    const data = run(governed(doc, 60), { duration: 2.2, timestep: 0.001, reactions: 'peaks' });
     expect(data.loops?.tier).toBe('fail');
     expect(data.loops?.residualM ?? 0).toBeGreaterThan(1e-5);
     expect(data.warnings.some((w) => w.startsWith('FPR_LOOP_DRIFT (fail)'))).toBe(true);

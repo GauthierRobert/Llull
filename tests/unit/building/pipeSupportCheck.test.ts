@@ -196,6 +196,36 @@ describe('span verdicts', () => {
     expect(run(loose).totals.unattached).toBe(1);
     expect(execute(loose, 'check_pipe_supports', {}).summary).toContain('1 unattached support(s)');
   });
+  it('applies the gas span column to gas / air / steam lines and notes it, water stays on the water column', () => {
+    const line = (service: string): CadDocument =>
+      step(twoLevels(), 'add_pipe_run', { levelId: 'level-1', dn: 50, service, points: xyz(0, 0, 1000, 1000, 0, 1000) });
+    for (const service of ['compressed air', 'steam', 'natural gas']) {
+      const row = rowOf(run(line(service)), 'PL1');
+      expect(row).toMatchObject({ maxSpanM: 4.0, allowedSpanM: 4 });
+      expect(row.notes.join(' ')).toContain('gas span column');
+    }
+    const water = rowOf(run(line('cooling water')), 'PL1');
+    expect(water.maxSpanM).toBe(3.0);
+    expect(water.notes.join(' ')).not.toContain('gas span');
+  });
+  it('passes 5 m spans on a DN100 steam line (gas 5.2 m) that fail on a water line (4.3 m)', () => {
+    const doc = (service: string): CadDocument => {
+      let d = twoLevels();
+      for (const x of [1000, 6000, 11000]) d = beam(d, [x, 0], [x, 4000]);
+      return shoes(
+        step(d, 'add_pipe_run', { levelId: 'level-1', dn: 100, service, points: xyz(0, 2000, 3027.15, 12000, 2000, 3027.15) }),
+        [1000, 6000, 11000],
+      );
+    };
+    expect(rowOf(run(doc('steam')), 'PL1')).toMatchObject({ ok: true, largestSpanM: 5 });
+    expect(rowOf(run(doc('water')), 'PL1').ok).toBe(false);
+  });
+  it('gas column differs per DN and never rounds up', () => {
+    expect(pipeSpanLimit(100, 114.3, 'air')).toEqual({ dn: 100, spanM: 5.2, approximated: false });
+    expect(pipeSpanLimit(100, 114.3, 'water')).toEqual({ dn: 100, spanM: 4.3, approximated: false });
+    expect(pipeSpanLimit(undefined, 95, 'steam')).toEqual({ dn: 80, spanM: 4.6, approximated: true });
+    expect(pipeSpanLimit(600, 610, 'gas').spanM).toBe(12.8);
+  });
   it('takes an untabulated size from the next smaller table row and says so', () => {
     const row = rowOf(run(shoes(railDoc([2000, 6000, 10000], undefined), [2000, 6000, 10000])), 'PL1');
     expect(row.dn).toBe(100);

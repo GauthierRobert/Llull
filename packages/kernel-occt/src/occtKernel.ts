@@ -13,6 +13,7 @@ import { entityToOccShape, placementTransform, transformedCopy } from './occtSha
 import { extractMeshData } from './occtMesh';
 import { shapeTopology, uniqueSubShapes } from './occtTopology';
 import { analyzeShape, shapeDistance } from './occtAnalysis';
+import { nearestOn } from './occtFaceDistance';
 import { exactMassProperties } from './occtMass';
 import { nativeFeature } from './occtFeatures';
 import { inheritThreadMark, isThreadBearing } from './occtThreadMark';
@@ -30,6 +31,7 @@ import {
   type OccShapeList,
   type OccHandle,
   type OccOffsetMaker,
+  type OccThickSolidMaker,
   type OccShape,
 } from './occtTypes';
 
@@ -205,6 +207,15 @@ function unified(api: OccApi, shape: OccShape, own: <H extends OccHandle | null>
   }
 }
 
+/** The offset skin as a solid: OCC returns the offset of a solid with curved faces as a bare shell, which a boolean cut cannot subtract. */
+function closedCavity(api: OccApi, skin: OccShape, own: <H extends OccHandle | null>(handle: H) => H): OccShape {
+  if (uniqueSubShapes(api, skin, 'TopAbs_SOLID').map(own).length > 0) return skin;
+  const [shell] = uniqueSubShapes(api, skin, 'TopAbs_SHELL').map(own);
+  if (shell === undefined) return skin;
+  const fixer = own(new api.ShapeFix_Solid_1() as OccHandle & { SolidFromShell(shell: OccShape): OccShape });
+  return fixer.SolidFromShell(own(api.TopoDS.Shell_1(shell) as OccShape));
+}
+
 /** Closed hollow: the solid minus its inward offset by `thickness` (a sealed internal cavity). */
 function hollow(api: OccApi, solid: OccShape, thickness: number): OccShape | null {
   if (!(thickness > 0)) return null;
@@ -222,12 +233,53 @@ function hollow(api: OccApi, solid: OccShape, thickness: number): OccShape | nul
     );
     return offset.IsDone() ? offset.Shape() : null;
   });
-  if (cavity === null) return null;
-  return guarded('fragile', (own) => {
-    own(cavity);
-    const cut = own(new api.BRepAlgoAPI_Cut_3(solid, cavity) as OccBuilder);
-    cut.Build();
-    return cut.IsDone() ? cut.Shape() : null;
+  const viaCut =
+    cavity === null
+      ? null
+      : guarded('fragile', (own) => {
+          own(cavity);
+          const cut = own(new api.BRepAlgoAPI_Cut_3(solid, closedCavity(api, cavity, own)) as OccBuilder);
+          cut.Build();
+          return cut.IsDone() ? cut.Shape() : null;
+        });
+  return viaCut;
+}
+
+/**
+ * Hollow with the faces nearest to each `openNear` point removed (BRepOffsetAPI_MakeThickSolid): walls of `thickness` grown inward,
+ * open where the picked faces were.
+ * @failure no points, a point with no face, builder not done or invalid result -> null
+ */
+function openShell(api: OccApi, solid: OccShape, thickness: number, openNear: readonly Vec3[]): OccShape | null {
+  if (!(thickness > 0) || openNear.length === 0) return null;
+  return guarded('refusal', (own) => {
+    const faces = uniqueSubShapes(api, solid, 'TopAbs_FACE').map(own);
+    const picked = new Set<OccShape>();
+    for (const point of openNear) {
+      const nearest = faces
+        .map((face) => ({ face, distance: nearestOn(api, face, point, own)?.distance ?? Infinity }))
+        .reduce<{
+          face: OccShape;
+          distance: number;
+        } | null>((best, entry) => (best === null || entry.distance < best.distance ? entry : best), null);
+      if (nearest === null || !Number.isFinite(nearest.distance)) return null;
+      picked.add(nearest.face);
+    }
+    const closing = own(new api.TopTools_ListOfShape_1() as OccShapeList);
+    for (const face of picked) closing.Append_1(face);
+    const maker = own(new api.BRepOffsetAPI_MakeThickSolid_1() as OccThickSolidMaker);
+    maker.MakeThickSolidByJoin(
+      solid,
+      closing,
+      -thickness,
+      1e-3,
+      api.BRepOffset_Mode.BRepOffset_Skin,
+      false,
+      false,
+      api.GeomAbs_JoinType.GeomAbs_Arc,
+      false,
+    );
+    return maker.IsDone() ? validOrNull(api, maker.Shape(), own) : null;
   });
 }
 
@@ -307,7 +359,11 @@ export function occtOps(api: OccApi, nativeFeatures = true): KernelOps<OccShape>
         roundEdges(api, shape, edges, distance, (solid) => new api.BRepFilletAPI_MakeChamfer(solid)),
         shape,
       ),
-    shell: (shape, thickness) => inheritThreadMark(hollow(api, shape, thickness), shape),
+    shell: (shape, thickness, openNear) =>
+      inheritThreadMark(
+        openNear !== undefined && openNear.length > 0 ? openShell(api, shape, thickness, openNear) : hollow(api, shape, thickness),
+        shape,
+      ),
     place: (shape, position: Vec3, rotation: Vec3) =>
       inheritThreadMark(
         transformed(api, shape, () => placementTransform(api, rotation, position)),

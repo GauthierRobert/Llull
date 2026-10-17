@@ -10,6 +10,7 @@ import { setPartIdealization } from './parts';
 import { addResultProbe, deleteResultProbe } from './probes';
 import { recordFeMesh, recordFeaResults } from './record';
 import { feaReport } from './report';
+import { renderFeaResults } from './renderResults';
 
 export const feaCommands = commandCatalog(
   createAnalysis,
@@ -28,5 +29,6 @@ export const feaCommands = commandCatalog(
   recordFeMesh,
   recordFeaResults,
   feaReport,
+  renderFeaResults,
   checkAnalysis,
 );

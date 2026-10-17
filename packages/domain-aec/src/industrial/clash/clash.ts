@@ -13,18 +13,27 @@ import { dot3, scale3, sub3 } from '@lib/vec3';
 import { atLevel } from '../evaluate';
 import { briefList } from '../../shared/briefList';
 import { type OrientedBox, boxOverlap, elementBoxes } from './clashBoxes';
-import { slabPenetrations } from './clashSlabs';
+import { STAIR_HEADROOM_MM, slabPenetrations, stairPenetrations } from './clashSlabs';
+import { columnsInOpening } from '../../building/geometry/openingColumns';
 
 const CLEARANCE_OBSTACLES: ReadonlySet<BimCategory> = new Set(['equipment', 'member', 'column', 'wall', 'curvedWall', 'stair']);
 
 type Solid = { readonly elementId: string; readonly category: BimCategory; readonly box: OrientedBox };
 
-/** Category pairs that are checked (structure–structure joints are intentional and skipped). */
+const STAIR_OBSTACLES: ReadonlySet<BimCategory> = new Set(['beam', 'column', 'wall', 'curvedWall']);
+
+/**
+ * Category pairs that are checked: anything involving services / equipment, a steel member against concrete, and a stair against
+ * concrete structure (beam / column / wall). Other structure–structure joints are intentional and skipped; a beam against a wall is
+ * decided per pair in `connected`.
+ */
 function relevant(a: BimCategory, b: BimCategory): boolean {
   const active = (category: BimCategory): boolean =>
     category === 'pipe' || category === 'tray' || category === 'equipment' || category === 'pipeSupport';
   if (a === 'pipeSupport' && b === 'pipeSupport') return false;
   if (active(a) || active(b)) return true;
+  if ((a === 'stair' && STAIR_OBSTACLES.has(b)) || (b === 'stair' && STAIR_OBSTACLES.has(a))) return true;
+  if ((a === 'beam' && (b === 'wall' || b === 'curvedWall')) || (b === 'beam' && (a === 'wall' || a === 'curvedWall'))) return true;
   return (a === 'member') !== (b === 'member');
 }
 
@@ -90,6 +99,11 @@ function connected(
     );
   }
   const margin = fromMm(doc, 1);
+  const framesInto = (beam: BuildingElement, other: BuildingElement, beamBox: OrientedBox, box: OrientedBox): boolean =>
+    beam.category === 'beam' &&
+    (other.category === 'wall' || other.category === 'curvedWall') &&
+    [beam.start, beam.end].some((end) => pointInBox([end[0], end[1], beamBox.center[2]], box, margin));
+  if (framesInto(a, b, boxA, boxB) || framesInto(b, a, boxB, boxA)) return true;
   const endsIn = (pipe: BuildingElement, other: BuildingElement, box: OrientedBox): boolean =>
     pipe.category === 'pipe' &&
     other.category === 'equipment' &&
@@ -128,9 +142,22 @@ function findClashes(doc: CadDocument, levelIds: ReadonlySet<string> | null, tol
     }
   }
   const inScope = (levelId: string): boolean => levelIds === null || levelIds.has(levelId);
-  for (const penetration of slabPenetrations(building, inScope, tolerance)) {
-    const [a, b] = [penetration.equipmentId, penetration.slabId].sort() as [string, string];
+  const penetrations = [
+    ...slabPenetrations(building, inScope, tolerance),
+    ...stairPenetrations(building, inScope, fromMm(doc, STAIR_HEADROOM_MM), tolerance),
+  ];
+  for (const penetration of penetrations) {
+    const [a, b] = [penetration.elementId, penetration.slabId].sort() as [string, string];
     record({ a, b, kind: 'hard', depth: penetration.depth });
+  }
+  for (const opening of Object.values(building.elements)) {
+    if (opening.category !== 'door' && opening.category !== 'window') continue;
+    const wall = building.elements[opening.hostId];
+    if (wall?.category !== 'wall' || !inScope(wall.levelId)) continue;
+    for (const { column, depth } of columnsInOpening(building, wall, opening, tolerance)) {
+      const [a, b] = [opening.id, column.id].sort() as [string, string];
+      record({ a, b, kind: 'hard', depth });
+    }
   }
   for (const solid of solids) {
     const equipment = building.elements[solid.elementId];
@@ -159,8 +186,10 @@ export const checkClashes = defineCommand({
   annotations: { readOnly: true, idempotent: true },
   description:
     'Read-only clash detection (like Navisworks / Plant 3D): hard clashes between pipes, cable trays, equipment, steel members, walls, ' +
-    'concrete columns, beams and stairs, equipment passing through a floor / grating that has no opening around it (add_slab_opening), ' +
-    'plus equipment maintenance-clearance violations. Steel-to-steel joints, run connections (a pipe end inside equipment, a pipe / tray ' +
+    'concrete columns, beams and stairs (a beam or column through a stair flight, a beam crossing a wall it does not frame into), equipment passing through a floor / grating that has no opening around it (add_slab_opening), ' +
+    'a stair whose headroom (2 m above its treads) runs into a slab without a well (add_slab_opening stairId), a door / window opening ' +
+    'that overlaps a column in its wall line, ' +
+    'plus equipment maintenance-clearance violations. Steel-to-steel joints, a beam ending in the wall or column it frames into, run connections (a pipe end inside equipment, a pipe / tray ' +
     'ending on another) and a pipe support touching its own pipe and the steel it bears on are not reported. Returns element ids, kind ' +
     'and penetration depth (document units; summary in mm).',
   params: z.object({

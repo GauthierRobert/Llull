@@ -5,6 +5,8 @@ import { convertValue, isUnitFailure, parseUnit } from './quantity';
 /** SI unit of every thermal quantity kind. */
 const SI_UNITS = {
   length: 'm',
+  area: 'm^2',
+  volume: 'm^3',
   conductivity: 'W/(m*K)',
   specificHeat: 'J/(kg*K)',
   density: 'kg/m^3',

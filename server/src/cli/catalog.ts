@@ -97,7 +97,8 @@ export function suggestNames(name: string): string[] {
 function typeLabel(spec: ParamItemSpec): string {
   if (spec.enum !== undefined) return spec.enum.map((value) => JSON.stringify(value)).join('|');
   if (spec.type === 'array' && spec.items !== undefined) return `${typeLabel(spec.items)}[]`;
-  return spec.type;
+  if (spec.anyOf !== undefined) return spec.anyOf.map(typeLabel).join(' | ');
+  return spec.type ?? 'any';
 }
 
 /** One line per parameter: `- name (type, required): description`, nested object keys indented. */

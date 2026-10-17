@@ -14,6 +14,8 @@ import { changed, commandError, noop, report } from '../noop';
 import { convertValue, isUnitFailure } from '../../lib/quantity';
 import { refuseMaterial } from '../materials/refusal';
 
+const DEFAULT_COLOR = '#b0b0b0';
+
 /** First problem of the finish options, or null. */
 function finishProblem(
   scale: number,
@@ -70,20 +72,26 @@ export const createMaterial = defineCommand({
       .string()
       .describe(
         'Diffuse/albedo color as a 6-digit CSS hex string, e.g. "#b0b0b0" for grey steel. ' +
-          'Must match the pattern #rrggbb (exactly 6 hex digits after the #). Used by the 3D viewport PBR renderer.',
-      ),
+          'Must match the pattern #rrggbb (exactly 6 hex digits after the #). Used by the 3D viewport PBR renderer. ' +
+          'Default: the replaced material\'s color, else "#b0b0b0".',
+      )
+      .optional(),
     metalness: z
       .number()
       .describe(
         'PBR metalness factor in [0, 1]. 0 = fully dielectric (plastic, wood, ceramic), ' +
-          '1 = fully metallic (aluminium, steel, copper). Non-metallic coatings are typically 0.',
-      ),
+          '1 = fully metallic (aluminium, steel, copper). Non-metallic coatings are typically 0. ' +
+          "Default: the replaced material's value, else 0.",
+      )
+      .optional(),
     roughness: z
       .number()
       .describe(
         'PBR roughness factor in [0, 1]. 0 = mirror-smooth (polished metal), ' +
-          '1 = fully diffuse/matte (rough concrete, unfinished wood). Brushed aluminium ≈ 0.3, matte plastic ≈ 0.7.',
-      ),
+          '1 = fully diffuse/matte (rough concrete, unfinished wood). Brushed aluminium ≈ 0.3, matte plastic ≈ 0.7. ' +
+          "Default: the replaced material's value, else 0.5.",
+      )
+      .optional(),
     finish: z
       .enum(FINISH_PATTERNS)
       .describe(
@@ -108,9 +116,9 @@ export const createMaterial = defineCommand({
       name,
       density: given,
       densityUnit,
-      color,
-      metalness,
-      roughness,
+      color: givenColor,
+      metalness: givenMetalness,
+      roughness: givenRoughness,
       finish: pattern,
       finishScale: requestedScale,
       color2,
@@ -132,6 +140,10 @@ export const createMaterial = defineCommand({
         error: commandError(converted.code, 'give a density unit such as g/cm^3, kg/m^3 or lb/in^3', [], ['densityUnit']),
       };
     const density = converted.value;
+    const previous = Object.hasOwn(doc.materials, name) ? doc.materials[name] : undefined;
+    const color = givenColor ?? previous?.color ?? DEFAULT_COLOR;
+    const metalness = givenMetalness ?? previous?.metalness ?? 0;
+    const roughness = givenRoughness ?? previous?.roughness ?? 0.5;
     for (const [field, value] of [
       ['metalness', metalness],
       ['roughness', roughness],
@@ -156,7 +168,6 @@ export const createMaterial = defineCommand({
             ...(normalStrength !== undefined ? { normalStrength } : {}),
             ...(clearcoat !== undefined ? { clearcoat } : {}),
           };
-    const previous = Object.hasOwn(doc.materials, name) ? doc.materials[name] : undefined;
     if (previous?.record?.libraryRef !== undefined)
       return refuseMaterial(
         doc,

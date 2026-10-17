@@ -3,7 +3,8 @@
  * straight from the kernel shapes.
  */
 
-import { type CadDocument, type Entity, type Vec3, is3D } from '../../model/types';
+import { type CadDocument, type Entity, type InstanceEntity, type Vec3, is3D } from '../../model/types';
+import { expandInstance } from '../../geometry/instanceExpansion';
 import type { ShapeHandle, ShapeTopology } from '../../geometry/kernel';
 import type { CommandResult } from '../types';
 import { confirmExportControlled, defineCommand, z } from '../schema';
@@ -86,6 +87,20 @@ function stepLabels(doc: CadDocument, solids: readonly Entity[]): StepLabel[] {
   });
 }
 
+/** Component instances nested deeper than this are not exported (guards against reference cycles). */
+const MAX_INSTANCE_DEPTH = 4;
+
+/** The 3D solids of a component instance in world space (nested instances expanded), named `<instance>/<part>`. */
+function instanceSolids(doc: CadDocument, instance: InstanceEntity, label: string, depth: number): Entity[] {
+  const component = doc.components[instance.componentId];
+  if (component === undefined || depth >= MAX_INSTANCE_DEPTH) return [];
+  return expandInstance(instance, component).flatMap((child): Entity[] => {
+    const name = `${label}/${child.name ?? child.id}`;
+    if (child.kind === 'instance') return instanceSolids(doc, child, name, depth + 1);
+    return is3D(child) ? [{ ...child, name }] : [];
+  });
+}
+
 /** Ids of the exportable solids in `entityIds` (or the whole document), plus the ids skipped and why. */
 function stepTargets(doc: CadDocument, entityIds: readonly string[] | undefined): { solids: Entity[]; skipped: string[] } {
   const ids = entityIds !== undefined && entityIds.length > 0 ? entityIds : doc.order;
@@ -94,8 +109,11 @@ function stepTargets(doc: CadDocument, entityIds: readonly string[] | undefined)
   for (const id of ids) {
     const entity = doc.entities[id];
     if (entity === undefined) skipped.push(`${id} (not found)`);
-    else if (entity.kind === 'instance') skipped.push(`${id} (instance)`);
-    else if (is3D(entity)) solids.push(entity);
+    else if (entity.kind === 'instance') {
+      const parts = instanceSolids(doc, entity, entity.name ?? entity.id, 0);
+      if (parts.length === 0) skipped.push(`${id} (instance without solids)`);
+      solids.push(...parts);
+    } else if (is3D(entity)) solids.push(entity);
     else if (entityIds !== undefined && entityIds.length > 0) skipped.push(`${id} (2D)`);
   }
   return { solids, skipped };
@@ -118,8 +136,8 @@ export const exportStepExact = defineCommand({
     '(use export_step via the Python bridge, or export_stl, instead). ' +
     'Each solid becomes one STEP product named after its entity (set_entity_name, else the id; the group ' +
     'name goes in the product description) and carries its entity color as a surface style. ' +
-    'Returns data: { format, step (the file text), solidCount, entityIds, skipped }. Instances are skipped ' +
-    '(explode_instance first). Does not modify the document.',
+    'Returns data: { format, step (the file text), solidCount, entityIds, skipped }. Component instances (assembly parts, ' +
+    'fasteners) are exported as their solids in world space, named <instance>/<part>. Does not modify the document.',
   params: z.object({
     entityIds: z
       .array(z.string())

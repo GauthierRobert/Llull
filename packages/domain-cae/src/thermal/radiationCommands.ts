@@ -1,6 +1,6 @@
-/** add_cavity_radiation / add_thermal_contact (PHY-03 V1): cavity radiation groups and contact conductances, recorded as data. */
+/** add_cavity_radiation (PHY-03 V1): cavity radiation groups, recorded as data. */
 
-import type { CavityRadiation, FeaTarget, Q, ThermalContact } from '@core/model/analysis';
+import type { CavityRadiation } from '@core/model/analysis';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
@@ -85,87 +85,6 @@ export const addCavityRadiation = defineCommand({
       withThermal(doc, found, thermal),
       `add_cavity_radiation: '${cavity.id}' (${name}) ${cavity.environment.kind} cavity of ${faces.length} faces in '${analysisId}'.`,
       [cavity.id],
-    );
-  },
-});
-
-const conductanceSchema = z.union([
-  quantitySchema,
-  z.object({
-    points: z
-      .array(z.tuple([z.number(), z.number(), z.number()]))
-      .describe('Rows [conductance W/(m^2*K), contact pressure MPa, temperature].'),
-  }),
-]);
-
-function conductanceProblem(conductance: Q | { readonly points: ReadonlyArray<readonly [number, number, number]> }): string | null {
-  if ('points' in conductance) {
-    if (conductance.points.length === 0) return 'the conductance table is empty';
-    if (conductance.points.some((row) => !row.every(Number.isFinite) || !(row[0] > 0)))
-      return 'conductance table rows must be finite with conductance > 0';
-    return null;
-  }
-  return quantityProblem('film', conductance) ?? (conductance.value > 0 ? null : 'conductance must be > 0');
-}
-
-const sameFace = (a: FeaTarget, b: FeaTarget): boolean => a.entityId === b.entityId;
-
-/**
- * @affects doc.analysis.cases[analysisId].thermal.contacts (adds 1 contact, id `tc-<step>.<k>`; affected: [contactId])
- * @invariant master and slave are face targets on DIFFERENT parts; conductance > 0 (W/(m^2*K), or a table)
- * @failure same part / bad conductance -> THM_CONTACT_INVALID; wrong unit -> THM_UNITS_MISMATCH; bad targets (refusals, unchanged doc)
- * @note the deck writes a tied `*CONTACT PAIR` (surface to surface) with `*GAP CONDUCTANCE`; the two parts are meshed separately, so the face meshes need not match
- */
-export const addThermalContact = defineCommand({
-  name: 'add_thermal_contact',
-  description:
-    'Record a thermal contact conductance between a master face and a slave face of two different parts (bolted interface on a cold ' +
-    'plate); returns the contact id in affected[0]. conductance: { value, unit "W/(m^2*K)" } or { points: [[W/(m^2*K), pressureMPa, T], ...] }. ' +
-    'The deck ties the two faces thermally (CalculiX tied *CONTACT PAIR with *GAP CONDUCTANCE); the parts are meshed separately, so the ' +
-    'two face meshes need not match. A table is evaluated at the mean temperature of the two faces (temperature on the case scale) and at ' +
-    'zero contact pressure, so give the pressure column 0 unless it varies nothing. Check the result with thermal_report.',
-  params: z.object({
-    analysisId: analysisIdSchema,
-    name: z.string().min(1).describe('Display name, e.g. "box to plate".'),
-    master: feaTargetSchema.describe('Master face (facesNear points) on one part.'),
-    slave: feaTargetSchema.describe('Slave face (facesNear points) on another part.'),
-    conductance: conductanceSchema.describe('Interface conductance.'),
-  }),
-  run: (doc, params): CommandResult => {
-    const { analysisId, name, conductance } = params;
-    const fail = (found: Problem): CommandResult =>
-      refuseThermal(doc, 'add_thermal_contact', found.code, found.message, found.ids, found.paths);
-    const found = thermalCaseOf(doc, analysisId);
-    if (isProblem(found)) return fail(found);
-    const master = toTarget(params.master);
-    const slave = toTarget(params.slave);
-    for (const [path, target] of [
-      ['master', master],
-      ['slave', slave],
-    ] as const) {
-      const bad = targetProblem(doc, found.analysisCase, target);
-      if (bad !== null) return fail(problem(bad.code, bad.message, [target.entityId], [path]));
-      if ((target.facesNear ?? []).length === 0)
-        return fail(problem('FEA_TARGET_UNRESOLVED', `${path} needs facesNear`, [target.entityId], [path]));
-    }
-    if (sameFace(master, slave))
-      return fail(problem('THM_CONTACT_INVALID', 'master and slave are on the same part', [master.entityId], ['slave']));
-    const bad = conductanceProblem(conductance);
-    if (bad !== null)
-      return fail(
-        problem(
-          'unit' in conductance && quantityProblem('film', conductance) !== null ? 'THM_UNITS_MISMATCH' : 'THM_CONTACT_INVALID',
-          bad,
-          [analysisId],
-          ['conductance'],
-        ),
-      );
-    const contact: ThermalContact = { id: nextId('tc'), name, master, slave, conductance };
-    const thermal = { ...found.thermal, contacts: { ...found.thermal.contacts, [contact.id]: contact } };
-    return changed(
-      withThermal(doc, found, thermal),
-      `add_thermal_contact: '${contact.id}' (${name}) between '${master.entityId}' and '${slave.entityId}' in '${analysisId}' (tied contact conductance).`,
-      [contact.id],
     );
   },
 });

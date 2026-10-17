@@ -140,7 +140,7 @@ describe('fixed column bases in the frame analysis', () => {
   // Two full portal-frame designs: ~10 s plain, ~28 s under coverage instrumentation.
   it('designs a lighter crane hall with fixed bases than with pinned bases', () => {
     const design = (columnBase: 'pinned' | 'fixed'): ReturnType<typeof sections> => {
-      const result = execute(hall({ ...CRANE_HALL, columnBase }), 'design_portal_frames', { windPressure: 0.7 });
+      const result = execute(hall({ ...CRANE_HALL, columnBase }), 'design_portal_frames', { windPressure: 0.7, allowFixedBases: false });
       expect((result.data as { failures: number }).failures).toBe(0);
       return sections(result.document);
     };

@@ -1,7 +1,7 @@
 import type { CadDocument, Vec3 } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
-import { boundsOverlap, instanceBoundsFromDoc } from '../../geometry/bounds';
+import { instanceBoundsFromDoc } from '../../geometry/bounds';
 import type { Bounds } from '../../geometry/bounds';
 import { evaluateMotionInternal } from './jointsKinematics';
 import { noop, report } from '../noop';
@@ -29,16 +29,29 @@ export interface MotionStudyData {
   summary: { totalSteps: number; framesWithInterference: number };
 }
 
-/** World AABB per instance id with each instance moved to its position at the step. @pure */
-function boundsAtStep(doc: CadDocument, instancePositions: Record<string, Vec3>): Record<string, Bounds> {
+/** Overlap depth below this fraction of the larger box diagonal is contact, not interference. */
+const CONTACT_TOLERANCE = 1e-6;
+
+/** World AABB per instance id with each instance posed (position AND rotation) as at the step. @pure */
+function boundsAtStep(doc: CadDocument, step: Pick<MotionStep, 'instancePositions' | 'instanceRotations'>): Record<string, Bounds> {
   const result: Record<string, Bounds> = {};
   for (const id of Object.keys(doc.entities)) {
     const entity = doc.entities[id];
     if (!entity || entity.kind !== 'instance') continue;
-    const resolvedPos = instancePositions[id] ?? entity.position;
-    result[id] = instanceBoundsFromDoc({ ...entity, position: resolvedPos }, doc);
+    result[id] = instanceBoundsFromDoc(
+      { ...entity, position: step.instancePositions[id] ?? entity.position, rotation: step.instanceRotations[id] ?? entity.rotation },
+      doc,
+    );
   }
   return result;
+}
+
+const diagonal = ({ min, max }: Bounds): number => Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
+
+/** The boxes overlap by more than the contact tolerance on every axis (touching faces do not count). */
+function interferes(a: Bounds, b: Bounds): boolean {
+  const tolerance = CONTACT_TOLERANCE * Math.max(diagonal(a), diagonal(b));
+  return [0, 1, 2].every((axis) => Math.min(a.max[axis] ?? 0, b.max[axis] ?? 0) - Math.max(a.min[axis] ?? 0, b.min[axis] ?? 0) > tolerance);
 }
 
 /** Every overlapping pair of instance AABBs. @pure */
@@ -49,7 +62,7 @@ function detectInterferences(bounds: Record<string, Bounds>): [string, string][]
     for (let j = i + 1; j < entries.length; j++) {
       const [idA, boundsA] = elementAt(entries, i);
       const [idB, boundsB] = elementAt(entries, j);
-      if (boundsOverlap(boundsA, boundsB)) pairs.push([idA, idB]);
+      if (interferes(boundsA, boundsB)) pairs.push([idA, idB]);
     }
   }
   return pairs;
@@ -73,7 +86,7 @@ export const motionStudy = defineCommand({
     'mode="parameter": sweep a named doc.parameters entry through a value range, propagating to any joints that reference it. ' +
     '"target" is the joint id or parameter name to sweep. "start" and "end" define the sweep range (inclusive). ' +
     '"steps" is the number of samples (default 24; clamped to [2, 360]; non-integers rounded). ' +
-    '"interferenceCheck" (default false): when true, runs a lightweight AABB overlap test on every instance pair at each step. ' +
+    '"interferenceCheck" (default false): when true, runs a lightweight overlap test (axis-aligned box of each instance in its rotated pose; faces that merely touch are not interference) on every instance pair at each step. ' +
     'Returns the input document unchanged (affected:[]) with data: { steps: MotionStep[], interferences: InterferencePair[], ' +
     '  summary: { totalSteps: number, framesWithInterference: number } }. ' +
     'Failure cases (unknown target, start===end, steps<2) return an explanatory summary with empty data.',
@@ -156,7 +169,7 @@ export const motionStudy = defineCommand({
       const { instancePositions, instanceRotations, resolvedJoints } = evaluateMotionInternal(doc, baseValues);
       motionSteps.push({ stepIndex: k, sweepValue, instancePositions, instanceRotations, resolvedJoints });
       if (interferenceCheck === true) {
-        const bounds = boundsAtStep(doc, instancePositions);
+        const bounds = boundsAtStep(doc, { instancePositions, instanceRotations });
         const pairs = detectInterferences(bounds);
         for (const [idA, idB] of pairs) {
           allInterferences.push({ stepIndex: k, instanceIdA: idA, instanceIdB: idB });

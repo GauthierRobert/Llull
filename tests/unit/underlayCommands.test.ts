@@ -216,7 +216,7 @@ const imageOf2 = (doc: CadDocument, id: string): ImageEntity => doc.entities[id]
 describe('render_view with an underlay', () => {
   it('embeds the raster as an <image> with an affine transform, behind every polygon', () => {
     const { doc, imageId } = scene();
-    const svg = (execute(doc, 'render_view', { view: 'top' }).data as { svg: string }).svg;
+    const svg = (execute(doc, 'render_view', { mode: 'vector', view: 'top' }).data as { svg: string }).svg;
     const tag = svg.match(/<image [^>]*\/>/)?.[0] ?? '';
     expect(tag).toContain(`data-id="${imageId}"`);
     expect(tag).toContain(`href="${PNG2}"`);
@@ -234,7 +234,7 @@ describe('render_view with an underlay', () => {
   });
   it('frames the scene on the underlay bounds and labels it as an annotation', () => {
     const { doc } = scene();
-    const result = execute(doc, 'render_view', { view: 'top', showLabels: true });
+    const result = execute(doc, 'render_view', { mode: 'vector', view: 'top', showLabels: true });
     const data = result.data as { bounds: { min: number[]; max: number[] }; svg: string };
     expect(data.bounds.max[0]).toBe(200);
     expect(data.bounds.max[1]).toBe(100);

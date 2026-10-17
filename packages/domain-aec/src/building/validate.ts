@@ -160,6 +160,9 @@ function elementErrors(key: string, element: unknown, levels: Record<string, unk
       errors.push(`building element ${key}: riserCount must be an integer >= 1`);
     }
   }
+  if (category === 'stair' && element['waistThickness'] !== undefined && !isPositiveNumber(element['waistThickness'])) {
+    errors.push(`building element ${key}: waistThickness must be a number > 0`);
+  }
   for (const field of POINTS[category] ?? []) {
     if (!isPoint(element[field])) errors.push(`building element ${key}: ${field} must be [x, y]`);
   }

@@ -55,19 +55,41 @@ function loopXml(loop: SimulationLoop, centers: ReadonlyMap<string, Vec3>, model
     .join('');
 }
 
-function bodyXml(body: SimulationBody, parentCenter: Vec3, childrenOf: ReadonlyMap<string | null, SimulationBody[]>): string {
+/**
+ * Dry friction as a near-rigid velocity constraint: MuJoCo's default soft friction row (impedance 0.9) lets a body creep at a speed
+ * proportional to the unbalanced pull; impedance 0.9999 with the stiffest stable reference (2 · timestep) holds it to ~1e-6 m/s.
+ */
+const FRICTION_IMPEDANCE = '0.9999 0.9999 0.001';
+
+function bodyXml(
+  body: SimulationBody,
+  parentCenter: Vec3,
+  childrenOf: ReadonlyMap<string | null, SimulationBody[]>,
+  timestep: number,
+): string {
   const { joint } = body;
   const jointXml =
     joint !== null
-      ? `<joint name="${attribute(joint.id)}" type="${joint.kind === 'revolute' ? 'hinge' : 'slide'}" pos="${numbers(minus(joint.anchor, body.centerOfMass))}" axis="${numbers(joint.axis)}" damping="${joint.damping}" frictionloss="${joint.friction}"/>`
+      ? `<joint name="${attribute(joint.id)}" type="${joint.kind === 'revolute' ? 'hinge' : 'slide'}" pos="${numbers(minus(joint.anchor, body.centerOfMass))}" axis="${numbers(joint.axis)}" damping="${joint.damping}" frictionloss="${joint.friction}"${joint.friction > 0 ? ` solreffriction="${2 * timestep} 1" solimpfriction="${FRICTION_IMPEDANCE}"` : ''}/>`
       : body.fixed
         ? ''
         : '<freejoint/>';
-  const children = (childrenOf.get(body.id) ?? []).map((child) => bodyXml(child, body.centerOfMass, childrenOf)).join('');
+  const children = (childrenOf.get(body.id) ?? []).map((child) => bodyXml(child, body.centerOfMass, childrenOf, timestep)).join('');
   return (
     `<body name="${attribute(body.id)}" pos="${numbers(minus(body.centerOfMass, parentCenter))}">` +
     `<inertial pos="0 0 0" mass="${body.mass}" fullinertia="${numbers(body.inertia)}"/>${jointXml}${children}</body>`
   );
+}
+
+/**
+ * Servos on an open kinematic chain (a robot arm: a jointed body hanging from a jointed body, no loops or gears). The servo damping acts
+ * explicitly in RK4 and the chain's mass matrix is near-singular (links nearly rigid against each other), so the per-joint gains that are
+ * stable alone chatter at the step rate (torque pinned at +-maxForce, aliased speeds); the implicit-in-velocity integrator is stable.
+ */
+function servoChain(model: SimulationModel): boolean {
+  if (model.servos.length === 0 || model.loops.length > 0 || model.gears.length > 0) return false;
+  const jointed = new Set(model.bodies.flatMap((body) => (body.joint === null ? [] : [body.id])));
+  return model.bodies.some((body) => body.joint !== null && body.parentId !== null && jointed.has(body.parentId));
 }
 
 /**
@@ -80,7 +102,7 @@ function bodyXml(body: SimulationBody, parentCenter: Vec3, childrenOf: ReadonlyM
 export function toMjcf(model: SimulationModel, timestep: number): string {
   const childrenOf = new Map<string | null, SimulationBody[]>();
   for (const body of model.bodies) childrenOf.set(body.parentId, [...(childrenOf.get(body.parentId) ?? []), body]);
-  const roots = (childrenOf.get(null) ?? []).map((body) => bodyXml(body, ZERO, childrenOf)).join('');
+  const roots = (childrenOf.get(null) ?? []).map((body) => bodyXml(body, ZERO, childrenOf, timestep)).join('');
   const centers = new Map(model.bodies.map((body) => [body.id, body.centerOfMass] as const));
   const gears = model.gears
     .map(
@@ -96,11 +118,12 @@ export function toMjcf(model: SimulationModel, timestep: number): string {
         `actrange="-1e12 1e12" forcelimited="true" forcerange="${-servo.maxForce} ${servo.maxForce}"/>`,
     )
     .join('');
-  const integrator = model.solver.integrator === 'implicitfast' ? 'implicitfast' : 'RK4';
+  const integrator = model.solver.integrator === 'implicitfast' || servoChain(model) ? 'implicitfast' : 'RK4';
   const flags = model.loops.length > 0 ? '<flag diagexact="enable"/>' : '';
+  const jacobian = model.loops.length > 0 ? ' jacobian="dense"' : '';
   return (
     '<mujoco model="llull"><compiler angle="radian" inertiafromgeom="false" balanceinertia="true"/>' +
-    `<option timestep="${timestep}" integrator="${integrator}" gravity="${numbers(model.gravity)}">${flags}</option>` +
+    `<option timestep="${timestep}" integrator="${integrator}"${jacobian} gravity="${numbers(model.gravity)}">${flags}</option>` +
     `<worldbody>${roots}</worldbody>${gears === '' && loops === '' ? '' : `<equality>${gears}${loops}</equality>`}` +
     `${servos === '' ? '' : `<actuator>${servos}</actuator>`}</mujoco>`
   );

@@ -102,12 +102,14 @@ function addColors(step: string, styled: readonly { items: string[]; rgb: [numbe
 }
 
 /**
- * `step` with the n-th product renamed to `labels[n-1]` (id, name, description), its solids named
+ * `step` with the n-th product (in translator numbering order) renamed to `labels[n-1]` (id, name, description), its solids named
  * likewise, and its solids colored. Labels beyond the products found are ignored.
  */
 export function labelStep(step: string, labels: readonly StepLabel[]): string {
+  // the translator numbers products with a process-wide counter (a second export in the same server starts at 3, 4, ...): rank them
+  const ordinals = [...new Set([...step.matchAll(PRODUCT_PATTERN)].map((match) => Number(match[1])))].sort((a, b) => a - b);
   const labeled = step.replace(PRODUCT_PATTERN, (statement, ordinal: string) => {
-    const label = labels[Number(ordinal) - 1];
+    const label = labels[ordinals.indexOf(Number(ordinal))];
     return label === undefined ? statement : named(statement, label);
   });
   const representations = [...labeled.matchAll(REPRESENTATION_PATTERN)];

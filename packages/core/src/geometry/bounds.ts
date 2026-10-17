@@ -5,6 +5,8 @@ import { ORIGIN, add3, vec3At } from '../lib/vec3';
 import { sweepTriangles } from './sweep';
 import { loftTriangles } from './loft';
 import { subdivisionTriangles } from './subdivision';
+import { revolutionAxisIndex } from './revolution';
+import { applyEulerXYZ, isZeroRotation } from '../lib/eulerRotation';
 
 /** World-space axis-aligned bounding box. */
 export interface Bounds {
@@ -64,6 +66,23 @@ function sweepLocalBounds(e: Extract<Entity, { kind: 'sweep' | 'loft' | 'subdivi
 }
 
 /**
+ * [min,max] of the two radial coordinates (r·cosθ, r·sinθ) over θ ∈ [0, angle] for r ∈ [rMin, rMax]. Extremes sit at the arc ends and at
+ * the quarter turns inside the sweep; a full turn gives the symmetric ±max|r| square.
+ */
+function arcExtent(rMin: number, rMax: number, angle: number): [[number, number], [number, number]] {
+  const sweep = Math.min(angle, 2 * Math.PI);
+  const thetas = [0, sweep];
+  for (let k = 1; (k * Math.PI) / 2 < sweep - 1e-9; k++) thetas.push((k * Math.PI) / 2);
+  const xs = thetas.flatMap((t) => [rMin * Math.cos(t), rMax * Math.cos(t)]);
+  const ys = thetas.flatMap((t) => [rMin * Math.sin(t), rMax * Math.sin(t)]);
+  const snap = (n: number): number => (Math.abs(n) < 1e-12 ? 0 : n);
+  return [
+    [snap(Math.min(...xs)), snap(Math.max(...xs))],
+    [snap(Math.min(...ys)), snap(Math.max(...ys))],
+  ];
+}
+
+/**
  * AABB of one entity in its own frame (before `rotation` / `position`), matching how the viewport places each kind. Mesh positions are
  * world-space, so their local bounds are relative to `position`.
  */
@@ -101,14 +120,15 @@ export function localBounds(e: Entity): Bounds {
     case 'subdivision':
       return sweepLocalBounds(e);
     case 'revolution': {
-      // Conservative: radial extent around the world axis closest to `axis`, axial extent from the profile.
-      const maxR = e.profile.reduce((m, [x]) => Math.max(m, Math.abs(x)), 0);
+      // Radial extent follows the swept arc (from +X, counter-clockwise); axial extent from the profile.
+      const radii = e.profile.map(([r]) => r);
       const minAxial = Math.min(...e.profile.map(([, y]) => y));
       const maxAxial = Math.max(...e.profile.map(([, y]) => y));
-      const [abx, aby, abz] = e.axis.map(Math.abs) as [number, number, number];
-      if (abz >= abx && abz >= aby) return bounds([-maxR, -maxR, minAxial], [maxR, maxR, maxAxial]);
-      if (aby >= abx) return bounds([-maxR, minAxial, -maxR], [maxR, maxAxial, maxR]);
-      return bounds([minAxial, -maxR, -maxR], [maxAxial, maxR, maxR]);
+      const [u, v] = arcExtent(Math.min(...radii), Math.max(...radii), e.angle);
+      const axial = revolutionAxisIndex(e.axis);
+      if (axial === 2) return bounds([u[0], v[0], minAxial], [u[1], v[1], maxAxial]);
+      if (axial === 1) return bounds([u[0], minAxial, v[0]], [u[1], maxAxial, v[1]]);
+      return bounds([minAxial, u[0], v[0]], [maxAxial, u[1], v[1]]);
     }
     case 'line': {
       const { minX, minY, maxX, maxY } = pointsExtent([e.start, e.end]);
@@ -147,6 +167,26 @@ export function localBounds(e: Entity): Bounds {
 export function entityBounds(e: Entity): Bounds {
   const { min, max } = localBounds(e);
   return bounds(add3(e.position, min), add3(e.position, max));
+}
+
+/** Local-space points whose rotated hull bounds `e`: cone/pyramid base corners + apex, otherwise the 8 local AABB corners. */
+function localEntityCorners(e: Entity): Vec3[] {
+  if (e.kind === 'mesh' && (e.mesh.positions.length < 9 || e.mesh.positions.length % 3 !== 0)) return [[0, 0, 0]];
+  const local = localBounds(e);
+  const corners = boundsCorners(local);
+  return e.kind === 'cone' || e.kind === 'pyramid' ? [...corners.slice(0, 4), [0, 0, local.max[2]]] : corners;
+}
+
+/**
+ * World AABB of one entity with `rotation` applied about `position` (three.js Rx·Ry·Rz). Zero rotation equals `entityBounds`; otherwise the
+ * result wraps the rotated local geometry and carries `oriented:true`.
+ */
+export function orientedEntityBounds(e: Entity): Bounds {
+  if (isZeroRotation(e.rotation)) return entityBounds(e);
+  const rotated = localEntityCorners(e).map((local) =>
+    applyEulerXYZ([e.position[0] + local[0], e.position[1] + local[1], e.position[2] + local[2]], e.position, e.rotation),
+  );
+  return { ...boundsOfPoints(rotated), oriented: true };
 }
 
 /** The 8 corners of an AABB. */
@@ -196,7 +236,7 @@ export function instanceBoundsFromDoc(instance: InstanceEntity, doc: CadDocument
 export function entityBoundsInDoc(doc: CadDocument, e: Entity, depth = 0): Bounds {
   if (e.kind === 'instance') return instanceBoundsFromDoc(e, doc, depth);
   if (e.kind === 'dimension') return dimensionBoundsFromDoc(e, doc);
-  return entityBounds(e);
+  return orientedEntityBounds(e);
 }
 
 /**

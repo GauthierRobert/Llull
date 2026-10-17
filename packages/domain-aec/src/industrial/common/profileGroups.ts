@@ -59,7 +59,7 @@ export function resizeProfileGroup(
 export function upsizeProfileGroups(
   building: BuildingModel,
   groups: ProfileGroups,
-  nextSize: (profile: string) => string | null,
+  nextSize: (profile: string, role: string) => string | null,
   resizeGroup: (building: BuildingModel, group: ProfileGroup, larger: string) => { building: BuildingModel; changedIds: string[] },
 ): { building: BuildingModel; progressed: boolean; limited: boolean; changes: string[]; changedIds: string[] } {
   let next = building;
@@ -68,7 +68,7 @@ export function upsizeProfileGroups(
   const changes: string[] = [];
   const changedIds: string[] = [];
   for (const group of groups.values()) {
-    const larger = nextSize(group.profile);
+    const larger = nextSize(group.profile, group.role);
     if (!larger) {
       limited = true;
       continue;

@@ -96,6 +96,15 @@ describe('export_code of exact kernel results', () => {
     const openscad = code(chamfered, 'openscad').text;
     expect(openscad).toMatch(/module box_1_v\d+\(\) polyhedron\(/);
   });
+  it('records the selected edge mid points on the recipe, so a kernel without topology (Manifold) still exports near=', () => {
+    const box = step(createEmptyDocument(), 'add_box', { size: [2, 2, 2] });
+    const filleted = step(box.document, 'fillet_edge', { id: box.affected[0], edgeIndices: [1], radius: 0.5 });
+    const entity = filleted.document.entities[filleted.affected[0]!] as MeshSolidEntity;
+    expect(entity.brep).toMatchObject({ op: 'fillet', edges: [1], near: [[1, 0.5, 1]] });
+    setGeometryKernel(fakeKernel({ boolean: TETRA, fillet: TETRA }));
+    const snapshot = { ...filleted.document, featureHistory: [] };
+    expect(code(snapshot, 'cadquery').text).toMatch(/^box_1 = fillet\(box_1, \[1\], 0\.5, near=\[\(1, 0\.5, 1\)\]\)$/m);
+  });
   it('OpenSCAD leaves a comment when no triangles are known', () => {
     const snapshot = { ...model(), featureHistory: [] };
     setGeometryKernel(null);

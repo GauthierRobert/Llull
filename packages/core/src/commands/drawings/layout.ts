@@ -47,7 +47,10 @@ interface LayoutOptions {
 }
 
 /** Enlargements (10:1 … 2:1) then reductions; the first that fits wins. */
-const STANDARD_SCALES: ReadonlyArray<number> = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000];
+const STANDARD_SCALES: ReadonlyArray<number> = [0.1, 0.2, 0.5, 1, 2, 2.5, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000];
+
+/** Scales a detail's default magnification is taken from: the sheet scales without 1:2.5. */
+const DETAIL_SCALES: ReadonlyArray<number> = STANDARD_SCALES.filter((candidate) => candidate !== 2.5);
 
 /** Paper mm reserved under a view for its label; paper mm between neighbouring views. */
 const LABEL_HEIGHT = 8;
@@ -80,7 +83,7 @@ export const viewDenominator = (view: DrawingView, scale: number): number =>
 
 /** The standard scale at least 2x larger than `scale` (the largest standard denominator <= scale / 2). */
 const magnified = (scale: number): number =>
-  [...STANDARD_SCALES].reverse().find((candidate) => candidate <= scale / 2) ?? (STANDARD_SCALES[0] as number);
+  [...DETAIL_SCALES].reverse().find((candidate) => candidate <= scale / 2) ?? (DETAIL_SCALES[0] as number);
 
 interface Sized {
   readonly item: LayoutItem;
@@ -111,6 +114,7 @@ function arrange(auto: ReadonlyArray<Sized>, angle: ProjectionAngle): Arranged {
     else grid.set(key, sized);
   }
   const cells = [...grid.entries()].map(([key, sized]) => ({ sized, col: Number(key.split(',')[0]), row: Number(key.split(',')[1]) }));
+  const gridKeys = new Set(grid.keys());
   const cols = [...new Set(cells.map((cell) => cell.col))].sort((a, b) => a - b);
   const rows = [...new Set(cells.map((cell) => cell.row))].sort((a, b) => a - b);
   const sizeOf = (
@@ -128,6 +132,19 @@ function arrange(auto: ReadonlyArray<Sized>, angle: ProjectionAngle): Arranged {
     (cell) => cell.sized.boxHeight,
     (cell) => cell.row,
   );
+  const free = cols
+    .flatMap((col, c) => rows.map((row, r) => ({ col, row, c, r })))
+    .filter((slot) => !gridKeys.has(`${slot.col},${slot.row}`))
+    .sort((a, b) => Math.abs(a.col) + Math.abs(a.row) - Math.abs(b.col) - Math.abs(b.row) || a.row - b.row || a.col - b.col);
+  for (const sized of extras.filter((extra) => extra.item.view.kind !== 'projection')) {
+    const index = free.findIndex(
+      (slot) => sized.boxWidth <= (colWidths[slot.c] as number) && sized.boxHeight <= (rowHeights[slot.r] as number),
+    );
+    if (index < 0) continue;
+    const [slot] = free.splice(index, 1);
+    cells.push({ sized, col: (slot as { col: number }).col, row: (slot as { row: number }).row });
+    extras.splice(extras.indexOf(sized), 1);
+  }
   const gridWidth = cells.length > 0 ? sum(colWidths) : 0;
   const gridHeight = cells.length > 0 ? sum(rowHeights) : 0;
   const extrasWidth = extras.length > 0 ? sum(extras.map((sized) => sized.boxWidth)) : 0;

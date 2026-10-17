@@ -4,7 +4,8 @@
  */
 
 import type { MeshData } from '../model/types';
-import type { Point2 } from '../lib/polygon';
+import { polygonArea, type Point2 } from '../lib/polygon';
+import { orient2 } from '../lib/vec2';
 import { entityLocalToWorld } from './entityFrame';
 import { vec3At } from '../lib/vec3';
 import { triangulatePolygon } from '../lib/triangulate';
@@ -56,8 +57,10 @@ export function addCap(
 }
 
 /**
- * Cap of the annulus between two loops that are both CCW and star-shaped about the origin
- * (e.g. a rim circle and a gear outline): a zipper of well-shaped triangles walked by polar angle.
+ * Cap of the annulus between two CCW loops around the origin (e.g. a rim circle and a gear outline): a zipper of well-shaped
+ * triangles walked by polar angle when both loops are star-shaped about the origin.
+ * @invariant the zipper is used only if every triangle is CCW and they tile exactly the annulus; otherwise (re-entrant outline) the cap
+ *   is triangulated as a polygon with a hole (`addCap`)
  */
 export function addStarAnnulusCap(
   builder: MeshBuilder,
@@ -76,25 +79,28 @@ export function addStarAnnulusCap(
   };
   const o = prepare(outer);
   const n = prepare(inner);
-  const id = (loop: Point2[], i: number): number => {
-    const [x, y] = loop[i % loop.length]!;
-    return builder.vertex(x, y, z);
-  };
   const emit = (a: number, b: number, c: number): void => (up ? builder.triangle(a, b, c) : builder.triangle(a, c, b));
   const angleAt = (loop: { angles: number[] }, i: number): number => (i < loop.angles.length ? loop.angles[i]! : loop.angles[0]! + turn);
+  const zipper: Array<[Point2, Point2, Point2]> = [];
+  const at = (loop: Point2[], k: number): Point2 => loop[k % loop.length]!;
   let i = 0;
   let j = 0;
   while (i < o.points.length || j < n.points.length) {
     const nextOuter = i < o.points.length ? angleAt(o, i + 1) : Infinity;
     const nextInner = j < n.points.length ? angleAt(n, j + 1) : Infinity;
     if (nextOuter <= nextInner) {
-      emit(id(o.points, i), id(o.points, i + 1), id(n.points, j));
+      zipper.push([at(o.points, i), at(o.points, i + 1), at(n.points, j)]);
       i++;
     } else {
-      emit(id(o.points, i), id(n.points, j + 1), id(n.points, j));
+      zipper.push([at(o.points, i), at(n.points, j + 1), at(n.points, j)]);
       j++;
     }
   }
+  const area = zipper.reduce((sum, [a, b, c]) => sum + orient2(a, b, c) / 2, 0);
+  const target = polygonArea(outer) - polygonArea(inner);
+  const tiles = zipper.every(([a, b, c]) => orient2(a, b, c) > -1e-12) && target > 0 && Math.abs(area - target) <= target * 1e-6;
+  if (!tiles) return addCap(builder, outer, [inner], z, up);
+  for (const [a, b, c] of zipper) emit(builder.vertex(a[0], a[1], z), builder.vertex(b[0], b[1], z), builder.vertex(c[0], c[1], z));
 }
 
 /**

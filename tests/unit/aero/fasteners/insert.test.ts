@@ -91,7 +91,7 @@ describe('insert_fastener_stack (VC-MAT-10)', () => {
     ]);
   });
 
-  it('reduces each plate volume by pi r^2 t and replaces the plates by their cut meshes (material carried over)', () => {
+  it('reduces each plate volume by pi r^2 t and cuts the plates in place (same ids, cut meshes, material carried over)', () => {
     // A millimetre document: Manifold facets a 0.1 in hole coarsely in inch documents (its default segment count follows the radius in mm).
     let doc = docWith();
     const first = ok(doc, 'add_box', { size: [50.8, 25.4, 6.35], anchor: 'min', position: [0, 0, 0] });
@@ -110,8 +110,9 @@ describe('insert_fastener_stack (VC-MAT-10)', () => {
     };
     const result = ok(doc, 'insert_fastener_stack', params, ctxWith(kernel));
     const [one, two] = stackOf(result).layers;
-    expect(result.document.entities[first.affected[0] as string]).toBeUndefined();
-    expect(result.document.entities[second.affected[0] as string]).toBeUndefined();
+    expect(one?.entityId).toBe(first.affected[0]);
+    expect(two?.entityId).toBe(second.affected[0]);
+    expect(result.document.entities[one?.entityId as string]?.kind).toBe('mesh');
     const hole = (thickness: number): number => Math.PI * (4.826 / 2) ** 2 * thickness;
     const removed = (id: string | undefined, whole: number): number => whole - meshVolume(result.document, id as string);
     expect(removed(one?.entityId, 50.8 * 25.4 * 6.35) / hole(6.35)).toBeGreaterThan(0.97);
@@ -321,7 +322,7 @@ describe('bill_of_materials with standard parts (VC-MAT-11)', () => {
 
   it('lists NAS6203-9 x2, MS21042L3 x2 and NAS1149(.063) x2, plus materials with the plate mass', () => {
     const { doc, stacks } = twoStacks();
-    expect(stacks[0]?.layers[0]?.entityId).not.toBe(stacks[1]?.layers[0]?.entityId);
+    expect(stacks[0]?.layers[0]?.entityId).toBe(stacks[1]?.layers[0]?.entityId);
     expect(Object.values(doc.fasteners?.stacks ?? {}).every((s) => s.layers.every((l) => doc.entities[l.entityId] !== undefined))).toBe(
       true,
     );

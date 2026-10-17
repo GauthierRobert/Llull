@@ -2,6 +2,7 @@
 
 export interface MjModel {
   readonly njnt: number;
+  readonly nv: number;
   readonly jnt_qposadr: Int32Array;
   readonly jnt_dofadr: Int32Array;
   readonly body_rootid: Int32Array;
@@ -30,6 +31,8 @@ export interface MjData {
   readonly efc_id: Int32Array;
   readonly efc_force: Float64Array;
   readonly efc_pos: Float64Array;
+  /** Constraint Jacobian, row-major nefc x nv (dense: the MJCF sets jacobian="dense"). */
+  readonly efc_J: Float64Array;
   delete(): void;
 }
 

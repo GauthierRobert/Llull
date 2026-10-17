@@ -111,7 +111,10 @@ export type ParamType = 'number' | 'integer' | 'string' | 'boolean' | 'array' | 
 
 /** Array element / nested schema: the `description` is optional. */
 export interface ParamItemSpec {
-  type: ParamType;
+  /** Absent only when `anyOf` lists the alternatives (a union of differing types). */
+  type?: ParamType;
+  /** JSON Schema `anyOf`: the value must match one of these branches (zod union / discriminated union). */
+  anyOf?: ParamItemSpec[];
   description?: string;
   /** Constrained value set (JSON Schema `enum`). */
   enum?: readonly (string | number)[];

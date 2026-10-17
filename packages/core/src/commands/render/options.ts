@@ -15,6 +15,7 @@ interface RenderParams {
   target?: Vec3 | undefined;
   background?: string | undefined;
   maxPolygons?: number | undefined;
+  mode?: 'raster' | 'vector' | undefined;
   cut?: { planes: { normal: Vec3; offset: number }[]; mode?: CutSpec['mode'] | undefined; entityIds?: string[] | undefined } | undefined;
 }
 
@@ -36,6 +37,7 @@ function validateCut(doc: CadDocument, cut: NonNullable<RenderParams['cut']>): s
 /** Validated render options, or the reason they are invalid. @pure */
 export function resolveRenderOptions(doc: CadDocument, params: RenderParams): { options: RenderOptions } | { error: string } {
   const options: RenderOptions = {};
+  if (params.mode !== undefined) options.mode = params.mode;
   if (params.zoom !== undefined) {
     if (!Number.isFinite(params.zoom) || params.zoom <= 0) return { error: 'zoom must be > 0' };
     options.zoom = clamp(params.zoom, 0.1, 50);

@@ -26,7 +26,7 @@ export interface Placed {
   readonly stack: FastenerStack;
   /** Entity ids created or replaced: instances first (bolt, washers, nut), then the cut plates. */
   readonly affected: readonly string[];
-  /** Plate id before the cut -> the id of the plate with the hole. */
+  /** Plate id -> id of the plate with the hole (identical: the cut keeps the plate id). */
   readonly replaced: Readonly<Record<string, string>>;
   readonly representative: readonly string[];
 }
@@ -74,17 +74,6 @@ function holeTool(measured: MeasuredStack, diameter: number): CylinderEntity {
   };
 }
 
-/** Re-point every recorded stack layer from a replaced plate to its successor. */
-function remapLayers(doc: CadDocument, oldId: string, newId: string): CadDocument {
-  const stacks = fastenerModel(doc).stacks;
-  const touched = Object.values(stacks).filter((stack) => stack.layers.some((layer) => layer.entityId === oldId));
-  if (touched.length === 0) return doc;
-  const next = { ...stacks };
-  for (const stack of touched)
-    next[stack.id] = { ...stack, layers: stack.layers.map((layer) => (layer.entityId === oldId ? { ...layer, entityId: newId } : layer)) };
-  return withFasteners(doc, { stacks: next });
-}
-
 type Cut = { readonly document: CadDocument; readonly replaced: Record<string, string>; readonly cutIds: string[] } | PlaceFailure;
 
 function cutHoles(doc: CadDocument, ctx: ExecutionContext | undefined, measured: MeasuredStack, diameter: number): Cut {
@@ -102,12 +91,17 @@ function cutHoles(doc: CadDocument, ctx: ExecutionContext | undefined, measured:
       return fail('FAST_HOLE_CUT_FAILED', `kernel boolean on '${layer.entityId}' failed: ${cut.summary}`, [layer.entityId]);
     const carried: Entity = {
       ...created,
+      id: layer.entityId,
       ...(plate.materialId === undefined ? {} : { materialId: plate.materialId }),
       ...(plate.name === undefined ? {} : { name: plate.name }),
       ...(plate.tags === undefined ? {} : { tags: plate.tags }),
     };
-    current = remapLayers({ ...cut.document, entities: { ...cut.document.entities, [newId]: carried } }, layer.entityId, newId);
-    replaced[layer.entityId] = newId;
+    const others = Object.fromEntries(Object.entries(cut.document.entities).filter(([id]) => id !== newId));
+    const slot = current.order.indexOf(layer.entityId);
+    const rest = cut.document.order.filter((id) => id !== newId && id !== layer.entityId);
+    const order = slot < 0 ? [...rest, layer.entityId] : [...rest.slice(0, slot), layer.entityId, ...rest.slice(slot)];
+    current = { ...cut.document, entities: { ...others, [layer.entityId]: carried }, order };
+    replaced[layer.entityId] = layer.entityId;
   }
   return { document: current, replaced, cutIds: Object.values(replaced) };
 }

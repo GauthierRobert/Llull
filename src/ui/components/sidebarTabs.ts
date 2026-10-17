@@ -26,6 +26,7 @@ export const SIDEBAR_TAB_SPECS: readonly SidebarTabSpec[] = [
   { tab: 'materials', label: 'Materials', shortLabel: 'Materials', icon: 'materials' },
   { tab: 'manufacturing', label: 'Manufacturing', shortLabel: 'Mfg', icon: 'manufacturing' },
   { tab: 'fasteners', label: 'Fasteners', shortLabel: 'Fasteners', icon: 'fastener' },
+  { tab: 'analysis', label: 'Analysis', shortLabel: 'FEA', icon: 'wireframe' },
   { tab: 'review', label: 'Review', shortLabel: 'Review', icon: 'review' },
 ];
 

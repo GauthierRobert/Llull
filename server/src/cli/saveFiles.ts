@@ -15,12 +15,15 @@ export interface OutputFile {
 }
 
 const BASE64_KEYS = ['stlBase64', 'stepBase64', 'base64'] as const;
-const TEXT_KEYS = ['text', 'step', 'stl', 'ifc', 'svg', 'content'] as const;
+const TEXT_KEYS = ['text', 'step', 'stl', 'ifc', 'dxf', 'svg', 'content'] as const;
 
 /** The single file a data record carries (base64 or text payload), or null. */
 export function fileOfRecord(record: Record<string, unknown>): OutputFile | null {
   const bareName = nonEmptyString(record['name']);
-  const name = nonEmptyString(record['fileName']) ?? (bareName !== undefined && path.extname(bareName) !== '' ? bareName : null);
+  const name =
+    nonEmptyString(record['fileName']) ??
+    nonEmptyString(record['filename']) ??
+    (bareName !== undefined && path.extname(bareName) !== '' ? bareName : null);
   for (const [keys, encoding] of [
     [BASE64_KEYS, 'base64'],
     [TEXT_KEYS, 'utf8'],
@@ -41,10 +44,22 @@ export function filesOfData(data: unknown): OutputFile[] {
 /** PNG of `data.svg` (sized by `data.width`); null without svg or on failure. */
 function pngOfData(data: unknown): OutputFile | null {
   if (!isRecord(data)) return null;
-  const svg = nonEmptyString(data['svg']);
+  const text = nonEmptyString(data['text']);
+  const svg = nonEmptyString(data['svg']) ?? (text?.trimStart().startsWith('<svg') === true ? text : undefined); // civil sheets: svg in data.text
   if (svg === undefined) return null;
   const base64 = rasterizeSvg(svg, typeof data['width'] === 'number' ? data['width'] : undefined);
   return base64 === null ? null : { name: null, bytes: Buffer.from(base64, 'base64') };
+}
+
+/**
+ * `export_gltf --save x.glb` must run with binary=true (its text payload is JSON glTF otherwise); `.gltf` with binary=false.
+ * Explicit `binary` params win; any other command or target is returned as is.
+ */
+export function withSaveDefaults(name: string, params: unknown, save: string | undefined): unknown {
+  if (name !== 'export_gltf' || save === undefined || (isRecord(params) && 'binary' in params)) return params;
+  const extension = path.extname(save).toLowerCase();
+  if (extension !== '.glb' && extension !== '.gltf') return params;
+  return { ...(isRecord(params) ? params : {}), binary: extension === '.glb' };
 }
 
 export interface SavedFile {
@@ -64,7 +79,7 @@ export function saveDataFiles(data: unknown, target: string): SavedFile[] {
     throw new Error(
       wantsPng
         ? 'the result has no data.svg that rasterizes (use render_view or a sheet export for --save *.png).'
-        : 'the result carries no file payload to save (no data.files / text / base64 field).',
+        : 'the result carries no file payload to save (no data.files / text / dxf / svg / base64 field).',
     );
   }
   const targetIsDirectory = files.length > 1 || target.endsWith('/') || (fs.existsSync(target) && fs.statSync(target).isDirectory());

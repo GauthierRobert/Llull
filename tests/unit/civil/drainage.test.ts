@@ -356,6 +356,28 @@ describe('IDF and time of concentration', () => {
     expect(outlet?.tcMin).toBeCloseTo(expected, 1);
     expect(outlet?.designLps).toBeCloseTo(10, 1);
   });
+  it('warns when a larger outgoing pipe is invert-matched, leaving its crown above the incoming crown', () => {
+    const manholes = [0, 1, 2].map((k) => ({
+      location: [k * 50, 0],
+      invertElevation: 98 - 0.5 * k,
+      rimElevation: 100,
+      ...(k === 0 ? { inflowLps: 20 } : k === 1 ? { inflowLps: 150 } : {}),
+    }));
+    const doc = build(
+      manholes,
+      [1, 2].map((k) => ({ fromId: `manhole-${k}`, toId: `manhole-${k + 1}` })),
+    );
+    const sized = run(doc, 'size_drainage_pipes', {});
+    const data = sized.data as { crownWarnings: string[] };
+    const diameter = (id: string): number => (sized.document.civil?.objects[id] as { diameter: number }).diameter;
+    expect(diameter('pipe-2')).toBeGreaterThan(diameter('pipe-1'));
+    expect(data.crownWarnings).toHaveLength(1);
+    expect(data.crownWarnings[0]).toContain('pipe-2');
+    expect(sized.summary).toContain('WARNING');
+    expect(sized.summary).toContain('crown');
+    const uniform = run(chain({ inflowLps: 20 }), 'size_drainage_pipes', {});
+    expect((uniform.data as { crownWarnings: string[] } | undefined)?.crownWarnings ?? []).toEqual([]);
+  });
   it('iterates sizing and velocities to convergence', () => {
     const doc = chain({ catchmentAreaHa: 2, runoffCoefficient: 0.9 });
     const sized = run(doc, 'size_drainage_pipes', { idf: { a: 1500, b: 8, c: 0.85 } });
@@ -501,6 +523,15 @@ describe('export_drainage_long_section', () => {
       pipeIds: string[];
     };
     expect(part.pipeIds).toEqual(['pipe-2']);
+  });
+  it('prints a real scale, data.svg and a clean data band', () => {
+    const data = run(chain({ inflowLps: (FULL / 2) * 1000 }), 'export_drainage_long_section', { fromManholeId: 'manhole-1' }).data as {
+      svg: string;
+      text: string;
+    };
+    expect(data.svg).toBe(data.text);
+    expect(data.svg).toMatch(/Scale H 1:[1-9]\d* {2}V 1:[1-9]\d*;/);
+    expect(data.svg).toMatch(/text-anchor="start"[^>]*>0\.00<\/text>/);
   });
   it('follows the largest pipe at a fork and flags flooding in red', () => {
     const forkRun = run(diverging(), 'export_drainage_long_section', { fromManholeId: 'manhole-1' }).data as { manholeIds: string[] };

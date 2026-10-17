@@ -11,7 +11,7 @@ import { caseOf, withCase } from '../shared/access';
 import { refuseCode } from '../shared/codes';
 import { loadCaseNameProblem } from '../shared/names';
 import { analysisIdSchema } from '../shared/schemas';
-import { feaTargetSchema, targetProblem, toTarget, type FeaTargetInput } from '../shared/target';
+import { feaTargetSchema, targetDistanceWarning, targetProblem, toTarget, type FeaTargetInput } from '../shared/target';
 
 type LoadKind = 'force' | 'pressure' | 'gravity';
 interface LoadFields {
@@ -121,7 +121,11 @@ export const addFeaLoad = defineCommand({
       loads: { ...analysisCase.loads, [load.id]: load },
       loadOrder: [...analysisCase.loadOrder, load.id],
     };
-    return changed(withCase(doc, next), `add_fea_load: '${load.id}' (${name}) ${summarize(load)} in '${analysisId}'.`, [load.id]);
+    return changed(
+      withCase(doc, next),
+      `add_fea_load: '${load.id}' (${name}) ${summarize(load)} in '${analysisId}'.${load.target ? targetDistanceWarning(doc, load.target) : ''}`,
+      [load.id],
+    );
   },
 });
 
