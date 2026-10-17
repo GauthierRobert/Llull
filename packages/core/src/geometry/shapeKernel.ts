@@ -12,6 +12,7 @@
 
 import type { BooleanOp, Entity, MeshData, ShapeRecipe, Vec3 } from '../model/types';
 import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, ShapeTopology } from './kernel';
+import type { ImportShapesOptions, ImportShapesResult, KernelInfo } from './kernelPorts';
 import { recipeKey } from './shapeRecipe';
 import { errorMessage } from '../lib/errorMessage';
 
@@ -48,6 +49,12 @@ export interface KernelOps<S> {
   release(shape: S): void;
   /** Shape of the loaded blob `sha256` (`loadBlob`); absent = `brep` leaves are unsupported. */
   brep?(sha256: string): S | null;
+  /** Keep the B-rep text of blob `sha256` (idempotent) so `brep(sha256)` can build, and rebuild after a cache eviction. */
+  loadBlob?(sha256: string, brep: string): void;
+  /** Exact import of an exchange file (`GeometryKernel.importShapes`); the ops own the native reader, no recipe is involved. */
+  importShapes?(format: 'step', text: string, options: ImportShapesOptions): ImportShapesResult | null;
+  /** Kernel description (`GeometryKernel.info`). */
+  info?(): KernelInfo;
 }
 
 /**
@@ -203,8 +210,25 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
   };
   const analyzeOps = ops.analyze?.bind(ops);
   const distanceOps = ops.distance?.bind(ops);
+  const loadBlobOps = ops.loadBlob?.bind(ops);
+  const loadedBlobs = new Set<string>();
+  const importOps = ops.importShapes?.bind(ops);
+  const infoOps = ops.info?.bind(ops);
   return {
     ...(ops.name === undefined ? {} : { name: ops.name }),
+    ...(infoOps === undefined ? {} : { info: infoOps }),
+    ...(importOps === undefined ? {} : { importShapes: (format, text, options) => call(() => importOps(format, text, options)) }),
+    ...(loadBlobOps === undefined
+      ? {}
+      : {
+          loadBlob: (sha256: string, brep: string): void => {
+            if (loadedBlobs.has(sha256)) return;
+            loadBlobOps(sha256, brep);
+            loadedBlobs.add(sha256);
+            for (const [key, shape] of shapes) if (shape === null) shapes.delete(key); // a null may have been "blob missing"
+            for (const [key, mesh] of meshes) if (mesh === null) meshes.delete(key);
+          },
+        }),
     ...(analyzeOps === undefined
       ? {}
       : {

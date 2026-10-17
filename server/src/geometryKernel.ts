@@ -5,6 +5,7 @@
  */
 
 import { setGeometryKernel, type GeometryKernel } from '@core/geometry/kernel';
+import type { KernelInfo } from '@core/geometry/kernelPorts';
 import { createIsolatedKernel, defaultWorkerEntry } from './isolatedKernel';
 import { parseKernelChoice, type KernelChoice } from '@core/geometry/kernelChoice';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
@@ -44,20 +45,30 @@ function startIsolatedOcct(): GeometryKernel | null {
   return null;
 }
 
+/** `kernel` whose `info()` also tells how the server runs it (`kernel_info`, TR-KRN-04); every other member is the kernel's own. */
+function described(kernel: GeometryKernel, extra: Pick<KernelInfo, 'isolation' | 'fallbackReason'>): GeometryKernel {
+  return { ...kernel, info: () => ({ capabilities: [], ...kernel.info?.(), ...extra }) };
+}
+
 /** Load the configured kernel; on failure commands keep their graceful "no kernel" no-op. */
 export async function installGeometryKernel(): Promise<boolean> {
+  let fallbackReason: string | undefined;
   if (parseKernelChoice(process.env['LLULL_KERNEL']) === 'occt') {
     try {
       const { createNodeOcctKernel } = await import('./occtNode');
-      setGeometryKernel(startIsolatedOcct() ?? (await createNodeOcctKernel()));
+      const isolated = startIsolatedOcct();
+      setGeometryKernel(described(isolated ?? (await createNodeOcctKernel()), { isolation: isolated === null ? 'in-process' : 'worker' }));
       activeKernel = 'occt';
       return true;
     } catch (error) {
+      fallbackReason = errorMessage(error);
       warnUnavailable('OCC kernel unavailable; falling back to Manifold', error);
     }
   }
   try {
-    setGeometryKernel(await createManifoldKernel());
+    setGeometryKernel(
+      described(await createManifoldKernel(), { isolation: 'in-process', ...(fallbackReason === undefined ? {} : { fallbackReason }) }),
+    );
     activeKernel = 'manifold';
     return true;
   } catch (error) {

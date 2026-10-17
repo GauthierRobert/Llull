@@ -5,7 +5,7 @@
  */
 
 import type { MeshData, Vec2, Vec3 } from '../model/types';
-import type { FaceSurface, ShapeHandle } from './kernel';
+import type { FaceSurface, ShapeHandle } from './shapeHandle';
 import type { InertiaTensor } from './massProperties';
 
 /** What the active kernel is (TR-KRN-04); the composition root may add `isolation` / `fallbackReason`. */

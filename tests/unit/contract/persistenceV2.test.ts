@@ -20,7 +20,7 @@ describe('llull-document v2', () => {
     const full = serializeDocument(doc, { includeDerived: true });
     expect(compact.length).toBeLessThan(full.length / 2);
     const stored = JSON.parse(compact) as { version: number; document: CadDocument };
-    expect(stored.version).toBe(2);
+    expect(stored.version).toBe(3);
     expect(Object.keys(stored.document.entities)).toHaveLength(Object.keys(doc.entities).length - derived.size);
     const loaded = deserializeDocument(compact);
     expect(loaded.entities).toEqual(doc.entities);

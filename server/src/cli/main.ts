@@ -14,7 +14,7 @@ import { createStepObserver, type StepObserver } from './progress';
 import { resolveImageRefs } from './imageParams';
 import { saveDataFiles, withoutPayloads } from './saveFiles';
 import { llullHome, readDesktopDiscovery } from './desktopDiscovery';
-import { exchangeTool, withFileContent } from './exchange';
+import { exchangeTool, takesFileParam, withFileContent } from './exchange';
 import type { CommandOutcome } from '@mcp/restProtocol';
 import { isHealthy } from '../restClient';
 import { outcomeIsFailure } from '@mcp/commandOutcome';
@@ -203,7 +203,7 @@ async function runExec(args: ParsedArgv, io: CliIo): Promise<number> {
   const isExchange = exchangeTool(name) !== undefined;
   if (getCommand(name) === undefined && !isExchange) unknownCommand(name);
   const raw = await paramsOf(name, rest, io);
-  const params = asUsage(() => (isExchange ? withFileContent(name, raw) : raw));
+  const params = asUsage(() => (takesFileParam(name) ? withFileContent(name, raw) : raw));
   const observer = observerOf(args, io);
   const backend = await backendOf(args, io, observer);
   const result = isExchange ? await backend.exchange(name, params) : await backend.run(name, params);

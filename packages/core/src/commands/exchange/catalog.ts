@@ -8,5 +8,15 @@ import { exportCode } from './exportCode';
 import { applyCodeTrace } from './codeTrace';
 import { importMesh } from './importMesh';
 import { importDxf } from './importDxf';
+import { importStepExact } from './importStepExact';
 
-export const exchangeCommands = commandCatalog(exportStl, exportObj, exportGltf, exportCode, applyCodeTrace, importMesh, importDxf);
+export const exchangeCommands = commandCatalog(
+  exportStl,
+  exportObj,
+  exportGltf,
+  exportCode,
+  applyCodeTrace,
+  importMesh,
+  importDxf,
+  importStepExact,
+);

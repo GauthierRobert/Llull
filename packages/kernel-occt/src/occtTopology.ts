@@ -9,7 +9,7 @@ import type { Vec3 } from '@core/model/types';
 import { release } from '@core/geometry/nativeObject';
 import { explorer, type OccApi, type OccHandle, type OccPoint, type OccShape } from './occtTypes';
 
-type SubShapeKind = 'TopAbs_SOLID' | 'TopAbs_FACE' | 'TopAbs_EDGE' | 'TopAbs_VERTEX';
+type SubShapeKind = 'TopAbs_SOLID' | 'TopAbs_SHELL' | 'TopAbs_FACE' | 'TopAbs_EDGE' | 'TopAbs_VERTEX';
 
 const HASH_BOUND = 1 << 30;
 
