@@ -5,12 +5,17 @@ import { changed, report } from '@core/commands/noop';
 import { toDegrees } from '@lib/angle';
 import { nextId } from '@lib/id';
 import { buildFlat, isRefusal, type FlatBuild } from '../flatData';
+import { formingNote } from '../formNotes';
+import { FLANGED_HOLE_SOURCE, HEM_SOURCE } from '../provenance';
 import { REVIEW_NOTE, fixed, unverifiedNote } from '../result';
 
 /** Outline vertices returned inline before `outlineTruncated` is set (AF-12). */
 const MAX_OUTLINE_POINTS = 200;
 
 const round = (value: number): number => Math.round(value * 1e9) / 1e9 + 0;
+
+const hemOf = (geometry: FlatBuild['geometry'], bendId: string): string | null =>
+  geometry.hems.find((hem) => hem.bend === bendId)?.id ?? null;
 
 function flatPatternData(build: FlatBuild): Record<string, unknown> {
   const { part, geometry, meta } = build;
@@ -27,9 +32,37 @@ function flatPatternData(build: FlatBuild): Record<string, unknown> {
       insideRadius: bend.insideRadius,
       direction: bend.direction,
       ba: bend.quantities.ba.value,
-      bd: bend.quantities.bd.value,
-      ossb: bend.quantities.ossb.value,
+      bd: hemOf(geometry, bend.id) !== null ? null : bend.quantities.bd.value,
+      ossb: hemOf(geometry, bend.id) !== null ? null : bend.quantities.ossb.value,
+      hem: hemOf(geometry, bend.id),
       kFactor: { value: bend.k.value, source: bend.k.source, defaulted: false, verification: bend.k.verification },
+    })),
+    hems: geometry.hems.map((hem) => ({
+      id: hem.id,
+      bend: hem.bend,
+      hemType: hem.hemType,
+      gap: hem.gap,
+      returnLeg: hem.leg,
+      bendAllowance: hem.bendAllowance,
+      developedLength: { value: hem.developedLength, source: HEM_SOURCE, defaulted: false, verification: 'unverified' },
+    })),
+    formingNotes: geometry.forms.map((form) => ({
+      id: form.id,
+      kind: form.kind,
+      excludedFromFlatPattern: form.kind === 'bead',
+      approximate: form.kind === 'flanged_hole',
+      ...(form.kind === 'flanged_hole'
+        ? {
+            flatCutDiameter: {
+              value: round(2 * form.developedRadius),
+              source: FLANGED_HOLE_SOURCE,
+              defaulted: false,
+              verification: 'unverified',
+            },
+            tangentDiameter: round(2 * form.physicalRadius),
+          }
+        : {}),
+      note: formingNote(form, (point) => point, 1),
     })),
     joggles: geometry.joggles.map((joggle) => ({
       id: joggle.id,
@@ -50,7 +83,7 @@ export const flatPattern = defineCommand({
   name: 'flat_pattern',
   description:
     'Compute the analytic flat pattern of a sheet-metal part (BA = theta*(R+K*T) added at every bend, unfolded from the base flat) without changing the document. ' +
-    'Returns data { extents [x, y], area, outline (vertices, bounded), bends[] with angleDeg, insideRadius, direction up/down, ba, bd, ossb and the K-factor used with its source, joggles[] with allowance/run/inclinedStraight, ' +
+    'Returns data { extents [x, y], area, outline (vertices, bounded), bends[] with angleDeg, insideRadius, direction up/down, ba, bd, ossb and the K-factor used with its source, joggles[] with allowance/run/inclinedStraight, hems[] (add_hem: gap, returnLeg, developedLength = pi*(gap/2+K*T)+leg, unverified model; a hem bend has ossb/bd null), formingNotes[] (beads are excluded from the pattern; a flanged hole is developed to an approximate, unverified cut diameter), ' +
     'provenance (formulas, inputs, sources), unverified + unverifiedInputs, reviewRequired }. Lengths are in the document length unit, angles in degrees. ' +
     'The result is computed by llull, not approved: a qualified person must review it. Refusal: FTR_PART_NOT_FOUND, FTR_NON_DEVELOPABLE. Next: export_flat_pattern_dxf, materialize_flat_pattern, check_sheet_metal.',
   annotations: { readOnly: true, idempotent: true },
@@ -62,7 +95,7 @@ export const flatPattern = defineCommand({
     const { geometry, meta } = built;
     return report(
       doc,
-      `flat_pattern ${id}: ${fixed(geometry.extents[0])} x ${fixed(geometry.extents[1])} ${doc.units}, area ${fixed(geometry.area)}, ${geometry.bends.length} bend(s), ${geometry.joggles.length} joggle(s).${unverifiedNote(meta)} ${REVIEW_NOTE}`,
+      `flat_pattern ${id}: ${fixed(geometry.extents[0])} x ${fixed(geometry.extents[1])} ${doc.units}, area ${fixed(geometry.area)}, ${geometry.bends.length} bend(s), ${geometry.joggles.length} joggle(s)${geometry.hems.length > 0 ? `, ${geometry.hems.length} hem(s)` : ''}${geometry.forms.length > 0 ? `, ${geometry.forms.length} forming note(s)` : ''}.${unverifiedNote(meta)} ${REVIEW_NOTE}`,
       data,
     );
   },

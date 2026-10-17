@@ -7,6 +7,8 @@ export type FlatNode = Extract<SheetNode, { type: 'flat' }>;
 export type BendNode = Extract<SheetNode, { type: 'bend' }>;
 export type JoggleNode = Extract<SheetNode, { type: 'joggle' }>;
 export type ReliefNode = Extract<SheetNode, { type: 'relief' }>;
+export type FormNode = Extract<SheetNode, { type: 'form' }>;
+export type HemNode = Extract<SheetNode, { type: 'hem' }>;
 
 const EMPTY_MODEL: SheetMetalModel = { rules: {}, parts: {}, radiusTable: [] };
 
@@ -40,6 +42,18 @@ export const reliefNodes = (part: SheetMetalPart): ReliefNode[] =>
     return node?.type === 'relief' ? [node] : [];
   });
 
+export const formsOf = (part: SheetMetalPart): FormNode[] =>
+  part.order.flatMap((id) => {
+    const node = part.nodes[id];
+    return node?.type === 'form' ? [node] : [];
+  });
+
+export const hemsOf = (part: SheetMetalPart): HemNode[] =>
+  part.order.flatMap((id) => {
+    const node = part.nodes[id];
+    return node?.type === 'hem' ? [node] : [];
+  });
+
 export const flatOf = (part: SheetMetalPart, id: string): FlatNode | undefined => {
   const node = part.nodes[id];
   return node?.type === 'flat' ? node : undefined;
@@ -56,15 +70,17 @@ export const childBends = (part: SheetMetalPart, flatId: string): BendNode[] => 
 /** The bend that leads into `flatId` (undefined for the root). */
 export const parentBend = (part: SheetMetalPart, flatId: string): BendNode | undefined => bendsOf(part).find((bend) => bend.to === flatId);
 
+type NodePrefix = 'f' | 'b' | 'j' | 'r' | 'c' | 'm' | 'h';
+
 /** Next free node id with the given prefix (`f1`, `f2`, … / `b1` …). */
-export function nextNodeId(part: SheetMetalPart, prefix: 'f' | 'b' | 'j' | 'r'): string {
+export function nextNodeId(part: SheetMetalPart, prefix: NodePrefix): string {
   let n = 1;
   while (part.nodes[`${prefix}${n}`] !== undefined) n += 1;
   return `${prefix}${n}`;
 }
 
 /** The next `count` free node ids with the given prefix. */
-export function nextNodeIds(part: SheetMetalPart, prefix: 'f' | 'b' | 'j' | 'r', count: number): string[] {
+export function nextNodeIds(part: SheetMetalPart, prefix: NodePrefix, count: number): string[] {
   const ids: string[] = [];
   for (let n = 1; ids.length < count; n += 1) if (part.nodes[`${prefix}${n}`] === undefined) ids.push(`${prefix}${n}`);
   return ids;

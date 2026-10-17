@@ -53,7 +53,7 @@ export const sheetMetalDerivationGuard: DerivationGuard = {
     if (edited.length === 0) return null;
     return (
       `it would edit the folded solid of sheet-metal part(s) ${edited.join(', ')}. ` +
-      'Edit the part instead (add_flange, add_joggle, add_sheet_cutout, add_relief; set_sheet_metal_material for its material and layer) — derived geometry is read-only.'
+      'Edit the part instead (add_flange, add_joggle, add_sheet_cutout, add_relief, add_corner_relief, add_flanged_hole, add_bead, add_hem; set_sheet_metal_material for its material and layer) — derived geometry is read-only.'
     );
   },
 };

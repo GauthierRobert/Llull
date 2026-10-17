@@ -2,8 +2,8 @@ import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { changed } from '@core/commands/noop';
 import { withFoldedSolid } from '../fold';
-import { bendOf, flatOf, getModel, nextNodeId, reliefNodes, ruleOfPart, withModel, withNodes, withPart } from '../graph';
-import { bendEnd, notchOutline } from '../reliefGeometry';
+import { getModel, ruleOfPart, withModel, withPart } from '../graph';
+import { applyRelief, isReliefFailure, reliefData } from '../reliefOps';
 import { fixed, refuse } from '../result';
 
 /**
@@ -47,68 +47,17 @@ export const addRelief = defineCommand({
       return fail('FTR_PART_NOT_FOUND', `no sheet-metal part "${params.id}"`, 'Create one with add_sheet_metal_base.', { paths: ['id'] });
     const rule = ruleOfPart(model, part);
     if (rule === undefined) return fail('FTR_RULE_NOT_FOUND', `rule "${part.rule}" is missing`, 'Recreate the rule.', { ids: [part.id] });
-    const bend = bendOf(part, params.bend);
-    if (bend === undefined)
-      return fail('FTR_PARAM_INVALID', `no bend "${params.bend}" in part ${part.id}`, 'Use a bend id from flat_pattern data.bends[].id.', {
-        ids: [part.id],
-        paths: ['bend'],
-      });
-    if (reliefNodes(part).some((node) => node.bend === bend.id && node.end === params.end))
-      return fail(
-        'FTR_RELIEF_INVALID',
-        `bend ${bend.id} already has a relief at its ${params.end}`,
-        'Relieve the other end or edit nothing.',
-        { ids: [part.id, bend.id], paths: ['end'] },
-      );
-    const ruleRelief = rule.relief;
-    const defaulted = params.width === undefined || params.depth === undefined;
-    if (defaulted && (ruleRelief === undefined || ruleRelief.type !== 'rectangular'))
-      return fail(
-        'FTR_PARAM_INVALID',
-        'width/depth not given and the rule defines no rectangular relief',
-        'Give width and depth, or create the rule with relief { type: "rectangular", widthRatio }.',
-        { paths: ['width', 'depth'] },
-      );
-    const width = params.width ?? (ruleRelief?.widthRatio ?? 0) * rule.thickness;
-    const depth = params.depth ?? bend.insideRadius + rule.thickness + (ruleRelief?.depthExtra ?? 0);
-    if (!(width > 0) || !(depth > 0))
-      return fail('FTR_PARAM_INVALID', `relief width ${width} and depth ${depth} must be > 0`, 'Give positive lengths.', {
-        paths: ['width', 'depth'],
-      });
-    const parent = flatOf(part, bend.from);
-    const end = parent === undefined ? null : bendEnd(parent.outline, bend.lineInFrom, params.end);
-    if (parent === undefined || end === null)
-      return fail(
-        'FTR_RELIEF_INVALID',
-        `bend ${bend.id} does not lie on an edge of its parent flat`,
-        'A relief needs the bend on an outline edge.',
-        { ids: [part.id, bend.id] },
-      );
-    if (end.free <= 1e-6)
-      return fail(
-        'FTR_RELIEF_INVALID',
-        `the bend ends at a corner of ${parent.id}: there is no free edge to relieve`,
-        'Reliefs go where the flange stops short of the edge end.',
-        { ids: [part.id, bend.id], paths: ['end'] },
-      );
-    const outline = notchOutline(parent.outline, end, params.end, width, depth);
-    if (outline === null)
-      return fail(
-        'FTR_RELIEF_INVALID',
-        `a ${fixed(width)} x ${fixed(depth)} notch does not fit on the free ${fixed(end.free)} of the edge`,
-        'Reduce width/depth, or lengthen the free edge (widthStart / widthEnd of the flange).',
-        { ids: [part.id, bend.id] },
-      );
-    const reliefId = nextNodeId(part, 'r');
-    const nextPart = withNodes(part, [
-      { ...parent, outline },
-      { id: reliefId, type: 'relief', bend: bend.id, end: params.end, width, depth },
-    ]);
-    const next = withFoldedSolid(withModel(doc, withPart(model, nextPart)), nextPart, rule);
-    return changed(
-      next,
-      `add_relief: part "${part.id}" relief ${reliefId} at the ${params.end} of bend ${bend.id}: ${fixed(width)} x ${fixed(depth)} notch in ${parent.id}${defaulted ? ' (defaulted from rule ' + rule.name + ' relief)' : ''}.`,
-      [part.id],
-    );
+    const applied = applyRelief(part, rule, params.bend, params.end, { width: params.width, depth: params.depth });
+    if (isReliefFailure(applied))
+      return fail(applied.code, applied.why, applied.fix, { ids: applied.ids ?? [], paths: applied.paths ?? [] });
+    const next = withFoldedSolid(withModel(doc, withPart(model, applied.part)), applied.part, rule);
+    return {
+      ...changed(
+        next,
+        `add_relief: part "${part.id}" relief ${applied.id} at the ${params.end} of bend ${params.bend}: ${fixed(applied.width)} x ${fixed(applied.depth)} notch in ${applied.flat}${applied.defaulted ? ' (defaulted from rule ' + rule.name + ' relief)' : ''}.`,
+        [part.id],
+      ),
+      data: reliefData(applied, rule.name),
+    };
   },
 });

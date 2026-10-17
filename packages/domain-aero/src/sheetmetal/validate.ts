@@ -58,6 +58,30 @@ function rowErrors(index: number, row: unknown): string[] {
   return errors;
 }
 
+const sideOk = (value: unknown): boolean => value === 'up' || value === 'down';
+
+function formOk(form: unknown): boolean {
+  if (!isRecord(form) || !sideOk(form['direction'])) return false;
+  if (form['kind'] === 'flanged_hole')
+    return (
+      isVec2(form['center']) &&
+      positive(form['holeDiameter']) &&
+      positive(form['flangeHeight']) &&
+      positive(form['lipRadius']) &&
+      typeof form['angle'] === 'number' &&
+      form['angle'] > 0 &&
+      form['angle'] <= Math.PI / 2 + 1e-9
+    );
+  return (
+    form['kind'] === 'bead' &&
+    isVec2(form['start']) &&
+    isVec2(form['end']) &&
+    positive(form['radius']) &&
+    positive(form['depth']) &&
+    (form['endShape'] === 'round' || form['endShape'] === 'open')
+  );
+}
+
 function nodeErrors(path: string, node: unknown, nodes: Record<string, unknown>): string[] {
   if (!isRecord(node) || typeof node['id'] !== 'string') return [`${path} must be a node with an id`];
   const flat = (id: unknown): boolean => typeof id === 'string' && isRecord(nodes[id]) && nodes[id]['type'] === 'flat';
@@ -66,7 +90,11 @@ function nodeErrors(path: string, node: unknown, nodes: Record<string, unknown>)
       const frame = node['frame'];
       const frameOk = isRecord(frame) && isVec3(frame['origin']) && isVec3(frame['xDir']) && isVec3(frame['normal']);
       const cutoutsOk =
-        Array.isArray(node['cutouts']) && node['cutouts'].every((cutout) => isRecord(cutout) && isVec2List(cutout['points']));
+        Array.isArray(node['cutouts']) &&
+        node['cutouts'].every(
+          (cutout) =>
+            isRecord(cutout) && isVec2List(cutout['points']) && (cutout['form'] === undefined || typeof cutout['form'] === 'string'),
+        );
       return isVec2List(node['outline']) && (node['outline'] as unknown[]).length >= 3 && frameOk && cutoutsOk
         ? []
         : [`${path} is a malformed flat`];
@@ -91,6 +119,18 @@ function nodeErrors(path: string, node: unknown, nodes: Record<string, unknown>)
       return typeof node['bend'] === 'string' && positive(node['width']) && positive(node['depth'])
         ? []
         : [`${path} is a malformed relief`];
+    case 'corner_relief':
+      return flat(node['on']) && isVec2(node['corner']) && positive(node['size']) ? [] : [`${path} is a malformed corner relief`];
+    case 'form':
+      return flat(node['on']) && formOk(node['form']) ? [] : [`${path} is a malformed form`];
+    case 'hem':
+      return typeof node['bend'] === 'string' &&
+        flat(node['flat']) &&
+        (node['hemType'] === 'closed' || node['hemType'] === 'open') &&
+        nonNegative(node['gap']) &&
+        positive(node['length'])
+        ? []
+        : [`${path} is a malformed hem`];
     default:
       return [`${path} has an unknown type`];
   }

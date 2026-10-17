@@ -21,6 +21,7 @@ function validSlice(): Json {
     lengthReference: 'outside_mold_line',
     position: 'material_outside',
     widthStart: 4,
+    autoRelief: false,
   });
   next = apply(next, 'add_relief', { id: part, bend: 'b1', end: 'end' });
   next = apply(next, 'add_joggle', {
