@@ -27,7 +27,7 @@ function machined(size: [number, number, number] = [100, 60, 10]): { doc: Return
   });
   const blind = run(csk.document, idOf(csk), 'add_hole', {
     points: [[50, 15]],
-    hole: { diameter: 6, thread: { designation: 'MJ6x1-4H5H' } },
+    hole: { kind: 'simple', diameter: 6, thread: { designation: 'MJ6x1-4H5H' } },
     extent: { kind: 'blind', depth: Math.min(6, size[2] - 1) },
   });
   const pocket = run(blind.document, idOf(blind), 'add_pocket', {
@@ -116,7 +116,7 @@ describe('hole_table', () => {
       target: stock.id,
       face: TOP,
       points: [[10, 10]],
-      hole: { diameter: 4 },
+      hole: { kind: 'simple', diameter: 4 },
       extent: { kind: 'blind', depth: 5, drillPointAngle: 135 },
     });
     const table = dataOf<HoleTableData>(execute(drilled.document, 'hole_table', { id: idOf(drilled), origin: [0, 0] }));
@@ -155,11 +155,11 @@ describe('check_machining', () => {
     const { doc, id } = machined();
     const result = execute(doc, 'check_machining', {
       id,
-      rules: {
-        minLand: { value: 1, source: 'company rule 12' },
-        maxDepthRatio: { value: 10, source: 'shop handbook' },
-        toolDiameter: { value: 6, source: 'cutter T3' },
-      },
+      rules: [
+        { rule: 'minLand', value: 1, source: 'company rule 12' },
+        { rule: 'maxDepthRatio', value: 10, source: 'shop handbook' },
+        { rule: 'toolDiameter', value: 6, source: 'cutter T3' },
+      ],
     });
     const check = dataOf<FtrCheckData>(result);
     expect(check.status).toBe('pass');
@@ -184,11 +184,11 @@ describe('check_machining', () => {
     const check = dataOf<FtrCheckData>(
       execute(doc, 'check_machining', {
         id,
-        rules: {
-          minLand: { value: 1, source: 'rule A' },
-          maxDepthRatio: { value: 0.5, source: 'rule B' },
-          toolDiameter: { value: 8, source: 'rule C' },
-        },
+        rules: [
+          { rule: 'minLand', value: 1, source: 'rule A' },
+          { rule: 'maxDepthRatio', value: 0.5, source: 'rule B' },
+          { rule: 'toolDiameter', value: 8, source: 'rule C' },
+        ],
       }),
     );
     const byCode = (code: string): ReturnType<typeof Array.prototype.find> => check.findings.find((f) => f.code === code);

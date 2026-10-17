@@ -211,7 +211,7 @@ describe('add_hole / add_pocket on the live OCC kernel', () => {
         target: cylinder.affected[0],
         face: { near: [10, 0, 0] },
         points: [[0, 0]],
-        hole: { diameter: 2 },
+        hole: { kind: 'simple', diameter: 2 },
         extent: { kind: 'through_all' },
       },
       ctxOf(kernels.occt),
@@ -227,7 +227,7 @@ describe('add_hole / add_pocket on the live OCC kernel', () => {
           face: { near: [50, 30, 10] },
           pointsFrame: 'world_xy',
           points,
-          hole: { diameter: 4 },
+          hole: { kind: 'simple', diameter: 4 },
           extent: { kind: 'through_all' },
         },
         ctxOf(kernels.occt),
@@ -240,6 +240,30 @@ describe('add_hole / add_pocket on the live OCC kernel', () => {
 interface ExpectedPlate {
   cases: Array<{ vc: string; expected: { countersink: { centres_xy: number[][] } } }>;
 }
+
+describe('add_hole performance budget (07 TR §8)', () => {
+  it('100 positions are cut by one compound tool in a few seconds, with the exact volume', () => {
+    const plate = execute(createEmptyDocument(), 'add_box', { size: [200, 200, 10], position: [0, 0, 0], anchor: 'min' });
+    const points = Array.from({ length: 100 }, (_, i) => [10 + (i % 10) * 20, 10 + Math.floor(i / 10) * 20]);
+    const started = Date.now();
+    const cut = execute(
+      plate.document,
+      'add_hole',
+      {
+        target: plate.affected[0],
+        face: { near: [100, 100, 10] },
+        pointsFrame: 'world_xy',
+        points,
+        hole: { kind: 'simple', diameter: 4 },
+        extent: { kind: 'through_all' },
+      },
+      ctxOf(kernels.occt),
+    );
+    const volume = volumeOf(kernels.occt, cut.document, only(cut.document));
+    expect(Date.now() - started).toBeLessThan(15_000);
+    expect(rel(volume, 400000 - 100 * Math.PI * 4 * 10)).toBeLessThan(1e-9);
+  }, 120_000);
+});
 
 describe('recognize_features on the live OCC kernel', () => {
   const expected = (JSON.parse(readFileSync(path.join(PACK, 'data/expected_feature_recognition.json'), 'utf8')) as ExpectedPlate).cases[0]!

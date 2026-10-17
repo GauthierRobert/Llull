@@ -440,6 +440,47 @@ export const plans: Record<string, GoldenAction[]> = {
 
 /** Plans needing the Manifold geometry kernel (booleans). */
 export const kernelPlans: Record<string, GoldenAction[]> = {
+  // 07 FTR: a countersunk through hole, a counterbored hole, a blind drilled hole and a rounded pocket on one plate (feature recipe nodes)
+  kernel_machined_plate_features: [
+    { command: 'add_box', params: { size: [60, 40, 10], position: [0, 0, 0], anchor: 'min' }, as: 'plate' },
+    {
+      command: 'add_hole',
+      params: {
+        target: '$plate',
+        face: { near: [30, 20, 10] },
+        points: [[8, 8]],
+        pointsFrame: 'world_xy',
+        hole: { kind: 'countersink', diameter: 4.8, cskDiameter: 9, cskAngle: 100, thread: { designation: 'M5x0.8-6H' } },
+        extent: { kind: 'through_all' },
+      },
+      as: 'csk',
+    },
+    {
+      command: 'add_hole',
+      params: {
+        target: '$csk',
+        face: { near: [30, 20, 10] },
+        points: [[8, 32]],
+        pointsFrame: 'world_xy',
+        hole: { kind: 'simple', diameter: 6 },
+        extent: { kind: 'blind', depth: 6, drillPointAngle: 118 },
+      },
+      as: 'blind',
+    },
+    {
+      command: 'add_pocket',
+      params: {
+        target: '$blind',
+        face: { near: [30, 20, 10] },
+        outline: { kind: 'rectangle', center: [38, 20], size: [24, 16] },
+        depth: 4,
+        cornerRadius: 3,
+        floorFillet: 0,
+      },
+      as: 'part',
+    },
+    { command: 'set_thread', params: { id: '$part', featureIndex: 1, thread: { designation: 'M6x1-6H' } } },
+  ],
   kernel_sweep_welded_to_revolution: [
     { command: 'revolve_profile', params: { profile: xy(0, 0, 3, 0, 3, 4, 0, 4), segments: 24 }, as: 'drum' },
     { command: 'sweep_profile', params: { path: xyz(2, 0, 2, 7, 0, 2, 7, 0, 8), radius: 0.5, bendRadius: 2 }, as: 'pipe' },

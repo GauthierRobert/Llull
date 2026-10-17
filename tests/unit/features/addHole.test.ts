@@ -59,7 +59,7 @@ describe('add_hole', () => {
       face: TOP,
       pointsFrame: 'world_xy',
       points: [[50, 15]],
-      hole: { diameter: 6 },
+      hole: { kind: 'simple', diameter: 6 },
       extent: { kind: 'blind', depth: 6 },
     });
     expect(blind.summary).toContain('118');
@@ -73,10 +73,13 @@ describe('add_hole', () => {
 
   it('flat bottom with drillPointAngle 0; hole.thread and fastener never change the recipe key', () => {
     const stock = plate();
-    const flat = drill({ points: [[50, 15]], hole: { diameter: 6 }, extent: { kind: 'blind', depth: 6, drillPointAngle: 0 } }, stock);
+    const flat = drill(
+      { points: [[50, 15]], hole: { kind: 'simple', diameter: 6 }, extent: { kind: 'blind', depth: 6, drillPointAngle: 0 } },
+      stock,
+    );
     expect(Math.abs(60000 - volumeOf(flat.document, idOf(flat)) - Math.PI * 9 * 6) / (Math.PI * 9 * 6)).toBeLessThan(MESH_TOLERANCE);
-    const plain = drill({ points: [[50, 15]], hole: { diameter: 6 } }, stock);
-    const threaded = drill({ points: [[50, 15]], hole: { diameter: 6, thread: { designation: 'MJ6x1-4H5H' } } }, stock);
+    const plain = drill({ points: [[50, 15]], hole: { kind: 'simple', diameter: 6 } }, stock);
+    const threaded = drill({ points: [[50, 15]], hole: { kind: 'simple', diameter: 6, thread: { designation: 'MJ6x1-4H5H' } } }, stock);
     const key = (r: ReturnType<typeof execute>): string => recipeKey(meshOf(r.document, idOf(r)).brep!);
     expect(key(threaded)).toBe(key(plain));
     expect(meshOf(threaded.document, idOf(threaded)).brep).toMatchObject({ hole: { thread: { designation: 'MJ6x1-4H5H', family: 'MJ' } } });
@@ -97,14 +100,14 @@ describe('add_hole', () => {
 
   it('is pure and the second hole group stacks on the first result', () => {
     const stock = plate();
-    expectPure(stock.doc, () => drill({ points: [[10, 10]], hole: { diameter: 4 } }, stock));
-    const first = drill({ points: [[10, 10]], hole: { diameter: 4 } }, stock);
+    expectPure(stock.doc, () => drill({ points: [[10, 10]], hole: { kind: 'simple', diameter: 4 } }, stock));
+    const first = drill({ points: [[10, 10]], hole: { kind: 'simple', diameter: 4 } }, stock);
     const second = execute(first.document, 'add_hole', {
       target: idOf(first),
       face: TOP,
       pointsFrame: 'world_xy',
       points: [[90, 50]],
-      hole: { diameter: 4 },
+      hole: { kind: 'simple', diameter: 4 },
       extent: THROUGH,
     });
     expect(meshOf(second.document, idOf(second)).brep).toMatchObject({ op: 'feature', source: { op: 'feature' } });
@@ -133,36 +136,44 @@ describe('add_hole', () => {
       'FTR_CSK_ANGLE_OUT_OF_RANGE',
       'hole.cskAngle',
     );
-    refused({ points: [[10, 10]], hole: { diameter: 4 }, extent: { kind: 'blind', depth: 0 } }, 'FTR_BLIND_DEPTH_INVALID', 'extent.depth');
-    refused({ points: [[10, 10]], hole: { diameter: 4 }, extent: { kind: 'blind', depth: 10 } }, 'FTR_BLIND_DEPTH_INVALID');
     refused(
-      { points: [[10, 10]], hole: { diameter: 4 }, extent: { kind: 'blind', depth: 3, drillPointAngle: 200 } },
+      { points: [[10, 10]], hole: { kind: 'simple', diameter: 4 }, extent: { kind: 'blind', depth: 0 } },
+      'FTR_BLIND_DEPTH_INVALID',
+      'extent.depth',
+    );
+    refused({ points: [[10, 10]], hole: { kind: 'simple', diameter: 4 }, extent: { kind: 'blind', depth: 10 } }, 'FTR_BLIND_DEPTH_INVALID');
+    refused(
+      { points: [[10, 10]], hole: { kind: 'simple', diameter: 4 }, extent: { kind: 'blind', depth: 3, drillPointAngle: 200 } },
       'FTR_DRILL_POINT_ANGLE_OUT_OF_RANGE',
     );
     refused(
-      { points: [[10, 10]], hole: { diameter: 4, thread: { designation: 'MJ6' } } },
+      { points: [[10, 10]], hole: { kind: 'simple', diameter: 4, thread: { designation: 'MJ6' } } },
       'FTR_THREAD_DESIGNATION_INVALID',
       'hole.thread.designation',
     );
     refused(
-      { points: [[10, 10]], hole: { diameter: 4, fastener: { catalogId: 'NAS', partNumber: 'NAS1351-3-8' } } },
+      { points: [[10, 10]], hole: { kind: 'simple', diameter: 4, fastener: { catalogId: 'NAS', partNumber: 'NAS1351-3-8' } } },
       'FTR_FASTENER_CATALOG_UNAVAILABLE',
       'hole.fastener',
     );
-    refused({ points: [[10, 10]], hole: {} }, 'FTR_HOLE_DIAMETERS_INCONSISTENT', 'hole.diameter');
+    refused({ points: [[10, 10]], hole: { kind: 'simple' } }, 'FTR_HOLE_DIAMETERS_INCONSISTENT', 'hole.diameter');
     refused(
       {
         points: [
           [10, 10],
           [500, 10],
         ],
-        hole: { diameter: 4 },
+        hole: { kind: 'simple', diameter: 4 },
       },
       'FTR_HOLE_POINT_OUTSIDE_FACE',
       'points.1',
     );
-    refused({ points: [[10, 10, 1]], hole: { diameter: 4 } }, 'FTR_HOLE_POINT_OUTSIDE_FACE', 'points.0');
-    refused({ points: [[10, 10]], hole: { diameter: 4 }, face: { near: [50, 30, 500] } }, 'FTR_FACE_NOT_FOUND', 'face.near');
+    refused({ points: [[10, 10, 1]], hole: { kind: 'simple', diameter: 4 } }, 'FTR_HOLE_POINT_OUTSIDE_FACE', 'points.0');
+    refused(
+      { points: [[10, 10]], hole: { kind: 'simple', diameter: 4 }, face: { near: [50, 30, 500] } },
+      'FTR_FACE_NOT_FOUND',
+      'face.near',
+    );
   });
 
   it('all-or-nothing: one bad point cuts nothing', () => {
@@ -173,7 +184,7 @@ describe('add_hole', () => {
           [10, 10],
           [-5, 10],
         ],
-        hole: { diameter: 4 },
+        hole: { kind: 'simple', diameter: 4 },
       },
       stock,
     );
@@ -183,7 +194,13 @@ describe('add_hole', () => {
 
   it('no-ops on a missing target, a 2D target, and an absent kernel', () => {
     const stock = plate();
-    const missing = execute(stock.doc, 'add_hole', { target: 'nope', face: TOP, points: [[1, 1]], hole: { diameter: 2 }, extent: THROUGH });
+    const missing = execute(stock.doc, 'add_hole', {
+      target: 'nope',
+      face: TOP,
+      points: [[1, 1]],
+      hole: { kind: 'simple', diameter: 2 },
+      extent: THROUGH,
+    });
     expect(missing.error?.code).toBe('FTR_FACE_NOT_FOUND');
     const line = execute(stock.doc, 'draw_polyline', {
       points: [
@@ -195,7 +212,7 @@ describe('add_hole', () => {
       target: idOf(line),
       face: TOP,
       points: [[1, 1]],
-      hole: { diameter: 2 },
+      hole: { kind: 'simple', diameter: 2 },
       extent: THROUGH,
     });
     expectNoOp(flat, line.document, 'not a 3D solid');
@@ -207,7 +224,7 @@ describe('add_hole', () => {
       target: idOf(cylinder),
       face: { near: [10, 0, 0] },
       points: [[0, 0]],
-      hole: { diameter: 2 },
+      hole: { kind: 'simple', diameter: 2 },
       extent: THROUGH,
     });
     expect(result.error?.code).toBe('FTR_FACE_NOT_PLANAR');

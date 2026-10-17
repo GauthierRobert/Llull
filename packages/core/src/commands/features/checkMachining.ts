@@ -19,14 +19,22 @@ import { report } from '../noop';
 import { machinedPart } from './machined';
 import { refuse, resultMeta } from './ftr';
 
-const threshold = (what: string, unit: string): z.ZodOptional<z.ZodObject<{ value: z.ZodNumber; source: z.ZodString }>> =>
-  z
-    .object({
-      value: z.number().positive().describe(`${what}, in ${unit}.`),
-      source: z.string().describe('Where the value comes from (standard, handbook, company rule): mandatory.'),
-    })
-    .optional()
-    .describe(what);
+const RULE_NAMES = ['minLand', 'maxDepthRatio', 'toolDiameter'] as const;
+
+const ruleSchema = z.object({
+  rule: z
+    .enum(RULE_NAMES)
+    .describe(
+      '"minLand": minimum cylindrical land under a countersink (thickness - cone depth), in document length units; ' +
+        '"maxDepthRatio": maximum hole depth / diameter ratio, dimensionless; ' +
+        '"toolDiameter": cutter diameter for the pocket corner check, in document length units.',
+    ),
+  value: z
+    .number()
+    .positive()
+    .describe('Threshold value, in the unit of the rule (document length units, or dimensionless for maxDepthRatio).'),
+  source: z.string().describe('Where the value comes from (standard, handbook, company rule): mandatory.'),
+});
 
 const waiverSchema = z.object({
   code: z.enum(FTR_CODES).describe('The finding code to waive.'),
@@ -67,7 +75,7 @@ export const checkMachining = defineCommand({
     '(FTR_CSK_KNIFE_EDGE: cone depth >= local thickness), thin land (FTR_CSK_LAND_BELOW_MIN), hole depth / diameter ratio ' +
     '(FTR_HOLE_DEPTH_RATIO_HIGH) and pocket corner radius below the cutter radius (FTR_POCKET_CORNER_BELOW_TOOL_RADIUS). Holes and pockets ' +
     'come from add_hole / add_pocket, or are recognised from the B-rep of an imported solid. Thresholds are data you pass in rules ' +
-    '({ value, source }); a rule whose threshold is missing is skipped and reported (rulesSkipped, FTR_RULE_THRESHOLD_MISSING), never ' +
+    '([{ rule, value, source }]); a rule whose threshold is missing is skipped and reported (rulesSkipped, FTR_RULE_THRESHOLD_MISSING), never ' +
     'assumed. The local material thickness at each hole is measured by a ray cast along the hole axis, unless you give thickness ' +
     '(document length unit). Waivers are accepted only with a human-signed approval record, which does not exist yet: a waiver ' +
     'leaves the finding failing and adds FTR_WAIVER_NOT_APPROVED. Lengths in the document length unit, angles in degrees. Query: exit 0 even ' +
@@ -75,13 +83,11 @@ export const checkMachining = defineCommand({
   params: z.object({
     id: z.string().describe('Id of the 3D solid to check.'),
     rules: z
-      .object({
-        minLand: threshold('Minimum cylindrical land under a countersink (thickness - cone depth)', 'document length units'),
-        maxDepthRatio: threshold('Maximum hole depth / diameter ratio', 'dimensionless units (a ratio)'),
-        toolDiameter: threshold('Cutter diameter used to check pocket corner radii', 'document length units'),
-      })
+      .array(ruleSchema)
       .optional()
-      .describe('Thresholds as { value, source }. A threshold you omit makes its rule skipped and reported.'),
+      .describe(
+        'Thresholds, one entry per rule { rule, value, source }. A rule you omit is skipped and reported (a later entry replaces an earlier one).',
+      ),
     thickness: z
       .number()
       .positive()
@@ -89,7 +95,9 @@ export const checkMachining = defineCommand({
       .describe('Local material thickness override, in document length units; replaces the ray cast at every hole.'),
     waivers: z.array(waiverSchema).optional().describe('Requested waivers; none can be honoured without a human-signed approval record.'),
   }),
-  run: (doc: CadDocument, { id, rules = {}, thickness, waivers = [] }, ctx): CommandResult => {
+  run: (doc: CadDocument, { id, rules: ruleList = [], thickness, waivers = [] }, ctx): CommandResult => {
+    const rules: Partial<Record<(typeof RULE_NAMES)[number], { value: number; source: string }>> = {};
+    for (const { rule, value, source } of ruleList) rules[rule] = { value, source };
     const entity = doc.entities[id];
     if (!entity || !is3D(entity) || entity.kind === 'instance')
       return refuse(

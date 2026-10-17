@@ -15,9 +15,8 @@ export const holeParams = z
   .object({
     kind: z
       .enum(HOLE_KINDS)
-      .optional()
       .describe(
-        '"simple" (plain bore, default), "counterbore" (needs cboreDiameter, cboreDepth) or "countersink" (needs cskAngle and cskDiameter or cskDepth).',
+        '"simple" (plain bore), "counterbore" (needs cboreDiameter, cboreDepth) or "countersink" (needs cskAngle and cskDiameter or cskDepth).',
       ),
     diameter: z
       .number()
@@ -123,7 +122,7 @@ function extentOf(input: ExtentParams, stepDepth: number): HoleExtent | SpecProb
  */
 export function buildHole(doc: CadDocument, input: HoleParams, extentInput: ExtentParams): BuiltHole | SpecProblem {
   const notes: string[] = [];
-  const kind = input.kind ?? 'simple';
+  const { kind } = input;
   let diameter = input.diameter;
   const fastener: FastenerRef | undefined =
     input.fastener === undefined
