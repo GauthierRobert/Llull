@@ -10,23 +10,24 @@ const path = require('path');
 
 const serverDir = path.resolve(__dirname, '..');
 const outfile = path.join(serverDir, 'dist', 'llull-cli.cjs');
-const metaFile = `${outfile}.inputs.json`;
+/** The OCC worker the CLI's isolated kernel loads (`dist/occtWorker.js`, next to the bundle); rebuilt too, or a stale worker would run old kernel code. */
+const workerFile = path.join(serverDir, 'dist', 'occtWorker.js');
 
-function isFresh() {
+function isFresh(target) {
   try {
-    const builtAt = fs.statSync(outfile).mtimeMs;
-    const inputs = JSON.parse(fs.readFileSync(metaFile, 'utf8'));
+    const builtAt = fs.statSync(target).mtimeMs;
+    const inputs = JSON.parse(fs.readFileSync(`${target}.inputs.json`, 'utf8'));
     return inputs.every((input) => fs.statSync(path.resolve(serverDir, input)).mtimeMs <= builtAt);
   } catch {
     return false;
   }
 }
 
-function bundle() {
+function bundle(entry, target) {
   const esbuild = require('esbuild');
-  const temporary = `${outfile}.${process.pid}.tmp`;
+  const temporary = `${target}.${process.pid}.tmp`;
   const result = esbuild.buildSync({
-    entryPoints: [path.join(serverDir, 'src', 'cli', 'bin.ts')],
+    entryPoints: [path.join(serverDir, entry)],
     absWorkingDir: serverDir,
     tsconfig: path.join(serverDir, 'tsconfig.json'),
     bundle: true,
@@ -38,9 +39,10 @@ function bundle() {
     metafile: true,
     logLevel: 'error',
   });
-  fs.writeFileSync(metaFile, JSON.stringify(Object.keys(result.metafile.inputs)));
-  fs.renameSync(temporary, outfile);
+  fs.writeFileSync(`${target}.inputs.json`, JSON.stringify(Object.keys(result.metafile.inputs)));
+  fs.renameSync(temporary, target);
 }
 
-if (!isFresh()) bundle();
+if (!isFresh(workerFile)) bundle(path.join('src', 'occtWorker.ts'), workerFile);
+if (!isFresh(outfile)) bundle(path.join('src', 'cli', 'bin.ts'), outfile);
 require(outfile);
