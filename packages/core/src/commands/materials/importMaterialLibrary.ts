@@ -72,6 +72,15 @@ export const importMaterialLibrary = defineCommand({
         'library.storage',
         [library.id],
       );
+    const licensedRecord =
+      library.storage === 'embedded' ? library.materials.find((m) => m.licence === 'licensed-no-redistribution') : undefined;
+    if (licensedRecord !== undefined)
+      return refuse(
+        'MAT_LICENCE_EMBED_FORBIDDEN',
+        `material '${licensedRecord.id}' of library '${library.id}' is licensed-no-redistribution and cannot be embedded in a document`,
+        'library.materials',
+        [library.id, licensedRecord.id],
+      );
     if (library.storage === 'private' && source.inline)
       return refuse(
         'MAT_LIBRARY_PRIVATE_INLINE',
