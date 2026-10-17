@@ -5,6 +5,7 @@ import { MM_PER_UNIT } from '@core/model/units';
 import { toDegrees } from '@lib/angle';
 import { DxfWriter, INSUNITS, fmt } from '@lib/dxfWriter';
 import type { FlatBuild } from './flatData';
+import { formingNote } from './formNotes';
 
 export const DXF_LAYERS = { outline: 'OUTLINE', cutout: 'CUTOUT', bendUp: 'BEND_UP', bendDown: 'BEND_DOWN', notes: 'NOTES' } as const;
 
@@ -113,6 +114,11 @@ export function buildFlatDxf(
     `llull flat pattern ${part.id} (${outUnit})`,
     meta.reviewReason,
     ...meta.unverifiedInputs.map((input) => `UNVERIFIED ${input.kind} ${input.id}: ${input.source}`),
+    ...geometry.forms.map((form) => formingNote(form, place, factor)),
+    ...geometry.hems.map(
+      (hem) =>
+        `HEM ${hem.id} ${hem.hemType.toUpperCase()} GAP${fmt(hem.gap * factor)} LEG${fmt(hem.leg * factor)} DEVELOPED${fmt(hem.developedLength * factor)} (UNVERIFIED MODEL)`,
+    ),
     ...(options.bendNotes
       ? geometry.bends.map(
           (bend) =>

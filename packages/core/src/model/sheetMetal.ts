@@ -58,7 +58,39 @@ export type Seg2 = readonly [Vec2, Vec2];
 export interface SheetCutout {
   readonly points: readonly Vec2[];
   readonly circle?: { readonly center: Vec2; readonly radius: number };
+  /** Id of the `form` node (flanged hole) this cutout is the physical hole of: the folded solid keeps it, the flat pattern develops it. */
+  readonly form?: string;
 }
+
+/** Flanged lightening hole: a lip of `angle` bent up/down around a hole (FR-FTR-10). The physical hole in the flat has radius holeDiameter/2 + T + lipRadius. */
+export interface FlangedHoleForm {
+  readonly kind: 'flanged_hole';
+  readonly center: Vec2;
+  /** Bore diameter of the lip where the bend starts. */
+  readonly holeDiameter: number;
+  /** Rise of the free end of the lip above the flat's face on the lip side. */
+  readonly flangeHeight: number;
+  /** Radians, angle bent through, (0, pi/2]. */
+  readonly angle: number;
+  /** Inside (concave) radius of the bend between flat and lip. */
+  readonly lipRadius: number;
+  readonly direction: 'up' | 'down';
+}
+
+/** Straight stiffening bead: circular arch (inside `radius`, crown `depth` above the flat face) along start -> end (FR-FTR-11). */
+export interface BeadForm {
+  readonly kind: 'bead';
+  readonly start: Vec2;
+  readonly end: Vec2;
+  /** Inside radius of the arch on the concave side. */
+  readonly radius: number;
+  /** Height of the crown above the flat's face on the bead side, 0 < depth < radius. */
+  readonly depth: number;
+  readonly endShape: 'round' | 'open';
+  readonly direction: 'up' | 'down';
+}
+
+type SheetForm = FlangedHoleForm | BeadForm;
 
 export type SheetNode =
   | {
@@ -101,6 +133,25 @@ export type SheetNode =
       readonly end: 'start' | 'end';
       readonly width: number;
       readonly depth: number;
+    }
+  | {
+      /** Square notch cut into a flat at one outline corner (`corner`, a vertex of the outline at the time of the cut). */
+      readonly id: string;
+      readonly type: 'corner_relief';
+      readonly on: string;
+      readonly corner: Vec2;
+      readonly size: number;
+    }
+  | { readonly id: string; readonly type: 'form'; readonly on: string; readonly form: SheetForm }
+  | {
+      /** Record of a 180 degree hem: `bend` (inside radius gap/2) followed by the return flat `flat` of straight length `length`. */
+      readonly id: string;
+      readonly type: 'hem';
+      readonly bend: string;
+      readonly flat: string;
+      readonly hemType: 'closed' | 'open';
+      readonly gap: number;
+      readonly length: number;
     };
 
 export interface SheetMetalPart {

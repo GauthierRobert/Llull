@@ -3,22 +3,19 @@
  * in pure TS for display and mesh mass properties (flats and bends only touch face to face, so their volumes add exactly).
  */
 
-import { DEFAULT_LAYER_ID, type CadDocument, type Entity, type MeshSolidEntity, type ShapeRecipe, type Vec3 } from '@core/model/types';
+import { DEFAULT_LAYER_ID, type CadDocument, type MeshSolidEntity, type ShapeRecipe, type Vec3 } from '@core/model/types';
 import type { SheetCutout, SheetMetalPart, SheetMetalRule } from '@core/model/sheetMetal';
 import { prismMesh, placeMesh } from '@core/geometry/prismMesh';
 import { orientOutward } from '@core/geometry/meshVolume';
-import { solidTriangles } from '@core/geometry/solidTriangles';
 import { add3, scale3 } from '@lib/vec3';
 import { circleCurves } from './geometry2d';
+import { formPieces } from './foldForms';
+import { type Piece, SHEET_COLOR, leaf, solidPiece } from './foldPiece';
 import { bendGeometry, basisOf, bottomOffset, frameEuler } from './frames';
 import { bendsOf, flatsOf } from './graph';
 
-const SHEET_COLOR = '#9fb3c4';
 /** Maximum angular step of a displayed bend sector, radians (3 degrees). */
 const SECTOR_STEP = Math.PI / 60;
-
-const leaf = (id: string, kind: 'extrusion' | 'revolution', geometry: object, position: Vec3, rotation: Vec3): Entity =>
-  ({ id, kind, ...geometry, position, rotation, layerId: DEFAULT_LAYER_ID, color: SHEET_COLOR }) as Entity;
 
 function cutoutTool(
   partId: string,
@@ -42,15 +39,10 @@ function cutoutTool(
   };
 }
 
-interface Piece {
-  readonly recipe: ShapeRecipe;
-  readonly positions: number[];
-  readonly indices: number[];
-}
-
-function flatPiece(partId: string, part: SheetMetalPart, flatId: string, thickness: number, bottom: number): Piece | null {
+function flatPieces(partId: string, part: SheetMetalPart, flatId: string, thickness: number, bottom: number): Piece[] {
   const flat = part.nodes[flatId];
-  if (flat?.type !== 'flat') return null;
+  if (flat?.type !== 'flat') return [];
+  const forms = formPieces(partId, part, flat.id, flat.frame, thickness, bottom);
   const basis = basisOf(flat.frame);
   const position = add3(basis.origin, scale3(basis.z, bottom));
   const rotation = frameEuler(flat.frame);
@@ -58,7 +50,7 @@ function flatPiece(partId: string, part: SheetMetalPart, flatId: string, thickne
     op: 'solid',
     entity: leaf(`${partId}:${flat.id}`, 'extrusion', { profile: flat.outline, depth: thickness }, position, rotation),
   };
-  const recipe = flat.cutouts.reduce<ShapeRecipe>(
+  const cut = flat.cutouts.reduce<ShapeRecipe>(
     (acc, cutout, index) => ({
       op: 'boolean',
       boolean: 'subtract',
@@ -67,16 +59,13 @@ function flatPiece(partId: string, part: SheetMetalPart, flatId: string, thickne
     }),
     body,
   );
+  const recipe = forms.tools.reduce<ShapeRecipe>((acc, tool) => ({ op: 'boolean', boolean: 'subtract', a: acc, b: tool }), cut);
   const mesh = placeMesh(
-    prismMesh(
-      flat.outline,
-      flat.cutouts.map((cutout) => cutout.points),
-      thickness,
-    ),
+    prismMesh(flat.outline, [...flat.cutouts.map((cutout) => cutout.points), ...forms.meshHoles], thickness),
     position,
     rotation,
   );
-  return { recipe, positions: [...mesh.positions], indices: orientOutward(mesh.positions, mesh.indices) };
+  return [{ recipe, positions: [...mesh.positions], indices: orientOutward(mesh.positions, mesh.indices) }, ...forms.pieces];
 }
 
 function bendPieces(partId: string, part: SheetMetalPart, thickness: number, bottom: number): Piece[] {
@@ -96,14 +85,7 @@ function bendPieces(partId: string, part: SheetMetalPart, thickness: number, bot
       revolution.position,
       revolution.rotation,
     );
-    const positions: number[] = [];
-    const indices: number[] = [];
-    for (const triangle of solidTriangles(entity)) {
-      const base = positions.length / 3;
-      for (const corner of triangle) positions.push(...corner);
-      indices.push(base, base + 1, base + 2);
-    }
-    return [{ recipe: { op: 'solid', entity }, positions, indices: orientOutward(positions, indices) }];
+    return [solidPiece(entity)];
   });
 }
 
@@ -114,7 +96,7 @@ function bendPieces(partId: string, part: SheetMetalPart, thickness: number, bot
 export function foldPart(part: SheetMetalPart, rule: SheetMetalRule): MeshSolidEntity | null {
   const bottom = bottomOffset(part.side, rule.thickness);
   const pieces = [
-    ...flatsOf(part).flatMap((flat) => flatPiece(part.id, part, flat.id, rule.thickness, bottom) ?? []),
+    ...flatsOf(part).flatMap((flat) => flatPieces(part.id, part, flat.id, rule.thickness, bottom)),
     ...bendPieces(part.id, part, rule.thickness, bottom),
   ];
   const first = pieces[0];

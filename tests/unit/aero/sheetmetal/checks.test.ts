@@ -51,6 +51,7 @@ function testPart(
     length: 20,
     lengthReference: 'outside_mold_line',
     position: 'material_outside',
+    autoRelief: false,
     ...options.flange,
   });
   return { doc: doc2, part };

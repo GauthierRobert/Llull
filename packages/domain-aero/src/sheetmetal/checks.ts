@@ -6,7 +6,7 @@ import type { SheetMetalModel, SheetMetalPart, SheetMetalRule } from '@core/mode
 import { toDegrees } from '@lib/angle';
 import { projectOntoSegment } from '@lib/polygon';
 import { polygonToSegmentDistance } from './geometry2d';
-import { type FlatNode, bendsOf, flatsOf, joggleNodes, reliefNodes } from './graph';
+import { type FlatNode, bendsOf, flatsOf, hemsOf, joggleNodes, reliefNodes } from './graph';
 import { bendEnd } from './reliefGeometry';
 import { findRadiusRow } from './rules';
 
@@ -39,7 +39,8 @@ const missingThreshold = (name: string, ids: readonly string[], what: string): R
 });
 
 export function minBendRadius({ unit, model, part, rule }: Context): RuleOutcome {
-  const bends = bendsOf(part);
+  const closedHems = new Set(hemsOf(part).flatMap((hem) => (hem.hemType === 'closed' ? [hem.bend] : [])));
+  const bends = bendsOf(part).filter((bend) => !closedHems.has(bend.id));
   const findings: FtrFinding[] = [];
   for (const bend of bends)
     if (bend.insideRadius === 0 && rule.allowSharpBends !== true)
@@ -86,7 +87,7 @@ export function minBendRadius({ unit, model, part, rule }: Context): RuleOutcome
 }
 
 /** Bend tangent lines on a flat's own plane: its child bends, and the line to its parent at y = 0. */
-function bendLinesOn(part: SheetMetalPart, flat: FlatNode): Array<{ id: string; a: Vec2; b: Vec2 }> {
+export function bendLinesOn(part: SheetMetalPart, flat: FlatNode): Array<{ id: string; a: Vec2; b: Vec2 }> {
   return bendsOf(part).flatMap((bend) => {
     if (bend.from === flat.id) return [{ id: bend.id, a: bend.lineInFrom[0], b: bend.lineInFrom[1] }];
     if (bend.to !== flat.id) return [];

@@ -26,6 +26,8 @@ export const FORMULAS = {
   joggleRun: 'run=2*rm*sin(phi)+s*cos(phi)',
   joggleDeveloped: 'Ldev=2*BA(phi)+s',
   joggleAllowance: 'dL=Ldev-run',
+  hemAllowance: 'BA_hem=pi*(gap/2+K*T)',
+  hemDeveloped: 'Ldev_hem=BA_hem+leg',
 } as const;
 
 /** FAA empirical K-equivalent: 0.0078 / 0.01743. */
@@ -143,4 +145,27 @@ export function joggleQuantities(input: {
 /** Smallest joggle offset valid for the angle and radius: 2*(R+T/2)*(1-cos(phi)). */
 export function minJoggleOffset(thickness: number, insideRadius: number, phi: number): number {
   return 2 * (insideRadius + thickness / 2) * (1 - Math.cos(phi));
+}
+
+export interface HemQuantities {
+  readonly bendAllowance: Formulaed;
+  readonly developed: Formulaed;
+}
+
+/**
+ * 180 degree hem: neutral-surface bend allowance pi*(R + K*T) with R = gap/2 (0 for a closed hem) plus the straight return leg. The setback
+ * (tan(theta/2)) is undefined at 180 degrees, so a hem has no OSSB/BD of its own.
+ * UNVERIFIED: the neutral-surface model extended to 180 degrees; no published hem allowance table was checked.
+ * @failure non-positive thickness, negative gap or leg -> null
+ */
+export function hemQuantities(input: {
+  readonly thickness: number;
+  readonly gap: number;
+  readonly k: number;
+  readonly leg: number;
+}): HemQuantities | null {
+  const { thickness: t, gap, k, leg } = input;
+  if (!(t > 0) || !(gap >= 0) || !(leg >= 0)) return null;
+  const ba = Math.PI * (gap / 2 + k * t);
+  return { bendAllowance: withFormula(ba, FORMULAS.hemAllowance), developed: withFormula(ba + leg, FORMULAS.hemDeveloped) };
 }

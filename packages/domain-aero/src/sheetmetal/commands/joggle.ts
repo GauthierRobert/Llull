@@ -7,7 +7,7 @@ import { toRadians } from '@lib/angle';
 import { joggleQuantities, minJoggleOffset } from '@lib/sheetMath';
 import { withFoldedSolid } from '../fold';
 import { EPS, clipHalfPlane, isSimplePolygon, lineBasis, lineCrossings, sideOf, toLineFrame } from '../geometry2d';
-import { childBends, getModel, nextNodeIds, parentBend, ruleOfPart, withModel, withNodes, withPart } from '../graph';
+import { childBends, formsOf, getModel, nextNodeIds, parentBend, ruleOfPart, withModel, withNodes, withPart } from '../graph';
 import { relayout } from '../layout';
 import { pickFlat } from '../pick';
 import { fixed, refuse } from '../result';
@@ -142,6 +142,8 @@ export const addJoggle = defineCommand({
     const moved = clipHalfPlane(flat.outline, p, normal, 'positive');
     if (!isSimplePolygon(kept) || !isSimplePolygon(moved)) return invalid('the line does not split the flat into two simple pieces');
 
+    if (formsOf(part).some((node) => node.on === flat.id))
+      return invalid('the flat carries a flanged hole or bead, which a joggle cannot split');
     const sideOfCutout = (cutout: SheetCutout): Side => sideOfPoints(p, q, cutout.points);
     if (flat.cutouts.some((cutout) => ['mixed', 'on'].includes(sideOfCutout(cutout)))) return invalid('the line crosses a cutout');
     const bends = childBends(part, flat.id);

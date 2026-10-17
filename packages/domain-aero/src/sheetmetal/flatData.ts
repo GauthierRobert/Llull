@@ -2,11 +2,12 @@
 
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
-import type { FtrResultMeta } from '@core/model/manufacturing';
+import type { FtrResultMeta, FtrUnverifiedInput } from '@core/model/manufacturing';
 import type { SheetMetalPart, SheetMetalRule } from '@core/model/sheetMetal';
 import { toDegrees } from '@lib/angle';
 import { FORMULAS } from '@lib/sheetMath';
 import { getModel, ruleOfPart } from './graph';
+import { FLANGED_HOLE_SOURCE, HEM_SOURCE } from './provenance';
 import { refuse, resultMeta } from './result';
 import { ruleUnverifiedInputs } from './rules';
 import { type FlatPatternGeometry, unfoldPart } from './unfold';
@@ -57,7 +58,13 @@ export function buildFlat(doc: CadDocument, command: string, partId: string): Fl
         { ids: [part.id] },
       ),
     };
-  const unverifiedInputs = ruleUnverifiedInputs(model, rule, doc.units);
+  const unverifiedInputs: FtrUnverifiedInput[] = [
+    ...ruleUnverifiedInputs(model, rule, doc.units),
+    ...geometry.forms.flatMap((form): FtrUnverifiedInput[] =>
+      form.kind === 'flanged_hole' ? [{ kind: 'preset', id: `flanged_hole:${part.id}/${form.id}`, source: FLANGED_HOLE_SOURCE }] : [],
+    ),
+    ...geometry.hems.map((hem): FtrUnverifiedInput => ({ kind: 'preset', id: `hem:${part.id}/${hem.id}`, source: HEM_SOURCE })),
+  ];
   const meta = resultMeta({
     lengthUnit: doc.units,
     unverifiedInputs,
@@ -68,6 +75,7 @@ export function buildFlat(doc: CadDocument, command: string, partId: string): Fl
       kChart: FORMULAS.kChart,
       joggleRun: FORMULAS.joggleRun,
       joggleAllowance: FORMULAS.joggleAllowance,
+      ...(geometry.hems.length > 0 ? { hemAllowance: FORMULAS.hemAllowance, hemDeveloped: FORMULAS.hemDeveloped } : {}),
     },
     inputs: {
       thickness: { value: rule.thickness, unit: doc.units, source: `rule ${rule.name}` },

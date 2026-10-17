@@ -122,6 +122,7 @@ describe('add_relief', () => {
     length: 30,
     lengthReference: 'outside_mold_line',
     position: 'material_outside',
+    autoRelief: false,
     ...extra,
   });
 
