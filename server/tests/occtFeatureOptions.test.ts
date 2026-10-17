@@ -61,6 +61,8 @@ describe('add_rib on the live OCC kernel (VC-FTR-33)', () => {
     expect(result.error).toBeUndefined();
     const volume = volumeOf(kernels.occt, result.document, idOf(result));
     expect(rel(volume, 60000 + 3 * 80 * 20)).toBeLessThan(REL);
+    const ocp = JSON.parse(readFileSync(path.join(PACK, 'expected_rib_ocp.json'), 'utf8')) as { prism_fuse_volume_mm3: number };
+    expect(rel(volume, ocp.prism_fuse_volume_mm3)).toBeLessThan(REL);
     expect(result.document.order).toHaveLength(1);
   }, 120_000);
 

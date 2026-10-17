@@ -1,0 +1,14 @@
+{
+ "generator": "docs/aerospace/07-sheet-metal-machined-features/validation/crosscheck_rib_ocp.py",
+ "ocp_version": "8.0.1.1.0",
+ "units": "mm",
+ "case": "VC-FTR-33: 3 x 80 x 20 rib on 100 x 60 x 10 plate (add_rib path (10,30)-(90,30), symmetric, plane z=10)",
+ "tolerance": {
+  "volume_rel": 1e-06
+ },
+ "analytic_volume_mm3": 64800.0,
+ "prism_fuse_volume_mm3": 64800.0,
+ "linear_form_volume_mm3": 570000.0014947999,
+ "linear_form_agrees": false,
+ "linear_form_note": "BRepFeat_MakeLinearForm (silhouette on the mid plane, Direction=(0,3,0), Direction1=(0,0,0)) returns a body that is not the rib (it sweeps a boundary-sliding form and needs a profile lying on a face of the base); the prism fuse is the reference. Not used as an assertion."
+}
