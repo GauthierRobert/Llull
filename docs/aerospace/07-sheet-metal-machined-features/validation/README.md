@@ -41,10 +41,10 @@ Tolerance column: abs = absolute, rel = relative. FR/TR = what the case proves.
 | VC-FTR-10 | FR-07, FR-34 | Rule R = 0 (FP-12); synthetic table row `TEST-ALLOY/T0, 0.8 mm → 2.0 mm`; R = 1.0 | R = 0: refusal `FTR_SHARP_BEND_FORBIDDEN`; R = 1.0: finding `FTR_BEND_RADIUS_BELOW_MIN` citing the row (limit 2.0); R = 2.4 → none | exact | b (synthetic row; real rows TBD after D6) | inline |
 | VC-FTR-11 | FR-09 | JG-01…03 | allowance 0.197880 / 0.098095 / 0.287239 mm; run 5.242333 / 5.136723 / 6.143594 | 1e-6 | b | `expected_flat_pattern.json` |
 | VC-FTR-11b | FR-09 | JG-04 (R 6, φ 45°, h 0.5) | rejected: s < 0 | — | b | same |
-| VC-FTR-12 | FR-08 | Flange with rectangular relief, width ratio 0.5 | relief width = 0.5·T, depth = R + T + extra; flat cut matches | TBD — measure with OCC `mass_properties` after M5 | TBD | — |
-| VC-FTR-13 | FR-10 | Flanged lightening hole ∅40, flange 4, 90°, lip R 2, T 1.6 | valid solid; flat cut diameter flagged approximate | TBD — measure with OCC | TBD | — |
-| VC-FTR-14 | FR-11 | Bead R 3, depth 2, length 60 on a 1.0 mm flat | valid solid; flat pattern excludes bead with forming note | TBD — measure with OCC | TBD | — |
-| VC-FTR-15 | FR-12, FR-13 | Hem and contour flange (V2) | TBD | TBD | TBD | — |
+| VC-FTR-12 | FR-08 | Flange with rectangular relief, width ratio 0.5 (flange 33.6×50, T 1.6, R 4.8, widthStart 4) | relief width 0.8 = 0.5·T, depth 6.4 = R + T + 0 (extra = named default 0); volume removed 8.192 mm³ (0.8 × 6.4 × 1.6) | 1e-6 abs (OCC measured, 2026-10-17) | b + c | `server/tests/occtSheetMetalForms.test.ts` |
+| VC-FTR-13 | FR-10 | Flanged lightening hole ∅40, flange 4, 90°, lip R 2, T 1.6 (on a 100×80 plate) | valid solid, volume 11381.155100 mm³; physical hole ∅47.2; flat cut ∅34.705133 flagged approximate + unverified | 1e-6 rel (OCC measured, 2026-10-17) | c | same |
+| VC-FTR-14 | FR-11 | Bead R 3 (inside), depth 2, length 60 on a 1.0 mm 100×60 flat | valid solid: 6144.808987 mm³ round ends, 6128.053826 mm³ open ends; flat area stays 6000 with one forming note | 1e-6 rel (OCC measured, 2026-10-17) | c | same |
+| VC-FTR-15 | FR-12, FR-13 | Hem on a 40×30 plate (leg 10); contour flange on a 40×30 base, T 1.6, R 4.8, K 0.5 | hem closed 2520.637158 / open (gap 3.2) 2761.911474 mm³; contour L 3475.030053, Z (mid) 3638.060105, Z-return (top) 4127.490158 mm³ = flat area × T | 1e-9 rel vs flat area × T (OCC measured, 2026-10-17); hem developed-length formula unverified | b + c | same |
 | VC-FTR-16 | FR-16 | Hole at 2 mm from the bend tangent with threshold 3 mm (data) | violation `hole_to_bend` | exact | b | inline |
 | VC-FTR-17 | FR-24 | `ftr_machined_plate.step` | 7 holes (4 csk 100° c 1.762109, 2 cbore, 1 blind 118° tip 1.802582) + 1 pocket rc 3; 0 false positives | 1e-4 mm, 1e-3° | b | `data/expected_feature_recognition.json` |
 | VC-FTR-18 | FR-15, FR-24 | `ftr_bracket_L.step` → `convert_to_sheet_metal` → `flat_pattern` (K 0.44) | T 1.6, 1 bend R 4.8, 90°, flat 65.845663 × 50 | 0.01 mm | b | same |
@@ -62,7 +62,7 @@ Tolerance column: abs = absolute, rel = relative. FR/TR = what the case proves.
 | VC-FTR-30 | FR-27 | Machined plate with thickness parameter t = 10 → 12 | holes stay through and on the same faces; volume = analytic at t = 12 (generator with lz = 12) | 1e-6 rel | b | — |
 | VC-FTR-31 | FR-28 | All new commands | in `listCommands()`, `toToolSchemas()` snapshot, toolset `manufacturing`, CLI `describe`; happy + failure + `is pure` tests | — | — | — |
 | VC-FTR-32 | FR-25 | Recognised CTC-01 holes converted to `add_hole` steps | volume equal to the imported solid | 1e-6 rel | c | — |
-| VC-FTR-33 | FR-22 | Rib 3 mm × 20 mm on a plate | TBD — measure with OCP (`cadquery-ocp` 8.0.1.1.0, `BRepFeat_MakeLinearForm`) vs analytic prism volume; llull's lowered rib must match | 1e-6 rel | TBD | — |
+| VC-FTR-33 | FR-22 | Rib 3 mm × 20 mm × 80 mm on a plate | volume = plate + 3 × 80 × 20 (analytic prism); L-shaped mitred, one-sided and upToFace ribs match closed forms. OCP `BRepFeat_MakeLinearForm` cross-check not run (no OCP here) | 1e-6 rel (OCC measured, 2026-10-17) | b + c | `server/tests/occtFeatureOptions.test.ts` |
 | VC-FTR-34 | FR-29 | `hole_table` on the machined plate | 7 rows, coordinates from the top-left corner datum, sorted | exact | b | `expected_feature_recognition.json` |
 | VC-FTR-35 | FR-30 | FP-08…11 entered in an inch document | same values in inch; mm document gives ×25.4 exactly | 1e-9 rel | b | `flat_pattern_cases.csv` |
 | VC-FTR-36 | FR-20 | Modelled thread (V2) | TBD | TBD | TBD | — |

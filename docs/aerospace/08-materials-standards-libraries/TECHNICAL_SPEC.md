@@ -588,3 +588,22 @@ that lowers a marking needs the human gate; **every** registered `export_*` comm
 bound to the lowered markings or the exported document hash, and `confirmation` is not stored in step params; library records are
 read-only for every model command (`MAT_RECORD_READONLY`); the server store treats `<id>@<version>` as immutable (`MAT_LIBRARY_EXISTS`).
 Open: live sync still broadcasts raw params (a `confirmation` signature), the desktop signing UI must sign the new payload.
+
+**Round 2 (2026-10-17): the rest of the 08 scope.**
+
+| Item | Where / evidence |
+| ---- | ---------------- |
+| M9 `joint_capacity` (fasteners, query): single shear Fsu·πD²/4 and bearing Fbru·D·t per layer at e/D, values only through `get_material_allowable` with the exact basis; basis propagation §5.6 (VC-MAT-21 A+A→A, A+B→B, B+S→mixed with the per-input list) | `packages/domain-aero/src/fasteners/jointCapacity.ts`, `tests/unit/aero/fasteners/jointCapacity.test.ts` |
+| M4 seed library mechanism: `npm run seed:materials` (`--check`) builds `packages/domain-aero/data/seed.llull-matlib.json` and `sources.lock.json` from the `verified` entries of `validation/materials_dataset.json` only (MatWeb S10/S12 excluded, OQ-MAT-06); installed with `import_material_library`; VC-MAT-18 CI test | `scripts/build-seed-library.mjs`, `tests/unit/materials/seedLibrary.test.ts` |
+| TR-MAT-32: `licensed-no-redistribution` values redacted (`redacted: true`, basis / locator kept) for non-loopback MCP and REST callers | `packages/mcp/src/redactLicensed.ts`, `server/tests/licensedRedaction.test.ts` |
+| Confirmation signatures never stored or broadcast (feature steps, plan steps and loops, live `command` events) | `lib/withoutConfirmations.ts`, `server/tests/liveConfirmationRedaction.test.ts` |
+| Browser `ctx.libraries` provider over IndexedDB (immutable `id@version`), installed in `src/main.tsx` through the core port `commands/libraryPort.ts` | `src/ui/services/browserLibraries.ts` |
+| VC-MAT-17: 10⁴ instances of 3 part numbers — `bill_of_materials` ≈ 110 ms, `mass_properties` ≈ 0.5 s, ≈ 349 B per instance | `tests/unit/aero/fastenerScale.test.ts` |
+| UI: Materials record inspector (basis / direction filter, provenance), library list with licence and marking badges; Fasteners tab (catalogue, live `select_fastener` preview, insert, layout check, BOM sections) | `src/ui/panels/{materials,fasteners}/` |
+
+**Blocked on data, not on code (owner action):** the seed holds no MIL-HDBK-5J A/B/S allowables and no Fbru: the primary PDF and every
+source host were refused by this environment's network proxy (CONNECT 403), and the dataset has no verified allowable to bundle — values
+are never invented. The seven unpinned sources carry `sha256: null` with that reason. `joint_capacity` therefore computes capacities only
+from allowables the user imports. Two seed records need an owner decision: the NAS6203 Ftu / Fsu specification minimums (distributor /
+AIA facts, OQ-MAT-01) and Ti-6Al-4V `density_supplier_alt` (supplier unidentified in the dataset). `joint_capacity` keeps a single
+non-A/B basis shared by every input (e.g. all S) instead of `mixed`; `sheetBasis` is one value for all layers.

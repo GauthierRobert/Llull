@@ -677,3 +677,21 @@ Tests: `tests/unit/features/*` (VC-FTR-22, 23, 24, 27, 28, 29), `tests/unit/aero
 lists authored holes without a kernel and refuses `FTR_NEEDS_EXACT_KERNEL` otherwise; sheet-metal parts carry a material and layer
 through `set_sheet_metal_material` (re-applied on every derivation and load); fastener catalogues refuse non-positive grip / length
 increments and embedded `licensed-no-redistribution` families (`FAST_LICENCE_EMBED_FORBIDDEN`).
+
+**Round 2 (2026-10-17): the rest of the 07 scope.**
+
+| Item | Where / evidence |
+| ---- | ---------------- |
+| Sheet metal: `add_flanged_hole`, `add_bead`, `add_corner_relief`, `add_hem` (closed / open), `add_contour_flange` (chain of flats + bends from an open profile), automatic rectangular relief on `add_flange` (`autoRelief`, default on), `set_sheet_metal_material` | `packages/domain-aero/src/sheetmetal/**`; VC-FTR-12/13/14/15 measured on OCC (`server/tests/occtSheetMetalForms.test.ts`, values in validation/README.md) |
+| Core: `add_rib` (VC-FTR-33), `counterdrill`, extents `up_to_next` / `up_to_face`, pocket `islands` / `upToFace` / `open`, `holes_from_recognition` (VC-FTR-32: machined plate rebuilt at rel 3.2e-15, CTC-01 at 4.5e-10) | `commands/features/`, `server/tests/occtFeatureOptions.test.ts` |
+| M7 OCC-native features: `KernelOps.feature?` tried first, `BRepFeat_MakePrism` (pockets without islands) and `BRepFeat_MakeRevol` (holes, ≤ 8 positions), lowering otherwise; native vs lowered equal to 1e-9 (VC-FTR-25, 14 parity cases) | `packages/kernel-occt/src/occtFeatures.ts`, `server/tests/occtNativeFeatures.test.ts` |
+| VC-FTR-21 / 46: NIST CTC-02…05 pinned in `quality/corpus.json` (sha256 verified, fetched by `npm run quality:fetch`, not committed); apex counts 74 / 0 / 22 / 10 and 45° seeds 0 / 0 / 42 / 3 match; recognition 3.8 s / 0.35 s / 2.0 s / 0.65 s | `server/tests/quality/ftrRecognition.gate.ts` |
+| UI: Manufacturing tab (flat-pattern preview + materialize + DXF download, findings with review banner and provenance, sortable feature table, hole form with 82/90/100° presets labelled unverified); MCP prompt `design_sheet_bracket` | `src/ui/panels/manufacturing/`, `packages/mcp/src/prompts.ts` |
+
+Deviations of round 2: `up_to_next` / `up_to_face` and pocket `upToFace` are stored as the resolved depth (replay re-resolves through the command);
+`counterdrill` = countersink cone to `cboreDiameter`, then counterbore, then bore (no source definition: review); rib joints sharper than
+≈ 154° are refused; contour flanges attach to a base edge (no standalone part); hem / flanged-hole developed sizes are unverified models;
+no pocket / sheet-metal parameter forms in the UI (hole form only). Codes added: `FTR_FORM_INVALID`, `FTR_POCKET_ISLAND_INVALID`,
+`FTR_RIB_PATH_NOT_SUPPORTED`, `FTR_UP_TO_TARGET_INVALID`. What stays open is outside the built kernel: `BRepFeat_MakeCylindricalHole` /
+`MakeLinearForm` are not constructible in opencascade.js 1.1.1 (AERO-2-M2), the OCP cross-check of VC-FTR-33 needs `cadquery-ocp`,
+and modelled threads (VC-FTR-36) are V2 / M8.
