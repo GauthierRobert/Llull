@@ -389,6 +389,37 @@ const designSite: PromptTemplate = {
   },
 };
 
+/**
+ * @prompt design_sheet_bracket
+ * Sheet-metal workflow (07 TR-FTR-10): calc → rule → radius table → base → flange → check → flat pattern → DXF.
+ */
+const designSheetBracket: PromptTemplate = {
+  descriptor: {
+    name: 'design_sheet_bracket',
+    description:
+      'Workflow for a sheet-metal bracket: compute the bend quantities, define the sheet-metal rule and radius table, ' +
+      'model the base flat and flange, run the design checks, then unfold it and export the flat-pattern DXF. ' +
+      'Every result is computed by llull and is not approved.',
+    arguments: [
+      { name: 'brief', description: 'The bracket to design, e.g. "L-bracket 60 x 40, 1.6 thick, 90 degree flange".', required: false },
+    ],
+  },
+  buildMessages({ brief = 'an L-bracket with one 90 degree flange' }) {
+    return conversation(
+      `Design ${brief} as a sheet-metal part in llull and produce its flat pattern.`,
+      `**Sheet-metal workflow (document units; give every value a source — nothing is defaulted)**\n\n` +
+        `1. Calc: \`sheet_metal_calc\` { units, thickness, insideRadius, angle, kFactor } for one bend (BA, outside setback) before modelling.\n` +
+        `2. Rule: \`create_sheet_metal_rule\` { name, material, temper, thickness, insideRadius, kFactor | kTable, thresholds } — thresholds and K tables need a source and stay unverified until verified.\n` +
+        `3. Radius table: \`import_bend_radius_table\` { rows } (material, temper, thickness, minimum inside radius, source) so the check can compare the bend radius.\n` +
+        `4. Base: draw the closed profile (\`draw_rectangle\` or \`draw_polyline\`), then \`add_sheet_metal_base\` { profileId, rule, side }.\n` +
+        `5. Flange: \`add_flange\` { id, edge, angle, length, lengthReference, position }; add \`add_relief\` / \`add_sheet_cutout\` where needed.\n` +
+        `6. Check: \`check_sheet_metal\` { id } — read every finding (code, value, limit, source); a waiver never turns a failure into a pass.\n` +
+        `7. Unfold: \`flat_pattern\` { id } for extents, bend allowances and the K-factor source, then \`export_flat_pattern_dxf\` { id }.\n\n` +
+        `State to the user that the results are computed by llull, are NOT approved, and use unverified data wherever a table or threshold is marked unverified: a qualified person must review them before manufacture.`,
+    );
+  },
+};
+
 const TEMPLATES: ReadonlyArray<PromptTemplate> = [
   modelBracket,
   orthographicSetup,
@@ -396,6 +427,7 @@ const TEMPLATES: ReadonlyArray<PromptTemplate> = [
   designBuilding,
   designFactory,
   designSite,
+  designSheetBracket,
 ];
 
 export function listMcpPrompts(): McpPromptDescriptor[] {

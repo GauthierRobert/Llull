@@ -129,6 +129,7 @@ const PROMPT_TOOLSETS: Readonly<Record<string, ToolsetName>> = {
   design_building: 'building',
   design_factory: 'building',
   design_site: 'civil',
+  design_sheet_bracket: 'manufacturing',
 };
 
 /** True when the MCP prompt `promptName` only references enabled tools. */
