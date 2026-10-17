@@ -137,7 +137,7 @@ export function massProvenance(e: Entity, resolved: ResolvedMass, ctx: Execution
   };
 }
 
-/** `unverified` reasons that come from how the figure was computed (TR-KRN-103). */
+/** Review reasons that come from how the figure was computed (TR-KRN-103/104); `unverified` stays about the density (AERO-1). */
 export const methodReasons = (resolved: ResolvedMass): string[] => [
   ...(resolved.method === 'mesh' || resolved.inertiaFromMesh ? ['method_mesh'] : []),
   ...(resolved.facetedBody ? ['faceted_body'] : []),

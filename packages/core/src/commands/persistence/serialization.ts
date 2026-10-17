@@ -11,9 +11,6 @@ import { changed, noop } from '../noop';
 import { errorMessage } from '../../lib/errorMessage';
 import { isRecord } from '../../lib/isRecord';
 import { derivedEntityIds, documentExtensions } from '../../plugins/host';
-import { currentContext } from '../context';
-import { DEFAULT_MODELING_TOLERANCE, withKernelStamp } from '../../model/kernelSettings';
-import { kernelStampOf } from './kernelStamp';
 import { validateDocumentShape, validateDocumentValues } from './validation';
 import { migrateRetiredCommands } from './retiredCommands';
 
@@ -26,7 +23,7 @@ interface DocumentEnvelope {
 /** Bump on a breaking field; `migrate()` upgrades older documents. */
 const CURRENT_SCHEMA_VERSION = 3;
 
-/** v1 files (legacy ids, building entities stored) load unchanged; v2 adds step-scoped ids; v3 adds kernelSettings + blobs (aerospace 01). */
+/** v1 files (legacy ids, building entities stored) load unchanged; v2 adds step-scoped ids; v3 adds kernelSettings + blobs (aerospace 01); v1/v2 need no rewrite for v3 (both slices stay absent). */
 const READABLE_VERSIONS: ReadonlySet<unknown> = new Set([1, 2, 3]);
 
 interface SerializeOptions {
@@ -39,23 +36,16 @@ interface SerializeOptions {
 
 /**
  * Deterministic `{ format: 'llull-document', version, document }` JSON; derived entities omitted unless `includeDerived`.
- * @invariant a save (not `includeDerived`, which hashes and diffs) under a kernel that describes itself stamps `kernelSettings.kernel /
- *   occtVersion / build` into the TEXT only when that kernel is exact (`occtVersion` known) or the document already has settings; the
- *   passed document is never changed
+ * @invariant a function of the document alone: kernel provenance (`kernelSettings`) is written by the commands that use the exact kernel
+ *   (`import_step_exact`, `set_modeling_tolerance`) from their own ctx, never from the ambient kernel at save time
  */
 export function serializeDocument(doc: CadDocument, options: SerializeOptions = {}): string {
   const envelope: DocumentEnvelope = {
     format: 'llull-document',
     version: CURRENT_SCHEMA_VERSION,
-    document: options.includeDerived === true ? doc : stampedForSave(withoutDerivedEntities(doc)),
+    document: options.includeDerived === true ? doc : withoutDerivedEntities(doc),
   };
   return JSON.stringify(envelope);
-}
-
-function stampedForSave(doc: CadDocument): CadDocument {
-  const stamp = kernelStampOf(currentContext().kernel);
-  if (stamp === null || (stamp.occtVersion === undefined && doc.kernelSettings === undefined)) return doc;
-  return withKernelStamp(doc, stamp);
 }
 
 function withoutDerivedEntities(doc: CadDocument): CadDocument {
@@ -143,18 +133,6 @@ function repairedOrder(raw: Record<string, unknown>): string[] {
 }
 
 /**
- * v1/v2 -> v3 (total, idempotent): a document without `kernelSettings` gets `{ kernel: <active kernel>, defaults }` when a kernel is
- * installed (no occtVersion / build: the old file never recorded them), else stays absent; `blobs` stays absent (the writer never writes an
- * empty slice). A v3 file is never rewritten.
- */
-function migrate2to3(raw: Record<string, unknown>, fromVersion: unknown): Record<string, unknown> {
-  if (fromVersion === 3 || raw['kernelSettings'] !== undefined) return raw;
-  const stamp = kernelStampOf(currentContext().kernel);
-  if (stamp === null) return raw;
-  return { ...raw, kernelSettings: { kernel: stamp.kernel, modelingTolerance: DEFAULT_MODELING_TOLERANCE } };
-}
-
-/**
  * Upgrade a raw document object (already shape-validated) to the current schema: the SINGLE place for back-compat defaults. A new optional
  * `CadDocument` field gets its default here.
  */
@@ -198,7 +176,7 @@ export function deserializeDocument(json: string): CadDocument {
       'load_document: document structure is invalid — missing or malformed required fields ' +
         '(entities, order, layers, layerOrder, selection, camera).',
     );
-  const migratedDoc = withSafeStepCounter(restoreDerivedEntities(migrate2to3(migrateRetiredCommands(migrate(rawDoc)), parsed['version'])));
+  const migratedDoc = withSafeStepCounter(restoreDerivedEntities(migrateRetiredCommands(migrate(rawDoc))));
   const valueErrors = validateDocumentValues(migratedDoc);
   if (valueErrors.length > 0) throw new Error(`load_document: document contains invalid values:\n  ${valueErrors.join('\n  ')}`);
   return migratedDoc as unknown as CadDocument;

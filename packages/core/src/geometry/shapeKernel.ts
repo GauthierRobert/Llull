@@ -15,6 +15,7 @@ import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, ShapeTo
 import type { ExactMassProperties, FaceQueryPort, ImportShapesOptions, ImportShapesResult, KernelInfo } from './kernelPorts';
 import { recipeKey } from './shapeRecipe';
 import { errorMessage } from '../lib/errorMessage';
+import { sha256Hex } from '../lib/sha256';
 
 /** `FaceQueryPort` over native shapes: every method takes the native shape where the port takes a handle. */
 export type FaceQueryOps<S> = {
@@ -289,6 +290,10 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
       : {
           loadBlob: (sha256: string, brep: string): void => {
             if (loadedBlobs.has(sha256)) return;
+            if (sha256Hex(brep) !== sha256) {
+              console.warn(`[kernel] KRN_BLOB_HASH_MISMATCH: blob ${sha256} refused (its text hashes differently)`);
+              return;
+            }
             loadBlobOps(sha256, brep);
             loadedBlobs.add(sha256);
             for (const [key, shape] of shapes) if (shape === null) shapes.delete(key); // a null may have been "blob missing"

@@ -254,8 +254,9 @@ export const massProperties = defineCommand({
     'and, when a density is known, { density (g/(document-unit)³), densityKgPerM3, mass (in massUnit), massUnit, massG, massKg, massLb, ' +
     'densitySource (which value was used), densityDefaulted, unverified, unverifiedReasons } (plus unit: "g" when massUnit is g). ' +
     'A plain material density or a param is always unverified (no basis or source); a density model is unverified when its basis is typical / ' +
-    "supplier_unstated / unspecified; a mesh-integrated result adds 'method_mesh', a mesh body without a B-rep 'faceted_body'. " +
-    'reviewRequired.value is true for purpose weight-and-balance, any unverified reason, or a part outside the precision envelope; the summary ' +
+    'supplier_unstated / unspecified (unverified is about the density only). ' +
+    "reviewRequired.value is true for purpose weight-and-balance, any unverified density, a mesh-integrated figure ('method_mesh'), a mesh body " +
+    "without a B-rep ('faceted_body'), or a part outside the precision envelope; the summary " +
     'then says the figure is computed by llull, not approved, and needs a qualified engineer. Does not modify the document.',
   params: z.object({
     entityId: z
@@ -329,10 +330,9 @@ export const massProperties = defineCommand({
     };
     const resolved = resolveMassProperties(doc, e, densityOf, context);
     const method = resolved?.method ?? total.method;
-    const methodUnverified = resolved === null ? [] : methodReasons(resolved);
-    const unverifiedReasons = union(total.unverifiedReasons, methodUnverified);
+    const unverifiedReasons = [...total.unverifiedReasons];
     const warnings = resolved === null ? [] : precisionWarnings(doc, e, resolved);
-    const review = reviewRequired(purpose, unverifiedReasons, warnings);
+    const review = reviewRequired(purpose, union(unverifiedReasons, resolved === null ? [] : methodReasons(resolved)), warnings);
     const detail: MassDetail | null = resolved === null ? null : massDetail(doc, e, resolved, frame, about, weighted);
     const densitySource = sources.length === 1 ? (sources[0] ?? '') : sources.length === 0 ? 'none' : 'several (see densitySources)';
     const volumeData: MassPropertiesData = {
@@ -341,7 +341,6 @@ export const massProperties = defineCommand({
       ...(method === undefined ? {} : { method }),
       ...(detail ?? {}),
       ...(resolved === null ? {} : { frame, provenance: massProvenance(e, resolved, context, densitySource) }),
-      ...(unverifiedReasons.length > 0 && !weighted ? { unverified: true, unverifiedReasons } : {}),
       reviewRequired: review,
       ...(warnings.length > 0 ? { warnings } : {}),
     };
@@ -385,7 +384,7 @@ export const massProperties = defineCommand({
       unverified: unverifiedReasons.length > 0,
       unverifiedReasons,
     };
-    const flag = data.unverified === true ? ` Unverified (${unverifiedReasons.join('; ')}).` : '';
+    const flag = data.unverified === true ? ` Unverified density (${unverifiedReasons.join('; ')}).` : '';
     return report(
       doc,
       `Mass of ${e.kind === 'instance' ? 'assembly ' : ''}${entityId}: volume=${shown} ${volumeUnit}${note}, density=${meanDensity} g/${doc.units}³ (${data.densitySource}), ` +

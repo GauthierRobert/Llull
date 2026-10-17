@@ -63,19 +63,16 @@ describe('migrate2to3', () => {
     expect(loaded.blobs).toBeUndefined();
   });
 
-  it('fills kernelSettings with the active kernel and default tolerances (no occtVersion: the old file never recorded one)', () => {
+  it('leaves kernelSettings absent whatever kernel is running: an old file never recorded which kernel wrote it', () => {
     setGeometryKernel(fakeExactKernel({ info: OCC }).kernel);
-    const loaded = deserializeDocument(v2());
-    expect(loaded.kernelSettings).toEqual({ kernel: 'occt', modelingTolerance: { linear: 1e-4, angular: 1e-9, maxImportTolerance: 0.01 } });
-    expect(deserializeDocument(envelope(1, createEmptyDocument())).kernelSettings?.kernel).toBe('occt');
+    expect(deserializeDocument(v2()).kernelSettings).toBeUndefined();
+    expect(deserializeDocument(envelope(1, createEmptyDocument())).kernelSettings).toBeUndefined();
   });
 
   it('is idempotent: migrating the migrated document changes nothing, and v3 files are never rewritten', () => {
     setGeometryKernel(fakeExactKernel({ info: OCC }).kernel);
     const once = deserializeDocument(v2());
-    const twice = deserializeDocument(envelope(3, once));
-    expect(twice).toEqual(once);
-    expect(deserializeDocument(envelope(3, createEmptyDocument())).kernelSettings).toBeUndefined();
+    expect(deserializeDocument(envelope(3, once))).toEqual(once);
   });
 
   it('does not stamp when the active kernel cannot describe itself', () => {
@@ -84,30 +81,19 @@ describe('migrate2to3', () => {
   });
 });
 
-describe('kernel stamp on save (TR-KRN-61)', () => {
+describe('save is a function of the document (no ambient-kernel stamp)', () => {
   const settingsOf = (text: string): unknown => (JSON.parse(text) as { document: { kernelSettings?: unknown } }).document.kernelSettings;
 
-  it('writes kernel / occtVersion / build of the saving OCC kernel into the text, not into the document', () => {
-    setGeometryKernel(fakeExactKernel({ info: OCC }).kernel);
-    const doc = createEmptyDocument();
-    const text = serializeDocument(doc);
-    expect(settingsOf(text)).toMatchObject({ kernel: 'occt', occtVersion: '7.4.0p1', build: 'opencascade.js@1.1.1' });
-    expect(doc.kernelSettings).toBeUndefined();
-    expect(settingsOf(serializeDocument(doc, { includeDerived: true }))).toBeUndefined();
-  });
-
-  it('keeps tolerances and restamps the kernel of a document saved by another kernel', () => {
-    const base = execute(createEmptyDocument(), 'set_modeling_tolerance', { linear: 1e-5 }).document;
-    setGeometryKernel(fakeExactKernel({ name: 'manifold', info: { capabilities: [] }, exact: false }).kernel);
-    expect(settingsOf(serializeDocument(base))).toEqual({
-      kernel: 'manifold',
-      modelingTolerance: { linear: 1e-5, angular: 1e-9, maxImportTolerance: 0.01 },
-    });
-  });
-
-  it('leaves a document without settings unstamped under a mesh kernel', () => {
-    setGeometryKernel(fakeExactKernel({ name: 'manifold', info: { capabilities: [] }, exact: false }).kernel);
-    expect(settingsOf(serializeDocument(createEmptyDocument()))).toBeUndefined();
+  it('writes the document kernelSettings as they are, under any installed kernel', () => {
+    const tuned = execute(createEmptyDocument(), 'set_modeling_tolerance', { linear: 1e-5 }).document;
+    for (const kernel of [
+      fakeExactKernel({ info: OCC }).kernel,
+      fakeExactKernel({ name: 'manifold', info: { capabilities: [] }, exact: false }).kernel,
+    ]) {
+      setGeometryKernel(kernel);
+      expect(settingsOf(serializeDocument(createEmptyDocument()))).toBeUndefined();
+      expect(settingsOf(serializeDocument(tuned))).toEqual(tuned.kernelSettings);
+    }
   });
 });
 
@@ -164,6 +150,19 @@ describe('blob integrity on load', () => {
     expect(missing).toContain('mesh-1.1');
     const noBlobs = loadError(tampered(({ blobs: _blobs, ...doc }) => doc as CadDocument));
     expect(noBlobs).toContain('KRN_BLOB_MISSING');
+  });
+
+  it('refuses a recipe nested beyond the scan depth instead of skipping its blob check', () => {
+    const message = loadError(
+      tampered((doc) => {
+        const [id, entity] = Object.entries(doc.entities)[0] ?? ['', doc.entities['']];
+        let brep: unknown = { op: 'brep', blob: '0'.repeat(64), format: 'occt-brep-v1' };
+        for (let level = 0; level < 1100; level++) brep = { op: 'scale', source: brep, factor: 1 };
+        return { ...doc, entities: { [id]: { ...entity, brep } as never } };
+      }),
+    );
+    expect(message).not.toBeNull();
+    expect(message).toMatch(/nested deeper|brep recipe invalid|KRN_BLOB_MISSING/);
   });
 
   it('refuses a brep leaf that is not a lowercase sha256', () => {

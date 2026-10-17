@@ -19,6 +19,9 @@ import { MAX_IMPORT_BODIES } from '../limits';
 import { DEFAULT_MESH_COLOR } from './importMesh';
 import { stepImportReport } from './stepImportReport';
 
+/** Largest STEP accepted (characters of Part 21 text; 64 MiB): the text is also kept in the step params for replay. */
+const MAX_STEP_CHARS = 64 * 1024 * 1024;
+
 const refuse = (doc: CadDocument, code: string, remediation: string, why: string, paths: readonly string[] = []): CommandResult => ({
   ...noop(doc, `import_step_exact: ${why}; no-op. [${code}]`),
   error: commandError(code, remediation, [], paths),
@@ -173,9 +176,10 @@ function run(doc: CadDocument, params: Params, ctx: ExecutionContext | undefined
 const paramsSchema = z.object({
   stepBase64: z
     .string()
+    .max(Math.ceil((MAX_STEP_CHARS * 4) / 3) + 4)
     .optional()
     .describe('The STEP file bytes, base64 encoded (ISO 10303-21 text, UTF-8/ASCII). Give exactly one of stepBase64 or text.'),
-  text: z.string().optional().describe('The STEP file as Part 21 text. Give exactly one of stepBase64 or text.'),
+  text: z.string().max(MAX_STEP_CHARS).optional().describe('The STEP file as Part 21 text. Give exactly one of stepBase64 or text.'),
   fileName: z.string().optional().describe('Original file name, kept in the report only.'),
   heal: z.boolean().optional().describe('Run shape healing (ShapeFix) on every solid at the document linear tolerance. Default true.'),
   sew: z.boolean().optional().describe('Sew loose shells and faces into closed solids. Default true.'),

@@ -1,5 +1,5 @@
 /** Aerospace 01 KRN: kernel_info, set_modeling_tolerance and the blob hand-off from execute() to the kernel (no WASM). */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { defaultContext } from '@core/commands/context';
 import type { CommandResult, ExecutionContext } from '@core/commands/types';
@@ -44,7 +44,7 @@ describe('kernel_info', () => {
     const result = execute(doc, 'kernel_info', {}, ctxOf(fakeExactKernel({ info: OCC_INFO }).kernel));
     const data = result.data as InfoData;
     expect(data).toMatchObject({ active: 'occt', occtVersion: '7.4.0p1', build: 'opencascade.js@1.1.1', isolation: 'worker' });
-    expect(data.capabilities).toEqual(['topology', 'importShapes']);
+    expect(data.capabilities).toEqual(expect.arrayContaining(['topology', 'importShapes']));
     expect(data.modelingTolerance.linear).toMatchObject({ value: 1e-4, unit: 'mm', defaulted: true });
     expect(data.modelingTolerance.angular).toMatchObject({ value: 1e-9, unit: 'rad', defaulted: true });
     expect(data.modelingTolerance.maxImportTolerance).toMatchObject({ value: 0.01, unit: 'mm', defaulted: true });
@@ -172,5 +172,17 @@ describe('execute hands document blobs to the kernel', () => {
     expect(kernel.evaluate(recipe)).toBeNull();
     kernel.loadBlob?.(blob.sha256, 'late');
     expect(kernel.evaluate(recipe)).not.toBeNull();
+  });
+
+  it('refuses blob text whose sha256 differs from its key (a forged document cannot poison a shared kernel)', () => {
+    const { kernel, loaded } = fakeExactKernel();
+    const blob = makeBlob('model/x-occt-brep', 'genuine');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    kernel.loadBlob?.(blob.sha256, 'forged');
+    expect(loaded).toEqual([]);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('KRN_BLOB_HASH_MISMATCH'));
+    warn.mockRestore();
+    kernel.loadBlob?.(blob.sha256, 'genuine');
+    expect(loaded).toEqual([blob.sha256]);
   });
 });

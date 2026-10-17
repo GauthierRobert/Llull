@@ -8,6 +8,7 @@
 import { isFiniteNumber } from '../../lib/isFiniteNumber';
 import { isRecord } from '../../lib/isRecord';
 import { blobProblem } from '../../model/blobs';
+import { MAX_RECIPE_DEPTH } from '../../geometry/shapeRecipe';
 
 const TOLERANCE_KEYS = ['linear', 'angular', 'maxImportTolerance'] as const;
 
@@ -27,19 +28,27 @@ function kernelSettingsProblems(settings: unknown): string[] {
   return errors;
 }
 
-const MAX_SCAN_DEPTH = 64;
+/** JSON nesting scanned for `brep` leaves: a recipe level spans a few JSON levels, so this sits well above `MAX_RECIPE_DEPTH`. */
+const MAX_SCAN_DEPTH = 4 * MAX_RECIPE_DEPTH;
 
-/** Every `{ op: 'brep', blob }` leaf below `value`, with the id of the entity it sits in. */
-function collectBrepLeaves(value: unknown, owner: string, out: Array<readonly [string, string]>, depth = 0): void {
-  if (depth > MAX_SCAN_DEPTH || typeof value !== 'object' || value === null) return;
+/**
+ * Every `{ op: 'brep', blob }` leaf below `value`, with the id of the entity it sits in; `tooDeep` collects owners nested beyond
+ * `MAX_SCAN_DEPTH` (refused: an unscanned leaf would skip the KRN_BLOB_MISSING check).
+ */
+function collectBrepLeaves(value: unknown, owner: string, out: Array<readonly [string, string]>, tooDeep: Set<string>, depth = 0): void {
+  if (typeof value !== 'object' || value === null) return;
+  if (depth > MAX_SCAN_DEPTH) {
+    tooDeep.add(owner);
+    return;
+  }
   if (Array.isArray(value)) {
-    for (const item of value) collectBrepLeaves(item, owner, out, depth + 1);
+    for (const item of value) collectBrepLeaves(item, owner, out, tooDeep, depth + 1);
     return;
   }
   const node = value as Record<string, unknown>;
   if (node['op'] === 'brep' && typeof node['blob'] === 'string') out.push([owner, node['blob']]);
   for (const [key, child] of Object.entries(node))
-    if (key !== 'positions' && key !== 'indices') collectBrepLeaves(child, owner, out, depth + 1);
+    if (key !== 'positions' && key !== 'indices') collectBrepLeaves(child, owner, out, tooDeep, depth + 1);
 }
 
 /** Errors of `kernelSettings`, `blobs` and the `brep` leaves of `entities` / `components` in a raw document record. */
@@ -54,11 +63,14 @@ export function kernelSliceProblems(doc: Record<string, unknown>): string[] {
     else if (problem !== null) errors.push(`${problem}: blob '${key}' bytes do not match its sha256, mediaType or size`);
   }
   const leaves: Array<readonly [string, string]> = [];
+  const tooDeep = new Set<string>();
   for (const section of ['entities', 'components'] as const) {
     const records = doc[section];
     if (!isRecord(records)) continue;
-    for (const [id, item] of Object.entries(records)) collectBrepLeaves(item, id, leaves);
+    for (const [id, item] of Object.entries(records)) collectBrepLeaves(item, id, leaves, tooDeep);
   }
+  for (const owner of tooDeep)
+    errors.push(`'${owner}' is nested deeper than ${MAX_SCAN_DEPTH} levels; its B-rep references cannot be checked`);
   for (const [owner, sha256] of leaves)
     if (!isRecord(blobs) || !Object.hasOwn(blobs, sha256))
       errors.push(

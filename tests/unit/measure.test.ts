@@ -148,7 +148,11 @@ describe('measure commands (read-only)', () => {
     const r = execute(b.doc, 'mass_properties', { entityId: b.ids[0] });
     expect(r.data).toMatchObject({ volume: 48, volumeUnit: 'mm³', method: 'closed-form', centroid: [0, 0, 0], area: 88 });
     expect(r.summary).toContain('Volume of');
-    expect(execute(b.doc, 'mass_properties', { entityId: b.ids[0], density: 0.5 }).data).toMatchObject({
+    expect(r.data).not.toHaveProperty('unverified');
+    expect(r.data).not.toHaveProperty('unverifiedReasons');
+    const weighed = execute(b.doc, 'mass_properties', { entityId: b.ids[0], density: 0.5 });
+    expect(weighed.summary).toContain('Unverified density (given by the caller');
+    expect(weighed.data).toMatchObject({
       volume: 48,
       volumeUnit: 'mm³',
       density: 0.5,

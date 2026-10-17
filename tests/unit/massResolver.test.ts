@@ -141,7 +141,7 @@ describe('mass_properties against the analytic corpus (closed-form path)', () =>
     expect(relative(data.inertia.atCentroid[2][2], expected.inertia_rho1_mm5?.[2] ?? 1)).toBeLessThan(0.05);
   });
 
-  it('a loft is integrated from its triangles: method mesh, unverified method_mesh, review required', () => {
+  it('a loft is integrated from its triangles: method mesh, review required for method_mesh (unverified stays about the density)', () => {
     const loft = solid(createEmptyDocument(), 'loft_sections', {
       sections: [
         { center: [0, 0, 0], radius: 1 },
@@ -150,8 +150,7 @@ describe('mass_properties against the analytic corpus (closed-form path)', () =>
     });
     const data = dataOf(loft.doc, { entityId: loft.id });
     expect(data.method).toBe('mesh');
-    expect(data.unverified).toBe(true);
-    expect(data.unverifiedReasons).toContain('method_mesh');
+    expect(data.unverified).toBeUndefined();
     expect(data.reviewRequired).toEqual({ value: true, reasons: ['method_mesh'] });
   });
 });

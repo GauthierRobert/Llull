@@ -207,7 +207,8 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
     for (const [sha256, text] of blobs) {
       if (target.blobsSent.has(sha256)) continue;
       target.blobsSent.add(sha256);
-      if (transact(target, 'loadBlob', [sha256, text]) === null) return null;
+      // a reply that recycled the worker leaves `target` killed: stop here, the next call respawns and re-sends every blob
+      if (transact(target, 'loadBlob', [sha256, text]) === null || live !== target) return null;
     }
     return transact(target, op, args);
   };
