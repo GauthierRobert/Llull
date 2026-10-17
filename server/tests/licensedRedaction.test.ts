@@ -76,7 +76,7 @@ const command = (name: string, params: Record<string, unknown>, headers: Record<
   request(app).post('/command').set(headers).send({ name, params });
 
 async function mcpCall(headers: Record<string, string>, name: string, args: Record<string, unknown>): Promise<McpToolResult> {
-  const post = (body: object, session?: string): request.Test => {
+  const post = (session?: string): request.Test => {
     const req = request(app)
       .post('/mcp')
       .set(headers)
@@ -85,13 +85,13 @@ async function mcpCall(headers: Record<string, string>, name: string, args: Reco
     return session !== undefined ? req.set('mcp-session-id', session) : req;
   };
   const rpc = async (body: object, session?: string): Promise<request.Response> => {
-    const res = session !== undefined ? await post(body, session).send(body) : await post(body).send(body);
+    const res = await post(session).send(body);
     expect(res.status).toBe(200);
     return res;
   };
   const init = await rpc({ jsonrpc: '2.0', id: 1, method: 'initialize', params: INITIALIZE_PARAMS });
   const session = init.headers['mcp-session-id'] as string;
-  await post({}, session).send({ jsonrpc: '2.0', method: 'notifications/initialized' });
+  await post(session).send({ jsonrpc: '2.0', method: 'notifications/initialized' });
   await rpc(
     { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'enable_toolset', arguments: { toolset: 'materials' } } },
     session,
