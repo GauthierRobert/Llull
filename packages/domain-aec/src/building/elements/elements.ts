@@ -28,6 +28,8 @@ import { nextMemberMark } from '../../industrial/common/memberSupport';
 import { copyPipeSupports } from '../../industrial/piping/pipeSupportCopy';
 import { reconcilePipeSupports, reconciliationNote } from '../../industrial/piping/pipeSupportAttach';
 import { levelIdParam } from '../levelParams';
+import { fromMm } from '@core/model/units';
+import { STAIR_HEADROOM_MM, stairSlabCrossings } from '../../industrial/clash/clashSlabs';
 
 /**
  * @affects creates the room outline + name/area tags on layer A-AREA
@@ -260,7 +262,7 @@ export const copyLevelElements = defineCommand({
   name: 'copy_level_elements',
   description:
     'Repeat a floor: copy every wall (with its doors/windows), slab, column, beam, stair and room of the source level onto each target ' +
-    'level (typical floors of a multi-storey building). Optionally restrict to some categories. Copied pipes bring their pipe supports, ' +
+    'level (typical floors of a multi-storey building; a copied stair is reported if the slab above has no well - use add_slab_opening). Optionally restrict to some categories. Copied pipes bring their pipe supports, ' +
     're-attached to the steel found at their new position (unattached when none is in reach).',
   params: z.object({
     sourceLevelId: z.string().describe('Level to copy from.'),
@@ -350,11 +352,22 @@ export const copyLevelElements = defineCommand({
       next,
       created.filter((id) => next.elements[id]?.category === 'pipeSupport'),
     );
+    const unwelled = created.flatMap((id) => {
+      const stair = supports.building.elements[id];
+      return stair?.category === 'stair' &&
+        stairSlabCrossings(supports.building, stair, fromMm(doc, STAIR_HEADROOM_MM), fromMm(doc, 5)).length > 0
+        ? [stair.mark]
+        : [];
+    });
+    const wellNote =
+      unwelled.length > 0
+        ? ` WARNING: stair(s) ${unwelled.join(', ')} run into the slab above, which has no well; cut one with add_slab_opening { stairId }.`
+        : '';
     return commitBuilding(
       doc,
       supports.building,
       created,
-      `Copied ${sourceElements.length} element(s) from ${sourceLevelId} to ${targetLevelIds.join(', ')}: ${created.length} new element(s).${reconciliationNote(supports)}`,
+      `Copied ${sourceElements.length} element(s) from ${sourceLevelId} to ${targetLevelIds.join(', ')}: ${created.length} new element(s).${reconciliationNote(supports)}${wellNote}`,
       { elementIds: created },
     );
   },

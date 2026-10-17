@@ -129,6 +129,12 @@ export interface SimulationOptions {
 /** Unit quaternion [w, x, y, z]. */
 export type Quaternion = readonly [number, number, number, number];
 
+/** Largest magnitude seen, and when. */
+export interface StepPeak {
+  readonly value: number;
+  readonly timeS: number;
+}
+
 /** Sampled motion; every series has one value per entry of `times`. */
 export interface SimulationTrace {
   readonly times: number[];
@@ -147,6 +153,11 @@ export interface SimulationTrace {
    * world axes, N and N·m, per sample (needs `options.reactions`). Omitted by engines that cannot report reactions.
    */
   readonly jointReaction?: Record<string, { force: Vec3[]; moment: Vec3[] }>;
+  /**
+   * Largest |force| (N) and |moment| (N·m, tree joints only) of every loop / tree joint over EVERY integration step, not only the recorded
+   * samples (needs `options.reactions`; omitted by engines that cannot). Sampling can miss a sharp peak; this cannot.
+   */
+  readonly reactionPeaks?: Record<string, { force: StepPeak; moment: StepPeak | null }>;
   /** m: largest loop-constraint violation over every integration step (present when the model has loops). */
   readonly loopResidual?: number;
 }

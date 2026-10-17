@@ -71,6 +71,8 @@ function runLoopNode(run: PlanRun, index: number, node: LoopNode, path: string, 
       path,
     );
   run.loopIterations += header.values.length;
+  for (const [alias, ids] of Object.entries(node.bind ?? {}))
+    if (Array.isArray(ids) && ids.every((id) => typeof id === 'string')) run.bindings[alias] ??= ids;
   for (let k = 0; k < header.values.length; k++) {
     const scope = { ...vars, [header.variable]: header.values[k] as number };
     if (runBody(run, index, node.actions, `${path} › iter ${k}`, scope)) return true;
@@ -88,16 +90,18 @@ function innerAliases(items: readonly unknown[], into = new Set<string>()): Set<
   return into;
 }
 
-/** The loop with `$alias` refs to aliases bound BEFORE it replaced by their ids (replay has no aliases). */
+/** The loop with `$alias` refs to aliases bound BEFORE it replaced by their ids (replay has no aliases); outer aliases the body rebinds are seeded via `bind`. */
 function freezeOuterRefs(node: LoopNode, bindings: Record<string, string[]>): LoopNode {
   const inner = innerAliases(node.actions);
-  return mapStringLeaves(node, (text) => {
+  const frozen = mapStringLeaves(node, (text) => {
     const m = REF.exec(text);
     const name = m?.[1];
     if (name === undefined || inner.has(name) || bindings[name] === undefined) return text;
     const ref = resolveRef(text, bindings);
     return ref.error === null ? ref.value : text;
   }) as LoopNode;
+  const rebound = Object.entries(bindings).filter(([name]) => inner.has(name));
+  return rebound.length > 0 ? { ...frozen, bind: Object.fromEntries(rebound) } : frozen;
 }
 
 /**

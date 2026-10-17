@@ -12,7 +12,7 @@ import { buildCivilPlanSheet } from './civilPlanSheet';
 import { buildPlanProfileSheet } from './planProfileSheet';
 
 /**
- * @affects none; data = { text, fileName, paper, scale, counts, layers, clipped }
+ * @affects none; data = { svg, text, fileName, paper, scale, counts, layers, clipped }
  * @failure no civil entity / scale <= 0 / no matching layer -> no data
  */
 export const exportCivilPlanSheet = defineCommand({
@@ -21,12 +21,12 @@ export const exportCivilPlanSheet = defineCommand({
     'Printable civil plan drawing (SVG in real millimetres, print to PDF at 100 %): every civil entity (contours with labels, survey ' +
     'points, pads and daylight lines, alignment centreline with stations, corridor edges, manholes and pipes with labels) at a true ' +
     'scale 1:N on ISO paper A4-A0 landscape, clipped to the drawing viewport, with the title block from set_project_info, north arrow, ' +
-    'scale bar, layer legend and, on a calibrated site (set_site_calibration), grid coordinate ticks. data.text holds the file, ' +
+    'scale bar, layer legend and, on a calibrated site (set_site_calibration), grid coordinate ticks. data.svg holds the file (data.text is an alias), ' +
     'data.fileName its name.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
     confirmExportControlled,
-    paper: z.enum(PAPER_SIZES).describe('Paper size, landscape: A4, A3, A2, A1 or A0.'),
+    paper: z.enum(PAPER_SIZES).optional().describe('Paper size, landscape: A4, A3, A2, A1 or A0. Default A3.'),
     scale: z
       .number()
       .optional()
@@ -35,7 +35,7 @@ export const exportCivilPlanSheet = defineCommand({
     title: z.string().optional().describe('Drawing title. Default "Civil plan".'),
     layers: z.array(z.string()).optional().describe('Civil layer names to draw, e.g. ["C-TOPO-MAJR", "C-ROAD-CNTR"]. Default: all.'),
   }),
-  run: (doc, { confirmExportControlled, paper, scale, center, title, layers }, ctx): CommandResult => {
+  run: (doc, { confirmExportControlled, paper = 'A3', scale, center, title, layers }, ctx): CommandResult => {
     const refused = exportRefusal(doc, 'export_civil_plan_sheet', 'sheet', confirmExportControlled, ctx);
     if (refused !== null) return refused;
     const sheet = buildCivilPlanSheet(doc, { paper, scale, center, title, layers });
@@ -52,6 +52,7 @@ export const exportCivilPlanSheet = defineCommand({
         `at 1:${sheet.scale} on ${paper}, ${sheet.layers.length} layer(s).`,
       {
         text: sheet.text,
+        svg: sheet.text,
         fileName,
         paper,
         scale: sheet.scale,
@@ -65,7 +66,7 @@ export const exportCivilPlanSheet = defineCommand({
 });
 
 /**
- * @affects none; data = { text, fileName, paper, scale, fits }
+ * @affects none; data = { svg, text, fileName, paper, scale, fits }
  * @failure unknown alignment / no valid profile / invalid scale -> no data
  */
 export const exportPlanProfileSheet = defineCommand({
@@ -73,7 +74,7 @@ export const exportPlanProfileSheet = defineCommand({
   description:
     'Printable plan-and-profile sheet of an alignment (SVG, print to PDF at 100 %): a stationed plan strip (road edges, station ticks, ' +
     'horizontal curves with radius) above the long section (ground, design, PVIs, table band), both at the horizontal scale 1:N so ' +
-    'stations line up. Needs set_alignment_profile. data.text holds the file, data.fileName its name.',
+    'stations line up. Needs set_alignment_profile. data.svg holds the file (data.text is an alias), data.fileName its name.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
     confirmExportControlled,
@@ -96,7 +97,7 @@ export const exportPlanProfileSheet = defineCommand({
         (sheet.fits
           ? ''
           : ' WARNING: the long section is larger than the paper; use a larger paper, a smaller scale or lower verticalExaggeration.'),
-      { text: sheet.text, fileName, paper, scale: sheet.scale, fits: sheet.fits },
+      { text: sheet.text, svg: sheet.text, fileName, paper, scale: sheet.scale, fits: sheet.fits },
     );
   },
 });

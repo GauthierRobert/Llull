@@ -64,6 +64,13 @@ export interface OccOffsetMaker extends OccHandle {
   Shape(): OccShape;
 }
 
+/** BRepOffsetAPI_MakeThickSolid: hollows a solid, removing the closing faces (none = a sealed cavity). */
+export interface OccThickSolidMaker extends OccHandle {
+  MakeThickSolidByJoin(...args: readonly unknown[]): void;
+  IsDone(): boolean;
+  Shape(): OccShape;
+}
+
 export interface OccFilletMaker extends OccBuilder {
   Add_2(radius: number, edge: OccShape): void;
   Add_3(radiusStart: number, radiusEnd: number, edge: OccShape): void;

@@ -146,7 +146,7 @@ describe('derived loads against the analytic peaks at low speed (VC-FPR-12 dynam
 
   it('light bodies under a 27 kN gas force at a 1 ms step drift past the fail tier: flagged, reactions unreliable (VC-FPR-35)', () => {
     const { doc } = engine({ rpm: 60, crankInertia: 2, pistonKg: 0.001, rodKg: 0.001 });
-    const data = run(governed(doc, 60), { duration: 2.2, reactions: 'peaks' });
+    const data = run(governed(doc, 60), { duration: 2.2, timestep: 0.001, reactions: 'peaks' });
     expect(data.loops?.tier).toBe('fail');
     expect(data.loops?.residualM ?? 0).toBeGreaterThan(1e-5);
     expect(data.warnings.some((w) => w.startsWith('FPR_LOOP_DRIFT (fail)'))).toBe(true);

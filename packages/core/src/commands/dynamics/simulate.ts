@@ -5,7 +5,8 @@ import { defineCommand, z } from '../schema';
 import { commandError, failer, rejection, report } from '../noop';
 import { currentContext } from '../context';
 import { toMetres } from '../../model/units';
-import { buildSimulationModel, solverSettingsOf } from '../../dynamics/simulationModel';
+import { buildSimulationModel, solverSettingsOf, type BuiltSimulation } from '../../dynamics/simulationModel';
+import type { SimulationTrace } from '../../dynamics/physicsEngine';
 import { simulationData, simulationSummary } from '../../dynamics/simulationReport';
 import { PILOT_DURATION, PILOT_TIMESTEP, resolveTimestep } from '../../dynamics/timestep';
 import { buildTopology, isRefusal } from '../../dynamics/topology';
@@ -20,6 +21,13 @@ import { openLoopGaps } from './inspect';
 const MAX_STEPS = 1_000_000;
 /** Upper bound on recorded samples (keeps results small enough for MCP and the viewport). */
 const MAX_SAMPLES = 6001;
+/** Most halvings of the auto timestep after a failed loop-residual gate, and the smallest step they may reach (s). */
+const MAX_HALVINGS = 5;
+const MIN_STEP = 1e-5;
+
+type Attempt =
+  | { readonly timestep: number; readonly error: string }
+  | { readonly timestep: number; readonly built: BuiltSimulation; readonly trace: SimulationTrace; readonly sampleInterval: number };
 
 /**
  * @affects nothing — read-only; returns { ...SimulationData, loops?, reactions?, engineReport? } in data
@@ -117,22 +125,45 @@ export const simulateMotion = defineCommand({
       }
     };
     const resolved = resolveTimestep(dynamics, settings, params.timestep, structured, pilotPeak);
-    const timestep = resolved.timestep;
-    if (duration / timestep > MAX_STEPS)
-      return fail(`duration / timestep is over ${MAX_STEPS.toLocaleString('en-US')} steps; raise the timestep`);
     // engines: one sample per degree of crank at the top speed unless the call sets a rate
     const degreeInterval = resolved.maxSpeed > 0 ? Math.PI / 180 / resolved.maxSpeed : 1 / 50;
     const defaultInterval = hasCylinders ? degreeInterval : 1 / 50;
-    const sampleInterval = Math.max(
-      timestep,
-      params.sampleRate !== undefined ? 1 / params.sampleRate : defaultInterval,
-      duration / (MAX_SAMPLES - 1),
-    );
-    const built = buildSimulationModel(doc, timestep, kernel);
-    if ('error' in built) return fail(built.error);
     const mode: ReactionMode = params.reactions ?? (structured ? 'peaks' : 'off');
+    const attemptAt = (step: number): Attempt => {
+      if (duration / step > MAX_STEPS)
+        return { timestep: step, error: `duration / timestep is over ${MAX_STEPS.toLocaleString('en-US')} steps; raise the timestep` };
+      const interval = params.sampleRate !== undefined ? 1 / params.sampleRate : defaultInterval;
+      // the engine samples every whole number of steps: round the cap UP to one so the run never exceeds MAX_SAMPLES
+      const capInterval = duration / (MAX_SAMPLES - 1);
+      const sampleInterval =
+        capInterval > Math.max(step, interval) ? Math.ceil(capInterval / step - 1e-9) * step : Math.max(step, interval);
+      const model = buildSimulationModel(doc, step, kernel);
+      if ('error' in model) return { timestep: step, error: model.error };
+      try {
+        const options = { duration, timestep: step, sampleInterval, ...(mode !== 'off' ? { reactions: true } : {}) };
+        return { timestep: step, built: model, trace: engine.simulate(model.model, options), sampleInterval };
+      } catch (error) {
+        return { timestep: step, error: `the physics engine rejected the model: ${errorMessage(error)}` };
+      }
+    };
+    // the auto rule only sees speed and geometry: a light slow loop can still miss the residual gate, so halve the step and retry
+    const adaptive = params.timestep === undefined && structured && settings.timestepS === 'auto';
+    const failsGate = (attempt: Attempt): boolean =>
+      'error' in attempt ||
+      residualTier(attempt.trace.loopResidual ?? 0, settings.loopResidualPassM, settings.loopResidualFailM) === 'fail';
+    let attempt = attemptAt(resolved.timestep);
+    let halvings = 0;
+    while (adaptive && failsGate(attempt) && halvings < MAX_HALVINGS && attempt.timestep / 2 >= MIN_STEP) {
+      const next = attemptAt(attempt.timestep / 2);
+      if ('error' in next && next.error.includes('steps; raise')) break;
+      attempt = next;
+      halvings++;
+    }
+    if ('error' in attempt) return fail(attempt.error);
     try {
-      const trace = engine.simulate(built.model, { duration, timestep, sampleInterval, ...(mode !== 'off' ? { reactions: true } : {}) });
+      const { trace, built, timestep } = attempt;
+      const basis =
+        halvings > 0 ? `${resolved.basis}; halved ${halvings}x from ${resolved.timestep} s after the loop residual failed` : resolved.basis;
       const base = simulationData(dynamics, built.mass, trace, {
         engine: engine.name,
         duration,
@@ -143,6 +174,14 @@ export const simulateMotion = defineCommand({
       const residual = trace.loopResidual ?? 0;
       const tier = residualTier(residual, settings.loopResidualPassM, settings.loopResidualFailM);
       const warnings = [...base.warnings];
+      if (halvings > 0)
+        warnings.push(
+          `timestep halved ${halvings}x by the auto rule: ${resolved.timestep} s left the loop residual above the fail tier, ${timestep} s is used`,
+        );
+      if (params.sampleRate !== undefined && attempt.sampleInterval > 1 / params.sampleRate + 1e-12)
+        warnings.push(
+          `sampleRate ${params.sampleRate} Hz was reduced to ${(1 / attempt.sampleInterval).toPrecision(4)} Hz (at most ${MAX_SAMPLES} samples per run, and never finer than the timestep ${timestep} s)`,
+        );
       if (structured && tier !== 'pass')
         warnings.push(
           `FPR_LOOP_DRIFT (${tier}): loop residual ${(residual * 1e6).toPrecision(3)} µm; ` +
@@ -183,7 +222,7 @@ export const simulateMotion = defineCommand({
                 solver: {
                   integrator: settings.integrator,
                   timestepS: timestep,
-                  timestepBasis: resolved.basis,
+                  timestepBasis: basis,
                   loopTimeConstantS: built.model.solver.loopTimeConstant,
                   loopTimeConstantSteps: settings.loopTimeConstantSteps,
                   loopImpedance: settings.loopImpedance,

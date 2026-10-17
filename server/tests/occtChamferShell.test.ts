@@ -57,6 +57,23 @@ describe('occt shell', () => {
     expect(volume(meshOf(occt, shell(meshLeaf, 0.5))!)).toBeCloseTo(4 ** 3 - 3 ** 3, 2);
   });
 
+  it('hollows a filleted solid (the offset skin is closed into a solid before the cut)', () => {
+    const rounded: ShapeRecipe = { op: 'fillet', source: cube, edges: [0], size: 1 };
+    const solidVolume = volume(meshOf(occt, rounded)!);
+    const hollow = meshOf(occt, shell(rounded, 0.5));
+    expect(hollow).not.toBeNull();
+    const cavity = volume(hollow!);
+    expect(cavity).toBeGreaterThan(solidVolume * 0.3);
+    expect(cavity).toBeLessThan(solidVolume - 4 ** 3 * 0.3);
+  });
+
+  it('openNear removes the picked face: an open-topped cup of the exact wall volume', () => {
+    const cup = meshOf(occt, { op: 'shell', source: cube, thickness: 0.5, openNear: [[0, 0, 2]] });
+    expect(cup).not.toBeNull();
+    expect(volume(cup!)).toBeCloseTo(4 ** 3 - 3 * 3 * 3.5, 2);
+    expect(occt.evaluate({ op: 'shell', source: cube, thickness: 0.5, openNear: [] })).not.toBeNull();
+  });
+
   it('rejects a non-positive thickness and an empty mesh', () => {
     expect(occt.evaluate(shell(cube, 0))).toBeNull();
     const empty = { ...cubeEntity(1), kind: 'mesh', mesh: { positions: [], indices: [] } };

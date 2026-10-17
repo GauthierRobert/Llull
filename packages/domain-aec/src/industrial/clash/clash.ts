@@ -13,7 +13,8 @@ import { dot3, scale3, sub3 } from '@lib/vec3';
 import { atLevel } from '../evaluate';
 import { briefList } from '../../shared/briefList';
 import { type OrientedBox, boxOverlap, elementBoxes } from './clashBoxes';
-import { slabPenetrations } from './clashSlabs';
+import { STAIR_HEADROOM_MM, slabPenetrations, stairPenetrations } from './clashSlabs';
+import { columnsInOpening } from '../../building/geometry/openingColumns';
 
 const CLEARANCE_OBSTACLES: ReadonlySet<BimCategory> = new Set(['equipment', 'member', 'column', 'wall', 'curvedWall', 'stair']);
 
@@ -128,9 +129,22 @@ function findClashes(doc: CadDocument, levelIds: ReadonlySet<string> | null, tol
     }
   }
   const inScope = (levelId: string): boolean => levelIds === null || levelIds.has(levelId);
-  for (const penetration of slabPenetrations(building, inScope, tolerance)) {
-    const [a, b] = [penetration.equipmentId, penetration.slabId].sort() as [string, string];
+  const penetrations = [
+    ...slabPenetrations(building, inScope, tolerance),
+    ...stairPenetrations(building, inScope, fromMm(doc, STAIR_HEADROOM_MM), tolerance),
+  ];
+  for (const penetration of penetrations) {
+    const [a, b] = [penetration.elementId, penetration.slabId].sort() as [string, string];
     record({ a, b, kind: 'hard', depth: penetration.depth });
+  }
+  for (const opening of Object.values(building.elements)) {
+    if (opening.category !== 'door' && opening.category !== 'window') continue;
+    const wall = building.elements[opening.hostId];
+    if (wall?.category !== 'wall' || !inScope(wall.levelId)) continue;
+    for (const { column, depth } of columnsInOpening(building, wall, opening, tolerance)) {
+      const [a, b] = [opening.id, column.id].sort() as [string, string];
+      record({ a, b, kind: 'hard', depth });
+    }
   }
   for (const solid of solids) {
     const equipment = building.elements[solid.elementId];
@@ -160,6 +174,8 @@ export const checkClashes = defineCommand({
   description:
     'Read-only clash detection (like Navisworks / Plant 3D): hard clashes between pipes, cable trays, equipment, steel members, walls, ' +
     'concrete columns, beams and stairs, equipment passing through a floor / grating that has no opening around it (add_slab_opening), ' +
+    'a stair whose headroom (2 m above its treads) runs into a slab without a well (add_slab_opening stairId), a door / window opening ' +
+    'that overlaps a column in its wall line, ' +
     'plus equipment maintenance-clearance violations. Steel-to-steel joints, run connections (a pipe end inside equipment, a pipe / tray ' +
     'ending on another) and a pipe support touching its own pipe and the steel it bears on are not reported. Returns element ids, kind ' +
     'and penetration depth (document units; summary in mm).',

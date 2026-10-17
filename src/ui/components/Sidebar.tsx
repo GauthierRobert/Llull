@@ -1,5 +1,5 @@
 // Icon rail + the one browser panel it selects (objects, building, civil, layers, assembly, mechanisms, parameters, history,
-// configurations, materials); tab state in useLayoutStore.
+// configurations, materials, analysis); tab state in useLayoutStore.
 
 import React from 'react';
 import type { CadDocument } from '@core/model/types';
@@ -18,6 +18,7 @@ import { BuildingPanel } from '@ui/panels/building/BuildingPanel';
 import { CivilPanel } from '@ui/panels/civil/CivilPanel';
 import { ManufacturingPanel } from '@ui/panels/manufacturing/ManufacturingPanel';
 import { FastenersPanel } from '@ui/panels/fasteners/FastenersPanel';
+import { AnalysisPanel } from '@ui/panels/analysis/AnalysisPanel';
 import { ReviewPanel } from '@ui/panels/review/ReviewPanel';
 import { useReviewStore } from '@ui/panels/review/reviewStore';
 import { type SidebarTabSpec, SIDEBAR_TAB_SPECS, isSidebarTabAvailable } from './sidebarTabs';
@@ -36,6 +37,7 @@ const TAB_PANELS: Readonly<Record<SidebarTab, React.ComponentType<{ className?: 
   materials: MaterialsPanel,
   manufacturing: ManufacturingPanel,
   fasteners: FastenersPanel,
+  analysis: AnalysisPanel,
   review: ReviewPanel,
 };
 
@@ -54,6 +56,7 @@ const TAB_COUNTS: Readonly<Record<SidebarTab, (doc: CadDocument) => number>> = {
   materials: (doc) => Object.keys(doc.materials).length,
   manufacturing: (doc) => Object.keys(doc.sheetMetal?.parts ?? {}).length,
   fasteners: (doc) => Object.keys(doc.fasteners?.stacks ?? {}).length,
+  analysis: (doc) => doc.analysis?.caseOrder.length ?? 0,
   review: () => 0,
 };
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rasterizeSvg, buildImageBlock, stripSvgFromData, MAX_RASTER_PX } from '../src/renderImage';
+import { sanitizeSvgForResvg, rasterizeSvg, buildImageBlock, stripSvgFromData, MAX_RASTER_PX } from '../src/renderImage';
 import { shapeToolCallContent } from '@mcp/index';
 
 const VALID_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="#336699"/></svg>';
@@ -34,6 +34,24 @@ describe('rasterizeSvg', () => {
 
   it.each(['', 'not-svg-at-all <<<', '<svg xmlns="http://www.w3.org/2000/svg">'])('returns null (no throw) for %j', (svg) => {
     expect(rasterizeSvg(svg)).toBeNull();
+  });
+});
+
+describe('rasterizeSvg on content that aborts resvg', () => {
+  // A <g opacity> layer lying entirely outside the canvas (a zoomed-in render_view's ground grid) is a Rust panic = process abort.
+  const OFFSCREEN_GROUP =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="800" height="600" fill="#123"/>' +
+    '<g opacity="0.18" stroke="#88aacc" stroke-width="0.8"><line x1="-2430" y1="2551" x2="-2430" y2="-1951"/></g></svg>';
+
+  it('rasterizes it (group opacity rewritten) and keeps the process alive', () => {
+    const png = rasterizeSvg(OFFSCREEN_GROUP);
+    expect(png).not.toBeNull();
+    expect(isPng(png!)).toBe(true);
+    expect(sanitizeSvgForResvg(OFFSCREEN_GROUP)).toContain('<g stroke-opacity="0.18" fill-opacity="0.18" stroke="#88aacc"');
+  });
+
+  it('leaves svg without group opacity untouched', () => {
+    expect(sanitizeSvgForResvg(VALID_SVG)).toBe(VALID_SVG);
   });
 });
 

@@ -8,7 +8,9 @@ import {
   PLOT_MAX_WIDTH,
   PLOT_ROW_HEIGHT,
   PLOT_TOP,
+  bandAnchor,
   levelFrame,
+  scaleDenominator,
   pushLevelGrid,
   pushTableLabels,
   svgDocument,
@@ -69,7 +71,8 @@ export function drainageLongSectionSvg(title: string, stations: readonly RunStat
     svgText(
       LEFT,
       42,
-      `Scale H 1:${Math.round(1 / hScale)}  V 1:${Math.round(1 / vScale)}; levels in m; ` + `ground = rim, red = obvert/invert, blue = HGL`,
+      `Scale H 1:${scaleDenominator(hScale)}  V 1:${scaleDenominator(vScale)}; levels in m; ` +
+        `ground = rim, red = obvert/invert, blue = HGL`,
       { size: 10 },
     ),
     svgRect(LEFT, TOP, plotWidth, plotHeight),
@@ -112,17 +115,18 @@ export function drainageLongSectionSvg(title: string, stations: readonly RunStat
   const bandTop = TOP + plotHeight + 12;
   pushTableLabels(body, TABLE_LABELS, LEFT, plotWidth, bandTop, ROW_HEIGHT);
   body.push(svgLine([LEFT, bandTop], [LEFT + plotWidth, bandTop], '#444'));
-  const cell = (px: number, row: number, text: string): void => {
-    body.push(svgText(px, bandTop + row * ROW_HEIGHT + 12, text, { anchor: 'middle', size: 8 }));
+  const cell = (px: number, row: number, text: string, anchor: 'start' | 'middle' | 'end' = 'middle'): void => {
+    body.push(svgText(px, bandTop + row * ROW_HEIGHT + 12, text, { anchor, size: 8 }));
   };
-  for (const station of stations) {
+  stations.forEach((station, index) => {
+    const anchor = bandAnchor(index, stations.length);
     const px = x(station.chainageM);
     body.push(svgLine([px, TOP + plotHeight], [px, bandTop + TABLE_LABELS.length * ROW_HEIGHT]));
-    cell(px, 0, station.chainageM.toFixed(2));
-    cell(px, 1, station.rimM.toFixed(2));
-    cell(px, 2, station.invertM.toFixed(2));
-    cell(px, 4, station.hglM.toFixed(2));
-  }
+    cell(px, 0, station.chainageM.toFixed(2), anchor);
+    cell(px, 1, station.rimM.toFixed(2), anchor);
+    cell(px, 2, station.invertM.toFixed(2), anchor);
+    cell(px, 4, station.hglM.toFixed(2), anchor);
+  });
   for (const segment of segments) {
     const mid = (x(segment.startM) + x(segment.endM)) / 2;
     cell(mid, 3, `${segment.id} Ø${segment.diameterMm} ${segment.slopePct.toFixed(2)}% ${segment.lengthM.toFixed(1)}m`);

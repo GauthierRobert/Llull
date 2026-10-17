@@ -12,10 +12,10 @@ import { endStation, horizontalElements } from '../alignment/alignmentGeometry';
 import { stationText, getCivil } from '../model';
 import { analyseStations, reportRows, reportStations } from '../road/roadReport';
 import { LONG_SECTION_LEFT, longSectionSvg } from './longSectionSvg';
+import { SVG_UNIT_MM } from '../road/roadSvg';
 import { validateProfile } from '../alignment/profileGeometry';
 
-/** Paper millimetres per long-section SVG unit. */
-const PAPER_PER_UNIT = 0.25;
+const PAPER_PER_UNIT = SVG_UNIT_MM;
 const STRIP_HEIGHT = 42;
 const LONG_SECTION_RIGHT = 40;
 
@@ -60,7 +60,7 @@ export function buildPlanProfileSheet(
     `<text x="${n(area.x)}" y="${n(area.y + 4)}" font-size="3.2" text-anchor="start">${escapeXml(`PLAN - ${alignment.name}`)}</text>`,
     ...[-halfWidth, halfWidth].map(
       (side) =>
-        `<line class="road-edge" x1="${n(stationX(startM))}" y1="${n(axisY + side)}" x2="${n(stationX(startM + lengthM))}" y2="${n(axisY + side)}" class="thin"/>`,
+        `<line class="road-edge" x1="${n(stationX(startM))}" y1="${n(axisY + side)}" x2="${n(stationX(startM + lengthM))}" y2="${n(axisY + side)}" stroke="#444" stroke-width="0.25"/>`,
     ),
     `<line class="centreline" x1="${n(stationX(startM))}" y1="${n(axisY)}" x2="${n(stationX(startM + lengthM))}" y2="${n(axisY)}" stroke="#d04a4a" stroke-width="0.35"/>`,
   ];

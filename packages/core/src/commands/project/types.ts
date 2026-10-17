@@ -27,6 +27,8 @@ export interface LoopNode {
   repeat?: { count: number | string; as?: string };
   for?: { var: string; from: number | string; to: number | string; step?: number | string };
   actions: ActionItem[];
+  /** Recorded in history: ids of outer aliases that the body both reads (before rebinding) and rebinds; seeds the bindings on replay. */
+  bind?: Record<string, string[]>;
 }
 
 /** A plan item — a plain action, a legacy single-step loop, or a nestable loop. */

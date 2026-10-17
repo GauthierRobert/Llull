@@ -16,7 +16,9 @@ import {
   PLOT_MAX_WIDTH,
   PLOT_ROW_HEIGHT,
   PLOT_TOP,
+  bandAnchor,
   levelFrame,
+  scaleDenominator,
   pushLevelGrid,
   pushTableLabels,
   svgDocument,
@@ -34,6 +36,8 @@ const TOP = PLOT_TOP;
 const ROW_HEIGHT = PLOT_ROW_HEIGHT;
 const MAX_PLOT_WIDTH = PLOT_MAX_WIDTH;
 const MAX_PLOT_HEIGHT = 480;
+/** Minimum horizontal gap (SVG units) between two table-band columns. */
+const MIN_COLUMN_GAP = 64;
 
 type Pair = readonly [number, number];
 
@@ -87,7 +91,7 @@ export function longSectionSvg(
     svgText(
       LEFT,
       42,
-      `Scale H 1:${Math.round(1 / hScale)}  V 1:${Math.round(1 / vScale)}  (vertical exaggeration x${verticalExaggeration}); levels in m`,
+      `Scale H 1:${scaleDenominator(hScale)}  V 1:${scaleDenominator(vScale)}  (vertical exaggeration x${verticalExaggeration}); levels in m`,
       { size: 10 },
     ),
   );
@@ -158,9 +162,11 @@ export function longSectionSvg(
   const bandTop = TOP + plotHeight + 12;
   pushTableLabels(body, ['Station', 'Ground', 'Design', 'Cut(-)/Fill(+)'], LEFT, plotWidth, bandTop, ROW_HEIGHT);
   body.push(svgLine([LEFT, bandTop], [LEFT + plotWidth, bandTop], '#444'));
-  const stride = Math.max(1, Math.ceil(64 / Math.max(1, plotWidth / Math.max(1, rows.length - 1))));
+  const stride = Math.max(1, Math.ceil(MIN_COLUMN_GAP / Math.max(1, plotWidth / Math.max(1, rows.length - 1))));
+  const lastX = x((rows[rows.length - 1] ?? { station: 0 }).station);
   rows.forEach((row, index) => {
-    if (index % stride !== 0 && index !== rows.length - 1) return;
+    const isLast = index === rows.length - 1;
+    if (!isLast && (index % stride !== 0 || lastX - x(row.station) < MIN_COLUMN_GAP)) return;
     const px = x(row.station);
     body.push(svgLine([px, TOP + plotHeight], [px, bandTop + 4 * ROW_HEIGHT], '#ddd'));
     const cells = [
@@ -170,7 +176,7 @@ export function longSectionSvg(
       row.cutFillM === null ? '-' : (row.cutFillM > 0 ? '+' : '') + row.cutFillM.toFixed(2),
     ];
     cells.forEach((cell, r) => {
-      body.push(svgText(px, bandTop + r * ROW_HEIGHT + 12, cell, { anchor: 'middle', size: 8 }));
+      body.push(svgText(px, bandTop + r * ROW_HEIGHT + 12, cell, { anchor: bandAnchor(index, rows.length), size: 8 }));
     });
   });
   return svgDocument(LEFT + plotWidth + 40, bandTop + 4 * ROW_HEIGHT + 20, body);

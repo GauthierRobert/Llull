@@ -98,7 +98,9 @@ describe('add_beam / add_stair', () => {
     const stair = result.document.building!.elements['stair-1']!;
     expect(stair).toMatchObject({ riserCount: 18 });
     expect(stair.category === 'stair' && stair.riserHeight).toBeCloseTo(166.67, 1);
-    expect(result.affected).toHaveLength(19);
+    expect(result.affected).toHaveLength(18);
+    expect(stair).toMatchObject({ waistThickness: 175 });
+    expect(result.summary).toContain('17 treads');
     expect(result.summary).toMatch(/2R\+G = 613 mm\./);
     const steep = execute(createEmptyDocument(), 'add_stair', { start: [0, 0], riserCount: 10, treadDepth: 200 });
     expect(steep.summary).toMatch(/outside the 600–650 mm comfort range/);

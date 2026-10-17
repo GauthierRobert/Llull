@@ -1,8 +1,9 @@
 import type { ImageEntity, Vec3 } from '../../model/types';
 import { type Polygon3D } from './types';
-import { add3, scale3 } from '../../lib/vec3';
-import { type Camera, type Projector, makeProjector, shade } from './camera';
+import { add3, dot3, scale3 } from '../../lib/vec3';
+import { type Camera, type Projector, cameraBasis, makeProjector, shade } from './camera';
 import { underlaySvg } from './underlays';
+import { rasterLayer } from './raster';
 
 /** Round to 2 decimals (SVG coordinates and labels). */
 export function r2(n: number): number {
@@ -43,13 +44,18 @@ export function buildSvg(
   viewName: string,
   entityCount: number,
   background: string | null = DEFAULT_BACKGROUND,
+  rasterRadius: number | null = null,
 ): string {
   const project = makeProjector(cam, orthoHalf, width, height);
   // Painter's algorithm: `depth` grows away from the camera, so draw farthest first so nearer
   // faces paint on top. Strokes (2D) always draw on top; image underlays sit below everything.
-  const filled = polygons.filter((p) => !p.stroke).sort((a, b) => b.depth - a.depth);
+  // Back faces first: on a closed solid they are always hidden by its own front faces, so drawing them under every front face keeps a thin
+  // sheet's underside from showing through its top when the two triangulations sort differently.
+  const fwd = cameraBasis(cam).fwd;
+  const facingAway = (p: Polygon3D): number => (p.loops === undefined && dot3(p.normal, fwd) > 1e-9 ? 1 : 0);
+  const filled = polygons.filter((p) => !p.stroke).sort((a, b) => facingAway(b) - facingAway(a) || b.depth - a.depth);
   const stroked = polygons.filter((p) => p.stroke);
-  const hasCap = filled.some((p) => p.loops !== undefined);
+  const hasCap = rasterRadius === null && filled.some((p) => p.loops !== undefined);
   return svgDocument(
     width,
     height,
@@ -57,7 +63,9 @@ export function buildSvg(
       ...(hasCap ? [HATCH_PATTERN] : []),
       buildGroundGrid(project, cam.target, orthoHalf),
       ...underlays.map((image) => underlaySvg(image, project)),
-      ...[...filled, ...stroked].map((poly) => polygonSvg(poly, project)),
+      ...(rasterRadius === null
+        ? [...filled, ...stroked].map((poly) => polygonSvg(poly, project))
+        : [rasterLayer(filled, cam, orthoHalf, width, height, rasterRadius), ...stroked.map((poly) => polygonSvg(poly, project))]),
       buildAxisTriad(project, cam.target, width, height, orthoHalf),
       `  <text x="8" y="20" font-family="monospace" font-size="13" fill="#aaaacc">${viewName.toUpperCase()} | ${entityCount} entit${entityCount === 1 ? 'y' : 'ies'}</text>`,
     ],
@@ -111,6 +119,7 @@ function polygonSvg(poly: Polygon3D, project: Projector): string {
   if (poly.stroke)
     return `  <polyline points="${points}" fill="none" stroke="${poly.color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`;
   const fill = shade(poly.normal, poly.color);
+  if (poly.seamless) return `  <polygon points="${points}" fill="${fill}" stroke="${fill}" stroke-width="0.6" stroke-linejoin="round"/>`;
   if (poly.inflate)
     return `  <polygon points="${points}" fill="${fill}" stroke="${fill}" stroke-width="${r2(gapBridgeWidth(poly, project))}" stroke-linejoin="round"/>`;
   return `  <polygon points="${points}" fill="${fill}" stroke="rgba(0,0,0,0.25)" stroke-width="0.5"/>`;

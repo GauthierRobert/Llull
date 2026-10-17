@@ -216,7 +216,7 @@ describe('llull CLI — local document', () => {
     ];
     const text = capture({ stdin: JSON.stringify(plan) });
     expect(await runCli(['run', '-', ...docFlag()], text.io)).toBe(EXIT_OK);
-    expect(text.out[0]).toMatch(/\nAliases: part=mesh-3\.1\nConsumed: body, hole$/);
+    expect(text.out[0]).toMatch(/\nAliases: part=mesh-3\.1\nNot in the final scene: body, hole /);
 
     const json = capture({ stdin: JSON.stringify(plan) });
     await runCli(['run', '-', '--json', '--force', ...docFlag()], json.io);
@@ -278,6 +278,29 @@ describe('llull CLI — local document', () => {
     const nothing = capture();
     expect(await runCli(['describe_scene', '--save', path.join(workDir, 'x.txt'), ...docFlag()], nothing.io)).toBe(EXIT_COMMAND_ERROR);
     expect(nothing.err.join('\n')).toMatch(/no file payload/);
+  });
+
+  it('export_gltf --save x.glb writes a binary GLB, x.gltf the JSON form', async () => {
+    await runCli(['exec', 'add_box', 'size=[5,5,5]', ...docFlag()], capture().io);
+    const glb = path.join(workDir, 'm.glb');
+    expect(await runCli(['exec', 'export_gltf', '--save', glb, ...docFlag()], capture().io)).toBe(EXIT_OK);
+    expect(readFileSync(glb).subarray(0, 4).toString()).toBe('glTF');
+    const gltf = path.join(workDir, 'm.gltf');
+    expect(await runCli(['exec', 'export_gltf', '--save', gltf, ...docFlag()], capture().io)).toBe(EXIT_OK);
+    expect(JSON.parse(readFileSync(gltf, 'utf8'))).toHaveProperty('asset');
+  });
+
+  it('--validate warns when a plan needs a kernel the selected one lacks', async () => {
+    const plan = JSON.stringify([
+      { command: 'add_box', params: { size: [5, 5, 5] }, as: 'b' },
+      { command: 'fillet_edge', params: { entityId: '$b' } },
+    ]);
+    const manifold = capture({ stdin: plan });
+    await runCli(['run', '-', '--validate', ...docFlag()], manifold.io);
+    expect(manifold.out.join('\n')).toMatch(/warning: .*fillet_edge.*--kernel occt/);
+    const occt = capture({ stdin: plan });
+    await runCli(['run', '-', '--validate', '--kernel', 'occt', ...docFlag()], occt.io);
+    expect(occt.out.join('\n')).not.toMatch(/warning:/);
   });
 
   it('--quiet prints nothing on success but still prints errors', async () => {

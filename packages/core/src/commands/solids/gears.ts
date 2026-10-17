@@ -47,7 +47,7 @@ export const addSpurGear = defineCommand({
     'then extrudes it by faceWidth along +Z. module (metric) sets the tooth scale: pitchDiameter = module * teeth. ' +
     'pressureAngle is in RADIANS; standard value is 0.3491 rad (20 degrees = Math.PI/9). faceWidth is the gear thickness along Z. ' +
     'bore is a central hole radius; if > 0 the gear is emitted as a closed mesh solid with a through hole (no boolean needed). ' +
-    'position is [x, y, z] of the gear center; rotation is three.js intrinsic XYZ Euler angles in radians (about world Z, then Y, then X). ' +
+    'position is [x, y, z] of the gear axis at its bottom face (the gear spans z..z+faceWidth, not centred on z); rotation is three.js intrinsic XYZ Euler angles in radians (about world Z, then Y, then X). ' +
     'Right-handed frame, +Z up.',
   params: z.object({
     module: z
@@ -78,7 +78,8 @@ export const addSpurGear = defineCommand({
       )
       .optional(),
     position: looseVec3(
-      'World-space center of the gear [x, y, z] in document units. Right-handed frame, +Z up. Defaults to [0, 0, 0].',
+      'World-space position [x, y, z] of the gear axis at its BOTTOM face: the gear axis passes through [x, y] and the gear spans z..z+faceWidth ' +
+        '(it is not centred on z). Right-handed frame, +Z up. Defaults to [0, 0, 0].',
     ).optional(),
     rotation: z
       .array(z.number())

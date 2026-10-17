@@ -115,12 +115,12 @@ export function stairPrimitives(
 ): DrawingPrimitive[] {
   const half = stair.width / 2;
   const at = (along: number, across: number): Vec2 => stairPoint(stair, along, across);
-  const run = stair.riserCount * stair.treadDepth;
+  const run = (stair.riserCount - 1) * stair.treadDepth;
   const layer = layerName('stair');
   const primitives: DrawingPrimitive[] = [
     { type: 'polygon', layer, style: 'thin', points: [at(0, -half), at(run, -half), at(run, half), at(0, half)] },
   ];
-  for (let index = 1; index < stair.riserCount; index++) {
+  for (let index = 1; index < stair.riserCount - 1; index++) {
     const along = index * stair.treadDepth;
     primitives.push(thinLine(layer, at(along, -half), at(along, half)));
   }

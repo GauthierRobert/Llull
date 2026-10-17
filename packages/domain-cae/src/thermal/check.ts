@@ -9,6 +9,7 @@ import { analysisInputHash } from '../hash/inputHash';
 import { feRemediation } from '../shared/feCodes';
 import { cavityNameProblem } from '../shared/names';
 import { analysisIdSchema } from '../shared/schemas';
+import { temperatureBcConflicts } from './bcConflicts';
 import { trustedRecord } from '../shared/trust';
 import { isProblem, thermalCaseOf, type ThermalCase } from './access';
 import { tableProblem } from './amplitude';
@@ -178,7 +179,7 @@ function resultItems(analysisCase: AnalysisCase, doc: CadDocument, verified: Res
       item(
         'THM_HEAT_BALANCE',
         'warning',
-        `heat balance residual ${balance.residualRel} exceeds ${HEAT_BALANCE_TOLERANCE.value} (in ${balance.inW} W, out ${balance.outW} W, stored ${balance.storedW} W at t=${balance.timeS} s)`,
+        `heat balance residual ${balance.residualRel} exceeds ${HEAT_BALANCE_TOLERANCE.value}${(balance.samplingRel ?? 0) > HEAT_BALANCE_TOLERANCE.value ? ` (the output interval is too coarse to resolve it: sampling spread ${balance.samplingRel ?? 0}; write results at every increment with set_thermal_step outputEveryS)` : ''} (in ${balance.inW} W, out ${balance.outW} W, stored ${balance.storedW} W at t=${balance.timeS} s)`,
         [analysisCase.id],
       ),
     );
@@ -244,6 +245,15 @@ export const checkThermal = defineCommand({
       analysisCase.results.inputHash !== analysisInputHash(doc, analysisId, 'full')
     )
       items.push(item('FEA_RESULTS_STALE', 'error', 'the recorded results were computed for other inputs', [analysisId]));
+    for (const conflict of trust.meshArtifact === null ? [] : temperatureBcConflicts(found.thermal, trust.meshArtifact))
+      items.push(
+        item(
+          'THM_BC_CONFLICT',
+          'error',
+          `temperature BCs '${conflict.first}' and '${conflict.second}' prescribe different values on ${conflict.sharedNodes} shared node(s): the solver keeps only the last one`,
+          [conflict.first, conflict.second],
+        ),
+      );
     if (trust.state === 'untrusted')
       items.push(
         item('FEA_SUMMARY_MISMATCH', 'error', trust.problem?.message ?? 'a recorded summary differs from its artifact', [analysisId]),

@@ -24,6 +24,8 @@ export interface SliderCrankOptions {
   offsetMm?: number;
   /** Crank speed at t = 0, rpm (avoids the start-up transient of a governed run). */
   crankRpm?: number;
+  /** Z of the crank disc, mm (moves its centre of mass off the rod plane). Default 0. */
+  crankZMm?: number;
   /** Declare the joints in this order (default crank, rod, wrist, slide). */
   order?: ('crank_j' | 'rod_j' | 'wrist_j' | 'slide_j')[];
 }
@@ -52,7 +54,12 @@ export function sliderCrank(options: SliderCrankOptions = {}): SliderCrank {
   const crankRadius = 80;
   const crankMass = (2 * (options.crankInertia ?? 0.05)) / (crankRadius / 1000) ** 2;
   let doc = createEmptyDocument();
-  const crankSolid = step(doc, 'add_cylinder', { radius: crankRadius, height: 20, axis: [0, 0, 1], position: [0, 0, 0] });
+  const crankSolid = step(doc, 'add_cylinder', {
+    radius: crankRadius,
+    height: 20,
+    axis: [0, 0, 1],
+    position: [0, 0, options.crankZMm ?? 0],
+  });
   const rodSolid = step(crankSolid.doc, 'add_box', { size: [lMm, 10, 10], position: [(pin[0] + wristX) / 2, (pin[1] + offset) / 2, 0] });
   const pistonSolid = step(rodSolid.doc, 'add_box', { size: [30, 30, 30], position: [wristX, offset, 0] });
   const crank = step(pistonSolid.doc, 'add_rigid_body', { entityIds: [crankSolid.id], massKg: crankMass, id: 'crank' });

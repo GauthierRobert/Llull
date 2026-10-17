@@ -5,7 +5,7 @@
  */
 
 import type { Vec3 } from '../model/vectors';
-import type { SimulationTrace } from './physicsEngine';
+import type { SimulationTrace, StepPeak } from './physicsEngine';
 import type { Topology } from './topology';
 import { elementAt } from '../lib/elementAt';
 
@@ -53,6 +53,30 @@ export function peakOf(values: readonly Vec3[], times: readonly number[], angleD
   return { value: best, timeS: elementAt(times, at), angleDeg: angleDeg?.[at] ?? null };
 }
 
+/** Crank angle (deg, 0-360) at time `t` by linear interpolation of the sampled angle through the shorter way round. */
+function angleAt(times: readonly number[], angleDeg: readonly number[], t: number): number | null {
+  const after = Math.max(
+    1,
+    times.findIndex((time) => time >= t),
+  );
+  const [t0, t1, a0, a1] = [times[after - 1], times[after], angleDeg[after - 1], angleDeg[after]];
+  if (t0 === undefined || t1 === undefined || a0 === undefined || a1 === undefined) return angleDeg[0] ?? null;
+  const delta = ((((a1 - a0) % 360) + 540) % 360) - 180;
+  const fraction = t1 > t0 ? Math.min(1, Math.max(0, (t - t0) / (t1 - t0))) : 0;
+  return (((a0 + delta * fraction) % 360) + 360) % 360;
+}
+
+/** The sampled peak, replaced by the every-step peak when that is larger (sampling can step over a sharp peak). */
+function withStepPeak(
+  sampled: Peak,
+  step: StepPeak | null | undefined,
+  times: readonly number[],
+  angleDeg: readonly number[] | null,
+): Peak {
+  if (step == null || step.value <= sampled.value) return sampled;
+  return { value: step.value, timeS: step.timeS, angleDeg: angleDeg === null ? null : angleAt(times, angleDeg, step.timeS) };
+}
+
 /** Force on the declared child of `jointId` at each sample (tree or loop joint), or null when the engine did not report it. */
 export function childForceSeries(topology: Topology, trace: SimulationTrace, jointId: string): Vec3[] | null {
   const loop = trace.loopForce?.[jointId];
@@ -89,13 +113,19 @@ export function reactionsData(args: {
     const force = childForceSeries(topology, trace, entry.joint.id);
     const moment = childMomentSeries(topology, trace, entry.joint.id);
     if (force === null || moment === null) continue;
-    joints[entry.joint.id] = { forceN: peakOf(force, trace.times, angleDeg), momentNm: peakOf(moment, trace.times, angleDeg) };
+    const stepPeaks = trace.reactionPeaks?.[entry.joint.id];
+    joints[entry.joint.id] = {
+      forceN: withStepPeak(peakOf(force, trace.times, angleDeg), stepPeaks?.force, trace.times, angleDeg),
+      momentNm: withStepPeak(peakOf(moment, trace.times, angleDeg), stepPeaks?.moment, trace.times, angleDeg),
+    };
     seriesJoints[entry.joint.id] = { force, moment };
   }
   for (const loop of topology.loops) {
     const force = childForceSeries(topology, trace, loop.id);
     if (force === null) continue;
-    loops[loop.id] = { forceN: peakOf(force, trace.times, angleDeg) };
+    loops[loop.id] = {
+      forceN: withStepPeak(peakOf(force, trace.times, angleDeg), trace.reactionPeaks?.[loop.id]?.force, trace.times, angleDeg),
+    };
     seriesLoops[loop.id] = force;
   }
   return {

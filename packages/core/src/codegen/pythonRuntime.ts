@@ -362,11 +362,18 @@ def _shell(shape, thickness):
     from OCP.BRepOffset import BRepOffset_Skin
     from OCP.BRepOffsetAPI import BRepOffsetAPI_MakeOffsetShape
     from OCP.GeomAbs import GeomAbs_Arc
+    from OCP.ShapeFix import ShapeFix_Solid
+    from OCP.TopAbs import TopAbs_SHELL
+    from OCP.TopoDS import TopoDS
 
     topods = _shape_of(shape).wrapped
     offset = BRepOffsetAPI_MakeOffsetShape()
     offset.PerformByJoin(topods, -thickness, 1e-4, BRepOffset_Skin, False, False, GeomAbs_Arc, False)
-    cut = BRepAlgoAPI_Cut(topods, offset.Shape())
+    cavity = offset.Shape()
+    if cavity.ShapeType() == TopAbs_SHELL:
+        # A solid with curved faces offsets to a bare shell: close it, or the cut cannot subtract it.
+        cavity = ShapeFix_Solid().SolidFromShell(TopoDS.Shell_s(cavity))
+    cut = BRepAlgoAPI_Cut(topods, cavity)
     cut.Build()
     return _wrap(cut.Shape())
 

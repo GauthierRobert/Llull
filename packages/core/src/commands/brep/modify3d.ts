@@ -42,8 +42,8 @@ interface EdgeModification {
   readonly edges?: readonly number[];
   /** Points naming edges by their nearest edge (`edgesNear`), resolved on the current solid. */
   readonly near?: readonly Vec3[];
-  /** The modification node over the operand's exact recipe and the resolved edges. */
-  readonly recipe: (source: ShapeRecipe, edges: readonly number[]) => ShapeRecipe;
+  /** The modification node over the operand's exact recipe, the resolved edges and their mid points (empty when the kernel has no topology). */
+  readonly recipe: (source: ShapeRecipe, edges: readonly number[], near: readonly Vec3[]) => ShapeRecipe;
 }
 
 /** Why the kernel gave no usable result: an unsupported op, a failed / invalid solid, or an open mesh. */
@@ -59,7 +59,8 @@ function modifyFailure(command: string, kernel: GeometryKernel, modified: ShapeR
   if (command === 'shell_solid')
     return (
       'shell_solid: the kernel could not hollow this solid into a valid one (returned null: thickness too ' +
-      'large for a feature, or a self-intersecting offset); document unchanged. Try a smaller thickness.'
+      'large for a feature, a rounded edge whose radius is not larger than the thickness, an openFacesNear point that picks no face, or a ' +
+      'self-intersecting offset); document unchanged. Try a smaller thickness (below the smallest fillet radius), or shell BEFORE filleting.'
     );
   return (
     `${command}: the kernel could not round these edges into a valid solid (returned null: size too large ` +
@@ -92,7 +93,9 @@ function modifyEdges(
     );
   const selection = selectEdges(kernel.topology(sourceShape), edges, near);
   if ('problem' in selection) return noop(doc, `${command}: ${selection.problem} on '${id}'; document unchanged.`);
-  const modified = recipe(source, selection.edges);
+  const topology = kernel.topology(sourceShape);
+  const mids = selection.edges.map((index) => topology?.edges[index]?.mid);
+  const modified = recipe(source, selection.edges, mids.every((mid): mid is Vec3 => mid !== undefined) ? mids : []);
   const result = evaluateRecipe(kernel, modified);
   if (typeof result === 'string') return noop(doc, modifyFailure(command, kernel, modified, result));
   const picked = near.length > 0 ? ` edgesNear selected edges ${selection.edges.join(', ')}.` : '';
@@ -160,11 +163,12 @@ export const filletEdge = defineCommand({
           id,
           edges: edgeIndices,
           near: edgesNear,
-          recipe: (source, edges) => ({
+          recipe: (source, edges, near) => ({
             op: 'fillet',
             source,
             edges: [...edges],
             size: radius,
+            ...(near.length > 0 ? { near } : {}),
             ...(radiusEnd === undefined ? {} : { sizeEnd: radiusEnd }),
           }),
         }),
@@ -214,7 +218,7 @@ export const chamferEdge = defineCommand({
       id,
       edges: edgeIndices,
       near: edgesNear,
-      recipe: (source, edges) => ({ op: 'chamfer', source, edges: [...edges], size: distance }),
+      recipe: (source, edges, near) => ({ op: 'chamfer', source, edges: [...edges], size: distance, ...(near.length > 0 ? { near } : {}) }),
     }),
 });
 
@@ -229,20 +233,28 @@ export const shellSolid = defineCommand({
   description:
     'Hollow out a closed 3D solid, leaving walls of the given thickness (grown inward), and replace it ' +
     'with a new mesh entity. The source entity is consumed. ' +
+    'By default the result has a sealed internal cavity; pass openFacesNear (points on the faces to remove) for an open-topped shell. ' +
     'Requires a geometry kernel that supports shellSolid; a kernel without it (or a solid that is too ' +
     'thin for the thickness) makes this a graceful no-op that leaves the document unchanged. ' +
     'Target must be a 3D solid (box, cylinder, sphere, cone, torus, wedge, pyramid, extrusion, revolution or mesh).',
   params: z.object({
     id: z.string().describe('Id of the closed 3D solid entity to hollow. Must exist and be a 3D solid.'),
     thickness: z.number().describe("Wall thickness in document units. Must be > 0 and smaller than half the solid's thinnest dimension."),
+    openFacesNear: z
+      .array(vec3('A point [x, y, z] on or near the face to remove (e.g. its centre from inspect_topology).'))
+      .describe(
+        'Faces to leave OPEN (removed), picked by location: each point removes the face nearest to it, giving an open-topped box / pocket ' +
+          'instead of a sealed internal cavity. Omit or pass [] for a sealed cavity. Needs the OCC kernel.',
+      )
+      .optional(),
   }),
-  run: (doc, { id, thickness }, ctx): CommandResult =>
+  run: (doc, { id, thickness, openFacesNear = [] }, ctx): CommandResult =>
     modifyEdges(doc, ctx, {
       command: 'shell_solid',
       pastTense: 'shelled',
       amountName: 'thickness',
       amount: thickness,
       id,
-      recipe: (source) => ({ op: 'shell', source, thickness }),
+      recipe: (source) => ({ op: 'shell', source, thickness, ...(openFacesNear.length > 0 ? { openNear: openFacesNear } : {}) }),
     }),
 });

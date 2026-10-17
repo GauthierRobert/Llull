@@ -1,7 +1,7 @@
 /**
  * One schema per command: a zod object is the single source of the params TS type, the agent-facing `paramsSchema` (MCP JSON Schema) and
  * runtime validation in `execute`.
- * @invariant `toParamsSchema(schema)` emits only the `ParamSpec` vocabulary (type, description, enum, items, properties, required) — the
+ * @invariant `toParamsSchema(schema)` emits only the `ParamSpec` vocabulary (type, description, enum, items, properties, required, anyOf for unions) — the
  *   MCP tool surface is unchanged by migration.
  */
 
@@ -108,10 +108,41 @@ function describeChildren(shape: Record<string, z.ZodType>): { properties: Recor
 
 function toItemSpec(schema: z.ZodType): ParamItemSpec {
   const { core, description } = unwrap(schema);
-  const spec: ParamItemSpec = { type: paramType(core) };
+  const spec: ParamItemSpec = {};
   if (description !== undefined) spec.description = description;
-  fillStructure(spec, core);
+  fillSpec(spec, core);
   return spec;
+}
+
+/** Branch specs of a union that is not a plain value enum; undefined for every other schema. */
+function unionBranches(core: z.ZodType): ParamItemSpec[] | undefined {
+  const def = core.def as { type: string; options?: readonly z.ZodType[] };
+  if (def.type !== 'union' || !def.options || enumValues(core) !== undefined) return undefined;
+  const branches: ParamItemSpec[] = [];
+  for (const option of def.options) {
+    const branch = toItemSpec(option);
+    if (!branches.some((known) => JSON.stringify(known) === JSON.stringify(branch))) branches.push(branch);
+  }
+  return branches;
+}
+
+const isPlainType = (branch: ParamItemSpec): boolean =>
+  branch.items === undefined && branch.properties === undefined && branch.enum === undefined;
+
+/** `type` + structure of `core`; a union with differing branches becomes `anyOf` (no `type`). */
+function fillSpec(spec: ParamItemSpec, core: z.ZodType): void {
+  const branches = unionBranches(core);
+  if (branches === undefined) {
+    spec.type = paramType(core);
+    fillStructure(spec, core);
+    return;
+  }
+  const first = branches[0];
+  if (branches.length === 1 && first)
+    Object.assign(spec, { ...first, ...(spec.description !== undefined ? { description: spec.description } : {}) });
+  else if (first && branches.every((branch) => isPlainType(branch) && branch.type === first.type)) {
+    if (first.type !== undefined) spec.type = first.type;
+  } else spec.anyOf = branches;
 }
 
 function fillStructure(spec: ParamItemSpec, core: z.ZodType): void {
@@ -131,8 +162,8 @@ function fillStructure(spec: ParamItemSpec, core: z.ZodType): void {
 function toParamSpec(schema: z.ZodType, key: string): { spec: ParamSpec; optional: boolean } {
   const { core, optional, description } = unwrap(schema);
   if (description === undefined) throw new Error(`paramsSchema property '${key}' needs a .describe() text for agents`);
-  const spec: ParamSpec = { type: paramType(core), description };
-  fillStructure(spec, core);
+  const spec: ParamSpec = { description };
+  fillSpec(spec, core);
   return { spec, optional };
 }
 

@@ -9,7 +9,7 @@ import { caseOf, withCase } from '../shared/access';
 import { refuseCode } from '../shared/codes';
 import { analysisIdSchema } from '../shared/schemas';
 
-const QUANTITIES = [
+export const QUANTITIES = [
   'temperature',
   'heat_flux',
   'u_mag',

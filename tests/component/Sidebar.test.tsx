@@ -68,12 +68,12 @@ describe('Sidebar — keyboard', () => {
     fireEvent.keyDown(layers, { key: 'ArrowDown' });
     expect(document.activeElement).toBe(screen.getByRole('tab', { name: /^Drawing sheets/ }));
     fireEvent.keyDown(document.activeElement as Element, { key: 'End' });
-    expect(document.activeElement).toBe(screen.getByRole('tab', { name: /^Fasteners/ }));
+    expect(document.activeElement).toBe(screen.getByRole('tab', { name: /^Analysis/ }));
     const objects = screen.getByRole('tab', { name: /^Objects/ });
     fireEvent.keyDown(document.activeElement as Element, { key: 'ArrowDown' });
     expect(document.activeElement).toBe(objects);
     fireEvent.keyDown(objects, { key: 'ArrowUp' });
-    expect(document.activeElement).toBe(screen.getByRole('tab', { name: /^Fasteners/ }));
+    expect(document.activeElement).toBe(screen.getByRole('tab', { name: /^Analysis/ }));
     fireEvent.keyDown(document.activeElement as Element, { key: 'Home' });
     expect(document.activeElement).toBe(objects);
   });

@@ -61,6 +61,9 @@ const ASSUMPTIONS: ReadonlyArray<string> = [
   'Not covered: pipes with concentrated loads (valves, flanged instruments), insulation, non-water content, sloped lines (use a smaller spanFactor), thermal loops and seismic restraint.',
 ];
 
+/** Services whose lines are lighter than water-filled pipe (MSS SP-69 has a longer gas / air / steam span column). */
+const GAS_SERVICE = /\b(air|gas|steam|vapou?r|nitrogen|oxygen|hydrogen|methane)\b/i;
+
 function rowOf(
   units: ModelUnits,
   run: PipeRun,
@@ -113,6 +116,11 @@ function rowOf(
   }
   for (const station of unattached) {
     issues.push(`support ${station.mark} (${station.type}) is attached to no steel member`);
+  }
+  if (GAS_SERVICE.test(element.service ?? '')) {
+    notes.push(
+      `service "${element.service}" is gas / air / steam: the water-filled span table was applied (conservative, the gas table allows longer spans); raise spanFactor to model the gas table`,
+    );
   }
   if (limit.approximated) notes.push(`DN not tabulated: span of DN${limit.dn} used (next smaller size)`);
   if (run.lengthMm - length > 1) notes.push(`risers (${shown(run.lengthMm - length)} m) are not counted in the spans`);

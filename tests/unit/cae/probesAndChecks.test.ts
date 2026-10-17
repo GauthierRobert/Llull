@@ -71,8 +71,9 @@ describe('evaluateProbes', () => {
     const readings = evaluateProbes(analysis, mesh, resultsOf('heat.frd'), 1);
     expect(readings[0]).toMatchObject({ quantity: 'temperature', unit: 'degC', nodeId: 1 });
     expect(readings[0]?.values).toEqual([{ loadCase: null, step: 1, time: 1, value: 100 }]);
-    expect(readings[1]?.unit).toBe('heat flux (N-mm-t-s)');
-    expect(readings[1]?.values[0]?.value).toBeCloseTo(2000, 6);
+    // N-mm-t-s flux is mW/mm^2 = 1000 W/m^2
+    expect(readings[1]?.unit).toBe('W/m^2');
+    expect(readings[1]?.values[0]?.value).toBeCloseTo(2000 * 1000, 3);
     const transient = evaluateProbes(analysis, mesh, resultsOf('transient.frd'), 1);
     expect(transient[0]?.values.map((value) => value.time)).toEqual([0.5, 1, 1.5]);
     const kelvin = withCase(doc, { ...caseOf(doc, analysisId)!, thermal: { ...caseOf(doc, analysisId)!.thermal!, temperatureScale: 'K' } });

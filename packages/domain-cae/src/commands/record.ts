@@ -7,7 +7,7 @@ import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { significantNumber } from '@lib/compactNumber';
 import { analysisInputHash } from '../hash/inputHash';
-import { stressUnitName } from '../decks/units';
+import { stressUnitName, lengthUnitName } from '../decks/units';
 import { meshSummary, resultsSummary } from '../results/summary';
 import { caseOf, withCase } from '../shared/access';
 import { refuseFe } from '../shared/feCodes';
@@ -146,7 +146,7 @@ export const recordFeaResults = defineCommand({
       `record_fea_results: '${analysisId}' solved — ${expected.loadCases.length} load case(s)${expected.loadCases
         .map(
           (lc) =>
-            `; ${lc.name}: max von Mises ${significantNumber(lc.maxVonMises.value, 6)} ${stressUnitName(expected.units)}, max displacement ${significantNumber(lc.maxDisplacement.value, 6)}`,
+            `; ${lc.name}: max von Mises ${significantNumber(lc.maxVonMises.value, 6)} ${stressUnitName(expected.units)}, max displacement ${significantNumber(lc.maxDisplacement.value, 6)} ${lengthUnitName(expected.units)}`,
         )
         .join(
           '',

@@ -4,6 +4,7 @@ import type { AnalysisCase, FeMeshArtifact, FeResultsArtifact, ProbeQuantity } f
 import { loadCasesOf } from '../decks/context';
 import { lengthUnitName, stressUnitName } from '../decks/units';
 import { magnitude, nodeCoordinates, stepOfLoadCase, vonMises, type ResultStep } from './fields';
+import { systemToSi } from '@lib/thermalUnits';
 import { locatePoint, type PointWeights } from './probeInterpolation';
 
 interface ProbeValue {
@@ -26,7 +27,9 @@ export interface ProbeReading {
   readonly values: readonly ProbeValue[];
 }
 
-const FIELD: Readonly<Record<ProbeQuantity, { readonly field: string; readonly scalar: (values: readonly number[]) => number }>> = {
+export const QUANTITY_FIELDS: Readonly<
+  Record<ProbeQuantity, { readonly field: string; readonly scalar: (values: readonly number[]) => number }>
+> = {
   temperature: { field: 'NDTEMP', scalar: (values) => values[0] ?? Number.NaN },
   heat_flux: { field: 'FLUX', scalar: magnitude },
   u_mag: { field: 'DISP', scalar: magnitude },
@@ -39,9 +42,13 @@ const FIELD: Readonly<Record<ProbeQuantity, { readonly field: string; readonly s
   s_zz: { field: 'STRESS', scalar: (values) => values[2] ?? Number.NaN },
 };
 
-function unitOf(analysis: AnalysisCase, quantity: ProbeQuantity): string {
+/** Factor from the solver's value of `quantity` to the value in quantityUnit (heat flux: system units -> W/m^2; others 1). */
+export const quantityScale = (analysis: AnalysisCase, quantity: ProbeQuantity): number =>
+  quantity === 'heat_flux' ? systemToSi('flux', 1, analysis.unitSystem) : 1;
+
+export function quantityUnit(analysis: AnalysisCase, quantity: ProbeQuantity): string {
   if (quantity === 'temperature') return analysis.thermal?.temperatureScale ?? analysis.thermomech?.temperatureScale ?? 'degC';
-  if (quantity === 'heat_flux') return `heat flux (${analysis.unitSystem})`;
+  if (quantity === 'heat_flux') return 'W/m^2';
   return quantity.startsWith('u_') ? lengthUnitName(analysis.unitSystem) : stressUnitName(analysis.unitSystem);
 }
 
@@ -97,7 +104,7 @@ export function evaluateProbes(
       });
   return Object.entries(analysis.probes).map(([probeId, probe]) => {
     const [nodeId, nodeDistance] = nearestNode(mesh, probeId, probe.point, lengthToAnalysis);
-    const { field, scalar } = FIELD[probe.quantity];
+    const { field, scalar } = QUANTITY_FIELDS[probe.quantity];
     const inside =
       probe.quantity === 'temperature' && nodeDistance !== null && nodeDistance > 0
         ? locatePoint(mesh, [probe.point[0] * lengthToAnalysis, probe.point[1] * lengthToAnalysis, probe.point[2] * lengthToAnalysis])
@@ -106,12 +113,17 @@ export function evaluateProbes(
       probeId,
       name: probe.name,
       quantity: probe.quantity,
-      unit: unitOf(analysis, probe.quantity),
+      unit: quantityUnit(analysis, probe.quantity),
       nodeId,
       nodeDistance,
       values: sets.map(({ loadCase, step }) => {
         const values = nodeId === null ? undefined : step.fields[field]?.values[String(nodeId)];
-        const value = inside !== null ? interpolated(inside, step.fields[field]) : values === undefined ? Number.NaN : scalar(values);
+        const value =
+          inside !== null
+            ? interpolated(inside, step.fields[field])
+            : values === undefined
+              ? Number.NaN
+              : scalar(values) * quantityScale(analysis, probe.quantity);
         return { loadCase, step: step.step, time: step.time, value: Number.isFinite(value) ? value : null };
       }),
     };

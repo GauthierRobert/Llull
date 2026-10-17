@@ -3,6 +3,7 @@ import { type MeshSolidEntity, createEmptyDocument } from '@core/model/types';
 import { execute, getCommand } from '@core/commands/registry';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import type { MeshData } from '@core/model/types';
+import { recipeKey, validateShapeRecipe } from '@core/geometry/shapeRecipe';
 import { fakeKernel, type FakeKernel } from '../helpers/fakeKernel';
 import { expectNoOp } from '../helpers/expectNoOp';
 import { xy } from '../helpers/xy';
@@ -34,6 +35,25 @@ describe('shell_solid', () => {
     expect(result.document.entities[id]).toBeUndefined();
     expect(thicknessesOf(fake)).toEqual([0.5]);
     expect(result.summary).toContain('shelled');
+  });
+  it('openFacesNear is recorded on the recipe, changes the recipe key, and survives validation', () => {
+    setGeometryKernel(fakeKernel({ shell: SHELL_MESH }));
+    const open = execute(doc, 'shell_solid', { id, thickness: 0.5, openFacesNear: [[0, 0, 2]] });
+    const sealed = execute(doc, 'shell_solid', { id, thickness: 0.5, openFacesNear: [] });
+    const openBrep = (open.document.entities[open.affected[0]!] as MeshSolidEntity).brep!;
+    const sealedBrep = (sealed.document.entities[sealed.affected[0]!] as MeshSolidEntity).brep!;
+    expect(openBrep).toMatchObject({ op: 'shell', openNear: [[0, 0, 2]] });
+    expect('openNear' in sealedBrep).toBe(false);
+    expect(recipeKey(openBrep)).not.toBe(recipeKey(sealedBrep));
+    expect(validateShapeRecipe(openBrep)).toBeNull();
+    expect(validateShapeRecipe({ ...openBrep, openNear: [[0, 'x', 2]] })).toMatch(/openNear/);
+    expect(execute(doc, 'shell_solid', { id, thickness: 0.5, openFacesNear: [[0, 1]] }).rejected).toBe(true);
+  });
+  it('the failure summary names the fillet-radius and open-face causes', () => {
+    setGeometryKernel(fakeKernel({ shell: null }));
+    const result = execute(doc, 'shell_solid', { id, thickness: 0.5, openFacesNear: [[0, 0, 2]] });
+    expect(result.document).toBe(doc);
+    expect(result.summary).toMatch(/smallest fillet radius/);
   });
   it('is a no-op when the kernel refuses this shell (invalid offset)', () => {
     setGeometryKernel(fakeKernel({ shell: null }));

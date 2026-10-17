@@ -12,6 +12,16 @@ import { noop } from '@core/commands/noop';
 import { builtExtent, openingsOf, wallFrame } from '../geometry/wallGeometry';
 import { arcOffsetOf, curvedWallLength } from '../geometry/curvedWallGeometry';
 import { openingFitError } from './walls';
+import { columnsInOpening } from '../geometry/openingColumns';
+
+/** Summary warning naming the columns an opening cuts through (empty when none or on a curved wall). */
+function columnWarning(doc: CadDocument, building: BuildingModel, wall: WallElement | CurvedWallElement, opening: OpeningElement): string {
+  if (wall.category !== 'wall') return '';
+  const columns = columnsInOpening(building, wall, opening, fromMm(doc, 5));
+  if (columns.length === 0) return '';
+  const names = columns.map(({ column }) => `${column.mark} (${column.id})`).join(', ');
+  return ` WARNING: the ${opening.category} overlaps column ${names}; move it along the wall (update_opening offset) or clear the column.`;
+}
 
 type OpeningKind = 'door' | 'window';
 
@@ -75,7 +85,7 @@ function addOpening(doc: CadDocument, kind: OpeningKind, params: AddOpeningParam
     withElement(building, opening),
     [opening.id, wall.id],
     `Added ${kind} ${opening.mark} (${opening.id}) ${width}×${height} in wall ${wall.mark} at ` +
-      `${offset.toFixed(3)} from its start, sill ${sillHeight}.`,
+      `${offset.toFixed(3)} from its start, sill ${sillHeight}.${columnWarning(doc, building, wall, opening)}`,
     { elementId: opening.id },
   );
 }
@@ -140,7 +150,7 @@ type AddOpeningParams = z.output<typeof doorParams>;
 export const addDoor = defineCommand({
   name: 'add_door',
   description:
-    'Insert a door into a wall: cuts the wall, adds the door leaf (3D) and its swing arc (plan). ' +
+    'Insert a door into a wall: cuts the wall, adds the door leaf (3D) and its swing arc (plan). The summary warns when the opening overlaps a column in the wall line. ' +
     'Refused if it does not fit in the wall or overlaps another opening.',
   params: doorParams,
   run: (doc, params): CommandResult => addOpening(doc, 'door', params),
@@ -153,7 +163,7 @@ export const addDoor = defineCommand({
 export const addWindow = defineCommand({
   name: 'add_window',
   description:
-    'Insert a window into a wall: cuts the wall between sill and head and adds the glazing. ' +
+    'Insert a window into a wall: cuts the wall between sill and head and adds the glazing. The summary warns when the opening overlaps a column in the wall line. ' +
     'Refused if it does not fit in the wall or overlaps another opening.',
   params: windowParams,
   run: (doc, params): CommandResult => addOpening(doc, 'window', params),
@@ -213,7 +223,7 @@ export const updateOpening = defineCommand({
       doc,
       withElement(building, updated),
       [openingId, wall.id],
-      `Updated ${updated.category} ${updated.mark} (${openingId}): ${updated.width}×${updated.height} at ${updated.offset.toFixed(3)}, sill ${updated.sillHeight}.`,
+      `Updated ${updated.category} ${updated.mark} (${openingId}): ${updated.width}×${updated.height} at ${updated.offset.toFixed(3)}, sill ${updated.sillHeight}.${columnWarning(doc, building, wall, updated)}`,
     );
   },
 });

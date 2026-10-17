@@ -8,6 +8,8 @@ import type { Vec3 } from '../model/vectors';
 import { RAD_PER_S_PER_RPM, motorForce, propellerOutput } from './forceLaws';
 import type { Quaternion, SimulationTrace } from './physicsEngine';
 import type { BodyMassDistribution } from './simulationModel';
+import { warnJams } from './jamDetection';
+import { findPeriod, tailMean, type Period } from './periodicity';
 
 export type SimulationDetail = 'summary' | 'series' | 'poses';
 
@@ -34,6 +36,23 @@ interface JointResult {
   readonly settledAfter: number | null;
   /** Speed changed by less than 0.5 % over the last 10 % of the run. */
   readonly steady: boolean;
+  /** Not steady but repeating: the last two cycles of the speed match (a pendulum, an oscillating arm, a crank with speed ripple). */
+  readonly periodic?: true;
+  /** Seconds per cycle, when periodic. */
+  readonly periodS?: number;
+  /** Mean speed over the last full cycle (rad/s or m/s), when periodic. */
+  readonly cycleMeanVelocity?: number;
+  /** Revolute only, when periodic. */
+  readonly cycleMeanRpm?: number;
+}
+
+/** Final state of a body that no joint carries (free fall, thrown): document units and m/s. */
+interface FreeBodyResult {
+  readonly finalPosition: Vec3;
+  /** m/s, last two samples. */
+  readonly finalVelocity: Vec3;
+  /** m/s. */
+  readonly speed: number;
 }
 
 export interface SimulationData {
@@ -43,7 +62,12 @@ export interface SimulationData {
   readonly samples: number;
   readonly bodies: Record<string, { name?: string; massKg: number; centerOfMass: Vec3 }>;
   readonly joints: Record<string, JointResult>;
-  readonly motors: Record<string, { joint: string; torque: number; power: number }>;
+  /** torque / power are the values at the end; cycleMean* are averages over the last full cycle when the torque or speed repeats. */
+  readonly motors: Record<
+    string,
+    { joint: string; torque: number; power: number; cycleMeanTorque?: number; cycleMeanPower?: number; periodS?: number }
+  >;
+  readonly freeBodies?: Record<string, FreeBodyResult>;
   /** tipMach: helical tip Mach number at the end (static: tip speed / 340.3 m/s); figureOfMerit: Ct^1.5 / (Cp·sqrt(π/2)). */
   readonly propellers: Record<
     string,
@@ -81,6 +105,8 @@ function jointResult(
   while (settleIndex > 0 && Math.abs((velocity[settleIndex - 1] ?? 0) - final) <= band) settleIndex--;
   const tailStart = velocity[Math.floor(velocity.length * 0.9)] ?? final;
   const steady = Math.abs(final - tailStart) <= Math.max(Math.abs(final) * 0.005, 1e-6);
+  const period = steady ? null : findPeriod(velocity, times);
+  const cycleMean = period === null ? null : tailMean(velocity, period.windowSamples);
   return {
     kind,
     finalVelocity: final,
@@ -89,6 +115,14 @@ function jointResult(
     finalPosition: last(position),
     settledAfter: steady ? (times[settleIndex] ?? null) : null,
     steady,
+    ...(period !== null && cycleMean !== null
+      ? {
+          periodic: true as const,
+          periodS: period.periodS,
+          cycleMeanVelocity: cycleMean,
+          ...(kind === 'revolute' ? { cycleMeanRpm: cycleMean / RAD_PER_S_PER_RPM } : {}),
+        }
+      : {}),
   };
 }
 
@@ -121,7 +155,7 @@ export function simulationData(
     ),
   );
   for (const [id, result] of Object.entries(joints))
-    if (!result.steady && result.peakVelocity > 1e-6)
+    if (!result.steady && !result.periodic && result.peakVelocity > 1e-6)
       warnings.push(`joint '${id}' is still accelerating at the end: simulate longer for its steady speed`);
   const motorTorque = Object.fromEntries(
     Object.values(dynamics.motors).map((m) => [
@@ -131,8 +165,49 @@ export function simulationData(
   );
   const motors = Object.fromEntries(
     Object.values(dynamics.motors).map((m) => {
-      const torque = last(seriesOf(motorTorque, m.id));
-      return [m.id, { joint: m.joint, torque, power: torque * last(velocityOf(m.joint)) }];
+      const [torques, speeds] = [seriesOf(motorTorque, m.id), velocityOf(m.joint)];
+      const torque = last(torques);
+      const period: Period | null = findPeriod(torques, trace.times) ?? findPeriod(speeds, trace.times);
+      const cycle =
+        period === null
+          ? {}
+          : {
+              periodS: period.periodS,
+              cycleMeanTorque: tailMean(torques, period.windowSamples),
+              cycleMeanPower: tailMean(
+                torques.map((t, i) => t * (speeds[i] ?? 0)),
+                period.windowSamples,
+              ),
+            };
+      return [m.id, { joint: m.joint, torque, power: torque * last(speeds), ...cycle }];
+    }),
+  );
+  warnJams(dynamics, trace, motorTorque, warnings);
+  const freeCarried = new Set(Object.values(dynamics.joints).map((joint) => joint.child));
+  const freeBodies = Object.fromEntries(
+    Object.values(dynamics.bodies).flatMap((body) => {
+      const track = seriesOf(trace.bodyPosition, body.id);
+      const [end, before] = [track[track.length - 1], track[track.length - 2]];
+      if (body.fixed || freeCarried.has(body.id) || end === undefined) return [];
+      const [t0, t1] = [trace.times[track.length - 1] ?? 0, trace.times[track.length - 2] ?? 0];
+      const dt = t0 - t1;
+      const older = track[track.length - 3];
+      // backward difference of second order (uniform samples) so a falling body's speed is the end value, not the last interval's mean
+      const velocity = (before === undefined || dt <= 0
+        ? [0, 0, 0]
+        : end.map((c, k) =>
+            older === undefined ? (c - (before[k] ?? c)) / dt : (3 * c - 4 * (before[k] ?? c) + (older[k] ?? c)) / (2 * dt),
+          )) as unknown as Vec3;
+      return [
+        [
+          body.id,
+          {
+            finalPosition: end.map((c) => c / run.metresPerUnit) as unknown as Vec3,
+            finalVelocity: velocity,
+            speed: Math.hypot(velocity[0], velocity[1], velocity[2]),
+          },
+        ] as const,
+      ];
     }),
   );
   const outputs = Object.fromEntries(
@@ -180,7 +255,16 @@ export function simulationData(
     }),
   );
   const base = { engine: run.engine, duration: run.duration, timestep: run.timestep, samples: trace.times.length };
-  const data: SimulationData = { ...base, bodies, joints, motors, propellers, gears, warnings };
+  const data: SimulationData = {
+    ...base,
+    bodies,
+    joints,
+    motors,
+    ...(Object.keys(freeBodies).length > 0 ? { freeBodies } : {}),
+    propellers,
+    gears,
+    warnings,
+  };
   if (run.detail === 'summary') return data;
   const series = {
     times: trace.times,
@@ -212,12 +296,31 @@ const formatNumber = (value: number, digits: number): string => value.toLocaleSt
 export function simulationSummary(data: SimulationData): string {
   const parts = [`simulate_motion: ${formatNumber(data.duration, 3)} s with ${data.engine}.`];
   for (const [id, joint] of Object.entries(data.joints)) {
-    const speed = joint.finalRpm !== undefined ? `${formatNumber(joint.finalRpm, 1)} rpm` : `${formatNumber(joint.finalVelocity, 4)} m/s`;
-    const settled = joint.steady ? `steady after ${formatNumber(joint.settledAfter ?? 0, 2)} s` : 'not yet steady';
-    parts.push(`Joint ${id}: ${speed} (${settled}).`);
+    const unit = joint.finalRpm !== undefined ? 'rpm' : 'm/s';
+    const show = (rpm: number | undefined, velocity: number): string =>
+      rpm !== undefined ? `${formatNumber(rpm, 1)} rpm` : `${formatNumber(velocity, 4)} ${unit}`;
+    if (joint.periodic && joint.periodS !== undefined)
+      parts.push(
+        `Joint ${id}: periodic, period ${formatNumber(joint.periodS, 3)} s, cycle-mean ${show(joint.cycleMeanRpm, joint.cycleMeanVelocity ?? 0)}, ` +
+          `peak ${show(joint.kind === 'revolute' ? joint.peakVelocity / RAD_PER_S_PER_RPM : undefined, joint.peakVelocity)}, travel ${formatNumber(joint.finalPosition, 4)} ${joint.kind === 'revolute' ? 'rad' : 'm'} at the end.`,
+      );
+    else {
+      const settled = joint.steady ? `steady after ${formatNumber(joint.settledAfter ?? 0, 2)} s` : 'not yet steady';
+      parts.push(`Joint ${id}: ${show(joint.finalRpm, joint.finalVelocity)} (${settled}).`);
+    }
   }
   for (const [id, motor] of Object.entries(data.motors))
-    parts.push(`Motor ${id}: ${formatNumber(motor.torque, 1)} N·m, ${formatNumber(motor.power / 1000, 2)} kW.`);
+    parts.push(
+      motor.cycleMeanTorque !== undefined && motor.cycleMeanPower !== undefined
+        ? `Motor ${id}: cycle-mean ${formatNumber(motor.cycleMeanTorque, 1)} N·m, ${formatNumber(motor.cycleMeanPower / 1000, 2)} kW ` +
+            `(period ${formatNumber(motor.periodS ?? 0, 3)} s; at the end ${formatNumber(motor.torque, 1)} N·m).`
+        : `Motor ${id}: ${formatNumber(motor.torque, 1)} N·m, ${formatNumber(motor.power / 1000, 2)} kW.`,
+    );
+  for (const [id, body] of Object.entries(data.freeBodies ?? {}))
+    parts.push(
+      `Body ${id}: free, ends at [${body.finalPosition.map((c) => formatNumber(c, 2)).join(', ')}] with velocity ` +
+        `[${body.finalVelocity.map((c) => formatNumber(c, 3)).join(', ')}] m/s (speed ${formatNumber(body.speed, 3)} m/s).`,
+    );
   for (const [id, prop] of Object.entries(data.propellers))
     parts.push(
       `Propeller ${id}: ${formatNumber(prop.rpm, 1)} rpm, thrust ${formatNumber(prop.thrust, 1)} N, ` +

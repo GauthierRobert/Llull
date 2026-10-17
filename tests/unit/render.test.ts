@@ -35,7 +35,7 @@ function svgSize(svg: string): [number, number] {
 function renderSolid(command: string, params: object, delta?: Vec3, view = 'front'): string {
   let doc = execute(createEmptyDocument(), command, { ...params, position: [0, 0, 0] }).document;
   if (delta) doc = execute(doc, 'rotate_entity', { id: doc.order[0]!, delta }).document;
-  return (execute(doc, 'render_view', { view, width: 400, height: 400 }).data as { svg: string }).svg;
+  return (execute(doc, 'render_view', { mode: 'vector', view, width: 400, height: 400 }).data as { svg: string }).svg;
 }
 
 const QUARTER_X: Vec3 = [Math.PI / 2, 0, 0];
@@ -136,7 +136,7 @@ describe('render stroke placement honours the work-plane rotation', () => {
     const rotated = draw('draw_polyline', { points: xy(0, 0, 2, 0) }, [0, 0, QUARTER_TURN]);
     const upright = draw('draw_polyline', { points: xy(0, 0, 0, 2) });
     const dots = (doc: CadDocument): string[] => {
-      const svg = (execute(doc, 'render_view', { view: 'top', ...labelled }).data as { svg: string }).svg;
+      const svg = (execute(doc, 'render_view', { mode: 'vector', view: 'top', ...labelled }).data as { svg: string }).svg;
       return [...svg.matchAll(/<circle cx="([-\d.]+)" cy="([-\d.]+)"/g)].map((m) => `${m[1]},${m[2]}`);
     };
     const expected = dots(upright.doc);
@@ -186,7 +186,7 @@ function meshDoc(id: string, triangles: number, x0: number, base: CadDocument): 
 }
 
 function render(doc: CadDocument, params: Record<string, unknown> = {}): RenderViewData {
-  const result = execute(doc, 'render_view', { ...bare, ...params });
+  const result = execute(doc, 'render_view', { mode: 'vector', ...bare, ...params });
   expectNoOp(result, doc);
   return result.data as RenderViewData;
 }
@@ -200,7 +200,7 @@ describe('render_view polygon budget', () => {
   it('keeps later entities visible when the first entity alone exceeds the budget', () => {
     const big = meshDoc('big', MAX_POLYGONS + 5000, 0, createEmptyDocument());
     const doc = addBox(big, [50, 0, 0], '#ff0000');
-    const result = execute(doc, 'render_view', bare);
+    const result = execute(doc, 'render_view', { mode: 'vector', ...bare });
     const data = result.data as RenderViewData;
     expect(data.simplifiedEntityIds).toEqual(['big']);
     expect(data.skippedEntityIds).toEqual([]);
@@ -212,7 +212,7 @@ describe('render_view polygon budget', () => {
   it('reports skipped entities when the budget is smaller than the entity count', () => {
     let doc = createEmptyDocument();
     for (let i = 0; i < 520; i++) doc = meshDoc(`m${i}`, 1, i, doc);
-    const result = execute(doc, 'render_view', { ...bare, maxPolygons: 500 });
+    const result = execute(doc, 'render_view', { mode: 'vector', ...bare, maxPolygons: 500 });
     const data = result.data as RenderViewData;
     expect(data.polygonCount).toBe(500);
     expect(data.skippedEntityIds).toHaveLength(20);
@@ -251,7 +251,7 @@ describe('render_view cutaway', () => {
   };
   it('splits box faces and adds one hatched cap for a single plane', () => {
     const { doc, id } = boxDoc();
-    const result = execute(doc, 'render_view', { ...bare, cut: { planes: [{ normal: [1, 0, 0], offset: 0 }] } });
+    const result = execute(doc, 'render_view', { mode: 'vector', ...bare, cut: { planes: [{ normal: [1, 0, 0], offset: 0 }] } });
     const data = result.data as RenderViewData;
     // left face + 4 clipped side faces + cap
     expect(data.polygonCount).toBe(6);
@@ -288,15 +288,15 @@ describe('render_view cutaway', () => {
     const whole = render(doc, { cut: { planes: [{ normal: [1, 0, 0], offset: 5 }] } });
     expect(whole.polygonCount).toBe(6);
     expect(whole.cutEntityIds).toEqual([]);
-    const result = execute(doc, 'render_view', { ...bare, cut: { planes: [{ normal: [1, 0, 0], offset: 5 }] } });
+    const result = execute(doc, 'render_view', { mode: 'vector', ...bare, cut: { planes: [{ normal: [1, 0, 0], offset: 5 }] } });
     expect(result.summary).toContain('removed nothing');
   });
   it('cut works with isolate and turntable', () => {
     const { doc, id } = boxDoc();
     const cut = { planes: [{ normal: [1, 0, 0], offset: 0 }] };
-    const isolated = execute(doc, 'render_view', { ...bare, cut, isolate: id });
+    const isolated = execute(doc, 'render_view', { mode: 'vector', ...bare, cut, isolate: id });
     expect((isolated.data as RenderViewData).svg).toContain('ISOLATED');
-    const strip = execute(doc, 'render_view', { ...bare, cut, turntable: { frames: 3 } });
+    const strip = execute(doc, 'render_view', { mode: 'vector', ...bare, cut, turntable: { frames: 3 } });
     expect((strip.data as RenderViewData).svg).toContain('llull-hatch');
   });
   it('rejects invalid cut input without touching the document', () => {
@@ -309,7 +309,7 @@ describe('render_view cutaway', () => {
       ['unknown ids', { planes: [{ normal: [1, 0, 0], offset: 0 }], entityIds: ['nope'] }, /matches no entity/],
     ];
     for (const [, cut, message] of bad) {
-      const result = execute(doc, 'render_view', { ...bare, cut });
+      const result = execute(doc, 'render_view', { mode: 'vector', ...bare, cut });
       expectNoOp(result, doc);
       expect(result.summary).toMatch(message);
       expect(result.data).toBeUndefined();
@@ -391,7 +391,7 @@ describe('render_view camera, title, background', () => {
       [{ background: 'url(javascript:1)' }, /not a CSS color/],
     ];
     for (const [params, message] of cases) {
-      const result = execute(doc, 'render_view', { ...bare, ...params });
+      const result = execute(doc, 'render_view', { mode: 'vector', ...bare, ...params });
       expect(result.document).toBe(doc);
       expect(result.summary).toMatch(message);
       expect(result.data).toBeUndefined();
@@ -400,7 +400,7 @@ describe('render_view camera, title, background', () => {
   it('keeps isolate layers aligned to the full scene and transparent over the background', () => {
     const first = boxDoc();
     const doc = addBox(first.doc, [10, 0, 0], '#ff8800');
-    const result = execute(doc, 'render_view', { ...bare, isolate: first.id, background: '#ffffff' });
+    const result = execute(doc, 'render_view', { mode: 'vector', ...bare, isolate: first.id, background: '#ffffff' });
     const svg = (result.data as RenderViewData).svg;
     expect(svg.match(/<rect width="400" height="300"/g)).toHaveLength(1);
   });
@@ -414,7 +414,7 @@ function boxDoc2(): { doc: CadDocument; boxId: string } {
 }
 
 function render2(doc: CadDocument, params: Record<string, unknown>): RenderViewData {
-  const result = execute(doc, 'render_view', { width: 300, height: 200, ...params });
+  const result = execute(doc, 'render_view', { mode: 'vector', width: 300, height: 200, ...params });
   expectNoOp(result, doc);
   return result.data as RenderViewData;
 }
@@ -472,7 +472,7 @@ describe('render_view overlays', () => {
 describe('render_view turntable', () => {
   it('stitches N frames into one strip and reports the strip width', () => {
     const { doc } = boxDoc2();
-    const result = execute(doc, 'render_view', { width: 200, height: 150, turntable: { frames: 4 } });
+    const result = execute(doc, 'render_view', { mode: 'vector', width: 200, height: 150, turntable: { frames: 4 } });
     const data = result.data as RenderViewData;
     expect(data.width).toBe(800);
     expect(data.height).toBe(150);
@@ -491,7 +491,7 @@ describe('render_view isolate and section', () => {
     const { doc, boxId } = boxDoc2();
     const other = execute(doc, 'add_box', { position: [5, 0, 0], size: [1, 1, 1] }).document;
     for (const isolate of [boxId, [boxId]]) {
-      const result = execute(other, 'render_view', { isolate, ...bare2 });
+      const result = execute(other, 'render_view', { mode: 'vector', isolate, ...bare2 });
       const svg = (result.data as RenderViewData).svg;
       expect(svg).toContain('opacity="0.15"');
       expect(svg).toContain(`ISOLATED: ${boxId}`);
@@ -502,7 +502,7 @@ describe('render_view isolate and section', () => {
   it.each(['x', 'y', 'z'] as const)('section cuts along %s with a plane line and label', (axis) => {
     const { doc } = boxDoc2();
     const other = execute(doc, 'add_box', { position: [5, 5, 5], size: [1, 1, 1] }).document;
-    const result = execute(other, 'render_view', { section: { axis, offset: 2 }, ...bare2 });
+    const result = execute(other, 'render_view', { mode: 'vector', section: { axis, offset: 2 }, ...bare2 });
     const svg = (result.data as RenderViewData).svg;
     expect(svg).toContain('id="section-plane"');
     expect(svg).toContain(`SECTION ${axis.toUpperCase()}=2`);
@@ -514,7 +514,7 @@ describe('render_view isolate and section', () => {
   });
   it('rejects an invalid section axis without touching the document', () => {
     const { doc } = boxDoc2();
-    expectNoOp(execute(doc, 'render_view', { section: { axis: 'w', offset: 0 } }), doc, 'rejected');
+    expectNoOp(execute(doc, 'render_view', { mode: 'vector', section: { axis: 'w', offset: 0 } }), doc, 'rejected');
   });
 });
 
@@ -612,7 +612,7 @@ describe('render_view face normals', () => {
 });
 
 const svgOf = (doc: CadDocument, params: Record<string, unknown> = {}): string =>
-  (execute(doc, 'render_view', params).data as { svg: string }).svg;
+  (execute(doc, 'render_view', { mode: 'vector', ...params }).data as { svg: string }).svg;
 
 const shapeCount = (svg: string): number => (svg.match(/<polygon|<path|<polyline/g) ?? []).length;
 
@@ -669,7 +669,7 @@ describe('render_view — large mesh', () => {
       mesh: { positions, indices },
     };
     const withMesh = { ...doc, entities: { ...doc.entities, [mesh.id]: mesh }, order: [...doc.order, mesh.id] };
-    const result = execute(withMesh, 'render_view', {});
+    const result = execute(withMesh, 'render_view', { mode: 'vector' });
     expect(result.summary).not.toMatch(/failed/);
     expect(result.data).toMatchObject({ entityCount: 1 });
   });

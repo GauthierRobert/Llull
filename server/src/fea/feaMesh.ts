@@ -104,6 +104,13 @@ export async function runFeaMesh(analysisId: string, host: FeaHost, deps: FeaMes
   if (mesh === null) return feaFailure('fea_mesh', 'FEA_MESH_FAILED', 'the mesher returned a malformed mesh');
   const meshHash = deps.store.put(mesh);
   const recorded = host.applyCommand('record_fe_mesh', { analysisId, summary: deps.hooks.meshSummary(mesh, meshHash) });
+  const faceted = parts.filter((part) => (part.geometry as { kind?: string }).kind === 'stl').map((part) => part.entityId);
+  const facetedNote =
+    faceted.length === 0
+      ? ''
+      : ` WARNING: ${faceted.join(', ')} meshed from a faceted tessellation (no exact B-rep with this kernel): curved faces are polygons, ` +
+        'so stresses at holes / fillets read high (+5-15 %) and facesNear targets snap to facets; for stress results re-run with the OCC ' +
+        'kernel (--kernel occt or LLULL_KERNEL=occt).';
   const counts = mesh.blocks.reduce<Record<string, number>>(
     (all, block) => ({ ...all, [block.type]: (all[block.type] ?? 0) + block.elements.length }),
     {},
@@ -111,9 +118,9 @@ export async function runFeaMesh(analysisId: string, host: FeaHost, deps: FeaMes
   return {
     summary: `fea_mesh: ${mesh.nodes.length} nodes, ${Object.entries(counts)
       .map(([type, n]) => `${n} ${type}`)
-      .join(', ')} (${mesh.mesher} ${mesh.mesherVersion}). ${recorded.summary}`,
+      .join(', ')} (${mesh.mesher} ${mesh.mesherVersion}). ${recorded.summary}${facetedNote}`,
     affected: recorded.affected,
     isError: recorded.isError,
-    data: { meshHash, nodes: mesh.nodes.length, elements: counts, targets: Object.keys(mesh.nodeSets).length },
+    data: { meshHash, nodes: mesh.nodes.length, elements: counts, targets: Object.keys(mesh.nodeSets).length, facetedParts: faceted },
   };
 }

@@ -784,7 +784,8 @@ export type ShapeRecipe =
   | { readonly op: 'boolean'; readonly boolean: BooleanOp; readonly a: ShapeRecipe; readonly b: ShapeRecipe }
   /**
    * `edges`: 0-based indices into the source's unique edges (`ShapeTopology.edges`); [] = all. `sizeEnd` (fillet only): radius at each
-   * edge's end, varying linearly from `size` at its start.
+   * edge's end, varying linearly from `size` at its start. `near`: the mid point of each selected edge at creation (document frame), so code
+   * generators can pick the same edges by position when the kernel's edge indices are unavailable; kernels ignore it.
    */
   | {
       readonly op: 'fillet' | 'chamfer';
@@ -792,10 +793,12 @@ export type ShapeRecipe =
       readonly edges: readonly number[];
       readonly size: number;
       readonly sizeEnd?: number;
+      readonly near?: readonly Vec3[];
     }
   /** One-piece union of `sources` with every new intersection (joint) edge filleted by `radius`. */
   | { readonly op: 'blend'; readonly sources: readonly ShapeRecipe[]; readonly radius: number }
-  | { readonly op: 'shell'; readonly source: ShapeRecipe; readonly thickness: number }
+  /** `openNear`: points, each picking the face of the source nearest to it to remove (an open pocket); absent = a sealed internal cavity. */
+  | { readonly op: 'shell'; readonly source: ShapeRecipe; readonly thickness: number; readonly openNear?: readonly Vec3[] }
   /** Rotate (M = Rx·Ry·Rz, radians) then translate. */
   | { readonly op: 'place'; readonly source: ShapeRecipe; readonly position: Vec3; readonly rotation: Vec3 }
   /** Uniform scale about the world origin. */

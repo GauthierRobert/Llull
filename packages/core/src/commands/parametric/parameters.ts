@@ -11,6 +11,7 @@ import { topologicalSort } from '../../lib/topologicalSort';
 import { changed, noop, report } from '../noop';
 import { evaluateExpression, expressionSyntaxError, extractReferences } from './expression';
 import { regenerateParameterDependents } from '../history/dependents';
+import { replayFailureError, replayFailuresNote } from '../history/replay';
 
 /** Parameter names ordered by dependency; names in a reference cycle are appended and listed in `cycleSet`. */
 function topoSort(parameters: Readonly<Record<string, Parameter>>): { sorted: string[]; cycleSet: Set<string> } {
@@ -120,15 +121,20 @@ export const setParameter = defineCommand({
         `set_parameter '${name}': expression '${expression}' could not be evaluated — ${param.error}. Parameter stored with error.`,
       );
     const dependentCount = Object.values(evaluated).filter((p) => p.name !== name && extractReferences(p.expression).has(name)).length;
-    const { document, dependentSteps, refusal } = regenerateParameterDependents(doc, newDoc, ctx);
+    const { document, dependentSteps, refusal, failures } = regenerateParameterDependents(doc, newDoc, ctx);
     if (refusal !== undefined) return noop(doc, `set_parameter '${name}': ${refusal}`);
-    return changed(
-      document,
-      `set_parameter '${name}' = ${param.value} (expression: '${expression}')` +
-        (dependentCount > 0 ? `; ${dependentCount} dependent(s) re-evaluated` : '') +
-        (dependentSteps > 0 ? `; regenerated ${dependentSteps} dependent feature step(s).` : '.'),
-      dependentSteps > 0 ? document.order : [],
-    );
+    const error = replayFailureError(failures);
+    return {
+      ...changed(
+        document,
+        `set_parameter '${name}' = ${param.value} (expression: '${expression}')` +
+          (dependentCount > 0 ? `; ${dependentCount} dependent(s) re-evaluated` : '') +
+          (dependentSteps > 0 ? `; regenerated ${dependentSteps} dependent feature step(s).` : '.') +
+          replayFailuresNote(failures),
+        dependentSteps > 0 ? document.order : [],
+      ),
+      ...(error ? { error } : {}),
+    };
   },
 });
 

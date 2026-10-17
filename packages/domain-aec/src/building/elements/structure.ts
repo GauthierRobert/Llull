@@ -333,13 +333,13 @@ export const addBeam = defineCommand({
 const MAX_RISERS = 200;
 
 /**
- * @affects creates riserCount step solids on layer A-FLOR-STRS
+ * @affects creates riserCount - 1 step blocks on a waist slab on layer A-FLOR-STRS
  * @failure invalid start / riserCount < 2 / sizes <= 0 -> no-op
  */
 export const addStair = defineCommand({
   name: 'add_stair',
   description:
-    'Add a straight-run stair climbing one full level. Riser count defaults to the level height ÷ 175 mm (rounded up), so risers are ' +
+    'Add a straight-run reinforced-concrete-style stair climbing one full level, modelled as a waist slab (sloping slab, waistThickness) with the steps on top; the last riser lands on the upper floor, so N risers give N-1 treads and the run is (N-1) x tread. Riser count defaults to the level height ÷ 175 mm (rounded up), so risers are ' +
     'equal; tread default 280 mm. The summary reports the Blondel rule (2R + G, comfortable between 600 and 650 mm). Refused above 200 ' +
     'risers or if a stair with the same start and angle already exists on the level.',
   params: z.object({
@@ -348,18 +348,25 @@ export const addStair = defineCommand({
     width: z.number().optional().describe('Stair width, in document units. Default 1000 mm.'),
     riserCount: z.number().optional().describe('Number of risers (integer, 2 to 200). Default: level height ÷ 175 mm, rounded up.'),
     treadDepth: z.number().optional().describe('Tread (going) depth, in document units. Default 280 mm.'),
+    waistThickness: z
+      .number()
+      .optional()
+      .describe(
+        'Thickness of the sloping waist slab under the steps, perpendicular to the flight, in document units (> 0). Default 175 mm.',
+      ),
     levelId: levelIdParam,
     material: concreteMaterialParam,
   }),
-  run: (doc, { start, angle = 0, width, riserCount, treadDepth, levelId, material }): CommandResult => {
+  run: (doc, { start, angle = 0, width, riserCount, treadDepth, waistThickness, levelId, material }): CommandResult => {
     const resolution = resolveLevel(doc, getBuilding(doc), levelId);
     if (!resolution.ok) return noop(doc, `add_stair failed: ${resolution.reason}.`);
     const levelHeight = resolution.level.height;
     const count = riserCount ?? Math.ceil(levelHeight / fromMm(doc, 175));
     const resolvedWidth = width ?? fromMm(doc, 1000);
     const resolvedTread = treadDepth ?? fromMm(doc, 280);
-    if (!Number.isInteger(count) || count < 2 || resolvedWidth <= 0 || resolvedTread <= 0) {
-      return noop(doc, 'add_stair failed: riserCount must be an integer ≥ 2, width and treadDepth > 0.');
+    const resolvedWaist = waistThickness ?? fromMm(doc, 175);
+    if (!Number.isInteger(count) || count < 2 || resolvedWidth <= 0 || resolvedTread <= 0 || !(resolvedWaist > 0)) {
+      return noop(doc, 'add_stair failed: riserCount must be an integer ≥ 2, width, treadDepth and waistThickness > 0.');
     }
     if (count > MAX_RISERS) {
       return noop(
@@ -387,6 +394,7 @@ export const addStair = defineCommand({
       riserCount: count,
       riserHeight,
       treadDepth: resolvedTread,
+      waistThickness: resolvedWaist,
       material: material?.trim() || 'concrete',
     };
     const blondelMm = toMm(doc, 2 * riserHeight + resolvedTread);
@@ -395,7 +403,7 @@ export const addStair = defineCommand({
       withElement(resolution.building, stair),
       [stair.id],
       `Added stair ${stair.mark} (${stair.id}): ${count} risers of ${Number(riserHeight.toPrecision(4))}, tread ${resolvedTread}, ` +
-        `run ${(count * resolvedTread).toFixed(1)} ${doc.units}; 2R+G = ${blondelMm.toFixed(0)} mm` +
+        `${count - 1} treads, run ${((count - 1) * resolvedTread).toFixed(1)} ${doc.units}, waist slab ${resolvedWaist}; 2R+G = ${blondelMm.toFixed(0)} mm` +
         `${blondelMm < 600 || blondelMm > 650 ? ' (outside the 600–650 mm comfort range)' : ''}.`,
       { elementId: stair.id },
     );

@@ -34,6 +34,16 @@ export const differingKeys = (given: object, expected: object): string[] => {
     .sort();
 };
 
+/**
+ * The heat balance is a diagnostic re-derived from the artifact on every read (what readers show is the recomputed summary), and its
+ * quadrature evolves between versions: it is left out of the comparison so results recorded by an older summariser stay trusted.
+ */
+function withoutHeatBalance(summary: ResultsSummary): object {
+  if (summary.thermal === undefined) return summary;
+  const thermal = Object.fromEntries(Object.entries(summary.thermal).filter(([key]) => key !== 'heatBalance'));
+  return { ...summary, thermal };
+}
+
 const artifactHashes = new WeakMap<object, string>();
 
 /** sha256 of the canonical JSON of an artifact, computed once per artifact object. */
@@ -126,7 +136,7 @@ export function trustedRecord(doc: CadDocument, analysisCase: AnalysisCase, port
       ),
     );
   const results = resultsSummary(doc, analysisCase.id, meshFetched.artifact, resultsFetched.artifact, resultsRecord.resultsHash);
-  const resultsDiff = differingKeys(resultsRecord, results);
+  const resultsDiff = differingKeys(withoutHeatBalance(resultsRecord), withoutHeatBalance(results));
   if (resultsDiff.length > 0)
     return nothing(
       'untrusted',

@@ -43,10 +43,10 @@ function runPipes(civil: CivilModel, fromId: string, toId: string | undefined): 
 export const exportDrainageLongSection = defineCommand({
   name: 'export_drainage_long_section',
   description:
-    'Long section of a drainage pipe run as SVG text in `data.text` (`data.fileName`): ground (rim) line, manholes with labels, pipe ' +
+    'Long section of a drainage pipe run as SVG text in `data.svg` (alias `data.text`) (`data.fileName`): ground (rim) line, manholes with labels, pipe ' +
     'invert and obvert, the hydraulic grade line (same method as check_drainage_network) and a table band of chainage, rim, invert, pipe ' +
     '(diameter, slope, length) and HGL. The run starts at `fromManholeId` and ends at `toManholeId`, or, when omitted, follows the ' +
-    'largest pipe at each fork down to the outfall. Returns data { text, fileName, pipeIds, manholeIds }.',
+    'largest pipe at each fork down to the outfall. Returns data { svg, text, fileName, pipeIds, manholeIds }.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
     confirmExportControlled,
@@ -124,7 +124,7 @@ export const exportDrainageLongSection = defineCommand({
       `Drainage long section ${start.id} to ${ids[ids.length - 1]}: ${segments.length} pipe(s), ` +
         `${chainage.toFixed(1)} m, ${segments.filter((s) => s.surcharged).length} surcharged, ` +
         `${stations.filter((s) => s.flooding).length} flooding manhole(s); ${fileName} (${text.length} bytes).`,
-      { text, fileName, pipeIds: run.map((p) => p.id), manholeIds: ids },
+      { text, svg: text, fileName, pipeIds: run.map((p) => p.id), manholeIds: ids },
     );
   },
 });

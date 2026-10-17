@@ -12,7 +12,7 @@ import { planAliases } from './aliases';
 import { planText, resultJson, resultText, type PrintableResult } from './output';
 import { createStepObserver, type StepObserver } from './progress';
 import { resolveImageRefs } from './imageParams';
-import { saveDataFiles, withoutPayloads } from './saveFiles';
+import { saveDataFiles, withoutPayloads, withSaveDefaults } from './saveFiles';
 import { llullHome, readDesktopDiscovery } from './desktopDiscovery';
 import { exchangeTool, takesFileParam, withFileContent } from './exchange';
 import type { CommandOutcome } from '@mcp/restProtocol';
@@ -21,6 +21,8 @@ import { outcomeIsFailure } from '@mcp/commandOutcome';
 import { exchangeOptionsWithDwg } from '../dwgConvert';
 import type { ExchangeOptions } from '../pythonExchange';
 import { USAGE } from './usage';
+import { parseKernelChoice } from '@core/geometry/kernelChoice';
+import { planKernelWarnings } from './planKernelWarning';
 import { benchmarkCli } from './benchmarks';
 
 export interface CliIo {
@@ -203,7 +205,7 @@ async function runExec(args: ParsedArgv, io: CliIo): Promise<number> {
   const isExchange = exchangeTool(name) !== undefined;
   if (getCommand(name) === undefined && !isExchange) unknownCommand(name);
   const raw = await paramsOf(name, rest, io);
-  const params = asUsage(() => (takesFileParam(name) ? withFileContent(name, raw) : raw));
+  const params = asUsage(() => withSaveDefaults(name, takesFileParam(name) ? withFileContent(name, raw) : raw, stringFlag(args, 'save')));
   const observer = observerOf(args, io);
   const backend = await backendOf(args, io, observer);
   const result = isExchange ? await backend.exchange(name, params) : await backend.run(name, params);
@@ -226,7 +228,16 @@ async function runPlan(args: ParsedArgv, io: CliIo): Promise<number> {
   const backend = await backendOf(args, io, observer);
   const result = withTimeout(observer, withOutcome('build_project', await backend.run('build_project', params)));
   const found = planAliases(result.data);
-  return finish(found === null ? result : { ...result, planAliases: found }, args, io, planText);
+  const warnings =
+    booleanFlag(args, 'validate') && serverOf(args, io) === undefined
+      ? planKernelWarnings(params, parseKernelChoice(stringFlag(args, 'kernel') ?? io.env['LLULL_KERNEL']))
+      : [];
+  const printable: PrintableResult = {
+    ...result,
+    ...(found !== null ? { planAliases: found } : {}),
+    ...(warnings.length > 0 ? { warnings } : {}),
+  };
+  return finish(printable, args, io, planText);
 }
 
 function runNew(args: ParsedArgv, io: CliIo): number {

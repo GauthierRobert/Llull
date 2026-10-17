@@ -1,7 +1,7 @@
 /**
  * Lower a kernel result's exact construction (`mesh.brep`) — or one fillet / chamfer / shell step — to feature-program ops, so generated
  * code rebuilds the B-rep instead of a triangle soup.
- * @failure a node no program op expresses (a rotated placement, a scale) -> null (caller falls back)
+ * @failure a node no program op expresses (a rotated placement, a scale, a shell with open faces) -> null (caller falls back)
  */
 
 import type { Entity, Vec3 } from '../model/types';
@@ -33,7 +33,7 @@ export function meshSoup(mesh: MeshData): number[] {
   ]);
 }
 
-/** Mid points of the selected edges of `source`, when the kernel has exact topology. */
+/** Mid points of the selected edges of `source`, when the kernel has exact topology (else the recipe's own `near`). */
 function edgeMidPoints(kernel: GeometryKernel | null, source: ShapeRecipe, edges: readonly number[]): Vec3[] | undefined {
   if (kernel === null || edges.length === 0) return undefined;
   const shape = kernel.evaluate(source);
@@ -59,7 +59,9 @@ export function modificationFeature(
 ): Feature {
   const fallback = mesh === undefined ? {} : { mesh };
   if (recipe.op === 'shell') return { ...base, op: 'shell', thickness: size, ...fallback };
-  const near = edgeMidPoints(kernel, recipe.source, recipe.edges);
+  const near =
+    edgeMidPoints(kernel, recipe.source, recipe.edges) ??
+    (recipe.near !== undefined && recipe.near.length > 0 ? [...recipe.near] : undefined);
   return { ...base, op: recipe.op, edges: recipe.edges, size, ...(near === undefined ? {} : { near }), ...fallback };
 }
 
@@ -127,6 +129,7 @@ export function lowerRecipe(recipe: ShapeRecipe, lowering: RecipeLowering): Lowe
     case 'chamfer':
     case 'shell': {
       if (recipe.op !== 'shell' && recipe.sizeEnd !== undefined) return null;
+      if (recipe.op === 'shell' && recipe.openNear !== undefined && recipe.openNear.length > 0) return null;
       const source = lowerRecipe(recipe.source, lowering);
       if (source === null) return null;
       const base = lowering.base(source.variable);

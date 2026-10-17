@@ -125,7 +125,15 @@ export interface ThermalResultsSummary {
   readonly minT: { value: number; at: Vec3; entityId: EntityId; timeS: number };
   readonly maxHeatFluxW_m2: { value: number; at: Vec3; timeS: number };
   readonly bcHeatFlowsW: ReadonlyArray<{ bcId: string; timeS: number; valueW: number }>;
-  readonly heatBalance: { inW: number; outW: number; storedW: number; residualRel: number; timeS: number };
+  readonly heatBalance: {
+    inW: number;
+    outW: number;
+    storedW: number;
+    residualRel: number;
+    timeS: number;
+    /** Transient only: spread of the residual between two quadratures of the BC flows over the last output interval (coarse outputs). */
+    samplingRel?: number;
+  };
   readonly probes: ReadonlyArray<{ probeId: string; series: ReadonlyArray<readonly [timeS: number, T: number]> }>;
   readonly propertyRangeExceeded: ReadonlyArray<{
     material: string;

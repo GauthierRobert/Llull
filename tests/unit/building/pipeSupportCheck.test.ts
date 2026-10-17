@@ -196,6 +196,12 @@ describe('span verdicts', () => {
     expect(run(loose).totals.unattached).toBe(1);
     expect(execute(loose, 'check_pipe_supports', {}).summary).toContain('1 unattached support(s)');
   });
+  it('notes that the water-filled table was applied to a gas / air line, and stays quiet for water', () => {
+    const line = (service: string): CadDocument =>
+      step(twoLevels(), 'add_pipe_run', { levelId: 'level-1', dn: 50, service, points: xyz(0, 0, 1000, 1000, 0, 1000) });
+    expect(rowOf(run(line('compressed air')), 'PL1').notes.join(' ')).toContain('water-filled span table was applied');
+    expect(rowOf(run(line('cooling water')), 'PL1').notes.join(' ')).not.toContain('water-filled span table');
+  });
   it('takes an untabulated size from the next smaller table row and says so', () => {
     const row = rowOf(run(shoes(railDoc([2000, 6000, 10000], undefined), [2000, 6000, 10000])), 'PL1');
     expect(row.dn).toBe(100);

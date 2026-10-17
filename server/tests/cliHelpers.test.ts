@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { booleanFlag, missingValueFlag, paramsSource, parseArgv, stringFlag } from '../src/cli/argv';
 import { describeCommand, listCatalog, searchCatalog, shortDescription, suggestNames, toolsetCounts } from '../src/cli/catalog';
-import { filesOfData, saveDataFiles, withoutPayloads } from '../src/cli/saveFiles';
+import { filesOfData, saveDataFiles, withoutPayloads, withSaveDefaults } from '../src/cli/saveFiles';
 import { imageDataUrl, resolveImageRefs } from '../src/cli/imageParams';
 import { listCommands } from '@core/commands/registry';
 import { exchangeToolDefinitions } from '../src/cli/exchange';
@@ -151,6 +151,31 @@ describe('saveFiles', () => {
     expect(existsSync(path.join(root, 'bad.png'))).toBe(false);
     expect(() => saveDataFiles({ count: 1 }, path.join(root, 'x.txt'))).toThrow(/no file payload/);
     expect(existsSync(path.join(root, 'x.txt'))).toBe(false);
+  });
+
+  it('saves dxf / ifc / step text payloads and civil svg held in data.text (also to .png)', () => {
+    const root = dir();
+    const [dxf] = saveDataFiles({ partId: 'p', filename: 'p_flat.dxf', dxf: '0\nSECTION' }, path.join(root, 'part.dxf'));
+    expect(readFileSync(dxf?.path ?? '', 'utf8')).toBe('0\nSECTION');
+    expect(filesOfData({ dxf: 'D', filename: 'a.dxf' })[0]?.name).toBe('a.dxf');
+    expect(filesOfData({ ifc: 'ISO-10303-21;' })).toHaveLength(1);
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>';
+    const [png] = saveDataFiles({ text: svg, fileName: 'civil.svg' }, path.join(root, 'civil.png'));
+    expect(
+      readFileSync(png?.path ?? '')
+        .subarray(1, 4)
+        .toString(),
+    ).toBe('PNG');
+    expect(() => saveDataFiles({ text: 'LandXML' }, path.join(root, 'land.png'))).toThrow(/no data.svg/);
+  });
+
+  it('picks export_gltf binary from the --save extension unless the caller set it', () => {
+    expect(withSaveDefaults('export_gltf', { entityIds: ['a'] }, 'x.glb')).toEqual({ entityIds: ['a'], binary: true });
+    expect(withSaveDefaults('export_gltf', {}, 'x.GLTF')).toEqual({ binary: false });
+    expect(withSaveDefaults('export_gltf', { binary: false }, 'x.glb')).toEqual({ binary: false });
+    expect(withSaveDefaults('export_gltf', {}, 'x.bin')).toEqual({});
+    expect(withSaveDefaults('export_gltf', {}, undefined)).toEqual({});
+    expect(withSaveDefaults('export_stl', {}, 'x.glb')).toEqual({});
   });
 
   it('replaces payloads with size markers, recursing into files[]', () => {

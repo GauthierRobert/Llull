@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { type ExtrusionEntity, type MeshSolidEntity, createEmptyDocument } from '@core/model/types';
-import { execute } from '@core/commands/registry';
+import { execute, getCommand } from '@core/commands/registry';
 import { buildSpurGearProfile } from '@core/commands/solids/gears';
 import { polygonArea, segmentsIntersect, signedArea } from '@lib/polygon';
-import { isWatertight, meshTris, signedVolume } from './gearTestUtils';
+import { isWatertight, meshTris, signedVolume, triArea2D, type Tri } from './gearTestUtils';
 import { expectSingleEntity, expectNoOp, expectPure } from '../helpers/expectNoOp';
 
 const gear = (p: object): ReturnType<typeof execute> => execute(createEmptyDocument(), 'add_spur_gear', p);
@@ -166,6 +166,32 @@ describe('add_spur_gear', () => {
     expect(signedVolume(tris)).toBeGreaterThan(expected * 0.99);
     expect(signedVolume(tris)).toBeLessThan(expected * 1.01);
   });
+  it.each([
+    [18, 5],
+    [36, 10],
+    [12, 3],
+  ])('bored gear (%i teeth, bore %f): caps face outward, tile the annulus exactly and leave the bore open', (teeth, bore) => {
+    const r = gear({ module: 2, teeth, faceWidth: 20, bore });
+    const tris = meshTris((r.document.entities[r.affected[0]!] as MeshSolidEntity).mesh);
+    expect(isWatertight(tris)).toBe(true);
+    const profileArea = polygonArea(buildSpurGearProfile(2, teeth, Math.PI / 9));
+    expect(signedVolume(tris)).toBeCloseTo((profileArea - Math.PI * bore * bore) * 20, -1);
+    const caps = (z: number): Tri[] => tris.filter((t) => t.every((v) => v[2] === z));
+    for (const [z, sign] of [
+      [0, -1],
+      [20, 1],
+    ] as const) {
+      const cap = caps(z);
+      expect(cap.length).toBeGreaterThan(teeth * 4);
+      for (const t of cap) {
+        const [a, b, c] = t;
+        expect(Math.sign((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]))).toBe(sign);
+        const centroidRadius = Math.hypot((a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3);
+        expect(centroidRadius).toBeGreaterThan(bore * 0.99);
+      }
+      expect(cap.reduce((sum, t) => sum + triArea2D(t), 0)).toBeCloseTo(profileArea - Math.PI * bore * bore, -1);
+    }
+  });
   it.each<[object, RegExp?]>([
     [{ module: 2, teeth: 2, faceWidth: 10 }, /teeth/i],
     [{ module: 0, teeth: 20, faceWidth: 10 }, /module/i],
@@ -184,5 +210,16 @@ describe('add_spur_gear', () => {
     const r = execute(doc, 'add_spur_gear', p);
     expectNoOp(r, doc);
     if (summary) expect(r.summary).toMatch(summary);
+  });
+});
+
+describe('add_spur_gear position semantics', () => {
+  it('the description says position is the bottom face and the gear spans z..z+faceWidth', () => {
+    const def = getCommand('add_spur_gear')!;
+    expect(def.description).toMatch(/bottom face/);
+    expect(def.paramsSchema.properties['position']!.description).toMatch(/BOTTOM face/);
+    const r = gear({ module: 2, teeth: 20, faceWidth: 10, bore: 4, position: [0, 0, 7] });
+    const zs = (r.document.entities[r.affected[0]!] as MeshSolidEntity).mesh.positions.filter((_, i) => i % 3 === 2);
+    expect([Math.min(...zs), Math.max(...zs)]).toEqual([7, 17]);
   });
 });
