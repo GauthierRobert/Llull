@@ -173,6 +173,25 @@ describe('build_project — validate (dry run)', () => {
     expect(malformed.ok).toBe(false);
     expect(malformed.issues!.join(' ')).toMatch(/not a valid action/);
   });
+
+  it('type-checks literal params against the command schema and names step and parameter (VC-FTR-45)', () => {
+    const { result, data } = build([{ command: 'add_sphere', params: { radius: 'abc' } }], { validate: true });
+    expect(data.ok).toBe(false);
+    expect(data.issues).toHaveLength(1);
+    expect(data.issues![0]).toMatch(/^step 0 \(add_sphere\): invalid params — radius: /);
+    expect(result.summary).toContain('step 0');
+    // values only known at run time (alias refs, =expr, {loop} placeholders) are not type-checked
+    const deferred = build(
+      [
+        { command: 'set_parameter', params: { name: 'r', expression: '2' } },
+        { command: 'add_sphere', params: { radius: '=r' } },
+      ],
+      { validate: true },
+    ).data;
+    expect(deferred.ok).toBe(true);
+    // a missing required param is reported once, not twice
+    expect(build([{ command: 'add_sphere', params: {} }], { validate: true }).data.issues).toHaveLength(1);
+  });
 });
 
 function project(doc: CadDocument, actions: unknown[]): ReturnType<typeof execute> {

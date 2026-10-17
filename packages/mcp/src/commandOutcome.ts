@@ -45,13 +45,13 @@ export function failedOutcome(name: string, error: unknown): CommandOutcome {
 }
 
 /**
- * A result whose status a script can trust: besides a rejection, a failed plan (`data.ok` false)
- * and a mutating command that changed nothing (a graceful no-op such as "add_box failed: …") are
+ * A result whose status a script can trust: besides a rejection, a command's own machine-readable refusal (`error`, e.g.
+ * FAST_PITCH on a read-only query), a failed plan (`data.ok` false) and a mutating command that changed nothing (a graceful no-op such as "add_box failed: …") are
  * failures — except setters (`idempotent`), read-only and history meta-commands, which may change
  * nothing. `mayNoop` overrides that for a caller that knows better (clearing an empty document).
  */
 export function outcomeIsFailure(name: string, outcome: CommandOutcome, mayNoop?: boolean): boolean {
-  if (outcome.isError) return true;
+  if (outcome.isError || outcome.error !== undefined) return true;
   if (isRecord(outcome.data) && outcome.data['ok'] === false) return true;
   const annotations = getCommand(name)?.annotations;
   const noopAllowed = mayNoop ?? (annotations?.readOnly === true || annotations?.idempotent === true || annotations?.metaHistory === true);

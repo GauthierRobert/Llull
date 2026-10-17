@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { recipeKey } from '@core/geometry/shapeRecipe';
+import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import type { FtrCheckData } from '@core/model/manufacturing';
 import type { HoleTableData } from '@core/commands/features/holeTable';
 import { expectNoOp, expectPure } from '../../helpers/expectNoOp';
-import { ctxWith, idOf, manifoldSuite, meshOf, plate } from '../../helpers/featureSupport';
+import { ctxWith, idOf, manifoldSuite, meshOf, plate, volumeOf } from '../../helpers/featureSupport';
 
 const kernelOf = manifoldSuite();
 
@@ -55,6 +56,28 @@ describe('set_thread', () => {
     expectPure(doc, () => execute(doc, 'set_thread', { id, featureIndex: 0, thread: { designation: 'M6x1-6H' } }));
   });
 
+  it('VC-FTR-28: MJ6x1-4H5H leaves volume and recipeKey unchanged and persists through save / load and the code export comment', () => {
+    const stock = plate();
+    const drilled = execute(stock.doc, 'add_hole', {
+      target: stock.id,
+      face: TOP,
+      points: [[50, 30]],
+      pointsFrame: 'world_xy',
+      hole: { kind: 'simple', diameter: 6 },
+      extent: { kind: 'blind', depth: 6, drillPointAngle: 118 },
+    });
+    const id = idOf(drilled);
+    const threaded = execute(drilled.document, 'set_thread', { id, featureIndex: 0, thread: { designation: 'MJ6x1-4H5H' } });
+    expect(threaded.affected).toEqual([id]);
+    expect(volumeOf(threaded.document, id)).toBe(volumeOf(drilled.document, id));
+    expect(recipeKey(meshOf(threaded.document, id).brep!)).toBe(recipeKey(meshOf(drilled.document, id).brep!));
+    const reloaded = deserializeDocument(serializeDocument(threaded.document));
+    expect(meshOf(reloaded, id).brep).toMatchObject({ hole: { thread: { designation: 'MJ6x1-4H5H', family: 'MJ' } } });
+    expect(recipeKey(meshOf(reloaded, id).brep!)).toBe(recipeKey(meshOf(drilled.document, id).brep!));
+    const code = execute(threaded.document, 'export_code', { language: 'cadquery' }).data as { text: string };
+    expect(code.text).toContain('thread MJ6x1-4H5H');
+  });
+
   it('removes a thread with null, and accepts free text for family other', () => {
     const { doc, id } = machined();
     const removed = execute(doc, 'set_thread', { id, featureIndex: 1, thread: null });
@@ -88,7 +111,7 @@ describe('set_thread', () => {
 });
 
 describe('hole_table', () => {
-  it('lists holes from the top-left datum, sorted, with the drill point named (VC-FTR-34, 39)', () => {
+  it('lists holes from the top-left datum, sorted, with the drill point named (VC-FTR-34, VC-FTR-39)', () => {
     const { doc, id } = machined();
     const result = execute(doc, 'hole_table', { id });
     const table = dataOf<HoleTableData>(result);
