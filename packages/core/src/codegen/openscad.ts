@@ -151,6 +151,8 @@ export function emitOpenScad(program: FeatureProgram): string {
         return `// ${v} removed`;
       case 'label':
         return `// ${v} labelled ${quote(feature.name)}`;
+      case 'note':
+        return `// ${commentText(feature.text)}`;
     }
   };
   lines.push(...featureLinesWithHeadings(program, '//', featureLine));

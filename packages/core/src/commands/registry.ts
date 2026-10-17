@@ -14,6 +14,7 @@ import { draw2dCommands } from './draw2d/catalog';
 import { modify2dCommands } from './modify2d/catalog';
 import { editCommands } from './edit/catalog';
 import { brepCommands } from './brep/catalog';
+import { featuresCommands } from './features/catalog';
 import { inspectCommands } from './inspect/catalog';
 import { renderCommands } from './render/catalog';
 import { parametricCommands } from './parametric/catalog';
@@ -39,6 +40,7 @@ registerCommands('core', [
   ...modify2dCommands,
   ...editCommands,
   ...brepCommands,
+  ...featuresCommands,
   ...inspectCommands,
   ...renderCommands,
   ...parametricCommands,

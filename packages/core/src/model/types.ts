@@ -13,6 +13,7 @@ import type { CurveSegment } from './curve';
 import type { FastenerModel, PartRef } from './fasteners';
 import type { MaterialLibraryEntry, MaterialRecordInfo } from './materialLibrary';
 import type { SheetMetalModel } from './sheetMetal';
+import type { FeatureParams } from './features';
 
 /** Re-exported: every model consumer reads its vectors from here. */
 export type { Vec2, Vec3 };
@@ -798,4 +799,6 @@ export type ShapeRecipe =
   /** Uniform scale about the world origin. */
   | { readonly op: 'scale'; readonly source: ShapeRecipe; readonly factor: number }
   /** An exact B-rep held in `CadDocument.blobs[blob]` (`BRepTools::Write` text): imported geometry (01 KRN TR-KRN-21). */
-  | { readonly op: 'brep'; readonly blob: string; readonly format: 'occt-brep-v1'; readonly label?: string };
+  | { readonly op: 'brep'; readonly blob: string; readonly format: 'occt-brep-v1'; readonly label?: string }
+  /** A hole group or pocket cut into a face of `source` (07 FTR); kernels lower it to boolean subtracts (`geometry/featureLowering`). */
+  | ({ readonly op: 'feature'; readonly source: ShapeRecipe } & FeatureParams);

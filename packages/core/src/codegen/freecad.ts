@@ -152,6 +152,8 @@ function featureLine(feature: Feature): string {
       return `${v} = None`;
     case 'label':
       return `# ${v} labelled ${quote(feature.name)}`;
+    case 'note':
+      return `# ${commentText(feature.text)}`;
   }
 }
 

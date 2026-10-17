@@ -34,7 +34,7 @@ const ANALYSIS_CORE_TOOLS = words(
 );
 
 /** Core part-modelling features (07 FTR §4.1); the sheet-metal plugin adds its commands to the same toolset. */
-const MANUFACTURING_CORE_TOOLS: readonly string[] = [];
+const MANUFACTURING_CORE_TOOLS: readonly string[] = words('add_hole add_pocket set_thread recognize_features check_machining hole_table');
 
 /** Tool names per toolset; `building` / `civil` / the FE part of `analysis` come from their plugins. */
 export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {

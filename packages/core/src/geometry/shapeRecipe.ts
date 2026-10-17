@@ -11,6 +11,7 @@ import { hashText } from '../lib/hash';
 import { isRecord } from '../lib/isRecord';
 import { isFiniteNumber } from '../lib/isFiniteNumber';
 import { isVec3 } from '../lib/vec3';
+import { featureError, featureKeyText } from './featureRecipe';
 
 const PRESENTATION_FIELDS = new Set(['id', 'name', 'color', 'layerId', 'tags', 'materialId']);
 
@@ -52,6 +53,8 @@ function keyText(recipe: ShapeRecipe): string {
       return `scale(${recipeKey(recipe.source)},${recipe.factor})`;
     case 'brep':
       return `brep(${recipe.blob})`;
+    case 'feature':
+      return featureKeyText(recipe, recipeKey(recipe.source));
   }
 }
 
@@ -150,6 +153,8 @@ function nodeError(node: Record<string, unknown>, depth: number, validateLeaf: L
         return 'brep: blob must be a lowercase sha256 hex string';
       if (node['format'] !== 'occt-brep-v1') return `brep: unsupported format '${String(node['format'])}'`;
       return node['label'] === undefined || typeof node['label'] === 'string' ? null : 'brep: label must be a string';
+    case 'feature':
+      return featureError(node) ?? child(node['source']);
     default:
       return `unknown recipe op '${String(node['op'])}'`;
   }
