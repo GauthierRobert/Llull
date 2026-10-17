@@ -64,7 +64,7 @@ export const fooThing = defineCommand({
 - Parameters (`set_parameter`, `=expr` strings in step params) regenerate only dependents
   (`commands/history/dependents.ts`). Constraints + pure solver (`solve_constraints`), configurations, recipes.
 - CONSTRUCTIVE vs EVALUATED: `entities`/`order` are evaluated, the rest is definition. Plugin-derived
-  entities (`derivedEntityIds`, `@core/plugins/host`) are omitted from saved files (llull-document v2) and re-derived on load; v1 still read.
+  entities (`derivedEntityIds`, `@core/plugins/host`) are omitted from saved files (llull-document v3) and re-derived on load; v1/v2 still read.
 
 ## Kernel (L9, as built)
 

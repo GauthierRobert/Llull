@@ -76,6 +76,14 @@ describe('desktop backend', () => {
     expect([401, 403]).toContain(otherSite.status);
   });
 
+  it('runs the exact OCC kernel (kernel_info, TR-KRN-01)', async () => {
+    const info = await runCli('kernel_info', '--app', '--json');
+    expect(JSON.parse(info.stdout)).toMatchObject({
+      ok: true,
+      data: { active: 'occt', occtVersion: '7.4.0p1', capabilities: expect.arrayContaining(['importShapes', 'brepBlobs']) },
+    });
+  }, 120_000);
+
   it('drives the open document from the CLI with --app, then saves it like File > Save', async () => {
     const status = await runCli('status');
     expect(status.stdout).toMatch(/Desktop app: running at http:\/\/127\.0\.0\.1:\d+/);

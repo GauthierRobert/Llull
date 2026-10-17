@@ -27,10 +27,16 @@ export function exchangeTool(name: string): McpToolDefinition | undefined {
 /** `file=` target per tool: the parameter it fills and how the file is read. */
 const FILE_PARAMS: Readonly<Record<string, { key: string; encoding: 'base64' | 'utf8' }>> = {
   import_step: { key: 'stepBase64', encoding: 'base64' },
+  import_step_exact: { key: 'stepBase64', encoding: 'base64' },
   import_dwg: { key: 'dwgBase64', encoding: 'base64' },
   import_code: { key: 'code', encoding: 'utf8' },
   fea_import_field: { key: 'csv', encoding: 'utf8' },
 };
+
+/** Whether `file=<path>` fills a content parameter of `name` (the exchange tools and `import_step_exact`, a registry command). */
+export function takesFileParam(name: string): boolean {
+  return FILE_PARAMS[name] !== undefined;
+}
 
 /**
  * Replace `file=<path>` with the tool's content parameter, read from the local disk (works the

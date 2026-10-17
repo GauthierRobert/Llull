@@ -51,7 +51,7 @@ describe('serializeDocument / deserializeDocument', () => {
     ['[]', /root level/i],
     [JSON.stringify({ format: 'other-app', version: 1, document: {} }), /format/i],
     [JSON.stringify({ version: 1, document: {} }), /format/i],
-    [JSON.stringify({ format: 'llull-document', version: 3, document: {} }), /version/i],
+    [JSON.stringify({ format: 'llull-document', version: 4, document: {} }), /version/i],
     [JSON.stringify({ format: 'llull-document', document: {} }), /version/i],
     [
       JSON.stringify({

@@ -13,6 +13,8 @@ import { checkPropertyModels } from './checkPropertyModels';
 import { addMaterialModel, removeMaterialModel } from './materialModels';
 import { defineConstitutiveSet } from './constitutiveSets';
 import { checkMaterialModels } from './checkMaterialModels';
+import { kernelInfo } from './kernelInfo';
+import { setModelingTolerance } from './modelingTolerance';
 
 export const documentCommands = commandCatalog(
   setUnits,
@@ -35,4 +37,6 @@ export const documentCommands = commandCatalog(
   removeMaterialModel,
   defineConstitutiveSet,
   checkMaterialModels,
+  kernelInfo,
+  setModelingTolerance,
 );

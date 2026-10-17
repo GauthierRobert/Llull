@@ -64,12 +64,31 @@ describe('backendEnv', () => {
       LLULL_AUTOSAVE_PATH: path.join('/u', 'autosave.json'),
       LLULL_PYTHON: layout.python,
     });
-    expect(env['LLULL_KERNEL']).toBeUndefined();
+    expect(env['LLULL_KERNEL']).toBe('occt');
     expect(env['LLULL_ALLOW_CODE_EXECUTION']).toBeUndefined();
     const optedIn = backendEnv({ port: 1, token: 't', layout, userDataDir: '/u', baseEnv: { LLULL_ALLOW_CODE_EXECUTION: '1' } });
     expect(optedIn['LLULL_ALLOW_CODE_EXECUTION']).toBe('1');
     expect('EMPTY' in env).toBe(false);
     expect(backendOrigin(1)).toBe('http://127.0.0.1:1');
+  });
+});
+
+describe('backendEnv kernel (TR-KRN-01)', () => {
+  const layout = desktopLayout({ packaged: true, resourcesPath: '/r', repoRoot: '', platform: 'linux' });
+  const kernelFor = (baseEnv: Record<string, string>): string | undefined =>
+    backendEnv({ port: 1, token: 't', layout, userDataDir: '/u', baseEnv })['LLULL_KERNEL'];
+
+  it('selects the exact OCC kernel by default', () => {
+    expect(kernelFor({})).toBe('occt');
+  });
+
+  it('passes an inherited LLULL_KERNEL=manifold through as a diagnostic override', () => {
+    expect(kernelFor({ LLULL_KERNEL: 'manifold' })).toBe('manifold');
+  });
+
+  it('ignores every other inherited value', () => {
+    for (const value of ['occt', 'OCCT', 'Manifold', 'cadquery', '', ' manifold'])
+      expect(kernelFor({ LLULL_KERNEL: value }), value).toBe('occt');
   });
 });
 

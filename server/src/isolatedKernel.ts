@@ -8,7 +8,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { MessageChannel, Worker, receiveMessageOnPort, type MessagePort } from 'node:worker_threads';
 import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle } from '@core/geometry/kernel';
-import type { ExactMassProperties } from '@core/geometry/kernelPorts';
+import type { ExactMassProperties, ImportShapesResult, KernelInfo } from '@core/geometry/kernelPorts';
 import { errorMessage } from '@lib/errorMessage';
 import { handleOf, keyOnlyHandle, SHAPE_NOT_CACHED } from '@core/geometry/shapeKernel';
 import type { FaceQueryPort } from '@core/geometry/kernelPorts';
@@ -64,6 +64,7 @@ interface LiveWorker {
   readonly port: MessagePort;
   readonly status: Int32Array;
   ready: boolean; // false while the WASM still loads in the background
+  readonly blobsSent: Set<string>; // document B-rep blobs this worker already holds
 }
 
 class WorkerDiedOnStartError extends Error {
@@ -97,6 +98,9 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
   let live: LiveWorker | null = null;
   let crashes = 0;
   let recycles = 0;
+  /** Every document blob the host loaded, kept to re-send to a worker that was recycled or restarted. */
+  const blobs = new Map<string, string>();
+  let describedAs: KernelInfo | null = null;
 
   const kill = (): void => {
     if (live === null) return;
@@ -120,7 +124,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
     worker.on('exit', () => {
       if (live?.worker === worker) live = null; // died while idle: the next call respawns
     });
-    return { worker, port: port1, status, ready: false };
+    return { worker, port: port1, status, ready: false, blobsSent: new Set() };
   };
 
   const awaitReady = (candidate: LiveWorker): void => {
@@ -161,18 +165,8 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
     }
   };
 
-  const exchange = (op: KernelOperation | TestHook, args: readonly unknown[]): KernelReply | null => {
-    let target: LiveWorker;
-    try {
-      target = ensureLive();
-      if (Atomics.load(target.status, 0) === STATUS_DIED) {
-        kill(); // the worker died while idle (its exit event may not have run yet)
-        target = ensureLive();
-      }
-    } catch (error) {
-      console.warn(`[occt] ${errorMessage(error)}; returning null`);
-      return null;
-    }
+  /** One synchronous request/reply with `target`; null (worker recycled) when it died or timed out. */
+  const transact = (target: LiveWorker, op: KernelOperation | TestHook, args: readonly unknown[]): KernelReply | null => {
     const { port, status } = target;
     port.postMessage({ op, args });
     const outcome = Atomics.wait(status, 0, 0, callTimeoutMs);
@@ -195,6 +189,27 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
     );
     recycle();
     return null;
+  };
+
+  /** @invariant a request reaches a worker only after it holds every blob the host loaded (`brep` leaves evaluate there) */
+  const exchange = (op: KernelOperation | TestHook, args: readonly unknown[]): KernelReply | null => {
+    let target: LiveWorker;
+    try {
+      target = ensureLive();
+      if (Atomics.load(target.status, 0) === STATUS_DIED) {
+        kill(); // the worker died while idle (its exit event may not have run yet)
+        target = ensureLive();
+      }
+    } catch (error) {
+      console.warn(`[occt] ${errorMessage(error)}; returning null`);
+      return null;
+    }
+    for (const [sha256, text] of blobs) {
+      if (target.blobsSent.has(sha256)) continue;
+      target.blobsSent.add(sha256);
+      if (transact(target, 'loadBlob', [sha256, text]) === null) return null;
+    }
+    return transact(target, op, args);
   };
 
   const call = (op: KernelOperation | TestHook, args: readonly unknown[]): unknown => exchange(op, args)?.result ?? null;
@@ -225,6 +240,12 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
     analyze: (shape) => shapeCall('analyze', [shape], false) as ShapeAnalysis | null,
     massProperties: (shape) => shapeCall('massProperties', [shape], false) as ExactMassProperties | null,
     distance: (a, b, maxDistance) => shapeCall('distance', [a, b], false, [maxDistance]) as ShapeDistance | null,
+    loadBlob: (sha256, brep) => void blobs.set(sha256, brep),
+    importShapes: (format, text, options) => call('importShapes', [format, text, options]) as ImportShapesResult | null,
+    info: () => {
+      describedAs ??= call('info', []) as KernelInfo | null;
+      return describedAs ?? { capabilities: [] };
+    },
     crashCount: () => crashes,
     recycleCount: () => recycles,
     forceFailure: (hook) => void call(hook, []),

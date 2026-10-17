@@ -104,7 +104,7 @@ describe('corrupt industrial building data never crashes load', () => {
   });
   it('v2 file: single-field corruption (3 levels deep) of one element per category', () => {
     const file = JSON.parse(serializeDocument(doc)) as { version: number; document: Json };
-    expect(file.version).toBe(2);
+    expect(file.version).toBe(3);
     expect(fuzzBuilding(file, 'v2', 3).slice(0, 10)).toEqual([]);
   });
   it('v1 file (derived entities stored, no step counter): field-level corruption sweep', () => {

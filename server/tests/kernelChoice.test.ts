@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getGeometryKernel, setGeometryKernel } from '@core/geometry/kernel';
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
@@ -48,4 +48,46 @@ describe('LLULL_KERNEL', () => {
       JSON.stringify(entity && 'mesh' in entity ? entity.mesh : null),
     );
   }, 60_000);
+});
+
+describe('kernel_info through the composition root (TR-KRN-04)', () => {
+  const infoOf = (): Record<string, unknown> =>
+    execute(createEmptyDocument(), 'kernel_info', {}, defaultContext()).data as Record<string, unknown>;
+
+  it('Manifold: in-process, no fallback reason', async () => {
+    await installGeometryKernel();
+    expect(infoOf()).toMatchObject({ active: 'manifold', isolation: 'in-process' });
+    expect(infoOf()['fallbackReason']).toBeUndefined();
+  });
+
+  it('occt: reports OCCT 7.4.0p1, its ports and how it is isolated', async () => {
+    process.env['LLULL_KERNEL'] = 'occt';
+    process.env['LLULL_OCC_ISOLATION'] = 'off';
+    try {
+      await installGeometryKernel();
+    } finally {
+      delete process.env['LLULL_OCC_ISOLATION'];
+    }
+    expect(infoOf()).toMatchObject({ active: 'occt', occtVersion: '7.4.0p1', isolation: 'in-process' });
+    expect(infoOf()['capabilities']).toEqual(expect.arrayContaining(['importShapes', 'brepBlobs']));
+  }, 60_000);
+
+  it('a failed OCC start falls back to Manifold and kernel_info says why (KRN_KERNEL_FALLBACK)', async () => {
+    vi.resetModules();
+    vi.doMock('../src/occtNode', () => ({ createNodeOcctKernel: () => Promise.reject(new Error('wasm missing')) }));
+    process.env['LLULL_KERNEL'] = 'occt';
+    process.env['LLULL_OCC_ISOLATION'] = 'off';
+    let data: { active: string; fallbackReason: string; issues: Array<{ code: string }> };
+    try {
+      const { installGeometryKernel: install } = await import('../src/geometryKernel');
+      await install();
+      const fresh = (await import('@core/geometry/kernel')).getGeometryKernel(); // vi.resetModules gave this graph its own singleton
+      data = execute(createEmptyDocument(), 'kernel_info', {}, { ...defaultContext(), kernel: fresh }).data as typeof data;
+    } finally {
+      delete process.env['LLULL_OCC_ISOLATION'];
+      vi.doUnmock('../src/occtNode');
+    }
+    expect(data).toMatchObject({ active: 'manifold', fallbackReason: 'wasm missing' });
+    expect(data.issues.map((issue) => issue.code)).toContain('KRN_KERNEL_FALLBACK');
+  });
 });

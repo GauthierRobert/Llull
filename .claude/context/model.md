@@ -127,10 +127,12 @@ derivedEntityIds(doc): Set<string>   // @core/plugins/host — ids a plugin rege
 
 ## Persistence (`commands/persistence/serialization.ts`)
 
-Envelope `{ format: 'llull-document', version: 2, document }` (`serializeDocument(doc,
-{ includeDerived? })` / `deserializeDocument(json)`, `load_document`). v2 omits plugin-derived
-entities (building) and re-derives them on load (`DocumentExtension.restore`); version 1 files
-are still read and migrated.
+Envelope `{ format: 'llull-document', version: 3, document }` (`serializeDocument(doc,
+{ includeDerived? })` / `deserializeDocument(json)`, `load_document`). v2+ omits plugin-derived
+entities (building) and re-derives them on load (`DocumentExtension.restore`); versions 1 and 2 are
+still read and migrated (`migrate2to3`). v3 adds `kernelSettings` (kernel provenance + modelling
+tolerances, stamped on save) and `blobs` (sha256-keyed healed B-rep / STEP payloads that `brep`
+recipe leaves reference; checked on load: KRN_BLOB_MISSING / KRN_BLOB_HASH_MISMATCH).
 
 ## Invariants commands must preserve
 

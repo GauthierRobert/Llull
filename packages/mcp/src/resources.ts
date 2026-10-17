@@ -41,7 +41,7 @@ export function listMcpResources(): McpResourceDescriptor[] {
       uri: CAD_RESOURCE_URIS.document,
       name: 'CAD Document',
       description:
-        'Full serialized CadDocument in the current llull-document JSON envelope (version 2). ' +
+        'Full serialized CadDocument in the current llull-document JSON envelope (version 3). ' +
         'Use this to inspect or reload the complete document state.',
       mimeType: 'application/json',
     },

@@ -640,8 +640,41 @@ export interface CadDocument {
   dynamics?: DynamicsModel;
   /** Absent until the first prototype-review command (`allow_interference`, `set_part_grounded`). */
   prototype?: PrototypeModel;
+  /** Absent until a kernel-provenance command or a v3 save stamps it (`set_modeling_tolerance`, `import_step_exact`). */
+  kernelSettings?: DocumentKernelSettings;
+  /** Content-addressed binary payloads keyed by sha256 (healed B-rep, original STEP); absent until the first exact import. */
+  blobs?: Record<string, DocumentBlob>;
   /** Absent until the first analysis command (`create_analysis`, plugin `cae`). */
   analysis?: AnalysisModel;
+}
+
+/** Kernel provenance and modelling tolerance of a document (aerospace 01 KRN, TR-KRN-11/61). */
+export interface DocumentKernelSettings {
+  readonly kernel: 'occt' | 'manifold';
+  /** e.g. "7.4.0p1"; stamped on save from the active kernel. */
+  readonly occtVersion?: string;
+  /** Binary identity of the kernel, e.g. "opencascade.js@1.1.1". */
+  readonly build?: string;
+  readonly modelingTolerance: {
+    /** mm; default 1e-4; range [1e-7, 1e-2]. Heal / sew / import precision. */
+    readonly linear: number;
+    /** rad; default 1e-9. */
+    readonly angular: number;
+    /** mm; default 0.01. Sub-shape tolerances above it raise KRN_IMPORT_TOLERANCE_HIGH. */
+    readonly maxImportTolerance: number;
+  };
+}
+
+/**
+ * Content-addressed payload referenced by `brep` recipe leaves.
+ * @invariant `sha256` = sha256 of the UTF-8 text `bytes` decodes to, and equals its key in `CadDocument.blobs`; `size` = decoded byte length
+ */
+export interface DocumentBlob {
+  readonly sha256: string;
+  readonly mediaType: 'model/x-occt-brep' | 'model/step';
+  /** Base64 of the payload text. */
+  readonly bytes: string;
+  readonly size: number;
 }
 
 /**

@@ -147,8 +147,8 @@ between steps never need rewriting. On top of that:
   model, as feature-based CAD tools do.
 - **Constructive vs evaluated.** The definition (history, parameters, constraints,
   domain models) is the source of truth; `entities` and `order` are the evaluated cache.
-  Saved files (llull-document version 2) omit plugin-derived geometry and re-derive it on
-  load. Version 1 files are still read.
+  Saved files (llull-document version 3) omit plugin-derived geometry and re-derive it on
+  load. Versions 1 and 2 are still read.
 
 ## Geometry kernel
 

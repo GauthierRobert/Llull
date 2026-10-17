@@ -5,6 +5,7 @@
  * @failure unsupported kind / non-manifold mesh / OCC refusal or failure -> null
  */
 import type { BooleanOp, ShapeRecipe, Vec3 } from '@core/model/types';
+import type { KernelInfo } from '@core/geometry/kernelPorts';
 import { kernelFromOps, type CachingKernel, type KernelOps } from '@core/geometry/shapeKernel';
 import { errorMessage } from '@lib/errorMessage';
 import { clearTangentContact } from './tangentGuard';
@@ -15,6 +16,7 @@ import { analyzeShape, shapeDistance } from './occtAnalysis';
 import { exactMassProperties } from './occtMass';
 import { writeStep } from './occtStep';
 import { occtFaceQueryOps } from './occtFaceQuery';
+import { importStepShapes, readBrepText } from './occtImport';
 import { release, withOwned } from '@core/geometry/nativeObject';
 import {
   type OccApi,
@@ -229,9 +231,24 @@ function untangle(a: ShapeRecipe, b: ShapeRecipe): [ShapeRecipe, ShapeRecipe] {
   return [entityA === a.entity ? a : { op: 'solid', entity: entityA }, entityB === b.entity ? b : { op: 'solid', entity: entityB }];
 }
 
+/** Version of the bundled OCCT (opencascade.js 1.1.1 ships 7.4.0p1) and the package identity the document stamps (TR-KRN-61). */
+const OCCT_INFO: KernelInfo = {
+  occtVersion: '7.4.0p1',
+  build: 'opencascade.js@1.1.1',
+  capabilities: ['topology', 'analyze', 'distance', 'exportStep', 'importShapes', 'brepBlobs'],
+};
+
 export function occtOps(api: OccApi): KernelOps<OccShape> {
+  const blobTexts = new Map<string, string>();
   return {
     name: 'occt',
+    info: () => OCCT_INFO,
+    loadBlob: (sha256, brep) => void blobTexts.set(sha256, brep),
+    brep: (sha256) => {
+      const text = blobTexts.get(sha256);
+      return text === undefined ? null : guarded('refusal', () => readBrepText(api, text));
+    },
+    importShapes: (format, text, options) => (format === 'step' ? guarded('fragile', () => importStepShapes(api, text, options)) : null),
     failureEpoch: nativeFailureCount,
     solid: (entity) => guarded('refusal', () => entityToOccShape(api, entity)),
     prepareBoolean: untangle,
