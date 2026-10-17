@@ -36,7 +36,7 @@ export const addRigidBody = defineCommand({
   name: 'add_rigid_body',
   description:
     'Make a set of 3D entities move together as ONE rigid body for physics simulation (simulate_motion). Mass, centre of mass and ' +
-    "inertia are computed from the entities' real geometry: each entity uses its assigned material density, else `density` (kg/m³, " +
+    "inertia are computed from the entities' real geometry: each entity uses its assigned material (density model, else plain density), else `density` (kg/m³, " +
     'default 7850 steel; aluminium 2700, wood 600, CFRP 1550). Give `massKg` when the real part mass is known (hollow parts): the ' +
     'distribution is scaled to it. `fixed: true` welds the body to the ground (engine block, frame, stand). A non-fixed body with no ' +
     'joint is a free body that falls under gravity. Next: connect bodies with add_body_joint. Returns the body id in affected[0] and ' +

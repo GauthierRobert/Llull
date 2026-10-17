@@ -152,8 +152,18 @@ describe('measure commands (read-only)', () => {
       volume: 48,
       volumeUnit: 'mm³',
       density: 0.5,
+      densityUnit: 'g/mm³',
+      densityKgPerM3: 500000,
       mass: 24,
+      massUnit: 'g',
       unit: 'g',
+      massG: 24,
+      massKg: 0.024,
+      massLb: 24 / 453.59237,
+      densitySource: 'density param 0.5 g/mm³',
+      densityDefaulted: false,
+      unverified: true,
+      unverifiedReasons: ['given by the caller (density param 0.5 g/mm³)'],
     });
     const crossing = build(['revolve_profile', { profile: xy(-1, 0, 1, 0, 1, 1, -1, 1) }]);
     expect(execute(crossing.doc, 'mass_properties', { entityId: crossing.ids[0] }).summary).toContain('bounding-box approximation');

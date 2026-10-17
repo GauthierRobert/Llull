@@ -10,7 +10,8 @@ import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { isReservedKey } from '../../lib/reservedKey';
 import { isHexColor } from '../../lib/isHexColor';
-import { changed, noop, report } from '../noop';
+import { changed, commandError, noop, report } from '../noop';
+import { convertValue, isUnitFailure } from '../../lib/quantity';
 
 /** First problem of the finish options, or null. */
 function finishProblem(
@@ -56,6 +57,13 @@ export const createMaterial = defineCommand({
           'For a document in mm: g/mm³ — steel ≈ 0.00785, aluminium ≈ 0.0027, PLA ≈ 0.00124, titanium ≈ 0.00445, copper ≈ 0.00893. ' +
           'This value is used by mass_properties when the material is assigned to an entity.',
       ),
+    densityUnit: z
+      .string()
+      .describe(
+        'Optional unit of `density`, e.g. "g/cm^3", "kg/m^3", "lb/in^3". When given, density is converted to g/(document-unit)³ ' +
+          '(the stored unit). Omit it to give density directly in g/(document-unit)³.',
+      )
+      .optional(),
     color: z
       .string()
       .describe(
@@ -94,7 +102,19 @@ export const createMaterial = defineCommand({
   annotations: { idempotent: true },
   run: (
     doc,
-    { name, density, color, metalness, roughness, finish: pattern, finishScale: requestedScale, color2, normalStrength, clearcoat },
+    {
+      name,
+      density: given,
+      densityUnit,
+      color,
+      metalness,
+      roughness,
+      finish: pattern,
+      finishScale: requestedScale,
+      color2,
+      normalStrength,
+      clearcoat,
+    },
   ): CommandResult => {
     if (name.trim() === '') return noop(doc, 'create_material failed: name must be a non-empty string.');
     if (isReservedKey(name))
@@ -102,7 +122,14 @@ export const createMaterial = defineCommand({
         doc,
         `create_material failed: name '${name}' is a reserved JavaScript property name (constructor, toString, __proto__, ...); choose another.`,
       );
-    if (density <= 0) return noop(doc, `create_material '${name}' failed: density must be a finite number > 0, got ${String(density)}.`);
+    if (!(given > 0)) return noop(doc, `create_material '${name}' failed: density must be a finite number > 0, got ${String(given)}.`);
+    const converted = densityUnit === undefined ? { value: given } : convertValue(given, densityUnit, `g/${doc.units}^3`);
+    if (isUnitFailure(converted))
+      return {
+        ...noop(doc, `create_material '${name}' failed: densityUnit: ${converted.message}.`),
+        error: commandError(converted.code, 'give a density unit such as g/cm^3, kg/m^3 or lb/in^3', [], ['densityUnit']),
+      };
+    const density = converted.value;
     for (const [field, value] of [
       ['metalness', metalness],
       ['roughness', roughness],
@@ -145,7 +172,7 @@ export const createMaterial = defineCommand({
     const action = Object.hasOwn(doc.materials, name) ? 'replaced' : 'created';
     return report(
       newDoc,
-      `create_material '${name}': ${action} (density=${density} g/${doc.units}³, color=${color}, metalness=${metalness}, roughness=${roughness}${finish !== undefined ? `, finish=${finish.pattern} every ${finish.scale} ${doc.units}` : ''}).`,
+      `create_material '${name}': ${action} (density=${density} g/${doc.units}³${densityUnit === undefined ? '' : ` from ${given} ${densityUnit}`}, color=${color}, metalness=${metalness}, roughness=${roughness}${finish !== undefined ? `, finish=${finish.pattern} every ${finish.scale} ${doc.units}` : ''}).`,
     );
   },
 });

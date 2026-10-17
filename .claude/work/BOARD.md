@@ -79,6 +79,13 @@ Agents are isolated; coordination is structural, run by the orchestrator:
 ## Pillar 2 — Camera control (Lane 1 command + Lane 2 viewport, PAIR)
 - `[TODO]` **W5B** Camera-control command(s): `set_camera` / `look_at` / `fit_view(direction, padding)` writing `document.camera`, and make the viewport **react to `document.camera` changes** (today `ViewPresetsInner` reads `cam` only at initial mount, so an MCP camera change is ignored live). _Lane 1 cmd + Lane 2 viewport (PAIR). deps: —. Acceptance: an MCP agent frames the model deterministically (front/iso/top + fit-all with padding) with no UI click or wheel hack; camera changes broadcast over SSE move the live camera; flagged `readOnly`/meta as appropriate so it doesn't pollute feature history._
 
+## AERO — Aerospace story, five steps (`docs/aerospace/README.md` § Aerospace story)
+- `[DONE]` **AERO-1** One mass and density truth: 08 M1 `resolveDensity` (TR-MAT-10) read by `mass_properties` and dynamics; unit-correct mass (`massG/Kg/Lb`, `massUnit`), density `{ value, unit }`, `create_material.densityUnit`; named sources + `unverified` (AF-31/32). VC-MAT-01, 03, 04 a–c/e, 22 (legacy row). Done 2026-10-17 (08 TECHNICAL_SPEC §13). _Lane 1. deps: PHY-01 (done)._
+- `[TODO]` **AERO-2** Exact kernel: 01 M1–M3, `FaceQueryPort`, v3 envelope, `import_step_exact`. _deps: AERO-1; decision 2 (OCC build)._
+- `[TODO]` **AERO-3** Real parts, real materials: 07 FTR, 08 M2–M5 (records on PHY-01 models), PROP-08, MATL-M4b, `check_materials`. _deps: AERO-2; decision 1 (package layout)._
+- `[TODO]` **AERO-4** Supply-chain ready: 03 GDT, 04 XCH (AP242), 09 PLM (`HumanSignaturePort` impl → `dispose_*`, VNV-M3). _deps: AERO-3._
+- `[TODO]` **AERO-5** Engineering depth: 05 FEA-REST, 02 SRF, 06 CMP. _deps: AERO-2 (AERO-3 for materials)._
+
 ## PHY-00 — Physics V&V harness (`docs/physics/00-vv-harness/`)
 - `[DONE]` **VNV-M1** `lib/convergence.ts` (observed order, Richardson, GCI, classification, required / representative spacing), `lib/quantity.ts` (unit grammar), `check_convergence` + `compare_to_expected` (core `commands/vnv/`, toolset `analysis`), expected-results schema + 05 adapter. Done 2026-10-16 (branch `ccr-a7b1e46b-1dp1n9`); deviations in TECHNICAL_SPEC §13.
 - `[DONE]` **VNV-M2** `llull run_benchmarks` (server/src/cli/benchmarks.ts) + `npm run quality:physics` (unit-test measurements via `LLULL_PHYSICS_MEASUREMENTS`). Gate green: 26 VC-VNV + 81 VC-PROP pass.

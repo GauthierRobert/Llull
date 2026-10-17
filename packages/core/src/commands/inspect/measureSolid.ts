@@ -6,7 +6,9 @@ import { expandInstance } from '../../geometry/instanceExpansion';
 import type { Bounds } from '../../geometry/bounds';
 import { formatLength } from '../document/units';
 import { childVolume, solidVolume } from './solidVolume';
-import { noop, report } from '../noop';
+import { commandError, noop, report } from '../noop';
+import { kgPerM3FromDocDensity, resolveDensity, type DensityFallback } from '../../geometry/resolveDensity';
+import { convertValue, isUnitFailure } from '../../lib/quantity';
 
 interface MeasureBoundingBoxData {
   min: Vec3;
@@ -66,60 +68,140 @@ export const measureBoundingBox = defineCommand({
   },
 });
 
+const GRAMS_PER_POUND = 453.59237;
+
+const MASS_UNITS = ['g', 'kg', 'lb'] as const;
+type MassUnit = (typeof MASS_UNITS)[number];
+
 interface MassPropertiesData {
   volume: number;
   volumeUnit: string;
   method?: 'exact' | 'mesh';
+  /** g/(document unit)³ (the legacy `Material.density` unit); the mean over the parts of an instance. */
   density?: number;
+  densityUnit?: string;
+  densityKgPerM3?: number;
+  /** In `massUnit`. */
   mass?: number;
+  massUnit?: MassUnit;
+  /** Legacy field, present only when `massUnit` is g. */
   unit?: 'g';
+  massG?: number;
+  massKg?: number;
+  massLb?: number;
+  densitySource?: string;
+  densitySources?: string[];
+  densityDefaulted?: boolean;
+  unverified?: boolean;
+  unverifiedReasons?: string[];
+}
+
+/** Volume and mass (g) of a solid, with the density sources and unverified reasons used; `massG` null when a solid part has no density. */
+interface MassTotal {
+  readonly volume: number;
+  readonly massG: number | null;
+  readonly method?: 'exact' | 'mesh';
+  readonly approximation?: string;
+  readonly sources: readonly string[];
+  readonly defaulted: boolean;
+  readonly unverifiedReasons: readonly string[];
+}
+
+type MassFailure = { readonly error: string; readonly code?: string; readonly remediation?: string; readonly ids?: readonly string[] };
+
+const union = (a: readonly string[], b: readonly string[]): string[] => [...new Set([...a, ...b])];
+
+/** Mass of `volume` (document units³) of `materialId`, else `fallback`. */
+function partMass(
+  doc: CadDocument,
+  volume: number,
+  materialId: string | undefined,
+  fallback: DensityFallback | undefined,
+  id: string,
+): Omit<MassTotal, 'volume'> | MassFailure {
+  const density = resolveDensity(doc, materialId, fallback);
+  if (density === null) return { massG: volume > 0 ? null : 0, sources: [], defaulted: false, unverifiedReasons: [] };
+  if (!density.available) return { error: density.reason, code: density.code, remediation: density.remediation, ids: [id] };
+  return {
+    massG: volume * density.gPerDocUnit3,
+    sources: [density.source],
+    defaulted: density.defaulted,
+    unverifiedReasons: density.unverifiedReasons,
+  };
 }
 
 /**
- * Volume and mass of a baked instance: every solid child uses its own material density, else the
- * instance's material, else `fallbackDensity`. Nested instances recurse; 2D children weigh nothing.
- * `mass` is null when some solid child has no known density.
+ * Volume and mass of a baked instance: every solid child uses its own material, else the instance's material, else `fallback`. Nested
+ * instances recurse; 2D children weigh nothing.
  */
 function instanceMass(
   doc: CadDocument,
   instance: Entity & { kind: 'instance' },
-  fallbackDensity: number | undefined,
+  inheritedMaterialId: string | undefined,
+  fallback: DensityFallback | undefined,
   ctx: ExecutionContext | undefined,
-): { volume: number; mass: number | null } | string {
+): MassTotal | MassFailure {
   const component = doc.components[instance.componentId];
-  if (!component) return `instance '${instance.id}' references missing component '${instance.componentId}'.`;
-  let volume = 0;
-  let mass: number | null = 0;
+  if (!component) return { error: `instance '${instance.id}' references missing component '${instance.componentId}'.` };
+  let total: MassTotal = { volume: 0, massG: 0, sources: [], defaulted: false, unverifiedReasons: [] };
   for (const baked of expandInstance(instance, component)) {
-    const materialId = baked.materialId ?? instance.materialId;
-    const material = materialId ? doc.materials[materialId] : undefined;
-    const density = material?.density ?? fallbackDensity;
-    if (baked.kind === 'instance') {
-      const nested = instanceMass(doc, baked, density, ctx);
-      if (typeof nested === 'string') return nested;
-      volume += nested.volume;
-      mass = mass === null || nested.mass === null ? null : mass + nested.mass;
-      continue;
-    }
-    const partVolume = childVolume(doc, baked, ctx);
-    volume += partVolume;
-    if (partVolume > 0 && density === undefined) mass = null;
-    else if (mass !== null) mass += partVolume * (density ?? 0);
+    const materialId = baked.materialId ?? instance.materialId ?? inheritedMaterialId;
+    const part =
+      baked.kind === 'instance'
+        ? instanceMass(doc, baked, materialId, fallback, ctx)
+        : ((volume): MassTotal | MassFailure => {
+            const mass = partMass(doc, volume, materialId, fallback, instance.id);
+            return 'error' in mass ? mass : { volume, ...mass };
+          })(childVolume(doc, baked, ctx));
+    if ('error' in part) return part;
+    total = {
+      volume: total.volume + part.volume,
+      massG: total.massG === null || part.massG === null ? null : total.massG + part.massG,
+      sources: union(total.sources, part.sources),
+      defaulted: total.defaulted || part.defaulted,
+      unverifiedReasons: union(total.unverifiedReasons, part.unverifiedReasons),
+    };
   }
-  return { volume, mass };
+  return total;
 }
+
+/** The `density` param as a fallback: a bare number is g/(document unit)³, `{ value, unit }` any density unit. */
+function densityParam(
+  doc: CadDocument,
+  density: number | { value: number; unit: string } | undefined,
+): DensityFallback | MassFailure | undefined {
+  if (density === undefined) return undefined;
+  if (typeof density === 'number') {
+    if (!(density > 0))
+      return { error: `density must be > 0, got ${String(density)}.`, code: 'MAT_DENSITY_INVALID', remediation: 'give a density > 0' };
+    return { kgPerM3: kgPerM3FromDocDensity(doc, density), source: `density param ${density} g/${doc.units}³`, defaulted: false };
+  }
+  const converted = convertValue(density.value, density.unit, 'kg/m^3');
+  if (isUnitFailure(converted))
+    return {
+      error: `density: ${converted.message}`,
+      code: converted.code,
+      remediation: 'give a density unit such as g/cm^3, kg/m^3 or lb/in^3',
+    };
+  if (!(converted.value > 0))
+    return {
+      error: `density must be > 0, got ${density.value} ${density.unit}.`,
+      code: 'MAT_DENSITY_INVALID',
+      remediation: 'give a density > 0',
+    };
+  return { kgPerM3: converted.value, source: `density param ${density.value} ${density.unit}`, defaulted: false };
+}
+
+const massIn = (massG: number, unit: MassUnit): number => (unit === 'g' ? massG : unit === 'kg' ? massG / 1000 : massG / GRAMS_PER_POUND);
 
 /**
  * @affects nothing — read-only; document returned unchanged, affected:[]
- * @invariant data is { volume, volumeUnit, method? } plus { density, mass, unit: 'g' } when a density is known
- * @failure non-solid entity, missing id, or a given density <= 0 -> no-op, affected:[], no data
+ * @invariant data is { volume, volumeUnit, method? } plus, when a density is known, { density (g/unit³), densityKgPerM3, mass in massUnit,
+ *            massG, massKg, massLb, densitySource(s), densityDefaulted, unverified, unverifiedReasons } (and legacy unit:'g' when massUnit is g)
+ * @failure non-solid entity, missing id, a density <= 0 or with a bad unit, an unusable density model -> no-op, affected:[], no data
  *
- * Density resolution order:
- *   1. If the entity has a `materialId` and that material exists in `doc.materials`,
- *      the material's density is used (ignores the `density` param for that entity).
- *   2. Otherwise the caller-supplied `density` param is used.
- *   3. Otherwise only the volume is returned (no mass).
- * Unit assumption: density is in g/(document-unit)³ so that mass = volume × density in grams.
+ * Density resolution (`geometry/resolveDensity`, 08 TR-MAT-10): the material's PHY-01 density model (preferred, at 20 degC), else its
+ * legacy density (g/(document unit)³), else the `density` param. Without any, only the volume is returned.
  */
 export const massProperties = defineCommand({
   name: 'mass_properties',
@@ -132,13 +214,15 @@ export const massProperties = defineCommand({
     "'revolution' (Pappus's centroid theorem; a profile crossing the axis falls back to the bounding-box volume), " +
     "'sweep' (round section: section area × exact path length; other sections: closed-mesh sum), 'loft', " +
     "'subdivision' (closed-mesh sum), and 'instance' (assembly: the sum over its component solids, each with its " +
-    'own material density, else the instance material, else the density param). 2D shape entities are rejected. ' +
-    'Density resolution: if the entity has a material assigned (via assign_material) and that ' +
-    "material exists in doc.materials, the material's density is used automatically — the density " +
-    'param is ignored for that entity. Otherwise the density param is used (g/(document-unit)³ — for a document in ' +
-    'mm: steel ≈ 0.00785, aluminium ≈ 0.0027). With neither, only the volume is returned. ' +
-    'Returns data: { volume, volumeUnit (e.g. "mm³"), method? } and, when a density is known, ' +
-    '{ density, mass, unit: "g" }. Does not modify the document.',
+    'own material, else the instance material, else the density param). 2D shape entities are rejected. ' +
+    'Density resolution, in order: the assigned material\'s density property model (define_property_model property "density"; the ' +
+    "preferred one, read at 20 degC), else the material's plain density (create_material, g/(document-unit)³), else the density param. " +
+    'A material always wins over the param. With none, only the volume is returned. If a material has density models that cannot be used ' +
+    '(several and none preferred, or not valid at 20 degC), the command refuses with that code instead of falling back. ' +
+    'Returns data: { volume, volumeUnit (e.g. "mm³"), method? } and, when a density is known, { density (g/(document-unit)³), ' +
+    'densityKgPerM3, mass (in massUnit), massUnit, massG, massKg, massLb, densitySource (which value was used), densityDefaulted, ' +
+    'unverified, unverifiedReasons } (plus unit: "g" when massUnit is g). A plain material density or a param is always unverified ' +
+    '(no basis or source); a density model is unverified when its basis is typical / supplier_unstated / unspecified. Does not modify the document.',
   params: z.object({
     entityId: z
       .string()
@@ -147,60 +231,82 @@ export const massProperties = defineCommand({
           "'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', 'subdivision', 'instance'.",
       ),
     density: z
-      .number()
+      .union([
+        z.number(),
+        z.object({
+          value: z.number().describe('Density value; must be > 0.'),
+          unit: z.string().describe('Density unit, e.g. "g/cm^3", "kg/m^3", "lb/in^3".'),
+        }),
+      ])
       .describe(
-        'Optional fallback material density in g/(document-unit)³. Must be > 0 when given. ' +
-          'Used only when the entity has no material assigned via assign_material; omit it to measure the volume alone. ' +
-          'Examples for a mm document: steel ≈ 0.00785, aluminium ≈ 0.0027, PLA ≈ 0.00124.',
+        'Optional fallback density, used only for solids without an assigned material; omit it to measure the volume alone. ' +
+          'Either { value, unit } (e.g. { "value": 0.101, "unit": "lb/in^3" }) or a bare number in g/(document-unit)³ ' +
+          '(for a mm document: steel ≈ 0.00785, aluminium ≈ 0.0027). Must be > 0.',
       )
       .optional(),
+    massUnit: z
+      .enum(MASS_UNITS)
+      .describe('Unit of data.mass and of the summary: g (default), kg or lb. massG / massKg / massLb are always given.')
+      .optional(),
   }),
-  run: (doc, { entityId, density }, ctx): CommandResult => {
-    if (density !== undefined && density <= 0) return noop(doc, `mass_properties: density must be > 0, got ${String(density)}.`);
+  run: (doc, { entityId, density, massUnit = 'g' }, ctx): CommandResult => {
+    const failed = (failure: MassFailure): CommandResult => ({
+      ...noop(doc, `mass_properties: ${failure.error}`),
+      ...(failure.code === undefined ? {} : { error: commandError(failure.code, failure.remediation ?? '', failure.ids ?? []) }),
+    });
+    const fallback = densityParam(doc, density);
+    if (fallback !== undefined && 'error' in fallback) return failed(fallback);
     const e = doc.entities[entityId];
     if (!e) return noop(doc, `mass_properties: entity '${entityId}' not found.`);
     const volumeUnit = `${doc.units}³`;
-    const materialDensity = e.materialId ? doc.materials[e.materialId]?.density : undefined;
-    const effectiveDensity = materialDensity ?? density;
-    const densitySource = materialDensity === undefined ? 'param' : `material '${e.materialId}'`;
-    if (e.kind === 'instance') {
-      const assembly = instanceMass(doc, e, density, ctx);
-      if (typeof assembly === 'string') return noop(doc, `mass_properties: ${assembly}`);
-      const { volume, mass } = assembly;
-      if (mass === null)
-        return report(
-          doc,
-          `Volume of ${entityId} = ${volume.toFixed(doc.displayPrecision)} ${volumeUnit} ` +
-            '(no mass: some parts have no material density and no density param was given).',
-          { volume, volumeUnit } satisfies MassPropertiesData,
-        );
-      const averageDensity = volume > 0 ? mass / volume : (density ?? 0);
-      const data: MassPropertiesData = { volume, volumeUnit, density: averageDensity, mass, unit: 'g' };
-      return report(
-        doc,
-        `Mass of assembly ${entityId}: volume=${volume.toFixed(doc.displayPrecision)} ${doc.units}³, ` +
-          `mean density=${averageDensity} g/${doc.units}³ (per-part materials, else param), mass=${mass.toFixed(doc.displayPrecision)} g.`,
-        data,
-      );
+    let total: MassTotal | MassFailure;
+    if (e.kind === 'instance') total = instanceMass(doc, e, undefined, fallback, ctx);
+    else {
+      const measured = solidVolume(doc, e, ctx);
+      if ('error' in measured) return noop(doc, `mass_properties: ${measured.error}`);
+      const mass = partMass(doc, measured.volume, e.materialId, fallback, entityId);
+      total = 'error' in mass ? mass : { ...measured, ...mass };
     }
-    const measured = solidVolume(doc, e, ctx);
-    if ('error' in measured) return noop(doc, `mass_properties: ${measured.error}`);
-    const { volume, method, approximation } = measured;
+    if ('error' in total) return failed(total);
+    const { volume, massG, method, approximation, sources } = total;
     const volumeData = { volume, volumeUnit, ...(method === undefined ? {} : { method }) };
     const shown = volume.toFixed(doc.displayPrecision);
-    if (effectiveDensity === undefined) {
+    const note = approximation === undefined ? '' : ` (${approximation})`;
+    if (massG === null || sources.length === 0) {
       const how =
         method === 'exact' ? ' (exact B-rep)' : method === 'mesh' ? ' (display mesh; the OCC kernel gives the exact B-rep volume)' : '';
+      const why = massG === null ? ' (no mass: some parts have no material density and no density param was given)' : '';
       const sign = approximation === undefined ? '=' : '≈';
-      const note = approximation === undefined ? how : ` (${approximation})`;
-      return report(doc, `Volume of ${entityId} ${sign} ${shown} ${volumeUnit}${note}.`, volumeData satisfies MassPropertiesData);
+      return report(
+        doc,
+        `Volume of ${entityId} ${sign} ${shown} ${volumeUnit}${approximation === undefined ? how : note}${why}.`,
+        volumeData satisfies MassPropertiesData,
+      );
     }
-    const mass = volume * effectiveDensity;
-    const data: MassPropertiesData = { ...volumeData, density: effectiveDensity, mass, unit: 'g' };
+    const meanDensity = volume > 0 ? massG / volume : 0;
+    const mass = massIn(massG, massUnit);
+    const data: MassPropertiesData = {
+      ...volumeData,
+      density: meanDensity,
+      densityUnit: `g/${doc.units}³`,
+      densityKgPerM3: kgPerM3FromDocDensity(doc, meanDensity),
+      mass,
+      massUnit,
+      ...(massUnit === 'g' ? { unit: 'g' as const } : {}),
+      massG,
+      massKg: massG / 1000,
+      massLb: massG / GRAMS_PER_POUND,
+      densitySource: sources.length === 1 ? (sources[0] ?? '') : 'several (see densitySources)',
+      ...(sources.length > 1 ? { densitySources: [...sources] } : {}),
+      densityDefaulted: total.defaulted,
+      unverified: total.unverifiedReasons.length > 0,
+      unverifiedReasons: [...total.unverifiedReasons],
+    };
+    const flag = data.unverified === true ? ` Unverified density (${total.unverifiedReasons.join('; ')}).` : '';
     return report(
       doc,
-      `Mass of ${entityId}: volume=${shown} ${doc.units}³${approximation === undefined ? '' : ` (${approximation})`}, ` +
-        `density=${effectiveDensity} g/${doc.units}³ (${densitySource}), mass=${mass.toFixed(doc.displayPrecision)} g.`,
+      `Mass of ${e.kind === 'instance' ? 'assembly ' : ''}${entityId}: volume=${shown} ${volumeUnit}${note}, density=${meanDensity} g/${doc.units}³ (${data.densitySource}), ` +
+        `mass=${massUnit === 'g' ? mass.toFixed(doc.displayPrecision) : mass.toPrecision(7)} ${massUnit}.${flag}`,
       data,
     );
   },

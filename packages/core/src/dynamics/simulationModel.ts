@@ -8,6 +8,7 @@ import { DEFAULT_SOLVER_SETTINGS, GROUND, type DynamicsModel, type DynamicsSolve
 import { toMetres } from '../model/units';
 import { entityBoundsInDoc } from '../geometry/bounds';
 import { entityMassProperties } from '../geometry/entityMassProperties';
+import { resolveDensity, type DensityFallback } from '../geometry/resolveDensity';
 import { combineMassProperties, type InertiaTensor, type MassProperties } from '../geometry/massProperties';
 import { RAD_PER_S_PER_RPM, appliedLoadsFor, speedServoGains } from './forceLaws';
 import type { SimulationBody, SimulationJoint, SimulationLoop, SimulationModel, SimulationServo } from './physicsEngine';
@@ -17,33 +18,54 @@ import { announcedSpeed } from './timestep';
 import type { CurveCode } from './pressureCurve';
 import { buildTopology, isRefusal, type Topology, type TopologyRefusal } from './topology';
 
-/** kg/m³ of a body entity without a material: steel. */
-const DEFAULT_DENSITY = 7850;
+/** kg/m³ of a body entity without a material and without a body density: steel (a named default, AF-31). */
+const DEFAULT_DENSITY: DensityFallback = { kgPerM3: 7850, source: 'default:steel 7850 kg/m^3', defaulted: true };
 
-/** SI mass properties of one body (kg, m, kg·m²). */
+/** SI mass properties of one body (kg, m, kg·m²) and the densities they were computed from (`geometry/resolveDensity`). */
 export interface BodyMassProperties {
   readonly mass: number;
   readonly centerOfMass: Vec3;
   readonly inertia: InertiaTensor;
+  readonly densitySources: readonly string[];
+  readonly densityDefaulted: boolean;
+  readonly unverifiedReasons: readonly string[];
 }
 
+/** The mass distribution alone (what the reports and the inertia helpers read). */
+export type BodyMassDistribution = Pick<BodyMassProperties, 'mass' | 'centerOfMass' | 'inertia'>;
+
 /**
- * Mass properties of `body` in SI units, or an error. Entity densities: assigned material (g per document unit³), else the body density,
- * else steel. `massKg` rescales the whole distribution.
+ * Mass properties of `body` in SI units, or an error. Entity densities come from `resolveDensity`: the assigned material (density model,
+ * else its plain density), else the body density (kg/m³), else steel, reported as a default. `massKg` rescales the whole distribution.
  */
 export function bodyMassProperties(doc: CadDocument, body: RigidBody): BodyMassProperties | { error: string } {
   const metres = toMetres(doc, 1);
-  const unitVolume = metres ** 3;
+  const fallback: DensityFallback =
+    body.density !== undefined
+      ? { kgPerM3: body.density, source: `body '${body.id}' density ${body.density} kg/m^3`, defaulted: false }
+      : DEFAULT_DENSITY;
+  const sources = new Set<string>();
+  const reasons = new Set<string>();
+  let defaulted = false;
+  let refused: { error: string } | null = null;
   const densityOf = (solid: Entity): number => {
-    const material = solid.materialId === undefined ? undefined : doc.materials[solid.materialId];
-    const kgPerCubicMetre = material !== undefined ? material.density / 1000 / unitVolume : (body.density ?? DEFAULT_DENSITY);
-    return kgPerCubicMetre * unitVolume;
+    const density = resolveDensity(doc, solid.materialId, fallback);
+    if (density === null) return 0;
+    if (!density.available) {
+      refused ??= { error: `${density.code}: body '${body.id}': ${density.reason}` };
+      return 0;
+    }
+    sources.add(density.source);
+    for (const reason of density.unverifiedReasons) reasons.add(reason);
+    defaulted ||= density.defaulted;
+    return density.gPerDocUnit3 / 1000;
   };
   const parts: MassProperties[] = [];
   for (const id of body.entityIds) {
     const entity = doc.entities[id];
     if (entity === undefined) return { error: `body '${body.id}' references missing entity '${id}'` };
     const props = entityMassProperties(entity, doc, densityOf);
+    if (refused !== null) return refused;
     if (props === null) return { error: `body '${body.id}': entity '${id}' (${entity.kind}) has no solid volume` };
     parts.push(props);
   }
@@ -54,6 +76,9 @@ export function bodyMassProperties(doc: CadDocument, body: RigidBody): BodyMassP
     mass: combined.mass * scale,
     centerOfMass: combined.centerOfMass.map((c) => c * metres) as unknown as Vec3,
     inertia: combined.inertia.map((value) => value * scale * metres * metres) as unknown as InertiaTensor,
+    densitySources: body.massKg !== undefined ? [`body '${body.id}' massKg ${body.massKg}`, ...sources] : [...sources],
+    densityDefaulted: body.massKg === undefined && defaulted,
+    unverifiedReasons: [...reasons],
   };
 }
 
@@ -75,7 +100,7 @@ function initialVelocities(dynamics: DynamicsModel): Record<string, number> {
 }
 
 /** Moment of inertia (kg·m²) of a body about the line through `anchor` along unit `axis` (parallel-axis theorem). */
-export function inertiaAboutAxis(body: BodyMassProperties, anchor: Vec3, axis: Vec3): number {
+export function inertiaAboutAxis(body: BodyMassDistribution, anchor: Vec3, axis: Vec3): number {
   const [ax, ay, az] = axis;
   const [ixx, iyy, izz, ixy, ixz, iyz] = body.inertia;
   const own = ixx * ax * ax + iyy * ay * ay + izz * az * az + 2 * (ixy * ax * ay + ixz * ax * az + iyz * ay * az);
