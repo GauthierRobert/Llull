@@ -8,7 +8,7 @@ import { GROUND, type DynamicJoint, type DynamicsModel } from '../model/dynamics
 import type { Vec3 } from '../model/vectors';
 import type { Topology } from './topology';
 import { elementAt } from '../lib/elementAt';
-import { dot3 } from '../lib/vec3';
+import { cross3, dot3 } from '../lib/vec3';
 
 /** Central-difference step in tree coordinates (rad or m). */
 const DIFFERENCE_STEP = 1e-7;
@@ -109,9 +109,8 @@ function bodyPoses(topology: Topology, q: readonly number[], metresPerUnit: numb
 /** Two unit vectors orthogonal to unit `u` and to each other. */
 function orthogonalPair(u: Vec3): [Vec3, Vec3] {
   const helper: Vec3 = Math.abs(u[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
-  const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-  const e1 = unit(cross(u, helper));
-  return [e1, cross(u, e1)];
+  const e1 = unit(cross3(u, helper));
+  return [e1, cross3(u, e1)];
 }
 
 /** Constraint rows of every loop at tree coordinates `q`: 3 position rows, plus 2 axis-alignment rows for a revolute loop. */
