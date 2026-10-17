@@ -11,25 +11,33 @@ import { parseAnalysisList, parseCheck, parseDescribe } from './analysisData';
 import { AnalysisChecks } from './AnalysisChecks';
 import { AnalysisResults } from './AnalysisResults';
 import { AnalysisSetup } from './AnalysisSetup';
+import { useHostQuery } from './useHostQuery';
+
+const ALL_CASES: Record<string, unknown> = {};
 
 export function AnalysisPanel({ className }: { className?: string }): React.ReactElement {
   const document = useStore((s) => s.document);
   const [pickedId, setPickedId] = useState<string | null>(null);
   const analysis = document.analysis;
 
-  const list = useMemo(() => parseAnalysisList(execute(document, 'describe_analysis', {}).data), [document]);
+  const local = useMemo(() => parseAnalysisList(execute(document, 'describe_analysis', {}).data), [document]);
+  const listed = useHostQuery('describe_analysis', ALL_CASES, document);
+  // The local list shows at once; the host's answer (states verified against its artifacts) replaces it when it arrives.
+  const list = listed.status === 'done' && !listed.isError ? parseAnalysisList(listed.data) : local;
   const selectedId = list.find((item) => item.id === pickedId)?.id ?? list[0]?.id ?? null;
-  const detail = useMemo(() => {
-    if (selectedId === null) return null;
-    const described = execute(document, 'describe_analysis', { analysisId: selectedId });
-    const checked = execute(document, 'check_analysis', { analysisId: selectedId });
-    return {
-      described: parseDescribe(described.data),
-      describeSummary: described.summary,
-      check: parseCheck(checked.data),
-      checkSummary: checked.summary,
-    };
-  }, [document, selectedId]);
+  const caseParams = useMemo(() => (selectedId === null ? null : { analysisId: selectedId }), [selectedId]);
+  // Server-side when online: the mesh / results artifacts the state and the checks are verified against live there.
+  const described = useHostQuery('describe_analysis', caseParams, document);
+  const checked = useHostQuery('check_analysis', caseParams, document);
+  const detail =
+    selectedId === null || described.status === 'loading' || checked.status === 'loading'
+      ? null
+      : {
+          described: parseDescribe(described.data),
+          describeSummary: described.summary,
+          check: parseCheck(checked.data),
+          checkSummary: checked.summary,
+        };
 
   return (
     <aside className={classNames('panel', className)} aria-label="Analysis" data-testid="analysis-panel">
