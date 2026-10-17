@@ -3,6 +3,7 @@
 import { installPlugin } from '@core/plugins/host';
 import { buildingPlugin, civilPlugin, industrialPlugin } from '@aec/index';
 import { caePlugin } from '@cae/index';
+import { fastenersPlugin, sheetMetalPlugin } from '@aero/index';
 
 /** Install every default domain plugin (idempotent). */
 export function installDefaultPlugins(): void {
@@ -10,4 +11,6 @@ export function installDefaultPlugins(): void {
   installPlugin(industrialPlugin);
   installPlugin(civilPlugin);
   installPlugin(caePlugin);
+  installPlugin(sheetMetalPlugin);
+  installPlugin(fastenersPlugin);
 }

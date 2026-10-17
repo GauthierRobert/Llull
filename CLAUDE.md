@@ -29,6 +29,8 @@ packages/core/src/        @core  framework-agnostic: NO react/DOM/window/fetch
   codegen/                       CadQuery / build123d / OpenSCAD / FreeCAD emitters
 packages/mcp/src/         @mcp   tools/resources/prompts/toolsets/discovery/liveSync over the registry
 packages/domain-aec/src/  @aec   plugins `<domain>/{catalog,plugin}.ts`: building/ industrial/<discipline>/ civil/<topic>/ steel/ shared/
+packages/domain-cae/src/  @cae   plugin `cae` (toolset analysis): 05 FEA set-up, decks, results, thermal/ thermomech/ margins/
+packages/domain-aero/src/ @aero  plugins `sheetmetal` (toolset manufacturing, 07 FTR) and `fasteners` (toolset fasteners, 08 MAT)
 packages/kernel-{manifold,occt}/src/   GeometryKernel impls
 packages/physics-mujoco/src/           PhysicsEngine impl (MuJoCo WASM) — rigid-body dynamics, docs/DYNAMICS.md
 src/app/                  @app   composition root: installDefaultPlugins()
@@ -65,7 +67,7 @@ Agents: `command-author` · `viewport-engineer` · `mcp-engineer` · `test-verif
 npm install          # root + workspaces (server/, desktop/ separately: npm --prefix <dir> install)
 npm run dev          # http://localhost:5173
 npm run check        # typecheck + arch + deadcode + lint + format:check + test — MUST pass before commit
-npm run test:coverage  # gate 90/85/90/90 on core/{commands,geometry} + domain-aec
+npm run test:coverage  # gate 90/85/90/90 on core/{commands,geometry,dynamics} + domain-{aec,cae,aero}
 npm run claude:lint  # after editing .claude/
 npm run quality | production   # real-file gates (docs/QUALITY_GATES.md, docs/PRODUCTION_GATE.md)
 node server/bin/llull.cjs help # CLI (llull-cli skill)
@@ -77,6 +79,6 @@ npm --prefix server test ; npm --prefix desktop test
 1. Commands are pure (new doc, never mutate input; `is pure` test).
 2. New command = `defineCommand({ name, description, params: z.object(…), run })` + registration (core: feature
    `catalog.ts`; domain: plugin `commands`) + unit test (happy + failure).
-3. Coverage 90/85/90/90 on `packages/core/src/{commands,geometry}/**` + `packages/domain-aec/src/**`.
+3. Coverage 90/85/90/90 on `packages/core/src/{commands,geometry,dynamics}/**` + `packages/domain-{aec,cae,aero}/src/**`.
 4. Command/tool `name` is `snake_case`.
 5. TS strict, no `any`, ≤500 code lines/file, `npm run check` green.

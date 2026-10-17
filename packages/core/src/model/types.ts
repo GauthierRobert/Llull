@@ -10,6 +10,9 @@ import type { DrawingsModel } from './sheet';
 import type { DynamicsModel } from './dynamics';
 import type { PrototypeModel } from './prototype';
 import type { CurveSegment } from './curve';
+import type { FastenerModel, PartRef } from './fasteners';
+import type { MaterialLibraryEntry } from './materialLibrary';
+import type { SheetMetalModel } from './sheetMetal';
 
 /** Re-exported: every model consumer reads its vectors from here. */
 export type { Vec2, Vec3 };
@@ -517,6 +520,8 @@ export interface Component {
   name: string;
   entities: Record<EntityId, Entity>;
   order: EntityId[];
+  /** Standard part this component is (08 MAT, set by the fasteners plugin); `bill_of_materials` groups by it. */
+  readonly partRef?: PartRef;
 }
 
 /**
@@ -646,6 +651,12 @@ export interface CadDocument {
   blobs?: Record<string, DocumentBlob>;
   /** Absent until the first analysis command (`create_analysis`, plugin `cae`). */
   analysis?: AnalysisModel;
+  /** Imported material libraries by id (08 MAT M3); absent until `import_material_library`. */
+  materialLibraries?: Record<string, MaterialLibraryEntry>;
+  /** Absent until the first fastener command (plugin `fasteners`, 08 MAT M5). */
+  fasteners?: FastenerModel;
+  /** Absent until the first sheet-metal command (plugin `sheetmetal`, 07 FTR M3). */
+  sheetMetal?: SheetMetalModel;
 }
 
 /** Kernel provenance and modelling tolerance of a document (aerospace 01 KRN, TR-KRN-11/61). */

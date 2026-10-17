@@ -18,6 +18,8 @@ export const TOOLSET_NAMES = [
   'material-lab',
   'analysis',
   'review',
+  'manufacturing',
+  'fasteners',
   'exchange',
   'building',
   'civil',
@@ -30,6 +32,9 @@ const words = (list: string): readonly string[] => list.split(' ');
 const ANALYSIS_CORE_TOOLS = words(
   'check_assembly engine_quick_check check_convergence compare_to_expected thermal_analytic_check compute_view_factors fit_at_temperature thermal_stress_check fea_mesh fea_solve fea_export fea_import_field',
 );
+
+/** Core part-modelling features (07 FTR §4.1); the sheet-metal plugin adds its commands to the same toolset. */
+const MANUFACTURING_CORE_TOOLS: readonly string[] = [];
 
 /** Tool names per toolset; `building` / `civil` / the FE part of `analysis` come from their plugins. */
 export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
@@ -61,6 +66,14 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   /** Core analytic checks plus the finite-element commands contributed by the installed cae plugin. */
   get analysis(): readonly string[] {
     return [...ANALYSIS_CORE_TOOLS, ...pluginToolNames('analysis')];
+  },
+  /** Core hole / pocket / recognition commands plus the sheet-metal plugin's commands. */
+  get manufacturing(): readonly string[] {
+    return [...MANUFACTURING_CORE_TOOLS, ...pluginToolNames('manufacturing')];
+  },
+  /** Contributed by the installed fasteners plugin. */
+  get fasteners(): readonly string[] {
+    return pluginToolNames('fasteners');
   },
   /** Contributed by the installed building + industrial plugins. */
   get building(): readonly string[] {
