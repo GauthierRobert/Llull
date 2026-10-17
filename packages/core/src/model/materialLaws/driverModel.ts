@@ -2,20 +2,14 @@
 
 import { convertValue, isUnitFailure } from '../../lib/quantity';
 import type { LawOf, MaterialModel, SetSlot } from '../materialModel';
-import {
-  bulkShear,
-  expandTransverselyIsotropic,
-  isotropicStiffness,
-  orthotropicCompliance,
-  stiffnessReport,
-  symmetricFromUpperTriangle,
-} from './elastic';
+import { bulkShear, isotropicStiffness, orthotropicCompliance, stiffnessReport, symmetricFromUpperTriangle } from './elastic';
 import type { Matrix } from './linalg';
 import { invertMatrix, pivotReport } from './linalg';
 import { cowperSymondsRateFactor, johnsonCookRateFactor, resolveIsotropic } from './hardening';
 import type { J2Material } from './j2';
 import { arrheniusLnShift, wlfLog10Shift } from './viscoelastic';
 import { convertQuantity, failure, isLawFailure, resolveAll, resolveParameter, type LawFailure, type ResolveEnv } from './resolve';
+import { resolveOrthotropicConstants } from './elasticResolve';
 
 interface ElasticModel {
   readonly C: Matrix;
@@ -90,40 +84,8 @@ function resolveElastic(model: MaterialModel, env: ResolveEnv): ElasticModel | L
     }
     case 'elastic_orthotropic':
     case 'elastic_transversely_isotropic': {
-      let constants;
-      if (law.kind === 'elastic_orthotropic') {
-        const values = resolveAll(
-          {
-            E1: { parameter: law.E1, dimension: 'stress' },
-            E2: { parameter: law.E2, dimension: 'stress' },
-            E3: { parameter: law.E3, dimension: 'stress' },
-            nu12: { parameter: law.nu12, dimension: 'dimensionless' },
-            nu13: { parameter: law.nu13, dimension: 'dimensionless' },
-            nu23: { parameter: law.nu23, dimension: 'dimensionless' },
-            G12: { parameter: law.G12, dimension: 'stress' },
-            G13: { parameter: law.G13, dimension: 'stress' },
-            G23: { parameter: law.G23, dimension: 'stress' },
-          },
-          env,
-          path,
-        );
-        if (isLawFailure(values)) return values;
-        constants = values;
-      } else {
-        const values = resolveAll(
-          {
-            Ep: { parameter: law.Ep, dimension: 'stress' },
-            Et: { parameter: law.Et, dimension: 'stress' },
-            Gt: { parameter: law.Gt, dimension: 'stress' },
-            nuP: { parameter: law.nuP, dimension: 'dimensionless' },
-            nuPT: { parameter: law.nuPT, dimension: 'dimensionless' },
-          },
-          env,
-          path,
-        );
-        if (isLawFailure(values)) return values;
-        constants = expandTransverselyIsotropic(law.isotropyPlane, values.Ep, values.Et, values.nuP, values.nuPT, values.Gt);
-      }
+      const constants = resolveOrthotropicConstants(law, env, path);
+      if (isLawFailure(constants)) return constants;
       const compliance = orthotropicCompliance(constants);
       const notPd = pivotReport(compliance).positiveDefinite
         ? null
