@@ -15,7 +15,7 @@ import { pickEdge } from '../pick';
 import { bendEnd } from '../reliefGeometry';
 import { applyRelief, isReliefFailure, reliefData } from '../reliefOps';
 import { fixed, refuser, type Fail } from '../result';
-import { partContext, isRefusal } from '../partLookup';
+import { insideRadiusOf, isRefusal, partContext } from '../partLookup';
 
 /** Overlap length of intervals [a0,a1] and [b0,b1]. */
 const overlap = (a0: number, a1: number, b0: number, b1: number): number =>
@@ -68,7 +68,6 @@ export function applyFlange(doc: CadDocument, command: string, params: FlangePar
   const { model, part, rule } = found;
   const { angle, length, lengthReference, position } = params;
   const T = rule.thickness;
-  const R = params.insideRadius ?? rule.insideRadius;
   if (!(angle > 0 && angle <= 180) || (angle >= 180 && lengthReference !== 'tangent'))
     return fail(
       'FTR_BEND_ANGLE_OUT_OF_RANGE',
@@ -76,14 +75,8 @@ export function applyFlange(doc: CadDocument, command: string, params: FlangePar
       'Bend angle is the angle bent through, 0 < angle < 180 degrees (180 only with lengthReference tangent).',
       { paths: ['angle'] },
     );
-  if (!(R >= 0)) return fail('FTR_PARAM_INVALID', `insideRadius must be >= 0 (got ${R})`, 'Give R >= 0.', { paths: ['insideRadius'] });
-  if (R === 0 && rule.allowSharpBends !== true && options.allowZeroRadius !== true)
-    return fail(
-      'FTR_SHARP_BEND_FORBIDDEN',
-      'inside radius 0 and the rule does not allow sharp bends',
-      'Use an inside radius >= the table minimum, or a rule with allowSharpBends.',
-      { ids: [part.id], paths: ['insideRadius'] },
-    );
+  const R = insideRadiusOf(found, params.insideRadius, refuseFlange, options.allowZeroRadius === true);
+  if (isRefusal(R)) return { result: R.refusal };
   const widthStart = params.widthStart ?? 0;
   const widthEnd = params.widthEnd ?? 0;
   if (!(length > 0) || !(widthStart >= 0) || !(widthEnd >= 0))

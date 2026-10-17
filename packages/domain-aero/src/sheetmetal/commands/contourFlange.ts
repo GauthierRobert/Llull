@@ -10,7 +10,7 @@ import { flatOf, getModel, nextNodeIds, withModel, withNodes, withPart } from '.
 import { fixed, refuser } from '../result';
 import { findRadiusRow, resolveK } from '../rules';
 import { applyFlange } from './flange';
-import { partContext, isRefusal } from '../partLookup';
+import { insideRadiusOf, isRefusal, partContext } from '../partLookup';
 
 type Face = 'top' | 'bottom' | 'mid';
 
@@ -66,15 +66,8 @@ export const addContourFlange = defineCommand({
     if (isRefusal(found)) return found.refusal;
     const { model, part, rule } = found;
     const T = rule.thickness;
-    const R = params.insideRadius ?? rule.insideRadius;
-    if (!(R >= 0)) return fail('FTR_PARAM_INVALID', `insideRadius must be >= 0 (got ${R})`, 'Give R >= 0.', { paths: ['insideRadius'] });
-    if (R === 0 && rule.allowSharpBends !== true)
-      return fail(
-        'FTR_SHARP_BEND_FORBIDDEN',
-        'inside radius 0 and the rule does not allow sharp bends',
-        'Use R > 0 or a rule with allowSharpBends.',
-        { paths: ['insideRadius'] },
-      );
+    const R = insideRadiusOf(found, params.insideRadius, fail);
+    if (isRefusal(R)) return R.refusal;
     const points: Vec2[] = [[0, 0], ...params.path];
     const segments = points.slice(1).map((end, i) => {
       const start = points[i] as Vec2;

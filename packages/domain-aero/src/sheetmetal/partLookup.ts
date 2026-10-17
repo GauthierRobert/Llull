@@ -11,7 +11,7 @@ export interface Refusal {
   readonly refusal: CommandResult;
 }
 
-export const isRefusal = <T extends object>(value: T | Refusal): value is Refusal => 'refusal' in value;
+export const isRefusal = <T>(value: T | Refusal): value is Refusal => typeof value === 'object' && value !== null && 'refusal' in value;
 
 export interface PartContext {
   readonly model: SheetMetalModel;
@@ -63,4 +63,21 @@ export function flatNear(
       }),
     };
   return hit;
+}
+
+/** The inside bend radius (`given`, else the rule's), or the FTR_PARAM_INVALID (R < 0) / FTR_SHARP_BEND_FORBIDDEN (R = 0) refusal. */
+export function insideRadiusOf({ part, rule }: PartContext, given: number | undefined, fail: Fail, allowZero = false): number | Refusal {
+  const radius = given ?? rule.insideRadius;
+  if (!(radius >= 0))
+    return { refusal: fail('FTR_PARAM_INVALID', `insideRadius must be >= 0 (got ${radius})`, 'Give R >= 0.', { paths: ['insideRadius'] }) };
+  if (radius === 0 && rule.allowSharpBends !== true && !allowZero)
+    return {
+      refusal: fail(
+        'FTR_SHARP_BEND_FORBIDDEN',
+        'inside radius 0 and the rule does not allow sharp bends',
+        'Use an inside radius >= the table minimum, or a rule with allowSharpBends.',
+        { ids: [part.id], paths: ['insideRadius'] },
+      ),
+    };
+  return radius;
 }

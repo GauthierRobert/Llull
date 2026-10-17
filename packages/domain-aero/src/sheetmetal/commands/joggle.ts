@@ -11,7 +11,7 @@ import { childBends, formsOf, nextNodeIds, parentBend, withModel, withNodes, wit
 import { relayout } from '../layout';
 import { fixed, refuser } from '../result';
 import { resolveK } from '../rules';
-import { partContext, isRefusal, flatNear } from '../partLookup';
+import { flatNear, insideRadiusOf, isRefusal, partContext } from '../partLookup';
 
 type Side = 'left' | 'right' | 'on' | 'mixed';
 
@@ -67,7 +67,6 @@ export const addJoggle = defineCommand({
     if (isRefusal(found)) return found.refusal;
     const { model, part, rule } = found;
     const T = rule.thickness;
-    const R = params.insideRadius ?? rule.insideRadius;
     const phi = toRadians(params.angle);
     if (!(params.angle > 0 && params.angle <= 90))
       return fail(
@@ -76,14 +75,8 @@ export const addJoggle = defineCommand({
         'Joggle angle is the angle of each bend, 0 < angle <= 90 degrees.',
         { paths: ['angle'] },
       );
-    if (!(R >= 0)) return fail('FTR_PARAM_INVALID', `insideRadius must be >= 0 (got ${R})`, 'Give R >= 0.', { paths: ['insideRadius'] });
-    if (R === 0 && rule.allowSharpBends !== true)
-      return fail(
-        'FTR_SHARP_BEND_FORBIDDEN',
-        'inside radius 0 and the rule does not allow sharp bends',
-        'Use an inside radius >= the table minimum, or a rule with allowSharpBends.',
-        { ids: [part.id], paths: ['insideRadius'] },
-      );
+    const R = insideRadiusOf(found, params.insideRadius, fail);
+    if (isRefusal(R)) return R.refusal;
     const k = resolveK(rule, R).value;
     const quantities = joggleQuantities({ thickness: T, insideRadius: R, k, phi, offset: params.offset });
     const minimum = minJoggleOffset(T, R, phi);
