@@ -19,6 +19,7 @@ const SIDEBAR_TABS = [
   'materials',
   'manufacturing',
   'fasteners',
+  'analysis',
   'review',
 ] as const;
 

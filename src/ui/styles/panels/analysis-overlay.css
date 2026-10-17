@@ -1,0 +1,26 @@
+/* Value pill next to a support / load / thermal BC / probe glyph in the 3D view (FeaSetupOverlay).
+   Every pill sits at its glyph's point; --stack staggers pills sharing one point so they never overlap. */
+.fea-label {
+  display: inline-block;
+  transform: translate(10px, calc(-50% + var(--stack, 0) * 21px));
+  padding: 1px 6px;
+  border: 1px solid;
+  border-left-width: 3px;
+  border-radius: var(--radius-xs);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+  color: var(--fg);
+  max-width: 260px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Supports sit where parts are held, often next to a probe or a load: their pills open to the left. */
+.fea-label--support {
+  transform: translate(calc(-100% - 10px), calc(-50% + var(--stack, 0) * 21px));
+}

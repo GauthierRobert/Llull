@@ -2,6 +2,7 @@
 // newtons, motor torque rings, joint axes and gear links, each with its value label. During playback the arrows ride the bodies and the
 // values follow the run. Visibility, labels and the emphasised load come from useLoadOverlayStore (Mechanisms › Loads & forces).
 
+import { useAnalysisViewStore } from '@ui/store/analysisViewStore';
 import React, { useEffect, useMemo } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Html, Line } from '@react-three/drei';
@@ -187,13 +188,15 @@ export function DynamicsLoadsOverlay(): React.ReactElement | null {
   const document = useStore((s) => s.document);
   const result = useDynamicsPlaybackStore((s) => s.result);
   const overlay = useLoadOverlayStore();
+  // An FE case's own glyphs (FeaSetupOverlay) replace the rigid-body loads while the Analysis panel focuses it.
+  const analysisFocused = useAnalysisViewStore((s) => s.focusedAnalysisId !== null);
   const invalidate = useThree((state) => state.invalidate);
   useEffect(() => useLoadOverlayStore.subscribe(() => invalidate()), [invalidate]);
   const { design, current: items } = useDynamicsLoads();
   const size = useMemo(() => (document.dynamics === undefined ? 1 : modelSize(document)), [document]);
   const reference = useMemo(() => scaleReference(design, result), [design, result]);
 
-  if (!overlay.shown || items.length === 0) return null;
+  if (!overlay.shown || items.length === 0 || analysisFocused) return null;
   return (
     <group name="dynamics-loads">
       {items

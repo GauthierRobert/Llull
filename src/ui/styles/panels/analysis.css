@@ -1,0 +1,172 @@
+/* Analysis tab (FEA / thermal cases). Same tokens as Manufacturing; status = glyph + word, never colour alone. */
+
+.analysis-cards {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+}
+
+.analysis-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2);
+  text-align: left;
+  color: var(--fg);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.analysis-card:hover {
+  border-color: var(--border-strong);
+}
+
+.analysis-card:focus-visible {
+  outline: 2px solid var(--accent-border);
+  outline-offset: 2px;
+}
+
+.analysis-card--active {
+  background: var(--accent-softer);
+  border-color: var(--accent-border);
+}
+
+.analysis-card__kind {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  font-weight: 700;
+  font-size: var(--text-sm);
+  color: var(--accent-text);
+  background: var(--accent-soft);
+  border-radius: var(--radius-sm);
+}
+
+.analysis-card__kind--thermal {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.analysis-card__body {
+  display: grid;
+  min-width: 0;
+}
+
+.analysis-card__name {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.analysis-card__meta {
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+
+.analysis-card__progress--solved {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.analysis-card__progress--meshed {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.analysis-setup {
+  margin: 0;
+  padding: 0 var(--space-3);
+  list-style: none;
+}
+
+.analysis-setup__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--space-2);
+  padding: 3px 0;
+  font-size: var(--text-xs);
+  border-bottom: 1px solid var(--divider);
+}
+
+.analysis-setup__name {
+  overflow: hidden;
+  color: var(--fg);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.analysis-setup__value {
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.analysis-setup__meta {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  color: var(--fg-faint);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.analysis-setup__footer {
+  margin-top: var(--space-2);
+  line-height: 1.5;
+}
+
+.analysis__hint code {
+  font-family: var(--font-mono);
+  font-size: 0.95em;
+}
+
+.analysis__category {
+  display: block;
+  font-family: var(--font-sans, inherit);
+  font-size: 0.9em;
+  color: var(--fg-faint);
+}
+
+.analysis__table td .status-mark {
+  white-space: nowrap;
+}
+
+.analysis__figures {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-1);
+  margin: var(--space-1) var(--space-3);
+}
+
+.analysis__figures > div {
+  padding: var(--space-1) var(--space-2);
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+}
+
+.analysis__figures dt {
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+
+.analysis__figures dd {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.analysis__note {
+  margin: 0;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--fg-muted);
+  overflow-wrap: anywhere;
+}

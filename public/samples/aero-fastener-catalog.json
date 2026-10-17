@@ -1,0 +1,492 @@
+{
+ "format": "llull-fastener-catalog",
+ "schemaVersion": 1,
+ "title": "sample (test fixture)",
+ "families": [
+  {
+   "id": "NAS6203-6220",
+   "kind": "bolt",
+   "standard": {
+    "body": "AIA/NAS",
+    "id": "NAS6203-6220"
+   },
+   "partNumber": [
+    {
+     "kind": "literal",
+     "text": "NAS62"
+    },
+    {
+     "kind": "int",
+     "name": "diameterDash",
+     "width": 2
+    },
+    {
+     "kind": "literal",
+     "text": "-"
+    },
+    {
+     "kind": "int",
+     "name": "gripDash",
+     "scale": 0.0625,
+     "unit": "in"
+    }
+   ],
+   "gripIncrement": {
+    "value": 0.0625,
+    "unit": "in"
+   },
+   "gripMode": "min_grip_ge_stack",
+   "lengthRule": {
+    "kind": "grip_plus_thread"
+   },
+   "sizes": [
+    {
+     "dash": "3",
+     "nominalDiameter": {
+      "value": 0.1875,
+      "unit": "in"
+     },
+     "thread": ".1900-32 UNJF-3A",
+     "threadsPerInch": 32,
+     "threadLength": {
+      "value": 0.323,
+      "unit": "in"
+     },
+     "dims": {}
+    },
+    {
+     "dash": "4",
+     "nominalDiameter": {
+      "value": 0.25,
+      "unit": "in"
+     },
+     "thread": ".2500-28",
+     "threadsPerInch": 28,
+     "threadLength": {
+      "value": 0.37,
+      "unit": "in"
+     },
+     "dims": {}
+    },
+    {
+     "dash": "5",
+     "nominalDiameter": {
+      "value": 0.3125,
+      "unit": "in"
+     },
+     "threadLength": {
+      "value": 0.438,
+      "unit": "in"
+     },
+     "dims": {}
+    },
+    {
+     "dash": "6",
+     "nominalDiameter": {
+      "value": 0.375,
+      "unit": "in"
+     },
+     "threadLength": {
+      "value": 0.454,
+      "unit": "in"
+     },
+     "dims": {}
+    }
+   ],
+   "availableGripDash": {
+    "min": 1,
+    "max": 40
+   },
+   "licence": "vendor-catalogue",
+   "provenance": {
+    "citation": "docs/aerospace/08-materials-standards-libraries/validation/fastener_catalog_sample.json (S22)"
+   }
+  },
+  {
+   "id": "MS20470",
+   "kind": "solid_rivet",
+   "standard": {
+    "body": "MS",
+    "id": "MS20470"
+   },
+   "partNumber": [
+    {
+     "kind": "literal",
+     "text": "MS20470"
+    },
+    {
+     "kind": "code",
+     "name": "material",
+     "table": {
+      "AD": "aluminium 2117-T4 (verify)",
+      "DD": "aluminium 2024 (verify)"
+     }
+    },
+    {
+     "kind": "int",
+     "name": "diameterDash",
+     "scale": 0.03125,
+     "unit": "in"
+    },
+    {
+     "kind": "literal",
+     "text": "-"
+    },
+    {
+     "kind": "int",
+     "name": "lengthDash",
+     "scale": 0.0625,
+     "unit": "in"
+    }
+   ],
+   "lengthRule": {
+    "kind": "stack_plus_k_d",
+    "k": 1.5,
+    "round": "up",
+    "step": {
+     "value": 0.0625,
+     "unit": "in"
+    }
+   },
+   "sizes": [
+    {
+     "dash": "3",
+     "nominalDiameter": {
+      "value": 0.09375,
+      "unit": "in"
+     },
+     "dims": {}
+    },
+    {
+     "dash": "4",
+     "nominalDiameter": {
+      "value": 0.125,
+      "unit": "in"
+     },
+     "dims": {
+      "headDiameter": {
+       "min": 0.238,
+       "max": 0.262,
+       "unit": "in",
+       "provenance": {
+        "citation": "docs/aerospace/08-materials-standards-libraries/validation/fastener_catalog_sample.json (S24)"
+       }
+      },
+      "headHeight": {
+       "min": 0.054,
+       "max": 0.064,
+       "unit": "in",
+       "provenance": {
+        "citation": "docs/aerospace/08-materials-standards-libraries/validation/fastener_catalog_sample.json (S24)"
+       }
+      }
+     }
+    },
+    {
+     "dash": "5",
+     "nominalDiameter": {
+      "value": 0.15625,
+      "unit": "in"
+     },
+     "dims": {
+      "headDiameter": {
+       "min": 0.296,
+       "max": 0.328,
+       "unit": "in",
+       "provenance": {
+        "citation": "docs/aerospace/08-materials-standards-libraries/validation/fastener_catalog_sample.json (S24)"
+       }
+      },
+      "headHeight": {
+       "min": 0.067,
+       "max": 0.077,
+       "unit": "in",
+       "provenance": {
+        "citation": "docs/aerospace/08-materials-standards-libraries/validation/fastener_catalog_sample.json (S24)"
+       }
+      }
+     }
+    },
+    {
+     "dash": "6",
+     "nominalDiameter": {
+      "value": 0.1875,
+      "unit": "in"
+     },
+     "dims": {
+      "headDiameter": {
+       "min": 0.356,
+       "max": 0.394,
+       "unit": "in",
+       "provenance": {
+        "citation": "docs/aerospace/08-materials-standards-libraries/validation/fastener_catalog_sample.json (S24)"
+       }
+      },
+      "headHeight": {
+       "min": 0.08,
+       "max": 0.09,
+       "unit": "in",
+       "provenance": {
+        "citation": "docs/aerospace/08-materials-standards-libraries/validation/fastener_catalog_sample.json (S24)"
+       }
+      }
+     }
+    }
+   ],
+   "licence": "vendor-catalogue",
+   "provenance": {
+    "citation": "docs/aerospace/08-materials-standards-libraries/validation/fastener_catalog_sample.json (S24)"
+   }
+  },
+  {
+   "id": "HL19",
+   "kind": "hi_lok_pin",
+   "standard": {
+    "body": "Hi-Shear",
+    "id": "Hi-Lok Product Specification 342"
+   },
+   "partNumber": [
+    {
+     "kind": "literal",
+     "text": "HL19-"
+    },
+    {
+     "kind": "int",
+     "name": "diameterDash",
+     "scale": 0.03125,
+     "unit": "in"
+    },
+    {
+     "kind": "literal",
+     "text": "-"
+    },
+    {
+     "kind": "int",
+     "name": "gripDash",
+     "scale": 0.0625,
+     "unit": "in"
+    }
+   ],
+   "gripIncrement": {
+    "value": 0.0625,
+    "unit": "in"
+   },
+   "gripMode": "max_grip_range",
+   "sizes": [
+    {
+     "dash": "6",
+     "nominalDiameter": {
+      "value": 0.1875,
+      "unit": "in"
+     },
+     "dims": {}
+    },
+    {
+     "dash": "8",
+     "nominalDiameter": {
+      "value": 0.25,
+      "unit": "in"
+     },
+     "dims": {}
+    }
+   ],
+   "availableGripDash": {
+    "min": 1,
+    "max": 40
+   },
+   "licence": "vendor-catalogue",
+   "provenance": {
+    "citation": "docs/aerospace/08-materials-standards-libraries/validation/fastener_catalog_sample.json (S26)"
+   }
+  },
+  {
+   "id": "MS21042",
+   "kind": "nut",
+   "standard": {
+    "body": "MS",
+    "id": "MS21042"
+   },
+   "partNumber": [
+    {
+     "kind": "literal",
+     "text": "MS21042"
+    },
+    {
+     "kind": "code",
+     "name": "style",
+     "table": {
+      "L": "reduced hexagon, extended washer, 450 F"
+     }
+    },
+    {
+     "kind": "int",
+     "name": "diameterDash"
+    }
+   ],
+   "sizes": [
+    {
+     "dash": "3",
+     "partNumber": "MS21042L3",
+     "nominalDiameter": {
+      "value": 0.19,
+      "unit": "in"
+     },
+     "thread": "0.190-32 UNJF-3B",
+     "threadsPerInch": 32,
+     "dims": {
+      "height": {
+       "min": 0.154,
+       "max": 0.188,
+       "unit": "in",
+       "provenance": {
+        "citation": "docs/aerospace/08-materials-standards-libraries/validation/fastener_catalog_sample.json (S25)"
+       }
+      },
+      "acrossFlats": {
+       "min": 0.243,
+       "max": 0.252,
+       "unit": "in",
+       "provenance": {
+        "citation": "docs/aerospace/08-materials-standards-libraries/validation/fastener_catalog_sample.json (S25)"
+       }
+      }
+     }
+    }
+   ],
+   "licence": "vendor-catalogue",
+   "provenance": {
+    "citation": "docs/aerospace/08-materials-standards-libraries/validation/fastener_catalog_sample.json (S25)"
+   }
+  },
+  {
+   "id": "NAS1149",
+   "kind": "washer",
+   "standard": {
+    "body": "AIA/NAS",
+    "id": "NAS1149"
+   },
+   "partNumber": [
+    {
+     "kind": "literal",
+     "text": "NAS1149"
+    },
+    {
+     "kind": "code",
+     "name": "material",
+     "table": {
+      "F": "carbon steel"
+     }
+    },
+    {
+     "kind": "int",
+     "name": "diameterDash",
+     "width": 2
+    },
+    {
+     "kind": "int",
+     "name": "thickness",
+     "scale": 0.001,
+     "unit": "in",
+     "width": 2
+    },
+    {
+     "kind": "code",
+     "name": "finish",
+     "table": {
+      "P": "cadmium plated"
+     }
+    }
+   ],
+   "sizes": [
+    {
+     "dash": "3",
+     "nominalDiameter": {
+      "value": 0.19,
+      "unit": "in"
+     },
+     "dims": {
+      "thickness": {
+       "options": [
+        0.016,
+        0.032,
+        0.063,
+        0.09
+       ],
+       "unit": "in",
+       "provenance": {
+        "citation": "docs/aerospace/08-materials-standards-libraries/validation/fastener_catalog_sample.json (S27)"
+       }
+      }
+     }
+    },
+    {
+     "dash": "4",
+     "nominalDiameter": {
+      "value": 0.25,
+      "unit": "in"
+     },
+     "dims": {
+      "thickness": {
+       "options": [
+        0.016,
+        0.032,
+        0.063,
+        0.09
+       ],
+       "unit": "in",
+       "provenance": {
+        "citation": "docs/aerospace/08-materials-standards-libraries/validation/fastener_catalog_sample.json (S27)"
+       }
+      }
+     }
+    },
+    {
+     "dash": "5",
+     "nominalDiameter": {
+      "value": 0.3125,
+      "unit": "in"
+     },
+     "dims": {
+      "thickness": {
+       "options": [
+        0.016,
+        0.032,
+        0.063,
+        0.09
+       ],
+       "unit": "in",
+       "provenance": {
+        "citation": "docs/aerospace/08-materials-standards-libraries/validation/fastener_catalog_sample.json (S27)"
+       }
+      }
+     }
+    },
+    {
+     "dash": "6",
+     "nominalDiameter": {
+      "value": 0.375,
+      "unit": "in"
+     },
+     "dims": {
+      "thickness": {
+       "options": [
+        0.016,
+        0.032,
+        0.063,
+        0.09
+       ],
+       "unit": "in",
+       "provenance": {
+        "citation": "docs/aerospace/08-materials-standards-libraries/validation/fastener_catalog_sample.json (S27)"
+       }
+      }
+     }
+    }
+   ],
+   "licence": "vendor-catalogue",
+   "provenance": {
+    "citation": "docs/aerospace/08-materials-standards-libraries/validation/fastener_catalog_sample.json (S27)"
+   }
+  }
+ ]
+}

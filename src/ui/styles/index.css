@@ -19,7 +19,9 @@
 @import './panels/configurations.css';
 @import './panels/materials.css';
 @import './panels/mechanisms.css';
+@import './panels/analysis-overlay.css';
 @import './panels/building.css';
 @import './panels/civil.css';
 @import './panels/review.css';
 @import './panels/manufacturing.css';
+@import './panels/analysis.css';

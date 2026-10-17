@@ -9,6 +9,7 @@ import { IconButton } from '@ui/panels/PanelParts';
 import { SOLID_PRESETS } from '@ui/components/toolbar/solidPresets';
 import { createSolid } from '@ui/actions/createSolid';
 import { startCivilSite } from '@ui/actions/civilStarter';
+import { startAerospaceProject } from '@ui/actions/aerospaceStarter';
 
 interface StartChipProps {
   icon: IconName;
@@ -43,6 +44,7 @@ export function EmptyState(): React.ReactElement | null {
   const drawToolArmed = useToolStore((s) => s.drawTool !== 'none');
   const [dismissed, setDismissed] = useState(false);
   const [civilLoading, setCivilLoading] = useState(false);
+  const [aeroLoading, setAeroLoading] = useState(false);
 
   // Never covers the drawing area while a 2D tool is armed.
   if (entityCount > 0 || dismissed || drawToolArmed) return null;
@@ -57,6 +59,12 @@ export function EmptyState(): React.ReactElement | null {
     if (sidebarTab !== 'civil' || !sidebarOpen) selectSidebarTab('civil');
     setCivilLoading(true);
     void startCivilSite().finally(() => setCivilLoading(false));
+  };
+  const startAerospace = (): void => {
+    const { sidebarTab, sidebarOpen, selectSidebarTab } = useLayoutStore.getState();
+    if (sidebarTab !== 'analysis' || !sidebarOpen) selectSidebarTab('analysis');
+    setAeroLoading(true);
+    void startAerospaceProject().finally(() => setAeroLoading(false));
   };
 
   return (
@@ -105,6 +113,13 @@ export function EmptyState(): React.ReactElement | null {
             caption={civilLoading ? 'Loading survey…' : 'Civil site'}
             busy={civilLoading}
             onClick={startCivil}
+          />
+          <StartChip
+            icon="analysis"
+            label={aeroLoading ? 'Aerospace starter — building the UAV propulsion pod…' : 'Aerospace starter: UAV propulsion pod'}
+            caption={aeroLoading ? 'Building pod…' : 'Aerospace pod'}
+            busy={aeroLoading}
+            onClick={startAerospace}
           />
         </div>
 

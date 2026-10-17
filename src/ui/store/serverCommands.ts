@@ -78,3 +78,8 @@ export function postRedo(): Promise<ServerCommandResponse> {
 export function fetchLiveSnapshot(): Promise<LiveSnapshotEvent> {
   return request('/live/snapshot');
 }
+
+/** POST /exchange: a host transport tool (fea_mesh, fea_solve, export_step …); its document changes arrive over /live. */
+export function postExchange(name: string, params: unknown): Promise<ServerCommandResponse> {
+  return request('/exchange', { name, params });
+}

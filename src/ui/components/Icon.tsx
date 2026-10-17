@@ -13,6 +13,7 @@ const ICON_PATHS = {
   configurations: 'M12 2 3 7v10l9 5 9-5V7l-9-5ZM3 7l9 5 9-5M12 12v10M7.5 4.5l9 5',
   manufacturing: 'M4 20h16M6 20V9l6-5 6 5v11M10 20v-5h4v5M9 10.5h.01M15 10.5h.01',
   fastener: 'M12 3v4M8 7h8M10 7v10l2 3 2-3V7M10 11h4M10 14h4',
+  analysis: 'M3 20h18M5 20V9l4-4M9 5l4 6M13 11l4-6M17 5l2 4v11M5 14h14',
   review: 'M12 2.5 4 6v6c0 5 3.4 8.5 8 9.5 4.6-1 8-4.5 8-9.5V6l-8-3.5ZM8.5 12l2.5 2.5 4.5-5',
   materials:
     'M12 22a10 10 0 1 1 0-20c5.5 0 10 4 10 9a5 5 0 0 1-5 5h-1.8a1.7 1.7 0 0 0-1.2 2.8A1.7 1.7 0 0 1 12 22ZM7.5 11.5h.01M10.5 7.5h.01M15.5 7.5h.01',
