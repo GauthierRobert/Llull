@@ -10,7 +10,8 @@ import { buildPlanDrawing } from '../drawings/planDrawing';
 import { entityPlanPoint } from '@core/geometry/entityFrame';
 import { technicalView } from '@core/geometry/technicalView';
 import { TOP_VIEW } from '@core/geometry/viewProjection';
-import { CENTER_LAYERS, DxfWriter, HIDDEN_LAYERS, INSUNITS, fmt, writePrimitive } from './dxfWriter';
+import { INSUNITS, fmt } from '@lib/dxfWriter';
+import { CENTER_LAYERS, DxfWriter, HIDDEN_LAYERS, writePrimitive } from './dxfWriter';
 
 function writeDrafting(writer: DxfWriter, doc: CadDocument): void {
   for (const id of doc.order) {

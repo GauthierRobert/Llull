@@ -1,0 +1,105 @@
+import { defineCommand, z, vec3 } from '@core/commands/schema';
+import type { CommandResult } from '@core/commands/types';
+import { changed } from '@core/commands/noop';
+import type { Vec2 } from '@core/model/types';
+import type { SheetCutout } from '@core/model/sheetMetal';
+import { pointInPolygon, polygonArea, segmentsIntersect, toCounterClockwise } from '@lib/polygon';
+import { withFoldedSolid } from '../fold';
+import { frameToWorld, worldToFrame } from '../frames';
+import { circlePolygon, isSimplePolygon } from '../geometry2d';
+import { getModel, ruleOfPart, withModel, withNodes, withPart } from '../graph';
+import { pickFlat } from '../pick';
+import { readProfile } from '../profile';
+import { fixed, refuse } from '../result';
+
+const crosses = (a: readonly Vec2[], b: readonly Vec2[]): boolean =>
+  a.some((p, i) => b.some((q, j) => segmentsIntersect(p, a[(i + 1) % a.length] as Vec2, q, b[(j + 1) % b.length] as Vec2)));
+
+const inside = (inner: readonly Vec2[], outer: readonly Vec2[]): boolean =>
+  inner.every((point) => pointInPolygon(point, outer)) && !crosses(inner, outer);
+
+/**
+ * @affects adds a cutout to one flat of the part and re-derives its folded solid; the profile entity stays
+ * @invariant the cutout is projected normal to the flat, stored in flat-local coordinates (so it appears in the flat pattern) and lies wholly inside the flat outline
+ * @failure unknown part, profile not a closed rectangle/polyline/circle, no flat at face.near (FTR_FACE_NOT_FOUND), cutout crossing the outline or another cutout (FTR_CUTOUT_INVALID) -> rejected with error.code
+ */
+export const addSheetCutout = defineCommand({
+  name: 'add_sheet_cutout',
+  description:
+    'Cut a hole through ONE flat of a sheet-metal part with a closed 2D profile (rectangle, closed polyline or circle drawn earlier). The cut is normal to the flat: the profile is projected onto the flat picked by the world point `face.near` ' +
+    "(any point on or within one thickness of the flat), stored in the flat's own coordinates and appears as a cutout (CIRCLE for a circle) in flat_pattern and the DXF. " +
+    'The profile must lie wholly inside that flat and not touch other cutouts. All lengths are in the document length unit. ' +
+    'Refusals: FTR_PART_NOT_FOUND, FTR_PROFILE_NOT_CLOSED, FTR_FACE_NOT_FOUND, FTR_CUTOUT_INVALID. Next: check_sheet_metal (hole-to-bend and hole-to-edge distances), flat_pattern.',
+  params: z.object({
+    id: z.string().describe('Sheet-metal part id (returned by add_sheet_metal_base).'),
+    face: z.object({ near: vec3('World point [x, y, z] on or near the flat to cut (document length unit).') }).describe('Flat selector.'),
+    profileId: z.string().describe('Id of a closed 2D profile entity (rectangle, closed polyline or circle) whose shape is cut.'),
+  }),
+  run: (doc, { id, face, profileId }): CommandResult => {
+    const fail = (code: Parameters<typeof refuse>[2], why: string, fix: string, where: Parameters<typeof refuse>[5] = {}): CommandResult =>
+      refuse(doc, 'add_sheet_cutout', code, why, fix, where);
+    const model = getModel(doc);
+    const part = model.parts[id];
+    if (part === undefined)
+      return fail('FTR_PART_NOT_FOUND', `no sheet-metal part "${id}"`, 'Create one with add_sheet_metal_base.', { paths: ['id'] });
+    const rule = ruleOfPart(model, part);
+    if (rule === undefined) return fail('FTR_RULE_NOT_FOUND', `rule "${part.rule}" is missing`, 'Recreate the rule.', { ids: [id] });
+    const entity = doc.entities[profileId];
+    if (entity === undefined)
+      return fail('FTR_PARAM_INVALID', `no entity "${profileId}"`, 'Draw the profile first.', { paths: ['profileId'] });
+    const loop = readProfile(entity);
+    if (typeof loop === 'string')
+      return fail('FTR_PROFILE_NOT_CLOSED', loop, 'Pass a closed, simple 2D profile: a rectangle, closed polyline or circle.', {
+        ids: [profileId],
+        paths: ['profileId'],
+      });
+    const hit = pickFlat(part, rule.thickness, face.near);
+    if (hit === null || hit.distance > rule.thickness + 1e-6)
+      return fail(
+        'FTR_FACE_NOT_FOUND',
+        `no flat within one thickness of ${JSON.stringify(face.near)}`,
+        'Pick a point on a flat face of the part.',
+        { ids: [id], paths: ['face.near'] },
+      );
+    const { flat } = hit;
+    const project = (point: Vec2): Vec2 => {
+      const [x, y] = worldToFrame(flat.frame, frameToWorld(loop.frame, point));
+      return [x, y];
+    };
+    const circle = loop.circle === undefined ? undefined : { center: project(loop.circle.center), radius: loop.circle.radius };
+    const points = circle !== undefined ? circlePolygon(circle.center, circle.radius) : toCounterClockwise(loop.points.map(project));
+    if (!isSimplePolygon(points) || polygonArea(points) < 1e-9)
+      return fail(
+        'FTR_CUTOUT_INVALID',
+        'the projected profile is degenerate (is the profile parallel to the flat?)',
+        'Draw the profile on a plane parallel to the flat.',
+        { ids: [profileId] },
+      );
+    if (!inside(points, flat.outline))
+      return fail(
+        'FTR_CUTOUT_INVALID',
+        'the cutout is not wholly inside the picked flat',
+        'Move the profile inside the flat (bend zones cannot be cut) or pick the right flat.',
+        { ids: [id, flat.id, profileId] },
+      );
+    if (
+      flat.cutouts.some(
+        (other) =>
+          crosses(points, other.points) ||
+          points.some((p) => pointInPolygon(p, other.points)) ||
+          other.points.some((p) => pointInPolygon(p, points)),
+      )
+    )
+      return fail('FTR_CUTOUT_INVALID', 'the cutout overlaps an existing cutout', 'Move the profile away from the other cutout.', {
+        ids: [id, flat.id, profileId],
+      });
+    const cutout: SheetCutout = { points, ...(circle !== undefined ? { circle } : {}) };
+    const nextPart = withNodes(part, [{ ...flat, cutouts: [...flat.cutouts, cutout] }]);
+    const next = withFoldedSolid(withModel(doc, withPart(model, nextPart)), nextPart, rule);
+    return changed(
+      next,
+      `add_sheet_cutout: part "${id}" flat ${flat.id} cut ${circle !== undefined ? `circle R=${fixed(circle.radius)} at [${fixed(circle.center[0])}, ${fixed(circle.center[1])}]` : `${points.length}-vertex profile`} (${flat.cutouts.length + 1} cutout(s) on the flat).`,
+      [id],
+    );
+  },
+});
