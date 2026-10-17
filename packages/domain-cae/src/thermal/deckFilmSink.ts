@@ -15,6 +15,7 @@ import { safeName, type DeckContext, type DeckRefusal } from '../decks/context';
 import { commentText, row } from '../decks/format';
 import { faceNodes, indexMesh, type MeshElement, type MeshIndex } from './meshGeometry';
 import { inScale } from './quantities';
+import { cross3, dot3, sub3 } from '@lib/vec3';
 
 export interface SinkBlocks {
   /** Model-definition lines (dummy nodes, elements, material, sets, contact pair), to sit before the step. */
@@ -28,10 +29,7 @@ const FILM_SINK_MATERIAL = 'FILM_SINK';
 /** Local corner (1-based) of a C3D4 / C3D10 element opposite to each CalculiX face label. */
 const OPPOSITE: Readonly<Record<number, number>> = { 1: 4, 2: 3, 3: 1, 4: 2 };
 
-const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const add = (a: Vec3, b: Vec3, scale: number): Vec3 => [a[0] + scale * b[0], a[1] + scale * b[1], a[2] + scale * b[2]];
-const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const mean = (points: readonly Vec3[]): Vec3 => [
   points.reduce((sum, p) => sum + p[0], 0) / points.length,
   points.reduce((sum, p) => sum + p[1], 0) / points.length,
@@ -64,15 +62,15 @@ function wedgeCoordinates(index: MeshIndex, face: Corner): Vec3[] | null {
   const [p0, p1, p2] = corners;
   if (p0 === null || p0 === undefined || p1 === null || p1 === undefined || p2 === null || p2 === undefined || opposite === null)
     return null;
-  let normal = cross(sub(p1, p0), sub(p2, p0));
+  let normal = cross3(sub3(p1, p0), sub3(p2, p0));
   const doubleArea = Math.hypot(...normal);
   if (!(doubleArea > 0)) return null;
   const unit: Vec3 = [normal[0] / doubleArea, normal[1] / doubleArea, normal[2] / doubleArea];
-  const outward = dot(unit, sub(mean([p0, p1, p2]), opposite)) > 0 ? 1 : -1;
+  const outward = dot3(unit, sub3(mean([p0, p1, p2]), opposite)) > 0 ? 1 : -1;
   normal = [unit[0] * outward, unit[1] * outward, unit[2] * outward];
   const thickness = 0.5 * Math.sqrt(doubleArea / 2);
   // face order a, b, c with (b - a) x (c - a) . n > 0; a face stored the other way swaps b and c (and the mid-side nodes with them)
-  const swap = dot(cross(sub(p1, p0), sub(p2, p0)), normal) < 0;
+  const swap = dot3(cross3(sub3(p1, p0), sub3(p2, p0)), normal) < 0;
   const order = swap ? [0, 2, 1] : [0, 1, 2];
   const [a, b, c] = order.map((i) => corners[i]);
   if (a === null || a === undefined || b === null || b === undefined || c === null || c === undefined) return null;

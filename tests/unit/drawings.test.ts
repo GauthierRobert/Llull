@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
-import { SheetPainter, n, paperDimension } from '@core/commands/drawings/svgPainter';
+import { DrawingPainter, n, paperDimension } from '@core/geometry/drawingSvg';
 import { scaleText, nextMark } from '@core/commands/drawings/sheetOps';
 import { layoutViews } from '@core/commands/drawings/layout';
 import type { DrawingView } from '@core/model/sheet';
@@ -649,7 +649,7 @@ describe('helpers', () => {
   });
 
   it('paints every primitive kind', () => {
-    const painter = new SheetPainter((p) => [p[0] * 2, -p[1] * 2], 2);
+    const painter = new DrawingPainter((p) => [p[0] * 2, -p[1] * 2], 2);
     const base = { layer: 'L' } as const;
     painter.paint({
       ...base,

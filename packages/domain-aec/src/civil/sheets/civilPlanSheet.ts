@@ -7,19 +7,9 @@ import { clamp } from '@lib/clamp';
 import { toDegrees } from '@lib/angle';
 import type { CadDocument, Entity, Vec2 } from '@core/model/types';
 import { escapeXml } from '@lib/escapeXml';
-import {
-  composeSheetSvg,
-  fitScale,
-  MARGIN,
-  n,
-  paperMap,
-  svgPoints,
-  northArrow,
-  PAPER_MM,
-  sheetDrawingArea,
-  type PaperSize,
-  type Viewport,
-} from '../../shared/sheetFrame';
+import { composeSheetSvg, fitScale, MARGIN, paperMap, northArrow, sheetDrawingArea, type Viewport } from '../../shared/sheetFrame';
+import { n, svgPoints } from '@core/geometry/drawingSvg';
+import { PAPER_MM, type PaperSize } from '@core/model/sheet';
 import { toMetres, toMm } from '@core/model/units';
 import { niceStep } from '@lib/niceStep';
 import { clipPolyline, insideRect } from './planClip';

@@ -35,9 +35,6 @@ const DENSITY_DEFAULT: NamedDefault = {
   defaulted: true,
 };
 
-const materialOf = (doc: CadDocument, id: string): Material | undefined =>
-  Object.hasOwn(doc.materials, id) ? doc.materials[id] : undefined;
-
 const refusal = (doc: CadDocument, command: string, refused: PropertyEvaluationRefused, ids: readonly string[]): CommandResult => ({
   ...rejection(
     doc,
@@ -75,6 +72,19 @@ const unresolvedMaterial = (doc: CadDocument, command: string, id: string, reaso
     },
     [id],
   );
+
+/** The queried material and its property record, or the MAT_RECORD_NOT_FOUND / MAT_LIBRARY_UNRESOLVED refusal. */
+function queriedMaterial(
+  doc: CadDocument,
+  command: string,
+  id: string,
+): { readonly material: Material; readonly record: PropertyRecord } | { readonly refusal: CommandResult } {
+  const material = Object.hasOwn(doc.materials, id) ? doc.materials[id] : undefined;
+  if (material === undefined) return { refusal: missingMaterial(doc, command, id) };
+  if (material.record?.unresolved !== undefined)
+    return { refusal: unresolvedMaterial(doc, command, id, material.record.unresolved.reason) };
+  return { material, record: { name: id, ...(material.propertyModels !== undefined ? { propertyModels: material.propertyModels } : {}) } };
+}
 
 /** Model for the query, falling back to a derived CTE when only a thermalStrain model exists. */
 function resolveFor(
@@ -147,14 +157,9 @@ export const evaluateProperty = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const command = 'evaluate_property';
-    const material = materialOf(doc, params.material);
-    if (material === undefined) return missingMaterial(doc, command, params.material);
-    if (material.record?.unresolved !== undefined)
-      return unresolvedMaterial(doc, command, params.material, material.record.unresolved.reason);
-    const record: PropertyRecord = {
-      name: params.material,
-      ...(material.propertyModels !== undefined ? { propertyModels: material.propertyModels } : {}),
-    };
+    const queried = queriedMaterial(doc, command, params.material);
+    if ('refusal' in queried) return queried.refusal;
+    const { material, record } = queried;
     const at = params.at as VariableValues;
     const resolved = resolveFor(record, params);
     if ('available' in resolved) {
@@ -270,14 +275,9 @@ export const sampleProperty = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const command = 'sample_property';
-    const material = materialOf(doc, params.material);
-    if (material === undefined) return missingMaterial(doc, command, params.material);
-    if (material.record?.unresolved !== undefined)
-      return unresolvedMaterial(doc, command, params.material, material.record.unresolved.reason);
-    const record: PropertyRecord = {
-      name: params.material,
-      ...(material.propertyModels !== undefined ? { propertyModels: material.propertyModels } : {}),
-    };
+    const queried = queriedMaterial(doc, command, params.material);
+    if ('refusal' in queried) return queried.refusal;
+    const { record } = queried;
     if (params.property === undefined && params.modelId === undefined) {
       return refusal(
         doc,

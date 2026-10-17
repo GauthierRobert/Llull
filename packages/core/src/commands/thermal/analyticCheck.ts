@@ -3,7 +3,7 @@
 import type { CadDocument } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
-import { commandError, rejection, report } from '../noop';
+import { codedRejection, report } from '../noop';
 import { CHECK_SPECS, type CheckSpec, type Domain, type InputSpec } from './analyticChecks';
 import { physicalConstants } from './constants';
 import { fromSi, siToSystem, siUnitOf, toSi, UNIT_SYSTEMS, type ThermalKind } from '../../lib/thermalUnits';
@@ -59,7 +59,7 @@ const domainCode = (spec: InputSpec): string => {
 };
 
 const refuse = (doc: CadDocument, code: string, why: string, remediation: string, paths: readonly string[]): CommandResult =>
-  rejection(doc, `thermal_analytic_check: ${code} — ${why}; no-op.`, commandError(code, remediation, [], paths));
+  codedRejection(doc, 'thermal_analytic_check', code, why, remediation, [], paths);
 
 const REMEDIATION_UNITS = 'Give each input as { value, unit } with a unit of the documented dimension (temperatures in degC, K or degF).';
 const REMEDIATION_INPUT = 'Fix the listed input; the tool description names every input of each check.';

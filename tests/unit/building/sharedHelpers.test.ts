@@ -10,7 +10,7 @@ import { batterLevel } from '@aec/civil/earthworks/batter';
 import { entityPlanPoint } from '@core/geometry/entityFrame';
 import { stationText } from '@aec/civil/model';
 import { planAreaM2 } from '@aec/shared/planArea';
-import { svgText } from '@aec/shared/sheetFrame';
+import { svgText } from '@core/geometry/drawingSvg';
 import { deflectionCheckLine, shearCheckLine } from '@aec/industrial/steelDesign/steelMemberRows';
 import { run } from '../../helpers/runFixtures';
 import { briefList } from '@aec/shared/briefList';

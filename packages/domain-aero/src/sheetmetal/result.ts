@@ -9,6 +9,9 @@ import { FTR_REVIEW_REASON, type FtrCode, type FtrRefusal, type FtrResultMeta, t
 export const REVIEW_NOTE =
   'Computed by llull, not approved — a qualified person must review it before it is used for an aircraft part or repair.';
 
+/** Offending ids and param paths of a refusal. */
+type RefusalWhere = { readonly ids?: readonly string[]; readonly paths?: readonly string[] };
+
 /** Refusal with a stable FTR code, the offending ids/param paths and a one-line fix; the document is returned unchanged. */
 export function refuse(
   doc: CadDocument,
@@ -16,7 +19,7 @@ export function refuse(
   code: FtrCode,
   why: string,
   remediation: string,
-  where: { readonly ids?: readonly string[]; readonly paths?: readonly string[] } = {},
+  where: RefusalWhere = {},
 ): CommandResult {
   const refusal: FtrRefusal = { code, ids: where.ids ?? [], paths: where.paths ?? [], remediation };
   return rejection(
@@ -25,6 +28,14 @@ export function refuse(
     commandError(refusal.code, refusal.remediation, refusal.ids, refusal.paths),
   );
 }
+
+/** `refuse` bound to one command run. */
+export type Fail = (code: FtrCode, why: string, remediation: string, where?: RefusalWhere) => CommandResult;
+
+export const refuser =
+  (doc: CadDocument, command: string): Fail =>
+  (code, why, remediation, where = {}) =>
+    refuse(doc, command, code, why, remediation, where);
 
 export interface MetaInput {
   readonly lengthUnit: DocumentUnit;

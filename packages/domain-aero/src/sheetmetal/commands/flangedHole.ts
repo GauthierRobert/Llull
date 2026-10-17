@@ -8,12 +8,12 @@ import { withFoldedSolid } from '../fold';
 import { developedHoleRadius, lipGeometry, lipVolume } from '../formGeometry';
 import { frameToWorld, worldToFrame } from '../frames';
 import { circlePolygon } from '../geometry2d';
-import { formsOf, getModel, nextNodeId, ruleOfPart, withModel, withNodes, withPart } from '../graph';
+import { formsOf, nextNodeId, withModel, withNodes, withPart } from '../graph';
 import { beadFootprints, discClear, polygonDistanceAtLeast } from '../placement';
-import { pickFlat } from '../pick';
-import { fixed, refuse } from '../result';
+import { fixed, refuser } from '../result';
 import { FLANGED_HOLE_SOURCE } from '../provenance';
 import { resolveK } from '../rules';
+import { partContext, isRefusal, flatNear } from '../partLookup';
 
 /**
  * @affects cuts the physical hole (radius holeDiameter/2 + T + lipRadius) into one flat, adds the revolved lip to the folded solid and records a form node
@@ -49,23 +49,13 @@ export const addFlangedHole = defineCommand({
       .describe("Lip towards the flat's +normal face ('up', default) or the -normal face ('down')."),
   }),
   run: (doc, params): CommandResult => {
-    const fail = (code: Parameters<typeof refuse>[2], why: string, fix: string, where: Parameters<typeof refuse>[5] = {}): CommandResult =>
-      refuse(doc, 'add_flanged_hole', code, why, fix, where);
-    const model = getModel(doc);
-    const part = model.parts[params.id];
-    if (part === undefined)
-      return fail('FTR_PART_NOT_FOUND', `no sheet-metal part "${params.id}"`, 'Create one with add_sheet_metal_base.', { paths: ['id'] });
-    const rule = ruleOfPart(model, part);
-    if (rule === undefined) return fail('FTR_RULE_NOT_FOUND', `rule "${part.rule}" is missing`, 'Recreate the rule.', { ids: [part.id] });
+    const fail = refuser(doc, 'add_flanged_hole');
+    const found = partContext(doc, params.id, fail);
+    if (isRefusal(found)) return found.refusal;
+    const { model, part, rule } = found;
     const T = rule.thickness;
-    const hit = pickFlat(part, T, params.face.near);
-    if (hit === null || hit.distance > T + 1e-6)
-      return fail(
-        'FTR_FACE_NOT_FOUND',
-        `no flat within one thickness of ${JSON.stringify(params.face.near)}`,
-        'Pick a point on a flat face of the part.',
-        { ids: [part.id], paths: ['face.near'] },
-      );
+    const hit = flatNear(part, T, params.face.near, 'face.near', fail);
+    if (isRefusal(hit)) return hit.refusal;
     const { flat } = hit;
     const [cx, cy] = worldToFrame(flat.frame, params.center);
     const center: Vec2 = [cx, cy];

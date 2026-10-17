@@ -2,7 +2,7 @@
 
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
-import { refuse } from '../shared/refuse';
+import { codedRejection } from '@core/commands/noop';
 import { feRemediation } from '../shared/feCodes';
 
 const REMEDIATION: Readonly<Record<string, string>> = {
@@ -15,5 +15,5 @@ const REMEDIATION: Readonly<Record<string, string>> = {
 
 /** `refuse` with the remediation registered for `code` (this module's table, else the 05 table). */
 export function refuseMargins(doc: CadDocument, code: string, message: string, ids: readonly string[] = []): CommandResult {
-  return refuse(doc, 'compute_margins', code, message, REMEDIATION[code] ?? feRemediation(code), ids);
+  return codedRejection(doc, 'compute_margins', code, message, REMEDIATION[code] ?? feRemediation(code), ids);
 }

@@ -1,16 +1,15 @@
 /** Shared preparation of the flat-pattern queries: part lookup, analytic unfold, provenance and unverified inputs. */
 
 import type { CadDocument } from '@core/model/types';
-import type { CommandResult } from '@core/commands/types';
 import type { FtrResultMeta, FtrUnverifiedInput } from '@core/model/manufacturing';
 import type { SheetMetalPart, SheetMetalRule } from '@core/model/sheetMetal';
 import { toDegrees } from '@lib/angle';
 import { FORMULAS } from '@lib/sheetMath';
-import { getModel, ruleOfPart } from './graph';
 import { FLANGED_HOLE_SOURCE, HEM_SOURCE } from './provenance';
-import { refuse, resultMeta } from './result';
+import { resultMeta, refuser } from './result';
 import { ruleUnverifiedInputs } from './rules';
 import { type FlatPatternGeometry, unfoldPart } from './unfold';
+import { type Refusal, isRefusal, partContext } from './partLookup';
 
 export interface FlatBuild {
   readonly part: SheetMetalPart;
@@ -20,38 +19,15 @@ export interface FlatBuild {
 }
 
 /** The part, its rule and unfolded geometry, or the refusal to return. */
-export function buildFlat(doc: CadDocument, command: string, partId: string): FlatBuild | { readonly refusal: CommandResult } {
-  const model = getModel(doc);
-  const part = model.parts[partId];
-  if (part === undefined)
-    return {
-      refusal: refuse(
-        doc,
-        command,
-        'FTR_PART_NOT_FOUND',
-        `no sheet-metal part "${partId}"`,
-        'List parts with describe_scene or create one with add_sheet_metal_base.',
-        { paths: ['id'] },
-      ),
-    };
-  const rule = ruleOfPart(model, part);
-  if (rule === undefined)
-    return {
-      refusal: refuse(
-        doc,
-        command,
-        'FTR_RULE_NOT_FOUND',
-        `rule "${part.rule}" of part ${part.id} is missing`,
-        'Recreate the rule with create_sheet_metal_rule.',
-        { ids: [part.id] },
-      ),
-    };
+export function buildFlat(doc: CadDocument, command: string, partId: string): FlatBuild | Refusal {
+  const fail = refuser(doc, command);
+  const found = partContext(doc, partId, fail);
+  if (isRefusal(found)) return found;
+  const { model, part, rule } = found;
   const geometry = unfoldPart(part, rule);
   if (geometry === null)
     return {
-      refusal: refuse(
-        doc,
-        command,
+      refusal: fail(
         'FTR_NON_DEVELOPABLE',
         `part ${part.id} has no closed flat boundary`,
         'Check the flats of the part; it cannot be developed.',
@@ -91,6 +67,3 @@ export function buildFlat(doc: CadDocument, command: string, partId: string): Fl
   });
   return { part, rule, geometry, meta };
 }
-
-export const isRefusal = (built: FlatBuild | { readonly refusal: CommandResult }): built is { readonly refusal: CommandResult } =>
-  'refusal' in built;

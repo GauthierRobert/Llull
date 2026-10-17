@@ -79,6 +79,22 @@ const modelAt = (record: PropertyRecord, model: PropertyModel, kelvin: number, u
   return evaluation.available ? evaluation : wrap(evaluation, path);
 };
 
+/** The model at `kelvin` and at the reference `spec`, with their merged unverified reasons, or the first refusal. */
+function endpointsAt(
+  record: PropertyRecord,
+  model: PropertyModel,
+  kelvin: number,
+  spec: number,
+  unit: string,
+  path: string,
+): { readonly hot: Evaluated; readonly reference: Evaluated; readonly reasons: string[] } | CteRefusal {
+  const hot = modelAt(record, model, kelvin, unit, path);
+  if ('code' in hot) return hot;
+  const reference = modelAt(record, model, spec, unit, path);
+  if ('code' in reference) return reference;
+  return { hot, reference, reasons: uniq([...hot.unverifiedReasons, ...reference.unverifiedReasons]) };
+}
+
 /** `thermalStrain` model: strain = (s(T) - s(T_spec)) / (1 + s(T_spec)), the exact secant of PHY-01 TECHNICAL_SPEC §3.3. */
 function thermalStrainProvider(record: PropertyRecord, model: PropertyModel, path: string): CteProvider {
   return {
@@ -86,14 +102,10 @@ function thermalStrainProvider(record: PropertyRecord, model: PropertyModel, pat
     basis: 'thermal strain (L - L_ref)/L_ref',
     conversion: 'secant from thermalStrain: (s(T) - s(T_spec)) / ((T - T_spec)(1 + s(T_spec)))',
     strainAt: (temperature, spec) => {
-      const hot = modelAt(record, model, temperature, '1', path);
-      if ('code' in hot) return hot;
-      const reference = modelAt(record, model, spec, '1', path);
-      if ('code' in reference) return reference;
-      return {
-        strain: (hot.value - reference.value) / (1 + reference.value),
-        unverifiedReasons: uniq([...hot.unverifiedReasons, ...reference.unverifiedReasons]),
-      };
+      const ends = endpointsAt(record, model, temperature, spec, '1', path);
+      if ('code' in ends) return ends;
+      const { hot, reference, reasons } = ends;
+      return { strain: (hot.value - reference.value) / (1 + reference.value), unverifiedReasons: reasons };
     },
   };
 }
@@ -107,12 +119,11 @@ function cteModelProvider(record: PropertyRecord, model: PropertyModel, basis: C
       basis: `secant, reference ${basis.referenceKelvin} K`,
       conversion: `re-referenced from ${basis.referenceKelvin} K to T_spec: [a(T)(T - Ta) - a(Ts)(Ts - Ta)] / (T - Ts)`,
       strainAt: (temperature, spec) => {
-        const hot = modelAt(record, model, temperature, '1/K', path);
-        if ('code' in hot) return hot;
-        const reference = modelAt(record, model, spec, '1/K', path);
-        if ('code' in reference) return reference;
+        const ends = endpointsAt(record, model, temperature, spec, '1/K', path);
+        if ('code' in ends) return ends;
+        const { hot, reference, reasons } = ends;
         const strain = hot.value * (temperature - basis.referenceKelvin) - reference.value * (spec - basis.referenceKelvin);
-        return { strain, unverifiedReasons: uniq([...hot.unverifiedReasons, ...reference.unverifiedReasons]) };
+        return { strain, unverifiedReasons: reasons };
       },
     };
   }
@@ -131,11 +142,9 @@ function cteModelProvider(record: PropertyRecord, model: PropertyModel, basis: C
         ? 'instantaneous table integrated exactly (piecewise linear)'
         : 'instantaneous model sampled at <= 10 K steps, Simpson',
     strainAt: (temperature, spec) => {
-      const hot = modelAt(record, model, temperature, '1/K', path);
-      if ('code' in hot) return hot;
-      const reference = modelAt(record, model, spec, '1/K', path);
-      if ('code' in reference) return reference;
-      const reasons = uniq([...hot.unverifiedReasons, ...reference.unverifiedReasons]);
+      const ends = endpointsAt(record, model, temperature, spec, '1/K', path);
+      if ('code' in ends) return ends;
+      const { reasons } = ends;
       if (exact !== undefined) {
         const strain = exact.integral(spec, temperature);
         if (Number.isFinite(strain)) return { strain, unverifiedReasons: reasons };

@@ -21,7 +21,8 @@ import { orderedEntities } from '@core/commands/entity/entityOps';
 import { docWith } from '../helpers/fixtureDocument';
 import { isStringArray } from '@lib/isStringArray';
 import { roundedMetres, unitsToMm } from '@aec/shared/numeric';
-import { paperMap, readableDimensionLabel, svgPoints } from '@aec/shared/sheetFrame';
+import { paperMap } from '@aec/shared/sheetFrame';
+import { readableDimensionLabel, svgPoints } from '@core/geometry/drawingSvg';
 
 /** Unit tetrahedron wound outward as a triangle soup. */
 const SOUP_TETRA = [

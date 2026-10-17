@@ -3,8 +3,9 @@ import type { CommandResult } from '@core/commands/types';
 import { report, exportRefusal } from '@core/commands/noop';
 import { DOCUMENT_UNITS } from '@core/model/types';
 import { buildFlatDxf } from '../dxfFlat';
-import { buildFlat, isRefusal } from '../flatData';
+import { buildFlat } from '../flatData';
 import { REVIEW_NOTE, fixed, unverifiedNote } from '../result';
+import { isRefusal } from '../partLookup';
 
 /**
  * @affects none; data = { partId, filename, dxf, unit, extents, entityCount, layers[], insunits } + FtrResultMeta

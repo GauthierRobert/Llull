@@ -23,11 +23,24 @@ function nodeSetOf(ctx: DeckContext, key: string): string | null {
   return nodes.length === 0 ? null : ctx.nset(key);
 }
 
+/** Lines of every BC of `thermal`, in `bcOrder`; the first refusal wins. */
+export function allBcLines(ctx: DeckContext, thermal: ThermalSetup, volumes: ReadonlyMap<string, number>): Blocks {
+  const lines: string[] = [];
+  for (const id of thermal.bcOrder) {
+    const record = thermal.bcs[id];
+    if (record === undefined) continue;
+    const block = bcLines(ctx, thermal, record, volumes);
+    if ('code' in block) return block;
+    lines.push(...block.lines);
+  }
+  return { lines };
+}
+
 /**
  * Lines of one BC. Temperatures are written on the case scale; flux, film, generation and power in the unit system.
  * @failure target without nodes / faces in the mesh -> FEA_TARGET_UNRESOLVED (ids: the BC); total generation on a part without volume -> FEA_PART_INVALID
  */
-export function bcLines(ctx: DeckContext, thermal: ThermalSetup, record: ThermalBcRecord, volumes: ReadonlyMap<string, number>): Blocks {
+function bcLines(ctx: DeckContext, thermal: ThermalSetup, record: ThermalBcRecord, volumes: ReadonlyMap<string, number>): Blocks {
   const bc = record.bc;
   const scale = thermal.temperatureScale;
   const system = ctx.unitSystem;

@@ -15,17 +15,15 @@ import { faceMetric } from './occtFaceMetrics';
 import {
   type FaceSurfaceAdaptor,
   type Own,
-  cross,
-  dot,
   faceAdaptor,
   isReversed,
   norm,
   pointAndNormal,
-  scaled,
   surfaceParams,
   uvOfPoint,
   uvRange,
 } from './occtFaceSurface';
+import { cross3, dot3, scale3 } from '@lib/vec3';
 
 /** Normals closer than this (rad) are the same tangent plane. */
 const SMOOTH_ANGLE = 1e-6;
@@ -74,7 +72,7 @@ function edgeMidTangent(api: OccApi, shape: OccShape, own: Own): { point: Vec3; 
   curve.D1((curve.FirstParameter() + curve.LastParameter()) / 2, point, tangent);
   const direction: Vec3 = [tangent.X(), tangent.Y(), tangent.Z()];
   const length = norm(direction);
-  return length > 0 ? { point: [point.X(), point.Y(), point.Z()], tangent: scaled(direction, 1 / length) } : null;
+  return length > 0 ? { point: [point.X(), point.Y(), point.Z()], tangent: scale3(direction, 1 / length) } : null;
 }
 
 export function faceGraph(api: OccApi, shape: OccShape, own: Own): FaceGraph | null {
@@ -132,9 +130,9 @@ function convexityAt(
   });
   const [nA, nB] = normals;
   if (nA === null || nB === null || nA === undefined || nB === undefined) return 'unknown';
-  if (dot(nA, nB) > 0 && norm(cross(nA, nB)) < SMOOTH_ANGLE) return 'smooth';
-  const inward = cross(nA, scaled(mid.tangent, reversedInA ? -1 : 1));
-  const side = dot(inward, nB);
+  if (dot3(nA, nB) > 0 && norm(cross3(nA, nB)) < SMOOTH_ANGLE) return 'smooth';
+  const inward = cross3(nA, scale3(mid.tangent, reversedInA ? -1 : 1));
+  const side = dot3(inward, nB);
   if (Math.abs(side) < 1e-9) return 'unknown';
   return side < 0 ? 'convex' : 'concave';
 }

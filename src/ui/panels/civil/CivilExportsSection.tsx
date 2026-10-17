@@ -1,7 +1,7 @@
 // Local read-only LandXML (`export_landxml`) and civil DXF (`export_civil_dxf`) downloads.
 
 import React, { useState } from 'react';
-import { PAPER_SIZES, type PaperSize } from '@aec/shared/sheetFrame';
+import { PAPER_SIZES, type PaperSize } from '@core/model/sheet';
 import { PanelSection, StatusLine } from '@ui/panels/PanelParts';
 import { QueryDownloadButton } from '@ui/panels/QueryDownloadButton';
 import { OptionSelect } from '@ui/panels/OptionSelect';

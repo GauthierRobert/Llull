@@ -1,7 +1,7 @@
 /** Elevations and sections as printable SVG drawing sheets over the hidden-line projection. */
 
 import type { CadDocument, Vec2 } from '@core/model/types';
-import { DrawingPainter, svgLine } from '../../shared/drawingSvg';
+import { DrawingPainter, svgLine, n } from '@core/geometry/drawingSvg';
 import type { CommandResult } from '@core/commands/types';
 import { defineCommand, z, confirmExportControlled } from '@core/commands/schema';
 import { toMetres, toMm } from '@core/model/units';
@@ -11,17 +11,15 @@ import { escapeXml } from '@lib/escapeXml';
 import { sub2 } from '@lib/vec2';
 import { ELEVATION_DIRECTIONS, buildElevationDrawing, type ElevationDirection } from './elevationProjection';
 import {
-  PAPER_MM,
   PAPER_FIELD,
   SCALE_FIELD,
   sheetFitWarning,
-  type PaperSize,
   type Viewport,
   composeSheetSvg,
   fitScale,
-  n,
   sheetDrawingArea,
 } from '../../shared/sheetFrame';
+import { PAPER_MM, type PaperSize } from '@core/model/sheet';
 
 export interface ElevationSheet {
   readonly filename: string;

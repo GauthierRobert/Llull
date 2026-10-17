@@ -4,7 +4,7 @@ import { LINE_PATTERNS, dashArray } from '../../model/drawing';
 import { type DrawingSheet, PAPER_MM } from '../../model/sheet';
 import { escapeXml } from '../../lib/escapeXml';
 import type { Area } from './layout';
-import { n } from './svgPainter';
+import { n } from '../../geometry/drawingSvg';
 import { scaleText } from './sheetOps';
 
 const MARGIN = 10;

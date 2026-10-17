@@ -1,6 +1,7 @@
 /** Tetrahedron quality of a mesh artifact (corner nodes only; midside nodes of C3D10 do not enter). */
 
 import type { FeMeshArtifact, QualitySummary } from '@core/model/analysis';
+import { sub3 } from '@lib/vec3';
 
 type Metric = { min: number; max: number; p01: number; p99: number; outsideAcceptable: number };
 
@@ -25,7 +26,6 @@ function metric(values: readonly number[], outside: (value: number) => boolean):
 }
 
 type P = readonly [number, number, number];
-const sub = (a: P, b: P): P => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const length = (a: P): number => Math.hypot(a[0], a[1], a[2]);
 const triple = (a: P, b: P, c: P): number =>
   a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0]);
@@ -44,8 +44,8 @@ export function meshQuality(mesh: FeMeshArtifact): QualitySummary {
       const corners = [1, 2, 3, 4].map((index) => coordinates.get(element[index] ?? -1));
       const [a, b, c, d] = corners;
       if (a === undefined || b === undefined || c === undefined || d === undefined) continue;
-      const volume6 = triple(sub(b, a), sub(c, a), sub(d, a));
-      const edges = [sub(b, a), sub(c, a), sub(d, a), sub(c, b), sub(d, b), sub(d, c)].map(length);
+      const volume6 = triple(sub3(b, a), sub3(c, a), sub3(d, a));
+      const edges = [sub3(b, a), sub3(c, a), sub3(d, a), sub3(c, b), sub3(d, b), sub3(d, c)].map(length);
       const at = (vertex: number): number => {
         const incident: number[] = vertex === 0 ? [0, 1, 2] : vertex === 1 ? [0, 3, 4] : vertex === 2 ? [1, 3, 5] : [2, 4, 5];
         return incident.reduce((product, edge) => product * (edges[edge] ?? 0), 1);

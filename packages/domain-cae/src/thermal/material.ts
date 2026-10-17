@@ -7,7 +7,7 @@ import { baseEvaluatorOf, evaluatePropertyModel, resolvePropertyModel, type Prop
 import { curveOf, SOLVER_TABLE_REL_TOL, tabulateModel } from '@core/model/propertyTabulate';
 import { convertValue, isUnitFailure } from '@lib/quantity';
 import { siToSystem, siUnitOf, type ThermalKind } from '@lib/thermalUnits';
-import { problem, type Problem } from './access';
+import { problem, type Problem, type ThermalCase } from './access';
 import { amplitudeRange } from './amplitudeRange';
 import { inScale } from './quantities';
 
@@ -304,3 +304,42 @@ export function partMaterials(doc: CadDocument, analysisCase: AnalysisCase): Par
 /** Properties a case needs: k always; cp and density for a transient. */
 export const propertiesNeeded = (analysisCase: AnalysisCase): readonly ThermalProperty[] =>
   analysisCase.type === 'heat_transient' ? ['k', 'cp', 'density'] : ['k'];
+
+/** Table of `material` (id `materialId`) for `property` over the temperatures the case `found` reaches. */
+export function casePropertyTable(
+  doc: CadDocument,
+  found: ThermalCase,
+  materialId: string,
+  material: Material,
+  property: ThermalProperty,
+): PropertyTable | Problem {
+  const { analysisCase, thermal } = found;
+  return propertyTable({
+    materialName: materialId,
+    material,
+    documentUnit: doc.units,
+    property,
+    scale: thermal.temperatureScale,
+    unitSystem: analysisCase.unitSystem,
+    required: caseTemperatureRange(thermal),
+  });
+}
+
+/** Each distinct material × property table the case reads, in part order; parts without a material are skipped. */
+export function caseTables(
+  doc: CadDocument,
+  found: ThermalCase,
+): { readonly materialId: string; readonly property: ThermalProperty; readonly table: PropertyTable | Problem }[] {
+  const tables: { materialId: string; property: ThermalProperty; table: PropertyTable | Problem }[] = [];
+  const seen = new Set<string>();
+  for (const { materialId, material } of partMaterials(doc, found.analysisCase)) {
+    if (material === null) continue;
+    for (const property of propertiesNeeded(found.analysisCase)) {
+      const key = `${materialId}/${property}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      tables.push({ materialId, property, table: casePropertyTable(doc, found, materialId, material, property) });
+    }
+  }
+  return tables;
+}

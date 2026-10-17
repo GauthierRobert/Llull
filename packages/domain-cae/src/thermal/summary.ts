@@ -12,7 +12,7 @@ import { analysisLengthMetres } from '../shared/defaults';
 import { isProblem, thermalCaseOf, type ThermalCase } from './access';
 import { flowsAndBalance, nodal } from './heatBalance';
 import { physicalConstantsOf, hasRadiation } from './constants';
-import { caseTemperatureRange, partMaterials, propertiesNeeded, propertyTable } from './material';
+import { caseTables } from './material';
 import { indexMesh } from './meshGeometry';
 
 type Step = FeResultsArtifact['steps'][number];
@@ -36,30 +36,12 @@ const emptySummary = (scale: ThermalSetup['temperatureScale']): ThermalResultsSu
 
 /** Tables out of range: property tables whose tabulated span the solved field leaves (CalculiX then holds the end values). */
 function rangeExceeded(doc: CadDocument, found: ThermalCase, low: number, high: number): ThermalResultsSummary['propertyRangeExceeded'] {
-  const { analysisCase, thermal } = found;
-  const required = caseTemperatureRange(thermal);
   const out: ThermalResultsSummary['propertyRangeExceeded'][number][] = [];
-  const seen = new Set<string>();
-  for (const part of partMaterials(doc, analysisCase)) {
-    if (part.material === null) continue;
-    for (const property of propertiesNeeded(analysisCase)) {
-      const key = `${part.materialId}/${property}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const table = propertyTable({
-        materialName: part.materialId,
-        material: part.material,
-        documentUnit: doc.units,
-        property,
-        scale: thermal.temperatureScale,
-        unitSystem: analysisCase.unitSystem,
-        required,
-      });
-      if ('code' in table || table.range === null) continue;
-      const [from, to] = table.range;
-      if (low < from) out.push({ material: part.materialId, property, validRange: [from, to], reached: low });
-      if (high > to) out.push({ material: part.materialId, property, validRange: [from, to], reached: high });
-    }
+  for (const { materialId, property, table } of caseTables(doc, found)) {
+    if ('code' in table || table.range === null) continue;
+    const [from, to] = table.range;
+    if (low < from) out.push({ material: materialId, property, validRange: [from, to], reached: low });
+    if (high > to) out.push({ material: materialId, property, validRange: [from, to], reached: high });
   }
   return out;
 }

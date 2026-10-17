@@ -13,7 +13,7 @@ import { convertTo, failed, toKelvin, type Quantity } from './thermoUnits';
 import type { CadDocument } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
-import { commandError, rejection, report } from '../noop';
+import { codedRejection, report } from '../noop';
 
 const FORMULA = 'D(T) = D_spec (1 + a_sec (T - T_spec))';
 const MAX_ROWS = 200;
@@ -48,7 +48,7 @@ const basis = z.object({
 type CteSide = 'hole' | 'shaft';
 
 const refusal = (doc: CadDocument, code: string, reason: string, remediation: string, path: string, cause?: unknown): CommandResult => ({
-  ...rejection(doc, `fit_at_temperature: ${code} — ${reason}; no-op.`, commandError(code, remediation, [], [path])),
+  ...codedRejection(doc, 'fit_at_temperature', code, reason, remediation, [], [path]),
   data: { code, reason, remediation, path, ...(cause !== undefined ? { cause } : {}) },
 });
 

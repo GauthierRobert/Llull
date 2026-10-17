@@ -72,6 +72,17 @@ const validRange = z.object({
   equation: pair.optional().describe('[min, max] the source allows for the fit (⊇ data; default = data).'),
 });
 
+const provenanceDetails = {
+  locator: z.string().optional().describe('Table / page / figure in the source.'),
+  url: z.string().optional().describe('Where it was read.'),
+  accessed: z.string().optional().describe('Access date, YYYY-MM-DD.'),
+  sourceId: z.string().optional().describe('Registered source id, when one exists.'),
+};
+
+/** Required provenance of a stored model: the citation of its `what` (`data`, `parameters`), locator, url, access date, registered source. */
+export const provenanceSchema = (what: string): z.ZodObject<{ citation: z.ZodString } & typeof provenanceDetails> =>
+  z.object({ citation: z.string().describe(`Bibliographic citation of the ${what}.`), ...provenanceDetails });
+
 export const fitRecordSchema = z.object({
   method: z.enum(['linear_least_squares', 'levenberg_marquardt', 'interpolating']),
   objective: z.enum(['absolute', 'relative', 'log10']),
@@ -136,15 +147,7 @@ export const modelInputSchema = z.object({
     .describe(
       'Uncertainty: kind fitErrorVsData (fit quality, NOT a confidence bound), measurement or statistical (with coverage); relative or absolute.',
     ),
-  source: z
-    .object({
-      citation: z.string().describe('Bibliographic citation of the data.'),
-      locator: z.string().optional().describe('Table / page / figure in the source.'),
-      url: z.string().optional().describe('Where it was read.'),
-      accessed: z.string().optional().describe('Access date, YYYY-MM-DD.'),
-      sourceId: z.string().optional().describe('Registered source id, when one exists.'),
-    })
-    .describe('Provenance of the coefficients (required).'),
+  source: provenanceSchema('data').describe('Provenance of the coefficients (required).'),
   fit: z.record(z.string(), z.unknown()).optional().describe('Fit record exactly as returned by fit_property_model (never hand-written).'),
   preferred: z.literal(true).optional().describe('Mark as THE model for its property / direction / basis / condition (one per key).'),
 });

@@ -6,7 +6,9 @@
 import type { CadDocument } from '@core/model/types';
 import type { AlignmentObject } from '@core/model/civil';
 import { escapeXml } from '@lib/escapeXml';
-import { composeSheetSvg, fitScale, MARGIN, n, northArrow, PAPER_MM, sheetDrawingArea, type PaperSize } from '../../shared/sheetFrame';
+import { composeSheetSvg, fitScale, MARGIN, northArrow, sheetDrawingArea } from '../../shared/sheetFrame';
+import { n } from '@core/geometry/drawingSvg';
+import { PAPER_MM, type PaperSize } from '@core/model/sheet';
 import { toMetres, toMm } from '@core/model/units';
 import { endStation, horizontalElements } from '../alignment/alignmentGeometry';
 import { stationText, getCivil } from '../model';

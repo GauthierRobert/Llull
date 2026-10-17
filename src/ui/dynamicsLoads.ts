@@ -8,6 +8,7 @@ import { bodyMassProperties } from '@core/dynamics/simulationModel';
 import { RAD_PER_S_PER_RPM, propellerOutput } from '@core/dynamics/forceLaws';
 import type { SimulationData } from '@core/dynamics/simulationReport';
 import { toMetres } from '@core/model/units';
+import { normalize3 } from '@lib/vec3';
 
 export const LOAD_LAYERS = ['gravity', 'joints', 'drives', 'thrust'] as const;
 export type LoadLayer = (typeof LOAD_LAYERS)[number];
@@ -56,11 +57,6 @@ export const formatQuantity = (value: number, digits = 3): string => {
   if (abs >= 1e4 || abs < 1e-2) return value.toExponential(digits - 1);
   return value.toLocaleString('en-US', { maximumSignificantDigits: digits });
 };
-
-function unit(v: Vec3): Vec3 {
-  const length = Math.hypot(v[0], v[1], v[2]);
-  return length > 0 ? [v[0] / length, v[1] / length, v[2] / length] : [0, 0, 1];
-}
 
 /** Index of the last sample at or before `time` (0 when none). */
 function sampleIndex(times: readonly number[], time: number): number {
@@ -124,7 +120,7 @@ function weightItems(context: Context): LoadItem[] {
       value: `W ${formatQuantity(weight)} N`,
       detail: `${formatQuantity(props.mass)} kg · ${density}${body.fixed ? ' · fixed to ground' : ''} · ${body.entityIds.length} part(s)`,
       origin,
-      direction: g > 0 ? unit(dynamics.gravity) : [0, 0, -1],
+      direction: g > 0 ? normalize3(dynamics.gravity) : [0, 0, -1],
       magnitude: body.fixed ? 0 : weight,
     });
   }
@@ -164,7 +160,7 @@ function jointItems(context: Context): LoadItem[] {
       value: live === undefined && velocity === undefined ? joint.kind : value,
       detail: jointDetail(joint),
       origin: joint.anchor,
-      direction: unit(joint.axis),
+      direction: normalize3(joint.axis),
       magnitude: null,
     } satisfies LoadItem;
   });
@@ -184,7 +180,7 @@ function jointItems(context: Context): LoadItem[] {
       }`,
       origin: driver.anchor,
       end: driven.anchor,
-      direction: unit(driven.axis),
+      direction: normalize3(driven.axis),
       magnitude: null,
     });
   }
@@ -223,7 +219,7 @@ function motorItems(context: Context): LoadItem[] {
       value: torque === undefined ? design.value : `${formatQuantity(torque)} N·m`,
       detail: design.detail,
       origin: joint.anchor,
-      direction: unit(joint.axis),
+      direction: normalize3(joint.axis),
       magnitude: torque === undefined ? design.magnitude : Math.abs(torque),
     });
   }
@@ -257,7 +253,7 @@ function propellerItems(context: Context): LoadItem[] {
       value: thrust === null ? 'T after a run' : `T ${formatQuantity(thrust)} N`,
       detail: `Ø ${formatQuantity(propeller.diameter)} m · Ct ${formatQuantity(propeller.thrustCoefficient)} · Cp ${formatQuantity(propeller.powerCoefficient)} · ρ ${formatQuantity(propeller.airDensity)} kg/m³${live === undefined && thrust !== null ? ' · at the governed speed' : ''}`,
       origin: centreAt(context, joint.child) ?? joint.anchor,
-      direction: unit(propeller.thrustDirection),
+      direction: normalize3(propeller.thrustDirection),
       magnitude: thrust,
     });
   }

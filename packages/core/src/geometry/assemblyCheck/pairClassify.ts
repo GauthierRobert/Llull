@@ -10,6 +10,7 @@ import type { Vec3 } from '../../model/types';
 import type { GeometryKernel, ShapeDistance } from '../kernel';
 import { type AssemblyPart, type CheckTolerances } from './partTypes';
 import { makeItem } from './partValidity';
+import { scale3 } from '../../lib/vec3';
 
 type PairKind = 'hard' | 'containment' | 'touch' | 'clearance';
 
@@ -121,9 +122,7 @@ export function pairItem(pair: PairClass, ids: readonly [string, string], tolera
   const { mmPerUnit } = tolerances;
   const values: Record<string, number> = { overlapVolumeMm3: pair.volume * mmPerUnit ** 3, minDistanceMm: pair.distance * mmPerUnit };
   if (pair.kind === 'hard') values['penetrationEstimateMm'] = pair.penetration * mmPerUnit;
-  const witness = {
-    pointsMm: [pair.pointA.map((c) => c * mmPerUnit) as unknown as Vec3, pair.pointB.map((c) => c * mmPerUnit) as unknown as Vec3],
-  };
+  const witness = { pointsMm: [scale3(pair.pointA, mmPerUnit), scale3(pair.pointB, mmPerUnit)] };
   if (intent !== undefined && (pair.kind === 'hard' || pair.kind === 'containment'))
     return makeItem(
       'FPR_PAIR_ALLOWED',

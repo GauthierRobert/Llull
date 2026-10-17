@@ -4,10 +4,11 @@ import type { CommandResult } from '@core/commands/types';
 import { changed, report } from '@core/commands/noop';
 import { toDegrees } from '@lib/angle';
 import { nextId } from '@lib/id';
-import { buildFlat, isRefusal, type FlatBuild } from '../flatData';
+import { buildFlat, type FlatBuild } from '../flatData';
 import { formingNote } from '../formNotes';
 import { FLANGED_HOLE_SOURCE, HEM_SOURCE } from '../provenance';
 import { REVIEW_NOTE, fixed, unverifiedNote } from '../result';
+import { isRefusal } from '../partLookup';
 
 /** Outline vertices returned inline before `outlineTruncated` is set (AF-12). */
 const MAX_OUTLINE_POINTS = 200;

@@ -2,7 +2,7 @@
 
 import type { CadDocument } from '../../model/types';
 import type { CommandResult } from '../types';
-import { commandError, rejection } from '../noop';
+import { codedRejection } from '../noop';
 
 export const MATL_REMEDIATION: Readonly<Record<string, string>> = {
   MAT_RECORD_NOT_FOUND: 'create the material first with create_material (its name is the material id)',
@@ -38,8 +38,12 @@ export const matlRefusal = (
   path?: string,
   remediation?: string,
 ): CommandResult =>
-  rejection(
+  codedRejection(
     doc,
-    `${command}: ${code} — ${message}; no-op.`,
-    commandError(code, remediation ?? MATL_REMEDIATION[code] ?? 'see the command description', ids, path !== undefined ? [path] : []),
+    command,
+    code,
+    message,
+    remediation ?? MATL_REMEDIATION[code] ?? 'see the command description',
+    ids,
+    path !== undefined ? [path] : [],
   );

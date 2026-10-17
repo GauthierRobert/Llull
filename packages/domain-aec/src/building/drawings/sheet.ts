@@ -10,20 +10,19 @@ import { toMm } from '@core/model/units';
 import { fileSlug, getBuilding } from '../model';
 import { noop, report, exportRefusal } from '@core/commands/noop';
 import { buildPlanDrawing } from './planDrawing';
-import { DrawingPainter } from '../../shared/drawingSvg';
+import { DrawingPainter } from '@core/geometry/drawingSvg';
 import {
   composeSheetSvg,
   fitScale,
   MARGIN,
   paperMap,
   northArrow,
-  PAPER_MM,
   PAPER_FIELD,
   SCALE_FIELD,
   sheetFitWarning,
   sheetDrawingArea,
-  type PaperSize,
 } from '../../shared/sheetFrame';
+import { PAPER_MM, type PaperSize } from '@core/model/sheet';
 
 export interface PlanSheet {
   readonly filename: string;

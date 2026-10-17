@@ -6,7 +6,7 @@ import { convertTo, differenceToKelvin, failed, toKelvin, type Quantity } from '
 import type { CadDocument } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
-import { commandError, rejection, report } from '../noop';
+import { codedRejection, report } from '../noop';
 
 const quantity = z.object({
   value: z.number().describe('Value.'),
@@ -14,7 +14,7 @@ const quantity = z.object({
 });
 
 const refusal = (doc: CadDocument, code: string, reason: string, remediation: string, path: string): CommandResult => ({
-  ...rejection(doc, `thermal_stress_check: ${code} — ${reason}; no-op.`, commandError(code, remediation, [], [path])),
+  ...codedRejection(doc, 'thermal_stress_check', code, reason, remediation, [], [path]),
   data: { code, reason, remediation, path },
 });
 

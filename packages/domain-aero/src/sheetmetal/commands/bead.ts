@@ -6,10 +6,10 @@ import type { BeadForm } from '@core/model/sheetMetal';
 import { withFoldedSolid } from '../fold';
 import { beadAreaChange, beadFootprint, beadGeometry } from '../formGeometry';
 import { worldToFrame } from '../frames';
-import { formsOf, getModel, nextNodeId, ruleOfPart, withModel, withNodes, withPart } from '../graph';
+import { formsOf, nextNodeId, withModel, withNodes, withPart } from '../graph';
 import { beadFootprints, insideOutline, polygonsTouch } from '../placement';
-import { pickFlat } from '../pick';
-import { fixed, refuse } from '../result';
+import { fixed, refuser } from '../result';
+import { partContext, isRefusal, flatNear } from '../partLookup';
 
 /**
  * @affects forms a stiffening bead into one flat (arch added, trough removed in the folded solid), records a form node; the flat pattern is unchanged and lists the bead as a forming note
@@ -47,23 +47,13 @@ export const addBead = defineCommand({
       .describe("Bead towards the flat's +normal face ('up', default) or the -normal face ('down')."),
   }),
   run: (doc, params): CommandResult => {
-    const fail = (code: Parameters<typeof refuse>[2], why: string, fix: string, where: Parameters<typeof refuse>[5] = {}): CommandResult =>
-      refuse(doc, 'add_bead', code, why, fix, where);
-    const model = getModel(doc);
-    const part = model.parts[params.id];
-    if (part === undefined)
-      return fail('FTR_PART_NOT_FOUND', `no sheet-metal part "${params.id}"`, 'Create one with add_sheet_metal_base.', { paths: ['id'] });
-    const rule = ruleOfPart(model, part);
-    if (rule === undefined) return fail('FTR_RULE_NOT_FOUND', `rule "${part.rule}" is missing`, 'Recreate the rule.', { ids: [part.id] });
+    const fail = refuser(doc, 'add_bead');
+    const found = partContext(doc, params.id, fail);
+    if (isRefusal(found)) return found.refusal;
+    const { model, part, rule } = found;
     const T = rule.thickness;
-    const hit = pickFlat(part, T, params.face.near);
-    if (hit === null || hit.distance > T + 1e-6)
-      return fail(
-        'FTR_FACE_NOT_FOUND',
-        `no flat within one thickness of ${JSON.stringify(params.face.near)}`,
-        'Pick a point on a flat face of the part.',
-        { ids: [part.id], paths: ['face.near'] },
-      );
+    const hit = flatNear(part, T, params.face.near, 'face.near', fail);
+    if (isRefusal(hit)) return hit.refusal;
     const { flat } = hit;
     const local = params.path.map((point): Vec2 => {
       const [x, y] = worldToFrame(flat.frame, point);

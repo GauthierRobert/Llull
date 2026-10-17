@@ -7,6 +7,7 @@ import { GROUND, type CylinderPressure, type DynamicJoint, type DynamicsModel } 
 import type { Vec3 } from '../model/vectors';
 import { createSlider, sliderStroke, type Slider } from './slider';
 import type { Topology } from './topology';
+import { cross3, dot3, scale3, sub3 } from '../lib/vec3';
 
 export interface EngineLayout {
   readonly cylinderId: string;
@@ -36,15 +37,11 @@ export interface EngineLayout {
   readonly headDirection: Vec3;
 }
 
-const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const unit = (v: Vec3): Vec3 => {
   const length = Math.hypot(v[0], v[1], v[2]);
   return length > 0 ? [v[0] / length, v[1] / length, v[2] / length] : [0, 0, 0];
 };
-const scale = (v: Vec3, s: number): Vec3 => [v[0] * s, v[1] * s, v[2] * s];
-const metres = (v: Vec3, m: number): Vec3 => scale(v, m);
+const metres = (v: Vec3, m: number): Vec3 => scale3(v, m);
 
 const TWO_PI = 2 * Math.PI;
 
@@ -100,17 +97,17 @@ export function engineLayout(
     metres(pin.anchor, m),
     unit(piston.axis),
   ];
-  if (Math.abs(dot(cylinderAxis, axis)) > 1e-3) return { error: 'the cylinder axis must be perpendicular to the crank axis' };
-  const reach = dot(sub(wristPoint, center), cylinderAxis);
+  if (Math.abs(dot3(cylinderAxis, axis)) > 1e-3) return { error: 'the cylinder axis must be perpendicular to the crank axis' };
+  const reach = dot3(sub3(wristPoint, center), cylinderAxis);
   const headSign: 1 | -1 = reach < 0 ? -1 : 1;
-  const head = scale(cylinderAxis, headSign);
-  const normal = cross(axis, head);
-  const pinVector = sub(pinPoint, center);
-  const [pinHead, pinNormal] = [dot(pinVector, head), dot(pinVector, normal)];
+  const head = scale3(cylinderAxis, headSign);
+  const normal = cross3(axis, head);
+  const pinVector = sub3(pinPoint, center);
+  const [pinHead, pinNormal] = [dot3(pinVector, head), dot3(pinVector, normal)];
   const r = Math.hypot(pinHead, pinNormal);
-  const rodVector = sub(pinPoint, wristPoint);
-  const l = Math.hypot(dot(rodVector, head), dot(rodVector, normal));
-  const offset = dot(sub(wristPoint, center), normal);
+  const rodVector = sub3(pinPoint, wristPoint);
+  const l = Math.hypot(dot3(rodVector, head), dot3(rodVector, normal));
+  const offset = dot3(sub3(wristPoint, center), normal);
   if (r < 1e-9) return { error: 'the crank pin lies on the crank axis (crank radius 0)' };
   if (l <= r + Math.abs(offset))
     return { error: `the rod (${(l * 1000).toPrecision(5)} mm) is not longer than the crank radius plus the offset` };
