@@ -8,6 +8,7 @@ import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { type GeometryKernel, getGeometryKernel, setGeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { aerospaceStarterActions } from '@ui/actions/aerospacePlan';
+import { STARTER_FITTING, fittingLayout } from '@ui/actions/aerospaceGeometry';
 
 const catalog: unknown = JSON.parse(readFileSync('public/samples/aero-fastener-catalog.json', 'utf8'));
 
@@ -74,7 +75,7 @@ describe('aerospace starter plan', () => {
     expect(cases.map((analysis) => analysis?.type)).toEqual(['static', 'heat_steady']);
     const [structural, thermal] = cases;
     expect(Object.keys(structural?.parts ?? {})).toEqual([alias('pylonFitting')]);
-    expect(structural?.loadOrder).toHaveLength(3);
+    expect(structural?.loadOrder).toHaveLength(8);
     expect(structural?.factors.extra[0]?.value).toBe(1.15);
     const check = execute(doc, 'check_analysis', { analysisId: structural?.id });
     const codes = (check.data as { items: { code: string; severity: string }[] }).items.filter((item) => item.severity === 'error');
@@ -94,5 +95,46 @@ describe('aerospace starter plan', () => {
     const sheet = Object.values(doc.drawings?.sheets ?? {})[0];
     expect(sheet?.paper).toBe('A3');
     expect(sheet?.views.map((view) => view.direction)).toEqual(['front', 'top', 'right', 'iso']);
+  });
+
+  it('reacts the limit motor torque (stall 2.1 N·m x 1.25) through the four screw holes', () => {
+    const structural = doc.analysis?.cases[doc.analysis.caseOrder[0] ?? ''];
+    const screws = Object.values(structural?.loads ?? {}).filter((load) => load.name.startsWith('Motor torque reaction'));
+    expect(screws).toHaveLength(4);
+    for (const load of screws) {
+      const [, y = 0, z = 0] = load.target?.facesNear?.[0] ?? [];
+      const [, fy = 0, fz = 0] = load.vector ?? [];
+      // 26.25 N each, tangential to the screw circle: 4 x 26.25 N x 25 mm = 2.625 N·m.
+      expect(Math.hypot(fy, fz)).toBeCloseTo((2.1 * 1.25 * 1000) / (4 * 25), 4);
+      expect(y * fy + (z - 240) * fz).toBeCloseTo(0, 3);
+    }
+  });
+});
+
+describe('starter pylon fitting (design study, docs/aerospace/STARTER_DESIGN_STUDY.md)', () => {
+  it('meets the sizing rules: web >= 1.5 D of M4 thread engagement, every machined member and the doubler >= 3 mm', () => {
+    expect(STARTER_FITTING.web).toBeGreaterThanOrEqual(6);
+    for (const gauge of [STARTER_FITTING.flange, STARTER_FITTING.strut, STARTER_FITTING.doubler]) expect(gauge).toBeGreaterThanOrEqual(3);
+    expect(STARTER_FITTING.halfWidth).toBeGreaterThanOrEqual(2 * 4.763);
+    expect(STARTER_FITTING.webHalfWidth - (25 * Math.SQRT1_2 + 1.65)).toBeGreaterThanOrEqual(4);
+  });
+
+  it('pockets the truss so the strut keeps its sized thickness across the member', () => {
+    const layout = fittingLayout(STARTER_FITTING);
+    const [left, corner, bottom] = layout.pocket;
+    expect(corner).toEqual([layout.webBack, layout.flangeBottom]);
+    const [ax, az] = [-140, layout.flangeBottom];
+    const [cx, cz] = [layout.webBack, 195];
+    const distance = (point: readonly [number, number] | undefined): number => {
+      const [px, pz] = point ?? [0, 0];
+      return Math.abs((cx - ax) * (pz - az) - (cz - az) * (px - ax)) / Math.hypot(cx - ax, cz - az);
+    };
+    expect(distance(left)).toBeCloseTo(STARTER_FITTING.strut, 2);
+    expect(distance(bottom)).toBeCloseTo(STARTER_FITTING.strut, 2);
+  });
+
+  it('keeps the machined fitting within its 250 g budget', () => {
+    const mass = execute(doc, 'mass_properties', { entityId: alias('pylonFitting') }).data as { massG: number };
+    expect(mass.massG).toBeLessThan(250);
   });
 });

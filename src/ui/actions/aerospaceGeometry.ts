@@ -18,18 +18,81 @@ const SKIN = 1.5;
 /** Motor axis and propeller plane. */
 export const AXIS_Z = 240;
 export const PROP_X = 112;
-/** Fitting side profile, extruded across y in [-FIT_HALF_WIDTH, FIT_HALF_WIDTH]. */
-export const FIT_HALF_WIDTH = 24;
-export const FLANGE_TOP = 294;
-export const FLANGE_BOTTOM = 286;
+/** Fitting side profile (x, z), extruded across y in [-halfWidth, halfWidth]: flange (top chord) under the doubler, motor web
+ * whose front face carries the motor, diagonal strut from the web foot to the flange; the triangle between them is pocketed through. */
 const FLANGE_REAR = -250;
 export const WEB_FRONT = 52;
-const WEB_BACK = 44;
 const WEB_BOTTOM = 195;
 const STRUT_TOP_X = -140;
-/** Doubler under the lower skin, bridging the fitting access cutout. */
-const DOUBLER_MIN: readonly [number, number, number] = [-255, -40, WING_Z - 6];
-const DOUBLER_SIZE: readonly [number, number, number] = [160, 80, 6];
+
+/** The pylon fitting's sizing variables (mm). Member thicknesses are the as-machined ones: the truss pocket shares their faces. */
+export interface FittingDesign {
+  /** Half width of the truss (flange, strut); the bolt row on its centreline needs >= 2 D edge distance. */
+  readonly halfWidth: number;
+  /** Half width of the motor web plate (covers the Ø50 screw circle); wider than the truss = a separate plate unioned to it. */
+  readonly webHalfWidth: number;
+  readonly flange: number;
+  readonly web: number;
+  /** Diagonal strut, measured across the member. */
+  readonly strut: number;
+  readonly doubler: number;
+  /** Pocket corner radius (stress relief at the flange / web / strut junctions; >= cutter radius). */
+  readonly cornerRadius: number;
+}
+
+/** Sizing study result (docs/aerospace/STARTER_DESIGN_STUDY.md): the lightest fitting meeting every design rule. */
+export const STARTER_FITTING: FittingDesign = { halfWidth: 10, webHalfWidth: 26, flange: 5, web: 6, strut: 4, doubler: 3, cornerRadius: 3 };
+
+export interface FittingLayout {
+  readonly flangeTop: number;
+  readonly flangeBottom: number;
+  readonly webBack: number;
+  readonly profile: readonly Vec2[];
+  readonly pocket: readonly Vec2[];
+  /** A point on the strut's lower side edge (at y = ±halfWidth) 20 mm from the flange: where the strut joint is refined. */
+  readonly strutEdge: Vec2;
+  /** A point inside the strut 20 mm from the flange: the stress probe of the strut / flange junction. */
+  readonly strutRoot: Vec2;
+}
+
+/** Profile, truss pocket and analysis pick points of a design, all (x, z) in world mm. */
+export function fittingLayout(design: FittingDesign): FittingLayout {
+  const flangeTop = WING_Z - design.doubler;
+  const flangeBottom = flangeTop - design.flange;
+  const webBack = WEB_FRONT - design.web;
+  const [ax, az] = [STRUT_TOP_X, flangeBottom];
+  const [dx, dz] = [webBack - ax, WEB_BOTTOM - az];
+  const length = Math.hypot(dx, dz);
+  const [ux, uz] = [dx / length, dz / length];
+  // Unit normal of the strut's lower edge pointing into the strut (towards the flange / web corner): the web foot is below the flange.
+  const [nx, nz] = [-uz, ux];
+  const pocketLeft = ax + design.strut / nx;
+  const pocketBottom = flangeBottom + (design.strut - (webBack - ax) * nx) / nz;
+  const along = (distance: number, inward: number): Vec2 => [
+    round3(ax + ux * distance + nx * inward),
+    round3(az + uz * distance + nz * inward),
+  ];
+  return {
+    flangeTop,
+    flangeBottom,
+    webBack,
+    profile: [
+      [FLANGE_REAR, flangeTop],
+      [WEB_FRONT, flangeTop],
+      [WEB_FRONT, WEB_BOTTOM],
+      [webBack, WEB_BOTTOM],
+      [ax, flangeBottom],
+      [FLANGE_REAR, flangeBottom],
+    ],
+    pocket: [
+      [round3(pocketLeft), flangeBottom],
+      [webBack, flangeBottom],
+      [webBack, round3(pocketBottom)],
+    ],
+    strutEdge: along(20, 0),
+    strutRoot: along(20, design.strut / 2),
+  };
+}
 
 /** Clark Y ordinates y/c at x/c (upper and lower surfaces). */
 const CLARK_Y_UPPER: readonly Vec2[] = [
@@ -128,7 +191,7 @@ export const BOLT_X_LAST = -150;
 /** Fitting side face (normal +Y): face frame u = world x, v = -world z. */
 const sideFace = (x: number, z: number): number[] => [x, -z];
 
-function airframeActions(): PlanAction[] {
+function airframeActions(design: FittingDesign): PlanAction[] {
   return [
     {
       command: 'extrude_profile',
@@ -144,41 +207,53 @@ function airframeActions(): PlanAction[] {
     { command: 'add_box', params: { size: [136, 60, 4], position: [-246, -30, WING_Z - 1], anchor: 'min' }, as: 'accessCutout' },
     { command: 'boolean', params: { op: 'subtract', a: '$wingSkin', b: '$accessCutout' }, as: 'wing' },
     { command: 'set_entity_name', params: { id: '$wing', name: 'Wing stub (CFRP, Clark Y 400)', tags: ['airframe'] } },
-    { command: 'add_box', params: { size: [...DOUBLER_SIZE], position: [...DOUBLER_MIN], anchor: 'min', color: '#9aa4ad' }, as: 'doubler' },
+    {
+      command: 'add_box',
+      params: { size: [160, 80, design.doubler], position: [-255, -40, WING_Z - design.doubler], anchor: 'min', color: '#9aa4ad' },
+      as: 'doubler',
+    },
     { command: 'set_entity_name', params: { id: '$doubler', name: 'Pylon doubler', tags: ['airframe', 'primary-structure'] } },
   ];
 }
 
-function fittingActions(): PlanAction[] {
+function fittingActions(design: FittingDesign): PlanAction[] {
+  const layout = fittingLayout(design);
   return [
     {
       command: 'extrude_profile',
       params: {
-        profile: [
-          [FLANGE_REAR, -FLANGE_TOP],
-          [WEB_FRONT, -FLANGE_TOP],
-          [WEB_FRONT, -WEB_BOTTOM],
-          [WEB_BACK, -WEB_BOTTOM],
-          [STRUT_TOP_X, -FLANGE_BOTTOM],
-          [FLANGE_REAR, -FLANGE_BOTTOM],
-        ],
-        depth: 2 * FIT_HALF_WIDTH,
-        position: [0, -FIT_HALF_WIDTH, 0],
+        profile: layout.profile.map(([x, z]) => [x, -z]),
+        depth: 2 * design.halfWidth,
+        position: [0, -design.halfWidth, 0],
         axis: [0, 1, 0],
         color: '#b8c2cc',
       },
-      as: 'fittingBlank',
+      as: 'fittingTruss',
     },
+    ...(design.webHalfWidth > design.halfWidth
+      ? [
+          {
+            command: 'add_box',
+            params: {
+              size: [design.web, 2 * design.webHalfWidth, layout.flangeTop - WEB_BOTTOM],
+              position: [layout.webBack, -design.webHalfWidth, WEB_BOTTOM],
+              anchor: 'min',
+            },
+            as: 'fittingWebPlate',
+          },
+          { command: 'boolean', params: { op: 'union', a: '$fittingTruss', b: '$fittingWebPlate' }, as: 'fittingBlank' },
+        ]
+      : [{ command: 'set_entity_name', params: { id: '$fittingTruss', name: 'Pylon fitting blank' }, as: 'fittingBlank' }]),
     {
       command: 'add_pocket',
       params: {
         target: '$fittingBlank',
-        face: { near: [-60, FIT_HALF_WIDTH, 290] },
-        outline: { kind: 'polygon', points: [sideFace(-112, 280), sideFace(38, 280), sideFace(38, 206)] },
+        face: { near: [FLANGE_REAR + 20, design.halfWidth, (layout.flangeTop + layout.flangeBottom) / 2] },
+        outline: { kind: 'polygon', points: layout.pocket.map(([x, z]) => sideFace(x, z)) },
         through: true,
-        cornerRadius: 3,
+        cornerRadius: design.cornerRadius,
         floorFillet: 0,
-        toolDiameter: 6,
+        toolDiameter: 2 * design.cornerRadius,
       },
       as: 'fittingPocketed',
     },
@@ -322,6 +397,6 @@ function systemsActions(): PlanAction[] {
 }
 
 /** Aliases bound: wing, doubler, fitting, stator, bell, propeller, spinner, escBracket, esc. */
-export function aerospaceGeometryActions(): PlanAction[] {
-  return [...airframeActions(), ...fittingActions(), ...propulsionActions(), ...systemsActions()];
+export function aerospaceGeometryActions(design: FittingDesign): PlanAction[] {
+  return [...airframeActions(design), ...fittingActions(design), ...propulsionActions(), ...systemsActions()];
 }

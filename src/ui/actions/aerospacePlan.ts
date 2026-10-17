@@ -7,13 +7,14 @@ import {
   AXIS_Z,
   BOLT_X_FIRST,
   BOLT_X_LAST,
-  FIT_HALF_WIDTH,
-  FLANGE_BOTTOM,
-  FLANGE_TOP,
+  STARTER_FITTING,
   PROP_DIAMETER,
   PROP_X,
   WEB_FRONT,
   aerospaceGeometryActions,
+  fittingLayout,
+  type FittingDesign,
+  type FittingLayout,
   type PlanAction,
 } from '@ui/actions/aerospaceGeometry';
 
@@ -129,7 +130,7 @@ function materialActions(): PlanAction[] {
 }
 
 /** One row of four NAS6203-3 bolts on the fitting centreline (heads below the flange, MS21042L3 nuts in the wing cutout). */
-function fastenerActions(): PlanAction[] {
+function fastenerActions(design: FittingDesign, layout: FittingLayout): PlanAction[] {
   return [
     {
       command: 'insert_fastener_row',
@@ -140,10 +141,10 @@ function fastenerActions(): PlanAction[] {
         washer: 'NAS1149',
         axis: [0, 0, 1],
         stackIds: ['$fitting', '$doubler'],
-        from: [BOLT_X_FIRST, 0, FLANGE_BOTTOM],
-        to: [BOLT_X_LAST, 0, FLANGE_BOTTOM],
+        from: [BOLT_X_FIRST, 0, layout.flangeBottom],
+        to: [BOLT_X_LAST, 0, layout.flangeBottom],
         count: 4,
-        edgeDistance: { value: 12, unit: 'mm' },
+        edgeDistance: { value: design.halfWidth, unit: 'mm' },
         minEdgeDistance: { value: 9.5, unit: 'mm' },
         minPitch: { value: 19, unit: 'mm' },
         holeMode: 'cut_close_tolerance',
@@ -239,16 +240,53 @@ function dynamicsActions(): PlanAction[] {
   ];
 }
 
-const WEB_FACE = [WEB_FRONT, 22, 285];
-const FLANGE_TOP_FACE = [-195, 15, FLANGE_TOP];
-/** A point on the diagonal strut's side edge (y = +FIT_HALF_WIDTH), near where it meets the flange. */
-const STRUT_EDGE_NEAR = [-120, FIT_HALF_WIDTH, 276.1];
+/** Face pick points: the motor face of the web, the flange top (bonded to the doubler); off the y = 0 seam of the bored web. */
+const webFace = (design: FittingDesign): number[] => [WEB_FRONT, Math.max(design.halfWidth, design.webHalfWidth) - 2, AXIS_Z + 35];
+const flangeTopFace = (layout: FittingLayout): number[] => [-195, 15, layout.flangeTop];
 
-function structuralActions(): PlanAction[] {
+/** Motor screws: tapped M4 on a 50 mm circle at 45° + k·90°, bore radius of the tap drill. */
+const SCREW_CIRCLE_RADIUS = 25;
+const SCREW_HOLE_RADIUS = 1.65;
+const SCREW_ANGLES_DEG = [45, 135, 225, 315];
+
+function structuralActions(design: FittingDesign, layout: FittingLayout): PlanAction[] {
+  const webFacePoint = webFace(design);
+  const [strutX, strutZ] = layout.strutEdge;
+  // Limit torque reaction (stall 2.1 N·m x 1.25) shared by the four screws as tangential forces on their tapped hole walls.
+  const screwTorque = SCREW_ANGLES_DEG.map((deg, index): PlanAction => {
+    const angle = (deg * Math.PI) / 180;
+    const radial = SCREW_CIRCLE_RADIUS + SCREW_HOLE_RADIUS;
+    return {
+      command: 'add_fea_load',
+      params: {
+        analysisId: '$staticCase',
+        name: `Motor torque reaction, screw ${index + 1}`,
+        kind: 'force',
+        loadCase: 'LC1_thrust_10g',
+        category: 'limit',
+        target: {
+          entityId: '$pylonFitting',
+          facesNear: [
+            [
+              WEB_FRONT - design.web / 2,
+              Math.round(radial * Math.cos(angle) * 1000) / 1000,
+              Math.round((AXIS_Z + radial * Math.sin(angle)) * 1000) / 1000,
+            ],
+          ],
+        },
+        vector: [
+          0,
+          `=-torque_screw_N * ${Math.round(Math.sin(angle) * 1e6) / 1e6}`,
+          `=torque_screw_N * ${Math.round(Math.cos(angle) * 1e6) / 1e6}`,
+        ],
+      },
+    };
+  });
   return [
     { command: 'set_parameter', params: { name: 'thrust_limit_N', expression: '60' } },
     { command: 'set_parameter', params: { name: 'inertia_limit_N', expression: '64' } },
     { command: 'set_parameter', params: { name: 'emergency_ultimate_N', expression: '58' } },
+    { command: 'set_parameter', params: { name: 'torque_screw_N', expression: `2.1 * 1.25 * 1000 / (4 * ${SCREW_CIRCLE_RADIUS})` } },
     {
       command: 'create_analysis',
       params: {
@@ -269,7 +307,7 @@ function structuralActions(): PlanAction[] {
         analysisId: '$staticCase',
         name: 'Flange bonded to doubler',
         kind: 'fixed',
-        target: { entityId: '$pylonFitting', facesNear: [FLANGE_TOP_FACE] },
+        target: { entityId: '$pylonFitting', facesNear: [flangeTopFace(layout)] },
       },
     },
     {
@@ -280,7 +318,7 @@ function structuralActions(): PlanAction[] {
         kind: 'force',
         loadCase: 'LC1_thrust_10g',
         category: 'limit',
-        target: { entityId: '$pylonFitting', facesNear: [WEB_FACE] },
+        target: { entityId: '$pylonFitting', facesNear: [webFacePoint] },
         vector: ['=thrust_limit_N', 0, 0],
       },
     },
@@ -292,10 +330,11 @@ function structuralActions(): PlanAction[] {
         kind: 'force',
         loadCase: 'LC1_thrust_10g',
         category: 'limit',
-        target: { entityId: '$pylonFitting', facesNear: [WEB_FACE] },
+        target: { entityId: '$pylonFitting', facesNear: [webFacePoint] },
         vector: [0, 0, '=-inertia_limit_N'],
       },
     },
+    ...screwTorque,
     {
       command: 'add_fea_load',
       params: {
@@ -304,8 +343,20 @@ function structuralActions(): PlanAction[] {
         kind: 'force',
         loadCase: 'LC2_emergency_9g',
         category: 'ultimate',
-        target: { entityId: '$pylonFitting', facesNear: [WEB_FACE] },
+        target: { entityId: '$pylonFitting', facesNear: [webFacePoint] },
         vector: ['=-emergency_ultimate_N', 0, 0],
+      },
+    },
+    {
+      command: 'add_fea_load',
+      params: {
+        analysisId: '$staticCase',
+        name: 'Stiffness probe: 100 N down on the motor face',
+        kind: 'force',
+        loadCase: 'LC3_stiffness',
+        category: 'limit',
+        target: { entityId: '$pylonFitting', facesNear: [webFacePoint] },
+        vector: [0, 0, -100],
       },
     },
     {
@@ -317,7 +368,13 @@ function structuralActions(): PlanAction[] {
         minSize: 0.8,
         refinements: [
           {
-            target: { entityId: '$pylonFitting', edgesNear: [STRUT_EDGE_NEAR, [STRUT_EDGE_NEAR[0], -FIT_HALF_WIDTH, STRUT_EDGE_NEAR[2]]] },
+            target: {
+              entityId: '$pylonFitting',
+              edgesNear: [
+                [strutX, design.halfWidth, strutZ],
+                [strutX, -design.halfWidth, strutZ],
+              ],
+            },
             size: 2.5,
           },
         ],
@@ -325,11 +382,20 @@ function structuralActions(): PlanAction[] {
     },
     {
       command: 'add_result_probe',
-      params: { analysisId: '$staticCase', name: 'Strut root (flange junction)', point: [-130, 0, 284], quantity: 'von_mises' },
+      params: {
+        analysisId: '$staticCase',
+        name: 'Strut root (flange junction)',
+        point: [layout.strutRoot[0], 0, layout.strutRoot[1]],
+        quantity: 'von_mises',
+      },
     },
     {
       command: 'add_result_probe',
       params: { analysisId: '$staticCase', name: 'Motor face deflection', point: [WEB_FRONT, 0, AXIS_Z - 20], quantity: 'u_mag' },
+    },
+    {
+      command: 'add_result_probe',
+      params: { analysisId: '$staticCase', name: 'Motor face vertical deflection', point: [WEB_FRONT, 0, AXIS_Z - 15], quantity: 'u_z' },
     },
   ];
 }
@@ -339,7 +405,8 @@ const FILM_SOURCE = {
   locator: 'Incropera, Fundamentals of Heat and Mass Transfer, 7th ed., Eq. 7.30 (order of magnitude)',
 };
 
-function thermalActions(): PlanAction[] {
+function thermalActions(design: FittingDesign, layout: FittingLayout): PlanAction[] {
+  const flangeMid = (layout.flangeTop + layout.flangeBottom) / 2;
   return [
     { command: 'create_analysis', params: { name: 'Motor heat soak (hot-day climb)', analysisType: 'heat_steady' }, as: 'thermalCase' },
     { command: 'set_part_idealization', params: { analysisId: '$thermalCase', entityId: '$pylonFitting' } },
@@ -352,7 +419,7 @@ function thermalActions(): PlanAction[] {
         kind: 'surface_flux',
         value: 2500,
         unit: 'W/m^2',
-        target: { entityId: '$pylonFitting', facesNear: [WEB_FACE] },
+        target: { entityId: '$pylonFitting', facesNear: [webFace(design)] },
         source: { citation: 'Owner estimate: about 14 W of the 1.1 kW motor loss (87 % efficiency) conducted into the mount' },
       },
     },
@@ -364,7 +431,7 @@ function thermalActions(): PlanAction[] {
         kind: 'temperature',
         value: 45,
         unit: 'degC',
-        target: { entityId: '$pylonFitting', facesNear: [FLANGE_TOP_FACE] },
+        target: { entityId: '$pylonFitting', facesNear: [flangeTopFace(layout)] },
       },
     },
     {
@@ -378,8 +445,8 @@ function thermalActions(): PlanAction[] {
         target: {
           entityId: '$pylonFitting',
           facesNear: [
-            [-200, FIT_HALF_WIDTH, (FLANGE_TOP + FLANGE_BOTTOM) / 2],
-            [-200, -FIT_HALF_WIDTH, (FLANGE_TOP + FLANGE_BOTTOM) / 2],
+            [-200, design.halfWidth, flangeMid],
+            [-200, -design.halfWidth, flangeMid],
           ],
         },
         source: FILM_SOURCE,
@@ -407,7 +474,7 @@ function documentationActions(): PlanAction[] {
   return [
     {
       command: 'set_project_info',
-      params: { name: 'UAV propulsion pod', client: 'Sample project', author: 'llull', drawingNumber: 'UAV-PP-101', revision: 'A' },
+      params: { name: 'UAV propulsion pod', client: 'Sample project', author: 'llull', drawingNumber: 'UAV-PP-101', revision: 'B' },
     },
     {
       command: 'create_sheet',
@@ -416,7 +483,7 @@ function documentationActions(): PlanAction[] {
         paper: 'A3',
         title: 'PYLON FITTING - MOTOR MOUNT',
         partNumber: 'UAV-PP-101',
-        revision: 'A',
+        revision: 'B',
         drawnBy: 'llull',
         date: '2026-10-17',
         projectionAngle: 'first',
@@ -429,17 +496,18 @@ function documentationActions(): PlanAction[] {
 }
 
 /** Ids are those minted on an empty document; `catalog` is the sample fastener catalogue file object. */
-export function aerospaceStarterActions(catalog: unknown): PlanAction[] {
+export function aerospaceStarterActions(catalog: unknown, design: FittingDesign = STARTER_FITTING): PlanAction[] {
+  const layout = fittingLayout(design);
   return [
     { command: 'set_units', params: { units: 'mm' } },
     { command: 'import_fastener_catalog', params: { catalog } },
-    ...aerospaceGeometryActions(),
-    ...fastenerActions(),
+    ...aerospaceGeometryActions(design),
+    ...fastenerActions(design, layout),
     ...materialActions(),
     ...layerActions(),
     ...dynamicsActions(),
-    ...structuralActions(),
-    ...thermalActions(),
+    ...structuralActions(design, layout),
+    ...thermalActions(design, layout),
     ...documentationActions(),
     { command: 'fit_view', params: { direction: 'iso' } },
     // Front-left, just below the wing: the pod, propeller disc and fitting face the engineer.
