@@ -700,3 +700,21 @@ and modelled threads (VC-FTR-36) are V2 / M8.
 method, exact or mesh, is reported); `up_to_face` onto the face where the material ends overshoots by 2ε; a native BRepFeat attempt that
 degrades the OCC module disables native features for the process and is retried after the kernel epoch bump instead of lowering on the
 degraded module; `set_sheet_metal_material` refuses prototype-key names.
+
+**Round 3 (2026-10-17, lane K): every validation case run and recorded.** `validation/RESULTS.json` / `RESULTS.md` hold one record per
+VC of `validation/README.md` (status, expected vs measured, the tests that run it); `tests/unit/contract/aeroValidationMatrix.test.ts`
+fails when a case has no record, a listed test file is missing or does not name the case, or a blocked case has no reason. 45 of 47
+cases pass; VC-FTR-33 (OCP `BRepFeat_MakeLinearForm` cross-check; the analytic and closed-form rib checks pass) and VC-FTR-36 (modelled
+threads, pack row TBD) are in progress by lane J. `expected_results.json` is now replayed through the real CLI entry
+(`server/tests/packReplay07.test.ts`, `runCli --json`), including the CLI-phrased VC-FTR-44 / 45 / 46 (the last in
+`server/tests/quality/ftrRecognition.gate.ts`); the four `plans/*.json` run through `build_project` (pocket outline as `rectangle` +
+`cornerRadius`). `build_expected_results.py` was brought in line with the built commands (JG-01..03 and JG-04 plans, pocket params,
+`<first:PATH>`, `error.code` paths) and regenerated.
+
+Found and fixed while proving the cases: `llull run --validate` did not type-check literal params (a plan with `thickness: "abc"` was
+"valid"; now `step 0 (sheet_metal_calc): invalid params — thickness: …`, VC-FTR-45); `export_code` after `set_thread` replaced the
+holed solid by a triangle mesh and lost the thread comment (VC-FTR-28; kernel results edited in place are lowered from their recipe
+again); a command's own refusal (`error` set, no `rejected`: `insert_fastener_row` FAST_PITCH, `decode_part_number`) exited 0 in the CLI
+(now exit 1, as VC-MAT-24 requires). Tests tightened: VC-FTR-08 (refold = re-derivation), 13 (flat cut Ø 34.705133, physical Ø 47.2),
+19 (joggle offset), 28 (save / load, code comment), 29 (regeneration after editing the catalogue step), 30, 34 (datum coordinates), 35
+(command level, 1e-9).

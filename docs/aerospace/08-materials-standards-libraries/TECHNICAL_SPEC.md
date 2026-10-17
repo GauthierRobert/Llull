@@ -613,3 +613,17 @@ non-A/B basis shared by every input (e.g. all S) instead of `mixed`; `sheetBasis
 the locality they were created with; more proxy headers mark a caller as relayed; embedded libraries and inline records may not carry
 `licensed-no-redistribution` values (`MAT_LICENCE_EMBED_FORBIDDEN`); seed fastener allowables take the dataset basis and otherwise
 `supplier_unstated` (unverified), never an assumed S basis.
+
+**Round 3 (2026-10-17, lane K): every validation case run and recorded.** `validation/RESULTS.json` / `RESULTS.md` hold one record per
+VC of `validation/README.md`; `tests/unit/contract/aeroValidationMatrix.test.ts` checks them (a case without a record, a listed test
+file that is missing or does not name the case, a blocked case without a reason all fail). 24 of 26 cases pass. Blocked, with the
+cause: VC-MAT-18 (seven lock sources unpinned and no MIL-HDBK-5J values: the primary PDF is out of reach of the authoring network; the
+mechanism checks pass) and VC-MAT-21 (capacity values are TBD in the pack until verified Fsu / Fbru allowables exist; basis propagation
+passes). `server/tests/packReplay08.test.ts` runs the CLI-phrased cases through `runCli --json`: VC-MAT-22 (three densities), VC-MAT-24
+(nine wrong inputs, exit 1), VC-MAT-26, VC-MAT-15 / 25 (a) the CLI agent and (b) the cloud `/mcp` path, and the plans on the exact
+kernel: `mass_7075_block_current` (140.5 g), `mass_ti_cylinder` (69.56719 g, both supplier densities), `fastener_stack_nas6203`
+(plate volumes at 1e-6, one insert step, instances x1, undo / redo deep-equal, replay id-stable) and VC-MAT-04 d (137.9083 g, exact
+1e-6 / mesh 5e-3). Plans: `fastener_catalog_llull.json` is the sample catalogue in `llull-fastener-catalog` format. Tightened:
+VC-MAT-01 (v2 file load, v3 re-save), VC-MAT-09 (dimensions to the pack's 5 decimals), VC-MAT-17 (the pack's 1 s, no x3 allowance).
+Fixed on the way: a command's own refusal (`error` without `rejected`) now exits 1 in the CLI (`insert_fastener_row` FAST_PITCH,
+`decode_part_number` FAST_PART_NUMBER_UNKNOWN, VC-MAT-24).
