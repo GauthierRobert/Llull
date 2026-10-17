@@ -28,7 +28,8 @@ export const sheetMetalDocument: DocumentExtension = {
         const rule = model.rules[part.rule];
         const folded = rule === undefined ? null : foldPart(part, rule);
         if (folded === null) continue;
-        entities[part.id] = { ...folded, layerId };
+        const partLayer = part.layerId !== undefined && layers[part.layerId] !== undefined ? part.layerId : layerId;
+        entities[part.id] = { ...folded, layerId: partLayer, ...(part.materialId === undefined ? {} : { materialId: part.materialId }) };
         if (!order.includes(part.id)) order.push(part.id);
       }
     } catch {
@@ -52,7 +53,7 @@ export const sheetMetalDerivationGuard: DerivationGuard = {
     if (edited.length === 0) return null;
     return (
       `it would edit the folded solid of sheet-metal part(s) ${edited.join(', ')}. ` +
-      'Edit the part instead (add_flange, add_joggle, add_sheet_cutout, add_relief) — derived geometry is read-only.'
+      'Edit the part instead (add_flange, add_joggle, add_sheet_cutout, add_relief; set_sheet_metal_material for its material and layer) — derived geometry is read-only.'
     );
   },
 };

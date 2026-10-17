@@ -113,6 +113,10 @@ export interface SheetMetalPart {
   readonly order: readonly string[];
   /** Set for parts built by `convert_to_sheet_metal`: the exact solid they describe (no derived folded solid). */
   readonly sourceEntity?: string;
+  /** Material of the derived folded solid (set by `set_sheet_metal_material`; re-applied on every derivation and load). */
+  readonly materialId?: string;
+  /** Layer of the derived folded solid; the default layer when absent or deleted. */
+  readonly layerId?: string;
 }
 
 export interface BendRadiusRow {

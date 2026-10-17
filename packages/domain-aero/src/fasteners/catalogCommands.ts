@@ -33,7 +33,7 @@ function issueResult(doc: Parameters<typeof refuse>[0], issues: readonly Catalog
 /**
  * @affects fasteners.catalogs (one entry per family in the file)
  * @invariant re-importing identical families changes nothing; a different family under an existing id needs replace:true
- * @failure bad structure / grammar -> FAST_CATALOG_INVALID; bad unit -> MAT_UNIT_*; value without citation -> MAT_PROVENANCE_MISSING; clash -> FAST_CATALOG_CONFLICT
+ * @failure bad structure / grammar -> FAST_CATALOG_INVALID; bad unit -> MAT_UNIT_*; value without citation -> MAT_PROVENANCE_MISSING; licensed-no-redistribution family -> FAST_LICENCE_EMBED_FORBIDDEN; clash -> FAST_CATALOG_CONFLICT
  */
 export const importFastenerCatalog = defineCommand({
   name: 'import_fastener_catalog',
@@ -42,7 +42,7 @@ export const importFastenerCatalog = defineCommand({
     'The file is { format: "llull-fastener-catalog", schemaVersion: 1, families: [...] }; each family has id, kind, standard, a part-number grammar ' +
     '(literal / code table / int fields; an int field named diameterDash selects the size), sizes (dash, nominalDiameter, thread, dims such as headDiameter, ' +
     'height, thickness with options), grip / length rules, licence and provenance. Every dimension needs provenance.citation or sourceId and a parsable ' +
-    'length unit. Nothing is bundled: the user supplies the dimensions (licence flags travel with the family). Next: list_fastener_families, select_fastener.',
+    'length unit. Nothing is bundled: the user supplies the dimensions (licence flags travel with the family; licensed-no-redistribution families are refused: FAST_LICENCE_EMBED_FORBIDDEN). Next: list_fastener_families, select_fastener.',
   params: z.object({
     catalog: z
       .record(z.string(), z.unknown())
@@ -68,6 +68,16 @@ export const importFastenerCatalog = defineCommand({
       else issues.push(...checked.issues);
     });
     if (issues.length > 0) return issueResult(doc, issues);
+    const licensed = families.filter((family) => family.licence === 'licensed-no-redistribution').map((family) => family.id);
+    if (licensed.length > 0)
+      return refuse(
+        doc,
+        'import_fastener_catalog',
+        'FAST_LICENCE_EMBED_FORBIDDEN',
+        `famil${licensed.length === 1 ? 'y' : 'ies'} [${licensed.join(', ')}] licensed-no-redistribution cannot be embedded in a document`,
+        licensed,
+        licensed.map((id) => `catalog.families.${id}.licence`),
+      );
     const existing = fastenerModel(doc).catalogs;
     const clashes = families
       .filter((family) => Object.hasOwn(existing, family.id) && !sameJson(existing[family.id], family))

@@ -147,8 +147,9 @@ export function foldPart(part: SheetMetalPart, rule: SheetMetalRule): MeshSolidE
 export function withFoldedSolid(doc: CadDocument, part: SheetMetalPart, rule: SheetMetalRule): CadDocument {
   const entity = foldPart(part, rule);
   if (entity === null) return doc;
-  const layerId = doc.layers[DEFAULT_LAYER_ID] !== undefined ? DEFAULT_LAYER_ID : (doc.layerOrder[0] ?? DEFAULT_LAYER_ID);
-  const placed = { ...entity, layerId };
+  const fallbackLayer = doc.layers[DEFAULT_LAYER_ID] !== undefined ? DEFAULT_LAYER_ID : (doc.layerOrder[0] ?? DEFAULT_LAYER_ID);
+  const layerId = part.layerId !== undefined && doc.layers[part.layerId] !== undefined ? part.layerId : fallbackLayer;
+  const placed = { ...entity, layerId, ...(part.materialId === undefined ? {} : { materialId: part.materialId }) };
   return {
     ...doc,
     entities: { ...doc.entities, [part.id]: placed },

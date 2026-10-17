@@ -104,6 +104,8 @@ function partErrors(key: string, part: unknown, rules: Record<string, unknown>):
   const errors: string[] = [];
   if (typeof part['rule'] !== 'string' || rules[part['rule']] === undefined) errors.push(`${path}.rule must name an existing rule`);
   if (part['side'] !== 'up' && part['side'] !== 'down' && part['side'] !== 'mid') errors.push(`${path}.side must be up|down|mid`);
+  for (const key of ['materialId', 'layerId'])
+    if (part[key] !== undefined && typeof part[key] !== 'string') errors.push(`${path}.${key} must be a string`);
   const rootNode = typeof part['root'] === 'string' ? nodes[part['root']] : undefined;
   if (!isRecord(rootNode) || rootNode['type'] !== 'flat') errors.push(`${path}.root must be a flat`);
   for (const [id, node] of Object.entries(nodes)) {

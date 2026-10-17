@@ -3,8 +3,9 @@
 import { type CadDocument, type Vec2, type Vec3, is3D } from '../../model/types';
 import type { FtrResultMeta, FtrUnverifiedInput, Named } from '../../model/manufacturing';
 import type { HoleKind } from '../../model/features';
-import type { MachinedHole } from '../../geometry/featureInstances';
+import { type MachinedHole, authoredFeatures } from '../../geometry/featureInstances';
 import { drillTipHeight } from '../../lib/holeMath';
+import { recipeOf } from '../../geometry/shapeRecipe';
 import { worldToFrame } from '../../geometry/featureFrame';
 import { dot3 } from '../../lib/vec3';
 import type { CommandResult } from '../types';
@@ -71,7 +72,7 @@ function faceDatum(positions: readonly number[], indices: readonly number[], hol
  * @affects nothing — read-only
  * @invariant data = HoleTableData; rows sorted by face normal, then y, then x (rounded to 1e-6); a drill point that add_hole defaulted is named
  *   { value: 118, defaulted: true, source: 'R8' } and flagged unverified (AF-31)
- * @failure missing / non-solid entity (FTR_PART_NOT_FOUND) -> rejected no-op; a part with no holes -> empty rows
+ * @failure missing / non-solid entity (FTR_PART_NOT_FOUND) -> rejected no-op; no kernel and no authored holes (FTR_NEEDS_EXACT_KERNEL); a part with no holes -> empty rows
  */
 export const holeTable = defineCommand({
   name: 'hole_table',
@@ -81,7 +82,7 @@ export const holeTable = defineCommand({
     'top-left corner of its face (x along the face, y downwards, document length units), kind (simple, counterbore, countersink), ' +
     'diameter, countersink diameter / included angle in degrees / depth, counterbore diameter / depth, blind depth or through, drill point ' +
     'angle with its source (a drill point that was not given is reported as defaulted, 118 degrees, source R8) and tip height, and the ' +
-    'cosmetic thread. Holes come from add_hole, or are recognised from the B-rep of an imported solid when the kernel is exact. Rows are ' +
+    'cosmetic thread. Holes come from add_hole, or are recognised from the B-rep of an imported solid when the kernel is exact (without a kernel only authored holes are listed, otherwise FTR_NEEDS_EXACT_KERNEL). Rows are ' +
     'sorted by face, then y, then x. Pass origin to measure from another datum of the face frame. Lengths in the document length unit, ' +
     'angles in degrees. The table is returned in data = { origin, rows } plus the unit, provenance and reviewRequired (computed by llull, not approved).',
   params: z.object({
@@ -103,7 +104,18 @@ export const holeTable = defineCommand({
         ['id'],
       );
     const kernel = (ctx ?? currentContext()).kernel;
-    const part = kernel === null ? { holes: [], source: 'none' as const } : machinedPart(kernel, operandRecipe(kernel, entity));
+    const authored = kernel === null ? authoredFeatures(recipeOf(entity)) : null;
+    if (authored !== null && authored.holes.length + authored.pockets.length === 0)
+      return refuse(
+        doc,
+        'hole_table',
+        'FTR_NEEDS_EXACT_KERNEL',
+        'no kernel is available and the part has no authored holes, so its holes cannot be recognised',
+        'rerun with --kernel occt; for imported parts use import_step_exact',
+        [id],
+      );
+    const part =
+      kernel === null ? { holes: authored?.holes ?? [], source: 'authored' as const } : machinedPart(kernel, operandRecipe(kernel, entity));
     const mesh = entity.kind === 'mesh' ? entity.mesh : null;
     const datums = new Map<string, Vec2>();
     const datumOf = (hole: MachinedHole): Vec2 => {

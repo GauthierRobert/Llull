@@ -132,8 +132,18 @@ describe('hole_table', () => {
     const missing = execute(doc, 'hole_table', { id: 'nope' });
     expectNoOp(missing, doc);
     expect(missing.error?.code).toBe('FTR_PART_NOT_FOUND');
-    const noKernel = execute(doc, 'hole_table', { id }, ctxWith(null));
-    expect(dataOf<HoleTableData>(noKernel).rows).toEqual([]);
+  });
+
+  it('without a kernel: authored holes are still listed, a part that needs recognition is refused (FTR_NEEDS_EXACT_KERNEL)', () => {
+    const { doc, id } = plate();
+    const refused = execute(doc, 'hole_table', { id }, ctxWith(null));
+    expectNoOp(refused, doc);
+    expect(refused.error?.code).toBe('FTR_NEEDS_EXACT_KERNEL');
+    expect(refused.error?.ids).toEqual([id]);
+    const authored = machined();
+    const listed = execute(authored.doc, 'hole_table', { id: authored.id }, ctxWith(null));
+    expect(listed.error).toBeUndefined();
+    expect(dataOf<HoleTableData>(listed).rows).toHaveLength(3);
   });
 });
 

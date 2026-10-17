@@ -86,6 +86,39 @@ describe('import_fastener_catalog', () => {
     expect(result.error?.remediation).not.toBe('');
   });
 
+  it.each([
+    ['a zero grip increment', 'gripIncrement', 0],
+    ['a negative grip increment', 'gripIncrement', -0.0625],
+    ['a zero length step', 'lengthRule', 0],
+    ['a negative length step', 'lengthRule', -0.0625],
+  ])('refuses %s as FAST_CATALOG_INVALID', (_what, field, value) => {
+    const file = sampleCatalogFile();
+    const families = file['families'] as Array<Record<string, unknown>>;
+    const pick = (f: Record<string, unknown>): boolean =>
+      field === 'lengthRule'
+        ? (f['lengthRule'] as { kind?: string } | undefined)?.kind === 'stack_plus_k_d'
+        : f['gripIncrement'] !== undefined;
+    const family = structuredClone(families.find(pick)) as Record<string, unknown>;
+    const holder = field === 'lengthRule' ? (family['lengthRule'] as Record<string, unknown>)['step'] : family['gripIncrement'];
+    (holder as Record<string, unknown>)['value'] = value;
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'import_fastener_catalog', { catalog: { ...file, families: [family] } });
+    expect(result.document).toBe(doc);
+    expect(result.error?.code).toBe('FAST_CATALOG_INVALID');
+  });
+
+  it('refuses a licensed-no-redistribution family embedded in the document', () => {
+    const file = sampleCatalogFile();
+    const family = { ...(file['families'] as Array<Record<string, unknown>>)[0], licence: 'licensed-no-redistribution' };
+    const doc = createEmptyDocument();
+    const result = execute(doc, 'import_fastener_catalog', { catalog: { ...file, families: [family] } });
+    expect(result.document).toBe(doc);
+    expect(result.affected).toEqual([]);
+    expect(result.error?.code).toBe('FAST_LICENCE_EMBED_FORBIDDEN');
+    expect(result.error?.ids).toEqual(['NAS6203-6220']);
+    expect(result.error?.remediation).toContain('private library');
+  });
+
   it('VC-MAT-20: a synthetic metric family imports and works without a code change', () => {
     const doc = docWith(acmeCatalogFile());
     const decoded = dataOf(execute(doc, 'decode_part_number', { partNumber: 'AC100-M6x12' }))['matches'] as Array<Record<string, unknown>>;

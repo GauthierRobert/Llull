@@ -25,6 +25,7 @@ const provenanceSchema = z.object({
   note: z.string().optional(),
 });
 const quantitySchema = z.object({ value: z.number().finite(), unit: z.string() });
+const positiveQuantitySchema = z.object({ value: z.number().finite().positive(), unit: z.string() });
 const dimensionSchema = z.object({
   min: z.number().finite().optional(),
   max: z.number().finite().optional(),
@@ -60,12 +61,17 @@ const familySchema = z.object({
   kind: z.enum(['bolt', 'hi_lok_pin', 'solid_rivet', 'blind_rivet', 'lockbolt', 'nut', 'washer', 'collar', 'insert']),
   standard: z.object({ body: z.string().min(1), id: z.string().min(1), revision: z.string().optional() }),
   partNumber: z.array(fieldSchema).min(1),
-  gripIncrement: quantitySchema.optional(),
+  gripIncrement: positiveQuantitySchema.optional(),
   gripMode: z.enum(['min_grip_ge_stack', 'max_grip_range']).optional(),
   lengthRule: z
     .discriminatedUnion('kind', [
       z.object({ kind: z.literal('grip_plus_thread') }),
-      z.object({ kind: z.literal('stack_plus_k_d'), k: z.number().positive(), round: z.enum(['up', 'nearest']), step: quantitySchema }),
+      z.object({
+        kind: z.literal('stack_plus_k_d'),
+        k: z.number().positive(),
+        round: z.enum(['up', 'nearest']),
+        step: positiveQuantitySchema,
+      }),
     ])
     .optional(),
   sizes: z.array(sizeSchema).min(1),

@@ -30,6 +30,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   FAST_ROW_INVALID: 'Give from and to as different points and either pitch or count (count >= 1).',
   FAST_CATALOG_INVALID: 'Fix the catalogue file at the listed paths (format llull-fastener-catalog, schemaVersion 1).',
   FAST_CATALOG_CONFLICT: 'Pass replace: true to overwrite the family, or rename the family id.',
+  FAST_LICENCE_EMBED_FORBIDDEN:
+    'Keep the catalogue in a private library (not supported for fastener catalogues yet); use a public-domain or company-proprietary family.',
   MAT_UNIT_INVALID: 'Use a unit listed by `llull describe convert_quantity`.',
   MAT_UNIT_DIMENSION: 'Give a unit of the right dimension.',
   MAT_PROVENANCE_MISSING: 'Add provenance.citation (or sourceId) to the value.',
