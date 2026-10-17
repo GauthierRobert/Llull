@@ -607,3 +607,9 @@ are never invented. The seven unpinned sources carry `sha256: null` with that re
 from allowables the user imports. Two seed records need an owner decision: the NAS6203 Ftu / Fsu specification minimums (distributor /
 AIA facts, OQ-MAT-01) and Ti-6Al-4V `density_supplier_alt` (supplier unidentified in the dataset). `joint_capacity` keeps a single
 non-A/B basis shared by every input (e.g. all S) instead of `mixed`; `sheetBasis` is one value for all layers.
+
+**Round-2 review fixes (cad-reviewer):** remote redaction is fail-closed — any read-only answer whose params reference a licensed material
+(directly, through an entity, a fastener stack or a `build_project` alias) is redacted, per `build_project` step; MCP sessions are bound to
+the locality they were created with; more proxy headers mark a caller as relayed; embedded libraries and inline records may not carry
+`licensed-no-redistribution` values (`MAT_LICENCE_EMBED_FORBIDDEN`); seed fastener allowables take the dataset basis and otherwise
+`supplier_unstated` (unverified), never an assumed S basis.

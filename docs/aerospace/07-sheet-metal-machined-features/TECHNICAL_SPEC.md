@@ -695,3 +695,8 @@ no pocket / sheet-metal parameter forms in the UI (hole form only). Codes added:
 `FTR_RIB_PATH_NOT_SUPPORTED`, `FTR_UP_TO_TARGET_INVALID`. What stays open is outside the built kernel: `BRepFeat_MakeCylindricalHole` /
 `MakeLinearForm` are not constructible in opencascade.js 1.1.1 (AERO-2-M2), the OCP cross-check of VC-FTR-33 needs `cadquery-ocp`,
 and modelled threads (VC-FTR-36) are V2 / M8.
+
+**Round-2 review fixes (cad-reviewer):** `up_to_next` depth is refined on the exact faces when the kernel has the face-query port (the
+method, exact or mesh, is reported); `up_to_face` onto the face where the material ends overshoots by 2ε; a native BRepFeat attempt that
+degrades the OCC module disables native features for the process and is retried after the kernel epoch bump instead of lowering on the
+degraded module; `set_sheet_metal_material` refuses prototype-key names.
