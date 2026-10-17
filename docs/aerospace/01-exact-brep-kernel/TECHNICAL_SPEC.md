@@ -710,3 +710,34 @@ M7; `massProperties` M3 and `import_step_exact` M4 for XCH M1/M3), 02 / 03 / 05 
 - [R33] OCCT V7_8_0 toolkit PACKAGES and XCAFDoc / STEPCAFControl / BOPAlgo headers — https://raw.githubusercontent.com/Open-Cascade-SAS/OCCT/V7_8_0/src/TKTopAlgo/PACKAGES (accessed 2026-10)
 - llull code and decisions cited by path in §1 (KI4, KI5, KI6); measured data: `validation/occt_behaviour_probe.json`,
   `validation/occt_crosscheck.json`, `validation/nist_occt_reference.json`, `validation/nist_gvp_vs_occt.json`
+
+## 13. Implementation status (AERO-2)
+
+### 13.B Face-query port (M10)
+
+Built: the OCC face-query port (TR-KRN-90..92), the worker proxy, and one agent command, `inspect_faces` (AF-01).
+
+- Port contract: `packages/core/src/geometry/kernelPorts.ts` (`FaceQueryPort`, unchanged except the notes below). `KernelOps.faceQuery` (`FaceQueryOps<S>`, the same methods on native shapes) is wired in `kernelFromOps` (`shapeKernel.ts`): handles resolve through the recipe cache, every call runs inside the kernel `call(...)` and any throw becomes null with a warning. A key-only handle that is no longer cached still throws `SHAPE_NOT_CACHED`, so the worker proxy can resend the recipe. Manifold omits the port.
+- OCC implementation: `packages/kernel-occt/src/occtFaceQuery.ts` (the ops), `occtFaceSurface.ts` (surface parameters, normals, curvature), `occtFaceDistance.ts` (point distance), `occtFaceGraph.ts` (adjacency and convexity). Face and edge indices come from `uniqueSubShapes`, the enumeration `ShapeTopology` uses; `occtTopology.ts` now also exports `subShapeIndexer` and `surfaceKindOf`.
+- Worker: `server/src/isolatedKernel.ts` forwards the 12 methods as `faceQuery.<method>` requests (key-only handles first, resend on `SHAPE_NOT_CACHED`); `occtWorker.ts` dispatches them.
+- Command: `inspect_faces` in `packages/core/src/commands/brep/faces.ts`, toolset `3d`. Refusals carry `error.code`: `KRN_NO_EXACT_KERNEL`, `KRN_SHAPE_UNAVAILABLE`, `KRN_FACE_INDEX`, `KRN_FACE_QUERY_FAILED`, `ENTITY_NOT_FOUND`, `ENTITY_NOT_SOLID`. With no kernel installed at all the registry answers first with `CMD_KERNEL_UNAVAILABLE`.
+
+Behaviour worth knowing:
+
+- Normals and curvature signs are relative to the outward face normal (face orientation applied): a convex sphere has k1 = k2 = +1/r, a bore has k2 = -1/r. k1 >= k2; Gaussian = k1 k2, mean = (k1 + k2) / 2.
+- `faceContains` and `projectOnFace` use the exact distance to the trimmed face (`BRepExtrema_DistShapeShape` from a vertex), not the untrimmed surface. A point beyond the trim projects onto the face boundary.
+- `distance` measures against the shells, because OCC reports 0 for a point inside a solid. `signed` is negative inside a solid (`BRepClass3d_SolidClassifier`). `face` is the nearest face index; -1 when the nearest point is on an edge shared by two faces or on a vertex (a seam edge counts as its single face).
+- `faceGraph` convexity is taken at the edge mid point: smooth when the outward normals agree within 1e-6 rad, else convex or concave from the sign of (n0 x t) . n1 with the edge walked in face 0's loop orientation. A seam is smooth; degenerate edges, edges with a number of faces other than 2, and anti-parallel normals are unknown.
+- A cone with a negative OCC semi angle is reported as the equivalent cone opening along +axis with a positive angle.
+- Samples are the centres of a uv grid kept when `BRepClass_FaceClassifier` says IN, thinned evenly to the requested count.
+
+Returns null (not implemented in this kernel build): `tessellateFace` (OCC 7.4 bindings give no UV access to the triangulation), `edgeSamples` and `edgeContinuity` (need third derivatives and continuity along an edge), `bspline` (no `Geom_BSplineSurface` pole readout verified). B-spline faces are therefore reported as surface `bspline` / `other` only.
+
+Tests: `server/tests/occtFaceQuery.test.ts` (real OCC; one fixture per surface type: box, cylinder, cone, sphere, torus; closed forms for centroid, area, normal, curvature, projection distance, signed distance, graph counts; a bore, a stepped union and a filleted box; the worker proxy). `tests/unit/brepFaces.test.ts` (command: happy path, filters, samples, graph, every refusal, purity) and `tests/unit/contract/faceQueryOps.test.ts` (`kernelFromOps` wiring). The tool-schema snapshot gained one entry, `inspect_faces`. The B-spline fixture of TR-KRN-92 is skipped for lack of a verified B-spline readout.
+
+Deviations from the sketch in 5.9:
+
+- `FaceGraphFace.uvBounds` is `[uMin, uMax, vMin, vMax]` (OCC order); `faceGeometry.uvBounds` stays `[[uMin, vMin], [uMax, vMax]]`.
+- `ShapeHandle` and `FaceSurface` moved to `packages/core/src/geometry/kernelTypes.ts` (re-exported by `kernel.ts`) because `kernel.ts` and `kernelPorts.ts` imported each other and `npm run arch` rejected the cycle.
+- `EdgeCurveSample`, `EdgeContinuitySample` and `NurbsSurfaceData` are no longer exported (knip: no consumer yet); export them again when a pack uses them.
+- Results are not cached by `(recipeKey, method, args)`; the shapes are cached and each query is cheap.

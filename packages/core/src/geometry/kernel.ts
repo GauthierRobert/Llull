@@ -8,19 +8,12 @@
 
 import type { MeshData, ShapeRecipe, Vec3 } from '../model/types';
 
-declare const shapeHandleBrand: unique symbol;
-
-/**
- * Opaque reference to a kernel-owned shape. Core never inspects it: it only passes it back to the kernel that minted it. It stays valid
- * after the kernel evicts or restarts (it re-evaluates).
- */
 import type { ExactMassProperties, FaceQueryPort, ImportShapesOptions, ImportShapesResult, KernelInfo } from './kernelPorts';
-export interface ShapeHandle {
-  readonly [shapeHandleBrand]: true;
-}
+import type { FaceSurface, ShapeHandle } from './kernelTypes';
+
+export type { FaceSurface, ShapeHandle };
 
 export type EdgeCurve = 'line' | 'circle' | 'ellipse' | 'bspline' | 'other';
-export type FaceSurface = 'plane' | 'cylinder' | 'cone' | 'sphere' | 'torus' | 'bspline' | 'revolution' | 'extrusion' | 'other';
 
 /** One unique edge; `index` is what `fillet_edge` / `chamfer_edge` `edgeIndices` select. */
 export interface ShapeEdge {

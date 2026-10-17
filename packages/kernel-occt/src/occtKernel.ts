@@ -13,6 +13,7 @@ import { extractMeshData } from './occtMesh';
 import { shapeTopology, uniqueSubShapes } from './occtTopology';
 import { analyzeShape, shapeDistance } from './occtAnalysis';
 import { writeStep } from './occtStep';
+import { occtFaceQueryOps } from './occtFaceQuery';
 import { release, withOwned } from '@core/geometry/nativeObject';
 import {
   type OccApi,
@@ -266,6 +267,7 @@ export function occtOps(api: OccApi): KernelOps<OccShape> {
     exportStep: (shapes) => guarded('fragile', () => writeStep(api, shapes)),
     analyze: (shape) => guarded('fragile', () => analyzeShape(api, shape)),
     distance: (a, b) => guarded('fragile', () => shapeDistance(api, a, b)),
+    faceQuery: occtFaceQueryOps(api, guarded),
     release,
   };
 }

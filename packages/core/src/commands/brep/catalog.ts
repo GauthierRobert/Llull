@@ -5,6 +5,7 @@ import { booleanOperation } from './boolean';
 import { filletEdge, chamferEdge, shellSolid } from './modify3d';
 import { inspectTopology, exportStepExact } from './topology';
 import { blendUnion } from './blend';
+import { inspectFaces } from './faces';
 
 export const brepCommands = commandCatalog(
   booleanOperation,
@@ -13,5 +14,6 @@ export const brepCommands = commandCatalog(
   chamferEdge,
   shellSolid,
   inspectTopology,
+  inspectFaces,
   exportStepExact,
 );

@@ -10,6 +10,7 @@ import { MessageChannel, Worker, receiveMessageOnPort, type MessagePort } from '
 import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle } from '@core/geometry/kernel';
 import { errorMessage } from '@lib/errorMessage';
 import { handleOf, keyOnlyHandle, SHAPE_NOT_CACHED } from '@core/geometry/shapeKernel';
+import type { FaceQueryPort } from '@core/geometry/kernelPorts';
 import { STATUS_DIED, STATUS_READY, STATUS_REPLY, type KernelOperation, type KernelReply, type TestHook } from './occtWorkerProtocol';
 
 export interface IsolatedKernelOptions {
@@ -70,6 +71,21 @@ class WorkerDiedOnStartError extends Error {
     this.name = 'WorkerDiedOnStartError';
   }
 }
+
+const FACE_QUERY_METHODS = [
+  'faceDetails',
+  'faceContains',
+  'faceGraph',
+  'faceGeometry',
+  'projectOnFace',
+  'evaluateFace',
+  'tessellateFace',
+  'faceSamples',
+  'edgeSamples',
+  'edgeContinuity',
+  'distance',
+  'bspline',
+] as const satisfies readonly (keyof FaceQueryPort)[];
 
 export function createIsolatedKernel(options: IsolatedKernelOptions = {}): IsolatedKernel {
   const entry = options.entry ?? defaultWorkerEntry();
@@ -190,8 +206,16 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
     return call(op, pack(handles));
   };
 
+  const faceQuery = Object.fromEntries(
+    FACE_QUERY_METHODS.map((method) => [
+      method,
+      (shape: ShapeHandle, ...args: unknown[]) => shapeCall(`faceQuery.${method}`, [shape], false, args),
+    ]),
+  ) as unknown as FaceQueryPort;
+
   return {
     name: 'occt',
+    faceQuery,
     supports: () => true,
     evaluate: (recipe) => (call('evaluate', [recipe]) === null ? null : handleOf(recipe)),
     tessellate: (shape) => shapeCall('tessellate', [shape], false) as ReturnType<GeometryKernel['tessellate']>,
