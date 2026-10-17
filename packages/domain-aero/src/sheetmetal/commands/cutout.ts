@@ -8,10 +8,10 @@ import { withFoldedSolid } from '../fold';
 import { basisOf, frameToWorld, worldToFrame } from '../frames';
 import { dot3, normalize3 } from '@lib/vec3';
 import { circlePolygon, isSimplePolygon } from '../geometry2d';
-import { getModel, ruleOfPart, withModel, withNodes, withPart } from '../graph';
-import { pickFlat } from '../pick';
+import { withModel, withNodes, withPart } from '../graph';
 import { readProfile } from '../profile';
-import { fixed, refuse } from '../result';
+import { fixed, refuser } from '../result';
+import { partContext, isRefusal, flatNear } from '../partLookup';
 
 const crosses = (a: readonly Vec2[], b: readonly Vec2[]): boolean =>
   a.some((p, i) => b.some((q, j) => segmentsIntersect(p, a[(i + 1) % a.length] as Vec2, q, b[(j + 1) % b.length] as Vec2)));
@@ -37,14 +37,10 @@ export const addSheetCutout = defineCommand({
     profileId: z.string().describe('Id of a closed 2D profile entity (rectangle, closed polyline or circle) whose shape is cut.'),
   }),
   run: (doc, { id, face, profileId }): CommandResult => {
-    const fail = (code: Parameters<typeof refuse>[2], why: string, fix: string, where: Parameters<typeof refuse>[5] = {}): CommandResult =>
-      refuse(doc, 'add_sheet_cutout', code, why, fix, where);
-    const model = getModel(doc);
-    const part = model.parts[id];
-    if (part === undefined)
-      return fail('FTR_PART_NOT_FOUND', `no sheet-metal part "${id}"`, 'Create one with add_sheet_metal_base.', { paths: ['id'] });
-    const rule = ruleOfPart(model, part);
-    if (rule === undefined) return fail('FTR_RULE_NOT_FOUND', `rule "${part.rule}" is missing`, 'Recreate the rule.', { ids: [id] });
+    const fail = refuser(doc, 'add_sheet_cutout');
+    const found = partContext(doc, id, fail);
+    if (isRefusal(found)) return found.refusal;
+    const { model, part, rule } = found;
     const entity = doc.entities[profileId];
     if (entity === undefined)
       return fail('FTR_PARAM_INVALID', `no entity "${profileId}"`, 'Draw the profile first.', { paths: ['profileId'] });
@@ -54,14 +50,8 @@ export const addSheetCutout = defineCommand({
         ids: [profileId],
         paths: ['profileId'],
       });
-    const hit = pickFlat(part, rule.thickness, face.near);
-    if (hit === null || hit.distance > rule.thickness + 1e-6)
-      return fail(
-        'FTR_FACE_NOT_FOUND',
-        `no flat within one thickness of ${JSON.stringify(face.near)}`,
-        'Pick a point on a flat face of the part.',
-        { ids: [id], paths: ['face.near'] },
-      );
+    const hit = flatNear(part, rule.thickness, face.near, 'face.near', fail);
+    if (isRefusal(hit)) return hit.refusal;
     const { flat } = hit;
     if (Math.abs(dot3(normalize3(loop.frame.normal), basisOf(flat.frame).z)) < 1 - 1e-6)
       return fail(

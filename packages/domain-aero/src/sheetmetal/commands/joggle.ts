@@ -7,11 +7,11 @@ import { toRadians } from '@lib/angle';
 import { joggleQuantities, minJoggleOffset } from '@lib/sheetMath';
 import { withFoldedSolid } from '../fold';
 import { EPS, clipHalfPlane, isSimplePolygon, lineBasis, lineCrossings, sideOf, toLineFrame } from '../geometry2d';
-import { childBends, formsOf, getModel, nextNodeIds, parentBend, ruleOfPart, withModel, withNodes, withPart } from '../graph';
+import { childBends, formsOf, nextNodeIds, parentBend, withModel, withNodes, withPart } from '../graph';
 import { relayout } from '../layout';
-import { pickFlat } from '../pick';
-import { fixed, refuse } from '../result';
+import { fixed, refuser } from '../result';
 import { resolveK } from '../rules';
+import { partContext, isRefusal, flatNear } from '../partLookup';
 
 type Side = 'left' | 'right' | 'on' | 'mixed';
 
@@ -62,14 +62,10 @@ export const addJoggle = defineCommand({
       .describe("Direction of the offset: 'up' moves the offset piece towards the flat's +normal side, 'down' towards -normal."),
   }),
   run: (doc, params): CommandResult => {
-    const fail = (code: Parameters<typeof refuse>[2], why: string, fix: string, where: Parameters<typeof refuse>[5] = {}): CommandResult =>
-      refuse(doc, 'add_joggle', code, why, fix, where);
-    const model = getModel(doc);
-    const part = model.parts[params.id];
-    if (part === undefined)
-      return fail('FTR_PART_NOT_FOUND', `no sheet-metal part "${params.id}"`, 'Create one with add_sheet_metal_base.', { paths: ['id'] });
-    const rule = ruleOfPart(model, part);
-    if (rule === undefined) return fail('FTR_RULE_NOT_FOUND', `rule "${part.rule}" is missing`, 'Recreate the rule.', { ids: [part.id] });
+    const fail = refuser(doc, 'add_joggle');
+    const found = partContext(doc, params.id, fail);
+    if (isRefusal(found)) return found.refusal;
+    const { model, part, rule } = found;
     const T = rule.thickness;
     const R = params.insideRadius ?? rule.insideRadius;
     const phi = toRadians(params.angle);
@@ -98,14 +94,8 @@ export const addJoggle = defineCommand({
         `Increase offset to more than ${fixed(minimum)} (2*(R+T/2)*(1-cos(angle))), or reduce R or angle.`,
         { ids: [part.id], paths: ['offset', 'angle', 'insideRadius'] },
       );
-    const hit = pickFlat(part, T, params.face.near);
-    if (hit === null || hit.distance > T + 1e-6)
-      return fail(
-        'FTR_FACE_NOT_FOUND',
-        `no flat within one thickness of ${JSON.stringify(params.face.near)}`,
-        'Pick a point on a flat face of the part.',
-        { ids: [part.id], paths: ['face.near'] },
-      );
+    const hit = flatNear(part, T, params.face.near, 'face.near', fail);
+    if (isRefusal(hit)) return hit.refusal;
     const { flat } = hit;
     const [start, end] = params.line;
     if (Math.hypot(end[0] - start[0], end[1] - start[1]) < EPS)

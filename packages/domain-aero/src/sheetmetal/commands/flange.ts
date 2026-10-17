@@ -10,11 +10,12 @@ import type { SheetNode } from '@core/model/sheetMetal';
 import { bendGeometry, bottomOffset } from '../frames';
 import { withFoldedSolid } from '../fold';
 import { EPS, moveEdgeInward } from '../geometry2d';
-import { childBends, flatOf, getModel, nextNodeId, parentBend, ruleOfPart, withModel, withNodes, withPart } from '../graph';
+import { childBends, flatOf, nextNodeId, parentBend, withModel, withNodes, withPart } from '../graph';
 import { pickEdge } from '../pick';
 import { bendEnd } from '../reliefGeometry';
 import { applyRelief, isReliefFailure, reliefData } from '../reliefOps';
-import { fixed, refuse } from '../result';
+import { fixed, refuser, type Fail } from '../result';
+import { partContext, isRefusal } from '../partLookup';
 
 /** Overlap length of intervals [a0,a1] and [b0,b1]. */
 const overlap = (a0: number, a1: number, b0: number, b1: number): number =>
@@ -60,16 +61,11 @@ export interface FlangeOutcome {
  * @failure see add_flange
  */
 export function applyFlange(doc: CadDocument, command: string, params: FlangeParams, options: FlangeOptions = {}): FlangeOutcome {
-  const fail = (code: Parameters<typeof refuse>[2], why: string, fix: string, where: Parameters<typeof refuse>[5] = {}): FlangeOutcome => ({
-    result: refuse(doc, command, code, why, fix, where),
-  });
-  const model = getModel(doc);
-  const part = model.parts[params.id];
-  if (part === undefined)
-    return fail('FTR_PART_NOT_FOUND', `no sheet-metal part "${params.id}"`, 'Create one with add_sheet_metal_base.', { paths: ['id'] });
-  const rule = ruleOfPart(model, part);
-  if (rule === undefined)
-    return fail('FTR_RULE_NOT_FOUND', `rule "${part.rule}" of part ${part.id} is missing`, 'Recreate the rule.', { ids: [part.id] });
+  const refuseFlange = refuser(doc, command);
+  const fail = (...args: Parameters<Fail>): FlangeOutcome => ({ result: refuseFlange(...args) });
+  const found = partContext(doc, params.id, refuseFlange);
+  if (isRefusal(found)) return { result: found.refusal };
+  const { model, part, rule } = found;
   const { angle, length, lengthReference, position } = params;
   const T = rule.thickness;
   const R = params.insideRadius ?? rule.insideRadius;

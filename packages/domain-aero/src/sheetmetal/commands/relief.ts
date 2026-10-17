@@ -2,9 +2,10 @@ import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { changed } from '@core/commands/noop';
 import { withFoldedSolid } from '../fold';
-import { getModel, ruleOfPart, withModel, withPart } from '../graph';
+import { withModel, withPart } from '../graph';
 import { applyRelief, isReliefFailure, reliefData } from '../reliefOps';
-import { fixed, refuse } from '../result';
+import { fixed, refuser } from '../result';
+import { partContext, isRefusal } from '../partLookup';
 
 /**
  * @affects cuts a rectangular notch into the parent flat of the bend (outline edit), records a relief node, re-derives the folded solid
@@ -39,14 +40,10 @@ export const addRelief = defineCommand({
       ),
   }),
   run: (doc, params): CommandResult => {
-    const fail = (code: Parameters<typeof refuse>[2], why: string, fix: string, where: Parameters<typeof refuse>[5] = {}): CommandResult =>
-      refuse(doc, 'add_relief', code, why, fix, where);
-    const model = getModel(doc);
-    const part = model.parts[params.id];
-    if (part === undefined)
-      return fail('FTR_PART_NOT_FOUND', `no sheet-metal part "${params.id}"`, 'Create one with add_sheet_metal_base.', { paths: ['id'] });
-    const rule = ruleOfPart(model, part);
-    if (rule === undefined) return fail('FTR_RULE_NOT_FOUND', `rule "${part.rule}" is missing`, 'Recreate the rule.', { ids: [part.id] });
+    const fail = refuser(doc, 'add_relief');
+    const found = partContext(doc, params.id, fail);
+    if (isRefusal(found)) return found.refusal;
+    const { model, part, rule } = found;
     const applied = applyRelief(part, rule, params.bend, params.end, { width: params.width, depth: params.depth });
     if (isReliefFailure(applied))
       return fail(applied.code, applied.why, applied.fix, { ids: applied.ids ?? [], paths: applied.paths ?? [] });

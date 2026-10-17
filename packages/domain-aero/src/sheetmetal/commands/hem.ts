@@ -55,7 +55,7 @@ export const addHem = defineCommand({
       );
     const gap = closed ? 0 : (params.gap as number);
     const model = getModel(doc);
-    const part = model.parts[params.id];
+    const part = Object.hasOwn(model.parts, params.id) ? model.parts[params.id] : undefined;
     const rule = part === undefined ? undefined : ruleOfPart(model, part);
     const hemId = part === undefined ? 'h1' : nextNodeId(part, 'h');
     const outcome = applyFlange(
