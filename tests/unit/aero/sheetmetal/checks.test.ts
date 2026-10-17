@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { FtrCheckData, FtrFinding } from '@core/model/manufacturing';
-import { apply, data, expectRefusal, ok } from './helpers';
+import { apply, data, expectRefusal, ok, ruleParams } from './helpers';
 
 const ROW = {
   material: 'TEST-ALLOY',
@@ -27,16 +27,20 @@ function testPart(
 ): Built {
   let doc = createEmptyDocument();
   if (options.row !== false) doc = apply(doc, 'import_bend_radius_table', { rows: [ROW] });
-  doc = apply(doc, 'create_sheet_metal_rule', {
-    name: 'TEST',
-    material: 'TEST-ALLOY',
-    temper: 'T0',
-    thickness: 0.8,
-    insideRadius: radius,
-    kFactor: 0.4,
-    kFactorStandard: 'ansi',
-    ...options.rule,
-  });
+  doc = apply(
+    doc,
+    'create_sheet_metal_rule',
+    ruleParams({
+      name: 'TEST',
+      material: 'TEST-ALLOY',
+      temper: 'T0',
+      thickness: 0.8,
+      insideRadius: radius,
+      kFactor: 0.4,
+      kFactorStandard: 'ansi',
+      ...options.rule,
+    }),
+  );
   const drawn = ok(doc, 'draw_rectangle', { width: 20, height: 20, position: [0, 0, 0] });
   const made = ok(drawn.document, 'add_sheet_metal_base', { profileId: drawn.affected[0], rule: 'TEST', side: 'up' });
   const part = made.affected[0] as string;

@@ -39,10 +39,10 @@ describe('create_sheet_metal_rule', () => {
         ],
         source: 'shop chart',
       },
-      thresholds: {
-        holeToBend: { value: 3, source: 'company rule 7' },
-        minFlange: { value: 6, source: 'handbook', verification: 'verified' },
-      },
+      thresholds: [
+        { kind: 'holeToBend', value: 3, source: 'company rule 7' },
+        { kind: 'minFlange', value: 6, source: 'handbook', verification: 'verified' },
+      ],
       relief: { type: 'rectangular', widthRatio: 0.5, depthExtra: 0.2 },
       allowSharpBends: true,
     });
@@ -90,9 +90,22 @@ describe('create_sheet_metal_rule', () => {
     expectRefusal(
       empty,
       'create_sheet_metal_rule',
-      { ...RULE, thresholds: { holeToEdge: { value: 2, source: '' } } },
+      { ...RULE, thresholds: [{ kind: 'holeToEdge', value: 2, source: '' }] },
       'FTR_PARAM_INVALID',
-      'thresholds.holeToEdge',
+      'thresholds[0]',
+    );
+    expectRefusal(
+      empty,
+      'create_sheet_metal_rule',
+      {
+        ...RULE,
+        thresholds: [
+          { kind: 'minFlange', value: 2, source: 'a' },
+          { kind: 'minFlange', value: 3, source: 'b' },
+        ],
+      },
+      'FTR_PARAM_INVALID',
+      'thresholds[1]',
     );
   });
 

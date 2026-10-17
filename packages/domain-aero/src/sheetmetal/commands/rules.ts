@@ -6,7 +6,14 @@ import { getModel, withModel } from '../graph';
 import { fixed, refuse } from '../result';
 import { radiusRowId } from '../rules';
 
+const THRESHOLDS = ['holeToBend', 'holeToEdge', 'minFlange', 'minLand', 'maxDepthRatio'] as const satisfies readonly SheetRuleThreshold[];
+
 const thresholdField = z.object({
+  kind: z
+    .enum(THRESHOLDS)
+    .describe(
+      'Which design rule: holeToBend (hole edge to bend tangent, document length unit), holeToEdge (hole edge to part edge, document length unit), minFlange (flange flat length, document length unit), minLand (countersink land, document length unit) or maxDepthRatio (hole depth / diameter, dimensionless).',
+    ),
   value: z.number().describe('Threshold value in the document length unit (ratio for maxDepthRatio); >= 0.'),
   source: z.string().describe('Where the value comes from (standard, handbook or company rule with edition); mandatory.'),
   verification: z
@@ -14,8 +21,6 @@ const thresholdField = z.object({
     .optional()
     .describe("'verified' only after dual-review transcription from the cited source; default 'unverified'."),
 });
-
-const THRESHOLDS: readonly SheetRuleThreshold[] = ['holeToBend', 'holeToEdge', 'minFlange', 'minLand', 'maxDepthRatio'];
 
 type ThresholdParam = z.infer<typeof thresholdField>;
 
@@ -69,15 +74,9 @@ export const createSheetMetalRule = defineCommand({
         "Convention of kFactor / kTable K values (dimensionless): 'ansi' (default) or 'din' (K_din = 2 x K_ansi, converted when used).",
       ),
     thresholds: z
-      .object({
-        holeToBend: thresholdField.optional().describe('Minimum distance hole edge to bend tangent line (document length unit).'),
-        holeToEdge: thresholdField.optional().describe('Minimum distance hole edge to part edge (document length unit).'),
-        minFlange: thresholdField.optional().describe('Minimum flange flat length (document length unit).'),
-        minLand: thresholdField.optional().describe('Minimum countersink land (document length unit).'),
-        maxDepthRatio: thresholdField.optional().describe('Maximum hole depth / diameter (dimensionless).'),
-      })
+      .array(thresholdField)
       .optional()
-      .describe('Sourced design-rule thresholds; absent ones are reported by check_sheet_metal, never assumed.'),
+      .describe('Sourced design-rule thresholds, one entry per rule kind; absent ones are reported by check_sheet_metal, never assumed.'),
     relief: z
       .object({
         type: z.enum(['rectangular', 'obround', 'none']).describe('Relief shape asked for at free bend ends.'),
@@ -134,17 +133,15 @@ export const createSheetMetalRule = defineCommand({
         ]);
     }
     const thresholds: Partial<Record<SheetRuleThreshold, SourcedValue>> = {};
-    for (const key of THRESHOLDS) {
-      const entry = params.thresholds?.[key];
-      if (entry === undefined) continue;
-      if (entry.source.trim() === '' || !(entry.value >= 0))
+    for (const [index, entry] of (params.thresholds ?? []).entries()) {
+      if (entry.source.trim() === '' || !(entry.value >= 0) || thresholds[entry.kind] !== undefined)
         return fail(
           'FTR_PARAM_INVALID',
-          `threshold ${key} needs a source and a value >= 0`,
-          'Give { value, source } for every threshold.',
-          [`thresholds.${key}`],
+          `threshold ${entry.kind} needs a source, a value >= 0 and must be given once`,
+          'Give { kind, value, source } once per threshold.',
+          [`thresholds[${index}]`],
         );
-      thresholds[key] = sourced(entry);
+      thresholds[entry.kind] = sourced(entry);
     }
     const k: KFactorSpec =
       kTable !== undefined
