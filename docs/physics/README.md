@@ -227,7 +227,7 @@ re-run to byte-identical output; values are stored with 12 significant digits.
 | PHY-00 | V&V harness | [spec](00-vv-harness/FUNCTIONAL_SPEC.md) | [spec](00-vv-harness/TECHNICAL_SPEC.md) | [pack](00-vv-harness/validation/README.md) | 33 (31 / 0 / 2) |
 | PHY-01 | Property models | [spec](01-property-models/FUNCTIONAL_SPEC.md) | [spec](01-property-models/TECHNICAL_SPEC.md) | [pack](01-property-models/validation/README.md) | 81 (75 / 6 / 0) |
 | PHY-02 | Constitutive models + material-point driver | [spec](02-constitutive-models/FUNCTIONAL_SPEC.md) | [spec](02-constitutive-models/TECHNICAL_SPEC.md) | [pack](02-constitutive-models/validation/README.md) | 107 (103 / 4 / 0) |
-| PHY-03 | Thermal analysis | [spec](03-thermal-analysis/FUNCTIONAL_SPEC.md) | [spec](03-thermal-analysis/TECHNICAL_SPEC.md) | [pack](03-thermal-analysis/validation/README.md) | 30 (29 / 0 / 1) |
+| PHY-03 | Thermal analysis | [spec](03-thermal-analysis/FUNCTIONAL_SPEC.md) | [spec](03-thermal-analysis/TECHNICAL_SPEC.md) | [pack](03-thermal-analysis/validation/README.md) | 30 (30 / 0 / 0) |
 | PHY-04 | Thermo-mechanical & fits at temperature | [spec](04-thermo-mechanical/FUNCTIONAL_SPEC.md) | [spec](04-thermo-mechanical/TECHNICAL_SPEC.md) | [pack](04-thermo-mechanical/validation/README.md) | 31 (30 / 1 / 0) |
 | PHY-05 | Nonlinear structural | [spec](05-nonlinear-structural/FUNCTIONAL_SPEC.md) | [spec](05-nonlinear-structural/TECHNICAL_SPEC.md) | [pack](05-nonlinear-structural/validation/README.md) | 35 (30 / 1 / 4) |
 | PHY-06 | Contact, friction, bolted joints | [spec](06-contact-joints/FUNCTIONAL_SPEC.md) | [spec](06-contact-joints/TECHNICAL_SPEC.md) | [pack](06-contact-joints/validation/README.md) | 29 (24 / 2 / 3) |
@@ -247,7 +247,7 @@ re-run to byte-identical output; values are stored with 12 significant digits.
 | PHY-20 | Vibro-acoustics (hand-off) | [spec](20-vibroacoustics/FUNCTIONAL_SPEC.md) | [spec](20-vibroacoustics/TECHNICAL_SPEC.md) | [pack](20-vibroacoustics/validation/README.md) | 19 (18 / 0 / 1) |
 | PHY-21 | Functional digital prototype (buildability gate, closed-loop piston engine, motion clearance, review UX; on the merged MuJoCo engine) | [spec](21-functional-prototype/FUNCTIONAL_SPEC.md) | [spec](21-functional-prototype/TECHNICAL_SPEC.md) | [pack](21-functional-prototype/validation/README.md) | 25 (25 / 0 / 0) + 4 behaviour cases |
 
-Total: 709 validation cases (629 A, 57 B, 23 C / TBD). Every generator is Python standard library
+Total: 709 validation cases (630 A, 57 B, 22 C / TBD). Every generator is Python standard library
 only and re-runs byte-identical (`python3 -I <script>` from its `validation/` folder; re-checked by the coordinator).
 PHY-00's harness schema accepts every pack's `expected_results.json` (survey in PHY-00 TECHNICAL_SPEC §6.2).
 

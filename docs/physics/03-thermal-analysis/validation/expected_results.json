@@ -655,20 +655,20 @@
   },
   {
    "id": "VC-THM-30",
-   "quantity": "CalculiX cavity view factor vs compute_view_factors for VC-THM-09.a geometry",
-   "value": null,
+   "quantity": "CalculiX cavity view factor F12 for the VC-THM-09.a geometry (inferred from the cavity heat flow)",
+   "value": 0.199824895698,
    "unit": "1",
    "tolerance": {
-    "abs": 0.002
+    "abs": 0.0005
    },
-   "source": "TBD - measure with bundled ccx (*VIEWFACTOR, WRITE) and llull TS factors",
-   "grade": "TBD",
+   "source": "closed form (as VC-THM-09.a); measured with ccx 2.21 open cavity: F12 = 0.1998337 (tet10 h 0.05), 0.1998339 (tet4 h 0.025)",
+   "grade": "A",
    "proves": [
     "FR-THM-06",
     "TR-THM-20",
     "TR-THM-21"
    ],
-   "note": "not a gate until measured; the manual calls CalculiX view factors approximate (S7)"
+   "note": "pinned 2026-10-17 (owner-approved recommendation): converged CalculiX factor is within 1e-5 of the closed form; abs 5e-4 also covers a coarse h = 0.1 tet4 mesh (+1.5e-4). The manual calls CalculiX view factors approximate (S7)."
   },
   {
    "id": "VC-THM-50",

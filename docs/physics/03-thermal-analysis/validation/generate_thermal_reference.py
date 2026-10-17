@@ -395,9 +395,12 @@ def main() -> None:
                           {"setup": "film BC with numeric h and no source", "code": "THM_SOURCE_REQUIRED"},
                       ]))
 
-    cases.append(case("VC-THM-30", "CalculiX cavity view factor vs compute_view_factors for VC-THM-09.a geometry", None, "1", {"abs": 0.002},
-                      "TBD - measure with bundled ccx (*VIEWFACTOR, WRITE) and llull TS factors", "TBD", ["FR-THM-06", "TR-THM-20", "TR-THM-21"],
-                      note="not a gate until measured; the manual calls CalculiX view factors approximate (S7)"))
+    cases.append(case("VC-THM-30", "CalculiX cavity view factor F12 for the VC-THM-09.a geometry (inferred from the cavity heat flow)",
+                      sig(vf_parallel(1.0, 1.0, 1.0)), "1", {"abs": 0.0005},
+                      "closed form (as VC-THM-09.a); measured with ccx 2.21 open cavity: F12 = 0.1998337 (tet10 h 0.05), 0.1998339 (tet4 h 0.025)",
+                      "A", ["FR-THM-06", "TR-THM-20", "TR-THM-21"],
+                      note="pinned 2026-10-17 (owner-approved recommendation): converged CalculiX factor is within 1e-5 of the closed form; "
+                           "abs 5e-4 also covers a coarse h = 0.1 tet4 mesh (+1.5e-4). The manual calls CalculiX view factors approximate (S7)."))
     cases.append(case("VC-THM-50", "stale thermal results are refused", None, "-", {"exact": True}, "05 TR-FEA-06 + TR-THM-32", "A",
                       ["FR-THM-15", "FR-THM-18", "TR-THM-32"],
                       expected={"thermal_report.state": "stale", "check_temperature_limits.code": "FEA_RESULTS_STALE", "dependentThermoStatic.state": "stale"}))
