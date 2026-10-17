@@ -580,3 +580,11 @@ Tests: `tests/unit/materials/*` (VC-MAT-01, 02, 03, 05, 13, 14, 15 core, 16, 22 
 - Codes added beyond §7.1: `MAT_LIBRARY_PRIVATE_INLINE`, `FAST_CATALOG_INVALID`, `FAST_CATALOG_CONFLICT`, `FAST_FAMILY_UNKNOWN`, `FAST_SIZE_UNKNOWN`, `FAST_FAMILY_NOT_SELECTABLE`, `FAST_STACK_MISSING`, `FAST_STACK_NOT_FOUND`, `FAST_AXIS_MISS`, `FAST_LAYER_MISSING`, `FAST_INSTANCE_MISSING`, `FAST_HOLE_DIAMETER_UNKNOWN`, `FAST_HOLE_CUT_FAILED`, `FAST_ROW_INVALID`. `FAST_KERNEL_REQUIRED` is never raised: `execute` refuses `requiresKernel` commands with `CMD_KERNEL_UNAVAILABLE`.
 - Manifold facets small holes coarsely in inch documents (segment count follows the radius in mm): use OCC for volumes.
 - Hi-Lok pins have no listed length (representative); collars are not selected.
+
+**Review fixes (cad-reviewer, 2026-10-17):** private values fail closed (any record whose `libraryRef` does not resolve to a declared
+embedded library is saved as a stub; `import_code` and history replay carry libraries only through their import step); a replace import
+that lowers a marking needs the human gate; **every** registered `export_*` command and the FE deck precheck consult `exportGate`
+(contract test `tests/unit/contract/exportGateAll.test.ts`); the signed payload is `sha256(canonicalJson({act, ids, details, nonce}))`
+bound to the lowered markings or the exported document hash, and `confirmation` is not stored in step params; library records are
+read-only for every model command (`MAT_RECORD_READONLY`); the server store treats `<id>@<version>` as immutable (`MAT_LIBRARY_EXISTS`).
+Open: live sync still broadcasts raw params (a `confirmation` signature), the desktop signing UI must sign the new payload.

@@ -672,3 +672,8 @@ Tests: `tests/unit/features/*` (VC-FTR-22, 23, 24, 27, 28, 29), `tests/unit/aero
 - Waivers: always `FTR_WAIVER_NOT_APPROVED` until gap 09 approval records exist (AERO-4).
 - Codes added: `FTR_JOGGLE_LINE_INVALID`, `FTR_EDGE_OCCUPIED`, `FTR_RELIEF_INVALID`, `FTR_CUTOUT_INVALID`, `FTR_PARAM_INVALID`, `FTR_DRILL_POINT_ANGLE_OUT_OF_RANGE`, `FTR_FEATURE_BUILD_FAILED`, `FTR_POCKET_CORNER_TOO_LARGE`.
 - Not built: flanged hole, bead, corner relief, hem, auto relief on `add_flange` (M5/M8 rest), OCC-native BRepFeat (M7), VC-FTR-21 (CTC-02…05 not stored), VC-FTR-32 (recognised → `add_hole` steps), MCP prompt `design_sheet_bracket`, UI panels.
+
+**Review fixes (cad-reviewer, 2026-10-17):** `add_hole` checks a blind depth against the local stock under each hole; `hole_table`
+lists authored holes without a kernel and refuses `FTR_NEEDS_EXACT_KERNEL` otherwise; sheet-metal parts carry a material and layer
+through `set_sheet_metal_material` (re-applied on every derivation and load); fastener catalogues refuse non-positive grip / length
+increments and embedded `licensed-no-redistribution` families (`FAST_LICENCE_EMBED_FORBIDDEN`).
