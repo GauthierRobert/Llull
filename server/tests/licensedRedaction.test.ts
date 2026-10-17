@@ -274,4 +274,23 @@ describe('licensed values and non-local clients (TR-MAT-32)', () => {
     expect(steps[2]?.data?.redacted).toBeUndefined();
     expect(steps[2]?.data?.value).toBe(80);
   });
+
+  it('MCP: a session is bound to the locality that opened it; a request from the other locality gets 403', async () => {
+    const post = (headers: Record<string, string>, session?: string): request.Test => {
+      const req = request(app)
+        .post('/mcp')
+        .set(headers)
+        .set('Content-Type', 'application/json')
+        .set('Accept', 'application/json, text/event-stream');
+      return session !== undefined ? req.set('mcp-session-id', session) : req;
+    };
+    const init = await post(REMOTE).send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: INITIALIZE_PARAMS });
+    const session = init.headers['mcp-session-id'] as string;
+    const call = { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} };
+    expect((await post({}, session).send(call)).status).toBe(403);
+    expect((await post(REMOTE, session).send(call)).status).toBe(200);
+    const local = await post({}).send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: INITIALIZE_PARAMS });
+    const localSession = local.headers['mcp-session-id'] as string;
+    expect((await post(REMOTE, localSession).send(call)).status).toBe(403);
+  });
 });

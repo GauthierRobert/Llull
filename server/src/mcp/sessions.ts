@@ -9,6 +9,8 @@ interface SessionEntry {
   lastSeenMs: number;
   /** Named user that opened the session (named-user mode); other users cannot reuse the id. */
   userId?: string;
+  /** Locality of the creating request (`!isLocalPeer`); a request of the other locality is refused (licensed redaction is fixed per session). */
+  remote: boolean;
 }
 
 /** Session id -> entry. Removed on DELETE, on transport close, or by the idle sweep. */
