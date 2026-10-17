@@ -267,7 +267,22 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
   return {
     ...(faceQuery === undefined ? {} : { faceQuery }),
     ...(ops.name === undefined ? {} : { name: ops.name }),
-    ...(infoOps === undefined ? {} : { info: infoOps }),
+    ...(infoOps === undefined
+      ? {}
+      : {
+          info: (): KernelInfo => {
+            const own = infoOps();
+            const wired = [
+              ...(analyzeOps === undefined ? [] : ['analyze']),
+              ...(distanceOps === undefined ? [] : ['distance']),
+              ...(massOps === undefined ? [] : ['massProperties']),
+              ...(importOps === undefined ? [] : ['importShapes']),
+              ...(faceQuery === undefined ? [] : ['faceQuery']),
+              ...(ops.brep === undefined ? [] : ['brepBlobs']),
+            ];
+            return { ...own, capabilities: [...new Set([...own.capabilities, ...wired])] };
+          },
+        }),
     ...(importOps === undefined ? {} : { importShapes: (format, text, options) => call(() => importOps(format, text, options)) }),
     ...(loadBlobOps === undefined
       ? {}

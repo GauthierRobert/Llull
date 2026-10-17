@@ -92,3 +92,18 @@ describe('kernelFromOps face query', () => {
     expect(kernel.faceQuery?.faceDetails(handle)).not.toBeNull();
   });
 });
+
+describe('kernelFromOps info', () => {
+  it('lists every optional port that is wired, on top of what the ops declare', () => {
+    const ops: KernelOps<Native> = {
+      ...opsWith(faceQuery()),
+      info: () => ({ occtVersion: '7.4.0p1', capabilities: ['topology', 'exportStep'] }),
+      massProperties: nothing,
+      brep: nothing,
+    };
+    const info = kernelFromOps(ops).info?.();
+    expect(info?.occtVersion).toBe('7.4.0p1');
+    expect(info?.capabilities).toEqual(['topology', 'exportStep', 'massProperties', 'faceQuery', 'brepBlobs']);
+    expect(kernelFromOps(opsWith()).info).toBeUndefined();
+  });
+});
