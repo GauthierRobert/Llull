@@ -144,6 +144,8 @@ export interface MeshSolidEntity extends BaseEntity {
   mesh: MeshData;
   /** Exact shape recipe of a kernel result; absent for imported / triangle-only meshes. */
   brep?: ShapeRecipe;
+  /** Set only on the groove tool of a modelled thread (feature lowering): kernels skip post-boolean face merging on results built from it. */
+  threadTool?: true;
 }
 
 /** Base circle in XY centered at `position`, apex at +Z. */

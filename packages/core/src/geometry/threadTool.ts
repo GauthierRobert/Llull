@@ -6,17 +6,26 @@
  * robustly. The inner edge reaches `INNER_MARGIN` x pitch inside the bore so the groove overlaps the bore void instead of sharing a surface.
  * @invariant the helix starts above the face and ends below the threaded depth by one groove width: no cap lies inside the material;
  *   ring radii are inflated by sqrt(step / sin step) so each facet wedge has the area of the circular sector it stands for (volume-faithful)
- * @failure bore radius at or above the major radius, groove wider than the pitch at its inner edge, no room for a turn -> null
+ * @failure bore radius at or above the major radius, groove wider than the pitch at its inner edge, no room for a turn, more than MAX_THREAD_TURNS turns -> null
  */
 
 import type { HoleExtent, HoleSpec } from '../model/features';
 import type { MeshData } from '../model/types';
-import { internalThreadForm } from '../lib/threadForm';
+import { type InternalThreadForm, internalThreadForm } from '../lib/threadForm';
 
 /** Facet rings per helix turn. */
 const RINGS_PER_TURN = 32;
 const INNER_MARGIN = 0.05;
 const MAX_FILL = 0.98;
+/** Longest modelled thread (turns): past it the groove skin has too many faces for the OpenCascade booleans to stay responsive. */
+export const MAX_THREAD_TURNS = 60;
+
+/** Whether a bore of `boreRadius` carries the groove of `form`: below the major radius, and the groove at its inner edge narrower than the pitch. */
+export function grooveFits(form: InternalThreadForm, boreRadius: number): boolean {
+  if (!(boreRadius < form.majorRadius)) return false;
+  const innerRadius = Math.min(form.minorRadius, boreRadius) - INNER_MARGIN * form.pitch;
+  return form.widthAt(innerRadius) < MAX_FILL * form.pitch;
+}
 
 /** The groove's mesh in the hole frame (axis = local z, helix start at the origin height) and where that start lies. */
 export interface ThreadGroove {
@@ -62,16 +71,17 @@ export function threadGroove(hole: HoleSpec, extent: HoleExtent, reach: number):
   if (thread?.modelled !== true || thread.pitch === undefined || thread.majorDiameter === undefined) return null;
   const form = internalThreadForm(thread.pitch, thread.majorDiameter);
   const boreRadius = hole.diameter / 2;
-  if (!(boreRadius < form.majorRadius)) return null;
+  if (!grooveFits(form, boreRadius)) return null;
   const innerRadius = Math.min(form.minorRadius, boreRadius) - INNER_MARGIN * form.pitch;
   const innerWidth = form.widthAt(innerRadius);
-  if (!(innerWidth < MAX_FILL * form.pitch)) return null;
   const outerWidth = form.widthAt(form.majorRadius);
   const topCenter = innerWidth;
   const bottomCenter =
-    extent.kind === 'through_all' ? -reach - innerWidth : innerWidth / 2 - Math.min(thread.depth ?? extent.depth, extent.depth);
+    extent.kind === 'through_all'
+      ? -reach - innerWidth
+      : innerWidth / 2 + INNER_MARGIN * form.pitch - Math.min(thread.depth ?? extent.depth, extent.depth);
   const turns = (topCenter - bottomCenter) / form.pitch;
-  if (!(turns > 0.5)) return null;
+  if (!(turns > 0.5) || turns > MAX_THREAD_TURNS) return null;
   const corners = [
     [innerRadius, -innerWidth / 2],
     [form.majorRadius, -outerWidth / 2],

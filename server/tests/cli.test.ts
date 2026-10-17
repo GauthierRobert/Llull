@@ -11,7 +11,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
-import { deserializeDocument } from '@core/commands/persistence/serialization';
+import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
+import { ctxWith, docWith, inchDocument, ok, sampleCatalogFile } from '../../tests/unit/aero/fasteners/fixtures';
 import { EXIT_COMMAND_ERROR, EXIT_OK, EXIT_USAGE, runCli, type CliIo } from '../src/cli/main';
 
 interface Captured {
@@ -398,5 +399,41 @@ describe('llull CLI — --server backend', () => {
     const fresh = capture();
     expect(await runCli(['new', ...server], fresh.io)).toBe(EXIT_USAGE);
     expect(dry.fetched).toEqual([]);
+  });
+});
+
+describe('llull CLI — check_fastener_layout findings', () => {
+  it('exits 0 on an answered check with error-severity findings and 1 on an unknown stack', async () => {
+    const serverCwd = process.cwd();
+    process.chdir(path.resolve(serverCwd, '..'));
+    const catalog = sampleCatalogFile();
+    process.chdir(serverCwd);
+    const first = ok(docWith(catalog, inchDocument()), 'add_box', { size: [3, 1, 0.0625], anchor: 'min', position: [0, 0, 0] });
+    const second = ok(first.document, 'add_box', { size: [3, 1, 0.0625], anchor: 'min', position: [0, 0, 0.0625] });
+    const ids = [first.affected[0] ?? '', second.affected[0] ?? ''];
+    const placed = ok(
+      second.document,
+      'insert_fastener_stack',
+      {
+        family: 'MS20470',
+        diameterDash: '4',
+        codes: { material: 'AD' },
+        stackIds: ids,
+        axisPoint: [0.5, 0.5, 0],
+        holeDiameter: { value: 0.129, unit: 'in' },
+      },
+      ctxWith(await createManifoldKernel()),
+    );
+    const stackId = String((placed.data as { stackId?: string } | undefined)?.stackId ?? '');
+    const apart = ok(placed.document, 'move_entities', {
+      ids: [placed.document.fasteners?.stacks[stackId]?.layers[1]?.entityId ?? ''],
+      delta: [0, 0, 0.3],
+    });
+    writeFileSync(docPath, serializeDocument(apart.document));
+    const gap = capture();
+    expect(await runCli(['exec', 'check_fastener_layout', ...docFlag()], gap.io)).toBe(EXIT_OK);
+    expect(gap.out.join('\n')).toContain('FAST_LAYER_GAP');
+    const unknown = capture();
+    expect(await runCli(['exec', 'check_fastener_layout', 'stackIds=["fst-nope"]', ...docFlag()], unknown.io)).toBe(EXIT_COMMAND_ERROR);
   });
 });

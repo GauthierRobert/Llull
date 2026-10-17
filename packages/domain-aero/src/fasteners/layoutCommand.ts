@@ -121,7 +121,7 @@ function pitchItems(doc: CadDocument, stacks: readonly FastenerStack[]): LayoutI
 
 /**
  * @affects nothing (query)
- * @failure unknown stack id -> FAST_STACK_NOT_FOUND; a changed stack -> FAST_REGRIP_NEEDED (warning); a deleted or replaced layer -> FAST_LAYER_MISSING (error)
+ * @failure unknown stack id -> error FAST_STACK_NOT_FOUND; findings (FAST_REGRIP_NEEDED warning, FAST_LAYER_MISSING error, ...) live in data.items/status, never in `error`
  */
 export const checkFastenerLayout = defineCommand({
   name: 'check_fastener_layout',
@@ -150,10 +150,6 @@ export const checkFastenerLayout = defineCommand({
     const items = [...stacks.flatMap((stack) => checkStack(doc, stack)), ...pitchItems(doc, stacks)];
     const status = items.some((entry) => entry.severity === 'error') ? 'fail' : items.length > 0 ? 'warn' : 'pass';
     const summary = `check_fastener_layout: ${status} — ${stacks.length} stack(s), ${items.length} finding(s)${items.length > 0 ? ` (${[...new Set(items.map((entry) => entry.code))].join(', ')})` : ''}.`;
-    const first = items.find((entry) => entry.severity === 'error');
-    return {
-      ...report(doc, summary, { status, stacksChecked: stacks.length, items }),
-      ...(first === undefined ? {} : { error: fastenerError(first.code, first.stackIds) }),
-    };
+    return report(doc, summary, { status, stacksChecked: stacks.length, items });
   },
 });

@@ -3,8 +3,8 @@
 import type { CadDocument } from '../../model/types';
 import type { HoleSpec, ThreadSpec } from '../../model/features';
 import { fromMm } from '../../model/units';
-import { parseThreadDimensions } from '../../lib/threadForm';
-import { threadGroove } from '../../geometry/threadTool';
+import { internalThreadForm, parseThreadDimensions } from '../../lib/threadForm';
+import { grooveFits } from '../../geometry/threadTool';
 
 /**
  * `thread` with `modelled: true`, `pitch` and `majorDiameter` (document units) resolved from its designation; a cosmetic thread is returned as is.
@@ -22,7 +22,7 @@ export function resolveModelledThread(doc: CadDocument, thread: ThreadSpec): Thr
 export function threadBoreProblem(hole: HoleSpec): string | null {
   const { thread } = hole;
   if (thread?.modelled !== true || thread.pitch === undefined || thread.majorDiameter === undefined) return null;
-  if (threadGroove(hole, { kind: 'through_all' }, 1) !== null) return null;
+  if (grooveFits(internalThreadForm(thread.pitch, thread.majorDiameter), hole.diameter / 2)) return null;
   const minor = thread.majorDiameter - 1.0825318 * thread.pitch;
   return `bore Ø${hole.diameter} does not fit thread ${thread.designation} (minor Ø${Math.round(minor * 1e4) / 1e4}, major Ø${thread.majorDiameter}): use a bore near the minor diameter`;
 }

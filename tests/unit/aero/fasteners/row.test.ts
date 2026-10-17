@@ -159,6 +159,9 @@ describe('insert_fastener_row (VC-MAT-12)', () => {
   });
 });
 
+const codesOf = (result: ReturnType<typeof execute>): string[] =>
+  (dataOf(result)['items'] as Array<{ code: string }>).map((item) => item.code);
+
 describe('check_fastener_layout', () => {
   function oneRivet(): { doc: CadDocument; ids: string[]; stackId: string } {
     const { doc, ids } = sheets();
@@ -221,17 +224,22 @@ describe('check_fastener_layout', () => {
     const deleted = execute(doc, 'delete_entities', { ids: [second] }).document;
     const missing = execute(deleted, 'check_fastener_layout', {});
     expect(dataOf(missing)['status']).toBe('fail');
-    expect(missing.error).toMatchObject({ code: 'FAST_LAYER_MISSING', ids: [stackId] });
+    expect(missing.error).toBeUndefined();
+    expect(
+      (dataOf(missing)['items'] as Array<{ code: string; stackIds: string[] }>).find((i) => i.code === 'FAST_LAYER_MISSING')?.stackIds,
+    ).toEqual([stackId]);
 
     const apart = execute(doc, 'move_entities', { ids: [second], delta: [0, 0, 0.3] }).document;
-    expect(execute(apart, 'check_fastener_layout', {}).error?.code).toBe('FAST_LAYER_GAP');
+    const gap = execute(apart, 'check_fastener_layout', {});
+    expect(gap.error).toBeUndefined();
+    expect(codesOf(gap)).toContain('FAST_LAYER_GAP');
 
     const aside = execute(doc, 'move_entities', { ids: [first, second], delta: [10, 0, 0] }).document;
-    expect(execute(aside, 'check_fastener_layout', {}).error?.code).toBe('FAST_AXIS_MISS');
+    expect(codesOf(execute(aside, 'check_fastener_layout', {}))).toContain('FAST_AXIS_MISS');
 
     const lost = stack?.fastener.instanceId ?? '';
     const withoutBolt: CadDocument = { ...doc, entities: Object.fromEntries(Object.entries(doc.entities).filter(([id]) => id !== lost)) };
-    expect(execute(withoutBolt, 'check_fastener_layout', {}).error?.code).toBe('FAST_INSTANCE_MISSING');
+    expect(codesOf(execute(withoutBolt, 'check_fastener_layout', {}))).toContain('FAST_INSTANCE_MISSING');
   });
 
   it('flags representative geometry and refuses unknown stack ids', () => {

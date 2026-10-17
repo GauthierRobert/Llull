@@ -15,6 +15,7 @@ import { commitKernelResult, evaluateRecipe, operandRecipe } from '../brep/kerne
 import { noop } from '../noop';
 import { frameToWorld } from '../../geometry/featureFrame';
 import { throughReach } from '../../geometry/featureLowering';
+import { MAX_THREAD_TURNS } from '../../geometry/threadTool';
 import { buildMeshBvh } from '../../geometry/meshBvh';
 import { localThickness } from '../../geometry/featureThickness';
 import { meshDiagonal } from '../../geometry/meshExtent';
@@ -218,7 +219,7 @@ function drill(
       doc,
       'add_hole',
       'FTR_FEATURE_BUILD_FAILED',
-      `the kernel could not cut the holes (${result})`,
+      `the kernel could not cut the holes (${result})${hole.thread?.modelled === true ? `; a modelled thread is also refused past ${MAX_THREAD_TURNS} turns` : ''}`,
       'check the solid and the hole sizes with inspect_topology',
       [entity.id],
     );

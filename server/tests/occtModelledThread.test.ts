@@ -75,6 +75,16 @@ describe('modelled thread on the live OCC kernel (VC-FTR-36)', () => {
     expect(Math.abs(volumeLeft - volumeRight) / 60000).toBeLessThan(1e-4);
   }, 300_000);
 
+  it('a blind full-depth thread with the default 118 deg drill point is a valid solid (groove ends above the bore bottom)', () => {
+    const result = plateWithThread({ designation: 'M6x1-6H', modelled: true }, { kind: 'blind', depth: 8 });
+    expect(result.error).toBeUndefined();
+    expect(result.summary).toContain('drill point');
+    const { volume, valid } = measure(result.document, result.affected[0] as string);
+    expect(valid).toBe(true);
+    const bore = Math.PI * (MINOR_DIAMETER / 2) ** 2 * 8;
+    expect(60000 - volume).toBeGreaterThan(bore);
+  }, 300_000);
+
   it('a cosmetic thread stays geometry-free: volume is the plain minor-diameter bore', () => {
     const result = plateWithThread({ designation: 'M6x1-6H' });
     const { volume } = measure(result.document, result.affected[0] as string);

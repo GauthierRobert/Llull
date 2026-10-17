@@ -6,6 +6,7 @@
 import type { MeshData } from '@core/model/types';
 import { isClosedMesh } from './meshClosure';
 import { hasManyFreeformFaces } from './occtFreeform';
+import { isThreadBearing } from './occtThreadMark';
 import { release } from '@core/geometry/nativeObject';
 import { explorer, type OccApi, type OccHandle, type OccExplorer, type OccShape, type OccTopoDS, type OccTriangulation } from './occtTypes';
 
@@ -24,7 +25,7 @@ export function extractMeshData(api: OccApi, shape: OccShape): MeshData | null {
   const first = triangulate(api, shape, DISPLAY_DEFLECTION);
   if (!isClosedSolid(api, shape)) return first.mesh;
   if (first.missingFaces === 0 && isClosedMesh(first.mesh)) return first.mesh;
-  if (!hasManyFreeformFaces(api, shape)) return null;
+  if (!isThreadBearing(shape) && !hasManyFreeformFaces(api, shape)) return null;
   const fine = triangulate(api, shape, FINE_DEFLECTION);
   return fine.missingFaces === 0 && isClosedMesh(fine.mesh) ? fine.mesh : null;
 }

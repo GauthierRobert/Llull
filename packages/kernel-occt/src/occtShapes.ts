@@ -4,6 +4,7 @@
  * entity's rotation and position; the caller owns (releases) it.
  */
 
+import { markThreadBearing } from './occtThreadMark';
 import type { MeshData } from '@core/model/types';
 import { type Entity, type Vec3, createEmptyDocument } from '@core/model/types';
 import { entityTrianglePositions } from '@core/geometry/entityTriangles';
@@ -248,7 +249,8 @@ function meshSolid(api: OccApi, entity: Entity): OccShape | null {
   if (entity.kind !== 'mesh') return null;
   const shape = meshDataToTopoDSShape(api, entity.mesh);
   const moved = [...entity.rotation, ...entity.position].some((value) => value !== 0);
-  return shape !== null && moved ? placed(api, shape, entity) : shape;
+  const result = shape !== null && moved ? placed(api, shape, entity) : shape;
+  return result !== null && entity.threadTool === true ? markThreadBearing(result) : result;
 }
 
 /** Pyramids (planar faces only, so their sewn triangles are already exact) use their triangles. */

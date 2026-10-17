@@ -61,7 +61,7 @@ export const holeParams = z
       .optional()
       .describe('Standard fastener this hole is for: its clearance hole diameter comes from the document fastener catalogue.'),
   })
-  .describe('Hole definition: kind, diameters, optional cosmetic thread and fastener reference.');
+  .describe('Hole definition: kind, diameters, optional thread (cosmetic, or a modelled helical groove) and fastener reference.');
 
 export const extentParams = z
   .object({

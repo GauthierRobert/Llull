@@ -37,12 +37,13 @@ export function throughReach(mesh: MeshData, frame: FeatureFrame): number {
 
 /**
  * Half-section [radius, height above the face] of one hole tool; the tool axis is the local z axis. A modelled thread overshoots the face by two
- * pitches so the groove ends lie inside the bore tool (a bore end plane cutting the groove makes the OCC union drop an operand).
+ * pitches (above the face, and below a through-all hole; never past an up_to_* wall) so the groove ends lie inside the bore tool (a bore end plane cutting the groove makes the OCC union drop an operand).
  */
 export function holeToolProfile(hole: HoleSpec, extent: HoleExtent, reach: number): Array<[number, number]> | null {
   const radius = hole.diameter / 2;
   const clearance = hole.thread?.modelled === true ? 2 * (hole.thread.pitch ?? 0) : 0;
-  const eps = Math.max(epsilonOf(Math.max(hole.diameter, hole.cskDiameter ?? 0, hole.cboreDiameter ?? 0)), clearance);
+  const base = epsilonOf(Math.max(hole.diameter, hole.cskDiameter ?? 0, hole.cboreDiameter ?? 0));
+  const eps = Math.max(base, clearance);
   const top: Array<[number, number]> = [[0, eps]];
   let stepDepth = 0;
   if (hole.kind === 'countersink') {
@@ -68,7 +69,7 @@ export function holeToolProfile(hole: HoleSpec, extent: HoleExtent, reach: numbe
       [radius, -cboreDepth],
     );
   } else top.push([radius, eps]);
-  const bottom = holeBottom(extent, Math.max(reach, stepDepth), eps);
+  const bottom = holeBottom(extent, Math.max(reach, stepDepth), base, eps);
   if (!(bottom > stepDepth) && hole.kind !== 'simple') return null;
   top.push([radius, -bottom]);
   const tip =
@@ -77,8 +78,8 @@ export function holeToolProfile(hole: HoleSpec, extent: HoleExtent, reach: numbe
   return top;
 }
 
-/** Depth of the cylindrical bottom of a hole tool below the face. */
-function holeBottom(extent: HoleExtent, reach: number, eps: number): number {
+/** Depth of the cylindrical bottom of a hole tool below the face; `throughEps` (the thread clearance included) only below a through-all hole, where no material lies past the tool. */
+function holeBottom(extent: HoleExtent, reach: number, eps: number, throughEps: number): number {
   switch (extent.kind) {
     case 'blind':
       return extent.depth;
@@ -87,7 +88,7 @@ function holeBottom(extent: HoleExtent, reach: number, eps: number): number {
     case 'up_to_next':
       return extent.depth + 2 * eps;
     case 'through_all':
-      return reach + 2 * eps;
+      return reach + 2 * throughEps;
   }
 }
 
@@ -120,7 +121,7 @@ function holeTool(node: Extract<FeatureRecipe, { feature: 'hole' }>, reach: numb
   if (groove !== null)
     for (const point of node.points) {
       const start = frameToWorld(node.frame, point, groove.startDepth);
-      tools.push({ op: 'solid', entity: toolEntity({ kind: 'mesh', mesh: groove.mesh }, start, rotation) });
+      tools.push({ op: 'solid', entity: toolEntity({ kind: 'mesh', mesh: groove.mesh, threadTool: true }, start, rotation) });
     }
   return unionOf(tools);
 }

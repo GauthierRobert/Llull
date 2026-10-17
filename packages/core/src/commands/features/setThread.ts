@@ -9,6 +9,7 @@ import { defineCommand, z } from '../schema';
 import { changed } from '../noop';
 import { editFeatureNode, featureNodes } from '../../geometry/featureInstances';
 import { evaluateRecipe } from '../brep/kernelShape';
+import { MAX_THREAD_TURNS } from '../../geometry/threadTool';
 import { refuse } from './ftr';
 import { resolveModelledThread, threadBoreProblem } from './modelledThread';
 import { parseThread, threadSchema } from './threads';
@@ -22,7 +23,7 @@ const withThread = (hole: HoleSpec, thread: ThreadSpec | null): HoleSpec => {
 
 /**
  * @affects modifies 1 mesh entity: the thread of one hole feature in its recipe (same id)
- * @invariant a cosmetic change keeps the shape recipe key and the mesh; `thread: null` removes the attribute; adding or removing a modelled thread rebuilds the mesh
+ * @invariant kernel-optional: a cosmetic change needs no ctx.kernel; a modelled-thread change needs ctx.kernel and refuses FTR_NEEDS_EXACT_KERNEL without it. A cosmetic change keeps the shape recipe key and the mesh; `thread: null` removes the attribute; adding or removing a modelled thread rebuilds the mesh
  * @failure missing entity / no such hole feature (FTR_PART_NOT_FOUND), designation fails its family grammar or has no modelled form (FTR_THREAD_DESIGNATION_INVALID),
  *   bore does not fit the modelled thread (FTR_HOLE_DIAMETERS_INCONSISTENT), no kernel (FTR_NEEDS_EXACT_KERNEL), kernel cannot build it (FTR_FEATURE_BUILD_FAILED) -> rejected no-op
  */
@@ -126,7 +127,7 @@ export const setThread = defineCommand({
         doc,
         'set_thread',
         'FTR_FEATURE_BUILD_FAILED',
-        `the kernel could not build the thread (${rebuilt})`,
+        `the kernel could not build the thread (${rebuilt}); a modelled thread is refused past ${MAX_THREAD_TURNS} turns`,
         'check the bore against the thread and the depth',
         [id],
       );

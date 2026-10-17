@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { recipeKey } from '@core/geometry/shapeRecipe';
 import { internalThreadForm, internalThreadRemovedVolume, parseThreadDimensions } from '@lib/threadForm';
-import { threadGroove } from '@core/geometry/threadTool';
+import { holeToolProfile } from '@core/geometry/featureLowering';
+import { MAX_THREAD_TURNS, grooveFits, threadGroove } from '@core/geometry/threadTool';
+import { threadBoreProblem } from '@core/commands/features/modelledThread';
+import { createEmptyDocument } from '@core/model/types';
 import { featureError } from '@core/geometry/featureRecipe';
 import { expectPure } from '../../helpers/expectNoOp';
 import { ctxWith, idOf, manifoldSuite, meshOf, plate, volumeOf } from '../../helpers/featureSupport';
@@ -194,5 +197,87 @@ describe('threadGroove and the recipe check', () => {
     expect(featureError(node({ designation: 'M6x1', family: 'M', modelled: true }))).toContain('pitch');
     expect(featureError(node({ designation: 'M6x1', family: 'M', modelled: true, pitch: 1, majorDiameter: 6 }))).toBeNull();
     expect(featureError(node({ designation: 'M6x1', family: 'M' }))).toBeNull();
+  });
+});
+
+describe('modelled thread extents and limits', () => {
+  const thread = { designation: 'M6x1', family: 'M', modelled: true, pitch: 1, majorDiameter: 6 } as const;
+  const bore = 6 - 1.0825318;
+
+  it('keeps the exit overshoot of up_to_next at epsilon: the 2-pitch clearance is only above the face', () => {
+    const plain = holeToolProfile({ kind: 'simple', diameter: bore }, { kind: 'up_to_next', depth: 7 }, 99);
+    const threaded = holeToolProfile({ kind: 'simple', diameter: bore, thread }, { kind: 'up_to_next', depth: 7 }, 99);
+    expect(threaded?.[0]?.[1]).toBeGreaterThanOrEqual(2);
+    expect(threaded?.at(-2)?.[1]).toBeCloseTo(plain?.at(-2)?.[1] ?? NaN, 12);
+    const exits = holeToolProfile({ kind: 'simple', diameter: bore, thread }, { kind: 'up_to_face', depth: 7, exits: true }, 99);
+    expect(exits?.at(-2)?.[1]).toBeCloseTo(plain?.at(-2)?.[1] ?? NaN, 12);
+  });
+
+  it('up_to_next into a cavity shallower than 4 pitches leaves the far wall intact (volume = plain bore + groove over the wall only)', () => {
+    const outer = execute(createEmptyDocument(), 'add_box', { size: [100, 60, 30], position: [0, 0, 0], anchor: 'min' });
+    const inner = execute(outer.document, 'add_box', { size: [80, 40, 2], position: [10, 10, 23], anchor: 'min' });
+    const hollow = execute(inner.document, 'boolean', { op: 'subtract', a: idOf(outer), b: idOf(inner) });
+    const cut = (hole: Record<string, unknown>): ReturnType<typeof execute> =>
+      execute(
+        hollow.document,
+        'add_hole',
+        {
+          target: idOf(hollow),
+          face: { near: [50, 30, 30] },
+          pointsFrame: 'world_xy',
+          points: [[50, 30]],
+          hole,
+          extent: { kind: 'up_to_next' },
+        },
+        ctxWith(kernelOf()),
+      );
+    const plain = cut({ kind: 'simple', diameter: bore });
+    const threaded = cut({ kind: 'simple', diameter: bore, thread: { designation: 'M6x1-6H', modelled: true } });
+    expect(threaded.error).toBeUndefined();
+    const form = internalThreadForm(1, 6);
+    const grooveOverWall = internalThreadRemovedVolume(form, 5) - Math.PI * form.minorRadius ** 2 * 5;
+    const extra = volumeOf(plain.document, idOf(plain)) - volumeOf(threaded.document, idOf(threaded));
+    expect(extra).toBeGreaterThan(0);
+    expect(extra).toBeLessThan(1.3 * grooveOverWall);
+  });
+
+  it('ends a blind groove without thread.depth above the bore-bottom plane', () => {
+    const groove = threadGroove({ kind: 'simple', diameter: 4.9, thread }, { kind: 'blind', depth: 8 }, 0);
+    let lowest = Infinity;
+    for (let i = 2; i < (groove?.mesh.positions.length ?? 0); i += 3) lowest = Math.min(lowest, groove?.mesh.positions[i] ?? Infinity);
+    expect((groove?.startDepth ?? 0) - lowest).toBeLessThan(8 - 0.04);
+  });
+
+  it('refuses a thread longer than MAX_THREAD_TURNS and accepts one just inside it', () => {
+    const hole = { kind: 'simple', diameter: 4.9, thread } as const;
+    expect(threadGroove(hole, { kind: 'blind', depth: MAX_THREAD_TURNS + 5 }, 0)).toBeNull();
+    expect(threadGroove(hole, { kind: 'blind', depth: MAX_THREAD_TURNS - 5 }, 0)).not.toBeNull();
+    const tall = execute(createEmptyDocument(), 'add_box', { size: [40, 40, 100], position: [0, 0, 0], anchor: 'min' });
+    const long = execute(
+      tall.document,
+      'add_hole',
+      {
+        target: idOf(tall),
+        face: { near: [20, 20, 100] },
+        pointsFrame: 'world_xy',
+        points: [[20, 20]],
+        hole: { kind: 'simple', diameter: bore, thread: { designation: 'M6x1-6H', modelled: true } },
+        extent: { kind: 'blind', depth: MAX_THREAD_TURNS + 5 },
+      },
+      ctxWith(kernelOf()),
+    );
+    expect(long.error?.code).toBe('FTR_FEATURE_BUILD_FAILED');
+    expect(long.summary).toContain(`${MAX_THREAD_TURNS} turns`);
+    expect(long.document).toBe(tall.document);
+  });
+
+  it('grooveFits is the pure bore check (below the major radius, groove narrower than the pitch)', () => {
+    const form = internalThreadForm(1, 6);
+    expect(grooveFits(form, 2.45)).toBe(true);
+    expect(grooveFits(form, 3)).toBe(false);
+    expect(grooveFits(form, 1.7)).toBe(false);
+    expect(threadBoreProblem({ kind: 'simple', diameter: 6, thread })).toContain('does not fit');
+    expect(threadBoreProblem({ kind: 'simple', diameter: 4.9, thread })).toBeNull();
+    expect(threadBoreProblem({ kind: 'simple', diameter: 6 })).toBeNull();
   });
 });
