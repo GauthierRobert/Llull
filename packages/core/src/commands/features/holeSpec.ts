@@ -1,10 +1,10 @@
 /** Params of a hole and their all-or-nothing validation (07 FTR §4.1 `add_hole`): one `HoleSpec` + `HoleExtent`, or the refusal to return. */
 
-import type { CadDocument } from '../../model/types';
+import type { CadDocument, Vec3 } from '../../model/types';
 import type { FtrCode } from '../../model/manufacturing';
 import { HOLE_KINDS, type FastenerRef, type HoleExtent, type HoleSpec } from '../../model/features';
 import { countersinkDepth, countersinkDiameter } from '../../lib/holeMath';
-import { z } from '../schema';
+import { vec3, z } from '../schema';
 import { holeFromFastener } from './fastenerHole';
 import { parseThread, threadSchema } from './threads';
 
@@ -16,20 +16,32 @@ export const holeParams = z
     kind: z
       .enum(HOLE_KINDS)
       .describe(
-        '"simple" (plain bore), "counterbore" (needs cboreDiameter, cboreDepth) or "countersink" (needs cskAngle and cskDiameter or cskDepth).',
+        '"simple" (plain bore), "counterbore" (needs cboreDiameter, cboreDepth), "countersink" (needs cskAngle and cskDiameter or cskDepth) ' +
+          'or "counterdrill" (a countersink cone from the face down to the counterbore, then the counterbore, then the bore: needs cboreDiameter, ' +
+          'cboreDepth, cskAngle and cskDiameter or cskDepth; cskDiameter > cboreDiameter > diameter).',
       ),
     diameter: z
       .number()
       .positive()
       .optional()
       .describe('Bore diameter, in document length units. Required unless fastener gives it from the catalogue.'),
-    cboreDiameter: z.number().positive().optional().describe('Counterbore diameter, in document length units; must exceed diameter.'),
-    cboreDepth: z.number().positive().optional().describe('Counterbore depth from the face, in document length units.'),
+    cboreDiameter: z
+      .number()
+      .positive()
+      .optional()
+      .describe('Counterbore (or counterdrill) diameter, in document length units; must exceed diameter.'),
+    cboreDepth: z
+      .number()
+      .positive()
+      .optional()
+      .describe('Counterbore (or counterdrill) depth from the face, in document length units; a counterdrill needs it below the cone.'),
     cskDiameter: z
       .number()
       .positive()
       .optional()
-      .describe('Countersink diameter at the face, in document length units; must exceed diameter. Alternative to cskDepth.'),
+      .describe(
+        'Countersink diameter at the face, in document length units; must exceed diameter (counterdrill: must exceed cboreDiameter). Alternative to cskDepth.',
+      ),
     cskDepth: z
       .number()
       .positive()
@@ -52,7 +64,17 @@ export const holeParams = z
 
 export const extentParams = z
   .object({
-    kind: z.enum(['blind', 'through_all']).describe('"through_all" cuts through the whole part along the axis; "blind" stops at depth.'),
+    kind: z
+      .enum(['blind', 'through_all', 'up_to_next', 'up_to_face'])
+      .describe(
+        '"through_all" cuts through the whole part along the axis; "blind" stops at depth; "up_to_next" cuts through the first wall only ' +
+          '(until the axis leaves the material, measured per hole); "up_to_face" stops at the plane of the planar face picked by face.near, which ' +
+          'must be parallel to the hole face and below it.',
+      ),
+    face: z
+      .object({ near: vec3('World point [x, y, z] on the planar target face, in document length units.') })
+      .optional()
+      .describe('up_to_face only: the planar target face the hole stops at, picked by a world point.'),
     depth: z
       .number()
       .optional()
@@ -65,6 +87,9 @@ export const extentParams = z
       ),
   })
   .describe('How far the hole goes.');
+
+/** An up-to extent whose depth is measured on the target solid by `add_hole`, once the entrance face is known. */
+export type PendingExtent = { readonly kind: 'up_to_next' } | { readonly kind: 'up_to_face'; readonly near: Vec3 };
 
 export type HoleParams = z.output<typeof holeParams>;
 export type ExtentParams = z.output<typeof extentParams>;
@@ -80,13 +105,34 @@ const problem = (code: FtrCode, why: string, remediation: string, ...paths: stri
 
 export interface BuiltHole {
   readonly hole: HoleSpec;
-  readonly extent: HoleExtent;
+  readonly extent: HoleExtent | PendingExtent;
+  /** Depth of the counterbore / countersink / counterdrill below the face (0 for a simple hole): an extent must go deeper. */
+  readonly stepDepth: number;
   /** Facts the summary should state: the fastener used, the defaulted drill point. */
   readonly notes: readonly string[];
 }
 
-function extentOf(input: ExtentParams, stepDepth: number): HoleExtent | SpecProblem {
+function extentOf(input: ExtentParams, stepDepth: number): HoleExtent | PendingExtent | SpecProblem {
   if (input.kind === 'through_all') return { kind: 'through_all' };
+  if (input.kind === 'up_to_next' || input.kind === 'up_to_face') {
+    if (input.depth !== undefined || input.drillPointAngle !== undefined)
+      return problem(
+        'FTR_BLIND_DEPTH_INVALID',
+        `${input.kind} takes no depth or drillPointAngle`,
+        'remove extent.depth and extent.drillPointAngle',
+        'extent.depth',
+        'extent.drillPointAngle',
+      );
+    if (input.kind === 'up_to_next') return { kind: 'up_to_next' };
+    if (input.face === undefined)
+      return problem(
+        'FTR_UP_TO_TARGET_INVALID',
+        'up_to_face needs extent.face.near',
+        'pick the target face with extent.face.near',
+        'extent.face',
+      );
+    return { kind: 'up_to_face', near: input.face.near };
+  }
   const depth = input.depth;
   if (depth === undefined || !(depth > 0))
     return problem(
@@ -166,6 +212,43 @@ export function buildHole(doc: CadDocument, input: HoleParams, extentInput: Exte
       );
     stepDepth = cboreDepth;
     spec = { ...spec, cboreDiameter, cboreDepth };
+  } else if (kind === 'counterdrill') {
+    const { cboreDiameter, cboreDepth, cskAngle: angle } = input;
+    if (cboreDiameter === undefined || cboreDepth === undefined || !(cboreDiameter > diameter))
+      return problem(
+        'FTR_HOLE_DIAMETERS_INCONSISTENT',
+        `counterdrill needs cboreDiameter > diameter (${diameter}) and cboreDepth > 0`,
+        'countersink / counterbore diameter must exceed the hole diameter',
+        'hole.cboreDiameter',
+        'hole.cboreDepth',
+      );
+    if (angle === undefined || !(angle > 0 && angle < 180))
+      return problem(
+        'FTR_CSK_ANGLE_OUT_OF_RANGE',
+        `cskAngle ${String(angle)} is not in (0, 180) degrees`,
+        'included angle in degrees, e.g. 82, 90, 100',
+        'hole.cskAngle',
+      );
+    const cskDiameter =
+      input.cskDiameter ?? (input.cskDepth === undefined ? undefined : countersinkDiameter(cboreDiameter, input.cskDepth, angle).value);
+    if (cskDiameter === undefined || !(cskDiameter > cboreDiameter))
+      return problem(
+        'FTR_HOLE_DIAMETERS_INCONSISTENT',
+        `counterdrill needs cskDiameter (or cskDepth) giving a diameter above cboreDiameter (${cboreDiameter})`,
+        'countersink / counterbore diameter must exceed the hole diameter',
+        'hole.cskDiameter',
+        'hole.cskDepth',
+      );
+    const cone = countersinkDepth(cboreDiameter, cskDiameter, angle).value;
+    if (!(cboreDepth > cone))
+      return problem(
+        'FTR_HOLE_DIAMETERS_INCONSISTENT',
+        `counterdrill cboreDepth ${cboreDepth} does not go below the countersink cone (${cone})`,
+        'make cboreDepth deeper than the cone, or shrink cskDiameter',
+        'hole.cboreDepth',
+      );
+    stepDepth = cboreDepth;
+    spec = { ...spec, cboreDiameter, cboreDepth, cskDiameter, cskAngle: angle };
   } else if (kind === 'countersink') {
     const angle = input.cskAngle;
     if (angle === undefined || !(angle > 0 && angle < 180))
@@ -204,5 +287,5 @@ export function buildHole(doc: CadDocument, input: HoleParams, extentInput: Exte
   if ('code' in extent) return extent;
   if (extent.kind === 'blind' && extent.drillPointDefaulted === true)
     notes.push(`drill point ${DEFAULT_DRILL_POINT_ANGLE} deg applied by default (source R8); pass drillPointAngle 0 for a flat bottom`);
-  return { hole: spec, extent, notes };
+  return { hole: spec, extent, stepDepth, notes };
 }

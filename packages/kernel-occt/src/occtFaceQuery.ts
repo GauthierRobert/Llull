@@ -11,10 +11,11 @@ import type { FaceQueryOps } from '@core/geometry/shapeKernel';
 import type { FaceDetail, FaceProjection } from '@core/geometry/kernelPorts';
 import type { FaceSurface } from '@core/geometry/kernel';
 import type { Vec2, Vec3 } from '@core/model/types';
-import { type OccApi, type OccHandle, type OccPoint, type OccShape } from './occtTypes';
-import { surfaceKindOf, uniqueSubShapes } from './occtTopology';
+import { type OccApi, type OccHandle, type OccShape } from './occtTypes';
+import { subShapeAt, surfaceKindOf, uniqueSubShapes } from './occtTopology';
 import { nearestOn, pointDistances } from './occtFaceDistance';
 import { faceGraph } from './occtFaceGraph';
+import { faceMetric } from './occtFaceMetrics';
 import {
   type FaceSurfaceAdaptor,
   type Own,
@@ -40,11 +41,6 @@ const DEFAULT_SAMPLES = 64;
 const MAX_GRID_POINTS = 4096;
 const DEFAULT_CONTAINS_TOLERANCE = 1e-6;
 
-interface GProps extends OccHandle {
-  Mass(): number;
-  CentreOfMass(): OccPoint;
-}
-
 interface FaceClassifier extends OccHandle {
   Perform_1(face: OccShape, uv: OccHandle, tolerance: number): void;
   State(): unknown;
@@ -53,9 +49,8 @@ interface FaceClassifier extends OccHandle {
 /** Runs `body` on the `index`-th unique face (ShapeTopology numbering); null when `index` is not a face index. */
 function withFace<T>(api: OccApi, shape: OccShape, index: number, own: Own, body: (face: OccShape) => T | null): T | null {
   if (!Number.isInteger(index) || index < 0) return null;
-  const faces = uniqueSubShapes(api, shape, 'TopAbs_FACE').map(own);
-  const face = faces[index];
-  return face === undefined ? null : body(own(api.TopoDS.Face_1(face) as OccShape));
+  const face = subShapeAt(api, shape, 'TopAbs_FACE', index);
+  return face === null ? null : body(own(api.TopoDS.Face_1(own(face)) as OccShape));
 }
 
 /** Up to `count` points inside the trimmed face: cell centres of a uv grid kept when the face classifier says IN, thinned evenly. */
@@ -77,12 +72,11 @@ function interiorSamples(api: OccApi, face: OccShape, adaptor: FaceSurfaceAdapto
   return chosen.map(([u, v]) => vec(adaptor.Value(u, v)));
 }
 
-function faceDetail(api: OccApi, face: OccShape, index: number, samples: number, own: Own): FaceDetail {
+function faceDetail(api: OccApi, solid: OccShape, face: OccShape, index: number, samples: number, own: Own): FaceDetail {
   const adaptor = faceAdaptor(api, face, own);
   const kind: FaceSurface = surfaceKindOf(api, adaptor);
-  const props = own(new api.GProp_GProps_1() as GProps);
-  api.BRepGProp.SurfaceProperties_1(face, props, false, false);
-  const centroid = vec(props.CentreOfMass());
+  const metric = faceMetric(api, solid, index, face);
+  const { centroid } = metric;
   const surface = surfaceParams(api, adaptor, own);
   const sign = isReversed(face) ? -1 : 1;
   const extra = ((): Pick<FaceDetail, 'normal' | 'axis' | 'radius'> => {
@@ -104,7 +98,7 @@ function faceDetail(api: OccApi, face: OccShape, index: number, samples: number,
         return {};
     }
   })();
-  return { index, surface: kind, area: props.Mass(), centroid, ...extra, samples: interiorSamples(api, face, adaptor, samples, own) };
+  return { index, surface: kind, area: metric.area, centroid, ...extra, samples: interiorSamples(api, face, adaptor, samples, own) };
 }
 
 /** Uv list of `faceSamples`: explicit pairs, or the cell centres of an `nu` x `nv` grid over the face's uv box. */
@@ -138,7 +132,7 @@ export function occtFaceQueryOps(api: OccApi, guarded: Guarded): FaceQueryOps<Oc
       guarded('fragile', (own) => {
         const samples = Math.max(0, Math.floor(options?.samples ?? DEFAULT_SAMPLES));
         const faces = uniqueSubShapes(api, shape, 'TopAbs_FACE').map(own);
-        return faces.map((face, index) => faceDetail(api, own(api.TopoDS.Face_1(face) as OccShape), index, samples, own));
+        return faces.map((face, index) => faceDetail(api, shape, own(api.TopoDS.Face_1(face) as OccShape), index, samples, own));
       }),
     faceContains: (shape, index, point, tolerance) =>
       guarded('fragile', (own) =>

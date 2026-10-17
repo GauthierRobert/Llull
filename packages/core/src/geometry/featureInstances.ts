@@ -64,9 +64,10 @@ export interface MachinedPocket {
 
 function holesOf(node: Extract<FeatureRecipe, { feature: 'hole' }>, ordinal: number): MachinedHole[] {
   const { hole, extent } = node;
+  const coneBore = hole.kind === 'counterdrill' ? (hole.cboreDiameter ?? hole.diameter) : hole.diameter;
   const cskDepth =
-    hole.kind === 'countersink' && hole.cskDiameter !== undefined && hole.cskAngle !== undefined
-      ? countersinkDepth(hole.diameter, hole.cskDiameter, hole.cskAngle).value
+    (hole.kind === 'countersink' || hole.kind === 'counterdrill') && hole.cskDiameter !== undefined && hole.cskAngle !== undefined
+      ? countersinkDepth(coneBore, hole.cskDiameter, hole.cskAngle).value
       : undefined;
   const tip =
     extent.kind === 'blind' && extent.drillPointAngle !== undefined
@@ -81,7 +82,7 @@ function holesOf(node: Extract<FeatureRecipe, { feature: 'hole' }>, ordinal: num
     ...(hole.cskDiameter === undefined ? {} : { cskDiameter: hole.cskDiameter }),
     ...(hole.cskAngle === undefined ? {} : { cskAngle: hole.cskAngle }),
     ...(cskDepth === undefined ? {} : { cskDepth }),
-    ...(extent.kind === 'blind' ? { depth: extent.depth } : {}),
+    ...(extent.kind === 'through_all' ? {} : { depth: extent.depth }),
     through: extent.kind === 'through_all',
     ...(hole.thread === undefined ? {} : { thread: hole.thread }),
     ...(tip === undefined ? {} : { drillPointAngle: tip }),
@@ -97,7 +98,7 @@ export function authoredFeatures(recipe: ShapeRecipe): { holes: MachinedHole[]; 
   const pockets: MachinedPocket[] = [];
   featureNodes(recipe).forEach((node, ordinal) => {
     if (node.feature === 'hole') holes.push(...holesOf(node, ordinal));
-    else
+    else if (node.feature === 'pocket')
       pockets.push({
         id: `pocket-${ordinal}`,
         cornerRadius: node.pocket.cornerRadius,

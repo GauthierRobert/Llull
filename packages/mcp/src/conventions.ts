@@ -196,11 +196,12 @@ reviewRequired. Never present them as released; say what a qualified person must
   names every default) → \`insert_fastener_stack\` / \`insert_fastener_row\` (one feature step: hole cut,
   one component per part number, instances) → \`check_fastener_layout\` → \`bill_of_materials\`
   (standardParts, \`includeMaterials\`). Delete with \`delete_fastener_stack\`, never \`delete_entities\`.
-- **Machined features.** \`add_hole\` (simple / counterbore / countersink, through_all or blind with a
-  118° point reported as defaulted; face picked by \`face.near\`), \`add_pocket\`, \`set_thread\` (cosmetic),
+- **Machined features.** \`add_hole\` (simple / counterbore / countersink / counterdrill; through_all,
+  up_to_next, up_to_face or blind with a 118° point reported as defaulted; face picked by \`face.near\`),
+  \`add_pocket\` (islands, \`upToFace\`, \`open\`), \`add_rib\`, \`set_thread\` (cosmetic),
   \`hole_table\`, \`check_machining\` (thresholds are data with a source; missing ones are skipped and
   listed). \`recognize_features\` needs an exact kernel (\`--kernel occt\`); imported parts come from
-  \`import_step_exact\`.
+  \`import_step_exact\`; \`holes_from_recognition\` turns their holes into \`add_hole\` plan steps.
 - **Sheet metal.** \`sheet_metal_calc\` (no part; K-factor explicit, or mode faa_empirical) →
   \`create_sheet_metal_rule\` (material, thickness, inside radius, K; no defaults) →
   \`import_bend_radius_table\` (every row needs its source) → \`add_sheet_metal_base\` (closed profile) →

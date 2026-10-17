@@ -17,7 +17,13 @@ export function floorEdgeIndices(topology: ShapeTopology, tool: PocketTool, fram
       if (edge.seam || edge.degenerate) return false;
       const points = [edge.start, edge.mid, edge.end];
       const onFloor = points.every((point) => Math.abs(heightAbove(frame, point) + tool.floorDepth) < tolerance);
-      return onFloor && points.every((point) => distanceToOutline(tool.outline.curves, worldToFrame(frame, point)) < tolerance);
+      return (
+        onFloor &&
+        points.every((point) => {
+          const local = worldToFrame(frame, point);
+          return [tool.outline, ...tool.islands].some((outline) => distanceToOutline(outline.curves, local) < tolerance);
+        })
+      );
     })
     .map((edge) => edge.index);
 }

@@ -14,6 +14,7 @@ import { extractMeshData } from './occtMesh';
 import { shapeTopology, uniqueSubShapes } from './occtTopology';
 import { analyzeShape, shapeDistance } from './occtAnalysis';
 import { exactMassProperties } from './occtMass';
+import { nativeFeature } from './occtFeatures';
 import { writeStep } from './occtStep';
 import { occtFaceQueryOps } from './occtFaceQuery';
 import { importStepShapes, readBrepText } from './occtImport';
@@ -35,6 +36,8 @@ import {
 interface OcctKernelOptions {
   readonly wasmBinary?: ArrayBuffer | Uint8Array;
   readonly locateFile?: (path: string) => string;
+  /** false = cut holes and pockets by the recipe lowering only (parity tests); default true: native BRepFeat first (07 FTR M7). */
+  readonly nativeFeatures?: boolean;
   /** Defaults to `opencascade.js/dist/opencascade.wasm.js`. */
   readonly factory?: OcctFactory;
 }
@@ -238,7 +241,7 @@ const OCCT_INFO: KernelInfo = {
   capabilities: ['topology', 'analyze', 'distance', 'exportStep', 'importShapes', 'brepBlobs'],
 };
 
-export function occtOps(api: OccApi): KernelOps<OccShape> {
+export function occtOps(api: OccApi, nativeFeatures = true): KernelOps<OccShape> {
   const blobTexts = new Map<string, string>();
   return {
     name: 'occt',
@@ -257,6 +260,15 @@ export function occtOps(api: OccApi): KernelOps<OccShape> {
         const builder = own(new api[BOOLEAN_BUILDERS[op]](a, b) as OccBuilder);
         return builder.IsDone() ? unified(api, builder.Shape(), own) : null;
       }),
+    ...(nativeFeatures
+      ? {
+          feature: (source: OccShape, node: Parameters<typeof nativeFeature>[3], reach: number) =>
+            guarded('fragile', (own) => {
+              const native = nativeFeature(api, own, source, node, reach);
+              return native === null ? null : unified(api, native, own);
+            }),
+        }
+      : {}),
     fillet: (shape, edges, radius, radiusEnd) =>
       roundEdges(
         api,
@@ -293,5 +305,5 @@ export function occtOps(api: OccApi): KernelOps<OccShape> {
 
 export async function createOcctKernel(options: OcctKernelOptions = {}): Promise<CachingKernel> {
   const api = await getOccModule(options);
-  return kernelFromOps(occtOps(api));
+  return kernelFromOps(occtOps(api, options.nativeFeatures !== false));
 }

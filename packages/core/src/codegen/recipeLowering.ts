@@ -74,7 +74,13 @@ function lowerFeatureNode(recipe: FeatureRecipe, lowering: RecipeLowering): Lowe
   if (plan === null || tool === null) return null;
   const base = lowering.base(source.variable);
   const notes = featureNotes(recipe).map((text): Feature => ({ ...base, op: 'note', text }));
-  const cut: Feature = { ...base, op: 'boolean', kind: 'cut', left: source.variable, right: tool.variable };
+  const cut: Feature = {
+    ...base,
+    op: 'boolean',
+    kind: plan.mode === 'union' ? 'union' : 'cut',
+    left: source.variable,
+    right: tool.variable,
+  };
   const features = [...source.features, ...notes, ...tool.features, cut];
   if (recipe.feature !== 'pocket' || recipe.pocket.floorFillet <= 0 || plan.pocket === undefined)
     return { features, variable: source.variable };

@@ -1,16 +1,19 @@
 /**
  * Lowering of a `feature` recipe node (07 FTR §5.3 / §5.5) to plain booleans: `source` minus ONE compound tool. A hole tool is a revolved
  * half-section (bore, counterbore step, countersink cone, drill point) per position; a pocket tool is the exact rounded outline extruded.
- * Tools reach `epsilon` above the face so no cut face is coplanar with it. Every kernel therefore accepts the node.
- * @invariant through-all depth = the source's extent below the face plane (`throughReach`) + 2 epsilon
- * @failure inconsistent spec (cone deeper than the hole, bad outline) -> null
+ * Tools reach `epsilon` above the face so no cut face is coplanar with it. Every kernel therefore accepts the node. A rib tool is the thickened
+ * path extruded from the face plane and FUSED to the source.
+ * @invariant through-all depth = the source's extent below the face plane (`throughReach`) + 2 epsilon; up_to_next = its resolved depth + 2
+ *   epsilon (it leaves the material); up_to_face = exactly its resolved depth
+ * @failure inconsistent spec (cone deeper than the hole, bad outline or island, bad rib path) -> null
  */
 
 import { type Entity, type MeshData, type ShapeRecipe, type Vec3, DEFAULT_LAYER_ID } from '../model/types';
-import type { FeatureFrame, HoleExtent, HoleSpec, PocketSpec } from '../model/features';
+import type { FeatureFrame, HoleExtent, HoleSpec, PocketSpec, RibSpec } from '../model/features';
 import { countersinkDepth, drillTipHeight } from '../lib/holeMath';
 import { frameEuler, frameToWorld, heightAbove } from './featureFrame';
 import { type PocketOutline, roundedOutline } from './pocketOutline';
+import { thickenedPath } from './featureRib';
 
 export type FeatureRecipe = Extract<ShapeRecipe, { op: 'feature' }>;
 
@@ -32,7 +35,7 @@ export function throughReach(mesh: MeshData, frame: FeatureFrame): number {
 }
 
 /** Half-section [radius, height above the face] of one hole tool; the tool axis is the local z axis. */
-function holeToolProfile(hole: HoleSpec, extent: HoleExtent, reach: number): Array<[number, number]> | null {
+export function holeToolProfile(hole: HoleSpec, extent: HoleExtent, reach: number): Array<[number, number]> | null {
   const radius = hole.diameter / 2;
   const eps = epsilonOf(Math.max(hole.diameter, hole.cskDiameter ?? 0, hole.cboreDiameter ?? 0));
   const top: Array<[number, number]> = [[0, eps]];
@@ -47,14 +50,39 @@ function holeToolProfile(hole: HoleSpec, extent: HoleExtent, reach: number): Arr
     if (hole.cboreDiameter === undefined || hole.cboreDepth === undefined) return null;
     stepDepth = hole.cboreDepth;
     top.push([hole.cboreDiameter / 2, eps], [hole.cboreDiameter / 2, -hole.cboreDepth], [radius, -hole.cboreDepth]);
+  } else if (hole.kind === 'counterdrill') {
+    const { cboreDiameter, cboreDepth, cskDiameter, cskAngle } = hole;
+    if (cboreDiameter === undefined || cboreDepth === undefined || cskDiameter === undefined || cskAngle === undefined) return null;
+    const cone = countersinkDepth(cboreDiameter, cskDiameter, cskAngle).value;
+    if (!(cone > 0) || !(cboreDepth > cone)) return null;
+    stepDepth = cboreDepth;
+    top.push(
+      [cskDiameter / 2 + eps * Math.tan((cskAngle * Math.PI) / 360), eps],
+      [cboreDiameter / 2, -cone],
+      [cboreDiameter / 2, -cboreDepth],
+      [radius, -cboreDepth],
+    );
   } else top.push([radius, eps]);
-  const bottom = extent.kind === 'blind' ? extent.depth : Math.max(reach, stepDepth) + 2 * eps;
+  const bottom = holeBottom(extent, Math.max(reach, stepDepth), eps);
   if (!(bottom > stepDepth) && hole.kind !== 'simple') return null;
   top.push([radius, -bottom]);
   const tip =
     extent.kind === 'blind' && extent.drillPointAngle !== undefined ? drillTipHeight(hole.diameter, extent.drillPointAngle).value : 0;
   top.push([0, -bottom - tip]);
   return top;
+}
+
+/** Depth of the cylindrical bottom of a hole tool below the face. */
+function holeBottom(extent: HoleExtent, reach: number, eps: number): number {
+  switch (extent.kind) {
+    case 'blind':
+    case 'up_to_face':
+      return extent.depth;
+    case 'up_to_next':
+      return extent.depth + 2 * eps;
+    case 'through_all':
+      return reach + 2 * eps;
+  }
 }
 
 const toolEntity = (fields: Record<string, unknown>, position: Vec3, rotation: Vec3): Entity =>
@@ -84,30 +112,57 @@ function holeTool(node: Extract<FeatureRecipe, { feature: 'hole' }>, reach: numb
   return unionOf(tools);
 }
 
-/** A pocket tool, its exact outline and its floor depth below the face. */
+/** A pocket tool, its exact outline (and island outlines) and its floor depth below the face. */
 export interface PocketTool {
   readonly recipe: ShapeRecipe;
   readonly outline: PocketOutline;
+  readonly islands: readonly PocketOutline[];
   readonly floorDepth: number;
 }
 
 function pocketTool(frame: FeatureFrame, pocket: PocketSpec, reach: number): PocketTool | null {
   const outline = roundedOutline(pocket.outline, pocket.cornerRadius);
   if (typeof outline === 'string') return null;
+  const islands = (pocket.islands ?? []).map((island) => roundedOutline(island, pocket.cornerRadius));
+  const rounded = islands.filter((island): island is PocketOutline => typeof island !== 'string');
+  if (rounded.length !== islands.length) return null;
   const eps = epsilonOf(pocket.cornerRadius > 0 ? pocket.cornerRadius : 1);
   const floorDepth = pocket.depth === 'through' ? reach + 2 * eps : pocket.depth;
   if (!(floorDepth > 0)) return null;
-  const entity = toolEntity(
-    { kind: 'extrusion', profile: outline.profile, curves: outline.curves, depth: floorDepth + eps },
-    frameToWorld(frame, [0, 0], floorDepth),
-    frameEuler(frame),
+  const cutter: ShapeRecipe = {
+    op: 'solid',
+    entity: toolEntity(
+      { kind: 'extrusion', profile: outline.profile, curves: outline.curves, depth: floorDepth + eps },
+      frameToWorld(frame, [0, 0], floorDepth),
+      frameEuler(frame),
+    ),
+  };
+  const posts = rounded.map(
+    (island): ShapeRecipe => ({
+      op: 'solid',
+      entity: toolEntity(
+        { kind: 'extrusion', profile: island.profile, curves: island.curves, depth: floorDepth + 3 * eps },
+        frameToWorld(frame, [0, 0], floorDepth + eps),
+        frameEuler(frame),
+      ),
+    }),
   );
-  return { recipe: { op: 'solid', entity }, outline, floorDepth };
+  const recipe: ShapeRecipe = posts.length === 0 ? cutter : { op: 'boolean', boolean: 'subtract', a: cutter, b: unionOf(posts) };
+  return { recipe, outline, islands: rounded, floorDepth };
+}
+
+/** The rib tool: the thickened path extruded `height` along the frame normal from the face plane. */
+function ribTool(frame: FeatureFrame, rib: RibSpec): ShapeRecipe | null {
+  const polygon = thickenedPath(rib.path, rib.thickness, rib.symmetric);
+  if (typeof polygon === 'string' || !(rib.height > 0)) return null;
+  const entity = toolEntity({ kind: 'extrusion', profile: polygon, depth: rib.height }, frameToWorld(frame, [0, 0]), frameEuler(frame));
+  return { op: 'solid', entity };
 }
 
 export interface LoweredFeature {
-  /** The compound tool: subtract it from `source`. */
+  /** The compound tool: subtracted from `source`, or fused to it when `mode` is 'union' (rib). */
   readonly tool: ShapeRecipe;
+  readonly mode: 'subtract' | 'union';
   /** Set for a pocket: its outline and floor depth, to find the floor edges on the cut result. */
   readonly pocket?: PocketTool;
 }
@@ -116,12 +171,18 @@ export interface LoweredFeature {
 export function lowerFeature(node: FeatureRecipe, reach: number): LoweredFeature | null {
   if (node.feature === 'hole') {
     const tool = holeTool(node, reach);
-    return tool === null ? null : { tool };
+    return tool === null ? null : { tool, mode: 'subtract' };
+  }
+  if (node.feature === 'rib') {
+    const tool = ribTool(node.frame, node.rib);
+    return tool === null ? null : { tool, mode: 'union' };
   }
   const tool = pocketTool(node.frame, node.pocket, reach);
-  return tool === null ? null : { tool: tool.recipe, pocket: tool };
+  return tool === null ? null : { tool: tool.recipe, mode: 'subtract', pocket: tool };
 }
 
 /** Whether lowering reads the source's extent (through-all hole, through pocket). */
-export const needsReach = (node: FeatureRecipe): boolean =>
-  node.feature === 'hole' ? node.extent.kind === 'through_all' : node.pocket.depth === 'through';
+export const needsReach = (node: FeatureRecipe): boolean => {
+  if (node.feature === 'hole') return node.extent.kind === 'through_all';
+  return node.feature === 'pocket' && node.pocket.depth === 'through';
+};

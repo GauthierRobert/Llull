@@ -39,6 +39,11 @@ export interface KernelOps<S> {
   failureEpoch?(): number;
   solid(entity: Entity): S | null;
   boolean(op: BooleanOp, a: S, b: S): S | null;
+  /**
+   * Optional NATIVE form of a `feature` node (07 FTR M7): the cut result of a hole / pocket on `source` (before any floor fillet), or null when
+   * this node needs the lowering to booleans. `reach` = the source's extent below the face plane (through-all / through depth).
+   */
+  feature?(source: S, node: Extract<ShapeRecipe, { op: 'feature' }>, reach: number): S | null;
   /** Optional rewrite of a boolean's operand recipes before they are built (degenerate-contact guards). */
   prepareBoolean?(a: ShapeRecipe, b: ShapeRecipe): [ShapeRecipe, ShapeRecipe];
   /** `edges`: 0-based unique-edge indices ([] = all); `radiusEnd` varies the radius along each edge. */
@@ -150,10 +155,13 @@ function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe
       const source = child(recipe.source);
       const mesh = source !== null && needsReach(recipe) ? ops.tessellate(source) : null;
       if (source === null || (needsReach(recipe) && mesh === null)) return null;
-      const lowered = lowerFeature(recipe, mesh === null ? 0 : throughReach(mesh, recipe.frame));
-      const tool = lowered === null ? null : child(lowered.tool);
-      if (lowered === null || tool === null) return null;
-      const cut = ops.boolean('subtract', source, tool);
+      const reach = mesh === null ? 0 : throughReach(mesh, recipe.frame);
+      const lowered = lowerFeature(recipe, reach);
+      if (lowered === null) return null;
+      const native = ops.feature?.(source, recipe, reach) ?? null;
+      const tool = native === null ? child(lowered.tool) : null;
+      if (native === null && tool === null) return null;
+      const cut = native ?? (tool === null ? null : ops.boolean(lowered.mode, source, tool));
       const fillet = recipe.feature === 'pocket' ? recipe.pocket.floorFillet : 0;
       if (cut === null || fillet <= 0 || lowered.pocket === undefined) return cut;
       try {

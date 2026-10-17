@@ -1,5 +1,5 @@
 /**
- * add_pocket (07 FTR M2): a pocket with a rounded-corner outline and an optional floor fillet cut into one planar face of a solid. The result
+ * add_pocket (07 FTR M2): a pocket with a rounded-corner outline, optional islands and floor fillet cut into one planar face of a solid. The result
  * is a `mesh` whose `brep` is a `feature(pocket)` node over the target's recipe.
  */
 
@@ -15,10 +15,11 @@ import { noop } from '../noop';
 import { frameToWorld } from '../../geometry/featureFrame';
 import { throughReach } from '../../geometry/featureLowering';
 import { roundedOutline } from '../../geometry/pocketOutline';
-import { isValidPolygon, segmentsIntersect } from '../../lib/polygon';
+import { isValidPolygon, pointInPolygon, polygonCentroid, segmentsIntersect, selfIntersects } from '../../lib/polygon';
 import { type ResolvedFace, resolveFace } from './faceResolve';
 import { expectedShape, localPoints } from './facePoints';
 import { refuse } from './ftr';
+import { depthToFace } from './holeExtents';
 
 const outlineParams = z
   .object({
@@ -50,34 +51,47 @@ function rawVertices(outline: OutlineParams): ReadonlyArray<readonly number[]> |
   ];
 }
 
-const selfIntersects = (polygon: readonly Vec2[]): boolean =>
-  polygon.some((a, i) =>
-    polygon.some(
-      (b, j) =>
-        j > i + 1 &&
-        !(i === 0 && j === polygon.length - 1) &&
-        segmentsIntersect(a, polygon[(i + 1) % polygon.length] as Vec2, b, polygon[(j + 1) % polygon.length] as Vec2),
-    ),
+const edgesOf = (polygon: readonly Vec2[]): Array<readonly [Vec2, Vec2]> =>
+  polygon.map((point, i): readonly [Vec2, Vec2] => [point, polygon[(i + 1) % polygon.length] as Vec2]);
+
+const crossing = (a: readonly Vec2[], b: readonly Vec2[]): boolean =>
+  edgesOf(a).some(([a1, a2]) => edgesOf(b).some(([b1, b2]) => segmentsIntersect(a1, a2, b1, b2)));
+
+/** Why `island` cannot stand inside `outline` alongside the earlier `islands`, or null. */
+function islandProblem(island: readonly Vec2[], outline: readonly Vec2[], earlier: ReadonlyArray<readonly Vec2[]>): string | null {
+  if (!isValidPolygon(island) || selfIntersects(island)) return 'is not a simple closed polygon';
+  if (crossing(island, outline) || !island.every((point) => pointInPolygon(point, outline))) return 'is not inside the outline';
+  const clash = earlier.findIndex(
+    (other) =>
+      crossing(island, other) ||
+      island.some((point) => pointInPolygon(point, other)) ||
+      other.some((point) => pointInPolygon(point, island)),
   );
+  return clash === -1 ? null : `overlaps island ${clash}`;
+}
 
 /**
  * @affects replaces `target` by 1 mesh entity (the part with the pocket cut, `brep` = feature(pocket) over the target's recipe)
- * @invariant corners rounded with exact arcs; floorFillet <= cornerRadius; the pocket stays inside the picked face; needs an exact kernel for a floor fillet
- * @failure missing / non-solid target, no kernel, face not found / not planar, open / self-crossing / too-small outline, outline outside the face, floorFillet >
- *   cornerRadius, depth beyond the stock, kernel refusal -> rejected no-op with an FTR_* code
+ * @invariant corners rounded with exact arcs; floorFillet <= cornerRadius; the pocket stays inside the picked face unless open=true; islands stay inside the
+ *   outline and keep their material; needs an exact kernel for a floor fillet
+ * @failure missing / non-solid target, no kernel, face not found / not planar, open / self-crossing / too-small outline, outline outside the face (open=false),
+ *   bad island, floorFillet > cornerRadius, depth beyond the stock, bad up-to face, kernel refusal -> rejected no-op with an FTR_* code
  */
 export const addPocket = defineCommand({
   name: 'add_pocket',
   annotations: { requiresKernel: true },
   description:
     'Cut a pocket into a planar face of a 3D solid: a closed outline (rectangle or polygon) whose vertical corners are rounded by ' +
-    'cornerRadius (exact arcs) and whose floor edges may carry a floorFillet (exact kernel only). Give a depth, or through=true to cut ' +
-    'through the part. The face is picked by a world point (face.near); coordinates are [u, v] in the face frame (origin = the world origin ' +
+    'cornerRadius (exact arcs) and whose floor edges may carry a floorFillet (exact kernel only). Give exactly one of depth, through=true (cut ' +
+    'through the part) or upToFace (stop at the plane of a parallel planar face below). islands are closed polygons inside the outline that ' +
+    'stay as material posts (their corners are rounded by cornerRadius too). The pocket must stay inside the picked face unless open=true (it ' +
+    'may then run out over a side of the part, e.g. a step). The face is picked by a world point (face.near); coordinates are [u, v] in the face frame (origin = the world origin ' +
     'projected on the face plane, u = world X (or Y) projected on it, v = normal x u) or, with pointsFrame "world_xy", world [x, y]. All ' +
     'lengths are in the document length unit. cornerRadius must be >= floorFillet and >= toolDiameter / 2 for machinable corners ' +
     '(check_machining reports it). Consumes target, creates one mesh entity. Refusals carry error.code: FTR_FACE_NOT_FOUND, ' +
     'FTR_FACE_NOT_PLANAR, FTR_PROFILE_NOT_CLOSED, FTR_POCKET_CORNER_TOO_LARGE, FTR_POCKET_FILLET_GT_CORNER, FTR_POCKET_DEPTH_EXCEEDS_STOCK, ' +
-    'FTR_HOLE_POINT_OUTSIDE_FACE (outline leaves the face), FTR_NEEDS_EXACT_KERNEL (floor fillet), FTR_FEATURE_BUILD_FAILED. Next: ' +
+    'FTR_HOLE_POINT_OUTSIDE_FACE (outline leaves the face without open=true), FTR_POCKET_ISLAND_INVALID, FTR_UP_TO_TARGET_INVALID, ' +
+    'FTR_NEEDS_EXACT_KERNEL (floor fillet), FTR_FEATURE_BUILD_FAILED. Next: ' +
     'check_machining, recognize_features.',
   params: z.object({
     target: z.string().describe('Id of the 3D solid to cut (a primitive or a kernel result).'),
@@ -85,11 +99,33 @@ export const addPocket = defineCommand({
       .object({ near: vec3('World point [x, y, z] on the planar face, in document length units.') })
       .describe('The planar face to cut into, picked by a world point.'),
     outline: outlineParams,
-    pointsFrame: z.enum(['face', 'world_xy']).optional().describe('Coordinates of the outline: "face" (default) or "world_xy".'),
+    islands: z
+      .array(z.array(z.array(z.number())))
+      .optional()
+      .describe(
+        'Optional material posts left standing inside the pocket: each a closed polygon of >= 3 [u, v] vertices (same pointsFrame as the outline), ' +
+          'simple, fully inside the outline and not overlapping another island, in document length units.',
+      ),
+    pointsFrame: z
+      .enum(['face', 'world_xy'])
+      .optional()
+      .describe('Coordinates of the outline and islands: "face" (default) or "world_xy".'),
     depth: z
       .number()
       .optional()
-      .describe('Pocket depth below the face, in document length units; must be inside the stock. Omit with through=true.'),
+      .describe('Pocket depth below the face, in document length units; must be inside the stock. Omit with through=true or upToFace.'),
+    upToFace: z
+      .object({ near: vec3('World point [x, y, z] on the planar target face, in document length units.') })
+      .optional()
+      .describe(
+        'Stop the floor at the plane of this planar face, which must be parallel to the picked face and below it. Omit depth / through.',
+      ),
+    open: z
+      .boolean()
+      .optional()
+      .describe(
+        'true = the outline may leave the picked face (the pocket runs out over a side of the part); it must still overlap the face. Default false.',
+      ),
     through: z.boolean().optional().describe('true = cut through the whole part along the face normal (no depth, no floorFillet).'),
     cornerRadius: z
       .number()
@@ -108,7 +144,8 @@ export const addPocket = defineCommand({
       .describe('Planned cutter diameter, in document length units; recorded for check_machining.'),
   }),
   run: (doc, params, ctx): CommandResult => {
-    const { target, face, outline, pointsFrame = 'face', depth, through = false, cornerRadius, floorFillet, toolDiameter } = params;
+    const { target, face, outline, islands, pointsFrame = 'face', depth, through = false, upToFace, open = false } = params;
+    const { cornerRadius, floorFillet, toolDiameter } = params;
     const fail = (code: FtrCode, why: string, remediation: string, ...paths: string[]): CommandResult =>
       refuse(doc, 'add_pocket', code, why, remediation, [target], paths);
     const entity = doc.entities[target];
@@ -125,12 +162,15 @@ export const addPocket = defineCommand({
         'floorFillet',
         'cornerRadius',
       );
-    if (through ? depth !== undefined || floorFillet > 0 : depth === undefined || !(depth > 0))
+    const extents = [depth !== undefined, through, upToFace !== undefined].filter(Boolean).length;
+    if (extents !== 1 || (depth !== undefined && !(depth > 0)) || (through && floorFillet > 0))
       return fail(
         'FTR_POCKET_DEPTH_EXCEEDS_STOCK',
-        through ? 'through=true takes no depth and no floorFillet' : 'depth must be > 0 (or give through=true)',
-        "reduce depth or use 'through'",
+        through && floorFillet > 0 ? 'through=true takes no floorFillet' : 'give exactly one of depth (> 0), through=true or upToFace',
+        "reduce depth, or use 'through' / 'upToFace'",
         'depth',
+        'through',
+        'upToFace',
       );
     if (floorFillet > 0 && !kernel.supports('fillet'))
       return fail(
@@ -157,7 +197,41 @@ export const addPocket = defineCommand({
         'pass a closed, simple 2D profile',
         'outline',
       );
-    return cut(doc, { entity, source, resolved, polygon: placed.local, depth, cornerRadius, floorFillet, toolDiameter }, kernel, fail);
+    const posts = (islands ?? []).map((island) => localPoints(resolved.frame, island, pointsFrame));
+    const badIsland = posts.findIndex(
+      (post, index) =>
+        post.bad.length > 0 ||
+        islandProblem(
+          post.local,
+          placed.local,
+          posts.slice(0, index).map((earlier) => earlier.local),
+        ) !== null,
+    );
+    if (badIsland !== -1) {
+      const post = posts[badIsland] as { local: Vec2[]; bad: number[] };
+      const why =
+        post.bad.length > 0
+          ? `has points that are not ${expectedShape[pointsFrame]}`
+          : islandProblem(
+              post.local,
+              placed.local,
+              posts.slice(0, badIsland).map((earlier) => earlier.local),
+            );
+      return fail(
+        'FTR_POCKET_ISLAND_INVALID',
+        `island ${badIsland} ${why}`,
+        'islands are simple closed polygons inside the outline',
+        `islands.${badIsland}`,
+      );
+    }
+    let floorDepth = depth;
+    if (upToFace !== undefined) {
+      const reach = depthToFace(kernel, source, resolved.frame, upToFace.near, 'upToFace.near');
+      if (typeof reach !== 'number') return fail('FTR_UP_TO_TARGET_INVALID', reach.why, reach.remediation, ...reach.paths);
+      floorDepth = reach;
+    }
+    const plan = { entity, source, resolved, polygon: placed.local, islands: posts.map((post) => post.local), depth: floorDepth, open };
+    return cut(doc, { ...plan, cornerRadius, floorFillet, toolDiameter }, kernel, fail);
   },
 });
 
@@ -166,6 +240,8 @@ interface PocketPlan {
   readonly source: ShapeRecipe;
   readonly resolved: ResolvedFace;
   readonly polygon: readonly Vec2[];
+  readonly islands: ReadonlyArray<readonly Vec2[]>;
+  readonly open: boolean;
   readonly depth: number | undefined;
   readonly cornerRadius: number;
   readonly floorFillet: number;
@@ -178,12 +254,28 @@ function cut(
   kernel: GeometryKernel,
   fail: (code: FtrCode, why: string, remediation: string, ...paths: string[]) => CommandResult,
 ): CommandResult {
-  const { entity, source, resolved, polygon, depth, cornerRadius, floorFillet, toolDiameter } = plan;
+  const { entity, source, resolved, polygon, islands, open, depth, cornerRadius, floorFillet, toolDiameter } = plan;
   const outline = roundedOutline(polygon, cornerRadius);
   if (typeof outline === 'string')
     return fail('FTR_POCKET_CORNER_TOO_LARGE', outline, 'reduce cornerRadius so the arcs fit the outline edges', 'cornerRadius');
-  if (outline.profile.some((point) => !resolved.contains(frameToWorld(resolved.frame, point))))
-    return fail('FTR_HOLE_POINT_OUTSIDE_FACE', 'the outline leaves the picked face', 'keep the pocket inside the face outline', 'outline');
+  const tooBig = islands.map((island) => roundedOutline(island, cornerRadius)).find((rounded) => typeof rounded === 'string');
+  if (typeof tooBig === 'string')
+    return fail('FTR_POCKET_CORNER_TOO_LARGE', `island: ${tooBig}`, 'reduce cornerRadius so the arcs fit the island edges', 'cornerRadius');
+  const onFace = (point: Vec2): boolean => resolved.contains(frameToWorld(resolved.frame, point));
+  if (!open && outline.profile.some((point) => !onFace(point)))
+    return fail(
+      'FTR_HOLE_POINT_OUTSIDE_FACE',
+      'the outline leaves the picked face',
+      'keep the pocket inside the face outline, or set open=true for a pocket that runs out over a side',
+      'outline',
+    );
+  if (open && ![...outline.profile, polygonCentroid(polygon)].some(onFace))
+    return fail(
+      'FTR_HOLE_POINT_OUTSIDE_FACE',
+      'an open pocket must still overlap the picked face',
+      'move the outline onto the face',
+      'outline',
+    );
   const shape = kernel.evaluate(source);
   const mesh = shape === null ? null : kernel.tessellate(shape);
   if (depth !== undefined && mesh !== null && depth >= throughReach(mesh, resolved.frame))
@@ -200,6 +292,7 @@ function cut(
     frame: resolved.frame,
     pocket: {
       outline: polygon,
+      ...(islands.length === 0 ? {} : { islands }),
       depth: depth ?? 'through',
       cornerRadius,
       floorFillet,
