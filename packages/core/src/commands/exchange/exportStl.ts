@@ -4,6 +4,7 @@ import type { Vec3 } from '../../model/types';
 import { report } from '../noop';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
+import { confirmExportControlled, exportRefusal } from '../materials/exportGate';
 import { uint8ArrayToBase64 } from '../../lib/base64';
 import { collectExportParts, exportSummary, type ExportPart } from '../../geometry/entityTriangles';
 import type { Triangle } from '../../geometry/triangles';
@@ -99,6 +100,7 @@ export const exportStl = defineCommand({
     'name: optional solid name embedded in the STL header (default: the entity name when exactly one named ' +
     'entity is exported, else "llull"). perEntity: one named solid block per entity (ASCII). Does NOT modify the document.',
   params: z.object({
+    confirmExportControlled,
     format: z
       .enum(['ascii', 'binary'])
       .optional()
@@ -132,7 +134,9 @@ export const exportStl = defineCommand({
           'Use a meaningful name to help downstream tools identify the mesh.',
       ),
   }),
-  run: (doc, params): CommandResult => {
+  run: (doc, params, ctx): CommandResult => {
+    const refused = exportRefusal(doc, 'export_stl', 'stl', params.confirmExportControlled, ctx);
+    if (refused !== null) return refused;
     const fmt: 'ascii' | 'binary' = params.format === 'binary' ? 'binary' : 'ascii';
     const collected = collectExportParts(doc, params.entityIds);
     const tris = collected.parts.flatMap((part) => part.tris);

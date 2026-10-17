@@ -94,6 +94,12 @@ export interface PropertyCondition {
   readonly rrr?: number;
   readonly environment?: string;
   readonly note?: string;
+  /** Product thickness range the value applies to (08 MAT allowables), in `unit`. */
+  readonly thickness?: { readonly min: number; readonly max: number; readonly unit: string };
+  /** Bearing edge distance ratio e/D (08 MAT Fbru / Fbry). */
+  readonly edOverD?: number;
+  /** Exposure time at temperature, hours (08 MAT temperature tables). */
+  readonly exposureHours?: number;
 }
 
 export interface PropertyUncertainty {

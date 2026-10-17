@@ -7,6 +7,7 @@
 import type { CommandResult } from '../types';
 import { report } from '../noop';
 import { defineCommand, z } from '../schema';
+import { confirmExportControlled, exportRefusal } from '../materials/exportGate';
 import { uint8ArrayToBase64 } from '../../lib/base64';
 import { collectExportParts, exportSummary } from '../../geometry/entityTriangles';
 import type { CadDocument } from '../../model/types';
@@ -75,6 +76,7 @@ function withInlineBuffer(scene: GltfScene): Record<string, unknown> {
  * @invariant glTF JSON is valid 2.0 (asset.version="2.0"); GLB header magic=0x46546C67
  * @failure 2D-only or unknown entities silently skipped; empty → triangleCount:0, nodeCount:0
  * @failure never throws for user error
+ * @failure the document uses ITAR / EAR material records -> MAT_EXPORT_CONTROLLED, nothing exported (MAT_HUMAN_GATE for an agent confirmation)
  */
 export const exportGltf = defineCommand({
   name: 'export_gltf',
@@ -100,6 +102,7 @@ export const exportGltf = defineCommand({
     'binary: false (default) → data.text contains JSON; true → data.base64 contains GLB. Does NOT modify the document.',
   params: z.object({
     entityIds: entityIdsField,
+    confirmExportControlled,
     binary: z
       .boolean()
       .optional()
@@ -110,8 +113,10 @@ export const exportGltf = defineCommand({
           'Most web viewers accept JSON glTF; most desktop importers accept GLB.',
       ),
   }),
-  run: (doc, params): CommandResult => {
+  run: (doc, params, ctx): CommandResult => {
     const { entityIds, binary = false } = params;
+    const refused = exportRefusal(doc, 'export_gltf', 'gltf', params.confirmExportControlled, ctx);
+    if (refused !== null) return refused;
     const collected = collectExportParts(doc, entityIds);
     const ids = collected.parts.map((part) => part.id);
     const scene = buildGltfScene(collectSceneParts(doc, ids), collectDecalParts(doc, ids), groupIndex(doc));

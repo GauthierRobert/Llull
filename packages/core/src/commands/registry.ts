@@ -30,6 +30,7 @@ import { vnvCommands } from './vnv/catalog';
 import { materialLabCommands } from './materiallab/catalog';
 import { thermalCommands } from './thermal/catalog';
 import { thermomechCommands } from './thermomech/catalog';
+import { materialCommands } from './materials/catalog';
 
 registerCommands('core', [
   ...documentCommands,
@@ -54,6 +55,7 @@ registerCommands('core', [
   ...materialLabCommands,
   ...thermalCommands,
   ...thermomechCommands,
+  ...materialCommands,
 ]);
 onPluginInstalled((plugin) => registerCommands(`plugin '${plugin.name}'`, plugin.commands));
 

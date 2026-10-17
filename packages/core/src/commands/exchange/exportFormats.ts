@@ -3,6 +3,7 @@
 import type { CommandResult } from '../types';
 import { report } from '../noop';
 import { defineCommand, z } from '../schema';
+import { confirmExportControlled, exportRefusal } from '../materials/exportGate';
 import { collectExportParts, exportSummary, type ExportPart } from '../../geometry/entityTriangles';
 import { facetNormal } from '../../geometry/tessellation';
 
@@ -64,6 +65,7 @@ export const exportObj = defineCommand({
     'units: optional units label embedded in the OBJ comment (defaults to doc units). Does NOT modify the document.',
   params: z.object({
     entityIds: entityIdsField,
+    confirmExportControlled,
     units: z
       .string()
       .optional()
@@ -72,8 +74,10 @@ export const exportObj = defineCommand({
           'Defaults to the document units setting. Informational only — OBJ has no unit standard.',
       ),
   }),
-  run: (doc, params): CommandResult => {
+  run: (doc, params, ctx): CommandResult => {
     const { entityIds, units } = params;
+    const refused = exportRefusal(doc, 'export_obj', 'obj', params.confirmExportControlled, ctx);
+    if (refused !== null) return refused;
     // One comment line only: a newline in the label would inject arbitrary OBJ records.
     const unitLabel = (units ?? doc.units).replace(/[\r\n\u2028\u2029]+/g, ' ').trim() || doc.units;
     const collected = collectExportParts(doc, entityIds);

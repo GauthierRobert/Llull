@@ -14,6 +14,7 @@ import { dynamicsProblems } from './dynamicsValidation';
 import { prototypeProblems } from './prototypeValidation';
 import { kernelSliceProblems } from './kernelValidation';
 import { validateCamera, validateLayer, validateEntityValue, validateMaterialValue, validateParameterValue } from './guards';
+import { materialLibraryProblems } from './materialRecordValidation';
 
 const VALID_CONSTRAINT_KINDS: ReadonlySet<string> = new Set(CONSTRAINT_KINDS);
 
@@ -97,6 +98,7 @@ const PROTOTYPE_KEYED_RECORDS = [
   'entities',
   'layers',
   'materials',
+  'materialLibraries',
   'parameters',
   'animations',
   'configurations',
@@ -225,6 +227,7 @@ export function validateDocumentValues(v: Record<string, unknown>): string[] {
     if (!validateLayer(layer)) errors.push(`layer entry is malformed: ${JSON.stringify(layer)}`);
   }
   validateSection(v['materials'], validateMaterialValue);
+  errors.push(...materialLibraryProblems(v['materialLibraries'], v['materials']));
   validateSection(v['parameters'], validateParameterValue);
   validateSection(v['recipes'], validateRecipeValue);
   validateSection(v['constraints'], validateConstraintValue);
