@@ -40,6 +40,7 @@ export type BodyMassDistribution = Pick<BodyMassProperties, 'mass' | 'centerOfMa
  */
 export function bodyMassProperties(doc: CadDocument, body: RigidBody): BodyMassProperties | { error: string } {
   const metres = toMetres(doc, 1);
+  const unitVolume = metres ** 3;
   const fallback: DensityFallback =
     body.density !== undefined
       ? { kgPerM3: body.density, source: `body '${body.id}' density ${body.density} kg/m^3`, defaulted: false }
@@ -58,7 +59,7 @@ export function bodyMassProperties(doc: CadDocument, body: RigidBody): BodyMassP
     sources.add(density.source);
     for (const reason of density.unverifiedReasons) reasons.add(reason);
     defaulted ||= density.defaulted;
-    return density.gPerDocUnit3 / 1000;
+    return density.materialId === undefined ? density.kgPerM3 * unitVolume : density.gPerDocUnit3 / 1000;
   };
   const parts: MassProperties[] = [];
   for (const id of body.entityIds) {

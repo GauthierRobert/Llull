@@ -105,6 +105,8 @@ interface MassTotal {
   readonly sources: readonly string[];
   readonly defaulted: boolean;
   readonly unverifiedReasons: readonly string[];
+  /** The one density used, for a single solid (an assembly reports the mean). */
+  readonly gPerDocUnit3?: number;
 }
 
 type MassFailure = { readonly error: string; readonly code?: string; readonly remediation?: string; readonly ids?: readonly string[] };
@@ -124,6 +126,7 @@ function partMass(
   if (!density.available) return { error: density.reason, code: density.code, remediation: density.remediation, ids: [id] };
   return {
     massG: volume * density.gPerDocUnit3,
+    gPerDocUnit3: density.gPerDocUnit3,
     sources: [density.source],
     defaulted: density.defaulted,
     unverifiedReasons: density.unverifiedReasons,
@@ -140,6 +143,7 @@ function instanceMass(
   inheritedMaterialId: string | undefined,
   fallback: DensityFallback | undefined,
   ctx: ExecutionContext | undefined,
+  rootId: string = instance.id,
 ): MassTotal | MassFailure {
   const component = doc.components[instance.componentId];
   if (!component) return { error: `instance '${instance.id}' references missing component '${instance.componentId}'.` };
@@ -148,9 +152,9 @@ function instanceMass(
     const materialId = baked.materialId ?? instance.materialId ?? inheritedMaterialId;
     const part =
       baked.kind === 'instance'
-        ? instanceMass(doc, baked, materialId, fallback, ctx)
+        ? instanceMass(doc, baked, materialId, fallback, ctx, rootId)
         : ((volume): MassTotal | MassFailure => {
-            const mass = partMass(doc, volume, materialId, fallback, instance.id);
+            const mass = partMass(doc, volume, materialId, fallback, rootId);
             return 'error' in mass ? mass : { volume, ...mass };
           })(childVolume(doc, baked, ctx));
     if ('error' in part) return part;
@@ -174,7 +178,12 @@ function densityParam(
   if (typeof density === 'number') {
     if (!(density > 0))
       return { error: `density must be > 0, got ${String(density)}.`, code: 'MAT_DENSITY_INVALID', remediation: 'give a density > 0' };
-    return { kgPerM3: kgPerM3FromDocDensity(doc, density), source: `density param ${density} g/${doc.units}³`, defaulted: false };
+    return {
+      kgPerM3: kgPerM3FromDocDensity(doc, density),
+      gPerDocUnit3: density,
+      source: `density param ${density} g/${doc.units}³`,
+      defaulted: false,
+    };
   }
   const converted = convertValue(density.value, density.unit, 'kg/m^3');
   if (isUnitFailure(converted))
@@ -283,7 +292,9 @@ export const massProperties = defineCommand({
         volumeData satisfies MassPropertiesData,
       );
     }
-    const meanDensity = volume > 0 ? massG / volume : 0;
+    const fallbackDensity = resolveDensity(doc, undefined, fallback);
+    const meanDensity =
+      total.gPerDocUnit3 ?? (volume > 0 ? massG / volume : fallbackDensity?.available === true ? fallbackDensity.gPerDocUnit3 : 0);
     const mass = massIn(massG, massUnit);
     const data: MassPropertiesData = {
       ...volumeData,

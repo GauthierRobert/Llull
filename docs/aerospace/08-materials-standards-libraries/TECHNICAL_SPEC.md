@@ -546,3 +546,9 @@ Tests: `tests/unit/aeroMassDensity.test.ts`. It covers VC-MAT-01, VC-MAT-03 (rel
 - VC-MAT-04 d (plate with a Ø10 hole) needs a kernel boolean. It is covered when 01 M3 lands (AERO-2). VC-MAT-02 and the rest of
   VC-MAT-22 need M2 records and `check_materials`.
 - Codes added: `MAT_DENSITY_INVALID` (density ≤ 0, or a model that gives ≤ 0) and `DYN_DENSITY_DEFAULTED` (warning).
+- Legacy numbers are unchanged to the last digit. A legacy `Material.density` or a bare-number param is used as given in
+  g/(doc unit)³; kg/m³ is only derived from it, never the other way round. A legacy density ≤ 0 or NaN in a loaded document is
+  refused with `MAT_DENSITY_INVALID`.
+- Follow-up: in dynamics, a density refusal reaches `add_rigid_body` / `simulate_motion` as a message prefixed with the code
+  (`PROP_…: body 'b': …`). It is not yet a structured `CommandResult.error`. This is part of the AGENT_FIRST rule 5 dynamics
+  follow-up (`DYN_*` codes).

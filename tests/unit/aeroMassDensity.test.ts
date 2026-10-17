@@ -195,4 +195,71 @@ describe('AERO-1 / 08 M1: one density resolver, unit-correct mass', () => {
     const ambiguous = withModel(modelled, densityModel('rho_b', 2.8, 'g/cm^3', 'typical'));
     expect(bodyMassProperties(ambiguous, body)).toMatchObject({ error: expect.stringContaining('PROP_NO_MODEL_FOR_PROPERTY') as unknown });
   });
+
+  it('keeps legacy numbers bit-identical in every document unit (no kg/m^3 round trip)', () => {
+    for (const units of ['in', 'ft'] as const) {
+      const doc = run(createEmptyDocument(), 'set_units', { units });
+      const added = execute(doc, 'add_box', { size: [1, 2, 3] });
+      const id = added.affected[0] ?? '';
+      expect(massOf(added.document, id, { density: 7.85 })).toMatchObject({ density: 7.85, massG: 6 * 7.85 });
+      const withMaterial = run(
+        run(added.document, 'create_material', { name: 'm', density: 0.0027, color: '#aaaaaa', metalness: 0, roughness: 0 }),
+        'assign_material',
+        { materialName: 'm', entityIds: [id] },
+      );
+      expect(massOf(withMaterial, id)).toMatchObject({ density: 0.0027, massG: 6 * 0.0027 });
+    }
+  });
+
+  /** A box (with `material` when given) and a sphere in one component, inserted once. */
+  function assemblyWith(prepare: (doc: CadDocument, boxId: string) => CadDocument): { doc: CadDocument; instanceId: string } {
+    const box = execute(createEmptyDocument(), 'add_box', { size: [2, 2, 2] });
+    const boxId = box.affected[0] ?? '';
+    const sphere = execute(prepare(box.document, boxId), 'add_sphere', { radius: 1, position: [10, 0, 0] });
+    const component = execute(sphere.document, 'create_component', {
+      name: 'Part',
+      entityIds: [boxId, sphere.affected[0] ?? ''],
+      componentId: 'comp-part',
+    });
+    const inserted = execute(component.document, 'insert_instance', { componentId: 'comp-part', position: [100, 0, 0] });
+    return { doc: inserted.document, instanceId: inserted.affected[0] ?? '' };
+  }
+  const material = (doc: CadDocument, boxId: string): CadDocument =>
+    run(
+      run(doc, 'create_material', { name: 'alloy', density: 0.0027, color: '#aaaaaa', metalness: 1, roughness: 0.4 }),
+      'assign_material',
+      { materialName: 'alloy', entityIds: [boxId] },
+    );
+
+  it('assemblies: an unusable density model inside a part refuses (no fallback to the param), with the top-level id', () => {
+    const { doc, instanceId } = assemblyWith((d, boxId) =>
+      withModel(withModel(material(d, boxId), densityModel('rho_a', 2.8, 'g/cm^3', 'typical')), densityModel('rho_b', 2.7, 'g/cm^3', 'S')),
+    );
+    const result = execute(doc, 'mass_properties', { entityId: instanceId, density: 1 });
+    expect(result.data).toBeUndefined();
+    expect(result.error).toMatchObject({ code: 'PROP_NO_MODEL_FOR_PROPERTY', ids: [instanceId] });
+  });
+
+  it('assemblies: a part without density and no param gives the volume only; with a param, several sources are listed', () => {
+    const { doc, instanceId } = assemblyWith(material);
+    const partial = execute(doc, 'mass_properties', { entityId: instanceId });
+    expect(partial.data).toEqual({ volume: expect.closeTo(8 + (4 / 3) * Math.PI, 9) as unknown, volumeUnit: 'mm³' });
+    expect(partial.summary).toContain('no mass');
+    const full = massOf(doc, instanceId, { density: 0.001 });
+    expect(full.massG).toBeCloseTo(8 * 0.0027 + (4 / 3) * Math.PI * 0.001, 12);
+    expect(full.densitySource).toBe('several (see densitySources)');
+    expect(full.densitySources).toHaveLength(2);
+  });
+
+  it('a legacy density <= 0 in a loaded document is refused, not used', () => {
+    const { doc, id } = part('mm', ['add_box', { size: [1, 1, 1] }]);
+    const broken: CadDocument = {
+      ...doc,
+      materials: {
+        ...doc.materials,
+        alloy: { ...(doc.materials.alloy ?? { name: 'alloy', density: 1, color: '#aaaaaa', metalness: 0, roughness: 0 }), density: 0 },
+      },
+    };
+    expect(execute(broken, 'mass_properties', { entityId: id }).error?.code).toBe('MAT_DENSITY_INVALID');
+  });
 });
