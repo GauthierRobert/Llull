@@ -35,6 +35,8 @@ interface Face {
   readonly normal: Vec3;
   readonly owner: number;
   readonly hatch: boolean;
+  /** A 2D stroke: depth-tested against the solids but never outlined. */
+  readonly line?: true;
 }
 
 interface Buffers {
@@ -111,6 +113,30 @@ function fill(buffers: Buffers, loops: readonly (readonly ScreenPoint[])[], face
   }
 }
 
+/**
+ * A stroke from `a` to `b`, `halfWidth` pixels each side, drawn where it is not behind a solid. It is pulled toward the viewer by
+ * `bias` so a sketch lying ON a face stays visible.
+ */
+function strokeSegment(buffers: Buffers, a: ScreenPoint, b: ScreenPoint, faceIndex: number, halfWidth: number, bias: number): void {
+  const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y)));
+  const radius = Math.ceil(halfWidth);
+  for (let k = 0; k <= steps; k += 1) {
+    const t = k / steps;
+    const cx = a.x + (b.x - a.x) * t;
+    const cy = a.y + (b.y - a.y) * t;
+    const z = a.z + (b.z - a.z) * t - bias;
+    for (let dy = -radius; dy <= radius; dy += 1)
+      for (let dx = -radius; dx <= radius; dx += 1) {
+        const x = Math.floor(cx) + dx;
+        const y = Math.floor(cy) + dy;
+        if (x < 0 || y < 0 || x >= buffers.width || y >= buffers.height || dx * dx + dy * dy > halfWidth * halfWidth + 0.5) continue;
+        const index = y * buffers.width + x;
+        if (z > (buffers.depth[index] ?? Infinity)) continue;
+        buffers.face[index] = faceIndex;
+      }
+  }
+}
+
 /** Darkens pixels on a crease, a depth jump or an entity boundary (and the silhouette against the background). */
 function outline(buffers: Buffers, depthJump: number): Uint8Array {
   const { width, height, depth, face, faces } = buffers;
@@ -118,6 +144,7 @@ function outline(buffers: Buffers, depthJump: number): Uint8Array {
   const differs = (a: number, b: number): boolean => {
     const faceA = faces[face[a] ?? -1];
     const faceB = faces[face[b] ?? -1];
+    if (faceA?.line === true || faceB?.line === true) return false;
     if (faceA === undefined || faceB === undefined) return faceA !== faceB;
     if (faceA === faceB) return false;
     if (faceA.owner !== faceB.owner) return true;
@@ -137,8 +164,8 @@ function outline(buffers: Buffers, depthJump: number): Uint8Array {
 const SUPERSAMPLE_MAX_PIXELS = 1_200_000;
 
 /**
- * The filled (non-stroke) polygons drawn as an `<image>` element (PNG data URL) covering the `width` × `height` canvas, or '' when there is
- * nothing to fill. Strokes are left to the vector layer.
+ * The polygons drawn as an `<image>` element (PNG data URL) covering the `width` × `height` canvas, or '' when there is nothing to fill
+ * (a pure 2D drawing stays vector). Strokes are depth-tested against the solids, so a sketch behind a part is hidden by it.
  * @pure
  */
 export function rasterLayer(
@@ -151,6 +178,7 @@ export function rasterLayer(
 ): string {
   const filled = polygons.filter((p) => !p.stroke);
   if (filled.length === 0) return '';
+  const strokes = polygons.filter((p) => p.stroke);
   const samples = width * height > SUPERSAMPLE_MAX_PIXELS ? 1 : SUPERSAMPLE;
   const w = width * samples;
   const h = height * samples;
@@ -188,6 +216,16 @@ export function rasterLayer(
     const diffuse = Math.max(0, facing[0] * LIGHT[0] + facing[1] * LIGHT[1] + facing[2] * LIGHT[2]);
     const factor = AMBIENT + (1 - AMBIENT) * diffuse;
     fill(buffers, [polygon.verts.map(toScreen)], { color: [r * factor, g * factor, b * factor], normal: facing, owner, hatch: false });
+  }
+  for (const stroke of strokes) {
+    const faceIndex = buffers.faces.length;
+    buffers.faces.push({ color: rgbOf(stroke.color), normal: [0, 0, 1], owner: -1, hatch: false, line: true });
+    const points = stroke.verts.map(toScreen);
+    for (let i = 0; i + 1 < points.length; i += 1) {
+      const a = points[i];
+      const b = points[i + 1];
+      if (a !== undefined && b !== undefined) strokeSegment(buffers, a, b, faceIndex, 0.75 * samples, sceneRadius * 0.002);
+    }
   }
   const edges = outline(buffers, sceneRadius * 0.01);
   const rgba = new Uint8Array(width * height * 4);

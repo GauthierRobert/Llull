@@ -66,9 +66,9 @@ Always one call per plan (`llull run plan.json`), not a loop of single calls.
    `llull run plan.json --validate --app` → fix issues → `llull run plan.json --app`
    (or `--doc part.llull` instead of `--app`).
    The report prints one line per step with the ids it created.
-   **With `--app`, end with `llull fit_view --app`**: the camera is document state and is NOT
-   refit by a plan (nor by `clear_document`), so a part much smaller than what was framed before
-   shows as a speck, or sits hidden inside earlier geometry. Run `llull describe_scene --app` first:
+   **Camera:** it is document state; `llull run` frames it after a plan that built geometry
+   without setting it (`fit_view direction=current`; `--no-fit` keeps it). Single `llull <cmd>`
+   edits do not refit: end those with `llull fit_view --app`. Run `llull describe_scene --app` first:
    if the open document already has entities, ask the user before building into it or clearing it.
 4. **Inspect / measure** (read-only, never written): `llull describe_scene`,
    `llull mass_properties entityId=mesh-4.1`, `llull check_model`. FEA / thermal results:

@@ -65,7 +65,9 @@ export function buildSvg(
       ...underlays.map((image) => underlaySvg(image, project)),
       ...(rasterRadius === null
         ? [...filled, ...stroked].map((poly) => polygonSvg(poly, project))
-        : [rasterLayer(filled, cam, orthoHalf, width, height, rasterRadius), ...stroked.map((poly) => polygonSvg(poly, project))]),
+        : filled.length === 0
+          ? stroked.map((poly) => polygonSvg(poly, project))
+          : [rasterLayer([...filled, ...stroked], cam, orthoHalf, width, height, rasterRadius)]),
       buildAxisTriad(project, cam.target, width, height, orthoHalf),
       `  <text x="8" y="20" font-family="monospace" font-size="13" fill="#aaaacc">${viewName.toUpperCase()} | ${entityCount} entit${entityCount === 1 ? 'y' : 'ies'}</text>`,
     ],

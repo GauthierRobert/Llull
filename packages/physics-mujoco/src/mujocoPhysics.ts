@@ -144,6 +144,9 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
     };
     const steps = Math.round(options.duration / options.timestep);
     const stride = Math.max(1, Math.round(options.sampleInterval / options.timestep));
+    // Reaction peaks are tracked between samples at up to PEAK_RESOLUTION × the sample rate (every step when samples are that close):
+    // a reaction read is a full forward pass, so reading every step would double the cost of the run.
+    const peakStride = Math.max(1, Math.ceil(stride / PEAK_RESOLUTION));
     record();
     let previousVelocity = joints.map((joint) => data.qvel[joint.dof] ?? 0);
     for (let step = 1; step <= steps; step++) {
@@ -152,7 +155,7 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
       if (!data.qvel.every(Number.isFinite)) throw new Error(`simulation diverged at t = ${data.time.toFixed(4)} s.`);
       if (slots.length > 0) residual = Math.max(residual, reader.residual(data));
       const sampled = step % stride === 0 || step === steps;
-      if (wantReactions) {
+      if (wantReactions && (sampled || step % peakStride === 0)) {
         const read = readReactions();
         if (sampled) record(read);
       } else if (sampled) record();
@@ -167,6 +170,9 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
     mjModel.delete();
   }
 }
+
+/** Reaction reads per sample interval when tracking peaks between samples. */
+const PEAK_RESOLUTION = 50;
 
 function jointDof(joints: readonly JointSlot[], id: string): number {
   return joints.find((joint) => joint.id === id)?.dof ?? 0;

@@ -4,12 +4,13 @@
  */
 
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { setGeometryKernel } from '@core/geometry/kernel';
+import { createEmptyDocument } from '@core/model/types';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
 import { ctxWith, docWith, inchDocument, ok, sampleCatalogFile } from '../../tests/unit/aero/fasteners/fixtures';
@@ -333,6 +334,30 @@ describe('llull CLI — local document', () => {
     const fresh = capture();
     await runCli(['undo', '--doc', path.join(workDir, 'other.json')], fresh.io);
     expect(fresh.out[0]).toMatch(/Nothing to undo/);
+  });
+});
+
+describe('llull CLI — plans frame the camera', () => {
+  const cameraOf = (): unknown => deserializeDocument(readFileSync(docPath, 'utf8')).camera;
+  const plan = (actions: unknown[]): string => {
+    const planPath = path.join(workDir, 'frame.json');
+    writeFileSync(planPath, JSON.stringify(actions));
+    return planPath;
+  };
+
+  it('fits the view after a plan that built geometry without touching the camera, unless --no-fit or the plan sets it', async () => {
+    const box = [{ command: 'add_box', params: { size: [2000, 1000, 500], position: [5000, 0, 0] } }];
+    const fitted = capture();
+    expect(await runCli(['run', plan(box), ...docFlag()], fitted.io)).toBe(EXIT_OK);
+    expect(fitted.out.join('\n')).toContain('Camera framed on the model');
+    expect(cameraOf()).not.toEqual(createEmptyDocument().camera);
+    rmSync(docPath, { force: true });
+    expect(await runCli(['run', plan(box), '--no-fit', ...docFlag()], capture().io)).toBe(EXIT_OK);
+    expect(cameraOf()).toEqual(createEmptyDocument().camera);
+    rmSync(docPath, { force: true });
+    const own = [...box, { command: 'set_camera', params: { distance: 123 } }];
+    expect(await runCli(['run', plan(own), ...docFlag()], capture().io)).toBe(EXIT_OK);
+    expect((cameraOf() as { distance: number }).distance).toBe(123);
   });
 });
 

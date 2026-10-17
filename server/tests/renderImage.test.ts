@@ -56,16 +56,28 @@ describe('rasterizeSvg on content that aborts resvg', () => {
 });
 
 describe('buildImageBlock', () => {
-  it.each([{ svg: VALID_SVG, width: 100, height: 100 }, { svg: VALID_SVG }])('builds an image/png block from %#', (data) => {
-    const block = buildImageBlock(data);
+  it('rasterizes without blocking the event loop: a timer fires while the render runs', async () => {
+    let ticks = 0;
+    const timer = setInterval(() => (ticks += 1), 1);
+    const block = await buildImageBlock({ svg: VALID_SVG, width: 400 });
+    clearInterval(timer);
+    expect(block?.type).toBe('image');
+    expect(ticks).toBeGreaterThan(0);
+  });
+
+  it.each([{ svg: VALID_SVG, width: 100, height: 100 }, { svg: VALID_SVG }])('builds an image/png block from %#', async (data) => {
+    const block = await buildImageBlock(data);
     expect(block!.type).toBe('image');
     expect(block!.mimeType).toBe('image/png');
     expect(isPng(block!.data)).toBe(true);
   });
 
-  it.each([{ volume: 42, unit: 'mm³' }, {}, { svg: '' }, null, undefined, 'hello', 42, [VALID_SVG]])('returns null for %j', (data) => {
-    expect(buildImageBlock(data)).toBeNull();
-  });
+  it.each([{ volume: 42, unit: 'mm³' }, {}, { svg: '' }, null, undefined, 'hello', 42, [VALID_SVG]])(
+    'returns null for %j',
+    async (data) => {
+      expect(await buildImageBlock(data)).toBeNull();
+    },
+  );
 });
 
 describe('stripSvgFromData', () => {
@@ -102,12 +114,12 @@ describe('MCP content shaping', () => {
     expect(result.structuredContent!['entityCount']).toBe(5);
   });
 
-  it('an svg result keeps its text summary first; the image block goes last', () => {
+  it('an svg result keeps its text summary first; the image block goes last', async () => {
     const data = { svg: VALID_SVG, width: 100, height: 100 };
     const result = shaped(data);
     expect(result.content[0]?.type).toBe('text');
     expect(result.content[0]?.text).toBe('Rendered view.');
-    const content = [...result.content, buildImageBlock(data)!];
+    const content = [...result.content, (await buildImageBlock(data))!];
     expect(content.length).toBeGreaterThanOrEqual(2);
     expect(content.at(-1)?.type).toBe('image');
   });

@@ -103,8 +103,10 @@ function jointResult(
   const band = Math.max(Math.abs(final) * SETTLE_BAND, 1e-6);
   let settleIndex = velocity.length - 1;
   while (settleIndex > 0 && Math.abs((velocity[settleIndex - 1] ?? 0) - final) <= band) settleIndex--;
-  const tailStart = velocity[Math.floor(velocity.length * 0.9)] ?? final;
-  const steady = Math.abs(final - tailStart) <= Math.max(Math.abs(final) * 0.005, 1e-6);
+  // steady = the whole last 10 % stays in a 0.5 % band (comparing two samples reads a periodic signal sampled in phase as steady)
+  const tail = velocity.slice(Math.floor(velocity.length * 0.9));
+  const tailSpread = tail.reduce((spread, v) => Math.max(spread, Math.abs(v - final)), 0);
+  const steady = tailSpread <= Math.max(Math.abs(final) * 0.005, 1e-6);
   const period = steady ? null : findPeriod(velocity, times);
   const cycleMean = period === null ? null : tailMean(velocity, period.windowSamples);
   return {

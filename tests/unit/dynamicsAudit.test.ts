@@ -310,3 +310,23 @@ describe('plot_simulation draws the motion as SVG (audit 10)', () => {
     }
   });
 });
+
+describe('loop mechanisms are sampled finely enough not to alias', () => {
+  const crank = (): CadDocument => withMotor(sliderCrank({ crankRpm: 3000, crankInertia: 0.05 }).doc, 3000);
+  type Sampled = Data & { joints: Record<string, { steady: boolean; periodic?: true }>; warnings: string[]; times?: number[] };
+
+  it('samples a 3000 rpm crank at >= 36 points per turn by default, so the rod swing reads periodic, not steady', () => {
+    const data = simulate(crank(), { duration: 0.2, detail: 'series' }) as Sampled;
+    const times = data.times ?? [];
+    const interval = ((times.at(-1) ?? 0) - (times[0] ?? 0)) / Math.max(1, times.length - 1);
+    expect(interval).toBeLessThanOrEqual(1 / (50 * 36) + 1e-9);
+    expect(data.joints['rod_j']?.steady).toBe(false);
+    expect(data.joints['rod_j']?.periodic).toBe(true);
+    expect(data.warnings.some((w) => w.startsWith('FPR_SAMPLING_ALIASED'))).toBe(false);
+  });
+
+  it('warns when a forced sample rate sees fewer than 8 points per turn', () => {
+    const data = simulate(crank(), { duration: 0.2, sampleRate: 50 }) as Sampled;
+    expect(data.warnings.some((w) => w.startsWith('FPR_SAMPLING_ALIASED: 1.00 samples per turn'))).toBe(true);
+  });
+});

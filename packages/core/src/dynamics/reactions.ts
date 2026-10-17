@@ -67,7 +67,7 @@ function angleAt(times: readonly number[], angleDeg: readonly number[], t: numbe
 }
 
 /** The sampled peak, replaced by the every-step peak when that is larger (sampling can step over a sharp peak). */
-function withStepPeak(
+export function withStepPeak(
   sampled: Peak,
   step: StepPeak | null | undefined,
   times: readonly number[],

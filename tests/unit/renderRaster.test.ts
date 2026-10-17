@@ -73,19 +73,49 @@ describe('render_view raster mode (default)', () => {
     expect(b).toBe(0);
   });
 
-  it('fills section caps and keeps strokes as vector paths', () => {
+  it('fills section caps', () => {
     let doc = createEmptyDocument();
     doc = run(doc, 'add_box', { size: [10, 10, 10] });
+    const cut = { planes: [{ normal: [1, 0, 0] as Vec3, offset: 0 }] };
+    const svg = (execute(doc, 'render_view', { cut }).data as { svg: string }).svg;
+    expect(pngOf(svg).length).toBeGreaterThan(100);
+  });
+
+  it('depth-tests 2D strokes: a sketch behind a solid is hidden, one in front shows; a pure drawing stays vector', () => {
+    let doc = createEmptyDocument();
+    doc = run(doc, 'add_box', { size: [20, 2, 20], color: '#0000ff' });
     doc = run(doc, 'draw_polyline', {
+      points: [
+        [-30, 0],
+        [30, 0],
+      ],
+      position: [0, 10, 0],
+      color: '#ff0000',
+    });
+    doc = run(doc, 'draw_polyline', {
+      points: [
+        [-30, 0],
+        [30, 0],
+      ],
+      position: [0, -10, 5],
+      color: '#00ff00',
+    });
+    const params = { view: 'front', showGrid: false, showAxes: false, width: 200, height: 200 };
+    const svg = (execute(doc, 'render_view', params).data as { svg: string }).svg;
+    expect(svg).not.toContain('<polyline');
+    const image = decodePng(pngOf(svg));
+    const column = Array.from({ length: 200 }, (_, y) => image.pixel(100, y));
+    expect(column.some(([r, g, b]) => (g ?? 0) > 150 && (r ?? 0) < 80 && (b ?? 0) < 80)).toBe(true);
+    expect(column.some(([r, g, b]) => (r ?? 0) > 150 && (g ?? 0) < 80 && (b ?? 0) < 80)).toBe(false);
+    const sideways = Array.from({ length: 200 }, (_, y) => image.pixel(40, y));
+    expect(sideways.some(([r, g, b]) => (r ?? 0) > 150 && (g ?? 0) < 80 && (b ?? 0) < 80)).toBe(true);
+    const drawing = run(createEmptyDocument(), 'draw_polyline', {
       points: [
         [0, 0],
         [30, 0],
       ],
     });
-    const cut = { planes: [{ normal: [1, 0, 0] as Vec3, offset: 0 }] };
-    const svg = (execute(doc, 'render_view', { cut }).data as { svg: string }).svg;
-    expect(svg).toContain('<polyline');
-    expect(pngOf(svg).length).toBeGreaterThan(100);
+    expect((execute(drawing, 'render_view', {}).data as { svg: string }).svg).toContain('<polyline');
   });
 });
 

@@ -17,6 +17,10 @@ import { errorMessage } from '../../lib/errorMessage';
 import { dynamicsOf } from './bodies';
 import { openLoopGaps } from './inspect';
 
+/** Default samples per turn of the fastest announced joint (10 deg), and the floor below which a warning says the motion aliases. */
+const SAMPLES_PER_TURN = 36;
+const MIN_SAMPLES_PER_TURN = 8;
+
 /** Upper bound on integration steps of one run (keeps a call interactive). */
 const MAX_STEPS = 1_000_000;
 /** Upper bound on recorded samples (keeps results small enough for MCP and the viewport). */
@@ -66,7 +70,13 @@ export const simulateMotion = defineCommand({
       .max(0.01)
       .optional()
       .describe('Integration step in seconds. Default 0.001 (loops or cylinders: the "auto" rule or the stored solver setting).'),
-    sampleRate: z.number().positive().optional().describe('Recorded samples per second. Default 50.'),
+    sampleRate: z
+      .number()
+      .positive()
+      .optional()
+      .describe(
+        'Recorded samples per second. Default 50, raised for loop mechanisms to 36 per turn of the crank so periodic motion is not aliased; engines: one per crank degree. At most 6001 samples per run.',
+      ),
     detail: z.enum(['summary', 'series', 'poses']).optional().describe('"summary" (default), "series" or "poses".'),
     reactions: z
       .enum(['off', 'peaks', 'series'])
@@ -125,9 +135,11 @@ export const simulateMotion = defineCommand({
       }
     };
     const resolved = resolveTimestep(dynamics, settings, params.timestep, structured, pilotPeak);
-    // engines: one sample per degree of crank at the top speed unless the call sets a rate
+    // engines: one sample per degree of crank at the top speed; otherwise 50 Hz, or 36 samples per turn of the fastest announced joint
+    // (sampling a 3000 rpm crank at 50 Hz sees the same phase every turn: the motion would alias into a false "steady")
     const degreeInterval = resolved.maxSpeed > 0 ? Math.PI / 180 / resolved.maxSpeed : 1 / 50;
-    const defaultInterval = hasCylinders ? degreeInterval : 1 / 50;
+    const turnInterval = resolved.maxSpeed > 0 ? (2 * Math.PI) / SAMPLES_PER_TURN / resolved.maxSpeed : Infinity;
+    const defaultInterval = hasCylinders ? degreeInterval : Math.min(1 / 50, turnInterval);
     const mode: ReactionMode = params.reactions ?? (structured ? 'peaks' : 'off');
     const attemptAt = (step: number): Attempt => {
       if (duration / step > MAX_STEPS)
@@ -181,6 +193,10 @@ export const simulateMotion = defineCommand({
       if (params.sampleRate !== undefined && attempt.sampleInterval > 1 / params.sampleRate + 1e-12)
         warnings.push(
           `sampleRate ${params.sampleRate} Hz was reduced to ${(1 / attempt.sampleInterval).toPrecision(4)} Hz (at most ${MAX_SAMPLES} samples per run, and never finer than the timestep ${timestep} s)`,
+        );
+      if (resolved.maxSpeed > 0 && attempt.sampleInterval * resolved.maxSpeed > (2 * Math.PI) / MIN_SAMPLES_PER_TURN)
+        warnings.push(
+          `FPR_SAMPLING_ALIASED: ${((2 * Math.PI) / (attempt.sampleInterval * resolved.maxSpeed)).toPrecision(3)} samples per turn of the fastest joint (< ${MIN_SAMPLES_PER_TURN}): periodic motion aliases (it can read as steady); raise sampleRate or shorten duration`,
         );
       if (structured && tier !== 'pass')
         warnings.push(

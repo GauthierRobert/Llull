@@ -154,8 +154,9 @@ export interface SimulationTrace {
    */
   readonly jointReaction?: Record<string, { force: Vec3[]; moment: Vec3[] }>;
   /**
-   * Largest |force| (N) and |moment| (N·m, tree joints only) of every loop / tree joint over EVERY integration step, not only the recorded
-   * samples (needs `options.reactions`; omitted by engines that cannot). Sampling can miss a sharp peak; this cannot.
+   * Largest |force| (N) and |moment| (N·m, tree joints only) of every loop / tree joint, read between the recorded samples too (every
+   * integration step, or at least 50 times per sample interval when samples are further apart; needs `options.reactions`; omitted by
+   * engines that cannot). Sampling can miss a sharp peak; this resolves it.
    */
   readonly reactionPeaks?: Record<string, { force: StepPeak; moment: StepPeak | null }>;
   /** m: largest loop-constraint violation over every integration step (present when the model has loops). */
