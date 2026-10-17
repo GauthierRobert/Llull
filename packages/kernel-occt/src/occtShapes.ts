@@ -27,7 +27,7 @@ import { chainFace, loftedSolid, sweptSolid } from './occtCurves';
 import { subdivisionBSplineSolid } from './occtPatches';
 
 /** Planar OCC face of a closed polygon wire through `corners`, or null when OCC rejects it. */
-function polygonFace(api: OccApi, corners: readonly Vec3[]): OccShape | null {
+export function polygonFace(api: OccApi, corners: readonly Vec3[]): OccShape | null {
   const points: OccHandle[] = corners.map(([x, y, z]) => new api.gp_Pnt_3(x, y, z));
   const poly = new api.BRepBuilderAPI_MakePolygon_1() as OccMakePolygon;
   for (const point of points) poly.Add_1(point);
