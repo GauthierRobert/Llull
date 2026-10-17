@@ -25,6 +25,17 @@ export const rejection = (doc: CadDocument, summary: string, error: CommandError
   error,
 });
 
+/** Coded rejection: summary "<command>: <code> — <message>; no-op." with its `CommandError` (stable code, ids, paths, one-line fix). */
+export const codedRejection = (
+  doc: CadDocument,
+  command: string,
+  code: string,
+  message: string,
+  remediation: string,
+  ids: readonly string[] = [],
+  paths: readonly string[] = [],
+): CommandResult => rejection(doc, `${command}: ${code} — ${message}; no-op.`, commandError(code, remediation, ids, paths));
+
 /** Reporter for a command's rejections: `fail(why)` -> no-op "<command>: <why>; no-op.". */
 export const failer =
   (doc: CadDocument, command: string) =>

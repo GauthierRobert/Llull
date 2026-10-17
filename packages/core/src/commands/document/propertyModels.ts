@@ -8,7 +8,7 @@ import { modelProblem } from '../../model/propertyModelValidate';
 import type { CadDocument, Material } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
-import { changed, commandError, rejection } from '../noop';
+import { codedRejection, changed } from '../noop';
 import { editableMaterial } from './libraryReadonly';
 import { fitRecordSchema, formSchema, modelInputSchema, withoutUndefined } from './propertyModelSchema';
 
@@ -35,11 +35,7 @@ export const refuseWith = (
   ids: readonly string[] = [],
   path?: string,
 ): CommandResult =>
-  rejection(
-    doc,
-    `${command}: ${code} — ${message}; no-op.`,
-    commandError(code, REMEDIATION[code] ?? 'see the command description', ids, path !== undefined ? [path] : []),
-  );
+  codedRejection(doc, command, code, message, REMEDIATION[code] ?? 'see the command description', ids, path !== undefined ? [path] : []);
 
 /** `coefficientsSha256` = sha256 of the canonical JSON of the form (TR-PROP-09). */
 export const formHash = (form: PropertyForm): string => sha256Hex(canonicalJson(form));

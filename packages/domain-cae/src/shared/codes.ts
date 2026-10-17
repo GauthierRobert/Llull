@@ -2,7 +2,7 @@
 
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
-import { refuse } from './refuse';
+import { codedRejection } from '@core/commands/noop';
 
 const REMEDIATION: Readonly<Record<string, string>> = {
   FEA_ANALYSIS_NOT_FOUND: 'list the analyses with describe_analysis (no analysisId), or create one with create_analysis',
@@ -36,5 +36,5 @@ export function refuseCode(
   ids: readonly string[] = [],
   paths: readonly string[] = [],
 ): CommandResult {
-  return refuse(doc, command, code, message, REMEDIATION[code] ?? 'see the command description', ids, paths);
+  return codedRejection(doc, command, code, message, REMEDIATION[code] ?? 'see the command description', ids, paths);
 }

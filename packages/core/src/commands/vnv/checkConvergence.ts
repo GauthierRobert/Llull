@@ -11,7 +11,7 @@ import {
 } from '../../lib/convergence';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
-import { commandError, rejection, report } from '../noop';
+import { codedRejection, report } from '../noop';
 
 export interface NamedValue {
   readonly value: number;
@@ -43,10 +43,14 @@ const FORMULAS = [
 ];
 
 const fail = (doc: Parameters<typeof report>[0], why: string, path: string, code = 'VNV_SAMPLES_INVALID'): CommandResult =>
-  rejection(
+  codedRejection(
     doc,
-    `check_convergence: ${code} — ${why}; no-op.`,
-    commandError(code, 'Supply ≥ 3 distinct positive spacings (refinement ratio ≥ 1.3) with finite values.', [], [path]),
+    'check_convergence',
+    code,
+    why,
+    'Supply ≥ 3 distinct positive spacings (refinement ratio ≥ 1.3) with finite values.',
+    [],
+    [path],
   );
 
 const STATUS_CODES: Partial<Record<ConvergenceStatus, Finding>> = {
