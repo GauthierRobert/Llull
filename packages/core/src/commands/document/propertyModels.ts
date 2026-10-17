@@ -177,9 +177,11 @@ export const definePropertyModel = defineCommand({
     }
     return changed(
       withModels(doc, materialId, material, models),
-      `define_property_model '${materialId}/${model.id}': ${model.property} [${model.unit}] as ${model.form.kind} over ${model.validity
-        .map((r) => `${r.variable} ${(r.equation ?? r.data).join('…')} ${r.unit}`)
-        .join(', ')} (basis ${model.basis}, sha256 ${model.coefficientsSha256.slice(0, 12)}…)${index >= 0 ? ', replaced' : ''}.`,
+      `define_property_model '${materialId}/${model.id}': ${model.property} [${model.unit}] as ${model.form.kind} over ${
+        model.validity.length === 0
+          ? 'no variable (constant)'
+          : model.validity.map((r) => `${r.variable} ${(r.equation ?? r.data).join('…')} ${r.unit}`).join(', ')
+      } (basis ${model.basis}, sha256 ${model.coefficientsSha256.slice(0, 12)}…)${index >= 0 ? ', replaced' : ''}.`,
       [],
     );
   },

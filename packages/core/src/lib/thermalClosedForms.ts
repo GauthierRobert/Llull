@@ -71,10 +71,63 @@ export function lumpedSphere(
   return { temperature: ambient + (initial - ambient) * Math.exp(-t / timeConstant), biot: (h * volumeOverArea) / k, timeConstant };
 }
 
-/** Straight pin fin with adiabatic tip: m = sqrt(4h/(k d)), eta = tanh(mL)/(mL). */
-export function pinFin(h: number, k: number, d: number, length: number): { readonly efficiency: number; readonly m: number } {
-  const m = Math.sqrt((4 * h) / (k * d));
-  return { efficiency: Math.tanh(m * length) / (m * length), m };
+/** Lumped capacitance of any body: Lc = V/As, Bi = h Lc / k, tau = rho c Lc / h. */
+export function lumpedBody(
+  volume: number,
+  area: number,
+  rho: number,
+  c: number,
+  k: number,
+  h: number,
+  initial: number,
+  ambient: number,
+  t: number,
+): LumpedResult & { readonly characteristicLength: number } {
+  const characteristicLength = volume / area;
+  const timeConstant = (rho * c * characteristicLength) / h;
+  return {
+    temperature: ambient + (initial - ambient) * Math.exp(-t / timeConstant),
+    biot: (h * characteristicLength) / k,
+    timeConstant,
+    characteristicLength,
+  };
+}
+
+export interface FinResult {
+  readonly m: number;
+  readonly efficiency: number;
+  readonly heatScale: number;
+  /** heat rate per unit base excess temperature, W/K, for each tip condition */
+  readonly adiabaticPerKelvin: number;
+  readonly convectiveTipPerKelvin: number;
+  readonly correctedPerKelvin: number;
+  readonly correctedLength: number;
+  readonly adiabaticTipRatio: number;
+  readonly convectiveTipRatio: number;
+}
+
+/**
+ * Straight fin of uniform section (perimeter P, area A, length L): m = sqrt(hP/(kA)), M = sqrt(hPkA).
+ * Adiabatic tip: Q = M tanh(mL) theta_b, theta(L)/theta_b = 1/cosh(mL). Convective tip: Q = M (sinh mL + B cosh mL)/(cosh mL + B sinh mL) theta_b,
+ * theta(L)/theta_b = 1/(cosh mL + B sinh mL), B = h/(mk). Corrected length Lc = L + A/P. Efficiency = tanh(mL)/(mL) (adiabatic tip).
+ */
+export function straightFin(h: number, k: number, perimeter: number, area: number, length: number): FinResult {
+  const m = Math.sqrt((h * perimeter) / (k * area));
+  const bigM = Math.sqrt(h * perimeter * k * area);
+  const ml = m * length;
+  const b = h / (m * k);
+  const correctedLength = length + area / perimeter;
+  return {
+    m,
+    heatScale: bigM,
+    efficiency: Math.tanh(ml) / ml,
+    adiabaticPerKelvin: bigM * Math.tanh(ml),
+    convectiveTipPerKelvin: (bigM * (Math.sinh(ml) + b * Math.cosh(ml))) / (Math.cosh(ml) + b * Math.sinh(ml)),
+    correctedPerKelvin: bigM * Math.tanh(m * correctedLength),
+    correctedLength,
+    adiabaticTipRatio: 1 / Math.cosh(ml),
+    convectiveTipRatio: 1 / (Math.cosh(ml) + b * Math.sinh(ml)),
+  };
 }
 
 /** Infinite grey parallel plates: q = sigma (T1^4 - T2^4) / (1/e1 + 1/e2 - 1), absolute temperatures. */

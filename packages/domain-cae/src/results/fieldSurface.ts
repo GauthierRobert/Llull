@@ -5,6 +5,12 @@ import type { Vec3 } from '@core/model/vectors';
 
 export type SkinTriangle = readonly [number, number, number];
 
+/** A skin triangle with the entity of the element it bounds. */
+export interface OwnedSkinTriangle {
+  readonly nodes: SkinTriangle;
+  readonly entityId: string;
+}
+
 /** Corner triples of the four tetrahedron faces (0-based corner indices). */
 const TET_FACES: readonly (readonly [number, number, number, number])[] = [
   [0, 1, 2, 3],
@@ -18,6 +24,7 @@ const MIDSIDE: Readonly<Record<string, number>> = { '0-1': 4, '1-2': 5, '0-2': 6
 const midside = (a: number, b: number): number | undefined => MIDSIDE[a < b ? `${a}-${b}` : `${b}-${a}`];
 
 interface Face {
+  readonly entityId: string;
   readonly corners: readonly [number, number, number];
   readonly opposite: number;
   readonly nodes: readonly number[];
@@ -37,7 +44,13 @@ function facesOfBlock(block: FeMeshArtifact['blocks'][number]): Face[] {
         ? [midside(a, b), midside(b, c), midside(a, c)].map((index) => (index === undefined ? undefined : nodes[index]))
         : [];
       const complete = mids.every((node) => node !== undefined);
-      faces.push({ corners: [na, nb, nc], opposite: nd, nodes: complete ? (mids as number[]) : [], quadratic: quadratic && complete });
+      faces.push({
+        entityId: block.entityId,
+        corners: [na, nb, nc],
+        opposite: nd,
+        nodes: complete ? (mids as number[]) : [],
+        quadratic: quadratic && complete,
+      });
     }
   }
   return faces;
@@ -64,18 +77,24 @@ function outward(face: Face, at: (node: number) => Vec3 | undefined): readonly [
  * @pure
  */
 export function meshSkin(mesh: FeMeshArtifact, coordinates: ReadonlyMap<number, Vec3>): SkinTriangle[] {
+  return meshSkinOwned(mesh, coordinates).map((triangle) => triangle.nodes);
+}
+
+/** `meshSkin` keeping the entity of each triangle (the part whose element the face bounds). @pure */
+export function meshSkinOwned(mesh: FeMeshArtifact, coordinates: ReadonlyMap<number, Vec3>): OwnedSkinTriangle[] {
   const count = new Map<string, number>();
   const faces = mesh.blocks.flatMap(facesOfBlock);
   const keyOf = (face: Face): string => [...face.corners].sort((x, y) => x - y).join(',');
   for (const face of faces) count.set(keyOf(face), (count.get(keyOf(face)) ?? 0) + 1);
   const at = (node: number): Vec3 | undefined => coordinates.get(node);
-  const skin: SkinTriangle[] = [];
+  const skin: OwnedSkinTriangle[] = [];
   for (const face of faces) {
     if (count.get(keyOf(face)) !== 1) continue;
     const ordered = outward(face, at);
     if (ordered === null) continue;
+    const owned = (nodes: SkinTriangle): OwnedSkinTriangle => ({ nodes, entityId: face.entityId });
     if (!face.quadratic) {
-      skin.push(ordered);
+      skin.push(owned(ordered));
       continue;
     }
     const flipped = ordered[1] !== face.corners[1];
@@ -88,7 +107,7 @@ export function meshSkin(mesh: FeMeshArtifact, coordinates: ReadonlyMap<number, 
       [mac, mbc, c],
       [mab, mbc, mac],
     ];
-    for (const triangle of subs) skin.push(flipped ? [triangle[0], triangle[2], triangle[1]] : triangle);
+    for (const triangle of subs) skin.push(owned(flipped ? [triangle[0], triangle[2], triangle[1]] : triangle));
   }
   return skin;
 }

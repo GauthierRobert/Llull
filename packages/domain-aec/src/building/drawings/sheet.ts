@@ -13,7 +13,7 @@ import { buildPlanDrawing } from './planDrawing';
 import { DrawingPainter } from '../../shared/drawingSvg';
 import {
   composeSheetSvg,
-  fitScale,
+  fitPaperOrientation,
   MARGIN,
   paperMap,
   northArrow,
@@ -23,6 +23,7 @@ import {
   sheetFitWarning,
   sheetDrawingArea,
   type PaperSize,
+  type SheetOrientation,
 } from '../../shared/sheetFrame';
 
 export interface PlanSheet {
@@ -30,6 +31,8 @@ export interface PlanSheet {
   readonly svg: string;
   readonly paper: PaperSize;
   readonly scale: number;
+  /** Portrait when a tall plan reaches a larger scale on the turned paper; landscape otherwise or when `scale` is given. */
+  readonly orientation: SheetOrientation;
   readonly levelId: string;
   /** False when the drawing extents exceed the drawing area of the paper at this scale. */
   readonly fits: boolean;
@@ -45,11 +48,13 @@ function buildPlanSheet(
 ): PlanSheet | null {
   const drawing = buildPlanDrawing(doc, levelId);
   if (!drawing || (requestedScale !== undefined && requestedScale <= 0)) return null;
-  const [width, height] = PAPER_MM[paper];
-  const viewport = sheetDrawingArea(width, height);
   const millimetresPerUnit = toMm(doc, 1);
   const [minX, minY, maxX, maxY] = drawing.bounds;
-  const scale = requestedScale ?? fitScale((maxX - minX) * millimetresPerUnit, (maxY - minY) * millimetresPerUnit, viewport);
+  const fitted = fitPaperOrientation(paper, (maxX - minX) * millimetresPerUnit, (maxY - minY) * millimetresPerUnit);
+  const [width, height] = requestedScale === undefined ? [fitted.width, fitted.height] : PAPER_MM[paper];
+  const orientation = requestedScale === undefined ? fitted.orientation : 'landscape';
+  const viewport = sheetDrawingArea(width, height);
+  const scale = requestedScale ?? fitted.scale;
   const paperPerUnit = millimetresPerUnit / scale;
   const painter = new DrawingPainter(paperMap(viewport, [(minX + maxX) / 2, (minY + maxY) / 2], paperPerUnit), paperPerUnit);
   for (const primitive of drawing.primitives) painter.paint(primitive);
@@ -71,13 +76,14 @@ function buildPlanSheet(
     svg: `${svg}\n`,
     paper,
     scale,
+    orientation,
     levelId: drawing.level.id,
     fits: ((maxX - minX) * millimetresPerUnit) / scale <= viewport.width && ((maxY - minY) * millimetresPerUnit) / scale <= viewport.height,
   };
 }
 
 /**
- * @affects none; data = { filename, svg, paper, scale, levelId }
+ * @affects none; data = { filename, svg, paper, scale, orientation, levelId }
  * @failure unknown level / paper / invalid scale -> no data
  */
 export const exportPlanSheet = defineCommand({
@@ -85,7 +91,7 @@ export const exportPlanSheet = defineCommand({
   annotations: { readOnly: true, idempotent: true },
   description:
     'Produce a printable floor-plan drawing sheet (SVG in real millimetres, print to PDF at 100%): the level plan at a true scale (1:50, ' +
-    '1:100…; auto-fitted when omitted) on ISO paper A4–A0 landscape, with wall poché, doors, windows, grids, room tags, dimensions in ' +
+    '1:100…; auto-fitted when omitted, turning the paper portrait when a tall plan then fits a larger scale) on ISO paper A4–A0 (landscape by default), with wall poché, doors, windows, grids, room tags, dimensions in ' +
     'mm, north arrow, scale bar and a title block filled from set_project_info. data.svg holds the file text.',
   params: z.object({
     confirmExportControlled,
@@ -101,7 +107,7 @@ export const exportPlanSheet = defineCommand({
     if (!sheet) return noop(doc, 'export_plan_sheet failed: no such level (add_level / draw_walls first) or invalid scale (must be > 0).');
     return report(
       doc,
-      `Plan sheet ${sheet.filename}: level ${sheet.levelId} at 1:${sheet.scale} on ${sheet.paper}.${sheetFitWarning(sheet.fits, 'drawing')}`,
+      `Plan sheet ${sheet.filename}: level ${sheet.levelId} at 1:${sheet.scale} on ${sheet.paper} ${sheet.orientation}.${sheetFitWarning(sheet.fits, 'drawing')}`,
       sheet,
     );
   },

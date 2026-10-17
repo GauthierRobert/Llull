@@ -33,6 +33,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   THM_RADIATION_SCALE: 'recreate the case with temperatureScale degC or K (radiation is evaluated on absolute temperature)',
   THM_CAVITY_INVALID: 'give a unique cavity name of at most 3 characters and at least 2 faces',
   THM_CONTACT_INVALID: 'give master and slave targets on different parts and a positive conductance in W/(m^2*K)',
+  THM_CONTACT_NOT_FOUND: 'list the contacts with describe_analysis (ids are tc-<step>.<k>)',
   THM_BC_CONFLICT: 'keep one temperature BC per face (delete_thermal_bc), or move one to other faces, then re-mesh',
   THM_HEAT_BALANCE: 'refine the mesh or time step and check the boundary conditions; do not report the result as final',
   THM_NO_LIMITS: 'add_temperature_limit with a datasheet or rule citation',

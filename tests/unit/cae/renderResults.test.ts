@@ -81,7 +81,14 @@ describe('render_fea_results', () => {
     expect(data.unit).toBe('mm');
     expect(data.levels).toEqual([0, 0.001, 0.002, 0.003, 0.004]);
     expect(data.deformationScale).toBe(0);
-    expect(data.svg).toContain('stroke-opacity="0.35"');
+    const plain = execute(
+      solved,
+      'render_fea_results',
+      { analysisId: bar.analysisId, field: 'u_x', direction: [0, -1, 0.2], range: [0, 0.004], bands: 4, deformationScale: 0 },
+      ctxOf(bar),
+    );
+    expect(data.svg).toContain('<image');
+    expect(data.svg).not.toBe((plain.data as PlotData).svg);
     expect(custom.summary).toContain('undeformed');
     const top = execute(solved, 'render_fea_results', { analysisId: bar.analysisId, view: 'top', direction: [0, 0, 0] }, ctxOf(bar));
     expect((top.data as PlotData).trianglesDrawn).toBeGreaterThan(0);
@@ -111,9 +118,73 @@ describe('render_fea_results', () => {
     expect(data.field).toBe('temperature');
     expect(data.unit).toBe('degC');
     expect(data.deformationScale).toBe(0);
-    expect(data.resultSet.time).toBe(1);
+    expect(data.resultSet.time).toBe(0);
+    expect(data.resultSet.label).toBe('steady state');
     expect(data.max.value).toBeGreaterThan(data.min.value);
     expect(data.svg).toContain('hot_film (film)');
+  });
+});
+
+describe('render_fea_results cylindrical fields, cut and isolation', () => {
+  const bar = solvedBar();
+  const solved = recorded(bar);
+  const render = (params: Record<string, unknown>): ReturnType<typeof execute> =>
+    execute(solved, 'render_fea_results', { analysisId: bar.analysisId, ...params }, ctxOf(bar));
+
+  it('plots axial / hoop / radial components about a given axis (uniaxial bar: axial = 210, hoop = radial = 0)', () => {
+    const axis = { axisPoint: [1, 0.5, 0.5], axisDirection: [2, 0, 0] };
+    const axial = render({ field: 's_axial', ...axis });
+    expect(axial.rejected).toBeUndefined();
+    const data = axial.data as PlotData & { axis: { point: number[]; direction: number[] } };
+    expect(data.field).toBe('s_axial');
+    expect(data.unit).toBe('MPa');
+    expect(data.max.value).toBeCloseTo(210, 3);
+    expect(data.axis).toEqual({ point: [1, 0.5, 0.5], direction: [1, 0, 0] });
+    expect(axial.summary).toContain('axis [1, 0, 0] through [1, 0.5, 0.5]');
+    for (const field of ['s_hoop', 's_radial']) {
+      const read = render({ field, ...axis }).data as PlotData;
+      expect(Math.abs(read.max.value)).toBeLessThan(1);
+      expect(Math.abs(read.min.value)).toBeLessThan(1);
+    }
+    const radial = render({ field: 'u_radial', ...axis }).data as PlotData;
+    expect(radial.unit).toBe('mm');
+    expect(radial.max.value).toBeLessThan(1e-3);
+  });
+
+  it('defaults to the z axis through the bounding box centre and refuses a zero axis direction', () => {
+    const byDefault = render({ field: 's_axial' }).data as PlotData & { axis: { point: number[]; direction: number[] } };
+    expect(byDefault.axis.direction).toEqual([0, 0, 1]);
+    expect(byDefault.axis.point).toEqual([1, 0.5, 0.5]);
+    expect((render({ field: 'von_mises' }).data as { axis: unknown }).axis).toBeNull();
+    const zero = render({ field: 's_hoop', axisDirection: [0, 0, 0] });
+    expect(codeOf(zero)).toBe('FEA_PLOT_INVALID');
+    expect(zero.document).toBe(solved);
+  });
+
+  it('cuts the model: removes the far half, paints the section and restricts min / max to the kept nodes', () => {
+    const whole = render({ field: 'u_x', deformationScale: 0 });
+    const cut = render({ field: 'u_x', deformationScale: 0, cut: { normal: [3, 0, 0], offset: 1 } });
+    expect(cut.rejected).toBeUndefined();
+    const [all, half] = [whole.data as PlotData, cut.data as PlotData & { cut: { normal: number[]; offset: number } }];
+    expect(half.cut).toEqual({ normal: [1, 0, 0], offset: 1 });
+    expect(half.max.value).toBeLessThan(all.max.value);
+    expect(half.max.at[0]).toBeLessThanOrEqual(1 + 1e-9);
+    expect(half.svg).toContain('<image');
+    expect(cut.summary).toContain('cut 1, 0, 0');
+    expect(codeOf(render({ cut: { normal: [1, 0, 0], offset: -5 } }))).toBe('FEA_FIELD_MISSING');
+    const zero = render({ cut: { normal: [0, 0, 0], offset: 0 } });
+    expect(codeOf(zero)).toBe('FEA_PLOT_INVALID');
+    expect(zero.document).toBe(solved);
+  });
+
+  it('isolates parts by entity id and refuses an unknown part', () => {
+    const only = render({ entityIds: [bar.boxId] });
+    expect(only.rejected).toBeUndefined();
+    expect((only.data as { entityIds: string[] }).entityIds).toEqual([bar.boxId]);
+    expect(only.summary).toContain(`parts ${bar.boxId}`);
+    const missing = render({ entityIds: ['box-404'] });
+    expect(codeOf(missing)).toBe('FEA_PART_INVALID');
+    expect(missing.summary).toContain(`meshed parts: ${bar.boxId}`);
   });
 });
 

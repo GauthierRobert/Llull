@@ -42,27 +42,52 @@ function failureOf(result: CommandResult | null): string | null {
 /** A step that failed during a replay. */
 export interface ReplayFailure {
   readonly stepId: string;
+  /** Name of the command the failed step runs. */
+  readonly command: string;
   readonly text: string;
+}
+
+/** Steps that record a host-produced analysis artifact: they fail when the regenerated geometry no longer matches it. */
+const ANALYSIS_RECORD_COMMANDS: ReadonlySet<string> = new Set(['record_fe_mesh', 'record_fea_results']);
+
+/** True when every failure is an analysis record step (geometry regenerated fine, the recorded analysis went stale). */
+function onlyAnalysisRecords(failures: readonly ReplayFailure[]): boolean {
+  return failures.length > 0 && failures.every((f) => ANALYSIS_RECORD_COMMANDS.has(f.command));
 }
 
 /** `onStep` observer helper: records `event` into `into` when its step failed. */
 export function noteReplayFailure(into: ReplayFailure[], event: ReplayStepEvent): void {
-  if (event.failure !== null) into.push({ stepId: event.step.id, text: `${event.step.id} (${event.step.name}): ${event.failure}` });
+  if (event.failure !== null) {
+    into.push({ stepId: event.step.id, command: event.step.name, text: `${event.step.id} (${event.step.name}): ${event.failure}` });
+  }
 }
 
 /** Summary suffix naming the steps whose replay failed; empty when none. */
 export function replayFailuresNote(failures: readonly ReplayFailure[]): string {
+  if (onlyAnalysisRecords(failures)) {
+    return (
+      ` Warning: the geometry was regenerated, but the analysis is now stale — ${failures.length} recorded analysis step(s) no longer match it ` +
+      `(${failures.map((f) => f.text).join(' | ')}). Re-run fea_mesh then fea_solve.`
+    );
+  }
   return failures.length > 0
     ? ` Warning: ${failures.length} step(s) FAILED during regeneration — the model is incomplete: ${failures.map((f) => f.text).join(' | ')}`
     : '';
 }
 
-/** `CommandError` for a regeneration that hid failed steps; undefined when none failed. */
+/**
+ * `CommandError` for a regeneration that hid failed steps; undefined when none failed or when only analysis record steps failed (the
+ * geometry is complete and the analysis is merely stale, reported in the summary).
+ */
 export function replayFailureError(failures: readonly ReplayFailure[]): CommandError | undefined {
-  return failures.length > 0
+  return failures.length > 0 && !onlyAnalysisRecords(failures)
     ? commandError(
         'HIST_STEP_FAILED',
-        'Fix or suppress the failing step(s) (edit_step_params / set_step_suppressed), then replay_history.',
+        `Fix or suppress the failing step(s) (${failures.map((f) => `${f.stepId} ${f.command}`).join(', ')}) with edit_step_params / set_step_suppressed, then replay_history.${
+          failures.some((f) => ANALYSIS_RECORD_COMMANDS.has(f.command))
+            ? ' Failed analysis record steps mean the analysis is stale: re-run fea_mesh then fea_solve.'
+            : ''
+        }`,
         failures.map((f) => f.stepId),
       )
     : undefined;

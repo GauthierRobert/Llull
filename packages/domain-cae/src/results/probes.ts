@@ -11,6 +11,7 @@ interface ProbeValue {
   /** Load case name (static / thermo_static) or null for a time series (heat_*). */
   readonly loadCase: string | null;
   readonly step: number;
+  /** seconds; 0 for heat_steady (steady state has no time, agrees with the thermal summary) */
   readonly time: number;
   /** null when the field was not written in that result set. */
   readonly value: number | null;
@@ -124,7 +125,12 @@ export function evaluateProbes(
             : values === undefined
               ? Number.NaN
               : scalar(values) * quantityScale(analysis, probe.quantity);
-        return { loadCase, step: step.step, time: step.time, value: Number.isFinite(value) ? value : null };
+        return {
+          loadCase,
+          step: step.step,
+          time: heat && analysis.type === 'heat_steady' ? 0 : step.time,
+          value: Number.isFinite(value) ? value : null,
+        };
       }),
     };
   });

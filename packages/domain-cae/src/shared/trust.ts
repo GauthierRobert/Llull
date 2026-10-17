@@ -25,11 +25,15 @@ export interface Trust {
   readonly problem: TrustProblem | null;
 }
 
-/** Top-level keys whose values differ between two summaries. */
+/** Derived diagnostics re-computed on every read whose formula evolves between versions (the mesh `quality`): never compared. */
+const DIAGNOSTIC_KEYS: ReadonlySet<string> = new Set(['quality']);
+
+/** Top-level keys whose values differ between two summaries (derived diagnostics excluded, so older recorded ones stay trusted). */
 export const differingKeys = (given: object, expected: object): string[] => {
   const left = new Map(Object.entries(given));
   const right = new Map(Object.entries(expected));
   return [...new Set([...left.keys(), ...right.keys()])]
+    .filter((key) => !DIAGNOSTIC_KEYS.has(key))
     .filter((key) => canonicalJson(left.get(key)) !== canonicalJson(right.get(key)))
     .sort();
 };

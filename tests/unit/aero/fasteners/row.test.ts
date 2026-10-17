@@ -55,7 +55,7 @@ describe('insert_fastener_row (VC-MAT-12)', () => {
     expect(result.summary).toContain('2 D');
   });
 
-  it('with allowViolations places the row and reports the two warnings; stacks share a rowId and follow the cut plates', () => {
+  it('with allowViolations places the row and reports the two warnings; stacks share a rowId and keep the plate ids (cut in place)', () => {
     const { doc, ids } = sheets();
     const result = ok(
       doc,
@@ -75,12 +75,34 @@ describe('insert_fastener_row (VC-MAT-12)', () => {
     const lastLayers = stacks[3]?.layers.map((layer) => layer.entityId);
     for (const stack of stacks) expect(stack?.layers.map((layer) => layer.entityId)).toEqual(lastLayers);
     for (const id of lastLayers ?? []) expect(result.document.entities[id]?.kind).toBe('mesh');
-    expect(ids.every((id) => result.document.entities[id] === undefined)).toBe(true);
+    expect(lastLayers).toEqual(ids);
     const positions = stacks.map((stack) => result.document.entities[stack?.fastener.instanceId ?? '']?.position[0] ?? 0);
     expect(positions.map((x) => Math.round(x * 1000) / 1000)).toEqual([0.5, 0.8, 1.1, 1.4]);
     const layout = dataOf(execute(result.document, 'check_fastener_layout', {}));
     expect(layout['status']).toBe('warn');
     expect((layout['items'] as Array<{ code: string }>).filter((item) => item.code === 'FAST_PITCH')).toHaveLength(3);
+  });
+
+  it('with a pitch, rounds the interval count and adjusts the pitch so the last rivet lands on `to`', () => {
+    const { doc, ids } = sheets();
+    // 2.0 in run, requested 0.3 in: round(6.67) = 7 intervals -> 8 rivets at 0.2857 in
+    const params = rowParams(ids, { to: [2.5, 0.5, 0], pitch: { value: 0.3, unit: 'in' }, allowViolations: true });
+    const result = ok(doc, 'insert_fastener_row', params, ctxFor());
+    const data = dataOf(result);
+    expect(data['count']).toBe(8);
+    expect(data['pitchIn']).toBeCloseTo(2 / 7, 5);
+    expect(data['requestedPitchIn']).toBeCloseTo(0.3, 9);
+    expect(result.summary).toContain('adjusted from requested 0.3 in');
+    const xs = (data['stackIds'] as string[]).map(
+      (id) => result.document.entities[result.document.fasteners?.stacks[id]?.fastener.instanceId ?? '']?.position[0] ?? 0,
+    );
+    expect(xs[0]).toBeCloseTo(0.5, 9);
+    expect(xs.at(-1)).toBeCloseTo(2.5, 9);
+    const gaps = xs.slice(1).map((x, k) => x - (xs[k] as number));
+    for (const gap of gaps) expect(gap).toBeCloseTo(2 / 7, 6);
+    const short = ok(doc, 'insert_fastener_row', rowParams(ids, { pitch: { value: 5, unit: 'in' }, allowViolations: true }), ctxFor());
+    expect(dataOf(short)['count']).toBe(2);
+    expect(dataOf(short)['pitchIn']).toBeCloseTo(0.9, 9);
   });
 
   it('places a conforming row by count, with no warnings and a derived pitch; is pure', () => {

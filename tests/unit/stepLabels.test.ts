@@ -41,6 +41,13 @@ describe('labelStep', () => {
     expect(labeled).toContain("PRODUCT('Shaft''s','Shaft''s','',(#356))");
     expect(labeled).not.toContain('Open CASCADE STEP translator 7.4');
   });
+  it('labels a later export of the same process, whose translator numbering does not restart at 1', () => {
+    const later = KERNEL_STEP.replace(/translator 7\.4 1/g, 'translator 7.4 3').replace(/translator 7\.4 2/g, 'translator 7.4 4');
+    const relabeled = labelStep(later, [{ name: 'Bearing 1' }, { name: 'Shaft' }]);
+    expect(relabeled).toContain("PRODUCT('Bearing 1','Bearing 1','',(#8))");
+    expect(relabeled).toContain("PRODUCT('Shaft','Shaft','',(#356))");
+    expect(relabeled).not.toContain('Open CASCADE STEP translator 7.4');
+  });
   it('names the solids, not the placement axis', () => {
     for (const s of [
       "#15 = MANIFOLD_SOLID_BREP('Bearing 1',#16);",

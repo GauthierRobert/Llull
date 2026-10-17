@@ -21,8 +21,10 @@ const rowSchema = z.object({
     .array(z.string())
     .describe('Ids of the 3D solids (plates) every fastener of the row passes through; measured at each position along axis.'),
   from: vec3('Axis point [x, y, z] (document units) of the first fastener.'),
-  to: vec3('Axis point [x, y, z] (document units) the row runs towards; the last fastener is at or before it.'),
-  pitch: quantity('Spacing between fastener axes as { value, unit }. Give this OR count').optional(),
+  to: vec3('Axis point [x, y, z] (document units) the row runs towards; the last fastener is exactly here.'),
+  pitch: quantity(
+    'Requested spacing between fastener axes as { value, unit }; the row is divided into round(length / pitch) equal intervals so the last fastener lands on `to` (actual pitch in data.pitchIn). Give this OR count',
+  ).optional(),
   count: z.number().int().describe('Number of fasteners, spread evenly from `from` to `to` (1..500). Give this OR pitch.').optional(),
   edgeDistance: quantity(
     'Distance from the fastener axes to the nearest plate edge, as { value, unit }, known to the caller (it is checked against the minimum, not measured)',
@@ -59,7 +61,7 @@ export const insertFastenerRow = defineCommand({
     'Insert a straight row of identical fastener stacks (insert_fastener_stack at each position) along from -> to with either pitch {value, unit} or count. ' +
     'Rivet rows are checked against the minimum pitch 3 D and edge distance 2 D (AC 43.13-1B 4-57(c)); other families use minPitch / minEdgeDistance when given. ' +
     'edgeDistance is the distance from the row to the plate edge as the caller knows it. A violation refuses the row (FAST_PITCH / FAST_EDGE_DISTANCE, listed in ' +
-    'data.violations) unless allowViolations is true, which places it with warnings. Selection params as in select_fastener; needs stackIds. Returns data.rowId and data.stackIds.',
+    'data.violations) unless allowViolations is true, which places it with warnings. Selection params as in select_fastener; needs stackIds. With pitch, the pitch is adjusted (count = round(length/pitch)+1) so the last fastener lands on `to`. Returns data.rowId, data.stackIds, data.count, data.pitchIn (actual) and data.requestedPitchIn.',
   params: rowSchema,
   run: (doc, params, ctx): CommandResult => {
     const line = sub3(params.to, params.from);
@@ -80,7 +82,7 @@ export const insertFastenerRow = defineCommand({
     const pitchDoc = params.pitch === undefined ? null : quantityToDoc(doc, params.pitch.value, params.pitch.unit);
     if (params.pitch !== undefined && (pitchDoc === null || !(pitchDoc > 0)))
       return refuse(doc, 'insert_fastener_row', 'FAST_ROW_INVALID', 'pitch must be a positive length', [], ['pitch']);
-    const count = params.count ?? Math.floor(length / (pitchDoc ?? length) + 1e-9) + 1;
+    const count = params.count ?? Math.max(1, Math.round(length / (pitchDoc ?? length))) + 1;
     if (count > MAX_ROW)
       return refuse(
         doc,
@@ -90,7 +92,7 @@ export const insertFastenerRow = defineCommand({
         [],
         ['pitch', 'count'],
       );
-    const stepDoc = count === 1 ? 0 : pitchDoc !== null && params.count === undefined ? pitchDoc : length / (count - 1);
+    const stepDoc = count === 1 ? 0 : length / (count - 1);
     const direction = scale3(line, 1 / length);
     const points: Vec3[] = Array.from({ length: count }, (_, k) => add3(params.from, scale3(direction, k * stepDoc)));
     const shared = Object.fromEntries(
@@ -156,6 +158,7 @@ export const insertFastenerRow = defineCommand({
       };
     }
 
+    const requestedIn = params.pitch === undefined ? null : inches(params.pitch);
     const mode: HoleMode = params.holeMode ?? 'cut_close_tolerance';
     const diameter = holeDiameterDoc(doc, first.resolved, mode, params.holeDiameter);
     if (typeof diameter !== 'number')
@@ -198,10 +201,10 @@ export const insertFastenerRow = defineCommand({
     return {
       ...changed(
         current,
-        `Inserted fastener row ${rowId}: ${count} × ${first.resolved.partNumber} at ${pitchIn === null ? 'one position' : `${pitchIn} in pitch`}, stacks [${stackIds.join(', ')}]; ${affected.length} entities created/replaced.${warnings.length > 0 ? ` ${warnings.length} warning(s): ${warnings.map((w) => w.code).join(', ')}.` : ''}`,
+        `Inserted fastener row ${rowId}: ${count} × ${first.resolved.partNumber} at ${pitchIn === null ? 'one position' : `${pitchIn} in pitch${params.pitch === undefined ? '' : ` (adjusted from requested ${requestedIn} in so the last lands on 'to')`}`}, stacks [${stackIds.join(', ')}]; ${affected.length} entities created/replaced.${warnings.length > 0 ? ` ${warnings.length} warning(s): ${warnings.map((w) => w.code).join(', ')}.` : ''}`,
         affected,
       ),
-      data: { rowId, stackIds, count, pitchIn, minPitchIn, minEdgeDistanceIn: minEdgeIn, warnings },
+      data: { rowId, stackIds, count, pitchIn, requestedPitchIn: requestedIn, minPitchIn, minEdgeDistanceIn: minEdgeIn, warnings },
     };
   },
 });

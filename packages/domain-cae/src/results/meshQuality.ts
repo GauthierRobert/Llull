@@ -31,7 +31,7 @@ const triple = (a: P, b: P, c: P): number =>
   a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0]);
 
 /**
- * Quality of every tetrahedron: `tet_scaled_jacobian` = 6V / (sqrt(2) * lambdaMax) (1 = regular, <= 0 = inverted; llull normalisation of the
+ * Quality of every tetrahedron: `tet_scaled_jacobian` = sqrt(2) * 6V / lambdaMax (1 = regular, <= 0 = inverted; llull normalisation of the
  * Verdict metric) and `tet_edge_ratio` = longest / shortest edge. Deterministic.
  * @invariant `inverted` counts elements with scaled Jacobian <= 0
  */
@@ -51,7 +51,7 @@ export function meshQuality(mesh: FeMeshArtifact): QualitySummary {
         return incident.reduce((product, edge) => product * (edges[edge] ?? 0), 1);
       };
       const lambdaMax = Math.max(at(0), at(1), at(2), at(3));
-      scaledJacobian.push(lambdaMax > 0 ? volume6 / (Math.SQRT2 * lambdaMax) : 0);
+      scaledJacobian.push(lambdaMax > 0 ? (Math.SQRT2 * volume6) / lambdaMax : 0);
       const shortest = Math.min(...edges);
       edgeRatio.push(shortest > 0 ? Math.max(...edges) / shortest : Number.MAX_SAFE_INTEGER);
     }

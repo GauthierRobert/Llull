@@ -159,7 +159,7 @@ describe('record_fe_mesh (trust model, 05 §4.1)', () => {
     expect(result.error?.ids).toContain(bar.meshHash);
   });
 
-  it('refuses a mesh built for other inputs (FEA_INPUT_STALE)', () => {
+  it('records a mesh built for other inputs as stale (regeneration after a parameter change), never as current', () => {
     const bar = solvedBar();
     const moved = execute(bar.doc, 'set_mesh_controls', { analysisId: bar.analysisId, globalSize: 3 }).document;
     const result = execute(
@@ -168,8 +168,12 @@ describe('record_fe_mesh (trust model, 05 §4.1)', () => {
       { analysisId: bar.analysisId, summary: meshSummary(bar.mesh, bar.meshHash) },
       withPort(bar),
     );
-    expect(result.error?.code).toBe('FEA_INPUT_STALE');
-    expect(result.document).toBe(moved);
+    expect(result.error).toBeUndefined();
+    expect(result.summary).toContain('recorded STALE');
+    expect(result.summary).toContain('re-run fea_mesh then fea_solve');
+    expect((execute(result.document, 'fea_report', { analysisId: bar.analysisId }, withPort(bar)).data as { state: string }).state).toBe(
+      'stale',
+    );
   });
 });
 
@@ -225,7 +229,7 @@ describe('record_fea_results (trust model, 05 §4.1)', () => {
     );
   });
 
-  it('refuses results for other inputs (FEA_INPUT_STALE) and leaves the document untouched', () => {
+  it('records results computed for other inputs as stale; their numbers are withheld', () => {
     const bar = solvedBar();
     const meshed = recordedMesh(bar);
     const stale: FeResultsArtifact = { ...bar.results, inputHash: analysisInputHash(bar.doc, bar.analysisId, 'mesh') };
@@ -236,7 +240,11 @@ describe('record_fea_results (trust model, 05 §4.1)', () => {
       { ...summaryOf(bar), resultsHash: staleHash, inputHash: stale.inputHash },
       withPort(bar, portOf(bar.mesh, stale)),
     );
-    expect(result.error?.code).toBe('FEA_INPUT_STALE');
-    expect(result.document).toBe(meshed);
+    expect(result.error).toBeUndefined();
+    expect(result.summary).toContain('recorded STALE');
+    const reported = execute(result.document, 'fea_report', { analysisId: bar.analysisId }, withPort(bar, portOf(bar.mesh, stale)))
+      .data as { state: string; results: unknown };
+    expect(reported.state).toBe('stale');
+    expect(reported.results).toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-/** Refusals of the PHY-04 commands: stable code, ids, paths and the remediation texts of TECHNICAL_SPEC §7.1. */
+/** Refusals of the PHY-04 commands: stable code, ids, paths and the remediation texts. */
 
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
@@ -25,6 +25,18 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   FEA_RESULTS_MISSING: 'run fea_mesh and fea_solve on the analysis so the results artifact exists in the store',
   FEA_RESULTS_STALE: 're-solve the analysis (fea_solve); results of changed inputs are never read',
   FEA_PARAM_INVALID: 'see the parameter descriptions of the command',
+  TMC_CTE_BASIS_UNKNOWN:
+    "state the basis with set_temperature_field { analysisId, cteBasis: { <materialId>: { kind: 'secant', referenceTemperature } or { kind: 'instantaneous' } } }, or define a thermalStrain property model",
+  TMC_MATERIAL_NO_CTE:
+    'assign a material to the part and define_property_model with property thermalStrain (preferred) or cte on it (basis and source required)',
+  TMC_MATERIAL_UNVERIFIED:
+    'replace the typical / unstated CTE, E or nu by a verified, sourced define_property_model value; results stay flagged until then',
+  TMC_PROPERTY_OUT_OF_RANGE:
+    'define the CTE / E / nu model over the temperatures reached (define_property_model with a validity range covering the reference and field temperatures)',
+  TMC_THERMAL_CATEGORY_UNSET:
+    'add_fea_load with loadCase set to the thermal load case name and category limit or ultimate, per the programme rule',
+  TMC_COUPLED_UNSUPPORTED:
+    'remove the cavity radiation, thermal contacts, amplitudes and h(T) tables from the coupled case, or run a heat_* case then a thermo_static case',
 };
 
 /** `refuse` with the remediation registered for `code`; document unchanged. */
@@ -40,4 +52,4 @@ export function refuseTmc(
 }
 
 /** Remediation text of a code (for check items). */
-export const remediationOf = (code: string): string => REMEDIATION[code] ?? 'see TECHNICAL_SPEC §7.1';
+export const remediationOf = (code: string): string => REMEDIATION[code] ?? 'see the description of check_thermo_mechanical';

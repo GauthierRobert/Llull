@@ -82,6 +82,17 @@ function bodyXml(
 }
 
 /**
+ * Servos on an open kinematic chain (a robot arm: a jointed body hanging from a jointed body, no loops or gears). The servo damping acts
+ * explicitly in RK4 and the chain's mass matrix is near-singular (links nearly rigid against each other), so the per-joint gains that are
+ * stable alone chatter at the step rate (torque pinned at +-maxForce, aliased speeds); the implicit-in-velocity integrator is stable.
+ */
+function servoChain(model: SimulationModel): boolean {
+  if (model.servos.length === 0 || model.loops.length > 0 || model.gears.length > 0) return false;
+  const jointed = new Set(model.bodies.flatMap((body) => (body.joint === null ? [] : [body.id])));
+  return model.bodies.some((body) => body.joint !== null && body.parentId !== null && jointed.has(body.parentId));
+}
+
+/**
  * MJCF for `model`, integrated with RK4 (or implicitfast, per `solver.integrator`) at `timestep`. Gear couplings are joint equality
  * constraints q_driven = ratio · q_driver (from the initial pose), near-rigid (GEAR_IMPEDANCE) with the stiffest stable reference (time
  * constant 2 · timestep). Loop joints are `connect` equalities with the loop solref / solimp, and `diagexact` is enabled when loops exist.
@@ -107,7 +118,7 @@ export function toMjcf(model: SimulationModel, timestep: number): string {
         `actrange="-1e12 1e12" forcelimited="true" forcerange="${-servo.maxForce} ${servo.maxForce}"/>`,
     )
     .join('');
-  const integrator = model.solver.integrator === 'implicitfast' ? 'implicitfast' : 'RK4';
+  const integrator = model.solver.integrator === 'implicitfast' || servoChain(model) ? 'implicitfast' : 'RK4';
   const flags = model.loops.length > 0 ? '<flag diagexact="enable"/>' : '';
   const jacobian = model.loops.length > 0 ? ' jacobian="dense"' : '';
   return (

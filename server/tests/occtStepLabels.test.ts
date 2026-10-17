@@ -33,4 +33,22 @@ describe('occt export_step_exact labels', () => {
     expect(step.match(/STYLED_ITEM\('color'/g)).toHaveLength(2);
     expect(step.indexOf('MECHANICAL_DESIGN_GEOMETRIC_PRESENTATION_REPRESENTATION')).toBeLessThan(step.lastIndexOf('ENDSEC;'));
   }, 120_000);
+
+  it('exports component instances as their placed solids, named <instance>/<part>', () => {
+    let doc = createEmptyDocument();
+    doc = execute(doc, 'add_box', { size: [10, 10, 10] }).document;
+    const box = doc.order[0] ?? '';
+    doc = execute(doc, 'set_entity_name', { id: box, name: 'Bolt' }).document;
+    const created = execute(doc, 'create_component', { name: 'Bolt', entityIds: [box] });
+    const componentId = Object.keys(created.document.components)[0] ?? '';
+    const second = execute(created.document, 'insert_instance', { componentId, position: [50, 0, 0] });
+    const ctx = { ...defaultContext(), kernel: kernels.occt };
+    const result = execute(second.document, 'export_step_exact', {}, ctx);
+    const data = result.data as { step: string; solidCount: number; skipped: string[] };
+    expect(data.solidCount).toBe(2);
+    expect(data.skipped).toEqual([]);
+    expect(data.step.match(/PRODUCT\('[^']*\/Bolt'/g)).toHaveLength(2);
+    // the second instance sits 50 mm along x: its corner coordinates appear in the exact B-rep
+    expect(data.step).toMatch(/CARTESIAN_POINT\('',\(5[45]\.\d*E?\+?\d*,/);
+  }, 120_000);
 });

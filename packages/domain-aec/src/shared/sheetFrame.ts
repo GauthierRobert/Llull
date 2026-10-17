@@ -22,7 +22,9 @@ export const PAPER_FIELD = z.enum(PAPER_SIZES).optional().describe('Paper size (
 export const SCALE_FIELD = z
   .number()
   .optional()
-  .describe('Scale denominator N for 1:N (e.g. 100). Default: the smallest standard scale that fits (1-2-5 steps beyond 1:2000).');
+  .describe(
+    'Scale denominator N for 1:N (e.g. 100). Default: the largest standard scale (smallest N) that fits (1-2-5 steps beyond 1:2000).',
+  );
 
 /** Warning appended to a sheet summary when `what` is larger than the paper at the chosen scale. */
 export const sheetFitWarning = (fits: boolean, what: string): string =>
@@ -105,6 +107,25 @@ export function fitScale(widthMm: number, heightMm: number, viewport: Viewport):
   const needed = Math.max(widthMm / (viewport.width * 0.92), heightMm / (viewport.height * 0.92));
   if (!(needed > largest) || !Number.isFinite(needed)) return largest;
   return niceStep(needed);
+}
+
+export type SheetOrientation = 'landscape' | 'portrait';
+
+/**
+ * Paper orientation and scale for model extents of `widthMm`×`heightMm`: the orientation (landscape on a tie) whose auto-fit scale is
+ * largest, i.e. a tall drawing turns the paper portrait instead of dropping to a smaller scale. @pure
+ */
+export function fitPaperOrientation(
+  paper: PaperSize,
+  widthMm: number,
+  heightMm: number,
+): { readonly orientation: SheetOrientation; readonly width: number; readonly height: number; readonly scale: number } {
+  const [long, short] = PAPER_MM[paper];
+  const landscape = fitScale(widthMm, heightMm, sheetDrawingArea(long, short));
+  const portrait = fitScale(widthMm, heightMm, sheetDrawingArea(short, long));
+  return portrait < landscape
+    ? { orientation: 'portrait', width: short, height: long, scale: portrait }
+    : { orientation: 'landscape', width: long, height: short, scale: landscape };
 }
 
 /** Shared drawing-sheet stylesheet (line weights in paper millimetres). */

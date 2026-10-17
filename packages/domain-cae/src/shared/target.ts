@@ -1,6 +1,7 @@
 /** Target schema + validation shared by constraints, loads, mesh refinements and thermal BCs. Targets are points; the mesher resolves them. */
 
 import type { AnalysisCase, FeaTarget } from '@core/model/analysis';
+import { entityBoundsInDoc, boundsExtent } from '@core/geometry/bounds';
 import { is3D, type CadDocument } from '@core/model/types';
 import { vec3, z } from '@core/commands/schema';
 
@@ -58,4 +59,27 @@ export function targetProblem(doc: CadDocument, analysisCase: AnalysisCase, targ
   if (!Object.hasOwn(analysisCase.parts, target.entityId))
     return { code: 'FEA_PART_NOT_IN_ANALYSIS', message: `entity '${target.entityId}' is not a part of analysis '${analysisCase.id}'` };
   return null;
+}
+
+/** A selector point farther than this fraction of the part size from the part's bounds draws a warning. */
+const FAR_FRACTION = 0.05;
+
+const gapToBounds = (point: readonly number[], min: readonly number[], max: readonly number[]): number =>
+  Math.hypot(...[0, 1, 2].map((i) => Math.max((min[i] ?? 0) - (point[i] ?? 0), 0, (point[i] ?? 0) - (max[i] ?? 0))));
+
+/**
+ * Warning text (leading space, '' when fine) for selector points lying farther than 5 % of the part size outside its bounds (document units).
+ * @failure missing entity or no selector points -> ''
+ */
+export function targetDistanceWarning(doc: CadDocument, target: FeaTargetInput | FeaTarget): string {
+  const entity = Object.hasOwn(doc.entities, target.entityId) ? doc.entities[target.entityId] : undefined;
+  if (entity === undefined || !is3D(entity)) return '';
+  const bounds = entityBoundsInDoc(doc, entity);
+  const size = boundsExtent(bounds);
+  const far = [...(target.facesNear ?? []), ...(target.edgesNear ?? []), ...(target.pointsNear ?? [])]
+    .map((point) => ({ point, gap: gapToBounds(point, bounds.min, bounds.max) }))
+    .filter(({ gap }) => gap > FAR_FRACTION * size);
+  if (far.length === 0) return '';
+  const worst = far.reduce((a, b) => (b.gap > a.gap ? b : a));
+  return ` WARNING: ${far.length} target point(s) lie off the part '${target.entityId}' (point [${worst.point.join(', ')}] is ${Number(worst.gap.toPrecision(3))} document units from its bounds, part size ${Number(size.toPrecision(3))}); the mesher will resolve them to the nearest face or fail — check the coordinates.`;
 }

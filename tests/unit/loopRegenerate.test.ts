@@ -3,6 +3,7 @@ import { createEmptyDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import { TETRA, fakeKernel } from '../helpers/fakeKernel';
+import { noteReplayFailure, replayFailureError, replayFailuresNote, type ReplayFailure } from '@core/commands/history/replay';
 
 const plan = [
   { command: 'set_parameter', params: { name: 'n', expression: '3' } },
@@ -68,5 +69,44 @@ describe('loop regeneration with a rebinding outer alias', () => {
     const r = execute(broken, 'set_parameter', { name: 'n', expression: '4' });
     expect(r.summary).toMatch(/FAILED during regeneration/);
     expect(r.error?.code).toBe('HIST_STEP_FAILED');
+  });
+});
+
+describe('replay failure reporting for analysis record steps', () => {
+  const event = (name: string, id: string): Parameters<typeof noteReplayFailure>[1] => ({
+    step: { id, name, params: {}, affected: [] },
+    rawParams: {},
+    params: {},
+    before: createEmptyDocument(),
+    after: createEmptyDocument(),
+    inert: true,
+    failure: `${name}: FEA_INPUT_STALE`,
+  });
+
+  it('only analysis record failures: no hard error, summary says the analysis is stale and to re-run fea_mesh / fea_solve', () => {
+    const failures: ReplayFailure[] = [];
+    noteReplayFailure(failures, event('record_fe_mesh', 'step-22'));
+    noteReplayFailure(failures, event('record_fea_results', 'step-23'));
+    expect(replayFailureError(failures)).toBeUndefined();
+    const note = replayFailuresNote(failures);
+    expect(note).toMatch(/analysis is now stale/);
+    expect(note).toMatch(/fea_mesh then fea_solve/);
+    expect(note).toMatch(/step-22 \(record_fe_mesh\)/);
+  });
+
+  it('a geometry failure stays a hard HIST_STEP_FAILED naming the command, with the stale hint when records also failed', () => {
+    const failures: ReplayFailure[] = [];
+    noteReplayFailure(failures, event('add_box', 'step-3'));
+    noteReplayFailure(failures, event('record_fe_mesh', 'step-22'));
+    const error = replayFailureError(failures);
+    expect(error?.code).toBe('HIST_STEP_FAILED');
+    expect(error?.remediation).toMatch(/step-3 add_box/);
+    expect(error?.remediation).toMatch(/fea_mesh then fea_solve/);
+    expect(replayFailuresNote(failures)).toMatch(/FAILED during regeneration/);
+  });
+
+  it('no failures: no error and no note', () => {
+    expect(replayFailureError([])).toBeUndefined();
+    expect(replayFailuresNote([])).toBe('');
   });
 });

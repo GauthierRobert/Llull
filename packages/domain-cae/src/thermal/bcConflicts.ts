@@ -1,4 +1,4 @@
-/** Prescribed-temperature BCs that fix the same mesh nodes to different values (CalculiX silently keeps the last one). */
+/** Prescribed-temperature BCs that fix the same mesh nodes to different values (CalculiX silently keeps the last one), or that override film / radiation BCs. */
 
 import type { FeMeshArtifact, ThermalSetup } from '@core/model/analysis';
 import { faceNodes, indexMesh } from './meshGeometry';
@@ -6,6 +6,14 @@ import { faceNodes, indexMesh } from './meshGeometry';
 export interface BcConflict {
   readonly first: string;
   readonly second: string;
+  readonly sharedNodes: number;
+}
+
+/** A prescribed temperature that overrides the film / radiation BC `flow` on `sharedNodes` nodes (the flow's heat is not applied there). */
+export interface FlowOverride {
+  readonly temperature: string;
+  readonly flow: string;
+  readonly kind: 'film' | 'radiation';
   readonly sharedNodes: number;
 }
 
@@ -40,4 +48,29 @@ export function temperatureBcConflicts(thermal: ThermalSetup, mesh: FeMeshArtifa
     }
   });
   return conflicts;
+}
+
+/**
+ * Film / radiation BCs (in bcOrder) whose meshed node sets intersect a prescribed-temperature BC, whatever its value: the temperature wins there.
+ * @pure
+ */
+export function temperatureOverridesFlows(thermal: ThermalSetup, mesh: FeMeshArtifact): FlowOverride[] {
+  const index = indexMesh(mesh);
+  const records = thermal.bcOrder.flatMap((id) =>
+    Object.hasOwn(thermal.bcs, id) && thermal.bcs[id] !== undefined ? [thermal.bcs[id]] : [],
+  );
+  const fixed = records
+    .filter((record) => record.bc.kind === 'temperature')
+    .map((record) => ({ record, nodes: nodesOf(mesh, `B_${record.id}`, index) }));
+  const overrides: FlowOverride[] = [];
+  for (const record of records) {
+    const kind = record.bc.kind;
+    if (kind !== 'film' && kind !== 'radiation') continue;
+    const nodes = nodesOf(mesh, `B_${record.id}`, index);
+    for (const other of fixed) {
+      const sharedNodes = [...nodes].filter((node) => other.nodes.has(node)).length;
+      if (sharedNodes > 0) overrides.push({ temperature: other.record.id, flow: record.id, kind, sharedNodes });
+    }
+  }
+  return overrides;
 }

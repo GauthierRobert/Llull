@@ -43,7 +43,7 @@ export const measureBoundingBox = defineCommand({
     '(b) useSelection:true — combined AABB of the current document selection; ' +
     '(c) no params (or useSelection:false) — combined AABB of the entire document. ' +
     'Returns data: { min:[x,y,z], max:[x,y,z], size:[w,h,d] }. Does not modify the document. ' +
-    'Note: entity rotation is NOT applied to bounds (axis-aligned approximation).',
+    'Entity rotation and partial revolve angles are applied (the AABB wraps the rotated, swept geometry).',
   params: z.object({
     entityId: z.string().optional().describe('Id of the entity whose bounding box to compute. Takes precedence over useSelection.'),
     useSelection: z

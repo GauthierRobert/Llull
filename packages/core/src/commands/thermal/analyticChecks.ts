@@ -2,13 +2,14 @@
 
 import {
   interfaceSlabs,
+  lumpedBody,
   lumpedSphere,
   neumannMelting,
   parallelPlates,
-  pinFin,
   planeWall,
   semiInfinite,
   slabGenerationRise,
+  straightFin,
   STEFAN_BOLTZMANN,
   viewFactorCoaxialDiscs,
   viewFactorParallel,
@@ -24,6 +25,8 @@ export interface InputSpec {
   readonly kind: ThermalKind;
   readonly domain: Domain;
   readonly describe: string;
+  /** may be omitted by the caller; `compute` then sees the key absent */
+  readonly optional?: boolean;
 }
 
 export interface Output {
@@ -52,6 +55,14 @@ export interface CheckSpec {
 }
 
 const input = (name: string, kind: ThermalKind, domain: Domain, describe: string): InputSpec => ({ name, kind, domain, describe });
+const optionalInput = (name: string, kind: ThermalKind, domain: Domain, describe: string): InputSpec => ({
+  name,
+  kind,
+  domain,
+  describe,
+  optional: true,
+});
+const has = (v: Readonly<Record<string, number>>, name: string): boolean => v[name] !== undefined;
 const out = (kind: ThermalKind, value: number): Output => ({ kind, value });
 /** SI inputs are validated against their declared names before `compute`, so a missing key cannot occur. */
 const n = (v: Readonly<Record<string, number>>, name: string): number => v[name] ?? Number.NaN;
@@ -112,9 +123,12 @@ export const CHECK_SPECS: Readonly<Record<string, CheckSpec>> = {
     }),
   },
   lumped: {
-    formula: 'T = Tinf + (Ti - Tinf) exp(-t/tau), tau = rho c (d/6) / h; Bi = h (d/6) / k, valid when Bi < 0.1 (sphere)',
+    formula:
+      'T = Tinf + (Ti - Tinf) exp(-t/tau), tau = rho c Lc / h, Lc = V/As (sphere shorthand d: Lc = d/6); Bi = h Lc / k, valid when Bi < 0.1',
     inputs: [
-      input('d', 'length', 'positive', 'sphere diameter'),
+      optionalInput('V', 'volume', 'positive', 'body volume (with As: any shape)'),
+      optionalInput('As', 'area', 'positive', 'convecting surface area (with V)'),
+      optionalInput('d', 'length', 'positive', 'sphere diameter (shorthand for V and As of a sphere; give V and As or d)'),
       input('rho', 'density', 'positive', 'density'),
       input('c', 'specificHeat', 'positive', 'specific heat'),
       input('k', 'conductivity', 'positive', 'thermal conductivity'),
@@ -124,29 +138,79 @@ export const CHECK_SPECS: Readonly<Record<string, CheckSpec>> = {
       input('t', 'time', 'nonnegative', 'time'),
     ],
     compute: (v) => {
-      const sphere = lumpedSphere(n(v, 'd'), n(v, 'rho'), n(v, 'c'), n(v, 'k'), n(v, 'h'), n(v, 'Ti'), n(v, 'Tinf'), n(v, 't'));
-      const ok = sphere.biot < LUMPED_BIOT_LIMIT;
+      const common = [n(v, 'rho'), n(v, 'c'), n(v, 'k'), n(v, 'h'), n(v, 'Ti'), n(v, 'Tinf'), n(v, 't')] as const;
+      let body: ReturnType<typeof lumpedBody>;
+      if (has(v, 'V') || has(v, 'As')) {
+        if (!has(v, 'V') || !has(v, 'As')) return { code: 'THM_INPUT_INVALID', reason: 'give both V and As (or the sphere diameter d)' };
+        body = lumpedBody(n(v, 'V'), n(v, 'As'), ...common);
+      } else if (has(v, 'd')) {
+        const sphere = lumpedSphere(n(v, 'd'), ...common);
+        body = { ...sphere, characteristicLength: n(v, 'd') / 6 };
+      } else {
+        return { code: 'THM_INPUT_INVALID', reason: 'give the body as V and As (any shape) or the sphere diameter d' };
+      }
+      const ok = body.biot < LUMPED_BIOT_LIMIT;
       return {
         primary: 'T',
-        outputs: { T: out('temperature', sphere.temperature), Bi: out('ratio', sphere.biot), tau: out('time', sphere.timeConstant) },
-        validity: { Bi: sphere.biot, limit: LUMPED_BIOT_LIMIT, ok },
+        outputs: {
+          T: out('temperature', body.temperature),
+          Bi: out('ratio', body.biot),
+          tau: out('time', body.timeConstant),
+          Lc: out('length', body.characteristicLength),
+        },
+        validity: { Bi: body.biot, limit: LUMPED_BIOT_LIMIT, ok },
         ...(ok
           ? {}
-          : { warnings: [`Bi = ${sphere.biot.toPrecision(4)} >= ${LUMPED_BIOT_LIMIT}: the lumped-capacitance assumption is not valid`] }),
+          : { warnings: [`Bi = ${body.biot.toPrecision(4)} >= ${LUMPED_BIOT_LIMIT}: the lumped-capacitance assumption is not valid`] }),
       };
     },
   },
   fin: {
-    formula: 'eta = tanh(m L)/(m L), m = sqrt(4 h / (k d)) (pin fin, adiabatic tip)',
+    formula:
+      'm = sqrt(hP/(kA)), M = sqrt(hPkA); eta = tanh(mL)/(mL); adiabatic tip: Q = M tanh(mL) (Tb-Tinf), theta(L)/theta_b = 1/cosh(mL); ' +
+      'convective tip: Q = M (sinh mL + B cosh mL)/(cosh mL + B sinh mL) (Tb-Tinf), theta(L)/theta_b = 1/(cosh mL + B sinh mL), B = h/(mk); ' +
+      'corrected length: Q = M tanh(m Lc) (Tb-Tinf), Lc = L + A/P (pin: P = pi d, A = pi d^2/4)',
     inputs: [
       input('h', 'film', 'positive', 'film coefficient'),
       input('k', 'conductivity', 'positive', 'thermal conductivity'),
-      input('d', 'length', 'positive', 'pin diameter'),
+      optionalInput('d', 'length', 'positive', 'pin diameter (gives P = pi d, A = pi d^2/4; or give P and A)'),
+      optionalInput('P', 'length', 'positive', 'section perimeter (with A, for any uniform section)'),
+      optionalInput('A', 'area', 'positive', 'section cross-sectional area (with P)'),
       input('L', 'length', 'positive', 'fin length'),
+      optionalInput('Tb', 'temperature', 'any', 'base temperature (with Tinf: adds heat rates and tip temperatures)'),
+      optionalInput('Tinf', 'temperature', 'any', 'fluid temperature (with Tb)'),
     ],
     compute: (v) => {
-      const fin = pinFin(n(v, 'h'), n(v, 'k'), n(v, 'd'), n(v, 'L'));
-      return { primary: 'eta', outputs: { eta: out('ratio', fin.efficiency), m: out('inverseLength', fin.m) } };
+      let perimeter: number;
+      let area: number;
+      if (has(v, 'P') || has(v, 'A')) {
+        if (!has(v, 'P') || !has(v, 'A')) return { code: 'THM_INPUT_INVALID', reason: 'give both P and A (or the pin diameter d)' };
+        perimeter = n(v, 'P');
+        area = n(v, 'A');
+      } else if (has(v, 'd')) {
+        perimeter = Math.PI * n(v, 'd');
+        area = (Math.PI * n(v, 'd') ** 2) / 4;
+      } else {
+        return { code: 'THM_INPUT_INVALID', reason: 'give the section as d (pin) or P and A' };
+      }
+      if (has(v, 'Tb') !== has(v, 'Tinf')) return { code: 'THM_INPUT_INVALID', reason: 'give both Tb and Tinf (or neither)' };
+      const fin = straightFin(n(v, 'h'), n(v, 'k'), perimeter, area, n(v, 'L'));
+      const outputs: Record<string, Output> = { eta: out('ratio', fin.efficiency), m: out('inverseLength', fin.m) };
+      if (has(v, 'Tb')) {
+        const base = n(v, 'Tb') - n(v, 'Tinf');
+        const tip = (ratio: number): Output => out('temperature', n(v, 'Tinf') + base * ratio);
+        Object.assign(outputs, {
+          Q: out('power', fin.adiabaticPerKelvin * base),
+          Q_convective_tip: out('power', fin.convectiveTipPerKelvin * base),
+          Q_corrected: out('power', fin.correctedPerKelvin * base),
+          Lc: out('length', fin.correctedLength),
+          tip_ratio: out('ratio', fin.adiabaticTipRatio),
+          tip_ratio_convective: out('ratio', fin.convectiveTipRatio),
+          T_tip: tip(fin.adiabaticTipRatio),
+          T_tip_convective: tip(fin.convectiveTipRatio),
+        });
+      }
+      return { primary: 'eta', outputs };
     },
   },
   parallel_plates: {
