@@ -1,7 +1,7 @@
 import { defineCommand, z } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
 import { report } from '@core/commands/noop';
-import type { FtrCheckData, FtrFinding } from '@core/model/manufacturing';
+import { FTR_CODES, type FtrCheckData, type FtrFinding, type FtrWaiver } from '@core/model/manufacturing';
 import { type CheckContext, type RuleOutcome, holeDistances, minBendRadius, minFlange, reliefPresent } from '../checks';
 import { getModel, ruleOfPart } from '../graph';
 import { REVIEW_NOTE, refuse, resultMeta } from '../result';
@@ -39,7 +39,7 @@ export const checkSheetMetal = defineCommand({
     waivers: z
       .array(
         z.object({
-          code: z.string().describe('FTR code of the finding to waive, e.g. FTR_BEND_RADIUS_BELOW_MIN.'),
+          code: z.enum(FTR_CODES).describe('FTR code of the finding to waive, e.g. FTR_BEND_RADIUS_BELOW_MIN.'),
           ids: z.array(z.string()).describe('Part / node ids of the finding.'),
           approvalRef: z.string().describe('Reference of the human-signed approval record that accepts the finding.'),
         }),
@@ -49,7 +49,8 @@ export const checkSheetMetal = defineCommand({
         'Waiver requests. They are honoured only with a human-signed approval (not available yet): otherwise FTR_WAIVER_NOT_APPROVED.',
       ),
   }),
-  run: (doc, { id, waivers = [] }): CommandResult => {
+  run: (doc, { id, waivers: requested = [] }): CommandResult => {
+    const waivers: readonly FtrWaiver[] = requested;
     const model = getModel(doc);
     const part = model.parts[id];
     if (part === undefined)

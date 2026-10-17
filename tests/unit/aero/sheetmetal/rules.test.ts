@@ -5,7 +5,7 @@ import type { SheetMetalRule } from '@core/model/sheetMetal';
 import { RULE, apply, expectRefusal, ok } from './helpers';
 
 const empty = createEmptyDocument();
-const rowOf = (extra: Record<string, unknown> = {}) => ({
+const rowOf = (extra: Record<string, unknown> = {}): Record<string, unknown> => ({
   material: 'TEST-ALLOY',
   temper: 'T0',
   thickness: 0.8,

@@ -5,7 +5,8 @@ import type { Vec2 } from '@core/model/types';
 import type { SheetCutout } from '@core/model/sheetMetal';
 import { pointInPolygon, polygonArea, segmentsIntersect, toCounterClockwise } from '@lib/polygon';
 import { withFoldedSolid } from '../fold';
-import { frameToWorld, worldToFrame } from '../frames';
+import { basisOf, frameToWorld, worldToFrame } from '../frames';
+import { dot3, normalize3 } from '@lib/vec3';
 import { circlePolygon, isSimplePolygon } from '../geometry2d';
 import { getModel, ruleOfPart, withModel, withNodes, withPart } from '../graph';
 import { pickFlat } from '../pick';
@@ -62,6 +63,13 @@ export const addSheetCutout = defineCommand({
         { ids: [id], paths: ['face.near'] },
       );
     const { flat } = hit;
+    if (Math.abs(dot3(normalize3(loop.frame.normal), basisOf(flat.frame).z)) < 1 - 1e-6)
+      return fail(
+        'FTR_CUTOUT_INVALID',
+        'the profile plane is not parallel to the picked flat',
+        'Draw the profile on a plane parallel to the flat (same orientation).',
+        { ids: [id, flat.id, profileId] },
+      );
     const project = (point: Vec2): Vec2 => {
       const [x, y] = worldToFrame(flat.frame, frameToWorld(loop.frame, point));
       return [x, y];

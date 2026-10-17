@@ -3,7 +3,7 @@
 import type { CadDocument, DocumentUnit } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { commandError, rejection } from '@core/commands/noop';
-import { FTR_REVIEW_REASON, type FtrCode, type FtrResultMeta, type FtrUnverifiedInput } from '@core/model/manufacturing';
+import { FTR_REVIEW_REASON, type FtrCode, type FtrRefusal, type FtrResultMeta, type FtrUnverifiedInput } from '@core/model/manufacturing';
 
 /** Plain-words review note appended to the summary of every query that could support a release decision (FR-FTR-37). */
 export const REVIEW_NOTE =
@@ -18,10 +18,11 @@ export function refuse(
   remediation: string,
   where: { readonly ids?: readonly string[]; readonly paths?: readonly string[] } = {},
 ): CommandResult {
+  const refusal: FtrRefusal = { code, ids: where.ids ?? [], paths: where.paths ?? [], remediation };
   return rejection(
     doc,
     `${command} rejected [${code}]: ${why}. ${remediation} Document unchanged.`,
-    commandError(code, remediation, where.ids ?? [], where.paths ?? []),
+    commandError(refusal.code, refusal.remediation, refusal.ids, refusal.paths),
   );
 }
 

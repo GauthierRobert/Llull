@@ -27,7 +27,7 @@ function strip(rule: Record<string, unknown> = {}, width = 40, height = 30): { d
   return { doc: made.document, part: made.affected[0] as string };
 }
 
-const joggle = (part: string, extra: Record<string, unknown> = {}) => ({
+const joggle = (part: string, extra: Record<string, unknown> = {}): Record<string, unknown> => ({
   id: part,
   face: { near: [10, 15, 0] },
   line: [

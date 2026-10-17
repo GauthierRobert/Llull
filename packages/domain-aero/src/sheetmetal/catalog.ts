@@ -11,9 +11,11 @@ import { addSheetCutout } from './commands/cutout';
 import { addRelief } from './commands/relief';
 import { checkSheetMetal } from './commands/check';
 import { exportFlatPatternDxf } from './commands/dxf';
+import { convertToSheetMetal } from './commands/convert';
 
 // prettier-ignore
 export const sheetMetalCommands = commandCatalog(
   sheetMetalCalc, createSheetMetalRule, importBendRadiusTable, addSheetMetalBase, addFlange, addJoggle, addSheetCutout, addRelief, flatPattern,
   materializeFlatPattern, checkSheetMetal, exportFlatPatternDxf,
+  convertToSheetMetal,
 );

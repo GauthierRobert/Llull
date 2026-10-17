@@ -104,8 +104,8 @@ function partErrors(key: string, part: unknown, rules: Record<string, unknown>):
   const errors: string[] = [];
   if (typeof part['rule'] !== 'string' || rules[part['rule']] === undefined) errors.push(`${path}.rule must name an existing rule`);
   if (part['side'] !== 'up' && part['side'] !== 'down' && part['side'] !== 'mid') errors.push(`${path}.side must be up|down|mid`);
-  if (typeof part['root'] !== 'string' || !isRecord(nodes[part['root']]) || nodes[part['root']] === undefined)
-    errors.push(`${path}.root must be a flat`);
+  const rootNode = typeof part['root'] === 'string' ? nodes[part['root']] : undefined;
+  if (!isRecord(rootNode) || rootNode['type'] !== 'flat') errors.push(`${path}.root must be a flat`);
   for (const [id, node] of Object.entries(nodes)) {
     errors.push(...nodeErrors(`${path}.nodes.${id}`, node, nodes));
     if (isRecord(node) && node['id'] !== id) errors.push(`${path}.nodes.${id}.id must equal its key`);

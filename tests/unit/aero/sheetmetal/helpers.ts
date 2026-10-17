@@ -62,15 +62,15 @@ export const meshVolume = (doc: CadDocument, part: string): number => {
   return signedMeshVolume(entity.mesh.positions, entity.mesh.indices);
 };
 
-export function meshBounds(doc: CadDocument, part: string): { min: number[]; max: number[] } {
+export function meshBounds(doc: CadDocument, part: string): { min: [number, number, number]; max: [number, number, number] } {
   const positions = folded(doc, part).mesh.positions;
-  const min = [Infinity, Infinity, Infinity];
-  const max = [-Infinity, -Infinity, -Infinity];
-  for (let i = 0; i < positions.length; i++) {
-    const axis = i % 3;
-    min[axis] = Math.min(min[axis] as number, positions[i] as number);
-    max[axis] = Math.max(max[axis] as number, positions[i] as number);
-  }
+  const min: [number, number, number] = [Infinity, Infinity, Infinity];
+  const max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i + 2 < positions.length; i += 3)
+    for (const axis of [0, 1, 2] as const) {
+      min[axis] = Math.min(min[axis], positions[i + axis] as number);
+      max[axis] = Math.max(max[axis], positions[i + axis] as number);
+    }
   return { min, max };
 }
 
@@ -92,5 +92,3 @@ export function expectRefusal(doc: CadDocument, name: string, params: unknown, c
   if (path !== undefined) expect(result.error?.paths).toContain(path);
   return result;
 }
-
-export const mmToIn = 1 / 25.4;

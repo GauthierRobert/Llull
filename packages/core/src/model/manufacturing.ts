@@ -107,7 +107,10 @@ export interface FtrCheckData extends FtrResultMeta {
   readonly status: 'pass' | 'warn' | 'fail';
   readonly findings: readonly FtrFinding[];
   readonly rulesApplied: readonly string[];
-  readonly rulesSkipped: ReadonlyArray<{ readonly rule: string; readonly code: 'FTR_RULE_THRESHOLD_MISSING' | 'FTR_BEND_RADIUS_NO_TABLE_ROW' }>;
+  readonly rulesSkipped: ReadonlyArray<{
+    readonly rule: string;
+    readonly code: 'FTR_RULE_THRESHOLD_MISSING' | 'FTR_BEND_RADIUS_NO_TABLE_ROW';
+  }>;
 }
 
 /** Refusal payload (`CommandResult.error` / `data.error`) of an FTR command. */

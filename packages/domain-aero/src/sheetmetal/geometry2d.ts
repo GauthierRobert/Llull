@@ -89,19 +89,6 @@ export function lineCrossings(polygon: readonly Vec2[], p: Vec2, direction: Vec2
   return hits.sort((a, b) => dot2(a, direction) - dot2(b, direction));
 }
 
-/** Index of the polygon edge nearest `point` and the distance to it. */
-export function nearestEdge(
-  polygon: readonly Vec2[],
-  point: Vec2,
-): { readonly index: number; readonly distance: number; readonly t: number } {
-  let best = { index: 0, distance: Infinity, t: 0 };
-  polygon.forEach((a, index) => {
-    const hit = projectOntoSegment(point, a, polygon[(index + 1) % polygon.length] as Vec2);
-    if (hit.distance < best.distance - 1e-12) best = { index, distance: hit.distance, t: hit.t };
-  });
-  return best;
-}
-
 /**
  * The CCW polygon with edge `index` moved `shift` into the material (adjacent edges extended or trimmed to meet it).
  * @failure adjacent edge parallel to the moved one, or the result not simple -> null

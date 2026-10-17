@@ -3,7 +3,7 @@ import type { CommandResult } from '@core/commands/types';
 import { report } from '@core/commands/noop';
 import { toRadians } from '@lib/angle';
 import { FORMULAS, bendQuantities, dinToAnsiK, faaBendQuantities } from '@lib/sheetMath';
-import type { FtrUnverifiedInput } from '@core/model/manufacturing';
+import type { FtrUnverifiedInput, Named } from '@core/model/manufacturing';
 import { findRadiusRow } from '../rules';
 import { getModel } from '../graph';
 import { REVIEW_NOTE, fixed, refuse, resultMeta, unverifiedNote } from '../result';
@@ -136,19 +136,13 @@ export const sheetMetalCalc = defineCommand({
       },
       sources: mode === 'faa_empirical' ? ['R2', 'R3'] : ['R2', 'R7', 'R14'],
     });
+    const kFactorUsed: (Named<number> & { standard: 'ansi' }) | undefined =
+      ansiK === undefined
+        ? undefined
+        : { value: ansiK, standard: 'ansi', source: `param kFactor (${kStandard})`, defaulted: false, verification: 'verified' };
     const data = {
       mode,
-      ...(ansiK !== undefined
-        ? {
-            kFactor: {
-              value: ansiK,
-              standard: 'ansi' as const,
-              source: `param kFactor (${kStandard})`,
-              defaulted: false,
-              verification: 'verified' as const,
-            },
-          }
-        : {}),
+      ...(kFactorUsed !== undefined ? { kFactor: kFactorUsed } : {}),
       ba: q.ba.value,
       ossb: q.ossb.value,
       issb: q.issb.value,

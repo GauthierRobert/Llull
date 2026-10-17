@@ -92,7 +92,7 @@ describe('sheet-metal bracket (VC-FTR-06, 07, 08, 41)', () => {
 });
 
 describe('add_flange options', () => {
-  const flange = (extra: Record<string, unknown>) => ({
+  const flange = (extra: Record<string, unknown>): Record<string, unknown> => ({
     edge: { near: [0, 25, 0] },
     angle: 90,
     length: 20,
@@ -135,7 +135,7 @@ describe('add_flange options', () => {
     expect(bend?.direction).toBe('down');
     expect(bend?.angleDeg).toBeCloseTo(135, 9);
     const narrow = apply(doc, 'add_flange', { id: part, ...flange({ widthStart: 10, widthEnd: 5 }) });
-    const width = (narrow.sheetMetal?.parts[part]?.nodes['f2'] as { outline: number[][] }).outline[1]?.[0];
+    const width = (narrow.sheetMetal?.parts[part]?.nodes['f2'] as unknown as { outline: number[][] }).outline[1]?.[0];
     expect(width).toBeCloseTo(35, 9);
   });
 
@@ -177,7 +177,10 @@ describe('add_flange options', () => {
     expectRefusal(
       small.doc,
       'add_flange',
-      { id: small.part, ...flange({ edge: { near: [33.6, 25, 0] }, position: 'material_inside', lengthReference: 'tangent', length: 10, angle: 170 }) },
+      {
+        id: small.part,
+        ...flange({ edge: { near: [33.6, 25, 0] }, position: 'material_inside', lengthReference: 'tangent', length: 10, angle: 170 }),
+      },
       'FTR_PARAM_INVALID',
       'position',
     );
@@ -229,7 +232,12 @@ describe('add_sheet_metal_base', () => {
       closed: false,
     });
     const circle = ok(open.document, 'draw_arc', { center: [0, 0], radius: 5 });
-    const line = ok(circle.document, 'draw_polyline', { points: [[0, 0], [4, 4]] });
+    const line = ok(circle.document, 'draw_polyline', {
+      points: [
+        [0, 0],
+        [4, 4],
+      ],
+    });
     const tangled = ok(line.document, 'draw_polyline', {
       points: [
         [0, 0],
