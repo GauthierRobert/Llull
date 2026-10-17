@@ -7,7 +7,7 @@ import { toRadians } from '@lib/angle';
 import type { CadDocument, Entity, Vec2, Vec3 } from '@core/model/types';
 import { DxfWriter } from '../../building/exchange/dxfWriter';
 import type { SiteCalibration } from '@core/model/civil';
-import { assembleDxf } from '../../building/exchange/dxfExport';
+import { assembleAecDxf } from '../../building/exchange/dxfExport';
 import { localToGrid, resolveFrame, type CoordinateFrame } from '../crs/crs';
 import { entityPlanPoint } from '@core/geometry/entityFrame';
 
@@ -81,5 +81,5 @@ export function buildCivilDxf(doc: CadDocument, coordinates?: CoordinateFrame): 
     if (!entity?.tags?.includes('civil')) continue;
     writeEntity(writer, doc.layers[entity.layerId]?.name ?? '0', entity, frame, rotationDeg);
   }
-  return { text: `${assembleDxf(doc, writer)}\n`, entityCount: writer.entityCount, layers: [...writer.layers.keys()] };
+  return { text: `${assembleAecDxf(doc, writer)}\n`, entityCount: writer.entityCount, layers: [...writer.layers.keys()] };
 }

@@ -104,6 +104,15 @@ describe('export_flat_pattern_dxf (VC-FTR-09, 41)', () => {
     expect(number(bend as DxfEntity, 10)).toBeCloseTo(33.6 + 8.645662983 / 2, 5);
   });
 
+  it('declares header extents that cover every entity, the notes below the pattern included', () => {
+    const lines = result.dxf.split('\n');
+    const extentY = (variable: string): number => Number(lines[lines.indexOf(variable) + 4]);
+    const textYs = parsed.entities.filter((entity) => entity.type === 'TEXT').map((entity) => number(entity, 20));
+    expect(textYs.length).toBeGreaterThan(0);
+    expect(extentY('$EXTMIN')).toBeLessThanOrEqual(Math.min(...textYs));
+    expect(extentY('$EXTMAX')).toBeCloseTo(50, 6);
+  });
+
   it('carries the review flags in the result (VC-FTR-41)', () => {
     const answer = ok(doc, 'export_flat_pattern_dxf', { id: part });
     expect(answer.summary).toContain('not approved');

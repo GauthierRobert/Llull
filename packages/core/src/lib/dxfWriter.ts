@@ -1,6 +1,6 @@
 /**
- * Generic AutoCAD R12 DXF writer: sanitised layer names, escaped text, entity methods with running extents. Domain packages add their own
- * layer colours and header/table assembly (AEC plan export, sheet-metal flat patterns).
+ * Generic AutoCAD R12 DXF writer: sanitised layer names, escaped text, entity methods with running extents, and the file assembly (header,
+ * line types, layer table). Domain packages add their own layer colours and line types (AEC plan export, sheet-metal flat patterns).
  * @layer lib
  */
 
@@ -31,7 +31,7 @@ const round6 = (value: number): number => Math.round(value * 1e6) / 1e6 + 0;
 
 export const fmt = (value: number): string => String(round6(value));
 
-/** Generic AutoCAD R12 entity writer (LINE, CIRCLE, ARC, TEXT, POLYLINE, SOLID, POINT, 3DFACE); callers assemble header, tables and sections. */
+/** Generic AutoCAD R12 entity writer (LINE, CIRCLE, ARC, TEXT, POLYLINE, SOLID, POINT, 3DFACE); `assembleDxf` wraps it in a file. */
 export class DxfWriter {
   readonly lines: string[] = [];
   readonly layers = new Map<string, number>();
@@ -162,4 +162,56 @@ export class DxfWriter {
       this.point(base, [corner[0], corner[1]], corner[2]);
     }
   }
+}
+
+type DxfGroup = readonly [code: number, value: string | number];
+
+const flatten = (groups: ReadonlyArray<DxfGroup>): string[] => groups.flatMap(([code, value]) => [String(code), String(value)]);
+
+/** An LTYPE table entry: dash lengths positive, gaps negative, in drawing units. */
+export interface DxfLineType {
+  readonly name: string;
+  readonly description: string;
+  readonly lengths: ReadonlyArray<number>;
+}
+
+// prettier-ignore
+function lineTypeGroups({ name, description, lengths }: DxfLineType): DxfGroup[] {
+  return [
+    [0, 'LTYPE'], [2, name], [70, 0], [3, description], [72, 65], [73, lengths.length],
+    [40, fmt(lengths.reduce((sum, length) => sum + Math.abs(length), 0))],
+    ...lengths.map((length): DxfGroup => [49, fmt(length)]),
+  ];
+}
+
+/**
+ * The complete R12 file text of everything `writer` holds: header ($INSUNITS, extents), LTYPE table (CONTINUOUS + `lineTypes`), LAYER table
+ * (layer 0 + the writer's layers, each drawn with `layerLineType`), then the entities.
+ */
+// prettier-ignore
+export function assembleDxf(
+  unit: keyof typeof INSUNITS,
+  writer: DxfWriter,
+  lineTypes: ReadonlyArray<DxfLineType> = [],
+  layerLineType: (layer: string) => string = () => 'CONTINUOUS',
+): string {
+  const bounds = writer.bounds();
+  const groups: DxfGroup[] = [
+    [0, 'SECTION'], [2, 'HEADER'], [9, '$ACADVER'], [1, 'AC1009'], [9, '$INSUNITS'], [70, INSUNITS[unit]],
+    [9, '$EXTMIN'], [10, fmt(bounds[0])], [20, fmt(bounds[1])], [30, 0],
+    [9, '$EXTMAX'], [10, fmt(bounds[2])], [20, fmt(bounds[3])], [30, 0],
+    [0, 'ENDSEC'],
+    [0, 'SECTION'], [2, 'TABLES'],
+    [0, 'TABLE'], [2, 'LTYPE'], [70, lineTypes.length + 1],
+    [0, 'LTYPE'], [2, 'CONTINUOUS'], [70, 0], [3, 'Solid line'], [72, 65], [73, 0], [40, '0.0'],
+    ...lineTypes.flatMap(lineTypeGroups),
+    [0, 'ENDTAB'],
+    [0, 'TABLE'], [2, 'LAYER'], [70, writer.layers.size + 1],
+    [0, 'LAYER'], [2, '0'], [70, 0], [62, 7], [6, 'CONTINUOUS'],
+  ];
+  for (const [name, color] of writer.layers) {
+    if (name !== '0') groups.push([0, 'LAYER'], [2, name], [70, 0], [62, color], [6, layerLineType(name)]);
+  }
+  groups.push([0, 'ENDTAB'], [0, 'ENDSEC'], [0, 'SECTION'], [2, 'ENTITIES']);
+  return [...flatten(groups), ...writer.lines, ...flatten([[0, 'ENDSEC'], [0, 'EOF']])].join('\n');
 }
