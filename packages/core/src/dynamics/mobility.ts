@@ -8,6 +8,7 @@ import { GROUND, type DynamicJoint, type DynamicsModel } from '../model/dynamics
 import type { Vec3 } from '../model/vectors';
 import type { Topology } from './topology';
 import { elementAt } from '../lib/elementAt';
+import { dot3 } from '../lib/vec3';
 
 /** Central-difference step in tree coordinates (rad or m). */
 const DIFFERENCE_STEP = 1e-7;
@@ -113,8 +114,6 @@ function orthogonalPair(u: Vec3): [Vec3, Vec3] {
   return [e1, cross(u, e1)];
 }
 
-const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-
 /** Constraint rows of every loop at tree coordinates `q`: 3 position rows, plus 2 axis-alignment rows for a revolute loop. */
 function loopResidual(topology: Topology, q: readonly number[], metresPerUnit: number): number[] {
   const poses = bodyPoses(topology, q, metresPerUnit);
@@ -129,7 +128,7 @@ function loopResidual(topology: Topology, q: readonly number[], metresPerUnit: n
     if (loop.kind === 'revolute') {
       const axis = unit(loop.axis);
       const axisB = apply(b.rotation, axis);
-      for (const e of orthogonalPair(axis)) rows.push(dot(apply(a.rotation, e), axisB));
+      for (const e of orthogonalPair(axis)) rows.push(dot3(apply(a.rotation, e), axisB));
     }
   }
   return rows;

@@ -2,6 +2,7 @@
 
 import type { FeMeshArtifact } from '@core/model/analysis';
 import type { Vec3 } from '@core/model/vectors';
+import { cross3, dot3, sub3 } from '@lib/vec3';
 
 export interface MeshElement {
   readonly id: number;
@@ -32,9 +33,6 @@ export function indexMesh(mesh: FeMeshArtifact): MeshIndex {
   return { coordinates, elements, entityOfNode };
 }
 
-const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const origin: Vec3 = [0, 0, 0];
 
 const at = (index: MeshIndex, node: number | undefined): Vec3 => (node === undefined ? origin : (index.coordinates.get(node) ?? origin));
@@ -43,7 +41,7 @@ const at = (index: MeshIndex, node: number | undefined): Vec3 => (node === undef
 export function elementVolume(index: MeshIndex, element: MeshElement): number {
   const [a, b, c, d] = element.nodes.slice(0, 4).map((node) => at(index, node));
   if (a === undefined || b === undefined || c === undefined || d === undefined) return 0;
-  return Math.abs(dot(cross(sub(b, a), sub(c, a)), sub(d, a))) / 6;
+  return Math.abs(dot3(cross3(sub3(b, a), sub3(c, a)), sub3(d, a))) / 6;
 }
 
 /** Sum of the element volumes of each part (analysis length unit cubed). */
@@ -125,7 +123,7 @@ export function integrateFace(
   g: (temperature: number) => number,
 ): FaceIntegral {
   const [a, b, c] = nodes.slice(0, 3).map((node) => at(index, node));
-  const area = a === undefined || b === undefined || c === undefined ? 0 : Math.hypot(...cross(sub(b, a), sub(c, a))) / 2;
+  const area = a === undefined || b === undefined || c === undefined ? 0 : Math.hypot(...cross3(sub3(b, a), sub3(c, a))) / 2;
   const values = nodes.map(field);
   const mean = RULE.reduce((sum, [l1, l2, l3, w]) => sum + w * g(interpolate(values, l1, l2, l3)), 0);
   return { area, integral: area * mean };

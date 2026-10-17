@@ -19,19 +19,17 @@ import { faceMetric } from './occtFaceMetrics';
 import {
   type FaceSurfaceAdaptor,
   type Own,
-  dot,
   faceAdaptor,
   isReversed,
-  minus,
   norm,
   pointAndNormal,
-  scaled,
   surfaceParams,
   surfaceSample,
   uvOfPoint,
   uvRange,
   vec,
 } from './occtFaceSurface';
+import { dot3, scale3, sub3 } from '@lib/vec3';
 
 /** Same signature as `occtKernel`'s `guarded`: runs `body`, maps an OCC exception to null and frees every handle passed to `own`. */
 export type Guarded = <T>(operation: 'fragile' | 'refusal', body: (own: Own) => T | null) => T | null;
@@ -82,13 +80,13 @@ function faceDetail(api: OccApi, solid: OccShape, face: OccShape, index: number,
   const extra = ((): Pick<FaceDetail, 'normal' | 'axis' | 'radius'> => {
     switch (surface.type) {
       case 'plane':
-        return { normal: scaled(surface.normal, sign) };
+        return { normal: scale3(surface.normal, sign) };
       case 'cylinder':
         return { axis: { origin: surface.origin, dir: surface.axis }, radius: surface.radius };
       case 'cone': {
-        const toCentroid = minus(centroid, surface.apex);
-        const along = dot(toCentroid, surface.axis);
-        return { axis: { origin: surface.apex, dir: surface.axis }, radius: norm(minus(toCentroid, scaled(surface.axis, along))) };
+        const toCentroid = sub3(centroid, surface.apex);
+        const along = dot3(toCentroid, surface.axis);
+        return { axis: { origin: surface.apex, dir: surface.axis }, radius: norm(sub3(toCentroid, scale3(surface.axis, along))) };
       }
       case 'sphere':
         return { axis: { origin: surface.center, dir: [0, 0, 1] }, radius: surface.radius };
