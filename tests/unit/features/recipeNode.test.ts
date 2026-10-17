@@ -47,6 +47,23 @@ const pocket = (overrides: Record<string, unknown> = {}): FeatureRecipe => ({
   },
 });
 
+const rib = (overrides: Record<string, unknown> = {}): FeatureRecipe => ({
+  op: 'feature',
+  source: SOURCE,
+  feature: 'rib',
+  frame: FRAME,
+  rib: {
+    path: [
+      [10, 10],
+      [40, 10],
+    ],
+    thickness: 3,
+    height: 20,
+    symmetric: true,
+    ...overrides,
+  },
+});
+
 describe('recipeKey of a feature node', () => {
   it('covers every geometric field', () => {
     const keys = [
@@ -58,6 +75,29 @@ describe('recipeKey of a feature node', () => {
       hole({}, { points: [[10, 11]] }),
       hole({}, { frame: { ...FRAME, origin: [0, 0, 9] } }),
       hole({}, { extent: { kind: 'blind', depth: 3 } }),
+      hole({}, { extent: { kind: 'up_to_next', depth: 3 } }),
+      hole({}, { extent: { kind: 'up_to_face', depth: 3 } }),
+      hole({}, { extent: { kind: 'up_to_face', depth: 4 } }),
+      hole({ kind: 'counterdrill', cboreDiameter: 8, cboreDepth: 4, cskDiameter: 10, cskAngle: 90 }),
+      pocket({
+        islands: [
+          [
+            [2, 2],
+            [4, 2],
+            [4, 4],
+          ],
+        ],
+      }),
+      rib(),
+      rib({ thickness: 4 }),
+      rib({ height: 21 }),
+      rib({ symmetric: false }),
+      rib({
+        path: [
+          [10, 10],
+          [41, 10],
+        ],
+      }),
       hole({}, { extent: { kind: 'blind', depth: 3, drillPointAngle: 118 } }),
       pocket(),
       pocket({ depth: 4 }),
@@ -100,7 +140,7 @@ describe('validateShapeRecipe on feature nodes (persistence, live snapshots)', (
 
   it('rejects malformed nodes with the reason', () => {
     bad({ ...hole(), frame: { origin: [0, 0, 0] } }, 'frame needs');
-    bad({ ...hole(), feature: 'rib' }, "unknown feature 'rib'");
+    bad({ ...hole(), feature: 'weld' }, "unknown feature 'weld'");
     bad({ ...hole(), points: [] }, 'points must be');
     bad({ ...hole(), points: [[1, 'x']] }, 'points must be');
     bad({ ...hole(), hole: { kind: 'tapered', diameter: 4 } }, "unknown hole kind 'tapered'");
@@ -111,7 +151,9 @@ describe('validateShapeRecipe on feature nodes (persistence, live snapshots)', (
     bad({ ...hole(), hole: { kind: 'simple', diameter: 4, thread: { designation: 7, family: 'M' } } }, 'thread');
     bad({ ...hole(), hole: { kind: 'simple', diameter: 4, thread: { designation: 'M6', family: 'XX' } } }, 'thread');
     bad({ ...hole(), extent: undefined }, 'extent is required');
-    bad({ ...hole(), extent: { kind: 'up_to_face' } }, "unknown extent 'up_to_face'");
+    bad({ ...hole(), extent: { kind: 'up_to_face' } }, 'up_to_face depth must be > 0');
+    bad({ ...hole(), extent: { kind: 'up_to_next', depth: -1 } }, 'up_to_next depth must be > 0');
+    bad({ ...hole(), extent: { kind: 'tunnel' } }, "unknown extent 'tunnel'");
     bad({ ...hole(), extent: { kind: 'blind', depth: 0 } }, 'blind depth');
     bad({ ...hole(), extent: { kind: 'blind', depth: 3, drillPointAngle: 180 } }, 'drillPointAngle');
     bad({ ...pocket(), pocket: undefined }, 'pocket is required');
@@ -121,6 +163,12 @@ describe('validateShapeRecipe on feature nodes (persistence, live snapshots)', (
     bad(pocket({ cornerRadius: -1 }), 'cornerRadius');
     bad(pocket({ floorFillet: 2 }), 'floorFillet');
     bad(pocket({ toolDiameter: 0 }), 'toolDiameter');
+    bad(pocket({ islands: [[[0, 0]]] }), 'every island');
+    bad(pocket({ islands: 'x' }), 'every island');
+    bad({ ...rib(), rib: undefined }, 'rib is required');
+    bad(rib({ path: [[0, 0]] }), 'path needs');
+    bad(rib({ thickness: 0 }), 'thickness and height');
+    bad(rib({ symmetric: 'yes' }), 'symmetric');
     bad({ ...hole(), source: { op: 'nope' } }, "unknown recipe op 'nope'");
   });
 });

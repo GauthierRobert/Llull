@@ -210,7 +210,7 @@ function classify(model: Model, part: readonly Group[]): RecognizedHole | null {
   };
 }
 
-const RANK = { simple: 0, counterbore: 1, countersink: 2 } as const;
+const RANK = { simple: 0, counterbore: 1, countersink: 2, counterdrill: 3 } as const;
 
 /** Holes of the model, in a deterministic order (kind, then axis point x, y, z). `taken` receives the groups they explain. */
 export function recognizeHoles(model: Model, taken: Set<Group>): RecognizedHole[] {

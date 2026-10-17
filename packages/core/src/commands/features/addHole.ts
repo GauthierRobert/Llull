@@ -20,7 +20,8 @@ import { localThickness } from '../../geometry/featureThickness';
 import { meshDiagonal } from '../../geometry/meshExtent';
 import { type ResolvedFace, resolveFace } from './faceResolve';
 import { POINT_FRAMES, expectedShape, localPoints } from './facePoints';
-import { buildHole, extentParams, holeParams } from './holeSpec';
+import { type BuiltHole, type PendingExtent, buildHole, extentParams, holeParams } from './holeSpec';
+import { resolveExtents } from './holeExtents';
 import { refuse } from './ftr';
 import type { MachinedHole } from '../../geometry/featureInstances';
 
@@ -34,8 +35,9 @@ export const addHole = defineCommand({
   name: 'add_hole',
   annotations: { requiresKernel: true },
   description:
-    'Cut holes into a planar face of a 3D solid: simple, counterbore or countersink; through the whole part (through_all) or blind with a ' +
-    'drill point (default 118 degrees, reported as defaulted; drillPointAngle 0 = flat bottom). The face is picked by a world point on it ' +
+    'Cut holes into a planar face of a 3D solid: simple, counterbore, countersink or counterdrill (countersink cone, then counterbore, then ' +
+    'bore); through the whole part (through_all), through the first wall only (up_to_next), up to the plane of a parallel face below ' +
+    '(up_to_face, extent.face.near) or blind with a drill point (default 118 degrees, reported as defaulted; drillPointAngle 0 = flat bottom). The face is picked by a world point on it ' +
     '(face.near); the holes go INTO the material, along the opposite of the face outward normal. All lengths are in the document length ' +
     'unit, all angles in degrees. points: [u, v] in the face frame (origin = the world origin projected on the face plane, u = world X ' +
     '(or Y) projected on it, v = normal x u), or pointsFrame "world_xy" ([x, y] world, the point is moved along Z onto the face), or ' +
@@ -43,7 +45,8 @@ export const addHole = defineCommand({
     'cosmetic attribute (geometry unchanged). hole.fastener takes the clearance diameter from the document fastener catalogue. Consumes ' +
     'target and creates one mesh entity (exact B-rep with an exact kernel). Refusals carry error.code: FTR_FACE_NOT_FOUND, ' +
     'FTR_FACE_NOT_PLANAR, FTR_HOLE_POINT_OUTSIDE_FACE, FTR_HOLE_DIAMETERS_INCONSISTENT, FTR_CSK_ANGLE_OUT_OF_RANGE, FTR_BLIND_DEPTH_INVALID, ' +
-    'FTR_DRILL_POINT_ANGLE_OUT_OF_RANGE, FTR_THREAD_DESIGNATION_INVALID, FTR_FASTENER_CATALOG_UNAVAILABLE, FTR_FEATURE_BUILD_FAILED. ' +
+    'FTR_DRILL_POINT_ANGLE_OUT_OF_RANGE, FTR_THREAD_DESIGNATION_INVALID, FTR_FASTENER_CATALOG_UNAVAILABLE, FTR_UP_TO_TARGET_INVALID, ' +
+    'FTR_FEATURE_BUILD_FAILED. ' +
     'Next: check_machining, hole_table, recognize_features.',
   params: z.object({
     target: z.string().describe('Id of the 3D solid to drill (a primitive or a kernel result).'),
@@ -91,9 +94,21 @@ export const addHole = defineCommand({
         [target],
         ['face.near'],
       );
-    return drill(doc, kernel, entity, source, resolved, points, pointsFrame, built.hole, built.extent, built.notes);
+    return drill(doc, kernel, entity, source, resolved, points, pointsFrame, built);
   },
 });
+
+const isPending = (extent: BuiltHole['extent']): extent is PendingExtent =>
+  (extent.kind === 'up_to_next' || extent.kind === 'up_to_face') && !('depth' in extent);
+
+function extentLabel(extents: readonly HoleExtent[]): string {
+  const [first] = extents;
+  if (first === undefined || first.kind === 'through_all') return ', through all';
+  if (first.kind === 'blind')
+    return `, blind ${first.depth}${first.drillPointAngle === undefined ? ' flat' : ` + ${first.drillPointAngle}° point`}`;
+  const depths = extents.map((extent) => ('depth' in extent ? Math.round(extent.depth * 1e6) / 1e6 : 0)).join(' / ');
+  return `, ${first.kind.replace(/_/g, ' ')} (depth ${depths})`;
+}
 
 /** Material thickness under each hole centre (ray cast along the axis); a point the cast cannot measure falls back to the deepest reach. */
 function stockUnder(
@@ -131,11 +146,10 @@ function drill(
   resolved: ResolvedFace,
   points: ReadonlyArray<readonly number[]>,
   pointsFrame: (typeof POINT_FRAMES)[number],
-  hole: HoleSpec,
-  extent: HoleExtent,
-  notes: readonly string[],
+  built: BuiltHole,
 ): CommandResult {
   const { frame } = resolved;
+  const { hole, notes } = built;
   const { local, bad } = localPoints(frame, points, pointsFrame);
   if (bad.length > 0)
     return refuse(
@@ -158,6 +172,23 @@ function drill(
       [entity.id],
       outside.map((index) => `points.${index}`),
     );
+  const groups = isPending(built.extent)
+    ? resolveExtents(kernel, source, frame, local, built.extent)
+    : [{ points: local, extent: built.extent }];
+  if (!Array.isArray(groups))
+    return refuse(doc, 'add_hole', 'FTR_UP_TO_TARGET_INVALID', groups.why, groups.remediation, [entity.id], groups.paths);
+  const shallow = groups.filter((group) => 'depth' in group.extent && group.extent.depth <= built.stepDepth);
+  if (shallow.length > 0)
+    return refuse(
+      doc,
+      'add_hole',
+      'FTR_BLIND_DEPTH_INVALID',
+      `the ${shallow[0]?.extent.kind} depth does not go below the counterbore / countersink (${built.stepDepth})`,
+      'pick a deeper target, or use through_all',
+      [entity.id],
+      ['extent'],
+    );
+  const extent = groups[0]?.extent as HoleExtent;
   if (extent.kind === 'blind') {
     const shape = kernel.evaluate(source);
     const mesh = shape === null ? null : kernel.tessellate(shape);
@@ -176,7 +207,10 @@ function drill(
         ['extent.depth'],
       );
   }
-  const recipe: ShapeRecipe = { op: 'feature', source, feature: 'hole', frame, points: local, hole, extent };
+  const recipe: ShapeRecipe = groups.reduce<ShapeRecipe>(
+    (current, group) => ({ op: 'feature', source: current, feature: 'hole', frame, points: group.points, hole, extent: group.extent }),
+    source,
+  );
   const result = evaluateRecipe(kernel, recipe);
   if (result === 'refused' || result === 'empty')
     return refuse(
@@ -191,9 +225,7 @@ function drill(
   const detail = [
     hole.cskDiameter === undefined ? '' : `, countersink Ø${hole.cskDiameter} ${hole.cskAngle}°`,
     hole.cboreDiameter === undefined ? '' : `, counterbore Ø${hole.cboreDiameter} x ${hole.cboreDepth}`,
-    extent.kind === 'blind'
-      ? `, blind ${extent.depth}${extent.drillPointAngle === undefined ? ' flat' : ` + ${extent.drillPointAngle}° point`}`
-      : ', through all',
+    extentLabel(groups.map((group) => group.extent)),
     hole.thread === undefined ? '' : `, thread ${hole.thread.designation} (cosmetic)`,
   ].join('');
   const facts = notes.length === 0 ? '' : ` Note: ${notes.join('; ')}.`;

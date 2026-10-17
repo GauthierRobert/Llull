@@ -50,6 +50,9 @@ export const FTR_CODES = [
   'FTR_RELIEF_INVALID',
   'FTR_CUTOUT_INVALID',
   'FTR_PARAM_INVALID',
+  'FTR_POCKET_ISLAND_INVALID',
+  'FTR_RIB_PATH_NOT_SUPPORTED',
+  'FTR_UP_TO_TARGET_INVALID',
 ] as const;
 
 export type FtrCode = (typeof FTR_CODES)[number];

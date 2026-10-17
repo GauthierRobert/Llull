@@ -79,7 +79,7 @@ export const holeTable = defineCommand({
   annotations: { readOnly: true },
   description:
     'List the holes of a part as a table for drawings: one row per hole with its label (H1, H2, ... in table order), position x, y from the ' +
-    'top-left corner of its face (x along the face, y downwards, document length units), kind (simple, counterbore, countersink), ' +
+    'top-left corner of its face (x along the face, y downwards, document length units), kind (simple, counterbore, countersink, counterdrill), ' +
     'diameter, countersink diameter / included angle in degrees / depth, counterbore diameter / depth, blind depth or through, drill point ' +
     'angle with its source (a drill point that was not given is reported as defaulted, 118 degrees, source R8) and tip height, and the ' +
     'cosmetic thread. Holes come from add_hole, or are recognised from the B-rep of an imported solid when the kernel is exact (without a kernel only authored holes are listed, otherwise FTR_NEEDS_EXACT_KERNEL). Rows are ' +
