@@ -31,6 +31,9 @@ const round6 = (value: number): number => Math.round(value * 1e6) / 1e6 + 0;
 
 export const fmt = (value: number): string => String(round6(value));
 
+/** Mean character width of the R12 STANDARD font, in text heights (extents estimate only). */
+const TEXT_WIDTH_PER_HEIGHT = 0.6;
+
 /** Generic AutoCAD R12 entity writer (LINE, CIRCLE, ARC, TEXT, POLYLINE, SOLID, POINT, 3DFACE); `assembleDxf` wraps it in a file. */
 export class DxfWriter {
   readonly lines: string[] = [];
@@ -77,11 +80,15 @@ export class DxfWriter {
     this.entityCount += 1;
   }
 
-  private point(base: number, [x, y]: Vec2, z = 0): void {
+  private extend(x: number, y: number): void {
     this.minX = Math.min(this.minX, x);
     this.minY = Math.min(this.minY, y);
     this.maxX = Math.max(this.maxX, x);
     this.maxY = Math.max(this.maxY, y);
+  }
+
+  private point(base: number, [x, y]: Vec2, z = 0): void {
+    this.extend(x, y);
     this.pair(base, x);
     this.pair(base + 10, y);
     this.pair(base + 20, z);
@@ -108,9 +115,25 @@ export class DxfWriter {
     this.pair(51, toDegrees(endAngle));
   }
 
+  /** Grows the extents by the estimated box of a text line (width ≈ 0.6 × height per character), aligned and rotated about `at`. */
+  private extendByTextBox(at: Vec2, height: number, content: string, align: 'left' | 'center' | 'right', rotation: number): void {
+    const width = content.length * height * TEXT_WIDTH_PER_HEIGHT;
+    const left = align === 'left' ? 0 : align === 'center' ? -width / 2 : -width;
+    const [c, s] = [Math.cos(rotation), Math.sin(rotation)];
+    for (const [u, v] of [
+      [left, 0],
+      [left + width, 0],
+      [left, height],
+      [left + width, height],
+    ] as const) {
+      this.extend(at[0] + u * c - v * s, at[1] + u * s + v * c);
+    }
+  }
+
   text(layer: string, at: Vec2, height: number, content: string, align: 'left' | 'center' | 'right', rotation = 0, z = 0): void {
     this.start('TEXT', layer);
     this.point(10, at, z);
+    this.extendByTextBox(at, height, content, align, rotation);
     this.pair(40, height);
     this.pair(1, dxfText(content));
     if (rotation !== 0) this.pair(50, toDegrees(rotation));
