@@ -35,6 +35,7 @@ export function parseThread(input: {
   readonly family?: Family | undefined;
   readonly depth?: number | undefined;
   readonly handedness?: 'right' | 'left' | undefined;
+  readonly modelled?: boolean | undefined;
 }): ThreadSpec | null {
   const designation = input.designation.trim();
   const family = input.family ?? inferFamily(designation);
@@ -46,6 +47,7 @@ export function parseThread(input: {
     family,
     ...(input.depth === undefined ? {} : { depth: input.depth }),
     ...(input.handedness === undefined ? {} : { handedness: input.handedness }),
+    ...(input.modelled === true ? { modelled: true as const } : {}),
   };
 }
 
@@ -53,11 +55,18 @@ export const threadSchema = z
   .object({
     designation: z
       .string()
-      .describe(
-        'Thread designation, e.g. "MJ6x1-4H5H", ".1900-32 UNJF-3B", "M6x1-6H", "1/4-20 UNC-2B". Cosmetic: it never changes the geometry.',
-      ),
+      .describe('Thread designation, e.g. "MJ6x1-4H5H", ".1900-32 UNJF-3B", "M6x1-6H", "1/4-20 UNC-2B". Cosmetic unless modelled is true.'),
     family: z.enum(THREAD_FAMILIES).optional().describe('Thread family (UNJ, MJ, UN, M, other). Omit to infer it from the designation.'),
     depth: z.number().positive().optional().describe('Threaded depth, in document length units. Omit for the full hole depth.'),
     handedness: z.enum(['right', 'left']).optional().describe('"right" (default if omitted) or "left".'),
+    modelled: z
+      .boolean()
+      .optional()
+      .describe(
+        'true cuts a real helical thread groove (basic 60 degree internal ISO 68-1 profile; M / MJ / UN / UNJ designations with an explicit pitch, ' +
+          'e.g. "M6x1"; MJ / UNJ root radius not applied, unverified) into the hole: the bore diameter must be about the minor diameter ' +
+          '(D - 1.0825 P) and below the major diameter; needs a geometry kernel; changes the geometry and the shape recipe key. ' +
+          'Omit or false = cosmetic, no geometry.',
+      ),
   })
-  .describe('Cosmetic thread attribute of the hole.');
+  .describe('Thread attribute of the hole: cosmetic by default, a real helical groove when modelled is true.');

@@ -6,6 +6,7 @@ import { HOLE_KINDS, type FastenerRef, type HoleExtent, type HoleSpec } from '..
 import { countersinkDepth, countersinkDiameter } from '../../lib/holeMath';
 import { vec3, z } from '../schema';
 import { holeFromFastener } from './fastenerHole';
+import { resolveModelledThread, threadBoreProblem } from './modelledThread';
 import { parseThread, threadSchema } from './threads';
 
 /** Drill point applied to a blind hole that gives none, degrees (reported as defaulted; source R8, AF-31). */
@@ -280,7 +281,12 @@ export function buildHole(doc: CadDocument, input: HoleParams, extentInput: Exte
         "use the family's designation form, e.g. MJ6x1-4H5H",
         'hole.thread.designation',
       );
-    spec = { ...spec, thread };
+    const resolved = resolveModelledThread(doc, thread);
+    if (typeof resolved === 'string')
+      return problem('FTR_THREAD_DESIGNATION_INVALID', resolved, 'use an explicit pitch, e.g. M6x1', 'hole.thread.designation');
+    spec = { ...spec, thread: resolved };
+    const fit = threadBoreProblem(spec);
+    if (fit !== null) return problem('FTR_HOLE_DIAMETERS_INCONSISTENT', fit, 'set hole.diameter to the minor diameter', 'hole.diameter');
   }
   if (fastener !== undefined) spec = { ...spec, fastener };
   const extent = extentOf(extentInput, stepDepth);

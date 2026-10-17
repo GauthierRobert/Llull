@@ -230,7 +230,9 @@ function drill(
       groups.map((group) => group.extent),
       groups.map((group) => group.method),
     ),
-    hole.thread === undefined ? '' : `, thread ${hole.thread.designation} (cosmetic)`,
+    hole.thread === undefined
+      ? ''
+      : `, thread ${hole.thread.designation} (${hole.thread.modelled === true ? 'modelled helical groove, basic profile' : 'cosmetic'})`,
   ].join('');
   const facts = notes.length === 0 ? '' : ` Note: ${notes.join('; ')}.`;
   const normal = frame.normal.map((c) => Math.round(c * 1e6) / 1e6).join(', ');

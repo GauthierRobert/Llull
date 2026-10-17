@@ -1,6 +1,6 @@
 /**
  * The `feature` recipe node (07 FTR §3.1): its content-hash text and the check of an untrusted node (loaded file, live snapshot).
- * @invariant the key text covers every geometric field and EXCLUDES the non-geometric `thread` and `fastener` of a hole
+ * @invariant the key text covers every geometric field and EXCLUDES the non-geometric `fastener` and a cosmetic `thread` of a hole; a modelled thread is geometry and is covered
  */
 
 import { HOLE_KINDS, THREAD_FAMILIES, type HoleExtent } from '../model/features';
@@ -26,8 +26,17 @@ export function featureKeyText(node: FeatureRecipe, sourceKey: string): string {
     const posts = islands === undefined || islands.length === 0 ? '' : `,${JSON.stringify(islands)}`;
     return `feature(${sourceKey},pocket,${frame},${JSON.stringify([outline, depth, cornerRadius, floorFillet])}${posts})`;
   }
-  const { kind, diameter, cboreDiameter, cboreDepth, cskDiameter, cskAngle } = node.hole;
-  const spec = [kind, diameter, cboreDiameter ?? null, cboreDepth ?? null, cskDiameter ?? null, cskAngle ?? null];
+  const { kind, diameter, cboreDiameter, cboreDepth, cskDiameter, cskAngle, thread } = node.hole;
+  const spec: Array<string | number | null> = [
+    kind,
+    diameter,
+    cboreDiameter ?? null,
+    cboreDepth ?? null,
+    cskDiameter ?? null,
+    cskAngle ?? null,
+  ];
+  if (thread?.modelled === true)
+    spec.push(JSON.stringify([thread.pitch ?? null, thread.majorDiameter ?? null, thread.depth ?? null, thread.handedness ?? 'right']));
   const extent = extentKey(node.extent);
   return `feature(${sourceKey},hole,${frame},${JSON.stringify(node.points)},${JSON.stringify(spec)},${JSON.stringify(extent)})`;
 }
@@ -52,6 +61,8 @@ function holeError(node: Record<string, unknown>): string | null {
     const valid =
       isRecord(thread) && typeof thread['designation'] === 'string' && (THREAD_FAMILIES as readonly unknown[]).includes(thread['family']);
     if (!valid) return 'feature hole: thread needs a designation and a known family';
+    if (thread['modelled'] === true && !(positive(thread['pitch']) && positive(thread['majorDiameter'])))
+      return 'feature hole: a modelled thread needs pitch and majorDiameter > 0';
   }
   if (!isRecord(extent)) return 'feature hole: extent is required';
   if (extent['kind'] === 'through_all') return null;

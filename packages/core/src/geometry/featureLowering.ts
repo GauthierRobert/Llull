@@ -1,7 +1,7 @@
 /**
  * Lowering of a `feature` recipe node (07 FTR §5.3 / §5.5) to plain booleans: `source` minus ONE compound tool. A hole tool is a revolved
  * half-section (bore, counterbore step, countersink cone, drill point) per position; a pocket tool is the exact rounded outline extruded.
- * Tools reach `epsilon` above the face so no cut face is coplanar with it. Every kernel therefore accepts the node. A rib tool is the thickened
+ * A modelled thread adds one helical groove sweep per position to the hole tool (./threadTool). Tools reach `epsilon` above the face so no cut face is coplanar with it. Every kernel therefore accepts the node. A rib tool is the thickened
  * path extruded from the face plane and FUSED to the source.
  * @invariant through-all depth = the source's extent below the face plane (`throughReach`) + 2 epsilon; up_to_next = its resolved depth + 2
  *   epsilon (it leaves the material); up_to_face = exactly its resolved depth (+ 2 epsilon when the target face is where the material ends: no zero-thickness skin)
@@ -14,6 +14,7 @@ import { countersinkDepth, drillTipHeight } from '../lib/holeMath';
 import { frameEuler, frameToWorld, heightAbove } from './featureFrame';
 import { type PocketOutline, roundedOutline } from './pocketOutline';
 import { thickenedPath } from './featureRib';
+import { threadGroove } from './threadTool';
 
 export type FeatureRecipe = Extract<ShapeRecipe, { op: 'feature' }>;
 
@@ -34,10 +35,14 @@ export function throughReach(mesh: MeshData, frame: FeatureFrame): number {
   return reach;
 }
 
-/** Half-section [radius, height above the face] of one hole tool; the tool axis is the local z axis. */
+/**
+ * Half-section [radius, height above the face] of one hole tool; the tool axis is the local z axis. A modelled thread overshoots the face by two
+ * pitches so the groove ends lie inside the bore tool (a bore end plane cutting the groove makes the OCC union drop an operand).
+ */
 export function holeToolProfile(hole: HoleSpec, extent: HoleExtent, reach: number): Array<[number, number]> | null {
   const radius = hole.diameter / 2;
-  const eps = epsilonOf(Math.max(hole.diameter, hole.cskDiameter ?? 0, hole.cboreDiameter ?? 0));
+  const clearance = hole.thread?.modelled === true ? 2 * (hole.thread.pitch ?? 0) : 0;
+  const eps = Math.max(epsilonOf(Math.max(hole.diameter, hole.cskDiameter ?? 0, hole.cboreDiameter ?? 0)), clearance);
   const top: Array<[number, number]> = [[0, eps]];
   let stepDepth = 0;
   if (hole.kind === 'countersink') {
@@ -110,6 +115,13 @@ function holeTool(node: Extract<FeatureRecipe, { feature: 'hole' }>, reach: numb
       ),
     }),
   );
+  const groove = threadGroove(node.hole, node.extent, reach);
+  if (node.hole.thread?.modelled === true && groove === null) return null;
+  if (groove !== null)
+    for (const point of node.points) {
+      const start = frameToWorld(node.frame, point, groove.startDepth);
+      tools.push({ op: 'solid', entity: toolEntity({ kind: 'mesh', mesh: groove.mesh }, start, rotation) });
+    }
   return unionOf(tools);
 }
 

@@ -64,7 +64,7 @@ function nativeHoles(
   node: Extract<FeatureRecipe, { feature: 'hole' }>,
   reach: number,
 ): OccShape | null {
-  if (node.points.length > NATIVE_MAX_HOLES) return null;
+  if (node.points.length > NATIVE_MAX_HOLES || node.hole.thread?.modelled === true) return null;
   const profile = holeToolProfile(node.hole, node.extent, reach);
   if (profile === null) return null;
   let current = source;
