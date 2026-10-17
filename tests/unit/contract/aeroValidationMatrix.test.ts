@@ -120,6 +120,6 @@ describe('blocked cases are limited to genuinely external or in-progress causes'
         .filter(([, r]) => r.status === 'blocked')
         .map(([id]) => id),
     );
-    expect(blocked).toEqual(['VC-FTR-33', 'VC-FTR-36', 'VC-MAT-18', 'VC-MAT-21']);
+    expect(blocked).toEqual(['VC-MAT-18', 'VC-MAT-21']);
   });
 });

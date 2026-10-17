@@ -15,6 +15,7 @@ import { shapeTopology, uniqueSubShapes } from './occtTopology';
 import { analyzeShape, shapeDistance } from './occtAnalysis';
 import { exactMassProperties } from './occtMass';
 import { nativeFeature } from './occtFeatures';
+import { hasManyFreeformFaces } from './occtFreeform';
 import { writeStep } from './occtStep';
 import { occtFaceQueryOps } from './occtFaceQuery';
 import { importStepShapes, readBrepText } from './occtImport';
@@ -187,9 +188,10 @@ function blendedUnion(api: OccApi, shapes: readonly OccShape[], radius: number):
   });
 }
 
-/** Post-boolean ShapeUpgrade_UnifySameDomain (else a fused seam splits an edge and a fillet rounds half); `shape` on failure. */
+/** Post-boolean ShapeUpgrade_UnifySameDomain (else a fused seam splits an edge and a fillet rounds half); `shape` on failure or a freeform-heavy shape (a thread: it never returns). */
 function unified(api: OccApi, shape: OccShape, own: <H extends OccHandle | null>(handle: H) => H): OccShape {
   try {
+    if (hasManyFreeformFaces(api, shape)) return shape;
     const unifier = own(new api.ShapeUpgrade_UnifySameDomain_2(shape, true, true, false) as OccUnifier);
     unifier.AllowInternalEdges(false);
     unifier.Build();

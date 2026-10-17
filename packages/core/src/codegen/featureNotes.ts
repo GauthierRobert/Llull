@@ -42,6 +42,9 @@ export function featureNotes(node: FeatureRecipe): string[] {
   ];
   if (extent.kind === 'blind' && extent.drillPointAngle !== undefined)
     lines.push(`drill point ${formatNumber(extent.drillPointAngle)} deg: an extra cone cut, included in the cut below`);
-  if (hole.thread !== undefined) lines.push(`thread ${hole.thread.designation} (cosmetic, no geometry)`);
+  if (hole.thread !== undefined)
+    lines.push(
+      `thread ${hole.thread.designation} (${hole.thread.modelled === true ? 'modelled helical groove in the llull model; not emitted here' : 'cosmetic, no geometry'})`,
+    );
   return lines;
 }

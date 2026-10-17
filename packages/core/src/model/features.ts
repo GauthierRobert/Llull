@@ -12,13 +12,20 @@ export type HoleKind = (typeof HOLE_KINDS)[number];
 
 export const THREAD_FAMILIES = ['UNJ', 'MJ', 'UN', 'M', 'other'] as const;
 
-/** Cosmetic thread attribute: never changes geometry or the recipe key (FR-FTR-19). */
+/**
+ * Thread attribute of a hole. Cosmetic (default): never changes geometry or the recipe key (FR-FTR-19).
+ * `modelled` (FR-FTR-20): the hole is cut with the helical groove of the basic internal profile, so `pitch` and `majorDiameter` (document units,
+ * resolved from the designation) are set and enter the recipe key.
+ */
 export interface ThreadSpec {
   readonly designation: string;
   readonly family: (typeof THREAD_FAMILIES)[number];
   /** Absent = full hole depth. */
   readonly depth?: number;
   readonly handedness?: 'right' | 'left';
+  readonly modelled?: true;
+  readonly pitch?: number;
+  readonly majorDiameter?: number;
 }
 
 /** Standard-part reference resolved against `doc.fasteners.catalogs` (family id + part number). */

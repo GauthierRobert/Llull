@@ -42,7 +42,7 @@ export const addHole = defineCommand({
     'unit, all angles in degrees. points: [u, v] in the face frame (origin = the world origin projected on the face plane, u = world X ' +
     '(or Y) projected on it, v = normal x u), or pointsFrame "world_xy" ([x, y] world, the point is moved along Z onto the face), or ' +
     '"world" ([x, y, z] projected onto the face). All positions are validated first: if one is bad nothing is cut. hole.thread is a ' +
-    'cosmetic attribute (geometry unchanged). hole.fastener takes the clearance diameter from the document fastener catalogue. Consumes ' +
+    'cosmetic attribute (geometry unchanged) unless thread.modelled is true (a real helical groove). hole.fastener takes the clearance diameter from the document fastener catalogue. Consumes ' +
     'target and creates one mesh entity (exact B-rep with an exact kernel). Refusals carry error.code: FTR_FACE_NOT_FOUND, ' +
     'FTR_FACE_NOT_PLANAR, FTR_HOLE_POINT_OUTSIDE_FACE, FTR_HOLE_DIAMETERS_INCONSISTENT, FTR_CSK_ANGLE_OUT_OF_RANGE, FTR_BLIND_DEPTH_INVALID, ' +
     'FTR_DRILL_POINT_ANGLE_OUT_OF_RANGE, FTR_THREAD_DESIGNATION_INVALID, FTR_FASTENER_CATALOG_UNAVAILABLE, FTR_UP_TO_TARGET_INVALID, ' +
@@ -230,7 +230,9 @@ function drill(
       groups.map((group) => group.extent),
       groups.map((group) => group.method),
     ),
-    hole.thread === undefined ? '' : `, thread ${hole.thread.designation} (cosmetic)`,
+    hole.thread === undefined
+      ? ''
+      : `, thread ${hole.thread.designation} (${hole.thread.modelled === true ? 'modelled helical groove, basic profile' : 'cosmetic'})`,
   ].join('');
   const facts = notes.length === 0 ? '' : ` Note: ${notes.join('; ')}.`;
   const normal = frame.normal.map((c) => Math.round(c * 1e6) / 1e6).join(', ');
