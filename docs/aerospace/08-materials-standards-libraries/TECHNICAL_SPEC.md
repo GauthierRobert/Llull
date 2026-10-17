@@ -499,7 +499,7 @@ Total MVP (M1–M5) ≈ 26 d (M2 revised 2026-10-17); V1 (M6–M8) ≈ 16 d.
 
 | Id | Question | Proposed default |
 | -- | -------- | ---------------- |
-| OQ-MAT-01 | Legal review: may llull ship a sample catalogue with distributor-published NAS/MS dimensions? | Ship encoding rules only; dimensions user-imported until cleared |
+| OQ-MAT-01 | Legal review: may llull ship a sample catalogue with distributor-published NAS/MS dimensions? | **Decided 2026-10-17 (owner):** catalogue dimensions stay user-imported; the NAS6203 strength minimums stay in the seed library as `supplier_unstated` (unverified) |
 | OQ-MAT-02 | S-basis semantics: MMPDS text (S3) says S applies where T99 fails A-basis requirements; common usage = spec minimum. | Store as given; display "S (specification minimum / no statistical assurance)"; never treat S ≥ A |
 | OQ-MAT-03 | New package `domain-aero` vs folder inside `domain-aec`? | New package (AEC and aero toolsets differ; clean knip/arch boundaries) |
 | OQ-MAT-04 | Rivet length rounding: "nearest 1/16" (S19 secondary) vs "up". | `up` (conservative: protrusion ≥ 1.5D); configurable |
@@ -627,3 +627,8 @@ kernel: `mass_7075_block_current` (140.5 g), `mass_ti_cylinder` (69.56719 g, bot
 VC-MAT-01 (v2 file load, v3 re-save), VC-MAT-09 (dimensions to the pack's 5 decimals), VC-MAT-17 (the pack's 1 s, no x3 allowance).
 Fixed on the way: a command's own refusal (`error` without `rejected`) now exits 1 in the CLI (`insert_fastener_row` FAST_PITCH,
 `decode_part_number` FAST_PART_NUMBER_UNKNOWN, VC-MAT-24).
+
+**Owner decisions (2026-10-17, closing AERO-3):** (1) VC-MAT-18 and VC-MAT-21 are accepted as **data-blocked**: the code (seed-library
+mechanism, `joint_capacity`, basis propagation) is complete and tested; the values arrive when MIL-HDBK-5J (hosts refused by the session
+network policy) or a licensed MMPDS library is imported. (2) OQ-MAT-01: the NAS6203 Ftu / Fsu minimums from distributor / AIA catalogue
+data **stay in the seed, marked `supplier_unstated` (unverified)**.

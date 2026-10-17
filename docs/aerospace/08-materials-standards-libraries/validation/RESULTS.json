@@ -1,258 +1,196 @@
 {
- "VC-MAT-01": {
-  "status": "pass",
-  "expected": "Mass 7.85 g, unchanged from today. Record shows basis unspecified, provenance legacy. Re-save produces v3 and preserves the material.",
-  "tolerance": "rel 1e-12",
-  "measured": "v2 file with legacy steel: 7.85 g (rel < 1e-12), basis unspecified, provenance legacy; re-saved as v3 with the material intact",
-  "tests": [
-   "tests/unit/materials/records.test.ts",
-   "tests/unit/aeroMassDensity.test.ts"
-  ]
- },
- "VC-MAT-02": {
-  "status": "pass",
-  "expected": "mass_properties reports densitySource = the 0.160 entry and both values are listed by get_material. Marking 0.163 preferred as well is refused (one preferred per key).",
-  "tolerance": "exact",
-  "measured": "densitySource = the preferred 0.160 lb/in3 entry; get_material lists 0.160 and 0.163; a second preferred is refused MAT_PREFERRED_CONFLICT",
-  "tests": [
-   "tests/unit/materials/records.test.ts",
-   "server/tests/packReplay08.test.ts"
-  ]
- },
- "VC-MAT-03": {
-  "status": "pass",
-  "expected": "2.76799, 2.79567, 4.42878 g/cm³ (rounded here; 12 significant digits in the JSON)",
-  "tolerance": "rel 1e-9",
-  "measured": "0.100 / 0.101 / 0.160 lb/in3 → 2.76799047102 / 2.79567037573 / 4.42878475363 g/cm3 (rel < 1e-9)",
-  "tests": [
-   "tests/unit/materials/records.test.ts",
-   "tests/unit/aeroMassDensity.test.ts"
-  ]
- },
- "VC-MAT-04": {
-  "status": "pass",
-  "expected": "(a) 140.5 g (b) 139.7835 g (c) 69.56719 g (d) 137.9083 g (e) 0.0505 lb = 22.90641 g",
-  "tolerance": "rel 1e-6 exact/closed-form; 5e-3 mesh",
-  "measured": "140.5 / 139.7835 / 69.56719 / 137.9083 / 22.90641 g; exact kernel rel < 1e-6, Manifold mesh < 5e-3 (plate with hole)",
-  "tests": [
-   "tests/unit/aeroMassDensity.test.ts",
-   "server/tests/packReplay08.test.ts"
-  ]
- },
- "VC-MAT-05": {
-  "status": "pass",
-  "expected": "A and B: available:false with candidate list [S value]. S: the value. forCertification: refused with reason \"superseded source\".",
-  "tolerance": "exact",
-  "measured": "A and B refused with candidates [S 60 ksi]; S returned; forCertification on a superseded record refused (MAT_SOURCE_SUPERSEDED)",
-  "tests": [
-   "tests/unit/materials/allowables.test.ts"
-  ]
- },
- "VC-MAT-06": {
-  "status": "pass",
-  "expected": "grip/length within 0.001 in of published: NAS6203-33 2.062/2.385; NAS6204-33 2.062/2.432; NAS6204-10 0.625/0.995; NAS6205-33 2.062/2.500; NAS6205-10 0.625/1.063; NAS6206-33 2.062/2.516",
-  "tolerance": "abs 0.001 in",
-  "measured": "6 checkpoints within 0.001 in of the published and the expected grip / length",
-  "tests": [
-   "tests/unit/aero/fasteners/catalog.test.ts"
-  ]
- },
- "VC-MAT-07": {
-  "status": "pass",
-  "expected": "e.g. t = 0.510 → NAS6203-9, washer [0.063], length 0.885, protrusion 0.124 ≥ 1/32 → ok. t = 0.300 → NAS6204-5 + [0.016]. t = 3.000 → fail (beyond the fixture grip range). t = 0.020 → NAS6206-1 is **fixture-only** (grip dash range [1, 40] is a test fixture; whether a -1 grip exists is TBD from the NAS sheet). Protrusion uses the length rounded to 0.001 in and one thread pitch beyond the nut maximum height (llull choices, TECHNICAL_SPEC §5.2 step 5). Full table in JSON.",
-  "tolerance": "exact (sixteenths)",
-  "measured": "10 stacks, e.g. t 0.51 → NAS6203-9 + [0.063], L 0.885, protrusion 0.124 (9 decimals); 3.000 in → FAST_STACK_OUT_OF_RANGE",
-  "tests": [
-   "tests/unit/aero/fasteners/select.test.ts"
-  ]
- },
- "VC-MAT-08": {
-  "status": "pass",
-  "expected": "0.600 → HL19-8-10 (.5625–.625). 0.5625 → HL19-8-9. 0.5626 → HL19-8-10. 0.250 → HL19-6-4. 0.251 → HL19-6-5.",
-  "tolerance": "exact",
-  "measured": "5 Hi-Lok stacks incl. boundaries: HL19-8-10 / -9 / -10, HL19-6-4 / -5 exact",
-  "tests": [
-   "tests/unit/aero/fasteners/select.test.ts"
-  ]
- },
- "VC-MAT-09": {
-  "status": "pass",
-  "expected": "e.g. AD4, t = 0.125 → MS20470AD4-5 (L = 0.3125). AD4, t = 0.080 → AD4-5 (raw 0.2675, round up). Edge ≥ 0.25 in, pitch ≥ 0.375 in.",
-  "tolerance": "exact",
-  "measured": "6 rivet stacks: part numbers exact, dimensions within 5e-6 (the pack rounds to 5 decimals)",
-  "tests": [
-   "tests/unit/aero/fasteners/select.test.ts"
-  ]
- },
- "VC-MAT-10": {
-  "status": "pass",
-  "expected": "1 FeatureStep for the insert. Plate volumes each reduced by π·(d_hole/2)²·t (d_hole from the catalogue, TBD; test with user-supplied d = 0.190 in). Instances: NAS6203-9 ×1, NAS1149 0.063 ×1, MS21042L3 ×1. Undo restores a deep-equal document. Replay is id-stable.",
-  "tolerance": "volume rel 1e-6",
-  "measured": "OCC plan: plate volumes = plate - pi (0.095)^2 t (rel < 1e-6), 1 insert step, instances NAS6203-9 / NAS1149(.063) / MS21042L3 x1, undo and redo restore a deep-equal document, replay id-stable",
-  "tests": [
-   "tests/unit/aero/fasteners/insert.test.ts",
-   "server/tests/aeroFasteners.occt.test.ts",
-   "server/tests/packReplay08.test.ts"
-  ]
- },
- "VC-MAT-11": {
-  "status": "pass",
-  "expected": "standardParts: NAS6203-9 ×2, MS21042L3 ×2, NAS1149(.063) ×2. materials: one row per material with total mass = Σ VC-MAT-04 style volume × density. Legacy rows unchanged.",
-  "tolerance": "exact counts; mass rel 1e-6",
-  "measured": "standardParts NAS6203-9 / MS21042L3 / NAS1149(.063) x2; one materials row with mass = exact volume x density (rel < 1e-6)",
-  "tests": [
-   "tests/unit/aero/fasteners/insert.test.ts",
-   "tests/unit/aero/bomStandardParts.test.ts",
-   "server/tests/aeroFasteners.occt.test.ts"
-  ]
- },
- "VC-MAT-12": {
-  "status": "pass",
-  "expected": "No-op with 2 reasons citing 3 D / 2 D. With allowViolations:true: inserted with 2 warnings.",
-  "tolerance": "exact",
-  "measured": "pitch 0.30 / edge 0.20 → FAST_PITCH + FAST_EDGE_DISTANCE no-op citing 3 D and 2 D; allowViolations inserts with 2 warnings",
-  "tests": [
-   "tests/unit/aero/fasteners/row.test.ts"
-  ]
- },
- "VC-MAT-13": {
-  "status": "pass",
-  "expected": "diff lists 1 changed value old 156 → new 146 with both provenances",
-  "tolerance": "exact",
-  "measured": "diff of v1 / v2: 1 changed value (Fbru 156 → 146 ksi) with both provenances",
-  "tests": [
-   "tests/unit/materials/libraries.test.ts"
-  ]
- },
- "VC-MAT-14": {
-  "status": "pass",
-  "expected": "The sentinel appears in none of the outputs. The document carries only {libraryId, version, sha256}. Reload with the provider gives the same mass; without the provider, the record stays unresolved with the saved sha256 and mass_properties returns available:false (no number). A provider with a different sha256 also leaves it unresolved (hash mismatch).",
-  "tolerance": "exact (string search)",
-  "measured": "sentinel absent from save, snapshot, export_code and the live-sync log; reload with the provider gives 140.5 g; without it MAT_LIBRARY_UNRESOLVED; other hash → hash mismatch",
-  "tests": [
-   "tests/unit/materials/privateValues.test.ts",
-   "server/tests/materialLibraries.test.ts"
-  ]
- },
- "VC-MAT-15": {
-  "status": "pass",
-  "expected": "(a) exit 1 MAT_EXPORT_CONTROLLED; with confirmExportControlled=true from the agent: MAT_HUMAN_GATE; the export proceeds only after a human confirmation in the desktop app. (b) refused. Unmarked document: unaffected. Nothing saved on refusal.",
-  "tolerance": "exact",
-  "measured": "(a) CLI: exit 1 MAT_EXPORT_CONTROLLED, then MAT_HUMAN_GATE, nothing saved; (b) /mcp refuses both; an unmarked document exports; human confirmation by a verified signature (port) in exportGate.test",
-  "tests": [
-   "tests/unit/materials/exportGate.test.ts",
-   "server/tests/packReplay08.test.ts"
-  ]
- },
- "VC-MAT-16": {
-  "status": "pass",
-  "expected": "400 °F → 65 % → 39 ksi; 600 °F → available:false (no extrapolation)",
-  "tolerance": "rel 1e-12",
-  "measured": "400 °F → 39 ksi (rel < 1e-12); 600 °F → available:false, MAT_TEMPERATURE_OUT_OF_RANGE",
-  "tests": [
-   "tests/unit/materials/allowables.test.ts"
-  ]
- },
- "VC-MAT-17": {
-  "status": "pass",
-  "expected": "BOM ≤ 1 s, mass ≤ 1 s, file growth ≤ 1 KB per instance",
-  "tolerance": "budget",
-  "measured": "10^4 instances of 3 part numbers: BOM and mass within the pack 1 s (best of 3 runs), growth <= 1 KB per instance",
-  "tests": [
-   "tests/unit/aero/fastenerScale.test.ts"
-  ]
- },
- "VC-MAT-18": {
-  "status": "blocked",
-  "expected": "Every value has basis, a sourceId present in sources.lock.json with sha256, and a locator. superseded is set.",
-  "tolerance": "exact",
-  "measured": "mechanism passes; 7 of the lock sources unpinned, MIL-HDBK-5J values not seeded",
-  "tests": [
-   "tests/unit/materials/seedLibrary.test.ts"
-  ],
-  "blockedReason": "Only part of the check can pass. The mechanism is asserted (every seed value has a basis, a sourceId present in sources.lock.json, a citation and a locator; superseded is set exactly on MIL-HDBK-5J-derived materials), but seven sources in sources.lock.json (S13, S15, S16, S21, S22, S26, S38) have sha256 null because their primary files returned HTTP 403 from the build sandbox, and no MIL-HDBK-5J allowable values are seeded: those need the MIL-HDBK-5J PDF (S38) to be fetched and pinned from a network that can reach it."
- },
- "VC-MAT-19": {
-  "status": "pass",
-  "expected": "Head Ø within [0.238, 0.262] in, head h within [0.054, 0.064] in. NAS620x head (dims unknown) is representative and excluded from mass.",
-  "tolerance": "range",
-  "measured": "MS20470AD4 head Ø within [0.238, 0.262] in, height within [0.054, 0.064] in, mass allowed; NAS620x representative, excluded from mass",
-  "tests": [
-   "tests/unit/aero/fasteners/insert.test.ts"
-  ]
- },
- "VC-MAT-20": {
-  "status": "pass",
-  "expected": "Decode, select and BOM work. The composite record validates with basis B and CMH-17 provenance.",
-  "tolerance": "exact",
-  "measured": "synthetic ACME-100 family imported without code change: decode, select, list work",
-  "tests": [
-   "tests/unit/aero/fasteners/catalog.test.ts"
-  ]
- },
- "VC-MAT-21": {
-  "status": "blocked",
-  "expected": "(i) basis A, (ii) basis B, (iii) basis mixed with the per-input list (TECHNICAL_SPEC §5.6). Capacity values **TBD** — needs verified Fsu/Fbru allowables (seed library, M4); until then only the basis propagation is asserted.",
-  "tolerance": "exact (basis); TBD (values)",
-  "measured": "basis propagation (i) A (ii) B (iii) mixed asserted; capacity values not asserted",
-  "tests": [
-   "tests/unit/aero/fasteners/jointCapacity.test.ts"
-  ],
-  "blockedReason": "Capacity values: the pack row defers them (TBD) until verified Fsu / Fbru allowables exist in the seed library (M4, MMPDS / MIL-HDBK-5J, see VC-MAT-18). Only the basis propagation is asserted and passes: A + A → A, A + B → B, B + S → mixed with the per-input list, never upgraded."
- },
- "VC-MAT-22": {
-  "status": "pass",
-  "expected": "expected_results.json agentFirst VC-MAT-22: massG/massKg/massLb, densitySource, unverified: true with reasons in all three; check_materials warning MAT_VALUE_UNVERIFIED",
-  "tolerance": "rel 1e-6",
-  "measured": "(a) 140.5 g (b) 139.7835 g (c) 7.85 g, massKg / massLb at rel < 1e-6; unverified true with reasons; MAT_VALUE_UNVERIFIED warning (CLI --json)",
-  "tests": [
-   "tests/unit/materials/checkMaterials.test.ts",
-   "tests/unit/aeroMassDensity.test.ts",
-   "server/tests/packReplay08.test.ts"
-  ]
- },
- "VC-MAT-23": {
-  "status": "pass",
-  "expected": "VC-MAT-23: value returned with unverified + reviewRequired; forCertification refused (MAT_VALUE_UNVERIFIED); FEA rows flagged",
-  "tolerance": "exact",
-  "measured": "typical Ftu 83 ksi = 572 MPa returned unverified + reviewRequired; forCertification refused MAT_VALUE_UNVERIFIED; FEA margin rows unverified, check_analysis FEA_MATERIAL_UNVERIFIED",
-  "tests": [
-   "tests/unit/materials/allowables.test.ts",
-   "tests/unit/cae/margins.test.ts",
-   "tests/unit/cae/probesAndChecks.test.ts"
-  ]
- },
- "VC-MAT-24": {
-  "status": "pass",
-  "expected": "each: exit 1, listed data.code, non-empty data.remediation",
-  "tolerance": "exact",
-  "measured": "nine wrong inputs through the CLI: exit 1, the listed error.code, remediation > 10 chars, ids or paths",
-  "tests": [
-   "tests/unit/materials/agentFirst.test.ts",
-   "tests/unit/aero/fasteners/catalog.test.ts",
-   "tests/unit/materials/libraries.test.ts",
-   "tests/unit/materials/records.test.ts",
-   "server/tests/packReplay08.test.ts"
-  ]
- },
- "VC-MAT-25": {
-  "status": "pass",
-  "expected": "refused with MAT_EXPORT_CONTROLLED / MAT_HUMAN_GATE, document unchanged, nothing saved; raising a marking is allowed",
-  "tolerance": "exact",
-  "measured": "export refused (nothing saved), confirm=true MAT_HUMAN_GATE, lowering ITAR → none refused with the document file unchanged, raising none → EAR99 allowed",
-  "tests": [
-   "tests/unit/materials/exportGate.test.ts",
-   "server/tests/packReplay08.test.ts"
-  ]
- },
- "VC-MAT-26": {
-  "status": "pass",
-  "expected": "data.rules contains each VC-MAT-26 default with source and defaulted: true",
-  "tolerance": "exact",
-  "measured": "maxWasherTotal, minProtrusion, rivetLengthRounding, rivetMinEdgeDistance, rivetMinPitch each with source and defaulted: true (CLI --json)",
-  "tests": [
-   "tests/unit/aero/fasteners/select.test.ts",
-   "server/tests/packReplay08.test.ts"
-  ]
- }
+  "VC-MAT-01": {
+    "status": "pass",
+    "expected": "Mass 7.85 g, unchanged from today. Record shows basis unspecified, provenance legacy. Re-save produces v3 and preserves the material.",
+    "tolerance": "rel 1e-12",
+    "measured": "v2 file with legacy steel: 7.85 g (rel < 1e-12), basis unspecified, provenance legacy; re-saved as v3 with the material intact",
+    "tests": ["tests/unit/materials/records.test.ts", "tests/unit/aeroMassDensity.test.ts"]
+  },
+  "VC-MAT-02": {
+    "status": "pass",
+    "expected": "mass_properties reports densitySource = the 0.160 entry and both values are listed by get_material. Marking 0.163 preferred as well is refused (one preferred per key).",
+    "tolerance": "exact",
+    "measured": "densitySource = the preferred 0.160 lb/in3 entry; get_material lists 0.160 and 0.163; a second preferred is refused MAT_PREFERRED_CONFLICT",
+    "tests": ["tests/unit/materials/records.test.ts", "server/tests/packReplay08.test.ts"]
+  },
+  "VC-MAT-03": {
+    "status": "pass",
+    "expected": "2.76799, 2.79567, 4.42878 g/cm³ (rounded here; 12 significant digits in the JSON)",
+    "tolerance": "rel 1e-9",
+    "measured": "0.100 / 0.101 / 0.160 lb/in3 → 2.76799047102 / 2.79567037573 / 4.42878475363 g/cm3 (rel < 1e-9)",
+    "tests": ["tests/unit/materials/records.test.ts", "tests/unit/aeroMassDensity.test.ts"]
+  },
+  "VC-MAT-04": {
+    "status": "pass",
+    "expected": "(a) 140.5 g (b) 139.7835 g (c) 69.56719 g (d) 137.9083 g (e) 0.0505 lb = 22.90641 g",
+    "tolerance": "rel 1e-6 exact/closed-form; 5e-3 mesh",
+    "measured": "140.5 / 139.7835 / 69.56719 / 137.9083 / 22.90641 g; exact kernel rel < 1e-6, Manifold mesh < 5e-3 (plate with hole)",
+    "tests": ["tests/unit/aeroMassDensity.test.ts", "server/tests/packReplay08.test.ts"]
+  },
+  "VC-MAT-05": {
+    "status": "pass",
+    "expected": "A and B: available:false with candidate list [S value]. S: the value. forCertification: refused with reason \"superseded source\".",
+    "tolerance": "exact",
+    "measured": "A and B refused with candidates [S 60 ksi]; S returned; forCertification on a superseded record refused (MAT_SOURCE_SUPERSEDED)",
+    "tests": ["tests/unit/materials/allowables.test.ts"]
+  },
+  "VC-MAT-06": {
+    "status": "pass",
+    "expected": "grip/length within 0.001 in of published: NAS6203-33 2.062/2.385; NAS6204-33 2.062/2.432; NAS6204-10 0.625/0.995; NAS6205-33 2.062/2.500; NAS6205-10 0.625/1.063; NAS6206-33 2.062/2.516",
+    "tolerance": "abs 0.001 in",
+    "measured": "6 checkpoints within 0.001 in of the published and the expected grip / length",
+    "tests": ["tests/unit/aero/fasteners/catalog.test.ts"]
+  },
+  "VC-MAT-07": {
+    "status": "pass",
+    "expected": "e.g. t = 0.510 → NAS6203-9, washer [0.063], length 0.885, protrusion 0.124 ≥ 1/32 → ok. t = 0.300 → NAS6204-5 + [0.016]. t = 3.000 → fail (beyond the fixture grip range). t = 0.020 → NAS6206-1 is **fixture-only** (grip dash range [1, 40] is a test fixture; whether a -1 grip exists is TBD from the NAS sheet). Protrusion uses the length rounded to 0.001 in and one thread pitch beyond the nut maximum height (llull choices, TECHNICAL_SPEC §5.2 step 5). Full table in JSON.",
+    "tolerance": "exact (sixteenths)",
+    "measured": "10 stacks, e.g. t 0.51 → NAS6203-9 + [0.063], L 0.885, protrusion 0.124 (9 decimals); 3.000 in → FAST_STACK_OUT_OF_RANGE",
+    "tests": ["tests/unit/aero/fasteners/select.test.ts"]
+  },
+  "VC-MAT-08": {
+    "status": "pass",
+    "expected": "0.600 → HL19-8-10 (.5625–.625). 0.5625 → HL19-8-9. 0.5626 → HL19-8-10. 0.250 → HL19-6-4. 0.251 → HL19-6-5.",
+    "tolerance": "exact",
+    "measured": "5 Hi-Lok stacks incl. boundaries: HL19-8-10 / -9 / -10, HL19-6-4 / -5 exact",
+    "tests": ["tests/unit/aero/fasteners/select.test.ts"]
+  },
+  "VC-MAT-09": {
+    "status": "pass",
+    "expected": "e.g. AD4, t = 0.125 → MS20470AD4-5 (L = 0.3125). AD4, t = 0.080 → AD4-5 (raw 0.2675, round up). Edge ≥ 0.25 in, pitch ≥ 0.375 in.",
+    "tolerance": "exact",
+    "measured": "6 rivet stacks: part numbers exact, dimensions within 5e-6 (the pack rounds to 5 decimals)",
+    "tests": ["tests/unit/aero/fasteners/select.test.ts"]
+  },
+  "VC-MAT-10": {
+    "status": "pass",
+    "expected": "1 FeatureStep for the insert. Plate volumes each reduced by π·(d_hole/2)²·t (d_hole from the catalogue, TBD; test with user-supplied d = 0.190 in). Instances: NAS6203-9 ×1, NAS1149 0.063 ×1, MS21042L3 ×1. Undo restores a deep-equal document. Replay is id-stable.",
+    "tolerance": "volume rel 1e-6",
+    "measured": "OCC plan: plate volumes = plate - pi (0.095)^2 t (rel < 1e-6), 1 insert step, instances NAS6203-9 / NAS1149(.063) / MS21042L3 x1, undo and redo restore a deep-equal document, replay id-stable",
+    "tests": ["tests/unit/aero/fasteners/insert.test.ts", "server/tests/aeroFasteners.occt.test.ts", "server/tests/packReplay08.test.ts"]
+  },
+  "VC-MAT-11": {
+    "status": "pass",
+    "expected": "standardParts: NAS6203-9 ×2, MS21042L3 ×2, NAS1149(.063) ×2. materials: one row per material with total mass = Σ VC-MAT-04 style volume × density. Legacy rows unchanged.",
+    "tolerance": "exact counts; mass rel 1e-6",
+    "measured": "standardParts NAS6203-9 / MS21042L3 / NAS1149(.063) x2; one materials row with mass = exact volume x density (rel < 1e-6)",
+    "tests": [
+      "tests/unit/aero/fasteners/insert.test.ts",
+      "tests/unit/aero/bomStandardParts.test.ts",
+      "server/tests/aeroFasteners.occt.test.ts"
+    ]
+  },
+  "VC-MAT-12": {
+    "status": "pass",
+    "expected": "No-op with 2 reasons citing 3 D / 2 D. With allowViolations:true: inserted with 2 warnings.",
+    "tolerance": "exact",
+    "measured": "pitch 0.30 / edge 0.20 → FAST_PITCH + FAST_EDGE_DISTANCE no-op citing 3 D and 2 D; allowViolations inserts with 2 warnings",
+    "tests": ["tests/unit/aero/fasteners/row.test.ts"]
+  },
+  "VC-MAT-13": {
+    "status": "pass",
+    "expected": "diff lists 1 changed value old 156 → new 146 with both provenances",
+    "tolerance": "exact",
+    "measured": "diff of v1 / v2: 1 changed value (Fbru 156 → 146 ksi) with both provenances",
+    "tests": ["tests/unit/materials/libraries.test.ts"]
+  },
+  "VC-MAT-14": {
+    "status": "pass",
+    "expected": "The sentinel appears in none of the outputs. The document carries only {libraryId, version, sha256}. Reload with the provider gives the same mass; without the provider, the record stays unresolved with the saved sha256 and mass_properties returns available:false (no number). A provider with a different sha256 also leaves it unresolved (hash mismatch).",
+    "tolerance": "exact (string search)",
+    "measured": "sentinel absent from save, snapshot, export_code and the live-sync log; reload with the provider gives 140.5 g; without it MAT_LIBRARY_UNRESOLVED; other hash → hash mismatch",
+    "tests": ["tests/unit/materials/privateValues.test.ts", "server/tests/materialLibraries.test.ts"]
+  },
+  "VC-MAT-15": {
+    "status": "pass",
+    "expected": "(a) exit 1 MAT_EXPORT_CONTROLLED; with confirmExportControlled=true from the agent: MAT_HUMAN_GATE; the export proceeds only after a human confirmation in the desktop app. (b) refused. Unmarked document: unaffected. Nothing saved on refusal.",
+    "tolerance": "exact",
+    "measured": "(a) CLI: exit 1 MAT_EXPORT_CONTROLLED, then MAT_HUMAN_GATE, nothing saved; (b) /mcp refuses both; an unmarked document exports; human confirmation by a verified signature (port) in exportGate.test",
+    "tests": ["tests/unit/materials/exportGate.test.ts", "server/tests/packReplay08.test.ts"]
+  },
+  "VC-MAT-16": {
+    "status": "pass",
+    "expected": "400 °F → 65 % → 39 ksi; 600 °F → available:false (no extrapolation)",
+    "tolerance": "rel 1e-12",
+    "measured": "400 °F → 39 ksi (rel < 1e-12); 600 °F → available:false, MAT_TEMPERATURE_OUT_OF_RANGE",
+    "tests": ["tests/unit/materials/allowables.test.ts"]
+  },
+  "VC-MAT-17": {
+    "status": "pass",
+    "expected": "BOM ≤ 1 s, mass ≤ 1 s, file growth ≤ 1 KB per instance",
+    "tolerance": "budget",
+    "measured": "10^4 instances of 3 part numbers: BOM and mass within the pack 1 s (best of 3 runs), growth <= 1 KB per instance",
+    "tests": ["tests/unit/aero/fastenerScale.test.ts"]
+  },
+  "VC-MAT-18": {
+    "status": "blocked",
+    "expected": "Every value has basis, a sourceId present in sources.lock.json with sha256, and a locator. superseded is set.",
+    "tolerance": "exact",
+    "measured": "mechanism passes; 7 of the lock sources unpinned, MIL-HDBK-5J values not seeded",
+    "tests": ["tests/unit/materials/seedLibrary.test.ts"],
+    "blockedReason": "Only part of the check can pass. The mechanism is asserted (every seed value has a basis, a sourceId present in sources.lock.json, a citation and a locator; superseded is set exactly on MIL-HDBK-5J-derived materials), but seven sources in sources.lock.json (S13, S15, S16, S21, S22, S26, S38) have sha256 null because their primary files returned HTTP 403 from the build sandbox, and no MIL-HDBK-5J allowable values are seeded: those need the MIL-HDBK-5J PDF (S38) to be fetched and pinned from a network that can reach it. Owner decision 2026-10-17: accepted as data-blocked; closes when MIL-HDBK-5J / a licensed MMPDS library is imported (code complete and tested)."
+  },
+  "VC-MAT-19": {
+    "status": "pass",
+    "expected": "Head Ø within [0.238, 0.262] in, head h within [0.054, 0.064] in. NAS620x head (dims unknown) is representative and excluded from mass.",
+    "tolerance": "range",
+    "measured": "MS20470AD4 head Ø within [0.238, 0.262] in, height within [0.054, 0.064] in, mass allowed; NAS620x representative, excluded from mass",
+    "tests": ["tests/unit/aero/fasteners/insert.test.ts"]
+  },
+  "VC-MAT-20": {
+    "status": "pass",
+    "expected": "Decode, select and BOM work. The composite record validates with basis B and CMH-17 provenance.",
+    "tolerance": "exact",
+    "measured": "synthetic ACME-100 family imported without code change: decode, select, list work",
+    "tests": ["tests/unit/aero/fasteners/catalog.test.ts"]
+  },
+  "VC-MAT-21": {
+    "status": "blocked",
+    "expected": "(i) basis A, (ii) basis B, (iii) basis mixed with the per-input list (TECHNICAL_SPEC §5.6). Capacity values **TBD** — needs verified Fsu/Fbru allowables (seed library, M4); until then only the basis propagation is asserted.",
+    "tolerance": "exact (basis); TBD (values)",
+    "measured": "basis propagation (i) A (ii) B (iii) mixed asserted; capacity values not asserted",
+    "tests": ["tests/unit/aero/fasteners/jointCapacity.test.ts"],
+    "blockedReason": "Capacity values: the pack row defers them (TBD) until verified Fsu / Fbru allowables exist in the seed library (M4, MMPDS / MIL-HDBK-5J, see VC-MAT-18). Only the basis propagation is asserted and passes: A + A → A, A + B → B, B + S → mixed with the per-input list, never upgraded. Owner decision 2026-10-17: accepted as data-blocked; closes when MIL-HDBK-5J / a licensed MMPDS library is imported (code complete and tested)."
+  },
+  "VC-MAT-22": {
+    "status": "pass",
+    "expected": "expected_results.json agentFirst VC-MAT-22: massG/massKg/massLb, densitySource, unverified: true with reasons in all three; check_materials warning MAT_VALUE_UNVERIFIED",
+    "tolerance": "rel 1e-6",
+    "measured": "(a) 140.5 g (b) 139.7835 g (c) 7.85 g, massKg / massLb at rel < 1e-6; unverified true with reasons; MAT_VALUE_UNVERIFIED warning (CLI --json)",
+    "tests": ["tests/unit/materials/checkMaterials.test.ts", "tests/unit/aeroMassDensity.test.ts", "server/tests/packReplay08.test.ts"]
+  },
+  "VC-MAT-23": {
+    "status": "pass",
+    "expected": "VC-MAT-23: value returned with unverified + reviewRequired; forCertification refused (MAT_VALUE_UNVERIFIED); FEA rows flagged",
+    "tolerance": "exact",
+    "measured": "typical Ftu 83 ksi = 572 MPa returned unverified + reviewRequired; forCertification refused MAT_VALUE_UNVERIFIED; FEA margin rows unverified, check_analysis FEA_MATERIAL_UNVERIFIED",
+    "tests": ["tests/unit/materials/allowables.test.ts", "tests/unit/cae/margins.test.ts", "tests/unit/cae/probesAndChecks.test.ts"]
+  },
+  "VC-MAT-24": {
+    "status": "pass",
+    "expected": "each: exit 1, listed data.code, non-empty data.remediation",
+    "tolerance": "exact",
+    "measured": "nine wrong inputs through the CLI: exit 1, the listed error.code, remediation > 10 chars, ids or paths",
+    "tests": [
+      "tests/unit/materials/agentFirst.test.ts",
+      "tests/unit/aero/fasteners/catalog.test.ts",
+      "tests/unit/materials/libraries.test.ts",
+      "tests/unit/materials/records.test.ts",
+      "server/tests/packReplay08.test.ts"
+    ]
+  },
+  "VC-MAT-25": {
+    "status": "pass",
+    "expected": "refused with MAT_EXPORT_CONTROLLED / MAT_HUMAN_GATE, document unchanged, nothing saved; raising a marking is allowed",
+    "tolerance": "exact",
+    "measured": "export refused (nothing saved), confirm=true MAT_HUMAN_GATE, lowering ITAR → none refused with the document file unchanged, raising none → EAR99 allowed",
+    "tests": ["tests/unit/materials/exportGate.test.ts", "server/tests/packReplay08.test.ts"]
+  },
+  "VC-MAT-26": {
+    "status": "pass",
+    "expected": "data.rules contains each VC-MAT-26 default with source and defaulted: true",
+    "tolerance": "exact",
+    "measured": "maxWasherTotal, minProtrusion, rivetLengthRounding, rivetMinEdgeDistance, rivetMinPitch each with source and defaulted: true (CLI --json)",
+    "tests": ["tests/unit/aero/fasteners/select.test.ts", "server/tests/packReplay08.test.ts"]
+  }
 }
