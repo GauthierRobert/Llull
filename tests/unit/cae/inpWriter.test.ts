@@ -133,6 +133,29 @@ describe('writeInp refusals', () => {
     const assigned = mustRun(bare, 'assign_material', { materialName: 'bare', entityIds: [none.boxId] });
     const written = writeInp(assigned, none.analysisId, barMesh(assigned, none.analysisId, none.boxId, supportSets(none.constraints)));
     expect(written).toMatchObject({ code: 'FEA_MATERIAL_NO_ELASTIC', ids: [none.boxId] });
+    const materialId = assigned.entities[none.boxId]?.materialId ?? 'bare';
+    const stub = {
+      ...assigned,
+      materials: {
+        ...assigned.materials,
+        [materialId]: {
+          ...assigned.materials[materialId]!,
+          record: {
+            id: materialId,
+            designation: 'private',
+            specs: [],
+            licence: 'licensed-no-redistribution' as const,
+            exportMarking: { regime: 'none' as const },
+            libraryRef: { libraryId: 'lib', version: '1', sha256: 'a'.repeat(64) },
+            unresolved: { reason: 'provider missing' as const },
+          },
+        },
+      },
+    };
+    expect(writeInp(stub, none.analysisId, barMesh(stub, none.analysisId, none.boxId, supportSets(none.constraints)))).toMatchObject({
+      code: 'MAT_LIBRARY_UNRESOLVED',
+      ids: [none.boxId, materialId],
+    });
     const free = barDocument({ supports: false });
     expect(code(free.doc, free.analysisId, barMesh(free.doc, free.analysisId, free.boxId, {}))).toBe('FEA_NO_CONSTRAINTS');
   });

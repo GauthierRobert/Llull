@@ -83,7 +83,14 @@ function precheck(doc: CadDocument, analysisId: string, mesh: FeMeshArtifact, ct
   }
   for (const entityId of Object.keys(analysis.parts)) {
     if (!blockEntities.has(entityId)) return refuse('FEA_PART_INVALID', `part '${entityId}' has no elements in the mesh`, [entityId]);
-    if (ctx.materialOf(entityId) === null) return refuse('FEA_MATERIAL_MISSING', `part '${entityId}' has no material`, [entityId]);
+    const material = ctx.materialOf(entityId);
+    if (material === null) return refuse('FEA_MATERIAL_MISSING', `part '${entityId}' has no material`, [entityId]);
+    if (material.record?.unresolved !== undefined)
+      return refuse(
+        'MAT_LIBRARY_UNRESOLVED',
+        `part '${entityId}': material '${material.name}' comes from private library '${material.record.libraryRef?.libraryId ?? '?'}', not resolved on this machine (${material.record.unresolved.reason}); run resolve_material_libraries`,
+        [entityId, material.record.id],
+      );
   }
   const collision = nameCollision(ctx);
   if (collision !== null) return collision;
