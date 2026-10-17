@@ -36,8 +36,14 @@ const density = (material: string, value: number, unit: string, basis: string): 
 const items = (
   doc: CadDocument,
   params: Record<string, unknown> = {},
-): { code: string; severity: string; ids: string[]; remediation: string }[] =>
-  dataOf(call(doc, 'check_materials', params))['items'] as { code: string; severity: string; ids: string[]; remediation: string }[];
+): { code: string; severity: string; ids: string[]; message: string; remediation: string }[] =>
+  dataOf(call(doc, 'check_materials', params))['items'] as {
+    code: string;
+    severity: string;
+    ids: string[];
+    message: string;
+    remediation: string;
+  }[];
 const near = (actual: unknown, expected: number): boolean => Math.abs((actual as number) / expected - 1) < 1e-6;
 
 describe('VC-MAT-22: unverified values reach mass_properties and check_materials', () => {

@@ -643,3 +643,32 @@ to `unclassified[]`. `add_hole` validates all positions first, so it is all-or-n
 - [R1]–[R15] as listed in `validation/sources.md` (FAA AC 43.13-1B, EAA, FAA-H-8083-31B, NIST MBE PMI, usnistgov/CAD-PMI-Testing, FreeCAD SheetMetal, FreeCAD PartDesign Hole, FreeCAD Fasteners, OCCT headers, NIST CTC mirror, cadquery-ocp, Web3D, The Fabricator, NIST AMS 100-10).
 - [R16] CadQuery `cadquery/cq.py` @5f5bc62b255f62e3512105740025361b6c31eddd (`hole`, `cboreHole(diameter, cboreDiameter, cboreDepth, depth)`, `cskHole(diameter, cskDiameter, cskAngle, depth)`) — CadQuery / GitHub — https://github.com/CadQuery/cadquery/blob/master/cadquery/cq.py (accessed 2026-10, fetched)
 - llull: `docs/decisions/KI5-shape-kernel-boundary.md`, `KI6-desktop-app-cli-first.md`, `KI4-occt-spike.md`, `.claude/rules/architecture.md`.
+
+## 13. Implementation status (2026-10-17): M1, M1b, M2, M3, M4, M6 (fastener link, hole table) and part of M5 built (aerospace step AERO-3)
+
+Package layout: decision D1 taken differently from the proposal: the sheet-metal plugin lives in **`packages/domain-aero`**
+(plugin `sheetmetal`, toolset `manufacturing`), not a separate `domain-mfg` (`docs/decisions/AERO3-package-layout.md`).
+
+| Item | Where |
+| ---- | ----- |
+| Agent-first contract: `FTR_CODES`, `FtrResultMeta`, `Named`, `FtrFinding`, `FtrCheckData`, `FtrRefusal`, `FTR_REVIEW_REASON` | `packages/core/src/model/manufacturing.ts` |
+| `lib/holeMath.ts`, `lib/sheetMath.ts` (each value with its formula id, TR-FTR-09); generic R12 writer moved to `lib/dxfWriter.ts` (D4; AEC keeps a thin subclass) | `packages/core/src/lib/` |
+| `feature` recipe node (`model/features.ts`), lowered in `kernelFromOps` (Manifold and OCC; `thread` / `fastener` excluded from `recipeKey`); feature meta read from the `brep` nodes, no copy on the entity | `geometry/feature*.ts`, `geometry/shapeKernel.ts` |
+| Core commands (toolset `manufacturing`): `add_hole`, `add_pocket`, `set_thread`, `recognize_features`, `check_machining`, `hole_table` | `commands/features/` |
+| Recognition over `FaceGraph` (split-face merge, hole chains, pockets, fillets / chamfers, bends) | `geometry/recognition/` |
+| Codegen: feature cuts with the CadQuery `hole` / `cboreHole` / `cskHole` idiom, thread and drill point as notes | `codegen/` |
+| Sheet-metal plugin: `sheet_metal_calc`, `create_sheet_metal_rule`, `import_bend_radius_table`, `add_sheet_metal_base`, `add_flange`, `add_joggle`, `add_sheet_cutout`, `add_relief`, `flat_pattern`, `materialize_flat_pattern`, `check_sheet_metal`, `export_flat_pattern_dxf`, `convert_to_sheet_metal`; folded solids derived (omitted from save, re-derived on load, guarded) | `packages/domain-aero/src/sheetmetal/**`, `model/sheetMetal.ts` |
+| `llull guide` § 8 (AF-03) | `packages/mcp/src/conventions.ts` |
+
+Tests: `tests/unit/features/*` (VC-FTR-22, 23, 24, 27, 28, 29), `tests/unit/aero/sheetmetal/*` (VC-FTR-01…05, 07, 08, 09, 10, 11, 11b, 16, 35, 37, 39, 40, 41, 42, 43, 44), `tests/unit/contract/ftrAgentFirst.test.ts` (VC-FTR-31, 37, 38, 39, 42, 44), golden `kernel_machined_plate_features`; on live OCC `server/tests/occtFeatures.test.ts` (VC-FTR-17, 20, 25 = 55978.529153, 26, 27, 30, 34) and `server/tests/occtSheetMetal.test.ts` (VC-FTR-06 = 5279.716754, 08, 18, 19).
+
+**Deviations and open items:**
+
+- Contract shapes forced by the `nested-schema` rule (no all-optional nested objects): `check_machining.rules` and `create_sheet_metal_rule.thresholds` are lists of `{ rule|kind, value, source }`; `hole.kind` is required.
+- `flat_pattern` is a pure query; `materialize_flat_pattern` (mutating) draws the snapshot entities.
+- `recognize_features.angularTolerance` is in degrees (AF-04). Recognition reads face orientation from the kernel's face details, not the raw `reversed` flag.
+- Narrower than §3.1 / §4: no `counterdrill`, no `up_to_next` / `up_to_face` extents, no pocket islands / `upToFace`, no `add_rib` (VC-FTR-33), no `direction` param. Floor fillets need the exact kernel (Manifold: `FTR_NEEDS_EXACT_KERNEL`).
+- `add_joggle` takes `angle` only (not `run`); `convert_to_sheet_metal` needs an explicit `rule` whose thickness matches the measured one (0.1 %).
+- Waivers: always `FTR_WAIVER_NOT_APPROVED` until gap 09 approval records exist (AERO-4).
+- Codes added: `FTR_JOGGLE_LINE_INVALID`, `FTR_EDGE_OCCUPIED`, `FTR_RELIEF_INVALID`, `FTR_CUTOUT_INVALID`, `FTR_PARAM_INVALID`, `FTR_DRILL_POINT_ANGLE_OUT_OF_RANGE`, `FTR_FEATURE_BUILD_FAILED`, `FTR_POCKET_CORNER_TOO_LARGE`.
+- Not built: flanged hole, bead, corner relief, hem, auto relief on `add_flange` (M5/M8 rest), OCC-native BRepFeat (M7), VC-FTR-21 (CTC-02…05 not stored), VC-FTR-32 (recognised → `add_hole` steps), MCP prompt `design_sheet_bracket`, UI panels.

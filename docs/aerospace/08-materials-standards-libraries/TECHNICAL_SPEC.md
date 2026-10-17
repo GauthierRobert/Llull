@@ -552,3 +552,31 @@ Tests: `tests/unit/aeroMassDensity.test.ts`. It covers VC-MAT-01, VC-MAT-03 (rel
 - Follow-up: in dynamics, a density refusal reaches `add_rigid_body` / `simulate_motion` as a message prefixed with the code
   (`PROP_…: body 'b': …`). It is not yet a structured `CommandResult.error`. This is part of the AGENT_FIRST rule 5 dynamics
   follow-up (`DYN_*` codes).
+
+## 14. Implementation status (2026-10-17): M2, M3, M5, M6, M7, M8 built (aerospace step AERO-3)
+
+Package layout: decision 1 taken, `docs/decisions/AERO3-package-layout.md` (`packages/domain-aero`, plugin `fasteners`).
+
+| Item | Where |
+| ---- | ----- |
+| Record = `Material.record?: MaterialRecordInfo` (designation, temper, form, specs, licence, export marking, superseded, libraryRef, unresolved); values are PHY-01 `propertyModels` (PROP-08: no second `PropertyValue` type; `set_material_property` is the TR-PROP-07 adapter: value → `constant`, absolute temperature table → `table1d`, percent-of-RT → `ratioOf`) | `model/materialLibrary.ts`, `model/types.ts`, `commands/materials/` |
+| Commands (toolset `materials`): `define_material_record`, `set_material_property`, `get_material`, `get_material_allowable`, `convert_quantity`, `import_material_library`, `remove_material_library`, `diff_material_libraries`, `resolve_material_libraries` (new `session` annotation: no FeatureStep, never logged), `set_export_marking`, `check_materials`; `create_material` / `assign_material` moved from `3d` to `materials` | `commands/materials/catalog.ts` |
+| Private libraries (TR-MAT-16/31): `ctx.libraries` (`MaterialLibraryProvider.get(libraryId, version)`, core compares sha256), server store `LLULL_LIBRARIES_DIR` (default `~/.llull/libraries`, files 0600), transport `register_material_library`; save and the live snapshot strip private values to stubs; `resolveDensity`, allowables, `evaluate_property`, `sample_property` and FE decks refuse an unresolved record with `MAT_LIBRARY_UNRESOLVED` | `commands/types.ts`, `commands/persistence/serialization.ts`, `server/src/libraries/libraryStore.ts`, `packages/mcp/src/libraryTools.ts`, `domain-cae/src/decks/deckBuilder.ts` |
+| Export gate (TR-MAT-30/51): pure `exportGate(doc, target)`; `export_step_exact`, `export_gltf`, `export_stl`, `export_obj`, `export_code` (and `export_step` through them) refuse ITAR / EAR-ECCN content in use with `MAT_EXPORT_CONTROLLED`; `confirmExportControlled` passes only with a signature verified by `ctx.humanSignature`, otherwise `MAT_HUMAN_GATE`; lowering a marking is gated the same way, raising is free | `commands/materials/`, `commands/{exchange,brep}/` |
+| Fasteners plugin (toolset `fasteners`): `import_fastener_catalog`, `list_fastener_families`, `decode_part_number`, `select_fastener` (§5.2 in integer ticks), `insert_fastener_stack`, `insert_fastener_row`, `check_fastener_layout`, `delete_fastener_stack`; derivation guard on fastener instances; `fasteners` document slice validated on load | `packages/domain-aero/src/fasteners/**`, `model/fasteners.ts` |
+| BOM: `standardParts` (by `Component.partRef.partNumber`) and `materials` (`includeMaterials`, resolveDensity, unverified) sections; `rows` unchanged | `commands/assembly/billOfMaterials.ts`, `bomMaterials.ts` |
+
+Tests: `tests/unit/materials/*` (VC-MAT-01, 02, 03, 05, 13, 14, 15 core, 16, 22 a–c, 23, 24 material codes, 25; VC-PROP-22), `tests/unit/aero/fasteners/*` and `tests/unit/aero/bomStandardParts.test.ts` (VC-MAT-06, 07, 08, 09, 10, 11, 12, 19, 20, 24 fastener codes, 26), `tests/unit/contract/{materialLibraries,fastenersPlugin}.test.ts`, server `materialLibraries.test.ts`, `aeroFasteners.occt.test.ts` (exact hole volume and BOM mass rel 1e-6 on OCC).
+
+**Deviations and open items:**
+
+- Library files hold PHY-01 `propertyModels` directly (`coefficientsSha256` recomputed on import); `diff_material_libraries` is keyed (material id, model id).
+- `set_material_property.source` needs `citation` (no bare `sourceId`); missing source → `MAT_PROVENANCE_MISSING`.
+- Replay without the provider: `import_material_library` by reference is refused (the record ids are unknown without the file); replay with the provider is value-identical.
+- Not built: cloud-MCP redaction of private-licensed values (TR-MAT-32; only save and live snapshot are redacted), the browser IndexedDB provider, M4 seed library (needs the MIL-HDBK-5J PDF), `joint_capacity` (M9), `sources.lock.json` CI check (VC-MAT-18), VC-MAT-17 performance at 10⁴ instances.
+- Stack measurement ray-casts entity triangles (exact on flat faces); after a cut, `check_fastener_layout` re-measures beside the hole. `edgeDistance` of a row is declared by the caller and checked, not measured.
+- Length = grip truncated to 0.001 in + thread length (reproduces the distributor table). Washer part numbers are descriptors (`NAS1149(.063)`).
+- `includeMaterials` defaults to false to keep the legacy BOM shape.
+- Codes added beyond §7.1: `MAT_LIBRARY_PRIVATE_INLINE`, `FAST_CATALOG_INVALID`, `FAST_CATALOG_CONFLICT`, `FAST_FAMILY_UNKNOWN`, `FAST_SIZE_UNKNOWN`, `FAST_FAMILY_NOT_SELECTABLE`, `FAST_STACK_MISSING`, `FAST_STACK_NOT_FOUND`, `FAST_AXIS_MISS`, `FAST_LAYER_MISSING`, `FAST_INSTANCE_MISSING`, `FAST_HOLE_DIAMETER_UNKNOWN`, `FAST_HOLE_CUT_FAILED`, `FAST_ROW_INVALID`. `FAST_KERNEL_REQUIRED` is never raised: `execute` refuses `requiresKernel` commands with `CMD_KERNEL_UNAVAILABLE`.
+- Manifold facets small holes coarsely in inch documents (segment count follows the radius in mm): use OCC for volumes.
+- Hi-Lok pins have no listed length (representative); collars are not selected.

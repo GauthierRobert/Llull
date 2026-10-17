@@ -65,3 +65,22 @@ describe('CONVENTIONS_GUIDE content', () => {
     expect(CONVENTIONS_GUIDE).not.toMatch(/require\(/);
   });
 });
+
+describe('CONVENTIONS_GUIDE aerospace section (AF-03)', () => {
+  const section = CONVENTIONS_GUIDE.slice(CONVENTIONS_GUIDE.indexOf('## 8. Materials, fasteners and manufacturing'));
+
+  it('exists and names only registered commands', async () => {
+    const { getCommand } = await import('@core/commands/registry');
+    expect(section.length).toBeGreaterThan(500);
+    const names = [...section.matchAll(/`([a-z][a-z0-9]*(?:_[a-z0-9]+)+)`/g)].map((match) => match[1] ?? '');
+    const unknown = names.filter((name) => getCommand(name) === undefined && !['import_step_exact'].includes(name));
+    expect(names.length).toBeGreaterThan(30);
+    expect(unknown).toEqual([]);
+  });
+
+  it('states the review requirement and the human gate', () => {
+    expect(section).toMatch(/reviewRequired/);
+    expect(section).toMatch(/MAT_HUMAN_GATE/);
+    expect(section).toMatch(/FTR_WAIVER_NOT_APPROVED/);
+  });
+});
