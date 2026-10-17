@@ -3,8 +3,8 @@
  * face of a solid. The result is a `mesh` whose `brep` is a `feature(hole)` node over the target's recipe.
  */
 
-import { type CadDocument, type Entity, is3D } from '../../model/types';
-import type { HoleExtent, HoleSpec } from '../../model/features';
+import { type CadDocument, type Entity, type MeshData, type Vec2, is3D } from '../../model/types';
+import type { FeatureFrame, HoleExtent, HoleSpec } from '../../model/features';
 import type { GeometryKernel } from '../../geometry/kernel';
 import type { ShapeRecipe } from '../../model/types';
 import type { CommandResult } from '../types';
@@ -15,10 +15,14 @@ import { commitKernelResult, evaluateRecipe, operandRecipe } from '../brep/kerne
 import { noop } from '../noop';
 import { frameToWorld } from '../../geometry/featureFrame';
 import { throughReach } from '../../geometry/featureLowering';
+import { buildMeshBvh } from '../../geometry/meshBvh';
+import { localThickness } from '../../geometry/featureThickness';
+import { meshDiagonal } from '../../geometry/meshExtent';
 import { type ResolvedFace, resolveFace } from './faceResolve';
 import { POINT_FRAMES, expectedShape, localPoints } from './facePoints';
 import { buildHole, extentParams, holeParams } from './holeSpec';
 import { refuse } from './ftr';
+import type { MachinedHole } from '../../geometry/featureInstances';
 
 /**
  * @affects replaces `target` by 1 mesh entity (the part with the holes cut, `brep` = feature(hole) over the target's recipe)
@@ -91,6 +95,34 @@ export const addHole = defineCommand({
   },
 });
 
+/** Material thickness under each hole centre (ray cast along the axis); a point the cast cannot measure falls back to the deepest reach. */
+function stockUnder(
+  mesh: MeshData,
+  hole: HoleSpec,
+  depth: number,
+  frame: FeatureFrame,
+  points: ReadonlyArray<Vec2>,
+): Array<{ index: number; thickness: number }> {
+  const bvh = buildMeshBvh(mesh);
+  const reach = 2 * meshDiagonal(mesh);
+  const fallback = throughReach(mesh, frame);
+  return points.map((point, index) => {
+    const machined: MachinedHole = {
+      id: `hole-${index}`,
+      kind: hole.kind,
+      diameter: hole.diameter,
+      ...(hole.cboreDiameter === undefined ? {} : { cboreDiameter: hole.cboreDiameter }),
+      ...(hole.cskDiameter === undefined ? {} : { cskDiameter: hole.cskDiameter }),
+      depth,
+      through: false,
+      frame,
+      position: frameToWorld(frame, point),
+      point,
+    };
+    return { index, thickness: localThickness(bvh, machined, reach) ?? fallback };
+  });
+}
+
 function drill(
   doc: CadDocument,
   kernel: GeometryKernel,
@@ -129,13 +161,17 @@ function drill(
   if (extent.kind === 'blind') {
     const shape = kernel.evaluate(source);
     const mesh = shape === null ? null : kernel.tessellate(shape);
-    if (mesh !== null && extent.depth >= throughReach(mesh, frame))
+    const stock = mesh === null ? [] : stockUnder(mesh, hole, extent.depth, frame, local);
+    const tooDeep = stock.filter((entry) => extent.depth >= entry.thickness);
+    if (tooDeep.length > 0)
       return refuse(
         doc,
         'add_hole',
         'FTR_BLIND_DEPTH_INVALID',
-        `blind depth ${extent.depth} reaches or exceeds the stock below the face (${throughReach(mesh, frame)})`,
-        'use through_all, or a depth inside the material',
+        `blind depth ${extent.depth} reaches or exceeds the local stock at points ${tooDeep.map((entry) => entry.index).join(', ')} (${tooDeep
+          .map((entry) => entry.thickness)
+          .join(', ')})`,
+        'use through_all, or a depth inside the material under every hole',
         [entity.id],
         ['extent.depth'],
       );

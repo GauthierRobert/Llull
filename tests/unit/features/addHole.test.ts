@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { recipeKey } from '@core/geometry/shapeRecipe';
 import { countersinkRemovedVolume, drillTipHeight } from '@lib/holeMath';
+import { createEmptyDocument } from '@core/model/types';
 import { expectNoOp, expectPure } from '../../helpers/expectNoOp';
 import { idOf, manifoldSuite, meshOf, plate, volumeOf } from '../../helpers/featureSupport';
 
@@ -228,5 +229,26 @@ describe('add_hole', () => {
       extent: THROUGH,
     });
     expect(result.error?.code).toBe('FTR_FACE_NOT_PLANAR');
+  });
+
+  it('measures the blind depth against the local stock, not the deepest point of the part', () => {
+    const flange = execute(createEmptyDocument(), 'add_box', { size: [100, 60, 3], position: [0, 0, 47], anchor: 'min' });
+    const column = execute(flange.document, 'add_box', { size: [20, 60, 47], position: [0, 0, 0], anchor: 'min' });
+    const joined = execute(column.document, 'boolean', { op: 'union', a: idOf(flange), b: idOf(column) });
+    const blind = (depth: number): ReturnType<typeof execute> =>
+      execute(joined.document, 'add_hole', {
+        target: idOf(joined),
+        face: { near: [60, 30, 50] },
+        pointsFrame: 'world_xy',
+        points: [[70, 30]],
+        hole: { kind: 'simple', diameter: 4 },
+        extent: { kind: 'blind', depth },
+      });
+    const through = blind(5);
+    expectNoOp(through, joined.document);
+    expect(through.error?.code).toBe('FTR_BLIND_DEPTH_INVALID');
+    expect(through.error?.paths).toContain('extent.depth');
+    expect(through.error?.ids).toContain(idOf(joined));
+    expect(blind(2).rejected).toBeUndefined();
   });
 });
