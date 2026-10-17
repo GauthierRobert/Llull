@@ -236,7 +236,7 @@
             "kind": "constant",
             "value": 160
           },
-          "basis": "S",
+          "basis": "supplier_unstated",
           "provenance": {
             "sourceId": "S21",
             "citation": "AIA/NAS NAS6203-6220 catalogue entry (GlobalSpec / Accuris): 160 KSI Ftu bolt",
@@ -255,7 +255,7 @@
             "kind": "constant",
             "value": 95
           },
-          "basis": "S",
+          "basis": "supplier_unstated",
           "provenance": {
             "sourceId": "S22",
             "citation": "Airfasco NAS6203 / NAS6204 product pages (minimum shear 95 ksi)",
@@ -287,7 +287,7 @@
             "kind": "constant",
             "value": 95
           },
-          "basis": "S",
+          "basis": "supplier_unstated",
           "provenance": {
             "sourceId": "S26",
             "citation": "Hi-Shear HL18 drawing (AAE store); HL10 / HL18 shear 95 ksi",
@@ -319,7 +319,7 @@
             "kind": "constant",
             "value": 95
           },
-          "basis": "S",
+          "basis": "supplier_unstated",
           "provenance": {
             "sourceId": "S26",
             "citation": "Hi-Shear HL18 drawing (AAE store); HL10 / HL18 shear 95 ksi",
