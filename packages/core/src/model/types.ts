@@ -11,7 +11,7 @@ import type { DynamicsModel } from './dynamics';
 import type { PrototypeModel } from './prototype';
 import type { CurveSegment } from './curve';
 import type { FastenerModel, PartRef } from './fasteners';
-import type { MaterialLibraryEntry } from './materialLibrary';
+import type { MaterialLibraryEntry, MaterialRecordInfo } from './materialLibrary';
 import type { SheetMetalModel } from './sheetMetal';
 
 /** Re-exported: every model consumer reads its vectors from here. */
@@ -691,11 +691,14 @@ export interface DocumentBlob {
 /**
  * Physical + PBR material. `density` is mass per (document unit)³ so mass = volume × density (mm document: g/mm³, steel ≈ 0.00785).
  * Replaced via `create_material`.
- * @invariant density > 0 and finite; color matches /^#[0-9a-fA-F]{6}$/; metalness, roughness in [0, 1]
+ * @invariant density > 0 and finite (0 only on a `record` material with no density value yet, or an unresolved private stub); color matches
+ *   /^#[0-9a-fA-F]{6}$/; metalness, roughness in [0, 1]
  */
 export interface Material {
   readonly name: string;
   density: number;
+  /** Aerospace material record (08 MAT M2): designation, specs, licence, export marking, library origin. Absent on a legacy material. */
+  readonly record?: MaterialRecordInfo;
   color: string;
   metalness: number;
   roughness: number;

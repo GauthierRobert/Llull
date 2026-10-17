@@ -20,6 +20,7 @@ import {
   TOOLSETS,
   buildExchangeToolDefinitions,
   buildFeaToolDefinitions,
+  buildLibraryToolDefinitions,
   isPromptEnabled,
   isToolEnabled,
   type ToolSearchResult,
@@ -452,6 +453,7 @@ const allToolNames = [
   ...listCommands().map((command) => command.name),
   ...buildExchangeToolDefinitions().map((tool) => tool.name),
   ...buildFeaToolDefinitions().map((tool) => tool.name),
+  ...buildLibraryToolDefinitions().map((tool) => tool.name),
   ...buildDiscoveryToolDefinitions().map((tool) => tool.name),
 ];
 

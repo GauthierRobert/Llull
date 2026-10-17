@@ -79,6 +79,13 @@ export function resolveDensity(
 ): DensityResolution | null {
   const material = materialId === undefined ? undefined : doc.materials[materialId];
   if (material !== undefined && materialId !== undefined) {
+    if (material.record?.unresolved !== undefined)
+      return {
+        available: false,
+        code: 'MAT_LIBRARY_UNRESOLVED',
+        reason: `material '${materialId}' comes from private library '${material.record.libraryRef?.libraryId ?? '?'}' whose values are not on this machine (${material.record.unresolved.reason})`,
+        remediation: 'register the library file (register_material_library), then run resolve_material_libraries',
+      };
     if (material.propertyModels?.some((model) => model.property === 'density') === true) {
       const record = { name: materialId, propertyModels: material.propertyModels };
       const model = resolvePropertyModel(record, { property: 'density' });
@@ -107,7 +114,10 @@ export function resolveDensity(
         available: false,
         code: 'MAT_DENSITY_INVALID',
         reason: `material '${materialId}' has density ${String(material.density)}`,
-        remediation: 'redefine the material with create_material (density must be > 0)',
+        remediation:
+          material.record !== undefined
+            ? 'give the record a density with set_material_property (property density)'
+            : 'redefine the material with create_material (density must be > 0)',
       };
     return resolved(
       doc,

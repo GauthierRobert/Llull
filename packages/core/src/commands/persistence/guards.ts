@@ -1,6 +1,7 @@
 import { storedMaterialModelsProblem } from '../document/materialModelStored';
 import { storedModelsProblem } from '../document/propertyModelSchema';
 import { formHash } from '../document/propertyModels';
+import { recordProblem } from './materialRecordValidation';
 import {
   type Layer,
   type CameraState,
@@ -322,7 +323,14 @@ const KIND_PROBLEMS: Readonly<Record<EntityKind, (v: Record<string, unknown>) =>
 export function validateMaterialValue(name: string, v: unknown): string | null {
   if (!isRecord(v)) return `material '${name}' is not an object`;
   const { density, color, metalness, roughness } = v;
-  if (!isPositiveNumber(density)) return `material '${name}': density must be finite and > 0, got ${String(density)}`;
+  const record = v['record'];
+  if (record !== undefined) {
+    const recordIssue = recordProblem(name, record);
+    if (recordIssue !== null) return recordIssue;
+  }
+  // a record may have no density value yet (0); a legacy material always has one
+  if (!isPositiveNumber(density) && !(record !== undefined && density === 0))
+    return `material '${name}': density must be finite and > 0, got ${String(density)}`;
   if (!isHexColor(color)) return `material '${name}': color '${String(color)}' is not a valid hex color (#rrggbb)`;
   const isUnit = (x: unknown): boolean => isFiniteNumber(x) && x >= 0 && x <= 1;
   if (!isUnit(metalness)) return `material '${name}': metalness must be a finite number in [0, 1], got ${String(metalness)}`;

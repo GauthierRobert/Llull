@@ -12,6 +12,7 @@ import { isReservedKey } from '../../lib/reservedKey';
 import { isHexColor } from '../../lib/isHexColor';
 import { changed, commandError, noop, report } from '../noop';
 import { convertValue, isUnitFailure } from '../../lib/quantity';
+import { refuseMaterial } from '../materials/refusal';
 
 /** First problem of the finish options, or null. */
 function finishProblem(
@@ -41,6 +42,7 @@ export const createMaterial = defineCommand({
     'A material carries a physical density (used by mass_properties for mass = volume × density) ' +
     'and PBR visual properties (color, metalness, roughness) used by the 3D viewport renderer. ' +
     'If a material with the same name already exists it is replaced (its property models are kept). ' +
+    'Records made with define_material_record keep their record; records imported from a library are read-only (MAT_RECORD_READONLY). ' +
     'Density units match the document unit system: for a mm document, density is in g/mm³ ' +
     '(steel ≈ 0.00785, aluminium ≈ 0.0027, PLA ≈ 0.00124). Assign the material to entities with assign_material.',
   params: z.object({
@@ -155,6 +157,14 @@ export const createMaterial = defineCommand({
             ...(clearcoat !== undefined ? { clearcoat } : {}),
           };
     const previous = Object.hasOwn(doc.materials, name) ? doc.materials[name] : undefined;
+    if (previous?.record?.libraryRef !== undefined)
+      return refuseMaterial(
+        doc,
+        'create_material',
+        'MAT_RECORD_READONLY',
+        `'${name}' is a record of library '${previous.record.libraryRef.libraryId}'`,
+        { ids: [name], path: 'name' },
+      );
     const models = previous?.propertyModels;
     const material: Material = {
       name,
@@ -164,6 +174,7 @@ export const createMaterial = defineCommand({
       roughness,
       ...(finish !== undefined ? { finish } : {}),
       ...(models !== undefined ? { propertyModels: models } : {}),
+      ...(previous?.record !== undefined ? { record: previous.record } : {}),
       ...(previous?.materialModels !== undefined ? { materialModels: previous.materialModels } : {}),
       ...(previous?.constitutiveSets !== undefined ? { constitutiveSets: previous.constitutiveSets } : {}),
       ...(previous?.defaultConstitutiveSet !== undefined ? { defaultConstitutiveSet: previous.defaultConstitutiveSet } : {}),
@@ -189,6 +200,8 @@ export const assignMaterial = defineCommand({
     'The material must already exist in the document (create it first with create_material). ' +
     "Once assigned, mass_properties uses the material's density for that entity " +
     '(mass = volume × material.density), overriding the caller-supplied density param. ' +
+    'The material may be a record (define_material_record or a library record: use its id); an unresolved private record can be assigned, ' +
+    'but mass_properties answers MAT_LIBRARY_UNRESOLVED until resolve_material_libraries. ' +
     'Multiple entity ids can be assigned in a single call; unknown ids are skipped with a note. ' +
     'Assigning a material is a replayable document edit recorded in featureHistory.',
   params: z.object({
