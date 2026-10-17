@@ -24,6 +24,7 @@ import {
   suggestToolNames,
   isToolEnabled,
   toolsetOf,
+  redactLicensedOutcome,
 } from '@mcp/index';
 import { getCommand, listCommands } from '@core/commands/registry';
 import type { ToolsetName } from '@mcp/index';
@@ -49,6 +50,8 @@ function unknownToolResult(name: string, enabledToolsets: ReadonlySet<ToolsetNam
 interface McpCaller {
   readonly actor: Actor;
   readonly role: Role | null;
+  /** Not a direct loopback peer: licensed material values are redacted from its answers (TR-MAT-32). */
+  readonly remote?: boolean;
 }
 
 /** What a viewer may call. */
@@ -109,7 +112,8 @@ export function buildMcpServer(
     const exchangeResult = await applyLiveExchangeToolCall(name, args, exchange, caller.actor);
     if (exchangeResult !== null) return exchangeResult;
     if (getCommand(name) === undefined) return unknownToolResult(name, enabledToolsets);
-    const busResult = applyCommand(name, args ?? {}, undefined, caller.actor);
+    const applied = applyCommand(name, args ?? {}, undefined, caller.actor);
+    const busResult = caller.remote === true ? redactLicensedOutcome(getLiveDoc(), name, args, applied) : applied;
     // Vision loop: the PNG replaces the multi-KB SVG in the text/structured content.
     const imageBlock = buildImageBlock(busResult.data);
     const shaped = shapeToolCallContent(imageBlock !== null ? { ...busResult, data: stripSvgFromData(busResult.data) } : busResult);

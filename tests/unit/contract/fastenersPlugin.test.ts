@@ -18,6 +18,7 @@ const NAMES = [
   'insert_fastener_row',
   'check_fastener_layout',
   'delete_fastener_stack',
+  'joint_capacity',
 ];
 
 describe('fasteners toolset', () => {

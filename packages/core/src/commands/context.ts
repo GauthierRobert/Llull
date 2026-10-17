@@ -8,6 +8,7 @@
 
 import { getGeometryKernel } from '../geometry/kernel';
 import { getPhysicsEngine } from '../dynamics/physicsEngine';
+import { getMaterialLibraryProvider } from './libraryPort';
 import { type ReplayCache, createReplayCache } from './history/replayCache';
 import { counterIdSource, withIdSource } from '../lib/id';
 import type { ExecutionContext } from './types';
@@ -37,6 +38,7 @@ export function defaultContext(): ExecutionContext {
   return {
     kernel,
     physics: getPhysicsEngine(),
+    libraries: getMaterialLibraryProvider(),
     ids: counterIdSource,
     registry: getCommand,
     projectDepth: 0,
