@@ -42,6 +42,9 @@ export const FTR_CODES = [
   'FTR_WAIVER_NOT_APPROVED',
   'FTR_NEEDS_EXACT_KERNEL',
   'FTR_RECOGNITION_AMBIGUOUS',
+  'FTR_DRILL_POINT_ANGLE_OUT_OF_RANGE',
+  'FTR_FEATURE_BUILD_FAILED',
+  'FTR_POCKET_CORNER_TOO_LARGE',
 ] as const;
 
 export type FtrCode = (typeof FTR_CODES)[number];
@@ -102,7 +105,10 @@ export interface FtrCheckData extends FtrResultMeta {
   readonly status: 'pass' | 'warn' | 'fail';
   readonly findings: readonly FtrFinding[];
   readonly rulesApplied: readonly string[];
-  readonly rulesSkipped: ReadonlyArray<{ readonly rule: string; readonly code: 'FTR_RULE_THRESHOLD_MISSING' | 'FTR_BEND_RADIUS_NO_TABLE_ROW' }>;
+  readonly rulesSkipped: ReadonlyArray<{
+    readonly rule: string;
+    readonly code: 'FTR_RULE_THRESHOLD_MISSING' | 'FTR_BEND_RADIUS_NO_TABLE_ROW';
+  }>;
 }
 
 /** Refusal payload (`CommandResult.error` / `data.error`) of an FTR command. */

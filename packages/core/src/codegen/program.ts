@@ -79,7 +79,9 @@ export type Feature =
   | (FeatureBase & { readonly op: 'shell'; readonly thickness: Term; readonly mesh?: readonly number[] })
   | (FeatureBase & { readonly op: 'translate'; readonly delta: Term3 })
   | (FeatureBase & { readonly op: 'remove' })
-  | (FeatureBase & { readonly op: 'label'; readonly name: string });
+  | (FeatureBase & { readonly op: 'label'; readonly name: string })
+  /** Comment line (no geometry): the idiomatic library call or attribute a lowered feature stands for (07 FTR holes, threads). */
+  | (FeatureBase & { readonly op: 'note'; readonly text: string });
 
 export interface ProgramParameter {
   /** llull parameter name (document key). */

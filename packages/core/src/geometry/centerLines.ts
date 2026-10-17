@@ -14,6 +14,7 @@ import type { Bounds } from './bounds';
 import { rotatedEntityBounds } from './rotatedBounds';
 import { revolutionAxisIndex } from './revolution';
 import { MAX_RECIPE_DEPTH, recipeOf } from './shapeRecipe';
+import { lowerFeature } from './featureLowering';
 import { type ViewFrame } from './viewProjection';
 
 /** A round feature: `radius` about the line origin + t·direction, t in [from, to]. */
@@ -34,6 +35,8 @@ const MAX_DEPTH = 8;
 const OVERSHOOT = 0.25;
 const END_ON = 0.999;
 const SIDE_ON = 0.02;
+/** Through-all depth given to a feature tool whose axis is later clipped to the part (`axisWithin`). */
+const UNBOUNDED_REACH = 1e9;
 
 function axisOf(entity: Entity, place: Placement, scale: number): RoundAxis | null {
   const world = (local: Vec3): Vec3 => place(entityLocalToWorld(entity, local));
@@ -88,6 +91,13 @@ function recipeAxes(recipe: ShapeRecipe, place: Placement, scale: number, depth:
       return recipeAxes(recipe.source, (point) => place(scale3(point, recipe.factor)), scale * recipe.factor, depth + 1);
     case 'brep':
       return [];
+    case 'feature': {
+      const tool = lowerFeature(recipe, UNBOUNDED_REACH)?.tool;
+      return [
+        ...recipeAxes(recipe.source, place, scale, depth + 1),
+        ...(tool === undefined ? [] : recipeAxes(tool, place, scale, depth + 1)),
+      ];
+    }
   }
 }
 

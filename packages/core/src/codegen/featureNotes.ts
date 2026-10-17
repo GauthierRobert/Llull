@@ -1,0 +1,37 @@
+/** Comment lines that accompany a lowered hole / pocket in generated code: the CadQuery idiom it stands for, drill point, thread (07 FTR §6). */
+
+import type { HoleSpec } from '../model/features';
+import type { FeatureRecipe } from '../geometry/featureLowering';
+import { formatNumber } from './format';
+
+const numbers = (values: readonly number[]): string => values.map(formatNumber).join(', ');
+
+/** The CadQuery workplane call of one hole kind (`depth` omitted = through). */
+function cadqueryCall(hole: HoleSpec, depth: string): string {
+  if (hole.kind === 'countersink') return `.cskHole(${numbers([hole.diameter, hole.cskDiameter ?? 0, hole.cskAngle ?? 0])}${depth})`;
+  if (hole.kind === 'counterbore') return `.cboreHole(${numbers([hole.diameter, hole.cboreDiameter ?? 0, hole.cboreDepth ?? 0])}${depth})`;
+  return `.hole(${formatNumber(hole.diameter)}${depth})`;
+}
+
+/** Notes for a feature node, emitted before the executable boolean lowering. */
+export function featureNotes(node: FeatureRecipe): string[] {
+  const normal = `[${numbers(node.frame.normal)}]`;
+  if (node.feature === 'pocket') {
+    const { cornerRadius, floorFillet, depth, outline } = node.pocket;
+    const size = depth === 'through' ? 'through' : `depth ${formatNumber(depth)}`;
+    return [
+      `add_pocket: ${outline.length}-vertex outline, ${size}, cornerRadius ${formatNumber(cornerRadius)}, floorFillet ${formatNumber(floorFillet)}; ` +
+        `face normal ${normal}; extruded cut below`,
+    ];
+  }
+  const { hole, extent, points } = node;
+  const depth = extent.kind === 'blind' ? `, ${formatNumber(extent.depth)}` : '';
+  const where = points.map(([u, v]) => `(${numbers([u, v])})`).join(', ');
+  const lines = [
+    `add_hole: CadQuery .workplane().pushPoints([${where}])${cadqueryCall(hole, depth)} on the face with normal ${normal}; revolved cut below`,
+  ];
+  if (extent.kind === 'blind' && extent.drillPointAngle !== undefined)
+    lines.push(`drill point ${formatNumber(extent.drillPointAngle)} deg: an extra cone cut, included in the cut below`);
+  if (hole.thread !== undefined) lines.push(`thread ${hole.thread.designation} (cosmetic, no geometry)`);
+  return lines;
+}

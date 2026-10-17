@@ -14,6 +14,8 @@ import type { BooleanOp, Entity, MeshData, ShapeRecipe, Vec3 } from '../model/ty
 import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, ShapeTopology } from './kernel';
 import type { ExactMassProperties, FaceQueryPort, ImportShapesOptions, ImportShapesResult, KernelInfo } from './kernelPorts';
 import { recipeKey } from './shapeRecipe';
+import { lowerFeature, needsReach, throughReach } from './featureLowering';
+import { floorEdgeIndices } from './featureFillet';
 import { errorMessage } from '../lib/errorMessage';
 import { sha256Hex } from '../lib/sha256';
 
@@ -144,6 +146,24 @@ function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe
     }
     case 'brep':
       return ops.brep?.(recipe.blob) ?? null;
+    case 'feature': {
+      const source = child(recipe.source);
+      const mesh = source !== null && needsReach(recipe) ? ops.tessellate(source) : null;
+      if (source === null || (needsReach(recipe) && mesh === null)) return null;
+      const lowered = lowerFeature(recipe, mesh === null ? 0 : throughReach(mesh, recipe.frame));
+      const tool = lowered === null ? null : child(lowered.tool);
+      if (lowered === null || tool === null) return null;
+      const cut = ops.boolean('subtract', source, tool);
+      const fillet = recipe.feature === 'pocket' ? recipe.pocket.floorFillet : 0;
+      if (cut === null || fillet <= 0 || lowered.pocket === undefined) return cut;
+      try {
+        const topology = ops.topology(cut);
+        const edges = topology === null ? [] : floorEdgeIndices(topology, lowered.pocket, recipe.frame);
+        return edges.length === 0 ? null : ops.fillet(cut, edges, fillet);
+      } finally {
+        ops.release(cut);
+      }
+    }
   }
 }
 

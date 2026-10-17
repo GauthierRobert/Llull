@@ -5,7 +5,7 @@
  */
 
 import type { Feature, FeatureProgram } from './program';
-import { formatNumber, provenance, quote } from './format';
+import { commentText, formatNumber, provenance, quote } from './format';
 import { modifierLine, parametersAndModel, placementKwargs, pythonTuple, shapeCallOpen } from './pythonCalls';
 import { pythonRuntime, type PythonBackend } from './pythonRuntime';
 
@@ -31,6 +31,8 @@ function featureLine(feature: Feature): string {
       return `remove(${v})`;
     case 'label':
       return `label(${v}, ${quote(feature.name)})`;
+    case 'note':
+      return `# ${commentText(feature.text)}`;
   }
 }
 
