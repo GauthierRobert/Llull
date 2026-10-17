@@ -158,7 +158,9 @@ function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe
       const reach = mesh === null ? 0 : throughReach(mesh, recipe.frame);
       const lowered = lowerFeature(recipe, reach);
       if (lowered === null) return null;
+      const epochBefore = ops.failureEpoch?.() ?? 0;
       const native = ops.feature?.(source, recipe, reach) ?? null;
+      if (native === null && (ops.failureEpoch?.() ?? 0) !== epochBefore) return null;
       const tool = native === null ? child(lowered.tool) : null;
       if (native === null && tool === null) return null;
       const cut = native ?? (tool === null ? null : ops.boolean(lowered.mode, source, tool));
