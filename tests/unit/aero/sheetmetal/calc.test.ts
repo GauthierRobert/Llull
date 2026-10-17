@@ -28,7 +28,7 @@ interface CalcData {
 
 const doc = createEmptyDocument();
 
-describe('sheet_metal_calc (VC-FTR-01, 02, 04, 05, 35)', () => {
+describe('sheet_metal_calc (VC-FTR-01, VC-FTR-02, VC-FTR-04, VC-FTR-05, VC-FTR-35)', () => {
   it.each(expected.bends)('$id matches the reference to 1e-6 mm / 1e-7 in', (row) => {
     const result = data<CalcData>(doc, 'sheet_metal_calc', {
       units: row.units,
@@ -47,6 +47,28 @@ describe('sheet_metal_calc (VC-FTR-01, 02, 04, 05, 35)', () => {
     expect(Math.abs(result.bd - row.BD)).toBeLessThan(tolerance);
     expect(Math.abs(result.kChart - row.K_chart_tan_half)).toBeLessThan(1e-9);
   });
+
+  it.each(expected.bends.filter((row) => ['FP-08', 'FP-09', 'FP-10', 'FP-11'].includes(row.id)))(
+    '$id: the inch values hold in an inch document and the mm document gives them x 25.4 to 1e-9 relative (VC-FTR-35)',
+    (row) => {
+      const inchDocument = apply(createEmptyDocument(), 'set_units', { units: 'in' });
+      const call = (units: 'in' | 'mm', scale: number): CalcData =>
+        data<CalcData>(inchDocument, 'sheet_metal_calc', {
+          units,
+          thickness: row.T * scale,
+          insideRadius: row.R * scale,
+          angle: row.theta_deg,
+          kFactor: row.K_ansi,
+          mode: 'k_factor',
+        });
+      const inch = call('in', 1);
+      const mm = call('mm', 25.4);
+      expect([inch.lengthUnit, mm.lengthUnit]).toEqual(['in', 'mm']);
+      expect(Math.abs(inch.ba - row.BA)).toBeLessThan(1e-7);
+      expect(Math.abs(inch.ossb - row.OSSB)).toBeLessThan(1e-7);
+      for (const key of ['ba', 'ossb', 'issb', 'bd'] as const) expect(Math.abs(mm[key] / (inch[key] * 25.4) - 1)).toBeLessThan(1e-9);
+    },
+  );
 
   it('reproduces the AC 43.13-1B setbacks 0.130 / 0.758 in and K-chart values (VC-FTR-02)', () => {
     const at = (angle: number): CalcData =>

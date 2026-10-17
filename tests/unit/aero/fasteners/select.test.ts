@@ -155,6 +155,9 @@ describe('select_fastener Hi-Lok pins (VC-MAT-08)', () => {
   });
 });
 
+/** The pack lists rivet dimensions rounded to 5 decimals (inch): half a unit in the last place. */
+const PACK_ROUNDING = 5e-6 + 1e-12;
+
 describe('select_fastener rivets (VC-MAT-09)', () => {
   it.each(expectedResults.rivetSelection)('$id', ({ input, expected }) => {
     const result = execute(doc, 'select_fastener', {
@@ -165,12 +168,16 @@ describe('select_fastener rivets (VC-MAT-09)', () => {
     });
     const data = dataOf(result);
     expect(data['partNumber']).toBe(expected['partNumber']);
-    expect(data['rawLengthIn']).toBeCloseTo(expected['rawLength_in'] as number, 4);
-    expect(data['lengthIn']).toBeCloseTo(expected['length_in'] as number, 4);
-    expect(data['shopHeadMinDiameterIn']).toBeCloseTo(expected['shopHeadMinDiameter_in'] as number, 4);
-    expect(data['shopHeadMinHeightIn']).toBeCloseTo(expected['shopHeadMinHeight_in'] as number, 4);
-    expect(data['minEdgeDistanceIn']).toBeCloseTo(expected['minEdgeDistance_in'] as number, 4);
-    expect(data['minPitchIn']).toBeCloseTo(expected['minPitch_in'] as number, 4);
+    expect(Math.abs((data['rawLengthIn'] as number) - (expected['rawLength_in'] as number))).toBeLessThanOrEqual(PACK_ROUNDING);
+    expect(Math.abs((data['lengthIn'] as number) - (expected['length_in'] as number))).toBeLessThanOrEqual(PACK_ROUNDING);
+    expect(Math.abs((data['shopHeadMinDiameterIn'] as number) - (expected['shopHeadMinDiameter_in'] as number))).toBeLessThanOrEqual(
+      PACK_ROUNDING,
+    );
+    expect(Math.abs((data['shopHeadMinHeightIn'] as number) - (expected['shopHeadMinHeight_in'] as number))).toBeLessThanOrEqual(
+      PACK_ROUNDING,
+    );
+    expect(Math.abs((data['minEdgeDistanceIn'] as number) - (expected['minEdgeDistance_in'] as number))).toBeLessThanOrEqual(PACK_ROUNDING);
+    expect(Math.abs((data['minPitchIn'] as number) - (expected['minPitch_in'] as number))).toBeLessThanOrEqual(PACK_ROUNDING);
   });
 
   it('rounds to the nearest step when asked and names a defaulted code choice', () => {

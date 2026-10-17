@@ -132,7 +132,7 @@ describe('compute_margins', () => {
     expect(margins(bar, { allowable: { value: 5, unit: 'mm' } }).error?.code).toBe('FEA_MATERIAL_NO_ALLOWABLE');
   });
 
-  it('propagates unverified flags of the allowable (typical basis) and reads a component criterion', () => {
+  it('propagates unverified flags of the allowable (typical basis, VC-MAT-23 / VC-FEA-64) and reads a component criterion', () => {
     const bar = marginBar({ ftuExtra: { basis: 'typical' } });
     const [ultimate, yielded] = dataOf(margins(bar)).rows;
     expect(ultimate?.unverified).toBe(true);

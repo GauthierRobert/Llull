@@ -1,6 +1,6 @@
 /**
  * VC-MAT-17 (FR-MAT-15/16): 10^4 instances of 3 part numbers. bill_of_materials and mass_properties run in about a second or less on a
- * mid laptop (TECHNICAL_SPEC §8); this test allows CI noise (x3) and the document grows <= 1 KB per instance. The 10^4 instances are
+ * mid laptop (TECHNICAL_SPEC §8); the budget is the pack's 1 s (best of three runs) and the document grows <= 1 KB per instance. The 10^4 instances are
  * written straight into the document: the budget is for the queries and the footprint, not for 10^4 inserts.
  */
 import { describe, expect, it } from 'vitest';
@@ -11,8 +11,9 @@ import { type CadDocument, createEmptyDocument, type Entity } from '@core/model/
 
 const COUNT = 10_000;
 const PARTS = ['NAS6204-10', 'MS21042L4', 'NAS1149F0463P'] as const;
-const CI_FACTOR = 3;
-const BUDGET_MS = 1000 * CI_FACTOR;
+/** The pack budget (VC-MAT-17): BOM <= 1 s and mass <= 1 s. The best of three runs absorbs scheduler noise, not a looser budget. */
+const BUDGET_MS = 1000;
+const RUNS = 3;
 const BYTES_PER_INSTANCE = 1024;
 
 function run(doc: CadDocument, name: string, params: Record<string, unknown>): { doc: CadDocument; ids: string[] } {
@@ -62,9 +63,14 @@ const stackRecord = (id: string, k: number): FastenerStack => ({
 });
 
 const timed = <T>(fn: () => T): { value: T; ms: number } => {
-  const start = performance.now();
-  const value = fn();
-  return { value, ms: performance.now() - start };
+  let best = Number.POSITIVE_INFINITY;
+  let value: T | undefined;
+  for (let run = 0; run < RUNS; run++) {
+    const start = performance.now();
+    value = fn();
+    best = Math.min(best, performance.now() - start);
+  }
+  return { value: value as T, ms: best };
 };
 
 describe('VC-MAT-17: 10^4 instances of 3 part numbers', () => {

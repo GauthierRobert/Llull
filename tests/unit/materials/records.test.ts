@@ -379,6 +379,26 @@ describe('get_material and convert_quantity', () => {
     expect(deserializeDocument(serializeDocument(doc)).materials['steel']).toEqual(doc.materials['steel']);
   });
 
+  it('VC-MAT-01: a v2 file with legacy steel 0.00785 on a 10 mm cube loads to 7.85 g (1e-12), basis unspecified, and re-saves as v3 with the material intact', () => {
+    let doc = step(mmDocument(), 'create_material', { name: 'steel', density: 0.00785, color: '#aaaaaa', metalness: 1, roughness: 0.4 });
+    const added = call(doc, 'add_box', { size: [10, 10, 10] });
+    const id = added.affected[0] ?? '';
+    doc = step(added.document, 'assign_material', { materialName: 'steel', entityIds: [id] });
+    const v2 = JSON.stringify({ ...(JSON.parse(serializeDocument(doc)) as object), version: 2 });
+    expect((JSON.parse(v2) as { version: number }).version).toBe(2);
+    const loaded = deserializeDocument(v2);
+    const mass = dataOf(call(loaded, 'mass_properties', { entityId: id }));
+    expect(Math.abs((mass['massG'] as number) / 7.85 - 1)).toBeLessThan(1e-12);
+    expect(mass).toMatchObject({ unverified: true, unverifiedReasons: ['provenance legacy'] });
+    expect(dataOf(call(loaded, 'get_material', { material: 'steel' }))).toMatchObject({
+      legacy: true,
+      density: { basis: 'unspecified', provenance: 'legacy' },
+    });
+    const resaved = JSON.parse(serializeDocument(loaded)) as { version: number; document: CadDocument };
+    expect(resaved.version).toBe(3);
+    expect(resaved.document.materials['steel']).toEqual(doc.materials['steel']);
+  });
+
   it('lists the record, its values and the marking; refuses an unknown material with the known ids', () => {
     let doc = step(
       mmDocument(),

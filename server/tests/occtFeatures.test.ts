@@ -200,6 +200,8 @@ describe('add_hole / add_pocket on the live OCC kernel', () => {
     expect(rel(volumeOf(kernels.occt, regenerated.document, id), 72000 - removedVolume(12))).toBeLessThan(1e-9);
     const table = execute(regenerated.document, 'hole_table', { id }, ctxOf(kernels.occt)).data as HoleTableData;
     expect(table.rows.filter((row) => row.through)).toHaveLength(6);
+    expect(table.rows).toHaveLength(7); // 4 countersinks + 2 counterbores + 1 blind: none lost
+    for (const row of table.rows) expect(row.face).toEqual([0, 0, 1]); // every hole stays on the (moved) top face
   }, 180_000);
 
   it('rejects a face that is not planar and a point on a face the pick missed (exact topology)', () => {
@@ -238,7 +240,10 @@ describe('add_hole / add_pocket on the live OCC kernel', () => {
 });
 
 interface ExpectedPlate {
-  cases: Array<{ vc: string; expected: { countersink: { centres_xy: number[][] } } }>;
+  cases: Array<{
+    vc: string;
+    expected: { countersink: { centres_xy: number[][] }; counterbore: { centres_xy: number[][] }; blind: { centre_xy: number[] } };
+  }>;
 }
 
 describe('add_hole performance budget (07 TR §8)', () => {
@@ -343,6 +348,16 @@ describe('recognize_features on the live OCC kernel', () => {
     const ys = table.rows.map((row) => row.y);
     expect([...ys].sort((a, b) => a - b)).toEqual(ys);
     expect(table.rows.map((row) => row.label)).toEqual(['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'H7']);
+    // coordinates from the top-left datum of the top face (0, 60): x = u, y = 60 - v, sorted by y then x (pack expected_feature_recognition.json)
+    const packed = (JSON.parse(readFileSync(path.join(PACK, 'data/expected_feature_recognition.json'), 'utf8')) as ExpectedPlate).cases[0]!
+      .expected;
+    const centres: number[][] = [...packed.countersink.centres_xy, ...packed.counterbore.centres_xy, packed.blind.centre_xy];
+    const datum = centres.map(([u, v]) => [u as number, 60 - (v as number)]).sort((a, b) => a[1]! - b[1]! || a[0]! - b[0]!);
+    expect(datum).toHaveLength(7);
+    table.rows.forEach((row, index) => {
+      expect(Math.abs(row.x - (datum[index]?.[0] as number))).toBeLessThan(1e-4);
+      expect(Math.abs(row.y - (datum[index]?.[1] as number))).toBeLessThan(1e-4);
+    });
     const check = execute(imported.document, 'check_machining', { id }, ctxOf(kernels.occt)).data as FtrCheckData;
     expect(check.findings.some((finding) => finding.code === 'FTR_CSK_KNIFE_EDGE')).toBe(false);
     expect(check.rulesSkipped.map((entry) => entry.rule)).toContain('minLand');

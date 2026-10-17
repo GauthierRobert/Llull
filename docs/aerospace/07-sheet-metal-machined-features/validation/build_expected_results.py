@@ -38,6 +38,19 @@ TP = load('expected_test_parts.json')['parts']
 REC = {c['vc']: c for c in load('expected_feature_recognition.json')['cases']}
 
 
+def joggle_plan(j):
+    """Plan of the joggle strip: a 40 x 30 strip with a joggle across x = 20 (add_joggle takes offset h and angle phi)."""
+    return [
+        {'command': 'set_units', 'params': {'units': 'mm'}},
+        {'command': 'create_sheet_metal_rule', 'params': {'name': 'strip', 'material': '2024', 'thickness': j['T'], 'insideRadius': j['R'],
+                                                           'kFactor': j['K_ansi'], 'kFactorStandard': 'ansi'}},
+        {'command': 'draw_rectangle', 'params': {'width': 40, 'height': 30, 'position': [0, 0, 0]}, 'as': 'outline'},
+        {'command': 'add_sheet_metal_base', 'params': {'profileId': '$outline', 'rule': 'strip', 'side': 'up'}, 'as': 'sm'},
+        {'command': 'add_joggle', 'params': {'id': '$sm', 'face': {'near': [10, 15, 0]}, 'line': [[20, 30], [20, 0]], 'offset': j['offset_h'],
+                                              'angle': j['phi_deg'], 'side': 'up'}},
+    ]
+
+
 def approx(path, value, tol, kind='abs', unit=None):
     a = {'path': path, 'op': 'approx', 'value': value, 'tol': tol, 'tolKind': kind}
     if unit:
@@ -147,22 +160,23 @@ cases.append({
     'source': 'FUNCTIONAL_SPEC FR-FTR-37',
 })
 
-# VC-FTR-11 / 11b: joggle (V1; plan written in M5).
-j = JG['JG-01']
-cases.append({
-    'vc': 'VC-FTR-11', 'case': 'JG-01', 'proves': ['FR-FTR-09'], 'category': 'b', 'plan_file': 'TBD (M5): joggle strip plan matching data/ftr_joggle_strip.step',
-    'cli': ['llull flat_pattern id=<alias:sm>'],
-    'assert': [approx('data.joggles[0].allowance', j['allowance'], 1e-6, unit='mm'), approx('data.joggles[0].run', j['run'], 1e-6, unit='mm'),
-               approx('data.joggles[0].inclinedStraight', j['inclined_straight'], 1e-6, unit='mm')],
-    'source': 'data/expected_flat_pattern.json JG-01',
-})
+# VC-FTR-11 / 11b: joggle JG-01..03 (JG-04 is the refusal case under VC-FTR-37).
+for jid in ('JG-01', 'JG-02', 'JG-03'):
+    j = JG[jid]
+    cases.append({
+        'vc': 'VC-FTR-11', 'case': jid, 'proves': ['FR-FTR-09'], 'category': 'b', 'plan': joggle_plan(j),
+        'cli': ['llull flat_pattern id=<alias:sm>'],
+        'assert': [approx('data.joggles[0].allowance', j['allowance'], 1e-6, unit='mm'), approx('data.joggles[0].run', j['run'], 1e-6, unit='mm'),
+                   approx('data.joggles[0].inclinedStraight', j['inclined_straight'], 1e-6, unit='mm')],
+        'source': 'data/expected_flat_pattern.json ' + jid,
+    })
 
 # VC-FTR-17 / 18 / 19 / 20: recognition (needs gap 01 import_step_exact).
 r17 = REC['VC-FTR-17']['expected']
 cases.append({
     'vc': 'VC-FTR-17', 'case': 'machined plate', 'proves': ['FR-FTR-24'], 'category': 'b',
     'cli': ['llull import_step_exact file=docs/aerospace/07-sheet-metal-machined-features/validation/data/ftr_machined_plate.step --kernel occt',
-            'llull find_entities kind=mesh', 'llull recognize_features id=<first:data.ids> --kernel occt'],
+            'llull find_entities kind=mesh', 'llull recognize_features id=<first:data.matches[0].id> --kernel occt'],
     'assert': [eq('data.counts.holes', r17['holes']), eq('data.counts.countersink', r17['by_subtype']['countersink']),
                eq('data.counts.counterbore', r17['by_subtype']['counterbore']), eq('data.counts.blind', r17['by_subtype']['simple_blind']),
                eq('data.counts.pockets', r17['pockets']), {'path': 'data.unclassified', 'op': 'len', 'value': 0}],
@@ -172,7 +186,7 @@ r20 = REC['VC-FTR-20']['expected_features']['blind_drilled_holes_with_118deg_poi
 cases.append({
     'vc': 'VC-FTR-20', 'case': 'NIST CTC-01', 'proves': ['FR-FTR-24'], 'category': 'c',
     'cli': ['llull import_step_exact file=docs/aerospace/07-sheet-metal-machined-features/validation/data/nist_ctc_01_asme1_ap242.stp --kernel occt',
-            'llull find_entities kind=mesh', 'llull recognize_features id=<first:data.ids> --kernel occt'],
+            'llull find_entities kind=mesh', 'llull recognize_features id=<first:data.matches[0].id> --kernel occt'],
     'assert': [{'path': 'data.holes[?drillPointAngleDeg==118]', 'op': 'len', 'value': r20['count']},
                {'path': 'data.holes[?drillPointAngleDeg==118].diameter', 'op': 'eq', 'value': [r20['diameter']] * r20['count']}],
     'source': 'data/expected_feature_recognition.json VC-FTR-20 (measured baseline)',
@@ -242,7 +256,7 @@ for pid in ('PK-01', 'PK-02'):
             {'command': 'add_box', 'params': {'size': [60, 40, 10], 'position': [0, 0, 0], 'anchor': 'min'}, 'as': 'plate'},
             {'command': 'add_pocket', 'as': 'part', 'params': {
                 'target': '$plate', 'face': {'near': [30, 20, 10]},
-                'outline': {'kind': 'rounded_rectangle', 'center': [30, 20], 'size': [p['W'], p['L']], 'cornerRadius': p['rc']},
+                'outline': {'kind': 'rectangle', 'center': [30, 20], 'size': [p['W'], p['L']]}, 'pointsFrame': 'world_xy', 'cornerRadius': p['rc'],
                 'depth': p['D'], 'floorFillet': p['rf']}}]
     cases.append({
         'vc': 'VC-FTR-27', 'case': pid, 'proves': ['FR-FTR-21'], 'category': 'b', 'plan': plan, 'flags': ['--kernel', 'occt'],
@@ -259,22 +273,22 @@ cases.append({
         {'id': 'PK-03', 'plan': [{'command': 'set_units', 'params': {'units': 'mm'}},
                                   {'command': 'add_box', 'params': {'size': [60, 40, 10], 'anchor': 'min'}, 'as': 'plate'},
                                   {'command': 'add_pocket', 'params': {'target': '$plate', 'face': {'near': [30, 20, 10]},
-                                   'outline': {'kind': 'rounded_rectangle', 'center': [30, 20], 'size': [pk3['W'], pk3['L']], 'cornerRadius': pk3['rc']},
-                                   'depth': pk3['D'], 'floorFillet': pk3['rf']}}],
+                                   'outline': {'kind': 'rectangle', 'center': [30, 20], 'size': [pk3['W'], pk3['L']]}, 'pointsFrame': 'world_xy',
+                                   'cornerRadius': pk3['rc'], 'depth': pk3['D'], 'floorFillet': pk3['rf']}}],
          'assert': [exit_code(1), eq('data.steps[2].error.code', 'FTR_POCKET_FILLET_GT_CORNER'), contains('data.steps[2].error.paths', 'floorFillet'),
                     {'path': 'data.steps[2].error.remediation', 'op': 'exists'}]},
         {'id': 'K missing', 'cli': ['llull sheet_metal_calc units=mm thickness=1.6 insideRadius=4.8 angle=90'],
-         'assert': [exit_code(1), eq('data.error.code', 'FTR_K_FACTOR_MISSING'), contains('data.error.paths', 'kFactor')]},
+         'assert': [exit_code(1), eq('error.code', 'FTR_K_FACTOR_MISSING'), contains('error.paths', 'kFactor')]},
         {'id': 'angle 0', 'cli': ['llull sheet_metal_calc units=mm thickness=1.6 insideRadius=4.8 angle=0 kFactor=0.44'],
-         'assert': [exit_code(1), eq('data.error.code', 'FTR_BEND_ANGLE_OUT_OF_RANGE')]},
+         'assert': [exit_code(1), eq('error.code', 'FTR_BEND_ANGLE_OUT_OF_RANGE')]},
         {'id': 'row without source', 'cli': ["llull import_bend_radius_table 'rows=[{\"material\":\"TEST-ALLOY\",\"temper\":\"T0\",\"thickness\":0.8,\"minInsideRadius\":2.0,\"units\":\"mm\",\"bendAngle\":90,\"verification\":\"unverified\"}]'"],
-         'assert': [exit_code(1), eq('data.error.code', 'FTR_TABLE_ROW_NO_SOURCE'), contains('data.error.paths', 'rows[0].source')]},
+         'assert': [exit_code(1), eq('error.code', 'FTR_TABLE_ROW_NO_SOURCE'), contains('error.paths', 'rows[0].source')]},
         {'id': 'csk D <= d', 'plan': plate_plan(10.0) + [{'command': 'add_hole', 'params': {'target': '$plate', 'face': {'near': [20, 20, 10]},
                                    'points': [[20, 20]], 'pointsFrame': 'world_xy', 'hole': {'kind': 'countersink', 'diameter': 4.8, 'cskDiameter': 4.0, 'cskAngle': 100},
                                    'extent': {'kind': 'through_all'}}}],
          'assert': [exit_code(1), eq('data.steps[2].error.code', 'FTR_HOLE_DIAMETERS_INCONSISTENT')]},
-        {'id': 'JG-04 (V1)', 'note': 'add_joggle with JG-04 values on a T 1.6 part (plan in M5)',
-         'assert': [exit_code(1), eq('data.error.code', 'FTR_JOGGLE_OFFSET_TOO_SMALL')], 'source': 'data/expected_flat_pattern.json JG-04'},
+        {'id': 'JG-04 (V1)', 'note': 'add_joggle with JG-04 values on a T 1.6 part', 'plan': joggle_plan(JG['JG-04']),
+         'assert': [exit_code(1), eq('data.steps[4].error.code', 'FTR_JOGGLE_OFFSET_TOO_SMALL')], 'source': 'data/expected_flat_pattern.json JG-04'},
     ],
 })
 
@@ -318,7 +332,7 @@ cases.append({
     'vc': 'VC-FTR-39', 'case': 'named defaults', 'proves': ['FR-FTR-35'], 'af': ['AF-31'], 'category': 'b',
     'subcases': [
         {'id': 'K never defaulted', 'cli': ['llull sheet_metal_calc units=in thickness=0.064 insideRadius=0.25 angle=90'],
-         'assert': [exit_code(1), eq('data.error.code', 'FTR_K_FACTOR_MISSING')]},
+         'assert': [exit_code(1), eq('error.code', 'FTR_K_FACTOR_MISSING')]},
         {'id': 'drill point default named', 'plan': plate_plan(10.0) + [{'command': 'add_hole', 'as': 'part', 'params': {'target': '$plate',
          'face': {'near': [20, 20, 10]}, 'points': [[20, 20]], 'pointsFrame': 'world_xy', 'hole': {'kind': 'simple', 'diameter': 6.0},
          'extent': {'kind': 'blind', 'depth': 6.0}}}], 'flags': ['--kernel', 'occt'], 'cli': ['llull hole_table id=<alias:part> --kernel occt'],
@@ -354,7 +368,7 @@ cases.append({
 cases.append({
     'vc': 'VC-FTR-44', 'case': 'discoverable, units in schemas, data units', 'proves': ['FR-FTR-31', 'FR-FTR-32'], 'af': ['AF-01', 'AF-02', 'AF-04', 'AF-10'], 'category': 'b',
     'subcases': [
-        {'id': 'search', 'cli': ['llull search sheet metal flat pattern'], 'assert': [contains('data[*].name', 'flat_pattern'), contains('data[*].name', 'sheet_metal_calc')]},
+        {'id': 'search', 'cli': ['llull search sheet metal flat pattern'], 'assert': [contains('[*].name', 'flat_pattern'), contains('[*].name', 'sheet_metal_calc')]},
         {'id': 'describe', 'cli': ['llull describe sheet_metal_calc add_flange add_hole add_pocket check_machining'],
          'assert': [{'op': 'allNumericParamsHaveUnit', 'unitWords': ['document length unit', 'degrees', 'in `units`']}]},
         {'id': 'echo', 'cli': [calc_cli(FP['FP-02'])], 'assert': [eq('data.lengthUnit', 'mm'), eq('data.angleUnit', 'deg')]},
@@ -369,13 +383,13 @@ cases.append({
         {'id': 'dry run leaves the file unchanged', **bracket, 'cli': ['llull add_flange id=<alias:sm> \'edge={"near":[0,25,0]}\' angle=90 length=20 lengthReference=outside_mold_line position=material_outside --dry-run'],
          'assert': [{'op': 'docFileUnchanged'}]},
         {'id': 'render', **bracket, 'cli': ['llull flat_pattern id=<alias:sm> materialize=true', 'llull render_view view=top --save flat.png'],
-         'assert': [contains('saved', 'flat.png'), {'op': 'fileIsPng', 'value': 'flat.png'}]},
+         'assert': [contains('saved[*].path', 'flat.png'), {'op': 'fileIsPng', 'value': 'flat.png'}]},
     ],
 })
 cases.append({
     'vc': 'VC-FTR-46', 'case': 'progress and timeout on a large part', 'proves': ['FR-FTR-42'], 'af': ['AF-40', 'AF-41'], 'category': 'c',
     'cli': ['llull import_step_exact file=<ctc-dir>/nist_ctc_02_asme1_ap242.stp --kernel occt --progress --timeout 120',
-            'llull find_entities kind=mesh', 'llull recognize_features id=<first:data.ids> --kernel occt --progress --timeout 30'],
+            'llull find_entities kind=mesh', 'llull recognize_features id=<first:data.matches[0].id> --kernel occt --progress --timeout 30'],
     'assert': [exit_code(0), {'op': 'durationBelowMs', 'value': 5000, 'on': 2}],
     'source': 'TECHNICAL_SPEC §8 budget; CTC-02 sha256 pinned in README §4',
 })
@@ -386,9 +400,9 @@ out = {
     'conventions': {
         'doc': 'each case runs on a fresh temp --doc; plan / plan_file first (llull run … --json), then cli calls with --json',
         'alias': '<alias:NAME> = first id in affected of the plan step whose "as" is NAME',
-        'first': '<first:data.ids> = first id in data.ids of the previous call (find_entities)',
-        'paths': 'dot paths into the --json object; [*] maps over an array; [?field==value] filters',
-        'status': 'commands marked proposed in TECHNICAL_SPEC §4 make these cases red until implemented; VC-FTR-26 runs today',
+        'first': '<first:PATH> = the value at PATH (e.g. data.matches[0].id of find_entities) in the previous call\'s --json output',
+        'paths': 'dot paths into the --json object (a single command that fails reports error.code / error.paths / error.remediation beside data; a plan reports data.steps[i].error); [*] maps over an array; [?field==value] filters',
+        'status': 'all cases run against the built commands (server/tests/packReplay07.test.ts replays them through runCli); VC-FTR-46 needs the pinned CTC-02 (npm run quality:fetch)',
     },
     'cases': cases,
 }

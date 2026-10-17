@@ -19,8 +19,8 @@ beforeAll(async () => {
 
 const HOLE = { value: 0.19, unit: 'in' };
 const planStep = (
-  readValidation('plans/fastener_stack_nas6203_proposed.json') as Array<{ command: string; params: Record<string, unknown> }>
-).find((step) => step.command === 'insert_fastener_stack');
+  readValidation('plans/fastener_stack_nas6203_proposed.json') as { actions: Array<{ command: string; params: Record<string, unknown> }> }
+).actions.find((step) => step.command === 'insert_fastener_stack');
 
 interface Scene {
   doc: CadDocument;
@@ -433,11 +433,11 @@ describe('VC-MAT-19: MS20470AD4 head geometry', () => {
 
 describe('AF-05: the proposed plan runs as one build_project', () => {
   it('select -> insert -> BOM with aliases, one recorded step per mutating command', () => {
-    const plan = readValidation('plans/fastener_stack_nas6203_proposed.json') as Array<{
-      command: string;
-      params: Record<string, unknown>;
-      as?: string;
-    }>;
+    const plan = (
+      readValidation('plans/fastener_stack_nas6203_proposed.json') as {
+        actions: Array<{ command: string; params: Record<string, unknown>; as?: string }>;
+      }
+    ).actions;
     const withHole = plan.map((step) =>
       step.command === 'insert_fastener_stack' ? { ...step, params: { ...step.params, holeDiameter: HOLE } } : step,
     );

@@ -86,7 +86,7 @@ describe('check_analysis item coverage', () => {
   const codesOf = (doc: Parameters<typeof execute>[0], analysisId: string): string[] =>
     ((execute(doc, 'check_analysis', { analysisId }).data as { items: { code: string }[] }).items ?? []).map((item) => item.code);
 
-  it('warns that property models on a typical basis are unverified', () => {
+  it('warns that property models on a typical basis are unverified (FEA_MATERIAL_UNVERIFIED, VC-MAT-23)', () => {
     const bar = barDocument({ material: 'models' });
     expect(codesOf(bar.doc, bar.analysisId)).toContain('FEA_MATERIAL_UNVERIFIED');
   });

@@ -100,6 +100,8 @@ describe('flanged hole (VC-FTR-13)', () => {
     const flat = (result.data as { flatCutDiameter: { value: number; approximate: boolean } }).flatCutDiameter;
     expect(flat.approximate).toBe(true);
     expect(flat.value).toBeCloseTo(2 * (cutRadius - (Math.PI / 2) * (2 + 0.44 * T) - 2), 9);
+    expect(Math.abs(flat.value - 34.705133)).toBeLessThan(1e-6); // pack value, flat cut diameter
+    expect(2 * cutRadius).toBeCloseTo(47.2, 9); // physical hole diameter of the pack
     const pattern = run(result.document, 'flat_pattern', { id: part }).data as { unverified: boolean };
     expect(pattern.unverified).toBe(true);
   });

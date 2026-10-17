@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
+import { deserializeDocument, serializeDocument } from '@core/commands/persistence/serialization';
+import { recipeKey, recipeOf } from '@core/geometry/shapeRecipe';
 import { createEmptyDocument } from '@core/model/types';
 import type { SheetMetalPart } from '@core/model/sheetMetal';
 import expectedParts from '../../../../docs/aerospace/07-sheet-metal-machined-features/validation/data/expected_test_parts.json';
@@ -15,7 +17,7 @@ interface FlatData {
   unverified: boolean;
 }
 
-describe('sheet-metal bracket (VC-FTR-06, 07, 08, 41)', () => {
+describe('sheet-metal bracket (VC-FTR-06, VC-FTR-07, VC-FTR-08, VC-FTR-41)', () => {
   it.each([
     [0.33, bracketParts.expected_flat_length_by_K['0.33']],
     [0.44, bracketParts.expected_flat_length_by_K['0.44']],
@@ -52,6 +54,16 @@ describe('sheet-metal bracket (VC-FTR-06, 07, 08, 41)', () => {
     const flat = data<FlatData>(doc, 'flat_pattern', { id: part });
     expect(flat.area * RULE.thickness).toBeCloseTo(bracketParts.analytic_volume_mm3, 6);
     expect(Math.abs(meshVolume(doc, part) / (flat.area * RULE.thickness) - 1)).toBeLessThan(1e-3);
+  });
+
+  it('refold: unfolding never edits the part and re-derivation (rebuild, save / load) gives the same recipe key (VC-FTR-08)', () => {
+    const { doc, part } = bracket({ name: 'K05', kFactor: 0.5 });
+    const keyOf = (candidate: typeof doc): string => recipeKey(recipeOf(folded(candidate, part)));
+    const original = keyOf(doc);
+    expect(keyOf(apply(doc, 'materialize_flat_pattern', { id: part }))).toBe(original);
+    expect(ok(doc, 'flat_pattern', { id: part }).document).toBe(doc);
+    expect(keyOf(bracket({ name: 'K05', kFactor: 0.5 }).doc)).toBe(original);
+    expect(keyOf(deserializeDocument(serializeDocument(doc)))).toBe(original);
   });
 
   it('stores the folded solid as a union recipe of flats and bend sectors', () => {

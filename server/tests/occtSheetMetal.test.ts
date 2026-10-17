@@ -106,7 +106,7 @@ describe('native bracket on OCC (VC-FTR-06, 08)', () => {
   });
 });
 
-describe('convert_to_sheet_metal on OCC (VC-FTR-18, 19)', () => {
+describe('convert_to_sheet_metal on OCC (VC-FTR-18, VC-FTR-19)', () => {
   const converted = (file: string, rule: Record<string, unknown>, near: number[]): { doc: CadDocument; part: string; summary: string } => {
     const { doc, solid } = importPart(kernels.occt, file);
     const withRule = run(kernels.occt, doc, 'create_sheet_metal_rule', rule).document;
@@ -140,6 +140,9 @@ describe('convert_to_sheet_metal on OCC (VC-FTR-18, 19)', () => {
     expect(flat.joggles).toHaveLength(1);
     expect(Math.abs((flat.joggles[0]?.allowance ?? 0) - 0.197879593)).toBeLessThan(1e-5);
     expect(strip.summary).toContain('1 joggle');
+    const nodes = Object.values(strip.doc.sheetMetal?.parts[strip.part]?.nodes ?? {});
+    const joggle = nodes.find((node) => node.type === 'joggle');
+    expect(Math.abs(((joggle?.type === 'joggle' ? joggle.offset : Number.NaN) as number) - 1.6)).toBeLessThan(0.01); // pack: joggle offset 1.6
   });
 
   it('refuses a stepped solid, a wrong rule thickness, a curved face, an edge face and a mesh kernel', () => {

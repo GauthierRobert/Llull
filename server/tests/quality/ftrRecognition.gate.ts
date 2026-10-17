@@ -17,6 +17,7 @@ import { lengthToleranceOf, recognitionOf } from '@core/commands/features/recogn
 import { buildModel } from '@core/geometry/recognition/model';
 import { setGeometryKernel, type GeometryKernel } from '@core/geometry/kernel';
 import { createNodeOcctKernel } from '../../src/occtNode';
+import { REPO_ROOT, checkAssertion, newSession, runCliLines, type PackCase } from '../packCli';
 
 const CORPUS_DIR = path.resolve(__dirname, '../../../.cache/quality-corpus');
 const BUDGET_MS = 5000;
@@ -67,4 +68,30 @@ describe('VC-FTR-21: NIST CTC-02…05 drill-point apexes and 45 degree cone seed
       120_000,
     );
   }
+});
+
+/** VC-FTR-46 in its pack form (expected_results.json): the CLI imports CTC-02 and recognises it with --progress / --timeout, exit 0, under 5 s. */
+describe('VC-FTR-46: llull import_step_exact + recognize_features --progress --timeout on CTC-02', () => {
+  const ctc02 = path.join(CORPUS_DIR, 'nist-ctc-02.stp');
+  const pack = JSON.parse(
+    readFileSync(path.join(REPO_ROOT, 'docs/aerospace/07-sheet-metal-machined-features/validation/expected_results.json'), 'utf8'),
+  ) as { cases: Array<PackCase & { vc: string }> };
+
+  it.skipIf(!existsSync(ctc02))(
+    'exits 0 on every call and the recognition call stays under the 5 s budget',
+    async () => {
+      const packCase = pack.cases.find((candidate) => candidate.vc === 'VC-FTR-46');
+      expect(packCase?.cli).toHaveLength(3);
+      const cli = (packCase?.cli ?? []).map((line) => line.replace('<ctc-dir>/nist_ctc_02_asme1_ap242.stp', ctc02));
+      expect(cli.join('\n')).toContain('--progress --timeout');
+      const session = newSession();
+      await runCliLines(session, { cli });
+      expect(session.calls.map((call) => call.code)).toEqual([0, 0, 0]);
+      for (const assertion of packCase?.assert ?? []) checkAssertion(session, assertion, 'VC-FTR-46');
+      const data = (session.calls[2]?.json as { data: { counts: { holes: number } } }).data;
+      expect(data.counts.holes).toBeGreaterThan(0);
+      console.warn(`VC-FTR-46: recognize_features via CLI ${Math.round(session.calls[2]?.ms ?? 0)} ms`);
+    },
+    300_000,
+  );
 });
