@@ -12,8 +12,16 @@
 
 import type { BooleanOp, Entity, MeshData, ShapeRecipe, Vec3 } from '../model/types';
 import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, ShapeTopology } from './kernel';
+import type { FaceQueryPort } from './kernelPorts';
 import { recipeKey } from './shapeRecipe';
 import { errorMessage } from '../lib/errorMessage';
+
+/** `FaceQueryPort` over native shapes: every method takes the native shape where the port takes a handle. */
+export type FaceQueryOps<S> = {
+  [K in keyof FaceQueryPort]: FaceQueryPort[K] extends (shape: ShapeHandle, ...rest: infer R) => infer T
+    ? (shape: S, ...rest: R) => T
+    : never;
+};
 
 /**
  * Native operations of a concrete kernel. Each returns a NEW native shape (never one of its inputs: the cache owns and releases every
@@ -45,6 +53,8 @@ export interface KernelOps<S> {
   analyze?(shape: S): ShapeAnalysis | null;
   /** Optional minimum distance (searched up to `maxDistance`); a kernel without it leaves `GeometryKernel.distance` undefined. */
   distance?(a: S, b: S, maxDistance: number): ShapeDistance | null;
+  /** Optional face-level queries (01 §5.9); a kernel without it leaves `GeometryKernel.faceQuery` undefined. */
+  readonly faceQuery?: FaceQueryOps<S>;
   release(shape: S): void;
   /** Shape of the loaded blob `sha256` (`loadBlob`); absent = `brep` leaves are unsupported. */
   brep?(sha256: string): S | null;
@@ -128,6 +138,38 @@ function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe
   }
 }
 
+type OnNative<S> = <T>(handle: ShapeHandle, query: (shape: S) => T | null) => T | null;
+
+/** The public port over `ops`: handles resolve to natives (null shape or any throw -> null, never an exception). */
+function faceQueryPort<S>(ops: FaceQueryOps<S> | undefined, onNative: OnNative<S>): FaceQueryPort | undefined {
+  if (ops === undefined) return undefined;
+  const guard =
+    <A extends unknown[], T>(query: (shape: S, ...args: A) => T | null) =>
+    (handle: ShapeHandle, ...args: A): T | null => {
+      try {
+        return onNative(handle, (shape) => query(shape, ...args));
+      } catch (error) {
+        if (error instanceof Error && error.message.startsWith(SHAPE_NOT_CACHED)) throw error;
+        console.warn(`[kernel] face query failed: ${errorMessage(error)}`);
+        return null;
+      }
+    };
+  return {
+    faceDetails: guard(ops.faceDetails),
+    faceContains: guard(ops.faceContains),
+    faceGraph: guard(ops.faceGraph),
+    faceGeometry: guard(ops.faceGeometry),
+    projectOnFace: guard(ops.projectOnFace),
+    evaluateFace: guard(ops.evaluateFace),
+    tessellateFace: guard(ops.tessellateFace),
+    faceSamples: guard(ops.faceSamples),
+    edgeSamples: guard(ops.edgeSamples),
+    edgeContinuity: guard(ops.edgeContinuity),
+    distance: guard(ops.distance),
+    bspline: guard(ops.bspline),
+  };
+}
+
 /**
  * Wrap native ops as a recipe-evaluating `GeometryKernel` with an LRU of `capacity` native shapes. Failed recipes (null) are cached too, so
  * a refused fillet is not retried on every replay.
@@ -203,7 +245,14 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
   };
   const analyzeOps = ops.analyze?.bind(ops);
   const distanceOps = ops.distance?.bind(ops);
+  const faceQuery = faceQueryPort(ops.faceQuery, (handle, query) =>
+    call(() => {
+      const shape = nativeOf(handle);
+      return shape === null ? null : query(shape);
+    }),
+  );
   return {
+    ...(faceQuery === undefined ? {} : { faceQuery }),
     ...(ops.name === undefined ? {} : { name: ops.name }),
     ...(analyzeOps === undefined
       ? {}

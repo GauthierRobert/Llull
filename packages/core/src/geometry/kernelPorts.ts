@@ -5,7 +5,7 @@
  */
 
 import type { MeshData, Vec2, Vec3 } from '../model/types';
-import type { FaceSurface, ShapeHandle } from './kernel';
+import type { FaceSurface, ShapeHandle } from './kernelTypes';
 import type { InertiaTensor } from './massProperties';
 
 /** What the active kernel is (TR-KRN-04); the composition root may add `isolation` / `fallbackReason`. */
@@ -107,6 +107,7 @@ export interface FaceGraphFace {
   readonly area: number;
   /** Edge indices (`ShapeTopology.edges`), outer loop first. */
   readonly loops: readonly (readonly number[])[];
+  /** `[uMin, uMax, vMin, vMax]` (OCC `BRepTools::UVBounds` order) of the trimmed face. */
   readonly uvBounds: readonly [number, number, number, number];
 }
 
@@ -139,7 +140,7 @@ export interface SurfaceSample {
   readonly degenerate: boolean;
 }
 
-export interface EdgeCurveSample {
+interface EdgeCurveSample {
   readonly t: number;
   readonly s: number;
   readonly point: Vec3;
@@ -150,7 +151,7 @@ export interface EdgeCurveSample {
   readonly normal: Vec3;
 }
 
-export interface EdgeContinuitySample {
+interface EdgeContinuitySample {
   readonly t: number;
   readonly point: Vec3;
   readonly g0: number;
@@ -159,7 +160,7 @@ export interface EdgeContinuitySample {
   readonly g3?: number;
 }
 
-export interface NurbsSurfaceData {
+interface NurbsSurfaceData {
   readonly degreeU: number;
   readonly degreeV: number;
   readonly poles: readonly (readonly Vec3[])[];
