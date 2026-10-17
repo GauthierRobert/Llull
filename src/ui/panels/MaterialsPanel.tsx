@@ -10,6 +10,8 @@ import { materialDraftOf } from '@ui/panels/materialRules';
 import { LabeledInput } from '@ui/panels/LabeledInput';
 import { parseNumber } from '@ui/numberText';
 import { significantNumber } from '@lib/compactNumber';
+import { MaterialLibrariesSection } from '@ui/panels/materials/MaterialLibrariesSection';
+import { MaterialRecordInspector } from '@ui/panels/materials/MaterialRecordInspector';
 
 /** 3 significant digits, no exponent for ordinary magnitudes (7850, not "7.85e+3"). */
 function formatDensity(density: number): string {
@@ -193,6 +195,8 @@ export function MaterialsPanel({ className }: { className?: string }): React.Rea
         </ul>
       )}
 
+      <MaterialLibrariesSection onSelect={setActiveMaterialName} />
+      {activeMaterialName !== null && <MaterialRecordInspector key={activeMaterialName} materialName={activeMaterialName} />}
       <CreateMaterialForm />
     </aside>
   );

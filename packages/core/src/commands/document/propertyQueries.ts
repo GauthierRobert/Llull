@@ -61,6 +61,21 @@ const missingMaterial = (doc: CadDocument, command: string, id: string): Command
     [id],
   );
 
+/** TR-PROP-15: a private-library record without values answers available: false, never another model. */
+const unresolvedMaterial = (doc: CadDocument, command: string, id: string, reason: string): CommandResult =>
+  refusal(
+    doc,
+    command,
+    {
+      available: false,
+      code: 'MAT_LIBRARY_UNRESOLVED',
+      reason: `material '${id}' has no values on this machine (${reason})`,
+      remediation: 'register the library file (register_material_library), then run resolve_material_libraries',
+      path: 'material',
+    },
+    [id],
+  );
+
 /** Model for the query, falling back to a derived CTE when only a thermalStrain model exists. */
 function resolveFor(
   record: PropertyRecord,
@@ -134,6 +149,8 @@ export const evaluateProperty = defineCommand({
     const command = 'evaluate_property';
     const material = materialOf(doc, params.material);
     if (material === undefined) return missingMaterial(doc, command, params.material);
+    if (material.record?.unresolved !== undefined)
+      return unresolvedMaterial(doc, command, params.material, material.record.unresolved.reason);
     const record: PropertyRecord = {
       name: params.material,
       ...(material.propertyModels !== undefined ? { propertyModels: material.propertyModels } : {}),
@@ -255,6 +272,8 @@ export const sampleProperty = defineCommand({
     const command = 'sample_property';
     const material = materialOf(doc, params.material);
     if (material === undefined) return missingMaterial(doc, command, params.material);
+    if (material.record?.unresolved !== undefined)
+      return unresolvedMaterial(doc, command, params.material, material.record.unresolved.reason);
     const record: PropertyRecord = {
       name: params.material,
       ...(material.propertyModels !== undefined ? { propertyModels: material.propertyModels } : {}),

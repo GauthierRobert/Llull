@@ -1,16 +1,20 @@
 /** INP assembly (05 §5.6, FE_PIPELINE_DESIGN §5): model block + materials + sections + the steps of the analysis type. */
 
 import type { FeArtifactPort, FeMeshArtifact } from '@core/model/analysis';
+import { EXPORT_REMEDIATION, exportGate } from '@core/model/exportGate';
 import type { CadDocument } from '@core/model/types';
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 import { analysisInputHash } from '../hash/inputHash';
 import { ALL_ELEMENTS, ALL_NODES, buildDeckContext, isDeckRefusal, type DeckContext, type DeckRefusal, type DeckSections } from './context';
+import type { MaterialCardWriter } from './constitutive';
 import { commentText, idLines, linesText, row } from './format';
 import { mechanicalMaterialLines, staticStep } from './mechanical';
 
 /** The discipline functions of the thermal and thermo-mechanical lanes (FE_PIPELINE_DESIGN §5 table). */
 export interface DisciplineTable {
+  /** Constitutive-set cards (plastic / hyperelastic / creep); absent or null result = the elastic / thermal cards below. */
+  readonly materialCardWriter?: MaterialCardWriter;
   readonly heat: {
     readonly materialCards: (ctx: DeckContext, entityId: string) => DeckSections;
     readonly sections: (ctx: DeckContext) => DeckSections;
@@ -57,6 +61,13 @@ function nameCollision(ctx: DeckContext): DeckRefusal | null {
 
 function precheck(doc: CadDocument, analysisId: string, mesh: FeMeshArtifact, ctx: DeckContext): DeckRefusal | null {
   const { analysis } = ctx;
+  const gate = exportGate(doc, 'deck');
+  if (gate.controlled)
+    return refuse(
+      'MAT_EXPORT_CONTROLLED',
+      `the document uses ${gate.marking.regime}-marked material(s) ${gate.ids.join(', ')}; no deck was written (${EXPORT_REMEDIATION.MAT_EXPORT_CONTROLLED})`,
+      gate.ids,
+    );
   if (analysis.type === 'modal' || analysis.type === 'buckling')
     return refuse('FEA_ANALYSIS_TYPE_UNSUPPORTED', `analysis type '${analysis.type}' has no deck writer`, [analysisId]);
   if (mesh.kind !== 'fe_mesh') return refuse('FEA_ARTIFACT_NOT_FOUND', 'the mesh artifact is not an fe_mesh', [analysisId]);
@@ -80,7 +91,14 @@ function precheck(doc: CadDocument, analysisId: string, mesh: FeMeshArtifact, ct
   }
   for (const entityId of Object.keys(analysis.parts)) {
     if (!blockEntities.has(entityId)) return refuse('FEA_PART_INVALID', `part '${entityId}' has no elements in the mesh`, [entityId]);
-    if (ctx.materialOf(entityId) === null) return refuse('FEA_MATERIAL_MISSING', `part '${entityId}' has no material`, [entityId]);
+    const material = ctx.materialOf(entityId);
+    if (material === null) return refuse('FEA_MATERIAL_MISSING', `part '${entityId}' has no material`, [entityId]);
+    if (material.record?.unresolved !== undefined)
+      return refuse(
+        'MAT_LIBRARY_UNRESOLVED',
+        `part '${entityId}': material '${material.name}' comes from private library '${material.record.libraryRef?.libraryId ?? '?'}', not resolved on this machine (${material.record.unresolved.reason}); run resolve_material_libraries`,
+        [entityId, material.record.id],
+      );
   }
   const collision = nameCollision(ctx);
   if (collision !== null) return collision;
@@ -110,6 +128,7 @@ function modelBlock(ctx: DeckContext): string[] {
 /**
  * Deterministic CalculiX deck of `analysisId` over `mesh`, with the discipline functions in `disciplines`.
  * @invariant byte-identical for identical inputs; header `** llull analysis <name> units <us> inputHash <h> meshHash <m>`
+ * @failure the document uses ITAR / EAR material records -> MAT_EXPORT_CONTROLLED (a deck leaves the machine; no confirmation path here)
  * @failure unknown analysis / unsupported type -> FEA_ANALYSIS_NOT_FOUND / FEA_ANALYSIS_TYPE_UNSUPPORTED; mesh of other inputs -> FEA_MESH_STALE;
  *   part without elements or with non-tet elements -> FEA_PART_INVALID; no material -> FEA_MATERIAL_MISSING; static / thermo_static / coupled without a
  *   constraint -> FEA_NO_CONSTRAINTS; plus every refusal of the mechanical and discipline functions
@@ -135,14 +154,18 @@ export function buildInp(
   for (const entityId of Object.keys(analysis.parts))
     if (!materialOwners.has(ctx.materialName(entityId))) materialOwners.set(ctx.materialName(entityId), entityId);
   for (const [name, entityId] of materialOwners) {
+    const constitutive = heat ? null : (disciplines.materialCardWriter?.(ctx, entityId) ?? null);
+    if (constitutive !== null && 'code' in constitutive) return constitutive;
     const cards = heat
       ? [disciplines.heat.materialCards(ctx, entityId)]
       : [
-          mechanicalMaterialLines(ctx, entityId),
+          ...(constitutive === null ? [mechanicalMaterialLines(ctx, entityId)] : []),
           ...(analysis.type === 'thermo_static' ? [disciplines.thermomech.materialCards(ctx, entityId)] : []),
           ...(analysis.type === 'coupled_temperature_displacement' ? [disciplines.coupled.materialCards(ctx, entityId)] : []),
         ];
-    lines.push(`** material ${name} = '${commentText(ctx.materialId(entityId) ?? '', 80)}'`, `*MATERIAL, NAME=${name}`);
+    lines.push(`** material ${name} = '${commentText(ctx.materialId(entityId) ?? '', 80)}'`);
+    if (constitutive === null) lines.push(`*MATERIAL, NAME=${name}`);
+    else lines.push(...constitutive.comments, ...constitutive.lines);
     for (const card of cards) {
       if (isDeckRefusal(card)) return card;
       lines.push(...card.text.split('\n').filter((line) => line !== ''));

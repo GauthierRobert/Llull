@@ -3,10 +3,10 @@
 import type { CadDocument, Vec2 } from '@core/model/types';
 import { DrawingPainter, svgLine } from '../../shared/drawingSvg';
 import type { CommandResult } from '@core/commands/types';
-import { defineCommand, z } from '@core/commands/schema';
+import { defineCommand, z, confirmExportControlled } from '@core/commands/schema';
 import { toMetres, toMm } from '@core/model/units';
 import { elementsOf, fileSlug, getBuilding } from '../model';
-import { noop, report } from '@core/commands/noop';
+import { noop, report, exportRefusal } from '@core/commands/noop';
 import { escapeXml } from '@lib/escapeXml';
 import { sub2 } from '@lib/vec2';
 import { ELEVATION_DIRECTIONS, buildElevationDrawing, type ElevationDirection } from './elevationProjection';
@@ -159,6 +159,7 @@ export const exportElevationSheet = defineCommand({
     'heavy, hatched at 45°, steel filled solid). Shows level datums, grid bubbles, scale bar and the title block. Use exclude: ["panel"] ' +
     'to show the steel frame behind the cladding. data.svg holds the file text.',
   params: z.object({
+    confirmExportControlled,
     direction: z
       .enum(ELEVATION_DIRECTIONS)
       .optional()
@@ -169,7 +170,9 @@ export const exportElevationSheet = defineCommand({
     scale: SCALE_FIELD,
     title: z.string().optional().describe('Drawing title. Default "<Direction> elevation".'),
   }),
-  run: (doc, { direction = 'south', cutAt, exclude, paper = 'A3', scale, title }): CommandResult => {
+  run: (doc, { confirmExportControlled, direction = 'south', cutAt, exclude, paper = 'A3', scale, title }, ctx): CommandResult => {
+    const refused = exportRefusal(doc, 'export_elevation_sheet', 'sheet', confirmExportControlled, ctx);
+    if (refused !== null) return refused;
     const sheet = buildElevationSheet(doc, { direction, cutAt, exclude, paper, scale, title });
     if (!sheet) return noop(doc, 'export_elevation_sheet failed: no 3D geometry to draw (on that side of the cut) or invalid scale.');
     return report(

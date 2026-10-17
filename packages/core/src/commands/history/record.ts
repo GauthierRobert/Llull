@@ -6,9 +6,10 @@
 import type { CadDocument } from '../../model/types';
 import type { CommandResult } from '../types';
 import { execute } from '../execute';
+import { withoutConfirmations } from '../../lib/withoutConfirmations';
 
 /**
- * @invariant when `execute` appended exactly one step FOR `command`, its `params` become `recordedParams`; otherwise (query, no-op,
+ * @invariant when `execute` appended exactly one step FOR `command`, its `params` become `recordedParams` (a `confirmation` signature never stored); otherwise (query, no-op,
  *   meta-history command such as insert_step, which appends a step for another command) the result is returned untouched.
  */
 export function executeRecorded(doc: CadDocument, command: string, params: unknown, recordedParams: unknown): CommandResult {
@@ -20,6 +21,9 @@ export function executeRecorded(doc: CadDocument, command: string, params: unkno
   if (appended === undefined || appended.name !== command) return result;
   return {
     ...result,
-    document: { ...result.document, featureHistory: [...history.slice(0, -1), { ...appended, params: recordedParams }] },
+    document: {
+      ...result.document,
+      featureHistory: [...history.slice(0, -1), { ...appended, params: withoutConfirmations(recordedParams) }],
+    },
   };
 }

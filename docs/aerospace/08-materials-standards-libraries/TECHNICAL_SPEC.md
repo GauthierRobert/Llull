@@ -499,7 +499,7 @@ Total MVP (M1–M5) ≈ 26 d (M2 revised 2026-10-17); V1 (M6–M8) ≈ 16 d.
 
 | Id | Question | Proposed default |
 | -- | -------- | ---------------- |
-| OQ-MAT-01 | Legal review: may llull ship a sample catalogue with distributor-published NAS/MS dimensions? | Ship encoding rules only; dimensions user-imported until cleared |
+| OQ-MAT-01 | Legal review: may llull ship a sample catalogue with distributor-published NAS/MS dimensions? | **Decided 2026-10-17 (owner):** catalogue dimensions stay user-imported; the NAS6203 strength minimums stay in the seed library as `supplier_unstated` (unverified) |
 | OQ-MAT-02 | S-basis semantics: MMPDS text (S3) says S applies where T99 fails A-basis requirements; common usage = spec minimum. | Store as given; display "S (specification minimum / no statistical assurance)"; never treat S ≥ A |
 | OQ-MAT-03 | New package `domain-aero` vs folder inside `domain-aec`? | New package (AEC and aero toolsets differ; clean knip/arch boundaries) |
 | OQ-MAT-04 | Rivet length rounding: "nearest 1/16" (S19 secondary) vs "up". | `up` (conservative: protrusion ≥ 1.5D); configurable |
@@ -552,3 +552,83 @@ Tests: `tests/unit/aeroMassDensity.test.ts`. It covers VC-MAT-01, VC-MAT-03 (rel
 - Follow-up: in dynamics, a density refusal reaches `add_rigid_body` / `simulate_motion` as a message prefixed with the code
   (`PROP_…: body 'b': …`). It is not yet a structured `CommandResult.error`. This is part of the AGENT_FIRST rule 5 dynamics
   follow-up (`DYN_*` codes).
+
+## 14. Implementation status (2026-10-17): M2, M3, M5, M6, M7, M8 built (aerospace step AERO-3)
+
+Package layout: decision 1 taken, `docs/decisions/AERO3-package-layout.md` (`packages/domain-aero`, plugin `fasteners`).
+
+| Item | Where |
+| ---- | ----- |
+| Record = `Material.record?: MaterialRecordInfo` (designation, temper, form, specs, licence, export marking, superseded, libraryRef, unresolved); values are PHY-01 `propertyModels` (PROP-08: no second `PropertyValue` type; `set_material_property` is the TR-PROP-07 adapter: value → `constant`, absolute temperature table → `table1d`, percent-of-RT → `ratioOf`) | `model/materialLibrary.ts`, `model/types.ts`, `commands/materials/` |
+| Commands (toolset `materials`): `define_material_record`, `set_material_property`, `get_material`, `get_material_allowable`, `convert_quantity`, `import_material_library`, `remove_material_library`, `diff_material_libraries`, `resolve_material_libraries` (new `session` annotation: no FeatureStep, never logged), `set_export_marking`, `check_materials`; `create_material` / `assign_material` moved from `3d` to `materials` | `commands/materials/catalog.ts` |
+| Private libraries (TR-MAT-16/31): `ctx.libraries` (`MaterialLibraryProvider.get(libraryId, version)`, core compares sha256), server store `LLULL_LIBRARIES_DIR` (default `~/.llull/libraries`, files 0600), transport `register_material_library`; save and the live snapshot strip private values to stubs; `resolveDensity`, allowables, `evaluate_property`, `sample_property` and FE decks refuse an unresolved record with `MAT_LIBRARY_UNRESOLVED` | `commands/types.ts`, `commands/persistence/serialization.ts`, `server/src/libraries/libraryStore.ts`, `packages/mcp/src/libraryTools.ts`, `domain-cae/src/decks/deckBuilder.ts` |
+| Export gate (TR-MAT-30/51): pure `exportGate(doc, target)`; `export_step_exact`, `export_gltf`, `export_stl`, `export_obj`, `export_code` (and `export_step` through them) refuse ITAR / EAR-ECCN content in use with `MAT_EXPORT_CONTROLLED`; `confirmExportControlled` passes only with a signature verified by `ctx.humanSignature`, otherwise `MAT_HUMAN_GATE`; lowering a marking is gated the same way, raising is free | `commands/materials/`, `commands/{exchange,brep}/` |
+| Fasteners plugin (toolset `fasteners`): `import_fastener_catalog`, `list_fastener_families`, `decode_part_number`, `select_fastener` (§5.2 in integer ticks), `insert_fastener_stack`, `insert_fastener_row`, `check_fastener_layout`, `delete_fastener_stack`; derivation guard on fastener instances; `fasteners` document slice validated on load | `packages/domain-aero/src/fasteners/**`, `model/fasteners.ts` |
+| BOM: `standardParts` (by `Component.partRef.partNumber`) and `materials` (`includeMaterials`, resolveDensity, unverified) sections; `rows` unchanged | `commands/assembly/billOfMaterials.ts`, `bomMaterials.ts` |
+
+Tests: `tests/unit/materials/*` (VC-MAT-01, 02, 03, 05, 13, 14, 15 core, 16, 22 a–c, 23, 24 material codes, 25; VC-PROP-22), `tests/unit/aero/fasteners/*` and `tests/unit/aero/bomStandardParts.test.ts` (VC-MAT-06, 07, 08, 09, 10, 11, 12, 19, 20, 24 fastener codes, 26), `tests/unit/contract/{materialLibraries,fastenersPlugin}.test.ts`, server `materialLibraries.test.ts`, `aeroFasteners.occt.test.ts` (exact hole volume and BOM mass rel 1e-6 on OCC).
+
+**Deviations and open items:**
+
+- Library files hold PHY-01 `propertyModels` directly (`coefficientsSha256` recomputed on import); `diff_material_libraries` is keyed (material id, model id).
+- `set_material_property.source` needs `citation` (no bare `sourceId`); missing source → `MAT_PROVENANCE_MISSING`.
+- Replay without the provider: `import_material_library` by reference is refused (the record ids are unknown without the file); replay with the provider is value-identical.
+- Not built: cloud-MCP redaction of private-licensed values (TR-MAT-32; only save and live snapshot are redacted), the browser IndexedDB provider, M4 seed library (needs the MIL-HDBK-5J PDF), `joint_capacity` (M9), `sources.lock.json` CI check (VC-MAT-18), VC-MAT-17 performance at 10⁴ instances.
+- Stack measurement ray-casts entity triangles (exact on flat faces); after a cut, `check_fastener_layout` re-measures beside the hole. `edgeDistance` of a row is declared by the caller and checked, not measured.
+- Length = grip truncated to 0.001 in + thread length (reproduces the distributor table). Washer part numbers are descriptors (`NAS1149(.063)`).
+- `includeMaterials` defaults to false to keep the legacy BOM shape.
+- Codes added beyond §7.1: `MAT_LIBRARY_PRIVATE_INLINE`, `FAST_CATALOG_INVALID`, `FAST_CATALOG_CONFLICT`, `FAST_FAMILY_UNKNOWN`, `FAST_SIZE_UNKNOWN`, `FAST_FAMILY_NOT_SELECTABLE`, `FAST_STACK_MISSING`, `FAST_STACK_NOT_FOUND`, `FAST_AXIS_MISS`, `FAST_LAYER_MISSING`, `FAST_INSTANCE_MISSING`, `FAST_HOLE_DIAMETER_UNKNOWN`, `FAST_HOLE_CUT_FAILED`, `FAST_ROW_INVALID`. `FAST_KERNEL_REQUIRED` is never raised: `execute` refuses `requiresKernel` commands with `CMD_KERNEL_UNAVAILABLE`.
+- Manifold facets small holes coarsely in inch documents (segment count follows the radius in mm): use OCC for volumes.
+- Hi-Lok pins have no listed length (representative); collars are not selected.
+
+**Review fixes (cad-reviewer, 2026-10-17):** private values fail closed (any record whose `libraryRef` does not resolve to a declared
+embedded library is saved as a stub; `import_code` and history replay carry libraries only through their import step); a replace import
+that lowers a marking needs the human gate; **every** registered `export_*` command and the FE deck precheck consult `exportGate`
+(contract test `tests/unit/contract/exportGateAll.test.ts`); the signed payload is `sha256(canonicalJson({act, ids, details, nonce}))`
+bound to the lowered markings or the exported document hash, and `confirmation` is not stored in step params; library records are
+read-only for every model command (`MAT_RECORD_READONLY`); the server store treats `<id>@<version>` as immutable (`MAT_LIBRARY_EXISTS`).
+Open: live sync still broadcasts raw params (a `confirmation` signature), the desktop signing UI must sign the new payload.
+
+**Round 2 (2026-10-17): the rest of the 08 scope.**
+
+| Item | Where / evidence |
+| ---- | ---------------- |
+| M9 `joint_capacity` (fasteners, query): single shear Fsu·πD²/4 and bearing Fbru·D·t per layer at e/D, values only through `get_material_allowable` with the exact basis; basis propagation §5.6 (VC-MAT-21 A+A→A, A+B→B, B+S→mixed with the per-input list) | `packages/domain-aero/src/fasteners/jointCapacity.ts`, `tests/unit/aero/fasteners/jointCapacity.test.ts` |
+| M4 seed library mechanism: `npm run seed:materials` (`--check`) builds `packages/domain-aero/data/seed.llull-matlib.json` and `sources.lock.json` from the `verified` entries of `validation/materials_dataset.json` only (MatWeb S10/S12 excluded, OQ-MAT-06); installed with `import_material_library`; VC-MAT-18 CI test | `scripts/build-seed-library.mjs`, `tests/unit/materials/seedLibrary.test.ts` |
+| TR-MAT-32: `licensed-no-redistribution` values redacted (`redacted: true`, basis / locator kept) for non-loopback MCP and REST callers | `packages/mcp/src/redactLicensed.ts`, `server/tests/licensedRedaction.test.ts` |
+| Confirmation signatures never stored or broadcast (feature steps, plan steps and loops, live `command` events) | `lib/withoutConfirmations.ts`, `server/tests/liveConfirmationRedaction.test.ts` |
+| Browser `ctx.libraries` provider over IndexedDB (immutable `id@version`), installed in `src/main.tsx` through the core port `commands/libraryPort.ts` | `src/ui/services/browserLibraries.ts` |
+| VC-MAT-17: 10⁴ instances of 3 part numbers — `bill_of_materials` ≈ 110 ms, `mass_properties` ≈ 0.5 s, ≈ 349 B per instance | `tests/unit/aero/fastenerScale.test.ts` |
+| UI: Materials record inspector (basis / direction filter, provenance), library list with licence and marking badges; Fasteners tab (catalogue, live `select_fastener` preview, insert, layout check, BOM sections) | `src/ui/panels/{materials,fasteners}/` |
+
+**Blocked on data, not on code (owner action):** the seed holds no MIL-HDBK-5J A/B/S allowables and no Fbru: the primary PDF and every
+source host were refused by this environment's network proxy (CONNECT 403), and the dataset has no verified allowable to bundle — values
+are never invented. The seven unpinned sources carry `sha256: null` with that reason. `joint_capacity` therefore computes capacities only
+from allowables the user imports. Two seed records need an owner decision: the NAS6203 Ftu / Fsu specification minimums (distributor /
+AIA facts, OQ-MAT-01) and Ti-6Al-4V `density_supplier_alt` (supplier unidentified in the dataset). `joint_capacity` keeps a single
+non-A/B basis shared by every input (e.g. all S) instead of `mixed`; `sheetBasis` is one value for all layers.
+
+**Round-2 review fixes (cad-reviewer):** remote redaction is fail-closed — any read-only answer whose params reference a licensed material
+(directly, through an entity, a fastener stack or a `build_project` alias) is redacted, per `build_project` step; MCP sessions are bound to
+the locality they were created with; more proxy headers mark a caller as relayed; embedded libraries and inline records may not carry
+`licensed-no-redistribution` values (`MAT_LICENCE_EMBED_FORBIDDEN`); seed fastener allowables take the dataset basis and otherwise
+`supplier_unstated` (unverified), never an assumed S basis.
+
+**Round 3 (2026-10-17, lane K): every validation case run and recorded.** `validation/RESULTS.json` / `RESULTS.md` hold one record per
+VC of `validation/README.md`; `tests/unit/contract/aeroValidationMatrix.test.ts` checks them (a case without a record, a listed test
+file that is missing or does not name the case, a blocked case without a reason all fail). 24 of 26 cases pass. Blocked, with the
+cause: VC-MAT-18 (seven lock sources unpinned and no MIL-HDBK-5J values: the primary PDF is out of reach of the authoring network; the
+mechanism checks pass) and VC-MAT-21 (capacity values are TBD in the pack until verified Fsu / Fbru allowables exist; basis propagation
+passes). `server/tests/packReplay08.test.ts` runs the CLI-phrased cases through `runCli --json`: VC-MAT-22 (three densities), VC-MAT-24
+(nine wrong inputs, exit 1), VC-MAT-26, VC-MAT-15 / 25 (a) the CLI agent and (b) the cloud `/mcp` path, and the plans on the exact
+kernel: `mass_7075_block_current` (140.5 g), `mass_ti_cylinder` (69.56719 g, both supplier densities), `fastener_stack_nas6203`
+(plate volumes at 1e-6, one insert step, instances x1, undo / redo deep-equal, replay id-stable) and VC-MAT-04 d (137.9083 g, exact
+1e-6 / mesh 5e-3). Plans: `fastener_catalog_llull.json` is the sample catalogue in `llull-fastener-catalog` format. Tightened:
+VC-MAT-01 (v2 file load, v3 re-save), VC-MAT-09 (dimensions to the pack's 5 decimals), VC-MAT-17 (the pack's 1 s, no x3 allowance).
+Fixed on the way: a command's own refusal (`error` without `rejected`) now exits 1 in the CLI (`insert_fastener_row` FAST_PITCH,
+`decode_part_number` FAST_PART_NUMBER_UNKNOWN, VC-MAT-24).
+
+**Owner decisions (2026-10-17, closing AERO-3):** (1) VC-MAT-18 and VC-MAT-21 are accepted as **data-blocked**: the code (seed-library
+mechanism, `joint_capacity`, basis propagation) is complete and tested; the values arrive when MIL-HDBK-5J (hosts refused by the session
+network policy) or a licensed MMPDS library is imported. (2) OQ-MAT-01: the NAS6203 Ftu / Fsu minimums from distributor / AIA catalogue
+data **stay in the seed, marked `supplier_unstated` (unverified)**.

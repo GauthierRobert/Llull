@@ -13,6 +13,7 @@ import { isRecord } from '../../lib/isRecord';
 import { derivedEntityIds, documentExtensions } from '../../plugins/host';
 import { validateDocumentShape, validateDocumentValues } from './validation';
 import { migrateRetiredCommands } from './retiredCommands';
+import { withoutPrivateValues } from '../materials/libraryRecords';
 
 interface DocumentEnvelope {
   format: 'llull-document';
@@ -36,6 +37,7 @@ interface SerializeOptions {
 
 /**
  * Deterministic `{ format: 'llull-document', version, document }` JSON; derived entities omitted unless `includeDerived`.
+ * @invariant values of `private` material libraries are never written: their records are stubs { id, libraryRef, marking } (TR-MAT-31)
  * @invariant a function of the document alone: kernel provenance (`kernelSettings`) is written by the commands that use the exact kernel
  *   (`import_step_exact`, `set_modeling_tolerance`) from their own ctx, never from the ambient kernel at save time
  */
@@ -43,7 +45,7 @@ export function serializeDocument(doc: CadDocument, options: SerializeOptions = 
   const envelope: DocumentEnvelope = {
     format: 'llull-document',
     version: CURRENT_SCHEMA_VERSION,
-    document: options.includeDerived === true ? doc : withoutDerivedEntities(doc),
+    document: withoutPrivateValues(options.includeDerived === true ? doc : withoutDerivedEntities(doc)),
   };
   return JSON.stringify(envelope);
 }

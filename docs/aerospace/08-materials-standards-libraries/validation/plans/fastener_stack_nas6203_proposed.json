@@ -1,8 +1,99 @@
-[
- {"command": "set_units", "params": {"units": "in"}},
- {"command": "add_box", "params": {"size": [2, 1, 0.25], "anchor": "min"}, "as": "plateA"},
- {"command": "add_box", "params": {"size": [2, 1, 0.26], "position": [0, 0, 0.25], "anchor": "min"}, "as": "plateB"},
- {"command": "select_fastener", "params": {"family": "NAS6203-6220", "diameterDash": "3", "stackIds": ["$plateA", "$plateB"], "axisPoint": [1, 0.5, 0], "axis": [0, 0, 1], "nut": "MS21042", "washer": "NAS1149"}},
- {"command": "insert_fastener_stack", "params": {"family": "NAS6203-6220", "diameterDash": "3", "stackIds": ["$plateA", "$plateB"], "axisPoint": [1, 0.5, 0], "axis": [0, 0, 1], "nut": "MS21042", "washer": "NAS1149", "holeMode": "cut_close_tolerance"}, "as": "stack"},
- {"command": "bill_of_materials", "params": {"includeStandardParts": true}}
-]
+{
+ "status": "RUNNABLE (AERO-3, 2026-10-17). Needs the sample catalogue in the document first: `llull import_fastener_catalog @params.json` with params.json = { \"catalog\": <validation/fastener_catalog_llull.json> } (a plan step cannot read a file). Run by server/tests/packReplay08.test.ts (OCC) and tests/unit/aero/fasteners/insert.test.ts.",
+ "expected": "VC-MAT-10: one insert_fastener_stack step; each plate volume reduced by pi*(0.19/2)^2*t; instances NAS6203-9 x1, NAS1149(.063) x1, MS21042L3 x1; undo restores a deep-equal document",
+ "actions": [
+  {
+   "command": "set_units",
+   "params": {
+    "units": "in"
+   }
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     2,
+     1,
+     0.25
+    ],
+    "anchor": "min"
+   },
+   "as": "plateA"
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     2,
+     1,
+     0.26
+    ],
+    "position": [
+     0,
+     0,
+     0.25
+    ],
+    "anchor": "min"
+   },
+   "as": "plateB"
+  },
+  {
+   "command": "select_fastener",
+   "params": {
+    "family": "NAS6203-6220",
+    "diameterDash": "3",
+    "stackIds": [
+     "$plateA",
+     "$plateB"
+    ],
+    "axisPoint": [
+     1,
+     0.5,
+     0
+    ],
+    "axis": [
+     0,
+     0,
+     1
+    ],
+    "nut": "MS21042",
+    "washer": "NAS1149"
+   }
+  },
+  {
+   "command": "insert_fastener_stack",
+   "params": {
+    "family": "NAS6203-6220",
+    "diameterDash": "3",
+    "stackIds": [
+     "$plateA",
+     "$plateB"
+    ],
+    "axisPoint": [
+     1,
+     0.5,
+     0
+    ],
+    "axis": [
+     0,
+     0,
+     1
+    ],
+    "nut": "MS21042",
+    "washer": "NAS1149",
+    "holeMode": "cut_close_tolerance",
+    "holeDiameter": {
+     "value": 0.19,
+     "unit": "in"
+    }
+   },
+   "as": "stack"
+  },
+  {
+   "command": "bill_of_materials",
+   "params": {
+    "includeStandardParts": true
+   }
+  }
+ ]
+}

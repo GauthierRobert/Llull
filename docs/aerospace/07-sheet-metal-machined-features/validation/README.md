@@ -41,10 +41,10 @@ Tolerance column: abs = absolute, rel = relative. FR/TR = what the case proves.
 | VC-FTR-10 | FR-07, FR-34 | Rule R = 0 (FP-12); synthetic table row `TEST-ALLOY/T0, 0.8 mm → 2.0 mm`; R = 1.0 | R = 0: refusal `FTR_SHARP_BEND_FORBIDDEN`; R = 1.0: finding `FTR_BEND_RADIUS_BELOW_MIN` citing the row (limit 2.0); R = 2.4 → none | exact | b (synthetic row; real rows TBD after D6) | inline |
 | VC-FTR-11 | FR-09 | JG-01…03 | allowance 0.197880 / 0.098095 / 0.287239 mm; run 5.242333 / 5.136723 / 6.143594 | 1e-6 | b | `expected_flat_pattern.json` |
 | VC-FTR-11b | FR-09 | JG-04 (R 6, φ 45°, h 0.5) | rejected: s < 0 | — | b | same |
-| VC-FTR-12 | FR-08 | Flange with rectangular relief, width ratio 0.5 | relief width = 0.5·T, depth = R + T + extra; flat cut matches | TBD — measure with OCC `mass_properties` after M5 | TBD | — |
-| VC-FTR-13 | FR-10 | Flanged lightening hole ∅40, flange 4, 90°, lip R 2, T 1.6 | valid solid; flat cut diameter flagged approximate | TBD — measure with OCC | TBD | — |
-| VC-FTR-14 | FR-11 | Bead R 3, depth 2, length 60 on a 1.0 mm flat | valid solid; flat pattern excludes bead with forming note | TBD — measure with OCC | TBD | — |
-| VC-FTR-15 | FR-12, FR-13 | Hem and contour flange (V2) | TBD | TBD | TBD | — |
+| VC-FTR-12 | FR-08 | Flange with rectangular relief, width ratio 0.5 (flange 33.6×50, T 1.6, R 4.8, widthStart 4) | relief width 0.8 = 0.5·T, depth 6.4 = R + T + 0 (extra = named default 0); volume removed 8.192 mm³ (0.8 × 6.4 × 1.6) | 1e-6 abs (OCC measured, 2026-10-17) | b + c | `server/tests/occtSheetMetalForms.test.ts` |
+| VC-FTR-13 | FR-10 | Flanged lightening hole ∅40, flange 4, 90°, lip R 2, T 1.6 (on a 100×80 plate) | valid solid, volume 11381.155100 mm³; physical hole ∅47.2; flat cut ∅34.705133 flagged approximate + unverified | 1e-6 rel (OCC measured, 2026-10-17) | c | same |
+| VC-FTR-14 | FR-11 | Bead R 3 (inside), depth 2, length 60 on a 1.0 mm 100×60 flat | valid solid: 6144.808987 mm³ round ends, 6128.053826 mm³ open ends; flat area stays 6000 with one forming note | 1e-6 rel (OCC measured, 2026-10-17) | c | same |
+| VC-FTR-15 | FR-12, FR-13 | Hem on a 40×30 plate (leg 10); contour flange on a 40×30 base, T 1.6, R 4.8, K 0.5 | hem closed 2520.637158 / open (gap 3.2) 2761.911474 mm³; contour L 3475.030053, Z (mid) 3638.060105, Z-return (top) 4127.490158 mm³ = flat area × T | 1e-9 rel vs flat area × T (OCC measured, 2026-10-17); hem developed-length formula unverified | b + c | same |
 | VC-FTR-16 | FR-16 | Hole at 2 mm from the bend tangent with threshold 3 mm (data) | violation `hole_to_bend` | exact | b | inline |
 | VC-FTR-17 | FR-24 | `ftr_machined_plate.step` | 7 holes (4 csk 100° c 1.762109, 2 cbore, 1 blind 118° tip 1.802582) + 1 pocket rc 3; 0 false positives | 1e-4 mm, 1e-3° | b | `data/expected_feature_recognition.json` |
 | VC-FTR-18 | FR-15, FR-24 | `ftr_bracket_L.step` → `convert_to_sheet_metal` → `flat_pattern` (K 0.44) | T 1.6, 1 bend R 4.8, 90°, flat 65.845663 × 50 | 0.01 mm | b | same |
@@ -62,10 +62,10 @@ Tolerance column: abs = absolute, rel = relative. FR/TR = what the case proves.
 | VC-FTR-30 | FR-27 | Machined plate with thickness parameter t = 10 → 12 | holes stay through and on the same faces; volume = analytic at t = 12 (generator with lz = 12) | 1e-6 rel | b | — |
 | VC-FTR-31 | FR-28 | All new commands | in `listCommands()`, `toToolSchemas()` snapshot, toolset `manufacturing`, CLI `describe`; happy + failure + `is pure` tests | — | — | — |
 | VC-FTR-32 | FR-25 | Recognised CTC-01 holes converted to `add_hole` steps | volume equal to the imported solid | 1e-6 rel | c | — |
-| VC-FTR-33 | FR-22 | Rib 3 mm × 20 mm on a plate | TBD — measure with OCP (`cadquery-ocp` 8.0.1.1.0, `BRepFeat_MakeLinearForm`) vs analytic prism volume; llull's lowered rib must match | 1e-6 rel | TBD | — |
+| VC-FTR-33 | FR-22 | Rib 3 mm × 20 mm × 80 mm on a plate | volume = plate + 3 × 80 × 20 (analytic prism); L-shaped mitred, one-sided and upToFace ribs match closed forms. OCP cross-check (cadquery-ocp 8.0.1.1.0, `crosscheck_rib_ocp.py`): a prism fuse on the same plate gives 64800.0 mm³ = llull's rib volume (rel 1e-6, asserted against `data/expected_rib_ocp.json`); `BRepFeat_MakeLinearForm` (silhouette profile, Direction (0, 3, 0)) returns a 570000 mm³ body, i.e. it does not reproduce the rib with these arguments, so only the prism fuse is the reference | 1e-6 rel (OCC measured, 2026-10-17) | b + c | `server/tests/occtFeatureOptions.test.ts`, `data/expected_rib_ocp.json` |
 | VC-FTR-34 | FR-29 | `hole_table` on the machined plate | 7 rows, coordinates from the top-left corner datum, sorted | exact | b | `expected_feature_recognition.json` |
 | VC-FTR-35 | FR-30 | FP-08…11 entered in an inch document | same values in inch; mm document gives ×25.4 exactly | 1e-9 rel | b | `flat_pattern_cases.csv` |
-| VC-FTR-36 | FR-20 | Modelled thread (V2) | TBD | TBD | TBD | — |
+| VC-FTR-36 | FR-20 | Modelled thread (V2): `add_hole` / `set_thread` with `thread.modelled`, M6x1 through a 100 × 60 × 10 plate, bore = minor diameter D1 = 6 − 1.0825318 mm | valid solid (OCC `analyze`); removed volume = π r1² L + 2π r̄ A L / P with A = 0.236804 mm² (basic internal ISO 68-1 groove, P/4 crest flat at D1, P/8 root flat at D), r̄ = 2.66493 mm, L = 10 mm: groove 39.6510 mm³, solid 59770.428 mm³. OCC measured 59770.3149 mm³ (groove 39.7641, +2.85e-3 rel); Manifold groove +8.6e-3 rel (faceted bore baseline). Cosmetic thread stays geometry-free and `recipeKey`-neutral. MJ / UNJ use the basic profile (ISO 5855 / AS8879 root radius not applied: unverified) | 5e-3 rel on the groove volume (facet ring step 2π/32; ring radii inflated by √(step / sin step)) | b + c | `server/tests/occtModelledThread.test.ts`, `tests/unit/features/modelledThread.test.ts` |
 | VC-FTR-37 | FR-33 (AF-11) | Wrong inputs: PK-03, missing K, θ = 0, radius row without `source`, D ≤ d, JG-04 | exit 1; `data.error.code` = `FTR_POCKET_FILLET_GT_CORNER` / `FTR_K_FACTOR_MISSING` / `FTR_BEND_ANGLE_OUT_OF_RANGE` / `FTR_TABLE_ROW_NO_SOURCE` / `FTR_HOLE_DIAMETERS_INCONSISTENT` / `FTR_JOGGLE_OFFSET_TOO_SMALL`; offending path + remediation present | exact | b | `expected_results.json` |
 | VC-FTR-38 | FR-34 (AF-20, AF-30, AF-31) | `check_machining` on a countersunk plate with no `minLand` threshold | warn `FTR_RULE_THRESHOLD_MISSING`; `rulesSkipped` lists `minLand` | exact | b | same |
 | VC-FTR-39 | FR-35 (AF-31) | `sheet_metal_calc` without K; blind hole without drill angle | refusal `FTR_K_FACTOR_MISSING`; `hole_table` row `drillPointAngle` = {118, defaulted true, source R8} | exact | b | same |
@@ -90,8 +90,11 @@ FR-36→40 · FR-37→41 · FR-38→42 · FR-39→43 · FR-40→45 · FR-41→45
 `expected_results.json` (generated by `build_expected_results.py` from `data/*.json`, never edited by hand) lists each VC
 as an optional inline plan or plan file, CLI calls with `--json`, and assertions (`path`, `op`, `value`, `tol`, `unit`).
 The consumer is a small script used by the production-gate agent driver: fresh `--doc` per case, `llull run … --json`,
-then the calls, then the assertions; exit codes only, no UI. Cases on proposed commands stay red until those commands
-land; VC-FTR-26 runs today (review run 2026-10-15). Recognition cases need gap 01 `import_step_exact`.
+then the calls, then the assertions; exit codes only, no UI. Since AERO-3 (lane K) every case runs against the built commands:
+`server/tests/packReplay07.test.ts` replays this file through `runCli --json` (a failing single command reports `error.code` /
+`error.paths` / `error.remediation` beside `data`; a failing plan reports `data.steps[i].error`; `<first:PATH>` reads a value of the
+previous call, e.g. `data.matches[0].id` of `find_entities`). VC-FTR-46 needs the pinned CTC-02 (`npm run quality:fetch`) and runs in
+`server/tests/quality/ftrRecognition.gate.ts`. Results: `RESULTS.json` / `RESULTS.md`.
 
 ## 3. Generators and how to run them
 
@@ -140,9 +143,12 @@ the geometry, so tests must assert on geometry, never on hashes, for these files
 | Plan | Runs today? | Purpose |
 | ---- | ----------- | ------- |
 | `baseline_countersunk_plate_today.json` | yes, existing commands only. Run in review (2026-10-15, `build_project`, opencascade.js 1.1.1 kernel): 7/7 steps ok, `mass_properties` 59783.006 mm³ (exact B-rep, display precision); Manifold gives 59787.578 mm³ (mesh) | What a countersunk hole costs today: 2 primitives, 2 booleans, no semantics. Volume reference VC-FTR-26 |
-| `draft_machined_plate.json` | no (proposed `add_hole`, `add_pocket`, `recognize_features`) | Target authoring of the machined plate; must match `ftr_machined_plate.step` |
-| `draft_sheet_metal_bracket.json` | no (proposed sheet-metal plugin) | Target authoring of the bracket; must match `ftr_bracket_L.step` and FP-02 |
-| `draft_recognize_ctc01.json` | no (proposed `recognize_features`) | CLI import of CTC-01, then recognition |
+| `draft_machined_plate.json` | yes (AERO-3 lane K: `{ status, expected, actions }`, pocket as `rectangle` + `cornerRadius`) | Authoring of the machined plate with `add_hole`, `add_pocket`, `recognize_features`; 55978.529153 mm³ (VC-FTR-25) and the 7 + 1 recognised features |
+| `draft_sheet_metal_bracket.json` | yes (AERO-3 lane K: `actions`) | Authoring of the bracket with the sheet-metal plugin; 65.845663 × 50 flat, 5279.716754 mm³ (VC-FTR-06 / 07 / 41) |
+| `draft_recognize_ctc01.json` | yes (AERO-3 lane K: a CLI script, `cli` lines) | CLI import of CTC-01 with `import_step_exact` (`file=` is read by the CLI), then `recognize_features` |
+
+The `draft_` names are historical. All four plans are run by `server/tests/packReplay07.test.ts`, which also replays every case of
+`expected_results.json` through the real `llull` CLI entry (`runCli --json`).
 
 ## 5. Gates
 

@@ -46,6 +46,7 @@ export function exchangeDepsOf(exchange: ExchangeOptions, host: ExchangeHost): E
     port: exchange.port,
     dwg: exchange.dwg ?? null,
     fea: exchange.fea ?? null,
+    libraries: exchange.libraries ?? null,
     getDoc: host.getDoc,
     applyCommand: host.applyCommand,
     allowCodeExecution: exchange.allowCodeExecution,

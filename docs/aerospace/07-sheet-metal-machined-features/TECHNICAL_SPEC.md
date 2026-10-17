@@ -643,3 +643,86 @@ to `unclassified[]`. `add_hole` validates all positions first, so it is all-or-n
 - [R1]–[R15] as listed in `validation/sources.md` (FAA AC 43.13-1B, EAA, FAA-H-8083-31B, NIST MBE PMI, usnistgov/CAD-PMI-Testing, FreeCAD SheetMetal, FreeCAD PartDesign Hole, FreeCAD Fasteners, OCCT headers, NIST CTC mirror, cadquery-ocp, Web3D, The Fabricator, NIST AMS 100-10).
 - [R16] CadQuery `cadquery/cq.py` @5f5bc62b255f62e3512105740025361b6c31eddd (`hole`, `cboreHole(diameter, cboreDiameter, cboreDepth, depth)`, `cskHole(diameter, cskDiameter, cskAngle, depth)`) — CadQuery / GitHub — https://github.com/CadQuery/cadquery/blob/master/cadquery/cq.py (accessed 2026-10, fetched)
 - llull: `docs/decisions/KI5-shape-kernel-boundary.md`, `KI6-desktop-app-cli-first.md`, `KI4-occt-spike.md`, `.claude/rules/architecture.md`.
+
+## 13. Implementation status (2026-10-17): M1, M1b, M2, M3, M4, M6 (fastener link, hole table) and part of M5 built (aerospace step AERO-3)
+
+Package layout: decision D1 taken differently from the proposal: the sheet-metal plugin lives in **`packages/domain-aero`**
+(plugin `sheetmetal`, toolset `manufacturing`), not a separate `domain-mfg` (`docs/decisions/AERO3-package-layout.md`).
+
+| Item | Where |
+| ---- | ----- |
+| Agent-first contract: `FTR_CODES`, `FtrResultMeta`, `Named`, `FtrFinding`, `FtrCheckData`, `FtrRefusal`, `FTR_REVIEW_REASON` | `packages/core/src/model/manufacturing.ts` |
+| `lib/holeMath.ts`, `lib/sheetMath.ts` (each value with its formula id, TR-FTR-09); generic R12 writer moved to `lib/dxfWriter.ts` (D4; AEC keeps a thin subclass) | `packages/core/src/lib/` |
+| `feature` recipe node (`model/features.ts`), lowered in `kernelFromOps` (Manifold and OCC; `thread` / `fastener` excluded from `recipeKey`); feature meta read from the `brep` nodes, no copy on the entity | `geometry/feature*.ts`, `geometry/shapeKernel.ts` |
+| Core commands (toolset `manufacturing`): `add_hole`, `add_pocket`, `set_thread`, `recognize_features`, `check_machining`, `hole_table` | `commands/features/` |
+| Recognition over `FaceGraph` (split-face merge, hole chains, pockets, fillets / chamfers, bends) | `geometry/recognition/` |
+| Codegen: feature cuts with the CadQuery `hole` / `cboreHole` / `cskHole` idiom, thread and drill point as notes | `codegen/` |
+| Sheet-metal plugin: `sheet_metal_calc`, `create_sheet_metal_rule`, `import_bend_radius_table`, `add_sheet_metal_base`, `add_flange`, `add_joggle`, `add_sheet_cutout`, `add_relief`, `flat_pattern`, `materialize_flat_pattern`, `check_sheet_metal`, `export_flat_pattern_dxf`, `convert_to_sheet_metal`; folded solids derived (omitted from save, re-derived on load, guarded) | `packages/domain-aero/src/sheetmetal/**`, `model/sheetMetal.ts` |
+| `llull guide` § 8 (AF-03) | `packages/mcp/src/conventions.ts` |
+
+Tests: `tests/unit/features/*` (VC-FTR-22, 23, 24, 27, 28, 29), `tests/unit/aero/sheetmetal/*` (VC-FTR-01…05, 07, 08, 09, 10, 11, 11b, 16, 35, 37, 39, 40, 41, 42, 43, 44), `tests/unit/contract/ftrAgentFirst.test.ts` (VC-FTR-31, 37, 38, 39, 42, 44), golden `kernel_machined_plate_features`; on live OCC `server/tests/occtFeatures.test.ts` (VC-FTR-17, 20, 25 = 55978.529153, 26, 27, 30, 34) and `server/tests/occtSheetMetal.test.ts` (VC-FTR-06 = 5279.716754, 08, 18, 19).
+
+**Deviations and open items:**
+
+- Contract shapes forced by the `nested-schema` rule (no all-optional nested objects): `check_machining.rules` and `create_sheet_metal_rule.thresholds` are lists of `{ rule|kind, value, source }`; `hole.kind` is required.
+- `flat_pattern` is a pure query; `materialize_flat_pattern` (mutating) draws the snapshot entities.
+- `recognize_features.angularTolerance` is in degrees (AF-04). Recognition reads face orientation from the kernel's face details, not the raw `reversed` flag.
+- Narrower than §3.1 / §4: no `counterdrill`, no `up_to_next` / `up_to_face` extents, no pocket islands / `upToFace`, no `add_rib` (VC-FTR-33), no `direction` param. Floor fillets need the exact kernel (Manifold: `FTR_NEEDS_EXACT_KERNEL`).
+- `add_joggle` takes `angle` only (not `run`); `convert_to_sheet_metal` needs an explicit `rule` whose thickness matches the measured one (0.1 %).
+- Waivers: always `FTR_WAIVER_NOT_APPROVED` until gap 09 approval records exist (AERO-4).
+- Codes added: `FTR_JOGGLE_LINE_INVALID`, `FTR_EDGE_OCCUPIED`, `FTR_RELIEF_INVALID`, `FTR_CUTOUT_INVALID`, `FTR_PARAM_INVALID`, `FTR_DRILL_POINT_ANGLE_OUT_OF_RANGE`, `FTR_FEATURE_BUILD_FAILED`, `FTR_POCKET_CORNER_TOO_LARGE`.
+- Not built: flanged hole, bead, corner relief, hem, auto relief on `add_flange` (M5/M8 rest), OCC-native BRepFeat (M7), VC-FTR-21 (CTC-02…05 not stored), VC-FTR-32 (recognised → `add_hole` steps), MCP prompt `design_sheet_bracket`, UI panels.
+
+**Review fixes (cad-reviewer, 2026-10-17):** `add_hole` checks a blind depth against the local stock under each hole; `hole_table`
+lists authored holes without a kernel and refuses `FTR_NEEDS_EXACT_KERNEL` otherwise; sheet-metal parts carry a material and layer
+through `set_sheet_metal_material` (re-applied on every derivation and load); fastener catalogues refuse non-positive grip / length
+increments and embedded `licensed-no-redistribution` families (`FAST_LICENCE_EMBED_FORBIDDEN`).
+
+**Round 2 (2026-10-17): the rest of the 07 scope.**
+
+| Item | Where / evidence |
+| ---- | ---------------- |
+| Sheet metal: `add_flanged_hole`, `add_bead`, `add_corner_relief`, `add_hem` (closed / open), `add_contour_flange` (chain of flats + bends from an open profile), automatic rectangular relief on `add_flange` (`autoRelief`, default on), `set_sheet_metal_material` | `packages/domain-aero/src/sheetmetal/**`; VC-FTR-12/13/14/15 measured on OCC (`server/tests/occtSheetMetalForms.test.ts`, values in validation/README.md) |
+| Core: `add_rib` (VC-FTR-33), `counterdrill`, extents `up_to_next` / `up_to_face`, pocket `islands` / `upToFace` / `open`, `holes_from_recognition` (VC-FTR-32: machined plate rebuilt at rel 3.2e-15, CTC-01 at 4.5e-10) | `commands/features/`, `server/tests/occtFeatureOptions.test.ts` |
+| M7 OCC-native features: `KernelOps.feature?` tried first, `BRepFeat_MakePrism` (pockets without islands) and `BRepFeat_MakeRevol` (holes, ≤ 8 positions), lowering otherwise; native vs lowered equal to 1e-9 (VC-FTR-25, 14 parity cases) | `packages/kernel-occt/src/occtFeatures.ts`, `server/tests/occtNativeFeatures.test.ts` |
+| VC-FTR-21 / 46: NIST CTC-02…05 pinned in `quality/corpus.json` (sha256 verified, fetched by `npm run quality:fetch`, not committed); apex counts 74 / 0 / 22 / 10 and 45° seeds 0 / 0 / 42 / 3 match; recognition 3.8 s / 0.35 s / 2.0 s / 0.65 s | `server/tests/quality/ftrRecognition.gate.ts` |
+| UI: Manufacturing tab (flat-pattern preview + materialize + DXF download, findings with review banner and provenance, sortable feature table, hole form with 82/90/100° presets labelled unverified); MCP prompt `design_sheet_bracket` | `src/ui/panels/manufacturing/`, `packages/mcp/src/prompts.ts` |
+
+Deviations of round 2: `up_to_next` / `up_to_face` and pocket `upToFace` are stored as the resolved depth (replay re-resolves through the command);
+`counterdrill` = countersink cone to `cboreDiameter`, then counterbore, then bore (no source definition: review); rib joints sharper than
+≈ 154° are refused; contour flanges attach to a base edge (no standalone part); hem / flanged-hole developed sizes are unverified models;
+no pocket / sheet-metal parameter forms in the UI (hole form only). Codes added: `FTR_FORM_INVALID`, `FTR_POCKET_ISLAND_INVALID`,
+`FTR_RIB_PATH_NOT_SUPPORTED`, `FTR_UP_TO_TARGET_INVALID`. What stays open is outside the built kernel: `BRepFeat_MakeCylindricalHole` /
+`MakeLinearForm` are not constructible in opencascade.js 1.1.1 (AERO-2-M2), the OCP cross-check of VC-FTR-33 needs `cadquery-ocp`,
+and modelled threads (VC-FTR-36) are V2 / M8.
+
+**Round-2 review fixes (cad-reviewer):** `up_to_next` depth is refined on the exact faces when the kernel has the face-query port (the
+method, exact or mesh, is reported); `up_to_face` onto the face where the material ends overshoots by 2ε; a native BRepFeat attempt that
+degrades the OCC module disables native features for the process and is retried after the kernel epoch bump instead of lowering on the
+degraded module; `set_sheet_metal_material` refuses prototype-key names.
+
+**Round 3 (2026-10-17, lane K): every validation case run and recorded.** `validation/RESULTS.json` / `RESULTS.md` hold one record per
+VC of `validation/README.md` (status, expected vs measured, the tests that run it); `tests/unit/contract/aeroValidationMatrix.test.ts`
+fails when a case has no record, a listed test file is missing or does not name the case, or a blocked case has no reason. 45 of 47
+cases pass; VC-FTR-33 (OCP `BRepFeat_MakeLinearForm` cross-check; the analytic and closed-form rib checks pass) and VC-FTR-36 (modelled
+threads, pack row TBD) are in progress by lane J. `expected_results.json` is now replayed through the real CLI entry
+(`server/tests/packReplay07.test.ts`, `runCli --json`), including the CLI-phrased VC-FTR-44 / 45 / 46 (the last in
+`server/tests/quality/ftrRecognition.gate.ts`); the four `plans/*.json` run through `build_project` (pocket outline as `rectangle` +
+`cornerRadius`). `build_expected_results.py` was brought in line with the built commands (JG-01..03 and JG-04 plans, pocket params,
+`<first:PATH>`, `error.code` paths) and regenerated.
+
+Found and fixed while proving the cases: `llull run --validate` did not type-check literal params (a plan with `thickness: "abc"` was
+"valid"; now `step 0 (sheet_metal_calc): invalid params — thickness: …`, VC-FTR-45); `export_code` after `set_thread` replaced the
+holed solid by a triangle mesh and lost the thread comment (VC-FTR-28; kernel results edited in place are lowered from their recipe
+again); a command's own refusal (`error` set, no `rejected`: `insert_fastener_row` FAST_PITCH, `decode_part_number`) exited 0 in the CLI
+(now exit 1, as VC-MAT-24 requires). Tests tightened: VC-FTR-08 (refold = re-derivation), 13 (flat cut Ø 34.705133, physical Ø 47.2),
+19 (joggle offset), 28 (save / load, code comment), 29 (regeneration after editing the catalogue step), 30, 34 (datum coordinates), 35
+(command level, 1e-9).
+
+**Round 3 (lane J, 2026-10-17): OCP cross-check and modelled threads.**
+
+- VC-FTR-33 OCP cross-check: `validation/crosscheck_rib_ocp.py` (pure OCP, `python3 -I`, cadquery-ocp 8.0.1.1.0) fuses a 3 × 80 × 20 prism on the 100 × 60 × 10 plate: 64800.0 mm³, equal to the OCC rib of llull at rel 1e-6 (`data/expected_rib_ocp.json`, asserted in `server/tests/occtFeatureOptions.test.ts`). `BRepFeat_MakeLinearForm` was tried and does not reproduce the rib (570000 mm³); the prism fuse is the reference. `generate_test_parts.py` and `survey_step_features.py` (CTC-01…05) re-run to the committed JSON exactly.
+- FR-FTR-20 / VC-FTR-36 modelled threads: `ThreadSpec.modelled` (with `pitch`, `majorDiameter` in document units, resolved from the designation by `parseThreadDimensions` in `lib/threadForm.ts`: M / MJ with explicit pitch, UN / UNJ with size and TPI). Geometry: one planar-faced helical groove tool per hole position (`geometry/threadTool.ts`), the basic internal ISO 68-1 trapezoid in the axial plane, unioned with the bore tool by `featureLowering`; the recipe key covers a modelled thread only (cosmetic stays neutral); the native OCC hole path defers to the lowering. `set_thread` with `modelled` rebuilds the mesh through `ctx.kernel` (refusals `FTR_NEEDS_EXACT_KERNEL`, `FTR_FEATURE_BUILD_FAILED`, `FTR_HOLE_DIAMETERS_INCONSISTENT`, `FTR_THREAD_DESIGNATION_INVALID`).
+- Why a faceted tool: a pipe sweep twists a non-circular section along a helix (both kernels), a smooth loft rounds the trapezoid corners (closed Catmull-Rom ring) and, on OCC, booleans of a helical BSpline skin with the coaxial bore cylinder hang or drop an operand; planar facets intersect robustly. Ring radii are inflated by √(step / sin step) so each wedge keeps the area of its circular sector (volume-faithful, flanks within the chord sag ≈ 0.01 mm).
+- OCC kernel changes needed by threads: post-boolean `UnifySameDomain` is skipped for shapes with > 40 freeform or > 600 faces (it never returned on a thread); the display mesh of a freeform-heavy solid that meshes open is retried at 0.02 mm / 0.2 rad.
+- Deviations: MJ / UNJ root radius not applied (`unverified`); coarse `M6` (no pitch) is refused for modelling (ISO 261 table not stored); the thread end is a flat cut, no run-out; bore diameter must stay within about 0.2 P below the minor diameter and below the major diameter; Manifold groove is +8.6e-3 rel, OCC +2.85e-3 rel to the analytic screw groove (sign: facets plus the faceted bore of Manifold).

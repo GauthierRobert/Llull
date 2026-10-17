@@ -7,6 +7,7 @@
 import type { EdgeCurve, FaceSurface, ShapeEdge, ShapeFace, ShapeTopology } from '@core/geometry/kernel';
 import type { Vec3 } from '@core/model/types';
 import { release } from '@core/geometry/nativeObject';
+import { faceMetric } from './occtFaceMetrics';
 import { explorer, type OccApi, type OccHandle, type OccPoint, type OccShape } from './occtTypes';
 
 type SubShapeKind = 'TopAbs_SOLID' | 'TopAbs_SHELL' | 'TopAbs_FACE' | 'TopAbs_EDGE' | 'TopAbs_VERTEX';
@@ -35,6 +36,48 @@ export function uniqueSubShapes(api: OccApi, shape: OccShape, kind: SubShapeKind
   }
   exp.delete();
   return unique;
+}
+
+const ordinals = new WeakMap<object, Map<SubShapeKind, number[]>>();
+
+/** Explorer ordinal of each distinct sub-shape of `kind`, in `uniqueSubShapes` order; computed once per shape and kind. */
+function distinctOrdinals(api: OccApi, shape: OccShape, kind: SubShapeKind): number[] {
+  const known = ordinals.get(shape) ?? new Map<SubShapeKind, number[]>();
+  ordinals.set(shape, known);
+  const cached = known.get(kind);
+  if (cached !== undefined) return cached;
+  const found: number[] = [];
+  const buckets = new Map<number, OccShape[]>();
+  const exp = explorer(api, shape, kind);
+  for (let ordinal = 0; exp.More(); exp.Next(), ordinal++) {
+    const current = exp.Current();
+    const hash = current.HashCode(HASH_BOUND);
+    const bucket = buckets.get(hash) ?? [];
+    buckets.set(hash, bucket);
+    if (bucket.some((seen) => seen.IsSame(current))) release(current);
+    else {
+      bucket.push(current);
+      found.push(ordinal);
+    }
+  }
+  exp.delete();
+  [...buckets.values()].flat().forEach(release);
+  known.set(kind, found);
+  return found;
+}
+
+/**
+ * The `index`-th distinct sub-shape of `kind` (the caller releases it), or null when out of range. Walks the explorer to its ordinal instead of
+ * hashing every sub-shape, so a per-face query costs O(position) cheap steps rather than O(faces) hash lookups.
+ */
+export function subShapeAt(api: OccApi, shape: OccShape, kind: SubShapeKind, index: number): OccShape | null {
+  const ordinal = distinctOrdinals(api, shape, kind)[index];
+  if (ordinal === undefined) return null;
+  const exp = explorer(api, shape, kind);
+  for (let step = 0; step < ordinal; step++) exp.Next();
+  const current = exp.Current();
+  exp.delete();
+  return current;
 }
 
 interface GProps extends OccHandle {
@@ -216,14 +259,12 @@ export function surfaceKindOf(api: OccApi, adaptor: { GetType(): unknown }): Fac
   return classify(api.GeomAbs_SurfaceType, SURFACES, adaptor.GetType(), 'other');
 }
 
-function faceInfo(api: OccApi, shape: OccShape, index: number): ShapeFace {
+function faceInfo(api: OccApi, solid: OccShape, shape: OccShape, index: number): ShapeFace {
   const face = api.TopoDS.Face_1(shape) as OccShape;
   const adaptor = new api.BRepAdaptor_Surface_2(face, true) as SurfaceAdaptor;
-  const props = new api.GProp_GProps_1() as GProps;
-  api.BRepGProp.SurfaceProperties_1(face, props, false, false);
   const surface = surfaceKindOf(api, adaptor);
-  const info: ShapeFace = { index, surface, area: props.Mass(), ...faceGeometry(face, adaptor, surface) };
-  [props, adaptor, face].forEach(release);
+  const info: ShapeFace = { index, surface, area: faceMetric(api, solid, index, face).area, ...faceGeometry(face, adaptor, surface) };
+  [adaptor, face].forEach(release);
   return info;
 }
 
@@ -241,7 +282,7 @@ export function shapeTopology(api: OccApi, shape: OccShape): ShapeTopology {
   api.BRepGProp.VolumeProperties_1(shape, volumeProps, false, false, false);
   const topology: ShapeTopology = {
     solids: count('TopAbs_SOLID'),
-    faces: faces.map((face, index) => faceInfo(api, face, index)),
+    faces: faces.map((face, index) => faceInfo(api, shape, face, index)),
     edges: edges.map((edge, index) => edgeInfo(api, edge, index, faceCounts[index] ?? 0)),
     vertices: count('TopAbs_VERTEX'),
     volume: Math.abs(volumeProps.Mass()),

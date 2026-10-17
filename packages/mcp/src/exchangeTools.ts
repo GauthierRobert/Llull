@@ -15,6 +15,7 @@ import { nonEmptyString } from '@lib/nonEmptyString';
 import { safeFileName } from '@lib/safeFileName';
 import type { McpToolDefinition } from './tools';
 import { applyFeaToolCall, type FeaToolsPort } from './feaTools';
+import { applyLibraryToolCall, type MaterialLibraryStorePort } from './libraryTools';
 import { shapeToolCallContent, type McpShapedResult } from './dispatch';
 import type { CommandOutcome } from './restProtocol';
 
@@ -47,6 +48,7 @@ export interface ExchangeDeps {
   readonly port: CadExchangePort | null;
   readonly dwg?: DwgConverterPort | null;
   readonly fea?: FeaToolsPort | null; // fea_mesh / fea_solve / fea_export transports
+  readonly libraries?: MaterialLibraryStorePort | null; // register_material_library
   readonly getDoc: () => CadDocument;
   readonly applyCommand: (name: string, params: unknown) => ExchangeCommandResult; // the command bus (undo + broadcast)
   readonly allowCodeExecution: boolean; // import_code runs arbitrary Python
@@ -75,6 +77,11 @@ export function buildExchangeToolDefinitions(): McpToolDefinition[] {
           save: {
             type: 'boolean',
             description: 'Also write <name>.step into the server exchange directory (default true when configured).',
+          },
+          confirmExportControlled: {
+            type: 'boolean',
+            description:
+              'Documents that use ITAR / EAR material records are refused (MAT_EXPORT_CONTROLLED). Only a human signature in the desktop app lifts this; an agent passing true gets MAT_HUMAN_GATE.',
           },
         },
         required: [],
@@ -192,8 +199,8 @@ interface StepFile {
 const NO_STEP_BACKEND = 'STEP export needs the Python bridge (LLULL_PYTHON is off) or the exact OCC kernel (LLULL_KERNEL=occt).';
 
 /** Without the Python bridge the exact kernel writes the STEP (`export_step_exact`). */
-function exportStepExact(getDoc: () => CadDocument, name?: string): StepFile | { error: string } {
-  const exact = execute(getDoc(), 'export_step_exact', {});
+function exportStepExact(getDoc: () => CadDocument, name?: string, confirmation?: unknown): StepFile | { error: string } {
+  const exact = execute(getDoc(), 'export_step_exact', confirmation === undefined ? {} : { confirmExportControlled: confirmation });
   const data = exact.data as { step?: string; solidCount?: number } | undefined;
   if (data?.step === undefined) return { error: `${NO_STEP_BACKEND} Kernel export: ${exact.summary}` };
   const fileName = `${safeFileName(name, 'model')}.step`;
@@ -215,12 +222,16 @@ function exportStepExact(getDoc: () => CadDocument, name?: string): StepFile | {
 export async function exportStepFile(
   getDoc: () => CadDocument,
   port: CadExchangePort | null,
-  options: { name?: string; language?: unknown; save?: boolean },
+  options: { name?: string; language?: unknown; save?: boolean; confirmExportControlled?: unknown },
 ): Promise<StepFile | { error: string }> {
-  if (port === null) return exportStepExact(getDoc, options.name);
+  if (port === null) return exportStepExact(getDoc, options.name, options.confirmExportControlled);
   const language = pythonLanguage(options.language);
   if (language === null) return { error: 'export_step: language must be "cadquery" or "build123d".' };
-  const code = execute(getDoc(), 'export_code', { language, name: options.name ?? 'model' });
+  const code = execute(getDoc(), 'export_code', {
+    language,
+    name: options.name ?? 'model',
+    ...(options.confirmExportControlled !== undefined ? { confirmExportControlled: options.confirmExportControlled } : {}),
+  });
   const codeData = code.data as { text: string; fileName: string; solidCount: number; source: string } | undefined;
   if (codeData === undefined) return { error: `export_step: ${code.summary}` };
   if (codeData.solidCount === 0) return { error: 'export_step: the model has no 3D solids to export.' };
@@ -243,6 +254,7 @@ async function exportStep(deps: ExchangeDeps, port: CadExchangePort | null, args
   const file = await exportStepFile(deps.getDoc, port, {
     language: args.language,
     save: args.save !== false,
+    ...(args['confirmExportControlled'] !== undefined ? { confirmExportControlled: args['confirmExportControlled'] } : {}),
     ...(name !== undefined ? { name } : {}),
   });
   if ('error' in file) return failure(file.error);
@@ -330,6 +342,8 @@ const EXCHANGE_HANDLERS = new Map([
 export async function applyExchangeToolCall(toolName: string, rawArgs: unknown, deps: ExchangeDeps): Promise<McpShapedResult | null> {
   const fea = await applyFeaToolCall(toolName, rawArgs, deps);
   if (fea !== null) return fea;
+  const library = applyLibraryToolCall(toolName, rawArgs, deps);
+  if (library !== null) return library;
   if (toolName === 'import_dwg') {
     if (deps.dwg === undefined || deps.dwg === null) return failure(`import_dwg ${NO_DWG}`);
     try {

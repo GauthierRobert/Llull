@@ -1,0 +1,208 @@
+/* Manufacturing, Fasteners and material-record surfaces (aerospace 07/08). Same tokens as Review; status = glyph + word, never colour alone. */
+
+.mfg__part,
+.mfg__actions,
+.mfg__figures,
+.mfg__subhead {
+  padding: var(--space-1) var(--space-3);
+}
+
+.mfg__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.mfg__figures {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.mfg__subhead {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+
+.mfg__form {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+}
+
+.mfg__presets {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.mfg__table {
+  width: calc(100% - 2 * var(--space-3));
+  margin: var(--space-1) var(--space-3);
+  border-collapse: collapse;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.mfg__table th,
+.mfg__table td {
+  padding: 3px var(--space-1);
+  text-align: left;
+  font-weight: 400;
+  border-bottom: 1px solid var(--divider);
+  color: var(--fg-muted);
+}
+
+.mfg__table thead th {
+  font-weight: 600;
+  color: var(--fg-subtle);
+}
+
+.mfg__table tbody th {
+  color: var(--fg);
+  font-family: var(--font-mono);
+}
+
+.mfg__sort {
+  all: unset;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.mfg__sort:focus-visible {
+  outline: 2px solid var(--accent-border);
+  outline-offset: 2px;
+}
+
+.flat-preview {
+  display: block;
+  width: 160px;
+  height: 160px;
+  margin: var(--space-2) var(--space-3);
+  color: var(--accent-text);
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+}
+
+.review-banner {
+  margin: var(--space-2) var(--space-3);
+  padding: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--fg);
+  background: var(--warning-soft);
+  border-left: 3px solid var(--warning);
+  border-radius: var(--radius-xs);
+}
+
+.review-banner__unverified {
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.provenance {
+  margin: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+}
+
+.provenance__toggle {
+  cursor: pointer;
+  color: var(--accent-text);
+}
+
+.provenance__body {
+  margin: var(--space-1) 0 0;
+  padding: var(--space-2);
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px var(--space-2);
+  background: var(--surface-popover);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.provenance__body dt {
+  color: var(--fg-subtle);
+}
+
+.provenance__body dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.badge {
+  display: inline-block;
+  padding: 1px var(--space-2);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  color: var(--fg-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+}
+
+.badge--danger {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.badge--warn {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.material-library {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.material-library__head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.material-library__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+}
+
+.material-library__records {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fastener-family {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.fastener-dialog {
+  width: min(460px, 92vw);
+  max-height: 86vh;
+  overflow-y: auto;
+}
+
+.fastener-preview {
+  padding: var(--space-2);
+  font-size: var(--text-sm);
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+}
+
+.fastener-preview[data-ok='false'] {
+  border-left: 3px solid var(--danger);
+}
+
+.fastener-preview__reasons {
+  margin: 0;
+  padding-left: var(--space-4);
+}

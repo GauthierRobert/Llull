@@ -8,6 +8,7 @@ import { isRecord } from '@lib/isRecord';
 import { buildMcpTools, type McpToolDefinition } from './tools';
 import { buildExchangeToolDefinitions } from './exchangeTools';
 import { buildFeaToolDefinitions } from './feaTools';
+import { buildLibraryToolDefinitions } from './libraryTools';
 import { shapeToolCallContent, type McpShapedResult } from './dispatch';
 import { TOOLSET_NAMES, isToolEnabled, toolsetOf, type ToolsetName } from './toolsets';
 
@@ -63,7 +64,13 @@ export function buildDiscoveryToolDefinitions(): McpToolDefinition[] {
 
 /** Every tool a session can be served: registry commands + exchange + FE + discovery meta-tools. */
 export function buildAllMcpTools(): McpToolDefinition[] {
-  return [...buildMcpTools(), ...buildExchangeToolDefinitions(), ...buildFeaToolDefinitions(), ...buildDiscoveryToolDefinitions()];
+  return [
+    ...buildMcpTools(),
+    ...buildExchangeToolDefinitions(),
+    ...buildFeaToolDefinitions(),
+    ...buildLibraryToolDefinitions(),
+    ...buildDiscoveryToolDefinitions(),
+  ];
 }
 
 /** Plural-insensitive stem: "edges" -> "edge", "holes" -> "hole", "entities" -> "entity". */

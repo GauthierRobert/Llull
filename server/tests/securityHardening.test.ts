@@ -10,7 +10,7 @@ import os from 'os';
 import path from 'path';
 import type { Request, Response } from 'express';
 import { app } from '../src/index';
-import { guardMutation, hasValidBearer, isLoopbackAddress, checkBindSafety } from '../src/security';
+import { guardMutation, hasValidBearer, isLoopbackAddress, isLocalPeer, checkBindSafety } from '../src/security';
 import { createAutosaver } from '../src/autosave';
 import { createEmptyDocument } from '@core/model/types';
 
@@ -42,6 +42,23 @@ describe('isLoopbackAddress', () => {
   it('classifies addresses', () => {
     for (const a of ['127.0.0.1', '127.5.6.7', '::1', '::ffff:127.0.0.1', 'localhost']) expect(isLoopbackAddress(a)).toBe(true);
     for (const a of ['10.0.0.5', '::ffff:10.0.0.5', '0.0.0.0', undefined]) expect(isLoopbackAddress(a)).toBe(false);
+  });
+});
+
+describe('isLocalPeer', () => {
+  it('is local for a bare loopback peer and not for any proxy-relay header or a non-loopback address', () => {
+    expect(isLocalPeer(fakeReq({}, '127.0.0.1'))).toBe(true);
+    for (const header of [
+      'x-forwarded-for',
+      'forwarded',
+      'x-real-ip',
+      'cf-connecting-ip',
+      'x-forwarded-host',
+      'x-forwarded-proto',
+      'x-forwarded-port',
+    ])
+      expect(isLocalPeer(fakeReq({ [header]: 'x' }, '127.0.0.1')), header).toBe(false);
+    expect(isLocalPeer(fakeReq({}, '203.0.113.9'))).toBe(false);
   });
 });
 

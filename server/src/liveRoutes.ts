@@ -12,8 +12,9 @@
 import { Router, type Request, type RequestHandler } from 'express';
 import { isRecord } from '@lib/isRecord';
 import { applyCommand, undo, redo } from './commandBus';
-import { subscribeLive, getLiveSnapshot, liveSubscriberCount, MAX_LIVE_SUBSCRIBERS, liveMaxPerClient } from './liveDocument';
-import { guardMutation, guardRead, guardTicketIssue } from './security';
+import { getLiveDoc, subscribeLive, getLiveSnapshot, liveSubscriberCount, MAX_LIVE_SUBSCRIBERS, liveMaxPerClient } from './liveDocument';
+import { guardMutation, guardRead, guardTicketIssue, isLocalPeer } from './security';
+import { redactLicensedOutcome } from '@mcp/index';
 import { actorOf } from './audit';
 import { TICKET_TTL_MS, issueTicket } from './tickets';
 import { requestUser } from './users';
@@ -78,7 +79,8 @@ export function buildLiveRouter(restLimiter: RequestHandler): Router {
     if (commandId !== undefined && (typeof commandId !== 'string' || commandId.length === 0)) {
       return void res.status(400).json({ error: '"commandId" must be a non-empty string when present.' });
     }
-    res.status(200).json(applyCommand(name, params ?? {}, commandId, actorOf(res, body.client === 'cli' ? 'cli' : 'rest')));
+    const applied = applyCommand(name, params ?? {}, commandId, actorOf(res, body.client === 'cli' ? 'cli' : 'rest'));
+    res.status(200).json(isLocalPeer(req) ? applied : redactLicensedOutcome(getLiveDoc(), name, params, applied));
   });
 
   router.post('/undo', restLimiter, mutationGuard, (_req, res) => void res.status(200).json(undo(actorOf(res, 'rest'))));

@@ -1,0 +1,99 @@
+{
+  "schema": "llull-sources-lock/1",
+  "note": "sha256 pins the primary file (TR-MAT-41). null = the file could not be fetched (reason given): the value is still traceable by URL and locator but not content-pinned.",
+  "sources": {
+    "S13": {
+      "citation": "Michlin Metals, 7075 AMS 4154 / AMS 4045 (supplier page)",
+      "url": "https://www.michlinmetals.com/7075-aluminum-round-bar-ams-4154-ams-4045-sheet-plate/",
+      "grade": "supplier",
+      "sha256": null,
+      "size": null,
+      "retrieved": null,
+      "unpinned": {
+        "reason": "primary file not fetched",
+        "attempted": "2026-10-17",
+        "result": "HTTP 403 (CONNECT tunnel failed) from the build sandbox proxy; the primary file was never downloaded"
+      }
+    },
+    "S15": {
+      "citation": "Rolled Alloys, Data Sheet - 6Al-4V Titanium (supplier datasheet)",
+      "url": "https://www.rolledalloys.com/wp-content/uploads/6AL4V_Data-sheet.pdf",
+      "grade": "supplier",
+      "sha256": null,
+      "size": null,
+      "retrieved": null,
+      "unpinned": {
+        "reason": "primary file not fetched",
+        "attempted": "2026-10-17",
+        "result": "HTTP 403 (CONNECT tunnel failed) from the build sandbox proxy; the primary file was never downloaded"
+      }
+    },
+    "S16": {
+      "citation": "Aircraft Materials, Ti-6Al-4V typical annealed sheet properties; titanium.com AMS 4911 summary",
+      "url": "https://www.aircraftmaterials.com/data/titanium/ti6al4v.html",
+      "grade": "typical / supplier",
+      "sha256": null,
+      "size": null,
+      "retrieved": null,
+      "unpinned": {
+        "reason": "primary file not fetched",
+        "attempted": "2026-10-17",
+        "result": "HTTP 403 (CONNECT tunnel failed) from the build sandbox proxy; the primary file was never downloaded"
+      }
+    },
+    "S21": {
+      "citation": "AIA/NAS NAS6203-6220 catalogue entry (GlobalSpec / Accuris): 160 KSI Ftu bolt",
+      "url": "https://store.accuristech.com/standards/aia-nas6203-6220?product_id=2926055",
+      "grade": "catalogue",
+      "sha256": null,
+      "size": null,
+      "retrieved": null,
+      "unpinned": {
+        "reason": "primary file not fetched",
+        "attempted": "2026-10-17",
+        "result": "HTTP 403 (CONNECT tunnel failed) from the build sandbox proxy; the primary file was never downloaded"
+      }
+    },
+    "S22": {
+      "citation": "Airfasco NAS6203 / NAS6204 product pages (minimum shear 95 ksi)",
+      "url": "https://airfasco.com/products/NAS/NAS6203THRUNAS6220/NAS6204.php",
+      "grade": "distributor",
+      "sha256": null,
+      "size": null,
+      "retrieved": null,
+      "unpinned": {
+        "reason": "primary file not fetched",
+        "attempted": "2026-10-17",
+        "result": "HTTP 403 (CONNECT tunnel failed) from the build sandbox proxy; the primary file was never downloaded"
+      }
+    },
+    "S26": {
+      "citation": "Hi-Shear HL18 drawing (AAE store); HL10 / HL18 shear 95 ksi",
+      "url": "https://www.aaestore.com.au/media/specs/HL18.pdf",
+      "grade": "manufacturer drawing / distributor",
+      "sha256": null,
+      "size": null,
+      "retrieved": null,
+      "unpinned": {
+        "reason": "primary file not fetched",
+        "attempted": "2026-10-17",
+        "result": "HTTP 403 (CONNECT tunnel failed) from the build sandbox proxy; the primary file was never downloaded"
+      }
+    },
+    "S38": {
+      "citation": "MIL-HDBK-5J (31 January 2003, cancelled), EverySpec listing",
+      "url": "https://everyspec.com/MIL-HDBK/MIL-HDBK-0001-0099/MIL_HDBK_5J_139/",
+      "grade": "primary (index)",
+      "sha256": null,
+      "size": null,
+      "retrieved": null,
+      "unpinned": {
+        "reason": "primary file not fetched",
+        "attempted": "2026-10-17",
+        "result": "HTTP 403 (CONNECT tunnel failed) from the build sandbox proxy; the primary file was never downloaded"
+      },
+      "milHdbk5J": true,
+      "supersededBy": "MMPDS"
+    }
+  }
+}

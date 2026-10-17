@@ -3,7 +3,10 @@ import { getCommand, listCommands } from '@core/commands/registry';
 import { commandCatalog } from '@core/commands/schema';
 import type { CommandDefinition } from '@core/commands/types';
 
-const modules = import.meta.glob(['/packages/core/src/commands/**/*.ts', '/packages/domain-aec/src/**/*.ts'], { eager: true });
+const modules = import.meta.glob(
+  ['/packages/core/src/commands/**/*.ts', '/packages/domain-aec/src/**/*.ts', '/packages/domain-aero/src/**/*.ts'],
+  { eager: true },
+);
 
 function isCommandDefinition(value: unknown): value is CommandDefinition<unknown> {
   return (

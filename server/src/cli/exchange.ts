@@ -6,7 +6,7 @@
 
 import fs from 'fs';
 import type { CadDocument } from '@core/model/types';
-import { buildExchangeToolDefinitions, buildFeaToolDefinitions } from '@mcp/index';
+import { buildExchangeToolDefinitions, buildFeaToolDefinitions, buildLibraryToolDefinitions } from '@mcp/index';
 import type { McpToolDefinition } from '@mcp/tools';
 import { isRecord } from '@lib/isRecord';
 import { runExchangeTool } from '../exchangeResult';
@@ -16,7 +16,7 @@ import type { CommandOutcome } from '@mcp/restProtocol';
 let definitions: readonly McpToolDefinition[] | null = null;
 
 export function exchangeToolDefinitions(): readonly McpToolDefinition[] {
-  definitions ??= [...buildExchangeToolDefinitions(), ...buildFeaToolDefinitions()];
+  definitions ??= [...buildExchangeToolDefinitions(), ...buildFeaToolDefinitions(), ...buildLibraryToolDefinitions()];
   return definitions;
 }
 
@@ -31,6 +31,7 @@ const FILE_PARAMS: Readonly<Record<string, { key: string; encoding: 'base64' | '
   import_dwg: { key: 'dwgBase64', encoding: 'base64' },
   import_code: { key: 'code', encoding: 'utf8' },
   fea_import_field: { key: 'csv', encoding: 'utf8' },
+  register_material_library: { key: 'libraryJson', encoding: 'utf8' },
 };
 
 /** Whether `file=<path>` fills a content parameter of `name` (the exchange tools and `import_step_exact`, a registry command). */

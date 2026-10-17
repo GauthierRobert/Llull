@@ -7,6 +7,7 @@ import type { CadDocument } from '../model/types';
 import type { GeometryKernel } from '../geometry/kernel';
 import type { PhysicsEngine } from '../dynamics/physicsEngine';
 import type { FeArtifactPort, HumanSignaturePort } from '../model/analysis';
+import type { MaterialLibrary } from '../model/materialLibrary';
 import type { IdSource } from '../lib/id';
 import type { ReplayCache } from './history/replayCache';
 import type { ZodType } from 'zod';
@@ -62,6 +63,11 @@ export interface CommandAnnotations {
    * parameter-table commands (document INPUT state, architecture L8). Not emitted to MCP.
    */
   readonly metaHistory?: boolean;
+  /**
+   * Session command (OQ-MAT-09): changes the in-memory document only. `execute` appends no FeatureStep and the host neither logs nor
+   * syncs it; its effect is never serialized (private material-library values, TR-MAT-31). Not emitted to MCP.
+   */
+  readonly session?: boolean;
   /**
    * Needs `ExecutionContext.kernel`: `execute` no-ops it with a "kernel not ready" summary when none is available and `replayHistory`
    * refuses to regenerate a history containing it. Not emitted to MCP.
@@ -148,6 +154,15 @@ export interface PlanStepEvent {
   readonly stepPosition?: number;
 }
 
+/**
+ * Read-only access to material library files held on this machine (08 MAT M3, `~/.llull/libraries/` on the server). Private-library
+ * values reach a document only through this port; absent / null = none installed.
+ */
+export interface MaterialLibraryProvider {
+  /** The library `libraryId` at `version`, or null when this machine does not hold it (or the file is not a valid library). */
+  get(libraryId: string, version: string): MaterialLibrary | null;
+}
+
 export interface ExecutionContext {
   /** Geometry kernel for booleans/fillets; null while none is installed or loaded. */
   readonly kernel: GeometryKernel | null;
@@ -157,6 +172,8 @@ export interface ExecutionContext {
   readonly feaArtifacts?: FeArtifactPort | null;
   /** Human-signature verifier (09 PLM); null/absent = human-gate commands refuse. */
   readonly humanSignature?: HumanSignaturePort | null;
+  /** Material library files of this machine (`import_material_library` by reference, `resolve_material_libraries`); null/absent = none. */
+  readonly libraries?: MaterialLibraryProvider | null;
   /** Mints every id the command creates. */
   readonly ids: IdSource;
   /** Resolves command names for commands that run other commands. */

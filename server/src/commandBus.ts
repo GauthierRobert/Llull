@@ -74,7 +74,11 @@ function boundedForReplay(result: CommandResponseBody): CommandResponseBody {
 function runCommand(name: string, params: unknown, actor?: Actor, commandId?: string): CommandResponseBody {
   const prior = getLiveDoc();
   const { document, outcome } = runCommandOutcome(prior, name, params, serverContext());
-  if (outcome.changed) {
+  if (outcome.changed && getCommand(name)?.annotations?.session === true) {
+    // Session command (resolve_material_libraries): in memory only, no undo entry, no command log; clients get a snapshot.
+    setLiveDoc(document);
+    recordAudit(actor, name, params, outcome.summary, outcome.affected.length);
+  } else if (outcome.changed) {
     history.undo = pushCapped(history.undo, prior);
     history.redo = [];
     setLiveDoc(document, {

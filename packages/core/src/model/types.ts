@@ -10,6 +10,10 @@ import type { DrawingsModel } from './sheet';
 import type { DynamicsModel } from './dynamics';
 import type { PrototypeModel } from './prototype';
 import type { CurveSegment } from './curve';
+import type { FastenerModel, PartRef } from './fasteners';
+import type { MaterialLibraryEntry, MaterialRecordInfo } from './materialLibrary';
+import type { SheetMetalModel } from './sheetMetal';
+import type { FeatureParams } from './features';
 
 /** Re-exported: every model consumer reads its vectors from here. */
 export type { Vec2, Vec3 };
@@ -140,6 +144,8 @@ export interface MeshSolidEntity extends BaseEntity {
   mesh: MeshData;
   /** Exact shape recipe of a kernel result; absent for imported / triangle-only meshes. */
   brep?: ShapeRecipe;
+  /** Set only on the groove tool of a modelled thread (feature lowering): kernels skip post-boolean face merging on results built from it. */
+  threadTool?: true;
 }
 
 /** Base circle in XY centered at `position`, apex at +Z. */
@@ -517,6 +523,8 @@ export interface Component {
   name: string;
   entities: Record<EntityId, Entity>;
   order: EntityId[];
+  /** Standard part this component is (08 MAT, set by the fasteners plugin); `bill_of_materials` groups by it. */
+  readonly partRef?: PartRef;
 }
 
 /**
@@ -646,6 +654,12 @@ export interface CadDocument {
   blobs?: Record<string, DocumentBlob>;
   /** Absent until the first analysis command (`create_analysis`, plugin `cae`). */
   analysis?: AnalysisModel;
+  /** Imported material libraries by id (08 MAT M3); absent until `import_material_library`. */
+  materialLibraries?: Record<string, MaterialLibraryEntry>;
+  /** Absent until the first fastener command (plugin `fasteners`, 08 MAT M5). */
+  fasteners?: FastenerModel;
+  /** Absent until the first sheet-metal command (plugin `sheetmetal`, 07 FTR M3). */
+  sheetMetal?: SheetMetalModel;
 }
 
 /** Kernel provenance and modelling tolerance of a document (aerospace 01 KRN, TR-KRN-11/61). */
@@ -680,11 +694,14 @@ export interface DocumentBlob {
 /**
  * Physical + PBR material. `density` is mass per (document unit)³ so mass = volume × density (mm document: g/mm³, steel ≈ 0.00785).
  * Replaced via `create_material`.
- * @invariant density > 0 and finite; color matches /^#[0-9a-fA-F]{6}$/; metalness, roughness in [0, 1]
+ * @invariant density > 0 and finite (0 only on a `record` material with no density value yet, or an unresolved private stub); color matches
+ *   /^#[0-9a-fA-F]{6}$/; metalness, roughness in [0, 1]
  */
 export interface Material {
   readonly name: string;
   density: number;
+  /** Aerospace material record (08 MAT M2): designation, specs, licence, export marking, library origin. Absent on a legacy material. */
+  readonly record?: MaterialRecordInfo;
   color: string;
   metalness: number;
   roughness: number;
@@ -784,4 +801,6 @@ export type ShapeRecipe =
   /** Uniform scale about the world origin. */
   | { readonly op: 'scale'; readonly source: ShapeRecipe; readonly factor: number }
   /** An exact B-rep held in `CadDocument.blobs[blob]` (`BRepTools::Write` text): imported geometry (01 KRN TR-KRN-21). */
-  | { readonly op: 'brep'; readonly blob: string; readonly format: 'occt-brep-v1'; readonly label?: string };
+  | { readonly op: 'brep'; readonly blob: string; readonly format: 'occt-brep-v1'; readonly label?: string }
+  /** A hole group or pocket cut into a face of `source` (07 FTR); kernels lower it to boolean subtracts (`geometry/featureLowering`). */
+  | ({ readonly op: 'feature'; readonly source: ShapeRecipe } & FeatureParams);

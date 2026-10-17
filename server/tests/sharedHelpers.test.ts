@@ -67,6 +67,13 @@ describe('runCommandOutcome / outcomeIsFailure', () => {
     expect(outcomeIsFailure('add_box', noop, true)).toBe(false);
     expect(outcomeIsFailure('add_box', { ...noop, data: { ok: false } }, true)).toBe(true);
   });
+
+  it("counts a command's own refusal (error set, not rejected) as a failure even for a query that returns data (exit 1 in the CLI)", () => {
+    const refusal = { summary: 'x', affected: [], isError: false, changed: false, data: { matches: [] } };
+    const error = { code: 'FAST_PART_NUMBER_UNKNOWN', ids: ['XYZ123'], paths: [], remediation: 'import a catalogue' };
+    expect(outcomeIsFailure('decode_part_number', refusal)).toBe(false);
+    expect(outcomeIsFailure('decode_part_number', { ...refusal, error })).toBe(true);
+  });
 });
 
 describe('document files', () => {

@@ -9,6 +9,9 @@ import type { GeometryKernel } from '../geometry/kernel';
 import type { MeshData } from '../model/types';
 import type { ShapeRecipe } from '../model/types';
 import type { Feature, FeatureBase, Term } from './program';
+import { type FeatureRecipe, lowerFeature, needsReach, throughReach } from '../geometry/featureLowering';
+import { floorEdgeIndices } from '../geometry/featureFillet';
+import { featureNotes } from './featureNotes';
 
 const BOOLEAN_OPS = { union: 'union', subtract: 'cut', intersect: 'intersect' } as const;
 
@@ -60,6 +63,38 @@ export function modificationFeature(
   return { ...base, op: recipe.op, edges: recipe.edges, size, ...(near === undefined ? {} : { near }), ...fallback };
 }
 
+/** A hole / pocket as notes + tool solids + one cut (+ the floor fillet of a pocket); null when the kernel cannot supply what lowering needs. */
+function lowerFeatureNode(recipe: FeatureRecipe, lowering: RecipeLowering): Lowered | null {
+  const source = lowerRecipe(recipe.source, lowering);
+  const sourceShape = lowering.kernel?.evaluate(recipe.source) ?? null;
+  const mesh = sourceShape === null ? null : (lowering.kernel?.tessellate(sourceShape) ?? null);
+  if (source === null || (needsReach(recipe) && mesh === null)) return null;
+  const plan = lowerFeature(recipe, mesh === null ? 0 : throughReach(mesh, recipe.frame));
+  const tool = plan === null ? null : lowerRecipe(plan.tool, lowering);
+  if (plan === null || tool === null) return null;
+  const base = lowering.base(source.variable);
+  const notes = featureNotes(recipe).map((text): Feature => ({ ...base, op: 'note', text }));
+  const cut: Feature = {
+    ...base,
+    op: 'boolean',
+    kind: plan.mode === 'union' ? 'union' : 'cut',
+    left: source.variable,
+    right: tool.variable,
+  };
+  const features = [...source.features, ...notes, ...tool.features, cut];
+  if (recipe.feature !== 'pocket' || recipe.pocket.floorFillet <= 0 || plan.pocket === undefined)
+    return { features, variable: source.variable };
+  const kernel = lowering.kernel;
+  const cutRecipe: ShapeRecipe = { op: 'boolean', boolean: 'subtract', a: recipe.source, b: plan.tool };
+  const cutShape = kernel === null ? null : kernel.evaluate(cutRecipe);
+  const topology = kernel === null || cutShape === null ? null : kernel.topology(cutShape);
+  const edges = topology === null ? [] : floorEdgeIndices(topology, plan.pocket, recipe.frame);
+  if (topology === null || edges.length === 0) return null;
+  const near = edges.map((index) => topology.edges[index]?.mid).filter((mid): mid is Vec3 => mid !== undefined);
+  const size: Term = { value: recipe.pocket.floorFillet };
+  return { features: [...features, { ...base, op: 'fillet', edges, near, size }], variable: source.variable };
+}
+
 interface Lowered {
   readonly features: Feature[];
   readonly variable: string;
@@ -108,5 +143,7 @@ export function lowerRecipe(recipe: ShapeRecipe, lowering: RecipeLowering): Lowe
     }
     case 'scale':
       return null;
+    case 'feature':
+      return lowerFeatureNode(recipe, lowering);
   }
 }

@@ -20,6 +20,7 @@ import {
   TOOLSETS,
   buildExchangeToolDefinitions,
   buildFeaToolDefinitions,
+  buildLibraryToolDefinitions,
   isPromptEnabled,
   isToolEnabled,
   type ToolSearchResult,
@@ -135,7 +136,7 @@ describe('search_tools on natural phrasing', () => {
   const top = (query: string, count = 3): string[] => searchTools(query, count, new Set(parseToolsets('all').enabled)).map((r) => r.name);
   it.each([
     ['cut a hole', 'boolean'],
-    ['make a hole in a plate', 'boolean'],
+    ['make a hole in a plate', 'add_hole'],
     ['round the edges', 'fillet_edge'],
     ['bevel the edges', 'chamfer_edge'],
     ['how heavy is it', 'mass_properties'],
@@ -452,6 +453,7 @@ const allToolNames = [
   ...listCommands().map((command) => command.name),
   ...buildExchangeToolDefinitions().map((tool) => tool.name),
   ...buildFeaToolDefinitions().map((tool) => tool.name),
+  ...buildLibraryToolDefinitions().map((tool) => tool.name),
   ...buildDiscoveryToolDefinitions().map((tool) => tool.name),
 ];
 
@@ -528,6 +530,10 @@ describe('isPromptEnabled()', () => {
     expect(isPromptEnabled('design_site', parseToolsets('building').enabled)).toBe(false);
     expect(isPromptEnabled('design_site', parseToolsets('civil').enabled)).toBe(true);
   });
+  it('hides the sheet-bracket workflow without the manufacturing toolset', () => {
+    expect(isPromptEnabled('design_sheet_bracket', parseToolsets('core').enabled)).toBe(false);
+    expect(isPromptEnabled('design_sheet_bracket', parseToolsets('manufacturing').enabled)).toBe(true);
+  });
   it('every prompt is enabled when all toolsets are', () => {
     const all = parseToolsets('all').enabled;
     for (const prompt of listMcpPrompts()) expect(isPromptEnabled(prompt.name, all)).toBe(true);
@@ -543,9 +549,9 @@ describe('MCP prompts', () => {
     return [r.messages[0]!.content.text, r.messages[1]!.content.text];
   };
 
-  it('lists 6 described templates, incl. model_bracket, orthographic_setup, parametric_part; unknown names are null', () => {
+  it('lists 7 described templates, incl. model_bracket, orthographic_setup, parametric_part; unknown names are null', () => {
     const prompts = listMcpPrompts();
-    expect(prompts).toHaveLength(6);
+    expect(prompts).toHaveLength(7);
     expect(prompts.map((p) => p.name)).toEqual(expect.arrayContaining(['model_bracket', 'orthographic_setup', 'parametric_part']));
     for (const p of prompts) {
       expect(p.name.length * p.description.length).toBeGreaterThan(0);
@@ -553,6 +559,26 @@ describe('MCP prompts', () => {
     }
     expect(getMcpPrompt('nonexistent_prompt')).toBeNull();
     expect(getMcpPrompt('')).toBeNull();
+  });
+
+  it('design_sheet_bracket lists the workflow in order and says the results are not approved', () => {
+    const listed = listMcpPrompts().find((p) => p.name === 'design_sheet_bracket');
+    expect(listed?.description).toMatch(/not approved/);
+    const [user, assistant] = messages('design_sheet_bracket', { brief: 'a hat channel' });
+    expect(user).toMatch(/hat channel/);
+    const order = [
+      'sheet_metal_calc',
+      'create_sheet_metal_rule',
+      'import_bend_radius_table',
+      'add_sheet_metal_base',
+      'add_flange',
+      'check_sheet_metal',
+      'flat_pattern',
+      'export_flat_pattern_dxf',
+    ].map((tool) => assistant.indexOf(`\`${tool}\``));
+    expect(order.every((index) => index >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(assistant).toMatch(/NOT approved/);
   });
 
   it.each(['model_bracket', 'orthographic_setup', 'parametric_part'])('%s messages are non-empty user/assistant text', (name) => {

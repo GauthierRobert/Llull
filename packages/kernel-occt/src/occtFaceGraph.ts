@@ -11,7 +11,9 @@ import type { FaceGraph, FaceGraphFace } from '@core/geometry/kernelPorts';
 import type { Vec3 } from '@core/model/types';
 import { explorer, type OccApi, type OccHandle, type OccPoint, type OccShape } from './occtTypes';
 import { subShapeIndexer, uniqueSubShapes } from './occtTopology';
+import { faceMetric } from './occtFaceMetrics';
 import {
+  type FaceSurfaceAdaptor,
   type Own,
   cross,
   dot,
@@ -34,10 +36,6 @@ type Convexity = FaceGraph['edgeConvexity'][number];
 interface EdgeUse {
   readonly edge: number;
   readonly reversed: boolean;
-}
-
-interface GProps extends OccHandle {
-  Mass(): number;
 }
 
 interface CurveAdaptor extends OccHandle {
@@ -67,12 +65,6 @@ function faceLoops(api: OccApi, face: OccShape, indexOfEdge: (edge: OccShape) =>
   return [...loops.filter((loop) => loop.outer), ...loops.filter((loop) => !loop.outer)].map((loop) => loop.uses);
 }
 
-function areaOf(api: OccApi, face: OccShape, own: Own): number {
-  const props = own(new api.GProp_GProps_1() as GProps);
-  api.BRepGProp.SurfaceProperties_1(face, props, false, false);
-  return props.Mass();
-}
-
 /** Mid point and unit tangent (edge parameter direction) of `edge`; null for a degenerate or unevaluable edge. */
 function edgeMidTangent(api: OccApi, shape: OccShape, own: Own): { point: Vec3; tangent: Vec3 } | null {
   const edge = own(api.TopoDS.Edge_1(shape) as OccShape);
@@ -90,13 +82,19 @@ export function faceGraph(api: OccApi, shape: OccShape, own: Own): FaceGraph | n
   const edges = uniqueSubShapes(api, shape, 'TopAbs_EDGE').map(own);
   const indexOfEdge = subShapeIndexer(edges);
   const uses = faces.map((face) => faceLoops(api, face, indexOfEdge, own));
+  const adaptors = new Map<number, FaceSurfaceAdaptor>();
+  const adaptorOf = (index: number): FaceSurfaceAdaptor => {
+    const known = adaptors.get(index) ?? faceAdaptor(api, faces[index] as OccShape, own);
+    adaptors.set(index, known);
+    return known;
+  };
   const nodes: FaceGraphFace[] = faces.map((face, index) => {
-    const adaptor = faceAdaptor(api, face, own);
+    const adaptor = adaptorOf(index);
     return {
       index,
       surface: surfaceParams(api, adaptor, own),
       reversed: isReversed(face),
-      area: areaOf(api, face, own),
+      area: faceMetric(api, shape, index, face).area,
       loops: (uses[index] ?? []).map((loop) => [...new Set(loop.map((use) => use.edge))]),
       uvBounds: uvRange(adaptor),
     };
@@ -110,16 +108,25 @@ export function faceGraph(api: OccApi, shape: OccShape, own: Own): FaceGraph | n
     const [first, second] = faceList;
     if (faceList.length !== 2 || first === undefined || second === undefined) return 'unknown';
     const reversed = edgeUses[index]?.find((use) => use.face === first)?.reversed ?? false;
-    return convexityAt(api, edge, [faces[first], faces[second]] as [OccShape, OccShape], reversed, own);
+    return convexityAt(api, edge, [first, second], reversed, own, faces, adaptorOf);
   });
   return { faces: nodes, edgeFaces, edgeConvexity };
 }
 
-function convexityAt(api: OccApi, edge: OccShape, [faceA, faceB]: [OccShape, OccShape], reversedInA: boolean, own: Own): Convexity {
+function convexityAt(
+  api: OccApi,
+  edge: OccShape,
+  [indexA, indexB]: [number, number],
+  reversedInA: boolean,
+  own: Own,
+  faces: readonly OccShape[],
+  adaptorOf: (index: number) => FaceSurfaceAdaptor,
+): Convexity {
   const mid = edgeMidTangent(api, edge, own);
   if (mid === null) return 'unknown';
-  const normals = [faceA, faceB].map((face) => {
-    const adaptor = faceAdaptor(api, face, own);
+  const normals = [indexA, indexB].map((index) => {
+    const face = faces[index] as OccShape;
+    const adaptor = adaptorOf(index);
     const [u, v] = uvOfPoint(api, face, adaptor, mid.point, own);
     return pointAndNormal(api, adaptor, isReversed(face), u, v, own)?.normal ?? null;
   });

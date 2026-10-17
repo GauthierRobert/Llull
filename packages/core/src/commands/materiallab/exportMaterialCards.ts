@@ -1,15 +1,10 @@
 /** export_material_cards (PHY-02 §6): solver material cards of a constitutive set — the single implementation the deck writers reuse. */
 
-import { canonicalJson } from '../../lib/canonicalJson';
-import { sha256Hex } from '../../lib/sha256';
 import { convertValue, isUnitFailure } from '../../lib/quantity';
-import { writeCalculixCards } from '../../model/materialLaws/cardsCalculix';
-import { writeNastranCards } from '../../model/materialLaws/cardsNastran';
-import { modelUnverifiedReasonsOf, needsReview } from '../../model/materialLaws/references';
-import { SET_SLOTS } from '../../model/materialModel';
+import { defaultCardName, isMaterialCardsRefusal, writeMaterialCards } from '../../model/materialLaws/cardWriter';
 import type { CommandResult } from '../types';
-import { defineCommand, z } from '../schema';
-import { report } from '../noop';
+import { confirmExportControlled, defineCommand, z } from '../schema';
+import { exportRefusal, report } from '../noop';
 import { matlRefusal } from '../document/materialModelRefusal';
 import { isRefusal, selectSlots } from './setSelection';
 
@@ -24,13 +19,6 @@ const DEFAULT_TEXT: Readonly<Record<string, { value: string | number | boolean; 
 };
 
 const CARD_NAME = /^[A-Za-z0-9_]{1,80}$/;
-const cardName = (material: string, set: string): string =>
-  `${material}_${set}`
-    .toUpperCase()
-    .replace(/[^A-Z0-9_]/g, '_')
-    .slice(0, 80);
-/** Ids in the provenance comment: no line breaks, no commas. */
-const commentId = (id: string): string => id.replace(/[\r\n,]/g, ' ');
 
 /**
  * @affects nothing — read-only; data { lines[], header, target, name, unverified, unverifiedReasons, reviewRequired, warnings[], defaults[] }
@@ -49,6 +37,7 @@ export const exportMaterialCards = defineCommand({
     '(never dropped silently); every model must carry validity ranges (MATL_VALIDITY_MISSING). data.header is the provenance comment line ' +
     '(hash, unverified reasons) to put above the lines. Next: embed in the solver deck.',
   params: z.object({
+    confirmExportControlled,
     material: z.string().describe('Material id (create_material name).'),
     set: z.string().optional().describe('Constitutive set id (default: the material default set).'),
     target: z.enum(['calculix', 'nastran']).describe('Solver the cards are for.'),
@@ -65,7 +54,9 @@ export const exportMaterialCards = defineCommand({
       .optional()
       .describe('Temperatures to write rows at (default: one row without a temperature column). Nastran: at most one.'),
   }),
-  run: (doc, params): CommandResult => {
+  run: (doc, params, ctx): CommandResult => {
+    const gated = exportRefusal(doc, command, 'data', params.confirmExportControlled, ctx, [params.material]);
+    if (gated !== null) return gated;
     const material = Object.hasOwn(doc.materials, params.material) ? doc.materials[params.material] : undefined;
     const refuse = (code: string, message: string, ids: readonly string[], path: string, remediation?: string): CommandResult => ({
       ...matlRefusal(doc, command, code, message, ids, path, remediation),
@@ -80,51 +71,36 @@ export const exportMaterialCards = defineCommand({
       if (isUnitFailure(kelvin)) return refuse('MATL_LAW_PARAMS_INVALID', kelvin.message, [], `temperatures[${i}].unit`);
       temperaturesK.push(kelvin.value);
     }
-    const models = SET_SLOTS.flatMap((slot) => (selection.slots[slot] === undefined ? [] : [{ slot, model: selection.slots[slot] }]));
-    const missing = models.find(({ model }) => model !== undefined && (model.validity === undefined || model.validity.length === 0));
-    if (missing?.model !== undefined)
-      return refuse(
-        'MATL_VALIDITY_MISSING',
-        `model '${missing.model.id}' has no validity ranges`,
-        [missing.model.id],
-        `models.${missing.model.id}.validity`,
-        'add validity (equivalentPlasticStrain, T, stretch …) with add_material_model replace: true',
-      );
     if (params.name !== undefined && !CARD_NAME.test(params.name))
       return refuse('MATL_LAW_PARAMS_INVALID', 'name must be 1-80 letters, digits or underscores', [], 'name', 'give a name like NL1_ISO');
-    const name = params.name ?? cardName(params.material, selection.setId);
+    const name = params.name ?? defaultCardName(params.material, selection.setId);
     const record = { name: params.material, ...(material.propertyModels !== undefined ? { propertyModels: material.propertyModels } : {}) };
-    const request = { record, slots: selection.slots, name, mid: params.mid ?? 1, temperaturesK };
-    const output = params.target === 'calculix' ? writeCalculixCards(request) : writeNastranCards(request);
-    if ('code' in output) return refuse(output.code, output.message, [], output.path, output.remediation);
-    const reasons = new Set<string>(output.unverifiedReasons);
-    for (const { slot, model } of models) {
-      if (model === undefined) continue;
-      for (const reason of modelUnverifiedReasonsOf(model, record)) reasons.add(`${slot} '${model.id}': ${reason}`);
+    const output = writeMaterialCards({
+      record,
+      materialId: params.material,
+      setId: selection.setId,
+      slots: selection.slots,
+      target: params.target,
+      name,
+      mid: params.mid ?? 1,
+      temperaturesK,
+      ...(params.forCertification !== undefined ? { forCertification: params.forCertification } : {}),
+    });
+    if (isMaterialCardsRefusal(output)) {
+      const ids = output.code === 'MATL_VALIDITY_MISSING' ? [output.path.split('.')[1] ?? ''] : [];
+      const refused = refuse(output.code, output.message, ids, output.path, output.remediation);
+      return output.unverifiedReasons === undefined
+        ? refused
+        : { ...refused, data: { code: output.code, reviewRequired: true, unverifiedReasons: output.unverifiedReasons } };
     }
-    const reviewRequired =
-      params.forCertification === true || output.reviewRequired || models.some(({ model }) => model !== undefined && needsReview(model));
-    if (params.forCertification === true && reasons.size > 0)
-      return {
-        ...refuse(
-          'MAT_VALUE_UNVERIFIED',
-          `the cards are unverified (${[...reasons].join('; ')}) and cannot be used for certification`,
-          [],
-          'forCertification',
-          'use verified bases and sourced, reviewed models',
-        ),
-        data: { code: 'MAT_VALUE_UNVERIFIED', reviewRequired: true, unverifiedReasons: [...reasons] },
-      };
-    const hash = sha256Hex(canonicalJson(Object.fromEntries(models.map(({ slot, model }) => [slot, model?.parametersSha256 ?? null]))));
-    const marker = params.target === 'calculix' ? '**' : '$';
-    const header = `${marker} llull material ${commentId(params.material)}/${commentId(selection.setId)} sha256=${hash} unverified=${reasons.size > 0 ? [...reasons].map(commentId).join('; ') : 'none'}`;
+    const { header, reviewRequired, unverified, unverifiedReasons: reasons } = output;
     const defaults = output.usedDefaults.flatMap((key) => {
       const text = DEFAULT_TEXT[key];
       return text === undefined ? [] : [{ name: key, value: text.value, source: text.source, defaulted: true as const }];
     });
     return report(
       doc,
-      `${command} '${params.material}/${selection.setId}' for ${params.target}: ${output.lines.length} line(s)${reasons.size > 0 ? `; unverified (${[...reasons].join('; ')})` : ''}${reviewRequired ? '; review required' : ''}${
+      `${command} '${params.material}/${selection.setId}' for ${params.target}: ${output.lines.length} line(s)${unverified ? `; unverified (${reasons.join('; ')})` : ''}${reviewRequired ? '; review required' : ''}${
         output.warnings.length > 0 ? `; warnings: ${output.warnings.map((w) => w.code).join(', ')}` : ''
       }.`,
       {
@@ -133,8 +109,8 @@ export const exportMaterialCards = defineCommand({
         target: params.target,
         name,
         set: selection.setId,
-        unverified: reasons.size > 0,
-        unverifiedReasons: [...reasons],
+        unverified,
+        unverifiedReasons: reasons,
         reviewRequired,
         warnings: output.warnings,
         defaults,

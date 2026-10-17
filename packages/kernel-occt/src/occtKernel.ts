@@ -14,6 +14,8 @@ import { extractMeshData } from './occtMesh';
 import { shapeTopology, uniqueSubShapes } from './occtTopology';
 import { analyzeShape, shapeDistance } from './occtAnalysis';
 import { exactMassProperties } from './occtMass';
+import { nativeFeature } from './occtFeatures';
+import { inheritThreadMark, isThreadBearing } from './occtThreadMark';
 import { writeStep } from './occtStep';
 import { occtFaceQueryOps } from './occtFaceQuery';
 import { importStepShapes, readBrepText } from './occtImport';
@@ -35,6 +37,8 @@ import {
 interface OcctKernelOptions {
   readonly wasmBinary?: ArrayBuffer | Uint8Array;
   readonly locateFile?: (path: string) => string;
+  /** false = cut holes and pockets by the recipe lowering only (parity tests); default true: native BRepFeat first (07 FTR M7). */
+  readonly nativeFeatures?: boolean;
   /** Defaults to `opencascade.js/dist/opencascade.wasm.js`. */
   readonly factory?: OcctFactory;
 }
@@ -88,6 +92,8 @@ function guarded<T>(operation: OperationClass, body: (own: <H extends OccHandle 
 }
 
 let nativeFailures = 0;
+/** Set for the process once a native BRepFeat attempt degraded the module: later features take the boolean lowering. */
+let nativeFeaturesDisabled = false;
 
 /** Operations that degraded the module since load; a host that can restart it (worker kernel) should when this grows. */
 export function nativeFailureCount(): number {
@@ -182,9 +188,14 @@ function blendedUnion(api: OccApi, shapes: readonly OccShape[], radius: number):
   });
 }
 
-/** Post-boolean ShapeUpgrade_UnifySameDomain (else a fused seam splits an edge and a fillet rounds half); `shape` on failure. */
-function unified(api: OccApi, shape: OccShape, own: <H extends OccHandle | null>(handle: H) => H): OccShape {
+/**
+ * Post-boolean ShapeUpgrade_UnifySameDomain (else a fused seam splits an edge and a fillet rounds half); `shape` on failure, or when
+ * `skip` (an operand holds a modelled-thread groove tool: unifying its thousands of facets never returns). Ordinary parts always unify,
+ * so their face and edge indices stay stable.
+ */
+function unified(api: OccApi, shape: OccShape, own: <H extends OccHandle | null>(handle: H) => H, skip: boolean): OccShape {
   try {
+    if (skip) return shape;
     const unifier = own(new api.ShapeUpgrade_UnifySameDomain_2(shape, true, true, false) as OccUnifier);
     unifier.AllowInternalEdges(false);
     unifier.Build();
@@ -238,7 +249,7 @@ const OCCT_INFO: KernelInfo = {
   capabilities: ['topology', 'analyze', 'distance', 'exportStep', 'importShapes', 'brepBlobs'],
 };
 
-export function occtOps(api: OccApi): KernelOps<OccShape> {
+export function occtOps(api: OccApi, nativeFeatures = true): KernelOps<OccShape> {
   const blobTexts = new Map<string, string>();
   return {
     name: 'occt',
@@ -253,33 +264,68 @@ export function occtOps(api: OccApi): KernelOps<OccShape> {
     solid: (entity) => guarded('refusal', () => entityToOccShape(api, entity)),
     prepareBoolean: untangle,
     boolean: (op: BooleanOp, a, b) =>
-      guarded('fragile', (own) => {
-        const builder = own(new api[BOOLEAN_BUILDERS[op]](a, b) as OccBuilder);
-        return builder.IsDone() ? unified(api, builder.Shape(), own) : null;
-      }),
-    fillet: (shape, edges, radius, radiusEnd) =>
-      roundEdges(
-        api,
-        shape,
-        edges,
-        radius,
-        (solid) => new api.BRepFilletAPI_MakeFillet(solid, api.ChFi3d_FilletShape.ChFi3d_Rational),
-        radiusEnd,
+      inheritThreadMark(
+        guarded('fragile', (own) => {
+          const builder = own(new api[BOOLEAN_BUILDERS[op]](a, b) as OccBuilder);
+          return builder.IsDone() ? unified(api, builder.Shape(), own, isThreadBearing(a, b)) : null;
+        }),
+        a,
+        b,
       ),
-    blend: (shapes, radius) => blendedUnion(api, shapes, radius),
-    chamfer: (shape, edges, distance) => roundEdges(api, shape, edges, distance, (solid) => new api.BRepFilletAPI_MakeChamfer(solid)),
-    shell: (shape, thickness) => hollow(api, shape, thickness),
-    place: (shape, position: Vec3, rotation: Vec3) => transformed(api, shape, () => placementTransform(api, rotation, position)),
+    ...(nativeFeatures
+      ? {
+          feature: (source: OccShape, node: Parameters<typeof nativeFeature>[3], reach: number) => {
+            if (nativeFeaturesDisabled) return null;
+            const failuresBefore = nativeFailureCount();
+            const result = inheritThreadMark(
+              guarded('fragile', (own) => {
+                const native = nativeFeature(api, own, source, node, reach);
+                return native === null ? null : unified(api, native, own, isThreadBearing(source));
+              }),
+              source,
+            );
+            if (nativeFailureCount() > failuresBefore) nativeFeaturesDisabled = true;
+            return result;
+          },
+        }
+      : {}),
+    fillet: (shape, edges, radius, radiusEnd) =>
+      inheritThreadMark(
+        roundEdges(
+          api,
+          shape,
+          edges,
+          radius,
+          (solid) => new api.BRepFilletAPI_MakeFillet(solid, api.ChFi3d_FilletShape.ChFi3d_Rational),
+          radiusEnd,
+        ),
+        shape,
+      ),
+    blend: (shapes, radius) => inheritThreadMark(blendedUnion(api, shapes, radius), ...shapes),
+    chamfer: (shape, edges, distance) =>
+      inheritThreadMark(
+        roundEdges(api, shape, edges, distance, (solid) => new api.BRepFilletAPI_MakeChamfer(solid)),
+        shape,
+      ),
+    shell: (shape, thickness) => inheritThreadMark(hollow(api, shape, thickness), shape),
+    place: (shape, position: Vec3, rotation: Vec3) =>
+      inheritThreadMark(
+        transformed(api, shape, () => placementTransform(api, rotation, position)),
+        shape,
+      ),
     scale: (shape, factor) =>
-      factor > 0
-        ? transformed(api, shape, () => {
-            const transform = new api.gp_Trsf_1();
-            const origin: OccHandle = new api.gp_Pnt_3(0, 0, 0);
-            transform.SetScale(origin, factor);
-            release(origin);
-            return transform as OccHandle;
-          })
-        : null,
+      inheritThreadMark(
+        factor > 0
+          ? transformed(api, shape, () => {
+              const transform = new api.gp_Trsf_1();
+              const origin: OccHandle = new api.gp_Pnt_3(0, 0, 0);
+              transform.SetScale(origin, factor);
+              release(origin);
+              return transform as OccHandle;
+            })
+          : null,
+        shape,
+      ),
     tessellate: (shape) => guarded('fragile', () => extractMeshData(api, shape)),
     topology: (shape) => guarded('fragile', () => shapeTopology(api, shape)),
     exportStep: (shapes) => guarded('fragile', () => writeStep(api, shapes)),
@@ -293,5 +339,5 @@ export function occtOps(api: OccApi): KernelOps<OccShape> {
 
 export async function createOcctKernel(options: OcctKernelOptions = {}): Promise<CachingKernel> {
   const api = await getOccModule(options);
-  return kernelFromOps(occtOps(api));
+  return kernelFromOps(occtOps(api, options.nativeFeatures !== false));
 }

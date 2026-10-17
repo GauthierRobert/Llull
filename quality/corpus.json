@@ -571,6 +571,58 @@
       "bytes": 91234,
       "license": "MIT",
       "knownIssues": []
+    },
+    {
+      "id": "nist-ctc-02",
+      "format": "stp",
+      "dimension": "3d",
+      "tier": "full",
+      "gate": "ftr-recognition",
+      "description": "NIST CTC-02 AP242 machined part (PMI), VC-FTR-21 drill-point and cone-seed counts",
+      "url": "https://raw.githubusercontent.com/pzfreo/dw-examples/12fa031f02a9d279c1e13dc1aa51662c63a640f4/steps/nist/nist_ctc_02_asme1_ap242.stp",
+      "sha256": "99a0a2079ddeb64d05c2432cbe931fa17c89da60d8b0bcb0b11bd0ed94fa2e68",
+      "bytes": 1981342,
+      "license": "Public domain in the U.S. (NIST, U.S. government work)",
+      "knownIssues": []
+    },
+    {
+      "id": "nist-ctc-03",
+      "format": "stp",
+      "dimension": "3d",
+      "tier": "full",
+      "gate": "ftr-recognition",
+      "description": "NIST CTC-03 AP242 machined part (PMI), VC-FTR-21 drill-point and cone-seed counts",
+      "url": "https://raw.githubusercontent.com/pzfreo/dw-examples/12fa031f02a9d279c1e13dc1aa51662c63a640f4/steps/nist/nist_ctc_03_asme1_ap242.stp",
+      "sha256": "196b665776e759282f80fc8fb27d7bceb995df77cf78b7ce48347535a4d6cb5f",
+      "bytes": 673846,
+      "license": "Public domain in the U.S. (NIST, U.S. government work)",
+      "knownIssues": []
+    },
+    {
+      "id": "nist-ctc-04",
+      "format": "stp",
+      "dimension": "3d",
+      "tier": "full",
+      "gate": "ftr-recognition",
+      "description": "NIST CTC-04 AP242 machined part (PMI), VC-FTR-21 drill-point and cone-seed counts",
+      "url": "https://raw.githubusercontent.com/pzfreo/dw-examples/12fa031f02a9d279c1e13dc1aa51662c63a640f4/steps/nist/nist_ctc_04_asme1_ap242.stp",
+      "sha256": "20b43b54ce25d4ed17cff794084c406e831c687f5b62471d3371eef33669e355",
+      "bytes": 1287291,
+      "license": "Public domain in the U.S. (NIST, U.S. government work)",
+      "knownIssues": []
+    },
+    {
+      "id": "nist-ctc-05",
+      "format": "stp",
+      "dimension": "3d",
+      "tier": "full",
+      "gate": "ftr-recognition",
+      "description": "NIST CTC-05 AP242 machined part (PMI), VC-FTR-21 drill-point and cone-seed counts",
+      "url": "https://raw.githubusercontent.com/pzfreo/dw-examples/12fa031f02a9d279c1e13dc1aa51662c63a640f4/steps/nist/nist_ctc_05_asme1_ap242.stp",
+      "sha256": "59bbc09a34621c03106e4c1b2a5bc909fdb67463117c16c4965ee7a6fe5c1521",
+      "bytes": 878030,
+      "license": "Public domain in the U.S. (NIST, U.S. government work)",
+      "knownIssues": []
     }
   ]
 }

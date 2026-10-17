@@ -366,7 +366,15 @@ function lowerStep(
     } else {
       // Re-create from the evaluated state; remove first so the old solid does not linger.
       features.push({ ...base(variable), op: 'remove' });
-      features.push(solidFeature(current, after, rawParams, ctx, base(variable)));
+      if (current.kind === 'mesh' && current.brep !== undefined) {
+        // A kernel result edited in place (set_thread, ...): rebuild its recipe so feature notes (thread, drill point) survive.
+        const lowered = entityFeatures(current, after, rawParams, ctx, namer, base, variables);
+        features.push(...lowered.features);
+        if (lowered.triangles)
+          notes.push(
+            `step ${stepNumber} (${step.name}): ${current.kind} '${current.id}' has no analytic form; exported as a triangle mesh.`,
+          );
+      } else features.push(solidFeature(current, after, rawParams, ctx, base(variable)));
     }
   }
   for (const entity of created) {

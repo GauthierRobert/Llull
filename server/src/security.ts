@@ -47,11 +47,24 @@ export function isLoopbackAddress(address: string | undefined): boolean {
   return value === 'localhost' || value === '::1' || value.startsWith('127.') || value.startsWith('::ffff:127.');
 }
 
-/** Loopback TCP peer not relayed by a proxy (behind a local reverse proxy every client looks like loopback). */
-function isLocalPeer(req: Request): boolean {
-  return (
-    req.headers['x-forwarded-for'] === undefined && req.headers['forwarded'] === undefined && isLoopbackAddress(req.socket?.remoteAddress)
-  );
+/** Headers a reverse proxy sets when it relays a client; any of them marks the request as proxied (not local). */
+const PROXY_HEADERS: readonly string[] = [
+  'x-forwarded-for',
+  'forwarded',
+  'x-real-ip',
+  'cf-connecting-ip',
+  'x-forwarded-host',
+  'x-forwarded-proto',
+  'x-forwarded-port',
+];
+
+/**
+ * Loopback TCP peer not relayed by a proxy (behind a local reverse proxy every client looks like loopback).
+ * Remote redaction of licensed values (TR-MAT-32) relies on the proxy setting at least one of PROXY_HEADERS (every common
+ * proxy sets X-Forwarded-For or Forwarded); a proxy that strips all of them makes its clients look local.
+ */
+export function isLocalPeer(req: Request): boolean {
+  return PROXY_HEADERS.every((header) => req.headers[header] === undefined) && isLoopbackAddress(req.socket?.remoteAddress);
 }
 
 /** Refusal message when a non-loopback `HOST` would expose an unauthenticated API (opt out: `LLULL_ALLOW_UNAUTHENTICATED=true`), else null. */

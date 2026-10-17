@@ -1,0 +1,334 @@
+{
+  "format": "llull-material-library",
+  "schemaVersion": 1,
+  "id": "llull-aero-seed",
+  "version": "0.1.0",
+  "title": "llull aerospace seed library (verified entries only; supplier / typical / specification-minimum values, no design allowables)",
+  "licence": "vendor-catalogue",
+  "exportMarking": {
+    "regime": "none"
+  },
+  "storage": "embedded",
+  "sources": {
+    "S13": {
+      "citation": "Michlin Metals, 7075 AMS 4154 / AMS 4045 (supplier page)",
+      "url": "https://www.michlinmetals.com/7075-aluminum-round-bar-ams-4154-ams-4045-sheet-plate/",
+      "accessed": "2026-10-15"
+    },
+    "S15": {
+      "citation": "Rolled Alloys, Data Sheet - 6Al-4V Titanium (supplier datasheet)",
+      "url": "https://www.rolledalloys.com/wp-content/uploads/6AL4V_Data-sheet.pdf",
+      "accessed": "2026-10-15"
+    },
+    "S16": {
+      "citation": "Aircraft Materials, Ti-6Al-4V typical annealed sheet properties; titanium.com AMS 4911 summary",
+      "url": "https://www.aircraftmaterials.com/data/titanium/ti6al4v.html",
+      "accessed": "2026-10-15"
+    },
+    "S21": {
+      "citation": "AIA/NAS NAS6203-6220 catalogue entry (GlobalSpec / Accuris): 160 KSI Ftu bolt",
+      "url": "https://store.accuristech.com/standards/aia-nas6203-6220?product_id=2926055",
+      "accessed": "2026-10-15"
+    },
+    "S22": {
+      "citation": "Airfasco NAS6203 / NAS6204 product pages (minimum shear 95 ksi)",
+      "url": "https://airfasco.com/products/NAS/NAS6203THRUNAS6220/NAS6204.php",
+      "accessed": "2026-10-15"
+    },
+    "S26": {
+      "citation": "Hi-Shear HL18 drawing (AAE store); HL10 / HL18 shear 95 ksi",
+      "url": "https://www.aaestore.com.au/media/specs/HL18.pdf",
+      "accessed": "2026-10-15"
+    }
+  },
+  "materials": [
+    {
+      "id": "aa7075_t6",
+      "name": "aa7075_t6",
+      "designation": "Aluminium alloy 7075",
+      "temper": "T6",
+      "productForm": "sheet",
+      "specs": [
+        {
+          "body": "SAE",
+          "id": "AMS 4045"
+        }
+      ],
+      "licence": "vendor-catalogue",
+      "exportMarking": {
+        "regime": "none"
+      },
+      "propertyModels": [
+        {
+          "id": "density_ams4045_supplier",
+          "property": "density",
+          "unit": "lb/in^3",
+          "variables": [],
+          "validity": [],
+          "form": {
+            "kind": "constant",
+            "value": 0.101
+          },
+          "basis": "supplier_unstated",
+          "provenance": {
+            "sourceId": "S13",
+            "citation": "Michlin Metals, 7075 AMS 4154 / AMS 4045 (supplier page)",
+            "locator": "validation/materials_dataset.json#aa7075_t6.physical.density_ams4045_supplier; sources.md S13",
+            "url": "https://www.michlinmetals.com/7075-aluminum-round-bar-ams-4154-ams-4045-sheet-plate/",
+            "accessed": "2026-10-15"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ti6al4v_annealed",
+      "name": "ti6al4v_annealed",
+      "designation": "Titanium Ti-6Al-4V (UNS R56400)",
+      "temper": "annealed",
+      "productForm": "sheet",
+      "specs": [
+        {
+          "body": "SAE",
+          "id": "AMS 4911"
+        }
+      ],
+      "licence": "vendor-catalogue",
+      "exportMarking": {
+        "regime": "none"
+      },
+      "propertyModels": [
+        {
+          "id": "density_supplier",
+          "property": "density",
+          "unit": "lb/in^3",
+          "variables": [],
+          "validity": [],
+          "form": {
+            "kind": "constant",
+            "value": 0.16
+          },
+          "basis": "supplier_unstated",
+          "provenance": {
+            "sourceId": "S15",
+            "citation": "Rolled Alloys, Data Sheet - 6Al-4V Titanium (supplier datasheet)",
+            "locator": "validation/materials_dataset.json#ti6al4v_annealed.physical.density_supplier; sources.md S15",
+            "url": "https://www.rolledalloys.com/wp-content/uploads/6AL4V_Data-sheet.pdf",
+            "accessed": "2026-10-15"
+          }
+        },
+        {
+          "id": "density_supplier_alt",
+          "property": "density",
+          "unit": "lb/in^3",
+          "variables": [],
+          "validity": [],
+          "form": {
+            "kind": "constant",
+            "value": 0.163
+          },
+          "basis": "supplier_unstated",
+          "provenance": {
+            "sourceId": "S15",
+            "citation": "Rolled Alloys, Data Sheet - 6Al-4V Titanium (supplier datasheet)",
+            "locator": "validation/materials_dataset.json#ti6al4v_annealed.physical.density_supplier_alt (sources disagree by ~2%: the library must keep both with provenance (FR-MAT-04)); sources.md S15",
+            "url": "https://www.rolledalloys.com/wp-content/uploads/6AL4V_Data-sheet.pdf",
+            "accessed": "2026-10-15"
+          }
+        },
+        {
+          "id": "Ftu_typical",
+          "property": "Ftu",
+          "unit": "ksi",
+          "variables": [],
+          "validity": [],
+          "form": {
+            "kind": "constant",
+            "value": 134
+          },
+          "basis": "typical",
+          "condition": {
+            "thickness": {
+              "min": 0.063,
+              "max": 0.1875,
+              "unit": "in"
+            }
+          },
+          "provenance": {
+            "sourceId": "S16",
+            "citation": "Aircraft Materials, Ti-6Al-4V typical annealed sheet properties; titanium.com AMS 4911 summary",
+            "locator": "validation/materials_dataset.json#ti6al4v_annealed.mechanical.Ftu_typical; sources.md S16",
+            "url": "https://www.aircraftmaterials.com/data/titanium/ti6al4v.html",
+            "accessed": "2026-10-15"
+          }
+        },
+        {
+          "id": "Fty_typical",
+          "property": "Fty",
+          "unit": "ksi",
+          "variables": [],
+          "validity": [],
+          "form": {
+            "kind": "constant",
+            "value": 126
+          },
+          "basis": "typical",
+          "condition": {
+            "thickness": {
+              "min": 0.063,
+              "max": 0.1875,
+              "unit": "in"
+            }
+          },
+          "provenance": {
+            "sourceId": "S16",
+            "citation": "Aircraft Materials, Ti-6Al-4V typical annealed sheet properties; titanium.com AMS 4911 summary",
+            "locator": "validation/materials_dataset.json#ti6al4v_annealed.mechanical.Fty_typical; sources.md S16",
+            "url": "https://www.aircraftmaterials.com/data/titanium/ti6al4v.html",
+            "accessed": "2026-10-15"
+          }
+        },
+        {
+          "id": "elongation_typical",
+          "property": "elongation",
+          "unit": "%",
+          "variables": [],
+          "validity": [],
+          "form": {
+            "kind": "constant",
+            "value": 10
+          },
+          "basis": "typical",
+          "condition": {
+            "thickness": {
+              "min": 0.063,
+              "max": 0.1875,
+              "unit": "in"
+            }
+          },
+          "provenance": {
+            "sourceId": "S16",
+            "citation": "Aircraft Materials, Ti-6Al-4V typical annealed sheet properties; titanium.com AMS 4911 summary",
+            "locator": "validation/materials_dataset.json#ti6al4v_annealed.mechanical.elongation_typical; sources.md S16",
+            "url": "https://www.aircraftmaterials.com/data/titanium/ti6al4v.html",
+            "accessed": "2026-10-15"
+          }
+        }
+      ]
+    },
+    {
+      "id": "nas6203_bolt_alloy_steel",
+      "name": "nas6203_bolt_alloy_steel",
+      "designation": "NAS6203-6220",
+      "productForm": "fastener",
+      "specs": [],
+      "licence": "vendor-catalogue",
+      "exportMarking": {
+        "regime": "none"
+      },
+      "propertyModels": [
+        {
+          "id": "Ftu_min",
+          "property": "Ftu",
+          "unit": "ksi",
+          "variables": [],
+          "validity": [],
+          "form": {
+            "kind": "constant",
+            "value": 160
+          },
+          "basis": "supplier_unstated",
+          "provenance": {
+            "sourceId": "S21",
+            "citation": "AIA/NAS NAS6203-6220 catalogue entry (GlobalSpec / Accuris): 160 KSI Ftu bolt",
+            "locator": "validation/materials_dataset.json#nas6203_bolt_alloy_steel.fastenerMaterialAllowables.Ftu_min; sources.md S21",
+            "url": "https://store.accuristech.com/standards/aia-nas6203-6220?product_id=2926055",
+            "accessed": "2026-10-15"
+          }
+        },
+        {
+          "id": "Fsu_min",
+          "property": "Fsu",
+          "unit": "ksi",
+          "variables": [],
+          "validity": [],
+          "form": {
+            "kind": "constant",
+            "value": 95
+          },
+          "basis": "supplier_unstated",
+          "provenance": {
+            "sourceId": "S22",
+            "citation": "Airfasco NAS6203 / NAS6204 product pages (minimum shear 95 ksi)",
+            "locator": "validation/materials_dataset.json#nas6203_bolt_alloy_steel.fastenerMaterialAllowables.Fsu_min; sources.md S22",
+            "url": "https://airfasco.com/products/NAS/NAS6203THRUNAS6220/NAS6204.php",
+            "accessed": "2026-10-15"
+          }
+        }
+      ]
+    },
+    {
+      "id": "hilok_hl10_ti",
+      "name": "hilok_hl10_ti",
+      "designation": "HL10 (Ti-6Al-4V)",
+      "productForm": "fastener",
+      "specs": [],
+      "licence": "vendor-catalogue",
+      "exportMarking": {
+        "regime": "none"
+      },
+      "propertyModels": [
+        {
+          "id": "Fsu_min",
+          "property": "Fsu",
+          "unit": "ksi",
+          "variables": [],
+          "validity": [],
+          "form": {
+            "kind": "constant",
+            "value": 95
+          },
+          "basis": "supplier_unstated",
+          "provenance": {
+            "sourceId": "S26",
+            "citation": "Hi-Shear HL18 drawing (AAE store); HL10 / HL18 shear 95 ksi",
+            "locator": "validation/materials_dataset.json#hilok_hl10_ti.fastenerMaterialAllowables.Fsu_min; sources.md S26",
+            "url": "https://www.aaestore.com.au/media/specs/HL18.pdf",
+            "accessed": "2026-10-15"
+          }
+        }
+      ]
+    },
+    {
+      "id": "hilok_hl18_steel",
+      "name": "hilok_hl18_steel",
+      "designation": "HL18 (alloy steel)",
+      "productForm": "fastener",
+      "specs": [],
+      "licence": "vendor-catalogue",
+      "exportMarking": {
+        "regime": "none"
+      },
+      "propertyModels": [
+        {
+          "id": "Fsu_min",
+          "property": "Fsu",
+          "unit": "ksi",
+          "variables": [],
+          "validity": [],
+          "form": {
+            "kind": "constant",
+            "value": 95
+          },
+          "basis": "supplier_unstated",
+          "provenance": {
+            "sourceId": "S26",
+            "citation": "Hi-Shear HL18 drawing (AAE store); HL10 / HL18 shear 95 ksi",
+            "locator": "validation/materials_dataset.json#hilok_hl18_steel.fastenerMaterialAllowables.Fsu_min; sources.md S26",
+            "url": "https://www.aaestore.com.au/media/specs/HL18.pdf",
+            "accessed": "2026-10-15"
+          }
+        }
+      ]
+    }
+  ]
+}

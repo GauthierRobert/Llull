@@ -1,7 +1,7 @@
 {
-  "status": "DRAFT - uses commands PROPOSED in TECHNICAL_SPEC.md section 4 (add_hole, add_pocket, recognize_features). Not runnable today.",
+  "status": "RUNNABLE (AERO-3, 2026-10-17): add_hole / add_pocket / recognize_features landed; run by server/tests/packReplay07.test.ts.",
   "expected": "expected_test_parts.json parts['ftr_machined_plate.step'] (volume 55978.529153 mm3, rel tol 1e-6)",
-  "plan": [
+  "actions": [
     { "command": "set_units", "params": { "units": "mm" } },
     { "command": "add_box", "params": { "size": [100, 60, 10], "position": [0, 0, 0], "anchor": "min" }, "as": "plate" },
     {
@@ -33,7 +33,9 @@
       "params": {
         "target": "$cb",
         "face": { "near": [50, 30, 10] },
-        "outline": { "kind": "rounded_rectangle", "center": [50, 45], "size": [40, 12], "cornerRadius": 3 },
+        "outline": { "kind": "rectangle", "center": [50, 45], "size": [40, 12] },
+        "pointsFrame": "world_xy",
+        "cornerRadius": 3,
         "depth": 4,
         "floorFillet": 0
       },

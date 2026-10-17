@@ -24,10 +24,14 @@ export const SIDEBAR_TAB_SPECS: readonly SidebarTabSpec[] = [
   { tab: 'history', label: 'History', shortLabel: 'History', icon: 'history' },
   { tab: 'configurations', label: 'Configurations', shortLabel: 'Variants', icon: 'configurations' },
   { tab: 'materials', label: 'Materials', shortLabel: 'Materials', icon: 'materials' },
+  { tab: 'manufacturing', label: 'Manufacturing', shortLabel: 'Mfg', icon: 'manufacturing' },
+  { tab: 'fasteners', label: 'Fasteners', shortLabel: 'Fasteners', icon: 'fastener' },
   { tab: 'review', label: 'Review', shortLabel: 'Review', icon: 'review' },
 ];
 
 /** The Review tab appears once prototype checks can run (check_prototype registered) or a result is loaded. */
 export function isSidebarTabAvailable(tab: SidebarTab, reviewLoaded: boolean): boolean {
+  if (tab === 'manufacturing') return getCommand('check_sheet_metal') !== undefined;
+  if (tab === 'fasteners') return getCommand('select_fastener') !== undefined;
   return tab !== 'review' || reviewLoaded || getCommand('check_prototype') !== undefined;
 }

@@ -25,6 +25,7 @@
     "../packages/mcp/src",
     "../packages/domain-aec/src",
     "../packages/domain-cae/src",
+    "../packages/domain-aero/src",
     "../packages/kernel-manifold/src",
     "../packages/kernel-occt/src",
     "../packages/physics-mujoco/src",

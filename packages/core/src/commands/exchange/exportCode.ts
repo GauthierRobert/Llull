@@ -4,7 +4,7 @@
  */
 
 import type { CommandResult } from '../types';
-import { defineCommand, z } from '../schema';
+import { confirmExportControlled, defineCommand, z } from '../schema';
 import { currentContext } from '../context';
 import { getCommand } from '../commandTable';
 import { buildFeatureProgram } from '../../codegen/featureProgram';
@@ -12,7 +12,7 @@ import { emitPython } from '../../codegen/python';
 import { emitOpenScad } from '../../codegen/openscad';
 import { emitFreeCad } from '../../codegen/freecad';
 import { safeFileName } from '../../lib/safeFileName';
-import { report } from '../noop';
+import { exportRefusal, report } from '../noop';
 
 type CodeLanguage = 'cadquery' | 'build123d' | 'openscad' | 'freecad';
 
@@ -38,9 +38,13 @@ export const exportCode = defineCommand({
       .enum(['cadquery', 'build123d', 'openscad', 'freecad'])
       .describe('Target: "cadquery" | "build123d" | "openscad" | "freecad".'),
     name: z.string().optional().describe('Base file name without extension (sanitized). Default "model".'),
+    confirmExportControlled,
   }),
   annotations: { readOnly: true, idempotent: true },
-  run: (doc, { language, name }, ctx): CommandResult => {
+  run: (doc, params, ctx): CommandResult => {
+    const { language, name } = params;
+    const refused = exportRefusal(doc, 'export_code', 'code', params.confirmExportControlled, ctx);
+    if (refused !== null) return refused;
     const program = buildFeatureProgram(doc, getCommand, (ctx ?? currentContext()).kernel);
     const text =
       language === 'openscad' ? emitOpenScad(program) : language === 'freecad' ? emitFreeCad(program) : emitPython(program, language);

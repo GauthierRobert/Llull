@@ -1,0 +1,10 @@
+{
+  "name": "@llull/domain-aero",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Aerospace plugins (AERO-3): sheet metal (07 FTR, toolset manufacturing) and standard-part fasteners (08 MAT, toolset fasteners).",
+  "dependencies": {
+    "@llull/core": "0.1.0"
+  }
+}

@@ -15,8 +15,9 @@ facts come from [sources.md](sources.md) (S-ids). All derived numbers come from
 | `generate_mat_reference.py` | Pure-stdlib generator. `python3 generate_mat_reference.py` writes the expected JSON; `--check` fails if the JSON is stale. It uses only `verified` inputs (it asserts this). | complete |
 | `expected_results.json` | Derived expectations: unit conversions, mass properties, catalogue checkpoints, bolt grip selection, Hi-Lok grip, rivet selection, and the agent-first contract (`agentFirst`: unverified propagation, reviewRequired, human gates, named defaults, error codes). Each has value, tolerance and derivation. | generated |
 | `plans/mass_7075_block_current.json` | `build_project` plan that runs on **today's** llull (create_material → add_box → assign_material → mass_properties). Expected mass 140.5 g. | runnable now |
-| `plans/mass_ti_cylinder_proposed.json` | Draft plan using the proposed `load_material_library` / `set_material_property` with a lb/in³ density in a mm document. Expected mass 69.56719 g. | proposed commands |
-| `plans/fastener_stack_nas6203_proposed.json` | Draft plan: two plates (0.25 + 0.26 in) → `select_fastener` → `insert_fastener_stack` → `bill_of_materials`. | proposed commands |
+| `plans/mass_ti_cylinder_proposed.json` | `build_project` plan: `define_material_record` + two `set_material_property` supplier densities (0.160 preferred, 0.163; lb/in³ in a mm document) → cylinder r 10 h 50 → `mass_properties`. Expected mass 69.56719 g. | runnable now (AERO-3 lane K, `server/tests/packReplay08.test.ts`) |
+| `plans/fastener_stack_nas6203_proposed.json` | `{ status, expected, actions }` plan: two plates (0.25 + 0.26 in) → `select_fastener` → `insert_fastener_stack` (hole Ø 0.190 in) → `bill_of_materials`. Needs the catalogue in the document first (`fastener_catalog_llull.json`, the sample in `llull-fastener-catalog` format, imported with `llull import_fastener_catalog @params.json`). | runnable now (OCC: `packReplay08.test.ts`; Manifold: `tests/unit/aero/fasteners/insert.test.ts`) |
+| `fastener_catalog_llull.json` | `fastener_catalog_sample.json` converted to the `llull-fastener-catalog` file format (the test fixture `sampleCatalogFile()`), for `import_fastener_catalog`. | test data |
 
 No public test *files* (STEP, PDF) are stored. MIL-HDBK-5J (about 70 MB, public, cancelled) must be pinned by
 URL plus sha256 once it can be downloaded (the authoring sandbox was blocked). It goes in
@@ -132,8 +133,8 @@ node server/bin/llull.cjs run docs/aerospace/08-materials-standards-libraries/va
 # expect the last step's data.mass = 140.5 (g)
 ```
 
-The `*_proposed.json` plans use commands that do not exist yet. They are the acceptance fixtures for
-M2/M5/M6 (TECHNICAL_SPEC §10).
+The `*_proposed.json` file names are historical: both plans run with today's command names (VC-MAT-02, 04, 10).
+Results of every case: `RESULTS.json` / `RESULTS.md` (checked by `tests/unit/contract/aeroValidationMatrix.test.ts`).
 
 ## Known gaps in this pack (honest status)
 

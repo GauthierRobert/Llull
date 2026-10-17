@@ -6,6 +6,7 @@
 
 export { buildMcpTools } from './tools';
 export { shapeToolCallContent } from './dispatch';
+export { redactLicensedOutcome } from './redactLicensed';
 export { listMcpResources, readMcpResource, CAD_RESOURCE_URIS } from './resources';
 export { CONVENTIONS_GUIDE, CONVENTIONS_URI } from './conventions';
 export { listMcpPrompts, getMcpPrompt } from './prompts';
@@ -16,6 +17,7 @@ export { buildExchangeToolDefinitions, applyExchangeToolCall, exportStepFile } f
 
 export type { FeaToolsPort, FeaHost, FeaToolResult, FieldTableInput } from './feaTools';
 export { buildFeaToolDefinitions, FEA_SOLVE_TIMEOUT_S } from './feaTools';
+export { buildLibraryToolDefinitions, type MaterialLibraryStorePort, type LibraryRegistration } from './libraryTools';
 
 export type { ToolSearchResult } from './discovery';
 export {

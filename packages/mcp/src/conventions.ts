@@ -174,6 +174,41 @@ off the picture (origin top-left, +y down) into model [x, y] points for \`draw_p
 To read or rework a whole model at once, call \`export_code\` (language "cadquery"):
 the code lists every parameter, dimension and feature in build order. Edit it and
 send it back with \`import_code\` to regenerate an editable feature history.
+
+## 8. Materials, fasteners and manufacturing features (toolsets materials, fasteners, manufacturing)
+
+Engineering results are computed, not approved: every one carries unverified (with reasons) and
+reviewRequired. Never present them as released; say what a qualified person must check.
+
+- **Units.** Physical values are \`{ value, unit }\` (\`g/cm^3\`, \`lb/in^3\`, ksi, MPa, degF);
+  \`convert_quantity\` converts. Lengths in manufacturing commands are document length units; angles degrees.
+- **Materials.** \`define_material_record\` (designation, temper, form, specs, licence, export marking) →
+  \`set_material_property\` (value or temperature table, \`basis\` A / B / S / typical / …, \`source.citation\`
+  required, at most one \`preferred\` per key) → \`assign_material\` → \`mass_properties\` (massG / massKg /
+  massLb + densitySource). Allowables: \`get_material_allowable\` never substitutes a basis and never
+  extrapolates; \`forCertification: true\` refuses typical, unverified and superseded values. Libraries:
+  \`import_material_library\`, \`diff_material_libraries\`; private (licensed) libraries are imported by
+  reference and filled by \`resolve_material_libraries\` on an exact sha256 match — their values never
+  enter saved files. Readiness: \`check_materials\`. ITAR / EAR-marked content refuses exports
+  (MAT_EXPORT_CONTROLLED); an agent cannot confirm the export (MAT_HUMAN_GATE).
+- **Fasteners.** \`import_fastener_catalog\` (your licensed catalogue file) → \`list_fastener_families\` /
+  \`decode_part_number\` → \`select_fastener\` (grip, washers ≤ 1/8 in, protrusion ≥ one thread; data.rules
+  names every default) → \`insert_fastener_stack\` / \`insert_fastener_row\` (one feature step: hole cut,
+  one component per part number, instances) → \`check_fastener_layout\` → \`bill_of_materials\`
+  (standardParts, \`includeMaterials\`). Delete with \`delete_fastener_stack\`, never \`delete_entities\`.
+- **Machined features.** \`add_hole\` (simple / counterbore / countersink / counterdrill; through_all,
+  up_to_next, up_to_face or blind with a 118° point reported as defaulted; face picked by \`face.near\`),
+  \`add_pocket\` (islands, \`upToFace\`, \`open\`), \`add_rib\`, \`set_thread\` (cosmetic),
+  \`hole_table\`, \`check_machining\` (thresholds are data with a source; missing ones are skipped and
+  listed). \`recognize_features\` needs an exact kernel (\`--kernel occt\`); imported parts come from
+  \`import_step_exact\`; \`holes_from_recognition\` turns their holes into \`add_hole\` plan steps.
+- **Sheet metal.** \`sheet_metal_calc\` (no part; K-factor explicit, or mode faa_empirical) →
+  \`create_sheet_metal_rule\` (material, thickness, inside radius, K; no defaults) →
+  \`import_bend_radius_table\` (every row needs its source) → \`add_sheet_metal_base\` (closed profile) →
+  \`add_flange\` (angle = angle bent through; cuts the rule relief itself) / \`add_contour_flange\` (multi-bend profile) /
+  \`add_hem\` / \`add_joggle\` / \`add_sheet_cutout\` / \`add_relief\` / \`add_corner_relief\` / \`add_flanged_hole\` / \`add_bead\` →
+  \`check_sheet_metal\` → \`flat_pattern\` → \`export_flat_pattern_dxf --save blank.dxf\`. Existing exact
+  solids: \`convert_to_sheet_metal\`. Waivers stay FTR_WAIVER_NOT_APPROVED until a human approval exists.
 `;
 
 export const CONVENTIONS_URI = 'cad://conventions' as const;

@@ -7,6 +7,7 @@ import { getCommand } from './commandTable';
 import { kernelUnavailable } from './kernelRefusal';
 import { commandError, rejection, unknownCommandError } from './noop';
 import { stepIdSource } from '../lib/id';
+import { withoutConfirmations } from '../lib/withoutConfirmations';
 import type { GeometryKernel } from '../geometry/kernel';
 import { blobText } from '../model/blobs';
 
@@ -27,7 +28,7 @@ function feedBlobs(doc: CadDocument, kernel: GeometryKernel | null): void {
 }
 
 /**
- * @invariant a mutating command (not `readOnly` / `metaHistory`) that changes the document appends FeatureStep `step-<n>` (n =
+ * @invariant a mutating command (not `readOnly` / `metaHistory` / `session`) that changes the document appends FeatureStep `step-<n>` (n =
  *   doc.nextStepNumber) and mints ids `<prefix>-<n>.<k>`, so replay re-mints identical ids; an execute nested inside a running step joins
  *   it (no extra step)
  * @invariant before any command runs, the kernel is given every document B-rep blob it has not seen (`GeometryKernel.loadBlob`)
@@ -44,7 +45,7 @@ export function execute(doc: CadDocument, commandName: string, params: unknown, 
       commandError('CMD_KERNEL_UNAVAILABLE', 'Retry once the geometry kernel has loaded, or run with `--kernel occt`.'),
     );
   feedBlobs(doc, ctx.kernel);
-  const recordsStep = annotations?.readOnly !== true && annotations?.metaHistory !== true;
+  const recordsStep = annotations?.readOnly !== true && annotations?.metaHistory !== true && annotations?.session !== true;
   if (!recordsStep || ctx.stepKey !== undefined) {
     // Queries, history meta-commands, and executes nested inside a running step append nothing.
     return runInContext(ctx, () => def.run(doc, params, ctx));
@@ -65,7 +66,13 @@ export function execute(doc: CadDocument, commandName: string, params: unknown, 
   const stepContext: ExecutionContext = { ...ctx, ids: stepIdSource(stepKey), stepKey };
   const result = runInContext(stepContext, () => def.run(doc, params, stepContext));
   if (result.document === doc) return result;
-  const step: FeatureStep = { id: `step-${stepKey}`, name: commandName, params, suppressed: false, affected: result.affected };
+  const step: FeatureStep = {
+    id: `step-${stepKey}`,
+    name: commandName,
+    params: withoutConfirmations(params),
+    suppressed: false,
+    affected: result.affected,
+  };
   return {
     ...result,
     document: {

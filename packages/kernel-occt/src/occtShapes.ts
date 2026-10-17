@@ -4,6 +4,7 @@
  * entity's rotation and position; the caller owns (releases) it.
  */
 
+import { markThreadBearing } from './occtThreadMark';
 import type { MeshData } from '@core/model/types';
 import { type Entity, type Vec3, createEmptyDocument } from '@core/model/types';
 import { entityTrianglePositions } from '@core/geometry/entityTriangles';
@@ -27,7 +28,7 @@ import { chainFace, loftedSolid, sweptSolid } from './occtCurves';
 import { subdivisionBSplineSolid } from './occtPatches';
 
 /** Planar OCC face of a closed polygon wire through `corners`, or null when OCC rejects it. */
-function polygonFace(api: OccApi, corners: readonly Vec3[]): OccShape | null {
+export function polygonFace(api: OccApi, corners: readonly Vec3[]): OccShape | null {
   const points: OccHandle[] = corners.map(([x, y, z]) => new api.gp_Pnt_3(x, y, z));
   const poly = new api.BRepBuilderAPI_MakePolygon_1() as OccMakePolygon;
   for (const point of points) poly.Add_1(point);
@@ -248,7 +249,8 @@ function meshSolid(api: OccApi, entity: Entity): OccShape | null {
   if (entity.kind !== 'mesh') return null;
   const shape = meshDataToTopoDSShape(api, entity.mesh);
   const moved = [...entity.rotation, ...entity.position].some((value) => value !== 0);
-  return shape !== null && moved ? placed(api, shape, entity) : shape;
+  const result = shape !== null && moved ? placed(api, shape, entity) : shape;
+  return result !== null && entity.threadTool === true ? markThreadBearing(result) : result;
 }
 
 /** Pyramids (planar faces only, so their sewn triangles are already exact) use their triangles. */

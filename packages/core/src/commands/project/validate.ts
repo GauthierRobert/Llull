@@ -13,6 +13,7 @@ import { isLoopNode, resolveLoopHeader } from './loopHeader';
 import { REF, evaluateLeafExpression, fillPlaceholders, interpolate, isForEachStep, isPlanAction, isRepeatStep } from './resolve';
 import { type ActionItem, type LoopNode } from './types';
 import { mapStringLeaves } from '../history/regenerate';
+import { formatIssues } from '../schema';
 
 /** Stop collecting after this many issues (a loop body error repeats once per iteration). */
 const MAX_ISSUES = 50;
@@ -47,6 +48,16 @@ function findParamIssue(value: unknown, defined: ReadonlySet<string>, env: Recor
   return first;
 }
 
+/** Whether a string leaf is only known at run time (alias ref, `=expr`, `{loop}` placeholder), so the params cannot be type-checked yet. */
+function hasDeferredLeaf(value: unknown): boolean {
+  let deferred = false;
+  mapStringLeaves(value, (raw) => {
+    if (REF.test(raw) || raw.startsWith('=') || raw.includes('{')) deferred = true;
+    return raw;
+  });
+  return deferred;
+}
+
 function trackParameter(state: Validation, params: Record<string, unknown>): void {
   const { name, expression } = params;
   if (typeof name !== 'string' || typeof expression !== 'string') return;
@@ -65,12 +76,17 @@ function validateAction(state: Validation, label: string, raw: ActionItem, vars:
     state.issues.push(`${label} (${raw.command}): unknown command`);
     return;
   }
+  const issuesBefore = state.issues.length;
   for (const req of def.paramsSchema.required) {
     if (!(req in params)) state.issues.push(`${label} (${raw.command}): missing required param "${req}"`);
   }
   const env = { ...state.parameters, ...vars };
   const issue = findParamIssue(params, state.defined, env);
   if (issue) state.issues.push(`${label} (${raw.command}): ${issue}`);
+  else if (state.issues.length === issuesBefore && def.paramsValidator && !hasDeferredLeaf(params)) {
+    const parsed = def.paramsValidator.safeParse(params);
+    if (!parsed.success) state.issues.push(`${label} (${raw.command}): invalid params — ${formatIssues(parsed.error)}`);
+  }
   if (raw.command === 'set_parameter') trackParameter(state, params);
   if (raw.as) {
     const filled = interpolate(raw.as, env);

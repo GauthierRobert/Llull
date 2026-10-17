@@ -5,22 +5,29 @@
 
 import type { MeshData } from '@core/model/types';
 import { isClosedMesh } from './meshClosure';
+import { hasManyFreeformFaces } from './occtFreeform';
+import { isThreadBearing } from './occtThreadMark';
 import { release } from '@core/geometry/nativeObject';
 import { explorer, type OccApi, type OccHandle, type OccExplorer, type OccShape, type OccTopoDS, type OccTriangulation } from './occtTypes';
 
 /** Display deflections: linear (document units), angular (radians). */
 const DISPLAY_DEFLECTION = [0.1, 0.5] as const;
+/** Retry for freeform-heavy solids (a modelled thread has 0.1 mm features): their faces mesh open at the display deflection. */
+const FINE_DEFLECTION = [0.02, 0.2] as const;
 
 /**
  * Display mesh of `shape`, or null. BRepMesh can leave a face without triangles, or a solid's mesh
  * open (a corner where several fillet blends meet); a closed solid is then refused rather than
  * shown and exported as a holed shell (re-meshing finer does not close those, and can overflow the
- * WASM stack). Surface parts and compounds with free faces keep the old, lenient behaviour.
+ * WASM stack; only a freeform-heavy solid is retried finer). Surface parts and compounds with free faces keep the old, lenient behaviour.
  */
 export function extractMeshData(api: OccApi, shape: OccShape): MeshData | null {
-  const { mesh, missingFaces } = triangulate(api, shape, DISPLAY_DEFLECTION);
-  if (!isClosedSolid(api, shape)) return mesh;
-  return missingFaces === 0 && isClosedMesh(mesh) ? mesh : null;
+  const first = triangulate(api, shape, DISPLAY_DEFLECTION);
+  if (!isClosedSolid(api, shape)) return first.mesh;
+  if (first.missingFaces === 0 && isClosedMesh(first.mesh)) return first.mesh;
+  if (!isThreadBearing(shape) && !hasManyFreeformFaces(api, shape)) return null;
+  const fine = triangulate(api, shape, FINE_DEFLECTION);
+  return fine.missingFaces === 0 && isClosedMesh(fine.mesh) ? fine.mesh : null;
 }
 
 interface Triangulated {

@@ -14,6 +14,8 @@ import type { BooleanOp, Entity, MeshData, ShapeRecipe, Vec3 } from '../model/ty
 import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, ShapeTopology } from './kernel';
 import type { ExactMassProperties, FaceQueryPort, ImportShapesOptions, ImportShapesResult, KernelInfo } from './kernelPorts';
 import { recipeKey } from './shapeRecipe';
+import { lowerFeature, needsReach, throughReach } from './featureLowering';
+import { floorEdgeIndices } from './featureFillet';
 import { errorMessage } from '../lib/errorMessage';
 import { sha256Hex } from '../lib/sha256';
 
@@ -37,6 +39,11 @@ export interface KernelOps<S> {
   failureEpoch?(): number;
   solid(entity: Entity): S | null;
   boolean(op: BooleanOp, a: S, b: S): S | null;
+  /**
+   * Optional NATIVE form of a `feature` node (07 FTR M7): the cut result of a hole / pocket on `source` (before any floor fillet), or null when
+   * this node needs the lowering to booleans. `reach` = the source's extent below the face plane (through-all / through depth).
+   */
+  feature?(source: S, node: Extract<ShapeRecipe, { op: 'feature' }>, reach: number): S | null;
   /** Optional rewrite of a boolean's operand recipes before they are built (degenerate-contact guards). */
   prepareBoolean?(a: ShapeRecipe, b: ShapeRecipe): [ShapeRecipe, ShapeRecipe];
   /** `edges`: 0-based unique-edge indices ([] = all); `radiusEnd` varies the radius along each edge. */
@@ -144,6 +151,29 @@ function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe
     }
     case 'brep':
       return ops.brep?.(recipe.blob) ?? null;
+    case 'feature': {
+      const source = child(recipe.source);
+      const mesh = source !== null && needsReach(recipe) ? ops.tessellate(source) : null;
+      if (source === null || (needsReach(recipe) && mesh === null)) return null;
+      const reach = mesh === null ? 0 : throughReach(mesh, recipe.frame);
+      const lowered = lowerFeature(recipe, reach);
+      if (lowered === null) return null;
+      const epochBefore = ops.failureEpoch?.() ?? 0;
+      const native = ops.feature?.(source, recipe, reach) ?? null;
+      if (native === null && (ops.failureEpoch?.() ?? 0) !== epochBefore) return null;
+      const tool = native === null ? child(lowered.tool) : null;
+      if (native === null && tool === null) return null;
+      const cut = native ?? (tool === null ? null : ops.boolean(lowered.mode, source, tool));
+      const fillet = recipe.feature === 'pocket' ? recipe.pocket.floorFillet : 0;
+      if (cut === null || fillet <= 0 || lowered.pocket === undefined) return cut;
+      try {
+        const topology = ops.topology(cut);
+        const edges = topology === null ? [] : floorEdgeIndices(topology, lowered.pocket, recipe.frame);
+        return edges.length === 0 ? null : ops.fillet(cut, edges, fillet);
+      } finally {
+        ops.release(cut);
+      }
+    }
   }
 }
 

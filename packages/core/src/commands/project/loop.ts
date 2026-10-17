@@ -6,6 +6,7 @@
 
 import { stepIdSource } from '../../lib/id';
 import { isRecord } from '../../lib/isRecord';
+import { withoutConfirmations } from '../../lib/withoutConfirmations';
 import type { FeatureStep } from '../../model/types';
 import { currentContext, runInContext } from '../context';
 import { MAX_LOOP_ITERATIONS, MAX_PROJECT_STEPS } from '../limits';
@@ -119,7 +120,10 @@ export function runLoopItem(run: PlanRun, index: number, node: LoopNode): boolea
     const step: FeatureStep = {
       id: `step-${stepKey}`,
       name: 'build_project',
-      params: { actions: [freezeOuterRefs(node, outerBindings)], ...(run.onError === 'continue' ? { onError: 'continue' } : {}) },
+      params: withoutConfirmations({
+        actions: [freezeOuterRefs(node, outerBindings)],
+        ...(run.onError === 'continue' ? { onError: 'continue' } : {}),
+      }),
       suppressed: false,
       affected: run.allAffected.slice(firstAffected),
     };

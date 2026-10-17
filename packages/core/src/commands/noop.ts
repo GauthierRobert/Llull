@@ -1,5 +1,7 @@
+import { EXPORT_REMEDIATION, exportDocumentHash, exportGate, type ExportTarget } from '../model/exportGate';
+import { humanGate } from '../model/humanGate';
 import type { CadDocument } from '../model/types';
-import type { CommandError, CommandResult } from './types';
+import type { CommandError, CommandResult, ExecutionContext } from './types';
 
 /** Graceful rejection: the document is returned unchanged with nothing affected. */
 export const noop = (doc: CadDocument, summary: string): CommandResult => ({ document: doc, summary, affected: [] });
@@ -43,3 +45,35 @@ export const report = (document: CadDocument, summary: string, data?: unknown): 
 
 /** Mutating result: `document` is the next state, `affected` the created/changed entity ids. */
 export const changed = (document: CadDocument, summary: string, affected: string[]): CommandResult => ({ document, summary, affected });
+
+/**
+ * Refusal of an export of export-controlled content (TR-MAT-30 / 51), or null when the export may proceed. Every `export_*` command that emits
+ * content runs it first with its `confirmExportControlled` param.
+ * @failure controlled content without confirmation -> MAT_EXPORT_CONTROLLED; a bare true / no signing port / unverified signature -> MAT_HUMAN_GATE
+ * @invariant the signature covers the act, the marked ids, the command and the hash of the exported document (`exportDocumentHash`) plus the nonce
+ */
+export function exportRefusal(
+  doc: CadDocument,
+  command: string,
+  target: ExportTarget,
+  confirmation: unknown,
+  ctx: ExecutionContext | undefined,
+  emitted: readonly string[] = [],
+): CommandResult | null {
+  const gate = exportGate(doc, target, emitted);
+  if (!gate.controlled) return null;
+  const refuse = (code: keyof typeof EXPORT_REMEDIATION, message: string, path: string): CommandResult =>
+    rejection(
+      doc,
+      `${command}: ${code} — ${message}; nothing was exported; no-op.`,
+      commandError(code, EXPORT_REMEDIATION[code], gate.ids, [path]),
+    );
+  const regime = gate.marking.regime;
+  if (confirmation === undefined || confirmation === false)
+    return refuse('MAT_EXPORT_CONTROLLED', `the document uses ${regime}-marked material(s) ${gate.ids.join(', ')}`, 'document');
+  const outcome = humanGate(ctx?.humanSignature ?? null, `export of ${regime}-controlled content`, gate.ids, confirmation, {
+    command,
+    documentHash: exportDocumentHash(doc),
+  });
+  return outcome.cleared ? null : refuse('MAT_HUMAN_GATE', outcome.reason, 'confirmExportControlled');
+}

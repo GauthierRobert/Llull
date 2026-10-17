@@ -14,7 +14,7 @@ import { lstat, mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
 import type { PythonBackend } from '@core/codegen/pythonRuntime';
-import type { CadExchangePort, DwgConverterPort, FeaToolsPort, ProgramRun } from '@mcp/index';
+import type { CadExchangePort, DwgConverterPort, FeaToolsPort, MaterialLibraryStorePort, ProgramRun } from '@mcp/index';
 import { exchangeDirOf, positiveInteger } from './env';
 import { trackChild } from './childProcesses';
 
@@ -36,6 +36,7 @@ export interface ExchangeOptions {
   readonly port: CadExchangePort | null;
   readonly dwg?: DwgConverterPort | null;
   readonly fea?: FeaToolsPort | null; // fea_mesh / fea_solve / fea_export
+  readonly libraries?: MaterialLibraryStorePort | null; // register_material_library
   readonly allowCodeExecution: boolean;
 }
 

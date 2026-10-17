@@ -15,6 +15,7 @@ import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 import { parseKernelChoice } from '@core/geometry/kernelChoice';
 import { registerAppServiceWorker } from '@ui/services/appUpdates';
 import { useKernelStatusStore } from '@ui/store/kernelStatus';
+import { installBrowserLibraries } from '@ui/services/browserLibraries';
 
 // Kernel selection: Manifold by default (fast, no large WASM asset); ?kernel=occt swaps in OCC
 // (dev/power-user toggle, opt-in only). OCC carries a 63 MB WASM binary (~800–1000 ms cold init),
@@ -50,6 +51,7 @@ if (useOcct) {
 }
 
 installDefaultPlugins();
+installBrowserLibraries();
 
 // Production builds only: the dev server has no sw.js and must never be served from a cache.
 if (import.meta.env.PROD) {

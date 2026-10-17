@@ -6,12 +6,12 @@
 import { type CadDocument, type Entity, type Vec3, is3D } from '../../model/types';
 import type { ShapeHandle, ShapeTopology } from '../../geometry/kernel';
 import type { CommandResult } from '../types';
-import { defineCommand, z } from '../schema';
+import { confirmExportControlled, defineCommand, z } from '../schema';
 import { currentContext } from '../context';
 import { kernelUnavailable } from '../kernelRefusal';
 import { operandRecipe } from './kernelShape';
 import { labelStep, type StepLabel } from './stepLabels';
-import { noop, report } from '../noop';
+import { exportRefusal, noop, report } from '../noop';
 import { fixedNumber } from '../../lib/compactNumber';
 
 const OCC_HINT = 'the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server)';
@@ -125,8 +125,12 @@ export const exportStepExact = defineCommand({
       .array(z.string())
       .optional()
       .describe('Ids of the 3D solids to export. Omit or pass [] to export every 3D solid of the document.'),
+    confirmExportControlled,
   }),
-  run: (doc, { entityIds }, ctx): CommandResult => {
+  run: (doc, params, ctx): CommandResult => {
+    const { entityIds } = params;
+    const refused = exportRefusal(doc, 'export_step_exact', 'step', params.confirmExportControlled, ctx);
+    if (refused !== null) return refused;
     const kernel = (ctx ?? currentContext()).kernel;
     if (!kernel) return noop(doc, kernelUnavailable('export_step_exact'));
     const { solids, skipped } = stepTargets(doc, entityIds);

@@ -1,0 +1,366 @@
+{
+  "VC-FTR-01": {
+    "status": "pass",
+    "expected": "BA, OSSB, ISSB, BD, flat length per row",
+    "tolerance": "1e-6 mm / 1e-7 in abs",
+    "measured": "12 rows, 60 CLI assertions: worst |err| 4.3e-10 (limits 1e-6 mm, 1e-7 in, K-chart 1e-9)",
+    "tests": [
+      "server/tests/packReplay07.test.ts",
+      "tests/unit/aero/sheetmetal/calc.test.ts",
+      "tests/unit/aero/sheetmetal/sheetMath.test.ts"
+    ]
+  },
+  "VC-FTR-02": {
+    "status": "pass",
+    "expected": "OSSB 0.130 in / 0.758 in (computed 0.130063 / 0.758063); K-chart 0.41421 / 2.4142",
+    "tolerance": "0.0005 in",
+    "measured": "ossb 0.130063 / 0.758063 in (|d| 6.3e-5 from the chart 0.130 / 0.758, limit 5e-4); K-chart 0.414214 / 2.414214",
+    "tests": ["server/tests/packReplay07.test.ts", "tests/unit/aero/sheetmetal/calc.test.ts"]
+  },
+  "VC-FTR-03": {
+    "status": "pass",
+    "expected": "0.28017 in exact; source text 0.2796 (rounded intermediates)",
+    "tolerance": "0.0007 in vs source, 1e-7 vs exact",
+    "measured": "BA 0.28017 in (exact, err < 1e-7); 5.7e-4 from the source text 0.2796 (limit 7e-4)",
+    "tests": [
+      "server/tests/packReplay07.test.ts",
+      "tests/unit/aero/sheetmetal/calc.test.ts",
+      "tests/unit/aero/sheetmetal/sheetMath.test.ts"
+    ]
+  },
+  "VC-FTR-04": {
+    "status": "pass",
+    "expected": "BA 3.769911, leg 48.115044, FD 1.755044, flange 51.755044 mm",
+    "tolerance": "1e-6 mm",
+    "measured": "BA 3.76991118 mm (err 1.8e-7 vs 3.769911, limit 1e-6); OSSB 3.64",
+    "tests": ["server/tests/packReplay07.test.ts", "tests/unit/aero/sheetmetal/calc.test.ts"]
+  },
+  "VC-FTR-05": {
+    "status": "pass",
+    "expected": "as stated",
+    "tolerance": "1e-12",
+    "measured": "K 0.44 ansi from DIN 0.88; BA 8.645662983 (err 3.2e-10); table 0.42 and clamp 0.40 in sheetMath.test",
+    "tests": [
+      "server/tests/packReplay07.test.ts",
+      "tests/unit/aero/sheetmetal/calc.test.ts",
+      "tests/unit/aero/sheetmetal/sheetMath.test.ts"
+    ]
+  },
+  "VC-FTR-06": {
+    "status": "pass",
+    "expected": "volume 5279.716754 mm³ (OCC measured 5279.716754, rel err 1.6e-15)",
+    "tolerance": "1e-6 rel",
+    "measured": "OCC volume 5279.716754404116 mm3, rel err 1.7e-16 (limit 1e-6)",
+    "tests": ["server/tests/packReplay07.test.ts", "server/tests/occtSheetMetal.test.ts", "tests/unit/aero/sheetmetal/bracket.test.ts"]
+  },
+  "VC-FTR-07": {
+    "status": "pass",
+    "expected": "flat length 65.569203 / 65.845663 / 65.996459 mm, width 50",
+    "tolerance": "1e-6 (native)",
+    "measured": "flat length 65.569203 / 65.845663 / 65.996459 at K 0.33 / 0.44 / 0.50 (1e-6), width 50; bracket plan on OCC: BA 8.645662983 (3.2e-10)",
+    "tests": ["server/tests/packReplay07.test.ts", "tests/unit/aero/sheetmetal/bracket.test.ts"]
+  },
+  "VC-FTR-08": {
+    "status": "pass",
+    "expected": "flat area × T = folded volume; refold recipe key equal to original",
+    "tolerance": "1e-6 rel",
+    "measured": "OCC: flat area x T = folded volume (rel < 1e-6) at K 0.5; refold = re-derivation (rebuild, save/load, flat_pattern / materialize leave the part alone) gives the same recipe key",
+    "tests": ["tests/unit/aero/sheetmetal/bracket.test.ts", "server/tests/occtSheetMetal.test.ts"]
+  },
+  "VC-FTR-09": {
+    "status": "pass",
+    "expected": "only LINE/ARC/CIRCLE/TEXT; 1 entity on BEND_UP; extents 65.8457 × 50 mm; $INSUNITS = 4 (mm)",
+    "tolerance": "1e-4 mm",
+    "measured": "extents 65.8457 x 50 mm (|d| < 5e-5, limit 1e-4); LINE / TEXT only; 1 entity on BEND_UP; $INSUNITS 4",
+    "tests": ["tests/unit/aero/sheetmetal/dxf.test.ts"]
+  },
+  "VC-FTR-10": {
+    "status": "pass",
+    "expected": "R = 0: refusal FTR_SHARP_BEND_FORBIDDEN; R = 1.0: finding FTR_BEND_RADIUS_BELOW_MIN citing the row (limit 2.0); R = 2.4 → none",
+    "tolerance": "exact",
+    "measured": "R 1.0 → FTR_BEND_RADIUS_BELOW_MIN with limit 2.0 (err 0); R 0 → FTR_SHARP_BEND_FORBIDDEN; R 2.4 → no finding",
+    "tests": ["server/tests/packReplay07.test.ts", "tests/unit/aero/sheetmetal/checks.test.ts"]
+  },
+  "VC-FTR-11": {
+    "status": "pass",
+    "expected": "allowance 0.197880 / 0.098095 / 0.287239 mm; run 5.242333 / 5.136723 / 6.143594",
+    "tolerance": "1e-6",
+    "measured": "JG-01..03 allowance / run / inclined straight (CLI): worst |err| 4.7e-10 (limit 1e-6)",
+    "tests": [
+      "server/tests/packReplay07.test.ts",
+      "tests/unit/aero/sheetmetal/joggle.test.ts",
+      "tests/unit/aero/sheetmetal/sheetMath.test.ts"
+    ]
+  },
+  "VC-FTR-11b": {
+    "status": "pass",
+    "expected": "rejected: s < 0",
+    "tolerance": "—",
+    "measured": "JG-04 refused FTR_JOGGLE_OFFSET_TOO_SMALL (paths offset, angle, insideRadius), exit 1",
+    "tests": ["server/tests/packReplay07.test.ts", "tests/unit/aero/sheetmetal/joggle.test.ts"]
+  },
+  "VC-FTR-12": {
+    "status": "pass",
+    "expected": "relief width 0.8 = 0.5·T, depth 6.4 = R + T + 0 (extra = named default 0); volume removed 8.192 mm³ (0.8 × 6.4 × 1.6)",
+    "tolerance": "1e-6 abs (OCC measured, 2026-10-17)",
+    "measured": "OCC removed volume 0.8 x 6.4 x 1.6 = 8.192 mm3 (|d| < 1e-6); relief width 0.8, depth 6.4",
+    "tests": ["server/tests/occtSheetMetalForms.test.ts", "tests/unit/aero/sheetmetal/reliefAuto.test.ts"]
+  },
+  "VC-FTR-13": {
+    "status": "pass",
+    "expected": "valid solid, volume 11381.155100 mm³; physical hole ∅47.2; flat cut ∅34.705133 flagged approximate + unverified",
+    "tolerance": "1e-6 rel (OCC measured, 2026-10-17)",
+    "measured": "OCC volume 11381.155100 mm3 (rel < 1e-9); flat cut diameter 34.705133 (|d| < 1e-6, approximate + unverified); physical hole 47.2",
+    "tests": ["server/tests/occtSheetMetalForms.test.ts", "tests/unit/aero/sheetmetal/forms.test.ts"]
+  },
+  "VC-FTR-14": {
+    "status": "pass",
+    "expected": "valid solid: 6144.808987 mm³ round ends, 6128.053826 mm³ open ends; flat area stays 6000 with one forming note",
+    "tolerance": "1e-6 rel (OCC measured, 2026-10-17)",
+    "measured": "OCC 6144.808987 (round) / 6128.053826 (open) mm3, rel < 1e-9; flat area 6000, 1 forming note",
+    "tests": ["server/tests/occtSheetMetalForms.test.ts", "tests/unit/aero/sheetmetal/forms.test.ts"]
+  },
+  "VC-FTR-15": {
+    "status": "pass",
+    "expected": "hem closed 2520.637158 / open (gap 3.2) 2761.911474 mm³; contour L 3475.030053, Z (mid) 3638.060105, Z-return (top) 4127.490158 mm³ = flat area × T",
+    "tolerance": "1e-9 rel vs flat area × T (OCC measured, 2026-10-17); hem developed-length formula unverified",
+    "measured": "OCC hem 2520.637158 / 2761.911474; contour L 3475.030053, Z 3638.060105, Z-return 4127.490158 mm3 (rel < 1e-9; = flat area x T within 1e-6)",
+    "tests": [
+      "server/tests/occtSheetMetalForms.test.ts",
+      "tests/unit/aero/sheetmetal/contour.test.ts",
+      "tests/unit/aero/sheetmetal/hem.test.ts"
+    ]
+  },
+  "VC-FTR-16": {
+    "status": "pass",
+    "expected": "violation hole_to_bend",
+    "tolerance": "exact",
+    "measured": "hole 2.000000 mm from the bend tangent vs 3 mm → FTR_HOLE_TO_BEND_TOO_CLOSE",
+    "tests": ["tests/unit/aero/sheetmetal/checks.test.ts"]
+  },
+  "VC-FTR-17": {
+    "status": "pass",
+    "expected": "7 holes (4 csk 100° c 1.762109, 2 cbore, 1 blind 118° tip 1.802582) + 1 pocket rc 3; 0 false positives",
+    "tolerance": "1e-4 mm, 1e-3°",
+    "measured": "7 holes (4 csk 100°, 2 cbore, 1 blind 118°) + 1 pocket, 0 unclassified; authored and STEP plate; positions 1e-4 mm, angles 1e-3°",
+    "tests": [
+      "server/tests/packReplay07.test.ts",
+      "server/tests/occtFeatures.test.ts",
+      "tests/unit/features/recognition.test.ts",
+      "tests/unit/features/recognizeCommands.test.ts"
+    ]
+  },
+  "VC-FTR-18": {
+    "status": "pass",
+    "expected": "T 1.6, 1 bend R 4.8, 90°, flat 65.845663 × 50",
+    "tolerance": "0.01 mm",
+    "measured": "bracket from STEP: T 1.6, 1 bend R 4.8 90°, flat 65.8457 x 50 (limit 0.01), from the bottom, top and flange faces",
+    "tests": ["server/tests/occtSheetMetal.test.ts", "tests/unit/aero/sheetmetal/convert.test.ts"]
+  },
+  "VC-FTR-19": {
+    "status": "pass",
+    "expected": "2 bends R 1.6, φ 20°, joggle offset 1.6, flat 45.440213 (K 0.44)",
+    "tolerance": "0.01 mm",
+    "measured": "joggle strip from STEP: 2 bends R 1.6 at 20°, 1 joggle (offset 1.6 within 0.01), flat 45.4402 (limit 0.01)",
+    "tests": ["server/tests/occtSheetMetal.test.ts", "tests/unit/aero/sheetmetal/convert.test.ts"]
+  },
+  "VC-FTR-20": {
+    "status": "pass",
+    "expected": "2 blind holes ∅20 with 118° point (4 half-cone faces → 2 apexes); further features TBD vs PMI",
+    "tolerance": "exact count",
+    "measured": "CTC-01: 2 blind holes Ø20 with a 118° point (4 half cones merged to 2)",
+    "tests": ["server/tests/packReplay07.test.ts", "server/tests/occtFeatures.test.ts"]
+  },
+  "VC-FTR-21": {
+    "status": "pass",
+    "expected": "per-file drill-point apex counts 74 / 0 / 22 / 10 (59° semi-angle), 45° cone seeds 0 / 0 / 42 / 3; no crash, < 5 s each",
+    "tolerance": "exact counts (seeds)",
+    "measured": "CTC-02..05 apexes 74 / 0 / 22 / 10 and 45° seeds 0 / 0 / 42 / 3; recognition under 5 s each (npm run quality:fetch)",
+    "tests": ["server/tests/quality/ftrRecognition.gate.ts"]
+  },
+  "VC-FTR-22": {
+    "status": "pass",
+    "expected": "countersink depth c, removed volume beyond bore (full cone and removed_volume_in_sheet, truncated at T for knife-edge cases), cone area",
+    "tolerance": "1e-6 abs / 1e-6 rel",
+    "measured": "CS-01..07 depths, volumes (OCC exact) and cone areas: worst rel err 2.4e-10 of 1e-6; CS-01 depth 1.762109225",
+    "tests": ["server/tests/packReplay07.test.ts", "tests/unit/features/holeMath.test.ts"]
+  },
+  "VC-FTR-23": {
+    "status": "pass",
+    "expected": "knife edge true for 02/03/06 (land −0.162 / −0.562 / −0.133 mm), false for 01/07 (land 8.238 / 0.651 mm)",
+    "tolerance": "exact flag",
+    "measured": "FTR_CSK_KNIFE_EDGE for CS-02 / 03 / 06 (land -0.162109 / -0.562109 / -0.133…), none for CS-01 / 04 / 05 / 07",
+    "tests": ["server/tests/packReplay07.test.ts", "tests/unit/features/queries.test.ts", "tests/unit/features/recognizeCommands.test.ts"]
+  },
+  "VC-FTR-24": {
+    "status": "pass",
+    "expected": "tip height 1.802582 / 1.242641 / 0.991420 mm",
+    "tolerance": "1e-6",
+    "measured": "tip height 1.802582 / 1.242641 / 0.991420 mm and volumes within 1e-6",
+    "tests": ["server/tests/packReplay07.test.ts", "tests/unit/features/holeMath.test.ts"]
+  },
+  "VC-FTR-25": {
+    "status": "pass",
+    "expected": "volume 55978.529153 mm³ (OCC reference build rel err 1.2e-15); native vs lowered equal",
+    "tolerance": "1e-6 rel",
+    "measured": "plan on OCC: 55978.52915279594 mm3 (rel 3.6e-12 vs 55978.529153); native = lowered to 1e-9",
+    "tests": ["server/tests/packReplay07.test.ts", "server/tests/occtFeatures.test.ts", "server/tests/occtNativeFeatures.test.ts"]
+  },
+  "VC-FTR-26": {
+    "status": "pass",
+    "expected": "mass_properties volume 59783.006014 mm³",
+    "tolerance": "1e-6 rel",
+    "measured": "baseline plan on OCC: 59783.00601377506 mm3 (rel 3.8e-12 vs 59783.006014)",
+    "tests": ["server/tests/packReplay07.test.ts", "server/tests/occtFeatures.test.ts"]
+  },
+  "VC-FTR-27": {
+    "status": "pass",
+    "expected": "removed volume 3931.327412 / 3877.717302 mm³; PK-03 rejected (rf > rc); tool Ø > 2·rc → DFM violation",
+    "tolerance": "1e-6 rel",
+    "measured": "PK-01 20068.672587712816 and PK-02 20122.282698 mm3 (rel < 1e-10); PK-03 refused FTR_POCKET_FILLET_GT_CORNER",
+    "tests": [
+      "server/tests/packReplay07.test.ts",
+      "server/tests/occtFeatures.test.ts",
+      "tests/unit/features/addPocket.test.ts",
+      "tests/unit/features/holeMath.test.ts"
+    ]
+  },
+  "VC-FTR-28": {
+    "status": "pass",
+    "expected": "volume and recipeKey unchanged; designation persists through save/load and code export comment",
+    "tolerance": "exact",
+    "measured": "MJ6x1-4H5H: volume and recipeKey unchanged; designation persists through save / load and the CadQuery export comment",
+    "tests": ["tests/unit/features/queries.test.ts", "tests/unit/features/recipeNode.test.ts"]
+  },
+  "VC-FTR-29": {
+    "status": "pass",
+    "expected": "hole regenerates with new D; summary names the fastener",
+    "tolerance": "exact",
+    "measured": "D = middle of the entry 6.1 / 6.2 = 6.15; after editing the catalogue step to 7.0 / 7.2 the hole regenerates with 7.1; summary names ACME-100 ACME-100-6-10",
+    "tests": ["tests/unit/aero/fasteners/holeRegeneration.test.ts", "tests/unit/features/holeFastener.test.ts"]
+  },
+  "VC-FTR-30": {
+    "status": "pass",
+    "expected": "holes stay through and on the same faces; volume = analytic at t = 12 (generator with lz = 12)",
+    "tolerance": "1e-6 rel",
+    "measured": "t 10 → 12 on OCC: 7 holes (6 through) all on the top face, volume rel < 1e-9 vs the analytic value",
+    "tests": ["server/tests/occtFeatures.test.ts"]
+  },
+  "VC-FTR-31": {
+    "status": "pass",
+    "expected": "in listCommands(), toToolSchemas() snapshot, toolset manufacturing, CLI describe; happy + failure + is pure tests",
+    "tolerance": "—",
+    "measured": "all FTR commands listed, schema 1:1 with toToolSchemas, toolset manufacturing once; happy / failure / is-pure tests per command",
+    "tests": ["tests/unit/contract/ftrAgentFirst.test.ts"]
+  },
+  "VC-FTR-32": {
+    "status": "pass",
+    "expected": "volume equal to the imported solid",
+    "tolerance": "1e-6 rel",
+    "measured": "machined plate rebuilt from recognised holes: rel err 3.2e-15; CTC-01: 4.5e-10 (limit 1e-6)",
+    "tests": ["server/tests/occtFeatureOptions.test.ts"]
+  },
+  "VC-FTR-33": {
+    "status": "pass",
+    "expected": "rib 3 x 80 x 20 on the 100 x 60 x 10 plate: volume = plate + 4800 = 64800 mm^3; OCP cross-check (cadquery-ocp 8.0.1.1.0, prism fuse) in validation/data/expected_rib_ocp.json",
+    "tolerance": "1e-6 rel",
+    "measured": "llull OCC 64800.0 = OCP prism fuse 64800.0 (rel < 1e-6); BRepFeat_MakeLinearForm did not reproduce the rib (recorded linear_form_agrees: false), so the prism fuse is the reference",
+    "tests": ["server/tests/occtFeatureOptions.test.ts", "tests/unit/features/addRib.test.ts"]
+  },
+  "VC-FTR-34": {
+    "status": "pass",
+    "expected": "7 rows, coordinates from the top-left corner datum, sorted",
+    "tolerance": "exact",
+    "measured": "7 rows H1..H7 sorted by y then x; (x, y) from the top-left datum match the pack within 1e-4",
+    "tests": ["server/tests/occtFeatures.test.ts", "tests/unit/features/queries.test.ts"]
+  },
+  "VC-FTR-35": {
+    "status": "pass",
+    "expected": "same values in inch; mm document gives ×25.4 exactly",
+    "tolerance": "1e-9 rel",
+    "measured": "FP-08..11 in an inch document equal the pack inch values (1e-7); the mm document gives x 25.4 to 1e-9 relative",
+    "tests": ["tests/unit/aero/sheetmetal/calc.test.ts", "tests/unit/aero/sheetmetal/sheetMath.test.ts"]
+  },
+  "VC-FTR-36": {
+    "status": "pass",
+    "expected": "modelled M6x1 internal thread (ISO 68-1 basic profile) through a 10 mm plate, bore D1 = 4.9174682: groove volume 39.6510 mm^3 (analytic A x 2 pi r x L/P), solid valid",
+    "tolerance": "5e-3 rel on the groove volume",
+    "measured": "OCC groove 39.7641 mm^3 (+2.85e-3 rel), solid 59770.3149 mm^3, valid; Manifold +8.6e-3 (faceted bore)",
+    "tests": ["server/tests/occtModelledThread.test.ts", "tests/unit/features/modelledThread.test.ts"]
+  },
+  "VC-FTR-37": {
+    "status": "pass",
+    "expected": "exit 1; data.error.code = FTR_POCKET_FILLET_GT_CORNER / FTR_K_FACTOR_MISSING / FTR_BEND_ANGLE_OUT_OF_RANGE / FTR_TABLE_ROW_NO_SOURCE / FTR_HOLE_DIAMETERS_INCONSISTENT / FTR_JOGGLE_OFFSET_TOO_SMALL; offending path + remediation present",
+    "tolerance": "exact",
+    "measured": "six wrong inputs: exit 1, error.code FTR_POCKET_FILLET_GT_CORNER / FTR_K_FACTOR_MISSING / FTR_BEND_ANGLE_OUT_OF_RANGE / FTR_TABLE_ROW_NO_SOURCE / FTR_HOLE_DIAMETERS_INCONSISTENT / FTR_JOGGLE_OFFSET_TOO_SMALL with paths and remediation",
+    "tests": [
+      "server/tests/packReplay07.test.ts",
+      "tests/unit/contract/ftrAgentFirst.test.ts",
+      "tests/unit/aero/sheetmetal/calc.test.ts",
+      "tests/unit/aero/sheetmetal/rules.test.ts"
+    ]
+  },
+  "VC-FTR-38": {
+    "status": "pass",
+    "expected": "warn FTR_RULE_THRESHOLD_MISSING; rulesSkipped lists minLand",
+    "tolerance": "exact",
+    "measured": "check_machining without minLand: warn FTR_RULE_THRESHOLD_MISSING; rulesSkipped lists minLand",
+    "tests": ["server/tests/packReplay07.test.ts", "tests/unit/contract/ftrAgentFirst.test.ts", "tests/unit/features/queries.test.ts"]
+  },
+  "VC-FTR-39": {
+    "status": "pass",
+    "expected": "refusal FTR_K_FACTOR_MISSING; hole_table row drillPointAngle = {118, defaulted true, source R8}",
+    "tolerance": "exact",
+    "measured": "sheet_metal_calc without K → FTR_K_FACTOR_MISSING; hole_table drillPointAngle {118, defaulted true, source R8}",
+    "tests": ["server/tests/packReplay07.test.ts", "tests/unit/features/queries.test.ts"]
+  },
+  "VC-FTR-40": {
+    "status": "pass",
+    "expected": "data.unverified true in calc and flat pattern; check warn FTR_UNVERIFIED_DATA",
+    "tolerance": "exact",
+    "measured": "unverified row: data.unverified true in calc and flat pattern; check warns FTR_UNVERIFIED_DATA",
+    "tests": ["server/tests/packReplay07.test.ts", "tests/unit/aero/sheetmetal/calc.test.ts", "tests/unit/aero/sheetmetal/checks.test.ts"]
+  },
+  "VC-FTR-41": {
+    "status": "pass",
+    "expected": "data.reviewRequired true + reason; summary contains \"not approved\"; DXF NOTES carries the note",
+    "tolerance": "exact",
+    "measured": "reviewRequired true + reason, \"not approved\" in the summary, the DXF NOTES layer carries the note",
+    "tests": ["server/tests/packReplay07.test.ts", "tests/unit/aero/sheetmetal/bracket.test.ts", "tests/unit/aero/sheetmetal/dxf.test.ts"]
+  },
+  "VC-FTR-42": {
+    "status": "pass",
+    "expected": "status fail; findings FTR_BEND_RADIUS_BELOW_MIN + FTR_WAIVER_NOT_APPROVED",
+    "tolerance": "exact",
+    "measured": "status fail; FTR_BEND_RADIUS_BELOW_MIN + FTR_WAIVER_NOT_APPROVED",
+    "tests": ["server/tests/packReplay07.test.ts", "tests/unit/aero/sheetmetal/checks.test.ts", "tests/unit/features/queries.test.ts"]
+  },
+  "VC-FTR-43": {
+    "status": "pass",
+    "expected": "provenance.formulas.ossb = \"tan(theta/2)*(R+T)\", inputs with units, sources contain R2",
+    "tolerance": "exact",
+    "measured": "formulas.ossb = tan(theta/2)*(R+T), inputs with units (in), sources contain R2",
+    "tests": ["server/tests/packReplay07.test.ts", "tests/unit/aero/sheetmetal/calc.test.ts"]
+  },
+  "VC-FTR-44": {
+    "status": "pass",
+    "expected": "commands found; every numeric param states a unit; lengthUnit / angleUnit echoed",
+    "tolerance": "exact",
+    "measured": "llull search finds flat_pattern and sheet_metal_calc; every numeric param of the five commands states a unit (dimensionless marker for K); lengthUnit mm / angleUnit deg echoed",
+    "tests": ["server/tests/packReplay07.test.ts", "tests/unit/contract/ftrAgentFirst.test.ts"]
+  },
+  "VC-FTR-45": {
+    "status": "pass",
+    "expected": "validate ok; broken plan names step 0 and thickness; doc file unchanged after dry run; PNG written",
+    "tolerance": "exact",
+    "measured": "plan --validate ok; broken plan: summary names step 0 and thickness; --dry-run leaves the doc file byte-identical; render_view --save writes a PNG",
+    "tests": ["server/tests/packReplay07.test.ts", "tests/unit/project.test.ts"]
+  },
+  "VC-FTR-46": {
+    "status": "pass",
+    "expected": "exit 0; recognition < 5 s",
+    "tolerance": "exact / budget",
+    "measured": "CTC-02 import + recognition via the CLI with --progress --timeout: exit 0 on all calls, recognition under 5 s",
+    "tests": ["server/tests/quality/ftrRecognition.gate.ts", "server/tests/packReplay07.test.ts"]
+  }
+}

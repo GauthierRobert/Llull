@@ -24,6 +24,8 @@ Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first cha
   fea_export analysisId=ID    the CalculiX .inp deck (text + sha256)  [--save deck.inp]
   fea_import_field analysisId=ID file=T.csv coordinatesUnit=mm temperatureUnit=degC   temperature table x,y,z,T -> thermo_static field
                               (works locally and with --app / --server; artifacts: $LLULL_FEA_CACHE)
+  register_material_library file=LIB.llull-matlib.json   copy a material library into $LLULL_LIBRARIES_DIR (~/.llull/libraries); then
+                              import_material_library libraryId=ID version=V sha256=H, and resolve_material_libraries after a load
   run <plan.json | ->         build_project: an actions array or { actions, onError }
                               [--validate] dry-run check  [--continue] onError=continue
   new [--force]               write an empty document

@@ -23,6 +23,20 @@ function paramString(step: FeatureStep, key: string): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
+/**
+ * Whether replay regenerates material `name` instead of carrying it: `create_material` (params.name), `define_material_record` (params.id), or a
+ * record of an imported library (only `import_material_library` produces those; a suppressed or deleted import step must not leave its values behind).
+ * @invariant `materialLibraries` is never carried: library entries and their records come back only from their import step
+ */
+function ownsMaterial(history: readonly FeatureStep[], name: string, material: CadDocument['materials'][string]): boolean {
+  if (material.record?.libraryRef !== undefined) return true;
+  return history.some(
+    (s) =>
+      (s.name === 'create_material' && paramString(s, 'name') === name) ||
+      (s.name === 'define_material_record' && paramString(s, 'id') === name),
+  );
+}
+
 /** The records of an ordered table that no history step produced, with their order. */
 function orphanRecords<T>(
   table: Readonly<Record<string, T>>,
@@ -41,8 +55,7 @@ export function orphanState(
 > {
   const history = base.featureHistory;
   const affected = affectedIds(history);
-  const materialClaims = new Set(history.filter((s) => s.name === 'create_material').map((s) => paramString(s, 'name')));
-  const materials = Object.fromEntries(Object.entries(base.materials).filter(([key]) => !materialClaims.has(key)));
+  const materials = Object.fromEntries(Object.entries(base.materials).filter(([key, material]) => !ownsMaterial(history, key, material)));
   const componentSteps = history.filter((s) => s.name === 'create_component');
   const componentClaims = new Set<string | undefined>();
   let unattributable = 0;

@@ -14,6 +14,7 @@ import { draw2dCommands } from './draw2d/catalog';
 import { modify2dCommands } from './modify2d/catalog';
 import { editCommands } from './edit/catalog';
 import { brepCommands } from './brep/catalog';
+import { featuresCommands } from './features/catalog';
 import { inspectCommands } from './inspect/catalog';
 import { renderCommands } from './render/catalog';
 import { parametricCommands } from './parametric/catalog';
@@ -30,6 +31,7 @@ import { vnvCommands } from './vnv/catalog';
 import { materialLabCommands } from './materiallab/catalog';
 import { thermalCommands } from './thermal/catalog';
 import { thermomechCommands } from './thermomech/catalog';
+import { materialCommands } from './materials/catalog';
 
 registerCommands('core', [
   ...documentCommands,
@@ -38,6 +40,7 @@ registerCommands('core', [
   ...modify2dCommands,
   ...editCommands,
   ...brepCommands,
+  ...featuresCommands,
   ...inspectCommands,
   ...renderCommands,
   ...parametricCommands,
@@ -54,6 +57,7 @@ registerCommands('core', [
   ...materialLabCommands,
   ...thermalCommands,
   ...thermomechCommands,
+  ...materialCommands,
 ]);
 onPluginInstalled((plugin) => registerCommands(`plugin '${plugin.name}'`, plugin.commands));
 

@@ -1,7 +1,7 @@
 {
-  "status": "DRAFT - uses commands PROPOSED in TECHNICAL_SPEC.md section 4 (sheet-metal plugin). Not runnable today.",
+  "status": "RUNNABLE (AERO-3, 2026-10-17): sheet-metal plugin landed; run by server/tests/packReplay07.test.ts.",
   "expected": "expected_test_parts.json parts['ftr_bracket_L.step'] (volume 5279.716754 mm3) and expected_flat_pattern.json FP-02 (flat length 65.845663 mm at K=0.44)",
-  "plan": [
+  "actions": [
     { "command": "set_units", "params": { "units": "mm" } },
     {
       "command": "create_sheet_metal_rule",

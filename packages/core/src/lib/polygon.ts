@@ -155,3 +155,11 @@ export function segmentsIntersect(a1: Point2, a2: Point2, b1: Point2, b2: Point2
   const d4 = orient2(a1, a2, b2);
   return d1 * d2 < 0 && d3 * d4 < 0;
 }
+
+/** True when two non-adjacent edges of the closed polygon cross. */
+export function selfIntersects(polygon: ReadonlyArray<Point2>): boolean {
+  const next = (index: number): Point2 => polygon[(index + 1) % polygon.length] as Point2;
+  return polygon.some((a, i) =>
+    polygon.some((b, j) => j > i + 1 && !(i === 0 && j === polygon.length - 1) && segmentsIntersect(a, next(i), b, next(j))),
+  );
+}

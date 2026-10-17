@@ -159,7 +159,7 @@ their execution context.
 
 The kernel boundary is a shape, not a mesh. A command describes what it wants as a
 `ShapeRecipe` — a serializable construction tree (primitive leaves, then boolean, fillet,
-chamfer, shell, placement and scale nodes) — and the kernel evaluates it to an opaque,
+chamfer, shell, placement and scale nodes, plus `feature` nodes — holes and pockets cut into a face, lowered to one compound boolean tool by `geometry/featureLowering`) — and the kernel evaluates it to an opaque,
 kernel-owned `ShapeHandle` (a TopoDS_Shape under OpenCascade). The kernel caches its native
 shapes by the recipe's content hash, so an unchanged prefix of the feature tree is never
 rebuilt; a handle carries its recipe, so a shape evicted from the cache, or lost with a

@@ -4,9 +4,9 @@
  "conventions": {
   "doc": "each case runs on a fresh temp --doc; plan / plan_file first (llull run \u2026 --json), then cli calls with --json",
   "alias": "<alias:NAME> = first id in affected of the plan step whose \"as\" is NAME",
-  "first": "<first:data.ids> = first id in data.ids of the previous call (find_entities)",
-  "paths": "dot paths into the --json object; [*] maps over an array; [?field==value] filters",
-  "status": "commands marked proposed in TECHNICAL_SPEC \u00a74 make these cases red until implemented; VC-FTR-26 runs today"
+  "first": "<first:PATH> = the value at PATH (e.g. data.matches[0].id of find_entities) in the previous call's --json output",
+  "paths": "dot paths into the --json object (a single command that fails reports error.code / error.paths / error.remediation beside data; a plan reports data.steps[i].error); [*] maps over an array; [?field==value] filters",
+  "status": "all cases run against the built commands (server/tests/packReplay07.test.ts replays them through runCli); VC-FTR-46 needs the pinned CTC-02 (npm run quality:fetch)"
  },
  "cases": [
   {
@@ -1031,7 +1031,73 @@
     "FR-FTR-09"
    ],
    "category": "b",
-   "plan_file": "TBD (M5): joggle strip plan matching data/ftr_joggle_strip.step",
+   "plan": [
+    {
+     "command": "set_units",
+     "params": {
+      "units": "mm"
+     }
+    },
+    {
+     "command": "create_sheet_metal_rule",
+     "params": {
+      "name": "strip",
+      "material": "2024",
+      "thickness": 1.6,
+      "insideRadius": 1.6,
+      "kFactor": 0.44,
+      "kFactorStandard": "ansi"
+     }
+    },
+    {
+     "command": "draw_rectangle",
+     "params": {
+      "width": 40,
+      "height": 30,
+      "position": [
+       0,
+       0,
+       0
+      ]
+     },
+     "as": "outline"
+    },
+    {
+     "command": "add_sheet_metal_base",
+     "params": {
+      "profileId": "$outline",
+      "rule": "strip",
+      "side": "up"
+     },
+     "as": "sm"
+    },
+    {
+     "command": "add_joggle",
+     "params": {
+      "id": "$sm",
+      "face": {
+       "near": [
+        10,
+        15,
+        0
+       ]
+      },
+      "line": [
+       [
+        20,
+        30
+       ],
+       [
+        20,
+        0
+       ]
+      ],
+      "offset": 1.6,
+      "angle": 20.0,
+      "side": "up"
+     }
+    }
+   ],
    "cli": [
     "llull flat_pattern id=<alias:sm>"
    ],
@@ -1064,6 +1130,216 @@
    "source": "data/expected_flat_pattern.json JG-01"
   },
   {
+   "vc": "VC-FTR-11",
+   "case": "JG-02",
+   "proves": [
+    "FR-FTR-09"
+   ],
+   "category": "b",
+   "plan": [
+    {
+     "command": "set_units",
+     "params": {
+      "units": "mm"
+     }
+    },
+    {
+     "command": "create_sheet_metal_rule",
+     "params": {
+      "name": "strip",
+      "material": "2024",
+      "thickness": 1.0,
+      "insideRadius": 2.0,
+      "kFactor": 0.4,
+      "kFactorStandard": "ansi"
+     }
+    },
+    {
+     "command": "draw_rectangle",
+     "params": {
+      "width": 40,
+      "height": 30,
+      "position": [
+       0,
+       0,
+       0
+      ]
+     },
+     "as": "outline"
+    },
+    {
+     "command": "add_sheet_metal_base",
+     "params": {
+      "profileId": "$outline",
+      "rule": "strip",
+      "side": "up"
+     },
+     "as": "sm"
+    },
+    {
+     "command": "add_joggle",
+     "params": {
+      "id": "$sm",
+      "face": {
+       "near": [
+        10,
+        15,
+        0
+       ]
+      },
+      "line": [
+       [
+        20,
+        30
+       ],
+       [
+        20,
+        0
+       ]
+      ],
+      "offset": 1.2,
+      "angle": 15.0,
+      "side": "up"
+     }
+    }
+   ],
+   "cli": [
+    "llull flat_pattern id=<alias:sm>"
+   ],
+   "assert": [
+    {
+     "path": "data.joggles[0].allowance",
+     "op": "approx",
+     "value": 0.098095083,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.joggles[0].run",
+     "op": "approx",
+     "value": 5.136723457,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.joggles[0].inclinedStraight",
+     "op": "approx",
+     "value": 3.978181478,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    }
+   ],
+   "source": "data/expected_flat_pattern.json JG-02"
+  },
+  {
+   "vc": "VC-FTR-11",
+   "case": "JG-03",
+   "proves": [
+    "FR-FTR-09"
+   ],
+   "category": "b",
+   "plan": [
+    {
+     "command": "set_units",
+     "params": {
+      "units": "mm"
+     }
+    },
+    {
+     "command": "create_sheet_metal_rule",
+     "params": {
+      "name": "strip",
+      "material": "2024",
+      "thickness": 2.0,
+      "insideRadius": 4.0,
+      "kFactor": 0.44,
+      "kFactorStandard": "ansi"
+     }
+    },
+    {
+     "command": "draw_rectangle",
+     "params": {
+      "width": 40,
+      "height": 30,
+      "position": [
+       0,
+       0,
+       0
+      ]
+     },
+     "as": "outline"
+    },
+    {
+     "command": "add_sheet_metal_base",
+     "params": {
+      "profileId": "$outline",
+      "rule": "strip",
+      "side": "up"
+     },
+     "as": "sm"
+    },
+    {
+     "command": "add_joggle",
+     "params": {
+      "id": "$sm",
+      "face": {
+       "near": [
+        10,
+        15,
+        0
+       ]
+      },
+      "line": [
+       [
+        20,
+        30
+       ],
+       [
+        20,
+        0
+       ]
+      ],
+      "offset": 2.0,
+      "angle": 30.0,
+      "side": "up"
+     }
+    }
+   ],
+   "cli": [
+    "llull flat_pattern id=<alias:sm>"
+   ],
+   "assert": [
+    {
+     "path": "data.joggles[0].allowance",
+     "op": "approx",
+     "value": 0.287238586,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.joggles[0].run",
+     "op": "approx",
+     "value": 6.143593539,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    },
+    {
+     "path": "data.joggles[0].inclinedStraight",
+     "op": "approx",
+     "value": 1.320508076,
+     "tol": 1e-06,
+     "tolKind": "abs",
+     "unit": "mm"
+    }
+   ],
+   "source": "data/expected_flat_pattern.json JG-03"
+  },
+  {
    "vc": "VC-FTR-17",
    "case": "machined plate",
    "proves": [
@@ -1073,7 +1349,7 @@
    "cli": [
     "llull import_step_exact file=docs/aerospace/07-sheet-metal-machined-features/validation/data/ftr_machined_plate.step --kernel occt",
     "llull find_entities kind=mesh",
-    "llull recognize_features id=<first:data.ids> --kernel occt"
+    "llull recognize_features id=<first:data.matches[0].id> --kernel occt"
    ],
    "assert": [
     {
@@ -1119,7 +1395,7 @@
    "cli": [
     "llull import_step_exact file=docs/aerospace/07-sheet-metal-machined-features/validation/data/nist_ctc_01_asme1_ap242.stp --kernel occt",
     "llull find_entities kind=mesh",
-    "llull recognize_features id=<first:data.ids> --kernel occt"
+    "llull recognize_features id=<first:data.matches[0].id> --kernel occt"
    ],
    "assert": [
     {
@@ -2770,7 +3046,7 @@
        ]
       },
       "outline": {
-       "kind": "rounded_rectangle",
+       "kind": "rectangle",
        "center": [
         30,
         20
@@ -2778,9 +3054,10 @@
        "size": [
         40.0,
         20.0
-       ],
-       "cornerRadius": 4.0
+       ]
       },
+      "pointsFrame": "world_xy",
+      "cornerRadius": 4.0,
       "depth": 5.0,
       "floorFillet": 0.0
      }
@@ -2850,7 +3127,7 @@
        ]
       },
       "outline": {
-       "kind": "rounded_rectangle",
+       "kind": "rectangle",
        "center": [
         30,
         20
@@ -2858,9 +3135,10 @@
        "size": [
         40.0,
         20.0
-       ],
-       "cornerRadius": 4.0
+       ]
       },
+      "pointsFrame": "world_xy",
+      "cornerRadius": 4.0,
       "depth": 5.0,
       "floorFillet": 1.5
      }
@@ -2930,7 +3208,7 @@
          ]
         },
         "outline": {
-         "kind": "rounded_rectangle",
+         "kind": "rectangle",
          "center": [
           30,
           20
@@ -2938,9 +3216,10 @@
          "size": [
           40.0,
           20.0
-         ],
-         "cornerRadius": 1.0
+         ]
         },
+        "pointsFrame": "world_xy",
+        "cornerRadius": 1.0,
         "depth": 5.0,
         "floorFillet": 1.5
        }
@@ -2978,12 +3257,12 @@
        "value": 1
       },
       {
-       "path": "data.error.code",
+       "path": "error.code",
        "op": "eq",
        "value": "FTR_K_FACTOR_MISSING"
       },
       {
-       "path": "data.error.paths",
+       "path": "error.paths",
        "op": "contains",
        "value": "kFactor"
       }
@@ -3000,7 +3279,7 @@
        "value": 1
       },
       {
-       "path": "data.error.code",
+       "path": "error.code",
        "op": "eq",
        "value": "FTR_BEND_ANGLE_OUT_OF_RANGE"
       }
@@ -3017,12 +3296,12 @@
        "value": 1
       },
       {
-       "path": "data.error.code",
+       "path": "error.code",
        "op": "eq",
        "value": "FTR_TABLE_ROW_NO_SOURCE"
       },
       {
-       "path": "data.error.paths",
+       "path": "error.paths",
        "op": "contains",
        "value": "rows[0].source"
       }
@@ -3098,14 +3377,81 @@
     },
     {
      "id": "JG-04 (V1)",
-     "note": "add_joggle with JG-04 values on a T 1.6 part (plan in M5)",
+     "note": "add_joggle with JG-04 values on a T 1.6 part",
+     "plan": [
+      {
+       "command": "set_units",
+       "params": {
+        "units": "mm"
+       }
+      },
+      {
+       "command": "create_sheet_metal_rule",
+       "params": {
+        "name": "strip",
+        "material": "2024",
+        "thickness": 1.6,
+        "insideRadius": 6.0,
+        "kFactor": 0.44,
+        "kFactorStandard": "ansi"
+       }
+      },
+      {
+       "command": "draw_rectangle",
+       "params": {
+        "width": 40,
+        "height": 30,
+        "position": [
+         0,
+         0,
+         0
+        ]
+       },
+       "as": "outline"
+      },
+      {
+       "command": "add_sheet_metal_base",
+       "params": {
+        "profileId": "$outline",
+        "rule": "strip",
+        "side": "up"
+       },
+       "as": "sm"
+      },
+      {
+       "command": "add_joggle",
+       "params": {
+        "id": "$sm",
+        "face": {
+         "near": [
+          10,
+          15,
+          0
+         ]
+        },
+        "line": [
+         [
+          20,
+          30
+         ],
+         [
+          20,
+          0
+         ]
+        ],
+        "offset": 0.5,
+        "angle": 45.0,
+        "side": "up"
+       }
+      }
+     ],
      "assert": [
       {
        "op": "exit",
        "value": 1
       },
       {
-       "path": "data.error.code",
+       "path": "data.steps[4].error.code",
        "op": "eq",
        "value": "FTR_JOGGLE_OFFSET_TOO_SMALL"
       }
@@ -3519,7 +3865,7 @@
        "value": 1
       },
       {
-       "path": "data.error.code",
+       "path": "error.code",
        "op": "eq",
        "value": "FTR_K_FACTOR_MISSING"
       }
@@ -3948,12 +4294,12 @@
      ],
      "assert": [
       {
-       "path": "data[*].name",
+       "path": "[*].name",
        "op": "contains",
        "value": "flat_pattern"
       },
       {
-       "path": "data[*].name",
+       "path": "[*].name",
        "op": "contains",
        "value": "sheet_metal_calc"
       }
@@ -4086,7 +4432,7 @@
      ],
      "assert": [
       {
-       "path": "saved",
+       "path": "saved[*].path",
        "op": "contains",
        "value": "flat.png"
       },
@@ -4112,7 +4458,7 @@
    "cli": [
     "llull import_step_exact file=<ctc-dir>/nist_ctc_02_asme1_ap242.stp --kernel occt --progress --timeout 120",
     "llull find_entities kind=mesh",
-    "llull recognize_features id=<first:data.ids> --kernel occt --progress --timeout 30"
+    "llull recognize_features id=<first:data.matches[0].id> --kernel occt --progress --timeout 30"
    ],
    "assert": [
     {

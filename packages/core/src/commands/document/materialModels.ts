@@ -13,6 +13,7 @@ import type { CadDocument, Material } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { changed } from '../noop';
+import { libraryRecordRefusal } from './libraryReadonly';
 import { matlRefusal } from './materialModelRefusal';
 import { lawSchema, materialFitSchema, validRangeSchema } from './materialLawSchema';
 import { withoutUndefined } from './propertyModelSchema';
@@ -48,7 +49,7 @@ const MODEL_DESCRIPTION =
  * @invariant stored in the canonical convention with `conversion` recorded; parametersSha256 recomputed from the law, never taken from
  *   params; the catalogue validators pass (elastic laws positive definite, hyperelastic initial modulus > 0, Drucker stable inside the
  *   declared stretch validity); reviewedBy is never set here
- * @failure unknown material -> MAT_RECORD_NOT_FOUND; unknown kind / bad parameter -> MATL_LAW_PARAMS_INVALID; the dedicated MATL_* codes
+ * @failure unknown material -> MAT_RECORD_NOT_FOUND; library record -> MAT_RECORD_READONLY; unknown kind / bad parameter -> MATL_LAW_PARAMS_INVALID; the dedicated MATL_* codes
  *   of §7.1; duplicate id without replace -> MATL_MODEL_EXISTS (all rejections, document unchanged)
  */
 export const addMaterialModel = defineCommand({
@@ -95,6 +96,8 @@ export const addMaterialModel = defineCommand({
     const material = materialOf(doc, params.material);
     if (material === undefined)
       return matlRefusal(doc, command, 'MAT_RECORD_NOT_FOUND', `no material '${params.material}'`, [params.material], 'material');
+    const readonly = libraryRecordRefusal(doc, command, params.material, material);
+    if (readonly !== null) return readonly;
     const normalized = normalizeLawInput(params.model);
     if (isLawFailure(normalized))
       return matlRefusal(doc, command, normalized.code, normalized.message, [params.id], normalized.path, normalized.remediation);
@@ -200,7 +203,7 @@ export const addMaterialModel = defineCommand({
 /**
  * @affects CadDocument.materials[material].materialModels (removes one model)
  * @invariant other models and the constitutive sets are untouched
- * @failure unknown material -> MAT_RECORD_NOT_FOUND; unknown id -> MATL_MODEL_NOT_FOUND; a set lists it -> MATL_MODEL_IN_USE
+ * @failure unknown material -> MAT_RECORD_NOT_FOUND; library record -> MAT_RECORD_READONLY; unknown id -> MATL_MODEL_NOT_FOUND; a set lists it -> MATL_MODEL_IN_USE
  */
 export const removeMaterialModel = defineCommand({
   name: 'remove_material_model',
@@ -215,6 +218,8 @@ export const removeMaterialModel = defineCommand({
     const material = materialOf(doc, materialId);
     if (material === undefined)
       return matlRefusal(doc, command, 'MAT_RECORD_NOT_FOUND', `no material '${materialId}'`, [materialId], 'material');
+    const readonly = libraryRecordRefusal(doc, command, materialId, material);
+    if (readonly !== null) return readonly;
     const models = material.materialModels ?? [];
     if (!models.some((candidate) => candidate.id === id))
       return matlRefusal(doc, command, 'MATL_MODEL_NOT_FOUND', `'${materialId}' has no material model '${id}'`, [id], 'id');
