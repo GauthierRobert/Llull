@@ -30,7 +30,7 @@ export const inspectDynamics = defineCommand({
   annotations: { readOnly: true },
   description:
     'List the physics model: every rigid body with its computed mass (kg), centre of mass (document units) and moment of inertia about ' +
-    'its joint axis (kg·m²), plus joints, gear couplings, motors, propellers and cylinder pressures, and any problem that would stop ' +
+    'its joint axis (kg·m²) and the densities used (densitySources, densityDefaulted: true when the steel default filled in, with a DYN_DENSITY_DEFAULTED warning; unverified), plus joints, gear couplings, motors, propellers and cylinder pressures, and any problem that would stop ' +
     'simulate_motion. With mobility true (default) it also reports the closed-loop structure: data.topology { tree: spanning-tree ' +
     'joints rooted at the ground, loops: joints that close loops, flipped: tree joints whose declared parent/child sense is reversed }, ' +
     'data.mobility { gruebler: 6·bodies − joint constraints; rank: numerical rank of the loop-constraint Jacobian at the start pose; ' +
@@ -40,9 +40,9 @@ export const inspectDynamics = defineCommand({
     'above 1 µm simulate_motion refuses with FPR_LOOP_OPEN). Gear couplings are not counted in the degrees of freedom. Use it to check ' +
     'a setup before simulating. Read-only; needs no physics engine.',
   params: z.object({ mobility: z.boolean().optional().describe('Report data.topology, data.mobility and data.loopGapsM (default true).') }),
-  run: (doc, params): CommandResult => {
+  run: (doc, params, ctx): CommandResult => {
     const dynamics = dynamicsOf(doc);
-    const built = buildSimulationModel(doc, 0.001);
+    const built = buildSimulationModel(doc, 0.001, ctx?.kernel);
     const metres = toMetres(doc, 1);
     const problems = 'error' in built ? [built.code !== undefined ? `${built.code}: ${built.error}` : built.error] : [];
     const warnings: string[] = [];
@@ -61,6 +61,9 @@ export const inspectDynamics = defineCommand({
                     izz * axis[2] ** 2 +
                     2 * (ixy * axis[0] * axis[1] + ixz * axis[0] * axis[2] + iyz * axis[1] * axis[2]);
               const offset = body.joint === null ? 0 : distanceToAxis(body.centerOfMass, body.joint.anchor, body.joint.axis);
+              const density = built.mass[body.id];
+              if (density?.densityDefaulted === true)
+                warnings.push(`DYN_DENSITY_DEFAULTED: body '${body.id}' uses the steel default (7850 kg/m^3) for parts without a material`);
               return [
                 body.id,
                 {
@@ -71,6 +74,9 @@ export const inspectDynamics = defineCommand({
                   joint: body.joint?.id ?? null,
                   // parallel axis: about the joint axis, not the centre of mass
                   inertiaAboutJointAxis: aboutAxis === null ? null : aboutAxis + body.mass * offset * offset,
+                  densitySources: density?.densitySources ?? [],
+                  densityDefaulted: density?.densityDefaulted ?? false,
+                  unverified: (density?.unverifiedReasons.length ?? 0) > 0,
                 },
               ];
             }),

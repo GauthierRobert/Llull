@@ -10,7 +10,7 @@ import { cylinderState, type CylinderRuntime } from './cylinderLoads';
 import { cycleLength } from './pressureCurve';
 import type { Quaternion, SimulationTrace } from './physicsEngine';
 import { childForceSeries, peakOf, type Peak } from './reactions';
-import { inertiaAboutAxis, type BodyMassProperties } from './simulationModel';
+import { inertiaAboutAxis, type BodyMassDistribution } from './simulationModel';
 import { sliderRate } from './slider';
 import type { Topology } from './topology';
 import { elementAt } from '../lib/elementAt';
@@ -179,7 +179,7 @@ export interface EngineInput {
   readonly topology: Topology;
   readonly runtimes: readonly CylinderRuntime[];
   readonly trace: SimulationTrace;
-  readonly mass: Readonly<Record<string, BodyMassProperties>>;
+  readonly mass: Readonly<Record<string, BodyMassDistribution>>;
   readonly metresPerUnit: number;
   /** Include the torque curves. */
   readonly series: boolean;

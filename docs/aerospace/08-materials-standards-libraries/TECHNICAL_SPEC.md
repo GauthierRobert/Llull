@@ -483,8 +483,8 @@ degrades with explicit warnings; replay with changed library hash ⇒ step warni
 
 | Milestone | Content | Depends on | Effort |
 | --------- | ------- | ---------- | ------ |
-| M1 Units + mass fix | `lib/quantity.ts`, `resolveDensity` (TR-MAT-10), `mass_properties` unit-correct output, `create_material` density quantity; after the dynamics merge, `add_rigid_body` / `simulate_motion` read `resolveDensity` (+0.5 d) | — (dynamics merge for the last step only) | 3.5 d |
-| M2 Material records | model, commands, persistence v3, allowable query, provenance, legacy migration | M1 | 8 d |
+| M1 Units + mass fix (**done 2026-10-17, AERO-1, §13**; `lib/quantity.ts` came from PHY-01) | `lib/quantity.ts`, `resolveDensity` (TR-MAT-10), `mass_properties` unit-correct output, `create_material` density quantity; after the dynamics merge, `add_rigid_body` / `simulate_motion` read `resolveDensity` (+0.5 d) | — (dynamics merge for the last step only) | 3.5 d |
+| M2 Material records | model, commands, persistence v3, allowable query, provenance, legacy migration. **Revised 2026-10-17:** the record extends `Material`; its values are PHY-01 `PropertyModel`s (basis, provenance, preferred, validity, unverified already built), so `PropertyValue` is not a second type (`../README.md` § Alignment with physics) | M1 | 6 d |
 | M3 Libraries & IP | import/export, `ctx.libraries` provider (server fs + browser IndexedDB), licence/marking flags, export gate | M2; gap 09 marking semantics | 6 d |
 | M4 Seed library | re-verify MIL-HDBK-5J values from primary PDF, `sources.lock.json`, ~10 materials | M2; human access to PDF | 4 d |
 | M5 Fastener catalogue + select | `@aero` package scaffolding (aliases, arch rules, knip), catalogue model, decode, `select_fastener` | M1 | 7 d |
@@ -493,7 +493,7 @@ degrades with explicit warnings; replay with changed library hash ⇒ step warni
 | M8 Temperature + diff | temperature tables, `diff_material_libraries` | M2 | 3 d |
 | M9 V2 joint hook | `joint_capacity`, gap 05 hand-off | M6, gap 05 | 5 d |
 
-Total MVP (M1–M5) ≈ 28 d; V1 (M6–M8) ≈ 16 d.
+Total MVP (M1–M5) ≈ 26 d (M2 revised 2026-10-17); V1 (M6–M8) ≈ 16 d.
 
 ## 11. Open questions / decisions needed
 
@@ -520,3 +520,35 @@ See FUNCTIONAL_SPEC §11 [R1]–[R28] and `validation/sources.md` [S1]–[S40]. 
 - [T5] MMPDS design allowables definitions — Battelle — https://www.mmpds.org/wp-content/uploads/2015/03/mmpds_2015_2007aeromat_presentation.pdf (accessed 2026-10)
 - [T6] NASA RP-1228 Fastener Design Manual — NASA NTRS — https://ntrs.nasa.gov/citations/19900009424 (accessed 2026-10)
 - [T7] Open CASCADE Technology reference — `BRepIntCurveSurface_Inter`, `IntCurvesFace_ShapeIntersector` — https://dev.opencascade.org/doc/refman/html/ (not fetched in this session; class names from OCCT public API — verify against the bundled opencascade.js build)
+
+## 13. Implementation status (2026-10-17): M1 built (aerospace step AERO-1)
+
+| Item | Where |
+| ---- | ----- |
+| `lib/quantity.ts` (unit grammar, `MAT_UNIT_INVALID` / `MAT_UNIT_DIMENSION`) | built earlier by PHY-01; reused unchanged |
+| `resolveDensity(doc, materialId, fallback?)` (TR-MAT-10) → `{ kgPerM3, gPerDocUnit3, source, materialId?, modelId?, basis?, defaulted, unverified, unverifiedReasons }` or `available: false` with a code | `packages/core/src/geometry/resolveDensity.ts` |
+| `mass_properties` (TR-MAT-02): density param `number` (g/(doc unit)³, legacy) or `{ value, unit }`; `massUnit` g / kg / lb; data adds `densityUnit`, `densityKgPerM3`, `massUnit`, `massG`, `massKg`, `massLb`, `densitySource` (`densitySources` for an assembly with several), `densityDefaulted`, `unverified`, `unverifiedReasons`; legacy `unit: 'g'` kept when massUnit = g | `commands/inspect/measureSolid.ts` |
+| `create_material.densityUnit` (density given in any unit, stored in g/(doc unit)³) | `commands/document/materials.ts` |
+| Dynamics reads the same resolver: `bodyMassProperties` returns `densitySources`, `densityDefaulted`, `unverifiedReasons`; `add_rigid_body.density` is the fallback; the steel 7850 kg/m³ default is named `default:steel` and `inspect_dynamics` warns `DYN_DENSITY_DEFAULTED` | `dynamics/simulationModel.ts`, `commands/dynamics/inspect.ts` |
+
+Tests: `tests/unit/aeroMassDensity.test.ts`. It covers VC-MAT-01, VC-MAT-03 (rel 1e-9), VC-MAT-04 a/b/c/e (read from `validation/expected_results.json`) and the legacy row of VC-MAT-22. It also covers refusals and dynamics.
+
+**Deviations from the spec (before M2):**
+
+- There is no `MaterialRecord` yet. The "record preferred density" of TR-MAT-10 is the material's PHY-01 `density` property model.
+  When several models exist, the preferred one is used. Models are read at 20 °C (293.15 K). When a material has density models
+  that cannot be used (several and none preferred, or not valid at 20 °C), the chain **stops**: the command returns `error.code` =
+  the PHY-01 code (`PROP_NO_MODEL_FOR_PROPERTY`, `PROP_OUT_OF_RANGE`) and does not fall back to the legacy value or the param.
+- `unverified` reasons are `provenance legacy` (plain `Material.density`), `basis <basis>` (a model on typical / supplier_unstated /
+  unspecified basis), and `given by the caller (…)` / `defaulted (…)` for a param or a default. The last two are additions to TR-MAT-50:
+  a bare number has no source.
+- The default `massUnit` is g in every document unit, so existing callers keep working. The masses in g, kg and lb are always all present.
+- VC-MAT-04 d (plate with a Ø10 hole) needs a kernel boolean. It is covered when 01 M3 lands (AERO-2). VC-MAT-02 and the rest of
+  VC-MAT-22 need M2 records and `check_materials`.
+- Codes added: `MAT_DENSITY_INVALID` (density ≤ 0, or a model that gives ≤ 0) and `DYN_DENSITY_DEFAULTED` (warning).
+- Legacy numbers are unchanged to the last digit. A legacy `Material.density` or a bare-number param is used as given in
+  g/(doc unit)³; kg/m³ is only derived from it, never the other way round. A legacy density ≤ 0 or NaN in a loaded document is
+  refused with `MAT_DENSITY_INVALID`.
+- Follow-up: in dynamics, a density refusal reaches `add_rigid_body` / `simulate_motion` as a message prefixed with the code
+  (`PROP_…: body 'b': …`). It is not yet a structured `CommandResult.error`. This is part of the AGENT_FIRST rule 5 dynamics
+  follow-up (`DYN_*` codes).

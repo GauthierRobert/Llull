@@ -42,3 +42,19 @@ export function base64ToUint8Array(text: string): Uint8Array | null {
   }
   return bytes;
 }
+
+/** UTF-8 text → base64. */
+export function textToBase64(text: string): string {
+  return uint8ArrayToBase64(new TextEncoder().encode(text));
+}
+
+/** base64 → UTF-8 text; null when `encoded` is not base64 or not valid UTF-8. */
+export function base64ToText(encoded: string): string | null {
+  const bytes = base64ToUint8Array(encoded);
+  if (bytes === null) return null;
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return null;
+  }
+}

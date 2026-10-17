@@ -5,12 +5,15 @@
  */
 
 import type { GeometryKernel } from '@core/geometry/kernel';
+import type { FaceQueryPort } from '@core/geometry/kernelPorts';
 
 export const STATUS_REPLY = 1;
 export const STATUS_DIED = 2;
 export const STATUS_READY = 3;
 
-export type KernelOperation = keyof GeometryKernel;
+/** `faceQuery.<method>`: one request per face-query port method (the port is an object, not a method). */
+type FaceQueryOperation = `faceQuery.${keyof FaceQueryPort}`;
+export type KernelOperation = keyof GeometryKernel | FaceQueryOperation;
 export type TestHook = '__abort' | '__hang' | '__exitIdle';
 
 export interface KernelRequest {

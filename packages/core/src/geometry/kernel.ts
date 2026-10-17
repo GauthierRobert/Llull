@@ -8,18 +8,12 @@
 
 import type { MeshData, ShapeRecipe, Vec3 } from '../model/types';
 
-declare const shapeHandleBrand: unique symbol;
+import type { ExactMassProperties, FaceQueryPort, ImportShapesOptions, ImportShapesResult, KernelInfo } from './kernelPorts';
+import type { FaceSurface, ShapeHandle } from './kernelTypes';
 
-/**
- * Opaque reference to a kernel-owned shape. Core never inspects it: it only passes it back to the kernel that minted it. It stays valid
- * after the kernel evicts or restarts (it re-evaluates).
- */
-export interface ShapeHandle {
-  readonly [shapeHandleBrand]: true;
-}
+export type { FaceSurface, ShapeHandle };
 
 export type EdgeCurve = 'line' | 'circle' | 'ellipse' | 'bspline' | 'other';
-export type FaceSurface = 'plane' | 'cylinder' | 'cone' | 'sphere' | 'torus' | 'bspline' | 'revolution' | 'extrusion' | 'other';
 
 /** One unique edge; `index` is what `fillet_edge` / `chamfer_edge` `edgeIndices` select. */
 export interface ShapeEdge {
@@ -124,6 +118,21 @@ export interface GeometryKernel {
 
   /** Minimum distance between two shapes, searched up to `maxDistance` (document units; farther pairs may report a larger value). */
   distance?(a: ShapeHandle, b: ShapeHandle, maxDistance: number): ShapeDistance | null;
+
+  /** What this kernel is and which optional ports it has (`kernel_info`, TR-KRN-04). */
+  info?(): KernelInfo;
+
+  /** Exact volume, area, centroid and inertia at unit density (TR-KRN-40); null when the kernel cannot integrate the shape. */
+  massProperties?(shape: ShapeHandle): ExactMassProperties | null;
+
+  /** Read and heal an exchange file into exact solids (TR-KRN-20/24); `text` is the Part 21 file content. */
+  importShapes?(format: 'step', text: string, options: ImportShapesOptions): ImportShapesResult | null;
+
+  /** Make a document blob (`brep` recipe leaves, `BRepTools::Write` text keyed by sha256) available to `evaluate`. Idempotent. */
+  loadBlob?(sha256: string, brep: string): void;
+
+  /** Face-level queries (01 §5.9); absent on mesh kernels. */
+  readonly faceQuery?: FaceQueryPort;
 }
 
 let _kernel: GeometryKernel | null = null;

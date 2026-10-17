@@ -9,7 +9,7 @@ import type { Vec3 } from '@core/model/types';
 import { release } from '@core/geometry/nativeObject';
 import { explorer, type OccApi, type OccHandle, type OccPoint, type OccShape } from './occtTypes';
 
-type SubShapeKind = 'TopAbs_SOLID' | 'TopAbs_FACE' | 'TopAbs_EDGE' | 'TopAbs_VERTEX';
+type SubShapeKind = 'TopAbs_SOLID' | 'TopAbs_SHELL' | 'TopAbs_FACE' | 'TopAbs_EDGE' | 'TopAbs_VERTEX';
 
 const HASH_BOUND = 1 << 30;
 
@@ -77,19 +77,25 @@ function pointAt(adaptor: { Value(u: number): OccPoint }, parameter: number): Ve
   return xyz;
 }
 
-/** Number of distinct faces each unique edge bounds (1 = a seam), indexed like `edges`. */
-function adjacentFaceCounts(api: OccApi, faces: readonly OccShape[], edges: readonly OccShape[]): number[] {
+/** Index lookup over `unique` shapes (IsSame, any orientation): the index of `shape` among them, or undefined. */
+export function subShapeIndexer(unique: readonly OccShape[]): (shape: OccShape) => number | undefined {
   const buckets = new Map<number, number[]>();
-  edges.forEach((edge, index) => {
-    const hash = edge.HashCode(HASH_BOUND);
+  unique.forEach((candidate, index) => {
+    const hash = candidate.HashCode(HASH_BOUND);
     buckets.set(hash, [...(buckets.get(hash) ?? []), index]);
   });
+  return (shape) => buckets.get(shape.HashCode(HASH_BOUND))?.find((index) => unique[index]?.IsSame(shape));
+}
+
+/** Number of distinct faces each unique edge bounds (1 = a seam), indexed like `edges`. */
+function adjacentFaceCounts(api: OccApi, faces: readonly OccShape[], edges: readonly OccShape[]): number[] {
+  const indexOfEdge = subShapeIndexer(edges);
   const facesOf = edges.map(() => new Set<number>());
   faces.forEach((face, faceIndex) => {
     const exp = explorer(api, face, 'TopAbs_EDGE');
     for (; exp.More(); exp.Next()) {
       const current = exp.Current();
-      const match = buckets.get(current.HashCode(HASH_BOUND))?.find((index) => edges[index]?.IsSame(current));
+      const match = indexOfEdge(current);
       if (match !== undefined) facesOf[match]?.add(faceIndex);
       release(current);
     }
@@ -205,12 +211,17 @@ function faceGeometry(face: OccShape, adaptor: SurfaceAdaptor, surface: FaceSurf
   return {};
 }
 
+/** Surface type of a face adaptor, as `ShapeFace.surface`. */
+export function surfaceKindOf(api: OccApi, adaptor: { GetType(): unknown }): FaceSurface {
+  return classify(api.GeomAbs_SurfaceType, SURFACES, adaptor.GetType(), 'other');
+}
+
 function faceInfo(api: OccApi, shape: OccShape, index: number): ShapeFace {
   const face = api.TopoDS.Face_1(shape) as OccShape;
   const adaptor = new api.BRepAdaptor_Surface_2(face, true) as SurfaceAdaptor;
   const props = new api.GProp_GProps_1() as GProps;
   api.BRepGProp.SurfaceProperties_1(face, props, false, false);
-  const surface = classify(api.GeomAbs_SurfaceType, SURFACES, adaptor.GetType(), 'other');
+  const surface = surfaceKindOf(api, adaptor);
   const info: ShapeFace = { index, surface, area: props.Mass(), ...faceGeometry(face, adaptor, surface) };
   [props, adaptor, face].forEach(release);
   return info;

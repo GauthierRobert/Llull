@@ -12,8 +12,17 @@
 
 import type { BooleanOp, Entity, MeshData, ShapeRecipe, Vec3 } from '../model/types';
 import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, ShapeTopology } from './kernel';
+import type { ExactMassProperties, FaceQueryPort, ImportShapesOptions, ImportShapesResult, KernelInfo } from './kernelPorts';
 import { recipeKey } from './shapeRecipe';
 import { errorMessage } from '../lib/errorMessage';
+import { sha256Hex } from '../lib/sha256';
+
+/** `FaceQueryPort` over native shapes: every method takes the native shape where the port takes a handle. */
+export type FaceQueryOps<S> = {
+  [K in keyof FaceQueryPort]: FaceQueryPort[K] extends (shape: ShapeHandle, ...rest: infer R) => infer T
+    ? (shape: S, ...rest: R) => T
+    : never;
+};
 
 /**
  * Native operations of a concrete kernel. Each returns a NEW native shape (never one of its inputs: the cache owns and releases every
@@ -43,9 +52,21 @@ export interface KernelOps<S> {
   exportStep(shapes: readonly S[]): string | null;
   /** Optional validity / lump report; a kernel without it leaves `GeometryKernel.analyze` undefined. */
   analyze?(shape: S): ShapeAnalysis | null;
+  /** Optional exact mass properties at unit density; a kernel without it leaves `GeometryKernel.massProperties` undefined. */
+  massProperties?(shape: S): ExactMassProperties | null;
   /** Optional minimum distance (searched up to `maxDistance`); a kernel without it leaves `GeometryKernel.distance` undefined. */
   distance?(a: S, b: S, maxDistance: number): ShapeDistance | null;
+  /** Optional face-level queries (01 §5.9); a kernel without it leaves `GeometryKernel.faceQuery` undefined. */
+  readonly faceQuery?: FaceQueryOps<S>;
   release(shape: S): void;
+  /** Shape of the loaded blob `sha256` (`loadBlob`); absent = `brep` leaves are unsupported. */
+  brep?(sha256: string): S | null;
+  /** Keep the B-rep text of blob `sha256` (idempotent) so `brep(sha256)` can build, and rebuild after a cache eviction. */
+  loadBlob?(sha256: string, brep: string): void;
+  /** Exact import of an exchange file (`GeometryKernel.importShapes`); the ops own the native reader, no recipe is involved. */
+  importShapes?(format: 'step', text: string, options: ImportShapesOptions): ImportShapesResult | null;
+  /** Kernel description (`GeometryKernel.info`). */
+  info?(): KernelInfo;
 }
 
 /**
@@ -121,7 +142,41 @@ function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe
       const source = child(recipe.source);
       return source === null ? null : ops.scale(source, recipe.factor);
     }
+    case 'brep':
+      return ops.brep?.(recipe.blob) ?? null;
   }
+}
+
+type OnNative<S> = <T>(handle: ShapeHandle, query: (shape: S) => T | null) => T | null;
+
+/** The public port over `ops`: handles resolve to natives (null shape or any throw -> null, never an exception). */
+function faceQueryPort<S>(ops: FaceQueryOps<S> | undefined, onNative: OnNative<S>): FaceQueryPort | undefined {
+  if (ops === undefined) return undefined;
+  const guard =
+    <A extends unknown[], T>(query: (shape: S, ...args: A) => T | null) =>
+    (handle: ShapeHandle, ...args: A): T | null => {
+      try {
+        return onNative(handle, (shape) => query(shape, ...args));
+      } catch (error) {
+        if (error instanceof Error && error.message.startsWith(SHAPE_NOT_CACHED)) throw error;
+        console.warn(`[kernel] face query failed: ${errorMessage(error)}`);
+        return null;
+      }
+    };
+  return {
+    faceDetails: guard(ops.faceDetails),
+    faceContains: guard(ops.faceContains),
+    faceGraph: guard(ops.faceGraph),
+    faceGeometry: guard(ops.faceGeometry),
+    projectOnFace: guard(ops.projectOnFace),
+    evaluateFace: guard(ops.evaluateFace),
+    tessellateFace: guard(ops.tessellateFace),
+    faceSamples: guard(ops.faceSamples),
+    edgeSamples: guard(ops.edgeSamples),
+    edgeContinuity: guard(ops.edgeContinuity),
+    distance: guard(ops.distance),
+    bspline: guard(ops.bspline),
+  };
 }
 
 /**
@@ -199,8 +254,52 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
   };
   const analyzeOps = ops.analyze?.bind(ops);
   const distanceOps = ops.distance?.bind(ops);
+  const faceQuery = faceQueryPort(ops.faceQuery, (handle, query) =>
+    call(() => {
+      const shape = nativeOf(handle);
+      return shape === null ? null : query(shape);
+    }),
+  );
+  const massOps = ops.massProperties?.bind(ops);
+  const loadBlobOps = ops.loadBlob?.bind(ops);
+  const loadedBlobs = new Set<string>();
+  const importOps = ops.importShapes?.bind(ops);
+  const infoOps = ops.info?.bind(ops);
   return {
+    ...(faceQuery === undefined ? {} : { faceQuery }),
     ...(ops.name === undefined ? {} : { name: ops.name }),
+    ...(infoOps === undefined
+      ? {}
+      : {
+          info: (): KernelInfo => {
+            const own = infoOps();
+            const wired = [
+              ...(analyzeOps === undefined ? [] : ['analyze']),
+              ...(distanceOps === undefined ? [] : ['distance']),
+              ...(massOps === undefined ? [] : ['massProperties']),
+              ...(importOps === undefined ? [] : ['importShapes']),
+              ...(faceQuery === undefined ? [] : ['faceQuery']),
+              ...(ops.brep === undefined ? [] : ['brepBlobs']),
+            ];
+            return { ...own, capabilities: [...new Set([...own.capabilities, ...wired])] };
+          },
+        }),
+    ...(importOps === undefined ? {} : { importShapes: (format, text, options) => call(() => importOps(format, text, options)) }),
+    ...(loadBlobOps === undefined
+      ? {}
+      : {
+          loadBlob: (sha256: string, brep: string): void => {
+            if (loadedBlobs.has(sha256)) return;
+            if (sha256Hex(brep) !== sha256) {
+              console.warn(`[kernel] KRN_BLOB_HASH_MISMATCH: blob ${sha256} refused (its text hashes differently)`);
+              return;
+            }
+            loadBlobOps(sha256, brep);
+            loadedBlobs.add(sha256);
+            for (const [key, shape] of shapes) if (shape === null) shapes.delete(key); // a null may have been "blob missing"
+            for (const [key, mesh] of meshes) if (mesh === null) meshes.delete(key);
+          },
+        }),
     ...(analyzeOps === undefined
       ? {}
       : {
@@ -208,6 +307,15 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
             call(() => {
               const shape = nativeOf(handle);
               return shape === null ? null : analyzeOps(shape);
+            }),
+        }),
+    ...(massOps === undefined
+      ? {}
+      : {
+          massProperties: (handle: ShapeHandle): ExactMassProperties | null =>
+            call(() => {
+              const shape = nativeOf(handle);
+              return shape === null ? null : massOps(shape);
             }),
         }),
     ...(distanceOps === undefined
@@ -219,7 +327,7 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
               return first === null || second === null ? null : distanceOps(first, second, maxDistance);
             }),
         }),
-    supports: (op) => !(ops.unsupported?.has(op) ?? false),
+    supports: (op) => (op === 'brep' ? ops.brep !== undefined : !(ops.unsupported?.has(op) ?? false)),
     evaluate: (recipe) => call(() => (evaluateNative(recipe) === null ? null : handleOf(recipe))),
     tessellate: (handle) =>
       call(() => {

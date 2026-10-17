@@ -16,15 +16,15 @@ import { migrateRetiredCommands } from './retiredCommands';
 
 interface DocumentEnvelope {
   format: 'llull-document';
-  version: 2;
+  version: 3;
   document: CadDocument;
 }
 
 /** Bump on a breaking field; `migrate()` upgrades older documents. */
-const CURRENT_SCHEMA_VERSION = 2;
+const CURRENT_SCHEMA_VERSION = 3;
 
-/** v1 files (legacy ids, building entities stored) load unchanged; v2 adds step-scoped ids. */
-const READABLE_VERSIONS: ReadonlySet<unknown> = new Set([1, 2]);
+/** v1 files (legacy ids, building entities stored) load unchanged; v2 adds step-scoped ids; v3 adds kernelSettings + blobs (aerospace 01); v1/v2 need no rewrite for v3 (both slices stay absent). */
+const READABLE_VERSIONS: ReadonlySet<unknown> = new Set([1, 2, 3]);
 
 interface SerializeOptions {
   /**
@@ -34,7 +34,11 @@ interface SerializeOptions {
   readonly includeDerived?: boolean;
 }
 
-/** Deterministic `{ format: 'llull-document', version, document }` JSON; derived entities omitted unless `includeDerived`. */
+/**
+ * Deterministic `{ format: 'llull-document', version, document }` JSON; derived entities omitted unless `includeDerived`.
+ * @invariant a function of the document alone: kernel provenance (`kernelSettings`) is written by the commands that use the exact kernel
+ *   (`import_step_exact`, `set_modeling_tolerance`) from their own ctx, never from the ambient kernel at save time
+ */
 export function serializeDocument(doc: CadDocument, options: SerializeOptions = {}): string {
   const envelope: DocumentEnvelope = {
     format: 'llull-document',
@@ -165,7 +169,7 @@ export function deserializeDocument(json: string): CadDocument {
   if (parsed['format'] !== 'llull-document')
     throw new Error(`load_document: unrecognized format '${String(parsed['format'])}' — expected 'llull-document'.`);
   if (!READABLE_VERSIONS.has(parsed['version']))
-    throw new Error(`load_document: unsupported version ${String(parsed['version'])} — expected 1 or ${CURRENT_SCHEMA_VERSION}.`);
+    throw new Error(`load_document: unsupported version ${String(parsed['version'])} — expected 1, 2 or ${CURRENT_SCHEMA_VERSION}.`);
   const rawDoc = parsed['document'];
   if (!validateDocumentShape(rawDoc))
     throw new Error(
@@ -182,7 +186,7 @@ export const loadDocument = defineCommand({
   name: 'load_document',
   description:
     'Replace the current document with one parsed from a serialized JSON string ' +
-    'produced by serializeDocument (envelope format: llull-document v2; v1 is still read). ' +
+    'produced by serializeDocument (envelope format: llull-document v3; v1 and v2 are still read). ' +
     'On parse or validation failure the document is left unchanged.',
   annotations: { metaHistory: true, idempotent: true },
   params: z.object({
@@ -190,7 +194,7 @@ export const loadDocument = defineCommand({
       .string()
       .describe(
         'A JSON string produced by serializeDocument — the full llull-document envelope ' +
-          '({ format: "llull-document", version: 2, document: { ... } }; version 1 is also read). ' +
+          '({ format: "llull-document", version: 3, document: { ... } }; versions 1 and 2 are also read). ' +
           'Must contain a valid CadDocument with entities, order, layers, layerOrder, selection, and camera.',
       ),
   }),

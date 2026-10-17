@@ -1,6 +1,6 @@
 # Aerospace / aeronautics gap analysis — specifications
 
-Status: **specifications only** (no implementation). Written 2026-10-15.
+Status: specifications written 2026-10-15; implementation follows the five-step story below (updated 2026-10-17).
 Product direction (user decision): **Electron desktop + offline first**, OpenCascade (OCC) as the desktop
 kernel, bundled CPython + CadQuery (see [`../decisions/KI6-desktop-app-cli-first.md`](../decisions/KI6-desktop-app-cli-first.md)).
 
@@ -87,24 +87,48 @@ Rules this sets for every pack:
    refusals get stable `DYN_*` codes (`CommandResult.error`) and `provenance` (engine, timestep, densities).
    Tracked as a dynamics follow-up.
 
-### Start order (updated 2026-10-16, after the dynamics merge)
+## Alignment with physics PHY-00 … PHY-04 (2026-10-17)
 
-| Task | Pack / milestone | State |
-| ---- | ---------------- | ----- |
-| Plan reports with per-step error codes, query `data`, alias map | AGENT_FIRST AF-14 (shared prerequisite) | **implemented** (see AGENT_FIRST §2.2 status) |
-| OCC default on desktop, `kernel_info`, provenance fields | 01 M1 | ready |
-| Custom OCCT 7.9.x WASM build with exceptions | 01 M2 (long pole, 4–6 eng-weeks) | ready; unblocks 01 M3–M10, 02, 04, 07 native |
-| `lib/quantity.ts`, `resolveDensity` (wired into `mass_properties` **and** dynamics), unit-correct mass | 08 M1 | ready |
-| Pure maths: NURBS / NACA generator / `SECTION_RING_POINTS` loft fix | 02 core maths | ready |
-| CLT (ABD, first-ply failure) | 06 pure core | ready |
-| Flat pattern / setback / countersink maths, hole table | 07 pure parts | ready; native BRepFeat waits for 01 M2 |
-| Canonical JSON + Ed25519 verify helpers | 09 pure parts | ready; `packages/plm` waits for decision 1 |
-| `doc.pmi` data model + note commands (no face resolution yet) | 03 MVP data | ready |
-| `resolveMassProperties` over the dynamics mass engine (merge `solidVolume.ts` closed forms; part-frame shift on the mesh path) | 01 M3, non-kernel half | ready; the exact-kernel half waits for 01 M1 (M2 for exception-safe GProp) |
-| New `ExecutionContext` ports (`ctx.caller`, `ctx.libraries`, `ctx.feaArtifacts`) | 09 / 08 / 05 | ready; copy the `ctx.physics` shape |
-| New packages + dep-cruiser / alias entries (`domain-aero`, `plm`) | 02 / 06 / 07 / 08 / 09 | blocked on decision 1 (package layout) |
-| v3 envelope + `migrate2to3`, import placement by `position` / `rotation` | 01 M4, 04 M3 | waits for 01 M2 |
-| Deck writers, closed-form checks | 05 `@cae` pure | blocked on decision 1; materials need 08 M2 |
+The physics packs PHY-00 (V&V harness), PHY-01 (property models), PHY-02 (constitutive models), PHY-03 (thermal) and
+PHY-04 (thermo-mechanical and fits) are done (`.claude/work/BOARD.md`; [`../physics/README.md`](../physics/README.md)).
+They built several pieces that the aerospace packs had planned. The aerospace packs **reuse** these pieces and do not build them again.
+
+| Delivered by physics | Where | Pack that planned it | Decision |
+| -------------------- | ----- | -------------------- | -------- |
+| Unit grammar and conversion (`parseUnit`, `convertValue`, dimension vectors, `MAT_UNIT_INVALID` / `MAT_UNIT_DIMENSION`) | `packages/core/src/lib/quantity.ts` | 08 TR-MAT-01 (`lib/quantity.ts`), AF-04 | **Done**. 08 M1 now only covers `resolveDensity` and the mass output. Every pack takes `{ value, unit }` through this grammar. |
+| `PropertyModel`: a value or a law with a basis (`A`/`B`/`S`/`typical`/`supplier_unstated`/`company`/`unspecified`), provenance, a required validity range, `preferred` per key, a coefficient hash, and `unverified` / `reviewRequired` propagation; catalogue row `density` | `model/propertyModel*.ts`, commands `define_property_model` / `evaluate_property` / `check_property_models` | 08 TR-MAT-11 (`PropertyValue` / `Provenance`), TR-MAT-13 (temperature tables), TR-MAT-50 | **08 M2 extends `Material` with the record fields** (id, designation, condition, form, sources, licence) and keeps `propertyModels` as its values. It does not define a second `PropertyValue` type. A constant value is a `constant` model. Allowables are `Ftu`/`Fty`/… models on basis A/B/S. PHY-01 PROP-08 ("move onto `MaterialRecord`") then becomes a rename. |
+| Constitutive / durability laws, material-point driver, CalculiX / Nastran material cards | `model/materialModel*.ts`, `commands/materiallab/` | 05 `FeaMaterialView`, 08 → 05 hand-off | 05 decks read material cards from `export_material_cards`. MATL-M4b (the `MaterialCardWriter` hook) is the remaining join. |
+| **05 FEA minimal slice**: `CadDocument.analysis`, plugin `packages/domain-cae` (`@cae`, toolset `analysis`), INP writer, FRD/DAT readers, record commands with the §4.1 trust model, `fea_report`, `check_analysis`, `compute_margins` (§5.8), server transports `fea_mesh` (Gmsh 4.15.2) / `fea_solve` (ccx 2.21) / `fea_export`, content-addressed artifact store, conformal multi-part meshes | `packages/domain-cae/src/**`, `server/src/fea/`, 05 TECHNICAL_SPEC §13 | 05 M1–M3 (static solid part) | **Built.** What remains is FEA-REST: modal, buckling, shells, BDF/OP2, face map, `dispose_margin`, UI. |
+| Ports `ctx.feaArtifacts` (`FeArtifactPort`) and `ctx.humanSignature` (`HumanSignaturePort`, "null = human gates refuse") | `commands/types.ts` | 05 `ctx.feaArtifacts`; 09 `record_signature` verification (AF-34a) | **Ports exist.** 09 PLM implements `HumanSignaturePort` (Ed25519, key held by a human). It does not add a new port. Every `dispose_*` command (thermal limits, fits, margins) already refuses through it. |
+| `lib/convergence.ts` (observed order, Richardson, GCI), `check_convergence`, `compare_to_expected`, `llull run_benchmarks`, `npm run quality:physics` | `lib/`, `commands/vnv/`, `server/src/cli/benchmarks.ts` | AF-23 (each pack's VCs run as CLI scripts against `expected_results.json`), 05 mesh convergence | **This is the gate runner for aerospace VCs too.** A pack registers its `expected_results.json` with the benchmark runner instead of writing its own driver. |
+| `lib/canonicalJson.ts`, `lib/sha256.ts` | `lib/` | 09 pure parts (canonical JSON hashes) | **Done.** 09 still needs the Ed25519 verify helper. |
+| Decision 1 (package layout), partly settled: analysis lives in `packages/domain-cae` (the plugin `cae` with the disciplines `thermal/` and `thermomech/` inside it). Solvers are host transports. | FE_PIPELINE_DESIGN.md | 05 §2 | Still open for `domain-aero` (02 / 06 / 08 fasteners) and `plm` (09). Recommendation unchanged: one `packages/domain-aero` with one `CadPlugin` per discipline, plus `packages/plm`. |
+
+Physics follow-ups that wait on aerospace: VNV-M3 (needs 09 signing), PROP-M6 / PROP-08 (08 libraries / records),
+MATL-M4b (05 deck hook), FEA face map (01 face query port), ε(T) (PHY-15).
+
+## Aerospace story: five steps (2026-10-17)
+
+This replaces the "start order" table of 2026-10-16. The whole aerospace programme is delivered in **five steps**. Each step can be
+shipped and validated on its own. The board ids are `AERO-1` to `AERO-5` (`.claude/work/BOARD.md`). Milestone numbers refer to each
+pack's TECHNICAL_SPEC § Delivery plan.
+
+| Step | Name | Content (pack milestones) | Unblocks | State |
+| ---- | ---- | ------------------------- | -------- | ----- |
+| **AERO-1** | One mass and density truth | 08 M1: `resolveDensity` (TR-MAT-10) in core `geometry/`, read by `mass_properties` **and** by dynamics `bodyMassProperties`. The order is a PHY-01 `density` model (preferred, at 20 °C) → legacy `Material.density` → explicit fallback. The source is named (`densitySource`, `defaulted`) and `unverified` propagates (AF-31/32). `mass_properties` gives unit-correct mass (`massG` / `massKg` / `massLb`, `massUnit`) and takes the density param as `{ value, unit }`. `create_material` gets `densityUnit`. VC-MAT-01, 03, 04 (a–c, e), 22 (legacy row). | 08 M2, 01 M3, 05 modal mass, BOM / weight | **done 2026-10-17** (08 TECHNICAL_SPEC §13) |
+| **AERO-2** | Exact kernel | 01 M1 (OCC default on desktop, `kernel_info`, provenance), 01 M2 (custom OCCT 7.9.x WASM with exceptions, the long pole), 01 M3 (`resolveMassProperties`: exact → closed form → mesh, part frame), `FaceQueryPort` (§5.9), v3 envelope + `migrate2to3`, `import_step_exact` | everything below; the 05 face map (targets by face, not nearest Gmsh surface) | **done 2026-10-17 on the OCCT 7.4 binding** (01 TECHNICAL_SPEC §13); M2 (7.9 build) blocked on decision 2 |
+| **AERO-3** | Real parts, real materials | 07 FTR (holes, threads, pockets, sheet-metal flat pattern; native BRepFeat after AERO-2), 08 M2–M5 (material records on PHY-01 models, libraries, `ctx.libraries`, fastener catalogue + `select_fastener`), PROP-08, MATL-M4b, `check_materials` | first sellable value: machined fittings and sheet-metal brackets with fasteners and sourced materials | todo |
+| **AERO-4** | Supply-chain ready | 03 GDT (`doc.pmi`, datums on faces, stack-ups), 04 XCH (AP242 semantic PMI, validation properties, JT/IGES), 09 PLM (`packages/plm`, revisions, effectivity, FAI, `HumanSignaturePort` impl, `dispose_*` unblocked, VNV-M3) | OEM supply chain, AS9100 / EN 9100 release discipline | todo |
+| **AERO-5** | Engineering depth | 05 FEA-REST (modal, buckling, shells / midsurface, BDF/OP2, `dispose_margin`, UI), 02 SRF (NURBS, NACA, G2/G3 analysis, wings and fuselage lofts, `SECTION_RING_POINTS` fix), 06 CMP (CLT, plies, drape, flat patterns, PCOMP / composite shell sections) | aerodynamic surfaces, composite structures, analysis hand-off | todo |
+
+Rules for the steps:
+
+1. A step is done when its VCs pass in an automated gate (unit tests and `npm run quality:physics`-style runs of `expected_results.json`),
+   `npm run check` is green, and the pack's TECHNICAL_SPEC has an implementation-status section. This is the same rule as the physics packs.
+2. Pure core pieces of a later step (CLT, NACA generator, flat-pattern maths, Ed25519 verify) may be pulled forward when a lane is free.
+   They do not change the step order.
+3. Decision 1 (package layout) is needed before AERO-3 (the first `domain-aero` command). Decision 2 (OCC build) is the work of AERO-2.
+   Decision 5 (licensing) is needed before the desktop installer ships Gmsh / CalculiX.
 
 ## Status (2026-10-15)
 
@@ -130,7 +154,7 @@ output (`python3 -I <script>` from its `validation/` folder). Four scripts need 
 
 - `loft_sections` / `sweep_profile` resample every section to 24 points (`SECTION_RING_POINTS`): an airfoil
   loses ≈ 2 % section area and its sharp trailing edge (02 SRF).
-- `mass_properties` always labels mass in grams, whatever the document units and density unit (08 MAT);
+- ~~`mass_properties` always labels mass in grams, whatever the document units and density unit (08 MAT)~~ — fixed by AERO-1 (2026-10-17): density `{ value, unit }`, `massG/Kg/Lb`;
   it returns no surface area or centroid, so STEP validation properties cannot be checked (04 XCH).
 - The bundled `opencascade.js@1.1.1` is OCCT 7.4.0p1 (2020) while the bundled CadQuery uses OCP 7.9.3; it
   does not bind `GeomAPI_Interpolate` / `GeomFill_NSections`, and `STEPCAFControl` / `XCAFDoc` / `BRepFeat_*`
@@ -138,7 +162,7 @@ output (`python3 -I <script>` from its `validation/` folder). Four scripts need 
 - Inertia computed far from the origin loses precision (1.2e-9 relative at 70 m, 1.2e-7 at 1 km); a local
   part frame fixes it (01 KRN). The dynamics branch's triangle integration also runs in world coordinates, so
   the same part-frame shift applies to it (01 TR-KRN-41).
-- Two mass paths with two density conventions once dynamics merges: `mass_properties` (g/(doc unit)³ param,
+- Two mass paths with two density conventions (density half fixed by AERO-1: one `resolveDensity`; geometry half waits for 01 M3): `mass_properties` (g/(doc unit)³ param,
   exact OCC volume, sweep/loft closed forms, no inertia) and `add_rigid_body` (kg/m³ param, silent steel default,
   inertia from display triangles for every non-primitive). Unified by 01 §5.4 and 08 TR-MAT-10.
 

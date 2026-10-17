@@ -36,7 +36,7 @@ export const addRigidBody = defineCommand({
   name: 'add_rigid_body',
   description:
     'Make a set of 3D entities move together as ONE rigid body for physics simulation (simulate_motion). Mass, centre of mass and ' +
-    "inertia are computed from the entities' real geometry: each entity uses its assigned material density, else `density` (kg/m³, " +
+    "inertia are computed from the entities' real geometry: each entity uses its assigned material (density model, else plain density), else `density` (kg/m³, " +
     'default 7850 steel; aluminium 2700, wood 600, CFRP 1550). Give `massKg` when the real part mass is known (hollow parts): the ' +
     'distribution is scaled to it. `fixed: true` welds the body to the ground (engine block, frame, stand). A non-fixed body with no ' +
     'joint is a free body that falls under gravity. Next: connect bodies with add_body_joint. Returns the body id in affected[0] and ' +
@@ -49,7 +49,7 @@ export const addRigidBody = defineCommand({
     massKg: z.number().positive().optional().describe('Known real mass in kg; the computed mass distribution is scaled to it.'),
     id: z.string().optional().describe('Optional explicit body id (shares the id space of all dynamics records).'),
   }),
-  run: (doc, { entityIds, name, fixed, density, massKg, id }): CommandResult => {
+  run: (doc, { entityIds, name, fixed, density, massKg, id }, ctx): CommandResult => {
     const fail = failer(doc, 'add_rigid_body');
     const dynamics = dynamicsOf(doc);
     const owners = new Map(Object.values(dynamics.bodies).flatMap((body) => body.entityIds.map((e) => [e, body.id] as const)));
@@ -71,7 +71,7 @@ export const addRigidBody = defineCommand({
       ...(density !== undefined ? { density } : {}),
       ...(massKg !== undefined ? { massKg } : {}),
     };
-    const props = bodyMassProperties(doc, body);
+    const props = bodyMassProperties(doc, body, ctx?.kernel);
     if ('error' in props) return fail(props.error);
     const next = withDynamics(doc, { ...dynamics, bodies: { ...dynamics.bodies, [bodyId]: body } });
     const center = props.centerOfMass.map((c) => formatLength(doc, c / toMetres(doc, 1))).join(', ');

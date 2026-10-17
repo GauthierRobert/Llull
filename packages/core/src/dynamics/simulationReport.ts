@@ -7,7 +7,7 @@ import type { DynamicsModel } from '../model/dynamics';
 import type { Vec3 } from '../model/vectors';
 import { RAD_PER_S_PER_RPM, motorForce, propellerOutput } from './forceLaws';
 import type { Quaternion, SimulationTrace } from './physicsEngine';
-import type { BodyMassProperties } from './simulationModel';
+import type { BodyMassDistribution } from './simulationModel';
 
 export type SimulationDetail = 'summary' | 'series' | 'poses';
 
@@ -107,7 +107,7 @@ function gearRatioError(ratio: number, driver: readonly number[], driven: readon
 /** The structured result of one run (all forces re-evaluated on the samples with the same laws the engine applied). */
 export function simulationData(
   dynamics: DynamicsModel,
-  mass: Readonly<Record<string, BodyMassProperties>>,
+  mass: Readonly<Record<string, BodyMassDistribution>>,
   trace: SimulationTrace,
   run: { engine: string; duration: number; timestep: number; detail: SimulationDetail; metresPerUnit: number },
 ): SimulationData {

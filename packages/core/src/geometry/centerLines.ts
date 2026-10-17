@@ -86,6 +86,8 @@ function recipeAxes(recipe: ShapeRecipe, place: Placement, scale: number, depth:
     }
     case 'scale':
       return recipeAxes(recipe.source, (point) => place(scale3(point, recipe.factor)), scale * recipe.factor, depth + 1);
+    case 'brep':
+      return [];
   }
 }
 

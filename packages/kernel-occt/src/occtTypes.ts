@@ -7,6 +7,7 @@ export interface OccShape extends OccHandle {
   ShapeType(): unknown;
   Orientation_1(): { value: number };
   IsSame(other: OccShape): boolean;
+  IsNull(): boolean;
   HashCode(upperBound: number): number;
 }
 

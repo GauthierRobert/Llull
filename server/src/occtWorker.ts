@@ -55,10 +55,23 @@ function run(kernel: GeometryKernel, request: KernelRequest, testHooks: boolean)
     }
     for (;;);
   }
-  const method = kernel[request.op] as (...args: unknown[]) => unknown;
-  const result = method.apply(kernel, [...request.args]);
+  const result = invoke(kernel, request);
   // The server rebuilds the full handle from its own recipe: never clone the tree back.
   return request.op === 'evaluate' && result !== null ? keyOnlyHandle(result as ShapeHandle) : result;
+}
+
+const FACE_QUERY_PREFIX = 'faceQuery.';
+
+/** Calls the kernel method named by `request.op` (`faceQuery.<method>` resolves on the face-query port). */
+function invoke(kernel: GeometryKernel, request: KernelRequest): unknown {
+  if (request.op.startsWith(FACE_QUERY_PREFIX)) {
+    const port = kernel.faceQuery as unknown as Record<string, ((...args: unknown[]) => unknown) | undefined> | undefined;
+    const method = port?.[request.op.slice(FACE_QUERY_PREFIX.length)];
+    if (method === undefined) throw new Error(`unknown kernel operation ${request.op}`);
+    return method.apply(port, [...request.args]);
+  }
+  const method = kernel[request.op as keyof GeometryKernel] as (...args: unknown[]) => unknown;
+  return method.apply(kernel, [...request.args]);
 }
 
 main().catch((error: unknown) => {

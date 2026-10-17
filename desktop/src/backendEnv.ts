@@ -43,6 +43,8 @@ export function backendEnv(input: BackendEnvInput): Record<string, string> {
     LLULL_AUTOSAVE_PATH: path.join(input.userDataDir, 'autosave.json'),
     LLULL_BODY_LIMIT: DESKTOP_BODY_LIMIT,
     LLULL_PYTHON: input.layout.python,
+    // The exact OCC kernel is the desktop default (TR-KRN-01); an inherited LLULL_KERNEL=manifold is a diagnostic override, any other value is ignored.
+    LLULL_KERNEL: input.baseEnv['LLULL_KERNEL'] === 'manifold' ? 'manifold' : 'occt',
     // import_code runs arbitrary Python: off unless the user launched the app with it set to 1.
     ...(input.baseEnv['LLULL_ALLOW_CODE_EXECUTION'] === '1' ? { LLULL_ALLOW_CODE_EXECUTION: '1' } : {}),
   };

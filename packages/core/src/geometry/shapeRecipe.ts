@@ -50,6 +50,8 @@ function keyText(recipe: ShapeRecipe): string {
       return `place(${recipeKey(recipe.source)},${recipe.position.join(',')},${recipe.rotation.join(',')})`;
     case 'scale':
       return `scale(${recipeKey(recipe.source)},${recipe.factor})`;
+    case 'brep':
+      return `brep(${recipe.blob})`;
   }
 }
 
@@ -143,6 +145,11 @@ function nodeError(node: Record<string, unknown>, depth: number, validateLeaf: L
     case 'scale':
       if (!isFiniteNumber(node['factor']) || node['factor'] <= 0) return 'scale: factor must be > 0';
       return child(node['source']);
+    case 'brep':
+      if (typeof node['blob'] !== 'string' || !/^[0-9a-f]{64}$/.test(node['blob']))
+        return 'brep: blob must be a lowercase sha256 hex string';
+      if (node['format'] !== 'occt-brep-v1') return `brep: unsupported format '${String(node['format'])}'`;
+      return node['label'] === undefined || typeof node['label'] === 'string' ? null : 'brep: label must be a string';
     default:
       return `unknown recipe op '${String(node['op'])}'`;
   }
