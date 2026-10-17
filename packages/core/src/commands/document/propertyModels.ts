@@ -9,7 +9,7 @@ import type { CadDocument, Material } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { changed, commandError, rejection } from '../noop';
-import { libraryRecordRefusal } from './libraryReadonly';
+import { editableMaterial } from './libraryReadonly';
 import { fitRecordSchema, formSchema, modelInputSchema, withoutUndefined } from './propertyModelSchema';
 
 const REMEDIATION: Readonly<Record<string, string>> = {
@@ -86,11 +86,9 @@ export const definePropertyModel = defineCommand({
   }),
   run: (doc, { material: materialId, model: input, replace }): CommandResult => {
     const name = 'define_property_model';
-    const material = Object.hasOwn(doc.materials, materialId) ? doc.materials[materialId] : undefined;
-    if (material === undefined)
-      return refuseWith(doc, name, 'MAT_RECORD_NOT_FOUND', `no material '${materialId}'`, [materialId], 'material');
-    const readonly = libraryRecordRefusal(doc, name, materialId, material);
-    if (readonly !== null) return readonly;
+    const editable = editableMaterial(doc, name, materialId, refuseWith);
+    if ('refusal' in editable) return editable.refusal;
+    const { material } = editable;
     const form = formSchema.safeParse(input.form);
     if (!form.success)
       return refuseWith(
@@ -201,11 +199,9 @@ export const removePropertyModel = defineCommand({
   }),
   run: (doc, { material: materialId, modelId }): CommandResult => {
     const name = 'remove_property_model';
-    const material = Object.hasOwn(doc.materials, materialId) ? doc.materials[materialId] : undefined;
-    if (material === undefined)
-      return refuseWith(doc, name, 'MAT_RECORD_NOT_FOUND', `no material '${materialId}'`, [materialId], 'material');
-    const readonly = libraryRecordRefusal(doc, name, materialId, material);
-    if (readonly !== null) return readonly;
+    const editable = editableMaterial(doc, name, materialId, refuseWith);
+    if ('refusal' in editable) return editable.refusal;
+    const { material } = editable;
     const models = material.propertyModels ?? [];
     if (!models.some((m) => m.id === modelId))
       return refuseWith(doc, name, 'PROP_MODEL_NOT_FOUND', `'${materialId}' has no model '${modelId}'`, [modelId], 'modelId');

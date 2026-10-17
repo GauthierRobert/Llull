@@ -13,7 +13,7 @@ import type { CadDocument, Material } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { changed } from '../noop';
-import { libraryRecordRefusal } from './libraryReadonly';
+import { editableMaterial } from './libraryReadonly';
 import { matlRefusal } from './materialModelRefusal';
 import { lawSchema, materialFitSchema, validRangeSchema } from './materialLawSchema';
 import { withoutUndefined } from './propertyModelSchema';
@@ -24,9 +24,6 @@ export const withMaterialModels = (doc: CadDocument, name: string, material: Mat
   ...doc,
   materials: { ...doc.materials, [name]: { ...material, materialModels: models } },
 });
-
-const materialOf = (doc: CadDocument, name: string): Material | undefined =>
-  Object.hasOwn(doc.materials, name) ? doc.materials[name] : undefined;
 
 /** `parametersSha256` = sha256 of the canonical JSON of the stored law (PHY-01 TR-PROP-09 rule). */
 export const lawHash = (law: MaterialLaw): string => sha256Hex(canonicalJson(law));
@@ -93,11 +90,9 @@ export const addMaterialModel = defineCommand({
   }),
   run: (doc, params): CommandResult => {
     const command = 'add_material_model';
-    const material = materialOf(doc, params.material);
-    if (material === undefined)
-      return matlRefusal(doc, command, 'MAT_RECORD_NOT_FOUND', `no material '${params.material}'`, [params.material], 'material');
-    const readonly = libraryRecordRefusal(doc, command, params.material, material);
-    if (readonly !== null) return readonly;
+    const editable = editableMaterial(doc, command, params.material, matlRefusal);
+    if ('refusal' in editable) return editable.refusal;
+    const { material } = editable;
     const normalized = normalizeLawInput(params.model);
     if (isLawFailure(normalized))
       return matlRefusal(doc, command, normalized.code, normalized.message, [params.id], normalized.path, normalized.remediation);
@@ -215,11 +210,9 @@ export const removeMaterialModel = defineCommand({
   }),
   run: (doc, { material: materialId, id }): CommandResult => {
     const command = 'remove_material_model';
-    const material = materialOf(doc, materialId);
-    if (material === undefined)
-      return matlRefusal(doc, command, 'MAT_RECORD_NOT_FOUND', `no material '${materialId}'`, [materialId], 'material');
-    const readonly = libraryRecordRefusal(doc, command, materialId, material);
-    if (readonly !== null) return readonly;
+    const editable = editableMaterial(doc, command, materialId, matlRefusal);
+    if ('refusal' in editable) return editable.refusal;
+    const { material } = editable;
     const models = material.materialModels ?? [];
     if (!models.some((candidate) => candidate.id === id))
       return matlRefusal(doc, command, 'MATL_MODEL_NOT_FOUND', `'${materialId}' has no material model '${id}'`, [id], 'id');

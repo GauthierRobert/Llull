@@ -6,7 +6,7 @@ import type { CadDocument } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { changed } from '../noop';
-import { libraryRecordRefusal } from './libraryReadonly';
+import { editableMaterial } from './libraryReadonly';
 import { matlRefusal } from './materialModelRefusal';
 
 const command = 'define_constitutive_set';
@@ -43,11 +43,9 @@ export const defineConstitutiveSet = defineCommand({
     replace: z.boolean().optional().describe('Replace an existing set with the same id (default false: refused with MATL_MODEL_EXISTS).'),
   }),
   run: (doc, { material: materialId, set: input, makeDefault, replace }): CommandResult => {
-    const material = Object.hasOwn(doc.materials, materialId) ? doc.materials[materialId] : undefined;
-    if (material === undefined)
-      return matlRefusal(doc, command, 'MAT_RECORD_NOT_FOUND', `no material '${materialId}'`, [materialId], 'material');
-    const readonly = libraryRecordRefusal(doc, command, materialId, material);
-    if (readonly !== null) return readonly;
+    const editable = editableMaterial(doc, command, materialId, matlRefusal);
+    if ('refusal' in editable) return editable.refusal;
+    const { material } = editable;
     const set: ConstitutiveSet = {
       id: input.id,
       ...Object.fromEntries(SET_SLOTS.flatMap((slot) => (input[slot] === undefined ? [] : [[slot, input[slot]]]))),
