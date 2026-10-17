@@ -1,5 +1,6 @@
 /** Refusals of the materials commands (AF-11): a stable MAT_* / PROP_* code, the offending ids and path, and a one-line fix. */
 
+import { EXPORT_REMEDIATION } from '../../model/exportGate';
 import type { CadDocument } from '../../model/types';
 import type { CommandResult } from '../types';
 import { commandError, rejection } from '../noop';
@@ -26,8 +27,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   MAT_LIBRARY_EXISTS: 'pass replace: true to import another version of this library',
   MAT_LIBRARY_PRIVATE_INLINE: 'register the file with register_material_library, then import by { libraryId, version, sha256 }',
   MAT_LICENCE_EMBED_FORBIDDEN: 'use storage: private (register_material_library) and import by reference',
-  MAT_EXPORT_CONTROLLED: 'hand over to a human (export-control officer); ask the owner to confirm in the desktop app',
-  MAT_HUMAN_GATE: 'ask the owner to do it in the desktop app (a verified human signature is required)',
+  ...EXPORT_REMEDIATION,
   MAT_DENSITY_INVALID: 'give the material a density with set_material_property (property density)',
   PROP_FORM_INVALID: 'follow the parameter description in `llull describe set_material_property`',
   PROP_PROPERTY_UNKNOWN: 'use a catalogue property (density, E, Ec, G, nu, Ftu, Fty, Fcy, Fsu, Fbru, Fbry, elongation, cte, k, cp)',

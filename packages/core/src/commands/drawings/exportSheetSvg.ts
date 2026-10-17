@@ -1,6 +1,6 @@
 import type { CommandResult } from '../types';
-import { defineCommand, z } from '../schema';
-import { report } from '../noop';
+import { defineCommand, z, confirmExportControlled } from '../schema';
+import { report, exportRefusal } from '../noop';
 import { PAPER_MM } from '../../model/sheet';
 import { renderSheet } from './exportSheet';
 import { isRejection, requireSheet, scaleText } from './sheetOps';
@@ -20,13 +20,16 @@ export const exportSheetSvg = defineCommand({
     'views: [{ id, label, kind, scale, scaleText, bounds: [minX, minY, maxX, maxY] in paper mm }], skipped: [{ id, reason }], warnings: string[] }. ' +
     '`fits` is false when views overflow the drawing area (choose a smaller scale or larger paper).',
   params: z.object({
+    confirmExportControlled,
     sheetId: z.string().describe('Id of the sheet to export.'),
     showDimensions: z
       .boolean()
       .optional()
       .describe('true = add overall width and height dimensions to each projection view. Default false.'),
   }),
-  run: (doc, { sheetId, showDimensions }): CommandResult => {
+  run: (doc, { confirmExportControlled, sheetId, showDimensions }, ctx): CommandResult => {
+    const refused = exportRefusal(doc, 'export_sheet_svg', 'sheet', confirmExportControlled, ctx);
+    if (refused !== null) return refused;
     const sheet = requireSheet(doc, 'export_sheet_svg', sheetId);
     if (isRejection(sheet)) return sheet;
     const rendered = renderSheet(doc, sheet, { showDimensions: showDimensions === true });

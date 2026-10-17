@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defaultContext } from '@core/commands/context';
-import { exportGate } from '@core/commands/materials/exportGate';
+import { exportDocumentHash, exportGate } from '@core/model/exportGate';
 import type { ExecutionContext } from '@core/commands/types';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import type { HumanSignaturePort } from '@core/model/analysis';
@@ -99,7 +99,7 @@ describe('VC-MAT-15 / VC-MAT-25: exports of controlled content', () => {
 
   it('a signature without a port, or one that does not verify, is MAT_HUMAN_GATE', () => {
     const { doc } = markedBox({ regime: 'ITAR' });
-    const signature = { signature: 'x' };
+    const signature = { signature: 'x', nonce: 'n1' };
     const none = call(doc, 'export_stl', { confirmExportControlled: signature }, NO_PORT);
     expect(none.error?.code).toBe('MAT_HUMAN_GATE');
     expect(none.summary).toContain('no signing port');
@@ -116,10 +116,30 @@ describe('VC-MAT-15 / VC-MAT-25: exports of controlled content', () => {
         return { signer: 'alice', signatureId: 's1' };
       },
     };
-    const result = call(doc, 'export_stl', { confirmExportControlled: { signature: 'x' } }, contextWith(port));
+    const result = call(doc, 'export_stl', { confirmExportControlled: { signature: 'x', nonce: 'n1' } }, contextWith(port));
     expect(result.rejected).toBeUndefined();
     expect(dataOf(result)['format']).toBe('ascii');
-    expect(seen).toEqual([sha256Hex(canonicalJson({ act: 'export of ITAR-controlled content', ids: ['secret'] }))]);
+    const details = { command: 'export_stl', documentHash: exportDocumentHash(doc) };
+    expect(seen).toEqual([sha256Hex(canonicalJson({ act: 'export of ITAR-controlled content', ids: ['secret'], details, nonce: 'n1' }))]);
+  });
+
+  it('a confirmation without a nonce is MAT_HUMAN_GATE; the signed payload changes with the document', () => {
+    const { doc } = markedBox({ regime: 'ITAR' });
+    const hashes: string[] = [];
+    const port: HumanSignaturePort = {
+      verify: (_signature, payload) => {
+        hashes.push(payload);
+        return { signer: 'alice', signatureId: 's1' };
+      },
+    };
+    const noNonce = call(doc, 'export_stl', { confirmExportControlled: { signature: 'x' } }, contextWith(port));
+    expect(noNonce.error?.code).toBe('MAT_HUMAN_GATE');
+    expect(noNonce.summary).toContain('nonce');
+    expect(hashes).toEqual([]);
+    const other = step(doc, 'add_box', { size: [1, 2, 3] });
+    call(doc, 'export_stl', { confirmExportControlled: { nonce: 'n1' } }, contextWith(port));
+    call(other, 'export_stl', { confirmExportControlled: { nonce: 'n1' } }, contextWith(port));
+    expect(new Set(hashes).size).toBe(2);
   });
 
   it('an unmarked document exports as before (VC-MAT-15 core part)', () => {
@@ -191,7 +211,7 @@ describe('set_export_marking', () => {
   });
 
   it('lowering needs a signature the port verifies', () => {
-    const lower = { material: 'secret', marking: { regime: 'EAR', eccn: '9A610' }, confirmation: { signature: 'x' } };
+    const lower = { material: 'secret', marking: { regime: 'EAR', eccn: '9A610' }, confirmation: { signature: 'x', nonce: 'n1' } };
     expect(call(ITAR_BOX, 'set_export_marking', lower, port(false)).error?.code).toBe('MAT_HUMAN_GATE');
     const applied = call(ITAR_BOX, 'set_export_marking', lower, port(true));
     expect(applied.rejected).toBeUndefined();

@@ -1,10 +1,9 @@
 /** export_stl: read-only serialisation to STL (document returned unchanged, output in `data`). */
 
 import type { Vec3 } from '../../model/types';
-import { report } from '../noop';
+import { exportRefusal, report } from '../noop';
 import type { CommandResult } from '../types';
-import { defineCommand, z } from '../schema';
-import { confirmExportControlled, exportRefusal } from '../materials/exportGate';
+import { confirmExportControlled, defineCommand, z } from '../schema';
 import { uint8ArrayToBase64 } from '../../lib/base64';
 import { collectExportParts, exportSummary, type ExportPart } from '../../geometry/entityTriangles';
 import type { Triangle } from '../../geometry/triangles';

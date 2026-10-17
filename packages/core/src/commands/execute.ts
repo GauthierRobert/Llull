@@ -27,6 +27,16 @@ function feedBlobs(doc: CadDocument, kernel: GeometryKernel | null): void {
 }
 
 /**
+ * Step params without a human signature (TR-MAT-51): the signature is checked by the command and never stored in the history or the saved file.
+ * @invariant a `confirmation` object is replaced by `{ verified: true }`; params without one are returned as given
+ */
+function withoutConfirmation(params: unknown): unknown {
+  if (typeof params !== 'object' || params === null || Array.isArray(params)) return params;
+  const confirmation: unknown = (params as Record<string, unknown>)['confirmation'];
+  return typeof confirmation === 'object' && confirmation !== null ? { ...params, confirmation: { verified: true } } : params;
+}
+
+/**
  * @invariant a mutating command (not `readOnly` / `metaHistory` / `session`) that changes the document appends FeatureStep `step-<n>` (n =
  *   doc.nextStepNumber) and mints ids `<prefix>-<n>.<k>`, so replay re-mints identical ids; an execute nested inside a running step joins
  *   it (no extra step)
@@ -65,7 +75,13 @@ export function execute(doc: CadDocument, commandName: string, params: unknown, 
   const stepContext: ExecutionContext = { ...ctx, ids: stepIdSource(stepKey), stepKey };
   const result = runInContext(stepContext, () => def.run(doc, params, stepContext));
   if (result.document === doc) return result;
-  const step: FeatureStep = { id: `step-${stepKey}`, name: commandName, params, suppressed: false, affected: result.affected };
+  const step: FeatureStep = {
+    id: `step-${stepKey}`,
+    name: commandName,
+    params: withoutConfirmation(params),
+    suppressed: false,
+    affected: result.affected,
+  };
   return {
     ...result,
     document: {

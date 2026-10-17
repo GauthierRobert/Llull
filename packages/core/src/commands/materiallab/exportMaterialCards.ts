@@ -3,8 +3,8 @@
 import { convertValue, isUnitFailure } from '../../lib/quantity';
 import { defaultCardName, isMaterialCardsRefusal, writeMaterialCards } from '../../model/materialLaws/cardWriter';
 import type { CommandResult } from '../types';
-import { defineCommand, z } from '../schema';
-import { report } from '../noop';
+import { confirmExportControlled, defineCommand, z } from '../schema';
+import { exportRefusal, report } from '../noop';
 import { matlRefusal } from '../document/materialModelRefusal';
 import { isRefusal, selectSlots } from './setSelection';
 
@@ -37,6 +37,7 @@ export const exportMaterialCards = defineCommand({
     '(never dropped silently); every model must carry validity ranges (MATL_VALIDITY_MISSING). data.header is the provenance comment line ' +
     '(hash, unverified reasons) to put above the lines. Next: embed in the solver deck.',
   params: z.object({
+    confirmExportControlled,
     material: z.string().describe('Material id (create_material name).'),
     set: z.string().optional().describe('Constitutive set id (default: the material default set).'),
     target: z.enum(['calculix', 'nastran']).describe('Solver the cards are for.'),
@@ -53,7 +54,9 @@ export const exportMaterialCards = defineCommand({
       .optional()
       .describe('Temperatures to write rows at (default: one row without a temperature column). Nastran: at most one.'),
   }),
-  run: (doc, params): CommandResult => {
+  run: (doc, params, ctx): CommandResult => {
+    const gated = exportRefusal(doc, command, 'data', params.confirmExportControlled, ctx, [params.material]);
+    if (gated !== null) return gated;
     const material = Object.hasOwn(doc.materials, params.material) ? doc.materials[params.material] : undefined;
     const refuse = (code: string, message: string, ids: readonly string[], path: string, remediation?: string): CommandResult => ({
       ...matlRefusal(doc, command, code, message, ids, path, remediation),

@@ -4,7 +4,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence/serialization';
@@ -109,6 +109,32 @@ describe('library store', () => {
     expect(createLibraryProvider().get('mmpds', '2024')).toBeNull();
     writeFileSync(path.join(directory, 'mmpds@2024.llull-matlib.json'), JSON.stringify({ ...file, version: '1999' }));
     expect(createLibraryProvider().get('mmpds', '2024')).toBeNull();
+  });
+
+  it('a registered version is immutable: other content under the same id@version is refused and the stored file is kept', async () => {
+    expect((await register(JSON.stringify(file), 'private'))?.isError).toBe(false);
+    expect((await register(JSON.stringify(file), 'private'))?.isError).toBe(false);
+    const changed = { ...file, title: 'Licensed, edited' };
+    const refused = await register(JSON.stringify(changed), 'private');
+    expect(refused?.isError).toBe(true);
+    expect(JSON.stringify(refused)).toContain('MAT_LIBRARY_EXISTS');
+    const stored = JSON.parse(readFileSync(path.join(directory, 'mmpds@2024.llull-matlib.json'), 'utf8')) as MaterialLibrary;
+    expect(libraryHash(stored)).toBe(sha256);
+    expect((await register(JSON.stringify({ ...changed, version: '2025' }), 'private'))?.isError).toBe(false);
+  });
+
+  it('refuses an id or version that is not its own file-safe name, writing nothing', () => {
+    const port = createLibraryStorePort();
+    for (const [id, version] of [
+      ['a b', '1'],
+      ['../evil', '1'],
+      ['lib', '1/2'],
+      ['_hidden', '1'],
+    ] as const) {
+      const library = { ...file, id, version } as unknown as MaterialLibrary;
+      expect(() => port.register(library, libraryHash(library)), `${id}@${version}`).toThrow('MAT_LIBRARY_INVALID');
+    }
+    expect(readdirSync(directory)).toEqual([]);
   });
 
   it('the CLI reads file=<path> into libraryJson', () => {

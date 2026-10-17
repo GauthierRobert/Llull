@@ -2,8 +2,8 @@
 
 import type { CivilModel, PipeObject } from '@core/model/civil';
 import type { CommandResult } from '@core/commands/types';
-import { defineCommand, z } from '@core/commands/schema';
-import { noop, report } from '@core/commands/noop';
+import { defineCommand, z, confirmExportControlled } from '@core/commands/schema';
+import { noop, report, exportRefusal } from '@core/commands/noop';
 import { safeFileName } from '@lib/safeFileName';
 import { toMetres, toMm } from '@core/model/units';
 import { civilObject, civilObjectsOf, getCivil } from '../model';
@@ -49,13 +49,16 @@ export const exportDrainageLongSection = defineCommand({
     'largest pipe at each fork down to the outfall. Returns data { text, fileName, pipeIds, manholeIds }.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
+    confirmExportControlled,
     fromManholeId: z.string().describe('Upstream manhole id where the run starts, e.g. "manhole-1".'),
     toManholeId: z.string().optional().describe('Downstream manhole id where the run ends. Default: follow the main run to the outfall.'),
     rainfallIntensityMmH: intensityField,
     idf: idfField,
     ...HYDRAULIC_FIELDS,
   }),
-  run: (doc, params): CommandResult => {
+  run: (doc, params, ctx): CommandResult => {
+    const refused = exportRefusal(doc, 'export_drainage_long_section', 'sheet', params.confirmExportControlled, ctx);
+    if (refused !== null) return refused;
     const criteria = criteriaOrFailure(doc, params, 'export_drainage_long_section');
     if ('summary' in criteria) return criteria;
     const civil = getCivil(doc);

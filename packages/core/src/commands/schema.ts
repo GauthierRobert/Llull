@@ -192,6 +192,16 @@ export function commandCatalog(...commands: ReadonlyArray<CommandDefinition<neve
   return commands as ReadonlyArray<CommandDefinition<unknown>>;
 }
 
+/** The optional param every `export_*` command takes (see `exportRefusal`). */
+export const confirmExportControlled = z
+  .union([z.boolean(), z.record(z.string(), z.unknown())])
+  .optional()
+  .describe(
+    'Human confirmation for a document that uses export-controlled (ITAR / EAR) material records: a signature object produced in the desktop ' +
+      'app, with a nonce field, over the export act and the document hash. An agent cannot give it: true is refused with MAT_HUMAN_GATE. ' +
+      'Without it a controlled document is refused with MAT_EXPORT_CONTROLLED.',
+  );
+
 /** 2-number vector `[x, y]` (local work-plane coordinates). */
 export function vec2(description: string): z.ZodTuple<[z.ZodNumber, z.ZodNumber], null> {
   return z.tuple([z.number(), z.number()]).describe(description);

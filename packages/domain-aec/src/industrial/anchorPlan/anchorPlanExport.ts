@@ -1,9 +1,9 @@
 import { unitsToMm } from '../../shared/numeric';
 import type { Vec2 } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
-import { defineCommand, z } from '@core/commands/schema';
+import { defineCommand, z, confirmExportControlled } from '@core/commands/schema';
 import { elementsOf, existingLevelId, fileSlug, getBuilding } from '../../building/model';
-import { noop, report } from '@core/commands/noop';
+import { noop, report, exportRefusal } from '@core/commands/noop';
 import { distance } from '@lib/polygon';
 import {
   MARGIN,
@@ -66,6 +66,7 @@ export const exportAnchorPlan = defineCommand({
     'schedule (plate mark, grid ref like A/1, bolt count x size, embedment, projection above concrete, plate size). Needs steel columns ' +
     'with base plates (add_base_plates). data.svg holds the file text.',
   params: z.object({
+    confirmExportControlled,
     levelId: z.string().optional().describe('Level whose base plates are drawn. Default: active level.'),
     scale: z
       .number()
@@ -79,7 +80,9 @@ export const exportAnchorPlan = defineCommand({
       .optional()
       .describe('Anchor bolt embedment below the plate underside in the schedule, in document units. Default 300 mm.'),
   }),
-  run: (doc, { levelId, scale, paper, embedment }): CommandResult => {
+  run: (doc, { confirmExportControlled, levelId, scale, paper, embedment }, ctx): CommandResult => {
+    const refused = exportRefusal(doc, 'export_anchor_plan', 'sheet', confirmExportControlled, ctx);
+    if (refused !== null) return refused;
     if (scale !== undefined && !(scale > 0)) return noop(doc, 'export_anchor_plan failed: scale must be a number > 0.');
     if (embedment !== undefined && !(embedment > 0)) return noop(doc, 'export_anchor_plan failed: embedment must be a number > 0.');
     const building = getBuilding(doc);

@@ -8,7 +8,7 @@ import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { changed } from '../noop';
 import { withoutUndefined } from '../document/propertyModelSchema';
-import { humanGate } from './humanGate';
+import { humanGate } from '../../model/humanGate';
 import { specsSchema, supersededSchema } from './libraryFormat';
 import { markingInput, markingOf, markingText } from './marking';
 import { refuseMaterial } from './refusal';
@@ -60,7 +60,7 @@ export const defineMaterialRecord = defineCommand({
         return refuse('MAT_RECORD_READONLY', `'${id}' comes from library '${previous.record.libraryRef.libraryId}'`, 'id');
       const before = previous.record?.exportMarking;
       if (before !== undefined && markingRank(marking) < markingRank(before)) {
-        const gate = humanGate(ctx, 'lowering an export marking', [id], undefined);
+        const gate = humanGate(ctx?.humanSignature ?? null, 'lowering an export marking', [id], undefined);
         return refuse(
           'MAT_HUMAN_GATE',
           `${gate.cleared ? '' : gate.reason} (${markingText(before)} → ${markingText(marking)}; use set_export_marking with a human signature)`,

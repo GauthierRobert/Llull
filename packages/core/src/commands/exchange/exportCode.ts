@@ -4,8 +4,7 @@
  */
 
 import type { CommandResult } from '../types';
-import { defineCommand, z } from '../schema';
-import { confirmExportControlled, exportRefusal } from '../materials/exportGate';
+import { confirmExportControlled, defineCommand, z } from '../schema';
 import { currentContext } from '../context';
 import { getCommand } from '../commandTable';
 import { buildFeatureProgram } from '../../codegen/featureProgram';
@@ -13,7 +12,7 @@ import { emitPython } from '../../codegen/python';
 import { emitOpenScad } from '../../codegen/openscad';
 import { emitFreeCad } from '../../codegen/freecad';
 import { safeFileName } from '../../lib/safeFileName';
-import { report } from '../noop';
+import { exportRefusal, report } from '../noop';
 
 type CodeLanguage = 'cadquery' | 'build123d' | 'openscad' | 'freecad';
 

@@ -1,8 +1,8 @@
 /** Civil exchange (LandXML, DXF) commands. */
 
 import type { CommandDefinition, CommandResult } from '@core/commands/types';
-import { defineCommand, z } from '@core/commands/schema';
-import { noop, report } from '@core/commands/noop';
+import { defineCommand, z, confirmExportControlled } from '@core/commands/schema';
+import { noop, report, exportRefusal } from '@core/commands/noop';
 import { fileSlug, getBuilding } from '../../building/model';
 import { getCivil } from '../model';
 import { buildLandXml } from './landxml';
@@ -23,13 +23,16 @@ export const exportLandxml = defineCommand({
     'in metres. data.text holds the file, data.fileName its name.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
+    confirmExportControlled,
     date: z.string().regex(ISO_DATE).optional().describe('Header date yyyy-mm-dd. Default: the project date, else 1970-01-01.'),
     coordinates: COORDINATES.describe(
       'Plan coordinates: "grid" (projected CRS via the site calibration) or "local". Default grid ' +
         'when set_site_calibration was called, else local.',
     ),
   }),
-  run: (doc, { date, coordinates }): CommandResult => {
+  run: (doc, { confirmExportControlled, date, coordinates }, ctx): CommandResult => {
+    const refused = exportRefusal(doc, 'export_landxml', 'data', confirmExportControlled, ctx);
+    if (refused !== null) return refused;
     if (getCivil(doc).order.length === 0) return noop(doc, 'export_landxml: nothing to export (no civil objects).');
     const project = getBuilding(doc).project;
     const projectDate = ISO_DATE.test(project.date) ? project.date : '1970-01-01';
@@ -61,12 +64,15 @@ export const exportCivilDxf = defineCommand({
     'platforms, corridors and drainage meshes as 3DFACE triangles. data.text holds the file.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
+    confirmExportControlled,
     coordinates: COORDINATES.describe(
       'Plan coordinates: "grid" (projected CRS via the site calibration) or "local". Default grid ' +
         'when set_site_calibration was called, else local.',
     ),
   }),
-  run: (doc, { coordinates }): CommandResult => {
+  run: (doc, { confirmExportControlled, coordinates }, ctx): CommandResult => {
+    const refused = exportRefusal(doc, 'export_civil_dxf', 'data', confirmExportControlled, ctx);
+    if (refused !== null) return refused;
     const result = buildCivilDxf(doc, coordinates);
     if (result.entityCount === 0) return noop(doc, 'export_civil_dxf: nothing to export (no civil entities).');
     const fileName = `${fileSlug(getBuilding(doc).project.name, 'site')}_civil.dxf`;
