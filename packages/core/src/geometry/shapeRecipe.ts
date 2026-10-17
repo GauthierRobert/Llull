@@ -50,6 +50,8 @@ function keyText(recipe: ShapeRecipe): string {
       return `place(${recipeKey(recipe.source)},${recipe.position.join(',')},${recipe.rotation.join(',')})`;
     case 'scale':
       return `scale(${recipeKey(recipe.source)},${recipe.factor})`;
+    case 'brep':
+      return `brep(${recipe.blob})`;
   }
 }
 

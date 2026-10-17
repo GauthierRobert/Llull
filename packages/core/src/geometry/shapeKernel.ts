@@ -46,6 +46,8 @@ export interface KernelOps<S> {
   /** Optional minimum distance (searched up to `maxDistance`); a kernel without it leaves `GeometryKernel.distance` undefined. */
   distance?(a: S, b: S, maxDistance: number): ShapeDistance | null;
   release(shape: S): void;
+  /** Shape of the loaded blob `sha256` (`loadBlob`); absent = `brep` leaves are unsupported. */
+  brep?(sha256: string): S | null;
 }
 
 /**
@@ -121,6 +123,8 @@ function build<S>(ops: KernelOps<S>, recipe: ShapeRecipe, child: (r: ShapeRecipe
       const source = child(recipe.source);
       return source === null ? null : ops.scale(source, recipe.factor);
     }
+    case 'brep':
+      return ops.brep?.(recipe.blob) ?? null;
   }
 }
 
@@ -219,7 +223,7 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
               return first === null || second === null ? null : distanceOps(first, second, maxDistance);
             }),
         }),
-    supports: (op) => !(ops.unsupported?.has(op) ?? false),
+    supports: (op) => (op === 'brep' ? ops.brep !== undefined : !(ops.unsupported?.has(op) ?? false)),
     evaluate: (recipe) => call(() => (evaluateNative(recipe) === null ? null : handleOf(recipe))),
     tessellate: (handle) =>
       call(() => {

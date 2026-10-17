@@ -749,4 +749,6 @@ export type ShapeRecipe =
   /** Rotate (M = Rx·Ry·Rz, radians) then translate. */
   | { readonly op: 'place'; readonly source: ShapeRecipe; readonly position: Vec3; readonly rotation: Vec3 }
   /** Uniform scale about the world origin. */
-  | { readonly op: 'scale'; readonly source: ShapeRecipe; readonly factor: number };
+  | { readonly op: 'scale'; readonly source: ShapeRecipe; readonly factor: number }
+  /** An exact B-rep held in `CadDocument.blobs[blob]` (`BRepTools::Write` text): imported geometry (01 KRN TR-KRN-21). */
+  | { readonly op: 'brep'; readonly blob: string; readonly format: 'occt-brep-v1'; readonly label?: string };

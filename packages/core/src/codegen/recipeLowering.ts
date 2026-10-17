@@ -86,6 +86,7 @@ export function lowerRecipe(recipe: ShapeRecipe, lowering: RecipeLowering): Lowe
       return { features: [...left.features, ...right.features, feature], variable: left.variable };
     }
     case 'blend':
+    case 'brep':
       return null;
     case 'fillet':
     case 'chamfer':
