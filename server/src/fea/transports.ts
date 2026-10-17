@@ -8,6 +8,7 @@ import { defaultFeArtifactStore } from './artifactStore';
 import { caeHooks } from './caeHooks';
 import { createCcxRunner } from './ccxProcess';
 import { runFeaExport } from './feaExport';
+import { runFeaImportField } from './feaImportField';
 import { runFeaMesh, type MeshBridgeResponse } from './feaMesh';
 import { runFeaSolve } from './feaSolve';
 
@@ -30,5 +31,6 @@ export function createFeaToolsPort(env: NodeJS.ProcessEnv = process.env): FeaToo
     mesh: (analysisId, host) => runFeaMesh(analysisId, host, { bridge, store, hooks: caeHooks, kernel: getGeometryKernel }),
     solve: (analysisId, options, host) => runFeaSolve(analysisId, options.timeoutS, host, { store, hooks: caeHooks, ccx, keepJobs }),
     exportDeck: (analysisId, host) => Promise.resolve(runFeaExport(analysisId, host, { store, hooks: caeHooks })),
+    importField: (analysisId, table, host) => Promise.resolve(runFeaImportField(analysisId, table, host, { store, hooks: caeHooks })),
   };
 }

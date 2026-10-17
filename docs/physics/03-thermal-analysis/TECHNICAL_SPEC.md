@@ -457,7 +457,10 @@ Cross-gap: **05 FEA** (pipeline), **08 MAT** / **PHY-01** (k, cp, ρ data), **PH
 3. **Film coefficient helpers**: should llull ship cited natural-convection correlations as a query (never a default),
    and from which open source? Not researched in this pack.
 4. **CalculiX view factor accuracy** versus llull's TS factors (VC-THM-30, TBD): which one is authoritative when they differ?
+   *Measured 2026-10-17 (§13): for the VC-THM-09.a plates they agree to 9e-6 on a converged mesh; the closed form is the reference and the
+   proposal for the pack owner is value 0.199825, tolerance 5e-4 abs, grade A (the pack's 0.002 would also pass). Open for other geometries.*
 5. **Contact conductance card set** (TR-THM-15) must be confirmed on the `contact7–9` decks before M4.
+   *Answered 2026-10-17 without the decks (not available locally): the card set of §13 reproduces VC-THM-11 to 6.6e-5 on ccx 2.21.*
 6. **Temperature-limit sources**: llull ships no limit tables (component and qualification limits are proprietary or
    paywalled); confirm this policy matches 03 GDT's "customer fills the rule tables" approach.
 
@@ -531,16 +534,25 @@ open-cavity case against the exact view-factor network (0.5 %).
   on T3); other quantities use the nearest node.
 - **Targets** are resolved by the mesher (closest Gmsh surface / node to the given points), not by the 05 face map (TR-FEA-32, needs the
   01 face-query port); with the Manifold kernel faces are the 40° crease regions of the tessellation.
-- **Contact conductance:** data and validation only; the deck refuses it with `THM_CONTACT_UNSUPPORTED` (TR-THM-15 card set not yet
-  confirmed on `contact7–9`). Steady cavity cases without an initial temperature warn (ccx starts from 0 K).
+- **Contact conductance:** written, see "V1 additions (2026-10-17)" below.
 - **Human gate:** `dispose_thermal_limit` verifies through `ctx.humanSignature`; no implementation is installed (09 PLM not built), so
   every call is refused with `THM_HUMAN_GATE` — the specified agent-path behaviour. Payload:
   `sha256(canonicalJson({ kind, analysisId, rowId, decision, justification, resultsHash }))`.
 - **Extra codes:** `THM_BC_NOT_FOUND`, `THM_AMPLITUDE_NOT_FOUND`, `THM_AMPLITUDE_IN_USE`, `THM_LIMIT_INVALID`, `THM_LIMIT_NOT_FOUND`,
-  `THM_CONTACT_INVALID`, `THM_CONTACT_UNSUPPORTED`, `THM_TABLE_POINTS`, `THM_CONSTANT_INVALID`.
+  `THM_CONTACT_INVALID`, `THM_TABLE_POINTS`, `THM_CONSTANT_INVALID`.
 
-**Still open:** VC-THM-30 (TBD grade, CalculiX cavity factors vs llull's); contact conductance deck; phase change (V2); orthotropic k,
-h(T) / ε(T) tables and `render_view field=temperature` (M4 V1); a signing implementation (09 PLM); the `llull guide` thermal section.
+**Still open:** phase change (V2); ε(T) tables (needs PHY-15 emissivity data, absent) and `render_view field=temperature` (M4 V1); h(T) in transient
+cases; a signing implementation (09 PLM); the `llull guide` thermal section.
+
+**V1 additions (2026-10-17), all measured on ccx 2.21 with Gmsh 4.15.2 through plan -> `fea_mesh` -> `fea_solve` -> `thermal_report`:**
+
+| Item | Result |
+| ---- | ------ |
+| Contact conductance (TR-THM-15) | `thermal/deckContact.ts`. Card set: `*SURFACE, TYPE=ELEMENT` (master and slave from the face sets `K_<contactId>_M` / `_S`), `*SURFACE INTERACTION`, `*SURFACE BEHAVIOR, PRESSURE-OVERCLOSURE=TIED`, `*GAP CONDUCTANCE` (one row `h, 0` or table rows `h, p, T`), `*CONTACT PAIR, INTERACTION=, TYPE=SURFACE TO SURFACE` (slave first). Found by hand decks (the `contact7–9` decks are not available locally); the tied pair needs no spring stiffness line. The two parts are meshed as separate volumes, so the face meshes do not match; this does not matter (flux 64860.6 on tet10 h = 0.01, 64862.5–64864.8 on tet4 / tet10 h = 0.05, 0.025, 0.01 for 64864.8649: at most 7e-5 relative). A table is read at the MEAN temperature of the two faces and at zero pressure (verified: h = 1000 + 30 T_mean reproduced). `THM_CONTACT_UNSUPPORTED` is removed; `check_thermal` reports `THM_CONTACT_INVALID` for a contact whose parts are not two different parts of the case. VC-THM-11.a/b pass (`server/tests/feaThermalContact.test.ts`): flux 64860.6 W/m^2 (pack 64864.8649, 0.5 %), interface jump 32.434 K (32.4324, 1 %). |
+| VC-THM-30 (CalculiX vs llull view factor) | `server/tests/feaThermalViewFactor.test.ts`. F12 inferred from the plate-1 heat flow of an open-cavity run (plate 1 and the environment at 1 K, plate 2 at 500 K, k = 1e5 so the faces sit at the BC temperatures, `F = (q1/(sigma A) - (T1^4 - Te^4)) / -(T2^4 - Te^4)`): **0.1998337** (tet10, h = 0.05), 0.1998339 (tet4, h = 0.025), 0.199970 (tet4, h = 0.1). `compute_view_factors`: 0.19982489569839; closed form 0.199824895698. CalculiX minus closed form: +9e-6 (converged), +1.5e-4 (coarse). **Proposal to the pack owner (not applied):** value 0.199825, tolerance 0.0005 abs (the pack's 0.002 is also met), grade A with the source "ccx 2.21 cavity run, converged under refinement; closed form". CalculiX is therefore no less accurate than the TS factor for opposed squares; for other geometries it stays open. |
+| Orthotropic conductivity | k property models with `direction` '1', '2', '3' (PHY-01 directions) make the material orthotropic: `*CONDUCTIVITY, TYPE=ORTHO` with `k1, k2, k3[, T]` rows on the union of the directional temperature grids (each direction tabulated to the named tolerance and held at its end values like the solver does). The directions are the DOCUMENT X, Y, Z axes: a rotated part with an orthotropic material is refused (`THM_MATERIAL_ORTHO_ROTATED`, no `*ORIENTATION` is written); k models for only some directions give `THM_MATERIAL_K_ORTHO`. Validated on a 0.1 m cube with k = (10, 20, 30) held at 100 / 0 degC along each axis: 100 / 200 / 300 W within 1e-3, mid temperature 50 degC (`server/tests/feaThermalOrtho.test.ts`). |
+| h(T) film coefficient | `add_thermal_bc kind=film` with `filmTable: { points: [[T, h], ...] }` instead of `filmCoefficient` (stored as `filmCoefficient: { table: { points } }`; T on the case scale, strictly increasing, h > 0, `source` mandatory, no amplitude). CalculiX has NO table on `*FILM` (`film.f` user subroutine only; only the time amplitudes `AMPLITUDE=` / `FILM AMPLITUDE=` exist). The deck therefore writes the table as a tied `*GAP CONDUCTANCE` to a dummy wedge layer (C3D6 / C3D15, one per film face, coincident with the face) whose nodes are prescribed at the sink temperature; the gap table is read at (Ts + Tsink)/2, so rows are written at Tm = (T + Tsink)/2 and q = h(Ts)(Ts - Tsink) exactly (`thermal/deckFilmSink.ts`). The dummy layer MUST be the slave: with the face as slave ccx left 2–4 K error on a coarse mesh. **Steady only:** 1D slab k = 50, L = 0.1, h = 100 + 2 T into 20 degC, bottom 100 degC: face 73.54160 degC vs closed form 73.54157, flux 13229.2 W/m^2, balance residual < 2e-6, identical on tet4 h = 0.05, tet10 h = 0.05 and 0.1. In a transient the same construction gave surface temperature rises 2–8 % off a constant `*FILM` at equal h (hand hex model, converged in mesh and time step: 26.55 vs 26.40 degC; the gap behaves like a 12 % smaller h at h = 500), so `add_thermal_bc` refuses a table in any case but heat_steady (`THM_FILM_INVALID`; the coupled deck reuses `bcLines`, which refuses it too). `bcFlows` integrates h(T)(Tsink - T) over the face for the report. `TableRef` (CSV hash reference) is not supported: the model gained `FilmTable` with inline points. |
+| ε(T) | Not built: PHY-15 emissivity data is absent. |
 
 **Review fixes (2026-10-17):**
 

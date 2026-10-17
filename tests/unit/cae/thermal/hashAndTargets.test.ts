@@ -59,4 +59,25 @@ describe('thermal inputs in the analysis hashes', () => {
     expect(targets.map((target) => target.key)).toEqual([`V_${id}_0`, `V_${id}_1`]);
     expect(targets[1]).toMatchObject({ entityId: fixture.boxId, facesNear: [[1, 1, 0.05]] });
   });
+
+  it('keys the two faces of a thermal contact K_<contactId>_M / _S and the mesh hash moves with the contact faces', () => {
+    const fixture = thermalFixture();
+    const second = must(fixture.doc, 'add_box', { size: [1, 1, 0.05], position: [0, 0, 0.05] });
+    const otherId = second.affected[0] ?? '';
+    const parted = must(second.document, 'set_part_idealization', { analysisId: fixture.analysisId, entityId: otherId });
+    const contact = must(parted.document, 'add_thermal_contact', {
+      analysisId: fixture.analysisId,
+      name: 'iface',
+      master: { entityId: fixture.boxId, facesNear: [[0.5, 0.5, 0.05]] },
+      slave: { entityId: otherId, facesNear: [[0.5, 0.5, 0.05]] },
+      conductance: { value: 2000, unit: 'W/(m^2*K)' },
+    });
+    const id = contact.affected[0] ?? '';
+    const targets = keyedTargets(caseOf(contact.document, fixture.analysisId));
+    expect(targets.map((target) => target.key)).toEqual([`K_${id}_M`, `K_${id}_S`]);
+    expect(targets[1]).toMatchObject({ entityId: otherId, facesNear: [[0.5, 0.5, 0.05]] });
+    expect(analysisInputHash(contact.document, fixture.analysisId, 'mesh')).not.toBe(
+      analysisInputHash(parted.document, fixture.analysisId, 'mesh'),
+    );
+  });
 });

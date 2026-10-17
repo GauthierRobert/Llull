@@ -88,8 +88,9 @@ density from PHY-01 models (tabulated over the case temperature range) or `Mater
 Built: solid idealization only (tet C3D4 / C3D10); static, heat_steady, heat_transient, thermo_static; constraints fixed / pinned /
 displacement / symmetry (planar); loads force / pressure / gravity; thermal BCs of PHY-03 §3.1; PHY-04 field sources uniform /
 expression / thermal_result (same mesh) / table. Not built (stay in the 05 backlog): modal, buckling, shells, plane stress,
-midsurface, defeature, Nastran BDF, OP2, margins (`compute_margins`, `dispose_margin`), quality port beyond Gmsh's own metrics,
-UI panels, cavity radiation deck and contact conductance (PHY-03 V1, unless time allows), coupled procedure (PHY-04 V1).
+midsurface, defeature, Nastran BDF, OP2, `dispose_margin`, quality port beyond Gmsh's own metrics,
+UI panels, cavity radiation deck and contact conductance (PHY-03 V1: see its §13). Built since this note (PHY-04 TECHNICAL_SPEC §14):
+`compute_margins`, `fea_import_field`, the steady coupled procedure and mesh mapping.
 Human gates (`dispose_thermal_limit`, `dispose_fit_result`) verify through `ctx.humanSignature`; no implementation is installed
 (09 PLM is not built), so every call is refused with the `*_HUMAN_GATE` code, which is the specified agent-path behaviour.
 

@@ -1,0 +1,144 @@
+[
+  { "command": "set_units", "params": { "units": "m" } },
+  { "command": "add_box", "params": { "size": [0.1, 0.1, 0.01], "position": [0, 0, 0], "anchor": "min" }, "as": "lower" },
+  { "command": "add_box", "params": { "size": [0.1, 0.1, 0.01], "position": [0, 0, 0.01], "anchor": "min" }, "as": "upper" },
+  {
+    "command": "create_material",
+    "params": { "name": "slab_k150", "density": 8000000.0, "color": "#9aa0a6", "metalness": 1, "roughness": 0.4 }
+  },
+  {
+    "command": "define_property_model",
+    "params": {
+      "material": "slab_k150",
+      "model": {
+        "id": "k_const",
+        "property": "k",
+        "unit": "W/(m*K)",
+        "variables": [],
+        "validity": [],
+        "form": { "kind": "constant", "value": 150.0 },
+        "basis": "company",
+        "source": { "citation": "test input of this validation case (not a material claim)" }
+      }
+    }
+  },
+  {
+    "command": "define_property_model",
+    "params": {
+      "material": "slab_k150",
+      "model": {
+        "id": "cp_const",
+        "property": "cp",
+        "unit": "J/(kg*K)",
+        "variables": [],
+        "validity": [],
+        "form": { "kind": "constant", "value": 500.0 },
+        "basis": "company",
+        "source": { "citation": "test input of this validation case (not a material claim)" }
+      }
+    }
+  },
+  {
+    "command": "create_material",
+    "params": { "name": "slab_k15", "density": 8000000.0, "color": "#9aa0a6", "metalness": 1, "roughness": 0.4 }
+  },
+  {
+    "command": "define_property_model",
+    "params": {
+      "material": "slab_k15",
+      "model": {
+        "id": "k_const",
+        "property": "k",
+        "unit": "W/(m*K)",
+        "variables": [],
+        "validity": [],
+        "form": { "kind": "constant", "value": 15.0 },
+        "basis": "company",
+        "source": { "citation": "test input of this validation case (not a material claim)" }
+      }
+    }
+  },
+  {
+    "command": "define_property_model",
+    "params": {
+      "material": "slab_k15",
+      "model": {
+        "id": "cp_const",
+        "property": "cp",
+        "unit": "J/(kg*K)",
+        "variables": [],
+        "validity": [],
+        "form": { "kind": "constant", "value": 500.0 },
+        "basis": "company",
+        "source": { "citation": "test input of this validation case (not a material claim)" }
+      }
+    }
+  },
+  { "command": "assign_material", "params": { "materialName": "slab_k150", "entityIds": ["$lower"] } },
+  { "command": "assign_material", "params": { "materialName": "slab_k15", "entityIds": ["$upper"] } },
+  {
+    "command": "create_analysis",
+    "params": {
+      "name": "stacked_slabs",
+      "analysisType": "heat_steady",
+      "unitSystem": "N-m-kg-s",
+      "solver": "calculix",
+      "temperatureScale": "degC"
+    },
+    "as": "an"
+  },
+  { "command": "set_part_idealization", "params": { "analysisId": "$an", "entityId": "$lower", "idealization": "solid" } },
+  { "command": "set_part_idealization", "params": { "analysisId": "$an", "entityId": "$upper", "idealization": "solid" } },
+  {
+    "command": "add_thermal_bc",
+    "params": {
+      "analysisId": "$an",
+      "name": "hot_T",
+      "kind": "temperature",
+      "value": 100.0,
+      "unit": "degC",
+      "target": { "entityId": "$lower", "facesNear": [[0.05, 0.05, 0]] }
+    }
+  },
+  {
+    "command": "add_thermal_bc",
+    "params": {
+      "analysisId": "$an",
+      "name": "cold_T",
+      "kind": "temperature",
+      "value": 20.0,
+      "unit": "degC",
+      "target": { "entityId": "$upper", "facesNear": [[0.05, 0.05, 0.02]] }
+    }
+  },
+  {
+    "command": "add_thermal_contact",
+    "params": {
+      "analysisId": "$an",
+      "name": "interface",
+      "master": { "entityId": "$lower", "facesNear": [[0.05, 0.05, 0.01]] },
+      "slave": { "entityId": "$upper", "facesNear": [[0.05, 0.05, 0.01]] },
+      "conductance": { "value": 2000.0, "unit": "W/(m^2*K)" }
+    }
+  },
+  {
+    "command": "set_mesh_controls",
+    "params": { "analysisId": "$an", "mesher": "gmsh", "elementFamily": "tet", "order": 2, "globalSize": 0.01 }
+  },
+  {
+    "command": "add_result_probe",
+    "params": { "analysisId": "$an", "name": "t_hot", "point": [0.05, 0.05, 0.0], "quantity": "temperature" }
+  },
+  {
+    "command": "add_result_probe",
+    "params": { "analysisId": "$an", "name": "t_lower", "point": [0.05, 0.05, 0.0099], "quantity": "temperature" }
+  },
+  {
+    "command": "add_result_probe",
+    "params": { "analysisId": "$an", "name": "t_upper", "point": [0.05, 0.05, 0.0101], "quantity": "temperature" }
+  },
+  {
+    "command": "add_result_probe",
+    "params": { "analysisId": "$an", "name": "t_cold", "point": [0.05, 0.05, 0.02], "quantity": "temperature" }
+  }
+]

@@ -131,10 +131,12 @@ function checkCase(scope: Scope, id: string, analysisCase: Record<string, unknow
     errors.push(`${where}: a thermal set-up is required for heat_* cases and only for them`);
   if (analysisCase['thermal'] !== undefined) checkThermal(scope, analysisCase['thermal'], `${where}.thermal`);
   const thermomech = analysisCase['thermomech'];
-  if ((analysisCase['type'] === 'thermo_static') !== (thermomech !== undefined))
-    errors.push(`${where}: a thermomech set-up is required for thermo_static cases and only for them`);
+  const coupled = analysisCase['type'] === 'coupled_temperature_displacement';
+  if ((analysisCase['type'] === 'thermo_static' || coupled) !== (thermomech !== undefined))
+    errors.push(`${where}: a thermomech set-up is required for thermo_static and coupled cases and only for them`);
   if (isRecord(thermomech)) {
     if (!isRecord(thermomech['referenceTemperature'])) errors.push(`${where}: thermomech.referenceTemperature is required`);
+    if (coupled && thermomech['thermal'] === undefined) errors.push(`${where}: thermomech.thermal is required for coupled cases`);
     if (thermomech['thermal'] !== undefined) checkThermal(scope, thermomech['thermal'], `${where}.thermomech.thermal`);
   }
   for (const summary of ['meshSummary', 'results'])

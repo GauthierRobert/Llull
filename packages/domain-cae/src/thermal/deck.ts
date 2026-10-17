@@ -12,6 +12,8 @@ import { absoluteZeroOf, inScale } from './quantities';
 import { checkThermalItems } from './check';
 import { propertyCards } from './deckMaterial';
 import { cavityLines, bcLines } from './deckLoads';
+import { contactBlocks } from './deckContact';
+import { filmSinkBlocks } from './deckFilmSink';
 import { amplitudeName } from './deckNames';
 import { planStep } from './deckStep';
 import { hasRadiation, stefanBoltzmannOf } from './constants';
@@ -42,25 +44,19 @@ const BLOCKING = new Set([
   'THM_UNITS_MISMATCH',
   'THM_AMPLITUDE_INVALID',
   'THM_CAVITY_INVALID',
+  'THM_CONTACT_INVALID',
 ]);
 
 /**
  * Initial conditions, amplitudes, physical constants and the `*HEAT TRANSFER` step (loads, output requests) of the case.
- * @failure blocking set-up errors (see `check_thermal`) -> their THM_* code; a thermal contact -> THM_CONTACT_UNSUPPORTED; a BC or cavity whose
- *   faces / nodes are not in the mesh -> FEA_TARGET_UNRESOLVED
+ * @failure blocking set-up errors (see `check_thermal`) -> their THM_* code; a BC, cavity face or contact face set that
+ *   is not in the mesh -> FEA_TARGET_UNRESOLVED
  */
 export function thermalSections(ctx: DeckContext): DeckSections {
   const thermal = ctx.analysis.thermal;
   if (thermal === undefined) return refusal('THM_CASE_TYPE', `analysis '${ctx.analysisId}' has no thermal set-up`, [ctx.analysisId]);
   const blocking = checkThermalItems(ctx.doc, ctx.analysisId).find((item) => item.severity === 'error' && BLOCKING.has(item.code));
   if (blocking !== undefined) return refusal(blocking.code, blocking.message, blocking.ids);
-  const contacts = Object.keys(thermal.contacts);
-  if (contacts.length > 0)
-    return refusal(
-      'THM_CONTACT_UNSUPPORTED',
-      `thermal contact conductance (${contacts.join(', ')}) is recorded but not written to the deck yet`,
-      contacts,
-    );
   const steady = ctx.analysis.type === 'heat_steady';
   const scale = thermal.temperatureScale;
   const plan = planStep(thermal, steady);
@@ -83,6 +79,14 @@ export function thermalSections(ctx: DeckContext): DeckSections {
     lines.push(`*AMPLITUDE, NAME=${amplitudeName(id)}`);
     for (let i = 0; i < points.length; i += 4) lines.push(row(...points.slice(i, i + 4).flat()));
   }
+  for (const contact of Object.values(thermal.contacts)) {
+    const block = contactBlocks(ctx, contact);
+    if ('code' in block) return block;
+    lines.push(...block.lines);
+  }
+  const sink = filmSinkBlocks(ctx, thermal);
+  if (sink !== null && 'code' in sink) return sink;
+  if (sink !== null) lines.push(...sink.model);
   lines.push(...plan.notes, ...plan.stepLines);
   for (const id of thermal.bcOrder) {
     const record = thermal.bcs[id];
@@ -91,6 +95,7 @@ export function thermalSections(ctx: DeckContext): DeckSections {
     if ('code' in block) return block;
     lines.push(...block.lines);
   }
+  if (sink !== null) lines.push(...sink.step);
   for (const cavity of Object.values(thermal.cavities)) {
     const block = cavityLines(ctx, thermal, cavity);
     if ('code' in block) return block;

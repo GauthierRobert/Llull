@@ -5,6 +5,7 @@
  *   fea_mesh    analysed solids -> tet mesh artifact -> record_fe_mesh
  *   fea_solve   mesh artifact -> input deck -> CalculiX -> results artifact -> record_fea_results
  *   fea_export  the CalculiX input deck (text + sha256), nothing run
+ *   fea_import_field  a CSV `x,y,z,T` -> table artifact -> set_temperature_field (PHY-04 TR-TMC-14)
  */
 import { errorMessage } from '@lib/errorMessage';
 import { isRecord } from '@lib/isRecord';
@@ -22,11 +23,19 @@ export interface FeaHost {
   readonly applyCommand: (name: string, params: unknown) => FeaToolResult;
 }
 
+/** A temperature table as the agent gave it: CSV text and the units it declares. */
+export interface FieldTableInput {
+  readonly csv: string;
+  readonly coordinatesUnit: string;
+  readonly temperatureUnit: string;
+}
+
 /** Port to the FE transports (implemented in `server/`). Failures are results (`isError`, summary starts `<tool> <CODE>`), not throws. */
 export interface FeaToolsPort {
   mesh(analysisId: string, host: FeaHost): Promise<FeaToolResult>;
   solve(analysisId: string, options: { readonly timeoutS?: number }, host: FeaHost): Promise<FeaToolResult>;
   exportDeck(analysisId: string, host: FeaHost): Promise<FeaToolResult>;
+  importField(analysisId: string, table: FieldTableInput, host: FeaHost): Promise<FeaToolResult>;
 }
 
 /** Bounds of the solver wall-clock limit (seconds): schema `minimum` / `maximum`, enforced again by the transport. */
@@ -34,7 +43,7 @@ export const FEA_SOLVE_TIMEOUT_S = { min: 1, max: 86400 } as const;
 
 const ANALYSIS_ID = { type: 'string' as const, description: 'Id of the analysis case (create_analysis).' };
 
-const FEA_TOOL_NAMES = ['fea_mesh', 'fea_solve', 'fea_export'] as const;
+const FEA_TOOL_NAMES = ['fea_mesh', 'fea_solve', 'fea_export', 'fea_import_field'] as const;
 
 export function buildFeaToolDefinitions(): McpToolDefinition[] {
   return [
@@ -77,6 +86,28 @@ export function buildFeaToolDefinitions(): McpToolDefinition[] {
       inputSchema: { type: 'object', properties: { analysisId: ANALYSIS_ID }, required: ['analysisId'] },
       annotations: { readOnlyHint: true },
     },
+    {
+      name: 'fea_import_field',
+      description:
+        'Import a temperature table for a thermo_static analysis: CSV lines "x,y,z,T" (optional header x,y,z,T; # comments) with the ' +
+        'units you DECLARE (coordinatesUnit mm | m | in ...; temperatureUnit degC | K | degF). The table is stored as a content-addressed ' +
+        'artifact and the analysis field is set to it (set_temperature_field kind table). At deck time every mesh node must have a row ' +
+        'within 1e-6 of the model size, else the solve is refused with TMC_FIELD_TABLE_UNMATCHED (nearest-node match, no interpolation). ' +
+        'Give the CSV inline (csv) or as a file in the server exchange directory (path); the llull CLI reads a local file with file=<path>. ' +
+        'Run it after fea_mesh when the rows should follow the mesh nodes (the node coordinates are in the mesh artifact). Next: check_thermo_mechanical.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          analysisId: { ...ANALYSIS_ID, description: 'Id of a thermo_static analysis (create_analysis).' },
+          csv: { type: 'string', description: 'CSV text, one "x,y,z,T" row per line.' },
+          path: { type: 'string', description: 'CSV file inside the server exchange directory (alternative to csv).' },
+          coordinatesUnit: { type: 'string', description: 'Length unit of the x, y, z columns, e.g. "mm". Required, no default.' },
+          temperatureUnit: { type: 'string', enum: ['degC', 'K', 'degF'], description: 'Unit of the T column. Required, no default.' },
+        },
+        required: ['analysisId', 'coordinatesUnit', 'temperatureUnit'],
+      },
+      annotations: { idempotentHint: true },
+    },
   ];
 }
 
@@ -85,6 +116,22 @@ const failure = (message: string): McpShapedResult => shapeToolCallContent({ sum
 /** What `applyFeaToolCall` needs: the port (null = not configured) + the host. */
 interface FeaDeps extends FeaHost {
   readonly fea?: FeaToolsPort | null;
+  /** Exchange-directory reader for `path` (the same port the STEP / code imports use). */
+  readonly port?: { readonly readExchangeFile?: (path: string, encoding: 'base64' | 'utf8') => Promise<string> } | null;
+}
+
+/** The CSV of a fea_import_field call: inline `csv`, else the exchange-directory file `path`. */
+async function tableInput(args: Record<string, unknown>, deps: FeaDeps): Promise<FieldTableInput | string> {
+  const { coordinatesUnit, temperatureUnit } = args;
+  if (typeof coordinatesUnit !== 'string' || coordinatesUnit === '' || typeof temperatureUnit !== 'string' || temperatureUnit === '')
+    return 'coordinatesUnit and temperatureUnit are required (no default)';
+  const inline = typeof args['csv'] === 'string' ? args['csv'] : undefined;
+  const file = nonEmptyString(args['path']);
+  if (inline === undefined && file === undefined) return 'provide csv (text) or path (a file in the exchange directory)';
+  if (inline !== undefined) return { csv: inline, coordinatesUnit, temperatureUnit };
+  if (deps.port?.readExchangeFile === undefined || file === undefined)
+    return 'path is unavailable: the server has no exchange directory (LLULL_EXCHANGE_DIR); pass csv';
+  return { csv: await deps.port.readExchangeFile(file, 'utf8'), coordinatesUnit, temperatureUnit };
 }
 
 /**
@@ -107,6 +154,12 @@ export async function applyFeaToolCall(toolName: string, rawArgs: unknown, deps:
       ? Math.min(FEA_SOLVE_TIMEOUT_S.max, Math.max(FEA_SOLVE_TIMEOUT_S.min, requested))
       : undefined;
   try {
+    if (toolName === 'fea_import_field') {
+      const table = await tableInput(args, deps);
+      return typeof table === 'string'
+        ? failure(`${toolName}: ${table}.`)
+        : shapeToolCallContent(await deps.fea.importField(analysisId, table, deps));
+    }
     const result =
       toolName === 'fea_mesh'
         ? await deps.fea.mesh(analysisId, deps)

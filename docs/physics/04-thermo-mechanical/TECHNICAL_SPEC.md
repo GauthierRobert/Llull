@@ -362,22 +362,21 @@ FE benchmarks, real Gmsh + ccx 2.21 (`server/tests/feaThermomech*.test.ts`, adap
 `npm run quality:physics`): VC-TMC-01.a/b/c (−251.997 / −359.996 / −629.994 MPa), 02 LE11 (−103.43 MPa vs −105, −1.5 %, OCC kernel, full
 FeenoX section revolved), 05.a/b/c sequential thick cylinder (−206.93 / 133.69 / −208.40 MPa, ≤ 1.4 %), 08.b/c/d thermal bow
 (`thermal_distortion_report` agrees with the probe), 60, 61, 63, and the fit plan (06.a–d). VC-TMC-50 is verified on its
-`fea_report` (stale) and `check_thermo_mechanical` (`TMC_THERMAL_RESULT_STALE`) sides and by the refused mechanical solve; its contract also
-lists `compute_margins`, a 05 command not built in the minimal slice, so the case is not recorded as a whole.
+`fea_report` (stale) and `check_thermo_mechanical` (`TMC_THERMAL_RESULT_STALE`) sides and by the refused mechanical solve; its `compute_margins`
+key is closed by §14.
 
 **FE deviations:**
 
 - **Same-mesh test:** two cases with different BCs never share a mesh hash (their node sets differ), so `thermal_result` compares nodes
   and element blocks when the hashes differ; a missing mesh or a different discretisation is still `TMC_MESH_MISMATCH`.
-- **Table fields** read `{ kind: 'fe_table', rows }` from the artifact store under the CSV hash; the `fea_import_field` transport that
-  writes it is not built.
+- **Table fields** read `{ kind: 'fe_table', rows }` from the artifact store under the artifact hash; the `fea_import_field` transport that
+  writes it is built (2026-10-17, see §14).
 - **LE11 needs the OCC kernel:** with Manifold the sphere tessellation gives overlapping facets in Gmsh. Initial temperatures are written
   per node (no set-name dependency). `TMC_THERMAL_CATEGORY_UNSET` is a warning (`add_fea_load` always sets a category).
 - **Human gate:** `dispose_fit_result` verifies through `ctx.humanSignature`; none is installed (09 PLM), so agents get `TMC_HUMAN_GATE`.
 
-**Still open:** VC-TMC-50's `compute_margins` key (05 margins); VC-TMC-03.b NAFEMS T1 FE (needs plane stress or bonded multi-part meshes — 05 V1; the analytic VC-TMC-03.a–c pass);
-M4 (coupled procedure, mesh mapping, orthotropic CTE, fit stack-ups, bimetal FE); `fea_import_field`; a signing implementation (09 PLM);
-the `llull guide` section.
+**Still open:** VC-TMC-03.a/.b as FE values (nodal temperature step, see §14; the analytic VC-TMC-03.a–c pass and 03.c is also judged on the FE solve);
+M4 remainder (transient coupled step, orthotropic CTE, fit stack-ups, bimetal FE); a signing implementation (09 PLM); the `llull guide` section.
 
 **Review fixes (2026-10-17):**
 
@@ -391,3 +390,45 @@ the `llull guide` section.
   `loadCaseName` of `create_analysis` must match `[A-Za-z0-9_]{1,40}` (`FEA_LOAD_INVALID`).
 - **Fit dispositions.** `dispose_fit_result` stores the verified `signature` with the decision so a reader can re-verify it; no read path counts
   `fitDispositions` yet (rows are always `pending_human`), so nothing trusts them.
+
+## 14. PHY-04 closure (2026-10-17)
+
+Built on the 05 slice; every number below was measured with Gmsh 4.15.2 and CalculiX 2.21 (`npm --prefix server test -- feaThermomech`, recorded for
+`npm run quality:physics`).
+
+| Item | What | Where |
+| ---- | ---- | ----- |
+| VC-TMC-50 in full | `fea_report(ms).state` = `stale`, `compute_margins(ms).code` = `FEA_RESULTS_STALE`, `check_thermo_mechanical(ms).items` = `[TMC_THERMAL_RESULT_STALE]`; judged with all three keys by a unit test on hand-built trusted artifacts and by the CLI pipeline on the thick-cylinder plan | `tests/unit/cae/thermomech/margins.test.ts`, `server/tests/feaThermomech.test.ts` |
+| `compute_margins` (05 §5.8) | read-only, toolset `analysis`; see 05 TECHNICAL_SPEC §13 | `packages/domain-cae/src/margins/` |
+| `fea_import_field` (TR-TMC-14, §6) | CSV `x,y,z,T` (optional header, `#` comments, comma / semicolon / tab / space) with declared `coordinatesUnit` / `temperatureUnit` -> artifact `{ kind: 'fe_table', rows }` stored under `sha256Hex(canonicalJson(artifact))` -> `set_temperature_field { source: { kind: 'table', csvSha256, rows, coordinatesUnit, temperatureUnit } }` through the command bus. Nearest-node match within 1e-6 x model size at deck time, else `TMC_FIELD_TABLE_UNMATCHED` (already in `field.ts`). CLI `llull fea_import_field analysisId=… file=T.csv coordinatesUnit=mm temperatureUnit=degC`, MCP tool of the same name (`csv` inline or `path` in the exchange directory). Guards named in code: 5e6 rows, 256 Mi characters, temperatures in [0, 1e5] K | `thermomech/tableImport.ts` (pure), `server/src/fea/feaImportField.ts`, `packages/mcp/src/feaTools.ts` |
+| Coupled procedure (TR-TMC-22, steady state) | `create_analysis analysisType=coupled_temperature_displacement` (reference temperature required) holds a `ThermoMechSetup` whose `thermal` is the PHY-03 set-up: `add_thermal_bc` and the other thermal commands work on it unchanged (`thermal/access.ts` resolves `thermomech.thermal`), mechanical constraints and loads are the 05 ones. Deck: conductivity (PHY-03 tables) + secant `*EXPANSION, ZERO=<T_ref>` over the BC temperatures, `*INITIAL CONDITIONS` = T_ref, `*COUPLED TEMPERATURE-DISPLACEMENT, STEADY STATE`, the 05 mechanical lines, then the thermal BCs, `*NODE FILE U, NT`, `*EL FILE S, HFL`. Not written (refused with `TMC_COUPLED_UNSUPPORTED`): cavity radiation, thermal contacts, amplitudes, h(T) film tables; no transient coupled step. `set_temperature_field` takes `cteBasis` only on a coupled case | `thermomech/coupledDeck.ts`, `decks/deckBuilder.ts` |
+| Mesh mapping (TR-TMC-23) | `set_temperature_field` `thermal_result` gains `mapping: 'same_mesh' \| 'interpolate'`. Interpolate: bounding-box tree over the thermal elements (C3D4 / C3D10, mid-edge nodes at the straight positions), the lowest element index containing the node wins, shape-function interpolation of `NDTEMP`; a node outside every element takes the value at the nearest point of the nearest element and is counted. Report in the deck comment and the field description: `maxMappingDistance`, nodes outside, coincident-node error (must be < 1e-9 of the field magnitude, else `TMC_FIELD_INVALID`); `check_thermo_mechanical` warns `TMC_MAPPING_PROJECTED` | `thermomech/mapping.ts`, `field.ts` |
+
+Measured values (MPa):
+
+| Case | Setup | Measured | Expected | Error |
+| ---- | ----- | -------- | -------- | ----- |
+| VC-TMC-01.a | coupled restrained bar, 120 degC on both ends | -251.997 | -252 | -0.001 % |
+| VC-TMC-05.a / b / c | coupled thick cylinder (bore 120 degC, outer 20 degC, one analysis) | -206.926 / 133.691 / -208.399 | -209.824 / 133.033 / -209.824 | -1.4 % / +0.5 % / -0.7 % |
+| VC-TMC-05.a / b / c | sequential, thermal mesh 3 mm mapped (interpolate) onto the 2 mm mechanical mesh | -206.715 / 133.261 / -208.793 | same | -1.5 % / +0.2 % / -0.5 % |
+| VC-TMC-03.c | NAFEMS T1 as FE, stress inside the hot disc (node nearest (0.5, 0)) | -49.464 | -50 | +1.1 % |
+
+(With a 4 mm thermal mesh the mapped bore hoop stress is -205.37 MPa, -2.1 %: the error is the coarse thermal solution, not the mapping.)
+
+**VC-TMC-03.b / 03.a as FE are not judged.** The plate (20 x 20 mm, quarter with symmetry, 0.05 mm thick so the free faces give plane stress, E = 100 GPa,
+nu = 0.3, thermal strain 0.001 per K, 1 K inside r < 1 mm) is solved with the temperature table of `fea_import_field` on the mesh nodes (two passes:
+`fea_mesh`, read the nodes, import, `fea_solve`) and a ball refinement along the circle (`server/tests/feaThermomechT1.test.ts`). The expression grammar has
+no step and was not changed. The nodal temperature is continuous, so the step is smeared over the elements straddling r = a, and CalculiX averages
+the extrapolated element stresses at each node: the hoop stress at the node nearest (1.005, 0), half an element from the interface, is mesh noise.
+Measured, ring size = thickness, global size 0.2 mm (0.1 for the last), against 49.5037:
+
+| ring size (mm) | 0.10 | 0.08 | 0.07 | 0.06 | 0.05 | 0.04 | 0.03 | 0.02 |
+| -------------- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- |
+| nodes | 38 k | 39 k | 40 k | 41 k | 43 k | 46 k | 77 k | 171 k |
+| sigma_y at the node nearest (1.005, 0), MPa | 35.5 | -31.9 | 43.8 | 25.8 | 48.9 | 50.5 | 52.1 | 52.9 |
+
+A 2 % value (0.05, 0.04) is luck of the node position, not convergence; the next size down is 7e5 nodes. Away from the interface the FE field is accurate: inside
+the disc -49.5 .. -49.8 on every mesh, 34.9 .. 35.7 at r = 1.2 mm (closed form 34.72), 22.2 .. 23.6 at 1.5 mm (22.22), 12.5 .. 13.1 at 2 mm (12.50). The test
+therefore judges VC-TMC-03.c on the FE solve, checks r = 1.5 and 2 mm against the closed form at the actual node position (4 %), and asserts only the sign
+and order of magnitude of the value next to the interface. The analytic VC-TMC-03.a-c stay judged by `thermal_stress_check inclusion`. Judging 03.a/.b on FE needs a
+conformal interface (bonded multi-part meshes: 05 V1) or the two-material form of the pack's statement (alpha_hot inside, alpha_bulk = 0 outside).

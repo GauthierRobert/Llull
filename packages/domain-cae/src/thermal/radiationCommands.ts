@@ -114,15 +114,16 @@ const sameFace = (a: FeaTarget, b: FeaTarget): boolean => a.entityId === b.entit
  * @affects doc.analysis.cases[analysisId].thermal.contacts (adds 1 contact, id `tc-<step>.<k>`; affected: [contactId])
  * @invariant master and slave are face targets on DIFFERENT parts; conductance > 0 (W/(m^2*K), or a table)
  * @failure same part / bad conductance -> THM_CONTACT_INVALID; wrong unit -> THM_UNITS_MISMATCH; bad targets (refusals, unchanged doc)
- * @note recorded as data; the deck writer refuses a case that holds one with THM_CONTACT_UNSUPPORTED
+ * @note the deck writes a tied `*CONTACT PAIR` (surface to surface) with `*GAP CONDUCTANCE`; the two parts are meshed separately, so the face meshes need not match
  */
 export const addThermalContact = defineCommand({
   name: 'add_thermal_contact',
   description:
     'Record a thermal contact conductance between a master face and a slave face of two different parts (bolted interface on a cold ' +
     'plate); returns the contact id in affected[0]. conductance: { value, unit "W/(m^2*K)" } or { points: [[W/(m^2*K), pressureMPa, T], ...] }. ' +
-    'The set-up is validated and stored, but the CalculiX deck for contact conductance is NOT written yet: fea_export / fea_solve refuse such ' +
-    'a case with THM_CONTACT_UNSUPPORTED (model the interface as one body, or as films on both sides).',
+    'The deck ties the two faces thermally (CalculiX tied *CONTACT PAIR with *GAP CONDUCTANCE); the parts are meshed separately, so the ' +
+    'two face meshes need not match. A table is evaluated at the mean temperature of the two faces (temperature on the case scale) and at ' +
+    'zero contact pressure, so give the pressure column 0 unless it varies nothing. Check the result with thermal_report.',
   params: z.object({
     analysisId: analysisIdSchema,
     name: z.string().min(1).describe('Display name, e.g. "box to plate".'),
@@ -163,7 +164,7 @@ export const addThermalContact = defineCommand({
     const thermal = { ...found.thermal, contacts: { ...found.thermal.contacts, [contact.id]: contact } };
     return changed(
       withThermal(doc, found, thermal),
-      `add_thermal_contact: '${contact.id}' (${name}) between '${master.entityId}' and '${slave.entityId}' in '${analysisId}' (recorded; the deck does not write contacts yet).`,
+      `add_thermal_contact: '${contact.id}' (${name}) between '${master.entityId}' and '${slave.entityId}' in '${analysisId}' (tied contact conductance).`,
       [contact.id],
     );
   },

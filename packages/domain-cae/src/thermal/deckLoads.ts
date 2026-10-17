@@ -72,9 +72,9 @@ export function bcLines(ctx: DeckContext, thermal: ThermalSetup, record: Thermal
       };
     }
     case 'film': {
-      if (!('value' in bc.filmCoefficient))
-        return refusal('THM_FILM_INVALID', `thermal BC '${record.id}' has a film table, which is not written`, [record.id]);
       if (ctx.faces(key).length === 0) return missingFaces();
+      if (!('value' in bc.filmCoefficient))
+        return { lines: [head, '** h(T) table: written as a tied gap conductance to the sink layer (see the model section)'] };
       const h = siToSystem('film', siOf('film', bc.filmCoefficient), system);
       return { lines: [head, keyword('FILM', record), ...faceLines(ctx, key, 'F', inScale(bc.sinkTemperature, scale), h)] };
     }

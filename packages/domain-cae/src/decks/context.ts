@@ -81,7 +81,7 @@ export function buildDeckContext(
 
 /** Load cases of an analysis in solve order (one `*STEP` each): names by first appearance, `ultimate` when any load of the case is. */
 export function loadCasesOf(analysis: AnalysisCase): { readonly name: string; readonly category: 'limit' | 'ultimate' }[] {
-  if (analysis.type === 'thermo_static' && analysis.thermomech !== undefined)
+  if ((analysis.type === 'thermo_static' || analysis.type === 'coupled_temperature_displacement') && analysis.thermomech !== undefined)
     return [{ name: analysis.thermomech.loadCaseName, category: 'limit' }];
   const cases: { name: string; category: 'limit' | 'ultimate' }[] = [];
   for (const id of analysis.loadOrder) {

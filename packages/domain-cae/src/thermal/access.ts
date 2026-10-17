@@ -25,20 +25,35 @@ export interface ThermalCase {
 
 const isHeatType = (type: AnalysisCase['type']): boolean => type === 'heat_steady' || type === 'heat_transient';
 
+/** The thermal set-up a case carries: its own for heat_*, `thermomech.thermal` for a coupled_temperature_displacement case (PHY-04 TR-TMC-22). */
+const thermalOf = (analysisCase: AnalysisCase): ThermalSetup | undefined =>
+  isHeatType(analysisCase.type)
+    ? analysisCase.thermal
+    : analysisCase.type === 'coupled_temperature_displacement'
+      ? analysisCase.thermomech?.thermal
+      : undefined;
+
 /**
- * The heat_* case `analysisId` with its thermal set-up.
+ * The heat_* (or coupled_temperature_displacement) case `analysisId` with its thermal set-up.
  * @failure unknown id -> FEA_ANALYSIS_NOT_FOUND; other analysis type (or a missing set-up) -> THM_CASE_TYPE
  */
 export function thermalCaseOf(doc: CadDocument, analysisId: string): ThermalCase | Problem {
   const analysisCase = caseOf(doc, analysisId);
   if (analysisCase === undefined) return problem('FEA_ANALYSIS_NOT_FOUND', `no analysis '${analysisId}'`, [analysisId], ['analysisId']);
-  if (!isHeatType(analysisCase.type) || analysisCase.thermal === undefined)
-    return problem('THM_CASE_TYPE', `analysis '${analysisId}' is '${analysisCase.type}', not heat_steady / heat_transient`, [analysisId]);
-  return { analysisCase, thermal: analysisCase.thermal };
+  const thermal = thermalOf(analysisCase);
+  if (thermal === undefined)
+    return problem(
+      'THM_CASE_TYPE',
+      `analysis '${analysisId}' is '${analysisCase.type}', not heat_steady / heat_transient / coupled_temperature_displacement`,
+      [analysisId],
+    );
+  return { analysisCase, thermal };
 }
 
 export const isProblem = (value: ThermalCase | Problem): value is Problem => 'code' in value;
 
 /** `doc` with the thermal set-up of the case replaced. */
 export const withThermal = (doc: CadDocument, found: ThermalCase, thermal: ThermalSetup): CadDocument =>
-  withCase(doc, { ...found.analysisCase, thermal });
+  found.analysisCase.type === 'coupled_temperature_displacement' && found.analysisCase.thermomech !== undefined
+    ? withCase(doc, { ...found.analysisCase, thermomech: { ...found.analysisCase.thermomech, thermal } })
+    : withCase(doc, { ...found.analysisCase, thermal });

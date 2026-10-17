@@ -404,7 +404,7 @@ describe('thermal deck refusals', () => {
     expect(mechanical && thermalMaterialCards(mechanical, narrow.boxId)).toMatchObject({ code: 'THM_CASE_TYPE' });
   });
 
-  it('refuses recorded contact conductance with THM_CONTACT_UNSUPPORTED', () => {
+  it('writes a tied contact pair with gap conductance from the K_ face sets (constant and table) and refuses a missing set', () => {
     const fixture = thermalFixture();
     const second = must(fixture.doc, 'add_box', { size: [1, 1, 0.05], position: [0, 0, 0.05] });
     const otherId = second.affected[0] ?? '';
@@ -423,7 +423,57 @@ describe('thermal deck refusals', () => {
       slave: { entityId: otherId, facesNear: [[0.5, 0.5, 0.05]] },
       conductance: { value: 2000, unit: 'W/(m^2*K)' },
     });
-    const result = sectionsOf(contact.document, fixture, twoTetMesh(fixture, { nodeSets: { [`B_${sink.id}`]: [1] } }));
-    expect(result).toMatchObject({ code: 'THM_CONTACT_UNSUPPORTED', ids: [contact.affected[0]] });
+    const id = contact.affected[0] ?? '';
+    const mesh = twoTetMesh(fixture, {
+      nodeSets: { [`B_${sink.id}`]: [1] },
+      faceSets: { [`K_${id}_M`]: facesOn(TWO_TETS, [2, 4, 5]), [`K_${id}_S`]: facesOn(TWO_TETS, [1, 2, 3]) },
+    });
+    const text = textOf(sectionsOf(contact.document, fixture, mesh));
+    const base = id.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+    expect(text).toContain(
+      [
+        `** ${id} iface (tied thermal contact)`,
+        `*SURFACE, NAME=KM_${base}, TYPE=ELEMENT`,
+        '2, S4',
+        `*SURFACE, NAME=KS_${base}, TYPE=ELEMENT`,
+        '1, S1',
+        `*SURFACE INTERACTION, NAME=KI_${base}`,
+        '*SURFACE BEHAVIOR, PRESSURE-OVERCLOSURE=TIED',
+        '*GAP CONDUCTANCE',
+        '2000, 0',
+        `*CONTACT PAIR, INTERACTION=KI_${base}, TYPE=SURFACE TO SURFACE`,
+        `KS_${base}, KM_${base}`,
+        '*STEP, INC=200',
+      ].join('\n'),
+    );
+    expect(text.indexOf('*CONTACT PAIR')).toBeLessThan(text.indexOf('*STEP'));
+    const table = must(sink.doc, 'add_thermal_contact', {
+      analysisId: fixture.analysisId,
+      name: 'tab',
+      master: { entityId: fixture.boxId, facesNear: [[0.5, 0.5, 0.05]] },
+      slave: { entityId: otherId, facesNear: [[0.5, 0.5, 0.05]] },
+      conductance: {
+        points: [
+          [1000, 0, 0],
+          [4000, 10, 100],
+        ],
+      },
+    });
+    const tableId = table.affected[0] ?? '';
+    const tableText = textOf(
+      sectionsOf(
+        table.document,
+        fixture,
+        twoTetMesh(fixture, {
+          nodeSets: { [`B_${sink.id}`]: [1] },
+          faceSets: { [`K_${tableId}_M`]: facesOn(TWO_TETS, [2, 4, 5]), [`K_${tableId}_S`]: facesOn(TWO_TETS, [1, 2, 3]) },
+        }),
+      ),
+    );
+    expect(tableText).toContain('*GAP CONDUCTANCE\n1000, 0, 0\n4000, 10000000, 100\n*CONTACT PAIR');
+    expect(sectionsOf(contact.document, fixture, twoTetMesh(fixture, { nodeSets: { [`B_${sink.id}`]: [1] } }))).toMatchObject({
+      code: 'FEA_TARGET_UNRESOLVED',
+      ids: [id],
+    });
   });
 });

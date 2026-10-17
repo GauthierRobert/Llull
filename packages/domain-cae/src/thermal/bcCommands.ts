@@ -13,7 +13,7 @@ import { refuseThermal } from './codes';
 const describeBc = (bc: ThermalBc): string => {
   switch (bc.kind) {
     case 'film':
-      return `film h=${'value' in bc.filmCoefficient ? `${bc.filmCoefficient.value} ${bc.filmCoefficient.unit}` : 'table'}, sink ${bc.sinkTemperature.value} ${bc.sinkTemperature.unit}`;
+      return `film h=${'value' in bc.filmCoefficient ? `${bc.filmCoefficient.value} ${bc.filmCoefficient.unit}` : 'h(T) table'}, sink ${bc.sinkTemperature.value} ${bc.sinkTemperature.unit}`;
     case 'radiation':
       return `radiation e=${bc.emissivity}, sink ${bc.sinkTemperature.value} ${bc.sinkTemperature.unit}`;
     case 'heat_generation':
@@ -27,6 +27,7 @@ const fieldsOf = (params: BcFields): BcFields => ({
   value: params.value,
   unit: params.unit,
   filmCoefficient: params.filmCoefficient,
+  filmTable: params.filmTable,
   sinkTemperature: params.sinkTemperature,
   emissivity: params.emissivity,
   mode: params.mode,
@@ -50,7 +51,7 @@ export const addThermalBc = defineCommand({
     'Add a thermal boundary condition or load to a heat_steady / heat_transient analysis; returns the BC id in affected[0]. kind: ' +
     'temperature (value+unit degC | K, on faces / edges / points), surface_flux (W/m^2, positive INTO the part, on faces), heat_generation ' +
     '(W/m^3, or total W with mode "total" spread over the part volume, on a part via entityId), concentrated_flux (W at points), film ' +
-    '(filmCoefficient W/(m^2*K) and sinkTemperature), radiation (emissivity 0-1 and sinkTemperature; evaluated on absolute temperature). ' +
+    '(filmCoefficient W/(m^2*K), or filmTable { points: [[T, h], ...] } for h(T) of the face temperature in heat_steady cases, and sinkTemperature), radiation (emissivity 0-1 and sinkTemperature; evaluated on absolute temperature). ' +
     'Film coefficients and emissivities are NEVER defaulted: pass `source` with a citation. Faces are given as points near them (facesNear, ' +
     'document units). amplitude names a define_amplitude curve that scales the value (sink temperature for film / radiation) over time. ' +
     'Refuses emissivity outside [0, 1], h <= 0, a wrong unit dimension or a non-thermal case. Next: set_thermal_step (transient), ' +
@@ -113,7 +114,7 @@ const recordOf = (found: ThermalCase, bcId: string): ThermalBcRecord | undefined
 export const updateThermalBc = defineCommand({
   name: 'update_thermal_bc',
   description:
-    'Change a thermal BC: name, value+unit, filmCoefficient, sinkTemperature, emissivity, mode, entityId, target, amplitude or source. ' +
+    'Change a thermal BC: name, value+unit, filmCoefficient, filmTable, sinkTemperature, emissivity, mode, entityId, target, amplitude or source. ' +
     'Only the given fields change; the kind cannot change (delete and add instead). The result is validated like add_thermal_bc ' +
     '(emissivity 0-1, h > 0, source for film / radiation, unit dimensions). amplitude "" removes the amplitude.',
   params: z.object({

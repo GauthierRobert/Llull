@@ -46,6 +46,22 @@ export function bcFaces(thermal: ThermalSetup, mesh: FeMeshArtifact, index: Mesh
 
 const fourth = (x: number): number => x * x * x * x;
 
+/** h (W/(m^2*K)) of a film table at face temperature `temperature` (case scale): piecewise linear, end values held; 0 for a table without rows. */
+function filmTableAt(points: readonly (readonly [number, number])[], temperature: number): number {
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (first === undefined || last === undefined) return 0;
+  if (temperature <= first[0]) return first[1];
+  if (temperature >= last[0]) return last[1];
+  const upper = Math.max(
+    1,
+    points.findIndex((point) => point[0] >= temperature),
+  );
+  const [t1, h1] = points[upper - 1] ?? first;
+  const [t2, h2] = points[upper] ?? last;
+  return h1 + ((h2 - h1) * (temperature - t1)) / (t2 - t1);
+}
+
 /** Amplitude factor of a record at `time` (1 without an amplitude). */
 function factorOf(thermal: ThermalSetup, record: ThermalBcRecord, time: number): number {
   const amplitude =
@@ -78,9 +94,12 @@ export function bcFlowW(inputs: FlowInputs, record: ThermalBcRecord, step: StepF
     case 'temperature':
       return nodes().reduce((sum, node) => sum + systemToSi('power', step.reaction(node), unitSystem), 0);
     case 'film': {
-      if (!('value' in bc.filmCoefficient)) return 0;
-      const h = siOf('film', bc.filmCoefficient);
       const sink = inScale(bc.sinkTemperature, scale) * factor;
+      if (!('value' in bc.filmCoefficient)) {
+        const table = bc.filmCoefficient.table;
+        return 'points' in table ? faceSum((temperature) => filmTableAt(table.points, temperature) * (sink - temperature)) : 0;
+      }
+      const h = siOf('film', bc.filmCoefficient);
       return faceSum((temperature) => h * (sink - temperature));
     }
     case 'radiation': {
@@ -132,6 +151,7 @@ export function nodalLoadsW(inputs: FlowInputs, record: ThermalBcRecord, step: S
   };
   switch (bc.kind) {
     case 'film': {
+      // an h(T) table is a tied gap conductance in the stiffness (deckFilmSink): the solver's reaction already holds it
       if (!('value' in bc.filmCoefficient)) return loads;
       const h = siOf('film', bc.filmCoefficient);
       const sink = inScale(bc.sinkTemperature, scale) * factor;

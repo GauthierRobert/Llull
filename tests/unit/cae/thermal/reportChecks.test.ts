@@ -233,7 +233,7 @@ describe('check_thermal', () => {
       'THM_AMPLITUDE_INVALID',
       'THM_RADIATION_SCALE',
       'THM_CAVITY_INVALID',
-      'THM_CONTACT_UNSUPPORTED',
+      'THM_CONTACT_INVALID',
       'THM_LIMIT_SOURCE_REQUIRED',
     ])
       expect(found, code).toContain(code);

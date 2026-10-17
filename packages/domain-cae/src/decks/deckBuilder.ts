@@ -19,6 +19,10 @@ export interface DisciplineTable {
     readonly materialCards: (ctx: DeckContext, entityId: string) => DeckSections;
     readonly sections: (ctx: DeckContext) => DeckSections;
   };
+  readonly coupled: {
+    readonly materialCards: (ctx: DeckContext, entityId: string) => DeckSections;
+    readonly sections: (ctx: DeckContext) => DeckSections;
+  };
 }
 
 export type InpResult = { readonly text: string } | DeckRefusal;
@@ -53,7 +57,7 @@ function nameCollision(ctx: DeckContext): DeckRefusal | null {
 
 function precheck(doc: CadDocument, analysisId: string, mesh: FeMeshArtifact, ctx: DeckContext): DeckRefusal | null {
   const { analysis } = ctx;
-  if (analysis.type === 'modal' || analysis.type === 'buckling' || analysis.type === 'coupled_temperature_displacement')
+  if (analysis.type === 'modal' || analysis.type === 'buckling')
     return refuse('FEA_ANALYSIS_TYPE_UNSUPPORTED', `analysis type '${analysis.type}' has no deck writer`, [analysisId]);
   if (mesh.kind !== 'fe_mesh') return refuse('FEA_ARTIFACT_NOT_FOUND', 'the mesh artifact is not an fe_mesh', [analysisId]);
   if (mesh.inputHash !== analysisInputHash(doc, analysisId, 'mesh'))
@@ -80,7 +84,7 @@ function precheck(doc: CadDocument, analysisId: string, mesh: FeMeshArtifact, ct
   }
   const collision = nameCollision(ctx);
   if (collision !== null) return collision;
-  const structural = analysis.type === 'static' || analysis.type === 'thermo_static';
+  const structural = analysis.type !== 'heat_steady' && analysis.type !== 'heat_transient';
   if (structural && analysis.constraintOrder.length === 0)
     return refuse('FEA_NO_CONSTRAINTS', `analysis '${analysisId}' has no constraint: the stiffness matrix would be singular`, [analysisId]);
   return null;
@@ -107,7 +111,7 @@ function modelBlock(ctx: DeckContext): string[] {
  * Deterministic CalculiX deck of `analysisId` over `mesh`, with the discipline functions in `disciplines`.
  * @invariant byte-identical for identical inputs; header `** llull analysis <name> units <us> inputHash <h> meshHash <m>`
  * @failure unknown analysis / unsupported type -> FEA_ANALYSIS_NOT_FOUND / FEA_ANALYSIS_TYPE_UNSUPPORTED; mesh of other inputs -> FEA_MESH_STALE;
- *   part without elements or with non-tet elements -> FEA_PART_INVALID; no material -> FEA_MATERIAL_MISSING; static / thermo_static without a
+ *   part without elements or with non-tet elements -> FEA_PART_INVALID; no material -> FEA_MATERIAL_MISSING; static / thermo_static / coupled without a
  *   constraint -> FEA_NO_CONSTRAINTS; plus every refusal of the mechanical and discipline functions
  */
 export function buildInp(
@@ -136,6 +140,7 @@ export function buildInp(
       : [
           mechanicalMaterialLines(ctx, entityId),
           ...(analysis.type === 'thermo_static' ? [disciplines.thermomech.materialCards(ctx, entityId)] : []),
+          ...(analysis.type === 'coupled_temperature_displacement' ? [disciplines.coupled.materialCards(ctx, entityId)] : []),
         ];
     lines.push(`** material ${name} = '${commentText(ctx.materialId(entityId) ?? '', 80)}'`, `*MATERIAL, NAME=${name}`);
     for (const card of cards) {
@@ -145,7 +150,13 @@ export function buildInp(
   }
   for (const entityId of Object.keys(analysis.parts))
     lines.push(`*SOLID SECTION, ELSET=${ctx.elset(entityId)}, MATERIAL=${ctx.materialName(entityId)}`);
-  const steps = heat ? disciplines.heat.sections(ctx) : analysis.type === 'static' ? staticStep(ctx) : disciplines.thermomech.sections(ctx);
+  const steps = heat
+    ? disciplines.heat.sections(ctx)
+    : analysis.type === 'static'
+      ? staticStep(ctx)
+      : analysis.type === 'coupled_temperature_displacement'
+        ? disciplines.coupled.sections(ctx)
+        : disciplines.thermomech.sections(ctx);
   if (isDeckRefusal(steps)) return steps;
   return { text: `${linesText(lines)}${steps.text === '' || steps.text.endsWith('\n') ? steps.text : `${steps.text}\n`}` };
 }

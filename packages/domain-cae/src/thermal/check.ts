@@ -15,7 +15,14 @@ import { tableProblem } from './amplitude';
 import { recordProblem } from './bcModel';
 import { refuseThermal, remediationOf } from './codes';
 import { HEAT_BALANCE_TOLERANCE, hasRadiation } from './constants';
-import { caseTemperatureRange, partMaterials, propertiesNeeded, propertyTable } from './material';
+import {
+  caseTemperatureRange,
+  isOrthotropic,
+  orthotropicRotationProblem,
+  partMaterials,
+  propertiesNeeded,
+  propertyTable,
+} from './material';
 import { unverifiedInputs } from './unverified';
 
 export interface ThermalCheckItem {
@@ -58,6 +65,8 @@ function partItems(doc: CadDocument, found: ThermalCase): ThermalCheckItem[] {
       items.push(item('THM_MATERIAL_NO_K', 'error', `part '${part.entityId}' has no material`, [part.entityId]));
       continue;
     }
+    const rotated = isOrthotropic(part.material) ? orthotropicRotationProblem(part.entityId, entity.rotation) : null;
+    if (rotated !== null) items.push(item('THM_MATERIAL_ORTHO_ROTATED', 'error', rotated, [part.entityId], 'k'));
     for (const property of propertiesNeeded(analysisCase)) {
       if (seen.has(`${part.materialId}/${property}`)) continue;
       seen.add(`${part.materialId}/${property}`);
@@ -134,10 +143,15 @@ function setupItems(doc: CadDocument, found: ThermalCase): ThermalCheckItem[] {
       );
     names.add(upper);
   }
-  for (const contact of Object.values(thermal.contacts))
-    items.push(
-      item('THM_CONTACT_UNSUPPORTED', 'error', `thermal contact '${contact.id}' is recorded but the deck cannot write it`, [contact.id]),
-    );
+  for (const contact of Object.values(thermal.contacts)) {
+    const parts = [contact.master.entityId, contact.slave.entityId];
+    if (parts[0] === parts[1] || !parts.every((entityId) => Object.hasOwn(analysisCase.parts, entityId)))
+      items.push(
+        item('THM_CONTACT_INVALID', 'error', `thermal contact '${contact.id}': master and slave must be two different parts of the case`, [
+          contact.id,
+        ]),
+      );
+  }
   for (const limit of Object.values(thermal.limits))
     if (limit.source.citation.trim() === '')
       items.push(item('THM_LIMIT_SOURCE_REQUIRED', 'error', `limit '${limit.id}' has no source`, [limit.id], 'source'));

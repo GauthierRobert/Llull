@@ -1,6 +1,6 @@
-/** check_thermo_mechanical (PHY-04 §7.1): set-up completeness and staleness of a thermo_static case; every answer needs human review. */
+/** check_thermo_mechanical (PHY-04 §7.1): set-up completeness and staleness of a thermo_static or coupled case; every answer needs human review. */
 
-import type { AnalysisCase, FeArtifactPort, ThermoMechSetup } from '@core/model/analysis';
+import type { AnalysisCase, FeArtifactPort, TemperatureFieldSource, ThermoMechSetup } from '@core/model/analysis';
 import { isCteRefusal } from '@core/model/materialCte';
 import type { CadDocument } from '@core/model/types';
 import { defineCommand, z } from '@core/commands/schema';
@@ -8,9 +8,10 @@ import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { caseOf } from '../shared/access';
 import { trustedRecord } from '../shared/trust';
+import { checkThermalItems } from '../thermal/check';
 import { analysisIdSchema } from '../shared/schemas';
 import { elasticUnverifiedReasons, providerFor, REFERENCE_PROBE_KELVIN } from './cte';
-import { expressionProblem, thermalSourceProblem, thermomechOf } from './field';
+import { expressionProblem, resolveTemperatureField, thermalSourceProblem, thermomechOf } from './field';
 import { refuseTmc, remediationOf } from './refusal';
 import { kelvinOf, temperatureIn } from './units';
 
@@ -30,6 +31,34 @@ const item = (code: string, severity: 'error' | 'warning', message: string, ids:
   remediation: remediationOf(code),
 });
 
+/** Warning when interpolation had to project nodes outside the thermal mesh; an error when the mapping itself fails. Needs the artifacts. */
+function mappingItems(
+  doc: CadDocument,
+  analysisCase: AnalysisCase,
+  field: Extract<TemperatureFieldSource, { kind: 'thermal_result' }>,
+  artifacts: FeArtifactPort | null,
+): ThermomechCheckItem[] {
+  const hash = analysisCase.meshSummary?.meshHash;
+  const mesh = hash === undefined ? null : (artifacts?.get(hash) ?? null);
+  if (mesh?.kind !== 'fe_mesh') return [];
+  const resolvedField = resolveTemperatureField(doc, analysisCase.id, mesh, artifacts);
+  if (!resolvedField.ok)
+    return resolvedField.code === 'TMC_FIELD_INVALID'
+      ? [item(resolvedField.code, 'error', resolvedField.message, [...resolvedField.ids])]
+      : [];
+  const report = resolvedField.mapping;
+  return report === undefined || report.outside === 0
+    ? []
+    : [
+        item(
+          'TMC_MAPPING_PROJECTED',
+          'warning',
+          `${report.outside} node(s) of '${analysisCase.id}' lie outside the thermal mesh of '${field.analysisId}' and took the value at the nearest point (largest distance ${report.maxMappingDistance})`,
+          [analysisCase.id, field.analysisId],
+        ),
+      ];
+}
+
 function fieldItems(
   doc: CadDocument,
   analysisCase: AnalysisCase,
@@ -46,14 +75,16 @@ function fieldItems(
   if (field.kind !== 'thermal_result') return [];
   const problem = thermalSourceProblem(doc, analysisCase, field, artifacts);
   if (problem !== null) return [item(problem.code, 'error', problem.message, problem.ids)];
+  const mapped = field.mapping === 'interpolate' ? mappingItems(doc, analysisCase, field, artifacts) : [];
   const source = caseOf(doc, field.analysisId);
   const times = (source === undefined ? null : trustedRecord(doc, source, artifacts).results)?.thermal?.times ?? [];
   const wanted = field.time;
   const known =
     wanted === 'last' || times.length === 0 || times.some((time) => Math.abs(time - wanted) <= 1e-9 * Math.max(1, Math.abs(wanted)));
   return known
-    ? []
+    ? mapped
     : [
+        ...mapped,
         item('TMC_FIELD_SOURCE_INVALID', 'error', `the thermal results have no output at time ${String(field.time)} s`, [
           id,
           field.analysisId,
@@ -103,9 +134,17 @@ function partItems(doc: CadDocument, analysisCase: AnalysisCase, setup: ThermoMe
 export function checkThermomechItems(doc: CadDocument, analysisId: string, artifacts: FeArtifactPort | null = null): ThermomechCheckItem[] {
   const analysisCase = caseOf(doc, analysisId);
   if (analysisCase === undefined) return [item('FEA_ANALYSIS_NOT_FOUND', 'error', `no analysis '${analysisId}'`, [analysisId])];
-  const setup = thermomechOf(analysisCase);
+  const coupled = analysisCase.type === 'coupled_temperature_displacement';
+  const setup = coupled ? analysisCase.thermomech : thermomechOf(analysisCase);
   if (setup === undefined)
-    return [item('THM_CASE_TYPE', 'error', `analysis '${analysisId}' is a ${analysisCase.type} analysis, not thermo_static`, [analysisId])];
+    return [
+      item(
+        'THM_CASE_TYPE',
+        'error',
+        `analysis '${analysisId}' is a ${analysisCase.type} analysis, not thermo_static / coupled_temperature_displacement`,
+        [analysisId],
+      ),
+    ];
   const items: ThermomechCheckItem[] = [];
   const reference = temperatureIn(setup.referenceTemperature, setup.temperatureScale);
   if (reference === null || !Number.isFinite(reference)) {
@@ -113,7 +152,8 @@ export function checkThermomechItems(doc: CadDocument, analysisId: string, artif
       item('TMC_REFERENCE_TEMPERATURE_MISSING', 'error', 'the reference temperature is missing or has an invalid unit', [analysisId]),
     );
   }
-  items.push(...fieldItems(doc, analysisCase, setup, artifacts));
+  if (coupled) items.push(...checkThermalItems(doc, analysisId));
+  else items.push(...fieldItems(doc, analysisCase, setup, artifacts));
   if (reference !== null && Number.isFinite(reference))
     items.push(...partItems(doc, analysisCase, setup, kelvinOf(reference, setup.temperatureScale)));
   if (!analysisCase.loadOrder.some((id) => analysisCase.loads[id]?.loadCase === setup.loadCaseName))
@@ -130,13 +170,14 @@ export function checkThermomechItems(doc: CadDocument, analysisId: string, artif
 
 /**
  * @invariant read-only; data { analysisId, verdict, items[{ code, severity, message, ids, remediation }], reviewRequired: true }
- * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; not thermo_static -> THM_CASE_TYPE (refusals)
+ * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; not thermo_static / coupled -> THM_CASE_TYPE (refusals)
  */
 export const checkThermoMechanical = defineCommand({
   name: 'check_thermo_mechanical',
   description:
-    'Check a thermo_static analysis before meshing or solving: the stress-free reference temperature, the temperature field (uniform, ' +
-    'expression in x/y/z, thermal_result of a solved heat_* case, table), the thermal source (unsolved, stale, different mesh), the ' +
+    'Check a thermo_static or coupled_temperature_displacement analysis before meshing or solving: the stress-free reference temperature, the temperature field (uniform, ' +
+    'expression in x/y/z, thermal_result of a solved heat_* case, table; for a coupled case instead the thermal set-up items of check_thermal, ' +
+    'e.g. THM_NO_HEAT_PATH), the thermal source (unsolved, stale, different mesh), the ' +
     'coefficient of thermal expansion of every part (property model present, basis stated, inside its validity range), unverified ' +
     'CTE / E / nu values, and the limit/ultimate category of the thermal load case. Returns data.items with a stable code, severity ' +
     '(error blocks the solve, warning does not), the ids involved and a remediation. verdict is fail with any error, warn with only ' +
@@ -154,12 +195,12 @@ export const checkThermoMechanical = defineCommand({
         [analysisId],
         ['analysisId'],
       );
-    if (thermomechOf(analysisCase) === undefined)
+    if (thermomechOf(analysisCase) === undefined && analysisCase.type !== 'coupled_temperature_displacement')
       return refuseTmc(
         doc,
         'check_thermo_mechanical',
         'THM_CASE_TYPE',
-        `analysis '${analysisId}' is ${analysisCase.type}, not thermo_static`,
+        `analysis '${analysisId}' is ${analysisCase.type}, not thermo_static / coupled_temperature_displacement`,
         [analysisId],
       );
     const items = checkThermomechItems(doc, analysisId, ctx?.feaArtifacts ?? null);

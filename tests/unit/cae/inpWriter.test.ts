@@ -154,6 +154,13 @@ describe('discipline dispatch', () => {
         return { text: '*STEP\n*STATIC\n*END STEP\n' };
       },
     },
+    coupled: {
+      materialCards: () => ({ text: '*CONDUCTIVITY\n50\n*EXPANSION, ZERO=20\n1.2e-5\n' }),
+      sections: () => {
+        log.push('coupled');
+        return { text: '*STEP\n*COUPLED TEMPERATURE-DISPLACEMENT, STEADY STATE\n*END STEP\n' };
+      },
+    },
   });
 
   it('uses the thermal functions for heat cases and no mechanical cards', () => {
@@ -179,6 +186,32 @@ describe('discipline dispatch', () => {
     const text = 'text' in written ? written.text : '';
     expect(log).toEqual(['thermomech']);
     expect(text).toContain('*MATERIAL, NAME=M_1\n*ELASTIC\n210000, 0.3\n*DENSITY\n7.85e-9\n*EXPANSION, ZERO=20\n1.2e-5\n*SOLID SECTION');
+  });
+
+  it('appends the coupled cards inside each mechanical material and uses the coupled step for a coupled case', () => {
+    const base = barDocument({ analysisType: 'thermo_static' });
+    const created = execute(base.doc, 'create_analysis', {
+      name: 'c',
+      analysisType: 'coupled_temperature_displacement',
+      referenceTemperature: { value: 20, unit: 'degC' },
+    });
+    const analysisId = created.affected[0] ?? '';
+    let doc = mustRun(created.document, 'set_part_idealization', { analysisId, entityId: base.boxId });
+    doc = mustRun(doc, 'add_fea_constraint', {
+      analysisId,
+      name: 'fix',
+      kind: 'fixed',
+      target: { entityId: base.boxId, facesNear: [[0, 0.5, 0.5]] },
+    });
+    const log: string[] = [];
+    const key = Object.keys(doc.analysis?.cases[analysisId]?.constraints ?? {})[0] ?? '';
+    const written = buildInp(doc, analysisId, barMesh(doc, analysisId, base.boxId, { [`C_${key}`]: [1, 3, 5, 7] }), null, table(log));
+    const text = 'text' in written ? written.text : '';
+    expect(log).toEqual(['coupled']);
+    expect(text).toContain(
+      '*MATERIAL, NAME=M_1\n*ELASTIC\n210000, 0.3\n*DENSITY\n7.85e-9\n*CONDUCTIVITY\n50\n*EXPANSION, ZERO=20\n1.2e-5\n*SOLID SECTION',
+    );
+    expect(text).toContain('*COUPLED TEMPERATURE-DISPLACEMENT, STEADY STATE');
   });
 
   it('passes a discipline refusal through', () => {

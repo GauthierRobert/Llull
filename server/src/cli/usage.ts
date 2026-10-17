@@ -22,6 +22,7 @@ Act (on --doc FILE, default $LLULL_DOC or model.llull.json; created on first cha
   fea_mesh analysisId=ID      mesh an FE analysis (Gmsh) and record it; needs python gmsh
   fea_solve analysisId=ID     solve it with CalculiX (ccx)  [timeoutS=600]; then: fea_report analysisId=ID
   fea_export analysisId=ID    the CalculiX .inp deck (text + sha256)  [--save deck.inp]
+  fea_import_field analysisId=ID file=T.csv coordinatesUnit=mm temperatureUnit=degC   temperature table x,y,z,T -> thermo_static field
                               (works locally and with --app / --server; artifacts: $LLULL_FEA_CACHE)
   run <plan.json | ->         build_project: an actions array or { actions, onError }
                               [--validate] dry-run check  [--continue] onError=continue

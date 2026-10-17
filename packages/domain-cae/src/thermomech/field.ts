@@ -17,6 +17,7 @@ import { caseOf } from '../shared/access';
 import { analysisLengthMetres } from '../shared/defaults';
 import { trustedRecord } from '../shared/trust';
 import { temperatureProblem } from '../shared/quantity';
+import { mapNodalField, type MappingReport } from './mapping';
 import { affineBetween, metresPer, temperatureIn, type Affine } from './units';
 
 /** Nodal temperatures aligned with `mesh.nodes` (same order), in the case temperature scale. */
@@ -26,6 +27,8 @@ export interface ResolvedField {
   readonly min: number;
   readonly max: number;
   readonly description: string;
+  /** Present for a `thermal_result` field mapped between different meshes (TR-TMC-23). */
+  readonly mapping?: MappingReport;
 }
 
 export interface FieldRefusal {
@@ -37,14 +40,14 @@ export interface FieldRefusal {
 
 const refusal = (code: string, message: string, ids: readonly string[]): FieldRefusal => ({ ok: false, code, message, ids });
 
-function resolved(values: readonly number[], description: string): ResolvedField {
+function resolved(values: readonly number[], description: string, mapping?: MappingReport): ResolvedField {
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
   for (const value of values) {
     if (value < min) min = value;
     if (value > max) max = value;
   }
-  return { ok: true, values, min, max, description };
+  return { ok: true, values, min, max, description, ...(mapping !== undefined ? { mapping } : {}) };
 }
 
 /** Problem text when `expression` has a syntax error or reads anything but x, y, z (and the built-in constants), else null. */
@@ -54,18 +57,6 @@ export function expressionProblem(expression: string): string | null {
   const unknown = [...extractReferences(expression)].filter((name) => !['x', 'y', 'z'].includes(name) && !isBuiltinConstant(name));
   return unknown.length === 0 ? null : `unknown name(s) ${unknown.join(', ')}; only x, y, z (and pi, tau) are available`;
 }
-
-/** Table artifact a host stores under the CSV sha256: rows `[x, y, z, T]` in the declared units. */
-interface TableArtifact {
-  readonly kind: 'fe_table';
-  readonly rows: readonly (readonly [number, number, number, number])[];
-}
-
-const isTableArtifact = (value: unknown): value is TableArtifact =>
-  typeof value === 'object' &&
-  value !== null &&
-  (value as { kind?: unknown }).kind === 'fe_table' &&
-  Array.isArray((value as TableArtifact).rows);
 
 function uniformField(
   field: Extract<TemperatureFieldSource, { kind: 'uniform' }>,
@@ -135,8 +126,8 @@ function tableField(
   artifacts: FeArtifactPort | null,
   id: string,
 ): ResolvedField | FieldRefusal {
-  const artifact: unknown = artifacts?.get(field.csvSha256) ?? null;
-  if (!isTableArtifact(artifact))
+  const artifact = artifacts?.get(field.csvSha256) ?? null;
+  if (artifact?.kind !== 'fe_table' || !Array.isArray(artifact.rows))
     return refusal('TMC_FIELD_SOURCE_INVALID', `no table artifact ${field.csvSha256} in the artifact store (fea_import_field writes it)`, [
       id,
     ]);
@@ -239,7 +230,7 @@ export function thermalSourceProblem(
     );
   const hash = source.meshSummary?.meshHash;
   const own = analysisCase.meshSummary?.meshHash;
-  if (hash !== undefined && own !== undefined && meshesDiffer(artifacts, hash, own))
+  if (field.mapping !== 'interpolate' && hash !== undefined && own !== undefined && meshesDiffer(artifacts, hash, own))
     return refusal('TMC_MESH_MISMATCH', `thermal mesh ${hash} differs from this analysis' mesh ${own}`, ids);
   return null;
 }
@@ -265,13 +256,16 @@ function thermalResultField(
       ids,
     );
   const artifact = results as FeResultsArtifact;
-  const meshHash = sha256Hex(canonicalJson(mesh));
-  if (meshesDiffer(artifacts, artifact.meshHash, meshHash, mesh))
-    return refusal(
-      'TMC_MESH_MISMATCH',
-      `thermal results were computed on mesh ${artifact.meshHash}, this analysis uses mesh ${meshHash}`,
-      ids,
-    );
+  const interpolate = field.mapping === 'interpolate';
+  if (!interpolate) {
+    const meshHash = sha256Hex(canonicalJson(mesh));
+    if (meshesDiffer(artifacts, artifact.meshHash, meshHash, mesh))
+      return refusal(
+        'TMC_MESH_MISMATCH',
+        `thermal results were computed on mesh ${artifact.meshHash}, this analysis uses mesh ${meshHash}`,
+        ids,
+      );
+  }
   const step = sourceStep(artifact, field.time);
   if (step === undefined) return refusal('TMC_FIELD_SOURCE_INVALID', `thermal results have no output at time ${String(field.time)}`, ids);
   const nodal = step.fields['NDTEMP'];
@@ -279,6 +273,17 @@ function thermalResultField(
   const sourceScale = source?.thermal?.temperatureScale ?? 'degC';
   const affine = affineBetween(sourceScale, scale);
   if (affine === null) return refusal('TMC_FIELD_SOURCE_INVALID', `cannot convert ${sourceScale} to ${scale}`, ids);
+  const label = `thermal_result ${field.analysisId} step ${step.step} t=${step.time} s (results ${resultsHash.slice(0, 12)})`;
+  if (interpolate) {
+    const mapped = mapThermalField(artifact, nodal.values, affine, mesh, artifacts, ids);
+    if (!mapped.ok) return mapped;
+    const { report } = mapped.mapped;
+    return resolved(
+      mapped.mapped.values,
+      `${label} mapped by interpolation: max mapping distance ${report.maxMappingDistance}, ${report.outside} node(s) outside (projected), coincident-node error ${report.coincidentMaxError} over ${report.coincidentNodes} node(s)`,
+      report,
+    );
+  }
   const values: number[] = [];
   let missing = 0;
   for (const [nodeId] of mesh.nodes) {
@@ -290,7 +295,48 @@ function thermalResultField(
   }
   if (missing > 0)
     return refusal('TMC_FIELD_INVALID', `thermal results have no finite NDTEMP at ${missing} of ${mesh.nodes.length} node(s)`, ids);
-  return resolved(values, `thermal_result ${field.analysisId} step ${step.step} t=${step.time} s (results ${resultsHash.slice(0, 12)})`);
+  return resolved(values, label);
+}
+
+const mappings = new WeakMap<FeMeshArtifact, Map<string, MappedResult>>();
+type MappedResult = Extract<ReturnType<typeof mapNodalField>, { ok: true }>;
+
+/** Largest relative difference at a coincident node that still passes the TR-TMC-23 check (1e-9 of the field magnitude). */
+const COINCIDENT_TOLERANCE = 1e-9;
+
+/** The thermal NDTEMP mapped onto `mesh` (cached per target mesh object: the deck asks once per material and once for the step). */
+function mapThermalField(
+  results: FeResultsArtifact,
+  nodal: Readonly<Record<string, readonly number[]>>,
+  affine: Affine,
+  mesh: FeMeshArtifact,
+  artifacts: FeArtifactPort | null,
+  ids: readonly string[],
+): { readonly ok: true; readonly mapped: MappedResult } | FieldRefusal {
+  const thermalMesh = artifacts?.get(results.meshHash) ?? null;
+  if (thermalMesh?.kind !== 'fe_mesh')
+    return refusal('FEA_RESULTS_MISSING', `the thermal mesh ${results.meshHash} is not in the artifact store (mapping needs it)`, ids);
+  const key = `${results.meshHash}|${sha256Hex(canonicalJson(nodal))}|${affine.offset}|${affine.scale}`;
+  const cached = mappings.get(mesh)?.get(key);
+  if (cached !== undefined) return { ok: true, mapped: cached };
+  const values = new Map<number, number>();
+  for (const [id] of thermalMesh.nodes) {
+    const raw = nodal[String(id)]?.[0];
+    if (raw !== undefined && Number.isFinite(raw)) values.set(id, affine.offset + affine.scale * raw);
+  }
+  const mapped = mapNodalField(thermalMesh, values, mesh);
+  if (!mapped.ok) return refusal('TMC_FIELD_INVALID', `temperature mapping failed: ${mapped.message}`, ids);
+  const magnitude = Math.max(1, ...mapped.values.map(Math.abs));
+  if (!(mapped.report.coincidentMaxError <= COINCIDENT_TOLERANCE * magnitude))
+    return refusal(
+      'TMC_FIELD_INVALID',
+      `the mapped field differs from the thermal values by ${mapped.report.coincidentMaxError} at coincident nodes (limit ${COINCIDENT_TOLERANCE} of the field magnitude)`,
+      ids,
+    );
+  const perMesh = mappings.get(mesh) ?? new Map<string, MappedResult>();
+  perMesh.set(key, mapped);
+  mappings.set(mesh, perMesh);
+  return { ok: true, mapped };
 }
 
 /** The case's thermo-mechanical set-up when it is a thermo_static case. */

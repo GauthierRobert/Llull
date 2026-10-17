@@ -3,7 +3,15 @@
 import { type DeckContext, type DeckSections } from '../decks/context';
 import { commentText, linesText, num, row } from '../decks/format';
 import type { ThermalSetup } from '@core/model/analysis';
-import { caseTemperatureRange, propertiesNeeded, propertyTable, type PropertyTable, type ThermalProperty } from './material';
+import {
+  caseTemperatureRange,
+  orthotropicRotationProblem,
+  orthotropicRows,
+  propertiesNeeded,
+  propertyTable,
+  type PropertyTable,
+  type ThermalProperty,
+} from './material';
 
 const HEAT_PROPERTY: Readonly<Record<ThermalProperty, { readonly keyword: string; readonly label: string }>> = {
   k: { keyword: '*CONDUCTIVITY', label: 'k' },
@@ -11,7 +19,23 @@ const HEAT_PROPERTY: Readonly<Record<ThermalProperty, { readonly keyword: string
   density: { keyword: '*DENSITY', label: 'density' },
 };
 
+function orthotropicLines(table: PropertyTable, scale: string): string[] {
+  const notes = (table.orthotropic ?? []).flatMap((direction, i) => {
+    const range =
+      direction.range === null ? 'constant' : `range=${num(direction.range[0])}..${num(direction.range[1])} ${scale} relTol=1e-3`;
+    const sha = direction.modelId === null ? '' : ` coefficientsSha256=${commentText(direction.coefficientsSha256 ?? '')}`;
+    return [
+      `** k direction ${i + 1} (document ${'XYZ'[i] ?? ''} axis): ${commentText(direction.origin)}${sha} maxRelError=${num(direction.maxRelError)} ${range}`,
+      ...(direction.unverifiedReasons.length > 0
+        ? [`** k direction ${i + 1} unverified: ${commentText(direction.unverifiedReasons.join('; '), 400)}`]
+        : []),
+    ];
+  });
+  return [...notes, '*CONDUCTIVITY, TYPE=ORTHO', ...orthotropicRows(table).map((values) => row(...values))];
+}
+
 function cardLines(table: PropertyTable, scale: string): string[] {
+  if (table.orthotropic !== undefined) return orthotropicLines(table, scale);
   const { keyword, label } = HEAT_PROPERTY[table.property];
   const range = table.range === null ? 'constant' : `range=${num(table.range[0])}..${num(table.range[1])} ${scale} relTol=1e-3`;
   const origin = commentText(table.origin);
@@ -41,6 +65,8 @@ export function propertyCards(ctx: DeckContext, thermal: ThermalSetup, entityId:
       required,
     });
     if ('code' in table) return { code: table.code, message: table.message, ids: [entityId, ...table.ids] };
+    const rotated = table.orthotropic === undefined || entity === undefined ? null : orthotropicRotationProblem(entityId, entity.rotation);
+    if (rotated !== null) return { code: 'THM_MATERIAL_ORTHO_ROTATED', message: rotated, ids: [entityId] };
     lines.push(...cardLines(table, thermal.temperatureScale));
   }
   return { text: linesText(lines) };

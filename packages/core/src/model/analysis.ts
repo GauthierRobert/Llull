@@ -160,6 +160,11 @@ export interface TableRef {
   readonly rows: number;
 }
 
+/** Film coefficient h(T) of a face: rows [surface temperature on the case scale, h in W/(m^2*K)], strictly increasing temperature, h > 0. */
+interface FilmTable {
+  readonly points: ReadonlyArray<readonly [temperature: number, filmCoefficient: number]>;
+}
+
 export interface Amplitude {
   readonly id: string;
   readonly name: string;
@@ -174,7 +179,7 @@ export type ThermalBc =
   | { readonly kind: 'concentrated_flux'; readonly value: Q; readonly target: FeaTarget }
   | {
       readonly kind: 'film';
-      readonly filmCoefficient: Q | { readonly table: TableRef };
+      readonly filmCoefficient: Q | { readonly table: TableRef | FilmTable };
       readonly sinkTemperature: Q;
       readonly target: FeaTarget;
     }
@@ -375,9 +380,15 @@ export interface FeResultsArtifact {
   };
 }
 
+/** Temperature table (PHY-04 TR-TMC-14): rows `[x, y, z, T]` in the units the `table` field source declares; written by `fea_import_field`. */
+export interface FeTableArtifact {
+  readonly kind: 'fe_table';
+  readonly rows: readonly (readonly [x: number, y: number, z: number, T: number])[];
+}
+
 /** Read-only artifact store injected by the host (`ExecutionContext.feaArtifacts`). */
 export interface FeArtifactPort {
-  get(hash: string): FeMeshArtifact | FeResultsArtifact | null;
+  get(hash: string): FeMeshArtifact | FeResultsArtifact | FeTableArtifact | null;
 }
 
 /** Verifies a human signature over a payload hash (09 PLM); no implementation is installed, so human gates refuse. */

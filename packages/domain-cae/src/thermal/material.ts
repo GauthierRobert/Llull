@@ -2,6 +2,7 @@
 
 import type { AnalysisCase, TemperatureScale, ThermalSetup, UnitSystem } from '@core/model/analysis';
 import type { CadDocument, Material } from '@core/model/types';
+import type { PropertyDirection } from '@core/model/propertyModel';
 import { baseEvaluatorOf, evaluatePropertyModel, resolvePropertyModel, type PropertyRecord } from '@core/model/propertyModelEval';
 import { curveOf, SOLVER_TABLE_REL_TOL, tabulateModel } from '@core/model/propertyTabulate';
 import { convertValue, isUnitFailure } from '@lib/quantity';
@@ -33,7 +34,15 @@ export interface PropertyTable {
   /** Tabulated temperature range (case scale); null for a constant. */
   readonly range: readonly [number, number] | null;
   readonly unverifiedReasons: readonly string[];
+  /**
+   * Orthotropic conductivity only (`property` 'k' with models of direction 1 / 2 / 3): the three directional tables, in order; the fields above
+   * then summarise them (`constant` null, no `points`, `range` the span common to all three, `maxRelError` the largest).
+   */
+  readonly orthotropic?: readonly [PropertyTable, PropertyTable, PropertyTable];
 }
+
+/** Material directions of an orthotropic conductivity: the document X, Y, Z axes (no `*ORIENTATION` is written). */
+const ORTHO_DIRECTIONS = ['1', '2', '3'] as const satisfies readonly PropertyDirection[];
 
 const withSi = (kind: ThermalKind, value: number, unit: string): number => {
   const converted = convertValue(value, unit, siUnitOf(kind));
@@ -78,6 +87,80 @@ export interface PropertyRequest {
   readonly unitSystem: UnitSystem;
   /** Temperatures the case reaches (case scale), or null when unknown. */
   readonly required: readonly [number, number] | null;
+  /** Material direction of a conductivity model ('1' | '2' | '3'); set by the orthotropic path only. */
+  readonly direction?: PropertyDirection;
+}
+
+/** True when some k model of the material names a material direction 1 / 2 / 3 (the material is orthotropic). */
+export const isOrthotropic = (material: Material): boolean =>
+  (material.propertyModels ?? []).some(
+    (model) => model.property === 'k' && model.direction !== undefined && (ORTHO_DIRECTIONS as readonly string[]).includes(model.direction),
+  );
+
+/** Problem text when an orthotropic material sits on a rotated part (its directions are the document axes), else null. */
+export const orthotropicRotationProblem = (entityId: string, rotation: readonly number[]): string | null =>
+  rotation.some((angle) => angle !== 0)
+    ? `part '${entityId}' is rotated but its material k is orthotropic: the directions 1 / 2 / 3 are the document X / Y / Z axes`
+    : null;
+
+/** Value of a piecewise-linear table at `temperature` (end values held, as the solver does); a constant table ignores it. */
+const valueAt = (table: PropertyTable, temperature: number): number => {
+  if (table.constant !== null) return table.constant;
+  const points = table.points;
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (first === undefined || last === undefined) return Number.NaN;
+  if (temperature <= first[0]) return first[1];
+  if (temperature >= last[0]) return last[1];
+  const upper = points.findIndex((point) => point[0] >= temperature);
+  const [t1, v1] = points[upper - 1] ?? first;
+  const [t2, v2] = points[upper] ?? last;
+  return v1 + ((v2 - v1) * (temperature - t1)) / (t2 - t1);
+};
+
+/** Rows `[k1, k2, k3, T]` (T last, absent for constants) of an orthotropic table, on the union of the directional temperature grids. */
+export function orthotropicRows(table: PropertyTable): readonly (readonly number[])[] {
+  const [a, b, c] = table.orthotropic ?? [];
+  if (a === undefined || b === undefined || c === undefined) return [];
+  const grid = [...new Set([a, b, c].flatMap((entry) => entry.points.map(([temperature]) => temperature)))].sort((x, y) => x - y);
+  if (grid.length === 0) return [[a.constant ?? Number.NaN, b.constant ?? Number.NaN, c.constant ?? Number.NaN]];
+  return grid.map((temperature) => [valueAt(a, temperature), valueAt(b, temperature), valueAt(c, temperature), temperature]);
+}
+
+/**
+ * Orthotropic k: the three directional tables of `request` (direction 1 / 2 / 3) combined.
+ * @failure a direction missing -> THM_MATERIAL_K_ORTHO; the refusals of the directional tables pass through
+ */
+function orthotropicTable(request: PropertyRequest): PropertyTable | Problem {
+  const have = new Set((request.material.propertyModels ?? []).filter((model) => model.property === 'k').map((model) => model.direction));
+  const missing = ORTHO_DIRECTIONS.filter((direction) => !have.has(direction));
+  if (missing.length > 0)
+    return problem(
+      'THM_MATERIAL_K_ORTHO',
+      `material '${request.materialName}' has k models for some of the directions 1 / 2 / 3 but not for ${missing.join(', ')}`,
+      [request.materialName],
+    );
+  const tables: PropertyTable[] = [];
+  for (const direction of ORTHO_DIRECTIONS) {
+    const table = propertyTable({ ...request, direction });
+    if ('code' in table) return table;
+    tables.push(table);
+  }
+  const [a, b, c] = tables;
+  if (a === undefined || b === undefined || c === undefined) return problem('THM_MATERIAL_K_ORTHO', 'orthotropic k needs three tables');
+  const ranges = tables.flatMap((table) => (table.range === null ? [] : [table.range]));
+  return {
+    property: 'k',
+    origin: tables.map((table, i) => `direction ${ORTHO_DIRECTIONS[i] ?? ''}: ${table.origin}`).join('; '),
+    modelId: tables.map((table) => table.modelId ?? '').join(','),
+    coefficientsSha256: tables.map((table) => table.coefficientsSha256 ?? '').join(','),
+    maxRelError: Math.max(...tables.map((table) => table.maxRelError)),
+    constant: null,
+    points: [],
+    range: ranges.length === 0 ? null : [Math.max(...ranges.map((r) => r[0])), Math.min(...ranges.map((r) => r[1]))],
+    unverifiedReasons: [...new Set(tables.flatMap((table) => table.unverifiedReasons))],
+    orthotropic: [a, b, c],
+  };
 }
 
 function constantTable(request: PropertyRequest, siValue: number, origin: string, extra: Partial<PropertyTable> = {}): PropertyTable {
@@ -100,17 +183,22 @@ function constantTable(request: PropertyRequest, siValue: number, origin: string
  * tolerance over the case temperature range), else `Material.density` for density.
  * @failure no model (and no document density) -> THM_MATERIAL_NO_K / THM_MATERIAL_NO_CP; range outside the model equation range -> PROP_OUT_OF_RANGE
  *   (passed through); several unranked models -> PROP_NO_MODEL_FOR_PROPERTY; a model with variables other than T -> PROP_VARIABLE_MISSING;
- *   more than 500 table points -> THM_TABLE_POINTS
+ *   more than 500 table points -> THM_TABLE_POINTS; k models for only some of the directions 1 / 2 / 3 -> THM_MATERIAL_K_ORTHO
+ * @note k models with direction 1 / 2 / 3 make the material orthotropic: `orthotropic` holds the three directional tables
  */
 export function propertyTable(request: PropertyRequest): PropertyTable | Problem {
   const { property, material, scale } = request;
+  if (property === 'k' && request.direction === undefined && isOrthotropic(material)) return orthotropicTable(request);
   const kind = KIND[property];
   const record: PropertyRecord = {
     name: request.materialName,
     ...(material.propertyModels !== undefined ? { propertyModels: material.propertyModels } : {}),
   };
   const declared = (material.propertyModels ?? []).some((model) => model.property === property);
-  const resolved = resolvePropertyModel(record, { property });
+  const resolved = resolvePropertyModel(
+    record,
+    request.direction === undefined ? { property } : { property, direction: request.direction },
+  );
   if ('available' in resolved) {
     if (!declared && property === 'density' && material.density > 0) {
       const kgPerM3 = convertValue(material.density, `g/${request.documentUnit}^3`, 'kg/m^3');

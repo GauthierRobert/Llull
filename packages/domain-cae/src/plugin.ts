@@ -3,6 +3,7 @@
 import type { CadPlugin, DocumentExtension } from '@core/plugins/plugin';
 import { feaCommands } from './commands/catalog';
 import { analysisReferenceGuard } from './guard';
+import { marginCommands } from './margins/catalog';
 import { analysisErrors } from './model/validate';
 import { thermalCommands } from './thermal/catalog';
 import { thermomechCommands } from './thermomech/catalog';
@@ -13,7 +14,7 @@ const analysisDocument: DocumentExtension = { validate: analysisErrors, derivedE
 export const caePlugin: CadPlugin = {
   name: 'cae',
   toolset: 'analysis',
-  commands: [...feaCommands, ...thermalCommands, ...thermomechCommands],
+  commands: [...feaCommands, ...marginCommands, ...thermalCommands, ...thermomechCommands],
   guards: [analysisReferenceGuard],
   document: analysisDocument,
 };

@@ -14,7 +14,7 @@ export { SERVER_INSTRUCTIONS } from './instructions';
 export type { CadExchangePort, DwgConverterPort, ProgramRun } from './exchangeTools';
 export { buildExchangeToolDefinitions, applyExchangeToolCall, exportStepFile } from './exchangeTools';
 
-export type { FeaToolsPort, FeaHost, FeaToolResult } from './feaTools';
+export type { FeaToolsPort, FeaHost, FeaToolResult, FieldTableInput } from './feaTools';
 export { buildFeaToolDefinitions, FEA_SOLVE_TIMEOUT_S } from './feaTools';
 
 export type { ToolSearchResult } from './discovery';

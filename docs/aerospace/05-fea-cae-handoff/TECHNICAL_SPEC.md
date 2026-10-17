@@ -650,7 +650,7 @@ Mesh quality reports Gmsh-independent tet scaled Jacobian and edge ratio only. C
 system. The FE tools run synchronously in the server process (no ticket cancel yet).
 
 **Not built (05 backlog):** modal, buckling, shells / plane stress / beams, midsurface, defeature, moment loads, Nastran BDF, OP2,
-`compute_margins` / `dispose_margin`, `analytic_check`, `set_result_view`, `fea_import_results`, `fea_result_field`, the full Verdict
+`dispose_margin`, `analytic_check`, `set_result_view`, `fea_import_results`, `fea_result_field`, the full Verdict
 quality port, UI panels, `.llullz` result bundling.
 
 **Review fixes (2026-10-17), documented behaviour changes:**
@@ -677,3 +677,29 @@ quality port, UI panels, `.llullz` result bundling.
   non-finite result values are `FEA_SOLVER_FAILED` ("non-finite results"); the recorded results summary is built from the artifact read back
   from the store; `meshRequest` refuses an estimated element count above 2e6 (bbox volume / globalSize^3 x 6 per part, refinements ignored)
   with `FEA_MESH_TOO_LARGE`.
+
+**`compute_margins` (2026-10-17, PHY-04 closure).** Read-only registry command of the plugin `cae` (toolset `analysis`, `packages/domain-cae/src/margins/`),
+§5.8 shape. `{ analysisId, criterion?, allowable?, groupBy?, loadCases?, marginalBand? }` -> `data { analysisId, unitSystem, resultsHash, criterion, groupBy,
+marginalBand, minMs, minMsRow, factors, rows, singularScreening, warnings, reviewRequired }`, field names carrying the stress / length unit (`appliedMPa`,
+`allowableMPa`, `atMm`; `Pa` / `M`, `Psi` / `In` in the other unit systems).
+
+- **Trust.** Numbers come from the results artifact re-verified by `trustedRecord` (§4.1), never from the document summary: stale -> `FEA_RESULTS_STALE`
+  (also when the cause is an edited thermal source of a thermo_static case), no verified artifact -> `FEA_RESULTS_MISSING`, summary differs from its artifact
+  -> `FEA_SUMMARY_MISMATCH`. Static and thermo_static cases only (`FEA_ANALYSIS_TYPE_UNSUPPORTED` otherwise).
+- **Applied stress.** `von_mises` (default) or the largest magnitude of `s_xx` / `s_yy` / `s_zz` over the nodes of a group: `groupBy part` (all nodes of the part's
+  elements) or `target` (the nodes of each constraint / load node set `C_` / `L_`, split by owning part). Nodal values are the solver's averages: the artifact
+  carries no per-element stresses, so averaging is not restricted to one part where parts share nodes (one mesh per part shares none).
+- **Allowables.** Omitted: Ftu and Fty from the PHY-01 property models of the part material, evaluated in MPa at the case reference temperature (thermo_static)
+  or 20 degC; `'ftu'` / `'fty'` run one check; `{ value, unit, against? }` is explicit (against `ultimate` by default, always `unverified`). A model missing, ambiguous
+  or outside its validity at that temperature -> `FEA_MATERIAL_NO_ALLOWABLE` with the PHY-01 code in the message. `Material` changes make the results stale (the input hash
+  holds the property models), so strengths are defined before the solve.
+- **Margins.** Limit load case: `MS_ult = Ftu / (applied x FoS_ult x prod(extra)) - 1` and `MS_yield = Fty / (applied x FoS_yield x prod(extra)) - 1`; ultimate load
+  case: `MS_ult = Ftu / (applied x prod(extra)) - 1`, no yield check (`allowable 'fty'` on it -> `FEA_MARGIN_PARAM_INVALID`). Applied = 0 gives `ms: null`, PASS. The
+  factors come from the case; each is listed with `source` and `defaulted` (a value equal to 1.5 / 1.0 is `defaulted: true`, source 14 CFR 25.303 / 25.305(a);
+  anything else is `defaulted: false`, source `create_analysis factors`; extras keep their justification). thermo_static results are one limit load case named
+  `loadCaseName`.
+- **Status.** FAIL if MS < 0 (`FEA_MS_NEGATIVE`), MARGINAL only when `marginalBand` is given and MS < band (`FEA_MS_MARGINAL`; no default, warning
+  `FEA_MARGINAL_BAND_UNSET` in `data.warnings`), else PASS. FAIL / MARGINAL rows are `disposition: pending_human` (`dispose_margin` is not built); every row has
+  `reviewRequired: true`; `unverified` = OR of the allowable's PHY-01 flags, the E / nu flags (and, for thermo_static, the CTE flags of `check_thermo_mechanical`).
+- **Singular zones are not screened.** Every row has `singular: false` and `data.singularScreening` says so; peak stresses at point loads, supports and re-entrant
+  corners must be judged by the reader (a node in a constraint set is visible with `groupBy target`).

@@ -21,6 +21,10 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   THM_MATERIAL_NO_K: 'define_property_model on the part material with property k (W/(m*K)), a valid T range and a source',
   THM_MATERIAL_NO_CP:
     'define_property_model with property cp (J/(kg*K)); a transient also needs density (model or create_material density)',
+  THM_MATERIAL_K_ORTHO:
+    'give the conductivity models of directions 1, 2 and 3 (define_property_model with direction), or one model without a direction',
+  THM_MATERIAL_ORTHO_ROTATED:
+    'orthotropic k follows the document X / Y / Z axes: use a part with rotation [0, 0, 0] (model the part in the rotated position) or an isotropic k',
   THM_MATERIAL_UNVERIFIED: 'replace the typical / unstated value by a verified, sourced model; results stay flagged until then',
   THM_PROPERTY_OUT_OF_RANGE: 'widen the tabulation inside the model equation range, or define a model sourced for the temperatures reached',
   THM_NO_HEAT_PATH: 'add a sink: add_thermal_bc kind temperature, film or radiation (the steady problem has no unique solution)',
@@ -29,8 +33,6 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   THM_RADIATION_SCALE: 'recreate the case with temperatureScale degC or K (radiation is evaluated on absolute temperature)',
   THM_CAVITY_INVALID: 'give a unique cavity name of at most 3 characters and at least 2 faces',
   THM_CONTACT_INVALID: 'give master and slave targets on different parts and a positive conductance in W/(m^2*K)',
-  THM_CONTACT_UNSUPPORTED:
-    'thermal contact conductance is recorded but not written to the deck yet; model the interface as one body or a film',
   THM_HEAT_BALANCE: 'refine the mesh or time step and check the boundary conditions; do not report the result as final',
   THM_NO_LIMITS: 'add_temperature_limit with a datasheet or rule citation',
   THM_LIMIT_SOURCE_REQUIRED: 'add source: { citation } (component datasheet, company rule or material record)',

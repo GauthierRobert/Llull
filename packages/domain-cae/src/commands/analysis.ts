@@ -24,8 +24,16 @@ const ANALYSIS_TYPES = [
   'buckling',
   'coupled_temperature_displacement',
 ] as const;
-const BUILT: ReadonlySet<AnalysisType> = new Set(['static', 'heat_steady', 'heat_transient', 'thermo_static']);
+const BUILT: ReadonlySet<AnalysisType> = new Set([
+  'static',
+  'heat_steady',
+  'heat_transient',
+  'thermo_static',
+  'coupled_temperature_displacement',
+]);
 const isThermal = (type: AnalysisType): boolean => type === 'heat_steady' || type === 'heat_transient';
+/** Types that carry a ThermoMechSetup (stress-free reference temperature). */
+const hasThermoMech = (type: AnalysisType): boolean => type === 'thermo_static' || type === 'coupled_temperature_displacement';
 
 const factorsSchema = z.object({
   ultimate: z.number().describe('Ultimate factor on limit loads (14 CFR 25.303 uses 1.5). Must be >= 1.'),
@@ -54,9 +62,9 @@ const plain = (value: number): string => String(Math.round(value * 1e6) / 1e6);
 /**
  * @affects doc.analysis.cases (adds 1 case; affected: [analysisId])
  * @invariant ids `an-<step>.<k>`; unitSystem follows the document unit; heat_* cases get an empty ThermalSetup, thermo_static a ThermoMechSetup
- *   (no default reference temperature); defaults are named in the summary
- * @failure modal / buckling / coupled type -> FEA_ANALYSIS_TYPE_UNSUPPORTED; explicit unitSystem != document unit -> FEA_UNITS_MISMATCH;
- *   thermo_static without referenceTemperature -> TMC_REFERENCE_TEMPERATURE_MISSING; bad temperature unit -> THM_UNITS_MISMATCH;
+ *   and a coupled case a ThermoMechSetup holding an empty ThermalSetup (no default reference temperature); defaults are named in the summary
+ * @failure modal / buckling type -> FEA_ANALYSIS_TYPE_UNSUPPORTED; explicit unitSystem != document unit -> FEA_UNITS_MISMATCH;
+ *   thermo_static / coupled without referenceTemperature -> TMC_REFERENCE_TEMPERATURE_MISSING; bad temperature unit -> THM_UNITS_MISMATCH;
  *   factor < 1 -> FEA_FACTOR_INVALID; temperature params on a type that has no use for them -> FEA_PARAM_NOT_APPLICABLE (all refusals, unchanged doc)
  */
 export const createAnalysis = defineCommand({
@@ -64,14 +72,20 @@ export const createAnalysis = defineCommand({
   description:
     'Create a finite-element analysis case (CalculiX) in the document and return its id in affected[0]. analysisType: static (linear ' +
     'structural), heat_steady / heat_transient (thermal conduction, convection, radiation) or thermo_static (structural response to a ' +
-    'temperature field; REQUIRES referenceTemperature, the stress-free temperature, no default). modal, buckling and coupled cases are not ' +
-    'built and are refused. unitSystem follows the document unit (mm: N-mm-t-s, m: N-m-kg-s, in: lbf-in-slinch-s) and a different one is ' +
+    'temperature field; REQUIRES referenceTemperature, the stress-free temperature, no default) or coupled_temperature_displacement ' +
+    '(steady-state heat conduction and thermal stress solved together: thermal boundary conditions with add_thermal_bc, mechanical ones with ' +
+    'add_fea_constraint / add_fea_load, REQUIRES referenceTemperature; the temperature field is solved, not set). modal and buckling cases ' +
+    'are not built and are refused. unitSystem follows the document unit (mm: N-mm-t-s, m: N-m-kg-s, in: lbf-in-slinch-s) and a different one is ' +
     'refused. The case starts with the default mesh (tet, quadratic, 10 mm) and no parts: next set_part_idealization, then ' +
     'add_fea_constraint / add_fea_load (or the thermal commands), set_mesh_controls, and the host runs fea_mesh then fea_solve. ' +
     'describe_analysis shows the case at any time.',
   params: z.object({
     name: z.string().min(1).describe('Display name of the analysis, e.g. "bracket under 500 N".'),
-    analysisType: z.enum(ANALYSIS_TYPES).describe('static | heat_steady | heat_transient | thermo_static (the others are refused).'),
+    analysisType: z
+      .enum(ANALYSIS_TYPES)
+      .describe(
+        'static | heat_steady | heat_transient | thermo_static | coupled_temperature_displacement (modal and buckling are refused).',
+      ),
     solver: z.enum(['calculix']).optional().describe('Solver; only calculix is built (default).'),
     unitSystem: z
       .enum(['N-mm-t-s', 'N-m-kg-s', 'lbf-in-slinch-s'])
@@ -80,15 +94,17 @@ export const createAnalysis = defineCommand({
     temperatureScale: z
       .enum(['degC', 'K'])
       .optional()
-      .describe('Scale temperatures are reported in (heat_* and thermo_static only). Default degC, recorded in the case.'),
+      .describe('Scale temperatures are reported in (thermal, thermo_static and coupled cases only). Default degC, recorded in the case.'),
     referenceTemperature: quantitySchema
       .optional()
-      .describe('thermo_static ONLY, REQUIRED there: stress-free (reference) temperature, e.g. { value: 20, unit: "degC" }.'),
+      .describe(
+        'thermo_static and coupled_temperature_displacement ONLY, REQUIRED there: stress-free (reference) temperature, e.g. { value: 20, unit: "degC" }.',
+      ),
     loadCaseName: z
       .string()
       .optional()
       .describe(
-        'thermo_static only: name of the load case that carries the thermal load (1-40 letters, digits or underscores). Default "thermal".',
+        'thermo_static and coupled only: name of the load case that carries the thermal load (1-40 letters, digits or underscores). Default "thermal".',
       ),
     factors: factorsSchema
       .optional()
@@ -107,18 +123,18 @@ export const createAnalysis = defineCommand({
         [],
         ['unitSystem'],
       );
-    const thermalUse = isThermal(type) || type === 'thermo_static';
+    const thermalUse = isThermal(type) || hasThermoMech(type);
     if (temperatureScale !== undefined && !thermalUse)
       return fail('FEA_PARAM_NOT_APPLICABLE', `temperatureScale does not apply to a '${type}' analysis`, [], ['temperatureScale']);
-    if ((referenceTemperature !== undefined || loadCaseName !== undefined) && type !== 'thermo_static')
+    if ((referenceTemperature !== undefined || loadCaseName !== undefined) && !hasThermoMech(type))
       return fail(
         'FEA_PARAM_NOT_APPLICABLE',
-        `referenceTemperature / loadCaseName apply to thermo_static only`,
+        `referenceTemperature / loadCaseName apply to thermo_static and coupled_temperature_displacement only`,
         [],
         ['referenceTemperature'],
       );
-    if (type === 'thermo_static' && referenceTemperature === undefined)
-      return fail('TMC_REFERENCE_TEMPERATURE_MISSING', 'a thermo_static analysis needs referenceTemperature', [], ['referenceTemperature']);
+    if (hasThermoMech(type) && referenceTemperature === undefined)
+      return fail('TMC_REFERENCE_TEMPERATURE_MISSING', `a ${type} analysis needs referenceTemperature`, [], ['referenceTemperature']);
     const temperature = referenceTemperature === undefined ? null : temperatureProblem(referenceTemperature);
     if (temperature !== null) return fail('THM_UNITS_MISMATCH', temperature, [], ['referenceTemperature']);
     const caseNameProblem = loadCaseName === undefined ? null : loadCaseNameProblem(loadCaseName);
@@ -132,8 +148,13 @@ export const createAnalysis = defineCommand({
         ? DEFAULT_FACTORS
         : { ultimate: params.factors.ultimate, yield: params.factors.yield, extra: params.factors.extra ?? [] };
     const thermomech: ThermoMechSetup | undefined =
-      type === 'thermo_static' && referenceTemperature !== undefined
-        ? { referenceTemperature, temperatureScale: scale, loadCaseName: loadCaseName ?? 'thermal' }
+      hasThermoMech(type) && referenceTemperature !== undefined
+        ? {
+            referenceTemperature,
+            temperatureScale: scale,
+            loadCaseName: loadCaseName ?? 'thermal',
+            ...(type === 'coupled_temperature_displacement' ? { thermal: emptyThermalSetup(scale) } : {}),
+          }
         : undefined;
     const mesh = defaultMeshControls(doc.units);
     const id = nextId('an');

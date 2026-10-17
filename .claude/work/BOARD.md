@@ -102,12 +102,13 @@ Agents are isolated; coordination is structural, run by the orchestrator:
 ## PHY-03 — Thermal analysis (`docs/physics/03-thermal-analysis/`)
 - `[DONE]` **THM-A** `thermal_analytic_check`, thermal units, `compute_view_factors` (V1-a + V1-b obstruction, explicit polygons) in core `commands/thermal/` (toolset `analysis`). Done 2026-10-16: VC-THM-01, 02, 06–13, 60 pass; deviations in TECHNICAL_SPEC §13.
 - `[DONE]` **THM-M0…M3, M4 decks** on the minimal 05 slice (`packages/domain-cae`, Proposal B, `docs/physics/FE_PIPELINE_DESIGN.md`): set-up commands, decks, summary + heat balance, `thermal_report`, `check_thermal`, `check_temperature_limits`, `dispose_thermal_limit` (refused until 09 PLM). Done 2026-10-16: VC-THM-01, 03, 04, 05, 14, 50, 61–63 through real Gmsh + ccx.
-- `[TODO]` **THM-V1** contact conductance deck, orthotropic k, h(T)/ε(T), render_view temperature; VC-THM-30; `llull guide` section.
+- `[DONE]` **THM-V1** contact conductance deck (VC-THM-11 FE), orthotropic k, steady h(T) film, VC-THM-30 measured (ccx F12 0.199834 vs 0.199825). Open: ε(T) (needs PHY-15), render_view temperature, `llull guide` section.
 
 ## PHY-04 — Thermo-mechanical & fits (`docs/physics/04-thermo-mechanical/`)
 - `[DONE]` **TMC-M1** `fit_at_temperature` (+ Lamé), `thermal_stress_check`, CTE conversions in core `commands/thermomech/` (toolset `analysis`). Done 2026-10-16: VC-TMC-01, 03–09, 62 pass. VC-TMC-09.b/c generator aligned with §5.3 (owner-approved).
 - `[DONE]` **TMC-M2…M3** `thermo_static`, `set_reference_temperature`, `set_temperature_field`, decks, `check_thermo_mechanical`, `thermal_distortion_report`, `dispose_fit_result` (refused until 09 PLM), staleness chain, `lib/expression` move. Done 2026-10-16: VC-TMC-01, 02 (LE11), 05, 08, 50, 60, 61, 63 through real Gmsh + ccx.
-- `[TODO]` **TMC-M4** coupled procedure, mesh mapping, VC-TMC-03.b (T1 needs plane stress / bonded meshes), `fea_import_field`.
+- `[DONE]` **TMC-M4a** `compute_margins` (05 §5.8) + VC-TMC-50 in full, `fea_import_field`, steady coupled procedure (`coupled_temperature_displacement`), mesh mapping (`mapping: interpolate`). Done 2026-10-17 (PHY-04 TECHNICAL_SPEC §14).
+- `[TODO]` **TMC-M4b** VC-TMC-03.a/.b as FE (nodal temperature step is mesh noise next to the interface; needs bonded multi-part meshes), transient coupled step, orthotropic CTE, fit stack-ups, bimetal FE.
 
 ## PHY-21 — Functional digital prototype (`docs/physics/21-functional-prototype/`)
 - `[DONE]` **FPR-A** Buildability gate (FUNCTIONAL_SPEC §5.1, TECHNICAL_SPEC M1 + joint realisation): kernel `analyze`/`distance` (both kernels) + face axes, `meshBvh`, `check_assembly` (validity, pairs, connectivity, ray thickness, process table, joint realisation), `doc.prototype` intents/grounding, `allow_interference` / `remove_interference_intent` / `set_part_grounded`; VC-FPR-01…09. _Lane 1+4. Done 2026-10-16 (merged 930fca4c): adds status `info`, codes `FPR_NO_PARTS`, `FPR_STALE_REFERENCE`, `FPR_JOINT_REALISED`, `FPR_WALL_MEASURED`; joint realisation OCC + dynamics revolute joints only; inputsHash = FNV-64 of canonical JSON (no sha256 in core)._

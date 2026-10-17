@@ -16,7 +16,10 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   TMC_FIELD_TABLE_UNMATCHED:
     're-export the table so every mesh node has a row within 1e-6 of the model size, or use a thermal_result field',
   TMC_THERMAL_RESULT_STALE: 're-solve the thermal case (fea_solve), then this one',
-  TMC_MESH_MISMATCH: 'mesh both cases with the same parts, mesh controls and targets (mapping interpolate is not built)',
+  TMC_MESH_MISMATCH:
+    'mesh both cases with the same parts and mesh controls, or set the field with mapping "interpolate" to map between different meshes',
+  TMC_MAPPING_PROJECTED:
+    'nodes outside the thermal mesh took the value at the nearest point: mesh the thermal case over the whole mechanical geometry, or review the mapped field',
   TMC_HUMAN_GATE: 'hand over to the qualified reviewer: a human signature verified by the signing port is required',
   TMC_FIT_INPUTS_CHANGED: 'recompute the fit (fit_at_temperature), then disposition the new row',
   FEA_RESULTS_MISSING: 'run fea_mesh and fea_solve on the analysis so the results artifact exists in the store',

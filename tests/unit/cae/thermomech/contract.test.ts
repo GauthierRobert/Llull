@@ -92,7 +92,7 @@ describe('PHY-04 agent-first contract (VC-TMC)', () => {
   });
 
   it('VC-TMC-50 (check side): editing the thermal case makes check_thermo_mechanical report TMC_THERMAL_RESULT_STALE', () => {
-    // fea_report(ms).state and compute_margins(ms) of the same case are judged by the 05 pack tests
+    // all three keys together (fea_report state, compute_margins code, check items) are judged in margins.test.ts
     const source = withThermalSource(thermoFixture());
     const edited = execute(source.fixture.doc, 'add_result_probe', {
       analysisId: source.thermalId,

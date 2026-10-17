@@ -10,7 +10,8 @@ import { setGeometryKernel } from '@core/geometry/kernel';
 import { EXIT_COMMAND_ERROR } from '../src/cli/main';
 import { createNodeOcctKernel } from '../src/occtNode';
 import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
-import { expectCase, planPath, Workspace } from './feaThermomechSupport';
+import { isRecord } from '@lib/isRecord';
+import { dataOf, expectCase, planPath, Workspace } from './feaThermomechSupport';
 
 const READY = HAS_GMSH && HAS_CCX;
 let workspace: Workspace;
@@ -78,11 +79,23 @@ describe.skipIf(!READY)('VC-TMC-05 thick cylinder, heat_steady then thermo_stati
     expectCase('VC-TMC-05.b', probes['outer_hoop'] ?? Number.NaN, 'MPa');
     expectCase('VC-TMC-05.c', probes['bore_axial'] ?? Number.NaN, 'MPa');
 
-    // VC-TMC-50: editing the thermal analysis makes its results stale, so the mechanical solve is refused
+    // VC-TMC-50 in full: editing the thermal analysis makes the mechanical result stale, its margins refused, its check item raised
     const edited = await session.cli('add_result_probe', `analysisId=${thermal}`, 'name=extra', 'point=[15,0,0]', 'quantity=temperature');
     expect(edited.code).toBe(0);
     const stale = await session.cli('fea_solve', `analysisId=${mechanical}`);
     expect(stale.code).toBe(EXIT_COMMAND_ERROR);
     expect(String(stale.json['summary'])).toContain('TMC_THERMAL_RESULT_STALE');
+    const report = await session.cli('fea_report', `analysisId=${mechanical}`);
+    const margins = await session.cli('compute_margins', `analysisId=${mechanical}`);
+    const check = await session.cli('check_thermo_mechanical', `analysisId=${mechanical}`);
+    const items = dataOf(check.json)['items'];
+    const errorCodes = (Array.isArray(items) ? items : []).flatMap((item: unknown) =>
+      isRecord(item) && item['severity'] === 'error' ? [String(item['code'])] : [],
+    );
+    expectCase('VC-TMC-50', {
+      'fea_report(ms).state': String(dataOf(report.json)['state']),
+      'compute_margins(ms).code': /: ([A-Z][A-Z0-9_]+) —/.exec(String(margins.json['summary']))?.[1] ?? null,
+      'check_thermo_mechanical(ms).items': errorCodes,
+    });
   }, 240_000);
 });

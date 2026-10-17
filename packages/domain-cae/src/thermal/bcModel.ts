@@ -1,10 +1,11 @@
 /** Thermal boundary condition assembly and validation shared by add_thermal_bc, update_thermal_bc and check_thermal. */
 
-import type { AnalysisCase, FeaTarget, Q, ThermalBc, ThermalBcRecord, ThermalSetup } from '@core/model/analysis';
+import type { AnalysisCase, FeaTarget, Q, TemperatureScale, ThermalBc, ThermalBcRecord, ThermalSetup } from '@core/model/analysis';
 import { is3D, type CadDocument } from '@core/model/types';
 import { z } from '@core/commands/schema';
 import { problem, type Problem } from './access';
-import { quantityProblem } from './quantities';
+import { absoluteZeroOf, quantityProblem } from './quantities';
+import { MAX_PLAUSIBLE_TEMPERATURE } from '../shared/quantity';
 import { quantitySchema } from '../shared/schemas';
 import { feaTargetSchema, targetProblem, toTarget, type FeaTargetInput } from '../shared/target';
 
@@ -23,6 +24,15 @@ export const plainSource = (source: SourceInput): NonNullable<ThermalBcRecord['s
   ...(source.locator !== undefined ? { locator: source.locator } : {}),
 });
 
+const filmTableSchema = z.object({
+  points: z
+    .array(z.tuple([z.number(), z.number()]))
+    .describe(
+      'Rows [surface temperature on the case temperature scale, h in W/(m^2*K)]: at least 2, strictly increasing temperature, h > 0.',
+    ),
+});
+type FilmTableInput = z.output<typeof filmTableSchema>;
+
 /** Flat BC fields as the commands receive them (a field the kind does not use is refused, never dropped). */
 export const bcFieldsSchema = {
   value: z
@@ -35,7 +45,13 @@ export const bcFieldsSchema = {
   unit: z.string().optional().describe("Unit of `value`, 08 grammar: 'degC', 'K', 'W/m^2', 'W/m^3', 'W'. Required with value."),
   filmCoefficient: quantitySchema
     .optional()
-    .describe('film only: h as { value, unit } in W/(m^2*K); > 0. Never defaulted: needs `source`.'),
+    .describe('film only: constant h as { value, unit } in W/(m^2*K); > 0. Never defaulted: needs `source`. Alternative: filmTable.'),
+  filmTable: filmTableSchema
+    .optional()
+    .describe(
+      'film only: h(T) of the FACE temperature T instead of filmCoefficient (heat_steady cases only, no amplitude): points [[T on the case ' +
+        'scale, h in W/(m^2*K)], ...], at least 2, strictly increasing T, h > 0; end values are held outside the rows. Needs `source`.',
+    ),
   sinkTemperature: quantitySchema
     .optional()
     .describe(
@@ -69,6 +85,7 @@ export interface BcFields {
   readonly value?: number | undefined;
   readonly unit?: string | undefined;
   readonly filmCoefficient?: Q | undefined;
+  readonly filmTable?: FilmTableInput | undefined;
   readonly sinkTemperature?: Q | undefined;
   readonly emissivity?: number | undefined;
   readonly mode?: 'density' | 'total' | undefined;
@@ -81,7 +98,7 @@ const USED: Readonly<Record<BcKind, readonly (keyof BcFields)[]>> = {
   surface_flux: ['value', 'unit', 'target'],
   concentrated_flux: ['value', 'unit', 'target'],
   heat_generation: ['value', 'unit', 'mode', 'entityId'],
-  film: ['filmCoefficient', 'sinkTemperature', 'target'],
+  film: ['filmCoefficient', 'filmTable', 'sinkTemperature', 'target'],
   radiation: ['emissivity', 'sinkTemperature', 'target'],
 };
 
@@ -108,11 +125,16 @@ export function assembleBc(kind: BcKind, fields: BcFields, previous?: ThermalBc)
   const targetOf = (): FeaTarget | undefined =>
     fields.target !== undefined ? toTarget(fields.target) : before !== undefined && 'target' in before ? before.target : undefined;
   if (kind === 'film') {
+    if (fields.filmCoefficient !== undefined && fields.filmTable !== undefined)
+      return problem('THM_FILM_INVALID', 'give filmCoefficient or filmTable, not both', [], ['filmTable']);
     const film =
-      fields.filmCoefficient ?? (before?.kind === 'film' && 'value' in before.filmCoefficient ? before.filmCoefficient : undefined);
+      fields.filmTable !== undefined
+        ? { table: { points: fields.filmTable.points } }
+        : (fields.filmCoefficient ?? (before?.kind === 'film' ? before.filmCoefficient : undefined));
     const sink = fields.sinkTemperature ?? (before?.kind === 'film' ? before.sinkTemperature : undefined);
     const target = targetOf();
-    if (film === undefined) return missing('THM_FILM_INVALID', 'filmCoefficient { value, unit }', 'filmCoefficient');
+    if (film === undefined)
+      return missing('THM_FILM_INVALID', 'filmCoefficient { value, unit } or filmTable { points }', 'filmCoefficient');
     if (sink === undefined) return missing('THM_UNITS_MISMATCH', 'sinkTemperature { value, unit }', 'sinkTemperature');
     if (target === undefined) return missing('FEA_TARGET_UNRESOLVED', 'a target with facesNear', 'target');
     return { kind, filmCoefficient: film, sinkTemperature: sink, target };
@@ -149,8 +171,27 @@ function targetUse(kind: BcKind, target: FeaTarget): string | null {
   return null;
 }
 
+/** Problem of a film table h(T) (rows [T on the case scale, h]); a CSV reference carries no rows and is refused. */
+function filmTableProblem(table: object, scale: TemperatureScale): Problem | null {
+  const fail = (text: string): Problem => problem('THM_FILM_INVALID', `film table: ${text}`, [], ['filmCoefficient']);
+  if (!('points' in table) || !Array.isArray(table.points))
+    return fail('give inline points [[T, h], ...] (a CSV reference is not supported)');
+  const points = table.points as readonly (readonly [number, number])[];
+  if (points.length < 2) return fail('at least 2 rows');
+  const floor = absoluteZeroOf(scale);
+  const ceiling = scale === 'K' ? MAX_PLAUSIBLE_TEMPERATURE.value : MAX_PLAUSIBLE_TEMPERATURE.value + floor;
+  for (const [index, [temperature, h]] of points.entries()) {
+    if (!Number.isFinite(temperature) || !Number.isFinite(h)) return fail(`row ${index} is not finite`);
+    if (!(h > 0)) return fail(`row ${index}: h ${h} must be > 0`);
+    if (!(temperature > floor) || temperature > ceiling)
+      return fail(`row ${index}: temperature ${temperature} ${scale} is outside (absolute zero, ceiling]`);
+    if (index > 0 && !(temperature > (points[index - 1]?.[0] ?? Number.NaN))) return fail('temperatures must be strictly increasing');
+  }
+  return null;
+}
+
 /** Quantity dimension and range problems of a BC (units, h > 0, 0 <= emissivity <= 1, finite values). */
-function valueProblem(bc: ThermalBc): Problem | null {
+function valueProblem(bc: ThermalBc, scale: TemperatureScale): Problem | null {
   const units = (path: string, text: string | null): Problem | null =>
     text === null ? null : problem('THM_UNITS_MISMATCH', `${path}: ${text}`, [], [path]);
   switch (bc.kind) {
@@ -163,7 +204,11 @@ function valueProblem(bc: ThermalBc): Problem | null {
     case 'heat_generation':
       return units('value', quantityProblem(bc.mode === 'total' ? 'power' : 'generation', bc.value));
     case 'film': {
-      if (!('value' in bc.filmCoefficient)) return null;
+      if (!('value' in bc.filmCoefficient)) {
+        return (
+          filmTableProblem(bc.filmCoefficient.table, scale) ?? units('sinkTemperature', quantityProblem('temperature', bc.sinkTemperature))
+        );
+      }
       const bad = units('filmCoefficient', quantityProblem('film', bc.filmCoefficient));
       if (bad !== null) return bad;
       if (!(bc.filmCoefficient.value > 0))
@@ -209,7 +254,6 @@ export function amplitudeIdOf(thermal: ThermalSetup, reference: string): string 
 /** Source problem: film and radiation need a non-empty citation. */
 function sourceProblem(bc: ThermalBc, source: ThermalBcRecord['source']): Problem | null {
   if (bc.kind !== 'film' && bc.kind !== 'radiation') return null;
-  if (bc.kind === 'film' && !('value' in bc.filmCoefficient)) return null;
   if (source !== undefined && source.citation.trim() !== '') return null;
   const what = bc.kind === 'film' ? 'film coefficient h' : 'emissivity';
   return problem('THM_SOURCE_REQUIRED', `the ${what} needs a source (citation); it is never defaulted`, [], ['source']);
@@ -222,12 +266,26 @@ export function recordProblem(
   thermal: ThermalSetup,
   record: ThermalBcRecord,
 ): Problem | null {
-  const value = valueProblem(record.bc);
+  const value = valueProblem(record.bc, thermal.temperatureScale);
   if (value !== null) return value;
   const source = sourceProblem(record.bc, record.source);
   if (source !== null) return source;
   const placed = placementProblem(doc, analysisCase, record.bc);
   if (placed !== null) return placed;
+  if (record.bc.kind === 'film' && !('value' in record.bc.filmCoefficient) && analysisCase.type !== 'heat_steady')
+    return problem(
+      'THM_FILM_INVALID',
+      'a film table h(T) is accepted in heat_steady cases only (not heat_transient or coupled): the tied gap conductance it is written as gave transient surface temperature rises 2-8 % off a constant film on ccx 2.21',
+      [],
+      ['filmCoefficient'],
+    );
+  if (record.bc.kind === 'film' && !('value' in record.bc.filmCoefficient) && record.amplitude !== undefined)
+    return problem(
+      'THM_FILM_INVALID',
+      'a film table h(T) cannot be scaled by an amplitude (the sink temperature must stay constant)',
+      [],
+      ['amplitude'],
+    );
   if (record.amplitude !== undefined && !Object.hasOwn(thermal.amplitudes, record.amplitude))
     return problem('THM_AMPLITUDE_INVALID', `amplitude '${record.amplitude}' does not exist`, [record.amplitude], ['amplitude']);
   return null;

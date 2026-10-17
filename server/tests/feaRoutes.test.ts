@@ -22,14 +22,16 @@ const fake: FeaToolsPort = {
     return Promise.resolve(ok(`solved ${id}`));
   },
   exportDeck: (id) => Promise.reject(new Error(`no deck for ${id}`)),
+  importField: (id) => Promise.resolve(ok(`imported ${id}`)),
 };
 const host = { port: null, allowCodeExecution: false, getDoc: createEmptyDocument, applyCommand: (): FeaToolResult => ok('') };
 
 describe('FE tool dispatch', () => {
-  it('defines fea_mesh / fea_solve / fea_export with a required analysisId', () => {
+  it('defines fea_mesh / fea_solve / fea_export / fea_import_field with a required analysisId', () => {
     const tools = buildFeaToolDefinitions();
-    expect(tools.map((tool) => tool.name)).toEqual(['fea_mesh', 'fea_solve', 'fea_export']);
-    for (const tool of tools) expect(tool.inputSchema.required).toEqual(['analysisId']);
+    expect(tools.map((tool) => tool.name)).toEqual(['fea_mesh', 'fea_solve', 'fea_export', 'fea_import_field']);
+    for (const tool of tools.slice(0, 3)) expect(tool.inputSchema.required).toEqual(['analysisId']);
+    expect(tools[3]?.inputSchema.required).toEqual(['analysisId', 'coordinatesUnit', 'temperatureUnit']);
   });
 
   it('routes calls to the port, passes timeoutS and turns throws into error results', async () => {

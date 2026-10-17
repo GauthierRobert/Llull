@@ -26,9 +26,19 @@ const sourceSchema = z.discriminatedUnion('kind', [
     temperatureUnit: z.enum(['degC', 'K', 'degF']).describe('Unit of the expression result.'),
   }),
   z.object({
-    kind: z.literal('thermal_result').describe('Nodal temperatures of a solved heat_steady / heat_transient analysis on the SAME mesh.'),
+    kind: z
+      .literal('thermal_result')
+      .describe('Nodal temperatures of a solved heat_steady / heat_transient analysis (same mesh, or mapping interpolate).'),
     analysisId: analysisIdSchema.describe('Id of the solved heat_* analysis that provides the temperatures.'),
     time: z.union([z.number(), z.literal('last')]).describe('Output time in seconds (an output time of the thermal results) or "last".'),
+    mapping: z
+      .enum(['same_mesh', 'interpolate'])
+      .optional()
+      .describe(
+        'same_mesh (default): the thermal case must be meshed identically (TMC_MESH_MISMATCH otherwise). interpolate: the thermal nodal ' +
+          'temperatures are interpolated with the shape functions of the containing thermal element at every node of this analysis mesh ' +
+          '(a node outside every thermal element takes the value at the nearest point of the nearest element and is counted).',
+      ),
   }),
   z.object({
     kind: z.literal('table').describe('Temperatures from a table of x, y, z, T rows stored in the artifact store, matched to mesh nodes.'),
@@ -54,17 +64,17 @@ function withSetup(doc: CadDocument, analysisId: string, setup: ThermoMechSetup)
 
 /**
  * @affects doc.analysis.cases[analysisId].thermomech.referenceTemperature (affected: [analysisId])
- * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; not thermo_static -> THM_CASE_TYPE; bad value / unit -> THM_UNITS_MISMATCH (refusals)
+ * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; not thermo_static / coupled -> THM_CASE_TYPE; bad value / unit -> THM_UNITS_MISMATCH (refusals)
  */
 export const setReferenceTemperature = defineCommand({
   name: 'set_reference_temperature',
   description:
-    'Set the stress-free (reference) temperature of a thermo_static analysis: the temperature at which the parts carry no thermal strain. ' +
+    'Set the stress-free (reference) temperature of a thermo_static or coupled_temperature_displacement analysis: the temperature at which the parts carry no thermal strain. ' +
     'Thermal strain is the secant CTE times (T - reference), and the reference is also the initial temperature of the solve. There is no ' +
     'default; it must be stated with a unit (degC, K, degF). Changing it makes recorded mesh-independent results stale.',
   annotations: { idempotent: true },
   params: z.object({
-    analysisId: analysisIdSchema.describe('Id of a thermo_static analysis.'),
+    analysisId: analysisIdSchema.describe('Id of a thermo_static or coupled_temperature_displacement analysis.'),
     value: z.number().describe('Reference temperature value in `unit`.'),
     unit: z.string().describe('Temperature unit: degC, K or degF.'),
   }),
@@ -79,12 +89,12 @@ export const setReferenceTemperature = defineCommand({
         [analysisId],
         ['analysisId'],
       );
-    if (analysisCase.type !== 'thermo_static')
+    if (analysisCase.type !== 'thermo_static' && analysisCase.type !== 'coupled_temperature_displacement')
       return refuseTmc(
         doc,
         'set_reference_temperature',
         'THM_CASE_TYPE',
-        `analysis '${analysisId}' is ${analysisCase.type}, not thermo_static`,
+        `analysis '${analysisId}' is ${analysisCase.type}, not thermo_static / coupled_temperature_displacement`,
         [analysisId],
       );
     const problem = temperatureProblem({ value, unit });
@@ -136,27 +146,31 @@ function sourceProblem(doc: CadDocument, source: SourceInput): { code: string; m
 }
 
 const toField = (source: SourceInput): TemperatureFieldSource =>
-  source.kind === 'thermal_result' ? { ...source, mapping: 'same_mesh' } : source;
+  source.kind === 'thermal_result' ? { ...source, mapping: source.mapping ?? 'same_mesh' } : source;
 
 /**
- * @affects doc.analysis.cases[analysisId].thermomech.field (and cteBasis per material when given; affected: [analysisId])
- * @invariant a thermal_result source must be a heat_* analysis; expressions read only x, y, z; units valid
- * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; not thermo_static -> THM_CASE_TYPE; missing / non-heat case or bad time / table units ->
- *   TMC_FIELD_SOURCE_INVALID; unparsable expression -> TMC_FIELD_INVALID; bad temperature -> THM_UNITS_MISMATCH (refusals)
+ * @affects doc.analysis.cases[analysisId].thermomech.field (when `source` is given) and cteBasis per material when given; affected: [analysisId]
+ * @invariant a thermal_result source must be a heat_* analysis; expressions read only x, y, z; units valid; a coupled case takes cteBasis only
+ * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; not thermo_static / coupled -> THM_CASE_TYPE; a source on a coupled case -> THM_CASE_TYPE;
+ *   neither source nor cteBasis -> FEA_PARAM_INVALID; missing / non-heat case or bad time / table units -> TMC_FIELD_SOURCE_INVALID; unparsable
+ *   expression -> TMC_FIELD_INVALID; bad temperature -> THM_UNITS_MISMATCH (refusals)
  */
 export const setTemperatureField = defineCommand({
   name: 'set_temperature_field',
   description:
     'Set the temperature field a thermo_static analysis is loaded with (replaces the previous one). source.kind: uniform (one value ' +
     'for all nodes), expression (a function of node coordinates x, y, z evaluated at every mesh node at deck time), thermal_result ' +
-    '(nodal temperatures of a SOLVED heat_steady / heat_transient analysis meshed identically, at an output time or "last"; a ' +
-    're-solved or edited thermal analysis makes this analysis stale) or table (x, y, z, T rows in the artifact store). Optional ' +
-    'cteBasis states, per material id, whether its cte property model is secant (about a reference temperature) or instantaneous; ' +
-    'without it a cte model of unstated basis is refused at solve time (a thermalStrain model needs none). Next: check_thermo_mechanical.',
+    '(nodal temperatures of a SOLVED heat_steady / heat_transient analysis at an output time or "last", on the same mesh or, with mapping ' +
+    '"interpolate", on a different mesh by shape-function interpolation; a ' +
+    're-solved or edited thermal analysis makes this analysis stale) or table (x, y, z, T rows in the artifact store, written by the ' +
+    'fea_import_field tool). Optional cteBasis states, per material id, whether its cte property model is secant (about a reference ' +
+    'temperature) or instantaneous; without it a cte model of unstated basis is refused at solve time (a thermalStrain model needs none). ' +
+    'Give source, cteBasis or both. A coupled_temperature_displacement analysis solves its own field: it takes cteBasis only (no source). ' +
+    'Next: check_thermo_mechanical.',
   annotations: { idempotent: true },
   params: z.object({
-    analysisId: analysisIdSchema.describe('Id of a thermo_static analysis.'),
-    source: sourceSchema.describe('Where the nodal temperatures come from.'),
+    analysisId: analysisIdSchema.describe('Id of a thermo_static (or, for cteBasis only, a coupled_temperature_displacement) analysis.'),
+    source: sourceSchema.optional().describe('Where the nodal temperatures come from; omit to leave the field unchanged (cteBasis only).'),
     cteBasis: z
       .record(z.string(), cteBasisSchema)
       .optional()
@@ -167,11 +181,25 @@ export const setTemperatureField = defineCommand({
       refuseTmc(doc, 'set_temperature_field', code, message, ids, paths);
     const analysisCase = caseOf(doc, analysisId);
     if (analysisCase === undefined) return fail('FEA_ANALYSIS_NOT_FOUND', `no analysis '${analysisId}'`, [analysisId], ['analysisId']);
-    const setup = thermomechOf(analysisCase);
-    if (setup === undefined) return fail('THM_CASE_TYPE', `analysis '${analysisId}' is ${analysisCase.type}, not thermo_static`);
-    const problem = sourceProblem(doc, source);
+    const coupled = analysisCase.type === 'coupled_temperature_displacement';
+    const setup = coupled ? analysisCase.thermomech : thermomechOf(analysisCase);
+    if (setup === undefined)
+      return fail(
+        'THM_CASE_TYPE',
+        `analysis '${analysisId}' is ${analysisCase.type}, not thermo_static / coupled_temperature_displacement`,
+      );
+    if (source === undefined && cteBasis === undefined)
+      return fail('FEA_PARAM_INVALID', 'give a source, a cteBasis or both', [analysisId], ['source', 'cteBasis']);
+    if (coupled && source !== undefined)
+      return fail(
+        'THM_CASE_TYPE',
+        `analysis '${analysisId}' is coupled_temperature_displacement: its temperature field is solved, not set (use add_thermal_bc; cteBasis only here)`,
+        [analysisId],
+        ['source'],
+      );
+    const problem = source === undefined ? null : sourceProblem(doc, source);
     if (problem !== null)
-      return fail(problem.code, problem.message, source.kind === 'thermal_result' ? [analysisId, source.analysisId] : [analysisId], [
+      return fail(problem.code, problem.message, source?.kind === 'thermal_result' ? [analysisId, source.analysisId] : [analysisId], [
         'source',
       ]);
     const bases: Record<string, CteBasisSpec> = { ...setup.cteBasis };
@@ -185,11 +213,19 @@ export const setTemperatureField = defineCommand({
         );
       bases[material] = basis;
     }
-    const next: ThermoMechSetup = { ...setup, field: toField(source), ...(Object.keys(bases).length > 0 ? { cteBasis: bases } : {}) };
-    const basisNote = cteBasis === undefined ? '' : `; cteBasis for ${Object.keys(cteBasis).join(', ') || 'no material'}`;
+    const next: ThermoMechSetup = {
+      ...setup,
+      ...(source !== undefined ? { field: toField(source) } : {}),
+      ...(Object.keys(bases).length > 0 ? { cteBasis: bases } : {}),
+    };
+    const basisNote = cteBasis === undefined ? '' : `cteBasis for ${Object.keys(cteBasis).join(', ') || 'no material'}`;
+    const fieldNote =
+      source === undefined
+        ? 'field unchanged'
+        : `field ${source.kind}${source.kind === 'thermal_result' ? ` from '${source.analysisId}' at ${String(source.time)}` : ''}`;
     return changed(
       withSetup(doc, analysisId, next),
-      `set_temperature_field: '${analysisId}' field ${source.kind}${source.kind === 'thermal_result' ? ` from '${source.analysisId}' at ${String(source.time)}` : ''}${basisNote}.`,
+      `set_temperature_field: '${analysisId}' ${fieldNote}${basisNote === '' ? '' : `; ${basisNote}`}.`,
       [analysisId],
     );
   },
