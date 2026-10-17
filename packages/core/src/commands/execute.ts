@@ -7,6 +7,7 @@ import { getCommand } from './commandTable';
 import { kernelUnavailable } from './kernelRefusal';
 import { commandError, rejection, unknownCommandError } from './noop';
 import { stepIdSource } from '../lib/id';
+import { withoutConfirmations } from '../lib/withoutConfirmations';
 import type { GeometryKernel } from '../geometry/kernel';
 import { blobText } from '../model/blobs';
 
@@ -24,16 +25,6 @@ function feedBlobs(doc: CadDocument, kernel: GeometryKernel | null): void {
     kernel.loadBlob(sha256, text);
     given.add(sha256);
   }
-}
-
-/**
- * Step params without a human signature (TR-MAT-51): the signature is checked by the command and never stored in the history or the saved file.
- * @invariant a `confirmation` object is replaced by `{ verified: true }`; params without one are returned as given
- */
-function withoutConfirmation(params: unknown): unknown {
-  if (typeof params !== 'object' || params === null || Array.isArray(params)) return params;
-  const confirmation: unknown = (params as Record<string, unknown>)['confirmation'];
-  return typeof confirmation === 'object' && confirmation !== null ? { ...params, confirmation: { verified: true } } : params;
 }
 
 /**
@@ -78,7 +69,7 @@ export function execute(doc: CadDocument, commandName: string, params: unknown, 
   const step: FeatureStep = {
     id: `step-${stepKey}`,
     name: commandName,
-    params: withoutConfirmation(params),
+    params: withoutConfirmations(params),
     suppressed: false,
     affected: result.affected,
   };

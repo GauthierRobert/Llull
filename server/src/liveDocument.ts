@@ -8,6 +8,7 @@ import { type CadDocument, createEmptyDocument } from '@core/model/types';
 import { serializeDocument, deserializeDocument } from '@core/commands/persistence/serialization';
 import { withoutPrivateValues } from '@core/commands/materials/libraryRecords';
 import { errorMessage } from '@lib/errorMessage';
+import { withoutConfirmations } from '@lib/withoutConfirmations';
 import { type LiveCommandEvent, type LiveCommandSource, type LiveSnapshotEvent, documentHash } from '@mcp/liveSync';
 import { setAuditDefaultDirectory } from './audit';
 import { isTestRun, positiveInteger } from './env';
@@ -135,7 +136,7 @@ export function setLiveDoc(next: CadDocument, command?: LiveCommand): void {
     epoch: _epoch,
     seq: _seq,
     name: command.name,
-    params: command.params,
+    params: withoutConfirmations(command.params),
     stateHash: documentHash(next),
     ...(command.source !== undefined ? { source: command.source } : {}),
     ...(command.commandId !== undefined ? { commandId: command.commandId } : {}),
