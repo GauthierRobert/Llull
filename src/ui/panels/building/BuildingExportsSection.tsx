@@ -1,7 +1,7 @@
 // Read-only exporter downloads: DXF plan, IFC4, SVG plan / elevation / section sheets, anchor bolt plan, DSTV NC1 per part.
 
 import React, { useState } from 'react';
-import { PAPER_SIZES } from '@aec/shared/sheetFrame';
+import { PAPER_SIZES } from '@core/model/sheet';
 import { isNcFilesData } from '@ui/resultData';
 import { runQuery } from '@ui/services/localQuery';
 import { PanelSection, StatusLine } from '@ui/panels/PanelParts';

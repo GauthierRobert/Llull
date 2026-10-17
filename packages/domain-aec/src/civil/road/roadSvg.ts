@@ -1,7 +1,7 @@
 /** Small SVG builders for the road drawings (long section, cross sections). Text is XML-escaped. */
 
 import { escapeXml } from '@lib/escapeXml';
-import { n, svgPoints } from '../../shared/sheetFrame';
+import { n, svgPoints } from '@core/geometry/drawingSvg';
 import { niceStep } from '@lib/niceStep';
 
 type Point = readonly [number, number];

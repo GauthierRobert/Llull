@@ -5,7 +5,7 @@ import { defineCommand, z, vec2, confirmExportControlled } from '@core/commands/
 import { noop, report, exportRefusal } from '@core/commands/noop';
 import { safeFileName } from '@lib/safeFileName';
 import { fileSlug, getBuilding } from '../../building/model';
-import { PAPER_SIZES } from '../../shared/sheetFrame';
+import { PAPER_SIZES } from '@core/model/sheet';
 import { alignmentIdParam } from '../road/roadParams';
 import { civilObjectOrNoop } from '../model';
 import { buildCivilPlanSheet } from './civilPlanSheet';
