@@ -102,7 +102,13 @@ describe('add_contour_flange (FR-FTR-13, VC-FTR-15)', () => {
       'path',
     );
     expectRefusal(doc, 'add_contour_flange', params(part, { path: [[0, 6]] }), 'FTR_FLANGE_TOO_SHORT', 'path');
-    expectRefusal(doc, 'add_contour_flange', params(part, { insideRadius: 0 }), 'FTR_SHARP_BEND_FORBIDDEN', 'insideRadius');
+    const sharp = expectRefusal(doc, 'add_contour_flange', params(part, { insideRadius: 0 }), 'FTR_SHARP_BEND_FORBIDDEN', 'insideRadius');
+    expect(sharp.error).toEqual({
+      code: 'FTR_SHARP_BEND_FORBIDDEN',
+      ids: [part],
+      paths: ['insideRadius'],
+      remediation: 'Use an inside radius >= the table minimum, or a rule with allowSharpBends.',
+    });
     expectRefusal(doc, 'add_contour_flange', params(part, { edge: { near: [20, 15, 40] } }), 'FTR_EDGE_NOT_STRAIGHT', 'edge.near');
     expectRefusal(doc, 'add_contour_flange', params('nope'), 'FTR_PART_NOT_FOUND', 'id');
     const strict = apply(doc, 'import_bend_radius_table', {
