@@ -55,7 +55,7 @@ function massOf(api: OccApi, shape: OccShape): { volume: number; area: number } 
   return out;
 }
 
-function boundsOf(api: OccApi, shape: OccShape): { min: Vec3; max: Vec3 } {
+export function boundsOf(api: OccApi, shape: OccShape): { min: Vec3; max: Vec3 } {
   const box = new api.Bnd_Box_1() as BoundingBox;
   api.BRepBndLib.Add(shape, box, false);
   const bounds = { min: xyz(box.CornerMin()), max: xyz(box.CornerMax()) };

@@ -10,7 +10,7 @@ import { entityToTriangles } from '@core/geometry/entityTriangles';
 import { entityBounds } from '@core/geometry/bounds';
 import { rotatedEntityBounds } from '@core/geometry/rotatedBounds';
 import { recipeOf } from '@core/geometry/shapeRecipe';
-import { entityMassProperties } from '@core/geometry/entityMassProperties';
+import { resolveMassProperties } from '@core/geometry/resolveMassProperties';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
 
@@ -93,7 +93,7 @@ describe('mesh entities honour their transform', () => {
     expectExtent(kernelExtent(mesh), expected);
     expectExtent(triangleExtent(mesh, moved), expected);
     expectExtent(entityBounds(mesh), expected);
-    const props = entityMassProperties(mesh, moved, () => 1);
+    const props = resolveMassProperties(moved, mesh, () => 1, {})?.properties;
     expect(props?.centerOfMass).toEqual([105, 10, 215]);
     expect(props?.mass).toBeCloseTo(6000, 9);
   });

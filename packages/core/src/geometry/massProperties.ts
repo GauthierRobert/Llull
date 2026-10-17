@@ -4,7 +4,9 @@
  */
 
 import type { Vec3 } from '../model/types';
+import { ORIGIN } from '../lib/vec3';
 import type { Triangle } from './triangles';
+import { boundsOfPoints } from './bounds';
 
 /** Inertia tensor components about the centre of mass, world axes: [Ixx, Iyy, Izz, Ixy, Ixz, Iyz] (Ixy = -∫xy dm convention). */
 export type InertiaTensor = readonly [number, number, number, number, number, number];
@@ -72,6 +74,29 @@ function volumeIntegrals(triangles: readonly Triangle[]): Integrals {
  * accepted: integrals are sign-normalised by the volume.
  */
 export function meshMassProperties(triangles: readonly Triangle[], density: number): MassProperties | null {
+  const frame = partFrameOrigin(triangles);
+  const local = frame === ORIGIN ? triangles : triangles.map(([a, b, c]): Triangle => [minus(a, frame), minus(b, frame), minus(c, frame)]);
+  const props = localMeshMassProperties(local, density);
+  if (props === null || frame === ORIGIN) return props;
+  const [cx, cy, cz] = props.centerOfMass;
+  return { ...props, centerOfMass: [cx + frame[0], cy + frame[1], cz + frame[2]] };
+}
+
+const minus = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+
+/**
+ * Part-frame origin (TR-KRN-41): the bounding-box centre rounded to 1 length unit. Integrating about it keeps the products of
+ * inertia free of the cancellation a part far from the origin would suffer; results are moved back by the caller.
+ */
+function partFrameOrigin(triangles: readonly Triangle[]): Vec3 {
+  if (triangles.length === 0) return ORIGIN;
+  const { min, max } = boundsOfPoints(triangles.flat());
+  const centre = (axis: 0 | 1 | 2): number => Math.round((min[axis] + max[axis]) / 2);
+  const origin: Vec3 = [centre(0) + 0, centre(1) + 0, centre(2) + 0];
+  return origin.every((c) => c === 0) || !origin.every(Number.isFinite) ? ORIGIN : origin;
+}
+
+function localMeshMassProperties(triangles: readonly Triangle[], density: number): MassProperties | null {
   const [v, x, y, z, xx, yy, zz, xy, yz, zx] = volumeIntegrals(triangles);
   if (!(Math.abs(v) > 1e-15) || !Number.isFinite(v)) return null;
   const sign = Math.sign(v);
@@ -90,7 +115,7 @@ export function meshMassProperties(triangles: readonly Triangle[], density: numb
 }
 
 /** Parallel-axis shift of `inertia` (about `from`, a mass `mass`) to the point `to`. */
-function shiftInertia(inertia: InertiaTensor, mass: number, from: Vec3, to: Vec3): InertiaTensor {
+export function shiftInertia(inertia: InertiaTensor, mass: number, from: Vec3, to: Vec3): InertiaTensor {
   const [dx, dy, dz] = [from[0] - to[0], from[1] - to[1], from[2] - to[2]];
   const [ixx, iyy, izz, ixy, ixz, iyz] = inertia;
   return [

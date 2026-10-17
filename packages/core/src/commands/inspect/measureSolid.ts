@@ -1,6 +1,6 @@
 import type { CadDocument, Entity, Vec3 } from '../../model/types';
 import type { CommandResult, ExecutionContext } from '../types';
-import { defineCommand, z } from '../schema';
+import { defineCommand, vec3, z } from '../schema';
 import { entityBoundsInDoc, mergeBounds } from '../../geometry/bounds';
 import { expandInstance } from '../../geometry/instanceExpansion';
 import type { Bounds } from '../../geometry/bounds';
@@ -9,6 +9,20 @@ import { childVolume, solidVolume } from './solidVolume';
 import { commandError, noop, report } from '../noop';
 import { kgPerM3FromDocDensity, resolveDensity, type DensityFallback } from '../../geometry/resolveDensity';
 import { convertValue, isUnitFailure } from '../../lib/quantity';
+import { resolveMassProperties, type ResolvedMass } from '../../geometry/resolveMassProperties';
+import { currentContext } from '../context';
+import {
+  NOT_APPROVED,
+  massDetail,
+  massProvenance,
+  methodReasons,
+  precisionWarnings,
+  reviewRequired,
+  type MassDetail,
+  type MassProvenance,
+  type MassWarning,
+  type ReviewRequired,
+} from './massReport';
 
 interface MeasureBoundingBoxData {
   min: Vec3;
@@ -73,10 +87,14 @@ const GRAMS_PER_POUND = 453.59237;
 const MASS_UNITS = ['g', 'kg', 'lb'] as const;
 type MassUnit = (typeof MASS_UNITS)[number];
 
-interface MassPropertiesData {
+interface MassPropertiesData extends Partial<MassDetail> {
   volume: number;
   volumeUnit: string;
-  method?: 'exact' | 'mesh';
+  method?: ResolvedMass['method'];
+  frame?: 'document' | 'entity';
+  provenance?: MassProvenance;
+  reviewRequired?: ReviewRequired;
+  warnings?: MassWarning[];
   /** g/(document unit)³ (the legacy `Material.density` unit); the mean over the parts of an instance. */
   density?: number;
   densityUnit?: string;
@@ -216,22 +234,29 @@ export const massProperties = defineCommand({
   name: 'mass_properties',
   annotations: { readOnly: true },
   description:
-    'Measure the volume of a 3D solid and, when a density is known, its mass. ' +
-    "Supported entity kinds: 'box' (w×h×d), 'cylinder' (π r² h), 'sphere' (4/3 π r³), 'extrusion' (profile area × depth), " +
-    "'mesh' (a kernel result with the OCC kernel: the exact B-rep volume; otherwise the signed-tetrahedra sum of its " +
-    "display triangles — data.method says which), 'cone', 'torus', 'wedge' (half the enclosing box), 'pyramid', " +
-    "'revolution' (Pappus's centroid theorem; a profile crossing the axis falls back to the bounding-box volume), " +
-    "'sweep' (round section: section area × exact path length; other sections: closed-mesh sum), 'loft', " +
-    "'subdivision' (closed-mesh sum), and 'instance' (assembly: the sum over its component solids, each with its " +
-    'own material, else the instance material, else the density param). 2D shape entities are rejected. ' +
+    'Measure the volume, area, centroid, inertia and (when a density is known) the mass of a 3D solid, in the document unit. ' +
+    "Supported entity kinds: 'box', 'cylinder', 'sphere' (closed forms), 'extrusion', 'cone', 'torus', 'wedge', 'pyramid', " +
+    "'revolution' (Pappus's centroid theorem; a profile crossing the axis falls back to the bounding-box volume), 'sweep' (round section: " +
+    "section area × exact path length), 'loft', 'subdivision', 'mesh' (a kernel result with the OCC kernel: the exact B-rep; otherwise its " +
+    "display triangles), and 'instance' (assembly: the combined mass, centroid and inertia of its component solids, each with its own " +
+    'material, else the instance material, else the density param). 2D shape entities are rejected. ' +
     'Density resolution, in order: the assigned material\'s density property model (define_property_model property "density"; the ' +
     "preferred one, read at 20 degC), else the material's plain density (create_material, g/(document-unit)³), else the density param. " +
-    'A material always wins over the param. With none, only the volume is returned. If a material has density models that cannot be used ' +
-    '(several and none preferred, or not valid at 20 degC), the command refuses with that code instead of falling back. ' +
-    'Returns data: { volume, volumeUnit (e.g. "mm³"), method? } and, when a density is known, { density (g/(document-unit)³), ' +
-    'densityKgPerM3, mass (in massUnit), massUnit, massG, massKg, massLb, densitySource (which value was used), densityDefaulted, ' +
-    'unverified, unverifiedReasons } (plus unit: "g" when massUnit is g). A plain material density or a param is always unverified ' +
-    '(no basis or source); a density model is unverified when its basis is typical / supplier_unstated / unspecified. Does not modify the document.',
+    'A material always wins over the param. With none, mass is not given and the inertia is per unit density. If a material has density ' +
+    'models that cannot be used (several and none preferred, or not valid at 20 degC), the command refuses with that code instead of falling back. ' +
+    'Method order: exact (OCC kernel B-rep integration) > closed-form (primitives; volume of cone, torus, revolution, ... with inertia from the ' +
+    'triangles scaled to it) > mesh (display triangles, integrated in a part frame so a part far from the origin keeps its precision). ' +
+    'Returns data: { volume, volumeUnit (e.g. "mm³"), method ("exact" | "closed-form" | "mesh"), centroid (document unit, in the chosen frame), ' +
+    'area and areaUnit when known, frame, inertia: { atCentroid, atOrigin (about `about`, default the frame origin), about, principal: ' +
+    '{ moments (ascending), axes (unit vectors, right-handed) }, radiiOfGyration, unit ("g·mm²" with a density, else "mm⁵ (per unit density)") } ' +
+    '(3x3 matrices, row-major, off-diagonals are -∫xy dm), provenance: { method, kernel: { name, ... }, inputs: { entityIds, recipeKey?, ' +
+    'densitySource } }, reviewRequired: { value, reasons[] }, warnings? (KRN_PRECISION_ENVELOPE when the part is beyond ±1e5 mm), relErrorEstimate? } ' +
+    'and, when a density is known, { density (g/(document-unit)³), densityKgPerM3, mass (in massUnit), massUnit, massG, massKg, massLb, ' +
+    'densitySource (which value was used), densityDefaulted, unverified, unverifiedReasons } (plus unit: "g" when massUnit is g). ' +
+    'A plain material density or a param is always unverified (no basis or source); a density model is unverified when its basis is typical / ' +
+    "supplier_unstated / unspecified; a mesh-integrated result adds 'method_mesh', a mesh body without a B-rep 'faceted_body'. " +
+    'reviewRequired.value is true for purpose weight-and-balance, any unverified reason, or a part outside the precision envelope; the summary ' +
+    'then says the figure is computed by llull, not approved, and needs a qualified engineer. Does not modify the document.',
   params: z.object({
     entityId: z
       .string()
@@ -257,8 +282,26 @@ export const massProperties = defineCommand({
       .enum(MASS_UNITS)
       .describe('Unit of data.mass and of the summary: g (default), kg or lb. massG / massKg / massLb are always given.')
       .optional(),
+    frame: z
+      .enum(['document', 'entity'])
+      .describe(
+        "Frame of data.centroid and data.inertia: 'document' (default; world axes, origin at the document origin) or 'entity' " +
+          "(axes and origin of the entity's own position / rotation).",
+      )
+      .optional(),
+    about: vec3(
+      'Optional point [x, y, z] in document length units, expressed in the chosen frame, about which data.inertia.atOrigin is taken ' +
+        '(parallel-axis theorem). Default: the frame origin [0, 0, 0].',
+    ).optional(),
+    purpose: z
+      .enum(['general', 'weight-and-balance'])
+      .describe(
+        "'general' (default) or 'weight-and-balance'. weight-and-balance marks the result reviewRequired (data.reviewRequired.value true): " +
+          'the figure is computed by llull and not approved; a qualified engineer must review it before it is used for flight or certification.',
+      )
+      .optional(),
   }),
-  run: (doc, { entityId, density, massUnit = 'g' }, ctx): CommandResult => {
+  run: (doc, { entityId, density, massUnit = 'g', frame = 'document', about, purpose = 'general' }, ctx): CommandResult => {
     const failed = (failure: MassFailure): CommandResult => ({
       ...noop(doc, `mass_properties: ${failure.error}`),
       ...(failure.code === undefined ? {} : { error: commandError(failure.code, failure.remediation ?? '', failure.ids ?? []) }),
@@ -277,19 +320,48 @@ export const massProperties = defineCommand({
       total = 'error' in mass ? mass : { ...measured, ...mass };
     }
     if ('error' in total) return failed(total);
-    const { volume, massG, method, approximation, sources } = total;
-    const volumeData = { volume, volumeUnit, ...(method === undefined ? {} : { method }) };
+    const { volume, massG, approximation, sources } = total;
+    const weighted = massG !== null && sources.length > 0;
+    const context = ctx ?? currentContext();
+    const densityOf = (solid: Entity): number => {
+      const resolvedDensity = weighted ? resolveDensity(doc, solid.materialId, fallback) : null;
+      return resolvedDensity?.available === true ? resolvedDensity.gPerDocUnit3 : 1;
+    };
+    const resolved = resolveMassProperties(doc, e, densityOf, context);
+    const method = resolved?.method ?? total.method;
+    const methodUnverified = resolved === null ? [] : methodReasons(resolved);
+    const unverifiedReasons = union(total.unverifiedReasons, methodUnverified);
+    const warnings = resolved === null ? [] : precisionWarnings(doc, e, resolved);
+    const review = reviewRequired(purpose, unverifiedReasons, warnings);
+    const detail: MassDetail | null = resolved === null ? null : massDetail(doc, e, resolved, frame, about, weighted);
+    const densitySource = sources.length === 1 ? (sources[0] ?? '') : sources.length === 0 ? 'none' : 'several (see densitySources)';
+    const volumeData: MassPropertiesData = {
+      volume,
+      volumeUnit,
+      ...(method === undefined ? {} : { method }),
+      ...(detail ?? {}),
+      ...(resolved === null ? {} : { frame, provenance: massProvenance(e, resolved, context, densitySource) }),
+      ...(unverifiedReasons.length > 0 && !weighted ? { unverified: true, unverifiedReasons } : {}),
+      reviewRequired: review,
+      ...(warnings.length > 0 ? { warnings } : {}),
+    };
     const shown = volume.toFixed(doc.displayPrecision);
     const note = approximation === undefined ? '' : ` (${approximation})`;
-    if (massG === null || sources.length === 0) {
+    const centroidNote =
+      detail === null
+        ? ''
+        : ` Centroid (${frame} frame) = ${detail.centroid.map((v) => formatLength(doc, v)).join(', ')}; principal moments = ` +
+          `${detail.inertia.principal.moments.map((m) => m.toPrecision(7)).join(', ')} ${detail.inertia.unit}; method ${method}.`;
+    const approval = review.value ? ` ${NOT_APPROVED} (${review.reasons.join('; ')}).` : '';
+    if (!weighted) {
       const how =
         method === 'exact' ? ' (exact B-rep)' : method === 'mesh' ? ' (display mesh; the OCC kernel gives the exact B-rep volume)' : '';
       const why = massG === null ? ' (no mass: some parts have no material density and no density param was given)' : '';
       const sign = approximation === undefined ? '=' : '≈';
       return report(
         doc,
-        `Volume of ${entityId} ${sign} ${shown} ${volumeUnit}${approximation === undefined ? how : note}${why}.`,
-        volumeData satisfies MassPropertiesData,
+        `Volume of ${entityId} ${sign} ${shown} ${volumeUnit}${approximation === undefined ? how : note}${why}.${centroidNote}${approval}`,
+        volumeData,
       );
     }
     const fallbackDensity = resolveDensity(doc, undefined, fallback);
@@ -307,17 +379,17 @@ export const massProperties = defineCommand({
       massG,
       massKg: massG / 1000,
       massLb: massG / GRAMS_PER_POUND,
-      densitySource: sources.length === 1 ? (sources[0] ?? '') : 'several (see densitySources)',
+      densitySource,
       ...(sources.length > 1 ? { densitySources: [...sources] } : {}),
       densityDefaulted: total.defaulted,
-      unverified: total.unverifiedReasons.length > 0,
-      unverifiedReasons: [...total.unverifiedReasons],
+      unverified: unverifiedReasons.length > 0,
+      unverifiedReasons,
     };
-    const flag = data.unverified === true ? ` Unverified density (${total.unverifiedReasons.join('; ')}).` : '';
+    const flag = data.unverified === true ? ` Unverified (${unverifiedReasons.join('; ')}).` : '';
     return report(
       doc,
       `Mass of ${e.kind === 'instance' ? 'assembly ' : ''}${entityId}: volume=${shown} ${volumeUnit}${note}, density=${meanDensity} g/${doc.units}³ (${data.densitySource}), ` +
-        `mass=${massUnit === 'g' ? mass.toFixed(doc.displayPrecision) : mass.toPrecision(7)} ${massUnit}.${flag}`,
+        `mass=${massUnit === 'g' ? mass.toFixed(doc.displayPrecision) : mass.toPrecision(7)} ${massUnit}.${flag}${centroidNote}${approval}`,
       data,
     );
   },

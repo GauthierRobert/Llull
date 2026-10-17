@@ -1,13 +1,8 @@
 import { type CadDocument, type Entity, is2D } from '../../model/types';
 import { signedMeshVolume } from '../../geometry/meshVolume';
 import type { ExecutionContext } from '../types';
-import { entityBounds } from '../../geometry/bounds';
 import { expandInstance } from '../../geometry/instanceExpansion';
-import { polygonArea, polygonCentroid } from '../../lib/polygon';
-import { chainLength } from '../../geometry/curveSegments';
-import { sweepTriangles } from '../../geometry/sweep';
-import { loftTriangles } from '../../geometry/loft';
-import { subdivisionTriangles } from '../../geometry/subdivision';
+import { closedFormVolume } from '../../geometry/closedFormVolume';
 import { currentContext } from '../context';
 
 /** Volume of one solid: how it was computed, or why it could not be. */
@@ -34,21 +29,6 @@ function exactVolume(e: Entity, ctx: ExecutionContext | undefined): number | nul
   return topology !== null && topology.volume > 0 ? topology.volume : null;
 }
 
-/** Round sections: annulus area × path length (Pappus); other sections: tessellated volume. */
-function sweepVolume(e: Extract<Entity, { kind: 'sweep' }>): number {
-  const { section } = e;
-  if (section.shape === 'circle' && e.stations === undefined) {
-    const bore = section.innerRadius ?? 0;
-    return Math.PI * (section.radius ** 2 - bore ** 2) * chainLength(e.path);
-  }
-  return closedMeshVolume(sweepTriangles(e).flat(2));
-}
-
-/** Volume of a closed, outward-wound triangle soup. */
-function closedMeshVolume(positions: number[]): number {
-  return Math.abs(signedMeshVolume(positions, []));
-}
-
 /**
  * Volume of one solid entity (instances: the sum of their baked solid children).
  * @failure instance with a missing component, or a non-solid kind -> { error }
@@ -60,57 +40,23 @@ export function solidVolume(doc: CadDocument, e: Entity, ctx: ExecutionContext |
         `entity '${e.id}' is kind '${e.kind}'; ` +
         "supported kinds are 'box', 'cylinder', 'sphere', 'extrusion', 'mesh', 'cone', 'torus', 'wedge', 'pyramid', 'revolution', 'sweep', 'loft', 'subdivision', 'instance'.",
     };
-  switch (e.kind) {
-    case 'box':
-      return { volume: e.size[0] * e.size[1] * e.size[2] };
-    case 'cylinder':
-      return { volume: Math.PI * e.radius * e.radius * e.height };
-    case 'sphere':
-      return { volume: (4 / 3) * Math.PI * e.radius * e.radius * e.radius };
-    case 'extrusion':
-      return { volume: polygonArea(e.profile) * e.depth };
-    case 'mesh': {
-      const exact = exactVolume(e, ctx);
-      return exact === null
-        ? { volume: Math.abs(signedMeshVolume(e.mesh.positions, e.mesh.indices)), method: 'mesh' }
-        : { volume: exact, method: 'exact' };
-    }
-    case 'cone':
-      return { volume: (Math.PI * e.radius * e.radius * e.height) / 3 };
-    case 'torus':
-      return { volume: 2 * Math.PI * Math.PI * e.ringRadius * e.tubeRadius * e.tubeRadius };
-    case 'wedge':
-      return { volume: (e.size[0] * e.size[1] * e.size[2]) / 2 };
-    case 'pyramid':
-      return { volume: (e.baseWidth * e.baseDepth * e.height) / 3 };
-    case 'instance': {
-      const component = doc.components[e.componentId];
-      if (!component) return { error: `instance '${e.id}' references missing component '${e.componentId}'.` };
-      // Bake the instance (scale, rotation, translation) and sum its solid children.
-      let volume = 0;
-      for (const child of expandInstance(e, component)) volume += childVolume(doc, child, ctx);
-      return { volume };
-    }
-    case 'revolution': {
-      // Pappus: V = sweepAngle * |centroid x| * profile area; profile x = distance from the axis. A profile crossing the axis falls back to
-      // the bounding-box volume.
-      if (e.profile.some(([x]) => x < 0)) {
-        const b = entityBounds(e);
-        return {
-          volume: (b.max[0] - b.min[0]) * (b.max[1] - b.min[1]) * (b.max[2] - b.min[2]),
-          approximation: 'bounding-box approximation — profile crosses revolution axis; Pappus requires profile x ≥ 0',
-        };
-      }
-      const profileArea = polygonArea(e.profile);
-      return { volume: profileArea < 1e-12 ? 0 : (e.angle ?? 2 * Math.PI) * Math.abs(polygonCentroid(e.profile)[0]) * profileArea };
-    }
-    case 'sweep':
-      return { volume: sweepVolume(e) };
-    case 'loft':
-      return { volume: closedMeshVolume(loftTriangles(e).flat(2)) };
-    case 'subdivision':
-      return { volume: closedMeshVolume(subdivisionTriangles(e).flat(2)) };
+  if (e.kind === 'mesh') {
+    const exact = exactVolume(e, ctx);
+    return exact === null
+      ? { volume: Math.abs(signedMeshVolume(e.mesh.positions, e.mesh.indices)), method: 'mesh' }
+      : { volume: exact, method: 'exact' };
   }
+  if (e.kind === 'instance') {
+    const component = doc.components[e.componentId];
+    if (!component) return { error: `instance '${e.id}' references missing component '${e.componentId}'.` };
+    let volume = 0;
+    for (const child of expandInstance(e, component)) volume += childVolume(doc, child, ctx);
+    return { volume };
+  }
+  const closed = closedFormVolume(e);
+  return closed === null
+    ? { error: `entity '${e.id}' is kind '${e.kind}'; it has no solid volume.` }
+    : { volume: closed.volume, ...(closed.approximation === undefined ? {} : { approximation: closed.approximation }) };
 }
 
 /** Volume of a baked instance child; 2D and unsupported children weigh nothing. */

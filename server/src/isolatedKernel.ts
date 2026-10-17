@@ -8,6 +8,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { MessageChannel, Worker, receiveMessageOnPort, type MessagePort } from 'node:worker_threads';
 import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle } from '@core/geometry/kernel';
+import type { ExactMassProperties } from '@core/geometry/kernelPorts';
 import { errorMessage } from '@lib/errorMessage';
 import { handleOf, keyOnlyHandle, SHAPE_NOT_CACHED } from '@core/geometry/shapeKernel';
 import type { FaceQueryPort } from '@core/geometry/kernelPorts';
@@ -222,6 +223,7 @@ export function createIsolatedKernel(options: IsolatedKernelOptions = {}): Isola
     topology: (shape) => shapeCall('topology', [shape], false) as ReturnType<GeometryKernel['topology']>,
     exportStep: (shapes) => shapeCall('exportStep', shapes, true) as ReturnType<GeometryKernel['exportStep']>,
     analyze: (shape) => shapeCall('analyze', [shape], false) as ShapeAnalysis | null,
+    massProperties: (shape) => shapeCall('massProperties', [shape], false) as ExactMassProperties | null,
     distance: (a, b, maxDistance) => shapeCall('distance', [a, b], false, [maxDistance]) as ShapeDistance | null,
     crashCount: () => crashes,
     recycleCount: () => recycles,

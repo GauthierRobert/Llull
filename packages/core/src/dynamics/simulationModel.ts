@@ -7,7 +7,8 @@ import type { CadDocument, Entity, Vec3 } from '../model/types';
 import { DEFAULT_SOLVER_SETTINGS, GROUND, type DynamicsModel, type DynamicsSolverSettings, type RigidBody } from '../model/dynamics';
 import { toMetres } from '../model/units';
 import { entityBoundsInDoc } from '../geometry/bounds';
-import { entityMassProperties } from '../geometry/entityMassProperties';
+import type { GeometryKernel } from '../geometry/kernel';
+import { resolveMassProperties } from '../geometry/resolveMassProperties';
 import { resolveDensity, type DensityFallback } from '../geometry/resolveDensity';
 import { combineMassProperties, type InertiaTensor, type MassProperties } from '../geometry/massProperties';
 import { RAD_PER_S_PER_RPM, appliedLoadsFor, speedServoGains } from './forceLaws';
@@ -37,8 +38,13 @@ export type BodyMassDistribution = Pick<BodyMassProperties, 'mass' | 'centerOfMa
 /**
  * Mass properties of `body` in SI units, or an error. Entity densities come from `resolveDensity`: the assigned material (density model,
  * else its plain density), else the body density (kg/m³), else steel, reported as a default. `massKg` rescales the whole distribution.
+ * With `kernel` (OCC) an exact B-rep part gets its exact inertia (`resolveMassProperties`).
  */
-export function bodyMassProperties(doc: CadDocument, body: RigidBody): BodyMassProperties | { error: string } {
+export function bodyMassProperties(
+  doc: CadDocument,
+  body: RigidBody,
+  kernel?: GeometryKernel | null,
+): BodyMassProperties | { error: string } {
   const metres = toMetres(doc, 1);
   const unitVolume = metres ** 3;
   const fallback: DensityFallback =
@@ -65,7 +71,7 @@ export function bodyMassProperties(doc: CadDocument, body: RigidBody): BodyMassP
   for (const id of body.entityIds) {
     const entity = doc.entities[id];
     if (entity === undefined) return { error: `body '${body.id}' references missing entity '${id}'` };
-    const props = entityMassProperties(entity, doc, densityOf);
+    const props = resolveMassProperties(doc, entity, densityOf, { kernel: kernel ?? null })?.properties ?? null;
     if (refused !== null) return refused;
     if (props === null) return { error: `body '${body.id}': entity '${id}' (${entity.kind}) has no solid volume` };
     parts.push(props);
@@ -171,7 +177,7 @@ function loopHalfSpan(doc: CadDocument, bodies: readonly (RigidBody | undefined)
 }
 
 /** The simulation model of the document's dynamics at integration step `timestep` (s), or the first problem that prevents simulating it. */
-export function buildSimulationModel(doc: CadDocument, timestep: number): BuiltSimulation | BuildRefusal {
+export function buildSimulationModel(doc: CadDocument, timestep: number, kernel?: GeometryKernel | null): BuiltSimulation | BuildRefusal {
   const dynamics = doc.dynamics;
   if (dynamics === undefined || Object.keys(dynamics.bodies).length === 0) return { error: 'no rigid bodies (add_rigid_body first)' };
   const metres = toMetres(doc, 1);
@@ -184,7 +190,7 @@ export function buildSimulationModel(doc: CadDocument, timestep: number): BuiltS
   for (const id of topology.bodyOrder) {
     const body = dynamics.bodies[id];
     if (body === undefined) continue;
-    const props = bodyMassProperties(doc, body);
+    const props = bodyMassProperties(doc, body, kernel);
     if ('error' in props) return props;
     mass[body.id] = props;
     const entry = body.fixed ? undefined : topology.jointOfBody.get(body.id);

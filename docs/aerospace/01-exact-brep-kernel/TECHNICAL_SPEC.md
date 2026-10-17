@@ -713,6 +713,29 @@ M7; `massProperties` M3 and `import_step_exact` M4 for XCH M1/M3), 02 / 03 / 05 
 
 ## 13. Implementation status (AERO-2)
 
+### 13.A Mass properties (M3)
+
+Built:
+
+- `GeometryKernel.massProperties` for OCC: `packages/kernel-occt/src/occtMass.ts`, wired in `kernelFromOps` (`KernelOps.massProperties`). The worker proxy forwards it (`server/src/isolatedKernel.ts`); the worker entry dispatches by operation name and needed no change. Manifold omits it.
+- Part-frame evaluation (TR-KRN-41): the shape is copied and translated by the bounding-box centre rounded to 1 mm, integrated there, and the centroid is shifted back. The mesh path does the same in `meshMassProperties`.
+- `@lib/symmetricEigen`: Jacobi eigen-decomposition of a symmetric 3×3 (ascending moments, right-handed unit axes, fixed sign rule). `shiftInertia` (parallel axis) is now exported from `geometry/massProperties.ts`.
+- `geometry/resolveMassProperties.ts` (TR-KRN-40a): exact kernel, then closed form, then mesh. The closed-form volumes moved to `geometry/closedFormVolume.ts`; `solidVolume` and the resolver share them. Box, cylinder and sphere moved to `geometry/primitiveMass.ts`; `entityMassProperties.ts` is gone. Instances combine children with `combineMassProperties`; a child without a material inherits the instance material.
+- `bodyMassProperties` and `buildSimulationModel` take an optional kernel; `add_rigid_body`, `simulate_motion` and `inspect_dynamics` pass `ctx.kernel`.
+- `mass_properties` (extended, nothing removed): `centroid`, `area`/`areaUnit`, `inertia { atCentroid, atOrigin, about, principal, radiiOfGyration, unit, frame }`, `method` (`exact`/`closed-form`/`mesh`), `relErrorEstimate`, `provenance`, `reviewRequired`, `warnings` (`KRN_PRECISION_ENVELOPE`), and params `frame`, `about`, `purpose`. Reasons `method_mesh` and `faceted_body` are added to `unverifiedReasons`. The summary appends "computed by llull, not approved — needs a qualified engineer" when review is required.
+
+Tests: `tests/unit/massResolver.test.ts` (Jacobi, analytic corpus, mesh part frame at 70 m, payload, failure paths, `is pure`, exact path with a fake kernel, dynamics) and `server/tests/occtMassProperties.test.ts` (real OCC: box 100×50×20 at the origin and at 70 m to 1e-12, cylinder and sphere to 1e-9, `mass_properties` on a kernel result).
+
+Deviations:
+
+- The adaptive integration uses `VolumeProperties_2` with eps 1e-12, not 1e-9: at 1e-9 the cylinder transverse inertia was off by 4e-8. There is no `eps` parameter yet.
+- `method` is `closed-form` where it was absent before. Loft, subdivision, non-round sweep and a revolution that crosses its axis now report `mesh` (their volume is a triangle sum).
+- Cone, torus, wedge, pyramid, extrusion, round sweep and revolution have a closed-form volume only; their centroid and inertia come from the triangles, scaled by closed-form volume / mesh volume.
+- A kernel with `topology` but no `massProperties` gives an exact volume with mesh inertia scaled to it (`method` stays `exact`; `method_mesh` is added to the unverified reasons).
+- `unverified` stays a boolean with `unverifiedReasons`, as AERO-1 shipped it; `reviewRequired` is an object.
+- Bounds in the envelope check come from the kernel (exact) or `entityBoundsInDoc`; the OCC bounds use `BRepBndLib.Add`, not `AddOptimal`.
+- No worker-proxy test: the OCC worker does not start in the build sandbox (`isolatedKernel.test.ts` times out there too).
+
 ### 13.B Face-query port (M10)
 
 Built: the OCC face-query port (TR-KRN-90..92), the worker proxy, and one agent command, `inspect_faces` (AF-01).

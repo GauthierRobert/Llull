@@ -1,14 +1,12 @@
 /**
- * Mass properties of one document entity in its world pose. Box, cylinder and sphere use exact closed forms (their display tessellation
- * loses ~1 % / ~4 % of the volume); every other solid integrates its world-space triangles. Instances combine their baked children.
+ * Closed-form mass properties of the box, cylinder and sphere primitives in their world pose: their display tessellation loses ~1 % / ~4 %
+ * of the volume, so these are never integrated from triangles.
  */
 
-import type { CadDocument, Entity, Vec3 } from '../model/types';
+import type { Entity, Vec3 } from '../model/types';
 import { applyEulerXYZ } from '../lib/eulerRotation';
 import { ORIGIN } from '../lib/vec3';
-import { expandInstance } from './instanceExpansion';
-import { combineMassProperties, meshMassProperties, type InertiaTensor, type MassProperties } from './massProperties';
-import { solidTriangles } from './solidTriangles';
+import type { InertiaTensor, MassProperties } from './massProperties';
 
 /** Rotate a principal (diagonal) inertia [a, b, c] given in the entity's local axes into world axes: I_w = R · diag · Rᵀ. */
 function rotatedPrincipalInertia([a, b, c]: Vec3, rotation: Vec3): InertiaTensor {
@@ -25,7 +23,7 @@ function rotatedPrincipalInertia([a, b, c]: Vec3, rotation: Vec3): InertiaTensor
 }
 
 /** Closed-form mass properties of a box / cylinder (local axis Z) / sphere about its centre; null for every other kind. */
-function primitiveMassProperties(e: Entity, density: number): MassProperties | null {
+export function primitiveMassProperties(e: Entity, density: number): MassProperties | null {
   if (e.kind === 'box') {
     const [w, h, d] = e.size;
     const volume = w * h * d;
@@ -49,23 +47,10 @@ function primitiveMassProperties(e: Entity, density: number): MassProperties | n
   return null;
 }
 
-/**
- * Mass properties (document length units; mass = density × volume) of a 3D entity; null for 2D shapes, empty meshes or an instance with
- * a missing component. `densityOf` picks each solid's density (instances pass their children through it).
- */
-export function entityMassProperties(
-  e: Entity,
-  doc: Pick<CadDocument, 'components'>,
-  densityOf: (solid: Entity) => number,
-): MassProperties | null {
-  if (e.kind === 'instance') {
-    const component = doc.components[e.componentId];
-    if (!component) return null;
-    const parts = expandInstance(e, component)
-      .map((child) => entityMassProperties(child, doc, densityOf))
-      .filter((part): part is MassProperties => part !== null);
-    return combineMassProperties(parts);
-  }
-  const density = densityOf(e);
-  return primitiveMassProperties(e, density) ?? meshMassProperties(solidTriangles(e), density);
+/** Surface area of a box / cylinder / sphere (closed forms); null for every other kind. */
+export function primitiveArea(e: Entity): number | null {
+  if (e.kind === 'box') return 2 * (e.size[0] * e.size[1] + e.size[0] * e.size[2] + e.size[1] * e.size[2]);
+  if (e.kind === 'cylinder') return 2 * Math.PI * e.radius * (e.radius + e.height);
+  if (e.kind === 'sphere') return 4 * Math.PI * e.radius * e.radius;
+  return null;
 }

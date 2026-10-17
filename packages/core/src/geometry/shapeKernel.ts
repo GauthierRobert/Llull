@@ -12,7 +12,7 @@
 
 import type { BooleanOp, Entity, MeshData, ShapeRecipe, Vec3 } from '../model/types';
 import type { GeometryKernel, ShapeAnalysis, ShapeDistance, ShapeHandle, ShapeTopology } from './kernel';
-import type { FaceQueryPort } from './kernelPorts';
+import type { ExactMassProperties, FaceQueryPort } from './kernelPorts';
 import { recipeKey } from './shapeRecipe';
 import { errorMessage } from '../lib/errorMessage';
 
@@ -51,6 +51,8 @@ export interface KernelOps<S> {
   exportStep(shapes: readonly S[]): string | null;
   /** Optional validity / lump report; a kernel without it leaves `GeometryKernel.analyze` undefined. */
   analyze?(shape: S): ShapeAnalysis | null;
+  /** Optional exact mass properties at unit density; a kernel without it leaves `GeometryKernel.massProperties` undefined. */
+  massProperties?(shape: S): ExactMassProperties | null;
   /** Optional minimum distance (searched up to `maxDistance`); a kernel without it leaves `GeometryKernel.distance` undefined. */
   distance?(a: S, b: S, maxDistance: number): ShapeDistance | null;
   /** Optional face-level queries (01 §5.9); a kernel without it leaves `GeometryKernel.faceQuery` undefined. */
@@ -251,6 +253,7 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
       return shape === null ? null : query(shape);
     }),
   );
+  const massOps = ops.massProperties?.bind(ops);
   return {
     ...(faceQuery === undefined ? {} : { faceQuery }),
     ...(ops.name === undefined ? {} : { name: ops.name }),
@@ -261,6 +264,15 @@ export function kernelFromOps<S>(ops: KernelOps<S>, capacity = 128): CachingKern
             call(() => {
               const shape = nativeOf(handle);
               return shape === null ? null : analyzeOps(shape);
+            }),
+        }),
+    ...(massOps === undefined
+      ? {}
+      : {
+          massProperties: (handle: ShapeHandle): ExactMassProperties | null =>
+            call(() => {
+              const shape = nativeOf(handle);
+              return shape === null ? null : massOps(shape);
             }),
         }),
     ...(distanceOps === undefined
