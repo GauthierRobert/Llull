@@ -14,7 +14,7 @@ import { inertiaAboutAxis, type BodyMassDistribution } from './simulationModel';
 import { sliderRate } from './slider';
 import type { Topology } from './topology';
 import { elementAt } from '../lib/elementAt';
-import { dot3 } from '../lib/vec3';
+import { dot3, scale3 } from '../lib/vec3';
 
 /** Cycle-energy closure gate, 0.5 % (named, FR-FPR-16). */
 const ENERGY_CLOSURE_GATE = 0.005;
@@ -298,7 +298,7 @@ export function engineData(input: EngineInput): EngineData | null {
   const ratio = evaluated ? Math.abs(simulatedWork - expected) / Math.abs(expected) : null;
   const crankJoint = input.dynamics.joints[crank];
   const crankBody = crankJoint === undefined ? undefined : input.mass[crankJoint.child];
-  const anchor = (crankJoint?.anchor ?? [0, 0, 0]).map((c) => c * input.metresPerUnit) as unknown as Vec3;
+  const anchor = scale3(crankJoint?.anchor ?? [0, 0, 0], input.metresPerUnit);
   const bodyInertia = crankJoint === undefined || crankBody === undefined ? 0 : inertiaAboutAxis(crankBody, anchor, crankJoint.axis);
   const reflected = reflectedInertia(input, crank, 1);
   const inertia = bodyInertia + reflected;
@@ -372,7 +372,7 @@ function reflectedInertia(input: EngineInput, jointId: string, factor: number): 
       const driven = input.dynamics.joints[gear.driven];
       const props = driven === undefined ? undefined : input.mass[driven.child];
       if (driven === undefined || props === undefined) return total;
-      const anchor = driven.anchor.map((c) => c * input.metresPerUnit) as unknown as Vec3;
+      const anchor = scale3(driven.anchor, input.metresPerUnit);
       const ratio = factor * gear.ratio;
       return total + inertiaAboutAxis(props, anchor, driven.axis) * ratio * ratio + reflectedInertia(input, gear.driven, ratio);
     }, 0);

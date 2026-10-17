@@ -8,7 +8,7 @@ import { GROUND, type DynamicJoint, type DynamicsModel } from '../model/dynamics
 import type { Vec3 } from '../model/vectors';
 import type { Topology } from './topology';
 import { elementAt } from '../lib/elementAt';
-import { cross3, dot3 } from '../lib/vec3';
+import { cross3, dot3, scale3 } from '../lib/vec3';
 
 /** Central-difference step in tree coordinates (rad or m). */
 const DIFFERENCE_STEP = 1e-7;
@@ -79,7 +79,7 @@ function rotationAbout(u: Vec3, angle: number): Mat3 {
 function jointMotion(joint: DynamicJoint, q: number, metresPerUnit: number): Pose {
   const axis = unit(joint.axis);
   if (joint.kind === 'prismatic') return { rotation: IDENTITY.rotation, translation: [axis[0] * q, axis[1] * q, axis[2] * q] };
-  const anchor = joint.anchor.map((c) => c * metresPerUnit) as unknown as Vec3;
+  const anchor = scale3(joint.anchor, metresPerUnit);
   const rotation = rotationAbout(axis, q);
   const turned = apply(rotation, anchor);
   return { rotation, translation: [anchor[0] - turned[0], anchor[1] - turned[1], anchor[2] - turned[2]] };
@@ -120,8 +120,8 @@ function loopResidual(topology: Topology, q: readonly number[], metresPerUnit: n
   const rows: number[] = [];
   for (const loop of topology.loops) {
     const [a, b] = [poseOf(loop.parent), poseOf(loop.child)];
-    const anchor = loop.anchor.map((c) => c * metresPerUnit) as unknown as Vec3;
-    const onChild = (loop.anchorOnChild ?? loop.anchor).map((c) => c * metresPerUnit) as unknown as Vec3;
+    const anchor = scale3(loop.anchor, metresPerUnit);
+    const onChild = scale3(loop.anchorOnChild ?? loop.anchor, metresPerUnit);
     const [pa, pb] = [transform(a, anchor), transform(b, onChild)];
     rows.push(pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2]);
     if (loop.kind === 'revolute') {
