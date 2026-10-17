@@ -45,6 +45,7 @@ export interface HoleSpec {
 }
 
 /**
+ * `exits` (up_to_face): the target face is where the material ends (its outward normal opposes the feature face normal): the tool overshoots it.
  * `depth`: cylindrical depth from the face (the drill point comes on top); `drillPointAngle` degrees, absent = flat bottom;
  * `drillPointDefaulted`: the angle is the 118 degree default, not an input (reported as such, AF-31).
  */
@@ -52,7 +53,7 @@ export type HoleExtent =
   | { readonly kind: 'blind'; readonly depth: number; readonly drillPointAngle?: number; readonly drillPointDefaulted?: boolean }
   | { readonly kind: 'through_all' }
   | { readonly kind: 'up_to_next'; readonly depth: number }
-  | { readonly kind: 'up_to_face'; readonly depth: number };
+  | { readonly kind: 'up_to_face'; readonly depth: number; readonly exits?: true };
 
 /**
  * Pocket outline = closed polygon (implicitly closed, local 2D); vertices are rounded by `cornerRadius` with exact arcs.

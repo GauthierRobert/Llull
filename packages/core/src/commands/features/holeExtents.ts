@@ -39,6 +39,18 @@ export function depthToFace(
   near: readonly [number, number, number],
   path: string,
 ): number | ExtentProblem {
+  const target = faceTarget(kernel, source, frame, near, path);
+  return 'why' in target ? target : target.depth;
+}
+
+/** `depth` as in `depthToFace`; `exits`: the face's outward normal opposes the feature face normal (the material ends at that face). */
+function faceTarget(
+  kernel: GeometryKernel,
+  source: ShapeRecipe,
+  frame: FeatureFrame,
+  near: readonly [number, number, number],
+  path: string,
+): { readonly depth: number; readonly exits: boolean } | ExtentProblem {
   const target = resolveFace(kernel, source, near);
   const paths = [path];
   if (target === 'not_found' || target === 'not_planar')
@@ -51,7 +63,7 @@ export function depthToFace(
     return { why: 'the target face is not parallel to the feature face', remediation: 'pick a face parallel to the feature face', paths };
   const depth = dot3(sub3(frame.origin, target.frame.origin), frame.normal);
   return depth > 0
-    ? depth
+    ? { depth, exits: dot3(target.frame.normal, frame.normal) < 0 }
     : { why: 'the target face lies at or above the feature face plane', remediation: 'pick a face below the feature face', paths };
 }
 
@@ -67,8 +79,11 @@ export function resolveExtents(
   pending: PendingExtent,
 ): ExtentGroup[] | ExtentProblem {
   if (pending.kind === 'up_to_face') {
-    const depth = depthToFace(kernel, source, frame, pending.near, 'extent.face.near');
-    return typeof depth === 'number' ? [{ points: [...points], extent: { kind: 'up_to_face', depth } }] : depth;
+    const target = faceTarget(kernel, source, frame, pending.near, 'extent.face.near');
+    if ('why' in target) return target;
+    return [
+      { points: [...points], extent: { kind: 'up_to_face', depth: target.depth, ...(target.exits ? { exits: true as const } : {}) } },
+    ];
   }
   const shape = kernel.evaluate(source);
   const mesh = shape === null ? null : kernel.tessellate(shape);

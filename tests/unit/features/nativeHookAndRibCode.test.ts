@@ -121,6 +121,8 @@ describe('lowering of the new feature members', () => {
     expect(faceBottom?.at(-2)).toEqual([2, -7]);
     const nextBottom = holeToolProfile({ kind: 'simple', diameter: 4 }, { kind: 'up_to_next', depth: 7 }, 99);
     expect((nextBottom?.at(-2)?.[1] ?? 0) < -7).toBe(true);
+    const exitBottom = holeToolProfile({ kind: 'simple', diameter: 4 }, { kind: 'up_to_face', depth: 7, exits: true }, 99);
+    expect(exitBottom?.at(-2)?.[1]).toBeCloseTo(nextBottom?.at(-2)?.[1] ?? 0, 12);
   });
 });
 

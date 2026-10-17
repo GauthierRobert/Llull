@@ -4,7 +4,7 @@
  * Tools reach `epsilon` above the face so no cut face is coplanar with it. Every kernel therefore accepts the node. A rib tool is the thickened
  * path extruded from the face plane and FUSED to the source.
  * @invariant through-all depth = the source's extent below the face plane (`throughReach`) + 2 epsilon; up_to_next = its resolved depth + 2
- *   epsilon (it leaves the material); up_to_face = exactly its resolved depth
+ *   epsilon (it leaves the material); up_to_face = exactly its resolved depth (+ 2 epsilon when the target face is where the material ends: no zero-thickness skin)
  * @failure inconsistent spec (cone deeper than the hole, bad outline or island, bad rib path) -> null
  */
 
@@ -76,8 +76,9 @@ export function holeToolProfile(hole: HoleSpec, extent: HoleExtent, reach: numbe
 function holeBottom(extent: HoleExtent, reach: number, eps: number): number {
   switch (extent.kind) {
     case 'blind':
-    case 'up_to_face':
       return extent.depth;
+    case 'up_to_face':
+      return extent.depth + (extent.exits === true ? 2 * eps : 0);
     case 'up_to_next':
       return extent.depth + 2 * eps;
     case 'through_all':
