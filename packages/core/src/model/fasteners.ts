@@ -8,24 +8,37 @@ import type { Provenance } from './propertyModel';
 import type { LicenceFlag } from './materialLibrary';
 import type { Vec3 } from './vectors';
 
-export type FastenerKind = 'bolt' | 'hi_lok_pin' | 'solid_rivet' | 'blind_rivet' | 'lockbolt' | 'nut' | 'washer' | 'collar' | 'insert';
+type FastenerKind = 'bolt' | 'hi_lok_pin' | 'solid_rivet' | 'blind_rivet' | 'lockbolt' | 'nut' | 'washer' | 'collar' | 'insert';
 
 /** One ordered field of a part-number grammar. */
 export type PartNumberField =
   | { readonly kind: 'literal'; readonly text: string }
   | { readonly kind: 'code'; readonly name: string; readonly table: Readonly<Record<string, string>> }
-  | { readonly kind: 'int'; readonly name: string; readonly scale?: number; readonly unit?: string; readonly optional?: boolean };
+  | {
+      readonly kind: 'int';
+      readonly name: string;
+      /** Value of one unit of the integer (the grip dash `10` with scale 0.0625 `in` is 0.625 in). */
+      readonly scale?: number;
+      readonly unit?: string;
+      readonly optional?: boolean;
+      /** Zero-padded digit count when printed and exact digit count when decoded (`NAS62` + `04`); absent: any number of digits. */
+      readonly width?: number;
+    };
 
-export interface FastenerDimension {
+interface FastenerDimension {
   readonly min?: number;
   readonly max?: number;
   readonly nominal?: number;
+  /** Discrete catalogue values (a washer's available thicknesses), in `unit`. */
+  readonly options?: readonly number[];
   readonly unit: string;
   readonly provenance: Provenance;
 }
 
 export interface FastenerSize {
   readonly dash: string;
+  /** Full part number of a nut/washer size whose grammar has choices (`MS21042L3`); absent: formatted from the grammar. */
+  readonly partNumber?: string;
   readonly nominalDiameter: Quantity;
   readonly thread?: string;
   readonly threadsPerInch?: number;
@@ -55,11 +68,16 @@ export interface FastenerStack {
   readonly id: string;
   readonly axis: { readonly origin: Vec3; readonly direction: Vec3 };
   readonly layers: ReadonlyArray<{ readonly entityId: string; readonly thickness: number }>;
-  readonly fastener: { readonly family: string; readonly partNumber: string; readonly instanceId: string };
+  readonly fastener: { readonly family: string; readonly partNumber: string; readonly instanceId: string; readonly diameterDash: string };
   readonly washers: ReadonlyArray<{ readonly partNumber: string; readonly instanceId: string; readonly side: 'head' | 'nut' }>;
   readonly nut?: { readonly partNumber: string; readonly instanceId: string };
   /** Stack thickness in document units when inserted (regrip check). */
   readonly stackThickness: number;
+  readonly holeMode: 'cut_close_tolerance' | 'cut_clearance' | 'none';
+  /** Hole diameter in document units (0 when `holeMode` is `none`). */
+  readonly holeDiameter: number;
+  /** Id of the first stack of the row this stack was placed with (`insert_fastener_row`). */
+  readonly rowId?: string;
 }
 
 /** `CadDocument.fasteners`: catalogues by family id and placed stacks by id. */
