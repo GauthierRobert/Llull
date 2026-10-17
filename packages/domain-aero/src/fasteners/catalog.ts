@@ -1,5 +1,18 @@
 /** Standard-part fastener commands (08 MAT §4.2), toolset `fasteners`. */
 
-import type { CommandDefinition } from '@core/commands/types';
+import { commandCatalog } from '@core/commands/schema';
+import { decodePartNumber, importFastenerCatalog, listFastenerFamilies } from './catalogCommands';
+import { deleteFastenerStack, insertFastenerStack, selectFastener } from './insertCommands';
+import { checkFastenerLayout } from './layoutCommand';
+import { insertFastenerRow } from './rowCommand';
 
-export const fastenerCommands: ReadonlyArray<CommandDefinition<unknown>> = [];
+export const fastenerCommands = commandCatalog(
+  importFastenerCatalog,
+  listFastenerFamilies,
+  decodePartNumber,
+  selectFastener,
+  insertFastenerStack,
+  insertFastenerRow,
+  checkFastenerLayout,
+  deleteFastenerStack,
+);

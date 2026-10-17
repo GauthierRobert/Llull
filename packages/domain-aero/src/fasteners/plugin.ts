@@ -2,9 +2,12 @@
 
 import type { CadPlugin } from '@core/plugins/plugin';
 import { fastenerCommands } from './catalog';
+import { fastenerInstanceGuard, fastenersDocument } from './document';
 
 export const fastenersPlugin: CadPlugin = {
   name: 'fasteners',
   toolset: 'fasteners',
   commands: fastenerCommands,
+  guards: [fastenerInstanceGuard],
+  document: fastenersDocument,
 };
