@@ -7,9 +7,9 @@ import type { CadDocument } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { report } from '../noop';
-import { exportGate } from './exportGate';
+import { exportGate } from '../../model/exportGate';
 import { markingText } from './marking';
-import { materialsInUse } from './materialsInUse';
+import { materialsInUse } from '../../model/materialsInUse';
 import { preferredConflicts } from './propertyKey';
 
 export interface MaterialCheckItem {

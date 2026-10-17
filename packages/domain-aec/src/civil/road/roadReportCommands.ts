@@ -6,8 +6,8 @@
 import type { CadDocument } from '@core/model/types';
 import type { AlignmentObject } from '@core/model/civil';
 import type { CommandResult } from '@core/commands/types';
-import { commandCatalog, defineCommand, z } from '@core/commands/schema';
-import { noop, report } from '@core/commands/noop';
+import { commandCatalog, defineCommand, z, confirmExportControlled } from '@core/commands/schema';
+import { noop, report, exportRefusal } from '@core/commands/noop';
 import { safeFileName } from '@lib/safeFileName';
 import { alignmentLength } from '../alignment/alignmentGeometry';
 import { civilObjectOrNoop, getCivil } from '../model';
@@ -98,11 +98,14 @@ export const exportLongSection = defineCommand({
     'set_alignment_profile; ground needs a linked surface. Vertical exaggeration scales the vertical axis against the horizontal one.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
+    confirmExportControlled,
     alignmentId: alignmentIdParam,
     verticalExaggeration: z.number().optional().describe('Vertical / horizontal scale ratio (> 0). Default 10.'),
     interval: intervalField('Table column', 'the station interval'),
   }),
-  run: (doc, params): CommandResult => {
+  run: (doc, params, ctx): CommandResult => {
+    const refused = exportRefusal(doc, 'export_long_section', 'sheet', params.confirmExportControlled, ctx);
+    if (refused !== null) return refused;
     const checked = checkedAlignment(doc, params, 'export_long_section');
     if ('summary' in checked) return checked;
     const { alignment, interval } = checked;
@@ -132,8 +135,10 @@ export const exportCrossSections = defineCommand({
     'the road template with batters to daylight, and the cut / fill areas (m2), all at one 1:1 scale. Needs set_alignment_profile and ' +
     'set_road_section; ground and areas need a linked surface. At most 60 stations are drawn (the spacing is widened).',
   annotations: { readOnly: true, idempotent: true },
-  params: z.object({ alignmentId: alignmentIdParam, interval: intervalField('Section', 'the station interval') }),
-  run: (doc, params): CommandResult => {
+  params: z.object({ confirmExportControlled, alignmentId: alignmentIdParam, interval: intervalField('Section', 'the station interval') }),
+  run: (doc, params, ctx): CommandResult => {
+    const refused = exportRefusal(doc, 'export_cross_sections', 'sheet', params.confirmExportControlled, ctx);
+    if (refused !== null) return refused;
     const checked = checkedAlignment(doc, params, 'export_cross_sections');
     if ('summary' in checked) return checked;
     const { alignment } = checked;

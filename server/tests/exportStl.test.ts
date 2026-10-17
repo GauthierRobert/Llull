@@ -65,3 +65,25 @@ describe('GET /export/stl', () => {
     expect(res.text.startsWith('solid ')).toBe(true);
   });
 });
+
+describe('GET /export/* of export-controlled content (TR-MAT-51)', () => {
+  const controlledBox = (): void => {
+    applyCommand('define_material_record', {
+      id: 'secret',
+      designation: 'X',
+      specs: [],
+      licence: 'company-proprietary',
+      exportMarking: { regime: 'ITAR' },
+    });
+    const box = applyCommand('add_box', { size: [2, 2, 2], position: [0, 0, 0] });
+    applyCommand('assign_material', { materialName: 'secret', entityIds: box.affected });
+  };
+
+  it.each(['/export/stl', '/export/code'])('%s answers 403 with the gate code, not a 500 "no data"', async (route) => {
+    controlledBox();
+    const res = await request(app).get(route);
+    expect(res.status).toBe(403);
+    expect(res.body).toMatchObject({ code: 'MAT_EXPORT_CONTROLLED' });
+    expect(String(res.body.error)).toContain('MAT_EXPORT_CONTROLLED');
+  });
+});

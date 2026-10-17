@@ -5,10 +5,10 @@
 
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
-import { defineCommand, z } from '@core/commands/schema';
+import { defineCommand, z, confirmExportControlled } from '@core/commands/schema';
 import { toMm } from '@core/model/units';
 import { fileSlug, getBuilding } from '../model';
-import { noop, report } from '@core/commands/noop';
+import { noop, report, exportRefusal } from '@core/commands/noop';
 import { buildPlanDrawing } from './planDrawing';
 import { DrawingPainter } from '../../shared/drawingSvg';
 import {
@@ -88,12 +88,15 @@ export const exportPlanSheet = defineCommand({
     '1:100…; auto-fitted when omitted) on ISO paper A4–A0 landscape, with wall poché, doors, windows, grids, room tags, dimensions in ' +
     'mm, north arrow, scale bar and a title block filled from set_project_info. data.svg holds the file text.',
   params: z.object({
+    confirmExportControlled,
     levelId: z.string().optional().describe('Level to draw. Default: active level.'),
     paper: PAPER_FIELD,
     scale: SCALE_FIELD,
     title: z.string().optional().describe('Drawing title. Default "<level> — Floor plan".'),
   }),
-  run: (doc, { levelId, paper = 'A3', scale, title }): CommandResult => {
+  run: (doc, { confirmExportControlled, levelId, paper = 'A3', scale, title }, ctx): CommandResult => {
+    const refused = exportRefusal(doc, 'export_plan_sheet', 'sheet', confirmExportControlled, ctx);
+    if (refused !== null) return refused;
     const sheet = buildPlanSheet(doc, levelId, paper, scale, title);
     if (!sheet) return noop(doc, 'export_plan_sheet failed: no such level (add_level / draw_walls first) or invalid scale (must be > 0).');
     return report(

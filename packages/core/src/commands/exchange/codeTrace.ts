@@ -179,6 +179,7 @@ function replaceBase(doc: CadDocument): CadDocument {
     layers: doc.layers,
     layerOrder: doc.layerOrder,
     materials: doc.materials,
+    ...(doc.materialLibraries !== undefined ? { materialLibraries: doc.materialLibraries } : {}),
   };
 }
 

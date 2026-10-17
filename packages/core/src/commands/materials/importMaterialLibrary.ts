@@ -1,6 +1,7 @@
 /** import_material_library / remove_material_library (08 MAT M3): material libraries with licence, export marking and content hash. */
 
-import type { MaterialLibraryEntry } from '../../model/materialLibrary';
+import { humanGate } from '../../model/humanGate';
+import { markingRank, type ExportMarking, type MaterialLibraryEntry } from '../../model/materialLibrary';
 import type { CadDocument } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
@@ -22,9 +23,10 @@ const usersOf = (doc: CadDocument, materialIds: ReadonlySet<string>): string[] =
  * @affects CadDocument.materialLibraries[id]; CadDocument.materials (one record per library material, values included)
  * @invariant the library hash is sha256 of its canonical JSON; records pin { libraryId, version, sha256 }; an inline library is embedded only;
  *   a private library arrives by reference and its step params carry no value (TR-MAT-31)
+ * @invariant replace never lowers an export marking (library or record) without a verified human confirmation
  * @failure invalid library MAT_LIBRARY_INVALID (or the model code); licensed-no-redistribution embedded MAT_LICENCE_EMBED_FORBIDDEN; private inline
  *   MAT_LIBRARY_PRIVATE_INLINE; hash differs MAT_LIBRARY_HASH_MISMATCH; no provider / file MAT_LIBRARY_UNRESOLVED; known library without replace
- *   MAT_LIBRARY_EXISTS; id clash with a material MAT_RECORD_EXISTS; dropped record still assigned MAT_RECORD_IN_USE (all rejections)
+ *   MAT_LIBRARY_EXISTS; id clash with a material MAT_RECORD_EXISTS; dropped record still assigned MAT_RECORD_IN_USE; replace lowering a marking without a verified confirmation MAT_HUMAN_GATE (all rejections)
  */
 export const importMaterialLibrary = defineCommand({
   name: IMPORT,
@@ -46,6 +48,13 @@ export const importMaterialLibrary = defineCommand({
     version: z.string().optional().describe('Version of that library file.'),
     sha256: z.string().optional().describe('Expected content hash. Required with libraryId; optional check with an inline library.'),
     replace: z.boolean().optional().describe('Replace an already imported library of the same id (a new version); default false.'),
+    confirmation: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe(
+        'Human signature object (with a nonce), required only when replace would LOWER the export marking of the library or of a record ' +
+          '(for example ITAR → none). An agent cannot give it: MAT_HUMAN_GATE.',
+      ),
   }),
   run: (doc, params, ctx): CommandResult => {
     const label = params.libraryId ?? (typeof params.library?.['id'] === 'string' ? params.library['id'] : 'library');
@@ -91,6 +100,30 @@ export const importMaterialLibrary = defineCommand({
         'library',
         stillUsed,
       );
+    const lowered: Array<{ id: string; from: ExportMarking; to: ExportMarking }> = [];
+    if (previous !== undefined && markingRank(library.exportMarking) < markingRank(previous.exportMarking))
+      lowered.push({ id: library.id, from: previous.exportMarking, to: library.exportMarking });
+    for (const material of library.materials) {
+      const before = outgoing.has(material.id) ? doc.materials[material.id]?.record?.exportMarking : undefined;
+      if (before !== undefined && markingRank(material.exportMarking) < markingRank(before))
+        lowered.push({ id: material.id, from: before, to: material.exportMarking });
+    }
+    if (lowered.length > 0) {
+      const gate = humanGate(
+        ctx?.humanSignature ?? null,
+        'lowering an export marking',
+        lowered.map((entry) => entry.id),
+        params.confirmation,
+        { lowered },
+      );
+      if (!gate.cleared)
+        return refuse(
+          'MAT_HUMAN_GATE',
+          `${gate.reason} (${lowered.map((entry) => `${entry.id}: ${markingText(entry.from)} → ${markingText(entry.to)}`).join(', ')})`,
+          'confirmation',
+          lowered.map((entry) => entry.id),
+        );
+    }
     const ref = refOf(library, sha256);
     const kept = Object.fromEntries(Object.entries(doc.materials).filter(([name]) => !outgoing.has(name)));
     const materials = {

@@ -7,11 +7,11 @@ import type { BasePlateElement, MomentConnectionElement, SteelMemberElement } fr
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { unknownLevelFailure } from '../../building/levelLookup';
-import { defineCommand, z } from '@core/commands/schema';
+import { defineCommand, z, confirmExportControlled } from '@core/commands/schema';
 import { toMm } from '@core/model/units';
 import { getBuilding, orderedElements } from '../../building/model';
 import { round } from '../../shared/numeric';
-import { noop, report } from '@core/commands/noop';
+import { noop, report, exportRefusal } from '@core/commands/noop';
 import { sweepFrame } from '../../shared/mesh';
 import { findProfile, STEEL_DENSITY_KG_PER_M3 } from '../../steel/profiles';
 import { connectionSolids, plateLayout, type ConnectionSolid, type PlateLayout } from '../connections/evaluateConnections';
@@ -129,6 +129,7 @@ export const exportNcFiles = defineCommand({
     'end plates become separate code-B files with an AK contour and BO holes. Identical pieces are grouped into one file with a ' +
     'quantity. All numbers are millimetres whatever the document unit. data.files[].content holds each NC1 file text.',
   params: z.object({
+    confirmExportControlled,
     memberIds: z
       .array(z.string())
       .optional()
@@ -136,7 +137,9 @@ export const exportNcFiles = defineCommand({
     includePlates: z.boolean().optional().describe('Also export base plates and connection end plates as separate NC files. Default true.'),
     levelId: z.string().optional().describe('Only export pieces of this level id. Default: all levels.'),
   }),
-  run: (doc, params): CommandResult => {
+  run: (doc, params, ctx): CommandResult => {
+    const refused = exportRefusal(doc, 'export_nc_files', 'data', params.confirmExportControlled, ctx);
+    if (refused !== null) return refused;
     const { memberIds, includePlates = true, levelId } = params;
     const building = getBuilding(doc);
     const unknownLevel = unknownLevelFailure(doc, 'export_nc_files', levelId);

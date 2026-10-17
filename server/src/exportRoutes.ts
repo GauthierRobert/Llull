@@ -18,6 +18,15 @@ function sendDownload(res: Response, fileName: string, contentType: string, body
   res.status(200).end(body);
 }
 
+const GATE_CODES: ReadonlySet<string> = new Set(['MAT_EXPORT_CONTROLLED', 'MAT_HUMAN_GATE']);
+
+/** 403 with the gate's code and summary when the export gate refused (export-controlled content, TR-MAT-51); else the route's own status. */
+function gateRefusal(res: Response, code: string | undefined, text: string): boolean {
+  const gate = code !== undefined ? GATE_CODES.has(code) : [...GATE_CODES].some((known) => text.includes(known));
+  if (gate) res.status(403).json({ error: text, code: code ?? [...GATE_CODES].find((known) => text.includes(known)) });
+  return gate;
+}
+
 export function buildExportRouter(exchange: ExchangeOptions): Router {
   const router = Router();
   router.use(guardRead());
@@ -27,8 +36,9 @@ export function buildExportRouter(exchange: ExchangeOptions): Router {
     const name = safeFileName(req.query['name']);
     const result = applyCommand('export_stl', { format, name });
     const file = isRecord(result.data) ? fileOfRecord(result.data) : null;
-    if (file === null) res.status(500).json({ error: `export_stl returned no ${format} data.` });
-    else sendDownload(res, `${name}.stl`, 'model/stl', file.bytes);
+    if (file === null) {
+      if (!gateRefusal(res, result.error?.code, result.summary)) res.status(500).json({ error: `export_stl returned no ${format} data.` });
+    } else sendDownload(res, `${name}.stl`, 'model/stl', file.bytes);
   });
 
   // `language` is validated by the export_code schema: invalid -> 400.
@@ -39,7 +49,8 @@ export function buildExportRouter(exchange: ExchangeOptions): Router {
     });
     const data = result.data as { text?: string; fileName?: string } | undefined;
     if (data?.text === undefined || data.fileName === undefined) {
-      res.status(result.summary.includes('invalid params') ? 400 : 500).json({ error: result.summary });
+      if (!gateRefusal(res, result.error?.code, result.summary))
+        res.status(result.summary.includes('invalid params') ? 400 : 500).json({ error: result.summary });
     } else sendDownload(res, data.fileName, 'text/plain; charset=utf-8', data.text);
   });
 
@@ -48,8 +59,9 @@ export function buildExportRouter(exchange: ExchangeOptions): Router {
     const port = exchange.port;
     exportStepFile(getLiveDoc, port, { name: safeFileName(req.query['name'], 'model'), language: req.query['language'], save: false })
       .then((file) => {
-        if ('error' in file) res.status(port === null ? 503 : 500).json({ error: file.error });
-        else sendDownload(res, file.fileName, 'model/step', Buffer.from(file.stepBase64, 'base64'));
+        if ('error' in file) {
+          if (!gateRefusal(res, undefined, file.error)) res.status(port === null ? 503 : 500).json({ error: file.error });
+        } else sendDownload(res, file.fileName, 'model/step', Buffer.from(file.stepBase64, 'base64'));
       })
       .catch(
         (error: unknown) =>

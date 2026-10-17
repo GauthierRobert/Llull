@@ -5,9 +5,8 @@
  */
 
 import type { CommandResult } from '../types';
-import { report } from '../noop';
-import { defineCommand, z } from '../schema';
-import { confirmExportControlled, exportRefusal } from '../materials/exportGate';
+import { exportRefusal, report } from '../noop';
+import { confirmExportControlled, defineCommand, z } from '../schema';
 import { uint8ArrayToBase64 } from '../../lib/base64';
 import { collectExportParts, exportSummary } from '../../geometry/entityTriangles';
 import type { CadDocument } from '../../model/types';

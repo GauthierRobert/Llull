@@ -9,6 +9,7 @@ import type { CadDocument, Material } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { changed, commandError, rejection } from '../noop';
+import { libraryRecordRefusal } from './libraryReadonly';
 import { fitRecordSchema, formSchema, modelInputSchema, withoutUndefined } from './propertyModelSchema';
 
 const REMEDIATION: Readonly<Record<string, string>> = {
@@ -65,7 +66,7 @@ const firstIssuePath = (error: z.ZodError, prefix: string): string => {
  * @affects CadDocument.materials[material].propertyModels (adds or, with replace, replaces one model)
  * @invariant coefficientsSha256 recomputed from the form, never taken from params; one preferred model per (property, direction, basis,
  *   condition); a validity range for every variable; reviewedBy is never set here
- * @failure unknown material -> MAT_RECORD_NOT_FOUND; malformed form -> PROP_FORM_INVALID; table not increasing -> PROP_TABLE_NOT_MONOTONIC;
+ * @failure unknown material -> MAT_RECORD_NOT_FOUND; library record -> MAT_RECORD_READONLY; malformed form -> PROP_FORM_INVALID; table not increasing -> PROP_TABLE_NOT_MONOTONIC;
  *   wrong unit dimension -> MAT_UNIT_DIMENSION; duplicate id without replace -> PROP_MODEL_EXISTS; second preferred -> MAT_PREFERRED_CONFLICT
  *   (all rejections, document unchanged)
  */
@@ -88,6 +89,8 @@ export const definePropertyModel = defineCommand({
     const material = Object.hasOwn(doc.materials, materialId) ? doc.materials[materialId] : undefined;
     if (material === undefined)
       return refuseWith(doc, name, 'MAT_RECORD_NOT_FOUND', `no material '${materialId}'`, [materialId], 'material');
+    const readonly = libraryRecordRefusal(doc, name, materialId, material);
+    if (readonly !== null) return readonly;
     const form = formSchema.safeParse(input.form);
     if (!form.success)
       return refuseWith(
@@ -185,7 +188,7 @@ export const definePropertyModel = defineCommand({
 /**
  * @affects CadDocument.materials[material].propertyModels (removes one model)
  * @invariant other models untouched
- * @failure unknown material -> MAT_RECORD_NOT_FOUND; unknown id -> PROP_MODEL_NOT_FOUND; base of a ratioOf model -> PROP_MODEL_IN_USE
+ * @failure unknown material -> MAT_RECORD_NOT_FOUND; library record -> MAT_RECORD_READONLY; unknown id -> PROP_MODEL_NOT_FOUND; base of a ratioOf model -> PROP_MODEL_IN_USE
  */
 export const removePropertyModel = defineCommand({
   name: 'remove_property_model',
@@ -201,6 +204,8 @@ export const removePropertyModel = defineCommand({
     const material = Object.hasOwn(doc.materials, materialId) ? doc.materials[materialId] : undefined;
     if (material === undefined)
       return refuseWith(doc, name, 'MAT_RECORD_NOT_FOUND', `no material '${materialId}'`, [materialId], 'material');
+    const readonly = libraryRecordRefusal(doc, name, materialId, material);
+    if (readonly !== null) return readonly;
     const models = material.propertyModels ?? [];
     if (!models.some((m) => m.id === modelId))
       return refuseWith(doc, name, 'PROP_MODEL_NOT_FOUND', `'${materialId}' has no model '${modelId}'`, [modelId], 'modelId');

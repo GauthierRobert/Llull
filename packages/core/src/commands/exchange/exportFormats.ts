@@ -1,9 +1,8 @@
 /** export_obj: read-only export of the world-space triangles (document returned unchanged, affected: []). */
 
 import type { CommandResult } from '../types';
-import { report } from '../noop';
-import { defineCommand, z } from '../schema';
-import { confirmExportControlled, exportRefusal } from '../materials/exportGate';
+import { exportRefusal, report } from '../noop';
+import { confirmExportControlled, defineCommand, z } from '../schema';
 import { collectExportParts, exportSummary, type ExportPart } from '../../geometry/entityTriangles';
 import { facetNormal } from '../../geometry/tessellation';
 

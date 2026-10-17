@@ -6,13 +6,12 @@
 import { type CadDocument, type Entity, type Vec3, is3D } from '../../model/types';
 import type { ShapeHandle, ShapeTopology } from '../../geometry/kernel';
 import type { CommandResult } from '../types';
-import { defineCommand, z } from '../schema';
-import { confirmExportControlled, exportRefusal } from '../materials/exportGate';
+import { confirmExportControlled, defineCommand, z } from '../schema';
 import { currentContext } from '../context';
 import { kernelUnavailable } from '../kernelRefusal';
 import { operandRecipe } from './kernelShape';
 import { labelStep, type StepLabel } from './stepLabels';
-import { noop, report } from '../noop';
+import { exportRefusal, noop, report } from '../noop';
 import { fixedNumber } from '../../lib/compactNumber';
 
 const OCC_HINT = 'the OCC kernel (?kernel=occt in the browser, LLULL_KERNEL=occt on the server)';

@@ -4,7 +4,7 @@ import { markingRank } from '../../model/materialLibrary';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { changed } from '../noop';
-import { humanGate } from './humanGate';
+import { humanGate } from '../../model/humanGate';
 import { markingInput, markingOf, markingText } from './marking';
 import { refuseMaterial } from './refusal';
 
@@ -35,7 +35,9 @@ export const setExportMarking = defineCommand({
     if (typeof marking === 'string')
       return refuseMaterial(doc, COMMAND, 'PROP_FORM_INVALID', marking, { ids: [name], path: 'marking.eccn' });
     if (markingRank(marking) < markingRank(record.exportMarking)) {
-      const gate = humanGate(ctx, 'lowering an export marking', [name], confirmation);
+      const gate = humanGate(ctx?.humanSignature ?? null, 'lowering an export marking', [name], confirmation, {
+        lowered: [{ id: name, from: record.exportMarking, to: marking }],
+      });
       if (!gate.cleared)
         return refuseMaterial(
           doc,

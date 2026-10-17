@@ -1,8 +1,8 @@
 /** Civil drawing-sheet commands: plan sheet and plan-and-profile sheet (printable SVG). */
 
 import type { CommandDefinition, CommandResult } from '@core/commands/types';
-import { defineCommand, z, vec2 } from '@core/commands/schema';
-import { noop, report } from '@core/commands/noop';
+import { defineCommand, z, vec2, confirmExportControlled } from '@core/commands/schema';
+import { noop, report, exportRefusal } from '@core/commands/noop';
 import { safeFileName } from '@lib/safeFileName';
 import { fileSlug, getBuilding } from '../../building/model';
 import { PAPER_SIZES } from '../../shared/sheetFrame';
@@ -25,6 +25,7 @@ export const exportCivilPlanSheet = defineCommand({
     'data.fileName its name.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
+    confirmExportControlled,
     paper: z.enum(PAPER_SIZES).describe('Paper size, landscape: A4, A3, A2, A1 or A0.'),
     scale: z
       .number()
@@ -34,7 +35,9 @@ export const exportCivilPlanSheet = defineCommand({
     title: z.string().optional().describe('Drawing title. Default "Civil plan".'),
     layers: z.array(z.string()).optional().describe('Civil layer names to draw, e.g. ["C-TOPO-MAJR", "C-ROAD-CNTR"]. Default: all.'),
   }),
-  run: (doc, { paper, scale, center, title, layers }): CommandResult => {
+  run: (doc, { confirmExportControlled, paper, scale, center, title, layers }, ctx): CommandResult => {
+    const refused = exportRefusal(doc, 'export_civil_plan_sheet', 'sheet', confirmExportControlled, ctx);
+    if (refused !== null) return refused;
     const sheet = buildCivilPlanSheet(doc, { paper, scale, center, title, layers });
     if (!sheet) {
       return noop(
@@ -73,12 +76,15 @@ export const exportPlanProfileSheet = defineCommand({
     'stations line up. Needs set_alignment_profile. data.text holds the file, data.fileName its name.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
+    confirmExportControlled,
     alignmentId: alignmentIdParam,
     paper: z.enum(PAPER_SIZES).optional().describe('Paper size, landscape. Default A3.'),
     scale: z.number().optional().describe('Horizontal scale denominator N for 1:N (> 0). Default: smallest standard scale that fits.'),
     verticalExaggeration: z.number().optional().describe('Vertical / horizontal scale ratio (> 0). Default 10.'),
   }),
-  run: (doc, { alignmentId, paper = 'A3', scale, verticalExaggeration = 10 }): CommandResult => {
+  run: (doc, { confirmExportControlled, alignmentId, paper = 'A3', scale, verticalExaggeration = 10 }, ctx): CommandResult => {
+    const refused = exportRefusal(doc, 'export_plan_profile_sheet', 'sheet', confirmExportControlled, ctx);
+    if (refused !== null) return refused;
     const alignment = civilObjectOrNoop(doc, alignmentId, 'alignment', 'export_plan_profile_sheet');
     if ('summary' in alignment) return alignment;
     const sheet = buildPlanProfileSheet(doc, alignment, { paper, scale, verticalExaggeration });

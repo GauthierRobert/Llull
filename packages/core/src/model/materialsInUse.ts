@@ -1,6 +1,6 @@
 /** Which materials a document actually uses: the ones assigned to an entity, including the entities inside component definitions. */
 
-import type { CadDocument, Entity } from '../../model/types';
+import type { CadDocument, Entity } from './types';
 
 /**
  * Material name → ids of the entities that carry it.

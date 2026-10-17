@@ -1,10 +1,10 @@
 import type { CadDocument } from '@core/model/types';
 import type { BuildingElement, BuildingLevel } from '@core/model/building';
 import type { CommandResult } from '@core/commands/types';
-import { defineCommand, z } from '@core/commands/schema';
+import { defineCommand, z, confirmExportControlled } from '@core/commands/schema';
 import { toMm } from '@core/model/units';
 import { fileSlug, getBuilding, orderedElements } from '../model';
-import { noop, report } from '@core/commands/noop';
+import { noop, report, exportRefusal } from '@core/commands/noop';
 import { type Context, StepWriter, ifcGuid, ifcReal, ifcString, placement } from './ifcStep';
 import { type Exported, exportCurvedWallElement, exportWallElement } from './ifcElementExport';
 import { exportConnection, exportIndustrial, exportPlate } from './ifcIndustrialExport';
@@ -168,12 +168,15 @@ export const exportIfc = defineCommand({
     '/ building / storeys, walls with real openings (IfcOpeningElement) filled by doors and windows, slabs (floor / roof / base slab), ' +
     'columns, beams, stairs, spaces and materials. GlobalIds are stable across exports. data.ifc holds the file text.',
   params: z.object({
+    confirmExportControlled,
     timestamp: z
       .string()
       .optional()
       .describe('ISO 8601 timestamp written in the file header. Default: project date or 1970-01-01T00:00:00.'),
   }),
-  run: (doc, { timestamp }): CommandResult => {
+  run: (doc, { confirmExportControlled, timestamp }, ctx): CommandResult => {
+    const refused = exportRefusal(doc, 'export_ifc', 'data', confirmExportControlled, ctx);
+    if (refused !== null) return refused;
     const building = getBuilding(doc);
     if (building.levelOrder.length === 0) return noop(doc, 'export_ifc: the building model has no levels (add_level / draw_walls first).');
     const isoDate = /^\d{4}-\d{2}-\d{2}$/.test(building.project.date);

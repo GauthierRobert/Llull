@@ -77,25 +77,24 @@ export function stubOf(material: Material, reason: UnresolvedReason): Material {
   return { ...rest, density: 0, ...(rest.record !== undefined ? { record: { ...rest.record, unresolved: { reason } } } : {}) };
 }
 
-/** Whether `material` is a record of a `private` library of `doc`. */
-export const isPrivateRecord = (doc: Pick<CadDocument, 'materialLibraries'>, material: Material): boolean => {
+/** Why `material` must not keep its values in a saved file, or null when it may (no library pin, or a declared embedded library). */
+const strippedReason = (doc: Pick<CadDocument, 'materialLibraries'>, material: Material): UnresolvedReason | null => {
   const ref = material.record?.libraryRef;
-  return ref !== undefined && doc.materialLibraries?.[ref.libraryId]?.storage === 'private';
+  if (ref === undefined) return null;
+  const entry = doc.materialLibraries?.[ref.libraryId];
+  if (entry === undefined) return 'library missing';
+  return entry.storage === 'embedded' ? null : 'provider missing';
 };
 
 /**
- * `doc` with every private-library record reduced to its stub (TR-MAT-31): what is saved, snapshotted and sent to live-sync clients.
- * @invariant returns `doc` itself when it has no private record
+ * `doc` with every record of a non-embedded library reduced to its stub (TR-MAT-31): what is saved, snapshotted and sent to live-sync clients.
+ * @invariant fails closed: a record whose `libraryRef` does not resolve to a declared embedded library is stubbed; returns `doc` itself when none is
  */
 export function withoutPrivateValues(doc: CadDocument): CadDocument {
-  const privateNames = Object.entries(doc.materials)
-    .filter(([, material]) => isPrivateRecord(doc, material))
-    .map(([name]) => name);
-  if (privateNames.length === 0) return doc;
+  const stubbed = Object.entries(doc.materials).filter(([, material]) => strippedReason(doc, material) !== null);
+  if (stubbed.length === 0) return doc;
   const materials = { ...doc.materials };
-  for (const name of privateNames) {
-    const material = materials[name];
-    if (material !== undefined) materials[name] = stubOf(material, material.record?.unresolved?.reason ?? 'provider missing');
-  }
+  for (const [name, material] of stubbed)
+    materials[name] = stubOf(material, material.record?.unresolved?.reason ?? strippedReason(doc, material) ?? 'provider missing');
   return { ...doc, materials };
 }

@@ -1,6 +1,7 @@
 /** INP assembly (05 §5.6, FE_PIPELINE_DESIGN §5): model block + materials + sections + the steps of the analysis type. */
 
 import type { FeArtifactPort, FeMeshArtifact } from '@core/model/analysis';
+import { EXPORT_REMEDIATION, exportGate } from '@core/model/exportGate';
 import type { CadDocument } from '@core/model/types';
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
@@ -60,6 +61,13 @@ function nameCollision(ctx: DeckContext): DeckRefusal | null {
 
 function precheck(doc: CadDocument, analysisId: string, mesh: FeMeshArtifact, ctx: DeckContext): DeckRefusal | null {
   const { analysis } = ctx;
+  const gate = exportGate(doc, 'deck');
+  if (gate.controlled)
+    return refuse(
+      'MAT_EXPORT_CONTROLLED',
+      `the document uses ${gate.marking.regime}-marked material(s) ${gate.ids.join(', ')}; no deck was written (${EXPORT_REMEDIATION.MAT_EXPORT_CONTROLLED})`,
+      gate.ids,
+    );
   if (analysis.type === 'modal' || analysis.type === 'buckling')
     return refuse('FEA_ANALYSIS_TYPE_UNSUPPORTED', `analysis type '${analysis.type}' has no deck writer`, [analysisId]);
   if (mesh.kind !== 'fe_mesh') return refuse('FEA_ARTIFACT_NOT_FOUND', 'the mesh artifact is not an fe_mesh', [analysisId]);
@@ -120,6 +128,7 @@ function modelBlock(ctx: DeckContext): string[] {
 /**
  * Deterministic CalculiX deck of `analysisId` over `mesh`, with the discipline functions in `disciplines`.
  * @invariant byte-identical for identical inputs; header `** llull analysis <name> units <us> inputHash <h> meshHash <m>`
+ * @failure the document uses ITAR / EAR material records -> MAT_EXPORT_CONTROLLED (a deck leaves the machine; no confirmation path here)
  * @failure unknown analysis / unsupported type -> FEA_ANALYSIS_NOT_FOUND / FEA_ANALYSIS_TYPE_UNSUPPORTED; mesh of other inputs -> FEA_MESH_STALE;
  *   part without elements or with non-tet elements -> FEA_PART_INVALID; no material -> FEA_MATERIAL_MISSING; static / thermo_static / coupled without a
  *   constraint -> FEA_NO_CONSTRAINTS; plus every refusal of the mechanical and discipline functions

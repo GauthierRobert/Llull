@@ -1,6 +1,6 @@
-import { defineCommand, z } from '@core/commands/schema';
+import { defineCommand, z, confirmExportControlled } from '@core/commands/schema';
 import type { CommandResult } from '@core/commands/types';
-import { report } from '@core/commands/noop';
+import { report, exportRefusal } from '@core/commands/noop';
 import { DOCUMENT_UNITS } from '@core/model/types';
 import { buildFlatDxf } from '../dxfFlat';
 import { buildFlat, isRefusal } from '../flatData';
@@ -20,6 +20,7 @@ export const exportFlatPatternDxf = defineCommand({
     'Refusals: FTR_PART_NOT_FOUND, FTR_NON_DEVELOPABLE. Run check_sheet_metal first.',
   annotations: { readOnly: true, idempotent: true },
   params: z.object({
+    confirmExportControlled,
     id: z.string().describe('Sheet-metal part id (returned by add_sheet_metal_base).'),
     units: z
       .enum(DOCUMENT_UNITS)
@@ -31,7 +32,9 @@ export const exportFlatPatternDxf = defineCommand({
       .optional()
       .describe('Write one TEXT note per bend (angle in degrees, inside radius, K, BA) on NOTES (default true).'),
   }),
-  run: (doc, { id, units, bendLines = true, bendNotes = true }): CommandResult => {
+  run: (doc, { confirmExportControlled, id, units, bendLines = true, bendNotes = true }, ctx): CommandResult => {
+    const refused = exportRefusal(doc, 'export_flat_pattern_dxf', 'data', confirmExportControlled, ctx);
+    if (refused !== null) return refused;
     const built = buildFlat(doc, 'export_flat_pattern_dxf', id);
     if (isRefusal(built)) return built.refusal;
     const unit = units ?? doc.units;

@@ -2,10 +2,10 @@ import { ellipsePoint } from '@lib/arc';
 import { type CadDocument, type Entity, type Vec2, is2D, is3D } from '@core/model/types';
 import { LINE_PATTERNS } from '@core/model/drawing';
 import type { CommandResult } from '@core/commands/types';
-import { defineCommand, z } from '@core/commands/schema';
+import { defineCommand, z, confirmExportControlled } from '@core/commands/schema';
 import { fromMm } from '@core/model/units';
 import { fileSlug, getBuilding } from '../model';
-import { noop, report } from '@core/commands/noop';
+import { noop, report, exportRefusal } from '@core/commands/noop';
 import { buildPlanDrawing } from '../drawings/planDrawing';
 import { entityPlanPoint } from '@core/geometry/entityFrame';
 import { technicalView } from '@core/geometry/technicalView';
@@ -186,6 +186,7 @@ export const exportDxf = defineCommand({
     '(A-WALL, A-DOOR, A-GLAZ, S-GRID…), plus the document’s own 2D drafting and its 3D solids as a technical top view (visible edges on ' +
     'OBJ-VISIBLE, hidden edges dashed on OBJ-HIDDEN, centre lines on OBJ-CENTER). data.dxf holds the file text.',
   params: z.object({
+    confirmExportControlled,
     levelId: z.string().optional().describe('Level to plot. Default: the active level.'),
     includeDrafting: z
       .boolean()
@@ -194,7 +195,9 @@ export const exportDxf = defineCommand({
         'Also export non-building 2D entities (lines, polylines, circles, text…) and the top view of non-building 3D solids. Default true.',
       ),
   }),
-  run: (doc, { levelId, includeDrafting = true }): CommandResult => {
+  run: (doc, { confirmExportControlled, levelId, includeDrafting = true }, ctx): CommandResult => {
+    const refused = exportRefusal(doc, 'export_dxf', 'data', confirmExportControlled, ctx);
+    if (refused !== null) return refused;
     const result = buildDxf(doc, levelId, includeDrafting);
     if (!result) return noop(doc, `export_dxf failed: no level '${levelId ?? ''}'.`);
     if (result.entityCount === 0) return noop(doc, 'export_dxf: nothing to export (no building elements, 2D drafting or 3D solids).');

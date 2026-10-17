@@ -6,6 +6,7 @@ import type { CadDocument } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
 import { changed } from '../noop';
+import { libraryRecordRefusal } from './libraryReadonly';
 import { matlRefusal } from './materialModelRefusal';
 
 const command = 'define_constitutive_set';
@@ -14,7 +15,7 @@ const command = 'define_constitutive_set';
  * @affects CadDocument.materials[material].constitutiveSets (adds or replaces one set), defaultConstitutiveSet (with makeDefault)
  * @invariant the combination rules of §3.4 hold: one of elastic / hyperelastic (Ramberg-Osgood carries E, ν), plasticity on isotropic
  *   elasticity, creep on elastic, viscoelastic on elastic or hyperelastic, Johnson-Cook rate on Johnson-Cook hardening, no durability kinds
- * @failure unknown material -> MAT_RECORD_NOT_FOUND; unknown model id -> MATL_MODEL_NOT_FOUND; rule broken -> MATL_COMBINATION_INVALID;
+ * @failure unknown material -> MAT_RECORD_NOT_FOUND; library record -> MAT_RECORD_READONLY; unknown model id -> MATL_MODEL_NOT_FOUND; rule broken -> MATL_COMBINATION_INVALID;
  *   duplicate set id without replace -> MATL_MODEL_EXISTS (all rejections, document unchanged)
  */
 export const defineConstitutiveSet = defineCommand({
@@ -45,6 +46,8 @@ export const defineConstitutiveSet = defineCommand({
     const material = Object.hasOwn(doc.materials, materialId) ? doc.materials[materialId] : undefined;
     if (material === undefined)
       return matlRefusal(doc, command, 'MAT_RECORD_NOT_FOUND', `no material '${materialId}'`, [materialId], 'material');
+    const readonly = libraryRecordRefusal(doc, command, materialId, material);
+    if (readonly !== null) return readonly;
     const set: ConstitutiveSet = {
       id: input.id,
       ...Object.fromEntries(SET_SLOTS.flatMap((slot) => (input[slot] === undefined ? [] : [[slot, input[slot]]]))),
