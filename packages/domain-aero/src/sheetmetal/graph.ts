@@ -101,3 +101,17 @@ export const withPart = (model: SheetMetalModel, part: SheetMetalPart): SheetMet
   ...model,
   parts: { ...model.parts, [part.id]: part },
 });
+
+/** A `width` x `leg` rectangular flat (the leg of a flange) in `frame`, without cutouts. */
+export const legFlat = (id: string, width: number, leg: number, frame: FlatNode['frame']): FlatNode => ({
+  id,
+  type: 'flat',
+  outline: [
+    [0, 0],
+    [width, 0],
+    [width, leg],
+    [0, leg],
+  ],
+  frame,
+  cutouts: [],
+});

@@ -6,7 +6,7 @@ import { toDegrees } from '@lib/angle';
 import { bendGeometry, bottomOffset } from '../frames';
 import { withFoldedSolid } from '../fold';
 import { EPS } from '../geometry2d';
-import { flatOf, getModel, nextNodeIds, withModel, withNodes, withPart } from '../graph';
+import { legFlat, flatOf, getModel, nextNodeIds, withModel, withNodes, withPart } from '../graph';
 import { fixed, refuser } from '../result';
 import { findRadiusRow, resolveK } from '../rules';
 import { applyFlange } from './flange';
@@ -163,18 +163,7 @@ export const addContourFlange = defineCommand({
       const [bendId] = nextNodeIds(current, 'b', 1) as [string];
       const leg = legs[i] as number;
       current = withNodes(current, [
-        {
-          id: flatId,
-          type: 'flat',
-          outline: [
-            [0, 0],
-            [width, 0],
-            [width, leg],
-            [0, leg],
-          ],
-          frame: geometry.child,
-          cutouts: [],
-        },
+        legFlat(flatId, width, leg, geometry.child),
         { id: bendId, type: 'bend', from: parent.id, to: flatId, lineInFrom: line, angle: signed, insideRadius: R },
       ]);
       flats.push(flatId);

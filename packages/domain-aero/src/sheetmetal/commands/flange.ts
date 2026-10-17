@@ -10,7 +10,7 @@ import type { SheetNode } from '@core/model/sheetMetal';
 import { bendGeometry, bottomOffset } from '../frames';
 import { withFoldedSolid } from '../fold';
 import { EPS, moveEdgeInward } from '../geometry2d';
-import { childBends, flatOf, nextNodeId, parentBend, withModel, withNodes, withPart } from '../graph';
+import { legFlat, childBends, flatOf, nextNodeId, parentBend, withModel, withNodes, withPart } from '../graph';
 import { pickEdge } from '../pick';
 import { bendEnd } from '../reliefGeometry';
 import { applyRelief, isReliefFailure, reliefData } from '../reliefOps';
@@ -173,18 +173,7 @@ export function applyFlange(doc: CadDocument, command: string, params: FlangePar
   const bendId = nextNodeId(part, 'b');
   const nodes: SheetNode[] = [
     { ...flat, outline },
-    {
-      id: flatId,
-      type: 'flat',
-      outline: [
-        [0, 0],
-        [width, 0],
-        [width, leg],
-        [0, leg],
-      ],
-      frame: geometry.child,
-      cutouts: [],
-    },
+    legFlat(flatId, width, leg, geometry.child),
     { id: bendId, type: 'bend', from: flat.id, to: flatId, lineInFrom: [p, qEnd], angle: signed, insideRadius: R },
   ];
   const extra = options.extraNodes?.({ flatId, bendId }) ?? [];
