@@ -7,10 +7,12 @@ import { ProvenancePopover } from '@ui/panels/ProvenancePopover';
 import { ReviewBanner } from '@ui/panels/ReviewBanner';
 import { useReadOnlyQuery } from '@ui/panels/useReadOnlyQuery';
 import { downloadQuery } from '@ui/services/localQuery';
+import { significantNumber } from '@lib/compactNumber';
 import { useStore } from '@ui/store';
 import { parseFlatPattern, type FlatPatternView } from './ftrData';
 
 const SVG_SIZE = 160;
+const fmt = (value: number): string => significantNumber(value, 5);
 
 function OutlinePreview({ view }: { view: FlatPatternView }): React.ReactElement | null {
   const path = useMemo(() => {
@@ -80,7 +82,7 @@ export function FlatPatternSection({ partId }: { partId: string }): React.ReactE
           <ReviewBanner {...(view.reviewReason === undefined ? {} : { reason: view.reviewReason })} unverified={view.unverified} />
           <OutlinePreview view={view} />
           <p className="mfg__figures" data-testid="flat-figures">
-            {view.extents[0]} × {view.extents[1]} {view.unit} · area {view.area} · {view.bends.length} bend(s)
+            {fmt(view.extents[0])} × {fmt(view.extents[1])} {view.unit} · area {fmt(view.area)} · {view.bends.length} bend(s)
           </p>
           {view.bends.length > 0 && (
             <table className="mfg__table" data-testid="flat-bends">
@@ -101,8 +103,8 @@ export function FlatPatternSection({ partId }: { partId: string }): React.ReactE
                     <td>{bend.angleDeg}</td>
                     <td>{bend.insideRadius}</td>
                     <td>{bend.direction}</td>
-                    <td>{bend.ba}</td>
-                    <td title={bend.kSource}>{bend.kSource}</td>
+                    <td>{fmt(bend.ba)}</td>
+                    <td title={bend.kSource}>{bend.k}</td>
                   </tr>
                 ))}
               </tbody>

@@ -178,6 +178,13 @@
   list-style: none;
 }
 
+.fastener-family {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
 .fastener-dialog {
   width: min(460px, 92vw);
   max-height: 86vh;

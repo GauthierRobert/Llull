@@ -34,6 +34,7 @@ interface FlatBendView {
   readonly insideRadius: number;
   readonly direction: string;
   readonly ba: number;
+  readonly k: string;
   readonly kSource: string;
 }
 
@@ -137,6 +138,7 @@ export function parseFlatPattern(data: unknown): FlatPatternView | null {
       insideRadius: num(bend['insideRadius']) ?? 0,
       direction: str(bend['direction']) ?? '',
       ba: num(bend['ba']) ?? 0,
+      k: isRecord(k) ? String(k['value']) : '',
       kSource: isRecord(k) ? `K ${String(k['value'])} — ${str(k['source']) ?? ''}` : '',
     };
   });

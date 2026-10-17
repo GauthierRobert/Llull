@@ -45,7 +45,7 @@ export function FastenersPanel({ className }: { className?: string }): React.Rea
         <PanelSection title="Catalogue" count={families.length} testId="fastener-families">
           <ul className="panel__list" aria-label="Fastener families">
             {families.map((family) => (
-              <li key={family.id} className="panel__row" data-testid={`family-${family.id}`}>
+              <li key={family.id} className="panel__row fastener-family" data-testid={`family-${family.id}`}>
                 <strong>{family.id}</strong>
                 <span className="panel__row-meta">
                   {family.kind.replace('_', ' ')} · {family.standard.body} {family.standard.id} · {family.sizes.length} sizes
