@@ -6,11 +6,14 @@ import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 import { analysisInputHash } from '../hash/inputHash';
 import { ALL_ELEMENTS, ALL_NODES, buildDeckContext, isDeckRefusal, type DeckContext, type DeckRefusal, type DeckSections } from './context';
+import type { MaterialCardWriter } from './constitutive';
 import { commentText, idLines, linesText, row } from './format';
 import { mechanicalMaterialLines, staticStep } from './mechanical';
 
 /** The discipline functions of the thermal and thermo-mechanical lanes (FE_PIPELINE_DESIGN §5 table). */
 export interface DisciplineTable {
+  /** Constitutive-set cards (plastic / hyperelastic / creep); absent or null result = the elastic / thermal cards below. */
+  readonly materialCardWriter?: MaterialCardWriter;
   readonly heat: {
     readonly materialCards: (ctx: DeckContext, entityId: string) => DeckSections;
     readonly sections: (ctx: DeckContext) => DeckSections;
@@ -135,14 +138,18 @@ export function buildInp(
   for (const entityId of Object.keys(analysis.parts))
     if (!materialOwners.has(ctx.materialName(entityId))) materialOwners.set(ctx.materialName(entityId), entityId);
   for (const [name, entityId] of materialOwners) {
+    const constitutive = heat ? null : (disciplines.materialCardWriter?.(ctx, entityId) ?? null);
+    if (constitutive !== null && 'code' in constitutive) return constitutive;
     const cards = heat
       ? [disciplines.heat.materialCards(ctx, entityId)]
       : [
-          mechanicalMaterialLines(ctx, entityId),
+          ...(constitutive === null ? [mechanicalMaterialLines(ctx, entityId)] : []),
           ...(analysis.type === 'thermo_static' ? [disciplines.thermomech.materialCards(ctx, entityId)] : []),
           ...(analysis.type === 'coupled_temperature_displacement' ? [disciplines.coupled.materialCards(ctx, entityId)] : []),
         ];
-    lines.push(`** material ${name} = '${commentText(ctx.materialId(entityId) ?? '', 80)}'`, `*MATERIAL, NAME=${name}`);
+    lines.push(`** material ${name} = '${commentText(ctx.materialId(entityId) ?? '', 80)}'`);
+    if (constitutive === null) lines.push(`*MATERIAL, NAME=${name}`);
+    else lines.push(...constitutive.comments, ...constitutive.lines);
     for (const card of cards) {
       if (isDeckRefusal(card)) return card;
       lines.push(...card.text.split('\n').filter((line) => line !== ''));
