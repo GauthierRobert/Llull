@@ -16,7 +16,7 @@ import { changed } from '../noop';
 import { editableMaterial } from './libraryReadonly';
 import { matlRefusal } from './materialModelRefusal';
 import { lawSchema, materialFitSchema, validRangeSchema } from './materialLawSchema';
-import { withoutUndefined } from './propertyModelSchema';
+import { provenanceSchema, withoutUndefined } from './propertyModelSchema';
 
 const pathOf = (error: z.ZodError, prefix: string): string => [prefix, ...(error.issues[0]?.path ?? []).map(String)].join('.');
 
@@ -72,15 +72,7 @@ export const addMaterialModel = defineCommand({
     basis: z
       .enum(BASES)
       .describe('A | B | S, typical, supplier_unstated, company, unspecified (typical / unstated / unspecified ⇒ unverified).'),
-    source: z
-      .object({
-        citation: z.string().describe('Bibliographic citation of the parameters.'),
-        locator: z.string().optional().describe('Table / page / figure in the source.'),
-        url: z.string().optional().describe('Where it was read.'),
-        accessed: z.string().optional().describe('Access date, YYYY-MM-DD.'),
-        sourceId: z.string().optional().describe('Registered source id, when one exists.'),
-      })
-      .describe('Provenance of the parameters (required).'),
+    source: provenanceSchema('parameters').describe('Provenance of the parameters (required).'),
     fit: z
       .record(z.string(), z.unknown())
       .optional()

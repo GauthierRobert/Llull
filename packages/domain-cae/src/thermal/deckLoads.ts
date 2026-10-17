@@ -40,7 +40,7 @@ export function allBcLines(ctx: DeckContext, thermal: ThermalSetup, volumes: Rea
  * Lines of one BC. Temperatures are written on the case scale; flux, film, generation and power in the unit system.
  * @failure target without nodes / faces in the mesh -> FEA_TARGET_UNRESOLVED (ids: the BC); total generation on a part without volume -> FEA_PART_INVALID
  */
-export function bcLines(ctx: DeckContext, thermal: ThermalSetup, record: ThermalBcRecord, volumes: ReadonlyMap<string, number>): Blocks {
+function bcLines(ctx: DeckContext, thermal: ThermalSetup, record: ThermalBcRecord, volumes: ReadonlyMap<string, number>): Blocks {
   const bc = record.bc;
   const scale = thermal.temperatureScale;
   const system = ctx.unitSystem;
