@@ -91,6 +91,8 @@ function guarded<T>(operation: OperationClass, body: (own: <H extends OccHandle 
 }
 
 let nativeFailures = 0;
+/** Set for the process once a native BRepFeat attempt degraded the module: later features take the boolean lowering. */
+let nativeFeaturesDisabled = false;
 
 /** Operations that degraded the module since load; a host that can restart it (worker kernel) should when this grows. */
 export function nativeFailureCount(): number {
@@ -262,11 +264,16 @@ export function occtOps(api: OccApi, nativeFeatures = true): KernelOps<OccShape>
       }),
     ...(nativeFeatures
       ? {
-          feature: (source: OccShape, node: Parameters<typeof nativeFeature>[3], reach: number) =>
-            guarded('fragile', (own) => {
+          feature: (source: OccShape, node: Parameters<typeof nativeFeature>[3], reach: number) => {
+            if (nativeFeaturesDisabled) return null;
+            const failuresBefore = nativeFailureCount();
+            const result = guarded('fragile', (own) => {
               const native = nativeFeature(api, own, source, node, reach);
               return native === null ? null : unified(api, native, own);
-            }),
+            });
+            if (nativeFailureCount() > failuresBefore) nativeFeaturesDisabled = true;
+            return result;
+          },
         }
       : {}),
     fillet: (shape, edges, radius, radiusEnd) =>

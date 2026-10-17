@@ -3,9 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
 import { expectNoOp, expectPure } from '../../helpers/expectNoOp';
-import { idOf, manifoldSuite, meshOf, plate, volumeOf } from '../../helpers/featureSupport';
+import type { FaceQueryPort } from '@core/geometry/kernelPorts';
+import { ctxWith, idOf, manifoldSuite, meshOf, plate, volumeOf } from '../../helpers/featureSupport';
 
-manifoldSuite();
+const kernelOf = manifoldSuite();
 
 const TOP = { near: [50, 30, 10] };
 const MESH_TOLERANCE = 3e-3;
@@ -52,7 +53,56 @@ describe('add_hole counterdrill', () => {
   });
 });
 
+/** Connected surface pieces of a mesh (vertices merged by position): a sealed cavity is its own piece. */
+function surfacePieces(mesh: { positions: ArrayLike<number>; indices: ArrayLike<number> }): number {
+  const ids = new Map<string, number>();
+  const parent: number[] = [];
+  const find = (a: number): number => {
+    let root = a;
+    while (parent[root] !== root) root = parent[root] as number;
+    return root;
+  };
+  const vertex = (i: number): number => {
+    const key = [0, 1, 2].map((axis) => Math.round(Number(mesh.positions[i * 3 + axis]) * 1e4)).join(',');
+    const known = ids.get(key);
+    if (known !== undefined) return known;
+    ids.set(key, parent.length);
+    parent.push(parent.length);
+    return parent.length - 1;
+  };
+  for (let t = 0; t < mesh.indices.length; t += 3) {
+    const [a, b, c] = [0, 1, 2].map((k) => vertex(Number(mesh.indices[t + k])));
+    parent[find(b as number)] = find(a as number);
+    parent[find(c as number)] = find(a as number);
+  }
+  return new Set(parent.map((_, index) => find(index))).size;
+}
+
 describe('add_hole up_to_next / up_to_face', () => {
+  it('up_to_face on the face where the material ends overshoots it: the cavity opens, no zero-thickness skin', () => {
+    const block = hollowBlock();
+    const result = drill(
+      { hole: { kind: 'simple', diameter: 6 }, extent: { kind: 'up_to_face', face: { near: [50, 30, 25] } }, face: { near: [50, 30, 30] } },
+      block,
+    );
+    expect(result.rejected).toBeUndefined();
+    const entity = meshOf(result.document, idOf(result));
+    expect(entity.brep).toMatchObject({ extent: { kind: 'up_to_face', exits: true } });
+    expect(relative(volumeOf(block.doc, block.id) - volumeOf(result.document, idOf(result)), Math.PI * 9 * 5)).toBeLessThan(MESH_TOLERANCE);
+    expect(surfacePieces(meshOf(block.doc, block.id).mesh)).toBe(2);
+    expect(surfacePieces(entity.mesh)).toBe(1);
+  });
+
+  it('up_to_face on a face the material continues past (cavity floor) keeps the exact depth and no exits flag', () => {
+    const block = hollowBlock();
+    const result = drill(
+      { hole: { kind: 'simple', diameter: 6 }, extent: { kind: 'up_to_face', face: { near: [50, 30, 5] } }, face: { near: [50, 30, 30] } },
+      block,
+    );
+    const extent = (meshOf(result.document, idOf(result)).brep as { extent: Record<string, unknown> }).extent;
+    expect(extent).toEqual({ kind: 'up_to_face', depth: 25 });
+  });
+
   it('up_to_next cuts the first wall only and stores the measured depth', () => {
     const block = hollowBlock();
     const result = drill(
@@ -65,6 +115,36 @@ describe('add_hole up_to_next / up_to_face', () => {
     expect(relative(before - volumeOf(result.document, id), Math.PI * 9 * 5)).toBeLessThan(MESH_TOLERANCE);
     expect(meshOf(result.document, id).brep).toMatchObject({ extent: { kind: 'up_to_next' } });
     expect(result.summary).toContain('up to next');
+  });
+
+  it('up_to_next measures the exit wall on the exact faces when the kernel has them, else on the mesh, and says which', () => {
+    const block = hollowBlock();
+    const params = { hole: { kind: 'simple', diameter: 6 }, extent: { kind: 'up_to_next' }, face: { near: [50, 30, 30] } };
+    const WALL_Z = 24.9996; // the exact wall is a hair below the tessellated one (a curved wall's chord error)
+    const exactPort = {
+      distance: (_shape: unknown, points: ReadonlyArray<readonly [number, number, number]>) =>
+        points.map((point) => ({ distance: Math.abs(point[2] - WALL_Z), signed: 0, face: 7 })),
+      projectOnFace: (_shape: unknown, face: number, points: ReadonlyArray<readonly [number, number, number]>) =>
+        face === 7
+          ? points.map((point) => ({
+              point: [point[0], point[1], WALL_Z],
+              normal: [0, 0, -1],
+              uv: [0, 0],
+              distance: Math.abs(point[2] - WALL_Z),
+            }))
+          : null,
+    } as unknown as FaceQueryPort;
+    const run = (kernel: ReturnType<typeof kernelOf>): ReturnType<typeof execute> =>
+      execute(block.doc, 'add_hole', { target: block.id, pointsFrame: 'world_xy', points: [[50, 30]], ...params }, ctxWith(kernel));
+    const exact = run({ ...kernelOf(), faceQuery: exactPort });
+    expect(exact.rejected).toBeUndefined();
+    expect((meshOf(exact.document, idOf(exact)).brep as { extent: { depth: number } }).extent.depth).toBeCloseTo(30 - WALL_Z, 9);
+    expect(exact.summary).toContain('measured by exact face query');
+    const mesh = run(kernelOf());
+    expect((meshOf(mesh.document, idOf(mesh)).brep as { extent: { depth: number } }).extent.depth).toBeCloseTo(5, 9);
+    expect(mesh.summary).toContain('measured by mesh ray cast');
+    const wrongFace = run({ ...kernelOf(), faceQuery: { ...exactPort, projectOnFace: () => null } as unknown as FaceQueryPort });
+    expect(wrongFace.summary).toContain('measured by mesh ray cast');
   });
 
   it('up_to_next groups holes with different wall depths into separate nodes', () => {

@@ -81,6 +81,15 @@ describe('import_material_library', () => {
     expect(inline.document).toBe(doc);
   });
 
+  it('refuses an embedded library holding a licensed-no-redistribution record (its values would travel with the document)', () => {
+    const doc = mmDocument();
+    const file = withMaterials(libraryFile(), (m) => ({ ...m, licence: 'licensed-no-redistribution' }));
+    const refused = call(doc, 'import_material_library', { library: file });
+    expect(refused.error).toMatchObject({ code: 'MAT_LICENCE_EMBED_FORBIDDEN', paths: ['library.materials'] });
+    expect(refused.document).toBe(doc);
+    expect(refused.affected).toEqual([]);
+  });
+
   it('refuses a library that is not valid, with the JSON path and the code of the problem', () => {
     const doc = mmDocument();
     const file = libraryFile();

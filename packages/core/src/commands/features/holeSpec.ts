@@ -68,7 +68,7 @@ export const extentParams = z
       .enum(['blind', 'through_all', 'up_to_next', 'up_to_face'])
       .describe(
         '"through_all" cuts through the whole part along the axis; "blind" stops at depth; "up_to_next" cuts through the first wall only ' +
-          '(until the axis leaves the material, measured per hole); "up_to_face" stops at the plane of the planar face picked by face.near, which ' +
+          '(until the axis leaves the material, measured per hole: refined on the exact faces of the kernel when it has them (OpenCascade), else on the display mesh, which is only accurate to the tessellation on curved exit walls; the summary says which); "up_to_face" stops at the plane of the planar face picked by face.near, which ' +
           'must be parallel to the hole face and below it.',
       ),
     face: z

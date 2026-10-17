@@ -141,7 +141,7 @@ function libraryMaterial(material) {
 
 function fastenerMaterial(row) {
   const propertyModels = Object.entries(FASTENER_KEYS).flatMap(([key, property]) =>
-    usable(row[key]) ? [modelOf(row.id, 'fastenerMaterialAllowables', key, row[key], property, 'S')] : [],
+    usable(row[key]) ? [modelOf(row.id, 'fastenerMaterialAllowables', key, row[key], property, row[key].basis ?? 'supplier_unstated')] : [],
   );
   if (propertyModels.length === 0) return null;
   return {

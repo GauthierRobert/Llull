@@ -41,11 +41,11 @@ export function buildMcpRouter(
   router.use(buildAuthMiddleware());
   router.use(buildMcpRateLimiter());
 
-  const allocateSession = (userId: string | undefined): StreamableHTTPServerTransport => {
+  const allocateSession = (userId: string | undefined, remote: boolean): StreamableHTTPServerTransport => {
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
       onsessioninitialized: (sessionId) =>
-        void sessions.set(sessionId, { transport, lastSeenMs: Date.now(), ...(userId !== undefined ? { userId } : {}) }),
+        void sessions.set(sessionId, { transport, lastSeenMs: Date.now(), remote, ...(userId !== undefined ? { userId } : {}) }),
       onsessionclosed: (sessionId) => void sessions.delete(sessionId),
     });
     // Any other close path (dropped socket, crash) forgets the session too.
@@ -71,6 +71,10 @@ export function buildMcpRouter(
       res.status(403).json({ error: 'This MCP session belongs to another user.' });
       return true;
     }
+    if (entry.remote === isLocalPeer(req)) {
+      res.status(403).json({ error: 'This MCP session was opened from a different network locality.' });
+      return true;
+    }
     entry.lastSeenMs = Date.now(); // keeps the idle sweep away from active sessions
     try {
       await entry.transport.handleRequest(req, res, req.body as unknown);
@@ -86,12 +90,13 @@ export function buildMcpRouter(
       if (await routeToExistingSession(req, res)) return;
       // Anything else is rejected by the transport and must not push other sessions out.
       if (isInitializeRequest(req.body)) evictForCapacity(requestUser(res)?.id);
-      const transport = allocateSession(requestUser(res)?.id);
+      const remote = !isLocalPeer(req);
+      const transport = allocateSession(requestUser(res)?.id, remote);
       try {
         await buildMcpServer(exchange, enabledToolsets, {
           actor: actorOf(res, 'mcp'),
           role: requestUser(res)?.role ?? null,
-          remote: !isLocalPeer(req),
+          remote,
         }).connect(transport as Transport);
         await transport.handleRequest(req, res, req.body as unknown);
       } catch (err: unknown) {

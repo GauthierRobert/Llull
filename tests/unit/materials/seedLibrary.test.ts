@@ -89,6 +89,18 @@ describe('seed library (VC-MAT-18)', () => {
     for (const excluded of EXCLUDED_SOURCES) expect(cited.has(excluded)).toBe(false);
   });
 
+  it('never invents a basis for a fastener allowable: the dataset row basis, else supplier_unstated', () => {
+    for (const row of dataset.fastenerMaterialAllowables) {
+      const material = materials.find((entry) => entry.id === row['id']);
+      for (const key of ['Ftu_min', 'Fsu_min']) {
+        const entry = row[key] as { status?: string; basis?: string } | undefined;
+        if (entry?.status !== 'verified') continue;
+        const model = material?.propertyModels.find((candidate) => candidate.id === key);
+        expect(model?.basis, `${row['id']}.${key}`).toBe(entry.basis ?? 'supplier_unstated');
+      }
+    }
+  });
+
   it('is current: the committed files equal a fresh build of the dataset', () => {
     expect(() => execFileSync('node', ['scripts/build-seed-library.mjs', '--check'], { cwd: root, stdio: 'pipe' })).not.toThrow();
   });
@@ -116,17 +128,17 @@ describe('seed library (VC-MAT-18)', () => {
 });
 
 describe('seed library installed through import_material_library', () => {
-  it('imports as read-only records whose values carry basis, sourceId and locator; S-basis is not flagged unverified, typical is', () => {
+  it('imports as read-only records with basis, sourceId and locator; a fastener value without a dataset basis is supplier_unstated (unverified), never S', () => {
     const doc = step(mmDocument(), 'import_material_library', { library: seed });
     expect(doc.materialLibraries?.['llull-aero-seed']?.licence).toBe('vendor-catalogue');
     expect(Object.keys(doc.materials)).toEqual(expect.arrayContaining(materials.map((material) => material.id)));
-    const fsu = call(doc, 'get_material_allowable', { material: 'nas6203_bolt_alloy_steel', property: 'Fsu', basis: 'S' });
+    const fsu = call(doc, 'get_material_allowable', { material: 'nas6203_bolt_alloy_steel', property: 'Fsu', basis: 'supplier_unstated' });
     expect(dataOf(fsu)).toMatchObject({
       available: true,
       value: 95,
       unit: 'ksi',
-      basis: 'S',
-      unverified: false,
+      basis: 'supplier_unstated',
+      unverified: true,
       reviewRequired: true,
       provenance: { sourceId: 'S22' },
     });

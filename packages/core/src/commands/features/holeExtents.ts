@@ -1,7 +1,8 @@
 /**
  * Resolution of the `up_to_next` / `up_to_face` hole extents (07 FTR §3.1): their depth is measured on the target solid once the entrance face
  * is known, then stored in the `feature` node (`depth`), so a replay re-measures through the command.
- * @invariant `up_to_next` is measured per hole by a centre-line ray cast; holes with different depths become separate groups (one node each)
+ * @invariant `up_to_next` is measured per hole by a centre-line ray cast, refined on the exact faces when the kernel has the face-query port
+ *   (mesh-only otherwise: on a curved exit wall the mesh depth is kernel-dependent); holes with different depths become separate groups
  */
 
 import type { ShapeRecipe, Vec2 } from '../../model/types';
@@ -10,6 +11,7 @@ import type { GeometryKernel } from '../../geometry/kernel';
 import { buildMeshBvh } from '../../geometry/meshBvh';
 import { meshDiagonal } from '../../geometry/meshExtent';
 import { depthToNextExit } from '../../geometry/featureReach';
+import { exactExitDepth } from '../../geometry/exactReach';
 import { dot3, sub3 } from '../../lib/vec3';
 import { resolveFace } from './faceResolve';
 import type { PendingExtent } from './holeSpec';
@@ -17,6 +19,8 @@ import type { PendingExtent } from './holeSpec';
 export interface ExtentGroup {
   readonly points: Vec2[];
   readonly extent: HoleExtent;
+  /** How an `up_to_next` depth was measured: `exact` = refined on the kernel's exact faces, `mesh` = display-mesh ray cast. */
+  readonly method?: 'exact' | 'mesh';
 }
 
 export interface ExtentProblem {
@@ -35,6 +39,18 @@ export function depthToFace(
   near: readonly [number, number, number],
   path: string,
 ): number | ExtentProblem {
+  const target = faceTarget(kernel, source, frame, near, path);
+  return 'why' in target ? target : target.depth;
+}
+
+/** `depth` as in `depthToFace`; `exits`: the face's outward normal opposes the feature face normal (the material ends at that face). */
+function faceTarget(
+  kernel: GeometryKernel,
+  source: ShapeRecipe,
+  frame: FeatureFrame,
+  near: readonly [number, number, number],
+  path: string,
+): { readonly depth: number; readonly exits: boolean } | ExtentProblem {
   const target = resolveFace(kernel, source, near);
   const paths = [path];
   if (target === 'not_found' || target === 'not_planar')
@@ -47,7 +63,7 @@ export function depthToFace(
     return { why: 'the target face is not parallel to the feature face', remediation: 'pick a face parallel to the feature face', paths };
   const depth = dot3(sub3(frame.origin, target.frame.origin), frame.normal);
   return depth > 0
-    ? depth
+    ? { depth, exits: dot3(target.frame.normal, frame.normal) < 0 }
     : { why: 'the target face lies at or above the feature face plane', remediation: 'pick a face below the feature face', paths };
 }
 
@@ -63,8 +79,11 @@ export function resolveExtents(
   pending: PendingExtent,
 ): ExtentGroup[] | ExtentProblem {
   if (pending.kind === 'up_to_face') {
-    const depth = depthToFace(kernel, source, frame, pending.near, 'extent.face.near');
-    return typeof depth === 'number' ? [{ points: [...points], extent: { kind: 'up_to_face', depth } }] : depth;
+    const target = faceTarget(kernel, source, frame, pending.near, 'extent.face.near');
+    if ('why' in target) return target;
+    return [
+      { points: [...points], extent: { kind: 'up_to_face', depth: target.depth, ...(target.exits ? { exits: true as const } : {}) } },
+    ];
   }
   const shape = kernel.evaluate(source);
   const mesh = shape === null ? null : kernel.tessellate(shape);
@@ -75,11 +94,15 @@ export function resolveExtents(
   const groups = new Map<number, ExtentGroup>();
   const missed: number[] = [];
   points.forEach((point, index) => {
-    const depth = depthToNextExit(bvh, frame, point, reach);
-    if (depth === null || !(depth > 0)) return void missed.push(index);
+    const meshDepth = depthToNextExit(bvh, frame, point, reach);
+    if (meshDepth === null || !(meshDepth > 0)) return void missed.push(index);
+    const exact =
+      kernel.faceQuery === undefined || shape === null ? null : exactExitDepth(kernel.faceQuery, shape, frame, point, meshDepth);
+    const depth = exact ?? meshDepth;
     const key = Math.round(depth / (1e-7 * (1 + depth)));
     const group = groups.get(key);
-    if (group === undefined) groups.set(key, { points: [point], extent: { kind: 'up_to_next', depth } });
+    if (group === undefined)
+      groups.set(key, { points: [point], extent: { kind: 'up_to_next', depth }, method: exact === null ? 'mesh' : 'exact' });
     else group.points.push(point);
   });
   return missed.length > 0

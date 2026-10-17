@@ -11,6 +11,7 @@ import request from 'supertest';
 import { libraryHash } from '@core/commands/materials/libraryFormat';
 import type { MaterialLibrary } from '@core/model/materialLibrary';
 import { app } from '../src/index';
+import { getLiveDoc, setLiveDoc } from '../src/liveDocument';
 import { applyCommand, _resetHistory } from '../src/commandBus';
 import { _resetLiveDoc } from '../src/liveDocument';
 import { createLibraryStorePort } from '../src/libraries/libraryStore';
@@ -47,6 +48,15 @@ const file = {
       licence: 'licensed-no-redistribution',
       exportMarking: { regime: 'none' },
       propertyModels: [model('density', 'density', 2.81, 'g/cm^3', 'company'), model('Ftu.A', 'Ftu', SENTINEL, 'ksi', 'A')],
+    },
+    {
+      id: 'bolt_lic',
+      name: 'bolt_lic',
+      designation: 'bolt',
+      specs: [],
+      licence: 'licensed-no-redistribution',
+      exportMarking: { regime: 'none' },
+      propertyModels: [model('density', 'density', 7.8, 'g/cm^3', 'company'), model('Fsu.A', 'Fsu', SENTINEL, 'ksi', 'A')],
     },
   ],
 };
@@ -165,5 +175,122 @@ describe('licensed values and non-local clients (TR-MAT-32)', () => {
     const remote = await command('get_material_allowable', { material: 'open', property: 'Ftu', basis: 'A' }, REMOTE);
     expect(remote.body.data).toMatchObject({ value: 77 });
     expect(remote.body.data.redacted).toBeUndefined();
+  });
+
+  /** Two plates (one open sheet material) and a hand-built stack in the live document; the bolt is the licensed library material. */
+  function placeStack(): string {
+    const plates = ['plate_a', 'plate_b'].map((name) => applyCommand('add_box', { size: [10, 10, 2], name }).affected[0] as string);
+    applyCommand('define_material_record', {
+      id: 'sheet',
+      designation: 'sheet',
+      specs: [],
+      licence: 'company-proprietary',
+      exportMarking: { regime: 'none' },
+    });
+    applyCommand('set_material_property', {
+      material: 'sheet',
+      property: 'Fbru',
+      value: 80,
+      unit: 'ksi',
+      basis: 'A',
+      edOverD: 1.5,
+      source: { citation: 'synthetic' },
+    });
+    expect(applyCommand('assign_material', { entityIds: plates, materialName: 'sheet' }).isError).toBe(false);
+    const doc = getLiveDoc();
+    const provenance = { citation: 'synthetic' };
+    setLiveDoc({
+      ...doc,
+      fasteners: {
+        catalogs: {
+          F: {
+            id: 'F',
+            kind: 'bolt',
+            standard: { body: 'x', id: 'x' },
+            partNumber: [],
+            sizes: [{ dash: '3', nominalDiameter: { value: 0.1875, unit: 'in' }, dims: {} }],
+            licence: 'company-proprietary',
+            provenance,
+          },
+        },
+        stacks: {
+          'fst-1.0': {
+            id: 'fst-1.0',
+            axis: { origin: [0, 0, 0], direction: [0, 0, 1] },
+            layers: plates.map((entityId) => ({ entityId, thickness: 2 })),
+            fastener: { family: 'F', partNumber: 'F3', instanceId: 'i', diameterDash: '3' },
+            washers: [],
+            stackThickness: 4,
+            holeMode: 'none',
+            holeDiameter: 0,
+          },
+        },
+      },
+    });
+    return 'fst-1.0';
+  }
+  const jointParams = (stackId: string): Record<string, unknown> => ({
+    stackId,
+    fastenerMaterial: 'bolt_lic',
+    fastenerBasis: 'A',
+    sheetBasis: 'A',
+    edOverD: 1.5,
+  });
+  const shearLbf = Math.round(SENTINEL * 1000 * ((Math.PI * 0.1875 * 0.1875) / 4) * 1e6) / 1e6;
+
+  it('joint_capacity with a licensed fastener material: a remote peer gets neither the Fsu, the capacities nor numbers in the summary', async () => {
+    const stackId = placeStack();
+    const local = await command('joint_capacity', jointParams(stackId));
+    expect(local.body.data.inputs[0].value).toBe(SENTINEL);
+    expect(local.body.data.shear.lbf).toBe(shearLbf);
+    const remote = await command('joint_capacity', jointParams(stackId), REMOTE);
+    const text = JSON.stringify(remote.body);
+    expect(text).not.toContain(String(SENTINEL));
+    expect(text).not.toContain(String(shearLbf));
+    expect(remote.body.data.redacted).toBe(true);
+    expect(remote.body.data.inputs[0].value).toBeUndefined();
+    expect(remote.body.data.shear.lbf).toBeUndefined();
+    expect(remote.body.data.basis).toBe('A');
+    expect(remote.body.summary).not.toMatch(/\d/);
+  });
+
+  it('build_project: a read-only step on a licensed material is redacted per step for a remote peer; an unrelated step is not', async () => {
+    const stackId = placeStack();
+    const actions = [
+      { command: 'get_material_allowable', params: ALLOWABLE },
+      { command: 'joint_capacity', params: jointParams(stackId) },
+      { command: 'get_material_allowable', params: { material: 'sheet', property: 'Fbru', basis: 'A', edOverD: 1.5 } },
+    ];
+    const local = await command('build_project', { actions });
+    expect(JSON.stringify(local.body)).toContain(String(SENTINEL));
+    const remote = await command('build_project', { actions }, REMOTE);
+    expect(remote.status).toBe(200);
+    expect(JSON.stringify(remote.body)).not.toContain(String(SENTINEL));
+    expect(JSON.stringify(remote.body)).not.toContain(String(shearLbf));
+    const steps = remote.body.data.steps as Array<{ ok: boolean; data?: { redacted?: boolean; value?: number } }>;
+    expect(steps.map((step) => step.ok)).toEqual([true, true, true]);
+    expect(steps[0]?.data?.redacted).toBe(true);
+    expect(steps[1]?.data?.redacted).toBe(true);
+    expect(steps[2]?.data?.redacted).toBeUndefined();
+    expect(steps[2]?.data?.value).toBe(80);
+  });
+
+  it('MCP: a session is bound to the locality that opened it; a request from the other locality gets 403', async () => {
+    const post = (headers: Record<string, string>, session?: string): request.Test => {
+      const req = request(app)
+        .post('/mcp')
+        .set(headers)
+        .set('Content-Type', 'application/json')
+        .set('Accept', 'application/json, text/event-stream');
+      return session !== undefined ? req.set('mcp-session-id', session) : req;
+    };
+    const init = await post(REMOTE).send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: INITIALIZE_PARAMS });
+    const session = init.headers['mcp-session-id'] as string;
+    const call = { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} };
+    expect((await post({}, session).send(call)).status).toBe(403);
+    expect((await post(REMOTE, session).send(call)).status).toBe(200);
+    const local = await post({}).send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: INITIALIZE_PARAMS });
+    const localSession = local.headers['mcp-session-id'] as string;
+    expect((await post(REMOTE, localSession).send(call)).status).toBe(403);
   });
 });

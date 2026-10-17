@@ -25,7 +25,7 @@ export const defineMaterialRecord = defineCommand({
   name: COMMAND,
   description:
     'Define an aerospace material record: id (also its material name), designation (e.g. "7075"), temper, productForm, the specifications it is ' +
-    'bought to (body + id, e.g. SAE AMS 4045), licence of its data, export-control marking and whether a source superseded it (MIL-HDBK-5J → MMPDS). ' +
+    'bought to (body + id, e.g. SAE AMS 4045), licence of its data (not licensed-no-redistribution: that stays in a private library, MAT_LICENCE_EMBED_FORBIDDEN), export-control marking and whether a source superseded it (MIL-HDBK-5J → MMPDS). ' +
     'The record has no values yet: add density, moduli and allowables with set_material_property, then assign it with assign_material. ' +
     'It behaves like any material (mass_properties, viewport colour). Redefining an id needs replace: true and keeps its values.',
   params: z.object({
@@ -36,7 +36,9 @@ export const defineMaterialRecord = defineCommand({
     specs: specsSchema.describe('Specifications: [{ body: "SAE", id: "AMS 4045", revision?: "H" }, …]. May be empty.'),
     licence: z
       .enum(LICENCE_FLAGS)
-      .describe('Licence of the data: public-domain-us-gov, licensed-no-redistribution, company-proprietary, vendor-catalogue, legacy.'),
+      .describe(
+        'Licence of the data: public-domain-us-gov, company-proprietary, vendor-catalogue, legacy. licensed-no-redistribution is refused here (MAT_LICENCE_EMBED_FORBIDDEN): it lives in a private library.',
+      ),
     exportMarking: markingInput.describe('Export-control marking of the material data.'),
     superseded: supersededSchema
       .optional()
@@ -51,6 +53,12 @@ export const defineMaterialRecord = defineCommand({
     if (id.trim() === '' || isReservedKey(id)) return refuse('MAT_RECORD_NOT_FOUND', `'${id}' is not a usable material id`, 'id');
     if (params.color !== undefined && !isHexColor(params.color))
       return refuse('PROP_FORM_INVALID', `color must be #rrggbb, got '${params.color}'`, 'color');
+    if (params.licence === 'licensed-no-redistribution')
+      return refuse(
+        'MAT_LICENCE_EMBED_FORBIDDEN',
+        `'${id}' is licensed-no-redistribution: a record defined in the document is embedded in the file and live snapshots. Keep such values in a private library (register_material_library, then import_material_library by libraryId)`,
+        'licence',
+      );
     const marking = markingOf(params.exportMarking);
     if (typeof marking === 'string') return refuse('PROP_FORM_INVALID', marking, 'exportMarking.eccn');
     const previous = Object.hasOwn(doc.materials, id) ? doc.materials[id] : undefined;

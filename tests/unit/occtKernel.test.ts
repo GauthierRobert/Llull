@@ -119,6 +119,36 @@ describe('occtOps — static / contract tests', () => {
     expect(ops.chamfer(shape, [], 0)).toBeNull();
     expect(ops.shell(shape, 0)).toBeNull();
   });
+  it('a native feature attempt that degrades the module disables native features for the process', async () => {
+    const { occtOps, nativeFailureCount } = await import('@kernel-occt/occtKernel');
+    let touches = 0;
+    const api = new Proxy(
+      {},
+      {
+        get: () => {
+          touches++;
+          throw 'module degraded'; // a non-Error throw always degrades (trap-like)
+        },
+      },
+    );
+    const ops = occtOps(api as never);
+    const node = {
+      op: 'feature',
+      feature: 'hole',
+      frame: { origin: [0, 0, 0], normal: [0, 0, 1], xDir: [1, 0, 0] },
+      points: [[1, 1]],
+      hole: { kind: 'simple', diameter: 2 },
+      extent: { kind: 'through_all' },
+    } as never;
+    const before = nativeFailureCount();
+    expect(ops.feature?.({} as never, node, 5)).toBeNull();
+    expect(nativeFailureCount()).toBeGreaterThan(before);
+    const settled = nativeFailureCount();
+    const seen = touches;
+    expect(ops.feature?.({} as never, node, 5)).toBeNull();
+    expect(nativeFailureCount()).toBe(settled);
+    expect(touches).toBe(seen);
+  });
   it('createOcctKernel is exported from occtKernel module (import check)', async () => {
     // This confirms the module compiles and the named export exists.
     // We do NOT call createOcctKernel() here — that would load 63 MB WASM.

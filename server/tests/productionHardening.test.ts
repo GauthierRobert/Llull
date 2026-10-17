@@ -53,7 +53,7 @@ describe('MCP session eviction', () => {
   it('a session-less non-initialize POST is refused and evicts nothing', async () => {
     process.env['MCP_MAX_SESSIONS'] = '1';
     const close = vi.fn().mockResolvedValue(undefined);
-    sessions.set('victim', { transport: { close } as never, lastSeenMs: 1 });
+    sessions.set('victim', { transport: { close } as never, lastSeenMs: 1, remote: false });
     const res = await mcpRequest(app).send({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} });
     expect(res.status).toBe(400);
     expect(sessions.has('victim')).toBe(true);

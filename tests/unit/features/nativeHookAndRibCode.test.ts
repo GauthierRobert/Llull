@@ -30,6 +30,7 @@ describe('KernelOps.feature (native form of a feature node)', () => {
 
   const kernelWith = (
     feature: (() => object | null) | undefined,
+    failureEpoch?: () => number,
   ): { kernel: ReturnType<typeof kernelFromOps<object>>; boolean: ReturnType<typeof vi.fn> } => {
     const boolean = vi.fn(() => ({ tag: 'boolean' }));
     const kernel = kernelFromOps<object>({
@@ -37,6 +38,7 @@ describe('KernelOps.feature (native form of a feature node)', () => {
       solid: () => ({ tag: 'solid' }),
       boolean,
       ...(feature === undefined ? {} : { feature }),
+      ...(failureEpoch === undefined ? {} : { failureEpoch }),
       fillet: () => null,
       blend: () => null,
       chamfer: () => null,
@@ -60,6 +62,22 @@ describe('KernelOps.feature (native form of a feature node)', () => {
     const [, node, reach] = feature.mock.calls[0] as unknown as [object, FeatureRecipe, number];
     expect(node.feature).toBe('hole');
     expect(reach).toBeGreaterThanOrEqual(0);
+  });
+
+  it('a native attempt that degraded the module is not lowered on that module: null, then retried after the epoch bump', () => {
+    let epoch = 0;
+    let degrade = true;
+    const feature = vi.fn(() => {
+      if (degrade) epoch += 1;
+      return null;
+    });
+    const { kernel, boolean } = kernelWith(feature, () => epoch);
+    expect(kernel.evaluate(recipe())).toBeNull();
+    expect(boolean).not.toHaveBeenCalled();
+    degrade = false;
+    expect(kernel.evaluate(recipe())).not.toBeNull();
+    expect(feature).toHaveBeenCalledTimes(2);
+    expect(boolean).toHaveBeenCalledWith('subtract', expect.anything(), expect.anything());
   });
 
   it('lowers to a boolean when the hook declines or is absent', () => {
@@ -103,6 +121,8 @@ describe('lowering of the new feature members', () => {
     expect(faceBottom?.at(-2)).toEqual([2, -7]);
     const nextBottom = holeToolProfile({ kind: 'simple', diameter: 4 }, { kind: 'up_to_next', depth: 7 }, 99);
     expect((nextBottom?.at(-2)?.[1] ?? 0) < -7).toBe(true);
+    const exitBottom = holeToolProfile({ kind: 'simple', diameter: 4 }, { kind: 'up_to_face', depth: 7, exits: true }, 99);
+    expect(exitBottom?.at(-2)?.[1]).toBeCloseTo(nextBottom?.at(-2)?.[1] ?? 0, 12);
   });
 });
 

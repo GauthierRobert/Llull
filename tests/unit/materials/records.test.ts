@@ -42,6 +42,14 @@ describe('define_material_record', () => {
     expect(JSON.stringify(doc)).toBe(before);
   });
 
+  it('refuses licensed-no-redistribution: an embedded record would reach saved files, live snapshots and cad://document', () => {
+    const doc = mmDocument();
+    const refused = call(doc, 'define_material_record', record('aa7075', { licence: 'licensed-no-redistribution' }));
+    expect(refused.document).toBe(doc);
+    expect(refused.affected).toEqual([]);
+    expect(refused.error).toMatchObject({ code: 'MAT_LICENCE_EMBED_FORBIDDEN', ids: ['aa7075'], paths: ['licence'] });
+  });
+
   it('refuses an existing id without replace, and keeps the values when replacing', () => {
     let doc = step(mmDocument(), 'define_material_record', record('aa7075'));
     doc = step(doc, 'set_material_property', property('aa7075', { property: 'density', value: 2.81, unit: 'g/cm^3', basis: 'typical' }));

@@ -163,5 +163,8 @@ describe('material and layer of a sheet-metal part', () => {
     refuse({ id: 'nope', materialName: 'al2024' }, 'FTR_PART_NOT_FOUND');
     refuse({ id: part, materialName: 'unobtainium' }, 'FTR_PARAM_INVALID');
     refuse({ id: part, materialName: 'al2024', layerId: 'no-layer' }, 'FTR_PARAM_INVALID');
+    for (const inherited of ['constructor', 'toString', 'hasOwnProperty']) {
+      refuse({ id: part, materialName: inherited }, 'FTR_PARAM_INVALID');
+    }
   });
 });
