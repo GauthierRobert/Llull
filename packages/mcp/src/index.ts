@@ -6,6 +6,7 @@
 
 export { buildMcpTools } from './tools';
 export { shapeToolCallContent } from './dispatch';
+export { redactLicensedOutcome } from './redactLicensed';
 export { listMcpResources, readMcpResource, CAD_RESOURCE_URIS } from './resources';
 export { CONVENTIONS_GUIDE, CONVENTIONS_URI } from './conventions';
 export { listMcpPrompts, getMcpPrompt } from './prompts';

@@ -23,6 +23,7 @@ import { buildAuthMiddleware, buildMcpRateLimiter } from './mcp/middleware';
 import { buildMcpServer } from './mcp/server';
 import { requestUser } from './users';
 import { actorOf } from './audit';
+import { isLocalPeer } from './security';
 
 /** Toolsets from `LLULL_TOOLSETS` (comma-separated; unset = core only, `all` = everything). Warns on unknown names. */
 export function toolsetsFromEnv(raw: string | undefined = process.env['LLULL_TOOLSETS']): ReadonlySet<ToolsetName> {
@@ -87,9 +88,11 @@ export function buildMcpRouter(
       if (isInitializeRequest(req.body)) evictForCapacity(requestUser(res)?.id);
       const transport = allocateSession(requestUser(res)?.id);
       try {
-        await buildMcpServer(exchange, enabledToolsets, { actor: actorOf(res, 'mcp'), role: requestUser(res)?.role ?? null }).connect(
-          transport as Transport,
-        );
+        await buildMcpServer(exchange, enabledToolsets, {
+          actor: actorOf(res, 'mcp'),
+          role: requestUser(res)?.role ?? null,
+          remote: !isLocalPeer(req),
+        }).connect(transport as Transport);
         await transport.handleRequest(req, res, req.body as unknown);
       } catch (err: unknown) {
         console.error('[/mcp] new session error:', errorMessage(err));
