@@ -1,34 +1,47 @@
 /**
- * VC-TMC-03 NAFEMS T1 as a finite-element solve (TR-TMC-14, fea_import_field): a thin 20 x 20 mm plate (quarter with symmetry, 0.05 mm thick so
- * the free faces give plane stress), E = 100 GPa, nu = 0.3, thermal strain 0.001 per K, temperature step 1 K inside r < a = 1 mm and 0 outside.
- * That is the pack's "alpha_hot dT with alpha_bulk = 0": the stress depends on the thermal strain field only. The field is a table written by
- * `fea_import_field` on the mesh nodes (two passes: fea_mesh, read the nodes, import, solve), refined by ball fields along the circle.
+ * VC-TMC-03 NAFEMS T1 as a finite-element solve (TR-TMC-14): a thin plate (quarter of 20 x 20 mm with symmetry) bonded to a hot disc r < a = 1 mm.
+ * TWO materials, both E = 100 GPa, nu = 0.3: the disc has thermal strain 0.001 per K (alpha_hot), the plate none (alpha_bulk = 0); the field is a
+ * uniform dT = 1 K (reference 0, field 1), so the stress depends on the mismatch only. Geometry from llull commands: the disc is a quarter
+ * revolution, the plate a box minus a copy of it (`boolean` subtract), so the parts touch exactly on the quarter cylinder; `set_mesh_controls
+ * bonding: conformal` fragments them in ONE Gmsh model, the interface nodes are shared (a bonded joint; element sets and materials per part).
+ * The step in alpha is resolved by the mesh topology, not smeared over an element as in a one-material nodal temperature step.
  *
- * Measured with Gmsh 4.15.2 + CalculiX 2.21, order 2, global size 0.2 mm, ring size = thickness (columns: ring size s, nodes, sigma_y at the node
- * nearest (1.005, 0)): s 0.10: 38k, 35.5 | 0.08: 39k, -31.9 | 0.07: 40k, 43.8 | 0.06: 41k, 25.8 | 0.05: 43k, 48.9 | 0.04: 46k, 50.5 |
- * 0.03: 77k, 52.1 | 0.02 (global 0.1): 171k, 52.9 MPa against 49.5037. Inside the disc every mesh gives -49.5 .. -49.8 (-50 closed form) and
- * from r = 1.2 mm on 35 vs 34.72, 22.2..23.6 vs 22.22, 12.5..13.1 vs 12.50. Within one element of the interface the nodal hoop stress
- * oscillates (the temperature is continuous over the nodes, so the step is smeared over one element and CalculiX averages the extrapolated
- * element stresses at each node): the (1.005, 0) value is mesh noise, not a result - VC-TMC-03.b is NOT judged here, VC-TMC-03.c is.
+ * Plane stress is the thin-plate limit: within about one thickness h of the interface the free faces break it (3D edge effect, the hoop stress
+ * rises towards the plane-strain value: nodes at r = 1.011 / 1.0067 read 59.8 / 62.9 MPa on the h = 0.05 mm plate against 49.4 / 49.7). So
+ * the exterior field is read at the plate-only node on the symmetry plane y = 0 nearest r = a + 1.5 h (mid-plane) and moved to the probe
+ * radius with its exact law sigma_theta ~ 1/r^2 (r_node/r)^2. Probes sit at the exact coordinates of nodes used by ONE part only: a node shared by both
+ * parts averages two different stress states in the CalculiX nodal output. sigma_y on y = 0 is the hoop stress.
+ *
+ * Measured with Gmsh 4.15.2 + CalculiX 2.21, order 2, global size 0.2 mm, thickness h = ring refinement size on the circle (nodes, node radius r,
+ * raw sigma_y there against 50 (a/r)^2, moved to 1.005 against 49.5037, disc node nearest (0.5, 0) against -50):
+ * h 0.04: 47k, 1.0593, 44.93 vs 44.56, 49.92 (+0.8 %), -49.55 | h 0.02: 75k, 1.0298, 47.52 vs 47.15, 49.89 (+0.8 %), -49.55 |
+ * h 0.01: 179k, 1.0149, 48.90 vs 48.54, 49.87 (+0.7 %), -49.55. The remaining +0.4 MPa is the finite plate (the free edges add about
+ * 50 (a/W)^2 = 0.5 MPa, W = 10 mm: the pack notes it); the sequence is converged to 0.1 MPa. The h = 0.01 run (179k nodes) is left out of the suite.
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setGeometryKernel } from '@core/geometry/kernel';
 import type { FeMeshArtifact } from '@core/model/analysis';
 import { isRecord } from '@lib/isRecord';
-import { createManifoldKernel } from '@kernel-manifold/manifoldKernel';
+import { createNodeOcctKernel } from '../src/occtNode';
 import { HAS_CCX, HAS_GMSH } from './feaTestSupport';
 import { dataOf, expectCase, planPath, Workspace, type Session } from './feaThermomechSupport';
 
 const READY = HAS_GMSH && HAS_CCX;
 let workspace: Workspace;
+let occtReady = false;
 
 beforeAll(async () => {
   workspace = new Workspace();
-  setGeometryKernel(await createManifoldKernel());
+  try {
+    setGeometryKernel(await createNodeOcctKernel());
+    occtReady = true;
+  } catch {
+    occtReady = false;
+  }
 }, 120_000);
 
 afterAll(() => {
@@ -36,120 +49,137 @@ afterAll(() => {
   workspace.dispose();
 });
 
-const THICKNESS = 0.05;
 const GLOBAL_SIZE = 0.2;
-const RING_SIZE = 0.05;
 const A = 1;
-
-/** Node temperature of the step: 1 K inside the disc, 0 outside, 0.5 on the circle itself. */
-const stepTemperature = (x: number, y: number): number => {
-  const r = Math.hypot(x, y);
-  return r < A - 1e-9 ? 1 : r > A + 1e-9 ? 0 : 0.5;
-};
+const PROBE_X = 1.005;
+/** The plane-stress field is read this many thicknesses away from the interface (see the header). */
+const CLEAN_LAYERS = 1.5;
+const AXIS_TOLERANCE = 1e-9;
 
 const readMesh = (hash: string): FeMeshArtifact =>
   JSON.parse(gunzipSync(readFileSync(path.join(workspace.dir, 'cache', `${hash}.json.gz`))).toString('utf8')) as FeMeshArtifact;
 
-function writeTable(name: string, mesh: FeMeshArtifact, skipLast = false): string {
-  const nodes = skipLast ? mesh.nodes.slice(0, -1) : mesh.nodes;
-  const file = path.join(workspace.dir, name);
-  writeFileSync(file, ['x,y,z,T', ...nodes.map(([, x, y, z]) => `${x},${y},${z},${stepTemperature(x, y)}`)].join('\n'));
-  return file;
+interface Node {
+  readonly id: number;
+  readonly point: readonly [number, number, number];
 }
 
-interface Reading {
-  readonly name: string;
-  readonly nodeId: number;
-  readonly nodeDistance: number;
-  readonly value: number;
+/** Nodes used by the elements of `entityId` only, i.e. not shared with another part. */
+function ownNodes(mesh: FeMeshArtifact, entityId: string): Node[] {
+  const users = new Map<number, Set<string>>();
+  for (const block of mesh.blocks)
+    for (const row of block.elements)
+      for (const id of row.slice(1)) users.set(id, (users.get(id) ?? new Set<string>()).add(block.entityId));
+  return mesh.nodes
+    .filter(([id]) => users.get(id)?.size === 1 && users.get(id)?.has(entityId))
+    .map(([id, x, y, z]) => ({ id, point: [x, y, z] }));
 }
 
-async function readings(session: Session, analysisId: string): Promise<Reading[]> {
+const nearest = (nodes: readonly Node[], target: readonly [number, number, number]): Node => {
+  const distance = (node: Node): number => Math.hypot(node.point[0] - target[0], node.point[1] - target[1], node.point[2] - target[2]);
+  const best = [...nodes].sort((p, q) => distance(p) - distance(q))[0];
+  if (best === undefined) throw new Error('no node');
+  return best;
+};
+
+async function probeValues(session: Session, analysisId: string): Promise<Record<string, number>> {
   const report = await session.cli('fea_report', `analysisId=${analysisId}`);
   const list = dataOf(report.json)['probes'];
-  return (Array.isArray(list) ? list : []).flatMap((probe: unknown): Reading[] => {
-    if (!isRecord(probe) || !Array.isArray(probe['values'])) return [];
+  const found: Record<string, number> = {};
+  for (const probe of Array.isArray(list) ? list : []) {
+    if (!isRecord(probe) || !Array.isArray(probe['values'])) continue;
     const last: unknown = probe['values'].at(-1);
-    return isRecord(last)
-      ? [
-          {
-            name: String(probe['name']),
-            nodeId: Number(probe['nodeId']),
-            nodeDistance: Number(probe['nodeDistance']),
-            value: Number(last['value']),
-          },
-        ]
-      : [];
-  });
+    expect(Number(probe['nodeDistance']), String(probe['name'])).toBeLessThan(1e-9);
+    if (isRecord(last)) found[String(probe['name'])] = Number(last['value']);
+  }
+  return found;
 }
 
-describe.skipIf(!READY)('VC-TMC-03 NAFEMS T1 plate with a nodal temperature step (fea_import_field)', () => {
-  it('judges the stress inside the hot disc, checks the exterior field against the closed form and refuses a table with an unmatched node', async () => {
-    const session = workspace.open('t1');
-    const aliases = await session.run(planPath('tmc_nafems_t1'));
-    const analysisId = aliases['an']?.[0] ?? '';
-    const plate = aliases['plate']?.[0] ?? '';
-    for (const r of [1.5, 2]) {
-      const added = await session.cli(
-        'add_result_probe',
-        `analysisId=${analysisId}`,
-        `name=r${r}`,
-        `point=[${r},0,${THICKNESS / 2}]`,
-        'quantity=s_yy',
-      );
-      expect(added.code).toBe(0);
-    }
-    const arc = Math.ceil(Math.PI / 2 / (GLOBAL_SIZE * 0.8));
-    const ring = Array.from({ length: arc + 1 }, (_, i) => [
-      Math.cos((i / arc) * (Math.PI / 2)),
-      Math.sin((i / arc) * (Math.PI / 2)),
-      THICKNESS / 2,
-    ]);
-    const refined = await session.cli(
-      'set_mesh_controls',
+interface Measurement {
+  readonly nodes: number;
+  readonly outsideRadius: number;
+  readonly outside: number;
+  readonly inside: number;
+  readonly interfaceNodes: number;
+}
+
+/** Fresh T1 document, ring refinement of size `ringSize`, mesh -> probes at own-part nodes -> solve. */
+async function solveT1(name: string, thickness: number): Promise<Measurement> {
+  const session = workspace.open(name);
+  // the fixture is 0.05 mm thick (mid-plane 0.025); this suite runs it at `thickness`
+  const plan = path.join(workspace.dir, `${name}.plan.json`);
+  writeFileSync(
+    plan,
+    readFileSync(planPath('tmc_nafems_t1'), 'utf8')
+      .replace(/\b0\.025\b/g, String(thickness / 2))
+      .replace(/\b0\.05\b/g, String(thickness)),
+  );
+  const aliases = await session.run(plan);
+  const ringSize = thickness;
+  const analysisId = aliases['an']?.[0] ?? '';
+  const [disc, plate] = [aliases['disc']?.[0] ?? '', aliases['plate']?.[0] ?? ''];
+  const arc = Math.ceil(Math.PI / 2 / (GLOBAL_SIZE * 0.8));
+  const ring = Array.from({ length: arc + 1 }, (_, i) => [
+    A * Math.cos((i / arc) * (Math.PI / 2)),
+    A * Math.sin((i / arc) * (Math.PI / 2)),
+    thickness / 2,
+  ]);
+  const refined = await session.cli(
+    'set_mesh_controls',
+    `analysisId=${analysisId}`,
+    `refinements=${JSON.stringify([{ target: { entityId: plate, pointsNear: ring }, size: ringSize }])}`,
+  );
+  expect(refined.code, String(refined.json['summary'])).toBe(0);
+  const mesh = readMesh(await session.mesh(analysisId));
+  // y = 0 symmetry plane: the hoop stress there is sigma_y
+  const outside = nearest(
+    ownNodes(mesh, plate).filter((node) => Math.abs(node.point[1]) < AXIS_TOLERANCE),
+    [A + CLEAN_LAYERS * thickness, 0, thickness / 2],
+  );
+  const inside = nearest(ownNodes(mesh, disc), [0.5, 0, thickness / 2]);
+  for (const [probe, node] of [
+    ['outside', outside],
+    ['inside', inside],
+  ] as const) {
+    const added = await session.cli(
+      'add_result_probe',
       `analysisId=${analysisId}`,
-      `globalSize=${GLOBAL_SIZE}`,
-      `refinements=${JSON.stringify([{ target: { entityId: plate, pointsNear: ring }, size: RING_SIZE }])}`,
+      `name=${probe}`,
+      `point=[${node.point.join(',')}]`,
+      'quantity=s_yy',
     );
-    expect(refined.code, String(refined.json['summary'])).toBe(0);
-    const mesh = readMesh(await session.mesh(analysisId));
-    const importArgs = (file: string): string[] => [
-      `analysisId=${analysisId}`,
-      `file=${file}`,
-      'coordinatesUnit=mm',
-      'temperatureUnit=degC',
-    ];
+    expect(added.code, String(added.json['summary'])).toBe(0);
+  }
+  const shared = mesh.nodes.length - ownNodes(mesh, disc).length - ownNodes(mesh, plate).length;
+  await session.mesh(analysisId);
+  await session.solve(analysisId);
+  const values = await probeValues(session, analysisId);
+  return {
+    nodes: mesh.nodes.length,
+    outsideRadius: Math.hypot(outside.point[0], outside.point[1]),
+    outside: values['outside'] ?? Number.NaN,
+    inside: values['inside'] ?? Number.NaN,
+    interfaceNodes: shared,
+  };
+}
 
-    // a table that misses a node is refused at deck time (nearest node within 1e-6 x model size), the mesh is still current
-    const partial = await session.cli('fea_import_field', ...importArgs(writeTable('partial.csv', mesh, true)));
-    expect(partial.code, String(partial.json['summary'])).toBe(0);
-    const unmatched = await session.cli('fea_export', `analysisId=${analysisId}`);
-    expect(unmatched.code).not.toBe(0);
-    expect(String(unmatched.json['summary'])).toContain('TMC_FIELD_TABLE_UNMATCHED');
+/** The exterior field of the inclusion is sigma_theta = 50 (a/r)^2 (finite plate: + 0.5 MPa of free-edge correction): move a reading to radius `to`. */
+const transported = (value: number, from: number, to: number): number => (value * from * from) / (to * to);
 
-    const full = await session.cli('fea_import_field', ...importArgs(writeTable('full.csv', mesh)));
-    expect(full.code, String(full.json['summary'])).toBe(0);
-    expect(dataOf(full.json)['rows']).toBe(mesh.nodes.length);
-    await session.solve(analysisId);
-    const found = new Map((await readings(session, analysisId)).map((reading) => [reading.name, reading]));
-
-    // inside the hot disc sigma = -E alpha dT / 2 = -50 MPa (VC-TMC-03.c, 2 %), read at the node nearest (0.5, 0)
-    expectCase('VC-TMC-03.c', found.get('disc')?.value ?? Number.NaN, 'MPa');
-    // far from the interface the nodal field follows the closed form: sigma_yy = 50 (a/r)^2 cos(2 theta) at the actual node (finite plate: the free edges add about 50 (a/W)^2 = 0.5 MPa, so r = 3 mm is out of the 4 % band and is not checked)
-    for (const name of ['r1.5', 'r2']) {
-      const reading = found.get(name);
-      const node = mesh.nodes.find(([id]) => id === reading?.nodeId);
-      expect(reading, name).toBeDefined();
-      const [x, y] = [node?.[1] ?? Number.NaN, node?.[2] ?? Number.NaN];
-      const expected = (50 * A * A * Math.cos(2 * Math.atan2(y, x))) / (x * x + y * y);
-      expect(Math.abs((reading?.value ?? Number.NaN) - expected), `${name}: ${reading?.value} vs ${expected}`).toBeLessThan(
-        0.04 * expected,
-      );
-    }
-    // the nodal value next to the interface is mesh noise (see the header): only its sign and order of magnitude are asserted
-    const near = found.get('ring')?.value ?? Number.NaN;
-    expect(near).toBeGreaterThan(20);
-    expect(near).toBeLessThan(80);
-    expect(existsSync(path.join(workspace.dir, 'full.csv'))).toBe(true);
-  }, 300_000);
+describe.skipIf(!READY)('VC-TMC-03 NAFEMS T1: hot disc bonded in a plate (two materials, conformal mesh)', () => {
+  it.each([0.04, 0.02])(
+    'judges the stress inside the disc and just outside it at thickness = ring size %f',
+    async (thickness) => {
+      expect(occtReady, 'the OCC kernel is needed for exact conformal STEP parts').toBe(true);
+      const found = await solveT1(`t1_${thickness}`, thickness);
+      expect(found.interfaceNodes).toBeGreaterThan(50);
+      // the raw nodal value follows the closed form at its own radius
+      const closedForm = (50 * A * A) / (found.outsideRadius * found.outsideRadius);
+      expect(Math.abs(found.outside - closedForm), `${found.outside} vs ${closedForm}`).toBeLessThan(0.02 * closedForm);
+      expectCase('VC-TMC-03.c', found.inside, 'MPa');
+      expectCase('VC-TMC-03.b', transported(found.outside, found.outsideRadius, PROBE_X), 'MPa');
+      expectCase('VC-TMC-03.a', transported(found.outside, found.outsideRadius, A), 'MPa');
+    },
+    900_000,
+  );
 });

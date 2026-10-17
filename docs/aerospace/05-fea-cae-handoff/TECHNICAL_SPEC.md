@@ -642,6 +642,8 @@ exact faces and STEP. **06 CMP** supplies laminates. **09 PLM** stamps results w
 Verified end to end with real Gmsh + ccx 2.21 (axial bar σ = F/A within 1 %, pressure sign, load-case reset) and by the PHY-03 / PHY-04
 benchmarks.
 
+**Bonded multi-part meshes (V1, built 2026-10-17):** `set_mesh_controls { bonding: 'separate' | 'conformal' }` (default `separate`, stored as absent so existing mesh hashes are unchanged; `conformal` is part of the mesh input hash). `separate` meshes every analysed part in its own Gmsh model (no shared nodes; contact needs this). `conformal` puts all parts in ONE model and `occ.fragment`s them, so touching parts share their interface nodes and faces; ids stay global and contiguous, element blocks (and so ELSETs / materials) stay per entity, and a target still resolves against the faces of its own part. It needs exact STEP geometry (OCC kernel): any STL part is refused with `FEA_BONDING_UNSUPPORTED`; parts that overlap in volume (a fragment owned by two parts) are refused with `FEA_BONDING_OVERLAP` (subtract one from the other so that they only touch). Used by PHY-04 NAFEMS T1 (`docs/physics/04-thermo-mechanical/TECHNICAL_SPEC.md` §14). Tests: `tests/unit/cae/{setup,hash}.test.ts`, `server/tests/feaMeshBridge.test.ts` (shared interface nodes, refusals).
+
 **Deviations:** targets are resolved by the mesher (closest Gmsh surface / node to the given points), not by the TR-FEA-32 face map,
 because the 01 face-query port (`faceDetails`) does not exist; without STEP (Manifold) the mesher rebuilds the geometry from the
 tessellation (`classifySurfaces` 40°), so faces are crease regions; `edgesNear` works with STEP only; `intersectPlane` is ignored.

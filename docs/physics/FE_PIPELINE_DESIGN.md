@@ -90,7 +90,8 @@ displacement / symmetry (planar); loads force / pressure / gravity; thermal BCs 
 expression / thermal_result (same mesh) / table. Not built (stay in the 05 backlog): modal, buckling, shells, plane stress,
 midsurface, defeature, Nastran BDF, OP2, `dispose_margin`, quality port beyond Gmsh's own metrics,
 UI panels, cavity radiation deck and contact conductance (PHY-03 V1: see its §13). Built since this note (PHY-04 TECHNICAL_SPEC §14):
-`compute_margins`, `fea_import_field`, the steady coupled procedure and mesh mapping.
+`compute_margins`, `fea_import_field`, the steady coupled procedure and mesh mapping, and bonded multi-part meshes (`set_mesh_controls bonding: 'conformal'`: all
+parts fragmented in one Gmsh model so touching parts share interface nodes, STEP only; 05 TECHNICAL_SPEC §13).
 Human gates (`dispose_thermal_limit`, `dispose_fit_result`) verify through `ctx.humanSignature`; no implementation is installed
 (09 PLM is not built), so every call is refused with the `*_HUMAN_GATE` code, which is the specified agent-path behaviour.
 

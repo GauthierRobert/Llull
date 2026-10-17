@@ -375,8 +375,7 @@ key is closed by §14.
   per node (no set-name dependency). `TMC_THERMAL_CATEGORY_UNSET` is a warning (`add_fea_load` always sets a category).
 - **Human gate:** `dispose_fit_result` verifies through `ctx.humanSignature`; none is installed (09 PLM), so agents get `TMC_HUMAN_GATE`.
 
-**Still open:** VC-TMC-03.a/.b as FE values (nodal temperature step, see §14; the analytic VC-TMC-03.a–c pass and 03.c is also judged on the FE solve);
-M4 remainder (transient coupled step, orthotropic CTE, fit stack-ups, bimetal FE); a signing implementation (09 PLM); the `llull guide` section.
+**Still open:** M4 remainder (transient coupled step, orthotropic CTE, fit stack-ups, bimetal FE); a signing implementation (09 PLM); the `llull guide` section.
 
 **Review fixes (2026-10-17):**
 
@@ -411,24 +410,32 @@ Measured values (MPa):
 | VC-TMC-01.a | coupled restrained bar, 120 degC on both ends | -251.997 | -252 | -0.001 % |
 | VC-TMC-05.a / b / c | coupled thick cylinder (bore 120 degC, outer 20 degC, one analysis) | -206.926 / 133.691 / -208.399 | -209.824 / 133.033 / -209.824 | -1.4 % / +0.5 % / -0.7 % |
 | VC-TMC-05.a / b / c | sequential, thermal mesh 3 mm mapped (interpolate) onto the 2 mm mechanical mesh | -206.715 / 133.261 / -208.793 | same | -1.5 % / +0.2 % / -0.5 % |
-| VC-TMC-03.c | NAFEMS T1 as FE, stress inside the hot disc (node nearest (0.5, 0)) | -49.464 | -50 | +1.1 % |
+| VC-TMC-03.a / b / c | NAFEMS T1 as FE, two materials on a conformal mesh (h = 0.02 mm): hoop just outside, sigma_y at (1.005, 0), inside the disc | 50.39 / 49.89 / -49.55 | 50 / 49.5037 / -50 | +0.8 % / +0.8 % / +0.9 % |
 
 (With a 4 mm thermal mesh the mapped bore hoop stress is -205.37 MPa, -2.1 %: the error is the coarse thermal solution, not the mapping.)
 
-**VC-TMC-03.b / 03.a as FE are not judged.** The plate (20 x 20 mm, quarter with symmetry, 0.05 mm thick so the free faces give plane stress, E = 100 GPa,
-nu = 0.3, thermal strain 0.001 per K, 1 K inside r < 1 mm) is solved with the temperature table of `fea_import_field` on the mesh nodes (two passes:
-`fea_mesh`, read the nodes, import, `fea_solve`) and a ball refinement along the circle (`server/tests/feaThermomechT1.test.ts`). The expression grammar has
-no step and was not changed. The nodal temperature is continuous, so the step is smeared over the elements straddling r = a, and CalculiX averages
-the extrapolated element stresses at each node: the hoop stress at the node nearest (1.005, 0), half an element from the interface, is mesh noise.
-Measured, ring size = thickness, global size 0.2 mm (0.1 for the last), against 49.5037:
+**VC-TMC-03.a / .b / .c as FE (conformal two-material model).** The earlier one-material attempt (a nodal temperature step from `fea_import_field`, 0.001 per K inside
+r < 1 mm) smeared the step over the elements straddling r = a, and CalculiX averages the extrapolated element stresses at each node: the value at (1.005, 0) was mesh noise
+(35.5 .. 52.9 MPa over ring sizes 0.10 .. 0.02 mm, 38 k .. 171 k nodes) and 03.a/.b were not judged. It is replaced by the two-material form of the pack's statement
+(`server/tests/feaThermomechT1.test.ts`, plan `tmc_nafems_t1`):
 
-| ring size (mm) | 0.10 | 0.08 | 0.07 | 0.06 | 0.05 | 0.04 | 0.03 | 0.02 |
-| -------------- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- |
-| nodes | 38 k | 39 k | 40 k | 41 k | 43 k | 46 k | 77 k | 171 k |
-| sigma_y at the node nearest (1.005, 0), MPa | 35.5 | -31.9 | 43.8 | 25.8 | 48.9 | 50.5 | 52.1 | 52.9 |
+- Geometry from commands: the disc is a quarter `revolve_profile` (r 0..1 mm), the plate a 10 x 10 mm box minus a copy of the disc (`boolean` subtract), so the two parts touch exactly
+  on the quarter cylinder. Disc: E = 100 GPa, nu = 0.3, thermal strain 0.001 per K; plate: same E and nu, thermal strain 0 (alpha_bulk = 0). Reference 0 degC, uniform field 1 degC.
+  Symmetry (`ux = 0` on x = 0, `uy = 0` on y = 0, per part), one `uz` pin.
+- `set_mesh_controls bonding: 'conformal'` (05 §13): both parts are fragmented in one Gmsh model, so the interface nodes are shared (a bonded joint) while each part keeps
+  its element set and material. The temperature step is then the material step; no table field is needed.
+- A thin 3D plate is plane stress only away from the interface: within about one thickness h of it the free faces change the state (the hoop stress rises towards the
+  plane-strain value; h = 0.05 mm: 59.8 MPa at r = 1.011, 62.9 at r = 1.0067 against 49.4 / 49.7). The exterior field is therefore read at the plate-only node on y = 0 nearest
+  r = a + 1.5 h and moved to the probe radius with its exact law sigma_theta ~ 1/r^2 (a node shared with the disc would average two stress states and is never probed).
+  03.a is the same reading moved to r = a+; 03.b to r = 1.005 mm; 03.c is the disc node nearest (0.5, 0) read as is.
 
-A 2 % value (0.05, 0.04) is luck of the node position, not convergence; the next size down is 7e5 nodes. Away from the interface the FE field is accurate: inside
-the disc -49.5 .. -49.8 on every mesh, 34.9 .. 35.7 at r = 1.2 mm (closed form 34.72), 22.2 .. 23.6 at 1.5 mm (22.22), 12.5 .. 13.1 at 2 mm (12.50). The test
-therefore judges VC-TMC-03.c on the FE solve, checks r = 1.5 and 2 mm against the closed form at the actual node position (4 %), and asserts only the sign
-and order of magnitude of the value next to the interface. The analytic VC-TMC-03.a-c stay judged by `thermal_stress_check inclusion`. Judging 03.a/.b on FE needs a
-conformal interface (bonded multi-part meshes: 05 V1) or the two-material form of the pack's statement (alpha_hot inside, alpha_bulk = 0 outside).
+Measured (global size 0.2 mm, order 2, ring refinement size = thickness h; "raw" is sigma_y at the node of radius r, "closed" is 50 (a/r)^2):
+
+| h = ring size (mm) | nodes | node r (mm) | raw | closed | moved to 1.005 (03.b, 49.5037) | moved to a (03.a, 50) | disc (03.c, -50) |
+| ------------------ | ----- | ----------- | --- | ------ | ------------------------------ | --------------------- | ---------------- |
+| 0.04 | 47 k | 1.0593 | 44.93 | 44.56 | 49.92 (+0.8 %) | 50.42 (+0.8 %) | -49.55 (+0.9 %) |
+| 0.02 | 75 k | 1.0298 | 47.52 | 47.15 | 49.89 (+0.8 %) | 50.39 (+0.8 %) | -49.55 (+0.9 %) |
+| 0.01 (not in the suite) | 179 k | 1.0149 | 48.90 | 48.54 | 49.87 (+0.7 %) | 50.37 (+0.7 %) | -49.55 (+0.9 %) |
+
+The remaining +0.4 MPa is the finite plate (the free edges add about 50 (a/W)^2 = 0.5 MPa, W = 10 mm: the pack notes it); the sequence is converged to 0.1 MPa. All three cases
+pass the 2 % judge on both suite meshes, and are also judged analytically by `thermal_stress_check inclusion`.

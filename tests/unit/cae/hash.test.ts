@@ -151,6 +151,22 @@ describe('keyedTargets / meshRequest', () => {
     expect(request.controls.refinements).toHaveLength(1);
   });
 
+  it('puts the bonding option in the mesh hash and the mesh request, and leaves the default hash unchanged', () => {
+    const { doc, analysisId } = modelWithAnalysis();
+    const before = hashes(doc, analysisId);
+    const same = run(doc, 'set_mesh_controls', { analysisId, bonding: 'separate' });
+    expect(hashes(same.document, analysisId)).toEqual(before);
+    const conformal = run(doc, 'set_mesh_controls', { analysisId, bonding: 'conformal' });
+    expect(hashes(conformal.document, analysisId).mesh).not.toBe(before.mesh);
+    expect(hashes(conformal.document, analysisId).full).not.toBe(before.full);
+    const request = meshRequest(conformal.document, analysisId);
+    if ('code' in request) throw new Error(request.message);
+    expect(request.controls.bonding).toBe('conformal');
+    const plain = meshRequest(doc, analysisId);
+    if ('code' in plain) throw new Error(plain.message);
+    expect(plain.controls.bonding).toBeUndefined();
+  });
+
   it('keys the thermal BCs of a coupled thermo-mechanical setup', () => {
     const { doc, boxId, analysisId } = modelWithAnalysis('thermo_static', { referenceTemperature: { value: 20, unit: 'degC' } });
     const target = { entityId: boxId, facesNear: [[5, 5, 0]] as const };

@@ -170,3 +170,67 @@ describe.skipIf(!HAS_GMSH)('bridge op mesh — exact STEP geometry (OCC)', () =>
     expect(edge).toMatchObject({ ok: false, code: 'FEA_TARGET_AMBIGUOUS' });
   });
 });
+
+describe.skipIf(!HAS_GMSH)('bridge op mesh — conformal bonding of touching parts', () => {
+  let touching: CadDocument;
+  const pair: string[] = [];
+
+  beforeAll(() => {
+    let current = createEmptyDocument();
+    // [0,10] x [0,5] x [0,5] and a neighbour sharing the face x = 10; the third box overlaps the first one
+    for (const position of [
+      [0, 0, 0],
+      [10, 0, 0],
+      [5, 0, 0],
+    ]) {
+      const added = execute(current, 'add_box', { size: [10, 5, 5], position, anchor: 'min' });
+      current = added.document;
+      pair.push(added.affected[0] ?? '');
+    }
+    touching = current;
+  });
+
+  const conformal = (kernel: GeometryKernel, entityIds: readonly string[], bonding?: 'conformal'): Promise<MeshReply> =>
+    mesh({
+      parts: entityIds.map((entityId) => ({ entityId, geometry: partGeometry(touching, entityId, kernel) })),
+      targets: [{ key: 'C_if', entityId: entityIds[1], facesNear: [[10, 2.5, 2.5]] }],
+      controls: { order: 2, globalSize: 3, refinements: [], ...(bonding === undefined ? {} : { bonding }) },
+    });
+
+  const nodesOf = (reply: MeshReply, entityId: string): Set<number> =>
+    new Set(reply.blocks.filter((block) => block.entityId === entityId).flatMap((block) => block.elements.flatMap((row) => row.slice(1))));
+
+  it('shares the interface nodes between the parts and keeps one element block per entity; separate meshes share none', async (context) => {
+    if (occt === null) context.skip();
+    const kernel = occt as GeometryKernel;
+    const bonded = await conformal(kernel, [pair[0] ?? '', pair[1] ?? ''], 'conformal');
+    expect(bonded.ok, bonded.error).toBe(true);
+    expect(bonded.blocks.map((block) => block.entityId)).toEqual([pair[0], pair[1]]);
+    const first = nodesOf(bonded, pair[0] ?? '');
+    const second = nodesOf(bonded, pair[1] ?? '');
+    const shared = [...first].filter((id) => second.has(id));
+    expect(shared.length).toBeGreaterThan(8);
+    const position = new Map(bonded.nodes.map((node) => [node[0], node[1]]));
+    for (const id of shared) expect(position.get(id)).toBeCloseTo(10, 9); // lengthScale 1: STEP units
+    // ids are contiguous and every node is used (no orphans)
+    expect(bonded.nodes.map((node) => node[0])).toEqual(bonded.nodes.map((_, index) => index + 1));
+    expect(first.size + second.size - shared.length).toBe(bonded.nodes.length);
+    // the face target of the second part lies on the shared face: its face set holds elements of that part only
+    const secondElements = new Set(bonded.blocks[1]?.elements.map((row) => row[0]));
+    expect(bonded.faceSets['C_if']?.length).toBeGreaterThan(0);
+    for (const [elementId] of bonded.faceSets['C_if'] ?? []) expect(secondElements.has(elementId ?? -1)).toBe(true);
+
+    const separate = await conformal(kernel, [pair[0] ?? '', pair[1] ?? '']);
+    expect(separate.ok, separate.error).toBe(true);
+    expect([...nodesOf(separate, pair[0] ?? '')].filter((id) => nodesOf(separate, pair[1] ?? '').has(id))).toEqual([]);
+  });
+
+  it('refuses overlapping parts and STL geometry with a clear code', async (context) => {
+    if (occt === null) context.skip();
+    const overlap = await conformal(occt as GeometryKernel, [pair[0] ?? '', pair[2] ?? ''], 'conformal');
+    expect(overlap).toMatchObject({ ok: false, code: 'FEA_BONDING_OVERLAP' });
+    const stl = await conformal(manifold, [pair[0] ?? '', pair[1] ?? ''], 'conformal');
+    expect(stl).toMatchObject({ ok: false, code: 'FEA_BONDING_UNSUPPORTED' });
+    expect(stl.error).toContain('STEP');
+  });
+});

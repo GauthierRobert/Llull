@@ -11,7 +11,7 @@ import { feaTargetSchema, targetProblem, toTarget } from '../shared/target';
 
 /**
  * @affects doc.analysis.cases[analysisId].mesh (given fields replace the current controls; the recorded mesh summary stays and reads as stale)
- * @invariant tet elements only; order 1 (C3D4) or 2 (C3D10); globalSize > 0; 0 < minSize <= globalSize; every refinement size <= globalSize
+ * @invariant bonding 'separate' (default, stored as absent) or 'conformal'; tet elements only; order 1 (C3D4) or 2 (C3D10); globalSize > 0; 0 < minSize <= globalSize; every refinement size <= globalSize
  *   and its target is a part of the case
  * @failure unknown analysis, non-positive / inconsistent sizes, order not 1|2, bad refinement target -> refusal, unchanged doc
  */
@@ -41,6 +41,15 @@ export const setMeshControls = defineCommand({
       .describe('Replaces the whole refinement list (empty array clears it).'),
     elementFamily: z.enum(['tet']).optional().describe('Only "tet" is built (default).'),
     optimize: z.enum(['default', 'netgen', 'high_order', 'none']).optional().describe('Mesh optimisation pass; default "default".'),
+    bonding: z
+      .enum(['separate', 'conformal'])
+      .optional()
+      .describe(
+        'How touching parts of a multi-part analysis are meshed. "separate" (default): one independent volume per part, no shared nodes ' +
+          '(needed for contact). "conformal": all parts are fragmented in one Gmsh model so touching parts share their interface nodes ' +
+          '(bonded / perfectly glued parts; each part keeps its own element set and material). Conformal needs exact STEP geometry ' +
+          '(OCC kernel) and parts that only touch (do not overlap: subtract one from the other first); otherwise fea_mesh is refused.',
+      ),
   }),
   run: (doc, params): CommandResult => {
     const fail = (message: string, ids: readonly string[] = [params.analysisId], code = 'FEA_MESH_CONTROLS_INVALID'): CommandResult =>
@@ -61,6 +70,7 @@ export const setMeshControls = defineCommand({
         ? current.refinements
         : params.refinements.map((r) => ({ target: toTarget(r.target), size: r.size }));
     const minSize = params.minSize ?? current.minSize;
+    const bonding = params.bonding === undefined ? current.bonding : params.bonding === 'conformal' ? 'conformal' : undefined;
     const mesh: MeshControls = {
       mesher: current.mesher,
       elementFamily: params.elementFamily ?? current.elementFamily,
@@ -69,6 +79,7 @@ export const setMeshControls = defineCommand({
       refinements,
       optimize: params.optimize ?? current.optimize,
       ...(minSize !== undefined ? { minSize } : {}),
+      ...(bonding === 'conformal' ? { bonding } : {}),
     };
     if (mesh.minSize !== undefined && mesh.minSize > mesh.globalSize)
       return fail(`minSize ${mesh.minSize} exceeds globalSize ${mesh.globalSize}`);
@@ -83,7 +94,7 @@ export const setMeshControls = defineCommand({
     return changed(
       withCase(doc, next),
       `set_mesh_controls: '${params.analysisId}' tet order ${mesh.order}, globalSize ${mesh.globalSize} ${doc.units}` +
-        `${mesh.minSize === undefined ? '' : `, minSize ${mesh.minSize}`}, ${mesh.refinements.length} refinement(s).`,
+        `${mesh.minSize === undefined ? '' : `, minSize ${mesh.minSize}`}, ${mesh.refinements.length} refinement(s)${mesh.bonding === 'conformal' ? ', conformal bonding' : ''}.`,
       [params.analysisId],
     );
   },

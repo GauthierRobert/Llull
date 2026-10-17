@@ -81,6 +81,8 @@ export interface MeshControls {
   readonly minSize?: number;
   readonly refinements: readonly { readonly target: FeaTarget; readonly size: number }[];
   readonly optimize: 'default' | 'netgen' | 'high_order' | 'none';
+  /** 'conformal': touching parts are fragmented into one model and share interface nodes (STEP only). Absent = 'separate'. */
+  readonly bonding?: 'conformal';
 }
 
 export interface FactorSet {

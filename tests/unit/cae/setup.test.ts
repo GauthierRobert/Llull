@@ -244,6 +244,19 @@ describe('set_mesh_controls', () => {
     expectPure(doc, () => run(doc, 'set_mesh_controls', { analysisId, globalSize: 3 }));
   });
 
+  it('sets conformal bonding, stores "separate" as absent and keeps the choice on later edits', () => {
+    const { doc, analysisId } = modelWithAnalysis();
+    expect(caseIn(doc, analysisId).mesh.bonding).toBeUndefined();
+    const conformal = run(doc, 'set_mesh_controls', { analysisId, bonding: 'conformal' });
+    expect(caseIn(conformal.document, analysisId).mesh.bonding).toBe('conformal');
+    expect(conformal.summary).toContain('conformal bonding');
+    const finer = run(conformal.document, 'set_mesh_controls', { analysisId, globalSize: 2 });
+    expect(caseIn(finer.document, analysisId).mesh.bonding).toBe('conformal');
+    const back = run(finer.document, 'set_mesh_controls', { analysisId, bonding: 'separate' });
+    expect('bonding' in caseIn(back.document, analysisId).mesh).toBe(false);
+    expect(run(doc, 'set_mesh_controls', { analysisId, bonding: 'glued' }).summary).toContain('invalid params');
+  });
+
   it('refuses inconsistent or unresolvable controls', () => {
     const { doc, boxId, analysisId } = modelWithAnalysis();
     expectRefused(run(doc, 'set_mesh_controls', { analysisId: 'x', globalSize: 1 }), doc, 'FEA_ANALYSIS_NOT_FOUND');

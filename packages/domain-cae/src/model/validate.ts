@@ -86,6 +86,8 @@ function checkMesh(scope: Scope, mesh: unknown, where: string): void {
   const size = mesh['globalSize'];
   if (typeof size !== 'number' || !(size > 0)) scope.errors.push(`${where}: mesh.globalSize must be > 0`);
   if (mesh['order'] !== 1 && mesh['order'] !== 2) scope.errors.push(`${where}: mesh.order must be 1 or 2`);
+  if (mesh['bonding'] !== undefined && mesh['bonding'] !== 'conformal')
+    scope.errors.push(`${where}: mesh.bonding must be 'conformal' when present`);
   const refinements = mesh['refinements'];
   if (!Array.isArray(refinements)) return void scope.errors.push(`${where}: mesh.refinements must be a list`);
   refinements.forEach((refinement, index) => {

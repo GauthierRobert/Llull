@@ -85,6 +85,7 @@ export async function runFeaMesh(analysisId: string, host: FeaHost, deps: FeaMes
       })),
       controls: {
         order: request.controls.order,
+        ...(request.controls.bonding !== undefined ? { bonding: request.controls.bonding } : {}),
         globalSize: request.controls.globalSize,
         ...(request.controls.minSize !== undefined ? { minSize: request.controls.minSize } : {}),
         refinements: request.controls.refinements.map((refinement, index) => ({ key: `R_${index}`, size: refinement.size })),

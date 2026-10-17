@@ -148,13 +148,12 @@ def _faces_of(gmsh, region_of, points, key, entity_id):
     return resolved, residual
 
 
-def _edges_of(gmsh, points, key, entity_id):
+def _edges_of(gmsh, points, key, entity_id, curves=None):
     diag = _dist(gmsh.model.getBoundingBox(-1, -1)[:3], gmsh.model.getBoundingBox(-1, -1)[3:]) or 1.0
     resolved, residual = set(), 0.0
+    candidates = [tag for _, tag in gmsh.model.getEntities(1)] if curves is None else sorted(curves)
     for point in points:
-        ranked = sorted(
-            (_dist(point, [float(c) for c in gmsh.model.getClosestPoint(1, tag, list(point))[0]]), tag) for _, tag in gmsh.model.getEntities(1)
-        )
+        ranked = sorted((_dist(point, [float(c) for c in gmsh.model.getClosestPoint(1, tag, list(point))[0]]), tag) for tag in candidates)
         if not ranked or ranked[0][0] > UNRESOLVED_REL * diag:
             raise MeshError("FEA_TARGET_UNRESOLVED", "target %s: no edge of '%s' near point %s" % (key, entity_id, list(point)))
         if len(ranked) > 1 and ranked[1][0] - ranked[0][0] <= AMBIGUOUS_REL * diag:
@@ -203,22 +202,8 @@ def _size_fields(gmsh, controls, refinements, scale):
         gmsh.option.setNumber("Mesh.MeshSizeMin", float(controls["minSize"]) * scale)
 
 
-def _mesh_part(gmsh, part, targets, controls, scale, workdir):
-    """Mesh one entity in a fresh model; returns its raw mesh + target sets keyed by tags of this model."""
-    entity_id = part["entityId"]
-    geometry = part["geometry"]
-    gmsh.model.add("part_" + str(entity_id))
-    path = os.path.join(workdir, "part_%d" % len(os.listdir(workdir)))
-    if geometry["kind"] == "step":
-        with open(path + ".step", "wb") as handle:
-            handle.write(base64.b64decode(geometry["stepBase64"]))
-        region_of = _load_step(gmsh, path + ".step", scale)
-    elif geometry["kind"] == "stl":
-        _scaled_stl(base64.b64decode(geometry["stlBase64"]), scale, path + ".stl")
-        region_of = _load_stl(gmsh, path + ".stl")
-    else:
-        raise MeshError("FEA_MESH_FAILED", "unknown geometry kind %r" % geometry.get("kind"))
-
+def _resolve_targets(gmsh, geometry_kind, region_of, curves, targets, controls, scale, entity_id):
+    """Targets of one entity -> resolved faces / edges / points + the refinement fields they define."""
     resolved = {}
     for target in targets:
         key = target["key"]
@@ -226,12 +211,11 @@ def _mesh_part(gmsh, part, targets, controls, scale, workdir):
         if target.get("facesNear"):
             faces, residual = _faces_of(gmsh, region_of, [[c * scale for c in p] for p in target["facesNear"]], key, entity_id)
         if target.get("edgesNear"):
-            if geometry["kind"] != "step":
+            if geometry_kind != "step":
                 raise MeshError("FEA_TARGET_UNRESOLVED", "target %s: edgesNear needs exact STEP geometry (use the OCC kernel)" % key)
-            edges, edge_residual = _edges_of(gmsh, [[c * scale for c in p] for p in target["edgesNear"]], key, entity_id)
+            edges, edge_residual = _edges_of(gmsh, [[c * scale for c in p] for p in target["edgesNear"]], key, entity_id, curves)
             residual = max(residual, edge_residual)
         resolved[key] = {"faces": faces, "edges": edges, "residual": residual, "points": [[c * scale for c in p] for p in target.get("pointsNear") or []]}
-
     refinements = [
         {
             "size": r["size"],
@@ -241,6 +225,10 @@ def _mesh_part(gmsh, part, targets, controls, scale, workdir):
         for r in controls.get("refinements", [])
         if r["key"] in resolved
     ]
+    return resolved, refinements
+
+
+def _generate(gmsh, controls, refinements, scale, label):
     _size_fields(gmsh, controls, refinements, scale)
     for option, value in (
         ("Mesh.MeshSizeExtendFromBoundary", 0),
@@ -255,11 +243,14 @@ def _mesh_part(gmsh, part, targets, controls, scale, workdir):
     try:
         gmsh.model.mesh.generate(3)
     except Exception as error:  # noqa: BLE001 - Gmsh raises a bare Exception on meshing failure
-        raise MeshError("FEA_MESH_FAILED", "Gmsh could not mesh '%s': %s" % (entity_id, error))
+        raise MeshError("FEA_MESH_FAILED", "Gmsh could not mesh '%s': %s" % (label, error))
 
+
+def _extract(gmsh, volumes, region_of, controls, entity_id, resolved):
+    """Tetrahedra of `volumes`, the face triangles of `region_of` matched to their faces, curve nodes."""
     coords = _node_coords(gmsh)
     tets, wanted = [], TET10 if int(controls["order"]) == 2 else TET4
-    for _, volume in gmsh.model.getEntities(3):
+    for volume in volumes:
         types, _, nodes = gmsh.model.mesh.getElements(3, volume)
         for etype, enodes in zip(types, nodes):
             if etype != wanted:
@@ -290,6 +281,96 @@ def _mesh_part(gmsh, part, targets, controls, scale, workdir):
     return {"coords": coords, "tets": tets, "resolved": resolved, "region_nodes": region_nodes, "region_faces": region_faces, "curve_nodes": curve_nodes}
 
 
+def _mesh_part(gmsh, part, targets, controls, scale, workdir):
+    """Mesh one entity in a fresh model; returns its raw mesh + target sets keyed by tags of this model."""
+    entity_id = part["entityId"]
+    geometry = part["geometry"]
+    gmsh.model.add("part_" + str(entity_id))
+    path = os.path.join(workdir, "part_%d" % len(os.listdir(workdir)))
+    if geometry["kind"] == "step":
+        with open(path + ".step", "wb") as handle:
+            handle.write(base64.b64decode(geometry["stepBase64"]))
+        region_of = _load_step(gmsh, path + ".step", scale)
+    elif geometry["kind"] == "stl":
+        _scaled_stl(base64.b64decode(geometry["stlBase64"]), scale, path + ".stl")
+        region_of = _load_stl(gmsh, path + ".stl")
+    else:
+        raise MeshError("FEA_MESH_FAILED", "unknown geometry kind %r" % geometry.get("kind"))
+    resolved, refinements = _resolve_targets(gmsh, geometry["kind"], region_of, None, targets, controls, scale, entity_id)
+    _generate(gmsh, controls, refinements, scale, entity_id)
+    return _extract(gmsh, [tag for _, tag in gmsh.model.getEntities(3)], region_of, controls, entity_id, resolved)
+
+
+def _boundary_tags(gmsh, dim_tags):
+    seen = []
+    for _, tag in gmsh.model.getBoundary(dim_tags, combined=False, oriented=False):
+        if tag not in seen:
+            seen.append(tag)
+    return seen
+
+
+def _mesh_conformal(gmsh, parts, targets, controls, scale, workdir):
+    """All parts in ONE model, fragmented so touching parts share their interface (nodes + faces); one raw mesh per part, same order."""
+    gmsh.model.add("conformal")
+    gmsh.option.setString("Geometry.OCCTargetUnit", "")
+    imported = []
+    for index, part in enumerate(parts):
+        geometry = part["geometry"]
+        if geometry["kind"] != "step":
+            raise MeshError(
+                "FEA_BONDING_UNSUPPORTED",
+                "conformal bonding needs exact STEP geometry (use the OCC kernel): '%s' is %s" % (part["entityId"], geometry.get("kind")),
+            )
+        path = os.path.join(workdir, "conformal_%d.step" % index)
+        with open(path, "wb") as handle:
+            handle.write(base64.b64decode(geometry["stepBase64"]))
+        volumes = [(dim, tag) for dim, tag in gmsh.model.occ.importShapes(path) if dim == 3]
+        if not volumes:
+            raise MeshError("FEA_MESH_FAILED", "the STEP geometry of '%s' has no solid" % part["entityId"])
+        imported.append(volumes)
+    gmsh.model.occ.synchronize()
+    if scale != 1.0:
+        gmsh.model.occ.dilate(gmsh.model.occ.getEntities(), 0, 0, 0, scale, scale, scale)
+        gmsh.model.occ.synchronize()
+    flat = [item for volumes in imported for item in volumes]
+    try:
+        _, mapping = gmsh.model.occ.fragment(flat, [])
+        gmsh.model.occ.synchronize()
+    except Exception as error:  # noqa: BLE001
+        raise MeshError("FEA_MESH_FAILED", "Gmsh could not fragment the parts for conformal bonding: %s" % error)
+    owner, volumes_of, cursor = {}, [], 0
+    for part, volumes in zip(parts, imported):
+        own = []
+        for pieces in mapping[cursor : cursor + len(volumes)]:
+            for dim, tag in pieces:
+                if dim != 3:
+                    continue
+                if owner.setdefault(tag, part["entityId"]) != part["entityId"]:
+                    raise MeshError(
+                        "FEA_BONDING_OVERLAP",
+                        "conformal bonding: '%s' and '%s' overlap in volume; parts may only touch (subtract one from the other)"
+                        % (owner[tag], part["entityId"]),
+                    )
+                own.append(tag)
+        cursor += len(volumes)
+        volumes_of.append(own)
+    scopes, resolved_all, refinements = [], [], []
+    for part, own in zip(parts, volumes_of):
+        surfaces = _boundary_tags(gmsh, [(3, v) for v in own])
+        curves = set(_boundary_tags(gmsh, [(2, s) for s in surfaces]))
+        region_of = {s: s for s in surfaces}
+        mine = [t for t in targets if t.get("entityId") == part["entityId"]]
+        resolved, local = _resolve_targets(gmsh, "step", region_of, curves, mine, controls, scale, part["entityId"])
+        scopes.append(region_of)
+        resolved_all.append(resolved)
+        refinements += local
+    _generate(gmsh, controls, refinements, scale, "conformal parts")
+    return [
+        _extract(gmsh, own, region_of, controls, part["entityId"], resolved)
+        for part, own, region_of, resolved in zip(parts, volumes_of, scopes, resolved_all)
+    ]
+
+
 def _nearest_node(nodes, coords, point):
     best = min(nodes, key=lambda n: (_dist(coords[n], point), n))
     return best, _dist(coords[best], point)
@@ -315,17 +396,32 @@ def op_mesh(request):
         nodes_out, blocks, node_sets, face_sets, residuals = [], [], {}, {}, {}
         node_counter = element_counter = 0
         part_nodes = {}
+        conformal = controls.get("bonding") == "conformal"
         with tempfile.TemporaryDirectory(prefix="llull-mesh-") as workdir:
-            for part in parts:
-                own = [t for t in targets if t.get("entityId") == part["entityId"]]
-                gmsh.clear()
-                raw = _mesh_part(gmsh, part, own, controls, scale, workdir)
-                used = sorted({n for tet in raw["tets"] for n in tet})
-                renumber = {}
-                for tag in used:
+            raws = []
+            if conformal:
+                raws = _mesh_conformal(gmsh, parts, targets, controls, scale, workdir)
+            else:
+                for part in parts:
+                    own = [t for t in targets if t.get("entityId") == part["entityId"]]
+                    gmsh.clear()
+                    raws.append(_mesh_part(gmsh, part, own, controls, scale, workdir))
+            shared = None
+            if conformal:
+                shared = {}
+                for tag in sorted({n for raw in raws for tet in raw["tets"] for n in tet}):
                     node_counter += 1
-                    renumber[tag] = node_counter
-                    nodes_out.append([node_counter, *raw["coords"][tag]])
+                    shared[tag] = node_counter
+                    nodes_out.append([node_counter, *raws[0]["coords"][tag]])
+            for part, raw in zip(parts, raws):
+                used = sorted({n for tet in raw["tets"] for n in tet})
+                renumber = shared
+                if renumber is None:
+                    renumber = {}
+                    for tag in used:
+                        node_counter += 1
+                        renumber[tag] = node_counter
+                        nodes_out.append([node_counter, *raw["coords"][tag]])
                 part_nodes[part["entityId"]] = (used, renumber, raw["coords"])
                 elements, element_ids = [], []
                 for tet in raw["tets"]:
