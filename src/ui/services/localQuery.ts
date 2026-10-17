@@ -1,13 +1,19 @@
 // Read-only commands on the store document (reports, exports) + browser download of their payload.
 
-import { execute } from '@core/commands/registry';
+import { execute, getCommand } from '@core/commands/registry';
+import { noop } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { useStore } from '@ui/store';
 import { downloadText } from '@ui/download';
 import { isCsvData, stringFields } from '@ui/resultData';
 
+/** Runs a read-only command on the store document; a mutating command is refused (it must go through `dispatch`). */
 export function runQuery(command: string, params: Record<string, unknown> = {}): CommandResult {
-  return execute(useStore.getState().document, command, params);
+  const document = useStore.getState().document;
+  const definition = getCommand(command);
+  if (definition !== undefined && definition.annotations?.readOnly !== true)
+    return noop(document, `${command} changes the document; run it through dispatch, not as a query.`);
+  return execute(document, command, params);
 }
 
 /** Downloads `data[field]` as the reported name (civil `fileName`, building `filename`) or `fallbackName`; null fallback + no name = no download. @returns the summary */
