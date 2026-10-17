@@ -16,6 +16,8 @@ import { MaterialsPanel } from '@ui/panels/MaterialsPanel';
 import { SheetsPanel } from '@ui/panels/SheetsPanel';
 import { BuildingPanel } from '@ui/panels/building/BuildingPanel';
 import { CivilPanel } from '@ui/panels/civil/CivilPanel';
+import { ManufacturingPanel } from '@ui/panels/manufacturing/ManufacturingPanel';
+import { FastenersPanel } from '@ui/panels/fasteners/FastenersPanel';
 import { ReviewPanel } from '@ui/panels/review/ReviewPanel';
 import { useReviewStore } from '@ui/panels/review/reviewStore';
 import { type SidebarTabSpec, SIDEBAR_TAB_SPECS, isSidebarTabAvailable } from './sidebarTabs';
@@ -32,6 +34,8 @@ const TAB_PANELS: Readonly<Record<SidebarTab, React.ComponentType<{ className?: 
   history: FeatureHistoryPanel,
   configurations: ConfigurationsPanel,
   materials: MaterialsPanel,
+  manufacturing: ManufacturingPanel,
+  fasteners: FastenersPanel,
   review: ReviewPanel,
 };
 
@@ -48,6 +52,8 @@ const TAB_COUNTS: Readonly<Record<SidebarTab, (doc: CadDocument) => number>> = {
   history: (doc) => doc.featureHistory.length,
   configurations: (doc) => Object.keys(doc.configurations).length,
   materials: (doc) => Object.keys(doc.materials).length,
+  manufacturing: (doc) => Object.keys(doc.sheetMetal?.parts ?? {}).length,
+  fasteners: (doc) => Object.keys(doc.fasteners?.stacks ?? {}).length,
   review: () => 0,
 };
 

@@ -17,6 +17,8 @@ const SIDEBAR_TABS = [
   'history',
   'configurations',
   'materials',
+  'manufacturing',
+  'fasteners',
   'review',
 ] as const;
 
