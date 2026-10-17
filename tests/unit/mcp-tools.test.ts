@@ -136,7 +136,7 @@ describe('search_tools on natural phrasing', () => {
   const top = (query: string, count = 3): string[] => searchTools(query, count, new Set(parseToolsets('all').enabled)).map((r) => r.name);
   it.each([
     ['cut a hole', 'boolean'],
-    ['make a hole in a plate', 'boolean'],
+    ['make a hole in a plate', 'add_hole'],
     ['round the edges', 'fillet_edge'],
     ['bevel the edges', 'chamfer_edge'],
     ['how heavy is it', 'mass_properties'],
