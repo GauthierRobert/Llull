@@ -1,0 +1,10 @@
+{
+  "name": "@llull/domain-cae",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CAE plugin: analysis set-up (05 FEA hand-off), thermal (PHY-03) and thermo-mechanical (PHY-04) finite-element disciplines.",
+  "dependencies": {
+    "@llull/core": "0.1.0"
+  }
+}

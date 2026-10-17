@@ -19,6 +19,7 @@ import {
   SERVER_INSTRUCTIONS,
   TOOLSETS,
   buildExchangeToolDefinitions,
+  buildFeaToolDefinitions,
   isPromptEnabled,
   isToolEnabled,
   type ToolSearchResult,
@@ -450,6 +451,7 @@ describe('backticked names in prose', () => {
 const allToolNames = [
   ...listCommands().map((command) => command.name),
   ...buildExchangeToolDefinitions().map((tool) => tool.name),
+  ...buildFeaToolDefinitions().map((tool) => tool.name),
   ...buildDiscoveryToolDefinitions().map((tool) => tool.name),
 ];
 

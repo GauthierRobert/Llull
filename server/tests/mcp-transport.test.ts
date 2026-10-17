@@ -7,7 +7,7 @@ import { getLiveDoc, _resetLiveDoc } from '../src/liveDocument';
 import { _resetHistory } from '../src/commandBus';
 import { listCommands } from '@core/commands/registry';
 import * as registry from '@core/commands/registry';
-import { buildDiscoveryToolDefinitions, buildExchangeToolDefinitions } from '@mcp/index';
+import { buildDiscoveryToolDefinitions, buildExchangeToolDefinitions, buildFeaToolDefinitions } from '@mcp/index';
 import { callMcpTool, INITIALIZE_PARAMS, mcpRequest, mcpRpc, openMcpSession, type McpToolResult } from './mcpTestSupport';
 
 const mcpSession = (): Promise<string> => openMcpSession(app);
@@ -35,10 +35,10 @@ describe('MCP initialize', () => {
 });
 
 describe('MCP tools/list', () => {
-  it('lists every registered command, then the exchange and discovery tools', async () => {
+  it('lists every registered command, then the exchange, FE and discovery tools', async () => {
     const { result } = await mcpRpc(app, await mcpSession(), 'tools/list', {});
     const { tools = [] } = result as { tools?: Array<{ name: string }> };
-    const extra = [...buildExchangeToolDefinitions(), ...buildDiscoveryToolDefinitions()];
+    const extra = [...buildExchangeToolDefinitions(), ...buildFeaToolDefinitions(), ...buildDiscoveryToolDefinitions()];
     expect(tools.length).toBe(listCommands().length + extra.length);
     expect(tools.map((t) => t.name)).toEqual([...listCommands().map((c) => c.name), ...extra.map((t) => t.name)]);
   });

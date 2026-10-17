@@ -536,3 +536,48 @@ See FUNCTIONAL_SPEC §11 [R1]–[R15] and `validation/sources.md` [S1]–[S14]. 
 - [T4] 06 CMP TECHNICAL_SPEC §3 (`LaminaMaterial`), Q2 — `docs/aerospace/06-composites/TECHNICAL_SPEC.md`
 - [T5] PHY-01 TECHNICAL_SPEC §3 (`PropertyModel`, `FitRecord`, evaluator) — `docs/physics/01-property-models/TECHNICAL_SPEC.md`
 - [T6] PHY-07 / PHY-08 TECHNICAL_SPEC §3.1 (durability variants) — `docs/physics/07-fatigue/`, `docs/physics/08-fracture-damage-tolerance/`
+
+## 13. Implementation status (2026-10-16)
+
+**Built: M1–M6** (the parts that need no 05 FEA, 08 MAT or solver binaries). All 107 cases of `validation/expected_results.json` are
+judged by `tests/unit/physics/materials/` through the PHY-00 judge and pass (VC-MATL-01…15 and 17 values incl. the converged
+N = 100 000 NL1 runs; VC-MATL-16 durability kinds accepted and refused in sets; VC-MATL-18 budgets asserted with a 10× margin — measured
+J2 8 × 1000 increments ≈ 40 ms, Drucker scan ≈ 4 ms, card export ≈ 0.6 ms). The `nl1_material_point_proposed` plan runs through
+`build_project` (with `create_material` in place of the unbuilt 08 `define_material_record`).
+
+| Item | Where |
+| ---- | ----- |
+| `MaterialModel` union, durability variants (PHY-07/08 §3.1), law catalogue §3.4 | `packages/core/src/model/{materialModel,materialDurability,materialLawCatalog,quantity}.ts` |
+| Pure law kernels (elastic + LDLᵀ PD, J2 return mapping with linear / multilinear / Voce / J-C isotropic and linear / Chaboche kinematic, Ramberg-Osgood, hyperelastic stresses + Drucker scan, Prony / WLF / Arrhenius, Norton / Garofalo, J-C / Cowper-Symonds), driver, fits, card writers | `model/materialLaws/*.ts` |
+| `add_material_model`, `remove_material_model`, `define_constitutive_set`, `check_material_models` (toolset `materials`) | `commands/document/{materialModels,constitutiveSets,checkMaterialModels,materialLawSchema,materialModelRefusal,materialModelStored}.ts` |
+| `fit_material_model`, `material_point_response`, `export_material_cards` (toolset `material-lab`) | `commands/materiallab/` |
+| Load-time validation of the new fields | `commands/persistence/guards.ts` |
+
+**Deviations (recorded, not silent):**
+
+- **Placement.** No `packages/domain-physics` (README §8.3 decision 1 open): the queries live in the core catalog `commands/materiallab/`,
+  as PHY-00/01. Models hang off the document **`Material`** (`materialModels`, `constitutiveSets`, `defaultConstitutiveSet`); the material
+  id is the `create_material` name, and replacing a material keeps them (as PHY-01).
+- **Validity / fit types.** Validity variables are PHY-01 variables plus `stretch` (`MaterialValidityVariable`); fitted models carry a
+  `MaterialFitRecord`; malformed ranges reuse PHY-01's `PROP_RANGE_INVALID`.
+- **`forCertification`** param on `material_point_response` and `export_material_cards` (VC-MATL-15: unverified data ⇒
+  `MAT_VALUE_UNVERIFIED`, `reviewRequired: true`). `export_material_cards` `set` defaults to the default set; driver `output` defaults to
+  `steps` (named default). Export refuses `MATL_VALIDITY_MISSING` unless every model of the set has validity ranges.
+- **Card numbers** are cleaned to 15 significant digits (0.63·1.3/2 prints `0.4095`). **Nastran** writes MAT1 and MATS1 only (perfect /
+  linear isotropic HR 1, perfect + linear kinematic HR 2); MAT9, MATHE, TABLES1, creep and viscoelastic cards are catalogued `tbd` and
+  refused `MATL_EXPORT_UNSUPPORTED` (formats unverified, OQ-MATL-06). CalculiX refuses Chaboche, Prony, Garofalo, Cowper-Symonds and
+  strain-hardening Norton.
+- **Driver limits.** Plasticity / viscoelasticity / creep need `elastic_isotropic`; one run combines elasticity with at most one of
+  plasticity, Prony or creep; Norton is time hardening; finite kinematics covers incompressible hyperelastic laws in `uniaxial_stress`,
+  `equibiaxial`, `pure_shear` with control on `xx` (compressible ⇒ `MATL_PATH_INVALID`). Rows ≤ 10 000; the command allows ≤ 100 000 increments in total (the converged NL1 runs call the kernel directly). Chaboche back stresses ≤ 10 and Prony terms ≤ 20 (schema, also at load).
+- **Fits** are linear only (Neo-Hooke, Mooney-Rivlin, Yeoh, polynomial / reduced polynomial order 1–3, engineering Ramberg-Osgood, Prony
+  with fixed τ); no `start` param; multilinear curves are converted by `add_material_model`, not fitted.
+- **Unverified** follows basis, fit and property-model rules only (no 08 source status), as PHY-01. `check_material_models usedBy:
+  'analyses'` only adds a note (no analyses exist).
+- **Benchmark rounding.** The pack stores 12 significant digits but some cases judge at rel 1e-12, so the tests round measured values to
+  12 digits (the Ogden RMS case to 6) before judging.
+
+**Not built (blocked):** the 05 deck-writer `MaterialCardWriter` extension point, `FeaConstitutiveView` and ccx single-element read tests
+(05 FEA); the pyNastran `read_bdf` round trip (server Python test infrastructure); `reviewedBy`, library `schemaVersion: 2` and private
+libraries (08 MAT, 09 signing); M7 (Levenberg-Marquardt fits, compressible hyperelastic driver, Hill-48, MFront — V2, licence review);
+the `llull guide` material-laws section.

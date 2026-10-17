@@ -6,6 +6,7 @@
 import type { CadDocument } from '../model/types';
 import type { GeometryKernel } from '../geometry/kernel';
 import type { PhysicsEngine } from '../dynamics/physicsEngine';
+import type { FeArtifactPort, HumanSignaturePort } from '../model/analysis';
 import type { IdSource } from '../lib/id';
 import type { ReplayCache } from './history/replayCache';
 import type { ZodType } from 'zod';
@@ -108,6 +109,9 @@ export interface ParamItemSpec {
   description?: string;
   /** Constrained value set (JSON Schema `enum`). */
   enum?: readonly (string | number)[];
+  /** For numbers: inclusive bounds (JSON Schema `minimum` / `maximum`); set by hand-written transport schemas, never derived from zod. */
+  minimum?: number;
+  maximum?: number;
   /** For `type: 'array'`: the schema of each element. */
   items?: ParamItemSpec;
   /** For `type: 'object'`: named child properties. */
@@ -149,6 +153,10 @@ export interface ExecutionContext {
   readonly kernel: GeometryKernel | null;
   /** Rigid-body physics engine for `simulate_motion`; null/absent while none is installed. */
   readonly physics?: PhysicsEngine | null;
+  /** Read-only FE mesh/results artifact store (host-provided); null/absent = `record_fe_*` commands no-op with FEA_ARTIFACT_NOT_FOUND. */
+  readonly feaArtifacts?: FeArtifactPort | null;
+  /** Human-signature verifier (09 PLM); null/absent = human-gate commands refuse. */
+  readonly humanSignature?: HumanSignaturePort | null;
   /** Mints every id the command creates. */
   readonly ids: IdSource;
   /** Resolves command names for commands that run other commands. */

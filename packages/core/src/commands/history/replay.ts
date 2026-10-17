@@ -77,7 +77,10 @@ export function replayHistory(
   const cache = context.replayCache;
   // States are keyed by everything that determines them, so an unchanged prefix of an
   // edited history (or of a parameter change) is served from the cache instead of re-run.
-  let stateKey = cache ? hashText(JSON.stringify({ ...doc, featureHistory: [] })) : '';
+  // Whether an artifact store is injected decides how artifact-recording steps replay (verified or flagged), so it is part of every key.
+  let stateKey = cache
+    ? hashText(`${context.feaArtifacts ? 'artifacts' : 'no-artifacts'}|${JSON.stringify({ ...doc, featureHistory: [] })}`)
+    : '';
   for (const step of history) {
     if (step.suppressed) continue;
     const cmd = getCommandFn(step.name);

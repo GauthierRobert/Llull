@@ -1,0 +1,40 @@
+[
+  { "command": "set_units", "params": { "units": "mm" } },
+  { "command": "add_box", "params": { "size": [10, 10, 10], "anchor": "min" }, "as": "cube" },
+  { "command": "create_material", "params": { "name": "k_only", "density": 0.0027, "color": "#9aa0a6", "metalness": 1, "roughness": 0.4 } },
+  {
+    "command": "define_property_model",
+    "params": {
+      "material": "k_only",
+      "model": {
+        "id": "k_const",
+        "property": "k",
+        "unit": "W/(m*K)",
+        "variables": [],
+        "validity": [],
+        "form": { "kind": "constant", "value": 150.0 },
+        "basis": "company",
+        "source": { "citation": "test input of this validation case (not a material claim)" }
+      }
+    }
+  },
+  { "command": "assign_material", "params": { "materialName": "k_only", "entityIds": ["$cube"] } },
+  {
+    "command": "create_analysis",
+    "params": { "name": "bad_transient", "analysisType": "heat_transient", "solver": "calculix" },
+    "as": "an"
+  },
+  { "command": "set_part_idealization", "params": { "analysisId": "$an", "entityId": "$cube", "idealization": "solid" } },
+  {
+    "command": "add_thermal_bc",
+    "params": {
+      "analysisId": "$an",
+      "name": "bad_eps",
+      "kind": "radiation",
+      "emissivity": 1.2,
+      "sinkTemperature": { "value": 3.0, "unit": "K" },
+      "target": { "entityId": "$cube", "facesNear": [[5, 5, 10]] }
+    }
+  },
+  { "command": "check_thermal", "params": { "analysisId": "$an" } }
+]

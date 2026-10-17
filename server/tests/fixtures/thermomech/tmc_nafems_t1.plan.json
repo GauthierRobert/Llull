@@ -1,0 +1,174 @@
+[
+  { "command": "set_units", "params": { "units": "mm" } },
+  { "command": "add_box", "params": { "size": [10, 10, 0.05], "position": [0, 0, 0], "anchor": "min" }, "as": "slab" },
+  {
+    "command": "revolve_profile",
+    "params": {
+      "profile": [
+        [0, 0],
+        [1, 0],
+        [1, 0.05],
+        [0, 0.05]
+      ],
+      "axis": "z",
+      "angle": 1.5707963267948966
+    },
+    "as": "disc"
+  },
+  {
+    "command": "revolve_profile",
+    "params": {
+      "profile": [
+        [0, 0],
+        [1, 0],
+        [1, 0.05],
+        [0, 0.05]
+      ],
+      "axis": "z",
+      "angle": 1.5707963267948966
+    },
+    "as": "tool"
+  },
+  { "command": "boolean", "params": { "op": "subtract", "a": "$slab", "b": "$tool" }, "as": "plate" },
+  {
+    "command": "create_material",
+    "params": { "name": "t1_disc", "density": 0.0078, "color": "#9aa0a6", "metalness": 1, "roughness": 0.4 }
+  },
+  {
+    "command": "add_material_model",
+    "params": {
+      "material": "t1_disc",
+      "id": "elastic",
+      "model": { "kind": "elastic_isotropic", "E": { "value": 100, "unit": "GPa" }, "nu": { "value": 0.3, "unit": "1" } },
+      "basis": "company",
+      "source": { "citation": "test input of this validation case (not a material claim)" }
+    }
+  },
+  {
+    "command": "define_constitutive_set",
+    "params": { "material": "t1_disc", "set": { "id": "set", "elastic": "elastic" }, "makeDefault": true }
+  },
+  {
+    "command": "define_property_model",
+    "params": {
+      "material": "t1_disc",
+      "model": {
+        "id": "strain",
+        "property": "thermalStrain",
+        "unit": "1",
+        "variables": [{ "variable": "T", "unit": "K" }],
+        "form": { "kind": "polynomial", "variable": "T", "coefficients": [0, 0.001], "origin": 273.15 },
+        "validity": [{ "variable": "T", "unit": "K", "data": [100, 1000] }],
+        "basis": "company",
+        "source": { "citation": "test input of this validation case (not a material claim)" }
+      }
+    }
+  },
+  {
+    "command": "create_material",
+    "params": { "name": "t1_plate", "density": 0.0078, "color": "#9aa0a6", "metalness": 1, "roughness": 0.4 }
+  },
+  {
+    "command": "add_material_model",
+    "params": {
+      "material": "t1_plate",
+      "id": "elastic",
+      "model": { "kind": "elastic_isotropic", "E": { "value": 100, "unit": "GPa" }, "nu": { "value": 0.3, "unit": "1" } },
+      "basis": "company",
+      "source": { "citation": "test input of this validation case (not a material claim)" }
+    }
+  },
+  {
+    "command": "define_constitutive_set",
+    "params": { "material": "t1_plate", "set": { "id": "set", "elastic": "elastic" }, "makeDefault": true }
+  },
+  {
+    "command": "define_property_model",
+    "params": {
+      "material": "t1_plate",
+      "model": {
+        "id": "strain",
+        "property": "thermalStrain",
+        "unit": "1",
+        "variables": [{ "variable": "T", "unit": "K" }],
+        "form": { "kind": "polynomial", "variable": "T", "coefficients": [0, 0.0], "origin": 273.15 },
+        "validity": [{ "variable": "T", "unit": "K", "data": [100, 1000] }],
+        "basis": "company",
+        "source": { "citation": "test input of this validation case (not a material claim)" }
+      }
+    }
+  },
+  { "command": "assign_material", "params": { "materialName": "t1_disc", "entityIds": ["$disc"] } },
+  { "command": "assign_material", "params": { "materialName": "t1_plate", "entityIds": ["$plate"] } },
+  {
+    "command": "create_analysis",
+    "params": {
+      "name": "nafems_t1",
+      "analysisType": "thermo_static",
+      "unitSystem": "N-mm-t-s",
+      "solver": "calculix",
+      "referenceTemperature": { "value": 0.0, "unit": "degC" }
+    },
+    "as": "an"
+  },
+  { "command": "set_part_idealization", "params": { "analysisId": "$an", "entityId": "$disc", "idealization": "solid" } },
+  { "command": "set_part_idealization", "params": { "analysisId": "$an", "entityId": "$plate", "idealization": "solid" } },
+  {
+    "command": "set_temperature_field",
+    "params": { "analysisId": "$an", "source": { "kind": "uniform", "value": { "value": 1.0, "unit": "degC" } } }
+  },
+  {
+    "command": "add_fea_constraint",
+    "params": {
+      "analysisId": "$an",
+      "name": "sym_x_disc",
+      "kind": "displacement",
+      "dofs": { "ux": 0 },
+      "target": { "entityId": "$disc", "facesNear": [[0, 0.5, 0.025]] }
+    }
+  },
+  {
+    "command": "add_fea_constraint",
+    "params": {
+      "analysisId": "$an",
+      "name": "sym_y_disc",
+      "kind": "displacement",
+      "dofs": { "uy": 0 },
+      "target": { "entityId": "$disc", "facesNear": [[0.5, 0, 0.025]] }
+    }
+  },
+  {
+    "command": "add_fea_constraint",
+    "params": {
+      "analysisId": "$an",
+      "name": "sym_x_plate",
+      "kind": "displacement",
+      "dofs": { "ux": 0 },
+      "target": { "entityId": "$plate", "facesNear": [[0, 5, 0.025]] }
+    }
+  },
+  {
+    "command": "add_fea_constraint",
+    "params": {
+      "analysisId": "$an",
+      "name": "sym_y_plate",
+      "kind": "displacement",
+      "dofs": { "uy": 0 },
+      "target": { "entityId": "$plate", "facesNear": [[5, 0, 0.025]] }
+    }
+  },
+  {
+    "command": "add_fea_constraint",
+    "params": {
+      "analysisId": "$an",
+      "name": "pin_z",
+      "kind": "displacement",
+      "dofs": { "uz": 0 },
+      "target": { "entityId": "$disc", "pointsNear": [[0, 0, 0]] }
+    }
+  },
+  {
+    "command": "set_mesh_controls",
+    "params": { "analysisId": "$an", "mesher": "gmsh", "elementFamily": "tet", "order": 2, "globalSize": 0.2, "bonding": "conformal" }
+  }
+]

@@ -456,8 +456,11 @@ Cross-gap: **05 FEA** (pipeline), **08 MAT** / **PHY-01** (k, cp, ρ data), **PH
    to be fixed by the M2 deck test against CalculiX; the manual sections were not read for this detail.
 3. **Film coefficient helpers**: should llull ship cited natural-convection correlations as a query (never a default),
    and from which open source? Not researched in this pack.
-4. **CalculiX view factor accuracy** versus llull's TS factors (VC-THM-30, TBD): which one is authoritative when they differ?
+4. **CalculiX view factor accuracy** versus llull's TS factors (VC-THM-30): answered for opposed squares — both agree with the closed form (ccx +9e-6 converged); VC-THM-30 pinned at abs 5e-4. Other geometries stay open.
+   *Measured 2026-10-17 (§13): for the VC-THM-09.a plates they agree to 9e-6 on a converged mesh; the closed form is the reference and the
+   proposal for the pack owner is value 0.199825, tolerance 5e-4 abs, grade A (the pack's 0.002 would also pass). Open for other geometries.*
 5. **Contact conductance card set** (TR-THM-15) must be confirmed on the `contact7–9` decks before M4.
+   *Answered 2026-10-17 without the decks (not available locally): the card set of §13 reproduces VC-THM-11 to 6.6e-5 on ccx 2.21.*
 6. **Temperature-limit sources**: llull ships no limit tables (component and qualification limits are proprietary or
    paywalled); confirm this policy matches 03 GDT's "customer fills the rule tables" approach.
 
@@ -469,3 +472,98 @@ Cross-gap: **05 FEA** (pipeline), **08 MAT** / **PHY-01** (k, cp, ρ data), **PH
 - llull: `.claude/rules/architecture.md` (L1–L10), `.dependency-cruiser.cjs` (rule `plugins-and-kernels-depend-on-core-only`),
   `packages/core/src/model/types.ts`, `packages/mcp/src/toolsets.ts`, `docs/aerospace/05-fea-cae-handoff/TECHNICAL_SPEC.md`,
   `docs/aerospace/08-materials-standards-libraries/TECHNICAL_SPEC.md`, `docs/physics/README.md`.
+
+## 13. Implementation status (2026-10-16)
+
+**Built: the parts that need no FE pipeline** — `thermal_analytic_check` (TR-THM-40), thermal unit conversions (TR-THM-04) and
+`compute_view_factors` V1-a + V1-b (TR-THM-20). VC-THM-01.a–d, 02, 06, 07.a/b, 08, 09.a–d, 10, 11.a/b, 12.a/b, 13 and 60 are judged
+by `tests/unit/physics/thermal/` through the PHY-00 judge (all pass); all 16 rows of `view_factors.csv` pass. VC-THM-61 is asserted for
+the two set-ups that apply to these commands (`THM_EMISSIVITY_INVALID`, `THM_UNITS_MISMATCH`).
+
+| Item | Where |
+| ---- | ----- |
+| `thermal_analytic_check` | `packages/core/src/commands/thermal/{analyticCheck,analyticChecks,constants}.ts`, closed forms in `lib/thermalClosedForms.ts` |
+| `compute_view_factors` | `commands/thermal/computeViewFactors.ts`, `lib/{viewFactorContour,planarFacets,segmentTriangle}.ts` |
+| Units table §5.3 | `lib/thermalUnits.ts` (derived from dimension vectors; round-trip 1e-12; moved from `commands/thermal/` so the FE plugin can use it) |
+
+Toolset `analysis`.
+
+**Deviations (recorded, not silent):**
+
+- **Placement.** Core feature catalog `commands/thermal/` (no `packages/domain-physics`; README §8.3 decision 1 still open), as PHY-00/01.
+- **Check names.** `stefan` is the Neumann one-phase melting problem (VC-THM-12); σ (VC-THM-13) is `stefan_boltzmann`. `view_factor`
+  takes `configuration: parallel_rectangles | perpendicular_rectangles | coaxial_discs | cube_summation`. Inputs are `{ value, unit }`
+  maps (dimensionless unit `"1"`); temperature differences must be in K. `lumped` warns (not refuses) when Bi ≥ 0.1.
+- **View factors.** Inputs are explicit planar polygons (`surfaces[{ name, vertices, flip? }]` + `lengthUnit`), not 05 `FeaTarget`
+  faces, so the command is not `requiresKernel`. Quadrature: closed-form inner integral of ln r along one edge, adaptive 8-point
+  Gauss–Legendre on the other (exact for collinear / touching edges). Obstruction uses the centroid-segment test per facet pair
+  (refine with `maxFacetSize`). VC-THM-09.d (discs) uses 64-gons and passes within the case tolerance (≈ 1e-3).
+- **Extra codes:** `THM_INPUT_INVALID`, `THM_SURFACE_INVALID`, `THM_FACET_LIMIT` (400 facets, surfaces + blockers; at most 16 blockers and 256 vertices per polygon), `THM_VIEW_FACTOR_ROWSUM` (closed cavity
+  row sum off by > 1e-3).
+
+**FE milestones M0–M3 and the M4 decks: built (2026-10-16, owner decision).** The minimal 05 FEA slice was built first
+(`docs/physics/FE_PIPELINE_DESIGN.md`) and the thermal discipline sits inside it — **Proposal B** of §2.1 (`packages/domain-cae/src/thermal/`),
+so no core extension port was needed.
+
+| Item | Where |
+| ---- | ----- |
+| Set-up commands `add/update/delete_thermal_bc`, `set_initial_temperature`, `define/delete_amplitude`, `set_thermal_step`, `add/delete_temperature_limit`, `add_cavity_radiation`, `add_thermal_contact`, `set_thermal_physical_constants` | `packages/domain-cae/src/thermal/{bcCommands,stepCommands,amplitude,limitCommands,radiationCommands,constantsCommand}.ts` (toolset `analysis`) |
+| Deck sections §5.1 (materials tabulated from PHY-01 models, `*HEAT TRANSFER`, BCs, `*FILM`, `*RADIATE` incl. `CAVITY=`, output) | `thermal/{deck,deckMaterial,deckLoads,deckStep,deckNames}.ts`, assembled by the 05 `writeInp` |
+| Summary + heat balance §5.5 | `thermal/{summary,heatBalance,bcFlows,storedEnergy,meshGeometry}.ts` |
+| `thermal_report`, `check_thermal`, `check_temperature_limits`, `dispose_thermal_limit` (human gate) | `thermal/{report,check,limitsCheck,limitRows,dispose}.ts` |
+| Solve path | server `fea_mesh` (Gmsh 4.15.2) → `fea_solve` (CalculiX `ccx`) → `record_*` validated against the artifact store |
+
+FE benchmarks, real Gmsh + ccx 2.21, judged by the PHY-00 judge (`server/tests/feaThermal*.test.ts`, adapted plans in
+`server/tests/fixtures/thermal/`, run by `npm run quality:physics`): VC-THM-01.a–d (wall), 03 (T3 36.48 °C vs 36.60, 0.33 %), 04 (T4
+18.2542 vs 18.2538), 05 (T2 927.004 K, exact σ), 14.a/b (oneel8ra), plus 61 (all ten set-ups, CLI), 50 (incl. the dependent thermo_static going stale), 62, 63 at unit level and an
+open-cavity case against the exact view-factor network (0.5 %).
+
+**FE deviations:**
+
+- **Output times (§11 Q2), decided on ccx 2.21:** `DIRECT` cannot be combined with `*TIME POINTS`, so fixed increments write every
+  `outputEveryS / increment` increments (`FREQUENCY`) and `set_thermal_step` refuses `fixedIncrements` with `outputTimesS`; automatic
+  increments use a `*TIME POINTS` set (requested times + end time).
+- **Material tables** cover the case temperatures (initial, prescribed, film sinks, amplitude extremes) ± 50 K inside the model's equation
+  range; radiation sinks are excluded (a 3 K sink would demand k at 3 K); fields leaving the tables report `THM_PROPERTY_OUT_OF_RANGE`.
+- **Heat balance:** CalculiX's RFL omits loads applied at prescribed nodes and their capacity; the summary corrects both. Steady cases
+  balance to ≤ 1e-3; an amplitude-driven transient (T3) keeps ≈ 1.7 % (0.25 s increments) and reports `THM_HEAT_BALANCE`. Cavity cases
+  report "heat balance not evaluated" (the cavity exchange is not integrated).
+- **σ override:** `set_thermal_physical_constants` records an explicit σ (`defaulted: false`, source required); the oneel8ra case uses
+  CalculiX's 5.669e-8 (the exact SI σ misses its 1e-4 tolerance by 2.2e-4 — kept visible by a test). The default stays the exact SI value.
+- **Probes:** temperature probes are interpolated with the containing C3D4 / C3D10 element's shape functions (nearest node was 3 % low
+  on T3); other quantities use the nearest node.
+- **Targets** are resolved by the mesher (closest Gmsh surface / node to the given points), not by the 05 face map (TR-FEA-32, needs the
+  01 face-query port); with the Manifold kernel faces are the 40° crease regions of the tessellation.
+- **Contact conductance:** written, see "V1 additions (2026-10-17)" below.
+- **Human gate:** `dispose_thermal_limit` verifies through `ctx.humanSignature`; no implementation is installed (09 PLM not built), so
+  every call is refused with `THM_HUMAN_GATE` — the specified agent-path behaviour. Payload:
+  `sha256(canonicalJson({ kind, analysisId, rowId, decision, justification, resultsHash }))`.
+- **Extra codes:** `THM_BC_NOT_FOUND`, `THM_AMPLITUDE_NOT_FOUND`, `THM_AMPLITUDE_IN_USE`, `THM_LIMIT_INVALID`, `THM_LIMIT_NOT_FOUND`,
+  `THM_CONTACT_INVALID`, `THM_TABLE_POINTS`, `THM_CONSTANT_INVALID`.
+
+**Still open:** phase change (V2); ε(T) tables (needs PHY-15 emissivity data, absent) and `render_view field=temperature` (M4 V1); h(T) in transient
+cases; a signing implementation (09 PLM); the `llull guide` thermal section.
+
+**V1 additions (2026-10-17), all measured on ccx 2.21 with Gmsh 4.15.2 through plan -> `fea_mesh` -> `fea_solve` -> `thermal_report`:**
+
+| Item | Result |
+| ---- | ------ |
+| Contact conductance (TR-THM-15) | `thermal/deckContact.ts`. Card set: `*SURFACE, TYPE=ELEMENT` (master and slave from the face sets `K_<contactId>_M` / `_S`), `*SURFACE INTERACTION`, `*SURFACE BEHAVIOR, PRESSURE-OVERCLOSURE=TIED`, `*GAP CONDUCTANCE` (one row `h, 0` or table rows `h, p, T`), `*CONTACT PAIR, INTERACTION=, TYPE=SURFACE TO SURFACE` (slave first). Found by hand decks (the `contact7–9` decks are not available locally); the tied pair needs no spring stiffness line. The two parts are meshed as separate volumes, so the face meshes do not match; this does not matter (flux 64860.6 on tet10 h = 0.01, 64862.5–64864.8 on tet4 / tet10 h = 0.05, 0.025, 0.01 for 64864.8649: at most 7e-5 relative). A table is read at the MEAN temperature of the two faces and at zero pressure (verified: h = 1000 + 30 T_mean reproduced). `THM_CONTACT_UNSUPPORTED` is removed; `check_thermal` reports `THM_CONTACT_INVALID` for a contact whose parts are not two different parts of the case. VC-THM-11.a/b pass (`server/tests/feaThermalContact.test.ts`): flux 64860.6 W/m^2 (pack 64864.8649, 0.5 %), interface jump 32.434 K (32.4324, 1 %). |
+| VC-THM-30 (CalculiX vs llull view factor) | `server/tests/feaThermalViewFactor.test.ts`. F12 inferred from the plate-1 heat flow of an open-cavity run (plate 1 and the environment at 1 K, plate 2 at 500 K, k = 1e5 so the faces sit at the BC temperatures, `F = (q1/(sigma A) - (T1^4 - Te^4)) / -(T2^4 - Te^4)`): **0.1998337** (tet10, h = 0.05), 0.1998339 (tet4, h = 0.025), 0.199970 (tet4, h = 0.1). `compute_view_factors`: 0.19982489569839; closed form 0.199824895698. CalculiX minus closed form: +9e-6 (converged), +1.5e-4 (coarse). **Pinned 2026-10-17 (owner-approved recommendation):** the pack now carries the closed form 0.199824895698, tolerance 0.0005 abs, grade A; the converged ccx factor is judged by `expectCase` and counted by `quality:physics`. CalculiX is therefore no less accurate than the TS factor for opposed squares; for other geometries it stays open. |
+| Orthotropic conductivity | k property models with `direction` '1', '2', '3' (PHY-01 directions) make the material orthotropic: `*CONDUCTIVITY, TYPE=ORTHO` with `k1, k2, k3[, T]` rows on the union of the directional temperature grids (each direction tabulated to the named tolerance and held at its end values like the solver does). The directions are the DOCUMENT X, Y, Z axes: a rotated part with an orthotropic material is refused (`THM_MATERIAL_ORTHO_ROTATED`, no `*ORIENTATION` is written); k models for only some directions give `THM_MATERIAL_K_ORTHO`. Validated on a 0.1 m cube with k = (10, 20, 30) held at 100 / 0 degC along each axis: 100 / 200 / 300 W within 1e-3, mid temperature 50 degC (`server/tests/feaThermalOrtho.test.ts`). |
+| h(T) film coefficient | `add_thermal_bc kind=film` with `filmTable: { points: [[T, h], ...] }` instead of `filmCoefficient` (stored as `filmCoefficient: { table: { points } }`; T on the case scale, strictly increasing, h > 0, `source` mandatory, no amplitude). CalculiX has NO table on `*FILM` (`film.f` user subroutine only; only the time amplitudes `AMPLITUDE=` / `FILM AMPLITUDE=` exist). The deck therefore writes the table as a tied `*GAP CONDUCTANCE` to a dummy wedge layer (C3D6 / C3D15, one per film face, coincident with the face) whose nodes are prescribed at the sink temperature; the gap table is read at (Ts + Tsink)/2, so rows are written at Tm = (T + Tsink)/2 and q = h(Ts)(Ts - Tsink) exactly (`thermal/deckFilmSink.ts`). The dummy layer MUST be the slave: with the face as slave ccx left 2–4 K error on a coarse mesh. **Steady only:** 1D slab k = 50, L = 0.1, h = 100 + 2 T into 20 degC, bottom 100 degC: face 73.54160 degC vs closed form 73.54157, flux 13229.2 W/m^2, balance residual < 2e-6, identical on tet4 h = 0.05, tet10 h = 0.05 and 0.1. In a transient the same construction gave surface temperature rises 2–8 % off a constant `*FILM` at equal h (hand hex model, converged in mesh and time step: 26.55 vs 26.40 degC; the gap behaves like a 12 % smaller h at h = 500), so `add_thermal_bc` refuses a table in any case but heat_steady (`THM_FILM_INVALID`; the coupled deck reuses `bcLines`, which refuses it too). `bcFlows` integrates h(T)(Tsink - T) over the face for the report. `TableRef` (CSV hash reference) is not supported: the model gained `FilmTable` with inline points. |
+| ε(T) | Not built: PHY-15 emissivity data is absent. |
+
+**Review fixes (2026-10-17):**
+
+- **Read paths re-verify (05 §4.1).** `thermal_report`, `check_thermal` and `check_temperature_limits` use the results summary recomputed from the
+  artifact (`trustedRecord`): state `untrusted` + `FEA_SUMMARY_MISMATCH` when the recorded one differs, `missing` without an artifact store /
+  artifact; numbers are returned only for `solved`. `check_thermal` now reports `state`; post-solve items (`THM_HEAT_BALANCE`,
+  `THM_PROPERTY_OUT_OF_RANGE`) come only from a verified summary.
+- **Dispositions are claims.** `dispose_thermal_limit` stores the verified `signature` next to the decision; `check_temperature_limits` counts a
+  stored disposition only if it is on the current results AND re-verifies through `ctx.humanSignature` against the payload
+  (`sha256(canonicalJson({ kind, analysisId, rowId, decision, justification, resultsHash }))`). Otherwise the row stays `pending_human`, carries
+  `unverifiedDisposition { decision, signer, reason }` and `THM_DISPOSITION_UNVERIFIED` (warning) is added.
+- **Deck text.** BC names, cavity names / ids, material origin and unverified reasons pass through `commentText`; the cavity keyword uses the
+  sanitised upper-case name; `add_cavity_radiation` accepts only `[A-Za-z0-9_]{1,3}`.
+- **Temperatures** of every thermal quantity are bounded to (0, 1e5] K (named guard "llull guard", `shared/quantity.ts`).

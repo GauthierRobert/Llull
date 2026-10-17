@@ -1,4 +1,4 @@
-/** Document settings: units, layers, materials (and their property models), camera, clear. */
+/** Document settings: units, layers, materials (and their property and material models), camera, clear. */
 
 import { commandCatalog } from '../schema';
 import { setUnits } from './units';
@@ -10,6 +10,9 @@ import { definePropertyModel, removePropertyModel } from './propertyModels';
 import { evaluateProperty, sampleProperty } from './propertyQueries';
 import { fitPropertyModel } from './fitPropertyModel';
 import { checkPropertyModels } from './checkPropertyModels';
+import { addMaterialModel, removeMaterialModel } from './materialModels';
+import { defineConstitutiveSet } from './constitutiveSets';
+import { checkMaterialModels } from './checkMaterialModels';
 
 export const documentCommands = commandCatalog(
   setUnits,
@@ -28,4 +31,8 @@ export const documentCommands = commandCatalog(
   sampleProperty,
   fitPropertyModel,
   checkPropertyModels,
+  addMaterialModel,
+  removeMaterialModel,
+  defineConstitutiveSet,
+  checkMaterialModels,
 );

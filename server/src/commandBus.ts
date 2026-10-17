@@ -9,6 +9,7 @@ import { getLiveDoc, getLiveLogPosition, setLiveDoc } from './liveDocument';
 import { ANONYMOUS_ACTOR, appendAudit, hashJson, type Actor } from './audit';
 import { runCommandOutcome } from '@mcp/commandOutcome';
 import type { CommandResponseBody } from '@mcp/restProtocol';
+import { serverContext } from './fea/context';
 
 const MAX_UNDO_DEPTH = 100; // = the UI store's cap
 const MAX_IDEMPOTENCY_ENTRIES = 1000; // commandId -> result LRU
@@ -72,7 +73,7 @@ function boundedForReplay(result: CommandResponseBody): CommandResponseBody {
 
 function runCommand(name: string, params: unknown, actor?: Actor, commandId?: string): CommandResponseBody {
   const prior = getLiveDoc();
-  const { document, outcome } = runCommandOutcome(prior, name, params);
+  const { document, outcome } = runCommandOutcome(prior, name, params, serverContext());
   if (outcome.changed) {
     history.undo = pushCapped(history.undo, prior);
     history.redo = [];

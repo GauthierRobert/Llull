@@ -5,6 +5,7 @@
       "@lib/*": ["./packages/core/src/lib/*"],
       "@mcp/*": ["./packages/mcp/src/*"],
       "@aec/*": ["./packages/domain-aec/src/*"],
+      "@cae/*": ["./packages/domain-cae/src/*"],
       "@kernel-manifold/*": ["./packages/kernel-manifold/src/*"],
       "@kernel-occt/*": ["./packages/kernel-occt/src/*"],
       "@physics-mujoco/*": ["./packages/physics-mujoco/src/*"],

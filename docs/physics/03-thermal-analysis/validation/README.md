@@ -64,7 +64,7 @@ Status: **P** (proposed). "FE" = run through `fea_mesh` / `fea_solve` on the des
 | VC-THM-12 | FR-THM-09; TR-THM-16 | FE 1D melting with the apparent-heat-capacity table (V2) | λ = 0.245731; front 11.15 mm at 3600 s | 3 % on the front (smearing over the melting range) | A | integration (V2) |
 | VC-THM-13 | FR-THM-05; TR-THM-14 | deck writer | σ = 5.670 374 419 18e-8 W/(m² K⁴) (SI); 5.670 374 419e-11 in N-mm-t-s | 1e-9 | A | unit |
 | VC-THM-14 | FR-THM-05, 11, 12; TR-THM-14, 30, 31 | run the pinned CalculiX `test/oneel8ra.inp` (sha256 in JSON) and parse | radiating face −0.950739 °C; Σ RFL 47.5369 W (CalculiX ref −9.507386E-01, 4 × 11.88423) | 1e-4 | A | integration |
-| VC-THM-30 | FR-THM-06; TR-THM-20, 21 | VC-THM-09.a geometry: CalculiX `*VIEWFACTOR, WRITE ONLY` vs llull | TBD — measure | 0.002 abs once measured | TBD | integration (V1) |
+| VC-THM-30 | FR-THM-06; TR-THM-20, 21 | VC-THM-09.a geometry: CalculiX cavity F12 (inferred from the cavity heat flow) vs llull | 0.199824895698 (ccx 2.21: 0.1998337 converged) | 0.0005 abs | A (pinned 2026-10-17) | integration (V1) |
 | VC-THM-50 | FR-THM-15, 18; TR-THM-32 | solved T3, then `set_parameter` on the bar length | `state: "stale"`; limits refused with `FEA_RESULTS_STALE`; dependent PHY-04 case stale | exact | A | golden |
 | VC-THM-60 | FR-THM-20; TR-THM-50 | any radiation case, `thermal_report` | `physicalConstants` equals the JSON (σ, absolute zero, sources, `defaulted: true`) | exact | A | unit + CLI |
 | VC-THM-61 | FR-THM-21; TR-THM-51 | `plans/thm_rejections.plan.json` + the listed variants | each returns its code, non-empty `remediation`, ids or path | exact | A | unit + CLI |

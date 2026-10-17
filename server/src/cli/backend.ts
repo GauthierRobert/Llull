@@ -1,7 +1,6 @@
 /** Where the CLI runs a command: a local document file (in-process registry) or a server's command bus. */
 import fs from 'fs';
 import path from 'path';
-import { defaultContext } from '@core/commands/context';
 import type { CadDocument } from '@core/model/types';
 import { failedOutcome, runCommandOutcome } from '@mcp/commandOutcome';
 import { parseCommandResponse, type CommandOutcome } from '@mcp/restProtocol';
@@ -10,6 +9,7 @@ import type { StepObserver } from './progress';
 import type { ExchangeOptions } from '../pythonExchange';
 import { runLocalExchange } from './exchange';
 import { requestJson, type FetchLike } from '../restClient';
+import { serverContext } from '../fea/context';
 import { readDocumentFile, writeDocumentFile } from '../documentFile';
 
 export interface CliBackend {
@@ -47,7 +47,7 @@ export function createLocalBackend(docPath: string, options: LocalOptions): CliB
         prior,
         name,
         params,
-        options.observer !== undefined ? { ...defaultContext(), onStep: options.observer.onStep } : undefined,
+        options.observer !== undefined ? { ...serverContext(), onStep: options.observer.onStep } : serverContext(),
       );
       doc = document;
       if (outcome.changed && !options.dryRun) saveDocumentWithBackup(docPath, document);

@@ -127,7 +127,8 @@ export const createMaterial = defineCommand({
             ...(normalStrength !== undefined ? { normalStrength } : {}),
             ...(clearcoat !== undefined ? { clearcoat } : {}),
           };
-    const models = Object.hasOwn(doc.materials, name) ? doc.materials[name]?.propertyModels : undefined;
+    const previous = Object.hasOwn(doc.materials, name) ? doc.materials[name] : undefined;
+    const models = previous?.propertyModels;
     const material: Material = {
       name,
       density,
@@ -136,6 +137,9 @@ export const createMaterial = defineCommand({
       roughness,
       ...(finish !== undefined ? { finish } : {}),
       ...(models !== undefined ? { propertyModels: models } : {}),
+      ...(previous?.materialModels !== undefined ? { materialModels: previous.materialModels } : {}),
+      ...(previous?.constitutiveSets !== undefined ? { constitutiveSets: previous.constitutiveSets } : {}),
+      ...(previous?.defaultConstitutiveSet !== undefined ? { defaultConstitutiveSet: previous.defaultConstitutiveSet } : {}),
     };
     const newDoc: CadDocument = { ...doc, materials: { ...doc.materials, [name]: material } };
     const action = Object.hasOwn(doc.materials, name) ? 'replaced' : 'created';

@@ -7,6 +7,7 @@ import { isFiniteNumber } from '@lib/isFiniteNumber';
 import { isRecord } from '@lib/isRecord';
 import { buildMcpTools, type McpToolDefinition } from './tools';
 import { buildExchangeToolDefinitions } from './exchangeTools';
+import { buildFeaToolDefinitions } from './feaTools';
 import { shapeToolCallContent, type McpShapedResult } from './dispatch';
 import { TOOLSET_NAMES, isToolEnabled, toolsetOf, type ToolsetName } from './toolsets';
 
@@ -60,9 +61,9 @@ export function buildDiscoveryToolDefinitions(): McpToolDefinition[] {
   ];
 }
 
-/** Every tool a session can be served: registry commands + exchange + discovery meta-tools. */
+/** Every tool a session can be served: registry commands + exchange + FE + discovery meta-tools. */
 export function buildAllMcpTools(): McpToolDefinition[] {
-  return [...buildMcpTools(), ...buildExchangeToolDefinitions(), ...buildDiscoveryToolDefinitions()];
+  return [...buildMcpTools(), ...buildExchangeToolDefinitions(), ...buildFeaToolDefinitions(), ...buildDiscoveryToolDefinitions()];
 }
 
 /** Plural-insensitive stem: "edges" -> "edge", "holes" -> "hole", "entities" -> "entity". */
@@ -150,7 +151,7 @@ function scoreTool(tool: McpToolDefinition, toolset: ToolsetName, tokens: readon
 }
 
 /**
- * Rank every tool (registry commands + exchange + discovery tools, enabled or not) against `query`.
+ * Rank every tool (registry commands + exchange + FE + discovery tools, enabled or not) against `query`.
  * @invariant results sorted by score desc then name; zero-score tools are dropped
  */
 export function searchTools(query: string, limit: number, enabledToolsets: ReadonlySet<ToolsetName>): ToolSearchResult[] {

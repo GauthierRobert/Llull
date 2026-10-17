@@ -627,3 +627,81 @@ exact faces and STEP. **06 CMP** supplies laminates. **09 PLM** stamps results w
 - [R43] FeenoX NAFEMS examples — https://github.com/seamplex/feenox/tree/3759eb2426a9e9a77ab8a9ce97db93071a389776/examples (accessed 2026-10)
 - Other references (R4–R6, R20–R22, R31, R40–R45): see [`FUNCTIONAL_SPEC.md`](FUNCTIONAL_SPEC.md) §11 and [`validation/sources.md`](validation/sources.md).
 - L1 llull: `.claude/rules/architecture.md`, `docs/decisions/KI5-shape-kernel-boundary.md`, `docs/decisions/KI6-desktop-app-cli-first.md`, `packages/core/src/geometry/kernel.ts`, `server/src/pythonExchange.ts`.
+
+## 13. Implementation status (2026-10-16)
+
+**Built: a minimal slice**, driven by physics packs PHY-03 / PHY-04 (owner decision; design `docs/physics/FE_PIPELINE_DESIGN.md`).
+
+| Item | Where |
+| ---- | ----- |
+| Analysis types, artifacts, ports (`feaArtifacts`, `humanSignature` on `ExecutionContext`) | `packages/core/src/model/analysis.ts`, `commands/types.ts` |
+| Plugin `cae` (toolset `analysis`): `create_analysis` (static, heat_*, thermo_static), `delete_analysis`, `describe_analysis`, `set_part_idealization` (solid), constraints, loads (force, pressure, gravity), `set_mesh_controls` (tet 1/2), probes, `record_fe_mesh` / `record_fea_results` (§4.1 trust model), `fea_report`, `check_analysis` | `packages/domain-cae/src/commands/` |
+| INP writer §5.6 (model block, mechanical cards, `*STATIC` per load case), FRD / DAT readers §5.7, summaries, staleness TR-FEA-06 | `packages/domain-cae/src/{decks,results,hash}/` |
+| Transports `fea_mesh` (bridge op `mesh`, Gmsh 4.15.2), `fea_solve` (ccx), `fea_export`; content-addressed `FeArtifactStore` | `server/src/fea/`, `server/python/llull_mesh.py`, `packages/mcp/src/feaTools.ts` |
+
+Verified end to end with real Gmsh + ccx 2.21 (axial bar σ = F/A within 1 %, pressure sign, load-case reset) and by the PHY-03 / PHY-04
+benchmarks.
+
+**Bonded multi-part meshes (V1, built 2026-10-17):** `set_mesh_controls { bonding: 'separate' | 'conformal' }` (default `separate`, stored as absent so existing mesh hashes are unchanged; `conformal` is part of the mesh input hash). `separate` meshes every analysed part in its own Gmsh model (no shared nodes; contact needs this). `conformal` puts all parts in ONE model and `occ.fragment`s them, so touching parts share their interface nodes and faces; ids stay global and contiguous, element blocks (and so ELSETs / materials) stay per entity, and a target still resolves against the faces of its own part. It needs exact STEP geometry (OCC kernel): any STL part is refused with `FEA_BONDING_UNSUPPORTED`; parts that overlap in volume (a fragment owned by two parts) are refused with `FEA_BONDING_OVERLAP` (subtract one from the other so that they only touch). Used by PHY-04 NAFEMS T1 (`docs/physics/04-thermo-mechanical/TECHNICAL_SPEC.md` §14). Tests: `tests/unit/cae/{setup,hash}.test.ts`, `server/tests/feaMeshBridge.test.ts` (shared interface nodes, refusals).
+
+**Deviations:** targets are resolved by the mesher (closest Gmsh surface / node to the given points), not by the TR-FEA-32 face map,
+because the 01 face-query port (`faceDetails`) does not exist; without STEP (Manifold) the mesher rebuilds the geometry from the
+tessellation (`classifySurfaces` 40°), so faces are crease regions; `edgesNear` works with STEP only; `intersectPlane` is ignored.
+Forces are split equally over the target nodes (not area-consistent). Probes use the nearest node (temperature: element interpolation).
+Mesh quality reports Gmsh-independent tet scaled Jacobian and edge ratio only. Case lengths are in document units, loads in the case unit
+system. The FE tools run synchronously in the server process (no ticket cancel yet).
+
+**Not built (05 backlog):** modal, buckling, shells / plane stress / beams, midsurface, defeature, moment loads, Nastran BDF, OP2,
+`dispose_margin`, `analytic_check`, `set_result_view`, `fea_import_results`, `fea_result_field`, the full Verdict
+quality port, UI panels, `.llullz` result bundling.
+
+**Review fixes (2026-10-17), documented behaviour changes:**
+
+- **Trust model §4.1 completed on the read side.** A recorded summary in the document (also one that arrived through `load_document` or a
+  live snapshot) is a *claim*. `fea_report`, `check_analysis`, `describe_analysis` and the thermal / thermo-mechanical read paths call
+  `trustedRecord` (`domain-cae/src/shared/trust.ts`): the summary is recomputed from the artifact in `ctx.feaArtifacts` with the same
+  summariser the record commands use. State `solved` / `meshed` only when it matches; a difference gives state **`untrusted`** with
+  `FEA_SUMMARY_MISMATCH` (`data.problem`), no port / artifact absent / recorded without it gives **`missing`**. In both cases the mesh and
+  results are `null` (numbers withheld) and the results of a `stale` case are not shown. `stateOf` (hash only) is used where no number is read.
+- **Replay without artifacts (TR-FEA-05).** `record_fe_mesh` / `record_fea_results` keep the given summary flagged `verified: false` when the
+  port is absent or the artifact is not in it (step recorded, document changed, state `missing`, never read by any query); with the artifact
+  present every check of §4.1 still applies (mismatch, `FEA_INPUT_STALE`, `FEA_MESH_MISMATCH` refuse). A summary without a text `inputHash`
+  is refused. The replay cache key includes whether a port is injected. The live-sync state hash ignores the flag, so a replica without the
+  store converges with the server instead of requesting a snapshot after every FE command.
+- **Input hash (TR-FEA-06).** Hashes `parts[entity] = { idealization, geometry, materialId }`, the physical part of each used material
+  (density, property / material models, constitutive sets, default set - not name, colour, PBR, finish) and `documentUnit`: swapping the
+  materials of two parts or `set_units` makes results stale; a recolour does not.
+- **Deck text (§5.6).** Every free-text fragment written to the INP goes through `commentText` (control characters stripped, length capped);
+  load case names must match `[A-Za-z0-9_]{1,40}` (`FEA_LOAD_INVALID`), cavity names `[A-Za-z0-9_]{1,3}` (`THM_CAVITY_INVALID`). `*MATERIAL`
+  names are `M_<n>` by first appearance with the id in a `** material M_n = '<id>'` comment; element / node set names that coincide after
+  sanitising are refused (`FEA_DECK_NAME_COLLISION`).
+- **Limits.** `fea_solve` `timeoutS` is clamped to [1, 86400] (schema `minimum` / `maximum`); a `.frd` above 256 MiB is `FEA_RESULTS_TOO_LARGE`;
+  non-finite result values are `FEA_SOLVER_FAILED` ("non-finite results"); the recorded results summary is built from the artifact read back
+  from the store; `meshRequest` refuses an estimated element count above 2e6 (bbox volume / globalSize^3 x 6 per part, refinements ignored)
+  with `FEA_MESH_TOO_LARGE`.
+
+**`compute_margins` (2026-10-17, PHY-04 closure).** Read-only registry command of the plugin `cae` (toolset `analysis`, `packages/domain-cae/src/margins/`),
+§5.8 shape. `{ analysisId, criterion?, allowable?, groupBy?, loadCases?, marginalBand? }` -> `data { analysisId, unitSystem, resultsHash, criterion, groupBy,
+marginalBand, minMs, minMsRow, factors, rows, singularScreening, warnings, reviewRequired }`, field names carrying the stress / length unit (`appliedMPa`,
+`allowableMPa`, `atMm`; `Pa` / `M`, `Psi` / `In` in the other unit systems).
+
+- **Trust.** Numbers come from the results artifact re-verified by `trustedRecord` (§4.1), never from the document summary: stale -> `FEA_RESULTS_STALE`
+  (also when the cause is an edited thermal source of a thermo_static case), no verified artifact -> `FEA_RESULTS_MISSING`, summary differs from its artifact
+  -> `FEA_SUMMARY_MISMATCH`. Static and thermo_static cases only (`FEA_ANALYSIS_TYPE_UNSUPPORTED` otherwise).
+- **Applied stress.** `von_mises` (default) or the largest magnitude of `s_xx` / `s_yy` / `s_zz` over the nodes of a group: `groupBy part` (all nodes of the part's
+  elements) or `target` (the nodes of each constraint / load node set `C_` / `L_`, split by owning part). Nodal values are the solver's averages: the artifact
+  carries no per-element stresses, so averaging is not restricted to one part where parts share nodes (one mesh per part shares none).
+- **Allowables.** Omitted: Ftu and Fty from the PHY-01 property models of the part material, evaluated in MPa at the case reference temperature (thermo_static)
+  or 20 degC; `'ftu'` / `'fty'` run one check; `{ value, unit, against? }` is explicit (against `ultimate` by default, always `unverified`). A model missing, ambiguous
+  or outside its validity at that temperature -> `FEA_MATERIAL_NO_ALLOWABLE` with the PHY-01 code in the message. `Material` changes make the results stale (the input hash
+  holds the property models), so strengths are defined before the solve.
+- **Margins.** Limit load case: `MS_ult = Ftu / (applied x FoS_ult x prod(extra)) - 1` and `MS_yield = Fty / (applied x FoS_yield x prod(extra)) - 1`; ultimate load
+  case: `MS_ult = Ftu / (applied x prod(extra)) - 1`, no yield check (`allowable 'fty'` on it -> `FEA_MARGIN_PARAM_INVALID`). Applied = 0 gives `ms: null`, PASS. The
+  factors come from the case; each is listed with `source` and `defaulted` (a value equal to 1.5 / 1.0 is `defaulted: true`, source 14 CFR 25.303 / 25.305(a);
+  anything else is `defaulted: false`, source `create_analysis factors`; extras keep their justification). thermo_static results are one limit load case named
+  `loadCaseName`.
+- **Status.** FAIL if MS < 0 (`FEA_MS_NEGATIVE`), MARGINAL only when `marginalBand` is given and MS < band (`FEA_MS_MARGINAL`; no default, warning
+  `FEA_MARGINAL_BAND_UNSET` in `data.warnings`), else PASS. FAIL / MARGINAL rows are `disposition: pending_human` (`dispose_margin` is not built); every row has
+  `reviewRequired: true`; `unverified` = OR of the allowable's PHY-01 flags, the E / nu flags (and, for thermo_static, the CTE flags of `check_thermo_mechanical`).
+- **Singular zones are not screened.** Every row has `singular: false` and `data.singularScreening` says so; peak stresses at point loads, supports and re-entrant
+  corners must be judged by the reader (a node in a constraint set is visible with `groupBy target`).

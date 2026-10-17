@@ -1,13 +1,12 @@
 /**
- * The exchange tools (export_step, import_step, import_dwg, import_code) in the `llull` CLI. They
- * are not registry commands — Python / DWG I/O sits behind ports — so the CLI runs the same MCP-
- * layer handlers: in-process for a local --doc (document changes via `execute`), `POST /exchange`
+ * The exchange tools (export_step, import_step, import_dwg, import_code) and the FE tools (fea_mesh, fea_solve, fea_export, fea_import_field) in the
+ * `llull` CLI. They are not registry commands — Python / DWG / solver I/O sits behind ports — so the CLI runs the same MCP-layer handlers: in-process for a local --doc (document changes via `execute`), `POST /exchange`
  * for --app / --server. `file=<path>` reads a local file into the tool's content parameter.
  */
 
 import fs from 'fs';
 import type { CadDocument } from '@core/model/types';
-import { buildExchangeToolDefinitions } from '@mcp/index';
+import { buildExchangeToolDefinitions, buildFeaToolDefinitions } from '@mcp/index';
 import type { McpToolDefinition } from '@mcp/tools';
 import { isRecord } from '@lib/isRecord';
 import { runExchangeTool } from '../exchangeResult';
@@ -17,7 +16,7 @@ import type { CommandOutcome } from '@mcp/restProtocol';
 let definitions: readonly McpToolDefinition[] | null = null;
 
 export function exchangeToolDefinitions(): readonly McpToolDefinition[] {
-  definitions ??= buildExchangeToolDefinitions();
+  definitions ??= [...buildExchangeToolDefinitions(), ...buildFeaToolDefinitions()];
   return definitions;
 }
 
@@ -30,6 +29,7 @@ const FILE_PARAMS: Readonly<Record<string, { key: string; encoding: 'base64' | '
   import_step: { key: 'stepBase64', encoding: 'base64' },
   import_dwg: { key: 'dwgBase64', encoding: 'base64' },
   import_code: { key: 'code', encoding: 'utf8' },
+  fea_import_field: { key: 'csv', encoding: 'utf8' },
 };
 
 /**

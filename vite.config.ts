@@ -27,6 +27,7 @@ export default defineConfig(({ command }) => ({
             // The registry needs every plugin at startup, so these load eagerly; separate chunks
             // keep them cached across UI-only deploys and keep each chunk under the warning limit.
             { name: 'llull-core', test: /packages[\\/]core[\\/]src[\\/]/, priority: 1 },
+            { name: 'llull-cae', test: /packages[\\/]domain-cae[\\/]src[\\/]/, priority: 1 },
             { name: 'llull-aec', test: /packages[\\/]domain-aec[\\/]src[\\/]/, priority: 1 },
           ],
         },
@@ -75,6 +76,7 @@ export default defineConfig(({ command }) => ({
         'packages/core/src/geometry/**': { statements: 90, branches: 85, functions: 90, lines: 90 },
         'packages/core/src/dynamics/**': { statements: 90, branches: 85, functions: 90, lines: 90 },
         'packages/domain-aec/src/**': { statements: 90, branches: 85, functions: 90, lines: 90 },
+        'packages/domain-cae/src/**': { statements: 90, branches: 85, functions: 90, lines: 90 },
       },
     },
   },

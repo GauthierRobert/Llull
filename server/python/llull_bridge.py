@@ -16,6 +16,7 @@ Requests:
       -> {"ok": true, "trace": {...}, "traced": bool, "stepBase64"?: "...", "log": "..."}
   {"op": "import_step", "stepBase64": "...", "tolerance": float}
       -> {"ok": true, "bodies": [{"name", "color", "positions"}], "log": "..."}
+  {"op": "mesh", ...}   Gmsh tetrahedral FE mesh + target sets (see llull_mesh.py; independent of CadQuery)
 
 Errors -> {"ok": false, "error": "...", "log": "..."} (exit code 0; the caller reads ok).
 """
@@ -285,10 +286,18 @@ def main():
                 response = op_run(request)
             elif op == "import_step":
                 response = op_import_step(request)
+            elif op == "mesh":
+                from llull_mesh import op_mesh
+
+                response = op_mesh(request)
             else:
                 raise ValueError("unknown op %r" % op)
     except Exception as error:  # noqa: BLE001 - every failure becomes a structured error
-        response = {"ok": False, "error": "%s: %s" % (type(error).__name__, error), "traceback": traceback.format_exc(limit=8)}
+        code = getattr(error, "code", None)
+        if isinstance(code, str):  # mesh op: MeshError(code, message)
+            response = {"ok": False, "code": code, "error": str(error)}
+        else:
+            response = {"ok": False, "error": "%s: %s" % (type(error).__name__, error), "traceback": traceback.format_exc(limit=8)}
     response["log"] = log.getvalue()[-20000:]
     sys.stdout.write(json.dumps(response))
     sys.stdout.flush()

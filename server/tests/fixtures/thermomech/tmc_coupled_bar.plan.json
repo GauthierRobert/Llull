@@ -1,0 +1,142 @@
+[
+  { "command": "set_units", "params": { "units": "mm" } },
+  { "command": "add_box", "params": { "size": [100, 10, 10], "position": [0, 0, 0], "anchor": "min" }, "as": "bar" },
+  {
+    "command": "create_material",
+    "params": { "name": "steel_test", "density": 0.0078, "color": "#9aa0a6", "metalness": 1, "roughness": 0.4 }
+  },
+  {
+    "command": "add_material_model",
+    "params": {
+      "material": "steel_test",
+      "id": "elastic",
+      "model": { "kind": "elastic_isotropic", "E": { "value": 210, "unit": "GPa" }, "nu": { "value": 0.3, "unit": "1" } },
+      "basis": "company",
+      "source": { "citation": "test input of this validation case (not a material claim)" }
+    }
+  },
+  {
+    "command": "define_constitutive_set",
+    "params": { "material": "steel_test", "set": { "id": "set", "elastic": "elastic" }, "makeDefault": true }
+  },
+  {
+    "command": "define_property_model",
+    "params": {
+      "material": "steel_test",
+      "model": {
+        "id": "cte",
+        "property": "cte",
+        "unit": "1/K",
+        "variables": [{ "variable": "T", "unit": "K" }],
+        "form": { "kind": "constant", "value": 1.2e-5 },
+        "validity": [{ "variable": "T", "unit": "K", "data": [100, 1000] }],
+        "basis": "company",
+        "source": { "citation": "test input of this validation case (not a material claim)" }
+      }
+    }
+  },
+  {
+    "command": "define_property_model",
+    "params": {
+      "material": "steel_test",
+      "model": {
+        "id": "k_const",
+        "property": "k",
+        "unit": "W/(m*K)",
+        "variables": [],
+        "validity": [],
+        "form": { "kind": "constant", "value": 50.0 },
+        "basis": "company",
+        "source": { "citation": "test input of this validation case (not a material claim)" }
+      }
+    }
+  },
+  { "command": "assign_material", "params": { "materialName": "steel_test", "entityIds": ["$bar"] } },
+  {
+    "command": "create_analysis",
+    "params": {
+      "name": "coupled_restrained_bar",
+      "analysisType": "coupled_temperature_displacement",
+      "unitSystem": "N-mm-t-s",
+      "solver": "calculix",
+      "referenceTemperature": { "value": 20.0, "unit": "degC" }
+    },
+    "as": "an"
+  },
+  { "command": "set_part_idealization", "params": { "analysisId": "$an", "entityId": "$bar", "idealization": "solid" } },
+  {
+    "command": "add_thermal_bc",
+    "params": {
+      "analysisId": "$an",
+      "name": "end1_T",
+      "kind": "temperature",
+      "value": 120.0,
+      "unit": "degC",
+      "target": { "entityId": "$bar", "facesNear": [[100, 5, 5]] }
+    }
+  },
+  {
+    "command": "add_thermal_bc",
+    "params": {
+      "analysisId": "$an",
+      "name": "end0_T",
+      "kind": "temperature",
+      "value": 120.0,
+      "unit": "degC",
+      "target": { "entityId": "$bar", "facesNear": [[0, 5, 5]] }
+    }
+  },
+  {
+    "command": "set_temperature_field",
+    "params": {
+      "analysisId": "$an",
+      "cteBasis": { "steel_test": { "kind": "secant", "referenceTemperature": { "value": 20.0, "unit": "degC" } } }
+    }
+  },
+  {
+    "command": "add_fea_constraint",
+    "params": {
+      "analysisId": "$an",
+      "name": "end0",
+      "kind": "displacement",
+      "dofs": { "ux": 0 },
+      "target": { "entityId": "$bar", "facesNear": [[0, 5, 5]] }
+    }
+  },
+  {
+    "command": "add_fea_constraint",
+    "params": {
+      "analysisId": "$an",
+      "name": "end1",
+      "kind": "displacement",
+      "dofs": { "ux": 0 },
+      "target": { "entityId": "$bar", "facesNear": [[100, 5, 5]] }
+    }
+  },
+  {
+    "command": "add_fea_constraint",
+    "params": {
+      "analysisId": "$an",
+      "name": "sym_y",
+      "kind": "displacement",
+      "dofs": { "uy": 0 },
+      "target": { "entityId": "$bar", "facesNear": [[50, 0, 5]] }
+    }
+  },
+  {
+    "command": "add_fea_constraint",
+    "params": {
+      "analysisId": "$an",
+      "name": "sym_z",
+      "kind": "displacement",
+      "dofs": { "uz": 0 },
+      "target": { "entityId": "$bar", "facesNear": [[50, 5, 0]] }
+    }
+  },
+  {
+    "command": "set_mesh_controls",
+    "params": { "analysisId": "$an", "mesher": "gmsh", "elementFamily": "tet", "order": 2, "globalSize": 5 }
+  },
+  { "command": "add_result_probe", "params": { "analysisId": "$an", "name": "mid", "point": [50, 5, 5], "quantity": "s_xx" } },
+  { "command": "add_result_probe", "params": { "analysisId": "$an", "name": "T_mid", "point": [50, 5, 5], "quantity": "temperature" } }
+]

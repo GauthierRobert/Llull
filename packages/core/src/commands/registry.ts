@@ -27,6 +27,9 @@ import { drawingsCommands } from './drawings/catalog';
 import { dynamicsCommands } from './dynamics/catalog';
 import { reviewCommands } from './review/catalog';
 import { vnvCommands } from './vnv/catalog';
+import { materialLabCommands } from './materiallab/catalog';
+import { thermalCommands } from './thermal/catalog';
+import { thermomechCommands } from './thermomech/catalog';
 
 registerCommands('core', [
   ...documentCommands,
@@ -48,6 +51,9 @@ registerCommands('core', [
   ...dynamicsCommands,
   ...reviewCommands,
   ...vnvCommands,
+  ...materialLabCommands,
+  ...thermalCommands,
+  ...thermomechCommands,
 ]);
 onPluginInstalled((plugin) => registerCommands(`plugin '${plugin.name}'`, plugin.commands));
 

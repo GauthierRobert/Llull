@@ -15,6 +15,7 @@ export const TOOLSET_NAMES = [
   'parametric',
   'assembly',
   'materials',
+  'material-lab',
   'analysis',
   'review',
   'exchange',
@@ -26,7 +27,11 @@ export type ToolsetName = (typeof TOOLSET_NAMES)[number];
 
 const words = (list: string): readonly string[] => list.split(' ');
 
-/** Tool names per toolset; `building` / `civil` come from their plugins. */
+const ANALYSIS_CORE_TOOLS = words(
+  'check_assembly engine_quick_check check_convergence compare_to_expected thermal_analytic_check compute_view_factors fit_at_temperature thermal_stress_check fea_mesh fea_solve fea_export fea_import_field',
+);
+
+/** Tool names per toolset; `building` / `civil` / the FE part of `analysis` come from their plugins. */
 export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   core: words(
     'search_tools enable_toolset describe_scene find_entities build_project check_model render_view set_units load_document clear_document move_entities rotate_entity scale_entity mirror_entity duplicate_entities delete_entities array_linear array_polar group_entities ungroup_entities set_entity_name align distribute stack_on set_parameter delete_parameter add_layer update_layer set_entity_layer delete_layer set_camera fit_view',
@@ -46,13 +51,17 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
       'add_rigid_body add_body_joint add_gear_coupling add_motor add_propeller add_cylinder_pressure set_gravity delete_dynamics_item set_dynamics_solver inspect_dynamics simulate_motion',
   ),
   materials: words(
-    'define_property_model remove_property_model evaluate_property sample_property fit_property_model check_property_models',
+    'define_property_model remove_property_model evaluate_property sample_property fit_property_model check_property_models add_material_model remove_material_model define_constitutive_set check_material_models',
   ),
-  analysis: words('check_assembly engine_quick_check check_convergence compare_to_expected'),
+  'material-lab': words('fit_material_model material_point_response export_material_cards'),
   review: words('allow_interference remove_interference_intent set_part_grounded'),
   exchange: words(
     'export_stl export_obj export_gltf export_step_exact export_code apply_code_trace import_mesh import_dxf export_step import_step import_dwg import_code',
   ),
+  /** Core analytic checks plus the finite-element commands contributed by the installed cae plugin. */
+  get analysis(): readonly string[] {
+    return [...ANALYSIS_CORE_TOOLS, ...pluginToolNames('analysis')];
+  },
   /** Contributed by the installed building + industrial plugins. */
   get building(): readonly string[] {
     return pluginToolNames('building');

@@ -1,0 +1,78 @@
+[
+  { "command": "set_units", "params": { "units": "m" } },
+  { "command": "add_box", "params": { "size": [0.1, 0.01, 0.01], "position": [0, 0, 0], "anchor": "min" }, "as": "body" },
+  {
+    "command": "create_material",
+    "params": { "name": "t2_k556", "density": 8000000.0, "color": "#9aa0a6", "metalness": 1, "roughness": 0.4 }
+  },
+  {
+    "command": "define_property_model",
+    "params": {
+      "material": "t2_k556",
+      "model": {
+        "id": "k_const",
+        "property": "k",
+        "unit": "W/(m*K)",
+        "variables": [],
+        "validity": [],
+        "form": { "kind": "constant", "value": 55.6 },
+        "basis": "company",
+        "source": { "citation": "test input of this validation case (not a material claim)" }
+      }
+    }
+  },
+  {
+    "command": "define_property_model",
+    "params": {
+      "material": "t2_k556",
+      "model": {
+        "id": "cp_const",
+        "property": "cp",
+        "unit": "J/(kg*K)",
+        "variables": [],
+        "validity": [],
+        "form": { "kind": "constant", "value": 500.0 },
+        "basis": "company",
+        "source": { "citation": "test input of this validation case (not a material claim)" }
+      }
+    }
+  },
+  { "command": "assign_material", "params": { "materialName": "t2_k556", "entityIds": ["$body"] } },
+  {
+    "command": "create_analysis",
+    "params": { "name": "t2_k556", "analysisType": "heat_steady", "unitSystem": "N-m-kg-s", "solver": "calculix", "temperatureScale": "K" },
+    "as": "an"
+  },
+  { "command": "set_part_idealization", "params": { "analysisId": "$an", "entityId": "$body", "idealization": "solid" } },
+  {
+    "command": "add_thermal_bc",
+    "params": {
+      "name": "hot",
+      "kind": "temperature",
+      "value": 1000.0,
+      "unit": "K",
+      "analysisId": "$an",
+      "target": { "entityId": "$body", "facesNear": [[0, 0.005, 0.005]] }
+    }
+  },
+  {
+    "command": "add_thermal_bc",
+    "params": {
+      "name": "rad",
+      "kind": "radiation",
+      "emissivity": 0.98,
+      "sinkTemperature": { "value": 300.0, "unit": "K" },
+      "source": { "citation": "test input of this validation case (not a material claim)" },
+      "analysisId": "$an",
+      "target": { "entityId": "$body", "facesNear": [[0.1, 0.005, 0.005]] }
+    }
+  },
+  {
+    "command": "set_mesh_controls",
+    "params": { "analysisId": "$an", "mesher": "gmsh", "elementFamily": "tet", "order": 2, "globalSize": 0.02 }
+  },
+  {
+    "command": "add_result_probe",
+    "params": { "analysisId": "$an", "name": "face", "point": [0.1, 0.005, 0.005], "quantity": "temperature" }
+  }
+]
