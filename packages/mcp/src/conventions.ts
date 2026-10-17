@@ -204,7 +204,8 @@ reviewRequired. Never present them as released; say what a qualified person must
 - **Sheet metal.** \`sheet_metal_calc\` (no part; K-factor explicit, or mode faa_empirical) →
   \`create_sheet_metal_rule\` (material, thickness, inside radius, K; no defaults) →
   \`import_bend_radius_table\` (every row needs its source) → \`add_sheet_metal_base\` (closed profile) →
-  \`add_flange\` (angle = angle bent through) / \`add_joggle\` / \`add_sheet_cutout\` / \`add_relief\` →
+  \`add_flange\` (angle = angle bent through; cuts the rule relief itself) / \`add_contour_flange\` (multi-bend profile) /
+  \`add_hem\` / \`add_joggle\` / \`add_sheet_cutout\` / \`add_relief\` / \`add_corner_relief\` / \`add_flanged_hole\` / \`add_bead\` →
   \`check_sheet_metal\` → \`flat_pattern\` → \`export_flat_pattern_dxf --save blank.dxf\`. Existing exact
   solids: \`convert_to_sheet_metal\`. Waivers stay FTR_WAIVER_NOT_APPROVED until a human approval exists.
 `;

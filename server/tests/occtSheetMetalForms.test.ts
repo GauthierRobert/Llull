@@ -157,3 +157,35 @@ describe('hem (VC-FTR-15)', () => {
     expect(relative(openVolume, 40 * 30 * T + (Math.PI / 2) * ((1.6 + T) ** 2 - 1.6 ** 2) * 30 + 10 * 30 * T)).toBeLessThan(1e-6);
   });
 });
+
+const VOLUMES: Record<string, number> = { L: 3475.030052642468, Z: 3638.0601052849365, 'Z-return': 4127.490157927407 };
+
+describe('contour flange (VC-FTR-15)', () => {
+  it.each([
+    ['L', 'bottom', [[0, 30]]],
+    [
+      'Z',
+      'mid',
+      [
+        [0, 20],
+        [15, 20],
+      ],
+    ],
+    [
+      'Z-return',
+      'top',
+      [
+        [0, 20],
+        [15, 20],
+        [15, 5],
+      ],
+    ],
+  ])('%s profile at K 0.5: folded volume = developed area x T', (_name, side, path) => {
+    const { doc, part } = plate(40, 30, { name: 'AL5', kFactor: 0.5 });
+    const result = run(doc, 'add_contour_flange', { id: part, edge: { near: [40, 15, 0] }, side, path });
+    const flat = run(result.document, 'flat_pattern', { id: part }).data as { area: number };
+    const volume = volumeOf(result.document, part);
+    expect(relative(volume, VOLUMES[_name] as number)).toBeLessThan(1e-9);
+    expect(relative(volume, flat.area * T)).toBeLessThan(1e-6);
+  });
+});

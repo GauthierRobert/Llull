@@ -13,6 +13,7 @@ import { addCornerRelief } from './commands/cornerRelief';
 import { addFlangedHole } from './commands/flangedHole';
 import { addBead } from './commands/bead';
 import { addHem } from './commands/hem';
+import { addContourFlange } from './commands/contourFlange';
 import { checkSheetMetal } from './commands/check';
 import { exportFlatPatternDxf } from './commands/dxf';
 import { convertToSheetMetal } from './commands/convert';
@@ -20,7 +21,7 @@ import { setSheetMetalMaterial } from './commands/material';
 
 // prettier-ignore
 export const sheetMetalCommands = commandCatalog(
-  sheetMetalCalc, createSheetMetalRule, importBendRadiusTable, addSheetMetalBase, addFlange, addJoggle, addSheetCutout, addRelief, addCornerRelief, addFlangedHole, addBead, addHem, flatPattern,
+  sheetMetalCalc, createSheetMetalRule, importBendRadiusTable, addSheetMetalBase, addFlange, addJoggle, addSheetCutout, addRelief, addCornerRelief, addFlangedHole, addBead, addHem, addContourFlange, flatPattern,
   materializeFlatPattern, checkSheetMetal, exportFlatPatternDxf,
   convertToSheetMetal, setSheetMetalMaterial,
 );
