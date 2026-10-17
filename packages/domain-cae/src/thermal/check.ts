@@ -16,14 +16,7 @@ import { tableProblem } from './amplitude';
 import { recordProblem } from './bcModel';
 import { refuseThermal, remediationOf } from './codes';
 import { HEAT_BALANCE_TOLERANCE, hasRadiation } from './constants';
-import {
-  caseTemperatureRange,
-  isOrthotropic,
-  orthotropicRotationProblem,
-  partMaterials,
-  propertiesNeeded,
-  propertyTable,
-} from './material';
+import { isOrthotropic, orthotropicRotationProblem, partMaterials, propertiesNeeded, casePropertyTable } from './material';
 import { unverifiedInputs } from './unverified';
 
 export interface ThermalCheckItem {
@@ -50,11 +43,10 @@ export function item(
 }
 
 function partItems(doc: CadDocument, found: ThermalCase): ThermalCheckItem[] {
-  const { analysisCase, thermal } = found;
+  const { analysisCase } = found;
   const items: ThermalCheckItem[] = [];
   const parts = partMaterials(doc, analysisCase);
   if (parts.length === 0) return [item('FEA_PART_INVALID', 'error', 'the analysis has no part', [analysisCase.id])];
-  const required = caseTemperatureRange(thermal);
   const seen = new Set<string>();
   for (const part of parts) {
     const entity = Object.hasOwn(doc.entities, part.entityId) ? doc.entities[part.entityId] : undefined;
@@ -71,15 +63,7 @@ function partItems(doc: CadDocument, found: ThermalCase): ThermalCheckItem[] {
     for (const property of propertiesNeeded(analysisCase)) {
       if (seen.has(`${part.materialId}/${property}`)) continue;
       seen.add(`${part.materialId}/${property}`);
-      const table = propertyTable({
-        materialName: part.materialId,
-        material: part.material,
-        documentUnit: doc.units,
-        property,
-        scale: thermal.temperatureScale,
-        unitSystem: analysisCase.unitSystem,
-        required,
-      });
+      const table = casePropertyTable(doc, found, part.materialId, part.material, property);
       if ('code' in table) items.push(item(table.code, 'error', table.message, [part.materialId, part.entityId], property));
     }
   }

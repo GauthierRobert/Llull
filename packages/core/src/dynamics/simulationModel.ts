@@ -18,6 +18,7 @@ import { consistentSpeeds } from './mobility';
 import { announcedSpeed } from './timestep';
 import type { CurveCode } from './pressureCurve';
 import { buildTopology, isRefusal, type Topology, type TopologyRefusal } from './topology';
+import { scale3 } from '../lib/vec3';
 
 /** kg/m³ of a body entity without a material and without a body density: steel (a named default, AF-31). */
 const DEFAULT_DENSITY: DensityFallback = { kgPerM3: 7850, source: 'default:steel 7850 kg/m^3', defaulted: true };
@@ -81,7 +82,7 @@ export function bodyMassProperties(
   const scale = body.massKg !== undefined ? body.massKg / combined.mass : 1;
   return {
     mass: combined.mass * scale,
-    centerOfMass: combined.centerOfMass.map((c) => c * metres) as unknown as Vec3,
+    centerOfMass: scale3(combined.centerOfMass, metres),
     inertia: combined.inertia.map((value) => value * scale * metres * metres) as unknown as InertiaTensor,
     densitySources: body.massKg !== undefined ? [`body '${body.id}' massKg ${body.massKg}`, ...sources] : [...sources],
     densityDefaulted: body.massKg === undefined && defaulted,
@@ -200,7 +201,7 @@ export function buildSimulationModel(doc: CadDocument, timestep: number, kernel?
       simulationJoint = {
         id: entry.joint.id,
         kind: entry.joint.kind,
-        anchor: entry.joint.anchor.map((c) => c * metres) as unknown as Vec3,
+        anchor: scale3(entry.joint.anchor, metres),
         axis: entry.flipped ? [-axis[0], -axis[1], -axis[2]] : axis,
         damping: entry.joint.damping,
         friction: entry.joint.friction,
@@ -236,7 +237,7 @@ export function buildSimulationModel(doc: CadDocument, timestep: number, kernel?
         kind: loop.kind,
         bodyA: loop.parent === GROUND ? 'world' : loop.parent,
         bodyB: loop.child,
-        anchor: loop.anchor.map((c) => c * metres) as unknown as Vec3,
+        anchor: scale3(loop.anchor, metres),
         axis,
         halfSpan: loopHalfSpan(doc, [dynamics.bodies[loop.parent], dynamics.bodies[loop.child]], axis, metres),
       },

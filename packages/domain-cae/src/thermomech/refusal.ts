@@ -1,8 +1,6 @@
 /** Refusals of the PHY-04 commands: stable code, ids, paths and the remediation texts. */
 
-import type { CadDocument } from '@core/model/types';
-import type { CommandResult } from '@core/commands/types';
-import { refuse } from '../shared/refuse';
+import { tableRejection } from '@core/commands/noop';
 
 const REMEDIATION: Readonly<Record<string, string>> = {
   FEA_ANALYSIS_NOT_FOUND: 'list the analyses with describe_analysis (no analysisId), or create one with create_analysis',
@@ -39,17 +37,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'remove the cavity radiation, thermal contacts, amplitudes and h(T) tables from the coupled case, or run a heat_* case then a thermo_static case',
 };
 
-/** `refuse` with the remediation registered for `code`; document unchanged. */
-export function refuseTmc(
-  doc: CadDocument,
-  command: string,
-  code: string,
-  message: string,
-  ids: readonly string[] = [],
-  paths: readonly string[] = [],
-): CommandResult {
-  return refuse(doc, command, code, message, REMEDIATION[code] ?? 'see the command description', ids, paths);
-}
+/** `codedRejection` with the remediation registered for `code`; document unchanged. */
+export const refuseTmc = tableRejection(REMEDIATION);
 
 /** Remediation text of a code (for check items). */
 export const remediationOf = (code: string): string => REMEDIATION[code] ?? 'see the description of check_thermo_mechanical';

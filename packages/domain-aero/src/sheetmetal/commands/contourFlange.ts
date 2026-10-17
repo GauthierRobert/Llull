@@ -6,10 +6,11 @@ import { toDegrees } from '@lib/angle';
 import { bendGeometry, bottomOffset } from '../frames';
 import { withFoldedSolid } from '../fold';
 import { EPS } from '../geometry2d';
-import { flatOf, getModel, nextNodeIds, ruleOfPart, withModel, withNodes, withPart } from '../graph';
-import { fixed, refuse } from '../result';
+import { legFlat, flatOf, getModel, nextNodeIds, withModel, withNodes, withPart } from '../graph';
+import { fixed, refuser } from '../result';
 import { findRadiusRow, resolveK } from '../rules';
 import { applyFlange } from './flange';
+import { insideRadiusOf, isRefusal, partContext } from '../partLookup';
 
 type Face = 'top' | 'bottom' | 'mid';
 
@@ -60,24 +61,13 @@ export const addContourFlange = defineCommand({
     widthEnd: z.number().optional().describe('Inset of the flange from the edge end, in the document length unit (>= 0, default 0).'),
   }),
   run: (doc, params): CommandResult => {
-    const fail = (code: Parameters<typeof refuse>[2], why: string, fix: string, paths: string[] = []): CommandResult =>
-      refuse(doc, 'add_contour_flange', code, why, fix, { paths });
-    const model = getModel(doc);
-    const part = model.parts[params.id];
-    if (part === undefined)
-      return fail('FTR_PART_NOT_FOUND', `no sheet-metal part "${params.id}"`, 'Create one with add_sheet_metal_base.', ['id']);
-    const rule = ruleOfPart(model, part);
-    if (rule === undefined) return fail('FTR_RULE_NOT_FOUND', `rule "${part.rule}" is missing`, 'Recreate the rule.');
+    const fail = refuser(doc, 'add_contour_flange');
+    const found = partContext(doc, params.id, fail);
+    if (isRefusal(found)) return found.refusal;
+    const { model, part, rule } = found;
     const T = rule.thickness;
-    const R = params.insideRadius ?? rule.insideRadius;
-    if (!(R >= 0)) return fail('FTR_PARAM_INVALID', `insideRadius must be >= 0 (got ${R})`, 'Give R >= 0.', ['insideRadius']);
-    if (R === 0 && rule.allowSharpBends !== true)
-      return fail(
-        'FTR_SHARP_BEND_FORBIDDEN',
-        'inside radius 0 and the rule does not allow sharp bends',
-        'Use R > 0 or a rule with allowSharpBends.',
-        ['insideRadius'],
-      );
+    const R = insideRadiusOf(found, params.insideRadius, fail);
+    if (isRefusal(R)) return R.refusal;
     const points: Vec2[] = [[0, 0], ...params.path];
     const segments = points.slice(1).map((end, i) => {
       const start = points[i] as Vec2;
@@ -88,7 +78,8 @@ export const addContourFlange = defineCommand({
       normalizeAngle(segment.heading - (i === 0 ? 0 : (segments[i - 1] as { heading: number }).heading)),
     );
     const zero = segments.findIndex((segment) => !(segment.length > EPS));
-    if (zero >= 0) return fail('FTR_PARAM_INVALID', `path segment ${zero + 1} has zero length`, 'Give distinct vertices.', ['path']);
+    if (zero >= 0)
+      return fail('FTR_PARAM_INVALID', `path segment ${zero + 1} has zero length`, 'Give distinct vertices.', { paths: ['path'] });
     const straight = turns.findIndex((turn) => Math.abs(turn) < 1e-6);
     if (straight >= 0)
       return fail(
@@ -97,7 +88,7 @@ export const addContourFlange = defineCommand({
         straight === 0
           ? 'Start the profile with a segment that leaves the base plane, or lengthen the base.'
           : 'Merge the collinear segments.',
-        ['path'],
+        { paths: ['path'] },
       );
     const flat = turns.findIndex((turn) => Math.abs(turn) > Math.PI - 1e-6);
     if (flat >= 0)
@@ -105,7 +96,7 @@ export const addContourFlange = defineCommand({
         'FTR_BEND_ANGLE_OUT_OF_RANGE',
         `vertex P${flat} turns by ${fixed(toDegrees(Math.abs(turns[flat] as number)))} degrees`,
         'Bends must turn by less than 180 degrees (use add_hem for a fold-back).',
-        ['path'],
+        { paths: ['path'] },
       );
     const setbacks = turns.map((turn) => Math.tan(Math.abs(turn) / 2) * faceRadius(params.side, turn > 0, R, T));
     for (const [i, turn] of turns.entries()) {
@@ -121,7 +112,7 @@ export const addContourFlange = defineCommand({
           'FTR_BEND_RADIUS_BELOW_MIN',
           `insideRadius ${fixed(R)} is below the table minimum ${fixed(match.minInsideRadius)} at vertex P${i} (${match.id})`,
           `Use insideRadius >= ${fixed(match.minInsideRadius)}.`,
-          ['insideRadius'],
+          { paths: ['insideRadius'] },
         );
     }
     const legs = segments.map((segment, i) => segment.length - (setbacks[i] as number) - (setbacks[i + 1] ?? 0));
@@ -131,7 +122,7 @@ export const addContourFlange = defineCommand({
         'FTR_FLANGE_TOO_SHORT',
         `leg ${short + 1} is ${fixed(legs[short] as number)} long after the setbacks`,
         'Lengthen the segment or reduce the radius.',
-        ['path'],
+        { paths: ['path'] },
       );
 
     const first = applyFlange(
@@ -172,18 +163,7 @@ export const addContourFlange = defineCommand({
       const [bendId] = nextNodeIds(current, 'b', 1) as [string];
       const leg = legs[i] as number;
       current = withNodes(current, [
-        {
-          id: flatId,
-          type: 'flat',
-          outline: [
-            [0, 0],
-            [width, 0],
-            [width, leg],
-            [0, leg],
-          ],
-          frame: geometry.child,
-          cutouts: [],
-        },
+        legFlat(flatId, width, leg, geometry.child),
         { id: bendId, type: 'bend', from: parent.id, to: flatId, lineInFrom: line, angle: signed, insideRadius: R },
       ]);
       flats.push(flatId);

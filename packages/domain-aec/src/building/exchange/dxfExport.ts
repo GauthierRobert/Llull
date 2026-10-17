@@ -10,7 +10,7 @@ import { buildPlanDrawing } from '../drawings/planDrawing';
 import { entityPlanPoint } from '@core/geometry/entityFrame';
 import { technicalView } from '@core/geometry/technicalView';
 import { TOP_VIEW } from '@core/geometry/viewProjection';
-import { INSUNITS, fmt } from '@lib/dxfWriter';
+import { assembleDxf, type DxfLineType } from '@lib/dxfWriter';
 import { CENTER_LAYERS, DxfWriter, HIDDEN_LAYERS, writePrimitive } from './dxfWriter';
 
 function writeDrafting(writer: DxfWriter, doc: CadDocument): void {
@@ -85,63 +85,26 @@ function writeSolids(writer: DxfWriter, doc: CadDocument, hatchSpacing: number):
   }
 }
 
-type Group = readonly [code: number, value: string | number];
-
-const flatten = (groups: ReadonlyArray<Group>): string[] => groups.flatMap(([code, value]) => [String(code), String(value)]);
-
-// prettier-ignore
-function header(doc: Pick<CadDocument, 'units'>, bounds: readonly [number, number, number, number]): string[] {
-  return flatten([
-    [0, 'SECTION'], [2, 'HEADER'], [9, '$ACADVER'], [1, 'AC1009'], [9, '$INSUNITS'], [70, INSUNITS[doc.units]],
-    [9, '$EXTMIN'], [10, fmt(bounds[0])], [20, fmt(bounds[1])], [30, 0],
-    [9, '$EXTMAX'], [10, fmt(bounds[2])], [20, fmt(bounds[3])], [30, 0],
-    [0, 'ENDSEC'],
-  ]);
-}
-
 /** Pattern unit of the DXF line types, drawing units (scaled further by LTSCALE). */
 const LTYPE_UNIT = 0.25;
 
-/** An LTYPE table entry for an ISO pattern (dashes positive, gaps negative). */
-// prettier-ignore
-function lineType(name: string, description: string, pattern: ReadonlyArray<number>): Group[] {
-  const lengths = pattern.map((length, index) => length * LTYPE_UNIT * (index % 2 === 0 ? 1 : -1));
-  return [
-    [0, 'LTYPE'], [2, name], [70, 0], [3, description], [72, 65], [73, pattern.length],
-    [40, fmt(lengths.reduce((sum, length) => sum + Math.abs(length), 0))],
-    ...lengths.map((length): Group => [49, fmt(length)]),
-  ];
-}
+/** An ISO pattern ([dash, gap, …] in pattern units) as a DXF line type. */
+const lineType = (name: string, description: string, pattern: ReadonlyArray<number>): DxfLineType => ({
+  name,
+  description,
+  lengths: pattern.map((length, index) => length * LTYPE_UNIT * (index % 2 === 0 ? 1 : -1)),
+});
 
-// prettier-ignore
-function tables(layers: ReadonlyMap<string, number>): string[] {
-  const groups: Group[] = [
-    [0, 'SECTION'], [2, 'TABLES'],
-    [0, 'TABLE'], [2, 'LTYPE'], [70, 3],
-    [0, 'LTYPE'], [2, 'CONTINUOUS'], [70, 0], [3, 'Solid line'], [72, 65], [73, 0], [40, '0.0'],
-    ...lineType('DASHED', '__ __ __', LINE_PATTERNS.hidden),
-    ...lineType('CENTER', '____ _ ____ _', LINE_PATTERNS.center),
-    [0, 'ENDTAB'],
-    [0, 'TABLE'], [2, 'LAYER'], [70, layers.size + 1],
-    [0, 'LAYER'], [2, '0'], [70, 0], [62, 7], [6, 'CONTINUOUS'],
-  ];
-  for (const [name, color] of layers) {
-    if (name === '0') continue;
-    const lineTypeName = HIDDEN_LAYERS.has(name) ? 'DASHED' : CENTER_LAYERS.has(name) ? 'CENTER' : 'CONTINUOUS';
-    groups.push([0, 'LAYER'], [2, name], [70, 0], [62, color], [6, lineTypeName]);
-  }
-  groups.push([0, 'ENDTAB'], [0, 'ENDSEC']);
-  return flatten(groups);
-}
+const LINE_TYPES: ReadonlyArray<DxfLineType> = [
+  lineType('DASHED', '__ __ __', LINE_PATTERNS.hidden),
+  lineType('CENTER', '____ _ ____ _', LINE_PATTERNS.center),
+];
 
-/** The complete R12 file text (header, layer table, entities) of everything `writer` holds. */
-// prettier-ignore
-export function assembleDxf(doc: Pick<CadDocument, 'units'>, writer: DxfWriter): string {
-  return [
-    ...header(doc, writer.bounds()), ...tables(writer.layers), ...flatten([[0, 'SECTION'], [2, 'ENTITIES']]),
-    ...writer.lines, ...flatten([[0, 'ENDSEC'], [0, 'EOF']]),
-  ].join('\n');
-}
+const layerLineType = (layer: string): string => (HIDDEN_LAYERS.has(layer) ? 'DASHED' : CENTER_LAYERS.has(layer) ? 'CENTER' : 'CONTINUOUS');
+
+/** The complete R12 file text (header, line types, layer table, entities) of everything `writer` holds. */
+export const assembleAecDxf = (doc: Pick<CadDocument, 'units'>, writer: DxfWriter): string =>
+  assembleDxf(doc.units, writer, LINE_TYPES, layerLineType);
 
 export type DxfExport = { readonly filename: string; readonly dxf: string; readonly entityCount: number; readonly layers: string[] };
 
@@ -164,7 +127,7 @@ function buildDxf(doc: CadDocument, levelId: string | undefined, includeDrafting
     writeDrafting(writer, doc);
     writeSolids(writer, doc, hatchSpacing);
   }
-  const dxf = assembleDxf(doc, writer);
+  const dxf = assembleAecDxf(doc, writer);
   return {
     filename: `${fileSlug(building.project.name, 'project')}_${fileSlug(levelLabel, 'plan')}.dxf`,
     dxf: `${dxf}\n`,

@@ -11,7 +11,7 @@ import { commentText, linesText, num, row } from '../decks/format';
 import { mechanicalStepLines } from '../decks/mechanical';
 import { checkThermalItems } from '../thermal/check';
 import { stefanBoltzmannOf, hasRadiation } from '../thermal/constants';
-import { bcLines } from '../thermal/deckLoads';
+import { allBcLines } from '../thermal/deckLoads';
 import { propertyCards } from '../thermal/deckMaterial';
 import { indexMesh, partVolumes } from '../thermal/meshGeometry';
 import { caseTemperatureRange } from '../thermal/material';
@@ -88,13 +88,9 @@ export function coupledSections(ctx: DeckContext): DeckSections {
   if (!('text' in mechanical)) return mechanical;
   const volumes = partVolumes(indexMesh(ctx.mesh));
   const thermalLines: string[] = [];
-  for (const id of thermal.bcOrder) {
-    const record = thermal.bcs[id];
-    if (record === undefined) continue;
-    const block = bcLines(ctx, thermal, record, volumes);
-    if ('code' in block) return block;
-    thermalLines.push(...block.lines);
-  }
+  const bcBlocks = allBcLines(ctx, thermal, volumes);
+  if ('code' in bcBlocks) return bcBlocks;
+  thermalLines.push(...bcBlocks.lines);
   const lines = [
     `** coupled temperature-displacement analysis ${commentText(ctx.analysisId)}: steady state, T_ref ${num(reference)} ${setup.temperatureScale}`,
     ...(hasRadiation(thermal)

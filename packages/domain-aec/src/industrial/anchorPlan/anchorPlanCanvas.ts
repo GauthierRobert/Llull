@@ -1,6 +1,6 @@
 import type { Vec2 } from '@core/model/types';
-import { n, svgPoints, svgText, type Viewport } from '../../shared/sheetFrame';
-import { paperDimension, svgLine } from '../../shared/drawingSvg';
+import { type Viewport } from '../../shared/sheetFrame';
+import { n, svgPoints, svgText, paperDimension, svgLine } from '@core/geometry/drawingSvg';
 import { ROW_HEIGHT } from './anchorPlanLayout';
 
 export class PlanCanvas {

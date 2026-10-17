@@ -13,7 +13,7 @@ import { temperatureBcConflicts } from './bcConflicts';
 import { checkThermalItems } from './check';
 import { remediationOf } from './codes';
 import { propertyCards } from './deckMaterial';
-import { cavityLines, bcLines } from './deckLoads';
+import { allBcLines, cavityLines } from './deckLoads';
 import { contactBlocks } from './deckContact';
 import { filmSinkBlocks } from './deckFilmSink';
 import { amplitudeName } from './deckNames';
@@ -97,13 +97,9 @@ export function thermalSections(ctx: DeckContext): DeckSections {
   if (sink !== null && 'code' in sink) return sink;
   if (sink !== null) lines.push(...sink.model);
   lines.push(...plan.notes, ...plan.stepLines);
-  for (const id of thermal.bcOrder) {
-    const record = thermal.bcs[id];
-    if (record === undefined) continue;
-    const block = bcLines(ctx, thermal, record, volumes);
-    if ('code' in block) return block;
-    lines.push(...block.lines);
-  }
+  const bcBlocks = allBcLines(ctx, thermal, volumes);
+  if ('code' in bcBlocks) return bcBlocks;
+  lines.push(...bcBlocks.lines);
   if (sink !== null) lines.push(...sink.step);
   for (const cavity of Object.values(thermal.cavities)) {
     const block = cavityLines(ctx, thermal, cavity);

@@ -6,6 +6,8 @@
  */
 
 import type { FeMeshArtifact } from '@core/model/analysis';
+import { cross3, dot3, sub3 } from '@lib/vec3';
+import { closestPointOnTriangle } from '@core/geometry/triangleQueries';
 
 export interface MappingReport {
   /** Largest distance from a target node to the source element used (0 when all nodes are inside), in mesh length units. */
@@ -50,59 +52,18 @@ interface Tree {
   readonly right?: Tree;
 }
 
-const sub = (a: Vec, b: Vec): Vec => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const dot = (a: Vec, b: Vec): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const cross = (a: Vec, b: Vec): Vec => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-
 /** Barycentric coordinates of `p` in the tetrahedron `c` (null for a degenerate element). */
 function barycentric(c: readonly [Vec, Vec, Vec, Vec], p: Vec): [number, number, number, number] | null {
-  const a = sub(c[1], c[0]);
-  const b = sub(c[2], c[0]);
-  const d = sub(c[3], c[0]);
-  const det = dot(a, cross(b, d));
+  const a = sub3(c[1], c[0]);
+  const b = sub3(c[2], c[0]);
+  const d = sub3(c[3], c[0]);
+  const det = dot3(a, cross3(b, d));
   if (!Number.isFinite(det) || Math.abs(det) < 1e-300) return null;
-  const q = sub(p, c[0]);
-  const l1 = dot(q, cross(b, d)) / det;
-  const l2 = dot(a, cross(q, d)) / det;
-  const l3 = dot(a, cross(b, q)) / det;
+  const q = sub3(p, c[0]);
+  const l1 = dot3(q, cross3(b, d)) / det;
+  const l2 = dot3(a, cross3(q, d)) / det;
+  const l3 = dot3(a, cross3(b, q)) / det;
   return [1 - l1 - l2 - l3, l1, l2, l3];
-}
-
-/** Closest point of the triangle (a, b, c) to p (Ericson, Real-Time Collision Detection 5.1.5). */
-function closestOnTriangle(p: Vec, a: Vec, b: Vec, c: Vec): Vec {
-  const ab = sub(b, a);
-  const ac = sub(c, a);
-  const ap = sub(p, a);
-  const d1 = dot(ab, ap);
-  const d2 = dot(ac, ap);
-  if (d1 <= 0 && d2 <= 0) return a;
-  const bp = sub(p, b);
-  const d3 = dot(ab, bp);
-  const d4 = dot(ac, bp);
-  if (d3 >= 0 && d4 <= d3) return b;
-  const vc = d1 * d4 - d3 * d2;
-  if (vc <= 0 && d1 >= 0 && d3 <= 0) {
-    const v = d1 / (d1 - d3);
-    return [a[0] + v * ab[0], a[1] + v * ab[1], a[2] + v * ab[2]];
-  }
-  const cp = sub(p, c);
-  const d5 = dot(ab, cp);
-  const d6 = dot(ac, cp);
-  if (d6 >= 0 && d5 <= d6) return c;
-  const vb = d5 * d2 - d1 * d6;
-  if (vb <= 0 && d2 >= 0 && d6 <= 0) {
-    const w = d2 / (d2 - d6);
-    return [a[0] + w * ac[0], a[1] + w * ac[1], a[2] + w * ac[2]];
-  }
-  const va = d3 * d6 - d5 * d4;
-  if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) {
-    const w = (d4 - d3) / (d4 - d3 + (d5 - d6));
-    return [b[0] + w * (c[0] - b[0]), b[1] + w * (c[1] - b[1]), b[2] + w * (c[2] - b[2])];
-  }
-  const denominator = 1 / (va + vb + vc);
-  const v = vb * denominator;
-  const w = vc * denominator;
-  return [a[0] + ab[0] * v + ac[0] * w, a[1] + ab[1] * v + ac[1] * w, a[2] + ab[2] * v + ac[2] * w];
 }
 
 const FACES = [
@@ -119,8 +80,8 @@ function closestOnTet(c: readonly [Vec, Vec, Vec, Vec], p: Vec): { readonly poin
   let best: Vec = c[0];
   let bestDistance = Number.POSITIVE_INFINITY;
   for (const [i, j, k] of FACES) {
-    const point = closestOnTriangle(p, c[i as 0], c[j as 0], c[k as 0]);
-    const distance = Math.hypot(...sub(p, point));
+    const point = closestPointOnTriangle(p, [c[i as 0], c[j as 0], c[k as 0]]);
+    const distance = Math.hypot(...sub3(p, point));
     if (distance < bestDistance) {
       best = point;
       bestDistance = distance;

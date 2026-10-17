@@ -3,7 +3,7 @@
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { refuseCode } from '../shared/codes';
-import { refuse } from '../shared/refuse';
+import { codedRejection } from '@core/commands/noop';
 
 const REMEDIATION: Readonly<Record<string, string>> = {
   THM_CASE_TYPE: 'create a heat_steady / heat_transient analysis with create_analysis and use its id',
@@ -66,6 +66,6 @@ export function refuseThermal(
   ids: readonly string[] = [],
   paths: readonly string[] = [],
 ): CommandResult {
-  if (Object.hasOwn(REMEDIATION, code)) return refuse(doc, command, code, message, remediationOf(code), ids, paths);
+  if (Object.hasOwn(REMEDIATION, code)) return codedRejection(doc, command, code, message, remediationOf(code), ids, paths);
   return refuseCode(doc, command, code, message, ids, paths);
 }

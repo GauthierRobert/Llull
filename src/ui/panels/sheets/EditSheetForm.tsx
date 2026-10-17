@@ -5,9 +5,9 @@ import type { DrawingSheet, PaperSize, ProjectionAngle } from '@core/model/sheet
 import { useStore } from '@ui/store';
 import { CommandForm } from '@ui/panels/CommandForm';
 import { LabeledInput } from '@ui/panels/LabeledInput';
-import { LabeledSelect } from '@ui/panels/LabeledSelect';
 import { useFormValues } from '@ui/panels/useFormValues';
-import { PAPER_OPTIONS, PROJECTION_OPTIONS, titleBlockParams } from './sheetOptions';
+import { titleBlockParams } from './sheetOptions';
+import { PaperFields } from './PaperFields';
 import { TitleBlockFields } from './TitleBlockFields';
 
 export function EditSheetForm({ sheet }: { sheet: DrawingSheet }): React.ReactElement {
@@ -46,19 +46,11 @@ export function EditSheetForm({ sheet }: { sheet: DrawingSheet }): React.ReactEl
       onSubmit={submit}
     >
       <LabeledInput label="Name" type="text" value={values.name} testId="sheet-edit-name" onChange={(v) => form.change('name', v)} />
-      <LabeledSelect
-        label="Paper"
-        value={values.paper}
-        options={PAPER_OPTIONS}
-        testId="sheet-edit-paper"
-        onChange={(v) => form.change('paper', v)}
-      />
-      <LabeledSelect
-        label="Projection"
-        value={values.projectionAngle}
-        options={PROJECTION_OPTIONS}
-        testId="sheet-edit-projection"
-        onChange={(v) => form.change('projectionAngle', v)}
+      <PaperFields
+        idPrefix="sheet-edit"
+        paper={values.paper}
+        projectionAngle={values.projectionAngle}
+        onChange={(key, value) => form.change(key, value)}
       />
       <TitleBlockFields idPrefix="sheet-edit" values={values} onChange={(key, value) => form.change(key, value)} />
     </CommandForm>

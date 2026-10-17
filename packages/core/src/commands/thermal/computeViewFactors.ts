@@ -8,7 +8,7 @@ import type { Vec3 } from '../../model/vectors';
 import type { CadDocument } from '../../model/types';
 import type { CommandResult } from '../types';
 import { defineCommand, vec3, z } from '../schema';
-import { commandError, rejection, report } from '../noop';
+import { codedRejection, report } from '../noop';
 import { toSi } from '../../lib/thermalUnits';
 
 const RECIPROCITY_WARNING = 1e-3;
@@ -36,7 +36,7 @@ const polygon = z.object({
 });
 
 const refuse = (doc: CadDocument, code: string, why: string, remediation: string, paths: readonly string[]): CommandResult =>
-  rejection(doc, `compute_view_factors: ${code} — ${why}; no-op.`, commandError(code, remediation, [], paths));
+  codedRejection(doc, 'compute_view_factors', code, why, remediation, [], paths);
 
 const REMEDIATION_SURFACE = 'Give each surface a unique name and 3 or more coplanar vertices with non-zero area.';
 

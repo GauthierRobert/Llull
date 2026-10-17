@@ -1,13 +1,20 @@
-/** SVG painter of technical-drawing primitives on a sheet (ISO line weights come from the sheet style classes). */
+/**
+ * The one SVG painter of technical-drawing primitives on a paper sheet — part sheets (`export_sheet_svg`) and the AEC plans, elevations,
+ * sections and anchor plans. ISO line weights and patterns come from each sheet's style classes.
+ */
 
-import type { Vec2 } from '../../model/vectors';
-import type { DrawingFill, DrawingPrimitive } from '../../model/drawing';
-import { clamp } from '../../lib/clamp';
-import { readableAngle, toDegrees, wrapAngle } from '../../lib/angle';
-import { escapeXml } from '../../lib/escapeXml';
+import type { Vec2 } from '../model/vectors';
+import type { DrawingFill, DrawingPrimitive } from '../model/drawing';
+import { clamp } from '../lib/clamp';
+import { readableAngle, toDegrees, wrapAngle } from '../lib/angle';
+import { escapeXml } from '../lib/escapeXml';
 
 /** SVG number text: two decimals, no trailing zeros, no negative zero. */
 export const n = (value: number): string => String(Math.round(value * 100) / 100 + 0);
+
+/** SVG points attribute text: `x,y` pairs joined by spaces. */
+export const svgPoints = (points: ReadonlyArray<readonly [number, number]>): string =>
+  points.map((point) => point.map(n).join(',')).join(' ');
 
 const classOf = (style: DrawingPrimitive['style']): string => {
   switch (style) {
@@ -24,10 +31,11 @@ const classOf = (style: DrawingPrimitive['style']): string => {
   }
 };
 
-/** Class of a closed area: its explicit fill or just its outline. */
+/** Class of a closed area: its explicit fill (solid poché, ANSI31 hatch) or just its outline. */
 const areaClass = (fill: DrawingFill | undefined, outline: string): string =>
   fill === 'solid' ? 'cut' : fill === 'hatch' ? 'cut-hatch' : outline;
 
+/** `<line>` between two paper points. */
 export const svgLine = (a: Vec2, b: Vec2, cssClass: string): string =>
   `<line x1="${n(a[0])}" y1="${n(a[1])}" x2="${n(b[0])}" y2="${n(b[1])}" class="${cssClass}"/>`;
 
@@ -37,8 +45,23 @@ export function svgText(x: number, y: number, size: number, anchor: 'start' | 'm
   return `<text x="${n(x)}" y="${n(y)}" font-size="${n(size)}" text-anchor="${anchor}"${transform}>${escapeXml(content)}</text>`;
 }
 
-/** Aligned dimension between paper points: extension lines, dimension line `side` mm off a→b, ticks, readable label. */
-export function paperDimension(a: Vec2, b: Vec2, side: number, label: string): string[] {
+/**
+ * Dimension label placement: text angle (degrees, flipped to read left-to-right / bottom-up) for a baseline direction (`dx`, `dy`), and the
+ * label anchor 1.2 mm off the midpoint of the dimension line `da`-`db`.
+ */
+export function readableDimensionLabel(da: Vec2, db: Vec2, dx: number, dy: number): { readonly angle: number; readonly middle: Vec2 } {
+  const radians = readableAngle(Math.atan2(dy, dx));
+  return {
+    angle: toDegrees(radians),
+    middle: [(da[0] + db[0]) / 2 + Math.sin(radians) * 1.2, (da[1] + db[1]) / 2 - Math.cos(radians) * 1.2],
+  };
+}
+
+/**
+ * Aligned dimension between paper points `a`, `b`: extension lines, the dimension line `side` paper mm off a→b (positive = left of a→b on
+ * paper), oblique ticks and a readable label `textSize` mm high.
+ */
+export function paperDimension(a: Vec2, b: Vec2, side: number, label: string, textSize = 2.5): string[] {
   const [dx, dy] = [b[0] - a[0], b[1] - a[1]];
   const length = Math.hypot(dx, dy);
   if (length === 0) return [];
@@ -46,19 +69,18 @@ export function paperDimension(a: Vec2, b: Vec2, side: number, label: string): s
   const shift = (point: Vec2, distance: number): Vec2 => [point[0] + normal[0] * distance, point[1] + normal[1] * distance];
   const sign = Math.sign(side);
   const [da, db] = [shift(a, side), shift(b, side)];
-  const radians = readableAngle(Math.atan2(dy, dx));
-  const middle: Vec2 = [(da[0] + db[0]) / 2 + Math.sin(radians) * 1.2, (da[1] + db[1]) / 2 - Math.cos(radians) * 1.2];
+  const { angle, middle } = readableDimensionLabel(da, db, dx, dy);
   return [
     svgLine(shift(a, sign * 1.5), shift(a, side + sign * 1.5), 'dim'),
     svgLine(shift(b, sign * 1.5), shift(b, side + sign * 1.5), 'dim'),
     svgLine(da, db, 'dim'),
     ...[da, db].map((end) => svgLine([end[0] - 1, end[1] + 1], [end[0] + 1, end[1] - 1], 'dim')),
-    svgText(middle[0], middle[1], 2.5, 'middle', label, toDegrees(radians)),
+    svgText(middle[0], middle[1], textSize, 'middle', label, angle),
   ];
 }
 
 /** Paints primitives through a model → paper map at `perUnit` paper mm per model unit. */
-export class SheetPainter {
+export class DrawingPainter {
   readonly parts: string[] = [];
 
   constructor(
@@ -67,7 +89,7 @@ export class SheetPainter {
   ) {}
 
   private points(points: ReadonlyArray<Vec2>): string {
-    return points.map((point) => this.map(point).map(n).join(',')).join(' ');
+    return svgPoints(points.map((point) => this.map(point)));
   }
 
   paint(primitive: DrawingPrimitive): void {
@@ -109,6 +131,7 @@ export class SheetPainter {
         return;
       }
       case 'dimension': {
+        // Model "right of a→b" becomes "left of a→b" once Y is flipped on paper.
         const gap = clamp(primitive.offset * this.perUnit, 6, 14);
         this.parts.push(...paperDimension(this.map(primitive.a), this.map(primitive.b), -gap, primitive.label));
         return;

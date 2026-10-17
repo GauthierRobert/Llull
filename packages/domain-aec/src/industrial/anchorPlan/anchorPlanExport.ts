@@ -7,17 +7,16 @@ import { noop, report, exportRefusal } from '@core/commands/noop';
 import { distance } from '@lib/polygon';
 import {
   MARGIN,
-  PAPER_MM,
   PAPER_FIELD,
   sheetFitWarning,
   composeSheetSvg,
   TITLE_HEIGHT,
   fitScale,
-  n,
   sheetDrawingArea,
-  type PaperSize,
   type Viewport,
 } from '../../shared/sheetFrame';
+import { PAPER_MM, type PaperSize } from '@core/model/sheet';
+import { n } from '@core/geometry/drawingSvg';
 import { boltSize } from '../evaluate';
 import {
   BAND_STEP,

@@ -14,6 +14,7 @@ import { inertiaAboutAxis, type BodyMassDistribution } from './simulationModel';
 import { sliderRate } from './slider';
 import type { Topology } from './topology';
 import { elementAt } from '../lib/elementAt';
+import { dot3, scale3 } from '../lib/vec3';
 
 /** Cycle-energy closure gate, 0.5 % (named, FR-FPR-16). */
 const ENERGY_CLOSURE_GATE = 0.005;
@@ -141,8 +142,6 @@ function pinTrack(input: EngineInput, body: string, jointId: string): Vec3[] {
   });
 }
 
-const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-
 function derivedLoads(runtime: CylinderRuntime, input: EngineInput, angleDeg: readonly number[] | null): DerivedLoads | null {
   const { topology, trace } = input;
   const { layout } = runtime;
@@ -153,7 +152,7 @@ function derivedLoads(runtime: CylinderRuntime, input: EngineInput, angleDeg: re
   if (wrist === null || pin === null || bearing === null || slide === null) return null;
   const head = layout.headDirection;
   const lateral = slide.map((f): Vec3 => {
-    const along = dot(f, head);
+    const along = dot3(f, head);
     return [f[0] - along * head[0], f[1] - along * head[1], f[2] - along * head[2]];
   });
   const wristTrack = pinTrack(input, layout.rodBody, layout.wristJoint);
@@ -163,7 +162,7 @@ function derivedLoads(runtime: CylinderRuntime, input: EngineInput, angleDeg: re
     if (a === undefined || b === undefined) return f;
     const d: Vec3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
     const length = Math.hypot(d[0], d[1], d[2]);
-    return [length > 0 ? dot(f, d) / length : 0, 0, 0];
+    return [length > 0 ? dot3(f, d) / length : 0, 0, 0];
   });
   return {
     // joint forces also take the every-step peak (sampling can step over it); the projections exist only at the samples
@@ -305,7 +304,7 @@ export function engineData(input: EngineInput): EngineData | null {
   const ratio = evaluated ? Math.abs(simulatedWork - expected) / Math.abs(expected) : null;
   const crankJoint = input.dynamics.joints[crank];
   const crankBody = crankJoint === undefined ? undefined : input.mass[crankJoint.child];
-  const anchor = (crankJoint?.anchor ?? [0, 0, 0]).map((c) => c * input.metresPerUnit) as unknown as Vec3;
+  const anchor = scale3(crankJoint?.anchor ?? [0, 0, 0], input.metresPerUnit);
   const bodyInertia = crankJoint === undefined || crankBody === undefined ? 0 : inertiaAboutAxis(crankBody, anchor, crankJoint.axis);
   const reflected = reflectedInertia(input, crank, 1);
   const inertia = bodyInertia + reflected;
@@ -379,7 +378,7 @@ function reflectedInertia(input: EngineInput, jointId: string, factor: number): 
       const driven = input.dynamics.joints[gear.driven];
       const props = driven === undefined ? undefined : input.mass[driven.child];
       if (driven === undefined || props === undefined) return total;
-      const anchor = driven.anchor.map((c) => c * input.metresPerUnit) as unknown as Vec3;
+      const anchor = scale3(driven.anchor, input.metresPerUnit);
       const ratio = factor * gear.ratio;
       return total + inertiaAboutAxis(props, anchor, driven.axis) * ratio * ratio + reflectedInertia(input, gear.driven, ratio);
     }, 0);

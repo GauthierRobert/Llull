@@ -11,6 +11,7 @@ import type { Vec2, Vec3 } from '@core/model/types';
 import { type OccApi, type OccHandle, type OccPoint, type OccShape } from './occtTypes';
 import { surfaceKindOf } from './occtTopology';
 import { release } from '@core/geometry/nativeObject';
+import { cross3, scale3 } from '@lib/vec3';
 
 /** Registers a native handle for release when the enclosing guarded operation ends. */
 export type Own = <H extends OccHandle | null>(handle: H) => H;
@@ -74,10 +75,6 @@ export const vec = (point: OccPoint): Vec3 => {
   return out;
 };
 
-export const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-export const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-export const scaled = (a: Vec3, k: number): Vec3 => [a[0] * k, a[1] * k, a[2] * k];
-export const minus = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 export const norm = (a: Vec3): number => Math.hypot(a[0], a[1], a[2]);
 
 /** Adaptor of `face` restricted to its trimmed uv box; the caller releases it (via `own`). */
@@ -116,7 +113,7 @@ export function surfaceParams(api: OccApi, adaptor: FaceSurfaceAdaptor, own: Own
       return {
         type: 'cone',
         apex: vec(cone.Apex()),
-        axis: opensBackwards ? scaled(axis, -1) : axis,
+        axis: opensBackwards ? scale3(axis, -1) : axis,
         xDir,
         semiAngle: Math.abs(cone.SemiAngle()),
       };
@@ -143,7 +140,7 @@ function localProps(api: OccApi, adaptor: FaceSurfaceAdaptor, u: number, v: numb
   return own(new api.BRepLProp_SLProps_1(adaptor, u, v, 2, 1e-9) as LocalProps);
 }
 
-const outward = (normal: Vec3, reversed: boolean): Vec3 => (reversed ? scaled(normal, -1) : normal);
+const outward = (normal: Vec3, reversed: boolean): Vec3 => (reversed ? scale3(normal, -1) : normal);
 
 /** Point and outward unit normal at (u, v); null where the normal is undefined (a pole, a degenerate edge). */
 export function pointAndNormal(
@@ -178,7 +175,7 @@ export function surfaceSample(api: OccApi, adaptor: FaceSurfaceAdaptor, reversed
     if (!props.IsTangentUDefined()) return { ...degenerate, normal };
     props.TangentU(maxDir);
     dirMax = [maxDir.X(), maxDir.Y(), maxDir.Z()];
-    dirMin = cross(normal, dirMax);
+    dirMin = cross3(normal, dirMax);
   } else {
     props.CurvatureDirections(maxDir, minDir);
     dirMax = [maxDir.X(), maxDir.Y(), maxDir.Z()];

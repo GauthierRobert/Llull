@@ -6,7 +6,7 @@ import type { DrawingSheet, DrawingView } from '../../model/sheet';
 import { type Bounds, type DerivedView, cuttingLine, deriveView } from './viewDrawing';
 import { type PlacedView, layoutViews } from './layout';
 import { composeSheet, sheetArea } from './sheetFrame';
-import { SheetPainter, n, paperDimension, svgLine, svgText } from './svgPainter';
+import { DrawingPainter, n, paperDimension, svgLine, svgText } from '../../geometry/drawingSvg';
 import { escapeXml } from '../../lib/escapeXml';
 import { scaleText } from './sheetOps';
 
@@ -143,7 +143,7 @@ export function renderSheet(doc: CadDocument, sheet: DrawingSheet, options: { re
       placed.center[0] + (point[0] - mx) * placed.perUnit,
       placed.center[1] - (point[1] - my) * placed.perUnit,
     ];
-    const painter = new SheetPainter(map, placed.perUnit);
+    const painter = new DrawingPainter(map, placed.perUnit);
     entry.derived.primitives.forEach((primitive) => painter.paint(primitive));
     const own = view.scale !== undefined || view.kind === 'detail';
     const caption = own ? `${view.label} (${scaleText(placed.denominator)})` : view.label;

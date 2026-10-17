@@ -1,8 +1,9 @@
 /** render_fea_results: read-only contour plot of a solved analysis (stress, displacement, temperature, heat flux) as an SVG image. */
 
 import { defineCommand, z } from '@core/commands/schema';
-import { report } from '@core/commands/noop';
+import { codedRejection, report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
+import type { CadDocument } from '@core/model/types';
 import type { ProbeQuantity } from '@core/model/analysis';
 import type { Vec3 } from '@core/model/vectors';
 import { VIEW_DIRECTIONS } from '@core/model/sheet';
@@ -17,7 +18,6 @@ import { frameOf, isHeat, markersOf, selectStep } from '../results/plotSetup';
 import { QUANTITY_FIELDS, quantityScale, quantityUnit } from '../results/probes';
 import { caseOf } from '../shared/access';
 import { refuseFe } from '../shared/feCodes';
-import { refuse } from '../shared/refuse';
 import { analysisIdSchema } from '../shared/schemas';
 import { trustedRecord } from '../shared/trust';
 import { QUANTITIES } from './probes';
@@ -29,8 +29,8 @@ const FIELDS = [...QUANTITIES, ...CYLINDRICAL_QUANTITIES] as const;
 
 const isSteady = (type: string): boolean => type === 'heat_steady';
 
-function invalid(doc: Parameters<typeof refuse>[0], message: string, path: string): CommandResult {
-  return refuse(doc, NAME, 'FEA_PLOT_INVALID', message, 'fix the parameter named in the message and render again', [], [path]);
+function invalid(doc: CadDocument, message: string, path: string): CommandResult {
+  return codedRejection(doc, NAME, 'FEA_PLOT_INVALID', message, 'fix the parameter named in the message and render again', [], [path]);
 }
 
 function nearestNode(coordinates: ReadonlyMap<number, Vec3>, point: Vec3): number {

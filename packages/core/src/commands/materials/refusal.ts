@@ -3,7 +3,7 @@
 import { EXPORT_REMEDIATION } from '../../model/exportGate';
 import type { CadDocument } from '../../model/types';
 import type { CommandResult } from '../types';
-import { commandError, rejection } from '../noop';
+import { codedRejection } from '../noop';
 
 const REMEDIATION: Readonly<Record<string, string>> = {
   MAT_UNIT_INVALID: 'use a unit listed by `llull describe convert_quantity` (e.g. g/cm^3, lb/in^3, ksi, MPa, degF)',
@@ -45,15 +45,14 @@ export function refuseMaterial(
   message: string,
   options: { readonly ids?: readonly string[]; readonly path?: string; readonly remediation?: string; readonly data?: unknown } = {},
 ): CommandResult {
-  const result = rejection(
+  const result = codedRejection(
     doc,
-    `${command}: ${code} — ${message}; no-op.`,
-    commandError(
-      code,
-      options.remediation ?? REMEDIATION[code] ?? 'see the command description',
-      options.ids ?? [],
-      options.path !== undefined ? [options.path] : [],
-    ),
+    command,
+    code,
+    message,
+    options.remediation ?? REMEDIATION[code] ?? 'see the command description',
+    options.ids ?? [],
+    options.path !== undefined ? [options.path] : [],
   );
   return options.data === undefined ? result : { ...result, data: options.data };
 }

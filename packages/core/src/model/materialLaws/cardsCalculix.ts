@@ -7,7 +7,7 @@
 import type { LawOf, MaterialModel } from '../materialModel';
 import { calculixLines, calculixNumber } from './cardFormat';
 import type { CardOutput, CardRequest } from './cardTypes';
-import { expandTransverselyIsotropic, symmetricFromUpperTriangle, type OrthotropicConstants } from './elastic';
+import { symmetricFromUpperTriangle } from './elastic';
 import { multilinearCurve, resolveIsotropic } from './hardening';
 import { resolveHyper, isIncompressible, type HyperLaw } from './hyperResolve';
 import { warning, type MatlIssue } from './issues';
@@ -21,6 +21,7 @@ import {
   type LawFailure,
   type ResolveEnv,
 } from './resolve';
+import { resolveOrthotropicConstants } from './elasticResolve';
 
 const VOCE_POINTS = 21;
 
@@ -73,40 +74,8 @@ function elasticCards(model: MaterialModel, context: Context): string[] | LawFai
       values = [resolved.E, resolved.nu];
     } else if (law.kind === 'elastic_orthotropic' || law.kind === 'elastic_transversely_isotropic') {
       header = '*ELASTIC,TYPE=ENGINEERING CONSTANTS';
-      let c: OrthotropicConstants;
-      if (law.kind === 'elastic_orthotropic') {
-        const resolved = resolveAll(
-          {
-            E1: { parameter: law.E1, dimension: 'stress' },
-            E2: { parameter: law.E2, dimension: 'stress' },
-            E3: { parameter: law.E3, dimension: 'stress' },
-            nu12: { parameter: law.nu12, dimension: 'dimensionless' },
-            nu13: { parameter: law.nu13, dimension: 'dimensionless' },
-            nu23: { parameter: law.nu23, dimension: 'dimensionless' },
-            G12: { parameter: law.G12, dimension: 'stress' },
-            G13: { parameter: law.G13, dimension: 'stress' },
-            G23: { parameter: law.G23, dimension: 'stress' },
-          },
-          env,
-          path,
-        );
-        if (isLawFailure(resolved)) return resolved;
-        c = resolved;
-      } else {
-        const resolved = resolveAll(
-          {
-            Ep: { parameter: law.Ep, dimension: 'stress' },
-            Et: { parameter: law.Et, dimension: 'stress' },
-            Gt: { parameter: law.Gt, dimension: 'stress' },
-            nuP: { parameter: law.nuP, dimension: 'dimensionless' },
-            nuPT: { parameter: law.nuPT, dimension: 'dimensionless' },
-          },
-          env,
-          path,
-        );
-        if (isLawFailure(resolved)) return resolved;
-        c = expandTransverselyIsotropic(law.isotropyPlane, resolved.Ep, resolved.Et, resolved.nuP, resolved.nuPT, resolved.Gt);
-      }
+      const c = resolveOrthotropicConstants(law, env, path);
+      if (isLawFailure(c)) return c;
       values = [c.E1, c.E2, c.E3, c.nu12, c.nu13, c.nu23, c.G12, c.G13, c.G23];
     } else {
       header = '*ELASTIC,TYPE=ANISO';

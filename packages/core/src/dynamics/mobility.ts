@@ -8,6 +8,7 @@ import { GROUND, type DynamicJoint, type DynamicsModel } from '../model/dynamics
 import type { Vec3 } from '../model/vectors';
 import type { Topology } from './topology';
 import { elementAt } from '../lib/elementAt';
+import { cross3, dot3, scale3 } from '../lib/vec3';
 
 /** Central-difference step in tree coordinates (rad or m). */
 const DIFFERENCE_STEP = 1e-7;
@@ -78,7 +79,7 @@ function rotationAbout(u: Vec3, angle: number): Mat3 {
 function jointMotion(joint: DynamicJoint, q: number, metresPerUnit: number): Pose {
   const axis = unit(joint.axis);
   if (joint.kind === 'prismatic') return { rotation: IDENTITY.rotation, translation: [axis[0] * q, axis[1] * q, axis[2] * q] };
-  const anchor = joint.anchor.map((c) => c * metresPerUnit) as unknown as Vec3;
+  const anchor = scale3(joint.anchor, metresPerUnit);
   const rotation = rotationAbout(axis, q);
   const turned = apply(rotation, anchor);
   return { rotation, translation: [anchor[0] - turned[0], anchor[1] - turned[1], anchor[2] - turned[2]] };
@@ -108,12 +109,9 @@ function bodyPoses(topology: Topology, q: readonly number[], metresPerUnit: numb
 /** Two unit vectors orthogonal to unit `u` and to each other. */
 function orthogonalPair(u: Vec3): [Vec3, Vec3] {
   const helper: Vec3 = Math.abs(u[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
-  const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-  const e1 = unit(cross(u, helper));
-  return [e1, cross(u, e1)];
+  const e1 = unit(cross3(u, helper));
+  return [e1, cross3(u, e1)];
 }
-
-const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
 /** Constraint rows of every loop at tree coordinates `q`: 3 position rows, plus 2 axis-alignment rows for a revolute loop. */
 function loopResidual(topology: Topology, q: readonly number[], metresPerUnit: number): number[] {
@@ -122,14 +120,14 @@ function loopResidual(topology: Topology, q: readonly number[], metresPerUnit: n
   const rows: number[] = [];
   for (const loop of topology.loops) {
     const [a, b] = [poseOf(loop.parent), poseOf(loop.child)];
-    const anchor = loop.anchor.map((c) => c * metresPerUnit) as unknown as Vec3;
-    const onChild = (loop.anchorOnChild ?? loop.anchor).map((c) => c * metresPerUnit) as unknown as Vec3;
+    const anchor = scale3(loop.anchor, metresPerUnit);
+    const onChild = scale3(loop.anchorOnChild ?? loop.anchor, metresPerUnit);
     const [pa, pb] = [transform(a, anchor), transform(b, onChild)];
     rows.push(pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2]);
     if (loop.kind === 'revolute') {
       const axis = unit(loop.axis);
       const axisB = apply(b.rotation, axis);
-      for (const e of orthogonalPair(axis)) rows.push(dot(apply(a.rotation, e), axisB));
+      for (const e of orthogonalPair(axis)) rows.push(dot3(apply(a.rotation, e), axisB));
     }
   }
   return rows;

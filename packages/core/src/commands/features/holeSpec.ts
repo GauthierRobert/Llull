@@ -163,6 +163,33 @@ function extentOf(input: ExtentParams, stepDepth: number): HoleExtent | PendingE
     : { kind: 'blind', depth, drillPointAngle: angle };
 }
 
+/** Included angle and top diameter (given, or from cskDepth) of a countersink cut over a bore of diameter `bore`; `tooSmall` words the refusal. */
+function countersinkOver(
+  input: HoleParams,
+  bore: number,
+  tooSmall: string,
+): { readonly angle: number; readonly cskDiameter: number } | SpecProblem {
+  const angle = input.cskAngle;
+  if (angle === undefined || !(angle > 0 && angle < 180))
+    return problem(
+      'FTR_CSK_ANGLE_OUT_OF_RANGE',
+      `cskAngle ${String(angle)} is not in (0, 180) degrees`,
+      'included angle in degrees, e.g. 82, 90, 100',
+      'hole.cskAngle',
+    );
+  const cskDiameter =
+    input.cskDiameter ?? (input.cskDepth === undefined ? undefined : countersinkDiameter(bore, input.cskDepth, angle).value);
+  if (cskDiameter === undefined || !(cskDiameter > bore))
+    return problem(
+      'FTR_HOLE_DIAMETERS_INCONSISTENT',
+      tooSmall,
+      'countersink / counterbore diameter must exceed the hole diameter',
+      'hole.cskDiameter',
+      'hole.cskDepth',
+    );
+  return { angle, cskDiameter };
+}
+
 /**
  * The hole and extent of `add_hole` params, resolving the fastener catalogue and the countersink depth form.
  * @failure first inconsistency -> SpecProblem with its stable code and offending param paths
@@ -214,7 +241,7 @@ export function buildHole(doc: CadDocument, input: HoleParams, extentInput: Exte
     stepDepth = cboreDepth;
     spec = { ...spec, cboreDiameter, cboreDepth };
   } else if (kind === 'counterdrill') {
-    const { cboreDiameter, cboreDepth, cskAngle: angle } = input;
+    const { cboreDiameter, cboreDepth } = input;
     if (cboreDiameter === undefined || cboreDepth === undefined || !(cboreDiameter > diameter))
       return problem(
         'FTR_HOLE_DIAMETERS_INCONSISTENT',
@@ -223,23 +250,13 @@ export function buildHole(doc: CadDocument, input: HoleParams, extentInput: Exte
         'hole.cboreDiameter',
         'hole.cboreDepth',
       );
-    if (angle === undefined || !(angle > 0 && angle < 180))
-      return problem(
-        'FTR_CSK_ANGLE_OUT_OF_RANGE',
-        `cskAngle ${String(angle)} is not in (0, 180) degrees`,
-        'included angle in degrees, e.g. 82, 90, 100',
-        'hole.cskAngle',
-      );
-    const cskDiameter =
-      input.cskDiameter ?? (input.cskDepth === undefined ? undefined : countersinkDiameter(cboreDiameter, input.cskDepth, angle).value);
-    if (cskDiameter === undefined || !(cskDiameter > cboreDiameter))
-      return problem(
-        'FTR_HOLE_DIAMETERS_INCONSISTENT',
-        `counterdrill needs cskDiameter (or cskDepth) giving a diameter above cboreDiameter (${cboreDiameter})`,
-        'countersink / counterbore diameter must exceed the hole diameter',
-        'hole.cskDiameter',
-        'hole.cskDepth',
-      );
+    const csk = countersinkOver(
+      input,
+      cboreDiameter,
+      `counterdrill needs cskDiameter (or cskDepth) giving a diameter above cboreDiameter (${cboreDiameter})`,
+    );
+    if ('code' in csk) return csk;
+    const { angle, cskDiameter } = csk;
     const cone = countersinkDepth(cboreDiameter, cskDiameter, angle).value;
     if (!(cboreDepth > cone))
       return problem(
@@ -251,24 +268,9 @@ export function buildHole(doc: CadDocument, input: HoleParams, extentInput: Exte
     stepDepth = cboreDepth;
     spec = { ...spec, cboreDiameter, cboreDepth, cskDiameter, cskAngle: angle };
   } else if (kind === 'countersink') {
-    const angle = input.cskAngle;
-    if (angle === undefined || !(angle > 0 && angle < 180))
-      return problem(
-        'FTR_CSK_ANGLE_OUT_OF_RANGE',
-        `cskAngle ${String(angle)} is not in (0, 180) degrees`,
-        'included angle in degrees, e.g. 82, 90, 100',
-        'hole.cskAngle',
-      );
-    const cskDiameter =
-      input.cskDiameter ?? (input.cskDepth === undefined ? undefined : countersinkDiameter(diameter, input.cskDepth, angle).value);
-    if (cskDiameter === undefined || !(cskDiameter > diameter))
-      return problem(
-        'FTR_HOLE_DIAMETERS_INCONSISTENT',
-        `countersink needs cskDiameter (or cskDepth) giving a diameter above ${diameter}`,
-        'countersink / counterbore diameter must exceed the hole diameter',
-        'hole.cskDiameter',
-        'hole.cskDepth',
-      );
+    const csk = countersinkOver(input, diameter, `countersink needs cskDiameter (or cskDepth) giving a diameter above ${diameter}`);
+    if ('code' in csk) return csk;
+    const { angle, cskDiameter } = csk;
     stepDepth = countersinkDepth(diameter, cskDiameter, angle).value;
     spec = { ...spec, cskDiameter, cskAngle: angle };
   }

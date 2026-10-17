@@ -3,9 +3,9 @@ import type { CommandResult } from '@core/commands/types';
 import { report } from '@core/commands/noop';
 import { FTR_CODES, type FtrCheckData, type FtrFinding, type FtrWaiver } from '@core/model/manufacturing';
 import { type CheckContext, type RuleOutcome, holeDistances, minBendRadius, minFlange, reliefPresent } from '../checks';
-import { getModel, ruleOfPart } from '../graph';
-import { REVIEW_NOTE, refuse, resultMeta } from '../result';
+import { REVIEW_NOTE, resultMeta, refuser } from '../result';
 import { ruleUnverifiedInputs } from '../rules';
+import { partContext, isRefusal } from '../partLookup';
 
 const SEVERITY_RANK = { fail: 0, warn: 1, info: 2 } as const;
 
@@ -51,27 +51,9 @@ export const checkSheetMetal = defineCommand({
   }),
   run: (doc, { id, waivers: requested = [] }): CommandResult => {
     const waivers: readonly FtrWaiver[] = requested;
-    const model = getModel(doc);
-    const part = model.parts[id];
-    if (part === undefined)
-      return refuse(
-        doc,
-        'check_sheet_metal',
-        'FTR_PART_NOT_FOUND',
-        `no sheet-metal part "${id}"`,
-        'List parts with describe_scene or create one with add_sheet_metal_base.',
-        { paths: ['id'] },
-      );
-    const rule = ruleOfPart(model, part);
-    if (rule === undefined)
-      return refuse(
-        doc,
-        'check_sheet_metal',
-        'FTR_RULE_NOT_FOUND',
-        `rule "${part.rule}" of part ${id} is missing`,
-        'Recreate the rule with create_sheet_metal_rule.',
-        { ids: [id] },
-      );
+    const found = partContext(doc, id, refuser(doc, 'check_sheet_metal'));
+    if (isRefusal(found)) return found.refusal;
+    const { model, part, rule } = found;
     const context: CheckContext = { unit: doc.units, model, part, rule };
     const outcomes: RuleOutcome[] = [
       minBendRadius(context),
