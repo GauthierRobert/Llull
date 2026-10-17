@@ -1,6 +1,6 @@
 /** recognize_features (07 FTR M4): holes, pockets, fillets, chamfers and sheet-metal bends of an exact solid, read from its face graph. */
 
-import { type CadDocument, is3D } from '../../model/types';
+import { type CadDocument } from '../../model/types';
 import type { FtrFinding, FtrResultMeta } from '../../model/manufacturing';
 import { HOLE_KINDS } from '../../model/features';
 import { toRadians } from '../../lib/angle';
@@ -8,13 +8,10 @@ import { recognizeFeatures as recognize } from '../../geometry/recognition/recog
 import { RECOGNIZE_KINDS, type Recognition } from '../../geometry/recognition/types';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
-import { currentContext } from '../context';
-import { operandRecipe } from '../brep/kernelShape';
-import { report } from '../noop';
-import { refuse, resultMeta } from './ftr';
-import { lengthToleranceOf, recognitionOf } from './recognition';
 
-const EXACT_HINT = 'rerun with --kernel occt; for imported parts use import_step_exact';
+import { report } from '../noop';
+import { resultMeta } from './ftr';
+import { lengthToleranceOf, solidRecognition } from './recognition';
 
 export interface RecognizeData extends FtrResultMeta {
   readonly entityId: string;
@@ -106,30 +103,9 @@ export const recognizeFeatures = defineCommand({
       ),
   }),
   run: (doc: CadDocument, { id, kinds, mergeSplitFaces = true, angularTolerance, lengthTolerance }, ctx): CommandResult => {
-    const entity = doc.entities[id];
-    if (!entity || !is3D(entity) || entity.kind === 'instance')
-      return refuse(
-        doc,
-        'recognize_features',
-        'FTR_PART_NOT_FOUND',
-        `no 3D solid '${id}'`,
-        'list entities with describe_scene, then pass a solid id',
-        [id],
-        ['id'],
-      );
-    const kernel = (ctx ?? currentContext()).kernel;
-    const input = kernel === null ? 'no_port' : recognitionOf(kernel, operandRecipe(kernel, entity));
-    if (typeof input === 'string')
-      return refuse(
-        doc,
-        'recognize_features',
-        'FTR_NEEDS_EXACT_KERNEL',
-        input === 'no_port'
-          ? 'this kernel has no face-query port (no exact B-rep)'
-          : 'the kernel could not build the face graph of this solid',
-        EXACT_HINT,
-        [id],
-      );
+    const recognition = solidRecognition(doc, 'recognize_features', id, ctx, 'list entities with describe_scene, then pass a solid id');
+    if ('refusal' in recognition) return recognition.refusal;
+    const { input } = recognition;
     const tolerance = lengthTolerance ?? lengthToleranceOf(input.topology);
     const angle = angularTolerance ?? 1e-4;
     const found = recognize(

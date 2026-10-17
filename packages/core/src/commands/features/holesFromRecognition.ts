@@ -1,16 +1,15 @@
 /** holes_from_recognition (07 FTR FR-FTR-25, VC-FTR-32): the recognised holes of an exact solid as a `build_project` plan of `add_hole` steps. */
 
-import { type CadDocument, is3D } from '../../model/types';
+import { type CadDocument } from '../../model/types';
 import type { FtrResultMeta } from '../../model/manufacturing';
 import { toRadians } from '../../lib/angle';
 import { recognizeFeatures as recognize } from '../../geometry/recognition/recognize';
 import type { CommandResult } from '../types';
 import { defineCommand, z } from '../schema';
-import { currentContext } from '../context';
-import { operandRecipe } from '../brep/kernelShape';
+
 import { report } from '../noop';
-import { refuse, resultMeta } from './ftr';
-import { lengthToleranceOf, recognitionOf } from './recognition';
+import { resultMeta } from './ftr';
+import { lengthToleranceOf, solidRecognition } from './recognition';
 import { type HolePlanAction, holePlan } from './holePlan';
 
 export interface HolePlanData extends FtrResultMeta {
@@ -45,22 +44,9 @@ export const holesFromRecognition = defineCommand({
       .describe('Entity id (or "$alias" of an earlier plan step) of the solid the plan drills; the first add_hole step targets it.'),
   }),
   run: (doc: CadDocument, { id, stock }, ctx): CommandResult => {
-    const entity = doc.entities[id];
-    if (!entity || !is3D(entity) || entity.kind === 'instance')
-      return refuse(doc, 'holes_from_recognition', 'FTR_PART_NOT_FOUND', `no 3D solid '${id}'`, 'pass a solid id', [id], ['id']);
-    const kernel = (ctx ?? currentContext()).kernel;
-    const input = kernel === null ? 'no_port' : recognitionOf(kernel, operandRecipe(kernel, entity));
-    if (typeof input === 'string')
-      return refuse(
-        doc,
-        'holes_from_recognition',
-        'FTR_NEEDS_EXACT_KERNEL',
-        input === 'no_port'
-          ? 'this kernel has no face-query port (no exact B-rep)'
-          : 'the kernel could not build the face graph of this solid',
-        'rerun with --kernel occt; for imported parts use import_step_exact',
-        [id],
-      );
+    const recognition = solidRecognition(doc, 'holes_from_recognition', id, ctx, 'pass a solid id');
+    if ('refusal' in recognition) return recognition.refusal;
+    const { input } = recognition;
     const found = recognize(
       input.graph,
       input.topology,

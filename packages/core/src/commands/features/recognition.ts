@@ -3,7 +3,11 @@
 import type { GeometryKernel, ShapeHandle, ShapeTopology } from '../../geometry/kernel';
 import type { FaceGraph, FaceQueryPort } from '../../geometry/kernelPorts';
 import type { Orientation } from '../../geometry/recognition/model';
-import type { ShapeRecipe } from '../../model/types';
+import { type CadDocument, type ShapeRecipe, is3D } from '../../model/types';
+import type { CommandResult, ExecutionContext } from '../types';
+import { currentContext } from '../context';
+import { operandRecipe } from '../brep/kernelShape';
+import { refuse } from './ftr';
 import { meshCorners } from '../../geometry/meshExtent';
 import { distance3 } from '../../lib/vec3';
 
@@ -53,4 +57,36 @@ export function recognitionOf(kernel: GeometryKernel, recipe: ShapeRecipe): Reco
   const graph = shape === null ? null : port.faceGraph(shape);
   if (shape === null || topology === null || graph === null) return 'no_shape';
   return { graph, topology, orientation: orientationOf(port, shape, graph) };
+}
+
+/**
+ * Recognition input of the solid `id` for `command`.
+ * @failure not a 3D solid -> FTR_PART_NOT_FOUND (fix `partFix`); no exact B-rep / face graph -> FTR_NEEDS_EXACT_KERNEL
+ */
+export function solidRecognition(
+  doc: CadDocument,
+  command: string,
+  id: string,
+  ctx: ExecutionContext | undefined,
+  partFix: string,
+): { readonly input: RecognitionInput } | { readonly refusal: CommandResult } {
+  const entity = doc.entities[id];
+  if (!entity || !is3D(entity) || entity.kind === 'instance')
+    return { refusal: refuse(doc, command, 'FTR_PART_NOT_FOUND', `no 3D solid '${id}'`, partFix, [id], ['id']) };
+  const kernel = (ctx ?? currentContext()).kernel;
+  const input = kernel === null ? 'no_port' : recognitionOf(kernel, operandRecipe(kernel, entity));
+  if (typeof input === 'string')
+    return {
+      refusal: refuse(
+        doc,
+        command,
+        'FTR_NEEDS_EXACT_KERNEL',
+        input === 'no_port'
+          ? 'this kernel has no face-query port (no exact B-rep)'
+          : 'the kernel could not build the face graph of this solid',
+        'rerun with --kernel occt; for imported parts use import_step_exact',
+        [id],
+      ),
+    };
+  return { input };
 }
