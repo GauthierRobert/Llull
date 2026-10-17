@@ -29,6 +29,9 @@ export interface FeaToolsPort {
   exportDeck(analysisId: string, host: FeaHost): Promise<FeaToolResult>;
 }
 
+/** Bounds of the solver wall-clock limit (seconds): schema `minimum` / `maximum`, enforced again by the transport. */
+export const FEA_SOLVE_TIMEOUT_S = { min: 1, max: 86400 } as const;
+
 const ANALYSIS_ID = { type: 'string' as const, description: 'Id of the analysis case (create_analysis).' };
 
 const FEA_TOOL_NAMES = ['fea_mesh', 'fea_solve', 'fea_export'] as const;
@@ -55,7 +58,12 @@ export function buildFeaToolDefinitions(): McpToolDefinition[] {
         type: 'object',
         properties: {
           analysisId: ANALYSIS_ID,
-          timeoutS: { type: 'number', description: 'Solver wall-clock limit in seconds (default 600).' },
+          timeoutS: {
+            type: 'number',
+            minimum: FEA_SOLVE_TIMEOUT_S.min,
+            maximum: FEA_SOLVE_TIMEOUT_S.max,
+            description: `Solver wall-clock limit in seconds, ${FEA_SOLVE_TIMEOUT_S.min} to ${FEA_SOLVE_TIMEOUT_S.max} (default 600); values outside are clamped.`,
+          },
         },
         required: ['analysisId'],
       },
@@ -93,7 +101,11 @@ export async function applyFeaToolCall(toolName: string, rawArgs: unknown, deps:
       `${toolName} FEA_TOOL_MISSING: the FE transports are not configured on this host (needs the llull server with gmsh and ccx).`,
     );
   }
-  const timeoutS = typeof args['timeoutS'] === 'number' && args['timeoutS'] > 0 ? args['timeoutS'] : undefined;
+  const requested = args['timeoutS'];
+  const timeoutS =
+    typeof requested === 'number' && Number.isFinite(requested) && requested > 0
+      ? Math.min(FEA_SOLVE_TIMEOUT_S.max, Math.max(FEA_SOLVE_TIMEOUT_S.min, requested))
+      : undefined;
   try {
     const result =
       toolName === 'fea_mesh'

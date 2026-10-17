@@ -5,6 +5,7 @@ import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { nextId } from '@lib/id';
+import { cavityNameProblem } from '../shared/names';
 import { analysisIdSchema, quantitySchema } from '../shared/schemas';
 import { feaTargetSchema, targetProblem, toTarget } from '../shared/target';
 import { isProblem, problem, thermalCaseOf, withThermal, type Problem } from './access';
@@ -21,12 +22,15 @@ export const addCavityRadiation = defineCommand({
   name: 'add_cavity_radiation',
   description:
     'Group faces into a radiation cavity of a heat_* analysis (CalculiX *RADIATE, CAVITY with view factors computed by the solver); ' +
-    'returns the cavity id in affected[0]. name: 1-3 characters, unique. faces: at least 2 { target (facesNear), emissivity 0-1 }. ' +
+    'returns the cavity id in affected[0]. name: 1-3 letters, digits or underscores, unique. faces: at least 2 { target (facesNear), emissivity 0-1 }. ' +
     'environmentTemperature { value, unit } makes the cavity OPEN (the remainder radiates to that temperature); omit it for a CLOSED ' +
     'cavity (view factors scaled to 1). Check the geometry first with compute_view_factors. Radiation is evaluated on absolute temperature.',
   params: z.object({
     analysisId: analysisIdSchema,
-    name: z.string().min(1).describe('Cavity name, 1-3 characters (CalculiX limit), unique in the analysis, e.g. "C1".'),
+    name: z
+      .string()
+      .min(1)
+      .describe('Cavity name, 1-3 letters, digits or underscores (CalculiX limit), unique in the analysis, e.g. "C1".'),
     environmentTemperature: quantitySchema
       .optional()
       .describe('Open cavity: temperature { value, unit } the unclosed part of the view radiates to. Omit for a closed cavity.'),
@@ -47,7 +51,8 @@ export const addCavityRadiation = defineCommand({
     if (isProblem(found)) return fail(found);
     const cavityError = (message: string, path = 'name'): CommandResult =>
       fail(problem('THM_CAVITY_INVALID', message, [analysisId], [path]));
-    if (name.length > 3) return cavityError(`name '${name}' is longer than 3 characters`);
+    const nameProblem = cavityNameProblem(name);
+    if (nameProblem !== null) return cavityError(nameProblem);
     if (Object.values(found.thermal.cavities).some((cavity) => cavity.name.toUpperCase() === name.toUpperCase()))
       return cavityError(`a cavity named '${name}' exists`);
     if (faces.length < 2) return cavityError('a cavity needs at least 2 faces', 'faces');

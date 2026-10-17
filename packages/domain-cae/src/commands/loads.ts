@@ -9,6 +9,7 @@ import type { CommandResult } from '@core/commands/types';
 import { nextId } from '@lib/id';
 import { caseOf, withCase } from '../shared/access';
 import { refuseCode } from '../shared/codes';
+import { loadCaseNameProblem } from '../shared/names';
 import { analysisIdSchema } from '../shared/schemas';
 import { feaTargetSchema, targetProblem, toTarget, type FeaTargetInput } from '../shared/target';
 
@@ -49,7 +50,8 @@ function irrelevantParams(kind: LoadKind, fields: LoadFields): string[] {
 
 function problemOf(doc: CadDocument, analysisCase: AnalysisCase, load: FeaLoad): { code: string; message: string } | null {
   const invalid = (message: string): { code: string; message: string } => ({ code: 'FEA_LOAD_INVALID', message });
-  if (load.loadCase.trim() === '') return invalid('loadCase must not be empty');
+  const caseProblem = loadCaseNameProblem(load.loadCase);
+  if (caseProblem !== null) return invalid(caseProblem);
   if (load.kind === 'gravity') {
     if (load.vector === undefined || !load.vector.every(Number.isFinite) || load.vector.every((c) => c === 0))
       return invalid('gravity needs a non-zero finite vector');
@@ -87,7 +89,10 @@ export const addFeaLoad = defineCommand({
     analysisId: analysisIdSchema,
     name: z.string().min(1).describe('Display name, e.g. "tip load".'),
     kind: z.enum(['force', 'pressure', 'gravity']).describe('Load type.'),
-    loadCase: z.string().optional().describe('Load case name this load belongs to. Default "LC1".'),
+    loadCase: z
+      .string()
+      .optional()
+      .describe('Load case name this load belongs to: 1-40 letters, digits or underscores (e.g. "LC1", "landing_2"). Default "LC1".'),
     category: z.enum(['limit', 'ultimate']).optional().describe('limit (default) or ultimate load.'),
     ...loadFieldsSchema,
   }),
@@ -133,7 +138,7 @@ export const updateFeaLoad = defineCommand({
     analysisId: analysisIdSchema,
     loadId: z.string().describe('Load id (affected[0] of add_fea_load, or see describe_analysis).'),
     name: z.string().min(1).optional().describe('New display name.'),
-    loadCase: z.string().optional().describe('New load case name.'),
+    loadCase: z.string().optional().describe('New load case name: 1-40 letters, digits or underscores.'),
     category: z.enum(['limit', 'ultimate']).optional().describe('New category.'),
     ...loadFieldsSchema,
   }),

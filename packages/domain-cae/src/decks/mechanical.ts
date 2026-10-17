@@ -4,7 +4,7 @@ import type { FeaConstraint } from '@core/model/analysis';
 import { ALL_ELEMENTS, isDeckRefusal, loadCasesOf, type DeckContext, type DeckRefusal, type DeckSections } from './context';
 import { densityToAnalysis, stressPerMpa } from './units';
 import { elasticConstants, isElasticRefusal, propertyTemperatureK } from './elastic';
-import { linesText, num, row } from './format';
+import { commentText, linesText, num, row } from './format';
 
 const DOF_NUMBER = { ux: 1, uy: 2, uz: 3 } as const;
 
@@ -19,7 +19,7 @@ const refusal = (code: string, message: string, ids: readonly string[] = []): De
 export function mechanicalMaterialLines(ctx: DeckContext, entityId: string): DeckSections {
   const material = ctx.materialOf(entityId);
   if (material === null) return refusal('FEA_MATERIAL_MISSING', `part '${entityId}' has no material`, [entityId]);
-  const elastic = elasticConstants(material, ctx.materialName(entityId), propertyTemperatureK(ctx.analysis));
+  const elastic = elasticConstants(material, ctx.materialId(entityId) ?? '', propertyTemperatureK(ctx.analysis));
   if (isElasticRefusal(elastic)) return refusal(elastic.code, elastic.message, [entityId]);
   const density = densityToAnalysis(material.density, ctx.doc.units, ctx.unitSystem);
   return { text: linesText(['*ELASTIC', row(elastic.E * stressPerMpa(ctx.unitSystem), elastic.nu), '*DENSITY', row(density)]) };
@@ -162,7 +162,7 @@ export function staticStep(ctx: DeckContext): DeckSections {
   for (const { name } of loadCasesOf(ctx.analysis)) {
     const mechanical = mechanicalStepLines(ctx, name);
     if (isDeckRefusal(mechanical)) return mechanical;
-    out.push(`** load case ${name}`, '*STEP', '*STATIC');
+    out.push(`** load case ${commentText(name)}`, '*STEP', '*STATIC');
     out.push(...mechanical.text.split('\n').filter((line) => line !== ''));
     out.push('*NODE FILE', 'U', '*EL FILE', 'S, E', ...probePrintLines(ctx), '*END STEP');
   }

@@ -109,6 +109,9 @@ export interface ParamItemSpec {
   description?: string;
   /** Constrained value set (JSON Schema `enum`). */
   enum?: readonly (string | number)[];
+  /** For numbers: inclusive bounds (JSON Schema `minimum` / `maximum`); set by hand-written transport schemas, never derived from zod. */
+  minimum?: number;
+  maximum?: number;
   /** For `type: 'array'`: the schema of each element. */
   items?: ParamItemSpec;
   /** For `type: 'object'`: named child properties. */

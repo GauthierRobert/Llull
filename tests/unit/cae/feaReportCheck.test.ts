@@ -4,23 +4,27 @@ import { execute } from '@core/commands/registry';
 import type { ExecutionContext } from '@core/commands/types';
 import type { CadDocument } from '@core/model/types';
 import { meshSummary, resultsSummary } from '@cae/results/summary';
-import { barDocument, mustRun, portOf, solvedBar, type SolvedBar } from './deckFixtures';
+import { barDocument, hashOf, mustRun, portOf, solvedBar, type SolvedBar } from './deckFixtures';
 
 const ctxOf = (bar: SolvedBar, port = bar.port): ExecutionContext => ({ ...defaultContext(), feaArtifacts: port });
 
-/** The bar with mesh and results recorded through the commands. */
-function recorded(bar: SolvedBar): CadDocument {
+/** The bar with mesh and results recorded through the commands (optionally for other artifacts, served by their own port). */
+function recorded(bar: SolvedBar, artifacts: Pick<SolvedBar, 'mesh' | 'meshHash' | 'results' | 'resultsHash' | 'port'> = bar): CadDocument {
+  const context = ctxOf(bar, artifacts.port);
   const meshed = execute(
     bar.doc,
     'record_fe_mesh',
-    { analysisId: bar.analysisId, summary: meshSummary(bar.mesh, bar.meshHash) },
-    ctxOf(bar),
+    { analysisId: bar.analysisId, summary: meshSummary(artifacts.mesh, artifacts.meshHash) },
+    context,
   );
   return execute(
     meshed.document,
     'record_fea_results',
-    { analysisId: bar.analysisId, summary: resultsSummary(bar.doc, bar.analysisId, bar.mesh, bar.results, bar.resultsHash) },
-    ctxOf(bar),
+    {
+      analysisId: bar.analysisId,
+      summary: resultsSummary(bar.doc, bar.analysisId, artifacts.mesh, artifacts.results, artifacts.resultsHash),
+    },
+    context,
   ).document;
 }
 
@@ -78,12 +82,13 @@ describe('fea_report', () => {
 
   it('falls back to the nearest mesh node when the mesher resolved none, and refuses an unknown analysis', () => {
     const bar = solvedBar();
-    const solved = recorded(bar);
     const sets = Object.fromEntries(Object.entries(bar.mesh.nodeSets).filter(([key]) => !key.startsWith('P_')));
-    const noProbeNodes = { ...bar.mesh, nodeSets: sets };
-    expect(noProbeNodes.nodeSets).not.toEqual(bar.mesh.nodeSets);
-    // the artifact must be the recorded one: query through a port that serves the modified mesh under the recorded hash
-    const port = { get: (hash: string) => (hash === bar.meshHash ? noProbeNodes : bar.port.get(hash)) };
+    const mesh = { ...bar.mesh, nodeSets: sets };
+    expect(mesh.nodeSets).not.toEqual(bar.mesh.nodeSets);
+    const meshHash = hashOf(mesh);
+    const results = { ...bar.results, meshHash };
+    const port = portOf(mesh, results);
+    const solved = recorded(bar, { mesh, meshHash, results, resultsHash: hashOf(results), port });
     const result = execute(solved, 'fea_report', { analysisId: bar.analysisId }, ctxOf(bar, port));
     const probes = (result.data as Report).probes;
     expect(probes.find((p) => p.quantity === 'u_x')?.nodeId).toBe(2);
@@ -163,7 +168,7 @@ describe('check_analysis', () => {
       { analysisId: bar.analysisId, summary: meshSummary(bar.mesh, bar.meshHash) },
       ctxOf(bar),
     ).document;
-    expect(codes(check(meshed, bar.analysisId))).toEqual(['FEA_RESULTS_MISSING']);
+    expect(codes(check(meshed, bar.analysisId, ctxOf(bar)))).toEqual(['FEA_RESULTS_MISSING']);
   });
 
   it('flags results computed for other inputs and artifacts absent on this machine', () => {
@@ -172,7 +177,7 @@ describe('check_analysis', () => {
     const absent = check(solved, bar.analysisId, ctxOf(bar, portOf()));
     expect(codes(absent)).toEqual(['FEA_MESH_MISSING', 'FEA_RESULTS_MISSING']);
     const stale = mustRun(solved, 'add_fea_load', { analysisId: bar.analysisId, name: 'g', kind: 'gravity', vector: [0, 0, -9810] });
-    expect(codes(check(stale, bar.analysisId))).toEqual(['FEA_RESULTS_STALE']);
+    expect(codes(check(stale, bar.analysisId, ctxOf(bar)))).toEqual(['FEA_RESULTS_STALE']);
   });
 
   it('refuses an unknown analysis', () => {

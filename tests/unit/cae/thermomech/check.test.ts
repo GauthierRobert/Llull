@@ -3,7 +3,11 @@ import { execute } from '@core/commands/registry';
 import { checkThermomechItems } from '@cae/thermomech/check';
 import { cteModel } from '../../physics/thermomech/thermomechFixtures';
 import { expectNoOp, expectPure } from '../../../helpers/expectNoOp';
-import { portOf, thermoFixture, withThermalSource, type Fixture } from './fixtures';
+import type { FeArtifactPort } from '@core/model/analysis';
+import { analysisInputHash } from '@cae/hash/inputHash';
+import { meshSummary } from '@cae/results/summary';
+import { withCase } from '@cae/shared/access';
+import { hashOf, portOf, thermoFixture, withThermalSource, type Fixture } from './fixtures';
 
 const withThermalLoad = (fixture: Fixture): Fixture => ({
   ...fixture,
@@ -17,7 +21,8 @@ const withThermalLoad = (fixture: Fixture): Fixture => ({
   }).document,
 });
 
-const codes = (fixture: Fixture): string[] => checkThermomechItems(fixture.doc, fixture.analysisId).map((item) => item.code);
+const codes = (fixture: Fixture, artifacts: FeArtifactPort | null = null): string[] =>
+  checkThermomechItems(fixture.doc, fixture.analysisId, artifacts).map((item) => item.code);
 
 describe('check_thermo_mechanical', () => {
   it('passes a complete set-up and reports the data contract', () => {
@@ -92,7 +97,7 @@ describe('check_thermo_mechanical', () => {
 
   it('reports the thermal source states: stale, other mesh, unsolved, unknown output time', () => {
     const source = withThermalSource(withThermalLoad(thermoFixture()));
-    expect(codes(source.fixture)).toEqual([]);
+    expect(codes(source.fixture, source.artifacts)).toEqual([]);
     const stale = execute(source.fixture.doc, 'add_result_probe', {
       analysisId: source.thermalId,
       name: 'p',
@@ -100,33 +105,43 @@ describe('check_thermo_mechanical', () => {
       quantity: 'temperature',
     });
     expect(codes({ ...source.fixture, doc: stale.document })).toEqual(['TMC_THERMAL_RESULT_STALE']);
+    expect(codes({ ...source.fixture, doc: stale.document }, source.artifacts)).toEqual(['TMC_THERMAL_RESULT_STALE']);
     const wrongTime = execute(source.fixture.doc, 'set_temperature_field', {
       analysisId: source.fixture.analysisId,
       source: { kind: 'thermal_result', analysisId: source.thermalId, time: 99 },
     });
-    expect(codes({ ...source.fixture, doc: wrongTime.document })).toEqual(['TMC_FIELD_SOURCE_INVALID']);
+    expect(codes({ ...source.fixture, doc: wrongTime.document }, source.artifacts)).toEqual(['TMC_FIELD_SOURCE_INVALID']);
     const heat = execute(source.fixture.doc, 'create_analysis', { name: 'H2', analysisType: 'heat_steady' });
     const unsolved = execute(heat.document, 'set_temperature_field', {
       analysisId: source.fixture.analysisId,
       source: { kind: 'thermal_result', analysisId: heat.affected[0] ?? '', time: 'last' },
     });
-    expect(codes({ ...source.fixture, doc: unsolved.document })).toEqual(['FEA_RESULTS_MISSING']);
-    const doc = source.fixture.doc;
-    const mismatched = {
-      ...doc,
-      analysis: {
-        ...doc.analysis!,
-        cases: {
-          ...doc.analysis!.cases,
-          [source.fixture.analysisId]: { ...doc.analysis!.cases[source.fixture.analysisId]!, meshSummary: { meshHash: 'aaa' } as never },
-          [source.thermalId]: { ...doc.analysis!.cases[source.thermalId]!, meshSummary: { meshHash: 'bbb' } as never },
-        },
-      },
-    };
-    expect(codes({ ...source.fixture, doc: mismatched })).toEqual(['TMC_MESH_MISMATCH']);
-    const sameGeometry = portOf({ aaa: source.fixture.mesh, bbb: { ...source.fixture.mesh, nodeSets: { B_1: [1] } } });
-    const fromStore = checkThermomechItems(mismatched, source.fixture.analysisId, sameGeometry).map((i) => i.code);
-    expect(fromStore).not.toContain('TMC_MESH_MISMATCH');
+    expect(codes({ ...source.fixture, doc: unsolved.document }, source.artifacts)).toEqual(['FEA_RESULTS_MISSING']);
+    // a thermal case solved on another discretisation than the thermo-mechanical case's recorded mesh
+    const base = withThermalLoad(thermoFixture());
+    const moved = { ...base.mesh, nodes: base.mesh.nodes.map((node) => (node[0] === 5 ? ([5, 11, 10, 10] as const) : node)) };
+    const other = withThermalSource(base, { mesh: moved });
+    const own = { ...base.mesh, inputHash: analysisInputHash(other.fixture.doc, base.analysisId, 'mesh') };
+    const ownCase = other.fixture.doc.analysis!.cases[base.analysisId]!;
+    const mismatched = withCase(other.fixture.doc, { ...ownCase, meshSummary: meshSummary(own, hashOf(own)) });
+    const store = portOf({ [hashOf(own)]: own, [other.resultsHash]: other.results, [hashOf(other.thermalMesh)]: other.thermalMesh });
+    expect(checkThermomechItems(mismatched, base.analysisId, store).map((i) => i.code)).toContain('TMC_MESH_MISMATCH');
+    // only node / face sets and targets differ: one discretisation
+    const sibling = { ...base.mesh, nodeSets: { B_1: [1] } };
+    const same = withThermalSource(base, { mesh: sibling });
+    const sameOwn = { ...base.mesh, inputHash: analysisInputHash(same.fixture.doc, base.analysisId, 'mesh') };
+    const sameDoc = withCase(same.fixture.doc, {
+      ...same.fixture.doc.analysis!.cases[base.analysisId]!,
+      meshSummary: meshSummary(sameOwn, hashOf(sameOwn)),
+    });
+    const sameStore = portOf({
+      [hashOf(sameOwn)]: sameOwn,
+      [same.resultsHash]: same.results,
+      [hashOf(same.thermalMesh)]: same.thermalMesh,
+    });
+    expect(checkThermomechItems(sameDoc, base.analysisId, sameStore).map((i) => i.code)).not.toContain('TMC_MESH_MISMATCH');
+    // no artifact store: the thermal source cannot be verified, so it is not used
+    expect(checkThermomechItems(source.fixture.doc, source.fixture.analysisId).map((i) => i.code)).toEqual(['FEA_RESULTS_MISSING']);
   });
 
   it('refuses unknown and non thermo_static analyses', () => {

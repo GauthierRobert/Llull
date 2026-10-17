@@ -5,14 +5,13 @@ import type { CommandResult } from '@core/commands/types';
 import type { CadDocument } from '@core/model/types';
 import type { ThermalSetup } from '@core/model/analysis';
 import { checkThermalItems } from '@cae/thermal/check';
-import { thermalResultsSummary } from '@cae/thermal/summary';
 import { expectNoOp, expectPure } from '../../../helpers/expectNoOp';
 import { expectCase } from '../../physics/benchmarkCases';
-import { addBc, must, recorded, resultsFor, thermalFixture, twoTetMesh } from './fixtures';
+import { addBc, machineContext, must, recorded, resultsFor, thermalFixture, twoTetMesh } from './fixtures';
 import { HOT_T, solvedWall } from './solved';
 
 const PACK = '03-thermal-analysis';
-const run = (doc: CadDocument, command: string, params: Record<string, unknown>, ctx = defaultContext()): CommandResult =>
+const run = (doc: CadDocument, command: string, params: Record<string, unknown>, ctx = machineContext()): CommandResult =>
   execute(doc, command, params, ctx);
 const codes = (result: CommandResult): string[] => (result.data as { items: { code: string }[] }).items.map((item) => item.code);
 const roundDeep = (value: unknown): unknown =>
@@ -60,7 +59,7 @@ describe('thermal_report', () => {
     const fixture = { ...base, doc: rad.doc };
     const mesh = twoTetMesh(fixture, { faceSets: { [`B_${rad.id}`]: [[1, 1]] } });
     const results = resultsFor(fixture, mesh, [{ time: 1, temperature: { 1: 100, 2: 100, 3: 100, 4: 100, 5: 100 } }]);
-    const doc = recorded(fixture, mesh, results, thermalResultsSummary);
+    const doc = recorded(fixture, mesh, results);
     const data = run(doc, 'thermal_report', { analysisId: base.analysisId }).data as { physicalConstants: unknown };
     expectCase(PACK, 'VC-THM-60', roundDeep({ physicalConstants: data.physicalConstants }) as never, '-');
   });
@@ -243,24 +242,9 @@ describe('check_thermal', () => {
   it('warns THM_HEAT_BALANCE with the numbers when the recorded residual is above the named tolerance (5 % case)', () => {
     const wall = solvedWall({}, 1);
     const unbalanced = solvedWall({}, 1.05);
-    const mismatch = (doc: CadDocument): CommandResult => run(doc, 'check_thermal', { analysisId: wall.analysisId });
-    expect(codes(mismatch(wall.solved))).toEqual([]);
+    expect(codes(run(wall.solved, 'check_thermal', { analysisId: wall.analysisId }))).toEqual([]);
     // cold film flow 5 % off: residual 0.05 / 1.05
-    const result = mismatch({
-      ...wall.solved,
-      analysis: {
-        ...wall.solved.analysis!,
-        cases: {
-          [wall.analysisId]: {
-            ...wall.solved.analysis!.cases[wall.analysisId]!,
-            results: {
-              ...wall.solved.analysis!.cases[wall.analysisId]!.results!,
-              thermal: unbalanced.solved.analysis!.cases[unbalanced.analysisId]!.results!.thermal!,
-            },
-          },
-        },
-      },
-    });
+    const result = run(unbalanced.solved, 'check_thermal', { analysisId: unbalanced.analysisId });
     expect(codes(result)).toEqual(['THM_HEAT_BALANCE']);
     expect(result.data).toMatchObject({ status: 'warn' });
     const item = (result.data as { items: { message: string }[] }).items[0];

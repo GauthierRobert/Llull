@@ -1,7 +1,6 @@
 /** A hand-solved two-film case (VC-THM-01 values) recorded into a document, for the report / check / limit / disposition tests. */
 import type { FeArtifactPort } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
-import { thermalResultsSummary } from '@cae/thermal/summary';
 import {
   addBc,
   hashOf,
@@ -80,6 +79,6 @@ export function solvedWall(
   const coldMean = 20 + flow / (10 * AREA_COLD);
   const coldNode = (3 * coldMean - HOT_T) / 2;
   const results = resultsFor(fixture, mesh, [{ time: 1, temperature: { 1: HOT_T, 2: HOT_T, 3: HOT_T, 4: coldNode, 5: peak ?? coldNode } }]);
-  const solved = recorded(fixture, mesh, results, thermalResultsSummary);
+  const solved = recorded(fixture, mesh, results);
   return { ...fixture, hotId: hot.id, coldId: cold.id, mesh, results, resultsHash: hashOf(results), port: portOf(mesh, results), solved };
 }

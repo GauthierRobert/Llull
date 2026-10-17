@@ -27,6 +27,10 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   FEA_POINT_LOAD_SINGULAR: 'put the load on a face (facesNear) so it is distributed; peak stress at a point load is not meaningful',
   FEA_TARGET_UNRESOLVED: 'move the target points onto the intended topology and re-run fea_mesh',
   FEA_CONSTRAINT_INVALID: 'solid parts have translational dofs only (ux, uy, uz); a symmetry target must be an axis-aligned plane',
+  FEA_MESH_TOO_LARGE: 'raise the global mesh size (set_mesh_controls globalSize) or analyse a smaller part',
+  FEA_RESULTS_TOO_LARGE: 'mesh more coarsely (set_mesh_controls globalSize) or request fewer load cases / output times',
+  FEA_DECK_NAME_COLLISION:
+    'rename the entity or target so the sanitised set names differ (letters, digits and underscores only), then run fea_mesh',
   FEA_UNITS_MISMATCH: 'mesh and analysis disagree on the unit system: re-run fea_mesh',
   FEA_ANALYSIS_TYPE_UNSUPPORTED: 'use static, heat_steady, heat_transient or thermo_static',
 };

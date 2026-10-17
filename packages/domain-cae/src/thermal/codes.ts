@@ -41,6 +41,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   THM_LIMIT_EXCEEDED: 'redesign; only a qualified reviewer can disposition an exceeded limit (dispose_thermal_limit)',
   THM_LIMIT_MARGINAL: 'redesign or have a qualified reviewer disposition the row (dispose_thermal_limit)',
   THM_MARGINAL_BAND_UNSET: 'ask the owner or the company rule for a margin band in K and pass marginalBandK',
+  THM_DISPOSITION_UNVERIFIED:
+    'the stored disposition does not verify (no signing port, or no / a wrong signature): the qualified reviewer records it again with dispose_thermal_limit',
   THM_DISPOSITION_PENDING: 'a qualified reviewer dispositions the row in the desktop app (dispose_thermal_limit with a signature)',
   THM_HUMAN_GATE: 'hand over to the qualified reviewer: the disposition needs a human-held signature (09 PLM)',
   THM_TABLE_POINTS: 'narrow the temperature range or use a smoother property model: the solver table would exceed 500 points',

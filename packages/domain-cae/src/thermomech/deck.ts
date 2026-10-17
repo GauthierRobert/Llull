@@ -2,7 +2,7 @@
 
 import { isCteRefusal } from '@core/model/materialCte';
 import type { DeckContext, DeckSections } from '../decks/context';
-import { num } from '../decks/format';
+import { commentText, num } from '../decks/format';
 import { mechanicalStepLines } from '../decks/mechanical';
 import { providerFor, secantExpansion } from './cte';
 import { resolveTemperatureField, thermomechOf } from './field';
@@ -41,10 +41,10 @@ export function thermomechMaterialCards(ctx: DeckContext, entityId: string): Dec
   );
   if ('code' in table) return refused(table.code, table.reason, [materialId, entityId]);
   const lines = [
-    `** thermal expansion of '${materialId}' for part ${entityId}: secant alpha about T_ref = ${num(reference)} ${scale}`,
-    `** source ${table.provider.source}; basis ${table.provider.basis}; model sha256 ${table.modelSha256}`,
-    `** conversion ${table.provider.conversion}`,
-    ...(table.unverifiedReasons.length > 0 ? [`** UNVERIFIED: ${table.unverifiedReasons.join('; ')}`] : []),
+    `** thermal expansion of '${commentText(materialId)}' for part ${commentText(entityId)}: secant alpha about T_ref = ${num(reference)} ${scale}`,
+    `** source ${commentText(table.provider.source)}; basis ${commentText(table.provider.basis)}; model sha256 ${commentText(table.modelSha256)}`,
+    `** conversion ${commentText(table.provider.conversion)}`,
+    ...(table.unverifiedReasons.length > 0 ? [`** UNVERIFIED: ${commentText(table.unverifiedReasons.join('; '), 400)}`] : []),
     `*EXPANSION, ZERO=${num(reference)}`,
     ...table.rows.map((row) => row.map(num).join(', ')),
   ];
@@ -68,7 +68,7 @@ export function thermomechSections(ctx: DeckContext): DeckSections {
   const mechanical = mechanicalStepLines(ctx);
   if (!('text' in mechanical)) return mechanical;
   const lines = [
-    `** thermo-mechanical analysis ${ctx.analysisId}: T_ref ${num(reference)} ${setup.temperatureScale}; field ${field.description}`,
+    `** thermo-mechanical analysis ${commentText(ctx.analysisId)}: T_ref ${num(reference)} ${setup.temperatureScale}; field ${commentText(field.description, 240)}`,
     '*INITIAL CONDITIONS, TYPE=TEMPERATURE',
     ...ctx.mesh.nodes.map(([id]) => `${id}, ${num(reference)}`),
     '*STEP',

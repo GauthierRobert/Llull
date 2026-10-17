@@ -5,6 +5,7 @@ import type { ExecutionContext } from '@core/commands/types';
 import type { FeResultsArtifact, MeshSummary, ResultsSummary } from '@core/model/analysis';
 import { meshSummary, resultsSummary } from '@cae/results/summary';
 import { analysisInputHash } from '@cae/hash/inputHash';
+import { stateOf } from '@cae/shared/state';
 import { caseIn } from './helpers';
 import { hashOf, portOf, solvedBar, type SolvedBar } from './deckFixtures';
 
@@ -118,30 +119,35 @@ describe('record_fe_mesh (trust model, 05 §4.1)', () => {
     analysisId = bar.analysisId,
   ): ReturnType<typeof execute> => execute(bar.doc, 'record_fe_mesh', { analysisId, summary }, ctx);
 
-  it('refuses without a port, without the artifact, and for an unknown analysis', () => {
+  it('keeps the summary flagged verified:false without a port or without the artifact (state missing), and refuses an unknown analysis', () => {
     const bar = solvedBar();
     const summary = meshSummary(bar.mesh, bar.meshHash);
-    for (const result of [
-      refusal(bar, summary, undefined),
-      refusal(bar, summary, withPort(bar, portOf())),
-      refusal(bar, summary, withPort(bar), 'nope'),
-    ]) {
-      expect(result.rejected).toBe(true);
-      expect(result.document).toBe(bar.doc);
-      expect(result.affected).toEqual([]);
+    for (const result of [refusal(bar, summary, undefined), refusal(bar, summary, withPort(bar, portOf()))]) {
+      expect(result.rejected).toBeUndefined();
+      expect(result.affected).toEqual([bar.analysisId]);
+      expect(result.summary).toContain('UNVERIFIED');
+      const stored = caseIn(result.document, bar.analysisId);
+      expect(stored.meshSummary).toEqual({ ...summary, verified: false });
+      expect(stateOf(result.document, stored)).toBe('missing');
     }
-    expect(refusal(bar, summary, undefined).error?.code).toBe('FEA_ARTIFACT_NOT_FOUND');
-    expect(refusal(bar, summary, withPort(bar, portOf())).error?.code).toBe('FEA_ARTIFACT_NOT_FOUND');
-    expect(refusal(bar, summary, withPort(bar), 'nope').error?.code).toBe('FEA_ANALYSIS_NOT_FOUND');
+    const unknown = refusal(bar, summary, withPort(bar), 'nope');
+    expect(unknown.rejected).toBe(true);
+    expect(unknown.document).toBe(bar.doc);
+    expect(unknown.error?.code).toBe('FEA_ANALYSIS_NOT_FOUND');
+    const noHash = refusal(bar, { meshHash: bar.meshHash, nodes: 8 }, undefined);
+    expect(noHash.error?.code).toBe('FEA_SUMMARY_MISMATCH');
+    expect(noHash.document).toBe(bar.doc);
   });
 
-  it('refuses an artifact of the wrong kind or whose sha256 is not the hash', () => {
+  it('refuses an artifact whose sha256 is not the hash, and treats one of the wrong kind as absent', () => {
     const bar = solvedBar();
     const summary = meshSummary(bar.mesh, bar.meshHash);
     const lying = { get: () => ({ ...bar.mesh, mesher: 'forged' }) };
     expect(refusal(bar, summary, withPort(bar, lying)).error?.code).toBe('FEA_SUMMARY_MISMATCH');
     const resultsAsMesh = { get: () => bar.results };
-    expect(refusal(bar, summary, withPort(bar, resultsAsMesh)).error?.code).toBe('FEA_ARTIFACT_NOT_FOUND');
+    const unverified = refusal(bar, summary, withPort(bar, resultsAsMesh));
+    expect(unverified.rejected).toBeUndefined();
+    expect(caseIn(unverified.document, bar.analysisId).meshSummary?.verified).toBe(false);
   });
 
   it('refuses a hand-written summary and names the differing fields', () => {
@@ -198,11 +204,17 @@ describe('record_fea_results (trust model, 05 §4.1)', () => {
     expect(result.error?.code).toBe('FEA_MESH_MISMATCH');
   });
 
-  it('refuses missing artifacts, hand-written summaries and an unknown analysis', () => {
+  it('keeps results flagged verified:false when an artifact is missing, still refuses hand-written summaries and unknown analyses', () => {
     const bar = solvedBar();
     const meshed = recordedMesh(bar);
-    expect(record(bar, meshed, summaryOf(bar), null).error?.code).toBe('FEA_ARTIFACT_NOT_FOUND');
-    expect(record(bar, meshed, summaryOf(bar), withPort(bar, portOf(bar.results))).error?.code).toBe('FEA_ARTIFACT_NOT_FOUND');
+    for (const ctx of [null, withPort(bar, portOf(bar.results)), withPort(bar, portOf(bar.mesh))]) {
+      const kept = record(bar, meshed, summaryOf(bar), ctx);
+      expect(kept.rejected).toBeUndefined();
+      expect(kept.summary).toContain('UNVERIFIED');
+      const stored = caseIn(kept.document, bar.analysisId);
+      expect(stored.results).toEqual({ ...summaryOf(bar), verified: false });
+      expect(stateOf(kept.document, stored)).toBe('missing');
+    }
     const forged = summaryOf(bar);
     const inflated = { ...forged, loadCases: forged.loadCases.map((lc) => ({ ...lc, maxVonMises: { ...lc.maxVonMises, value: 1 } })) };
     const mismatch = record(bar, meshed, inflated);

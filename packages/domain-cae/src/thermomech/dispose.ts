@@ -10,7 +10,7 @@ import { analysisOf } from '../shared/access';
 import { refuseTmc } from './refusal';
 
 /**
- * @affects doc.analysis.fitDispositions[rowKey] (affected: [rowKey])
+ * @affects doc.analysis.fitDispositions[rowKey] (affected: [rowKey]); stores the verified signature next to the decision so a reader can re-verify it
  * @invariant the signature is verified over sha256 of canonical JSON { rowKey, decision, justification, inputsHash }
  * @failure no signing port or signature rejected -> TMC_HUMAN_GATE; currentInputsHash != inputsHash -> TMC_FIT_INPUTS_CHANGED; empty
  *   justification -> FEA_PARAM_INVALID (refusals, document unchanged)
@@ -50,7 +50,7 @@ export const disposeFitResult = defineCommand({
     const model = analysisOf(doc);
     const fitDispositions: FitDispositions = {
       ...model.fitDispositions,
-      [rowKey]: { decision, justification, inputsHash, signer: signer.signer, signatureId: signer.signatureId },
+      [rowKey]: { decision, justification, inputsHash, signer: signer.signer, signatureId: signer.signatureId, signature },
     };
     return changed(
       { ...doc, analysis: { ...model, fitDispositions } },

@@ -7,10 +7,10 @@ import type { Vec3 } from '@core/model/vectors';
 import { defineCommand, vec3, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
-import { analysisInputHash } from '../hash/inputHash';
 import { caseOf } from '../shared/access';
 import { analysisLengthMetres } from '../shared/defaults';
 import { analysisIdSchema } from '../shared/schemas';
+import { trustedRecord } from '../shared/trust';
 import { fitPlane } from './plane';
 import { refuseTmc } from './refusal';
 
@@ -42,16 +42,13 @@ interface Loaded {
   readonly results: FeResultsArtifact;
 }
 
-function isKind<T extends { kind: string }>(value: unknown, kind: T['kind']): value is T {
-  return typeof value === 'object' && value !== null && (value as { kind?: unknown }).kind === kind;
-}
-
 const lengthFactor = (doc: CadDocument, mesh: FeMeshArtifact): number => analysisLengthMetres(mesh.unitSystem) / toMetres(doc, 1);
 
 /**
  * @invariant read-only; data { unit, maxDisplacement, faces[{ name, nodes, flatnessBefore, flatnessAfter, change, normal, tolerance?, withinTolerance?,
  *   reviewRequired }], points[{ name, nodeId, distance, displacement[3], magnitude }], reviewRequired: true }; lengths in document units
- * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; unsolved / no artifact -> FEA_RESULTS_MISSING; stale -> FEA_RESULTS_STALE; face without a
+ * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; unsolved / no artifact / not verifiable on this machine -> FEA_RESULTS_MISSING; stale ->
+ *   FEA_RESULTS_STALE; recorded summary that differs from its artifact -> FEA_SUMMARY_MISMATCH; face without a
  *   usable node set (< 3 non-collinear nodes) -> FEA_TARGET_UNRESOLVED; no DISP field -> FEA_RESULTS_MISSING (refusals)
  */
 export const thermalDistortionReport = defineCommand({
@@ -84,12 +81,16 @@ export const thermalDistortionReport = defineCommand({
     if (analysisCase === undefined) return fail('FEA_ANALYSIS_NOT_FOUND', `no analysis '${analysisId}'`);
     if (analysisCase.results === undefined || analysisCase.meshSummary === undefined)
       return fail('FEA_RESULTS_MISSING', `analysis '${analysisId}' has no recorded mesh and results (fea_mesh, fea_solve)`);
-    if (analysisCase.results.inputHash !== analysisInputHash(doc, analysisId, 'full'))
-      return fail('FEA_RESULTS_STALE', `the results of '${analysisId}' were computed from different inputs`);
-    const mesh: unknown = ctx?.feaArtifacts?.get(analysisCase.meshSummary.meshHash) ?? null;
-    const results: unknown = ctx?.feaArtifacts?.get(analysisCase.results.resultsHash) ?? null;
-    if (!isKind<FeMeshArtifact>(mesh, 'fe_mesh') || !isKind<FeResultsArtifact>(results, 'fe_results'))
-      return fail('FEA_RESULTS_MISSING', 'the mesh or results artifact is not in the artifact store');
+    const trust = trustedRecord(doc, analysisCase, ctx?.feaArtifacts);
+    if (trust.state === 'stale') return fail('FEA_RESULTS_STALE', `the results of '${analysisId}' were computed from different inputs`);
+    if (trust.state === 'untrusted')
+      return fail('FEA_SUMMARY_MISMATCH', trust.problem?.message ?? 'a recorded summary differs from its artifact');
+    const { meshArtifact: mesh, resultsArtifact: results } = trust;
+    if (trust.state !== 'solved' || mesh === null || results === null)
+      return fail(
+        'FEA_RESULTS_MISSING',
+        `the mesh or results artifact is not verifiable on this machine: ${trust.problem?.message ?? 'no artifact store'}`,
+      );
     const loaded: Loaded = { mesh, results };
     return measure(doc, analysisId, loaded, faces, points, fail);
   },

@@ -1,13 +1,15 @@
 /** check_thermal and `checkThermalItems`: readiness and post-solve checks of a heat_* analysis (PHY-03 §7.1, AF-20). */
 
-import type { AnalysisCase } from '@core/model/analysis';
+import type { AnalysisCase, ResultsSummary } from '@core/model/analysis';
 import { is3D, type CadDocument } from '@core/model/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { analysisInputHash } from '../hash/inputHash';
 import { feRemediation } from '../shared/feCodes';
+import { cavityNameProblem } from '../shared/names';
 import { analysisIdSchema } from '../shared/schemas';
+import { trustedRecord } from '../shared/trust';
 import { isProblem, thermalCaseOf, type ThermalCase } from './access';
 import { tableProblem } from './amplitude';
 import { recordProblem } from './bcModel';
@@ -124,7 +126,7 @@ function setupItems(doc: CadDocument, found: ThermalCase): ThermalCheckItem[] {
   const names = new Set<string>();
   for (const cavity of Object.values(thermal.cavities)) {
     const upper = cavity.name.toUpperCase();
-    if (cavity.name.length === 0 || cavity.name.length > 3 || names.has(upper) || cavity.faces.length < 2)
+    if (cavityNameProblem(cavity.name) !== null || names.has(upper) || cavity.faces.length < 2)
       items.push(
         item('THM_CAVITY_INVALID', 'error', `cavity '${cavity.id}' (${cavity.name}): name 1-3 characters, unique, at least 2 faces`, [
           cavity.id,
@@ -143,9 +145,9 @@ function setupItems(doc: CadDocument, found: ThermalCase): ThermalCheckItem[] {
 }
 
 /** Post-solve items on fresh results: heat balance above the named tolerance, tables the field left. */
-function resultItems(analysisCase: AnalysisCase, doc: CadDocument): ThermalCheckItem[] {
-  const summary = analysisCase.results?.thermal;
-  if (summary === undefined || analysisCase.results?.inputHash !== analysisInputHash(doc, analysisCase.id, 'full')) return [];
+function resultItems(analysisCase: AnalysisCase, doc: CadDocument, verified: ResultsSummary | null): ThermalCheckItem[] {
+  const summary = verified?.thermal;
+  if (summary === undefined || verified?.inputHash !== analysisInputHash(doc, analysisCase.id, 'full')) return [];
   const items: ThermalCheckItem[] = [];
   const balance = summary.heatBalance;
   if (Object.keys(analysisCase.thermal?.cavities ?? {}).length > 0)
@@ -180,14 +182,18 @@ function resultItems(analysisCase: AnalysisCase, doc: CadDocument): ThermalCheck
 }
 
 /**
- * Items of a heat_* analysis: set-up errors (THM_*), unverified inputs, and, when the recorded results are current, the heat balance and
- * property-range warnings. Mesh / result staleness is added by `check_thermal` (and by 05 `check_analysis` for every type).
+ * Items of a heat_* analysis: set-up errors (THM_*), unverified inputs, and, when `verified` (the results summary recomputed from its
+ * artifact, see `trustedRecord`) is current, the heat balance and property-range warnings; without it no post-solve item is produced. Mesh / result staleness is added by `check_thermal` (and by 05 `check_analysis` for every type).
  * @failure not a heat_* analysis -> one THM_CASE_TYPE error
  */
-export function checkThermalItems(doc: CadDocument, analysisId: string): readonly ThermalCheckItem[] {
+export function checkThermalItems(
+  doc: CadDocument,
+  analysisId: string,
+  verified: ResultsSummary | null = null,
+): readonly ThermalCheckItem[] {
   const found = thermalCaseOf(doc, analysisId);
   if (isProblem(found)) return [item(found.code, 'error', found.message, found.ids)];
-  return [...setupItems(doc, found), ...partItems(doc, found), ...resultItems(found.analysisCase, doc)];
+  return [...setupItems(doc, found), ...partItems(doc, found), ...resultItems(found.analysisCase, doc, verified)];
 }
 
 /**
@@ -198,29 +204,49 @@ export const checkThermal = defineCommand({
   name: 'check_thermal',
   description:
     'Check a heat_steady / heat_transient analysis before the solve and after it: data { status: pass | warn | fail, items [{ code, severity, ' +
-    'ids, path?, message, remediation }], state, reviewRequired: true }. Errors (THM_NO_HEAT_PATH, THM_INITIAL_TEMPERATURE_MISSING, ' +
+    'ids, path?, message, remediation }], state, reviewRequired: true }; post-solve items need the recorded thermal summary to match its ' +
+    'artifact (FEA_SUMMARY_MISMATCH, state untrusted, when it does not). Errors (THM_NO_HEAT_PATH, THM_INITIAL_TEMPERATURE_MISSING, ' +
     'THM_MATERIAL_NO_K / NO_CP, THM_EMISSIVITY_INVALID, THM_SOURCE_REQUIRED, THM_STEP_INVALID, ...) must be fixed before fea_solve; warnings ' +
     'include THM_MATERIAL_UNVERIFIED, THM_HEAT_BALANCE (residual above the named 1e-2: do not report the result as final) and ' +
     'THM_PROPERTY_OUT_OF_RANGE. End every thermal job with this check.',
   annotations: { readOnly: true },
   params: z.object({ analysisId: analysisIdSchema }),
-  run: (doc, { analysisId }): CommandResult => {
+  run: (doc, { analysisId }, ctx): CommandResult => {
     const found = thermalCaseOf(doc, analysisId);
     if (isProblem(found)) return refuseThermal(doc, 'check_thermal', found.code, found.message, found.ids, found.paths);
     const { analysisCase } = found;
-    const items: ThermalCheckItem[] = [...checkThermalItems(doc, analysisId)];
+    const trust = trustedRecord(doc, analysisCase, ctx?.feaArtifacts);
+    const items: ThermalCheckItem[] = [...checkThermalItems(doc, analysisId, trust.results)];
     if (analysisCase.meshSummary === undefined)
       items.push(item('FEA_MESH_MISSING', 'warning', 'the analysis is not meshed yet', [analysisId]));
-    else if (analysisCase.meshSummary.inputHash !== analysisInputHash(doc, analysisId, 'mesh'))
+    else if (
+      analysisCase.meshSummary.verified !== false &&
+      analysisCase.meshSummary.inputHash !== analysisInputHash(doc, analysisId, 'mesh')
+    )
       items.push(item('FEA_MESH_STALE', 'warning', 'the recorded mesh was built for other inputs', [analysisId]));
-    if (analysisCase.results !== undefined && analysisCase.results.inputHash !== analysisInputHash(doc, analysisId, 'full'))
+    if (
+      analysisCase.results !== undefined &&
+      analysisCase.results.verified !== false &&
+      analysisCase.results.inputHash !== analysisInputHash(doc, analysisId, 'full')
+    )
       items.push(item('FEA_RESULTS_STALE', 'error', 'the recorded results were computed for other inputs', [analysisId]));
+    if (trust.state === 'untrusted')
+      items.push(
+        item('FEA_SUMMARY_MISMATCH', 'error', trust.problem?.message ?? 'a recorded summary differs from its artifact', [analysisId]),
+      );
+    else if (trust.state === 'missing' && analysisCase.results !== undefined)
+      items.push(
+        item('FEA_RESULTS_MISSING', 'warning', `the recorded results cannot be verified on this machine: ${trust.problem?.message ?? ''}`, [
+          analysisId,
+        ]),
+      );
     const errors = items.filter((entry) => entry.severity === 'error').length;
     const status = errors > 0 ? 'fail' : items.length > 0 ? 'warn' : 'pass';
     const inputs = unverifiedInputs(doc, found);
     const data = {
       analysisId,
       status,
+      state: trust.state,
       items,
       reviewRequired: true,
       reviewReason: REVIEW_REASON,

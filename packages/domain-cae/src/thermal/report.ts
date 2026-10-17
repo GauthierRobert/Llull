@@ -4,7 +4,7 @@ import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { analysisIdSchema } from '../shared/schemas';
-import { stateOf } from '../shared/state';
+import { trustedRecord } from '../shared/trust';
 import { isProblem, thermalCaseOf } from './access';
 import { REVIEW_REASON } from './check';
 import { refuseThermal } from './codes';
@@ -12,18 +12,20 @@ import { HEAT_BALANCE_TOLERANCE, hasRadiation, physicalConstantsOf } from './con
 import { unverifiedInputs } from './unverified';
 
 /**
- * @invariant read-only; numbers appear only when the recorded results are current (state solved); unverified is the OR of the k / cp /
+ * @invariant read-only; numbers appear only when the recorded results are current AND re-verified against the artifact store (state solved;
+ *   no store, a missing artifact or a summary that differs from its artifact withholds them: state missing / untrusted); unverified is the OR of the k / cp /
  *   density input flags; physical constants are named with source and defaulted when radiation exists
  * @failure unknown analysis / other case type -> refusal (FEA_ANALYSIS_NOT_FOUND / THM_CASE_TYPE)
  */
 export const thermalReport = defineCommand({
   name: 'thermal_report',
   description:
-    'Read the thermal results of a heat_steady / heat_transient analysis: data { state: unmeshed | meshed | solved | stale | missing, ' +
+    'Read the thermal results of a heat_steady / heat_transient analysis: data { state: unmeshed | meshed | solved | stale | missing | untrusted, ' +
     'temperatureScale, maxT / minT {value, at (document units), entityId, timeS}, maxHeatFlux, bcHeatFlows [{ bcId, timeS, valueW }] (W, ' +
     'positive INTO the part), heatBalance {inW, outW, storedW, residualRel, timeS, tolerance}, probes [{ probeId, series [[timeS, T]] }], ' +
     'physicalConstants (radiation cases: Stefan-Boltzmann and absolute zero with source and defaulted), propertyRangeExceeded, unverified, ' +
-    'unverifiedReasons }. Numbers are returned only for state "solved": a stale result must be re-solved (fea_mesh, fea_solve). ' +
+    'unverifiedReasons }. Numbers are returned only for state "solved" and are recomputed from the artifact store: a stale result must be re-solved (fea_mesh, ' +
+    'fea_solve); "missing" (no artifact store or artifact on this machine) and "untrusted" (FEA_SUMMARY_MISMATCH) withhold them. ' +
     'Check heatBalance.residualRel against the tolerance before reporting a result as final; end with check_thermal.',
   annotations: { readOnly: true },
   params: z.object({
@@ -35,24 +37,27 @@ export const thermalReport = defineCommand({
     const found = thermalCaseOf(doc, analysisId);
     if (isProblem(found)) return refuseThermal(doc, 'thermal_report', found.code, found.message, found.ids, found.paths);
     const { analysisCase, thermal } = found;
-    const base = stateOf(doc, analysisCase);
-    const port = ctx?.feaArtifacts ?? null;
-    const absent =
-      port !== null &&
-      ((analysisCase.meshSummary !== undefined && port.get(analysisCase.meshSummary.meshHash) === null) ||
-        (analysisCase.results !== undefined && port.get(analysisCase.results.resultsHash) === null));
-    const state = base === 'unmeshed' || base === 'stale' ? base : absent ? 'missing' : base;
+    const trust = trustedRecord(doc, analysisCase, ctx?.feaArtifacts);
+    const { state } = trust;
     const inputs = unverifiedInputs(doc, found);
-    const summary = analysisCase.results?.thermal;
+    const summary = trust.results?.thermal;
     const header = {
       analysisId,
       state,
       temperatureScale: thermal.temperatureScale,
       unverified: inputs.unverified,
       unverifiedReasons: inputs.reasons,
+      problem: trust.problem,
     };
-    if (summary === undefined || state === 'stale' || state === 'unmeshed' || state === 'meshed') {
-      const why = state === 'stale' ? 'results are stale: re-run fea_mesh and fea_solve' : 'no results yet: run fea_mesh and fea_solve';
+    if (summary === undefined || state !== 'solved') {
+      const why =
+        state === 'stale'
+          ? 'results are stale: re-run fea_mesh and fea_solve'
+          : state === 'untrusted'
+            ? `FEA_SUMMARY_MISMATCH: ${trust.problem?.message ?? 'the recorded summary differs from its artifact'}; numbers withheld`
+            : state === 'missing'
+              ? `${trust.problem?.message ?? 'the artifact is not available on this machine'}; numbers withheld`
+              : 'no results yet: run fea_mesh and fea_solve';
       return report(doc, `thermal_report: '${analysisId}' — ${state} (${why}).`, { ...header, message: why });
     }
     const times = summary.times;

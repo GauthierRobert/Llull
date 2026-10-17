@@ -2,17 +2,25 @@ import type { CommandResult } from '@core/commands/types';
 import { describe, expect, it } from 'vitest';
 import { defaultContext } from '@core/commands/context';
 import { execute } from '@core/commands/registry';
-import type { AnalysisCase, FeMeshArtifact, FeResultsArtifact, ResultsSummary } from '@core/model/analysis';
+import type { AnalysisCase, FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
+import type { CadDocument } from '@core/model/types';
+import { meshSummary, resultsSummary } from '@cae/results/summary';
 import { analysisInputHash } from '@cae/hash/inputHash';
 import { withCase } from '@cae/shared/access';
 import { expectNoOp, expectPure } from '../../../helpers/expectNoOp';
 import { hashOf, portOf, thermoFixture, type Fixture } from './fixtures';
 
-/** Plate z = 0 (nodes 1-5, centre node 5) and an apex node 6 above it; the centre lifts by 0.2 mm. */
-function solved(): { fixture: Fixture; port: ReturnType<typeof portOf>; mesh: FeMeshArtifact } {
-  const base = thermoFixture();
+/** Plate z = 0 (nodes 1-5, centre node 5) and an apex node 6 above it; the centre lifts by 0.2 mm. Mesh and results are recorded for real. */
+function solved(options: { units?: CadDocument['units']; steps?: FeResultsArtifact['steps'] } = {}): {
+  fixture: Fixture;
+  port: ReturnType<typeof portOf>;
+  mesh: FeMeshArtifact;
+} {
+  const created = thermoFixture();
+  const base: Fixture = options.units === undefined ? created : { ...created, doc: { ...created.doc, units: options.units } };
   const mesh: FeMeshArtifact = {
     ...base.mesh,
+    inputHash: analysisInputHash(base.doc, base.analysisId, 'mesh'),
     nodes: [
       [1, 0, 0, 0],
       [2, 10, 0, 0],
@@ -38,17 +46,17 @@ function solved(): { fixture: Fixture; port: ReturnType<typeof portOf>; mesh: Fe
   const results: FeResultsArtifact = {
     kind: 'fe_results',
     meshHash: hashOf(mesh),
-    inputHash: 'x',
+    inputHash: analysisInputHash(base.doc, base.analysisId, 'full'),
     solver: 'ccx',
     solverVersion: '2',
-    steps: [{ step: 1, time: 1, fields: { DISP: { components: ['D1', 'D2', 'D3'], values: displacement } } }],
+    steps: options.steps ?? [{ step: 1, time: 1, fields: { DISP: { components: ['D1', 'D2', 'D3'], values: displacement } } }],
   };
   const resultsHash = hashOf(results);
   const analysisCase = base.doc.analysis?.cases[base.analysisId] as AnalysisCase;
   const withArtifacts: AnalysisCase = {
     ...analysisCase,
-    meshSummary: { meshHash: hashOf(mesh), inputHash: analysisInputHash(base.doc, base.analysisId, 'mesh') } as never,
-    results: { resultsHash, inputHash: analysisInputHash(base.doc, base.analysisId, 'full') } as unknown as ResultsSummary,
+    meshSummary: meshSummary(mesh, hashOf(mesh)),
+    results: resultsSummary(base.doc, base.analysisId, mesh, results, resultsHash),
   };
   return {
     fixture: { ...base, mesh, doc: withCase(base.doc, withArtifacts) },
@@ -109,14 +117,8 @@ describe('thermal_distortion_report', () => {
   });
 
   it('converts analysis lengths to the document unit (in)', () => {
-    const { fixture, port } = solved();
-    const inches = { ...fixture, doc: { ...fixture.doc, units: 'in' as const } };
-    const analysisCase = inches.doc.analysis?.cases[inches.analysisId] as AnalysisCase;
-    const redone = withCase(inches.doc, {
-      ...analysisCase,
-      results: { ...analysisCase.results!, inputHash: analysisInputHash(inches.doc, inches.analysisId, 'full') },
-    });
-    const result = report({ ...inches, doc: redone }, port, { faces: [{ name: 'f', targetKey: 'C_fc-1.1' }] });
+    const { fixture, port } = solved({ units: 'in' });
+    const result = report(fixture, port, { faces: [{ name: 'f', targetKey: 'C_fc-1.1' }] });
     const data = result.data as { faces: FaceRow[]; unit: string };
     expect(data.unit).toBe('in');
     expect(data.faces[0]?.flatnessAfter).toBeCloseTo(0.2 / 25.4, 10);
@@ -155,18 +157,7 @@ describe('thermal_distortion_report', () => {
       expect(result.error?.code, JSON.stringify(face)).toBe('FEA_TARGET_UNRESOLVED');
       expect(result.document).toBe(fixture.doc);
     }
-    const analysisCase = fixture.doc.analysis?.cases[fixture.analysisId] as AnalysisCase;
-    const noDisp: FeResultsArtifact = {
-      kind: 'fe_results',
-      meshHash: 'm',
-      inputHash: 'x',
-      solver: 'c',
-      solverVersion: '1',
-      steps: [{ step: 1, time: 1, fields: {} }],
-    };
-    const hash = hashOf(noDisp);
-    const doc = withCase(fixture.doc, { ...analysisCase, results: { ...analysisCase.results!, resultsHash: hash } });
-    const mesh = portOf({ [analysisCase.meshSummary!.meshHash]: fixture.mesh, [hash]: noDisp });
-    expect(report({ ...fixture, doc }, mesh, {}).error?.code).toBe('FEA_RESULTS_MISSING');
+    const noDisp = solved({ steps: [{ step: 1, time: 1, fields: {} }] });
+    expect(report(noDisp.fixture, noDisp.port, {}).error?.code).toBe('FEA_RESULTS_MISSING');
   });
 });

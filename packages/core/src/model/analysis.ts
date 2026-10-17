@@ -95,6 +95,8 @@ export interface QualitySummary {
 }
 
 export interface MeshSummary {
+  /** `false` = recorded WITHOUT its artifact (replay on a machine that lacks the store): never trusted, never read as numbers (05 §4.1). */
+  readonly verified?: false;
   readonly meshHash: string;
   readonly inputHash: string;
   readonly mesher: string;
@@ -134,6 +136,8 @@ export interface ThermalResultsSummary {
 }
 
 export interface ResultsSummary {
+  /** `false` = recorded WITHOUT its artifact: state `missing`, never read as numbers (see `MeshSummary.verified`). */
+  readonly verified?: false;
   readonly resultsHash: string;
   readonly inputHash: string;
   readonly solver: string;
@@ -232,6 +236,8 @@ export interface Disposition {
   readonly resultsHash: string;
   readonly signer: string;
   readonly signatureId: string;
+  /** The signature object the signing port verified; readers re-verify it against the payload (a record without it is unverified). */
+  readonly signature?: unknown;
 }
 
 export interface ThermalSetup {
@@ -293,6 +299,8 @@ interface FitDisposition {
   readonly inputsHash: string;
   readonly signer: string;
   readonly signatureId: string;
+  /** The signature object the signing port verified; readers re-verify it against the payload. */
+  readonly signature?: unknown;
 }
 export type FitDispositions = Readonly<Record<string, FitDisposition>>;
 

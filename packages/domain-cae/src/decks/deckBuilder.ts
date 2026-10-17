@@ -6,7 +6,7 @@ import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 import { analysisInputHash } from '../hash/inputHash';
 import { ALL_ELEMENTS, ALL_NODES, buildDeckContext, isDeckRefusal, type DeckContext, type DeckRefusal, type DeckSections } from './context';
-import { idLines, linesText, row } from './format';
+import { commentText, idLines, linesText, row } from './format';
 import { mechanicalMaterialLines, staticStep } from './mechanical';
 
 /** The discipline functions of the thermal and thermo-mechanical lanes (FE_PIPELINE_DESIGN §5 table). */
@@ -24,7 +24,32 @@ export interface DisciplineTable {
 export type InpResult = { readonly text: string } | DeckRefusal;
 
 const refuse = (code: string, message: string, ids: readonly string[] = []): DeckRefusal => ({ code, message, ids });
-const singleLine = (text: string): string => text.replace(/[\r\n]+/g, ' ');
+
+/** Sets are matched case-insensitively by CalculiX: two sources that sanitise to the same name would silently merge. */
+function nameCollision(ctx: DeckContext): DeckRefusal | null {
+  const groups: {
+    readonly kind: string;
+    readonly sources: readonly string[];
+    readonly name: (source: string) => string;
+    readonly reserved: string;
+  }[] = [
+    { kind: 'element set', sources: [...new Set(ctx.mesh.blocks.map((block) => block.entityId))], name: ctx.elset, reserved: ALL_ELEMENTS },
+    { kind: 'node set', sources: Object.keys(ctx.mesh.nodeSets), name: ctx.nset, reserved: ALL_NODES },
+  ];
+  for (const { kind, sources, name, reserved } of groups) {
+    const owners = new Map<string, string>([[reserved, reserved]]);
+    for (const source of sources) {
+      const upper = name(source).toUpperCase();
+      const other = owners.get(upper);
+      if (other !== undefined)
+        return refuse('FEA_DECK_NAME_COLLISION', `${kind} names of '${other}' and '${source}' are both ${upper} after sanitising`, [
+          source,
+        ]);
+      owners.set(upper, source);
+    }
+  }
+  return null;
+}
 
 function precheck(doc: CadDocument, analysisId: string, mesh: FeMeshArtifact, ctx: DeckContext): DeckRefusal | null {
   const { analysis } = ctx;
@@ -53,6 +78,8 @@ function precheck(doc: CadDocument, analysisId: string, mesh: FeMeshArtifact, ct
     if (!blockEntities.has(entityId)) return refuse('FEA_PART_INVALID', `part '${entityId}' has no elements in the mesh`, [entityId]);
     if (ctx.materialOf(entityId) === null) return refuse('FEA_MATERIAL_MISSING', `part '${entityId}' has no material`, [entityId]);
   }
+  const collision = nameCollision(ctx);
+  if (collision !== null) return collision;
   const structural = analysis.type === 'static' || analysis.type === 'thermo_static';
   if (structural && analysis.constraintOrder.length === 0)
     return refuse('FEA_NO_CONSTRAINTS', `analysis '${analysisId}' has no constraint: the stiffness matrix would be singular`, [analysisId]);
@@ -97,7 +124,7 @@ export function buildInp(
   const { analysis } = ctx;
   const heat = analysis.type === 'heat_steady' || analysis.type === 'heat_transient';
   const lines = [
-    `** llull analysis ${singleLine(analysis.name)} units ${analysis.unitSystem} inputHash ${analysisInputHash(doc, analysisId, 'full')} meshHash ${sha256Hex(canonicalJson(mesh))}`,
+    `** llull analysis ${commentText(analysis.name)} units ${analysis.unitSystem} inputHash ${analysisInputHash(doc, analysisId, 'full')} meshHash ${sha256Hex(canonicalJson(mesh))}`,
     ...modelBlock(ctx),
   ];
   const materialOwners = new Map<string, string>();
@@ -110,7 +137,7 @@ export function buildInp(
           mechanicalMaterialLines(ctx, entityId),
           ...(analysis.type === 'thermo_static' ? [disciplines.thermomech.materialCards(ctx, entityId)] : []),
         ];
-    lines.push(`*MATERIAL, NAME=${name}`);
+    lines.push(`** material ${name} = '${commentText(ctx.materialId(entityId) ?? '', 80)}'`, `*MATERIAL, NAME=${name}`);
     for (const card of cards) {
       if (isDeckRefusal(card)) return card;
       lines.push(...card.text.split('\n').filter((line) => line !== ''));

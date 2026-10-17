@@ -8,7 +8,7 @@ import { thermalResultsSummary } from '@cae/thermal/summary';
 import { evaluateProbes } from '@cae/results/probes';
 import { locatePoint } from '@cae/results/probeInterpolation';
 import { solvedWall } from './solved';
-import { addBc, caseOf, must, resultsFor, thermalFixture, twoTetMesh, type ThermalFixture } from './fixtures';
+import { addBc, caseOf, machineContext, must, resultsFor, thermalFixture, twoTetMesh, type ThermalFixture } from './fixtures';
 
 const source = { citation: 'test source' };
 const FACE_234: [number, number][] = [[2, 3]];
@@ -135,14 +135,17 @@ describe('check_thermal: heat balance of a cavity case', () => {
       }).document,
     }));
     const items = (
-      execute(cavity.solved, 'check_thermal', { analysisId: cavity.analysisId }).data as { items: { code: string; message: string }[] }
+      execute(cavity.solved, 'check_thermal', { analysisId: cavity.analysisId }, machineContext()).data as {
+        items: { code: string; message: string }[];
+      }
     ).items;
     const balance = items.filter((item) => item.code === 'THM_HEAT_BALANCE');
     expect(balance).toHaveLength(1);
     expect(balance[0]?.message).toContain('not evaluated');
     const plain = solvedWall();
-    const plainItems = (execute(plain.solved, 'check_thermal', { analysisId: plain.analysisId }).data as { items: { code: string }[] })
-      .items;
+    const plainItems = (
+      execute(plain.solved, 'check_thermal', { analysisId: plain.analysisId }, machineContext()).data as { items: { code: string }[] }
+    ).items;
     expect(plainItems.some((item) => item.code === 'THM_HEAT_BALANCE')).toBe(false);
   });
 });

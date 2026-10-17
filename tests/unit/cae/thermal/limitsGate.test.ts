@@ -8,8 +8,10 @@ import type { CadDocument } from '@core/model/types';
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 import { analysisInputHash } from '@cae/hash/inputHash';
+import { isProblem, thermalCaseOf } from '@cae/thermal/access';
+import { limitRows } from '@cae/thermal/limitRows';
 import { expectNoOp, expectPure } from '../../../helpers/expectNoOp';
-import { caseOf, must } from './fixtures';
+import { caseOf, machineContext, must } from './fixtures';
 import { HOT_T, solvedWall, type SolvedWall } from './solved';
 
 const source = { citation: 'test input of this validation case', locator: 'VC-THM-62' };
@@ -18,7 +20,7 @@ const withPorts = (wall: SolvedWall, signatures?: HumanSignaturePort): Execution
   feaArtifacts: wall.port,
   ...(signatures !== undefined ? { humanSignature: signatures } : {}),
 });
-const run = (doc: CadDocument, command: string, params: Record<string, unknown>, ctx = defaultContext()): CommandResult =>
+const run = (doc: CadDocument, command: string, params: Record<string, unknown>, ctx = machineContext()): CommandResult =>
   execute(doc, command, params, ctx);
 
 interface Row {
@@ -103,14 +105,10 @@ describe('check_temperature_limits', () => {
     expectPure(doc, () => run(doc, 'check_temperature_limits', { analysisId: wall.analysisId }, withPorts(wall)));
   });
 
-  it('uses the marginal band only when given, bound by bound, and resolves target limits through node sets or faces', () => {
+  it('uses the marginal band only when given, bound by bound, and (limitRows) resolves target limits through node sets or faces', () => {
     const { wall, doc, targetId } = limited();
     const mesh = wall.mesh;
-    const storeWith = (artifact: typeof mesh): { get: (hash: string) => typeof wall.results | typeof mesh | null } => ({
-      get: (hash) => (hash === wall.resultsHash ? wall.results : hash === wall.results.meshHash ? artifact : null),
-    });
-    const ctx = { ...defaultContext(), feaArtifacts: storeWith(mesh) };
-    const result = run(doc, 'check_temperature_limits', { analysisId: wall.analysisId, marginalBandK: 50 }, ctx);
+    const result = run(doc, 'check_temperature_limits', { analysisId: wall.analysisId, marginalBandK: 50 }, withPorts(wall));
     const data = result.data as Data;
     const row = data.rows.find((entry) => entry.limitId === targetId);
     expect(row).toMatchObject({ status: 'MARGINAL', code: 'THM_LIMIT_MARGINAL' });
@@ -118,29 +116,14 @@ describe('check_temperature_limits', () => {
     expect(data.items.map((item) => item.code)).not.toContain('THM_MARGINAL_BAND_UNSET');
     expect(data.items.map((item) => item.code)).toContain('THM_LIMIT_MARGINAL');
     expect(data.summary).toMatchObject({ marginal: 1, fail: 1, pass: 1 });
+    const found = thermalCaseOf(doc, wall.analysisId);
+    if (isProblem(found)) throw new Error(found.message);
     const viaFaces = { ...mesh, nodeSets: {}, faceSets: { ...mesh.faceSets, [`T_${targetId}`]: [[1, 1]] as [number, number][] } };
-    const byFaces = run(
-      doc,
-      'check_temperature_limits',
-      { analysisId: wall.analysisId },
-      { ...defaultContext(), feaArtifacts: storeWith(viaFaces) },
-    );
-    expect((byFaces.data as Data).rows).toHaveLength(3);
+    const byFaces = limitRows(doc, found, viaFaces, wall.results, undefined);
+    expect(byFaces).toHaveLength(3);
     const emptyFaces = { ...viaFaces, faceSets: {} };
-    const refused = run(
-      doc,
-      'check_temperature_limits',
-      { analysisId: wall.analysisId },
-      { ...defaultContext(), feaArtifacts: storeWith(emptyFaces) },
-    );
-    expect(refused.error?.code).toBe('FEA_TARGET_UNRESOLVED');
-    const partOnly = run(
-      doc,
-      'check_temperature_limits',
-      { analysisId: wall.analysisId },
-      { ...defaultContext(), feaArtifacts: storeWith({ ...mesh, blocks: [] }) },
-    );
-    expect(partOnly.error?.code).toBe('FEA_TARGET_UNRESOLVED');
+    expect(limitRows(doc, found, emptyFaces, wall.results, undefined)).toMatchObject({ code: 'FEA_TARGET_UNRESOLVED' });
+    expect(limitRows(doc, found, { ...mesh, blocks: [] }, wall.results, undefined)).toMatchObject({ code: 'FEA_TARGET_UNRESOLVED' });
   });
 
   it('VC-THM-63: unverified conductivity marks every row', () => {
@@ -161,7 +144,7 @@ describe('check_temperature_limits', () => {
     expect(stale.rejected).toBe(true);
     expect(stale.error?.code).toBe('FEA_RESULTS_STALE');
     expect(stale.error?.remediation).toContain('fea_solve');
-    const withoutPort = run(doc, 'check_temperature_limits', { analysisId: wall.analysisId });
+    const withoutPort = run(doc, 'check_temperature_limits', { analysisId: wall.analysisId }, defaultContext());
     expect(withoutPort.error?.code).toBe('FEA_RESULTS_MISSING');
     const noResults = must(wall.doc, 'add_temperature_limit', {
       analysisId: wall.analysisId,
@@ -238,9 +221,10 @@ describe('dispose_thermal_limit (human gate)', () => {
       resultsHash: wall.resultsHash,
       signer: 'alice',
       signatureId: 'sig-7',
+      signature: 'good',
     });
     expectPure(doc, () => run(doc, 'dispose_thermal_limit', params, withPorts(wall, signer())));
-    const after = run(result.document, 'check_temperature_limits', { analysisId: wall.analysisId }, withPorts(wall));
+    const after = run(result.document, 'check_temperature_limits', { analysisId: wall.analysisId }, withPorts(wall, signer()));
     const row = (after.data as Data).rows.find((entry) => entry.rowId === rowId);
     expect(row?.disposition).toMatchObject({ decision: 'accepted', signer: 'alice' });
     expect((after.data as Data).items.map((item) => item.code)).not.toContain('THM_DISPOSITION_PENDING');
@@ -263,7 +247,7 @@ describe('dispose_thermal_limit (human gate)', () => {
         },
       },
     };
-    const pending = run(rebound, 'check_temperature_limits', { analysisId: wall.analysisId }, withPorts(wall));
+    const pending = run(rebound, 'check_temperature_limits', { analysisId: wall.analysisId }, withPorts(wall, signer()));
     expect((pending.data as Data).rows.find((entry) => entry.rowId === rowId)?.disposition).toBe('pending_human');
   });
 

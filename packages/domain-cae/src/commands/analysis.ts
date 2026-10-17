@@ -7,9 +7,10 @@ import { changed, report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { nextId } from '@lib/id';
 import { analysisInputHash } from '../hash/inputHash';
-import { stateOf } from '../shared/state';
+import { trustedRecord, type Trust } from '../shared/trust';
 import { analysisOf, caseOf, withCase, withoutCase } from '../shared/access';
 import { refuseCode } from '../shared/codes';
+import { loadCaseNameProblem } from '../shared/names';
 import { DEFAULT_FACTORS, defaultMeshControls, emptyThermalSetup, unitSystemOf } from '../shared/defaults';
 import { analysisIdSchema, quantitySchema } from '../shared/schemas';
 import { temperatureProblem } from '../shared/quantity';
@@ -86,7 +87,9 @@ export const createAnalysis = defineCommand({
     loadCaseName: z
       .string()
       .optional()
-      .describe('thermo_static only: name of the load case that carries the thermal load. Default "thermal".'),
+      .describe(
+        'thermo_static only: name of the load case that carries the thermal load (1-40 letters, digits or underscores). Default "thermal".',
+      ),
     factors: factorsSchema
       .optional()
       .describe('Safety factors; omit for the defaults (ultimate 1.5, yield 1.0, no extra). When given, state both ultimate and yield.'),
@@ -118,6 +121,8 @@ export const createAnalysis = defineCommand({
       return fail('TMC_REFERENCE_TEMPERATURE_MISSING', 'a thermo_static analysis needs referenceTemperature', [], ['referenceTemperature']);
     const temperature = referenceTemperature === undefined ? null : temperatureProblem(referenceTemperature);
     if (temperature !== null) return fail('THM_UNITS_MISMATCH', temperature, [], ['referenceTemperature']);
+    const caseNameProblem = loadCaseName === undefined ? null : loadCaseNameProblem(loadCaseName);
+    if (caseNameProblem !== null) return fail('FEA_LOAD_INVALID', caseNameProblem, [], ['loadCaseName']);
     const factorError = params.factors === undefined ? null : factorProblem(params.factors);
     if (factorError !== null) return fail('FEA_FACTOR_INVALID', factorError, [], ['factors']);
 
@@ -194,25 +199,40 @@ export const deleteAnalysis = defineCommand({
   },
 });
 
+/** The case with its recorded summaries replaced by the ones re-verified against the artifacts (absent when they could not be). */
+function verifiedView(analysisCase: AnalysisCase, trust: Trust): AnalysisCase {
+  const { meshSummary, results, ...rest } = analysisCase;
+  void meshSummary;
+  void results;
+  return {
+    ...rest,
+    ...(trust.mesh !== null ? { meshSummary: trust.mesh } : {}),
+    ...(trust.results !== null ? { results: trust.results } : {}),
+  };
+}
+
 /**
- * @invariant read-only; data.state is unmeshed | meshed | solved | stale (recorded artifact input hash != the current one)
+ * @invariant read-only; data.state is unmeshed | meshed | solved | stale (recorded artifact input hash != the current one) | missing (no
+ *   artifact store, artifact absent or recorded without it) | untrusted (a recorded summary differs from its artifact: FEA_SUMMARY_MISMATCH in
+ *   data.problem); the recorded mesh / results summaries are shown only when re-verified against the artifact store (05 §4.1)
  * @failure unknown id -> FEA_ANALYSIS_NOT_FOUND
  */
 export const describeAnalysis = defineCommand({
   name: 'describe_analysis',
   description:
     'Read an analysis case: data { case (parts, constraints, loads, mesh controls, probes, thermal / thermomech set-up, recorded mesh and ' +
-    'results summaries), state: unmeshed | meshed | solved | stale, inputHash { mesh, full } }. Without analysisId, list every analysis ' +
+    'results summaries), state: unmeshed | meshed | solved | stale | missing | untrusted, inputHash { mesh, full }, problem }. The recorded mesh / results summaries are shown only when they match their artifact in the artifact store (otherwise state missing or untrusted and they are omitted). Without analysisId, list every analysis ' +
     '(id, name, type, state). Use it to find ids for update_/delete_ commands and to check whether artifacts are current.',
   annotations: { readOnly: true },
   params: z.object({ analysisId: analysisIdSchema.optional() }),
-  run: (doc, { analysisId }): CommandResult => {
+  run: (doc, { analysisId }, ctx): CommandResult => {
+    const port = ctx?.feaArtifacts;
     if (analysisId === undefined) {
       const analyses = analysisOf(doc).caseOrder.flatMap((id) => {
         const analysisCase = caseOf(doc, id);
         return analysisCase === undefined
           ? []
-          : [{ id, name: analysisCase.name, type: analysisCase.type, state: stateOf(doc, analysisCase) }];
+          : [{ id, name: analysisCase.name, type: analysisCase.type, state: trustedRecord(doc, analysisCase, port).state }];
       });
       return report(
         doc,
@@ -223,10 +243,12 @@ export const describeAnalysis = defineCommand({
     const analysisCase = caseOf(doc, analysisId);
     if (analysisCase === undefined)
       return refuseCode(doc, 'describe_analysis', 'FEA_ANALYSIS_NOT_FOUND', `no analysis '${analysisId}'`, [analysisId], ['analysisId']);
-    const state = stateOf(doc, analysisCase);
+    const trust = trustedRecord(doc, analysisCase, port);
+    const state = trust.state;
     return report(doc, `describe_analysis: '${analysisId}' (${analysisCase.name}) — ${analysisCase.type}, ${state}.`, {
-      case: analysisCase,
+      case: verifiedView(analysisCase, trust),
       state,
+      problem: trust.problem,
       inputHash: { mesh: analysisInputHash(doc, analysisId, 'mesh'), full: analysisInputHash(doc, analysisId, 'full') },
     });
   },

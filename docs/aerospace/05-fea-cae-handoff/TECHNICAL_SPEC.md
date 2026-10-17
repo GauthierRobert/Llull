@@ -652,3 +652,28 @@ system. The FE tools run synchronously in the server process (no ticket cancel y
 **Not built (05 backlog):** modal, buckling, shells / plane stress / beams, midsurface, defeature, moment loads, Nastran BDF, OP2,
 `compute_margins` / `dispose_margin`, `analytic_check`, `set_result_view`, `fea_import_results`, `fea_result_field`, the full Verdict
 quality port, UI panels, `.llullz` result bundling.
+
+**Review fixes (2026-10-17), documented behaviour changes:**
+
+- **Trust model §4.1 completed on the read side.** A recorded summary in the document (also one that arrived through `load_document` or a
+  live snapshot) is a *claim*. `fea_report`, `check_analysis`, `describe_analysis` and the thermal / thermo-mechanical read paths call
+  `trustedRecord` (`domain-cae/src/shared/trust.ts`): the summary is recomputed from the artifact in `ctx.feaArtifacts` with the same
+  summariser the record commands use. State `solved` / `meshed` only when it matches; a difference gives state **`untrusted`** with
+  `FEA_SUMMARY_MISMATCH` (`data.problem`), no port / artifact absent / recorded without it gives **`missing`**. In both cases the mesh and
+  results are `null` (numbers withheld) and the results of a `stale` case are not shown. `stateOf` (hash only) is used where no number is read.
+- **Replay without artifacts (TR-FEA-05).** `record_fe_mesh` / `record_fea_results` keep the given summary flagged `verified: false` when the
+  port is absent or the artifact is not in it (step recorded, document changed, state `missing`, never read by any query); with the artifact
+  present every check of §4.1 still applies (mismatch, `FEA_INPUT_STALE`, `FEA_MESH_MISMATCH` refuse). A summary without a text `inputHash`
+  is refused. The replay cache key includes whether a port is injected. The live-sync state hash ignores the flag, so a replica without the
+  store converges with the server instead of requesting a snapshot after every FE command.
+- **Input hash (TR-FEA-06).** Hashes `parts[entity] = { idealization, geometry, materialId }`, the physical part of each used material
+  (density, property / material models, constitutive sets, default set - not name, colour, PBR, finish) and `documentUnit`: swapping the
+  materials of two parts or `set_units` makes results stale; a recolour does not.
+- **Deck text (§5.6).** Every free-text fragment written to the INP goes through `commentText` (control characters stripped, length capped);
+  load case names must match `[A-Za-z0-9_]{1,40}` (`FEA_LOAD_INVALID`), cavity names `[A-Za-z0-9_]{1,3}` (`THM_CAVITY_INVALID`). `*MATERIAL`
+  names are `M_<n>` by first appearance with the id in a `** material M_n = '<id>'` comment; element / node set names that coincide after
+  sanitising are refused (`FEA_DECK_NAME_COLLISION`).
+- **Limits.** `fea_solve` `timeoutS` is clamped to [1, 86400] (schema `minimum` / `maximum`); a `.frd` above 256 MiB is `FEA_RESULTS_TOO_LARGE`;
+  non-finite result values are `FEA_SOLVER_FAILED` ("non-finite results"); the recorded results summary is built from the artifact read back
+  from the store; `meshRequest` refuses an estimated element count above 2e6 (bbox volume / globalSize^3 x 6 per part, refinements ignored)
+  with `FEA_MESH_TOO_LARGE`.

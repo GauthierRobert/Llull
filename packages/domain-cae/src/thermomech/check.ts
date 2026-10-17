@@ -7,6 +7,7 @@ import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { caseOf } from '../shared/access';
+import { trustedRecord } from '../shared/trust';
 import { analysisIdSchema } from '../shared/schemas';
 import { elasticUnverifiedReasons, providerFor, REFERENCE_PROBE_KELVIN } from './cte';
 import { expressionProblem, thermalSourceProblem, thermomechOf } from './field';
@@ -45,7 +46,8 @@ function fieldItems(
   if (field.kind !== 'thermal_result') return [];
   const problem = thermalSourceProblem(doc, analysisCase, field, artifacts);
   if (problem !== null) return [item(problem.code, 'error', problem.message, problem.ids)];
-  const times = caseOf(doc, field.analysisId)?.results?.thermal?.times ?? [];
+  const source = caseOf(doc, field.analysisId);
+  const times = (source === undefined ? null : trustedRecord(doc, source, artifacts).results)?.thermal?.times ?? [];
   const wanted = field.time;
   const known =
     wanted === 'last' || times.length === 0 || times.some((time) => Math.abs(time - wanted) <= 1e-9 * Math.max(1, Math.abs(wanted)));

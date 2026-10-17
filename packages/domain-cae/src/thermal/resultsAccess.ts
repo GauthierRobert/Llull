@@ -2,7 +2,7 @@
 
 import type { FeMeshArtifact, FeResultsArtifact, FeArtifactPort } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
-import { stateOf } from '../shared/state';
+import { trustedRecord } from '../shared/trust';
 import { problem, type Problem, type ThermalCase } from './access';
 
 export interface ResultArtifacts {
@@ -12,9 +12,10 @@ export interface ResultArtifacts {
 }
 
 /**
- * Current results of the case with their artifacts.
+ * Current results of the case with their artifacts, the recorded summary re-verified against them (`trustedRecord`).
  * @failure no recorded results -> FEA_RESULTS_MISSING; inputs changed since the solve -> FEA_RESULTS_STALE; no artifact port, or the results /
- *   mesh artifact is not in the store -> FEA_RESULTS_MISSING
+ *   mesh artifact is not in the store, or the summary was recorded without it -> FEA_RESULTS_MISSING; summary that differs from its
+ *   artifact -> FEA_SUMMARY_MISMATCH
  */
 export function resultArtifacts(doc: CadDocument, found: ThermalCase, port: FeArtifactPort | null | undefined): ResultArtifacts | Problem {
   const { analysisCase } = found;
@@ -22,25 +23,20 @@ export function resultArtifacts(doc: CadDocument, found: ThermalCase, port: FeAr
   const record = analysisCase.results;
   if (record === undefined || record.thermal === undefined)
     return problem('FEA_RESULTS_MISSING', `analysis '${id}' has no recorded thermal results`, [id]);
-  if (stateOf(doc, analysisCase) === 'stale')
+  const trust = trustedRecord(doc, analysisCase, port);
+  if (trust.state === 'stale')
     return problem(
       'FEA_RESULTS_STALE',
       `the inputs of analysis '${id}' changed after the solve (results ${record.resultsHash.slice(0, 12)})`,
       [id],
     );
-  const results = port?.get(record.resultsHash) ?? null;
-  if (results === null || results.kind !== 'fe_results')
+  if (trust.state === 'untrusted')
+    return problem('FEA_SUMMARY_MISMATCH', trust.problem?.message ?? 'a recorded summary differs from its artifact', [id]);
+  if (trust.results === null || trust.resultsArtifact === null || trust.meshArtifact === null)
     return problem(
       'FEA_RESULTS_MISSING',
-      `the results artifact ${record.resultsHash.slice(0, 12)} is not in the artifact store of this machine`,
+      `the results artifact ${record.resultsHash.slice(0, 12)} is not verifiable on this machine: ${trust.problem?.message ?? 'no artifact store'}`,
       [id],
     );
-  const mesh = port?.get(results.meshHash) ?? null;
-  if (mesh === null || mesh.kind !== 'fe_mesh')
-    return problem(
-      'FEA_RESULTS_MISSING',
-      `the mesh artifact ${results.meshHash.slice(0, 12)} is not in the artifact store of this machine`,
-      [id],
-    );
-  return { resultsHash: record.resultsHash, mesh, results };
+  return { resultsHash: record.resultsHash, mesh: trust.meshArtifact, results: trust.resultsArtifact };
 }

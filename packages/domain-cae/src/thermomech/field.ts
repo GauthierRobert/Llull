@@ -13,9 +13,10 @@ import type { CadDocument } from '@core/model/types';
 import { canonicalJson } from '@lib/canonicalJson';
 import { evaluateExpression, expressionSyntaxError, extractReferences, isBuiltinConstant } from '@lib/expression';
 import { sha256Hex } from '@lib/sha256';
-import { analysisInputHash } from '../hash/inputHash';
 import { caseOf } from '../shared/access';
 import { analysisLengthMetres } from '../shared/defaults';
+import { trustedRecord } from '../shared/trust';
+import { temperatureProblem } from '../shared/quantity';
 import { affineBetween, metresPer, temperatureIn, type Affine } from './units';
 
 /** Nodal temperatures aligned with `mesh.nodes` (same order), in the case temperature scale. */
@@ -73,7 +74,7 @@ function uniformField(
   id: string,
 ): ResolvedField | FieldRefusal {
   const value = temperatureIn(field.value, scale);
-  if (value === null || !Number.isFinite(value))
+  if (value === null || !Number.isFinite(value) || temperatureProblem(field.value) !== null)
     return refusal('THM_UNITS_MISMATCH', `uniform temperature '${field.value.value} ${field.value.unit}' is not a finite temperature`, [
       id,
     ]);
@@ -217,10 +218,23 @@ export function thermalSourceProblem(
   if (source === undefined || (source.type !== 'heat_steady' && source.type !== 'heat_transient'))
     return refusal('TMC_FIELD_SOURCE_INVALID', `'${field.analysisId}' is not a heat_steady / heat_transient analysis`, ids);
   if (source.results === undefined) return refusal('FEA_RESULTS_MISSING', `thermal analysis '${source.id}' has no recorded results`, ids);
-  if (source.results.inputHash !== analysisInputHash(doc, source.id, 'full'))
+  const trust = trustedRecord(doc, source, artifacts);
+  if (trust.state === 'stale')
     return refusal(
       'TMC_THERMAL_RESULT_STALE',
       `the results of thermal analysis '${source.id}' are stale (its inputs changed since the solve)`,
+      ids,
+    );
+  if (trust.state === 'untrusted')
+    return refusal(
+      'FEA_SUMMARY_MISMATCH',
+      trust.problem?.message ?? `the recorded results of '${source.id}' differ from their artifact`,
+      ids,
+    );
+  if (trust.state !== 'solved')
+    return refusal(
+      'FEA_RESULTS_MISSING',
+      `the results of thermal analysis '${source.id}' cannot be verified on this machine: ${trust.problem?.message ?? 'no artifact store'}`,
       ids,
     );
   const hash = source.meshSummary?.meshHash;

@@ -46,12 +46,13 @@ P_box_1_1
 1, 3, 5, 7
 *NSET, NSET=C_fc_9_1
 1
-*MATERIAL, NAME=M_steel
+** material M_1 = 'steel'
+*MATERIAL, NAME=M_1
 *ELASTIC
 210000, 0.3
 *DENSITY
 7.85e-9
-*SOLID SECTION, ELSET=P_box_1_1, MATERIAL=M_steel
+*SOLID SECTION, ELSET=P_box_1_1, MATERIAL=M_1
 ** load case LC1
 *STEP
 *STATIC
@@ -166,7 +167,7 @@ describe('discipline dispatch', () => {
     const text = 'text' in written ? written.text : '';
     expect(log).toEqual(['heat']);
     expect(text).not.toContain('*ELASTIC');
-    expect(text).toContain('*MATERIAL, NAME=M_steel\n*CONDUCTIVITY\n50\n** heat cards of box-1.1\n*SOLID SECTION');
+    expect(text).toContain('*MATERIAL, NAME=M_1\n*CONDUCTIVITY\n50\n** heat cards of box-1.1\n*SOLID SECTION');
     expect(text.endsWith('*END STEP\n')).toBe(true);
   });
 
@@ -177,9 +178,7 @@ describe('discipline dispatch', () => {
     const written = buildInp(base.doc, base.analysisId, mesh, null, table(log));
     const text = 'text' in written ? written.text : '';
     expect(log).toEqual(['thermomech']);
-    expect(text).toContain(
-      '*MATERIAL, NAME=M_steel\n*ELASTIC\n210000, 0.3\n*DENSITY\n7.85e-9\n*EXPANSION, ZERO=20\n1.2e-5\n*SOLID SECTION',
-    );
+    expect(text).toContain('*MATERIAL, NAME=M_1\n*ELASTIC\n210000, 0.3\n*DENSITY\n7.85e-9\n*EXPANSION, ZERO=20\n1.2e-5\n*SOLID SECTION');
   });
 
   it('passes a discipline refusal through', () => {
@@ -208,7 +207,7 @@ describe('deck context', () => {
     expect(buildDeckContext(bar.doc, bar.analysisId, mesh)?.artifacts).toBeNull();
     expect(ctx?.nset('C_fc-8.1')).toBe('C_fc_8_1');
     expect(ctx?.elset(bar.boxId)).toBe('P_box_1_1');
-    expect(ctx?.materialName(bar.boxId)).toBe('M_steel');
+    expect(ctx?.materialName(bar.boxId)).toBe('M_1');
     expect(ctx?.materialOf(bar.boxId)?.name).toBe('steel');
     expect(ctx?.materialOf('nope')).toBeNull();
     expect(ctx?.materialName('nope')).toBe('M_NONE');

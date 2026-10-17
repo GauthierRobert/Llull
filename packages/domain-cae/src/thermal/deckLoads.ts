@@ -2,8 +2,8 @@
 
 import type { CavityRadiation, ThermalBcRecord, ThermalSetup } from '@core/model/analysis';
 import { siToSystem } from '@lib/thermalUnits';
-import type { DeckContext, DeckRefusal } from '../decks/context';
-import { num, row } from '../decks/format';
+import { safeName, type DeckContext, type DeckRefusal } from '../decks/context';
+import { commentText, num, row } from '../decks/format';
 import { analysisLengthMetres } from '../shared/defaults';
 import { amplitudeName } from './deckNames';
 import { absoluteZeroOf, inScale, siOf } from './quantities';
@@ -32,7 +32,7 @@ export function bcLines(ctx: DeckContext, thermal: ThermalSetup, record: Thermal
   const scale = thermal.temperatureScale;
   const system = ctx.unitSystem;
   const key = `B_${record.id}`;
-  const head = `** ${record.id} ${record.name} (${bc.kind})`;
+  const head = `** ${commentText(record.id)} ${commentText(record.name)} (${bc.kind})`;
   const missingFaces = (): DeckRefusal =>
     refusal('FEA_TARGET_UNRESOLVED', `thermal BC '${record.id}' (${record.name}) has no faces in the mesh`, [record.id]);
   switch (bc.kind) {
@@ -65,7 +65,7 @@ export function bcLines(ctx: DeckContext, thermal: ThermalSetup, record: Thermal
       return {
         lines: [
           head,
-          `** total ${num(watts)} W over ${num(volumeSi)} m^3 of '${bc.entityId}' = ${num(density)} W/m^3`,
+          `** total ${num(watts)} W over ${num(volumeSi)} m^3 of '${commentText(bc.entityId)}' = ${num(density)} W/m^3`,
           keyword('DFLUX', record),
           row(ctx.elset(bc.entityId), 'BF', siToSystem('generation', density, system)),
         ],
@@ -90,7 +90,10 @@ export function bcLines(ctx: DeckContext, thermal: ThermalSetup, record: Thermal
 export function cavityLines(ctx: DeckContext, thermal: ThermalSetup, cavity: CavityRadiation): Blocks {
   const scale = thermal.temperatureScale;
   const environment = cavity.environment.kind === 'open' ? inScale(cavity.environment.temperature, scale) : absoluteZeroOf(scale) - 1;
-  const lines = [`** ${cavity.id} ${cavity.name} (${cavity.environment.kind} cavity)`, `*RADIATE, CAVITY=${cavity.name.toUpperCase()}`];
+  const lines = [
+    `** ${commentText(cavity.id)} ${commentText(cavity.name)} (${cavity.environment.kind} cavity)`,
+    `*RADIATE, CAVITY=${safeName(cavity.name).toUpperCase()}`,
+  ];
   for (const [k, face] of cavity.faces.entries()) {
     const key = `V_${cavity.id}_${k}`;
     if (ctx.faces(key).length === 0)

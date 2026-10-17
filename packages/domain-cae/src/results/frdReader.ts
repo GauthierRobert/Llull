@@ -65,3 +65,15 @@ export function parseFrd(text: string): Steps {
   }
   return sets.filter((set) => Object.keys(set.fields).length > 0).map(({ step, time, fields }) => ({ step, time, fields }));
 }
+
+/**
+ * Location of the first non-finite value (NaN from a blank or unreadable cell, Infinity from an overflowing one) in parsed steps, as
+ * `step <n> field <name> node <id>`, or null when every value is finite.
+ */
+export function firstNonFinite(steps: Steps): string | null {
+  for (const { step, fields } of steps)
+    for (const [name, field] of Object.entries(fields))
+      for (const [node, values] of Object.entries(field.values))
+        if (values.some((value) => !Number.isFinite(value))) return `step ${step} field ${name} node ${node}`;
+  return null;
+}

@@ -192,15 +192,23 @@ describe('keyedTargets / meshRequest', () => {
     expect(meshRequest(noPart, analysisId)).toMatchObject({ code: 'FEA_PART_INVALID' });
     const metre = run({ ...doc, units: 'm' }, 'create_analysis', { name: 'm', analysisType: 'static' });
     const metreId = metre.affected[0] ?? '';
+    // the box is 10 document units wide whatever the label: a coarse mesh keeps the request under the element cap
     const withPart = patchCase(metre.document, metreId, {
       parts: { [Object.keys(caseIn(doc, analysisId).parts)[0] ?? '']: { kind: 'solid' } },
+      mesh: { ...caseIn(metre.document, metreId).mesh, globalSize: 5 },
     });
     const request = meshRequest(withPart, metreId);
     if ('code' in request) throw new Error(request.message);
     expect(request).toMatchObject({ unitSystem: 'N-m-kg-s', lengthToAnalysis: 1 });
     const inches = run({ ...withPart, units: 'in' }, 'create_analysis', { name: 'i', analysisType: 'static' });
     const inchId = inches.affected[0] ?? '';
-    const inchRequest = meshRequest(patchCase(inches.document, inchId, { parts: caseIn(withPart, metreId).parts }), inchId);
+    const inchRequest = meshRequest(
+      patchCase(inches.document, inchId, {
+        parts: caseIn(withPart, metreId).parts,
+        mesh: { ...caseIn(inches.document, inchId).mesh, globalSize: 5 },
+      }),
+      inchId,
+    );
     if ('code' in inchRequest) throw new Error(inchRequest.message);
     expect(inchRequest.lengthToAnalysis).toBe(1);
   });

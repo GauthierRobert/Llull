@@ -31,6 +31,13 @@ export function currentMesh(
   const recorded = analysisCase.meshSummary;
   if (recorded === undefined)
     return feaFailure(tool, 'FEA_MESH_MISSING', `analysis '${analysisId}' has no mesh; run fea_mesh first`, [analysisId]);
+  if (recorded.verified === false)
+    return feaFailure(
+      tool,
+      'FEA_MESH_MISSING',
+      `the mesh of '${analysisId}' was recorded without its artifact; run fea_mesh on this machine`,
+      [analysisId],
+    );
   if (recorded.inputHash !== hooks.analysisInputHash(doc, analysisId, 'mesh')) {
     return feaFailure(tool, 'FEA_MESH_STALE', `the mesh of '${analysisId}' predates a set-up change; run fea_mesh again`, [analysisId]);
   }

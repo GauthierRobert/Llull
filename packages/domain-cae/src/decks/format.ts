@@ -8,6 +8,20 @@ export const num = (value: number): string => (value === 0 ? '0' : significantNu
 /** Comma-separated data line. */
 export const row = (...values: readonly (number | string)[]): string => values.map((v) => (typeof v === 'number' ? num(v) : v)).join(', ');
 
+/** Longest free-text fragment written into a deck comment. */
+const COMMENT_FRAGMENT_MAX = 120;
+
+/**
+ * Free text made safe for a `**` comment: control characters (CR, LF, NUL, U+2028 ...) become one space, the result is trimmed and capped
+ * at `max` characters, so user text can never start a new deck line.
+ * @invariant the result has no line break; every free-text fragment written to a deck goes through it
+ */
+export const commentText = (text: string, max: number = COMMENT_FRAGMENT_MAX): string =>
+  text
+    .replace(/[\p{Cc}\p{Cf}\u2028\u2029]+/gu, ' ')
+    .trim()
+    .slice(0, max);
+
 /** Integer ids wrapped at 16 per line (CalculiX limit), each line `a, b, c`. */
 export function idLines(ids: readonly number[]): string[] {
   const lines: string[] = [];

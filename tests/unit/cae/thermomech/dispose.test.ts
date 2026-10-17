@@ -49,7 +49,14 @@ describe('dispose_fit_result (human gate)', () => {
     expect(seen).toEqual([payload()]);
     expect(result.affected).toEqual([params.rowKey]);
     expect(result.document.analysis?.fitDispositions).toEqual({
-      [params.rowKey]: { decision: 'accepted', justification: 'checked by hand', inputsHash: 'h1', signer: 'alice', signatureId: 'sig-1' },
+      [params.rowKey]: {
+        decision: 'accepted',
+        justification: 'checked by hand',
+        inputsHash: 'h1',
+        signer: 'alice',
+        signatureId: 'sig-1',
+        signature: params.signature,
+      },
     });
     expect(result.document.analysis?.cases).toEqual(doc.analysis?.cases);
   });

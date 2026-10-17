@@ -4,7 +4,7 @@ import type { FeArtifactPort, FeMeshArtifact, FeResultsArtifact, MeshSummary, Re
 import type { CadDocument } from '@core/model/types';
 import { analysisInputHash, meshRequest, type MeshRequest } from '@cae/index';
 import { writeInp } from '@cae/decks/inpWriter';
-import { parseFrd } from '@cae/results/frdReader';
+import { firstNonFinite, parseFrd } from '@cae/results/frdReader';
 import { parseDat } from '@cae/results/datReader';
 import { meshSummary, resultsSummary } from '@cae/results/summary';
 
@@ -23,6 +23,8 @@ export interface CaeHooks {
     artifacts: FeArtifactPort | null,
   ): { readonly text: string } | CaeCode;
   parseFrd(text: string): FeResultsArtifact['steps'];
+  /** Where the first non-finite value of parsed result steps is, or null. */
+  firstNonFinite(steps: FeResultsArtifact['steps']): string | null;
   parseDat(text: string): NonNullable<FeResultsArtifact['dat']>;
   meshSummary(mesh: FeMeshArtifact, meshHash: string): MeshSummary;
   resultsSummary(
@@ -34,4 +36,13 @@ export interface CaeHooks {
   ): ResultsSummary;
 }
 
-export const caeHooks: CaeHooks = { meshRequest, analysisInputHash, writeInp, parseFrd, parseDat, meshSummary, resultsSummary };
+export const caeHooks: CaeHooks = {
+  meshRequest,
+  analysisInputHash,
+  writeInp,
+  parseFrd,
+  firstNonFinite,
+  parseDat,
+  meshSummary,
+  resultsSummary,
+};

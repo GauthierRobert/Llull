@@ -4,9 +4,11 @@
  * a gap or mismatch falls back to a full snapshot.
  *
  * @invariant deterministic replay needs step-scoped ids and the same kernel on both ends
- * @invariant `selection` is per-client view state and is excluded from the state hash
+ * @invariant `selection` is per-client view state and is excluded from the state hash; so is the `verified: false` flag of recorded FE
+ *   summaries (a replica without the artifact store records it, the server does not)
  */
 
+import type { AnalysisModel } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
 import { serializeDocument } from '@core/commands/persistence/serialization';
@@ -84,6 +86,36 @@ class PartFold {
 }
 
 /**
+ * The analysis slice with the `verified: false` flag of recorded summaries removed. A replica that has no artifact store records a summary
+ * flagged `verified: false` (05 §4.1) where the server, which has the store, records it unflagged: the flag says what this machine could
+ * check, not what the document says, so it must not make the replicas' hashes differ (a mismatch would force a snapshot on every FE command).
+ */
+function withoutVerifiedFlags(analysis: AnalysisModel): AnalysisModel {
+  const flagged = Object.values(analysis.cases).some((entry) => entry.meshSummary?.verified === false || entry.results?.verified === false);
+  if (!flagged) return analysis;
+  const unflag = <T extends { readonly verified?: false }>(summary: T | undefined): T | undefined => {
+    if (summary === undefined) return undefined;
+    const { verified, ...rest } = summary;
+    void verified;
+    return rest as T;
+  };
+  return {
+    ...analysis,
+    cases: Object.fromEntries(
+      Object.entries(analysis.cases).map(([id, entry]) => {
+        const { meshSummary, results, ...rest } = entry;
+        const mesh = unflag(meshSummary);
+        const solved = unflag(results);
+        return [
+          id,
+          { ...rest, ...(mesh !== undefined ? { meshSummary: mesh } : {}), ...(solved !== undefined ? { results: solved } : {}) },
+        ];
+      }),
+    ),
+  };
+}
+
+/**
  * Hash of everything clients must agree on (selection excluded); memoized per (immutable) document.
  * Entities and feature steps are hashed once per object and combined, so a command costs the size
  * of what it changed plus a pass over the id lists, not a serialization of the whole document.
@@ -91,7 +123,8 @@ class PartFold {
 export function documentHash(doc: CadDocument): string {
   const known = hashByDocument.get(doc);
   if (known !== undefined) return known;
-  const rest = hashText(serializeDocument({ ...doc, selection: [], entities: {}, featureHistory: [] }, { includeDerived: true }));
+  const normalised = doc.analysis === undefined ? doc : { ...doc, analysis: withoutVerifiedFlags(doc.analysis) };
+  const rest = hashText(serializeDocument({ ...normalised, selection: [], entities: {}, featureHistory: [] }, { includeDerived: true }));
   const fold = new PartFold(rest);
   for (const id in doc.entities) {
     const entity = doc.entities[id];

@@ -9,7 +9,7 @@ import { elasticConstants, isElasticRefusal, propertyTemperatureK } from '../dec
 import { caseOf } from '../shared/access';
 import { feRemediation, refuseFe } from '../shared/feCodes';
 import { analysisIdSchema } from '../shared/schemas';
-import { stateOf } from '../shared/state';
+import { trustedRecord, type Trust } from '../shared/trust';
 import { analysisInputHash } from '../hash/inputHash';
 import { checkThermalItems } from '../thermal/check';
 import { checkThermomechItems } from '../thermomech/check';
@@ -80,29 +80,45 @@ function setupItems(analysis: AnalysisCase): CheckItem[] {
   return items;
 }
 
-function artifactItems(doc: CadDocument, analysis: AnalysisCase, hasPort: boolean, present: (hash: string) => boolean): CheckItem[] {
+function artifactItems(doc: CadDocument, analysis: AnalysisCase, trust: Trust): CheckItem[] {
+  const id = analysis.id;
   const mesh = analysis.meshSummary;
-  if (mesh === undefined) return [item('FEA_MESH_MISSING', 'error', `analysis '${analysis.id}' is not meshed`, [analysis.id])];
-  if (mesh.inputHash !== analysisInputHash(doc, analysis.id, 'mesh'))
-    return [item('FEA_MESH_STALE', 'error', 'the recorded mesh was built for other inputs', [analysis.id])];
+  if (mesh === undefined) return [item('FEA_MESH_MISSING', 'error', `analysis '${id}' is not meshed`, [id])];
+  if (trust.state === 'untrusted')
+    return [item('FEA_SUMMARY_MISMATCH', 'error', trust.problem?.message ?? 'a recorded summary differs from its artifact', [id])];
+  if (mesh.verified !== false && mesh.inputHash !== analysisInputHash(doc, id, 'mesh'))
+    return [item('FEA_MESH_STALE', 'error', 'the recorded mesh was built for other inputs', [id])];
   const items: CheckItem[] = [];
-  if (mesh.quality.inverted > 0)
-    items.push(item('FEA_MESH_INVERTED', 'error', `${mesh.quality.inverted} inverted element(s) (scaled Jacobian <= 0)`, [analysis.id]));
-  if (hasPort && !present(mesh.meshHash))
-    items.push(item('FEA_MESH_MISSING', 'error', `mesh artifact ${mesh.meshHash} is not available on this machine`, [analysis.id]));
-  const results = analysis.results;
-  if (results === undefined) return [...items, item('FEA_RESULTS_MISSING', 'error', 'no recorded results', [analysis.id])];
-  if (results.inputHash !== analysisInputHash(doc, analysis.id, 'full'))
-    return [...items, item('FEA_RESULTS_STALE', 'error', 'the recorded results were computed for other inputs', [analysis.id])];
-  if (hasPort && !present(results.resultsHash))
+  if (trust.mesh === null)
     items.push(
-      item('FEA_RESULTS_MISSING', 'error', `results artifact ${results.resultsHash} is not available on this machine`, [analysis.id]),
+      item(
+        'FEA_MESH_MISSING',
+        'error',
+        `mesh artifact ${mesh.meshHash} is not available or not verified on this machine: ${trust.problem?.message ?? ''}`,
+        [id],
+      ),
+    );
+  else if (trust.mesh.quality.inverted > 0)
+    items.push(item('FEA_MESH_INVERTED', 'error', `${trust.mesh.quality.inverted} inverted element(s) (scaled Jacobian <= 0)`, [id]));
+  const results = analysis.results;
+  if (results === undefined) return [...items, item('FEA_RESULTS_MISSING', 'error', 'no recorded results', [id])];
+  if (results.verified !== false && results.inputHash !== analysisInputHash(doc, id, 'full'))
+    return [...items, item('FEA_RESULTS_STALE', 'error', 'the recorded results were computed for other inputs', [id])];
+  if (trust.results === null)
+    items.push(
+      item(
+        'FEA_RESULTS_MISSING',
+        'error',
+        `results artifact ${results.resultsHash} is not available or not verified on this machine: ${trust.problem?.message ?? ''}`,
+        [id],
+      ),
     );
   return items;
 }
 
 /**
- * @invariant read-only; data { status: pass | warn | fail, state, items [{ code, severity, ids, path?, message, remediation }], reviewRequired: true };
+ * @invariant read-only; recorded summaries are re-verified against the artifact store (a differing one is FEA_SUMMARY_MISMATCH, an unavailable
+ *   artifact or a missing store is FEA_MESH_MISSING / FEA_RESULTS_MISSING); data { status: pass | warn | fail, state, items [{ code, severity, ids, path?, message, remediation }], reviewRequired: true };
  *   thermal and thermo-mechanical items come from the discipline checks
  * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND
  */
@@ -112,7 +128,9 @@ export const checkAnalysis = defineCommand({
     'Check a finite-element analysis end to end and return data { status: pass | warn | fail, state, items [{ code, severity: error | warning, ' +
     'ids, message, remediation }], reviewRequired: true }: parts exist and are solids with a material, elastic E / nu (static, thermo_static) or ' +
     'thermal properties (heat), supports (static needs at least one: FEA_NO_CONSTRAINTS), loads, thermal / thermo-mechanical set-up, mesh ' +
-    'recorded and not stale or inverted, results recorded and not stale. Run it before fea_mesh / fea_solve (readiness) and after the solve. ' +
+    'recorded and not stale or inverted, results recorded and not stale, and every recorded summary matching its artifact in the artifact ' +
+    'store (a differing one is FEA_SUMMARY_MISMATCH, state untrusted; no store or artifact is FEA_MESH_MISSING / FEA_RESULTS_MISSING, state ' +
+    'missing). Run it before fea_mesh / fea_solve (readiness) and after the solve. ' +
     'It is not a certification: reviewRequired is always true and a qualified person must review the model, mesh and results.',
   annotations: { readOnly: true },
   params: z.object({ analysisId: analysisIdSchema }),
@@ -121,9 +139,10 @@ export const checkAnalysis = defineCommand({
     if (analysis === undefined)
       return refuseFe(doc, 'check_analysis', 'FEA_ANALYSIS_NOT_FOUND', `no analysis '${analysisId}'`, [analysisId]);
     const port = ctx?.feaArtifacts ?? null;
+    const trust = trustedRecord(doc, analysis, port);
     const disciplines: readonly CheckItem[] =
       analysis.type === 'heat_steady' || analysis.type === 'heat_transient'
-        ? checkThermalItems(doc, analysisId)
+        ? checkThermalItems(doc, analysisId, trust.results)
         : analysis.type === 'thermo_static'
           ? checkThermomechItems(doc, analysisId, port)
           : [];
@@ -131,7 +150,7 @@ export const checkAnalysis = defineCommand({
       ...partItems(doc, analysis),
       ...setupItems(analysis),
       ...disciplines,
-      ...artifactItems(doc, analysis, port !== null, (hash) => port?.get(hash) != null),
+      ...artifactItems(doc, analysis, trust),
     ];
     const errors = items.filter((entry) => entry.severity === 'error').length;
     const warnings = items.length - errors;
@@ -139,7 +158,7 @@ export const checkAnalysis = defineCommand({
     return report(
       doc,
       `check_analysis: '${analysisId}' ${status} — ${errors} error(s), ${warnings} warning(s)${items.length > 0 ? `: ${[...new Set(items.map((entry) => entry.code))].join(', ')}` : ''}; reviewRequired.`,
-      { analysisId, status, state: stateOf(doc, analysis), items, reviewRequired: true },
+      { analysisId, status, state: trust.state, items, reviewRequired: true },
     );
   },
 });

@@ -11,11 +11,14 @@ import { sha256Hex } from '@lib/sha256';
 import { analysisInputHash } from '@cae/index';
 import { canonicalJson } from '@lib/canonicalJson';
 import { expectCase, packCase } from '../../physics/benchmarkCases';
-import { addBc, must, thermalFixture, twoTetMesh } from './fixtures';
+import { trustedRecord } from '@cae/shared/trust';
+import { addBc, caseOf, hashOf, machineContext, machineStore, must, portOf, thermalFixture, twoTetMesh } from './fixtures';
+import { meshSummary, resultsSummary } from '@cae/results/summary';
+import type { FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
 import { solvedWall } from './solved';
 
 const PACK = '03-thermal-analysis';
-const run = (doc: CadDocument, command: string, params: Record<string, unknown>, ctx = defaultContext()): CommandResult =>
+const run = (doc: CadDocument, command: string, params: Record<string, unknown>, ctx = machineContext()): CommandResult =>
   execute(doc, command, params, ctx);
 const round12 = (value: number): number => Number(value.toPrecision(12));
 const source = { citation: 'test input of this validation case', locator: 'VC-THM-62' };
@@ -38,8 +41,10 @@ function dependentStateAfterEdit(wall: ReturnType<typeof solvedWall>): string {
     { analysisId: dependentId, source: { kind: 'thermal_result', analysisId: wall.analysisId, time: 'last' } },
   ).document;
   const dependent = linked.analysis?.cases[dependentId];
-  const thermal = linked.analysis?.cases[wall.analysisId];
-  if (dependent === undefined || thermal?.meshSummary === undefined || thermal.results === undefined) return 'missing';
+  if (dependent === undefined) return 'missing';
+  const mesh: FeMeshArtifact = { ...wall.mesh, inputHash: analysisInputHash(linked, dependentId, 'mesh') };
+  const results: FeResultsArtifact = { ...wall.results, meshHash: hashOf(mesh), inputHash: analysisInputHash(linked, dependentId, 'full') };
+  portOf(mesh, results);
   const solved: CadDocument = {
     ...linked,
     analysis: {
@@ -48,13 +53,13 @@ function dependentStateAfterEdit(wall: ReturnType<typeof solvedWall>): string {
         ...linked.analysis!.cases,
         [dependentId]: {
           ...dependent,
-          meshSummary: { ...thermal.meshSummary, inputHash: analysisInputHash(linked, dependentId, 'mesh') },
-          results: { ...thermal.results, inputHash: analysisInputHash(linked, dependentId, 'full') },
+          meshSummary: meshSummary(mesh, hashOf(mesh)),
+          results: resultsSummary(linked, dependentId, mesh, results, hashOf(results)),
         },
       },
     },
   };
-  const withStore = { ...defaultContext(), feaArtifacts: wall.port };
+  const withStore = machineContext();
   const before = (run(solved, 'fea_report', { analysisId: dependentId }, withStore).data as { state: string }).state;
   expect(before).toBe('solved');
   const edited = must(solved, 'update_thermal_bc', {
@@ -249,7 +254,7 @@ describe('PHY-03 agent-first contract', () => {
       justification: 'j',
     });
     const checkCodes = (doc: CadDocument, id: string): readonly { code: string; remediation: string; ids: readonly string[] }[] =>
-      checkThermalItems(doc, id);
+      checkThermalItems(doc, id, trustedRecord(doc, caseOf(doc, id), machineStore).results);
     const measured = [
       {
         setup: 'heat_transient case, material record has k but no cp',

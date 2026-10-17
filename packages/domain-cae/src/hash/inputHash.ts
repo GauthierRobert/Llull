@@ -25,18 +25,35 @@ const meshInputs = (doc: CadDocument, analysisCase: AnalysisCase): Record<string
   parts: Object.fromEntries(
     Object.entries(analysisCase.parts).map(([entityId, idealization]) => {
       const entity = Object.hasOwn(doc.entities, entityId) ? doc.entities[entityId] : undefined;
-      return [entityId, { idealization, geometry: entity === undefined ? null : geometryHash(entity) }];
+      return [
+        entityId,
+        { idealization, geometry: entity === undefined ? null : geometryHash(entity), materialId: entity?.materialId ?? null },
+      ];
     }),
   ),
+  documentUnit: doc.units,
   controls: analysisCase.mesh,
   targets: keyedTargets(analysisCase),
 });
 
-function materialsUsed(doc: CadDocument, analysisCase: AnalysisCase): Record<string, Material | null> {
-  const used: Record<string, Material | null> = {};
+/** The physical part of a material: what a solve reads. Name, colour, PBR values and finish are presentation and never part of a hash. */
+function physicalMaterial(material: Material | null | undefined): Record<string, unknown> | null {
+  if (material === null || material === undefined) return null;
+  return {
+    density: material.density,
+    ...(material.propertyModels !== undefined ? { propertyModels: material.propertyModels } : {}),
+    ...(material.materialModels !== undefined ? { materialModels: material.materialModels } : {}),
+    ...(material.constitutiveSets !== undefined ? { constitutiveSets: material.constitutiveSets } : {}),
+    ...(material.defaultConstitutiveSet !== undefined ? { defaultConstitutiveSet: material.defaultConstitutiveSet } : {}),
+  };
+}
+
+function materialsUsed(doc: CadDocument, analysisCase: AnalysisCase): Record<string, Record<string, unknown> | null> {
+  const used: Record<string, Record<string, unknown> | null> = {};
   for (const entityId of Object.keys(analysisCase.parts)) {
     const materialId = Object.hasOwn(doc.entities, entityId) ? doc.entities[entityId]?.materialId : undefined;
-    if (materialId !== undefined) used[materialId] = Object.hasOwn(doc.materials, materialId) ? (doc.materials[materialId] ?? null) : null;
+    if (materialId !== undefined)
+      used[materialId] = Object.hasOwn(doc.materials, materialId) ? physicalMaterial(doc.materials[materialId]) : null;
   }
   return used;
 }
@@ -82,7 +99,7 @@ const fullInputs = (doc: CadDocument, analysisCase: AnalysisCase): Record<string
 /**
  * Hash of what an artifact depends on. `mesh`: part geometry + idealization, mesh controls and the targets (a mesh holds their node/face
  * sets). `full`: also type, solver, factors, constraints, loads, probes, thermal and thermo-mechanical set-ups, the materials of the parts
- * (with their property / material models) and, for a thermal-result field, the results hash of the source case. Names of the case, results
+ * (physical part only: density, property / material models, constitutive sets; and the material id of each part) and the document length unit and, for a thermal-result field, the results hash of the source case. Names of the case, results
  * and mesh summaries are never part of it.
  * @failure unknown analysisId -> '' (never equal to an artifact's inputHash, so it reads as stale)
  */

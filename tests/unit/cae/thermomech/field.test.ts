@@ -2,7 +2,7 @@ import type { CadDocument } from '@core/model/types';
 import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { resolveTemperatureField } from '@cae/thermomech/field';
-import { hashOf, portOf, thermoFixture, withThermalSource } from './fixtures';
+import { hashOf, portOf, thermoFixture, withRecordedResults, withThermalSource } from './fixtures';
 
 const resolve = (
   fixture: ReturnType<typeof thermoFixture>,
@@ -79,7 +79,8 @@ describe('resolveTemperatureField', () => {
     }).document;
     expect(resolveTemperatureField(stale, analysisId, mesh, source.artifacts)).toMatchObject({ code: 'TMC_THERMAL_RESULT_STALE' });
 
-    const other = withThermalSource(thermoFixture(), { meshHash: 'another-mesh' });
+    const movedMesh = { ...mesh, nodes: mesh.nodes.map((node) => (node[0] === 5 ? ([5, 11, 10, 10] as const) : node)) };
+    const other = withThermalSource(thermoFixture(), { mesh: movedMesh });
     expect(resolveTemperatureField(other.fixture.doc, other.fixture.analysisId, other.fixture.mesh, other.artifacts)).toMatchObject({
       code: 'TMC_MESH_MISMATCH',
     });
@@ -98,16 +99,17 @@ describe('resolveTemperatureField', () => {
     const base = thermoFixture();
     const sibling = { ...base.mesh, nodeSets: { B_1: [1, 2] }, targets: { B_1: { residual: 0 } } };
     expect(hashOf(sibling)).not.toBe(hashOf(base.mesh));
-    const same = withThermalSource(base, { meshHash: hashOf(sibling) });
-    const withMesh = portOf({ [hashOf(sibling)]: sibling, [same.resultsHash]: same.results });
+    const same = withThermalSource(base, { mesh: sibling });
     const { doc, analysisId, mesh } = same.fixture;
-    expect(resolveTemperatureField(doc, analysisId, mesh, withMesh)).toMatchObject({ ok: true, values: [101, 102, 103, 104, 105] });
-    expect(resolveTemperatureField(doc, analysisId, mesh, same.artifacts)).toMatchObject({ code: 'TMC_MESH_MISMATCH' });
+    expect(resolveTemperatureField(doc, analysisId, mesh, same.artifacts)).toMatchObject({ ok: true, values: [101, 102, 103, 104, 105] });
+    // the thermal mesh is part of what makes the thermal summary verifiable: without it the source is missing
+    expect(resolveTemperatureField(doc, analysisId, mesh, portOf({ [same.resultsHash]: same.results }))).toMatchObject({
+      code: 'FEA_RESULTS_MISSING',
+    });
 
     const moved = { ...sibling, nodes: sibling.nodes.map((node) => (node[0] === 5 ? ([5, 11, 10, 10] as const) : node)) };
-    const other = withThermalSource(base, { meshHash: hashOf(moved) });
-    const withMoved = portOf({ [hashOf(moved)]: moved, [other.resultsHash]: other.results });
-    expect(resolveTemperatureField(other.fixture.doc, analysisId, mesh, withMoved)).toMatchObject({ code: 'TMC_MESH_MISMATCH' });
+    const other = withThermalSource(base, { mesh: moved });
+    expect(resolveTemperatureField(other.fixture.doc, analysisId, mesh, other.artifacts)).toMatchObject({ code: 'TMC_MESH_MISMATCH' });
   });
 
   it('refuses an output time the results do not have and a results step without NDTEMP', () => {
@@ -119,32 +121,14 @@ describe('resolveTemperatureField', () => {
     expect(resolveTemperatureField(atTime(5), analysisId, mesh, source.artifacts)).toMatchObject({ ok: true });
     expect(resolveTemperatureField(atTime(7), analysisId, mesh, source.artifacts)).toMatchObject({ code: 'TMC_FIELD_SOURCE_INVALID' });
     const noField = { ...source.results, steps: [{ step: 1, time: 5, fields: {} }] };
-    const hash = hashOf(noField);
-    const heat = doc.analysis?.cases[source.thermalId];
-    const patched = {
-      ...doc,
-      analysis: {
-        ...doc.analysis!,
-        cases: { ...doc.analysis!.cases, [source.thermalId]: { ...heat!, results: { ...heat!.results!, resultsHash: hash } } },
-      },
-    };
+    const withoutNdtemp = withRecordedResults(source, noField);
     expect(boxId).toBeTruthy();
-    expect(resolveTemperatureField(patched, analysisId, mesh, portOf({ [hash]: noField }))).toMatchObject({
+    expect(resolveTemperatureField(withoutNdtemp.doc, analysisId, mesh, withoutNdtemp.artifacts)).toMatchObject({
       code: 'TMC_FIELD_SOURCE_INVALID',
     });
     const partial = { ...source.results, steps: [{ step: 1, time: 5, fields: { NDTEMP: { components: ['T'], values: { '1': [1] } } } }] };
-    const partialHash = hashOf(partial);
-    const patched2 = {
-      ...patched,
-      analysis: {
-        ...patched.analysis,
-        cases: {
-          ...patched.analysis.cases,
-          [source.thermalId]: { ...patched.analysis.cases[source.thermalId]!, results: { ...heat!.results!, resultsHash: partialHash } },
-        },
-      },
-    };
-    expect(resolveTemperatureField(patched2, analysisId, mesh, portOf({ [partialHash]: partial }))).toMatchObject({
+    const partiallyRecorded = withRecordedResults(source, partial);
+    expect(resolveTemperatureField(partiallyRecorded.doc, analysisId, mesh, partiallyRecorded.artifacts)).toMatchObject({
       code: 'TMC_FIELD_INVALID',
     });
   });

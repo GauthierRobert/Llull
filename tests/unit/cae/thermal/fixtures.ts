@@ -1,9 +1,11 @@
 /** PHY-03 fixtures: thermal analyses around a box, hand-built tet meshes (2 tets, structured bar) and hand-built results artifacts. */
 import { execute } from '@core/commands/registry';
-import type { CommandResult } from '@core/commands/types';
+import { defaultContext } from '@core/commands/context';
+import type { CommandResult, ExecutionContext } from '@core/commands/types';
 import type { AnalysisCase, FeArtifactPort, FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import { analysisInputHash } from '@cae/hash/inputHash';
+import { meshSummary, resultsSummary } from '@cae/results/summary';
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 
@@ -11,10 +13,20 @@ const SOURCE = { citation: 'synthetic test fixture', locator: 'tests/unit/cae/th
 
 export const hashOf = (artifact: FeMeshArtifact | FeResultsArtifact): string => sha256Hex(canonicalJson(artifact));
 
+const machine = new Map<string, FeMeshArtifact | FeResultsArtifact>();
+
+/** A store holding exactly `artifacts`; they are also remembered by the machine store (see `machineStore`). */
 export function portOf(...artifacts: (FeMeshArtifact | FeResultsArtifact)[]): FeArtifactPort {
   const byHash = new Map(artifacts.map((artifact) => [hashOf(artifact), artifact]));
+  for (const [hash, artifact] of byHash) machine.set(hash, artifact);
   return { get: (hash) => byHash.get(hash) ?? null };
 }
+
+/** The artifact store of "this machine" in the tests: every artifact `recorded` / `solvedWall` produced, by content hash. */
+export const machineStore: FeArtifactPort = { get: (hash) => machine.get(hash) ?? null };
+
+/** Execution context with the machine store (a recorded summary is only readable where its artifact is). */
+export const machineContext = (): ExecutionContext => ({ ...defaultContext(), feaArtifacts: machineStore });
 
 /** Run a command and fail the test setup when it is refused. */
 export function must(doc: CadDocument, command: string, params: Record<string, unknown>): CommandResult {
@@ -260,35 +272,20 @@ export function resultsFor(
   };
 }
 
-/** Record a mesh and results into the document the way record_fe_mesh / record_fea_results do (summaries computed by the pure summarisers). */
-export function recorded(
-  fixture: ThermalFixture,
-  mesh: FeMeshArtifact,
-  results: FeResultsArtifact,
-  summarise: (doc: CadDocument, analysisId: string, mesh: FeMeshArtifact, results: FeResultsArtifact) => unknown,
-): CadDocument {
+/**
+ * Record a mesh and results into the document the way record_fe_mesh / record_fea_results do: the summaries are the pure summarisers' output,
+ * so the trust model (recomputed summary == recorded summary) holds for them.
+ */
+export function recorded(fixture: ThermalFixture, mesh: FeMeshArtifact, results: FeResultsArtifact): CadDocument {
   const analysisCase = caseOf(fixture.doc, fixture.analysisId);
-  const resultsSummary = {
-    resultsHash: hashOf(results),
-    inputHash: results.inputHash,
-    solver: results.solver,
-    solverVersion: results.solverVersion,
-    loadCases: [],
-    units: mesh.unitSystem,
-    thermal: summarise(fixture.doc, fixture.analysisId, mesh, results),
+  const meshHash = hashOf(mesh);
+  machine.set(meshHash, mesh);
+  machine.set(hashOf(results), results);
+  const next: AnalysisCase = {
+    ...analysisCase,
+    meshSummary: meshSummary(mesh, meshHash),
+    results: resultsSummary(fixture.doc, fixture.analysisId, mesh, results, hashOf(results)),
   };
-  const meshSummary = {
-    meshHash: hashOf(mesh),
-    inputHash: mesh.inputHash,
-    mesher: mesh.mesher,
-    mesherVersion: mesh.mesherVersion,
-    nodes: mesh.nodes.length,
-    elements: {},
-    quality: { metrics: {}, inverted: 0 },
-    warnings: [],
-    faceMap: [],
-  };
-  const next = { ...analysisCase, meshSummary, results: resultsSummary } as AnalysisCase;
   return {
     ...fixture.doc,
     analysis: { cases: { ...fixture.doc.analysis?.cases, [fixture.analysisId]: next }, caseOrder: fixture.doc.analysis?.caseOrder ?? [] },

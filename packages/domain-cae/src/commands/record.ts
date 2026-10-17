@@ -1,48 +1,27 @@
 /** record_fe_mesh / record_fea_results: store the summary of a host-produced artifact, validated against the artifact store (05 §4.1). */
 
-import type { AnalysisCase, FeArtifactPort, FeMeshArtifact, FeResultsArtifact } from '@core/model/analysis';
+import type { AnalysisCase, MeshSummary, ResultsSummary } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
 import { significantNumber } from '@lib/compactNumber';
-import { canonicalJson } from '@lib/canonicalJson';
-import { sha256Hex } from '@lib/sha256';
 import { analysisInputHash } from '../hash/inputHash';
 import { stressUnitName } from '../decks/units';
 import { meshSummary, resultsSummary } from '../results/summary';
 import { caseOf, withCase } from '../shared/access';
 import { refuseFe } from '../shared/feCodes';
 import { analysisIdSchema } from '../shared/schemas';
+import { differingKeys, fetchArtifact } from '../shared/trust';
 
 const summaryNote =
   'Exactly the summary returned by the host transport (never hand-written): it is recomputed from the artifact and compared.';
 
-/** Top-level keys whose values differ between two summaries. */
-const differingKeys = (given: object, expected: object): string[] => {
-  const left = new Map(Object.entries(given));
-  const right = new Map(Object.entries(expected));
-  return [...new Set([...left.keys(), ...right.keys()])]
-    .filter((key) => canonicalJson(left.get(key)) !== canonicalJson(right.get(key)))
-    .sort();
-};
+type SummaryLike = { readonly inputHash?: unknown };
 
-type Fetched<T> = { readonly artifact: T } | { readonly code: string; readonly message: string };
-
-function fetchArtifact<K extends 'fe_mesh' | 'fe_results'>(
-  port: FeArtifactPort | null | undefined,
-  hash: string,
-  kind: K,
-): Fetched<Extract<FeMeshArtifact | FeResultsArtifact, { kind: K }>> {
-  const found = port?.get(hash) ?? null;
-  if (found === null || found.kind !== kind)
-    return {
-      code: 'FEA_ARTIFACT_NOT_FOUND',
-      message: port ? `no ${kind} artifact for hash ${hash}` : `no artifact store available for ${kind} ${hash}`,
-    };
-  if (sha256Hex(canonicalJson(found)) !== hash)
-    return { code: 'FEA_SUMMARY_MISMATCH', message: `the sha256 of the ${kind} artifact is not ${hash}` };
-  return { artifact: found as Extract<FeMeshArtifact | FeResultsArtifact, { kind: K }> };
+/** `summary` kept as given but flagged `verified: false`; null when it lacks the text `inputHash` every summary carries. */
+function unverified<T extends object>(summary: T & SummaryLike): (T & { readonly verified: false }) | null {
+  return typeof summary.inputHash === 'string' ? { ...summary, verified: false } : null;
 }
 
 function withoutResults(analysisCase: AnalysisCase): AnalysisCase {
@@ -52,10 +31,11 @@ function withoutResults(analysisCase: AnalysisCase): AnalysisCase {
 
 /**
  * @affects doc.analysis.cases[analysisId].meshSummary (set); recorded results are cleared
- * @invariant the artifact for summary.meshHash is in ctx.feaArtifacts, its sha256 equals the hash, its inputHash is the current mesh input
- *   hash, and summary equals the summary recomputed from it (trust model, 05 §4.1)
- * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; no port / no artifact -> FEA_ARTIFACT_NOT_FOUND; sha256 or summary differs ->
- *   FEA_SUMMARY_MISMATCH; artifact built for other inputs -> FEA_INPUT_STALE (all refusals, unchanged doc)
+ * @invariant with the artifact available: its sha256 equals the hash, its inputHash is the current mesh input hash and summary equals the
+ *   summary recomputed from it (trust model, 05 §4.1); WITHOUT it (no port, not in the store: replay on another machine) the summary is
+ *   kept flagged `verified: false` - state `missing`, never read by any query
+ * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; sha256 or summary differs -> FEA_SUMMARY_MISMATCH; artifact built for other inputs ->
+ *   FEA_INPUT_STALE; summary without a text inputHash when the artifact is unavailable -> FEA_SUMMARY_MISMATCH (all refusals, unchanged doc)
  */
 export const recordFeMesh = defineCommand({
   name: 'record_fe_mesh',
@@ -74,6 +54,15 @@ export const recordFeMesh = defineCommand({
     const analysisCase = caseOf(doc, analysisId);
     if (analysisCase === undefined) return fail('FEA_ANALYSIS_NOT_FOUND', `no analysis '${analysisId}'`);
     const fetched = fetchArtifact(ctx?.feaArtifacts, summary.meshHash, 'fe_mesh');
+    if ('code' in fetched && fetched.code === 'FEA_ARTIFACT_NOT_FOUND') {
+      const flagged = unverified(summary);
+      if (flagged === null) return fail('FEA_SUMMARY_MISMATCH', 'the summary has no text inputHash', [analysisId, summary.meshHash]);
+      return changed(
+        withCase(doc, { ...withoutResults(analysisCase), meshSummary: flagged as unknown as MeshSummary }),
+        `record_fe_mesh: '${analysisId}' mesh ${summary.meshHash.slice(0, 12)} recorded UNVERIFIED (artifact not available on this machine): state missing, no number is used until fea_mesh is run here.`,
+        [analysisId],
+      );
+    }
     if ('code' in fetched) return fail(fetched.code, fetched.message, [analysisId, summary.meshHash]);
     const expected = meshSummary(fetched.artifact, summary.meshHash);
     const differing = differingKeys(summary, expected);
@@ -96,10 +85,11 @@ export const recordFeMesh = defineCommand({
 
 /**
  * @affects doc.analysis.cases[analysisId].results (set)
- * @invariant as record_fe_mesh for summary.resultsHash; additionally the case has a recorded mesh, the results were computed on exactly that
- *   mesh (results.meshHash) and for the current full input hash; summarised against the recorded mesh artifact
- * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; no port / no results or mesh artifact -> FEA_ARTIFACT_NOT_FOUND; sha256 or summary
- *   differs -> FEA_SUMMARY_MISMATCH; no recorded mesh or other meshHash -> FEA_MESH_MISMATCH; other inputs -> FEA_INPUT_STALE
+ * @invariant as record_fe_mesh for summary.resultsHash (the summary is kept flagged `verified: false` when the results or the recorded mesh
+ *   artifact is unavailable); additionally the case has a recorded mesh, the results were computed on exactly that mesh (results.meshHash)
+ *   and for the current full input hash; summarised against the recorded mesh artifact
+ * @failure unknown analysis -> FEA_ANALYSIS_NOT_FOUND; sha256 or summary differs -> FEA_SUMMARY_MISMATCH; no recorded mesh or other meshHash ->
+ *   FEA_MESH_MISMATCH; other inputs -> FEA_INPUT_STALE
  */
 export const recordFeaResults = defineCommand({
   name: 'record_fea_results',
@@ -120,7 +110,17 @@ export const recordFeaResults = defineCommand({
     const recordedMesh = analysisCase.meshSummary;
     if (recordedMesh === undefined)
       return fail('FEA_MESH_MISMATCH', `analysis '${analysisId}' has no recorded mesh (record_fe_mesh first)`);
+    const keepUnverified = (): CommandResult => {
+      const flagged = unverified(summary);
+      if (flagged === null) return fail('FEA_SUMMARY_MISMATCH', 'the summary has no text inputHash', [analysisId, summary.resultsHash]);
+      return changed(
+        withCase(doc, { ...analysisCase, results: flagged as unknown as ResultsSummary }),
+        `record_fea_results: '${analysisId}' results ${summary.resultsHash.slice(0, 12)} recorded UNVERIFIED (artifact not available on this machine): state missing, no number is used until fea_solve is run here.`,
+        [analysisId],
+      );
+    };
     const fetched = fetchArtifact(ctx?.feaArtifacts, summary.resultsHash, 'fe_results');
+    if ('code' in fetched && fetched.code === 'FEA_ARTIFACT_NOT_FOUND') return keepUnverified();
     if ('code' in fetched) return fail(fetched.code, fetched.message, [analysisId, summary.resultsHash]);
     const results = fetched.artifact;
     if (results.meshHash !== recordedMesh.meshHash)
@@ -130,7 +130,8 @@ export const recordFeaResults = defineCommand({
         [analysisId, results.meshHash],
       );
     const mesh = fetchArtifact(ctx?.feaArtifacts, recordedMesh.meshHash, 'fe_mesh');
-    if ('code' in mesh) return fail(mesh.code, mesh.message, [analysisId, recordedMesh.meshHash]);
+    if ('code' in mesh)
+      return mesh.code === 'FEA_ARTIFACT_NOT_FOUND' ? keepUnverified() : fail(mesh.code, mesh.message, [analysisId, recordedMesh.meshHash]);
     const expected = resultsSummary(doc, analysisId, mesh.artifact, results, summary.resultsHash);
     const differing = differingKeys(summary, expected);
     if (differing.length > 0)

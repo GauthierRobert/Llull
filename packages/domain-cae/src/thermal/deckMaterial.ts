@@ -1,7 +1,7 @@
 /** `*CONDUCTIVITY` / `*SPECIFIC HEAT` / `*DENSITY` cards of one part's material. */
 
 import { type DeckContext, type DeckSections } from '../decks/context';
-import { linesText, num, row } from '../decks/format';
+import { commentText, linesText, num, row } from '../decks/format';
 import type { ThermalSetup } from '@core/model/analysis';
 import { caseTemperatureRange, propertiesNeeded, propertyTable, type PropertyTable, type ThermalProperty } from './material';
 
@@ -14,9 +14,11 @@ const HEAT_PROPERTY: Readonly<Record<ThermalProperty, { readonly keyword: string
 function cardLines(table: PropertyTable, scale: string): string[] {
   const { keyword, label } = HEAT_PROPERTY[table.property];
   const range = table.range === null ? 'constant' : `range=${num(table.range[0])}..${num(table.range[1])} ${scale} relTol=1e-3`;
-  const info = table.modelId === null ? table.origin : `${table.origin} coefficientsSha256=${table.coefficientsSha256 ?? ''}`;
+  const origin = commentText(table.origin);
+  const info = table.modelId === null ? origin : `${origin} coefficientsSha256=${commentText(table.coefficientsSha256 ?? '')}`;
   const header = `** ${label}: ${info} maxRelError=${num(table.maxRelError)} ${range}`;
-  const notes = table.unverifiedReasons.length > 0 ? [`** ${label} unverified: ${table.unverifiedReasons.join('; ')}`] : [];
+  const notes =
+    table.unverifiedReasons.length > 0 ? [`** ${label} unverified: ${commentText(table.unverifiedReasons.join('; '), 400)}`] : [];
   const data = table.constant !== null ? [row(table.constant)] : table.points.map(([temperature, value]) => row(value, temperature));
   return [header, ...notes, keyword, ...data];
 }

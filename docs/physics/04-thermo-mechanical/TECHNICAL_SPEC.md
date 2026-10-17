@@ -378,3 +378,16 @@ lists `compute_margins`, a 05 command not built in the minimal slice, so the cas
 **Still open:** VC-TMC-50's `compute_margins` key (05 margins); VC-TMC-03.b NAFEMS T1 FE (needs plane stress or bonded multi-part meshes — 05 V1; the analytic VC-TMC-03.a–c pass);
 M4 (coupled procedure, mesh mapping, orthotropic CTE, fit stack-ups, bimetal FE); `fea_import_field`; a signing implementation (09 PLM);
 the `llull guide` section.
+
+**Review fixes (2026-10-17):**
+
+- **Thermal source is verified (05 §4.1).** `thermal_result` fields and `check_thermo_mechanical` use `trustedRecord` for the source case: stale ->
+  `TMC_THERMAL_RESULT_STALE`, a summary that differs from its artifact -> `FEA_SUMMARY_MISMATCH`, no artifact store / artifact / thermal mesh ->
+  `FEA_RESULTS_MISSING` (a source can no longer be used on its recorded summary alone). `thermal_distortion_report` does the same for the case itself.
+- **Bounded allocation.** `temperatureProblem` rejects temperatures below absolute zero or above 1e5 K ("llull guard"); the uniform-field resolver
+  re-checks it for loaded documents. `secantExpansion` evaluates both ends of the field range BEFORE building the table (a range outside the model
+  validity is refused with `TMC_PROPERTY_OUT_OF_RANGE`, never sampled) and tabulates at most 1000 intervals (a wider range gets a coarser step).
+- **Deck text.** Material ids, model sources, conversions and unverified reasons in the `*EXPANSION` comments pass through `commentText`;
+  `loadCaseName` of `create_analysis` must match `[A-Za-z0-9_]{1,40}` (`FEA_LOAD_INVALID`).
+- **Fit dispositions.** `dispose_fit_result` stores the verified `signature` with the decision so a reader can re-verify it; no read path counts
+  `fitDispositions` yet (rows are always `pending_human`), so nothing trusts them.

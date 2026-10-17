@@ -29,7 +29,9 @@ describe('PHY-04 agent-first contract (VC-TMC)', () => {
       point: [1, 1, 1],
       quantity: 'temperature',
     }).document;
-    const mismatch = withThermalSource(thermoFixture(), { meshHash: 'other-mesh' });
+    const otherBase = thermoFixture();
+    const moved = { ...otherBase.mesh, nodes: otherBase.mesh.nodes.map((node) => (node[0] === 5 ? ([5, 11, 10, 10] as const) : node)) };
+    const mismatch = withThermalSource(otherBase, { mesh: moved });
     const noCte = thermoFixture({ model: null });
     const unstated = thermoFixture({
       model: { ...cteModel({ kind: 'constant', value: 1e-5 }), variables: [{ variable: 'T', unit: 'K' }] },

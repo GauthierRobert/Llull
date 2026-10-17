@@ -10,6 +10,8 @@ import { fromKelvin, temperatureIn } from './units';
 
 /** Step between tabulated temperatures (K); the secant CTE is interpolated linearly between rows. */
 const TABLE_STEP_KELVIN = 10;
+/** Named guard: most rows of a secant table, whatever the range (a wide range gets a coarser step, never a longer table). */
+const MAX_TABLE_INTERVALS = 1000;
 /** Offset (K) at which the limit alpha_sec(T_ref) = alpha_inst(T_ref) is read from the strain (large enough to avoid cancellation). */
 export const REFERENCE_PROBE_KELVIN = 0.5;
 
@@ -47,7 +49,9 @@ export function providerFor(doc: CadDocument, setup: ThermoMechSetup, materialId
 
 /**
  * Secant CTE table about `reference` covering [`lowKelvin`, `highKelvin`] (extended to contain the reference), rows in the case scale.
- * @failure PHY-01 range refusal (TMC_PROPERTY_OUT_OF_RANGE) when the field leaves the model validity
+ * @invariant both ends of the range are evaluated BEFORE any table is allocated (a range outside the model validity is refused, never
+ *   sampled), and the table has at most 1000 intervals
+ * @failure PHY-01 range refusal (TMC_PROPERTY_OUT_OF_RANGE) when the field leaves the model validity; non-finite range -> THM_UNITS_MISMATCH
  */
 export function secantExpansion(
   doc: CadDocument,
@@ -76,7 +80,13 @@ export function secantExpansion(
     }
     return refused ?? { code: 'TMC_PROPERTY_OUT_OF_RANGE', reason: 'no temperature to evaluate', remediation: '', path: 'material' };
   };
-  const intervals = high - low < 1e-9 ? 0 : Math.ceil((high - low) / TABLE_STEP_KELVIN);
+  if (!Number.isFinite(low) || !Number.isFinite(high))
+    return { code: 'THM_UNITS_MISMATCH', reason: 'the temperature range of the field is not finite', remediation: '', path: 'field' };
+  for (const edge of [low, high]) {
+    const atEdge = secantAt(edge);
+    if (typeof atEdge !== 'number') return atEdge;
+  }
+  const intervals = high - low < 1e-9 ? 0 : Math.min(MAX_TABLE_INTERVALS, Math.ceil((high - low) / TABLE_STEP_KELVIN));
   const samples =
     intervals === 0 ? [referenceKelvin] : Array.from({ length: intervals + 1 }, (_, i) => low + ((high - low) * i) / intervals);
   const alphas: number[] = [];

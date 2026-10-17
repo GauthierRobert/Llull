@@ -3,22 +3,17 @@
 import { defineCommand, z } from '@core/commands/schema';
 import { changed } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
-import { canonicalJson } from '@lib/canonicalJson';
-import { sha256Hex } from '@lib/sha256';
 import { analysisIdSchema } from '../shared/schemas';
 import { isProblem, thermalCaseOf, withThermal } from './access';
 import { refuseThermal } from './codes';
+import { dispositionPayload } from './dispositionGate';
 import { rowIdOf, type Bound } from './limitRows';
 import { resultArtifacts } from './resultsAccess';
 
 const ROW_PATTERN = /^(.+):(max|min)$/;
 
-/** SHA-256 the human signs: the decision on one row of one set of results. */
-const dispositionPayload = (analysisId: string, rowId: string, decision: string, justification: string, resultsHash: string): string =>
-  sha256Hex(canonicalJson({ kind: 'thermal_limit_disposition', analysisId, rowId, decision, justification, resultsHash }));
-
 /**
- * @affects doc.analysis.cases[analysisId].thermal.dispositions[rowId] (records decision, justification, resultsHash, signer, signatureId)
+ * @affects doc.analysis.cases[analysisId].thermal.dispositions[rowId] (records decision, justification, resultsHash, signer, signatureId and the verified signature, so readers can re-verify it)
  * @invariant only with a signature verified by `ctx.humanSignature` over the payload sha256 of (analysisId, rowId, decision, justification,
  *   resultsHash); the disposition binds to the current results hash
  * @failure no port or a signature that does not verify -> THM_HUMAN_GATE; unknown row -> THM_LIMIT_NOT_FOUND; stale results -> FEA_RESULTS_STALE;
@@ -63,13 +58,16 @@ export const disposeThermalLimit = defineCommand({
       );
     const record = found.analysisCase.results;
     const artifacts = resultArtifacts(doc, found, ctx?.feaArtifacts);
-    if ('code' in artifacts && (artifacts.code === 'FEA_RESULTS_STALE' || record === undefined))
+    if (
+      'code' in artifacts &&
+      (artifacts.code === 'FEA_RESULTS_STALE' || artifacts.code === 'FEA_SUMMARY_MISMATCH' || record === undefined)
+    )
       return fail(artifacts.code, artifacts.message, artifacts.ids);
     const resultsHash = record?.resultsHash ?? '';
     const signed = port.verify(signature, dispositionPayload(analysisId, rowId, decision, justification, resultsHash));
     if (signed === null)
       return fail('THM_HUMAN_GATE', 'the signature does not verify for this disposition: hand over to the qualified reviewer');
-    const disposition = { decision, justification, resultsHash, signer: signed.signer, signatureId: signed.signatureId };
+    const disposition = { decision, justification, resultsHash, signer: signed.signer, signatureId: signed.signatureId, signature };
     const thermal = { ...found.thermal, dispositions: { ...found.thermal.dispositions, [rowId]: disposition } };
     return changed(
       withThermal(doc, found, thermal),

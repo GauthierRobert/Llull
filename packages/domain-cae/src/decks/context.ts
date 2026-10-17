@@ -22,8 +22,10 @@ export interface DeckContext {
   readonly faces: (targetKey: string) => readonly (readonly [elementId: number, face: number])[];
   /** ELSET of a part, e.g. P_box_1_1. */
   readonly elset: (entityId: string) => string;
-  /** `*MATERIAL` name used by the part's `*SOLID SECTION`. */
+  /** `*MATERIAL` name used by the part's `*SOLID SECTION`: `M_<n>`, n by first appearance of the material among the parts. */
   readonly materialName: (entityId: string) => string;
+  /** Document material id of a part (undefined when it has none). */
+  readonly materialId: (entityId: string) => string | undefined;
   readonly materialOf: (entityId: string) => Material | null;
 }
 
@@ -52,6 +54,11 @@ export function buildDeckContext(
   if (analysis === undefined) return null;
   const materialId = (entityId: string): string | undefined =>
     Object.hasOwn(doc.entities, entityId) ? doc.entities[entityId]?.materialId : undefined;
+  const materialNumbers = new Map<string, number>();
+  for (const entityId of Object.keys(analysis.parts)) {
+    const id = materialId(entityId);
+    if (id !== undefined && !materialNumbers.has(id)) materialNumbers.set(id, materialNumbers.size + 1);
+  }
   return {
     doc,
     analysisId,
@@ -63,7 +70,8 @@ export function buildDeckContext(
     nset: safeName,
     faces: (targetKey) => (Object.hasOwn(mesh.faceSets, targetKey) ? (mesh.faceSets[targetKey] ?? []) : []),
     elset: (entityId) => `P_${safeName(entityId)}`,
-    materialName: (entityId) => `M_${safeName(materialId(entityId) ?? 'NONE')}`,
+    materialName: (entityId) => `M_${materialNumbers.get(materialId(entityId) ?? '') ?? 'NONE'}`,
+    materialId,
     materialOf: (entityId) => {
       const id = materialId(entityId);
       return id !== undefined && Object.hasOwn(doc.materials, id) ? (doc.materials[id] ?? null) : null;

@@ -82,7 +82,8 @@ export function deckContext(fixture: Fixture, artifacts: FeArtifactPort | null =
 
 import { analysisInputHash } from '@cae/hash/inputHash';
 import { withCase } from '@cae/shared/access';
-import type { AnalysisCase, ResultsSummary } from '@core/model/analysis';
+import type { AnalysisCase } from '@core/model/analysis';
+import { meshSummary, resultsSummary } from '@cae/results/summary';
 import { canonicalJson } from '@lib/canonicalJson';
 import { sha256Hex } from '@lib/sha256';
 
@@ -92,12 +93,19 @@ export interface ThermalSource {
   readonly fixture: Fixture;
   readonly thermalId: string;
   readonly resultsHash: string;
-  readonly artifacts: FeArtifactPort;
+  /** The mesh artifact the thermal case was solved on (recorded on it). */
+  readonly thermalMesh: FeMeshArtifact;
   readonly results: FeResultsArtifact;
+  /** Store holding the thermal mesh and results. */
+  readonly artifacts: FeArtifactPort;
 }
 
-/** A solved heat_steady case on the same mesh (NDTEMP 100 + node id) that the thermo_static case of `fixture` reads (time `last`). */
-export function withThermalSource(base: Fixture, options: { meshHash?: string; scale?: 'degC' | 'K' } = {}): ThermalSource {
+/**
+ * A solved heat_steady case (NDTEMP 100 + node id, time 5) that the thermo_static case of `fixture` reads (time `last`). Its mesh and
+ * results are recorded with the real summarisers, so they verify against `artifacts`. `mesh` is the discretisation it was solved on (default:
+ * the mesh of `base`).
+ */
+export function withThermalSource(base: Fixture, options: { mesh?: FeMeshArtifact; scale?: 'degC' | 'K' } = {}): ThermalSource {
   const created = execute(base.doc, 'create_analysis', {
     name: 'H',
     analysisType: 'heat_steady',
@@ -105,35 +113,53 @@ export function withThermalSource(base: Fixture, options: { meshHash?: string; s
   });
   const thermalId = created.affected[0] ?? '';
   let doc = execute(created.document, 'set_part_idealization', { analysisId: thermalId, entityId: base.boxId }).document;
+  const thermalMesh: FeMeshArtifact = { ...(options.mesh ?? base.mesh), inputHash: analysisInputHash(doc, thermalId, 'mesh') };
+  const meshHash = hashOf(thermalMesh);
   const results: FeResultsArtifact = {
     kind: 'fe_results',
-    meshHash: options.meshHash ?? hashOf(base.mesh),
-    inputHash: 'x',
+    meshHash,
+    inputHash: analysisInputHash(doc, thermalId, 'full'),
     solver: 'ccx',
     solverVersion: '2.21',
     steps: [
       {
         step: 1,
         time: 5,
-        fields: { NDTEMP: { components: ['T'], values: Object.fromEntries(base.mesh.nodes.map(([id]) => [String(id), [100 + id]])) } },
+        fields: { NDTEMP: { components: ['T'], values: Object.fromEntries(thermalMesh.nodes.map(([id]) => [String(id), [100 + id]])) } },
       },
     ],
   };
   const resultsHash = hashOf(results);
   const heat = doc.analysis?.cases[thermalId] as AnalysisCase;
-  const summary = {
-    resultsHash,
-    inputHash: analysisInputHash(doc, thermalId, 'full'),
-    solver: 'ccx',
-    solverVersion: '2.21',
-    loadCases: [],
-    units: 'N-mm-t-s',
-    thermal: { times: [5] },
-  } as unknown as ResultsSummary;
-  doc = withCase(doc, { ...heat, results: summary });
+  doc = withCase(doc, {
+    ...heat,
+    meshSummary: meshSummary(thermalMesh, meshHash),
+    results: resultsSummary(doc, thermalId, thermalMesh, results, resultsHash),
+  });
   doc = execute(doc, 'set_temperature_field', {
     analysisId: base.analysisId,
     source: { kind: 'thermal_result', analysisId: thermalId, time: 'last' },
   }).document;
-  return { fixture: { ...base, doc }, thermalId, resultsHash, results, artifacts: portOf({ [resultsHash]: results }) };
+  return {
+    fixture: { ...base, doc },
+    thermalId,
+    resultsHash,
+    thermalMesh,
+    results,
+    artifacts: portOf({ [resultsHash]: results, [meshHash]: thermalMesh }),
+  };
+}
+
+/** The document of `source` with its thermal results replaced by `results` (recorded with the real summariser) and a store serving them. */
+export function withRecordedResults(
+  source: ThermalSource,
+  results: FeResultsArtifact,
+): { readonly doc: CadDocument; readonly artifacts: FeArtifactPort } {
+  const { doc } = source.fixture;
+  const heat = doc.analysis?.cases[source.thermalId] as AnalysisCase;
+  const hash = hashOf(results);
+  return {
+    doc: withCase(doc, { ...heat, results: resultsSummary(doc, source.thermalId, source.thermalMesh, results, hash) }),
+    artifacts: portOf({ [hash]: results, [hashOf(source.thermalMesh)]: source.thermalMesh }),
+  };
 }

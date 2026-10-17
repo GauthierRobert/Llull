@@ -3,6 +3,7 @@
 import type { Q, TemperatureScale } from '@core/model/analysis';
 import { convertValue, isUnitFailure } from '@lib/quantity';
 import { toSi, type ThermalKind } from '@lib/thermalUnits';
+import { MAX_PLAUSIBLE_TEMPERATURE } from '../shared/quantity';
 
 /** Absolute zero written to the deck (`*PHYSICAL CONSTANTS, ABSOLUTE ZERO=`): the scale's value of 0 K. */
 export const absoluteZeroOf = (scale: TemperatureScale): number => (scale === 'degC' ? -273.15 : 0);
@@ -13,6 +14,8 @@ export function quantityProblem(kind: ThermalKind, q: Q): string | null {
   const si = toSi(kind, q);
   if (!si.ok) return si.reason;
   if (kind === 'temperature' && !(si.value > 0)) return `${q.value} ${q.unit} is at or below absolute zero`;
+  if (kind === 'temperature' && si.value > MAX_PLAUSIBLE_TEMPERATURE.value)
+    return `${q.value} ${q.unit} exceeds the plausible ceiling ${MAX_PLAUSIBLE_TEMPERATURE.value} K (${MAX_PLAUSIBLE_TEMPERATURE.source})`;
   return null;
 }
 

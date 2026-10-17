@@ -541,3 +541,17 @@ open-cavity case against the exact view-factor network (0.5 %).
 
 **Still open:** VC-THM-30 (TBD grade, CalculiX cavity factors vs llull's); contact conductance deck; phase change (V2); orthotropic k,
 h(T) / ε(T) tables and `render_view field=temperature` (M4 V1); a signing implementation (09 PLM); the `llull guide` thermal section.
+
+**Review fixes (2026-10-17):**
+
+- **Read paths re-verify (05 §4.1).** `thermal_report`, `check_thermal` and `check_temperature_limits` use the results summary recomputed from the
+  artifact (`trustedRecord`): state `untrusted` + `FEA_SUMMARY_MISMATCH` when the recorded one differs, `missing` without an artifact store /
+  artifact; numbers are returned only for `solved`. `check_thermal` now reports `state`; post-solve items (`THM_HEAT_BALANCE`,
+  `THM_PROPERTY_OUT_OF_RANGE`) come only from a verified summary.
+- **Dispositions are claims.** `dispose_thermal_limit` stores the verified `signature` next to the decision; `check_temperature_limits` counts a
+  stored disposition only if it is on the current results AND re-verifies through `ctx.humanSignature` against the payload
+  (`sha256(canonicalJson({ kind, analysisId, rowId, decision, justification, resultsHash }))`). Otherwise the row stays `pending_human`, carries
+  `unverifiedDisposition { decision, signer, reason }` and `THM_DISPOSITION_UNVERIFIED` (warning) is added.
+- **Deck text.** BC names, cavity names / ids, material origin and unverified reasons pass through `commentText`; the cavity keyword uses the
+  sanitised upper-case name; `add_cavity_radiation` accepts only `[A-Za-z0-9_]{1,3}`.
+- **Temperatures** of every thermal quantity are bounded to (0, 1e5] K (named guard "llull guard", `shared/quantity.ts`).
