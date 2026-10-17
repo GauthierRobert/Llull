@@ -101,13 +101,14 @@ export const addHole = defineCommand({
 const isPending = (extent: BuiltHole['extent']): extent is PendingExtent =>
   (extent.kind === 'up_to_next' || extent.kind === 'up_to_face') && !('depth' in extent);
 
-function extentLabel(extents: readonly HoleExtent[]): string {
+function extentLabel(extents: readonly HoleExtent[], methods: readonly (string | undefined)[] = []): string {
   const [first] = extents;
   if (first === undefined || first.kind === 'through_all') return ', through all';
   if (first.kind === 'blind')
     return `, blind ${first.depth}${first.drillPointAngle === undefined ? ' flat' : ` + ${first.drillPointAngle}° point`}`;
   const depths = extents.map((extent) => ('depth' in extent ? Math.round(extent.depth * 1e6) / 1e6 : 0)).join(' / ');
-  return `, ${first.kind.replace(/_/g, ' ')} (depth ${depths})`;
+  const method = methods.includes('mesh') ? 'mesh ray cast' : methods.includes('exact') ? 'exact face query' : undefined;
+  return `, ${first.kind.replace(/_/g, ' ')} (depth ${depths}${method === undefined ? '' : `, measured by ${method}`})`;
 }
 
 /** Material thickness under each hole centre (ray cast along the axis); a point the cast cannot measure falls back to the deepest reach. */
@@ -225,7 +226,10 @@ function drill(
   const detail = [
     hole.cskDiameter === undefined ? '' : `, countersink Ø${hole.cskDiameter} ${hole.cskAngle}°`,
     hole.cboreDiameter === undefined ? '' : `, counterbore Ø${hole.cboreDiameter} x ${hole.cboreDepth}`,
-    extentLabel(groups.map((group) => group.extent)),
+    extentLabel(
+      groups.map((group) => group.extent),
+      groups.map((group) => group.method),
+    ),
     hole.thread === undefined ? '' : `, thread ${hole.thread.designation} (cosmetic)`,
   ].join('');
   const facts = notes.length === 0 ? '' : ` Note: ${notes.join('; ')}.`;

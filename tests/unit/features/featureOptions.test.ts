@@ -3,9 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
 import { expectNoOp, expectPure } from '../../helpers/expectNoOp';
-import { idOf, manifoldSuite, meshOf, plate, volumeOf } from '../../helpers/featureSupport';
+import type { FaceQueryPort } from '@core/geometry/kernelPorts';
+import { ctxWith, idOf, manifoldSuite, meshOf, plate, volumeOf } from '../../helpers/featureSupport';
 
-manifoldSuite();
+const kernelOf = manifoldSuite();
 
 const TOP = { near: [50, 30, 10] };
 const MESH_TOLERANCE = 3e-3;
@@ -65,6 +66,36 @@ describe('add_hole up_to_next / up_to_face', () => {
     expect(relative(before - volumeOf(result.document, id), Math.PI * 9 * 5)).toBeLessThan(MESH_TOLERANCE);
     expect(meshOf(result.document, id).brep).toMatchObject({ extent: { kind: 'up_to_next' } });
     expect(result.summary).toContain('up to next');
+  });
+
+  it('up_to_next measures the exit wall on the exact faces when the kernel has them, else on the mesh, and says which', () => {
+    const block = hollowBlock();
+    const params = { hole: { kind: 'simple', diameter: 6 }, extent: { kind: 'up_to_next' }, face: { near: [50, 30, 30] } };
+    const WALL_Z = 24.9996; // the exact wall is a hair below the tessellated one (a curved wall's chord error)
+    const exactPort = {
+      distance: (_shape: unknown, points: ReadonlyArray<readonly [number, number, number]>) =>
+        points.map((point) => ({ distance: Math.abs(point[2] - WALL_Z), signed: 0, face: 7 })),
+      projectOnFace: (_shape: unknown, face: number, points: ReadonlyArray<readonly [number, number, number]>) =>
+        face === 7
+          ? points.map((point) => ({
+              point: [point[0], point[1], WALL_Z],
+              normal: [0, 0, -1],
+              uv: [0, 0],
+              distance: Math.abs(point[2] - WALL_Z),
+            }))
+          : null,
+    } as unknown as FaceQueryPort;
+    const run = (kernel: ReturnType<typeof kernelOf>): ReturnType<typeof execute> =>
+      execute(block.doc, 'add_hole', { target: block.id, pointsFrame: 'world_xy', points: [[50, 30]], ...params }, ctxWith(kernel));
+    const exact = run({ ...kernelOf(), faceQuery: exactPort });
+    expect(exact.rejected).toBeUndefined();
+    expect((meshOf(exact.document, idOf(exact)).brep as { extent: { depth: number } }).extent.depth).toBeCloseTo(30 - WALL_Z, 9);
+    expect(exact.summary).toContain('measured by exact face query');
+    const mesh = run(kernelOf());
+    expect((meshOf(mesh.document, idOf(mesh)).brep as { extent: { depth: number } }).extent.depth).toBeCloseTo(5, 9);
+    expect(mesh.summary).toContain('measured by mesh ray cast');
+    const wrongFace = run({ ...kernelOf(), faceQuery: { ...exactPort, projectOnFace: () => null } as unknown as FaceQueryPort });
+    expect(wrongFace.summary).toContain('measured by mesh ray cast');
   });
 
   it('up_to_next groups holes with different wall depths into separate nodes', () => {
