@@ -2,9 +2,12 @@
 
 import type { CadPlugin } from '@core/plugins/plugin';
 import { sheetMetalCommands } from './catalog';
+import { sheetMetalDerivationGuard, sheetMetalDocument } from './derive';
 
 export const sheetMetalPlugin: CadPlugin = {
   name: 'sheetmetal',
   toolset: 'manufacturing',
   commands: sheetMetalCommands,
+  guards: [sheetMetalDerivationGuard],
+  document: sheetMetalDocument,
 };
