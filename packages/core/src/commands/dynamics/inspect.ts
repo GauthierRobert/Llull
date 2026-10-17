@@ -40,9 +40,9 @@ export const inspectDynamics = defineCommand({
     'above 1 µm simulate_motion refuses with FPR_LOOP_OPEN). Gear couplings are not counted in the degrees of freedom. Use it to check ' +
     'a setup before simulating. Read-only; needs no physics engine.',
   params: z.object({ mobility: z.boolean().optional().describe('Report data.topology, data.mobility and data.loopGapsM (default true).') }),
-  run: (doc, params): CommandResult => {
+  run: (doc, params, ctx): CommandResult => {
     const dynamics = dynamicsOf(doc);
-    const built = buildSimulationModel(doc, 0.001);
+    const built = buildSimulationModel(doc, 0.001, ctx?.kernel);
     const metres = toMetres(doc, 1);
     const problems = 'error' in built ? [built.code !== undefined ? `${built.code}: ${built.error}` : built.error] : [];
     const warnings: string[] = [];

@@ -49,7 +49,7 @@ export const addRigidBody = defineCommand({
     massKg: z.number().positive().optional().describe('Known real mass in kg; the computed mass distribution is scaled to it.'),
     id: z.string().optional().describe('Optional explicit body id (shares the id space of all dynamics records).'),
   }),
-  run: (doc, { entityIds, name, fixed, density, massKg, id }): CommandResult => {
+  run: (doc, { entityIds, name, fixed, density, massKg, id }, ctx): CommandResult => {
     const fail = failer(doc, 'add_rigid_body');
     const dynamics = dynamicsOf(doc);
     const owners = new Map(Object.values(dynamics.bodies).flatMap((body) => body.entityIds.map((e) => [e, body.id] as const)));
@@ -71,7 +71,7 @@ export const addRigidBody = defineCommand({
       ...(density !== undefined ? { density } : {}),
       ...(massKg !== undefined ? { massKg } : {}),
     };
-    const props = bodyMassProperties(doc, body);
+    const props = bodyMassProperties(doc, body, ctx?.kernel);
     if ('error' in props) return fail(props.error);
     const next = withDynamics(doc, { ...dynamics, bodies: { ...dynamics.bodies, [bodyId]: body } });
     const center = props.centerOfMass.map((c) => formatLength(doc, c / toMetres(doc, 1))).join(', ');

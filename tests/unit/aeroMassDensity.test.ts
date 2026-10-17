@@ -243,7 +243,7 @@ describe('AERO-1 / 08 M1: one density resolver, unit-correct mass', () => {
   it('assemblies: a part without density and no param gives the volume only; with a param, several sources are listed', () => {
     const { doc, instanceId } = assemblyWith(material);
     const partial = execute(doc, 'mass_properties', { entityId: instanceId });
-    expect(partial.data).toEqual({ volume: expect.closeTo(8 + (4 / 3) * Math.PI, 9) as unknown, volumeUnit: 'mm³' });
+    expect(partial.data).toMatchObject({ volume: expect.closeTo(8 + (4 / 3) * Math.PI, 9) as unknown, volumeUnit: 'mm³' });
     expect(partial.summary).toContain('no mass');
     const full = massOf(doc, instanceId, { density: 0.001 });
     expect(full.massG).toBeCloseTo(8 * 0.0027 + (4 / 3) * Math.PI * 0.001, 12);

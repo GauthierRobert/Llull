@@ -146,9 +146,9 @@ describe('measure commands (read-only)', () => {
   it('mass_properties data shape: volume only, or with density and mass', () => {
     const b = build(['add_box', { size: [2, 4, 6], position: [0, 0, 0] }]);
     const r = execute(b.doc, 'mass_properties', { entityId: b.ids[0] });
-    expect(r.data).toEqual({ volume: 48, volumeUnit: 'mm³' });
+    expect(r.data).toMatchObject({ volume: 48, volumeUnit: 'mm³', method: 'closed-form', centroid: [0, 0, 0], area: 88 });
     expect(r.summary).toContain('Volume of');
-    expect(execute(b.doc, 'mass_properties', { entityId: b.ids[0], density: 0.5 }).data).toEqual({
+    expect(execute(b.doc, 'mass_properties', { entityId: b.ids[0], density: 0.5 }).data).toMatchObject({
       volume: 48,
       volumeUnit: 'mm³',
       density: 0.5,
@@ -307,7 +307,7 @@ describe('mass_properties of a kernel result', () => {
   it('reports the exact B-rep volume when the kernel has topology', () => {
     const { doc, id, kernel } = unionOfTwoBoxes(TOPOLOGY);
     const result = execute(doc, 'mass_properties', { entityId: id }, { ...defaultContext(), kernel });
-    expect(result.data).toEqual({ volume: 0.17, volumeUnit: 'mm³', method: 'exact' });
+    expect(result.data).toMatchObject({ volume: 0.17, volumeUnit: 'mm³', method: 'exact' });
     expectNoOp(result, doc, '(exact B-rep)');
   });
   it('falls back to the display mesh without exact topology', () => {
@@ -322,9 +322,9 @@ describe('mass_properties of a kernel result', () => {
     const result = execute(doc, 'mass_properties', { entityId: id, density: 2 }, { ...defaultContext(), kernel });
     expect(result.data).toMatchObject({ volume: 0.17, mass: 0.34 });
   });
-  it('a primitive keeps its analytic volume (no method)', () => {
+  it('a primitive keeps its analytic volume (method closed-form)', () => {
     const box = execute(createEmptyDocument(), 'add_box', { size: [2, 3, 4] });
     const result = execute(box.document, 'mass_properties', { entityId: box.affected[0]! });
-    expect(result.data).toEqual({ volume: 24, volumeUnit: 'mm³' });
+    expect(result.data).toMatchObject({ volume: 24, volumeUnit: 'mm³', method: 'closed-form' });
   });
 });

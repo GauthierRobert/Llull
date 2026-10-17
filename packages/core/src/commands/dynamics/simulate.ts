@@ -72,6 +72,7 @@ export const simulateMotion = defineCommand({
   run: (doc, params, ctx): CommandResult => {
     const fail = failer(doc, 'simulate_motion');
     const engine = (ctx ?? currentContext()).physics ?? null;
+    const kernel = (ctx ?? currentContext()).kernel;
     if (engine === null) return fail('no physics engine is loaded yet (MuJoCo loads at startup; retry in a moment)');
     const dynamics = dynamicsOf(doc);
     const metres = toMetres(doc, 1);
@@ -106,7 +107,7 @@ export const simulateMotion = defineCommand({
     const settings = solverSettingsOf(dynamics);
     const duration = params.duration ?? 5;
     const pilotPeak = (): number => {
-      const pilot = buildSimulationModel(doc, PILOT_TIMESTEP);
+      const pilot = buildSimulationModel(doc, PILOT_TIMESTEP, kernel);
       if ('error' in pilot) return 0;
       try {
         const trace = engine.simulate(pilot.model, { duration: PILOT_DURATION, timestep: PILOT_TIMESTEP, sampleInterval: 0.01 });
@@ -127,7 +128,7 @@ export const simulateMotion = defineCommand({
       params.sampleRate !== undefined ? 1 / params.sampleRate : defaultInterval,
       duration / (MAX_SAMPLES - 1),
     );
-    const built = buildSimulationModel(doc, timestep);
+    const built = buildSimulationModel(doc, timestep, kernel);
     if ('error' in built) return fail(built.error);
     const mode: ReactionMode = params.reactions ?? (structured ? 'peaks' : 'off');
     try {

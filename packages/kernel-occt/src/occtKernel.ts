@@ -12,6 +12,7 @@ import { entityToOccShape, placementTransform, transformedCopy } from './occtSha
 import { extractMeshData } from './occtMesh';
 import { shapeTopology, uniqueSubShapes } from './occtTopology';
 import { analyzeShape, shapeDistance } from './occtAnalysis';
+import { exactMassProperties } from './occtMass';
 import { writeStep } from './occtStep';
 import { release, withOwned } from '@core/geometry/nativeObject';
 import {
@@ -265,6 +266,7 @@ export function occtOps(api: OccApi): KernelOps<OccShape> {
     topology: (shape) => guarded('fragile', () => shapeTopology(api, shape)),
     exportStep: (shapes) => guarded('fragile', () => writeStep(api, shapes)),
     analyze: (shape) => guarded('fragile', () => analyzeShape(api, shape)),
+    massProperties: (shape) => guarded('fragile', () => exactMassProperties(api, shape)),
     distance: (a, b) => guarded('fragile', () => shapeDistance(api, a, b)),
     release,
   };

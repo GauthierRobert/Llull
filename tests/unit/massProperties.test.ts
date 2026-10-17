@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { combineMassProperties, meshMassProperties } from '@core/geometry/massProperties';
-import { entityMassProperties } from '@core/geometry/entityMassProperties';
+import { combineMassProperties, meshMassProperties, type MassProperties } from '@core/geometry/massProperties';
+import { resolveMassProperties } from '@core/geometry/resolveMassProperties';
 import { solidTriangles } from '@core/geometry/solidTriangles';
 import { execute } from '@core/commands/registry';
-import { createEmptyDocument, type Entity } from '@core/model/types';
+import { createEmptyDocument, type CadDocument, type Entity } from '@core/model/types';
+
+const entityMassProperties = (
+  e: Entity,
+  doc: Pick<CadDocument, 'components'>,
+  densityOf: (solid: Entity) => number,
+): MassProperties | null => resolveMassProperties(doc, e, densityOf, {})?.properties ?? null;
 
 function solid(command: string, params: Record<string, unknown>): Entity {
   const result = execute(createEmptyDocument(), command, params);
