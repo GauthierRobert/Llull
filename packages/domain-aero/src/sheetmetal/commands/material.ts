@@ -29,7 +29,7 @@ export const setSheetMetalMaterial = defineCommand({
   }),
   run: (doc, { id, materialName, layerId }): CommandResult => {
     const model = getModel(doc);
-    const part = model.parts[id];
+    const part = Object.hasOwn(model.parts, id) ? model.parts[id] : undefined;
     if (part === undefined || part.sourceEntity !== undefined || ruleOfPart(model, part) === undefined)
       return refuse(
         doc,
@@ -39,7 +39,7 @@ export const setSheetMetalMaterial = defineCommand({
         'Create one with add_sheet_metal_base.',
         { ids: [id], paths: ['id'] },
       );
-    if (doc.materials[materialName] === undefined)
+    if (!Object.hasOwn(doc.materials, materialName))
       return refuse(
         doc,
         'set_sheet_metal_material',
@@ -48,7 +48,7 @@ export const setSheetMetalMaterial = defineCommand({
         `Create it first with create_material. Available: ${Object.keys(doc.materials).join(', ') || 'none'}.`,
         { ids: [id], paths: ['materialName'] },
       );
-    if (layerId !== undefined && doc.layers[layerId] === undefined)
+    if (layerId !== undefined && !Object.hasOwn(doc.layers, layerId))
       return refuse(doc, 'set_sheet_metal_material', 'FTR_PARAM_INVALID', `layer "${layerId}" not found`, 'Create it with add_layer.', {
         ids: [id],
         paths: ['layerId'],
