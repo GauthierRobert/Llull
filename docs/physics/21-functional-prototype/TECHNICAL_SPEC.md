@@ -5,23 +5,23 @@ Gap id **PHY-21** · prefix **FPR** · status: specification · written 2026-10-
 
 ## 1. Current state in llull (read in code, 2026-10-16)
 
-| Area | What exists | Path | Limit for PHY-21 |
-| ---- | ----------- | ---- | ---------------- |
-| Dynamics model | `DynamicsModel { gravity, bodies, joints, gears, motors, propellers }`. `RigidBody { entityIds, fixed, density?, massKg? }`. `DynamicJoint { kind: 'revolute' \| 'prismatic', parent, child, anchor, axis, damping, friction, initialVelocity }` | `packages/core/src/model/dynamics.ts` | Invariant "each body is the child of at most one joint", so no loops; no spherical kind; motors are torque curve or speed governor only |
-| Engine boundary | `PhysicsEngine.simulate(SimulationModel, SimulationOptions): SimulationTrace`. Bodies ordered parent before child, each with `joint \| null`. `gears` and `servos`. Pure `loads(state)` callback for joint and body forces | `packages/core/src/dynamics/physicsEngine.ts` | Tree only; trace has positions, velocities, poses and servo force, but **no constraint or reaction forces** |
-| MuJoCo adapter | MJCF from the tree, RK4, **no geoms** (no contacts). Gears = `<joint>` equality, `solref = 2·dt`, `solimp 0.9999 0.9999 0.001`. Servos = `intvelocity`. Loads at the step midpoint | `packages/physics-mujoco/src/{mjcf,mujocoPhysics}.ts` (`@mujoco/mujoco` 3.14.0) | No `connect` equalities; `mj_rnePostConstraint`, `efc_*`, `cfrc_int` not read |
-| Force laws | `motorForce` (torque curve × throttle, governor), `propellerOutput` (static Ct, Cp) | `packages/core/src/dynamics/forceLaws.ts` | No cylinder pressure |
-| Report | Final rpm, settle time, engine and propeller output, measured gear ratios, tip Mach and figure-of-merit warnings; `detail: summary \| series \| poses` | `packages/core/src/dynamics/simulationReport.ts` | No reactions, no crank-angle axis, no energy closure |
-| Kinematic joints | Separate model `doc.joints` (instances, `add_joint`, `motion_study` sweep, AABB interference) | `packages/core/src/commands/motion/*` | AABB only; a second mechanism model next to `doc.dynamics` |
-| Model check | `check_model`: degenerate sizes, open profiles, dangling references, far from origin, parameter errors | `packages/core/src/commands/inspect/checkModel.ts` | Nothing physical |
-| Kernel | `GeometryKernel { supports, evaluate(ShapeRecipe), tessellate, topology, exportStep }`. Recipes include `boolean` (union / subtract / intersect) and `place`. `ShapeTopology { solids, faces: { index, surface, area }[], edges, vertices, volume }` (OCC only) | `packages/core/src/geometry/kernel.ts`, `model/types.ts` ≈ l. 717 | No distance query, no validity status, no lump count on Manifold, no face axis or radius (joint realisation needs them) |
-| Mass properties | Mesh-based mass, centre of mass and inertia per body | `packages/core/src/geometry/massProperties.ts`, `dynamics/simulationModel.ts` | — |
-| Materials | `doc.materials` (`Material { name, density, color, metalness, roughness, finish? }`), `assign_material`, `BaseEntity.materialId`. `RigidBody.density` falls back to steel 7850 kg/m³ | `packages/core/src/model/types.ts` ≈ l. 644, `commands/document/materials.ts`, `model/dynamics.ts` | No source or grade on a material; the steel fallback is silent (an aluminium piston without a material weighs 2.9 × too much) |
-| Losses | Joint `damping` and `friction` per dynamic joint; no engine friction, no gear efficiency | `model/dynamics.ts` | No FMEP, no brake values |
-| UI | Mechanisms tab: Constraints, Joints, Drive relations, Physics (simulate, rpm chart `SpeedChart`, playback `DynamicsPlayer` + `dynamicsPlaybackStore` with speeds 1…1/100). Loads & forces review list + `DynamicsLoadsOverlay` (uncommitted work in progress) | `src/ui/panels/{MechanismsPanel,PhysicsSection,PhysicsLoadsSection,SpeedChart}.tsx`, `src/ui/viewport/3d/{DynamicsPlayer,DynamicsLoadsOverlay,MechanismOverlay,ClippingPlane}.tsx` | No checklist, findings, mechanism graph, crank-angle axis or Explain |
-| Mesh acceleration | `three-mesh-bvh` in the UI (`bvhSetup.ts`) | `src/ui/viewport/3d/bvhSetup.ts` | Core may not import three (`.dependency-cruiser.cjs` L2 rule) |
-| Human gate | None: no `ctx.caller`, no signature (09 PLM not built) | — | FR-FPR-31/33 need an interim gate (§11 Q5) |
-| Spec overlap | PHY-10 specifies its own index-3 generalised-α solver with exact reactions and `check_mechanism`. The merged code uses MuJoCo instead | `docs/physics/10-rigid-body-dynamics/*` | PHY-21 builds on the MuJoCo code that exists; reconciliation is §11 Q1 |
+| Area              | What exists                                                                                                                                                                                                                                                     | Path                                                                                                                                                                               | Limit for PHY-21                                                                                                                        |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Dynamics model    | `DynamicsModel { gravity, bodies, joints, gears, motors, propellers }`. `RigidBody { entityIds, fixed, density?, massKg? }`. `DynamicJoint { kind: 'revolute' \| 'prismatic', parent, child, anchor, axis, damping, friction, initialVelocity }`                | `packages/core/src/model/dynamics.ts`                                                                                                                                              | Invariant "each body is the child of at most one joint", so no loops; no spherical kind; motors are torque curve or speed governor only |
+| Engine boundary   | `PhysicsEngine.simulate(SimulationModel, SimulationOptions): SimulationTrace`. Bodies ordered parent before child, each with `joint \| null`. `gears` and `servos`. Pure `loads(state)` callback for joint and body forces                                      | `packages/core/src/dynamics/physicsEngine.ts`                                                                                                                                      | Tree only; trace has positions, velocities, poses and servo force, but **no constraint or reaction forces**                             |
+| MuJoCo adapter    | MJCF from the tree, RK4, **no geoms** (no contacts). Gears = `<joint>` equality, `solref = 2·dt`, `solimp 0.9999 0.9999 0.001`. Servos = `intvelocity`. Loads at the step midpoint                                                                              | `packages/physics-mujoco/src/{mjcf,mujocoPhysics}.ts` (`@mujoco/mujoco` 3.14.0)                                                                                                    | No `connect` equalities; `mj_rnePostConstraint`, `efc_*`, `cfrc_int` not read                                                           |
+| Force laws        | `motorForce` (torque curve × throttle, governor), `propellerOutput` (static Ct, Cp)                                                                                                                                                                             | `packages/core/src/dynamics/forceLaws.ts`                                                                                                                                          | No cylinder pressure                                                                                                                    |
+| Report            | Final rpm, settle time, engine and propeller output, measured gear ratios, tip Mach and figure-of-merit warnings; `detail: summary \| series \| poses`                                                                                                          | `packages/core/src/dynamics/simulationReport.ts`                                                                                                                                   | No reactions, no crank-angle axis, no energy closure                                                                                    |
+| Kinematic joints  | Separate model `doc.joints` (instances, `add_joint`, `motion_study` sweep, AABB interference)                                                                                                                                                                   | `packages/core/src/commands/motion/*`                                                                                                                                              | AABB only; a second mechanism model next to `doc.dynamics`                                                                              |
+| Model check       | `check_model`: degenerate sizes, open profiles, dangling references, far from origin, parameter errors                                                                                                                                                          | `packages/core/src/commands/inspect/checkModel.ts`                                                                                                                                 | Nothing physical                                                                                                                        |
+| Kernel            | `GeometryKernel { supports, evaluate(ShapeRecipe), tessellate, topology, exportStep }`. Recipes include `boolean` (union / subtract / intersect) and `place`. `ShapeTopology { solids, faces: { index, surface, area }[], edges, vertices, volume }` (OCC only) | `packages/core/src/geometry/kernel.ts`, `model/types.ts` ≈ l. 717                                                                                                                  | No distance query, no validity status, no lump count on Manifold, no face axis or radius (joint realisation needs them)                 |
+| Mass properties   | Mesh-based mass, centre of mass and inertia per body                                                                                                                                                                                                            | `packages/core/src/geometry/massProperties.ts`, `dynamics/simulationModel.ts`                                                                                                      | —                                                                                                                                       |
+| Materials         | `doc.materials` (`Material { name, density, color, metalness, roughness, finish? }`), `assign_material`, `BaseEntity.materialId`. `RigidBody.density` falls back to steel 7850 kg/m³                                                                            | `packages/core/src/model/types.ts` ≈ l. 644, `commands/document/materials.ts`, `model/dynamics.ts`                                                                                 | No source or grade on a material; the steel fallback is silent (an aluminium piston without a material weighs 2.9 × too much)           |
+| Losses            | Joint `damping` and `friction` per dynamic joint; no engine friction, no gear efficiency                                                                                                                                                                        | `model/dynamics.ts`                                                                                                                                                                | No FMEP, no brake values                                                                                                                |
+| UI                | Mechanisms tab: Constraints, Joints, Drive relations, Physics (simulate, rpm chart `SpeedChart`, playback `DynamicsPlayer` + `dynamicsPlaybackStore` with speeds 1…1/100). Loads & forces review list + `DynamicsLoadsOverlay` (uncommitted work in progress)   | `src/ui/panels/{MechanismsPanel,PhysicsSection,PhysicsLoadsSection,SpeedChart}.tsx`, `src/ui/viewport/3d/{DynamicsPlayer,DynamicsLoadsOverlay,MechanismOverlay,ClippingPlane}.tsx` | No checklist, findings, mechanism graph, crank-angle axis or Explain                                                                    |
+| Mesh acceleration | `three-mesh-bvh` in the UI (`bvhSetup.ts`)                                                                                                                                                                                                                      | `src/ui/viewport/3d/bvhSetup.ts`                                                                                                                                                   | Core may not import three (`.dependency-cruiser.cjs` L2 rule)                                                                           |
+| Human gate        | None: no `ctx.caller`, no signature (09 PLM not built)                                                                                                                                                                                                          | —                                                                                                                                                                                  | FR-FPR-31/33 need an interim gate (§11 Q5)                                                                                              |
+| Spec overlap      | PHY-10 specifies its own index-3 generalised-α solver with exact reactions and `check_mechanism`. The merged code uses MuJoCo instead                                                                                                                           | `docs/physics/10-rigid-body-dynamics/*`                                                                                                                                            | PHY-21 builds on the MuJoCo code that exists; reconciliation is §11 Q1                                                                  |
 
 ## 2. Target architecture
 
@@ -71,26 +71,26 @@ Laws respected:
 
 **Requirements (technical)**
 
-| Id | Pri | Requirement |
-| -- | --- | ----------- |
-| TR-FPR-01 | MUST | Kernel interface: optional `analyze(shape): ShapeAnalysis \| null` and `distance(a, b, maxDistance): ShapeDistance \| null` (§5.1). Both kernels implement them; a kernel returning null makes the dependent items `not_run` with `FPR_KERNEL_UNSUPPORTED`, never a pass. |
-| TR-FPR-02 | MUST | `ShapeTopology.faces[i]` gains optional `axis?: { origin: Vec3; direction: Vec3; radius?: number }` for cylinder, cone and revolution faces and `normal?: Vec3` for planes (OCC: `BRepAdaptor_Surface`). Used by joint realisation. Backward compatible. |
-| TR-FPR-03 | MUST | Interference volume through the existing recipe path: `evaluate({ op: 'boolean', boolean: 'intersect', a, b })` then `analyze(...).volume`. No new boolean API. |
-| TR-FPR-04 | MUST | `geometry/meshBvh.ts`: AABB tree over a `MeshData` in its local frame, median split on the longest axis, leaf size 8, deterministic tie rule (lower triangle index). Queries take a rigid transform (rotation matrix + translation) for the other mesh: `intersects`, `minDistance(maxDistance)` with witness points, `rayCast(origin, direction, maxT)`. |
-| TR-FPR-05 | MUST | Dynamics topology (§5.3): spanning tree by BFS from `ground` over the body–joint graph. Order: joints sorted by `(isRevolute ? 1 : 0, creation order)` so prismatic joints enter the tree first. The tree is chosen Kruskal-style in that order (the last-declared joint of a loop closes it), then rooted by BFS from `ground`. Non-tree joints become `SimulationLoop`s. A prismatic joint that would have to be a loop closure is refused: `FPR_LOOP_PRISMATIC` (MuJoCo has no slide equality between bodies). |
-| TR-FPR-06 | MUST | `SimulationModel` gains `loops: SimulationLoop[]` and `solver: SimulationSolver`. `SimulationTrace` gains `loopForce` (per loop, world N, per sample), `jointReaction` (per tree joint: force N and moment N·m at the anchor, world axes), and `loopResidual` (max over samples, m). All three are optional on the interface so another engine may omit them; the report then marks the items `not_run`. |
+| Id        | Pri  | Requirement                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| --------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| TR-FPR-01 | MUST | Kernel interface: optional `analyze(shape): ShapeAnalysis \| null` and `distance(a, b, maxDistance): ShapeDistance \| null` (§5.1). Both kernels implement them; a kernel returning null makes the dependent items `not_run` with `FPR_KERNEL_UNSUPPORTED`, never a pass.                                                                                                                                                                                                                                                                                                                                  |
+| TR-FPR-02 | MUST | `ShapeTopology.faces[i]` gains optional `axis?: { origin: Vec3; direction: Vec3; radius?: number }` for cylinder, cone and revolution faces and `normal?: Vec3` for planes (OCC: `BRepAdaptor_Surface`). Used by joint realisation. Backward compatible.                                                                                                                                                                                                                                                                                                                                                   |
+| TR-FPR-03 | MUST | Interference volume through the existing recipe path: `evaluate({ op: 'boolean', boolean: 'intersect', a, b })` then `analyze(...).volume`. No new boolean API.                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| TR-FPR-04 | MUST | `geometry/meshBvh.ts`: AABB tree over a `MeshData` in its local frame, median split on the longest axis, leaf size 8, deterministic tie rule (lower triangle index). Queries take a rigid transform (rotation matrix + translation) for the other mesh: `intersects`, `minDistance(maxDistance)` with witness points, `rayCast(origin, direction, maxT)`.                                                                                                                                                                                                                                                  |
+| TR-FPR-05 | MUST | Dynamics topology (§5.3): spanning tree by BFS from `ground` over the body–joint graph. Order: joints sorted by `(isRevolute ? 1 : 0, creation order)` so prismatic joints enter the tree first. The tree is chosen Kruskal-style in that order (the last-declared joint of a loop closes it), then rooted by BFS from `ground`. Non-tree joints become `SimulationLoop`s. A prismatic joint that would have to be a loop closure is refused: `FPR_LOOP_PRISMATIC` (MuJoCo has no slide equality between bodies).                                                                                          |
+| TR-FPR-06 | MUST | `SimulationModel` gains `loops: SimulationLoop[]` and `solver: SimulationSolver`. `SimulationTrace` gains `loopForce` (per loop, world N, per sample), `jointReaction` (per tree joint: force N and moment N·m at the anchor, world axes), and `loopResidual` (max over samples, m). All three are optional on the interface so another engine may omit them; the report then marks the items `not_run`.                                                                                                                                                                                                   |
 | TR-FPR-07 | MUST | MuJoCo adapter: revolute loop = two `connect` equalities at the anchor ± `axis · s` (s = half the shorter body's bounding-box extent along the axis, ≥ 5 mm, named); spherical loop = one `connect`. Each equality gets the loop `solref`/`solimp` from `solver` (§5.3). `<flag diagexact="enable"/>` when available. Reactions: `mj_rnePostConstraint` after each recorded step, `cfrc_int` moved from the subtree-COM frame to the joint anchor; loop forces from `efc_force` rows with `efc_type == mjCNSTR_EQUALITY` and matching `efc_id`, sign fixed by a static unit test; residual from `efc_pos`. |
-| TR-FPR-08 | MUST | Cylinder pressure law (§5.4) is pure core code, evaluated in `loads(state)` as a generalised force on the piston's prismatic joint, so MuJoCo applies the reaction to the cylinder's body (the joint parent) automatically. The pressure–angle table is precomputed once per run on a 0.1° grid. |
-| TR-FPR-09 | MUST | Mobility (§5.5) in core from the same topology: Gruebler count and numerical rank of the loop-constraint Jacobian at the initial pose (finite differences in tree coordinates, column-pivoted QR, rank tolerance 1e-6 relative = sqrt(eps), the noise floor of the differences; named). |
-| TR-FPR-10 | MUST | `check_motion_clearance` (§5.6) rebuilds part poses from `SimulationTrace.bodyPosition/bodyOrientation` (or from `motion_study` steps) and uses `meshBvh` on the kernel tessellation (tessellation tolerance reported). The worst colliding pose is re-evaluated exactly through placed recipes for volume. |
-| TR-FPR-11 | MUST | Determinism: fixed iteration orders (entity order, body order, joint creation order, pair `(i < j)` order), no `Math.random`, numbers in `data` rounded to 12 significant digits (PHY-10 TR-RBD-24 convention). |
-| TR-FPR-12 | MUST | `inputsHash` per check = sha256 of the canonical JSON of everything the check reads: recipes' `recipeKey`, transforms, dynamics slice, intents, params, kernel and engine names. Uses `@lib/hash` over canonical JSON (keys sorted). Deviation: `@lib/hash` is a 64-bit FNV-style hash, not sha256 (core has no sha256 and may not use Node crypto); it identifies inputs but is not collision-resistant against an adversary. |
-| TR-FPR-13 | MUST | Agent-first result envelope on every query: `{ status, items[], provenance, unverified, reviewRequired, inputsHash }`, unit-suffixed fields, `FPR_*` codes (§7.1). |
-| TR-FPR-14 | MUST | `Accuracy` envelope (§3.4) attached to every scalar output of the engine report, the reactions and the comparison. It is built in `dynamics/accuracy.ts` from the model's inputs: each law declares its own band and basis (friction ±15 % [E-R9], combustion as calibrated, reactions inheriting the worst input band). Bands combine by root-sum-square of independent relative bands, named. A missing band propagates as `null` ("± ?"), never as 0. |
-| TR-FPR-15 | MUST | Engine losses (§5.8) are a pure core law evaluated in `loads(state)`: a torque on the crank joint, T_f = −FMEP(n, p_max)·V_d/(4π)·s(ω), with s(ω) = tanh(ω/ω_s), ω_s = 1 rad/s (named), so the cycle-average loss equals FMEP·V_d exactly at steady speed. p_max is taken from the previous cycle (first cycle: the calibration value). |
-| TR-FPR-16 | MUST | `singleZone.ts`: first-law single-zone ODE with Wiebe heat release and Woschni heat loss, RK4 on a 0.1° grid, precomputed per operating point (rpm enters through Woschni and burn scaling). The model is no longer linear in Q, so calibration uses a secant iteration on Q_total until \|brake target error\| ≤ 0.1 % (named), at most 30 iterations, else `FPR_CALIBRATION_FAILED`. |
-| TR-FPR-17 | MUST | Gear loss: on each gear equality the transmitted torque is read from the equality force (`efc_force`, as for the loop reactions). The loss (1 − η)·\|T_in\| is applied as a load on the driven joint, against its velocity. Power flow direction comes from sign(T·ω) on the driving side. |
-| TR-FPR-18 | MUST | `compare_to_reference`: per operating point, a governed run (full throttle, the point's rpm, settle + 2 cycles) or a free-equilibrium run with the propeller. It reports S from the last cycle, D, E, U_val and `origin` from the calibration set. U_num comes from the timestep-halving difference at the calibration point (FR-FPR-79); U_input comes from the input bands; U_D comes from the reference record. |
+| TR-FPR-08 | MUST | Cylinder pressure law (§5.4) is pure core code, evaluated in `loads(state)` as a generalised force on the piston's prismatic joint, so MuJoCo applies the reaction to the cylinder's body (the joint parent) automatically. The pressure–angle table is precomputed once per run on a 0.1° grid.                                                                                                                                                                                                                                                                                                           |
+| TR-FPR-09 | MUST | Mobility (§5.5) in core from the same topology: Gruebler count and numerical rank of the loop-constraint Jacobian at the initial pose (finite differences in tree coordinates, column-pivoted QR, rank tolerance 1e-6 relative = sqrt(eps), the noise floor of the differences; named).                                                                                                                                                                                                                                                                                                                    |
+| TR-FPR-10 | MUST | `check_motion_clearance` (§5.6) rebuilds part poses from `SimulationTrace.bodyPosition/bodyOrientation` (or from `motion_study` steps) and uses `meshBvh` on the kernel tessellation (tessellation tolerance reported). The worst colliding pose is re-evaluated exactly through placed recipes for volume.                                                                                                                                                                                                                                                                                                |
+| TR-FPR-11 | MUST | Determinism: fixed iteration orders (entity order, body order, joint creation order, pair `(i < j)` order), no `Math.random`, numbers in `data` rounded to 12 significant digits (PHY-10 TR-RBD-24 convention).                                                                                                                                                                                                                                                                                                                                                                                            |
+| TR-FPR-12 | MUST | `inputsHash` per check = sha256 of the canonical JSON of everything the check reads: recipes' `recipeKey`, transforms, dynamics slice, intents, params, kernel and engine names. Uses `@lib/hash` over canonical JSON (keys sorted). Deviation: `@lib/hash` is a 64-bit FNV-style hash, not sha256 (core has no sha256 and may not use Node crypto); it identifies inputs but is not collision-resistant against an adversary.                                                                                                                                                                             |
+| TR-FPR-13 | MUST | Agent-first result envelope on every query: `{ status, items[], provenance, unverified, reviewRequired, inputsHash }`, unit-suffixed fields, `FPR_*` codes (§7.1).                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| TR-FPR-14 | MUST | `Accuracy` envelope (§3.4) attached to every scalar output of the engine report, the reactions and the comparison. It is built in `dynamics/accuracy.ts` from the model's inputs: each law declares its own band and basis (friction ±15 % [E-R9], combustion as calibrated, reactions inheriting the worst input band). Bands combine by root-sum-square of independent relative bands, named. A missing band propagates as `null` ("± ?"), never as 0.                                                                                                                                                   |
+| TR-FPR-15 | MUST | Engine losses (§5.8) are a pure core law evaluated in `loads(state)`: a torque on the crank joint, T_f = −FMEP(n, p_max)·V_d/(4π)·s(ω), with s(ω) = tanh(ω/ω_s), ω_s = 1 rad/s (named), so the cycle-average loss equals FMEP·V_d exactly at steady speed. p_max is taken from the previous cycle (first cycle: the calibration value).                                                                                                                                                                                                                                                                    |
+| TR-FPR-16 | MUST | `singleZone.ts`: first-law single-zone ODE with Wiebe heat release and Woschni heat loss, RK4 on a 0.1° grid, precomputed per operating point (rpm enters through Woschni and burn scaling). The model is no longer linear in Q, so calibration uses a secant iteration on Q_total until \|brake target error\| ≤ 0.1 % (named), at most 30 iterations, else `FPR_CALIBRATION_FAILED`.                                                                                                                                                                                                                     |
+| TR-FPR-17 | MUST | Gear loss: on each gear equality the transmitted torque is read from the equality force (`efc_force`, as for the loop reactions). The loss (1 − η)·\|T_in\| is applied as a load on the driven joint, against its velocity. Power flow direction comes from sign(T·ω) on the driving side.                                                                                                                                                                                                                                                                                                                 |
+| TR-FPR-18 | MUST | `compare_to_reference`: per operating point, a governed run (full throttle, the point's rpm, settle + 2 cycles) or a free-equilibrium run with the propeller. It reports S from the last cycle, D, E, U_val and `origin` from the calibration set. U_num comes from the timestep-halving difference at the calibration point (FR-FPR-79); U_input comes from the input bands; U_D comes from the reference record.                                                                                                                                                                                         |
 
 ## 3. Data model
 
@@ -99,13 +99,15 @@ Laws respected:
 ```ts
 export interface DynamicJoint {
   readonly id: string;
-  kind: 'revolute' | 'prismatic' | 'spherical';       // + spherical (loop closures, ball ends)
-  parent: string;                                       // body id or GROUND
+  kind: 'revolute' | 'prismatic' | 'spherical'; // + spherical (loop closures, ball ends)
+  parent: string; // body id or GROUND
   child: string;
-  anchor: Vec3;                                         // document units
-  anchorOnChild?: Vec3;                                 // pin position on the child when it differs; the distance to `anchor` is the loop gap (FPR_LOOP_OPEN). Implemented: with one anchor per joint a loop is otherwise always closed at the start pose
-  axis: Vec3;                                           // ignored for spherical
-  damping: number; friction: number; initialVelocity: number;
+  anchor: Vec3; // document units
+  anchorOnChild?: Vec3; // pin position on the child when it differs; the distance to `anchor` is the loop gap (FPR_LOOP_OPEN). Implemented: with one anchor per joint a loop is otherwise always closed at the start pose
+  axis: Vec3; // ignored for spherical
+  damping: number;
+  friction: number;
+  initialVelocity: number;
 }
 // @invariant parent !== child; spherical joints have damping = friction = initialVelocity = 0;
 //            a body may be the child of several joints (closed loops) — the tree is chosen by dynamics/topology.ts
@@ -113,64 +115,84 @@ export interface DynamicJoint {
 /** Gas pressure on a piston (prismatic joint), driven by a crank (revolute joint) for the cycle angle. */
 export interface CylinderPressure {
   readonly id: string;
-  piston: string;                    // prismatic joint id
-  crank: string;                     // revolute joint id
-  boreMm: number;                    // > 0
-  compressionRatio: number;          // > 1
+  piston: string; // prismatic joint id
+  crank: string; // revolute joint id
+  boreMm: number; // > 0
+  compressionRatio: number; // > 1
   cycle: 'four_stroke' | 'two_stroke';
-  firingOffsetDeg: number;           // which TDC crossing of this piston fires: 0 or 360 (implemented restriction; other values put the firing TDC off a TDC). Phasing between cylinders comes from the crank-pin geometry
+  firingOffsetDeg: number; // which TDC crossing of this piston fires: 0 or 360 (implemented restriction; other values put the firing TDC off a TDC). Phasing between cylinders comes from the crank-pin geometry
   /** Crank joint angle (rad, from its t = 0 pose) at which this piston is at TDC; null = computed from geometry. */
   tdcCrankAngleRad: number | null;
-  ambientPressurePa: number;         // default 101 325 (ISA sea level), named
+  ambientPressurePa: number; // default 101 325 (ISA sea level), named
   model:
     | { kind: 'table'; points: readonly (readonly [cycleDeg: number, gaugePa: number])[]; source?: string }
-    | { kind: 'wiebe'; startDeg: number; durationDeg: number; a: number; m: number;
-        compressionIndex: number; expansionIndex: number; intakePressurePa: number;
+    | {
+        kind: 'wiebe';
+        startDeg: number;
+        durationDeg: number;
+        a: number;
+        m: number;
+        compressionIndex: number;
+        expansionIndex: number;
+        intakePressurePa: number;
         heat: { kind: 'per_cycle_J'; value: number } | { kind: 'target_imep_Pa'; value: number };
-        source?: string }
-    | { kind: 'single_zone';                         // FR-FPR-72, realistic default
-        burn: { ca50Deg: number; durationDeg: number; a: number; m: number; rpmExponent: number }  // 0.2 [E-R12]
-            | { startDeg: number; durationDeg: number; a: number; m: number; rpmExponent: number };  // fixed spark
+        source?: string;
+      }
+    | {
+        kind: 'single_zone'; // FR-FPR-72, realistic default
+        burn:
+          | { ca50Deg: number; durationDeg: number; a: number; m: number; rpmExponent: number } // 0.2 [E-R12]
+          | { startDeg: number; durationDeg: number; a: number; m: number; rpmExponent: number }; // fixed spark
         woschni: { c1: number; c2Closed: number; c2Exchange: number; c3: number; tempExponent: number; wallTempK: number };
-        intakePressurePa: number; intakeTempK: number;
-        heat: { kind: 'per_cycle_J'; value: number }
-            | { kind: 'calibrate_brake'; points: readonly { rpm: number; brakeTorqueNm: number }[] }
-            | { kind: 'table_vs_rpm'; points: readonly (readonly [rpm: number, joulesPerCycle: number])[]; source?: string };
-        source?: string };
+        intakePressurePa: number;
+        intakeTempK: number;
+        heat:
+          | { kind: 'per_cycle_J'; value: number }
+          | { kind: 'calibrate_brake'; points: readonly { rpm: number; brakeTorqueNm: number }[] }
+          | { kind: 'table_vs_rpm'; points: readonly (readonly [rpm: number, joulesPerCycle: number])[]; source?: string };
+        source?: string;
+      };
 }
 
 /** FR-FPR-71: mechanical losses on a crank, reported as FMEP. */
 export interface EngineLosses {
   readonly id: string;
-  crank: string;                     // revolute joint id
-  cylinders: string[];               // CylinderPressure ids (V_d, bore, stroke, p_max come from them)
+  crank: string; // revolute joint id
+  cylinders: string[]; // CylinderPressure ids (V_d, bore, stroke, p_max come from them)
   model:
-    | { kind: 'component'; mainBearing: { diameterMm: number; lengthMm: number; count: number };
+    | {
+        kind: 'component';
+        mainBearing: { diameterMm: number; lengthMm: number; count: number };
         rodBearing: { diameterMm: number; lengthMm: number };
-        valvetrain: 'ohv_rocker' | 'sohc_finger' | 'sohc_rocker' | 'dohc_direct'; valvesPerCylinder: number;
-        variant: 'pnh' | 'sandoval_heywood' }                    // [E-R9]
-    | { kind: 'chen_flynn'; aPa: number; bRatio: number; cPaPerRpm: number; dPaPerRpm2: number; source: string }  // [E-R10]
+        valvetrain: 'ohv_rocker' | 'sohc_finger' | 'sohc_rocker' | 'dohc_direct';
+        valvesPerCylinder: number;
+        variant: 'pnh' | 'sandoval_heywood';
+      } // [E-R9]
+    | { kind: 'chen_flynn'; aPa: number; bRatio: number; cPaPerRpm: number; dPaPerRpm2: number; source: string } // [E-R10]
     | { kind: 'fmep_table'; points: readonly (readonly [rpm: number, fmepPa: number])[]; source: string };
-  oilTempFactor: number;             // 1 = hot; cold ≈ 2.1 [E-R9]
+  oilTempFactor: number; // 1 = hot; cold ≈ 2.1 [E-R9]
 }
 
 export interface DynamicsSolverSettings {
-  timestepS: number | 'auto';        // auto = min(1 ms, 0.5° crank at the highest expected speed), named in provenance
+  timestepS: number | 'auto'; // auto = min(1 ms, 0.5° crank at the highest expected speed), named in provenance
   integrator: 'rk4' | 'implicitfast';
-  loopTimeConstantSteps: number;     // solref timeconst = k · timestep, k ≥ 2 (MuJoCo refsafe), default 2
-  loopImpedance: number;             // solimp d0 = dwidth, default 0.9999 (mjMAXIMP)
-  loopResidualPassM: number;         // default 1e-6 (5 % of 0.020 mm diametral pin clearance [F-R19])
-  loopResidualFailM: number;         // default 1e-5
-  timestepSensitivityGate: number;   // default 0.01 (FR-FPR-79)
+  loopTimeConstantSteps: number; // solref timeconst = k · timestep, k ≥ 2 (MuJoCo refsafe), default 2
+  loopImpedance: number; // solimp d0 = dwidth, default 0.9999 (mjMAXIMP)
+  loopResidualPassM: number; // default 1e-6 (5 % of 0.020 mm diametral pin clearance [F-R19])
+  loopResidualFailM: number; // default 1e-5
+  timestepSensitivityGate: number; // default 0.01 (FR-FPR-79)
 }
 
 export interface DynamicsModel {
-  gravity: Vec3; bodies; joints; motors;
-  gears;                                         // GearPair gains efficiency (default 0.99 [E-R21]) and optional teeth: [number, number]
-  propellers;                                    // Propeller gains table?: { points: [J, ct, cp][]; source; grade } and inertiaKgM2?
-  cylinders: Record<string, CylinderPressure>;   // new, default {}
-  losses: Record<string, EngineLosses>;          // new, default {}
-  solver?: DynamicsSolverSettings;               // new, absent = defaults
+  gravity: Vec3;
+  bodies;
+  joints;
+  motors;
+  gears; // GearPair gains efficiency (default 0.99 [E-R21]) and optional teeth: [number, number]
+  propellers; // Propeller gains table?: { points: [J, ct, cp][]; source; grade } and inertiaKgM2?
+  cylinders: Record<string, CylinderPressure>; // new, default {}
+  losses: Record<string, EngineLosses>; // new, default {}
+  solver?: DynamicsSolverSettings; // new, absent = defaults
 }
 ```
 
@@ -185,24 +207,31 @@ or `fixed`, otherwise `FPR_PART_FLOATING` at check time (not a load error).
 ### 3.2 Engine boundary (`packages/core/src/dynamics/physicsEngine.ts`)
 
 ```ts
-export interface SimulationJoint { readonly kind: 'revolute' | 'prismatic' | 'spherical'; /* rest unchanged */ }
+export interface SimulationJoint {
+  readonly kind: 'revolute' | 'prismatic' | 'spherical'; /* rest unchanged */
+}
 export interface SimulationLoop {
-  readonly id: string;                 // the DynamicJoint id that closes the loop
+  readonly id: string; // the DynamicJoint id that closes the loop
   readonly kind: 'revolute' | 'spherical';
-  readonly bodyA: string; readonly bodyB: string;   // bodyA = joint parent ('world' allowed), bodyB = child
-  readonly anchor: Vec3; readonly axis: Vec3;       // world, m
+  readonly bodyA: string;
+  readonly bodyB: string; // bodyA = joint parent ('world' allowed), bodyB = child
+  readonly anchor: Vec3;
+  readonly axis: Vec3; // world, m
 }
 export interface SimulationSolver {
   readonly integrator: 'rk4' | 'implicitfast';
-  readonly loopTimeConstant: number;   // s
+  readonly loopTimeConstant: number; // s
   readonly loopImpedance: number;
 }
-export interface SimulationModel { /* … */ readonly loops: readonly SimulationLoop[]; readonly solver: SimulationSolver }
+export interface SimulationModel {
+  /* … */ readonly loops: readonly SimulationLoop[];
+  readonly solver: SimulationSolver;
+}
 export interface SimulationTrace {
   /* … existing … */
-  readonly loopForce?: Record<string, Vec3[]>;                                   // on bodyB, world, N
-  readonly jointReaction?: Record<string, { force: Vec3[]; moment: Vec3[] }>;    // on child at anchor, world
-  readonly loopResidual?: number;                                                 // m, max over samples
+  readonly loopForce?: Record<string, Vec3[]>; // on bodyB, world, N
+  readonly jointReaction?: Record<string, { force: Vec3[]; moment: Vec3[] }>; // on child at anchor, world
+  readonly loopResidual?: number; // m, max over samples
 }
 ```
 
@@ -211,38 +240,45 @@ export interface SimulationTrace {
 ```ts
 export interface InterferenceIntent {
   readonly id: string;
-  a: string; b: string;                               // entity or instance ids (unordered pair)
+  a: string;
+  b: string; // entity or instance ids (unordered pair)
   kind: 'press_fit' | 'thread' | 'weld' | 'overlap_by_design';
-  reason: string;                                     // non-empty
-  declaredBy: 'agent' | 'human';                      // from the caller (§11 Q5); shown as a badge
+  reason: string; // non-empty
+  declaredBy: 'agent' | 'human'; // from the caller (§11 Q5); shown as a badge
 }
 export type DispositionStatus = 'not_reviewed' | 'relevant' | 'irrelevant' | 'accepted';
 export interface Disposition {
-  readonly findingKey: string;        // `${check}:${code}:${sorted ids}` — stable across runs
+  readonly findingKey: string; // `${check}:${code}:${sorted ids}` — stable across runs
   status: DispositionStatus;
   comment: string;
-  inputsHash: string;                 // of the check when the disposition was made
-  by: 'agent' | 'human'; at: string;  // ISO time from ctx.clock (deterministic in tests)
+  inputsHash: string; // of the check when the disposition was made
+  by: 'agent' | 'human';
+  at: string; // ISO time from ctx.clock (deterministic in tests)
 }
 export interface ReviewSignature {
-  readonly id: string; reviewer: string; at: string;
-  verdict: 'approved' | 'rejected'; checkHashes: Record<string, string>; comment: string;
+  readonly id: string;
+  reviewer: string;
+  at: string;
+  verdict: 'approved' | 'rejected';
+  checkHashes: Record<string, string>;
+  comment: string;
 }
 /** FR-FPR-77: measured or datasheet data to validate against. */
 export interface ReferenceData {
-  readonly id: string;               // e.g. 'rotax_912uls_full_throttle'
+  readonly id: string; // e.g. 'rotax_912uls_full_throttle'
   quantity: 'brake_torque_Nm' | 'brake_power_kW' | 'bmep_bar' | 'static_rpm' | 'propeller_rpm' | 'bsfc_g_per_kWh';
   condition: { throttle: 'full' | 'propeller_curve'; altitudeM: number; note?: string };
-  points: readonly { rpm?: number; value: number; min?: number; max?: number; uncertainty?: number }[];  // window: min/max
-  source: string; grade: 'A' | 'B' | 'C';
-  digitised: boolean;                // read off a graph (uncertainty = reading error)
-  calibrationRpm: number[];          // points used for calibration → origin 'calibrated'
-  bandRel: number;                   // default 0.05 [E-R20]
+  points: readonly { rpm?: number; value: number; min?: number; max?: number; uncertainty?: number }[]; // window: min/max
+  source: string;
+  grade: 'A' | 'B' | 'C';
+  digitised: boolean; // read off a graph (uncertainty = reading error)
+  calibrationRpm: number[]; // points used for calibration → origin 'calibrated'
+  bandRel: number; // default 0.05 [E-R20]
 }
 export interface PrototypeModel {
-  references: Record<string, ReferenceData>;          // new
+  references: Record<string, ReferenceData>; // new
   intents: Record<string, InterferenceIntent>;
-  grounded: string[];                                 // entity / instance ids treated as attached to the world
+  grounded: string[]; // entity / instance ids treated as attached to the world
   dispositions: Record<string, Disposition>;
   signatures: ReviewSignature[];
 }
@@ -255,29 +291,29 @@ export interface PrototypeModel {
 type CheckStatus = 'pass' | 'warn' | 'fail' | 'not_run';
 /** FR-FPR-70 / TR-FPR-14 — attached to every scalar output (values[key] ↔ accuracy[key]). */
 interface Accuracy {
-  band: { rel: number } | { abs: number; unit: string } | null;   // null = "no quantitative estimate available"
-  basis: string;                                                   // source ref or method
+  band: { rel: number } | { abs: number; unit: string } | null; // null = "no quantitative estimate available"
+  basis: string; // source ref or method
   origin: 'input' | 'calibrated' | 'predicted' | 'verification';
-  validationLevel: 0 | 1 | 2 | 3 | 4;                              // NASA-STD-7009 validation scale [F-R32]
+  validationLevel: 0 | 1 | 2 | 3 | 4; // NASA-STD-7009 validation scale [F-R32]
   comparison?: { referenceId: string; s: number; d: number; e: number; uVal: number | null };
-  warnings: string[];                                              // e.g. "rigid bodies: no torsional resonance"
+  warnings: string[]; // e.g. "rigid bodies: no torsional resonance"
 }
 interface CheckItem {
-  code: string;                  // FPR_* (§7.1)
+  code: string; // FPR_* (§7.1)
   status: CheckStatus;
-  ids: string[];                 // entities / instances / joints / bodies
+  ids: string[]; // entities / instances / joints / bodies
   findingKey: string;
-  values: Record<string, number>;        // unit-suffixed keys: overlapVolumeMm3, minDistanceMm, thicknessMm, …
-  accuracy?: Record<string, Accuracy>;   // same keys as values (physics outputs; geometry checks use tolerances)
+  values: Record<string, number>; // unit-suffixed keys: overlapVolumeMm3, minDistanceMm, thicknessMm, …
+  accuracy?: Record<string, Accuracy>; // same keys as values (physics outputs; geometry checks use tolerances)
   threshold?: { value: number; unit: string; source: string; grade: 'A' | 'B' | 'C'; defaulted: boolean };
   witness?: { pointsMm: Vec3[]; timeS?: number; crankDeg?: number };
   remediation: string;
   unverified?: boolean;
-  disposition?: Disposition & { stale: boolean };   // joined from doc.prototype
+  disposition?: Disposition & { stale: boolean }; // joined from doc.prototype
 }
 interface CheckResult {
   check: 'assembly' | 'mechanism' | 'motion_clearance' | 'dynamics';
-  status: CheckStatus;           // worst item, after allowed intents and accepted dispositions
+  status: CheckStatus; // worst item, after allowed intents and accepted dispositions
   items: CheckItem[];
   provenance: { method: string; kernel?: string; engine?: string; tolerances: Record<string, number>; params: unknown };
   inputsHash: string;
@@ -288,25 +324,25 @@ interface CheckResult {
 
 ## 4. Commands
 
-| Command | Kind | Params (sketch) | Tags |
-| ------- | ---- | --------------- | ---- |
-| `check_assembly` | query, `requiresKernel` | `{ scope?: 'all' \| { ids } \| { body } \| { component }, clearanceMm?, touchToleranceMm?, process?: ProcessId, minWallMm?, thickness?: 'off' \| 'ray', raysPerPart? (default 2000, max 20 000), includeJoints?: boolean (default true) }` | `@affects none` · `@invariant same doc back, affected []` · `@failure no kernel ⇒ FPR_KERNEL_UNSUPPORTED; budget ⇒ FPR_BUDGET_EXCEEDED` |
-| `allow_interference` | mutating | `{ a, b, kind, reason }` | `@affects doc.prototype.intents` · `@failure a = b, unknown id, empty reason` |
-| `remove_interference_intent` | mutating | `{ id }` | `@affects doc.prototype.intents` |
-| `set_part_grounded` | mutating | `{ ids, grounded: boolean }` | `@affects doc.prototype.grounded` |
-| `add_body_joint` (extended) | mutating | `+ kind: 'spherical'`; child may already have a joint | `@invariant parent ≠ child`; `@failure loop needs a prismatic closure ⇒ FPR_LOOP_PRISMATIC` |
-| `add_cylinder_pressure` | mutating | `{ piston, crank, boreMm, compressionRatio, cycle?, firingOffsetDeg?, tdcCrankAngleDeg?, ambientPressurePa?, model }` | `@affects doc.dynamics.cylinders` · `@failure piston not prismatic, crank not revolute, bore ≤ 0, CR ≤ 1, table not covering the cycle, Wiebe a ≤ 0 or duration ≤ 0` |
-| `set_engine_losses` | mutating | `{ crank, cylinders?, model, oilTempFactor? }` | `@affects doc.dynamics.losses` · `@failure crank not revolute; component model without bearing sizes; table without source` |
-| `add_reference_data` | mutating | `ReferenceData` minus id + `{ id? }`; `preset?: 'rotax_912uls_full_throttle' \| 'rotax_912is_power_table' \| 'o320a_full_throttle' \| 'o320b_full_throttle' \| 'rotax_912_static_rpm_window'` | `@affects doc.prototype.references` · `@failure empty points, no source, band ≤ 0` |
-| `compare_to_reference` | query, physics | `{ reference: id \| 'all', points?: rpm[], detail? }` | per point S, D, E, U_val, band, origin, status; `@failure no losses on a brake quantity ⇒ FPR_NO_LOSSES (brake vs indicated would mislead)` |
-| `set_dynamics_solver` | mutating | `Partial<DynamicsSolverSettings>` | `@affects doc.dynamics.solver` · `@failure loopTimeConstantSteps < 2, impedance ∉ (0, 0.9999]` |
-| `inspect_dynamics` (extended) | query | `+ mobility: boolean (default true)` | adds `data.topology { tree, loops }`, `data.mobility { gruebler, rank, dof, redundant[] }`, `data.loopGapsM` at the start pose |
-| `engine_quick_check` | query | `{ cylinder?: id, crankRadiusMm?, rodLengthMm?, forceN?, anglesDeg?, rpm?, mepBar?, displacementCm3?, cycle? }`. Taken from the model when a cylinder id is given | analytic only (§5.4), no kernel or physics |
-| `simulate_motion` (extended) | query, physics | `+ reactions?: 'off' \| 'peaks' \| 'series'` (default `peaks` when loops or cylinders exist), `+ crankAxis?: joint id` | adds `data.reactions`, `data.engineReport` (not `data.engine`: that key already holds the engine name string), `data.loops`; the reaction component along the axis of a driven joint includes the applied drive force (`cfrc_int` excludes `qfrc_applied`); unchanged output for models without loops or cylinders (FR-FPR-19) |
-| `check_motion_clearance` | query, `requiresKernel` + physics | `{ source: 'simulation' \| { joint, startDeg, endDeg }, durationS? \| cycles?, clearanceMm?, pairs?: 'moving' \| 'all', maxSamples? (default 4000) }` | `@failure no poses ⇒ FPR_NO_MOTION` |
-| `check_prototype` | query, `requiresKernel` + physics | `{ process?, minWallMm?, clearanceMm?, cycles? (default 1), settleS? }` | runs the four checks in order; `verdict`, `ownerSummary`, `checks[]` |
-| `set_review_disposition` | mutating | `{ findingKey, status, comment }` | `@failure accepted on a fail by an agent ⇒ FPR_HUMAN_GATE` |
-| `sign_prototype_review` | mutating, human gate | `{ reviewer, verdict, comment }` | `@failure open fails, stale dispositions, non-human caller ⇒ FPR_SIGNOFF_BLOCKED / FPR_HUMAN_GATE` |
+| Command                       | Kind                              | Params (sketch)                                                                                                                                                                                                                            | Tags                                                                                                                                                                                                                                                                                                                           |
+| ----------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `check_assembly`              | query, `requiresKernel`           | `{ scope?: 'all' \| { ids } \| { body } \| { component }, clearanceMm?, touchToleranceMm?, process?: ProcessId, minWallMm?, thickness?: 'off' \| 'ray', raysPerPart? (default 2000, max 20 000), includeJoints?: boolean (default true) }` | `@affects none` · `@invariant same doc back, affected []` · `@failure no kernel ⇒ FPR_KERNEL_UNSUPPORTED; budget ⇒ FPR_BUDGET_EXCEEDED`                                                                                                                                                                                        |
+| `allow_interference`          | mutating                          | `{ a, b, kind, reason }`                                                                                                                                                                                                                   | `@affects doc.prototype.intents` · `@failure a = b, unknown id, empty reason`                                                                                                                                                                                                                                                  |
+| `remove_interference_intent`  | mutating                          | `{ id }`                                                                                                                                                                                                                                   | `@affects doc.prototype.intents`                                                                                                                                                                                                                                                                                               |
+| `set_part_grounded`           | mutating                          | `{ ids, grounded: boolean }`                                                                                                                                                                                                               | `@affects doc.prototype.grounded`                                                                                                                                                                                                                                                                                              |
+| `add_body_joint` (extended)   | mutating                          | `+ kind: 'spherical'`; child may already have a joint                                                                                                                                                                                      | `@invariant parent ≠ child`; `@failure loop needs a prismatic closure ⇒ FPR_LOOP_PRISMATIC`                                                                                                                                                                                                                                    |
+| `add_cylinder_pressure`       | mutating                          | `{ piston, crank, boreMm, compressionRatio, cycle?, firingOffsetDeg?, tdcCrankAngleDeg?, ambientPressurePa?, model }`                                                                                                                      | `@affects doc.dynamics.cylinders` · `@failure piston not prismatic, crank not revolute, bore ≤ 0, CR ≤ 1, table not covering the cycle, Wiebe a ≤ 0 or duration ≤ 0`                                                                                                                                                           |
+| `set_engine_losses`           | mutating                          | `{ crank, cylinders?, model, oilTempFactor? }`                                                                                                                                                                                             | `@affects doc.dynamics.losses` · `@failure crank not revolute; component model without bearing sizes; table without source`                                                                                                                                                                                                    |
+| `add_reference_data`          | mutating                          | `ReferenceData` minus id + `{ id? }`; `preset?: 'rotax_912uls_full_throttle' \| 'rotax_912is_power_table' \| 'o320a_full_throttle' \| 'o320b_full_throttle' \| 'rotax_912_static_rpm_window'`                                              | `@affects doc.prototype.references` · `@failure empty points, no source, band ≤ 0`                                                                                                                                                                                                                                             |
+| `compare_to_reference`        | query, physics                    | `{ reference: id \| 'all', points?: rpm[], detail? }`                                                                                                                                                                                      | per point S, D, E, U_val, band, origin, status; `@failure no losses on a brake quantity ⇒ FPR_NO_LOSSES (brake vs indicated would mislead)`                                                                                                                                                                                    |
+| `set_dynamics_solver`         | mutating                          | `Partial<DynamicsSolverSettings>`                                                                                                                                                                                                          | `@affects doc.dynamics.solver` · `@failure loopTimeConstantSteps < 2, impedance ∉ (0, 0.9999]`                                                                                                                                                                                                                                 |
+| `inspect_dynamics` (extended) | query                             | `+ mobility: boolean (default true)`                                                                                                                                                                                                       | adds `data.topology { tree, loops }`, `data.mobility { gruebler, rank, dof, redundant[] }`, `data.loopGapsM` at the start pose                                                                                                                                                                                                 |
+| `engine_quick_check`          | query                             | `{ cylinder?: id, crankRadiusMm?, rodLengthMm?, forceN?, anglesDeg?, rpm?, mepBar?, displacementCm3?, cycle? }`. Taken from the model when a cylinder id is given                                                                          | analytic only (§5.4), no kernel or physics                                                                                                                                                                                                                                                                                     |
+| `simulate_motion` (extended)  | query, physics                    | `+ reactions?: 'off' \| 'peaks' \| 'series'` (default `peaks` when loops or cylinders exist), `+ crankAxis?: joint id`                                                                                                                     | adds `data.reactions`, `data.engineReport` (not `data.engine`: that key already holds the engine name string), `data.loops`; the reaction component along the axis of a driven joint includes the applied drive force (`cfrc_int` excludes `qfrc_applied`); unchanged output for models without loops or cylinders (FR-FPR-19) |
+| `check_motion_clearance`      | query, `requiresKernel` + physics | `{ source: 'simulation' \| { joint, startDeg, endDeg }, durationS? \| cycles?, clearanceMm?, pairs?: 'moving' \| 'all', maxSamples? (default 4000) }`                                                                                      | `@failure no poses ⇒ FPR_NO_MOTION`                                                                                                                                                                                                                                                                                            |
+| `check_prototype`             | query, `requiresKernel` + physics | `{ process?, minWallMm?, clearanceMm?, cycles? (default 1), settleS? }`                                                                                                                                                                    | runs the four checks in order; `verdict`, `ownerSummary`, `checks[]`                                                                                                                                                                                                                                                           |
+| `set_review_disposition`      | mutating                          | `{ findingKey, status, comment }`                                                                                                                                                                                                          | `@failure accepted on a fail by an agent ⇒ FPR_HUMAN_GATE`                                                                                                                                                                                                                                                                     |
+| `sign_prototype_review`       | mutating, human gate              | `{ reviewer, verdict, comment }`                                                                                                                                                                                                           | `@failure open fails, stale dispositions, non-human caller ⇒ FPR_SIGNOFF_BLOCKED / FPR_HUMAN_GATE`                                                                                                                                                                                                                             |
 
 Toolsets: the checks and `engine_quick_check` go in `analysis`, mirrored as next-call hints in `assembly` (FR-FPR-40).
 The review commands go in a new `review` toolset; `sign_prototype_review` is hidden from MCP (callable only through
@@ -318,21 +354,28 @@ the UI path; §11 Q5).
 
 ```ts
 interface ShapeAnalysis {
-  valid: boolean; status: string;          // Manifold ErrorStatus / OCC BRepCheck summary
-  closed: boolean;                          // watertight solid(s)
-  volume: number; area: number;             // document units³ / ²
-  lumps: { volume: number; area: number; bounds: Bounds }[];   // disconnected pieces
-  freeFaces: number;                        // OCC: faces not in a closed shell; Manifold: 0 (cannot hold sheets)
+  valid: boolean;
+  status: string; // Manifold ErrorStatus / OCC BRepCheck summary
+  closed: boolean; // watertight solid(s)
+  volume: number;
+  area: number; // document units³ / ²
+  lumps: { volume: number; area: number; bounds: Bounds }[]; // disconnected pieces
+  freeFaces: number; // OCC: faces not in a closed shell; Manifold: 0 (cannot hold sheets)
 }
-interface ShapeDistance { distance: number; pointA: Vec3; pointB: Vec3; inside: boolean }  // inside = one contains the other
+interface ShapeDistance {
+  distance: number;
+  pointA: Vec3;
+  pointB: Vec3;
+  inside: boolean;
+} // inside = one contains the other
 ```
 
-| Method | Manifold (`manifold-3d` 3.5.4) | OCC (`opencascade.js` 1.1.1) |
-| ------ | ------------------------------ | ---------------------------- |
-| `analyze.valid/status` | `status() === 'NoError'`, `isEmpty()` [B-R29][B-R30] | `BRepCheck_Analyzer.IsValid()`; `BRepAlgoAPI_Check` (`BOPAlgo_ArgumentAnalyzer` is not in the 1.1.1 bindings) [B-R19][B-R20] |
-| `analyze.lumps` | `decompose()` then `volume()/surfaceArea()/boundingBox()` per piece [B-R29] | explore `TopAbs_SOLID` + `BRepGProp.VolumeProperties` |
-| `analyze.freeFaces/closed` | input that is not a closed 2-manifold fails `status()` (NotManifold), so it reports invalid | `ShapeAnalysis_FreeBounds` (open wires), `ShapeAnalysis_ShapeContents` free faces / shells [B-R25][B-R27] |
-| `distance` | `minGap(other, maxDistance)` (0 when they intersect) [B-R29][B-R31]; witness points from the core BVH on the tessellation | `BRepExtrema_DistShapeShape` (`Value`, `PointOnShape1/2`, `InnerSolution`) [B-R22] |
+| Method                     | Manifold (`manifold-3d` 3.5.4)                                                                                            | OCC (`opencascade.js` 1.1.1)                                                                                                 |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `analyze.valid/status`     | `status() === 'NoError'`, `isEmpty()` [B-R29][B-R30]                                                                      | `BRepCheck_Analyzer.IsValid()`; `BRepAlgoAPI_Check` (`BOPAlgo_ArgumentAnalyzer` is not in the 1.1.1 bindings) [B-R19][B-R20] |
+| `analyze.lumps`            | `decompose()` then `volume()/surfaceArea()/boundingBox()` per piece [B-R29]                                               | explore `TopAbs_SOLID` + `BRepGProp.VolumeProperties`                                                                        |
+| `analyze.freeFaces/closed` | input that is not a closed 2-manifold fails `status()` (NotManifold), so it reports invalid                               | `ShapeAnalysis_FreeBounds` (open wires), `ShapeAnalysis_ShapeContents` free faces / shells [B-R25][B-R27]                    |
+| `distance`                 | `minGap(other, maxDistance)` (0 when they intersect) [B-R29][B-R31]; witness points from the core BVH on the tessellation | `BRepExtrema_DistShapeShape` (`Value`, `PointOnShape1/2`, `InnerSolution`) [B-R22]                                           |
 
 ### 5.2 `check_assembly`
 
@@ -365,15 +408,16 @@ interface ShapeDistance { distance: number; pointA: Vec3; pointB: Vec3; inside: 
    inscribed-sphere method.
 7. **Process thresholds** (`packages/core/src/model/processRules.ts`, data with sources, AF-30):
 
-   | ProcessId | Min wall | Source (grade) |
-   | --------- | -------- | -------------- |
-   | `cnc_metal` | 0.794 mm | Xometry CNC thin walls [B-R14] (B) |
+   | ProcessId                                  | Min wall                                      | Source (grade)                                 |
+   | ------------------------------------------ | --------------------------------------------- | ---------------------------------------------- |
+   | `cnc_metal`                                | 0.794 mm                                      | Xometry CNC thin walls [B-R14] (B)             |
    | `injection_abs` / `_nylon` / `_pc` / `_pp` | 1.143 / 0.762 / 1.016 / 0.889 mm (range lows) | Protolabs injection moulding guide [B-R12] (B) |
-   | `dmls_aluminium` | 0.762 mm (range low) | Protolabs [B-R15] (B) |
-   | `sls` / `mjf` / `sla` | 0.762 / 0.508 / 0.4064 mm | Protolabs [B-R15] (B) |
-   | `sand_cast_al` / `sand_cast_steel` | 2.54 / 3.30 mm (0.10 / 0.13 in) | Engineers Edge [B-R16] (B) |
+   | `dmls_aluminium`                           | 0.762 mm (range low)                          | Protolabs [B-R15] (B)                          |
+   | `sls` / `mjf` / `sla`                      | 0.762 / 0.508 / 0.4064 mm                     | Protolabs [B-R15] (B)                          |
+   | `sand_cast_al` / `sand_cast_steel`         | 2.54 / 3.30 mm (0.10 / 0.13 in)               | Engineers Edge [B-R16] (B)                     |
 
    All are vendor guidance, not standards, so they are grade B and carry `defaulted: true` when picked by process.
+
 8. **Joint realisation** (FR-FPR-08), OCC: for each revolute joint, among the faces of each side with
    `axis.direction` parallel to the joint axis within 0.5° and `|offset| ≤ 0.01 mm + 1e-4·radius`, take the closest
    pair across sides with opposite orientation (convex pin vs concave bore). Report diametral clearance =
@@ -475,6 +519,27 @@ above the gate gives `FPR_LOOP_OPEN`.
    time and angle, max penetration estimate and the volume at the worst pose; the achieved resolution. Pairs joined by
    a joint whose min distance ≈ the realised clearance are `touch` (pin in bore), not a failure.
 
+**As built (FPR-C), deviations from the sketch above** (`commands/dynamics/{checkMotionClearance,motionClearanceRun}.ts`,
+`dynamics/motionPoses.ts`):
+
+- Source: simulated runs only (`simulate_motion` poses, same `duration` / `timestep` / `sampleRate`); the `motion_study` sweep source
+  and `cycles` are not built. Params: `ids` (focus: pairs with at least one member listed), `crankAxis` (revolute joint whose angle
+  labels findings), `clearanceMm`, `touchToleranceMm`, `pairs: 'moving' | 'all'`, `maxSamples` (default 4000, thinned by stride).
+- Codes: `FPR_MOTION_INTERFERENCE` (fail), `FPR_MOTION_CLEARANCE_LOW` (warn), `FPR_MOTION_TOUCH` (info), `FPR_MOTION_ALLOWED` (pass, a
+  `doc.prototype` intent covers the pair), `FPR_MOTION_UNDERSAMPLED` (warn, unverified), `FPR_NO_PAIRS` / `FPR_PART_INVALID` (not_run).
+  Rejections: `FPR_NO_MOTION` (no bodies, nothing moves, simulation did not run), `FPR_UNKNOWN_ID`, `FPR_BUDGET_EXCEEDED` (500 parts,
+  2000 pairs, 400 000 pair-samples); a refused simulation keeps its own code (e.g. `FPR_LOOP_OPEN`).
+- Poses between samples are interpolated (lerp / slerp), up to 16 substeps per pair and sample, so the displacement per step stays under
+  half of the thinnest part side. Intervals are NOT bisected: start / end are the first / last contact moment, resolved to the substep
+  (`data.samples.resolutionS` is the sample spacing). When the cap leaves a step larger than the thinnest side, `FPR_MOTION_UNDERSAMPLED`.
+- A zero BVH distance is contact, not interference: the exact overlap volume at the first, middle and last moment of each interval
+  (kernel `intersect` + `analyze` on the placed recipes) decides; no volume = touch. At most 12 intervals per pair are classified; a
+  kernel without `analyze` leaves them unclassified, reported as interference with `unverified: true`. The "worst pose" is the largest
+  of those three, not a search.
+- Joint-connected pairs get no special treatment beyond the volume rule (a pin touching its bore is touch). One part wholly inside another
+  without surface contact is not detected (BVH distance is surface to surface).
+- `data.minClearance` is the closest approach among pairs that never overlap or touch; per-pair minima are in `data.pairs[]`.
+
 ### 5.7 `check_prototype`
 
 Order: `check_assembly` → `inspect_dynamics` (mobility) → `simulate_motion` (duration = settle + cycles·(720°/ω), with
@@ -521,21 +586,21 @@ what needs a human, and how far to trust the numbers (calibrated vs predicted, t
 
 ### 5.9 Numerical tolerances (named, in provenance)
 
-| Name | Default |
-| ---- | ------- |
-| ε_touch | max(1e-3 doc units, kernel tolerance) |
-| ε_vol (relative) | 1e-6 × smaller part volume |
-| containment ratio | 0.99 |
-| loop residual tiers | pass ≤ 1e-6 m, warn ≤ 1e-5 m, fail above (FR-FPR-15) |
-| energy-closure gate | 0.5 % |
-| timestep-halving gate | 1 % |
-| calibration tolerance | 0.1 % on the brake target, ≤ 30 secant iterations |
-| reference band (default) | ±5 % per point [E-R20] |
-| friction smoothing ω_s | 1 rad/s |
-| mobility rank tolerance | 1e-6 × max |pivot| (central-difference noise floor) |
-| thickness ray start offset | 1e-6 × part diagonal |
-| corner exclusion | 0.5 × threshold |
-| tessellation tolerance | kernel default, reported |
+| Name                       | Default                                              |
+| -------------------------- | ---------------------------------------------------- | ----- | -------------------------------- |
+| ε_touch                    | max(1e-3 doc units, kernel tolerance)                |
+| ε_vol (relative)           | 1e-6 × smaller part volume                           |
+| containment ratio          | 0.99                                                 |
+| loop residual tiers        | pass ≤ 1e-6 m, warn ≤ 1e-5 m, fail above (FR-FPR-15) |
+| energy-closure gate        | 0.5 %                                                |
+| timestep-halving gate      | 1 %                                                  |
+| calibration tolerance      | 0.1 % on the brake target, ≤ 30 secant iterations    |
+| reference band (default)   | ±5 % per point [E-R20]                               |
+| friction smoothing ω_s     | 1 rad/s                                              |
+| mobility rank tolerance    | 1e-6 × max                                           | pivot | (central-difference noise floor) |
+| thickness ray start offset | 1e-6 × part diagonal                                 |
+| corner exclusion           | 0.5 × threshold                                      |
+| tessellation tolerance     | kernel default, reported                             |
 
 ## 6. Interop & persistence
 
@@ -554,108 +619,108 @@ production gate's agent driver runs the reference engine scenario (validation/RE
 
 **UI** (Lane 2, `src/ui/**`, presentation only, L1):
 
-| Component | Path | Data |
-| --------- | ---- | ---- |
-| `ReviewPanel` (rail tab `review`) | `src/ui/panels/review/ReviewPanel.tsx` | dispatches `check_prototype`; holds the last result in `reviewStore` (UI state, not the document) |
-| `ReadinessChecklist`, `ChecklistRow` | `src/ui/panels/review/ReadinessChecklist.tsx` | `CheckResult[]`; status icon + word; Explain link |
-| `FindingsList` | `src/ui/panels/review/FindingsList.tsx` | items, filters, sort, grouping; dispatches `set_review_disposition` |
-| `MechanismGraph` | `src/ui/panels/review/MechanismGraph.tsx` | `inspect_dynamics.data.topology/mobility`; SVG layered layout rooted at ground; selection synced with `useStore` |
-| `ExplainDrawer` | `src/ui/panels/review/ExplainDrawer.tsx` | `provenance` + item; "copy as CLI" builds the query string from the command name and params |
-| `SignOffBar` | `src/ui/panels/review/SignOffBar.tsx` | enabled state from the result + `doc.prototype`; dispatches `sign_prototype_review` |
-| `TimelineDock`, `SeriesChart` (generalises `SpeedChart`) | `src/ui/components/TimelineDock.tsx`, `src/ui/panels/SeriesChart.tsx` | one cursor from `dynamicsPlaybackStore` (add `cursorTime`, `axis: 'time' \| 'crank'`); event markers |
-| `FindingsOverlay` | `src/ui/viewport/3d/FindingsOverlay.tsx` | isolate and ghost, overlap volume mesh (tessellated intersection recipe), witness segments with labels |
-| `ThicknessOverlay` | `src/ui/viewport/3d/ThicknessOverlay.tsx` | per-vertex colours from thickness samples (cividis; diverging around the threshold) |
-| `TracePathOverlay`, joint glyphs | `src/ui/viewport/3d/TracePathOverlay.tsx`, extend `MechanismOverlay.tsx` | poses from the run; glyph per joint kind; loop joints dashed |
-| Reaction arrows | extend `DynamicsLoadsOverlay` + `src/ui/dynamicsLoads.ts` | new layer `reactions` from `data.reactions` at the cursor time |
+| Component                                                | Path                                                                     | Data                                                                                                             |
+| -------------------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `ReviewPanel` (rail tab `review`)                        | `src/ui/panels/review/ReviewPanel.tsx`                                   | dispatches `check_prototype`; holds the last result in `reviewStore` (UI state, not the document)                |
+| `ReadinessChecklist`, `ChecklistRow`                     | `src/ui/panels/review/ReadinessChecklist.tsx`                            | `CheckResult[]`; status icon + word; Explain link                                                                |
+| `FindingsList`                                           | `src/ui/panels/review/FindingsList.tsx`                                  | items, filters, sort, grouping; dispatches `set_review_disposition`                                              |
+| `MechanismGraph`                                         | `src/ui/panels/review/MechanismGraph.tsx`                                | `inspect_dynamics.data.topology/mobility`; SVG layered layout rooted at ground; selection synced with `useStore` |
+| `ExplainDrawer`                                          | `src/ui/panels/review/ExplainDrawer.tsx`                                 | `provenance` + item; "copy as CLI" builds the query string from the command name and params                      |
+| `SignOffBar`                                             | `src/ui/panels/review/SignOffBar.tsx`                                    | enabled state from the result + `doc.prototype`; dispatches `sign_prototype_review`                              |
+| `TimelineDock`, `SeriesChart` (generalises `SpeedChart`) | `src/ui/components/TimelineDock.tsx`, `src/ui/panels/SeriesChart.tsx`    | one cursor from `dynamicsPlaybackStore` (add `cursorTime`, `axis: 'time' \| 'crank'`); event markers             |
+| `FindingsOverlay`                                        | `src/ui/viewport/3d/FindingsOverlay.tsx`                                 | isolate and ghost, overlap volume mesh (tessellated intersection recipe), witness segments with labels           |
+| `ThicknessOverlay`                                       | `src/ui/viewport/3d/ThicknessOverlay.tsx`                                | per-vertex colours from thickness samples (cividis; diverging around the threshold)                              |
+| `TracePathOverlay`, joint glyphs                         | `src/ui/viewport/3d/TracePathOverlay.tsx`, extend `MechanismOverlay.tsx` | poses from the run; glyph per joint kind; loop joints dashed                                                     |
+| Reaction arrows                                          | extend `DynamicsLoadsOverlay` + `src/ui/dynamicsLoads.ts`                | new layer `reactions` from `data.reactions` at the cursor time                                                   |
 
 Colours: Okabe-Ito tokens for categories, added to `src/ui/styles` as CSS variables in light and dark. Status icons
 use distinct shapes (✔ ▲ ✖ ○ ◌) with text [D-R43][D-R44].
 
 ### 7.1 Stable codes (AF-11)
 
-| Code | Status | Meaning → remediation |
-| ---- | ------ | --------------------- |
-| `FPR_PART_INVALID` | fail | kernel says the solid is invalid → rebuild the feature; see `status` |
-| `FPR_PART_EMPTY` | fail | zero volume → check booleans that removed everything |
-| `FPR_PART_DISCONNECTED` | fail | N lumps in one part → split into parts or join with material |
-| `FPR_PART_SHEET` | fail | zero-thickness surface or open shell → give it thickness (`shell`, extrude) |
-| `FPR_PAIR_HARD` | fail | overlap volume V → move/resize, or `allow_interference` with a reason |
-| `FPR_PAIR_CONTAINED` | fail | part inside another → remove the duplicate or subtract |
-| `FPR_PAIR_TOUCH` | info | touching (zero volume) |
-| `FPR_PAIR_CLEARANCE` | warn | gap below the required clearance |
-| `FPR_PAIR_ALLOWED` | pass | overlap matches a declared intent (shown with its reason) |
-| `FPR_PART_FLOATING` | fail | component not attached to anything grounded → joint, fasten, ground or remove |
-| `FPR_PART_RESTING_ONLY` | warn | held only by contact → add a joint or fastener |
-| `FPR_WALL_THIN` | fail | min wall below the threshold (value, threshold, source) |
-| `FPR_JOINT_NOT_REALISED` | warn (MVP) | no pin/bore coaxial with the joint → model the journal and the bore |
-| `FPR_JOINT_REALISED` | pass | pin and bore found (diametral clearance, engagement) — added by slice A |
-| `FPR_NO_PARTS` | not_run | the document or scope has no 3D parts → add solids or instances (an empty check is never a pass) |
-| `FPR_STALE_REFERENCE` | info | `doc.prototype` refers to deleted entities; they were ignored → remove the intent or release the part |
-| `FPR_WALL_MEASURED` | info | wall thickness measured without a threshold → give `process` or `minWallMm` — added by slice A |
-| `FPR_SPHERICAL_TREE` | refusal | a spherical joint would carry a body alone (it can only close a loop; accepted at declaration, reported by inspect/simulate) → add a revolute or prismatic joint |
-| `FPR_JOINT_DANGLING` | refusal | a joint references a body that does not exist → delete the joint or restore the body |
-| `FPR_PRESSURE_MODEL_INVALID` | refusal | pressure model leaves its valid range (burn outside the stroke, integration left the physical range) → change phasing or constants |
-| `FPR_LOOP_PRISMATIC` | refusal | loop would close through a prismatic joint → re-order or make that joint a tree joint |
-| `FPR_LOOP_OPEN` | fail | loop gap at the start pose → fix the anchors or geometry |
-| `FPR_REDUNDANT_CONSTRAINT` | warn | redundant direction at a loop → use `spherical` for that joint |
-| `FPR_LOOP_DRIFT` | warn / fail | residual 1–10 µm (warn) or > 10 µm (fail) → smaller timestep, `set_dynamics_solver` |
-| `FPR_MASS_DEFAULTED` | warn | body mass from the default density → `assign_material` with a sourced material |
-| `FPR_UNREALISTIC` | warn | value outside its plausibility band (value, band, source) → check the input named in the item |
-| `FPR_OUTSIDE_VALIDATED_RANGE` | warn | operating point outside the propeller table / reference / friction data |
-| `FPR_REFERENCE_MISMATCH` | fail / warn | hold-out point outside its band (S, D, E, U_val) → review the model input with the largest band |
-| `FPR_TIMESTEP_SENSITIVE` | warn | halving dt changes results by > 1 % → smaller timestep |
-| `FPR_CALIBRATION_FAILED` | refusal | brake target not reached (target, best, iterations) |
-| `FPR_NO_LOSSES` | refusal | brake comparison without `set_engine_losses` |
-| `FPR_ENERGY_CLOSURE` | fail | ∮T dθ ≠ Σ∮p dV beyond the gate → timestep or loop settings |
-| `FPR_PRESSURE_TABLE_GAP` | refusal | table does not cover the cycle |
-| `FPR_IMEP_UNREACHABLE` | refusal | target IMEP below the motored work |
-| `FPR_NO_MOTION` | fail | no poses to check → run `simulate_motion` or give a sweep |
-| `FPR_SAMPLING_COARSE` | warn | resolution not reached within the budget |
-| `FPR_KERNEL_UNSUPPORTED` | not_run | the installed kernel lacks `analyze`/`distance`/topology axes |
-| `FPR_BUDGET_EXCEEDED` | refusal | limit and how to narrow the request |
-| `FPR_HUMAN_GATE` | refusal | the act needs a human reviewer |
-| `FPR_SIGNOFF_BLOCKED` | refusal | open fails or stale dispositions (listed) |
+| Code                          | Status      | Meaning → remediation                                                                                                                                            |
+| ----------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FPR_PART_INVALID`            | fail        | kernel says the solid is invalid → rebuild the feature; see `status`                                                                                             |
+| `FPR_PART_EMPTY`              | fail        | zero volume → check booleans that removed everything                                                                                                             |
+| `FPR_PART_DISCONNECTED`       | fail        | N lumps in one part → split into parts or join with material                                                                                                     |
+| `FPR_PART_SHEET`              | fail        | zero-thickness surface or open shell → give it thickness (`shell`, extrude)                                                                                      |
+| `FPR_PAIR_HARD`               | fail        | overlap volume V → move/resize, or `allow_interference` with a reason                                                                                            |
+| `FPR_PAIR_CONTAINED`          | fail        | part inside another → remove the duplicate or subtract                                                                                                           |
+| `FPR_PAIR_TOUCH`              | info        | touching (zero volume)                                                                                                                                           |
+| `FPR_PAIR_CLEARANCE`          | warn        | gap below the required clearance                                                                                                                                 |
+| `FPR_PAIR_ALLOWED`            | pass        | overlap matches a declared intent (shown with its reason)                                                                                                        |
+| `FPR_PART_FLOATING`           | fail        | component not attached to anything grounded → joint, fasten, ground or remove                                                                                    |
+| `FPR_PART_RESTING_ONLY`       | warn        | held only by contact → add a joint or fastener                                                                                                                   |
+| `FPR_WALL_THIN`               | fail        | min wall below the threshold (value, threshold, source)                                                                                                          |
+| `FPR_JOINT_NOT_REALISED`      | warn (MVP)  | no pin/bore coaxial with the joint → model the journal and the bore                                                                                              |
+| `FPR_JOINT_REALISED`          | pass        | pin and bore found (diametral clearance, engagement) — added by slice A                                                                                          |
+| `FPR_NO_PARTS`                | not_run     | the document or scope has no 3D parts → add solids or instances (an empty check is never a pass)                                                                 |
+| `FPR_STALE_REFERENCE`         | info        | `doc.prototype` refers to deleted entities; they were ignored → remove the intent or release the part                                                            |
+| `FPR_WALL_MEASURED`           | info        | wall thickness measured without a threshold → give `process` or `minWallMm` — added by slice A                                                                   |
+| `FPR_SPHERICAL_TREE`          | refusal     | a spherical joint would carry a body alone (it can only close a loop; accepted at declaration, reported by inspect/simulate) → add a revolute or prismatic joint |
+| `FPR_JOINT_DANGLING`          | refusal     | a joint references a body that does not exist → delete the joint or restore the body                                                                             |
+| `FPR_PRESSURE_MODEL_INVALID`  | refusal     | pressure model leaves its valid range (burn outside the stroke, integration left the physical range) → change phasing or constants                               |
+| `FPR_LOOP_PRISMATIC`          | refusal     | loop would close through a prismatic joint → re-order or make that joint a tree joint                                                                            |
+| `FPR_LOOP_OPEN`               | fail        | loop gap at the start pose → fix the anchors or geometry                                                                                                         |
+| `FPR_REDUNDANT_CONSTRAINT`    | warn        | redundant direction at a loop → use `spherical` for that joint                                                                                                   |
+| `FPR_LOOP_DRIFT`              | warn / fail | residual 1–10 µm (warn) or > 10 µm (fail) → smaller timestep, `set_dynamics_solver`                                                                              |
+| `FPR_MASS_DEFAULTED`          | warn        | body mass from the default density → `assign_material` with a sourced material                                                                                   |
+| `FPR_UNREALISTIC`             | warn        | value outside its plausibility band (value, band, source) → check the input named in the item                                                                    |
+| `FPR_OUTSIDE_VALIDATED_RANGE` | warn        | operating point outside the propeller table / reference / friction data                                                                                          |
+| `FPR_REFERENCE_MISMATCH`      | fail / warn | hold-out point outside its band (S, D, E, U_val) → review the model input with the largest band                                                                  |
+| `FPR_TIMESTEP_SENSITIVE`      | warn        | halving dt changes results by > 1 % → smaller timestep                                                                                                           |
+| `FPR_CALIBRATION_FAILED`      | refusal     | brake target not reached (target, best, iterations)                                                                                                              |
+| `FPR_NO_LOSSES`               | refusal     | brake comparison without `set_engine_losses`                                                                                                                     |
+| `FPR_ENERGY_CLOSURE`          | fail        | ∮T dθ ≠ Σ∮p dV beyond the gate → timestep or loop settings                                                                                                       |
+| `FPR_PRESSURE_TABLE_GAP`      | refusal     | table does not cover the cycle                                                                                                                                   |
+| `FPR_IMEP_UNREACHABLE`        | refusal     | target IMEP below the motored work                                                                                                                               |
+| `FPR_NO_MOTION`               | fail        | no poses to check → run `simulate_motion` or give a sweep                                                                                                        |
+| `FPR_SAMPLING_COARSE`         | warn        | resolution not reached within the budget                                                                                                                         |
+| `FPR_KERNEL_UNSUPPORTED`      | not_run     | the installed kernel lacks `analyze`/`distance`/topology axes                                                                                                    |
+| `FPR_BUDGET_EXCEEDED`         | refusal     | limit and how to narrow the request                                                                                                                              |
+| `FPR_HUMAN_GATE`              | refusal     | the act needs a human reviewer                                                                                                                                   |
+| `FPR_SIGNOFF_BLOCKED`         | refusal     | open fails or stale dispositions (listed)                                                                                                                        |
 
 ## 8. Performance & robustness budgets
 
-| Item | Budget (named) |
-| ---- | -------------- |
-| Parts per `check_assembly` | 500; pairs after broad phase 20 000 |
-| Thickness rays | 2000 per part by default, 200 000 total |
-| `check_motion_clearance` | 4000 samples × 200 pairs; reference engine < 5 s on the desktop |
-| Simulation | 2 × 10⁶ steps (reference engine: 2 cycles at 5800 rpm, dt 14.4 µs ≈ 2900 steps) |
-| `compare_to_reference` | ≤ 12 operating points × (settle + 2 cycles); Rotax curve (9 points) < 30 s on the desktop; the timestep-halving run is counted once |
-| Review tab | open a saved result < 300 ms; playback ≥ 30 fps with overlays |
+| Item                       | Budget (named)                                                                                                                      |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Parts per `check_assembly` | 500; pairs after broad phase 20 000                                                                                                 |
+| Thickness rays             | 2000 per part by default, 200 000 total                                                                                             |
+| `check_motion_clearance`   | 4000 samples × 200 pairs; reference engine < 5 s on the desktop                                                                     |
+| Simulation                 | 2 × 10⁶ steps (reference engine: 2 cycles at 5800 rpm, dt 14.4 µs ≈ 2900 steps)                                                     |
+| `compare_to_reference`     | ≤ 12 operating points × (settle + 2 cycles); Rotax curve (9 points) < 30 s on the desktop; the timestep-halving run is counted once |
+| Review tab                 | open a saved result < 300 ms; playback ≥ 30 fps with overlays                                                                       |
 
 ## 9. Test strategy (VC mapping)
 
-| Layer | Tests | VCs |
-| ----- | ----- | --- |
-| Unit, core geometry | `meshBvh` (intersects, distance, ray) against brute force on random meshes, with a seeded generator stored in the test; pair classification on boxes; thickness on plates; connectivity graphs | VC-FPR-01…08 |
-| Unit, kernels | `analyze` and `distance` on both kernels with the same cases; coincident-face cases; joint-realisation cylinders (OCC) | VC-FPR-01…05, 09 |
-| Unit, dynamics | topology (BFS order, prismatic preference, flips), mobility rank on slider-crank and four-bar, Wiebe calibration linearity, exact slider-crank formulas vs `engine_quick_check` | VC-FPR-15, 20 |
-| MuJoCo integration (`tests/unit/mujocoPhysics*.test.ts`) | kinematics, static torque, reactions, residual, energy closure, gear ratio, flywheel ripple | VC-FPR-10…17, 21 |
-| Motion clearance | rotating bar vs block: analytic clearance and contact interval | VC-FPR-18, 19 |
-| Unit, realism laws | PNH terms (VC-29), material mass (VC-30), gear loss (VC-27), single-zone calibration convergence, PCHIP propeller table, accuracy band propagation (RSS, `null` stays `null`), E/U_val with synthetic S (VC-31), loop tiers (VC-35) | VC-FPR-27, 29…31, 34…36 |
-| MuJoCo integration, realism | motored inertia torque (VC-28), brake calibration (VC-15), timestep halving (VC-33), friction torque cycle average = FMEP·V_d (TR-FPR-15) | VC-FPR-15, 28, 33 |
-| Validation (V1, production gate) | four-cylinder Rotax-class reference against the full-throttle curve and the static rpm window; result recorded, misses listed (KPI, not a CI gate) | VC-FPR-31, 32 |
-| Contract | `toToolSchemas()` snapshot gains the new commands; load validation of the new slices; `is pure` on every command | VC-FPR-23 |
-| Golden | `build_project` plan of the reference engine → id-normalised snapshot + replay equality | VC-FPR-24 |
-| Component (Testing Library) | checklist row (icon + word + value + source), findings filter and disposition dispatch, sign-off disabled reason, Explain content, mechanism graph rendering | VC-FPR-22, 25 |
-| E2E (Playwright) | open the Review tab on the reference engine, click a finding → isolated, scrub → chart cursor moves, crank axis | VC-FPR-26 |
-| Production gate | agent driver runs the reference scenario CLI-only and compares to `expected_results.json` | VC-FPR-24 |
+| Layer                                                    | Tests                                                                                                                                                                                                                               | VCs                     |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| Unit, core geometry                                      | `meshBvh` (intersects, distance, ray) against brute force on random meshes, with a seeded generator stored in the test; pair classification on boxes; thickness on plates; connectivity graphs                                      | VC-FPR-01…08            |
+| Unit, kernels                                            | `analyze` and `distance` on both kernels with the same cases; coincident-face cases; joint-realisation cylinders (OCC)                                                                                                              | VC-FPR-01…05, 09        |
+| Unit, dynamics                                           | topology (BFS order, prismatic preference, flips), mobility rank on slider-crank and four-bar, Wiebe calibration linearity, exact slider-crank formulas vs `engine_quick_check`                                                     | VC-FPR-15, 20           |
+| MuJoCo integration (`tests/unit/mujocoPhysics*.test.ts`) | kinematics, static torque, reactions, residual, energy closure, gear ratio, flywheel ripple                                                                                                                                         | VC-FPR-10…17, 21        |
+| Motion clearance                                         | rotating bar vs block: analytic clearance and contact interval                                                                                                                                                                      | VC-FPR-18, 19           |
+| Unit, realism laws                                       | PNH terms (VC-29), material mass (VC-30), gear loss (VC-27), single-zone calibration convergence, PCHIP propeller table, accuracy band propagation (RSS, `null` stays `null`), E/U_val with synthetic S (VC-31), loop tiers (VC-35) | VC-FPR-27, 29…31, 34…36 |
+| MuJoCo integration, realism                              | motored inertia torque (VC-28), brake calibration (VC-15), timestep halving (VC-33), friction torque cycle average = FMEP·V_d (TR-FPR-15)                                                                                           | VC-FPR-15, 28, 33       |
+| Validation (V1, production gate)                         | four-cylinder Rotax-class reference against the full-throttle curve and the static rpm window; result recorded, misses listed (KPI, not a CI gate)                                                                                  | VC-FPR-31, 32           |
+| Contract                                                 | `toToolSchemas()` snapshot gains the new commands; load validation of the new slices; `is pure` on every command                                                                                                                    | VC-FPR-23               |
+| Golden                                                   | `build_project` plan of the reference engine → id-normalised snapshot + replay equality                                                                                                                                             | VC-FPR-24               |
+| Component (Testing Library)                              | checklist row (icon + word + value + source), findings filter and disposition dispatch, sign-off disabled reason, Explain content, mechanism graph rendering                                                                        | VC-FPR-22, 25           |
+| E2E (Playwright)                                         | open the Review tab on the reference engine, click a finding → isolated, scrub → chart cursor moves, crank axis                                                                                                                     | VC-FPR-26               |
+| Production gate                                          | agent driver runs the reference scenario CLI-only and compares to `expected_results.json`                                                                                                                                           | VC-FPR-24               |
 
 ## 10. Delivery plan
 
-| M | Content | Lanes | Depends on | Effort |
-| - | ------- | ----- | ---------- | ------ |
-| M1 | Kernel `analyze` + `distance` (both kernels), `meshBvh`, `check_assembly` (validity, pairs, connectivity, ray thickness, process table), intents and grounding commands, codes, unit tests VC-01…08 | 1 (core + kernels) | — | 2 w |
-| M2 | Dynamics topology, loops in MJCF, solver settings, reactions + residual in the trace, mobility in `inspect_dynamics`, VC-10…13, 20, 21 | 1 + physics | — (parallel with M1) | 2 w |
-| M3 | `add_cylinder_pressure` (table, Wiebe, calibration), engine report, `engine_quick_check`, VC-14…17 | 1 | M2 | 1.5 w |
-| M3b | Realism: `Accuracy` envelope, materials with sources + `FPR_MASS_DEFAULTED`, `set_engine_losses` (after Q8), single-zone Woschni + brake calibration, gear efficiency, propeller C_T(J)/C_P(J) + inertia check, plausibility checks, `add_reference_data` presets, `compare_to_reference`, timestep halving; VC-15, 27…36 | 1 | M3 | 2.5 w |
-| M4 | `check_motion_clearance`, `check_prototype`, joint realisation (OCC topology axes), VC-09, 18, 19, 24; reference engine plan | 1 | M1, M3b | 1.5 w |
-| M5 | Review tab: checklist, findings + overlay, mechanism graph, timeline dock with crank axis + `SeriesChart`, reaction arrows, thickness map, Explain, dispositions + interim sign-off; component + e2e tests VC-22, 25, 26 | 2 (+3 for overlays) | M1 data shapes (can start on fixtures after M1), M4 | 2.5 w |
-| V1 | Fits on joints, inscribed-sphere thickness, swept volume, Rotax-class 4-cylinder reference with gearbox validated against the full-throttle curve and static rpm window, load-dependent joint friction, cycle-to-cycle variation, bsfc, reaction export to 05 / PHY-10 | 1, 2 | MVP | 3.5 w |
+| M   | Content                                                                                                                                                                                                                                                                                                                   | Lanes               | Depends on                                          | Effort |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | --------------------------------------------------- | ------ |
+| M1  | Kernel `analyze` + `distance` (both kernels), `meshBvh`, `check_assembly` (validity, pairs, connectivity, ray thickness, process table), intents and grounding commands, codes, unit tests VC-01…08                                                                                                                       | 1 (core + kernels)  | —                                                   | 2 w    |
+| M2  | Dynamics topology, loops in MJCF, solver settings, reactions + residual in the trace, mobility in `inspect_dynamics`, VC-10…13, 20, 21                                                                                                                                                                                    | 1 + physics         | — (parallel with M1)                                | 2 w    |
+| M3  | `add_cylinder_pressure` (table, Wiebe, calibration), engine report, `engine_quick_check`, VC-14…17                                                                                                                                                                                                                        | 1                   | M2                                                  | 1.5 w  |
+| M3b | Realism: `Accuracy` envelope, materials with sources + `FPR_MASS_DEFAULTED`, `set_engine_losses` (after Q8), single-zone Woschni + brake calibration, gear efficiency, propeller C_T(J)/C_P(J) + inertia check, plausibility checks, `add_reference_data` presets, `compare_to_reference`, timestep halving; VC-15, 27…36 | 1                   | M3                                                  | 2.5 w  |
+| M4  | `check_motion_clearance`, `check_prototype`, joint realisation (OCC topology axes), VC-09, 18, 19, 24; reference engine plan                                                                                                                                                                                              | 1                   | M1, M3b                                             | 1.5 w  |
+| M5  | Review tab: checklist, findings + overlay, mechanism graph, timeline dock with crank axis + `SeriesChart`, reaction arrows, thickness map, Explain, dispositions + interim sign-off; component + e2e tests VC-22, 25, 26                                                                                                  | 2 (+3 for overlays) | M1 data shapes (can start on fixtures after M1), M4 | 2.5 w  |
+| V1  | Fits on joints, inscribed-sphere thickness, swept volume, Rotax-class 4-cylinder reference with gearbox validated against the full-throttle curve and static rpm window, load-dependent joint friction, cycle-to-cycle variation, bsfc, reaction export to 05 / PHY-10                                                    | 1, 2                | MVP                                                 | 3.5 w  |
 
 M5 also covers the accuracy badges, the "Matches reality" row and the reference overlays on charts (FR-FPR-62/63),
 within its 2.5 w. MVP is about 12 weeks of agent lane time. M1 and M2 run in parallel; M5 starts on fixtures after M1.

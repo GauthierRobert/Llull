@@ -7,7 +7,7 @@ import { failer, report } from '../noop';
 import { escapeXml } from '../../lib/escapeXml';
 import { clamp } from '../../lib/clamp';
 import type { Vec3 } from '../../model/vectors';
-import { documentAtPose, eulerDegOf, pointAtPose, type BodyPoseAt } from '../../dynamics/bodyPose';
+import { documentAtPose, eulerDegOf, pointAtPose, posesAtSample, type BodyPoseAt } from '../../dynamics/bodyPose';
 import type { SimulationData } from '../../dynamics/simulationReport';
 import { springSvg } from '../../dynamics/springDrawing';
 import { GROUND } from '../../model/dynamics';
@@ -32,8 +32,6 @@ const formatTime = (time: number): string => `t = ${+time.toFixed(3)} s`;
 const round = (value: number): number => Math.round(value * 1e6) / 1e6;
 const roundVec = (v: Vec3): Vec3 => [round(v[0]), round(v[1]), round(v[2])];
 
-type PosesData = NonNullable<SimulationData['poses']>;
-
 /** Index of the sample closest to `time`. */
 function nearestSample(times: readonly number[], time: number): number {
   let best = 0;
@@ -44,18 +42,6 @@ function nearestSample(times: readonly number[], time: number): number {
 /** `count` times evenly spaced from 0 to `duration`, both ends included (one frame = the start). */
 const evenTimes = (count: number, duration: number): number[] =>
   Array.from({ length: count }, (_, i) => (count === 1 ? 0 : (duration * i) / (count - 1)));
-
-/** Every body's pose at sample `index`. */
-function posesAt(poses: PosesData, index: number): Record<string, BodyPoseAt> {
-  const result: Record<string, BodyPoseAt> = {};
-  for (const [id, track] of Object.entries(poses.bodies)) {
-    const start = track.position[0];
-    const position = track.position[index];
-    const orientation = track.orientation[index];
-    if (start !== undefined && position !== undefined && orientation !== undefined) result[id] = { start, position, orientation };
-  }
-  return result;
-}
 
 /** World end points (document units) of every point spring in the pose `poses`: an end rides on its body, a ground end stays. */
 function springEnds(doc: CadDocument, poses: Readonly<Record<string, BodyPoseAt>>): Record<string, { a: Vec3; b: Vec3 }> {
@@ -159,8 +145,8 @@ export const renderMotion = defineCommand({
 
     const wanted = params.times ?? evenTimes(params.frames ?? DEFAULT_FRAMES, duration);
     const indices = wanted.map((time) => nearestSample(poses.times, time));
-    const frameDocs = indices.map((index) => documentAtPose(doc, posesAt(poses, index)));
-    const springPoses = indices.map((index) => springEnds(doc, posesAt(poses, index)));
+    const frameDocs = indices.map((index) => documentAtPose(doc, posesAtSample(poses, index)));
+    const springPoses = indices.map((index) => springEnds(doc, posesAtSample(poses, index)));
     const springPoints = springPoses.flatMap((ends) => Object.values(ends).flatMap((end) => [end.a, end.b]));
     const paths = traced.map((id) => (poses.bodies[id]?.position ?? []) as Vec3[]);
     const pathBounds = paths.filter((path) => path.length > 0).map((path) => boundsOfPoints(path));
@@ -208,7 +194,7 @@ export const renderMotion = defineCommand({
       return {
         time: round(time),
         bodies: Object.fromEntries(
-          Object.entries(posesAt(poses, index)).map(([id, pose]) => [
+          Object.entries(posesAtSample(poses, index)).map(([id, pose]) => [
             id,
             { position: roundVec(pose.position), rotationDeg: eulerDegOf(pose.orientation) },
           ]),
