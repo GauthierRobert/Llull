@@ -181,25 +181,8 @@
       "create_topology_study",
       "set_topology_regions"
     ],
-    "docs/physics/18-probabilistic-sensitivity/validation/plans/prb_box_mass.plan.json": [
-      "define_limit_state",
-      "define_random_variable",
-      "define_response",
-      "parameter_sensitivity",
-      "propagate_uncertainty"
-    ],
-    "docs/physics/18-probabilistic-sensitivity/validation/plans/prb_ishigami_sobol.plan.json": [
-      "define_limit_state",
-      "define_random_variable",
-      "sensitivity_indices"
-    ],
-    "docs/physics/18-probabilistic-sensitivity/validation/plans/prb_linear_r_minus_s.plan.json": [
-      "define_limit_state",
-      "define_random_variable",
-      "propagate_uncertainty",
-      "reliability_form"
-    ],
-    "docs/physics/18-probabilistic-sensitivity/validation/plans/prb_rejections.plan.json": ["define_random_variable", "set_correlation"],
+    "docs/physics/18-probabilistic-sensitivity/validation/plans/prb_box_mass.plan.json": ["define_response", "parameter_sensitivity"],
+    "docs/physics/18-probabilistic-sensitivity/validation/plans/prb_ishigami_sobol.plan.json": ["sensitivity_indices"],
     "docs/physics/19-explicit-impact/validation/plans/exp_bar_rigid_wall.plan.json": [
       "add_rigid_wall",
       "add_time_history",
