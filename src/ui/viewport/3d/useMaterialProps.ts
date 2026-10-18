@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import type { Material } from '@core/model/types';
 import { type DisplayMode, useViewportStore } from '@ui/store';
 import { SELECTION_EMISSIVE, SELECTION_EMISSIVE_INTENSITY, XRAY_EMISSIVE, XRAY_EMISSIVE_INTENSITY, XRAY_OPACITY } from '../viewportPalette';
+import { displayMetalness } from './displayMetalness';
 
 /** Document-material fields that drive a mesh's PBR surface. */
 export type PbrMaterial = Pick<Material, 'color' | 'metalness' | 'roughness' | 'finish'>;
@@ -72,6 +73,8 @@ export function useMaterialProps({
       };
     }
     // Selection emissive still wins over a material color.
-    return pbrOverride ? { ...base, color: pbrOverride.color, roughness: pbrOverride.roughness, metalness: pbrOverride.metalness } : base;
+    return pbrOverride
+      ? { ...base, color: pbrOverride.color, roughness: pbrOverride.roughness, metalness: displayMetalness(pbrOverride.metalness) }
+      : base;
   }, [displayMode, selected, color, roughness, metalness, envMapIntensity, pbrOverride]);
 }

@@ -23,6 +23,8 @@ const REMEDIATION: Readonly<Record<string, string>> = {
     'define an elastic_isotropic constitutive set (add_material_model + define_constitutive_set) or property models E and nu (define_property_model)',
   FEA_MATERIAL_ELASTIC_UNSUPPORTED: 'use an elastic_isotropic constitutive set or the property models E and nu',
   FEA_MATERIAL_UNVERIFIED: 'replace the property with a verified, sourced value',
+  FEA_DENSITY_IMPLAUSIBLE:
+    're-create the material with densityUnit (e.g. "kg/m^3"): mass, inertia loads and modal frequencies use this density',
   FEA_PROPERTY_INVALID: 'correct the value: E > 0 and -1 < nu < 0.5',
   FEA_NO_CONSTRAINTS: 'add a support with add_fea_constraint (fixed / pinned / symmetry / displacement)',
   FEA_NO_LOADS: 'add a load with add_fea_load, or a displacement constraint with a non-zero value',

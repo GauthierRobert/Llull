@@ -16,7 +16,9 @@ const RPM_PER_RAD_S = 60 / (2 * Math.PI);
 /** Samples per simulated second for playback: ≥ 4 per turn up to 15 000 rpm on short runs; capped by the command's 6001 samples. */
 const PLAYBACK_SAMPLES = 6000;
 
-const format = (value: number, digits = 1): string => value.toLocaleString('en-US', { maximumFractionDigits: digits });
+/** Grouped number with at most `digits` decimals; a value that rounds to zero prints "0", never "-0". */
+const format = (value: number, digits = 1): string =>
+  (Number(value.toFixed(digits)) === 0 ? 0 : value).toLocaleString('en-US', { maximumFractionDigits: digits });
 
 function isSimulationData(value: unknown): value is SimulationData {
   return typeof value === 'object' && value !== null && 'joints' in value && 'engine' in value;
@@ -210,7 +212,9 @@ export function PhysicsSection(): React.ReactElement {
               </>
             )}
           </TimelineDock>
-          <p className="physics-engine-note">{result.engine} · rigid-body dynamics, static propeller model</p>
+          <p className="physics-engine-note" data-testid="physics-engine-note">
+            {result.engine} · rigid-body dynamics{Object.keys(result.propellers).length > 0 ? ', static propeller model' : ''}
+          </p>
         </>
       )}
     </PanelSection>

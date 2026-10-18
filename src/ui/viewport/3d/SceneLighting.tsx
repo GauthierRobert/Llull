@@ -127,6 +127,11 @@ export function SceneLighting({
           <Lightformer form="rect" intensity={1} position={[-6, -2, 2]} scale={[6, 4, 1]} />
           <Lightformer form="rect" intensity={1} position={[6, -2, 2]} scale={[6, 4, 1]} />
           <Lightformer form="ring" intensity={0.6} position={[0, 0, -4]} scale={8} />
+          {/* Wide dim panels all around: a polished metal face must reflect something light from any camera angle. */}
+          <Lightformer form="rect" intensity={0.7} position={[0, 0, -8]} scale={[16, 8, 1]} />
+          <Lightformer form="rect" intensity={0.7} position={[-8, 0, 0]} rotation-y={Math.PI / 2} scale={[16, 8, 1]} />
+          <Lightformer form="rect" intensity={0.7} position={[8, 0, 0]} rotation-y={-Math.PI / 2} scale={[16, 8, 1]} />
+          <Lightformer form="rect" intensity={0.5} position={[0, -6, 0]} rotation-x={Math.PI / 2} scale={[16, 16, 1]} />
         </Environment>
       )}
 

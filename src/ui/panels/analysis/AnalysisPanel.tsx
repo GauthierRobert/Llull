@@ -20,6 +20,7 @@ const ALL_CASES: Record<string, unknown> = {};
 export function AnalysisPanel({ className }: { className?: string }): React.ReactElement {
   const document = useStore((s) => s.document);
   const [pickedId, setPickedId] = useState<string | null>(null);
+  const [pickedMode, setPickedMode] = useState<{ readonly analysisId: string; readonly mode: number } | null>(null);
   const analysis = document.analysis;
 
   const local = useMemo(() => parseAnalysisList(execute(document, 'describe_analysis', {}).data), [document]);
@@ -41,6 +42,7 @@ export function AnalysisPanel({ className }: { className?: string }): React.Reac
           checkSummary: checked.summary,
         };
 
+  const mode = pickedMode !== null && pickedMode.analysisId === selectedId ? pickedMode.mode : 1;
   const eigen = detail?.described == null ? null : eigenOf(detail.described.analysisCase);
 
   return (
@@ -82,11 +84,22 @@ export function AnalysisPanel({ className }: { className?: string }): React.Reac
           </PanelSection>
           <AnalysisSetup analysisCase={detail.described.analysisCase} document={document} />
           <AnalysisChecks check={detail.check} summary={detail.checkSummary} />
-          {eigen !== null && detail.described.state === 'solved' && <AnalysisModes eigen={eigen} />}
+          {eigen !== null && detail.described.state === 'solved' && (
+            <AnalysisModes
+              eigen={eigen}
+              selectedMode={mode}
+              onSelect={(next) => setPickedMode({ analysisId: selectedId ?? '', mode: next })}
+            />
+          )}
           {detail.described.state === 'solved' && Object.keys(detail.described.analysisCase.probes ?? {}).length > 0 && (
             <AnalysisProbes analysisId={detail.described.analysisCase.id} refreshKey={document} />
           )}
-          <AnalysisResults key={detail.described.analysisCase.id} analysisCase={detail.described.analysisCase} />
+          <AnalysisResults
+            key={detail.described.analysisCase.id}
+            analysisCase={detail.described.analysisCase}
+            mode={mode}
+            onModeChange={(next) => setPickedMode({ analysisId: selectedId ?? '', mode: next })}
+          />
         </>
       )}
     </aside>

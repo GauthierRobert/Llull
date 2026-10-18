@@ -2,9 +2,10 @@
 
 import React, { useId, useState } from 'react';
 import type { AnalysisCase } from '@core/model/analysis';
-import { ModalDialog } from '@ui/components/ModalDialog';
 import { PanelSection, StatusLine } from '@ui/panels/PanelParts';
 import { svgDataUrl } from './analysisData';
+import { PlotDialog } from './PlotDialog';
+import { formatQuantities, formatSignificant } from './quantityFormat';
 import { useFeaRender } from './useFeaRender';
 
 const STRUCTURAL_FIELDS = ['von_mises', 'u_mag', 'u_x', 'u_y', 'u_z', 's_xx', 's_yy', 's_zz'] as const;
@@ -16,7 +17,8 @@ const isEigen = (analysisCase: AnalysisCase): boolean => analysisCase.type === '
 const isHeat = (analysisCase: AnalysisCase): boolean => analysisCase.type === 'heat_steady' || analysisCase.type === 'heat_transient';
 const loadCasesOf = (analysisCase: AnalysisCase): string[] => [...new Set(Object.values(analysisCase.loads).map((load) => load.loadCase))];
 
-const round = (n: number): string => String(Math.round(n * 1e4) / 1e4);
+const timesOf = (analysisCase: AnalysisCase): readonly number[] =>
+  analysisCase.type === 'heat_transient' ? (analysisCase.results?.thermal?.times ?? []) : [];
 
 function SolveHint({ analysisId }: { analysisId: string }): React.ReactElement {
   return (
@@ -27,16 +29,25 @@ function SolveHint({ analysisId }: { analysisId: string }): React.ReactElement {
   );
 }
 
-export function AnalysisResults({ analysisCase }: { analysisCase: AnalysisCase }): React.ReactElement {
+interface AnalysisResultsProps {
+  analysisCase: AnalysisCase;
+  /** Mode plotted for modal / buckling cases (1-based); owned by the panel so the mode list can select it. */
+  mode: number;
+  onModeChange: (mode: number) => void;
+}
+
+export function AnalysisResults({ analysisCase, mode, onModeChange }: AnalysisResultsProps): React.ReactElement {
   const ids = useId();
   const heat = isHeat(analysisCase);
   const eigen = isEigen(analysisCase);
   const fields = heat ? THERMAL_FIELDS : eigen ? EIGEN_FIELDS : STRUCTURAL_FIELDS;
   const loadCases = heat || eigen ? [] : loadCasesOf(analysisCase);
+  const times = timesOf(analysisCase);
   const [field, setField] = useState<string>(fields[0]);
   const [view, setView] = useState<string>('iso');
   const [loadCase, setLoadCase] = useState('');
-  const [mode, setMode] = useState('1');
+  const [time, setTime] = useState('');
+  const [showMesh, setShowMesh] = useState(false);
   const [scale, setScale] = useState('');
   const [full, setFull] = useState(false);
 
@@ -45,11 +56,14 @@ export function AnalysisResults({ analysisCase }: { analysisCase: AnalysisCase }
     analysisId: analysisCase.id,
     field,
     view,
-    ...(eigen && Number.isInteger(Number(mode)) && Number(mode) >= 1 ? { mode: Number(mode) } : {}),
+    ...(eigen && Number.isInteger(mode) && mode >= 1 ? { mode } : {}),
+    ...(time !== '' ? { time: Number(time) } : {}),
+    ...(showMesh ? { showMesh: true } : {}),
     ...(loadCase !== '' ? { loadCase } : {}),
     ...(Number.isFinite(scaleValue) && scaleValue >= 0 ? { deformationScale: scaleValue } : {}),
   };
   const render = useFeaRender(params, analysisCase);
+  const extremes = render.status === 'ready' ? formatQuantities([render.view.min.value, render.view.max.value], render.view.unit) : null;
   const image = render.status === 'ready' ? svgDataUrl(render.view.svg) : '';
 
   return (
@@ -88,6 +102,19 @@ export function AnalysisResults({ analysisCase }: { analysisCase: AnalysisCase }
             </select>
           </label>
         )}
+        {times.length > 1 && (
+          <label className="field" htmlFor={`${ids}-time`}>
+            <span className="field__label">Time</span>
+            <select id={`${ids}-time`} data-testid="analysis-time" value={time} onChange={(e) => setTime(e.target.value)}>
+              <option value="">last</option>
+              {times.map((t) => (
+                <option key={t} value={t}>
+                  {formatSignificant(t)} s
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {eigen && (
           <label className="field" htmlFor={`${ids}-mode`}>
             <span className="field__label">Mode</span>
@@ -98,7 +125,10 @@ export function AnalysisResults({ analysisCase }: { analysisCase: AnalysisCase }
               step={1}
               data-testid="analysis-mode"
               value={mode}
-              onChange={(e) => setMode(e.target.value)}
+              onChange={(e) => {
+                const next = Number(e.target.value);
+                if (Number.isInteger(next) && next >= 1) onModeChange(next);
+              }}
             />
           </label>
         )}
@@ -116,6 +146,10 @@ export function AnalysisResults({ analysisCase }: { analysisCase: AnalysisCase }
             />
           </label>
         )}
+        <label className="field analysis__check">
+          <input type="checkbox" data-testid="analysis-show-mesh" checked={showMesh} onChange={(e) => setShowMesh(e.target.checked)} />
+          <span>Show mesh edges</span>
+        </label>
       </div>
       {render.status === 'loading' && <StatusLine text="Rendering…" />}
       {render.status === 'refused' && (
@@ -124,13 +158,13 @@ export function AnalysisResults({ analysisCase }: { analysisCase: AnalysisCase }
           <SolveHint analysisId={analysisCase.id} />
         </>
       )}
-      {render.status === 'ready' && (
+      {render.status === 'ready' && extremes !== null && (
         <figure className="analysis__figure">
           <img className="analysis__plot" data-testid="analysis-plot" alt={`${render.view.field} contour plot`} src={image} />
           <figcaption className="analysis__caption" data-testid="analysis-extremes">
-            {render.view.field} [{render.view.unit}] · {render.view.resultLabel}
+            {render.view.field} · {render.view.resultLabel}
             <br />
-            min {round(render.view.min.value)} · max {round(render.view.max.value)} {render.view.unit}
+            min {extremes.texts[0]} · max {extremes.texts[1]} {extremes.unit}
             {render.view.deformationScale > 0 ? ` · deformation ×${render.view.deformationScale}` : ''}
           </figcaption>
           <button type="button" className="btn btn--ghost" data-testid="analysis-open-full" onClick={() => setFull(true)}>
@@ -139,18 +173,12 @@ export function AnalysisResults({ analysisCase }: { analysisCase: AnalysisCase }
         </figure>
       )}
       {full && render.status === 'ready' && (
-        <ModalDialog
-          backdropClassName="shortcuts-backdrop"
-          className="shortcuts-dialog analysis__dialog"
-          onClose={() => setFull(false)}
+        <PlotDialog
+          src={image}
+          alt={`${render.view.field} contour plot, full size`}
           label="Analysis results, full size"
-          initialFocus="first"
-        >
-          <img className="analysis__plot analysis__plot--full" alt={`${render.view.field} contour plot, full size`} src={image} />
-          <button type="button" className="btn btn--ghost" onClick={() => setFull(false)}>
-            Close
-          </button>
-        </ModalDialog>
+          onClose={() => setFull(false)}
+        />
       )}
     </PanelSection>
   );

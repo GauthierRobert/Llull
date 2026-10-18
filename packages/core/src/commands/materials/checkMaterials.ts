@@ -1,6 +1,6 @@
 /** check_materials (08 MAT, AF-20): read-only readiness check of the materials in use before a result is handed to the owner. */
 
-import { resolveDensity } from '../../geometry/resolveDensity';
+import { densityPlausibilityWarning, resolveDensity } from '../../geometry/resolveDensity';
 import { isControlledMarking } from '../../model/materialLibrary';
 import { modelUnverifiedReasons } from '../../model/propertyModelEval';
 import type { CadDocument } from '../../model/types';
@@ -46,6 +46,14 @@ function valueItems(doc: CadDocument, name: string, users: readonly string[]): M
         `density of '${name}' is a bare number (${density.unverifiedReasons.join(', ')}): no basis, no source`,
         'set_material_property with a basis and a source',
       ),
+    );
+  const implausible =
+    density?.available === true && density.modelId === undefined
+      ? densityPlausibilityWarning(doc, density.gPerDocUnit3, material.densityUnit !== undefined)
+      : null;
+  if (implausible !== null)
+    items.push(
+      item('MAT_DENSITY_IMPLAUSIBLE', 'warning', [name], `'${name}': ${implausible}`, 'redefine it with create_material and a densityUnit'),
     );
   const unverified = (material.propertyModels ?? []).filter((model) => modelUnverifiedReasons(model).length > 0);
   if (unverified.length > 0)

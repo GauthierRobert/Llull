@@ -1,25 +1,30 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, within, cleanup } from '@testing-library/react';
+import { render, screen, within, cleanup, fireEvent } from '@testing-library/react';
 import { useStore, useLayoutStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { Sidebar } from '@ui/components/Sidebar';
 import { AnalysisPanel } from '@ui/panels/analysis/AnalysisPanel';
 import { localDispatch } from '../helpers/storeTestHelpers';
 
-const mocks = vi.hoisted(() => ({ svgResult: false, solved: null as null | 'modal' | 'static' }));
+const mocks = vi.hoisted(() => ({
+  svgResult: false,
+  solved: null as null | 'modal' | 'static' | 'transient',
+  renderParams: [] as Record<string, unknown>[],
+}));
 
 vi.mock('@ui/services/localQuery', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@ui/services/localQuery')>();
   return {
     ...actual,
     runQuery: (command: string, params: Record<string, unknown> = {}): ReturnType<typeof actual.runQuery> => {
+      if (command === 'render_fea_results') mocks.renderParams.push(params);
       if (command === 'render_fea_results' && mocks.svgResult) {
         const data = {
           svg: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>',
           field: 'von_mises',
-          unit: 'MPa',
+          unit: 'Pa',
           min: { value: 0, at: [0, 0, 0] },
-          max: { value: 123.4567, at: [1, 2, 3] },
+          max: { value: 224756.1869, at: [1, 2, 3] },
           deformationScale: 5,
           resultSet: { label: 'load case LC1', time: 0 },
         };
@@ -28,9 +33,28 @@ vi.mock('@ui/services/localQuery', async (importOriginal) => {
       if (mocks.solved !== null && command === 'describe_analysis' && params['analysisId'] !== undefined) {
         const real = actual.runQuery(command, params);
         const data = real.data as { case: Record<string, unknown> };
-        const results = mocks.solved === 'modal' ? { frequenciesHz: [209.73, 1299.4] } : {};
+        const results =
+          mocks.solved === 'modal'
+            ? { frequenciesHz: [209.73, 1299.4] }
+            : mocks.solved === 'transient'
+              ? { thermal: { times: [0, 10, 20] } }
+              : {};
+        const extra =
+          mocks.solved === 'modal'
+            ? { modes: 6 }
+            : mocks.solved === 'transient'
+              ? {
+                  thermal: {
+                    initialTemperature: { value: 20, unit: 'degC' },
+                    step: { endTimeS: 300, initialIncrementS: 2, outputEveryS: 10 },
+                    bcs: {},
+                    bcOrder: [],
+                  },
+                }
+              : {};
         const probes = { p1: { id: 'p1', name: 'tip temperature', quantity: 'temperature', point: [0, 0, 0] } };
-        return { ...real, data: { ...data, state: 'solved', case: { ...data.case, type: mocks.solved, results, probes } } };
+        const type = mocks.solved === 'transient' ? 'heat_transient' : mocks.solved;
+        return { ...real, data: { ...data, state: 'solved', case: { ...data.case, type, results, probes, ...extra } } };
       }
       if (command === 'probe_history') {
         const series = [
@@ -95,6 +119,7 @@ describe('AnalysisPanel', () => {
     cleanup();
     mocks.svgResult = false;
     mocks.solved = null;
+    mocks.renderParams = [];
     useStore.getState().setDocument(createEmptyDocument());
     useLayoutStore.setState({ sidebarTab: 'objects', sidebarOpen: true });
   });
@@ -133,7 +158,7 @@ describe('AnalysisPanel', () => {
     render(<AnalysisPanel />);
     const img = screen.getByTestId('analysis-plot') as HTMLImageElement;
     expect(img.src.startsWith('data:image/svg+xml;charset=utf-8,')).toBe(true);
-    expect(screen.getByTestId('analysis-extremes').textContent).toContain('max 123.4567');
+    expect(screen.getByTestId('analysis-extremes').textContent).toContain('max 224.8 kPa');
   });
 
   it('lists the modal frequencies and offers the mode number of the mode-shape plot', () => {
@@ -156,5 +181,61 @@ describe('AnalysisPanel', () => {
     expect(probes.textContent).toContain('tip temperature');
     expect(probes.textContent).toContain('20 → 85.5 (min 20, max 85.5) C');
     expect(probes.textContent).toContain('heat_flux · 5 → 2');
+  });
+
+  it('selects the plotted mode from the mode list and highlights it', () => {
+    seedAnalysis();
+    mocks.solved = 'modal';
+    mocks.svgResult = true;
+    render(<AnalysisPanel />);
+    expect(screen.getByTestId('analysis-mode-1').getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(screen.getByTestId('analysis-mode-2'));
+    expect(screen.getByTestId('analysis-mode-2').getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByTestId('analysis-mode-1').getAttribute('aria-pressed')).toBe('false');
+    expect((screen.getByTestId('analysis-mode') as HTMLInputElement).value).toBe('2');
+    expect(mocks.renderParams.at(-1)).toMatchObject({ mode: 2 });
+  });
+
+  it('shows the requested modes, initial temperature, time stepping and safety factors', () => {
+    seedAnalysis();
+    mocks.solved = 'modal';
+    const { unmount } = render(<AnalysisPanel />);
+    expect(screen.getByTestId('analysis-modes-requested').textContent).toContain('6');
+    expect(screen.getByTestId('analysis-factors').textContent).toContain('ultimate 1.5 · yield 1 (default)');
+    unmount();
+    mocks.solved = 'transient';
+    render(<AnalysisPanel />);
+    expect(screen.getByTestId('analysis-initial-temperature').textContent).toContain('20 degC');
+    expect(screen.getByTestId('analysis-time-stepping').textContent).toBe(
+      'Time stepping: duration 300 s · first step 2 s · output every 10 s',
+    );
+  });
+
+  it('offers a time selector for transient results and passes the chosen time', () => {
+    seedAnalysis();
+    mocks.solved = 'transient';
+    mocks.svgResult = true;
+    render(<AnalysisPanel />);
+    const select = screen.getByTestId('analysis-time') as HTMLSelectElement;
+    expect([...select.options].map((o) => o.textContent)).toEqual(['last', '0 s', '10 s', '20 s']);
+    expect(mocks.renderParams.at(-1)).not.toHaveProperty('time');
+    fireEvent.change(select, { target: { value: '10' } });
+    expect(mocks.renderParams.at(-1)).toMatchObject({ time: 10 });
+  });
+
+  it('passes showMesh when the toggle is on', () => {
+    seedAnalysis();
+    mocks.svgResult = true;
+    render(<AnalysisPanel />);
+    fireEvent.click(screen.getByTestId('analysis-show-mesh'));
+    expect(mocks.renderParams.at(-1)).toMatchObject({ showMesh: true });
+  });
+
+  it('opens the probe chart full size', () => {
+    seedAnalysis();
+    mocks.solved = 'static';
+    render(<AnalysisPanel />);
+    fireEvent.click(screen.getByTestId('analysis-probe-open-full'));
+    expect(screen.getByRole('img', { name: 'Probe history chart, full size' })).toBeTruthy();
   });
 });

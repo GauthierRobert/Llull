@@ -1,6 +1,7 @@
 // One-line descriptions of the recorded FE set-up items (presentation only; the data is the command output).
 
-import type { FeaConstraint, FeaLoad, FeaTarget, ThermalBc, ThermalBcRecord } from '@core/model/analysis';
+import type { AnalysisCase, FeaConstraint, FeaLoad, FeaTarget, ThermalBc, ThermalBcRecord } from '@core/model/analysis';
+import { formatSignificant } from './quantityFormat';
 
 export type NameOf = (entityId: string) => string;
 
@@ -50,4 +51,32 @@ export function thermalBcText(record: ThermalBcRecord, nameOf: NameOf): string {
   const { bc } = record;
   const where = bc.kind === 'heat_generation' ? nameOf(bc.entityId) : targetText(bc.target, nameOf);
   return `${bc.kind} ${bcValueText(bc)} on ${where}`;
+}
+
+/** Factors a new case starts with (create_analysis); shown as "default" while untouched. */
+const DEFAULT_ULTIMATE_FACTOR = 1.5;
+const DEFAULT_YIELD_FACTOR = 1.0;
+
+export function factorsText(factors: AnalysisCase['factors']): string {
+  const isDefault = factors.ultimate === DEFAULT_ULTIMATE_FACTOR && factors.yield === DEFAULT_YIELD_FACTOR && factors.extra.length === 0;
+  const extra = factors.extra.map((factor) => `${factor.name} ${factor.value}`);
+  return [`ultimate ${factors.ultimate}`, `yield ${factors.yield}`, ...extra].join(' · ') + (isDefault ? ' (default)' : ' (set)');
+}
+
+const seconds = (value: number): string => `${formatSignificant(value)} s`;
+
+/** Time stepping of a transient thermal case: duration, increments and output schedule. */
+export function stepText(step: NonNullable<AnalysisCase['thermal']>['step']): string {
+  const parts = [
+    step.endTimeS !== undefined ? `duration ${seconds(step.endTimeS)}` : 'duration not set',
+    step.initialIncrementS !== undefined ? `first step ${seconds(step.initialIncrementS)}` : '',
+    step.maxIncrementS !== undefined ? `max step ${seconds(step.maxIncrementS)}` : '',
+    step.minIncrementS !== undefined ? `min step ${seconds(step.minIncrementS)}` : '',
+    step.fixedIncrements === true ? 'fixed steps' : '',
+    step.outputEveryS !== undefined ? `output every ${seconds(step.outputEveryS)}` : '',
+    step.outputTimesS !== undefined && step.outputTimesS.length > 0
+      ? `output at ${step.outputTimesS.map(formatSignificant).join(', ')} s`
+      : '',
+  ];
+  return parts.filter((part) => part !== '').join(' · ');
 }

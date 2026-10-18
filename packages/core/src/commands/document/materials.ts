@@ -13,6 +13,7 @@ import { isHexColor } from '../../lib/isHexColor';
 import { changed, commandError, noop, report } from '../noop';
 import { convertValue, isUnitFailure } from '../../lib/quantity';
 import { refuseMaterial } from '../materials/refusal';
+import { describeDensity, densityPlausibilityWarning, kgPerM3FromDocDensity } from '../../geometry/resolveDensity';
 
 const DEFAULT_COLOR = '#b0b0b0';
 
@@ -45,8 +46,11 @@ export const createMaterial = defineCommand({
     'and PBR visual properties (color, metalness, roughness) used by the 3D viewport renderer. ' +
     'If a material with the same name already exists it is replaced (its property models are kept). ' +
     'Records made with define_material_record keep their record; records imported from a library are read-only (MAT_RECORD_READONLY). ' +
-    'Density units match the document unit system: for a mm document, density is in g/mm³ ' +
-    '(steel ≈ 0.00785, aluminium ≈ 0.0027, PLA ≈ 0.00124). Assign the material to entities with assign_material.',
+    'UNIT TRAP: a bare `density` is in GRAMS per (document unit)³, NOT kg/m³. mm document: steel 0.00785 (g/mm³), aluminium 0.0027, PLA 0.00124. ' +
+    'Metre document: steel is 7 850 000 g/m³; passing 7850 meaning kg/m³ makes every mass ~1000× too light. Safest: always pass ' +
+    'densityUnit, e.g. { density: 7850, densityUnit: "kg/m^3" } or { density: 7.85, densityUnit: "g/cm^3" } in any document. ' +
+    'A density outside 0.01–25 g/cm³ (0.0005–25 with an explicit densityUnit) is still stored but returns a WARNING in the summary and ' +
+    'data.warnings naming the likely intended unit; the summary always prints the density in g/cm³ and kg/m³ — check it. Assign the material to entities with assign_material.',
   params: z.object({
     name: z
       .string()
@@ -57,8 +61,9 @@ export const createMaterial = defineCommand({
     density: z
       .number()
       .describe(
-        'Density in (mass-unit) per (document-length-unit)³. Must be > 0 and finite. ' +
-          'For a document in mm: g/mm³ — steel ≈ 0.00785, aluminium ≈ 0.0027, PLA ≈ 0.00124, titanium ≈ 0.00445, copper ≈ 0.00893. ' +
+        'Density; must be > 0 and finite. Without densityUnit it is GRAMS per (document-length-unit)³ (not kg/m³): ' +
+          'for a mm document g/mm³ — steel ≈ 0.00785, aluminium ≈ 0.0027, PLA ≈ 0.00124, titanium ≈ 0.00445, copper ≈ 0.00893; ' +
+          'for a metre document steel = 7850000 (g/m³) — or pass 7850 with densityUnit "kg/m^3". ' +
           'This value is used by mass_properties when the material is assigned to an entity.',
       ),
     densityUnit: z
@@ -193,10 +198,15 @@ export const createMaterial = defineCommand({
     };
     const newDoc: CadDocument = { ...doc, materials: { ...doc.materials, [name]: material } };
     const action = Object.hasOwn(doc.materials, name) ? 'replaced' : 'created';
-    return report(
-      newDoc,
-      `create_material '${name}': ${action} (density=${density} g/${doc.units}³${densityUnit === undefined ? '' : ` from ${given} ${densityUnit}`}, color=${color}, metalness=${metalness}, roughness=${roughness}${finish !== undefined ? `, finish=${finish.pattern} every ${finish.scale} ${doc.units}` : ''}).`,
-    );
+    const warning = densityPlausibilityWarning(doc, density, densityUnit !== undefined);
+    const summary =
+      `create_material '${name}': ${action} (density=${describeDensity(doc, density)}, stored ${density} g/${doc.units}³${densityUnit === undefined ? '' : ` from ${given} ${densityUnit}`}, color=${color}, metalness=${metalness}, roughness=${roughness}${finish !== undefined ? `, finish=${finish.pattern} every ${finish.scale} ${doc.units}` : ''}).` +
+      (warning === null ? '' : ` WARNING: ${warning}.`);
+    return report(newDoc, summary, {
+      density,
+      densityKgPerM3: kgPerM3FromDocDensity(doc, density),
+      warnings: warning === null ? [] : [warning],
+    });
   },
 });
 

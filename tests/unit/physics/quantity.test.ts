@@ -23,6 +23,15 @@ describe('lib/quantity', () => {
     expect(convert(1, '1/degC', '1/K')).toBe(1);
   });
 
+  it('reads shorthand exponents (m3, cm², s2) like carets, but not a number exponent', () => {
+    expect(convert(7850, 'kg/m3', 'g/cm^3')).toBeCloseTo(7.85, 12);
+    expect(convert(7.85, 'g/cm3', 'kg/m^3')).toBeCloseTo(7850, 9);
+    expect(convert(1, 'mm²', 'm^2')).toBeCloseTo(1e-6, 18);
+    expect(convert(1, 'm³', 'mm3')).toBeCloseTo(1e9, 3);
+    expect(convert(9.81, 'm/s2', 'mm/s^2')).toBeCloseTo(9810, 9);
+    expect(convert(1, '1e5', '1')).toBe(1e5);
+  });
+
   it('converts absolute temperatures affinely', () => {
     expect(convert(-196, 'degC', 'K')).toBeCloseTo(77.15, 12);
     expect(convert(-320, 'degF', 'K')).toBeCloseTo(77.59444444444, 9);

@@ -3,6 +3,7 @@
 
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import { displayMetalness } from './displayMetalness';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { EntityId } from '@core/model/types';
 import { type DisplayMode, useViewportStore } from '@ui/store';
@@ -56,7 +57,10 @@ export function makeMaterialArgs(
       side: THREE.DoubleSide,
     };
   }
-  return { ...SHADED_MATERIAL_ARGS, ...(batchMaterial && { roughness: batchMaterial.roughness, metalness: batchMaterial.metalness }) };
+  return {
+    ...SHADED_MATERIAL_ARGS,
+    ...(batchMaterial && { roughness: batchMaterial.roughness, metalness: displayMetalness(batchMaterial.metalness) }),
+  };
 }
 
 interface InstanceBatchMeshProps {

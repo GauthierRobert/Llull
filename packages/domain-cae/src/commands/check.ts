@@ -2,6 +2,7 @@
 
 import type { AnalysisCase } from '@core/model/analysis';
 import { is3D, type CadDocument } from '@core/model/types';
+import { densityPlausibilityWarning } from '@core/geometry/resolveDensity';
 import { defineCommand, z } from '@core/commands/schema';
 import { report } from '@core/commands/noop';
 import type { CommandResult } from '@core/commands/types';
@@ -48,7 +49,12 @@ function partItems(doc: CadDocument, analysis: AnalysisCase): CheckItem[] {
     const material = materialId !== undefined && Object.hasOwn(doc.materials, materialId) ? doc.materials[materialId] : undefined;
     if (material === undefined) {
       items.push(item('FEA_MATERIAL_MISSING', 'error', `part '${entityId}' has no material`, [entityId]));
-    } else if (structural) {
+      continue;
+    }
+    const densityWarning = densityPlausibilityWarning(doc, material.density, material.densityUnit !== undefined);
+    if (densityWarning !== null)
+      items.push(item('FEA_DENSITY_IMPLAUSIBLE', 'warning', `material '${materialId}': ${densityWarning}`, [entityId, materialId ?? '']));
+    if (structural) {
       const elastic = elasticConstants(material, materialId ?? '', propertyTemperatureK(analysis));
       if (isElasticRefusal(elastic)) items.push(item(elastic.code, 'error', elastic.message, [entityId, materialId ?? '']));
       else if (elastic.unverifiedReasons.length > 0)

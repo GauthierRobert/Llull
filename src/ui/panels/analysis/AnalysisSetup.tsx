@@ -4,7 +4,7 @@ import React from 'react';
 import type { AnalysisCase } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 import { PanelSection } from '@ui/panels/PanelParts';
-import { constraintText, loadText, thermalBcText, type NameOf } from './analysisText';
+import { constraintText, factorsText, loadText, stepText, thermalBcText, type NameOf } from './analysisText';
 
 interface SetupItem {
   readonly key: string;
@@ -81,6 +81,29 @@ export function AnalysisSetup({ analysisCase, document }: AnalysisSetupProps): R
           <ItemList label="Thermal BCs" items={bcs} empty="No thermal boundary conditions." />
         </PanelSection>
       )}
+      <PanelSection title="Solution" testId="analysis-solution">
+        {(analysisCase.type === 'modal' || analysisCase.type === 'buckling') && (
+          <p className="analysis__line" data-testid="analysis-modes-requested">
+            Requested modes: {analysisCase.modes ?? 'default'}
+          </p>
+        )}
+        {analysisCase.thermal !== undefined && (
+          <p className="analysis__line" data-testid="analysis-initial-temperature">
+            Initial temperature:{' '}
+            {analysisCase.thermal.initialTemperature === undefined
+              ? 'not set'
+              : `${analysisCase.thermal.initialTemperature.value} ${analysisCase.thermal.initialTemperature.unit}`}
+          </p>
+        )}
+        {analysisCase.type === 'heat_transient' && analysisCase.thermal !== undefined && (
+          <p className="analysis__line" data-testid="analysis-time-stepping">
+            Time stepping: {stepText(analysisCase.thermal.step)}
+          </p>
+        )}
+        <p className="analysis__line" data-testid="analysis-factors">
+          Safety factors: {factorsText(analysisCase.factors)}
+        </p>
+      </PanelSection>
       <PanelSection title="Mesh" collapsible>
         <p className="analysis__line">
           {mesh.mesher} · {mesh.elementFamily} · order {mesh.order} · size {mesh.globalSize}

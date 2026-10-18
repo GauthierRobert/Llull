@@ -1,14 +1,15 @@
 // Probe time series of a solved case (probe_history): the chart, and a start / end / peak table per probe (temperatures, heat flux, stresses).
 
-import React from 'react';
+import React, { useState } from 'react';
 import { PanelSection, StatusLine } from '@ui/panels/PanelParts';
 import { svgDataUrl, parseProbeHistory } from './analysisData';
+import { PlotDialog } from './PlotDialog';
+import { formatQuantities } from './quantityFormat';
 import { useHostQuery } from './useHostQuery';
-
-const round = (n: number): string => String(Math.round(n * 1e4) / 1e4);
 
 export function AnalysisProbes({ analysisId, refreshKey }: { analysisId: string; refreshKey: unknown }): React.ReactElement {
   const query = useHostQuery('probe_history', { analysisId }, refreshKey);
+  const [full, setFull] = useState(false);
   const view = query.status === 'done' && !query.isError ? parseProbeHistory(query.data) : null;
   return (
     <PanelSection title="Probes" hint="Value of each result probe over the stored increments (probe_history).">
@@ -18,7 +19,20 @@ export function AnalysisProbes({ analysisId, refreshKey }: { analysisId: string;
         <StatusLine text="No probes defined (add_result_probe)." testId="analysis-probes-empty" />
       )}
       {view?.svg != null && (
-        <img className="analysis__plot" data-testid="analysis-probe-plot" alt="Probe history chart" src={svgDataUrl(view.svg)} />
+        <figure className="analysis__figure">
+          <img className="analysis__plot" data-testid="analysis-probe-plot" alt="Probe history chart" src={svgDataUrl(view.svg)} />
+          <button type="button" className="btn btn--ghost" data-testid="analysis-probe-open-full" onClick={() => setFull(true)}>
+            Open full size
+          </button>
+        </figure>
+      )}
+      {full && view?.svg != null && (
+        <PlotDialog
+          src={svgDataUrl(view.svg)}
+          alt="Probe history chart, full size"
+          label="Probe history, full size"
+          onClose={() => setFull(false)}
+        />
       )}
       {view !== null && view.series.length > 0 && (
         <ul className="analysis__items" aria-label="Probes" data-testid="analysis-probes">
@@ -26,6 +40,10 @@ export function AnalysisProbes({ analysisId, refreshKey }: { analysisId: string;
             const first = probe.points[0];
             const last = probe.points[probe.points.length - 1];
             const values = probe.points.map((p) => p.value);
+            const shown = formatQuantities(
+              first === undefined || last === undefined ? [] : [first.value, last.value, Math.min(...values), Math.max(...values)],
+              probe.unit,
+            );
             return (
               <li key={probe.probeId} className="analysis__item">
                 <span className="analysis__item-name">{probe.name}</span>
@@ -33,7 +51,7 @@ export function AnalysisProbes({ analysisId, refreshKey }: { analysisId: string;
                   {probe.quantity}
                   {first === undefined || last === undefined
                     ? ' · no values'
-                    : ` · ${round(first.value)} → ${round(last.value)} (min ${round(Math.min(...values))}, max ${round(Math.max(...values))}) ${probe.unit}`}
+                    : ` · ${shown.texts[0]} → ${shown.texts[1]} (min ${shown.texts[2]}, max ${shown.texts[3]}) ${shown.unit}`}
                 </span>
               </li>
             );
