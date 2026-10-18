@@ -31,6 +31,9 @@ import { useViewportPalette } from '@ui/viewport/viewportPalette';
 import { StoreInvalidator, ViewportStoreInvalidator } from '../StoreInvalidator';
 import { LiveFxCamera } from '../liveFx/LiveFxCamera';
 import { ScreenAnchorOverlay } from '../screenAnchor/ScreenAnchorOverlay';
+import { FocusOverlay } from '../FocusOverlay';
+import { FocusBanner } from '../FocusBanner';
+import { useFocusStore } from '@ui/store/focusStore';
 
 // Idempotent, StrictMode-safe.
 ensureBvhSetup();
@@ -121,6 +124,7 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
         <MechanismOverlay />
         <DynamicsLoadsOverlay />
         <DimensionLens />
+        <FocusOverlay />
       </group>
 
       <GizmoHelper alignment="bottom-right" margin={[72, 72]}>
@@ -143,6 +147,7 @@ export function Viewport3D(): React.ReactElement {
 
   const handlePointerMissed = useCallback((): void => {
     clearSelection();
+    useFocusStore.getState().setFocus(null);
   }, [clearSelection]);
 
   return (
@@ -161,6 +166,7 @@ export function Viewport3D(): React.ReactElement {
       </Canvas>
 
       <ScreenAnchorOverlay />
+      <FocusBanner />
       <ViewOptionsToggle />
       {viewOptionsOpen && (
         <>

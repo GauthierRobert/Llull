@@ -27,6 +27,8 @@ import { useViewportPalette } from '@ui/viewport/viewportPalette';
 import { StoreInvalidator } from '../StoreInvalidator';
 import { RenderOriginSyncer } from '../RenderOriginSyncer';
 import { ScreenAnchorOverlay } from '../screenAnchor/ScreenAnchorOverlay';
+import { FocusOverlay } from '../FocusOverlay';
+import { FocusBanner } from '../FocusBanner';
 
 /** Reports the ortho camera zoom to the HTML overlay, only when it changes. */
 function ZoomReader({ onZoom }: { onZoom: (zoom: number) => void }): null {
@@ -121,6 +123,7 @@ function SceneContents2D({
         <ModifyPickInteraction activeTool={activeModifyTool} phase={modifyPhase} zoom={zoom} onEntityPick={onEntityPick} />
 
         <MeasureBBoxRect2D />
+        <FocusOverlay />
       </group>
     </>
   );
@@ -162,6 +165,7 @@ export function Viewport2D(): React.ReactElement {
       </Canvas>
 
       <ScreenAnchorOverlay />
+      <FocusBanner />
       <ScaleBar zoom={cameraZoom} />
 
       {/* On demand: the modify palette shows once there is something to modify. */}

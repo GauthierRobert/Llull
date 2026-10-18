@@ -214,6 +214,8 @@ interface ListRowProps {
   buttonTestId?: string;
   /** Trailing row buttons. */
   actions?: React.ReactNode;
+  /** Legend dot: the colour the item is drawn with on the model (ties the row to its glyph). */
+  swatch?: string;
   /** Chip, `panel__row-main`, `panel__row-meta`. */
   children: React.ReactNode;
 }
@@ -228,6 +230,7 @@ export function ListRow({
   pressed,
   buttonTestId,
   actions,
+  swatch,
   children,
 }: ListRowProps): React.ReactElement {
   return (
@@ -244,6 +247,7 @@ export function ListRow({
         data-testid={buttonTestId}
         onClick={onSelect}
       >
+        {swatch !== undefined && <span className="panel__swatch" style={{ background: swatch }} aria-hidden="true" />}
         {children}
       </button>
       {actions !== undefined && <span className="panel__row-actions">{actions}</span>}
@@ -289,5 +293,62 @@ export function DeleteButton({
         onDelete();
       }}
     />
+  );
+}
+
+export type StatusTone = 'ok' | 'warn' | 'bad' | 'info';
+
+/** Pass / warn / fail chip: the verdict of a row or a panel, readable at a glance. */
+export function StatusChip({ tone, text, testId }: { tone: StatusTone; text: string; testId?: string }): React.ReactElement {
+  return (
+    <span className={`panel__status panel__status--${tone}`} data-testid={testId}>
+      {text}
+    </span>
+  );
+}
+
+export interface Kpi {
+  key: string;
+  label: string;
+  value: string;
+  /** Second line: unit context, location, limit. */
+  sub?: string;
+  tone?: StatusTone;
+  /** Clicking the tile highlights its location on the model. */
+  onClick?: () => void;
+}
+
+/** Headline numbers at the top of a panel: the few values an engineer reads first. */
+export function KpiStrip({ items, label }: { items: readonly Kpi[]; label: string }): React.ReactElement | null {
+  if (items.length === 0) return null;
+  return (
+    <div className="panel__kpis" role="group" aria-label={label}>
+      {items.map((item) => {
+        const className = classNames('panel__kpi', item.tone !== undefined && item.tone !== 'info' && `panel__kpi--${item.tone}`);
+        const body = (
+          <>
+            <span className="panel__kpi-label">{item.label}</span>
+            <span className="panel__kpi-value">{item.value}</span>
+            {item.sub !== undefined && <span className="panel__kpi-sub">{item.sub}</span>}
+          </>
+        );
+        return item.onClick === undefined ? (
+          <div key={item.key} className={className} data-testid={`kpi-${item.key}`}>
+            {body}
+          </div>
+        ) : (
+          <button
+            key={item.key}
+            type="button"
+            className={className}
+            data-testid={`kpi-${item.key}`}
+            title="Show on the model"
+            onClick={item.onClick}
+          >
+            {body}
+          </button>
+        );
+      })}
+    </div>
   );
 }
