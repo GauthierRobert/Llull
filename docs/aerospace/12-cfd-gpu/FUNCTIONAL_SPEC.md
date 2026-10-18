@@ -12,7 +12,10 @@ Status: specification written 2026-10-18, not implemented. Authoring rules: [`..
 3. **GPU first.** The solvers run on the local GPU when there is one, and fall back to the CPU otherwise. Other languages than
    TypeScript are allowed for speed and quality.
 
-This pack replaces the "CFD hand-off to OpenFOAM / SU2" items of 10 AER (FR-AER-13, M4) and 11 FLD (FR-FLD-11, M5). Both now point here.
+This pack takes over the flow-field solvers that 10 AER and 11 FLD had planned as an OpenFOAM / SU2 hand-off. 10 AER keeps the
+formula-level methods as the fast first pass and three links to this pack: CFD drag area into `aero_drag` / `road_load_power`
+(FR-AER-14), a compressibility cross-check against the Euler solver (FR-AER-15), and an optional export of a case prepared here to
+an OpenFOAM / SU2 the user runs locally (FR-AER-13). 11 FLD nozzle / plume flows are a V2 item here (FR-FLD-11).
 
 ## 1. Summary
 

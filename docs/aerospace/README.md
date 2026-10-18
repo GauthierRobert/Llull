@@ -44,8 +44,8 @@ Packs 10 AER and 11 FLD (added 2026-10-18) are built at MVP level with their spe
 nozzle thermal / stress).
 
 Pack 12 CFD (added 2026-10-18, specs only) follows owner directives that apply to it: **CLI only** (MCP will be removed), **local only**
-(never cloud), **GPU first** (a native Rust + wgpu sidecar; other languages allowed). It replaces the OpenFOAM / SU2 hand-off items of
-10 AER (FR-AER-13, M4) and 11 FLD (FR-FLD-11, M5). Its open decision CFD-D1 (Rust toolchain in the repo) is on the board.
+(never cloud), **GPU first** (a native Rust + wgpu sidecar; other languages allowed). It takes over the flow-field solvers planned in 10 AER and
+11 FLD; 10 AER keeps its formula-level methods plus three links (CFD drag area, compressibility cross-check, optional OpenFOAM / SU2 export). Its open decision CFD-D1 (Rust toolchain in the repo) is on the board.
 
 ## Dependencies and recommended order
 
