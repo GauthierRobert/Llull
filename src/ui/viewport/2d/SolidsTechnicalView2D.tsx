@@ -33,13 +33,22 @@ export function SolidsTechnicalView2D({
     const extent = Math.max(Math.hypot(maxX - minX, maxY - minY), 1e-6);
     return { patternUnit: extent * PATTERN_FRACTION, hatchSpacing: extent * HATCH_FRACTION };
   }, [drawings]);
+  // Only the selected SOLIDS tint this view: selecting a 2D shape must not rebuild its GPU buffers.
+  const selectedSolidKey = drawings
+    .filter(({ entityId }) => selectedIds.has(entityId))
+    .map(({ entityId }) => entityId)
+    .join('\u0000');
+  const selectedSolidIds = useMemo(
+    (): ReadonlySet<EntityId> => new Set(selectedSolidKey === '' ? [] : selectedSolidKey.split('\u0000')),
+    [selectedSolidKey],
+  );
   const items = useMemo((): StyledPrimitive[] => {
     const colorOf = new Map(solids.map((solid) => [solid.id, solid.color]));
     return drawings.flatMap(({ entityId, primitives }) => {
-      const color = selectedIds.has(entityId) ? SELECTION_COLOR : (colorOf.get(entityId) ?? palette.background);
+      const color = selectedSolidIds.has(entityId) ? SELECTION_COLOR : (colorOf.get(entityId) ?? palette.background);
       return primitives.map((primitive) => ({ primitive, color }));
     });
-  }, [drawings, solids, selectedIds, palette.background]);
+  }, [drawings, solids, selectedSolidIds, palette.background]);
 
   return <DrawingPrimitives2D name="solids-technical-view-2d" items={items} scale={scale} fillColor={palette.background} />;
 }

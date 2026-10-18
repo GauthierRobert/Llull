@@ -18,23 +18,23 @@ import { GridAnnotations3D } from './GridAnnotations3D';
 import { GRID_LAYER_NAME } from './gridAnnotations';
 import { expandInstance } from '@core/geometry/instanceExpansion';
 import type { PbrMaterial } from './useMaterialProps';
-import { useLiveFxStore } from '@ui/store/liveFxStore';
+import { useTransitioningIds } from '@ui/store/transitioningIds';
 import { LiveTransitionGroup } from '../liveFx/LiveTransitionGroup';
 import { type GhostRenderer, LiveFxLayer } from '../liveFx/LiveFxLayer';
 
 /** Expands an instance; every sub-mesh click selects the INSTANCE id so it moves as a unit. */
 function InstanceEntityRenderer({
   instance,
-  document,
+  components,
   selected,
   onSelect,
 }: {
   instance: InstanceEntity;
-  document: CadDocument;
+  components: CadDocument['components'];
   selected: boolean;
   onSelect: (id: EntityId, additive: boolean) => void;
 }): React.ReactElement | null {
-  const component = document.components[instance.componentId];
+  const component = components[instance.componentId];
 
   const handleSubSelect = useCallback(
     (_childId: EntityId, additive: boolean): void => {
@@ -56,19 +56,19 @@ function InstanceEntityRenderer({
   );
 }
 
-/** Memoized: only `instance` entities get `document`, so a selection change does not re-render every branch. */
+/** Memoized: only `instance` entities get `components`, so a selection change does not re-render every branch. */
 const EntityRenderer = memo(function EntityRenderer({
   entity,
   selected,
   onSelect,
   pbrMaterial,
-  document,
+  components,
 }: {
   entity: Entity;
   selected: boolean;
   onSelect: (id: EntityId, additive: boolean) => void;
   pbrMaterial?: PbrMaterial | undefined;
-  document?: CadDocument | undefined;
+  components?: CadDocument['components'] | undefined;
 }): React.ReactElement | null {
   if (entity.kind in SOLID_MESHES) {
     const Mesh = SOLID_MESHES[entity.kind as SolidKind] as SolidMeshBranch<Entity>;
@@ -85,8 +85,8 @@ const EntityRenderer = memo(function EntityRenderer({
     case 'text':
       return <TextMesh entity={entity} selected={selected} onSelect={onSelect} />;
     case 'instance':
-      if (!document) return null;
-      return <InstanceEntityRenderer instance={entity} document={document} selected={selected} onSelect={onSelect} />;
+      if (!components) return null;
+      return <InstanceEntityRenderer instance={entity} components={components} selected={selected} onSelect={onSelect} />;
     default:
       // 2D kinds draw on their own work plane through the 2D view's renderers (L7).
       return <Shape2DRenderer entity={entity} selected={selected} />;
@@ -101,7 +101,7 @@ const renderGhost3D: GhostRenderer = (ghost) => (
     entity={ghost.entity}
     selected={false}
     onSelect={noopSelect}
-    document={ghost.entity.kind === 'instance' ? ghost.document : undefined}
+    components={ghost.entity.kind === 'instance' ? ghost.document.components : undefined}
   />
 );
 
@@ -117,7 +117,7 @@ export function Entities(): React.ReactElement {
   const hiddenLayerIds = useViewportStore((s) => s.hiddenLayerIds);
   const toggleClickAnimation = useViewportStore((s) => s.toggleClickAnimation);
   // Entities mid live-transition leave their instanced batch for the per-entity path (own matrix + materials).
-  const transitions = useLiveFxStore((s) => s.transitions);
+  const transitions = useTransitioningIds();
 
   const handleSelect = useCallback(
     (id: EntityId, additive: boolean): void => {
@@ -181,7 +181,7 @@ export function Entities(): React.ReactElement {
             entity={entity}
             selected={selectionSet.has(entity.id)}
             onSelect={handleSelect}
-            document={entity.kind === 'instance' ? document : undefined}
+            components={entity.kind === 'instance' ? document.components : undefined}
             pbrMaterial={entity.materialId ? materials[entity.materialId] : undefined}
           />
         </LiveTransitionGroup>

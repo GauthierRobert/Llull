@@ -8,6 +8,7 @@ import { fetchLiveSnapshot, isCommandRefusal, isConnectionRefusal, postCommand }
 import type { CadStoreState, OutboxCommand, StoreGet, StoreSet } from './storeTypes';
 import { resetGraceRuns } from './graceRuns';
 import { rememberOwnCommandId } from './liveOrigin';
+import { reuseUnchanged } from './reuseUnchanged';
 
 const SYNC_RETRY_BASE_MS = 1000;
 const SYNC_RETRY_MAX_MS = 30000;
@@ -172,6 +173,7 @@ export function flushOutbox(set: StoreSet, get: StoreGet): void {
     const snapshot = await fetchLiveSnapshot();
     if (get().localOutbox.length > 0) return sendNext();
     const state = get();
+    const adopted = reuseUnchanged(state.liveBase, snapshot.document);
     flushIdMap = new Map();
     poisonedIds = new Map();
     ackedLocalIds = new Set();
@@ -181,10 +183,10 @@ export function flushOutbox(set: StoreSet, get: StoreGet): void {
       localUndoStack: [],
       localRedoStack: [],
       localRedoOutbox: [],
-      liveBase: snapshot.document,
+      liveBase: adopted,
       liveSeq: snapshot.seq,
       liveEpoch: snapshot.epoch,
-      document: withLocalSelection(snapshot.document, state.document.selection),
+      document: withLocalSelection(reuseUnchanged(state.document, adopted), state.document.selection),
       lastSummary: syncedSummary(sent.length, rejected),
     });
   };

@@ -1,7 +1,7 @@
 // The document's rigid-body loads (`dynamicsLoads`) as design values and, while a run is loaded, at the playback time.
 
 import { useMemo } from 'react';
-import { useStore } from '@ui/store';
+import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
 import { useDynamicsPlaybackStore } from '@ui/store/dynamicsPlaybackStore';
 import { bodyCentres, dynamicsLoads, type LoadItem } from '@ui/dynamicsLoads';
 
@@ -13,7 +13,7 @@ interface DynamicsLoads {
 }
 
 export function useDynamicsLoads(): DynamicsLoads {
-  const document = useStore((s) => s.document);
+  const document = useDocumentWithoutSelection();
   const result = useDynamicsPlaybackStore((s) => s.result);
   const time = useDynamicsPlaybackStore((s) => s.time);
   const hasDynamics = document.dynamics !== undefined;

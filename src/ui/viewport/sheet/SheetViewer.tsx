@@ -3,7 +3,7 @@
 
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import '@ui/styles/panels/sheets.css';
-import { useStore } from '@ui/store';
+import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
 import { Icon } from '@ui/components/Icon';
 import { IconButton } from '@ui/panels/PanelParts';
 import { QueryDownloadButton } from '@ui/panels/QueryDownloadButton';
@@ -20,7 +20,7 @@ const svgDataUrl = (svg: string): string => `data:image/svg+xml;charset=utf-8,${
 
 export function SheetViewer(): React.ReactElement | null {
   const sheetId = useSheetViewStore((s) => s.openSheetId);
-  const document = useStore((s) => s.document);
+  const document = useDocumentWithoutSelection();
   const sheet = sheetId === null ? undefined : document.drawings?.sheets[sheetId];
   const showDimensions = useSheetViewStore((s) => s.showDimensions);
   const selectedViewId = useSheetViewStore((s) => s.selectedViewId);

@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import type { SimulationData } from '@core/dynamics/simulationReport';
 import { boundsExtent, entityBoundsInDoc, mergeBounds, type Bounds } from '@core/geometry/bounds';
-import { useStore } from '@ui/store';
+import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
 import { useDynamicsPlaybackStore } from '@ui/store/dynamicsPlaybackStore';
 import { isLoadDrawn, useLoadOverlayStore } from '@ui/store/loadOverlayStore';
 import { LOAD_COLORS, type LoadItem } from '@ui/dynamicsLoads';
@@ -188,7 +188,7 @@ const GLYPHS: Readonly<Record<LoadItem['shape'], (props: GlyphProps) => React.Re
 };
 
 export function DynamicsLoadsOverlay(): React.ReactElement | null {
-  const document = useStore((s) => s.document);
+  const document = useDocumentWithoutSelection();
   const result = useDynamicsPlaybackStore((s) => s.result);
   const overlay = useLoadOverlayStore();
   const invalidate = useThree((state) => state.invalidate);
