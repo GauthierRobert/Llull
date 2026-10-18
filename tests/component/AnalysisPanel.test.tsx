@@ -121,11 +121,14 @@ describe('AnalysisPanel', () => {
     mocks.solved = null;
     mocks.renderParams = [];
     useStore.getState().setDocument(createEmptyDocument());
-    useLayoutStore.setState({ sidebarTab: 'objects', sidebarOpen: true });
+    useLayoutStore.setState({ sidebarTab: 'objects', sidebarOpen: true, pinnedTabs: [] });
   });
 
-  it('adds an Analysis tab to the sidebar rail', () => {
+  it('offers Analysis under More panels until pinned, then on the sidebar rail', () => {
     render(<Sidebar />);
+    expect(screen.queryByRole('tab', { name: 'Analysis' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'More panels' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Analysis/ }));
     expect(screen.getByRole('tab', { name: 'Analysis' })).toBeTruthy();
   });
 

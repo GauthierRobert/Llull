@@ -54,9 +54,16 @@ export class CivilUiDriver {
   private act(what: string, name: string): Promise<string> {
     return this.session.acting(what, () => this.button(name).click());
   }
+  /** Rail tab, or the "More panels" picker while the document does not use that panel yet. */
+  private async openTab(tab: string | RegExp, pickerItem: RegExp): Promise<void> {
+    const railTab = this.page.getByRole('tab', { name: tab });
+    if (await railTab.isVisible()) return railTab.click();
+    await this.page.getByRole('button', { name: 'More panels' }).click();
+    await this.page.getByRole('button', { name: pickerItem }).click();
+  }
   private async openSite(): Promise<void> {
     const panel = this.page.getByTestId('civil-panel');
-    if (!(await panel.isVisible())) await this.page.getByRole('tab', { name: /site/i }).click();
+    if (!(await panel.isVisible())) await this.openTab(/site/i, /^Civil \/ Site/);
     await expect(panel).toBeVisible();
   }
   private async take(id: DeliverableId, name: string): Promise<string> {
@@ -74,7 +81,7 @@ export class CivilUiDriver {
     const args = call.args;
     if (call.tool === 'set_project_info') {
       const building = this.page.getByTestId('building-panel');
-      if (!(await building.isVisible())) await this.page.getByRole('tab', { name: 'Building' }).click();
+      if (!(await building.isVisible())) await this.openTab('Building', /^Building/);
       await expect(building).toBeVisible();
       return this.building.setProjectInfo(Object.fromEntries(Object.entries(args).map(([key, value]) => [key, text(value)])));
     }

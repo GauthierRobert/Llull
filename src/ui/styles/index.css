@@ -7,6 +7,7 @@
 @import './empty-state.css';
 @import './toolbar.css';
 @import './palette.css';
+@import './context-menu.css';
 @import './mcp-connect.css';
 @import './app-error.css';
 @import './panels/common.css';

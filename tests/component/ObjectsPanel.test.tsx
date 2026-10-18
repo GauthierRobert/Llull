@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
-import { useStore, useViewportStore } from '@ui/store';
+import { act, render, screen, fireEvent, within } from '@testing-library/react';
+import { useStore, usePaletteStore, useViewportStore } from '@ui/store';
 import { ObjectsPanel } from '@ui/panels/ObjectsPanel';
 import { localDispatch, resetOfflineStore } from '../helpers/storeTestHelpers';
 
@@ -81,5 +81,57 @@ describe('ObjectsPanel', () => {
     fireEvent.change(screen.getByRole('searchbox', { name: 'Filter objects' }), { target: { value: 'spin' } });
     expect(screen.queryByTestId(`object-row-${a}`)).toBeNull();
     expect(screen.getByTestId(`object-row-${b}`)).toBeDefined();
+  });
+
+  describe('collections', () => {
+    function twoLayerModel(boxCount: number): string[] {
+      localDispatch('add_layer', { name: 'Walls' });
+      const ids = Array.from({ length: boxCount }, (_, index) => addBox(`Box${index}`));
+      const walls = Object.values(useStore.getState().document.layers).find((layer) => layer.name === 'Walls')!;
+      localDispatch('set_entity_layer', { entityId: ids[0]!, layerId: walls.id });
+      return ids;
+    }
+
+    it('groups by layer, expanded when small, collapsed when large, and toggles', () => {
+      const ids = twoLayerModel(2);
+      const { unmount } = render(<ObjectsPanel />);
+      expect(screen.getByTestId(`object-row-${ids[0]}`)).toBeDefined();
+      fireEvent.click(screen.getByRole('button', { name: 'Collapse Walls' }));
+      expect(screen.queryByTestId(`object-row-${ids[0]}`)).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'Expand Walls' }));
+      expect(screen.getByTestId(`object-row-${ids[0]}`)).toBeDefined();
+      unmount();
+    });
+
+    it('starts collapsed above 40 objects and auto-expands the collection of a selected entity', () => {
+      const ids = twoLayerModel(45);
+      const last = ids[44]!;
+      render(<ObjectsPanel />);
+      expect(screen.queryByTestId(`object-row-${last}`)).toBeNull();
+      act(() => useStore.getState().select([last]));
+      expect(screen.getByTestId(`object-row-${last}`)).toBeDefined();
+    });
+
+    it('hides a whole collection locally and selects it by name', () => {
+      const ids = twoLayerModel(2);
+      render(<ObjectsPanel />);
+      fireEvent.click(screen.getByRole('button', { name: 'Select all in Walls' }));
+      expect(useStore.getState().document.selection).toEqual([ids[0]]);
+      fireEvent.click(screen.getByRole('button', { name: 'Hide Walls' }));
+      expect(useViewportStore.getState().hiddenEntityIds.has(ids[0]!)).toBe(true);
+    });
+
+    it('expands every matching collection while filtering', () => {
+      const ids = twoLayerModel(45);
+      render(<ObjectsPanel />);
+      fireEvent.change(screen.getByRole('searchbox', { name: 'Filter objects' }), { target: { value: 'Box44' } });
+      expect(screen.getByTestId(`object-row-${ids[44]}`)).toBeDefined();
+    });
+  });
+
+  it('the empty state button opens the palette on the command form', () => {
+    render(<ObjectsPanel />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add a box' }));
+    expect(usePaletteStore.getState()).toMatchObject({ open: true, pendingCommand: 'add_box' });
   });
 });

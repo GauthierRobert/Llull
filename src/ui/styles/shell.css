@@ -8,12 +8,12 @@
   background: var(--surface-app);
   /* Viewport area left clear by the floating chrome; viewport overlays anchor to these. */
   --vp-inset-top: calc(var(--chrome-gap) * 2 + var(--chrome-h));
-  --vp-inset-left: calc(var(--chrome-gap) * 2 + 48px);
+  --vp-inset-left: calc(var(--chrome-gap) * 2 + var(--rail-w));
   --vp-inset-right: var(--chrome-gap);
 }
 
 .app-layout[data-sidebar='open'] {
-  --vp-inset-left: calc(var(--chrome-gap) * 2 + 48px + 8px + var(--sidebar-w));
+  --vp-inset-left: calc(var(--chrome-gap) * 2 + var(--rail-w) + 8px + var(--sidebar-w));
 }
 
 .app-layout[data-inspector='open'] {
@@ -314,11 +314,15 @@
   pointer-events: none;
 }
 .rail {
+  /* Above the panel body so the "More panels" picker overlays it. */
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  width: 48px;
+  width: var(--rail-w);
+  max-height: 100%;
   padding: 4px;
   flex-shrink: 0;
   border-radius: var(--radius-float);
@@ -329,14 +333,34 @@
   box-shadow: var(--shadow-float);
   pointer-events: auto;
 }
+.rail__tabs {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.rail__divider {
+  width: 28px;
+  height: 1px;
+  margin: 4px 0;
+  flex-shrink: 0;
+  background: var(--border);
+}
 
 .rail-btn {
   position: relative;
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  gap: 3px;
+  width: 52px;
+  height: 48px;
+  flex-shrink: 0;
   border-radius: 10px;
   color: var(--fg-subtle);
   transition: var(--transition-colors);
@@ -351,29 +375,77 @@
   color: var(--accent-text);
 }
 
+/* Captions are always visible: an icon-only rail of look-alike glyphs is unreadable. */
 .rail-btn__caption {
-  display: none;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
+  line-height: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.rail-btn__badge {
-  position: absolute;
-  top: 2px;
-  right: 1px;
-  min-width: 14px;
-  height: 14px;
-  padding: 0 3px;
-  border-radius: var(--radius-full);
-  background: var(--surface-3);
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: var(--weight-medium);
-  line-height: 14px;
-  text-align: center;
-  color: var(--fg-muted);
+.rail-more {
+  flex-shrink: 0;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
 }
-.rail-btn--active .rail-btn__badge {
-  background: var(--accent);
-  color: var(--accent-fg);
+.rail-more__panel {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 8px);
+  z-index: 40;
+  max-height: calc(100vh - var(--vp-inset-top) - 96px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 272px;
+  padding: 6px;
+  border-radius: var(--radius-float);
+  background: var(--surface-1);
+  border: 1px solid var(--border-float);
+  box-shadow: var(--shadow-float);
+  animation: float-in var(--dur) var(--ease);
+}
+.rail-more__title {
+  padding: 6px 8px 4px;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.rail-more__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 8px;
+  text-align: left;
+  color: var(--fg-muted);
+  transition: var(--transition-colors);
+}
+button.rail-more__item:hover {
+  background: var(--surface-2);
+  color: var(--fg);
+}
+.rail-more__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.rail-more__label {
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  color: var(--fg);
+}
+.rail-more__hint {
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
 }
 
 .sidebar__body {
@@ -563,13 +635,13 @@
 @media (max-width: 1024px) {
   .app-layout[data-sidebar='open'],
   .app-layout[data-inspector='open'] {
-    --vp-inset-left: calc(var(--chrome-gap) * 2 + 48px);
+    --vp-inset-left: calc(var(--chrome-gap) * 2 + var(--rail-w));
     --vp-inset-right: var(--chrome-gap);
   }
 
   .sidebar__body,
   .inspector {
-    max-width: calc(100vw - 48px - 4 * var(--chrome-gap));
+    max-width: calc(100vw - var(--rail-w) - 4 * var(--chrome-gap));
     box-shadow: var(--shadow-popover);
   }
 }
@@ -581,6 +653,11 @@
   }
 
   .status-bar-bottom {
+    display: none;
+  }
+
+  /* The rail only shows with its panel; the header toggle opens both. */
+  .sidebar--collapsed {
     display: none;
   }
 

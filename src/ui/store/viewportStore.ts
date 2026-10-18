@@ -47,6 +47,9 @@ interface ViewportStoreState {
   setClipPlane(patch: Partial<ClipPlaneState>): void;
   toggleClipPlane(): void;
   toggleEntityVisibility(id: EntityId): void;
+  hideEntities(ids: readonly EntityId[]): void;
+  /** Hides every id of `allIds` that is not in `keepIds`. */
+  isolateEntities(keepIds: readonly EntityId[], allIds: readonly EntityId[]): void;
   showAllEntities(): void;
   toggleLayerVisibility(layerId: string): void;
   toggleSnap3d(): void;
@@ -74,6 +77,8 @@ export const useViewportStore = create<ViewportStoreState>()((set) => ({
   setClipPlane: (patch) => set((state) => ({ clipPlane: { ...state.clipPlane, ...patch } })),
   toggleClipPlane: () => set((state) => ({ clipPlane: { ...state.clipPlane, enabled: !state.clipPlane.enabled } })),
   toggleEntityVisibility: (id) => set((state) => ({ hiddenEntityIds: toggledInSet(state.hiddenEntityIds, id) })),
+  hideEntities: (ids) => set((state) => ({ hiddenEntityIds: new Set<EntityId>([...state.hiddenEntityIds, ...ids]) })),
+  isolateEntities: (keepIds, allIds) => set({ hiddenEntityIds: new Set<EntityId>(allIds.filter((id) => !keepIds.includes(id))) }),
   showAllEntities: () => set({ hiddenEntityIds: new Set<EntityId>() }),
   toggleLayerVisibility: (layerId) => set((state) => ({ hiddenLayerIds: toggledInSet(state.hiddenLayerIds, layerId) })),
   toggleSnap3d: () => set((state) => ({ snap3dEnabled: !state.snap3dEnabled })),

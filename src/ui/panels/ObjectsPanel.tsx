@@ -5,7 +5,7 @@ import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore, useViewportStore } from '@ui/store';
 import { useSelectionSet } from '@ui/store/selectionHooks';
-import { type Entity, type EntityGroup, type EntityKind, is2D } from '@core/model/types';
+import { type Entity, type EntityGroup, type EntityKind, type Layer, is2D } from '@core/model/types';
 import { type IconName, Icon } from '@ui/components/Icon';
 import { IconButton, PanelEmpty, PanelHeader, PanelSection } from '@ui/panels/PanelParts';
 import { CommitInput } from '@ui/panels/propertyFields';
@@ -29,6 +29,7 @@ const KIND_ICONS: Readonly<Partial<Record<EntityKind, IconName>>> = {
   ellipse: 'drawEllipse',
   spline: 'drawSpline',
   point: 'drawPoint',
+  text: 'text',
   image: 'image',
 };
 
@@ -168,10 +169,97 @@ function GroupNode({
           className={classNames('object-visibility-btn', allHidden && 'object-visibility-btn--hidden')}
           pressed={!allHidden}
           label={allHidden ? `Show group ${group.name}` : `Hide group ${group.name}`}
-          onClick={() => memberIds.filter((id) => hiddenEntityIds.has(id) === !allHidden).forEach(toggleEntityVisibility)}
+          onClick={() => memberIds.filter((id) => hiddenEntityIds.has(id) === allHidden).forEach(toggleEntityVisibility)}
         />
       </li>
       {open && members.map((member) => <EntityRow key={member.id} entity={member} selected={selection.has(member.id)} nested />)}
+    </>
+  );
+}
+
+const AUTO_EXPAND_LIMIT = 40;
+
+interface Collection {
+  id: string;
+  name: string;
+  color: string | undefined;
+  members: Entity[];
+}
+
+interface CollectionOverride {
+  open: boolean;
+  /** Selection when toggled: a later selection change re-reveals the selected rows. */
+  selectionKey: string;
+}
+
+/** Layer-based outliner collection; a single layer collapses to "All objects". */
+function buildCollections(ungrouped: readonly Entity[], layers: Record<string, Layer>, layerOrder: readonly string[]): Collection[] {
+  const byLayer = new Map<string, Entity[]>();
+  ungrouped.forEach((entity) => byLayer.set(entity.layerId, [...(byLayer.get(entity.layerId) ?? []), entity]));
+  if (byLayer.size <= 1 && Object.keys(layers).length <= 1) {
+    return ungrouped.length === 0 ? [] : [{ id: 'all', name: 'All objects', color: undefined, members: [...ungrouped] }];
+  }
+  const ids = [...layerOrder.filter((id) => byLayer.has(id)), ...[...byLayer.keys()].filter((id) => !layerOrder.includes(id))];
+  return ids.map((id) => ({ id, name: layers[id]?.name ?? id, color: layers[id]?.color, members: byLayer.get(id) ?? [] }));
+}
+
+function CollectionNode({
+  collection,
+  open,
+  selection,
+  onToggle,
+}: {
+  collection: Collection;
+  open: boolean;
+  selection: ReadonlySet<string>;
+  onToggle: () => void;
+}): React.ReactElement {
+  const onSelect = useRowSelect();
+  const hiddenEntityIds = useViewportStore((s) => s.hiddenEntityIds);
+  const toggleEntityVisibility = useViewportStore((s) => s.toggleEntityVisibility);
+  const memberIds = collection.members.map((member) => member.id);
+  const allHidden = memberIds.length > 0 && memberIds.every((id) => hiddenEntityIds.has(id));
+  const allSelected = memberIds.length > 0 && memberIds.every((id) => selection.has(id));
+  const { name } = collection;
+
+  return (
+    <>
+      <li
+        className={classNames(
+          'panel__row object-row object-group-row',
+          allSelected && 'panel__row--selected',
+          allHidden && 'object-row--hidden',
+        )}
+        data-testid={`object-collection-${collection.id}`}
+      >
+        <IconButton
+          icon={open ? 'chevronDown' : 'chevronRight'}
+          size={12}
+          pressed={open}
+          label={open ? `Collapse ${name}` : `Expand ${name}`}
+          onClick={onToggle}
+        />
+        <button
+          type="button"
+          className="object-row__main"
+          aria-label={`Select all in ${name}`}
+          title={`${name} — select its ${memberIds.length} objects`}
+          onClick={(event) => onSelect(event, memberIds)}
+        >
+          {collection.color !== undefined && <span className="object-swatch" style={{ background: collection.color }} aria-hidden="true" />}
+          <span className="object-row__name">{name}</span>
+          <span className="panel__row-meta">{memberIds.length}</span>
+        </button>
+        <IconButton
+          icon={allHidden ? 'eyeOff' : 'eye'}
+          size={13}
+          className={classNames('object-visibility-btn', allHidden && 'object-visibility-btn--hidden')}
+          pressed={!allHidden}
+          label={allHidden ? `Show ${name}` : `Hide ${name}`}
+          onClick={() => memberIds.filter((id) => hiddenEntityIds.has(id) === allHidden).forEach(toggleEntityVisibility)}
+        />
+      </li>
+      {open && collection.members.map((member) => <EntityRow key={member.id} entity={member} selected={selection.has(member.id)} nested />)}
     </>
   );
 }
@@ -180,11 +268,14 @@ export function ObjectsPanel({ className }: { className?: string }): React.React
   const entities = useStore((s) => s.document.entities);
   const order = useStore((s) => s.document.order);
   const groups = useStore((s) => s.document.groups);
+  const layers = useStore((s) => s.document.layers);
+  const layerOrder = useStore((s) => s.document.layerOrder);
   const hiddenCount = useViewportStore((s) => s.hiddenEntityIds.size);
   const showAllEntities = useViewportStore((s) => s.showAllEntities);
   const selection = useSelectionSet();
   const [filterText, setFilterText] = useState('');
   const filter = filterText.trim().toLowerCase();
+  const [overrides, setOverrides] = useState<Record<string, CollectionOverride>>({});
 
   const tree = useMemo(() => {
     const all = orderedValues(order, entities);
@@ -204,6 +295,16 @@ export function ObjectsPanel({ className }: { className?: string }): React.React
       ungrouped: all.filter((entity) => !grouped.has(entity.id) && matchesFilter(entity, filter)),
     };
   }, [order, entities, groups, filter]);
+  const collections = useMemo(() => buildCollections(tree.ungrouped, layers, layerOrder), [tree.ungrouped, layers, layerOrder]);
+  const selectionKey = [...selection].join(',');
+
+  const isOpen = (collection: Collection): boolean => {
+    if (filter !== '') return true;
+    const hasSelected = collection.members.some((member) => selection.has(member.id));
+    const override = overrides[collection.id];
+    if (override !== undefined && (!hasSelected || override.selectionKey === selectionKey)) return override.open;
+    return hasSelected || tree.total <= AUTO_EXPAND_LIMIT;
+  };
 
   return (
     <aside className={classNames('panel objects-panel', className)} aria-label="Objects">
@@ -217,7 +318,12 @@ export function ObjectsPanel({ className }: { className?: string }): React.React
       </PanelHeader>
 
       {tree.total === 0 ? (
-        <PanelEmpty icon="cube" message="No objects yet." hint="Draw or add a solid — every object in the model is listed here." />
+        <PanelEmpty
+          icon="cube"
+          message="No objects yet."
+          hint="Draw or add a solid — every object in the model is listed here."
+          action={{ label: 'Add a box', command: 'add_box' }}
+        />
       ) : (
         <>
           <div className="objects-filter">
@@ -241,7 +347,7 @@ export function ObjectsPanel({ className }: { className?: string }): React.React
             </PanelSection>
           )}
           <PanelSection
-            title={tree.groupNodes.length > 0 ? 'Ungrouped' : 'All objects'}
+            title={tree.groupNodes.length > 0 ? 'Ungrouped' : 'Collections'}
             count={tree.ungrouped.length}
             countLabel={`${tree.ungrouped.length} objects`}
           >
@@ -249,9 +355,18 @@ export function ObjectsPanel({ className }: { className?: string }): React.React
               <PanelEmpty compact icon="search" message="No matching objects." />
             ) : (
               <ul className="panel__list" aria-label="Object list">
-                {tree.ungrouped.map((entity) => (
-                  <EntityRow key={entity.id} entity={entity} selected={selection.has(entity.id)} nested={false} />
-                ))}
+                {collections.map((collection) => {
+                  const open = isOpen(collection);
+                  return (
+                    <CollectionNode
+                      key={collection.id}
+                      collection={collection}
+                      open={open}
+                      selection={selection}
+                      onToggle={() => setOverrides((current) => ({ ...current, [collection.id]: { open: !open, selectionKey } }))}
+                    />
+                  );
+                })}
               </ul>
             )}
           </PanelSection>

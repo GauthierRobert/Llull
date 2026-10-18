@@ -3,7 +3,7 @@
 import type { Vec3 } from '@core/model/types';
 import { buildingElementOf } from '@aec/index';
 import { rotatedEntityBounds } from '@core/geometry/rotatedBounds';
-import { useStore } from '@ui/store';
+import { useStore, useViewportStore } from '@ui/store';
 import { isEntityOnLockedLayer } from '@ui/viewport/entityVisibility';
 
 /** Selected ids whose layer is not locked (a locked layer can still hold a stale selection). */
@@ -88,4 +88,20 @@ export function moveSelection(delta: Vec3, options: { joinPrevious?: boolean } =
   if (entityIds.length > 0) {
     dispatchStep('move_entities', { ids: entityIds, delta }, joinPrevious || dispatched);
   }
+}
+
+/** Blender H: hides the selection in the viewport (local filter, not a command) and clears it. */
+export function hideSelection(): void {
+  const { document, clearSelection } = useStore.getState();
+  const { selection } = document;
+  if (selection.length === 0) return;
+  useViewportStore.getState().hideEntities(selection);
+  clearSelection();
+}
+
+/** Blender Shift+H: hides everything but the selection. */
+export function isolateSelection(): void {
+  const { selection, order } = useStore.getState().document;
+  if (selection.length === 0) return;
+  useViewportStore.getState().isolateEntities(selection, order);
 }

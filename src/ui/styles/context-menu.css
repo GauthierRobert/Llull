@@ -1,0 +1,51 @@
+/* Viewport right-click menu: same surface language as the floating popovers. */
+.ctx-menu {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  min-width: 208px;
+  padding: 6px;
+  border-radius: var(--radius-float);
+  background: var(--surface-popover);
+  border: 1px solid var(--border-float);
+  box-shadow: var(--shadow-popover);
+  animation: float-in var(--dur) var(--ease);
+}
+
+.ctx-menu__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 9px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--fg-muted);
+  text-align: left;
+  transition: var(--transition-colors);
+}
+
+.ctx-menu__item:hover:not(:disabled),
+.ctx-menu__item:focus-visible {
+  background: var(--surface-2);
+  color: var(--fg);
+}
+
+.ctx-menu__item:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.ctx-menu__kbd {
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+
+.ctx-menu__separator {
+  height: 1px;
+  margin: 5px 4px;
+  background: var(--divider);
+}

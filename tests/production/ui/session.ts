@@ -41,7 +41,11 @@ export class UiSession {
     await this.page.reload();
     const showPanel = this.page.getByRole('button', { name: 'Show browser panel' });
     if (await showPanel.isVisible()) await showPanel.click();
-    await this.page.getByRole('tab', { name: 'Building' }).click();
+    if (await this.page.getByRole('tab', { name: 'Building' }).isVisible()) await this.page.getByRole('tab', { name: 'Building' }).click();
+    else {
+      await this.page.getByRole('button', { name: 'More panels' }).click();
+      await this.page.getByRole('button', { name: /^Building/ }).click();
+    }
     await expect(this.page.getByTestId('building-panel')).toBeVisible();
     this.watching = true;
   }

@@ -50,7 +50,13 @@ export function AnalysisPanel({ className }: { className?: string }): React.Reac
       <PanelHeader title="Analysis" count={list.length} countLabel={`${list.length} analyses`} />
       <PanelSection title="Cases" hint="Finite-element and thermal analyses set up in this document.">
         {list.length === 0 ? (
-          <PanelEmpty compact icon="wireframe" message="No analyses yet" hint="Ask an agent to create_analysis, or run it from the CLI." />
+          <PanelEmpty
+            compact
+            icon="wireframe"
+            message="No analyses yet"
+            hint="Set up a finite-element or thermal case."
+            action={{ label: 'New analysis', command: 'create_analysis' }}
+          />
         ) : (
           <ul className="panel__list" aria-label="Analyses">
             {list.map((item) => (
