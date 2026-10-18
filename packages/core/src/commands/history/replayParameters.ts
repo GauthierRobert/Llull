@@ -10,6 +10,12 @@ import { hashText } from '../../lib/hash';
 type ParameterTable = CadDocument['parameters'];
 
 const fingerprints = new WeakMap<ParameterTable, string>();
+const targets = new WeakMap<ParameterTable, ParameterTable>();
+
+/** The plain table behind a tracked one (a nested replay must never cache the outer step's proxy). */
+export function untrackedParameters(parameters: ParameterTable): ParameterTable {
+  return targets.get(parameters) ?? parameters;
+}
 
 /** Content hash of a parameter table (memoized per table object). */
 export function parametersFingerprint(parameters: ParameterTable): string {
@@ -41,6 +47,7 @@ export function trackParameterReads(doc: CadDocument): TrackedParameters {
     deleteProperty: (target, key) => ((read = true), Reflect.deleteProperty(target, key)),
     defineProperty: (target, key, descriptor) => ((read = true), Reflect.defineProperty(target, key, descriptor)),
   });
+  targets.set(proxy, untrackedParameters(doc.parameters));
   const tracked: CadDocument = { ...doc, parameters: proxy };
   const stashed = (result: CadDocument): boolean =>
     Object.entries(result).some(([field, value]) => field !== 'parameters' && value === proxy);

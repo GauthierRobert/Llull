@@ -36,7 +36,7 @@ export function nextStateKey(previous: string, stepId: string, commandName: stri
 
 /**
  * Capacity 1024: one replay inserts one entry per live step and reads them in order, so an LRU smaller than the history evicts exactly the
- * prefix the next replay needs (every edit misses). States share structure (spread documents), so 1024 stay in the low MBs.
+ * prefix the next replay needs (every edit misses). States share structure (spread documents): each holds its own entities record (pointers only), so memory grows with steps × entities.
  */
 export function createReplayCache(capacity = 1024): ReplayCache {
   return new LruCache(capacity);

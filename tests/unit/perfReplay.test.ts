@@ -100,6 +100,18 @@ describe('replay cache and parameters', () => {
     expect(probed?.kind === 'box' ? probed.size[0] : null).toBe(9);
   });
 
+  it('switching back to an earlier parameter table re-runs nothing (both tables stay cached)', () => {
+    const history = [...boxes(3), step(4, 'probe_read', { label: 'p' }), ...boxes(3).map((s, i) => step(5 + i, s.name, s.params))];
+    const cache = createReplayCache();
+    replay(baseDoc(history, 3), [], cache);
+    replay(baseDoc(history, 9), [], cache);
+    const back = baseDoc(history, 3);
+    const runs: string[] = [];
+    const warm = replay(back, runs, cache);
+    expect(runs).toHaveLength(0);
+    expect(warm).toEqual(cold(back));
+  });
+
   it('editing a late step re-runs only the suffix; a long history fits the cache', () => {
     const history = boxes(300);
     const cache = createReplayCache();

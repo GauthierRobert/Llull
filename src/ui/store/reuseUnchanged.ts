@@ -14,6 +14,7 @@ function deepEqual(a: unknown, b: unknown): boolean {
     const right = new Uint8Array(b.buffer, b.byteOffset, b.byteLength);
     return left.every((byte, index) => byte === right[index]);
   }
+  if (Object.getPrototypeOf(a) !== Object.getPrototypeOf(b)) return false;
   const arrayA = Array.isArray(a);
   if (arrayA !== Array.isArray(b)) return false;
   if (arrayA && Array.isArray(b)) return a.length === b.length && a.every((item, index) => deepEqual(item, b[index]));
