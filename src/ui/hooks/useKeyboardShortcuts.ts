@@ -1,13 +1,13 @@
 /**
  * Global shortcuts: Ctrl/Cmd+K palette (also from fields), +Z undo, +Y / +Shift+Z redo, +D duplicate, Delete/Backspace,
  * arrows nudge (Shift ×10, repeat while held), Escape clears selection (unless an armed 2D tool preventDefault-ed it),
- * `?` sheet, and the single-key table (shortcuts.ts). Ignored in form fields and dialogs.
+ * `?` sheet, H / Shift+H / Alt+H hide / isolate / reveal (local viewport filter), N inspector, Ctrl+B sidebar, and the single-key table (shortcuts.ts). Ignored in form fields and dialogs.
  */
 
 import { useEffect } from 'react';
 import type { Vec3 } from '@core/model/types';
-import { usePaletteStore, useStore, useToolStore } from '@ui/store';
-import { deleteSelection, duplicateSelection, moveSelection } from '@ui/actions/selectionActions';
+import { useLayoutStore, usePaletteStore, useStore, useToolStore, useViewportStore } from '@ui/store';
+import { deleteSelection, duplicateSelection, hideSelection, isolateSelection, moveSelection } from '@ui/actions/selectionActions';
 import { resolveShortcut } from './shortcuts';
 
 /** Document units (× NUDGE_LARGE_FACTOR with Shift). */
@@ -69,6 +69,12 @@ export function useKeyboardShortcuts(): void {
       } else if (modifier && key === 'd') {
         e.preventDefault();
         duplicateSelection();
+      } else if (modifier && key === 'b') {
+        e.preventDefault();
+        useLayoutStore.getState().toggleSidebar();
+      } else if (e.altKey && !modifier && (key === 'h' || e.code === 'KeyH')) {
+        e.preventDefault();
+        useViewportStore.getState().showAllEntities();
       } else if (modifier || e.altKey) {
         return;
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -77,6 +83,11 @@ export function useKeyboardShortcuts(): void {
         deleteSelection();
       } else if (e.key === 'Escape') {
         state.clearSelection();
+      } else if (key === 'h') {
+        if (e.shiftKey) isolateSelection();
+        else hideSelection();
+      } else if (key === 'n') {
+        useLayoutStore.getState().toggleInspector();
       } else if (e.key === '?') {
         tools.setShortcutsOpen(true);
       } else if (e.key in ARROW_DIRECTIONS) {

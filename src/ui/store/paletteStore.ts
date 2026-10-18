@@ -22,10 +22,14 @@ export interface PaletteResult {
 
 interface PaletteStoreState {
   open: boolean;
+  /** Command whose param form opens first; cleared on close. */
+  pendingCommand: string | null;
   /** Most recent first, ≤ RECENT_LIMIT. */
   recentIds: readonly string[];
   result: PaletteResult | null;
   setOpen(open: boolean): void;
+  /** Opens the palette straight on `name`'s param form. */
+  openCommand(name: string): void;
   showResult(result: Omit<PaletteResult, 'id'>): void;
   dismissResult(): void;
   recordRecent(id: string): void;
@@ -33,11 +37,16 @@ interface PaletteStoreState {
 
 export const usePaletteStore = create<PaletteStoreState>()((set, get) => ({
   open: false,
+  pendingCommand: null,
   recentIds: readRecent(),
   result: null,
 
   setOpen(open: boolean): void {
-    set({ open });
+    set(open ? { open } : { open, pendingCommand: null });
+  },
+
+  openCommand(name: string): void {
+    set({ open: true, pendingCommand: name });
   },
 
   showResult(result: Omit<PaletteResult, 'id'>): void {

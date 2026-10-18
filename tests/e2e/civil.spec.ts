@@ -19,7 +19,11 @@ test('survey -> terrain -> LandXML in the Civil / Site panel', async ({ page }) 
   await page.addInitScript(() => window.localStorage.clear());
   await page.goto('/');
   await page.getByRole('button', { name: 'Show browser panel' }).click();
-  await page.getByRole('tab', { name: /site/i }).click();
+  if (await page.getByRole('tab', { name: /site/i }).isVisible()) await page.getByRole('tab', { name: /site/i }).click();
+  else {
+    await page.getByRole('button', { name: 'More panels' }).click();
+    await page.getByRole('button', { name: /^Civil \/ Site/ }).click();
+  }
   await page.getByLabel('Survey unit').selectOption('m');
   await page.getByLabel('Survey points text').fill(survey());
   await page.getByRole('button', { name: 'Import points' }).click();

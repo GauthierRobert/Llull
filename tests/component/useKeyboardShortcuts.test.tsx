@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
-import { useStore, useToolStore } from '@ui/store';
+import { useLayoutStore, useStore, useToolStore, useViewportStore } from '@ui/store';
 import { createEmptyDocument } from '@core/model/types';
 import { useKeyboardShortcuts } from '@ui/hooks/useKeyboardShortcuts';
 import { execute } from '@core/commands/registry';
@@ -158,5 +158,33 @@ describe('useKeyboardShortcuts', () => {
       ['move_building_element', { elementIds: ['wall-1'], delta: [1, 0] }],
       ['move_entities', { ids: ['a'], delta: [1, 0, 0] }, { coalesce: true }],
     ]);
+  });
+  describe('visibility and layout', () => {
+    beforeEach(() => {
+      useViewportStore.setState({ hiddenEntityIds: new Set<string>() });
+      useStore.setState({ document: { ...createEmptyDocument(), order: ['a', 'b', 'c'], selection: ['a'] } });
+    });
+    it('H hides the selection and clears it', () => {
+      render(<Harness />);
+      fireEvent.keyDown(window, { key: 'h' });
+      expect([...useViewportStore.getState().hiddenEntityIds]).toEqual(['a']);
+      expect(clearSelection).toHaveBeenCalled();
+    });
+    it('Shift+H isolates, Alt+H reveals all', () => {
+      render(<Harness />);
+      fireEvent.keyDown(window, { key: 'H', shiftKey: true });
+      expect([...useViewportStore.getState().hiddenEntityIds]).toEqual(['b', 'c']);
+      fireEvent.keyDown(window, { key: 'h', altKey: true });
+      expect(useViewportStore.getState().hiddenEntityIds.size).toBe(0);
+    });
+    it('N toggles the inspector and Ctrl+B the sidebar', () => {
+      const inspector = useLayoutStore.getState().inspectorOpen;
+      const sidebar = useLayoutStore.getState().sidebarOpen;
+      render(<Harness />);
+      fireEvent.keyDown(window, { key: 'n' });
+      fireEvent.keyDown(window, { key: 'b', ctrlKey: true });
+      expect(useLayoutStore.getState().inspectorOpen).toBe(!inspector);
+      expect(useLayoutStore.getState().sidebarOpen).toBe(!sidebar);
+    });
   });
 });

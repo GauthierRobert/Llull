@@ -14,7 +14,12 @@ test('drawing sheet: create, view, download, follows the model', async ({ page }
   await expect(page.getByRole('contentinfo', { name: 'Document status' })).toContainText('Entities1');
 
   await page.getByRole('button', { name: 'Show browser panel', exact: true }).click();
-  await page.getByRole('tab', { name: /^Drawing sheets/ }).click();
+  if (await page.getByRole('tab', { name: /^Drawing sheets/ }).isVisible())
+    await page.getByRole('tab', { name: /^Drawing sheets/ }).click();
+  else {
+    await page.getByRole('button', { name: 'More panels' }).click();
+    await page.getByRole('button', { name: /^Drawing sheets/ }).click();
+  }
   const panel = page.getByRole('complementary', { name: 'Drawing sheets' });
   await panel.getByTestId('sheet-create').click();
 

@@ -11,10 +11,41 @@ import { SOLID_PRESETS } from '@ui/components/toolbar/solidPresets';
 import { DRAW_TOOLS } from '@ui/components/toolbar/drawTools';
 import { SIDEBAR_TAB_SPECS, isSidebarTabAvailable } from '@ui/components/sidebarTabs';
 import { useReviewStore } from '@ui/panels/review/reviewStore';
+import { TOOLSET_NAMES, type ToolsetName, toolsetOf } from '@mcp/toolsets';
 import { fuzzyScore } from './fuzzyMatch';
 import { humanizeName } from './paramForm';
 
-type PaletteGroup = 'Recent' | 'Create' | 'Draw' | 'View' | 'Edit' | 'Panels' | 'Commands';
+/** Registry commands are grouped by their MCP toolset, so a search result says what area it belongs to. */
+const TOOLSET_GROUPS = {
+  core: 'Model',
+  '2d': '2D drafting',
+  '3d': '3D solids',
+  measure: 'Measure',
+  parametric: 'Parametric',
+  assembly: 'Assembly',
+  materials: 'Materials',
+  'material-lab': 'Material lab',
+  analysis: 'Analysis',
+  review: 'Review',
+  manufacturing: 'Manufacturing',
+  fasteners: 'Fasteners',
+  exchange: 'Import / export',
+  building: 'Building',
+  piping: 'Piping',
+  civil: 'Civil / site',
+} as const satisfies Record<ToolsetName, string>;
+
+const OTHER_COMMANDS_GROUP = 'Other commands' as const;
+
+type PaletteGroup =
+  | 'Recent'
+  | 'Create'
+  | 'Draw'
+  | 'View'
+  | 'Edit'
+  | 'Panels'
+  | (typeof TOOLSET_GROUPS)[ToolsetName]
+  | typeof OTHER_COMMANDS_GROUP;
 
 interface PaletteItemBase {
   /** Recents key: `action:…` / `command:<name>`. */
@@ -153,13 +184,24 @@ function appActions(): PaletteAction[] {
   ];
 }
 
+function commandGroup(name: string): PaletteGroup {
+  const toolset = toolsetOf(name);
+  return toolset === undefined ? OTHER_COMMANDS_GROUP : TOOLSET_GROUPS[toolset];
+}
+
+/** Toolset order, then registry order inside a toolset (stable sort): each group is one run under one header. */
+function toolsetRank(name: string): number {
+  const toolset = toolsetOf(name);
+  return toolset === undefined ? TOOLSET_NAMES.length : TOOLSET_NAMES.indexOf(toolset);
+}
+
 /** Commands needing input get "…" (they open a form). */
 function commandItem(command: CommandDefinition<unknown>): PaletteCommand {
   const needsInput = Object.keys(command.paramsSchema.properties).length > 0;
   return {
     kind: 'command',
     id: `command:${command.name}`,
-    group: 'Commands',
+    group: commandGroup(command.name),
     label: `${humanizeName(command.name)}${needsInput ? '…' : ''}`,
     hint: command.description,
     keywords: `${command.name} ${command.annotations?.readOnly === true ? 'query inspect ' : ''}${command.description}`,
@@ -168,9 +210,10 @@ function commandItem(command: CommandDefinition<unknown>): PaletteCommand {
   };
 }
 
-/** App actions first, then registry order. */
+/** App actions first, then registry commands grouped by toolset. */
 export function allPaletteItems(): PaletteItem[] {
-  return [...appActions(), ...listCommands().map(commandItem)];
+  const commands = [...listCommands()].sort((a, b) => toolsetRank(a.name) - toolsetRank(b.name));
+  return [...appActions(), ...commands.map(commandItem)];
 }
 
 /** Empty query: recents (group 'Recent') then catalog order; else best score first, ties in catalog order. */

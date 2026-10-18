@@ -114,7 +114,12 @@ export function AssemblyPanel({ className }: { className?: string }): React.Reac
       <PanelHeader title="Assembly" />
       <PanelSection title="Components" count={componentList.length} countLabel={`${componentList.length} components`}>
         {componentList.length === 0 ? (
-          <PanelEmpty compact icon="assembly" message="No components defined." />
+          <PanelEmpty
+            compact
+            icon="assembly"
+            message="No components defined."
+            action={{ label: 'New component', command: 'create_component' }}
+          />
         ) : (
           <ul className="panel__list" aria-label="Component list" role="list">
             {componentList.map((comp) => (

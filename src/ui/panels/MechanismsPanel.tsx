@@ -26,6 +26,13 @@ const CONSTRAINT_CHIP_TONE: Record<string, ChipTone> = {
 
 const JOINT_CHIP_TONE: Record<string, ChipTone> = { revolute: 'accent', prismatic: 'agent' };
 
+const MECHANISM_ACTIONS = [
+  { label: 'Add constraint', command: 'add_constraint' },
+  { label: 'Add joint', command: 'add_joint' },
+  { label: 'Add drive', command: 'add_drive_relation' },
+  { label: 'Add rigid body', command: 'add_rigid_body' },
+] as const;
+
 const mechanismRowClass = (highlighted: boolean): string =>
   classNames('panel__row panel__row--overlay-actions mechanisms-row', highlighted && 'panel__row--selected mechanisms-row--highlighted');
 
@@ -284,6 +291,21 @@ export function MechanismsPanel({ className }: { className?: string }): React.Re
     (kind: 'constraint' | 'joint') =>
     (id: string): void =>
       setMechanismSelection(isHighlighted(kind, id) ? null : { kind, id });
+
+  const nothingDefined = !hasBodies && constraintOrder.length === 0 && jointOrder.length === 0 && driveRelationOrder.length === 0;
+  if (nothingDefined) {
+    return (
+      <aside className={classNames('panel mechanisms-panel', className)} aria-label="Mechanisms">
+        <PanelHeader title="Mechanisms" />
+        <PanelEmpty
+          icon="mechanism"
+          message="No mechanisms yet."
+          hint="Constrain parts, link them with joints, or make them physical."
+          actions={MECHANISM_ACTIONS}
+        />
+      </aside>
+    );
+  }
 
   return (
     <aside className={classNames('panel mechanisms-panel', className)} aria-label="Mechanisms">

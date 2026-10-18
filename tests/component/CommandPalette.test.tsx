@@ -194,4 +194,14 @@ describe('CommandPalette', () => {
       expect.anything(),
     );
   });
+
+  it('openCommand opens straight on the param form; Back returns to the list and closing clears it', () => {
+    render(<Harness />);
+    act(() => usePaletteStore.getState().openCommand('add_box'));
+    expect(screen.queryByRole('combobox', { name: 'Search commands' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Back to commands' }));
+    expect(screen.getByRole('combobox', { name: 'Search commands' })).toBeDefined();
+    act(() => usePaletteStore.getState().setOpen(false));
+    expect(usePaletteStore.getState().pendingCommand).toBeNull();
+  });
 });

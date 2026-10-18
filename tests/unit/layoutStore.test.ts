@@ -22,6 +22,20 @@ describe('layoutStore', () => {
     const stored: unknown = JSON.parse(localStorage.getItem('llull-layout') ?? '{}');
     expect(stored).toMatchObject({ inspectorOpen: false, sidebarTab: 'objects' });
   });
+  it('pins a tab (opening it) and unpins it, persisting the pins', () => {
+    useLayoutStore.getState().pinSidebarTab('analysis');
+    useLayoutStore.getState().pinSidebarTab('analysis');
+    expect(useLayoutStore.getState()).toMatchObject({ sidebarTab: 'analysis', sidebarOpen: true, pinnedTabs: ['analysis'] });
+    expect(JSON.parse(localStorage.getItem('llull-layout') ?? '{}')).toMatchObject({ pinnedTabs: ['analysis'] });
+    useLayoutStore.getState().unpinSidebarTab('analysis');
+    expect(useLayoutStore.getState().pinnedTabs).toEqual([]);
+  });
+  it('keeps only known tabs from stored pins', async () => {
+    localStorage.setItem('llull-layout', JSON.stringify({ pinnedTabs: ['civil', 'nope', 3] }));
+    vi.resetModules();
+    const fresh = await import('@ui/store/layoutStore');
+    expect(fresh.useLayoutStore.getState().pinnedTabs).toEqual(['civil']);
+  });
   it('toggles the sidebar', () => {
     useLayoutStore.getState().toggleSidebar();
     expect(useLayoutStore.getState().sidebarOpen).toBe(false);
@@ -39,7 +53,9 @@ describe('layoutStore — persisted layout parsing', () => {
     localStorage.setItem('llull-layout', '{not json');
     vi.resetModules();
     const again = await import('@ui/store/layoutStore');
-    expect(again.useLayoutStore.getState().inspectorOpen).toBe(false);
+    // Properties float in with a selection by default.
+    expect(again.useLayoutStore.getState().inspectorOpen).toBe(true);
+    expect(again.useLayoutStore.getState().pinnedTabs).toEqual([]);
   });
   it('restores a valid stored layout', async () => {
     localStorage.setItem('llull-layout', JSON.stringify({ sidebarTab: 'history', sidebarOpen: false, inspectorOpen: false }));

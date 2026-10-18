@@ -2,7 +2,9 @@
 
 import React, { useState } from 'react';
 import { classNames } from '@ui/classNames';
+import { getCommand } from '@core/commands/registry';
 import { type IconName, Icon } from '@ui/components/Icon';
+import { usePaletteStore } from '@ui/store';
 
 interface PanelHeaderProps {
   title: string;
@@ -30,14 +32,39 @@ interface PanelEmptyProps {
   message: string;
   hint?: string;
   compact?: boolean;
+  /** Opens the palette on the command's form; hidden when the command is not registered. */
+  action?: EmptyAction;
+  /** Several creating commands (first is primary). */
+  actions?: readonly EmptyAction[];
 }
 
-export function PanelEmpty({ icon, message, hint, compact }: PanelEmptyProps): React.ReactElement {
+interface EmptyAction {
+  label: string;
+  command: string;
+}
+
+export function PanelEmpty({ icon, message, hint, compact, action, actions }: PanelEmptyProps): React.ReactElement {
+  const openCommand = usePaletteStore((s) => s.openCommand);
+  const available = [...(action === undefined ? [] : [action]), ...(actions ?? [])].filter((a) => getCommand(a.command) !== undefined);
   return (
     <div className={`panel__empty${compact === true ? ' panel__empty--compact' : ''}`}>
       <Icon name={icon} size={20} strokeWidth={1.5} />
       <p className="panel__empty-text">{message}</p>
       {hint !== undefined && <p className="panel__empty-hint">{hint}</p>}
+      {available.length > 0 && (
+        <div className="panel__empty-actions">
+          {available.map((a, index) => (
+            <button
+              key={a.command}
+              type="button"
+              className={classNames('btn btn--sm', index === 0 ? 'btn--primary' : 'btn--ghost')}
+              onClick={() => openCommand(a.command)}
+            >
+              {a.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

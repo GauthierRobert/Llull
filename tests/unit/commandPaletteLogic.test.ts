@@ -126,8 +126,19 @@ describe('palette catalog', () => {
   const items = allPaletteItems();
   it('exposes every registry command exactly once', () => {
     const commandNames = items.flatMap((item) => (item.kind === 'command' ? [item.command.name] : []));
-    expect(commandNames).toEqual(listCommands().map((c) => c.name));
+    expect([...commandNames].sort()).toEqual(
+      listCommands()
+        .map((c) => c.name)
+        .sort(),
+    );
     expect(new Set(items.map((item) => item.id)).size).toBe(items.length);
+  });
+  it('groups commands by toolset, each group one contiguous run', () => {
+    const commands = items.filter((item) => item.kind === 'command');
+    expect(commands.find((item) => item.id === 'command:add_box')?.group).toBe('3D solids');
+    expect(commands.find((item) => item.id === 'command:measure_distance')?.group).toBe('Measure');
+    const runs = commands.map((item) => item.group).filter((group, index, all) => group !== all[index - 1]);
+    expect(new Set(runs).size).toBe(runs.length);
   });
   it('marks commands that need input with an ellipsis', () => {
     const addBox = items.find((item) => item.id === 'command:add_box');

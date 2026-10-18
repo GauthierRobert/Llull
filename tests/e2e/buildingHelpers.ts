@@ -20,7 +20,11 @@ export async function openBuilding(page: Page): Promise<void> {
   await page.goto('about:blank');
   await page.goto('/?fresh=1');
   await page.getByRole('button', { name: 'Show browser panel' }).click();
-  await page.getByRole('tab', { name: 'Building' }).click();
+  if (await page.getByRole('tab', { name: 'Building' }).isVisible()) await page.getByRole('tab', { name: 'Building' }).click();
+  else {
+    await page.getByRole('button', { name: 'More panels' }).click();
+    await page.getByRole('button', { name: /^Building/ }).click();
+  }
   await expect(page.getByTestId('building-panel')).toBeVisible();
 }
 

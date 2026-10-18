@@ -126,7 +126,8 @@ export function PhysicsSection(): React.ReactElement {
           compact
           icon="mechanism"
           message="No rigid bodies yet."
-          hint="Make parts physical with add_rigid_body, connect them with add_body_joint, drive them with add_motor (ask the AI: “make the propeller spin with real physics”)."
+          hint="Make parts physical to simulate them with real dynamics."
+          action={{ label: 'Add rigid body', command: 'add_rigid_body' }}
         />
       </PanelSection>
     );

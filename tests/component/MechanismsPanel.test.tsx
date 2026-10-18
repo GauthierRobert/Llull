@@ -1,7 +1,7 @@
 import { resetStore } from '../helpers/componentEntities';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { act, render, screen, fireEvent } from '@testing-library/react';
-import { useStore } from '@ui/store';
+import { useStore, usePaletteStore } from '@ui/store';
 import { useViewportStore } from '@ui/store';
 import { MechanismsPanel } from '@ui/panels/MechanismsPanel';
 import { localDispatch, spyDispatch } from '../helpers/storeTestHelpers';
@@ -92,17 +92,14 @@ describe('MechanismsPanel — empty state', () => {
     resetStore();
     useViewportStore.setState({ mechanismSelection: null });
   });
-  it('shows empty hints for all three sections when document is empty', () => {
+  it('shows one consolidated empty state with creation actions instead of stacked empty sections', () => {
     render(<MechanismsPanel />);
-    expect(screen.getByText('No constraints defined.')).toBeDefined();
-    expect(screen.getByText('No joints defined.')).toBeDefined();
-    expect(screen.getByText('No drive relations defined.')).toBeDefined();
-  });
-  it('shows section titles', () => {
-    render(<MechanismsPanel />);
-    expect(screen.getByText('Constraints')).toBeDefined();
-    expect(screen.getByText('Joints')).toBeDefined();
-    expect(screen.getByText('Drive Relations')).toBeDefined();
+    expect(screen.getByText('No mechanisms yet.')).toBeDefined();
+    expect(screen.queryByText('Constraints')).toBeNull();
+    expect(screen.queryByText('No joints defined.')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Add joint' }));
+    expect(usePaletteStore.getState()).toMatchObject({ open: true, pendingCommand: 'add_joint' });
+    usePaletteStore.getState().setOpen(false);
   });
 });
 

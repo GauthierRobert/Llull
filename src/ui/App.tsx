@@ -13,6 +13,7 @@ import { EmptyState } from '@ui/components/EmptyState';
 import { TopBar } from '@ui/components/TopBar';
 import { Sidebar } from '@ui/components/Sidebar';
 import { Toolbar } from '@ui/components/toolbar/Toolbar';
+import { ViewportContextMenu } from '@ui/components/ViewportContextMenu';
 import { HintBar } from '@ui/components/HintBar';
 import { ShortcutsDialog } from '@ui/components/ShortcutsDialog';
 import { CommandPalette } from '@ui/components/commandPalette/CommandPalette';
@@ -67,10 +68,11 @@ export function App(): React.ReactElement {
         <LiveActivityFeed />
         <HintBar />
         <PaletteResultToast />
+        <ViewportContextMenu />
       </main>
 
       <TopBar />
-      {sidebarOpen && <Sidebar />}
+      <Sidebar />
       {showInspector && <PropertiesPanel className="inspector" />}
       <Toolbar />
       <StatusBar />

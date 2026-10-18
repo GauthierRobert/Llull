@@ -2,6 +2,7 @@
 // params (or destructive) opens its generated form, others run at once; the result is toasted via `onResult`.
 
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { getCommand } from '@core/commands/registry';
 import type { CommandDefinition } from '@core/commands/types';
 import { usePaletteStore, useStore } from '@ui/store';
 import { Icon } from '@ui/components/Icon';
@@ -99,7 +100,10 @@ function OpenPalette(): React.ReactElement {
   const recordRecent = usePaletteStore((s) => s.recordRecent);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
-  const [formCommand, setFormCommand] = useState<CommandDefinition<unknown> | null>(null);
+  const [formCommand, setFormCommand] = useState<CommandDefinition<unknown> | null>(() => {
+    const pending = usePaletteStore.getState().pendingCommand;
+    return pending === null ? null : (getCommand(pending) ?? null);
+  });
   const inputRef = useRef<HTMLInputElement | null>(null);
   const listId = useId();
 

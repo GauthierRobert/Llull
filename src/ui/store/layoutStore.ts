@@ -1,4 +1,4 @@
-// Persisted layout UI state: open sidebar tab, dock expansion. In the narrow drawer layout (shell.css) both docks start
+// Persisted layout UI state: open sidebar tab, pinned rail tabs, dock expansion. In the narrow drawer layout (shell.css) both docks start
 // closed without touching the stored desktop preference until the user toggles one.
 
 import { create } from 'zustand';
@@ -38,9 +38,12 @@ interface PersistedLayout {
   sidebarTab: SidebarTab;
   sidebarOpen: boolean;
   inspectorOpen: boolean;
+  /** Domain tabs the user keeps on the rail even while the document does not use them. */
+  pinnedTabs: readonly SidebarTab[];
 }
 
-const DEFAULT_LAYOUT: PersistedLayout = { sidebarTab: 'objects', sidebarOpen: false, inspectorOpen: false };
+// Properties float in with a selection by default (Figma/Blender N panel); the browser panel starts as a rail.
+const DEFAULT_LAYOUT: PersistedLayout = { sidebarTab: 'objects', sidebarOpen: false, inspectorOpen: true, pinnedTabs: [] };
 
 function isSidebarTab(value: unknown): value is SidebarTab {
   return SIDEBAR_TABS.some((tab) => tab === value);
@@ -55,6 +58,7 @@ function readStoredLayout(): PersistedLayout {
     sidebarTab: isSidebarTab(stored.sidebarTab) ? stored.sidebarTab : DEFAULT_LAYOUT.sidebarTab,
     sidebarOpen: booleanOr(stored.sidebarOpen, DEFAULT_LAYOUT.sidebarOpen),
     inspectorOpen: booleanOr(stored.inspectorOpen, DEFAULT_LAYOUT.inspectorOpen),
+    pinnedTabs: Array.isArray(stored.pinnedTabs) ? stored.pinnedTabs.filter(isSidebarTab) : DEFAULT_LAYOUT.pinnedTabs,
   };
 }
 
@@ -63,6 +67,9 @@ interface LayoutStoreState extends PersistedLayout {
   selectSidebarTab(tab: SidebarTab): void;
   toggleSidebar(): void;
   toggleInspector(): void;
+  /** Opens the tab and keeps it on the rail. */
+  pinSidebarTab(tab: SidebarTab): void;
+  unpinSidebarTab(tab: SidebarTab): void;
 }
 
 export const useLayoutStore = create<LayoutStoreState>()((set, get) => {
@@ -88,6 +95,15 @@ export const useLayoutStore = create<LayoutStoreState>()((set, get) => {
 
     toggleInspector(): void {
       commit({ inspectorOpen: !get().inspectorOpen });
+    },
+
+    pinSidebarTab(tab: SidebarTab): void {
+      const { pinnedTabs } = get();
+      commit({ sidebarTab: tab, sidebarOpen: true, pinnedTabs: pinnedTabs.includes(tab) ? pinnedTabs : [...pinnedTabs, tab] });
+    },
+
+    unpinSidebarTab(tab: SidebarTab): void {
+      commit({ pinnedTabs: get().pinnedTabs.filter((pinned) => pinned !== tab) });
     },
   };
 });
