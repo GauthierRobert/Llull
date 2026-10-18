@@ -5,7 +5,8 @@ import { derivedEntityIds } from '@core/plugins/host';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { GeometryKernel } from '@core/geometry/kernel';
 import type { CommandResult } from '@core/commands/types';
-import { RULE, apply, data, expectRefusal, ok } from './helpers';
+import { RULE } from './helpers';
+import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 import { type Op, type SolidOptions, ctxWith, sheetProfile, syntheticSolid } from './syntheticSolid';
 
 const T = 1.6;

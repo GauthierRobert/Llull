@@ -1,0 +1,15 @@
+{
+  "id": "SC-AER-01",
+  "validates": ["VC-AER-01"],
+  "description": "Standard atmosphere at 10 km and 50 km geometric against the PDAS USSA76 table",
+  "actions": [
+    { "command": "standard_atmosphere", "params": { "altitude": 10, "altitudeUnit": "km" } },
+    { "command": "standard_atmosphere", "params": { "altitude": 50000 } }
+  ],
+  "expected": [
+    { "step": 0, "path": "densityKgM3", "value": 0.41351, "rel": 0.0001, "source": "PDAS table (data/us1976_pdas_table.json)" },
+    { "step": 0, "path": "temperatureK", "value": 223.25, "abs": 0.006, "source": "PDAS" },
+    { "step": 1, "path": "pressurePa", "value": 79.779, "rel": 0.0001, "source": "PDAS" },
+    { "step": 1, "path": "speedOfSoundMS", "value": 329.8, "rel": 0.0001, "source": "PDAS" }
+  ]
+}

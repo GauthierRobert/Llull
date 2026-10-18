@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import type { BeadForm, FlangedHoleForm, SheetMetalPart } from '@core/model/sheetMetal';
 import { developedHoleRadius, lipGeometry, lipVolume } from '@aero/sheetmetal/formGeometry';
-import { apply, data, expectRefusal, meshBounds, meshVolume, ok } from './helpers';
+import { meshBounds, meshVolume } from './helpers';
+import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 import { beadVolumeChange, integrate, plate } from './plates';
 
 interface FlatData {

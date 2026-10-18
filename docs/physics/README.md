@@ -68,7 +68,9 @@ session). Each pack will pin A-grade values and mark the rest `TBD`.
 ### Not in this list
 
 - **CFD, aerodynamics, aeroelasticity / flutter, fluid-structure interaction.** These are a separate product
-  line (fluid solvers), not material behaviour. Revisit after PHY-09.
+  line (fluid solvers), not material behaviour. Engineering-level aerodynamics and compressible flow / rocket
+  propulsion now live in the aerospace packs [10 AER](../aerospace/10-aerodynamics/FUNCTIONAL_SPEC.md) and
+  [11 FLD](../aerospace/11-fluid-dynamics-propulsion/FUNCTIONAL_SPEC.md); CFD hand-off and aeroelasticity remain open.
 - **Computing A / B-basis allowables from raw test data.** That is a CMH-17 / MMPDS statistical process; it
   goes to a later 08 MAT V3 item, not here.
 - **Cure simulation, resin flow** (06 out of scope), **atomistic or micromechanical material design.**

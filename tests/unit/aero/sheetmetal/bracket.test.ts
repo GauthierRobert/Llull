@@ -5,7 +5,8 @@ import { recipeKey, recipeOf } from '@core/geometry/shapeRecipe';
 import { createEmptyDocument } from '@core/model/types';
 import type { SheetMetalPart } from '@core/model/sheetMetal';
 import expectedParts from '../../../../docs/aerospace/07-sheet-metal-machined-features/validation/data/expected_test_parts.json';
-import { RULE, apply, bracket, data, expectRefusal, folded, meshBounds, meshVolume, ok } from './helpers';
+import { RULE, bracket, folded, meshBounds, meshVolume } from './helpers';
+import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 
 const bracketParts = expectedParts.parts['ftr_bracket_L.step'];
 

@@ -3,7 +3,8 @@ import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { SheetMetalModel, SheetMetalPart } from '@core/model/sheetMetal';
 import type { FtrCheckData } from '@core/model/manufacturing';
-import { RULE, apply, bracket, data, expectRefusal, meshBounds, ok } from './helpers';
+import { RULE, bracket, meshBounds } from './helpers';
+import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 import { ctxWith, sheetProfile, syntheticSolid, type Op, type SolidOptions } from './syntheticSolid';
 
 function withModel(doc: CadDocument, edit: (model: SheetMetalModel) => SheetMetalModel): CadDocument {

@@ -1,0 +1,50 @@
+{
+  "id": "SC-FLD-02",
+  "validates": ["VC-FLD-10", "VC-FLD-13", "VC-FLD-20", "VC-FLD-30"],
+  "description": "SSME-like LOX/LH2 thrust chamber: performance with the NASA CEA chamber state (206.4 bar, MR 6, eps 69), the RS-25 published vacuum Isp bound, a 80 % bell nozzle wall (theta n 33 / theta e 7 deg at eps ~70, Newlands extract) in mm sized for the RS-25 throat, the wall volume, and the stage delta-v of an illustrative 100 t stage",
+  "actions": [
+    {
+      "command": "nozzle_performance",
+      "params": {
+        "chamberPressure": 206.4,
+        "pressureUnit": "bar",
+        "chamberTemperatureK": 3598.55,
+        "gamma": 1.1475,
+        "molarMass": 13.614,
+        "expansionRatio": 69,
+        "altitudeM": 0,
+        "thrustN": 2278824,
+        "thrustAt": "vacuum"
+      }
+    },
+    {
+      "command": "design_nozzle",
+      "params": {
+        "throatRadius": 130,
+        "expansionRatio": 69,
+        "contractionRatio": 3,
+        "entranceAngleDeg": 33,
+        "exitAngleDeg": 7,
+        "wallThickness": 8
+      },
+      "as": "nozzle"
+    },
+    { "command": "mass_properties", "params": { "entityId": "$nozzle" } },
+    { "command": "rocket_delta_v", "params": { "ispS": 452.3, "initialMassKg": 100000, "propellantMassKg": 85000, "thrustN": 2278824 } }
+  ],
+  "expected": [
+    { "step": 0, "path": "cStarMS", "value": 2322.77, "rel": 0.005, "source": "NASA CEA via cea 3.3.4 (data/nasa_cea_reference.json)" },
+    { "step": 0, "path": "ispS.vacuum", "value": 462.85, "rel": 0.03, "source": "NASA CEA shifting equilibrium Isp vac" },
+    {
+      "step": 0,
+      "path": "ispS.vacuum",
+      "value": 452.3,
+      "min": 452.3,
+      "maxRel": 0.06,
+      "source": "RS-25 published vacuum Isp (ideal >= real)"
+    },
+    { "step": 1, "path": "expansionRatioCheck", "value": 69, "rel": 1e-9, "source": "(R_e/R_t)^2" },
+    { "step": 3, "path": "deltaVMS", "value": 8414.766366, "rel": 1e-9, "source": "Tsiolkovsky" }
+  ],
+  "notes": "2278824 N = 512300 lbf x 4.4482216 N/lbf (RS-25 109 % vacuum thrust, L3Harris)."
+}

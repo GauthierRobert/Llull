@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import type { CadDocument, Entity } from '@core/model/types';
 import type { SheetMetalPart } from '@core/model/sheetMetal';
-import { type BuiltPart, RULE, apply, bracket, data, expectRefusal, meshVolume, ok } from './helpers';
+import { type BuiltPart, RULE, bracket, meshVolume } from './helpers';
+import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 
 interface FlatData {
   area: number;

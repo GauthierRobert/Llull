@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument } from '@core/model/types';
 import expected from '../../../../docs/aerospace/07-sheet-metal-machined-features/validation/data/expected_flat_pattern.json';
-import { apply, data, expectRefusal, ok } from './helpers';
+import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 
 interface CalcData {
   mode: string;

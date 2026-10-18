@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import type { FtrCheckData } from '@core/model/manufacturing';
 import type { SheetMetalPart } from '@core/model/sheetMetal';
-import { apply, data, expectRefusal, meshBounds, meshVolume, ok } from './helpers';
+import { meshBounds, meshVolume } from './helpers';
+import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 import { plate } from './plates';
 
 interface FlatData {

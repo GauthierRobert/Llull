@@ -20,6 +20,8 @@ export const TOOLSET_NAMES = [
   'review',
   'manufacturing',
   'fasteners',
+  'aerodynamics',
+  'fluids',
   'exchange',
   'building',
   'piping',
@@ -81,6 +83,14 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   /** Contributed by the installed fasteners plugin. */
   get fasteners(): readonly string[] {
     return pluginToolNames('fasteners');
+  },
+  /** Contributed by the installed aerodynamics plugin (atmosphere, airfoils, wings, drag, cycling). */
+  get aerodynamics(): readonly string[] {
+    return pluginToolNames('aerodynamics');
+  },
+  /** Contributed by the installed fluids plugin (compressible flow, rocket nozzles). */
+  get fluids(): readonly string[] {
+    return pluginToolNames('fluids');
   },
   /** Contributed by the installed building + industrial plugins. */
   get building(): readonly string[] {

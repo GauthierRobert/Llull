@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
 import type { FtrCheckData, FtrFinding } from '@core/model/manufacturing';
-import { apply, data, expectRefusal, ok, ruleParams } from './helpers';
+import { ruleParams } from './helpers';
+import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 
 const ROW = {
   material: 'TEST-ALLOY',

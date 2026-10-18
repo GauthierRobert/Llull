@@ -1,0 +1,85 @@
+{
+  "pack": "11 FLD",
+  "generatedBy": "hand-written index; every value lives in the data files or plans named here",
+  "cases": [
+    {
+      "id": "VC-FLD-01..05",
+      "command": "compressible_flow",
+      "reference": "data/compressible_naca1135.json (13 cases)",
+      "tolerance": "5e-4 rel, 0.01 deg",
+      "test": "tests/unit/aero/fluids/compressible.test.ts"
+    },
+    {
+      "id": "VC-FLD-10",
+      "command": "nozzle_performance",
+      "reference": "data/nasa_cea_reference.json cases[0]",
+      "tolerance": "c* 0.5 %, Tt 1.5 %, Isp 3 % vs equilibrium",
+      "test": "tests/unit/aero/fluids/nozzle.test.ts"
+    },
+    {
+      "id": "VC-FLD-11",
+      "command": "nozzle_performance",
+      "reference": "data/nasa_cea_reference.json cases[1]",
+      "tolerance": "same",
+      "test": "nozzle.test.ts"
+    },
+    {
+      "id": "VC-FLD-12",
+      "command": "nozzle_performance",
+      "reference": "data/nasa_cea_reference.json rp1311_example8",
+      "tolerance": "same",
+      "test": "nozzle.test.ts"
+    },
+    {
+      "id": "VC-FLD-13",
+      "command": "nozzle_performance",
+      "reference": "data/engines_published.json RS-25",
+      "tolerance": "ideal/real - 1 in [0, 0.06]; separation warning",
+      "test": "nozzle.test.ts"
+    },
+    {
+      "id": "VC-FLD-14",
+      "command": "nozzle_performance",
+      "expected": { "cfVacMinusCfSeaLevel": 0.206 },
+      "reference": "NASA SP-125 A-1 (1.768 - 1.562)",
+      "tolerance": "1e-3",
+      "test": "nozzle.test.ts"
+    },
+    {
+      "id": "VC-FLD-15",
+      "command": "nozzle_performance",
+      "expected": "F = C_F pc At; mdot = F/(Isp g0); De = Dt sqrt(eps)",
+      "test": "nozzle.test.ts"
+    },
+    {
+      "id": "VC-FLD-20",
+      "command": "design_nozzle",
+      "expected": { "eps25_exitRadiusOverThroat": 5, "lengthFraction": 0.8, "thetaN_deg": 30.05, "thetaE_deg": 8.78 },
+      "reference": "data/nozzle_contour_references.json",
+      "tolerance": "1e-9 geometry; 0.2 deg / 0.05 deg",
+      "test": "tests/unit/aero/fluids/designNozzle.test.ts"
+    },
+    {
+      "id": "VC-FLD-21",
+      "command": "nozzle_performance",
+      "expected": { "lambda15deg": 0.98296 },
+      "tolerance": "1e-5",
+      "test": "nozzle.test.ts"
+    },
+    {
+      "id": "VC-FLD-22",
+      "command": "design_nozzle + mass_properties",
+      "expected": "volume = Pappus of the wall section",
+      "tolerance": "0.2 %",
+      "test": "designNozzle.test.ts"
+    },
+    {
+      "id": "VC-FLD-30",
+      "command": "rocket_delta_v",
+      "expected": { "isp450_m0_1000_mp800_dv": 7102.437 },
+      "tolerance": "1e-6 rel (closed form 450 g0 ln 5)",
+      "test": "designNozzle.test.ts"
+    }
+  ],
+  "scenarios": "plans/sc-fld-0*.json (tests/unit/aero/scenarioPlans.test.ts)"
+}

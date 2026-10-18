@@ -34,6 +34,13 @@ in [`AGENT_FIRST.md`](AGENT_FIRST.md) and override any UI-first wording in the p
 | 07 | Manufacturing features (aerospace sheet metal, holes, threads, pockets, feature recognition) | FTR | [spec](07-sheet-metal-machined-features/FUNCTIONAL_SPEC.md) | [spec](07-sheet-metal-machined-features/TECHNICAL_SPEC.md) | [pack](07-sheet-metal-machined-features/validation/README.md) |
 | 08 | Aerospace materials (allowables, basis) & standard parts (NAS / MS / AN / EN fasteners) | MAT | [spec](08-materials-standards-libraries/FUNCTIONAL_SPEC.md) | [spec](08-materials-standards-libraries/TECHNICAL_SPEC.md) | [pack](08-materials-standards-libraries/validation/README.md) |
 | 09 | Configuration management, revisions, effectivity, FAI, traceability, export control | PLM | [spec](09-plm-configuration-traceability/FUNCTIONAL_SPEC.md) | [spec](09-plm-configuration-traceability/TECHNICAL_SPEC.md) | [pack](09-plm-configuration-traceability/validation/README.md) |
+| 10 | Aerodynamics: standard atmosphere, airfoils (panel / thin airfoil), wings (lifting line), drag and frontal area, cycling power | AER | [spec](10-aerodynamics/FUNCTIONAL_SPEC.md) | [spec](10-aerodynamics/TECHNICAL_SPEC.md) | [pack](10-aerodynamics/validation/README.md) |
+| 11 | Fluid dynamics and rocket propulsion: compressible flow (NACA 1135), ideal nozzle performance, nozzle contour solid, rocket equation | FLD | [spec](11-fluid-dynamics-propulsion/FUNCTIONAL_SPEC.md) | [spec](11-fluid-dynamics-propulsion/TECHNICAL_SPEC.md) | [pack](11-fluid-dynamics-propulsion/validation/README.md) |
+
+Packs 10 AER and 11 FLD (added 2026-10-18) are built at MVP level with their specs: plugins `aerodynamics` and `fluids` in
+`packages/domain-aero`, every validation case automated against published or NASA reference-code data (see each pack's
+`validation/sources.md`). They depend on nothing above; 02 SRF lofts and 05 FEA are their natural follow-ups (wing geometry,
+nozzle thermal / stress).
 
 ## Dependencies and recommended order
 

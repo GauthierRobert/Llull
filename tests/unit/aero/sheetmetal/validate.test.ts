@@ -3,7 +3,8 @@ import { deserializeDocument, serializeDocument } from '@core/commands/persisten
 import type { Entity } from '@core/model/types';
 import { sheetMetalErrors } from '@aero/sheetmetal/validate';
 import { sheetMetalDocument } from '@aero/sheetmetal/derive';
-import { RULE, apply, bracket } from './helpers';
+import { RULE, bracket } from './helpers';
+import { apply } from '../../../helpers/commandAssertions';
 
 type Json = Record<string, unknown>;
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyDocument, type CadDocument } from '@core/model/types';
-import { RULE, apply, data, expectRefusal, meshBounds, meshVolume, ok, ruleParams } from './helpers';
+import { RULE, meshBounds, meshVolume, ruleParams } from './helpers';
+import { apply, data, expectRefusal, ok } from '../../../helpers/commandAssertions';
 
 interface FlatData {
   extents: [number, number];

@@ -1,0 +1,72 @@
+{
+  "id": "VC-FLD-10..12",
+  "title": "NASA CEA reference runs (reference-code outputs, not measurements)",
+  "code": "NASA CEA via the official NASA Python package cea 3.3.4 (PyPI, Apache-2.0, NASA Glenn; re-implementation of Gordon & McBride NASA RP-1311), validated here against the CEA2 Fortran 2004 output of RP-1311 Example 8 shipped as NASA_CEA_Fortran/cea2.out in the rocketcea 1.2.3 sdist",
+  "settings": "rocket, infinite-area combustor, products from thermo.lib; H2(L) 20.27 K, O2(L) 90.17 K, RP-1 298.15 K; 'frozen' = composition frozen at the throat",
+  "rp1311_example8": {
+    "case": "H2(L)/O2(L), O/F 5.55157, Pc 53.3172 bar, equilibrium",
+    "cea2Fortran2004": {
+      "chamberTemperatureK": 3383.84,
+      "throatTemperatureK": 3185.67,
+      "molarMassChamber": 12.716,
+      "molarMassThroat": 12.843,
+      "gammaChamber": 1.1447,
+      "gammaThroat": 1.1468,
+      "cStarMS": 2332.3,
+      "eps25": { "cf": 1.7684, "ivacMS": 4348.5, "ispMS": 4124.4 },
+      "eps50": { "cf": 1.8476, "ivacMS": 4487.3, "ispMS": 4309.1 }
+    },
+    "grade": "A (two codes agree)"
+  },
+  "cases": [
+    {
+      "id": "VC-FLD-10",
+      "name": "LOX/LH2 SSME-like",
+      "propellants": "O2(L)/H2(L)",
+      "chamberPressureBar": 206.4,
+      "mixtureRatio": 6.0,
+      "expansionRatio": 69,
+      "chamber": { "temperatureK": 3598.55, "molarMass": 13.614, "gamma": 1.1475 },
+      "throat": { "temperatureK": 3381.51, "pressureBar": 118.598, "molarMass": 13.74, "gamma": 1.1487 },
+      "cStarMS": 2322.77,
+      "frozen": {
+        "exitMach": 4.774,
+        "exitPressureBar": 0.1889,
+        "exitTemperatureK": 1036.27,
+        "exitGamma": 1.2782,
+        "cfVac": 1.9033,
+        "ispVacS": 450.8,
+        "ispSeaLevelS": 370.57
+      },
+      "equilibrium": { "exitMach": 4.582, "cfVac": 1.9542, "ispVacS": 462.85, "ispSeaLevelS": 382.62 }
+    },
+    {
+      "id": "VC-FLD-11",
+      "name": "LOX/RP-1 F-1-like",
+      "propellants": "O2(L)/RP-1",
+      "chamberPressureBar": 70.0,
+      "mixtureRatio": 2.27,
+      "expansionRatio": 16,
+      "chamber": { "temperatureK": 3558.34, "molarMass": 22.186, "gamma": 1.1507 },
+      "throat": { "temperatureK": 3345.63, "pressureBar": 40.176, "molarMass": 22.437, "gamma": 1.152 },
+      "cStarMS": 1807.53,
+      "frozen": {
+        "exitMach": 3.713,
+        "exitPressureBar": 0.4207,
+        "exitTemperatureK": 1413.55,
+        "exitGamma": 1.2572,
+        "cfVac": 1.7633,
+        "ispVacS": 325.0,
+        "ispSeaLevelS": 282.31
+      },
+      "equilibrium": { "exitMach": 3.548, "cfVac": 1.8144, "ispVacS": 334.42, "ispSeaLevelS": 291.73 }
+    }
+  ],
+  "acceptance": {
+    "inputs": "llull nozzle_performance is given the CEA chamber temperature, chamber gamma and chamber molar mass (one constant gamma for the whole expansion)",
+    "cStarRel": 0.005,
+    "throatTemperatureRel": 0.015,
+    "ispVsEquilibriumRel": 0.03,
+    "note": "c* depends only on the chamber state and matches to 0.02 %. A constant low (chamber) gamma reproduces CEA's shifting-equilibrium Isp to about +1.3..+2.7 %; CEA's frozen-at-throat Isp is 4-6 % lower because the frozen gamma rises from 1.15 to 1.26-1.28 along the nozzle, which a one-gamma model cannot represent. Frozen values are kept for reference, not as a gate."
+  }
+}

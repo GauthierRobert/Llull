@@ -2,3 +2,5 @@
 
 export { sheetMetalPlugin } from './sheetmetal/plugin';
 export { fastenersPlugin } from './fasteners/plugin';
+export { aerodynamicsPlugin } from './aerodynamics/plugin';
+export { fluidsPlugin } from './fluids/plugin';
