@@ -1,5 +1,6 @@
 // One render branch per Shape2DKind for both views (shapes sit on their work plane, at elevation in 3D); others: nothing.
 
+import { memo } from 'react';
 import type { Entity, Shape2DKind } from '@core/model/types';
 import { LineRenderer } from './entities/LineRenderer';
 import { PolylineRenderer } from './entities/PolylineRenderer';
@@ -27,9 +28,16 @@ const RENDERERS: { [K in Shape2DKind]: RenderBranch<Extract<Entity, { kind: K }>
   image: ImageUnderlayRenderer,
 };
 
-export function Shape2DRenderer({ entity, selected }: { entity: Entity; selected: boolean }): React.ReactElement | null {
+/** Memoized: Entities2D re-lists every shape on a selection change, only the toggled one should re-render. */
+export const Shape2DRenderer = memo(function Shape2DRenderer({
+  entity,
+  selected,
+}: {
+  entity: Entity;
+  selected: boolean;
+}): React.ReactElement | null {
   if (!(entity.kind in RENDERERS)) return null;
   // The map is keyed by kind, so the branch picked always matches the entity's narrowed type.
   const Renderer = RENDERERS[entity.kind as Shape2DKind] as RenderBranch<Entity>;
   return <Renderer entity={entity} selected={selected} />;
-}
+});

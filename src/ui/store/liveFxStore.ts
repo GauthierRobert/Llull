@@ -43,6 +43,21 @@ export function hasActiveLiveFx(state: Pick<LiveFxState, 'transitions' | 'ghosts
   return state.transitions.size > 0 || state.ghosts.length > 0 || state.ripples.length > 0 || state.badges.length > 0;
 }
 
+/** A finished transition is pixel-identical to none: while others still run, finished ones are dropped in bursts. */
+const PRUNE_BURST_MS = 150;
+
+/** Pure: every transition finished, or the oldest finished one has waited a full burst (one regroup per burst, not per entity). */
+export function shouldPruneTransitions(transitions: ReadonlyMap<EntityId, EntityTransition>, nowMs: number): boolean {
+  let oldestFinishedAt = Infinity;
+  let running = false;
+  for (const transition of transitions.values()) {
+    const endMs = transition.startMs + transition.durationMs;
+    if (endMs > nowMs) running = true;
+    else oldestFinishedAt = Math.min(oldestFinishedAt, endMs);
+  }
+  return oldestFinishedAt !== Infinity && (!running || nowMs - oldestFinishedAt >= PRUNE_BURST_MS);
+}
+
 export const useLiveFxStore = create<LiveFxState>()((set, get) => ({
   enabled: !prefersReducedMotion(),
   transitions: EMPTY_TRANSITIONS,
@@ -82,10 +97,12 @@ export const useLiveFxStore = create<LiveFxState>()((set, get) => ({
     const state = get();
     const patch: Partial<LiveFxState> = {};
     let transitions: Map<EntityId, EntityTransition> | null = null;
-    for (const [id, transition] of state.transitions) {
-      if (transition.startMs + transition.durationMs > nowMs) continue;
-      transitions ??= new Map(state.transitions);
-      transitions.delete(id);
+    if (shouldPruneTransitions(state.transitions, nowMs)) {
+      for (const [id, transition] of state.transitions) {
+        if (transition.startMs + transition.durationMs > nowMs) continue;
+        transitions ??= new Map(state.transitions);
+        transitions.delete(id);
+      }
     }
     if (transitions !== null) patch.transitions = transitions;
     const ghosts = state.ghosts.filter((ghost) => ghost.startMs + ghost.durationMs > nowMs);

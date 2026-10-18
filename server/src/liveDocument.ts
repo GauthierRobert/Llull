@@ -99,11 +99,24 @@ const MAX_SSE_BACKLOG_BYTES = 8 * 1024 * 1024;
 /** One named SSE event; false when the connection is dead or too slow. */
 function writeSseEvent(res: Response, eventType: string, payload: unknown): boolean {
   try {
+    return writeSseFrame(res, sseFrame(eventType, payload));
+  } catch {
+    return false;
+  }
+}
+
+function sseFrame(eventType: string, payload: unknown): string {
+  return `event: ${eventType}\ndata: ${JSON.stringify(payload)}\n\n`;
+}
+
+/** Write an already-serialized frame (one `JSON.stringify` shared by every subscriber). */
+function writeSseFrame(res: Response, frame: string): boolean {
+  try {
     if (res.writableLength > MAX_SSE_BACKLOG_BYTES) {
       res.destroy();
       return false;
     }
-    res.write(`event: ${eventType}\ndata: ${JSON.stringify(payload)}\n\n`);
+    res.write(frame);
     return true;
   } catch {
     return false;
@@ -111,7 +124,15 @@ function writeSseEvent(res: Response, eventType: string, payload: unknown): bool
 }
 
 function broadcast(eventType: 'snapshot' | 'command', payload: unknown): void {
-  for (const res of _subscribers) if (!writeSseEvent(res, eventType, payload)) _subscribers.delete(res);
+  if (_subscribers.size === 0) return;
+  let frame: string;
+  try {
+    frame = sseFrame(eventType, payload);
+  } catch {
+    _subscribers.clear();
+    return;
+  }
+  for (const res of _subscribers) if (!writeSseFrame(res, frame)) _subscribers.delete(res);
 }
 
 interface LiveCommand {
@@ -128,10 +149,11 @@ export function setLiveDoc(next: CadDocument, command?: LiveCommand): void {
   _seq += 1;
   if (AUTOSAVE_ENABLED) autosaver.schedule(next);
   if (command === undefined) {
+    if (_subscribers.size === 0) return;
     broadcast('snapshot', getLiveSnapshot());
     return;
   }
-  if (_subscribers.size === 0) return; // stateHash is a full serialization; nobody to verify it
+  if (_subscribers.size === 0) return; // nobody to verify the stateHash
   const event: LiveCommandEvent = {
     epoch: _epoch,
     seq: _seq,

@@ -31,7 +31,9 @@ answer it (add the test, or state why none is needed / why the snapshot diff is 
 | `tests/e2e/`, `server/tests/` | Playwright (`npm run test:e2e`); server + CLI (`npm --prefix server test`) |
 | `desktop/tests/` | desktop app without Electron: real backend, File ops, CLI `--app` (`npm --prefix desktop test`) |
 
-`tests/setup.ts` installs default plugins. Ids are deterministic per document; never assert on
+`tests/unit` + `tests/golden` run in node with one shared module graph per worker (vitest project `node`); a suite that
+mocks modules, stubs globals, uses the DOM or registers test commands goes in `tests/isolatedSuites.ts` (contract-tested).
+`tests/setup.ts` installs default plugins and resets the injected kernel/physics/library per file. Ids are deterministic per document; never assert on
 `Date.now()`. Assert observed behavior (entities, `affected`, `summary`), not internals.
 
 ## W4 — Definition of done

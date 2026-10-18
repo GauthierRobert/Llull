@@ -20,6 +20,11 @@ interface ReplayState {
   readonly inert: boolean;
   /** Why the step leading to this state failed (threw, was rejected, or reported a failed plan); absent when it succeeded. */
   readonly failure?: string;
+  /**
+   * Present only when the step's `run` read `doc.parameters`: the fingerprint of the table it ran against (the entry is served only for the
+   * same table). Absent ⇒ parameter-independent: served for any table, which the replay restores onto the state.
+   */
+  readonly parameterFingerprint?: string;
 }
 
 export type ReplayCache = LruCache<ReplayState>;
@@ -29,6 +34,10 @@ export function nextStateKey(previous: string, stepId: string, commandName: stri
   return hashText(`${previous}|${stepId}|${commandName}|${JSON.stringify(resolvedParams) ?? ''}`);
 }
 
-export function createReplayCache(capacity = 256): ReplayCache {
+/**
+ * Capacity 1024: one replay inserts one entry per live step and reads them in order, so an LRU smaller than the history evicts exactly the
+ * prefix the next replay needs (every edit misses). States share structure (spread documents): each holds its own entities record (pointers only), so memory grows with steps × entities.
+ */
+export function createReplayCache(capacity = 1024): ReplayCache {
   return new LruCache(capacity);
 }

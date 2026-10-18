@@ -1,11 +1,10 @@
 // Raw cursor → snapped world point against the live, visible document (pure snapping/ helpers, no mutation).
 
-import { useCallback, useMemo } from 'react';
-import type { Entity, Vec2 } from '@core/model/types';
+import { useMemo } from 'react';
+import type { Vec2 } from '@core/model/types';
 import { useStore, useViewportStore } from '@ui/store';
-import { isEntityVisible } from '../entityVisibility';
 import { snap, applyOrthoPolar } from './snapping/resolveSnap';
-import { collectSnapCandidates } from './snapping/candidates';
+import { sharedSnapCandidates } from './snapping/sharedCandidates';
 import { useSectionCutDepth } from './sectionCut';
 import { adaptiveGridStep, pixelsToWorld } from './gridHelpers';
 import type { SnapResult, OrthoPolarOpts } from './snapping/types';
@@ -27,26 +26,17 @@ export function useZoomSnap(cursor: Vec2 | null, zoom: number, drawOrigin: Vec2 
   const layers = useStore((s) => s.document.layers);
   const hiddenLayerIds = useViewportStore((s) => s.hiddenLayerIds);
   const hiddenEntityIds = useViewportStore((s) => s.hiddenEntityIds);
-  const isVisible = useCallback(
-    (entity: Entity): boolean => isEntityVisible(entity, layers, hiddenLayerIds, hiddenEntityIds),
-    [layers, hiddenLayerIds, hiddenEntityIds],
-  );
 
   const adjustedCursor = useMemo(
     (): Vec2 | null => (cursor === null ? null : ortho && drawOrigin !== null ? applyOrthoPolar(drawOrigin, cursor, ORTHO_ONLY) : cursor),
     [cursor, ortho, drawOrigin],
   );
 
-  // Cursor-independent (extension/nearest off), so the O(segments²) intersection pass runs per document/origin, not per mousemove.
+  // Cursor-independent (extension/nearest off): computed once per document/origin and shared across hooks (selection-only changes hit the cache).
   const candidates = useMemo(
     () =>
-      collectSnapCandidates(
-        { entities, order, components },
-        { extensions: false, nearest: false, isVisible, cutDepth },
-        drawOrigin ?? null,
-        null,
-      ),
-    [entities, order, components, drawOrigin, isVisible, cutDepth],
+      sharedSnapCandidates({ document: { entities, order, components, layers }, hiddenLayerIds, hiddenEntityIds, drawOrigin, cutDepth }),
+    [entities, order, components, layers, hiddenLayerIds, hiddenEntityIds, drawOrigin, cutDepth],
   );
 
   return adjustedCursor === null ? null : snap(adjustedCursor, candidates, adaptiveGridStep(zoom), pixelsToWorld(SNAP_TOLERANCE_PX, zoom));

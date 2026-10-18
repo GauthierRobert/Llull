@@ -3,6 +3,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { useStore } from '@ui/store';
+import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
 import { runSimulation } from '@ui/services/simulationRun';
 import { execute } from '@core/commands/registry';
 import type { SimulationData } from '@core/dynamics/simulationReport';
@@ -68,7 +69,7 @@ function ResultTable({ result }: { result: SimulationData }): React.ReactElement
 }
 
 export function PhysicsSection(): React.ReactElement {
-  const document = useStore((s) => s.document);
+  const document = useDocumentWithoutSelection();
   const dynamics = document.dynamics;
   const result = useDynamicsPlaybackStore((s) => s.result);
   const setResult = useDynamicsPlaybackStore((s) => s.setResult);

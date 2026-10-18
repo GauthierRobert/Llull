@@ -9,7 +9,7 @@ import { useStableList } from '../useStableByKey';
 import { BatchedLines2D } from './BatchedLines2D';
 import { Shape2DRenderer } from './Shape2DRenderer';
 import { SolidsTechnicalView2D } from './SolidsTechnicalView2D';
-import { useLiveFxStore } from '@ui/store/liveFxStore';
+import { useTransitioningIds } from '@ui/store/transitioningIds';
 import { LiveTransitionGroup } from '../liveFx/LiveTransitionGroup';
 import { type GhostRenderer, LiveFxLayer } from '../liveFx/LiveFxLayer';
 
@@ -26,7 +26,7 @@ export function Entities2D(): React.ReactElement {
   const hiddenEntityIds = useViewportStore((s) => s.hiddenEntityIds);
 
   const selectedIds = useMemo(() => new Set<EntityId>(selection), [selection]);
-  const transitions = useLiveFxStore((s) => s.transitions);
+  const transitions = useTransitioningIds();
 
   const visible = useMemo(
     () =>

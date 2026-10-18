@@ -11,7 +11,7 @@
 import type { AnalysisModel } from '@core/model/analysis';
 import type { CadDocument } from '@core/model/types';
 import { execute } from '@core/commands/registry';
-import { serializeDocument } from '@core/commands/persistence/serialization';
+import { withoutPrivateValues } from '@core/commands/materials/libraryRecords';
 import { hashText } from '@lib/hash';
 
 /** Who sent a broadcast command: the REST API (browser, scripts), an MCP agent, or the `llull` CLI. */
@@ -56,12 +56,79 @@ interface PartHash {
 /** Per-object hashes: commands share unchanged entities / steps between documents (L3 purity). */
 const hashByPart = new WeakMap<object, PartHash>();
 
+/** Hash of one `ShapeRecipe` node, by identity: results share their operands' recipe objects, so a boolean chain costs O(1) per link. */
+const hashByRecipeNode = new WeakMap<object, string>();
+
+const RECIPE_CHILD_MARK = '\u0000recipe:';
+
+function isRecipeNode(value: unknown): value is object {
+  return typeof value === 'object' && value !== null && typeof (value as { op?: unknown }).op === 'string';
+}
+
+/** JSON replacer: a nested recipe node stands for its own hash (always memoized by `hashRecipes` first), known or not. */
+function recipeChildReplacer(this: unknown, key: string, value: unknown): unknown {
+  if (key === '' || !isRecipeNode(value)) return value;
+  return RECIPE_CHILD_MARK + (hashByRecipeNode.get(value) ?? '');
+}
+
+/** Recipe nodes directly below `root` (not inside another node), found without recursion. */
+function childRecipeNodes(root: object, rootIsNode: boolean): object[] {
+  const found: object[] = [];
+  const pending: unknown[] = [root];
+  while (pending.length > 0) {
+    const value = pending.pop();
+    if (typeof value !== 'object' || value === null) continue;
+    if (isRecipeNode(value) && !(rootIsNode && value === root)) {
+      found.push(value);
+      continue;
+    }
+    for (const child of Object.values(value)) pending.push(child);
+  }
+  return found;
+}
+
+/** Memoize the hash of every recipe node under `root`, children first, with an explicit stack (chains can be thousands deep). */
+function hashRecipes(root: object): void {
+  const order: object[] = [];
+  const seen = new Set<object>();
+  const pending = childRecipeNodes(root, false);
+  while (pending.length > 0) {
+    const node = pending.pop();
+    if (node === undefined || seen.has(node) || hashByRecipeNode.has(node)) continue;
+    seen.add(node);
+    order.push(node);
+    pending.push(...childRecipeNodes(node, true));
+  }
+  for (let i = order.length - 1; i >= 0; i--) {
+    const node = order[i];
+    if (node !== undefined) hashByRecipeNode.set(node, hashText(JSON.stringify(node, recipeChildReplacer)));
+  }
+}
+
 function partHash(part: object, key: string): PartHash {
   const known = hashByPart.get(part);
   if (known !== undefined) return known;
-  const hex = hashText(JSON.stringify([key, part]));
+  hashRecipes(part);
+  const hex = hashText(JSON.stringify([key, part], recipeChildReplacer));
   const hash = { high: Number.parseInt(hex.slice(0, 8), 16), low: Number.parseInt(hex.slice(8), 16) };
   hashByPart.set(part, hash);
+  return hash;
+}
+
+/**
+ * Hash of one top-level document field (`blobs`, `analysis`, `drawings`, ...), memoized by the field value's identity: pure commands keep
+ * untouched fields' identity, so a multi-MB `blobs` record is serialized once, not per command. Content-based, so a re-parsed copy agrees.
+ */
+const hashByField = new Map<string, WeakMap<object, string>>();
+
+function fieldHash(key: string, value: unknown, serialize?: (value: unknown) => unknown): string {
+  if (typeof value !== 'object' || value === null) return hashText(JSON.stringify([key, value]));
+  let memo = hashByField.get(key);
+  if (memo === undefined) hashByField.set(key, (memo = new WeakMap()));
+  const known = memo.get(value);
+  if (known !== undefined) return known;
+  const hash = hashText(JSON.stringify([key, serialize === undefined ? value : serialize(value)]));
+  memo.set(value, hash);
   return hash;
 }
 
@@ -115,17 +182,34 @@ function withoutVerifiedFlags(analysis: AnalysisModel): AnalysisModel {
   };
 }
 
+/** Per-field serializers for fields that normalise or are large; blobs fold per-blob hashes so adding one never re-reads the others. */
+const SERIALIZE_FIELD: Record<string, (value: unknown) => unknown> = {
+  analysis: (value) => withoutVerifiedFlags(value as AnalysisModel),
+  blobs: (value) =>
+    Object.fromEntries(Object.entries(value as Record<string, object>).map(([sha, blob]) => [sha, fieldHash('blob', blob)])),
+};
+
+/** Top-level fields hashed per entity / step (or excluded) instead of as plain fields. */
+const PER_PART_FIELDS: ReadonlySet<string> = new Set(['entities', 'featureHistory', 'selection']);
+
 /**
  * Hash of everything clients must agree on (selection excluded); memoized per (immutable) document.
- * Entities and feature steps are hashed once per object and combined, so a command costs the size
- * of what it changed plus a pass over the id lists, not a serialization of the whole document.
+ * Entities, feature steps and every other top-level field are hashed once per object and combined, so a command costs the size
+ * of what it changed plus a pass over the id lists and field names, not a serialization of the whole document.
  */
 export function documentHash(doc: CadDocument): string {
   const known = hashByDocument.get(doc);
   if (known !== undefined) return known;
-  const normalised = doc.analysis === undefined ? doc : { ...doc, analysis: withoutVerifiedFlags(doc.analysis) };
-  const rest = hashText(serializeDocument({ ...normalised, selection: [], entities: {}, featureHistory: [] }, { includeDerived: true }));
-  const fold = new PartFold(rest);
+  const shared = withoutPrivateValues(doc);
+  const fields = new PartFold(hashText('llull-document-state'));
+  for (const key of Object.keys(shared).sort()) {
+    if (PER_PART_FIELDS.has(key)) continue;
+    const value = (shared as unknown as Record<string, unknown>)[key];
+    if (value === undefined) continue;
+    const hex = fieldHash(key, key === 'analysis' ? doc.analysis : value, SERIALIZE_FIELD[key]);
+    fields.add({ high: Number.parseInt(hex.slice(0, 8), 16), low: Number.parseInt(hex.slice(8), 16) });
+  }
+  const fold = new PartFold(fields.hex());
   for (const id in doc.entities) {
     const entity = doc.entities[id];
     if (entity !== undefined) fold.add(partHash(entity, id));

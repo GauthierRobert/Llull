@@ -70,10 +70,19 @@ interface InstanceBatchMeshProps {
   onSelect: (id: EntityId, additive: boolean) => void;
 }
 
+/** Buffer size that survives small count changes (the InstancedMesh is rebuilt only on growth or a big shrink). */
+function useBatchCapacity(count: number): number {
+  const capacity = useRef(0);
+  if (count > capacity.current || count * 4 < capacity.current)
+    capacity.current = Math.max(8, 2 ** Math.ceil(Math.log2(Math.max(count, 1))));
+  return capacity.current;
+}
+
 /** Colors go through `instanceColor`; `vertexColors` stays off (primitives carry no color attribute → black). */
 function InstanceBatchMesh({ batch, selectionSet, displayMode, onSelect }: InstanceBatchMeshProps): React.ReactElement | null {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const count = batch.entities.length;
+  const capacity = useBatchCapacity(count);
 
   // Batches are rebuilt every grouping pass; batch.key is the content identity.
   const geometryBatch = useStableByKey(batch, batch.key);
@@ -89,7 +98,7 @@ function InstanceBatchMesh({ batch, selectionSet, displayMode, onSelect }: Insta
   useEffect(() => {
     const mesh = meshRef.current;
     if (mesh) writeBatchInstances(mesh, batch, selectionSet);
-  }, [batch, selectionSet, geometry, material, count]);
+  }, [batch, selectionSet, geometry, material, capacity]);
 
   // InstancedMesh has no per-instance opacity: in x-ray, any selected entity raises the whole batch's opacity.
   useEffect(() => {
@@ -108,7 +117,7 @@ function InstanceBatchMesh({ batch, selectionSet, displayMode, onSelect }: Insta
     if (entityId) onSelect(entityId, isAdditiveSelect(e.nativeEvent));
   }
 
-  return <instancedMesh ref={meshRef} args={[geometry, material, count]} onClick={handleClick} castShadow receiveShadow />;
+  return <instancedMesh ref={meshRef} args={[geometry, material, capacity]} count={count} onClick={handleClick} castShadow receiveShadow />;
 }
 
 interface InstancedRendererProps {

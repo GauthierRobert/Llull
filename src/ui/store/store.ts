@@ -11,6 +11,7 @@ import { isLocalMode, refuseDuringSync, runLocally, stepLocalHistory } from './l
 import { postDispatch, postHistoryStep } from './onlineMode';
 import type { CadStoreState, DispatchOptions, LiveStatus } from './storeTypes';
 import { type LiveCommandEvent, type LiveSnapshotEvent, applyLiveCommand } from '@mcp/liveSync';
+import { reuseUnchanged } from './reuseUnchanged';
 import { toggledInList } from '@ui/toggleMember';
 
 export const useStore = create<CadStoreState>()((set, get) => {
@@ -93,11 +94,12 @@ export const useStore = create<CadStoreState>()((set, get) => {
       }
       const { liveEpoch, liveSeq } = get();
       if (snapshot.epoch === liveEpoch && snapshot.seq < liveSeq) return; // stale resync response
+      const adopted = reuseUnchanged(get().liveBase, snapshot.document);
       set({
-        liveBase: snapshot.document,
+        liveBase: adopted,
         liveSeq: snapshot.seq,
         liveEpoch: snapshot.epoch,
-        document: withLocalSelection(snapshot.document, get().document.selection),
+        document: withLocalSelection(reuseUnchanged(get().document, adopted), get().document.selection),
         localUndoStack: [],
         localRedoStack: [],
       });

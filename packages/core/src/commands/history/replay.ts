@@ -14,6 +14,7 @@ import { nextStateKey } from './replayCache';
 import { hashText } from '../../lib/hash';
 import { remapIds } from './regenerate';
 import { resolveStepForReplay, runReplayStep } from './replayStep';
+import { parametersFingerprint, trackParameterReads, untrackedParameters } from './replayParameters';
 
 /** One successfully replayed step, reported to `replayHistory`'s optional `onStep` observer. */
 export interface ReplayStepEvent {
@@ -119,7 +120,7 @@ export function replayHistory(
     camera: base.camera,
     units: base.units,
     displayPrecision: base.displayPrecision,
-    parameters: base.parameters,
+    parameters: untrackedParameters(base.parameters),
     animations: base.animations,
     groups: base.groups,
     layers: base.layers,
@@ -144,8 +145,10 @@ export function replayHistory(
   // States are keyed by everything that determines them, so an unchanged prefix of an
   // edited history (or of a parameter change) is served from the cache instead of re-run.
   // Whether an artifact store is injected decides how artifact-recording steps replay (verified or flagged), so it is part of every key.
+  // The parameter table is NOT part of the initial key: a step depends on it only through its resolved params (already in its key) or, when
+  // its `run` reads the table, through a fingerprint recorded on its cache entry and folded into every later key.
   let stateKey = cache
-    ? hashText(`${context.feaArtifacts ? 'artifacts' : 'no-artifacts'}|${JSON.stringify({ ...doc, featureHistory: [] })}`)
+    ? hashText(`${context.feaArtifacts ? 'artifacts' : 'no-artifacts'}|${JSON.stringify({ ...doc, parameters: {}, featureHistory: [] })}`)
     : '';
   for (const step of history) {
     if (step.suppressed) continue;
@@ -154,30 +157,49 @@ export function replayHistory(
     const remapped = resolveStepForReplay(step, doc, idMap, resolveWarnings, 'step');
     const before = doc;
     let key = cache ? nextStateKey(stateKey, step.id, step.name, remapped) : '';
-    const hit = cache?.get(key);
+    const inputFingerprint = cache ? parametersFingerprint(doc.parameters) : '';
+    // A parameter-dependent state is also stored per input table, so switching tables (configurations) back and forth keeps both cached.
+    const variantKey = cache ? nextStateKey(key, 'parameters-in', inputFingerprint, null) : '';
+    const latest = cache?.get(key);
+    const hit =
+      latest?.parameterFingerprint !== undefined && latest.parameterFingerprint !== inputFingerprint ? cache?.get(variantKey) : latest;
+    let parameterFingerprint: string | undefined;
     let inert: boolean;
     let failure: string | null;
-    if (hit !== undefined) {
-      doc = { ...hit.doc, featureHistory: history };
+    if (hit !== undefined && (hit.parameterFingerprint === undefined || hit.parameterFingerprint === inputFingerprint)) {
+      doc = { ...hit.doc, ...(hit.parameterFingerprint === undefined ? { parameters: doc.parameters } : {}), featureHistory: history };
       idMap = new Map(hit.idMap);
       inert = hit.inert;
       failure = hit.failure ?? null;
+      parameterFingerprint = hit.parameterFingerprint;
     } else {
       const uidBefore = doc.building?.uid;
-      const result = runReplayStep(cmd, step, doc, remapped, idMap, context, true);
+      const tracking = cache ? trackParameterReads(doc) : null;
+      const runDoc = tracking?.doc ?? doc;
+      const result = runReplayStep(cmd, step, runDoc, remapped, idMap, context, true);
       // Accept the new geometry but keep OUR featureHistory intact.
-      inert = result === null || result.document === doc;
+      inert = result === null || result.document === runDoc;
       failure = failureOf(result);
-      if (result) doc = { ...result.document, featureHistory: history };
+      if (tracking && cache) parameterFingerprint = tracking.wasRead(result ? result.document : doc) ? inputFingerprint : undefined;
+      if (result) doc = { ...(tracking ? tracking.restore(result.document) : result.document), featureHistory: history };
       const mintedUid = uidBefore === undefined ? doc.building?.uid : undefined;
-      if (mintedUid === undefined) cache?.set(key, { doc, idMap: new Map(idMap), inert, ...(failure !== null ? { failure } : {}) });
-      else if (cache) {
+      if (mintedUid === undefined) {
+        const state = {
+          doc,
+          idMap: new Map(idMap),
+          inert,
+          ...(failure !== null ? { failure } : {}),
+          ...(parameterFingerprint !== undefined ? { parameterFingerprint } : {}),
+        };
+        cache?.set(key, state);
+        if (parameterFingerprint !== undefined) cache?.set(variantKey, state);
+      } else if (cache) {
         // The step minted a globally unique id (uniqueId): never memoize it, and key every later
         // state by that id so no other document is served this document's identity.
         key = nextStateKey(key, 'minted-uid', mintedUid, null);
       }
     }
-    stateKey = key;
+    stateKey = parameterFingerprint !== undefined ? nextStateKey(key, 'parameters', parameterFingerprint, null) : key;
     onStep?.({ step, rawParams: remapIds(step.params, idMap), params: remapped, before, after: doc, inert, failure });
   }
   return doc;
