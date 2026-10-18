@@ -16,12 +16,13 @@ describe('ghosted solids (a painted FEA result stands in for the part)', () => {
     expect(result.current.opacity).toBe(1);
   });
 
-  it('the ghost store keeps one shared empty set when cleared', () => {
-    act(() => useGhostStore.getState().setGhosted(new Set(['box-1.1'])));
-    expect(useGhostStore.getState().ghostedIds.has('box-1.1')).toBe(true);
-    const before = useGhostStore.getState().ghostedIds;
-    act(() => useGhostStore.getState().setGhosted(new Set()));
+  it('ghosts the union of every source and clears per source', () => {
+    act(() => useGhostStore.getState().setGhosted('analysis', new Set(['box-1.1'])));
+    act(() => useGhostStore.getState().setGhosted('structural', new Set(['wall-1'])));
+    expect([...useGhostStore.getState().ghostedIds].sort()).toEqual(['box-1.1', 'wall-1']);
+    act(() => useGhostStore.getState().setGhosted('analysis', new Set()));
+    expect([...useGhostStore.getState().ghostedIds]).toEqual(['wall-1']);
+    act(() => useGhostStore.getState().setGhosted('structural', new Set()));
     expect(useGhostStore.getState().ghostedIds.size).toBe(0);
-    expect(useGhostStore.getState().ghostedIds).not.toBe(before);
   });
 });

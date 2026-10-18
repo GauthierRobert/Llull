@@ -114,6 +114,9 @@ describe('Civil', () => {
     fireEvent.click(screen.getByTestId('civil-focus-pointGroup-1'));
     expect(focus()?.key).toBe('civil:pointGroup:pointGroup-1');
     expect(focus()?.label).toContain('Topo');
+    // one beacon per survey point, labelled with its number and elevation
+    expect(focus()?.markers).toHaveLength(4);
+    expect(focus()?.markers[0]?.label).toBe('1 · 10 m');
   });
 });
 

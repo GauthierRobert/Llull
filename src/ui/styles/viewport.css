@@ -859,3 +859,19 @@ button.lens-pill:hover .lens-pill__label {
 .focus-label {
   font-weight: 600;
 }
+
+.focus-banner__zoom {
+  flex: 0 0 auto;
+  padding: 1px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-xs);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.focus-banner__zoom:hover {
+  background: var(--dock-hover);
+}

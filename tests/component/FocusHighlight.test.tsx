@@ -110,3 +110,26 @@ describe('PanelParts glance helpers', () => {
     expect(screen.getByTestId('chip').className).toContain('panel__status--bad');
   });
 });
+
+describe('Zoom to the highlight', () => {
+  it('frames the entities and beacons of the focus together', async () => {
+    const { focusBounds } = await import('@ui/viewport/3d/zoomToFocus');
+    resetStore();
+    const boxId = localDispatch('add_box', { size: [2, 2, 2], position: [10, 0, 1] }).affected[0]!;
+    const bounds = focusBounds(useStore.getState().document, { entityIds: [boxId], markers: [{ position: [-5, 0, 0] }] });
+    expect(bounds?.min[0]).toBe(-5);
+    expect(bounds?.max[0]).toBe(11);
+    expect(focusBounds(useStore.getState().document, { entityIds: ['nope'], markers: [] })).toBeNull();
+  });
+
+  it('the banner offers Zoom to only where a camera can frame it', () => {
+    let zoomed = 0;
+    const { unmount } = render(<FocusBanner onZoom={() => (zoomed += 1)} />);
+    act(() => useFocusStore.getState().setFocus(focusOf([])));
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom to' }));
+    expect(zoomed).toBe(1);
+    unmount();
+    render(<FocusBanner />);
+    expect(screen.queryByRole('button', { name: 'Zoom to' })).toBeNull();
+  });
+});

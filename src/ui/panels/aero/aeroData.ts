@@ -35,22 +35,6 @@ export function formatQuantity(value: number): string {
   return String(Number(value.toPrecision(3)));
 }
 
-const PREFIXES: readonly (readonly [number, string])[] = [
-  [1e6, 'M'],
-  [1e3, 'k'],
-  [1, ''],
-  [1e-3, 'm'],
-  [1e-6, 'µ'],
-];
-
-/** `value` in SI `unit` (N, W, Pa) with the engineering prefix that keeps 1-999 in front: 5.67e-4 N → "567 µN". */
-export function formatSi(value: number, unit: string): string {
-  if (value === 0) return `0 ${unit}`;
-  const magnitude = Math.abs(value);
-  const [factor, prefix] = PREFIXES.find(([scale]) => magnitude >= scale) ?? PREFIXES[PREFIXES.length - 1] ?? [1, ''];
-  return `${formatQuantity(value / factor)} ${prefix}${unit}`;
-}
-
 /** An area given in m², shown in mm² / cm² / m² so the number stays readable: 4e-6 m² → "4 mm²". */
 export function formatArea(areaM2: number): string {
   const magnitude = Math.abs(areaM2);

@@ -11,7 +11,8 @@ import { boundsExtent } from '@core/geometry/bounds';
 import { useAeroViewStore, type AeroAirfoilView, type AeroBodyView } from '@ui/store/aeroViewStore';
 import { useDisposable } from '../../useDisposable';
 import { ProjectedLabel } from '../ProjectedLabel';
-import { formatArea, formatSi } from '@ui/panels/aero/aeroData';
+import { formatArea } from '@ui/panels/aero/aeroData';
+import { formatSi } from '@ui/siText';
 import { AERO_COLORS, cpColor, dragArrowTip, flowFrame, silhouetteLoop, windArrows } from './aeroGeometry';
 
 const UP = new THREE.Vector3(0, 1, 0);

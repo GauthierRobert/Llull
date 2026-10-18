@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { boundsCenter, entityBoundsInDoc, type Bounds } from '@core/geometry/bounds';
 import type { Vec3 } from '@core/model/types';
 import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
+import { useGhostStore } from '@ui/store/ghostStore';
 import { useStructuralOverlayStore, type UtilisationMark } from '@ui/store/structuralOverlayStore';
 import { utilisationColor } from '@ui/panels/building/utilisationColor';
 import { useDisposable } from '../../useDisposable';
@@ -49,6 +50,19 @@ export function StructuralOverlay(): React.ReactElement | null {
   const marks = useStructuralOverlayStore((s) => s.marks);
   const invalidate = useThree((state) => state.invalidate);
   useEffect(() => invalidate(), [shown, marks, document, invalidate]);
+  // See through the envelope (cladding, slabs, everything not checked) so the coloured members read at a glance.
+  const building = document.building;
+  useEffect(() => {
+    const { setGhosted } = useGhostStore.getState();
+    if (!shown || marks.length === 0 || building === undefined) {
+      setGhosted('structural', new Set());
+      return;
+    }
+    const checked = new Set(marks.flatMap((mark) => mark.entityIds));
+    const others = Object.values(building.elements).flatMap((element) => element.entityIds.filter((id) => !checked.has(id)));
+    setGhosted('structural', new Set(others));
+    return () => setGhosted('structural', new Set());
+  }, [shown, marks, building]);
 
   const drawn = useMemo(
     () =>

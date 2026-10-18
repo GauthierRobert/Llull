@@ -31,6 +31,7 @@ function FindingRow({ finding, partId, index }: { finding: FtrFindingView; partI
     `finding:${finding.code}:${index}`,
     `${finding.code}${measure === null ? '' : ` · ${measure}`}`,
     FINDING_COLORS[finding.severity],
+    finding.ids,
   );
   const focused = useIsFocused(focus.key);
   return (
@@ -74,6 +75,8 @@ export function FtrFindingsSection({
 }): React.ReactElement {
   const check = useReadOnlyQuery(command, parseCheck);
   const view = check.view;
+  const fails = view?.findings.filter((finding) => finding.severity === 'fail').length ?? 0;
+  const warns = view?.findings.filter((finding) => finding.severity === 'warn').length ?? 0;
   return (
     <PanelSection title="Findings" {...(view === null ? {} : { count: view.findings.length })} testId="mfg-findings">
       <div className="mfg__actions">
@@ -92,13 +95,6 @@ export function FtrFindingsSection({
               <span aria-hidden="true">◌</span> The model changed after these checks ran. Re-run to refresh them.
             </p>
           )}
-          {view.reviewRequired && (
-            <ReviewBanner {...(view.reviewReason === undefined ? {} : { reason: view.reviewReason })} unverified={view.unverified} />
-          )}
-          <p className="mfg__figures" data-testid="ftr-overall">
-            Overall: <strong>{view.status}</strong>
-            {view.rulesSkipped.length > 0 && ` · skipped ${view.rulesSkipped.join(', ')}`}
-          </p>
           <KpiStrip
             label="Check summary"
             items={[
@@ -108,10 +104,17 @@ export function FtrFindingsSection({
                 value: view.status,
                 tone: view.status === 'fail' ? 'bad' : view.status === 'warn' ? 'warn' : 'ok',
               },
-              { key: 'fails', label: 'Failures', value: String(view.findings.filter((f) => f.severity === 'fail').length), tone: 'bad' },
-              { key: 'warns', label: 'Warnings', value: String(view.findings.filter((f) => f.severity === 'warn').length), tone: 'warn' },
+              { key: 'fails', label: 'Failures', value: String(fails), tone: fails > 0 ? 'bad' : 'ok' },
+              { key: 'warns', label: 'Warnings', value: String(warns), tone: warns > 0 ? 'warn' : 'ok' },
             ]}
           />
+          {view.reviewRequired && (
+            <ReviewBanner {...(view.reviewReason === undefined ? {} : { reason: view.reviewReason })} unverified={view.unverified} />
+          )}
+          <p className="mfg__figures" data-testid="ftr-overall">
+            Overall: <strong>{view.status}</strong>
+            {view.rulesSkipped.length > 0 && ` · not checked (no data): ${view.rulesSkipped.join(', ')}`}
+          </p>
           <ul className="findings__list" data-testid="ftr-findings-list">
             {view.findings.map((finding, index) => (
               <FindingRow key={`${finding.code}-${index}`} finding={finding} partId={partId} index={index} />

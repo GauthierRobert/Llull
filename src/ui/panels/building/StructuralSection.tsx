@@ -77,12 +77,14 @@ function OverlayToggle(): React.ReactElement {
         <input type="checkbox" checked={shown} onChange={(event) => setShown(event.target.checked)} data-testid="utilisation-shown" />
         Colour members on the model
       </label>
-      {UTILISATION_LEGEND.map(({ band, text }) => (
-        <span key={band} className="panel__row-meta">
-          <span className="panel__swatch" style={{ background: UTILISATION_COLORS[band], display: 'inline-block' }} aria-hidden="true" />{' '}
-          {text}
-        </span>
-      ))}
+      <span className="utilisation-legend">
+        {UTILISATION_LEGEND.map(({ band, text }) => (
+          <span key={band} className="panel__row-meta">
+            <span className="panel__swatch" style={{ background: UTILISATION_COLORS[band], display: 'inline-block' }} aria-hidden="true" />{' '}
+            {text}
+          </span>
+        ))}
+      </span>
     </div>
   );
 }
@@ -171,14 +173,17 @@ export function StructuralSection(): React.ReactElement {
       </div>
       {report !== null && (
         <>
-          <StatusLine text={report.summary} testId="frame-check-summary" />
+          <KpiStrip items={utilisationKpis(report.rows)} label="Structural summary" />
           {report.rows.some(isFailing) && (
             <p className="building-subhead" role="note" data-testid="frame-check-next-step">
               Some members fail: use Auto-size above to up-size them, then verify again.
             </p>
           )}
-          <KpiStrip items={utilisationKpis(report.rows)} label="Structural summary" />
           <OverlayToggle />
+          <details className="building-report">
+            <summary>Full check report</summary>
+            <StatusLine text={report.summary} testId="frame-check-summary" />
+          </details>
           <ul className="panel__list" aria-label="Utilisations">
             {report.rows.map((row) => (
               <MemberRow key={row.key} row={row} />

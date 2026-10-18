@@ -38,7 +38,8 @@ import { FocusOverlay } from '../FocusOverlay';
 import { FocusBanner } from '../FocusBanner';
 import { AnalysisOverlay } from './analysis/AnalysisOverlay';
 import { AnalysisLegend } from './analysis/AnalysisLegend';
-import { useFocusStore } from '@ui/store/focusStore';
+import { type PanelFocus, useFocusStore } from '@ui/store/focusStore';
+import { zoomToFocus } from './zoomToFocus';
 
 // Idempotent, StrictMode-safe.
 ensureBvhSetup();
@@ -143,6 +144,8 @@ function SceneContents({ orbitEnabled, gizmoMode, onDraggingChanged }: SceneCont
   );
 }
 
+const zoomToHighlight = (focus: PanelFocus): void => zoomToFocus(useStore.getState().document, focus);
+
 export function Viewport3D(): React.ReactElement {
   const clearSelection = useStore((s) => s.clearSelection);
   const gizmoMode = useToolStore((s) => s.gizmoMode);
@@ -175,7 +178,7 @@ export function Viewport3D(): React.ReactElement {
       </Canvas>
 
       <ScreenAnchorOverlay />
-      <FocusBanner />
+      <FocusBanner onZoom={zoomToHighlight} />
       <AnalysisLegend />
       <ViewOptionsToggle />
       {viewOptionsOpen && (

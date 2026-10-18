@@ -58,33 +58,6 @@ export function FastenersPanel({ className }: { className?: string }): React.Rea
               ]),
         ]}
       />
-      {families.length === 0 ? (
-        <PanelEmpty
-          icon="cube"
-          message="No fastener catalogue."
-          hint="Import a catalogue (import_fastener_catalog) to select and insert fasteners."
-          compact
-        />
-      ) : (
-        <PanelSection title="Catalogue" count={families.length} testId="fastener-families">
-          <ul className="panel__list" aria-label="Fastener families">
-            {families.map((family) => (
-              <li key={family.id} className="panel__row fastener-family" data-testid={`family-${family.id}`}>
-                <strong>{family.id}</strong>
-                <span className="panel__row-meta">
-                  {family.kind.replace('_', ' ')} · {family.standard.body} {family.standard.id} · {family.sizes.length} sizes
-                </span>
-                <span className="badge">{licenceText(family.licence)}</span>
-                <ProvenancePopover
-                  entries={[family.provenance.citation, family.provenance.locator, family.provenance.note]
-                    .filter((value): value is string => value !== undefined)
-                    .map((value) => ({ label: 'Source', value }))}
-                />
-              </li>
-            ))}
-          </ul>
-        </PanelSection>
-      )}
       <PanelSection title="Placed stacks" count={stackList.length} testId="fastener-stacks">
         {stackList.length === 0 ? (
           <p className="panel__row-meta">No fastener stacks yet.</p>
@@ -110,7 +83,7 @@ export function FastenersPanel({ className }: { className?: string }): React.Rea
                     </button>
                   }
                 >
-                  <strong>{stack.fastener.partNumber}</strong>
+                  <strong className="panel__row-main">{stack.fastener.partNumber}</strong>
                   <span className="panel__row-meta">
                     -{stack.fastener.diameterDash} · {stack.id} · {stack.layers.length} layer(s)
                   </span>
@@ -122,12 +95,7 @@ export function FastenersPanel({ className }: { className?: string }): React.Rea
             </button>
             {layout.view !== null && (
               <p className="mfg__figures" data-testid="layout-status">
-                Layout: <strong>{layout.view.status}</strong> — {layout.view.items.length} finding(s)
-                {layout.view.items.map((f) => (
-                  <span key={`${f.code}-${f.stackIds.join()}`} className="finding__badge" title={f.remediation}>
-                    {f.code}
-                  </span>
-                ))}
+                Layout: <strong>{layout.view.status}</strong> — {layout.view.items.length} finding(s); click one to see it on the model.
               </p>
             )}
             {layout.view !== null && layout.view.items.length > 0 && (
@@ -153,6 +121,33 @@ export function FastenersPanel({ className }: { className?: string }): React.Rea
         )}
       </PanelSection>
       <BomSections />
+      {families.length === 0 ? (
+        <PanelEmpty
+          icon="cube"
+          message="No fastener catalogue."
+          hint="Import a catalogue (import_fastener_catalog) to select and insert fasteners."
+          compact
+        />
+      ) : (
+        <PanelSection title="Catalogue" count={families.length} testId="fastener-families" collapsible defaultOpen={stackList.length === 0}>
+          <ul className="panel__list" aria-label="Fastener families">
+            {families.map((family) => (
+              <li key={family.id} className="panel__row fastener-family" data-testid={`family-${family.id}`}>
+                <strong>{family.id}</strong>
+                <span className="panel__row-meta">
+                  {family.kind.replace('_', ' ')} · {family.standard.body} {family.standard.id} · {family.sizes.length} sizes
+                </span>
+                <span className="badge">{licenceText(family.licence)}</span>
+                <ProvenancePopover
+                  entries={[family.provenance.citation, family.provenance.locator, family.provenance.note]
+                    .filter((value): value is string => value !== undefined)
+                    .map((value) => ({ label: 'Source', value }))}
+                />
+              </li>
+            ))}
+          </ul>
+        </PanelSection>
+      )}
       {inserting && <InsertFastenerDialog onClose={() => setInserting(false)} />}
     </aside>
   );

@@ -43,8 +43,8 @@ export function ResultSurface({ surface, partIds }: { surface: SurfaceView; part
   const partsKey = partIds.join('|');
   useEffect(() => {
     const { setGhosted } = useGhostStore.getState();
-    setGhosted(new Set(partsKey.split('|').filter((id) => id !== '')));
-    return () => setGhosted(new Set());
+    setGhosted('analysis', new Set(partsKey.split('|').filter((id) => id !== '')));
+    return () => setGhosted('analysis', new Set());
   }, [partsKey]);
   const bands = surface.levels.length - 1;
   const geometry = useDisposable(() => surfaceGeometry(surface), [surface]);
