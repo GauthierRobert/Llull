@@ -266,7 +266,7 @@ describe('export_step_exact assembly', () => {
     expect(mixUses[0]?.part.shapes).toHaveLength(1);
   });
 
-  it('bakes an instance that scales by a negative factor and a component that instances itself', () => {
+  it('bakes an instance that scales by a negative factor', () => {
     const doc = rodsAndPlate(2, { scale: [-1, 1, 1] });
     step(
       doc,

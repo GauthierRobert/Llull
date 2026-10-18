@@ -35,10 +35,16 @@ describe('occt export_step_exact nested scaled assembly', () => {
       doc = run(doc, 'insert_instance', { componentId: 'comp-big', position, rotation }).document;
     doc = run(doc, 'insert_instance', { componentId: 'comp-rod', scale: [2, 1, 3], position: [0, 100, 0] }).document;
 
+    // a nested part under a scaled parent: Pair holds an unscaled Rod at +30 in x, used at scale 2 (the nested placement must become +60)
+    const holder = run(doc, 'insert_instance', { componentId: 'comp-rod', position: [30, 0, 0] });
+    const pair = run(holder.document, 'create_component', { name: 'Pair', entityIds: holder.affected, componentId: 'comp-pair' });
+    doc = run(pair.document, 'insert_instance', { componentId: 'comp-pair', scale: [2, 2, 2], position: [0, -100, 0] }).document;
+
     const exported = run(doc, 'export_step_exact', {});
     const data = exported.data as { step: string; entityIds: string[]; assembly: { products: number; occurrences: number } };
-    // products: Rod, Big, Rod x2 (shared by every Big), Rod 2x1x3 (baked); occurrences: Rod, 3 x Big, the skewed Rod
-    expect(data.assembly).toEqual({ products: 4, occurrences: 5 });
+    // products: Rod, Big, Rod x2 (shared by every Big and by Pair x2), Rod 2x1x3 (baked), Pair, Pair x2
+    // occurrences: Rod, 3 x Big, the skewed Rod, Pair, Pair x2
+    expect(data.assembly).toEqual({ products: 6, occurrences: 7 });
     expect(data.entityIds.some((id) => id.startsWith('expanded::'))).toBe(false);
     expect(new Set(data.entityIds).size).toBe(data.entityIds.length);
     expect(data.entityIds).toEqual(doc.order.filter((id) => doc.entities[id]?.kind === 'instance'));
@@ -46,7 +52,7 @@ describe('occt export_step_exact nested scaled assembly', () => {
     const imported = run(createEmptyDocument(), 'import_step_exact', { text: data.step });
     const props = (d: CadDocument, id: string): { volume: number; centroid: Vec3 } =>
       run(d, 'mass_properties', { entityId: id }).data as { volume: number; centroid: Vec3 };
-    expect(imported.affected).toHaveLength(5);
+    expect(imported.affected).toHaveLength(7);
     const volumes = imported.affected.map((id) => props(imported.document, id).volume).sort((a, b) => a - b);
     const expected = doc.order.map((id) => props(doc, id).volume).sort((a, b) => a - b);
     volumes.forEach((volume, index) => expect(Math.abs(volume - expected[index]!) / expected[index]!).toBeLessThan(1e-6));
