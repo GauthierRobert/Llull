@@ -197,18 +197,99 @@ describe('export_step_exact assembly', () => {
       expect(text).toContain(`NEXT_ASSEMBLY_USAGE_OCCURRENCE('${name}'`);
   });
 
-  it('bakes a component whose nested instance is scaled, and one that instances itself', () => {
+  it('shares one scaled part across the uniformly scaled instances of a component, placing each by location', () => {
+    const result = step(
+      rodsAndPlate(4, { scale: [2, 2, 2] }),
+      assemblyKernel(() => 'TEXT'),
+    );
+    const [unit, second, third, fourth, plate] = captured.occurrences;
+    expect(second?.part).toBe(third?.part);
+    expect(third?.part).toBe(fourth?.part);
+    expect(second?.part).not.toBe(unit?.part);
+    expect(plate?.part).not.toBe(second?.part);
+    expect(third?.position).toEqual([40, 0, 0]);
+    expect(result.data).toMatchObject({ assembly: { products: 3, occurrences: 5 } });
+  });
+
+  it('keeps a scaled nested instance in local space: the component stays one shared part with a scaled sub-part', () => {
     let doc = execute(createEmptyDocument(), 'add_box', { size: [4, 4, 4] }).document;
     doc = execute(doc, 'create_component', { name: 'Bolt', entityIds: [...doc.order] }).document;
     const bolt = Object.keys(doc.components)[0] ?? '';
-    const scaled = execute(doc, 'insert_instance', { componentId: bolt, scale: [2, 2, 2] });
+    const scaled = execute(doc, 'insert_instance', { componentId: bolt, scale: [2, 2, 2], position: [3, 0, 0] });
     doc = execute(scaled.document, 'create_component', { name: 'Big', entityIds: scaled.affected }).document;
+    const big = Object.keys(doc.components).find((id) => id !== bolt) ?? '';
+    for (const x of [10, 20]) doc = execute(doc, 'insert_instance', { componentId: big, position: [x, 0, 0] }).document;
+    const result = step(
+      doc,
+      assemblyKernel(() => 'TEXT'),
+    );
+    const bigUses = captured.occurrences.filter((use) => (use.part.children ?? []).length > 0);
+    expect(bigUses.length).toBeGreaterThanOrEqual(2);
+    expect(bigUses[0]?.part).toBe(bigUses[1]?.part);
+    expect(bigUses[0]?.part.children?.[0]?.position).toEqual([3, 0, 0]);
+    expect(result.data).toMatchObject({ assembly: { products: 3 } });
+  });
+
+  it('scales the nested placements of a shared component by a uniformly scaled instance', () => {
+    let doc = execute(createEmptyDocument(), 'add_box', { size: [4, 4, 4] }).document;
+    doc = execute(doc, 'create_component', { name: 'Bolt', entityIds: [...doc.order] }).document;
+    const bolt = Object.keys(doc.components)[0] ?? '';
+    const inner = execute(doc, 'insert_instance', { componentId: bolt, position: [3, 0, 0] });
+    doc = execute(inner.document, 'create_component', { name: 'Pair', entityIds: inner.affected }).document;
+    const pair = Object.keys(doc.components).find((id) => id !== bolt) ?? '';
+    doc = execute(doc, 'insert_instance', { componentId: pair, scale: [2, 2, 2], position: [50, 0, 0] }).document;
     step(
       doc,
       assemblyKernel(() => null),
     );
-    expect(captured.occurrences[0]?.part.children).toBeUndefined();
-    expect(captured.occurrences[0]?.position).toEqual([0, 0, 0]);
+    const scaledUse = captured.occurrences.find((use) => use.position[0] === 50);
+    expect(scaledUse?.part.children?.[0]?.position).toEqual([6, 0, 0]);
+  });
+
+  it('bakes only the non-uniformly scaled nested instance into its parent part, never the whole component', () => {
+    let doc = execute(createEmptyDocument(), 'add_box', { size: [4, 4, 4] }).document;
+    doc = execute(doc, 'create_component', { name: 'Bolt', entityIds: [...doc.order] }).document;
+    const bolt = Object.keys(doc.components)[0] ?? '';
+    const plain = execute(doc, 'insert_instance', { componentId: bolt, position: [10, 0, 0] });
+    const skew = execute(plain.document, 'insert_instance', { componentId: bolt, scale: [2, 1, 1], position: [20, 0, 0] });
+    doc = execute(skew.document, 'create_component', { name: 'Mix', entityIds: [...plain.affected, ...skew.affected] }).document;
+    const mix = Object.keys(doc.components).find((id) => id !== bolt) ?? '';
+    for (const x of [100, 200]) doc = execute(doc, 'insert_instance', { componentId: mix, position: [x, 0, 0] }).document;
+    step(
+      doc,
+      assemblyKernel(() => null),
+    );
+    const mixUses = captured.occurrences.filter((use) => use.position[0] >= 100);
+    expect(mixUses).toHaveLength(2);
+    expect(mixUses[0]?.part).toBe(mixUses[1]?.part);
+    expect(mixUses[0]?.part.children).toHaveLength(1);
+    expect(mixUses[0]?.part.shapes).toHaveLength(1);
+  });
+
+  it('bakes an instance that scales by a negative factor and a component that instances itself', () => {
+    const doc = rodsAndPlate(2, { scale: [-1, 1, 1] });
+    step(
+      doc,
+      assemblyKernel(() => null),
+    );
+    expect(captured.occurrences[1]?.position).toEqual([0, 0, 0]);
+  });
+
+  it('lists user entity ids, never expanded:: ids, each once', () => {
+    const doc = rodsAndPlate(3, { scale: [2, 2, 2] });
+    const instances = doc.order.filter((id) => doc.entities[id]?.kind === 'instance');
+    const flat = step(doc, fakeKernel({ step: 'FLAT' }));
+    const assembled = step(
+      doc,
+      assemblyKernel(() => 'TEXT'),
+    );
+    for (const result of [flat, assembled]) {
+      const ids = (result.data as { entityIds: string[] }).entityIds;
+      expect(ids.some((id) => id.startsWith('expanded::'))).toBe(false);
+      expect(new Set(ids).size).toBe(ids.length);
+      expect(ids).toEqual([...instances, doc.order[doc.order.length - 1]]);
+      expect(result.summary).not.toContain('expanded::');
+    }
   });
 
   it('names the solids of a multi-solid component as sub-products', () => {

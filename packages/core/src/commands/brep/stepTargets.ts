@@ -22,7 +22,7 @@ export function stepLabels(doc: CadDocument, solids: readonly Entity[]): StepLab
 const MAX_INSTANCE_DEPTH = 4;
 
 /** The 3D solids of a component instance in world space (nested instances expanded), named `<instance>/<part>`. */
-function instanceSolids(doc: CadDocument, instance: InstanceEntity, label: string, depth: number): Entity[] {
+export function instanceSolids(doc: CadDocument, instance: InstanceEntity, label: string, depth: number): Entity[] {
   const component = doc.components[instance.componentId];
   if (component === undefined || depth >= MAX_INSTANCE_DEPTH) return [];
   const children = expandInstance(instance, component);
