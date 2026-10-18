@@ -1,0 +1,159 @@
+{
+ "frame": {
+  "id": "mesh-1137.1",
+  "members": [
+   "loft-993.1",
+   "loft-994.1",
+   "loft-995.1",
+   "loft-996.1",
+   "loft-1000.1",
+   "loft-1001.1",
+   "loft-1002.1",
+   "loft-1003.1",
+   "loft-997.1",
+   "loft-998.1",
+   "loft-999.1"
+  ],
+  "joints": [
+   {
+    "with": "loft-994.1",
+    "kind": "blend",
+    "radius": 6,
+    "seconds": 8.3
+   },
+   {
+    "with": "loft-995.1",
+    "kind": "union",
+    "radius": 0,
+    "seconds": 48.7
+   },
+   {
+    "with": "loft-1000.1",
+    "kind": "blend",
+    "radius": 6,
+    "seconds": 11.2
+   },
+   {
+    "with": "loft-1001.1",
+    "kind": "blend",
+    "radius": 3,
+    "seconds": 26.0
+   },
+   {
+    "with": "loft-1002.1",
+    "kind": "union",
+    "radius": 0,
+    "seconds": 69.4
+   },
+   {
+    "with": "loft-1003.1",
+    "kind": "union",
+    "radius": 0,
+    "seconds": 83.6
+   },
+   {
+    "with": "loft-999.1",
+    "kind": "blend",
+    "radius": 2,
+    "seconds": 20.6
+   },
+   {
+    "with": "mesh-1134.1",
+    "kind": "blend",
+    "radius": 8,
+    "seconds": 29.1
+   },
+   {
+    "with": "loft-997.1",
+    "kind": "blend",
+    "radius": 8,
+    "seconds": 25.4
+   },
+   {
+    "with": "mesh-1135.1",
+    "kind": "failed",
+    "radius": 0,
+    "seconds": 178.2
+   }
+  ]
+ },
+ "fork": {
+  "id": "mesh-1140.1",
+  "members": [
+   "loft-1004.1",
+   "loft-1005.1",
+   "loft-1006.1",
+   "loft-1007.1",
+   "loft-1008.1"
+  ],
+  "joints": [
+   {
+    "with": "loft-1005.1",
+    "kind": "union",
+    "radius": 0,
+    "seconds": 18.9
+   },
+   {
+    "with": "loft-1006.1",
+    "kind": "blend",
+    "radius": 2,
+    "seconds": 30.0
+   },
+   {
+    "with": "loft-1007.1",
+    "kind": "union",
+    "radius": 0,
+    "seconds": 50.3
+   },
+   {
+    "with": "loft-1008.1",
+    "kind": "failed",
+    "radius": 0,
+    "seconds": 55.9
+   }
+  ]
+ },
+ "stem": {
+  "id": "mesh-1145.1",
+  "members": [
+   "loft-1009.1",
+   "loft-1010.1",
+   "loft-1011.1",
+   "loft-1012.1",
+   "loft-1013.1",
+   "loft-1014.1"
+  ],
+  "joints": [
+   {
+    "with": "loft-1010.1",
+    "kind": "union",
+    "radius": 0,
+    "seconds": 15.7
+   },
+   {
+    "with": "loft-1011.1",
+    "kind": "union",
+    "radius": 0,
+    "seconds": 36.1
+   },
+   {
+    "with": "loft-1012.1",
+    "kind": "union",
+    "radius": 0,
+    "seconds": 51.5
+   },
+   {
+    "with": "loft-1013.1",
+    "kind": "union",
+    "radius": 0,
+    "seconds": 66.5
+   },
+   {
+    "with": "loft-1014.1",
+    "kind": "blend",
+    "radius": 2.5,
+    "seconds": 37.5
+   }
+  ]
+ }
+}
