@@ -10,6 +10,7 @@ import { ProvenancePopover } from '@ui/panels/ProvenancePopover';
 import { useReadOnlyQuery } from '@ui/panels/useReadOnlyQuery';
 import { licenceText } from '@ui/panels/materials/materialRecordView';
 import { useStore } from '@ui/store';
+import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
 import { BomSections } from './BomSections';
 import { parseLayout } from './fastenerView';
 import { InsertFastenerDialog } from './InsertFastenerDialog';
@@ -19,7 +20,7 @@ export function FastenersPanel({ className }: { className?: string }): React.Rea
   const catalogs = useStore((s) => s.document.fasteners?.catalogs);
   const stacks = useStore((s) => s.document.fasteners?.stacks);
   const dispatch = useStore((s) => s.dispatch);
-  const document = useStore((s) => s.document);
+  const document = useDocumentWithoutSelection();
   const focusItem = useFocusItem();
   const focusKey = useFocusStore((s) => s.focus?.key);
   const [inserting, setInserting] = useState(false);

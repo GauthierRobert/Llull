@@ -316,12 +316,12 @@ describe('render_fea_results surface', () => {
   it('converts analysis length to document units and truncates past the corner budget', () => {
     const vertex = (x: number, v: number): { u: Vec3; p: Vec3; v: number } => ({ u: [x, 0, 0], p: [x, 0, 0], v });
     const face = { corners: [vertex(0, 1), vertex(1000, 2), vertex(2000, 3)] as const, entityId: 'a', cap: false };
-    const full = surfacePayload([face, face], 'mm', 0.001, 100);
+    const full = surfacePayload([face, face], 'N-mm-t-s', 0.001, 100);
     expect(full.positions.slice(0, 6)).toEqual([0, 0, 0, 1000, 0, 0]);
     expect(full.truncated).toBe(false);
-    const metres = surfacePayload([face], 'm', 0.001, 100);
+    const metres = surfacePayload([face], 'N-m-kg-s', 0.001, 100);
     expect(metres.positions[3]).toBe(1_000_000);
-    const cut = surfacePayload([face, face, face], 'mm', 0.001, 6);
+    const cut = surfacePayload([face, face, face], 'N-mm-t-s', 0.001, 6);
     expect(cut.triangles).toBe(2);
     expect(cut.values).toHaveLength(6);
     expect(cut.truncated).toBe(true);

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '@ui/store';
+import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
 import { runQuery } from '@ui/services/localQuery';
 import type { Clash } from '@aec/industrial/clash/clash';
 import { toMetres } from '@core/model/units';
@@ -22,7 +23,7 @@ interface ClashReport {
 export function ClashSection(): React.ReactElement {
   const building = useStore((s) => s.document.building);
   const units = useStore((s) => s.document.units);
-  const document = useStore((s) => s.document);
+  const document = useDocumentWithoutSelection();
   const focusItem = useFocusItem();
   const focusKey = useFocusStore((s) => s.focus?.key);
   const [computed, setReport] = useState<ClashReport | null>(null);

@@ -7,6 +7,7 @@ import { boundsExtent, entityBoundsInDoc, mergeBounds, type Bounds } from '@core
 import { is3D, type CadDocument, type Vec3 } from '@core/model/types';
 import { useStore } from '@ui/store';
 import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
+import { useStableList } from '@ui/viewport/useStableByKey';
 import {
   flowVector,
   parseAirfoil,
@@ -43,7 +44,7 @@ export interface BodyAnalysis {
   readonly problem: string;
 }
 
-const solidIds = (document: CadDocument): string[] =>
+export const solidIds = (document: CadDocument): string[] =>
   document.order.filter((id) => document.entities[id] !== undefined && isSolidBody(document, id));
 
 function isSolidBody(document: CadDocument, id: string): boolean {
@@ -76,39 +77,63 @@ function useBodyIds(allSolids: boolean): readonly string[] {
 
 const positive = (text: string): number | null => (Number(text) > 0 ? Number(text) : null);
 
+interface FrontalMeasure {
+  readonly measured: ReturnType<typeof execute> | null;
+  readonly frontal: FrontalView | null;
+  readonly bounds: Bounds | null;
+}
+
+/**
+ * frontal_area rasterises every triangle of the bodies: it re-runs only when the bodies themselves (entity identity) or the flow change,
+ * never on a speed / Cd keystroke or an unrelated edit.
+ */
+function useFrontal(bodyIds: readonly string[], flow: Vec3 | null): FrontalMeasure {
+  const document = useDocumentWithoutSelection();
+  const bodies = useStableList(bodyIds.map((id) => document.entities[id]));
+  const flowKey = flow === null ? '' : flow.join(',');
+  return useMemo((): FrontalMeasure => {
+    if (flow === null || bodyIds.length === 0) return { measured: null, frontal: null, bounds: null };
+    const measured = execute(document, 'frontal_area', { entityIds: [...bodyIds], flowDirection: flow });
+    const frontal = parseFrontal(measured.data);
+    return { measured, frontal, bounds: frontal === null ? null : boundsOf(document, bodyIds) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `bodies` (entity identities) and `flowKey` stand for document + flow
+  }, [bodies, bodyIds, flowKey]);
+}
+
 export function useBodyAnalysis(inputs: AeroInputs): BodyAnalysis {
   const document = useDocumentWithoutSelection();
   const bodyIds = useBodyIds(inputs.allSolids);
+  const [cx, cy, cz] = inputs.custom;
+  const flow = useMemo(() => flowVector(inputs.preset, [cx, cy, cz]), [inputs.preset, cx, cy, cz]);
+  const { measured, frontal, bounds } = useFrontal(bodyIds, flow);
+  const { speed: speedText, speedUnit, altitude: altitudeText, dragMode, cd, cdA } = inputs;
   return useMemo((): BodyAnalysis => {
-    const flow = flowVector(inputs.preset, inputs.custom);
     const empty = { bodyIds, flow, bounds: null, frontal: null, atmosphere: null, drag: null };
     if (flow === null) return { ...empty, problem: 'Enter a non-zero custom flow direction.' };
-    const speed = Number(inputs.speed);
-    if (inputs.speed.trim() === '' || !(speed >= 0)) return { ...empty, problem: 'Enter an air speed of 0 or more.' };
-    const altitude = Number(inputs.altitude);
+    const speed = Number(speedText);
+    if (speedText.trim() === '' || !(speed >= 0)) return { ...empty, problem: 'Enter an air speed of 0 or more.' };
+    const altitude = Number(altitudeText);
     const atmosphereResult = execute(document, 'standard_atmosphere', { altitude: Number.isFinite(altitude) ? altitude : 0 });
     const atmosphere = parseAtmosphere(atmosphereResult.data);
     if (atmosphere === null) return { ...empty, problem: atmosphereResult.summary };
-    const coefficient = inputs.dragMode === 'cd' ? positive(inputs.cd) : positive(inputs.cdA);
-    const measured = bodyIds.length === 0 ? null : execute(document, 'frontal_area', { entityIds: [...bodyIds], flowDirection: flow });
-    const frontal = measured === null ? null : parseFrontal(measured.data);
-    const bounds = frontal === null ? null : boundsOf(document, bodyIds);
+    const coefficient = dragMode === 'cd' ? positive(cd) : positive(cdA);
     const base = { ...empty, atmosphere, frontal, bounds };
     if (measured !== null && frontal === null) return { ...base, problem: measured.summary };
     if (coefficient === null) return { ...base, problem: 'Enter a drag coefficient above 0.' };
     const areaSource =
-      inputs.dragMode === 'cda' ? { cdA: coefficient } : frontal === null ? null : { cd: coefficient, referenceAreaM2: frontal.areaM2 };
+      dragMode === 'cda' ? { cdA: coefficient } : frontal === null ? null : { cd: coefficient, referenceAreaM2: frontal.areaM2 };
     if (areaSource === null) return { ...base, problem: 'Select a solid (or tick All solids) to measure its frontal area.' };
     const dragResult = execute(document, 'aero_drag', {
       speed,
-      speedUnit: inputs.speedUnit,
+      speedUnit,
       altitudeM: Number.isFinite(altitude) ? altitude : 0,
       ...(frontal === null ? {} : { lengthM: frontal.lengthM }),
       ...areaSource,
     });
     const drag = parseDrag(dragResult.data);
     return { ...base, drag, problem: drag === null ? dragResult.summary : '' };
-  }, [document, bodyIds, inputs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- atmosphere / drag read no geometry: `document` is only their execute context
+  }, [bodyIds, flow, measured, frontal, bounds, speedText, speedUnit, altitudeText, dragMode, cd, cdA]);
 }
 
 export interface AirfoilSource {
@@ -135,6 +160,7 @@ export function useSelectedAirfoilId(): string | null {
 
 export function useAirfoilAnalysis({ entityId, naca }: AirfoilSource): AirfoilAnalysis {
   const document = useDocumentWithoutSelection();
+  const airfoil = entityId === null ? undefined : document.entities[entityId];
   return useMemo((): AirfoilAnalysis => {
     const code = naca.trim();
     if (entityId === null && code === '') return { view: null, problem: '' };
@@ -145,5 +171,6 @@ export function useAirfoilAnalysis({ entityId, naca }: AirfoilSource): AirfoilAn
     });
     const view = parseAirfoil(result.data);
     return { view, problem: view === null ? result.summary : '' };
-  }, [document, entityId, naca]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the airfoil entity (identity) stands for the document
+  }, [airfoil, entityId, naca]);
 }

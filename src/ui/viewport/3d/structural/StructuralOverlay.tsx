@@ -45,7 +45,8 @@ function MemberHull({ bounds, color }: { bounds: Bounds; color: string }): React
 
 export function StructuralOverlay(): React.ReactElement | null {
   const document = useDocumentWithoutSelection();
-  const { shown, marks } = useStructuralOverlayStore();
+  const shown = useStructuralOverlayStore((s) => s.shown);
+  const marks = useStructuralOverlayStore((s) => s.marks);
   const invalidate = useThree((state) => state.invalidate);
   useEffect(() => invalidate(), [shown, marks, document, invalidate]);
 

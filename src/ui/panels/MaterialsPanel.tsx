@@ -3,6 +3,7 @@
 import React, { memo, useCallback, useMemo, useState } from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore } from '@ui/store';
+import { useStableList } from '@ui/viewport/useStableByKey';
 import { useFocusItem } from '@ui/hooks/useFocusItem';
 import { useIsFocused } from '@ui/store/focusStore';
 import { entitiesFocus } from '@ui/panels/entityFocus';
@@ -41,11 +42,12 @@ const MaterialRow = memo(function MaterialRow({
   const focused = useIsFocused(focusKey);
   const units = useStore((s) => s.document.units);
   const entities = useStore((s) => s.document.entities);
-  // Only the mass of a material in use is measured; re-measured when the entities change.
+  // Only the mass of a material in use is measured, when one of ITS entities changes (per-entity cache in totalMassG).
+  const used = useStableList(entityIds.map((id) => entities[id]));
   const massG = useMemo(
     () => (entityIds.length === 0 ? null : totalMassG(useStore.getState().document, entityIds)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `entities` is the staleness key of the document read above
-    [entityIds, entities, material.density],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `used` (entity identities) is the staleness key of the document read above
+    [used, material.density],
   );
   const usage = entityIds.length === 0 ? 'unused' : `${entityIds.length} ${entityIds.length === 1 ? 'object' : 'objects'}`;
 

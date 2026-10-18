@@ -1,8 +1,9 @@
 // Click-to-select in 2D with no tool armed: plain click selects (nearest outline, else smallest enclosing closed
-// shape), Shift/Ctrl/Meta toggles, empty space clears; a pan is not a click. The plane sits in front of the snap plane
+// shape), Shift/Ctrl/Meta toggles, empty space clears (and drops the panel highlight); a pan is not a click. The plane sits in front of the snap plane
 // (which stops propagation) and, with no move handler, lets moves through.
 
 import { useStore } from '@ui/store';
+import { useFocusStore } from '@ui/store/focusStore';
 import { pickEntityId } from './modifyHelpers';
 import { pickContext } from './pickContext';
 import { GroundPlane, toDocumentPoint } from './GroundPlane';
@@ -28,7 +29,10 @@ export function SelectPickInteraction({ zoom }: SelectPickInteractionProps): Rea
         const id = pickEntityId(document, toDocumentPoint(e.point), tolerance, accepts);
         const additive = isAdditiveSelect(e);
         if (id === null) {
-          if (!additive) state.clearSelection();
+          if (!additive) {
+            state.clearSelection();
+            useFocusStore.getState().setFocus(null);
+          }
         } else if (additive) {
           state.toggleSelection(id);
         } else {

@@ -57,7 +57,7 @@ function Ramp({ surface }: { surface: SurfaceView }): React.ReactElement {
 export function AnalysisLegend(): React.ReactElement | null {
   const analysisId = useAnalysisViewStore((s) => s.analysisId);
   const showOnModel = useAnalysisViewStore((s) => s.showOnModel);
-  return showOnModel && analysisId !== null ? <LegendFeed analysisId={analysisId} /> : null;
+  return showOnModel && analysisId !== null ? <LegendFeed key={analysisId} analysisId={analysisId} /> : null;
 }
 
 function LegendFeed({ analysisId }: { analysisId: string }): React.ReactElement | null {

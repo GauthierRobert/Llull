@@ -1,7 +1,8 @@
 import { resetStore } from '../helpers/componentEntities';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { act, fireEvent, render, renderHook, screen } from '@testing-library/react';
-import { useStore } from '@ui/store';
+import { useLayoutStore, useStore } from '@ui/store';
+import { useFocusHousekeeping } from '@ui/hooks/useFocusHousekeeping';
 import { type PanelFocus, useFocusStore } from '@ui/store/focusStore';
 import { useFocusItem } from '@ui/hooks/useFocusItem';
 import { FocusBanner } from '@ui/viewport/FocusBanner';
@@ -43,6 +44,33 @@ describe('panel focus (click a row → highlight on the model)', () => {
     act(() => useFocusStore.getState().setFocus(focusOf([])));
     expect(screen.getByTestId('focus-banner').textContent).toContain('Load F1 — 500 N');
     fireEvent.click(screen.getByRole('button', { name: 'Clear highlight' }));
+    expect(useFocusStore.getState().focus).toBeNull();
+  });
+});
+
+describe('panel focus never goes stale', () => {
+  beforeEach(() => {
+    resetStore();
+    useFocusStore.setState({ focus: null });
+  });
+
+  it('drops the highlight when its entity is deleted or moved, but not on a selection change', () => {
+    const boxId = localDispatch('add_box', { size: [1, 1, 1] }).affected[0]!;
+    renderHook(() => useFocusHousekeeping());
+    act(() => useFocusStore.getState().setFocus(focusOf([boxId])));
+    act(() => useStore.getState().select([boxId]));
+    expect(useFocusStore.getState().focus).not.toBeNull();
+    act(() => void localDispatch('move_entities', { ids: [boxId], delta: [1, 0, 0] }));
+    expect(useFocusStore.getState().focus).toBeNull();
+    act(() => useFocusStore.getState().setFocus(focusOf([boxId])));
+    act(() => void localDispatch('delete_entities', { ids: [boxId] }));
+    expect(useFocusStore.getState().focus).toBeNull();
+  });
+
+  it('drops the highlight when the sidebar switches panel', () => {
+    renderHook(() => useFocusHousekeeping());
+    act(() => useFocusStore.getState().setFocus(focusOf([])));
+    act(() => useLayoutStore.setState({ sidebarTab: useLayoutStore.getState().sidebarTab === 'layers' ? 'objects' : 'layers' }));
     expect(useFocusStore.getState().focus).toBeNull();
   });
 });

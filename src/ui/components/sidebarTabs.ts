@@ -131,7 +131,7 @@ export const SIDEBAR_TAB_COUNTS: Readonly<Record<SidebarTab, (doc: CadDocument) 
   manufacturing: (doc) => Object.keys(doc.sheetMetal?.parts ?? {}).length,
   fasteners: (doc) => Object.keys(doc.fasteners?.stacks ?? {}).length,
   analysis: (doc) => doc.analysis?.caseOrder.length ?? 0,
-  aero: (doc) => Object.values(doc.entities).filter(is3D).length,
+  aero: (doc) => Object.values(doc.entities).filter((entity) => is3D(entity) && entity.kind !== 'image').length,
   review: () => 0,
 };
 

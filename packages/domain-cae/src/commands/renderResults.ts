@@ -94,7 +94,7 @@ export const renderFeaResults = defineCommand({
     'half-space dot(normal, p) > offset of the undeformed model and colours the section face by the field; entityIds plots only those ' +
     'parts (min / max and the colour range then refer to the plotted parts). With surface: true also data.surface { positions (flat xyz per triangle corner, deformed, document units), values (one per corner), triangles, truncated }. Returns data { svg, field, unit, resultSet, min { value, ' +
     'at }, max { value, at }, deformationScale, levels, trianglesDrawn, entityIds, cut, axis }; save it as PNG with the CLI (--save ' +
-    'plot.png). Requires a solved analysis on this machine (fea_mesh then fea_solve). Positions are in the analysis length unit.',
+    'plot.png). Requires a solved analysis on this machine (fea_mesh then fea_solve). min.at / max.at / axis / target are in the analysis length unit; data.surface is in document units.',
   annotations: { readOnly: true },
   params: z.object({
     analysisId: analysisIdSchema,
@@ -309,7 +309,8 @@ export const renderFeaResults = defineCommand({
       min: placedAt(min, deformed),
       max: placedAt(max, deformed),
     });
-    const surface = params.surface === true ? surfacePayload(faces, lengthUnit, toMetres(doc, 1), SURFACE_CORNER_BUDGET) : undefined;
+    const surface =
+      params.surface === true ? surfacePayload(faces, analysis.unitSystem, toMetres(doc, 1), SURFACE_CORNER_BUDGET) : undefined;
     const origin = (node: number): Vec3 => coordinates.get(node) ?? [0, 0, 0];
     return report(
       doc,

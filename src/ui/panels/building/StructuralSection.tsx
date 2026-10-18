@@ -3,6 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useStore } from '@ui/store';
+import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
 import { runQuery } from '@ui/services/localQuery';
 import type { BuildingModel } from '@core/model/building';
 import { KpiStrip, ListRow, PanelSection, StatusChip, StatusLine, type Kpi } from '@ui/panels/PanelParts';
@@ -37,7 +38,7 @@ type CheckCommand = (typeof CHECKS)[number]['command'];
 const loadsFromModel: ReadonlySet<CheckCommand> = new Set(['check_steel_members', 'check_pipe_supports']);
 
 function MemberRow({ row }: { row: ReportRow }): React.ReactElement {
-  const document = useStore((s) => s.document);
+  const document = useDocumentWithoutSelection();
   const focusItem = useFocusItem();
   const focus = memberFocus(document, row);
   const failing = isFailing(row);
@@ -68,7 +69,8 @@ function utilisationKpis(rows: readonly ReportRow[]): Kpi[] {
 }
 
 function OverlayToggle(): React.ReactElement {
-  const { shown, setShown } = useStructuralOverlayStore();
+  const shown = useStructuralOverlayStore((s) => s.shown);
+  const setShown = useStructuralOverlayStore((s) => s.setShown);
   return (
     <div className="building-inline-form" data-testid="utilisation-legend">
       <label className="loads-check">

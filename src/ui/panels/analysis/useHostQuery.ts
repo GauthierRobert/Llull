@@ -10,17 +10,20 @@ export type HostQueryState =
   | { readonly status: 'loading' }
   | { readonly status: 'done'; readonly data: unknown; readonly summary: string; readonly isError: boolean };
 
-/** Re-runs whenever `params` or `refreshKey` (e.g. the document) change; a stale answer is dropped. */
+/**
+ * Re-runs whenever `params` or `refreshKey` (e.g. the document) change; a stale answer is dropped. New `params` read as loading until
+ * their own answer arrives (never the previous params' answer); a `refreshKey` change keeps the last answer on screen meanwhile.
+ */
 export function useHostQuery(command: string, params: Record<string, unknown> | null, refreshKey: unknown): HostQueryState {
   const online = useStore((s) => s.liveStatus === 'connected');
-  const [state, setState] = useState<HostQueryState>({ status: 'loading' });
   const paramsKey = params === null ? null : JSON.stringify(params);
+  const [answer, setAnswer] = useState<{ key: string | null; state: HostQueryState }>({ key: null, state: { status: 'loading' } });
 
   useEffect(() => {
     if (paramsKey === null) return;
     let cancelled = false;
     const settle = (data: unknown, summary: string, isError: boolean): void => {
-      if (!cancelled) setState({ status: 'done', data, summary, isError });
+      if (!cancelled) setAnswer({ key: paramsKey, state: { status: 'done', data, summary, isError } });
     };
     const request = JSON.parse(paramsKey) as Record<string, unknown>;
     if (online) {
@@ -36,5 +39,7 @@ export function useHostQuery(command: string, params: Record<string, unknown> | 
     };
   }, [command, online, paramsKey, refreshKey]);
 
-  return state;
+  return answer.key === paramsKey ? answer.state : LOADING;
 }
+
+const LOADING: HostQueryState = { status: 'loading' };

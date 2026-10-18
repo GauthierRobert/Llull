@@ -16,6 +16,7 @@ import { boundsCenter, boundsExtent, entityBoundsInDoc, mergeBounds, type Bounds
 import { toMetres } from '@core/model/units';
 import type { CadDocument, Vec3 } from '@core/model/types';
 import { lengthUnitName, stressUnitName } from '@cae/decks/units';
+import { analysisLengthMetres } from '@cae/shared/defaults';
 import { formatQuantities, formatSignificant } from './quantityFormat';
 
 type ItemGroup = 'part' | 'constraint' | 'load' | 'thermal' | 'probe' | 'result';
@@ -81,7 +82,6 @@ export interface SetupItems {
 }
 
 const MAX_POINTS = 6;
-const METRES_PER_ANALYSIS_LENGTH: Readonly<Record<string, number>> = { mm: 0.001, m: 1, in: 0.0254 };
 
 const unitText = (unit: string): string => (unit === 'degC' ? '°C' : unit === 'degF' ? '°F' : unit);
 const quantityText = (q: { readonly value: number; readonly unit: string }): string => `${formatSignificant(q.value)} ${unitText(q.unit)}`;
@@ -290,7 +290,7 @@ function probeItems(analysisCase: AnalysisCase): SetupItem[] {
 
 /** Metres of one analysis-length unit per document unit (mesh coordinates -> document coordinates). */
 export function analysisToDocument(doc: CadDocument, unitSystem: UnitSystem): number {
-  return (METRES_PER_ANALYSIS_LENGTH[lengthUnitName(unitSystem)] ?? 0.001) / toMetres(doc, 1);
+  return analysisLengthMetres(unitSystem) / toMetres(doc, 1);
 }
 
 export function buildSetupItems(doc: CadDocument, analysisCase: AnalysisCase): SetupItems {

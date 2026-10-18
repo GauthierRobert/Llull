@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import type { CivilCategory, CivilObject } from '@core/model/civil';
 import { useStore } from '@ui/store';
+import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
 import { PairSelect } from '@ui/panels/OptionSelect';
 import { useFocusItem } from '@ui/hooks/useFocusItem';
 import { useIsFocused } from '@ui/store/focusStore';
@@ -40,7 +41,7 @@ interface CivilObjectRowProps {
 
 export function CivilObjectRow({ object, detail, children, body }: CivilObjectRowProps): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
-  const document = useStore((s) => s.document);
+  const document = useDocumentWithoutSelection();
   const focusItem = useFocusItem();
   const focus = civilFocus(document, object, detail);
   const focused = useIsFocused(focus.key);

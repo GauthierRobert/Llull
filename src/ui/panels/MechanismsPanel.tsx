@@ -5,6 +5,7 @@ import { toDegrees, toRadians } from '@lib/angle';
 import React from 'react';
 import { classNames } from '@ui/classNames';
 import { useStore, useViewportStore } from '@ui/store';
+import { useDocumentWithoutSelection } from '@ui/store/useDocumentWithoutSelection';
 import type { Constraint, Joint, DriveRelation } from '@core/model/types';
 import { PanelEmpty, PanelHeader, PanelSection, IconButton, DeleteButton, KpiStrip, type Kpi } from '@ui/panels/PanelParts';
 import { useFocusItem } from '@ui/hooks/useFocusItem';
@@ -131,7 +132,7 @@ function ConstraintRow({
   onHighlight: (id: string) => void;
 }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
-  const document = useStore((s) => s.document);
+  const document = useDocumentWithoutSelection();
 
   const chipTone = CONSTRAINT_CHIP_TONE[constraint.kind] ?? 'accent';
   const aRef = fmtEntityRef(constraint.a);
@@ -193,7 +194,7 @@ function JointRow({
 }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
 
-  const document = useStore((s) => s.document);
+  const document = useDocumentWithoutSelection();
   const documentUnits = document.units;
   const revolute = joint.kind === 'revolute';
   // Revolute angles shown in degrees (like Properties); the command takes radians.
@@ -248,7 +249,7 @@ function JointRow({
 
 function DriveRelationRow({ relation }: { relation: DriveRelation }): React.ReactElement {
   const dispatch = useStore((s) => s.dispatch);
-  const document = useStore((s) => s.document);
+  const document = useDocumentWithoutSelection();
 
   const offsetLabel = relation.offset !== undefined && relation.offset !== 0 ? ` + ${relation.offset.toFixed(3)}` : '';
 
@@ -314,7 +315,7 @@ function MechanismSection({ title, testId, listLabel, rows, collapseEmpty }: Mec
 
 /** Headline numbers: mobility, bodies, joints, drives and whether a simulation has been run. */
 function MechanismKpis(): React.ReactElement {
-  const document = useStore((s) => s.document);
+  const document = useDocumentWithoutSelection();
   const simulated = useDynamicsPlaybackStore((s) => s.result !== null);
   const counts = mechanismCounts(document);
   const items: Kpi[] = [

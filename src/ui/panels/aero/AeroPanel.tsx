@@ -16,7 +16,7 @@ import { AeroBodyInputs } from './AeroBodyInputs';
 import { AeroBodyKpis, AeroBodyRows } from './AeroBodyResults';
 import { AeroWingSection } from './AeroWingSection';
 import { airfoilOverlayView, selectedPolyline } from './airfoilOverlayView';
-import { useAirfoilAnalysis, useBodyAnalysis, useSelectedAirfoilId, type AeroInputs } from './useAeroAnalysis';
+import { useAirfoilAnalysis, useBodyAnalysis, useSelectedAirfoilId, solidIds, type AeroInputs } from './useAeroAnalysis';
 
 const DEFAULT_INPUTS: AeroInputs = {
   allSolids: false,
@@ -41,7 +41,7 @@ export function AeroPanel({ className }: { className?: string }): React.ReactEle
   const airfoilId = useSelectedAirfoilId();
   const airfoil = useAirfoilAnalysis({ entityId: airfoilId, naca });
   const airfoilEntity = useStore((s) => (airfoilId === null ? undefined : s.document.entities[airfoilId]));
-  const solidCount = useStore((s) => s.document.order.filter((id) => s.document.entities[id]?.kind !== 'polyline').length);
+  const solidCount = useStore((s) => solidIds(s.document).length);
 
   const bodyView = useMemo((): AeroBodyView | null => {
     if (body.bounds === null || body.flow === null || body.frontal === null) return null;

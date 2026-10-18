@@ -1,10 +1,11 @@
 /** The painted-surface payload of render_fea_results (surface: true): plotted triangles as flat arrays in DOCUMENT units. */
 
+import type { UnitSystem } from '@core/model/analysis';
+import { analysisLengthMetres } from '../shared/defaults';
 import type { FieldFace } from './fieldFaces';
 
 /** Corners (3 per triangle) returned at most. */
 export const SURFACE_CORNER_BUDGET = 150_000;
-const METRES_PER_ANALYSIS_LENGTH: Readonly<Record<string, number>> = { mm: 0.001, m: 1, in: 0.0254 };
 
 export interface SurfacePayload {
   /** Flat xyz per triangle corner, deformed as plotted, document units. */
@@ -16,16 +17,16 @@ export interface SurfacePayload {
 }
 
 /**
- * @invariant mesh coordinates are in the analysis length unit; `documentMetres` is the metres of one document unit; faces beyond the
+ * @invariant mesh coordinates are in the length unit of `unitSystem`; `documentMetres` is the metres of one document unit; faces beyond the
  *   budget are dropped and `truncated` says so
  */
 export function surfacePayload(
   faces: readonly FieldFace[],
-  analysisLengthUnit: string,
+  unitSystem: UnitSystem,
   documentMetres: number,
   cornerBudget: number,
 ): SurfacePayload {
-  const toDocument = (METRES_PER_ANALYSIS_LENGTH[analysisLengthUnit] ?? 0.001) / documentMetres;
+  const toDocument = analysisLengthMetres(unitSystem) / documentMetres;
   const kept = faces.slice(0, Math.floor(cornerBudget / 3));
   const positions: number[] = [];
   const values: number[] = [];
