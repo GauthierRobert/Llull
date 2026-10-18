@@ -6,6 +6,7 @@
  *   cad://scene        structured SceneSnapshot (entity ids/kinds/bounds/layers/groups/selection)
  *   cad://selection    selected entity ids + their kind/position summaries
  *   cad://conventions  static agent modeling guide (Markdown)
+ *   cad://entity/{id}  resource template: one entity, compact (mesh/brep payloads replaced by counts)
  */
 
 import type { CadDocument } from '@core/model/types';
@@ -74,6 +75,43 @@ export function listMcpResources(): McpResourceDescriptor[] {
   ];
 }
 
+/** A resource template listing entry (MCP `ResourceTemplate`). */
+interface McpResourceTemplateDescriptor {
+  uriTemplate: string;
+  name: string;
+  description: string;
+  mimeType: string;
+}
+
+const ENTITY_URI_PREFIX = 'cad://entity/';
+
+export function listMcpResourceTemplates(): McpResourceTemplateDescriptor[] {
+  return [
+    {
+      uriTemplate: `${ENTITY_URI_PREFIX}{id}`,
+      name: 'CAD Entity',
+      description:
+        'One entity by id (e.g. cad://entity/box-1), compact: kind, name, layer, position, rotation and parameters; ' +
+        'mesh vertex data and shape recipes are replaced by counts. Cheaper than cad://document.',
+      mimeType: 'application/json',
+    },
+  ];
+}
+
+/** Compact entity JSON: heavy payloads (`mesh`, `brep`) are summarised, everything else is kept. */
+function compactEntity(entity: object): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(entity).map(([key, value]): [string, unknown] => {
+      if (key === 'brep') return [key, '[shape recipe omitted; use cad://document]'];
+      if (key === 'mesh' && typeof value === 'object' && value !== null && 'positions' in value && 'indices' in value) {
+        const { positions, indices } = value as { positions: readonly number[]; indices: readonly number[] };
+        return [key, { vertexCount: positions.length / 3, triangleCount: indices.length / 3 }];
+      }
+      return [key, value];
+    }),
+  );
+}
+
 const jsonResource = (uri: string, text: string): McpResourceContent => ({ uri, mimeType: 'application/json', text });
 
 /** Lists in `cad://scene` / `cad://selection` are cut here so a huge model cannot flood a context. */
@@ -83,8 +121,9 @@ export const MAX_RESOURCE_ITEMS = 500;
 function boundedScene(doc: CadDocument): Record<string, unknown> {
   const snapshot = computeSceneSnapshot(doc);
   const cut = (items: readonly unknown[]): boolean => items.length > MAX_RESOURCE_ITEMS;
-  if (!cut(snapshot.entities) && !cut(snapshot.selection) && !cut(snapshot.animations)) return { ...snapshot };
+  if (!cut(snapshot.entities) && !cut(snapshot.selection) && !cut(snapshot.animations)) return { units: doc.units, ...snapshot };
   return {
+    units: doc.units,
     ...snapshot,
     entities: snapshot.entities.slice(0, MAX_RESOURCE_ITEMS),
     selection: snapshot.selection.slice(0, MAX_RESOURCE_ITEMS),
@@ -111,7 +150,7 @@ function selectionSummary(doc: CadDocument): { count: number; entities: unknown[
 /**
  * Dispatch a resource read by URI. Document-independent resources (conventions) ignore `doc`.
  *
- * @failure unknown URI -> null (the transport replies with an error)
+ * @failure unknown URI or entity id -> null (the transport replies with an error)
  */
 export function readMcpResource(doc: CadDocument, uri: string): McpResourceContent | null {
   switch (uri) {
@@ -123,7 +162,10 @@ export function readMcpResource(doc: CadDocument, uri: string): McpResourceConte
       return jsonResource(uri, JSON.stringify(selectionSummary(doc)));
     case CAD_RESOURCE_URIS.conventions:
       return { uri, mimeType: 'text/markdown', text: CONVENTIONS_GUIDE };
-    default:
-      return null;
+    default: {
+      if (!uri.startsWith(ENTITY_URI_PREFIX)) return null;
+      const entity = doc.entities[decodeURIComponent(uri.slice(ENTITY_URI_PREFIX.length))];
+      return entity === undefined ? null : jsonResource(uri, JSON.stringify(compactEntity(entity)));
+    }
   }
 }

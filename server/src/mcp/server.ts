@@ -4,6 +4,7 @@ import {
   ListToolsRequestSchema,
   CallToolRequestSchema,
   ListResourcesRequestSchema,
+  ListResourceTemplatesRequestSchema,
   ReadResourceRequestSchema,
   ListPromptsRequestSchema,
   GetPromptRequestSchema,
@@ -15,6 +16,7 @@ import {
   buildAllMcpTools,
   shapeToolCallContent,
   listMcpResources,
+  listMcpResourceTemplates,
   readMcpResource,
   listMcpPrompts,
   getMcpPrompt,
@@ -28,6 +30,7 @@ import {
 } from '@mcp/index';
 import { getCommand, listCommands } from '@core/commands/registry';
 import type { ToolsetName } from '@mcp/index';
+import { withFailureStatus } from '@mcp/commandOutcome';
 import { errorMessage } from '@lib/errorMessage';
 import { getLiveDoc } from '../liveDocument';
 import { ANONYMOUS_ACTOR, type Actor } from '../audit';
@@ -92,9 +95,9 @@ export function buildMcpServer(
     const disabledToolset = isToolEnabled(name, enabledToolsets) ? undefined : toolsetOf(name);
     if (disabledToolset !== undefined) {
       return makeErrorResult(
-        `Tool ${name} is disabled on this server: enable its toolset "${disabledToolset}" in ` +
-          'LLULL_TOOLSETS, call enable_toolset to load it for this session (search_tools finds ' +
-          'tools by keyword), or call it as a build_project step.',
+        `Tool ${name} is disabled for this session: call enable_toolset {"name":"${disabledToolset}"} to load it ` +
+          '(search_tools finds tools by keyword), or call it as a build_project step. ' +
+          `To enable it for every session, add "${disabledToolset}" to LLULL_TOOLSETS on the server.`,
       );
     }
     const discovery = applyDiscoveryToolCall(name, args, enabledToolsets);
@@ -113,7 +116,7 @@ export function buildMcpServer(
     if (exchangeResult !== null) return exchangeResult;
     if (getCommand(name) === undefined) return unknownToolResult(name, enabledToolsets);
     const applied = applyCommand(name, args ?? {}, undefined, caller.actor);
-    const busResult = caller.remote === true ? redactLicensedOutcome(getLiveDoc(), name, args, applied) : applied;
+    const busResult = withFailureStatus(name, caller.remote === true ? redactLicensedOutcome(getLiveDoc(), name, args, applied) : applied);
     // Vision loop: the PNG replaces the multi-KB SVG in the text/structured content.
     const imageBlock = await buildImageBlock(busResult.data);
     const shaped = shapeToolCallContent(imageBlock !== null ? { ...busResult, data: stripSvgFromData(busResult.data) } : busResult);
@@ -130,6 +133,7 @@ export function buildMcpServer(
   });
 
   server.setRequestHandler(ListResourcesRequestSchema, () => ({ resources: listMcpResources() }));
+  server.setRequestHandler(ListResourceTemplatesRequestSchema, () => ({ resourceTemplates: listMcpResourceTemplates() }));
 
   server.setRequestHandler(ReadResourceRequestSchema, (req) => {
     const { uri } = req.params;

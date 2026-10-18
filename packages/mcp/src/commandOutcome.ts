@@ -46,14 +46,21 @@ export function failedOutcome(name: string, error: unknown): CommandOutcome {
 
 /**
  * A result whose status a script can trust: besides a rejection, a command's own machine-readable refusal (`error`, e.g.
- * FAST_PITCH on a read-only query), a failed plan (`data.ok` false) and a mutating command that changed nothing (a graceful no-op such as "add_box failed: …") are
- * failures — except setters (`idempotent`), read-only and history meta-commands, which may change
- * nothing. `mayNoop` overrides that for a caller that knows better (clearing an empty document).
+ * FAST_PITCH on a read-only query), a failed plan (`data.ok` false), a mutating command that changed nothing (a graceful no-op such as
+ * "add_box failed: …") and a read-only command that answered nothing (no data, no ids: a refused query such as "mass_properties failed: …")
+ * are failures — except setters (`idempotent`) and history meta-commands, which may change nothing. `mayNoop` overrides that for a
+ * caller that knows better (clearing an empty document).
  */
 export function outcomeIsFailure(name: string, outcome: CommandOutcome, mayNoop?: boolean): boolean {
   if (outcome.isError || outcome.error !== undefined) return true;
   if (isRecord(outcome.data) && outcome.data['ok'] === false) return true;
+  if (outcome.changed || outcome.data !== undefined) return false;
   const annotations = getCommand(name)?.annotations;
-  const noopAllowed = mayNoop ?? (annotations?.readOnly === true || annotations?.idempotent === true || annotations?.metaHistory === true);
-  return !noopAllowed && !outcome.changed && outcome.data === undefined;
+  if (annotations?.readOnly === true) return outcome.affected.length === 0 && mayNoop !== true;
+  return !(mayNoop ?? (annotations?.idempotent === true || annotations?.metaHistory === true));
+}
+
+/** `outcome` with `isError` raised when `outcomeIsFailure` says so: the one status every surface (MCP, CLI) reports. */
+export function withFailureStatus<T extends CommandOutcome>(name: string, outcome: T): T {
+  return !outcome.isError && outcomeIsFailure(name, outcome) ? { ...outcome, isError: true } : outcome;
 }

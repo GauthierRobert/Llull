@@ -16,7 +16,7 @@ export const commandError = (
 
 /** `CMD_UNKNOWN`: no registered command has that name. */
 export const unknownCommandError = (paths: readonly string[] = []): CommandError =>
-  commandError('CMD_UNKNOWN', 'Find the right name with `llull search <keyword>` or the MCP tool list.', [], paths);
+  commandError('CMD_UNKNOWN', 'Find the right name with `search_tools` or the tool list (CLI: `llull search <keyword>`).', [], paths);
 
 /** `noop` flagged as refused by the registry choke point (`CommandResult.rejected`), with its machine-readable reason. */
 export const rejection = (doc: CadDocument, summary: string, error: CommandError): CommandResult => ({

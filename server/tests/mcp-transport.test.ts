@@ -54,8 +54,22 @@ describe('MCP tools/list', () => {
   });
 });
 
+describe('MCP resource templates', () => {
+  it('lists cad://entity/{id} and reads one entity through it', async () => {
+    const session = await mcpSession();
+    const { result } = await mcpRpc(app, session, 'resources/templates/list', {});
+    const { resourceTemplates = [] } = result as { resourceTemplates?: Array<{ uriTemplate: string }> };
+    expect(resourceTemplates.map((t) => t.uriTemplate)).toContain('cad://entity/{id}');
+    const created = await mcpCallTool(session, 'add_box', { size: [1, 2, 3] });
+    expect(created.isError).not.toBe(true);
+    const id = Object.keys(getLiveDoc().entities)[0] ?? '';
+    const read = await mcpRpc(app, session, 'resources/read', { uri: `cad://entity/${id}` });
+    expect(JSON.stringify(read.result)).toContain(id);
+  });
+});
+
 describe('MCP tools/call — mutation (add_box)', () => {
-  it('returns summary + affected-ids blocks, no structuredContent, no image; updates the live document', async () => {
+  it('returns summary + affected-ids blocks, affected ids as structuredContent, no image; updates the live document', async () => {
     const result = await mcpCallTool(await mcpSession(), 'add_box', { size: [2, 2, 2], position: [0, 0, 0] });
     expect(result.isError).toBeFalsy();
     expect(Array.isArray(result.content)).toBe(true);
@@ -64,7 +78,7 @@ describe('MCP tools/call — mutation (add_box)', () => {
     expect(result.content.length).toBeGreaterThanOrEqual(2);
     expect(result.content[1]!.type).toBe('text');
     expect(result.content[1]!.text).toMatch(/^Affected entity ids:/);
-    expect(result.structuredContent).toBeUndefined();
+    expect(result.structuredContent).toEqual({ affected: ['box-1.1'] });
     expect(result.content.filter((b) => b.type === 'image')).toHaveLength(0);
     expect(entityCount()).toBe(1);
   });

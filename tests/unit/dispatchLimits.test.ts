@@ -19,8 +19,12 @@ describe('shapeToolCallContent size limits', () => {
     const wrapped = shapeToolCallContent({ summary: 's', affected: all, isError: false, data: [1] });
     expect(wrapped.structuredContent).toEqual({ data: [1], affected: all });
   });
-  it('adds no structuredContent for a small mutation, and keeps a data record own affected key', () => {
-    expect(shapeToolCallContent({ summary: 's', affected: ids(3), isError: false }).structuredContent).toBeUndefined();
+  it('always gives a mutation its ids in structuredContent (deduplicated), and keeps a data record own affected key', () => {
+    expect(shapeToolCallContent({ summary: 's', affected: ids(3), isError: false }).structuredContent).toEqual({ affected: ids(3) });
+    const dup = shapeToolCallContent({ summary: 's', affected: ['a', 'b', 'a'], isError: false });
+    expect(dup.structuredContent).toEqual({ affected: ['a', 'b'] });
+    expect(dup.content[1]?.text).toBe('Affected entity ids: a, b');
+    expect(shapeToolCallContent({ summary: 's', affected: [], isError: false }).structuredContent).toBeUndefined();
     const own = shapeToolCallContent({ summary: 's', affected: ids(3), isError: false, data: { affected: 'mine' } });
     expect(own.structuredContent).toEqual({ affected: 'mine' });
   });
@@ -33,9 +37,11 @@ describe('shapeToolCallContent size limits', () => {
     expect(text).not.toContain('box-4999.1');
     expect(text.length).toBeLessThan(10_000);
   });
-  it('keeps small data pretty-printed and complete', () => {
-    const shaped = shapeToolCallContent({ summary: 's', affected: [], isError: false, data: { a: 1 } });
-    expect(shaped.content[1]?.text).toBe('```json\n{\n  "a": 1\n}\n```');
+  it('prints data compact, floats to 6 significant figures and float noise as 0; structuredContent keeps full precision', () => {
+    const data = { mass: 0.007850000000000001, m: [1, 1e-17, -2.5e-16], n: 3 };
+    const shaped = shapeToolCallContent({ summary: 's', affected: [], isError: false, data });
+    expect(shaped.content[1]?.text).toBe('```json\n{"mass":0.00785,"m":[1,0,0],"n":3}\n```');
+    expect(shaped.structuredContent).toEqual(data);
   });
   it('clips huge data in the text but keeps the full data in structuredContent', () => {
     const data = { entities: Array.from({ length: 20_000 }, (_, i) => ({ id: `e-${i}`, kind: 'box' })) };

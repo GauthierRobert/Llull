@@ -140,7 +140,7 @@ describe('MCP content shaping', () => {
     const result = shapeToolCallContent({ summary: 'Added box e-001.', affected: ['e-001'], isError: false });
     expect(result.content[0]!.text).toBe('Added box e-001.');
     expect(result.content[1]!.text).toBe('Affected entity ids: e-001');
-    expect(result.structuredContent).toBeUndefined();
+    expect(result.structuredContent).toEqual({ affected: ['e-001'] });
     expect(result.content.every((b) => b.type === 'text')).toBe(true);
   });
 });

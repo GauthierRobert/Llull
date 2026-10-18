@@ -384,7 +384,7 @@ describe('shapeToolCallContent code blocks', () => {
     expect(json.startsWith('```json')).toBe(true);
     expect(json).not.toContain('print');
     expect(json).toContain('(source code in the next block)');
-    expect(json).toContain('"language": "cadquery"');
+    expect(json).toContain('"language":"cadquery"');
     expect(shaped.content[2]?.text).toBe(source);
     expect(shaped.structuredContent).toMatchObject({ text: source });
     expect(shaped.isError).toBe(false);
@@ -392,7 +392,7 @@ describe('shapeToolCallContent code blocks', () => {
   it('keeps ordinary data records and non-code formats in the JSON block only', () => {
     const plain = shapeToolCallContent({ summary: 's', affected: ['a'], isError: false, data: { format: 'step', text: 'not code' } });
     expect(plain.content.map((c) => c.text)).toHaveLength(3);
-    expect(plain.content[2]?.text).toContain('"text": "not code"');
+    expect(plain.content[2]?.text).toContain('"text":"not code"');
     const noText = shapeToolCallContent({ summary: 's', affected: [], isError: false, data: { format: 'code', text: 5 } });
     expect(noText.content).toHaveLength(2);
     const array = shapeToolCallContent({ summary: 's', affected: [], isError: false, data: [1, 2] });

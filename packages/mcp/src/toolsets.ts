@@ -22,6 +22,7 @@ export const TOOLSET_NAMES = [
   'fasteners',
   'exchange',
   'building',
+  'piping',
   'civil',
 ] as const;
 
@@ -37,6 +38,9 @@ const ANALYSIS_CORE_TOOLS = words(
 const MANUFACTURING_CORE_TOOLS: readonly string[] = words(
   'add_hole add_pocket add_rib set_thread recognize_features holes_from_recognition check_machining hole_table',
 );
+
+/** Industrial piping commands: contributed by the `building` (industrial) plugin, exposed as their own small toolset. */
+const PIPING_TOOLS = words('add_pipe_run add_pipe_support add_cable_tray check_pipe_supports pipe_hydraulics');
 
 /** Tool names per toolset; `building` / `civil` / the FE part of `analysis` come from their plugins. */
 export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
@@ -80,7 +84,11 @@ export const TOOLSETS: Readonly<Record<ToolsetName, readonly string[]>> = {
   },
   /** Contributed by the installed building + industrial plugins. */
   get building(): readonly string[] {
-    return pluginToolNames('building');
+    return pluginToolNames('building').filter((name) => !PIPING_TOOLS.includes(name));
+  },
+  /** Industrial pipe runs, supports, cable trays and hydraulics (from the industrial plugin). */
+  get piping(): readonly string[] {
+    return pluginToolNames('building').filter((name) => PIPING_TOOLS.includes(name));
   },
   /** Contributed by the installed civil (site / terrain / roads / drainage) plugin. */
   get civil(): readonly string[] {
@@ -120,22 +128,31 @@ export function toolsetOf(toolName: string): ToolsetName | undefined {
   return TOOLSET_NAMES.find((toolset) => TOOLSETS[toolset].includes(toolName));
 }
 
-/** @invariant a tool no toolset lists is always enabled (fail open: never hide a new tool) */
-export function isToolEnabled(toolName: string, enabled: ReadonlySet<ToolsetName>): boolean {
+/** Session-set key for one individually enabled tool (the set holds toolset names and these keys). */
+export const toolKey = (toolName: string): string => `tool:${toolName}`;
+
+/**
+ * @invariant a tool no toolset lists is always enabled (fail open: never hide a new tool)
+ * @invariant a tool is enabled by its toolset or individually (`enable_toolset { tools }` adds `toolKey(name)`)
+ */
+export function isToolEnabled(toolName: string, enabled: ReadonlySet<string>): boolean {
   const toolset = toolsetOf(toolName);
-  return toolset === undefined || enabled.has(toolset);
+  return toolset === undefined || enabled.has(toolset) || enabled.has(toolKey(toolName));
 }
 
 /** Prompts whose workflow calls a toolset's tools directly; unlisted prompts need only `core`. */
 const PROMPT_TOOLSETS: Readonly<Record<string, ToolsetName>> = {
   design_building: 'building',
   design_factory: 'building',
+  piping_hydraulics: 'piping',
+  fea_static_check: 'analysis',
+  dynamics_simulation: 'assembly',
   design_site: 'civil',
   design_sheet_bracket: 'manufacturing',
 };
 
 /** True when the MCP prompt `promptName` only references enabled tools. */
-export function isPromptEnabled(promptName: string, enabled: ReadonlySet<ToolsetName>): boolean {
+export function isPromptEnabled(promptName: string, enabled: ReadonlySet<string>): boolean {
   const toolset = PROMPT_TOOLSETS[promptName];
   return toolset === undefined || enabled.has(toolset);
 }

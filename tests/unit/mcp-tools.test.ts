@@ -126,9 +126,9 @@ describe('search_tools summary hint', () => {
   it('points at enable_toolset only when some result is in a disabled toolset', () => {
     const everything = new Set<ToolsetName>(parseToolsets('all').enabled);
     const open = applyDiscoveryToolCall('search_tools', { query: 'wall' }, everything);
-    expect(open?.result.content[0]?.text).not.toContain('Call enable_toolset');
+    expect(open?.result.content[0]?.text).not.toContain('To use disabled tools');
     const limited = applyDiscoveryToolCall('search_tools', { query: 'wall' }, coreOnly());
-    expect(limited?.result.content[0]?.text).toContain('Call enable_toolset for: building');
+    expect(limited?.result.content[0]?.text).toContain('enable_toolset');
   });
 });
 
@@ -549,9 +549,9 @@ describe('MCP prompts', () => {
     return [r.messages[0]!.content.text, r.messages[1]!.content.text];
   };
 
-  it('lists 7 described templates, incl. model_bracket, orthographic_setup, parametric_part; unknown names are null', () => {
+  it('lists 10 described templates, incl. model_bracket, orthographic_setup, parametric_part; unknown names are null', () => {
     const prompts = listMcpPrompts();
-    expect(prompts).toHaveLength(7);
+    expect(prompts).toHaveLength(10);
     expect(prompts.map((p) => p.name)).toEqual(expect.arrayContaining(['model_bracket', 'orthographic_setup', 'parametric_part']));
     for (const p of prompts) {
       expect(p.name.length * p.description.length).toBeGreaterThan(0);

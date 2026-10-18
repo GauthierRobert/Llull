@@ -190,7 +190,7 @@ export const plotSimulation = defineCommand({
     );
     return report(
       doc,
-      `plot_simulation: ${panels.length} panel(s), ${data.samples} samples over ${duration} s. ${lines.join('; ')}. Save the chart with --save plot.png (rasterizes data.svg).`,
+      `plot_simulation: ${panels.length} panel(s), ${data.samples} samples over ${duration} s. ${lines.join('; ')}. The chart is in data.svg.`,
       { svg, width, height, title, duration, samples: data.samples, panels: stats },
     );
   },

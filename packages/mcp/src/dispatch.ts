@@ -13,7 +13,7 @@ interface McpTextContent {
 
 /**
  * MCP CallToolResult minus the document. `structuredContent` = the full `data` (non-records wrapped
- * as `{ data }`) + all `affected` ids; absent when there is neither data nor an over-cap id list.
+ * as `{ data }`) + all (deduplicated) `affected` ids; absent when there is neither data, error nor ids.
  * @invariant a type alias, not an interface: only an alias is assignable to the SDK's
  *            index-signatured CallToolResult (server/src/mcp/server.ts relies on it, no casts).
  */
@@ -48,12 +48,24 @@ function clip(text: string, max: number, hint: string): string {
   return `${text.slice(0, max)}\n… [truncated ${text.length - max} of ${text.length} characters; ${hint}]`;
 }
 
-/** Pretty JSON while it is small; compact (then clipped) once it would flood the context. */
+const TEXT_SIGNIFICANT_DIGITS = 6;
+const TEXT_NOISE_FLOOR = 1e-15;
+
+/** Floats to ~6 significant figures and float noise (|x| < 1e-15) to 0, for the text an agent reads; integers untouched. */
+function roundForText(value: unknown): unknown {
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value) || Number.isInteger(value)) return value;
+    return Math.abs(value) < TEXT_NOISE_FLOOR ? 0 : Number(value.toPrecision(TEXT_SIGNIFICANT_DIGITS));
+  }
+  if (Array.isArray(value)) return value.map(roundForText);
+  if (isRecord(value)) return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, roundForText(entry)]));
+  return value;
+}
+
+/** Compact, rounded JSON (full precision lives in structuredContent), clipped once it would flood the context. */
 function jsonText(value: unknown): string {
-  const pretty = JSON.stringify(value, null, 2) ?? 'undefined';
-  if (pretty.length <= MAX_JSON_TEXT_CHARS) return pretty;
   return clip(
-    JSON.stringify(value) ?? 'undefined',
+    JSON.stringify(roundForText(value)) ?? 'undefined',
     MAX_JSON_TEXT_CHARS,
     'the full data is in structuredContent; narrow the request (filters, a smaller selection) or read the cad://scene resource',
   );
@@ -72,7 +84,8 @@ export function shapeToolCallContent(result: {
   data?: unknown;
   error?: CommandError;
 }): McpShapedResult {
-  const { summary, affected, isError, data, error } = result;
+  const { summary, isError, data, error } = result;
+  const affected = [...new Set(result.affected)];
   const content: McpTextContent[] = [{ type: 'text', text: summary }];
   const errorPart = error === undefined ? {} : { error };
   if (error !== undefined) {
@@ -91,8 +104,8 @@ export function shapeToolCallContent(result: {
     });
   }
   if (data === undefined) {
-    // Ids past the text cap would otherwise be in no channel at all.
-    const structured = { ...errorPart, ...(affected.length > MAX_AFFECTED_IDS_SHOWN ? { affected } : {}) };
+    // Always give clients the new ids as a field (no regex on the text).
+    const structured = { ...errorPart, ...(affected.length > 0 ? { affected } : {}) };
     return Object.keys(structured).length > 0 ? { content, isError, structuredContent: structured } : { content, isError };
   }
 

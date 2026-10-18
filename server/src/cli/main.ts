@@ -17,7 +17,7 @@ import { llullHome, readDesktopDiscovery } from './desktopDiscovery';
 import { exchangeTool, takesFileParam, withFileContent } from './exchange';
 import type { CommandOutcome } from '@mcp/restProtocol';
 import { isHealthy } from '../restClient';
-import { outcomeIsFailure } from '@mcp/commandOutcome';
+import { withFailureStatus } from '@mcp/commandOutcome';
 import { exchangeOptionsWithDwg } from '../dwgConvert';
 import type { ExchangeOptions } from '../pythonExchange';
 import { USAGE } from './usage';
@@ -37,7 +37,7 @@ export interface CliIo {
   readonly stderrIsTty?: boolean; // stream per-step progress without `--progress`
 }
 
-/** 1 = the command failed or changed nothing (`withOutcome`); 2 = bad usage / unreadable input. */
+/** 1 = the command failed or changed nothing (`withFailureStatus`); 2 = bad usage / unreadable input. */
 export const EXIT_OK = 0;
 export const EXIT_COMMAND_ERROR = 1;
 export const EXIT_USAGE = 2;
@@ -201,9 +201,6 @@ function printEntries(entries: readonly CatalogEntry[], args: ParsedArgv, io: Cl
   return EXIT_OK;
 }
 
-const withOutcome = (name: string, result: CommandOutcome): CommandOutcome =>
-  !result.isError && outcomeIsFailure(name, result) ? { ...result, isError: true } : result;
-
 async function runExec(args: ParsedArgv, io: CliIo): Promise<number> {
   const [, name, ...rest] = args.positionals;
   if (name === undefined) throw new UsageError('exec needs a command name: llull exec <command> [params]');
@@ -214,7 +211,7 @@ async function runExec(args: ParsedArgv, io: CliIo): Promise<number> {
   const observer = observerOf(args, io);
   const backend = await backendOf(args, io, observer);
   const result = isExchange ? await backend.exchange(name, params) : await backend.run(name, params);
-  return finish(withTimeout(observer, withOutcome(name, result)), args, io);
+  return finish(withTimeout(observer, withFailureStatus(name, result)), args, io);
 }
 
 const CAMERA_COMMANDS = new Set(['fit_view', 'set_camera']);
@@ -260,7 +257,7 @@ async function runPlan(args: ParsedArgv, io: CliIo): Promise<number> {
   };
   const observer = observerOf(args, io);
   const backend = await backendOf(args, io, observer);
-  const result = withTimeout(observer, withOutcome('build_project', await backend.run('build_project', params)));
+  const result = withTimeout(observer, withFailureStatus('build_project', await backend.run('build_project', params)));
   const framed = await frameAfterPlan(args, base['actions'], result, backend);
   const found = planAliases(result.data);
   const warnings =
