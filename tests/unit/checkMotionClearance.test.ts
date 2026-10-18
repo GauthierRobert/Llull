@@ -167,9 +167,43 @@ describe('check_motion_clearance on a rotating arm', () => {
     expect(data.pairs[0]?.collisions[0]?.overlapVolumeMm3).toBeNull();
   });
 
+  it('lets a declared intent allow the pair even when the overlap volume cannot be computed', () => {
+    const { doc, arm, obstacle } = armScene();
+    const allowed = step(doc, 'allow_interference', { a: arm, b: obstacle, kind: 'weld', reason: 'welded stop' }).doc;
+    const blind: GeometryKernel = {
+      supports: (op) => kernel.supports(op),
+      evaluate: (recipe) => kernel.evaluate(recipe),
+      tessellate: (shape) => kernel.tessellate(shape),
+      topology: (shape) => kernel.topology(shape),
+      exportStep: (shapes) => kernel.exportStep(shapes),
+    };
+    const data = check(allowed, {}, ctxOf(blind)).data as Data;
+    expect(codes(data)).toEqual(['FPR_MOTION_ALLOWED']);
+    expect(data.status).toBe('pass');
+    expect(data.pairs[0]?.status).toBe('allowed');
+  });
+
+  it('warns (not fails) when some contact intervals stay unclassified beside classified touches', () => {
+    let intersections = 0;
+    const limited: GeometryKernel = {
+      ...kernel,
+      evaluate: (recipe) => {
+        if (recipe.op === 'boolean' && recipe.boolean === 'intersect' && ++intersections > 3) return null;
+        return kernel.evaluate(recipe);
+      },
+    };
+    const { doc } = armScene({ obstacleY: 50, obstacleZ: 10 });
+    const data = check(doc, { duration: 2, sampleRate: 180 }, ctxOf(limited)).data as Data;
+    expect(data.pairs[0]?.collisions.map((c) => c.kind)).toEqual(['touch', 'unknown']);
+    const item = itemOf(data, 'FPR_MOTION_INTERFERENCE');
+    expect(item.status).toBe('warn');
+    expect(item.unverified).toBe(true);
+    expect(data.status).toBe('warn');
+  });
+
   it('thins long runs with maxSamples and warns that a thin obstacle can be skipped', () => {
     const scene = armScene({ obstacleY: 150 });
-    const needle = step(scene.doc, 'add_box', { size: [2, 2, 2], position: [0, -150, 0] });
+    const needle = step(scene.doc, 'add_box', { size: [2, 2, 2], position: [0, -104, 0] });
     const data = check(needle.doc, { duration: 0.75, maxSamples: 4 }).data as Data;
     expect(data.samples.stride).toBeGreaterThan(1);
     expect(data.samples.evaluated).toBeLessThanOrEqual(5);
@@ -305,5 +339,48 @@ describe('check_motion_clearance failures', () => {
     expect(data.pairs).toEqual([]);
     expect(codes(data)).toContain('FPR_NO_PAIRS');
     expect(data.status).toBe('not_run');
+  });
+  it('refuses a crankAxis that closes a loop (no joint angle series)', () => {
+    const built = sliderCrank({ crankRpm: 60, crankZMm: 20, wrist: 'revolute' });
+    const result = execute(built.doc, 'check_motion_clearance', { crankAxis: 'wrist_j', duration: 0.2 }, ctxOf());
+    expect(result.rejected).toBe(true);
+    expect(result.error?.code).toBe('FPR_UNKNOWN_ID');
+    expect(result.summary).toContain('closes a loop');
+  });
+
+  it('refuses a run whose pairs x samples are over the budget', () => {
+    const { doc } = armScene({ obstacleY: 150 });
+    const batch = Array.from({ length: 100 }, (_, k) => ({
+      command: 'add_box',
+      params: { size: [1, 1, 1], position: [1000 + 5 * k, 1000, 0] },
+    }));
+    const crowded = execute(doc, 'build_project', { actions: batch }, ctxOf()).document;
+    rejected(crowded, 'FPR_BUDGET_EXCEEDED', { duration: 0.05, timestep: 1e-5, sampleRate: 100000, maxSamples: 6001 });
+  });
+
+  it('stops a sweep that needs too many distance evaluations', () => {
+    const { doc } = armScene({ obstacleY: 150, rpm: 6000 });
+    const batch = Array.from({ length: 30 }, (_, k) => ({
+      command: 'add_box',
+      params: { size: [1, 1, 1], position: [1000 + 5 * k, 1000, 0] },
+    }));
+    const crowded = execute(doc, 'build_project', { actions: batch }, ctxOf()).document;
+    const result = check(crowded, { duration: 1, timestep: 1e-4, sampleRate: 3000 });
+    expect(result.rejected, result.summary).toBe(true);
+    expect(result.error?.code).toBe('FPR_BUDGET_EXCEEDED');
+    expect(result.summary).toContain('distance evaluations');
+  });
+
+  it('reports a part the kernel cannot build as FPR_PART_INVALID (not_run)', () => {
+    const { doc } = armScene({ obstacleY: 150 });
+    const odd = step(doc, 'add_box', { size: [7.123, 5, 5], position: [0, 300, 0] });
+    const picky: GeometryKernel = {
+      ...kernel,
+      evaluate: (recipe) => (JSON.stringify(recipe).includes('7.123') ? null : kernel.evaluate(recipe)),
+    };
+    const data = check(odd.doc, {}, ctxOf(picky)).data as Data;
+    expect(itemOf(data, 'FPR_PART_INVALID')).toMatchObject({ status: 'not_run', ids: [odd.id] });
+    expect(data.status).toBe('not_run');
+    expect(data.unverified).toBe(true);
   });
 });

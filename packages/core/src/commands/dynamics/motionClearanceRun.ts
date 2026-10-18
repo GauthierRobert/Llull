@@ -20,6 +20,10 @@ import { intentOf } from '../inspect/assemblyGraph';
 const MAX_SUBSTEPS = 16;
 /** Most contact intervals per pair whose overlap volume is computed with the kernel. */
 const MAX_CLASSIFIED = 12;
+/** Most intervals classified with the kernel across all pairs. */
+export const MAX_CLASSIFIED_TOTAL = 200;
+/** Most pair-moment evaluations (distance queries) of one run. */
+export const MAX_EVALUATIONS = 300_000;
 const VOLUME_RELATIVE = 1e-6;
 const MAX_REPORTED_INTERVALS = 50;
 
@@ -138,10 +142,12 @@ type Kind = 'interference' | 'touch' | 'unknown';
 interface Interval {
   readonly from: Moment;
   to: Moment;
-  samples: number;
+  evaluations: number;
   kind: Kind;
   volume: number | null;
   depth: number | null;
+  /** Moment of the largest overlap and the contact points there (document units); null while unclassified. */
+  worst: { moment: Moment; witness: readonly [Vec3, Vec3] } | null;
 }
 
 interface Closest {
@@ -164,7 +170,7 @@ export interface PairReport {
     readonly endTimeS: number;
     readonly startCrankDeg: number | null;
     readonly endCrankDeg: number | null;
-    readonly samples: number;
+    readonly evaluations: number;
     readonly overlapVolumeMm3: number | null;
     readonly penetrationEstimateMm: number | null;
   }>;
@@ -180,23 +186,40 @@ function volumeAt(plan: MotionPlan, a: MotionPart, b: MotionPart, u: number): { 
   return first === undefined || second === undefined ? null : overlapOf(plan.kernel, first, second);
 }
 
-function classify(plan: MotionPlan, a: MotionPart, b: MotionPart, intervals: Interval[]): void {
+function contactAt(plan: MotionPlan, a: MotionPart, b: MotionPart, u: number): readonly [Vec3, Vec3] {
+  const poseA = poseOf(plan, a, u);
+  const hit = bvhMinDistance(a.bvh, b.bvh, plan.eps, relativeTransform(poseA, poseOf(plan, b, u)));
+  return hit === null ? [poseA.position, poseA.position] : [pointAtPose(hit.pointA, poseA), pointAtPose(hit.pointB, poseA)];
+}
+
+/** Classifies up to `allowance` intervals (evenly spread) by overlap volume at their first, middle and last moment; returns how many it used. */
+function classify(plan: MotionPlan, a: MotionPart, b: MotionPart, intervals: Interval[], allowance: number): number {
   const volumeOf = (part: MotionPart): number => plan.kernel.analyze?.(part.part.shape)?.volume ?? 0;
   const tolerance = VOLUME_RELATIVE * Math.min(volumeOf(a), volumeOf(b));
-  const step = Math.max(1, Math.ceil(intervals.length / MAX_CLASSIFIED));
+  const step = Math.max(1, Math.ceil(intervals.length / Math.max(1, Math.min(MAX_CLASSIFIED, allowance))));
+  let used = 0;
   intervals.forEach((interval, index) => {
-    if (index % step !== 0) return;
+    if (index % step !== 0 || used >= allowance) return;
+    used++;
     const [u0, u1] = [interval.from.u, interval.to.u];
-    const found = [u0, (u0 + u1) / 2, u1].map((u) => volumeAt(plan, a, b, u));
-    if (found.some((entry) => entry === null)) return;
+    const found = [u0, (u0 + u1) / 2, u1].map((u) => ({ u, overlap: volumeAt(plan, a, b, u) }));
+    if (found.some((entry) => entry.overlap === null)) return;
     const worst = found.reduce(
-      (top, entry) => (entry !== null && (top === null || entry.volume > top.volume) ? entry : top),
-      found[0] ?? null,
+      (top, entry) => ((entry.overlap?.volume ?? 0) > (top.overlap?.volume ?? 0) ? entry : top),
+      found[0] ?? { u: u0, overlap: null },
     );
-    interval.volume = worst?.volume ?? 0;
-    interval.depth = worst?.depth ?? 0;
-    interval.kind = (worst?.volume ?? 0) > tolerance ? 'interference' : 'touch';
+    interval.volume = worst.overlap?.volume ?? 0;
+    interval.depth = worst.overlap?.depth ?? 0;
+    interval.kind = interval.volume > tolerance ? 'interference' : 'touch';
+    interval.worst = { moment: momentAt(plan, worst.u), witness: contactAt(plan, a, b, worst.u) };
   });
+  return used;
+}
+
+/** Work left for the whole run: pair-moment evaluations and kernel-classified intervals. */
+export interface Budget {
+  evaluations: number;
+  classified: number;
 }
 
 interface Sweep {
@@ -205,16 +228,18 @@ interface Sweep {
   readonly undersampled: boolean;
   readonly evaluations: number;
   readonly maxStepMm: number;
+  readonly exhausted: boolean;
 }
 
-function sweep(plan: MotionPlan, a: MotionPart, b: MotionPart): Sweep {
+function sweep(plan: MotionPlan, a: MotionPart, b: MotionPart, budget: Budget): Sweep {
   const lowBound = plan.clearance + plan.eps;
   const limit = Math.max(Math.min(a.thin, b.thin) / 2, 1e-9);
   const state: { best: Closest | null; bound: number; open: Interval | null } = { best: null, bound: Infinity, open: null };
   const intervals: Interval[] = [];
   let evaluations = 0;
-  const evaluate = (u: number): void => {
+  const evaluate = (u: number): number => {
     evaluations++;
+    budget.evaluations--;
     const poseA = poseOf(plan, a, u);
     const hit = bvhMinDistance(a.bvh, b.bvh, state.bound, relativeTransform(poseA, poseOf(plan, b, u)));
     const moment = momentAt(plan, u);
@@ -224,12 +249,13 @@ function sweep(plan: MotionPlan, a: MotionPart, b: MotionPart): Sweep {
     }
     if (hit !== null && hit.distance <= plan.eps) {
       if (state.open === null) {
-        state.open = { from: moment, to: moment, samples: 0, kind: 'unknown', volume: null, depth: null };
+        state.open = { from: moment, to: moment, evaluations: 0, kind: 'unknown', volume: null, depth: null, worst: null };
         intervals.push(state.open);
       }
       state.open.to = moment;
-      state.open.samples++;
+      state.open.evaluations++;
     } else state.open = null;
+    return hit?.distance ?? state.bound;
   };
   let undersampled = false;
   let maxStep = 0;
@@ -240,12 +266,16 @@ function sweep(plan: MotionPlan, a: MotionPart, b: MotionPart): Sweep {
       return track === undefined ? sum : sum + travelBound(track, i, part.radius);
     }, 0);
     const substeps = Math.min(MAX_SUBSTEPS, Math.max(1, Math.ceil(travel / limit)));
-    if (travel / substeps > Math.min(a.thin, b.thin)) undersampled = true;
-    maxStep = Math.max(maxStep, travel / substeps);
-    for (let k = 1; k <= substeps; k++) evaluate(i + k / substeps);
+    const stepSize = travel / substeps;
+    maxStep = Math.max(maxStep, stepSize);
+    let nearest = Infinity;
+    for (let k = 1; k <= substeps; k++) nearest = Math.min(nearest, evaluate(i + k / substeps));
+    if (stepSize > Math.min(a.thin, b.thin) && nearest < stepSize) undersampled = true;
+    if (budget.evaluations < 0) return { best: state.best, intervals, undersampled, evaluations, maxStepMm: 0, exhausted: true };
   }
-  classify(plan, a, b, intervals);
-  return { best: state.best, intervals, undersampled, evaluations, maxStepMm: maxStep * plan.mmPerUnit };
+  const used = classify(plan, a, b, intervals, budget.classified);
+  budget.classified -= used;
+  return { best: state.best, intervals, undersampled, evaluations, maxStepMm: maxStep * plan.mmPerUnit, exhausted: false };
 }
 
 const item = (
@@ -268,9 +298,29 @@ export interface MotionOutcome {
   readonly pairs: PairReport[];
   readonly items: CheckItem[];
   readonly evaluations: number;
+  /** The run hit its evaluation budget and stopped: the other fields are partial. */
+  readonly exhausted: boolean;
 }
 
-export function runMotion(plan: MotionPlan): MotionOutcome {
+const momentWitness = (moment: Moment, points: readonly Vec3[], mmPerUnit: number): NonNullable<CheckItem['witness']> => ({
+  pointsMm: points.map((p) => mmPoint(p, mmPerUnit)),
+  timeS: moment.timeS,
+  ...(moment.crankDeg === null ? {} : { crankDeg: moment.crankDeg }),
+});
+
+type Verdict = Exclude<PairReport['status'], 'clearance_low' | 'clear'> | 'unclassified' | 'none';
+
+/** Pair verdict from its intervals: a declared intent allows whatever the kind; unclassified intervals only warn next to classified touches. */
+function verdictOf(intervals: readonly Interval[], intent: boolean): Verdict {
+  const hard = intervals.some((interval) => interval.kind === 'interference');
+  const unknown = intervals.some((interval) => interval.kind === 'unknown');
+  if (intent && (hard || unknown)) return 'allowed';
+  if (hard) return 'interference';
+  if (unknown) return intervals.some((interval) => interval.kind === 'touch') ? 'unclassified' : 'interference';
+  return intervals.length > 0 ? 'touch' : 'none';
+}
+
+export function runMotion(plan: MotionPlan, budget: Budget): MotionOutcome {
   const { mmPerUnit } = plan;
   const pairs: PairReport[] = [];
   const items: CheckItem[] = [];
@@ -279,38 +329,33 @@ export function runMotion(plan: MotionPlan): MotionOutcome {
   let maxStepMm = 0;
   for (const [a, b] of plan.pairs) {
     const ids = [a.part.id, b.part.id];
-    const result = sweep(plan, a, b);
+    const result = sweep(plan, a, b, budget);
     evaluations += result.evaluations;
+    if (result.exhausted) return { pairs, items, evaluations, exhausted: true };
     maxStepMm = Math.max(maxStepMm, result.maxStepMm);
     if (result.undersampled) ids.forEach((id) => undersampled.add(id));
     const { best, intervals } = result;
-    const hard = intervals.filter((interval) => interval.kind !== 'touch');
     const intent = intentOf(plan.doc, a.part.id, b.part.id);
-    const unknown = hard.some((interval) => interval.kind === 'unknown');
-    const worst = hard.reduce<Interval | null>(
-      (top, interval) => ((interval.volume ?? Infinity) > (top?.volume ?? -1) ? interval : top),
+    const verdict = verdictOf(intervals, intent !== undefined);
+    const contact = intervals.filter((interval) => interval.kind !== 'touch');
+    const worst = contact.reduce<Interval | null>(
+      (top, interval) => ((interval.volume ?? -1) > (top?.volume ?? -2) ? interval : top),
       null,
     );
-    const lowClearance = hard.length === 0 && best !== null && best.distance < plan.clearance;
-    let status: PairReport['status'] = 'clear';
-    if (hard.length > 0 && intent !== undefined && !unknown) status = 'allowed';
-    else if (hard.length > 0) status = 'interference';
-    else if (intervals.length > 0) status = 'touch';
-    else if (lowClearance) status = 'clearance_low';
+    const lowClearance = intervals.length === 0 && best !== null && best.distance < plan.clearance;
+    const status: PairReport['status'] =
+      verdict === 'unclassified' ? 'interference' : verdict === 'none' ? (lowClearance ? 'clearance_low' : 'clear') : verdict;
     if (worst !== null) {
       const values: Record<string, number> = {
-        intervals: hard.length,
-        firstContactTimeS: hard[0]?.from.timeS ?? 0,
+        intervals: contact.length,
+        firstContactTimeS: contact[0]?.from.timeS ?? 0,
         minDistanceMm: 0,
         ...(worst.volume === null ? {} : { maxOverlapVolumeMm3: worst.volume * mmPerUnit ** 3 }),
         ...(worst.depth === null ? {} : { maxPenetrationEstimateMm: worst.depth * mmPerUnit }),
       };
-      const witness = {
-        pointsMm: (best?.witness ?? []).map((p) => mmPoint(p, mmPerUnit)),
-        timeS: worst.from.timeS,
-        ...(worst.from.crankDeg === null ? {} : { crankDeg: worst.from.crankDeg }),
-      };
-      if (status === 'allowed' && intent !== undefined)
+      const witness = momentWitness(worst.worst?.moment ?? worst.from, worst.worst?.witness ?? best?.witness ?? [], mmPerUnit);
+      const partial = contact.some((interval) => interval.kind === 'unknown');
+      if (verdict === 'allowed' && intent !== undefined)
         items.push(
           item(
             'FPR_MOTION_ALLOWED',
@@ -324,22 +369,22 @@ export function runMotion(plan: MotionPlan): MotionOutcome {
         items.push(
           item(
             'FPR_MOTION_INTERFERENCE',
-            'fail',
+            verdict === 'unclassified' ? 'warn' : 'fail',
             ids,
             'Move or resize a part, change the mechanism geometry, or declare an intended overlap (press fit, weld) with allow_interference and a reason.',
             {
               values,
               witness,
-              ...(unknown
+              ...(partial
                 ? {
                     unverified: true,
-                    note: 'contact found but the overlap volume could not be computed (kernel without analyze, or too many intervals)',
+                    note: 'contact found but the overlap volume could not be computed for some intervals (kernel without analyze, or too many intervals)',
                   }
                 : {}),
             },
           ),
         );
-    } else if (status === 'touch')
+    } else if (verdict === 'touch')
       items.push(
         item('FPR_MOTION_TOUCH', 'info', ids, 'Parts touch during the motion with zero overlap volume (e.g. a pin in its bore).', {
           values: { intervals: intervals.length, firstContactTimeS: intervals[0]?.from.timeS ?? 0 },
@@ -349,11 +394,7 @@ export function runMotion(plan: MotionPlan): MotionOutcome {
       items.push(
         item('FPR_MOTION_CLEARANCE_LOW', 'warn', ids, 'Increase the gap at the reported time / crank angle, or lower clearanceMm.', {
           values: { minDistanceMm: best.distance * mmPerUnit, timeS: best.moment.timeS },
-          witness: {
-            pointsMm: best.witness.map((p) => mmPoint(p, mmPerUnit)),
-            timeS: best.moment.timeS,
-            ...(best.moment.crankDeg === null ? {} : { crankDeg: best.moment.crankDeg }),
-          },
+          witness: momentWitness(best.moment, best.witness, mmPerUnit),
           threshold: { value: plan.clearance * mmPerUnit, unit: 'mm', source: 'clearanceMm parameter', grade: 'A', defaulted: false },
         }),
       );
@@ -373,7 +414,7 @@ export function runMotion(plan: MotionPlan): MotionOutcome {
           endTimeS: interval.to.timeS,
           startCrankDeg: interval.from.crankDeg,
           endCrankDeg: interval.to.crankDeg,
-          samples: interval.samples,
+          evaluations: interval.evaluations,
           overlapVolumeMm3: interval.volume === null ? null : interval.volume * mmPerUnit ** 3,
           penetrationEstimateMm: interval.depth === null ? null : interval.depth * mmPerUnit,
         })),
@@ -385,9 +426,9 @@ export function runMotion(plan: MotionPlan): MotionOutcome {
         'FPR_MOTION_UNDERSAMPLED',
         'warn',
         [...undersampled],
-        'Parts move further between samples than their thinnest side even after interpolation: raise sampleRate or shorten duration so a thin obstacle cannot be skipped.',
+        'A part moves further between samples than the thinnest part side while another part is that close, even after interpolation: raise sampleRate or shorten duration so a thin obstacle cannot be skipped.',
         { values: { maxStepMm }, unverified: true, note: 'a pass for these parts may miss a short contact' },
       ),
     );
-  return { pairs, items, evaluations };
+  return { pairs, items, evaluations, exhausted: false };
 }

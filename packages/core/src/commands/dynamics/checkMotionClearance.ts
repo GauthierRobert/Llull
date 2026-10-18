@@ -16,11 +16,11 @@ import { candidateIds, collectParts } from '../inspect/assemblyParts';
 import { assemblyLinks } from '../inspect/assemblyGraph';
 import { dynamicsOf } from './bodies';
 import { simulateMotion } from './simulate';
-import { planMotion, runMotion } from './motionClearanceRun';
+import { MAX_CLASSIFIED_TOTAL, MAX_EVALUATIONS, planMotion, runMotion } from './motionClearanceRun';
 
 const MAX_PARTS = 500;
 const MAX_PAIRS = 2000;
-const MAX_EVALUATIONS = 400_000;
+const MAX_PAIR_SAMPLES = 400_000;
 const DEFAULT_TOUCH_MM = 0.001;
 const DEFAULT_DURATION = 2;
 const DEFAULT_MAX_SAMPLES = 4000;
@@ -163,13 +163,15 @@ export const checkMotionClearance = defineCommand({
       mmPerUnit,
     });
     if (plan.pairs.length > MAX_PAIRS) return refuse('FPR_BUDGET_EXCEEDED', `${plan.pairs.length} candidate pairs, limit ${MAX_PAIRS}`);
-    if (plan.pairs.length * plan.times.length > MAX_EVALUATIONS)
+    if (plan.pairs.length * plan.times.length > MAX_PAIR_SAMPLES)
       return refuse(
         'FPR_BUDGET_EXCEEDED',
-        `${plan.pairs.length} pairs x ${plan.times.length} samples is over ${MAX_EVALUATIONS} evaluations`,
+        `${plan.pairs.length} pairs x ${plan.times.length} samples is over ${MAX_PAIR_SAMPLES} pair-samples`,
       );
 
-    const outcome = runMotion(plan);
+    const outcome = runMotion(plan, { evaluations: MAX_EVALUATIONS, classified: MAX_CLASSIFIED_TOTAL });
+    if (outcome.exhausted)
+      return refuse('FPR_BUDGET_EXCEEDED', `the sweep needs more than ${MAX_EVALUATIONS} distance evaluations (fast motion, many pairs)`);
     const items: CheckItem[] = [
       ...collected.refused.map(
         ({ id }): CheckItem => ({
