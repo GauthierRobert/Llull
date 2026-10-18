@@ -31,7 +31,7 @@ vessel is fit for service (that needs a qualified engineer and, for a real vesse
 | `data/pump_envelopes.json` | ISO 2858 rows (a, f, h1, h2), ASME B73.1 rows (CP, D, X), API 610 type list | A / B per row |
 | `data/tema_designations.json` | TEMA letters, tube sizes, shell clearance, unsupported spans, tube-count reference cases | A / B |
 | `data/derive_expected.py` | independent re-implementation of the closed forms; prints every derived number used below | — |
-| `expected_results.json` | index of the 20 VCs | — |
+| `expected_results.json` | index of the 25 VCs (20 MVP, 5 V1 / V2) | — |
 | `plans/sc-eqp-0*.json` | 4 CLI scenarios (`build_project` actions + `expected[]`), commands flagged PROPOSED | — |
 
 ## Real use cases
@@ -69,6 +69,11 @@ vessel is fit for service (that needs a qualified engineer and, for a real vesse
 | VC-EQP-18 | (V1) tube counts and maximum unsupported tube span | ht 1.2.0 [S27] | exact | `tubeLayout.test.ts` |
 | VC-EQP-19 | Regeneration keeps element id, port ids and flange-face positions | closed form (11.705574 m³) | 1e-9; ids exact | `regeneration.test.ts` |
 | VC-EQP-20 | IFC export: 1 tank + 4 distribution ports | IFC4 entity names [S30] (C, confirm before gating) | exact counts | `ifcEquipment.test.ts` |
+| VC-EQP-21 | Column tray stack elevations; 30 trays refused `EQP_TRAYS_DONT_FIT` | closed form | exact | `column.test.ts` |
+| VC-EQP-22 | (V1) equipment template save / insert keeps relative port positions | closed form | 1e-9 | `templates.test.ts` |
+| VC-EQP-23 | (V1) air cooler / compressor envelope ports | explicit inputs | exact | `airCooler.test.ts` |
+| VC-EQP-24 | (V1) nozzle orientation view labels | SC-EQP-01 | exact text | `orientationView.test.ts` |
+| VC-EQP-25 | (V2) saddle / reinforcement checks vs COMPRESS or PV Elite | TBD — measure with a licensed tool | TBD | V2 |
 
 ### Derivations used as expectations
 

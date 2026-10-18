@@ -126,6 +126,24 @@ orthogonal residual of S9 [S13]. Floors: radius 0.2 mm, axis angle 0.05°, axis 
 | VC-SCN-51 | Unverified propagation: an extraction from a cloud whose registration has no quality record (`registration.status: "unverified"`) carries `unverified: true`. So does the pipe run created from it, and `check_point_clouds` lists it as a warning | flags present | `scan/checkPointClouds.test.ts` |
 | VC-SCN-52 | A deviation or clash report used for a tie-in carries `reviewRequired: true` with the reason ("tie-in dimensions from a scan — field-verify before fabrication"). The defaulted clash noise threshold (`minPointsInVolume: 10`) is named in `data` with `defaulted: true` | flags present | `asbuiltClash.test.ts` |
 
+### FR → VC coverage
+
+| FR | VC |
+| -- | -- |
+| FR-SCN-01 | 01, 02, 03, 04, 05 |
+| FR-SCN-02 | 06, 07, 08 |
+| FR-SCN-03 (ASCII) | 20a–c, 22–24, 31, 41, 43 (the synthetic clouds are imported as CSV) |
+| FR-SCN-04 | 05, 51; golden replay without the port (TR-SCN-04) |
+| FR-SCN-05 | 09 |
+| FR-SCN-06 | 10 (query twin of the viewport LOD rule) |
+| FR-SCN-07 | 12 |
+| FR-SCN-08 / 09 / 10 | 31, 32 / 30, 32 / 51 |
+| FR-SCN-11 | 11 |
+| FR-SCN-12 / 13 / 14 / 15 / 16 | 20a–c / 20, 21 / 22 / 23 / 24 |
+| FR-SCN-17 / 18 / 19 | 40, 41, 42 / 41 / 43, 52 |
+| FR-SCN-20 / 21 / 22 | 51 / 02, 03, 08, 11, 32, 50 / 51, 52 |
+| FR-SCN-23, 24 (COULD, V1) | none yet: E57 round-trip (export then re-import equals `e57_reference.json`) and global registration on ICP-A at 90° are to be added with V1 |
+
 ### Derivations used as expectations
 
 - **DN snap (VC-SCN-21).** OD_fit = 2 r_fit. The DN is the table row with |OD_fit − OD_table| ≤ 1.5 mm (existing llull

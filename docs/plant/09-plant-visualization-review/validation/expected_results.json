@@ -1,0 +1,581 @@
+{
+  "pack": "09 VIS",
+  "generatedBy": "hand-written index; derived numbers reproduced by data/derive_vis_expected.py",
+  "cases": [
+    {
+      "id": "VC-VIS-01",
+      "proves": [
+        "FR-VIS-01",
+        "FR-VIS-02",
+        "TR-VIS-01",
+        "TR-VIS-03"
+      ],
+      "command": "apply_service_colour_scheme + colour_by_rule_report",
+      "reference": "data/service_colour_schemes.json asme_a13_1 rows A13-FQ/TC/FO/CB/WA/CA (grade A)",
+      "expected": {
+        "CW-101": [
+          "water",
+          "green",
+          "white"
+        ],
+        "IA-102": [
+          "compressed_air",
+          "blue",
+          "white"
+        ],
+        "FG-103": [
+          "flammable_oxidizing",
+          "yellow",
+          "black"
+        ],
+        "FO-104": [
+          "combustible",
+          "brown",
+          "white"
+        ],
+        "CS-105": [
+          "toxic_corrosive",
+          "orange",
+          "black"
+        ],
+        "FW-106": [
+          "fire_quenching",
+          "red",
+          "white"
+        ]
+      },
+      "tolerance": "exact string",
+      "plan": "plans/sc-vis-01-service-colour-rules.json",
+      "test": "tests/unit/aec/industrial/serviceColour.test.ts"
+    },
+    {
+      "id": "VC-VIS-02",
+      "proves": [
+        "FR-VIS-02"
+      ],
+      "command": "apply_service_colour_scheme scheme=iso_14726",
+      "reference": "data/service_colour_schemes.json iso_14726 (grade A)",
+      "expected": {
+        "CW-101": "green",
+        "IA-102": "grey",
+        "FG-103": "yellow",
+        "FO-104": "brown",
+        "CS-105": "violet",
+        "FW-106": "red",
+        "N2-107": "grey"
+      },
+      "tolerance": "exact string",
+      "plan": "plans/sc-vis-01-service-colour-rules.json",
+      "test": "serviceColour.test.ts"
+    },
+    {
+      "id": "VC-VIS-03",
+      "proves": [
+        "FR-VIS-01",
+        "FR-VIS-03",
+        "TR-VIS-01",
+        "AF-11",
+        "AF-21"
+      ],
+      "command": "define_colour_profile / colour_by_rule_report / check_display",
+      "expected": {
+        "firstMatchWins": true,
+        "unmatchedCode": "VIS_COLOUR_UNMATCHED",
+        "geometryDeepEqualAfterProfileSwitch": true,
+        "palette": "llull-ral-approx-v1",
+        "approximate": true
+      },
+      "tolerance": "exact",
+      "source": "E3D / Navisworks first-match semantics [S17, S20]",
+      "test": "tests/unit/display/colourRules.test.ts"
+    },
+    {
+      "id": "VC-VIS-04",
+      "proves": [
+        "FR-VIS-04",
+        "TR-VIS-04"
+      ],
+      "command": "add_pipe_markers / check_pipe_markers",
+      "inputs": {
+        "odMm": {
+          "DN20": 26.9,
+          "DN25": 33.7,
+          "DN50": 60.3,
+          "DN100": 114.3,
+          "DN100_ins50": 214.3,
+          "DN150": 168.3,
+          "DN200": 219.1,
+          "DN300": 323.9
+        }
+      },
+      "expected": {
+        "DN20": {
+          "fieldLengthMm": 203.2,
+          "letterHeightMm": 12.7,
+          "bandInterpolated": false
+        },
+        "DN25": {
+          "fieldLengthMm": 203.2,
+          "letterHeightMm": 19.05,
+          "bandInterpolated": true
+        },
+        "DN50": {
+          "fieldLengthMm": 304.8,
+          "letterHeightMm": 31.75,
+          "bandInterpolated": true
+        },
+        "DN100": {
+          "fieldLengthMm": 304.8,
+          "letterHeightMm": 31.75,
+          "bandInterpolated": false
+        },
+        "DN100_ins50": {
+          "fieldLengthMm": 609.6,
+          "letterHeightMm": 63.5,
+          "bandInterpolated": false
+        },
+        "DN150": {
+          "fieldLengthMm": 609.6,
+          "letterHeightMm": 63.5,
+          "bandInterpolated": true
+        },
+        "DN200": {
+          "fieldLengthMm": 609.6,
+          "letterHeightMm": 63.5,
+          "bandInterpolated": false
+        },
+        "DN300": {
+          "fieldLengthMm": 812.8,
+          "letterHeightMm": 88.9,
+          "bandInterpolated": false
+        }
+      },
+      "tolerance": "exact (in x 25.4); letter heights gate (grade A), field lengths documented (grade B)",
+      "source": "data/service_colour_schemes.json asme_a13_1_legend_size; ODs from packages/domain-aec/src/industrial/piping/pipeSizes.ts",
+      "test": "tests/unit/aec/industrial/pipeMarkers.test.ts"
+    },
+    {
+      "id": "VC-VIS-10",
+      "proves": [
+        "FR-VIS-05",
+        "FR-VIS-09",
+        "TR-VIS-10",
+        "TR-VIS-12"
+      ],
+      "command": "save_viewpoint / get_viewpoint / export_bcf_viewpoint / import_bcf_viewpoint",
+      "reference": "data/bcf_3_0/example_viewpoint_orthogonal.bcfv",
+      "expected": {
+        "eyeM": [
+          18.674638207107783,
+          -19.54805982455614,
+          10.538476791232824
+        ],
+        "eyeMm": [
+          18674.638207107782,
+          -19548.05982455614,
+          10538.476791232824
+        ],
+        "direction": [
+          -0.8050867319107056,
+          0.5154458284378052,
+          -0.29351478815078735
+        ],
+        "up": [
+          -0.24719256162643433,
+          0.15826167166233063,
+          0.9559545516967773
+        ],
+        "viewToWorldScaleM": 9.673289179801941,
+        "viewHeightMm": 9673.289179801941,
+        "aspectRatio": 1.7777777777777777
+      },
+      "tolerance": "1e-12 rel",
+      "plan": "plans/sc-vis-02-viewpoint-bcf-roundtrip.json",
+      "test": "tests/unit/review/viewpointCamera.test.ts"
+    },
+    {
+      "id": "VC-VIS-11",
+      "proves": [
+        "FR-VIS-05",
+        "TR-VIS-11"
+      ],
+      "command": "apply_viewpoint",
+      "expected": {
+        "polarRad": 1.2728948190113956,
+        "azimuthRad": 2.1402772048541396
+      },
+      "tolerance": "1e-9 abs",
+      "source": "closed form, data/derive_vis_expected.py section 5",
+      "plan": "plans/sc-vis-02-viewpoint-bcf-roundtrip.json",
+      "test": "viewpointCamera.test.ts"
+    },
+    {
+      "id": "VC-VIS-12",
+      "proves": [
+        "FR-VIS-06",
+        "TR-VIS-13",
+        "AF-21"
+      ],
+      "command": "section_box_report",
+      "expected": {
+        "inside": [
+          "skid"
+        ],
+        "crossing": [
+          "pipe"
+        ],
+        "outside": [
+          "far"
+        ]
+      },
+      "tolerance": "exact",
+      "source": "AABB arithmetic",
+      "plan": "plans/sc-vis-04-section-box-markup-issue.json",
+      "test": "tests/unit/review/sectionBox.test.ts"
+    },
+    {
+      "id": "VC-VIS-13",
+      "proves": [
+        "FR-VIS-07",
+        "FR-VIS-08",
+        "TR-VIS-14",
+        "AF-13"
+      ],
+      "command": "add_markup / create_review_issue / add_review_comment",
+      "expected": {
+        "saveLoadEqual": true,
+        "undoRedoEqual": true,
+        "replayIdsEqual": true
+      },
+      "tolerance": "exact",
+      "test": "tests/integration/review.test.ts"
+    },
+    {
+      "id": "VC-VIS-14",
+      "proves": [
+        "FR-VIS-07",
+        "FR-VIS-10",
+        "TR-VIS-15",
+        "AF-20",
+        "AF-34",
+        "AF-34a"
+      ],
+      "command": "check_review / set_issue_status",
+      "expected": {
+        "afterDelete": [
+          "VIS_ISSUE_ENTITY_MISSING",
+          "VIS_ISSUE_OPEN"
+        ],
+        "afterResolved": [
+          "VIS_ISSUE_AWAITING_APPROVAL"
+        ],
+        "agentClose": "VIS_HUMAN_GATE",
+        "signedHumanClose": "ok"
+      },
+      "tolerance": "exact codes",
+      "plan": "plans/sc-vis-04-section-box-markup-issue.json",
+      "test": "tests/unit/review/checkReview.test.ts"
+    },
+    {
+      "id": "VC-VIS-15",
+      "proves": [
+        "FR-VIS-09",
+        "TR-VIS-12"
+      ],
+      "command": "export_bcf",
+      "reference": "data/bcf_3_0/visinfo.xsd, markup.xsd",
+      "expected": {
+        "schemaValid": true
+      },
+      "tolerance": "valid",
+      "test": "server/tests/bcf.test.ts"
+    },
+    {
+      "id": "VC-VIS-20",
+      "proves": [
+        "FR-VIS-12",
+        "FR-VIS-13",
+        "TR-VIS-20"
+      ],
+      "command": "render_stats",
+      "inputs": {
+        "bays": [
+          8,
+          44,
+          437,
+          4367
+        ]
+      },
+      "expected": {
+        "componentCount": [
+          1832,
+          10076,
+          100071,
+          1000037
+        ]
+      },
+      "tolerance": "exact",
+      "source": "N(n) = 227 n + 8 floor(n/4) (data/synthetic_pipe_rack_benchmark.json)",
+      "plan": "plans/sc-vis-03-synthetic-rack-drawcalls.json",
+      "test": "tests/unit/render/renderPlan.test.ts"
+    },
+    {
+      "id": "VC-VIS-21",
+      "proves": [
+        "FR-VIS-12",
+        "FR-VIS-13",
+        "TR-VIS-20"
+      ],
+      "command": "render_stats",
+      "expected": {
+        "opaqueModelCallsMax": 30,
+        "invariantUnderServiceColours": true,
+        "opaqueModelCallsExact": "TBD - pin from the first deterministic run per camera"
+      },
+      "tolerance": "<= / equality",
+      "source": "R-BATCH-v1: 2 x 13 + 4",
+      "test": "renderPlan.test.ts"
+    },
+    {
+      "id": "VC-VIS-22",
+      "proves": [
+        "FR-VIS-12",
+        "TR-VIS-21"
+      ],
+      "command": "render_stats (renderPlan LOD)",
+      "inputs": {
+        "prototype": "stud_m16",
+        "diagMm": 92.8009,
+        "viewportHeightPx": 1080,
+        "fovDeg": 45,
+        "thresholdsPx": [
+          48,
+          8,
+          1
+        ],
+        "hysteresis": 0.1
+      },
+      "expected": {
+        "lod0to1Mm": 2520.462372717879,
+        "lod1to2Mm": 15122.774236307274,
+        "cullMm": 120982.19389045819,
+        "lod1HoldDownToMm": 2268.416135446091,
+        "allPrototypes": "data/synthetic_pipe_rack_benchmark.json lod.switchDistancesMm"
+      },
+      "tolerance": "1e-6 rel on distances, exact level",
+      "source": "pinhole projection closed form; three r186 LOD hysteresis semantics (T4)",
+      "test": "renderPlan.test.ts"
+    },
+    {
+      "id": "VC-VIS-23",
+      "proves": [
+        "FR-VIS-13",
+        "TR-VIS-22"
+      ],
+      "command": "render_stats",
+      "expected": {
+        "drawnPlusCulledEqualsN": true,
+        "instancedMeshBytesPerInstance": 76,
+        "stateBytesPerInstance": 4,
+        "batchedMesh1e6TextureBytes": 84000000
+      },
+      "tolerance": "exact",
+      "source": "three r186 facts T1, T2",
+      "test": "renderPlan.test.ts"
+    },
+    {
+      "id": "VC-VIS-24",
+      "proves": [
+        "FR-VIS-12",
+        "FR-VIS-14"
+      ],
+      "command": "viewport (Playwright perf)",
+      "expected": {
+        "medianFrameMs": "TBD - measure",
+        "p95FrameMs": "TBD - measure",
+        "targets": {
+          "S": 16.7,
+          "M": 16.7,
+          "L": 33.3
+        }
+      },
+      "tolerance": "+20 % vs stored per-machine baseline",
+      "procedure": "data/synthetic_pipe_rack_benchmark.json frameTime.procedure",
+      "test": "tests/perf/plantViewport.perf.ts"
+    },
+    {
+      "id": "VC-VIS-25",
+      "proves": [
+        "FR-VIS-19"
+      ],
+      "command": "import_gltf / export_gltf",
+      "reference": "data/gltf_simple_instancing/SimpleInstancing.gltf",
+      "expected": {
+        "instances": 125,
+        "translationMin": [
+          0,
+          0,
+          0
+        ],
+        "translationMax": [
+          10,
+          10,
+          10
+        ],
+        "scaleMin": [
+          1,
+          1,
+          1
+        ],
+        "scaleMax": [
+          2,
+          2,
+          2
+        ],
+        "rotationMin": [
+          0,
+          0,
+          0,
+          0.5
+        ],
+        "rotationMax": [
+          0.7071068,
+          0.7071068,
+          0.7071068,
+          1
+        ],
+        "exportMeshes": 1,
+        "exportExtension": "EXT_mesh_gpu_instancing"
+      },
+      "tolerance": "exact counts, 1e-6 values",
+      "source": "Khronos SimpleInstancing README + accessor min/max [S23]",
+      "test": "tests/unit/exchange/gltfInstancing.test.ts"
+    },
+    {
+      "id": "VC-VIS-30",
+      "proves": [
+        "FR-VIS-16",
+        "TR-VIS-30",
+        "AF-13"
+      ],
+      "command": "render_view",
+      "expected": {
+        "repeatDigestEqual": true,
+        "pinnedDigests": "TBD - measure per rendererVersion"
+      },
+      "tolerance": "exact",
+      "plan": "plans/sc-vis-05-render-view-determinism.json",
+      "test": "tests/golden/renderReview.test.ts"
+    },
+    {
+      "id": "VC-VIS-31",
+      "proves": [
+        "FR-VIS-16",
+        "TR-VIS-31"
+      ],
+      "command": "render_view projection=perspective",
+      "inputs": {
+        "eye": [
+          0,
+          -10000,
+          0
+        ],
+        "direction": [
+          0,
+          1,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          1
+        ],
+        "fovDeg": 45,
+        "width": 800,
+        "height": 600,
+        "point": [
+          1000,
+          0,
+          500
+        ]
+      },
+      "expected": {
+        "pixel": [
+          472.42640687119285,
+          263.7867965644036
+        ]
+      },
+      "tolerance": "0.5 px",
+      "source": "pinhole closed form",
+      "test": "tests/unit/render/renderPerspective.test.ts"
+    },
+    {
+      "id": "VC-VIS-32",
+      "proves": [
+        "FR-VIS-06",
+        "FR-VIS-16"
+      ],
+      "command": "render_view sectionBoxId",
+      "expected": {
+        "visibleIncludes": [
+          "skid",
+          "pipe"
+        ],
+        "visibleExcludes": [
+          "far"
+        ]
+      },
+      "tolerance": "exact",
+      "test": "renderPerspective.test.ts"
+    },
+    {
+      "id": "VC-VIS-40",
+      "proves": [
+        "FR-VIS-11",
+        "TR-VIS-40"
+      ],
+      "command": "create_clash_issues",
+      "expected": {
+        "clashes": 1,
+        "firstRunCreated": 1,
+        "secondRunCreated": 0,
+        "secondRunUnchanged": 1
+      },
+      "tolerance": "exact",
+      "plan": "plans/sc-vis-06-clash-review.json",
+      "test": "tests/unit/review/clashIssues.test.ts"
+    },
+    {
+      "id": "VC-VIS-41",
+      "proves": [
+        "FR-VIS-11",
+        "TR-VIS-40"
+      ],
+      "command": "create_clash_issues",
+      "expected": {
+        "sectionBox": "AABB(a) intersect AABB(b), expanded by margin 500 on each side"
+      },
+      "tolerance": "1e-9",
+      "test": "clashIssues.test.ts"
+    },
+    {
+      "id": "VC-VIS-50",
+      "proves": [
+        "AF-11",
+        "FR-VIS-20"
+      ],
+      "command": "build_project (deliberately wrong plan)",
+      "expected": {
+        "codes": [
+          "VIS_PROFILE_NOT_FOUND",
+          "VIS_SECTION_BOX_INVALID",
+          "VIS_MARKUP_INVALID",
+          "VIS_VIEWPOINT_NOT_ORTHONORMAL"
+        ],
+        "each": "error.paths and error.remediation non-empty"
+      },
+      "tolerance": "exact codes",
+      "test": "tests/unit/review/errors.test.ts"
+    }
+  ]
+}

@@ -93,6 +93,36 @@ How the laws are respected:
   provider registered through `plugins/host.ts`. This adds one optional `CadPlugin` field (§3.4). The change touches
   `packages/core/src/plugins/plugin.ts`, so `cad-reviewer` must approve it.
 
+### 2.1 Technical requirements
+
+| Id | Pri | Requirement | FR | AF |
+| -- | --- | ----------- | -- | -- |
+| TR-VIS-01 | MUST | Pure first-match colour-rule engine `geometry/colourRules.ts` (§5.1); a cached result per (profile, entities identity) | FR-VIS-01 | AF-13 |
+| TR-VIS-02 | MUST | Property port: `CadPlugin.entityProperties` + `ctx.properties`; industrial provider for pipes / equipment (§3.3, §3.4) | FR-VIS-01 | AF-01 |
+| TR-VIS-03 | MUST | Scheme tables as data with source ids and grades; reports carry category names, `palette` and `approximate: true`; hazard profiles start `reviewRequired` | FR-VIS-02, 03 | AF-30, 31, 33, 35 |
+| TR-VIS-04 | SHOULD | A13.1 legend band and placement algorithm (§5.7) with a check command | FR-VIS-04 | AF-20, 33 |
+| TR-VIS-10 | MUST | `review` model; viewpoint commands `metaHistory`, ids from `review.nextNumber` (deterministic) | FR-VIS-05 | AF-05, 13 |
+| TR-VIS-11 | MUST | Viewpoint ⇄ `CameraState` ⇄ BCF camera conversion (§5.3) | FR-VIS-05 | AF-13 |
+| TR-VIS-12 | SHOULD | BCF 3.0 writer / reader (2.1 read), units and GUID mapping, schema-valid output (§6) | FR-VIS-09 | AF-12 |
+| TR-VIS-13 | MUST | Section-box classification and rendering conventions (§5.4) | FR-VIS-06 | AF-21 |
+| TR-VIS-14 | MUST | Markups, issues and comments as document data; undo / redo; replay-stable ids | FR-VIS-07, 08 | AF-13 |
+| TR-VIS-15 | MUST | Issue workflow with the human gate (§5.5) | FR-VIS-07 | AF-34, 34a |
+| TR-VIS-16 | MUST | `check_review` / `check_display` with the codes of §7 | FR-VIS-10 | AF-11, 20 |
+| TR-VIS-20 | MUST | `geometry/renderPlan.ts` R-BATCH-v1 (§5.2), shared by the viewport and `render_stats` | FR-VIS-12, 13 | AF-21 |
+| TR-VIS-21 | MUST | LOD metric, thresholds `lod:llull-v1`, hysteresis (§5.3) | FR-VIS-12 | — |
+| TR-VIS-22 | MUST | Instance bookkeeping (drawn + culled = N) and GPU byte estimate | FR-VIS-13 | AF-10 |
+| TR-VIS-23 | SHOULD | Static instance BVH (binned SAH) for frustum culling and picking, built in a worker above 10⁴ | FR-VIS-14 | AF-40 |
+| TR-VIS-24 | COULD | Hi-Z occlusion, tiled streaming, impostors (V2) | FR-VIS-14 | — |
+| TR-VIS-25 | SHOULD | glTF `EXT_mesh_gpu_instancing` export / import | FR-VIS-19 | AF-12 |
+| TR-VIS-30 | MUST | `render_view` determinism: `svgSha256`, `rendererVersion` | FR-VIS-16 | AF-13, 22 |
+| TR-VIS-31 | MUST | Perspective projector with perspective-correct depth | FR-VIS-16 | AF-22 |
+| TR-VIS-32 | SHOULD | Review shading: material-class Blinn–Phong, sun shadow, deterministic AO, edges, sky / ground (§5.6) | FR-VIS-15, 16 | AF-22 |
+| TR-VIS-33 | SHOULD | Viewport quality tiers keyed by drawn instances; material classes (§5.6) | FR-VIS-15 | — |
+| TR-VIS-40 | MUST | `create_clash_issues` with framing (§5.8) and `clashKey` idempotence | FR-VIS-11 | AF-13 |
+| TR-VIS-41 | MUST | Clash re-run reconciliation: `created`, `unchanged`, `updated` (depth) and `gone` (clash no longer reported) in `data` | FR-VIS-11 | AF-10 |
+| TR-VIS-42 | SHOULD | Walkthrough paths and frame rendering (§5.3) | FR-VIS-17 | AF-22, 40 |
+| TR-VIS-50 | MUST | Stable `VIS_*` codes with ids / paths / remediation on every refusal and check (§7) | FR-VIS-20 | AF-11 |
+
 ## 3. Data model
 
 ### 3.1 Display (core, `model/display.ts`)

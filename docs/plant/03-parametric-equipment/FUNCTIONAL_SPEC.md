@@ -126,6 +126,11 @@ symbols and tags on P&IDs and the P&ID ↔ 3D check are **04-pid-schematics (PID
 | FR-EQP-23 | COULD | Saddle, skirt, wind and seismic checks; UG-37 reinforcement; EN 13445 alternative (V2). | full mechanical design | [R18] |
 | FR-EQP-24 | COULD | PV Elite / COMPRESS neutral-file hand-off and result import (V2). | certified design stays in certified tools | [R5], [R6] |
 
+FR → VC map: FR-EQP-01 → VC-01..04; 02 → VC-03, 13, 14; 03 → VC-09 (legs), 13 (skirt), 14 (saddles); 04 → VC-21;
+05 → VC-17; 06 → VC-11, 15; 07 → VC-10; 08 → VC-12, 13; 09 → VC-01, 02; 10 → VC-04, 09; 11 → VC-05..07; 12 → VC-08,
+17; 13 → VC-13; 14 → VC-14, 16; 15 → VC-10, 16; 16 → VC-14, 19; 17 → VC-16; 18 → VC-20; 19 → VC-22; 20 → VC-18;
+21 → VC-23; 22 → VC-24; 23, 24 → VC-25 (TBD, V2).
+
 AF mapping: FR-EQP-02..09 → AF-01, AF-02, AF-04, AF-05; FR-EQP-09..13 → AF-10, AF-21, AF-35; FR-EQP-11/12 → AF-31,
 AF-33; FR-EQP-14 → AF-20, AF-11; FR-EQP-15 → AF-30, AF-32; FR-EQP-16 → AF-13; data-sheet approval → AF-34 / AF-34a
 (09 PLM signatures).
@@ -197,6 +202,7 @@ and the minimal plan above.
 | nozzle N1 at 3200 mm, 0°, projection 1000 on V-101 | `equipment_ports` | port `V-101:N1` at [5000, 6000, 5200], direction [0, 1, 0] | VC-EQP-12 |
 | the four scenario plans | `llull run --json` | every `expected[]` row within tolerance; exit code 0 except the deliberate refusal steps | VC-EQP-13/14/15/17 |
 | any code result | any EQP query | `reviewRequired: true` with the standard named; grade-B data → `unverified: true` and a warning in `check_equipment` | VC-EQP-16 |
+| a column ID 2000, T/T 15 000, 20 trays at 600 from 1500 / 30 trays | `add_column` | trays at 1500 … 12 900 mm / `EQP_TRAYS_DONT_FIT` at `trays.count` | VC-EQP-21 |
 | V-101 diameter changed to 1800 mm | `update_equipment_parameters` | same element id and port ids, nozzle faces unchanged, volume 11.705574 m³ | VC-EQP-19 |
 
 ## 8. Standards and regulatory alignment
@@ -232,7 +238,7 @@ Public facts only; the standards are paywalled and were not read.
 - **Paywalled standards.** Only formulas and rows confirmed by ≥ 2 public sources gate. Tables are shipped as data
   with their grade; a user (or a licensed company library) can replace them with the licensed values.
 - **Code misuse.** An owner may read "pass" as "safe". Mitigation: `reviewRequired` on every code number, plain
-  summary "computed by llull, not approved — needs a qualified engineer", status `pass_with_review` instead of `pass`.
+  summary "computed by llull, not approved — needs a qualified engineer", status `pass_with_review` (or `warn`) instead of `pass`.
 - **Convention differences.** Sources differ on corroded radius (UG27-B vs UG27-C), angle origins (north vs east,
   clockwise vs counter-clockwise), projection origin (axis vs shell outside). llull fixes one convention, names it in
   every result, and offers explicit switches (`corrodedDimensions`, `angleConvention`) rather than guessing.

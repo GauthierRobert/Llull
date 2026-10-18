@@ -71,6 +71,26 @@ packages/domain-aec/src/plant/equipment/
            tankShellThickness.ts, equipmentPorts.ts, equipmentDatasheet.ts, checkEquipment.ts
 ```
 
+### Technical requirements
+
+| Id | Pri | Requirement | Proves FR | AF | VC |
+| -- | --- | ----------- | --------- | -- | -- |
+| TR-EQP-01 | MUST | Plugin `plant-equipment` registered by `installDefaultPlugins()`, toolset `plant` in `@mcp/toolsets`; every capability is a `defineCommand` with a zod `params` object (snake_case names) | all | AF-01, AF-02 | contract snapshot |
+| TR-EQP-02 | MUST | `EquipmentElement.plant?: PlantEquipmentData` (types in `@core/model/plantEquipment`); legacy `size` / `shape` / `weight` re-derived inside the same command | FR-EQP-02, 16 | AF-13 | VC-EQP-13, 19 |
+| TR-EQP-03 | MUST | Derived geometry = `revolution` (exact `curves`), `box`, `extrusion` entities tagged `element:<id>`, read-only under the building derivation guard, re-derived on load | FR-EQP-02..07 | — | VC-EQP-03, 13 |
+| TR-EQP-04 | MUST | OCC builds exact B-rep from the profiles (volume within 1e-6 of the closed form); Manifold uses ≥ 64 segments per revolution | FR-EQP-02 | AF-41 | VC-EQP-03 |
+| TR-EQP-05 | MUST | Volumes, areas and depths from closed forms / fixed quadratures, never from meshes | FR-EQP-01, 09 | AF-21 | VC-EQP-01..04 |
+| TR-EQP-06 | MUST | Ports computed by a pure `equipmentPorts()`; shared `ConnectionPort` type; ids `<tag>:<mark>` stable across revisions | FR-EQP-08 | AF-14 | VC-EQP-12, 19 |
+| TR-EQP-07 | MUST | `codes/asmeDiv1.ts`: UG-27 / UG-32 / UG-99 in the corroded condition, applicability limits, S and E never defaulted | FR-EQP-11 | AF-31, AF-33 | VC-EQP-05..07 |
+| TR-EQP-08 | MUST | `codes/api650.ts`: one-foot method, graded Sd / St and minimum-thickness tables, 60 m limit | FR-EQP-12 | AF-30, AF-32 | VC-EQP-08, 17 |
+| TR-EQP-09 | MUST | Weights from exact offset solids and annuli; every breakdown line names its method; defaults named | FR-EQP-10 | AF-31, AF-35 | VC-EQP-09 |
+| TR-EQP-10 | MUST | `update_equipment_parameters` keeps element id, tag, nozzle marks, port ids; reports moved ports and connected pipes | FR-EQP-16 | AF-13 | VC-EQP-19 |
+| TR-EQP-11 | MUST | Standard / catalogue tables are TS data modules with `source` and `grade` per row; grade < A ⇒ `unverified` | FR-EQP-15 | AF-30, AF-32 | VC-EQP-10, 16 |
+| TR-EQP-12 | MUST | Every refusal returns `CommandResult.error` (`codedRejection`) with a code of §7, `ids`, `paths`, remediation | FR-EQP-17 | AF-11 | VC-EQP-07, 16 |
+| TR-EQP-13 | MUST | Every code result carries `provenance` (formula, inputs, source) and `reviewRequired: true` with a reason; flags propagate into data sheets and checks | FR-EQP-11..14 | AF-32, AF-33, AF-35 | VC-EQP-16 |
+| TR-EQP-14 | MUST | Deterministic output and the budgets of §8 | all | AF-12, AF-13, AF-40 | VC-EQP-16 |
+| TR-EQP-15 | SHOULD | IFC export of revolved bodies and one `IfcDistributionPort` per nozzle | FR-EQP-18 | — | VC-EQP-20 |
+
 ## 3. Data model
 
 New file `packages/core/src/model/plantEquipment.ts` (types only; core may hold domain data types, as
@@ -191,7 +211,7 @@ name suffix `Deg`. Equipment is addressed by `equipment` = tag (`"V-101"`) or el
 | `tank_shell_thickness` | query | `equipment`, `method: 'one_foot'` | `courses[{course, H_m, designThicknessMm, testThicknessMm, minimumThickness{mm, source, unverified}, governingThicknessMm}]`, `allowableStress{Sd, St}` | `EQP_API650_ONE_FOOT_LIMIT`, `EQP_MATERIAL_NOT_IN_TABLE` |
 | `equipment_ports` | query | `equipment?` (all when omitted) | `ports{[portId]: ConnectionPort + service}` | `EQP_NOT_FOUND` |
 | `equipment_datasheet` | query (+ `--save`) | `equipment`, `format: json \| csv` | the data-sheet record (§6) | `EQP_NOT_FOUND` |
-| `check_equipment` | query | `equipment?[]` | `status: pass \| pass_with_review \| warn \| fail`, `issues[{code, severity, ids, paths, message, remediation}]`, `reviewRequired` | — (findings, not refusals) |
+| `check_equipment` | query | `equipment?[]` | `status` = `fail` if any fail, else `warn` if any warning, else `pass_with_review` if any result needs review, else `pass`; `issues` sorted by severity (fail, warning) then code; `issues[{code, severity, ids, paths, message, remediation}]`, `reviewRequired` | — (findings, not refusals) |
 | `save_equipment_template` / `insert_equipment_template` (V1) | mutating | `equipment`, `name` / `name`, `tag`, `location`, `overrides` | `templateName` / `elementId` | `EQP_TEMPLATE_NOT_FOUND` |
 
 Structured tags (examples; every command file carries them):

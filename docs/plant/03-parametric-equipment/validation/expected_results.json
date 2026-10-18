@@ -152,6 +152,7 @@
       "id": "VC-EQP-09",
       "command": "equipment_weights",
       "proves": [
+        "FR-EQP-03",
         "FR-EQP-10",
         "TR-EQP-09"
       ],
@@ -164,6 +165,11 @@
         "SC-EQP-02": {
           "emptyKg": 6485.731147911467,
           "testKg": 27429.682171843422
+        },
+        "legsCase": {
+          "inputs": "4 legs, height 1500 mm, solid section area 10000 mm2 (section given as an area), rho 7850",
+          "legsKg": 471.0,
+          "derivation": "4 x 0.01 m2 x 1.5 m x 7850 kg/m3"
         }
       },
       "tolerance": "1e-6 relative",
@@ -392,6 +398,98 @@
       "tolerance": "exact counts",
       "source": "IFC4 IfcTank (IfcTankTypeEnum) and IfcDistributionPort, buildingSMART IFC4 ADD2 TC1 documentation [S30]; enum spelling grade C (not fetched) - confirm against the schema file used by @aec/building/exchange before gating",
       "test": "ifcEquipment.test.ts"
+    },
+    {
+      "id": "VC-EQP-21",
+      "command": "add_column",
+      "proves": [
+        "FR-EQP-04"
+      ],
+      "inputs": {
+        "insideDiameter": 2000,
+        "tangentLength": 15000,
+        "trays": {
+          "count": 20,
+          "spacing": 600,
+          "firstElevation": 1500
+        }
+      },
+      "expected": {
+        "trayElevationsAboveBTL_first_last": [
+          1500,
+          12900
+        ],
+        "trayCount": 20,
+        "count30": {
+          "error": "EQP_TRAYS_DONT_FIT",
+          "paths": [
+            "trays.count"
+          ],
+          "lastTrayWouldBe": 18900
+        }
+      },
+      "derivation": "elevation_i = firstElevation + (i-1) x spacing; fits when the last tray <= tangentLength",
+      "tolerance": "exact",
+      "test": "column.test.ts"
+    },
+    {
+      "id": "VC-EQP-22",
+      "command": "save_equipment_template / insert_equipment_template (V1)",
+      "proves": [
+        "FR-EQP-19"
+      ],
+      "inputs": "SC-EQP-02 drum saved as 'reflux-drum-2m', inserted as D-202 at [10000, 0]",
+      "expected": {
+        "templateDeepEqualExceptTagLocation": true,
+        "portOffsetsFromLocationEqual": true,
+        "D-202:N1.position": [
+          7600,
+          0,
+          2900
+        ]
+      },
+      "derivation": "D-201:N1 at [-2400, 0, 2900] + translation [10000, 0, 0]",
+      "tolerance": "1e-9",
+      "test": "templates.test.ts (V1)"
+    },
+    {
+      "id": "VC-EQP-23",
+      "command": "add_air_cooler / add_compressor (V1)",
+      "proves": [
+        "FR-EQP-21"
+      ],
+      "expected": "ports at the explicit envelope positions given in the params (closed form, exact); bundles x bays count = entities count",
+      "tolerance": "exact",
+      "test": "airCooler.test.ts (V1)"
+    },
+    {
+      "id": "VC-EQP-24",
+      "command": "nozzle orientation view (V1)",
+      "proves": [
+        "FR-EQP-22"
+      ],
+      "inputs": "SC-EQP-01",
+      "expected": {
+        "labels": [
+          "N1 0 deg EL 3200",
+          "M1 180 deg EL 1000",
+          "N2 bottom head",
+          "N3 top head"
+        ]
+      },
+      "tolerance": "exact text",
+      "test": "orientationView.test.ts (V1)"
+    },
+    {
+      "id": "VC-EQP-25",
+      "command": "V2 mechanical checks / hand-off",
+      "proves": [
+        "FR-EQP-23",
+        "FR-EQP-24"
+      ],
+      "expected": "TBD - measure with Codeware COMPRESS or PV Elite on SC-EQP-02 (saddle stresses, nozzle reinforcement) and compare to llull's V2 results; no number until a licensed run exists",
+      "tolerance": "TBD",
+      "test": "V2"
     }
   ]
 }
