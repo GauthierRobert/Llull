@@ -1,8 +1,12 @@
-/** Stacked time-series chart as SVG text: one panel per unit with axes, ticks, grid, legend and title (headless "look at the motion"). */
+/** Stacked time-series chart as SVG text: one panel per unit with axes, ticks, grid, legend and title (headless "look at the curve"). */
+
+import { escapeXml } from './escapeXml';
 
 export interface PlotSeries {
   readonly label: string;
   readonly values: readonly number[];
+  /** Time of each value; absent = the shared `times` of the layout. Non-finite values are skipped, never drawn. */
+  readonly times?: readonly number[];
 }
 
 export interface PlotPanel {
@@ -17,8 +21,12 @@ interface PlotLayout {
   readonly title: string;
   readonly width: number;
   readonly panelHeight: number;
-  /** Time axis label unit, seconds. */
-  readonly times: readonly number[];
+  /** Shared time axis (seconds) of the series without their own `times`; also fixes the axis range. Absent = the range of the series times. */
+  readonly times?: readonly number[];
+  /** Keep 0 inside the value axis (default true: motion plots). Probe curves set false. */
+  readonly includeZero?: boolean;
+  /** Distance of the legend from the right edge (default 150). */
+  readonly legendOffset?: number;
 }
 
 const PALETTE = ['#1f77b4', '#d62728', '#2ca02c', '#ff7f0e', '#9467bd', '#8c564b', '#e377c2', '#17becf'] as const;
@@ -28,7 +36,6 @@ const MAX_POINTS = 1500;
 const TICKS = 5;
 const FONT = 'font-family="Helvetica, Arial, sans-serif"';
 
-const escapeXml = (text: string): string => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const round = (value: number): number => Math.round(value * 100) / 100;
 
 /** Tick positions covering [low, high] at a 1/2/5 x 10^k step. */
@@ -59,15 +66,17 @@ function indices(n: number): number[] {
 }
 
 function panelSvg(panel: PlotPanel, layout: PlotLayout, top: number, bottomAxis: boolean): string {
-  const { width, panelHeight, times } = layout;
+  const { width, panelHeight } = layout;
   const [x0, x1] = [MARGIN.left, width - MARGIN.right];
   const [y0, y1] = [top + MARGIN.top, top + panelHeight - (bottomAxis ? MARGIN.bottom : 12)];
   const all = panel.series.flatMap((s) => s.values).filter(Number.isFinite);
-  let [low, high] = [Math.min(0, ...all), Math.max(0, ...all)];
+  const includeZero = layout.includeZero !== false;
+  let [low, high] = includeZero ? [Math.min(0, ...all), Math.max(0, ...all)] : [Math.min(...all), Math.max(...all)];
   if (high - low < 1e-12) [low, high] = [low - 1, high + 1];
   const pad = (high - low) * 0.05;
-  [low, high] = [low === 0 ? 0 : low - pad, high === 0 ? 0 : high + pad];
-  const [tMin, tMax] = [times[0] ?? 0, times[times.length - 1] ?? 1];
+  [low, high] = includeZero ? [low === 0 ? 0 : low - pad, high === 0 ? 0 : high + pad] : [low - pad, high + pad];
+  const seen = layout.times ?? panel.series.flatMap((s) => (s.times ?? []).filter(Number.isFinite));
+  const [tMin, tMax] = layout.times !== undefined ? [seen[0] ?? 0, seen[seen.length - 1] ?? 1] : [Math.min(...seen), Math.max(...seen)];
   const sx = (t: number): number => x0 + ((t - tMin) / (tMax - tMin || 1)) * (x1 - x0);
   const sy = (v: number): number => y1 - ((v - low) / (high - low || 1)) * (y1 - y0);
   const parts: string[] = [`<rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" fill="#ffffff" stroke="#888888"/>`];
@@ -86,10 +95,10 @@ function panelSvg(panel: PlotPanel, layout: PlotLayout, top: number, bottomAxis:
       );
   }
   if (bottomAxis) parts.push(`<text x="${(x0 + x1) / 2}" y="${y1 + 34}" text-anchor="middle" font-size="12" ${FONT}>time (s)</text>`);
-  const keep = indices(times.length);
   panel.series.forEach((series, k) => {
-    const points = keep
-      .filter((i) => Number.isFinite(series.values[i]))
+    const times = series.times ?? layout.times ?? [];
+    const points = indices(times.length)
+      .filter((i) => Number.isFinite(series.values[i]) && Number.isFinite(times[i]))
       .map((i) => `${round(sx(times[i] ?? 0))},${round(sy(series.values[i] ?? 0))}`);
     if (points.length > 0)
       parts.push(`<polyline fill="none" stroke="${PALETTE[k % PALETTE.length]}" stroke-width="1.6" points="${points.join(' ')}"/>`);
@@ -99,7 +108,7 @@ function panelSvg(panel: PlotPanel, layout: PlotLayout, top: number, bottomAxis:
     `<text transform="translate(16 ${round((y0 + y1) / 2)}) rotate(-90)" text-anchor="middle" font-size="12" ${FONT}>${escapeXml(panel.unit)}</text>`,
   );
   panel.series.forEach((series, k) => {
-    const [lx, ly] = [x1 - 150, y0 + 14 + k * 15];
+    const [lx, ly] = [x1 - (layout.legendOffset ?? 150), y0 + 14 + k * 15];
     parts.push(
       `<line x1="${lx}" y1="${ly - 4}" x2="${lx + 18}" y2="${ly - 4}" stroke="${PALETTE[k % PALETTE.length]}" stroke-width="2.5"/>`,
       `<text x="${lx + 24}" y="${ly}" font-size="11" ${FONT}>${escapeXml(series.label)}</text>`,

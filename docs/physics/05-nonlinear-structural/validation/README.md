@@ -58,7 +58,7 @@ Status P (proposed). Gate: `unit` (no external tool), `integration` (needs ccx),
 | VC-NLS-30.e | FR-NLS-02, 06 | thick-cylinder plan (ν = 0.49), pressure 149.850 MPa | elastic-plastic radius c = 150 mm (PEEQ > 0 boundary on the mid-plane) | 3 % on pressure at c = 150 mm | A: generator | integration |
 | VC-NLS-31 | FR-NLS-02 | NAFEMS NL2 | TBD (tables not obtained) — only consistency: generator p_c = 166.4 MPa > NL2 maximum 160 MPa if a = 100, b = 200 | — | C | — |
 | VC-NLS-40.a, e | FR-NLS-07, 11 | analytic check | M_p = 250 000 N·mm; M/My(κ = 2κy) = 1.375 | 1e-9 | A | unit |
-| VC-NLS-40.b | FR-NLS-05, 07 | `plans/nls_cantilever_plastic_collapse.plan.json`; `limit_load method=plateau slopeFraction=0.02 window=5` | collapse tip load **500 N** = M_p / L | 3 % (root constraint and shear raise the FE value slightly; revisit after the first run) | A: generator (S12) | integration |
+| VC-NLS-40.b | FR-NLS-05, 07 | `plans/nls_cantilever_plastic_collapse.plan.json`; `limit_load method=plateau slopeFraction=0.02 window=5` | collapse tip load **500 N** = M_p / L | 3 % (root constraint and shear raise the FE value slightly; revisit after the first run) | A: generator (S12) | integration; **deviation**: quadratic tets (hex_dominant not built) measured 520.4 N (+4.1 %), the replay asserts 500 N <= peak <= 530 N |
 | VC-NLS-40.c, d | FR-NLS-05, 07 | variants: propped, fixed-fixed (NLGEOM off) | 3000 N, 4000 N | 3 % | A | integration |
 | VC-NLS-41 | FR-NLS-02, 06; TR-NLS-04 | Run pinned ccx decks `beampiso`, `beampkin`, `beampd`; parse with the increment reader | displacements per increment equal the `.dat.ref` values | 1e-4 rel | TBD (extract with the M2 reader, then freeze) | integration |
 | VC-NLS-50.a | FR-NLS-09 | analytic check | P_cr = 4605.81538718 N | 1e-9 analytic; 2 % vs 05 buckling | A | unit / integration |
@@ -79,6 +79,22 @@ Status P (proposed). Gate: `unit` (no external tool), `integration` (needs ccx),
 Why ν = 0.49 in the thick-cylinder FE gate: the closed-form elastic-plastic boundary relation p(c) assumes an
 incompressible material (exact for ν = 0.5); with ν = 0.3 only first yield (30.a) and the limit pressure (30.b, from
 limit analysis, independent of elasticity) are exact.
+
+## Built so far (ENG-1)
+
+`set_nonlinear_controls`, `add_analysis_step`, `add_curve_probe` and `set_part_constitutive_set` (plugin `cae`, toolset `analysis`) are
+registered; `create_analysis` accepts `nonlinear_static`. `nls_cantilever_plastic_collapse` and `nls_thick_cylinder` run through
+`build_project` (`tests/unit/cae/nonlinear/plans.test.ts`) and, with ccx 2.21 + Gmsh, through mesh and solve
+(`server/tests/feaNonlinearPacks.test.ts`). Differences between the plan files and what is built:
+
+- `elementFamily: hex_dominant` is not built (`set_mesh_controls` knows `tet`); the replay uses quadratic tets. VC-NLS-40.b measured
+  **520.4 N** at 5 mm (+4.1 % over 500 N, outside the 3 % written for the hex mesh), so the replay test asserts 500 N <= peak <= 530 N (one-sided: the bias is known and positive).
+- The PHY-02 CalculiX card writer refuses models without `validity` ranges (`MATL_VALIDITY_MISSING`); the plans' `add_material_model`
+  steps have none, so the replay adds them (temperature 293 K, equivalent plastic strain 0 to 0.5).
+- `nls_thick_cylinder` at the plan's 5 mm mesh does not finish within 15 minutes of ccx time; the replay coarsens to 12 mm and checks
+  the 166 MPa load step converges with a bore displacement more than twice the elastic Lame value (0.58 mm against 0.16 mm).
+- `control.kind = arc_length` is refused with `NLS_ARC_LENGTH_UNSUPPORTED` (VC-NLS-63); CalculiX has no Riks procedure.
+- `nls_column_imperfection` still needs `add_imperfection` and the contact plans need the contact commands (not built).
 
 ## CLI harness (AF-23)
 

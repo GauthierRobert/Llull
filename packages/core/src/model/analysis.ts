@@ -22,7 +22,8 @@ export type AnalysisType =
   | 'heat_steady'
   | 'heat_transient'
   | 'thermo_static'
-  | 'coupled_temperature_displacement';
+  | 'coupled_temperature_displacement'
+  | 'nonlinear_static';
 export type FeSolver = 'calculix' | 'nastran';
 export type UnitSystem = 'N-mm-t-s' | 'N-m-kg-s' | 'lbf-in-slinch-s';
 export type TemperatureScale = 'degC' | 'K';
@@ -186,6 +187,98 @@ export interface ResultsSummary {
   readonly bucklingFactors?: readonly number[];
   readonly units: UnitSystem;
   readonly thermal?: ThermalResultsSummary;
+  /** PHY-05: present iff the case is `nonlinear_static`. */
+  readonly nonlinear?: NonlinearResultsSummary;
+}
+
+/** PHY-05 §3: how the load of one `*STEP` is driven. Increments are fractions of the step time (step time = 1). */
+interface IncrementControl {
+  readonly initialIncrement: number;
+  readonly minIncrement: number;
+  readonly maxIncrement: number;
+  readonly maxIncrements: number;
+}
+
+export type SolutionControl =
+  | ({ readonly kind: 'load' } & IncrementControl)
+  | ({
+      readonly kind: 'displacement';
+      readonly target: FeaTarget;
+      readonly dof: 'ux' | 'uy' | 'uz';
+      /** Document length units, reached at the END of the step (ramped from the previous step's value). */
+      readonly value: number;
+    } & IncrementControl)
+  | { readonly kind: 'arc_length'; readonly initialArcLength: number; readonly maxSteps: number };
+
+export interface AnalysisStep {
+  readonly id: string;
+  readonly name: string;
+  /** Load-case multipliers at the END of the step; a load case not listed keeps its previous value (0 in the first step). */
+  readonly multipliers: Readonly<Record<string, number>>;
+  readonly amplitude: 'ramp' | 'step';
+  readonly control: SolutionControl;
+}
+
+export interface CurveProbe {
+  readonly id: string;
+  readonly name: string;
+  readonly load:
+    | { readonly kind: 'load'; readonly loadId: string }
+    | { readonly kind: 'reaction'; readonly constraintId: string; readonly component: 'x' | 'y' | 'z' | 'magnitude' };
+  readonly displacement: { readonly point: Vec3; readonly dof: 'ux' | 'uy' | 'uz' | 'magnitude' };
+}
+
+/** Only for `custom`: keys of the ccx `*CONTROLS` FIELD line (R_n, C_n, q_0, q_u, R_p, eps, C_eps, R_l) and TIME INCREMENTATION line (I_0 ... I_T). */
+export interface ConvergencePreset {
+  readonly name: 'ccx_default' | 'custom';
+  readonly field?: Readonly<Partial<Record<'Rn' | 'Cn' | 'q0' | 'qu' | 'Rp' | 'eps' | 'Ceps' | 'Rl', number>>>;
+  readonly timeIncrementation?: Readonly<Partial<Record<'I0' | 'IR' | 'IP' | 'IC' | 'IL' | 'IG' | 'IS' | 'IA' | 'IJ' | 'IT', number>>>;
+}
+
+/** PHY-05 set-up of a `nonlinear_static` case; absent on every other case type. */
+export interface NonlinearSettings {
+  /** Absent until `set_nonlinear_controls` states it: the deck is refused without an explicit choice. */
+  readonly nlgeom?: boolean;
+  readonly convergence: ConvergencePreset;
+  readonly steps: Readonly<Record<string, AnalysisStep>>;
+  readonly stepOrder: readonly string[];
+  /** Part -> id of the constitutive set of its material record; absent = the record's default set. */
+  readonly constitutiveSets: Readonly<Record<EntityId, string>>;
+  readonly probes: Readonly<Record<string, CurveProbe>>;
+  readonly probeOrder: readonly string[];
+  readonly outputIncrements: 'all' | 'last_per_step' | { readonly every: number };
+}
+
+/** Convergence bookkeeping of a nonlinear solve (CalculiX `.sta`): one row per increment. */
+export interface FeConvergenceRow {
+  readonly step: number;
+  readonly increment: number;
+  readonly attempts: number;
+  readonly iterations: number;
+  readonly totalTime: number;
+}
+
+export interface NonlinearResultsSummary {
+  readonly nlgeom: boolean;
+  /** Every analysis step reached its end time (a run that stops early is a solver failure and is never recorded). */
+  readonly completed: boolean;
+  readonly steps: ReadonlyArray<{
+    stepId: string;
+    increments: number;
+    cutbacks: number;
+    iterations: number;
+    lastLoadFactor: number;
+    completed: boolean;
+  }>;
+  readonly curves: ReadonlyArray<{
+    probeId: string;
+    name: string;
+    points: number;
+    peakLoad: number;
+    dispRange: readonly [number, number];
+    curveHash: string;
+  }>;
+  readonly maxPeeq?: { value: number; at: Vec3; step: number };
 }
 
 /** PHY-03 §3.1 thermal set-up (present iff the case type is `heat_*`). */
@@ -368,6 +461,7 @@ export interface AnalysisCase {
   };
   readonly thermal?: ThermalSetup;
   readonly thermomech?: ThermoMechSetup;
+  readonly nonlinear?: NonlinearSettings;
   /** Margin dispositions by row id (human gate). */
   readonly dispositions: Readonly<Record<string, Disposition>>;
 }
@@ -416,6 +510,8 @@ export interface FeResultsArtifact {
   readonly dat?: {
     readonly tables: readonly { readonly title: string; readonly time: number; readonly rows: readonly (readonly number[])[] }[];
   };
+  /** Nonlinear solves only: the increments the solver took (`.sta`). */
+  readonly convergence?: readonly FeConvergenceRow[];
 }
 
 /** Temperature table (PHY-04 TR-TMC-14): rows `[x, y, z, T]` in the units the `table` field source declares; written by `fea_import_field`. */

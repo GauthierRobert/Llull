@@ -28,7 +28,7 @@ const targetSchema = (what: string): z.ZodObject<{ value: z.ZodNumber; source: z
 /**
  * @affects doc.reliability.variables (adds or replaces the variable called `name`; affected: [variable id])
  * @invariant distribution parameters valid (sd > 0, lognormal mean > 0, min < max); a parameter binding names an existing document parameter
- * @failure bad name, invalid distribution, unknown parameter -> PRB_DISTRIBUTION_INVALID / PRB_PARAMS_INVALID / PRB_BINDING_UNRESOLVED (unchanged doc)
+ * @failure bad name, name of a document parameter or built-in constant, invalid distribution, unknown parameter -> PRB_DISTRIBUTION_INVALID / PRB_PARAMS_INVALID / PRB_BINDING_UNRESOLVED (unchanged doc)
  */
 export const defineRandomVariable = defineCommand({
   name: 'define_random_variable',
@@ -63,6 +63,12 @@ export const defineRandomVariable = defineCommand({
       refuseReliability(doc, 'define_random_variable', code, message, [params.name], paths);
     if (!IDENTIFIER.test(params.name))
       return fail('PRB_PARAMS_INVALID', `name '${params.name}' is not an identifier (letters, digits, underscore)`, ['name']);
+    if (Object.hasOwn(doc.parameters, params.name) || isBuiltinConstant(params.name))
+      return fail(
+        'PRB_PARAMS_INVALID',
+        `name '${params.name}' is ${Object.hasOwn(doc.parameters, params.name) ? 'a document parameter' : 'a built-in constant'}: a limit-state expression could not tell the variable from it; choose another name`,
+        ['name'],
+      );
     const issue = distributionIssue(params.distribution);
     if (issue !== null) return fail('PRB_DISTRIBUTION_INVALID', issue, ['distribution']);
     const binding = params.binding ?? { kind: 'free' as const };
@@ -94,7 +100,7 @@ export const defineRandomVariable = defineCommand({
 
 /**
  * @affects doc.reliability.variables (removes the variable and its correlation row; affected: [variable id])
- * @failure unknown name -> PRB_VARIABLE_NOT_FOUND; used by a limit state -> PRB_EXPRESSION_INVALID (unchanged doc)
+ * @failure unknown name -> PRB_VARIABLE_NOT_FOUND; used by a limit state, directly or through its bound parameter -> PRB_EXPRESSION_INVALID (unchanged doc)
  */
 export const deleteRandomVariable = defineCommand({
   name: 'delete_random_variable',
@@ -109,13 +115,17 @@ export const deleteRandomVariable = defineCommand({
         params.name,
       ]);
     const model = reliabilityOf(doc);
-    const user = Object.values(model.limitStates).find((limitState) => extractReferences(limitState.expression).has(params.name));
+    const symbols = variable.binding.kind === 'parameter' ? [params.name, variable.binding.parameter] : [params.name];
+    const user = Object.values(model.limitStates).find((limitState) => {
+      const references = extractReferences(limitState.expression);
+      return symbols.some((symbol) => references.has(symbol));
+    });
     if (user !== undefined)
       return refuseReliability(
         doc,
         'delete_random_variable',
         'PRB_EXPRESSION_INVALID',
-        `limit state '${user.name}' still uses '${params.name}'`,
+        `limit state '${user.name}' still uses '${params.name}'${variable.binding.kind === 'parameter' ? ` (or its bound parameter '${variable.binding.parameter}')` : ''}`,
         [params.name, user.name],
       );
     const variables = Object.fromEntries(Object.entries(model.variables).filter(([name]) => name !== params.name));

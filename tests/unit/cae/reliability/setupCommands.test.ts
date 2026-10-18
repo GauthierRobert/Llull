@@ -31,7 +31,7 @@ describe('define_random_variable', () => {
   it('accepts a parameter binding to an existing parameter and refuses an unknown one', () => {
     const withParameter = execute(createEmptyDocument(), 'set_parameter', { name: 'w', expression: '40' }).document;
     const ok = define(withParameter, {
-      name: 'w',
+      name: 'width',
       unit: 'mm',
       distribution: { kind: 'normal', mean: 40, sd: 0.1 },
       binding: { kind: 'parameter', parameter: 'w' },

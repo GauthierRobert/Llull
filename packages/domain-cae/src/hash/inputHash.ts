@@ -1,6 +1,6 @@
 /** Input hash of an analysis (05 TR-FEA-06): equal hashes <=> the same set-up on the same geometry and materials. */
 
-import type { AnalysisCase, ThermalSetup } from '@core/model/analysis';
+import type { AnalysisCase, NonlinearSettings, ThermalSetup } from '@core/model/analysis';
 import type { CadDocument, Entity, Material } from '@core/model/types';
 import { geometryKey } from '@core/geometry/shapeRecipe';
 import { canonicalJson } from '@lib/canonicalJson';
@@ -78,6 +78,21 @@ function withoutDispositions(thermal: ThermalSetup | undefined): Omit<ThermalSet
   return rest;
 }
 
+/** Display names of steps and curve probes are presentation: renaming never makes results stale. */
+function withoutNames(
+  nonlinear: NonlinearSettings,
+): Omit<NonlinearSettings, 'steps' | 'probes'> & { readonly steps: Record<string, unknown>; readonly probes: Record<string, unknown> } {
+  const strip = <T extends { readonly name: string }>(bag: Readonly<Record<string, T>>): Record<string, unknown> =>
+    Object.fromEntries(
+      Object.entries(bag).map(([id, entry]) => {
+        const { name, ...rest } = entry;
+        void name;
+        return [id, rest];
+      }),
+    );
+  return { ...nonlinear, steps: strip(nonlinear.steps), probes: strip(nonlinear.probes) };
+}
+
 const fullInputs = (doc: CadDocument, analysisCase: AnalysisCase): Record<string, unknown> => ({
   ...meshInputs(doc, analysisCase),
   type: analysisCase.type,
@@ -94,11 +109,12 @@ const fullInputs = (doc: CadDocument, analysisCase: AnalysisCase): Record<string
       ? null
       : { ...analysisCase.thermomech, thermal: withoutDispositions(analysisCase.thermomech.thermal) },
   sourceResultsHash: sourceResultsHash(doc, analysisCase),
+  ...(analysisCase.nonlinear !== undefined ? { nonlinear: withoutNames(analysisCase.nonlinear) } : {}),
 });
 
 /**
  * Hash of what an artifact depends on. `mesh`: part geometry + idealization, mesh controls and the targets (a mesh holds their node/face
- * sets). `full`: also type, solver, factors, constraints, loads, probes, thermal and thermo-mechanical set-ups, the materials of the parts
+ * sets). `full`: also type, solver, factors, constraints, loads, probes, thermal, thermo-mechanical and nonlinear set-ups (only when present: a linear case hashes as before), the materials of the parts
  * (physical part only: density, property / material models, constitutive sets; and the material id of each part) and the document length unit and, for a thermal-result field, the results hash of the source case. Names of the case, results
  * and mesh summaries are never part of it.
  * @failure unknown analysisId -> '' (never equal to an artifact's inputHash, so it reads as stale)
