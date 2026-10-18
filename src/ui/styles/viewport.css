@@ -787,3 +787,20 @@ button.lens-pill:hover .lens-pill__label {
   font-size: var(--text-xs);
   white-space: normal;
 }
+
+/* ---- Screen anchors: DOM labels pinned to world points (see viewport/screenAnchor) ---- */
+
+.screen-anchors {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.screen-anchor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+  will-change: transform;
+}

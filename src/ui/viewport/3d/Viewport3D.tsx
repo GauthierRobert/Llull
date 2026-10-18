@@ -30,6 +30,7 @@ import { DynamicsLoadsOverlay } from './DynamicsLoadsOverlay';
 import { useViewportPalette } from '@ui/viewport/viewportPalette';
 import { StoreInvalidator, ViewportStoreInvalidator } from '../StoreInvalidator';
 import { LiveFxCamera } from '../liveFx/LiveFxCamera';
+import { ScreenAnchorOverlay } from '../screenAnchor/ScreenAnchorOverlay';
 
 // Idempotent, StrictMode-safe.
 ensureBvhSetup();
@@ -159,6 +160,7 @@ export function Viewport3D(): React.ReactElement {
         </Suspense>
       </Canvas>
 
+      <ScreenAnchorOverlay />
       <ViewOptionsToggle />
       {viewOptionsOpen && (
         <>

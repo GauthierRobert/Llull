@@ -12,6 +12,7 @@ import type { PrototypeModel } from './prototype';
 import type { CurveSegment } from './curve';
 import type { FastenerModel, PartRef } from './fasteners';
 import type { MaterialLibraryEntry, MaterialRecordInfo } from './materialLibrary';
+import type { ReliabilityModel } from './probabilistic';
 import type { SheetMetalModel } from './sheetMetal';
 import type { FeatureParams } from './features';
 
@@ -662,6 +663,8 @@ export interface CadDocument {
   fasteners?: FastenerModel;
   /** Absent until the first sheet-metal command (plugin `sheetmetal`, 07 FTR M3). */
   sheetMetal?: SheetMetalModel;
+  /** Absent until the first probabilistic command (`define_random_variable`; plugin `cae`, PHY-18). */
+  probabilistic?: ReliabilityModel;
 }
 
 /** Kernel provenance and modelling tolerance of a document (aerospace 01 KRN, TR-KRN-11/61). */

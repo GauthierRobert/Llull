@@ -1,6 +1,7 @@
 // One-line descriptions of the recorded FE set-up items (presentation only; the data is the command output).
 
 import type { AnalysisCase, FeaConstraint, FeaLoad, FeaTarget, ThermalBc, ThermalBcRecord } from '@core/model/analysis';
+import { DEFAULT_FACTORS } from '@cae/shared/defaults';
 import { formatSignificant } from './quantityFormat';
 
 export type NameOf = (entityId: string) => string;
@@ -53,12 +54,9 @@ export function thermalBcText(record: ThermalBcRecord, nameOf: NameOf): string {
   return `${bc.kind} ${bcValueText(bc)} on ${where}`;
 }
 
-/** Factors a new case starts with (create_analysis); shown as "default" while untouched. */
-const DEFAULT_ULTIMATE_FACTOR = 1.5;
-const DEFAULT_YIELD_FACTOR = 1.0;
-
+/** Shown as "default" while the case still has the factors create_analysis starts from. */
 export function factorsText(factors: AnalysisCase['factors']): string {
-  const isDefault = factors.ultimate === DEFAULT_ULTIMATE_FACTOR && factors.yield === DEFAULT_YIELD_FACTOR && factors.extra.length === 0;
+  const isDefault = factors.ultimate === DEFAULT_FACTORS.ultimate && factors.yield === DEFAULT_FACTORS.yield && factors.extra.length === 0;
   const extra = factors.extra.map((factor) => `${factor.name} ${factor.value}`);
   return [`ultimate ${factors.ultimate}`, `yield ${factors.yield}`, ...extra].join(' · ') + (isDefault ? ' (default)' : ' (set)');
 }

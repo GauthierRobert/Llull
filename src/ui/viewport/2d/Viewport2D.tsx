@@ -26,6 +26,7 @@ import { MeasureBBoxRect2D } from './MeasureBBoxRect2D';
 import { useViewportPalette } from '@ui/viewport/viewportPalette';
 import { StoreInvalidator } from '../StoreInvalidator';
 import { RenderOriginSyncer } from '../RenderOriginSyncer';
+import { ScreenAnchorOverlay } from '../screenAnchor/ScreenAnchorOverlay';
 
 /** Reports the ortho camera zoom to the HTML overlay, only when it changes. */
 function ZoomReader({ onZoom }: { onZoom: (zoom: number) => void }): null {
@@ -160,6 +161,7 @@ export function Viewport2D(): React.ReactElement {
         </Suspense>
       </Canvas>
 
+      <ScreenAnchorOverlay />
       <ScaleBar zoom={cameraZoom} />
 
       {/* On demand: the modify palette shows once there is something to modify. */}
