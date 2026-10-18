@@ -29,8 +29,8 @@ local only, GPU first) are in FUNCTIONAL_SPEC, top of file.
                   CLI (server/src/cli)            desktop (Electron) --app         UI (src/ui) — review surface only
                          │ transports                    │                               │ overlay reads result blobs
                          ▼                               ▼                               ▼
-server/src/cfd/   cfdTransports.ts  ── spawns ──►  llull-flow (native sidecar, Rust + wgpu)  ◄── GPU (Vulkan / Metal / DX12) or CPU
-                  flowProcess.ts                   solver/flow/  (own Cargo workspace)
+server/src/cfd/   cfdTransports.ts  ── spawns ──►  llull-compute flow (native sidecar, Rust + wgpu)  ◄── GPU (Vulkan / Metal / DX12) or CPU
+                  flowProcess.ts                   solver/  (shared Cargo workspace, RS1)
                   surfaceExport.ts  (doc → binary STL in metres, via ctx.kernel union)
                   resultStore.ts    (content-addressed, reuses the FEA artifact store)
                          │ dispatches validated record commands through execute()
@@ -47,8 +47,9 @@ Placement and laws:
 - **Solving is a host transport (L6),** like `fea_solve`: `server/src/cfd/` runs the sidecar, stores the artifacts, then dispatches the
   validated record command. The transport type `CfdTransport` is declared in `server/src/cfd/types.ts` and wired into the CLI transport
   table, **not** in `packages/mcp`.
-- **The solver is a native sidecar,** a separate executable `llull-flow` built from a new top-level Rust workspace `solver/flow/`
-  (sibling of `server/` and `desktop/`, own toolchain, own tests). It is bundled by `desktop/scripts/prepare-flow.mjs` per OS / arch,
+- **The solver is a native sidecar,** the `flow` job of the shared `llull-compute` binary, built from the top-level Rust workspace
+  `solver/` (sibling of `server/` and `desktop/`, own toolchain, own tests; one workspace for all native compute, decision
+  [RS1](../../decisions/RS1-native-compute.md)). It is bundled by `desktop/scripts/prepare-native.mjs` per OS / arch,
   like CPython and `ccx`. It talks to the host through files plus newline-delimited JSON on stdout (§6). Nothing in `packages/*`
   depends on it (L2), and llull stays fully usable without it (`CFD_SOLVER_MISSING`).
 - **Why Rust + wgpu.** One code base runs on Vulkan, Metal and D3D12 [R11], i.e. NVIDIA, AMD, Intel and Apple GPUs on the three
@@ -76,12 +77,13 @@ packages/domain-aero/src/cfd/
 packages/core/src/model/cfd.ts           CfdCase, CfdBoundaryTag, CfdResultSummary, CfdProvenance
 server/src/cfd/
   cfdTransports.ts flowProcess.ts surfaceExport.ts resultStore.ts types.ts
-solver/flow/                             Rust workspace (not an npm workspace)
-  crates/flow-core    grid, octree, voxeliser, cut cells, boundary conditions, forces, probes, streamlines (CPU reference)
-  crates/flow-lbm     D3Q19 / D3Q27 LBM (CPU + WGSL kernels)
-  crates/flow-euler   cut-cell finite-volume Euler (CPU + WGSL kernels)
-  crates/flow-gpu     wgpu device selection, buffers, chunking, deterministic reductions
-  crates/flow-cli     `llull-flow` binary: case.json in, NDJSON progress out, result files
+solver/                                  shared Rust workspace (RS1; not an npm workspace) — CFD crates:
+  crates/llull-flow-core    grid, octree, voxeliser, cut cells, boundary conditions, forces, probes, streamlines (CPU reference)
+  crates/llull-flow-lbm     D3Q19 / D3Q27 LBM (CPU + WGSL kernels)
+  crates/llull-flow-euler   cut-cell finite-volume Euler (CPU + WGSL kernels)
+  crates/llull-gpu          (shared) wgpu device selection, buffers, chunking, deterministic reductions
+  crates/llull-protocol     (shared) case.json in, NDJSON progress out, result bundle
+  bins/llull-compute        `llull-compute flow <job-folder>`
 src/ui/viewport/3d/CfdOverlay.tsx, src/ui/panels/flow/FlowPanel.tsx
 ```
 
@@ -147,7 +149,7 @@ export interface CfdResultSummary {
 }
 
 export interface CfdProvenance {
-  readonly solverVersion: string;            // llull-flow semver + git hash
+  readonly solverVersion: string;            // llull-compute semver + git hash
   readonly device: { readonly backend: 'vulkan' | 'metal' | 'dx12' | 'cpu'; readonly name: string; readonly driver: string };
   readonly wallTimeS: number;
   readonly steps: number;
@@ -181,7 +183,7 @@ Host transports (CLI, desktop; not registry commands):
 
 | Name | Params | What it does |
 | ---- | ------ | ------------ |
-| `cfd_solve` | `caseId`, `timeoutS?=3600`, `device?: 'auto'\|'gpu'\|'cpu'`, `gridStudy?: boolean` | runs `cfd_prepare`; refuses on any fail row; exports the surface; runs `llull-flow`; streams progress; stores the bundle; dispatches `record_cfd_results`. `gridStudy` runs three resolutions (ratio 2) and records the GCI |
+| `cfd_solve` | `caseId`, `timeoutS?=3600`, `device?: 'auto'\|'gpu'\|'cpu'`, `gridStudy?: boolean` | runs `cfd_prepare`; refuses on any fail row; exports the surface; runs `llull-compute flow`; streams progress; stores the bundle; dispatches `record_cfd_results`. `gridStudy` runs three resolutions (ratio 2) and records the GCI |
 | `cfd_streamlines` | `caseId`, `rake` (`line` \| `plane` \| `sphere`), `count`, `field?`, `maxLengthM?` | traces on the stored field (no re-solve), adds a streamline set to the bundle under a new hash, re-records |
 | `cfd_slice` | `caseId`, `plane: { origin, normal }`, `field` | samples a plane, stores it, re-records |
 | `cfd_probe` | `caseId`, `points[]`, `heightAboveGroundM?` | values at points; speed-up ratio U/U_ref when the case has a ground |
@@ -335,7 +337,7 @@ The report is deterministic for a given document and kernel (AF-13); its canonic
 | CFD_REGIME_MISMATCH | Mach outside the solver range |
 | CFD_UNSTABLE_PARAMS | LBM relaxation time too close to 0.5 |
 | CFD_MEMORY_EXCEEDED | the estimate exceeds device memory (largest fitting resolution given) |
-| CFD_SOLVER_MISSING | `llull-flow` not found (install hint) |
+| CFD_SOLVER_MISSING | `llull-compute` not found (install hint; generic code `NATIVE_TOOL_MISSING`) |
 | CFD_GPU_UNAVAILABLE | no usable adapter; CPU fallback used (warning) |
 | CFD_NOT_CONVERGED | stopped by time / step limit before the criterion |
 | CFD_SOLVER_FAILED | NaN / negative density / sidecar crash (log tail attached) |
@@ -373,9 +375,9 @@ writes into the document; a crashed sidecar leaves the document unchanged.
 | VC | Test |
 | -- | ---- |
 | VC-CFD-10..16 | `tests/unit/aero/cfd/prepare.test.ts`, `caseCommands.test.ts` (watertight, orientation, small features, domain sizing, blockage, memory estimate, replay hash) |
-| VC-CFD-20..26 | `solver/flow/crates/flow-lbm/tests/*.rs` (Poiseuille order, Taylor-Green, sphere drag, GPU vs CPU) + CLI scenarios |
-| VC-CFD-30..35 | `solver/flow/crates/flow-euler/tests/*.rs` (Sod, wedge, stagnation, entropy order) + CLI scenarios |
-| VC-CFD-40..43 | `solver/flow/crates/flow-core/tests/streamlines.rs` (analytic sphere field), `tests/component/CfdOverlay.test.tsx` (legend, ranges) |
+| VC-CFD-20..26 | `solver/crates/llull-flow-lbm/tests/*.rs` (Poiseuille order, Taylor-Green, sphere drag, GPU vs CPU) + CLI scenarios |
+| VC-CFD-30..35 | `solver/crates/llull-flow-euler/tests/*.rs` (Sod, wedge, stagnation, entropy order) + CLI scenarios |
+| VC-CFD-40..43 | `solver/crates/llull-flow-core/tests/streamlines.rs` (analytic sphere field), `tests/component/CfdOverlay.test.tsx` (legend, ranges) |
 | VC-CFD-50..55 | `server/tests/cfd/*.test.ts` (refusals, fallback, stale, record trust model) + `npm run quality:cfd` (scenario plans, performance log) |
 
 Scenario plans in `validation/plans/` are CLI scripts (AF-23) run by the benchmark runner (`llull run_benchmarks`, PHY-00) against
@@ -387,7 +389,7 @@ CPU backend runs everywhere, so every VC has a CI path. Coverage 90/85/90/90 app
 | Milestone | Content | Depends on | Effort |
 | --------- | ------- | ---------- | ------ |
 | M1 | Data model, case commands, `cfd_prepare` (§5.1 complete), `check_cfd`, VC-CFD-10..16 | 01 KRN union (done) | 3 eng-weeks |
-| M2 | `solver/flow` workspace, wgpu device layer, voxeliser, LBM D3Q19 BGK + LES, forces, CPU backend, bundling, `cfd_solve` transport, `record_cfd_results`, `cfd_report`, VC-CFD-20..22, 26, 50..52, 55 | M1 | 6 eng-weeks |
+| M2 | = RS-0: `solver/` workspace, shared `llull-gpu` / `llull-protocol`, voxeliser, LBM D3Q19 BGK + LES, forces, CPU backend, bundling, `cfd_solve` transport, `record_cfd_results`, `cfd_report`, VC-CFD-20..22, 26, 50..52, 55 | M1 | 6 eng-weeks |
 | M3 | Viewport overlay + legend, `render_view` overlay, streamlines, slices, probes, Flow panel, VC-CFD-40..43 | M2 | 3 eng-weeks |
 | M4 | Euler cut-cell octree solver, adaptation, VC-CFD-30..35, shuttle-like CLI scenario | M2 | 7 eng-weeks |
 | M5 | Grid study (`gridStudy`, GCI), pinned literature benchmarks (Schäfer-Turek 3D, AIJ, ONERA M6), performance gate | M3, M4 | 3 eng-weeks |
@@ -399,7 +401,7 @@ MVP (M1–M5): about 22 eng-weeks. M3 also gives FEA its first 3D result overlay
 ## 11. Open questions / decisions needed
 
 1. **Rust toolchain in the repo** — *resolved 2026-10-18*: the owner made the stack non-fixed ("always use the best-suited
-   stack", `conventions.md` C7). `solver/flow/` is a Cargo workspace; CI and the desktop build gain `cargo`.
+   stack", `conventions.md` C7). CFD lives in the shared `solver/` Cargo workspace (RS1); CI and the desktop build gain `cargo`.
 2. **FEA port location.** `FeaToolsPort` lives in `packages/mcp`; when MCP is removed it must move to `server/` (transport types) and
    core (`FeArtifactPort` already is). This pack uses the target location from the start.
 3. **One artifact store for FEA and CFD.** Proposed: generalise `ctx.feaArtifacts` into a store with namespaces (`fea/`, `cfd/`), or

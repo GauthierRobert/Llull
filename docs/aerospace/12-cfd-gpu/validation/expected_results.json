@@ -120,7 +120,7 @@
     },
     {
       "id": "VC-CFD-20",
-      "command": "llull-flow lbm",
+      "command": "llull-compute flow lbm",
       "reference": "data/analytic_references.json poiseuille",
       "tolerance": "L2 profile error falls with observed order >= 1.8 over 16 / 32 / 64 cells across the channel (check_convergence)",
       "grade": "exact solution",
@@ -128,7 +128,7 @@
         "FR-CFD-11",
         "FR-CFD-36"
       ],
-      "test": "solver/flow/crates/flow-lbm/tests/poiseuille.rs"
+      "test": "solver/crates/llull-flow-lbm/tests/poiseuille.rs"
     },
     {
       "id": "VC-CFD-21",
@@ -141,18 +141,18 @@
         "FR-CFD-20",
         "FR-CFD-36"
       ],
-      "test": "flow-lbm/tests/sphere.rs; plans/sc-cfd-02-sphere-lbm.json"
+      "test": "llull-flow-lbm/tests/sphere.rs; plans/sc-cfd-02-sphere-lbm.json"
     },
     {
       "id": "VC-CFD-22",
-      "command": "llull-flow lbm",
+      "command": "llull-compute flow lbm",
       "reference": "data/analytic_references.json taylorGreen",
       "tolerance": "amplitude ratio within 1 % at 64 x 64 (quasi-2D, periodic)",
       "grade": "exact solution",
       "proves": [
         "FR-CFD-11"
       ],
-      "test": "flow-lbm/tests/taylor_green.rs"
+      "test": "llull-flow-lbm/tests/taylor_green.rs"
     },
     {
       "id": "VC-CFD-23",
@@ -179,7 +179,7 @@
     },
     {
       "id": "VC-CFD-25",
-      "command": "llull-flow lbm",
+      "command": "llull-compute flow lbm",
       "reference": "data/literature_benchmarks.json VC-CFD-25",
       "tolerance": "planned: 2 % of the Ghia table",
       "grade": "TBD \u2014 not a gate until pinned",
@@ -196,18 +196,18 @@
       "proves": [
         "FR-CFD-12"
       ],
-      "test": "flow-gpu/tests/equivalence.rs; sc-cfd-02"
+      "test": "llull-gpu/tests/equivalence.rs; sc-cfd-02"
     },
     {
       "id": "VC-CFD-30",
-      "command": "llull-flow euler (1D tube)",
+      "command": "llull-compute flow euler (1D tube)",
       "reference": "data/analytic_references.json sod",
       "tolerance": "rarefaction head / tail, contact and shock positions at t = 0.2 within 2 cells at 400 cells; L1 density error falls with observed order >= 0.6 over 100 / 200 / 400",
       "grade": "exact Riemann solution",
       "proves": [
         "FR-CFD-10"
       ],
-      "test": "flow-euler/tests/sod.rs"
+      "test": "llull-flow-euler/tests/sod.rs"
     },
     {
       "id": "VC-CFD-31",
@@ -271,7 +271,7 @@
         "FR-CFD-10",
         "FR-CFD-31"
       ],
-      "test": "flow-euler/tests/entropy.rs"
+      "test": "llull-flow-euler/tests/entropy.rs"
     },
     {
       "id": "VC-CFD-40",
@@ -282,7 +282,7 @@
       "proves": [
         "FR-CFD-22"
       ],
-      "test": "flow-core/tests/streamlines.rs; sc-cfd-05"
+      "test": "llull-flow-core/tests/streamlines.rs; sc-cfd-05"
     },
     {
       "id": "VC-CFD-41",
@@ -295,7 +295,7 @@
       "proves": [
         "FR-CFD-21"
       ],
-      "test": "flow-core/tests/surface_map.rs"
+      "test": "llull-flow-core/tests/surface_map.rs"
     },
     {
       "id": "VC-CFD-42",
@@ -308,7 +308,7 @@
       "proves": [
         "FR-CFD-20"
       ],
-      "test": "flow-lbm/tests/forces.rs"
+      "test": "llull-flow-lbm/tests/forces.rs"
     },
     {
       "id": "VC-CFD-43",

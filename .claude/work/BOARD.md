@@ -48,6 +48,7 @@ Agents are isolated; coordination is structural, run by the orchestrator:
 - **QUALITY LOOPS DONE:** 2026-10-08 — 5 parallel worktree loops (Q-CORE 45, Q-AEC 42, Q-3D 40, Q-2D 43, Q-MCP 40 iterations; 10-min cron) merged on `feat/quality-loops`, then cleanups A/B/C (cross-lane dedup: FOV const, text bounds, escapeXml, NumberField, duplicate_entities UI, stepEditGuard removed from UI) and 4 cad-reviewer fix rounds (D/E/F + outbox poisoning B1 `8fc3080`) -> merged to `main`. Verified: typecheck + lint clean; 290 files / 4758 tests; coverage 97.59/92.66/98.27/97.59; server tests green except 2 known env failures (python, symlink). NOT run (env): `npm run quality` / `test:e2e` / `production` — Python+CadQuery missing and Playwright chromium_headless_shell-1194 not installed (stale install lock). Open user decisions: 2D rotation semantics (a821d75), locked-layer behaviour, document-storage redesign (defer), AutoCAD mouse mapping.
 
 ## Open tasks (DONE/REMOVED pruned 2026-10-13; full history in git)
+- `[TODO]` **RS — NEXT PRIORITY** Native compute programme (Rust + wgpu, native OCCT), steps RS-0..RS-8 in order: `docs/decisions/RS1-native-compute.md` (supersedes AERO-2-M2's WASM build; RS-0 = CFD-M2). _deps: CFD-M1 for RS-0._
 
 ## Lane 2 — 3D viewport + UI shell (`viewport-engineer`)
 - `[DONE]` **E3** Layers panel (visibility/lock) + undo/redo buttons + shortcuts. _deps: W0-2_
