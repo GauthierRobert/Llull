@@ -121,7 +121,11 @@ export interface NetworkComponent {
   readonly extra?: Readonly<Record<string, string>>; // unknown PCF attributes, written back verbatim
 }
 
-/** Document slice of the plugin (CadDocument.plugins['piping-fabrication']); absent until the first command. */
+/**
+ * Document slice: `CadDocument.fabrication?: FabricationModel`, type in a new core file `packages/core/src/model/fabrication.ts`
+ * (same pattern as `fasteners?` / `sheetMetal?` in model/types.ts); validated by the plugin's DocumentExtension; absent until the
+ * first fabrication command.
+ */
 export interface FabricationModel {
   readonly version: 1;
   readonly rules?: FabricationRules;
@@ -164,8 +168,9 @@ export interface IsoDefinition {
 }
 ```
 
-Document version: the slice is plugin data, validated by the plugin's `DocumentExtension.validate`; absent slice =
-no fabrication data (no migration of existing files). Units: the slice stores mm; command params take document units
+Document version: one optional field on `CadDocument` (a type-only core change, like `sheetMetal?` for 07 FTR), validated
+by the plugin's `DocumentExtension.validate`; absent = no fabrication data, so existing files need no migration and the
+document version is unchanged. Units: the slice stores mm; command params take document units
 for coordinates and state units for every length param (AF-04).
 
 ## 4. Commands (toolset `piping`)
@@ -306,8 +311,8 @@ stock-length nesting (first-fit decreasing on 6 m / 12 m random lengths given by
 
 - Projection: plant axes map to sheet directions east = (cos −30°, sin −30°), north = (cos 30°, sin 30°), up = (0, 1)
   — identical to `viewDirections.ts AXES.iso` (scale dropped because the drawing is not to scale). `northArrow:
-  'up_left'` mirrors the plant about the N-S axis before projection (east → 210°... i.e. the iso viewed from the
-  other quadrant: viewer at (−X, −Y, +Z)). Inter-axis angle 120°, true-iso scale √(2/3) is reported for reference
+  'up_left'` rotates plant directions by +90° about +Z before projection, so north projects at 150° (up-left) and east
+  at +30°; the arrow is always drawn along the projected north. Inter-axis angle 120°, true-iso scale √(2/3) is reported for reference
   [S18][S19].
 - Graph: maximal straight runs between nodes (elbows, tees, ends, direction changes); each run has a direction class
   (±E, ±N, ±U or skew).
@@ -383,7 +388,7 @@ REDUCER-CONCENTRIC / -ECCENTRIC, FLANGE, FLANGE-BLIND, GASKET, BOLT, VALVE, CAP,
 - Weld / cut / spool / BOM tables: in `data` (JSON) and V1 CSV files in `data.files[]`.
 - IFC: welds and spools are not exported in this gap (`08-plant-data-reports-interop` owns IFC piping); the PCF is the
   fabrication exchange.
-- Document: the `piping-fabrication` slice (§3) is saved with the document; `DocumentExtension.validate` checks ids,
+- Document: the `fabrication` slice (§3) is saved with the document; `DocumentExtension.validate` checks ids,
   numbers (unique per line), and references to existing components.
 
 ## 7. CLI / MCP / UI surfaces and error codes

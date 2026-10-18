@@ -1,0 +1,27 @@
+{
+  "id": "SC-PST-01",
+  "validates": ["VC-PST-12", "VC-PST-18"],
+  "description": "DN150 (NPS 6 Sch 40, 168.3 x 7.11 mm) L-bend 6 m x 3 m between two anchors, sharp corner, thermal strain 0.00225 (carbon steel 70 -> 400 degF): anchor reactions and maximum expansion stress against the unit-load flexibility closed form",
+  "unbuilt": ["create_stress_model", "import_pipe_material_data", "set_pipe_operating_conditions", "add_stress_restraint", "set_stress_load_cases", "analyze_pipe_stress", "check_pipe_stress"],
+  "actions": [
+    { "command": "add_level", "params": { "name": "Rack", "elevation": 0 } },
+    { "command": "add_pipe_run", "params": { "points": [[0, 0, 3000], [6000, 0, 3000], [6000, 3000, 3000]], "dn": 150, "line": "P-0701", "service": "hot oil" }, "as": "pipe" },
+    { "command": "import_pipe_material_data", "params": { "materialId": "cs-validation", "designation": "carbon steel (validation inputs)", "source": "validation inputs of VC-PST-12, not a material claim", "rows": [ { "tempC": 21.11, "growthMmPerM": 0, "EGPa": 200, "ShMPa": 137.9 }, { "tempC": 204.44, "growthMmPerM": 2.25, "EGPa": 200, "ShMPa": 137.9 } ] } },
+    { "command": "create_stress_model", "params": { "name": "P-0701 flexibility", "pipeIds": ["$pipe"], "code": "B31.3", "edition": "2018", "elbowRadiusFactor": 0, "friction": 0.3 }, "as": "stress" },
+    { "command": "set_pipe_operating_conditions", "params": { "modelId": "$stress", "installTempC": 21.11, "temperatures": [{ "name": "T1", "tempC": 204.44 }], "pressures": [{ "name": "P1", "gaugeBar": 0 }], "fluidDensityKgM3": 0, "cycles": 7000, "materialId": "cs-validation", "wallMm": 7.11, "corrosionAllowanceMm": 0, "millTolerancePct": 0 } },
+    { "command": "add_stress_restraint", "params": { "modelId": "$stress", "at": { "pipeId": "$pipe", "atMm": 0 }, "kind": "anchor" }, "as": "anchorA" },
+    { "command": "add_stress_restraint", "params": { "modelId": "$stress", "at": { "pipeId": "$pipe", "atMm": 9000 }, "kind": "anchor" }, "as": "anchorC" },
+    { "command": "set_stress_load_cases", "params": { "modelId": "$stress", "cases": [ { "name": "L1", "type": "OPE", "basic": ["T1"] }, { "name": "L3", "type": "EXP", "basic": ["T1"] } ] } },
+    { "command": "analyze_pipe_stress", "params": { "modelId": "$stress", "cases": ["L3"], "include": ["reactions", "stresses"] } },
+    { "command": "check_pipe_stress", "params": { "modelId": "$stress" } }
+  ],
+  "expected": [
+    { "step": 8, "path": "data.cases[case=L3].reactions[restraintId=$anchorC].forceN.0", "value": -7872.99, "rel": 0.0001, "source": "data/lbend_guided_cantilever.json (unit-load flexibility = frame3d)" },
+    { "step": 8, "path": "data.cases[case=L3].reactions[restraintId=$anchorC].forceN.1", "value": -2406.95, "rel": 0.0001, "source": "same" },
+    { "step": 8, "path": "data.cases[case=L3].reactions[restraintId=$anchorC].momentNm.2|abs", "value": 14868.57, "rel": 0.0001, "source": "same (N m)" },
+    { "step": 8, "path": "data.governing[case=L3].codeStressMPa", "value": 106.791, "rel": 0.001, "source": "M_C / Z, no SIF (sharp corner)" },
+    { "step": 8, "path": "data.reviewRequired", "value": true, "source": "AF-33" },
+    { "step": 9, "path": "items[code=PST_MATERIAL_UNVERIFIED]", "value": "present", "source": "unsigned import (AF-32)" },
+    { "step": 9, "path": "items[code=PST_EXPANSION_OVERSTRESS]", "value": "absent", "source": "106.79 < SA = 1.0213 x 206.85 = 211.25 MPa (f, N 7000, fm 1.2)" }
+  ]
+}

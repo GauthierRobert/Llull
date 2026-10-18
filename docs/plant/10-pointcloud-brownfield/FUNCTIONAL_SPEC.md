@@ -102,7 +102,7 @@ User stories:
 | FR-SCN-10 | MUST | Every applied registration is stored as a record: method, inputs, transform, residuals, date, and status `computed` / `accepted` / `unverified` (clouds delivered pre-registered without a report). Accepting a registration is a human act for fabrication use (AF-34) | Traceability of every downstream dimension | AF-32, AF-34 |
 | FR-SCN-11 | MUST | Proprietary formats (ReCap RCP / RCS, Faro FLS, Leica native) are refused with `SCN_FORMAT_PROPRIETARY` and the remediation "export E57 (or LAS) from the vendor tool" | No public specification; avoid reverse-engineering | — |
 | FR-SCN-12 | MUST | Fit primitives in a region (box, seed + radius, slice): plane, cylinder, sphere, circle (in a slice), with RANSAC for outliers and least-squares refinement. Return parameters, inlier count, RMS, coverage angle and the parameter uncertainty (covariance) | Base of every extraction and of target fitting | Schnabel 2007 [R8]; Lukács 1998 [R12] |
-| FR-SCN-13 | MUST | Pipe extraction: fit a cylinder, snap the OD to a size table (EN 10220 / ASME B36.10M, from 01 PSC; tolerance named), optionally account for an insulation thickness, and create an `add_pipe_run` flagged `asBuilt` with provenance (cloud, region, fit quality). Off-table diameters are kept as measured with `SCN_FIT_NO_STANDARD_SIZE` | Turning scan into intelligent pipe for tie-ins | VC-SCN-20, 21 |
+| FR-SCN-13 | MUST | Pipe extraction: fit a cylinder, snap the OD to a size table (EN 10220 / ASME B36.10M, from 01 PSC; tolerance named), optionally account for an insulation thickness, and (on commit) create an `add_pipe_run` flagged `asBuilt` with provenance (cloud, region, fit quality). Off-table diameters are kept as measured with `SCN_FIT_NO_STANDARD_SIZE` | Turning scan into intelligent pipe for tie-ins | VC-SCN-20, 21 |
 | FR-SCN-14 | SHOULD | Centreline tracing from a seed: follow a pipe along its axis and detect bends (torus fit), reducers (radius step) and ends. Return straights, bends (radius, angle), intersection points (PI). Optionally create one pipe run with bends | Existing lines are rarely one straight | VC-SCN-22 |
 | FR-SCN-15 | SHOULD | Steel member fit: project a region onto the member's section plane, rank catalogue profiles by fit (h, b, flange and web faces), return the best candidates with scores, and optionally create `add_steel_member` flagged `asBuilt` | Tie-ins to existing steel for supports and platforms | VC-SCN-23 |
 | FR-SCN-16 | MUST | Slice: a planar slab of given thickness returns the points (bounded) and fitted 2D primitives (circles, lines). Optionally commit them as 2D entities on a work plane for drafting (`draw_polyline`, `draw_circle`) | Plan and section drawings from scans | VC-SCN-24 |
@@ -137,8 +137,9 @@ llull cloud_to_model_deviation cloudId=st01 entityIds=pipe-12.1 threshold=0.01 -
 ```
 
 A typical `tiein_plan.json`: `attach_point_cloud` → `set_scan_crop` → `slice_cloud` (find the header) → `extract_pipes`
-(creates the as-built run) → `add_pipe_run` (new branch from 02 RTE) → `check_asbuilt_clash` → `check_point_clouds`.
-See `validation/plans/` for five complete scenarios.
+(query: the fit) → `commit_asbuilt_extraction` (creates the as-built run from the fit numbers) → `add_pipe_run` (new branch,
+02 RTE) → `check_asbuilt_clash` → `check_point_clouds`. Heavy work on points is always a query. Only the numbers it produced
+are committed, so the document replays without the scan (TECHNICAL §2). See `validation/plans/` for five complete scenarios.
 
 ### 6.2 MCP (cloud agents)
 
