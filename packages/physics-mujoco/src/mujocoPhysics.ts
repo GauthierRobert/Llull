@@ -180,6 +180,15 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
       mujoco.mj_step(mjModel, data);
       if (before !== null) appliedWork += stepWork(data, joints, servoJoints, before);
       if (!data.qvel.every(Number.isFinite)) throw new Error(`simulation diverged at t = ${data.time.toFixed(4)} s.`);
+      // anti-windup: after the step the set-point never leads the joint by more than the servo force limit allows (force = kp (act - q) - kv v);
+      // a position hold (target speed 0) keeps its set-point
+      model.servos.forEach((servo, i) => {
+        const joint = servoJoints[i];
+        if (joint === undefined || servo.targetVelocity === 0 || !(servo.stiffness > 0)) return;
+        const centre = (data.qpos[joint.qpos] ?? 0) + (servo.damping * (data.qvel[joint.dof] ?? 0)) / servo.stiffness;
+        const reach = servo.maxForce / servo.stiffness;
+        data.act[i] = Math.min(centre + reach, Math.max(centre - reach, data.act[i] ?? 0));
+      });
       if (slots.length > 0) residual = Math.max(residual, reader.residual(data));
       const sampled = step % stride === 0 || step === steps;
       if (wantReactions && (sampled || step % peakStride === 0)) {

@@ -150,6 +150,23 @@ describe('MuJoCo physics engine', () => {
     expect(worst / peak).toBeLessThan(1e-3);
   });
 
+  it('a saturated speed servo does not overshoot its target on spin-up (anti-windup)', () => {
+    const [timestep, inertia, target] = [0.001, 0.5, 10];
+    const model: SimulationModel = {
+      gravity: [0, 0, 0],
+      bodies: [rotor('wheel', [0, 0, 1], 10, inertia)],
+      gears: [],
+      ...tree,
+      servos: [{ id: 'drive', joint: 'wheel-hinge', targetVelocity: target, ...speedServoGains(inertia, timestep), maxForce: 2 }],
+      loads: noLoads,
+    };
+    const trace = engine.simulate(model, { duration: 12, timestep, sampleInterval: 0.01 });
+    const omega = trace.jointVelocity['wheel-hinge'] ?? [];
+    expect(Math.max(...(trace.servoForce['drive'] ?? []).map(Math.abs))).toBeCloseTo(2, 6);
+    expect(Math.max(...omega)).toBeLessThan(target * 1.001);
+    expect(last(omega)).toBeCloseTo(target, 6);
+  });
+
   it('rejects a model MuJoCo cannot compile', () => {
     const broken: SimulationBody = { ...rotor('bad', [0, 0, 0], -1, 0.1) };
     expect(() =>
