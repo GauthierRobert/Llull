@@ -1,11 +1,20 @@
 {
   "id": "SC-AER-03",
   "validates": ["VC-AER-21", "VC-AER-22"],
-  "description": "Crank power at 45 km/h, 80 kg rider + bike, sea-level density 1.225, for the three Defraeye et al. 2010 rider + bike CdA values (upright 0.270, dropped 0.243, time-trial 0.211) with the Martin et al. 1998 model; expected values are the closed form of the published model (derivation in validation/README.md)",
+  "description": "Crank power at 45 km/h, 80 kg rider + bike, sea-level density 1.225, for the three Defraeye et al. 2010 rider + bike CdA values (upright 0.270, dropped 0.243, time-trial 0.211) with the Martin et al. 1998 bicycle preset of road_load_power; expected values are the closed form of the published model (derivation in validation/README.md)",
   "actions": [
-    { "command": "cycling_power", "params": { "massKg": 80, "cdA": 0.27, "speed": 45, "speedUnit": "km/h", "densityKgM3": 1.225 } },
-    { "command": "cycling_power", "params": { "massKg": 80, "cdA": 0.243, "speed": 45, "speedUnit": "km/h", "densityKgM3": 1.225 } },
-    { "command": "cycling_power", "params": { "massKg": 80, "cdA": 0.211, "speed": 45, "speedUnit": "km/h", "densityKgM3": 1.225 } }
+    {
+      "command": "road_load_power",
+      "params": { "vehicle": "bicycle", "massKg": 80, "cdA": 0.27, "speed": 45, "speedUnit": "km/h", "densityKgM3": 1.225 }
+    },
+    {
+      "command": "road_load_power",
+      "params": { "vehicle": "bicycle", "massKg": 80, "cdA": 0.243, "speed": 45, "speedUnit": "km/h", "densityKgM3": 1.225 }
+    },
+    {
+      "command": "road_load_power",
+      "params": { "vehicle": "bicycle", "massKg": 80, "cdA": 0.211, "speed": 45, "speedUnit": "km/h", "densityKgM3": 1.225 }
+    }
   ],
   "expected": [
     { "step": 0, "path": "powerW", "value": 371.044953, "rel": 1e-6, "source": "Martin 1998 closed form with Defraeye 2010 CdA" },

@@ -18,14 +18,14 @@ published data. CFD (RANS / LES) is out of scope for the MVP. It is planned as a
 
 ## 2. Aerospace and sport context
 
-| Domain                                 | Typical question                                                                     | Tool used today                                                          | What llull adds                                                                                 |
-| -------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| Light aircraft / UAV conceptual design | wing area and aspect ratio for a stall speed; induced drag; tip loading with washout | XFLR5, OpenVSP VSPAERO, spreadsheets with Raymer / Anderson formulas     | the same lifting-line and panel results on the CAD section and planform, scriptable by an agent |
-| Launcher / sounding rocket             | air density, Mach and dynamic pressure along a trajectory (max-q)                    | US Standard Atmosphere tables, RASAero                                   | `standard_atmosphere` with Mach / q / Reynolds in one call                                      |
-| Wind-tunnel and test preparation       | Reynolds number of a model, blockage area                                            | hand calculation                                                         | `standard_atmosphere`, `frontal_area` on the model                                              |
-| Road cycling / triathlon               | watts saved by a position or a helmet, speed at a given power on a climb             | Martin 1998 power model in spreadsheets, field "virtual elevation" tests | `cycling_power` (Martin 1998) with CdA typed in or measured on a rider + bike model             |
-| Track hour record                      | power needed for a distance, effect of altitude                                      | Bassett et al. 1999 model                                                | `cycling_power model bassett_1999`, reproducing the published table                             |
-| Automotive / wind loads                | drag force and power at speed                                                        | Cd × A from catalogues                                                   | `aero_drag` with the frontal area measured on the model                                         |
+| Domain                                 | Typical question                                                                     | Tool used today                                                          | What llull adds                                                                                          |
+| -------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| Light aircraft / UAV conceptual design | wing area and aspect ratio for a stall speed; induced drag; tip loading with washout | XFLR5, OpenVSP VSPAERO, spreadsheets with Raymer / Anderson formulas     | the same lifting-line and panel results on the CAD section and planform, scriptable by an agent          |
+| Launcher / sounding rocket             | air density, Mach and dynamic pressure along a trajectory (max-q)                    | US Standard Atmosphere tables, RASAero                                   | `standard_atmosphere` with Mach / q / Reynolds in one call                                               |
+| Wind-tunnel and test preparation       | Reynolds number of a model, blockage area                                            | hand calculation                                                         | `standard_atmosphere`, `frontal_area` on the model                                                       |
+| Road cycling / triathlon               | watts saved by a position or a helmet, speed at a given power on a climb             | Martin 1998 power model in spreadsheets, field "virtual elevation" tests | `road_load_power` `vehicle: bicycle` (Martin 1998) with CdA typed in or measured on a rider + bike model |
+| Track hour record                      | power needed for a distance, effect of altitude                                      | Bassett et al. 1999 model                                                | `road_load_power` `model: bassett_1999`, reproducing the published table                                 |
+| Automotive / wind loads                | drag force and power at speed                                                        | Cd × A from catalogues                                                   | `aero_drag` with the frontal area measured on the model                                                  |
 
 ## 3. Personas and user stories
 
@@ -95,7 +95,8 @@ CLI first (`llull-cli` skill). Typical plan:
 ]
 ```
 
-Cycling: `llull cycling_power '{"massKg":80,"cdA":0.243,"speed":45,"speedUnit":"km/h"}' --json`.
+Cycling: `llull road_load_power '{"vehicle":"bicycle","massKg":80,"cdA":0.243,"speed":45,"speedUnit":"km/h"}' --json`.
+A car: `llull road_load_power '{"massKg":1500,"cdA":0.65,"crr":0.01,"speed":120,"speedUnit":"km/h"}' --json`.
 MCP: the `aerodynamics` toolset (`enable_toolset aerodynamics`). UI: the commands appear in the command palette
 under "Aerodynamics". A plot surface for Cp and span loading is a V1 item.
 
@@ -110,8 +111,8 @@ under "Aerodynamics". A plot surface for Cp and span loading is a V1 item.
 | NACA 2412                                               | `analyze_airfoil`                      | thin-airfoil α_L0 = −2.077°; panel α_L0 within 0.4° of the measured −2°                     | VC-AER-11    |
 | NACA 0012                                               | `analyze_airfoil`                      | inviscid lift slope 5–15 % above McCroskey's 0.1063 /deg (the documented viscous reduction) | VC-AER-12    |
 | an elliptical wing                                      | `analyze_wing`                         | e = 1, CL_α = a0/(1 + a0/πAR), CDi = CL²/πAR within 1e-6                                    | VC-AER-13    |
-| the 13 rows of Bassett et al. 1999 Table 7              | `cycling_power bassett_1999`           | power within 2 W of the published value (Boardman 1996: the paper's model value 452 W)      | VC-AER-20    |
-| Martin 1998 terms                                       | `cycling_power`                        | each term equals its closed form; speed ↔ power round trip                                  | VC-AER-21/22 |
+| the 13 rows of Bassett et al. 1999 Table 7              | `road_load_power bassett_1999`         | power within 2 W of the published value (Boardman 1996: the paper's model value 452 W)      | VC-AER-20    |
+| Martin 1998 terms                                       | `road_load_power` bicycle              | each term equals its closed form; speed ↔ power round trip                                  | VC-AER-21/22 |
 
 ## 8. Standards and regulatory alignment
 

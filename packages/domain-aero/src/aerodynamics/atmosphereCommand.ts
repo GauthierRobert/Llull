@@ -24,7 +24,7 @@ export const standardAtmosphere = defineCommand({
     '`altitude` in `altitudeUnit` (m default, ft or km); `altitudeType` geometric (default, height above sea level) or geopotential; range ' +
     '-5 km to 86 km geometric. `temperatureOffsetK` gives an ISA+ΔT day (temperature shifted, pressure kept, density from the gas law). ' +
     'Give `speed` (+ `speedUnit`) to also get Mach, dynamic pressure q = ½ρV², equivalent airspeed and Reynolds number per metre or for ' +
-    '`referenceLengthM` (chord, body length). Used by analyze_wing, aero_drag, cycling_power and nozzle_performance (ambient pressure).',
+    '`referenceLengthM` (chord, body length). Used by analyze_wing, aero_drag, road_load_power and nozzle_performance (ambient pressure).',
   params: z.object({
     altitude: z.number().describe('Altitude in altitudeUnit; -5000 m .. 86000 m geometric.'),
     altitudeUnit: z.enum(['m', 'ft', 'km']).optional().describe('Unit of altitude: m (default), ft or km.'),

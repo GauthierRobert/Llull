@@ -37,8 +37,8 @@ packages/domain-aero/src/aerodynamics/
   projectedArea.ts       silhouette rasterisation, wetted area
   geometryArea.ts        entity ids + flowParams -> metres -> projected area (one validation for 3 commands)
   skinFriction.ts        Cf correlations + validity ranges
-  cycling.ts             Martin 1998, Bassett 1999 formulas
-  cyclingParams.ts       one schema for both models; cyclingMartin.ts / cyclingBassett.ts runners; cyclingCommand.ts dispatches
+  roadLoad.ts            road-load power (Martin 1998 terms, bicycle preset) and Bassett 1999 formulas
+  roadLoadParams.ts      one schema for both models; roadLoadRun.ts / roadLoadBassett.ts runners; roadLoadCommand.ts dispatches
   *Command.ts, airfoilCommands.ts, dragCommands.ts, catalog.ts, plugin.ts, codes.ts
 ```
 
@@ -50,15 +50,15 @@ sections, a polar cache) would be a plugin `DocumentExtension`. It is not needed
 
 ## 4. Commands (toolset `aerodynamics`)
 
-| Name                  | Kind                                | Params (sketch)                                                                                                                                                                                                                                                                   | data                                                                                              | Failure codes                                                                                      |
-| --------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `standard_atmosphere` | query                               | `altitude`, `altitudeUnit m\|ft\|km`, `altitudeType geometric\|geopotential`, `temperatureOffsetK`, `speed`+`speedUnit`, `referenceLengthM`                                                                                                                                       | T, p, ρ, a, μ, ν, g, ratios, flow {Mach, q, EAS, Re}, provenance                                  | `AER_ALTITUDE_OUT_OF_RANGE`, `AER_PARAM_INVALID`                                                   |
-| `draw_naca_airfoil`   | mutating (composes `draw_polyline`) | `naca`, `chord`, `pointsPerSide`, `closedTrailingEdge`, `incidenceDeg`, `position`                                                                                                                                                                                                | — (1 polyline)                                                                                    | `AER_AIRFOIL_INVALID`, `AER_PARAM_INVALID`                                                         |
-| `analyze_airfoil`     | query                               | `naca` \| `entityId`, `alphasDeg[]`, `panelsPerSide`, `momentReference`, `includeSurface`                                                                                                                                                                                         | polar [{α, cl, clCirculation, cm, cdPressure}], liftSlope, zeroLiftAngle, thinAirfoil, surface Cp | `AER_AIRFOIL_SOURCE_CONFLICT`, `AER_AIRFOIL_INVALID`, `AER_PARAM_INVALID`, `AER_SOLVER_FAILED`     |
-| `analyze_wing`        | query                               | `span`, `rootChord`, `tipChord`, `planform`, `twistDeg`, `naca` \| `sectionLiftSlopePerRad`+`zeroLiftAngleDeg`, `alphasDeg[]`, `terms`, speed + air state                                                                                                                         | geometry {S, AR, λ, c̄}, polar [{CL, CDi, e, lift N, Di N}], CL*α, Helmbold CL*α, stations         | `AER_PARAM_INVALID`, `AER_AIRFOIL_INVALID`, `AER_SOLVER_FAILED`, air-state codes                   |
-| `frontal_area`        | query                               | `entityIds[]`, `flowDirection`, `resolution`                                                                                                                                                                                                                                      | frontal m² ± uncertainty, wetted m², length m, extents                                            | `AER_ENTITY_NOT_FOUND`, `AER_NO_GEOMETRY`, `AER_PARAM_INVALID`                                     |
-| `aero_drag`           | query                               | speed, `cdA` \| `cd`+`referenceAreaM2` \| `cd`+`entityIds`, `frictionModel`+`wettedAreaM2`+`lengthM`, air state                                                                                                                                                                   | drag N, power W, q, Mach, Re, friction {Cf, N}, warnings                                          | `AER_AREA_SOURCE_CONFLICT`, `AER_PARAM_INVALID`, geometry and air-state codes                      |
-| `cycling_power`       | query                               | `model martin_1998\|bassett_1999`, `speed` \| `powerW`; martin: `massKg`, `cdA` \| `cd`+`entityIds`, `crr`, `gradePercent`, `headwindMS`, `wheelAreaM2`, `chainEfficiency`, `bearingLosses`; bassett: `riderHeightM`, `riderMassKg`, `bikeMassKg`, `k1` \| factors, `trackFactor` | speed, power, breakdown, 1 h distance, inputs with `defaulted`                                    | `AER_SPEED_SOURCE_CONFLICT`, `AER_AREA_SOURCE_CONFLICT`, `AER_NO_EQUILIBRIUM`, `AER_PARAM_INVALID` |
+| Name                  | Kind                                | Params (sketch)                                                                                                                                                                                                                                                                                                                            | data                                                                                              | Failure codes                                                                                      |
+| --------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `standard_atmosphere` | query                               | `altitude`, `altitudeUnit m\|ft\|km`, `altitudeType geometric\|geopotential`, `temperatureOffsetK`, `speed`+`speedUnit`, `referenceLengthM`                                                                                                                                                                                                | T, p, ρ, a, μ, ν, g, ratios, flow {Mach, q, EAS, Re}, provenance                                  | `AER_ALTITUDE_OUT_OF_RANGE`, `AER_PARAM_INVALID`                                                   |
+| `draw_naca_airfoil`   | mutating (composes `draw_polyline`) | `naca`, `chord`, `pointsPerSide`, `closedTrailingEdge`, `incidenceDeg`, `position`                                                                                                                                                                                                                                                         | — (1 polyline)                                                                                    | `AER_AIRFOIL_INVALID`, `AER_PARAM_INVALID`                                                         |
+| `analyze_airfoil`     | query                               | `naca` \| `entityId`, `alphasDeg[]`, `panelsPerSide`, `momentReference`, `includeSurface`                                                                                                                                                                                                                                                  | polar [{α, cl, clCirculation, cm, cdPressure}], liftSlope, zeroLiftAngle, thinAirfoil, surface Cp | `AER_AIRFOIL_SOURCE_CONFLICT`, `AER_AIRFOIL_INVALID`, `AER_PARAM_INVALID`, `AER_SOLVER_FAILED`     |
+| `analyze_wing`        | query                               | `span`, `rootChord`, `tipChord`, `planform`, `twistDeg`, `naca` \| `sectionLiftSlopePerRad`+`zeroLiftAngleDeg`, `alphasDeg[]`, `terms`, speed + air state                                                                                                                                                                                  | geometry {S, AR, λ, c̄}, polar [{CL, CDi, e, lift N, Di N}], CL*α, Helmbold CL*α, stations         | `AER_PARAM_INVALID`, `AER_AIRFOIL_INVALID`, `AER_SOLVER_FAILED`, air-state codes                   |
+| `frontal_area`        | query                               | `entityIds[]`, `flowDirection`, `resolution`                                                                                                                                                                                                                                                                                               | frontal m² ± uncertainty, wetted m², length m, extents                                            | `AER_ENTITY_NOT_FOUND`, `AER_NO_GEOMETRY`, `AER_PARAM_INVALID`                                     |
+| `aero_drag`           | query                               | speed, `cdA` \| `cd`+`referenceAreaM2` \| `cd`+`entityIds`, `frictionModel`+`wettedAreaM2`+`lengthM`, air state                                                                                                                                                                                                                            | drag N, power W, q, Mach, Re, friction {Cf, N}, warnings                                          | `AER_AREA_SOURCE_CONFLICT`, `AER_PARAM_INVALID`, geometry and air-state codes                      |
+| `road_load_power`     | query                               | `model road_load\|bassett_1999`, `speed` \| `powerW`; road_load: `vehicle generic\|bicycle`, `massKg`, `cdA` \| `cd`+`entityIds`, `crr` (required for generic), `gradePercent`, `headwindMS`, `wheelAreaM2`, `drivetrainEfficiency`, `bearingLosses`; bassett: `riderHeightM`, `riderMassKg`, `bikeMassKg`, `k1` \| factors, `trackFactor` | speed, power, breakdown, 1 h distance, inputs with `defaulted`                                    | `AER_SPEED_SOURCE_CONFLICT`, `AER_AREA_SOURCE_CONFLICT`, `AER_NO_EQUILIBRIUM`, `AER_PARAM_INVALID` |
 
 Every command carries `@affects / @invariant / @failure` tags in its source (C2).
 
@@ -155,15 +155,15 @@ D = ½ρV²·CdA. With a friction model, D_f = Cf(Re_L)·q·S_wet is added. The 
 
 A warning is raised outside these ranges, and also above Mach 0.3.
 
-### 5.7 Cycling (TR-AER-07)
+### 5.7 Road load and track cycling (TR-AER-07)
 
-**Martin 1998, steady state:**
+**Road load (Martin 1998 terms), steady state.** One model for every road vehicle; the bicycle-only terms (Fw, bearings) are zero unless `vehicle: bicycle` or given:
 
 P = [½ρ(CdA + Fw)V_A|V_A|V_G + V_G Crr m g cos(atan G) + V_G(91 + 8.7V_G)e-3 + V_G m g sin(atan G)] / E_c
 
 - V_A = V_G + headwind. The sign-preserving square handles a tailwind faster than the rider.
-- Defaults are named and flagged: Fw 0.0044 m², Crr 0.0032, E_c 0.976.
-- Inverse: the speed is found by a downward scan from 40 m/s, then bisection on the first bracket (the largest
+- `vehicle: bicycle` defaults (named and flagged): Fw 0.0044 m², Crr 0.0032, bearings on, E_c 0.976. `vehicle: generic`: Fw 0, no bearings, η 1 (power at the wheels), and `crr` is required: there is no sourced default for an arbitrary vehicle.
+- Inverse: the speed is found by a downward scan from 100 m/s, then bisection on the first bracket (the largest
   root, which matters for descents).
 
 **Bassett 1999, eq. 8:**
@@ -197,7 +197,7 @@ The CLI (`llull <command> '{…}' --json`), MCP (toolset `aerodynamics`) and the
 | AER_SOLVER_FAILED                      | singular panel or lifting-line system                 |
 | AER_AREA_SOURCE_CONFLICT               | ambiguous drag area                                   |
 | AER_SPEED_SOURCE_CONFLICT              | both or neither of speed / power                      |
-| AER_NO_EQUILIBRIUM                     | no steady speed ≤ 40 m/s for the power                |
+| AER_NO_EQUILIBRIUM                     | no steady speed ≤ 100 m/s for the power               |
 
 ## 8. Performance budgets
 
@@ -218,7 +218,7 @@ The resolution is capped at 2000 cells. All commands are deterministic (AF-13).
 | VC-AER-02..05 | `drag.test.ts` (box, sphere, union, drag, Cf check values)                                                                            |
 | VC-AER-10..12 | `airfoil.test.ts` (Joukowski exact, NACA 2412, NACA 0012 vs Ladson / McCroskey, convergence, UIUC-validated ordinates)                |
 | VC-AER-13     | `wing.test.ts` (elliptic exact, rectangular, taper, washout, forces)                                                                  |
-| VC-AER-20..23 | `cycling.test.ts` (Bassett Table 7, Martin closed forms, Defraeye ranking)                                                            |
+| VC-AER-20..23 | `roadLoad.test.ts` (Bassett Table 7, Martin closed forms, Defraeye ranking)                                                           |
 | SC-AER-01..05 | `tests/unit/aero/scenarioPlans.test.ts` runs every plan in `validation/plans/` through `build_project` and checks its `expected` rows |
 
 The coverage gate on `packages/domain-aero/src/**` is 90/85/90/90 (CLAUDE.md).
@@ -250,7 +250,7 @@ See FUNCTIONAL_SPEC §11 and [validation/sources.md](validation/sources.md).
 M1 is built and green:
 
 - Plugin `aerodynamicsPlugin` with 7 commands (`standard_atmosphere`, `draw_naca_airfoil`, `analyze_airfoil`,
-  `analyze_wing`, `frontal_area`, `aero_drag`, `cycling_power`), toolset `aerodynamics`, palette group.
+  `analyze_wing`, `frontal_area`, `aero_drag`, `road_load_power`), toolset `aerodynamics`, palette group.
 - Tests: `tests/unit/aero/aerodynamics/*.test.ts` and `tests/unit/aero/scenarioPlans.test.ts`. Every VC listed in
   `validation/README.md` passes, against data pinned in `validation/data/`.
 

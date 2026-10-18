@@ -46,22 +46,22 @@ describe('aerodynamics / fluids review regressions', () => {
 
   it('bassett_1999 takes densityKgM3 as Kd = ρ/1.225, refuses unused air params, and flags K1 as given when any factor is given', () => {
     const rider = { model: 'bassett_1999', speed: 50, speedUnit: 'km/h', riderHeightM: 1.8, riderMassKg: 70 };
-    const thin = data<{ inputs: { k1: { value: number } } }>(doc, 'cycling_power', { ...rider, densityKgM3: 0.9 });
+    const thin = data<{ inputs: { k1: { value: number } } }>(doc, 'road_load_power', { ...rider, densityKgM3: 0.9 });
     expect(thin.inputs.k1.value).toBeCloseTo(0.9 / 1.225, 9);
-    expectRefusal(doc, 'cycling_power', { ...rider, temperatureOffsetK: 10 }, 'AER_PARAM_INVALID');
-    expectRefusal(doc, 'cycling_power', { ...rider, altitudeM: 1000, densityKgM3: 1 }, 'AER_AIR_STATE_CONFLICT');
-    expectRefusal(doc, 'cycling_power', { ...rider, altitudeM: 9000 }, 'AER_PARAM_INVALID');
-    const bike = data<{ inputs: { k1: { defaulted: boolean } } }>(doc, 'cycling_power', { ...rider, bikeFactor: 0.93 });
+    expectRefusal(doc, 'road_load_power', { ...rider, temperatureOffsetK: 10 }, 'AER_PARAM_INVALID');
+    expectRefusal(doc, 'road_load_power', { ...rider, altitudeM: 1000, densityKgM3: 1 }, 'AER_AIR_STATE_CONFLICT');
+    expectRefusal(doc, 'road_load_power', { ...rider, altitudeM: 9000 }, 'AER_PARAM_INVALID');
+    const bike = data<{ inputs: { k1: { defaulted: boolean } } }>(doc, 'road_load_power', { ...rider, bikeFactor: 0.93 });
     expect(bike.inputs.k1.defaulted).toBe(false);
-    const none = data<{ inputs: { k1: { defaulted: boolean } } }>(doc, 'cycling_power', rider);
+    const none = data<{ inputs: { k1: { defaulted: boolean } } }>(doc, 'road_load_power', rider);
     expect(none.inputs.k1.defaulted).toBe(true);
   });
 
   it('no-equilibrium refusal tells to lower the power or the descent', () => {
     const refusal = expectRefusal(
       doc,
-      'cycling_power',
-      { massKg: 80, cdA: 0.25, powerW: 100, gradePercent: -25, headwindMS: -10 },
+      'road_load_power',
+      { massKg: 40000, crr: 0.006, cdA: 6, powerW: 10, gradePercent: -25, headwindMS: -10 },
       'AER_NO_EQUILIBRIUM',
     );
     expect(refusal.error?.remediation).toContain('lower powerW');

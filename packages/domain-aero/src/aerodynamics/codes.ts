@@ -14,7 +14,7 @@ const REMEDIATION: Readonly<Record<string, string>> = {
   AER_SOLVER_FAILED: 'the linear system is singular: check the geometry (duplicate points, zero-length panels, zero chord)',
   AER_AREA_SOURCE_CONFLICT: 'give exactly one of cdA, (cd + referenceArea) or (cd + entityIds)',
   AER_SPEED_SOURCE_CONFLICT: 'give exactly one of speed or powerW',
-  AER_NO_EQUILIBRIUM: 'the steady speed would exceed 40 m/s: lower powerW, or the downhill grade / tailwind',
+  AER_NO_EQUILIBRIUM: 'the steady speed would exceed 100 m/s: lower powerW, or the downhill grade / tailwind',
 };
 
 export const refuseAero = tableRejection(REMEDIATION);

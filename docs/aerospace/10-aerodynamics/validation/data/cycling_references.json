@@ -8,7 +8,7 @@
       "wheelAreaFwM2": { "value": 0.0044, "grade": "A" },
       "bearingLossW": { "value": "V(91 + 8.7 V)e-3", "grade": "A (Dahn 1991 via Martin)" },
       "crr": { "value": 0.0032, "grade": "A" },
-      "chainEfficiency": { "value": 0.976, "grade": "B (rouleur 0.0.3 implementation; other reuses 0.975-0.98)" }
+      "drivetrainEfficiency": { "value": 0.976, "grade": "B (rouleur 0.0.3 implementation; other reuses 0.975-0.98)" }
     }
   },
   "defraeye2010": {

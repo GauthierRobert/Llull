@@ -4,11 +4,11 @@
   "description": "Boardman 1996 hour record (56.375 km, Manchester, K1 0.878): Bassett 1999 model power 452 W (the paper: 'Our model estimated Boardman high (452 W)'; SRM measured 442 W)",
   "actions": [
     {
-      "command": "cycling_power",
+      "command": "road_load_power",
       "params": { "model": "bassett_1999", "speed": 56.375, "speedUnit": "km/h", "riderHeightM": 1.75, "riderMassKg": 68, "k1": 0.878 }
     },
     {
-      "command": "cycling_power",
+      "command": "road_load_power",
       "params": { "model": "bassett_1999", "powerW": 452, "riderHeightM": 1.75, "riderMassKg": 68, "k1": 0.878 }
     }
   ],

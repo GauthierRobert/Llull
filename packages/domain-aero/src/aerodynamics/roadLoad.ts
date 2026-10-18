@@ -1,22 +1,25 @@
 /**
- * Road / track cycling power models:
- * - Martin, Milliken, Cobb, McFadden & Coggan 1998, J. Appl. Biomech. 14:276-291 (steady state, P_KE = 0):
- *   P = [½ρ(CdA + Fw)V_A²V_G + V_G Crr m g cos(atan G) + V_G(91 + 8.7 V_G)·1e-3 + V_G m g sin(atan G)] / E_c
+ * Road-load power of a vehicle on a grade with wind, and the track-cycling hour-record model:
+ * - steady road load (Martin, Milliken, Cobb, McFadden & Coggan 1998, J. Appl. Biomech. 14:276-291, P_KE = 0); the bicycle terms Fw (wheel
+ *   rotation drag area) and the 91 + 8.7 V mW bearing loss are zero for a generic vehicle:
+ *   P = [½ρ(CdA + Fw)V_A²V_G + V_G Crr m g cos(atan G) + bearings + V_G m g sin(atan G)] / η_drivetrain
  * - Bassett, Kyle, Passfield, Broker & Burke 1999, Med. Sci. Sports Exerc. 31:1665-1676, eq. 8 (V in km/h, velodrome):
  *   P = K (0.00953 M_t V + 0.00775 V² + K1 A_f 0.007551 V³), A_f = 0.0293 H^0.725 M^0.425 + 0.0604, M_t = M + 10 kg
  */
 
 import { bisect } from '@lib/bisect';
 
-export const MARTIN_DEFAULTS = { crr: 0.0032, wheelAreaM2: 0.0044, chainEfficiency: 0.976 } as const;
+/** Bicycle preset of Martin et al. 1998 (road tyres Crr, wheel drag area Fw m², chain drivetrain efficiency). */
+export const BICYCLE_DEFAULTS = { crr: 0.0032, wheelAreaM2: 0.0044, drivetrainEfficiency: 0.976 } as const;
 export const GRAVITY = 9.80665;
 
-export interface MartinInputs {
+export interface RoadLoadInputs {
   readonly massKg: number;
   readonly cdA: number;
   readonly crr: number;
   readonly wheelAreaM2: number;
-  readonly chainEfficiency: number;
+  /** Drivetrain efficiency (input power -> wheel power), (0, 1]. */
+  readonly drivetrainEfficiency: number;
   /** Rise over run (0.05 = 5 %). */
   readonly grade: number;
   /** Air speed component along travel added to the ground speed (+ headwind, - tailwind), m/s. */
@@ -25,45 +28,46 @@ export interface MartinInputs {
   readonly bearingLosses: boolean;
 }
 
-export interface MartinPower {
+export interface RoadLoadPower {
   readonly aeroW: number;
   readonly rollingW: number;
   readonly bearingW: number;
   readonly gravityW: number;
-  /** Power at the cranks (sum / E_c). */
+  /** Power at the drivetrain input (crank, motor shaft): sum / η. */
   readonly totalW: number;
 }
 
-export function martinPower(input: MartinInputs, groundSpeed: number): MartinPower {
+export function roadLoadPower(input: RoadLoadInputs, groundSpeed: number): RoadLoadPower {
   const airSpeed = groundSpeed + input.headwindMS;
   const slope = Math.atan(input.grade);
   const aeroW = 0.5 * input.densityKgM3 * (input.cdA + input.wheelAreaM2) * airSpeed * Math.abs(airSpeed) * groundSpeed;
   const rollingW = groundSpeed * input.crr * input.massKg * GRAVITY * Math.cos(slope);
   const bearingW = input.bearingLosses ? groundSpeed * (91 + 8.7 * groundSpeed) * 1e-3 : 0;
   const gravityW = groundSpeed * input.massKg * GRAVITY * Math.sin(slope);
-  return { aeroW, rollingW, bearingW, gravityW, totalW: (aeroW + rollingW + bearingW + gravityW) / input.chainEfficiency };
+  return { aeroW, rollingW, bearingW, gravityW, totalW: (aeroW + rollingW + bearingW + gravityW) / input.drivetrainEfficiency };
 }
 
-export const MAX_GROUND_SPEED_MS = 40;
+/** Largest steady speed searched (m/s, 360 km/h). */
+export const MAX_GROUND_SPEED_MS = 100;
 
 /**
- * Steady ground speed delivering `powerW` at the cranks (the larger root when the curve is not monotone, e.g. downhill).
+ * Steady ground speed delivering `powerW` at the drivetrain input (the larger root when the curve is not monotone, e.g. downhill).
  * @invariant powerW > 0 (callers check)
- * @failure the power exceeds what 40 m/s needs -> null
+ * @failure the power exceeds what 100 m/s needs -> null
  */
-export function martinSpeed(input: MartinInputs, powerW: number): number | null {
+export function roadLoadSpeed(input: RoadLoadInputs, powerW: number): number | null {
   const steps = 400;
   let previous = 0;
   for (let k = steps; k >= 1; k -= 1) {
     const speed = (MAX_GROUND_SPEED_MS * k) / steps;
-    if (k === steps && martinPower(input, speed).totalW < powerW) return null;
-    if (martinPower(input, speed).totalW < powerW) {
-      const range = bisect((v) => martinPower(input, v).totalW < powerW, speed, previous, 80);
+    if (k === steps && roadLoadPower(input, speed).totalW < powerW) return null;
+    if (roadLoadPower(input, speed).totalW < powerW) {
+      const range = bisect((v) => roadLoadPower(input, v).totalW < powerW, speed, previous, 80);
       return (range.low + range.high) / 2;
     }
     previous = speed;
   }
-  const range = bisect((v) => martinPower(input, v).totalW < powerW, 0, previous, 80);
+  const range = bisect((v) => roadLoadPower(input, v).totalW < powerW, 0, previous, 80);
   return (range.low + range.high) / 2;
 }
 

@@ -7,7 +7,7 @@ export const SPEED_UNITS = { 'm/s': 1, 'km/h': 1 / 3.6, kn: 1852 / 3600, mph: 0.
 export type SpeedUnit = keyof typeof SPEED_UNITS;
 
 export const speedParam = {
-  speed: z.number().optional().describe('Speed (air speed for aircraft, ground speed for cycling) in speedUnit, >= 0.'),
+  speed: z.number().optional().describe('Speed (air speed for aircraft, ground speed for road vehicles) in speedUnit, >= 0.'),
   speedUnit: z.enum(['m/s', 'km/h', 'kn', 'mph']).optional().describe('Unit of speed: m/s (default), km/h, kn (knot, 1852 m/h) or mph.'),
 };
 

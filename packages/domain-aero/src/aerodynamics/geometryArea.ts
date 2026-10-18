@@ -1,4 +1,4 @@
-/** Frontal / wetted area of document solids in m² (document units converted), shared by frontal_area, aero_drag and cycling_power. */
+/** Frontal / wetted area of document solids in m² (document units converted), shared by frontal_area, aero_drag and road_load_power. */
 
 import { z } from '@core/commands/schema';
 import type { CadDocument, Vec3 } from '@core/model/types';

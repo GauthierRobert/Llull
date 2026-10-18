@@ -1,10 +1,10 @@
-/** cycling_power, model bassett_1999: velodrome power <-> speed (Bassett et al. 1999 eq. 5, 7, 8). */
+/** road_load_power, model bassett_1999: track-cycling power <-> speed (Bassett et al. 1999 eq. 5, 7, 8). */
 
 import type { CadDocument } from '@core/model/types';
 import type { CommandResult } from '@core/commands/types';
 import { briefReport, sig } from '../shared/results';
-import { bassettDensityRatio, bassettFrontalArea, bassettPower, bassettSpeed } from './cycling';
-import type { CyclingInput, CyclingRefusal } from './cyclingParams';
+import { bassettDensityRatio, bassettFrontalArea, bassettPower, bassettSpeed } from './roadLoad';
+import type { RoadLoadInput, RoadLoadRefusal } from './roadLoadParams';
 
 /** Sea-level density of the 1976 standard (kg/m³): Kd = ρ / ρ0 when bassett_1999 gets densityKgM3. */
 const SEA_LEVEL_DENSITY = 1.225;
@@ -14,7 +14,7 @@ const kmh = (ms: number): number => ms * 3.6;
 /**
  * @failure missing / out-of-range rider, unused air params, bad factors -> AER_PARAM_INVALID / AER_AIR_STATE_CONFLICT through `fail`
  */
-export function runBassett(doc: CadDocument, params: CyclingInput, speedGiven: number | undefined, fail: CyclingRefusal): CommandResult {
+export function runBassett(doc: CadDocument, params: RoadLoadInput, speedGiven: number | undefined, fail: RoadLoadRefusal): CommandResult {
   const { riderHeightM: height, riderMassKg: mass } = params;
   if (height === undefined || mass === undefined || !(height >= 1.4 && height <= 2.2) || !(mass >= 40 && mass <= 120))
     return fail('AER_PARAM_INVALID', 'bassett_1999 needs riderHeightM 1.4..2.2 m and riderMassKg 40..120 kg', ['riderHeightM']);
@@ -89,7 +89,7 @@ export function runBassett(doc: CadDocument, params: CyclingInput, speedGiven: n
   };
   return briefReport(
     doc,
-    `cycling_power bassett_1999: ${data.speedKmh} km/h <-> ${data.powerW} W (K1 ${data.inputs.k1.value}, A_f ${data.inputs.frontalAreaM2} m²).`,
+    `road_load_power bassett_1999: ${data.speedKmh} km/h <-> ${data.powerW} W (K1 ${data.inputs.k1.value}, A_f ${data.inputs.frontalAreaM2} m²).`,
     data,
   );
 }

@@ -6,7 +6,7 @@ import { analyzeAirfoil, drawNacaAirfoil } from './airfoilCommands';
 import { analyzeWing } from './wingCommand';
 import { frontalArea } from './frontalAreaCommand';
 import { aeroDrag } from './aeroDragCommand';
-import { cyclingPower } from './cyclingCommand';
+import { roadLoadPowerCommand } from './roadLoadCommand';
 
 export const aerodynamicsCommands = commandCatalog(
   standardAtmosphere,
@@ -15,5 +15,5 @@ export const aerodynamicsCommands = commandCatalog(
   analyzeWing,
   frontalArea,
   aeroDrag,
-  cyclingPower,
+  roadLoadPowerCommand,
 );

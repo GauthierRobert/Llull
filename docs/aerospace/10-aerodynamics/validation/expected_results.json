@@ -80,29 +80,29 @@
     },
     {
       "id": "VC-AER-20",
-      "command": "cycling_power (bassett_1999)",
+      "command": "road_load_power (bassett_1999)",
       "reference": "data/bassett1999_table7.json",
       "tolerance": "2 W",
-      "test": "cycling.test.ts"
+      "test": "roadLoad.test.ts"
     },
     {
       "id": "VC-AER-21",
-      "command": "cycling_power (martin_1998)",
+      "command": "road_load_power (vehicle bicycle)",
       "expected": "each term equals its closed form",
-      "test": "cycling.test.ts"
+      "test": "roadLoad.test.ts"
     },
     {
       "id": "VC-AER-22",
-      "command": "cycling_power",
+      "command": "road_load_power",
       "reference": "data/cycling_references.json defraeye2010",
       "expected": "P(upright) > P(dropped) > P(time trial); inverse speed round trip 1e-4 km/h",
-      "test": "cycling.test.ts"
+      "test": "roadLoad.test.ts"
     },
     {
       "id": "VC-AER-23",
-      "command": "cycling_power",
+      "command": "road_load_power",
       "expected": "grade, wind, altitude effects; CdA from model area",
-      "test": "cycling.test.ts"
+      "test": "roadLoad.test.ts"
     }
   ],
   "scenarios": "plans/sc-aer-0*.json (tests/unit/aero/scenarioPlans.test.ts)"
