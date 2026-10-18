@@ -809,7 +809,7 @@ button.lens-pill:hover .lens-pill__label {
 
 .focus-banner {
   position: absolute;
-  bottom: calc(var(--space-3) + 40px);
+  top: calc(var(--vp-inset-top, var(--space-3)) + 4px);
   left: 50%;
   z-index: 19;
   display: flex;

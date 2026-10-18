@@ -11,6 +11,7 @@ import { boundsExtent } from '@core/geometry/bounds';
 import { useAeroViewStore, type AeroAirfoilView, type AeroBodyView } from '@ui/store/aeroViewStore';
 import { useDisposable } from '../../useDisposable';
 import { ProjectedLabel } from '../ProjectedLabel';
+import { formatArea, formatSi } from '@ui/panels/aero/aeroData';
 import { AERO_COLORS, cpColor, dragArrowTip, flowFrame, silhouetteLoop, windArrows } from './aeroGeometry';
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -78,7 +79,7 @@ function BodyGlyphs({ body }: { body: AeroBodyView }): React.ReactElement {
         depthTest={false}
         renderOrder={RENDER_ORDER}
       />
-      {label(`A = ${body.frontalAreaM2.toPrecision(3)} m²`, loop[2] as Vec3, AERO_COLORS.area, 'area')}
+      {label(`A = ${formatArea(body.frontalAreaM2)}`, loop[2] as Vec3, AERO_COLORS.area, 'area')}
       {body.dragN !== null && (
         <>
           <Arrow
@@ -89,7 +90,7 @@ function BodyGlyphs({ body }: { body: AeroBodyView }): React.ReactElement {
             color={AERO_COLORS.drag}
             opacity={0.95}
           />
-          {label(`Drag ${body.dragN.toPrecision(3)} N`, dragArrowTip(frame.center, body.flow, dragLength), AERO_COLORS.drag, 'drag')}
+          {label(`Drag ${formatSi(body.dragN, 'N')}`, dragArrowTip(frame.center, body.flow, dragLength), AERO_COLORS.drag, 'drag')}
         </>
       )}
     </group>

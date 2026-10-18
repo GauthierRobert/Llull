@@ -27,7 +27,7 @@ describe('AeroPanel', () => {
     act(() => useStore.getState().select([box]));
     render(<AeroPanel />);
     const tile = screen.getByTestId('kpi-drag');
-    expect(tile.textContent).toMatch(/\d.* N/);
+    expect(tile.textContent).toMatch(/\d.* [µmk]?N$/);
     expect(screen.getByTestId('kpi-area').textContent).toMatch(/m²/);
     expect(screen.getByTestId('aero-air').textContent).toMatch(/1\.22 kg\/m³/);
     expect(useAeroViewStore.getState().body?.dragN).toBeGreaterThan(0);

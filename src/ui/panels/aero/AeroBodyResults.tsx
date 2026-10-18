@@ -6,7 +6,7 @@ import { useFocusItem } from '@ui/hooks/useFocusItem';
 import { useIsFocused } from '@ui/store/focusStore';
 import { ListRow, type Kpi, KpiStrip } from '@ui/panels/PanelParts';
 import { AERO_COLORS } from '@ui/viewport/3d/aero/aeroGeometry';
-import { formatQuantity } from './aeroData';
+import { formatArea, formatQuantity, formatSi } from './aeroData';
 import type { BodyAnalysis } from './useAeroAnalysis';
 
 interface ResultItem {
@@ -23,28 +23,28 @@ function resultItems(analysis: BodyAnalysis): ResultItem[] {
   const { frontal, drag } = analysis;
   const items: ResultItem[] = [];
   if (frontal !== null) {
-    const area = `${formatQuantity(frontal.areaM2)} m²`;
+    const area = formatArea(frontal.areaM2);
     items.push({
       key: 'area',
       label: 'Frontal area',
       value: area,
       pill: `A = ${area}`,
       color: AERO_COLORS.area,
-      hint: `± ${formatQuantity(frontal.uncertaintyM2)} m², seen along the flow`,
+      hint: `± ${formatArea(frontal.uncertaintyM2)}, seen along the flow`,
     });
   }
   if (drag !== null) {
-    const force = `${formatQuantity(drag.dragN)} N`;
+    const force = formatSi(drag.dragN, 'N');
     items.push({ key: 'drag', label: 'Drag force', value: force, pill: `D = ${force}`, color: AERO_COLORS.drag, hint: 'D = ½ ρ V² CdA' });
     items.push({
       key: 'cda',
       label: 'Drag area CdA',
-      value: `${formatQuantity(drag.cdA)} m²`,
-      pill: `CdA = ${formatQuantity(drag.cdA)} m²`,
+      value: formatArea(drag.cdA),
+      pill: `CdA = ${formatArea(drag.cdA)}`,
       color: AERO_COLORS.drag,
       hint: 'Cd x frontal area',
     });
-    const power = drag.powerW >= 1000 ? `${formatQuantity(drag.powerW / 1000)} kW` : `${formatQuantity(drag.powerW)} W`;
+    const power = formatSi(drag.powerW, 'W');
     items.push({
       key: 'power',
       label: 'Drag power',
@@ -53,7 +53,7 @@ function resultItems(analysis: BodyAnalysis): ResultItem[] {
       color: AERO_COLORS.drag,
       hint: 'Power to overcome drag, P = D V',
     });
-    const q = `${formatQuantity(drag.dynamicPressurePa)} Pa`;
+    const q = formatSi(drag.dynamicPressurePa, 'Pa');
     items.push({ key: 'q', label: 'Dynamic pressure q', value: q, pill: `q = ${q}`, color: AERO_COLORS.wind, hint: '½ ρ V²' });
     if (drag.reynolds !== null)
       items.push({
