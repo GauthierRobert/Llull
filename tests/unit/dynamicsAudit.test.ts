@@ -74,8 +74,8 @@ describe('reaction peaks cover every integration step (audit 3)', () => {
 });
 
 describe('auto timestep recovers a light slow loop (audit 4)', () => {
-  it('halves the step until the four-bar loop residual passes, and says so', () => {
-    // a soft loop (impedance 0.5): the governor sized from the crank's own inertia (ENG-3) no longer kicks the default loop past 1 um at 1 ms
+  it('a soft loop (impedance 0.5) that fails the residual at 1 ms: the step is halved until it passes, and says so', () => {
+    // the default four-bar no longer needs halving (next test): the governor is gain-scheduled (ENG-3), so a soft loop provokes the rule
     const soft = { command: 'set_dynamics_solver', params: { loopImpedance: 0.5 } };
     const data = simulate(build([soft, ...lightFourBarActions]), { duration: 1 }) as Data & {
       loops: { tier: string; residualM: number; solver: { timestepS: number; timestepBasis: string } };
@@ -84,6 +84,17 @@ describe('auto timestep recovers a light slow loop (audit 4)', () => {
     expect(data.loops.solver.timestepS).toBeLessThan(0.001);
     expect(data.loops.solver.timestepBasis).toMatch(/halved/);
     expect(data.warnings.some((w) => /halved/.test(w))).toBe(true);
+  });
+
+  it('the default four-bar passes at 1 ms with no halving (the scheduled governor does not kick the loop)', () => {
+    const data = simulate(build(lightFourBarActions), { duration: 1 }) as Data & {
+      loops: { tier: string; residualM: number; solver: { timestepS: number; timestepBasis: string } };
+    };
+    expect(data.loops.tier).toBe('pass');
+    expect(data.loops.residualM).toBeLessThan(1e-6);
+    expect(data.loops.solver.timestepS).toBe(0.001);
+    expect(data.loops.solver.timestepBasis).not.toMatch(/halved/);
+    expect(data.warnings.some((w) => /halved/.test(w))).toBe(false);
   });
 
   it('an explicit timestep is never changed', () => {

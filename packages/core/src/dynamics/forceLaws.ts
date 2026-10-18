@@ -27,17 +27,16 @@ function curveTorque(curve: readonly TorquePoint[], rpm: number): number {
 type TorqueMotor = Extract<Motor, { kind: 'torque_curve' }>;
 
 /**
- * Gains of a speed motor's governor, a critically damped servo on the angle that advances at the target speed (so the steady speed error
- * is zero whatever the load below maxTorque): natural frequency 1 / (2 · timestep), i.e. omega_n · dt = 0.5, scaled by `jointInertia`.
- * stiffness N·m/rad, damping N·m·s/rad. Stability holds only if `jointInertia` does not exceed the smallest effective inertia the servo
- * sees (kp / I_eff · dt^2 = (omega_n · dt)^2 · I / I_eff, and RK4 is stable on the real axis up to about 2.79): with I at most I_eff the
- * fastest pole is omega_n · dt = 0.5, a margin of 5.6; an inertia that overestimates it by rho multiplies the pole by about 2 rho. The
- * servo lags the ideal ramp by torque / stiffness and the speed ripple times the inertia is an error torque proportional to
- * 1 / stiffness: 1 / (8 dt) -> 1 / (4 dt) -> 1 / (2 dt) took the pack-10 slider-crank torque error from 0.15 % to 0.04 % to 0.015 %.
+ * Governor of a speed motor: a critically damped servo on the angle that advances at the target speed (so the steady speed error is zero
+ * whatever the load below maxTorque), natural frequency `naturalFrequency` = 1 / (2 · timestep), i.e. omega_n · dt = 0.5. The engine
+ * schedules the gains from the measured constrained effective inertia (`SimulationServo`); `stiffness` N·m/rad and `damping` N·m·s/rad
+ * here, from the locked inertia of the carried bodies, are only the values of its first step and the fixed gains of an engine that does
+ * not schedule. The servo lags the ideal ramp by torque / stiffness and the speed ripple times the inertia is an error torque proportional
+ * to 1 / stiffness: 1 / (8 dt) -> 1 / (4 dt) -> 1 / (2 dt) took the pack-10 slider-crank torque error from 0.15 % to 0.04 % to 0.015 %.
  */
-export function speedServoGains(jointInertia: number, timestep: number): { stiffness: number; damping: number } {
+export function speedServoGains(jointInertia: number, timestep: number): { stiffness: number; damping: number; naturalFrequency: number } {
   const naturalFrequency = 1 / (2 * timestep);
-  return { stiffness: jointInertia * naturalFrequency ** 2, damping: 2 * jointInertia * naturalFrequency };
+  return { stiffness: jointInertia * naturalFrequency ** 2, damping: 2 * jointInertia * naturalFrequency, naturalFrequency };
 }
 
 /** Drive torque (N·m) or force (N) of a torque-curve motor at joint speed `velocity` (rad/s or m/s). */

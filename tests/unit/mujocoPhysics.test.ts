@@ -130,6 +130,8 @@ describe('MuJoCo physics engine', () => {
     expect(trace.bodyPosition['block']?.[1]?.[0]).toBeCloseTo(1, 6);
   });
 
+  // fixed gains on purpose (no naturalFrequency): omega_n · dt = 0.25 keeps the 4th-order difference of omega below accurate enough to
+  // tell the sampled-state force from the stale last-RK4-stage one; the scheduled omega_n · dt = 0.5 of the shipped gains does not
   it('a speed servo reports its force at the sampled state: F = I dω/dt through the spin-up from rest', () => {
     const [timestep, inertia] = [0.001, 0.5];
     const model: SimulationModel = {
@@ -182,6 +184,23 @@ describe('MuJoCo physics engine', () => {
     const omega = engine.simulate(model, { duration: 12, timestep, sampleInterval: 0.01 }).jointVelocity['wheel-hinge'] ?? [];
     expect(Math.min(...omega)).toBeGreaterThan(-10.01);
     expect(last(omega)).toBeCloseTo(-10, 6);
+  });
+
+  it('scheduled gains do not depend on the static ones: absurd first-step gains still spin the wheel up to 10 rad/s without ringing', () => {
+    const [timestep, inertia] = [0.001, 0.5];
+    const model: SimulationModel = {
+      gravity: [0, 0, 0],
+      bodies: [rotor('wheel', [0, 0, 1], 10, inertia)],
+      gears: [],
+      ...tree,
+      servos: [
+        { id: 'drive', joint: 'wheel-hinge', targetVelocity: 10, stiffness: 1e12, damping: 1e6, naturalFrequency: 500, maxForce: 1e9 },
+      ],
+      loads: noLoads,
+    };
+    const omega = engine.simulate(model, { duration: 1, timestep, sampleInterval: 0.01 }).jointVelocity['wheel-hinge'] ?? [];
+    expect(Math.max(...omega)).toBeLessThan(10.001);
+    expect(last(omega)).toBeCloseTo(10, 6);
   });
 
   it('rejects a model MuJoCo cannot compile', () => {

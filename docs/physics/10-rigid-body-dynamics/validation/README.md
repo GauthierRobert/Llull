@@ -38,7 +38,7 @@ physical case, all documented in `server/tests/packReplay10.test.ts`:
   engine used to be 0.33 % / 0.53 % low at 60 / 90 deg against the massless values. Causes, in order of size: (1) the 5 g rod, +0.7 %
   of the torque missing from the reference; (2) the loop closure relaxing over 2 steps (the default), which the integrator resolves
   badly: +0.73 % at 2 steps, 0.12 % at 4, 0.03 % at 8, 0.01 % at 16, a function of steps only (not of the step size); (3) the speed
-  servo's finite stiffness: its ripple times the crank inertia is an error torque, 0.15 % at 1 / (8 dt), 0.04 % at 1 / (4 dt), 0.015 % at 1 / (2 dt); the gains are sized from the crank's own inertia, the only bound that holds for any loop (a locked subtree overestimates the loop-reflected inertia and RK4 diverges); (4) the
+  servo's finite stiffness: its ripple times the crank inertia is an error torque, 0.15 % at 1 / (8 dt), 0.04 % at 1 / (4 dt), 0.015 % at 1 / (2 dt); the engine schedules the gains on the measured constrained effective inertia of the crank (a static inertia, locked or own, is wrong by factors of 10 in loops, gears and relative joints and RK4 diverges or the servo is far too soft); (4) the
   servo force was read after `mj_step`, i.e. at the last RK4 stage (a predicted state), up to 0.3 % off. Left: 1.4e-4 / 1.9e-4.
 - The Coulomb friction is MuJoCo's near-rigid soft constraint (impedance 0.9999): rest position -1.9335004 mm (1.9e-7 relative),
   last turning point 2.1e-4 relative late; no creep after the stop.

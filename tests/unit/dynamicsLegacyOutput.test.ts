@@ -3,9 +3,9 @@
  * from the output BEFORE PHY-21 slice B changed the dynamics layer; a change here is a regression unless the owner accepts a new baseline.
  * Accepted rebaseline (geared model only): its joints decelerate under propeller drag and the unsettled-joint warning now says "still
  * decelerating (speed X % lower ...)" instead of the misleading "still accelerating"; the numbers are unchanged.
- * Accepted rebaseline (speed-governed flywheel only, ENG-3): the governor is four times as stiff (natural frequency 1 / (2 dt) instead of
+ * Accepted rebaseline (speed-governed flywheel only, ENG-3): the governor is sixteen times as stiff (natural frequency 1 / (2 dt) instead of
  * 1 / (8 dt)), its torque is read at the sampled state instead of at the last RK4 stage, and its set-point cannot lead the joint by more
- * than maxTorque allows (anti-windup). Hash cd62962de5d04058 -> a2e9a2593ea063b7. Spin-up at 50 samples/s: speed at the first sample
+ * than maxTorque allows (anti-windup). Hash cd62962de5d04058 -> dbc21a98e45a07af (the gains are now scheduled on the measured effective inertia; for this lone disc it equals the locked one, so against the previous rebaseline a2e9a2593ea063b7 only the last digits move, ~1e-13). Spin-up at 50 samples/s: speed at the first sample
  * 111.95 -> 149.83 rad/s, first torque sample 99.37 -> 68.57 N m (the governor leaves saturation sooner), peak speed 157.0796 -> 157.0796
  * rad/s (no overshoot), final position 154.566 -> 155.501 rad (the speed is reached earlier); the final speed 157.0796 rad/s is unchanged.
  */
@@ -76,7 +76,7 @@ describe('simulate_motion output of models without loops or cylinders (FR-FPR-19
   });
 
   it('speed-governed flywheel', () => {
-    expect(hashOf(governed(), { duration: 1, detail: 'series' })).toBe('a2e9a2593ea063b7');
+    expect(hashOf(governed(), { duration: 1, detail: 'series' })).toBe('dbc21a98e45a07af');
   });
 
   it('is deterministic run to run', () => {

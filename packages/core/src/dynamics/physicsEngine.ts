@@ -55,21 +55,28 @@ interface SimulationGear {
 /**
  * Speed governor on a joint, integrated by the engine itself: a servo on the joint position chasing a set-point that advances at
  * `targetVelocity`, force = clamp(stiffness · (setpoint − q) − damping · v, ±maxForce). Zero steady speed error below maxForce.
- * Anti-windup (an engine must match it): when `targetVelocity` is not 0, after every step the set-point is limited to
- * q + damping · v / stiffness ± maxForce / stiffness, the window in which the unclamped force stays within ±maxForce. The angle lost while
- * saturated is NOT caught up afterwards (the servo governs speed, so a saturated spin-up does not overshoot the target). A hold
- * (`targetVelocity` 0) is exempt: its set-point is the position to return to, and a hold that cannot keep it stays pinned at maxForce.
- * The gains are sized for the engine's explicit step: stiffness / (smallest effective inertia) · dt² must stay well below 8.
+ * Gain scheduling (an engine must match it): with `naturalFrequency` wn the engine measures the constrained effective inertia I_eff of the
+ * joint coordinate at every step (the inertia the joint really drives, with loops, gears, free joints below it and a moving parent taken
+ * into account: I_eff = 1 / (acceleration of the coordinate per unit generalised force, constraint forces included)) and uses
+ * stiffness = I_eff · wn², damping = 2 · I_eff · wn, so the servo pole stays at wn · dt in every configuration. `stiffness` and `damping`
+ * are then only the values of the first step (and the fixed gains when `naturalFrequency` is absent). Not a property of the model: no
+ * static inertia can be right (it overestimates by factors of 10 or more and an explicit integrator diverges).
+ * Anti-windup: when `targetVelocity` is not 0, after every step the set-point is limited to q + damping · v / stiffness ± maxForce /
+ * stiffness (the gains in force), the window in which the unclamped force stays within ±maxForce. The angle lost while saturated is NOT
+ * caught up afterwards (the servo governs speed, so a saturated spin-up does not overshoot the target). A hold (`targetVelocity` 0) is
+ * exempt: its set-point is the position to return to, and a hold that cannot keep it stays pinned at maxForce.
  */
 export interface SimulationServo {
   readonly id: string;
   readonly joint: string;
   /** rad/s or m/s. */
   readonly targetVelocity: number;
-  /** N·m/rad or N/m. */
+  /** N·m/rad or N/m: first-step value (fixed value without `naturalFrequency`). */
   readonly stiffness: number;
-  /** N·m·s/rad or N·s/m. */
+  /** N·m·s/rad or N·s/m: first-step value (fixed value without `naturalFrequency`). */
   readonly damping: number;
+  /** rad/s: undamped natural frequency of the governor (critical damping); the engine schedules the gains to hold it. */
+  readonly naturalFrequency?: number;
   readonly maxForce: number;
 }
 

@@ -126,18 +126,6 @@ function inertiaAboutJoint(bodies: readonly SimulationBody[], joint: SimulationJ
   return bodies.filter((body) => carried.has(body.id)).reduce((total, body) => total + inertiaAboutAxis(body, joint.anchor, joint.axis), 0);
 }
 
-/**
- * Inertia (kg·m²) the governor of `joint` is sized from. Locked rigid, the subtree about the axis is the right scale for an open tree, but a
- * loop reflects only part of it (a rod and a piston add about m r^2 at the crank, not m l^2): with gains sized from the locked value the
- * servo is rho = locked / effective times too stiff for the step and RK4 goes unstable beyond rho of about 6. The child body's own inertia
- * about the axis is a lower bound of the constrained effective inertia at every configuration (constraints and descendants only add), so
- * with a loop the gains come from it and omega_n · dt is an upper bound of the servo pole for any mechanism.
- */
-function governedInertia(bodies: readonly SimulationBody[], joint: SimulationJoint, hasLoops: boolean): number {
-  const child = bodies.find((body) => body.joint?.id === joint.id);
-  return hasLoops && child !== undefined ? inertiaAboutAxis(child, joint.anchor, joint.axis) : inertiaAboutJoint(bodies, joint);
-}
-
 /** First reference from a gear / motor / propeller to a joint that cannot move (missing, or on a fixed body). */
 function danglingReference(dynamics: DynamicsModel, movable: ReadonlySet<string>, closing: ReadonlySet<string>): string | null {
   const why = (joint: string): string =>
@@ -245,7 +233,7 @@ export function buildSimulationModel(doc: CadDocument, timestep: number, kernel?
   const servos: SimulationServo[] = Object.values(dynamics.motors).flatMap((motor) => {
     const joint = simulated.get(motor.joint);
     if (motor.kind !== 'speed' || joint === undefined) return [];
-    const gains = speedServoGains(governedInertia(bodies, joint, topology.loops.length > 0), timestep);
+    const gains = speedServoGains(inertiaAboutJoint(bodies, joint), timestep);
     return [{ id: motor.id, joint: motor.joint, targetVelocity: motor.rpm * RAD_PER_S_PER_RPM, ...gains, maxForce: motor.maxTorque }];
   });
   const loops: SimulationLoop[] = topology.loops.flatMap((loop) => {
