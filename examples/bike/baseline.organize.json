@@ -1,0 +1,2370 @@
+{
+ "actions": [
+  {
+   "command": "add_layer",
+   "params": {
+    "name": "Frame",
+    "color": "#c8102e"
+   },
+   "as": "layer_frame"
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "cyl-3.1",
+    "layerId": "$layer_frame"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-4.1",
+    "layerId": "$layer_frame"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-5.1",
+    "layerId": "$layer_frame"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-6.1",
+    "layerId": "$layer_frame"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-7.1",
+    "layerId": "$layer_frame"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-8.1",
+    "layerId": "$layer_frame"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-9.1",
+    "layerId": "$layer_frame"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-10.1",
+    "layerId": "$layer_frame"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-11.1",
+    "layerId": "$layer_frame"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "box-45.1",
+    "layerId": "$layer_frame"
+   }
+  },
+  {
+   "command": "add_layer",
+   "params": {
+    "name": "Fork",
+    "color": "#c8102e"
+   },
+   "as": "layer_fork"
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "box-14.1",
+    "layerId": "$layer_fork"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-15.1",
+    "layerId": "$layer_fork"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-16.1",
+    "layerId": "$layer_fork"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "box-43.1",
+    "layerId": "$layer_fork"
+   }
+  },
+  {
+   "command": "add_layer",
+   "params": {
+    "name": "Saddle + post",
+    "color": "#222222"
+   },
+   "as": "layer_seat"
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-12.1",
+    "layerId": "$layer_seat"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "loft-13.1",
+    "layerId": "$layer_seat"
+   }
+  },
+  {
+   "command": "add_layer",
+   "params": {
+    "name": "Cockpit",
+    "color": "#333333"
+   },
+   "as": "layer_cockpit"
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-17.1",
+    "layerId": "$layer_cockpit"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-18.1",
+    "layerId": "$layer_cockpit"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "cyl-19.1",
+    "layerId": "$layer_cockpit"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-20.1",
+    "layerId": "$layer_cockpit"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "loft-21.1",
+    "layerId": "$layer_cockpit"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-22.1",
+    "layerId": "$layer_cockpit"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-23.1",
+    "layerId": "$layer_cockpit"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-24.1",
+    "layerId": "$layer_cockpit"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "loft-25.1",
+    "layerId": "$layer_cockpit"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-26.1",
+    "layerId": "$layer_cockpit"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-27.1",
+    "layerId": "$layer_cockpit"
+   }
+  },
+  {
+   "command": "add_layer",
+   "params": {
+    "name": "Front wheel",
+    "color": "#2b2b2b"
+   },
+   "as": "layer_wheel_front"
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "rev-28.1",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "rev-29.1",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "rev-30.1",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-31.1",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-32.1",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-32.2",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-32.3",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-32.4",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-32.5",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-32.6",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-32.7",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-32.8",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-32.9",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-32.10",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-32.11",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-33.1",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-34.1",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-34.2",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-34.3",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-34.4",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-34.5",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-34.6",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-34.7",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-34.8",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-34.9",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-34.10",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-34.11",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "rev-42.1",
+    "layerId": "$layer_wheel_front"
+   }
+  },
+  {
+   "command": "add_layer",
+   "params": {
+    "name": "Rear wheel",
+    "color": "#2b2b2b"
+   },
+   "as": "layer_wheel_rear"
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "rev-35.1",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "rev-36.1",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "rev-37.1",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-38.1",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-39.1",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-39.2",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-39.3",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-39.4",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-39.5",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-39.6",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-39.7",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-39.8",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-39.9",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-39.10",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-39.11",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-39.12",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-39.13",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-40.1",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-41.1",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-41.2",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-41.3",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-41.4",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-41.5",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-41.6",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-41.7",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-41.8",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-41.9",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-41.10",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-41.11",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-41.12",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sweep-41.13",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "rev-44.1",
+    "layerId": "$layer_wheel_rear"
+   }
+  },
+  {
+   "command": "add_layer",
+   "params": {
+    "name": "Cassette",
+    "color": "#9a9ea4"
+   },
+   "as": "layer_cassette"
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "gear-53.1",
+    "layerId": "$layer_cassette"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "gear-54.1",
+    "layerId": "$layer_cassette"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "gear-55.1",
+    "layerId": "$layer_cassette"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "gear-56.1",
+    "layerId": "$layer_cassette"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "gear-57.1",
+    "layerId": "$layer_cassette"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "gear-58.1",
+    "layerId": "$layer_cassette"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "gear-59.1",
+    "layerId": "$layer_cassette"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "gear-60.1",
+    "layerId": "$layer_cassette"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "gear-61.1",
+    "layerId": "$layer_cassette"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "gear-62.1",
+    "layerId": "$layer_cassette"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "gear-63.1",
+    "layerId": "$layer_cassette"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "gear-64.1",
+    "layerId": "$layer_cassette"
+   }
+  },
+  {
+   "command": "add_layer",
+   "params": {
+    "name": "Crankset",
+    "color": "#2e2e2e"
+   },
+   "as": "layer_crankset"
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "gear-46.1",
+    "layerId": "$layer_crankset"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "gear-47.1",
+    "layerId": "$layer_crankset"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "cyl-48.1",
+    "layerId": "$layer_crankset"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-49.1",
+    "layerId": "$layer_crankset"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "box-50.1",
+    "layerId": "$layer_crankset"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-51.1",
+    "layerId": "$layer_crankset"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "box-52.1",
+    "layerId": "$layer_crankset"
+   }
+  },
+  {
+   "command": "add_layer",
+   "params": {
+    "name": "Derailleurs",
+    "color": "#151515"
+   },
+   "as": "layer_derailleur"
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "gear-65.1",
+    "layerId": "$layer_derailleur"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "gear-66.1",
+    "layerId": "$layer_derailleur"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-67.1",
+    "layerId": "$layer_derailleur"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-68.1",
+    "layerId": "$layer_derailleur"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "box-69.1",
+    "layerId": "$layer_derailleur"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "box-70.1",
+    "layerId": "$layer_derailleur"
+   }
+  },
+  {
+   "command": "add_layer",
+   "params": {
+    "name": "Chain",
+    "color": "#8c8f94"
+   },
+   "as": "layer_chain"
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.1",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.2",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.3",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.4",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.5",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.6",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.7",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.8",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.9",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.10",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.11",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.12",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.13",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.14",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.15",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.16",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.17",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.18",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.19",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.20",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.21",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.22",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.23",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.24",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.25",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.26",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.27",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.28",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.29",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.30",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.31",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.32",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.33",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.34",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.35",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.36",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.37",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.38",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.39",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.40",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.41",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.42",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.43",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.44",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.45",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.46",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.47",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.48",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.49",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.50",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.51",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.52",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.53",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-83.54",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.1",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.2",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.3",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.4",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.5",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.6",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.7",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.8",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.9",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.10",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.11",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.12",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.13",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.14",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.15",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.16",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.17",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.18",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.19",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.20",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.21",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.22",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.23",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.24",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.25",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.26",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.27",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.28",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.29",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.30",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.31",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.32",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.33",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.34",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.35",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.36",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.37",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.38",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.39",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.40",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.41",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.42",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.43",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.44",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.45",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.46",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.47",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.48",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.49",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.50",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.51",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.52",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.53",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "instance-84.54",
+    "layerId": "$layer_chain"
+   }
+  },
+  {
+   "command": "add_layer",
+   "params": {
+    "name": "Bottles",
+    "color": "#e8e8e8"
+   },
+   "as": "layer_bottles"
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-85.1",
+    "layerId": "$layer_bottles"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-86.1",
+    "layerId": "$layer_bottles"
+   }
+  },
+  {
+   "command": "add_layer",
+   "params": {
+    "name": "Rider",
+    "color": "#1f4e79"
+   },
+   "as": "layer_rider"
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-87.1",
+    "layerId": "$layer_rider"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-88.1",
+    "layerId": "$layer_rider"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-89.1",
+    "layerId": "$layer_rider"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-90.1",
+    "layerId": "$layer_rider"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-91.1",
+    "layerId": "$layer_rider"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-92.1",
+    "layerId": "$layer_rider"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "loft-93.1",
+    "layerId": "$layer_rider"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-94.1",
+    "layerId": "$layer_rider"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "sph-95.1",
+    "layerId": "$layer_rider"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "loft-96.1",
+    "layerId": "$layer_rider"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-97.1",
+    "layerId": "$layer_rider"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-98.1",
+    "layerId": "$layer_rider"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-99.1",
+    "layerId": "$layer_rider"
+   }
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "swp-100.1",
+    "layerId": "$layer_rider"
+   }
+  },
+  {
+   "command": "add_layer",
+   "params": {
+    "name": "Construction (chain pitch line)"
+   },
+   "as": "layer_construction"
+  },
+  {
+   "command": "set_entity_layer",
+   "params": {
+    "entityId": "belt-71.1",
+    "layerId": "$layer_construction"
+   }
+  },
+  {
+   "command": "update_layer",
+   "params": {
+    "id": "$layer_construction",
+    "visible": false
+   }
+  },
+  {
+   "command": "group_entities",
+   "params": {
+    "ids": [
+     "rev-28.1",
+     "rev-29.1",
+     "rev-30.1",
+     "swp-31.1",
+     "sweep-32.1",
+     "sweep-32.2",
+     "sweep-32.3",
+     "sweep-32.4",
+     "sweep-32.5",
+     "sweep-32.6",
+     "sweep-32.7",
+     "sweep-32.8",
+     "sweep-32.9",
+     "sweep-32.10",
+     "sweep-32.11",
+     "swp-33.1",
+     "sweep-34.1",
+     "sweep-34.2",
+     "sweep-34.3",
+     "sweep-34.4",
+     "sweep-34.5",
+     "sweep-34.6",
+     "sweep-34.7",
+     "sweep-34.8",
+     "sweep-34.9",
+     "sweep-34.10",
+     "sweep-34.11",
+     "rev-42.1"
+    ],
+    "name": "Front wheel"
+   },
+   "as": "g_front_wheel"
+  },
+  {
+   "command": "group_entities",
+   "params": {
+    "ids": [
+     "rev-35.1",
+     "rev-36.1",
+     "rev-37.1",
+     "swp-38.1",
+     "sweep-39.1",
+     "sweep-39.2",
+     "sweep-39.3",
+     "sweep-39.4",
+     "sweep-39.5",
+     "sweep-39.6",
+     "sweep-39.7",
+     "sweep-39.8",
+     "sweep-39.9",
+     "sweep-39.10",
+     "sweep-39.11",
+     "sweep-39.12",
+     "sweep-39.13",
+     "swp-40.1",
+     "sweep-41.1",
+     "sweep-41.2",
+     "sweep-41.3",
+     "sweep-41.4",
+     "sweep-41.5",
+     "sweep-41.6",
+     "sweep-41.7",
+     "sweep-41.8",
+     "sweep-41.9",
+     "sweep-41.10",
+     "sweep-41.11",
+     "sweep-41.12",
+     "sweep-41.13",
+     "rev-44.1",
+     "gear-53.1",
+     "gear-54.1",
+     "gear-55.1",
+     "gear-56.1",
+     "gear-57.1",
+     "gear-58.1",
+     "gear-59.1",
+     "gear-60.1",
+     "gear-61.1",
+     "gear-62.1",
+     "gear-63.1",
+     "gear-64.1"
+    ],
+    "name": "Rear wheel + cassette"
+   },
+   "as": "g_rear_wheel"
+  },
+  {
+   "command": "group_entities",
+   "params": {
+    "ids": [
+     "gear-46.1",
+     "gear-47.1",
+     "cyl-48.1",
+     "swp-49.1",
+     "box-50.1",
+     "swp-51.1",
+     "box-52.1"
+    ],
+    "name": "Crankset"
+   },
+   "as": "g_crankset"
+  },
+  {
+   "command": "group_entities",
+   "params": {
+    "ids": [
+     "instance-83.1",
+     "instance-83.2",
+     "instance-83.3",
+     "instance-83.4",
+     "instance-83.5",
+     "instance-83.6",
+     "instance-83.7",
+     "instance-83.8",
+     "instance-83.9",
+     "instance-83.10",
+     "instance-83.11",
+     "instance-83.12",
+     "instance-83.13",
+     "instance-83.14",
+     "instance-83.15",
+     "instance-83.16",
+     "instance-83.17",
+     "instance-83.18",
+     "instance-83.19",
+     "instance-83.20",
+     "instance-83.21",
+     "instance-83.22",
+     "instance-83.23",
+     "instance-83.24",
+     "instance-83.25",
+     "instance-83.26",
+     "instance-83.27",
+     "instance-83.28",
+     "instance-83.29",
+     "instance-83.30",
+     "instance-83.31",
+     "instance-83.32",
+     "instance-83.33",
+     "instance-83.34",
+     "instance-83.35",
+     "instance-83.36",
+     "instance-83.37",
+     "instance-83.38",
+     "instance-83.39",
+     "instance-83.40",
+     "instance-83.41",
+     "instance-83.42",
+     "instance-83.43",
+     "instance-83.44",
+     "instance-83.45",
+     "instance-83.46",
+     "instance-83.47",
+     "instance-83.48",
+     "instance-83.49",
+     "instance-83.50",
+     "instance-83.51",
+     "instance-83.52",
+     "instance-83.53",
+     "instance-83.54",
+     "instance-84.1",
+     "instance-84.2",
+     "instance-84.3",
+     "instance-84.4",
+     "instance-84.5",
+     "instance-84.6",
+     "instance-84.7",
+     "instance-84.8",
+     "instance-84.9",
+     "instance-84.10",
+     "instance-84.11",
+     "instance-84.12",
+     "instance-84.13",
+     "instance-84.14",
+     "instance-84.15",
+     "instance-84.16",
+     "instance-84.17",
+     "instance-84.18",
+     "instance-84.19",
+     "instance-84.20",
+     "instance-84.21",
+     "instance-84.22",
+     "instance-84.23",
+     "instance-84.24",
+     "instance-84.25",
+     "instance-84.26",
+     "instance-84.27",
+     "instance-84.28",
+     "instance-84.29",
+     "instance-84.30",
+     "instance-84.31",
+     "instance-84.32",
+     "instance-84.33",
+     "instance-84.34",
+     "instance-84.35",
+     "instance-84.36",
+     "instance-84.37",
+     "instance-84.38",
+     "instance-84.39",
+     "instance-84.40",
+     "instance-84.41",
+     "instance-84.42",
+     "instance-84.43",
+     "instance-84.44",
+     "instance-84.45",
+     "instance-84.46",
+     "instance-84.47",
+     "instance-84.48",
+     "instance-84.49",
+     "instance-84.50",
+     "instance-84.51",
+     "instance-84.52",
+     "instance-84.53",
+     "instance-84.54"
+    ],
+    "name": "Chain (108 links)"
+   },
+   "as": "g_chain"
+  },
+  {
+   "command": "group_entities",
+   "params": {
+    "ids": [
+     "swp-87.1",
+     "swp-88.1",
+     "swp-89.1",
+     "swp-90.1",
+     "swp-91.1",
+     "swp-92.1",
+     "loft-93.1",
+     "swp-94.1",
+     "sph-95.1",
+     "loft-96.1",
+     "swp-97.1",
+     "swp-98.1",
+     "swp-99.1",
+     "swp-100.1"
+    ],
+    "name": "Rider"
+   },
+   "as": "g_rider"
+  },
+  {
+   "command": "set_entity_name",
+   "params": {
+    "id": "gear-65.1",
+    "name": "Guide pulley 13T"
+   }
+  },
+  {
+   "command": "set_entity_name",
+   "params": {
+    "id": "gear-66.1",
+    "name": "Tension pulley 13T"
+   }
+  },
+  {
+   "command": "animate",
+   "params": {
+    "targetId": "$g_front_wheel",
+    "mode": "spin",
+    "speed": 8.16814,
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "pivot": [
+     595.975,
+     0,
+     339.0
+    ]
+   }
+  },
+  {
+   "command": "animate",
+   "params": {
+    "targetId": "$g_rear_wheel",
+    "mode": "spin",
+    "speed": 8.16814,
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "pivot": [
+     -407.025,
+     0,
+     339.0
+    ]
+   }
+  },
+  {
+   "command": "animate",
+   "params": {
+    "targetId": "$g_crankset",
+    "mode": "spin",
+    "speed": 2.35619,
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "pivot": [
+     0,
+     0,
+     269.0
+    ]
+   }
+  },
+  {
+   "command": "animate",
+   "params": {
+    "targetId": "gear-65.1",
+    "mode": "spin",
+    "speed": 9.33899,
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "pivot": [
+     -415.025,
+     0,
+     271.924
+    ]
+   }
+  },
+  {
+   "command": "animate",
+   "params": {
+    "targetId": "gear-66.1",
+    "mode": "spin",
+    "speed": 9.33899,
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "pivot": [
+     -405.17,
+     0,
+     200.602
+    ]
+   }
+  },
+  {
+   "command": "animate",
+   "params": {
+    "targetId": "$g_chain",
+    "mode": "follow_path",
+    "pathId": "belt-71.1",
+    "speed": -247.8007
+   }
+  },
+  {
+   "command": "add_rigid_body",
+   "params": {
+    "entityIds": [
+     "cyl-3.1",
+     "swp-4.1",
+     "swp-5.1",
+     "swp-6.1",
+     "swp-7.1",
+     "swp-8.1",
+     "swp-9.1",
+     "swp-10.1",
+     "swp-11.1",
+     "box-45.1",
+     "box-14.1",
+     "swp-15.1",
+     "swp-16.1",
+     "box-43.1",
+     "swp-12.1",
+     "loft-13.1",
+     "swp-17.1",
+     "swp-18.1",
+     "cyl-19.1",
+     "swp-20.1",
+     "loft-21.1",
+     "swp-22.1",
+     "swp-23.1",
+     "swp-24.1",
+     "loft-25.1",
+     "swp-26.1",
+     "swp-27.1",
+     "gear-65.1",
+     "gear-66.1",
+     "swp-67.1",
+     "swp-68.1",
+     "box-69.1",
+     "box-70.1"
+    ],
+    "name": "frame",
+    "id": "body-frame",
+    "fixed": true,
+    "massKg": 1.6
+   }
+  },
+  {
+   "command": "add_rigid_body",
+   "params": {
+    "entityIds": [
+     "gear-46.1",
+     "gear-47.1",
+     "cyl-48.1",
+     "swp-49.1",
+     "box-50.1",
+     "swp-51.1",
+     "box-52.1"
+    ],
+    "name": "crank",
+    "id": "body-crank",
+    "massKg": 0.7
+   }
+  },
+  {
+   "command": "add_rigid_body",
+   "params": {
+    "entityIds": [
+     "rev-35.1",
+     "rev-36.1",
+     "rev-37.1",
+     "swp-38.1",
+     "sweep-39.1",
+     "sweep-39.2",
+     "sweep-39.3",
+     "sweep-39.4",
+     "sweep-39.5",
+     "sweep-39.6",
+     "sweep-39.7",
+     "sweep-39.8",
+     "sweep-39.9",
+     "sweep-39.10",
+     "sweep-39.11",
+     "sweep-39.12",
+     "sweep-39.13",
+     "swp-40.1",
+     "sweep-41.1",
+     "sweep-41.2",
+     "sweep-41.3",
+     "sweep-41.4",
+     "sweep-41.5",
+     "sweep-41.6",
+     "sweep-41.7",
+     "sweep-41.8",
+     "sweep-41.9",
+     "sweep-41.10",
+     "sweep-41.11",
+     "sweep-41.12",
+     "sweep-41.13",
+     "rev-44.1",
+     "gear-53.1",
+     "gear-54.1",
+     "gear-55.1",
+     "gear-56.1",
+     "gear-57.1",
+     "gear-58.1",
+     "gear-59.1",
+     "gear-60.1",
+     "gear-61.1",
+     "gear-62.1",
+     "gear-63.1",
+     "gear-64.1"
+    ],
+    "name": "rear",
+    "id": "body-rear",
+    "massKg": 1.75
+   }
+  },
+  {
+   "command": "add_rigid_body",
+   "params": {
+    "entityIds": [
+     "rev-28.1",
+     "rev-29.1",
+     "rev-30.1",
+     "swp-31.1",
+     "sweep-32.1",
+     "sweep-32.2",
+     "sweep-32.3",
+     "sweep-32.4",
+     "sweep-32.5",
+     "sweep-32.6",
+     "sweep-32.7",
+     "sweep-32.8",
+     "sweep-32.9",
+     "sweep-32.10",
+     "sweep-32.11",
+     "swp-33.1",
+     "sweep-34.1",
+     "sweep-34.2",
+     "sweep-34.3",
+     "sweep-34.4",
+     "sweep-34.5",
+     "sweep-34.6",
+     "sweep-34.7",
+     "sweep-34.8",
+     "sweep-34.9",
+     "sweep-34.10",
+     "sweep-34.11",
+     "rev-42.1"
+    ],
+    "name": "front",
+    "id": "body-front",
+    "massKg": 0.85
+   }
+  },
+  {
+   "command": "add_body_joint",
+   "params": {
+    "kind": "revolute",
+    "child": "body-crank",
+    "anchor": [
+     0,
+     0.0,
+     269.0
+    ],
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "id": "joint-crank",
+    "damping": 0.002
+   }
+  },
+  {
+   "command": "add_body_joint",
+   "params": {
+    "kind": "revolute",
+    "child": "body-rear",
+    "anchor": [
+     -407.025,
+     0.0,
+     339.0
+    ],
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "id": "joint-rear",
+    "damping": 0.243619
+   }
+  },
+  {
+   "command": "add_body_joint",
+   "params": {
+    "kind": "revolute",
+    "child": "body-front",
+    "anchor": [
+     595.975,
+     0.0,
+     339.0
+    ],
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "id": "joint-front",
+    "damping": 0.002
+   }
+  },
+  {
+   "command": "add_gear_coupling",
+   "params": {
+    "driver": "joint-crank",
+    "driven": "joint-rear",
+    "ratio": 3.466667,
+    "id": "chain-drive"
+   }
+  },
+  {
+   "command": "add_gear_coupling",
+   "params": {
+    "driver": "joint-rear",
+    "driven": "joint-front",
+    "ratio": 1,
+    "id": "road-contact"
+   }
+  },
+  {
+   "command": "add_motor",
+   "params": {
+    "joint": "joint-crank",
+    "kind": "speed",
+    "rpm": 90.0,
+    "maxTorque": 80,
+    "id": "rider-legs"
+   }
+  }
+ ]
+}

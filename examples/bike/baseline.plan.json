@@ -1,0 +1,2904 @@
+{
+ "actions": [
+  {
+   "command": "set_units",
+   "params": {
+    "units": "mm"
+   },
+   "as": "e1"
+  },
+  {
+   "command": "set_parameter",
+   "params": {
+    "name": "stack",
+    "expression": "580.0"
+   },
+   "as": "e2"
+  },
+  {
+   "command": "set_parameter",
+   "params": {
+    "name": "reach",
+    "expression": "401.0"
+   },
+   "as": "e3"
+  },
+  {
+   "command": "set_parameter",
+   "params": {
+    "name": "head_angle",
+    "expression": "73.3"
+   },
+   "as": "e4"
+  },
+  {
+   "command": "set_parameter",
+   "params": {
+    "name": "seat_angle",
+    "expression": "73.5"
+   },
+   "as": "e5"
+  },
+  {
+   "command": "set_parameter",
+   "params": {
+    "name": "chainstay",
+    "expression": "413.0"
+   },
+   "as": "e6"
+  },
+  {
+   "command": "set_parameter",
+   "params": {
+    "name": "wheelbase",
+    "expression": "1003.0"
+   },
+   "as": "e7"
+  },
+  {
+   "command": "set_parameter",
+   "params": {
+    "name": "bb_drop",
+    "expression": "70.0"
+   },
+   "as": "e8"
+  },
+  {
+   "command": "set_parameter",
+   "params": {
+    "name": "wheel_radius",
+    "expression": "339.0"
+   },
+   "as": "e9"
+  },
+  {
+   "command": "set_parameter",
+   "params": {
+    "name": "crank_length",
+    "expression": "172.5"
+   },
+   "as": "e10"
+  },
+  {
+   "command": "set_parameter",
+   "params": {
+    "name": "chainring",
+    "expression": "52"
+   },
+   "as": "e11"
+  },
+  {
+   "command": "set_parameter",
+   "params": {
+    "name": "cog",
+    "expression": "15"
+   },
+   "as": "e12"
+  },
+  {
+   "command": "set_parameter",
+   "params": {
+    "name": "chain_pitch",
+    "expression": "12.7"
+   },
+   "as": "e13"
+  },
+  {
+   "command": "create_material",
+   "params": {
+    "name": "carbon",
+    "density": 1.55,
+    "densityUnit": "g/cm^3",
+    "color": "#c8102e",
+    "roughness": 0.35,
+    "finish": "carbon_twill",
+    "color2": "#2a2a2a",
+    "finishScale": 24,
+    "clearcoat": 0.8
+   },
+   "as": "e14"
+  },
+  {
+   "command": "add_cylinder",
+   "params": {
+    "radius": 23,
+    "height": 86,
+    "position": [
+     0,
+     0.0,
+     269.0
+    ],
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "color": "#c8102e"
+   },
+   "as": "e15"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      398.701,
+      0.0,
+      856.663
+     ],
+     [
+      450.713,
+      0.0,
+      683.297
+     ]
+    ],
+    "color": "#c8102e",
+    "stations": [
+     {
+      "at": 0,
+      "radius": 24
+     },
+     {
+      "at": 1,
+      "radius": 28
+     }
+    ]
+   },
+   "as": "e16"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      406.747,
+      0.0,
+      829.844
+     ],
+     [
+      -147.688,
+      0.0,
+      767.586
+     ]
+    ],
+    "color": "#c8102e",
+    "radius": 16
+   },
+   "as": "e17"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      438.357,
+      0.0,
+      724.483
+     ],
+     [
+      0,
+      0.0,
+      269.0
+     ]
+    ],
+    "color": "#c8102e",
+    "radius": 23
+   },
+   "as": "e18"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      0,
+      0.0,
+      269.0
+     ],
+     [
+      -154.788,
+      0.0,
+      791.557
+     ]
+    ],
+    "color": "#c8102e",
+    "radius": 16
+   },
+   "as": "e19"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      12,
+      38,
+      269.0
+     ],
+     [
+      -407.025,
+      66.0,
+      339.0
+     ]
+    ],
+    "color": "#c8102e",
+    "stations": [
+     {
+      "at": 0,
+      "radius": 11
+     },
+     {
+      "at": 1,
+      "radius": 8
+     }
+    ]
+   },
+   "as": "e20"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      -144.848,
+      14,
+      757.998
+     ],
+     [
+      -407.025,
+      66.0,
+      339.0
+     ]
+    ],
+    "color": "#c8102e",
+    "stations": [
+     {
+      "at": 0,
+      "radius": 8
+     },
+     {
+      "at": 1,
+      "radius": 6
+     }
+    ]
+   },
+   "as": "e21"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      12,
+      -38,
+      269.0
+     ],
+     [
+      -407.025,
+      -66.0,
+      339.0
+     ]
+    ],
+    "color": "#c8102e",
+    "stations": [
+     {
+      "at": 0,
+      "radius": 11
+     },
+     {
+      "at": 1,
+      "radius": 8
+     }
+    ]
+   },
+   "as": "e22"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      -144.848,
+      -14,
+      757.998
+     ],
+     [
+      -407.025,
+      -66.0,
+      339.0
+     ]
+    ],
+    "color": "#c8102e",
+    "stations": [
+     {
+      "at": 0,
+      "radius": 8
+     },
+     {
+      "at": 1,
+      "radius": 6
+     }
+    ]
+   },
+   "as": "e23"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      -130.647,
+      0.0,
+      710.057
+     ],
+     [
+      -201.651,
+      0.0,
+      949.762
+     ]
+    ],
+    "color": "#151515",
+    "radius": 13.6
+   },
+   "as": "e24"
+  },
+  {
+   "command": "loft_sections",
+   "params": {
+    "sections": [
+     {
+      "center": [
+       -321.59,
+       0,
+       975.32
+      ],
+      "rotation": [
+       0,
+       1.570796,
+       0
+      ],
+      "radiusX": 22,
+      "radiusY": 70
+     },
+     {
+      "center": [
+       -251.59,
+       0,
+       971.32
+      ],
+      "rotation": [
+       0,
+       1.570796,
+       0
+      ],
+      "radiusX": 18,
+      "radiusY": 62
+     },
+     {
+      "center": [
+       -151.59,
+       0,
+       969.32
+      ],
+      "rotation": [
+       0,
+       1.570796,
+       0
+      ],
+      "radiusX": 14,
+      "radiusY": 25
+     },
+     {
+      "center": [
+       -61.59,
+       0,
+       973.32
+      ],
+      "rotation": [
+       0,
+       1.570796,
+       0
+      ],
+      "radiusX": 12,
+      "radiusY": 16
+     }
+    ],
+    "color": "#222222"
+   },
+   "as": "e25"
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     40,
+     100,
+     30
+    ],
+    "position": [
+     453.587,
+     0.0,
+     673.718
+    ],
+    "rotation": [
+     0,
+     0.29147,
+     0
+    ],
+    "color": "#c8102e"
+   },
+   "as": "e26"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      456.461,
+      48,
+      664.14
+     ],
+     [
+      595.975,
+      56.0,
+      339.0
+     ]
+    ],
+    "color": "#c8102e",
+    "stations": [
+     {
+      "at": 0,
+      "radius": 16
+     },
+     {
+      "at": 1,
+      "radius": 10
+     }
+    ]
+   },
+   "as": "e27"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      456.461,
+      -48,
+      664.14
+     ],
+     [
+      595.975,
+      -56.0,
+      339.0
+     ]
+    ],
+    "color": "#c8102e",
+    "stations": [
+     {
+      "at": 0,
+      "radius": 16
+     },
+     {
+      "at": 1,
+      "radius": 10
+     }
+    ]
+   },
+   "as": "e28"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      398.701,
+      0.0,
+      856.663
+     ],
+     [
+      386.632,
+      0.0,
+      896.891
+     ]
+    ],
+    "color": "#151515",
+    "radius": 15.9
+   },
+   "as": "e29"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      386.632,
+      0.0,
+      896.891
+     ],
+     [
+      496.029,
+      0.0,
+      885.393
+     ]
+    ],
+    "color": "#151515",
+    "radius": 17
+   },
+   "as": "e30"
+  },
+  {
+   "command": "add_cylinder",
+   "params": {
+    "radius": 15.9,
+    "height": 370,
+    "position": [
+     496.029,
+     0.0,
+     885.393
+    ],
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "color": "#151515"
+   },
+   "as": "e31"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      496.03,
+      185,
+      885.39
+     ],
+     [
+      541.03,
+      210,
+      887.39
+     ],
+     [
+      581.03,
+      210,
+      845.39
+     ],
+     [
+      556.03,
+      210,
+      775.39
+     ],
+     [
+      501.03,
+      210,
+      760.39
+     ],
+     [
+      456.03,
+      210,
+      770.39
+     ]
+    ],
+    "smooth": true,
+    "radius": 11.9,
+    "color": "#3a3a3a"
+   },
+   "as": "e32"
+  },
+  {
+   "command": "loft_sections",
+   "params": {
+    "sections": [
+     {
+      "center": [
+       551.03,
+       210,
+       887.39
+      ],
+      "rotation": [
+       0,
+       1.570796,
+       0
+      ],
+      "radiusX": 20,
+      "radiusY": 16
+     },
+     {
+      "center": [
+       601.03,
+       210,
+       901.39
+      ],
+      "rotation": [
+       0,
+       1.570796,
+       0
+      ],
+      "radiusX": 24,
+      "radiusY": 17
+     },
+     {
+      "center": [
+       626.03,
+       210,
+       907.39
+      ],
+      "rotation": [
+       0,
+       1.570796,
+       0
+      ],
+      "radiusX": 14,
+      "radiusY": 12
+     }
+    ],
+    "color": "#151515"
+   },
+   "as": "e33"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      621.029,
+      210,
+      895.393
+     ],
+     [
+      611.029,
+      210,
+      800.393
+     ]
+    ],
+    "color": "#151515",
+    "radius": 6
+   },
+   "as": "e34"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      561.03,
+      200,
+      880.39
+     ],
+     [
+      531.03,
+      150,
+      855.39
+     ],
+     [
+      486.03,
+      120,
+      795.39
+     ],
+     [
+      461.0,
+      60,
+      809.0
+     ],
+     [
+      391.0,
+      30,
+      789.0
+     ]
+    ],
+    "smooth": true,
+    "radius": 2.5,
+    "color": "#303030"
+   },
+   "as": "e35"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      496.03,
+      -185,
+      885.39
+     ],
+     [
+      541.03,
+      -210,
+      887.39
+     ],
+     [
+      581.03,
+      -210,
+      845.39
+     ],
+     [
+      556.03,
+      -210,
+      775.39
+     ],
+     [
+      501.03,
+      -210,
+      760.39
+     ],
+     [
+      456.03,
+      -210,
+      770.39
+     ]
+    ],
+    "smooth": true,
+    "radius": 11.9,
+    "color": "#3a3a3a"
+   },
+   "as": "e36"
+  },
+  {
+   "command": "loft_sections",
+   "params": {
+    "sections": [
+     {
+      "center": [
+       551.03,
+       -210,
+       887.39
+      ],
+      "rotation": [
+       0,
+       1.570796,
+       0
+      ],
+      "radiusX": 20,
+      "radiusY": 16
+     },
+     {
+      "center": [
+       601.03,
+       -210,
+       901.39
+      ],
+      "rotation": [
+       0,
+       1.570796,
+       0
+      ],
+      "radiusX": 24,
+      "radiusY": 17
+     },
+     {
+      "center": [
+       626.03,
+       -210,
+       907.39
+      ],
+      "rotation": [
+       0,
+       1.570796,
+       0
+      ],
+      "radiusX": 14,
+      "radiusY": 12
+     }
+    ],
+    "color": "#151515"
+   },
+   "as": "e37"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      621.029,
+      -210,
+      895.393
+     ],
+     [
+      611.029,
+      -210,
+      800.393
+     ]
+    ],
+    "color": "#151515",
+    "radius": 6
+   },
+   "as": "e38"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      561.03,
+      -200,
+      880.39
+     ],
+     [
+      531.03,
+      -150,
+      855.39
+     ],
+     [
+      486.03,
+      -120,
+      795.39
+     ],
+     [
+      461.0,
+      -60,
+      809.0
+     ],
+     [
+      391.0,
+      -30,
+      789.0
+     ]
+    ],
+    "smooth": true,
+    "radius": 2.5,
+    "color": "#303030"
+   },
+   "as": "e39"
+  },
+  {
+   "command": "revolve_profile",
+   "params": {
+    "profile": [
+     [
+      338.5,
+      0.0
+     ],
+     [
+      338.006,
+      3.623
+     ],
+     [
+      336.557,
+      7.0
+     ],
+     [
+      334.253,
+      9.899
+     ],
+     [
+      331.25,
+      12.124
+     ],
+     [
+      327.753,
+      13.523
+     ],
+     [
+      324.0,
+      14.0
+     ],
+     [
+      320.247,
+      13.523
+     ],
+     [
+      316.75,
+      12.124
+     ],
+     [
+      313.747,
+      9.899
+     ],
+     [
+      311.443,
+      7.0
+     ],
+     [
+      309.994,
+      3.623
+     ],
+     [
+      309.5,
+      0.0
+     ],
+     [
+      309.994,
+      -3.623
+     ],
+     [
+      311.443,
+      -7.0
+     ],
+     [
+      313.747,
+      -9.899
+     ],
+     [
+      316.75,
+      -12.124
+     ],
+     [
+      320.247,
+      -13.523
+     ],
+     [
+      324.0,
+      -14.0
+     ],
+     [
+      327.753,
+      -13.523
+     ],
+     [
+      331.25,
+      -12.124
+     ],
+     [
+      334.253,
+      -9.899
+     ],
+     [
+      336.557,
+      -7.0
+     ],
+     [
+      338.006,
+      -3.623
+     ]
+    ],
+    "axis": "y",
+    "position": [
+     595.975,
+     0,
+     339.0
+    ],
+    "segments": 72,
+    "color": "#202020"
+   },
+   "as": "e40"
+  },
+  {
+   "command": "revolve_profile",
+   "params": {
+    "profile": [
+     [
+      315.0,
+      -10.5
+     ],
+     [
+      315.0,
+      10.5
+     ],
+     [
+      294.0,
+      9.5
+     ],
+     [
+      290.0,
+      4
+     ],
+     [
+      290.0,
+      -4
+     ],
+     [
+      294.0,
+      -9.5
+     ]
+    ],
+    "axis": "y",
+    "position": [
+     595.975,
+     0,
+     339.0
+    ],
+    "segments": 72,
+    "color": "#2b2b2b"
+   },
+   "as": "e41"
+  },
+  {
+   "command": "revolve_profile",
+   "params": {
+    "profile": [
+     [
+      6,
+      -45.0
+     ],
+     [
+      28,
+      -45.0
+     ],
+     [
+      28,
+      -41.0
+     ],
+     [
+      13,
+      -37.0
+     ],
+     [
+      13,
+      37.0
+     ],
+     [
+      28,
+      41.0
+     ],
+     [
+      28,
+      45.0
+     ],
+     [
+      6,
+      45.0
+     ]
+    ],
+    "axis": "y",
+    "position": [
+     595.975,
+     0,
+     339.0
+    ],
+    "segments": 64,
+    "color": "#a9adb3"
+   },
+   "as": "e42"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      595.975,
+      41.0,
+      365.0
+     ],
+     [
+      595.975,
+      3,
+      630.0
+     ]
+    ],
+    "radius": 1.0,
+    "color": "#6e7074"
+   },
+   "as": "e43"
+  },
+  {
+   "command": "array_polar",
+   "params": {
+    "id": "$e43",
+    "count": 12,
+    "center": [
+     595.975,
+     0.0,
+     339.0
+    ],
+    "axis": [
+     0,
+     1,
+     0
+    ]
+   },
+   "as": "e44"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      602.705,
+      -41.0,
+      364.114
+     ],
+     [
+      671.292,
+      -3,
+      620.084
+     ]
+    ],
+    "radius": 1.0,
+    "color": "#6e7074"
+   },
+   "as": "e45"
+  },
+  {
+   "command": "array_polar",
+   "params": {
+    "id": "$e45",
+    "count": 12,
+    "center": [
+     595.975,
+     0.0,
+     339.0
+    ],
+    "axis": [
+     0,
+     1,
+     0
+    ]
+   },
+   "as": "e46"
+  },
+  {
+   "command": "revolve_profile",
+   "params": {
+    "profile": [
+     [
+      338.5,
+      0.0
+     ],
+     [
+      338.006,
+      3.623
+     ],
+     [
+      336.557,
+      7.0
+     ],
+     [
+      334.253,
+      9.899
+     ],
+     [
+      331.25,
+      12.124
+     ],
+     [
+      327.753,
+      13.523
+     ],
+     [
+      324.0,
+      14.0
+     ],
+     [
+      320.247,
+      13.523
+     ],
+     [
+      316.75,
+      12.124
+     ],
+     [
+      313.747,
+      9.899
+     ],
+     [
+      311.443,
+      7.0
+     ],
+     [
+      309.994,
+      3.623
+     ],
+     [
+      309.5,
+      0.0
+     ],
+     [
+      309.994,
+      -3.623
+     ],
+     [
+      311.443,
+      -7.0
+     ],
+     [
+      313.747,
+      -9.899
+     ],
+     [
+      316.75,
+      -12.124
+     ],
+     [
+      320.247,
+      -13.523
+     ],
+     [
+      324.0,
+      -14.0
+     ],
+     [
+      327.753,
+      -13.523
+     ],
+     [
+      331.25,
+      -12.124
+     ],
+     [
+      334.253,
+      -9.899
+     ],
+     [
+      336.557,
+      -7.0
+     ],
+     [
+      338.006,
+      -3.623
+     ]
+    ],
+    "axis": "y",
+    "position": [
+     -407.025,
+     0,
+     339.0
+    ],
+    "segments": 72,
+    "color": "#202020"
+   },
+   "as": "e47"
+  },
+  {
+   "command": "revolve_profile",
+   "params": {
+    "profile": [
+     [
+      315.0,
+      -10.5
+     ],
+     [
+      315.0,
+      10.5
+     ],
+     [
+      294.0,
+      9.5
+     ],
+     [
+      290.0,
+      4
+     ],
+     [
+      290.0,
+      -4
+     ],
+     [
+      294.0,
+      -9.5
+     ]
+    ],
+    "axis": "y",
+    "position": [
+     -407.025,
+     0,
+     339.0
+    ],
+    "segments": 72,
+    "color": "#2b2b2b"
+   },
+   "as": "e48"
+  },
+  {
+   "command": "revolve_profile",
+   "params": {
+    "profile": [
+     [
+      6,
+      -63.0
+     ],
+     [
+      28,
+      -63.0
+     ],
+     [
+      28,
+      -59.0
+     ],
+     [
+      13,
+      -55.0
+     ],
+     [
+      13,
+      55.0
+     ],
+     [
+      28,
+      59.0
+     ],
+     [
+      28,
+      63.0
+     ],
+     [
+      6,
+      63.0
+     ]
+    ],
+    "axis": "y",
+    "position": [
+     -407.025,
+     0,
+     339.0
+    ],
+    "segments": 64,
+    "color": "#a9adb3"
+   },
+   "as": "e49"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      -407.025,
+      59.0,
+      365.0
+     ],
+     [
+      -407.025,
+      3,
+      630.0
+     ]
+    ],
+    "radius": 1.0,
+    "color": "#6e7074"
+   },
+   "as": "e50"
+  },
+  {
+   "command": "array_polar",
+   "params": {
+    "id": "$e50",
+    "count": 14,
+    "center": [
+     -407.025,
+     0.0,
+     339.0
+    ],
+    "axis": [
+     0,
+     1,
+     0
+    ]
+   },
+   "as": "e51"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      -401.239,
+      -59.0,
+      364.348
+     ],
+     [
+      -342.271,
+      -3,
+      622.704
+     ]
+    ],
+    "radius": 1.0,
+    "color": "#6e7074"
+   },
+   "as": "e52"
+  },
+  {
+   "command": "array_polar",
+   "params": {
+    "id": "$e52",
+    "count": 14,
+    "center": [
+     -407.025,
+     0.0,
+     339.0
+    ],
+    "axis": [
+     0,
+     1,
+     0
+    ]
+   },
+   "as": "e53"
+  },
+  {
+   "command": "revolve_profile",
+   "params": {
+    "profile": [
+     [
+      45,
+      -0.9
+     ],
+     [
+      80,
+      -0.9
+     ],
+     [
+      80,
+      0.9
+     ],
+     [
+      45,
+      0.9
+     ]
+    ],
+    "axis": "y",
+    "position": [
+     595.975,
+     38.0,
+     339.0
+    ],
+    "segments": 64,
+    "color": "#b8bcc2"
+   },
+   "as": "e54"
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     60,
+     28,
+     34
+    ],
+    "position": [
+     545.975,
+     48.0,
+     389.0
+    ],
+    "rotation": [
+     0,
+     -0.5,
+     0
+    ],
+    "color": "#151515"
+   },
+   "as": "e55"
+  },
+  {
+   "command": "revolve_profile",
+   "params": {
+    "profile": [
+     [
+      45,
+      -0.9
+     ],
+     [
+      80,
+      -0.9
+     ],
+     [
+      80,
+      0.9
+     ],
+     [
+      45,
+      0.9
+     ]
+    ],
+    "axis": "y",
+    "position": [
+     -407.025,
+     57.0,
+     339.0
+    ],
+    "segments": 64,
+    "color": "#b8bcc2"
+   },
+   "as": "e56"
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     60,
+     28,
+     34
+    ],
+    "position": [
+     -457.025,
+     67.0,
+     389.0
+    ],
+    "rotation": [
+     0,
+     -0.5,
+     0
+    ],
+    "color": "#151515"
+   },
+   "as": "e57"
+  },
+  {
+   "command": "add_spur_gear",
+   "params": {
+    "module": 4.04254,
+    "teeth": 52,
+    "faceWidth": 1.8,
+    "bore": 30,
+    "position": [
+     0,
+     -47.6,
+     269.0
+    ],
+    "rotation": [
+     1.570796,
+     0,
+     0
+    ],
+    "color": "#2e2e2e"
+   },
+   "as": "e58"
+  },
+  {
+   "command": "add_spur_gear",
+   "params": {
+    "module": 4.04254,
+    "teeth": 36,
+    "faceWidth": 1.8,
+    "bore": 30,
+    "position": [
+     0,
+     -40.6,
+     269.0
+    ],
+    "rotation": [
+     1.570796,
+     0,
+     0
+    ],
+    "color": "#2e2e2e"
+   },
+   "as": "e59"
+  },
+  {
+   "command": "add_cylinder",
+   "params": {
+    "radius": 12,
+    "height": 128.0,
+    "position": [
+     0,
+     0.0,
+     269.0
+    ],
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "color": "#a9adb3"
+   },
+   "as": "e60"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      0,
+      -60.0,
+      269.0
+     ],
+     [
+      172.5,
+      -70.0,
+      269.0
+     ]
+    ],
+    "stations": [
+     {
+      "at": 0,
+      "radiusX": 9,
+      "radiusY": 20
+     },
+     {
+      "at": 1,
+      "radiusX": 7,
+      "radiusY": 12
+     }
+    ],
+    "color": "#2e2e2e"
+   },
+   "as": "e61"
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     90,
+     60,
+     14
+    ],
+    "position": [
+     172.5,
+     -104.0,
+     265.0
+    ],
+    "color": "#151515"
+   },
+   "as": "e62"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      0,
+      60.0,
+      269.0
+     ],
+     [
+      -172.5,
+      70.0,
+      269.0
+     ]
+    ],
+    "stations": [
+     {
+      "at": 0,
+      "radiusX": 9,
+      "radiusY": 20
+     },
+     {
+      "at": 1,
+      "radiusX": 7,
+      "radiusY": 12
+     }
+    ],
+    "color": "#2e2e2e"
+   },
+   "as": "e63"
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     90,
+     60,
+     14
+    ],
+    "position": [
+     -172.5,
+     104.0,
+     265.0
+    ],
+    "color": "#151515"
+   },
+   "as": "e64"
+  },
+  {
+   "command": "add_spur_gear",
+   "params": {
+    "module": 4.04254,
+    "teeth": 11,
+    "faceWidth": 1.6,
+    "bore": 12.23,
+    "position": [
+     -407.025,
+     -62.2,
+     339.0
+    ],
+    "rotation": [
+     1.570796,
+     0,
+     0
+    ],
+    "color": "#9a9ea4"
+   },
+   "as": "e65"
+  },
+  {
+   "command": "add_spur_gear",
+   "params": {
+    "module": 4.04254,
+    "teeth": 12,
+    "faceWidth": 1.6,
+    "bore": 13.34,
+    "position": [
+     -407.025,
+     -58.7,
+     339.0
+    ],
+    "rotation": [
+     1.570796,
+     0,
+     0
+    ],
+    "color": "#9a9ea4"
+   },
+   "as": "e66"
+  },
+  {
+   "command": "add_spur_gear",
+   "params": {
+    "module": 4.04254,
+    "teeth": 13,
+    "faceWidth": 1.6,
+    "bore": 14.45,
+    "position": [
+     -407.025,
+     -55.2,
+     339.0
+    ],
+    "rotation": [
+     1.570796,
+     0,
+     0
+    ],
+    "color": "#9a9ea4"
+   },
+   "as": "e67"
+  },
+  {
+   "command": "add_spur_gear",
+   "params": {
+    "module": 4.04254,
+    "teeth": 14,
+    "faceWidth": 1.6,
+    "bore": 15.56,
+    "position": [
+     -407.025,
+     -51.7,
+     339.0
+    ],
+    "rotation": [
+     1.570796,
+     0,
+     0
+    ],
+    "color": "#9a9ea4"
+   },
+   "as": "e68"
+  },
+  {
+   "command": "add_spur_gear",
+   "params": {
+    "module": 4.04254,
+    "teeth": 15,
+    "faceWidth": 1.6,
+    "bore": 16.68,
+    "position": [
+     -407.025,
+     -48.2,
+     339.0
+    ],
+    "rotation": [
+     1.570796,
+     0,
+     0
+    ],
+    "color": "#9a9ea4"
+   },
+   "as": "e69"
+  },
+  {
+   "command": "add_spur_gear",
+   "params": {
+    "module": 4.04254,
+    "teeth": 16,
+    "faceWidth": 1.6,
+    "bore": 17.79,
+    "position": [
+     -407.025,
+     -44.7,
+     339.0
+    ],
+    "rotation": [
+     1.570796,
+     0,
+     0
+    ],
+    "color": "#9a9ea4"
+   },
+   "as": "e70"
+  },
+  {
+   "command": "add_spur_gear",
+   "params": {
+    "module": 4.04254,
+    "teeth": 17,
+    "faceWidth": 1.6,
+    "bore": 18.9,
+    "position": [
+     -407.025,
+     -41.2,
+     339.0
+    ],
+    "rotation": [
+     1.570796,
+     0,
+     0
+    ],
+    "color": "#9a9ea4"
+   },
+   "as": "e71"
+  },
+  {
+   "command": "add_spur_gear",
+   "params": {
+    "module": 4.04254,
+    "teeth": 19,
+    "faceWidth": 1.6,
+    "bore": 21.12,
+    "position": [
+     -407.025,
+     -37.7,
+     339.0
+    ],
+    "rotation": [
+     1.570796,
+     0,
+     0
+    ],
+    "color": "#9a9ea4"
+   },
+   "as": "e72"
+  },
+  {
+   "command": "add_spur_gear",
+   "params": {
+    "module": 4.04254,
+    "teeth": 21,
+    "faceWidth": 1.6,
+    "bore": 23.35,
+    "position": [
+     -407.025,
+     -34.2,
+     339.0
+    ],
+    "rotation": [
+     1.570796,
+     0,
+     0
+    ],
+    "color": "#9a9ea4"
+   },
+   "as": "e73"
+  },
+  {
+   "command": "add_spur_gear",
+   "params": {
+    "module": 4.04254,
+    "teeth": 24,
+    "faceWidth": 1.6,
+    "bore": 26.68,
+    "position": [
+     -407.025,
+     -30.7,
+     339.0
+    ],
+    "rotation": [
+     1.570796,
+     0,
+     0
+    ],
+    "color": "#9a9ea4"
+   },
+   "as": "e74"
+  },
+  {
+   "command": "add_spur_gear",
+   "params": {
+    "module": 4.04254,
+    "teeth": 27,
+    "faceWidth": 1.6,
+    "bore": 30,
+    "position": [
+     -407.025,
+     -27.2,
+     339.0
+    ],
+    "rotation": [
+     1.570796,
+     0,
+     0
+    ],
+    "color": "#9a9ea4"
+   },
+   "as": "e75"
+  },
+  {
+   "command": "add_spur_gear",
+   "params": {
+    "module": 4.04254,
+    "teeth": 30,
+    "faceWidth": 1.6,
+    "bore": 30,
+    "position": [
+     -407.025,
+     -23.7,
+     339.0
+    ],
+    "rotation": [
+     1.570796,
+     0,
+     0
+    ],
+    "color": "#9a9ea4"
+   },
+   "as": "e76"
+  },
+  {
+   "command": "add_spur_gear",
+   "params": {
+    "module": 4.04254,
+    "teeth": 13,
+    "faceWidth": 2.4,
+    "bore": 14.45,
+    "position": [
+     -415.025,
+     -47.3,
+     271.924
+    ],
+    "rotation": [
+     1.570796,
+     0,
+     0
+    ],
+    "color": "#151515"
+   },
+   "as": "e77"
+  },
+  {
+   "command": "add_spur_gear",
+   "params": {
+    "module": 4.04254,
+    "teeth": 13,
+    "faceWidth": 2.4,
+    "bore": 14.45,
+    "position": [
+     -405.17,
+     -47.3,
+     200.602
+    ],
+    "rotation": [
+     1.570796,
+     0,
+     0
+    ],
+    "color": "#151515"
+   },
+   "as": "e78"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      -415.025,
+      -53.0,
+      271.924
+     ],
+     [
+      -405.17,
+      -53.0,
+      200.602
+     ]
+    ],
+    "section": [
+     [
+      -1,
+      -14
+     ],
+     [
+      1,
+      -14
+     ],
+     [
+      1,
+      14
+     ],
+     [
+      -1,
+      14
+     ]
+    ],
+    "color": "#2a2a2a"
+   },
+   "as": "e79"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      -415.025,
+      -44.0,
+      271.924
+     ],
+     [
+      -405.17,
+      -44.0,
+      200.602
+     ]
+    ],
+    "section": [
+     [
+      -1,
+      -14
+     ],
+     [
+      1,
+      -14
+     ],
+     [
+      1,
+      14
+     ],
+     [
+      -1,
+      14
+     ]
+    ],
+    "color": "#2a2a2a"
+   },
+   "as": "e80"
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     40,
+     30,
+     50
+    ],
+    "position": [
+     -417.025,
+     -70.5,
+     309.0
+    ],
+    "color": "#151515"
+   },
+   "as": "e81"
+  },
+  {
+   "command": "add_box",
+   "params": {
+    "size": [
+     50,
+     22,
+     25
+    ],
+    "position": [
+     -49.751,
+     -58.5,
+     436.956
+    ],
+    "color": "#151515"
+   },
+   "as": "e82"
+  },
+  {
+   "command": "draw_belt_around",
+   "params": {
+    "pulleys": [
+     {
+      "center": [
+       0,
+       269.0
+      ],
+      "radius": 105.1699
+     },
+     {
+      "center": [
+       -407.025,
+       339.0
+      ],
+      "radius": 30.5418
+     },
+     {
+      "center": [
+       -415.025,
+       271.924
+      ],
+      "radius": 26.534
+     },
+     {
+      "center": [
+       -405.17,
+       200.602
+      ],
+      "radius": 26.534
+     }
+    ],
+    "arcSamples": 24,
+    "position": [
+     0,
+     -48.5,
+     0
+    ],
+    "rotation": [
+     1.57079633,
+     0,
+     0
+    ],
+    "name": "chain pitch line",
+    "color": "#444444"
+   },
+   "as": "chainpath"
+  },
+  {
+   "command": "extrude_profile",
+   "params": {
+    "profile": [
+     [
+      -9.95,
+      -3.7
+     ],
+     [
+      9.95,
+      -3.7
+     ],
+     [
+      9.95,
+      3.7
+     ],
+     [
+      -9.95,
+      3.7
+     ]
+    ],
+    "depth": 0.8,
+    "position": [
+     0,
+     0,
+     1.05
+    ],
+    "color": "#8c8f94"
+   },
+   "as": "e84"
+  },
+  {
+   "command": "extrude_profile",
+   "params": {
+    "profile": [
+     [
+      -9.95,
+      -3.7
+     ],
+     [
+      9.95,
+      -3.7
+     ],
+     [
+      9.95,
+      3.7
+     ],
+     [
+      -9.95,
+      3.7
+     ]
+    ],
+    "depth": 0.8,
+    "position": [
+     0,
+     0,
+     -1.85
+    ],
+    "color": "#8c8f94"
+   },
+   "as": "e85"
+  },
+  {
+   "command": "add_cylinder",
+   "params": {
+    "radius": 3.87,
+    "height": 2.2,
+    "position": [
+     -6.35,
+     0,
+     0
+    ],
+    "color": "#6a6d72"
+   },
+   "as": "e86"
+  },
+  {
+   "command": "add_cylinder",
+   "params": {
+    "radius": 3.87,
+    "height": 2.2,
+    "position": [
+     6.35,
+     0,
+     0
+    ],
+    "color": "#6a6d72"
+   },
+   "as": "e87"
+  },
+  {
+   "command": "extrude_profile",
+   "params": {
+    "profile": [
+     [
+      -9.95,
+      -3.7
+     ],
+     [
+      9.95,
+      -3.7
+     ],
+     [
+      9.95,
+      3.7
+     ],
+     [
+      -9.95,
+      3.7
+     ]
+    ],
+    "depth": 0.8,
+    "position": [
+     0,
+     0,
+     2.05
+    ],
+    "color": "#b5b8bd"
+   },
+   "as": "e88"
+  },
+  {
+   "command": "extrude_profile",
+   "params": {
+    "profile": [
+     [
+      -9.95,
+      -3.7
+     ],
+     [
+      9.95,
+      -3.7
+     ],
+     [
+      9.95,
+      3.7
+     ],
+     [
+      -9.95,
+      3.7
+     ]
+    ],
+    "depth": 0.8,
+    "position": [
+     0,
+     0,
+     -2.85
+    ],
+    "color": "#b5b8bd"
+   },
+   "as": "e89"
+  },
+  {
+   "command": "add_cylinder",
+   "params": {
+    "radius": 1.85,
+    "height": 5.6,
+    "position": [
+     -6.35,
+     0,
+     0
+    ],
+    "color": "#d0d2d5"
+   },
+   "as": "e90"
+  },
+  {
+   "command": "add_cylinder",
+   "params": {
+    "radius": 1.85,
+    "height": 5.6,
+    "position": [
+     6.35,
+     0,
+     0
+    ],
+    "color": "#d0d2d5"
+   },
+   "as": "e91"
+  },
+  {
+   "command": "create_component",
+   "params": {
+    "name": "chain inner link",
+    "entityIds": [
+     "$e84",
+     "$e85",
+     "$e86",
+     "$e87"
+    ],
+    "componentId": "comp-chain-inner"
+   },
+   "as": "innerinst"
+  },
+  {
+   "command": "create_component",
+   "params": {
+    "name": "chain outer link",
+    "entityIds": [
+     "$e88",
+     "$e89",
+     "$e90",
+     "$e91"
+    ],
+    "componentId": "comp-chain-outer"
+   },
+   "as": "outerinst"
+  },
+  {
+   "command": "delete_entities",
+   "params": {
+    "ids": [
+     "$innerinst",
+     "$outerinst"
+    ]
+   },
+   "as": "e94"
+  },
+  {
+   "command": "pattern_along_path",
+   "params": {
+    "componentId": "comp-chain-inner",
+    "count": 54,
+    "pathId": "$chainpath"
+   },
+   "as": "chain_inner"
+  },
+  {
+   "command": "pattern_along_path",
+   "params": {
+    "componentId": "comp-chain-outer",
+    "count": 54,
+    "pathId": "$chainpath",
+    "startOffset": 12.7
+   },
+   "as": "chain_outer"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      317.491,
+      0.0,
+      526.79
+     ],
+     [
+      171.87,
+      0.0,
+      375.48
+     ]
+    ],
+    "radius": 37,
+    "color": "#e8e8e8"
+   },
+   "as": "e97"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      -2.58,
+      0.0,
+      436.151
+     ],
+     [
+      -62.223,
+      0.0,
+      637.503
+     ]
+    ],
+    "radius": 37,
+    "color": "#e8e8e8"
+   },
+   "as": "e98"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      -176.591,
+      -95,
+      1048.321
+     ],
+     [
+      174.735,
+      -105,
+      783.425
+     ]
+    ],
+    "stations": [
+     {
+      "at": 0,
+      "radius": 82
+     },
+     {
+      "at": 1,
+      "radius": 52
+     }
+    ],
+    "color": "#1f4e79"
+   },
+   "as": "e99"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      174.735,
+      -105,
+      783.425
+     ],
+     [
+      152.5,
+      -99.0,
+      354.0
+     ]
+    ],
+    "stations": [
+     {
+      "at": 0,
+      "radius": 52
+     },
+     {
+      "at": 0.35,
+      "radius": 56
+     },
+     {
+      "at": 1,
+      "radius": 36
+     }
+    ],
+    "color": "#d9a882"
+   },
+   "as": "e100"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      112.5,
+      -104.0,
+      334.0
+     ],
+     [
+      282.5,
+      -104.0,
+      281.0
+     ]
+    ],
+    "stations": [
+     {
+      "at": 0,
+      "radiusX": 42,
+      "radiusY": 38
+     },
+     {
+      "at": 1,
+      "radiusX": 40,
+      "radiusY": 22
+     }
+    ],
+    "color": "#f2f2f2"
+   },
+   "as": "e101"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      -176.591,
+      95,
+      1048.321
+     ],
+     [
+      77.21,
+      105,
+      688.898
+     ]
+    ],
+    "stations": [
+     {
+      "at": 0,
+      "radius": 82
+     },
+     {
+      "at": 1,
+      "radius": 52
+     }
+    ],
+    "color": "#1f4e79"
+   },
+   "as": "e102"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      77.21,
+      105,
+      688.898
+     ],
+     [
+      -192.5,
+      99.0,
+      354.0
+     ]
+    ],
+    "stations": [
+     {
+      "at": 0,
+      "radius": 52
+     },
+     {
+      "at": 0.35,
+      "radius": 56
+     },
+     {
+      "at": 1,
+      "radius": 36
+     }
+    ],
+    "color": "#d9a882"
+   },
+   "as": "e103"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      -232.5,
+      104.0,
+      334.0
+     ],
+     [
+      -62.5,
+      104.0,
+      281.0
+     ]
+    ],
+    "stations": [
+     {
+      "at": 0,
+      "radiusX": 42,
+      "radiusY": 38
+     },
+     {
+      "at": 1,
+      "radiusX": 40,
+      "radiusY": 22
+     }
+    ],
+    "color": "#f2f2f2"
+   },
+   "as": "e104"
+  },
+  {
+   "command": "loft_sections",
+   "params": {
+    "sections": [
+     {
+      "center": [
+       -176.591,
+       0.0,
+       1048.321
+      ],
+      "rotation": [
+       0,
+       0.907571,
+       0
+      ],
+      "radiusX": 110,
+      "radiusY": 165
+     },
+     {
+      "center": [
+       21.987,
+       0.0,
+       1203.467
+      ],
+      "rotation": [
+       0,
+       0.907571,
+       0
+      ],
+      "radiusX": 115,
+      "radiusY": 160
+     },
+     {
+      "center": [
+       198.502,
+       0.0,
+       1341.376
+      ],
+      "rotation": [
+       0,
+       0.907571,
+       0
+      ],
+      "radiusX": 120,
+      "radiusY": 195
+     },
+     {
+      "center": [
+       264.695,
+       0.0,
+       1393.091
+      ],
+      "rotation": [
+       0,
+       0.907571,
+       0
+      ],
+      "radiusX": 100,
+      "radiusY": 175
+     }
+    ],
+    "color": "#1f4e79"
+   },
+   "as": "e105"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      264.695,
+      0.0,
+      1393.091
+     ],
+     [
+      344.695,
+      0.0,
+      1453.091
+     ]
+    ],
+    "color": "#d9a882",
+    "radius": 55
+   },
+   "as": "e106"
+  },
+  {
+   "command": "add_sphere",
+   "params": {
+    "radius": 95,
+    "position": [
+     419.695,
+     0.0,
+     1523.091
+    ],
+    "color": "#d9a882"
+   },
+   "as": "e107"
+  },
+  {
+   "command": "loft_sections",
+   "params": {
+    "sections": [
+     {
+      "center": [
+       547.695,
+       0.0,
+       1553.091
+      ],
+      "rotation": [
+       0,
+       1.570796,
+       0
+      ],
+      "radiusX": 12,
+      "radiusY": 20
+     },
+     {
+      "center": [
+       519.695,
+       0.0,
+       1563.091
+      ],
+      "rotation": [
+       0,
+       1.570796,
+       0
+      ],
+      "radiusX": 55,
+      "radiusY": 80
+     },
+     {
+      "center": [
+       449.695,
+       0.0,
+       1578.091
+      ],
+      "rotation": [
+       0,
+       1.570796,
+       0
+      ],
+      "radiusX": 85,
+      "radiusY": 105
+     },
+     {
+      "center": [
+       369.695,
+       0.0,
+       1568.091
+      ],
+      "rotation": [
+       0,
+       1.570796,
+       0
+      ],
+      "radiusX": 80,
+      "radiusY": 100
+     },
+     {
+      "center": [
+       304.695,
+       0.0,
+       1548.091
+      ],
+      "rotation": [
+       0,
+       1.570796,
+       0
+      ],
+      "radiusX": 40,
+      "radiusY": 65
+     },
+     {
+      "center": [
+       284.695,
+       0.0,
+       1538.091
+      ],
+      "rotation": [
+       0,
+       1.570796,
+       0
+      ],
+      "radiusX": 8,
+      "radiusY": 15
+     }
+    ],
+    "color": "#f2f2f2"
+   },
+   "as": "e108"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      264.695,
+      185,
+      1393.091
+     ],
+     [
+      366.358,
+      255.038,
+      1114.712
+     ]
+    ],
+    "stations": [
+     {
+      "at": 0,
+      "radius": 50
+     },
+     {
+      "at": 1,
+      "radius": 40
+     }
+    ],
+    "color": "#1f4e79"
+   },
+   "as": "e109"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      366.358,
+      255.038,
+      1114.712
+     ],
+     [
+      581.029,
+      210,
+      910.393
+     ]
+    ],
+    "stations": [
+     {
+      "at": 0,
+      "radius": 40
+     },
+     {
+      "at": 1,
+      "radius": 30
+     }
+    ],
+    "color": "#d9a882"
+   },
+   "as": "e110"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      264.695,
+      -185,
+      1393.091
+     ],
+     [
+      366.358,
+      -255.038,
+      1114.712
+     ]
+    ],
+    "stations": [
+     {
+      "at": 0,
+      "radius": 50
+     },
+     {
+      "at": 1,
+      "radius": 40
+     }
+    ],
+    "color": "#1f4e79"
+   },
+   "as": "e111"
+  },
+  {
+   "command": "sweep_profile",
+   "params": {
+    "path": [
+     [
+      366.358,
+      -255.038,
+      1114.712
+     ],
+     [
+      581.029,
+      -210,
+      910.393
+     ]
+    ],
+    "stations": [
+     {
+      "at": 0,
+      "radius": 40
+     },
+     {
+      "at": 1,
+      "radius": 30
+     }
+    ],
+    "color": "#d9a882"
+   },
+   "as": "e112"
+  }
+ ]
+}
