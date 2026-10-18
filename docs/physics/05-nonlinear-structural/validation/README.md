@@ -80,6 +80,22 @@ Why ν = 0.49 in the thick-cylinder FE gate: the closed-form elastic-plastic bou
 incompressible material (exact for ν = 0.5); with ν = 0.3 only first yield (30.a) and the limit pressure (30.b, from
 limit analysis, independent of elasticity) are exact.
 
+## Built so far (ENG-1)
+
+`set_nonlinear_controls`, `add_analysis_step`, `add_curve_probe` and `set_part_constitutive_set` (plugin `cae`, toolset `analysis`) are
+registered; `create_analysis` accepts `nonlinear_static`. `nls_cantilever_plastic_collapse` and `nls_thick_cylinder` run through
+`build_project` (`tests/unit/cae/nonlinear/plans.test.ts`) and, with ccx 2.21 + Gmsh, through mesh and solve
+(`server/tests/feaNonlinearPacks.test.ts`). Differences between the plan files and what is built:
+
+- `elementFamily: hex_dominant` is not built (`set_mesh_controls` knows `tet`); the replay uses quadratic tets. VC-NLS-40.b measured
+  **520.4 N** at 5 mm (+4.1 % over 500 N, outside the 3 % written for the hex mesh), so the replay test allows 6 %.
+- The PHY-02 CalculiX card writer refuses models without `validity` ranges (`MATL_VALIDITY_MISSING`); the plans' `add_material_model`
+  steps have none, so the replay adds them (temperature 293 K, equivalent plastic strain 0 to 0.5).
+- `nls_thick_cylinder` at the plan's 5 mm mesh does not finish within 15 minutes of ccx time; the replay coarsens to 12 mm and checks
+  the 166 MPa load step converges with a bore displacement more than twice the elastic Lame value (0.58 mm against 0.16 mm).
+- `control.kind = arc_length` is refused with `NLS_ARC_LENGTH_UNSUPPORTED` (VC-NLS-63); CalculiX has no Riks procedure.
+- `nls_column_imperfection` still needs `add_imperfection` and the contact plans need the contact commands (not built).
+
 ## CLI harness (AF-23)
 
 ```bash

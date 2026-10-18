@@ -3,7 +3,16 @@
 import { isRecord } from '@lib/isRecord';
 import { durabilityErrors } from './validateDurability';
 
-const TYPES = ['static', 'modal', 'buckling', 'heat_steady', 'heat_transient', 'thermo_static', 'coupled_temperature_displacement'];
+const TYPES = [
+  'static',
+  'modal',
+  'buckling',
+  'heat_steady',
+  'heat_transient',
+  'thermo_static',
+  'coupled_temperature_displacement',
+  'nonlinear_static',
+];
 const UNIT_SYSTEMS = ['N-mm-t-s', 'N-m-kg-s', 'lbf-in-slinch-s'];
 const CONSTRAINT_KINDS = ['fixed', 'pinned', 'symmetry', 'displacement'];
 const LOAD_KINDS = ['force', 'pressure', 'gravity', 'moment'];
@@ -113,6 +122,32 @@ function checkMesh(scope: Scope, mesh: unknown, where: string): void {
   });
 }
 
+function checkNonlinear(scope: Scope, analysisCase: Record<string, unknown>, where: string): void {
+  const nonlinear = analysisCase['nonlinear'];
+  if (analysisCase['type'] !== 'nonlinear_static')
+    return void scope.errors.push(`${where}: only nonlinear_static cases carry nonlinear settings`);
+  if (!isRecord(nonlinear)) return void scope.errors.push(`${where}: expected a settings record`);
+  if (nonlinear['nlgeom'] !== undefined && typeof nonlinear['nlgeom'] !== 'boolean')
+    scope.errors.push(`${where}: nlgeom must be true or false`);
+  checkBag(scope, `${where}.steps`, nonlinear['steps'], nonlinear['stepOrder'], (id, step) => {
+    const control = step['control'];
+    if (!isRecord(control) || !oneOf(['load', 'displacement', 'arc_length'], control['kind']))
+      scope.errors.push(`${where}.steps: '${id}' has no valid control`);
+    else if (control['kind'] === 'displacement') checkTarget(scope, control['target'], `${where}.steps '${id}'`);
+    if (!isRecord(step['multipliers'])) scope.errors.push(`${where}.steps: '${id}' needs multipliers`);
+  });
+  checkBag(scope, `${where}.probes`, nonlinear['probes'], nonlinear['probeOrder'], (id, probe) => {
+    const displacement = probe['displacement'];
+    if (!isRecord(probe['load']) || !isRecord(displacement) || !isVec3(displacement['point']))
+      scope.errors.push(`${where}.probes: '${id}' is malformed`);
+  });
+  const sets = nonlinear['constitutiveSets'];
+  if (!isRecord(sets)) return void scope.errors.push(`${where}: constitutiveSets must be a record`);
+  for (const [entityId, setId] of Object.entries(sets))
+    if (!Object.hasOwn(scope.entities, entityId) || typeof setId !== 'string')
+      scope.errors.push(`${where}.constitutiveSets: '${entityId}' is invalid`);
+}
+
 function checkCase(scope: Scope, id: string, analysisCase: Record<string, unknown>): void {
   const where = `analysis case '${id}'`;
   const { errors } = scope;
@@ -163,6 +198,7 @@ function checkCase(scope: Scope, id: string, analysisCase: Record<string, unknow
     if (coupled && thermomech['thermal'] === undefined) errors.push(`${where}: thermomech.thermal is required for coupled cases`);
     if (thermomech['thermal'] !== undefined) checkThermal(scope, thermomech['thermal'], `${where}.thermomech.thermal`);
   }
+  if (analysisCase['nonlinear'] !== undefined) checkNonlinear(scope, analysisCase, `${where}.nonlinear`);
   for (const summary of ['meshSummary', 'results'])
     if (
       analysisCase[summary] !== undefined &&

@@ -17,11 +17,17 @@ interface ConstitutiveDeckCards {
   readonly view: FeaConstitutiveView;
 }
 
+/** The set a part uses: its nonlinear-case selection (`set_part_constitutive_set`) else the material record default. */
+export function partSetId(ctx: DeckContext, entityId: string, recordDefault: string | undefined): string | undefined {
+  const selected = ctx.analysis.nonlinear?.constitutiveSets;
+  return selected !== undefined && Object.hasOwn(selected, entityId) ? selected[entityId] : recordDefault;
+}
+
 /** Deck hook: constitutive cards of the material of a part, null when the part keeps the elastic / thermal cards. */
 export type MaterialCardWriter = (ctx: DeckContext, entityId: string) => ConstitutiveDeckCards | DeckRefusal | null;
 
 /**
- * Cards of the default constitutive set of the part's material when that set has a member besides the elastic law (plastic, hyperelastic,
+ * Cards of the constitutive set of the part (nonlinear-case selection, else the material's default set) when that set has a member besides the elastic law (plastic, hyperelastic,
  * creep, rate, viscoelastic); null otherwise (the elastic-only output is written by `mechanicalMaterialLines`).
  * @invariant lines are `writeMaterialCards` output verbatim (the text `export_material_cards` returns) plus `*DENSITY`; N-mm-t-s only (cards are MPa)
  * @failure other unit system / law the target cannot represent -> MATL_EXPORT_UNSUPPORTED; broken set -> MATL_COMBINATION_INVALID;
@@ -31,7 +37,7 @@ export const constitutiveMaterialCards: MaterialCardWriter = (ctx, entityId) => 
   const material = ctx.materialOf(entityId);
   const materialId = ctx.materialId(entityId);
   if (material === null || materialId === undefined) return null;
-  const set = findSet(material.constitutiveSets, material.defaultConstitutiveSet);
+  const set = findSet(material.constitutiveSets, partSetId(ctx, entityId, material.defaultConstitutiveSet));
   if (set === undefined || !SET_SLOTS.some((slot) => slot !== 'elastic' && set[slot] !== undefined)) return null;
   const refuse = (code: string, message: string): DeckRefusal => ({ code, message, ids: [entityId] });
   if (ctx.unitSystem !== 'N-mm-t-s')

@@ -12,6 +12,7 @@ import { feRemediation, refuseFe } from '../shared/feCodes';
 import { analysisIdSchema } from '../shared/schemas';
 import { trustedRecord, type Trust } from '../shared/trust';
 import { analysisInputHash } from '../hash/inputHash';
+import { checkNonlinearItems } from '../nonlinear/check';
 import { checkThermalItems } from '../thermal/check';
 import { checkThermomechItems } from '../thermomech/check';
 
@@ -37,7 +38,10 @@ function partItems(doc: CadDocument, analysis: AnalysisCase): CheckItem[] {
   const parts = Object.keys(analysis.parts);
   if (parts.length === 0) return [item('FEA_PART_INVALID', 'error', 'the analysis has no part', [analysis.id])];
   const structural =
-    analysis.type === 'static' || analysis.type === 'thermo_static' || analysis.type === 'coupled_temperature_displacement';
+    analysis.type === 'static' ||
+    analysis.type === 'nonlinear_static' ||
+    analysis.type === 'thermo_static' ||
+    analysis.type === 'coupled_temperature_displacement';
   const items: CheckItem[] = [];
   for (const entityId of parts) {
     const entity = Object.hasOwn(doc.entities, entityId) ? doc.entities[entityId] : undefined;
@@ -72,7 +76,10 @@ function partItems(doc: CadDocument, analysis: AnalysisCase): CheckItem[] {
 function setupItems(analysis: AnalysisCase): CheckItem[] {
   const items: CheckItem[] = [];
   const structural =
-    analysis.type === 'static' || analysis.type === 'thermo_static' || analysis.type === 'coupled_temperature_displacement';
+    analysis.type === 'static' ||
+    analysis.type === 'nonlinear_static' ||
+    analysis.type === 'thermo_static' ||
+    analysis.type === 'coupled_temperature_displacement';
   if (structural && analysis.constraintOrder.length === 0)
     items.push(item('FEA_NO_CONSTRAINTS', 'error', 'no constraint: the model is free to move (singular stiffness)', [analysis.id]));
   const prescribed = Object.values(analysis.constraints).some((c) => Object.values(c.dofs ?? {}).some((value) => value !== 0));
@@ -163,7 +170,7 @@ export const checkAnalysis = defineCommand({
         ? checkThermalItems(doc, analysisId, trust.results)
         : analysis.type === 'thermo_static' || analysis.type === 'coupled_temperature_displacement'
           ? checkThermomechItems(doc, analysisId, port)
-          : [];
+          : checkNonlinearItems(doc, analysis);
     const items: CheckItem[] = [
       ...partItems(doc, analysis),
       ...setupItems(analysis),

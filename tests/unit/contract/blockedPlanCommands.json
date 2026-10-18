@@ -97,35 +97,9 @@
       "record_as_built"
     ],
     "docs/physics/04-thermo-mechanical/validation/plans/tmc_fit_al_steel.plan.json": ["add_size_dimension", "set_pmi_standard"],
-    "docs/physics/05-nonlinear-structural/validation/plans/nls_cantilever_plastic_collapse.plan.json": [
-      "add_analysis_step",
-      "add_curve_probe",
-      "set_nonlinear_controls",
-      "set_part_constitutive_set"
-    ],
-    "docs/physics/05-nonlinear-structural/validation/plans/nls_column_imperfection.plan.json": [
-      "add_analysis_step",
-      "add_curve_probe",
-      "add_imperfection",
-      "set_nonlinear_controls"
-    ],
-    "docs/physics/05-nonlinear-structural/validation/plans/nls_thick_cylinder.plan.json": [
-      "add_analysis_step",
-      "add_curve_probe",
-      "set_nonlinear_controls",
-      "set_part_constitutive_set"
-    ],
-    "docs/physics/06-contact-joints/validation/plans/cnt_pretension_bar.plan.json": [
-      "add_analysis_step",
-      "add_bolt_pretension",
-      "add_curve_probe",
-      "set_nonlinear_controls"
-    ],
-    "docs/physics/06-contact-joints/validation/plans/cnt_ssnp154_cylinder_block.plan.json": [
-      "add_analysis_step",
-      "add_contact_pair",
-      "set_nonlinear_controls"
-    ],
+    "docs/physics/05-nonlinear-structural/validation/plans/nls_column_imperfection.plan.json": ["add_imperfection"],
+    "docs/physics/06-contact-joints/validation/plans/cnt_pretension_bar.plan.json": ["add_bolt_pretension"],
+    "docs/physics/06-contact-joints/validation/plans/cnt_ssnp154_cylinder_block.plan.json": ["add_contact_pair"],
     "docs/physics/09-structural-dynamics/validation/plans/dyn_beamdy8_ssd.plan.json": ["set_dynamic_damping", "set_frequency_sweep"],
     "docs/physics/09-structural-dynamics/validation/plans/dyn_cantilever_random_gevs.plan.json": [
       "define_vibration_spectrum",

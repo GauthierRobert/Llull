@@ -94,11 +94,12 @@ const fullInputs = (doc: CadDocument, analysisCase: AnalysisCase): Record<string
       ? null
       : { ...analysisCase.thermomech, thermal: withoutDispositions(analysisCase.thermomech.thermal) },
   sourceResultsHash: sourceResultsHash(doc, analysisCase),
+  ...(analysisCase.nonlinear !== undefined ? { nonlinear: analysisCase.nonlinear } : {}),
 });
 
 /**
  * Hash of what an artifact depends on. `mesh`: part geometry + idealization, mesh controls and the targets (a mesh holds their node/face
- * sets). `full`: also type, solver, factors, constraints, loads, probes, thermal and thermo-mechanical set-ups, the materials of the parts
+ * sets). `full`: also type, solver, factors, constraints, loads, probes, thermal, thermo-mechanical and nonlinear set-ups (only when present: a linear case hashes as before), the materials of the parts
  * (physical part only: density, property / material models, constitutive sets; and the material id of each part) and the document length unit and, for a thermal-result field, the results hash of the source case. Names of the case, results
  * and mesh summaries are never part of it.
  * @failure unknown analysisId -> '' (never equal to an artifact's inputHash, so it reads as stale)

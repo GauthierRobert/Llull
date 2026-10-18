@@ -6,6 +6,7 @@ import type { Vec3 } from '@core/model/vectors';
 import { significantNumber } from '@lib/compactNumber';
 import { loadCasesOf } from '../decks/context';
 import { caseOf } from '../shared/access';
+import { nonlinearSummary } from '../nonlinear/summary';
 import { thermalResultsSummary } from '../thermal/summary';
 import { maxOverNodes, magnitude, nodeCoordinates, nodeEntities, stepOfLoadCase, vonMises } from './fields';
 import { meshQuality } from './meshQuality';
@@ -51,7 +52,7 @@ function eigenColumn(results: FeResultsArtifact, title: string, index: number): 
  * Summary of a results artifact. Static and thermo_static: per load case (CalculiX step n = load case n, `loadCasesOf` order) the maximum
  * von Mises stress and the maximum displacement magnitude, each with its node position (analysis units) and, for stress, the owning
  * entity; a load case whose step lacks DISP or STRESS is omitted. modal: `frequenciesHz` (ascending); buckling: `bucklingFactors` (multiples
- * of the applied reference load); both without load cases. heat_*: `thermal` from the thermal lane, no load cases.
+ * of the applied reference load); both without load cases. heat_*: `thermal` from the thermal lane, no load cases. nonlinear_static: one load case per analysis step (its last stored increment) and `nonlinear`.
  * @invariant deterministic and pure; an unknown analysis gives no load cases
  */
 export function resultsSummary(
@@ -72,6 +73,7 @@ export function resultsSummary(
   if (analysis === undefined) return { ...base, loadCases: [] };
   if (analysis.type === 'heat_steady' || analysis.type === 'heat_transient')
     return { ...base, loadCases: [], thermal: thermalResultsSummary(doc, analysisId, mesh, results) };
+  if (analysis.type === 'nonlinear_static') return { ...base, ...nonlinearSummary(analysis, mesh, results) };
   if (analysis.type === 'modal') return { ...base, loadCases: [], frequenciesHz: eigenColumn(results, 'eigenvalues', 3) };
   if (analysis.type === 'buckling') return { ...base, loadCases: [], bucklingFactors: eigenColumn(results, 'buckling factors', 1) };
   const coordinates = nodeCoordinates(mesh);
