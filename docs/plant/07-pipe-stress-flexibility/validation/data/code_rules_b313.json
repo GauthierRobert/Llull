@@ -1,0 +1,28 @@
+{
+  "note": "Public facts about ASME B31.3 / B31.1 / MSS SP-58 / NEMA SM 23 / API 610 as quoted by secondary sources; the codes themselves are paywalled (catalogue pages S1, S2). Each rule names its grade. Only grade A rules gate.",
+  "rules": [
+    { "id": "B313-SA-1A", "clause": "B31.3 302.3.5(d) eq. (1a)", "formula": "SA = f (1.25 Sc + 0.25 Sh)", "sources": ["S10", "S11", "S3 (B31.1 form in psi/codes/b311.py)"], "grade": "A" },
+    { "id": "B313-SA-1B", "clause": "B31.3 302.3.5(d) eq. (1b), when Sh > SL", "formula": "SA = f [1.25 (Sc + Sh) - SL]", "sources": ["S10", "S11 (structure)", "S3 (B31.1 'liberal' form f(1.25Sc + 0.25Sh + (Sh - SL)))"], "grade": "A" },
+    { "id": "B313-F-PRE2022", "clause": "B31.3 302.3.5(d) eq. (1c), editions up to 2020", "formula": "f = 6.0 N^-0.2 <= fm; fm = 1.2 for ferrous materials with specified minimum tensile strength <= 517 MPa (75 ksi) and metal temperature <= 371 degC (700 degF), else 1.0; f >= 0.15", "sources": ["S12 (Paulin)", "S13 (Vibrationdata)", "S10"], "grade": "A (equation, cap); B (the 371 degC condition and the year the 0.15 floor was introduced)" },
+    { "id": "B313-F-2022", "clause": "B31.3-2022 302.3.5(d)", "formula": "f = 20 N^-0.333 (slope 3:1 instead of 5:1), same fm caps", "sources": ["S12", "S13", "S14 (Becht summary, constant not shown)"], "grade": "A for the form (two sources and the reported 1.2-crossing cycle counts 3125 / 4630 recomputed); a third source (LinkedIn) gives 6 N^-0.33 and is rejected" },
+    { "id": "B313-OCC", "clause": "B31.3 302.3.6(a)", "formula": "S_L(sustained) + S_L(occasional) <= 1.33 Sh", "sources": ["S11", "S15"], "grade": "B" },
+    { "id": "B313-SUS", "clause": "B31.3 302.3.5(c) / 320 (2016+)", "formula": "S_L = sqrt((|Sa| + Sb)^2 + (2 St)^2) <= Sh; Sb = sqrt((Ii Mi)^2 + (Io Mo)^2)/Z; Ii, Io sustained indices = 0.75 i but not less than 1.0 when no better data", "sources": ["S16 (CAEPIPE readme, eq. structure)", "S15 (index rule)"], "grade": "B" },
+    { "id": "B313-EXP", "clause": "B31.3 319.4.4 eq. (17)", "formula": "SE = sqrt(Sb^2 + 4 St^2), Sb = sqrt((ii Mi)^2 + (io Mo)^2)/Z, St = It Mt/(2Z)", "sources": ["S5", "S10"], "grade": "B (structure); the expansion stress formula is used with cited SIFs only" },
+    { "id": "B311-SUS", "clause": "B31.1 104.8.1", "formula": "S_L = P Do/(4 tn) + 0.75 i M_A / Z <= 1.0 Sh (0.75 i >= 1.0)", "sources": ["S17 (comparison table)", "S3 (b311.py uses i, 1967 edition)"], "grade": "B" },
+    { "id": "B311-OCC", "clause": "B31.1 104.8.2", "formula": "occasional allowance k Sh, k = 1.15 (events <= 10 % of any 24 h) or 1.2 (<= 1 %)", "sources": ["S3 b311.py k_from_hours (1.2 / 1.15)"], "grade": "B" },
+    { "id": "B311-EXP", "clause": "B31.1 104.8.3", "formula": "SE = i M_C / Z <= SA + f (Sh - SL); single SIF for in- and out-of-plane", "sources": ["S3", "S17"], "grade": "B" },
+    { "id": "SPRING-VAR", "clause": "MSS SP-58 / practice", "formula": "variability = |k d| / P_hot <= 25 % (15 % near rotating equipment); P_cold = P_hot + k d for upward thermal travel", "sources": ["S18 (several blogs agree on 25 %)"], "grade": "B (limit attribution conflicts between MSS SP-58, B31.1 and B31.3); the formula is a closed form" },
+    { "id": "NEMA-SM23-INDIV", "clause": "NEMA SM 23 8.4.6", "formula": "3 F + M <= 500 De (F lbf, M ft-lbf, De in); De = D for D <= 8 in, else (16 + D)/3", "sources": ["S19 (littlepeng)", "S20 (Eng-Tips quote)", "CAESAR II guide (search extract)"], "grade": "B" },
+    { "id": "API610-COMPONENT", "clause": "API 610 Annex F F.1.2", "formula": "each component of the nozzle load <= 2 x Table 5 value, plus Annex F resultant equations", "sources": ["S21 (CAESAR II guide extract)"], "grade": "B" }
+  ],
+  "derivedValues": [
+    { "vc": "VC-PST-03", "N": 7000, "f_pre2022_raw": 1.021249, "f_pre2022_fm1p2": 1.021249, "f_pre2022_fm1p0": 1.0, "f_2022_raw": 1.045516 },
+    { "vc": "VC-PST-03", "N": 100000, "f_pre2022": 0.6, "f_2022": 0.430887 },
+    { "vc": "VC-PST-03", "N": 3125, "f_pre2022_raw": 1.2 },
+    { "vc": "VC-PST-03", "N": 4630, "f_2022_raw": 1.199968 },
+    { "vc": "VC-PST-03", "N": 200000000, "f_pre2022_raw": 0.131203, "f_pre2022_floored": 0.15 },
+    { "vc": "VC-PST-05", "Sc_MPa": 137.9, "Sh_MPa": 137.9, "SL_MPa": 40.0, "f": 1.0, "SA_1a_MPa": 206.85, "SA_1b_MPa": 304.75 },
+    { "vc": "VC-PST-05", "Sc_MPa": 137.9, "Sh_MPa": 137.9, "SL_MPa": 40.0, "f": 0.6, "SA_1a_MPa": 124.11, "SA_1b_MPa": 182.85 },
+    { "vc": "VC-PST-14", "k_N_per_mm": 100, "travelUpMm": 20, "P_hot_N": 10000, "P_cold_N": 12000, "variability": 0.2 }
+  ]
+}

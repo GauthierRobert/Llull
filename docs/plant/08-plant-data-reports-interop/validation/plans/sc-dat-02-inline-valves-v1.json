@@ -1,0 +1,38 @@
+{
+  "id": "SC-DAT-02",
+  "status": "PROPOSED (V1) — depends on sibling gaps: 03 EQP nozzles (`add_nozzle`, name provisional), 02 RTE routing between ports (`route_pipe`, provisional) and inline components from the 01 PSC catalogue (`insert_inline_component`, provisional), plus the DAT commands flagged \"unbuilt\". Command names owned by siblings are placeholders until their packs fix them.",
+  "validates": ["VC-DAT-06", "VC-DAT-07", "VC-DAT-08", "VC-DAT-04"],
+  "description": "Same tank / pump as SC-DAT-01, but with real nozzles, a gate valve XV-1001 and a 90 degree elbow on 150-P-1001-A1A and a check valve NRV-1002 on 100-P-1002-A1A. Expected IFC structure: data/reference/sc-dat-02-reference.ifc (schema- and EXPRESS-rule-valid with IfcOpenShell 0.9.0).",
+  "actions": [
+    { "command": "set_units", "params": { "units": "mm" } },
+    { "command": "add_level", "params": { "name": "Grade", "elevation": 0, "height": 6000 } },
+    { "command": "define_plant_hierarchy", "unbuilt": true, "params": { "nodes": [ { "code": "S1", "kind": "site" }, { "code": "P1", "kind": "plant", "parent": "S1" }, { "code": "U10", "kind": "unit", "parent": "P1", "properties": { "areaNumber": "1" } } ] } },
+    { "command": "load_plant_class_library", "unbuilt": true, "params": { "library": "llull-default-process" }, "note": "ships the classes of SC-DAT-01 plus GateValve / CheckValve / Elbow with tag formats {valveCode}-{seq:4}" },
+    { "command": "add_equipment", "params": { "name": "Feed tank", "location": [0, 0], "size": [3000, 0, 4000], "shape": "vertical_vessel", "weight": 2500, "mark": "T-101" }, "as": "tank" },
+    { "command": "add_equipment", "params": { "name": "Transfer pump", "location": [6000, 0], "size": [1000, 500, 800], "weight": 450, "mark": "P-101" }, "as": "pump" },
+    { "command": "add_nozzle", "unbuilt": true, "owner": "03 EQP", "params": { "equipment": "$tank", "name": "N1", "dn": 150, "position": [1500, 0, 500], "direction": [1, 0, 0], "flowDirection": "SOURCE" }, "as": "tankN1" },
+    { "command": "add_nozzle", "unbuilt": true, "owner": "03 EQP", "params": { "equipment": "$pump", "name": "N1", "dn": 150, "position": [5500, 0, 200], "direction": [-1, 0, 0], "flowDirection": "SINK" }, "as": "pumpN1" },
+    { "command": "add_nozzle", "unbuilt": true, "owner": "03 EQP", "params": { "equipment": "$pump", "name": "N2", "dn": 100, "position": [6000, 0, 800], "direction": [0, 0, 1], "flowDirection": "SOURCE" }, "as": "pumpN2" },
+    { "command": "route_pipe", "unbuilt": true, "owner": "02 RTE", "params": { "from": "$tankN1", "to": "$pumpN1", "spec": "A1A", "lineNumber": "150-P-1001-A1A", "via": [[4000, 0, 500]] }, "as": "l1" },
+    { "command": "route_pipe", "unbuilt": true, "owner": "02 RTE", "params": { "from": "$pumpN2", "toPoint": [6000, 0, 3500], "endType": "battery_limit", "endTag": "BL-1", "spec": "A1A", "lineNumber": "100-P-1002-A1A" }, "as": "l2" },
+    { "command": "insert_inline_component", "unbuilt": true, "owner": "02 RTE / 01 PSC", "params": { "line": "$l1", "at": [2500, 0, 500], "component": "gate_valve", "tagFields": { "valveCode": "XV", "seq": 1001 } } },
+    { "command": "insert_inline_component", "unbuilt": true, "owner": "02 RTE / 01 PSC", "params": { "line": "$l2", "at": [6000, 0, 2000], "component": "check_valve", "tagFields": { "valveCode": "NRV", "seq": 1002 } } },
+    { "command": "plant_report", "unbuilt": true, "params": { "kind": "valve_list" } },
+    { "command": "check_plant_data", "unbuilt": true, "params": {} },
+    { "command": "export_ifc", "params": { "schema": "IFC4X3_ADD2", "timestamp": "2026-10-18T00:00:00" } }
+  ],
+  "expected": [
+    { "step": 13, "path": "rows.length", "value": 2, "source": "plan (XV-1001, NRV-1002)" },
+    { "step": 14, "path": "status", "value": "pass", "source": "plan" },
+    { "step": 15, "path": "counts.IfcPipeSegment", "value": 5, "source": "data/reference/sc-dat-02-reference.stats.json" },
+    { "step": 15, "path": "counts.IfcPipeFitting", "value": 1, "source": "idem" },
+    { "step": 15, "path": "counts.IfcValve", "value": 2, "source": "idem" },
+    { "step": 15, "path": "predefinedTypes.IfcValve.ISOLATING", "value": 1, "source": "IfcValveTypeEnum (IFC4X3_ADD2), gate valve -> ISOLATING (mapping table TECHNICAL_SPEC §5.5)" },
+    { "step": 15, "path": "predefinedTypes.IfcValve.CHECK", "value": 1, "source": "IfcValveTypeEnum" },
+    { "step": 15, "path": "counts.IfcDistributionPort", "value": 19, "source": "reference file" },
+    { "step": 15, "path": "counts.IfcRelConnectsPorts", "value": 9, "source": "reference file; = number of connections" },
+    { "step": 15, "path": "openPorts", "value": 1, "source": "reference file" },
+    { "step": 15, "path": "validation.errors", "value": 0, "source": "ifcopenshell.validate --rules on the exported text (production gate)" },
+    { "step": 15, "path": "ids.failed", "value": 0, "source": "data/reference/plant-handover.ids via ifctester 0.9.0" }
+  ]
+}

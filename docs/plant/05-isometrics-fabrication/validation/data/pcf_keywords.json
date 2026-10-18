@@ -1,0 +1,76 @@
+{
+  "meta": {
+    "id": "ISO-DATA-PCF-KEYWORDS",
+    "title": "PCF (Piping Component File, Alias / Intergraph / Hexagon ISOGEN) keywords and syntax rules used by the 05 ISO MVP",
+    "note": "Transcribed facts only; the PCF Reference Guide itself (Alias Ltd, version 2016 13.0, ~388 pages) was not reachable from the authoring sandbox. Each row names its source id from ../sources.md. Grade per row: A = two or more independent sources agree; B = one secondary extract; C = located, not confirmed. Only A rows may gate a pass / fail test; B rows define llull's MVP subset and are re-checked against the guide before V1 (open question OQ-ISO-01).",
+    "accessed": "2026-10-18"
+  },
+  "syntaxRules": [
+    { "rule": "First line of the file is ISOGEN-FILES <file>", "sources": ["S4", "S5"], "grade": "A" },
+    { "rule": "Header units: UNITS-BORE (MM | INCH), UNITS-CO-ORDS (MM | INCH), UNITS-WEIGHT (KGS | LBS), UNITS-BOLT-DIA, UNITS-BOLT-LENGTH, UNITS-WEIGHT-LENGTH (METER | FEET)", "sources": ["S3", "S4", "S5"], "grade": "A" },
+    { "rule": "A component starts with its type keyword at column 1; its attributes are on the following indented lines", "sources": ["S3", "S4", "S7"], "grade": "A" },
+    { "rule": "Item code and description entries under a material identifier start in column 5 (4-space indent)", "sources": ["S7"], "grade": "B" },
+    { "rule": "No line longer than 1024 characters", "sources": ["S7"], "grade": "B" },
+    { "rule": "No TAB characters anywhere in the file", "sources": ["S7"], "grade": "B" },
+    { "rule": "END-POINT x y z bore [endType]: coordinates in UNITS-CO-ORDS, nominal bore in UNITS-BORE, optional two-character end-connection code", "sources": ["S4", "S7", "S8"], "grade": "A" },
+    { "rule": "CENTRE-POINT x y z: coordinates only (elbows, bends, tees)", "sources": ["S4", "S8"], "grade": "A" },
+    { "rule": "Elbow / bend: two END-POINT records and one CENTRE-POINT record", "sources": ["S4", "S8"], "grade": "A" },
+    { "rule": "Tee: two END-POINT records, CENTRE-POINT and BRANCH1-POINT (with bore)", "sources": ["S4", "S8"], "grade": "A" },
+    { "rule": "SKEY <4 chars>: ISOGEN symbol key, mandatory for every component except PIPE", "sources": ["S3", "S4", "S9"], "grade": "A" },
+    { "rule": "ITEM-CODE <code> on a component links it to the MATERIALS section; MATERIALS lists ITEM-CODE then an indented DESCRIPTION line; it is placed at the end of the file", "sources": ["S5", "S10"], "grade": "A" },
+    { "rule": "SUPPORT components use CO-ORDS x y z (not END-POINT)", "sources": ["S3"], "grade": "B" },
+    { "rule": "Field-fit welds are written as erection items (ERECTION-ITEM); ERECTION / OFFSHORE category items mark the end of a spool in ISOGEN spool splitting", "sources": ["S11", "S7"], "grade": "A" },
+    { "rule": "SPOOL-IDENTIFIER CO-ORDS x y z TEXT t: user-positioned spool label", "sources": ["S7"], "grade": "B" },
+    { "rule": "HIGHEST-WELD-NUMBER N (pipeline header): new welds are numbered N+1, N+2, ... (repeatability)", "sources": ["S3", "S7"], "grade": "A" },
+    { "rule": "One PCF per pipeline (line number) on export", "sources": ["S12"], "grade": "B" }
+  ],
+  "pipelineHeaderKeywords": {
+    "sources": ["S3"],
+    "grade": "B",
+    "keywords": [
+      "PIPELINE-REFERENCE", "PIPING-SPEC", "TRACING-SPEC", "INSULATION-SPEC", "PAINTING-SPEC", "MISC-SPEC1..MISC-SPEC5", "JACKET-SPEC",
+      "REVISION", "PROJECT-IDENTIFIER", "AREA", "DATE-DMY", "NOMINAL-CLASS", "BEND-RADIUS", "ITEM-ATTRIBUTE0..9", "PIPELINE-TEMP",
+      "PIPELINE-TYPE", "SPECIFIC-GRAVITY", "SPOOL-PREFIX", "ATTRIBUTE0..199", "WELD-PREFIX-GENERAL", "WELD-PREFIX-FABRICATION",
+      "WELD-PREFIX-ERECTION", "WELD-PREFIX-OFFSHORE", "START-CO-ORDS", "HIGHEST-PART-NUMBER", "HIGHEST-UNIQUE-IDENTIFIER",
+      "HIGHEST-SPOOL-NUMBER", "HIGHEST-WELD-NUMBER", "HIGHEST-WELD-SUPPORT-NUMBER", "HIGHEST-ASSEMBLY-NUMBER", "OFFSET-IMPERIAL", "OFFSET-METRIC"
+    ]
+  },
+  "componentTypes": {
+    "mvp": [
+      { "type": "PIPE", "points": "END-POINT x2", "skey": "none", "sources": ["S3", "S4"], "grade": "A" },
+      { "type": "ELBOW", "points": "END-POINT x2, CENTRE-POINT", "skey": "EL..", "sources": ["S3", "S4", "S8"], "grade": "A" },
+      { "type": "BEND", "points": "END-POINT x2, CENTRE-POINT", "skey": "BEBW / ...", "sources": ["S8"], "grade": "B" },
+      { "type": "TEE", "points": "END-POINT x2, CENTRE-POINT, BRANCH1-POINT", "skey": "TE..", "sources": ["S3", "S4", "S8"], "grade": "A" },
+      { "type": "OLET", "points": "CENTRE-POINT, BRANCH1-POINT", "skey": "OL..", "sources": ["S3", "S13"], "grade": "A" },
+      { "type": "REDUCER-CONCENTRIC", "points": "END-POINT x2 (different bores)", "skey": "RC..", "sources": ["S3", "S13"], "grade": "A" },
+      { "type": "REDUCER-ECCENTRIC", "points": "END-POINT x2 (different bores)", "skey": "RE..", "sources": ["S3", "S9", "S13"], "grade": "A" },
+      { "type": "FLANGE", "points": "END-POINT x2", "skey": "FL..", "sources": ["S3", "S4"], "grade": "A" },
+      { "type": "FLANGE-BLIND", "points": "END-POINT x1 or x2", "skey": "FLBL", "sources": ["S3"], "grade": "B" },
+      { "type": "GASKET", "points": "END-POINT x2", "skey": "-", "sources": ["S4", "S14"], "grade": "A" },
+      { "type": "BOLT", "points": "with flanged joint (ERECTION-ITEM)", "skey": "-", "sources": ["S14"], "grade": "B" },
+      { "type": "VALVE", "points": "END-POINT x2 (+ spindle direction)", "skey": "V...", "sources": ["S3", "S13"], "grade": "A" },
+      { "type": "CAP", "points": "END-POINT x1", "skey": "KA..", "sources": ["S3"], "grade": "B" },
+      { "type": "WELD", "points": "END-POINT x2 (coincident)", "skey": "WW shop / WS site / WF field-fit", "sources": ["S6", "S8", "S13"], "grade": "A" },
+      { "type": "SUPPORT", "points": "CO-ORDS", "skey": "user", "sources": ["S3", "S13"], "grade": "A" },
+      { "type": "INSTRUMENT", "points": "END-POINT x2", "skey": "user", "sources": ["S3"], "grade": "B" }
+    ],
+    "laterCadmaticList": ["MISC-COMPONENT-RETURN", "MULTI-PORT-COMPONENT", "REINFORCEMENT-PAD", "SAFETY-DISC", "ELBOLET", "FLANGE-REDUCING-CONCENTRIC", "ELBOW-TEED", "TEE-SET"],
+    "laterSources": ["S13", "S15"]
+  },
+  "endConnectionCodes": {
+    "sources": ["S9", "S16"],
+    "grade": "A",
+    "codes": { "BW": "butt weld", "SW": "socket weld", "FL": "flanged", "CP": "compression", "SC": "screwed", "PL": "plain end" },
+    "note": "Two-character codes; the same letters form the last two characters of many SKEYs (ELBW = elbow butt weld)."
+  },
+  "componentAttributes": {
+    "sources": ["S3"],
+    "grade": "B",
+    "keywords": ["COMPONENT-IDENTIFIER", "CATEGORY", "STATUS", "PIPING-SPEC", "TRACING-SPEC", "INSULATION-SPEC", "PAINTING-SPEC", "MISC-SPEC1..5", "INSULATION", "TRACING", "FLOW", "UNIQUE-COMPONENT-IDENTIFIER", "MATERIAL-LIST", "MATERIAL-IDENTIFIER", "ITEM-CODE", "DESCRIPTION", "WEIGHT", "FABRICATION-ITEM", "ERECTION-ITEM", "COMPONENT-ATTRIBUTE1..10"]
+  },
+  "caesarIIAttributeMap": {
+    "sources": ["S3"],
+    "grade": "B",
+    "note": "CAESAR II PCF import reads COMPONENT-ATTRIBUTE1..10 as: 1 design pressure, 2 max temperature, 3 material name, 4 wall thickness, 5 insulation thickness, 6 insulation density, 7 corrosion allowance, 8 component weight, 9 fluid density, 10 hydro test pressure. Relevant to sibling 07-pipe-stress-flexibility."
+  }
+}

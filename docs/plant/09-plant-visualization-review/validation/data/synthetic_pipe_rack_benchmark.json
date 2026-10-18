@@ -1,0 +1,90 @@
+{
+  "id": "SYN-RACK-v1",
+  "pack": "09 VIS",
+  "status": "llull's own synthetic fixture. Every dimension below is a SYNTHETIC benchmark value chosen for repeatability, not a catalogue value (real pipe / flange / bolt dimensions are owned by 01-piping-specs-catalog). Expected counts and distances are closed forms computed by derive_vis_expected.py; frame times are TBD - measure.",
+  "layout": {
+    "axis": "bays along +X, pitch 6000 mm; bay i spans x = 6000 i .. 6000 (i + 1)",
+    "columns": "2 per bay at x = 6000 i, y = -3000 and +3000, base z = 0, height 6000",
+    "beam": "1 per bay at x = 6000 i, spanning y -3000..3000 at z = 6000",
+    "pipes": "8 per bay along +X on top of the beam, y = -2100 + 600 j (j = 0..7); j = 0..3 DN100 (OD 114.3), j = 4..7 DN200 (OD 219.1)",
+    "flangedJoint": "per pipe per bay at x = 6000 i + 300: 2 flanges, 8 studs, 16 nuts",
+    "shoe": "1 per pipe per bay on the beam, at x = 6000 i",
+    "valve": "1 per pipe in every bay with i mod 4 = 3, at x = 6000 i + 4500"
+  },
+  "services": {
+    "rule": "pipe j carries service services[j]; colour is resolved by the active colour profile (ASME A13.1 categories, data/service_colour_schemes.json) and is a PER-INSTANCE attribute, so it never splits a batch",
+    "services": ["water", "compressed_air", "flammable_oxidizing", "combustible", "toxic_corrosive", "fire_quenching", "user_defined_3", "water"]
+  },
+  "prototypes": {
+    "column": { "bboxMm": [254, 254, 6000], "perBay": 2, "materialClass": "structural_steel" },
+    "beam": { "bboxMm": [254, 6000, 254], "perBay": 1, "materialClass": "structural_steel" },
+    "shoe": { "bboxMm": [300, 150, 100], "perBay": 8, "materialClass": "structural_steel" },
+    "pipe_dn100": { "bboxMm": [6000, 114.3, 114.3], "perBay": 4, "materialClass": "carbon_steel_pipe" },
+    "pipe_dn200": { "bboxMm": [6000, 219.1, 219.1], "perBay": 4, "materialClass": "carbon_steel_pipe" },
+    "flange_dn100": { "bboxMm": [24, 230, 230], "perBay": 8, "materialClass": "carbon_steel_pipe" },
+    "flange_dn200": { "bboxMm": [30, 345, 345], "perBay": 8, "materialClass": "carbon_steel_pipe" },
+    "stud_m16": { "bboxMm": [90, 16, 16], "perBay": 32, "materialClass": "alloy_bolting" },
+    "stud_m20": { "bboxMm": [110, 20, 20], "perBay": 32, "materialClass": "alloy_bolting" },
+    "nut_m16": { "bboxMm": [13, 27.7, 24], "perBay": 64, "materialClass": "alloy_bolting" },
+    "nut_m20": { "bboxMm": [16, 34.6, 30], "perBay": 64, "materialClass": "alloy_bolting" },
+    "valve_dn100": { "bboxMm": [230, 230, 300], "perBay": 0, "per4Bays": 4, "materialClass": "cast_steel_valve" },
+    "valve_dn200": { "bboxMm": [345, 345, 420], "perBay": 0, "per4Bays": 4, "materialClass": "cast_steel_valve" }
+  },
+  "counts": {
+    "formula": "N(n) = 227 n + 8 floor(n / 4)",
+    "perBay": 227,
+    "valvesPer4Bays": 8
+  },
+  "sizes": {
+    "bays": [8, 44, 437, 4367],
+    "components": [1832, 10076, 100071, 1000037],
+    "labels": ["smoke (~2e3; n = 8 so the every-4th-bay valve array has count >= 2)", "S (~1e4)", "M (~1e5)", "L (~1e6)"]
+  },
+  "batching": {
+    "rule": "R-BATCH-v1: one InstancedMesh per (prototype, LOD0) and per (prototype, LOD1) bucket that is non-empty after culling; LOD2 is a unit box scaled per instance to the prototype bbox, one InstancedMesh per material class; colour, selection tint and highlight are per-instance attributes; unique (non-repeated) geometry goes to one BatchedMesh per material class",
+    "prototypes": 13,
+    "materialClasses": 4,
+    "maxOpaqueModelCalls": 30,
+    "derivation": "2 x 13 (LOD0 + LOD1 buckets) + 4 (LOD2 box per material class) + 0 (no unique geometry in SYN-RACK) = 30, independent of n",
+    "excluded": "background / environment, grid, gizmos, edges overlay, shadow passes, selection outline post-pass (each budgeted separately in TECHNICAL_SPEC section 8)"
+  },
+  "lod": {
+    "metric": "projected bbox diagonal in pixels p = D H / (2 d tan(fov / 2)), d = camera-to-instance-centre distance (camera.zoom = 1)",
+    "viewportHeightPx": 1080,
+    "fovDeg": 45,
+    "fovSource": "packages/core/src/model/viewport.ts VIEWPORT_FOV_DEGREES = 45",
+    "thresholdsPx": { "lod0to1": 48, "lod1to2": 8, "cull": 1 },
+    "thresholdSource": "named defaults `lod:llull-v1` (llull choice); cull at 1 px mirrors the Navisworks default area culling of objects smaller than 1 x 1 pixel (S16)",
+    "hysteresis": 0.1,
+    "hysteresisSemantics": "three r186 LOD.update (T4): a visible level i stays until d < distance_i (1 - hysteresis)",
+    "switchDistancesMm": {
+      "k_px": 1303.6753236814714,
+      "column": { "diagMm": 6010.743, "lod0to1": 163251.2, "lod1to2": 979507.2, "cull": 7836057.4 },
+      "beam": { "diagMm": 6010.743, "lod0to1": 163251.2, "lod1to2": 979507.2, "cull": 7836057.4 },
+      "shoe": { "diagMm": 350.0, "lod0to1": 9506.0, "lod1to2": 57035.8, "cull": 456286.4 },
+      "pipe_dn100": { "diagMm": 6002.177, "lod0to1": 163018.5, "lod1to2": 978111.3, "cull": 7824890.1 },
+      "pipe_dn200": { "diagMm": 6007.9955, "lod0to1": 163176.6, "lod1to2": 979059.4, "cull": 7832475.4 },
+      "flange_dn100": { "diagMm": 326.1533, "lod0to1": 8858.3, "lod1to2": 53149.8, "cull": 425198.1 },
+      "flange_dn200": { "diagMm": 488.8251, "lod0to1": 13276.4, "lod1to2": 79658.7, "cull": 637269.2 },
+      "stud_m16": { "diagMm": 92.8009, "lod0to1": 2520.5, "lod1to2": 15122.8, "cull": 120982.2 },
+      "stud_m20": { "diagMm": 113.5782, "lod0to1": 3084.8, "lod1to2": 18508.6, "cull": 148069.1 },
+      "nut_m16": { "diagMm": 38.8882, "lod0to1": 1056.2, "lod1to2": 6337.2, "cull": 50697.6 },
+      "nut_m20": { "diagMm": 48.5094, "lod0to1": 1317.5, "lod1to2": 7905.1, "cull": 63240.5 },
+      "valve_dn100": { "diagMm": 442.4929, "lod0to1": 12018.1, "lod1to2": 72108.4, "cull": 576867.1 },
+      "valve_dn200": { "diagMm": 643.7779, "lod0to1": 17484.9, "lod1to2": 104909.7, "cull": 839277.4 }
+    }
+  },
+  "gpuMemory": {
+    "source": "three r186 facts T1, T2",
+    "instancedMeshBytesPerInstance": 76,
+    "instancedMesh_1e5": 7600000,
+    "instancedMesh_1e6": 76000000,
+    "batchedMesh_1e6": { "matricesTextureSide": 2000, "coloursTextureSide": 1000, "indirectTextureSide": 1000, "bytes": 84000000 },
+    "note": "per-instance cost only; geometry of the 13 prototypes x 3 LODs is negligible. the 2000-px matrices texture at 1e6 instances must be checked against gl.MAX_TEXTURE_SIZE of the target GPU at start-up (the renderer splits a batch whose texture side would exceed it; VIS_GPU_LIMIT warning)."
+  },
+  "frameTime": {
+    "status": "TBD - measure",
+    "procedure": "tests/perf/plantViewport.perf.ts (Playwright, Chromium, --enable-gpu, fixed 1920x1080 window, devicePixelRatio 1): load SYN-RACK-v1 at each size from a saved .llull file; wait for first frame; orbit the camera 360 deg about the rack centre in 600 frames with frameloop 'always'; record renderer.info.render.calls and triangles at frames 0, 300, 599 and the median / p95 frame time from requestAnimationFrame deltas; repeat 3 runs, keep the median of medians; store per-machine baseline JSON (GPU string from WEBGL_debug_renderer_info) and fail on +20 % regression (QUALITY_GATES proposed gate 2).",
+    "targetsProposed": { "S_1e4_medianMs": 16.7, "M_1e5_medianMs": 16.7, "L_1e6_medianMs": 33.3, "basis": "60 Hz / 30 Hz frame budgets (1000/60, 1000/30 ms) - targets, not measured values" }
+  }
+}

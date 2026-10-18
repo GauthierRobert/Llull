@@ -1,0 +1,219 @@
+{
+ "scenario": "SC-DAT-01",
+ "derivation": "Inputs are the plan values (design choices of this pack, not standard data). Lengths are centreline lengths = sum of |p(i+1)-p(i)| (closed form); straights = points-1; bends = points-2 (add_pipe_run places a bend at every interior point). Port and connection counts follow the MVP mapping of TECHNICAL_SPEC \u00a75.6 and equal the counts measured on data/reference/sc-dat-01-reference.ifc (IfcOpenShell-built, schema + EXPRESS-rule valid).",
+ "inputs": {
+  "equipment": [
+   {
+    "tag": "T-101",
+    "class": "Tank",
+    "shape": "vertical_vessel",
+    "location": [
+     0,
+     0
+    ],
+    "size": [
+     3000,
+     0,
+     4000
+    ],
+    "weightKg": 2500,
+    "designPressureBarg": 3.5
+   },
+   {
+    "tag": "P-101",
+    "class": "CentrifugalPump",
+    "shape": "box",
+    "location": [
+     6000,
+     0
+    ],
+    "size": [
+     1000,
+     500,
+     800
+    ],
+    "weightKg": 450,
+    "designPressureBarg": 16
+   }
+  ],
+  "lines": [
+   {
+    "lineNumber": "150-P-1001-A1A",
+    "dn": 150,
+    "from": "T-101",
+    "to": "P-101",
+    "points": [
+     [
+      1400,
+      0,
+      500
+     ],
+     [
+      3000,
+      0,
+      500
+     ],
+     [
+      3000,
+      0,
+      300
+     ],
+     [
+      5600,
+      0,
+      300
+     ]
+    ]
+   },
+   {
+    "lineNumber": "100-P-1002-A1A",
+    "dn": 100,
+    "from": "P-101",
+    "to": "BL-1",
+    "points": [
+     [
+      6000,
+      0,
+      700
+     ],
+     [
+      6000,
+      0,
+      3500
+     ],
+     [
+      9000,
+      0,
+      3500
+     ]
+    ]
+   }
+  ]
+ },
+ "reports": {
+  "line_list": {
+   "rows": 2,
+   "rowsByLine": {
+    "150-P-1001-A1A": {
+     "nominalSize": 150,
+     "fluidCode": "P",
+     "spec": "A1A",
+     "from": "T-101",
+     "to": "P-101",
+     "lengthM": 4.4,
+     "straights": 3,
+     "bends": 2
+    },
+    "100-P-1002-A1A": {
+     "nominalSize": 100,
+     "fluidCode": "P",
+     "spec": "A1A",
+     "from": "P-101",
+     "to": "BL-1",
+     "lengthM": 5.8,
+     "straights": 2,
+     "bends": 1
+    }
+   }
+  },
+  "equipment_list": {
+   "rows": 2,
+   "tags": [
+    "P-101",
+    "T-101"
+   ],
+   "sortedBy": "tag"
+  },
+  "nozzle_schedule": {
+   "rows": 3,
+   "rowsByKey": {
+    "T-101/N1": {
+     "dn": 150,
+     "line": "150-P-1001-A1A",
+     "flowDirection": "SOURCE",
+     "inferred": true
+    },
+    "P-101/N1": {
+     "dn": 150,
+     "line": "150-P-1001-A1A",
+     "flowDirection": "SINK",
+     "inferred": true
+    },
+    "P-101/N2": {
+     "dn": 100,
+     "line": "100-P-1002-A1A",
+     "flowDirection": "SOURCE",
+     "inferred": true
+    }
+   }
+  },
+  "valve_list": {
+   "rows": 0
+  },
+  "instrument_index": {
+   "rows": 0
+  },
+  "mto": {
+   "groupBy": [
+    "spec",
+    "itemType",
+    "nominalSize"
+   ],
+   "rows": [
+    {
+     "spec": "A1A",
+     "itemType": "pipe",
+     "nominalSize": 100,
+     "quantity": 5.8,
+     "unit": "m"
+    },
+    {
+     "spec": "A1A",
+     "itemType": "pipe",
+     "nominalSize": 150,
+     "quantity": 4.4,
+     "unit": "m"
+    },
+    {
+     "spec": "A1A",
+     "itemType": "bend",
+     "nominalSize": 100,
+     "quantity": 1,
+     "unit": "ea"
+    },
+    {
+     "spec": "A1A",
+     "itemType": "bend",
+     "nominalSize": 150,
+     "quantity": 2,
+     "unit": "ea"
+    }
+   ],
+   "note": "centreline lengths; elbow take-out deduction belongs to 01 PSC / 02 RTE (component catalogue)"
+  },
+  "tag_register": {
+   "rows": 4,
+   "tags": [
+    "100-P-1002-A1A",
+    "150-P-1001-A1A",
+    "P-101",
+    "T-101"
+   ]
+  }
+ },
+ "ifc4x3": {
+  "IfcPipeSegment": 5,
+  "IfcPipeFitting": 3,
+  "IfcTank": 1,
+  "IfcPump": 1,
+  "IfcDistributionPort": 19,
+  "IfcRelConnectsPorts": 9,
+  "IfcRelNests": 10,
+  "IfcDistributionSystem": 2,
+  "openPorts": 1,
+  "systemMembers": {
+   "150-P-1001-A1A": 5,
+   "100-P-1002-A1A": 3
+  }
+ }
+}

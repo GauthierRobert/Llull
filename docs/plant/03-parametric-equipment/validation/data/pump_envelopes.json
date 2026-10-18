@@ -1,0 +1,47 @@
+{
+  "title": "Centrifugal pump envelope dimensions: ISO 2858 (EN ISO 2858) and ASME B73.1, API 610 type list",
+  "note": "ISO 2858:1975 and ASME B73.1 are paywalled. Rows are transcribed from freely published manufacturer catalogues as quoted by search extracts; a row is grade A only when two independent catalogues give the same numbers. The standards themselves were not read.",
+  "iso2858": {
+    "designation": "DNs-DNd-impeller nominal diameter, mm (e.g. 65-40-250: 65 mm suction, 40 mm discharge, 250 mm impeller) [S19]",
+    "scope": "end-suction centrifugal pumps, rating 16 bar, flange sizes 50..200 mm [S19]",
+    "dimensionMeaning": {
+      "a": "suction flange face to the centre of the discharge nozzle, along the shaft (mm)",
+      "f": "discharge nozzle centre to the free end of the bearing frame along the shaft (mm)",
+      "h1": "shaft centre height above the pump foot plane (mm)",
+      "h2": "discharge flange face height above the shaft centre (mm)",
+      "grade": "B",
+      "remark": "meaning of a/f taken from catalogue drawings (S20, S21); confirm against the standard (open question Q4)"
+    },
+    "rows": [
+      { "size": "50-32-125", "a": null, "f": null, "h1": 112, "h2": 140, "sources": ["S22 IS 13518 scan (garbled)"], "grade": "B" },
+      { "size": "50-32-160", "a": 80, "f": 385, "h1": 132, "h2": 160, "sources": ["S20 smartwater ISOPRO", "S22 IS 13518 / ISO 2858 (F) reproductions"], "grade": "A" },
+      { "size": "50-32-200", "a": 80, "f": 385, "h1": 160, "h2": 180, "sources": ["S20 smartwater ISOPRO", "S21 Northridge XCP (32-200)"], "grade": "A" },
+      { "size": "65-40-250", "a": 100, "f": 500, "h1": 180, "h2": 225, "sources": ["S20 smartwater ISOPRO", "S23 Goulds IC (h1/h2)", "S21 Northridge XCP (40-250 h1/h2)", "S21 Standartpompa EN 733 40-250 (h1/h2)"], "grade": "A" },
+      { "size": "80-50-200", "a": 100, "f": 385, "h1": 160, "h2": 200, "sources": ["S20 smartwater ISOPRO", "S21 Standard Pumps SEL / Apec Milano"], "grade": "A" }
+    ]
+  },
+  "asmeB73_1": {
+    "designation": "dimension designation letters AA..A120; pumps with the same designation are dimensionally interchangeable (mounting, nozzle size and location, shaft, baseplate, foundation bolts) [S24, S25]",
+    "dimensionMeaning": { "CP": "overall pump length (in)", "D": "shaft centre height above the foot plane (in)", "X": "discharge flange face height above the shaft centre (in)", "grade": "B" },
+    "rows": [
+      { "designation": "AA", "size": "1.5x1-6", "CP_in": 17.5, "D_in": 5.25, "X_in": 6.5, "sources": ["S24 BaseTek dimension sheet (from ASME B73.1M-1991)", "S25 OnHandSupply (X 6.5)"], "grade": "A (X), B (CP, D)" },
+      { "designation": "AB", "size": "3x1.5-6", "CP_in": 17.5, "D_in": 5.25, "X_in": 6.5, "sources": ["S24"], "grade": "B" },
+      { "designation": "A05", "size": "2x1-10", "CP_in": 23.5, "D_in": 8.25, "X_in": 8.5, "sources": ["S24"], "grade": "B" },
+      { "designation": "A60", "size": "3x2-10", "CP_in": 23.5, "D_in": 8.25, "X_in": 9.5, "sources": ["S24"], "grade": "B" }
+    ]
+  },
+  "api610Types": {
+    "families": { "OH": "overhung", "BB": "between bearings", "VS": "vertically suspended" },
+    "rows": [
+      { "type": "OH1", "text": "horizontal, foot mounted, single stage, overhung, end suction, flexibly coupled on a baseplate", "grade": "A" },
+      { "type": "OH2", "text": "horizontal, centreline mounted, single bearing housing, flexibly coupled", "grade": "A" },
+      { "type": "OH3", "text": "vertical in-line, single stage, separate bearing bracket", "grade": "A" },
+      { "type": "BB2", "text": "radially split, one or two stage, between bearings", "grade": "B" },
+      { "type": "BB5", "text": "double casing (barrel), multistage, between bearings", "grade": "A" },
+      { "type": "VS1", "text": "vertically suspended, wet pit, diffuser, single casing", "grade": "B" }
+    ],
+    "sources": ["S26 wermac, hardhatengineer, whatispiping, powerzone extracts"],
+    "conflicts": "VS2, VS6 and OH4/OH5 are described differently by different sources; not used"
+  },
+  "use": "MVP: envelope + nozzle positions of add_pump are generated from the grade-A rows only; any other size needs explicit dimensions (or a user-supplied catalogue record) and is flagged unverified (AF-32). Weights and motor frames are not tabulated here (TBD - from the vendor datasheet)."
+}

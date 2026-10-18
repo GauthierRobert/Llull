@@ -1,0 +1,397 @@
+{
+  "pack": "03 EQP - parametric equipment",
+  "generatedBy": "hand-written index; numbers are derived in data/derive_expected.py from cited closed forms or copied from the data files named here; none was produced by running llull",
+  "units": "SI unless the case says otherwise (Jones cases are in inches / US gallons as published)",
+  "cases": [
+    {
+      "id": "VC-EQP-01",
+      "command": "vessel_volume (head geometry module)",
+      "proves": [
+        "FR-EQP-01",
+        "FR-EQP-09",
+        "TR-EQP-05"
+      ],
+      "reference": "data/tank_head_volumes_jones.json cases J-VE-*, J-VS-*, J-VC-*, J-VT-* (14 rows)",
+      "tolerance": "1e-9 relative",
+      "source": "S1 via S2 (grade A)",
+      "test": "tests/unit/plant/equipment/headVolumes.test.ts"
+    },
+    {
+      "id": "VC-EQP-02",
+      "command": "vessel_volume",
+      "proves": [
+        "FR-EQP-01",
+        "FR-EQP-09"
+      ],
+      "reference": "data/tank_head_volumes_jones.json cases J-HE-*, J-HC-* (MVP, closed form); J-HT-* (V1, numerical integral)",
+      "tolerance": "1e-9 relative (closed form); 1e-6 relative (J-HT, V1)",
+      "source": "S1 via S2 (grade A)",
+      "test": "headVolumes.test.ts"
+    },
+    {
+      "id": "VC-EQP-03",
+      "command": "add_vessel + vessel_volume + mass_properties",
+      "proves": [
+        "FR-EQP-01",
+        "FR-EQP-02",
+        "TR-EQP-03",
+        "TR-EQP-04"
+      ],
+      "reference": "data/head_geometry_references.json depthCases + fullHeadVolumeD1m",
+      "expected": {
+        "torisphericalDepth_D96_f0.9_k0.2": 25.684268924767125,
+        "torisphericalDepth_D108_FD": 18.288462280484797,
+        "ASME_FD_V_D1m_m3": 0.08099900429115166,
+        "ellipsoidal_2to1_V_D1m_m3": 0.1308996938995747
+      },
+      "tolerance": "closed form 1e-9 relative; generated solid on OCC (exact revolution) 1e-6 relative; on Manifold (tessellated) -0.5 %..0 % (TBD - measure the chord error with llull mass_properties at the default segment count)",
+      "source": "S1, S2 (A); independent numerical revolution integral",
+      "test": "headGeometry.test.ts, tests/golden plan sc-eqp-01"
+    },
+    {
+      "id": "VC-EQP-04",
+      "command": "equipment_datasheet (head and shell surface areas for painting / insulation take-off)",
+      "proves": [
+        "FR-EQP-10"
+      ],
+      "reference": "data/head_geometry_references.json surfaceArea H-SA-1..4",
+      "tolerance": "1e-9 relative (ellipsoidal, grade A); 1e-7 relative (torispherical H-SA-4, grade B: documented, not a gate)",
+      "source": "S2, S3 (A); S4 (B)",
+      "test": "headGeometry.test.ts"
+    },
+    {
+      "id": "VC-EQP-05",
+      "command": "vessel_thickness",
+      "proves": [
+        "FR-EQP-11",
+        "TR-EQP-07"
+      ],
+      "reference": "data/asme_viii_div1_examples.json UG27-A, UG27-B (gates), UG27-C (corrodedDimensions:false variant)",
+      "expected": {
+        "UG27-A_t_in": 0.16008537886872998,
+        "UG27-B_trPlusCA_in": 0.39899289099526064,
+        "UG27-C_uncorroded_in": 0.5784005037783375
+      },
+      "tolerance": "1e-9 relative vs derived; published values within their printed rounding (0.1601, 0.3990, 0.578)",
+      "source": "S6, S7 (A), S10 (B)",
+      "test": "asmeThickness.test.ts"
+    },
+    {
+      "id": "VC-EQP-06",
+      "command": "vessel_thickness",
+      "proves": [
+        "FR-EQP-11",
+        "TR-EQP-07"
+      ],
+      "reference": "data/asme_viii_div1_examples.json UG32E-A, UG32E-B, UG32T-A, UG32T-B",
+      "expected": {
+        "UG32E-A_t_in": 0.45056320400500627,
+        "UG32E-B_t_in": 1.4916994145480793,
+        "UG32T-A_t_in": 0.05312656328164082,
+        "UG32T-B_t_in": 0.017708854427213608
+      },
+      "tolerance": "1e-9 relative vs derived; published within printed rounding",
+      "source": "S9, S10, S11, S12 (A)",
+      "test": "asmeThickness.test.ts"
+    },
+    {
+      "id": "VC-EQP-07",
+      "command": "vessel_thickness",
+      "proves": [
+        "FR-EQP-11",
+        "FR-EQP-14",
+        "TR-EQP-12"
+      ],
+      "inputs": {
+        "S_MPa": 137.9,
+        "E": 1.0
+      },
+      "expected": {
+        "UG27c1_pressureLimit_MPa": 53.0915,
+        "P_60MPa": {
+          "error": "EQP_FORMULA_OUT_OF_RANGE",
+          "paths": [
+            "design.pressure"
+          ]
+        },
+        "noAllowable": {
+          "error": "EQP_ALLOWABLE_MISSING",
+          "paths": [
+            "design.allowableStress"
+          ]
+        },
+        "mawpRoundTrip": "MAWP(t_required) = P within 1e-12 relative"
+      },
+      "tolerance": "exact codes; limit 0.385 S E closed form 1e-9",
+      "source": "UG-27 limit 0.385 SE (S8, S6 extracts, A)",
+      "test": "asmeThickness.test.ts"
+    },
+    {
+      "id": "VC-EQP-08",
+      "command": "tank_shell_thickness",
+      "proves": [
+        "FR-EQP-12",
+        "TR-EQP-08"
+      ],
+      "reference": "data/api650_references.json workedExample API650-PPNS, allowableStressRows",
+      "expected": {
+        "PPNS_td_mm": 5.440194635036496,
+        "PPNS_tt_mm": 2.4255,
+        "A36M_Sd_MPa": 160,
+        "A36M_St_MPa": 171,
+        "A283C_Sd_MPa": 137,
+        "A283C_St_MPa": 154,
+        "A516-70_Sd_MPa": 173,
+        "A516-70_St_MPa": 195
+      },
+      "tolerance": "1e-9 relative (closed form); table values exact",
+      "source": "S15 (B example, A formula), S16 (A), S17 (A rows)",
+      "test": "api650.test.ts"
+    },
+    {
+      "id": "VC-EQP-09",
+      "command": "equipment_weights",
+      "proves": [
+        "FR-EQP-10",
+        "TR-EQP-09"
+      ],
+      "expected": {
+        "SC-EQP-01": {
+          "emptyKg": 2633.4701290833223,
+          "operatingKg": 5262.099607204157,
+          "testKg": 10585.626533482486
+        },
+        "SC-EQP-02": {
+          "emptyKg": 6485.731147911467,
+          "testKg": 27429.682171843422
+        }
+      },
+      "tolerance": "1e-6 relative",
+      "source": "derived: shell annulus + exact constant-thickness head solid (offset of the inside profile, data.method) + skirt annulus, rho = 7850 kg/m3 given in the plan; liquid from VC-EQP-01/02 volumes",
+      "test": "weights.test.ts"
+    },
+    {
+      "id": "VC-EQP-10",
+      "command": "add_pump",
+      "proves": [
+        "FR-EQP-07",
+        "FR-EQP-15"
+      ],
+      "reference": "data/pump_envelopes.json iso2858.rows (grade A rows: 50-32-160, 50-32-200, 65-40-250, 80-50-200), asmeB73_1 AA X",
+      "expected": {
+        "65-40-250": {
+          "shaftHeightMm": 180,
+          "dischargeFaceAboveShaftMm": 225,
+          "suctionToDischargeMm": 100
+        },
+        "50-32-125": {
+          "warning": "EQP_TABLE_UNVERIFIED",
+          "dataUnverified": true
+        },
+        "99-99-999": {
+          "error": "EQP_PUMP_SIZE_UNKNOWN",
+          "paths": [
+            "size"
+          ]
+        }
+      },
+      "tolerance": "exact (table)",
+      "source": "S20, S21, S22, S23, S24, S25",
+      "test": "pumps.test.ts"
+    },
+    {
+      "id": "VC-EQP-11",
+      "command": "add_heat_exchanger",
+      "proves": [
+        "FR-EQP-06"
+      ],
+      "reference": "data/tema_designations.json designation.cases",
+      "tolerance": "exact",
+      "source": "S27, S28 (A)",
+      "test": "exchanger.test.ts"
+    },
+    {
+      "id": "VC-EQP-12",
+      "command": "add_nozzle + equipment_ports",
+      "proves": [
+        "FR-EQP-08",
+        "FR-EQP-09",
+        "TR-EQP-06"
+      ],
+      "reference": "plans SC-EQP-01 step 9, SC-EQP-02 step 9, SC-EQP-03 step 7",
+      "expected": {
+        "V-101:N1": {
+          "position": [
+            5000,
+            6000,
+            5200
+          ],
+          "direction": [
+            0,
+            1,
+            0
+          ]
+        },
+        "D-201:N4": {
+          "position": [
+            4000,
+            0,
+            1500
+          ],
+          "direction": [
+            1,
+            0,
+            0
+          ]
+        }
+      },
+      "tolerance": "1e-6 mm position, 1e-9 direction",
+      "source": "closed-form placement under the documented angle convention (TECHNICAL_SPEC 5.4)",
+      "test": "nozzles.test.ts"
+    },
+    {
+      "id": "VC-EQP-13",
+      "command": "build_project",
+      "proves": [
+        "FR-EQP-02",
+        "FR-EQP-03",
+        "FR-EQP-08",
+        "FR-EQP-10",
+        "FR-EQP-11",
+        "FR-EQP-13"
+      ],
+      "reference": "plans/sc-eqp-01-vertical-vessel-skirt.json expected[]",
+      "tolerance": "per row",
+      "test": "tests/unit/plant/equipment/scenarioPlans.test.ts; llull run --json"
+    },
+    {
+      "id": "VC-EQP-14",
+      "command": "build_project",
+      "proves": [
+        "FR-EQP-02",
+        "FR-EQP-04",
+        "FR-EQP-13",
+        "FR-EQP-16"
+      ],
+      "reference": "plans/sc-eqp-02-horizontal-drum-saddles.json expected[]",
+      "tolerance": "per row",
+      "test": "scenarioPlans.test.ts"
+    },
+    {
+      "id": "VC-EQP-15",
+      "command": "build_project",
+      "proves": [
+        "FR-EQP-06",
+        "FR-EQP-08"
+      ],
+      "reference": "plans/sc-eqp-03-bem-exchanger.json expected[]",
+      "tolerance": "per row",
+      "test": "scenarioPlans.test.ts"
+    },
+    {
+      "id": "VC-EQP-16",
+      "command": "check_equipment, every EQP command",
+      "proves": [
+        "FR-EQP-14",
+        "FR-EQP-17",
+        "TR-EQP-12",
+        "TR-EQP-13"
+      ],
+      "expected": {
+        "reviewRequired": "true on every vessel_thickness / tank_shell_thickness / check_equipment result that reports a code thickness or MAWP, reason names ASME VIII-1 or API 650",
+        "unverifiedPropagation": "a grade-B/C table row or a user value without source -> data.unverified true in the query and a warning EQP_TABLE_UNVERIFIED / EQP_VALUE_UNSOURCED in check_equipment",
+        "determinism": "running SC-EQP-01 twice gives byte-identical --json output (ids, numbers, order)",
+        "codes": "every refusal in the TECHNICAL_SPEC error table is reached by a unit test with its paths"
+      },
+      "tolerance": "exact",
+      "source": "AGENT_FIRST AF-11, AF-13, AF-31..33",
+      "test": "guardrails.test.ts"
+    },
+    {
+      "id": "VC-EQP-17",
+      "command": "build_project",
+      "proves": [
+        "FR-EQP-05",
+        "FR-EQP-12"
+      ],
+      "reference": "plans/sc-eqp-04-api650-tank.json expected[]",
+      "tolerance": "per row",
+      "test": "scenarioPlans.test.ts"
+    },
+    {
+      "id": "VC-EQP-18",
+      "command": "add_heat_exchanger (V1 tube layout), check_equipment",
+      "proves": [
+        "FR-EQP-20"
+      ],
+      "reference": "data/tema_designations.json tubeCountReference, maxUnsupportedTubeSpan",
+      "expected": {
+        "Ntubes_Phadke_45deg_pitch36": [
+          805,
+          782,
+          760,
+          698,
+          680
+        ],
+        "Ntubes_D1.2_Do25_p31.25_Phadke": 1285
+      },
+      "tolerance": "exact counts (reference code ht 1.2.0)",
+      "source": "S27 (A for counts, B for spans)",
+      "test": "V1 tubeLayout.test.ts"
+    },
+    {
+      "id": "VC-EQP-19",
+      "command": "update_equipment_parameters",
+      "proves": [
+        "FR-EQP-16",
+        "TR-EQP-10"
+      ],
+      "inputs": "SC-EQP-01, then set insideDiameter 1800 (shell/head thickness unchanged)",
+      "expected": {
+        "elementIdUnchanged": true,
+        "portIdsUnchanged": [
+          "V-101:N1",
+          "V-101:N2",
+          "V-101:N3",
+          "V-101:M1"
+        ],
+        "ports.V-101:N1.position": [
+          5000,
+          6000,
+          5200
+        ],
+        "ports.V-101:N3.position": [
+          5000,
+          5000,
+          6700
+        ],
+        "totalVolumeM3": 11.70557422727557
+      },
+      "derivation": "shell-nozzle projection is measured from the vessel axis to the flange face and head-nozzle projection from the tangent line, so the faces do not move; V = pi/4 x 1.8^2 x 4 + 2 x pi x 1.8^3 / 24",
+      "tolerance": "1e-9 relative; ids exact",
+      "test": "regeneration.test.ts"
+    },
+    {
+      "id": "VC-EQP-20",
+      "command": "export_ifc",
+      "proves": [
+        "FR-EQP-18"
+      ],
+      "inputs": "SC-EQP-01 document",
+      "expected": {
+        "IfcTank_count": 1,
+        "IfcTank_PredefinedType": "PRESSUREVESSEL",
+        "IfcDistributionPort_count": 4,
+        "portNames": [
+          "N1",
+          "N2",
+          "N3",
+          "M1"
+        ]
+      },
+      "tolerance": "exact counts",
+      "source": "IFC4 IfcTank (IfcTankTypeEnum) and IfcDistributionPort, buildingSMART IFC4 ADD2 TC1 documentation [S30]; enum spelling grade C (not fetched) - confirm against the schema file used by @aec/building/exchange before gating",
+      "test": "ifcEquipment.test.ts"
+    }
+  ]
+}

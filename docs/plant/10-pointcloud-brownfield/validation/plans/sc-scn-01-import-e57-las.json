@@ -1,0 +1,63 @@
+{
+  "id": "SC-SCN-01",
+  "status": "DRAFT — not runnable: every command below is unbuilt (TECHNICAL_SPEC §4); add_level / set_units exist today",
+  "validates": ["VC-SCN-04", "VC-SCN-05", "VC-SCN-06", "VC-SCN-09", "VC-SCN-10", "VC-SCN-12"],
+  "description": "Import a registered E57 station, a georeferenced LAS tile and a LAZ tile; attach them by source hash; inspect, snap and stream",
+  "prerequisites": [
+    "llull scan import validation/data/e57/bunnyInt32.e57 --json",
+    "llull scan import validation/data/e57/translationWithoutRotation.e57 --json",
+    "llull scan import validation/data/e57/ColouredCubeFloat.e57 --json",
+    "llull scan import validation/data/las/test1_4.las --json",
+    "llull scan import validation/data/las/autzen_trim.laz --json"
+  ],
+  "actions": [
+    { "command": "set_units", "params": { "units": "m" } },
+    {
+      "command": "attach_point_cloud",
+      "params": { "sourceSha256": "6b3696c452a2dd0e325ab30b1ad28a40de87f1a56cd9d8a24ad81389b606c205", "name": "bunny" },
+      "as": "bunny"
+    },
+    { "command": "describe_point_cloud", "params": { "cloudId": "$bunny" } },
+    {
+      "command": "attach_point_cloud",
+      "params": { "sourceSha256": "72e1a6923f8898841d8d24aa2d7679afc3fe7cc5a40e85c75a8fc993c02476f4", "name": "posed", "applyStationPoses": true },
+      "as": "posed"
+    },
+    { "command": "describe_point_cloud", "params": { "cloudId": "$posed" } },
+    {
+      "command": "attach_point_cloud",
+      "params": { "sourceSha256": "6dbf7972b358bd7dd0864c7893a4aa7b61a339fd6ee27c71b3031f763c977d33", "name": "cube" },
+      "as": "cube"
+    },
+    { "command": "nearest_cloud_point", "params": { "cloudId": "$cube", "point": [0.6, 0.6, 0.6], "maxDistance": 0.5 } },
+    {
+      "command": "attach_point_cloud",
+      "params": {
+        "sourceSha256": "f4e840920885fc175ab90c0a50778165e64e3f9ccb049ea5e360f3e30bb932b1",
+        "name": "lidar tile",
+        "coordinates": "grid",
+        "sourceUnit": "m"
+      },
+      "as": "tile"
+    },
+    { "command": "query_cloud_points", "params": { "cloudId": "$tile", "maxPoints": 1000, "lod": "full" } },
+    {
+      "command": "attach_point_cloud",
+      "params": { "sourceSha256": "75867b3e75cfc3c2e96da9f753c04c9fbaa6a59468dea13e2859f3109b38bd66", "name": "autzen" },
+      "as": "autzen"
+    },
+    { "command": "query_cloud_points", "params": { "cloudId": "$autzen", "maxPoints": 20000, "lod": "budget" } },
+    { "command": "check_point_clouds", "params": {} }
+  ],
+  "expected": [
+    { "step": 2, "path": "pointCount", "value": 30571, "abs": 0, "source": "libE57Format test assertion [S2]" },
+    { "step": 2, "path": "boundsLocal.min", "value": [-0.094689, 0.040011, -0.061873], "abs": 1e-6, "source": "pye57 [S3]" },
+    { "step": 4, "path": "centroid", "value": [4.5, 5.5, 6.0], "abs": 1e-9, "source": "pye57 transform=True" },
+    { "step": 6, "path": "recordIndex", "value": 6606, "abs": 0, "source": "brute force" },
+    { "step": 6, "path": "distance", "value": 0.177327150828571, "abs": 1e-6, "source": "brute force" },
+    { "step": 8, "path": "maxQuantisationError", "value": 5.8225677e-7, "abs": 1e-12, "source": "0.5 x LAS scale x (closed form)", "note": "the command reports its own bound; the test compares every point to laspy" },
+    { "step": 10, "path": "returned", "max": 20000, "source": "budget invariant" },
+    { "step": 10, "path": "totalPoints", "value": 110000, "abs": 0, "source": "laspy [S4]" },
+    { "step": 11, "path": "items[code=SCN_REGISTRATION_UNVERIFIED].severity", "value": "warn", "source": "AF-32: no registration quality record" }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "id": "SC-ISO-05",
+  "validates": ["VC-ISO-13", "VC-ISO-18"],
+  "description": "A 20-segment rack line (zig-zag in plan, 2 m legs) is split over sheets with at most 8 pipe pieces per sheet, only at welds; continuation marks on both sides of each split name the same weld. Re-issuing after adding one component on the last sheet keeps sheets 1 and 2 unchanged.",
+  "status": "UNBUILT - specification scenario; LR elbows from the spec need 02-spec-driven-routing",
+  "unbuilt": ["export_isometric", "define_isometric", "add_field_weld"],
+  "actions": [
+    { "command": "add_level", "params": { "name": "Grade", "elevation": 0 } },
+    {
+      "command": "add_pipe_run",
+      "params": {
+        "points": [[0,0,5000],[2000,0,5000],[2000,2000,5000],[4000,2000,5000],[4000,0,5000],[6000,0,5000],[6000,2000,5000],[8000,2000,5000],[8000,0,5000],[10000,0,5000],[10000,2000,5000],[12000,2000,5000],[12000,0,5000],[14000,0,5000],[14000,2000,5000],[16000,2000,5000],[16000,0,5000],[18000,0,5000],[18000,2000,5000],[20000,2000,5000],[20000,0,5000]],
+        "dn": 100, "line": "R-301", "service": "cooling water"
+      }
+    },
+    { "command": "define_isometric", "params": { "lineId": "R-301", "maxPipePiecesPerSheet": 8, "splitAt": "weld" } },
+    { "command": "export_isometric", "params": { "lineId": "R-301", "style": "final", "paper": "A3", "formats": ["svg"] }, "as": "issue1" },
+    { "command": "add_field_weld", "params": { "lineId": "R-301", "at": [19000, 2000, 5000], "type": "field" } },
+    { "command": "export_isometric", "params": { "lineId": "R-301", "style": "final", "paper": "A3", "formats": ["svg"] }, "as": "issue2" }
+  ],
+  "expected": [
+    { "step": 3, "path": "data.sheets.length", "value": 3, "source": "ceil(20 / 8) with splits at welds (TR-ISO-12)" },
+    { "step": 3, "path": "data.sheets[0].continuation.next.weld", "equalsPath": "data.sheets[1].continuation.previous.weld", "source": "continuation pairs" },
+    { "step": 5, "path": "data.sheets[0].sha256", "equalsPath": "$issue1.data.sheets[0].sha256", "source": "stable sheet content (S22)" },
+    { "step": 5, "path": "data.sheets[1].sha256", "equalsPath": "$issue1.data.sheets[1].sha256", "source": "stable sheet content (S22)" }
+  ],
+  "performance": "VC-ISO-18: scale the zig-zag to 500 legs (about 1000 components) and record elapsed ms; TBD"
+}

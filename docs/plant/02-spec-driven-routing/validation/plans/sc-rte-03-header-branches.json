@@ -1,0 +1,31 @@
+{
+  "id": "SC-RTE-03",
+  "status": "PROPOSED - not runnable yet. Unbuilt: load_pipe_spec (01), add_tie_in_point, create_pipeline, route_pipe, add_branch, check_piping, piping_takeoff, piping_connectivity.",
+  "unbuilt": ["load_pipe_spec", "add_tie_in_point", "create_pipeline", "route_pipe", "add_branch", "check_piping", "piping_takeoff", "piping_connectivity"],
+  "validates": ["VC-RTE-06", "VC-RTE-07"],
+  "description": "DN150 header between two butt-weld tie-in points (x 0 and x 10000, z 3000). A DN100 branch at x 4000 going +Y 2000 to tie-in TP-3, and a DN50 branch at x 7000 going +Z 1000 left open on purpose. The spec branch table must pick a reducing tee 6x4 and a weldolet 6x2.",
+  "units": "mm",
+  "actions": [
+    { "command": "add_tie_in_point", "params": { "tag": "TP-1", "position": [0, 0, 3000], "direction": [1, 0, 0], "dn": 150, "endType": "BW" }, "as": "tp1" },
+    { "command": "add_tie_in_point", "params": { "tag": "TP-2", "position": [10000, 0, 3000], "direction": [-1, 0, 0], "dn": 150, "endType": "BW" }, "as": "tp2" },
+    { "command": "add_tie_in_point", "params": { "tag": "TP-3", "position": [4000, 2000, 3000], "direction": [0, -1, 0], "dn": 100, "endType": "BW" }, "as": "tp3" },
+    { "command": "create_pipeline", "params": { "service": "CW", "sequence": "2001", "spec": "CS150", "dn": 150 }, "as": "line" },
+    { "command": "route_pipe", "params": { "lineId": "$line", "from": { "portId": "$tp1" }, "to": { "portId": "$tp2" } }, "as": "header" },
+    { "command": "add_branch", "params": { "runId": "$header", "at": { "point": [4000, 0, 3000] }, "dn": 100, "to": { "portId": "$tp3" } }, "as": "branch4" },
+    { "command": "add_branch", "params": { "runId": "$header", "at": { "point": [7000, 0, 3000] }, "dn": 50, "legs": [ { "direction": "+Z", "length": 1000 } ] }, "as": "branch2" },
+    { "command": "piping_connectivity", "params": { "lineIds": ["$line"] } },
+    { "command": "check_piping", "params": { "lineIds": ["$line"] } },
+    { "command": "piping_takeoff", "params": { "lineId": "$line" } }
+  ],
+  "expected": [
+    { "step": 5, "path": "data.fitting", "value": "teeReducing", "source": "branch table (6,4)" },
+    { "step": 6, "path": "data.fitting", "value": "weldolet", "source": "branch table (6,2)" },
+    { "step": 7, "path": "data.openEnds.length", "value": 1, "source": "only the DN50 branch end is free" },
+    { "step": 8, "path": "data.issues[0].code", "value": "RTE_OPEN_END" },
+    { "step": 8, "path": "data.status", "value": "warn" },
+    { "step": 9, "path": "data.counts", "value": { "teeReducing": 1, "weldolet": 1, "pipePieces": 4 }, "source": "header cut by the tee only; the olet does not cut the header" },
+    { "step": 9, "path": "data.pipePieces[?dn==150].cutLengthMm", "value": [3857, 5857], "abs": 0.01, "source": "4000 - 143 ; 6000 - 143 (C = 143)" },
+    { "step": 9, "path": "data.pipePieces[?dn==100].cutLengthMm", "value": [1870], "abs": 0.01, "source": "2000 - 130 (M = 130)" },
+    { "step": 9, "path": "data.pipePieces[?dn==50].cutLengthMm", "value": "TBD - 1000 minus the weldolet height from the 01 PSC catalogue" }
+  ]
+}

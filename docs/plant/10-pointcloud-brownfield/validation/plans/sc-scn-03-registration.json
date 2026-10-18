@@ -1,0 +1,53 @@
+{
+  "id": "SC-SCN-03",
+  "status": "DRAFT — not runnable: scan commands unbuilt",
+  "validates": ["VC-SCN-30", "VC-SCN-31", "VC-SCN-32"],
+  "description": "Register two stations by four sphere targets (coarse), then a moved bunny scan by ICP (fine); then a deliberately degenerate target set",
+  "prerequisites": [
+    "llull scan import validation/data/synthetic/tgt-a-station1.csv format=xyz sourceUnit=m --json",
+    "llull scan import validation/data/synthetic/tgt-a-station2.csv format=xyz sourceUnit=m --json",
+    "llull scan import validation/data/e57/bunnyInt32.e57 --json",
+    "the moved bunny target (R, t, seed 401, 70 % subsample, 0.2 mm noise per data/synthetic_truth.json ICP-A) is produced by the test harness with data/tools/reference_check.py logic and imported as xyz; it is not stored in the pack"
+  ],
+  "actions": [
+    { "command": "set_units", "params": { "units": "m" } },
+    { "command": "attach_point_cloud", "params": { "sourceSha256": "027ee68e896b5b26b6c7a11e766381fcc7267929d44d1f1578153f1497b8b03b", "name": "station 1" }, "as": "st1" },
+    { "command": "attach_point_cloud", "params": { "sourceSha256": "1b413e40aa5a01c29e6e8df5c24402ca276164efd4b394f0a3e529ae93675ae8", "name": "station 2" }, "as": "st2" },
+    {
+      "command": "register_point_clouds",
+      "params": {
+        "fixed": "$st1",
+        "moving": "$st2",
+        "method": "targets",
+        "targets": [
+          { "name": "T1", "fixedSeed": [1.5, -2.0, 0.0], "movingSeed": [-7.182, 7.9163, -0.35], "kind": "sphere", "radius": 0.0725 },
+          { "name": "T2", "fixedSeed": [6.0, 0.5, 0.2], "movingSeed": [-2.0836, 7.2047, -0.15], "kind": "sphere", "radius": 0.0725 },
+          { "name": "T3", "fixedSeed": [2.0, 7.0, 1.5], "movingSeed": [-1.3664, 14.8031, 1.15], "kind": "sphere", "radius": 0.0725 },
+          { "name": "T4", "fixedSeed": [-3.0, 4.0, 0.8], "movingSeed": [-7.165, 15.4163, 0.45], "kind": "sphere", "radius": 0.0725 }
+        ]
+      },
+      "as": "reg1"
+    },
+    {
+      "command": "register_point_clouds",
+      "params": {
+        "fixed": "$st1",
+        "moving": "$st2",
+        "method": "targets",
+        "targets": [
+          { "name": "T1", "fixedSeed": [1.5, -2.0, 0.0], "movingSeed": [-7.182, 7.9163, -0.35], "kind": "sphere", "radius": 0.0725 },
+          { "name": "T2", "fixedSeed": [6.0, 0.5, 0.2], "movingSeed": [-2.0836, 7.2047, -0.15], "kind": "sphere", "radius": 0.0725 }
+        ]
+      }
+    },
+    { "command": "check_point_clouds", "params": {} }
+  ],
+  "expected": [
+    { "step": 3, "path": "transform.translation", "value": [12.0, -4.0, 0.35], "abs": 0.003, "source": "synthetic truth TGT-A" },
+    { "step": 3, "path": "transform.rotationAngleDeg", "value": 37.0, "abs": 0.05, "source": "synthetic truth TGT-A" },
+    { "step": 3, "path": "quality.targetResidualRms", "max": 0.002, "source": "reference run 0.095 mm; gate 2 mm" },
+    { "step": 4, "error": "SCN_REG_TARGETS_INSUFFICIENT", "source": "Horn: >= 3 non-collinear correspondences" },
+    { "step": 5, "path": "items[code=SCN_REGISTRATION_UNVERIFIED]", "absentFor": "$st2", "source": "the target registration recorded a quality" }
+  ],
+  "notes": "movingSeed values are the station-2 centres from synthetic_truth.json TGT-A rounded to 0.1 mm (seeds only need to fall within 2 r of the sphere). The ICP-A case (VC-SCN-30) runs in tests/unit/scan/icp.test.ts because its moved cloud is generated, not stored."
+}

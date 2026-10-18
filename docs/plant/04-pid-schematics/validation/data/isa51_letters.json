@@ -1,0 +1,504 @@
+{
+ "title": "ISA 5.1 identification letters (instrument tag function letters), transcribed from secondary extracts",
+ "standard": "ANSI/ISA-5.1 Instrumentation Symbols and Identification (editions 2009, 2022, 2024 listed on isa.org; text paywalled, not read)",
+ "gradeRule": "A = at least two independent extracts agree; B = one extract or extracts disagree; only A rows gate tag-parsing VCs",
+ "caveats": [
+  "Extracts paraphrase the 2009 (and older 1984) tables; changes in the 2024 edition were not verified (grade C for edition currency).",
+  "Succeeding M: \"Middle, intermediate\" in most extracts, \"Momentary\" in one: grade B.",
+  "First letters C, D, G, M, N, O are user's choice: a project legend must define them; llull reports them as PID_TAG_USER_LETTER (info).",
+  "DEXPI does not restrict the category / function strings (DEXPI 1.4 spec 9.23.9, S3); the DEXPI reference P&ID uses IEC 62424-style codes such as PICSA."
+ ],
+ "firstLetter": [
+  {
+   "letter": "A",
+   "measuredVariable": "Analysis",
+   "modifier": null,
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "B",
+   "measuredVariable": "Burner, combustion",
+   "modifier": null,
+   "grade": "A",
+   "sources": [
+    "S6"
+   ]
+  },
+  {
+   "letter": "C",
+   "measuredVariable": "User's choice",
+   "modifier": null,
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "D",
+   "measuredVariable": "User's choice",
+   "modifier": "Differential",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "E",
+   "measuredVariable": "Voltage",
+   "modifier": null,
+   "grade": "A",
+   "sources": [
+    "S6"
+   ]
+  },
+  {
+   "letter": "F",
+   "measuredVariable": "Flow, flow rate",
+   "modifier": "Ratio (fraction)",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "G",
+   "measuredVariable": "User's choice",
+   "modifier": null,
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "H",
+   "measuredVariable": "Hand (manually initiated)",
+   "modifier": null,
+   "grade": "A",
+   "sources": [
+    "S6"
+   ]
+  },
+  {
+   "letter": "I",
+   "measuredVariable": "Current (electrical)",
+   "modifier": null,
+   "grade": "B",
+   "sources": [
+    "S5"
+   ]
+  },
+  {
+   "letter": "J",
+   "measuredVariable": "Power",
+   "modifier": "Scan",
+   "grade": "B",
+   "sources": [
+    "S5",
+    "S7"
+   ]
+  },
+  {
+   "letter": "K",
+   "measuredVariable": "Time, time schedule",
+   "modifier": "Time rate of change",
+   "grade": "B",
+   "sources": [
+    "S6"
+   ]
+  },
+  {
+   "letter": "L",
+   "measuredVariable": "Level",
+   "modifier": null,
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "M",
+   "measuredVariable": "User's choice",
+   "modifier": null,
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "N",
+   "measuredVariable": "User's choice",
+   "modifier": null,
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "O",
+   "measuredVariable": "User's choice",
+   "modifier": null,
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "P",
+   "measuredVariable": "Pressure, vacuum",
+   "modifier": null,
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "Q",
+   "measuredVariable": "Quantity",
+   "modifier": "Integrate, totalize",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "R",
+   "measuredVariable": "Radiation",
+   "modifier": null,
+   "grade": "A",
+   "sources": [
+    "S6"
+   ]
+  },
+  {
+   "letter": "S",
+   "measuredVariable": "Speed, frequency",
+   "modifier": "Safety",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "T",
+   "measuredVariable": "Temperature",
+   "modifier": null,
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "U",
+   "measuredVariable": "Multivariable",
+   "modifier": null,
+   "grade": "A",
+   "sources": [
+    "S6"
+   ]
+  },
+  {
+   "letter": "V",
+   "measuredVariable": "Vibration, mechanical analysis",
+   "modifier": null,
+   "grade": "A",
+   "sources": [
+    "S6"
+   ]
+  },
+  {
+   "letter": "W",
+   "measuredVariable": "Weight, force",
+   "modifier": null,
+   "grade": "A",
+   "sources": [
+    "S6"
+   ]
+  },
+  {
+   "letter": "X",
+   "measuredVariable": "Unclassified",
+   "modifier": "X axis",
+   "grade": "B",
+   "sources": [
+    "S5"
+   ]
+  },
+  {
+   "letter": "Y",
+   "measuredVariable": "Event, state or presence",
+   "modifier": "Y axis",
+   "grade": "A",
+   "sources": [
+    "S6"
+   ]
+  },
+  {
+   "letter": "Z",
+   "measuredVariable": "Position, dimension",
+   "modifier": "Z axis",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  }
+ ],
+ "succeedingLetters": [
+  {
+   "letter": "A",
+   "role": "readout",
+   "meaning": "Alarm",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "B",
+   "role": "readout",
+   "meaning": "User's choice",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "C",
+   "role": "output",
+   "meaning": "Control",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "E",
+   "role": "readout",
+   "meaning": "Sensor, primary element",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "G",
+   "role": "readout",
+   "meaning": "Glass, gauge, viewing device",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "H",
+   "role": "modifier",
+   "meaning": "High",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "I",
+   "role": "readout",
+   "meaning": "Indicate",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "K",
+   "role": "output",
+   "meaning": "Control station",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "L",
+   "role": "readout",
+   "meaning": "Light",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "L",
+   "role": "modifier",
+   "meaning": "Low",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "M",
+   "role": "modifier",
+   "meaning": "Middle, intermediate",
+   "grade": "B",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "N",
+   "role": "readout",
+   "meaning": "User's choice",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "O",
+   "role": "readout",
+   "meaning": "Orifice, restriction",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "P",
+   "role": "readout",
+   "meaning": "Point (test connection)",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "R",
+   "role": "readout",
+   "meaning": "Record",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "S",
+   "role": "output",
+   "meaning": "Switch",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "T",
+   "role": "output",
+   "meaning": "Transmit",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "U",
+   "role": "readout",
+   "meaning": "Multifunction",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "U",
+   "role": "output",
+   "meaning": "Multifunction",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "V",
+   "role": "output",
+   "meaning": "Valve, damper, louver",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "W",
+   "role": "readout",
+   "meaning": "Well, probe",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "X",
+   "role": "readout",
+   "meaning": "Unclassified",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "Y",
+   "role": "output",
+   "meaning": "Relay, compute, convert",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  },
+  {
+   "letter": "Z",
+   "role": "output",
+   "meaning": "Driver, actuator, unclassified final control element",
+   "grade": "A",
+   "sources": [
+    "S5",
+    "S6"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,26 @@
+{
+  "id": "SC-PSC-04",
+  "validates": ["VC-PSC-15", "VC-PSC-16", "VC-PSC-02"],
+  "description": "Route an NPS 2-1/2 line with the CS150-A1 spec: the outside diameter comes from ASME B36.10M (73.0 mm), not the legacy EN 10220 row (76.1 mm); a legacy pipe without spec keeps today's behaviour; the agent cannot approve the spec",
+  "unbuilt": ["import_pipe_spec", "add_pipe_run.spec/nps (new params)", "pipe_section_properties", "check_pipe_spec", "approve_pipe_spec"],
+  "harness": { "inline": { "actions[1].params.spec": "../data/sample_spec_cs150.json" } },
+  "actions": [
+    { "command": "add_level", "params": { "name": "Grade", "elevation": 0 } },
+    { "command": "import_pipe_spec", "params": { "spec": "<data/sample_spec_cs150.json>" } },
+    { "command": "add_pipe_run", "params": { "points": [[0, 0, 3000], [6000, 0, 3000], [6000, 4000, 3000]], "spec": "CS150-A1", "nps": 2.5, "line": "P-1001", "service": "naphtha" }, "as": "line1001" },
+    { "command": "add_pipe_run", "params": { "points": [[0, 2000, 3000], [6000, 2000, 3000]], "dn": 65, "line": "U-2001", "service": "cooling water" }, "as": "legacy" },
+    { "command": "pipe_section_properties", "params": { "pipeId": "$line1001" } },
+    { "command": "check_pipe_spec", "params": { "specId": "CS150-A1", "scope": "document" } },
+    { "command": "approve_pipe_spec", "params": { "specId": "CS150-A1" } }
+  ],
+  "expected": [
+    { "step": 2, "path": "data.outsideDiameterMm", "value": 73.0, "abs": 0.001, "source": "B36.10M NPS 2-1/2 (fluids; formulab)" },
+    { "step": 2, "path": "data.schedule", "value": "40", "source": "fixture P-BW NPS 2..6" },
+    { "step": 3, "path": "data.outsideDiameterMm", "value": 76.1, "abs": 0.001, "source": "unchanged legacy EN 10220 row (pipeSizes.ts)" },
+    { "step": 4, "path": "wallMm", "value": 5.16, "abs": 0.001, "source": "B36.10M NPS 2-1/2 Sch 40" },
+    { "step": 4, "path": "massKgPerM", "value": 8.633, "abs": 0.001, "source": "0.0246615 (73.0 - 5.16) 5.16 = 8.6329" },
+    { "step": 5, "path": "issues[code=PSC_PIPE_NO_SPEC].ids", "value": ["$legacy"], "source": "legacy pipe has no spec: warning, not failure" },
+    { "step": 5, "path": "issues[code=PSC_SPEC_NOT_APPROVED]", "value": "present", "source": "fixture status draft" },
+    { "step": 6, "path": "error.code", "value": "PSC_HUMAN_GATE", "source": "AF-34: approval needs a human signature" }
+  ]
+}

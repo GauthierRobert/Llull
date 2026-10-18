@@ -1,0 +1,17 @@
+{
+  "purpose": "Inputs for the nozzle-load check algorithm (VC-PST-15). Table values are grade B (secondary, possibly copied from one another) and never gate; the gate is the arithmetic of the check given these inputs.",
+  "api610_table5_nps6_usc": {
+    "source": "S21/S22: midstreamcalculator.com API 610 Table 5 page and an Eng-Tips post (search extracts, 2026-10-18); standard: API 610 12th ed. 2021 (catalogue S23)",
+    "grade": "B",
+    "forcesLbf": { "top": { "Fx": 560, "Fy": 460, "Fz": 700 }, "end": { "Fx": 700, "Fy": 560, "Fz": 460 } },
+    "momentsFtLbf": { "Mx": 1700, "My": 870, "Mz": 1300 },
+    "rule": "component <= 2 x table (Annex F F.1.2a); table values are allowable ranges +/- value"
+  },
+  "nema_sm23_example": {
+    "grade": "B (formula)",
+    "inputs": { "nominalIn": 6, "F_lbf": 500, "M_ftlbf": 1200 },
+    "expected": { "De_in": 6, "lhs": 2700, "limit": 3000, "ratio": 0.9 },
+    "inputs2": { "nominalIn": 10, "F_lbf": 600, "M_ftlbf": 2000 },
+    "expected2": { "De_in": 8.6667, "lhs": 3800, "limit": 4333.33, "ratio": 0.876923 }
+  }
+}

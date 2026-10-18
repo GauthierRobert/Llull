@@ -1,0 +1,308 @@
+{
+  "pack": "05 ISO",
+  "generatedBy": "hand-written index; computed values come from data/pcf_reference_parse.py run on data/iso-01-L101-dn100.pcf (output saved as data/iso-01-L101-dn100.expected.json) or from the closed forms quoted here",
+  "status": "specification only: every command below is unbuilt (TECHNICAL_SPEC §4); tests are named where they will live",
+  "cases": [
+    {
+      "id": "VC-ISO-01",
+      "title": "Parse a PCF: component counts and total pipe length",
+      "command": "import_pcf { preview: true }",
+      "inputs": { "file": "data/iso-01-L101-dn100.pcf" },
+      "expected": {
+        "componentCount": 15,
+        "countsByType": { "FLANGE": 3, "PIPE": 7, "WELD": 1, "ELBOW": 3, "TEE": 1 },
+        "totalPipeLengthMm": 13045.0,
+        "pipeLengthsMm": [2424.0, 2348.0, 3696.0, 1696.0, 1848.0, 714.0, 319.0],
+        "pipelineReference": "L-101",
+        "units": { "bore": "MM", "coords": "MM" }
+      },
+      "tolerance": "counts exact; lengths 1e-6 mm",
+      "source": "sum of |END-POINT2 - END-POINT1| over PIPE records of the file (closed form); syntax per data/pcf_keywords.json",
+      "grade": "closed form",
+      "frs": ["FR-ISO-01"],
+      "trs": ["TR-ISO-01"],
+      "test": "tests/unit/plant/fabrication/pcfRead.test.ts"
+    },
+    {
+      "id": "VC-ISO-02",
+      "title": "PCF syntax refusals carry stable codes and the line number",
+      "command": "import_pcf",
+      "inputs": [
+        { "variant": "TAB character inserted on line 14", "expectCode": "ISO_PCF_TAB", "expectPaths": ["line 14"] },
+        { "variant": "a 1025-character line", "expectCode": "ISO_PCF_LINE_TOO_LONG" },
+        { "variant": "first line is not ISOGEN-FILES", "expectCode": "ISO_PCF_HEADER" },
+        { "variant": "END-POINT with two numbers", "expectCode": "ISO_PCF_RECORD_INVALID", "expectPaths": ["line 15"] },
+        { "variant": "UNITS-CO-ORDS missing", "expectCode": "ISO_PCF_UNITS_MISSING" }
+      ],
+      "expected": { "documentUnchanged": true, "exitCode": 1 },
+      "source": "rules in data/pcf_keywords.json syntaxRules (A/B); codes are llull's (AF-11)",
+      "grade": "A (rule) / spec (codes)",
+      "frs": ["FR-ISO-01", "FR-ISO-17"],
+      "trs": ["TR-ISO-01", "TR-ISO-14"],
+      "test": "tests/unit/plant/fabrication/pcfRead.test.ts"
+    },
+    {
+      "id": "VC-ISO-03",
+      "title": "PCF read -> write round trip is lossless on the MVP subset",
+      "command": "import_pcf then export_pcf { lineIds: [L-101] }",
+      "inputs": { "file": "data/iso-01-L101-dn100.pcf" },
+      "expected": { "modelEqual": true, "analysisEqual": true, "rewrittenEqualsSource": true, "sourceSha256": "56d1b90a4796939e1885c597f20306bc459ec6fa86c583ce0a8e1e5bea81cefd" },
+      "tolerance": "byte-equal (canonical writer, coordinates %.1f)",
+      "source": "reference implementation data/pcf_reference_parse.py write(parse(file)) == file",
+      "grade": "closed form",
+      "frs": ["FR-ISO-01", "FR-ISO-02"],
+      "trs": ["TR-ISO-01", "TR-ISO-02"],
+      "test": "tests/unit/plant/fabrication/pcfRoundTrip.test.ts"
+    },
+    {
+      "id": "VC-ISO-04",
+      "title": "llull route -> PCF -> re-import preserves geometry, line data and take-outs",
+      "plan": "plans/sc-iso-02-route-to-pcf-roundtrip.json",
+      "expected": {
+        "routeCentrelineMm": 14500.0,
+        "pipeLengthMm": 13045.0,
+        "fittingTakeOutMm": 1455.0,
+        "takeOutBreakdown": "3 elbows x 2 x 152 (912) + tee run 2 x 105 (210) + tee branch 105 + 3 flanges x 76 (228) = 1455",
+        "countsByType": { "FLANGE": 3, "PIPE": 7, "WELD": 1, "ELBOW": 3, "TEE": 1 },
+        "reimportedEndPointsMaxDeviationMm": 0.0
+      },
+      "tolerance": "1e-6 mm (coordinates written with 0.1 mm resolution, model on whole mm)",
+      "source": "route lengths 5000 + 4000 + 2000 + 3000 + branch 500 (plan); LR90 DN100 centre-to-end 152 mm and tee run 105 mm from 01-piping-specs-catalog asme_b16_9_buttweld_fittings.json (LR90 grade A, tee B); flange 76 mm is a fixture length of this pack, not a catalogue claim",
+      "grade": "closed form + A (elbow) / B (tee)",
+      "frs": ["FR-ISO-02", "FR-ISO-03"],
+      "trs": ["TR-ISO-02", "TR-ISO-03"],
+      "test": "server/tests/packReplay05.test.ts"
+    },
+    {
+      "id": "VC-ISO-05",
+      "title": "Weld detection and numbering",
+      "command": "weld_list",
+      "inputs": { "file": "data/iso-01-L101-dn100.pcf" },
+      "expected": {
+        "weldCount": 13,
+        "shopWelds": 12,
+        "fieldWelds": 1,
+        "numbers": ["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8", "W9", "W10", "W11", "W12", "W13"],
+        "W2": { "kind": "field", "at": [2500.0, 0.0, 3000.0] },
+        "W12": { "kind": "shop", "at": [7105.0, 4000.0, 1105.0], "note": "branch welds are numbered after the main run" },
+        "flangedTerminals": 3
+      },
+      "tolerance": "exact",
+      "source": "llull numbering rule TR-ISO-06 (depth-first from the line start, main run before BRANCH1) applied by the reference script; weld SKEY meanings WS/WF/WW (S6, S13)",
+      "grade": "spec rule + A (SKEY)",
+      "frs": ["FR-ISO-06", "FR-ISO-07"],
+      "trs": ["TR-ISO-06"],
+      "test": "tests/unit/plant/fabrication/welds.test.ts"
+    },
+    {
+      "id": "VC-ISO-06",
+      "title": "Spool split on field welds",
+      "command": "split_spools then spool_list",
+      "inputs": { "file": "data/iso-01-L101-dn100.pcf" },
+      "expected": {
+        "spoolCount": 2,
+        "spools": [
+          { "spool": "L-101-SP01", "componentIds": ["1", "2"] },
+          { "spool": "L-101-SP02", "componentIds": ["4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"] }
+        ],
+        "variantNoFieldWeld": { "edit": "delete the WELD record (component 3)", "spoolCount": 1 }
+      },
+      "tolerance": "exact",
+      "source": "field / erection items end a spool (S7, S11, S6); union of components over shop joints (reference script)",
+      "grade": "A (rule)",
+      "frs": ["FR-ISO-05"],
+      "trs": ["TR-ISO-05"],
+      "test": "tests/unit/plant/fabrication/spools.test.ts"
+    },
+    {
+      "id": "VC-ISO-07",
+      "title": "Cut list: weld gap and field-fit allowance",
+      "command": "cut_list",
+      "inputs": { "file": "data/iso-01-L101-dn100.pcf" },
+      "expected": {
+        "gap0": [2424.0, 2348.0, 3696.0, 1696.0, 1848.0, 714.0, 319.0],
+        "gap3": [2421.0, 2345.0, 3693.0, 1693.0, 1845.0, 711.0, 316.0],
+        "weldSkeyWF_allowance100_gap0": [2524.0, 2448.0, 3696.0, 1696.0, 1848.0, 714.0, 319.0],
+        "weldSkeyWF_allowance100_gap3": [2521.0, 2445.0, 3693.0, 1693.0, 1845.0, 711.0, 316.0],
+        "pieceNames": ["L-101-SP01-P1", "L-101-SP02-P1", "L-101-SP02-P2", "L-101-SP02-P3", "L-101-SP02-P4", "L-101-SP02-P5", "L-101-SP02-P6"]
+      },
+      "tolerance": "1e-6 mm",
+      "source": "cut = centreline length - gap/2 per welded end + allowance per WF end (TR-ISO-07); allowance rule ISODRAFT (S23, B); gap and allowance are explicit params, never defaulted silently (AF-31)",
+      "grade": "closed form",
+      "frs": ["FR-ISO-08"],
+      "trs": ["TR-ISO-07"],
+      "test": "tests/unit/plant/fabrication/cutList.test.ts"
+    },
+    {
+      "id": "VC-ISO-08",
+      "title": "Per-iso BOM equals the PCF MATERIALS totals and the building takeoff pipe length",
+      "command": "piping_bom { scope: line, lineId: L-101 }",
+      "expected": {
+        "rows": [
+          { "itemCode": "FLWN-100-150", "quantity": 3, "unit": "ea" },
+          { "itemCode": "PIPE-100-S40", "quantity": 13.045, "unit": "m" },
+          { "itemCode": "ELL90LR-100-S40", "quantity": 3, "unit": "ea" },
+          { "itemCode": "TEE-100-S40", "quantity": 1, "unit": "ea" }
+        ],
+        "perSpoolSumEqualsLine": true,
+        "pipeLengthEqualsCutListCentrelineSum": true
+      },
+      "tolerance": "quantities exact; pipe 1e-6 m",
+      "source": "reference script bom; equality is an identity between three views of the same data",
+      "grade": "closed form",
+      "frs": ["FR-ISO-09"],
+      "trs": ["TR-ISO-08"],
+      "test": "tests/unit/plant/fabrication/bom.test.ts"
+    },
+    {
+      "id": "VC-ISO-09",
+      "title": "Bolting and gaskets at flanged joints",
+      "command": "piping_bom { includeBolting: true, matingFlanges: 'assume_in_scope' }",
+      "expected": { "flangedJoints": 3, "gaskets": 3, "studBolts": 24, "studBoltDiameterIn": "5/8", "boltsPerJoint": 8 },
+      "tolerance": "exact",
+      "source": "ASME B16.5 class 150 NPS 4: 8 bolts 5/8 in (01-piping-specs-catalog asme_b16_5_wn_rf_flanges.json, grade A); one gasket + one bolt set per flanged joint, bolts as erection items (S14, B)",
+      "grade": "A (bolt count) / B (rule)",
+      "frs": ["FR-ISO-09"],
+      "trs": ["TR-ISO-08"],
+      "test": "tests/unit/plant/fabrication/bom.test.ts"
+    },
+    {
+      "id": "VC-ISO-10",
+      "title": "True isometric projection: axes at 30 deg, north arrow up-right",
+      "command": "export_isometric",
+      "plan": "plans/sc-iso-03-isometric-sheet.json",
+      "expected": {
+        "eastAxisAngleDeg": -30.0,
+        "northAxisAngleDeg": 30.0,
+        "verticalAxisAngleDeg": 90.0,
+        "interAxisAngleDeg": 120.0,
+        "northArrowAngleDeg": 30.0,
+        "axisScaleTrueProjection": 0.816496580928
+      },
+      "tolerance": "1e-9 deg; 1e-12",
+      "source": "data/iso_drawing_conventions.json projection (S18, S19 grade A); llull iso frame packages/core/src/geometry/viewDirections.ts",
+      "grade": "A",
+      "frs": ["FR-ISO-10", "FR-ISO-11"],
+      "trs": ["TR-ISO-09"],
+      "test": "tests/unit/plant/fabrication/isoProjection.test.ts"
+    },
+    {
+      "id": "VC-ISO-11",
+      "title": "Not-to-scale iso: every dimension text equals the 3D centreline distance; string dimensions close",
+      "command": "export_isometric",
+      "plan": "plans/sc-iso-03-isometric-sheet.json",
+      "expected": {
+        "eastRunStringMm": [76, 2424, 2348, 152],
+        "eastRunOverallMm": 5000,
+        "northRunOverallMm": 4000,
+        "verticalDropOverallMm": 2000,
+        "dimensionsNotEqualTo3D": 0,
+        "elevationLabels": ["EL +3000", "EL +1000", "EL +1500"]
+      },
+      "tolerance": "exact (integers mm, display precision 0)",
+      "source": "dimensions from the centreline (CV-03, A); 76 + 2424 + 2348 + 152 = 5000 (closed form)",
+      "grade": "closed form",
+      "frs": ["FR-ISO-12"],
+      "trs": ["TR-ISO-10"],
+      "test": "tests/unit/plant/fabrication/isoDimensions.test.ts"
+    },
+    {
+      "id": "VC-ISO-12",
+      "title": "Slope annotation",
+      "plan": "plans/sc-iso-04-sloped-line.json",
+      "expected": { "slopeRatio": "1:100", "slopePercent": 1.0, "slopeDeg": 0.5729386977, "fallDirection": "+X", "annotation": "SLOPE 1:100" },
+      "tolerance": "1e-9 deg",
+      "source": "slope = drop / horizontal run = 100 / 10000; deg = atan(0.01); notation per CV-05 (A)",
+      "grade": "closed form",
+      "frs": ["FR-ISO-13"],
+      "trs": ["TR-ISO-11"],
+      "test": "tests/unit/plant/fabrication/isoSlope.test.ts"
+    },
+    {
+      "id": "VC-ISO-13",
+      "title": "Sheet splitting with continuation marks, stable on re-issue",
+      "plan": "plans/sc-iso-05-sheet-split.json",
+      "expected": {
+        "sheets": 3,
+        "rule": "maxPipePiecesPerSheet 8, split only at a weld; 20 pipe pieces -> pieces 1-8, 9-16, 17-20",
+        "continuationPairs": [["sheet 1 -> sheet 2", "same weld number on both sheets"], ["sheet 2 -> sheet 3", "same weld number on both sheets"]],
+        "reissueAfterAddingOneComponentOnSheet3": { "sheet1Unchanged": true, "sheet2Unchanged": true }
+      },
+      "tolerance": "exact",
+      "source": "llull split rule TR-ISO-12 (definition); stability behaviour as Smart 3D change management (S22, B)",
+      "grade": "spec rule",
+      "frs": ["FR-ISO-14"],
+      "trs": ["TR-ISO-12"],
+      "test": "tests/unit/plant/fabrication/isoSheets.test.ts"
+    },
+    {
+      "id": "VC-ISO-14",
+      "title": "Weld number repeatability after a model change",
+      "command": "number_welds",
+      "expected": {
+        "afterAddingAWeldAtX3500": { "existingNumbersKept": true, "newWeld": "W14", "highestWeldNumber": 14 }
+      },
+      "tolerance": "exact",
+      "source": "HIGHEST-WELD-NUMBER N -> new welds N+1.. (S3, S7: A); stored numbers (ISODRAFT WELDNUMBERS FROMDB, S6)",
+      "grade": "A (rule)",
+      "frs": ["FR-ISO-07"],
+      "trs": ["TR-ISO-06"],
+      "test": "tests/unit/plant/fabrication/welds.test.ts"
+    },
+    {
+      "id": "VC-ISO-15",
+      "title": "Orthographic piping GA plan: line annotation and elevations",
+      "plan": "plans/sc-iso-06-piping-ga.json",
+      "expected": {
+        "lineLabel": "L-101-DN100-A1A",
+        "centrelineElevationLabels": ["CL EL +3000", "CL EL +1000"],
+        "bottomOfPipeElevationMm": 2942.85,
+        "bopDerivation": "3000 - 114.3 / 2 (DN100 OD 114.3 mm, packages/domain-aec/src/industrial/piping/pipeSizes.ts)",
+        "flowArrows": ">= 1 per straight run longer than 1000 mm"
+      },
+      "tolerance": "0.01 mm",
+      "source": "closed form; label format is llull's (TR-ISO-13)",
+      "grade": "closed form",
+      "frs": ["FR-ISO-15"],
+      "trs": ["TR-ISO-13"],
+      "test": "tests/unit/plant/fabrication/pipingGa.test.ts"
+    },
+    {
+      "id": "VC-ISO-16",
+      "title": "check_isometric returns stable codes on a broken line",
+      "plan": "plans/sc-iso-07-check-errors.json",
+      "expected": {
+        "codes": ["ISO_DISCONNECTED", "ISO_SKEY_MISSING", "ISO_OPEN_END", "ISO_SPOOL_TOO_LARGE"],
+        "ok": false
+      },
+      "tolerance": "exact set",
+      "source": "llull codes (TECHNICAL_SPEC §7)",
+      "grade": "spec",
+      "frs": ["FR-ISO-16", "FR-ISO-17"],
+      "trs": ["TR-ISO-14"],
+      "test": "tests/unit/plant/fabrication/checkIsometric.test.ts"
+    },
+    {
+      "id": "VC-ISO-17",
+      "title": "Determinism: same plan twice gives byte-identical PCF, SVG and weld numbers",
+      "plan": "plans/sc-iso-02-route-to-pcf-roundtrip.json",
+      "expected": { "pcfSha256Equal": true, "svgSha256Equal": true, "weldNumbersEqual": true },
+      "tolerance": "exact",
+      "source": "AF-13",
+      "grade": "spec",
+      "frs": ["FR-ISO-18"],
+      "trs": ["TR-ISO-15"],
+      "test": "tests/golden/plant_iso_l101.json"
+    },
+    {
+      "id": "VC-ISO-18",
+      "title": "Performance budget for a 1000-component line",
+      "command": "export_pcf, export_isometric",
+      "expected": "TBD - measure with `llull run plans/sc-iso-05-sheet-split.json --json` scaled to 1000 components (budget in TECHNICAL_SPEC §8: PCF < 200 ms, iso SVG < 2 s on the reference desktop)",
+      "grade": "TBD",
+      "frs": ["FR-ISO-14"],
+      "trs": ["TR-ISO-16"],
+      "test": "quality gate"
+    }
+  ]
+}

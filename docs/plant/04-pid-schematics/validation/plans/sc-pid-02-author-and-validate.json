@@ -1,0 +1,394 @@
+{
+  "id": "SC-PID-02",
+  "status": "DRAFT \u2014 unbuilt commands: create_pid_sheet, add_pid_equipment, add_pid_line, add_pid_inline, add_pid_instrument, add_pid_signal_line, add_pid_actuating_system, add_pid_off_page_connector, check_pid, pid_report.",
+  "validates": [
+    "VC-PID-10",
+    "VC-PID-13",
+    "VC-PID-14"
+  ],
+  "description": "Author a small tank -> pump -> control valve P&ID in sheet millimetres, then seed exactly one instance of six validation errors. Expected findings are by construction (each seeded fault appears once; the clean part produces none). Coordinates are sheet mm on an A3 sheet.",
+  "actions": [
+    {
+      "command": "create_pid_sheet",
+      "params": {
+        "number": "PID-001",
+        "title": "Feed pump",
+        "size": "A3",
+        "convention": "ISA-5.1"
+      },
+      "as": "sheet"
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$sheet",
+        "class": "Tank",
+        "tag": "T-101",
+        "at": [
+          60,
+          150
+        ],
+        "nozzles": [
+          {
+            "subTag": "N1",
+            "side": "bottom",
+            "dn": 100
+          },
+          {
+            "subTag": "N2",
+            "side": "top",
+            "dn": 50
+          }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_equipment",
+      "params": {
+        "sheet": "$sheet",
+        "class": "CentrifugalPump",
+        "tag": "P-101",
+        "at": [
+          160,
+          80
+        ],
+        "nozzles": [
+          {
+            "subTag": "N1",
+            "side": "left",
+            "dn": 100
+          },
+          {
+            "subTag": "N2",
+            "side": "top",
+            "dn": 80
+          }
+        ]
+      }
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$sheet",
+        "from": {
+          "tag": "T-101",
+          "nozzle": "N1"
+        },
+        "to": {
+          "tag": "P-101",
+          "nozzle": "N1"
+        },
+        "lineNumber": "100-P-1001-A1",
+        "dn": 100,
+        "pipingClass": "A1",
+        "fluidCode": "P"
+      },
+      "as": "suction"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$sheet",
+        "from": {
+          "tag": "P-101",
+          "nozzle": "N2"
+        },
+        "to": {
+          "opc": "OPC-1",
+          "targetSheet": "PID-002"
+        },
+        "via": [
+          [
+            160,
+            120
+          ],
+          [
+            300,
+            120
+          ]
+        ],
+        "lineNumber": "80-P-1002-A1",
+        "dn": 80,
+        "pipingClass": "A1",
+        "fluidCode": "P"
+      },
+      "as": "discharge"
+    },
+    {
+      "command": "add_pid_inline",
+      "params": {
+        "line": "$discharge",
+        "at": [
+          200,
+          120
+        ],
+        "class": "BallValve",
+        "tag": "HV-102"
+      }
+    },
+    {
+      "command": "add_pid_inline",
+      "params": {
+        "line": "$discharge",
+        "at": [
+          250,
+          120
+        ],
+        "class": "GlobeValve",
+        "tag": "FV-101"
+      }
+    },
+    {
+      "command": "add_pid_instrument",
+      "params": {
+        "sheet": "$sheet",
+        "tag": "FT-101",
+        "at": [
+          230,
+          140
+        ],
+        "location": "field",
+        "measures": {
+          "line": "$discharge",
+          "at": [
+            230,
+            120
+          ]
+        }
+      }
+    },
+    {
+      "command": "add_pid_instrument",
+      "params": {
+        "sheet": "$sheet",
+        "tag": "FIC-101",
+        "at": [
+          230,
+          170
+        ],
+        "location": "central",
+        "display": "shared"
+      }
+    },
+    {
+      "command": "add_pid_signal_line",
+      "params": {
+        "from": "FT-101",
+        "to": "FIC-101",
+        "kind": "electric"
+      }
+    },
+    {
+      "command": "add_pid_actuating_system",
+      "params": {
+        "valve": "FV-101",
+        "actuator": "diaphragm",
+        "failAction": "FC",
+        "controller": "FIC-101"
+      }
+    },
+    {
+      "command": "check_pid",
+      "params": {}
+    },
+    {
+      "command": "add_pid_inline",
+      "params": {
+        "line": "$discharge",
+        "at": [
+          280,
+          120
+        ],
+        "class": "GlobeValve",
+        "tag": "HV-103",
+        "dn": 50
+      },
+      "seed": "PID_SIZE_MISMATCH"
+    },
+    {
+      "command": "add_pid_inline",
+      "params": {
+        "line": "$suction",
+        "at": [
+          100,
+          80
+        ],
+        "class": "BallValve",
+        "tag": "HV-104",
+        "pipingClass": "B2"
+      },
+      "seed": "PID_SPEC_MISMATCH"
+    },
+    {
+      "command": "add_pid_line",
+      "params": {
+        "sheet": "$sheet",
+        "from": {
+          "tag": "T-101",
+          "nozzle": "N2"
+        },
+        "to": {
+          "free": [
+            60,
+            240
+          ]
+        },
+        "lineNumber": "50-V-1003-A1",
+        "dn": 50,
+        "pipingClass": "A1",
+        "fluidCode": "V"
+      },
+      "seed": "PID_LINE_NON_TERMINATING"
+    },
+    {
+      "command": "add_pid_inline",
+      "params": {
+        "line": "$suction",
+        "at": [
+          130,
+          80
+        ],
+        "class": "SwingCheckValve",
+        "tag": "CV-105",
+        "reversed": true
+      },
+      "seed": "PID_FLOW_DIRECTION_CONFLICT"
+    },
+    {
+      "command": "add_pid_inline",
+      "params": {
+        "line": "$suction",
+        "at": [
+          115,
+          80
+        ],
+        "class": "GlobeValve",
+        "tag": "XV-106",
+        "operated": true
+      },
+      "seed": "PID_CONTROL_VALVE_NO_ACTUATOR"
+    },
+    {
+      "command": "add_pid_instrument",
+      "params": {
+        "sheet": "$sheet",
+        "tag": "FIC-101",
+        "at": [
+          260,
+          170
+        ],
+        "location": "central"
+      },
+      "seed": "refused: PID_TAG_DUPLICATE (command error, not a check finding)"
+    },
+    {
+      "command": "check_pid",
+      "params": {}
+    },
+    {
+      "command": "pid_report",
+      "params": {
+        "kind": "line_list"
+      }
+    }
+  ],
+  "expected": [
+    {
+      "step": 11,
+      "path": "data.summary.errors",
+      "value": 1,
+      "abs": 0,
+      "source": "by construction: only OPC-1 is unresolved (PID-002 does not exist)"
+    },
+    {
+      "step": 11,
+      "path": "data.findings[0].code",
+      "value": "PID_OPC_UNRESOLVED",
+      "source": "by construction"
+    },
+    {
+      "step": 11,
+      "path": "data.findings[?code=='PID_NOZZLE_UNCONNECTED'][*].item",
+      "value": [
+        "T-101/N2"
+      ],
+      "source": "by construction (N2 unused before step 14)"
+    },
+    {
+      "step": 17,
+      "path": "error.code",
+      "value": "PID_TAG_DUPLICATE",
+      "source": "by construction"
+    },
+    {
+      "step": 18,
+      "path": "data.countsByCode.PID_SIZE_MISMATCH",
+      "value": 1,
+      "abs": 0,
+      "source": "seeded at step 12"
+    },
+    {
+      "step": 18,
+      "path": "data.countsByCode.PID_SPEC_MISMATCH",
+      "value": 1,
+      "abs": 0,
+      "source": "seeded at step 13"
+    },
+    {
+      "step": 18,
+      "path": "data.countsByCode.PID_LINE_NON_TERMINATING",
+      "value": 1,
+      "abs": 0,
+      "source": "seeded at step 14"
+    },
+    {
+      "step": 18,
+      "path": "data.countsByCode.PID_FLOW_DIRECTION_CONFLICT",
+      "value": 1,
+      "abs": 0,
+      "source": "seeded at step 15"
+    },
+    {
+      "step": 18,
+      "path": "data.countsByCode.PID_CONTROL_VALVE_NO_ACTUATOR",
+      "value": 1,
+      "abs": 0,
+      "source": "seeded at step 16"
+    },
+    {
+      "step": 18,
+      "path": "data.countsByCode.PID_OPC_UNRESOLVED",
+      "value": 1,
+      "abs": 0,
+      "source": "carried over from step 11"
+    },
+    {
+      "step": 18,
+      "path": "data.countsByCode.PID_NOZZLE_UNCONNECTED",
+      "value": 0,
+      "abs": 0,
+      "source": "T-101/N2 connected at step 14"
+    },
+    {
+      "step": 19,
+      "path": "data.rows.length",
+      "value": 3,
+      "abs": 0,
+      "source": "3 lines authored"
+    },
+    {
+      "step": 19,
+      "path": "data.rows[?lineNumber=='80-P-1002-A1'].segments",
+      "value": 4,
+      "abs": 0,
+      "source": "3 inline items (HV-102, FV-101, HV-103) split one segment into 4 (VC-PID-13)"
+    },
+    {
+      "step": 19,
+      "path": "data.rows[?lineNumber=='100-P-1001-A1'].segments",
+      "value": 4,
+      "abs": 0,
+      "source": "3 inline items (HV-104, XV-106, CV-105) split one segment into 4"
+    }
+  ]
+}

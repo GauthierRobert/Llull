@@ -1,0 +1,34 @@
+{
+  "id": "SC-SCN-04",
+  "status": "DRAFT — not runnable: scan commands unbuilt; add_level / add_pipe_run exist",
+  "validates": ["VC-SCN-41", "VC-SCN-42", "VC-SCN-43", "VC-SCN-52"],
+  "description": "As-built vs design: a design DN200 line 25 mm off the scanned one; three new DN150 routes checked against the scan for hard clash and 75 mm clearance",
+  "prerequisites": ["llull scan import validation/data/synthetic/clh-a.csv format=xyz sourceUnit=m --json"],
+  "actions": [
+    { "command": "set_units", "params": { "units": "m" } },
+    { "command": "add_level", "params": { "name": "Ref", "elevation": 0 } },
+    { "command": "attach_point_cloud", "params": { "sourceSha256": "9dc5c064ce0ec48a5fbaf270a319f076f8bc714a10b6e95769b51d819ac9db23", "name": "existing DN200" }, "as": "scan" },
+    { "command": "add_pipe_run", "params": { "points": [[0, -0.025, 0], [2, -0.025, 0]], "diameter": 0.2191, "line": "D-200-01" }, "as": "design" },
+    { "command": "cloud_to_model_deviation", "params": { "cloudId": "$scan", "entityIds": ["$design"], "model": "analytic", "threshold": 0.01 } },
+    { "command": "cloud_to_model_deviation", "params": { "cloudId": "$scan", "entityIds": ["$design"], "model": "tessellated", "segments": 64, "threshold": 0.01 } },
+    { "command": "add_pipe_run", "params": { "points": [[0, 0, 0.15], [2, 0, 0.15]], "dn": 150, "line": "N-150-01" }, "as": "n1" },
+    { "command": "add_pipe_run", "params": { "points": [[0, 0, 0.25], [2, 0, 0.25]], "dn": 150, "line": "N-150-02" }, "as": "n2" },
+    { "command": "add_pipe_run", "params": { "points": [[0, 0, 0.5], [2, 0, 0.5]], "dn": 150, "line": "N-150-03" }, "as": "n3" },
+    { "command": "check_asbuilt_clash", "params": { "cloudId": "$scan", "entityIds": ["$n1", "$n2", "$n3"], "clearance": 0.075 } }
+  ],
+  "expected": [
+    { "step": 4, "path": "signed.max", "value": 0.025, "abs": 1e-6, "source": "closed form d(theta)" },
+    { "step": 4, "path": "signed.min", "value": -0.025, "abs": 1e-6, "source": "closed form" },
+    { "step": 4, "path": "rms", "value": 0.017648493703962532, "abs": 1e-6, "source": "closed form over the 2-degree grid" },
+    { "step": 4, "path": "fractionBeyondThreshold", "value": 0.7444444444444445, "abs": 1e-12, "source": "closed form, 134 of 180 angles" },
+    { "step": 5, "path": "modelErrorBound", "value": 0.00013195777272336304, "abs": 1e-12, "source": "r (1 - cos(pi/64))" },
+    { "step": 9, "path": "results[0].status", "value": "hard", "source": "gap -0.0437" },
+    { "step": 9, "path": "results[0].minGap", "value": -0.0437, "abs": 1.8e-5, "source": "D - r1 - r2" },
+    { "step": 9, "path": "results[1].status", "value": "clearance", "source": "gap 0.0563 < 0.075" },
+    { "step": 9, "path": "results[1].minGap", "value": 0.0563, "abs": 1.8e-5, "source": "D - r1 - r2" },
+    { "step": 9, "path": "results[2].status", "value": "clear", "source": "gap 0.3063" },
+    { "step": 9, "path": "reviewRequired", "value": true, "source": "AF-33" },
+    { "step": 9, "path": "minPointsInVolume.defaulted", "value": true, "source": "AF-31" }
+  ],
+  "notes": "add_pipe_run DN150 takes OD 168.3 mm from llull's table (r 84.15 mm); DN200 design uses an explicit OD 0.2191 m. Pipe runs are built at the level, z above the level = 0."
+}

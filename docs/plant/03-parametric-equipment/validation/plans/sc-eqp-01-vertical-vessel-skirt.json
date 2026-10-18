@@ -1,0 +1,61 @@
+{
+  "id": "SC-EQP-01",
+  "status": "PROPOSED - commands not built yet (add_vessel, add_nozzle, vessel_volume, vessel_thickness, equipment_weights, equipment_ports, check_equipment; toolset plant). Existing: set_units, add_level is implicit (default level). Run target: tests/unit/plant/equipment/scenarioPlans.test.ts and `llull run sc-eqp-01-vertical-vessel-skirt.json --json`.",
+  "validates": ["VC-EQP-03", "VC-EQP-05", "VC-EQP-06", "VC-EQP-09", "VC-EQP-12", "VC-EQP-13"],
+  "description": "Vertical separator V-101: ID 1500 mm, T/T 4000 mm, two 2:1 ellipsoidal heads, shell and heads 10 mm, CA 3 mm, design 1.0 MPa(g), SA-516-70 S = 137.9 MPa (explicit input), skirt 2000 mm x 10 mm, four nozzles (inlet DN150, outlet DN100 bottom, vapour DN80 top, manway DN500).",
+  "actions": [
+    { "command": "set_units", "params": { "units": "mm" } },
+    {
+      "command": "add_vessel",
+      "params": {
+        "tag": "V-101",
+        "name": "HP separator",
+        "orientation": "vertical",
+        "location": [5000, 5000],
+        "insideDiameter": 1500,
+        "tangentLength": 4000,
+        "heads": { "top": { "type": "ellipsoidal", "ratio": 2 }, "bottom": { "type": "ellipsoidal", "ratio": 2 } },
+        "shellThickness": 10,
+        "headThickness": 10,
+        "corrosionAllowance": 3,
+        "support": { "type": "skirt", "height": 2000, "thickness": 10 },
+        "design": {
+          "pressure": { "value": 1.0, "unit": "MPa" },
+          "temperatureC": 150,
+          "material": "SA-516 Gr 70",
+          "allowableStress": { "value": 137.9, "unit": "MPa", "source": "user input (ASME II-D value used by PVE CodeCalc reports, S14)" },
+          "jointEfficiency": { "shell": 1.0, "heads": 1.0 },
+          "materialDensityKgM3": 7850,
+          "operatingLiquid": { "specificGravity": 0.85, "levelAboveBottomTangent": 1500 }
+        }
+      },
+      "as": "v101"
+    },
+    { "command": "add_nozzle", "params": { "equipment": "V-101", "mark": "N1", "service": "inlet", "dn": 150, "rating": "CL150", "facing": "RF", "location": { "on": "shell", "elevation": 3200, "orientationDeg": 0 }, "projection": 1000 } },
+    { "command": "add_nozzle", "params": { "equipment": "V-101", "mark": "N2", "service": "liquid outlet", "dn": 100, "rating": "CL150", "facing": "RF", "location": { "on": "head", "head": "bottom", "radialOffset": 0 }, "projection": 600 } },
+    { "command": "add_nozzle", "params": { "equipment": "V-101", "mark": "N3", "service": "vapour outlet", "dn": 80, "rating": "CL150", "facing": "RF", "location": { "on": "head", "head": "top", "radialOffset": 0 }, "projection": 700 } },
+    { "command": "add_nozzle", "params": { "equipment": "V-101", "mark": "M1", "service": "manway", "dn": 500, "rating": "CL150", "facing": "RF", "location": { "on": "shell", "elevation": 1000, "orientationDeg": 180 }, "projection": 1000 } },
+    { "command": "vessel_volume", "params": { "equipment": "V-101" } },
+    { "command": "vessel_thickness", "params": { "equipment": "V-101" } },
+    { "command": "equipment_weights", "params": { "equipment": "V-101", "include": ["body"] } },
+    { "command": "equipment_ports", "params": { "equipment": "V-101" } },
+    { "command": "check_equipment", "params": { "equipment": ["V-101"] } }
+  ],
+  "expected": [
+    { "step": 6, "path": "totalVolumeM3", "value": 7.9521564043991635, "rel": 1e-9, "source": "pi D^2 L/4 + 2 pi D^3/24 (closed form, S1/S3)" },
+    { "step": 6, "path": "operating.liquidVolumeM3", "value": 3.0925052683774528, "rel": 1e-9, "source": "Jones vertical ellipsoidal, h = a + 1.5 m (S1)" },
+    { "step": 7, "path": "components.shell.requiredThicknessMm", "value": 8.484340859431901, "rel": 1e-9, "source": "UG-27(c)(1) corroded R = 753 mm, + CA" },
+    { "step": 7, "path": "components.headTop.requiredThicknessMm", "value": 8.4644412191582, "rel": 1e-9, "source": "UG-32 2:1, corroded D = 1506 mm, + CA" },
+    { "step": 7, "path": "mawpMPa", "value": 1.2748283148441628, "rel": 1e-9, "source": "min(UG-27 shell 1.27483, UG-32 head 1.28075) MPa, corroded, at top" },
+    { "step": 7, "path": "hydrotestPressureMPa", "value": 1.6572768092974117, "rel": 1e-9, "source": "UG-99(b) 1.3 x MAWP x (S_test/S_design = 1)" },
+    { "step": 8, "path": "body.emptyKg", "value": 2633.4701290833223, "rel": 1e-6, "source": "shell annulus + 2 x exact offset-solid head (numerical, checked on a hemisphere to 1e-10) + skirt annulus, rho 7850 (derive_expected.py)" },
+    { "step": 8, "path": "body.operatingKg", "value": 5262.099607204157, "rel": 1e-6, "source": "empty + 850 kg/m3 x 3.0925 m3" },
+    { "step": 8, "path": "body.testKg", "value": 10585.626533482486, "rel": 1e-6, "source": "empty + 1000 kg/m3 x 7.9522 m3" },
+    { "step": 9, "path": "ports.V-101:N1.position", "value": [5000, 6000, 5200], "abs": 1e-6, "source": "orientation 0 deg = plant north (+Y), BTL at skirt top 2000, elevation 3200 above BTL, face at 1000 from axis" },
+    { "step": 9, "path": "ports.V-101:N1.direction", "value": [0, 1, 0], "abs": 1e-9, "source": "radial outward" },
+    { "step": 9, "path": "ports.V-101:N2.position", "value": [5000, 5000, 1400], "abs": 1e-6, "source": "bottom head centre, face 600 below BTL (projection from tangent line)" },
+    { "step": 9, "path": "ports.V-101:N3.position", "value": [5000, 5000, 6700], "abs": 1e-6, "source": "TTL 6000 + 700" },
+    { "step": 9, "path": "ports.V-101:M1.position", "value": [5000, 4000, 3000], "abs": 1e-6, "source": "180 deg = south (-Y)" },
+    { "step": 10, "path": "status", "value": "pass_with_review", "source": "all code checks pass; reviewRequired true (pressure-vessel design, AF-33); flange geometry from 01 PSC or placeholder flagged" }
+  ]
+}

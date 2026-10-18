@@ -1,0 +1,83 @@
+{
+  "title": "ASME BPVC Section VIII Division 1 internal-pressure thickness formulas and published worked examples",
+  "note": "The Code is paywalled. Only the formulas (reproduced in many public sources) and third-party worked examples are used. Every expected value is re-derived from the formula in data/derive_expected.py; 'published' is what the source prints.",
+  "formulas": {
+    "UG-27(c)(1)": { "t": "P R / (S E - 0.6 P)", "P": "S E t / (R + 0.6 t)", "limits": "t <= R/2 and P <= 0.385 S E", "sources": ["S6", "S7", "S8"], "grade": "A" },
+    "UG-27(c)(2)": { "t": "P R / (2 S E + 0.4 P)", "P": "2 S E t / (R - 0.4 t)", "limits": "applicability limits not confirmed by a fetched source (grade C) - not gated", "sources": ["S7"], "grade": "B", "use": "longitudinal stress; reported, MVP gate on the formula only" },
+    "UG-32 ellipsoidal 2:1": { "t": "P D / (2 S E - 0.2 P)", "P": "2 S E t / (D + 0.2 t)", "sources": ["S9", "S10"], "grade": "A" },
+    "UG-32 torispherical (L = crown radius, r = 6 % L)": { "t": "0.885 P L / (S E - 0.1 P)", "P": "S E t / (0.885 L + 0.1 t)", "sources": ["S9", "S12"], "grade": "A" },
+    "UG-32 hemispherical": { "t": "P L / (2 S E - 0.2 P)", "P": "2 S E t / (L + 0.2 t)", "limits": "applicability limits not confirmed by a fetched source (grade C) - not gated", "sources": ["S9"], "grade": "B", "use": "closed form gate only" },
+    "UG-99(b) hydrostatic test": { "Pt": "1.3 * MAWP * (S_test / S_design), lowest ratio over the materials", "sources": ["S13"], "grade": "A", "gradeReason": "two independent extracts (engineersedge, API 510 formula sheet) agree" },
+    "corroded dimensions": "R and D in the corroded condition (R + CA, D + 2 CA); thickness available = t_nominal - CA (- mill undertolerance when given)"
+  },
+  "units": "symbols as in the Code: P design pressure (gauge), R inside radius, D inside diameter, S allowable stress at design temperature, E joint efficiency, CA corrosion allowance",
+  "examples": [
+    {
+      "id": "UG27-A",
+      "formula": "UG-27(c)(1)",
+      "inputs": { "P_psi": 100, "R_in": 30, "S_psi": 18800, "E": 1.0, "CA_in": 0 },
+      "published": { "t_in": 0.1601 },
+      "derived": { "t_in": 0.16008537886872998 },
+      "source": "S7 Codeware INSPECT API 510 sample report (search extract)",
+      "grade": "A",
+      "gradeReason": "published value + independent re-derivation agree to 4 printed digits"
+    },
+    {
+      "id": "UG27-B",
+      "formula": "UG-27(c)(1) with corroded radius",
+      "inputs": { "P_psi": 200, "D_in": 46, "S_psi": 20000, "E": 0.85, "CA_in": 0.125 },
+      "published": { "tr_in": 0.274, "trPlusCA_in": 0.399 },
+      "derived": { "tr_in": 0.27399289099526064, "trPlusCA_in": 0.39899289099526064 },
+      "source": "S6 Hexagon CodeCalc help 'Example Shell Analysis' (search extract): TR = P (D/2 + CA) / (S E - 0.6 P)",
+      "grade": "A"
+    },
+    {
+      "id": "UG27-C",
+      "formula": "UG-27(c)(1), radius NOT corroded (source convention)",
+      "inputs": { "P_psi": 250, "R_in": 36, "S_psi": 20000, "E": 1.0, "CA_in": 0.125 },
+      "published": { "t_total_in": 0.578 },
+      "derived": { "t_total_uncorrodedRadius_in": 0.5784005037783375, "t_total_corrodedRadius_in": 0.5799748110831234 },
+      "source": "S10 checalc vessel guide (search extract)",
+      "grade": "B",
+      "use": "documents that sources differ on corroded radius; llull default = corroded (Code convention, as UG27-B), option corrodedDimensions:false reproduces this example"
+    },
+    {
+      "id": "UG32E-A",
+      "formula": "UG-32 2:1 ellipsoidal",
+      "inputs": { "P_psi": 250, "D_in": 72, "S_psi": 20000, "E": 1.0, "CA_in": 0.125 },
+      "published": { "t_in": 0.450, "t_total_in": 0.575 },
+      "derived": { "t_in": 0.45056320400500627, "t_total_in": 0.5755632040050063 },
+      "source": "S10 checalc vessel guide (search extract)",
+      "grade": "A",
+      "gradeReason": "published (truncated to 3 decimals) + re-derivation; formula confirmed by S9"
+    },
+    {
+      "id": "UG32E-B",
+      "formula": "UG-32 2:1 ellipsoidal",
+      "inputs": { "P_psi": 434, "D_in": 120, "S_psi": 17500, "E": 1.0 },
+      "published": { "t_in": 1.492 },
+      "derived": { "t_in": 1.4916994145480793 },
+      "source": "S11 Scribd 'API Calculations' worksheet (search extract)",
+      "grade": "A"
+    },
+    {
+      "id": "UG32T-A",
+      "formula": "UG-32 torispherical",
+      "inputs": { "P_psi": 100, "L_in": 12, "S_psi": 20000, "E": 1.0 },
+      "published": { "t_in": 0.053 },
+      "derived": { "t_in": 0.05312656328164082 },
+      "source": "S12 City of Everett WA permit calculation (search extract)",
+      "grade": "A"
+    },
+    {
+      "id": "UG32T-B",
+      "formula": "UG-32 torispherical",
+      "inputs": { "P_psi": 100, "L_in": 4, "S_psi": 20000, "E": 1.0 },
+      "published": { "t_in": 0.018 },
+      "derived": { "t_in": 0.017708854427213608 },
+      "source": "S12 City of Everett WA permit calculation (search extract)",
+      "grade": "A"
+    }
+  ],
+  "materialAllowableNote": "S for SA-516 Gr 70 = 20 000 psi (137.9 MPa) is used by the PVE CodeCalc reports [S14]; it is a Section II Part D value (temperature dependent). llull never defaults S: it is an input, or read from a material record with a source; otherwise EQP_ALLOWABLE_MISSING."
+}

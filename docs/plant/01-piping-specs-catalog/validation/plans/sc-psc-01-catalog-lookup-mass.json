@@ -1,0 +1,34 @@
+{
+  "id": "SC-PSC-01",
+  "validates": ["VC-PSC-01", "VC-PSC-02", "VC-PSC-03", "VC-PSC-06", "VC-PSC-12", "VC-PSC-13"],
+  "description": "Read the bundled open catalogue: NPS 6 Sch 40 pipe, its plain-end and water-filled mass, LR 90 / 45 elbows, an NPS 4 Class 150 WN RF flange, its gasket and a Class 150 gate valve",
+  "unbuilt": ["lookup_piping_component", "pipe_section_properties"],
+  "actions": [
+    { "command": "lookup_piping_component", "params": { "catalogId": "llull-open-piping", "type": "pipe", "nps": 6, "schedule": "40" } },
+    { "command": "pipe_section_properties", "params": { "nps": 6, "schedule": "40", "standard": "ASME B36.10M", "contentDensityKgM3": 1000 } },
+    { "command": "lookup_piping_component", "params": { "catalogId": "llull-open-piping", "type": "elbow90", "radius": "LR", "nps": 6 } },
+    { "command": "lookup_piping_component", "params": { "catalogId": "llull-open-piping", "type": "elbow45", "radius": "LR", "nps": 4 } },
+    { "command": "lookup_piping_component", "params": { "catalogId": "llull-open-piping", "type": "flangeWeldNeck", "nps": 4, "class": 150, "facing": "RF" } },
+    { "command": "lookup_piping_component", "params": { "catalogId": "llull-open-piping", "type": "gasketSpiralWound", "nps": 4, "class": 150 } },
+    { "command": "lookup_piping_component", "params": { "catalogId": "llull-open-piping", "type": "valveGate", "nps": 4, "class": 150, "ends": "FL", "facing": "RF" } }
+  ],
+  "expected": [
+    { "step": 0, "path": "outsideDiameterMm", "value": 168.3, "abs": 0.001, "source": "B36.10M via fluids 1.3.1 + formulab 0.72.3 (data/asme_b36_pipe_schedules.json)" },
+    { "step": 0, "path": "wallMm", "value": 7.11, "abs": 0.001, "source": "same" },
+    { "step": 0, "path": "verified", "value": true, "source": "grade A row" },
+    { "step": 1, "path": "insideDiameterMm", "value": 154.08, "abs": 0.001, "source": "D - 2t" },
+    { "step": 1, "path": "massKgPerM", "value": 28.264, "abs": 0.001, "source": "0.0246615 (D - t) t (Ferrostaal; Steel & Tube)" },
+    { "step": 1, "path": "contentMassKgPerM", "value": 18.646, "abs": 0.001, "source": "pi/4 ID^2 rho" },
+    { "step": 1, "path": "totalMassKgPerM", "value": 46.909, "abs": 0.002, "source": "sum" },
+    { "step": 2, "path": "centreToEndMm", "value": 228.6, "abs": 0.01, "source": "B16.9 LR 90 NPS 6 = 9.00 in (Texas Flange, Wermac, Hardhat; printed 229)" },
+    { "step": 3, "path": "centreToEndMm", "value": 63.5, "abs": 0.01, "source": "B16.9 LR 45 NPS 4 = 2.50 in (Texas Flange; Hardhat 64)" },
+    { "step": 4, "path": "outsideDiameterMm", "value": 228.6, "abs": 0.01, "source": "B16.5 Cl150 NPS 4 9 in (formulab; Engineering ToolBox)" },
+    { "step": 4, "path": "boltCircleMm", "value": 190.5, "abs": 0.01, "source": "7-1/2 in" },
+    { "step": 4, "path": "boltCount", "value": 8, "source": "formulab; flange-studbolt-finder; Engineering ToolBox" },
+    { "step": 4, "path": "boltDiameterIn", "value": "5/8", "source": "same" },
+    { "step": 4, "path": "boltHoleMm", "value": 19.05, "abs": 0.01, "source": "5/8 + 1/8 in = 3/4 in" },
+    { "step": 5, "path": "innerRingIdMm", "value": 106.4, "abs": 0.05, "source": "B16.20 (Wermac; Garlock 106.43)" },
+    { "step": 5, "path": "centeringRingOdMm", "value": 174.8, "abs": 0.05, "source": "B16.20 (Wermac; second table)" },
+    { "step": 6, "path": "faceToFaceMm", "value": 229, "abs": 0.5, "source": "B16.10 Cl150 gate RF NPS 4 (Project Materials; Wermac)" }
+  ]
+}

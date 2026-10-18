@@ -1,0 +1,20 @@
+{
+  "id": "SC-PID-05",
+  "status": "DRAFT — unbuilt command: parse_instrument_tag (read-only).",
+  "validates": ["VC-PID-08"],
+  "description": "Parse the 16 tags of data/tag_parse_cases.json. Shown here: the brief's example and two tags taken from DEXPI example files.",
+  "actions": [
+    { "command": "parse_instrument_tag", "params": { "tag": "FIC-101" } },
+    { "command": "parse_instrument_tag", "params": { "tag": "FIC 032" } },
+    { "command": "parse_instrument_tag", "params": { "tag": "PIS+Z+A 275003" } }
+  ],
+  "expected": [
+    { "step": 0, "path": "data.firstLetter.letter", "value": "F", "source": "ISA 5.1 first letter F = Flow [S5][S6]" },
+    { "step": 0, "path": "data.firstLetter.meaning", "value": "Flow, flow rate", "source": "[S5][S6]" },
+    { "step": 0, "path": "data.functions[0]", "value": { "letter": "I", "role": "readout", "meaning": "Indicate" }, "source": "[S5][S6]" },
+    { "step": 0, "path": "data.functions[1]", "value": { "letter": "C", "role": "output", "meaning": "Control" }, "source": "[S5][S6]" },
+    { "step": 0, "path": "data.loop", "value": "101", "source": "tag grammar" },
+    { "step": 1, "path": "data.loop", "value": "032", "source": "I06V01-VER.EX01.xml [S1]" },
+    { "step": 2, "path": "error.code", "value": "PID_TAG_NONSTANDARD", "source": "C02V03-VER.EX02.xml uses DIN-style limit marks [S1]" }
+  ]
+}

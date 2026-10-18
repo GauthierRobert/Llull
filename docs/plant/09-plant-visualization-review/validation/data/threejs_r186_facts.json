@@ -1,0 +1,76 @@
+{
+  "pack": "09 VIS",
+  "description": "Facts read in the three.js source shipped in the npm package the repo pins (package.json three ^0.186.1, package-lock 0.186.1). Grade A: primary source read. Line numbers are those of the unpacked tarball. These facts fix the batching / LOD / draw-call rules the technical spec builds on.",
+  "package": {
+    "name": "three",
+    "version": "0.186.1",
+    "revision": "186 (src/constants.js REVISION)",
+    "tarball": "https://registry.npmjs.org/three/-/three-0.186.1.tgz",
+    "tarballSha256": "8cd068708ea44f2c73c944b1cead2ba2f0d5c15c8fc194e5700f4e4f4a033fe7",
+    "licence": "MIT (c) 2010-2026 three.js authors"
+  },
+  "fileSha256": {
+    "src/objects/LOD.js": "861082c43e936b4d25b7c44ea8339696c6ebf048f36d492d2a3624ded445c19b",
+    "src/objects/BatchedMesh.js": "09fad33f00a14c7319f1cfd41f19ff757f4c4e69403d45d6c0ff1ac32e3bda36",
+    "src/objects/InstancedMesh.js": "572ee1e4b09bb145ebf6b2398824b3b0d24d4c04ed41656aed2a442e61e8174e",
+    "src/renderers/webgl/WebGLInfo.js": "eee7c3f0f54643080d478a23acd964fe858143406fea62980f911393d995c532",
+    "src/renderers/WebGLRenderer.js": "9e8740aad691246b31b3704014e8f3bbd38a8e7bf4b1b4d23868541b023cc63a",
+    "examples/jsm/utils/SceneOptimizer.js": "9ca2e875cadd48af46d787a2f6bed8ebba3233992ff74b178997cb8c44aab34e"
+  },
+  "facts": [
+    {
+      "id": "T1",
+      "topic": "InstancedMesh",
+      "where": "src/objects/InstancedMesh.js:20-24, 57, 318-322, 151",
+      "fact": "One geometry + material(s) drawn N times with different transforms in one draw call (renderInstances). instanceMatrix = InstancedBufferAttribute(Float32Array(count * 16), 16) -> 64 bytes per instance. setColorAt lazily allocates instanceColor = Float32Array(count * 3) -> 12 bytes per instance. Frustum culling is per InstancedMesh (one bounding sphere over all instances, computeBoundingSphere), not per instance."
+    },
+    {
+      "id": "T2",
+      "topic": "BatchedMesh",
+      "where": "src/objects/BatchedMesh.js:145-150, 187-192, 211, 221, 338-380, 561, 627",
+      "fact": "Multi-draw batch of DIFFERENT geometries sharing one material: new BatchedMesh(maxInstanceCount, maxVertexCount, maxIndexCount = 2 * maxVertexCount, material); addGeometry / addInstance / setMatrixAt / setColorAt. perObjectFrustumCulled = true (each instance culled), sortObjects = true (front-to-back opaque, back-to-front transparent). Per-instance data lives in float textures: matrices texture side = max(4, ceil(sqrt(4 * maxInstanceCount) / 4) * 4) RGBA32F; colours texture side = ceil(sqrt(maxInstanceCount)) RGBA32F; indirect texture side = ceil(sqrt(maxInstanceCount)) R32UI."
+    },
+    {
+      "id": "T3",
+      "topic": "draw-call accounting",
+      "where": "src/renderers/webgl/WebGLInfo.js:10-25; src/renderers/webgl/WebGLIndexedBufferRenderer.js:37-55; src/renderers/WebGLRenderer.js:1315-1339",
+      "fact": "renderer.info.render.calls is incremented once per info.update. A BatchedMesh with WEBGL_multi_draw issues ONE multiDrawElementsWEBGL and counts ONE call; WITHOUT the extension the renderer loops renderer.render once per visible instance (one call each). An InstancedMesh counts one call. So a deterministic draw-call budget must state whether WEBGL_multi_draw is present."
+    },
+    {
+      "id": "T4",
+      "topic": "LOD",
+      "where": "src/objects/LOD.js:108-134, 188-210, 250-291",
+      "fact": "addLevel(object, distance = 0, hysteresis = 0); levels sorted by distance. update(camera): distance = |cameraWorldPos - lodWorldPos| / camera.zoom; level i is shown when distance >= levels[i].distance, reduced by levels[i].distance * hysteresis while that level is currently visible (so it switches back only below distance * (1 - hysteresis)). One LOD object per entity -> per-entity Object3D; for 1e5+ components the LOD choice must be done per batch (instance buckets), not with THREE.LOD objects."
+    },
+    {
+      "id": "T5",
+      "topic": "auto-batching reference",
+      "where": "examples/jsm/utils/SceneOptimizer.js:1-10, 160-200, 402-430, 443-455",
+      "fact": "Experimental SceneOptimizer.toBatchedMesh groups meshes by batchKey = materialPropertiesHash + attributesSignature, creates one BatchedMesh per group and reports drawCalls = batchGroups.size + singleGroups.size. toInstancingMesh() throws 'not implemented yet'. Confirms the batching key llull adopts: (material class, vertex-attribute layout) for unique geometry; (prototype geometry, material class) for instancing."
+    },
+    {
+      "id": "T6",
+      "topic": "edges",
+      "where": "src/geometries/EdgesGeometry.js:26-50",
+      "fact": "EdgesGeometry(geometry, thresholdAngle = 1) draws an edge only where adjacent face normals differ by more than thresholdAngle degrees."
+    },
+    {
+      "id": "T7",
+      "topic": "available addons (r186)",
+      "where": "examples/jsm/postprocessing/{SSAOPass,SAOPass,GTAOPass,OutlinePass,SMAAPass,TAARenderPass}.js; examples/jsm/csm/CSM.js; examples/jsm/controls/{FirstPersonControls,FlyControls,PointerLockControls,MapControls}.js; examples/jsm/lines/{Line2,LineSegments2,LineMaterial}.js",
+      "fact": "Ambient occlusion (SSAO, SAO, GTAO), outlines, SMAA / TAA, cascaded shadow maps and first-person / fly / pointer-lock controls ship with three r186 as addons; wide lines (Line2) exist for redlines."
+    },
+    {
+      "id": "T8",
+      "topic": "three-mesh-bvh 0.9.16 (repo dependency)",
+      "where": "three-mesh-bvh-0.9.16.tgz (sha256 114cd1686832f6dbfd10fc7f9789c3a68c6c6059ad7a14e2ead5c88c473c5e1c, MIT) README.md:36, 74, 101-124, 181",
+      "fact": "computeBatchedBoundsTree / acceleratedRaycast patch BatchedMesh; ObjectBVH builds a scene-wide BVH over objects and has a frustum-culling example (API marked as recent / may change). llull's bvhSetup.ts patches Mesh only, not InstancedMesh / BatchedMesh."
+    },
+    {
+      "id": "T9",
+      "topic": "@react-three/drei 10.7.9 (repo dependency)",
+      "where": "react-three-drei-10.7.9.tgz (sha256 02316520c703a4f5513b6c1478602604ed2af905342af7ce1e8f3109a0ab2b0b, MIT) core/{Detailed,Instances,PerformanceMonitor,AdaptiveDpr,Bvh,Edges,Outlines,Environment,Sky,BakeShadows}.d.ts",
+      "fact": "Detailed = THREE.LOD wrapper (distances[], hysteresis); PerformanceMonitor reports fps / factor with onIncline / onDecline; AdaptiveDpr lowers the pixel ratio on regression. All are per-object helpers: usable for the review shell, not for 1e6 components."
+    }
+  ]
+}

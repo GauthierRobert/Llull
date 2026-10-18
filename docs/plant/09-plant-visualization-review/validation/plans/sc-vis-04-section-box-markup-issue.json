@@ -1,0 +1,273 @@
+{
+  "id": "SC-VIS-04",
+  "validates": [
+    "VC-VIS-12",
+    "VC-VIS-13",
+    "VC-VIS-14"
+  ],
+  "status": "PROPOSED. add_box / add_cylinder / delete_entities run today; set_section_box, save_viewpoint, add_markup, create_review_issue, add_review_comment, set_issue_status, check_review are unbuilt (TR-VIS-10, 13..16).",
+  "description": "Model review loop: a section box isolates a pump skid, a viewpoint stores it, a redline cloud and an arrow are attached, an issue with a comment is raised, then the referenced entity is deleted so check_review reports a stale viewpoint and an open issue; the agent marks it resolved, closing it is a human gate. Section-box membership is exact AABB arithmetic.",
+  "actions": [
+    {
+      "command": "add_box",
+      "params": {
+        "size": [
+          1000,
+          600,
+          800
+        ],
+        "position": [
+          0,
+          0,
+          400
+        ]
+      },
+      "as": "skid"
+    },
+    {
+      "command": "add_cylinder",
+      "params": {
+        "radius": 100,
+        "height": 4000,
+        "position": [
+          2000,
+          0,
+          600
+        ],
+        "axis": [
+          1,
+          0,
+          0
+        ]
+      },
+      "as": "pipe"
+    },
+    {
+      "command": "add_box",
+      "params": {
+        "size": [
+          400,
+          400,
+          400
+        ],
+        "position": [
+          6000,
+          0,
+          200
+        ]
+      },
+      "as": "far"
+    },
+    {
+      "command": "set_section_box",
+      "params": {
+        "min": [
+          -1000,
+          -1000,
+          0
+        ],
+        "max": [
+          1500,
+          1000,
+          1500
+        ],
+        "name": "skid box"
+      },
+      "as": "box"
+    },
+    {
+      "command": "save_viewpoint",
+      "params": {
+        "name": "skid review",
+        "fromDocumentCamera": true,
+        "sectionBoxId": "$box"
+      },
+      "as": "vp"
+    },
+    {
+      "command": "add_markup",
+      "params": {
+        "viewpointId": "$vp",
+        "kind": "cloud",
+        "space": "screen",
+        "points": [
+          [
+            0.4,
+            0.35
+          ],
+          [
+            0.62,
+            0.35
+          ],
+          [
+            0.62,
+            0.58
+          ],
+          [
+            0.4,
+            0.58
+          ]
+        ],
+        "colour": "#e03030",
+        "text": "check nozzle orientation"
+      },
+      "as": "m1"
+    },
+    {
+      "command": "add_markup",
+      "params": {
+        "viewpointId": "$vp",
+        "kind": "arrow",
+        "space": "world",
+        "points": [
+          [
+            1500,
+            0,
+            1500
+          ],
+          [
+            500,
+            0,
+            800
+          ]
+        ],
+        "colour": "#e03030"
+      },
+      "as": "m2"
+    },
+    {
+      "command": "create_review_issue",
+      "params": {
+        "title": "Suction nozzle faces the walkway",
+        "type": "design",
+        "priority": "high",
+        "viewpointIds": [
+          "$vp"
+        ],
+        "entityIds": [
+          "$skid",
+          "$pipe"
+        ],
+        "labels": [
+          "piping",
+          "access"
+        ]
+      },
+      "as": "issue"
+    },
+    {
+      "command": "add_review_comment",
+      "params": {
+        "issueId": "$issue",
+        "text": "Rotate the skid 90 deg or reroute the suction line.",
+        "viewpointId": "$vp"
+      }
+    },
+    {
+      "command": "section_box_report",
+      "params": {
+        "id": "$box"
+      }
+    },
+    {
+      "command": "delete_entities",
+      "params": {
+        "ids": [
+          "$skid"
+        ]
+      }
+    },
+    {
+      "command": "check_review",
+      "params": {}
+    },
+    {
+      "command": "set_issue_status",
+      "params": {
+        "issueId": "$issue",
+        "status": "resolved",
+        "reason": "skid deleted in design change"
+      }
+    },
+    {
+      "command": "check_review",
+      "params": {}
+    },
+    {
+      "command": "set_issue_status",
+      "params": {
+        "issueId": "$issue",
+        "status": "closed",
+        "reason": "accept"
+      }
+    }
+  ],
+  "expected": [
+    {
+      "step": 9,
+      "path": "inside",
+      "value": [
+        "$skid"
+      ],
+      "source": "AABB [-500,500]x[-300,300]x[0,800] inside the box"
+    },
+    {
+      "step": 9,
+      "path": "crossing",
+      "value": [
+        "$pipe"
+      ],
+      "source": "pipe AABB x [0,4000] crosses x = 1500"
+    },
+    {
+      "step": 9,
+      "path": "outside",
+      "value": [
+        "$far"
+      ],
+      "source": "AABB x [5800,6200] > 1500"
+    },
+    {
+      "step": 11,
+      "path": "issues[?code=='VIS_VIEWPOINT_STALE'].length",
+      "value": 0,
+      "source": "the viewpoint references no entity; the issue does"
+    },
+    {
+      "step": 11,
+      "path": "issues[?code=='VIS_ISSUE_ENTITY_MISSING'].ids",
+      "value": [
+        "$issue"
+      ],
+      "source": "issue references the deleted skid"
+    },
+    {
+      "step": 11,
+      "path": "issues[?code=='VIS_ISSUE_OPEN'].length",
+      "value": 1,
+      "source": "one open issue"
+    },
+    {
+      "step": 13,
+      "path": "issues[?code=='VIS_ISSUE_OPEN'].length",
+      "value": 0,
+      "source": "status resolved is not open"
+    },
+    {
+      "step": 13,
+      "path": "issues[?code=='VIS_ISSUE_AWAITING_APPROVAL'].ids",
+      "value": [
+        "$issue"
+      ],
+      "source": "resolved, waiting for a human to close it"
+    },
+    {
+      "step": 14,
+      "path": "error.code",
+      "value": "VIS_HUMAN_GATE",
+      "source": "closing an issue is an approval act (AF-34); refused for an agent caller without a human signature / session",
+      "whenCaller": "agent"
+    }
+  ],
+  "notes": "Markup points in screen space are normalised [0,1] image coordinates of the viewpoint (redline on the snapshot); world-space markups map to BCF Lines. Expected ids are resolved through data.aliases."
+}

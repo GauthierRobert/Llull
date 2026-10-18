@@ -1,0 +1,24 @@
+{
+  "id": "SC-ISO-03",
+  "validates": ["VC-ISO-10", "VC-ISO-11"],
+  "description": "Produce the final isometric of L-101 (imported from the sample PCF) on an A3 sheet: true isometric projection, north arrow, centreline string dimensions, elevations, weld and spool marks, BOM, cut list and weld tables. Save SVG and DXF with --save.",
+  "status": "UNBUILT - specification scenario",
+  "unbuilt": ["import_pcf", "export_isometric"],
+  "harness": { "inline": { "actions[1].params.text": "../data/iso-01-L101-dn100.pcf" } },
+  "actions": [
+    { "command": "add_level", "params": { "name": "Grade", "elevation": 0 } },
+    { "command": "import_pcf", "params": { "text": "<data/iso-01-L101-dn100.pcf>" } },
+    { "command": "export_isometric", "params": { "lineId": "L-101", "style": "final", "paper": "A3", "formats": ["svg", "dxf"], "tables": ["bom", "cut_list", "weld_list", "spool_list"] } }
+  ],
+  "expected": [
+    { "step": 2, "path": "data.projection.axes.east.angleDeg", "value": -30.0, "abs": 1e-9, "source": "true isometric (S18, S19)" },
+    { "step": 2, "path": "data.projection.axes.north.angleDeg", "value": 30.0, "abs": 1e-9, "source": "true isometric" },
+    { "step": 2, "path": "data.projection.axes.up.angleDeg", "value": 90.0, "abs": 1e-9, "source": "true isometric" },
+    { "step": 2, "path": "data.northArrow.angleDeg", "value": 30.0, "abs": 1e-9, "source": "north up-right preferred (CV-02)" },
+    { "step": 2, "path": "data.dimensions[run=1].values", "value": [76, 2424, 2348, 152], "source": "centreline string dims" },
+    { "step": 2, "path": "data.dimensions[run=1].overall", "value": 5000, "source": "closed form" },
+    { "step": 2, "path": "data.dimensionMismatches", "value": 0, "source": "every label equals the 3D distance" },
+    { "step": 2, "path": "data.sheets.length", "value": 1, "source": "15 components fit one A3 sheet" },
+    { "step": 2, "path": "data.tables.weld_list.rows", "value": 13, "source": "VC-ISO-05" }
+  ]
+}
