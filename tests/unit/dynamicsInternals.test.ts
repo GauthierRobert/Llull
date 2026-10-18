@@ -71,10 +71,10 @@ describe('force laws', () => {
     expect(still.bodyForces['rotor']).toEqual([0, 0, 0]);
   });
 
-  it('speed-governor gains scale with the driven inertia (critically damped at 1/(8·dt))', () => {
+  it('speed-governor gains scale with the driven inertia (critically damped at 1/(4·dt))', () => {
     const { stiffness, damping } = speedServoGains(2, 0.001);
-    expect(stiffness).toBeCloseTo(2 * 125 ** 2, 9);
-    expect(damping).toBeCloseTo(2 * 2 * 125, 9);
+    expect(stiffness).toBeCloseTo(2 * 250 ** 2, 9);
+    expect(damping).toBeCloseTo(2 * 2 * 250, 9);
   });
 });
 

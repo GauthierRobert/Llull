@@ -143,6 +143,8 @@ function runSimulation(mujoco: MujocoModule, model: SimulationModel, options: Si
         trace.jointPosition[joint.id]?.push((data.qpos[joint.qpos] ?? 0) - (initialPosition.get(joint.id) ?? 0));
         trace.jointVelocity[joint.id]?.push(data.qvel[joint.dof] ?? 0);
       }
+      // mj_step leaves the actuator force of its last RK4 stage (a predicted state, not the sampled one): re-evaluate it at the sample
+      if (model.servos.length > 0 && read === undefined) mujoco.mj_forward(mjModel, data);
       model.servos.forEach((servo, i) => trace.servoForce[servo.id]?.push(data.actuator_force[i] ?? 0));
       if (options.energy === true) {
         mujoco.mj_forward(mjModel, data); // energy of the sampled state (mj_step leaves the value of its last stage)

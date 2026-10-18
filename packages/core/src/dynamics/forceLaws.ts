@@ -28,11 +28,13 @@ type TorqueMotor = Extract<Motor, { kind: 'torque_curve' }>;
 
 /**
  * Gains of a speed motor's governor, a critically damped servo on the angle that advances at the target speed (so the steady speed error
- * is zero whatever the load below maxTorque): natural frequency 1 / (8 · timestep), well inside what the step resolves, scaled by the
- * inertia it drives. stiffness N·m/rad, damping N·m·s/rad.
+ * is zero whatever the load below maxTorque): natural frequency 1 / (4 · timestep) (omega_n · dt = 0.25, a tenth of the RK4 stability
+ * limit), scaled by the inertia it drives. stiffness N·m/rad, damping N·m·s/rad. The servo lags the ideal ramp by torque / stiffness, so
+ * the speed ripple it leaves times the driven inertia is an error torque proportional to 1 / stiffness: doubling the natural frequency (1 / 8 to 1 / 4 timesteps)
+ * cut the crank torque error of the pack-10 slider-crank from about 0.15 % to 0.04 %.
  */
 export function speedServoGains(jointInertia: number, timestep: number): { stiffness: number; damping: number } {
-  const naturalFrequency = 1 / (8 * timestep);
+  const naturalFrequency = 1 / (4 * timestep);
   return { stiffness: jointInertia * naturalFrequency ** 2, damping: 2 * jointInertia * naturalFrequency };
 }
 

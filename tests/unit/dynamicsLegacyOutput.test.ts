@@ -3,6 +3,10 @@
  * from the output BEFORE PHY-21 slice B changed the dynamics layer; a change here is a regression unless the owner accepts a new baseline.
  * Accepted rebaseline (geared model only): its joints decelerate under propeller drag and the unsettled-joint warning now says "still
  * decelerating (speed X % lower ...)" instead of the misleading "still accelerating"; the numbers are unchanged.
+ * Accepted rebaseline (speed-governed flywheel only, ENG-3): the governor is twice as stiff (natural frequency 1 / (4 dt) instead of
+ * 1 / (8 dt)) and its torque is read at the sampled state instead of at the last RK4 stage. Spin-up: speed at the first sample 111.95 ->
+ * 158.18 rad/s, first torque sample 99.37 -> 200 N m (the 200 N m limit), peak speed 157.08 -> 160.50 rad/s (windup of the saturated
+ * spin-up), final position 154.566 -> 155.823 rad (the speed is reached earlier); the final speed 157.0796 rad/s is unchanged (1e-13).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { execute } from '@core/commands/registry';
@@ -71,7 +75,7 @@ describe('simulate_motion output of models without loops or cylinders (FR-FPR-19
   });
 
   it('speed-governed flywheel', () => {
-    expect(hashOf(governed(), { duration: 1, detail: 'series' })).toBe('cd62962de5d04058');
+    expect(hashOf(governed(), { duration: 1, detail: 'series' })).toBe('04d5cc245182bb04');
   });
 
   it('is deterministic run to run', () => {

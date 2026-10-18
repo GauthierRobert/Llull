@@ -4,6 +4,7 @@
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { PhysicsEngine, SimulationBody, SimulationModel } from '@core/dynamics/physicsEngine';
+import { speedServoGains } from '@core/dynamics/forceLaws';
 import { createMujocoPhysics } from '@physics-mujoco/mujocoPhysics';
 
 let engine: PhysicsEngine;
@@ -127,6 +128,26 @@ describe('MuJoCo physics engine', () => {
       { duration: 1, timestep: 0.001, sampleInterval: 1 },
     );
     expect(trace.bodyPosition['block']?.[1]?.[0]).toBeCloseTo(1, 6);
+  });
+
+  it('a speed servo reports its force at the sampled state: F = I dω/dt through the spin-up from rest', () => {
+    const [timestep, inertia] = [0.001, 0.5];
+    const model: SimulationModel = {
+      gravity: [0, 0, 0],
+      bodies: [rotor('wheel', [0, 0, 1], 10, inertia)],
+      gears: [],
+      ...tree,
+      servos: [{ id: 'drive', joint: 'wheel-hinge', targetVelocity: 10, ...speedServoGains(inertia, timestep), maxForce: 1e9 }],
+      loads: noLoads,
+    };
+    const trace = engine.simulate(model, { duration: 0.1, timestep, sampleInterval: timestep });
+    const [force, omega] = [trace.servoForce['drive'] ?? [], trace.jointVelocity['wheel-hinge'] ?? []];
+    const rate = (k: number): number =>
+      ((omega[k - 2] ?? 0) - 8 * (omega[k - 1] ?? 0) + 8 * (omega[k + 1] ?? 0) - (omega[k + 2] ?? 0)) / (12 * timestep);
+    const peak = Math.max(...force.map(Math.abs));
+    const worst = Math.max(...Array.from({ length: 40 }, (_, i) => Math.abs((force[i + 3] ?? 0) - inertia * rate(i + 3))));
+    expect(peak).toBeGreaterThan(100);
+    expect(worst / peak).toBeLessThan(1e-3);
   });
 
   it('rejects a model MuJoCo cannot compile', () => {
