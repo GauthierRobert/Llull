@@ -1,6 +1,6 @@
 {
   "title": "Minimal pipe spec CS150 used by the RTE plans (stand-in for the 01-piping-specs-catalog format)",
-  "status": "STUB. The real format is defined by 01-piping-specs-catalog; load with `llull load_pipe_spec @spec_stub_cs150.json` (01 command, not built) before the plans. Every dimension below is an INPUT of the plans: expected values are derived from these numbers, and the gating sources are listed per row.",
+  "status": "STUB. The real format is defined by 01-piping-specs-catalog; load with `llull import_pipe_spec @spec_stub_cs150.json` (01 command, not built) before the plans. Every dimension below is an INPUT of the plans: expected values are derived from these numbers, and the gating sources are listed per row.",
   "spec": "CS150",
   "description": "Carbon steel, ASME B16.5 Class 150 RF, butt-weld fittings ASME B16.9 STD, NPS 2-6 (illustrative subset)",
   "rating": "CL150",
@@ -23,7 +23,14 @@
     { "type": "tee", "nps": 6, "ports": 3, "ends": "BW", "C": 143, "M": 143 },
     { "type": "teeReducing", "nps": "6x4", "ports": 3, "ends": "BW", "C": 143, "M": 130 },
     { "type": "reducerConcentric", "nps": "6x4", "ports": 2, "ends": "BW", "H": 140 },
-    { "type": "weldolet", "nps": "6x2", "ports": 2, "ends": "BW", "height": null, "heightNote": "TBD - catalogue value from 01 PSC; plans count olets only" },
+    {
+      "type": "weldolet",
+      "nps": "6x2",
+      "ports": 2,
+      "ends": "BW",
+      "height": null,
+      "heightNote": "TBD - catalogue value from 01 PSC; plans count olets only"
+    },
     { "type": "flangeWN", "nps": 4, "rating": "CL150", "facing": "RF", "ends": ["BW", "FL"], "Y": 76 },
     { "type": "flangeWN", "nps": 6, "rating": "CL150", "facing": "RF", "ends": ["BW", "FL"], "Y": 89 },
     { "type": "gasket", "nps": 4, "rating": "CL150", "thickness": 3.0 },

@@ -1,0 +1,32 @@
+{
+  "id": "SC-PST-03",
+  "validates": ["VC-PST-01", "VC-PST-03", "VC-PST-04", "VC-PST-05", "VC-PST-06"],
+  "description": "Owner questions answered without a model: elbow SIF, f and SA by edition, growth of a 30 m carbon steel line to 204.4 degC, guided cantilever for a 6 m leg",
+  "unbuilt": ["pipe_sif", "pipe_stress_allowables", "thermal_growth", "guided_cantilever"],
+  "actions": [
+    { "command": "pipe_sif", "params": { "component": "elbow", "odMm": 168.275, "wallMm": 7.112, "bendRadiusMm": 228.6, "rule": "B31.3-2018" } },
+    { "command": "pipe_stress_allowables", "params": { "ScMPa": 137.9, "ShMPa": 137.9, "cycles": 7000, "edition": "2018", "ferrousLowStrength": true, "SLMPa": 40 } },
+    { "command": "pipe_stress_allowables", "params": { "ScMPa": 137.9, "ShMPa": 137.9, "cycles": 100000, "edition": "2018", "SLMPa": 40 } },
+    { "command": "pipe_stress_allowables", "params": { "ScMPa": 137.9, "ShMPa": 137.9, "cycles": 100000, "edition": "2022" } },
+    { "command": "pipe_stress_allowables", "params": { "ScMPa": 137.9, "ShMPa": 137.9, "cycles": 200000000, "edition": "2018" } },
+    { "command": "thermal_growth", "params": { "table": "carbon-steel-c1", "fromC": 21.111, "toC": 204.444, "lengthM": 30 } },
+    { "command": "guided_cantilever", "params": { "legMm": 6000, "displacementMm": 50, "odMm": 168.3, "wallMm": 7.11, "EMPa": 200000, "SAMPa": 206.85 } }
+  ],
+  "expected": [
+    { "step": 0, "path": "h", "value": 0.250379, "rel": 0.0001, "source": "T R1 / r2^2 with the inch dimensions (6.625 / 0.280 / 9 in)" },
+    { "step": 0, "path": "k", "value": 6.59002, "rel": 0.0001, "source": "1.65 / h" },
+    { "step": 0, "path": "ii", "value": 2.26557, "rel": 0.0001, "source": "0.9 / h^(2/3)" },
+    { "step": 0, "path": "io", "value": 1.88798, "rel": 0.0001, "source": "0.75 / h^(2/3)" },
+    { "step": 1, "path": "f", "value": 1.021249, "abs": 0.00001, "source": "6 x 7000^-0.2, fm 1.2" },
+    { "step": 1, "path": "SA1aMPa", "value": 211.2454, "rel": 0.00001, "source": "1.021249 x 206.85" },
+    { "step": 2, "path": "f", "value": 0.6, "abs": 0.00001, "source": "6 x 1e5^-0.2" },
+    { "step": 2, "path": "SA1aMPa", "value": 124.11, "rel": 0.00001, "source": "0.6 x 206.85" },
+    { "step": 2, "path": "SA1bMPa", "value": 182.85, "rel": 0.00001, "source": "0.6 x (1.25 x 275.8 - 40)" },
+    { "step": 3, "path": "f", "value": 0.430887, "abs": 0.00001, "source": "20 x 1e5^(-1/3) (2022)" },
+    { "step": 4, "path": "f", "value": 0.15, "abs": 0.00001, "source": "6 x 2e8^-0.2 = 0.1312 -> floor 0.15" },
+    { "step": 5, "path": "growthMm", "value": 67.52, "abs": 0.05, "source": "2.70 in/100 ft (Table C-1 via S8; PSI alpha)" },
+    { "step": 6, "path": "stressMPa", "value": 140.25, "rel": 0.000001, "source": "3 E D delta / L^2" },
+    { "step": 6, "path": "forceN", "value": 6509.017, "rel": 0.000001, "source": "12 E I delta / L^3" },
+    { "step": 6, "path": "minLegMm", "value": 4940.55, "rel": 0.000001, "source": "sqrt(3 E D delta / SA)" }
+  ]
+}

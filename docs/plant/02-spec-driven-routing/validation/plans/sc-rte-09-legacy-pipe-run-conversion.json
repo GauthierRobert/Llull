@@ -1,12 +1,26 @@
 {
   "id": "SC-RTE-09",
-  "status": "PROPOSED - partly runnable: add_pipe_run exists today (packages/domain-aec/src/industrial/equipment/equipment.ts). Unbuilt: load_pipe_spec (01), convert_pipe_run, check_piping, piping_takeoff.",
-  "unbuilt": ["load_pipe_spec", "convert_pipe_run", "check_piping", "piping_takeoff"],
+  "status": "PROPOSED - partly runnable: add_pipe_run exists today (packages/domain-aec/src/industrial/equipment/equipment.ts). Unbuilt: import_pipe_spec (01), convert_pipe_run, check_piping, piping_takeoff.",
+  "unbuilt": ["import_pipe_spec", "convert_pipe_run", "check_piping", "piping_takeoff"],
   "validates": ["VC-RTE-20"],
   "description": "A legacy polyline pipe (add_pipe_run, DN100, two interior 90 deg bends) is converted into a spec-driven run on CS150: the polyline vertices become PIs, each bend becomes a catalogue LR elbow, the free ends become open ends.",
   "units": "mm",
   "actions": [
-    { "command": "add_pipe_run", "params": { "points": [[1000, 3000, 1500], [5000, 3000, 1500], [5000, 6000, 1500], [5000, 6000, 4000]], "dn": 100, "line": "L-1", "service": "cooling water" }, "as": "legacy" },
+    {
+      "command": "add_pipe_run",
+      "params": {
+        "points": [
+          [1000, 3000, 1500],
+          [5000, 3000, 1500],
+          [5000, 6000, 1500],
+          [5000, 6000, 4000]
+        ],
+        "dn": 100,
+        "line": "L-1",
+        "service": "cooling water"
+      },
+      "as": "legacy"
+    },
     { "command": "convert_pipe_run", "params": { "pipeId": "$legacy", "spec": "CS150" }, "as": "run" },
     { "command": "piping_takeoff", "params": { "runId": "$run" } },
     { "command": "check_piping", "params": {} }
@@ -14,7 +28,13 @@
   "expected": [
     { "step": 1, "path": "data.lineNumber", "value": "L-1", "source": "legacy line number is kept verbatim" },
     { "step": 2, "path": "data.counts", "value": { "elbow90LR": 2, "pipePieces": 3, "buttWelds": 4 } },
-    { "step": 2, "path": "data.pipePieces[*].cutLengthMm", "value": [3848, 2696, 2348], "abs": 0.01, "source": "4000 - 152 ; 3000 - 2 x 152 ; 2500 - 152" },
+    {
+      "step": 2,
+      "path": "data.pipePieces[*].cutLengthMm",
+      "value": [3848, 2696, 2348],
+      "abs": 0.01,
+      "source": "4000 - 152 ; 3000 - 2 x 152 ; 2500 - 152"
+    },
     { "step": 3, "path": "data.issues[?code=='RTE_OPEN_END'].length", "value": 2 }
   ]
 }

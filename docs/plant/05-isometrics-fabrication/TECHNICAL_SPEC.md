@@ -27,7 +27,7 @@ What exists and is reused:
 
 What does **not** exist: any PCF code, weld / spool / cut-piece / bolt-set concept, piping BOM, isometric symbol
 library, not-to-scale layout, pipe annotation on plans, a fabrication check. `grep -ri "pcf\|spool\|isogen" packages`
-finds nothing relevant (only Valve-unrelated words).
+finds no piping-fabrication code.
 
 Upstream gaps this one consumes: `01-piping-specs-catalog` (PSC — spec, item codes, SKEYs, catalogue dimensions,
 bolt tables) and `02-spec-driven-routing` (RTE — components with ports, fittings, branches, flanges, connectivity,
@@ -83,6 +83,28 @@ Laws:
 Decision needed (OQ-ISO-04): whether PSC / RTE / ISO are one `plant` plugin with several catalogs or separate
 plugins. This spec assumes a separate `piping-fabrication` plugin depending on a shared `plant/model` module, so
 ISO can ship before RTE using the legacy and PCF inputs.
+
+### 2.1 Technical requirements
+
+| Id | Pri | Requirement | FR | AF | VC |
+| -- | --- | ----------- | -- | -- | -- |
+| TR-ISO-01 | MUST | PCF lexer / reader for the §6.1 subset with unit scaling, `extra` preservation and coded syntax refusals with line paths (§5.1) | FR-ISO-01, 17 | AF-04, AF-11 | VC-ISO-01, 02 |
+| TR-ISO-02 | MUST | Canonical PCF writer, one file per line, byte-deterministic, equal to the reference writer on the fixture (§5.2) | FR-ISO-02, 03, 18 | AF-12, AF-13 | VC-ISO-03, 17 |
+| TR-ISO-03 | MUST | `PipingNetwork` read port over RTE components, legacy `PipeElement` (derived fittings, flagged) and imported PCF lines (§3, §5.3) | FR-ISO-03, 04 | AF-32 | VC-ISO-04 |
+| TR-ISO-04 | MUST | Connectivity graph with 0.1 mm node keys, 1 mm disconnection guard, flow order (§5.4) | FR-ISO-06, 16 | AF-20 | VC-ISO-05, 16 |
+| TR-ISO-05 | MUST | Spool union-find over shop joints, limits from user rules with source, deterministic `autoBreak` (§5.5) | FR-ISO-05 | AF-30, AF-31 | VC-ISO-06 |
+| TR-ISO-06 | MUST | Weld detection and persistent numbering: highest + 1, orphaned numbers never reused, explicit renumber (§5.4) | FR-ISO-06, 07 | AF-13 | VC-ISO-05, 14 |
+| TR-ISO-07 | MUST | Cut list with explicit gap / allowance (no silent default), short-piece check (§5.6) | FR-ISO-08 | AF-31, AF-35 | VC-ISO-07 |
+| TR-ISO-08 | MUST | BOM per line / spool / sheet with bolting and gaskets from PSC tables, `unverified` propagation, sum identities (§5.7) | FR-ISO-09 | AF-10, AF-32 | VC-ISO-08, 09 |
+| TR-ISO-09 | MUST | True isometric projection identical to `viewDirections.ts` iso frame; north arrow up-right / up-left (§5.8) | FR-ISO-10 | AF-21 | VC-ISO-10 |
+| TR-ISO-10 | MUST | Not-to-scale layout with collision handling, symbols by SKEY family, centreline string dimensions, elevations and coordinates; every label listed in `data` with its 3D value (§5.8, §5.9) | FR-ISO-11, 12 | AF-21, AF-22 | VC-ISO-11 |
+| TR-ISO-11 | MUST | Slope detection and annotation (ratio / percent / degrees, fall arrow) (§5.9) | FR-ISO-13 | AF-21 | VC-ISO-12 |
+| TR-ISO-12 | SHOULD | Sheet split at welds / flanges with continuation marks and stored sheet assignment (§5.10) | FR-ISO-14 | AF-13 | VC-ISO-13 |
+| TR-ISO-13 | SHOULD | Piping GA annotation layer on the existing plan / elevation drawings (§5.11) | FR-ISO-15 | AF-22 | VC-ISO-15 |
+| TR-ISO-14 | MUST | `check_isometric` rule table with stable codes and remediation (§5.12, §7) | FR-ISO-16, 17 | AF-11, AF-20, AF-30 | VC-ISO-02, 16 |
+| TR-ISO-15 | MUST | Determinism of every output (sorted iteration, fixed number formats, no clock) | FR-ISO-18 | AF-13 | VC-ISO-17 |
+| TR-ISO-16 | SHOULD | Performance budgets of §8 | FR-ISO-14 | AF-40 | VC-ISO-18 |
+| TR-ISO-17 | MUST | `issue_isometric` human gate (09 PLM signature), `reviewRequired: true` on every unissued iso, "NOT FOR CONSTRUCTION" stamp | FR-ISO-19 | AF-33, AF-34, AF-34a | VC-ISO-19 |
 
 ## 3. Data model
 
@@ -455,6 +477,7 @@ layout iterations bounded (no infinite collision loops); all outputs determinist
 | Unit, fabrication | `welds.test.ts`, `spools.test.ts`, `cutList.test.ts`, `bom.test.ts` against `iso-01-L101-dn100.expected.json` | VC-ISO-05, 06, 07, 08, 09, 14 |
 | Unit, drawing | `isoProjection.test.ts`, `isoDimensions.test.ts`, `isoSlope.test.ts`, `isoSheets.test.ts`, `pipingGa.test.ts` (assert `data`, not SVG pixels) | VC-ISO-10, 11, 12, 13, 15 |
 | Unit, check | `checkIsometric.test.ts` (hand-built broken networks) | VC-ISO-16 |
+| Unit, styles / skew / gate | `isoStyles.test.ts`, `isoSkew.test.ts`, `issueIsometric.test.ts`; CSV and revision delta in `welds.test.ts` / `isoSheets.test.ts` | VC-ISO-19..23 |
 | Purity / contract | `is pure` per mutating command; tool-schema snapshot; `DocumentExtension` validation of the slice | all mutating |
 | Scenario | `server/tests/packReplay05.test.ts` runs `validation/plans/*.json` through `build_project` (`unbuilt` plans skipped until their commands exist) | VC-ISO-04, 13, 17 |
 | Golden | `tests/golden/plant_iso_l101.json` (plan sc-iso-02; PCF + SVG sha256) | VC-ISO-17 |

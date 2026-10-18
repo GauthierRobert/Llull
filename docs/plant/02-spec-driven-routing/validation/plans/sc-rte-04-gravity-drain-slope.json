@@ -1,18 +1,50 @@
 {
   "id": "SC-RTE-04",
-  "status": "PROPOSED - not runnable yet. Unbuilt: load_pipe_spec (01), add_tie_in_point, create_pipeline, route_pipe, check_piping, piping_takeoff.",
-  "unbuilt": ["load_pipe_spec", "add_tie_in_point", "create_pipeline", "route_pipe", "check_piping", "piping_takeoff"],
+  "status": "PROPOSED - not runnable yet. Unbuilt: import_pipe_spec (01), add_tie_in_point, create_pipeline, route_pipe, check_piping, piping_takeoff.",
+  "unbuilt": ["import_pipe_spec", "add_tie_in_point", "create_pipeline", "route_pipe", "check_piping", "piping_takeoff"],
   "validates": ["VC-RTE-08"],
   "description": "DN50 gravity drain from TP-D1 at (0,0,1000) running +X 8000 mm (plan length) at a 1 % fall, then down to a drain hub TP-D2 at grade (z 0). The elbow sees a 89.427 deg turn: inside the spec tolerance of 1 deg it is a standard 90 LR elbow. The same route with angleToleranceDeg 0.5 is refused.",
   "units": "mm",
   "actions": [
-    { "command": "add_tie_in_point", "params": { "tag": "TP-D1", "position": [0, 0, 1000], "direction": [1, 0, 0], "dn": 50, "endType": "BW" }, "as": "d1" },
-    { "command": "add_tie_in_point", "params": { "tag": "TP-D2", "position": [8000, 0, 0], "direction": [0, 0, 1], "dn": 50, "endType": "BW" }, "as": "d2" },
-    { "command": "create_pipeline", "params": { "service": "D", "sequence": "3001", "spec": "CS150", "dn": 50, "slope": { "value": 1, "unit": "percent" } }, "as": "line" },
-    { "command": "route_pipe", "params": { "lineId": "$line", "from": { "portId": "$d1" }, "to": { "portId": "$d2" }, "legs": [ { "direction": "+X", "planLength": 8000, "slope": { "value": 1, "unit": "percent", "fall": true } } ] }, "as": "run" },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "TP-D1", "position": [0, 0, 1000], "direction": [1, 0, 0], "dn": 50, "endType": "BW" },
+      "as": "d1"
+    },
+    {
+      "command": "add_tie_in_point",
+      "params": { "tag": "TP-D2", "position": [8000, 0, 0], "direction": [0, 0, 1], "dn": 50, "endType": "BW" },
+      "as": "d2"
+    },
+    {
+      "command": "create_pipeline",
+      "params": { "service": "D", "sequence": "3001", "spec": "CS150", "dn": 50, "slope": { "value": 1, "unit": "percent" } },
+      "as": "line"
+    },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$line",
+        "from": { "portId": "$d1" },
+        "to": { "portId": "$d2" },
+        "legs": [{ "direction": "+X", "planLength": 8000, "slope": { "value": 1, "unit": "percent", "fall": true } }]
+      },
+      "as": "run"
+    },
     { "command": "check_piping", "params": { "lineIds": ["$line"] } },
     { "command": "piping_takeoff", "params": { "runId": "$run" } },
-    { "command": "route_pipe", "params": { "lineId": "$line", "from": { "portId": "$d1" }, "to": { "portId": "$d2" }, "angleToleranceDeg": 0.5, "legs": [ { "direction": "+X", "planLength": 8000, "slope": { "value": 1, "unit": "percent", "fall": true } } ] }, "expectError": "RTE_NO_FITTING_FOR_ANGLE", "note": "last step: build_project stops here and reports the step error (AF-14)" }
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$line",
+        "from": { "portId": "$d1" },
+        "to": { "portId": "$d2" },
+        "angleToleranceDeg": 0.5,
+        "legs": [{ "direction": "+X", "planLength": 8000, "slope": { "value": 1, "unit": "percent", "fall": true } }]
+      },
+      "expectError": "RTE_NO_FITTING_FOR_ANGLE",
+      "note": "last step: build_project stops here and reports the step error (AF-14)"
+    }
   ],
   "expected": [
     { "step": 3, "path": "data.legs[0].dropMm", "value": 80, "abs": 1e-6, "source": "8000 x 0.01" },
@@ -21,8 +53,24 @@
     { "step": 3, "path": "data.turns[0].angleDeg", "value": 89.427061, "abs": 1e-6, "source": "acos(80 / 8000.4)" },
     { "step": 3, "path": "data.turns[0].fitting", "value": "elbow90LR" },
     { "step": 3, "path": "data.turns[0].deviationDeg", "value": 0.572939, "abs": 1e-6 },
-    { "step": 4, "path": "data.status", "value": "pass", "source": "fall is downstream, no adverse slope, no pocket" },
-    { "step": 5, "path": "data.pipePieces[*].cutLengthMm", "value": [7924.39999, 844], "abs": 1e-3, "source": "8000.4 - 76 ; (1000 - 80) - 76" },
-    { "step": 6, "path": "error.code (plan aborted at step 6)", "value": "RTE_NO_FITTING_FOR_ANGLE", "source": "0.573 deg deviation > 0.5 deg tolerance" }
+    {
+      "step": 4,
+      "path": "data.issues[?code!='RTE_SPEC_UNVERIFIED'].length",
+      "value": 0,
+      "source": "fall is downstream, no adverse slope, no pocket; both ends on tie-ins"
+    },
+    {
+      "step": 5,
+      "path": "data.pipePieces[*].cutLengthMm",
+      "value": [7924.39999, 844],
+      "abs": 1e-3,
+      "source": "8000.4 - 76 ; (1000 - 80) - 76"
+    },
+    {
+      "step": 6,
+      "path": "error.code (plan aborted at step 6)",
+      "value": "RTE_NO_FITTING_FOR_ANGLE",
+      "source": "0.573 deg deviation > 0.5 deg tolerance"
+    }
   ]
 }

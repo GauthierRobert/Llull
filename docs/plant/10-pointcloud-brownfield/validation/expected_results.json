@@ -766,7 +766,7 @@
   },
   {
    "id": "VC-SCN-30",
-   "command": "register_point_clouds {method: icp}",
+   "command": "compute_registration {method: icp}",
    "inputs": {
     "sourceFile": "e57/bunnyInt32.e57",
     "seed": 401,
@@ -822,7 +822,7 @@
   },
   {
    "id": "VC-SCN-31",
-   "command": "fit_primitive {kind: sphere} + register_point_clouds {method: targets}",
+   "command": "fit_primitive {kind: sphere} + compute_registration {method: targets}",
    "inputs": {
     "files": [
      "data/synthetic/tgt-a-station1.csv",
@@ -912,7 +912,7 @@
   },
   {
    "id": "VC-SCN-32",
-   "command": "register_point_clouds",
+   "command": "compute_registration",
    "expected": {
     "2 targets": "SCN_REG_TARGETS_INSUFFICIENT",
     "3 collinear targets": "SCN_REG_DEGENERATE",

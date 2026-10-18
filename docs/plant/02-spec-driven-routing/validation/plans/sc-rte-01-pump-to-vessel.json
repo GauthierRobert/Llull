@@ -1,16 +1,70 @@
 {
   "id": "SC-RTE-01",
-  "status": "PROPOSED - not runnable yet. Built today: add_equipment. Unbuilt: add_nozzle (03 EQP), load_pipe_spec (01 PSC, run before the plan: `llull load_pipe_spec @../data/spec_stub_cs150.json`), create_pipeline, route_pipe, check_piping, piping_takeoff (this pack).",
-  "unbuilt": ["add_nozzle", "load_pipe_spec", "create_pipeline", "route_pipe", "check_piping", "piping_takeoff"],
+  "status": "PROPOSED - not runnable yet. Built today: add_equipment. Unbuilt: add_nozzle (03 EQP), import_pipe_spec (01 PSC, run before the plan: `llull import_pipe_spec @../data/spec_stub_cs150.json`), create_pipeline, route_pipe, check_piping, piping_takeoff (this pack).",
+  "unbuilt": ["add_nozzle", "import_pipe_spec", "create_pipeline", "route_pipe", "check_piping", "piping_takeoff"],
   "validates": ["VC-RTE-01", "VC-RTE-02", "VC-RTE-03", "VC-RTE-17"],
   "description": "Pump P-101 top discharge (DN100 CL150 RF flanged nozzle at z 1000, facing +Z) to vertical vessel V-101 side inlet N1 (DN100 CL150 RF, face at x 6000, facing -X). Spec CS150. Route by compass legs: up 1500, +Y 3000, +X 3000, up 1500, then +X into the nozzle (3000). Four LR 90 elbows, a weld-neck flange + gasket + bolt set at each nozzle.",
   "units": "mm",
   "actions": [
-    { "command": "add_equipment", "params": { "name": "Centrifugal pump", "mark": "P-101", "location": [0, -300], "size": [1200, 600, 800], "weight": 650 }, "as": "pump" },
-    { "command": "add_nozzle", "params": { "equipmentId": "$pump", "tag": "N2", "position": [0, 0, 1000], "direction": [0, 0, 1], "dn": 100, "rating": "CL150", "facing": "RF", "endType": "FL" }, "as": "pumpOut" },
-    { "command": "add_equipment", "params": { "name": "Feed drum", "mark": "V-101", "location": [7000, 3000], "size": [1600, 1600, 5000], "shape": "vertical_vessel", "weight": 9000 }, "as": "vessel" },
-    { "command": "add_nozzle", "params": { "equipmentId": "$vessel", "tag": "N1", "position": [6000, 3000, 4000], "direction": [-1, 0, 0], "dn": 100, "rating": "CL150", "facing": "RF", "endType": "FL" }, "as": "vesselIn" },
-    { "command": "create_pipeline", "params": { "service": "P", "sequence": "1001", "spec": "CS150", "dn": 100, "from": "P-101/N2", "to": "V-101/N1", "designTempC": 60, "designPressureBarG": 10 }, "as": "line" },
+    {
+      "command": "add_equipment",
+      "params": { "name": "Centrifugal pump", "mark": "P-101", "location": [0, -300], "size": [1200, 600, 800], "weight": 650 },
+      "as": "pump"
+    },
+    {
+      "command": "add_nozzle",
+      "params": {
+        "equipmentId": "$pump",
+        "tag": "N2",
+        "position": [0, 0, 1000],
+        "direction": [0, 0, 1],
+        "dn": 100,
+        "rating": "CL150",
+        "facing": "RF",
+        "endType": "FL"
+      },
+      "as": "pumpOut"
+    },
+    {
+      "command": "add_equipment",
+      "params": {
+        "name": "Feed drum",
+        "mark": "V-101",
+        "location": [7000, 3000],
+        "size": [1600, 1600, 5000],
+        "shape": "vertical_vessel",
+        "weight": 9000
+      },
+      "as": "vessel"
+    },
+    {
+      "command": "add_nozzle",
+      "params": {
+        "equipmentId": "$vessel",
+        "tag": "N1",
+        "position": [6000, 3000, 4000],
+        "direction": [-1, 0, 0],
+        "dn": 100,
+        "rating": "CL150",
+        "facing": "RF",
+        "endType": "FL"
+      },
+      "as": "vesselIn"
+    },
+    {
+      "command": "create_pipeline",
+      "params": {
+        "service": "P",
+        "sequence": "1001",
+        "spec": "CS150",
+        "dn": 100,
+        "from": "P-101/N2",
+        "to": "V-101/N1",
+        "designTempC": 60,
+        "designPressureBarG": 10
+      },
+      "as": "line"
+    },
     {
       "command": "route_pipe",
       "params": {
@@ -30,13 +84,56 @@
     { "command": "piping_takeoff", "params": { "runId": "$run" } }
   ],
   "expected": [
-    { "step": 4, "path": "data.lineNumber", "value": "100-P-1001-CS150", "source": "line-number template DN-service-sequence-spec (project default, named)" },
+    {
+      "step": 4,
+      "path": "data.lineNumber",
+      "value": "100-P-1001-CS150",
+      "source": "line-number template DN-service-sequence-spec (project default, named)"
+    },
     { "step": 5, "path": "data.legs.length", "value": 5, "source": "4 given legs + closing leg to the port" },
-    { "step": 5, "path": "data.closingLeg", "value": { "direction": "+X", "length": 3000 }, "abs": 1e-6, "source": "geometry: (6000,3000,4000) - (3000,3000,4000)" },
-    { "step": 6, "path": "data.status", "value": "pass", "source": "no open end, sizes / ratings / end types match" },
-    { "step": 6, "path": "data.issues.length", "value": 0 },
-    { "step": 7, "path": "data.counts", "value": { "elbow90LR": 4, "flangeWN": 2, "gasket": 2, "boltSet": 2, "studs": 16, "pipePieces": 5, "buttWelds": 10, "flangedJoints": 2 }, "source": "spec stub + topology (4 elbows x 2 welds + 2 flange welds)" },
-    { "step": 7, "path": "data.pipePieces[*].cutLengthMm", "value": [1269, 2696, 2696, 1196, 2769], "abs": 0.01, "source": "cut = leg - sum(centre-to-end or Y + gasket at each end); A 152, Y 76, gasket 3" },
+    {
+      "step": 5,
+      "path": "data.closingLeg",
+      "value": { "direction": "+X", "length": 3000 },
+      "abs": 1e-6,
+      "source": "geometry: (6000,3000,4000) - (3000,3000,4000)"
+    },
+    {
+      "step": 6,
+      "path": "data.issues[?code!='RTE_SPEC_UNVERIFIED'].length",
+      "value": 0,
+      "source": "no open end, sizes / ratings / end types match"
+    },
+    {
+      "step": 6,
+      "path": "data.issues[?code=='RTE_SPEC_UNVERIFIED'].length",
+      "value": 1,
+      "source": "the stub spec has status stub (AF-32, VC-RTE-21)"
+    },
+    { "step": 6, "path": "data.status", "value": "warn" },
+    { "step": 7, "path": "data.unverified", "value": true },
+    {
+      "step": 7,
+      "path": "data.counts",
+      "value": {
+        "elbow90LR": 4,
+        "flangeWN": 2,
+        "gasket": 2,
+        "boltSet": 2,
+        "studs": 16,
+        "pipePieces": 5,
+        "buttWelds": 10,
+        "flangedJoints": 2
+      },
+      "source": "spec stub + topology (4 elbows x 2 welds + 2 flange welds)"
+    },
+    {
+      "step": 7,
+      "path": "data.pipePieces[*].cutLengthMm",
+      "value": [1269, 2696, 2696, 1196, 2769],
+      "abs": 0.01,
+      "source": "cut = leg - sum(centre-to-end or Y + gasket at each end); A 152, Y 76, gasket 3"
+    },
     { "step": 7, "path": "data.totalPipeMm", "value": 10626, "abs": 0.01, "source": "sum of cuts" },
     { "step": 7, "path": "data.centrelineLengthMm", "value": 11739.044, "abs": 0.01, "source": "12000 - 4 x 2 x 152 + 4 x (pi/2) x 152" }
   ]

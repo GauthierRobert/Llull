@@ -170,6 +170,12 @@ written by the host, not streamed (AF-12).
 | the fixture | `export_piping_ga view=plan` | label L-101-DN100-A1A, CL EL +3000 / +1000, BOP 2942.85 | VC-ISO-15 |
 | a broken line | `check_isometric` | codes ISO_DISCONNECTED, ISO_SKEY_MISSING, ISO_OPEN_END, ISO_SPOOL_TOO_LARGE, `ok: false` | VC-ISO-16 |
 | the same plan run twice | export | identical PCF / SVG hashes and weld numbers | VC-ISO-17 |
+| an unissued final iso, an agent caller | `issue_isometric` | `ISO_HUMAN_GATE`; the iso shows `reviewRequired: true` and NOT FOR CONSTRUCTION | VC-ISO-19 |
+| the fixture | `export_isometric style=check / final / spool` | no tables / four tables / one sheet per spool (2) | VC-ISO-20 |
+| a DN80 line with a 45° offset and two shoes | `export_pcf`, `export_isometric` | 2 SUPPORT records at the shoe points; skew box 1414.2135624 mm, legs 1000 / 1000 | VC-ISO-21 |
+| numbered welds | `weld_list format=csv` | 13 rows equal to the JSON list | VC-ISO-22 |
+| an issued iso, then a field weld added | `export_isometric compareToIssue` | changed component 4, new W14, revision cloud on sheet 1 | VC-ISO-23 |
+| a 1000-component line | `export_pcf`, `export_isometric` | within the §8 budgets of the technical spec (measured) | VC-ISO-18 |
 
 ## 8. Standards and regulatory alignment
 
@@ -188,7 +194,7 @@ written by the host, not streamed (AF-12).
 
 | KPI | Target |
 | --- | ------ |
-| VC pass rate | 18 / 18 (VC-ISO-18 measured) |
+| VC pass rate | 23 / 23 (VC-ISO-18 measured, not a closed form) |
 | PCF round trip on the MVP subset | byte-equal |
 | Isos needing manual fixing before issue (pilot, 20 lines) | ≤ 10 % of sheets, 0 dimension errors |
 | Time to produce one final iso (≤ 100 components) on the reference desktop | < 2 s |

@@ -38,7 +38,7 @@ ISOGEN or Plant 3D `PLANTPCFTOISO` is open question OQ-ISO-01; until then "accep
 | `data/skey_catalogue.json` | SKEYs used by the MVP (ELBW, TEBW, FLWN, WW / WS / WF …) and the unconfirmed ones | A / B / C per row |
 | `data/iso_drawing_conventions.json` | isometric projection closed forms, llull `iso` frame derivation, 13 drawing conventions, ISO 6412-1 / -2 catalogue facts | A / B per row |
 | `expected_results.json` | index of every VC: inputs, expected value, tolerance, source, FR / TR, test file | — |
-| `plans/sc-iso-0*.json` | CLI scenarios (`build_project` actions + `expected` rows); `unbuilt` lists the commands they need | — |
+| `plans/sc-iso-0*.json` (8 plans) | CLI scenarios (`build_project` actions + `expected` rows); `unbuilt` lists the commands they need | — |
 
 ## Fixture geometry (data/iso-01-L101-dn100.pcf)
 
@@ -66,6 +66,8 @@ pipe = 14500 - 1455 = 13045 mm = 2424 + 2348 + 3696 + 1696 + 1848 + 714 + 319
 | U6 | A long rack line does not fit one sheet | split at welds with continuation marks; stable re-issue | VC-ISO-13, SC-ISO-05 |
 | U7 | Erection contractor needs a GA plan with line labels and elevations | orthographic piping GA | VC-ISO-15, SC-ISO-06 |
 | U8 | The agent must prove its own output before handing it over | `check_isometric` with stable codes | VC-ISO-02, 16, SC-ISO-07 |
+| U9 | Supports and a 45° offset must appear on the iso and in the PCF | SUPPORT records, skew box | VC-ISO-21, SC-ISO-08 |
+| U10 | Only a piping checker may issue for construction | human gate | VC-ISO-19 |
 
 ## Validation cases
 
@@ -89,6 +91,11 @@ pipe = 14500 - 1455 = 13045 mm = 2424 + 2348 + 3696 + 1696 + 1848 + 714 + 319
 | VC-ISO-16 | `check_isometric` codes ISO_DISCONNECTED, ISO_SKEY_MISSING, ISO_OPEN_END, ISO_SPOOL_TOO_LARGE | spec codes | exact set | `checkIsometric.test.ts` |
 | VC-ISO-17 | Same plan twice → same PCF / SVG bytes and weld numbers | AF-13 | exact | golden |
 | VC-ISO-18 | 1000-component line within the performance budget | TBD — measure with `llull run … --json` | budget | quality gate |
+| VC-ISO-19 | `issue_isometric` by an agent → `ISO_HUMAN_GATE`; unissued iso `reviewRequired: true`, stamped NOT FOR CONSTRUCTION | AF-33 / AF-34 | exact | `issueIsometric.test.ts` |
+| VC-ISO-20 | Styles: check (no tables), final (4 tables), spool (2 sheets for 2 spools) | S11 (A) | exact | `isoStyles.test.ts` |
+| VC-ISO-21 | 2 SUPPORT records with CO-ORDS; 45° offset 1414.2135624 mm with legs 1000 / 1000 in a skew box | closed form; S3, S20 (B) | 1e-6 mm | `isoSkew.test.ts` |
+| VC-ISO-22 | Weld map CSV: 13 rows equal to `weld_list` | identity | exact | `welds.test.ts` |
+| VC-ISO-23 | Revision delta after adding a field weld: component 4 changed, W14 added, cloud on sheet 1 | spec rule | exact | `isoSheets.test.ts` |
 
 ## Reproducing the reference values
 

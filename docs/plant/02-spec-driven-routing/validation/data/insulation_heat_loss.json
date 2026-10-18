@@ -10,8 +10,13 @@
   },
   "formula": "Q' = (Ti - To) / [ ln(D1/D0)/(2 pi k_steel) + ln(D2/D1)/(2 pi k_ins) + 1/(h_o pi D2) + 1/(h_i pi D0) ]",
   "inputs": {
-    "TiK": 453.15, "ToK": 301.15, "hiWm2K": 1e12, "hoWm2K": 22.697193,
-    "insideDiameterM": 0.0779272, "layersThicknessM": [0.0054864, 0.05], "layersConductivityWmK": [56.045, 0.0598535265],
+    "TiK": 453.15,
+    "ToK": 301.15,
+    "hiWm2K": 1e12,
+    "hoWm2K": 22.697193,
+    "insideDiameterM": 0.0779272,
+    "layersThicknessM": [0.0054864, 0.05],
+    "layersConductivityWmK": [56.045, 0.0598535265],
     "comment": "NPS 3 Sch 40 steel (ID 77.93 mm, wall 5.49 mm) with 50 mm insulation"
   },
   "expected": { "heatLossWPerM": 73.12000884069367, "outerDiameterM": 0.1889, "outerSurfaceK": 306.578530147744 },

@@ -1,7 +1,7 @@
 {
   "id": "SC-RTE-06",
   "status": "PROPOSED - not runnable yet. Prefix = all actions of SC-RTE-01 (steps 0-5). Built today: update_equipment. Unbuilt: the plant plugin's reconciliation of runs after an equipment / nozzle move, piping_takeoff.",
-  "unbuilt": ["add_nozzle", "load_pipe_spec", "create_pipeline", "route_pipe", "piping_takeoff"],
+  "unbuilt": ["add_nozzle", "import_pipe_spec", "create_pipeline", "route_pipe", "piping_takeoff"],
   "validates": ["VC-RTE-12"],
   "description": "Move the vessel V-101 (its nozzle follows, 03 EQP) and check the orthogonal stretch: a displacement is absorbed by the legs parallel to it, walking back from the moved port. +500 X is absorbed by the last leg (+X). +500 Y then crosses the +X and +Z legs (their PIs shift) and is absorbed by the +Y leg.",
   "units": "mm",
@@ -14,8 +14,20 @@
   ],
   "expected": [
     { "step": 0, "path": "summary", "contains": "re-routed 1 run" },
-    { "step": 1, "path": "data.pipePieces[*].cutLengthMm", "value": [1269, 2696, 2696, 1196, 3269], "abs": 0.01, "source": "last leg 3000 + 500" },
-    { "step": 3, "path": "data.pipePieces[*].cutLengthMm", "value": [1269, 3196, 2696, 1196, 3269], "abs": 0.01, "source": "+Y leg 3000 + 500 - 2 x 152; PI2, PI3, PI4 move +500 Y" },
+    {
+      "step": 1,
+      "path": "data.pipePieces[*].cutLengthMm",
+      "value": [1269, 2696, 2696, 1196, 3269],
+      "abs": 0.01,
+      "source": "last leg 3000 + 500"
+    },
+    {
+      "step": 3,
+      "path": "data.pipePieces[*].cutLengthMm",
+      "value": [1269, 3196, 2696, 1196, 3269],
+      "abs": 0.01,
+      "source": "+Y leg 3000 + 500 - 2 x 152; PI2, PI3, PI4 move +500 Y"
+    },
     { "step": 3, "path": "data.counts.elbow90LR", "value": 4, "source": "topology unchanged" }
   ]
 }

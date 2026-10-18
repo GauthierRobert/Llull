@@ -173,8 +173,8 @@ cloud is never returned whole (AF-12).
 | AC-10 | ELB-A | `trace_pipe_centreline seed=[0.5,0,1]` | 2 straights, 1 bend of 90° ± 1° and R 152.4 ± 10 mm, PI within 5 mm | VC-SCN-22 |
 | AC-11 | STL-A | `fit_steel_member` | IPE 300 is ranked first; h and b within 3 mm | VC-SCN-23 |
 | AC-12 | a 20 mm slice of CYL-B | `slice_cloud fit=circle` | r = 109.55 ± 1.6 mm | VC-SCN-24 |
-| AC-13 | the bunny and its moved copy | `register_point_clouds method=icp` | rotation error ≤ 0.05°, translation ≤ 0.5 mm, RMS ≤ RMS at truth + 1e-5 m | VC-SCN-30 |
-| AC-14 | 2 stations with 4 sphere targets | `register_point_clouds method=targets` | translation ≤ 3 mm, rotation ≤ 0.05°; with 2 targets: `SCN_REG_TARGETS_INSUFFICIENT`, document unchanged | VC-SCN-31, 32 |
+| AC-13 | the bunny and its moved copy | `compute_registration method=icp` | rotation error ≤ 0.05°, translation ≤ 0.5 mm, RMS ≤ RMS at truth + 1e-5 m | VC-SCN-30 |
+| AC-14 | 2 stations with 4 sphere targets | `compute_registration method=targets` | translation ≤ 3 mm, rotation ≤ 0.05°; with 2 targets: `SCN_REG_TARGETS_INSUFFICIENT`, document unchanged | VC-SCN-31, 32 |
 | AC-15 | the scanned DN200 and a design 25 mm lower | `cloud_to_model_deviation` | max +25 mm, min −25 mm, RMS 17.6485 mm, 74.44 % beyond 10 mm; the tessellated mode reports its sagitta bound | VC-SCN-41, 42 |
 | AC-16 | three new DN150 routes at 0.15 / 0.25 / 0.50 m | `check_asbuilt_clash clearance=0.075` | hard / clearance / clear with gaps −43.7 / 56.3 / 306.3 mm; `reviewRequired: true`; `minPointsInVolume` named as defaulted | VC-SCN-43, 52 |
 | AC-17 | a pipe run extracted from a cloud with an unverified registration | `check_point_clouds` | warning `SCN_REGISTRATION_UNVERIFIED` listing the run | VC-SCN-51 |

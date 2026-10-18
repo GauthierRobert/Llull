@@ -1,27 +1,105 @@
 {
   "id": "SC-RTE-02",
   "status": "PROPOSED - not runnable yet. Same prerequisites as SC-RTE-01, plus insert_inline_component (this pack).",
-  "unbuilt": ["add_nozzle", "load_pipe_spec", "create_pipeline", "route_pipe", "insert_inline_component", "check_piping", "piping_takeoff"],
+  "unbuilt": ["add_nozzle", "import_pipe_spec", "create_pipeline", "route_pipe", "insert_inline_component", "check_piping", "piping_takeoff"],
   "validates": ["VC-RTE-04", "VC-RTE-05"],
   "description": "SC-RTE-01 plus a flanged gate valve (B16.10 CL150 NPS 4, face-to-face 229) centred at z 1800 on the first (vertical) leg, stem horizontal toward -Y. The valve pulls in two WN flanges, two gaskets and two bolt sets. check_piping is given an explicit project limit maxHandwheelCentreHeight 1500 mm above the level, so the valve (handwheel centre at 1800) must be reported.",
   "units": "mm",
   "actions": [
-    { "command": "add_equipment", "params": { "name": "Centrifugal pump", "mark": "P-101", "location": [0, -300], "size": [1200, 600, 800] }, "as": "pump" },
-    { "command": "add_nozzle", "params": { "equipmentId": "$pump", "tag": "N2", "position": [0, 0, 1000], "direction": [0, 0, 1], "dn": 100, "rating": "CL150", "facing": "RF", "endType": "FL" }, "as": "pumpOut" },
-    { "command": "add_equipment", "params": { "name": "Feed drum", "mark": "V-101", "location": [7000, 3000], "size": [1600, 1600, 5000], "shape": "vertical_vessel" }, "as": "vessel" },
-    { "command": "add_nozzle", "params": { "equipmentId": "$vessel", "tag": "N1", "position": [6000, 3000, 4000], "direction": [-1, 0, 0], "dn": 100, "rating": "CL150", "facing": "RF", "endType": "FL" }, "as": "vesselIn" },
+    {
+      "command": "add_equipment",
+      "params": { "name": "Centrifugal pump", "mark": "P-101", "location": [0, -300], "size": [1200, 600, 800] },
+      "as": "pump"
+    },
+    {
+      "command": "add_nozzle",
+      "params": {
+        "equipmentId": "$pump",
+        "tag": "N2",
+        "position": [0, 0, 1000],
+        "direction": [0, 0, 1],
+        "dn": 100,
+        "rating": "CL150",
+        "facing": "RF",
+        "endType": "FL"
+      },
+      "as": "pumpOut"
+    },
+    {
+      "command": "add_equipment",
+      "params": { "name": "Feed drum", "mark": "V-101", "location": [7000, 3000], "size": [1600, 1600, 5000], "shape": "vertical_vessel" },
+      "as": "vessel"
+    },
+    {
+      "command": "add_nozzle",
+      "params": {
+        "equipmentId": "$vessel",
+        "tag": "N1",
+        "position": [6000, 3000, 4000],
+        "direction": [-1, 0, 0],
+        "dn": 100,
+        "rating": "CL150",
+        "facing": "RF",
+        "endType": "FL"
+      },
+      "as": "vesselIn"
+    },
     { "command": "create_pipeline", "params": { "service": "P", "sequence": "1001", "spec": "CS150", "dn": 100 }, "as": "line" },
-    { "command": "route_pipe", "params": { "lineId": "$line", "from": { "portId": "$pumpOut" }, "to": { "portId": "$vesselIn" }, "legs": [ { "direction": "+Z", "length": 1500 }, { "direction": "+Y", "length": 3000 }, { "direction": "+X", "length": 3000 }, { "direction": "+Z", "length": 1500 } ] }, "as": "run" },
-    { "command": "insert_inline_component", "params": { "runId": "$run", "type": "valveGate", "tag": "XV-1001", "at": { "leg": 0, "centreDistance": 800 }, "stemDirection": [0, -1, 0] }, "as": "valve" },
+    {
+      "command": "route_pipe",
+      "params": {
+        "lineId": "$line",
+        "from": { "portId": "$pumpOut" },
+        "to": { "portId": "$vesselIn" },
+        "legs": [
+          { "direction": "+Z", "length": 1500 },
+          { "direction": "+Y", "length": 3000 },
+          { "direction": "+X", "length": 3000 },
+          { "direction": "+Z", "length": 1500 }
+        ]
+      },
+      "as": "run"
+    },
+    {
+      "command": "insert_inline_component",
+      "params": {
+        "runId": "$run",
+        "type": "valveGate",
+        "tag": "XV-1001",
+        "at": { "leg": 0, "centreDistance": 800 },
+        "stemDirection": [0, -1, 0]
+      },
+      "as": "valve"
+    },
     { "command": "check_piping", "params": { "lineIds": ["$line"], "maxHandwheelCentreHeight": 1500 } },
     { "command": "piping_takeoff", "params": { "runId": "$run" } }
   ],
   "expected": [
     { "step": 6, "path": "data.valveFacesZ", "value": [1685.5, 1914.5], "abs": 0.01, "source": "1800 -/+ 229/2" },
-    { "step": 7, "path": "data.issues[0].code", "value": "RTE_VALVE_OPERATOR_HEIGHT", "source": "explicit param 1500 < 1800" },
-    { "step": 7, "path": "data.issues[0].ids", "value": ["$valve"] },
+    { "step": 7, "path": "data.issues[?code=='RTE_VALVE_OPERATOR_HEIGHT'].length", "value": 1, "source": "explicit param 1500 < 1800" },
+    { "step": 7, "path": "data.issues[?code=='RTE_VALVE_OPERATOR_HEIGHT'][0].ids", "value": ["$valve"] },
     { "step": 7, "path": "data.status", "value": "warn" },
-    { "step": 8, "path": "data.counts", "value": { "elbow90LR": 4, "valveGate": 1, "flangeWN": 4, "gasket": 4, "boltSet": 4, "studs": 32, "pipePieces": 6, "buttWelds": 12, "flangedJoints": 4 } },
-    { "step": 8, "path": "data.pipePieces[*].cutLengthMm", "value": [527.5, 354.5, 2696, 2696, 1196, 2769], "abs": 0.01, "source": "leg 0 split: (1685.5 - 3) - (1000 + 3 + 76) - 76 = 527.5 ; (2500 - 152) - (1914.5 + 3 + 76) = 354.5" }
+    {
+      "step": 8,
+      "path": "data.counts",
+      "value": {
+        "elbow90LR": 4,
+        "valveGate": 1,
+        "flangeWN": 4,
+        "gasket": 4,
+        "boltSet": 4,
+        "studs": 32,
+        "pipePieces": 6,
+        "buttWelds": 12,
+        "flangedJoints": 4
+      }
+    },
+    {
+      "step": 8,
+      "path": "data.pipePieces[*].cutLengthMm",
+      "value": [527.5, 354.5, 2696, 2696, 1196, 2769],
+      "abs": 0.01,
+      "source": "leg 0 split: (1685.5 - 3) - (1000 + 3 + 76) - 76 = 527.5 ; (2500 - 152) - (1914.5 + 3 + 76) = 354.5"
+    }
   ]
 }

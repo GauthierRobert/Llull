@@ -6,22 +6,22 @@ requirements: [`../../aerospace/AGENT_FIRST.md`](../../aerospace/AGENT_FIRST.md)
 
 ## 1. Current state in llull
 
-| Area | What exists | File(s) | Limit for plant routing |
-| ---- | ----------- | ------- | ----------------------- |
-| Pipe element | `PipeElement` in the **building** model: `points: Vec3[]` (z relative to the level), `diameter`, `service`, `material`, optional `line`, `dn`, `from`, `to` (free text) | `packages/core/src/model/building.ts` (`PipeElement`, l. 251) | No ports, spec, components, joints; `from` / `to` are not references |
-| `add_pipe_run` | Validates points (2..1000), DN → OD from the EN 10220 / B36.10M table (DN15-400), refuses a twin route; summary counts "bends" = interior points | `packages/domain-aec/src/industrial/equipment/equipment.ts` | Any angle accepted; no fittings; no cut-back |
-| Pipe geometry | Circle (16 segments) swept along the polyline (`sweepRun`) + a sphere of pipe radius at each interior vertex | `packages/domain-aec/src/industrial/evaluate.ts` `evaluatePipe` | Mitred look, no elbows / flanges / valves; no insulation |
-| Sizes | `PIPE_SIZES` [DN, OD, STD wall, MSS SP-69 span] DN15-600 | `industrial/piping/pipeSizes.ts`, `pipeWeight.ts` | STD wall only; no schedules, no fittings (catalogue = 01 PSC) |
-| Route helpers | parse / length / snap to polyline / segments | `industrial/piping/routeSupport.ts` | Reusable for runs |
-| Supports | `add_pipe_support`, `check_pipe_supports` (MSS SP-69 spans, risers, re-attachment on edit) | `industrial/piping/pipeSupport*.ts`, `supportParts.ts`, `pipeSupportAttach.ts` | Work on `PipeElement` centrelines only |
-| Hydraulics | `pipe_hydraulics` (Darcy-Weisbach, Colebrook, K per bend from deflection) | `industrial/piping/pipeHydraulics.ts`, `pipeFlow.ts` | Would gain real fittings K from components |
-| Equipment | `add_equipment` (box / vertical / horizontal vessel, clearance, weight), `update_equipment` | `industrial/equipment/equipment.ts`, `equipmentUpdate.ts` | No nozzles (03 EQP) |
-| Clashes | `check_clashes`: pipes, trays, equipment, steel…; a pipe end inside equipment or on another pipe is a "connection", not a clash | `industrial/clash/clash.ts`, `clashBoxes.ts` | Connections guessed by geometry; no insulation envelope |
-| Gravity pipes | Civil drainage `add_pipe` / `update_pipe` with inverts, adverse-slope warning | `packages/domain-aec/src/civil/drainage/drainagePipeCommands.ts` | Network between manholes, not plant piping; slope check idea reused |
-| Exchange | IFC `IFCPIPESEGMENT(... .RIGIDSEGMENT.)` per pipe; plan sheets / DXF show pipes with service | `building/exchange/ifcIndustrialExport.ts` | No fittings, ports or `IfcRelConnectsPorts`; no PCF |
-| Toolset | MCP `piping` = `add_pipe_run add_pipe_support add_cable_tray check_pipe_supports pipe_hydraulics` | `packages/mcp/src/toolsets.ts` `PIPING_TOOLS` | Grows with this gap |
-| Plugin pattern for a model slice | `civil` plugin: `doc.civil` typed in `@core/model/civil`, `derivedModelExtension` regenerates entities, derivation guard | `packages/domain-aec/src/civil/plugin.ts`, `shared/derived.ts` | Template for `doc.plant` |
-| Plan reports | `build_project` steps carry `error { code, ids, paths, remediation }` and `data`; `data.aliases` | `packages/core/src/commands/project/` (AF-14, done) | Ready for `RTE_*` codes |
+| Area                             | What exists                                                                                                                                                             | File(s)                                                                        | Limit for plant routing                                              |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| Pipe element                     | `PipeElement` in the **building** model: `points: Vec3[]` (z relative to the level), `diameter`, `service`, `material`, optional `line`, `dn`, `from`, `to` (free text) | `packages/core/src/model/building.ts` (`PipeElement`, l. 251)                  | No ports, spec, components, joints; `from` / `to` are not references |
+| `add_pipe_run`                   | Validates points (2..1000), DN → OD from the EN 10220 / B36.10M table (DN15-400), refuses a twin route; summary counts "bends" = interior points                        | `packages/domain-aec/src/industrial/equipment/equipment.ts`                    | Any angle accepted; no fittings; no cut-back                         |
+| Pipe geometry                    | Circle (16 segments) swept along the polyline (`sweepRun`) + a sphere of pipe radius at each interior vertex                                                            | `packages/domain-aec/src/industrial/evaluate.ts` `evaluatePipe`                | Mitred look, no elbows / flanges / valves; no insulation             |
+| Sizes                            | `PIPE_SIZES` [DN, OD, STD wall, MSS SP-69 span] DN15-600                                                                                                                | `industrial/piping/pipeSizes.ts`, `pipeWeight.ts`                              | STD wall only; no schedules, no fittings (catalogue = 01 PSC)        |
+| Route helpers                    | parse / length / snap to polyline / segments                                                                                                                            | `industrial/piping/routeSupport.ts`                                            | Reusable for runs                                                    |
+| Supports                         | `add_pipe_support`, `check_pipe_supports` (MSS SP-69 spans, risers, re-attachment on edit)                                                                              | `industrial/piping/pipeSupport*.ts`, `supportParts.ts`, `pipeSupportAttach.ts` | Work on `PipeElement` centrelines only                               |
+| Hydraulics                       | `pipe_hydraulics` (Darcy-Weisbach, Colebrook, K per bend from deflection)                                                                                               | `industrial/piping/pipeHydraulics.ts`, `pipeFlow.ts`                           | Would gain real fittings K from components                           |
+| Equipment                        | `add_equipment` (box / vertical / horizontal vessel, clearance, weight), `update_equipment`                                                                             | `industrial/equipment/equipment.ts`, `equipmentUpdate.ts`                      | No nozzles (03 EQP)                                                  |
+| Clashes                          | `check_clashes`: pipes, trays, equipment, steel…; a pipe end inside equipment or on another pipe is a "connection", not a clash                                         | `industrial/clash/clash.ts`, `clashBoxes.ts`                                   | Connections guessed by geometry; no insulation envelope              |
+| Gravity pipes                    | Civil drainage `add_pipe` / `update_pipe` with inverts, adverse-slope warning                                                                                           | `packages/domain-aec/src/civil/drainage/drainagePipeCommands.ts`               | Network between manholes, not plant piping; slope check idea reused  |
+| Exchange                         | IFC `IFCPIPESEGMENT(... .RIGIDSEGMENT.)` per pipe; plan sheets / DXF show pipes with service                                                                            | `building/exchange/ifcIndustrialExport.ts`                                     | No fittings, ports or `IfcRelConnectsPorts`; no PCF                  |
+| Toolset                          | MCP `piping` = `add_pipe_run add_pipe_support add_cable_tray check_pipe_supports pipe_hydraulics`                                                                       | `packages/mcp/src/toolsets.ts` `PIPING_TOOLS`                                  | Grows with this gap                                                  |
+| Plugin pattern for a model slice | `civil` plugin: `doc.civil` typed in `@core/model/civil`, `derivedModelExtension` regenerates entities, derivation guard                                                | `packages/domain-aec/src/civil/plugin.ts`, `shared/derived.ts`                 | Template for `doc.plant`                                             |
+| Plan reports                     | `build_project` steps carry `error { code, ids, paths, remediation }` and `data`; `data.aliases`                                                                        | `packages/core/src/commands/project/` (AF-14, done)                            | Ready for `RTE_*` codes                                              |
 
 Gap: everything from §3 on. Nothing in `packages/` is changed by this pack.
 
@@ -81,78 +81,106 @@ packages/domain-aec/src/plant/piping/
 ### 3.1 Stored types (`@core/model/plant`)
 
 ```ts
-export type EndType = 'BW' | 'FL' | 'SW' | 'SC' | 'PL' | 'WAF' | 'LUG';      // butt weld, flanged, socket, screwed, plain, wafer, lug
+export type EndType = 'BW' | 'FL' | 'SW' | 'SC' | 'PL' | 'WAF' | 'LUG'; // butt weld, flanged, socket, screwed, plain, wafer, lug
 export type Facing = 'RF' | 'FF' | 'RTJ';
 
 /** A connection point. Direction = outward unit normal of the connection face, pointing toward the pipe. */
 export interface PortSpec {
-  position: Vec3;                 // world coordinates, document units (mm in plant documents)
-  direction: Vec3;                // unit vector
-  dn: number;                     // nominal size, DN integer (NPS mapped by 01)
+  position: Vec3; // world coordinates, document units (mm in plant documents)
+  direction: Vec3; // unit vector
+  dn: number; // nominal size, DN integer (NPS mapped by 01)
   endType: EndType;
-  rating?: string;                // 'CL150', 'PN16' …
+  rating?: string; // 'CL150', 'PN16' …
   facing?: Facing;
 }
 
-export interface TieInPoint { readonly id: string; tag: string; kind: 'tie_in' | 'battery_limit'; port: PortSpec }
+export interface TieInPoint {
+  readonly id: string;
+  tag: string;
+  kind: 'tie_in' | 'battery_limit';
+  port: PortSpec;
+}
 
-export type PortRef = { kind: 'tieIn'; id: string } | { kind: 'nozzle'; equipmentId: string; nozzleId: string } |
-  { kind: 'runEnd'; runId: string; end: 'start' | 'end' } | { kind: 'branch'; runId: string; branchId: string };
+export type PortRef =
+  | { kind: 'tieIn'; id: string }
+  | { kind: 'nozzle'; equipmentId: string; nozzleId: string }
+  | { kind: 'runEnd'; runId: string; end: 'start' | 'end' }
+  | { kind: 'branch'; runId: string; branchId: string };
 
-export interface Slope { value: number; unit: 'percent' | 'ratio' | 'deg'; fall: boolean }   // fall = descends along flow
+export interface Slope {
+  value: number;
+  unit: 'percent' | 'ratio' | 'deg';
+  fall: boolean;
+} // fall = descends along flow
 
 export interface PipeLine {
-  readonly id: string;                         // 'line-3'
-  lineNumber: string;                          // '100-P-1001-CS150' (template, §5.9)
+  readonly id: string; // 'line-3'
+  lineNumber: string; // '100-P-1001-CS150' (template, §5.9)
   fields: { dn: number; service: string; sequence: string; spec: string; insulationCode?: string };
-  spec: string;                                // spec name (01 PSC)
+  spec: string; // spec name (01 PSC)
   dn: number;
   designPressureBarG?: number;
   designTempC?: number;
   insulation?: { code: string; thicknessMm: number; material: string; source: 'spec' | 'explicit' };
   tracing?: { type: 'electric' | 'steam'; tracers: number; maintainTempC?: number };
   slope?: Slope;
-  from?: string;                               // tag text kept for the line list; checked against the graph
+  from?: string; // tag text kept for the line list; checked against the graph
   to?: string;
   runIds: string[];
 }
 
-export interface RunEnd { ref?: PortRef; point: Vec3; direction?: Vec3 }   // ref absent = open end at point
+export interface RunEnd {
+  ref?: PortRef;
+  point: Vec3;
+  direction?: Vec3;
+} // ref absent = open end at point
 
 export interface InlineComponent {
-  readonly id: string;                         // 'valve-2' (step-scoped)
-  type: string;                                // catalogue type: 'valveGate', 'strainerY', 'reducerConcentric' …
-  tag?: string;                                // 'XV-1001'
-  leg: number;                                 // leg index in the run
-  centreDistance: number;                      // from the leg start PI, document units
-  dn2?: number;                                // reducers: outlet DN
-  stemDirection?: Vec3;                        // valves
+  readonly id: string; // 'valve-2' (step-scoped)
+  type: string; // catalogue type: 'valveGate', 'strainerY', 'reducerConcentric' …
+  tag?: string; // 'XV-1001'
+  leg: number; // leg index in the run
+  centreDistance: number; // from the leg start PI, document units
+  dn2?: number; // reducers: outlet DN
+  stemDirection?: Vec3; // valves
 }
 
-export interface BranchPoint { readonly id: string; leg: number; distance: number; branchRunId: string; fitting?: string }
+export interface BranchPoint {
+  readonly id: string;
+  leg: number;
+  distance: number;
+  branchRunId: string;
+  fitting?: string;
+}
 
 export interface PipeRun {
-  readonly id: string;                         // 'run-4'
+  readonly id: string; // 'run-4'
   lineId: string;
   start: RunEnd;
   end: RunEnd;
-  pis: Vec3[];                                 // interior points of intersection; legs = [start, ...pis, end]
-  legDn?: number[];                            // per-leg DN when sizes change (reducers derived at the change)
+  pis: Vec3[]; // interior points of intersection; legs = [start, ...pis, end]
+  legDn?: number[]; // per-leg DN when sizes change (reducers derived at the change)
   legSlopes?: (Slope | null)[];
   inline: InlineComponent[];
   branches: BranchPoint[];
-  angleToleranceDeg?: number;                  // overrides the spec tolerance for this run (named in results)
+  angleToleranceDeg?: number; // overrides the spec tolerance for this run (named in results)
   broken?: { code: 'RTE_STRETCH_FAILED'; reason: string };
 }
 
 export interface PipingModel {
   counters: Record<string, number>;
-  lines: Record<string, PipeLine>; lineOrder: string[];
-  runs: Record<string, PipeRun>;   runOrder: string[];
+  lines: Record<string, PipeLine>;
+  lineOrder: string[];
+  runs: Record<string, PipeRun>;
+  runOrder: string[];
   tieIns: Record<string, TieInPoint>;
-  entityIds: Record<string, string[]>;         // derived entity ids per run (regeneration)
+  entityIds: Record<string, string[]>; // derived entity ids per run (regeneration)
 }
-export interface PlantModel { piping?: PipingModel; specs?: unknown /* 01 PSC */; equipment?: unknown /* 03 EQP */ }
+export interface PlantModel {
+  piping?: PipingModel;
+  specs?: unknown /* 01 PSC */;
+  equipment?: unknown; /* 03 EQP */
+}
 ```
 
 `CadDocument` gains `plant?: PlantModel` (optional, absent = no plant data; old files load unchanged). The building
@@ -162,31 +190,52 @@ export interface PlantModel { piping?: PipingModel; specs?: unknown /* 01 PSC */
 ### 3.2 Derived types (not stored)
 
 ```ts
-export interface PartPort { position: Vec3; direction: Vec3; dn: number; endType: EndType; rating?: string; facing?: Facing }
-export interface RoutedPart {
-  id: string;                                  // `${runId}/${kind}-${k}` deterministic in route order
-  runId: string; kind: 'pipe' | 'elbow' | 'tee' | 'olet' | 'stubIn' | 'reducer' | 'flange' | 'gasket' | 'boltSet' |
-    'valve' | 'inline' | 'cap';
-  catalogueKey: string;                        // 01 PSC row id, e.g. 'CS150/elbow90LR/4'
-  dn: number; dn2?: number;
-  ports: PartPort[];                           // 2 (pipe, elbow, flange…), 3 (tee), 1 (cap)
-  centre?: Vec3;                               // elbow / tee centre (PCF CENTRE-POINT)
-  cutLength?: number;                          // pipe pieces only
-  angleDeg?: number;                           // elbows: actual turn; nominal in catalogueKey
-  unverified?: boolean;                        // from the catalogue row / spec status (AF-32)
+export interface PartPort {
+  position: Vec3;
+  direction: Vec3;
+  dn: number;
+  endType: EndType;
+  rating?: string;
+  facing?: Facing;
 }
-export interface Joint { id: string; kind: 'buttWeld' | 'socketWeld' | 'threaded' | 'flanged' | 'fittingToFitting';
-  parts: [string, string]; position: Vec3; gapMm: number }
+export interface RoutedPart {
+  id: string; // `${runId}/${kind}-${k}` deterministic in route order
+  runId: string;
+  kind: 'pipe' | 'elbow' | 'tee' | 'olet' | 'stubIn' | 'reducer' | 'flange' | 'gasket' | 'boltSet' | 'valve' | 'inline' | 'cap';
+  catalogueKey: string; // 01 PSC row id, e.g. 'CS150/elbow90LR/4'
+  dn: number;
+  dn2?: number;
+  ports: PartPort[]; // 2 (pipe, elbow, flange…), 3 (tee), 1 (cap)
+  centre?: Vec3; // elbow / tee centre (PCF CENTRE-POINT)
+  cutLength?: number; // pipe pieces only
+  angleDeg?: number; // elbows: actual turn; nominal in catalogueKey
+  unverified?: boolean; // from the catalogue row / spec status (AF-32)
+}
+export interface Joint {
+  id: string;
+  kind: 'buttWeld' | 'socketWeld' | 'threaded' | 'flanged' | 'fittingToFitting';
+  parts: [string, string];
+  position: Vec3;
+  gapMm: number;
+}
 ```
 
 ### 3.3 `SpecLookup` (implemented by 01 PSC)
 
 ```ts
-export interface CatalogueRow { key: string; type: string; dn: number; dn2?: number; rating?: string; ends: EndType[];
-  dims: Record<string, number>;                // centreToEnd, C, M, H, Y, faceToFace, thickness, height, studs …
-  unverified: boolean; source: string }
+export interface CatalogueRow {
+  key: string;
+  type: string;
+  dn: number;
+  dn2?: number;
+  rating?: string;
+  ends: EndType[];
+  dims: Record<string, number>; // centreToEnd, C, M, H, Y, faceToFace, thickness, height, studs …
+  unverified: boolean;
+  source: string;
+}
 export interface SpecLookup {
-  status(spec: string): 'approved' | 'draft' | 'stub' | null;            // null = unknown spec
+  status(spec: string): 'approved' | 'draft' | 'stub' | null; // null = unknown spec
   pipe(spec: string, dn: number): CatalogueRow | SpecMiss;
   component(spec: string, q: { type: string; dn: number; dn2?: number; rating?: string; angleDeg?: number }): CatalogueRow | SpecMiss;
   elbowAngles(spec: string, dn: number): { anglesDeg: number[]; toleranceDeg: number; trimmedAllowed: boolean };
@@ -196,6 +245,13 @@ export interface SpecLookup {
 }
 export type SpecMiss = { miss: 'RTE_SPEC_NO_COMPONENT' | 'RTE_SPEC_AMBIGUOUS' | 'RTE_SPEC_UNKNOWN'; detail: string };
 ```
+
+Binding to 01-piping-specs-catalog: `SpecLookup` is a thin adapter over the pure functions behind 01's
+`resolve_spec_component` and `resolve_branch` (01 TECHNICAL §4-5), called in-process (not through `execute`, as
+derivation runs inside every regeneration). 01's codes are carried in `detail` and mapped:
+`PSC_SPEC_UNKNOWN` → `RTE_SPEC_UNKNOWN`, `PSC_BRANCH_UNDEFINED` → `RTE_BRANCH_NO_TABLE_ROW`, any "no component"
+miss → `RTE_SPEC_NO_COMPONENT`. `status()` reads 01's revision / approval state (`approve_pipe_spec` is 01's
+human gate, AF-34). Specs enter the document with 01's `import_pipe_spec` or `create_pipe_spec`.
 
 ### 3.4 Document version and migration
 
@@ -208,25 +264,25 @@ Mutating commands append a `FeatureStep` (L8). Ids are step-scoped. Units: docum
 documents) unless stated; angles in degrees; temperatures °C; pressure bar g. Every refusal sets
 `CommandResult.error` (AF-11) and returns the input document unchanged.
 
-| Command | Kind | Params sketch | Tags |
-| ------- | ---- | ------------- | ---- |
-| `add_tie_in_point` | mutating | `{ tag, position: [x,y,z], direction: [dx,dy,dz], dn, endType, rating?, facing?, kind?: 'tie_in'\|'battery_limit' }` | @affects creates 1 tie-in (port marker on layer P-TIE) · @invariant direction normalised; tag unique · @failure zero direction / dn ≤ 0 / duplicate tag → `RTE_INVALID_PORT`, `RTE_DUPLICATE_TAG` |
-| `create_pipeline` | mutating | `{ service, sequence, spec, dn, lineNumber?, designPressureBarG?, designTempC?, insulation?: { code, thickness: number\|'fromSpec', material? }, tracing?, slope?, from?, to? }` | @affects creates 1 line (no geometry) · @invariant lineNumber = explicit or template; unique · @failure unknown spec `RTE_SPEC_UNKNOWN`; duplicate `RTE_DUPLICATE_LINE_NUMBER`; insulation fromSpec without table row `RTE_SPEC_NO_COMPONENT` |
-| `update_pipeline` | mutating | `{ lineId, …same optional fields }` | @affects line + re-derivation of its runs (spec change re-selects parts) · @failure as above; parts missing in the new spec → refused, nothing changed |
-| `route_pipe` | mutating | `{ lineId, from: { portId } \| { point, direction? }, to?: { portId } \| { point }, legs?: [{ direction: '+X'…'-Z' \| [dx,dy,dz], length? , planLength?, slope? }], via?: [[x,y,z]…], dn?, angleToleranceDeg? }` | @affects creates 1 run + derived parts · @invariant legs from the start port; a final straight closing leg to `to` is added when collinear with the arrival direction; consecutive collinear legs merge · @failure §7 codes (`RTE_UNKNOWN_PORT`, `RTE_PORT_IN_USE`, `RTE_CLOSING_LEG_IMPOSSIBLE`, `RTE_NO_FITTING_FOR_ANGLE`, `RTE_SEGMENT_TOO_SHORT`, `RTE_SIZE_MISMATCH`, `RTE_RATING_MISMATCH`, `RTE_NO_CONNECTION_RULE`, `RTE_SPEC_NO_COMPONENT`, `RTE_ZERO_LEG`, `RTE_PORT_DIRECTION`) |
-| `insert_inline_component` | mutating | `{ runId, type, tag?, at: { leg, centreDistance } \| { point }, dn2?, stemDirection? }` | @affects run.inline + derived split / flange sets · @failure does not fit between neighbours `RTE_INLINE_DOES_NOT_FIT`; not in spec `RTE_SPEC_NO_COMPONENT` |
-| `move_inline_component` | mutating | `{ runId, componentId, centreDistance \| delta }` | @affects one inline position · @failure as above |
-| `add_branch` | mutating | `{ runId, at: { leg, distance } \| { point }, dn, to?: { portId } \| { point }, legs?: […] }` | @affects header run.branches + new branch run (same line unless `lineId`) · @invariant fitting from the branch table, reported in `data.fitting` · @failure on a fitting `RTE_BRANCH_ON_FITTING`; no table row `RTE_BRANCH_NO_TABLE_ROW` |
-| `edit_route` | mutating | `{ runId, op: 'move_pi' \| 'stretch_leg' \| 'insert_pi' \| 'delete_pi', index, delta? \| point? \| length? }` | @affects PIs; re-derivation · @failure any derived failure → refused with that code |
-| `delete_pipe_run` | mutating | `{ runId, heal?: boolean }` | @affects removes run (and its branch runs if `cascade`) · @failure branch runs exist and no cascade `RTE_HAS_BRANCHES` |
-| `convert_pipe_run` | mutating | `{ pipeId, spec, lineId?, replace?: boolean }` | @affects creates line (from `PipeElement.line`) + run; deletes the element when `replace` · @failure untranslatable angle `RTE_NO_FITTING_FOR_ANGLE` (lists vertex indices) |
-| `set_line_insulation` | mutating | `{ lineId, code, thickness: number\|'fromSpec', material? }` | V1; same validation as `create_pipeline` |
-| `set_heat_tracing` | mutating | `{ lineId, type, tracers, maintainTempC?, allowances?: { valveM, flangeM, supportM } }` | V1; data only |
-| `piping_connectivity` | query | `{ lineIds?, from?: portId, to?: portId }` | `data = { nodes, edges, openEnds, path? }` |
-| `check_piping` | query | `{ lineIds?, maxHandwheelCentreHeight?, minWeldSpacing?, include?: string[] }` | `data = { status, issues: [{ code, severity, ids, paths, detail, remediation }], counts, unverified, reviewRequired }` |
-| `piping_takeoff` | query | `{ runId? , lineId? }` | `data = { counts, parts[], pipePieces[{ id, dn, cutLengthMm, leg }], joints[], totalPipeMm, centrelineLengthMm, legs[], turns[], studs, unverified }` |
-| `line_heat_loss` | query (V1) | `{ lineId, fluidTempC, ambientTempC, outsideFilmWm2K, insideFilmWm2K?, steelConductivityWmK, insulationConductivityWmK? }` | `data = { heatLossWPerM, surfaceTempC, provenance, reviewRequired: true }`; every defaulted input named |
-| `auto_route_pipe` | mutating (V2) | `{ lineId, from, to, grid?, bendCost?, clearance?, preferElevations?, keepOut?: ids[], maxExpansions? }` | @affects creates 1 ordinary run · @failure `RTE_AUTOROUTE_NO_PATH`, `RTE_AUTOROUTE_BUDGET` |
+| Command                   | Kind          | Params sketch                                                                                                                                                                                                    | Tags                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `add_tie_in_point`        | mutating      | `{ tag, position: [x,y,z], direction: [dx,dy,dz], dn, endType, rating?, facing?, kind?: 'tie_in'\|'battery_limit' }`                                                                                             | @affects creates 1 tie-in (port marker on layer P-TIE) · @invariant direction normalised; tag unique · @failure zero direction / dn ≤ 0 / duplicate tag → `RTE_INVALID_PORT`, `RTE_DUPLICATE_TAG`                                                                                                                                                                                                                                                                                           |
+| `create_pipeline`         | mutating      | `{ service, sequence, spec, dn, lineNumber?, designPressureBarG?, designTempC?, insulation?: { code, thickness: number\|'fromSpec', material? }, tracing?, slope?, from?, to? }`                                 | @affects creates 1 line (no geometry) · @invariant lineNumber = explicit or template; unique · @failure unknown spec `RTE_SPEC_UNKNOWN`; duplicate `RTE_DUPLICATE_LINE_NUMBER`; insulation fromSpec without table row `RTE_SPEC_NO_COMPONENT`                                                                                                                                                                                                                                               |
+| `update_pipeline`         | mutating      | `{ lineId, …same optional fields }`                                                                                                                                                                              | @affects line + re-derivation of its runs (spec change re-selects parts) · @failure as above; parts missing in the new spec → refused, nothing changed                                                                                                                                                                                                                                                                                                                                      |
+| `route_pipe`              | mutating      | `{ lineId, from: { portId } \| { point, direction? }, to?: { portId } \| { point }, legs?: [{ direction: '+X'…'-Z' \| [dx,dy,dz], length? , planLength?, slope? }], via?: [[x,y,z]…], dn?, angleToleranceDeg? }` | @affects creates 1 run + derived parts · @invariant legs from the start port; a final straight closing leg to `to` is added when collinear with the arrival direction; consecutive collinear legs merge · @failure §7 codes (`RTE_UNKNOWN_PORT`, `RTE_PORT_IN_USE`, `RTE_CLOSING_LEG_IMPOSSIBLE`, `RTE_NO_FITTING_FOR_ANGLE`, `RTE_SEGMENT_TOO_SHORT`, `RTE_SIZE_MISMATCH`, `RTE_RATING_MISMATCH`, `RTE_NO_CONNECTION_RULE`, `RTE_SPEC_NO_COMPONENT`, `RTE_ZERO_LEG`, `RTE_PORT_DIRECTION`) |
+| `insert_inline_component` | mutating      | `{ runId, type, tag?, at: { leg, centreDistance } \| { point }, dn2?, stemDirection? }`                                                                                                                          | @affects run.inline + derived split / flange sets · @failure does not fit between neighbours `RTE_INLINE_DOES_NOT_FIT`; not in spec `RTE_SPEC_NO_COMPONENT`                                                                                                                                                                                                                                                                                                                                 |
+| `move_inline_component`   | mutating      | `{ runId, componentId, centreDistance \| delta }`                                                                                                                                                                | @affects one inline position · @failure as above                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `add_branch`              | mutating      | `{ runId, at: { leg, distance } \| { point }, dn, to?: { portId } \| { point }, legs?: […] }`                                                                                                                    | @affects header run.branches + new branch run (same line unless `lineId`) · @invariant fitting from the branch table, reported in `data.fitting` · @failure on a fitting `RTE_BRANCH_ON_FITTING`; no table row `RTE_BRANCH_NO_TABLE_ROW`                                                                                                                                                                                                                                                    |
+| `edit_route`              | mutating      | `{ runId, op: 'move_pi' \| 'stretch_leg' \| 'insert_pi' \| 'delete_pi', index, delta? \| point? \| length? }`                                                                                                    | @affects PIs; re-derivation · @failure any derived failure → refused with that code                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `delete_pipe_run`         | mutating      | `{ runId, heal?: boolean }`                                                                                                                                                                                      | @affects removes run (and its branch runs if `cascade`) · @failure branch runs exist and no cascade `RTE_HAS_BRANCHES`                                                                                                                                                                                                                                                                                                                                                                      |
+| `convert_pipe_run`        | mutating      | `{ pipeId, spec, lineId?, replace?: boolean }`                                                                                                                                                                   | @affects creates line (from `PipeElement.line`) + run; deletes the element when `replace` · @failure untranslatable angle `RTE_NO_FITTING_FOR_ANGLE` (lists vertex indices)                                                                                                                                                                                                                                                                                                                 |
+| `set_line_insulation`     | mutating      | `{ lineId, code, thickness: number\|'fromSpec', material? }`                                                                                                                                                     | V1; same validation as `create_pipeline`                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `set_heat_tracing`        | mutating      | `{ lineId, type, tracers, maintainTempC?, allowances?: { valveM, flangeM, supportM } }`                                                                                                                          | V1; data only                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `piping_connectivity`     | query         | `{ lineIds?, from?: portId, to?: portId }`                                                                                                                                                                       | `data = { nodes, edges, openEnds, path? }`                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `check_piping`            | query         | `{ lineIds?, maxHandwheelCentreHeight?, minWeldSpacing?, include?: string[] }`                                                                                                                                   | `data = { status, issues: [{ code, severity, ids, paths, detail, remediation }], counts, unverified, reviewRequired }`                                                                                                                                                                                                                                                                                                                                                                      |
+| `piping_takeoff`          | query         | `{ runId? , lineId? }`                                                                                                                                                                                           | `data = { counts, parts[], pipePieces[{ id, dn, cutLengthMm, leg }], joints[], totalPipeMm, centrelineLengthMm, legs[], turns[], studs, unverified }`                                                                                                                                                                                                                                                                                                                                       |
+| `line_heat_loss`          | query (V1)    | `{ lineId, fluidTempC, ambientTempC, outsideFilmWm2K, insideFilmWm2K?, steelConductivityWmK, insulationConductivityWmK? }`                                                                                       | `data = { heatLossWPerM, surfaceTempC, provenance, reviewRequired: true }`; every defaulted input named                                                                                                                                                                                                                                                                                                                                                                                     |
+| `auto_route_pipe`         | mutating (V2) | `{ lineId, from, to, grid?, bendCost?, clearance?, preferElevations?, keepOut?: ids[], maxExpansions? }`                                                                                                         | @affects creates 1 ordinary run · @failure `RTE_AUTOROUTE_NO_PATH`, `RTE_AUTOROUTE_BUDGET`                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 Descriptions follow AF-02: what, when, units, refusals, next command (e.g. `route_pipe` → "then run
 `check_piping`; add valves with `insert_inline_component`").
@@ -401,14 +457,14 @@ SC-RTE-08: free space, length = Manhattan 6000, bends = 2 (three axes need three
 
 ## 6. Interop and persistence
 
-| Format | Direction | What | Owner |
-| ------ | --------- | ---- | ----- |
-| llull document JSON | read / write | `plant.piping` (lines, runs, tie-ins, settings); derived parts not stored | this gap |
-| PCF (Alias, licensed spec [S26][S35]) | write (V1), read (V2) | from `piping_takeoff.parts` + graph: PIPE / ELBOW / TEE / FLANGE / GASKET / BOLT / VALVE records with END-POINT (+ size), CENTRE-POINT (elbows, tees), BRANCH1-POINT; pipeline header with line number | 05-isometrics-fabrication |
-| IFC 4.3 | write | `IfcPipeSegment`, `IfcPipeFitting` (BEND, JUNCTION, TRANSITION, CONNECTOR), `IfcValve`, `IfcDistributionPort` + `IfcRelNests` / `IfcRelConnectsPorts`, `IfcDistributionSystem` per line; extends `building/exchange/ifcIndustrialExport.ts` | 08-plant-data-reports-interop |
-| Stress neutral file (CAESAR II / PCF) | write | nodes at PIs, elbow radii, rigid valves / flanges with weights | 07-pipe-stress-flexibility |
-| DEXPI | read | line numbers, from / to, inline valves order for P&ID ↔ 3D check | 04-pid-schematics |
-| DXF / sheets | write | plan sheets draw runs with fittings (existing `export_plan_sheet` extended) | 05 / 09 |
+| Format                                | Direction             | What                                                                                                                                                                                                                                        | Owner                         |
+| ------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| llull document JSON                   | read / write          | `plant.piping` (lines, runs, tie-ins, settings); derived parts not stored                                                                                                                                                                   | this gap                      |
+| PCF (Alias, licensed spec [S26][S35]) | write (V1), read (V2) | from `piping_takeoff.parts` + graph: PIPE / ELBOW / TEE / FLANGE / GASKET / BOLT / VALVE records with END-POINT (+ size), CENTRE-POINT (elbows, tees), BRANCH1-POINT; pipeline header with line number                                      | 05-isometrics-fabrication     |
+| IFC 4.3                               | write                 | `IfcPipeSegment`, `IfcPipeFitting` (BEND, JUNCTION, TRANSITION, CONNECTOR), `IfcValve`, `IfcDistributionPort` + `IfcRelNests` / `IfcRelConnectsPorts`, `IfcDistributionSystem` per line; extends `building/exchange/ifcIndustrialExport.ts` | 08-plant-data-reports-interop |
+| Stress neutral file (CAESAR II / PCF) | write                 | nodes at PIs, elbow radii, rigid valves / flanges with weights                                                                                                                                                                              | 07-pipe-stress-flexibility    |
+| DEXPI                                 | read                  | line numbers, from / to, inline valves order for P&ID ↔ 3D check                                                                                                                                                                            | 04-pid-schematics             |
+| DXF / sheets                          | write                 | plan sheets draw runs with fittings (existing `export_plan_sheet` extended)                                                                                                                                                                 | 05 / 09                       |
 
 ## 7. CLI / MCP / UI surfaces and error codes
 
@@ -419,83 +475,83 @@ SC-RTE-08: free space, length = Manhattan 6000, bends = 2 (three axes need three
 - UI: route markers, open-end markers, issue list from `check_piping`, line list panel (08). Interactive compass
   emits `route_pipe` legs (viewport-engineer lane); no UI-only capability.
 
-| Code | Severity | Raised by | Meaning | Remediation |
-| ---- | -------- | --------- | ------- | ----------- |
-| `RTE_UNKNOWN_LINE` | error | all run commands | `lineId` not found | `create_pipeline` first |
-| `RTE_UNKNOWN_PORT` | error | `route_pipe`, `add_branch` | port id not found | list ports with `piping_connectivity` / `add_tie_in_point` |
-| `RTE_PORT_IN_USE` | error | `route_pipe` | port already connected | route from the run end, or `add_branch` |
-| `RTE_INVALID_PORT` | error | `add_tie_in_point` | zero direction, DN ≤ 0 | give a unit direction toward the pipe and a DN |
-| `RTE_DUPLICATE_TAG` / `RTE_DUPLICATE_LINE_NUMBER` | error | create commands, check | not unique | choose another tag / sequence |
-| `RTE_SPEC_UNKNOWN` | error | `create_pipeline` | spec not loaded | `load_pipe_spec` (01) |
-| `RTE_SPEC_NO_COMPONENT` | error | derivation | no catalogue row for (type, DN, rating…) | add the row to the spec or change size / rating |
-| `RTE_SPEC_AMBIGUOUS` | error | derivation | several rows match, no preference | set a preference in the spec |
-| `RTE_NO_CONNECTION_RULE` | error | derivation | end-type pair without a rule (e.g. BW–SW) | add the rule in the spec or change the end type |
-| `RTE_NO_FITTING_FOR_ANGLE` | error | `route_pipe`, `add_branch`, `convert_pipe_run` | turn angle not in spec ± tolerance | use 90 / 45 legs, or allow trimmed elbows in the spec |
-| `RTE_SEGMENT_TOO_SHORT` | error | derivation | negative cut length (`detail.cutLengthMm`) | lengthen the leg to ≥ sum of centre-to-ends |
-| `RTE_ZERO_LEG` | error | `route_pipe` | leg length 0 | remove the leg |
-| `RTE_PORT_DIRECTION` | error | `route_pipe` | first / last leg not along the port direction | start with a leg along the port direction |
-| `RTE_CLOSING_LEG_IMPOSSIBLE` | error | `route_pipe` | target port not reachable by one straight leg | add legs; `detail.offset` gives the remaining vector |
-| `RTE_SIZE_MISMATCH` / `RTE_RATING_MISMATCH` / `RTE_FACING_MISMATCH` / `RTE_END_TYPE_MISMATCH` | error | `route_pipe`, check | ports disagree and the spec has no transition | add a reducer / change spec / fix the nozzle |
-| `RTE_INLINE_DOES_NOT_FIT` | error | inline commands | component overlaps a fitting | move it (`centreDistance`) or lengthen the leg |
-| `RTE_BRANCH_ON_FITTING` / `RTE_BRANCH_NO_TABLE_ROW` | error | `add_branch` | branch point inside a fitting / no branch-table cell | move the point / extend the branch table |
-| `RTE_HAS_BRANCHES` | error | `delete_pipe_run` | branch runs depend on it | `cascade: true` |
-| `RTE_STRETCH_FAILED` | error (run marked broken) | regeneration after an edit | displacement not absorbable orthogonally | re-route the run (`edit_route`) |
-| `RTE_OPEN_END` | warning | `check_piping` | part port connected to nothing | route to a port, add a cap / blind, or a tie-in |
-| `RTE_DISCONNECTED_PORT` | info | `check_piping` | nozzle / tie-in without a run | route it or mark it spare |
-| `RTE_FITTING_TO_FITTING` | warning | check | zero cut length | accept or lengthen |
-| `RTE_WELD_SPACING` | warning | check | pipe piece shorter than the weld-spacing rule (named) | lengthen or accept per project spec |
-| `RTE_ADVERSE_SLOPE` / `RTE_POCKET` | warning | check | sloped line rises along flow / low or high point | fix the slope / add drain or vent |
-| `RTE_FROM_TO_MISMATCH` | warning | check | line from / to text ≠ connected equipment | update the line or the route |
-| `RTE_VALVE_OPERATOR_HEIGHT` / `RTE_VALVE_OPERATOR_CLASH` | warning | check | handwheel above the given limit / operator envelope clashes | rotate the stem, add a platform (06 STA), chain wheel |
-| `RTE_NONSTANDARD_FITTING` | warning | check | trimmed elbow, pulled bend | reviewer accepts |
-| `RTE_STUB_IN_REVIEW` | warning + `reviewRequired` | check | stub-in needs reinforcement check | 07 PST |
-| `RTE_SPEC_UNVERIFIED` | warning (cannot be hidden) | check | spec not approved / rows unverified | reviewer approves the spec (01) |
-| `RTE_AUTOROUTE_NO_PATH` / `RTE_AUTOROUTE_BUDGET` | error | `auto_route_pipe` | no path / expansion budget hit | widen the grid box, lower clearance, add via points |
+| Code                                                                                          | Severity                   | Raised by                                      | Meaning                                                     | Remediation                                                |
+| --------------------------------------------------------------------------------------------- | -------------------------- | ---------------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------- |
+| `RTE_UNKNOWN_LINE`                                                                            | error                      | all run commands                               | `lineId` not found                                          | `create_pipeline` first                                    |
+| `RTE_UNKNOWN_PORT`                                                                            | error                      | `route_pipe`, `add_branch`                     | port id not found                                           | list ports with `piping_connectivity` / `add_tie_in_point` |
+| `RTE_PORT_IN_USE`                                                                             | error                      | `route_pipe`                                   | port already connected                                      | route from the run end, or `add_branch`                    |
+| `RTE_INVALID_PORT`                                                                            | error                      | `add_tie_in_point`                             | zero direction, DN ≤ 0                                      | give a unit direction toward the pipe and a DN             |
+| `RTE_DUPLICATE_TAG` / `RTE_DUPLICATE_LINE_NUMBER`                                             | error                      | create commands, check                         | not unique                                                  | choose another tag / sequence                              |
+| `RTE_SPEC_UNKNOWN`                                                                            | error                      | `create_pipeline`                              | spec not loaded                                             | `import_pipe_spec` (01)                                      |
+| `RTE_SPEC_NO_COMPONENT`                                                                       | error                      | derivation                                     | no catalogue row for (type, DN, rating…)                    | add the row to the spec or change size / rating            |
+| `RTE_SPEC_AMBIGUOUS`                                                                          | error                      | derivation                                     | several rows match, no preference                           | set a preference in the spec                               |
+| `RTE_NO_CONNECTION_RULE`                                                                      | error                      | derivation                                     | end-type pair without a rule (e.g. BW–SW)                   | add the rule in the spec or change the end type            |
+| `RTE_NO_FITTING_FOR_ANGLE`                                                                    | error                      | `route_pipe`, `add_branch`, `convert_pipe_run` | turn angle not in spec ± tolerance                          | use 90 / 45 legs, or allow trimmed elbows in the spec      |
+| `RTE_SEGMENT_TOO_SHORT`                                                                       | error                      | derivation                                     | negative cut length (`detail.cutLengthMm`)                  | lengthen the leg to ≥ sum of centre-to-ends                |
+| `RTE_ZERO_LEG`                                                                                | error                      | `route_pipe`                                   | leg length 0                                                | remove the leg                                             |
+| `RTE_PORT_DIRECTION`                                                                          | error                      | `route_pipe`                                   | first / last leg not along the port direction               | start with a leg along the port direction                  |
+| `RTE_CLOSING_LEG_IMPOSSIBLE`                                                                  | error                      | `route_pipe`                                   | target port not reachable by one straight leg               | add legs; `detail.offset` gives the remaining vector       |
+| `RTE_SIZE_MISMATCH` / `RTE_RATING_MISMATCH` / `RTE_FACING_MISMATCH` / `RTE_END_TYPE_MISMATCH` | error                      | `route_pipe`, check                            | ports disagree and the spec has no transition               | add a reducer / change spec / fix the nozzle               |
+| `RTE_INLINE_DOES_NOT_FIT`                                                                     | error                      | inline commands                                | component overlaps a fitting                                | move it (`centreDistance`) or lengthen the leg             |
+| `RTE_BRANCH_ON_FITTING` / `RTE_BRANCH_NO_TABLE_ROW`                                           | error                      | `add_branch`                                   | branch point inside a fitting / no branch-table cell        | move the point / extend the branch table                   |
+| `RTE_HAS_BRANCHES`                                                                            | error                      | `delete_pipe_run`                              | branch runs depend on it                                    | `cascade: true`                                            |
+| `RTE_STRETCH_FAILED`                                                                          | error (run marked broken)  | regeneration after an edit                     | displacement not absorbable orthogonally                    | re-route the run (`edit_route`)                            |
+| `RTE_OPEN_END`                                                                                | warning                    | `check_piping`                                 | part port connected to nothing                              | route to a port, add a cap / blind, or a tie-in            |
+| `RTE_DISCONNECTED_PORT`                                                                       | info                       | `check_piping`                                 | nozzle / tie-in without a run                               | route it or mark it spare                                  |
+| `RTE_FITTING_TO_FITTING`                                                                      | warning                    | check                                          | zero cut length                                             | accept or lengthen                                         |
+| `RTE_WELD_SPACING`                                                                            | warning                    | check                                          | pipe piece shorter than the weld-spacing rule (named)       | lengthen or accept per project spec                        |
+| `RTE_ADVERSE_SLOPE` / `RTE_POCKET`                                                            | warning                    | check                                          | sloped line rises along flow / low or high point            | fix the slope / add drain or vent                          |
+| `RTE_FROM_TO_MISMATCH`                                                                        | warning                    | check                                          | line from / to text ≠ connected equipment                   | update the line or the route                               |
+| `RTE_VALVE_OPERATOR_HEIGHT` / `RTE_VALVE_OPERATOR_CLASH`                                      | warning                    | check                                          | handwheel above the given limit / operator envelope clashes | rotate the stem, add a platform (06 STA), chain wheel      |
+| `RTE_NONSTANDARD_FITTING`                                                                     | warning                    | check                                          | trimmed elbow, pulled bend                                  | reviewer accepts                                           |
+| `RTE_STUB_IN_REVIEW`                                                                          | warning + `reviewRequired` | check                                          | stub-in needs reinforcement check                           | 07 PST                                                     |
+| `RTE_SPEC_UNVERIFIED`                                                                         | warning (cannot be hidden) | check                                          | spec not approved / rows unverified                         | reviewer approves the spec (01)                            |
+| `RTE_AUTOROUTE_NO_PATH` / `RTE_AUTOROUTE_BUDGET`                                              | error                      | `auto_route_pipe`                              | no path / expansion budget hit                              | widen the grid box, lower clearance, add via points        |
 
 ## 8. Performance and robustness budgets
 
-| Operation | Budget (desktop, Node 22, no kernel) |
-| --------- | ----------------------------------- |
-| `route_pipe` 10 legs, derivation + geometry | ≤ 50 ms |
-| Regeneration of 1 000 runs (load) | ≤ 1.5 s |
-| `check_piping` 1 000 lines / 20 000 parts | ≤ 2 s (graph O(n α(n)); clash via existing boxes) |
-| `piping_takeoff` one line | ≤ 10 ms |
+| Operation                                                 | Budget (desktop, Node 22, no kernel)                                |
+| --------------------------------------------------------- | ------------------------------------------------------------------- |
+| `route_pipe` 10 legs, derivation + geometry               | ≤ 50 ms                                                             |
+| Regeneration of 1 000 runs (load)                         | ≤ 1.5 s                                                             |
+| `check_piping` 1 000 lines / 20 000 parts                 | ≤ 2 s (graph O(n α(n)); clash via existing boxes)                   |
+| `piping_takeoff` one line                                 | ≤ 10 ms                                                             |
 | `auto_route_pipe` (V2) 100 m × 100 m × 30 m at 50 mm grid | ≤ 5 s, `maxExpansions` default 2·10⁶, `--timeout` respected (AF-40) |
-| Document size | stored intent ≤ 1 kB per run; derived parts never stored |
+| Document size                                             | stored intent ≤ 1 kB per run; derived parts never stored            |
 
 Robustness: inputs with NaN / Infinity refused by the guard (`CMD_CORRUPT_RESULT` exists); all comparisons use
 `ε`; ids depend only on route order (AF-13); a spec change that would invalidate a run is refused atomically.
 
 ## 9. Test strategy
 
-| Level | Content | VC |
-| ----- | ------- | -- |
-| Unit `tests/unit/plant/piping/legs.test.ts` | compass legs, closing leg, collinear merge, port direction | VC-RTE-01, 09 |
-| Unit `fittings.test.ts` | turn angles, tolerance accept / refuse, catalogue centre-to-end, arc length | VC-RTE-03, 08, 11, 15 |
-| Unit `jointStack.test.ts` | cut lengths (flanged, BW, inline valve), fitting-to-fitting, weld spacing | VC-RTE-01, 04, 10 |
-| Unit `branches.test.ts` | branch table, tee / olet cuts | VC-RTE-06 |
-| Unit `stretch.test.ts` | +X / +Y moves, failure case | VC-RTE-12 |
-| Unit `graph.test.ts` / `checks.test.ts` | open ends, mismatches, from / to, operator height, unverified | VC-RTE-05, 07, 09 |
-| Unit `heatLoss.test.ts` | ht example | VC-RTE-14 |
-| Data test `catalogueConsistency.test.ts` | reads `validation/data/*.json`: OD / wall agree with `PIPE_SIZES`; 90 LR A ≈ 1.5 NPS (≤ 0.4 mm) | VC-RTE-15, 16 |
-| Golden `tests/golden/plans.ts` | SC-RTE-01, 02, 03, 06 as plans (id-normalised snapshots + replay equality) | VC-RTE-17 |
-| Scenario `tests/unit/plant/scenarioPlans.test.ts` | runs every `validation/plans/*.json` through `build_project` and compares `expected` | all |
-| Contract | toolset `piping` membership, schema snapshot, plugin document extension (validate / restore) | AF-01 |
-| Integration `tests/integration/` | `update_equipment` → run stretched; undo restores | VC-RTE-12 |
-| Server / CLI `server/tests/` | `llull run` on SC-RTE-01 with `--json` assertions | VC-AF-02 |
+| Level                                             | Content                                                                                         | VC                    |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------- |
+| Unit `tests/unit/plant/piping/legs.test.ts`       | compass legs, closing leg, collinear merge, port direction                                      | VC-RTE-01, 09         |
+| Unit `fittings.test.ts`                           | turn angles, tolerance accept / refuse, catalogue centre-to-end, arc length                     | VC-RTE-03, 08, 11, 15 |
+| Unit `jointStack.test.ts`                         | cut lengths (flanged, BW, inline valve), fitting-to-fitting, weld spacing                       | VC-RTE-01, 04, 10     |
+| Unit `branches.test.ts`                           | branch table, tee / olet cuts                                                                   | VC-RTE-06             |
+| Unit `stretch.test.ts`                            | +X / +Y moves, failure case                                                                     | VC-RTE-12             |
+| Unit `graph.test.ts` / `checks.test.ts`           | open ends, mismatches, from / to, operator height, unverified                                   | VC-RTE-05, 07, 09     |
+| Unit `heatLoss.test.ts`                           | ht example                                                                                      | VC-RTE-14             |
+| Data test `catalogueConsistency.test.ts`          | reads `validation/data/*.json`: OD / wall agree with `PIPE_SIZES`; 90 LR A ≈ 1.5 NPS (≤ 0.4 mm) | VC-RTE-15, 16         |
+| Golden `tests/golden/plans.ts`                    | SC-RTE-01, 02, 03, 06 as plans (id-normalised snapshots + replay equality)                      | VC-RTE-17             |
+| Scenario `tests/unit/plant/scenarioPlans.test.ts` | runs every `validation/plans/*.json` through `build_project` and compares `expected`            | all                   |
+| Contract                                          | toolset `piping` membership, schema snapshot, plugin document extension (validate / restore)    | AF-01                 |
+| Integration `tests/integration/`                  | `update_equipment` → run stretched; undo restores                                               | VC-RTE-12             |
+| Server / CLI `server/tests/`                      | `llull run` on SC-RTE-01 with `--json` assertions                                               | VC-AF-02              |
 
 Coverage gate 90/85/90/90 applies to `packages/domain-aec/src/plant/**`.
 
 ## 10. Delivery plan
 
-| Milestone | Content | Depends on | Effort |
-| --------- | ------- | ---------- | ------ |
-| M0 | `@core/model/plant` types, `piping` plugin skeleton, document extension, `SpecLookup` + test stub | — | 2 d |
-| M1 | tie-in points, `create_pipeline`, `route_pipe` (legs, closing leg), elbows, BW joints, cut-back, `piping_takeoff`, display geometry | M0 | 6 d |
-| M2 | flange sets + connection rules, inline components, reducers, branches (tee / olet), `check_piping` core codes, `piping_connectivity`, `convert_pipe_run` | M1; 01 PSC lookup (stub until then) | 7 d |
-| M3 | stretch on equipment / nozzle edits, `edit_route`, slope + adverse slope, insulation envelope in `check_clashes`, line-number template, supports on runs | M2; 03 EQP nozzles (`PortSource`) | 6 d |
-| V1 | socket / threaded engagement, eccentric reducers, trimmed elbows / bends, pockets, valve operators, heat tracing data, `line_heat_loss`, PCF writer hand-off (05), IFC ports (08), exact solids via kernel | M3 | 12 d |
-| V2 | `auto_route_pipe` (grid A*), rack preference, keep-outs, multi-line ordering | V1 | 15 d |
+| Milestone | Content                                                                                                                                                                                                    | Depends on                          | Effort |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ------ |
+| M0        | `@core/model/plant` types, `piping` plugin skeleton, document extension, `SpecLookup` + test stub                                                                                                          | —                                   | 2 d    |
+| M1        | tie-in points, `create_pipeline`, `route_pipe` (legs, closing leg), elbows, BW joints, cut-back, `piping_takeoff`, display geometry                                                                        | M0                                  | 6 d    |
+| M2        | flange sets + connection rules, inline components, reducers, branches (tee / olet), `check_piping` core codes, `piping_connectivity`, `convert_pipe_run`                                                   | M1; 01 PSC lookup (stub until then) | 7 d    |
+| M3        | stretch on equipment / nozzle edits, `edit_route`, slope + adverse slope, insulation envelope in `check_clashes`, line-number template, supports on runs                                                   | M2; 03 EQP nozzles (`PortSource`)   | 6 d    |
+| V1        | socket / threaded engagement, eccentric reducers, trimmed elbows / bends, pockets, valve operators, heat tracing data, `line_heat_loss`, PCF writer hand-off (05), IFC ports (08), exact solids via kernel | M3                                  | 12 d   |
+| V2        | `auto_route_pipe` (grid A\*), rack preference, keep-outs, multi-line ordering                                                                                                                              | V1                                  | 15 d   |
 
 Total MVP (M0-M3) ≈ 21 developer-days.
 
@@ -531,5 +587,5 @@ Total MVP (M0-M3) ≈ 21 developer-days.
 - [R11] Hart P. E., Nilsson N. J., Raphael B., IEEE Trans. SSC 4(2):100-107, 1968 [S28]
 - [R12] Park J. H., Storch R. L., Expert Systems with Applications 23(3):299-309, 2002 [S29]
 - [R13] Blanco V. et al., Omega 111:102659, 2022; arXiv 2108.00416 [S30]
-- [R14] Stanczak M. et al., ICORES 2020 — https://www.scitepress.org/Papers/2020/89233/ [S32]; Marriott K. et al., Diagrams 2014 [S33]; Wu H. et al., BIT improved A* [S31]
+- [R14] Stanczak M. et al., ICORES 2020 — https://www.scitepress.org/Papers/2020/89233/ [S32]; Marriott K. et al., Diagrams 2014 [S33]; Wu H. et al., BIT improved A\* [S31]
 - [R15] CADMATIC PCF export; SST CAEPIPE PCF data types — https://www.sstusa.com/docs/users_manual/data_types_from_caepipe.htm (accessed 2026-10) [S26]

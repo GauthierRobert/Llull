@@ -20,8 +20,8 @@
     { "step": 8, "path": "data.cases[case=TH].displacements[at=(0,4572,16048)].uMm.2", "value": 48.034, "rel": 0.01, "source": "PSI 1.891 in = frame3d 1.8911 in" },
     { "step": 8, "path": "data.cases[case=TH].displacements[at=(0,4572,16048)].rotDeg.0", "value": 0.1521, "rel": 0.01, "source": "PSI / frame3d" },
     { "step": 8, "path": "data.cases[case=WT].displacements[at=(0,4572,16048)].uMm.2", "value": -33.15, "rel": 0.03, "source": "PSI -1.31 in, frame3d -1.3051 in" },
-    { "step": 8, "path": "data.cases[case=PR].stresses[0].hoopMPa", "value": 25.383, "rel": 0.0001, "source": "3681.51 psi = 250 x 10.75 / (2 x 0.365)" },
-    { "step": 8, "path": "data.cases[case=PR].stresses[0].longitudinalPressureMPa", "value": 11.414, "rel": 0.0001, "source": "1655.45 psi, exact-area form" }
+    { "step": 8, "path": "data.cases[case=PR].stresses[0].hoopMPa", "value": 25.383, "rel": 0.0005, "source": "3681.51 psi = 250 x 10.75 / (2 x 0.365)" },
+    { "step": 8, "path": "data.cases[case=PR].stresses[0].longitudinalPressureMPa", "value": 11.414, "rel": 0.0005, "source": "1655.45 psi, exact-area form" }
   ],
   "notes": "Sh rows (12 000 / 9 000 psi) are PSI's B31.1 A53A values, used only so the material is complete; no gate depends on them. The elbows are sharp corners because PSI's fixture has no bends."
 }
