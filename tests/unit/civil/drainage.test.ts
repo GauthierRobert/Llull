@@ -237,6 +237,7 @@ describe('drainage analysis', () => {
     expect(run(doc, 'check_drainage_network', { minVelocity: 5, maxVelocity: 1 }).affected).toEqual([]);
     const empty = run(createEmptyDocument(), 'check_drainage_network', {});
     expect(empty.summary).toContain('no drainage pipes');
+    expect(empty.data).toEqual({ pipes: [], manholes: [], failures: [], diverging: [], csv: '' });
     expect(run(createEmptyDocument(), 'drainage_schedule', {}).summary).toContain('no manholes');
     expect(run(createEmptyDocument(), 'size_drainage_pipes', {}).summary).toContain('no pipes');
     expect(run(doc, 'size_drainage_pipes', { diameters: [0] }).affected).toEqual([]);
