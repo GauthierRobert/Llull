@@ -31,9 +31,15 @@ axis, `stiffness` + `springReference` for the initial deflection, `damping`, `fr
 physical case, all documented in `server/tests/packReplay10.test.ts`:
 
 - A point mass is a 1 mm cube of 1 kg (inertia 1.7e-7 kg m², a constant 8.3e-8 relative effect on the pendulum period).
-- Massless slider-crank links are not representable: the crank is a 100 kg flywheel (stiff speed servo) and the rod 5 g; the piston is
-  the specified 0.5 kg. The crank torque is the governor torque at 60° and 90° (0.33 % and 0.53 % off the closed form; extrapolated to
-  a massless rod the engine is about 1 % low, cause not isolated).
+- Massless slider-crank links are not representable: the crank is a 100 kg flywheel (stiff speed servo) and the rod 5 g (a 1 mg rod
+  opens the loop by 16 um, tier `fail`); the piston is the specified 0.5 kg. The 5 g rod is 0.7 % of the crank torque, so
+  VC-RBD-21 is replayed against the closed form of that model (rod mass and inertia added to the virtual-power formula; with the rod
+  mass at 0 the same formula reproduces the pack values to 2e-9). The plan sets `loopTimeConstantSteps` 16. History (ENG-3): the
+  engine used to be 0.33 % / 0.53 % low at 60 / 90 deg against the massless values. Causes, in order of size: (1) the 5 g rod, +0.7 %
+  of the torque missing from the reference; (2) the loop closure relaxing over 2 steps (the default), which the integrator resolves
+  badly: +0.73 % at 2 steps, 0.12 % at 4, 0.03 % at 8, 0.01 % at 16, a function of steps only (not of the step size); (3) the speed
+  servo's finite stiffness: its ripple times the crank inertia is an error torque, 0.15 % at 1 / (8 dt), 0.04 % at 1 / (4 dt), 0.015 % at 1 / (2 dt); the engine schedules the gains on the measured constrained effective inertia of the crank (a static inertia, locked or own, is wrong by factors of 10 in loops, gears and relative joints and RK4 diverges or the servo is far too soft); (4) the
+  servo force was read after `mj_step`, i.e. at the last RK4 stage (a predicted state), up to 0.3 % off. Left: 1.4e-4 / 1.9e-4.
 - The Coulomb friction is MuJoCo's near-rigid soft constraint (impedance 0.9999): rest position -1.9335004 mm (1.9e-7 relative),
   last turning point 2.1e-4 relative late; no creep after the stop.
 - Not replayed (no engine counterpart): the Andrews squeezer (VC-RBD-01…04), VC-RBD-41 and VC-RBD-50…58 (error codes, `check_mechanism`,
@@ -42,7 +48,7 @@ physical case, all documented in `server/tests/packReplay10.test.ts`:
 Measured against `expected_results.json` (`server/tests/packReplay10.test.ts`, relative error / tolerance used): periods of the
 pendulum 8.3e-8 / 1e-5; pivot tension 5e-9…1.3e-7 / 1e-6; compound pendulum 2.6e-13 and 5.3e-8 / 1e-6; spring-mass-damper
 x(0.5 s), x(1 s), decrement 3e-12…3e-11 / 1e-6; slider-crank x(90°) 2.3e-7, v(90°) 1.8e-6 (1e-5), a(0), a(90°) 2.7e-4, 6.5e-5 (1e-3),
-torque 3.3e-3, 5.3e-3 (1e-2); Coulomb stop time 2.1e-4 (1e-3), rest 1.9e-7 (1e-5).
+torque 1.4e-4, 1.9e-4 (3e-4); Coulomb stop time 2.1e-4 (1e-3), rest 1.9e-7 (1e-5).
 
 ## Real use cases
 
